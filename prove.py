@@ -4866,6 +4866,8 @@ def prove_foto():
     # per URL, quindi senza la sua forma qui Telegram si vedrebbe
     # rispondere 404 dal nostro stesso server.
     prova("si serve il podio del lunedi'", True, ammesso("pod_2026-08-17.jpg"))
+    prova("si serve la figura del negozio", True,
+          ammesso("neg_10_1786960394.jpg"))
     for nome in ("pod_2026-8-17.jpg", "pod_.jpg", "pod_2026-08-17.png",
                  "pod_2026-08-17_min.jpg", "pod_../config.py"):
         prova(f"non si serve {nome!r}", False, ammesso(nome))
@@ -12746,7 +12748,8 @@ def _censimento(acceso):
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
                  "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE",
                  "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
-                 "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE"):
+                 "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE",
+                 "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO"):
         amb[nome] = acceso and 24
     # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
     # decide il bot e il giudice e' `canale_id()`, che va a leggere il
@@ -12848,7 +12851,14 @@ def prove_canale_bot():
 
     # --- 2) LA CAPTION DEL CANALE --------------------------------
     cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store"}
-    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
+    # la firma passa dal giudice della npub, che a sua volta vuole il
+    # bech32: chi estrae una funzione ne eredita le dipendenze
+    exec(next(r for r in _SORGENTE.split("\n")
+              if r.startswith("CHARSET_BECH32")), cap)
+    for f in ("_bech32_polymod", "npub_to_hex",
+              "hex_to_npub", "chiave_nostr_provata", "_npub_breve",
+              "_npub_venditore",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
               "_hashtag_promo", "_firma_venditore", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
@@ -13000,6 +13010,7 @@ def prove_canale_bot():
            "promo_venduto",           # il ✅ sul post gia' fatto
            "promo_rimuovi",           # il post cancellato
            "riepilogo_settimana",     # il lunedi'
+           "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale"},         # che il canale lo DICE, non ci posta
           {n for n, c in _corpi.items()
            if "canale_id()" in c and "bot_api(" in c})
@@ -13061,6 +13072,181 @@ def prove_canale_bot():
           RECINTO, chiavi)
 
 
+def prove_vetrina_negozio():
+    """LA RAFFICA SI RACCONTA PER NEGOZIO (ago 2026, decisione di
+    Andrea): chi pubblica piu' cose insieme ha un post SUO — la figura
+    coi barattoli in FILA e un link per annuncio — invece di sparire
+    dentro un «📦 N nuovi annunci» che non nomina nessuno.
+
+    Qui si guarda quel che il canale VEDREBBE, e soprattutto la riga
+    che tiene la valvola una valvola: senza il tetto, venti venditori
+    con due annunci a testa farebbero venti post."""
+    print("\n[la raffica raccontata per negozio]")
+    import html as _html
+
+    # --- 1) IL RAGGRUPPAMENTO, che e' puro -------------------------
+    amb = {}
+    exec(pezzo("_raggruppa_per_venditore"), amb)
+    ragg = amb["_raggruppa_per_venditore"]
+
+    def a(i, v):
+        return {"id": i, "venditore_id": v}
+
+    g = ragg([a(1, 10), a(2, 20), a(3, 10), a(4, 30), a(5, 10), a(6, 20)])
+    prova("i gruppi piu' numerosi vengono per primi", [3, 2, 1],
+          [len(x) for x in g])
+    prova("...e ognuno tiene i suoi", {10}, {x["venditore_id"] for x in g[0]})
+    # A PARI NUMERO comanda l'ordine di ARRIVO (la coda e' cronologica):
+    # senza, due negozi con due annunci a testa si scambierebbero di
+    # posto a ogni finestra senza motivo. Lo da' la stabilita' del sort.
+    pari = ragg([a(1, 77), a(2, 88), a(3, 77), a(4, 88)])
+    prova("a pari numero comanda chi e' arrivato prima", [77, 88],
+          [x[0]["venditore_id"] for x in pari])
+    prova("un venditore solo resta un gruppo solo", 1, len(ragg([a(1, 1)])))
+
+    # --- 2) LA RIGA DELLA DIDASCALIA -------------------------------
+    rig = {"html": _html, "URL_PUBBLICO": "https://barattolo.store",
+           "EMOJI_CATEGORIA": {"Libri e media": "📚"}}
+    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_riga_negozio"):
+        exec(pezzo(f), rig)
+    riga = rig["_riga_negozio"](
+        {"id": 7, "titolo": "L'individuo <Sovrano>",
+         "categoria": "Libri e media", "prezzo_sats": 120000,
+         "valuta": "sats", "prezzo_eur": 0}, 0)
+    prova("il titolo E' il link", True,
+          '<a href="https://barattolo.store/annuncio/7">' in riga)
+    # IL TITOLO SCAPPATO: la didascalia e' HTML e un «<» spegne il
+    # messaggio in silenzio (la lezione dell'avviso di spedizione).
+    prova("il titolo cattivo esce scappato", True,
+          "&lt;Sovrano&gt;" in riga and "<Sovrano>" not in riga)
+    prova("...e i tag restano PARI", riga.count("<a "), riga.count("</a>"))
+    prova("c'e' l'emoji del reparto", True, riga.startswith("📚 "))
+    prova("e il prezzo", True, "120.000 sats" in riga)
+    prova("un reparto che non conosciamo ha il suo ripiego", True,
+          rig["_riga_negozio"]({"id": 1, "titolo": "x", "categoria": "Boh",
+                                "prezzo_sats": 1, "valuta": "sats",
+                                "prezzo_eur": 0}, 0).startswith("📦 "))
+
+    # --- 3) LA VALVOLA RESTA UNA VALVOLA ---------------------------
+    dre = codice(pezzo("_drena_promo"))
+    prova("la raffica passa dal raggruppamento", True,
+          "_raggruppa_per_venditore(annunci)" in dre)
+    prova("...col TETTO dei negozi raccontati", True,
+          "[:MAX_NEGOZI_RAFFICA]" in dre)
+    # chi ne ha pubblicato UNO solo non merita un post suo: ha gia' il
+    # post singolo quando il budget regge, e qui finisce nell'aggregato
+    prova("sotto i due annunci non si racconta un negozio", True,
+          "if len(gruppo) < 2:" in dre)
+    # IL RESTO NON SPARISCE: quel che non e' finito in un post-negozio
+    # esce nell'aggregato anonimo di sempre, che passa comunque
+    prova("il resto finisce nell'aggregato di sempre", True,
+          "resto = len(annunci) - raccontati" in dre
+          and "_posta_promo_aggregato(resto)" in dre)
+    prova("...e a resto zero non esce un post vuoto", True,
+          "if resto:" in dre)
+    # il post-negozio consuma il budget orario come un post singolo, o
+    # il tetto dei post si aggirerebbe pubblicando a gruppi
+    prova("il post-negozio consuma il budget", 2,
+          dre.count("_post_promo_recenti.append(time.time())"))
+
+    # --- 4) LA FIRMA DI CHI VIENE DA NOSTR --------------------------
+    # La npub PROVATA diventa un'ancora su njump. La riga che decide e'
+    # una sola: solo dal possesso dimostrato — `npub_accesso`, o il
+    # badge ma VERIFICATO. Questa firma sta in un post PUBBLICO, e una
+    # npub soltanto dichiarata manderebbe i lettori del canale sul
+    # profilo Nostr di un'altra persona.
+    fir = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    exec(next(r for r in _SORGENTE.split("\n")
+              if r.startswith("CHARSET_BECH32")), fir)
+    for f in ("_bech32_polymod", "npub_to_hex", "hex_to_npub",
+              "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
+              "_firma_venditore"):
+        exec(pezzo(f), fir)
+    firma = fir["_firma_venditore"]
+    NPUB = ("npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqq"
+            "hrjdv9")
+
+    solo_tg = firma({"venditore": "Rosina", "venditore_username": "rosina",
+                     "venditore_negozio": "aaa11111"})
+    prova("chi non ha Nostr ha la firma di sempre", False,
+          "njump" in solo_tg)
+    prova("...con la sua menzione", True, "<b>@rosina</b>" in solo_tg)
+
+    nativo = firma({"venditore": "Rosina del Croco",
+                    "venditore_negozio": "bbb22222",
+                    "venditore_npub_accesso": NPUB})
+    # IL NOME DIVENTA IL LINK solo a chi non ha @username: dove la
+    # menzione c'e', avvolgerla in un'ancora la spegnerebbe.
+    prova("al nativo Nostr il NOME e' l'ancora njump", True,
+          f'<a href="https://njump.me/{NPUB}">Rosina del Croco</a>' in nativo)
+    prova("...e la npub si vede, abbreviata e copiabile", True,
+          "<code>npub1sn0wd…jdv9</code>" in nativo)
+
+    doppio = firma({"venditore": "Gino", "venditore_username": "gino",
+                    "venditore_negozio": "ccc33333",
+                    "venditore_npub": NPUB, "venditore_npub_verificata": 1})
+    prova("il doppio cittadino TIENE la menzione", True,
+          "<b>@gino</b>" in doppio)
+    prova("...e guadagna la npub accanto", True, "njump.me" in doppio)
+
+    # LA RIGA CHE DECIDE: dichiarata non basta, ci vuole la prova
+    nudo = firma({"venditore": "Furbo", "venditore_negozio": "ddd44444",
+                  "venditore_npub": NPUB, "venditore_npub_verificata": 0})
+    prova("una npub DICHIARATA e non verificata non esce", False,
+          "njump" in nudo or "npub1" in nudo)
+    # e una stringa storta non fa esplodere un post
+    storto = firma({"venditore": "Rotto", "venditore_negozio": "eee55555",
+                    "venditore_npub_accesso": "npub1nonvalida"})
+    prova("una npub storta non esce e non rompe niente", False,
+          "njump" in storto)
+    prova("...e il negozio resta al suo posto", True,
+          "vedi il suo negozio" in storto)
+
+    # NON DUE VOLTE LA STESSA COSA: chi non ha mai messo un nome sul
+    # kind-0 SI CHIAMA gia' con la npub abbreviata
+    senza_nome = firma({"venditore": "npub1sn0w…wfqq",
+                        "venditore_negozio": "b",
+                        "venditore_npub_accesso": NPUB})
+    prova("chi si chiama gia' come la sua npub non la ripete", 1,
+          senza_nome.count("<code>") + senza_nome.count("npub1sn0w…wfqq"))
+    prova("...ma il link ce l'ha lo stesso", True, "njump.me" in senza_nome)
+
+    # i tag restano PARI in tutti i casi, o Telegram rifiuta il parse
+    for nome, r in (("telegram", solo_tg), ("nativo", nativo),
+                    ("doppio", doppio), ("nudo", nudo), ("storto", storto),
+                    ("senza nome", senza_nome)):
+        prova(f"i tag della firma restano pari ({nome})",
+              (r.count("<a "), r.count("<b>"), r.count("<code>")),
+              (r.count("</a>"), r.count("</b>"), r.count("</code>")))
+
+    # E LE DUE SELECT DEVONO PORTARE I CAMPI, o la npub sparisce
+    # proprio quando il post si riscrive col ✅ Venduto — che e' la
+    # trappola gia' pagata con la firma del venditore.
+    for f in ("_drena_promo", "promo_venduto"):
+        prova(f"{f} rilegge anche la npub", True,
+              "venditore_npub_accesso" in pezzo(f)
+              and "venditore_npub_verificata" in pezzo(f))
+
+    # --- 5) IL POST -------------------------------------------------
+    pn = codice(pezzo("_posta_negozio"))
+    sfn = codice(pezzo("_salva_figura_negozio"))
+    prova("la figura e' la FILA, non il podio", True, "FILA_MISURE" in sfn)
+    prova("i tre della figura sono i piu' recenti", True,
+          "reverse=True" in pn and "gruppo[:3]" in sfn)
+    prova("i link si tagliano al tetto della didascalia", True,
+          "gruppo[:MAX_LINK_NEGOZIO]" in pn)
+    prova("...e si dice quanti ne restano, invece di troncare zitti",
+          True, "e altri {restanti}" in pn)
+    # FAIL-OPEN: senza figura il post esce lo stesso, coi link — che
+    # sono la parte che serve
+    prova("senza figura si manda il testo", True,
+          'if not (r and r.get("ok")):' in pn and '"text": testo' in pn)
+    prova("il timbro del turno si scrive come per il post singolo", True,
+          "promo_canale_il" in pn)
+    prova("e la passata d'avvio salta la figura del negozio", True,
+          '("pod_", "neg_")' in pezzo("genera_miniature_mancanti"))
+
+
 def prove_podio_riepilogo():
     """IL PODIO DEL LUNEDI' (ago 2026, chiesto da Andrea): i tre piu'
     venduti come tre barattoli con dentro la foto dell'articolo.
@@ -13102,11 +13288,11 @@ def prove_podio_riepilogo():
           rie.index('"sendPhoto"') < rie.index('"sendMessage"'))
     # la passata d'avvio non gli fa la gemella _min: nessuno la chiede
     prova("la passata d'avvio salta il podio", True,
-          'nome.startswith("pod_")' in pezzo("genera_miniature_mancanti"))
+          '("pod_", "neg_")' in pezzo("genera_miniature_mancanti"))
     # NIENTE FONT, ed e' la decisione: la classifica la dicono misura e
     # posizione, i titoli stanno nella didascalia. Un font sarebbe un
     # asset da committare — quel che manco' alle vetrine Nostr.
-    for f in ("_barattolo_podio", "disegna_podio"):
+    for f in ("_barattolo", "disegna_figura"):
         prova(f"{f} non scrive testo", True,
               "ImageFont" not in pezzo(f) and ".text(" not in pezzo(f))
 
@@ -13135,7 +13321,7 @@ def prove_podio_riepilogo():
             exec(riga, amb)
         exec(next(r for r in _SORGENTE.split("\n")
                   if r.startswith("PODIO_LARGA")), amb)
-        for f in ("_foto_podio", "_barattolo_podio", "disegna_podio",
+        for f in ("_foto_podio", "_barattolo", "disegna_figura",
                   "_salva_podio"):
             exec(pezzo(f), amb)
 
@@ -13200,8 +13386,8 @@ def prove_podio_riepilogo():
         # e il RIFLESSO sta solo li': sopra una foto si legge come una
         # sbavatura (provato a schermo). Due barattoli, uno pieno e uno
         # vuoto, non possono avere gli stessi pixel.
-        pieno = amb["_barattolo_podio"](f[0], 300, 354, 5)
-        vuoto = amb["_barattolo_podio"](None, 300, 354, 5)
+        pieno = amb["_barattolo"](f[0], 300, 354, 5)
+        vuoto = amb["_barattolo"](None, 300, 354, 5)
         prova("il barattolo vuoto non e' quello pieno", True,
               pieno.tobytes() != vuoto.tobytes())
         prova("...e il vuoto porta il riflesso", True,
@@ -20489,7 +20675,7 @@ def main():
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
-              prove_podio_riepilogo,
+              prove_podio_riepilogo, prove_vetrina_negozio,
               prove_vetrina_canale,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,

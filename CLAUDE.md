@@ -3067,6 +3067,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore_username, venditore_negozio) — senza, il post riscritto
   perderebbe la firma che aveva da nuovo, e `promo_venduto` legge di
   conseguenza.
+  E CHI VIENE DA NOSTR HA LA SUA MANIGLIA (ago 2026, chiesto da
+  Andrea): la npub PROVATA diventa un'ancora su njump.me, con la npub
+  abbreviata dentro un `<code>` — che su Telegram si copia con un
+  tocco, ed è il modo in cui quella stringa serve davvero. Giudice
+  `_npub_venditore`, e la regola è quella di sempre: **solo dal
+  possesso dimostrato** (`npub_accesso`, o il badge `npub` ma
+  VERIFICATO). Qui pesa più che altrove — questa riga sta in un post
+  PUBBLICO, e una npub soltanto DICHIARATA manderebbe i lettori del
+  canale sul profilo Nostr di un'altra persona.
+  IL NOME DIVENTA IL LINK SOLO A CHI NON HA @USERNAME, ed è la riga da
+  non uniformare: dove lo username c'è, quello è una MENZIONE che
+  Telegram risolve, e avvolgerla in un'ancora la spegnerebbe. Il doppio
+  cittadino tiene la menzione e guadagna la npub accanto; il nativo
+  Nostr — che una menzione non l'ha mai avuta, ed è il caso che ha
+  aperto la voce — guadagna tutti e due. E chi non ha mai messo un nome
+  sul suo kind-0 SI CHIAMA già con la npub abbreviata (gliela dà
+  `crea_utente_nostr`): lì la npub accanto NON si ripete, o sarebbe la
+  stessa stringa due volte nella stessa riga.
+  Si passa dall'hex e si torna con `hex_to_npub` apposta: quel che si
+  mostra è la npub CANONICA bech32, non la stringa incollata nel
+  profilo. E le DUE SELECT che alimentano la firma — il drenatore e
+  `promo_venduto` — devono portare i tre campi, o la npub sparirebbe
+  proprio quando il post si riscrive col ✅ Venduto: è la trappola già
+  pagata con `venditore_username`, e c'è la prova per tutte e due.
+  NIENTE try/except nel giudice, e l'ha detto la TORTURA: ce n'era uno
+  sulla npub storta, e la mutazione che lo rendeva un `raise` non
+  faceva rossa nessuna prova — perché era irraggiungibile,
+  `chiave_nostr_provata` la stringa storta la scarta già da sé. Un
+  except che non può scattare è peggio di niente: promette una guardia
+  che nessuno esercita. A essere sorvegliata è quella VERA, dentro
+  `chiave_nostr_provata`: togliendola, la prova diventa rossa.
   UN POST PER VENDITORE A SETTIMANA (ago 2026, decisione di Andrea):
   il canale è una SELEZIONE, non la vetrina. Leva
   `PROMO_GIORNI_VENDITORE` (7; 0 = nessun freno, emergenza e non
@@ -3260,6 +3291,51 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e `genera_miniature_mancanti` lo salta, per la ragione degli avatar:
   è già della misura giusta e la gemella `_min` non la chiede nessuno.
   Leva `RIEPILOGO_IMMAGINE` (True di serie).
+  LA RAFFICA SI RACCONTA PER NEGOZIO (ago 2026, decisione di Andrea —
+  «l'aggregato è per persona però, quindi negozio diciamo»): quando più
+  annunci arrivano nella stessa finestra, chi ne ha pubblicati almeno
+  DUE ha un post SUO — la figura coi barattoli in FILA e un link per
+  annuncio — invece di sparire dentro il «📦 N nuovi annunci» che non
+  nomina nessuno. Il caso vero è proprio quello: le raffiche vengono
+  quasi sempre da UN negozio (l'import CSV), ed era la cosa che il
+  canale raccontava peggio.
+  IL TETTO È QUEL CHE TIENE LA VALVOLA UNA VALVOLA (`MAX_NEGOZI_RAFFICA`,
+  3): senza, venti venditori con due annunci a testa farebbero venti
+  post. Oltre il tetto — e per chi ne ha pubblicato UNO solo, che ha già
+  il suo post singolo quando il budget regge — resta l'aggregato anonimo
+  di sempre, che passa comunque. E il post-negozio CONSUMA il budget
+  orario come un post singolo, o il tetto dei post si aggirerebbe
+  pubblicando a gruppi.
+  UN DISEGNATORE SOLO, DUE DISPOSIZIONI: `disegna_figura(foto3, misure)`
+  con `PODIO_MISURE` (il 1° al centro e più grande: una classifica) e
+  `FILA_MISURE` (tre uguali: «ecco tre cose di questo banco», qui non
+  c'è nessuna classifica da dire). Sono la stessa figura con misure
+  diverse, e tenerle in due funzioni vorrebbe dire ritoccare l'anatomia
+  del barattolo in due posti — per questo `_barattolo_podio` è diventato
+  `_barattolo`: è il mattone di tutte le figure, non del podio.
+  I TRE DELLA FIGURA SONO I PIÙ RECENTI, i link li elenca TUTTI fino a
+  `MAX_LINK_NEGOZIO` (10): la figura ha una forma sola da tarare e da
+  guardare, l'elenco può crescere. Il tetto vero è quello di Telegram —
+  1024 caratteri per una caption — e dieci righe con titolo e prezzo ci
+  stanno comode (misurato: 520 con quattro). Oltre si dice quanti ne
+  restano, invece di troncare in silenzio.
+  LA RIGA È IL TITOLO CLICCABILE (decisione di Andrea): emoji del
+  reparto da `EMOJI_CATEGORIA`, il titolo che È l'ancora, il prezzo. Il
+  titolo passa da `html.escape` — la didascalia è HTML e un «<» spegne
+  il messaggio in silenzio, la lezione dell'avviso di spedizione.
+  IL RAGGRUPPAMENTO È PURO (`_raggruppa_per_venditore`): i gruppi più
+  numerosi per primi, e a pari numero comanda l'ordine di ARRIVO (la
+  coda è cronologica) — senza, due negozi con due annunci a testa si
+  scambierebbero di posto a ogni finestra senza motivo. Lo dà la
+  stabilità del sort, e c'è la prova.
+  VINCOLO STRUTTURALE DA SAPERE: `_un_post_per_venditore` gira PRIMA, e
+  col freno acceso lascia UN annuncio per venditore — quindi il
+  post-negozio può esistere solo a ritmo «tutto». Non è un difetto: con
+  un freno acceso quel venditore ha comunque un post solo. Il timbro del
+  turno si scrive lo stesso, ed è la riga che reggerà se il freno cambia.
+  Leve `MAX_NEGOZI_RAFFICA` e `MAX_LINK_NEGOZIO`; la figura riusa
+  `RIEPILOGO_IMMAGINE`, e senza esce il post di solo testo — coi link,
+  che sono la parte che serve.
   NIENTE LINK AL CANALE DENTRO L'APP (decisione di Andrea): il canale
   per ora è il suo banco di prova — dentro c'è solo lui, e prima vuole
   guardarlo. Nessuna fascia, nessun invito, e la strada per farlo il
