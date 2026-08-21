@@ -13194,16 +13194,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   SORGENTE e la fanno girare, e l'endpoint della firma gira per davvero
   con `pezzo()`: una sentinella sulla forma direbbe che la clausola c'è,
   mai che escluda la riga giusta lasciando passare le altre tre.
-  DUE COSE VISTE E NON TOCCATE, che tornano insieme il giorno della
-  cura delle righe: 1) il match per titolo del ramo `sold` ha la stessa
-  WHERE senza la guardia, quindi un evento suo marcato `sold` può
-  spegnere come «venduto» una riga NATIVA omonima di quel venditore
-  (nessun sat a rischio, `spegni_annuncio` filtra `stato='attivo'`) —
-  e diventa un rischio concreto per 208/209 appena torneranno native e
-  omonime; 2) `ritira_doppione` su una coppia col BIVIO risponde 502
-  «i relay non rispondono» mentre in realtà ha ACCODATO una firma e
-  funziona al giro dopo — oggi irraggiungibile perché la coppia non si
-  forma mai, e il tappo lo rende raggiungibile.
+  LE DUE COSE VISTE E NON TOCCATE SONO STATE CHIUSE (ago 2026, il giro
+  dopo, insieme alla cura delle righe: erano proprio le due strade in
+  cui 208 e 209 sarebbero cadute appena tornate native e omonime).
+  1) IL RAMO `sold` ha la stessa clausola del gemello. Un evento suo
+  marcato `sold` spegneva come «venduto» una riga NATIVA omonima di
+  quel venditore, e NON è cosmesi: nessun sat è a rischio
+  (`spegni_annuncio` filtra `stato='attivo'`), ma al riavvio dopo la
+  riparazione dell'invariante — `quantita=0 WHERE stato='venduto'` —
+  gli AZZERA anche lo stock. Il match per `d` resta senza guardia, ed
+  è la stessa riga da non ammorbidire: quella È la riga di
+  quell'evento.
+  2) IL 502 NON ERA UN ERRORE, ERA UN'ATTESA, ed è la lezione che vale
+  oltre questo caso: con `nostr_autore` pieno `ritira_da_nostr` accoda
+  la firma e torna 0 relay — zero lì non è un fallimento — e l'utente
+  leggeva «non è cambiato nulla» mentre il ritiro era PARTITO, cioè
+  veniva mandato a riprovare una cosa che aveva già funzionato. Ora
+  quel ramo risponde `{ok, firma:true}`; il 502 resta dove è vero
+  (evento nostro, relay muti). `ritira_da_nostr` NON cambia contratto
+  («quanti relay hanno accettato»): a chiedersi chi ha firmato è il
+  CHIAMANTE, che la riga ce l'ha già in mano — così la regola di chi
+  può cancellare cosa resta scritta in un posto solo.
+  E IL CASSETTO SBAGLIAVA IN TRE PUNTI INSIEME, tutti della stessa
+  famiglia del «perché» dell'allarme: era rimasto all'era PRE-BIVIO e
+  diceva «una da te, una da Barattolo», marcando il nativo come
+  pubblicato da NOI — falso da quando l'evento lo firma il venditore.
+  Adesso l'etichetta si sceglie su chi ha firmato DAVVERO — «🫙 nato
+  qui, firmato da te» / «…da noi», due facce della stessa domanda —
+  col flag `firmato_da_te` sulla COPPIA e non sulla riga (la domanda è
+  «chi ha firmato l'evento del NATIVO»): esce un BOOL, mai la chiave.
+  E L'INTRO DICE ANCHE COSA IL BOTTONE NON FA — deduplica gli EVENTI
+  su Nostr, non gli annunci in vetrina: restano due righe, e per
+  averne una sola bisogna togliere l'altra da «📋 I tuoi annunci».
+  Quella frase è ciò che dà una strada al venditore, e senza di lei il
+  cassetto risponde a una domanda che nessuno ha fatto.
+  IL 🟣 DELL'IMPORTATO in «I tuoi annunci» nasce da lì: senza, una riga
+  che vive sui relay e una nata qui erano INDISTINGUIBILI in quella
+  lista — si separavano solo aprendole — e «togli quello importato»
+  non aveva un referente. Il dato era già in mano al client
+  (`mapListing` porta `nostr`): zero server.
+  L'ETICHETTA È MISURATA, non scelta a orecchio: «firmato da
+  Barattolo» chiedeva 194px e a 320 si mangiava 8px del padding destro
+  della card (bordo a 266 contro i 258 delle altre tre); «da noi» ne
+  chiede 160 e rientra allineata. Chi la riallunga rimisuri a 320.
   MODERAZIONE, e qui i due strati finiscono in modo DIVERSO:
   le PAROLE VIETATE restano uno scarto secco (deterministico: armi e
   droga non vogliono una coda ma una porta chiusa; resta nel registro,
@@ -16419,12 +16452,60 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta. **IL TAPPO NON SPEGNE L'ALLARME**: 208 e
 209 continuano a matchare per `d` e la ronda continua a suonare finché
 le righe non si toccano.
-RESTA DA DECIDERE, ed è un giro suo perché le due cose vanno insieme:
-la CURA DELLE DUE RIGHE (renderle di nuovo native azzerando
-`contatto_nostr` e i tre `nostr_origine_*` — ripara il danno e lascia
-la testa, che è legittimamente sua; togliere `nostr_event_id`
-curerebbe l'allarme e non il danno) e il ramo `sold`, perché da native
-e omonime ci ricadono.
+Il giro dopo (ago 2026) ha chiuso le due cose che restavano e ha curato
+le righe. IL CODICE: il ramo `sold`, il cassetto doppioni riportato
+all'era del BIVIO (etichetta condizionata a chi ha firmato, il 502 che
+diventa un'attesa dichiarata, l'intro che dice anche cosa il bottone
+non fa) e il 🟣 dell'importato in «I tuoi annunci». Vedi Architettura,
+in coda a «L'ANNUNCIO A DUE TESTE».
+LA CURA È UN UPDATE, e la sua WHERE **è la query del libro mastro
+parola per parola** — «cura tutte le righe che l'allarme segnala» —
+quindi è idempotente per costruzione: `SET contatto_nostr='',
+nostr_origine_d='', nostr_origine_id='', nostr_origine_foto=''`.
+Perché ognuna: `contatto_nostr` è la testa di troppo (e ridà Modifica,
+rifornimento e il posto fra i «nativi» della deduplica);
+`nostr_origine_d` o il match per `d` la ri-adotta entro l'ora (accetta
+`venditore_id`); **`nostr_origine_id` perché è l'aggancio delle
+NIP-09** — lasciandolo, una cancellazione del suo evento su un altro
+client spegnerebbe la riga nata QUI; `nostr_origine_foto` per coerenza.
+NON si toccano `nostr_event_id` e `nostr_autore` (la testa è sua e
+legittima) né `modificato`, che è una data vera — l'import l'ha
+modificata davvero, e inventarne un'altra sarebbe peggio.
+L'ORDINE ERA VINCOLANTE: prima il deploy, poi l'UPDATE. Oggi il difetto
+`sold` non toccava quelle righe (importate, il match per `d` vinceva ed
+era quello giusto): diventa raggiungibile nell'istante in cui tornano
+native. È la regola dell'annuncio 173.
+COSA VEDE IL VENDITORE, ed è la parte che il messaggio deve dire: entro
+un'ora l'import crea DUE righe importate nuove — attive e senza
+ripassare dall'AI, perché `_da_giudicare` ripiega sul titolo e trova la
+riga curata col testo identico all'evento (l'ha scritto lui) — e la
+coppia arriva nel cassetto. Ma quel bottone NON toglie una riga: per
+averne una sola deve togliere l'altra dai suoi annunci, e lo scudo
+anti-resurrezione la tiene spenta per sempre. Effetto collaterale
+dichiarato: `accoda_match` conta anche gli importati, quindi chi ha un
+avviso di ricerca su quegli oggetti riceve un secondo avviso.
+E LE FOTO NATIVE ERANO SOVRASCRITTE, non orfanate — la correzione a una
+mia affermazione sbagliata, verificata sui file: `pubblica()` salva
+`a{id}_{i}.jpg` SENZA versione e `scarica_foto` dell'import scrive lo
+STESSO nome, quindi con un evento che porta immagini JPEG i file
+spariscono (e la `_min` gemella l'import la cancella apposta).
+Sopravvivono solo se l'estensione differisce o se l'annuncio era già
+stato modificato una volta, dove i nomi sono versionati. Non si
+recuperano che da un backup: lo dice il messaggio.
+IL VENDITORE VA AVVISATO — il precedente della correzione a mano della
+via di consegna — con «💬 Scrivi a un utente», che registra l'invio nel
+registro moderazione e attacca da sé la strada per risponderci.
+Collaudato: 4129 prove verdi (19 nuove) e 28 nel collaudo (16 nuove),
+con SEI mutazioni una per riga sorvegliata, ognuna rossa da sola; più
+il giro dal vivo sui DUE rami del ritiro (200 con la firma in coda, 502
+dove è vero) e le etichette misurate a 320px.
+LA COSA CHE RENDE SICURA L'OPERAZIONE è che
+`collaudo_due_teste.py` **esegue l'UPDATE di produzione VERBATIM** su
+un database di cartone e verifica tutto il seguito — la ronda che tace,
+l'idempotenza, il venditore che torna a rifornire, l'import che non
+ri-adotta, la coppia che arriva col flag, la NIP-09 che non spegne più
+la riga nata qui. La SQL è una costante di quel file: un collaudo che
+prova una query DIVERSA da quella che si lancia non prova niente.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
