@@ -988,12 +988,39 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 "AND (venditore_id=? OR contatto_nostr=?)",
                 (a["origine_d"], venditore_id, npub)).fetchone()
         if not gia:
+            # ...e MAI su una riga che ha gia' una TESTA sua (ago 2026,
+            # dal campo: gli annunci 208 e 209). La WHERE qui sotto
+            # ammette `venditore_id=?`, quindi fra i candidati per
+            # titolo ci sono anche le righe NATIVE di quel venditore —
+            # e l'UPDATE piu' sotto scrive `contatto_nostr` senza
+            # azzerare `nostr_event_id`, che non nomina proprio. Una
+            # riga cosi' dice due cose incompatibili («la fonte e' sui
+            # relay» e «di questa riga esiste un evento che comandiamo
+            # noi») e il venditore perde Modifica, il rifornimento e
+            # perfino «ritira il doppione». Saltandola, l'import gli
+            # crea una riga NUOVA: le due restano DUE, e la deduplica —
+            # che esiste apposta per la coppia (importato, nativo) e ha
+            # il suo bottone — torna a vederle.
+            #
+            # SOLO QUI, ed e' la riga da non ammorbidire. Il match per
+            # `d` qui sopra NON si guarda: una riga nativa non ha mai
+            # `nostr_origine_d` (lo scrive solo l'import), quindi da li'
+            # le due teste non possono nascere — mentre guardarlo
+            # smetterebbe di ritrovare le righe gia' adottate e ne
+            # creerebbe copie nuove. Stessa ragione per lo scudo
+            # anti-resurrezione qui sotto, dove trasformerebbe uno
+            # «skip» in un INSERT.
+            #
+            # `IS NULL` e non `nostr_event_id=''` secco: chi non ha una
+            # testa DEVE restare adottabile — e' il caso legacy per cui
+            # questo match per titolo esiste.
             gia = con.execute(
                 "SELECT id, foto, nostr_origine_foto FROM annunci "
                 "WHERE titolo=? AND stato='attivo' "
                 "AND (venditore_id=? OR contatto_nostr=?) "
                 "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
-                "     OR nostr_origine_d=?)",
+                "     OR nostr_origine_d=?) "
+                "AND (nostr_event_id='' OR nostr_event_id IS NULL)",
                 (a["titolo"], venditore_id, npub, a["origine_d"])).fetchone()
         if not gia:
             # SCUDO ANTI-RESURREZIONE (lug 2026, da un bug vissuto):

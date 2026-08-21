@@ -376,6 +376,181 @@ def prove_anello():
     prova("...e li chiama PRIMA del vaglio (l'AI non giudica i nostri)",
           True, 0 <= dove < corpo.index("if vaglio:"))
 
+    # --- LE DUE TESTE (ago 2026, dal campo: gli annunci 208 e 209) ---
+    # Il terzo membro della famiglia. L'anello importava NOI; il
+    # riflesso importava lo specchio di una riga nata qui; questo si
+    # prende una riga nativa QUALUNQUE, per via del match per TITOLO —
+    # che fra i candidati accetta `venditore_id=?` — e le lascia
+    # addosso la sua testa, perche' l'UPDATE scrive `contatto_nostr` e
+    # `nostr_event_id` non lo nomina proprio. Una riga con tutt'e due
+    # dice due cose incompatibili, e il venditore perde Modifica,
+    # rifornimento e perfino «ritira il doppione».
+    import asyncio
+    import sqlite3
+
+    def sql_di(blocco):
+        """La query dentro un `con.execute(...)`: i pezzi di stringa
+        fino ai parametri, che cominciano sempre con `(a[`. Se non la
+        ritrova torna '' e la prova FALLISCE invece di esplodere — una
+        prova che si schianta fa rossa la CI senza dire quale patto e'
+        saltato (la lezione del find() al posto dell'index())."""
+        i = blocco.find("con.execute(")
+        j = blocco.find("(a[", i + 1)
+        if i < 0 or j < 0:
+            return ""
+        return "".join(re.findall(r'"([^"]*)"', blocco[i:j]))
+
+    i1 = corpo.find("if not gia:")
+    i2 = corpo.find("if not gia:", i1 + 5)
+    i0 = corpo.find('if a["origine_d"]:')
+    sql_tit = sql_di(corpo[i1:i2]) if 0 <= i1 < i2 else ""
+    sql_d = sql_di(corpo[i0:i1]) if 0 <= i0 < i1 else ""
+    prova("si ritrova la query del match per titolo", True,
+          "WHERE titolo=?" in sql_tit and "stato='attivo'" in sql_tit)
+    prova("...e quella del match per `d`", True,
+          "WHERE nostr_origine_d=?" in sql_d)
+
+    # E la si fa GIRARE: una sentinella sulla forma direbbe che la
+    # clausola c'e', mai che escluda la riga giusta e lasci passare le
+    # altre tre.
+    con_i = sqlite3.connect(":memory:")
+    con_i.executescript("""
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, stato TEXT,
+      venditore_id INT, contatto_nostr TEXT, nostr_origine_d TEXT,
+      nostr_origine_foto TEXT, foto TEXT, nostr_event_id TEXT);
+    INSERT INTO annunci VALUES
+      (208,'con testa','attivo',955,'','','','','ev208'),
+      (300,'legacy importato','attivo',955,'npub1lui','','','',''),
+      (301,'nativo nudo','attivo',955,'','','','',''),
+      (302,'testa NULL','attivo',955,'','','','',NULL);
+    """)
+
+    def adotta(titolo):
+        if not sql_tit:
+            return "QUERY NON RITROVATA"
+        r = con_i.execute(sql_tit,
+                          (titolo, 955, "npub1lui", "d-suo")).fetchone()
+        return r[0] if r else None
+
+    prova("una riga NATIVA con la sua testa non si adotta", None,
+          adotta("con testa"))
+    prova("...ma l'importato di ieri senza testa si', come sempre",
+          300, adotta("legacy importato"))
+    prova("...e il nativo senza testa pure (non e' una riga a due teste)",
+          301, adotta("nativo nudo"))
+    prova("...e una testa a NULL non e' una testa", 302,
+          adotta("testa NULL"))
+    # La riga da non ammorbidire: guardare ANCHE il match per `d`
+    # smetterebbe di ritrovare le righe gia' adottate, e l'import ne
+    # creerebbe copie nuove.
+    prova("il match per `d` NON porta la clausola", False,
+          "nostr_event_id" in sql_d)
+
+    # --- La cintura dall'altro lato: la firma che torna dal browser ---
+    # Se la riga e' diventata importata mentre la firma era per strada,
+    # scriverle una testa la farebbe «a due teste» dall'altra porta.
+    # Qui l'endpoint si fa GIRARE per davvero, e le tre risposte sono
+    # diverse: importata+pubblica non scrive, nativa scrive come
+    # sempre, e la RITIRA azzera comunque — ritirare toglie una testa,
+    # non ne mette una.
+    class _Err(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+            super().__init__(f"{codice}: {testo}")
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    class _ChiaveFinta:
+        def __init__(self, _b): pass
+        def verify(self, *_a): return True
+
+    CHIAVE = "bb" * 32
+    EV_NUOVO = "ab" * 32
+
+    def firma(azione, annuncio):
+        """Il POST vero su un database di cartone. Torna (testa,
+        autore, quante firme restano in coda per quell'annuncio)."""
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, contatto_nostr TEXT,
+          nostr_event_id TEXT, nostr_autore TEXT);
+        CREATE TABLE utenti(tg_id INT, npub TEXT, npub_verificata INT,
+          npub_accesso TEXT);
+        CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,
+          tg_id INT, azione TEXT);
+        INSERT INTO annunci VALUES(208,'npub1lui','',''),
+                                  (209,'npub1lui','ev-vecchio','bb'),
+                                  (301,'','','');
+        INSERT INTO utenti VALUES(955,'','','');
+        INSERT INTO firme_nostr VALUES(208,955,'x'),(209,955,'x'),
+                                      (301,955,'x');
+        """)
+
+        async def json_finto(_req):
+            return {"biglietto": "B", "pubkey": CHIAVE, "sig": "cd" * 64}
+
+        amb = {"Request": object, "Header": lambda d: d,
+               "Cookie": lambda d: d, "HTTPException": _Err,
+               "verifica_utente": lambda *a: {"id": 955},
+               "leggi_json": json_finto,
+               "BIGLIETTI_FIRMA_NOSTR": {
+                   "B": {"scade": 9e9, "tg_id": 955, "azione": azione,
+                         "annuncio_id": annuncio, "kind": 30402,
+                         "tags": [], "content": "", "created_at": 1}},
+               "RE_HEX_64": re.compile("[0-9a-f]{64}"),
+               "RE_HEX_128": re.compile("[0-9a-f]{128}"),
+               "ChiavePubblicaNostr": _ChiaveFinta,
+               "chiave_nostr_provata": lambda u: CHIAVE,
+               "evento_non_firmato": lambda *a: {"id": EV_NUOVO},
+               "db": lambda: _SenzaClose(c),
+               "time": type("t", (), {"time": staticmethod(lambda: 1)})}
+        exec("async " + pezzo("firma_nostr_fatta"), amb)
+        asyncio.run(amb["firma_nostr_fatta"](None))
+        r = c.execute("SELECT nostr_event_id, nostr_autore FROM annunci "
+                      "WHERE id=?", (annuncio,)).fetchone()
+        coda = c.execute("SELECT COUNT(*) FROM firme_nostr "
+                         "WHERE annuncio_id=?", (annuncio,)).fetchone()[0]
+        return r["nostr_event_id"], r["nostr_autore"], coda
+
+    prova("sulla riga diventata importata non si scrive nessuna testa",
+          ("", "", 0), firma("pubblica", 208))
+    prova("...e su una gia' a due teste non se ne scrive una seconda",
+          ("ev-vecchio", "bb", 0), firma("pubblica", 209))
+    prova("la RITIRA azzera comunque (toglie una testa, non ne mette)",
+          ("", "", 0), firma("ritira", 209))
+    prova("sulla riga nativa si scrive come sempre",
+          (EV_NUOVO, CHIAVE, 0), firma("pubblica", 301))
+
+    # E la coda si svuota da sola, o il browser rifirma e ripubblica
+    # sui relay a ogni apertura (svuotaFirmeNostr gira in avvia()).
+    corpo_get = pezzo("firme_nostr_da_fare")
+    k = corpo_get.find("azione<>'ritira'")
+    inizio = corpo_get.rfind("con.execute(", 0, k) if k > 0 else -1
+    fine = corpo_get.find("(user[", k) if k > 0 else -1
+    sql_del = ("".join(re.findall(r'"([^"]*)"', corpo_get[inizio:fine]))
+               if 0 <= inizio < fine else "")
+    prova("si ritrova la pulizia di coda del GET", True,
+          sql_del.startswith("DELETE FROM firme_nostr"))
+    c2 = sqlite3.connect(":memory:")
+    c2.executescript("""
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, contatto_nostr TEXT);
+    CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY, tg_id INT,
+      azione TEXT);
+    INSERT INTO annunci VALUES(208,'npub1lui'),(209,'npub1lui'),(301,'');
+    INSERT INTO firme_nostr VALUES(208,955,'pubblica'),(209,955,'ritira'),
+                                  (301,955,'pubblica');
+    """)
+    if sql_del:
+        c2.execute(sql_del, (955,))
+    prova("la coda perde la 'pubblica' su una riga importata, e tiene "
+          "la 'ritira' e le righe native", [209, 301],
+          [r[0] for r in c2.execute("SELECT annuncio_id FROM firme_nostr "
+                                    "ORDER BY annuncio_id")])
+
 
 # ====================================================================
 def prove_categorie():

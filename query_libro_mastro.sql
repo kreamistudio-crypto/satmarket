@@ -138,9 +138,11 @@ SELECT nome FROM (
 -- --- LE COLONNE CHE NON DEVONO STARE INSIEME -------------------------
 
 SELECT '14) ANNUNCI A DUE TESTE (deve essere vuoto)' AS controllo;
--- contatto_nostr (importato) e nostr_event_id (nativo, firmato da noi)
--- non stanno mai sulla stessa riga: la deduplica confronterebbe un
--- annuncio con sé stesso
+-- contatto_nostr (importato) e nostr_event_id (l'evento di questa riga,
+-- firmato da noi O da lui col BIVIO) non stanno mai sulla stessa riga:
+-- se ci stanno, la riga è nata qui e l'import se l'è presa — il
+-- venditore non può più modificarla né rifornirla, e la coppia
+-- sparisce dalla deduplica invece di comparirci
 SELECT id, venditore_id, stato, contatto_nostr, nostr_event_id
   FROM annunci WHERE contatto_nostr <> '' AND nostr_event_id <> '';
 

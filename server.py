@@ -19718,6 +19718,17 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         con.commit()
         con.close()
         return {"firme": []}
+    # Stesso patto una riga piu' su, per un'altra ragione (ago 2026, il
+    # tappo delle «due teste»): una firma su una riga diventata
+    # IMPORTATA non ha piu' dove atterrare — il POST rifiuta di
+    # scriverle una testa — e finche' resta in coda il browser la
+    # rifirma e la ripubblica sui relay a OGNI apertura, piu' il nag di
+    # sollecita_firme_nostr. La 'ritira' resta: toglie una testa, non
+    # ne mette una.
+    con.execute("DELETE FROM firme_nostr WHERE tg_id=? AND azione<>'ritira' "
+                "AND annuncio_id IN (SELECT id FROM annunci "
+                "WHERE contatto_nostr<>'')", (user["id"],))
+    con.commit()
     righe = con.execute(
         "SELECT f.annuncio_id, f.azione, a.* FROM firme_nostr f "
         "JOIN annunci a ON a.id=f.annuncio_id "
@@ -19814,11 +19825,27 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
     if not buona:
         con.close()
         raise HTTPException(400, "Firma non valida")
+    imp = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
+                      (b["annuncio_id"],)).fetchone()
     if b["azione"] == "ritira":
         # Ritirato: la riga torna com'era prima di Nostr, e nessun
-        # gancio la ripubblichera' piu' (sono tutti solo_aggiornamento)
+        # gancio la ripubblichera' piu' (sono tutti solo_aggiornamento).
+        # Qui NON si guarda `contatto_nostr`, ed e' l'asimmetria che
+        # conta: ritirare TOGLIE una testa, non ne mette una — su una
+        # riga diventata importata e' anzi una delle strade di
+        # guarigione.
         con.execute("UPDATE annunci SET nostr_event_id='', nostr_autore='' "
                     "WHERE id=?", (b["annuncio_id"],))
+    elif imp and imp["contatto_nostr"]:
+        # La riga e' diventata IMPORTATA mentre la firma era per strada
+        # (ago 2026, la cintura del tappo delle «due teste»): scriverle
+        # addosso il filo dell'evento la farebbe dire due cose
+        # incompatibili, e il venditore perderebbe Modifica e
+        # rifornimento. L'evento e' gia' in piazza e resta suo — qui si
+        # rinuncia al filo, e la firma esce comunque dalla coda qui
+        # sotto, o il browser la rifirmerebbe a ogni apertura.
+        print(f"⚠️ Firma su annuncio #{b['annuncio_id']}, diventato "
+              f"importato: nessuna testa scritta")
     else:
         con.execute("UPDATE annunci SET nostr_event_id=?, nostr_autore=? "
                     "WHERE id=?", (ev["id"], pubkey, b["annuncio_id"]))
@@ -27122,9 +27149,17 @@ CONTROLLI_LIBRO_MASTRO = (
      "UNION ALL SELECT 'idx_rimborso_eccedenza') "
      "WHERE nome NOT IN (SELECT name FROM sqlite_master WHERE type='index')"),
     # --- le due colonne che non devono mai stare insieme ------------
+    # Il «perche'» diceva «la deduplica confronterebbe un annuncio con
+    # se' stesso», e non e' cosi' (ago 2026, dal caso 208/209): le due
+    # liste di trova_doppioni_nostr sono DISGIUNTE su contatto_nostr,
+    # quindi la riga cade solo fra gli importati e la coppia SPARISCE
+    # dalla coda. Chi leggeva quel 🧊 andava a cercare dalla parte
+    # sbagliata — e il danno vero non e' la deduplica, e' il venditore
+    # chiuso fuori da un annuncio nato qui.
     ("annuncio a due teste",
-     "contatto_nostr e nostr_event_id sulla stessa riga: la deduplica "
-     "confronterebbe un annuncio con se' stesso",
+     "contatto_nostr e nostr_event_id sulla stessa riga: la riga e' "
+     "nata qui e l'import se l'e' presa — il venditore non puo' piu' "
+     "modificarla ne' rifornirla, e la coppia sparisce dalla deduplica",
      "SELECT id FROM annunci "
      "WHERE contatto_nostr<>'' AND nostr_event_id<>''"),
     ("payout fuori contratto",
