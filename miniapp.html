@@ -8464,6 +8464,13 @@ setInterval(() => {
    vanno rimessi (l'elenco dei posti e' nella voce sua in CLAUDE.md).
    I due tempi del DIGITALE invece sbloccano ancora davvero. */
 const TEMPI = {
+  // NESSUNO LA LEGGE PIU' IN PAGINA (ago 2026), e non si toglie: il
+  // bottone col quale il compratore dichiarava l'arrivo e' sparito,
+  // e con lui l'unica riga che prometteva questa finestra. Di la'
+  // la leva e' viva — governa il ramo 'delivered' del promemoria e
+  // il ramo fisico disarmato — quindi togliere il gemello vorrebbe
+  // dire ricordarsi di rimetterlo il giorno del rientro: e' un
+  // vestito appeso, come i token --ship-soft. C'e' la prova.
   conferma:    72,   // ore per controllare l'oggetto dopo la consegna
   autoSblocco: 10,   // giorni dalla spedizione: primo promemoria
   confermaDig: 24,   // ore dalla rivelazione del codice
@@ -15523,7 +15530,7 @@ function openOrder(id){
         </div>` : o.consegnaScelta==='ritiro' ? `
         <div class="payout">
           <h4>🤝 Consegna in zona</h4>
-          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì l'acquirente ha ${TEMPI.conferma} ore per confermare, e se tace lo sollecitiamo noi.</div>
+          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì l'acquirente conferma la ricezione, e se tace lo sollecitiamo noi.</div>
           <button class="btn orange" onclick="markConsegnaMano()">🤝 Ho consegnato l'oggetto a mano</button>
         </div>` : `
         <div class="payout">
@@ -15571,24 +15578,24 @@ function openOrder(id){
       ${pannelloBustaRitiro(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
-      ${/* Il bottone dice la RICEZIONE e basta (ago 2026, dal campo:
-            «mi prendo 72h per controllarlo» lo mandava a capo a
-            320px). Il tempo e' un dettaglio e vive nel confirm, che
-            gia' dice «prenditi il tempo di controllare»; il «lo
-            controllo» resta perche' e' cio' che lo distingue dal
-            «libera i sats» qui sotto. */''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${/* L'ORDINE DEI BOTTONI del compratore (ago 2026, decisione di
             Andrea): prima il gesto PRINCIPALE — libera i sats, che e'
-            l'unico pieno e si legge per primo —, poi il passo
-            intermedio, poi le strade per parlarsi, e in fondo
-            l'uscita di sicurezza staccata. Prima «È arrivato» stava
-            SOPRA a «Ho ricevuto» e i ponti dopo la disputa. */''}
+            l'unico pieno e si legge per primo —, poi le strade per
+            parlarsi, e in fondo l'uscita di sicurezza staccata.
+            IL PASSO INTERMEDIO NON C'E' PIU' (ago 2026): «È arrivato —
+            lo controllo» portava a 'delivered', che non apriva NIENTE
+            — conferma e disputa si fanno gia' da 'shipped' e lo
+            stepper non avanzava nemmeno — e in cambio spostava chi lo
+            premeva nella popolazione veloce dei promemoria (3 giorni
+            invece di 10). Prometteva un beneficio che aveva comunque,
+            e taceva il costo. Sul DIGITALE 'delivered' resta vivo: la'
+            lo scrive la rivelazione del codice, che e' una ricevuta
+            vera, e i due bottoni qui sotto lo servono ancora. */''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
-      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — lo controllo`:`📬 È arrivato — lo controllo`}</button>`:''}
       ${/* A 'confirmed' ci si arriva in DUE modi, e fino a ieri la
             riga ne raccontava uno solo: «Hai confermato… per te e'
             tutto fatto!», che a chi l'affare l'ha chiuso un TIMER dice
@@ -19366,17 +19373,6 @@ async function depositaBusta(btn){
   openOrder(currentOrder.id);
   toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
                    : '📦 Istruzioni depositate');
-}
-
-async function markDelivered(){
-  haptic();
-  if (!confirm(`Il pacco è arrivato?\n\nPrenditi il tempo di controllare l'oggetto: i sats restano nel deposito finché non confermi tu. Se qualcosa non va, apri una disputa.`)) return;
-  if (DEMO) { currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000); toast('📬 Consegna registrata'); openOrder(currentOrder.id); return; }
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegnato`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000);
-  toast('📬 Consegna registrata: controlla con calma, i sats ti aspettano'); openOrder(currentOrder.id);
 }
 
 /* IL PROMEMORIA A COMANDO (ago 2026): TRE STATI E NON DUE — '' il

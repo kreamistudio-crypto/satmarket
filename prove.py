@@ -1631,7 +1631,7 @@ def prove_ritiro():
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("ordine: il bottone di conferma esiste anche a locked-ritiro",
           True, "s==='locked' && o.consegnaScelta==='ritiro'" in mini
-          and "L\\'ho ritirato" in mini)
+          and mini.count("L\\'ho ritirato") == 1)
     soll = corpo("sollecita_ritiri_fermi")
     prova("ritiro fermo: il promemoria guarda locked+ritiro", True,
           "stato='locked'" in soll and "consegna_scelta='ritiro'" in soll)
@@ -1778,6 +1778,71 @@ def prove_disarmo():
     prova("venditore fermo: agganciato all'orologio", True,
           "sollecita_venditori_fermi()" in oro)
 
+
+def prove_niente_passo_intermedio():
+    """VIA IL BOTTONE «È arrivato — lo controllo» (ago 2026). Quel
+    gesto portava l'ordine da 'shipped' a 'delivered' e non serviva a
+    chi lo premeva: conferma e disputa si fanno gia' da 'shipped' e lo
+    stepper non avanzava nemmeno — in cambio lo spostava nella
+    popolazione VELOCE di sollecita_conferme_ferme, anticipandogli i
+    promemoria (3 giorni invece di 10) e la segnalazione ai moderatori.
+    Si sorveglia che il gesto sia morto, che non rinasca da unaltra
+    porta, e — LA META' CHE CONTA — che tutto cio' che LEGGE
+    'delivered' sia rimasto al suo posto: sono le righe che un riordino
+    toglie per prime («tanto non ci arriva piu nessuno»), e servono al
+    DIGITALE, dove a 'delivered' ci si arriva ancora dalla rivelazione
+    del codice."""
+    print("\n[via il passo intermedio della consegna]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    # --- 1) il gesto e' morto, dai due lati ----------------------
+    prova("la rotta non esiste piu'", False,
+          "/api/orders/{ordine_id}/consegnato" in _SORGENTE)
+    prova("...ne' la funzione che la serviva", False,
+          "def segna_consegnato" in _SORGENTE)
+    prova("...ne' il bottone in pagina", False, "markDelivered" in mini)
+
+    # --- 2) IL CENSIMENTO: non rinasce da un'altra porta ---------
+    # Non un elenco di funzioni, che invecchia al primo cantiere: si
+    # CONTA chi scrive quella data, e dev'essere uno solo.
+    prova("`consegnato` ha un solo scrittore", 1,
+          _SORGENTE.count("consegnato=?"))
+    prova("...ed e' la rivelazione del contenuto digitale", True,
+          "consegnato=?" in corpo("leggi_contenuto_digitale"))
+
+    # --- 3) LA STANZA RESTA: da 'delivered' si esce ancora -------
+    prova("il server accetta 'delivered' da due porte", 2,
+          _SORGENTE.count("'locked','shipped','delivered'"))
+    for f in ("conferma_ricezione", "apri_disputa"):
+        prova(f"{f}: 'delivered' e' ancora nella WHERE", True,
+              "'locked','shipped','delivered'" in corpo(f))
+    prova("il client offre ancora «libera i sats» su 'delivered'", True,
+          "['delivered'].includes(s)" in mini)
+    prova("...e la disputa", True,
+          "['locked','shipped','delivered'].includes(s)" in mini)
+
+    # --- 4) il ramo rimasto senza popolazione NON si toglie ------
+    # E' la porta del tracking verificato: quel giorno `consegnato`
+    # la scrivera' il corriere, al posto della parte che ci rimette
+    # a scriverla.
+    prom = corpo("sollecita_conferme_ferme")
+    prova("il promemoria tiene il suo ramo 'delivered'", True,
+          '("delivered", "o.consegnato", ORE_CONFERMA * 3600)' in prom)
+    prova("...e dice per iscritto perche' resta", True,
+          "PORTA DEL" in prom and "TRACKING" in prom)
+
+    # --- 5) il testo del ritiro non promette piu' un numero ------
+    # Quelle 72 ore partivano SOLO col bottone tolto: il testo era
+    # gia' impreciso e sarebbe diventato falso.
+    i = mini.index("Consegna in zona</h4>")
+    prova("il pannello del ritiro non promette ore", False,
+          "TEMPI.conferma" in mini[i:i + 900])
+    prova("...e dice comunque che il compratore verra' sollecitato",
+          True, "se tace lo sollecitiamo noi" in mini[i:i + 900])
 
 def _finto_lnbits(uscite, codice=200, muto=False):
     """Un LNbits di cartone che REGISTRA ogni chiamata invece di
@@ -20800,6 +20865,7 @@ def main():
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
+              prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
               prove_ritiro_offerta, prove_fogli_di_casa,

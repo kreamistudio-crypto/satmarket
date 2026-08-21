@@ -18175,40 +18175,6 @@ async def segna_spedito(ordine_id: int, req: Request,
     return {"ok": True}
 
 
-@app.post("/api/orders/{ordine_id}/consegnato")
-async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header(""),
-                                           barattolo_sessione: str = Cookie("")):
-    """SOLO L'ACQUIRENTE segnala l'arrivo del pacco: si apre la sua
-    finestra di ORE_CONFERMA ore per controllare l'oggetto.
-    (Il venditore NON puo' usarlo: potrebbe far partire il timer
-    prima della consegna reale. In futuro questo scatto arrivera' in
-    automatico dal tracking del corriere.)
-    ATTENZIONE, dal ago 2026: allo scadere della finestra NON c'e' piu'
-    nessuno sblocco automatico — i sats restano nel deposito e parte il
-    promemoria di sollecita_conferme_ferme, poi il moderatore. Vedi il
-    disarmo dell'auto-sblocco in CLAUDE.md."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=? AND stato='shipped' "
-                    "AND compratore_id=?",
-                    (ordine_id, user["id"])).fetchone()
-    if not o:
-        con.close()
-        raise HTTPException(400, "Operazione non permessa")
-    con.execute("UPDATE ordini SET stato='delivered', consegnato=?, "
-                "aggiornato=? WHERE id=?",
-                (int(time.time()), int(time.time()), ordine_id))
-    con.commit()
-    con.close()
-    await notifica(o["venditore_id"],
-                   f"📬 L'acquirente ha segnalato la <b>consegna del pacco</b> "
-                   f"e sta controllando l'oggetto: ha {ORE_CONFERMA} ore di "
-                   f"tempo. I sats restano nel deposito di garanzia finché "
-                   f"non conferma — se non si fa vivo gli mandiamo un "
-                   f"promemoria, e poi interviene un moderatore.")
-    return {"ok": True, "stato": "delivered"}
-
-
 # ------------------- CONSEGNA DIGITALE (lug 2026) --------------------
 # Il principio cardine: il codice passa DENTRO Barattolo, mai fuori.
 # Il venditore lo consegna in un campo dedicato (locked -> shipped,
@@ -25035,6 +25001,18 @@ async def sollecita_conferme_ferme():
     # comanda l'ancora; dalla seconda comanda il sollecito precedente.
     # I pezzi interpolati sono nostri, mai dal client.
     righe = []
+    # IL RAMO 'delivered' E' RESTATO SENZA POPOLAZIONE (ago 2026), e
+    # NON SI TOGLIE: e' la riga che un riordino leverebbe per prima.
+    # Il bottone col quale il compratore dichiarava l'arrivo del pacco
+    # e' stato tolto — spostava chi lo premeva nella popolazione
+    # veloce, cioe' gli anticipava i propri promemoria (3 giorni
+    # invece di 10) e la segnalazione ai moderatori, senza dargli
+    # niente che non avesse gia'. Per la merce fisica a 'delivered'
+    # non ci si arriva piu'; il digitale ha le SUE finestre ed e'
+    # escluso qui sotto. Questo ramo resta perche' e' LA PORTA DEL
+    # TRACKING VERIFICATO: quel giorno `consegnato` la scrivera' il
+    # corriere — un fatto — al posto della parte che ci rimette a
+    # scriverla. Vedi il disarmo dell'auto-sblocco in CLAUDE.md.
     for stato, ancora, finestra in (
             ("delivered", "o.consegnato", ORE_CONFERMA * 3600),
             ("shipped", "o.spedito_il", GIORNI_AUTO_SBLOCCO * 86400)):
