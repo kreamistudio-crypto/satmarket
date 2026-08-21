@@ -4417,7 +4417,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🚚</span>Spedizione</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
-        <label class="cons-riga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
+        <label class="cons-riga" id="sellConsDigRiga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
@@ -21240,6 +21240,16 @@ async function rimuoviModerazione(id){
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
 let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
+/* «su QUESTA modifica firmata la consegna si dichiara» (ago 2026).
+   Non basta `editandoNostr`, e il caso che lo chiede sono i due
+   importati DIGITALI corretti a mano: li' la casella «codice online»
+   e' nascosta ma resterebbe SPUNTATA da impostaConsegnaForm, quindi
+   consegnaForm() direbbe 'digitale' e il venditore si prenderebbe il
+   400 del server su una modifica di solo prezzo — senza vedere
+   perche'. Con la variabile il blocco resta nascosto, le chiavi non
+   partono e il valore si conserva. Tre lettori: chi mostra i campi,
+   chi valida in publish(), chi compone il body firmato. */
+let consegnaFirmata = false;
 
 /* La valuta del listino nel form di Vendi: sats (com'e' sempre stato)
    oppure EUR — il prezzo in euro resta fisso e chi compra paga sempre
@@ -21594,10 +21604,18 @@ function aggiornaConsegnaForm(){
         rit = el('sellConsRitiro').checked,
         asta = astaAccesa();
   el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
+  /* LE DUE TARIFFE IN PIU' E LA TAGLIA RESTANO FUORI DALLA STRADA
+     FIRMATA (ago 2026), ed e' la regola del cantiere: li' si dichiara
+     solo quel che l'evento NIP-99 porta e l'import rilegge, e per
+     queste tre un tag non esiste — vivrebbero solo su Barattolo. Chi
+     compra non ci perde niente: la via «punto di ritiro» si offre lo
+     stesso, e la sua tariffa ripiega su quella di casa. */
   if (el('sellSpedPuntoField'))
-    el('sellSpedPuntoField').style.display = (sped && !asta) ? '' : 'none';
+    el('sellSpedPuntoField').style.display =
+      (sped && !asta && !editandoNostr) ? '' : 'none';
   if (el('sellSpedExtraField'))
-    el('sellSpedExtraField').style.display = (sped && !asta) ? '' : 'none';
+    el('sellSpedExtraField').style.display =
+      (sped && !asta && !editandoNostr) ? '' : 'none';
   /* il promemoria dei corrieri: solo a chi spedisce e non li ha
      dichiarati (in DEMO il catalogo non arriva e la riga tace).
      E' la stessa condizione del foglio, meno il tetto: quando il
@@ -21608,8 +21626,11 @@ function aggiornaConsegnaForm(){
     el('sellSpedizioniereHint').style.display =
       (sped && !asta && !DEMO && spedizionieriCatalogo.length
        && !mieRetiSped.length) ? '' : 'none';
-  el('sellTagliaField').style.display = sped ? '' : 'none';
-  if (el('sellQtaField') && !editandoNostr)
+  el('sellTagliaField').style.display = (sped && !editandoNostr) ? '' : 'none';
+  /* la quantita' invece la strada firmata la dichiara: il tag `stock`
+     l'import lo rilegge, quindi il giro si chiude (ago 2026 — prima
+     qui c'era un `&& !editandoNostr`, che teneva nascosto il campo) */
+  if (el('sellQtaField'))
     el('sellQtaField').style.display = asta ? 'none' : '';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
@@ -21624,13 +21645,15 @@ function aggiornaConsegnaForm(){
    regola e' il giudice senzaCondizione(), e i due ingressi che la
    cambiano sono la categoria (il `poi` del suo picker) e le caselle
    della consegna (qui sopra). Nascosto, il valore si azzera: cosi' il
-   payload non porta mai una condizione che il server butterebbe. La
-   modifica firmata resta fuori come prima — l'evento NIP-99 la
-   condizione non la porta. */
+   payload non porta mai una condizione che il server butterebbe.
+   E DALLA MODIFICA FIRMATA ADESSO SI DICHIARA (ago 2026): qui c'era
+   scritto «resta fuori — l'evento NIP-99 la condizione non la porta»,
+   e non era piu' vero dal cantiere dei metadati di commercio. Il tag
+   `condition` c'e' e l'import lo rilegge, quindi il giro si chiude e
+   il giudice torna a essere uno solo. */
 function aggiornaCondizioneForm(){
   const f = el('sellCondField'); if (!f) return;
-  const fuori = editandoNostr
-             || senzaCondizione(el('sellCat').value, consegnaForm().consegna);
+  const fuori = senzaCondizione(el('sellCat').value, consegnaForm().consegna);
   f.style.display = fuori ? 'none' : '';
   if (fuori && el('sellCond').value){
     el('sellCond').value = '';
@@ -21691,6 +21714,9 @@ function editListing(id){
      salvataggio prende la strada firmata. Senza chiave d'accesso il
      server risponde col suo messaggio di sempre. */
   editandoNostr = !DEMO && !!l.nostr && !!myNpubAccesso;
+  /* il digitale resta fuori dalla strada firmata: v. consegnaFirmata */
+  consegnaFirmata = editandoNostr && (l.consegna||'') !== 'digitale'
+                    && !l.ancheDigitale;
   el('sellTitle').value = l.title;
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
@@ -21770,6 +21796,7 @@ function annullaModificaChiedendo(){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
+  consegnaFirmata = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';
@@ -21810,8 +21837,14 @@ function aggiornaFormVendi(){
       + 'che non si possono vendere — armi, droghe, servizi sessuali, '
       + 'refurtiva, contraffazioni, documenti, dati personali, farmaci, '
       + 'animali protetti.';
+    /* «la consegna compresa» solo dove la consegna si dichiara
+       davvero: sui due importati digitali il blocco non c'e', e quella
+       coda sarebbe una promessa che la pagina non mantiene (visto a
+       schermo, non leggendo). */
     if (el('sellSottotitolo')) el('sellSottotitolo').textContent = editandoNostr
-      ? 'Le modifiche vanno anche sui relay Nostr, firmate con la tua chiave. Ripassano dalla moderazione come un annuncio nuovo.'
+      ? 'Le modifiche vanno anche sui relay Nostr, firmate con la tua chiave'
+        + (consegnaFirmata ? ' — la consegna compresa' : '')
+        + '. Ripassano dalla moderazione come un annuncio nuovo.'
       : 'Salvi e l\'annuncio è aggiornato in vetrina. Ripassa dalla moderazione come uno nuovo: se qualcosa non convince resta in attesa di un moderatore.';
     /* l'annulla non vive piu' qui: e' il bottone in fondo, sotto il
        salva — il banner dice soltanto cosa si sta facendo */
@@ -21839,20 +21872,35 @@ function aggiornaFormVendi(){
      sono lo stesso gesto in due posti */
   if (el('sellAnnulla')) el('sellAnnulla').style.display = editandoId ? '' : 'none';
   if (el('sellChiudi')) el('sellChiudi').style.display = editandoId ? '' : 'none';
-  /* Le foto degli importati vivono sui relay: qui non si cambiano.
-     E la consegna nemmeno: la modifica firmata rispecchia l'evento
-     NIP-99, che non la porta — il form non deve fingere. */
+  /* Le foto degli importati vivono sui relay: qui non si cambiano
+     (v1, invariato). */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
-  /* la firmata rispecchia l'evento NIP-99, che la condizione non la
-     porta: il campo si nasconde come quelli di consegna — e con lui
-     decide anche la categoria scelta (alimenti, codici online) */
+  /* LA CONSEGNA INVECE SI DICHIARA (ago 2026), e qui c'era scritto il
+     contrario: «la modifica firmata rispecchia l'evento NIP-99, che
+     non la porta — il form non deve fingere». Era vero prima del
+     cantiere dei metadati di commercio, che al NIP-99 i tag
+     `delivery`, `condition` e `stock` glieli ha dati: adesso il form
+     non finge se li MOSTRA, perche' quel che si dichiara finisce sui
+     relay e l'import lo rilegge. La regola in una riga — si dichiara
+     SOLO quel che l'evento porta e l'import rilegge — la fanno
+     rispettare aggiornaConsegnaForm (le due tariffe in piu' e la
+     taglia restano fuori) e la riga del codice online qui sotto. */
   aggiornaCondizioneForm();
-  /* e nemmeno la quantita' (gli importati restano un pezzo solo) */
   if (el('sellQtaField'))
-    el('sellQtaField').style.display = editandoNostr ? 'none' : '';
+    el('sellQtaField').style.display = '';
   if (el('sellConsegnaField')){
-    el('sellConsegnaField').style.display = editandoNostr ? 'none' : '';
-    if (editandoNostr){
+    /* Il blocco resta nascosto quando la consegna non e' dichiarabile
+       da qui: e' il caso dei due importati DIGITALI, v. consegnaFirmata. */
+    const fuori = editandoNostr && !consegnaFirmata;
+    el('sellConsegnaField').style.display = fuori ? 'none' : '';
+    /* Il codice online NON si offre sulla strada firmata: il tag c'e',
+       ma l'import lo butta apposta (quel contenuto si consegna dentro
+       Barattolo) e in combo con una via fisica si degraderebbe da solo
+       al primo giro. Chi lo vende passa da noi, e il DM di
+       completamento glielo dice con quelle parole. */
+    if (el('sellConsDigRiga'))
+      el('sellConsDigRiga').style.display = editandoNostr ? 'none' : '';
+    if (fuori){
       el('sellSpedField').style.display = 'none';
       el('sellTagliaField').style.display = 'none';
     } else aggiornaConsegnaForm();
@@ -22053,17 +22101,20 @@ async function publish(){
   const t = el('sellTitle').value.trim();
   const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
-  /* almeno una strada di consegna (la firmata degli importati non
-     offre il campo: li' la consegna resta '' per natura) */
-  if (!editandoNostr && !consegnaForm().consegna) {
+  /* «il blocco consegna e' in pagina»: da qui in giu' e' la domanda
+     che governa le validazioni, e sulla strada firmata la risposta la
+     da' consegnaFirmata (i due importati digitali restano fuori). */
+  const mostraConsegna = !editandoNostr || consegnaFirmata;
+  /* almeno una strada di consegna */
+  if (mostraConsegna && !consegnaForm().consegna) {
     toast('Spunta almeno una modalità di consegna'); return;
   }
   /* condizioni obbligatorie (lug 2026): anche in modifica — gli
-     annunci storici si mettono in regola al primo ritocco. La firmata
-     degli importati non offre il campo, come per la consegna, e
-     nemmeno le categorie dove la scala non dice niente. */
-  if (!editandoNostr
-      && !senzaCondizione(el('sellCat').value, consegnaForm().consegna)
+     annunci storici si mettono in regola al primo ritocco, e dall'ago
+     2026 anche gli importati (il tag `condition` fa il giro). Restano
+     fuori le categorie dove la scala non dice niente: il campo li' e'
+     nascosto, e il giudice e' lo stesso che lo nasconde. */
+  if (!senzaCondizione(el('sellCat').value, consegnaForm().consegna)
       && !el('sellCond').value) {
     toast('Indica le condizioni dell\'oggetto'); return;
   }
@@ -22073,10 +22124,18 @@ async function publish(){
      riusa il verdetto che il blur ha gia' chiesto, cosi' l'errore
      arriva prima del viaggio (foto comprese) e la riga #zonaHint
      resta sotto il campo a dire cosa fare. */
-  if (!editandoNostr && el('sellConsRitiro').checked
+  if (mostraConsegna && el('sellConsRitiro').checked
       && !el('sellZone').value.trim()) {
     toast('Per il ritiro in zona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
   }
+  /* IL CONTROLLO «e' un comune vero?» RESTA FUORI dalla strada
+     firmata, ed e' l'unica delle quattro che non si apre (ago 2026):
+     la zona di un importato la scrivono i relay e puo' essere un posto
+     fuori dall'Italia, mentre il dataset e' italiano per costruzione —
+     misurato, «baixllobregat» e «maresme» non passano. Bloccare qui
+     vorrebbe dire che quei venditori non dichiarano niente, e che
+     l'unico modo di sbloccarsi e' scrivere un comune italiano, cioe'
+     mentire. Il server dice la stessa cosa con esigi_luogo. */
   if (!editandoNostr && el('sellZone').value.trim()) {
     await controllaZona();              // il blur puo' non essere mai scattato
     if (zonaStorta) {
@@ -22385,11 +22444,36 @@ async function pubblicaEventoSuRelay(relays, evento){
   return esiti.filter(e=>e.status==='fulfilled').length;
 }
 
+/* I campi di consegna della strada FIRMATA (ago 2026): la versione
+   RIDOTTA di consegnaPayload, e ridotta apposta — si manda solo quel
+   che l'evento NIP-99 porta e l'import rilegge, cioe' la via fisica,
+   il costo verso casa, la condizione e la quantita'. Le due tariffe
+   in piu' e la taglia non hanno un tag e resterebbero solo qui;
+   `anche_digitale` non parte MAI, o la combo si degraderebbe al primo
+   import. Il server rifiuta comunque quel che non gli spetta: qui si
+   evita di chiedergli di ignorare delle chiavi.
+   Oggetto VUOTO quando la consegna non e' dichiarabile: la chiave
+   assente e' la dichiarazione «non l'ho toccata», e la fase 2
+   conserva quel che c'era. */
+function consegnaPayloadFirmata(){
+  if (!consegnaFirmata) return {};
+  const {consegna} = consegnaForm();
+  const out = {consegna, condizione:el('sellCond').value,
+               quantita:qtaForm()};
+  if (consegna==='spedizione' || consegna==='entrambe'){
+    if (sellValuta==='eur' || spedValuta==='eur')
+      out.spedizione_eur = eurCampo('sellSped');
+    else out.spedizione_sats = parseInt(el('sellSped').value)||0;
+  }
+  return out;
+}
+
 async function salvaModificaFirmata(t, p){
   const id = editandoId;
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   const body = {titolo:t, ...prezzo, categoria:el('sellCat').value,
-    zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
+    zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
+    ...consegnaPayloadFirmata()};
   /* Passo 1: guardie e moderazione PRIMA della firma (un rifiuto dopo
      la pubblicazione sui relay sarebbe teatro) */
   const r = await fetch(`${API_BASE}/listings/${id}/modifica-firmata/prepara`, {

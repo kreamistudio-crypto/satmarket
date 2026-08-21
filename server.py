@@ -7923,7 +7923,8 @@ def messaggio_zona_storta(zona: str) -> str:
             "vuoto" + (f" — forse {sugg}?" if sugg else " (es. «Pavia (PV)»)"))
 
 
-def guardia_zona_condizione(d: dict, consegna: str) -> str:
+def guardia_zona_condizione(d: dict, consegna: str,
+                            esigi_luogo: bool = True) -> str:
     """Le due regole del form Vendi (lug 2026), giudice unico di
     pubblica e modifica: la condizione e' OBBLIGATORIA (client E
     server: senza, niente pubblica — gli storici restano com'erano,
@@ -7941,9 +7942,26 @@ def guardia_zona_condizione(d: dict, consegna: str) -> str:
         li' che nascono le zone non-luogo che la vetrina deve poi
         nascondere.
     Senza dataset la regola geografica si spegne da sola (fail-open,
-    come il resto della geografia). La modifica firmata degli
-    importati NON passa di qui: quei campi il form non li offre
-    proprio, e la loro zona la riscrivono i relay.
+    come il resto della geografia).
+
+    `esigi_luogo=False` SPEGNE la sola seconda regola — «la zona
+    compilata dev'essere un comune» — e la modifica firmata degli
+    importati e' l'unica a chiederlo (ago 2026, quando quella strada
+    ha smesso di nascondere i campi di consegna). Il permesso si deve
+    SCRIVERE, l'idioma di zero_ammesso in quantita_da_payload: il
+    pavimento resta severo per tutti gli altri, byte per byte.
+    IL PERCHE', misurato e non dedotto: la zona di un importato la
+    scrivono i RELAY, e puo' essere un posto fuori dall'Italia mentre
+    il nostro dataset e' italiano per costruzione — dei sei importati
+    senza consegna, «Verona» e «Ravenna» passano, «baixllobregat» e
+    «maresme» (comarche catalane) no. Con la regola accesa quei
+    venditori non potrebbero dichiarare NIENTE, e l'unico modo di
+    sbloccarsi sarebbe scrivere un comune italiano, cioe' mentire —
+    un cantiere che esiste per sei non puo' escluderne due. Non e' un
+    buco nuovo: quella strada la zona non l'ha mai controllata, e la
+    vetrina degrada gia' da sola (zona_comune='' = niente 📍).
+    La PRIMA regola resta accesa anche li': chi dichiara il ritiro
+    deve almeno scrivere dove, o chi viene a ritirare non lo sa.
     Ritorna la condizione validata."""
     condizione = condizione_valida(d.get("condizione"))
     # Dove la scala non dice niente (alimenti, codici online) non si
@@ -7962,7 +7980,7 @@ def guardia_zona_condizione(d: dict, consegna: str) -> str:
                                      "comune valido: scegli il tuo dai "
                                      "suggerimenti del campo Zona "
                                      "(es. «Pavia (PV)»)")
-        if zona and coordinate_da_zona(zona) == (0.0, 0.0):
+        if esigi_luogo and zona and coordinate_da_zona(zona) == (0.0, 0.0):
             raise HTTPException(400, messaggio_zona_storta(zona))
     return condizione
 
@@ -10204,8 +10222,62 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         raise HTTPException(400, messaggio_rifiuto(motivo))
 
     categoria = categoria_valida(d.get("categoria"))
+    # --- LA CONSEGNA SI DICHIARA DA QUI (ago 2026) ------------------
+    # LA REGOLA, e vale la pena dirla intera perche' spiega da sola sia
+    # cio' che entra sia cio' che resta fuori: su questa strada si
+    # dichiara SOLO quel che l'evento NIP-99 porta E l'import rilegge.
+    # Dentro: spedizione, ritiro, il costo verso CASA, la condizione,
+    # la quantita' — tutti tag che estrai_commercio ritira su dai
+    # relay, quindi la dichiarazione vive li' e non solo qui.
+    # Fuori: la tariffa PUNTO, il supplemento per pezzo e la taglia
+    # (nessun tag NIP-99: vivrebbero solo da noi — e la via punto
+    # funziona lo stesso, che _tariffa_dichiarata ripiega sulla casa),
+    # e il CODICE ONLINE, che il tag ce l'ha ma l'import lo butta
+    # apposta: in combo con una via fisica si degraderebbe da solo al
+    # primo giro, perche' l'import spegne da se' il flag della combo.
+    #
+    # LA DICHIARAZIONE E' LA PRESENZA DELLA CHIAVE, mai il suo valore
+    # (il patto della tariffa dichiarata per presenza e dello stock in
+    # modifica): un client rimasto in cache manda le cinque chiavi di
+    # ieri, e scrivere lo stesso AZZEREREBBE la consegna dei due
+    # importati digitali corretti a mano. Chiave assente = conserva,
+    # ed e' la riga da non ammorbidire.
+    consegna = None
+    sped_sats = sped_eur = 0
+    condizione = None
+    if "consegna" in d:
+        # Il giudice unico dei campi di consegna: se ne prendono i
+        # primi tre valori e si buttano gli altri sette, che sono
+        # proprio quelli che sui relay non vanno.
+        consegna, sped_sats, sped_eur = (
+            await consegna_da_payload(d, valuta))[:3]
+        if consegna not in ("spedizione", "ritiro", "entrambe"):
+            # Fail-closed: da questa porta non si crea una combo che
+            # il primo import degraderebbe, ne' un digitale che i
+            # relay non sanno rileggere. Niente guardia_venditore_
+            # digitale, per la stessa ragione: qui il digitale non
+            # passa proprio. (Il `con` a questo punto e' gia' chiuso
+            # da un pezzo: siamo dopo le guardie d'identita'.)
+            raise HTTPException(400, "Da qui si dichiarano la spedizione "
+                                     "e il ritiro: per l'invio del codice "
+                                     "online scrivici, te lo accendiamo noi")
+        # Il giudice unico di pubblica e modifica, col solo ramo della
+        # zona-luogo spento: v. esigi_luogo (la zona di un importato la
+        # scrivono i relay e puo' essere fuori dall'Italia).
+        condizione = guardia_zona_condizione(d, consegna, esigi_luogo=False)
+    # Assente = conserva lo stock, il patto di sempre.
+    quantita = (quantita_da_payload(d, se_manca=a["quantita"])
+                if "quantita" in d else None)
+    # L'evento si costruisce sulla riga GIA' FUSA coi valori nuovi: e'
+    # cosi' che la dichiarazione appena fatta parte verso i relay.
+    riga = dict(a)
+    if consegna is not None:
+        riga.update(consegna=consegna, spedizione_sats=sped_sats,
+                    spedizione_eur=sped_eur, condizione=condizione)
+    if quantita is not None:
+        riga["quantita"] = quantita
     evento = evento_annuncio_importato(
-        a, d["titolo"], d.get("descrizione", ""), categoria,
+        riga, d["titolo"], d.get("descrizione", ""), categoria,
         d.get("zona", ""), valuta, prezzo_sats, prezzo_eur,
         int(time.time()))
     adesso = time.time()
@@ -10222,6 +10294,13 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         "valuta": valuta, "prezzo_sats": prezzo_sats,
         "prezzo_eur": prezzo_eur, "created_at": evento["created_at"],
         "tags": evento["tags"], "content": evento["content"],
+        # I campi di consegna viaggiano col biglietto perche' la fase 2
+        # scrive la copia locale dal PAYLOAD gia' validato, mai
+        # ri-parsando l'evento. `None` = non dichiarati: la fase 2 non
+        # tocca quelle colonne (v. il commento della dichiarazione).
+        "consegna": consegna, "spedizione_sats": sped_sats,
+        "spedizione_eur": sped_eur, "condizione": condizione,
+        "quantita": quantita,
         "scade": adesso + 600}
     # In collaudo anche il BROWSER deve simulare: senza questo flag
     # pubblicherebbe l'evento di prova sui relay veri (successo al
@@ -10292,16 +10371,38 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     # moderato in fase 1 (mai ri-parsare l'evento: sarebbe un giro
     # con perdita). Le foto non si toccano: v1, restano le sue.
     lat, lon = coordinate_da_zona(b["zona"])
+    # Le colonne di consegna si AGGIUNGONO solo se la fase 1 le ha
+    # viste dichiarate (ago 2026). Chiave assente = si conserva: un
+    # client rimasto in cache manda le cinque chiavi di ieri, e un
+    # UPDATE incondizionato azzererebbe la consegna degli importati
+    # corretti a mano — il patto dello stock, qui su un campo che
+    # decide come arriva la roba.
+    campi, valori = "", []
+    if b.get("consegna") is not None:
+        # SOLO queste, e nessuna delle altre: le due tariffe che i
+        # relay non sanno rileggere e la taglia del pacco qui non si
+        # scrivono — «simmetrizzare» questo UPDATE con quello di
+        # modifica() le azzererebbe a ogni sync firmato. E' il
+        # contratto che tiene verdi le due sentinelle dell'UNICO
+        # UPDATE, e i loro nomi non si citano nemmeno qui: quelle
+        # prove leggono anche i commenti.
+        campi += "consegna=?, spedizione_sats=?, spedizione_eur=?, "
+        campi += "condizione=?, "
+        valori += [b["consegna"], b["spedizione_sats"],
+                   b["spedizione_eur"], b["condizione"]]
+    if b.get("quantita") is not None:
+        # Il MAX e' l'idioma di ricarica_quantita: la memoria dei pezzi
+        # non scende mai, o il badge «Ne resta 1» direbbe il falso.
+        campi += "quantita=?, quantita_max=MAX(quantita_max, ?), "
+        valori += [b["quantita"], b["quantita"]]
     con.execute(
-        # NIENTE campi di consegna qui (spedizione_*, punto compreso):
-        # l'evento Nostr non li porta, e «simmetrizzare» questo UPDATE
-        # con quello di modifica() li azzererebbe a ogni sync firmato.
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
-        "regione=?, modificato=? WHERE id=?",
+        f"regione=?, {campi}modificato=? WHERE id=?",
         (b["titolo"], b["descrizione"], b["categoria"], b["prezzo_sats"],
          b["zona"], b["valuta"], b["prezzo_eur"], lat, lon,
-         regione_da_zona(b["zona"]), int(time.time()), annuncio_id))
+         regione_da_zona(b["zona"]), *valori,
+         int(time.time()), annuncio_id))
     con.commit()
     con.close()
     # Backstop: l'evento firmato riparte anche da qui verso i relay
@@ -21034,6 +21135,19 @@ def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
         tags.append(["t", categoria.lower().split()[0]])
     if zona:
         tags.append(["location", zona])
+    # I TAG DI COMMERCIO CI VANNO (ago 2026), e prima non ci andavano:
+    # questa funzione ricostruiva i tag da ZERO, quindi un venditore
+    # che sui relay aveva delivery/condition/stock e ritoccava il
+    # prezzo da qui se li ritrovava CANCELLATI in piazza — in silenzio,
+    # perche' da noi non si vede (l'assenza di un tag non riscrive
+    # niente, v. estrai_commercio). Ora l'evento sostitutivo li
+    # riporta, ed e' la stessa riga che porta sui relay la consegna
+    # appena dichiarata: `a` arriva GIA' FUSA coi valori nuovi.
+    # La categoria si sovrascrive qui e non nel chiamante: tag_commercio
+    # passa da condizione_da_mostrare, che la legge — se il parametro e
+    # a["categoria"] divergessero, l'evento direbbe una cosa e la riga
+    # un'altra.
+    tags += tag_commercio({**a, "categoria": categoria})
     # Le foto ripartono con gli URL ORIGINALI del venditore (v1: nella
     # modifica firmata non si cambiano). Se la colonna origine e' vuota
     # ma le foto ci sono (riga battezzata prima della colonna), ripiego
@@ -26151,15 +26265,22 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
     # consegna: è il caso di chi vende buoni e gift card, e dai relay
     # arriva sempre a mani vuote perché quella strada di là non esiste.
     # A chi vende una bici sarebbe rumore.
+    # ...e da quando la consegna si dichiara dalla modifica firmata
+    # (ago 2026) il testo dice come stanno le cose: la spedizione e il
+    # ritiro li scrive lui, il codice online no — quella strada l'evento
+    # NIP-99 la porta ma l'import la butta apposta, quindi resta un
+    # gesto nostro. Promettere il bottone che non c'è era esattamente
+    # il difetto che questo cantiere è nato per togliere, dall'altra
+    # parte.
     codice = ("\n\nE se quello che vendi è un buono, una gift card o un "
-              "codice: qui puoi consegnarlo <b>online dentro Barattolo</b>, "
-              "e il compratore che lo apre firma la ricevuta. Dai relay "
-              "quella strada non si può aprire."
+              "codice: quello non si dichiara da solo — <b>scrivici</b> e "
+              "te lo accendiamo noi. Da lì lo consegni <b>dentro "
+              "Barattolo</b>, e il compratore che lo apre firma la ricevuta."
               if "consegna" in manca else "")
     testo = (f"🫙 Un minuto per finire un annuncio?\n\n"
-             f"{quali} in vetrina su Barattolo, ma manca qualcosa che su "
-             f"Nostr non si può scrivere — ed è proprio quello su cui chi "
-             f"compra filtra:\n\n"
+             f"{quali} in vetrina su Barattolo, ma manca qualcosa che il "
+             f"tuo client Nostr non ti fa scrivere — ed è proprio quello "
+             f"su cui chi compra filtra:\n\n"
              + "\n".join(VOCI_COMPLETAMENTO[m] for m in manca) + codice +
              f"\n\nEntra con la stessa chiave con cui hai firmato e li "
              f"trovi già tuoi: {URL_PUBBLICO}"

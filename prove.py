@@ -3795,7 +3795,12 @@ def prove_nota_compratore():
         prova(f"{nome} e' cieco alla nota", False,
               "nota_compratore" in pezzo(nome))
     # --- Nostr non la vede: e' del checkout, non dell'annuncio -------
-    for nome in ("tag_commercio", "evento_annuncio"):
+    # ...e da ago 2026 anche l'evento degli IMPORTATI, che i tag di
+    # commercio li delega a tag_commercio invece di costruirli a
+    # mano: prima era cieco per COSTRUZIONE e non lo sorvegliava
+    # nessuno (pezzo("evento_annuncio") si ferma prima di lui).
+    for nome in ("tag_commercio", "evento_annuncio",
+                 "evento_annuncio_importato"):
         prova(f"{nome} non porta la nota fuori", False,
               "nota_compratore" in pezzo(nome))
 
@@ -7491,7 +7496,12 @@ def prove_supplemento_spedizione():
               True, "supplemento = sped, 0, 0" in c2)
     # E' un costrutto del CHECKOUT: non esce sui relay, come la
     # tariffa punto (NIP-99 non ha un vocabolario per il per-pezzo).
-    for nome in ("tag_commercio", "evento_annuncio"):
+    # ...e da ago 2026 anche l'evento degli IMPORTATI, che i tag di
+    # commercio li delega a tag_commercio invece di costruirli a
+    # mano: prima era cieco per COSTRUZIONE e non lo sorvegliava
+    # nessuno (pezzo("evento_annuncio") si ferma prima di lui).
+    for nome in ("tag_commercio", "evento_annuncio",
+                 "evento_annuncio_importato"):
         prova(f"{nome}: cieco al supplemento", False,
               "spedizione_extra" in pezzo(nome))
     prova("la modifica firmata non tocca il supplemento", False,
@@ -9198,7 +9208,12 @@ def prove_sped_gratis():
 
     # E' un costrutto del CHECKOUT: non esce sui relay (il NIP-99 resta
     # col prezzo pieno, come per lampo, sconto e tariffa punto).
-    for nome in ("tag_commercio", "evento_annuncio"):
+    # ...e da ago 2026 anche l'evento degli IMPORTATI, che i tag di
+    # commercio li delega a tag_commercio invece di costruirli a
+    # mano: prima era cieco per COSTRUZIONE e non lo sorvegliava
+    # nessuno (pezzo("evento_annuncio") si ferma prima di lui).
+    for nome in ("tag_commercio", "evento_annuncio",
+                 "evento_annuncio_importato"):
         prova(f"{nome}: cieco alla spedizione gratis", False,
               "sped_gratis" in pezzo(nome))
     # UN SOLO ENDPOINT scrive le soglie, e le scrive TUTTE E DUE nello
@@ -10365,7 +10380,12 @@ def prove_pagina_acquisto():
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
     #    imperfezione dichiarata): ne' il costo ne' il testo.
-    for nome in ("tag_commercio", "evento_annuncio"):
+    # ...e da ago 2026 anche l'evento degli IMPORTATI, che i tag di
+    # commercio li delega a tag_commercio invece di costruirli a
+    # mano: prima era cieco per COSTRUZIONE e non lo sorvegliava
+    # nessuno (pezzo("evento_annuncio") si ferma prima di lui).
+    for nome in ("tag_commercio", "evento_annuncio",
+                 "evento_annuncio_importato"):
         corpo = pezzo(nome)
         prova(f"{nome}: cieco alla tariffa punto", False,
               "spedizione_punto" in corpo)
@@ -11960,7 +11980,12 @@ def prove_forma_sconto_pacco():
     # 8) Lo sconto e' un costrutto del checkout: non esce sui relay
     # (il NIP-99 resta col prezzo pieno, come per lampo e tariffa
     # punto) e non cambia la forma del CSV, che e' contabilita'.
-    for nome in ("tag_commercio", "evento_annuncio"):
+    # ...e da ago 2026 anche l'evento degli IMPORTATI, che i tag di
+    # commercio li delega a tag_commercio invece di costruirli a
+    # mano: prima era cieco per COSTRUZIONE e non lo sorvegliava
+    # nessuno (pezzo("evento_annuncio") si ferma prima di lui).
+    for nome in ("tag_commercio", "evento_annuncio",
+                 "evento_annuncio_importato"):
         prova(f"{nome}: cieco allo sconto carrello", False,
               "sconto_pacco" in pezzo(nome))
     prova("un solo UPDATE scrive la regola", 1,
@@ -21142,12 +21167,267 @@ def prove_porta_timer():
               t for c, t in detto2 if c == 222))
 
 
+def prove_consegna_firmata():
+    """LA CONSEGNA SI DICHIARA DALLA MODIFICA FIRMATA (ago 2026).
+
+    La regola del cantiere, che spiega da sola sia cio' che entra sia
+    cio' che resta fuori: su quella strada si dichiara SOLO quel che
+    l'evento NIP-99 porta E l'import rilegge. Dentro spedizione,
+    ritiro, il costo verso casa, la condizione e la quantita'; fuori
+    il codice online (il tag c'e' ma l'import lo butta apposta) e le
+    due tariffe in piu' con la taglia, che un tag non ce l'hanno.
+
+    Qui l'area era un BUCO TOTALE: evento_annuncio_importato non la
+    guardava nessuno, il biglietto nemmeno, e il patto del form
+    firmato viveva come commento. La prima prova e' ESEGUIBILE
+    apposta — una sentinella direbbe che la chiamata c'e', mai che il
+    valore torni indietro uguale."""
+    print("\n[la consegna sulla strada firmata]")
+    import importa_nostr as imp
+    import json as _json
+    amb = {"json": _json, "URL_PUBBLICO": "https://barattolo.store"}
+    # Le stesse dipendenze di prove_tag_commercio: tag_commercio passa
+    # da condizione_da_mostrare, e ora ci passa anche l'evento degli
+    # importati. Se un domani tag_commercio acquisisce una costante
+    # nuova va aggiunta qui, o la prova esplode invece di fallire.
+    i = _SORGENTE.index("CATEGORIE_SENZA_CONDIZIONE = frozenset(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("senza_condizione", "condizione_da_mostrare",
+              "_foto_url_nostr"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("CONDIZIONE_NIP99 = {")
+    exec(_SORGENTE[i:_SORGENTE.index(
+        "\n\n\n", _SORGENTE.index("def tag_commercio"))], amb)
+    exec(pezzo("evento_annuncio_importato"), amb)
+    evento = amb["evento_annuncio_importato"]
+    leggi = imp.estrai_commercio
+
+    def riga(**extra):
+        base = {"nostr_origine_d": "d1", "nostr_origine_foto": "[]",
+                "foto": "[]", "categoria": "Elettronica", "consegna": "",
+                "spedizione_sats": 0, "spedizione_eur": 0.0,
+                "condizione": "", "quantita": 1, "anche_digitale": 0,
+                "valuta": "sats"}
+        base.update(extra)
+        return base
+
+    def giro(**extra):
+        """La dichiarazione fatta qui, riletta come la rileggera'
+        l'import al giro dopo: e' il cerchio che il cantiere esiste
+        per chiudere."""
+        ev = evento(riga(**extra), "Titolo", "Descrizione", "Elettronica",
+                    "Verona", "sats", 1000, 0.0, 111)
+        return leggi(ev)
+
+    # --- LA PROVA REGINA: quel che si dichiara torna dai relay -------
+    prova("giro: spedizione a 5 euro torna spedizione a 5 euro",
+          {"consegna": "spedizione", "anche_digitale": 0,
+           "spedizione_eur": 5.0, "spedizione_sats": 0},
+          giro(consegna="spedizione", spedizione_eur=5.0))
+    prova("giro: spedizione in sats",
+          {"consegna": "spedizione", "anche_digitale": 0,
+           "spedizione_eur": 0, "spedizione_sats": 700},
+          giro(consegna="spedizione", spedizione_sats=700))
+    prova("giro: ritiro", {"consegna": "ritiro", "anche_digitale": 0},
+          giro(consegna="ritiro"))
+    prova("giro: entrambe",
+          {"consegna": "entrambe", "anche_digitale": 0,
+           "spedizione_eur": 0, "spedizione_sats": 0},
+          giro(consegna="entrambe"))
+    prova("giro: la condizione torna", "come_nuovo",
+          giro(consegna="ritiro", condizione="come_nuovo")["condizione"])
+    prova("giro: la quantita' torna", 4,
+          giro(consegna="ritiro", quantita=4)["quantita"])
+    # La spedizione gratuita DICHIARATA e' un tag con lo zero, non un
+    # tag assente: e' la trappola che estrai_commercio nomina.
+    prova("giro: gratis dichiarato resta gratis", 0,
+          giro(consegna="spedizione", spedizione_sats=0)["spedizione_sats"])
+
+    # --- IL DIFETTO CHIUSO: l'evento non si spoglia piu' -------------
+    # Prima di questo cantiere evento_annuncio_importato ricostruiva i
+    # tag da ZERO: chi sui relay aveva delivery/condition/stock e
+    # ritoccava il prezzo da Barattolo se li ritrovava CANCELLATI in
+    # piazza, in silenzio (da noi non si vede: l'assenza di un tag non
+    # riscrive niente).
+    tag = evento(riga(consegna="entrambe", spedizione_eur=3.0,
+                      condizione="buono", quantita=5),
+                 "T", "D", "Elettronica", "Verona", "sats",
+                 1000, 0.0, 1)["tags"]
+    for atteso in (["delivery", "shipping", "3.00", "EUR"],
+                   ["delivery", "pickup"], ["condition", "good"],
+                   ["stock", "5"]):
+        prova(f"l'evento porta {atteso[0]}:{atteso[1]}", True, atteso in tag)
+    prova("...e il tag d dell'evento originale resta", True,
+          ["d", "d1"] in tag)
+
+    # LA CATEGORIA DEL PARAMETRO COMANDA, e non e' un dettaglio:
+    # tag_commercio passa da condizione_da_mostrare, che la legge — se
+    # divergessero, l'evento direbbe una cosa e la riga un'altra.
+    # «Alimenti e bevande» e' senza_condizione: il tag deve sparire.
+    tag2 = evento(riga(condizione="buono", categoria="Elettronica"),
+                  "T", "D", "Alimenti e bevande", "Verona", "sats",
+                  1000, 0.0, 1)["tags"]
+    prova("la categoria del parametro vince su quella della riga",
+          False, any(t[0] == "condition" for t in tag2))
+
+    # --- LA ZONA CHE PUO' ESSERE FUORI DALL'ITALIA -------------------
+    # Misurato sui sei importati veri: «Verona» e «Ravenna» passano,
+    # «baixllobregat» e «maresme» (comarche catalane) no. Con la
+    # regola accesa quei venditori non dichiarerebbero NIENTE, e
+    # l'unico modo di sbloccarsi sarebbe scrivere un comune italiano.
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code = code
+            super().__init__(detail)
+
+    ambz = {"HTTPException": _H, "CONDIZIONI": {"buono": "Buono"},
+            "COMUNI": {"verona": (45.4, 11.0)},
+            "categoria_valida": lambda c: c or "Altro",
+            "coordinate_da_zona": lambda z: (
+                (45.4, 11.0) if "verona" in (z or "").lower()
+                else (0.0, 0.0)),
+            "messaggio_zona_storta": lambda z: "zona storta",
+            "senza_condizione": lambda cat, cons: False}
+    exec(pezzo("condizione_valida"), ambz)
+    exec(pezzo("guardia_zona_condizione"), ambz)
+    guardia = ambz["guardia_zona_condizione"]
+
+    def alza(**kw):
+        try:
+            guardia(**kw)
+            return False
+        except _H:
+            return True
+
+    d_cat = {"condizione": "buono", "categoria": "Altro",
+             "zona": "baixllobregat"}
+    prova("zona catalana: con la regola accesa BLOCCA", True,
+          alza(d=d_cat, consegna="spedizione"))
+    prova("zona catalana: con esigi_luogo spenta PASSA", False,
+          alza(d=d_cat, consegna="spedizione", esigi_luogo=False))
+    prova("zona italiana: passa comunque", False,
+          alza(d={**d_cat, "zona": "Verona"}, consegna="spedizione"))
+    # LA PRIMA REGOLA RESTA ACCESA anche li': chi dichiara il ritiro
+    # deve almeno scrivere dove, o chi viene a ritirare non lo sa.
+    prova("ritiro senza zona: blocca anche con esigi_luogo spenta", True,
+          alza(d={**d_cat, "zona": ""}, consegna="ritiro",
+               esigi_luogo=False))
+    prova("la condizione la valida sempre lei", True,
+          alza(d={**d_cat, "condizione": ""}, consegna="spedizione",
+               esigi_luogo=False))
+    prova("il permesso si deve SCRIVERE (di serie e' severa)", True,
+          "esigi_luogo: bool = True" in pezzo("guardia_zona_condizione"))
+
+    # --- SENTINELLE: la fase 1 --------------------------------------
+    prep = pezzo("modifica_firmata_prepara").split('"""')[-1]
+    prova("fase 1: la dichiarazione e' la PRESENZA della chiave", True,
+          '"consegna" in d' in prep)
+    prova("fase 1: passa dal giudice unico dei campi di consegna", True,
+          "consegna_da_payload(d, valuta)" in prep)
+    # Dei dieci valori del giudice se ne tengono TRE. Il modo FORTE
+    # di dirlo non e' la forma del taglio — un refactor equivalente
+    # la farebbe rossa per niente, e una mutazione vera le passava
+    # davanti (l'ha detto la tortura) — ma che la fase 1 non NOMINI
+    # proprio cio' che sui relay non va.
+    for fuori in ("spedizione_punto", "spedizione_extra",
+                  "taglia_pacco", "anche_digitale"):
+        prova(f"fase 1: {fuori} non si nomina nemmeno", False,
+              fuori in prep)
+    prova("fase 1: il digitale da qui non passa (fail-closed)", True,
+          'consegna not in ("spedizione", "ritiro", "entrambe")' in prep)
+    prova("fase 1: la zona-luogo non si esige", True,
+          "esigi_luogo=False" in prep)
+    prova("fase 1: la quantita' assente CONSERVA lo stock", True,
+          'se_manca=a["quantita"]' in prep)
+    # Non serve, e il perche' va tenuto: da questa porta il digitale
+    # non passa proprio, quindi la leva anti-frode non ha niente da
+    # dire. Se un domani il codice online si aprisse, questa riga
+    # diventa il promemoria.
+    prova("fase 1: niente guardia del venditore digitale", False,
+          "guardia_venditore_digitale" in prep)
+    prova("fase 1: l'evento si costruisce sulla riga FUSA", True,
+          "evento_annuncio_importato(" in prep and "riga," in prep)
+    for chiave in ("consegna", "spedizione_sats", "spedizione_eur",
+                   "condizione", "quantita"):
+        prova(f"fase 1: il biglietto porta {chiave}", True,
+              '"' + chiave + '": ' in prep)
+
+    # --- SENTINELLE: la fase 2 --------------------------------------
+    src = _SORGENTE
+    i2 = src.index("async def modifica_firmata(")
+    corpo2 = src[i2:src.index("async def", i2 + 10)]
+    prova("fase 2: l'UPDATE e' CONDIZIONATO alla dichiarazione", True,
+          'b.get("consegna") is not None' in corpo2)
+    prova("fase 2: e cosi' la quantita'", True,
+          'b.get("quantita") is not None' in corpo2)
+    prova("fase 2: la memoria dei pezzi non scende (il MAX)", True,
+          "quantita_max=MAX(quantita_max, ?)" in corpo2)
+    # IL CONTRATTO CHE NON SI TOCCA: le due tariffe che i relay non
+    # sanno rileggere e la taglia restano fuori da questo UPDATE — e i
+    # loro nomi non compaiono NEMMENO nei commenti, che le due prove
+    # dell'UNICO UPDATE leggono anche quelli.
+    for fuori in ("spedizione_punto", "spedizione_extra", "taglia_pacco",
+                  "anche_digitale"):
+        prova(f"fase 2: {fuori} resta fuori dall'UPDATE firmato", False,
+              fuori in corpo2)
+    prova("l'UPDATE della consegna vive in DUE posti soli", 2,
+          src.count("consegna=?"))
+
+    # --- SENTINELLE: il client --------------------------------------
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    firmata = pezzo_js(mini, "function consegnaPayloadFirmata()")
+    prova("client: il payload firmato porta la consegna", True,
+          "consegna" in firmata)
+    prova("client: ...e la condizione e la quantita'", True,
+          "condizione" in firmata and "quantita" in firmata)
+    # LA RIDUZIONE E' IL PUNTO: consegnaPayload() intero manderebbe
+    # anche cio' che sui relay non va.
+    for fuori in ("spedizione_punto", "spedizione_extra", "taglia_pacco",
+                  "anche_digitale"):
+        prova(f"client: il payload firmato NON porta {fuori}", False,
+              fuori in firmata)
+    prova("client: il body firmato lo spande davvero", True,
+          "...consegnaPayloadFirmata()" in pezzo_js(
+              mini, "async function salvaModificaFirmata(t, p)"))
+    # IL GIUDICE DEL BLOCCO: i due importati digitali restano fuori, o
+    # la casella nascosta ma spuntata darebbe un 400 che non si vede.
+    edit = pezzo_js(mini, "function editListing(id)")
+    prova("client: consegnaFirmata esclude il digitale", True,
+          "!== 'digitale'" in edit and "!l.ancheDigitale" in edit)
+    prova("client: e si spegne insieme alla modifica", True,
+          "consegnaFirmata = false;" in pezzo_js(
+              mini, "function annullaModifica()"))
+    cons = pezzo_js(mini, "function aggiornaConsegnaForm()")
+    prova("client: le due tariffe in piu' restano fuori dalla firmata",
+          2, cons.count("(sped && !asta && !editandoNostr) ? '' : 'none'"))
+    prova("client: e la taglia del pacco pure", True,
+          "(sped && !editandoNostr) ? '' : 'none'" in cons)
+    prova("client: la quantita' invece si dichiara", False,
+          "el('sellQtaField') && !editandoNostr" in cons)
+    prova("client: la condizione non guarda piu' la strada firmata",
+          False, "editandoNostr" in pezzo_js(
+              mini, "function aggiornaCondizioneForm()"))
+    # NON basta che l'id esista da qualche parte: e' la GUARDIA a
+    # fare il lavoro, e togliendola la casella resta in pagina — la
+    # sentinella di prima restava verde, l'ha detto la tortura.
+    vendi = pezzo_js(mini, "function aggiornaFormVendi()")
+    prova("client: la riga del codice online si nasconde", True,
+          "el('sellConsDigRiga').style.display = editandoNostr ? 'none' : '';"
+          in vendi)
+    # ...e publish deve CHIEDERE la consegna quando il blocco c'e':
+    # senza, il form la mostra e non la valida nessuno.
+    prova("client: publish la chiede quando il blocco e' in pagina", True,
+          "const mostraConsegna = !editandoNostr || consegnaFirmata;"
+          in pezzo_js(mini, "async function publish()"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
-              prove_tag_commercio, prove_anello, prove_categorie,
+              prove_tag_commercio, prove_consegna_firmata,
+              prove_anello, prove_categorie,
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_proxy_asta,

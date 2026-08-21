@@ -4286,8 +4286,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella busta di prima pagina (la stima del client non hardcoda mai
   la cifra). NIP-99: la spedizione è una riga del CONTENT, nessun tag
   nuovo. Import CSV: colonne facoltative `consegna;spedizione;taglia`
-  nel modello e nel parser. La modifica FIRMATA degli importati non
-  offre i campi (v1: l'evento non li porta, il form li nasconde).
+  nel modello e nel parser. La modifica FIRMATA degli importati ADESSO
+  LI OFFRE (ago 2026, e questa riga ROVESCIA il «non li offre — v1:
+  l'evento non li porta, il form li nasconde»): il NIP-99 quei tag ce
+  li ha dal cantiere dei metadati di commercio, quindi la premessa era
+  invecchiata. Vedi «LA CONSEGNA SI DICHIARA DALLA MODIFICA FIRMATA».
   Frontend: form Vendi con le TRE CASELLE indipendenti (lug 2026,
   decisione di Andrea, via il select + checkbox: 🚚 Spedizione ·
   🤝 Ritiro in zona · 💾 Invio del codice online, spunta tutte quelle
@@ -4809,6 +4812,117 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   quel che resta DOPO che l'invito non ha funzionato, e non prima
   (quel DM parte una volta sola per annuncio, `completamento_avvisato`,
   quindi la strada dell'attesa è già finita).
+  LA CONSEGNA SI DICHIARA DALLA MODIFICA FIRMATA (ago 2026, e questa
+  voce EMENDA quella qui sopra: la correzione a mano resta, ma per i
+  soli DIGITALI). Il caso dal campo è un venditore da Nostr che non
+  può dichiarare la spedizione, e i numeri dicono che non è un caso:
+  **6 righe senza consegna su 8 importati attivi** — le altre 2 sono i
+  digitali corretti a mano — quindi NESSUN importato fisico aveva mai
+  dichiarato una via, e cresceva (4 fra il 17 e il 20 agosto contro 2
+  in tutto luglio). Tutti e sei i venditori avevano `npub_accesso`,
+  cioè la strada della modifica firmata era GIÀ APERTA per ognuno:
+  mancava solo il campo. E tre su sei avevano già ricevuto il DM di
+  `_chiedi_completamento`, che promette «entra con la stessa chiave con
+  cui hai firmato e li trovi già tuoi» — erano arrivati dove li
+  avevamo mandati noi e avevano trovato il campo nascosto.
+  LA PREMESSA ERA INVECCHIATA, ed è la lezione del giro: il commento
+  del client diceva «la modifica firmata rispecchia l'evento NIP-99,
+  che non la porta — il form non deve fingere», e quella riga era vera
+  fino al cantiere dei metadati di commercio (lug 2026), che al NIP-99
+  i tag `delivery`, `condition` e `stock` glieli ha dati. Da lì il form
+  non finge se li MOSTRA: quel che si dichiara finisce sui relay e
+  l'import lo rilegge.
+  LA REGOLA, una frase e nessuna eccezione da ricordare: **sulla strada
+  firmata si dichiara SOLO quel che l'evento NIP-99 porta E l'import
+  rilegge.** Dentro spedizione, ritiro, il costo verso CASA, la
+  condizione e la quantità; fuori il CODICE ONLINE (il tag c'è ma
+  `estrai_commercio` lo butta apposta — quel contenuto si consegna
+  dentro Barattolo — e in combo con una via fisica si degraderebbe da
+  solo al primo giro, che forza `anche_digitale=0`) e le due tariffe in
+  più con la taglia, che un tag NIP-99 non ce l'hanno: vivrebbero solo
+  qui. Chi compra non ci perde niente — la via «punto di ritiro» si
+  offre lo stesso e la sua tariffa ripiega su quella di casa
+  (`_tariffa_dichiarata`). Il perimetro è una DECISIONE di Andrea, e ha
+  un pregio che non era previsto: con quel confine **nessuna sentinella
+  esistente cambia lato** — le due dell'UNICO UPDATE restano verdi e
+  restano vere.
+  «CHIAVE ASSENTE = CONSERVA» È LA RIGA DA NON AMMORBIDIRE, e non è una
+  cortesia: la dichiarazione è la PRESENZA della chiave nel payload (il
+  patto di `spedizione_punto_dichiarata` e dello stock in modifica), e
+  un client rimasto in cache manda le cinque chiavi di ieri — con un
+  UPDATE incondizionato **azzererebbe la consegna dei due digitali
+  corretti a mano**. Quindi la fase 2 costruisce l'UPDATE a pezzi e
+  scrive quelle colonne solo se il biglietto le porta.
+  IL DIFETTO CHIUSO NELLA STESSA RIGA: `evento_annuncio_importato`
+  ricostruiva i tag da ZERO e non chiamava `tag_commercio`, quindi un
+  venditore che sui relay aveva delivery/condition/stock e ritoccava il
+  prezzo da qui se li ritrovava CANCELLATI in piazza, in silenzio (da
+  noi non si vede: l'assenza di un tag non riscrive niente). Una cura
+  sola per due cose, e quella funzione ha UN chiamante solo, quindi gli
+  annunci nati qui non si toccano. La categoria si sovrascrive DENTRO
+  (`tag_commercio({**a, "categoria": categoria})`): quella funzione
+  passa da `condizione_da_mostrare`, che la legge, e se il parametro e
+  la riga divergessero l'evento direbbe una cosa e la colonna un'altra.
+  LA ZONA PUÒ ESSERE FUORI DALL'ITALIA, ed è la scoperta che ha
+  cambiato il piano DOPO l'approvazione: `guardia_zona_condizione` è il
+  giudice unico e va chiamata anche qui (è lei a validare la
+  condizione), ma il suo secondo ramo — «la zona compilata dev'essere
+  un comune» — su questa strada si spegne, col permesso scritto come
+  argomento (`esigi_luogo=False`, l'idioma di `zero_ammesso`). MISURATO
+  e non dedotto: delle quattro zone dei sei, «Verona» e «Ravenna»
+  passano, **«baixllobregat» e «maresme» no** — sono comarche catalane,
+  e il dataset è i 7.904 comuni ITALIANI. Con la regola accesa quei
+  venditori non dichiarerebbero NIENTE, e l'unico modo di sbloccarsi
+  sarebbe scrivere un comune italiano, cioè mentire: un cantiere che
+  esiste per sei non può escluderne due. Non è un buco nuovo — quella
+  strada la zona non l'ha mai controllata — e la vetrina degrada già da
+  sola (`zona_comune=''` = niente 📍). LA PRIMA METÀ DELLA GUARDIA
+  RESTA ACCESA: chi dichiara il ritiro deve almeno scrivere dove.
+  ⚠️ ATTENZIONE, «zona compilata» NON vuol dire «zona valida»: è
+  esattamente l'errore in cui si è inciampati leggendo i dati a occhio,
+  e la domanda giusta la fa `coordinate_da_zona`, non lo sguardo.
+  NEL CLIENT IL GIUDICE È UNA VARIABILE SUA, `consegnaFirmata`, e non
+  basta `editandoNostr`: sui due importati digitali la casella «codice
+  online» è nascosta ma resterebbe SPUNTATA da `impostaConsegnaForm`,
+  quindi `consegnaForm()` direbbe 'digitale' e il venditore si
+  prenderebbe il 400 su una modifica di solo prezzo — senza vedere
+  perché. Con la variabile il blocco resta nascosto, le chiavi non
+  partono, il valore si conserva. Tre lettori: chi mostra i campi, chi
+  valida in `publish()`, chi compone il body. E il payload firmato è la
+  versione RIDOTTA di `consegnaPayload` (`consegnaPayloadFirmata`): non
+  si riusa quello intero, o si chiederebbe al server di ignorare delle
+  chiavi.
+  UNA SOLA DELLE QUATTRO VALIDAZIONI DEL CLIENT NON SI APRE, ed è la
+  simmetrica di `esigi_luogo`: il controllo «è un comune vero?» resta
+  gated su `!editandoNostr`, o il client fermerebbe il venditore
+  catalano prima ancora del viaggio.
+  I TESTI CHE DIVENTAVANO FALSI, e vanno tenuti insieme al codice: il
+  DM di `_chiedi_completamento` diceva «manca qualcosa che su **Nostr**
+  non si può scrivere» — falso per tutte e tre le voci che quel
+  messaggio elenca, che i tag ci sono — ed è diventato «che il tuo
+  client Nostr non ti fa scrivere»; e il suo paragrafo sul codice
+  online prometteva «qui puoi consegnarlo online», cioè un bottone che
+  su quella strada resta nascosto: adesso dice di scriverci, che è la
+  correzione a mano. Promettere una porta che non si apre era ESATTAMENTE
+  il difetto che questo cantiere è nato per togliere, dall'altra parte.
+  E IL SOTTOTITOLO DEL FORM segue `consegnaFirmata` e non
+  `editandoNostr`: «la consegna compresa» sui due digitali sarebbe una
+  promessa che la pagina non mantiene — visto a schermo, non leggendo.
+  LE PROVE ERANO UN BUCO TOTALE: nessuna sentinella su
+  `evento_annuncio_importato` (`pezzo("evento_annuncio")` si ferma
+  prima di lei), nessuna sul biglietto, e il patto del form firmato
+  viveva solo come commento. Ora la sua CECITÀ è certificata — il suo
+  nome è entrato in tutte e CINQUE le tuple `("tag_commercio",
+  "evento_annuncio")` — e la prova regina è ESEGUIBILE: il giro chiuso
+  `estrai_commercio(evento_annuncio_importato(riga))` deve ridare la
+  consegna di partenza. Una sentinella direbbe che la chiamata c'è, mai
+  che il valore torni indietro uguale. Accanto,
+  `collaudo_consegna_firmata.py` fa girare i DUE endpoint veri con una
+  firma Schnorr vera su un database usa-e-getta: il giro completo, le
+  colonne che non si toccano, il 400 sul digitale, la zona catalana che
+  passa, e soprattutto il client di ieri che NON azzera niente — se un
+  domani l'UPDATE torna incondizionato, quella riga MOSTRA il danno
+  invece di descriverlo.
   Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
   la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
   con al massimo UNA controproposta. Tabella `offerte` (annuncio,
@@ -10499,7 +10613,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con la colonna `spedizione_punto` IN CODA al modello (per nome: i
   file di ieri intonsi); la modifica FIRMATA non tocca le colonne
   punto per contratto (l'evento Nostr non le porta: le azzererebbe a
-  ogni sync — commento sull'UPDATE e sentinella «un solo UPDATE»).
+  ogni sync — commento sull'UPDATE e sentinella «un solo UPDATE»), e
+  quel contratto REGGE anche da quando quella strada dichiara la
+  consegna (ago 2026): là dentro si scrivono la sola tariffa CASA, la
+  condizione e la quantità, cioè quel che i relay sanno rileggere —
+  le due sentinelle dell'UNICO UPDATE restano verdi e restano VERE, e
+  i loro nomi non si citano nemmeno nei commenti di quella funzione,
+  che quelle prove leggono anche quelli.
   IL PUNTO NON ESCE SU NOSTR: tariffa interna del checkout,
   `tag_commercio` ed `evento_annuncio` ciechi per sentinella
   (imperfezione dichiarata: un client Nostr vede la sola tariffa
@@ -17164,6 +17284,42 @@ DA SEGNALARE, visto e NON toccato: il tasto «🔔 Sollecita l'acquirente»
 quindi sul DIGITALE il venditore non può sollecitare dal client anche
 se il server glielo permetterebbe. Buco preesistente, che il cantiere
 chiude per il fisico e lascia intatto per il digitale.
+
+La consegna si dichiara dalla modifica firmata (ago 2026, dal campo: un
+venditore da Nostr che non può dichiarare la spedizione). I numeri
+misurati in produzione dicevano che non era un caso isolato — 6 righe
+senza consegna su 8 importati attivi, cioè NESSUN importato fisico
+l'aveva mai dichiarata, e in crescita (4 in quattro giorni contro 2 in
+tutto luglio) — e che la strada era già aperta per tutti e sei
+(`npub_accesso`): mancava solo il campo, che il form nascondeva su una
+premessa invecchiata. Insieme, la cura del difetto che spogliava
+l'evento del venditore dei suoi tag di commercio: la stessa riga. Vedi
+Architettura, «LA CONSEGNA SI DICHIARA DALLA MODIFICA FIRMATA», per la
+regola in una frase, per «chiave assente = conserva» (che protegge i
+due digitali corretti a mano dal client rimasto in cache) e per la zona
+che può essere fuori dall'Italia.
+DUE COSE TROVATE MISURANDO, e sono la parte da ricordare: le quattro
+zone dei sei erano «tutte compilate» ma **«baixllobregat» e «maresme»
+non sono comuni italiani**, quindi con la guardia intera due venditori
+su sei non avrebbero dichiarato niente (da lì `esigi_luogo`); e il
+sottotitolo del form firmato prometteva «la consegna compresa» anche
+sui digitali, dove il blocco non c'è — visto a schermo, non leggendo.
+Collaudato: 4242 prove verdi (+87, fra cui il giro chiuso ESEGUIBILE
+`estrai_commercio(evento_annuncio_importato(riga))` e il nome di
+quell'evento entrato in tutte e cinque le tuple della cecità), il nuovo
+`collaudo_consegna_firmata.py` (27 verdi: i due endpoint veri con una
+firma Schnorr vera su database usa-e-getta — il giro completo, le
+colonne che non si toccano, il 400 sul digitale, la zona catalana, e il
+client di ieri che NON azzera niente), e **21 mutazioni, 0
+sopravvissute**. La tortura ha fatto il suo mestiere: tre sentinelle
+mie erano deboli o vacue — una guardava solo che un id esistesse — e
+una mutazione era mirata male (colpiva `modifica_annuncio` invece della
+fase 1, che quella stringa vive in due posti). In più ha scoperto un
+caso che nessun collaudo esercitava, «chiave presente ma VUOTA», che
+adesso c'è. IN PRODUZIONE basta il deploy: nessuna colonna, nessuna
+migrazione, nessuna leva. DA GUARDARE al primo giro: il primo dei sei
+che dichiara la spedizione, e che il suo evento su njump porti il tag
+`delivery` — è l'unica prova che il cerchio si chiude davvero.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
