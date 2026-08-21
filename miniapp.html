@@ -15781,15 +15781,21 @@ function openOrder(id){
             lo scrive la rivelazione del codice, che e' una ricevuta
             vera, e i due bottoni qui sotto lo servono ancora. */''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
-      ${/* A 'confirmed' ci si arriva in DUE modi, e fino a ieri la
-            riga ne raccontava uno solo: «Hai confermato… per te e'
-            tutto fatto!», che a chi l'affare l'ha chiuso un TIMER dice
-            l'esatto contrario del vero. */''}
-      ${o.role==='buyer' && s==='confirmed' && !chiusoDalTimer(s, o.sbloccatoAuto) ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
+            raccontava uno solo: «Hai confermato… per te e' tutto
+            fatto!», che a chi l'affare l'ha chiuso un TIMER dice
+            l'esatto contrario del vero — e a chi ha PERSO UNA DISPUTA
+            pure, perche' non ha confermato proprio niente. Il timer
+            era gia' escluso; la disputa no, ed era un difetto muto.
+            Adesso il giudice e' quello del pannello feedback qui
+            sotto: la nota e il voto rispondono alla STESSA domanda —
+            «questo confirmed e' chiuso davvero?» — e non possono piu'
+            dire due cose diverse a due righe di distanza. */''}
+      ${o.role==='buyer' && s==='confirmed' && !decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto) ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${notaChiusoDalTimer(o, s)}
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
-      ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
+      ${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}
       ${o.role==='admin'
         ? pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")
           + pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
@@ -19615,6 +19621,21 @@ function chiusoDalTimer(stato, autoIl){
 function decidibileDalModeratore(stato, disputata, autoIl){
   return chiusoDalTimer(stato, autoIl)
       || (!!disputata && ['confirmed','refund'].includes(stato));
+}
+/* IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO — il gemello di
+   `_ammette_feedback` del server, e la parita' fra i due si gira in CI
+   invece di sperarci (prima il client duplicava l'elenco a mano e
+   nessuna prova lo teneva in pari col gate).
+   NON serve un giudice NUOVO per il «confirmed non riapribile»: e'
+   `decidibileDalModeratore` rovesciato, cioe' esattamente la stessa
+   domanda — «questo confirmed lo puo' ancora toccare un moderatore?».
+   Scriverne un secondo vorrebbe dire due risposte possibili su un
+   ordine solo. */
+function puoiLasciareFeedback(o){
+  if (o.role==='admin') return false;
+  if (['released','refunded'].includes(o.state)) return true;
+  return o.state==='confirmed'
+      && !decidibileDalModeratore(o.state, o.disputata, o.sbloccatoAuto);
 }
 /* La riga permanente per chi ha comprato. LA NOTIFICA PASSA, LA RIGA
    RESTA: chi apre l'ordine tre giorni dopo per capire cos'e' successo

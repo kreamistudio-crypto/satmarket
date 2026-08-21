@@ -21032,12 +21032,24 @@ def prove_porta_timer():
     prova("...e il badge della coda pure", True,
           "decidibileDalModeratore(o.stato, o.disputata, o.sbloccato_auto_il)"
           in mini)
-    prova("la riga del compratore su 'confirmed' e' spaccata in due", True,
-          "s==='confirmed' && !chiusoDalTimer(s, o.sbloccatoAuto)" in mini)
-    # LA RIGA DA NON AMMORBIDIRE: la riga del compratore legge la META'
-    # TIMER e non tutta la porta. Sul 'confirmed' con disputata=1 la
-    # porta c'e' gia', ma «il tempo e' scaduto e l'affare si e' chiuso
-    # da solo» sarebbe FALSO: li' ha deciso un moderatore.
+    # LE DUE RIGHE DEL COMPRATORE SU 'confirmed' RESTANO DUE, e da ago
+    # 2026 hanno due giudici DIVERSI — non piu' lo stesso spaccato a
+    # meta'. «Hai confermato la ricezione… per te e' tutto fatto!» deve
+    # tacere su TUTTA la porta: escludeva il timer ma non la disputa,
+    # quindi a chi aveva PERSO una disputa diceva il falso (non ha
+    # confermato niente). Ora usa lo stesso giudice del pannello
+    # feedback, che risponde alla sua stessa domanda — «questo
+    # confirmed e' chiuso davvero?».
+    prova("la riga «hai confermato» tace su tutta la porta", True,
+          "s==='confirmed' && !decidibileDalModeratore(s, o.disputata,"
+          " o.sbloccatoAuto)" in mini)
+    # Conseguenza voluta: sul confirmed disputato NESSUNA delle due
+    # righe si accende, e va bene — quel compratore ha gia' il suo
+    # messaggio dal bot, e `notaFermo` copre l'ordine che si attarda.
+    # LA RIGA DA NON AMMORBIDIRE: la riga del TIMER invece legge la
+    # META' TIMER e non tutta la porta. Sul 'confirmed' con disputata=1
+    # la porta c'e' gia', ma «il tempo e' scaduto e l'affare si e'
+    # chiuso da solo» sarebbe FALSO: li' ha deciso un moderatore.
     riga = pezzo_js(mini, "function notaChiusoDalTimer(o, s){", "\n}") + "\n}"
     prova("la riga NON passa dal giudice della porta", False,
           "decidibileDalModeratore" in riga)
@@ -21421,6 +21433,171 @@ def prove_consegna_firmata():
           in pezzo_js(mini, "async function publish()"))
 
 
+def prove_feedback_confermato():
+    """IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026): chi ha
+    comprato vota appena dichiara di aver ricevuto l'oggetto, senza
+    aspettare che il venditore abbia messo un wallet.
+
+    Il gate non era coperto da NIENTE: STATI_FEEDBACK non compariva mai
+    qui dentro, e il client duplicava l'elenco a mano senza che nessuna
+    prova lo tenesse in pari — mentre il gemello NASCONDIBILI ce
+    l'aveva. Meta' del valore di questo cantiere sta in queste righe."""
+    print("\n[il feedback si apre alla conferma]")
+    import re as _re
+    import sqlite3 as _sq
+    amb = {"STATI_FEEDBACK": ("released", "refunded")}
+    exec(pezzo("_ammette_feedback"), amb)
+    giudice = amb["_ammette_feedback"]
+
+    # ---- 1. Il giudice, sui casi che decidono.
+    prova("released: vota (com'e' sempre stato)", True,
+          giudice("released", 0, 0))
+    prova("refunded: vota (anche gli affari finiti male)", True,
+          giudice("refunded", 0, 0))
+    prova("confirmed da conferma di persona: VOTA", True,
+          giudice("confirmed", 0, 0))
+    prova("confirmed chiuso dal TIMER: no", False,
+          giudice("confirmed", 0, 1_755_000_000))
+    prova("confirmed da DISPUTA decisa: no", False,
+          giudice("confirmed", 1, 0))
+    prova("confirmed disputato E dal timer: no", False,
+          giudice("confirmed", 1, 1_755_000_000))
+    # 'refund' resta fuori DICHIARATO: e' il gemello di confirmed dal
+    # lato rimborso, ma ci si arriva solo da una disputa o da un reso.
+    prova("refund: no, nemmeno a disputata=0", False,
+          giudice("refund", 0, 0))
+    for s in ("creato", "locked", "shipped", "delivered", "dispute",
+              "return_pending", "return_shipped", "annullato"):
+        prova(f"{s}: l'affare non e' finito, niente voto", False,
+              giudice(s, 0, 0))
+
+    # ---- 2. LA PROVA REGINA — il giudice e la PORTA DEL MODERATORE
+    # non sono MAI veri insieme. La WHERE non si ricopia: si ESTRAE da
+    # risolvi_disputa e si fa GIRARE, cosi' il giorno che qualcuno la
+    # allarga questa riga diventa rossa invece di lasciare il giudice
+    # falso in silenzio — che e' l'unico modo in cui il cantiere puo'
+    # rompersi senza fallire.
+    _rd = pezzo("risolvi_disputa")
+    _i = _rd.index('"SELECT * FROM ordini WHERE id=? AND ("')
+    _j = _rd.index("(ordine_id,)", _i)
+    _sql = "".join(_re.findall(r'"([^"]*)"', _rd[_i:_j]))
+    prova("la WHERE della porta si estrae davvero", True,
+          _sql.startswith("SELECT * FROM ordini WHERE id=?")
+          and "sbloccato_auto_il" in _sql)
+
+    con = _sq.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "disputata INTEGER, sbloccato_auto_il INTEGER)")
+    STATI = ("creato", "locked", "shipped", "delivered", "confirmed",
+             "released", "dispute", "return_pending", "return_shipped",
+             "refund", "refunded", "annullato")
+    insieme, apre_e_vota = [], []
+    n = 0
+    for st in STATI:
+        for disp in (0, 1):
+            for auto in (0, 1_755_000_000):
+                n += 1
+                con.execute("INSERT INTO ordini VALUES(?,?,?,?)",
+                            (n, st, disp, auto))
+                porta = con.execute(_sql, (n,)).fetchone() is not None
+                vota = giudice(st, disp, auto)
+                if porta and vota:
+                    insieme.append((st, disp, auto))
+                if st == "confirmed" and vota:
+                    apre_e_vota.append((disp, auto))
+    prova("PROVA REGINA: mai votabile e riapribile insieme (48 casi)",
+          [], insieme)
+    prova("...e il solo confirmed che vota e' quello di persona",
+          [(0, 0)], apre_e_vota)
+    con.close()
+
+    # ---- 3. Il gate chiama il giudice, e STATI_FEEDBACK non mente.
+    lf = codice(pezzo("lascia_feedback"))
+    prova("il gate passa dal giudice", True,
+          "_ammette_feedback(o[\"stato\"], o[\"disputata\"]," in lf)
+    prova("...e non da un `in STATI_FEEDBACK` a mano", False,
+          "in STATI_FEEDBACK" in lf)
+    prova("STATI_FEEDBACK resta la lista degli ASSORBENTI", True,
+          'STATI_FEEDBACK = ("released", "refunded")' in _SORGENTE)
+    # Il giudice prende i CAMPI e non la riga (il patto di in_ferie):
+    # e' quel che lo rende girabile qui sopra.
+    prova("il giudice non tocca una riga di database", False,
+          any(x in codice(pezzo("_ammette_feedback"))
+              for x in ('o["', "con.", "SELECT")))
+
+    # ---- 4. Parita' client↔server, girata e non sperata.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    node = _sh.which("node")
+    if not node:
+        salta("client e server rispondono uguale", "node non installato")
+    else:
+        js_giudici = (pezzo_js(mini, "function chiusoDalTimer(")
+                      + "\n" + pezzo_js(mini, "function decidibileDalModeratore(")
+                      + "\n" + pezzo_js(mini, "function puoiLasciareFeedback("))
+        casi = [(s, d, a) for s in STATI for d in (0, 1)
+                for a in (0, 1_755_000_000)]
+        js = (js_giudici + "\nconst casi=" + _js.dumps(casi) + ";"
+              "console.log(JSON.stringify(casi.map(([state,disputata,"
+              "sbloccatoAuto])=>puoiLasciareFeedback("
+              "{state,disputata,sbloccatoAuto,role:'buyer'}))));")
+        r = _sp.run([node, "-e", js], capture_output=True, text=True,
+                    encoding="utf-8")
+        try:
+            risposte = _js.loads((r.stdout or "").strip())
+        except Exception:
+            risposte = r.stderr
+        prova("client e server rispondono uguale su tutti i 48 casi",
+              [giudice(*c) for c in casi], risposte)
+        # La guardia dell'admin vive SOLO nel client (il server non ha
+        # quel ruolo: li' l'admin non e' parte dell'ordine e cade sul
+        # 403 di proprieta').
+        js_admin = (js_giudici + "console.log(puoiLasciareFeedback("
+                    "{state:'released',disputata:0,sbloccatoAuto:0,"
+                    "role:'admin'}));")
+        r2 = _sp.run([node, "-e", js_admin], capture_output=True,
+                     text=True, encoding="utf-8")
+        prova("il moderatore non vota mai", "false",
+              (r2.stdout or r2.stderr).strip())
+        # E IL PANNELLO SI MONTA DAVVERO: il giudice dice «si'», ma la
+        # resa e' un'altra domanda — su 'confirmed' devono uscire le
+        # cinque stelle vuote e l'invito, cioe' il ramo «da votare»;
+        # e su un ordine gia' votato il ramo «Feedback lasciato».
+        js_res = (js_giudici + pezzo_js(mini, "function feedbackPanel(o){",
+                                        "\n}\n") + "\n}\n"
+                  + "const esc=s=>s;const o={state:'confirmed',disputata:0,"
+                  "sbloccatoAuto:0,role:'buyer',mioVoto:0,suoVoto:0};"
+                  "const h=puoiLasciareFeedback(o)?feedbackPanel(o):'';"
+                  "console.log(JSON.stringify({monta:!!h,"
+                  "stelle:(h.match(/fbStella/g)||[]).length,"
+                  "invita:h.includes('Lascia un feedback')}));")
+        r3 = _sp.run([node, "-e", js_res], capture_output=True,
+                     text=True, encoding="utf-8")
+        prova("su 'confirmed' il pannello esce, con le sue cinque stelle",
+              {"monta": True, "stelle": 5, "invita": True},
+              _js.loads((r3.stdout or "{}").strip())
+              if r3.returncode == 0 else (r3.stderr or "")[:160])
+
+    # ---- 5. I due punti d'uso, e il giudice unico della vista.
+    ordine = pezzo_js(mini, "function openOrder(", fine="\n  go('ordine');")
+    prova("il pannello passa dal giudice", True,
+          "${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}" in ordine)
+    prova("...e il letterale non torna", False,
+          "['released','refunded'].includes(s) && o.role!=='admin'" in ordine)
+    # LA TRUST-NOTE E IL PANNELLO RISPONDONO ALLA STESSA DOMANDA: la
+    # riga «Hai confermato la ricezione… per te e' tutto fatto!»
+    # escludeva il timer ma NON la disputa, quindi a chi aveva PERSO
+    # una disputa diceva il falso. Ora chiamano lo stesso giudice, e
+    # non possono piu' divergere a due righe di distanza.
+    prova("la nota del compratore guarda anche la disputa", True,
+          "s==='confirmed' && !decidibileDalModeratore(s, o.disputata,"
+          " o.sbloccatoAuto)" in ordine)
+    prova("...e chiusoDalTimer non decide piu' da solo, li' dentro",
+          False, "!chiusoDalTimer(s, o.sbloccatoAuto)" in ordine)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -21476,7 +21653,7 @@ def main():
               prove_nwc_cifratura,
               prove_pagina_dati,
               prove_font,
-              prove_porta_timer,
+              prove_porta_timer, prove_feedback_confermato,
               prove_sintassi_client,
               prove_foto_vuota):
         try:

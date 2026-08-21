@@ -24758,7 +24758,43 @@ def import_stato(biglietto: str, x_tg_init_data: str = Header(""),
 # commento breve. Anche 'refunded' conta: e' una transazione vera, e
 # nascondere proprio quelle andate male gonfierebbe tutti i profili.
 
-STATI_FEEDBACK = ("released", "refunded")   # gli stati che ammettono il voto
+STATI_FEEDBACK = ("released", "refunded")   # gli stati ASSORBENTI
+
+
+def _ammette_feedback(stato, disputata, sbloccato_auto_il) -> bool:
+    """IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026, decisione
+    di Andrea da un caso vero): chi ha comprato deve poter votare appena
+    dichiara di aver ricevuto l'oggetto, senza aspettare che il venditore
+    abbia messo un wallet — quella e' una leva sua, non di chi compra.
+    Prende i CAMPI e non la riga (il patto di `in_ferie`): cosi' lo
+    stesso giudice serve il gate, i chiamanti futuri e la prova in CI.
+
+    Oltre ai due assorbenti passa il 'confirmed' NON RIAPRIBILE, ed e'
+    la meta' che regge tutto: `disputata=0 AND sbloccato_auto_il=0` e'
+    il COMPLEMENTO ESATTO delle due porte di `risolvi_disputa` — quel
+    confirmed lo puo' aver prodotto solo una conferma di persona, e li'
+    il commento della porta lo dichiara gia' («chi ha confermato di
+    persona resta chiuso, e nessuno puo' riaprire da solo un affare
+    concluso»). Quindi l'invariante di sempre NON si perde: il feedback
+    si lascia solo dove lo stato non puo' piu' cambiare, e la domanda
+    «e se dopo finisce in disputa?» non si pone.
+
+    CHI RESTA FUORI, e merita di restarci: il confirmed chiuso da un
+    TIMER (nessuno ha confermato niente, e' scaduto il tempo — e la
+    porta del moderatore e' aperta) e quello da DISPUTA decisa (c'e'
+    stata una lite, ed e' ancora ridecidibile). Fuori anche 'refund',
+    dichiarato: ci si arriva solo da una disputa o da un reso, quindi
+    ha praticamente sempre `disputata=1` — nominarlo qui vorrebbe dire
+    un caso in elenco che non scatta mai.
+
+    ⚠️ Se un domani qualcuno allarga la WHERE di `risolvi_disputa`,
+    questa riga diventa falsa IN SILENZIO: a impedirlo c'e' la prova
+    che gira quella query vera e chiede che le due non siano mai vere
+    insieme."""
+    if stato in STATI_FEEDBACK:
+        return True
+    return (stato == "confirmed" and not disputata
+            and not sbloccato_auto_il)
 
 
 def _ricalcola_rating(con, tg_id: int):
@@ -24813,7 +24849,8 @@ async def lascia_feedback(ordine_id: int, req: Request,
         if user["id"] not in (o["compratore_id"], o["venditore_id"]):
             con.rollback()
             raise HTTPException(403, "Operazione non permessa")
-        if o["stato"] not in STATI_FEEDBACK:
+        if not _ammette_feedback(o["stato"], o["disputata"],
+                                 o["sbloccato_auto_il"]):
             con.rollback()
             raise HTTPException(400, "Il feedback si lascia a affare concluso")
         per = (o["venditore_id"] if user["id"] == o["compratore_id"]

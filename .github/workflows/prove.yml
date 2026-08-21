@@ -60,6 +60,7 @@ jobs:
              converti_soglie_euro.py recupera_cambi_ordini.py
              stima_coda_moderazione.py collaudo_altri_oggetti.py
              collaudo_reti.py collaudo_nota.py collaudo_porta_timer.py
+             collaudo_feedback_confermato.py
              collaudo_pausa.py collaudo_due_teste.py
              collaudo_consegna_firmata.py
 
