@@ -5142,7 +5142,11 @@ document.getElementById('cartello')?.remove();</script>
        Scrittura ASSOLUTA, come l'endpoint: quanti pezzi hai ORA. -->
   <div class="sheet" id="rifornisciSheet">
     <div class="grab"></div>
-    <h3>🔄 Rifornisci l'annuncio</h3>
+    <!-- Titolo e verbo del bottone cambiano col numero: da un annuncio
+         ATTIVO questo foglio fa due mestieri (rifornire, e dire «per
+         ora e' finito»), e il bottone dev'essere quello che si sta per
+         premere. Li scrive apriRifornisci/rifDigitata. -->
+    <h3 id="rifTitolo">🔄 Rifornisci l'annuncio</h3>
     <!-- La testata (miniatura + titolo + stato di adesso): apriRifornisci() -->
     <div id="rifTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
     <!-- IL CAMPO E' LA VERITA', lo stepper ci scrive dentro: e' lo
@@ -5158,7 +5162,7 @@ document.getElementById('cartello')?.remove();</script>
     </div>
     <div id="rifNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px;line-height:1.4">È il numero che hai <b>adesso</b>, non quanti ne aggiungi. Non tocca nient'altro: gli affari in corso restano dove sono.</div>
-    <button class="btn orange" style="margin-top:12px" onclick="inviaRifornimento(this)">🔄 Rifornisci</button>
+    <button class="btn orange" id="rifInvia" style="margin-top:12px" onclick="inviaRifornimento(this)">🔄 Rifornisci</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -12580,6 +12584,25 @@ function openDetail(id){
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
+                e' obbligatoria: le tre strade che aprivano il foglio
+                erano tutte gatate sull'esaurito, quindi senza questa
+                «per ora e' finito» sarebbe un gesto che nessuno puo'
+                fare. E' il gemello del bottone arancio che
+                bloccoMioEsaurito mette QUI quando l'annuncio e' finito:
+                la scheda e' dove il proprio annuncio si gestisce.
+                Sta fra Modifica ed Elimina, che l'ordine della colonna
+                e' occasione → ritocco → stock → uscita, e l'uscita
+                rossa resta ultima.
+                SCARTATO il terzo badge nella riga di «I tuoi annunci»,
+                ed e' una misura: .mio-azioni e' flex-wrap e a 320px la
+                riga concede 196px, che la coppia Modifica+Elimina
+                chiede gia' tutti (fianco sceso a 12 apposta) — un terzo
+                badge va a capo e fa crescere OGNI riga della lista.
+                L'importato non ce l'ha: la sua quantita' vive sui
+                relay e ricarica_quantita risponde 400 (la stessa
+                guardia di bottoneRifornisci). -->
+           ${l.nostr ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
            <!-- L'uscita della colonna, e ora un bottone vero: il
                 testuale sottolineato spariva fra due ghost — proprio
                 il gesto che non si torna indietro. Il testo dice solo
@@ -19558,9 +19581,20 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
    dove viene. Tocca SOLO la quantita' (il server non aspetta gli
    affari in corso) e un esaurito torna in vetrina da solo.
    Scrittura ASSOLUTA: quanti pezzi hai ORA. */
-let rifId = 0;
-const rifQta = () => Math.max(1,
-  parseInt(String(el('rifQtaInp').value).replace(/\D/g, ''), 10) || 1);
+let rifId = 0, rifMin = 1;
+/* IL PAVIMENTO E' UNA VARIABILE (ago 2026): 0 su un annuncio ATTIVO,
+   dove lo zero e' il gesto «per ora e' finito»; 1 su uno gia'
+   esaurito, perche' li' segnare esaurito non cambierebbe niente e uno
+   stepper che ci arriva prometterebbe un gesto che non succede.
+   E IL `|| 1` NON PUO' TORNARE, ed e' la riga da non ammorbidire:
+   lo zero e' falsy, quindi `parseInt("0") || 1` fa UNO — il gesto non
+   partirebbe mai, e non si vedrebbe da nessun errore. isFinite separa
+   il campo VUOTO (che non e' un gesto: vale 1, il default di sempre)
+   dallo ZERO SCRITTO APPOSTA. */
+const rifQta = () => {
+  const n = parseInt(String(el('rifQtaInp').value).replace(/\D/g, ''), 10);
+  return Number.isFinite(n) ? Math.max(rifMin, n) : 1;
+};
 
 function apriRifornisci(id){
   haptic();
@@ -19576,6 +19610,13 @@ function apriRifornisci(id){
     <span style="font-size:12.5px;color:var(--muted);font-weight:700">${esaurito(l)
       ? 'ora è esaurito'
       : `ora in vetrina con ${fmt(l.quantita||1)} pezz${(l.quantita||1)===1?'o':'i'}`}</span></div>`;
+  /* Il foglio si apre sempre sul numero di ADESSO, mai su zero: il
+     gesto si sceglie, non si trova gia' scelto. */
+  rifMin = esaurito(l) ? 1 : 0;
+  /* Il 🔄 resta in tutti e due i casi: e' il gesto del VENDITORE (il
+     📦 e' gia' del pacco della taglia, e qui parlerebbe di spedizioni). */
+  el('rifTitolo').textContent = esaurito(l)
+    ? "🔄 Rifornisci l'annuncio" : '🔄 Aggiorna i pezzi';
   el('rifQtaInp').value = String(Math.max(1, l.quantita || 1));
   rifDigitata();
   el('sheetBg').classList.add('open');
@@ -19583,7 +19624,7 @@ function apriRifornisci(id){
 }
 function rifPasso(d){
   haptic();
-  el('rifQtaInp').value = String(Math.max(1, rifQta() + d));
+  el('rifQtaInp').value = String(Math.max(rifMin, rifQta() + d));
   rifDigitata();
 }
 function rifDigitata(){
@@ -19591,17 +19632,32 @@ function rifDigitata(){
   /* Lo stepper e' il chip di casa con le SUE chiamate: setQta e' del
      COMPRATORE e qui non c'entra — e i due non si vedono nemmeno,
      perche' l'aggiornamento in-place di setQta guarda solo
-     #detailContent e #barraCompra. */
-  el('rifStepper').innerHTML =
-    stepperMini(n, 'rifPasso(-1)', 'rifPasso(1)', n <= 1, false);
+     #detailContent e #barraCompra.
+     L'ETICHETTA del «−» dice il GESTO quando il prossimo passo e' il
+     gesto (il 6° argomento esiste apposta): e' cio' che lo rende
+     scopribile a chi lo stepper non lo vede. */
+  el('rifStepper').innerHTML = stepperMini(
+    n, 'rifPasso(-1)', 'rifPasso(1)', n <= rifMin, false,
+    (rifMin === 0 && n === 1) ? 'Segna esaurito' : '');
   const nota = el('rifNota');
   nota.style.color = 'var(--ink-soft)';
-  nota.innerHTML = `Torna in vetrina con <b>${fmt(n)} pezz${n===1?'o':'i'}</b>`;
+  /* La nota a zero dice cosa succede E COSA NON SUCCEDE: la paura di
+     chi preme e' di perdere l'annuncio, ed e' esattamente la cosa che
+     non accade. La riga sulle offerte si dice SEMPRE, anche quando non
+     ce n'e' nessuna: e' la regola, non un conteggio — il client le
+     offerte ricevute su quell'annuncio non le conosce. */
+  nota.innerHTML = n === 0
+    ? `Esce dalla vetrina come <b>esaurito</b>: il link resta vivo e lo `
+      + `ritrovi negli Esauriti del tuo negozio. Le offerte aperte su `
+      + `questo annuncio decadono, e finché è esaurito non si modifica.`
+    : `Torna in vetrina con <b>${fmt(n)} pezz${n===1?'o':'i'}</b>`;
+  el('rifInvia').textContent = n === 0 ? '⏸ Segna esaurito' : '🔄 Rifornisci';
 }
 async function inviaRifornimento(btn){
   haptic();
   const id = rifId, q = rifQta();
-  const ripristina = bottoneInAttesa(btn, '🔄 Rifornisco…');
+  const ripristina = bottoneInAttesa(btn,
+    q === 0 ? '⏸ Segno…' : '🔄 Rifornisco…');
   try {
     const r = await fetch(`${API_BASE}/listings/${id}/quantita`, {
       method:'POST',
@@ -19617,7 +19673,11 @@ async function inviaRifornimento(btn){
       return;
     }
     closeSheet();
+    /* IL TOAST LO DECIDE IL SERVER e non `q === 0`: solo lui sa se c'e'
+       stato un PASSAGGIO, e di un no-op (segnare esaurito cio' che e'
+       gia' esaurito) non si annuncia niente. */
     toast(d.riattivato ? '⚡ Annuncio di nuovo in vetrina!'
+                       : d.esaurito ? '⏸ Segnato esaurito'
                        : '✔ Quantità aggiornata');
     await dopoRifornimento(id);
   } catch(e) {
@@ -19634,6 +19694,20 @@ async function inviaRifornimento(btn){
 async function dopoRifornimento(id){
   await loadListings();
   await loadMyListings();
+  /* IL CATALOGO VA RIALLINEATO A MANO NEL VERSO DELLA PAUSA (ago 2026,
+     difetto visto dal vivo e non leggendo): `listings` e' un catalogo
+     che ACCUMULA e non si svuota, e un annuncio appena messo in pausa
+     dalla vetrina se ne va — quindi loadListings non lo aggiorna piu',
+     e la copia stantia resta li' ATTIVA. Il dettaglio riaperto un
+     istante dopo la pescava di la' e disegnava la scheda comprabile,
+     col recinto e il suo «Acquista».
+     Nel verso opposto non si vedeva: rifornendo, l'annuncio TORNA in
+     vetrina e la sua riga fresca arriva col giro di sempre.
+     La riga giusta ce l'abbiamo gia' in mano — «I tuoi annunci» porta
+     anche i venduti — quindi non si inventa niente e non si chiede
+     niente al server: si travasa quella. */
+  const fresco = myListings.find(x => x.id === id);
+  if (fresco) inCatalogo([fresco]);
   renderMyListings();
   renderGrid();
   const attiva = v => el('view-'+v) && el('view-'+v).classList.contains('active');
@@ -19970,9 +20044,14 @@ async function caricaPreferiti(){
     if (!r.ok) return;
     myPreferiti = (await r.json()).map(mapListing);
     preferiti = new Set(myPreferiti.map(l=>l.id));
-    /* gli attivi entrano nel catalogo: openDetail li trova anche
-       oltre le pagine caricate della vetrina */
-    inCatalogo(myPreferiti.filter(l=>l.stato==='attivo'));
+    /* entrano nel catalogo: openDetail li trova anche oltre le pagine
+       caricate della vetrina. Anche gli ESAURITI (ago 2026), o la
+       porta appena aperta in renderPreferiti darebbe «Annuncio non
+       trovato»: e' lo stesso insieme di stati che il server serve da
+       /api/listings/{id}. Il 'rimosso' resta fuori — di la' e' un 404
+       e di qua non si apre. */
+    inCatalogo(myPreferiti.filter(
+      l => l.stato === 'attivo' || l.stato === 'venduto'));
     aggiornaBarattolo();
     aggiornaJarCards();   /* le card possono essere nate prima del Set */
   } catch(e) {}
@@ -20122,7 +20201,18 @@ function renderPreferiti(){
     return;
   }
   box.innerHTML = myPreferiti.map(l => {
+    /* SPENTO NON VUOL DIRE CHIUSO (ago 2026), ed e' la stessa lezione
+       gia' scritta in rigaMioAnnuncio: il grigio dice «non si compra»
+       e vale per tutti, la PORTA la chiude solo cio' che non c'e' piu'
+       davvero. L'ESAURITO si apre — un_annuncio serve gli stati
+       ('attivo','venduto'), quindi la scheda esiste e ha il suo «Per
+       ora e' esaurito» — e senza questa riga il barattolo negava
+       proprio il ritrovamento che quella scheda promette («mettilo nel
+       barattolo 🫙 per ritrovarlo al volo»). Il 'rimosso' resta chiuso:
+       quello non e' uno scaffale vuoto, e' un annuncio che non esiste
+       piu'. */
     const vivo = l.stato === 'attivo';
+    const apre = vivo || esaurito(l);
     const spento = vivo ? '' : ';filter:grayscale(1);opacity:.6';
     const th = l.photos && l.photos[0]
       ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento}">`
@@ -20130,9 +20220,9 @@ function renderPreferiti(){
     return `
     <div class="order">
       <div class="row">
-        <b ${vivo?`onclick="openDetail(${l.id})" style="cursor:pointer;`:'style="'}display:flex;align-items:center;gap:8px;min-width:0">${th}<span style="overflow:hidden;text-overflow:ellipsis${vivo?'':';color:var(--muted)'}">${esc(l.title)}</span></b>
+        <b ${apre?`onclick="openDetail(${l.id})" style="cursor:pointer;`:'style="'}display:flex;align-items:center;gap:8px;min-width:0">${th}<span style="overflow:hidden;text-overflow:ellipsis${vivo?'':';color:var(--muted)'}">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
-          ${vivo?'':'<span class="badge" style="background:var(--off-bg);color:var(--muted)">non più disponibile</span>'}
+          ${vivo?'':`<span class="badge" style="background:var(--off-bg);color:var(--muted)">${esaurito(l)?'per ora esaurito':'non più disponibile'}</span>`}
           <span class="badge" onclick="togglePreferito(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Togli dal barattolo">🫙 Togli</span>
         </span>
       </div>

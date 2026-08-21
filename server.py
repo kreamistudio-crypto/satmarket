@@ -4275,20 +4275,39 @@ async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
     return valuta, prezzo_sats, prezzo_eur
 
 
-def quantita_da_payload(d, se_manca: int = 1) -> int:
-    """Il giudice unico della quantita' (pubblica, modifica, ricarica,
-    import CSV). Assente = se_manca (i client di ieri non la mandano,
-    e in modifica l'assenza deve conservare lo stock, mai azzerarlo);
-    storta o sotto l'1 = 1; oltre il tetto = 400 onesto, non un clamp
-    muto (chi scrive 10000 deve saperlo)."""
+def quantita_da_payload(d, se_manca: int = 1,
+                        zero_ammesso: bool = False) -> int:
+    """Il giudice unico della quantita' (pubblica, modifica, ricarica —
+    l'import CSV ha il suo gemello tollerante). Assente = se_manca (i
+    client di ieri non la mandano, e in modifica l'assenza deve
+    conservare lo stock, mai azzerarlo); storta o sotto l'1 = 1; oltre
+    il tetto = 400 onesto, non un clamp muto (chi scrive 10000 deve
+    saperlo).
+
+    LO ZERO NON E' UN NUMERO PICCOLO, E' UN VERBO (ago 2026): dice «per
+    ora e' finito», e lo riceve solo la rotta che ha un verbo per
+    interpretarlo — in pubblica sarebbe un annuncio nato morto, in
+    modifica uno svuotamento per distrazione. Il permesso e' un
+    argomento che si deve SCRIVERE, come `se_manca`: il pavimento resta
+    1 per tutti gli altri, byte per byte.
+    E UN NUMERO ROTTO NON E' MAI UN GESTO, che e' la riga da non
+    ammorbidire: il negativo e la parola storta valgono 1 ANCHE col
+    permesso acceso. La forma che verrebbe naturale — un pavimento a
+    zero e un `n < pavimento` — farebbe passare un «-3» per una pausa,
+    e sarebbe il modo silenzioso di spegnere un annuncio per un refuso.
+    Il booleano lo stesso: `int(False)` fa 0, quindi senza quella riga
+    un client rotto potrebbe INVENTARE il gesto (oggi vale 1, e
+    continua a valere 1: non cambia niente per nessuno)."""
     v = d.get("quantita")
     if v in (None, ""):
         return se_manca
+    if isinstance(v, bool):
+        return 1
     try:
         n = int(v)
     except (TypeError, ValueError):
         return 1
-    if n < 1:
+    if n < 0 or (n == 0 and not zero_ammesso):
         n = 1
     if n > MAX_QUANTITA_ANNUNCIO:
         # Col tetto alto il numero va scritto leggibile, o il messaggio
@@ -9513,6 +9532,29 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     return {"ok": True}
 
 
+async def _avvisa_offerte_esaurito(compratori: list, titolo: str):
+    """Il garbo verso chi restava in trattativa quando il venditore
+    segna l'annuncio esaurito (ago 2026). Gira in sottofondo — il
+    venditore non deve aspettare N chiamate a Telegram col foglio
+    aperto — ed e' il gemello del 🕊 di _incassa_ordine, con DUE
+    parole diverse che sono la ragione per cui non si riusa quello:
+    «venduto a qualcun altro» qui sarebbe falso (non l'ha comprato
+    nessuno), e «resta in vetrina» pure (un esaurito esce dai filtri
+    stato='attivo': resta nel NEGOZIO, e da li' si ritrova).
+    Il titolo nasce SCAPPATO: le notifiche sono HTML e un «<» spegne
+    l'avviso in silenzio — il gemello non lo fa ancora, ed e' un buco
+    noto della famiglia B6 che qui non si ricopia."""
+    nome = html.escape((titolo or "?")[:60])
+    for tg_id in compratori:
+        try:
+            await notifica(tg_id,
+                f"🕊 «{nome}» per ora è esaurito: il venditore ha finito "
+                f"le scorte, e la tua offerta decade. Se rimette dei "
+                f"pezzi lo ritrovi nel suo negozio.")
+        except Exception as e:
+            print(f"⚠️ Avviso offerta decaduta saltato ({tg_id}): {e}")
+
+
 @app.post("/api/listings/{annuncio_id}/quantita")
 async def ricarica_quantita(annuncio_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -9522,12 +9564,24 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     degli affari in corso: chi ha gia' pagato non conta sul numero in
     vetrina, e il negozio con spedizioni sempre aperte deve poter
     ricaricare il miele. Scrittura ASSOLUTA: il venditore dice quanti
-    pezzi ha ORA (il rimborso invece somma). Un esaurito con pezzi
-    nuovi torna in vetrina da solo, senza promo ne' match: ricaricare
-    non e' pubblicare."""
+    pezzi ha ORA (il rimborso invece somma).
+
+    VA NEI DUE VERSI (ago 2026): un esaurito con pezzi nuovi torna in
+    vetrina da solo — senza promo ne' match, che ricaricare non e'
+    pubblicare — e uno ZERO dice «per ora e' finito», che e' lo
+    speculare esatto. Prima quel gesto non c'era, e chi finiva le
+    scorte poteva solo RIMUOVERE l'annuncio (e perdeva il link, la
+    moderazione e le offerte) o chiudere l'INTERO negozio con le
+    ferie. Lo stato non e' nuovo: e' il 'venduto' di sempre,
+    l'invariante venduto <=> quantita=0 — quindi card grigia, scaffale
+    «Esauriti di recente», link vivo e badge «Ne resta 1» spento
+    arrivano tutti gratis, senza una riga di vetrina."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    quantita = quantita_da_payload(d)
+    # L'UNICO chiamante col permesso dello zero: qui c'e' un verbo per
+    # interpretarlo. `se_manca` resta 1 — un client di ieri che POSTa
+    # senza la chiave non mette in pausa niente.
+    quantita = quantita_da_payload(d, zero_ammesso=True)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato IN ('attivo','venduto')",
@@ -9551,17 +9605,55 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     riservati = _riservati(con, annuncio_id)
     if quantita < riservati:
         con.close()
+        # Il consiglio segue il GESTO: «scegli un numero piu' alto»
+        # contraddice chi ha appena chiesto di azzerare.
         raise HTTPException(400, f"{riservati} "
                             f"{'pezzo è' if riservati == 1 else 'pezzi sono'} "
-                            f"in pagamento proprio ora: riprova tra qualche "
-                            f"minuto o scegli un numero più alto")
-    riattivato = a["stato"] == "venduto"
+                            f"in pagamento proprio ora: " + (
+                                "aspetta qualche minuto e potrai segnarlo "
+                                "esaurito" if quantita == 0 else
+                                "riprova tra qualche minuto o scegli un "
+                                "numero più alto"))
+    # I DUE VERBI, e sono l'IDEMPOTENZA: guardano lo stato di PARTENZA,
+    # non solo la cifra. Segnare esaurito un annuncio gia' esaurito e'
+    # un no-op che non deve far ripartire niente — ne' i ganci verso le
+    # due piazze, ne' le notifiche a chi aveva offerto.
+    riattivato = a["stato"] == "venduto" and quantita > 0
+    esaurito_ora = a["stato"] == "attivo" and quantita == 0
     # Il massimo sale col MAX e non si assegna mai secco: chi rifornisce
     # UN pezzo dopo averne avuti dieci non deve perdere quella memoria,
     # o il badge «ultimo» direbbe di no proprio quando dice il vero.
+    # A zero il MAX non abbassa nulla per costruzione: la memoria dei
+    # pezzi ATTRAVERSA la pausa (e' il caso «esaurito: non si tocca»
+    # che la scopa d'avvio prova gia').
     con.execute("UPDATE annunci SET quantita=?, "
-                "quantita_max=MAX(quantita_max,?), stato='attivo' "
-                "WHERE id=?", (quantita, quantita, annuncio_id))
+                "quantita_max=MAX(quantita_max,?), stato=? WHERE id=?",
+                (quantita, quantita,
+                 "venduto" if quantita == 0 else "attivo", annuncio_id))
+    # Le offerte vive: decadono TUTTE E TRE, come all'esaurimento per
+    # vendita (_incassa_ordine), e nella stessa transazione. Non esiste
+    # davvero l'alternativa «restano vive»: scadenze_offerte guarda
+    # `a.stato != 'attivo'` e le raccoglierebbe comunque entro dieci
+    # minuti, col testo generico — farlo qui compra la tempestivita' e
+    # LE PAROLE VERE, non la correttezza. Anche le 'accettata':
+    # compra() rifiuta gia' l'annuncio non attivo, quindi un accordo su
+    # merce che non c'e' non e' onorabile (decisione di Andrea, ed e'
+    # l'asimmetria dichiarata con le FERIE — dove invece una stretta di
+    # mano gia' data TRATTIENE la partenza: li' la merce c'e' e il
+    # venditore e' solo via).
+    decadute = []
+    if esaurito_ora:
+        vive = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
+            "AND stato IN ('proposta','controproposta','accettata')",
+            (annuncio_id,)).fetchall()
+        if vive:
+            con.execute(
+                "UPDATE offerte SET stato='decaduta', aggiornato=? "
+                "WHERE annuncio_id=? AND stato IN "
+                "('proposta','controproposta','accettata')",
+                (int(time.time()), annuncio_id))
+            decadute = [r["compratore_id"] for r in vive]
     con.commit()
     con.close()
     if riattivato:
@@ -9570,7 +9662,25 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
         asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
                                               solo_aggiornamento=True))
         asyncio.create_task(promo_venduto(annuncio_id, venduto=False))
-    return {"ok": True, "quantita": quantita, "riattivato": riattivato}
+    elif esaurito_ora:
+        # Lo speculare esatto, ed e' un `elif` apposta: i due passaggi
+        # si escludono per costruzione, e cosi' nessuna svista futura
+        # puo' farli partire insieme.
+        # Sul canale la spunta dice «✅ Venduto» anche su una pausa
+        # (decisione di Andrea): una parola sola per «non si compra»,
+        # com'e' su Nostr, dove NIP-99 di stati ne ha due — active e
+        # sold — e non ne ha un terzo da dare a questo caso.
+        asyncio.create_task(annuncio_su_nostr(annuncio_id, "sold",
+                                              solo_aggiornamento=True))
+        asyncio.create_task(promo_venduto(annuncio_id))
+        if decadute:
+            asyncio.create_task(
+                _avvisa_offerte_esaurito(decadute, a["titolo"]))
+    # `quantita` dice dove si e', gli altri due se c'e' stato un
+    # PASSAGGIO: il client parla solo dei passaggi, che di un no-op non
+    # si annuncia niente.
+    return {"ok": True, "quantita": quantita, "riattivato": riattivato,
+            "esaurito": esaurito_ora}
 
 
 @app.post("/api/listings/{annuncio_id}/modifica")

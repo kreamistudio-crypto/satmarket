@@ -6007,6 +6007,189 @@ def prove_stock_raccontato():
           "${!esa && !ferie && !asta && lampoAttiva(l)?" in mini)
 
 
+def prove_pausa():
+    """«PER ORA E' FINITO» (ago 2026): il venditore che esaurisce le
+    scorte puo' dirlo, invece di scegliere fra rimuovere l'annuncio —
+    e perdere link, moderazione e offerte — o chiudere l'intero negozio
+    con le ferie. Lo stato non e' nuovo: e' il 'venduto' di sempre.
+    Le due righe che questo blocco difende piu' di tutte:
+    · UN NUMERO ROTTO NON E' MAI UN GESTO. Il permesso dello zero non
+      allenta il giudice per gli altri, e nemmeno per se': «-3» e
+      «abc» valgono 1 anche col permesso acceso. La forma che verrebbe
+      naturale — un pavimento a zero e un `n < pavimento` — spegnerebbe
+      un annuncio per un refuso, in silenzio.
+    · I DUE VERBI GUARDANO LO STATO DI PARTENZA. Sono l'idempotenza:
+      segnare esaurito cio' che e' gia' esaurito e' un no-op, e un
+      no-op non deve riscrivere le due piazze ne' riavvisare nessuno."""
+    print("\n[per ora e' finito]")
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    def prima(testo, a, b):
+        """«a viene prima di b», senza ESPLODERE se una delle due non
+        c'e': un index() nudo su una stringa sparita alza ValueError e
+        si porta dietro tutte le prove che vengono dopo nel blocco —
+        l'ha detto la tortura, non la rilettura."""
+        return a in testo and b in testo and testo.index(a) < testo.index(b)
+
+    def solo_codice(c):
+        """Il corpo SENZA la docstring, la lezione gia' pagata due
+        volte: qui la docstring dell'avviso NOMINA apposta le due
+        frasi che non deve dire, per spiegare perche' — cercarle nel
+        testo intero dava verdetti rovesciati."""
+        p = c.split('"""')
+        return p[0] + "".join(p[2:]) if len(p) > 2 else c
+
+    # ---- 1-11: il giudice, girato davvero -------------------------
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+
+    amb = {"MAX_QUANTITA_ANNUNCIO": 999999, "HTTPException": _HTTP}
+    exec(pezzo("quantita_da_payload"), amb)
+    q = amb["quantita_da_payload"]
+    prova("lo zero senza permesso resta 1", 1, q({"quantita": 0}))
+    prova("lo zero col permesso e' un gesto", 0,
+          q({"quantita": 0}, zero_ammesso=True))
+    prova("lo zero in stringa e' un gesto lo stesso", 0,
+          q({"quantita": "0"}, zero_ammesso=True))
+    # LE TRE CHE CONTANO: il permesso vale per lo ZERO, non per il resto
+    prova("il negativo non e' mai un gesto", 1,
+          q({"quantita": -3}, zero_ammesso=True))
+    prova("la parola storta non e' mai un gesto", 1,
+          q({"quantita": "abc"}, zero_ammesso=True))
+    prova("il booleano non e' mai un gesto (int(False) fa 0)", 1,
+          q({"quantita": False}, zero_ammesso=True))
+    prova("l'assenza conserva, non azzera", 7,
+          q({}, se_manca=7, zero_ammesso=True))
+    prova("il vuoto conserva anche lui", 7,
+          q({"quantita": ""}, se_manca=7, zero_ammesso=True))
+    try:
+        q({"quantita": 10 ** 9}, zero_ammesso=True)
+        alto = None
+    except _HTTP as e:
+        alto = e.status_code
+    prova("il tetto resta un 400 anche col permesso", 400, alto)
+    # e il permesso si deve SCRIVERE: un chiamante solo in tutto il file
+    prova("un solo chiamante chiede il permesso", 1,
+          _SORGENTE.count("zero_ammesso=True"))
+    prova("...ed e' la ricarica", True,
+          "zero_ammesso=True" in corpo("ricarica_quantita"))
+    prova("pubblica non lo chiede", False,
+          "zero_ammesso" in corpo("pubblica"))
+    prova("modifica non lo chiede", False,
+          "zero_ammesso" in corpo("modifica_annuncio"))
+
+    # ---- 12-24: la rotta ------------------------------------------
+    ric = corpo("ricarica_quantita")
+    prova("lo stato non si forza piu' ad attivo", False,
+          "stato='attivo' WHERE id=?" in ric)
+    prova("...si sceglie fra i due", True,
+          '"venduto" if quantita == 0 else "attivo"' in ric)
+    prova("il massimo continua a salire col MAX", True,
+          "quantita_max=MAX(quantita_max,?)" in ric)
+    # I DUE VERBI: senza lo stato di partenza il no-op non esiste piu'
+    prova("la riattivazione vuole pezzi veri E un esaurito", True,
+          'a["stato"] == "venduto" and quantita > 0' in ric)
+    prova("la pausa parte solo da un ATTIVO", True,
+          'a["stato"] == "attivo" and quantita == 0' in ric)
+    prova("i due passaggi si escludono (elif, non un secondo if)", True,
+          "elif esaurito_ora:" in ric)
+    prova("Nostr sente tutti e due i versi", True,
+          '"sold"' in ric and '"active"' in ric)
+    prova("il canale fa il viaggio nei due sensi", 2,
+          ric.count("promo_venduto("))
+    prova("la risposta dice il passaggio al client", True,
+          '"esaurito": esaurito_ora' in ric)
+    prova("...senza perdere la chiave di ieri", True,
+          '"riattivato": riattivato' in ric)
+    # la stringa e' spezzata a capo nel sorgente: si cerca il pezzo che
+    # sta su UNA riga, o la sentinella cade sulla piega (la lezione del
+    # censimento dei sats)
+    prova("il consiglio della guardia segue il gesto", True,
+          "e potrai segnarlo " in ric)
+    prova("...e la guardia viene PRIMA dell'UPDATE", True,
+          prima(ric, "riservati", "UPDATE annunci"))
+    # le due guardie di ieri non si sono allentate
+    prova("l'asta resta fuori (e' a pezzo unico)", True,
+          'a["asta_base_sats"] > 0' in ric)
+    prova("l'importato resta fuori (la quantita' vive sui relay)", True,
+          'a["contatto_nostr"]' in ric)
+
+    # ---- 25-31: le offerte ----------------------------------------
+    TRE = "('proposta','controproposta','accettata')"
+    prova("le offerte vive si leggono sui tre stati", True,
+          f"AND stato IN {TRE}" in ric)
+    prova("...e decadono sugli stessi tre", True,
+          f"stato='decaduta'" in ric and ric.count(TRE) == 2)
+    prova("la decadenza sta DENTRO il ramo della pausa", True,
+          prima(ric, "if esaurito_ora:", "stato='decaduta'"))
+    prova("...e PRIMA del commit (una transazione sola)", True,
+          prima(ric, "stato='decaduta'", "con.commit()"))
+    avv = solo_codice(corpo("_avvisa_offerte_esaurito"))
+    prova("il titolo dell'avviso nasce scappato", True,
+          "html.escape(" in avv)
+    prova("l'avviso non dice la bugia della vendita", False,
+          "qualcun altro" in avv)
+    prova("...ne' quella della vetrina", False, "in vetrina" in avv)
+    # la definizione piu' UNA chiamata sola: due occorrenze in tutto
+    prova("e parte solo dal ramo della pausa", 2,
+          _SORGENTE.count("_avvisa_offerte_esaurito("))
+    prova("...che e' dentro il ramo della pausa", True,
+          prima(ric, "elif esaurito_ora:", "_avvisa_offerte_esaurito("))
+
+    # ---- 32-42: il client -----------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rq = pezzo_js(mini, "const rifQta = () => {")
+    # LA RIGA CHE SI RIMETTE PER DISTRAZIONE: lo zero e' falsy, quindi
+    # quel ripiego lo scambierebbe per un campo vuoto e il gesto non
+    # partirebbe MAI — senza nessun errore da nessuna parte.
+    prova("il parser non scambia lo zero per un campo vuoto", True,
+          "Number.isFinite(n)" in rq)
+    prova("...e il ripiego falsy non torna", False, "|| 1" in rq)
+    apri = pezzo_js(mini, "function apriRifornisci(id){")
+    prova("il pavimento scende SOLO su un annuncio attivo", True,
+          "rifMin = esaurito(l) ? 1 : 0;" in apri)
+    prova("il foglio si apre sul numero di adesso, mai su zero", True,
+          "Math.max(1, l.quantita || 1)" in apri)
+    dig = pezzo_js(mini, "function rifDigitata(){")
+    prova("lo stepper si spegne sul pavimento, non sull'uno", True,
+          "n <= rifMin" in dig)
+    prova("il bottone dice il gesto che si sta per fare", True,
+          "'⏸ Segna esaurito' : '🔄 Rifornisci'" in dig)
+    prova("la nota a zero dice che il link resta vivo", True,
+          "il link resta vivo" in dig)
+    inv = pezzo_js(mini, "async function inviaRifornimento(btn){")
+    # il toast guarda la RISPOSTA: solo il server sa se c'e' stato un
+    # passaggio, e di un no-op non si annuncia niente. (`q === 0` nella
+    # funzione c'e' e ci deve stare: e' il testo d'attesa del bottone,
+    # che invece dipende da quel che si sta MANDANDO.)
+    prova("il toast lo decide il SERVER, non il numero mandato", True,
+          "d.esaurito ? '⏸ Segnato esaurito'" in inv)
+    # LA QUARTA PORTA: senza, il gesto non lo puo' fare nessuno —
+    # le tre strade di ieri sono tutte gatate sull'esaurito.
+    prova("la porta sull'attivo esiste, nella colonna del proprietario",
+          True, "🔄 Aggiorna i pezzi</button>" in mini)
+    prova("...e non la offre agli importati", True,
+          "${l.nostr ? '' : `<button class=\"btn ghost\" "
+          "onclick=\"apriRifornisci(" in mini)
+    prova("la card NON offre la pausa (li' si scorre, non si spegne)",
+          True, "if (!esaurito(l) || astaE(l) || l.nostr) return '';"
+          in pezzo_js(mini, "function bottoneRifornisci(l){"))
+
+    # ---- 43-45: il barattolo che si riapre ------------------------
+    pref = pezzo_js(mini, "function renderPreferiti(){", "\n}\n")
+    prova("nel barattolo l'esaurito si apre", True,
+          "const apre = vivo || esaurito(l);" in pref)
+    prova("...e lo dice con la sua parola", True,
+          "per ora esaurito" in pref)
+    prova("...e openDetail lo trova (entra in catalogo)", True,
+          "l.stato === 'attivo' || l.stato === 'venduto'"
+          in pezzo_js(mini, "async function caricaPreferiti(){"))
+
+
 def prove_firme_nostr():
     """L'annuncio di un doppio cittadino va sul SUO account Nostr
     (ago 2026). Il pezzo che conta e' il NON FATTO: quando il
@@ -19541,7 +19724,7 @@ def main():
               prove_barattolo_filtra,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
-              prove_ferie, prove_stock_raccontato,
+              prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,

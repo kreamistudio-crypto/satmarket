@@ -5932,6 +5932,134 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   giorno — chi aveva 10 pezzi e oggi ne ha 1 viene riallineato a 1, e
   niente si accende finché non rifornisce. Non è un guasto: è il prezzo
   di non inventare un passato.
+  «PER ORA È FINITO» (ago 2026): il venditore che esaurisce le scorte
+  lo dice, e prima non poteva. Le due strade erano tutte e due
+  sbagliate — RIMUOVERE (e con l'annuncio muoiono il link condiviso,
+  la posizione nell'indice, il post del canale, e per il venditore
+  anche il ritorno: `ricarica_quantita` accetta solo
+  ('attivo','venduto'), quindi da 'rimosso' non si torna, si
+  RIPUBBLICA, con id nuovo e moderazione da capo) oppure le FERIE, che
+  però chiudono l'INTERO negozio. La cura è ammettere lo ZERO in
+  `ricarica_quantita`, lo speculare esatto di quel che quella funzione
+  fa già quando riattiva un esaurito.
+  NIENTE STATO NUOVO E NIENTE COLONNE: è il 'venduto' di sempre e
+  l'invariante venduto ⟺ quantita=0 — quindi card grigia col badge
+  «Esaurito», foto spenta, scaffale «Esauriti di recente», link vivo,
+  badge «Ne resta 1» spento da sé e lampo che tace arrivano TUTTI
+  gratis, senza una riga di vetrina. Per chi compra la scheda dice già
+  da un mese la frase di questo cantiere: «**Per ora è esaurito.**
+  L'annuncio resta qui e non va da nessuna parte».
+  LO ZERO NON È UN NUMERO PICCOLO, È UN VERBO, ed è la riga da non
+  ammorbidire: `quantita_da_payload` prende `zero_ammesso` — un
+  permesso che si deve SCRIVERE, come `se_manca` — e il pavimento
+  resta 1 per `pubblica` e `modifica` byte per byte (là uno zero
+  sarebbe un annuncio nato morto, o uno svuotamento per distrazione).
+  E UN NUMERO ROTTO NON È MAI UN GESTO: `-3` e `"abc"` valgono 1
+  ANCHE col permesso acceso. LA FORMA CHE VERREBBE NATURALE È
+  SBAGLIATA — un `pavimento = 0 if zero_ammesso else 1` con `n <
+  pavimento` fa passare il «-3» per una pausa, cioè spegne un annuncio
+  per un refuso, in silenzio: c'è la mutazione che lo dice. Più il
+  booleano, che `int(False)` fa 0 e senza quella riga un client rotto
+  potrebbe INVENTARE il gesto (oggi vale 1 e continua a valere 1).
+  I DUE VERBI GUARDANO LO STATO DI PARTENZA (`riattivato` = era
+  venduto e ora ha pezzi; `esaurito_ora` = era attivo e ora è a zero),
+  e sono l'IDEMPOTENZA: segnare esaurito ciò che è già esaurito è un
+  no-op che non riscrive le due piazze e non riavvisa nessuno — non è
+  una forma, è una traccia di esecuzione, e si prova solo girandola.
+  I GANCI SONO TIRATI NEI DUE VERSI, in `elif` perché i due passaggi
+  si escludono per costruzione: `annuncio_su_nostr(..., "sold")` e
+  `promo_venduto(id)`. Sul canale la spunta dice «✅ Venduto» anche su
+  una pausa (decisione di Andrea): una parola sola per «non si
+  compra», com'è su Nostr, dove NIP-99 di stati ne ha DUE e non ne ha
+  un terzo da dare a questo caso.
+  LE OFFERTE DECADONO TUTTE E TRE — proposta, controproposta E
+  accettata — nella stessa transazione, come all'esaurimento per
+  vendita. NON ESISTE DAVVERO L'ALTERNATIVA «restano vive»:
+  `scadenze_offerte` guarda `a.stato != 'attivo'` e le raccoglierebbe
+  comunque entro dieci minuti, col testo generico — farlo nel gesto
+  compra la TEMPESTIVITÀ E LE PAROLE, non la correttezza. Anche le
+  'accettata': `compra()` rifiuta già l'annuncio non attivo, quindi un
+  accordo su merce che non c'è non è onorabile. ASIMMETRIA DICHIARATA
+  CON LE FERIE, dove invece una stretta di mano già data TRATTIENE la
+  partenza (`_impegni_aperti`): là la merce c'è e il venditore è solo
+  via, qui la merce non c'è.
+  IL 🕊 HA PAROLE SUE e non riusa quello di `_incassa_ordine`: «venduto
+  a qualcun altro» qui sarebbe falso (non l'ha comprato nessuno) e
+  «resta in vetrina» pure (un esaurito ESCE dai filtri stato='attivo':
+  resta nel NEGOZIO, e da lì si ritrova). Il titolo nasce SCAPPATO —
+  il gemello non lo fa ancora, ed è un buco noto della famiglia B6 che
+  qui non si ricopia — e parte in `create_task`: il venditore non deve
+  aspettare N chiamate a Telegram col foglio aperto.
+  LA QUARTA PORTA ERA OBBLIGATORIA, ed è la scoperta che ha allargato
+  il cantiere: le TRE strade che aprivano il foglio (`bloccoMioEsaurito`,
+  `rigaMioAnnuncio`, `bottoneRifornisci`) sono tutte gatate
+  sull'ESAURITO — il ramo «ora in vetrina con N pezzi» di
+  `apriRifornisci` era codice irraggiungibile. Senza una porta
+  sull'attivo si sarebbe costruito un gesto che nessuno può fare. È un
+  bottone ghost nella scheda del proprietario, «🔄 Aggiorna i pezzi»,
+  FRA Modifica ed Elimina (occasione → ritocco → stock → uscita, e
+  l'uscita rossa resta ultima): il gemello del bottone arancio che
+  `bloccoMioEsaurito` mette nello stesso posto. Bonus non cercato: da
+  lì lo stock di un annuncio attivo si corregge senza passare dalla
+  Modifica, che ripassa da tutti gli strati di moderazione.
+  SCARTATO il terzo badge nella riga di «I tuoi annunci», ed è una
+  MISURA e non un gusto: `.mio-azioni` è flex-wrap e a 320px la riga
+  concede 196px, che la coppia Modifica+Elimina chiede già tutti (il
+  fianco è sceso a 12 apposta) — un terzo badge va a capo e fa
+  crescere OGNI riga della lista, per un gesto raro. Scartata anche la
+  pastiglia sulla card: lì il posto è del barattolino, e in griglia si
+  scorre, non si spegne.
+  NEL FOGLIO IL PAVIMENTO È UNA VARIABILE (`rifMin`): 0 su un annuncio
+  ATTIVO, 1 su uno già esaurito — offrire «segna esaurito» su ciò che
+  è già esaurito prometterebbe un gesto che non succede. A 1 l'etichetta
+  ARIA del «−» diventa «Segna esaurito» (il 6° argomento di
+  `stepperMini` esiste apposta): è ciò che rende il gesto scopribile a
+  chi lo stepper non lo vede. E IL `|| 1` NON PUÒ TORNARE: lo zero è
+  falsy, quindi `parseInt("0") || 1` fa UNO e il gesto non partirebbe
+  MAI, senza nessun errore da nessuna parte — `Number.isFinite` separa
+  il campo VUOTO (che non è un gesto: vale 1) dallo ZERO SCRITTO.
+  NIENTE `chiediConferma`: il bottone dice cosa fa («⏸ Segna
+  esaurito») e la nota viva dice cosa succede E COSA NON SUCCEDE — il
+  link resta vivo — quindi il gesto è esplicito per costruzione, e si
+  disfa con un tocco. Il toast lo decide il SERVER (`d.esaurito`) e
+  mai `q === 0`: di un no-op non si annuncia niente.
+  IL CATALOGO VA RIALLINEATO A MANO NEL VERSO DELLA PAUSA (difetto
+  visto DAL VIVO, non leggendo): `listings` ACCUMULA e non si svuota,
+  e un annuncio appena messo in pausa esce dalla vetrina — quindi
+  `loadListings` non lo aggiorna più e la copia stantia resta lì
+  ATTIVA, col dettaglio riaperto un istante dopo che disegnava la
+  scheda COMPRABILE, recinto e «Acquista» compresi. Nel verso opposto
+  non si vedeva, perché rifornendo l'annuncio TORNA in vetrina e la
+  riga fresca arriva col giro di sempre. La cura non inventa e non
+  chiede niente al server: `dopoRifornimento` travasa in `inCatalogo`
+  la riga che «I tuoi annunci» ha appena portato (quella lista i
+  venduti li ha).
+  E IL BARATTOLO RIAPRE L'ESAURITO (difetto PREESISTENTE che questo
+  cantiere moltiplica): `renderPreferiti` apriva solo gli 'attivo',
+  mentre la scheda invita a «metterlo nel barattolo 🫙 per ritrovarlo
+  al volo» — cioè il cassetto negava il ritrovamento che quella frase
+  promette. Vale la lezione già scritta in `rigaMioAnnuncio`: SPENTO
+  NON VUOL DIRE CHIUSO — il grigio dice «non si compra» e resta a
+  tutti, la porta la chiude solo il 'rimosso'. `caricaPreferiti` mette
+  in catalogo anche i venduti, o `openDetail` direbbe «non trovato».
+  IMPERFEZIONI DICHIARATE: in pausa l'annuncio NON SI MODIFICA
+  (`modifica_annuncio` esige 'attivo') — vale già oggi per gli
+  esauriti veri, ma diventa frequente, e la nota del foglio lo dice
+  prima di premere; nessuno avvisa chi ce l'ha nel barattolo, né alla
+  pausa né al ritorno, esattamente come all'esaurimento per vendita;
+  `mapListing` normalizza `quantita: a.quantita || 1`, quindi in
+  memoria un esaurito porta 1 invece di 0 — innocuo oggi (a decidere è
+  sempre `stato`), ma è la stessa famiglia del `|| 1` tolto da
+  `rifQta`, e chi un domani scrivesse `l.quantita === 0` per dire
+  «esaurito» non funzionerebbe.
+  IL COLLAUDO È ESEGUIBILE, `collaudo_pausa.py` (46 verdi): le
+  sentinelle dicono che la forma è giusta, mai che il no-op sia muto —
+  quello si vede solo facendo girare la rotta VERA su un database
+  usa-e-getta, con le due piazze sostituite da contatori. La ronda del
+  libro mastro non guadagna nessun controllo: l'invariante venduto ⟺
+  quantita=0 ne è fuori APPOSTA (un venduto poi rimosso resta
+  legittimamente a (rimosso, 0)), e la pausa aggiunge solo un secondo
+  stato transitorio legittimo.
   Il SET «Riempi il barattolo» (lug 2026): più annunci DIVERSI dello
   stesso venditore in UN ordine solo — una invoice escrow, UNA
   spedizione, un tracking, una conferma. Modello «testata + righe»,
