@@ -2102,11 +2102,16 @@
     text-overflow:ellipsis;white-space:nowrap}
   .punto-riga .punto-cambia{flex:0 0 auto;font-weight:800;
     text-decoration:underline}
-  /* La riga che offre di ricordare il punto (ago 2026): un terziario,
-     cioe' testo e basta — il gesto e' facoltativo e non deve pesare
-     quanto le due scelte sopra, ne' somigliare a «Paga». Sta dentro il
-     cassetto, quindi eredita lo stop alla propagazione. */
-  .ricorda-punto{margin-top:8px;font-size:13px}
+  /* La riga che offre di ricordare il punto. Nacque terziario («testo
+     e basta, non deve pesare quanto le scelte sopra»), e dall'ago 2026
+     e' un BOTTONCINO vero (.btn.mini, decisione di Andrea): da testo
+     sottolineato il gesto non si trovava, e un bottone piccolo non
+     somiglia comunque a «Paga». Sta dentro il cassetto, quindi eredita
+     lo stop alla propagazione; il margine glielo annulla comunque
+     l'ID qui sopra (#acqPuntoCampo .btn) — la vecchia regola
+     .ricorda-punto{margin-top:8px} perdeva gia' contro di lui, cioe'
+     era morta dalla nascita, e non si rimette. La classe nel markup
+     resta: e' il nome con cui la riga si trova. */
   /* Le righe del cassetto nel Profilo: il testo che cede coi puntini e
      la ✕ che non si stringe mai — la stessa grammatica della riga
      compatta qui sopra. */
@@ -2908,6 +2913,18 @@
   .btn.link{color:var(--ink)}
   .btn.danger-ghost{color:var(--danger)}
   .btn.link:active,.btn.danger-ghost:active{opacity:.6}
+  /* IL BOTTONCINO PICCOLO (ago 2026, chiesto da Andrea per i
+     trova-punto e per «Ricorda questo punto»): la ricetta del ghost
+     in formato da riga — inline, largo quanto il suo testo, ombra
+     piena bassa. `margin-top:0` esplicito e non per pigrizia: la
+     regola dei fratelli (#orderContent .btn + .btn{margin-top:10px})
+     colpirebbe due mini adiacenti, e l'aria fra loro la mette il gap
+     di chi li ospita — mai margini inline sui bottoni, la famiglia
+     sorvegliata. */
+  .btn.mini{display:inline-flex;width:auto;padding:7px 12px;gap:6px;
+    font-size:13px;background:var(--card);border:2px solid var(--ink);
+    color:var(--ink);box-shadow:0 2px 0 var(--ink);margin-top:0}
+  .btn.mini:active{transform:translateY(2px);box-shadow:none}
   .btn[disabled]{opacity:.5;pointer-events:none}
 
   /* ---------- FIRMA: la cassaforte escrow ----------
@@ -11579,7 +11596,7 @@ function rigaRicordaPunto(d, rete){
     : 'Ricorda questo punto';
   /* la rete viaggia in un data- e mai dentro la stringa dell'onclick:
      e' il patto del filtro-alfabeto, e qui i nomi hanno gli spazi */
-  return `<button type="button" class="btn link ricorda-punto"
+  return `<button type="button" class="btn mini ricorda-punto"
       data-rete="${esc(rete)}"
       onclick="ricordaPunto(this.dataset.rete)">📍 ${testo}</button>`;
 }
