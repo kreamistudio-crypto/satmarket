@@ -3033,10 +3033,13 @@
   .mio-riga .mio-tit>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Il quadratino con l'emoji dell'oggetto, a sinistra della riga */
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
-  .order-ic{width:38px;height:38px;border-radius:12px;background:var(--chip-bg);
-    display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
-  /* il gemello grande, in testa al dettaglio dell'ordine */
-  .order-ic.grande{width:48px;height:48px;font-size:22px}
+  .order-ic{width:56px;height:56px;border-radius:12px;background:var(--chip-bg);
+    display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto}
+  /* il gemello grande, in testa al dettaglio dell'ordine.
+     MISURE (ago 2026, chieste da Andrea: le foto erano francobolli):
+     56 in lista e 64 nel dettaglio — verificate a 320/360/375, a
+     cedere coi puntini resta sempre il titolo, mai badge e X. */
+  .order-ic.grande{width:64px;height:64px;font-size:28px}
   /* La testa del dettaglio: foto e titolo in riga. `min-width:0` non
      e' cosmesi — un figlio flex non scende mai sotto il proprio
      contenuto, e una parola lunga senza spazi allargherebbe la PAGINA
@@ -3048,7 +3051,7 @@
   .ordine-testa h2{margin:0}
   /* IL NUMERO DELL'ORDINE (ago 2026): sopra il titolo, nella stessa
      colonna — a titolo di una riga non costa un pixel di pagina,
-     perche' la foto e' alta 48 e il titolo ne occupa 23. Si TOCCA per
+     perche' la foto e' alta 64 e il titolo ne occupa 23. Si TOCCA per
      copiarlo (e' il gesto vero: chi lo cerca lo deve incollare in una
      chat), quindi porta il sottolineato del tracciamento toccabile e
      il bersaglio largo dello pseudo-elemento, che non occupa layout e
@@ -15371,7 +15374,7 @@ function renderOrders(){
                  lo sta cercando. Qui NON si tocca — quel che agisce
                  vive dentro l'ordine, e la riga ha gia' il suo tocco
                  (apri) e la sua ✕: un terzo bersaglio su una card
-                 alta 60px si sbaglia e basta. */''}
+                 alta 85px si sbaglia e basta. */''}
             <div class="sub"><span class="mono">#${o.id}</span> · ${verboOrdine(o)} · ${o.when}</div>
           </div>
         </div>
