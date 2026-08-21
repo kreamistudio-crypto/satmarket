@@ -2813,6 +2813,74 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cui passa tutto il non-HEIC prima di toccare il disco.
   INVARIANTE che ne esce, ed è ciò che tiene semplice il resto: in
   `sellFoto` c'è SOLO il chip `caricando:` o un JPEG vero.
+  E LA FOTO CHE NON MOSTRA NIENTE SI RIFIUTA (ago 2026, caso dal
+  campo): l'annuncio 254 è rimasto in vetrina SEI GIORNI con una foto
+  che a schermo era un rettangolo viola, e l'abbiamo saputo solo
+  perché il venditore ha scritto. Il file era un JPEG sano — 704x628,
+  252KB, Pillow lo legge senza fiatare — e dentro aveva OTTO COLONNE
+  LARGHE UN PIXEL ripetute 88 volte, che l'occhio fonde in una tinta
+  piatta (il colore che si vedeva era la loro media, #836081).
+  NON NASCE DA NOI, ed è la prima cosa da sapere perché il sospetto
+  torna: il client ha UN SOLO `drawImage`, e un drawImage non può
+  ripetere niente — per 88 ripetizioni servirebbe un `createPattern`,
+  che in tutto il file non esiste. E un canvas di misura sbagliata poi
+  ristirato darebbe 8 bande LARGHE 88px, non 88 ripetizioni da 1px: la
+  differenza fra STIRAMENTO e RIPETIZIONE è esattamente ciò che il
+  pattern misura, e dice ripetizione. Il pattern era già nei pixel che
+  il canvas ha letto — un'estensione anti-fingerprinting che avvelena
+  il canvas, o una GPU che gli restituisce una texture sbagliata:
+  succedeva solo dal browser del PC e mai dall'app, e nella WebView le
+  estensioni non esistono. Il percorso di caricamento è lo STESSO nei
+  due casi (i due gesti — selettore e trascinamento — confluiscono in
+  `aggiungiFoto`, e da lì in giù non c'è un ramo che distingua desktop
+  e telefono). Impedirlo non possiamo; tenerlo in vetrina in silenzio
+  sì: `_foto_vuota` in `salva_foto`, scarto col MOTIVO — la lingua che
+  quella funzione ha già da «nessuna foto sparisce in silenzio».
+  IL GIUDIZIO È UNA CONGIUNZIONE, e nessuna delle due metà regge da
+  sola — MISURATO sulle 91 foto vere della vetrina e su grafiche
+  piatte costruite apposta, mai stimato: 1) POCHISSIMI COLORI
+  (`FOTO_COLORI_MIN` 32; le foto vere ne hanno da 4.153 in su, la più
+  povera di tutte quelle in vetrina, e questa ne aveva 8); 2) E PIATTA
+  DA LONTANO (`FOTO_PIATTA_SD` 6: ridotta a 16x16, cioè come la vede
+  chi sfoglia, non varia — il rotto sta a 4, le grafiche piatte
+  legittime a 117-127, perché le loro tinte formano ZONE). Da sola la
+  prima rifiuterebbe una BANDIERA a bande, che ha QUATTRO colori, cioè
+  MENO del rotto; da sola la seconda un buono con una scritta piccola
+  su fondo bianco, che è PIÙ piatto del rotto (0,9) ma ha 161 colori.
+  Insieme non prendono né l'una né l'altro, e ognuna ha un margine
+  largo nel proprio ruolo. Chi ritocca i due numeri li RIMISURI sulle
+  foto vere, che è come sono stati scelti.
+  BOX E MAI LANCZOS nella riduzione: BOX è la media esatta dei pixel,
+  cioè il modo in cui l'occhio fonde un pattern fitto, mentre LANCZOS
+  sui pattern periodici oscilla e misurerebbe il filtro invece della
+  foto. (La sentinella che lo sorveglia guarda `codice()` e non il
+  testo: LANCZOS il giudice lo NOMINA, in un commento, per dire perché
+  non lo usa — una prova che legge la prosa diventa rossa per colpa di
+  una spiegazione.)
+  FAIL-OPEN come `_e_immagine`: senza Pillow, su byte illeggibili o su
+  qualunque errore non si rifiuta niente — meglio una foto storta in
+  vetrina che una buona rifiutata, ed è il verso in cui questa difesa
+  deve sbagliare.
+  PERIMETRO: solo `salva_foto`, cioè la strada di chi pubblica dalla
+  Mini App o dal browser, che è dove il canvas — il punto in cui il
+  difetto nasce — sta. L'import CSV e quello da Nostr scaricano da URL
+  e un canvas non lo toccano: lì il caso non si presenta, e mettere la
+  guardia anche là vorrebbe dire scartare righe per una ragione che
+  quel percorso non ha.
+  IMPERFEZIONE DICHIARATA: una grafica a righe fini PERFETTE — un
+  tessuto disegnato, non fotografato — cade nella stessa rete. In
+  vetrina si vedrebbe piatta anche lei, quindi il rifiuto non dice il
+  falso, ma è merce legittima.
+  E LA «FOTO BUONA» DELLE PROVE ERA UNA TINTA UNITA: `prove_foto_
+  scarti` usava `Image.new((60,40), arancione)` come stand-in di una
+  foto, e da oggi quella viene RIFIUTATA — giustamente, è il mestiere
+  del giudice. Adesso c'è `foto_finta()` fra gli attrezzi di prove.py:
+  chi ha bisogno di una foto BUONA la chiede a lei, deterministica,
+  invece di dipingere un rettangolo. Il giudice si prova GIRANDOLO su
+  immagini vere (metà dei casi sono grafiche piatte legittime, perché
+  il rischio di questa difesa è tutto di quel lato), non con una
+  sentinella sulla forma: quella direbbe che la guardia c'è e mai che
+  risponda giusto.
   IL CORPO DELLA POST non ha tetto né in uvicorn né in Caddy (che di
   default non ne mette, a differenza di nginx), e misurato non è un
   problema: 5 foto scelte da 216 MB di originali fanno **1,53 MB** di
