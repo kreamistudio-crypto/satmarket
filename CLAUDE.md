@@ -739,6 +739,67 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un pagamento già uscito dal wallet del compratore). Disarmarli
   congelerebbe i sats di chi li ha versati e lascerebbe pagamenti
   orfani: si curerebbe un male causandone uno peggiore.
+  IL PASSO INTERMEDIO NON C'È PIÙ (ago 2026, decisione di Andrea): il
+  bottone «📬 È arrivato — lo controllo», col quale il compratore
+  portava l'ordine da `shipped` a `delivered`, è stato tolto insieme
+  alla sua rotta (`segna_consegnato`). IL MOTIVO È MISURATO: quel
+  gesto lavorava CONTRO chi lo premeva. Le due popolazioni di
+  `sollecita_conferme_ferme` hanno ancore diverse — da 'delivered' il
+  primo squillo cade a `ORE_CONFERMA` dalla consegna (3 giorni), da
+  'shipped' a `GIORNI_AUTO_SBLOCCO` dalla spedizione (10) — quindi
+  premendo ci si spostava DA SÉ nella popolazione veloce,
+  anticipandosi promemoria e 🧊 ai moderatori (g.12 invece di g.19);
+  chi non premeva restava tranquillo nei dieci giorni, ed è la
+  maggioranza (`pulisci_indirizzi` lo dichiara già: «14 released su 14
+  col campo a zero»). E il testo «lo controllo» prometteva un
+  beneficio che aveva COMUNQUE — i sats restano nel deposito finché
+  non conferma lui, sempre — tacendo il costo.
+  NON ERA NEMMENO UN CANCELLO: `conferma_ricezione` e `apri_disputa`
+  accettano già ('locked','shipped','delivered'), il client offre i
+  due bottoni da 'shipped', e lo stepper non avanzava (shipped e
+  delivered hanno lo stesso `progress`).
+  NON SI TOGLIE LA COLONNA, ed è la riga da capire prima di toccare
+  qualunque cosa qui: si toglie che a scriverla sia il COMPRATORE A
+  MANO, che è la fonte peggiore possibile. `consegnato` ha ora UN solo
+  scrittore — la rivelazione del codice digitale, che è una ricevuta
+  di lettura su un fatto NOSTRO — e ne avrà un terzo il giorno del
+  tracking verificato, come la docstring della funzione tolta diceva
+  da sempre. Si chiude la porta, la stanza resta.
+  QUINDI IL RAMO 'delivered' DEL PROMEMORIA RESTA SENZA POPOLAZIONE E
+  NON SI TOGLIE: è la riga che un riordino leverebbe per prima («tanto
+  non ci arriva più nessuno»), e c'è il commento che dice perché più
+  la sentinella. Restano intatti anche il CASE di `_SQL_FERMI`, i due
+  rami di `controlla_scadenze`, `sollecita_acquirente`,
+  `correggi_tracking`, e nel client trust-note, stepper, badge e i due
+  bottoni — che sul DIGITALE servono eccome: là a 'delivered' ci si
+  arriva ancora.
+  LA CODA NON PERDE NIENTE, ci guadagna: gli ordini restano 'shipped',
+  ancorati a `spedito_il`, che è più vecchio di `consegnato` — quindi
+  entrano in «⏸ Ordini fermi» PRIMA e più in alto, e l'invariante «se
+  il 🧊 è partito, la riga c'è» regge meglio (10 < 19). Il libro mastro
+  non legge né `delivered` né `consegnato`: zero controlli nuovi, che
+  un allarme su un caso che smettiamo di produrre non suona mai.
+  IL VENDITORE CI GUADAGNA UNA MANIGLIA: `sollecita_acquirente`
+  accetta ('shipped','delivered') ma il client mostra «🔔 Sollecita
+  l'acquirente» solo su 'shipped' — quindi il compratore, premendo,
+  gliela toglieva. La sua prova della consegna resta il TRACCIAMENTO,
+  più forte della parola di chi compra: per il fisico `consegnato` non
+  finiva nemmeno nella nota al moderatore (`apri_disputa` la cita solo
+  sul digitale), cioè era una prova che non arrivava mai a chi decide.
+  UN TESTO DIVENTAVA FALSO ed è stato riscritto: il pannello «🤝
+  Consegna in zona» prometteva «da lì l'acquirente ha 72 ore per
+  confermare», ma quelle ore partivano SOLO col bottone tolto — era
+  già impreciso, e senza il bottone sarebbe stato falso. Via il
+  numero: è la stessa formula che la notifica di
+  `sollecita_ritiri_fermi` gli manda già, e regge anche il giorno del
+  rientro. `TEMPI.conferma` resta senza lettori in pagina — un vestito
+  appeso, coi token `--ship-soft` — e il commento dice perché: la leva
+  di là è viva, e toglierla vorrebbe dire ricordarsi di rimetterla.
+  NIENTE RIGA «controlla prima di confermare» al posto suo (decisione
+  di Andrea): quel consiglio vive già nello stepper, nel recinto verde
+  e nella pagina «Il pagamento protetto», e il confirm di «libera i
+  sats» deve dire il FATTO irreversibile, che è la cosa che conta nel
+  momento del tocco.
   AL POSTO DELLO SBLOCCO, `sollecita_conferme_ferme` nell'orologio —
   gemella di `sollecita_incassi`, colonne SUE
   (`sollecito_conferma_il`, `solleciti_conferma`: un contatore
@@ -790,9 +851,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nel config del VPS, ma i TESTI sono scritti sul mondo disarmato e
   vanno rimessi: i posti sono `TEMPI` e la sua tabella in
   miniapp.html, le righe di `view-sicurezza` sui tempi, i pannelli e
-  i due confirm dell'ordine, e le due notifiche del server
-  (`segna_consegnato` e il testo al venditore di
-  `sollecita_ritiri_fermi`). È lo stesso patto della commissione
+  i due confirm dell'ordine, e la notifica al venditore di
+  `sollecita_ritiri_fermi` (erano DUE: l'altra era di
+  `segna_consegnato`, che dall'ago 2026 non esiste piu' — vedi «IL
+  PASSO INTERMEDIO NON C'È PIÙ»). È lo stesso patto della commissione
   sospesa.
   IL TRACCIAMENTO SI CORREGGE, MA NON DAL VENDITORE (ago 2026, caso
   vero dal campo): un venditore compra la spedizione da un
@@ -14229,7 +14291,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    refunded | annullato. Non inventarne di nuovi senza aggiornare
    frontend (STATES, stepper cassaforte) e notifiche.
 5. Solo l'ACQUIRENTE può segnare "consegnato" (anti-frode venditore).
-   Il venditore è protetto dall'auto-sblocco a 10 giorni e dal sollecito
+   Dall'ago 2026 A MANO non la scrive più NESSUNO: il bottone «È
+   arrivato» del compratore è stato tolto perché puniva chi lo premeva
+   (voce sua sopra). LA REGOLA RESTA, ed è quella che il giorno del
+   tracking verificato impedirà al VENDITORE di scriverla: quella data
+   la scriverà il corriere, cioè un fatto, mai la parte che ci rimette.
+   Sul digitale la scrive la rivelazione del codice, che è un gesto del
+   compratore. Il venditore è protetto dall'auto-sblocco a 10 giorni
+   (oggi disarmato: al suo posto il promemoria) e dal sollecito
    (max 1 ogni 24h).
 6. Testare sempre in locale (MODALITA_COLLAUDO=True, tre identità finte:
    Compratore 111, Venditore 222, Admin 999) prima del deploy.
@@ -16913,6 +16982,38 @@ quel che c'è, aggiunge solo due rotte e un foglio. DA GUARDARE al
 primo giro: il primo widget incollato su un sito vero. E se un giorno
 si vorrà accendere la leva, PRIMA si apre Barattolo da Telegram Web
 (il browser, non l'app): è la sola strada che può chiudere.
+
+Via il bottone «📬 È arrivato — lo controllo» (ago 2026): il passo
+intermedio fra 'shipped' e 'delivered' se n'è andato col suo endpoint,
+perché quel gesto lavorava contro chi lo premeva — vedi «IL PASSO
+INTERMEDIO NON C'È PIÙ» in Architettura per il conto dei tre giorni
+contro dieci, per la maniglia che il venditore riguadagna e per il
+testo del ritiro che sarebbe diventato falso. Non si tocca niente di
+ciò che LEGGE 'delivered': la porta si chiude, la stanza resta, e sul
+digitale quello stato è vivissimo (là lo scrive la rivelazione del
+codice). Collaudato: 4155 prove verdi con 12 sentinelle nuove — fra
+cui il censimento che CONTA gli scrittori di `consegnato` invece di
+elencarli — e OTTO mutazioni, una per riga sorvegliata, ognuna rossa
+da sola, compresa quella che toglie 'delivered' dalle due porte
+d'uscita; più una falsa sicurezza STRETTA in `prove_ritiro`, che
+cercava «L'ho ritirato» in tutto il file e restava verde per il
+gemello. `collaudo_porta_timer.py` resta 20/0 ed è la prova eseguibile
+che da 'delivered' si esce ancora. E dal vivo, server vero su database
+usa-e-getta e Chrome via CDP (15/15, zero errori JS): a 320 e 375 il
+bottone non c'è, «libera i sats» e la disputa ci sono, un 'delivered'
+seminato a mano arriva in fondo, il pannello del ritiro sta su una
+riga e il venditore tiene il suo sollecito. IN PRODUZIONE basta il
+deploy: nessuna colonna, nessuna migrazione, nessuna leva, nessuno
+stato nuovo — e la query in sola lettura prima del cantiere diceva
+ZERO ordini in 'delivered', quindi non c'è nessun residuo da
+accompagnare. DA GUARDARE al primo giro: che la coda «⏸ Ordini fermi»
+non cambi popolazione, e il primo ordine fisico che arriva a dieci
+giorni — deve ricevere il promemoria dal ramo 'shipped'.
+DA SEGNALARE, visto e NON toccato: il tasto «🔔 Sollecita l'acquirente»
+è gated su `s==='shipped'` mentre il server accetta anche 'delivered',
+quindi sul DIGITALE il venditore non può sollecitare dal client anche
+se il server glielo permetterebbe. Buco preesistente, che il cantiere
+chiude per il fisico e lascia intatto per il digitale.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
