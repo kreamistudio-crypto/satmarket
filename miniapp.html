@@ -2094,6 +2094,9 @@
      dei fratelli — cosi' le regole di .via-opzione non si toccano. */
   #acqPuntoCampo{margin-top:10px}
   #acqPuntoCampo .btn{margin-top:0}
+  /* la fila dei trova-punto: bottoncini .btn.mini affiancati, l'aria
+     fra loro e' del contenitore (la regola della classe mini) */
+  .mappe-punti{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
   .via-opzione.con-cassetto{flex-direction:column;align-items:stretch}
   .via-opzione .via-riga{display:flex;justify-content:space-between;
     align-items:center;gap:12px;min-width:0}
@@ -18817,16 +18820,16 @@ async function scegliConsegnaOrdine(v){
 /* Le mappe ufficiali dei punti di ritiro (ago 2026): il compratore
    non deve sapere il punto a memoria — apre la mappa in una scheda
    nuova, cerca, copia il nome e torna a incollarlo. Niente widget,
-   niente API, niente token: due link. Gli URL vivono QUI e mai
+   niente API, niente token: due bottoncini. Gli URL vivono QUI e mai
    dentro un onclick (il patto di linkCanaleTest); dentro Telegram
    si apre con tg.openLink, la strada documentata della Bot API —
    un <a target="_blank"> nella WebView di certi client non apre
    niente. */
 const MAPPE_PUNTI = {
   inpost: {url: 'https://inpost.it/trova-un-locker',
-           nome: 'trova un punto InPost'},
+           nome: 'Trova un punto InPost'},
   poste:  {url: 'https://www.poste.it/cerca-mappe-app/?vieni-in-poste',
-           nome: 'trova un Punto Poste'}};
+           nome: 'Trova un Punto Poste'}};
 const NOTA_LOCKER = '💡 Se puoi scegli un locker automatico: si '
   + 'ritira col solo codice — al banco di un negozio possono '
   + 'chiedere il nome scritto sul pacco.';
@@ -18882,10 +18885,33 @@ function linkMappePunti(reti){
     ? dichiarate.map(r => RETE_MAPPA[r]).filter(Boolean)
     : ['inpost', 'poste'];
   if (!mappe.length) return '';
+  /* IL MESSAGGIO DICE LA RETE (ago 2026, chiesto da Andrea): chi
+     sceglie un punto deve sapere di che rete dev'essere, PRIMA di
+     sbagliare. Parla delle reti che ha davanti — nella cassa con due
+     dichiarate il campo appare a rete gia' SCELTA, quindi qui ne
+     arriva una e il messaggio nomina quella (piu' preciso del
+     generico); il ramo a due resta per chi passa le reti non
+     filtrate. Con la sola 'Altro' non si arriva qui (nessuna mappa,
+     return sopra): comportamento di ieri, niente da promettere. */
+  const conMappa = dichiarate.filter(r => RETE_MAPPA[r]);
+  const msg = !dichiarate.length
+    ? 'Il venditore non ha ancora dichiarato il corriere: puoi '
+      + 'indicare un punto di qualsiasi rete — InPost e Punto Poste '
+      + 'sono le più diffuse.'
+    : conMappa.length >= 2
+      ? `Il venditore spedisce con ${esc(conMappa.join(' e '))}: `
+        + 'indica un locker o un punto di una di queste reti.'
+      : conMappa[0] === 'InPost'
+        ? 'Il venditore spedisce con InPost: assicurati di indicare '
+          + 'un locker o un punto InPost.'
+        : 'Il venditore spedisce con Poste Italiane: assicurati di '
+          + 'indicare un Punto Poste.';
   const link = mappe.map(r =>
-    `<button type="button" class="scopri-link" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
-  ).join(' · ');
-  return `<div class="hint" style="margin-top:6px">${link}<br>${NOTA_LOCKER}</div>`;
+    `<button type="button" class="btn mini" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
+  ).join(' ');
+  return `<div class="hint" style="margin-top:6px">${msg}</div>`
+       + `<div class="mappe-punti">${link}</div>`
+       + `<div class="hint" style="margin-top:6px">${NOTA_LOCKER}</div>`;
 }
 
 /* Il punto di ritiro dal campo dell'ordine (dal quarto giro la rete
