@@ -11938,6 +11938,34 @@ def prove_forma_sconto_pacco():
               _c.count('d.get("codice') == 1
               and 'd.get("codice_sconto")' in _c)
 
+    # 3-bis) IL CASSETTO COMPARE SOLO SE C'E' QUALCOSA DA SCRIVERCI
+    # (ago 2026, chiesto da Andrea): il preventivo porta il solo SI'/NO
+    # — codici_esistono, un booleano nudo, mai un nome o una
+    # percentuale — e il client gata il cassetto col fail-open di
+    # sconto_raggiungibile: chiave assente (server di ieri, DEMO) = si
+    # mostra, com'era. E' l'oracolo parziale ACCETTATO da Andrea:
+    # rivela che un negozio ha codici vivi, mai quali.
+    prova("codici_esistono esce dai DUE preventivi, e solo da li'", 2,
+          src.count('"codici_esistono":'))
+    prova("...dal giudice unico, chiamato nei due rami", (1, 2),
+          (src.count("def _codici_vivi("),
+           src.count("= _codici_vivi(con,")))
+    # «vivo» lo decide _codice_vale, lo stesso giudice dell'Applica:
+    # una seconda definizione (una WHERE riscritta a mano) divergerebbe
+    # al primo ritocco, e un cassetto mostrato su un codice che poi non
+    # vale non alza niente e non si vede.
+    _cv = pezzo("_codici_vivi")
+    prova("...e «vivo» lo decide _codice_vale, mai una seconda regola",
+          True, "_codice_vale(" in _cv and "_usi_codice(" in _cv)
+    prova("...fail-closed a leva spenta: funzione spenta, niente porta",
+          True, "if not CODICI_SCONTO_ATTIVI:" in _cv)
+    _mini_cod = open("miniapp.html", encoding="utf-8").read()
+    # la cintura nell'OR: un codice GIA' scritto non sparisce mai col
+    # testo dentro, qualunque cosa dica il flag del giro dopo
+    prova("client: il cassetto e' gated fail-open, con la cintura",
+          True, "p.codici_esistono !== false || codScritto"
+          in _mini_cod)
+
     # 4) IL MONO SCONTA (ago 2026, decisione di Andrea che ROVESCIA il
     # 6 ago: tre copie della stessa cosa sono tre pezzi). La divisione
     # a ritroso di _righe_ordine RIAGGIUNGE sconto_sats — una copia

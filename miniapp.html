@@ -11082,9 +11082,20 @@ function renderAcquisto(){
       <button type="button" class="btn ghost" onclick="applicaCodiceSconto(this)">Applica</button>
       ${codScritto ? `<button type="button" class="btn ghost" onclick="togliCodiceSconto()">Togli</button>` : ''}
     </div>`;
-  const cassettoCodice = `<div class="cassetto-cassa ${d.codiceAperto?'field':''}" id="acqCodiceCampo">
+  /* IL CASSETTO COMPARE SOLO SE C'E' QUALCOSA DA SCRIVERCI (ago 2026,
+     chiesto da Andrea): il si'/no arriva dal preventivo
+     (codici_esistono, il solo booleano — mai un dato del codice), e
+     il gate e' FAIL-OPEN col pattern di sconto_raggiungibile: chiave
+     assente (server di ieri, DEMO) = si mostra, com'era. La seconda
+     meta' dell'OR e' la cintura: un codice GIA' scritto non deve mai
+     sparire col testo dentro — es. il flag che cambia fra due
+     preventivi mentre il campo porta un rifiutato da correggere. */
+  const cassettoCodice =
+    (p.codici_esistono !== false || codScritto)
+    ? `<div class="cassetto-cassa ${d.codiceAperto?'field':''}" id="acqCodiceCampo">
     ${d.codiceAperto ? codCampo : codChiuso}
-  </div>`;
+  </div>`
+    : '';
 
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
      (decisione di Andrea, ago 2026: il totale con dentro l'oggetto

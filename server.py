@@ -15162,6 +15162,35 @@ def _codice_sconto(con, venditore_id: int, codice: str,
     return (pct, r["id"]) if pct else (0, 0)
 
 
+def _codici_vivi(con, venditore_id: int, adesso: int) -> bool:
+    """C'e' ALMENO un codice che oggi potrebbe scattare su questo
+    negozio? Esce SOLO il booleano nudo — niente nomi, percentuali o
+    conteggi: e' l'oracolo parziale che Andrea ha accettato («solo
+    si'/no», ago 2026) perche' il cassetto «Hai un codice sconto?»
+    della cassa compaia solo a chi potrebbe davvero scriverci
+    qualcosa. La definizione di «vivo» NON si riscrive in SQL:
+    e' _codice_vale, lo stesso giudice dell'Applica — due definizioni
+    divergerebbero al primo ritocco, e un cassetto mostrato su un
+    codice che poi non vale (o nascosto su uno che varrebbe) e' il
+    difetto che non alza niente e non si vede. Gli usi si chiedono
+    solo sui codici col tetto, come in _codice_sconto; i codici per
+    venditore sono al piu' 20 (il tetto), quindi il giro costa poco
+    anche a ogni ± dello stepper. A leva spenta esce False: il
+    cassetto di una funzione spenta sarebbe una porta su un muro."""
+    if not CODICI_SCONTO_ATTIVI:
+        return False
+    for r in con.execute(
+            "SELECT id, venditore_id, percento, scadenza, usi_max, "
+            "attivo FROM codici_sconto WHERE venditore_id=?",
+            (venditore_id,)).fetchall():
+        usi = _usi_codice(con, r["id"]) if r["usi_max"] else 0
+        if _codice_vale(r["percento"], r["scadenza"], r["usi_max"],
+                        r["attivo"], r["venditore_id"], venditore_id,
+                        adesso, usi):
+            return True
+    return False
+
+
 async def _compra_set(user: dict, d: dict) -> dict:
     """Il ramo SET di compra() (lug 2026, «Riempi il barattolo»):
     piu' annunci DIVERSI dello stesso venditore in UN ordine solo —
@@ -15979,6 +16008,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                          int(time.time()))
         if not cod_pct:
             _codice_tentativo_speso(user["id"])
+    # il cassetto della cassa compare solo se c'e' qualcosa da
+    # scriverci: il solo si'/no, mai un dato del codice
+    codici_vivi = _codici_vivi(con, a["venditore_id"], int(time.time()))
 
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
@@ -16218,6 +16250,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # percentuale di un'altra cosa sarebbe una bugia.
             "sconto_origine": ("codice" if chi_sc
                                else ("negozio" if sconto else "")),
+            # il SI'/NO che gata il cassetto «Hai un codice sconto?»:
+            # solo il booleano, mai un dato del codice
+            "codici_esistono": codici_vivi,
             "sconto_raggiungibile": bool(_sc_ragg),
             "sped_gratis_raggiungibile": bool(
                 _sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)),
@@ -16403,6 +16438,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                          int(time.time()))
         if not cod_pct:
             _codice_tentativo_speso(user["id"])
+    # il gemello del mono: il solo si'/no che gata il cassetto
+    codici_vivi = _codici_vivi(con, venditore_id, int(time.time()))
 
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
@@ -16537,6 +16574,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # percentuale di un'altra cosa sarebbe una bugia.
             "sconto_origine": ("codice" if chi_sc
                                else ("negozio" if sconto else "")),
+            # il SI'/NO che gata il cassetto «Hai un codice sconto?»:
+            # solo il booleano, mai un dato del codice
+            "codici_esistono": codici_vivi,
             # NEL SET la raggiungibilita' non si afferma MAI... TRANNE
             # quando a spegnere l'invito e' un CODICE che copre: quello
             # e' un fatto di adesso e non una previsione sulla
