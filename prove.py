@@ -773,6 +773,15 @@ def prove_categorie():
           [c for c in cat
            if not os.path.exists(f"assets/categorie/{slug(c)}-mini.webp")])
 
+    # L'illustrazione della card «Tutto» in testa alla striscia (ago
+    # 2026): «Tutto» non e' una categoria, quindi non sta in
+    # SLUG_CATEGORIE — la rotta la ammette da una whitelist allargata
+    # di UNA voce dichiarata a mano, e /categoria/tutto resta un nome
+    # inventato, fuori dal vocabolario delle pagine reparto.
+    prova("la rotta delle illustrazioni ammette anche «tutto»", True,
+          'SLUG_ILLUSTRAZIONI = SLUG_CATEGORIE | {"tutto"}' in _SORGENTE
+          and "base not in SLUG_ILLUSTRAZIONI" in _SORGENTE)
+
     # Le illustrazioni devono essere TIRATE, cioe' senza margine
     # trasparente attorno (ci pensa ritaglia_categorie.py). Non e' una
     # pignoleria: la piastrella le posa in un riquadro tarato al pixel
@@ -16289,28 +16298,35 @@ def prove_seo():
     prova("...e il vecchio gate sul risultato non esiste piu'", False,
           "bannerTestLetto" in testo_mini)
 
-    # --- 16) LE PIASTRELLE SONO LINK VERI --------------------------
-    sf = pezzo_js(testo_mini, "function renderSfoglia(){", "\n}\n")
-    prova("le piastrelle sono collegamenti veri", True,
-          '<a class="cat-tile"' in sf and 'href="/categoria/' in sf)
-    prova("...e l'indirizzo lo fa slugCat, non un elenco", True,
-          "slugCat(c)" in sf)
-    prova("...senza <button> rimasti in Sfoglia", False, "<button" in sf)
-    prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
-          "this.dataset.cat" in sf)
+    # --- 16) LA PAGINA SFOGLIA NON ESISTE PIU' (ago 2026) ----------
+    # La mappa delle categorie e' la striscia in home, con «Tutto» in
+    # testa: due elenchi della stessa cosa erano il difetto che il
+    # cantiere delle card era nato per togliere, e la pagina dietro
+    # l'ultima card era rimasta un doppione con una porta sola. Le
+    # rotte /categoria/{slug} non c'entrano: sono pagine del SERVER,
+    # e la loro prova (CATEGORIA_URL, piu' in basso) resta.
+    prova("la vista Sfoglia non esiste piu'", False,
+          'id="view-sfoglia"' in testo_mini)
+    prova("...e nemmeno il suo render", False,
+          "function renderSfoglia" in testo_mini)
+    prova("...e nessuno la chiama", 0, testo_mini.count("go('sfoglia')"))
+    # le entry vecchie della cronologia (v:'sfoglia') devono ricadere
+    # sulla home PRIMA del go() di default, che esploderebbe su una
+    # vista che non c'e' — degradazione, non errore
+    prova("una entry vecchia di Sfoglia degrada sulla home", True,
+          "if (b.v === 'sfoglia') return go('esplora');" in pezzo_js(
+              testo_mini, "function navRendiVista(b){", "\n}\n"))
 
     # --- 16bis) LE CATEGORIE IN HOME (ago 2026) -------------------
-    # Le stesse card di Sfoglia, in una fila che scorre sotto l'header.
-    # Il tab «Sfoglia» se n'e' andato dalla barra: quella pagina e'
-    # rimasta, ma ci si arriva SOLO dall'ultima card della striscia —
-    # se quel chiamante sparisce resta senza porte, che e' il difetto
-    # che questo cantiere esiste per non creare.
+    # Le card illustrate in una fila che scorre sotto l'header:
+    # dall'ago 2026 e' l'UNICA casa delle categorie — il tab «Sfoglia»
+    # se n'e' andato dalla barra, e poi la pagina intera.
     st = pezzo_js(testo_mini, "function renderStriscia(){", "\n}\n")
     prova("le card della striscia sono collegamenti veri", True,
           '<a class="cat-cella' in st and 'href="/categoria/' in st)
     prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
           "this.dataset.cat" in st)
-    prova("...con l'illustrazione PIENA, la stessa di Sfoglia", True,
+    prova("...con l'illustrazione PIENA e il suo calore", True,
           "urlIllustrazione(c)" in st and "caldaOk(c)" in st)
     # L'EMOJI DI RIPIEGO E' FRATELLA DELL'IMMAGINE, e non e' un
     # dettaglio di stile: a spegnerla e' `img[data-ok] + .cat-emoji`,
@@ -16334,12 +16350,12 @@ def prove_seo():
     #  sono gia scaldate: qui si guarda solo la striscia)
     prova("...e non guarda piu' il data-ok", False,
           ".cat-quad img[data-ok] + .cat-emoji" in testo_mini)
-    # L'ORDINE E' QUELLO DI SFOGLIA E NON UNA SECONDA CLASSIFICA: due
-    # ordinamenti sullo stesso catalogo direbbero due mappe diverse a
-    # due dita di distanza. E' anche cio' che tiene i chiamanti di
-    # contaCategorie a DUE (la prova qui sopra): la striscia non conta
-    # niente per conto suo.
-    prova("la striscia ordina col giudice di Sfoglia", True,
+    # L'ORDINE HA UN GIUDICE SOLO (ordineSfoglia, il nome resta quello
+    # della pagina che l'ha battezzato): due ordinamenti sullo stesso
+    # catalogo direbbero due mappe diverse. E' anche cio' che tiene i
+    # chiamanti di contaCategorie a DUE (la prova qui sopra): la
+    # striscia non conta niente per conto suo.
+    prova("la striscia ordina col giudice unico", True,
           "ordineSfoglia()" in st)
     prova("...e non si riconta le categorie da se'", False,
           "contaCategorie(" in st)
@@ -16399,13 +16415,34 @@ def prove_seo():
           "tornaATutto()" in rc and "setCat('Tutto')" not in rc)
     prova("...col nome in data-cat, mai dentro l'onclick", True,
           'data-cat="${esc(c)}"' in rc and "setCat('${c}')" not in rc)
-    # LA PORTA ALLO SCAFFALE: una sola, e c'e'. Due occorrenze perche'
-    # la card in coda si tocca anche da tastiera (onclick + onkeydown).
-    prova("a Sfoglia ci si arriva dalla card in coda", 2,
-          st.count("go('sfoglia')"))
-    prova("...e nessun altro posto la chiama", 2,
-          testo_mini.count("go('sfoglia')"))
-    prova("...perche' il tab non esiste piu'", False,
+    # LA CARD «TUTTO» IN TESTA (ago 2026, decisione di Andrea che
+    # ROVESCIA il «nessuna card Tutto in piu'» del primo giro): la
+    # fila apre col mercatino intero, come le pillole, e la card in
+    # coda «Tutte le categorie» e' morta con la pagina Sfoglia.
+    prova("la card «Tutto» sta in TESTA alla fila", True,
+          0 <= st.find("urlIllustrazione('Tutto')") < st.find("voci.map("))
+    prova("...con la sua figura e il suo calore", True,
+          "caldaOk('Tutto')" in st)
+    prova("...e si accende quando nessun reparto e' acceso", True,
+          "cat-cella${activeCat === 'Tutto' ? ' attiva' : ''}" in st)
+    prova("la card in coda non esiste piu'", False,
+          "cat-tutte" in testo_mini)
+    # il tocco passa da tornaATutto e MAI da apriCategoria: da un
+    # reparto quella SOSTITUIREBBE invece di consumare il gradino
+    # della home — due entry identiche impilate, un indietro morto
+    tt = pezzo_js(testo_mini, "function tornaATuttoDaTocco(e){", "\n}\n")
+    prova("il tocco su «Tutto» consuma il gradino", True,
+          "tornaATutto();" in tt)
+    prova("...senza setCat, che ricaricherebbe a vuoto", False,
+          "setCat" in tt)
+    prova("...e a «Tutto» gia' acceso non fa niente", True,
+          "if (activeCat !== 'Tutto') tornaATutto();" in tt)
+    # la figura di «Tutto» si scalda con le sorelle, o sarebbe l'unica
+    # a lampeggiare l'emoji a ogni ridisegno della fila
+    prova("il calore copre anche «Tutto»", True,
+          "CATS.forEach(" in pezzo_js(
+              testo_mini, "function scaldaSfoglia(){", "\n}\n"))
+    prova("il tab Sfoglia non esiste piu'", False,
           'id="nav-sfoglia"' in testo_mini)
 
     # --- 16bis-2) LA BARRA DELLE CATEGORIE SI INCOLLA -------------
@@ -16473,14 +16510,14 @@ def prove_seo():
     # ritorno — e valgono di piu', perche' dicono che il difetto non
     # puo' ripresentarsi invece di dire che e' curato.
 
-    # --- 16ter) SFOGLIA E' UNA VISTA INTERNA ----------------------
-    # Senza il suo tab non e' piu' una radice: si SPINGE, e l'indietro
-    # riporta in home invece di uscire dall'app (il patto di /privacy).
+    # --- 16ter) DI SFOGLIA NON RESTA NIENTE NEL MOTORE ------------
+    # (prima vista interna, poi morta del tutto: le sole tracce
+    # ammesse sono le degradazioni delle entry vecchie)
     i_r = testo_mini.index("const RADICI = ")
     prova("«sfoglia» e' fuori da RADICI", False,
           "'sfoglia'" in testo_mini[i_r:i_r + 260])
-    prova("...e la nav accende Esplora", True,
-          "'offertapresto','sfoglia'" in pezzo_js(
+    prova("...e la nav non la conosce piu'", False,
+          "'sfoglia'" in pezzo_js(
               testo_mini, "function voceNav(view){", "\n}\n"))
     # il ramo della vetrina resta alle sole ASTE: quello di Sfoglia non
     # esiste piu', e una entry gia' scritta nella cronologia di qualcuno

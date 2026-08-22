@@ -7295,6 +7295,13 @@ def slug_categoria(c: str) -> str:
 # calcola dal catalogo, quindi non esiste un elenco da tenere allineato
 # e nessun nome che non sia una categoria puo' uscire dal server.
 SLUG_CATEGORIE = {slug_categoria(c) for c in CATEGORIE}
+# ...piu' «tutto» (ago 2026): l'illustrazione della card «Tutto» in
+# testa alla striscia della home. Non e' una categoria — nessuna riga
+# la porta in colonna, e SLUG_CATEGORIE resta il vocabolario delle
+# rotte /categoria/{slug}, dove «tutto» NON deve entrare — ma il file
+# vive con le sorelle e passa dalla stessa rotta: la whitelist resta
+# chiusa e derivata, con UNA voce dichiarata a mano.
+SLUG_ILLUSTRAZIONI = SLUG_CATEGORIE | {"tutto"}
 
 
 # --- L'albero delle sottocategorie (ago 2026) — DORMIENTE ------------
@@ -29586,20 +29593,22 @@ def _file_con_etag(percorso: str, media_type: str, cache: str,
                         headers={"Cache-Control": cache})
 
 
-# Le 26 illustrazioni della pagina Sfoglia (lug 2026), una per
-# categoria. Qui il nome ARRIVA dal client, quindi non basta la rotta
-# esplicita: si accetta solo se sta nella whitelist chiusa calcolata
-# dal catalogo (SLUG_CATEGORIE). Ventisei rotte a mano direbbero la
-# stessa cosa in ventisei modi; cosi' l'insieme dei file servibili
-# resta chiuso e derivato, e nessun percorso puo' uscire dalla
-# cartella — lo spirito della regola ferrea 3, senza StaticFiles.
+# Le illustrazioni delle categorie (lug 2026; nate per la pagina
+# Sfoglia, dall'ago 2026 servono la striscia in home), una per
+# categoria piu' quella della card «Tutto». Qui il nome ARRIVA dal
+# client, quindi non basta la rotta esplicita: si accetta solo se sta
+# nella whitelist chiusa calcolata dal catalogo (SLUG_ILLUSTRAZIONI).
+# Ventotto rotte a mano direbbero la stessa cosa in ventotto modi;
+# cosi' l'insieme dei file servibili resta chiuso e derivato, e nessun
+# percorso puo' uscire dalla cartella — lo spirito della regola ferrea
+# 3, senza StaticFiles.
 @app.get("/assets/categorie/{nome}")
 def asset_categoria(nome: str, if_none_match: str = Header("")):
     slug = nome[:-5] if nome.endswith(".webp") else ""
     # il francobollo del foglio-picker: stesso slug col suffisso, e
     # passa dalla stessa whitelist (che resta calcolata dal catalogo)
     base = slug[:-5] if slug.endswith("-mini") else slug
-    if base not in SLUG_CATEGORIE:
+    if base not in SLUG_ILLUSTRAZIONI:
         raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "categorie", slug + ".webp")
     if not os.path.exists(percorso):
