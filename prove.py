@@ -1107,6 +1107,69 @@ def prove_ricategorizza():
     prova("una riga di chiacchiere non e' un verdetto", None,
           leggi("Ecco i risultati:"))
 
+    # LA REGOLA «BITCOIN» E' TEMATICA (ago 2026): 19 proposte in
+    # produzione, e UNDICI erano annunci da tirare fuori da «Bitcoin»
+    # — sacche, poster cypherpunk, magliette. Non era il modello a
+    # disobbedire: il prompt insegnava «hardware e nodi» con quattro
+    # esempi tutti apparecchi, mentre l'albero delle sottocategorie ha
+    # «merch» e «poster-stampe» sotto Bitcoin da quando e' stato
+    # disegnato. Qui si e' corretta una premessa parziale, mai
+    # inseguito il modello (la regola di casa).
+    prova("la regola «Bitcoin» dice TEMATICO", True,
+          "reparto TEMATICO" in ric.PROMPT)
+    # La coppia delle due magliette e' la parte che insegna (la
+    # lezione bici/cuffie: gli esempi insegnano il confine piu' della
+    # regola astratta) — un riordino la toglierebbe per prima,
+    # sembrando una ripetizione.
+    prova("...e tiene la coppia delle due magliette", True,
+          "una maglietta col logo bitcoin e' «Bitcoin»" in ric.PROMPT
+          and "maglietta qualunque e' «Abbigliamento»" in ric.PROMPT)
+    # L'unica clausola del testo vecchio che funzionava, e RESTA.
+    prova("...e la clausola sull'elettronica resta", True,
+          "elettronica generica" in ric.PROMPT)
+
+
+# ====================================================================
+def prove_collaudo_ricategorizza():
+    """IL COLLAUDO DEL PROMPT DI RICATEGORIZZA (ago 2026): il gemello
+    di collaudo_impersonazione.py — e qui si fa meglio del fratello.
+    Le sue sentinelle cercano l'atteso in una finestra di 400/500
+    caratteri dopo il titolo, fragilita' che CLAUDE.md dichiara: una
+    descrizione piu' lunga spinge l'atteso fuori finestra e la prova
+    diventa rossa per il motivo sbagliato. Questo collaudo si IMPORTA
+    (il modello si chiama solo dentro main()), quindi la tabella si
+    legge COME DATO. Nessuna finestra da tarare."""
+    print("\n[il collaudo della ricategorizzazione]")
+    import collaudo_ricategorizza as cr
+    import ricategorizza as ric
+    cat = ric.catalogo()
+
+    prova("i nove casi del piano ci sono", True, len(cr.CASI) >= 9)
+    prova("ogni «ora sta in» e' una categoria vera del catalogo", [],
+          [t for t, _, ora, _, _ in cr.CASI if ora not in cat])
+    prova("ogni atteso e' una categoria vera del catalogo", [],
+          [t for t, _, _, att, _ in cr.CASI if att not in cat])
+    # Il caso AFFILATO: la maglietta qualunque sta in «Bitcoin» e deve
+    # USCIRNE. Senza, «reparto tematico» diventerebbe «tutto quello
+    # che qualcuno ci ha messo».
+    prova("la maglietta qualunque esce da Bitcoin", True,
+          any(ora == "Bitcoin" and att == "Abbigliamento"
+              for _, _, ora, att, _ in cr.CASI))
+    prova("...e il merch tematico ci RESTA", True,
+          any(ora == "Bitcoin" and att == "Bitcoin"
+              for _, _, ora, att, _ in cr.CASI))
+    prova("...e l'elettronica generica esce (la clausola che resta)",
+          True, any(ora == "Bitcoin" and att == "Elettronica"
+                    for _, _, ora, att, _ in cr.CASI))
+    prova("il NON SO ha il suo caso («Altro» che resta «Altro»)", True,
+          any(ora == "Altro" and att == "Altro"
+              for _, _, ora, att, _ in cr.CASI))
+    # Il collaudo usa i pezzi VERI: un prompt in due copie e' un
+    # prompt che diverge, e una copia di chiedi() pure.
+    src = open("collaudo_ricategorizza.py", encoding="utf-8").read()
+    prova("il collaudo importa chiedi() e catalogo() veri", True,
+          "from ricategorizza import" in src)
+
 
 # ====================================================================
 # ====================================================================
@@ -22801,7 +22864,8 @@ def main():
               prove_anello, prove_categorie,
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
-              prove_ricategorizza, prove_asta, prove_proxy_asta,
+              prove_ricategorizza, prove_collaudo_ricategorizza,
+              prove_asta, prove_proxy_asta,
               prove_annullo, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,

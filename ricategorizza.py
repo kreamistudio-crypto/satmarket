@@ -99,9 +99,23 @@ PROMPT = (
     "spostato male si'.\n"
     "- «Altro» e' l'ultima spiaggia: se una categoria vera esiste, usa "
     "quella.\n"
-    "- «Bitcoin» e' per portafogli hardware, miner, libri e gadget "
-    "bitcoin (Jade, BitBox, SeedSigner, NerdMiner...), non per "
-    "l'elettronica generica.\n"
+    # La regola «Bitcoin» e' stata riscritta ad ago 2026 da un caso
+    # vero: 19 proposte in produzione, e UNDICI erano annunci da
+    # tirare fuori da «Bitcoin» — sacche, poster cypherpunk,
+    # magliette. Non era il modello a disobbedire: la regola vecchia
+    # insegnava «hardware e nodi» con quattro esempi tutti apparecchi
+    # (Jade, BitBox, SeedSigner, NerdMiner), mentre l'albero delle
+    # sottocategorie ha «merch» e «poster-stampe» sotto Bitcoin da
+    # quando e' stato disegnato: quel reparto e' TEMATICO. Qui si e'
+    # corretta una premessa parziale, mai inseguito il modello — e a
+    # dire se il modello ha capito c'e' collaudo_ricategorizza.py,
+    # da rilanciare a OGNI ritocco di questo prompt.
+    "- «Bitcoin» e' un reparto TEMATICO, non un reparto di hardware: "
+    "ci sta tutto cio' che parla di bitcoin — portafogli hardware, "
+    "miner, nodi, libri, poster, magliette, sacche, adesivi. A "
+    "decidere e' il TEMA, non il tipo di oggetto: una maglietta col "
+    "logo bitcoin e' «Bitcoin», una maglietta qualunque e' "
+    "«Abbigliamento». Non ci sta l'elettronica generica.\n"
     "- «Informatica» e' per computer, portatili, componenti e "
     "periferiche; «Telefonia» per telefoni e accessori; «Elettronica» "
     "resta per il resto.\n"
