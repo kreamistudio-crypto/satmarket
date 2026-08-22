@@ -2271,24 +2271,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (verificato da file://), zero dati utente, mai un `esc()`.
   L'ICONA È UNA ₿ NUOVA, disegnata: nel progetto una ₿ a tratto non
   esisteva — il lockup `.bmark` è CSS a pseudo-elementi, il resto è
-  glifo di testo (categoria Bitcoin, toggle valuta). È L'INCLINATA
-  PESANTE, scelta da Andrea in DUE GIRI di candidate guardate a
-  schermo (26px spenta/accesa/di sera + ingrandita): il primo giro —
-  dritta, moneta, inclinata, larga, frecce dello scambio — l'ha vinto
+  glifo di testo (categoria Bitcoin, toggle valuta). È L'INCLINATA,
+  scelta da Andrea in TRE TEMPI di candidate guardate a schermo (26px
+  spenta/accesa/di sera + ingrandita): il primo giro — dritta,
+  moneta, inclinata, larga, frecce dello scambio — l'ha vinto
   l'inclinata; al secondo («sempre con la B di bitcoin»: le varianti
   senza ₿ non si propongono) — moneta inclinata, girotondo, cambio
-  €₿, le due pesanti — è passata alla versione ispessita. Il TILT di
-  13° (`rotate(13 12 12)`) è quello del logo Bitcoin: lì il fuori
-  squadra non è un pelo, è il marchio, e il rotate tiene l'inchiostro
-  in [2,22] PER COSTRUZIONE (il punto più lontano dal centro sta a
-  raggio ~9 tratto compreso: dentro il ritaglio con qualunque
-  angolo). DEROGA DICHIARATA sul tratto: 2 invece dell'1,5 delle
-  sorelle — è un marchio, non un oggetto — con l'attributo
-  `stroke-width` sul `<g>` (la mano di ICO_LOCKER), che vince
-  sull'eredità del CSS perché `.nav-ico{stroke-width:1.5}` sta
-  sull'svg e un attributo del figlio batte l'eredità (verificato dal
-  vivo: la ₿ rende 2px, la lente accanto 1,5). Il resto è grammatica
-  di casa: currentColor, velo al 12%.
+  €₿, le due pesanti — è passata alla versione ispessita a tratto 2;
+  e IL GIORNO DOPO, guardandola montata nella barra vera, è TORNATA
+  FINE. La grammatica è per intero quella delle sorelle: tratto 1,5,
+  currentColor, velo al 12%. Il TILT di 13° (`rotate(13 12 12)`) è
+  quello del logo Bitcoin: lì il fuori squadra non è un pelo, è il
+  marchio, e il rotate tiene l'inchiostro in [2,22] PER COSTRUZIONE
+  (il punto più lontano dal centro sta a raggio ~9 tratto compreso:
+  dentro il ritaglio con qualunque angolo).
+  LA STRADA PROVATA E RIMESSA INDIETRO, da non riproporre senza un
+  motivo nuovo: il tratto 2 con l'argomento «è un marchio, non un
+  oggetto» — l'attributo `stroke-width` sul `<g>` vince sull'eredità
+  del CSS (`.nav-ico{stroke-width:1.5}` sta sull'svg e un attributo
+  del figlio batte l'eredità: la meccanica resta a verbale, per chi
+  un giorno avesse un motivo vero). Guardata montata, non è piaciuta:
+  il peso in più stonava accanto alle tre sorelle sottili.
   DUE TRAPPOLE PAGATE DALLE SENTINELLE, e sono la parte da ricordare:
   la regex delle celle in prove.py era `nav-[a-z]+` e il 2 di «p2p»
   non lo digeriva — «cinque celle» avrebbe detto quattro — ora è
