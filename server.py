@@ -7488,14 +7488,24 @@ CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              # voucher per soggiorni e cene. E' una famiglia di MERCE
              # vera, non un modo di consegnare — il bene e' la notte in
              # B&B, digitale e' solo come arriva il buono, e la tessera
-             # si puo' anche spedire. I SERVIZI restano fuori come
-             # sempre: un buono per una notte e' una cosa che esiste, una
-             # prestazione no; la moderazione non cambia — i buoni
-             # riscattabili presso il venditore stesso restano DUBBIO,
-             # decide un umano. ATTENZIONE: niente parentesi in questo
-             # commento — prove.py estrae la tupla per testo e taglia
-             # alla prima tonda chiusa.
-             "Buoni ed esperienze", "Altro")
+             # si puo' anche spedire.
+             "Buoni ed esperienze",
+             # LE DUE VOCI DELLE PRESTAZIONI, ago 2026. Qui c'era scritto
+             # «I SERVIZI restano fuori come sempre: un buono per una
+             # notte e' una cosa che esiste, una prestazione no» — ed e'
+             # diventato falso col cantiere dei servizi. Il perche' di
+             # allora e' diventato il CONFINE invece del divieto: si
+             # vendono le prestazioni DEFINITE, e il su misura resta
+             # DUBBIO.
+             # DUE E NON UNA, decisione di Andrea: una lezione e una
+             # consulenza si cercano in due modi diversi. Stanno in coda
+             # accanto ai Buoni perche' sono le voci che non sono MERCE,
+             # e «Altro» resta ultima — c'e' una prova che lo esige.
+             # ORTOGONALI ALLA STRADA, il patto dei Buoni: la categoria
+             # dice COSA compri, la strada COME arriva. Un corso puo'
+             # essere una lezione dal vivo, un video registrato o un
+             # cofanetto spedito, e restano tutti «Lezioni e corsi».
+             "Lezioni e corsi", "Lavoro e servizi", "Altro")
 
 
 # Le icone del reparto, gemelle di EMOJI_CAT nel client (ago 2026,
@@ -7517,6 +7527,12 @@ EMOJI_CATEGORIA = {
     "Libri e media": "📚", "Musica e film": "🎬",
     "Strumenti musicali": "🎸", "Collezionismo": "🏺",
     "Arte e artigianato": "🎨", "Buoni ed esperienze": "🎟️",
+    # il tocco col diploma e la valigetta sono ESATTAMENTE le due
+    # illustrazioni: l'emoji e' il loro ripiego, e nella griglia del bot
+    # e' l'unica cosa che si vede. Il 🎓 era l'icona della STRADA
+    # «servizio» fino a ieri: si e' spostata a 📅, che dice quel che
+    # quella strada e' — ci si accorda su una data.
+    "Lezioni e corsi": "🎓", "Lavoro e servizi": "💼",
     "Altro": "📦"}
 
 
@@ -7732,6 +7748,34 @@ SOTTOCATEGORIE = {
     "Buoni ed esperienze": (
         ("gift-card", "Gift card e buoni acquisto"),
         ("soggiorni-esperienze", "Soggiorni ed esperienze"),
+    ),
+    # LE DUE FAMIGLIE DELLE PRESTAZIONI, ago 2026. Le altre ventisei
+    # sono state disegnate sui 46 annunci veri di produzione; di
+    # servizi non ne esiste ancora nessuno, quindi queste due sono
+    # DISEGNATE SUL MESTIERE e non sui dati — si correggono col primo
+    # `--conta` che avra' qualcosa da contare.
+    "Lezioni e corsi": (
+        ("lingue", "Lingue"),
+        ("ripetizioni", "Scuola e ripetizioni"),
+        ("musica-lezioni", "Musica e canto"),
+        ("informatica-corsi", "Informatica e digitale"),
+        # di casa nostra, come «Bitcoin» fra le categorie: su un
+        # mercatino che incassa in sats, insegnare l'autocustodia e' il
+        # corso piu' probabile che ci sia
+        ("bitcoin-corsi", "Bitcoin e criptovalute"),
+        ("sport-benessere", "Sport e benessere"),
+        ("cucina-corsi", "Cucina"),
+        ("arte-corsi", "Arte e creativita"),
+    ),
+    "Lavoro e servizi": (
+        ("grafica-design", "Grafica e design"),
+        ("siti-e-app", "Siti web e app"),
+        ("traduzioni", "Traduzioni"),
+        ("scrittura-testi", "Scrittura e testi"),
+        ("consulenze", "Consulenze"),
+        ("riparazioni", "Riparazioni"),
+        ("casa-manutenzione", "Casa e manutenzione"),
+        ("foto-video-servizi", "Foto e video"),
     ),
 }
 
@@ -8002,6 +8046,60 @@ SINONIMI_SOTTOCATEGORIA = {
                            "uncinetto", "tessitura"),
         "materiali-creativi": ("colori", "tele", "pennelli", "lana",
                                "filati", "perline"),
+    },
+    "Lezioni e corsi": {
+        "lingue": ("inglese", "spagnolo", "francese", "tedesco", "cinese",
+                   "russo", "portoghese", "giapponese", "arabo", "lingua",
+                   "lingue", "conversazione", "madrelingua", "ielts",
+                   "toefl", "grammatica"),
+        "ripetizioni": ("ripetizioni", "matematica", "fisica", "chimica",
+                        "latino", "greco", "doposcuola", "maturita",
+                        "compiti", "geometria", "analisi", "liceo"),
+        "musica-lezioni": ("chitarra", "pianoforte", "canto", "batteria",
+                           "violino", "solfeggio", "spartito", "armonia",
+                           "ukulele", "sassofono"),
+        "informatica-corsi": ("programmazione", "python", "javascript",
+                              "excel", "coding", "database", "linux",
+                              "informatica", "algoritmi", "html"),
+        "bitcoin-corsi": ("bitcoin", "criptovalute", "cripto", "wallet",
+                          "seed", "lightning", "autocustodia", "nodo",
+                          "blockchain", "satoshi"),
+        "sport-benessere": ("yoga", "pilates", "allenamento", "fitness",
+                            "nutrizione", "meditazione", "palestra",
+                            "personal trainer", "respirazione"),
+        "cucina-corsi": ("cucina", "pasticceria", "pizza", "pane",
+                         "cucinare", "ricette", "lievitazione",
+                         "pasta fresca"),
+        "arte-corsi": ("disegno", "pittura", "ceramica", "fotografia",
+                       "teatro", "danza", "cucito", "acquerello",
+                       "recitazione"),
+    },
+    "Lavoro e servizi": {
+        "grafica-design": ("logo", "loghi", "grafica", "design",
+                           "illustrazione", "brand", "volantino",
+                           "locandina", "banner", "biglietti da visita"),
+        "siti-e-app": ("sito", "siti", "wordpress", "ecommerce", "app",
+                       "software", "landing", "plugin", "script",
+                       "shopify", "webapp"),
+        "traduzioni": ("traduzione", "traduzioni", "tradurre",
+                       "sottotitoli", "revisione", "correzione", "bozze",
+                       "asseverata"),
+        "scrittura-testi": ("copywriting", "testi", "articoli", "blog",
+                            "seo", "redazione", "ghostwriting", "recensioni",
+                            "newsletter"),
+        "consulenze": ("consulenza", "consulenze", "fiscale", "legale",
+                       "commercialista", "business", "marketing",
+                       "avvocato", "contabilita", "partita iva"),
+        "riparazioni": ("riparazione", "riparazioni", "riparo",
+                        "assistenza", "schermo", "batteria", "saldatura",
+                        "elettrodomestico", "diagnosi"),
+        "casa-manutenzione": ("idraulico", "elettricista", "imbianchino",
+                              "giardinaggio", "potatura", "muratore",
+                              "trasloco", "traslochi", "pulizie",
+                              "montaggio"),
+        "foto-video-servizi": ("fotografo", "matrimonio", "riprese",
+                               "drone", "book", "reportage", "videomaker",
+                               "ritratto"),
     },
     "Buoni ed esperienze": {
         "gift-card": ("buono", "buoni", "gift", "card", "codice", "sconto",
@@ -8619,6 +8717,15 @@ SINONIMI_CATEGORIA = {
     "gift card": "Buoni ed esperienze", "gift": "Buoni ed esperienze",
     "voucher": "Buoni ed esperienze", "coupon": "Buoni ed esperienze",
     "esperienze": "Buoni ed esperienze",
+    # le prestazioni, ago 2026. Chi importa un catalogo scrive
+    # «corsi» o «servizi» al singolare o al plurale, e la parola
+    # «lezione» piu' spesso del nome del reparto.
+    "lezione": "Lezioni e corsi", "lezioni": "Lezioni e corsi",
+    "corso": "Lezioni e corsi", "corsi": "Lezioni e corsi",
+    "formazione": "Lezioni e corsi", "ripetizioni": "Lezioni e corsi",
+    "servizio": "Lavoro e servizi", "servizi": "Lavoro e servizi",
+    "consulenza": "Lavoro e servizi", "consulenze": "Lavoro e servizi",
+    "prestazione": "Lavoro e servizi", "lavoro": "Lavoro e servizi",
     "altro": "Altro", "varie": "Altro",
 }
 
@@ -8654,6 +8761,14 @@ CAMPI_VETRINA = (
     # «gratis» su un annuncio dove solo il primo pezzo lo e'
     "a.spedizione_extra_sats, a.spedizione_extra_eur, "
     "a.anche_digitale, a.condizione, a.regione, "
+    # IL DOVE E IL QUANTO DELLA PRESTAZIONE, ago 2026. Erano scritti in
+    # colonna dal form e non uscivano da nessuna parte: tornavano solo
+    # alla pagina di MODIFICA del venditore, quindi chi comprava non
+    # sapeva se la lezione fosse online o di persona ne' che durasse
+    # un ora. E la durata e' meta' del «definito» che il prompt della
+    # moderazione pretende — la chiedevamo e poi la nascondevamo.
+    # Costo zero: la SELECT non cambia forma.
+    "a.servizio_dove, a.durata_min, "
     # la quantita' e' pubblica per natura: il selettore dei pezzi nel
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)
@@ -11698,7 +11813,7 @@ def _leve_stato():
             _leva("Aste vive per venditore", "ASTA_MAX_ATTIVE_VENDITORE",
                   ASTA_MAX_ATTIVE_VENDITORE),
         ]},
-        {"gruppo": "🎓 Servizi", "voci": [
+        {"gruppo": "📅 Servizi", "voci": [
             _leva("Servizi", "SERVIZI_ATTIVI", bool(SERVIZI_ATTIVI),
                   spento="non si pubblicano prestazioni: chi la dichiara "
                          "vede l'annuncio nascere senza modalità, come uno "
@@ -24136,7 +24251,7 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             "AND disputata=1 AND stato='refunded'",
             (o["venditore_id"],)).fetchone()["n"]
         nota_servizio = (
-            f"\n🎓 SERVIZIO: {stato_app}; {stato_link} (il collegamento "
+            f"\n📅 SERVIZIO: {stato_app}; {stato_link} (il collegamento "
             f"lo leggono solo le parti: non è mostrato ai moderatori). "
             f"Regola dichiarata all'acquisto: Barattolo non può sapere "
             f"se la prestazione c'è stata — si giudica se le CONDIZIONI "
@@ -24832,7 +24947,13 @@ MODELLO_IMPORT = (
     # sceglie chi compra
     "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
     "subito;50,00;eur;Buoni ed esperienze;Milano;;spedizione+digitale;"
-    "5,00;busta;;\n")
+    "5,00;busta;;\n"
+    # la quinta via: la PRESTAZIONE, ago 2026. Come il digitale non ha
+    # ne' spedizione ne' taglia ne' condizione — e la zona serve solo
+    # se la si eroga di persona. Il titolo mostra il confine che la
+    # moderazione pretende: quanto dura e che cosa comprende.
+    "Lezione di inglese online, un ora;Conversazione con madrelingua, "
+    "livello a scelta;30,00;eur;Lezioni e corsi;;;servizio;;;;\n")
 
 
 @app.get("/api/import/modello")
@@ -25923,12 +26044,12 @@ async def sollecita_servizi_fermi():
             else:
                 # la data e' passata: si chiude confermando
                 await notifica(r["compratore_id"],
-                    f"🎓 <b>«{titolo}» risulta ancora da concludere.</b> "
+                    f"📅 <b>«{titolo}» risulta ancora da concludere.</b> "
                     f"Se la prestazione c'è stata, apri l'ordine e "
                     f"conferma: i sats vanno al venditore. Se non c'è "
                     f"stata, dall'ordine puoi aprire una disputa.")
                 await notifica(r["venditore_id"],
-                    f"🎓 <b>«{titolo}» risulta ancora da concludere.</b> "
+                    f"📅 <b>«{titolo}» risulta ancora da concludere.</b> "
                     f"I sats si sbloccano quando chi ha comprato "
                     f"conferma. Se non si fa vivo lo solleciteremo noi, "
                     f"e poi guarderà un moderatore.")

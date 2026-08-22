@@ -759,6 +759,72 @@ def prove_categorie():
     # quasi giusta. Meglio che a dirlo sia la CI.
     exec(pezzo("slug_categoria"), amb)
     slug = amb["slug_categoria"]
+
+    # ============ LE DUE VOCI DELLE PRESTAZIONI (ago 2026) ============
+    prova("le due categorie delle prestazioni ci sono", True,
+          "Lezioni e corsi" in cat and "Lavoro e servizi" in cat)
+    prova("...in coda, prima di «Altro»",
+          ["Lezioni e corsi", "Lavoro e servizi", "Altro"], list(cat[-3:]))
+    # LE EMOJI RISPECCHIANO L'ILLUSTRAZIONE, ed e' il loro mestiere: il
+    # ripiego di un disegno, e nella griglia del bot l'unica cosa che
+    # si vede. Il tocco col diploma e la valigetta SONO quei due file.
+    i = html.index("const EMOJI_CAT = {")
+    emo = dict(re.findall(r"'([^']+)':'([^']+)'", html[i:html.index("};", i)]))
+    prova("il tocco al reparto delle lezioni", "🎓", emo["Lezioni e corsi"])
+    prova("la valigetta a quello dei servizi", "💼", emo["Lavoro e servizi"])
+
+    # --- L'ICONA DELLA STRADA NON E' PIU' QUELLA DEL REPARTO. Fino a
+    # ieri 🎓 era la strada «servizio»; adesso e' il reparto, e la
+    # strada ha 📅, che e' gia' l'icona del suo stesso flusso — ci si
+    # accorda su una data. Nessuna prova sorvegliava quel glifo: e' il
+    # censimento che mancava, e vieta al 🎓 di tornare a dire due cose.
+    # ⚠️ si guarda il CODICE e non la prosa: nel client i commenti
+    # sono a BLOCCO e le righe di mezzo non cominciano per «*»,
+    # quindi un filtro riga-per-riga inciampa nella spiegazione che
+    # racconta lo scambio. Chi la scrive non deve riscrivere la
+    # frase: e' la sentinella a dover guardare dove serve.
+    codice_js = re.sub(r"/\*.*?\*/", "", html, flags=re.S)
+    prova("il 🎓 nel client e' SOLO il reparto, mai la strada", [],
+          [r.strip()[:56] for r in codice_js.split("\n")
+           if "🎓" in r and "Lezioni e corsi" not in r])
+    prova("...e nel server idem", [],
+          [r.strip()[:56] for r in _SORGENTE.split("\n")
+           if "🎓" in r and "Lezioni e corsi" not in r
+           and not r.strip().startswith("#")])
+    prova("la strada porta il 📅 dove si sceglie e dove si racconta",
+          True, all("📅" in html[html.index(d) - 240:html.index(d) + 240]
+                    for d in ("v==='servizio' ?", 'id="notaServizio"')))
+
+    # --- LA NOTA NASCE APERTA anche sulle lezioni: li' la domanda e'
+    # certa quanto su una taglia. ⚠️ Questo elenco era l'UNICO del
+    # catalogo che nessuna prova incrociava: un refuso ci passava.
+    i = html.index("const CAT_NOTA_APERTA = [")
+    apre = re.findall(r"'([^']+)'", html[i:html.index("]", i)])
+    prova("le categorie della nota aperta esistono nel catalogo", [],
+          [c for c in apre if c not in cat])
+    prova("...e le lezioni ci sono", True, "Lezioni e corsi" in apre)
+    prova("...i servizi NO: una consulenza si concorda nell'annuncio",
+          False, "Lavoro e servizi" in apre)
+
+    # --- LE TRE SUPERFICI DELLA PRESTAZIONE, i buchi di ieri: la card
+    # aveva la riga delle icone VUOTA su un servizio, e i due campi che
+    # dicono DOVE e QUANTO DURA non uscivano da CAMPI_VETRINA — il
+    # venditore li dichiarava e chi compra non li vedeva mai.
+    cv = _SORGENTE[_SORGENTE.index("CAMPI_VETRINA = ("):]
+    cv = cv[:cv.index("\n)")]
+    prova("il dove e il quanto della prestazione escono in vetrina", True,
+          "a.servizio_dove" in cv and "a.durata_min" in cv)
+    ico = pezzo_js(html, "function iconeCard(l){")
+    prova("la card dice la strada anche su una prestazione", True,
+          "l.consegna === 'servizio'" in ico and "📅" in ico)
+    prova("...e distingue l'online dal di persona", True, "presenza" in ico)
+    pil = pezzo_js(html, "function pilloleModalita(l){")
+    prova("la scheda ha la pillola della prestazione", True,
+          "l.consegna==='servizio'" in pil and "📅" in pil)
+    prova("...e ci mette la durata", True, "durataTesto(l.durataMin)" in pil)
+    prova("la durata si dice in un posto solo", 1,
+          html.count("function durataTesto("))
+
     prova("nessuno slug di categoria si sovrappone a un altro",
           len(cat), len({slug(c) for c in cat}))
     prova("il frontend calcola lo slug come il server", True,

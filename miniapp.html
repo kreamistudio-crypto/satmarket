@@ -4447,7 +4447,7 @@ document.getElementById('cartello')?.remove();</script>
            e a parlare col dito e' il campo-bottone che apre il
            foglio-picker (apriPicker, pattern dei fogli esistenti). -->
       <div class="field"><label>Categoria</label>
-        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Bellezza e benessere</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Buoni ed esperienze</option><option>Altro</option></select>
+        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Bellezza e benessere</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Buoni ed esperienze</option><option>Lezioni e corsi</option><option>Lavoro e servizi</option><option>Altro</option></select>
         <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
         <select id="sellCond" hidden>
@@ -4490,7 +4490,7 @@ document.getElementById('cartello')?.remove();</script>
              perche' la domanda e' la stessa («come arriva quel che
              vendi?»), e la risposta «non arriva: ci si trova» e'
              una delle possibili. -->
-        <label class="cons-riga" id="sellConsServRiga" style="display:none"><input type="checkbox" id="sellConsServ" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🎓</span>È un servizio<span class="cons-sub">lezione, consulenza: una prestazione con una durata</span></span></label>
+        <label class="cons-riga" id="sellConsServRiga" style="display:none"><input type="checkbox" id="sellConsServ" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">📅</span>È un servizio<span class="cons-sub">lezione, consulenza: una prestazione con una durata</span></span></label>
         <div id="sellServOpzioni" style="display:none;margin-top:8px">
           <div style="display:flex;gap:8px" class="consegna-scelta">
             <button type="button" class="pill consegna-pill on" id="sellServOnline" onclick="setServDove('online')">💻 Online</button>
@@ -5464,7 +5464,11 @@ const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱
   'Strumenti musicali':'🎸', 'Collezionismo':'🏺',
   /* il biglietto dice il reparto — buoni, voucher, ingressi — mentre
      il pacco regalo 🎁 direbbe un'occasione, non una merce */
-  'Arte e artigianato':'🎨', 'Buoni ed esperienze':'🎟️', 'Altro':'📦'};
+  'Arte e artigianato':'🎨', 'Buoni ed esperienze':'🎟️',
+  /* il tocco col diploma e la valigetta: sono ESATTAMENTE le due
+     illustrazioni, di cui l'emoji e' il ripiego. Il 🎓 era l'icona
+     della STRADA «servizio» fino a ieri, e si e' spostata a 📅 */
+  'Lezioni e corsi':'🎓', 'Lavoro e servizi':'💼', 'Altro':'📦'};
 const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
 function fotoUrl(f){
   if (!f) return '';
@@ -5697,6 +5701,15 @@ function iconeCard(l){
     i += '<span title="Ritiro in zona">🤝</span>';
   if (l.consegna === 'digitale' || l.ancheDigitale)
     i += '<span title="Codice inviato online">💾</span>';
+  /* LA PRESTAZIONE MANCAVA (ago 2026): un annuncio servizio aveva la
+     riga delle icone COMPLETAMENTE VUOTA, e in una vetrina di lezioni
+     non si distingueva da niente. Il 📅 e' l'icona della strada — ci
+     si accorda su una data — e il titolo dice anche DOVE, che e' la
+     domanda vera di chi sfoglia: online o vicino a me. */
+  if (l.consegna === 'servizio')
+    i += `<span title="${l.servDove === 'presenza'
+      ? 'Di persona, su appuntamento' : 'In videoconferenza, su appuntamento'
+      }">📅</span>`;
   return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
@@ -6326,7 +6339,8 @@ const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
               "Orologi e gioielli","Bambini","Sport e hobby","Biciclette",
               "Motori","Animali","Libri e media","Musica e film",
               "Strumenti musicali","Collezionismo","Arte e artigianato",
-              "Buoni ed esperienze","Altro"];
+              "Buoni ed esperienze","Lezioni e corsi",
+              "Lavoro e servizi","Altro"];
 let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
@@ -9281,7 +9295,30 @@ function pilloleModalita(l){
     p.push('<span class="pill">🤝 Ritiro in zona</span>');
   if (l.consegna==='digitale' || l.ancheDigitale)
     p.push('<span class="pill">💾 Codice online</span>');
+  /* LA PRESTAZIONE, ago 2026: qui la pillola dice le DUE cose che il
+     compratore non poteva sapere — dove e quanto dura. La trust-note
+     due righe piu' giu' racconta il patto; questa dice il fatto. */
+  if (l.consegna==='servizio') {
+    const d = durataTesto(l.durataMin);
+    p.push(`<span class="pill">📅 ${l.servDove === 'presenza'
+      ? 'Di persona' : 'In videoconferenza'}${d ? ' \u00b7 ' + d : ''}</span>`);
+  }
   return p.join('');
+}
+/* La durata di una prestazione, in parole. Il minuto e' l'unita' in
+   colonna perche' e' l'unica che regge mezz'ore e ore e mezza, ma
+   «90 min» non si legge: si dice come lo direbbe il venditore.
+   0 = non dichiarata, e allora non si dice NIENTE — un annuncio
+   storico non deve inventarsi una durata. */
+function durataTesto(min){
+  const m = Math.max(0, parseInt(min, 10) || 0);
+  if (!m) return '';
+  if (m < 60) return `${m} min`;
+  const ore = Math.floor(m / 60), resto = m % 60;
+  const o = ore === 1 ? '1 ora' : `${ore} ore`;
+  /* il resto porta l'unita': il campo del form e' un numero LIBERO,
+     quindi 61 esiste, e «1 ora e 1» si legge come un refuso */
+  return resto ? `${o} e ${resto} min` : o;
 }
 /* Vero quando l'annuncio spedisce davvero (la strada fisica del
    pacco: il ritiro e il codice online non sono spedizione). */
@@ -10395,7 +10432,7 @@ const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
   : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker / punto</span>`
   : v==='digitale' ? '💾 Codice online'
-  : v==='servizio' ? '🎓 Di persona o in videoconferenza' : '';
+  : v==='servizio' ? '📅 Di persona o in videoconferenza' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
    decisione di Andrea): se casa e punto costano UGUALE la cifra non
@@ -11897,7 +11934,8 @@ const segnaposNota = (eSet, servizio) =>
    la prova. I nomi sono quelli ESATTI di CATEGORIE in server.py —
    «Arte e artigianato», mai «Artigianato». */
 const CAT_NOTA_APERTA = ['Abbigliamento', 'Scarpe e accessori',
-                         'Arte e artigianato', 'Bambini'];
+                         'Arte e artigianato', 'Bambini',
+                         'Lezioni e corsi'];
 function notaApertaDefault(cats){
   return (cats || []).some(c => CAT_NOTA_APERTA.includes(c));
 }
@@ -13296,7 +13334,7 @@ function openDetail(id){
                   con loro, che la prima spiegazione lunga ora vive li'. -->
              <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b>${offAcc.quantita > 1 ? ` — l'accordo è per ${fmt(offAcc.quantita)} pezzi` : ''} — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
-             ${stradeConsegna(l).includes('servizio') ? `<div class="trust-note" id="notaServizio">🎓 <span><b>Prestazione:</b> dopo il pagamento il venditore propone giorno e ora, e tu confermi — finché non confermi non parte nessun conto alla rovescia. I sats restano nel deposito di garanzia e <b>non si muovono da soli</b>: si sbloccano quando confermi tu che la prestazione c'è stata. ⚠️ Barattolo non può sapere se c'è stata davvero: se finite in disputa, un moderatore guarda se le <b>condizioni</b> c'erano — appuntamento concordato, collegamento lasciato in tempo.</span></div>` : ''}
+             ${stradeConsegna(l).includes('servizio') ? `<div class="trust-note" id="notaServizio">📅 <span><b>Prestazione:</b> dopo il pagamento il venditore propone giorno e ora, e tu confermi — finché non confermi non parte nessun conto alla rovescia. I sats restano nel deposito di garanzia e <b>non si muovono da soli</b>: si sbloccano quando confermi tu che la prestazione c'è stata. ⚠️ Barattolo non può sapere se c'è stata davvero: se finite in disputa, un moderatore guarda se le <b>condizioni</b> c'erano — appuntamento concordato, collegamento lasciato in tempo.</span></div>` : ''}
              ${/* L'AVVISO DEL RECUPERO WALLET (ago 2026, decisione di
                    Andrea): un AVVISO a chi COMPRA, mai un blocco a chi
                    vende. E' la truffa piu' diffusa del bitcoin, e chi
@@ -19564,7 +19602,7 @@ function pannelloServizioVenditore(o){
     : `<div class="hint">Lascia qui il link della videoconferenza (o il punto preciso, se vi vedete di persona): chi ha comprato lo trova nell'ordine, senza doverti scrivere.</div>`;
   return `
         <div class="payout">
-          <h4>🎓 L'appuntamento</h4>
+          <h4>📅 L'appuntamento</h4>
           ${testoData}
           <input id="servQuando" type="datetime-local">
           <button class="btn orange" onclick="proponiAppuntamento(this)">📅 ${quando ? 'Proponi un&#39;altra data' : 'Proponi la data'}</button>
@@ -19600,7 +19638,7 @@ function pannelloServizioCompratore(o){
     : '';
   return `
     <div class="payout">
-      <h4>🎓 L'appuntamento</h4>
+      <h4>📅 L'appuntamento</h4>
       ${testoData}
       ${testoLink}
     </div>`;
