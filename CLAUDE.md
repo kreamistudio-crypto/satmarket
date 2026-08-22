@@ -1816,7 +1816,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   conta anche quella, 225 contro 164, un arrivo 61px corto.
   Verificato al pixel: atteso 219, arrivo 219. Le sponsorizzate non
   c'entrano: il loro tocco aprira' l'annuncio, lo scroll vive solo
-  nel ramo dei due filtri.
+  nel ramo dei due filtri. Dall'ago 2026 la meccanica e' il giudice
+  unico `scorriSottoHeader`, condiviso con lo scroll dei reparti —
+  che arriva PIU' GIU', vedi la voce sua sotto le categorie in home:
+  qui cambia solo il punto d'arrivo, la fila stessa.
   MISURE: la sezione pesa 161px a 320 (misurata; era 157 prima
   dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
@@ -1990,6 +1993,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   illuminata fuori schermo non la vedrebbe nessuno, e la funzione del
   browser che porta in vista un elemento sposterebbe anche la pagina
   in verticale — dove non c'è niente da scorrere.
+  E IL TOCCO CHE ACCENDE FA SCENDERE LA PAGINA, PIÙ GIÙ DI «DA
+  SCOPRIRE» (ago 2026, decisione di Andrea): l'arrivo è la riga
+  «N oggetti» (`.strumenti`) sotto header e pillole — in vista la
+  MERCE, non la striscia. La meccanica è il GIUDICE UNICO
+  `scorriSottoHeader` (lo scroll di «Da scoprire» estratto: cambia
+  solo il punto d'arrivo, che per i reparti vive in `scorriAlReparto`,
+  un posto per i suoi due chiamanti). IL MOMENTO è la differenza con
+  «Da scoprire», dove la griglia resta piena e si scorre subito: qui
+  `apriCategoria` l'ha appena SVUOTATA e la pagina è troppo corta —
+  lo scroll clamperebbe quasi a zero e il gesto sembrerebbe di nuovo
+  non fare niente. Coi dati vivi si ARMA una bandierina che
+  `renderGrid` consuma al primo render, SOLO con la vista ancora
+  attiva (aperta una scheda nel frattempo, si butta senza scorrere:
+  scorrere sotto i piedi di un'altra pagina sarebbe il danno
+  peggiore); in DEMO `setCat` renderizza in sincrono e si scorre
+  subito — sempre DOPO il `go()`, che chiude col suo scrollTo e
+  altrimenti riporterebbe in cima un rigo dopo. MISURATO via CDP a
+  320/360/375: arrivo esatto (a 320 strumenti a 219 = header 164 +
+  pillole 51 + 4), e all'arrivo resta in vista la CODA della striscia
+  col nome del reparto acceso (~55px sotto l'header) — quindi
+  l'osservatore interseca ancora, le pillole restano SPENTE e il
+  ritocco è ancora sulla card. A 320×568 restano **249px di griglia**
+  sopra la nav: la prima riga di card quasi intera (235 dei 240px).
+  IL RITOCCO CHE SPEGNE RESTA FERMO (passa da `tornaATutto`, che allo
+  scroll non arriva — misurato: scrollY identico) e chi atterra da un
+  motore parte dalla cima (`apriCategoriaDaUrl` non passa da
+  `apriCategoria`). Vale per le DUE porte del reparto, card e pillole
+  appiccicate: passano tutte e due da `apriCategoria`.
+  LA TORTURA HA RIPAGATO LA LEZIONE DEL find(): due prove nuove
+  scritte con `.index()` esplodevano sulla mutazione che toglieva la
+  riga, mangiandosi 19 sorelle — riscritte con `find()`, come la
+  regola di casa già diceva.
   LA FIRMA DICE ANCHE QUALE CARD È ACCESA, e senza quel pezzo il
   cantiere non funziona affatto: entrando in un reparto l'ordine non
   cambia, quindi la firma sarebbe identica, il render uscirebbe subito
