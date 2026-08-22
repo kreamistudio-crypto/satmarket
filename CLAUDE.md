@@ -4462,6 +4462,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `atteso_sats`), e un id di livello sconosciuto vale PIÙ dell'ultimo
   gradino e mai zero — fail-closed come `importo_invoice`: una leva
   scritta a mano e storta deve chiudere la porta, non spalancarla.
+  E IL RIFIUTO DICE ENTRAMBE LE CHIAVI, COL NUMERO (ago 2026, dal
+  campo): il messaggio nominava il solo affare concluso, quindi chi ne
+  aveva tredici e 104 XP si sentiva chiedere una cosa che aveva già —
+  e andava a cercare dalla parte sbagliata. Le chiavi sono DUE (lo dice
+  `livello_utente`: il grado è il più alto che soddisfa ENTRAMBE le
+  soglie), e adesso `banner_cosa_manca` restituisce i numeri di tutt'e
+  due — quanti ne ha e quanti ne servono — con `0` sulla metà che non
+  manca, che è ciò che permette di DIRE SOLO L'ALTRA. Le soglie sono
+  quelle del gradino CHIESTO e non del prossimo: i due assi di
+  `LIVELLI` crescono insieme, quindi «essere al gradino N» è
+  esattamente «xp >= soglia_N e affari >= soglia_N» — la stessa
+  domanda di `banner_porta_aperta`, detta coi numeri (la mutazione che
+  guarda il gradino dopo fa rosse cinque righe).
+  LA FRASE SI SCRIVE IN UN POSTO SOLO, `msg_banner_chiuso`, e i due
+  posti che la dicono la CHIAMANO: il 400 dell'endpoint e il cassetto
+  del Profilo, che se la riceve già scritta in `banner_leve.motivo`
+  invece di ricomporla — è il patto di `messaggio_zona_storta`, e
+  soprattutto il client non deve ricalcolare QUALE metà manca, che è il
+  numero dove vive un off-by-one (la lezione di `mancano_pezzi`).
+  Chiave assente = server di ieri: nel cassetto resta la sola
+  spiegazione di cosa sia il banner, cioè un'assenza e mai una bugia.
+  Il gradino IGNOTO ricade sulla frase corta e non inventa nessun
+  numero: lì la porta è chiusa dal fail-closed qui sopra, e una soglia
+  scritta a caso sarebbe peggio del silenzio.
+  E IL «hai» STA DAVANTI UNA VOLTA SOLA: ripetuto dentro ogni pezzo,
+  col caso a due metà mancanti si leggerebbe «hai … e hai …».
+  ⚠️ IL BANNER È L'UNICA COSA CHE UN LIVELLO BLOCCA — censito: gli
+  altri lettori di `livello_utente` sono il profilo del negozio (che
+  mostra il grado) e `titoli_disponibili`, che dall'ago 2026 elenca i
+  soli titoli SBLOCCATI e quindi non ha nessun rifiuto da spiegare. Il
+  cassetto «🎖 Livello e titolo» diceva già le due chiavi col numero
+  («mancano N XP e M affari conclusi»): era il modello da seguire, ed
+  è il posto da cui ricopiare la forma se un domani una seconda
+  funzione si metterà dietro un livello.
   LA REVISIONE È UMANA E OBBLIGATORIA, e non è una scelta di comodo:
   `moderazione_ai` manda ad Haiku una STRINGA «TITOLO/DESCRIZIONE» e
   non una lista di blocchi, quindi un'immagine non ci sta

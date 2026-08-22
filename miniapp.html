@@ -18813,11 +18813,17 @@ function renderBanner(){
      livello deve sapere che il banner esiste e come si apre, o non
      scoprirebbe mai la funzione. */
   if (!bannerLeve.porta_aperta){
+    /* IL PERCHE' ARRIVA GIA' SCRITTO dal server (`motivo`), ed e' lo
+       stesso testo del 400: la porta ha DUE chiavi — gli XP e gli
+       affari conclusi — e quale delle due manca, col numero, lo dice
+       chi ha i dati in mano. Chiave assente (un server di ieri) =
+       resta la sola spiegazione di cosa sia il banner: un'assenza,
+       mai una bugia. */
+    const perche = bannerLeve.motivo ? esc(bannerLeve.motivo) + ' ' : '';
     box.innerHTML = `
-      <div class="trust-note" style="margin-bottom:0">🔒 <span>Il banner
-        si sblocca quando il tuo negozio si avvia: serve almeno
-        <b>un affare concluso</b>. È l'insegna che puoi appendere sopra
-        il tuo catalogo — una foto e il link al tuo sito.</span></div>`;
+      <div class="trust-note" style="margin-bottom:0">🔒 <span><b>${
+        perche}</b>È l'insegna che puoi appendere sopra il tuo catalogo
+        — una foto e il link al tuo sito.</span></div>`;
     return;
   }
   const vivo = b.stato === 'attivo' && b.foto;

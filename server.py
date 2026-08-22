@@ -1725,8 +1725,6 @@ def titoli_disponibili(con, tg_id: int) -> list[str]:
 # il database, la vetrina e la prova in CI.
 
 LINK_BANNER_MAX = 300      # un indirizzo piu' lungo non lo legge nessuno
-MSG_BANNER_CHIUSO = ("Il banner si sblocca quando il tuo negozio si "
-                     "avvia: serve almeno un affare concluso.")
 
 
 def _gradino_livello(id_livello: str) -> int:
@@ -1753,6 +1751,60 @@ def banner_porta_aperta(xp: int, affari: int, livello_minimo: str) -> bool:
     invece di ereditare in silenzio una soglia che non ha scelto."""
     return livello_utente(xp, affari)["numero"] >= _gradino_livello(
         livello_minimo)
+
+
+# LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago 2026,
+# dal campo): il messaggio nominava il solo affare concluso, quindi chi
+# ne aveva tredici e 104 XP si sentiva chiedere una cosa che aveva gia'
+# — e andava a cercare dalla parte sbagliata. Il livello lo decidono
+# ENTRAMBE le soglie (lo dice `livello_utente`), e il rifiuto ora dice
+# QUALE manca, col numero, e SOLO quella.
+
+
+def banner_cosa_manca(xp: int, affari: int, livello_minimo: str) -> dict:
+    """Che cosa manca alla porta, coi numeri: quanti XP ha e quanti ne
+    servono, quanti affari conclusi ha e quanti ne servono — e `0`
+    sulla meta' che non manca, che e' quel che permette di dire solo
+    l'altra.
+    Le soglie sono quelle del gradino chiesto e non del prossimo: i
+    due assi di LIVELLI crescono insieme, quindi «essere al gradino N»
+    e' esattamente «xp >= soglia_N e affari >= soglia_N» — la stessa
+    domanda di `banner_porta_aperta`, detta coi numeri.
+    Un gradino sconosciuto non manca di NIENTE (tutti zero): li' la
+    porta resta chiusa dal fail-closed di `banner_porta_aperta`, e un
+    numero inventato sarebbe peggio del silenzio."""
+    liv = next((l for l in LIVELLI if l[2] == livello_minimo), None)
+    if liv is None:
+        return {"xp": 0, "xp_ora": xp, "xp_serve": 0,
+                "affari": 0, "affari_ora": affari, "affari_serve": 0}
+    return {"xp": max(0, liv[0] - xp), "xp_ora": xp, "xp_serve": liv[0],
+            "affari": max(0, liv[1] - affari), "affari_ora": affari,
+            "affari_serve": liv[1]}
+
+
+def msg_banner_chiuso(xp: int, affari: int, livello_minimo: str) -> str:
+    """Il rifiuto della porta, scritto UNA volta sola: lo dicono il 400
+    dell'endpoint e il cassetto del Profilo, che se lo riceve gia'
+    scritto in `banner_leve` invece di ricomporlo — due prose sulla
+    stessa porta sono due prose che un giorno dicono due cose diverse
+    (il patto di `messaggio_zona_storta`).
+    Il gradino ignoto ricade sulla frase corta: la porta e' chiusa e
+    non c'e' un numero onesto da dire."""
+    nome = next((l[3] for l in LIVELLI if l[2] == livello_minimo),
+                livello_minimo)
+    m = banner_cosa_manca(xp, affari, livello_minimo)
+    pezzi = []
+    if m["xp"]:
+        pezzi.append(f"{m['xp_ora']} XP su {m['xp_serve']}")
+    if m["affari"]:
+        voce = "affare concluso" if m["affari_ora"] == 1 else "affari conclusi"
+        pezzi.append(f"{m['affari_ora']} {voce} su {m['affari_serve']}")
+    if not pezzi:
+        return f"Il banner si sblocca col livello «{nome}»."
+    # il «hai» sta DAVANTI e una volta sola: ripetuto in ogni pezzo,
+    # con tutt'e due le meta' mancanti si leggerebbe «hai ... e hai ...»
+    return (f"Il banner si sblocca col livello «{nome}»: hai "
+            + " e ".join(pezzi) + ".")
 
 
 def dominio_link(url: str) -> str:
@@ -20463,19 +20515,28 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il banner del negozio, per il cassetto «🖼». Le sue colonne
     # escono gia' dal SELECT * — e' il SUO profilo, quindi vede anche
     # cio' che aspetta una decisione e il motivo di un rifiuto — e qui
-    # si aggiungono le due cose che il client non deve calcolarsi da
-    # se': se la porta e' aperta, e i DOMINI in chiaro (un secondo
-    # parser di la' sarebbe il posto da cui un giorno la riga sotto il
-    # banner e il link che si apre direbbero due cose diverse).
+    # si aggiungono le tre cose che il client non deve calcolarsi da
+    # se': se la porta e' aperta, il PERCHE' quando e' chiusa, e i
+    # DOMINI in chiaro (un secondo parser di la' sarebbe il posto da
+    # cui un giorno la riga sotto il banner e il link che si apre
+    # direbbero due cose diverse).
+    _xp_ban = (u["xp"] or 0) if u else 0
+    _aff_ban = ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0
+    _porta_ban = bool(u) and banner_porta_aperta(
+        _xp_ban, _aff_ban, BANNER_LIVELLO)
     profilo["banner_leve"] = {
         "attivo": bool(BANNER_NEGOZIO_ATTIVO),
         "livello": BANNER_LIVELLO,
         "livello_nome": next(
             (l[3] for l in LIVELLI if l[2] == BANNER_LIVELLO), ""),
-        "porta_aperta": bool(u) and banner_porta_aperta(
-            u["xp"] or 0,
-            (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0),
-            BANNER_LIVELLO)}
+        "porta_aperta": _porta_ban,
+        # A porta chiusa il MOTIVO viaggia gia' scritto, ed e' lo
+        # STESSO testo del 400: il cassetto non lo ricompone (due
+        # prose sulla stessa porta divergono al primo ritocco) e
+        # soprattutto non si ricalcola quale meta' manca, che e' il
+        # numero dove vive un off-by-one — il patto di `mancano_pezzi`.
+        "motivo": "" if _porta_ban else msg_banner_chiuso(
+            _xp_ban, _aff_ban, BANNER_LIVELLO)}
     profilo["banner_dominio"] = dominio_link(profilo.get("banner_link") or "")
     profilo["banner_dominio_att"] = dominio_link(
         profilo.get("banner_link_att") or "")
@@ -21440,12 +21501,12 @@ async def salva_banner_negozio(req: Request,
     if not u or not u["negozio"]:
         con.close()
         raise HTTPException(400, "Il tuo negozio non è ancora pronto")
-    if not banner_porta_aperta(
-            u["xp"] or 0,
-            (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0),
-            BANNER_LIVELLO):
+    _xp = u["xp"] or 0
+    _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+    if not banner_porta_aperta(_xp, _affari, BANNER_LIVELLO):
         con.close()
-        raise HTTPException(400, MSG_BANNER_CHIUSO)
+        raise HTTPException(400, msg_banner_chiuso(_xp, _affari,
+                                                   BANNER_LIVELLO))
     link, motivo = link_banner_ammesso(d.get("link"), BANNER_LINK_VIETATI,
                                        _casa_barattolo())
     if not link:

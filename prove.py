@@ -24139,6 +24139,53 @@ def prove_banner_negozio():
     prova("...perche' il gradino ignoto vale piu' dell'ultimo", True,
           grad("boh") > grad("maestro"))
 
+    # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago
+    # 2026, dal campo): il messaggio nominava il solo affare concluso,
+    # e chi ne aveva tredici con 104 XP andava a cercare dalla parte
+    # sbagliata. Qui si prova il caso VERO che ha aperto il cantiere.
+    exec(pezzo("banner_cosa_manca"), amb2)
+    exec(pezzo("msg_banner_chiuso"), amb2)
+    manca, msg = amb2["banner_cosa_manca"], amb2["msg_banner_chiuso"]
+    m = manca(104, 13, "avviato")
+    prova("104 XP su 150: ne mancano 46", (46, 104, 150),
+          (m["xp"], m["xp_ora"], m["xp_serve"]))
+    prova("...e con tredici affari non ne manca nessuno", 0, m["affari"])
+    testo = msg(104, 13, "avviato")
+    prova("il rifiuto dice gli XP che ha e quelli che servono", True,
+          "104 XP su 150" in testo)
+    prova("...e NON chiede un affare che ha gia'", True,
+          "affar" not in testo)
+    prova("...e nomina il livello che apre la porta", True,
+          "Bottega avviata" in testo)
+    # Il rovescio: chi ha gli XP e nessun affare si sente dire QUELLO,
+    # e al singolare/plurale giusto.
+    zero = msg(900, 0, "avviato")
+    prova("chi non ha concluso niente se lo sente dire", True,
+          "0 affari conclusi su 1" in zero)
+    prova("...senza che gli si chiedano XP che ha", True, "XP" not in zero)
+    prova("un affare solo si scrive al singolare", True,
+          "1 affare concluso su 5" in msg(600, 1, "pratico"))
+    # Mancano tutt'e due: si dicono INSIEME, una volta sola ciascuna.
+    due = msg(0, 0, "avviato")
+    prova("mancano tutt'e due: si dicono insieme", True,
+          "0 XP su 150 e 0 affari conclusi su 1" in due)
+    # FAIL-CLOSED anche nella prosa: sul gradino ignoto la porta resta
+    # chiusa (sopra) e qui non si inventa nessun numero.
+    prova("il gradino ignoto non inventa numeri", True,
+          "su" not in msg(50, 2, "boh").split("«")[1])
+    prova("...e il giudice non manca di niente", (0, 0),
+          (manca(50, 2, "boh")["xp"], manca(50, 2, "boh")["affari"]))
+    # IL COMPOSER E' UNO: la frase vive dentro `msg_banner_chiuso` e in
+    # nessun altro posto — ne' nel 400, ne' nel client, che la riceve
+    # gia' scritta. Due prose sulla stessa porta divergono al primo
+    # ritocco (il patto di `messaggio_zona_storta`).
+    prova("la frase si scrive in un posto solo", 2,
+          src.count("Il banner si sblocca"))
+    prova("...dentro il composer", 2,
+          pezzo("msg_banner_chiuso").count("Il banner si sblocca"))
+    prova("il 400 e il cassetto chiamano lo stesso composer", 2,
+          src.count("msg_banner_chiuso(") - 1)
+
     # ---- 4. QUANDO SI VEDE ----------------------------------------
     amb3 = {"BANNER_NEGOZIO_ATTIVO": True, "dominio_link": dom}
     exec(pezzo("_banner_pubblico"), amb3)
@@ -24371,7 +24418,16 @@ def prove_banner_negozio():
     # LA PORTA CHIUSA SI DICE: chi non ha il livello deve sapere che il
     # banner esiste e come si apre, o non scoprirebbe mai la funzione.
     prova("la porta chiusa si racconta, non si nasconde", True,
-          "porta_aperta" in rb and "si sblocca" in rb)
+          "porta_aperta" in rb and "bannerLeve.motivo" in rb)
+    # HA CAMBIATO LATO (ago 2026): chiedeva che la frase «si sblocca»
+    # fosse SCRITTA QUI, e quella frase nominava una sola delle due
+    # chiavi della porta. Adesso il perche' arriva dal server, che ha i
+    # numeri: di qua non si ricompone e non si ricalcola quale meta'
+    # manca — e chiave assente vuol dire un'assenza, mai una bugia.
+    prova("il perche' non si riscrive nel client", True,
+          "si sblocca" not in rb and "affare concluso" not in rb)
+    prova("...e un server di ieri non lascia una frase falsa", True,
+          "bannerLeve.motivo ?" in rb)
     prova("il 400 si rende dentro il cassetto, non in un toast", True,
           "bannerErrore" in pezzo_js(mini, "async function salvaBanner(", "\n}"))
 
