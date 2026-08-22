@@ -3441,6 +3441,69 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   qualunque cosa su chi controlla un evento. Da quel momento la
   piattaforma NON tocca più quell'evento: anche il ritiro passa da una
   firma sua (azione 'ritira' = kind 5 dal suo browser).
+  E IL BIVIO VALE ANCHE ALL'INDIETRO (ago 2026, decisione di Andrea):
+  `trasloca_annunci_nostr` nell'orologio porta sull'account del
+  venditore gli annunci finiti in piazza a nome NOSTRO prima che lui
+  dimostrasse la sua chiave. Senza, il bivio vale solo da lì in avanti
+  e la roba di ieri resta intestata a noi PER SEMPRE — che è il
+  contrario di quel che il bivio esiste per dire.
+  UN POSTO SOLO E NESSUN GANCIO, ed è la scelta che tiene piccolo il
+  cantiere: non si tocca nessuno dei QUATTRO punti in cui una chiave
+  diventa provata (login Nostr, collegamento, accesso abilitato, npub
+  verificata) — sarebbero quattro cose da ricordare e il quinto di
+  domani non le erediterebbe. Il giro si fa una domanda sola («un
+  evento vivo, firmato da noi, su un annuncio nato qui, di un
+  venditore con chiave provata») e copre il passato e il futuro
+  insieme, riparandosi da sé.
+  LA NOTA kind-1 NON TRASLOCA, ed è la metà che si confonde: quella è
+  Barattolo che RACCONTA un annuncio nuovo ai suoi lettori, il gemello
+  esatto del post nel canale Telegram, e resta sul nostro account
+  perché il nostro canale è nostro. A traslocare è l'ANNUNCIO (kind
+  30402), che dice CHI VENDE. Chi le confondesse spegnerebbe il canale
+  Nostr un annuncio alla volta. ⚠️ Il nome di quella colonna nel corpo
+  del giro non si scrive nemmeno DENTRO UN COMMENTO: la sentinella lo
+  conta lì, e citandolo diventa rossa (ci si è inciampati scrivendola,
+  ed è la stessa trappola di `nome_pezzo`).
+  PRIMA NASCE IL SUO, POI MUORE IL NOSTRO (decisione di Andrea, e la
+  strada opposta era l'altra faccia della stessa moneta): così
+  l'annuncio non sparisce MAI dalla piazza. Il prezzo, dichiarato: fra
+  le due cose lo stesso oggetto esiste DUE volte con due firme diverse
+  — pochi secondi nel caso normale, perché chi prova la chiave sta
+  nell'app e il suo browser svuota la coda subito; finché non torna,
+  nel caso peggiore. LA STRADA SCARTATA (cancella e poi aspetta) non
+  lascerebbe mai un doppione, ma toglierebbe l'annuncio dalla piazza
+  per tutto il tempo dell'attesa: chi la riproponesse sappia che è una
+  decisione di prodotto e non un riordino.
+  DA LÌ LA COLONNA `annunci.nostr_event_vecchio`, che è tutta la
+  complessità del cantiere: la firma del venditore SOVRASCRIVE
+  `nostr_event_id`, quindi il nostro id va letto nell'unico istante in
+  cui esiste ancora — dentro `firma_nostr_fatta`, PRIMA di quell'UPDATE
+  — o resterebbe in piazza per sempre un evento nostro che nessuno sa
+  più di avere. Da lì non si AZZERA mai: una lapide già in attesa non
+  deve poter sparire per una seconda firma.
+  E LA LAPIDE DIMENTICA SOLO DOPO L'OK dei relay (`_seppellisci_
+  vecchio`): con l'ordine rovesciato un relay muto ci farebbe perdere
+  l'unico filo verso quell'evento, cioè proprio il doppione che il
+  giro esiste per chiudere. Restando in colonna, ci riprova il giro
+  dopo — ed è anche la rete di sicurezza, perché la lapide parte
+  SUBITO dopo la firma e non aspetta l'orologio.
+  `_lapide_nostra` è il giudice unico della NIP-09 sui nostri eventi
+  (la usano il ritiro di sempre e il trasloco): un kind 5 con la
+  coordinata `a` storta i relay lo ACCETTANO lo stesso e non cancella
+  niente — cioè un ritiro che sembra riuscito, ed è il modo silenzioso
+  in cui due copie di quelle tre righe divergerebbero.
+  La chiave provata passa da `chiave_nostr_provata` e MAI da una WHERE
+  scritta a mano: quella regola (npub_accesso, o il badge ma solo
+  VERIFICATO) è la stessa di `notifica()` e dei ponti, e riscritta in
+  SQL sarebbe il secondo posto che un giorno dice un'altra cosa su a
+  chi si intesta un annuncio in piazza. Leve `TRASLOCO_NOSTR` (ACCESA
+  di serie: non esce niente verso nessuno che non l'abbia chiesto — si
+  cancella un evento NOSTRO e si prepara una firma che l'utente può
+  semplicemente non dare; resta un interruttore perché cancellare dai
+  relay non si disfa) e `MAX_TRASLOCO_GIRO` (200, che il primo giro
+  passa sul pregresso). Il trasloco gira PRIMA di
+  `sollecita_firme_nostr`, così chi entra in coda adesso può già
+  essere richiamato dallo stesso giro.
   Post automatici (lug 2026): la piattaforma racconta i fatti — ogni
   nuovo annuncio in vetrina esce da solo come nota Nostr kind-1
   (chiave piattaforma, tag `t=barattolo`, foto come URL nel content)
