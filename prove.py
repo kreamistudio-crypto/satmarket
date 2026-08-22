@@ -16299,6 +16299,111 @@ def prove_seo():
     prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
           "this.dataset.cat" in sf)
 
+    # --- 16bis) LE CATEGORIE IN HOME (ago 2026) -------------------
+    # Le stesse card di Sfoglia, in una fila che scorre sotto l'header.
+    # Il tab «Sfoglia» se n'e' andato dalla barra: quella pagina e'
+    # rimasta, ma ci si arriva SOLO dall'ultima card della striscia —
+    # se quel chiamante sparisce resta senza porte, che e' il difetto
+    # che questo cantiere esiste per non creare.
+    st = pezzo_js(testo_mini, "function renderStriscia(){", "\n}\n")
+    prova("le card della striscia sono collegamenti veri", True,
+          '<a class="cat-cella"' in st and 'href="/categoria/' in st)
+    prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
+          "this.dataset.cat" in st)
+    prova("...con l'illustrazione PIENA, la stessa di Sfoglia", True,
+          "urlIllustrazione(c)" in st and "caldaOk(c)" in st)
+    # L'ORDINE E' QUELLO DI SFOGLIA E NON UNA SECONDA CLASSIFICA: due
+    # ordinamenti sullo stesso catalogo direbbero due mappe diverse a
+    # due dita di distanza. E' anche cio' che tiene i chiamanti di
+    # contaCategorie a DUE (la prova qui sopra): la striscia non conta
+    # niente per conto suo.
+    prova("la striscia ordina col giudice di Sfoglia", True,
+          "ordineSfoglia()" in st)
+    prova("...e non si riconta le categorie da se'", False,
+          "contaCategorie(" in st)
+    # con un filtro acceso si NASCONDE e non si svuota: tornando a
+    # «Tutto» la fila e' gia' li', senza un giro di render e senza che
+    # le figure lampeggino
+    prova("col filtro acceso la sezione si nasconde", True,
+          "style.display = filtro ? 'none' : ''" in st)
+    prova("...e non si svuota", False, "innerHTML = ''" in st)
+    prova("...e il filtro e' la categoria O il barattolo", True,
+          "vistaBarattolo || activeCat !== 'Tutto'" in st)
+    # un chiamante solo, ed e' renderChips: cosi' i cinque posti che
+    # gia' rifanno le pillole valgono per tutte e due le file, e non
+    # nasce un secondo elenco da tenere allineato
+    prova("la striscia ha un chiamante solo", 1,
+          testo_mini.count("renderStriscia();"))
+    prova("...ed e' renderChips", True,
+          "renderStriscia();" in pezzo_js(
+              testo_mini, "function renderChips(){", "\n}\n"))
+    # LA PORTA ALLO SCAFFALE: una sola, e c'e'. Due occorrenze perche'
+    # la card in coda si tocca anche da tastiera (onclick + onkeydown).
+    prova("a Sfoglia ci si arriva dalla card in coda", 2,
+          st.count("go('sfoglia')"))
+    prova("...e nessun altro posto la chiama", 2,
+          testo_mini.count("go('sfoglia')"))
+    prova("...perche' il tab non esiste piu'", False,
+          'id="nav-sfoglia"' in testo_mini)
+
+    # --- 16ter) SFOGLIA E' UNA VISTA INTERNA ----------------------
+    # Senza il suo tab non e' piu' una radice: si SPINGE, e l'indietro
+    # riporta in home invece di uscire dall'app (il patto di /privacy).
+    i_r = testo_mini.index("const RADICI = ")
+    prova("«sfoglia» e' fuori da RADICI", False,
+          "'sfoglia'" in testo_mini[i_r:i_r + 260])
+    prova("...e la nav accende Esplora", True,
+          "'offertapresto','sfoglia'" in pezzo_js(
+              testo_mini, "function voceNav(view){", "\n}\n"))
+    # il ramo della vetrina resta alle sole ASTE: quello di Sfoglia non
+    # esiste piu', e una entry gia' scritta nella cronologia di qualcuno
+    # ('sfoglia|Casa e giardino') deve ricadere su 'esplora'
+    prova("il ramo vive solo per le aste", 0,
+          testo_mini.count("ramoVetrina = 'sfoglia'"))
+    prova("...e una entry vecchia degrada su Esplora", True,
+          "ramo === 'aste' ? ramo : 'esplora'" in pezzo_js(
+              testo_mini, "function navRendiVista(b){", "\n}\n"))
+    # ENTRARE IN UN REPARTO E' UNA DISCESA DA TUTTE E DUE LE PORTE, e
+    # DOVE si alza la bandierina dipende da chi apre: dallo scaffale la
+    # vista cambia (a spingere e' il giro dell'osservatore, quindi
+    # DOPO), dalla home no — quel giro non arriva mai, quindi PRIMA.
+    # Senza, il reparto si mangiava la home e l'indietro usciva
+    # dall'app: difetto trovato dal vivo, non leggendo.
+    ac = pezzo_js(testo_mini, "function apriCategoria(c){", "\n}\n")
+    prova("la discesa sa da che porta si e' entrati", True,
+          "const restiamoQui = el('view-esplora').classList.contains('active');"
+          in ac)
+    # con find() e non index(): una riga tolta deve far ROSSA questa
+    # prova, non farla esplodere portandosi dietro tutte le altre
+    dove = lambda t: ac.find(t)
+    prova("...bandierina PRIMA di setCat se la vista resta", True,
+          0 <= dove("if (restiamoQui) navSpingi = true;")
+          < dove("setCat(c);"))
+    prova("...e DOPO se la vista cambia", True,
+          0 <= dove("setCat(c);")
+          < dove("if (!restiamoQui) navSpingi = true;")
+          < dove("go('esplora');"))
+
+    # --- 16quater) LA BARRA TORNA A CINQUE CELLE ------------------
+    # Quattro voci e uno spaziatore: e' lui a tenere il + al centro
+    # esatto (misurato: 180,0 su 360). Lo spaziatore ha ripreso il
+    # posto di «Sfoglia», cioe' PRIMA del Vendi — messo altrove il +
+    # scivola, e a occhio non se ne accorge nessuno.
+    barra = testo_mini[testo_mini.index("<nav>"):
+                       testo_mini.index("</nav>")]
+    celle = [a or b for a, b in _re.findall(
+        r'<(?:button id="(nav-[a-z]+)"|span class="(nav-vuoto)")', barra)]
+    prova("cinque celle in tutto", 5, len(celle))
+    prova("...e il + di Vendi e' la terza", "nav-vendi", celle[2])
+    prova("...con lo spaziatore fra Esplora e Vendi", "nav-vuoto", celle[1])
+    # il markup della barra e' STATICO: niente piu' celle accese e
+    # spente a runtime, che era il posto dove il + poteva scentrarsi
+    # secondo lo stato di una leva
+    prova("nessuna cella si accende a runtime", False,
+          "document.querySelector('.nav-vuoto')" in testo_mini)
+    prova("...e il tasto Aste nasce visibile", False,
+          '<button id="nav-aste" style="display:none"' in testo_mini)
+
     # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
     # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa
     # funzionare gli indirizzi parlanti senza toccare il client: chi la

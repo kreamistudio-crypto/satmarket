@@ -1614,6 +1614,110 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invece che vuoto. `prove.py` difende il patto: chiavi ∈ CATEGORIE,
   id unici e kebab, niente «altro», i giudici nei loro casi, il
   dizionario allineato all'albero voce per voce.
+  LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
+  di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
+  le stesse 27 figure della pagina Sfoglia, nello stesso ordine (per
+  numero di annunci, `ordineSfoglia`) — e il tab «Sfoglia» esce dalla
+  barra. Le categorie smettono di essere un elenco di nomi in un altro
+  posto e diventano la prima cosa che si vede.
+  LE PILLOLE RESTANO, E RESTANO DOVE SONO: `renderChips` non si tocca
+  di una riga. Le due file dicono cose diverse APPOSTA — le pillole
+  sono il COMANDO (solo i reparti pieni, «Tutto» in testa, dentro
+  l'header APPICCICATO, quindi a portata da qualunque punto della
+  pagina), la striscia è la MAPPA (tutte e 27, le vuote in fondo, e
+  scorre via con la pagina). È la stessa divisione che c'era fra chips
+  e Sfoglia, portata a un dito di distanza.
+  LA SEZIONE STA FUORI DALL'HEADER, ed è misurato e non a occhio:
+  l'header a 320px occupa già ~176px su 568 — con le card dentro
+  salirebbe a ~280, cioè la vetrina si guarderebbe da una fessura.
+  Quindi le card scorrono via e a restare appiccicate sono le pillole,
+  che il reparto lo fanno cambiare comunque.
+  CON UN FILTRO ACCESO LA SEZIONE SPARISCE (categoria scelta o
+  barattolo): a dire dove sei ci sono le pillole, che quello stato lo
+  dicono già. Si NASCONDE e non si svuota — tornando a «Tutto» la fila
+  è già lì, senza un giro di render e senza che le figure lampeggino.
+  L'ORDINE VIENE DA `ordineSfoglia` E DA NESSUN ALTRO POSTO: due
+  ordinamenti sullo stesso catalogo direbbero due mappe diverse a due
+  dita di distanza. È anche ciò che tiene i chiamanti di
+  `contaCategorie` a DUE — la striscia non conta niente per conto suo,
+  e la sentinella storica di quel conteggio protegge già questa regola
+  (provato: chi gliela fa contare trova rossa quella, non una nuova).
+  LE FIGURE SONO LE PIENE, non i francobolli, e le tre ragioni valgono
+  insieme: un set solo invece di un terzo da tenere allineato; i mini
+  (128px di lato lungo) su un riquadro da ~64px CSS si ammorbidiscono
+  a 3x; e soprattutto `scaldaSfoglia` — le 27 pesanti scaldate a
+  riposo 2,5s dopo l'avvio, ~805 KB — **smette di essere uno spreco**:
+  serviva una pagina in fondo a un tab, adesso serve la home. Col
+  `loading="lazy"` il costo iniziale sono le ~3 card in vista.
+  IL RIQUADRO DELLA FIGURA NON È QUADRATO dentro la card quadrata, ed
+  è la riga che sembra un refuso: il pareggio dell'inchiostro
+  (`ritaglia_categorie.py`) è tarato sul riquadro di Sfoglia, 85.9×75
+  — rapporto ~1,15 — quindi la figura tiene QUEL rapporto (88%×78%).
+  In un riquadro quadrato le illustrazioni larghe (biciclette 464×300)
+  e quelle alte (telefonia 240×386) si peserebbero diversamente da
+  come pesano di là, e il pareggio direbbe il falso.
+  MISURE, verificate a schermo a 320/360/375: card 84px + gap 8 →
+  **tre card intere e 28px della quarta a 320** (68 a 360, 83 a 375).
+  Il TAGLIO al bordo è il segnale che ce n'è altre, come già fanno le
+  pillole; niente barra di scorrimento e `overscroll-behavior-x:
+  contain`, che le chips non hanno e che impedisce al trascinamento di
+  incatenarsi alla pagina. Il nome sta SOTTO il quadrato (a 84px una
+  parola lunga sopra il disegno lo schiaccerebbe), due righe al
+  massimo. La sezione è alta 157px: chi allarga la card rifà quel
+  conto — a 96px se ne vedono due e mezza.
+  IN CODA LA CARD «TUTTE LE CATEGORIE», che è due cose insieme: la
+  fine dichiarata della fila e **l'unica porta rimasta allo scaffale**.
+  Non porta un'illustrazione perché non è un reparto — il segno è la
+  griglia in miniatura, la stessa che il tab Sfoglia aveva per icona —
+  e il suo velo sta al 28% e non al 12% delle icone della nav: là è
+  inchiostro su carta, qui crema su bruno, e al 12% due dei quattro
+  riquadri sparivano (visto a schermo, non leggendo il foglio).
+  SFOGLIA DIVENTA UNA VISTA INTERNA, il patto di /sicurezza e
+  /privacy: esce da `RADICI` (quindi si SPINGE e l'indietro riporta in
+  home invece di uscire dall'app), `voceNav` la mappa su 'esplora', e
+  il ramo `ramoVetrina='sfoglia'` NON ESISTE PIÙ. La pagina non si
+  tocca: griglia, ordine, illustrazioni e `/categoria/{slug}` restano
+  identici, e le entry già scritte nella cronologia di qualcuno
+  ('sfoglia|Casa e giardino') ricadono su 'esplora' nel ternario di
+  `navRendiVista` — degradazione, non errore.
+  LA REGOLA CHE SI ROVESCIA, col suo motivo: «MA LA NAV MENTIVA» —
+  entrando in un reparto si accendeva Esplora su una vetrina FILTRATA,
+  e chi guardava credeva fosse tutto il mercatino. Era vero finché il
+  reparto si apriva da UN ALTRO TAB; adesso si apre dalla home, quindi
+  «Esplora» è la verità, e a dire che è filtrata c'è la pillola
+  accesa, appiccicata in cima.
+  ENTRARE IN UN REPARTO RESTA UNA DISCESA da tutte e due le porte, ma
+  DOVE si alza la bandierina dipende da chi apre — ed è l'unica riga
+  delicata del cantiere, trovata DAL VIVO e non leggendo. `navRiflette`
+  scrive la entry e legge-e-azzera `navSpingi` a ogni giro, e i giri
+  sono due: quello dentro `setCat` (la categoria vive nella entry) e
+  quello dell'osservatore quando `go` cambia vista. Dallo SCAFFALE la
+  vista cambia, il primo giro vede la pila ancora su «sfoglia» — uguale
+  a quella scritta — ed esce subito: a spingere è il secondo, quindi la
+  bandierina si alza DOPO. Dalla HOME il secondo giro non arriva mai
+  (nessuna classe si muove) e il primo, se la bandierina non è ancora
+  alzata, SOSTITUISCE: il reparto si mangiava la home e l'indietro
+  usciva dall'app. Da qui `restiamoQui`, e le prove che tengono
+  l'ordine delle due righe.
+  LA BARRA TORNA A CINQUE CELLE col ＋ al centro ESATTO (misurato:
+  160,0 su 320 · 180,0 su 360 · 187,5 su 375, e la nav resta 61,2px):
+  lo spaziatore `.nav-vuoto` ha ripreso il posto di «Sfoglia», cioè
+  PRIMA del Vendi, ed è lui a tenere il tondo a metà — messo altrove
+  il ＋ scivola al 37,5% e a occhio non se ne accorge nessuno (c'è la
+  prova sull'ORDINE del markup). Il buco è dove andrà la voce nuova.
+  E IL MARKUP DELLA BARRA È STATICO: `aggiornaAstaVisibilita` non
+  accende più il tasto Aste né spegne lo spaziatore — due righe che
+  muovevano a runtime cose che ormai non cambiano mai erano solo un
+  secondo posto dove il ＋ poteva scentrarsi.
+  IN DEMO (file://) le illustrazioni non arrivano e restano le emoji
+  di ripiego: degradazione, non regressione — verificato, le 27 card
+  si leggono lo stesso.
+  LA STRISCIA HA UN CHIAMANTE SOLO, `renderChips`, ed è in TESTA e non
+  in coda: il ramo del barattolo esce con un `return`, e da lì la
+  striscia — che proprio in quel caso deve sparire — non la rifarebbe
+  nessuno. Così i cinque posti che già rifanno le pillole valgono per
+  tutte e due le file, e non nasce un secondo elenco da tenere in pari.
+
   LA PAGINA «SFOGLIA» (lug 2026): le categorie come vetrina, quarta
   radice della nav — griglia a due colonne di piastrelle illustrate,
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
@@ -1709,18 +1813,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gli slot cinque — `.nav-vuoto`, uno spaziatore elastico che tiene il
   quinto posto, vuoto di proposito e già destinato a qualcos'altro. In
   topbar desktop sparisce (lì i bottoni sono `flex:0 0 auto`).
-  L'ORDINE è [Esplora][Sfoglia](+)[vuoto][Ordini] (lug 2026): il posto
-  vuoto sta IN MEZZO, fra Vendi e Ordini, non in coda — così gli Ordini
-  restano all'estrema destra, dove il pollice li trova senza guardare.
-  Spostarlo è solo uno scambio di posto nel markup: voci e spaziatore
-  sono tutti `flex:1`, quindi il Vendi resta il terzo di cinque slot
-  uguali e nessuna regola CSS si tocca (misurato: centro invariato,
-  nav 61,2px, e da desktop lo spaziatore è già `display:none`).
+  L'ORDINE è [Esplora][vuoto](+)[Aste][Ordini] (ago 2026, col cantiere
+  delle categorie in home: prima era [Esplora][Sfoglia](+)[Aste][vuoto,
+  spento][Ordini]). Il posto vuoto è quello che era di «Sfoglia», cioè
+  PRIMA del Vendi, e ci resta finché non ci andrà la voce nuova; gli
+  Ordini restano comunque all'estrema destra, dove il pollice li trova
+  senza guardare. Spostarlo è solo uno scambio di posto nel markup:
+  voci e spaziatore sono tutti `flex:1`, quindi il Vendi resta il terzo
+  di cinque slot uguali e nessuna regola CSS si tocca (misurato:
+  centro esatto alle tre larghezze, nav 61,2px, e da desktop lo
+  spaziatore è già `display:none`).
   LE ICONE SONO NOSTRE (lug 2026): tre SVG al posto delle emoji
   🛍️🗂️🤝, che cambiavano forma da un telefono all'altro e non
   seguivano i token del tema — LENTE per Esplora, PIASTRELLE per
   Sfoglia (la sua pagina in miniatura), PACCO di tre quarti per gli
-  Ordini. Inline nel markup, non da JS: nessun lampo all'avvio e la
+  Ordini. Dall'ago 2026 le piastrelle non stanno più in barra: quel
+  disegno è passato tale e quale alla card «Tutte le categorie» in
+  coda alla striscia della home, che è dove Sfoglia si apre adesso. Inline nel markup, non da JS: nessun lampo all'avvio e la
   barra esiste prima che il primo script giri. Disegnate sulla griglia
   da 24 con la mano di `tagliaSVG` e `jarSVG` — tratto a currentColor,
   capi tondi, velo al 12% (classe `.velo`) che dà corpo — e fuori
@@ -6293,7 +6402,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   stessa icona di Esplora, che l'emoji 🛍️ cambiava forma da un
   telefono all'altro): le aste
   si annunciano prima di esistere, invece di apparire un giorno dal
-  nulla. È una RADICE SORELLA — sta in `RADICI`, si sostituisce come
+  nulla. (Dall'ago 2026 lo spaziatore È TORNATO A SERVIRE — ha preso
+  il posto di «Sfoglia» prima del Vendi — e il markup della barra è
+  statico: qui non si accende e non si spegne più nessuna cella.) È una RADICE SORELLA — sta in `RADICI`, si sostituisce come
   le altre e l'indietro passa da Esplora — e `voceNav` la mappa su
   'aste', che la nav deve dire dove sei. Non tocca né filtro né
   ordinamento: non c'è niente da accendere e niente da spegnere
@@ -17584,6 +17695,45 @@ il deploy: nessuna colonna, nessuna migrazione, nessuna leva nuova —
 vecchio non la legge. DA GUARDARE al primo giro: il primo venditore
 vero davanti al foglio senza tetto (che non lo senta come un muro), e
 il cassetto dei codici che compare solo dai negozi giusti.
+
+Le categorie in home diventano card a scorrimento (ago 2026,
+decisione di Andrea): sotto l'header di Esplora una fila di card
+quadrate illustrate — le stesse 27 figure di Sfoglia, nello stesso
+ordine — e il tab «Sfoglia» esce dalla barra, lasciando il suo posto
+alla voce che verrà. Le pillole coi nomi restano dove sono e come
+sono: scorrendo, le card vanno via e le pillole restano appiccicate,
+così il reparto si cambia da qualunque punto della pagina. Sfoglia
+resta, dietro l'ultima card («Tutte le categorie»), e diventa una
+vista interna come /privacy: la nav accende Esplora e l'indietro
+riporta in home. Vedi Architettura, «LE CATEGORIE IN HOME», per il
+riquadro non-quadrato dentro la card quadrata (il pareggio
+dell'inchiostro è tarato su quello di Sfoglia), per le misure
+verificate a schermo e per la regola che si rovescia — «MA LA NAV
+MENTIVA» era vera finché il reparto si apriva da un ALTRO tab.
+IL DIFETTO TROVATO DAL VIVO, ed è la parte che leggendo non si vedeva:
+dalla home il tocco su una card NON creava il gradino — la vista non
+cambia, quindi l'osservatore del motore non scatta e la entry veniva
+SOSTITUITA: il reparto si mangiava la home e l'indietro usciva
+dall'app. Da lì `restiamoQui`, che decide se la bandierina si alza
+prima o dopo `setCat`, con le prove che ne tengono l'ordine.
+Collaudato: 4418 prove verdi (25 nuove) e **21 MUTAZIONI, 21 uccise,
+zero sopravvissute** — fra cui una che conferma la tenuta di una
+regola vecchia (se la striscia si contasse le categorie da sé, a
+diventare rossa è la sentinella storica dei due chiamanti di
+`contaCategorie`). Due prove nuove sono state riscritte con `find()`
+invece di `index()` perché la tortura le ha viste ESPLODERE invece che
+diventare rosse, portandosi dietro tutte quelle dopo. Più il giro dal
+vivo via CDP a 320/360/375 nei due temi: il ＋ della nav al centro
+esatto (160,0 · 180,0 · 187,5), tre card intere col taglio della
+quarta, la catena dell'indietro dalle DUE porte, il barattolo, la
+ricerca, il desktop e la DEMO col ripiego a emoji, zero errori JS.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta, nessun file nuovo — e `scaldaSfoglia`
+non si tocca, ma smette di essere uno spreco perché adesso quelle
+figure servono la home. DA GUARDARE dal telefono, che è dove non si
+può provare da qui: l'apertura dentro Telegram e nella PWA
+installata, e il gesto indietro di sistema dopo essere entrati in un
+reparto dalla card.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

@@ -716,6 +716,60 @@
      campionato dai file: e' cosi' che la cucitura fra l'immagine e la
      piastrella sparisce, e un fondo che cambiasse col tema la
      rimetterebbe in mezzo alla griglia. */
+  /* ---------- la striscia delle categorie in home (ago 2026) ----
+     Le stesse 27 illustrazioni della pagina Sfoglia, in card quadrate
+     che scorrono di lato sotto l'header. Il calco e' `.chips`: flex,
+     scorrimento nascosto, celle che non si stringono mai — piu'
+     `overscroll-behavior-x:contain`, che le chips NON hanno e che
+     impedisce al trascinamento di incatenarsi alla pagina (la lezione
+     della galleria a foto singola).
+     Il padding laterale e' quello di casa: allinea la prima card
+     all'etichetta sopra e fa respirare l'ultima. */
+  .cat-strip{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+    scrollbar-width:none;padding:8px var(--pad) 2px}
+  .cat-strip::-webkit-scrollbar{display:none}
+  /* 84px + 8 di gap: a 320px (288 utili) si vedono tre card intere e
+     20px della quarta — il TAGLIO al bordo e' il segnale che ce n'e'
+     altre, come gia' fanno le pillole. Chi allarga la card cambia quel
+     conto: a 96 se ne vedono due e mezza. */
+  .cat-cella{flex:0 0 auto;width:84px;text-decoration:none;
+    display:flex;flex-direction:column;cursor:pointer}
+  .cat-cella:active{transform:translateY(1px)}
+  .cat-quad{position:relative;aspect-ratio:1;border-radius:14px;
+    overflow:hidden;background:var(--cat-fondo)}
+  /* IL RIQUADRO DELLA FIGURA NON E' QUADRATO, ed e' voluto: il
+     pareggio dell'inchiostro (ritaglia_categorie.py) e' tarato sul
+     riquadro di Sfoglia, 85.9x75 — rapporto ~1,15 — quindi dentro la
+     card quadrata la figura tiene QUEL rapporto. In un riquadro
+     quadrato le illustrazioni larghe (biciclette 464x300) e quelle
+     alte (telefonia 240x386) si peserebbero diversamente da come
+     pesano di la', e il pareggio direbbe il falso. */
+  .cat-quad .cat-fig{position:absolute;left:6%;right:6%;top:11%;bottom:11%}
+  .cat-quad img{position:absolute;inset:0;width:100%;height:100%;
+    display:block;object-fit:contain;object-position:50% 50%}
+  .cat-quad .cat-emoji{position:absolute;inset:0;display:flex;
+    align-items:center;justify-content:center;font-size:30px;line-height:1}
+  .cat-quad img[data-ok] + .cat-emoji{display:none}
+  /* Il nome sta SOTTO il quadrato e non dentro: a 84px una parola
+     lunga sopra il disegno lo schiaccerebbe, e qui la card e' piccola
+     apposta. Due righe al massimo, poi i puntini. */
+  .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
+    line-height:1.2;color:var(--ink);text-align:center}
+  /* La card in coda: la porta alla mappa intera, e la fine dichiarata
+     della fila. Non porta un'illustrazione perche' non e' un reparto —
+     il segno e' la griglia in miniatura, la stessa che il tab Sfoglia
+     aveva come icona. */
+  .cat-tutte .cat-quad{display:flex;align-items:center;justify-content:center;
+    color:var(--cat-ink)}
+  .cat-tutte svg{width:30px;height:30px;fill:none;stroke:currentColor;
+    stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  /* il velo qui e' al 28% e non al 12% delle icone della nav: la' e'
+     inchiostro su carta, qui e' crema su bruno — al 12% due dei
+     quattro riquadri sparivano e l'icona sembrava rotta (visto a
+     schermo, non leggendo il foglio) */
+  .cat-tutte svg .velo{fill:currentColor;opacity:.28;stroke:none}
+
   /* Il respiro sopra la griglia e' 8px e non 12, e l'etichetta non
      porta il padding-top maggiorato delle altre viste: sono i pixel
      che fanno stare la QUINTA riga sopra la nav a 360x760. Chi li
@@ -3774,6 +3828,21 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
+    <!-- Le categorie come CARD ILLUSTRATE (ago 2026): le stesse
+         figure della pagina Sfoglia, in una fila che scorre di lato.
+         Sta FUORI dall'header apposta — dentro, l'header a 320px si
+         mangerebbe meta' schermo (176px oggi, ~280 con le card) e la
+         vetrina si guarderebbe da una fessura. Quindi le card
+         scorrono via, e a restare appiccicate sono le PILLOLE, che
+         il reparto lo fanno cambiare da qualunque punto della pagina.
+         Le due file dicono cose diverse apposta: le pillole sono il
+         COMANDO (solo i reparti pieni, «Tutto» in testa), la striscia
+         e' la MAPPA (tutte e 27, le vuote in fondo). Con un filtro
+         acceso la sezione sparisce: lo stato lo dicono le pillole. -->
+    <div id="catSez">
+      <div class="section-label">Esplora per categorie</div>
+      <div class="cat-strip" id="catStrip"></div>
+    </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
          euro") resta com'e': questi servono a chi sfoglia.
@@ -3899,12 +3968,16 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ VISTA: SFOGLIA ============ -->
-  <!-- Le 26 categorie come vetrina: la MAPPA di cosa si vende su
-       Barattolo, non l'inventario di oggi — quindi ordine fisso di
-       catalogo (mai per numero: una mappa che si riordina ogni giorno
-       non si impara), tutte presenti, le vuote spente ma toccabili.
-       Niente barra di ricerca: quella vive in Esplora, a un tocco, e
-       duplicarla vorrebbe dire due posti da tenere allineati. -->
+  <!-- Le 27 categorie come vetrina: la MAPPA di cosa si vende su
+       Barattolo, tutte presenti — anche le vuote, che aperte offrono
+       il loro «Avvisami se arriva» — nell'ordine per numero deciso ad
+       ago 2026. Niente barra di ricerca: quella vive in Esplora, a un
+       tocco, e duplicarla vorrebbe dire due posti da tenere allineati.
+       DALL'AGO 2026 NON E' PIU' UN TAB: le stesse card vivono in home
+       in una fila che scorre, e questa pagina e' quel che c'e' dietro
+       l'ultima — la mappa intera a colpo d'occhio, con le vuote in
+       fondo. E' una vista INTERNA (fuori da RADICI): la nav accende
+       Esplora e l'indietro riporta in home. -->
   <div class="view" id="view-sfoglia">
     <div class="section-label">Sfoglia per categoria</div>
     <div class="sfoglia-griglia" id="sfogliaGriglia"></div>
@@ -4889,11 +4962,15 @@ document.getElementById('cartello')?.remove();</script>
   <nav>
     <!-- Quattro voci in CINQUE posti, col + di Vendi al centro esatto.
          Il quinto e' vuoto apposta: con quattro bottoni soli il Vendi
-         finirebbe al 62,5% invece che a meta'. Lo spazio libero sta fra
-         Vendi e Ordini — non in coda — cosi' gli Ordini restano
-         all'ESTREMA destra, dove il pollice li trova senza guardare;
-         il posto vuoto e' li' per qualcosa che arrivera'. Da desktop
-         lo spaziatore sparisce e le quattro voci tornano appaiate. Il
+         finirebbe al 37,5% invece che a meta'.
+         DALL'AGO 2026 IL POSTO VUOTO STA FRA ESPLORA E VENDI: era la
+         cella di «Sfoglia», che se n'e' andato dalla barra quando le
+         categorie sono diventate card in home — e li' restera' finche'
+         non ci andra' la voce nuova. Gli Ordini restano comunque
+         all'ESTREMA destra, dove il pollice li trova senza guardare.
+         Lo spaziatore e' un <span> e non un bottone spento apposta:
+         non prende tocchi e non parla ai lettori di schermo. Da
+         desktop sparisce e le quattro voci tornano appaiate. Il
          Profilo vive nel tasto tappo in testata (mobile) e qui in coda
          solo da desktop -->
     <!-- Il logo TORNA AL MERCATINO (ago 2026): da desktop e' la
@@ -4922,7 +4999,7 @@ document.getElementById('cartello')?.remove();</script>
     <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg></span>Esplora</button>
     <!-- Sfoglia: le PIASTRELLE, cioe' la sua pagina in miniatura —
          due colonne di riquadri, la stessa griglia che si apre -->
-    <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M3.6 5.5c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.5 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.5-.7-1.5-1.6z"/><path d="M13.4 5.4c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.7-1.6-1.6z"/><path d="M3.5 14.9c0-.9.7-1.6 1.6-1.6H9c.9 0 1.6.7 1.6 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6z"/><path class="velo" d="M13.4 14.8c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.6-1.6-1.5z"/></svg></span>Sfoglia</button>
+    <span class="nav-vuoto" aria-hidden="true"></span>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <!-- Aste: il MARTELLETTO (ago 2026), nello slot che aspettava
          proprio lui. Compare SOLO a leva accesa (aggiornaAstaVisibilita
@@ -4931,8 +5008,7 @@ document.getElementById('cartello')?.remove();</script>
          sorelle: si accende in arancio con currentColor, la
          convenzione della nav non cambia. Inchiostro dentro [2,22],
          la mano di tagliaSVG. -->
-    <button id="nav-aste" style="display:none" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
-    <span class="nav-vuoto" aria-hidden="true"></span>
+    <button id="nav-aste" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
     <!-- Ordini: il PACCO di tre quarti. La scatola PIATTA (quadro +
          riga del coperchio, la famiglia di tagliaSVG) e' stata
          disegnata e scartata: a 24px con la riga in mezzo si legge
@@ -6417,13 +6493,24 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
    aperti da li' restano nel ramo per la stessa ragione: la nav dice
    dove sei, e «dove sei» e' la strada che hai fatto. */
 function voceNav(view){
+  /* «sfoglia» sta in questo elenco dall'ago 2026: da quando le
+     categorie vivono in home, lo scaffale non e' piu' un tab ma una
+     vista INTERNA — ci si scende dall'ultima card della striscia, e
+     la nav accende Esplora perche' e' da li' che si viene. */
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
-       'acquisto','offertapresto'].includes(view)) view = 'esplora';
+       'acquisto','offertapresto','sfoglia'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
   else if (view === 'astepresto') view = 'aste';
-  return (view === 'esplora' && ['sfoglia','aste'].includes(ramoVetrina))
+  /* Il ramo resta alle sole ASTE: quello di Sfoglia non esiste piu'.
+     LA RIGA CHE SI ROVESCIA, col suo motivo — «MA LA NAV MENTIVA»:
+     entrando in un reparto si accendeva Esplora su una vetrina
+     FILTRATA, e chi guardava credeva fosse tutto il mercatino. Era
+     vero finche' il reparto si apriva da UN ALTRO TAB; adesso si apre
+     dalla home, quindi «Esplora» e' la verita' — e a dire che e'
+     filtrata c'e' la pillola accesa, appiccicata in cima. */
+  return (view === 'esplora' && ramoVetrina === 'aste')
     ? ramoVetrina : view;
 }
 
@@ -6625,7 +6712,10 @@ function ripristinaMieiPos(){
    (girarli tutti non deve costare un indietro a testa) e dalla radice
    l'indietro esce dall'app, che e' il patto chiesto. Si spinge solo
    entrando in una vista piu' interna. */
-const RADICI = new Set(['esplora','sfoglia','vendi','affari','profilo',
+/* «sfoglia» NON e' piu' una radice (ago 2026): senza il suo tab e'
+   una vista interna come /sicurezza e /privacy, quindi si SPINGE e
+   l'indietro riporta in home invece di uscire dall'app. */
+const RADICI = new Set(['esplora','vendi','affari','profilo',
   /* il «coming soon» delle aste: ci si arriva da un tab, quindi e' una
      radice sorella — si SOSTITUISCE come le altre e l'indietro passa
      da Esplora, mai un gradino che intrappola */
@@ -6733,7 +6823,10 @@ function navRendiVista(b){
        si scrive DOPO, e go() legge quello giusto per la nav. */
     const [ramo, cat] = String(b.k ?? '').split('|');
     if (activeCat !== (cat || 'Tutto')) setCat(cat || 'Tutto');
-    ramoVetrina = ['sfoglia','aste'].includes(ramo) ? ramo : 'esplora';
+    /* solo 'aste': una entry gia' scritta nella cronologia di
+       qualcuno puo' ancora dire 'sfoglia|Casa e giardino', e ricade
+       qui su 'esplora' — degradazione, non errore. */
+    ramoVetrina = ramo === 'aste' ? ramo : 'esplora';
     return go('esplora');
   }
   if (b.v === 'dettaglio')
@@ -7165,6 +7258,14 @@ function contaCategorie(){
   return conta;
 }
 function renderChips(){
+  /* La striscia illustrata si ridisegna DA QUI, ed e' il suo unico
+     chiamante: i cinque posti che gia' rifanno le pillole (avvia,
+     setCat, alternaBarattolo, apriCategoriaDaUrl, il giro dei dati
+     vivi) valgono per tutte e due le file, e non nasce un secondo
+     elenco da tenere allineato. In TESTA e non in coda: il ramo del
+     barattolo qui sotto esce con un return, e da li' la striscia —
+     che proprio in quel caso deve sparire — non la rifarebbe nessuno. */
+  renderStriscia();
   /* A BARATTOLO ACCESO la fila dice una cosa sola: dove sei, e come si
      esce. Le categorie non hanno senso qui — filtrare dieci oggetti
      che hai scelto tu non serve a niente, e quelle pillole chiamano il
@@ -7343,32 +7444,91 @@ function renderSfoglia(){
     </a>`).join('');
 }
 
-/* Dalla piastrella alla vetrina filtrata. setCat resta il giudice
-   unico del cambio categoria (ricarica la prima pagina, rifa' le
-   pillole, sa gia' della DEMO): qui si aggiunge solo la bandierina che
-   dice al motore di navigazione che questa e' una discesa, non un
-   cambio di tab — l'indietro deve riportare a Sfoglia. */
+/* LA STRISCIA IN HOME (ago 2026): le stesse card, in fila.
+   L'ORDINE VIENE DA `ordineSfoglia` E DA NESSUN ALTRO POSTO — due
+   ordinamenti sullo stesso catalogo direbbero due mappe diverse a due
+   dita di distanza — ed e' anche cio' che tiene i chiamanti di
+   `contaCategorie` a DUE: la striscia non conta niente per conto suo.
+   La fabbrica della card e' quella delle piastrelle: collegamento
+   vero verso /categoria/{slug}, il nome in data-cat e MAI dentro la
+   stringa JS dell'onclick, l'illustrazione piena col suo calore e
+   l'emoji di ripiego sotto. */
+let strisciaFirma = '';
+function renderStriscia(){
+  /* Con un filtro acceso la sezione se ne va: a dire dove sei ci sono
+     le pillole, che restano appiccicate in cima. Si NASCONDE e non si
+     svuota — tornando a «Tutto» la fila e' gia' li', senza un giro di
+     render e senza che le figure lampeggino. */
+  const filtro = vistaBarattolo || activeCat !== 'Tutto';
+  el('catSez').style.display = filtro ? 'none' : '';
+  if (filtro) return;
+  const voci = ordineSfoglia();
+  const firma = voci.join('|');
+  if (firma === strisciaFirma) return;
+  strisciaFirma = firma;
+  el('catStrip').innerHTML = voci.map(c => `
+    <a class="cat-cella" data-cat="${esc(c)}"
+       href="/categoria/${slugCat(c)}"
+       onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
+      <span class="cat-quad"><span class="cat-fig"><img src="${urlIllustrazione(c)}"
+           alt="" loading="lazy" decoding="async"${caldaOk(c)}
+           onload="this.dataset.ok=1" onerror="this.remove()"
+        ></span><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
+      <span class="cat-eti">${esc(c)}</span>
+    </a>`).join('')
+    /* La porta alla mappa intera, e la fine dichiarata della fila:
+       da quando il tab non c'e' piu' e' l'unico posto da cui si
+       arriva allo scaffale — se sparisce, quella pagina resta senza
+       porte. C'e' la prova che li conta (e per questo qui sotto la
+       chiamata non si nomina nemmeno in prosa: le sentinelle leggono
+       anche i commenti, ed e' cosi' che una prova diventa vacua). */
+    + `
+    <div class="cat-cella cat-tutte" role="button" tabindex="0"
+         onclick="go('sfoglia')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();go('sfoglia')}">
+      <span class="cat-quad"><svg viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M3.6 5.5c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.5 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.5-.7-1.5-1.6z"/><path d="M13.4 5.4c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.7-1.6-1.6z"/><path d="M3.5 14.9c0-.9.7-1.6 1.6-1.6H9c.9 0 1.6.7 1.6 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6z"/><path class="velo" d="M13.4 14.8c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.6-1.6-1.5z"/></svg></span>
+      <span class="cat-eti">Tutte le categorie</span>
+    </div>`;
+}
+
+/* Dalla card (in home o nello scaffale) alla vetrina filtrata. setCat
+   resta il giudice unico del cambio categoria (ricarica la prima
+   pagina, rifa' le pillole, sa gia' della DEMO): qui si aggiunge solo
+   la bandierina che dice al motore di navigazione che questa e' una
+   DISCESA, non un cambio di tab — l'indietro deve riportare al
+   mercatino intero, da qualunque porta si sia entrati. */
 function apriCategoria(c){
-  /* si scende in un reparto: la nav resta accesa su Sfoglia, che e'
-     lo scaffale da cui si viene e dove l'indietro riporta */
-  ramoVetrina = 'sfoglia';
+  /* La nav accende ESPLORA: dall'ago 2026 in un reparto si scende
+     dalla home (la striscia illustrata) o dallo scaffale, che e' a
+     sua volta una vista interna di Esplora — quindi non c'e' piu' un
+     ramo da accendere. Resta una DISCESA: la bandierina qui sotto fa
+     si' che l'indietro riporti al mercatino intero. */
   /* La griglia si SVUOTA prima di partire: setCat ricarica dal server
      e la risposta arriva mezzo secondo dopo, quindi senza questo si
      atterra su Esplora vedendo per un attimo gli annunci di PRIMA —
      che con una categoria appena scelta e' proprio la cosa sbagliata
      da mostrare. Meglio un mezzo secondo di vuoto che mezzo secondo
      di bugia. In DEMO setCat ridisegna subito e non si nota. */
+  /* DOVE si alza la bandierina dipende da CHI apre il reparto, ed e'
+     l'unica riga delicata di questa funzione. `navRiflette` scrive la
+     entry e legge-e-azzera `navSpingi` a ogni giro, e i giri sono due:
+     quello dentro setCat (la categoria vive nella entry) e quello
+     dell'osservatore quando `go` cambia vista.
+     · DALLO SCAFFALE la vista cambia: il primo giro vede la pila
+       ancora su «sfoglia» — uguale a quella scritta — ed esce subito;
+       a spingere e' il secondo, quindi la bandierina si alza DOPO.
+     · DALLA HOME la vista e' gia' Esplora: il secondo giro non arriva
+       mai (nessuna classe si muove) e il primo, se la bandierina non
+       e' ancora alzata, SOSTITUISCE — cioe' il reparto si mangia la
+       home e l'indietro esce dall'app invece di riportarci.
+     Provato dal vivo in tutti e due i versi: e' cosi' che si e'
+     scoperto il difetto, non leggendo. */
+  const restiamoQui = el('view-esplora').classList.contains('active');
+  if (restiamoQui) navSpingi = true;
   el('grid').innerHTML = '';
   el('gridEmpty').style.display = 'none';
   setCat(c);
-  /* La bandierina si alza QUI, subito prima della navigazione che la
-     usa, e non in cima alla funzione: navRiflette la legge-e-azzera
-     prima di ogni sua via d'uscita, e setCat adesso lo chiama (deve:
-     la categoria vive nella entry). Alzata prima, se la mangiava quel
-     giro — che non cambia vista, quindi esce subito — e la discesa
-     nel reparto tornava a essere un cambio di tab: l'indietro saltava
-     Sfoglia e finiva dritto in Esplora. */
-  navSpingi = true;
+  if (!restiamoQui) navSpingi = true;
   go('esplora');
 }
 
@@ -21578,22 +21738,21 @@ function astaForm(){
 }
 /* IL TASTO 🔨 C'E' SEMPRE (ago 2026, decisione di Andrea): prima
    compariva solo a leva accesa e lo slot restava allo spaziatore.
-   Adesso il martelletto prende quel posto in ogni caso e a leva
-   spenta porta al «coming soon» — le aste si annunciano prima di
-   esistere, invece di apparire un giorno dal nulla. Gli slot restano
-   cinque e il Vendi al centro esatto: cambia solo CHI occupa il
-   quinto, e lo spaziatore ora non serve mai (resta nel markup perche'
-   e' lui a tenere il posto se un domani il tasto tornasse
-   condizionato). Il TOGGLE del form invece segue la leva sul serio:
-   un'asta non si puo' creare finche' non e' accesa. */
+   Adesso il martelletto c'e' in ogni caso e a leva spenta porta al
+   «coming soon» — le aste si annunciano prima di esistere, invece di
+   apparire un giorno dal nulla. Il TOGGLE del form invece segue la
+   leva sul serio: un'asta non si puo' creare finche' non e' accesa.
+   E DAL GIRO DELLE CARD IN HOME il markup della barra e' STATICO:
+   il tasto nasce visibile e lo spaziatore pure (ha ripreso il posto
+   di «Sfoglia», fra Esplora e Vendi, ed e' lui a tenere il + al
+   centro). Qui non si tocca piu' nessuna cella: due righe che
+   accendevano e spegnevano a runtime cio' che ormai non cambia mai
+   erano solo un secondo posto dove sbagliare. */
 function aggiornaAstaVisibilita(){
   const on = asteAccese();
   const f = el('sellAstaField');
   if (f) f.style.display = (on && !editandoId && !editandoNostr)
     ? '' : 'none';
-  const nb = el('nav-aste'), sp = document.querySelector('.nav-vuoto');
-  if (nb) nb.style.display = '';
-  if (sp) sp.style.display = 'none';
 }
 /* La leva delle aste da DUE fonti, che dicono la stessa cosa perche'
    leggono lo stesso config: /api/me (`asta_leve.abilitata`) per chi e'
@@ -23740,7 +23899,7 @@ let categoriaAperta = false;
 function preparaCategoriaDaUrl(){
   if (!CATEGORIA_DA_URL) return;
   activeCat = CATEGORIA_DA_URL;
-  ramoVetrina = 'sfoglia';   /* la nav dice il reparto, non «Esplora» */
+  /* la nav accende Esplora: il reparto e' la home filtrata */
 }
 
 /* ATTERRARE SU UN REPARTO NON E' UNA DISCESA, ed e' la distinzione che
