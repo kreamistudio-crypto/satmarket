@@ -6807,6 +6807,17 @@ const RADICE_MADRE = 'esplora';
    sapere da dove si viene: serve una bandierina, alzata da
    apriCategoria e consumata al primo giro di navRiflette. */
 let navSpingi = false;
+/* La profondita' del gradino del REPARTO spinto dalla home (0 = non
+   c'e'): sotto quel gradino c'e' gia' `esplora|Tutto`. Serve a chi
+   torna a «Tutto» (ritocco della card, pillola, tab Esplora, ricerca)
+   per CONSUMARE il gradino con un vero passo indietro invece di
+   sostituirlo — sostituendo resterebbero due entry identiche
+   impilate, cioe' un indietro che non fa niente e quello dopo butta
+   fuori dall'app. Si azzera tornando a «Tutto» (setCat) e quando il
+   reparto si apre dall'ALTRA porta, lo scaffale: li' sotto c'e'
+   Sfoglia, e il pop atterrerebbe nel posto sbagliato. Un reload lo
+   perde e il ritorno degrada sulla sostituzione: mai peggio di cosi'. */
+let navGradinoReparto = 0;
 /* Acceso mentre navApplica ricostruisce: vedi navRiflette */
 let navApplicando = false;
 /* Chiesto dall'annullo della modifica: il foglio della conferma costa
@@ -7358,18 +7369,17 @@ function renderChips(){
   const scelta = (activeCat!=='Tutto' && !conta[activeCat]) ? [activeCat] : [];
   /* LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO, e devono comportarsi
      come le card (ago 2026, difetto dal campo): passano da
-     `apriCategoria`, che SPINGE un gradino — cosi' l'indietro
-     ripercorre i reparti visitati invece di saltare tutti in una volta
-     alla home. Prima chiamavano `setCat` diretto, che su una radice
-     SOSTITUISCE: tre reparti di fila lasciavano la cronologia a zero
-     gradini, e al secondo indietro si usciva dall'app.
-     «Tutto» resta `setCat`, ed e' la regola gia' scritta in
-     navRiflette: tornare a una radice non scava un gradino nuovo.
+     `apriCategoria`. Chiamare `setCat` diretto qui SOSTITUIVA la
+     home, e l'indietro usciva dall'app senza passarci — e' il difetto
+     da cui tutto e' partito. Il gradino e' UNO per il reparto intero
+     (i cambi reparto→reparto sostituiscono, vedi apriCategoria), e
+     «Tutto» passa da tornaATutto, che quel gradino lo CONSUMA con un
+     vero passo indietro quando era della home.
      Il nome viaggia in `data-cat` e non piu' dentro la stringa JS
      dell'onclick — il patto delle card, e un difetto storico in meno. */
   el('chips').innerHTML = ['Tutto',...scelta,...cats].map(c=>
     `<div class="chip ${c===activeCat?'active':''}" data-cat="${esc(c)}"
-       onclick="${c==='Tutto' ? `setCat('Tutto')`
+       onclick="${c==='Tutto' ? `tornaATutto()`
                               : 'apriCategoria(this.dataset.cat)'}">${esc(c)}</div>`).join('');
 }
 function setCat(c){
@@ -7379,7 +7389,14 @@ function setCat(c){
      una pubblicazione): il ramo esiste solo finche' esiste il filtro
      che lo giustifica, o la nav resterebbe accesa su «Sfoglia» davanti
      a tutto il mercatino — la stessa bugia al contrario. */
-  if (c === 'Tutto') ramoVetrina = 'esplora';
+  if (c === 'Tutto') {
+    ramoVetrina = 'esplora';
+    /* e col filtro muore anche il gradino del reparto: da qui in poi
+       la entry dice `esplora|Tutto`, e un pop tardivo non avrebbe
+       piu' niente da consumare (vale anche per il ritorno applicato
+       da navRendiVista, che passa di qui) */
+    navGradinoReparto = 0;
+  }
   /* col pannello aperto la riga della condizione compare o sparisce
      insieme alla categoria */
   if (el('filtroCondRiga') && el('filtriBox').style.display !== 'none')
@@ -7638,28 +7655,33 @@ function apriCategoria(c){
   /* RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (ago 2026, decisione di
      Andrea): e' lo stesso gesto del barattolino in testata — si tocca
      per filtrare, si ritocca per uscire — e per questo non esiste
-     nessuna card «Tutto» in piu' nella fila.
-     Il ritorno passa da `setCat` e NON alza la bandierina: tornare al
-     mercatino intero e' un ritorno a una radice, non una discesa, e
-     la regola di navRiflette dice gia' che li' si sostituisce. Cosi'
-     la cronologia non si riempie di gradini che dicono la stessa
-     cosa, e l'indietro continua a ripercorrere i reparti VISITATI. */
-  if (c === activeCat) { haptic(); setCat('Tutto'); return; }
+     nessuna card «Tutto» in piu' nella fila. Il ritorno passa da
+     tornaATutto: il gradino del reparto, se era stato spinto dalla
+     home, si CONSUMA con un vero passo indietro — sostituendo
+     resterebbero due entry identiche impilate, un indietro che non fa
+     niente e quello dopo che butta fuori dall'app. */
+  if (c === activeCat) { haptic(); tornaATutto(); return; }
   /* La nav accende ESPLORA: dall'ago 2026 in un reparto si scende
      dalla home (la striscia illustrata) o dallo scaffale, che e' a
      sua volta una vista interna di Esplora — quindi non c'e' piu' un
-     ramo da accendere. Resta una DISCESA: la bandierina qui sotto fa
-     si' che l'indietro riporti al mercatino intero. */
+     ramo da accendere. */
   /* La griglia si SVUOTA prima di partire: setCat ricarica dal server
      e la risposta arriva mezzo secondo dopo, quindi senza questo si
      atterra su Esplora vedendo per un attimo gli annunci di PRIMA —
      che con una categoria appena scelta e' proprio la cosa sbagliata
      da mostrare. Meglio un mezzo secondo di vuoto che mezzo secondo
      di bugia. In DEMO setCat ridisegna subito e non si nota. */
-  /* DOVE si alza la bandierina dipende da CHI apre il reparto, ed e'
-     l'unica riga delicata di questa funzione. `navRiflette` scrive la
-     entry e legge-e-azzera `navSpingi` a ogni giro, e i giri sono due:
-     quello dentro setCat (la categoria vive nella entry) e quello
+  /* IL REPARTO E' UN GRADINO SOLO (ago 2026, decisione di Andrea che
+     ROVESCIA il giro prima, «l'indietro ripercorre i reparti
+     visitati»): dalla home si SPINGE una volta — l'entry sotto e' la
+     home, e l'indietro ci riporta SUBITO, un tocco e sei fuori — e i
+     cambi reparto→reparto SOSTITUISCONO: la cronologia non accumula
+     mai i ripensamenti. `scende` si legge PRIMA di setCat, che
+     riscrive activeCat.
+     DOVE si alza la bandierina dipende da CHI apre il reparto, ed e'
+     la riga delicata di sempre. `navRiflette` scrive la entry e
+     legge-e-azzera `navSpingi` a ogni giro, e i giri sono due: quello
+     dentro setCat (la categoria vive nella entry) e quello
      dell'osservatore quando `go` cambia vista.
      · DALLO SCAFFALE la vista cambia: il primo giro vede la pila
        ancora su «sfoglia» — uguale a quella scritta — ed esce subito;
@@ -7671,12 +7693,51 @@ function apriCategoria(c){
      Provato dal vivo in tutti e due i versi: e' cosi' che si e'
      scoperto il difetto, non leggendo. */
   const restiamoQui = el('view-esplora').classList.contains('active');
-  if (restiamoQui) navSpingi = true;
+  const scende = activeCat === 'Tutto';
+  if (restiamoQui && scende) {
+    navSpingi = true;
+    /* il gradino si potra' consumare solo se sotto c'e' la home VERA:
+       dal ramo Aste sotto c'e' `aste|Tutto`, e il pop non e' un
+       ritorno alla home. Si registra la PROFONDITA' e non un
+       booleano: da un dettaglio aperto sopra il reparto (d piu'
+       fondo) il pop atterrerebbe sul reparto, non sulla home. */
+    navGradinoReparto = ramoVetrina === 'esplora'
+                      ? (history.state?.d || 0) + 1 : 0;
+  }
   el('grid').innerHTML = '';
   el('gridEmpty').style.display = 'none';
   setCat(c);
-  if (!restiamoQui) navSpingi = true;
+  if (!restiamoQui) { navSpingi = true; navGradinoReparto = 0; }
   go('esplora');
+}
+
+/* Il gradino del reparto si CONSUMA quando lo si e' spinto dalla home
+   e ci si sta sopra (stessa profondita', nessuno strato): sotto c'e'
+   gia' `esplora|Tutto`, e sostituire lascerebbe due entry identiche
+   impilate. history.back() DIRETTO e non navIndietro: la serratura
+   dei 350ms e' del doppio canale dello stesso gesto, e qui il gesto
+   e' un tocco — strozzato, morirebbe in silenzio. La guardia del d=0
+   di navIndietro qui non serve: il gradino esiste, l'abbiamo spinto
+   noi. */
+function consumaGradinoReparto(){
+  if (!(STORIA && navGradinoReparto
+        && (history.state?.d || 0) === navGradinoReparto
+        && navPila().length === 1)) return false;
+  navGradinoReparto = 0;
+  history.back();
+  return true;
+}
+
+/* Tornare a «Tutto» da un reparto, da qualunque maniglia (ritocco
+   della card, pillola, tab Esplora): se il gradino era della home lo
+   si consuma — e a rifare la home (setCat compreso) e' navApplica,
+   che riapplica la entry sotto — altrimenti setCat sostituisce come
+   sempre. Torna true quando il passo indietro e' partito: il
+   chiamante non deve piu' toccare niente. */
+function tornaATutto(){
+  if (consumaGradinoReparto()) return true;
+  setCat('Tutto');
+  return false;
 }
 
 /* Il tasto Esplora della barra riporta SEMPRE alla vetrina intera.
@@ -7698,7 +7759,11 @@ function vaiEsplora(){
     if (!DEMO && activeCat === 'Tutto')
       loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
   }
-  if (activeCat !== 'Tutto') { setCat('Tutto'); }
+  /* il tab passa dallo stesso giudice delle altre maniglie: se il
+     gradino del reparto era della home si consuma (e navApplica rifa'
+     la home, setCat compreso), altrimenti setCat sostituisce e si
+     prosegue come sempre */
+  if (activeCat !== 'Tutto' && tornaATutto()) return;
   /* il ramo si chiude anche quando la categoria era gia' Tutto: il
      tocco sul nome del tab e' sempre un ritorno alla radice, e non
      deve dipendere dallo stato di un'altra variabile per esserlo */
@@ -8055,9 +8120,38 @@ const cardHTML = l => {
       </a>${jar}${rif}
     </div>`; };
 
+/* Cercare da dentro un reparto SPEGNE il reparto (ago 2026, decisione
+   di Andrea): la ricerca parla di TUTTO il mercatino, e l'anello
+   arancione non deve restare acceso su risultati che non sono suoi.
+   Qui NIENTE setCat, ed e' la riga da non «uniformare»: setCat
+   ricarica la prima pagina intera, che partirebbe in GARA con la
+   fetch dei risultati — vincerebbe chi arriva ultimo, cioe' a caso.
+   Lo stato si spegne a mano e a caricare e' solo la ricerca. Il
+   gradino del reparto, se era della home, si consuma con activeCat
+   GIA' su «Tutto»: cosi' navApplica trova la entry identica alla
+   propria e non ridisegna niente sotto i risultati. */
+function spegniReparto(){
+  activeCat = 'Tutto';
+  ramoVetrina = 'esplora';
+  renderChips();
+  if (el('filtroCondRiga') && el('filtriBox').style.display !== 'none')
+    el('filtroCondRiga').style.display = condFiltrabile() ? '' : 'none';
+  if (!consumaGradinoReparto()) navRiflette();
+  navGradinoReparto = 0;
+}
+
 async function doSearch(){
   haptic();
   const q = el('q').value.trim();
+  /* LA RICERCA GUARDA TUTTI GLI ARTICOLI (ago 2026, decisione di
+     Andrea): premere invio da dentro un reparto lo spegne — l'AI non
+     ha mai filtrato per categoria, ma DEMO e vetrina anonima si', e
+     l'anello restava acceso accanto a risultati di tutt'altro
+     reparto («cerco un faro d'auto e mi esce il risultato con
+     Alimenti ancora selezionato»). SOLO con una query: l'invio a
+     campo vuoto e' un «ricomincia la vista», non una ricerca, e il
+     reparto resta suo. */
+  if (q && activeCat !== 'Tutto') spegniReparto();
   if (!q) {
     /* Campo svuotato: coi dati vivi si riparte dalla prima pagina
        della vista (il server dimentica la q), in demo basta ridisegnare */

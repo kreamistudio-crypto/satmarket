@@ -16386,16 +16386,17 @@ def prove_seo():
               testo_mini, "function renderChips(){", "\n}\n"))
     # LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO (ago 2026, difetto dal
     # campo): chiamavano `setCat` diretto, che su una radice
-    # SOSTITUISCE — tre reparti di fila lasciavano la cronologia a
-    # ZERO gradini, e al secondo indietro si usciva dall'app. Adesso
-    # passano da `apriCategoria`, che spinge, e l'indietro ripercorre
-    # i reparti visitati. «Tutto» resta setCat: tornare a una radice
-    # non scava un gradino nuovo (la regola di navRiflette).
+    # SOSTITUISCE — il reparto si mangiava la home e l'indietro usciva
+    # dall'app senza passarci. Passano da `apriCategoria`, come le
+    # card. «Tutto» passa da tornaATutto: il gradino del reparto, se
+    # era della home, si CONSUMA con un vero passo indietro —
+    # sostituendo resterebbero due entry identiche impilate, un
+    # indietro che non fa niente e quello dopo che butta fuori.
     rc = pezzo_js(testo_mini, "function renderChips(){", "\n}\n")
     prova("le pillole passano da apriCategoria", True,
           "apriCategoria(this.dataset.cat)" in rc)
-    prova("...e «Tutto» no, che e' un ritorno", True,
-          "setCat('Tutto')" in rc)
+    prova("...e «Tutto» consuma il gradino del reparto", True,
+          "tornaATutto()" in rc and "setCat('Tutto')" not in rc)
     prova("...col nome in data-cat, mai dentro l'onclick", True,
           'data-cat="${esc(c)}"' in rc and "setCat('${c}')" not in rc)
     # LA PORTA ALLO SCAFFALE: una sola, e c'e'. Due occorrenze perche'
@@ -16495,25 +16496,103 @@ def prove_seo():
     # DOPO), dalla home no — quel giro non arriva mai, quindi PRIMA.
     # Senza, il reparto si mangiava la home e l'indietro usciva
     # dall'app: difetto trovato dal vivo, non leggendo.
+    # IL REPARTO E' UN GRADINO SOLO (ago 2026, decisione di Andrea che
+    # ROVESCIA il giro prima, «l'indietro ripercorre i reparti
+    # visitati»): dalla home si spinge UNA volta, i cambi
+    # reparto→reparto SOSTITUISCONO — la bandierina si alza solo
+    # SCENDENDO, con activeCat ancora su 'Tutto', letto PRIMA che
+    # setCat lo riscriva — e l'indietro riporta SUBITO alla home:
+    # un tocco e sei fuori.
     ac = pezzo_js(testo_mini, "function apriCategoria(c){", "\n}\n")
     # RITOCCARE LA CARD ACCESA TORNA A «TUTTO», il gesto del
     # barattolino in testata — ed e' per questo che nella fila non
     # esiste nessuna card «Tutto» in piu'.
     prova("ritoccare il reparto acceso lo spegne", True,
-          "if (c === activeCat) { haptic(); setCat('Tutto'); return; }" in ac)
+          "if (c === activeCat) { haptic(); tornaATutto(); return; }" in ac)
     prova("la discesa sa da che porta si e' entrati", True,
           "const restiamoQui = el('view-esplora').classList.contains('active');"
           in ac)
+    prova("...e se sta scendendo davvero", True,
+          "const scende = activeCat === 'Tutto';" in ac)
     # con find() e non index(): una riga tolta deve far ROSSA questa
     # prova, non farla esplodere portandosi dietro tutte le altre
     dove = lambda t: ac.find(t)
     prova("...bandierina PRIMA di setCat se la vista resta", True,
-          0 <= dove("if (restiamoQui) navSpingi = true;")
+          0 <= dove("if (restiamoQui && scende) {")
+          < dove("navSpingi = true;")
           < dove("setCat(c);"))
     prova("...e DOPO se la vista cambia", True,
           0 <= dove("setCat(c);")
-          < dove("if (!restiamoQui) navSpingi = true;")
+          < dove("if (!restiamoQui) { navSpingi = true;")
           < dove("go('esplora');"))
+    # reparto→reparto NON spinge: le bandierine sono nei due soli rami
+    # della discesa, e un terzo — quello incondizionato di ieri —
+    # rimetterebbe la cronologia ad accumulare i ripensamenti
+    prova("...e reparto→reparto sostituisce", 2,
+          ac.count("navSpingi = true;"))
+    # il gradino registra la PROFONDITA', non un booleano: da un
+    # dettaglio aperto sopra il reparto il pop atterrerebbe sul
+    # reparto, non sulla home — e il ramo Aste non e' la home
+    prova("...e il gradino sa quanto e' fondo", True,
+          "navGradinoReparto = ramoVetrina === 'esplora'" in ac
+          and "(history.state?.d || 0) + 1 : 0;" in ac)
+
+    # IL GRADINO SI CONSUMA, NON SI SOSTITUISCE: tornando a «Tutto»
+    # con un replace resterebbero due entry identiche impilate — il
+    # primo indietro non farebbe niente e il secondo butterebbe fuori
+    # dall'app. history.back() DIRETTO e non navIndietro: la
+    # serratura dei 350ms e' del doppio canale dello stesso gesto, e
+    # qui il gesto e' un tocco — strozzato, morirebbe in silenzio.
+    cg = pezzo_js(testo_mini, "function consumaGradinoReparto(){", "\n}\n")
+    prova("il gradino della home si consuma con un passo vero", True,
+          "history.back();" in cg and "navIndietro" not in cg)
+    prova("...solo alla profondita' a cui e' stato spinto", True,
+          "(history.state?.d || 0) === navGradinoReparto" in cg)
+    prova("...e a strati chiusi", True,
+          "navPila().length === 1" in cg)
+    ta = pezzo_js(testo_mini, "function tornaATutto(){", "\n}\n")
+    prova("tornaATutto: pop se si puo', setCat altrimenti", True,
+          "if (consumaGradinoReparto()) return true;" in ta
+          and "setCat('Tutto');" in ta)
+    # la bandierina muore tornando a «Tutto» da QUALUNQUE strada:
+    # setCat e' il giudice unico del cambio categoria, e ci passa
+    # anche il ritorno applicato da navRendiVista
+    prova("setCat('Tutto') azzera il gradino", True,
+          "navGradinoReparto = 0;" in pezzo_js(
+              testo_mini, "function setCat(c){", "\n}\n"))
+    # e il tab Esplora passa dallo stesso giudice delle altre maniglie
+    prova("il tab Esplora consuma il gradino come gli altri", True,
+          "if (activeCat !== 'Tutto' && tornaATutto()) return;" in
+          pezzo_js(testo_mini, "function vaiEsplora(){", "\n}\n"))
+
+    # LA RICERCA PARLA DI TUTTO IL MERCATINO (ago 2026, decisione di
+    # Andrea): premere invio da dentro un reparto lo SPEGNE — l'anello
+    # arancione via, e i risultati su tutti gli articoli («cerco un
+    # faro d'auto e mi esce il risultato con Alimenti ancora
+    # selezionato»). Solo con una query: l'invio a campo vuoto e' un
+    # «ricomincia la vista», e il reparto resta suo.
+    ds = pezzo_js(testo_mini, "async function doSearch(){", "\n}\n")
+    prova("cercare spegne il reparto", True,
+          "if (q && activeCat !== 'Tutto') spegniReparto();" in ds)
+    sr = pezzo_js(testo_mini, "function spegniReparto(){", "\n}\n")
+    # NIENTE setCat qui dentro: ricaricherebbe la prima pagina intera
+    # in GARA con la fetch dei risultati — vincerebbe chi arriva
+    # ultimo, cioe' a caso
+    prova("...senza setCat, che gareggerebbe coi risultati", False,
+          "setCat" in sr)
+    # la categoria si spegne PRIMA di consumare il gradino: cosi'
+    # navApplica trova la entry identica alla propria e non ridisegna
+    # niente sotto i risultati
+    prova("...e la categoria muore PRIMA del passo indietro", True,
+          0 <= sr.find("activeCat = 'Tutto';")
+          < sr.find("consumaGradinoReparto()"))
+    # il server non ha mai filtrato la ricerca AI per categoria: se un
+    # giorno il parametro nascesse, questa voce va riletta per intero
+    # (la firma si taglia alla docstring: una regex a parentesi si
+    # fermerebbe dentro Header(""), e certificherebbe mezza firma)
+    _i_cerca = _SORGENTE.index("def cerca(")
+    prova("la ricerca AI non conosce la categoria", False,
+          "cat" in _SORGENTE[_i_cerca:_SORGENTE.index('"""', _i_cerca)])
 
     # --- 16quater) LA BARRA TORNA A CINQUE CELLE ------------------
     # Quattro voci e uno spaziatore: e' lui a tenere il + al centro
