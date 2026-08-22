@@ -1740,15 +1740,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ramoVetrina nuovo: i filtri non sono mai stati in chiaveVetrina, e
   il ramo resta alle sole Aste.
   LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 750x345
-  WebP pieno bordo a bordo col TESTO DENTRO il disegno (decisione di
-  Andrea; l'app porta l'aria-label). Cartella SUA e MAI
+  WebP pieno bordo a bordo, SENZA testo (ago 2026, decisione di
+  Andrea che ROVESCIA il testo-nel-disegno della nascita: il titolo
+  si muoveva col disegno). IL TITOLO LO SCRIVE L'APP (`.sc-titolo`,
+  Baloo 2 crema FISSA nei due temi, largo 96px a sinistra): e' un
+  FRATELLO dell'img e mai un involucro — l'animazione vive sull'img,
+  quindi il titolo e' fermo PER COSTRUZIONE — e atterra nella ZONA
+  QUIETA che i fondi riservano a sinistra (soggetto a destra). LA
+  LEGGIBILITA' LA GARANTISCE IL DISEGNO E LA MISURA LA CI: la prova
+  del contrasto campiona la fascia sui file VERI — col PIXEL
+  PEGGIORE, non con la media, e una fascia PIU' LARGA del titolo (il
+  margine dell'onda) — ed esige >=4.5 (misurati ~11-12): un
+  ridisegno che scalda la fascia si sente dalla CI. Oltre i 96px, sul
+  fondo della sveglia, comincia il primo cartellino: chi allarga il
+  titolo rimisuri. Il titolo si mostra SOLO con l'immagine (`img ~`),
+  o sull'errore raddoppierebbe il testo della riserva; niente velo
+  sotto il testo (il precedente delle piastrelle di Sfoglia: salvava
+  il testo e spegneva i disegni). E' anche la lingua delle future
+  SPONSORIZZATE, che avranno comunque un testo dell'app su una foto.
+  Cartella SUA e MAI
   assets/categorie/: ritaglia_categorie.py fa il glob della cartella e
   un banner full-bleed inquinerebbe la mediana del pareggio. Rotta
   `/assets/scoprire/{nome}` col calco delle illustrazioni (tupla
   `FILE_SCOPRIRE`, `_file_con_etag`, `public, no-cache`: i file si
-  ridisegnano sotto lo stesso nome). DA FARE quando Andrea consegna i
-  file: la prova d'esistenza in prove.py, che oggi manca APPOSTA (il
-  precedente di tutto.webp) — fino ad allora il ripiego emoji+testo.
+  ridisegnano sotto lo stesso nome). I file arrivano da Andrea a
+  2752x1536 e si portano a 750x345 col ritaglio CENTRATO (ImageOps.fit
+  LANCZOS q92 method=6, ~18% dell'altezza via, meta' e meta' —
+  approvato sui primi due); la prova d'esistenza e di misura vive in
+  prove.py dal commit dei primi file (prima mancava APPOSTA, il
+  precedente di tutto.webp), e il ripiego emoji+testo resta per
+  quando l'immagine non arriva.
   IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in TRE tempi,
   e vanno tenuti tutti: prima il dondolio alla mascotte della card
   intera, ROVESCIATO un'ora dopo — il bottone resta FERMO, bersaglio
