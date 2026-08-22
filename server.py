@@ -1008,6 +1008,40 @@ try:
     from config import ASTA_ABILITATA
 except ImportError:
     ASTA_ABILITATA = False         # spenta di serie: si accende dal VPS
+# I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
+# lezione, una consulenza — con un appuntamento concordato dentro
+# l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
+# per una ragione sua: non muove denaro in uscita, ma cambia COSA si
+# puo' vendere qui dentro, e allarga la finestra in cui i sats restano
+# in cassaforte da giorni a settimane. Un salto cosi' si fa con un
+# gesto nel config del VPS, guardando il primo giro — mai per effetto
+# di un deploy.
+# Spenta, `consegna_da_payload` normalizza 'servizio' a '' e non nasce
+# nessun annuncio nuovo; gli ordini servizio GIA' vivi non diventano
+# ostaggio della leva — appuntamenti, conferme e conferma di ricezione
+# continuano, come per le aste.
+try:
+    from config import SERVIZI_ATTIVI
+except ImportError:
+    SERVIZI_ATTIVI = False         # spenti di serie: si accende dal VPS
+# Quanto lontano puo' stare un appuntamento (decisione di Andrea): 60
+# giorni. Oltre, i sats resterebbero in cassaforte per mesi — ed e'
+# anche il primo punto che il parere legale guardera'.
+try:
+    from config import SERVIZIO_MAX_GIORNI
+except ImportError:
+    SERVIZIO_MAX_GIORNI = 60
+# Quanti ordini servizio APERTI INSIEME puo' avere chi non ha ancora
+# vendite concluse. NON e' la gemella di DIGITALE_MIN_VENDITE (che e'
+# una soglia per PUBBLICARE) ne' di TETTO_DIGITALE_NUOVI (un tetto sul
+# COMPRATORE): e' un tetto sulle partite aperte, ed e' l'unica forma
+# che morde su una RAFFICA. Il conteggio delle dispute del venditore
+# smaschera il recidivo, non chi incassa cinquanta lezioni prima che
+# la prima disputa sia decisa. 0 = spento.
+try:
+    from config import SERVIZIO_MAX_APERTI
+except ImportError:
+    SERVIZIO_MAX_APERTI = 0        # spento di serie
 try:
     from config import ASTA_DURATE_GIORNI
 except ImportError:
@@ -2780,7 +2814,18 @@ def init_db():
                     # dipende dall'OGGETTO e non dalla destinazione (un
                     # sacco di riso pesa uguale ovunque vada).
                     "spedizione_extra_sats INTEGER DEFAULT 0",
-                    "spedizione_extra_eur REAL DEFAULT 0"):
+                    "spedizione_extra_eur REAL DEFAULT 0",
+                    # il servizio (ago 2026): la prestazione DEFINITA.
+                    # `durata_min` (0 = non dichiarata) e' meta' della
+                    # definizione che la moderazione pretende — «un'ora
+                    # di conversazione» e' una cosa precisa, «ti
+                    # sviluppo quello che ti serve» no — e serve a
+                    # sapere quando l'appuntamento e' FINITO, che e'
+                    # un'altra cosa da quando comincia.
+                    # `servizio_dove` ('' = online, il caso che non
+                    # chiede niente) decide la guardia della zona.
+                    "durata_min INTEGER DEFAULT 0",
+                    "servizio_dove TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3248,7 +3293,47 @@ def init_db():
                     # chiave della porta del moderatore; su 'released'
                     # e' inerte, e resta il censimento di quante volte
                     # i timer del digitale sono scattati davvero.
-                    "sbloccato_auto_il INTEGER DEFAULT 0"):
+                    "sbloccato_auto_il INTEGER DEFAULT 0",
+                    # --- IL SERVIZIO (ago 2026) ---
+                    # L'APPUNTAMENTO, col pattern di
+                    # scegli_consegna_ordine: un dato che manca finche'
+                    # qualcuno non lo scrive, e finche' manca nessuna
+                    # finestra parte. Lo PROPONE il venditore
+                    # (`appuntamento_il` = l'istante concordato, 0 =
+                    # mai proposto; `appuntamento_proposto_il` = quando
+                    # l'ha proposto, che e' un'altra cosa e serve da
+                    # ancora al sollecito) e lo CONFERMA il compratore.
+                    # `appuntamento_confermato_il` e' il `busta_il` di
+                    # questo cantiere: a 0 non parte NIENTE, ed e' il
+                    # primo dei due fatti che il moderatore legge in
+                    # disputa. Le proposte si CONTANO (il pattern di
+                    # busta_correzioni): senza, uno stallo per rinvii
+                    # e' invisibile — si vedrebbe l'ultima data e la si
+                    # crederebbe l'unica.
+                    "appuntamento_il INTEGER DEFAULT 0",
+                    "appuntamento_proposto_il INTEGER DEFAULT 0",
+                    "appuntamento_confermato_il INTEGER DEFAULT 0",
+                    "appuntamento_proposte INTEGER DEFAULT 0",
+                    "appuntamento_mosso_il INTEGER DEFAULT 0",
+                    # IL LUOGO DELL'INCONTRO (il link della
+                    # videoconferenza, o il punto per chi va di
+                    # persona): il calco della busta di ritiro — dentro
+                    # l'ordine invece che in chat, CIFRATO, e il
+                    # moderatore ne vede il SE e il QUANDO, mai il
+                    # contenuto. E' il caso della busta per la QUARTA
+                    # volta: chi non ha ne' username Telegram ne' npub
+                    # non potrebbe darlo in nessun altro modo.
+                    "accesso_testo TEXT DEFAULT ''",
+                    "accesso_il INTEGER DEFAULT 0",
+                    "accesso_correzioni INTEGER DEFAULT 0",
+                    "accesso_corretto_il INTEGER DEFAULT 0",
+                    # Contatore SUO, mai ereditato: un contatore preso
+                    # in prestito salta dritto al tetto (la lezione dei
+                    # ritiri e delle buste). Va aggiunto a ENTRAMBI i
+                    # MAX di _SQL_FERMI, o la coda dira' «mai
+                    # sollecitato» su righe bussate tre volte.
+                    "sollecito_appuntamento_il INTEGER DEFAULT 0",
+                    "solleciti_appuntamento INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -4553,11 +4638,23 @@ async def consegna_da_payload(d: dict, valuta: str):
     consegna = d.get("consegna", "")
     if consegna not in MODALITA_CONSEGNA:
         consegna = ""
+    if consegna == "servizio" and not SERVIZI_ATTIVI:
+        # La leva sta QUI e non nei chiamanti: e' il giudice unico dei
+        # payload, quindi la spegnitura la ereditano pubblica(), la
+        # modifica e l'import CSV senza doversene ricordare. E ricade
+        # su '' — la strada storica — invece di alzare un 400: a leva
+        # spenta il client quella modalita' non la offre, quindi chi
+        # la manda o e' un client di domani o e' qualcuno che prova.
+        consegna = ""
     taglia = d.get("taglia_pacco", "")
     if taglia not in TAGLIE_PACCO:
         taglia = ""
-    if consegna == "digitale":
+    if consegna in ("digitale", "servizio"):
         # Niente pacco: una taglia arrivata per sbaglio non resta.
+        # Il servizio sta qui per la stessa ragione del digitale —
+        # non c'e' niente da imballare — e non per somiglianza: se un
+        # giorno una modalita' nuova avesse un pacco, non basta
+        # aggiungerla a questa tupla.
         taglia = ""
     # La combo: solo con una modalita' fisica dichiarata (con
     # 'digitale' e' gia' tutto digitale, con '' non si promette nulla)
@@ -4650,6 +4747,28 @@ def guardia_venditore_digitale(tg_id: int, consegna: str,
             f"Per vendere con consegna digitale servono almeno "
             f"{DIGITALE_MIN_VENDITE} vendite concluse su Barattolo: "
             f"inizia con una spedizione o un ritiro in zona")
+
+
+SERVIZIO_DOVE = ("online", "presenza")
+
+
+def servizio_dove_da_payload(d: dict, consegna: str) -> str:
+    """DOVE si svolge una prestazione: 'online' | 'presenza' | ''.
+    Non e' un ornamento — decide una GUARDIA: un servizio in presenza
+    vuole il comune per la stessa ragione del ritiro (chi viene deve
+    sapere dove), uno online un luogo non ce l'ha e non gliela si puo'
+    chiedere.
+    Fuori dal servizio vale '' sempre, anche se arriva qualcosa: e' la
+    forma di `anche_digitale`, che si azzera dove non ha senso invece
+    di restare in colonna a dire una cosa che nessuno guardera' mai.
+    Sconosciuto = '' e mai un 400, come `consegna_da_payload`: il
+    client non decide i cataloghi, e un valore storto non deve far
+    fallire una pubblicazione — a valle '' vale come 'online', che e'
+    il caso che non chiede niente a nessuno."""
+    if consegna != "servizio":
+        return ""
+    dove = (d.get("servizio_dove") or "").strip()
+    return dove if dove in SERVIZIO_DOVE else ""
 
 
 def strade_annuncio(a) -> set:
@@ -7893,9 +8012,16 @@ def senza_condizione(categoria: str, consegna: str = "") -> bool:
     combo (tessera fisica O codice online) la merce fisica c'e' e una
     condizione ce l'ha, quindi si continua a chiedere. Per questo si
     guarda la colonna `consegna` e mai `anche_digitale`: quella
-    colonna dice «digitale» solo quando non c'e' nient'altro."""
+    colonna dice «digitale» solo quando non c'e' nient'altro.
+
+    Il SERVIZIO (ago 2026) e' il terzo caso, e non e' «nuovo per
+    definizione» come i primi due: e' che la scala non lo descrive
+    proprio — un'ora di lezione non e' ne' nuova ne' usata, e
+    chiedere «in che condizioni e'?» a chi vende una consulenza e'
+    una domanda senza risposte giuste, cioe' una domanda inutile.
+    Il precedente sono gli alimenti, per la stessa ragione."""
     return (categoria in CATEGORIE_SENZA_CONDIZIONE
-            or consegna == "digitale")
+            or consegna in ("digitale", "servizio"))
 
 
 def condizione_da_mostrare(a: dict) -> str:
@@ -8017,6 +8143,20 @@ def guardia_zona_condizione(d: dict, consegna: str,
                                      "comune valido: scegli il tuo dai "
                                      "suggerimenti del campo Zona "
                                      "(es. «Pavia (PV)»)")
+        # Il servizio IN PRESENZA (ago 2026): stessa regola del
+        # ritiro, messaggio SUO — chi vende una lezione a domicilio
+        # non capirebbe una frase sul «ritiro in zona». Online no: li'
+        # un luogo non esiste, e chiederlo sarebbe una domanda senza
+        # risposta. Sta accanto alla prima regola e NON dentro la
+        # seconda: `esigi_luogo` spegne solo «la zona dev'essere un
+        # comune», e questa e' «la zona ci vuole».
+        if (consegna == "servizio"
+                and servizio_dove_da_payload(d, consegna) == "presenza"
+                and not zona):
+            raise HTTPException(400, "Per un servizio di persona serve un "
+                                     "comune valido: scegli il tuo dai "
+                                     "suggerimenti del campo Zona "
+                                     "(es. «Pavia (PV)»)")
         if esigi_luogo and zona and coordinate_da_zona(zona) == (0.0, 0.0):
             raise HTTPException(400, messaggio_zona_storta(zona))
     return condizione
@@ -8032,7 +8172,20 @@ def guardia_zona_condizione(d: dict, consegna: str,
 # modalita' e' LIBERA dal tipo di oggetto: una gift card fisica si
 # spedisce, un codice si consegna digitale; le tutele seguono la
 # modalita' scelta, mai il tipo di bene.
-MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale")
+# 'servizio' (ago 2026) EMENDA quella riga, e va detto invece di
+# lasciarla mentire: la modalita' resta libera dal tipo per tutto cio'
+# che VIAGGIA, ma una prestazione non viaggia — le sue strade sono un
+# insieme di UNO, quindi qui tipo e modalita' coincidono senza che si
+# perda niente. Il precedente e' 'digitale', che un valore nuovo se
+# l'e' preso per la stessa ragione: un CICLO DI VITA suo. Il patto
+# «MAI un valore nuovo di consegna_scelta» resta intero e riguarda i
+# MODIFICATORI (via_punto, rete_punto, anche_digitale), che appoggiano
+# su una strada i cui timer sono gia' giusti; qui i timer di tutte e
+# quattro le strade esistenti sono sbagliati, e appoggiarcisi
+# renderebbe FALSO per costruzione proprio cio' che quel patto
+# proteggeva.
+MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale",
+                     "servizio")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
 # Le reti di punti di ritiro del NEGOZIO (ago 2026, pagina d'acquisto;
@@ -10295,9 +10448,19 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
             # digitale, per la stessa ragione: qui il digitale non
             # passa proprio. (Il `con` a questo punto e' gia' chiuso
             # da un pezzo: siamo dopo le guardie d'identita'.)
+            # IL SERVIZIO (ago 2026) ci cade dentro ED E' GIUSTO: una
+            # prestazione da un evento Nostr non ha senso — chi la
+            # vende deve essere QUI a proporre l'appuntamento e a
+            # riceverne la conferma. A cambiare e' solo il TESTO, che
+            # nominava il codice online e rispondeva la cosa sbagliata
+            # a chi provava a dichiarare una lezione: la lista bianca
+            # e' fail-closed apposta, ma un messaggio fail-closed che
+            # parla di un'altra funzione manda a cercare il guasto
+            # dalla parte opposta.
             raise HTTPException(400, "Da qui si dichiarano la spedizione "
-                                     "e il ritiro: per l'invio del codice "
-                                     "online scrivici, te lo accendiamo noi")
+                                     "e il ritiro: per il codice online o "
+                                     "per un servizio scrivici, te li "
+                                     "accendiamo noi")
         # Il giudice unico di pubblica e modifica, col solo ramo della
         # zona-luogo spento: v. esigi_luogo (la zona di un importato la
         # scrivono i relay e puo' essere fuori dall'Italia).
@@ -11415,6 +11578,21 @@ def _leve_stato():
                   ASTA_PROROGA_MINUTI),
             _leva("Aste vive per venditore", "ASTA_MAX_ATTIVE_VENDITORE",
                   ASTA_MAX_ATTIVE_VENDITORE),
+        ]},
+        {"gruppo": "🎓 Servizi", "voci": [
+            _leva("Servizi", "SERVIZI_ATTIVI", bool(SERVIZI_ATTIVI),
+                  spento="non si pubblicano prestazioni: chi la dichiara "
+                         "vede l'annuncio nascere senza modalità, come uno "
+                         "storico. Gli ordini servizio già vivi continuano "
+                         "— appuntamenti, conferme e conferma di ricezione "
+                         "non sono ostaggio della leva"),
+            _leva("Appuntamento entro (giorni)", "SERVIZIO_MAX_GIORNI",
+                  SERVIZIO_MAX_GIORNI),
+            _leva("Ordini aperti insieme, chi non ha vendite",
+                  "SERVIZIO_MAX_APERTI", SERVIZIO_MAX_APERTI,
+                  spento="nessun freno sulla raffica: un venditore nuovo "
+                         "può incassare quante prestazioni vuole prima "
+                         "che la prima disputa sia decisa"),
         ]},
         {"gruppo": "⚡ Offerta lampo", "voci": [
             _leva("Offerte lampo", "LAMPO_ATTIVE", bool(LAMPO_ATTIVE),

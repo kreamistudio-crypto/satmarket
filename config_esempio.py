@@ -355,6 +355,26 @@ ORE_LAMPO_OPZIONI = [6, 24, 48]  # le durate proposte
 MAX_LAMPO_SETTIMANA = 2      # lanci per annuncio in 7 giorni
 GIORNI_COLPO = 7             # cooldown dell'avviso «ha fatto colpo»
 
+# --- I servizi (prestazioni definite, con un appuntamento) -----------
+# Lezioni, consulenze, prestazioni con una durata e un contenuto
+# stabiliti PRIMA. Il venditore propone l'appuntamento dentro
+# l'ordine, il compratore lo conferma, e finche' non l'ha confermato
+# nessuna finestra parte. Nessun timer sposta sats: a chiudere
+# l'affare e' la conferma di chi ha comprato, come per il ritiro in
+# zona; se non arriva, decide un moderatore.
+# L'interruttore nasce SPENTO — non muove denaro in uscita, ma cambia
+# COSA si vende qui dentro e allunga la permanenza dei sats in
+# cassaforte: si accende con un gesto, guardando il primo giro.
+SERVIZI_ATTIVI = False       # interruttore generale (False = spento)
+SERVIZIO_MAX_GIORNI = 60     # quanto lontano puo' stare l'appuntamento
+SERVIZIO_MAX_APERTI = 0      # ordini servizio aperti INSIEME per chi
+                             # non ha vendite concluse (0 = spento).
+                             # Non e' una soglia per pubblicare: e' il
+                             # freno sulla raffica — il conteggio delle
+                             # dispute smaschera il recidivo, non chi
+                             # incassa cinquanta lezioni prima che la
+                             # prima disputa sia decisa.
+
 # --- Asta a tempo (vendita al miglior offerente) ---------------------
 # Chi vuole comprare punta versando sats nel deposito di garanzia; per
 # superare chi e' in testa si versa solo la differenza; alla scadenza
