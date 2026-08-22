@@ -1802,6 +1802,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `[data-id="lampo"] img` — la sentinella sulla forma diceva che la
   regola c'era, il giro CDP ha detto che non vinceva mai: ora
   `[data-id] img` pareggia l'attributo e vince per ordine.
+  AL TOCCO CHE ACCENDE LA PAGINA SCORRE (ago 2026, dal campo: la
+  griglia sta sotto la piega e il gesto sembrava non fare niente).
+  NON fino alla griglia: la fila si incolla SOTTO l'header, cosi' le
+  card restano in vista con l'anello — il gesto e la sua conferma non
+  si separano, il ritocco per uscire e' ancora li' — e la griglia
+  filtrata compare subito sotto con la sua etichetta «N oggetti». IL
+  RITOCCO CHE SPEGNE NON SCORRE (e' un annulla), scivolata secca con
+  reduced-motion. L'offset e' ALTEZZA dell'header + pillole
+  appiccicate + 4, e l'altezza NON e' il rect.bottom del momento —
+  misurato: prima dello scroll l'header puo' non essere ancora
+  incollato (la barra del collaudo/web gli sta sopra) e il bottom
+  conta anche quella, 225 contro 164, un arrivo 61px corto.
+  Verificato al pixel: atteso 219, arrivo 219. Le sponsorizzate non
+  c'entrano: il loro tocco aprira' l'annuncio, lo scroll vive solo
+  nel ramo dei due filtri.
   MISURE: la sezione pesa 161px a 320 (misurata; era 157 prima
   dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
