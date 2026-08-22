@@ -7733,6 +7733,36 @@ function toccaScoperta(id){
   el('filtriBtn').classList.toggle('attivo', filtriVivi());
   aggiornaPicker('ordinaSel');
   renderScoprire();   /* l'anello risponde al tocco, prima della rete */
+  /* AL TOCCO CHE ACCENDE LA PAGINA SCORRE (ago 2026, dal campo: la
+     griglia sta sotto la piega e il gesto sembrava non fare niente).
+     NON fino alla griglia: la fila si incolla SOTTO l'header, cosi'
+     le card restano in vista con l'anello acceso — il gesto e la sua
+     conferma non si separano, e il ritocco per uscire e' ancora li' —
+     e la griglia filtrata compare subito sotto.
+     L'ALTEZZA dell'header e MAI il suo rect.bottom, ed e' misurato:
+     prima dello scroll l'header puo' non essere ancora incollato (la
+     barra del collaudo/web gli sta sopra) e il bottom del momento
+     conta anche quella — 225 contro i 164 veri, cioe' un arrivo 61px
+     troppo corto. Da incollato, top:0, l'altezza E' il bottom.
+     L'addendo delle PILLOLE tiene la fila fuori dalla fascia dove la
+     barra appiccicata vive: di fatto all'arrivo resta in vista un
+     filo della sezione categorie (che tiene l'osservatore
+     intersecante, barra spenta) — e se la barra si accendesse, non
+     coprirebbe comunque le card.
+     IL RITOCCO CHE SPEGNE NON SCORRE: e' un annulla, si resta dove
+     si e'. Scivolata morbida, secca con reduced-motion (tourRidotto
+     e' il giudice di casa di quella preferenza). Il precedente e'
+     alternaBarattolo col suo scrollTo(0,0): «la griglia e'
+     un'altra». */
+  if (!acceso) {
+    const hdr = document.querySelector('#view-esplora header');
+    const sotto = (hdr ? hdr.offsetHeight : 0)
+                + (el('chips') ? el('chips').offsetHeight : 0) + 4;
+    window.scrollTo({
+      top: Math.max(0, scrollY
+           + el('scoprireSez').getBoundingClientRect().top - sotto),
+      behavior: tourRidotto() ? 'auto' : 'smooth'});
+  }
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }

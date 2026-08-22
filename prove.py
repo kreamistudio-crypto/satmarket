@@ -21037,6 +21037,37 @@ def prove_scoprire():
     # in chiaveVetrina, e il ramo resta alle sole Aste
     prova("...ne' la cronologia o il ramo della vetrina", (False, False),
           ("ramoVetrina" in _ts, "navRiflette" in _ts))
+    # AL TOCCO CHE ACCENDE LA PAGINA SCORRE (ago 2026, dal campo: la
+    # griglia sta sotto la piega e il gesto sembrava non fare
+    # niente) — la fila si incolla sotto l'header, NON fino alla
+    # griglia: le card restano in vista con l'anello.
+    prova("il tocco che accende porta la fila sotto l'header", 1,
+          _ts.count("window.scrollTo"))
+    # IL RITOCCO NON SCORRE (e' un annulla): lo scroll vive DENTRO il
+    # ramo che accende — e PRIMA del ramo DEMO, o la demo resterebbe
+    # ferma
+    prova("...solo nel ramo che accende, e anche in DEMO",
+          (True, True),
+          (_ts.index("if (!acceso) {") < _ts.index("window.scrollTo"),
+           _ts.index("window.scrollTo") < _ts.index("if (DEMO)")))
+    # L'OFFSET CONTA DUE ADDENDI, e il secondo non e' ovvio: a fila
+    # incollata la barra delle pillole appiccicate e' ACCESA (la
+    # sezione categorie e' fuori vista) e senza il suo addendo
+    # coprirebbe il bordo alto delle card
+    prova("...e l'offset conta header E pillole appiccicate",
+          (True, True),
+          ("#view-esplora header" in _ts,
+           "el('chips') ? el('chips').offsetHeight" in _ts))
+    # L'ALTEZZA dell'header e MAI il suo rect.bottom (misurato: prima
+    # dello scroll l'header puo' non essere ancora incollato — la
+    # barra del collaudo/web gli sta sopra — e il bottom del momento
+    # conta anche quella: 225 contro 164, un arrivo 61px corto)
+    prova("...con l'ALTEZZA dell'header, mai il suo bottom",
+          (True, False),
+          ("hdr.offsetHeight" in _ts,
+           "hdr.getBoundingClientRect" in _ts))
+    prova("...con la scivolata secca in reduced-motion", True,
+          "tourRidotto() ? 'auto' : 'smooth'" in _ts)
     # IL RAMO DEMO RIDISEGNA LE PILLOLE (ago 2026, trovato col giro
     # CDP di questo cantiere): il renderChips in testa ad avvia()
     # parte con DEMO ancora false, quindi senza questa chiamata nel
