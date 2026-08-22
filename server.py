@@ -6467,16 +6467,22 @@ MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
                "sessuali, refurtiva, contraffazioni, documenti, dati "
                "personali, farmaci e animali protetti.")
 
-# Chi prova a vendere un servizio onesto (un logo, una riparazione,
-# una consulenza) non merita la lista dei divieti gravi: il no e'
-# di prodotto, non di condotta. Barattolo vende COSE che esistono,
-# fisiche o digitali; l'escrow a consegna singola non regge lavori
-# con tempi e revisioni.
-MSG_RIFIUTO_SERVIZI = ("I servizi e le prestazioni non sono ancora "
-                       "supportati su Barattolo: qui si vendono solo "
-                       "oggetti che esistono già, fisici o digitali "
-                       "(anche buoni regalo, codici e licenze). "
-                       "Grazie della comprensione!")
+# Chi prova a vendere una prestazione non merita la lista dei divieti
+# gravi: il no e' di prodotto, non di condotta.
+# IL TESTO E' CAMBIATO COL CANTIERE DEI SERVIZI (ago 2026), e non era
+# facoltativo: diceva «non sono ancora supportati», che dal giorno in
+# cui si vendono e' una BUGIA — e per giunta detta a chi ha appena
+# provato a fare una cosa lecita. Il no adesso e' sul PERIMETRO, che
+# e' l'unica cosa che davvero manca: senza sapere dove finisce, in
+# una lite nessuno puo' dire se la prestazione sia stata resa.
+MSG_RIFIUTO_SERVIZI = ("Le prestazioni si vendono su Barattolo, ma "
+                       "devono essere DEFINITE: quanto durano, che "
+                       "cosa comprendono, a che prezzo. «Un'ora di "
+                       "lezione di inglese» sì; «ti sviluppo quello "
+                       "che ti serve» no — senza un perimetro, se "
+                       "nasce una lite nessuno può dire se hai "
+                       "consegnato. Riscrivi l'annuncio dicendo "
+                       "esattamente cosa comprende, e ripubblica!")
 
 # E chi si e' spacciato per la piattaforma non merita la lista delle
 # armi e delle droghe, che non c'entra niente: merita di sentirsi dire
@@ -7116,16 +7122,23 @@ PROMPT_MODERAZIONE = (
     "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
     "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
     "falsi; dati personali o account; farmaci con obbligo di ricetta; "
-    "animali protetti. Riserva VIETATO a questi casi netti. I SERVIZI "
-    "e le prestazioni (sviluppo software, grafica, riparazioni, "
-    "consulenze, lezioni, lavori su commissione) non sono supportati: "
-    "Barattolo vende solo COSE che esistono, fisiche o digitali — ma "
-    "un servizio non palesemente vietato NON e' un caso netto: "
-    "rispondi DUBBIO, decidera' un moderatore umano. DUBBIO anche per "
-    "i buoni riscattabili presso il VENDITORE STESSO quando cio' che "
-    "si riscatta e' il suo TEMPO o un lavoro su misura ('buono per "
-    "una lezione con me', 'buono per una mia consulenza'): sono a "
-    "meta' tra bene e prestazione. E' invece un PRODOTTO, quindi OK, "
+    "animali protetti. Riserva VIETATO a questi casi netti. LE "
+    "PRESTAZIONI si vendono, ma solo se sono DEFINITE: cio' che si "
+    "compra dev'essere stabilito PRIMA — quanto dura, che cosa "
+    "comprende, a che prezzo. 'Lezione di inglese online, un'ora di "
+    "conversazione', 'consulenza fiscale da 60 minuti', 'landing page "
+    "a una schermata, tre sezioni, due revisioni' -> OK: sono cose "
+    "precise. 'Ti sviluppo quello che ti serve', 'ti seguo finche' "
+    "non sei soddisfatto', 'ti porto il sito in prima pagina' -> "
+    "DUBBIO: non c'e' un perimetro, e senza perimetro non si puo' "
+    "dire se sia stato fatto. La stessa asta vale per i risultati che "
+    "nessuno puo' garantire (guadagni, posizionamenti, esiti) e per "
+    "cio' che vuole un titolo che qui non si verifica (prestazioni "
+    "mediche o legali): DUBBIO, decide un umano. Un buono "
+    "riscattabile presso il VENDITORE STESSO segue la stessa regola: "
+    "'buono per una lezione di chitarra da un'ora con me' -> OK, "
+    "'buono per una mia consulenza' senza altro -> DUBBIO. E' "
+    "PRODOTTO, quindi OK, anche "
     "cio' che il venditore offre gia' DEFINITO e a prezzo fisso, "
     "anche se si gode presso di lui: un soggiorno o un pernottamento "
     "(B&B, agriturismo, casa vacanze), un ingresso, una degustazione, "
@@ -7144,9 +7157,7 @@ PROMPT_MODERAZIONE = (
     "Un buono o un codice vale come PRODOTTO anche quando cio' che si "
     "riscatta e' cibo o una consumazione presso un esercizio (un buono "
     "per una piadina, una pizza, un caffe'): il bene venduto e' il "
-    "buono, non il lavoro di prepararlo. Il divieto sui servizi "
-    "riguarda i lavori che il VENDITORE stesso svolge su commissione, "
-    "non i buoni spendibili presso terzi; anche il cibo confezionato "
+    "buono, non il lavoro di prepararlo. E anche il cibo confezionato "
     "da spedire o ritirare e' merce lecita. "
     "Ai casi netti si aggiunge l'IMPERSONAZIONE, e la ragione e' che "
     "un annuncio ha un indirizzo del mercatino e diventa una scheda "
@@ -7222,8 +7233,14 @@ PROMPT_MODERAZIONE = (
     "a @supporto per sbloccare l'ordine' -> VIETATO: SI RIVOLGE al "
     "lettore a nome nostro e nomina un ordine che non esiste, e non "
     "lo salva il fatto che le cuffie ci siano. "
-    "'Ti sviluppo un bot Telegram' -> DUBBIO: servizio. 'Buono per "
-    "una lezione di chitarra con me' -> DUBBIO: buono-prestazione. "
+    "LA COPPIA CHE INSEGNA IL CONFINE DELLE PRESTAZIONI, e sono due "
+    "annunci dello stesso mestiere. 'Lezione di inglese online, "
+    "un'ora in videoconferenza' -> OK: dura un'ora, si sa cosa si "
+    "compra, e chi la vende la eroga di persona — che non e' un "
+    "problema. 'Ti sviluppo un bot Telegram su misura, dimmi cosa ti "
+    "serve' -> DUBBIO: non e' il software a essere vietato, e' che "
+    "non si sa DOVE FINISCE — e in una lite nessuno potrebbe dire se "
+    "sia stato consegnato. "
     "'Assistenza Barattolo - supporto agli utenti' -> DUBBIO: si "
     "intesta un ruolo che non ha. "
     "'Barattolo: verifica il tuo pagamento in sospeso' -> VIETATO: "

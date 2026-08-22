@@ -2748,9 +2748,13 @@ def prove_busta_ritiro():
             _t = mini.rfind("function ", 0, _m.start())
             fuori.add(mini[_t + 9:mini.index("(", _t + 9)])
         return fuori
-    prova("l'attesa ritardata la chiamano solo le quattro LETTURE",
+    # Cinque dall'ago 2026: il collegamento del servizio e' la quinta,
+    # ed e' una lettura come le altre — il GET e' puro, aprire un link
+    # non e' una ricevuta (a differenza del codice digitale, dove la
+    # prima lettura E' la rivelazione).
+    prova("l'attesa ritardata la chiamano solo le cinque LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
-           "apriDocBusta"},
+           "apriDocBusta", "mostraAccesso"},
           _chi_chiama("attesaRitardata(btn,"))
     # IL GEMELLO: chi non passa un testo si prende «Invio sats in
     # corso…», quindi il default puo' restare SOLO a chi i sats li
@@ -22173,6 +22177,119 @@ def prove_servizi():
     prova("il libro mastro sa che un servizio non spedisce", True,
           "IN ('ritiro','digitale','servizio')" in _SORGENTE)
 
+    # --- LA NOTA GIRA DAVVERO (la prova che vale piu' delle
+    # sentinelle: quelle dicono che le righe ci sono, questa dice
+    # COSA legge il moderatore — ed e' su quella che decide)
+    import sqlite3 as _sq
+    import time as _tt
+
+    class _Errore(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+
+    class _SenzaClose:
+        """La connessione che sopravvive al `con.close()` del codice
+        vero: cosi' la prova puo' rileggere il database dopo."""
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    def _disputa(**kw):
+        """Fa girare apri_disputa VERA su un db di cartone e
+        restituisce il testo che arriva ai moderatori."""
+        con = _sq.connect(":memory:")
+        con.row_factory = _sq.Row
+        con.executescript("""
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INT,
+            venditore_id INT, stato TEXT, disputata INT DEFAULT 0,
+            consegna_scelta TEXT DEFAULT '', consegnato INT DEFAULT 0,
+            via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
+            busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
+            busta_correzioni INT DEFAULT 0, busta_file TEXT DEFAULT '',
+            indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
+            indirizzo_corretto_il INT DEFAULT 0,
+            indirizzo_correzioni INT DEFAULT 0,
+            nota_compratore TEXT DEFAULT '',
+            appuntamento_il INT DEFAULT 0,
+            appuntamento_confermato_il INT DEFAULT 0,
+            appuntamento_proposte INT DEFAULT 0,
+            accesso_il INT DEFAULT 0, accesso_correzioni INT DEFAULT 0,
+            aggiornato INT DEFAULT 0);
+        """)
+        # la storia del venditore si toglie PRIMA di comporre i campi,
+        # o finirebbe in una colonna che non esiste
+        storia = kw.pop("_storia", [])
+        campi = dict(id=1, compratore_id=111, venditore_id=222,
+                     stato="locked", consegna_scelta="servizio")
+        campi.update(kw)
+        con.execute(
+            "INSERT INTO ordini(" + ",".join(campi) + ") VALUES(" +
+            ",".join("?" * len(campi)) + ")", list(campi.values()))
+        # gli ordini gia' decisi di questo venditore, per il RIPETUTO
+        for i, (st, d) in enumerate(storia, start=50):
+            con.execute("INSERT INTO ordini(id,venditore_id,stato,"
+                        "disputata) VALUES(?,222,?,?)", (i, st, d))
+        con.commit()
+        detti = []
+
+        async def _not(chi, testo):
+            detti.append((chi, testo))
+        # CHI ESTRAE UNA FUNZIONE NE EREDITA LE DIPENDENZE: `reale()`
+        # esegue in un ambiente VUOTO, e _quando_appuntamento vuole
+        # `time` e i due cataloghi. Costruito a mano qui, coi pezzi
+        # VERI presi dal sorgente — mai uno stub, che finirebbe per
+        # imitare anche i bug (la lezione di _fmt_sats).
+        _a = {"time": _tt}
+        for _c in ("MESI_IT", "GIORNI_IT"):
+            _i = _SORGENTE.index(_c + " = (")
+            exec(_SORGENTE[_i:_SORGENTE.index(")", _i) + 1], _a)
+        exec(pezzo("_quando_appuntamento"), _a)
+        amb = {"db": lambda: _SenzaClose(con), "time": _tt,
+               "html": __import__("html"), "notifica": _not,
+               "ADMIN_IDS": [1], "HTTPException": _Errore,
+               "Header": lambda d: d, "Cookie": lambda d: d,
+               "verifica_utente": lambda *a: {"id": 111},
+               "_lucchetti_ordine": __import__("collections").defaultdict(
+                   __import__("asyncio").Lock),
+               "_quando_appuntamento": _a["_quando_appuntamento"],
+               "app": type("a", (), {"post": lambda *a, **k:
+                                     (lambda f: f)})()}
+        # `pezzo` taglia dal `def`, quindi l'`async` va rimesso: e' la
+        # forma che usano gia' le prove delle altre rotte
+        exec("async " + pezzo("apri_disputa"), amb)
+        __import__("asyncio").run(amb["apri_disputa"](1, "", ""))
+        return next(t for chi, t in detti if chi == 1)
+
+    ora = int(_tt.time())
+    n = _disputa(appuntamento_il=ora - 3600,
+                 appuntamento_confermato_il=ora - 7200,
+                 appuntamento_proposte=1, accesso_il=ora - 9000)
+    prova("la nota dice che l'appuntamento era CONFERMATO", True,
+          "CONFERMATO dall'acquirente" in n)
+    prova("...e che il collegamento c'era, col giorno", True,
+          "collegamento lasciato il" in n)
+    prova("...e dichiara la regola delle condizioni", True,
+          "si giudica se le CONDIZIONI" in n)
+    n2 = _disputa(appuntamento_proposte=0)
+    prova("l'appuntamento mai proposto si vede", True,
+          "appuntamento MAI proposto dal venditore" in n2)
+    prova("...e il collegamento mai lasciato pure", True,
+          "collegamento MAI lasciato" in n2)
+    n3 = _disputa(appuntamento_il=ora - 3600, appuntamento_proposte=3)
+    prova("gli spostamenti si contano: uno stallo per rinvii si vede",
+          True, "spostato 2 volte" in n3)
+    prova("...e una data non confermata lo dice", True,
+          "MAI confermato dall'acquirente" in n3)
+    # IL RIPETUTO: le VINTE contano piu' delle perse — cinquanta
+    # no-show a proprio favore sono il profilo, non la sfortuna
+    n4 = _disputa(_storia=[("released", 1), ("released", 1),
+                           ("refunded", 1)])
+    prova("il moderatore vede quante dispute ha VINTO il venditore",
+          True, "2 decise a suo favore" in n4)
+    prova("...e quante ne ha perse", True, "1 a favore di chi ha" in n4)
+    prova("il contenuto del collegamento non c'e' MAI", True,
+          "meet." not in n and "http" not in n)
+
     # --- il form Vendi
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client conosce la strada", True,
@@ -22204,6 +22321,87 @@ def prove_servizi():
     # sviluppo quello che ti serve» no)
     prova("la durata si chiede, o la prestazione non e' definita", True,
           "parseInt(el('sellServDurata')?.value, 10) > 0" in mini)
+
+    # --- il PROMPT: non si toglie un divieto, si sposta la lezione
+    # dal lato del B&B. Il criterio «e' stabilito PRIMA?» c'era gia'
+    # ed e' quello che rende OK il pacchetto soggiorno.
+    i = _SORGENTE.index("PROMPT_MODERAZIONE = (")
+    prompt = re.sub(r'"\s*\n\s*"', "",
+                    _SORGENTE[i:_SORGENTE.index('Nessun altro testo."', i)])
+    prova("il prompt dice che una prestazione DEFINITA si vende", True,
+          "LE PRESTAZIONI si vendono, ma solo se sono DEFINITE" in prompt)
+    prova("...e cosa vuol dire definita: durata, contenuto, prezzo",
+          True, "quanto dura, che cosa comprende, a che prezzo" in prompt)
+    # Il su misura resta DUBBIO, e il motivo non e' che sia un
+    # servizio: e' che senza perimetro in disputa non si decide.
+    prova("il su misura resta DUBBIO", True,
+          "Ti sviluppo quello che ti serve" in prompt
+          and "non c'e' un perimetro" in prompt)
+    prova("...e i risultati che nessuno garantisce pure", True,
+          "risultati che nessuno puo' garantire" in prompt)
+    prova("la coppia che insegna il confine e' nel prompt", True,
+          "LA COPPIA CHE INSEGNA IL CONFINE DELLE PRESTAZIONI" in prompt)
+    prova("...con la lezione da un'ora in OK", True,
+          "un'ora in videoconferenza' -> OK" in prompt)
+    prova("...e il bot su misura in DUBBIO", True,
+          "dimmi cosa ti serve' -> DUBBIO" in prompt)
+    prova("il buono-prestazione segue la stessa regola", True,
+          "buono per una lezione di chitarra da un'ora con me' -> OK"
+          in prompt)
+    # La riga che «i servizi non sono supportati» non c'e' PIU', e la
+    # sua assenza va sorvegliata quanto la sua presenza di ieri
+    prova("il prompt non dice piu' che i servizi non si vendono",
+          True, "non sono supportati" not in prompt)
+    # ...e il messaggio di rifiuto nemmeno: «non ancora supportati»
+    # dal giorno in cui si vendono e' una BUGIA, detta a chi ha appena
+    # provato a fare una cosa lecita
+    # ⚠️ Si guarda il VALORE della costante e non tutto il sorgente:
+    # il commento che spiega il cambio CITA la frase vecchia, e una
+    # sentinella larga sarebbe rossa per colpa della prosa che
+    # racconta la cura. E' la lezione gia' pagata due volte in questo
+    # file (il nome della funzione che non si chiama).
+    _a = {}
+    _i = _SORGENTE.index("MSG_RIFIUTO_SERVIZI = (")
+    exec(_SORGENTE[_i:_SORGENTE.index('")', _i) + 2], _a)
+    msg_serv = _a["MSG_RIFIUTO_SERVIZI"]
+    prova("...e il rifiuto non promette un domani che e' gia' oggi",
+          True, "non sono ancora supportati" not in msg_serv)
+    prova("il rifiuto dice qual e' il problema: il perimetro", True,
+          "devono essere DEFINITE" in msg_serv)
+    # I casi nuovi nel collaudo col modello VERO: sono loro a dire se
+    # il modello ha capito, e vanno rilanciati a ogni ritocco
+    col = open("collaudo_impersonazione.py", encoding="utf-8").read()
+    for caso in ("Lezione di inglese online",
+                 "Consulenza fiscale da 60 minuti",
+                 "Landing page a una schermata",
+                 "Ti seguo finche' non sei soddisfatto"):
+        prova(f"«{caso[:34]}» e' nel collaudo", True, caso in col)
+
+    # --- i pannelli dell'ordine. NON basta che le funzioni esistano:
+    # la tortura le ha viste MONTATE MAI e nessuna prova arrossire —
+    # tre buchi trovati rompendo, non rileggendo.
+    prova("il pannello del venditore e' nella catena", True,
+          "o.consegnaScelta==='servizio' ? pannelloServizioVenditore(o) :"
+          in mini)
+    prova("...e quello del compratore e' montato", True,
+          "${pannelloServizioCompratore(o)}" in mini)
+    # Il bottone si offre solo DOPO l'appuntamento: prima non c'e'
+    # niente da confermare, e invitare a chiudere un affare che non e'
+    # cominciato e' il modo di farlo chiudere per sbaglio. Il server
+    # accetta comunque da 'locked' — chi vuole liberare i sats prima
+    # puo', ma non lo si INVITA.
+    prova("...e la conferma si offre solo a appuntamento passato", True,
+          "o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000"
+          in mini)
+    prova("lo stepper racconta l'appuntamento, coi suoi tre stati", True,
+          "'Appuntamento concordato'" in mini
+          and "'Appuntamento proposto'" in mini
+          and "'Appuntamento da fissare'" in mini)
+    # la resa e' LOCALE al telefono di chi guarda: sul server l'ora e'
+    # quella del server, e su una lezione l'ora E' il prodotto
+    prova("la data si rende nel fuso di chi guarda", True,
+          "toLocaleString('it-IT'" in mini
+          and "function dataAppuntamento" in mini)
     prova("gira nell'orologio", True,
           "await sollecita_servizi_fermi()" in _SORGENTE)
     # LEFT JOIN: un set ha annuncio_id=0 e con l'INNER sparirebbe in

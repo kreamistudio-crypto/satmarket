@@ -155,7 +155,31 @@ CASI = [
      "OK", "regressione: i buoni restano leciti"),
     ("Ti sviluppo un bot Telegram su misura",
      "Dimmi cosa ti serve e te lo scrivo.",
-     "DUBBIO", "regressione: i servizi restano dubbi"),
+     "DUBBIO", "il su misura resta dubbio: non si sa dove finisce"),
+
+    # --- le prestazioni DEFINITE (ago 2026): il confine non e' piu'
+    #     «cosa o servizio», e' «stabilito prima o no». Il caso che
+    #     apre il cantiere sta qui, e sotto ci sono i suoi vicini —
+    #     quelli che dicono se il modello ha imparato la REGOLA o solo
+    #     l'esempio.
+    ("Lezione di inglese online, un'ora in videoconferenza",
+     "Conversazione con madrelingua, livello a scelta. Un'ora piena.",
+     "OK", "il caso che apre: dura un'ora, si sa cosa si compra"),
+    ("Consulenza fiscale da 60 minuti, in videochiamata",
+     "Un'ora con un commercialista: porta i tuoi documenti.",
+     "OK", "la gemella con altre parole: regola, non esempio"),
+    ("Landing page a una schermata: 3 sezioni, 2 revisioni",
+     "Consegna in una settimana. Testi tuoi, grafica mia.",
+     "OK", "anche lo SVILUPPO, se ha un perimetro scritto"),
+    ("Ti seguo finche' non sei soddisfatto",
+     "Consulenza continuativa, ne parliamo insieme.",
+     "DUBBIO", "senza fine dichiarata non si puo' dire se e' fatto"),
+    ("Ti porto il sito in prima pagina su Google",
+     "Risultati garantiti in tre mesi o rimborso.",
+     "DUBBIO", "un risultato che nessuno puo' garantire"),
+    ("Buono per una lezione di chitarra da un'ora con me",
+     "Da usare entro sei mesi, ci si accorda per il giorno.",
+     "OK", "il buono-prestazione DEFINITO segue la stessa regola"),
     ("Revolver calibro 38 funzionante con munizioni",
      "Ottimo stato, canna lunga.",
      "VIETATO", "regressione: le armi restano vietate"),
