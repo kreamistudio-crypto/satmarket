@@ -1414,7 +1414,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   — che è cosa succede a tre deploy — e chiede UNA notifica sola. Una
   sentinella sulla forma non basterebbe: qui il difetto non era una
   riga mancante, era uno stato che non sopravviveva.
-  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
+  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 29
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
   media · Altro) più le 16 del catalogo largo (Informatica ·
@@ -1442,11 +1442,80 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che esiste, «ti sviluppo un bot» no) — ROVESCIATO ad ago 2026, vedi
   «I SERVIZI»: si vendono, ma solo DEFINITI, e il confine è lo stesso
   che qui rendeva OK il pacchetto B&B. La categoria però NON cambia: un
-  buono resta un buono, e una prestazione non ha ancora una casa sua
-  (dichiarato: si decide a rodaggio, quando si vedrà dove finiscono). Terza voce delle CATEGORIE_SENZA_CONDIZIONE:
+  buono resta un buono. E la casa delle prestazioni è arrivata il
+  giorno dopo: vedi «LEZIONI E CORSI E LAVORO E SERVIZI», qui sotto.
+  Terza voce delle CATEGORIE_SENZA_CONDIZIONE:
   un buono è nuovo per definizione, anche la tessera fisica. Le due
   righe-voucher del MODELLO_IMPORT traslocano lì e perdono la cella
   condizione (insegnerebbe una cosa falsa, la regola del miele).
+  «LEZIONI E CORSI» E «LAVORO E SERVIZI» (ago 2026, decisione di
+  Andrea col cantiere dei servizi, che dichiarava di decidere «a
+  rodaggio, guardando dove finiscono»). DUE e non una: una lezione e
+  una consulenza si cercano in due modi diversi. Stanno in CODA
+  accanto ai Buoni — sono le voci che non sono MERCE — e «Altro» resta
+  ultima, che c'è una prova a esigerlo.
+  ORTOGONALI ALLA STRADA, il patto dei Buoni: la categoria dice COSA
+  compri, la strada COME arriva. Un corso può essere una lezione dal
+  vivo, un video registrato o un cofanetto spedito, e restano tutti
+  «Lezioni e corsi» — chi le legasse alla strada `servizio` rifarebbe
+  l'errore di «Prodotti digitali», scartato allora.
+  FUORI da CATEGORIE_SENZA_CONDIZIONE, e la ragione è la DIFFERENZA
+  coi Buoni: lì la tessera fisica esiste davvero, quindi serviva
+  l'esenzione di categoria; qui `senza_condizione` esenta già chiunque
+  scelga la strada `servizio` o `digitale`, cioè il caso normale, e
+  metterle nel frozenset cambierebbe qualcosa SOLO nel caso fisico —
+  un corso in DVD spedito — dove la condizione invece vuol dire
+  qualcosa.
+  LE EMOJI RISPECCHIANO L'ILLUSTRAZIONE (🎓 il tocco col diploma, 💼 la
+  valigetta), ed è il loro mestiere: sono il RIPIEGO di quel disegno,
+  e nella griglia del bot sono l'unica cosa che si vede.
+  DA CUI LO SCAMBIO, che è la riga da leggere due volte: 🎓 era
+  l'icona della STRADA `servizio` e si è spostata a **📅**, che era già
+  l'icona del suo stesso flusso — proponi la data, appuntamento
+  proposto, sposta la data — e dice quel che quella strada È. Il
+  perché non è il posto ma il SIGNIFICATO: su un annuncio «Lavoro e
+  servizi» si sarebbero visti 💼 come reparto e 🎓 come strada, cioè 🎓
+  non avrebbe significato «servizio» ma «lezioni». Sette posti, e
+  NESSUNA PROVA SORVEGLIAVA QUEL GLIFO: nasce il censimento che
+  mancava.
+  ⚠️ Quella sentinella guarda il CODICE e non la prosa, e la prima
+  stesura ci è inciampata: nel client i commenti sono a BLOCCO e le
+  righe di mezzo non cominciano per «*», quindi un filtro
+  riga-per-riga trova la spiegazione che racconta lo scambio. Chi
+  scrive non deve riformulare la frase — è la sentinella a dover
+  guardare dove serve.
+  L'ALBERO ce l'hanno (otto sottovoci ciascuna, decisione di Andrea
+  contro il consiglio di lasciarle piatte), quindi «Altro» resta
+  l'unica piatta. DICHIARATO: le altre ventisei famiglie sono
+  disegnate sui 46 annunci veri di produzione, queste due sul
+  MESTIERE — di servizi non ne esisteva ancora nessuno — e si
+  correggono col primo `--conta` che avrà qualcosa da contare.
+  LE ILLUSTRAZIONI C'ERANO GIÀ, arrivate «in attesa» col commit delle
+  tre figure nuove: già ritagliate e già pareggiate, e i due file
+  spostano la mediana dell'inchiostro dell'1,9% — sotto la soglia del
+  2%, quindi nessuna sorella è stata riscritta. ⚠️ E
+  `ritaglia_categorie.py` NON va rilanciato: a secco dice «0 da
+  sistemare», ma con `--scrivi` un `and not scrivi` nella passata dei
+  francobolli riscrive e ricomprime tutti e trenta i `-mini` per
+  niente.
+  I TRE BUCHI DELLA STRADA `servizio`, chiusi qui perché due reparti
+  pieni di prestazioni li avrebbero resi clamorosi: `iconeCard`
+  conosceva 🚚🤝💾 e basta — su un servizio la riga delle icone era
+  COMPLETAMENTE VUOTA e l'annuncio non si distingueva da niente —,
+  `pilloleModalita` idem nella scheda, e soprattutto `servizio_dove` e
+  `durata_min` NON erano in `CAMPI_VETRINA`: il venditore li
+  dichiarava nel form, il server li scriveva in colonna, e tornavano
+  solo alla sua pagina di MODIFICA. Chi comprava non sapeva se la
+  lezione fosse online o di persona né che durasse un'ora — e la
+  DURATA è metà del «definito» che il prompt della moderazione
+  pretende: la chiedevamo e poi la nascondevamo. Il testo lo compone
+  `durataTesto`, che dice 0 come NIENTE — un annuncio storico non
+  inventa una durata — e mette l'unità sul resto, perché il campo del
+  form è un numero libero e «1 ora e 1» si legge come un refuso.
+  LA NOTA NASCE APERTA su «Lezioni e corsi» e NON su «Lavoro e
+  servizi»: là la domanda è certa quanto su una taglia — il livello,
+  l'argomento — mentre una consulenza o un logo si concordano già
+  nell'annuncio, e il campo aperto chiederebbe di ripeterlo.
   "Tutto" è solo la vista del
   frontend, non una categoria. «Bitcoin» è l'unica di casa nostra e non dei mercatini
   generalisti: su un mercatino che incassa in sats, Jade e BitBox02
@@ -1487,20 +1556,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Guardate e tenute come sono: 🏺 Collezionismo (tira
   sull'antiquariato, ma non c'e' di meglio) e 📦 Altro (e' anche il
   pacco della spedizione: convivono senza confondersi).
-  AGGIUNGERE UNA CATEGORIA TOCCA SETTE POSTI: `CATEGORIE` e
-  `SINONIMI_CATEGORIA` e `MODELLO_IMPORT` in server.py, `<select
-  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html, più
-  l'ILLUSTRAZIONE in `assets/categorie/{slug}.webp` (il settimo, lug
-  2026, nato con la pagina Sfoglia) — e `CATEGORIE_SENZA_CONDIZIONE`
-  col suo gemello `CAT_SENZA_COND`, se la voce nuova è di quelle dove
-  la condizione non vuol dire niente.
-  Non serve
-  ricordarseli: `prove.py` li incrocia tutti e sette e fallisce se
-  divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
-  dimenticare per davvero).
+  AGGIUNGERE UNA CATEGORIA TOCCA DIECI POSTI, e il «sette» che stava
+  qui era invecchiato PER DIFETTO — se ne sono aggiunti tre senza che
+  nessuno aggiornasse il conto, ed è la stessa lezione del titolo nudo
+  nelle notifiche: **l'elenco a memoria di una voce dichiarata
+  rimpicciolisce**. In server.py: `CATEGORIE`, `EMOJI_CATEGORIA` — che
+  il suo commento chiama già «l'OTTAVA copia» —, `SOTTOCATEGORIE` col
+  suo `SINONIMI_SOTTOCATEGORIA`, `SINONIMI_CATEGORIA` e
+  `MODELLO_IMPORT`. In miniapp.html: `<select id="sellCat">`,
+  `EMOJI_CAT`, `CATS` e `CAT_NOTA_APERTA`. Più l'ILLUSTRAZIONE in
+  `assets/categorie/{slug}.webp` col suo francobollo `-mini` (nata lug
+  2026 con la pagina Sfoglia) — e `CATEGORIE_SENZA_CONDIZIONE` col
+  gemello `CAT_SENZA_COND`, se la voce nuova è di quelle dove la
+  condizione non vuol dire niente.
+  QUALI SONO OBBLIGATORI, che è la parte utile: cinque incroci di
+  `prove.py` diventano rossi da soli — `CATS`, il `<select>`,
+  `EMOJI_CAT`, e i due della griglia del bot, che confrontano i
+  dizionari INTERI fra server e client. `SINONIMI_CATEGORIA`,
+  `MODELLO_IMPORT` e l'albero sono facoltativi e nessuna prova li
+  pretende; ma se dài delle sottocategorie a una voce nuova, allora
+  ogni id vuole ANCHE le sue parole, o una prova diventa rossa.
+  ⚠️ `CAT_NOTA_APERTA` era l'UNICO elenco che nessuna prova incrociava
+  col catalogo — un refuso lì passava in CI — e dall'ago 2026 ha la sua.
+  ⚠️ E LA TRAPPOLA DEL COMMENTO: `prove.py` estrae la tupla per TESTO e
+  taglia alla PRIMA tonda chiusa, quindi in un commento dentro
+  `CATEGORIE` non ci vanno parentesi — la prova *esplode* invece di
+  fallire. Il commento del catalogo lo dichiara già.
+  Tutto il resto è DERIVATO e non si tocca: `SLUG_CATEGORIE`,
+  `SLUG_ILLUSTRAZIONI`, le pagine `/categoria/{slug}`, la sitemap, il
+  prompt della ricerca AI, quello di `ricategorizza.py` e la griglia
+  del bot leggono `CATEGORIE` a runtime e si aprono da sole.
   L'ALBERO DELLE SOTTOCATEGORIE (ago 2026): definito ora, mostrato
-  MAI — catalogo `SOTTOCATEGORIE` in server.py (86 sottovoci su 26
-  categorie, disegnato sui 46 annunci veri di produzione), DORMIENTE:
+  MAI — catalogo `SOTTOCATEGORIE` in server.py (102 sottovoci su 28
+  categorie: le prime 86 disegnate sui 46 annunci veri di produzione,
+  le 16 dei due reparti delle prestazioni sul MESTIERE, perché di
+  servizi non ne esisteva ancora nessuno), DORMIENTE:
   niente form, niente filtri, niente Sfoglia finché non si deciderà
   di accenderlo. Il patto, scritto anche nel commento del catalogo:
   id kebab-case PER SEMPRE e unici in TUTTO l'albero (un filtro senza
@@ -18273,6 +18363,44 @@ DA GUARDARE al primo giro vero: la prima lezione comprata dentro
 Telegram (proposta → conferma → «c'è stata» → sats sbloccati) e la
 prima disputa, dove la nota al moderatore è l'unica cosa su cui
 decide.
+
+
+E le prestazioni hanno i loro due reparti (ago 2026): «Lezioni e corsi»
+e «Lavoro e servizi» — DUE e non uno, decisione di Andrea, perché una
+lezione e una consulenza si cercano in due modi diversi. Le
+illustrazioni c'erano già, arrivate «in attesa» col commit delle tre
+figure nuove: erano asset ORFANI, e la rotta rispondeva 404 anche col
+file sul disco perché la whitelist si deriva da `CATEGORIE`. Quindi è
+stato un cantiere di solo CODICE — per la maggior parte copiare due
+voci in dieci elenchi che `prove.py` incrocia fra loro. Il perché di
+ognuna delle scelte (in coda prima di «Altro», ortogonali alla strada,
+fuori da CATEGORIE_SENZA_CONDIZIONE, l'albero scritto invece che
+lasciato piatto) sta in Architettura, «LEZIONI E CORSI E LAVORO E
+SERVIZI».
+Nello stesso giro lo SCAMBIO DELLE ICONE — 🎓 al reparto, che è
+l'emoji della sua illustrazione, e 📅 alla strada «servizio», che era
+già l'icona del suo flusso — e i TRE BUCHI di ieri: la card non aveva
+nessuna icona per un servizio, la scheda non aveva la pillola, e
+soprattutto `servizio_dove` e `durata_min` non uscivano da
+`CAMPI_VETRINA`: il venditore li dichiarava e chi compra non li vedeva
+mai, mentre la durata è metà del «definito» che il prompt pretende.
+Provato: 4617 prove verdi (+16, fra cui il censimento che vieta al 🎓
+di tornare a dire due cose — quel glifo non lo sorvegliava nessuno) e
+DICIANNOVE MUTAZIONI una per riga sorvegliata, ognuna rossa da sola.
+Il giudice silenzioso girato su 18 titoli veri delle due famiglie: 16
+giusti, i due generici che SI ASTENGONO, zero sbagliati. Dal vivo, le
+rotte che davano 404 danno 200 e la striscia passa a 30 card senza
+cambiare altezza — 157px a 320/360/375 nei due temi.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva — e «si aggiunge, non si rinomina», quindi nessun annuncio
+cambia casella. ⚠️ `ritaglia_categorie.py` NON va rilanciato: a secco
+dice «0 da sistemare», e con `--scrivi` ricomprimerebbe per niente
+tutti e trenta i francobolli.
+DA GUARDARE al primo giro: la coda «🗂 Categorie da sistemare», che
+`ricategorizza_automatico` riempie da sola dopo ogni import guardando
+gli importati e chiunque stia in «Altro» — è da lì che i primi annunci
+traslocheranno. Per i nativi già decisi in passato serve
+`ricategorizza.py --rifai` sul VPS, che è una scelta e non un deploy.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
