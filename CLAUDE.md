@@ -325,9 +325,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `messaggio_rifiuto` l'impersonazione si guarda PRIMA dei servizi, e
   non è l'ordine che capita: il motivo lo scrive l'AI con parole sue
   e può dire «finto servizio clienti», che col ramo dei servizi
-  davanti risponderebbe «i servizi non sono ancora supportati» a chi
-  ha appena provato a spacciarsi per noi (una prova nomina quel caso,
-  ed è l'unica che diventa rossa scambiando i rami).
+  davanti risponderebbe col messaggio dei servizi a chi ha appena
+  provato a spacciarsi per noi (una prova nomina quel caso, ed è
+  l'unica che diventa rossa scambiando i rami). Quel messaggio dall'ago
+  2026 non dice più «non ancora supportati» — le prestazioni si
+  vendono: vedi «I SERVIZI».
   `PAROLE_IMPERSONAZIONE` sono prefissi, e «fint» c'è perché «finto»
   NON è una declinazione di «finge» — l'ha detto una prova, non la
   lettura del codice. E «confond» è entrata ad ago 2026 da un caso
@@ -1436,10 +1438,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SPEDISCE, e una categoria «Digitale» con spedizione fisica è una
   contraddizione in vetrina. Ortogonale per costruzione al filtro
   «💾 Codice online»: la categoria dice cosa compri, il filtro come
-  arriva. I SERVIZI restano fuori (decisione presa: un buono per una
-  notte è una cosa che esiste, «ti sviluppo un bot» no) e la
-  moderazione non cambia — i buoni riscattabili presso il venditore
-  stesso restano DUBBIO. Terza voce delle CATEGORIE_SENZA_CONDIZIONE:
+  arriva. I SERVIZI restavano fuori (un buono per una notte è una cosa
+  che esiste, «ti sviluppo un bot» no) — ROVESCIATO ad ago 2026, vedi
+  «I SERVIZI»: si vendono, ma solo DEFINITI, e il confine è lo stesso
+  che qui rendeva OK il pacchetto B&B. La categoria però NON cambia: un
+  buono resta un buono, e una prestazione non ha ancora una casa sua
+  (dichiarato: si decide a rodaggio, quando si vedrà dove finiscono). Terza voce delle CATEGORIE_SENZA_CONDIZIONE:
   un buono è nuovo per definizione, anche la tessera fisica. Le due
   righe-voucher del MODELLO_IMPORT traslocano lì e perdono la cella
   condizione (insegnerebbe una cosa falsa, la regola del miele).
@@ -5091,13 +5095,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   TETTO_DIGITALE_NUOVI (compratore con acquisti_ok=0 oltre il tetto =
   400, sul solo articolo, in compra()) e DIGITALE_MIN_VENDITE
   (`guardia_venditore_digitale` in pubblica/modifica, riga scartata
-  nell'import CSV). SERVIZI ESCLUSI (decisione di prodotto, lug 2026):
-  Barattolo vende COSE che esistono, fisiche o digitali — il
-  PROMPT_MODERAZIONE vieta prestazioni e servizi («VIETATO: servizio»)
-  e whitelista i prodotti digitali leciti (buoni regalo, gift card,
-  codici sconto, licenze — nato dal buono Zalando bloccato per
-  errore); `messaggio_rifiuto(motivo)` mappa il no dell'AI sui servizi
-  al gentile MSG_RIFIUTO_SERVIZI («non ancora supportati»), 'servizi
+  nell'import CSV). I SERVIZI NON SONO PIÙ ESCLUSI (ago 2026, e questa
+  riga ROVESCIA la decisione di prodotto del lug 2026 che stava qui:
+  «Barattolo vende COSE che esistono, fisiche o digitali», col prompt
+  che vietava le prestazioni e `MSG_RIFIUTO_SERVIZI` che diceva «non
+  ancora supportati»). Il perché di allora resta vero e diventa il
+  CONFINE invece del divieto: l'escrow a consegna singola non regge un
+  lavoro senza fine — quindi si vendono le prestazioni DEFINITE, e il
+  su misura resta DUBBIO. Vedi «I SERVIZI». Il whitelisting dei
+  prodotti digitali leciti (buoni, gift card, codici, licenze — nato
+  dal buono Zalando bloccato per errore) non si tocca, e 'servizi
   sessuali' resta col messaggio severo di sempre. Frontend: casella
   «💾 Invio del codice online» in Vendi con hint screenshot datato
   («in disputa le prove decidono», ripetuto nel pannello di
@@ -5313,6 +5320,207 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   passa, e soprattutto il client di ieri che NON azzera niente — se un
   domani l'UPDATE torna incondizionato, quella riga MOSTRA il danno
   invece di descriverlo.
+  I SERVIZI (ago 2026, quinta voce di MODALITA_CONSEGNA; il caso che
+  apre sono le lezioni di inglese online in videoconferenza, poi
+  consulenze e prestazioni definite, anche IN PRESENZA). Il quadro
+  dell'escrow è stato deciso PRIMA della categoria, ed è la cosa che
+  mancava: i sats si sbloccano su un fatto che passa da noi (il
+  tracciamento, il codice nel nostro database), e una lezione avviene
+  su Meet — dentro Barattolo non c'è NIENTE.
+  LA FRASE CHE TIENE INSIEME TUTTO: **Barattolo non può giudicare se la
+  lezione c'è stata; può giudicare se le CONDIZIONI per farla
+  c'erano.** Tutto il resto discende da lì.
+  LE CINQUE DECISIONI DI ANDREA, che non si rediscutono: 1) a
+  dichiarare è il COMPRATORE e solo lui — nessun timer sposta sats;
+  2) l'appuntamento lo PROPONE il venditore e il compratore lo
+  CONFERMA, e finché non è confermato non parte nessuna finestra
+  (tetto `SERVIZIO_MAX_GIORNI`, 60); 3) in disputa a zero prove il
+  moderatore giudica le condizioni, non il fatto; 4) solo prestazioni
+  DEFINITE PRIMA; 5) online e in presenza, riusando la ZONA — nessun
+  indirizzo nuovo.
+  NESSUNO STATO NUOVO, E SI RESTA IN `locked`, ed è la scelta che porta
+  via metà del cantiere: il servizio va `locked → released` (o
+  `→ dispute`) e NON usa `shipped` né `delivered`. Quei due significano
+  «esiste una dichiarazione» e sono l'ancora di quattro SELECT che
+  erediteremmo senza volerle — compresi i due rami fisici di
+  `controlla_scadenze`, che al riarmo della leva col tracking
+  verificato sbloccherebbero **una lezione sulla parola del
+  venditore**. Restando in `locked` quelle quattro sono
+  IRRAGGIUNGIBILI, e la sentinella che già esiste («auto-sblocco: mai
+  dai locked senza dichiarazioni») lo garantisce per sempre: una prova
+  di correttezza gratis. I tre pezzi che servono c'erano già intonsi —
+  `conferma_ricezione` accetta `locked`, `_sblocca_sats` ha solo la
+  blacklist, `apri_disputa` accetta `locked`. ⚠️ Quindi `segna_spedito`
+  RIFIUTA il servizio con un ramo esplicito, gemello di quello
+  digitale: senza, un ordine servizio passerebbe tutte le sue guardie.
+  IL PATTO TRIPLICATO NON È ROTTO («mai un valore nuovo di
+  `consegna_scelta`»): quello riguarda i MODIFICATORI — `via_punto`,
+  `rete_punto`, `anche_digitale` — che appoggiano su una strada i cui
+  timer sono già giusti. Un servizio non è un modificatore: è
+  l'ASSENZA di strada, e i timer di tutte e quattro le strade esistenti
+  sono sbagliati per lui.
+  IL PROBLEMA DEI TIMER VOLEVA UN'ANCORA, NON UN TIMER: `_SQL_FERMI` si
+  ancora ad `appuntamento_il` sulla via servizio, e
+  `sollecita_servizi_fermi` nasce gemella di `sollecita_ritiri_fermi`
+  (bussa a ENTRAMBE le parti), in forma POSITIVA
+  (`AND o.consegna_scelta='servizio'`) e mai una negazione.
+  ⚠️ DA DICHIARARE PERCHÉ SEMBRA UN BUG: con l'ancora nel FUTURO un
+  ordine che aspetta una data SPARISCE dalla coda dei fermi finché
+  l'appuntamento non passa. È giusto — non è fermo, è in attesa — ma è
+  il contrario di quello che il commento di `_SQL_FERMI` raccomanda.
+  E `solleciti_appuntamento` è entrato in ENTRAMBI i `MAX(...)` di
+  `_SQL_FERMI`, o la coda direbbe «🔕 mai sollecitato» su righe bussate
+  tre volte — mentendo proprio sul campo che quel commento dichiara «il
+  più importante da vedere». Le tre negazioni esistenti guardate una
+  per una: i due rami fisici di `controlla_scadenze` (`NOT IN
+  ('digitale','servizio')`, la riga che protegge la decisione 1 al
+  riarmo della leva) e `sollecita_venditore` manuale, che era `!=
+  'ritiro'` — viva e su `locked` — quindi adottava il servizio subito e
+  gli scriveva «Ricorda al venditore DI SPEDIRE».
+  IL BUCO DEL LINK MORTO SI CHIUDE COL RIPETUTO, e non con un
+  contro-fatto del compratore (decisione di Andrea): «il link non
+  funzionava» è una dichiarazione di parte travestita da prova — noi
+  quel link non lo apriamo e non sappiamo se andava. Il RIPETUTO invece
+  è un fatto NOSTRO: la nota in `apri_disputa` dice TRE numeri del
+  venditore su questa via — quante dispute, quante VINTE (`released`),
+  quante perse (`refunded`) — tutti da forme già in casa (il conteggio
+  del compratore e `dispute_perse` dei distintivi). È il terzo a
+  smascherare il profilo: **cinquanta dispute VINTE per no-show sono
+  più sospette di cinquanta perse.**
+  MA IL RIPETUTO È SEQUENZIALE E LA TRUFFA È PARALLELA, ed è la
+  risposta alla domanda «e la prima volta?»: chi incassa cinquanta
+  lezioni lo fa PRIMA che la prima disputa sia decisa, e tutte e
+  cinquanta le note direbbero «zero dispute» dicendo il vero. A coprire
+  l'ondata è un asse diverso — non la ripetizione, la CONTEMPORANEITÀ:
+  `SERVIZIO_MAX_APERTI`, quanti ordini servizio aperti INSIEME può
+  avere chi non ha vendite concluse. Nasce SPENTA (0) come le due
+  gemelle del digitale, e non è nessuna delle due: `DIGITALE_MIN_VENDITE`
+  è una soglia per PUBBLICARE e `TETTO_DIGITALE_NUOVI` un tetto sul
+  COMPRATORE — questo è un tetto sulle partite aperte, l'unica forma
+  che morde su una raffica.
+  UN SERVIZIO = UNA EROGAZIONE, quindi `quantita` è bloccata a 1, e il
+  gate va DOVE SI SCRIVE LO STOCK e non dove si legge: cinque porte
+  sull'annuncio (`pubblica`, `ricarica_quantita`, `modifica`, la
+  MODIFICA FIRMATA degli importati — quella che si dimentica — e
+  l'import CSV). Sull'ordine NESSUNA, ed è la parte buona: il
+  carrello/set esclude il servizio GRATIS per costruzione
+  (`_compra_set` parte da `{"spedizione","ritiro"}`, un annuncio senza
+  nessuna delle due dà `sue = set()` → 400 «si compra da solo», come il
+  digitale), e stepper e quantità dell'accordo si limano già allo
+  stock.
+  IL GIUDICE UNICO DELLE STRADE è il prerequisito che il cantiere ha
+  pagato per primo, e NON era una funzione nuova: le sei righe che
+  costruiscono `disponibili` erano scritte A MANO in quattro posti
+  (`compra`, `_preventivo_mono`, `_strade_asta`, più il gemello JS
+  `stradeConsegna`). Dimenticarne uno vuol dire `disponibili = set()` →
+  `scelta = ''` → **l'ordine nasce sulla strada storica: nessun timer,
+  nessun sollecito, e `segna_spedito` lo accetta** — il silenzio
+  peggiore. Ora è `strade_annuncio(a)`, l'idioma di casa.
+  IL MODELLO: colonne additive (`annunci.durata_min`,
+  `annunci.servizio_dove` — `online`|`presenza`, che NON è un ornamento:
+  decide la guardia della zona) e su `ordini` l'appuntamento
+  (`appuntamento_il`, `_proposto_il`, `_confermato_il` — **0 = nessuna
+  finestra parte**, è il `busta_il` di questo cantiere —, `_proposte`,
+  `_mosso_il`), l'accesso (`accesso_testo` CIFRATO con
+  `_cifra_contenuto` e **mai in `/api/orders`**, `accesso_il`,
+  `_correzioni`, `_corretto_il`) e le due colonne del sollecito.
+  RIPROPORRE AZZERA LA CONFERMA, o si sposterebbe una data che l'altro
+  aveva già accettato; e il moderatore vede SE e QUANDO il collegamento
+  è stato lasciato, **mai il contenuto** (il patto della busta).
+  IL PROMPT NON HA TOLTO UN DIVIETO: ha spostato la lezione dal lato
+  del B&B. Il criterio «è stabilito PRIMA?» c'era già ed è quello che
+  rende OK il pacchetto soggiorno — adesso vale per la prestazione in
+  sé. Restano DUBBIO il su misura, il risultato che nessuno può
+  garantire (guadagni, posizionamenti) e ciò che vuole un titolo che
+  qui non si verifica (prestazioni mediche o legali). La coppia che
+  insegna il confine sono due annunci dello STESSO mestiere: «lezione
+  di inglese online, un'ora in videoconferenza» → OK, «ti sviluppo un
+  bot Telegram su misura, dimmi cosa ti serve» → DUBBIO, e il motivo
+  scritto è che non si sa DOVE FINISCE.
+  ⚠️ `collaudo_impersonazione.py` ha SEI casi nuovi in CODA (25 in
+  tutto): le sue sentinelle cercano l'esito in una finestra di 400/500
+  caratteri dopo il nome del caso, quindi spostare le voci esistenti le
+  rompe. VA RILANCIATO SUL VPS con la chiave vera — è l'unica cosa che
+  dice se il modello ha capito il confine nuovo.
+  COSA RESTA FUORI, dichiarato: sedute multiple e ricorrenze · il
+  servizio nei set (escluso gratis) e all'asta · `anche_servizio` ·
+  rimborsi parziali · QUALUNQUE auto-sblocco · la videochiamata dentro
+  Barattolo · il moderatore che legge il link · la contro-proposta del
+  compratore · un valore `delivery` nuovo su NIP-99 (la spec non ha
+  vocabolario) · la verifica automatica della presenza, gemella del
+  tracking via API corrieri già in backlog · e una CATEGORIA sua, che
+  si decide a rodaggio guardando dove finiscono.
+  IMPERFEZIONI DICHIARATE: in presenza il patto della disputa è più
+  DEBOLE (nessun link depositato da verificare: restano appuntamento e
+  zona) · il FUSO ORARIO — `appuntamento_il` è unix, e l'ora QUI È IL
+  PRODOTTO: si rende in locale nel client, ma le notifiche del server
+  passano dal suo `localtime` · e vendere prestazioni cambia il profilo
+  fiscale del venditore (DAC7 non ha, per i servizi personali, la
+  soglia de-minimis dei beni): una riga per il parere legale già in
+  backlog, non una riga di codice.
+  LE PAROLE DELLA NOTA SEGUONO LA STRADA (ago 2026, visto dal giro
+  visivo e non leggendo il codice): il campo «nota per il venditore»
+  diceva «taglia, numero, colore: quello che gli serve per prepararti
+  l'oggetto giusto» e «puoi cambiarla finché non spedisce» — su una
+  lezione la prima non vuol dire niente e la seconda non arriva MAI,
+  che lì l'ordine resta in `locked` fino alla conferma. Il campo è UNO
+  e adesso lo sono anche le parole: `invitoNota(servizio)` per i TRE
+  posti che le scrivono (segnaposto, cassa, ordine), o direbbero tre
+  cose diverse sullo stesso campo.
+  E LA REVISIONE INSEGNA INVECE DI DIRE SOLO NO (ago 2026, decisione di
+  Andrea): a chi scrive «ti sviluppo quello che ti serve», «un
+  moderatore lo controllerà» è vero e INUTILE — non dice cosa manca né
+  che, aggiustandolo, si può. `SERVIZIO_DEFINITO` dice la regola e la
+  fa vedere con la COPPIA, che è l'unica cosa che insegna un confine.
+  ⚠️ E DICE LA STRADA GIUSTA, CHE NON È «CORREGGILO»: un annuncio in
+  revisione NON si modifica (`modifica_annuncio` esige 'attivo', e in
+  /miei il bottone Modifica lì non c'è) — si RITIRA e si ripubblica. Un
+  consiglio che manda su una strada chiusa è peggio di nessun
+  consiglio. UN TESTO SOLO PER I DUE POSTI: il toast che si legge sul
+  momento (12 secondi, che quel testo si legge e non si sbircia) e la
+  RIGA CHE RESTA in «I tuoi annunci», dove uno torna il giorno dopo a
+  chiedersi perché è ancora fermo. La riga sta FUORI da `.mio-azioni`:
+  quella è flex-wrap e a 320px i due badge la riempiono già tutta.
+  L'AVVISO DEL RECUPERO WALLET (ago 2026, decisione di Andrea col
+  cantiere dei servizi): è la truffa più diffusa del bitcoin, e chi ci
+  casca ha già perso l'accesso ai suoi fondi — quindi è disperato, e
+  paga in anticipo. Ma **un avviso a chi COMPRA, non un blocco a chi
+  vende**: `promette_recupero_wallet(titolo, descrizione)` accende la
+  trust-note rossa in fondo alla scheda, e non impedisce niente.
+  PERCHÉ NON UN DIVIETO: i recuperi leciti ESISTONO e non sono rari —
+  la Ledger col PIN scordato ma la seed in mano (reset e restore), il
+  `wallet.dat` corrotto o con la password dimenticata (btcrecover fa
+  proprio quello), la parola della seed che manca. Vietarli fermerebbe
+  gente onesta per una parola, che è l'errore già pagato col
+  «barattolo» vaso di vetro.
+  E LA RIGA È VERA ANCHE SUL CASO LECITO, che è ciò che rende il falso
+  positivo GRATIS: a un corso sulla sicurezza dei wallet «senza le tue
+  chiavi nessuno può recuperarlo» non toglie niente — lo conferma.
+  Quindi il giudice può sbagliare LARGO senza costo, mentre sbagliare
+  stretto costa i fondi di qualcuno: è il verso di `FORME_TRACKING`, si
+  CHIEDE invece di impedire.
+  COME SI RICONOSCONO SENZA PRENDERE I CORSI, che è la domanda vera:
+  non dalla parola «wallet» né da «recupero», che da sole prendono
+  mezzo catalogo (una Jade «ripristinabile da seed», un recupero
+  crediti). Serve una CONGIUNZIONE A DISTANZA — un atto di
+  riacquisizione VICINO a un oggetto d'accesso — perché è così che la
+  promessa si scrive: «recupero wallet», «sblocco la tua seed», «riapro
+  il tuo exchange». Nella Jade quelle due parole ci sono tutt'e due ma
+  LONTANE, in frasi diverse, ed è la distanza a separarle.
+  `RECUPERO_VICINANZA` È MISURATA e non scelta a occhio: su otto
+  annunci-truffa scritti come si scrivono davvero, quindici leciti
+  (mezzo catalogo Bitcoin: Jade, Ledger resettata, corsi, nodi,
+  riparazioni PC) e gli 860 attivi del database di collaudo — 4 perde
+  «riottengo l'accesso al tuo portafoglio bitcoin» (cinque parole in
+  mezzo), **5 le prende tutte e otto**, e da lì in su l'unico che
+  accende in più è un corso Bitcoin, cioè il falso positivo gratis. Sul
+  catalogo vero: ZERO. Chi ritocca quel numero lo RIMISURI così.
+  Dal server esce un BOOL (`avviso_wallet` in
+  `arricchisci_righe_vetrina`, il collo di bottiglia) e mai le parole,
+  che stanno nel client come ogni altra trust-note; il client non rifà
+  il giudizio, e un server di ieri non manda il campo — nessuna riga,
+  cioè un'assenza e non una bugia. ROSSA e non ambra: qui non c'è un
+  ritardo, c'è una cosa che si perde e non torna.
   Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
   la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
   con al massimo UNA controproposta. Tabella `offerte` (annuncio,
@@ -18024,6 +18232,47 @@ rotta delle illustrazioni allarga la whitelist di una voce). DA FARE:
 tutto.webp non è ancora nel repo — quando Andrea lo mette,
 ritaglia_categorie.py --scrivi e la prova d'esistenza in prove.py;
 fino ad allora la card mostra l'emoji di ripiego.
+
+
+Da oggi Barattolo vende anche i SERVIZI (ago 2026): lezioni,
+consulenze, prestazioni definite — online o in presenza. Il quadro
+dell'escrow è stato deciso PRIMA della categoria, ed è la cosa che
+mancava: su una lezione il fatto su cui i sats si sbloccano non esiste
+dentro Barattolo. La frase che tiene insieme tutto: **non possiamo
+giudicare se la lezione c'è stata, possiamo giudicare se le CONDIZIONI
+per farla c'erano** — appuntamento concordato da tutti e due,
+collegamento lasciato in tempo, e sono fatti che restano scritti qui.
+Le cinque decisioni di Andrea, il modello a zero stati nuovi (si resta
+in `locked`, e quello rende IRRAGGIUNGIBILI i due rami fisici
+dell'auto-sblocco), il buco del link morto chiuso col RIPETUTO invece
+che con una prova che non abbiamo, e le imperfezioni dichiarate stanno
+in Architettura, «I SERVIZI».
+Provato: 4601 prove verdi (le nuove comprendono la nota al moderatore
+girata DAVVERO su un database di cartone — una sentinella dice che le
+righe ci sono, solo girandola si vede cosa legge chi decide) più venti
+mutazioni una per riga sorvegliata, ognuna rossa da sola; e il giro
+visivo via CDP a 320/360/375 nei due temi sui due ruoli — scheda,
+form, i quattro pannelli dell'ordine — dove niente sborda.
+Nello stesso giro tre testi che il cantiere rendeva falsi: le parole
+della NOTA su una prestazione, il messaggio della REVISIONE che adesso
+insegna il perimetro invece di dire solo no (decisione di Andrea), e
+l'AVVISO DEL RECUPERO WALLET a chi compra — un avviso, mai un blocco a
+chi vende, con la distanza fra le parole MISURATA sui casi veri e zero
+falsi positivi sugli 860 annunci del collaudo.
+IN PRODUZIONE il deploy fa girare le migrazioni additive (due colonne
+su `annunci`, undici su `ordini`, tutte a 0/'') e **non cambia
+niente**: `SERVIZI_ATTIVI` nasce FALSE nel codice, come
+IMPORT_NOSTR_APERTO e per la stessa ragione — la si accende dal config
+del VPS con un gesto, guardando il primo giro. `SERVIZIO_MAX_APERTI`
+nasce a 0 (spenta) e si alza solo se in rodaggio si vede una raffica.
+DA FARE PRIMA DI ACCENDERE, ed è il pezzo che in locale non si può
+fare: `python collaudo_impersonazione.py` sul VPS con la chiave vera —
+i sei casi nuovi dicono se il modello ha capito il confine
+definito/su misura, e l'atteso segue il PROMPT, mai il modello.
+DA GUARDARE al primo giro vero: la prima lezione comprata dentro
+Telegram (proposta → conferma → «c'è stata» → sats sbloccati) e la
+prima disputa, dove la nota al moderatore è l'unica cosa su cui
+decide.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
