@@ -456,6 +456,30 @@ NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 # `python importa_nostr.py`, che usa NPUB_VENDITORE / VENDITORE_ID).
 IMPORT_NOSTR_APERTO = False
 
+# --- Il trasloco degli annunci su Nostr -------------------------------
+# Un annuncio pubblicato da chi NON aveva ancora una chiave Nostr sua
+# esce in piazza firmato da BARATTOLO. Il giorno che quel venditore la
+# chiave la dimostra (entra con Nostr, collega, abilita l'accesso o
+# verifica la npub), gli annunci di ieri resterebbero intestati a NOI
+# per sempre — il contrario di quel che il bivio esiste per dire.
+# Questo giro li porta da lui: prima nasce il suo evento, POI muore il
+# nostro, cosi' l'annuncio non sparisce mai dalla piazza.
+#
+# Nasce ACCESA, al contrario di IMPORT_NOSTR_APERTO: il deploy da solo
+# non cancella NIENTE dai relay. Il giro accoda soltanto una firma, e
+# la cancellazione del nostro evento parte dopo che l'utente ha firmato
+# dal SUO browser — cioe' dopo un suo gesto, che puo' anche non fare.
+# Resta un interruttore perche' cio' che si cancella dai relay non si
+# disfa: se qualcosa va storto, False e riavvia.
+# ⚠️ La nota kind-1 (Barattolo che RACCONTA l'annuncio ai suoi lettori,
+# il gemello del post nel canale) non trasloca: quella resta nostra.
+TRASLOCO_NOSTR = True
+# Quanti annunci per giro d'orologio. Il primo giro dopo il deploy
+# passa sul PREGRESSO, e ogni riga diventa una richiesta di firma a un
+# venditore vero: il tetto e' quel che lo spalma invece di chiedere a
+# qualcuno venti firme in una volta.
+MAX_TRASLOCO_GIRO = 200
+
 # --- Categorie proposte da sola (la coda dei moderatori) --------------
 # Dopo ogni giro d'import l'AI guarda gli annunci arrivati dai relay (e
 # chiunque sia rimasto in "Altro") e propone dove starebbero meglio: le
