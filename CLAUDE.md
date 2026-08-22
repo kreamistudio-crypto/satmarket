@@ -2287,20 +2287,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Esplora e Vendi») e quella nuova «dello spaziatore non resta
   niente» conta il nome OVUNQUE, commenti compresi: la lapide CSS non
   lo nomina apposta (ci si è inciampati scrivendola).
-  IMPERFEZIONE DICHIARATA, MISURATA PRIMA E DOPO: in topbar desktop la
-  pillola «P2P» pesa 88px e riapre il difetto dichiarato dello sbordo
-  — prima del tasto il logo a 768px sforava di soli 5px (i cantieri
-  successivi alla misura storica l'avevano di fatto riassorbito), col
-  tasto esce dal bordo SINISTRO di 99px e si legge «tolo⚡» fino a
-  ~867px (a 880 rientra). La manifestazione è il logo che scivola
-  fuori a sinistra (flex-end con contenuto più largo), non uno
-  scrollbar: `scrollWidth` non lo vede, si misura col
-  `getBoundingClientRect` del logo. Non curato QUI (il piano
-  approvato lo dichiara): la leva nota resta le sole icone sotto
-  ~900px, e una cura da una riga sarebbe far cedere il TESTO del
-  lockup in quella fascia tenendo la tessera — al contrario del
-  mobile sotto i 360, dove cede la tessera, perché qui i 51px del
-  solo barattolo non basterebbero.
+  E LA FASCIA STRETTA DELLA TOPBAR È CURATA (decisione di Andrea, il
+  giorno stesso, davanti al numero): la pillola «P2P» pesa 88px e
+  RIAPRIVA il difetto dichiarato dello sbordo — prima del tasto il
+  logo a 768px sforava di soli 5px (i cantieri successivi alla misura
+  storica l'avevano di fatto riassorbito), col tasto usciva dal bordo
+  SINISTRO di 99px e si leggeva «tolo⚡» fino a ~867px. La
+  manifestazione è il logo che scivola fuori a sinistra (flex-end con
+  contenuto più largo), non uno scrollbar: `scrollWidth` non lo vede,
+  si misura col `getBoundingClientRect` del logo. La cura: fra 768 e
+  899px il TESTO del lockup CEDE e resta la tessera del barattolo —
+  al CONTRARIO del mobile sotto i 360, dove cede la tessera e resta
+  il lockup («il marchio vero»), perché qui i 51px del solo barattolo
+  non bastavano e servivano i ~121 del testo. Misurato dopo: logo a
+  16px dal bordo su tutta la fascia, e al filo esatto 899 cede /
+  900 torna intero, sempre a 16px. Aria-label e title restano sul
+  `.nav-logo`, quindi il nome non si perde; c'è la sentinella sulla
+  media query, e chi la allarga o la stringe rilegga i due numeri
+  del filo. La «leva standard da tablet» (sole icone sotto ~900px)
+  resta la strada se un giorno le voci crescessero ancora.
   LE ICONE SONO NOSTRE (lug 2026): tre SVG al posto delle emoji
   🛍️🗂️🤝, che cambiavano forma da un telefono all'altro e non
   seguivano i token del tema — LENTE per Esplora, PIASTRELLE per
@@ -14408,7 +14413,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `view-esplora`, quindi è dove vivono già i suoi due fratelli — ed è
   dove serve, perché è lì che si mette roba nel barattolo. Da desktop
   la topbar c'è ovunque.
-  DIFETTO PREESISTENTE DICHIARATO E NON CURATO (decisione di Andrea):
+  DIFETTO PREESISTENTE DICHIARATO E NON CURATO (decisione di Andrea)
+  [CURATO dall'ago 2026 col tasto P2P, che l'aveva riaperto: nella
+  fascia 768-899 il testo del lockup cede e resta la tessera — vedi
+  «E LA FASCIA STRETTA DELLA TOPBAR È CURATA». La voce resta per i
+  numeri e per la leva di riserva]:
   **la topbar desktop sborda di ~82px fra 768 e ~850px** di larghezza —
   otto elementi che non si stringono (logo 175 + cinque voci + levetta
   + tappo = ~818 contro 736 disponibili a 768px), difetto nato quando
@@ -18824,8 +18833,10 @@ col teaser vago. Radice sorella sul calco di astepresto, zero server,
 zero leve; il cantiere vero (scambio euro↔bitcoin fra utenti) è un
 altro. Vedi Architettura, «IL TASTO P2P», per le due trappole delle
 sentinelle (la regex senza cifre, la fessura di RADICI ancorata alla
-chiusura del Set) e per lo sbordo della topbar 768-867 che si riapre,
-misurato prima e dopo. Collaudato: 4721 prove verdi, tortura a 12
+chiusura del Set) e per la fascia stretta della topbar — la pillola
+riapriva lo sbordo del logo a 768-867, e nella fascia 768-899 il testo
+del lockup ora CEDE tenendo la tessera (decisione di Andrea, misurata
+prima e dopo). Collaudato: 4722 prove verdi, tortura a 12
 mutazioni tutte uccise — comprese le due che con le finestre fisse di
 ieri sarebbero rimaste verdi — e il giro dal vivo via CDP: centro del
 ＋ esatto alle tre larghezze (160,0/180,0/187,5), voce accesa nei due
