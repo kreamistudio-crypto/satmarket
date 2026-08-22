@@ -3732,6 +3732,20 @@
     .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}
   }
 
+  /* LA FASCIA STRETTA DELLA TOPBAR (ago 2026, decisione di Andrea col
+     tasto P2P): fra 768 e ~900px la topbar non tiene tutto — con la
+     justify-content:flex-end a uscire dal bordo SINISTRO era il LOGO,
+     di 99px a 768 (misurato: si leggeva «tolo⚡»). A cedere e' il
+     TESTO del lockup, resta la tessera del barattolo — al CONTRARIO
+     del mobile sotto i 360, dove cede la tessera e resta il lockup
+     («il marchio vero»): qui i 51px del solo barattolo non
+     basterebbero, servivano i ~121 del testo. Da 900 in su il logo
+     intero sta comodo (bordo a 16px, misurato) e torna da solo.
+     Aria-label e title restano sul .nav-logo: il nome non si perde. */
+  @media (min-width:768px) and (max-width:899px){
+    .nav-logo .lockup{display:none}
+  }
+
   /* ==================== DESKTOP LARGO (≥1024px) ==================== */
   @media (min-width:1024px){
     #app{max-width:1160px}

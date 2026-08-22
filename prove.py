@@ -17028,6 +17028,16 @@ def prove_seo():
     _fv = testo_mini.index('id="view-p2ppresto"')
     prova("la vista P2P e' markup fisso, senza interpolazioni", False,
           "${" in testo_mini[_fv:testo_mini.index("============", _fv)])
+    # LA FASCIA STRETTA DELLA TOPBAR (decisione di Andrea): fra 768 e
+    # ~900 il testo del lockup cede e resta la tessera — senza, la
+    # pillola P2P spingeva il logo fuori dal bordo sinistro di 99px e
+    # si leggeva «tolo⚡». La regola vive nella sua media query, e
+    # deve restare quella: piu' larga mangerebbe il marchio dove sta
+    # comodo, piu' stretta lo rimetterebbe fuori dal bordo.
+    _if = testo_mini.index(
+        "@media (min-width:768px) and (max-width:899px)")
+    prova("nella fascia stretta il lockup cede", True,
+          ".nav-logo .lockup{display:none}" in testo_mini[_if:_if + 120])
 
     # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
     # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa
