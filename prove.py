@@ -21067,20 +21067,34 @@ def prove_scoprire():
     def _anim(sel):
         _r = mini[mini.index(sel):]
         return _r[:_r.index("}")]
-    prova("la sveglia squilla e la scatola respira", (True, True),
-          ("sc-squillo" in _anim('.scoprire-card[data-id="lampo"] img{'),
+    prova("la sveglia ondeggia e la scatola respira", (True, True),
+          ("sc-onda" in _anim('.scoprire-card[data-id="lampo"] img{'),
            "sc-respiro" in _anim('.scoprire-card[data-id="sconto"] img{')))
+    # L'ONDA E' LENTA E CONTINUA (ago 2026, decisione di Andrea che
+    # ROVESCIA lo squillo della nascita: il fremito, guardato dal
+    # vivo, dava fastidio — troppo di scatto): da -0.8° a +0.8° e
+    # ritorno, MAI un fotogramma di riposo — rotate(0) e' esattamente
+    # cio' che un ritocco «di quiete» rimetterebbe, e con lui il moto
+    # torna a partire e fermarsi.
+    _onda = mini[mini.index("@keyframes sc-onda"):
+                 mini.index("@keyframes sc-respiro")]
+    prova("l'onda non passa mai dal riposo", False, "rotate(0)" in _onda)
     # IL FONDO NON SI SCOPRE MAI, ed e' aritmetica: con l'origine al
-    # centro uno scale>=1 puo' solo ritagliare, e il fremito ruota
-    # un'immagine gia' ingrandita del 7%. Niente translate e niente
+    # centro uno scale>=1 puo' solo ritagliare, e l'onda ruota
+    # un'immagine gia' ingrandita del 5%. Niente translate e niente
     # scale sotto 1 nei due keyframes. (L'ancora di chiusura e' la
     # riserva e non la riga del reduce: quella la muove la mutazione
     # A3, e una prova che ESPLODE si porta via le sorelle.)
-    _kf = mini[mini.index("@keyframes sc-squillo"):
+    _kf = mini[mini.index("@keyframes sc-onda"):
                mini.index(".sc-riserva{")]
     prova("il fondo non si scopre: mai sotto scale(1), mai translate",
           (False, False, True),
-          ("scale(0" in _kf, "translate" in _kf, "scale(1.07)" in _kf))
+          ("scale(0" in _kf, "translate" in _kf, "scale(1.05)" in _kf))
+    # e l'anello della card accesa ha l'ARIA per il bordo di sotto:
+    # outline 2.5 + offset 2 = 4.5px, e col padding a 2 l'overflow
+    # della striscia lo ritagliava (visto da Andrea)
+    prova("l'anello ha l'aria per il bordo di sotto", True,
+          "padding:8px var(--pad) 6px}" in mini)
     # lo spegnimento deve VINCERE per specificita': col selettore nudo
     # perdeva contro [data-id="lampo"] img e i disegni si muovevano
     # anche in reduced-motion — la sentinella diceva che la regola

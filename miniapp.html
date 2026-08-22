@@ -826,9 +826,15 @@
      striscia, e la divergenza da .cat-strip e' voluta: le card
      spariscono quando non c'e' l'occasione, e uno spazio riservato
      per una cosa assente sarebbe un buco. */
+  /* Il padding di sotto e' 6 e non i 2 della .cat-strip, e non e'
+     un vezzo: l'anello .attiva (outline 2.5 + offset 2 = 4.5px)
+     sporge sotto il bordo della card, e l'overflow della striscia lo
+     RITAGLIAVA — il bordo basso dell'anello non si vedeva (ago 2026,
+     visto da Andrea). Alle categorie non succede perche' li' sotto
+     il quadrato c'e' l'etichetta. */
   .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
-    padding:8px var(--pad) 2px}
+    padding:8px var(--pad) 6px}
   .scoprire-strip::-webkit-scrollbar{display:none}
   .scoprire-card{flex:0 0 auto;position:relative;width:250px;
     aspect-ratio:250/115;border-radius:14px;overflow:hidden;
@@ -847,28 +853,27 @@
      costruzione, e a muoversi e' la sola immagine dentro
      l'overflow:hidden, che la ritaglia). OGNI CARD HA IL SUO
      MOVIMENTO, dal soggetto del disegno: la SVEGLIA delle offerte a
-     tempo SQUILLA — un fremito di rotazione di mezzo secondo ogni
-     quattro, mai un tremolio continuo che friggerebbe in vetrina — e
-     la scatola degli sconti RESPIRA, uno zoom lento e ampio.
+     tempo ONDEGGIA — lento, continuo, appena percettibile (ago 2026,
+     decisione di Andrea che ROVESCIA lo squillo della nascita: il
+     fremito di rotazione, guardato dal vivo, dava fastidio — troppo
+     di scatto; MAI riproporre un movimento a scatti qui) — e la
+     scatola degli sconti RESPIRA, uno zoom lento e ampio.
      IL FONDO NON SI SCOPRE MAI, ed e' aritmetica e non speranza: con
      l'origine al centro uno scale>=1 puo' solo ritagliare, mai
-     scoprire, quindi il respiro parte da scale(1); e il fremito
-     ruota un'immagine GIA' ingrandita del 7% — la rotazione di 1.4°
-     scopre negli angoli ~3px (250/2 x sin 1.4°), il 7% ne copre 4 sul
-     lato corto. Chi alza i gradi rifa' quel conto.
-     (Le forme sono proposte sulle DESCRIZIONI dei disegni — i file
-     li deve ancora consegnare Andrea: si ritarano guardandoli.) */
+     scoprire, quindi il respiro parte da scale(1); e l'onda ruota
+     un'immagine GIA' ingrandita del 5% — la rotazione di 0.8° scopre
+     negli angoli ~1.8px (250/2 x sin 0.8°), il 5% ne copre quasi 3
+     sul lato corto. Chi alza i gradi rifa' quel conto. */
   .scoprire-card[data-id="lampo"] img{
-    animation:sc-squillo 4s linear infinite}
+    animation:sc-onda 5s ease-in-out infinite}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
-  @keyframes sc-squillo{
-    0%{transform:scale(1.07) rotate(0)}
-    3%{transform:scale(1.07) rotate(1.4deg)}
-    6%{transform:scale(1.07) rotate(-1.4deg)}
-    9%{transform:scale(1.07) rotate(1deg)}
-    12%{transform:scale(1.07) rotate(-.6deg)}
-    15%,100%{transform:scale(1.07) rotate(0)}
+  /* l'onda non passa MAI dal riposo: da -0.8° a +0.8° e ritorno,
+     sempre in moto, mai un fotogramma fermo — e' cio' che la rende
+     continua invece che «a scatti» */
+  @keyframes sc-onda{
+    0%,100%{transform:scale(1.05) rotate(-.8deg)}
+    50%{transform:scale(1.05) rotate(.8deg)}
   }
   @keyframes sc-respiro{
     0%,100%{transform:scale(1)}
