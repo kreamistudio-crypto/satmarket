@@ -196,6 +196,30 @@ FERIE_ATTIVE = True          # interruttore generale (False = spento)
 FERIE_MAX_GIORNI = 90        # quanto in la' puo' stare la data di rientro
 FERIE_PREAVVISO_ORE = 24     # «domani riapri» (0 = nessun promemoria)
 
+# --- Il banner del negozio -------------------------------------------
+# L'insegna che il venditore appende sopra il suo catalogo: una foto e
+# un link al suo sito. Vive SOLO sulla pagina del suo negozio.
+# NASCE SPENTO, come SERVIZI_ATTIVI e ASTA_ABILITATA, e la ragione e'
+# il LINK: e' la prima volta che Barattolo apre un indirizzo scritto da
+# un utente davanti a un ALTRO utente. Si accende con un gesto qui,
+# guardando il primo giro, mai per effetto di un deploy.
+# Ogni banner — e ogni sua modifica — passa comunque da un MODERATORE:
+# l'AI di casa legge testo e un banner e' un'immagine, quindi li' non
+# ci sarebbe niente da leggere.
+BANNER_NEGOZIO_ATTIVO = False   # interruttore generale (False = spento)
+# Il gradino che apre la porta: «avviato» = 150 XP e un affare
+# concluso. Con «pratico» (600 XP e 5 affari) oggi non ce l'avrebbe
+# quasi nessuno e la funzione nascerebbe morta.
+# I gradini sono: nuovo · avviato · pratico · esperto · maestro.
+BANNER_LIVELLO = "avviato"
+# Gli accorciatori, ed e' la riga che regge la moderazione del link: un
+# «bit.ly/xyz» si approva pulito e domani punta altrove, quindi il link
+# dev'essere ISPEZIONABILE. Match sul dominio, sottodomini compresi.
+BANNER_LINK_VIETATI = (
+    "bit.ly", "t.co", "tinyurl.com", "is.gd", "cutt.ly", "ow.ly",
+    "buff.ly", "rebrand.ly", "short.io", "rb.gy", "t.ly", "lnkd.in",
+    "shorturl.at", "s.id", "bl.ink", "tiny.cc", "shorte.st")
+
 # --- La ronda del libro mastro ---------------------------------------
 # Una volta al giorno l'orologio ripassa gli INVARIANTI del database
 # (l'aritmetica degli ordini, la cassa delle aste chiuse, la forma di

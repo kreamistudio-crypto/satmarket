@@ -2659,6 +2659,40 @@
   .stars{color:var(--sats);letter-spacing:1px}
   .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
 
+  /* L'INSEGNA DEL NEGOZIO (ago 2026): la foto che il venditore appende
+     sopra il suo catalogo, dentro il rientro di #negozioHeader come
+     tutto il resto — e il rientro e' un PREGIO, non un ripiego: dice
+     che e' una cosa SUA e non una superficie di casa (le card «Da
+     scoprire» sono rientrate anche loro).
+     IL RAPPORTO E' FISSO 3:1 e non un'altezza libera: la testata del
+     negozio e' gia' lunga (226px misurati nel caso minimo, ~618 nel
+     tipico prima della prima card) e un banner che cresce col disegno
+     la spingerebbe dove nessuno arriva. A 360px fa ~109px.
+     NON E' UN <a href>, ed e' la riga da non ammorbidire: e' un
+     role=button che passa da apriLinkBanner, cosi' non esiste un href
+     su cui un target=_blank possa scavalcare la conferma d'uscita, e
+     non c'e' nessun URL da scappare dentro un attributo. */
+  .negozio-banner{position:relative;display:block;width:100%;
+    aspect-ratio:3/1;margin:0 0 6px;border:0;padding:0;
+    border-radius:var(--radius);overflow:hidden;
+    background:var(--cat-fondo);cursor:pointer}
+  .negozio-banner:active{transform:translateY(1px)}
+  .negozio-banner img{position:absolute;inset:0;width:100%;height:100%;
+    display:block;object-fit:cover}
+  /* Il ripiego quando la foto non arriva: FRATELLO ADIACENTE dell'img,
+     la lezione gia' pagata due volte (l'emoji delle categorie chiusa
+     dentro un altro span, e .sc-riserva). Se si separano, la regola
+     che lo spegne non matcha piu' e il ripiego resta SOPRA la foto. */
+  .ban-riserva{position:absolute;inset:0;display:flex;
+    align-items:center;justify-content:center;color:#FAF4E4;
+    font-size:13px;font-weight:800}
+  .negozio-banner img + .ban-riserva{display:none}
+  /* IL DOMINIO SI VEDE SEMPRE: un'insegna che nasconde dove porta e'
+     il difetto. Discreta, sotto, e ripete quel che dira' il foglio
+     della conferma — chi tocca sa dove va prima e durante. */
+  .ban-dominio{display:flex;align-items:center;gap:5px;
+    margin:0 0 14px;font-size:11.5px;font-weight:700;color:var(--muted)}
+
   .trust-note{
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
     padding:12px 14px;font-size:13px;color:var(--trust);font-weight:600;margin-bottom:16px;
@@ -4954,6 +4988,15 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accFerie">
         <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="ferieBlocco"></div></div>
+      </div>
+
+      <!-- Il banner del negozio (ago 2026): l'insegna sopra il
+           catalogo, una foto e un link al proprio sito. Ogni banner —
+           e ogni sua modifica — passa da un moderatore: qui dentro
+           si carica e si vede a che punto sta. -->
+      <div class="acc" id="accBanner">
+        <button class="acc-h" onclick="toggleAcc('accBanner')"><span class="em">🖼</span>Banner del negozio <span class="conta" id="bannerConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="bannerBlocco"></div></div>
       </div>
 
       <div class="acc" id="accRicerche" style="display:none">
@@ -8643,6 +8686,51 @@ function apriDistintiviSheet(){
   el('distintiviSheet').classList.add('open');
 }
 
+/* L'INSEGNA DEL NEGOZIO. Qui non si giudica NIENTE: il server manda
+   `banner` solo quando c'e' davvero qualcosa da mostrare — approvato,
+   acceso, e con almeno un annuncio in vetrina — e il client disegna e
+   basta. Chiave assente = server di ieri, e un'assenza non e' una
+   bugia.
+   L'URL non compare da nessuna parte nel markup, ne' in un href ne'
+   dentro l'onclick (il patto di linkCanaleTest): il tocco chiama una
+   funzione che va a leggerselo da `negozioCorrente`, che renderNegozio
+   ha appena scritto. */
+function bannerNegozio(v){
+  const b = v && v.banner;
+  if (!b || !b.foto || !b.link) return '';
+  return `<button type="button" class="negozio-banner"
+      aria-label="Vai su ${esc(b.dominio)}, il sito del venditore"
+      onclick="apriLinkBanner()"
+    ><img src="${esc(fotoUrl(b.foto))}" alt="" loading="lazy"
+          decoding="async" onerror="this.remove()"
+    ><span class="ban-riserva" aria-hidden="true">${esc(b.dominio)}</span
+    ></button>
+    <div class="ban-dominio">🔗 <span>${esc(b.dominio)}</span></div>`;
+}
+
+/* L'USCITA da Barattolo, e si CHIEDE prima. Il dominio sta nella
+   TESTATA del foglio, in grande: chi tocca deve sapere dove va, ed e'
+   l'unica cosa che rende onesto tutto il resto — un inganno del genere
+   vive sul fatto che chi tocca non guarda.
+   Poi il pattern di casa per uscire (apriMappaPunti, apriCanaleTest):
+   tg.openLink dentro Telegram, window.open con noopener fuori — un
+   <a target="_blank"> nella WebView di certi client non apre niente. */
+function apriLinkBanner(){
+  const b = negozioCorrente && negozioCorrente.banner;
+  if (!b || !b.link) return;
+  chiediConferma({
+    titolo: 'Esci da Barattolo?',
+    testata: `🔗 <b>${esc(b.dominio)}</b>`,
+    corpo: 'Questo sito non è di Barattolo e non lo controlliamo noi. '
+         + 'Quello che compri o scrivi lì non è protetto dal deposito '
+         + 'di garanzia.',
+    etichetta: 'Esci da Barattolo',
+    poi: () => {
+      if (tg?.initData && tg.openLink) tg.openLink(b.link);
+      else window.open(b.link, '_blank', 'noopener');
+    }});
+}
+
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   negozioCorrente = v;
   /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
@@ -8709,6 +8797,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
         <div class="rep">${rep}</div>
       </div>
     </div>
+    ${bannerNegozio(v)}
     ${ponti}
     ${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
@@ -17038,6 +17127,11 @@ let myInvitoCorrieri = 0, invitoCorrieriMax = 0;
    Le leve (attive, tetto in giorni) arrivano dal server come tutte le
    altre — il client non ne tiene una copia a memoria. */
 let myFerieFino = 0, ferieLeve = null;
+/* Il banner del negozio: quel che il server dice del MIO (compreso
+   cio' che aspetta una decisione e il motivo di un rifiuto — e' il
+   mio profilo) e le sue leve. `bannerScelta` e' la foto appena scelta
+   e non ancora spedita, che vive solo qui e mai nel DOM. */
+let myBanner = null, bannerLeve = null, bannerScelta = '';
 /* Lo sconto sul carrello: la regola attiva ({soglia, percento} o null)
    e le leve del server. Come le ferie: chiave assente = server di ieri
    = cassetto assente. La BOZZA e' la scelta in corso — le pillole
@@ -17641,6 +17735,7 @@ function renderIdentita(){
   renderSpedGratis();
   renderCodici();
   renderFerie();
+  renderBanner();
   renderRicerche();
 }
 
@@ -18670,6 +18765,157 @@ async function setFerie(riapri){
   toast(myFerieFino
     ? `🌴 Negozio chiuso: riapre il ${ferieData(myFerieFino)}`
     : '☀️ Bentornato: i tuoi annunci sono di nuovo comprabili');
+}
+
+/* ---- «🖼 Banner del negozio» (ago 2026) ----
+   L'insegna sopra il catalogo: una foto e un link al proprio sito.
+   OGNI banner, e ogni sua MODIFICA, passa da un moderatore — e mentre
+   il nuovo aspetta, quello gia' approvato resta acceso in vetrina.
+   Il cassetto sparisce se la leva e' spenta o in DEMO (il patto del
+   wallet), e il 400 si rende QUI DENTRO come per le ferie: i motivi
+   del link sono frasi, e una frase in un toast si legge male. */
+const BANNER_STATI = {
+  revisione: 'in attesa di approvazione',
+  attivo: 'in vetrina',
+  rifiutato: 'non approvato',
+  spento: 'spento da un moderatore',
+};
+function renderBanner(){
+  const box = el('bannerBlocco');
+  if (!box) return;
+  const sez = el('accBanner');
+  if (DEMO || VETRINA || !(bannerLeve && bannerLeve.attivo)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const b = myBanner || {};
+  el('bannerConta').textContent = BANNER_STATI[b.stato] || '';
+  /* LA PORTA CHIUSA SI DICE, non si nasconde: chi non ha ancora il
+     livello deve sapere che il banner esiste e come si apre, o non
+     scoprirebbe mai la funzione. */
+  if (!bannerLeve.porta_aperta){
+    box.innerHTML = `
+      <div class="trust-note" style="margin-bottom:0">🔒 <span>Il banner
+        si sblocca quando il tuo negozio si avvia: serve almeno
+        <b>un affare concluso</b>. È l'insegna che puoi appendere sopra
+        il tuo catalogo — una foto e il link al tuo sito.</span></div>`;
+    return;
+  }
+  const vivo = b.stato === 'attivo' && b.foto;
+  const attesa = b.stato === 'revisione' && b.fotoAtt;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Un'immagine e il link al tuo sito, sopra il catalogo del tuo
+      negozio. La guarda un moderatore prima che vada online — e se
+      cambi qualcosa, quello di adesso <b style="color:var(--ink)">resta
+      in vetrina</b> finché il nuovo non è approvato.</div>
+    ${vivo ? `
+      <div style="margin-top:12px">
+        <img src="${esc(fotoUrl(b.foto))}" alt=""
+             style="width:100%;aspect-ratio:3/1;object-fit:cover;border-radius:var(--radius);display:block"
+             onerror="this.remove()">
+        <div class="ban-dominio" style="margin-top:6px">🔗 <span>${esc(b.dominio)}</span></div>
+      </div>` : ''}
+    ${attesa ? `
+      <div class="trust-note" style="margin-top:12px">⏳ <span>Il banner
+        che hai caricato è in attesa: lo guarda un moderatore, di solito
+        entro qualche ora. Porta su <b>${esc(b.dominioAtt)}</b>.</span></div>` : ''}
+    ${b.stato === 'rifiutato' || b.stato === 'spento' ? `
+      <div class="trust-note" style="margin-top:12px">⚠️ <span>${
+        b.stato === 'spento'
+          ? 'Un moderatore ha spento il tuo banner.'
+          : 'Il banner non è stato approvato.'
+      }${b.motivo ? ' ' + esc(b.motivo) : ''} Puoi caricarne un altro qui
+        sotto.</span></div>` : ''}
+    <div id="bannerErrore"></div>
+    <div class="field" style="margin-top:12px">
+      <label for="bannerLink">Il link del tuo sito</label>
+      <input type="url" id="bannerLink" placeholder="https://ilmiosito.it"
+             inputmode="url" autocomplete="off" maxlength="300">
+    </div>
+    <div class="field">
+      <label for="bannerFile">L'immagine (larga e bassa, 3:1)</label>
+      <input type="file" id="bannerFile" accept="image/*"
+             onchange="scegliFotoBanner(this.files)">
+      <div id="bannerChip" style="font-size:12px;color:var(--muted);
+           font-weight:700;margin-top:6px"></div>
+    </div>
+    <button class="btn orange" style="margin-top:0" onclick="salvaBanner(this)">
+      ${vivo || attesa ? '🖼 Manda in revisione' : '🖼 Chiedi il banner'}</button>
+    ${(vivo || attesa || b.stato) ? `
+      <button class="btn danger-ghost" onclick="togliBanner()">🗑 Togli il banner</button>` : ''}`;
+  bannerScelta = '';
+}
+
+/* La foto scelta vive in `bannerScelta` e mai nel DOM: e' un data-URL
+   da qualche centinaio di kilobyte, e un value cosi' dentro un input
+   e' un posto da cui poi bisogna ricordarsi di ripulire. */
+async function scegliFotoBanner(files){
+  const chip = el('bannerChip');
+  const f = (files || [])[0];
+  if (!f){
+    /* il chooser che torna a mani vuote: la lezione del telefono
+       vecchio — se non si dice niente, il bottone «non fa niente» */
+    if (chip) chip.textContent = tg?.initData
+      ? 'Nessuna foto scelta. Se il selettore non si apre, controlla i '
+        + 'permessi di Telegram sulle foto.'
+      : 'Nessuna foto scelta.';
+    return;
+  }
+  if (chip) chip.textContent = 'Preparo l\'immagine…';
+  bannerScelta = await ridimensiona(f) || '';
+  if (chip) chip.textContent = bannerScelta
+    ? `✅ ${f.name.slice(0, 40)}`
+    : 'Questa immagine non si riesce a leggere: provane un\'altra.';
+}
+
+async function salvaBanner(btn){
+  haptic();
+  const link = (el('bannerLink')?.value || '').trim();
+  const box = el('bannerErrore');
+  if (box) box.innerHTML = '';
+  const dillo = t => {
+    if (box) box.innerHTML =
+      `<div class="trust-note" style="margin-top:10px">⚠️ <span>${esc(t)}</span></div>`;
+    else toast(t, 6000);
+  };
+  if (!link) return dillo('Scrivi il link del tuo sito');
+  if (!bannerScelta) return dillo('Scegli l\'immagine del banner');
+  const fine = bottoneInAttesa(btn, '⏳ Mando in revisione…');
+  try {
+    const r = await fetch(`${API_BASE}/me/banner`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({link, foto: bannerScelta})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { fine(); return dillo(d.detail || 'Non ci sono riuscito, riprova'); }
+    myBanner = Object.assign({}, myBanner, {
+      stato: 'revisione', fotoAtt: d.foto || '',
+      dominioAtt: d.dominio || '', motivo: ''});
+  } catch(e) { fine(); return dillo('Rete assente: riprova'); }
+  fine();
+  renderBanner();
+  toast('🖼 Banner mandato in revisione: lo guarda un moderatore');
+}
+
+async function togliBanner(){
+  haptic();
+  chiediConferma({
+    titolo: 'Togliere il banner?',
+    corpo: 'Sparisce dal tuo negozio. Potrai sempre caricarne un altro, '
+         + 'e ripasserà da un moderatore come la prima volta.',
+    etichetta: 'Togli il banner',
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/me/banner/togli`,
+          {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+        if (!r.ok) { toast('Non ci sono riuscito, riprova'); return; }
+      } catch(e) { toast('Rete assente: riprova'); return; }
+      myBanner = {stato:'', motivo:'', foto:'', dominio:'',
+                  fotoAtt:'', dominioAtt:''};
+      renderBanner();
+      toast('🗑 Banner tolto');
+    }});
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
@@ -21705,6 +21951,17 @@ async function loadAdminStats(){
     aggiornaAdmDot(s.in_revisione||0);
     /* gli annunci in attesa di una decisione: la lista arriva solo
        se ce n'e' almeno uno (mai una fetch a vuoto) */
+    /* I banner del negozio: UNA fetch sempre, e non «solo se il conto
+       dice che ce n'e'» come per la revisione — qui un conto in
+       /admin/stats non c'e', e aggiungerlo per risparmiare una SELECT
+       da cinquanta righe su una pagina che apre solo un moderatore
+       sarebbe una colonna in piu' da tenere in pari per niente. */
+    let ban = [];
+    try {
+      const rb = await fetch(`${API_BASE}/admin/banner`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rb.ok) ban = await rb.json();
+    } catch(e) {}
     let rev = [];
     if (s.in_revisione) {
       try {
@@ -21776,6 +22033,23 @@ async function loadAdminStats(){
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
       <div style="margin-top:10px">${rev.map(rigaRevisione).join('')}</div>` : ''}
+      ${(() => {
+        const attesa = ban.filter(b => b.banner_stato === 'revisione');
+        const resto = ban.filter(b => b.banner_stato !== 'revisione');
+        /* Quel che ASPETTA una decisione sta aperto, il resto in un
+           cassetto: e' la regola del pannello. Gli attivi ci sono
+           perche' un banner acceso non e' in nessuna coda, e senza
+           questa lista un moderatore che ne vede uno da spegnere non
+           avrebbe da nessuna parte il bottone per farlo. */
+        return (attesa.length ? `
+      <div class="section-label" style="padding:26px 0 0">🖼 Banner da approvare (${attesa.length})</div>
+      <div class="sub" style="margin-top:6px">Guarda l'immagine <b>e</b> il dominio: un banner può dire con un disegno quel che nessun filtro sul testo può leggere.</div>
+      <div style="margin-top:10px">${attesa.map(rigaBanner).join('')}</div>` : '')
+          + (resto.length ? cassettoAdm('accAdmBanner', '🖼',
+            'Banner in vetrina', resto.length, `
+        <div class="sub">Si può spegnere un banner in qualsiasi momento, e riaccenderlo se era un errore.</div>
+        <div style="margin-top:10px">${resto.map(rigaBanner).join('')}</div>`) : '');
+      })()}
       ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
         'Decisi di recente', decisi.length, `
         <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
@@ -22177,6 +22451,70 @@ function toggleAccAdm(id){
 }
 /* id, emoji e titolo sono NOSTRI, mai testo di un utente: nell'onclick
    viaggia solo l'id letterale (il patto del filtro-alfabeto). */
+/* Una riga della coda dei banner. La FOTO si vede: e' meta' di cio'
+   su cui si decide, e l'altra meta' e' il DOMINIO — che sta in
+   chiaro, in grassetto, perche' e' li' che si nasconde un inganno.
+   IL MOTIVO E' UN CAMPO IN RIGA e non un prompt() di sistema: quelli
+   in questo client non esistono piu' (c'e' il censimento che lo
+   verifica), e per giunta un motivo si scrive meglio guardando la
+   foto di cui si sta parlando. */
+const rigaBanner = b => {
+  const foto = b.banner_foto_att || b.banner_foto || '';
+  const st = b.banner_stato || '';
+  const bottoni = st === 'revisione'
+    ? `<span class="badge" onclick="decidiBannerAdmin(${b.tg_id},'approva')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ Pubblica</span>
+       <span class="badge" onclick="decidiBannerAdmin(${b.tg_id},'rifiuta')" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">❌ Rifiuta</span>`
+    : st === 'attivo'
+    ? `<span class="badge" onclick="decidiBannerAdmin(${b.tg_id},'spegni')" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🚫 Spegni</span>`
+    : `<span class="badge" onclick="decidiBannerAdmin(${b.tg_id},'riaccendi')" style="cursor:pointer;background:var(--warn-bg);color:var(--ink)">↩︎ Riaccendi</span>`;
+  return `
+    <div class="order">
+      <div class="row">
+        <b style="min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(b.nome||'—')}</b>
+        <span style="white-space:nowrap">${bottoni}</span>
+      </div>
+      ${foto ? `<img src="${esc(fotoUrl(foto))}" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"
+           style="width:100%;aspect-ratio:3/1;object-fit:cover;border-radius:10px;display:block;margin-top:8px">` : ''}
+      <div class="sub">🔗 <b>${esc(b.dominio||'—')}</b>${
+        st !== 'revisione' ? ` · ${esc(st)}` : ''}</div>
+      ${b.banner_motivo ? `<div class="sub">⚠️ ${esc(b.banner_motivo)}</div>` : ''}
+      ${st === 'spento' ? '' : `<input type="text" id="banMot${b.tg_id}"
+           placeholder="Perché no? (lo legge il venditore)"
+           maxlength="200" style="margin-top:8px">`}
+    </div>`; };
+
+/* La decisione. Il motivo si prende dal campo in riga — e' quel che il
+   venditore leggera' nel suo messaggio, e «non approvato» e basta non
+   gli direbbe cosa cambiare. Le due decisioni che TOLGONO qualcosa
+   passano dal foglio di conferma: e' il gesto piu' consequenziale di
+   questa pagina e non deve poter partire da un tocco storto. */
+async function decidiBannerAdmin(tgId, esito){
+  haptic();
+  const motivo = (el('banMot' + tgId)?.value || '').trim();
+  const manda = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/admin/banner/${tgId}`,
+        {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+         body: JSON.stringify({esito, motivo})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) toast(d.detail || 'Operazione non riuscita', 4000);
+      else toast(d.detto || 'Fatto');
+    } catch(e) { toast('Rete assente: riprova'); return; }
+    loadAdminStats();
+  };
+  if (esito === 'approva' || esito === 'riaccendi') return manda();
+  chiediConferma({
+    titolo: esito === 'rifiuta' ? 'Rifiutare il banner?' : 'Spegnere il banner?',
+    corpo: (esito === 'rifiuta'
+        ? 'Non andrà online. Se il venditore ne aveva già uno approvato, quello resta in vetrina.'
+        : 'Sparisce dal suo negozio. Il negozio e i suoi annunci non si toccano.')
+      + (motivo ? `\n\nGli scriverai: «${motivo}»`
+                : '\n\nNon hai scritto un motivo: riceverà un messaggio senza spiegazione.'),
+    etichetta: esito === 'rifiuta' ? 'Rifiuta' : 'Spegni',
+    poi: manda});
+}
+
 const cassettoAdm = (id, em, titolo, conta, dentro) => `
     <div class="acc${accAdmAperti.has(id)?' open':''}" id="${id}">
       <button class="acc-h" onclick="toggleAccAdm('${id}')"><span class="em">${em}</span>${titolo} <span class="conta">${conta}</span><span class="fr">▾</span></button>
@@ -24953,6 +25291,11 @@ async function avvia(){
     invitoCorrieriMax = me.invito_corrieri_max || 0;
     myFerieFino = me.ferie_fino || 0;
     ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
+    bannerLeve = me.banner_leve || null; // idem: leva assente = niente cassetto
+    myBanner = {stato: me.banner_stato || '', motivo: me.banner_motivo || '',
+                foto: me.banner_foto || '', dominio: me.banner_dominio || '',
+                fotoAtt: me.banner_foto_att || '',
+                dominioAtt: me.banner_dominio_att || ''};
     /* le cifre arrivano GREZZE, tutte e tre: e' il suo negozio, e il
        toggle deve poter ritrovare quella dell'altra valuta */
     myScontoPacco = (me.sconto_pacco_percento > 0)

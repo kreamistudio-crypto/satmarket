@@ -13245,7 +13245,8 @@ def _censimento(acceso):
                  "SCONTO_PACCO_VALORI_EUR", "SCONTO_PACCO_VALORI_SATS",
                  "SCONTO_PACCO_CRITERI", "VALUTE_SOGLIA",
                  "SPED_GRATIS_SOGLIE_EUR", "SPED_GRATIS_SOGLIE_SATS",
-                 "CODICI_SCONTO_PERCENTI", "CODICI_SCONTO_DURATE_GIORNI"):
+                 "CODICI_SCONTO_PERCENTI", "CODICI_SCONTO_DURATE_GIORNI",
+                 "BANNER_LINK_VIETATI"):
         amb[nome] = [1, 2, 3]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
@@ -18125,7 +18126,13 @@ def prove_fogli_di_casa():
     # SEI dall'ago 2026: il sesto e' l'eliminazione di un codice
     # sconto. Una superficie NUOVA non aumenta il debito dei confirm()
     # di sistema — eliminaRicerca usa ancora quello, ed e' dichiarato.
-    prova("i gesti che passano dalla domanda unica sono sei", 6,
+    # NOVE col banner del negozio, e il piu' importante dei tre e'
+    # il primo: l'USCITA da Barattolo, che chiede prima di aprire un
+    # sito che non e' nostro e mostra il dominio nella testata. Gli
+    # altri due sono il «togli il banner» del venditore e il
+    # rifiuto/spegnimento del moderatore — che e' anche il posto dove
+    # un prompt() sarebbe tornato a nascondersi, e non c'e'.
+    prova("i gesti che passano dalla domanda unica sono nove", 9,
           solo_codice(mini).count("chiediConferma({"))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):
@@ -23495,6 +23502,360 @@ def prove_feedback_confermato():
           False, "!chiusoDalTimer(s, o.sbloccatoAuto)" in ordine)
 
 
+def prove_banner_negozio():
+    """IL BANNER DEL NEGOZIO (ago 2026): l'insegna sopra il catalogo,
+    una foto e un LINK ESTERNO.
+
+    E' il primo indirizzo scritto da un utente che l'app apre davanti a
+    un ALTRO utente — l'unico non-nostro di prima era l'auth_url del
+    bunker, che pero' e' del proprietario stesso — quindi meta' di
+    queste righe sorveglia il giudice del link e l'altra meta' i posti
+    da cui il banner NON deve uscire."""
+    print("\n[il banner del negozio]")
+    import asyncio as _aio
+    import re as _re
+    import sqlite3 as _sq
+    from urllib.parse import urlparse as _up
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. Le leve e le colonne ---------------------------------
+    # NASCE SPENTA, come SERVIZI_ATTIVI e ASTA_ABILITATA: apre una
+    # superficie di rischio e si accende con un gesto dal VPS.
+    i = src.index("    BANNER_NEGOZIO_ATTIVO = ")
+    prova("la leva del banner nasce spenta",
+          "    BANNER_NEGOZIO_ATTIVO = False", src[i:src.index("#", i)].rstrip())
+    prova("il gradino che apre la porta e' una leva", True,
+          'BANNER_LIVELLO = "avviato"' in src)
+    prova("...e lo stesso nel config d'esempio", True,
+          'BANNER_LIVELLO = "avviato"'
+          in open("config_esempio.py", encoding="utf-8").read())
+    for c in ("banner_foto", "banner_link", "banner_foto_att",
+              "banner_link_att", "banner_stato", "banner_motivo",
+              "banner_chiesto_il", "banner_deciso_il"):
+        tipo = "INTEGER DEFAULT 0" if c.endswith("_il") else "TEXT DEFAULT ''"
+        prova(f"la colonna {c} e' fra le migrazioni additive", True,
+              f'"{c} {tipo}"' in src)
+    # NIENTE colonna del pagamento: non si aggiunge una colonna per un
+    # cantiere che non c'e' (il precedente e' `utenti.comune`, inerte).
+    prova("nessuna colonna per un pagamento che non esiste", False,
+          "banner_sbloccato_il" in src)
+
+    # ---- 2. IL GIUDICE DEL LINK, girato per davvero ---------------
+    amb = {"re": _re, "urlparse": _up, "LINK_BANNER_MAX": 300}
+    exec(pezzo("dominio_link"), amb)
+    exec(pezzo("link_banner_ammesso"), amb)
+    L, dom = amb["link_banner_ammesso"], amb["dominio_link"]
+    VIET = ("bit.ly", "t.co", "tinyurl.com")
+    CASA = "barattolo.store"
+    buoni = ("https://lamiabottega.it",
+             "https://www.lamiabottega.it/negozio?x=1#a",
+             "https://shop.lamiabottega.co.uk/p/1",
+             "https://lamiabottega.it:443/",
+             "https://bitly.com/pagina")          # NON e' bit.ly
+    for u in buoni:
+        prova(f"passa: {u}", True, bool(L(u, VIET, CASA)[0]))
+    cattivi = (
+        ("http, mai", "http://lamiabottega.it"),
+        ("javascript:", "javascript:alert(1)"),
+        ("data:", "data:text/html,x"),
+        # l'inganno visivo piu' vecchio che ci sia
+        ("credenziali nell'URL", "https://tizio:x@lamiabottega.it"),
+        ("IP nudo", "https://93.184.216.34/"),
+        ("localhost", "https://localhost/"),
+        ("una porta qualunque", "https://lamiabottega.it:8080/"),
+        # `barattolo.store` con la «a» cirillica: a occhio e' identico
+        ("host non latino (omografo)", "https://bаrattolo.store"),
+        # il punycode E' la forma codificata di quello sopra: senza
+        # questa riga la porta appena chiusa si riaprirebbe
+        ("punycode", "https://xn--brattolo-l3a.store"),
+        ("il nostro dominio", "https://barattolo.store/negozio/x"),
+        ("...e i suoi sottodomini", "https://www.barattolo.store"),
+        ("un accorciatore", "https://bit.ly/xyz"),
+        ("...anche col www davanti", "https://www.bit.ly/xyz"),
+        ("vuoto", ""),
+        ("con uno spazio dentro", "https://lamia bottega.it"),
+        ("piu' lungo del tetto", "https://" + "a" * 400 + ".it"),
+    )
+    for nome, u in cattivi:
+        r, motivo = L(u, VIET, CASA)
+        prova(f"si rifiuta: {nome}", True, r == "" and bool(motivo))
+    # IL RIFIUTO DICE COSA NON VA: sei ragioni e un messaggio solo
+    # manderebbero a cercare il guasto dalla parte sbagliata.
+    prova("l'accorciatore ha il SUO messaggio", True,
+          "accorciat" in L("https://bit.ly/x", VIET, CASA)[1])
+    prova("il nostro dominio ha il SUO messaggio", True,
+          "fuori da Barattolo" in L("https://barattolo.store", VIET, CASA)[1])
+    prova("il dominio da mostrare perde il www", "lamiabottega.it",
+          dom("https://www.lamiabottega.it/x"))
+    prova("...e su una stringa storta non esplode", "", dom("non un url"))
+
+    # ---- 3. LA PORTA: il livello, e il fail-CLOSED ----------------
+    amb2 = {"LIVELLI": (
+        (0, 0, "nuovo", "Nuovo arrivato"),
+        (150, 1, "avviato", "Bottega avviata"),
+        (600, 5, "pratico", "Mercante pratico"),
+        (2500, 15, "esperto", "Mercante esperto"),
+        (9000, 40, "maestro", "Maestro del banco"))}
+    exec(pezzo("livello_utente"), amb2)
+    exec(pezzo("_gradino_livello"), amb2)
+    exec(pezzo("banner_porta_aperta"), amb2)
+    porta, grad = amb2["banner_porta_aperta"], amb2["_gradino_livello"]
+    prova("chi non ha concluso niente resta fuori", False,
+          porta(0, 0, "avviato"))
+    prova("...e nemmeno con gli XP ma zero affari", False,
+          porta(5000, 0, "avviato"))
+    prova("un affare concluso e 150 XP: passa", True,
+          porta(150, 1, "avviato"))
+    prova("chi e' piu' avanti passa comunque (la scala)", True,
+          porta(9000, 40, "avviato"))
+    prova("col gradino alto, chi e' avviato non passa", False,
+          porta(150, 1, "pratico"))
+    # FAIL-CLOSED: una leva scritta a mano e storta deve CHIUDERE la
+    # porta, mai spalancarla a tutti. E' la ragione per cui il gradino
+    # sconosciuto vale piu' dell'ultimo e non zero.
+    prova("un livello inventato chiude la porta a chiunque", False,
+          porta(999999, 999, "livello-che-non-esiste"))
+    prova("...perche' il gradino ignoto vale piu' dell'ultimo", True,
+          grad("boh") > grad("maestro"))
+
+    # ---- 4. QUANDO SI VEDE ----------------------------------------
+    amb3 = {"BANNER_NEGOZIO_ATTIVO": True, "dominio_link": dom}
+    exec(pezzo("_banner_pubblico"), amb3)
+    pub = amb3["_banner_pubblico"]
+    prova("attivo, con foto, link e vetrina piena: si vede", True,
+          bool(pub("attivo", "ban_x_1.jpg", "https://x.it", True)))
+    prova("...e porta il dominio gia' pronto", "x.it",
+          pub("attivo", "ban_x_1.jpg", "https://x.it", True)["dominio"])
+    # LA CONDIZIONE CHE SI DIMENTICA: senza almeno un annuncio attivo
+    # un account diventa un cartellone a costo zero — pubblichi, apri
+    # la porta, ritiri l'annuncio, e l'insegna resta li' per sempre.
+    prova("vetrina VUOTA: non si vede", None,
+          pub("attivo", "ban_x_1.jpg", "https://x.it", False))
+    # LA META' CHE SI DIMENTICA, e l'ha trovata il giro dal vivo: lo
+    # stato e' UNO ma i campi sono DUE, quindi chiedendo una MODIFICA
+    # lo stato torna in 'revisione' mentre `banner_foto`/`banner_link`
+    # sono ancora quelli APPROVATI. Guardando il solo 'attivo' ogni
+    # modifica avrebbe spento l'insegna per tutta l'attesa — il
+    # contrario di cio' che le due coppie di campi garantiscono.
+    prova("una MODIFICA in attesa non spegne il banner vivo", True,
+          bool(pub("revisione", "ban_x_1.jpg", "https://x.it", True)))
+    prova("...ma la PRIMA richiesta non mostra niente", None,
+          pub("revisione", "", "", True))
+    for s in ("", "rifiutato", "spento"):
+        prova(f"stato {s or '(nessuno)'}: non si vede", None,
+              pub(s, "ban_x_1.jpg", "https://x.it", True))
+    prova("senza foto non si vede", None,
+          pub("attivo", "", "https://x.it", True))
+    prova("senza link non si vede", None,
+          pub("attivo", "ban_x_1.jpg", "", True))
+    amb3["BANNER_NEGOZIO_ATTIVO"] = False
+    prova("a leva spenta non si vede niente", None,
+          pub("attivo", "ban_x_1.jpg", "https://x.it", True))
+
+    # ---- 5. La foto ------------------------------------------------
+    prova("la forma ban_ e' nella whitelist dei nomi serviti", True,
+          r'r"|ban_[0-9a-f]+_\d+\.jpg"' in src)
+    prova("...e il nome che scriviamo la rispetta", True,
+          'f"ban_{negozio}_{int(time.time())}.jpg"' in src)
+    prova("la passata delle miniature salta i banner", True,
+          'nome.startswith("ban_")' in codice(pezzo("genera_miniature_mancanti")))
+    prova("il ritaglio e' 3:1", True,
+          "BANNER_LARGO = 1200" in src and "BANNER_ALTO = 400" in src)
+    # _foto_vuota e' nata per la MERCE: un'insegna che e' una tinta
+    # unita col logo sopra e' grafica legittima, e li' il rifiuto
+    # direbbe il falso. _e_immagine invece ci passa.
+    # La CHIAMATA e non la parola: `codice()` toglie i commenti col
+    # cancelletto ma non le DOCSTRING, e questa funzione nomina
+    # _foto_vuota nella sua prosa proprio per dire perche' NON la usa
+    # — una sentinella sulla parola sarebbe rossa per colpa di una
+    # spiegazione (la lezione gia' pagata da LANCZOS).
+    bb = codice(pezzo("_byte_banner"))
+    prova("il banner NON passa da _foto_vuota", False, "_foto_vuota(" in bb)
+    prova("...ma passa da _e_immagine", True, "_e_immagine(" in bb)
+    # e un rifiuto dice sempre QUALCOSA: `converti_in_jpeg` torna None
+    # sui byte che non si aprono, e senza la sua guardia il 400 usciva
+    # col detail vuoto — un rifiuto muto e' peggio di nessun rifiuto
+    prova("nessun rifiuto esce senza messaggio", True,
+          "if raw is None:" in bb)
+
+    # ---- 6. DOVE NON ENTRA ----------------------------------------
+    # Un'anteprima col NOSTRO nome e la pubblicita' di un altro sito e'
+    # l'impersonazione con la nostra faccia sopra: l'og:image del
+    # negozio resta il brand.
+    seo = pezzo("_seo_negozio")
+    prova("il banner non entra nei meta del negozio", False, "banner" in seo)
+    prova("...che restano sull'immagine del brand", True,
+          "IMMAGINE_BRAND" in seo or "_testa_seo" in seo)
+    for f in ("_widget_negozio", "_schede_cartello"):
+        try:
+            prova(f"il banner non entra in {f}", False, "banner" in pezzo(f))
+        except ValueError:
+            pass                      # la funzione ha un altro nome: si salta
+    prova("il widget non nomina il banner", False,
+          "banner" in src[src.index("/widget/negozio/"):
+                          src.index("/widget/negozio/") + 3000])
+    # I campi GREZZI non escono: un banner in revisione o spento non ha
+    # nessun motivo di far sapere in giro dove punterebbe.
+    neg = pezzo("negozio", fine="\n\n\n@app")
+    prova("i tre campi grezzi si tolgono dalla risposta", True,
+          'del venditore["banner_stato"], venditore["banner_foto"]' in neg
+          and 'del venditore["banner_link"]' in neg)
+    prova("il banner esce solo in prima pagina", True,
+          'venditore["banner"] = None if cursore else _banner_pubblico' in neg)
+    prova("...e la vetrina piena si chiede senza una query in piu'",
+          True, "bool(annunci))" in neg)
+
+    # ---- 7. Il link nel client ------------------------------------
+    # L'URL non compare da NESSUNA parte nel markup: ne' in un href
+    # (dove un target=_blank scavalcherebbe la conferma) ne' dentro un
+    # onclick (il patto di linkCanaleTest).
+    bn = pezzo_js(mini, "function bannerNegozio(", "\n}")
+    prova("il banner non e' un <a href>", False, "href" in bn)
+    prova("...e' un role=button che chiama la funzione", True,
+          'onclick="apriLinkBanner()"' in bn)
+    # Dentro il MARKUP, non nella guardia: `if (!b.link) return` deve
+    # poterlo nominare — a non doverci finire e' il template.
+    prova("l'URL non finisce nel markup ne' nell'onclick", False,
+          "b.link" in bn[bn.index("return `"):])
+    prova("il dominio si vede sempre sotto il banner", True,
+          "ban-dominio" in bn)
+    prova("img e ripiego restano FRATELLI ADIACENTI", True,
+          ".negozio-banner img + .ban-riserva{display:none}" in mini)
+    al = pezzo_js(mini, "function apriLinkBanner(", "\n}")
+    prova("l'uscita CHIEDE prima", True, "chiediConferma({" in al)
+    prova("...col dominio nella testata", True, "testata:" in al)
+    prova("...e poi il pattern di casa per uscire", True,
+          "tg.openLink(b.link)" in al and "'noopener'" in al)
+
+    # ---- 8. La moderazione, girata per davvero --------------------
+    dec = pezzo("decidi_banner")
+    for ramo, stato in (("approva", "revisione"), ("rifiuta", "revisione"),
+                        ("spegni", "attivo"), ("riaccendi", "spento")):
+        prova(f"{ramo}: l'UPDATE e' condizionato sullo stato", True,
+              f"AND banner_stato='{stato}'" in dec)
+    prova("il secondo moderatore trova il fatto compiuto", True,
+          "Ci ha già pensato un altro moderatore" in dec)
+    prova("il 403 sta PRIMA di leggere il body", True,
+          codice(pezzo("decidi_banner_admin")).index("e_admin")
+          < codice(pezzo("decidi_banner_admin")).index("leggi_json"))
+    prova("la tastiera non tiene token in memoria", True,
+          'f"ban:ok:{tg_id}"' in pezzo("avvisa_banner"))
+    prova("...e il tocco lo autorizza e_admin", True,
+          "e_admin(" in pezzo("callback_banner"))
+    prova("lo smistamento della tastiera esiste", True,
+          'if azione == "ban":' in src)
+
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
+                "negozio TEXT, banner_foto TEXT DEFAULT '', "
+                "banner_link TEXT DEFAULT '', banner_foto_att TEXT DEFAULT '', "
+                "banner_link_att TEXT DEFAULT '', banner_stato TEXT DEFAULT '', "
+                "banner_motivo TEXT DEFAULT '', banner_deciso_il INTEGER "
+                "DEFAULT 0)")
+    con.execute("INSERT INTO utenti(tg_id, nome, negozio) VALUES(1,'Rosa','ab12')")
+    con.commit()
+    # `decidi_banner` chiude la connessione a ogni giro, e una
+    # :memory: chiusa non esiste piu': si passa un guscio che a
+    # `close()` non fa niente. Un `con.close = ...` non basta —
+    # sqlite3 non lascia riscrivere quel metodo.
+    class _Guscio:
+        def __getattr__(self, n): return getattr(con, n)
+        def close(self): pass
+
+    tolti, avvisi = [], []
+    amb4 = {"db": _Guscio, "time": __import__("time"),
+            "html": __import__("html"), "dominio_link": dom,
+            "_togli_banner_file": tolti.append,
+            "registra_moderazione": lambda *a, **k: None}
+
+    async def _finta(tg, testo):
+        avvisi.append(testo)
+    amb4["notifica"] = _finta
+    # «async » davanti: `pezzo` cerca «def nome(» e su una funzione
+    # async taglia via la parola che la rende tale
+    exec("async " + pezzo("decidi_banner"), amb4)
+    decidi = amb4["decidi_banner"]
+
+    def stato():
+        return dict(con.execute("SELECT * FROM utenti WHERE tg_id=1").fetchone())
+
+    def chiedi(foto, link):
+        con.execute("UPDATE utenti SET banner_foto_att=?, banner_link_att=?, "
+                    "banner_stato='revisione' WHERE tg_id=1", (foto, link))
+        con.commit()
+
+    # il primo banner: si chiede, si approva, va in vetrina
+    chiedi("ban_ab12_1.jpg", "https://uno.it")
+    ok, _ = _aio.run(decidi(1, "approva", 999))
+    s = stato()
+    prova("approvato: l'attesa diventa viva", True,
+          ok and s["banner_stato"] == "attivo"
+          and s["banner_foto"] == "ban_ab12_1.jpg"
+          and s["banner_foto_att"] == "")
+    prova("...e il venditore lo viene a sapere", True,
+          bool(avvisi) and "online" in avvisi[-1])
+
+    # LA RIGA CHE REGGE TUTTO: una MODIFICA non spegne il banner che e'
+    # gia' in vetrina — senza, si fa approvare un sito pulito e lo si
+    # scambia il giorno dopo.
+    chiedi("ban_ab12_2.jpg", "https://due.it")
+    s = stato()
+    prova("mentre il nuovo aspetta, il vecchio resta acceso", True,
+          s["banner_foto"] == "ban_ab12_1.jpg"
+          and s["banner_link"] == "https://uno.it")
+    _aio.run(decidi(1, "rifiuta", 999, "il sito non è tuo"))
+    s = stato()
+    prova("modifica bocciata: il vivo NON si tocca", True,
+          s["banner_stato"] == "attivo"
+          and s["banner_foto"] == "ban_ab12_1.jpg")
+    prova("...e il file dell'attesa se ne va", True,
+          "ban_ab12_2.jpg" in tolti)
+    prova("...col motivo che il venditore legge", True,
+          "il sito non è tuo" in avvisi[-1])
+
+    # spegnere e riaccendere: il ripensamento dev'essere possibile
+    ok, _ = _aio.run(decidi(1, "spegni", 999, "non va bene"))
+    prova("spento: sparisce dalla vetrina", True,
+          ok and stato()["banner_stato"] == "spento")
+    prova("...ma il file resta, perche' si puo' riaccendere", True,
+          stato()["banner_foto"] == "ban_ab12_1.jpg")
+    ok, _ = _aio.run(decidi(1, "riaccendi", 999))
+    prova("riacceso: torna in vetrina", True,
+          ok and stato()["banner_stato"] == "attivo")
+
+    # il secondo moderatore: il CAS lo ferma, e nessuno decide due volte
+    ok, testo = _aio.run(decidi(1, "approva", 999))
+    prova("non si approva quel che non aspetta niente", False, ok)
+    ok, testo = _aio.run(decidi(1, "riaccendi", 999))
+    prova("non si riaccende quel che e' gia' acceso", False, ok)
+    prova("un esito inventato non fa niente", False,
+          _aio.run(decidi(1, "boh", 999))[0])
+    prova("un venditore che non c'e' nemmeno", False,
+          _aio.run(decidi(4242, "approva", 999))[0])
+    # un RIFIUTATO non si riapre: la sua attesa e' stata buttata col
+    # file, quindi non c'e' piu' niente da riaccendere — si richiede
+    con.execute("UPDATE utenti SET banner_stato='rifiutato', "
+                "banner_foto='', banner_link='' WHERE tg_id=1")
+    con.commit()
+    prova("un rifiutato non si riaccende", False,
+          _aio.run(decidi(1, "riaccendi", 999))[0])
+    con.close()
+
+    # ---- 9. Il cassetto del venditore ------------------------------
+    rb = pezzo_js(mini, "function renderBanner(", "\n}")
+    prova("il cassetto sparisce in DEMO e in vetrina", True,
+          "DEMO || VETRINA" in rb)
+    prova("...e a leva spenta", True, "bannerLeve.attivo" in rb)
+    # LA PORTA CHIUSA SI DICE: chi non ha il livello deve sapere che il
+    # banner esiste e come si apre, o non scoprirebbe mai la funzione.
+    prova("la porta chiusa si racconta, non si nasconde", True,
+          "porta_aperta" in rb and "si sblocca" in rb)
+    prova("il 400 si rende dentro il cassetto, non in un toast", True,
+          "bannerErrore" in pezzo_js(mini, "async function salvaBanner(", "\n}"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -23556,6 +23917,7 @@ def main():
               prove_porta_timer, prove_feedback_confermato,
               prove_servizi,
               prove_sintassi_client,
+              prove_banner_negozio,
               prove_foto_vuota):
         try:
             f()

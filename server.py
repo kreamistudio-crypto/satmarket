@@ -957,6 +957,45 @@ try:
 except ImportError:
     FERIE_PREAVVISO_ORE = 24       # «domani riapri» (0 = nessun promemoria)
 
+# IL BANNER DEL NEGOZIO (ago 2026): il venditore mette la sua insegna
+# sulla pagina del suo negozio — una foto e un link al suo sito. Vive
+# SOLO li': in home non ci va, quella e' pubblicita' vera e ha un
+# cantiere suo.
+# LA LEVA NASCE SPENTA, come SERVIZI_ATTIVI e ASTA_ABILITATA, e la
+# ragione e' il LINK: e' la prima volta che Barattolo apre un
+# indirizzo scritto da un utente davanti a un ALTRO utente — l'unico
+# non-nostro di oggi e' l'auth_url del bunker, che pero' e' del
+# proprietario stesso. Una superficie cosi' si accende con un gesto
+# dal VPS, guardando il primo giro, mai per effetto di un deploy.
+try:
+    from config import BANNER_NEGOZIO_ATTIVO
+except ImportError:
+    BANNER_NEGOZIO_ATTIVO = False  # spento di serie: si accende dal VPS
+# Il gradino che apre la porta. «avviato» = 150 XP e UN affare
+# concluso (decisione di Andrea): con «pratico» — 600 XP e 5 affari —
+# oggi non ce l'avrebbe quasi nessuno, la porta non si aprirebbe mai e
+# la funzione nascerebbe morta. E' un filtro alla CODA, non un premio:
+# a commissione spenta il livello si compra con due account e un
+# ordine finto, quindi il freno VERO resta la revisione umana.
+try:
+    from config import BANNER_LIVELLO
+except ImportError:
+    BANNER_LIVELLO = "avviato"
+# Gli accorciatori, ed e' la riga che regge tutta la moderazione del
+# link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
+# altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
+# giudicare affatto. Match sul dominio registrabile, sottodomini
+# compresi. NON ci sono le pagine «tutti i miei link» (linktr.ee e
+# simili): quelle una pagina ce l'hanno davvero e sono il modo in cui
+# un venditore piccolo si presenta — vietarle fermerebbe gente onesta.
+try:
+    from config import BANNER_LINK_VIETATI
+except ImportError:
+    BANNER_LINK_VIETATI = (
+        "bit.ly", "t.co", "tinyurl.com", "is.gd", "cutt.ly", "ow.ly",
+        "buff.ly", "rebrand.ly", "short.io", "rb.gy", "t.ly", "lnkd.in",
+        "shorturl.at", "s.id", "bl.ink", "tiny.cc", "shorte.st")
+
 # L'offerta lampo (lug 2026, modello Vinted «sconto ai follower»): il
 # venditore sconta a tempo TUTTO l'annuncio; chi l'ha nel barattolo
 # viene avvisato in modo anonimo. Lo sconto e' PUBBLICO (vale per
@@ -1678,6 +1717,145 @@ def titoli_disponibili(con, tg_id: int) -> list[str]:
              "livello": lambda v: v in raggiunti,
              "fondatore": lambda _v: tg_id in FONDATORI}
     return [t["id"] for t in TITOLI if fatto[t["serve"][0]](t["serve"][1])]
+
+
+# --------------------- IL BANNER DEL NEGOZIO ------------------------
+# L'insegna che il venditore appende sopra il suo catalogo. Qui vivono
+# i suoi GIUDICI PURI — chi puo' chiederlo, quale link si puo'
+# mostrare, quando si vede — e sono puri apposta: prendono i CAMPI e
+# mai la riga (il patto di `in_ferie`), cosi' lo stesso giudice serve
+# il database, la vetrina e la prova in CI.
+
+LINK_BANNER_MAX = 300      # un indirizzo piu' lungo non lo legge nessuno
+MSG_BANNER_CHIUSO = ("Il banner si sblocca quando il tuo negozio si "
+                     "avvia: serve almeno un affare concluso.")
+
+
+def _gradino_livello(id_livello: str) -> int:
+    """Il numero (1-based) di un gradino della scala dei livelli.
+    Un id sconosciuto vale PIU' dell'ultimo gradino, mai zero: una leva
+    scritta a mano e storta deve chiudere la porta, non spalancarla a
+    tutti — fail-closed come `importo_invoice`."""
+    for n, l in enumerate(LIVELLI, 1):
+        if l[2] == id_livello:
+            return n
+    return len(LIVELLI) + 1
+
+
+def banner_porta_aperta(xp: int, affari: int, livello_minimo: str) -> bool:
+    """Chi puo' CHIEDERE un banner. Oggi la porta la apre solo il
+    livello, ed e' un filtro alla CODA e non un premio: a commissione
+    spenta un livello si compra con due account e un ordine finto,
+    quindi il freno vero resta la revisione umana.
+    IL GIUDICE ESISTE ANCHE CON UNA CONDIZIONE SOLA, ed e' il motivo
+    per cui vale la pena averlo: il giorno che la porta si potra'
+    anticipare pagando, ad allargarsi e' QUESTA riga e nessun'altra.
+    `livello_minimo` e' obbligatorio e senza default apposta (la
+    lezione di `atteso_sats`): chi lo dimentica lo sente da Python
+    invece di ereditare in silenzio una soglia che non ha scelto."""
+    return livello_utente(xp, affari)["numero"] >= _gradino_livello(
+        livello_minimo)
+
+
+def dominio_link(url: str) -> str:
+    """Il dominio da MOSTRARE a chi guarda, senza il `www.`. Lo calcola
+    il server e viaggia nel payload: un secondo parser nel client
+    sarebbe il posto da cui un giorno la riga sotto il banner e il link
+    che si apre direbbero due cose diverse."""
+    try:
+        h = (urlparse((url or "").strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+    return h[4:] if h.startswith("www.") else h
+
+
+def link_banner_ammesso(url: str, vietati, casa: str) -> tuple[str, str]:
+    """`(url, "")` se si puo' mostrare, `("", motivo)` altrimenti — la
+    forma di `_leggi_verdetto`, perche' il rifiuto deve DIRE cosa non
+    va: sei ragioni diverse e un messaggio solo manderebbero a cercare
+    il guasto dalla parte sbagliata.
+    E' il primo indirizzo scritto da un utente che l'app apre davanti a
+    un ALTRO utente, quindi le regole sono strette e ognuna ha il suo
+    perche':
+    · solo https — su http non c'e' nessuna lettura innocente nel 2026;
+    · niente credenziali (`https://tizio:x@sito-vero.it`), che e'
+      l'inganno visivo piu' vecchio che ci sia;
+    · host solo ASCII e niente punycode: `barattolo.store` scritto con
+      la «a» cirillica e' indistinguibile a occhio dal nostro dominio,
+      ed e' la difesa che qui conta di piu';
+    · niente IP nudi, niente `localhost`, niente porte diverse dalla
+      443 — un banner non ha nessun motivo di puntarci;
+    · MAI il nostro dominio: sarebbe un link inutile, o uno che sembra
+      ufficiale;
+    · niente accorciatori, ed e' LA riga che regge la moderazione — un
+      `bit.ly/xyz` si approva pulito e domani punta altrove, quindi il
+      link dev'essere ISPEZIONABILE o non lo si puo' giudicare."""
+    u = (url or "").strip()
+    if not u:
+        return "", "Manca l'indirizzo del sito"
+    if len(u) > LINK_BANNER_MAX:
+        return "", f"L'indirizzo e' troppo lungo (max {LINK_BANNER_MAX})"
+    if any(c.isspace() or ord(c) < 32 for c in u):
+        return "", "L'indirizzo non puo' contenere spazi"
+    try:
+        p = urlparse(u)
+        porta = p.port
+    except ValueError:
+        return "", "Questo indirizzo non si riesce a leggere"
+    if p.scheme != "https":
+        return "", "L'indirizzo deve cominciare con https://"
+    if p.username or p.password:
+        return "", "L'indirizzo non puo' contenere un nome utente"
+    if porta not in (None, 443):
+        return "", "L'indirizzo non puo' indicare una porta"
+    host = (p.hostname or "").lower()
+    if not host or not host.isascii():
+        return "", "Il dominio deve essere scritto in lettere latine"
+    pezzi = host.split(".")
+    if (len(pezzi) < 2 or not all(pezzi)
+            or not re.fullmatch(r"[a-z0-9-]+", host.replace(".", ""))
+            or not pezzi[-1].isalpha() or len(pezzi[-1]) < 2):
+        return "", "Questo non sembra un dominio"
+    if any(x.startswith("xn--") for x in pezzi):
+        # il punycode E' la forma codificata di un dominio non latino:
+        # ammetterlo riaprirebbe la porta che `isascii` ha appena chiusa
+        return "", "Il dominio deve essere scritto in lettere latine"
+    casa = (casa or "").lower()
+    if casa and (host == casa or host.endswith("." + casa)):
+        return "", "Il banner porta fuori da Barattolo, non qui dentro"
+    for v in vietati:
+        v = (v or "").lower()
+        if v and (host == v or host.endswith("." + v)):
+            return "", ("Gli indirizzi accorciati non si possono "
+                        "controllare: scrivi il link per esteso")
+    return u, ""
+
+
+def _banner_pubblico(stato: str, foto: str, link: str,
+                     ha_annunci: bool) -> dict | None:
+    """Il banner che esce in vetrina, o None. Tre condizioni, e la
+    terza e' quella che si dimentica: SENZA NESSUN ANNUNCIO ATTIVO non
+    si mostra — altrimenti un account diventa un cartellone a costo
+    zero (pubblichi un annuncio, apri la porta, ritiri l'annuncio, e
+    l'insegna resta li' per sempre).
+    In FERIE invece resta, ed e' deciso: le ferie sono di Barattolo,
+    non della sua bottega — gli annunci restano visibili e l'insegna li
+    segue.
+    E RESTA ACCESO ANCHE IN «revisione», ed e' la meta' che si dimentica
+    (trovata solo dal vivo: le colonne erano giuste e la vetrina no).
+    Lo stato e' UNO per il venditore, ma i campi sono DUE: chiedendo una
+    MODIFICA lo stato torna in revisione mentre `banner_foto` e
+    `banner_link` sono ancora quelli approvati — e sono loro che si
+    mostrano. Guardando il solo 'attivo', ogni modifica avrebbe spento
+    l'insegna per tutto il tempo dell'attesa, cioe' esattamente il
+    contrario di cio' che le due coppie di campi esistono per garantire.
+    Su 'revisione' senza un vivo (la PRIMA richiesta) le due colonne
+    sono vuote e non si mostra niente lo stesso."""
+    if not BANNER_NEGOZIO_ATTIVO or stato not in ("attivo", "revisione"):
+        return None
+    if not foto or not link or not ha_annunci:
+        return None
+    return {"foto": foto, "link": link, "dominio": dominio_link(link)}
 
 
 def riallinea_quantita_max(con):
@@ -2592,7 +2770,35 @@ def init_db():
                     # due promesse restano indipendenti.
                     "sped_gratis_soglia INTEGER DEFAULT 0",
                     "sped_gratis_soglia_eur INTEGER DEFAULT 0",
-                    "sped_gratis_valuta TEXT DEFAULT 'eur'"):
+                    "sped_gratis_valuta TEXT DEFAULT 'eur'",
+                    # IL BANNER DEL NEGOZIO (ago 2026): l'insegna che
+                    # il venditore appende sopra il suo catalogo — una
+                    # foto e un link al suo sito. Il default '' E' la
+                    # migrazione, come per le nove sorelle qui sopra.
+                    # DUE COPPIE DI CAMPI E NON UNA, ed e' la riga da
+                    # capire prima di toccare qualunque cosa: approvare
+                    # una MODIFICA non deve spegnere il banner che e'
+                    # gia' in vetrina. Il vivo resta acceso, l'altro
+                    # aspetta in fondo alla coda; all'approvazione
+                    # l'attesa diventa viva e il FILE vecchio se ne va
+                    # (il pattern di _scrivi_avatar), al rifiuto si
+                    # svuota l'attesa e il vivo non si tocca.
+                    # Senza, si approva un sito pulito e lo si scambia
+                    # il giorno dopo.
+                    "banner_foto TEXT DEFAULT ''",
+                    "banner_link TEXT DEFAULT ''",
+                    "banner_foto_att TEXT DEFAULT ''",
+                    "banner_link_att TEXT DEFAULT ''",
+                    # '' = non ne ha mai chiesto uno. Poi revisione |
+                    # attivo | rifiutato | spento — e gli ultimi due
+                    # sono DUE stati apposta: «rifiutato» non e' mai
+                    # stato in vetrina, «spento» si' e un moderatore
+                    # l'ha tolto. Sono due frasi diverse da dire a chi
+                    # aspetta.
+                    "banner_stato TEXT DEFAULT ''",
+                    "banner_motivo TEXT DEFAULT ''",
+                    "banner_chiesto_il INTEGER DEFAULT 0",
+                    "banner_deciso_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -5757,6 +5963,9 @@ async def gestisci_callback(cb: dict):
     if azione == "rev":
         # la tastiera ✅/❌ della revisione (solo moderatori)
         return await callback_revisione(cb, token)
+    if azione == "ban":
+        # la tastiera ✅/❌ del banner del negozio (solo moderatori)
+        return await callback_banner(cb, token)
     if azione == "sfo":
         # la griglia «Sfoglia»: aperta a tutti, non tocca niente e non
         # dice niente di privato — nessun token da controllare
@@ -6266,6 +6475,12 @@ def genera_miniature_mancanti():
         # nessuno chiede col suffisso _min — la gemella sarebbe un file
         # inutile in piu' a ogni lunedi'.
         if nome.startswith(("pod_", "neg_")):
+            continue
+        # NEMMENO IL BANNER del negozio: e' gia' ritagliato a
+        # BANNER_LARGO x BANNER_ALTO e nessuno lo chiede col _min — lo
+        # monta `renderNegozio` col nome pieno. Stessa ragione degli
+        # avatar, terza volta.
+        if nome.startswith("ban_"):
             continue
         percorso_pieno = os.path.join(FOTO_DIR, nome)
         percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
@@ -9950,6 +10165,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
                      "sconto_pacco_valore_valuta, sconto_pacco_percento, "
                      "sped_gratis_soglia, sped_gratis_soglia_eur, "
                      "sped_gratis_valuta, "
+                     "banner_stato, banner_foto, banner_link, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -10079,6 +10295,21 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     # server, come per gli annunci, cosi' il client non ha un secondo
     # `_slug` da tenere in pari.
     venditore["slug"] = _slug(v["nome"] or "")
+    # L'INSEGNA DEL NEGOZIO, dal suo giudice. Solo in PRIMA PAGINA come
+    # gli esauriti e i feedback, e solo se in vetrina c'e' almeno un
+    # annuncio — `bool(annunci)` risponde a quella domanda senza una
+    # query in piu', perche' questa e' esattamente la pagina 1 degli
+    # attivi. Senza quella condizione un account diventerebbe un
+    # cartellone a costo zero: pubblichi, apri la porta, ritiri.
+    # La chiave c'e' SEMPRE, `None` quando non c'e' niente da mostrare:
+    # il contratto di questa risposta e' che le chiavi restino.
+    venditore["banner"] = None if cursore else _banner_pubblico(
+        v["banner_stato"], v["banner_foto"], v["banner_link"],
+        bool(annunci))
+    # e i campi grezzi non escono MAI: un banner in revisione o spento
+    # non ha nessun motivo di far sapere in giro dove punterebbe
+    del venditore["banner_stato"], venditore["banner_foto"]
+    del venditore["banner_link"]
     del venditore["xp"], venditore["acquisti_ok"]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
@@ -11952,6 +12183,18 @@ def _leve_stato():
             _leva("Ferie: preavviso di rientro (ore)", "FERIE_PREAVVISO_ORE",
                   FERIE_PREAVVISO_ORE,
                   spento="nessun «domani riapri» al venditore"),
+            _leva("Banner del negozio", "BANNER_NEGOZIO_ATTIVO",
+                  bool(BANNER_NEGOZIO_ATTIVO),
+                  acceso="i venditori possono appendere un'insegna con "
+                         "un LINK FUORI da Barattolo: ogni banner passa "
+                         "da un moderatore",
+                  allarme=bool(BANNER_NEGOZIO_ATTIVO)),
+            _leva("Banner: livello che apre la porta", "BANNER_LIVELLO",
+                  BANNER_LIVELLO),
+            _leva("Banner: domini vietati", "BANNER_LINK_VIETATI",
+                  len(BANNER_LINK_VIETATI),
+                  spento="nessun accorciatore fermato: un link corto si "
+                         "approva pulito e domani punta altrove"),
         ]},
         {"gruppo": "💾 Consegna digitale", "voci": [
             _leva("Tetto per compratori nuovi (sats)",
@@ -19413,6 +19656,52 @@ GIORNI_AVATAR = 7                    # rinfresco opportunistico
 _AVATAR_IN_CORSO: set[int] = set()   # anti-valanga: un fetch per utente
 
 
+# L'INSEGNA DEL NEGOZIO: il gemello dell'avatar, con due sole
+# differenze e tutte e due dichiarate.
+# 1) Il RITAGLIO e' 3:1 e non quadrato — un'insegna e' larga e bassa, e
+#    a 360px di schermo, dentro il padding di #negozioHeader, fa ~109px
+#    di altezza su una testata che ne misura gia' 226 nel caso minimo.
+# 2) NON passa da `_foto_vuota`, ed e' la riga da non «uniformare»:
+#    quel giudice e' nato per la MERCE (una foto di prodotto che si
+#    vede piatta e' rotta), mentre un banner che e' una tinta unita col
+#    logo sopra e' grafica legittima — li' il rifiuto direbbe il falso.
+#    Da `_e_immagine` invece ci passa: il PDF rinominato .jpg resta il
+#    caso da cui quella guardia e' nata.
+BANNER_LARGO = 1200
+BANNER_ALTO = 400                    # 3:1
+BANNER_QUALITA = 88
+
+
+def _salva_banner(negozio: str, raw: bytes | None) -> str:
+    """L'insegna ritagliata al centro. '' = niente banner, e va bene
+    cosi': il chiamante lo legge come un rifiuto e non scrive nulla."""
+    if not ImmaginePillow or not raw or not negozio:
+        return ""
+    try:
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img).convert("RGB")
+        img = ImageOps.fit(img, (BANNER_LARGO, BANNER_ALTO),
+                           ImmaginePillow.Resampling.LANCZOS)
+        nome = f"ban_{negozio}_{int(time.time())}.jpg"
+        img.save(os.path.join(FOTO_DIR, nome), "JPEG",
+                 quality=BANNER_QUALITA)
+        return nome
+    except Exception:
+        return ""
+
+
+def _togli_banner_file(nome: str):
+    """Il file vecchio se ne va DOPO il commit, mai prima (il pattern
+    di `_scrivi_avatar`): un disco che fa i capricci non deve poter
+    lasciare una colonna che punta al nulla."""
+    if not nome:
+        return
+    try:
+        os.remove(os.path.join(FOTO_DIR, nome))
+    except OSError:
+        pass
+
+
 def _salva_avatar(negozio: str, raw: bytes | None) -> str:
     """Il francobollo: quadrato ritagliato al centro come le _min
     (il CSS poi lo fa tondo). '' = niente foto."""
@@ -19807,6 +20096,25 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["ferie_leve"] = {
         "attive": bool(FERIE_ATTIVE),
         "max_giorni": FERIE_MAX_GIORNI}
+    # Il banner del negozio, per il cassetto «🖼». Le sue colonne
+    # escono gia' dal SELECT * — e' il SUO profilo, quindi vede anche
+    # cio' che aspetta una decisione e il motivo di un rifiuto — e qui
+    # si aggiungono le due cose che il client non deve calcolarsi da
+    # se': se la porta e' aperta, e i DOMINI in chiaro (un secondo
+    # parser di la' sarebbe il posto da cui un giorno la riga sotto il
+    # banner e il link che si apre direbbero due cose diverse).
+    profilo["banner_leve"] = {
+        "attivo": bool(BANNER_NEGOZIO_ATTIVO),
+        "livello": BANNER_LIVELLO,
+        "livello_nome": next(
+            (l[3] for l in LIVELLI if l[2] == BANNER_LIVELLO), ""),
+        "porta_aperta": bool(u) and banner_porta_aperta(
+            u["xp"] or 0,
+            (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0),
+            BANNER_LIVELLO)}
+    profilo["banner_dominio"] = dominio_link(profilo.get("banner_link") or "")
+    profilo["banner_dominio_att"] = dominio_link(
+        profilo.get("banner_link_att") or "")
     # Lo sconto sul carrello, per il cassetto «🎁»: criteri, soglie e
     # percentuali proposte sono le PILLOLE del venditore (il patto di
     # LAMPO_SCONTI), i minimi e il tetto servono ai messaggi. I suoi
@@ -20684,6 +20992,349 @@ async def imposta_ferie(req: Request,
         except Exception as e:
             print(f"⚠️ Avviso decadenza per ferie saltato (#{o['id']}): {e}")
     return {"ok": True, "ferie_fino": fino}
+
+
+# ---------------------- IL BANNER DEL NEGOZIO -----------------------
+# L'insegna sopra il catalogo: si carica (foto + link), un MODERATORE
+# guarda, e solo allora si vede.
+# LA REVISIONE E' UMANA E OBBLIGATORIA, e non e' una scelta di comodo:
+# `moderazione_ai` manda ad Haiku una STRINGA «TITOLO/DESCRIZIONE» e
+# non una lista di blocchi, quindi un'immagine non ci sta
+# strutturalmente; e il prompt dice che «se il testo non c'e' non si
+# conclude niente, la risposta e' OK» — cioe' un banner fatto di
+# immagine e URL uscirebbe OK per costruzione. Un «Assistenza
+# Barattolo, tocca qui» DIPINTO DENTRO la foto e' il caso
+# dell'impersonazione in una forma che nessuna moderazione testuale
+# puo' vedere. A guardare e' un umano, sempre.
+
+MSG_BANNER_SPENTO = "Il banner del negozio non è attivo su Barattolo"
+
+
+def _casa_barattolo() -> str:
+    """Il nostro dominio, letto da URL_PUBBLICO invece che scritto una
+    seconda volta: il giorno che il dominio cambia, cambia qui."""
+    try:
+        return (urlparse(URL_PUBBLICO).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _byte_banner(dato: str) -> tuple[bytes | None, str]:
+    """I byte della foto dal data-URL, o `(None, motivo)`. Stessi
+    formati e stessi tetti di `salva_foto` — quel che il browser sa
+    preparare arriva gia' JPEG, il resto lo converte Pillow.
+    E NON si passa da `_foto_vuota`, ed e' la riga da non
+    «uniformare»: quel giudice e' nato per la MERCE, dove una foto
+    piatta e' una foto rotta — un'insegna che e' una tinta unita col
+    logo sopra e' grafica legittima, e li' il rifiuto direbbe il
+    falso. Da `_e_immagine` invece ci si passa: il PDF rinominato .jpg
+    resta il caso da cui quella guardia e' nata."""
+    m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
+                 dato or "", re.S)
+    if not m:
+        return None, "Formato della foto non riconosciuto"
+    try:
+        raw = base64.b64decode(m.group(2))
+    except Exception:
+        return None, "Foto illeggibile"
+    tetto = 15_000_000 if ImmaginePillow else 2_500_000
+    if len(raw) > tetto:
+        return None, f"Foto troppo grande (oltre {tetto // 1_000_000}MB)"
+    if m.group(1) in ("heic", "heif"):
+        if not (ImmaginePillow and pillow_heif):
+            return None, "Foto HEIC: questo server non sa convertirla"
+        raw = converti_in_jpeg(raw)
+        # `converti_in_jpeg` torna None su byte che non si aprono, e
+        # senza questa riga il chiamante si prenderebbe un 400 col
+        # messaggio VUOTO — cioe' un rifiuto che non dice niente
+        if raw is None:
+            return None, "Questa foto non si riesce a convertire"
+    elif not _e_immagine(raw):
+        return None, "Questo file non è una foto"
+    return raw, ""
+
+
+@app.post("/api/me/banner")
+async def salva_banner_negozio(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Il venditore chiede il suo banner: foto + link. Nasce SEMPRE in
+    revisione, anche quando ne ha gia' uno acceso — e in quel caso il
+    vivo RESTA ACCESO finche' il nuovo non e' approvato. E' la riga che
+    regge tutto il resto: senza, si fa approvare un sito pulito e lo si
+    scambia il giorno dopo.
+    Chiedere di nuovo mentre una revisione e' in corso SOSTITUISCE
+    quella in attesa: e' una correzione, non un secondo banner."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not BANNER_NEGOZIO_ATTIVO:
+        raise HTTPException(400, MSG_BANNER_SPENTO)
+    d = await leggi_json(req)
+    con = db()
+    u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
+                    "banner_foto_att FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not u or not u["negozio"]:
+        con.close()
+        raise HTTPException(400, "Il tuo negozio non è ancora pronto")
+    if not banner_porta_aperta(
+            u["xp"] or 0,
+            (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0),
+            BANNER_LIVELLO):
+        con.close()
+        raise HTTPException(400, MSG_BANNER_CHIUSO)
+    link, motivo = link_banner_ammesso(d.get("link"), BANNER_LINK_VIETATI,
+                                       _casa_barattolo())
+    if not link:
+        con.close()
+        raise HTTPException(400, motivo)
+    raw, motivo = _byte_banner(d.get("foto") or "")
+    if raw is None:
+        con.close()
+        raise HTTPException(400, motivo)
+    nome = _salva_banner(u["negozio"], raw)
+    if not nome:
+        con.close()
+        raise HTTPException(400, "Non riesco a leggere questa foto")
+    vecchia_attesa = u["banner_foto_att"] or ""
+    con.execute("UPDATE utenti SET banner_foto_att=?, banner_link_att=?, "
+                "banner_stato='revisione', banner_motivo='', "
+                "banner_chiesto_il=? WHERE tg_id=?",
+                (nome, link, int(time.time()), user["id"]))
+    con.commit()
+    con.close()
+    # il file dell'attesa PRECEDENTE se ne va dopo il commit, mai prima
+    if vecchia_attesa and vecchia_attesa != nome:
+        _togli_banner_file(vecchia_attesa)
+    asyncio.create_task(avvisa_banner(user["id"]))
+    return {"ok": True, "stato": "revisione", "foto": nome, "link": link,
+            "dominio": dominio_link(link),
+            "attesa_ore": REVISIONE_ATTESA_ORE}
+
+
+@app.post("/api/me/banner/togli")
+async def togli_banner_negozio(x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Via il banner, e basta. NESSUNA guardia — nemmeno quella della
+    leva: togliere non e' mai un problema, ed e' il patto del rientro
+    dalle ferie e dello spegnimento dello sconto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    u = con.execute("SELECT banner_foto, banner_foto_att FROM utenti "
+                    "WHERE tg_id=?", (user["id"],)).fetchone()
+    con.execute("UPDATE utenti SET banner_foto='', banner_link='', "
+                "banner_foto_att='', banner_link_att='', banner_stato='', "
+                "banner_motivo='' WHERE tg_id=?", (user["id"],))
+    con.commit()
+    con.close()
+    for f in ((u["banner_foto"] if u else ""),
+              (u["banner_foto_att"] if u else "")):
+        _togli_banner_file(f)
+    return {"ok": True, "stato": ""}
+
+
+async def avvisa_banner(tg_id: int):
+    """La notifica coi bottoni ✅/❌ ai moderatori, gemella di
+    `avvisa_revisione` — e GEMELLA e non riuso, perche' quella legge e
+    scrive `annunci` mentre il banner vive su `utenti`.
+    Si manda con sendPhoto: il moderatore deve VEDERE l'insegna, che e'
+    meta' di cio' su cui decide (l'altra meta' e' il dominio).
+    callback_data = `ban:ok:{tg_id}` / `ban:no:{tg_id}` — niente token
+    in memoria: la decisione deve sopravvivere ai riavvii, e ad
+    autorizzare e' `e_admin` sul mittente del tocco."""
+    con = db()
+    u = con.execute("SELECT tg_id, nome, negozio, banner_foto_att, "
+                    "banner_link_att FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not u or not u["banner_foto_att"]:
+        return
+    dom = dominio_link(u["banner_link_att"])
+    testo = (f"🖼 <b>Banner da approvare</b>\n"
+             f"Negozio: {html.escape(u['nome'] or '')} "
+             f"({URL_PUBBLICO}/negozio/{u['negozio']})\n"
+             f"Porta su: <b>{html.escape(dom)}</b>\n"
+             f"<code>{html.escape(u['banner_link_att'])}</code>")
+    tastiera = {"inline_keyboard": [[
+        {"text": "✅ Pubblica", "callback_data": f"ban:ok:{tg_id}"},
+        {"text": "❌ Rifiuta", "callback_data": f"ban:no:{tg_id}"},
+    ]]}
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for admin in destinatari:
+        await bot_api("sendPhoto", {
+            "chat_id": admin, "parse_mode": "HTML", "caption": testo,
+            "photo": f"{URL_PUBBLICO}/foto/{u['banner_foto_att']}",
+            "reply_markup": tastiera})
+
+
+async def decidi_banner(tg_id: int, esito: str, admin_id: int,
+                        motivo: str = "") -> tuple[bool, str]:
+    """Il cuore condiviso della decisione (tastiera E pannello admin
+    passano di qui). Ritorna `(ok, testo per chi ha deciso)`.
+    Quattro esiti, e il perche' di ognuno:
+    · `approva` — l'attesa diventa viva e il FILE vecchio se ne va;
+    · `rifiuta` — si butta l'attesa e il vivo NON si tocca, quindi un
+      banner gia' in vetrina sopravvive a una modifica bocciata;
+    · `spegni` — da attivo, per un'insegna che non va piu' bene; il
+      file resta, perche' `riaccendi` esiste;
+    · `riaccendi` — il ripensamento, che una decisione di moderazione
+      dev'essere REVERSIBILE (il patto di `decidi_revisione`).
+    L'UPDATE e' sempre CONDIZIONATO sullo stato letto: il secondo
+    moderatore che tocca trova il fatto compiuto, mai un doppio gancio.
+    Non si riapre un RIFIUTATO, ed e' dichiarato: la sua attesa e'
+    stata buttata col file, quindi non c'e' piu' niente da riaccendere
+    — si richiede."""
+    con = db()
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not u:
+        con.close()
+        return False, "Venditore non trovato"
+    stato, adesso = u["banner_stato"] or "", int(time.time())
+    vivo, attesa = u["banner_foto"] or "", u["banner_foto_att"] or ""
+    dom = dominio_link(u["banner_link_att"] or u["banner_link"])
+    da_togliere = ""
+    if esito == "approva":
+        if stato != "revisione" or not attesa:
+            con.close()
+            return False, "Questo banner non è in attesa di una decisione"
+        n = con.execute(
+            "UPDATE utenti SET banner_foto=banner_foto_att, "
+            "banner_link=banner_link_att, banner_foto_att='', "
+            "banner_link_att='', banner_stato='attivo', banner_motivo='', "
+            "banner_deciso_il=? WHERE tg_id=? AND banner_stato='revisione'",
+            (adesso, tg_id)).rowcount
+        da_togliere = vivo
+        avviso = ("✅ <b>Il banner del tuo negozio è online.</b> Lo vedi "
+                  "aprendo il tuo negozio da Barattolo.")
+        detto = "✅ Banner pubblicato"
+    elif esito == "rifiuta":
+        if stato != "revisione" or not attesa:
+            con.close()
+            return False, "Questo banner non è in attesa di una decisione"
+        # se ne aveva gia' uno approvato quello resta acceso: si boccia
+        # la MODIFICA, non l'insegna che era gia' in vetrina
+        n = con.execute(
+            "UPDATE utenti SET banner_foto_att='', banner_link_att='', "
+            "banner_stato=?, banner_motivo=?, banner_deciso_il=? "
+            "WHERE tg_id=? AND banner_stato='revisione'",
+            ("attivo" if vivo else "rifiutato", motivo, adesso,
+             tg_id)).rowcount
+        da_togliere = attesa
+        avviso = ("🖼 <b>Il banner non è stato approvato.</b>"
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Puoi rifarlo dal Profilo, su Barattolo.")
+        detto = "❌ Banner rifiutato"
+    elif esito == "spegni":
+        if stato != "attivo":
+            con.close()
+            return False, "Questo banner non è acceso"
+        n = con.execute(
+            "UPDATE utenti SET banner_stato='spento', banner_motivo=?, "
+            "banner_deciso_il=? WHERE tg_id=? AND banner_stato='attivo'",
+            (motivo, adesso, tg_id)).rowcount
+        avviso = ("🖼 <b>Il banner del tuo negozio è stato spento</b> da un "
+                  "moderatore."
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Il negozio e i tuoi annunci non sono toccati.")
+        detto = "🚫 Banner spento"
+    elif esito == "riaccendi":
+        if stato != "spento" or not vivo:
+            con.close()
+            return False, "Questo banner non è spento"
+        n = con.execute(
+            "UPDATE utenti SET banner_stato='attivo', banner_motivo='', "
+            "banner_deciso_il=? WHERE tg_id=? AND banner_stato='spento'",
+            (adesso, tg_id)).rowcount
+        avviso = "🖼 <b>Il banner del tuo negozio è di nuovo online.</b>"
+        detto = "↩︎ Banner riacceso"
+    else:
+        con.close()
+        return False, "Esito sconosciuto"
+    con.commit()
+    con.close()
+    if not n:
+        return False, "Ci ha già pensato un altro moderatore"
+    if da_togliere:
+        _togli_banner_file(da_togliere)
+    registra_moderazione("banner", esito, motivo, dom, 0, tg_id, admin_id)
+    try:
+        await notifica(tg_id, avviso)
+    except Exception as e:
+        print(f"⚠️ Avviso banner saltato (tg {tg_id}): {e}")
+    return True, detto
+
+
+async def callback_banner(cb: dict, dati: str):
+    """Il tocco su ✅/❌ della tastiera del banner. Solo i moderatori:
+    il tocco di chiunque altro non conta. Il tg_id puo' essere NEGATIVO
+    (i nativi Nostr), quindi il segno si toglie prima di chiedersi se
+    e' un numero."""
+    if not e_admin((cb.get("from") or {}).get("id") or 0):
+        return
+    esito, _, sid = dati.partition(":")
+    if esito not in ("ok", "no") or not sid.lstrip("-").isdigit():
+        return
+    ok, testo = await decidi_banner(
+        int(sid), "approva" if esito == "ok" else "rifiuta",
+        cb["from"]["id"])
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    if chat:
+        await bot_api("editMessageCaption", {
+            "chat_id": chat, "message_id": msg.get("message_id"),
+            "caption": testo, "parse_mode": "HTML"})
+
+
+@app.get("/api/admin/banner")
+def lista_banner(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: i banner che esistono. Quelli in ATTESA per primi e
+    dal piu' vecchio — chi aspetta da piu' tempo si vede per primo,
+    come la revisione — e sotto quelli gia' in vetrina e quelli spenti.
+    ESCONO ANCHE GLI ATTIVI, ed e' il pezzo che serve davvero: un
+    banner acceso non e' in nessuna coda, quindi senza questa lista un
+    moderatore che ne vede uno da spegnere non avrebbe da nessuna parte
+    un bottone per farlo. E gli SPENTI, perche' il ripensamento
+    dev'essere raggiungibile senza sapere un tg_id a memoria."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, nome, negozio, banner_stato, banner_motivo, "
+        "banner_chiesto_il, banner_deciso_il, banner_foto, banner_link, "
+        "banner_foto_att, banner_link_att FROM utenti "
+        "WHERE banner_stato IN ('revisione','attivo','spento') "
+        "ORDER BY CASE banner_stato WHEN 'revisione' THEN 0 ELSE 1 END, "
+        "         banner_chiesto_il ASC LIMIT 50").fetchall()
+    con.close()
+    fuori = []
+    for r in righe:
+        d = dict(r)
+        d["dominio"] = dominio_link(r["banner_link_att"] or r["banner_link"])
+        fuori.append(d)
+    return fuori
+
+
+@app.post("/api/admin/banner/{tg_id}")
+async def decidi_banner_admin(tg_id: int, req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la seconda porta della decisione, gemella di quella
+    della revisione. Il 403 sta PRIMA di leggere il body."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = (d.get("esito") or "").strip()
+    if esito not in ("approva", "rifiuta", "spegni", "riaccendi"):
+        raise HTTPException(400, "Esito sconosciuto")
+    ok, testo = await decidi_banner(tg_id, esito, user["id"],
+                                    (d.get("motivo") or "").strip()[:200])
+    if not ok:
+        raise HTTPException(409, testo)
+    return {"ok": True, "detto": testo}
 
 
 @app.post("/api/me/suggerimenti")
@@ -30632,6 +31283,7 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 #                                                  l'estensione viene
 #                                                  dal Content-Type)
 #   av_{negozio}_{ts}.jpg         _salva_avatar
+#   ban_{negozio}_{ts}.jpg        _salva_banner (l'insegna del negozio)
 # — cosi' un file lasciato li' dentro per sbaglio non e' pubblico, e
 # l'insieme di cio' che si serve resta chiuso e derivato.
 # CHI AGGIUNGE UNO SCRITTORE deve aggiungere la sua forma qui, o le
@@ -30650,6 +31302,10 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 NOME_FOTO = re.compile(
     r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)"
     r"|av_[0-9a-f]+_\d+\.jpg"
+    # l'insegna del negozio: la chiave e' il codice negozio pubblico,
+    # come per l'avatar, e senza questa forma la foto risponderebbe 404
+    # a chiunque apra il negozio
+    r"|ban_[0-9a-f]+_\d+\.jpg"
     # la vetrina del venditore su Nostr: il QUARTO scrittore di
     # foto/, e la sua forma sta qui perche' senza, la figura
     # pubblicata in piazza risponderebbe 404 a chiunque la apra
