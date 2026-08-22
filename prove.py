@@ -20862,11 +20862,23 @@ def prove_scoprire():
           "if nome not in FILE_SCOPRIRE:" in ra)
     prova("la rotta serve col 304 e la revalidazione", True,
           "_file_con_etag" in ra and '"public, no-cache"' in ra)
-    # NIENTE prova d'esistenza dei due .webp, APPOSTA (il precedente
-    # di tutto.webp): i banner li disegna Andrea, e una CI rossa in
-    # attesa di un asset educa a non guardarla. Si aggiunge col commit
-    # delle immagini; fino ad allora la card mostra il ripiego
-    # emoji+testo — degradazione, non regressione.
+    # I due banner ci sono (la prova e' nata COL loro commit, il
+    # precedente di tutto.webp: prima mancava apposta — una CI rossa
+    # in attesa di un asset educa a non guardarla).
+    for _f in ("lampo.webp", "sconto.webp"):
+        prova(f"il banner {_f} esiste", True,
+              os.path.exists(os.path.join("assets", "scoprire", _f)))
+    # ...e sono ESATTAMENTE 750x345, il triplo della card 250x115: un
+    # ratio diverso verrebbe ritagliato da object-fit:cover in
+    # silenzio, e il disegno di Andrea perderebbe i bordi senza che
+    # nessuno lo veda.
+    try:
+        from PIL import Image as _Im
+        prova("...e misurano 750x345", [(750, 345)] * 2,
+              [_Im.open(os.path.join("assets", "scoprire", _f)).size
+               for _f in ("lampo.webp", "sconto.webp")])
+    except ImportError:
+        salta("misura dei banner: serve Pillow")
 
     # ---- 2. I FLAG DELLA BUSTA passano da _where_occasioni: il
     # predicato della card E' quello del filtro, mai una WHERE
