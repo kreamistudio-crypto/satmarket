@@ -1749,19 +1749,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ridisegnano sotto lo stesso nome). DA FARE quando Andrea consegna i
   file: la prova d'esistenza in prove.py, che oggi manca APPOSTA (il
   precedente di tutto.webp) — fino ad allora il ripiego emoji+testo.
-  IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in due tempi:
-  prima il dondolio alla mascotte della card intera, ROVESCIATO
-  un'ora dopo): il bottone resta FERMO — bersaglio, anello e :active,
-  quindi il tocco su un bersaglio in moto non esiste per costruzione —
-  e ogni immagine ha il SUO movimento, dal soggetto: la SVEGLIA
-  squilla (`sc-squillo`, fremito di rotazione di mezzo secondo ogni
-  quattro, mai un tremolio continuo) e la scatola RESPIRA
-  (`sc-respiro`, zoom lento). IL FONDO NON SI SCOPRE MAI ed e'
-  aritmetica: scale>=1 con l'origine al centro puo' solo ritagliare, e
-  il fremito ruota un'immagine gia' al 7% (1.4° scoprono ~3px, il 7%
-  ne copre 4) — misurato sui pixel al picco di rotazione, non sperato.
-  Le forme sono proposte sulle DESCRIZIONI dei disegni: si ritarano
-  coi file veri.
+  IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in TRE tempi,
+  e vanno tenuti tutti: prima il dondolio alla mascotte della card
+  intera, ROVESCIATO un'ora dopo — il bottone resta FERMO, bersaglio
+  anello e :active, quindi il tocco su un bersaglio in moto non
+  esiste per costruzione — poi lo SQUILLO della sveglia, un fremito
+  di rotazione di mezzo secondo ogni quattro, ROVESCIATO dal vivo:
+  dava fastidio, troppo di scatto. MAI riproporre un movimento a
+  scatti qui). Ogni immagine ha il SUO movimento, dal soggetto: la
+  SVEGLIA ONDEGGIA (`sc-onda`, ±0.8° su 5s ease-in-out, e i keyframes
+  non passano MAI dal riposo — da -0.8° a +0.8° e ritorno, mai un
+  fotogramma fermo: e' cio' che la rende continua, e c'e' la prova
+  che vieta il rotate(0)) e la scatola RESPIRA (`sc-respiro`, zoom
+  lento 1→1.055 su 6s). IL FONDO NON SI SCOPRE MAI ed e' aritmetica:
+  scale>=1 con l'origine al centro puo' solo ritagliare, e l'onda
+  ruota un'immagine gia' al 5% (0.8° scoprono ~1.8px, il 5% ne copre
+  quasi 3) — misurato sui pixel al picco di rotazione, non sperato.
+  E L'ANELLO HA L'ARIA PER IL BORDO DI SOTTO (ago 2026, visto da
+  Andrea): outline 2.5 + offset 2 = 4.5px, e col padding-bottom a 2
+  l'overflow della striscia lo RITAGLIAVA — il bordo basso non si
+  vedeva. La .scoprire-strip ha padding-bottom 6 (divergenza dalla
+  .cat-strip, dove sotto il quadrato c'e' l'etichetta e il caso non
+  si presenta); verificato sui pixel: 3px sotto il bordo della card
+  accesa c'e' l'arancio ₿ esatto.
   DUE DIFETTI TROVATI DAL VIVO e non leggendo: 1) in DEMO pura la
   striscia delle CATEGORIE non compariva piu' affatto — il
   renderChips d'avvio parte con DEMO ancora false, e nel catch della
@@ -1771,9 +1781,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `[data-id="lampo"] img` — la sentinella sulla forma diceva che la
   regola c'era, il giro CDP ha detto che non vinceva mai: ora
   `[data-id] img` pareggia l'attributo e vince per ordine.
-  MISURE: la sezione pesa ~157px a 320 (misurata), e nei giorni senza
-  occasioni costa zero. A 320 una card quasi piena piu' uno spicchio
-  della seconda, il taglio al bordo dice che ce n'e' altre.
+  MISURE: la sezione pesa 161px a 320 (misurata; era 157 prima
+  dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
+  320 una card quasi piena piu' uno spicchio della seconda, il taglio
+  al bordo dice che ce n'e' altre.
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
   le stesse 27 figure della pagina Sfoglia, nello stesso ordine (per
