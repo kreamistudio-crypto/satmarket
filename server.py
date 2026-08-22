@@ -34531,7 +34531,14 @@ def _feed_google() -> bytes:
            "<channel>"
            f"<title>{_xml(TITOLO_HOME)}</title>"
            f"<link>{_xml(URL_PUBBLICO)}</link>"
-           "<description>Mercatino dell'usato in satoshi, "
+           # «dell'usato» NON ci va (ago 2026, la decisione del
+           # LESSICO): su licenze, poster, olio e birre e' falsa, e
+           # qui la frase esce verso GOOGLE — cioe' e' una
+           # dichiarazione su cosa vendiamo fatta a chi le
+           # misrepresentation le sanziona. Il censimento di quella
+           # decisione girava su main, che il feed non ce l'ha: questa
+           # riga e' l'unica occorrenza che il cantiere REINTRODUCE.
+           "<description>Mercatino in satoshi, "
            "col deposito di garanzia</description>"
            + "".join(voci) + "</channel></rss>").encode("utf-8")
     _FEED_CACHE.update(quando=adesso, xml=xml)
