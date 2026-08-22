@@ -781,6 +781,13 @@ def prove_categorie():
     prova("la rotta delle illustrazioni ammette anche «tutto»", True,
           'SLUG_ILLUSTRAZIONI = SLUG_CATEGORIE | {"tutto"}' in _SORGENTE
           and "base not in SLUG_ILLUSTRAZIONI" in _SORGENTE)
+    # ...e il file c'e' davvero, col suo francobollo: senza, la card
+    # in testa mostrerebbe per sempre l'emoji di ripiego e sembrerebbe
+    # quasi giusta — la stessa ragione delle due prove qui sopra.
+    prova("l'illustrazione di «Tutto» esiste", True,
+          os.path.exists("assets/categorie/tutto.webp"))
+    prova("...col suo francobollo -mini", True,
+          os.path.exists("assets/categorie/tutto-mini.webp"))
 
     # Le illustrazioni devono essere TIRATE, cioe' senza margine
     # trasparente attorno (ci pensa ritaglia_categorie.py). Non e' una
