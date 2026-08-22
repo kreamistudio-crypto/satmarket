@@ -5746,6 +5746,11 @@ function mapListing(a){
        deciso dal server (ultimo_pezzo), qui non si rifa' il conto —
        il numero da cui nasce non esce apposta */
     ultimo:!!a.ultimo,
+    /* l'annuncio promette di RIACQUISIRE l'accesso a un wallet: il
+       verdetto lo dà il server (promette_recupero_wallet), qui non si
+       rifà il giudizio — e un server di ieri non manda il campo, che
+       vuol dire nessuna riga: un'assenza, non una bugia */
+    avvisoWallet:!!a.avviso_wallet,
     /* le date della riga «pubblicato/aggiornato N giorni fa» del
        dettaglio: modificato = 0 se mai toccato (per gli importati
        porta la data dell'EVENTO Nostr, che e' la pubblicazione vera) */
@@ -11341,7 +11346,7 @@ function renderAcquisto(){
   const notaScritta = (d.nota || '').trim();
   const campiNota = `<label for="acqNota">Nota per il venditore (facoltativa)</label>
     <input id="acqNota" maxlength="${MAX_NOTA}" value="${esc(d.nota||'')}"
-      placeholder="${esc(segnaposNota(d.tipo==='set'))}"
+      placeholder="${esc(segnaposNota(d.tipo==='set', d.via==='servizio'))}"
       oninput="if(acqDati)acqDati.nota=this.value">
     ${/* LA PREVENZIONE STA NELLA FRASE BASE e non nel ramo «casa», ed
           e' deliberato: e' sulle ALTRE vie che serve di piu' — li' un
@@ -11349,7 +11354,7 @@ function renderAcquisto(){
           qualcuno ci scriverebbe la via di casa. E' anche l'unica cosa
           che tiene la nota fuori dai dati personali, visto che resta
           nell'ordine e la legge un moderatore. */''}
-    <div class="acq-nota">Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto — non il tuo recapito.${d.via==='casa' ? ' Per citofono, scala e orari c\'è «Note per il corriere», qui sopra nell\'indirizzo.' : ''} <span class="fine-frase">Resta nell'ordine. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-moderatori')">Chi la legge</button></span></div>`;
+    <div class="acq-nota">${invitoNota(d.via==='servizio')} — non il tuo recapito.${d.via==='casa' ? ' Per citofono, scala e orari c\'è «Note per il corriere», qui sopra nell\'indirizzo.' : ''} <span class="fine-frase">Resta nell'ordine. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-moderatori')">Chi la legge</button></span></div>`;
   const notaChiusa = notaScritta
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
         onclick="apriNotaAcquisto()"><span class="punto-testo">📝 ${esc(notaScritta)}</span><span class="punto-cambia">Cambia</span></button>`
@@ -11842,9 +11847,47 @@ const MAX_NOTA = 200;
    L'ORDINE — imperfezione dichiarata, decisione di Andrea — quindi
    l'esempio invita a NOMINARE la cosa: con cinque oggetti «taglia L»
    da sola non dice a quale, e a scioglierlo e' chi scrive. */
-const segnaposNota = eSet =>
-  eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
-       : 'Es. taglia L, oppure la variante blu';
+/* LA REVISIONE DI UNA PRESTAZIONE INSEGNA, NON DICE SOLO NO (ago
+   2026, decisione di Andrea): «un moderatore lo controllerà» a chi ha
+   scritto «ti sviluppo quello che ti serve» è vero e inutile — non gli
+   dice che cosa manca né che, aggiustandolo, si può. Il testo dice la
+   REGOLA e la fa vedere con la COPPIA, che è l'unica cosa che insegna
+   davvero un confine: due annunci dello stesso mestiere, uno che passa
+   e uno che no.
+   ⚠️ E DICE LA STRADA GIUSTA, che NON è «correggilo»: un annuncio in
+   revisione non si modifica (`modifica_annuncio` esige 'attivo', e in
+   /miei il bottone Modifica lì non c'è) — si ritira e si ripubblica. È
+   la stessa lezione del bottone che porta a un 400: un consiglio che
+   manda su una strada chiusa è peggio di nessun consiglio.
+   UN TESTO SOLO PER I DUE POSTI — il toast che si legge sul momento e
+   la riga che RESTA in «I tuoi annunci», dove uno torna il giorno dopo
+   a chiedersi perché è ancora fermo. Due copie direbbero due regole. */
+const SERVIZIO_DEFINITO = 'Le prestazioni si vendono, ma devono essere '
+  + 'definite: <b>quanto durano, che cosa comprendono</b>. «Landing a una '
+  + 'schermata, 3 sezioni, 2 revisioni» sì; «ti sviluppo quello che ti '
+  + 'serve» no — senza un perimetro, se nasce una lite nessuno può dire '
+  + 'se hai consegnato. Se manca, ritiralo e ripubblicalo scrivendolo.';
+/* il toast è testo nudo (niente innerHTML): i grassetti si tolgono
+   invece di scriverli due volte — la lezione di `spoglia_html` */
+const servizioDefinitoNudo = () =>
+  SERVIZIO_DEFINITO.replace(/<\/?b>/g, '');
+
+/* SU UNA PRESTAZIONE LA NOTA DICE ALTRO (ago 2026, visto dal giro
+   visivo del cantiere dei servizi e non leggendo il codice): «taglia,
+   numero, colore» e «prepararti l'oggetto giusto» su una lezione non
+   vogliono dire niente, e «finche' non spedisce» non succede MAI — li'
+   l'ordine resta in 'locked' fino alla conferma, e la nota si corregge
+   per tutto il tempo. Il campo e' UNO, quindi le parole che lo
+   spiegano devono essere UNE: un giudice per i tre posti che le
+   scrivono (segnaposto, cassa, ordine), o direbbero tre cose diverse
+   sullo stesso campo. */
+const invitoNota = servizio => servizio
+  ? "Il livello, l'argomento, cosa ti serve: quello che gli serve per preparare la prestazione"
+  : "Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto";
+const segnaposNota = (eSet, servizio) =>
+  servizio ? 'Es. livello intermedio, vorrei lavorare sulla conversazione'
+  : eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
+         : 'Es. taglia L, oppure la variante blu';
 /* LA NOTA NASCE APERTA DOVE C'E' UNA VARIANTE DA DIRE (ago 2026,
    decisione di Andrea): taglia, numero, colore — nelle categorie in
    elenco la domanda e' quasi certa e il campo si trova gia' aperto;
@@ -13254,6 +13297,22 @@ function openDetail(id){
              <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b>${offAcc.quantita > 1 ? ` — l'accordo è per ${fmt(offAcc.quantita)} pezzi` : ''} — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${stradeConsegna(l).includes('servizio') ? `<div class="trust-note" id="notaServizio">🎓 <span><b>Prestazione:</b> dopo il pagamento il venditore propone giorno e ora, e tu confermi — finché non confermi non parte nessun conto alla rovescia. I sats restano nel deposito di garanzia e <b>non si muovono da soli</b>: si sbloccano quando confermi tu che la prestazione c'è stata. ⚠️ Barattolo non può sapere se c'è stata davvero: se finite in disputa, un moderatore guarda se le <b>condizioni</b> c'erano — appuntamento concordato, collegamento lasciato in tempo.</span></div>` : ''}
+             ${/* L'AVVISO DEL RECUPERO WALLET (ago 2026, decisione di
+                   Andrea): un AVVISO a chi COMPRA, mai un blocco a chi
+                   vende. E' la truffa piu' diffusa del bitcoin, e chi
+                   ci casca ha gia' perso l'accesso ai suoi fondi —
+                   quindi e' disperato, e paga in anticipo.
+                   LA RIGA E' VERA ANCHE SU UN CORSO ONESTO, ed e' cio'
+                   che rende il falso positivo GRATIS: «senza le tue
+                   chiavi nessuno puo' recuperarlo» a una lezione sulla
+                   sicurezza dei wallet non toglie niente, lo conferma.
+                   Percio' il giudice del server sbaglia LARGO apposta.
+                   Sta in FONDO alle trust-note e non in cima: prima si
+                   legge cosa protegge il deposito, poi cosa non puo'
+                   proteggere — e' l'ordine della pagina «Il pagamento
+                   protetto». Rosso e non ambra: qui non c'e' un
+                   ritardo, c'e' una cosa che si perde e non torna. */''}
+             ${l.avvisoWallet ? `<div class="trust-note" id="notaWallet" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span><b>Nessuno può recuperare un wallet senza le tue chiavi.</b> È la truffa più diffusa del bitcoin: chi lo promette prende l'anticipo e sparisce. E se ti chiedono la <b>seed</b> o le <b>chiavi private</b> per farlo, quelle non si danno a nessuno — chi le ha, ha i tuoi fondi. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Cosa protegge il deposito</button></span></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              <!-- Il ⚡ «Compra subito» NWC non vive piu' qui (ago
                   2026): l'ordine nasce SOLO dalla pagina d'acquisto,
@@ -19757,7 +19816,7 @@ function pannelloNota(o){
         <div class="hint">${esc(scritta)}</div>
         <div class="hint" style="margin-top:6px">Il venditore l'ha ricevuta. Da qui non si cambia più.</div></div>`;
     return `<div class="payout"><h4>📝 La tua nota per il venditore</h4>
-      <div class="hint">Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto. La legge prima di preparare la consegna, e puoi cambiarla o toglierla finché non spedisce.</div>
+      <div class="hint">${invitoNota(o.consegnaScelta==='servizio')}. ${o.consegnaScelta==='servizio' ? 'La legge prima dell&#39;appuntamento, e puoi cambiarla o toglierla fino a quando confermi che la prestazione c&#39;è stata.' : 'La legge prima di preparare la consegna, e puoi cambiarla o toglierla finché non spedisce.'}</div>
       ${/* TEXTAREA e non input, come i fratelli puntoRitiroInp e
             bustaNome: dentro .payout e' vestita solo lei (.payout
             textarea) — un <input> qui esce nudo, col bordo del
@@ -19765,7 +19824,7 @@ function pannelloNota(o){
             lettura. Il valore sta sulla stessa riga del tag, zero
             spazi: l'HTML mangia un solo \n iniziale e l'indentazione
             finirebbe DENTRO la nota. */''}
-      <textarea id="notaOrdineInp" style="min-height:38px" maxlength="${MAX_NOTA}" placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length)))}">${esc(scritta)}</textarea>
+      <textarea id="notaOrdineInp" style="min-height:38px" maxlength="${MAX_NOTA}" placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length), o.consegnaScelta==='servizio'))}">${esc(scritta)}</textarea>
       <button class="btn orange" onclick="salvaNota()">${scritta ? 'Aggiorna la nota' : 'Salva la nota'}</button>
       ${scritta ? `<button class="btn ghost" onclick="togliNota()">🗑 Togli la nota</button>` : ''}</div>`;
   }
@@ -20560,6 +20619,10 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
            che sta leggendo */''}
       <div class="mio-azioni">
         ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
+          /* LA RIGA CHE RESTA, e vale piu' del toast: chi torna qui il
+             giorno dopo a chiedersi perche' e' fermo trova la regola e
+             la strada, non un cartello muto. Solo sulle prestazioni:
+             altrove non sapremmo che consiglio dare. */
           /* Qui la parola resta «Venduto» ed e' voluto: questo e' il
              libro mastro del venditore, e la vendita e' successa
              davvero. «Esaurito» e' la parola PUBBLICA, per chi
@@ -20568,6 +20631,12 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
           :`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
         ${esa?'':`<span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
       </div>
+      ${/* fuori da .mio-azioni e su una riga sua: quella e' flex-wrap
+            e a 320px i due badge la riempiono gia' tutta — un terzo
+            pezzo la' dentro farebbe crescere OGNI riga della lista */''}
+      ${rev && l.consegna === 'servizio'
+        ? `<div class="hint" style="margin-top:8px">${SERVIZIO_DEFINITO}</div>`
+        : ''}
     </div>`; };
 
 /* ---------------- il rifornimento (ago 2026) ----------------
@@ -22972,7 +23041,11 @@ async function publish(){
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
-    toast(`⏳ Annuncio inviato: un moderatore lo controllerà (di solito entro ${attesaOre} ore). Lo trovi tra i tuoi annunci.${avvisoFotoTesto}`, 6000);
+    /* su una prestazione il toast INSEGNA invece di dire solo no, e
+       dura di piu': quel testo si legge, non si sbircia */
+    const serv = el('sellConsServ')?.checked;
+    toast(`⏳ Annuncio inviato: un moderatore lo controllerà (di solito entro ${attesaOre} ore). Lo trovi tra i tuoi annunci.${serv ? ' ' + servizioDefinitoNudo() : ''}${avvisoFotoTesto}`,
+          serv ? 12000 : 6000);
     setCat('Tutto');
     apriCassettoProfilo('accAnnunci');
     return;

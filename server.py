@@ -6514,6 +6514,78 @@ MSG_RIFIUTO_IMPERSONAZIONE = ("Questo annuncio sembra un messaggio da "
 PAROLE_IMPERSONAZIONE = ("impersona", "finge", "fint", "spaccia",
                          "phishing", "confond")
 
+# --- L'AVVISO DEL RECUPERO WALLET (ago 2026, decisione di Andrea col
+# cantiere dei servizi). E' la truffa piu' diffusa del bitcoin, e chi
+# ci casca ha gia' perso l'accesso ai suoi fondi: e' disperato, quindi
+# paga. Ma NON si blocca chi vende — si AVVISA chi compra.
+#
+# PERCHE' NON UN DIVIETO, ed e' la parte da non rovesciare: i recuperi
+# leciti ESISTONO e non sono rari — la Ledger di cui si e' scordato il
+# PIN ma si ha la seed (reset e restore), il wallet.dat corrotto o con
+# la password dimenticata (btcrecover fa proprio quello), la parola
+# della seed che manca. Vietarli fermerebbe gente onesta per una
+# parola, che e' l'errore gia' pagato col «barattolo» vaso di vetro.
+#
+# E LA RIGA E' VERA ANCHE SUL CASO LECITO, che e' cio' che rende il
+# falso positivo GRATIS: a un corso sulla sicurezza dei wallet
+# «nessuno puo' recuperarlo senza le tue chiavi» non fa nessun danno —
+# lo conferma. Quindi il giudice puo' sbagliare LARGO senza costo,
+# mentre sbagliare stretto costa i fondi di qualcuno. E' il verso di
+# `FORME_TRACKING`: si CHIEDE, non si impedisce.
+#
+# COME SI RICONOSCONO SENZA PRENDERE I CORSI: non dalla parola
+# «wallet» ne' dalla parola «recupero», che da sole prendono mezzo
+# catalogo (una Jade «ripristinabile da seed», un recupero crediti).
+# Serve una CONGIUNZIONE A DISTANZA — un atto di riacquisizione
+# VICINO a un oggetto d'accesso — perche' e' cosi' che si scrive la
+# promessa: «recupero wallet», «sblocco la tua seed», «riapro il tuo
+# exchange». Nella Jade quelle due parole ci sono tutt'e due ma
+# LONTANE, in frasi diverse, ed e' la distanza a separarle.
+RECUPERO_ATTI = ("recuper", "sblocc", "ripristin", "riapr", "riott",
+                 "ritrov", "forzar", "cracc", "hacker", "decifr",
+                 "bypass", "aggirar", "rientr", "restitui", "riavere",
+                 "riaver", "riacquis")
+# «fondi» e non «fond»: cosi' non prende «fondo» ne' «fondina». E i
+# nomi dei wallet contano quanto la parola «wallet»: chi promette il
+# recupero nomina quasi sempre il posto da cui recuperare.
+RECUPERO_ACCESSI = ("wallet", "portafogli", "seed", "mnemonic",
+                    "passphrase", "exchange", "metamask", "binance",
+                    "ledger", "trezor", "criptovalut", "cripto",
+                    "bitcoin", "btc", "chiavi", "chiave", "fondi",
+                    "coinbase", "kraken", "electrum", "blockchain")
+# QUANTO VICINE, ed e' MISURATO e non scelto a occhio: su otto
+# annunci-truffa scritti come si scrivono davvero e quindici leciti
+# (mezzo catalogo Bitcoin: Jade, Ledger resettata, corsi, nodi,
+# riparazioni PC) piu' gli 860 attivi del database di collaudo —
+# 4 perde «riottengo l'accesso al tuo portafoglio bitcoin» (cinque
+# parole in mezzo), 5 le prende tutte e otto, e da 5 in su l'unico
+# che accende in piu' e' un corso Bitcoin. Che e' il falso positivo
+# GRATIS: la' la riga e' vera e utile. Sul catalogo vero: zero.
+RECUPERO_VICINANZA = 5
+
+
+def promette_recupero_wallet(titolo: str, descrizione: str = "") -> bool:
+    """L'annuncio parla di RIACQUISIRE l'accesso a un wallet?
+
+    Congiunzione a distanza su testo normalizzato (la ricetta del
+    filtro di casa): un atto di recupero e un oggetto d'accesso
+    entro RECUPERO_VICINANZA parole l'uno dall'altro. Prefissi e non
+    parole intere, cosi' le declinazioni entrano da sole.
+
+    EURISTICA E NON VERIFICA, ed e' scritto: nessuno di questi
+    annunci lo possiamo controllare. Sbaglia LARGO apposta — la riga
+    che accende e' vera anche su un corso onesto.
+    """
+    parole = normalizza(f"{titolo} {descrizione}").split()
+    atti = [i for i, w in enumerate(parole)
+            if any(w.startswith(p) for p in RECUPERO_ATTI)]
+    if not atti:
+        return False
+    acc = [i for i, w in enumerate(parole)
+           if any(w.startswith(p) for p in RECUPERO_ACCESSI)]
+    return any(abs(a - b) <= RECUPERO_VICINANZA for a in atti for b in acc)
+
+
 
 def messaggio_rifiuto(motivo: str) -> str:
     """Il messaggio giusto per il no dell'AI: a chi si e' spacciato
@@ -8691,6 +8763,15 @@ def arricchisci_righe_vetrina(righe):
             r["venditore_titolo"] = NOMI_TITOLI.get(
                 r["venditore_titolo"] or "", "")
         r["zona_comune"] = comune_da_zona(r.get("zona") or "")
+        # L'AVVISO DEL RECUPERO WALLET (ago 2026): un BOOL e non il
+        # testo — le parole stanno nel client, come per ogni altra
+        # trust-note, e qui esce solo il verdetto. Si calcola nel collo
+        # di bottiglia perche' e' un campo DERIVATO come zona_comune,
+        # e cosi' lo ereditano per costruzione tutte e sei le rotte che
+        # diventano card, compresa quella del singolo — che e' l'unica
+        # dove oggi la riga si disegna.
+        r["avviso_wallet"] = promette_recupero_wallet(
+            r.get("titolo") or "", r.get("descrizione") or "")
         # 3-bis) `ultimo` (ago 2026): «ne resta UNO e ne ha avuti piu'
         # d'uno». UN campo derivato invece del numero grezzo, per la
         # ragione di zona_comune: il nome porta gia' dentro la risposta

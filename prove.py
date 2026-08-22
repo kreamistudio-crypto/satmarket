@@ -22292,6 +22292,138 @@ def prove_servizi():
 
     # --- il form Vendi
     mini = open("miniapp.html", encoding="utf-8").read()
+    # ================= L'AVVISO DEL RECUPERO WALLET =================
+    # Un avviso a chi COMPRA, mai un blocco a chi vende. Il giudice e'
+    # puro: si GIRA sui casi, meta' dei quali LEGITTIMI — il rischio
+    # di questa euristica e' tutto da quel lato.
+    amb = {"re": re, "unicodedata": __import__("unicodedata")}
+    # `pezzo` sa estrarre solo le funzioni: le tre liste si prendono
+    # dal blocco, come fanno le sorelle di PAROLE_FUNZIONE_IT
+    i = _SORGENTE.index("RECUPERO_ATTI = (")
+    exec(_SORGENTE[i:_SORGENTE.index("def promette_recupero_wallet", i)],
+         amb)
+    for f in ("normalizza", "promette_recupero_wallet"):
+        exec(pezzo(f), amb)
+    rec = amb["promette_recupero_wallet"]
+
+    truffe = [
+        ("Recupero wallet Bitcoin", "Hai perso l'accesso? Te lo riapro."),
+        ("Servizio recupero seed phrase", "Anche parziale."),
+        ("Sblocco account exchange bloccato", "Binance, Kraken."),
+        ("Ti riapro il tuo Metamask", ""),
+        ("Recupero criptovalute perse", "Pagamento anticipato 30%."),
+        ("Wallet recovery", "Recupero fondi da wallet inaccessibili."),
+        ("Consulenza", "Riottengo l'accesso al tuo portafoglio bitcoin."),
+        ("Hai perso le tue chiavi?", "Te le ritrovo io."),
+    ]
+    prova("l'avviso si accende su tutte le forme della truffa", [],
+          [t for t, d in truffe if not rec(t, d)])
+
+    # I LECITI SONO LA META' CHE CONTA: mezzo catalogo Bitcoin parla
+    # di wallet e di seed senza promettere nessun recupero
+    leciti = [
+        ("Jade hardware wallet nuova",
+         "Sigillata. Si configura in dieci minuti e la seed la scrivi tu."),
+        ("BitBox02 usata", "L'ho resettata: la seed di prima non c'e' piu'."),
+        ("Vendo Ledger Nano X",
+         "Comprata l'anno scorso, resettata. Nella scatola c'e' anche la "
+         "scheda dove si scrive la seed, mai usata."),
+        ("Consulenza fiscale su criptovalute",
+         "Un'ora: dichiarazione, plusvalenze, quadro RW."),
+        ("Lezione di inglese online", "Un'ora di conversazione."),
+        ("Recupero crediti, consulenza legale",
+         "Ti seguo nelle pratiche di recupero del credito."),
+        ("Ripristino computer lento", "Formattazione e reinstallazione."),
+        ("Riparazione PC", "Sblocco password di Windows, recupero dati."),
+        ("Libro: Mastering Bitcoin", "Seconda edizione, come nuovo."),
+        ("Consulenza su nodi Bitcoin",
+         "Ti configuro un nodo e ti spiego come si fa il backup delle "
+         "chiavi: la seed la scrivi e la tieni tu, io non la vedo mai."),
+    ]
+    prova("...e NON su chi vende o insegna senza promettere accessi", [],
+          [t for t, d in leciti if rec(t, d)])
+
+    # LA CONGIUNZIONE E' LA REGOLA: nessuna delle due meta' basta da
+    # sola, o si prenderebbe mezzo catalogo
+    prova("l'atto da solo non accende", False,
+          rec("Recupero crediti", "Pratiche stragiudiziali"))
+    prova("l'oggetto da solo non accende", False,
+          rec("Vendo una Jade", "Wallet hardware, seed a 12 parole"))
+    # ...E LA DISTANZA E' L'ALTRA META': in un annuncio lungo le due
+    # parole ci sono quasi sempre, ma lontane
+    prova("lontane non accendono", False,
+          rec("Corso", "Il recupero " + "di roba varia " * 6 + " wallet"))
+    prova("vicine si", True, rec("Corso", "recupero del tuo wallet"))
+
+    # IL VERSO IN CUI SBAGLIA: il falso positivo dichiarato — su un
+    # corso onesto la riga e' VERA, quindi non costa niente
+    prova("il corso sui backup accende, ed e' il falso positivo gratis",
+          True, rec("Corso Bitcoin", "come funziona un wallet, e a fine "
+                    "corso ripristiniamo insieme un backup di prova"))
+
+    prova("la distanza e' quella misurata", 5, amb["RECUPERO_VICINANZA"])
+    # la declinazione che la MISURA ha trovato e la lettura no
+    prova("la radice prende «riottengo» e non solo «riottieni»", True,
+          "riott" in amb["RECUPERO_ATTI"]
+          and "riottien" not in amb["RECUPERO_ATTI"])
+
+    # --- IL CAMPO NASCE NEL COLLO DI BOTTIGLIA, o le sei rotte che
+    # diventano card non lo avrebbero (e la scheda e' una di quelle)
+    arr = pezzo("arricchisci_righe_vetrina")
+    prova("il verdetto si calcola dove si calcolano i derivati", True,
+          'r["avviso_wallet"] = promette_recupero_wallet(' in arr)
+    prova("...e guarda titolo E descrizione", True,
+          'r.get("titolo") or "", r.get("descrizione") or ""' in arr)
+    # UN BOOL E NON IL TESTO: le parole stanno nel client come ogni
+    # altra trust-note, e dal server esce solo il verdetto
+    prova("dal server esce un verdetto, mai le parole", False,
+          "chiavi" in arr or "truffa" in arr)
+
+    # --- LA RIGA nel client
+    prova("il client non rifa' il giudizio", 1,
+          mini.count("avvisoWallet:!!a.avviso_wallet"))
+    prova("...e la riga la disegna una volta sola", 1,
+          mini.count('id="notaWallet"'))
+    prova("...gated sul verdetto del server", 1,
+          mini.count("${l.avvisoWallet ? `<div class=\"trust-note\""))
+    nota = mini.split('id="notaWallet"')[1].split("</div>")[0]
+    prova("la riga dice il FATTO, non un sospetto sul venditore", True,
+          "senza le tue chiavi" in nota)
+    prova("...e dice di non dare MAI la seed a nessuno", True,
+          "non si danno a nessuno" in nota)
+    prova("e' rossa e non ambra: qui non c'e' un ritardo", True,
+          "var(--danger)" in nota)
+
+    # --- LE PAROLE DELLA NOTA SEGUONO LA STRADA. Su una prestazione
+    # «taglia, numero, colore» non vuol dire niente e «finche' non
+    # spedisce» non arriva mai: e' il campo UNO, quindi le parole
+    # devono essere UNE — un giudice per i tre posti che le scrivono.
+    prova("l'invito della nota e' un giudice solo", 1,
+          mini.count("const invitoNota = servizio =>"))
+    prova("...e su una prestazione non nomina l'oggetto", True,
+          "preparare la prestazione" in mini)
+    inv = mini.split("const invitoNota")[1].split(";")[0]
+    prova("...mentre l'altro ramo tiene taglia/numero/colore", True,
+          "Taglia, numero, colore" in inv)
+    # I TRE CHIAMANTI: se uno resta indietro, quel posto dice ancora
+    # «oggetto» su una lezione — ed e' il difetto che si e' visto dal
+    # giro visivo e NON leggendo il codice
+    prova("i posti che scrivono quelle parole passano tutti dal giudice",
+          2, mini.count("invitoNota("))
+    prova("...e il segnaposto sa della prestazione nei DUE posti", 2,
+          mini.count("segnaposNota(d.tipo==='set', d.via==='servizio')")
+          + mini.count("segnaposNota(!!(o.righe && o.righe.length),"
+                       " o.consegnaScelta==='servizio')"))
+    seg = mini.split("const segnaposNota = (eSet, servizio) =>")[1][:230]
+    prova("il segnaposto guarda la prestazione PRIMA del set", True,
+          seg.index("servizio ?") < seg.index("eSet ?"))
+    # LA CODA e' l'altra meta': dice fino a QUANDO si puo' cambiare
+    prova("la coda del pannello non promette una spedizione", True,
+          "toglierla fino a quando confermi" in mini)
+    prova("...e la sceglie la strada, non lo stato", True,
+          "${o.consegnaScelta==='servizio' ? 'La legge prima"
+          " dell&#39;appuntamento" in mini)
+
     prova("il client conosce la strada", True,
           "if (l.consegna==='servizio') s.push('servizio');" in mini)
     # Il gemello di senza_condizione: se i due divergono il form chiede
