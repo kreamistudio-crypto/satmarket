@@ -14971,13 +14971,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che funzionava. La riga è UNA con DUE consumatori (lo script a mano
   e `ricategorizza_automatico`, che importa `PROMPT` e `RIGA`): la
   correzione vale per tutti e due.
+  E IL SECONDO GIRO HA TROVATO L'EFFETTO OPPOSTO (ago 2026, il giorno
+  dopo, dal rilancio vero sul VPS): le undici da «Bitcoin» ad «Altro»
+  sparite, ma TRE «Sat's Oil» proposti da Alimenti a Bitcoin per il
+  «Sat» nel NOME, e il «Manifesto Hacker» spinto verso Arte perché è
+  una stampa. La contro-regola (decisione di Andrea): IL TEMA
+  DEV'ESSERE L'OGGETTO, NON IL NOME DEL PRODOTTO — un olio in
+  edizione bitcoin resta olio — ed è alla lettera la terza
+  contro-regola già pagata dal prompt della moderazione («sat» è la
+  MONETA, una somiglianza di nome non è mai un motivo), che questo
+  prompt non aveva mai ricevuto; più la riga che il poster cypherpunk
+  resta «Bitcoin» anche se è una stampa d'arte. La guardia contro lo
+  stringere troppo sono i tre casi tematici del collaudo, che devono
+  continuare a restare in Bitcoin.
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
-  da rilanciare a OGNI ritocco. Nove casi con l'atteso accanto: i
+  da rilanciare a OGNI ritocco. Dodici casi con l'atteso accanto: i
   cinque di Andrea (sacca, poster, le DUE magliette — quella qualunque
   STA in Bitcoin e deve USCIRNE, il caso affilato apposta che
   impedisce a «tematico» di assorbire troppo — e il NerdMiner che il
-  prompt vecchio indovinava già) più quattro regressioni
+  prompt vecchio indovinava già), i TRE del secondo giro (il Sat's
+  Oil che resta olio, la birra gemella con altre parole — se cade
+  solo lei, la cura ha imparato il nome invece della regola — e il
+  Manifesto Hacker che non migra verso Arte) più quattro regressioni
   (portatile→Informatica, Jade→Bitcoin, l'alimentatore che sorveglia
   la clausola tenuta, e il NON SO che sopravvive). A differenza del
   fratello si IMPORTA — ricategorizza.py chiede il config dentro
@@ -14996,10 +15012,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che un giro saltato non si scambi per un giro riuscito. Torturato
   con sei mutazioni, ognuna rossa da sola.
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
-  (`python collaudo_ricategorizza.py`), atteso 9/9: chi lo rilancia
+  (`python collaudo_ricategorizza.py`), atteso 12/12: chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
-  maglietta qualunque o l'alimentatore la regola assorbe troppo e va
-  stretta, se cadono i tre tematici non ha insegnato abbastanza.
+  maglietta qualunque, l'alimentatore o l'olio la regola assorbe
+  troppo e va stretta, se cadono i tematici non ha insegnato
+  abbastanza.
   L'atteso segue il PROMPT, mai il modello. Dopo il giro,
   `ricategorizza.py --rifai` sul VPS è una SCELTA di Andrea, non un
   deploy: rifà le domande anche sui già decisi.
