@@ -19637,6 +19637,15 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "proroga_minuti": ASTA_PROROGA_MINUTI,
         "max_attive": ASTA_MAX_ATTIVE_VENDITORE,
         "proxy_attivo": bool(ASTA_PROXY_ATTIVO)}
+    # E quelle dei SERVIZI, per il form di vendita. Senza, a leva
+    # SPENTA il venditore vedrebbe la casella «È un servizio», la
+    # spunterebbe, e l'annuncio nascerebbe SENZA modalita' — il
+    # giudice dei payload normalizza a '' — cioe' come uno storico,
+    # in silenzio. E' il patto di `asta_leve`: il client non decide
+    # mai una leva, ma deve sapere quali gesti offrire.
+    profilo["servizio_leve"] = {
+        "attivi": bool(SERVIZI_ATTIVI),
+        "max_giorni": SERVIZIO_MAX_GIORNI}
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [

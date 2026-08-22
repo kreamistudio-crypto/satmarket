@@ -4481,7 +4481,23 @@ document.getElementById('cartello')?.remove();</script>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🚚</span>Spedizione</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
         <label class="cons-riga" id="sellConsDigRiga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
-        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
+        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div>
+        <!-- IL SERVIZIO (ago 2026): una prestazione non viaggia,
+             quindi la sua casella non convive con le altre tre — la
+             spunta le SPEGNE, come fa il toggle dell'asta con
+             quantita' e spedizione. Vive dentro lo stesso campo
+             perche' la domanda e' la stessa («come arriva quel che
+             vendi?»), e la risposta «non arriva: ci si trova» e'
+             una delle possibili. -->
+        <label class="cons-riga" id="sellConsServRiga" style="display:none"><input type="checkbox" id="sellConsServ" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🎓</span>È un servizio<span class="cons-sub">lezione, consulenza: una prestazione con una durata</span></span></label>
+        <div id="sellServOpzioni" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:8px" class="consegna-scelta">
+            <button type="button" class="pill consegna-pill on" id="sellServOnline" onclick="setServDove('online')">💻 Online</button>
+            <button type="button" class="pill consegna-pill" id="sellServPresenza" onclick="setServDove('presenza')">📍 Di persona</button>
+          </div>
+          <div class="sats-input" style="margin-top:8px"><input id="sellServDurata" type="number" inputmode="numeric" min="1" placeholder="60"><span class="suffix" style="pointer-events:none">minuti</span></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanto dura, e che cosa comprende: scrivilo nella descrizione. <b>Una prestazione si vende qui se è stabilita PRIMA</b> — «un'ora di conversazione in inglese» sì, «ti sviluppo quello che ti serve» no: senza un perimetro, in disputa non si può decidere niente. Dopo il pagamento proponi tu giorno e ora, e chi ha comprato conferma.</div>
+        </div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
@@ -5499,7 +5515,13 @@ function condPill(id){
 const CAT_SENZA_COND = ['Alimenti e bevande', 'Bellezza e benessere',
                         'Buoni ed esperienze'];
 const senzaCondizione = (cat, consegna) =>
-  CAT_SENZA_COND.includes(cat) || consegna === 'digitale';
+  CAT_SENZA_COND.includes(cat) || consegna === 'digitale'
+  /* il SERVIZIO (ago 2026): la scala non lo descrive proprio —
+     un'ora di lezione non e' ne' nuova ne' usata, e chiederlo e' una
+     domanda senza risposte giuste. Il gemello di senza_condizione:
+     se i due divergono, il form chiede una condizione che il server
+     butta via. Trovato DAL VIVO nel browser, non leggendo. */
+  || consegna === 'servizio';
 /* Il titolo del dettaglio con la condizione in CODA, come fosse
    l'ultima parola («Crema spalmabile NUOVO»). Il trucco e' legare la
    pillola all'ULTIMA PAROLA con un nowrap: se sull'ultima riga non
@@ -5710,6 +5732,7 @@ function mapListing(a){
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
+    servDove:a.servizio_dove||'', durataMin:a.durata_min||0,
     /* la condizione dell'oggetto: '' = mai dichiarata (storici) */
     condizione:a.condizione||'',
     /* lo stato viaggia dove serve — i preferiti, il singolo e lo
@@ -9034,6 +9057,12 @@ function stradeConsegna(l){
   if (l.consegna==='spedizione' || l.consegna==='entrambe') s.push('spedizione');
   if (l.consegna==='ritiro' || l.consegna==='entrambe') s.push('ritiro');
   if (l.consegna==='digitale' || l.ancheDigitale) s.push('digitale');
+  /* Il SERVIZIO (ago 2026) e' un insieme di UNO e non entra in
+     nessuna combo: una prestazione non viaggia, quindi non c'e' una
+     seconda strada da offrire accanto. Sta in fondo perche' l'ordine
+     di questa lista e' anche la precedenza del default, e li' non
+     compete con nessuno — quando c'e' lui e' l'unico. */
+  if (l.consegna==='servizio') s.push('servizio');
   return s;
 }
 /* La scelta del compratore quando le strade sono piu' d'una:
@@ -10355,7 +10384,8 @@ const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="tru
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
   : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker / punto</span>`
-  : v==='digitale' ? '💾 Codice online' : '';
+  : v==='digitale' ? '💾 Codice online'
+  : v==='servizio' ? '🎓 Di persona o in videoconferenza' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
    decisione di Andrea): se casa e punto costano UGUALE la cifra non
@@ -10579,7 +10609,7 @@ function preventivoDemo(l){
    gia' scelta si conserva sui ± come sempre. Il ripiego vive[0] copre
    lo storico (pseudo-via '') e ogni via futura fuori elenco. */
 function viaDefault(vive){
-  for (const v of ['punto','casa','ritiro','digitale'])
+  for (const v of ['punto','casa','ritiro','digitale','servizio'])
     if (vive.some(s => s.via === v)) return v;
   return vive.length ? vive[0].via : '';
 }
@@ -12143,7 +12173,10 @@ function corpoConsegna(){
   const nota = (acqDati?.nota || '').trim().slice(0, MAX_NOTA);
   const extra = nota ? {nota_compratore: nota} : {};
   if (!v) return extra;
-  if (v==='ritiro' || v==='digitale') return {consegna: v, ...extra};
+  /* il servizio esce di qui con le due vie che non hanno niente da
+     aggiungere: nessun punto, nessun indirizzo, nessuna tariffa */
+  if (v==='ritiro' || v==='digitale' || v==='servizio')
+    return {consegna: v, ...extra};
   const out = {consegna:'spedizione', ...extra,
                spedizione_via: v==='punto' ? 'punto' : 'casa'};
   /* dal quarto giro il punto c'e' sempre (ctaAcquisto lo esige
@@ -21809,6 +21842,15 @@ const prezzoEurForm = () => eurCampo('sellPrice');
    ('spedizione'/'ritiro'/'entrambe'/'digitale') + anche_digitale —
    che reggono tutte le combinazioni: nessuna colonna nuova. */
 function consegnaForm(){
+  /* Il SERVIZIO vince su tutto e non porta combo: una prestazione
+     non viaggia, quindi «servizio + spedizione» non e' una cosa che
+     esiste. La casella spegne le altre tre in aggiornaConsegnaForm;
+     qui la precedenza e' la cintura, per il caso in cui il DOM
+     arrivasse in uno stato che non dovrebbe. */
+  if (el('sellConsServ')?.checked)
+    return {consegna: 'servizio', anche_digitale: 0,
+            servizio_dove: servDove,
+            durata_min: parseInt(el('sellServDurata')?.value, 10) || 0};
   const sped = el('sellConsSped').checked,
         rit  = el('sellConsRitiro').checked,
         dig  = el('sellConsDig').checked;
@@ -21816,13 +21858,27 @@ function consegnaForm(){
                  : rit ? 'ritiro' : dig ? 'digitale' : '';
   return {consegna, anche_digitale: (dig && (sped || rit)) ? 1 : 0};
 }
+/* DOVE si svolge: 'online' | 'presenza'. Vive in una variabile e non
+   nel DOM perche' il form si ridisegna, ed e' la stessa ragione per
+   cui la quantita' scelta vive in `qtaScelta`. */
+let servDove = 'online';
+function setServDove(v){
+  servDove = v;
+  el('sellServOnline')?.classList.toggle('on', v==='online');
+  el('sellServPresenza')?.classList.toggle('on', v==='presenza');
+  /* la zona diventa obbligatoria di persona: il server lo esige
+     (guardia_zona_condizione), e la label lo deve dire PRIMA */
+  aggiornaConsegnaForm();
+}
 /* Il verso opposto: dai valori salvati alle caselle (precompilazione
    della modifica e reset del form). */
-function impostaConsegnaForm(c, ancheDig){
+function impostaConsegnaForm(c, ancheDig, dove, durata){
   el('sellConsSped').checked = c==='spedizione' || c==='entrambe';
   el('sellConsRitiro').checked = c==='ritiro' || c==='entrambe';
   el('sellConsDig').checked = c==='digitale' || !!ancheDig;
-  aggiornaConsegnaForm();
+  if (el('sellConsServ')) el('sellConsServ').checked = c==='servizio';
+  if (el('sellServDurata')) el('sellServDurata').value = durata || '';
+  setServDove(dove === 'presenza' ? 'presenza' : 'online');
 }
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
@@ -21834,6 +21890,11 @@ function impostaConsegnaForm(c, ancheDig){
    la spedizione, se offerta, e' inclusa nel prezzo). Le durate
    arrivano da /api/me (asta_leve): il client non hardcoda cifre. */
 let astaLeve = null;        // da /api/me
+/* La leva dei servizi, stessa fonte e stesso patto: a leva spenta la
+   casella non si disegna proprio — un gesto che porta a un annuncio
+   senza modalita' e' peggio di un gesto che non c'e'. */
+let servizioLeve = null;    // da /api/me
+const serviziAccesi = () => !!(servizioLeve && servizioLeve.attivi);
 let sellAstaGiorni = 0;     // la durata scelta nel form
 function astaAccesa(){ return !!(el('sellAsta') && el('sellAsta').checked); }
 function aggiornaAstaForm(){
@@ -21876,6 +21937,20 @@ function astaForm(){
    centro). Qui non si tocca piu' nessuna cella: due righe che
    accendevano e spegnevano a runtime cio' che ormai non cambia mai
    erano solo un secondo posto dove sbagliare. */
+function aggiornaServizioVisibilita(){
+  const r = el('sellConsServRiga');
+  if (!r) return;
+  /* fuori anche dalla modifica FIRMATA degli importati: una
+     prestazione da un evento Nostr non ha senso — chi la vende deve
+     essere QUI a proporre l'appuntamento — e il server la rifiuta
+     dalla lista bianca fail-closed. Offrirla sarebbe un vicolo. */
+  const on = serviziAccesi() && !editandoNostr;
+  r.style.display = on ? '' : 'none';
+  if (!on && el('sellConsServ')?.checked){
+    el('sellConsServ').checked = false;
+    aggiornaConsegnaForm();
+  }
+}
 function aggiornaAstaVisibilita(){
   const on = asteAccese();
   const f = el('sellAstaField');
@@ -22035,6 +22110,25 @@ function aggiornaHintPolitiche(){
   }
 }
 function aggiornaConsegnaForm(){
+  /* IL SERVIZIO SPEGNE LE ALTRE TRE, ed e' l'unica riga che serve
+     per renderlo esclusivo: le caselle si svuotano PRIMA di leggerle,
+     quindi da qui in giu' tutto il resto della funzione vede un form
+     senza spedizione, senza ritiro e senza codice — nessun ramo nuovo
+     da aggiungere ai sette gate visivi. */
+  const serv = el('sellConsServ')?.checked;
+  if (serv){
+    el('sellConsSped').checked = false;
+    el('sellConsRitiro').checked = false;
+    el('sellConsDig').checked = false;
+  }
+  if (el('sellServOpzioni'))
+    el('sellServOpzioni').style.display = serv ? '' : 'none';
+  /* e le tre caselle di sopra spariscono quando c'e' lui: lasciarle
+     spente e toccabili inviterebbe a spuntarle per poi vederle
+     spegnersi da sole */
+  for (const id of ['sellConsSped','sellConsRitiro','sellConsDig'])
+    if (el(id)) el(id).closest('.cons-riga').style.display =
+      serv ? 'none' : '';
   const sped = el('sellConsSped').checked,
         rit = el('sellConsRitiro').checked,
         asta = astaAccesa();
@@ -22071,8 +22165,15 @@ function aggiornaConsegnaForm(){
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
   const zl = el('zonaLabel');
-  if (zl) zl.textContent = rit ? 'Zona — il tuo comune, obbligatorio per il ritiro'
-                               : 'Zona (facoltativa)';
+  /* Il servizio DI PERSONA vuole il comune per la stessa ragione del
+     ritiro (chi viene deve sapere dove), e il server lo esige: la
+     label lo dice PRIMA, o l'errore arriva dopo il viaggio con le
+     foto in base64. Online no: li' un luogo non esiste. */
+  const servQui = serv && servDove === 'presenza';
+  if (zl) zl.textContent =
+    rit ? 'Zona — il tuo comune, obbligatorio per il ritiro'
+    : servQui ? 'Zona — il tuo comune, obbligatorio di persona'
+    : 'Zona (facoltativa)';
   aggiornaSpedHint();
   aggiornaCondizioneForm();   /* il solo-codice-online non la chiede */
 }
@@ -22101,7 +22202,14 @@ function aggiornaCondizioneForm(){
    viaggia nudo: niente costo, niente taglia. La combo aggiunge il
    flag anche_digitale accanto alla parte fisica. */
 function consegnaPayload(){
-  const {consegna, anche_digitale} = consegnaForm();
+  const {consegna, anche_digitale, servizio_dove,
+         durata_min} = consegnaForm();
+  /* Il servizio viaggia coi suoi due campi e con NIENT'ALTRO: niente
+     taglia, niente tariffe, niente combo. Il giudice del server le
+     azzererebbe comunque — qui non si mandano proprio, che e' la
+     forma del solo-digitale una riga piu' sotto. */
+  if (consegna==='servizio')
+    return {consegna, servizio_dove, durata_min};
   if (consegna==='digitale' || !consegna) return {consegna};
   const out = {consegna, taglia_pacco:el('sellTaglia').value};
   if (anche_digitale) out.anche_digitale = 1;
@@ -22158,7 +22266,8 @@ function editListing(id){
   el('sellCat').value = l.cat;
   el('sellZone').value = l.zone==='—' ? '' : l.zone;
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
-  impostaConsegnaForm(l.consegna||'', l.ancheDigitale);
+  impostaConsegnaForm(l.consegna||'', l.ancheDigitale,
+                      l.servDove, l.durataMin);
   el('sellTaglia').value = l.taglia||'';
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
@@ -22562,6 +22671,24 @@ async function publish(){
   if (mostraConsegna && el('sellConsRitiro').checked
       && !el('sellZone').value.trim()) {
     toast('Per il ritiro in zona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
+  }
+  /* Il servizio DI PERSONA vuole il comune per la stessa ragione del
+     ritiro, e il server lo esige (guardia_zona_condizione): il
+     controllo sta QUI perche' l'errore arrivi PRIMA del viaggio con
+     le foto in base64 — la lezione del gemello qui sopra. */
+  if (mostraConsegna && el('sellConsServ')?.checked
+      && servDove === 'presenza' && !el('sellZone').value.trim()) {
+    toast('Per un servizio di persona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
+  }
+  /* LA DURATA E' META' DELLA DEFINIZIONE, ed e' il motivo per cui una
+     prestazione si puo' vendere qui: «un'ora di conversazione» e' una
+     cosa precisa, «ti sviluppo quello che ti serve» no — senza un
+     perimetro, in disputa non si decide niente. Si chiede nel CLIENT,
+     dove si guida chi pubblica; il server la tollera a 0, che e' il
+     patto degli storici e dei client di ieri. */
+  if (mostraConsegna && el('sellConsServ')?.checked
+      && !(parseInt(el('sellServDurata')?.value, 10) > 0)) {
+    toast('Quanto dura? Scrivi i minuti: è quello che rende la prestazione una cosa precisa'); return;
   }
   /* IL CONTROLLO «e' un comune vero?» RESTA FUORI dalla strada
      firmata, ed e' l'unica delle quattro che non si apre (ago 2026):
@@ -24198,6 +24325,8 @@ async function avvia(){
     if (me.max_barattolo > 0) MAX_PREFERITI = Number(me.max_barattolo);
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();
+    servizioLeve = me.servizio_leve || null;
+    aggiornaServizioVisibilita();
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();

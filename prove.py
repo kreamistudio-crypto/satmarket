@@ -11343,9 +11343,14 @@ def prove_pagina_acquisto():
     # punto → casa → ritiro → digitale — e i chiamanti DUE, la pagina
     # vera e il ramo DEMO: chi torna a vive[0], a strade[0] o a
     # casa-prima fa rosse queste righe.
+    # Il SERVIZIO (ago 2026) entra in coda, e la posizione non e' una
+    # scelta di precedenza: quando c'e' lui e' l'UNICA strada — una
+    # prestazione non viaggia, quindi non compete con nessuno. Sta in
+    # fondo perche' li' non cambia niente per gli altri quattro.
     prova("il default della via e' una precedenza, punto prima",
           True,
-          "for (const v of ['punto','casa','ritiro','digitale'])" in mini)
+          "for (const v of ['punto','casa','ritiro','digitale','servizio'])"
+          in mini)
     prova("...il giudice e' uno coi suoi due chiamanti", 3,
           mini.count("viaDefault("))
     prova("...e il ramo DEMO non fa piu' da se'", False,
@@ -22167,6 +22172,38 @@ def prove_servizi():
     # non puo' suonare e' peggio di nessun allarme.
     prova("il libro mastro sa che un servizio non spedisce", True,
           "IN ('ritiro','digitale','servizio')" in _SORGENTE)
+
+    # --- il form Vendi
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client conosce la strada", True,
+          "if (l.consegna==='servizio') s.push('servizio');" in mini)
+    # Il gemello di senza_condizione: se i due divergono il form chiede
+    # una condizione che il server butta via. Trovato DAL VIVO nel
+    # browser (il campo restava visibile), non leggendo il codice.
+    prova("...e che a un servizio non si chiede la condizione", True,
+          "|| consegna === 'servizio';" in mini)
+    prova("il payload del servizio non porta tariffe ne' taglia", True,
+          "return {consegna, servizio_dove, durata_min};" in mini)
+    # A leva SPENTA la casella non si disegna: un gesto che porta a un
+    # annuncio senza modalita' e' peggio di un gesto che non c'e'
+    prova("la casella e' gatata sulla leva", True,
+          "const on = serviziAccesi() && !editandoNostr;" in mini)
+    prova("...e nasce nascosta, senza lampo", True,
+          'id="sellConsServRiga" style="display:none"' in mini)
+    prova("...e la leva arriva da /api/me", True,
+          "servizioLeve = me.servizio_leve || null;" in mini
+          and 'profilo["servizio_leve"]' in _SORGENTE)
+    prova("la spunta spegne le altre tre strade", True,
+          "el('sellConsSped').checked = false;" in mini)
+    prova("la zona lo dice PRIMA, di persona", True,
+          "obbligatorio di persona" in mini)
+    prova("...e publish la esige", True,
+          "servDove === 'presenza' && !el('sellZone').value.trim()" in mini)
+    # La durata e' meta' della definizione: e' cio' che rende una
+    # prestazione vendibile qui («un'ora di conversazione» sì, «ti
+    # sviluppo quello che ti serve» no)
+    prova("la durata si chiede, o la prestazione non e' definita", True,
+          "parseInt(el('sellServDurata')?.value, 10) > 0" in mini)
     prova("gira nell'orologio", True,
           "await sollecita_servizi_fermi()" in _SORGENTE)
     # LEFT JOIN: un set ha annuncio_id=0 e con l'INNER sparirebbe in
