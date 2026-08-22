@@ -115,6 +115,23 @@ CASI = [
      "«Bitcoin», non migra verso «Arte e artigianato» solo perche' "
      "e' una stampa"),
 
+    # --- il terzo giro (ago 2026, dal campo): lo stesso pendolo del
+    #     Sat's Oil ma sull'altro asse — una consulenza sui wallet
+    #     restava in «Bitcoin» perche' il modello guardava il TEMA e
+    #     ignorava che l'oggetto e' una PRESTAZIONE. La regola: le
+    #     prestazioni battono il tema, qualunque sia l'argomento.
+    ("Consulenza sui wallet bitcoin, un'ora in videochiamata",
+     "Ti aiuto a configurare il tuo hardware wallet e a mettere al "
+     "sicuro la seed.",
+     "Bitcoin", "Lezioni e corsi",
+     "il caso vero del terzo giro: e' una prestazione, non merce a "
+     "tema — sta in «Bitcoin» e deve USCIRNE"),
+    ("Corso di cucina a domicilio, 3 ore",
+     "Ti insegno tre piatti a casa tua, ingredienti compresi.",
+     "Alimenti e bevande", "Lezioni e corsi",
+     "la gemella su un ALTRO tema: se cade solo questa, la cura ha "
+     "imparato «bitcoin» invece della regola delle prestazioni"),
+
     # --- le regressioni: il file guarda tutto il prompt, non solo
     #     la cura -----------------------------------------------------
     ("Portatile Dell i5",

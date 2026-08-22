@@ -129,6 +129,17 @@ PROMPT = (
     "edizione bitcoin restano «Alimenti e bevande» — «sat» o "
     "«bitcoin» nel NOME non bastano mai a spostare un prodotto "
     "d'uso. Non ci sta l'elettronica generica.\n"
+    # IL TERZO GIRO (ago 2026, dal campo): una consulenza sui wallet
+    # restava in «Bitcoin» — lo stesso pendolo del Sat's Oil ma
+    # sull'altro asse: il modello guardava il TEMA e ignorava che
+    # l'oggetto e' una PRESTAZIONE. La regola sta da sola perche' non
+    # e' un caso di Bitcoin: vale per ogni argomento — un corso di
+    # cucina non e' «Alimenti e bevande».
+    "- Le PRESTAZIONI battono il tema: se quello che si vende e' una "
+    "prestazione — una lezione, un corso, una consulenza, un lavoro "
+    "su commissione — la categoria e' «Lezioni e corsi» o «Lavoro e "
+    "servizi», qualunque sia l'argomento. Una consulenza su bitcoin "
+    "e' «Lezioni e corsi», un hardware wallet e' «Bitcoin».\n"
     "- «Informatica» e' per computer, portatili, componenti e "
     "periferiche; «Telefonia» per telefoni e accessori; «Elettronica» "
     "resta per il resto.\n"

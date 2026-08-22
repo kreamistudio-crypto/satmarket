@@ -1137,6 +1137,16 @@ def prove_ricategorizza():
           in ric.PROMPT)
     prova("...e il poster a tema non migra verso Arte", True,
           "poster cypherpunk resta «Bitcoin»" in ric.PROMPT)
+    # IL TERZO GIRO (ago 2026, dal campo): una consulenza sui wallet
+    # restava in «Bitcoin» — lo stesso pendolo del Sat's Oil ma
+    # sull'altro asse: il tema batteva l'OGGETTO quando l'oggetto e'
+    # una prestazione. La regola sta in una voce SUA perche' vale per
+    # ogni argomento, non solo per Bitcoin.
+    prova("le prestazioni battono il tema (il terzo giro)", True,
+          "Le PRESTAZIONI battono il tema" in ric.PROMPT)
+    prova("...con la coppia consulenza/hardware wallet", True,
+          "Una consulenza su bitcoin e' «Lezioni e corsi»" in ric.PROMPT
+          and "un hardware wallet e' «Bitcoin»" in ric.PROMPT)
 
 
 # ====================================================================
@@ -1154,8 +1164,8 @@ def prove_collaudo_ricategorizza():
     import ricategorizza as ric
     cat = ric.catalogo()
 
-    prova("i dodici casi ci sono (nove del piano + il secondo giro)",
-          True, len(cr.CASI) >= 12)
+    prova("i quattordici casi ci sono (piano + secondo e terzo giro)",
+          True, len(cr.CASI) >= 14)
     prova("ogni «ora sta in» e' una categoria vera del catalogo", [],
           [t for t, _, ora, _, _ in cr.CASI if ora not in cat])
     prova("ogni atteso e' una categoria vera del catalogo", [],
@@ -1183,6 +1193,13 @@ def prove_collaudo_ricategorizza():
           any(t.startswith("Sat's Oil")
               and ora == "Alimenti e bevande"
               and att == "Alimenti e bevande"
+              for t, _, ora, att, _ in cr.CASI))
+    # Il terzo giro, ancorato al caso per NOME come il Sat's Oil: la
+    # gemella del corso di cucina terrebbe verde un any() generico su
+    # «Lezioni e corsi» anche con l'atteso della consulenza riscritto.
+    prova("la consulenza sui wallet esce da Bitcoin (terzo giro)", True,
+          any(t.startswith("Consulenza sui wallet")
+              and ora == "Bitcoin" and att == "Lezioni e corsi"
               for t, _, ora, att, _ in cr.CASI))
     # Il collaudo usa i pezzi VERI: un prompt in due copie e' un
     # prompt che diverge, e una copia di chiedi() pure.
