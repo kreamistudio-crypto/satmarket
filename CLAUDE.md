@@ -2120,6 +2120,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   PRIMA del Vendi, ed è lui a tenere il tondo a metà — messo altrove
   il ＋ scivola al 37,5% e a occhio non se ne accorge nessuno (c'è la
   prova sull'ORDINE del markup). Il buco è dove andrà la voce nuova.
+  [Dall'ago 2026 la voce è ARRIVATA — il tasto P2P, e lo spaziatore
+  non esiste più: vedi «IL TASTO P2P», sotto. Le misure del centro
+  restano identiche, che le celle sono sempre cinque `flex:1`.]
   E IL MARKUP DELLA BARRA È STATICO: `aggiornaAstaVisibilita` non
   accende più il tasto Aste né spegne lo spaziatore — due righe che
   muovevano a runtime cose che ormai non cambiano mai erano solo un
@@ -2236,20 +2239,68 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pillola accesa in fondo non la vedrebbe nessuno): è la regola della
   regione nel pannello Filtri, «il campo non deve mentire».
   NAV A CINQUE POSTI: il tondo del Vendi resta al centro ESATTO
-  (verificato: 180.0 su 180.0 a 360px) perché le voci sono quattro ma
-  gli slot cinque — `.nav-vuoto`, uno spaziatore elastico che tiene il
-  quinto posto, vuoto di proposito e già destinato a qualcos'altro. In
-  topbar desktop sparisce (lì i bottoni sono `flex:0 0 auto`).
-  L'ORDINE è [Esplora][vuoto](+)[Aste][Ordini] (ago 2026, col cantiere
-  delle categorie in home: prima era [Esplora][Sfoglia](+)[Aste][vuoto,
-  spento][Ordini]). Il posto vuoto è quello che era di «Sfoglia», cioè
-  PRIMA del Vendi, e ci resta finché non ci andrà la voce nuova; gli
-  Ordini restano comunque all'estrema destra, dove il pollice li trova
-  senza guardare. Spostarlo è solo uno scambio di posto nel markup:
-  voci e spaziatore sono tutti `flex:1`, quindi il Vendi resta il terzo
-  di cinque slot uguali e nessuna regola CSS si tocca (misurato:
-  centro esatto alle tre larghezze, nav 61,2px, e da desktop lo
-  spaziatore è già `display:none`).
+  (verificato: 180.0 su 180.0 a 360px) perché gli slot sono cinque e
+  tutti `flex:1`. [Lo spaziatore elastico che teneva il quinto posto
+  «vuoto di proposito e già destinato a qualcos'altro» NON ESISTE PIÙ
+  dall'ago 2026: il posto l'ha preso il tasto P2P — vedi «IL TASTO
+  P2P», sotto — e le celle sono cinque voci piene.]
+  L'ORDINE è [Esplora][P2P](+)[Aste][Ordini] (ago 2026, col cantiere
+  del tasto P2P: prima era [Esplora][vuoto](+)[Aste][Ordini], e prima
+  ancora [Esplora][Sfoglia](+)[Aste][vuoto, spento][Ordini]). Il posto
+  di «Sfoglia», PRIMA del Vendi, l'ha preso la voce nuova come il
+  commento della barra prometteva; gli Ordini restano comunque
+  all'estrema destra, dove il pollice li trova senza guardare. Le
+  cinque celle sono tutte `flex:1`, quindi il Vendi resta il terzo di
+  cinque slot uguali senza una regola dedicata (misurato: centro
+  esatto alle tre larghezze, nav 61,2px).
+  IL TASTO P2P (ago 2026, decisione di Andrea): la voce «P2P» con la
+  ₿ A TRATTO, che per ora porta SOLO al suo coming soon — «Qualcosa di
+  nuovo è in arrivo», teaser VAGO apposta (cosa arriva — lo scambio
+  euro↔bitcoin fra utenti — lo dirà il suo cantiere, e quei testi si
+  riscriveranno allora). Il patto del martelletto a leva spenta, ma
+  qui NESSUNA leva e nessun giudice, deliberato: la funzione non
+  esiste affatto e la risposta è una sola ovunque, DEMO e vetrina
+  anonima comprese — `vaiP2P()` è `go('p2ppresto')` e basta, e quando
+  lo scambio nascerà il calco della leva è `asteAccese()` (due fonti).
+  È una RADICE sorella come `astepresto` (in `RADICI`, si SOSTITUISCE
+  fra i tab, l'indietro passa da Esplora), `voceNav` mappa
+  `p2ppresto` → `p2p`, e NIENT'ALTRO si tocca: niente ramo in `go()`
+  né in `navRendiVista` (la vista è markup fisso e cade nel `go(b.v)`
+  finale), fuori da `VISTE_PTR`. La vista è il calco esatto di
+  `view-astepresto`: mascotte col ₿ arancio di ripiego nel `.big`
+  (verificato da file://), zero dati utente, mai un `esc()`.
+  L'ICONA È UNA ₿ NUOVA, disegnata: nel progetto una ₿ a tratto non
+  esisteva — il lockup `.bmark` è CSS a pseudo-elementi, il resto è
+  glifo di testo (categoria Bitcoin, toggle valuta) — e un glifo
+  pieno accanto a tre icone a tratto da 1,5 avrebbe stonato. La
+  grammatica è quella delle sorelle: viewBox `2 2 20 20`, inchiostro
+  in [2,22], currentColor, velo al 12%, fuori squadra di un pelo.
+  DUE TRAPPOLE PAGATE DALLE SENTINELLE, e sono la parte da ricordare:
+  la regex delle celle in prove.py era `nav-[a-z]+` e il 2 di «p2p»
+  non lo digeriva — «cinque celle» avrebbe detto quattro — ora è
+  `[a-z0-9]+`; e la fessura di 260 caratteri su `RADICI` si è ancorata
+  alla CHIUSURA del Set (`]);`), perché ogni voce aggiunta spingeva la
+  coda fuori vista e la prova diventava cieca in silenzio (la gemella
+  del blocco privacy aveva lo stesso male, curata insieme — le
+  mutazioni 'sfoglia'/'privacy' IN CODA al Set ora diventano rosse).
+  La sentinella dello spaziatore ha CAMBIATO LATO («col P2P fra
+  Esplora e Vendi») e quella nuova «dello spaziatore non resta
+  niente» conta il nome OVUNQUE, commenti compresi: la lapide CSS non
+  lo nomina apposta (ci si è inciampati scrivendola).
+  IMPERFEZIONE DICHIARATA, MISURATA PRIMA E DOPO: in topbar desktop la
+  pillola «P2P» pesa 88px e riapre il difetto dichiarato dello sbordo
+  — prima del tasto il logo a 768px sforava di soli 5px (i cantieri
+  successivi alla misura storica l'avevano di fatto riassorbito), col
+  tasto esce dal bordo SINISTRO di 99px e si legge «tolo⚡» fino a
+  ~867px (a 880 rientra). La manifestazione è il logo che scivola
+  fuori a sinistra (flex-end con contenuto più largo), non uno
+  scrollbar: `scrollWidth` non lo vede, si misura col
+  `getBoundingClientRect` del logo. Non curato QUI (il piano
+  approvato lo dichiara): la leva nota resta le sole icone sotto
+  ~900px, e una cura da una riga sarebbe far cedere il TESTO del
+  lockup in quella fascia tenendo la tessera — al contrario del
+  mobile sotto i 360, dove cede la tessera, perché qui i 51px del
+  solo barattolo non basterebbero.
   LE ICONE SONO NOSTRE (lug 2026): tre SVG al posto delle emoji
   🛍️🗂️🤝, che cambiavano forma da un telefono all'altro e non
   seguivano i token del tema — LENTE per Esplora, PIASTRELLE per
@@ -18765,6 +18816,24 @@ DA GUARDARE al primo giro: la coda «🗂 Categorie da sistemare», che
 gli importati e chiunque stia in «Altro» — è da lì che i primi annunci
 traslocheranno. Per i nativi già decisi in passato serve
 `ricategorizza.py --rifai` sul VPS, che è una scelta e non un deploy.
+
+Il tasto P2P nella barra (ago 2026): la voce nuova che il posto vuoto
+aspettava — «P2P» con la ₿ a tratto disegnata da zero (non esisteva),
+che per ora porta solo al coming soon «Qualcosa di nuovo è in arrivo»
+col teaser vago. Radice sorella sul calco di astepresto, zero server,
+zero leve; il cantiere vero (scambio euro↔bitcoin fra utenti) è un
+altro. Vedi Architettura, «IL TASTO P2P», per le due trappole delle
+sentinelle (la regex senza cifre, la fessura di RADICI ancorata alla
+chiusura del Set) e per lo sbordo della topbar 768-867 che si riapre,
+misurato prima e dopo. Collaudato: 4721 prove verdi, tortura a 12
+mutazioni tutte uccise — comprese le due che con le finestre fisse di
+ieri sarebbero rimaste verdi — e il giro dal vivo via CDP: centro del
+＋ esatto alle tre larghezze (160,0/180,0/187,5), voce accesa nei due
+temi, un gradino solo girando i tab e indietro che passa da Esplora,
+ripiego ₿ da file://. IN PRODUZIONE basta il deploy: nessuna colonna,
+nessuna leva, nessuna rotta — solo client. DA GUARDARE dal telefono:
+il tocco vero dentro Telegram e nella PWA (il gesto indietro di
+sistema dal coming soon), e la ₿ accesa sullo schermo vero.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
