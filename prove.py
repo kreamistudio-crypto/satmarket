@@ -292,6 +292,105 @@ def prove_tag_commercio():
 
 
 # ====================================================================
+def prove_tag_client():
+    """La firma di Barattolo sugli eventi Nostr (ago 2026): il tag
+    `client` NIP-89 sta su OGNI evento 30402 che componiamo noi,
+    chiunque lo firmi — piattaforma, BIVIO (che eredita i tags di
+    evento_annuncio), modifica firmata degli importati. E' cio' che le
+    classifiche dei marketplace (Nostrology) leggono, e leggono la
+    sola POSIZIONE 1: il nome. Le eseguibili valgono piu' delle
+    sentinelle, perche' un tag che manca non fallisce da solo: si
+    sparisce dalla classifica, in silenzio."""
+    print("\n[il tag client di Barattolo]")
+    import importa_nostr as imp
+    import inspect
+    import json as _json
+
+    amb = {"json": _json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "CONDIZIONI": {},
+           # tag_client legge _NOSTR alla CHIAMATA: la chiave finta
+           # accende la forma piena, l'azzeramento (sotto) il ripiego
+           "_NOSTR": (None, "f" * 64),
+           "RELAYS_VERIFICA": ("wss://relay.damus.io",),
+           # la firma vera non serve alla prova: si guarda l'evento
+           "firma_evento": lambda kind, tags, content: {
+               "kind": kind, "tags": tags, "content": content}}
+    i = _SORGENTE.index("CATEGORIE_SENZA_CONDIZIONE = frozenset(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("senza_condizione", "condizione_da_mostrare",
+              "_foto_url_nostr"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("CONDIZIONE_NIP99 = {")
+    exec(_SORGENTE[i:_SORGENTE.index(
+        "\n\n\n", _SORGENTE.index("def tag_commercio"))], amb)
+    exec(pezzo("evento_annuncio"), amb)
+    exec(pezzo("evento_annuncio_importato"), amb)
+
+    atteso = ["client", "Barattolo",
+              "31990:" + "f" * 64 + ":barattolo", "wss://relay.damus.io"]
+    riga = {"id": 42, "titolo": "Lampada", "descrizione": "Bella",
+            "prezzo_sats": 1000, "creato": 111, "categoria": "",
+            "zona": "", "consegna": "", "condizione": "", "quantita": 1,
+            "anche_digitale": 0, "valuta": "sats", "foto": "[]"}
+    ev = amb["evento_annuncio"](dict(riga), "active")
+    prova("l'evento firmato da noi porta il tag pieno", True,
+          atteso in ev["tags"])
+    imp_riga = {"nostr_origine_d": "d1", "nostr_origine_foto": "[]",
+                "foto": "[]", "categoria": "", "consegna": "",
+                "spedizione_sats": 0, "spedizione_eur": 0.0,
+                "condizione": "", "quantita": 1, "anche_digitale": 0,
+                "valuta": "sats"}
+    ev2 = amb["evento_annuncio_importato"](imp_riga, "T", "D", "", "",
+                                           "sats", 1000, 0.0, 111)
+    prova("anche l'evento della modifica firmata lo porta", True,
+          atteso in ev2["tags"])
+    prova("...e l'import lo IGNORA: il giro non si sporca", {},
+          imp.estrai_commercio(ev2))
+    amb["_NOSTR"] = None
+    prova("senza chiave resta il nome nudo, la posizione che conta",
+          ["client", "Barattolo"], amb["tag_client"]())
+
+    # Il nome e' l'identita' in classifica (raggruppamento per stringa
+    # ESATTA: «BTCPayServer-Shopstr» e' una voce separata da «Shopstr»)
+    prova("il nome in classifica e' congelato", True,
+          'NOME_CLIENT_NOSTR = "Barattolo"' in _SORGENTE)
+    # IL CENSIMENTO della regola: chi compone un 30402 da zero deve
+    # portare il tag. Il terzo compositore di domani fa rossa la prima
+    # riga, e la seconda pretende che porti anche lui il suo append.
+    # (firme_nostr_da_fare non c'e': riavvolge base["tags"] di
+    # evento_annuncio — lo sorveglia gia' prove_firme_nostr.)
+    siti = (_SORGENTE.count("firma_evento(30402") +
+            _SORGENTE.count('"kind": 30402'))
+    prova("i posti che compongono un 30402 da zero sono due", 2, siti)
+    prova("...e ognuno porta il suo tag", 2,
+          _SORGENTE.count("tags.append(tag_client())"))
+    prova("tag_commercio resta pulito: e' la lista che l'import rilegge",
+          False, "tag_client" in pezzo("tag_commercio"))
+    prova("estrai_commercio non legge mai il tag client", False,
+          '"client"' in inspect.getsource(imp.estrai_commercio))
+
+    # Lo script della ripubblicazione una-tantum
+    src = open("ripubblica_tag_client.py", encoding="utf-8").read()
+    # L'ancora e' la CODA della SELECT vera, non la parola: la stessa
+    # condizione vive anche nella docstring dello script, e la prima
+    # stesura di questa sentinella restava verde con la WHERE mutilata
+    # (l'ha detto la tortura, M5 — la prova che legge la prosa).
+    prova("lo script rifirma solo i NOSTRI, mai gli eventi altrui", True,
+          "AND nostr_autore='' ORDER BY id" in src
+          and "contatto_nostr=''" in src)
+    prova("...zero copie della fabbrica: riusa server.evento_annuncio",
+          True, "server.evento_annuncio(" in src
+          and "def evento_annuncio" not in src)
+    prova("...la testa si scrive solo dopo un relay OK", True,
+          src.index("if ok:") < src.index(
+              "UPDATE annunci SET nostr_event_id"))
+    prova("...anteprima di serie", True, "if not scrivi:" in src)
+    prova("...l'handler 31990 con la sua d", True,
+          '["d", "barattolo"]' in src and '["k", "30402"]' in src)
+
+
+# ====================================================================
 def prove_anello():
     """Il tappo del bug dell'anello (lug 2026): Barattolo non importa
     Barattolo, e l'import non crede sulla parola al filtro `authors`
@@ -22270,7 +22369,13 @@ def prove_consegna_firmata():
     print("\n[la consegna sulla strada firmata]")
     import importa_nostr as imp
     import json as _json
-    amb = {"json": _json, "URL_PUBBLICO": "https://barattolo.store"}
+    # La chiave finta serve a tag_client (ago 2026), che l'evento
+    # importato ormai porta: cosi' il giro qui sotto attraversa
+    # estrai_commercio col tag PIENO addosso — la prova piu' vera che
+    # l'import non lo rilegge mai.
+    amb = {"json": _json, "URL_PUBBLICO": "https://barattolo.store",
+           "_NOSTR": (None, "f" * 64),
+           "RELAYS_VERIFICA": ("wss://relay.damus.io",)}
     # Le stesse dipendenze di prove_tag_commercio: tag_commercio passa
     # da condizione_da_mostrare, e ora ci passa anche l'evento degli
     # importati. Se un domani tag_commercio acquisisce una costante
@@ -23280,7 +23385,8 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
-              prove_tag_commercio, prove_consegna_firmata,
+              prove_tag_commercio, prove_tag_client,
+              prove_consegna_firmata,
               prove_anello, prove_categorie,
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,

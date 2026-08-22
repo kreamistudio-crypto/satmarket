@@ -21783,6 +21783,29 @@ CONDIZIONE_NIP99 = {
     "da_sistemare": "poor",
 }
 
+# Il raggruppamento delle classifiche dei marketplace (Nostrology) e'
+# per stringa ESATTA: questo nome e' l'identita' di Barattolo in
+# piazza e non si ritocca mai piu'.
+NOME_CLIENT_NOSTR = "Barattolo"
+
+
+def tag_client() -> list:
+    """Il tag NIP-89 che dice quale app ha COMPOSTO l'evento — non chi
+    lo firma: e' lo standard di fatto (Shopstr e Amethyst lo mettono
+    sugli eventi firmati dagli UTENTI), ed e' cio' che le classifiche
+    dei marketplace leggono per attribuire un annuncio. LA REGOLA
+    (ago 2026, decisione di Andrea): il tag sta su ogni evento 30402
+    che componiamo noi, chiunque lo firmi — piattaforma, BIVIO,
+    modifica firmata degli importati; fuori restano solo gli eventi
+    che arrivano dai relay e leggiamo e basta. Forma piena col nostro
+    handler 31990; senza la chiave di piattaforma resta il nome nudo,
+    che e' la sola posizione che le classifiche leggono davvero —
+    fail-open nel verso giusto."""
+    if _NOSTR:
+        return ["client", NOME_CLIENT_NOSTR,
+                f"31990:{_NOSTR[1]}:barattolo", RELAYS_VERIFICA[0]]
+    return ["client", NOME_CLIENT_NOSTR]
+
 
 def tag_commercio(a: dict) -> list:
     """I tag di consegna, condizione e quantita' di un annuncio.
@@ -21838,6 +21861,11 @@ def evento_annuncio(a: dict, status: str) -> dict:
             ["status", status],
             ["published_at", str(a["creato"])],
             ["r", URL_PUBBLICO]]
+    # Chi ha composto l'evento: la firma di Barattolo nelle classifiche
+    # dei marketplace (v. tag_client). Copre da sola anche il BIVIO:
+    # firme_nostr_da_fare eredita questi tags e li fa firmare al
+    # venditore — il tag dice l'app, non chi firma.
+    tags.append(tag_client())
     if a.get("categoria"):
         # Il tag "t" e' un hashtag: niente spazi. Delle categorie
         # composte in piazza va la prima parola ("Casa e giardino"
@@ -21907,7 +21935,12 @@ def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
     il content e' la descrizione PURA: niente footer promozionale ne'
     riga prezzo — non si scrive pubblicita' dentro un evento che firma
     un altro, e il footer rientrerebbe in descrizione al giro d'import
-    successivo (estrai_annuncio legge il content)."""
+    successivo (estrai_annuncio legge il content). Il tag `client`
+    invece CI STA (ago 2026, decisione di Andrea): dice quale app ha
+    composto l'evento — e l'ha composto Barattolo — sta nei METADATI e
+    non tocca una parola del venditore; il divieto qui sopra e' sul
+    CONTENT, non sui tag, e l'import non lo rilegge mai
+    (estrai_commercio ignora i tag che non conosce)."""
     if valuta == "eur" and prezzo_eur:
         prezzo_tag = ["price", f"{prezzo_eur:.2f}", "EUR"]
     else:
@@ -21917,6 +21950,10 @@ def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
             ["summary", (descrizione or titolo)[:200]],
             prezzo_tag,
             ["status", "active"]]
+    # L'evento lo componiamo NOI, e il tag client dichiara proprio
+    # questo (v. tag_client e la docstring qui sopra): metadato, mai
+    # una parola nel testo del venditore.
+    tags.append(tag_client())
     if categoria:
         tags.append(["t", categoria.lower().split()[0]])
     if zona:
