@@ -3457,6 +3457,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cui passa tutto il non-HEIC prima di toccare il disco.
   INVARIANTE che ne esce, ed è ciò che tiene semplice il resto: in
   `sellFoto` c'è SOLO il chip `caricando:` o un JPEG vero.
+  E I DUE SILENZI DEL TELEFONO VECCHIO (ago 2026, dal campo: uno
+  Xiaomi di cinque anni fa dentro Telegram, «non riesco a inserire le
+  foto» e basta). 1) IL CHOOSER CHE TORNA A MANI VUOTE: dentro la
+  WebView il file chooser lo apre TELEGRAM, e su MIUI il permesso
+  della galleria può essere negato o revocato da solo — l'onchange
+  arriva con la lista vuota e il for di `aggiungiFoto` su una lista
+  vuota non faceva NIENTE: il bottone «non fa niente», alla lettera.
+  Ora lo dice, col messaggio che SEGUE IL CONTESTO: dentro Telegram
+  nomina i SUOI permessi, dal browser no — nominarglieli lì sarebbe
+  una bugia. Il picker mai APERTO resta irraccontabile, non arriva
+  nessun evento. IMPERFEZIONE DICHIARATA: qualche WebView vecchia
+  emette il change anche sull'ANNULLA del picker, con la lista vuota
+  — chi annulla può leggere l'avviso a vuoto; meglio un avviso di
+  troppo del silenzio che ha aperto il caso. 2) IL WATCHDOG DEL
+  DECODE: su quell'hardware il decode di una foto da 48+ MP dentro
+  `new Image()` può non finire MAI — né onload né onerror — e la
+  Promise di `ridimensiona` non si risolveva: chip «Carico la foto…»
+  eterno, e Pubblica bloccato dal suo «sto ancora caricando» senza
+  nessuna via d'uscita (il canvas d'USCITA è piccolo, 1200px: il
+  rischio è il decode della SORGENTE). Trenta secondi — un decode
+  vero, anche su hardware lento, finisce in pochi — poi si risolve
+  null, che è la lingua del rifiuto (il chiamante toglie il chip da
+  solo), e lo si DICE con la via d'uscita: una foto più piccola, uno
+  screenshot. SI DISARMA AL PRIMO CALLBACK E NON ALLA PROMISE, ed è
+  la riga da non ammorbidire: la strada del server dentro onerror può
+  legittimamente durare più di trenta secondi su rete lenta, e ha già
+  i suoi toast per ogni ramo. Le sentinelle guardano il clearTimeout
+  DENTRO CIASCUN ramo (la lezione del reaper: nel file intero non
+  potrebbero fallire) e il callback postumo tace nei due rami — sei
+  mutazioni, sei rosse, più lo smoke con node che gira davvero
+  `aggiungiFoto([])` nei due contesti e il decode muto fino al
+  timeout. RESTA MUTO PER COSTRUZIONE, dichiarato: il picker che non
+  si apre affatto (Telegram senza permessi che non emette proprio
+  l'evento) e il renderer della WebView che muore per la memoria —
+  lì l'app si ricarica da capo, e non c'è nessun callback su cui
+  parlare.
   E LA FOTO CHE NON MOSTRA NIENTE SI RIFIUTA (ago 2026, caso dal
   campo): l'annuncio 254 è rimasto in vetrina SEI GIORNI con una foto
   che a schermo era un rettangolo viola, e l'abbiamo saputo solo
