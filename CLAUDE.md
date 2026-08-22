@@ -15063,6 +15063,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   argomento — un corso di cucina non è «Alimenti e bevande» — ed è il
   gemello lato macchina dell'ortogonalità già decisa per i due
   reparti («la categoria dice COSA compri, la strada COME arriva»).
+  E IL PRIMO GIRO VERO DEL COLLAUDO HA PAGATO SUBITO (ago 2026):
+  atteso 14/14, uscito **13/14 DUE VOLTE** — a cadere la SACCA,
+  «Sacca in cotone col logo Bitcoin» spostata in Abbigliamento. Il
+  rilancio a prompt FERMO prima di curare è la liturgia del caso
+  «Assistenza Barattolo», ed è servito: caduta identica al secondo
+  giro, e la risposta grezza (vista col `--crudo`, che esiste per
+  questo momento) diceva «1: Abbigliamento» pulito — una SCELTA, non
+  una riga storta. Stabile, quindi si cura; se fosse passata, si
+  dichiarava INSTABILE e non la si rincorreva.
+  LA DIAGNOSI È NELLA COPPIA DEI CASI, ed è il collaudo a darla: la
+  maglietta col SIMBOLO ₿ restava giusta, la sacca «col logo
+  Bitcoin» scritto a PAROLE no — e la formula «col logo bitcoin»
+  compariva SOLO nella coppia delle magliette, quindi il modello se
+  l'era presa come proprietà DELLE MAGLIETTE. La lezione è quella di
+  sempre, vista dall'altro lato: gli esempi insegnano il confine più
+  della regola — anche quando insegnano un confine più stretto di
+  quello voluto.
+  LA CURA È MIRATA E NON ALLARGA LA REGOLA (i casi 4 e 8 la
+  presidiano): la riga «La coppia vale per OGNI oggetto, non solo
+  per le magliette: anche una sacca o una tazza col logo bitcoin
+  sono "Bitcoin", e il logo conta sia come simbolo ₿ sia scritto a
+  parole». La sacca è REGRESSIONE PERMANENTE nel collaudo, col
+  racconto nel suo perché. Il giro dopo la cura è da rifare: atteso
+  14/14.
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
   da rilanciare a OGNI ritocco. Quattordici casi con l'atteso accanto:
