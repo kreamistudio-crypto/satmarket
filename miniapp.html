@@ -22973,7 +22973,28 @@ function ridimensiona(file){
      limite — e anche li' la compressione e' una sola. */
   return new Promise(res=>{
     const img = new Image();
+    /* IL WATCHDOG DEL DECODE (ago 2026, dal campo: su un Android
+       vecchio dentro Telegram il decode di una foto da 48+ MP puo'
+       non finire MAI — ne' onload ne' onerror — e il chip «Carico la
+       foto…» restava eterno, con Pubblica bloccato dal suo «sto
+       ancora caricando» senza nessuna via d'uscita). Trenta secondi:
+       un decode vero, anche su hardware lento, finisce in pochi.
+       Il watchdog copre SOLO il silenzio — si disarma appena UNO dei
+       due callback parla, non quando la Promise si risolve: la
+       strada del server (dentro onerror) puo' legittimamente durare
+       piu' di trenta secondi su rete lenta, e ha gia' i suoi toast
+       per ogni ramo. Al timeout si risolve null, che e' la lingua
+       del rifiuto: il chiamante toglie il chip da solo. */
+    let decodeMuto = false;
+    const watchdog = setTimeout(()=>{
+      decodeMuto = true;
+      URL.revokeObjectURL(img.src);
+      toast(`Non riesco a caricare «${file.name}»: forse è troppo grande per questo telefono — prova con una foto più piccola (uno screenshot va bene)`, 8000);
+      res(null);
+    }, 30_000);
     img.onload = ()=>{
+      if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente lavoro postumo
+      clearTimeout(watchdog);
       const MAX = 1200, k = Math.min(1, MAX/Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
@@ -22985,6 +23006,8 @@ function ridimensiona(file){
       res(c.toDataURL('image/jpeg', .9));
     };
     img.onerror = ()=>{
+      if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente doppio toast
+      clearTimeout(watchdog);
       URL.revokeObjectURL(img.src);
       if (file.size > 15_000_000) { toast('Foto troppo grande (max 15MB)'); res(null); return; }
       /* Il browser JPEG, PNG, WebP e GIF li sa leggere: se ha detto di
@@ -23063,6 +23086,24 @@ async function fotoScelte(ev){
 async function aggiungiFoto(files){
   if (editandoNostr) {
     toast('Le foto degli annunci importati si cambiano dal tuo client Nostr', 6000);
+    return;
+  }
+  if (!files || !files.length) {
+    /* Il chooser di Telegram su Android puo' tornare a MANI VUOTE —
+       permessi della galleria negati, o revocati da MIUI da solo — e
+       il for qui sotto su una lista vuota non fa NIENTE: il bottone
+       «non fa niente», alla lettera (ago 2026, caso dal campo). Il
+       picker mai APERTO resta irraccontabile — non arriva nessun
+       evento — ma la lista vuota un evento ce l'ha, e si racconta.
+       Dentro Telegram i permessi sono i SUOI; dal browser dirlo
+       sarebbe una bugia, quindi il messaggio segue il contesto.
+       IMPERFEZIONE DICHIARATA: qualche WebView vecchia emette il
+       change anche sull'ANNULLA del picker, con la lista vuota — chi
+       annulla puo' leggere questo avviso a vuoto. Meglio un avviso
+       di troppo che il silenzio che ha aperto il caso. */
+    toast(tg?.initData
+      ? 'Non ho ricevuto nessuna foto: controlla che Telegram possa accedere alla galleria'
+      : 'Non ho ricevuto nessuna foto: controlla i permessi della galleria', 8000);
     return;
   }
   for (const file of files){

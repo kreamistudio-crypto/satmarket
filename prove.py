@@ -5342,6 +5342,40 @@ def prove_foto_scarti():
           len(re.findall(r"\w+, \w+ = await asyncio.to_thread\(\s*salva_foto|"
                          r"\w+, \w+ = await asyncio\.to_thread\(salva_foto",
                          _SORGENTE)))
+    # 6) I DUE SILENZI DEL CASO XIAOMI (ago 2026, dal campo: «non
+    # riesco a inserire le foto» su un Android vecchio dentro
+    # Telegram). Il chooser che torna a MANI VUOTE — il for su una
+    # lista vuota non fa niente, e il bottone «non fa niente» alla
+    # lettera — e il decode che non finisce MAI, col chip «Carico la
+    # foto…» eterno e Pubblica bloccato senza spiegazione. Le
+    # sentinelle guardano DENTRO il loro ramo (la lezione del reaper):
+    # cercate nel file intero non potrebbero fallire.
+    i = mini.index("async function aggiungiFoto(")
+    corpo = mini[i:mini.index("function fotoSopra(")]
+    prova("sentinella: la lista vuota si racconta, nei due contesti", 2,
+          corpo.count("Non ho ricevuto nessuna foto"))
+    prova("sentinella: ...e a decidere il contesto e' Telegram", True,
+          "tg?.initData" in corpo)
+    # find() e non index(): a blocco tolto deve diventare ROSSA, non
+    # esplodere portandosi dietro le prove dopo di lei
+    _pos = corpo.find("Non ho ricevuto nessuna foto")
+    prova("sentinella: ...PRIMA del for, che a mani vuote non fa niente",
+          True, 0 <= _pos < corpo.index("for (const file of files)"))
+    i = mini.index("function ridimensiona(")
+    corpo = mini[i:mini.index("async function fotoScelte(")]
+    j = corpo.index("img.onload")
+    k = corpo.index("img.onerror")
+    prova("sentinella: il watchdog del decode e' armato prima dei callback",
+          True, "setTimeout" in corpo[:j] and "res(null)" in corpo[:j])
+    prova("sentinella: ...e al timeout lo DICE, con la via d'uscita", True,
+          "troppo grande per questo telefono" in corpo[:j])
+    prova("sentinella: onload disarma il watchdog nel SUO ramo", True,
+          "clearTimeout(watchdog)" in corpo[j:k])
+    prova("sentinella: onerror pure — o la strada del server, che puo' "
+          "durare piu' di trenta secondi su rete lenta, correrebbe col "
+          "timer addosso", True, "clearTimeout(watchdog)" in corpo[k:])
+    prova("sentinella: e il callback postumo tace, in tutti e due i rami",
+          2, corpo.count("if (decodeMuto) return"))
 
 
 def prove_foto_vuota():
