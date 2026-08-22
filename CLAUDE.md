@@ -18,7 +18,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   incollarne una nuova. È il comportamento corretto — non si paga la
   cifra sbagliata — ma il giorno dell'accensione va guardata la coda
   degli ordini `confirmed` con una invoice già depositata),
-  notifiche via bot Telegram, ricerca AI (Haiku), orologio asyncio per gli
+  notifiche via bot Telegram, ricerca full-text (FTS5), orologio asyncio per gli
   sblocchi automatici (72h dalla consegna, 10gg dalla spedizione).
   L'IMPORTO DI OGNI BOLT11 IN USCITA SI CONTROLLA CONTRO IL DOVUTO
   (ago 2026, C-1 dell'audit, ed è la regola da non ammorbidire).
@@ -221,8 +221,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   distingue «non è tuo» da «non esiste»: chi enumera non impara nulla.
   `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
   la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
-  richieste autenticate. La ricerca AI resta riservata agli autenticati
-  (pubblica sarebbe credito API regalato ai bot). Tutto il resto è
+  richieste autenticate. La RICERCA vive dentro `/api/listings` ed è
+  quindi pubblica come lei: non costa più niente a nessuno, e il
+  recinto di ieri («credito API regalato ai bot») non ha più oggetto. Tutto il resto è
   autenticato via `verifica_utente`. Moderazione a tre strati su
   `pubblica()`: filtro `PAROLE_VIETATE` (parole intere su testo
   normalizzato), parere AI opzionale (fail-open se la chiave manca o
@@ -1539,7 +1540,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   catalogo); resta solo la migrazione VECCHIA in `init_db` (Sport →
   Sport e hobby ecc. con COLLATE NOCASE, che raddrizza le maiuscole
   storte dei vecchi import, 'casa'). La lista entra nel
-  prompt della ricerca AI; nel NIP-99 il tag `t` è la prima parola
+  catalogo della ricerca; nel NIP-99 il tag `t` è la prima parola
   minuscola ("Casa e giardino" → "casa": un hashtag non ha spazi).
   LE ICONE (`EMOJI_CAT` nel client) dicono il REPARTO, non un
   prodotto: 🍳 Elettrodomestici (il cesto 🧺 e' dove finisce il bucato,
@@ -2547,7 +2548,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ●●●○○ provati al loro posto si confondevano con le stelle delle
   recensioni — bocciati, non riproporli). Riga «— condizione:
   …» nel content NIP-99 (nessun tag: la spec non ne ha uno, pattern
-  della spedizione) e nel catalogo della ricerca AI; colonna
+  della spedizione) e nell'indice della ricerca; colonna
   facoltativa `condizione` nel CSV d'import con `condizione_tollerante`
   (SINONIMI_CONDIZIONE: «ottimo» → come_nuovo, «da riparare» →
   da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
@@ -2561,7 +2562,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Buoni ed esperienze»: un buono è nuovo per definizione, anche la
   tessera fisica) e il giudice unico è
   `senza_condizione(categoria, consegna)`, da cui passano form,
-  dettaglio, vetrina, NIP-99, ricerca AI e import — o divergono. Il
+  dettaglio, vetrina, NIP-99, ricerca e import — o divergono. Il
   secondo asse è la CONSEGNA: un codice Zalando è nuovo per
   definizione come la marmellata, ma vale solo per il digitale
   ESCLUSIVO (`consegna=='digitale'`) — sulla combo la merce fisica c'è
@@ -2671,8 +2672,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella valuta del toggle attivo al momento di Applica, stato per
   SESSIONE (mai localStorage) che sopravvive al cambio categoria
   (patto delle app di mercatino), in DEMO client-side sui dati finti.
-  La ricerca AI coi vincoli scritti resta separata da questi filtri
-  di navigazione. Le MINIATURE dal lug 2026 sono QUADRATE
+  La ricerca per parole SI COMPONE con questi filtri, e non è una
+  strada a parte: vive nella stessa rotta (vedi «LA RICERCA»). Le MINIATURE dal lug 2026 sono QUADRATE
   (ImageOps.fit al centro, 640 q87 LANCZOS, `MINIATURA_LATO/QUALITA`):
   la card 1:1 col cover ingrandiva il lato corto delle vecchie
   rettangolari (la sgranatura); il backfill rifà da solo quelle di
@@ -2681,21 +2682,161 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
   rotte conta) per il deep-link /annuncio/{id} oltre le pagine
   caricate.
-  LA RICERCA AI HA UN FRENO (ago 2026, audit): era l'unica rotta dove
-  UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
-  con un prompt di dimensione massima FISSA — la shortlist si riempie
-  fino a 300 annunci anche quando la domanda non trova niente, quindi
-  ogni ricerca costa uguale, tanto. L'unico recinto era
-  l'autenticazione, che la passa chiunque abbia un account.
-  `TETTO_RICERCHE_AI_ORA` (30, leva; 0 = nessun freno) col pattern di
-  `IMPORT_QUOTA` e l'ora al posto del giorno; purga in `pulisci_avvisi`.
-  A quota finita NON si sbatte la porta: si risponde col filtro per
-  parole — che esisteva già come ripiego dell'eccezione e non costa
-  niente — E LO SI DICE, invece di far sembrare che l'AI abbia capito
-  poco. Il discriminatore è `busta=1` → `{annunci, ai}`; senza il
-  parametro resta l'array di sempre, che è il patto della paginazione,
-  e il client regge tutt'e due le forme. Più il `timeout` sulla
-  chiamata, che era l'unica delle quattro del file a non averlo.
+  LA RICERCA È UNA SOLA (ago 2026, decisione di Andrea: «l'AI nella
+  ricerca eliminala proprio»). Fino a ieri erano DUE, e rispondevano
+  diverso alla stessa domanda: per gli anonimi un LIKE sulla FRASE
+  INTERA in titolo/descrizione/zona — quindi «bici da corsa» non
+  trovava «bicicletta da corsa», e «collezionismo» non trovava la
+  categoria Collezionismo, che il LIKE nemmeno guardava — e per gli
+  autenticati Haiku, cioè l'unica rotta del progetto dove UNA
+  richiesta di un utente qualunque era UNA chiamata al modello, col
+  prompt sempre pieno (300 annunci) anche quando la domanda non
+  trovava niente. Adesso è un indice full-text di casa: senza rete,
+  senza credito, uguale per tutti, e PROVABILE IN CI — che di un'AI
+  non si può dire. Il ripiego dell'AI era per giunta la strada che si
+  vedeva proprio quando le cose andavano male, cioè la peggiore da
+  lasciare zoppa.
+  DOVE VIVE: dentro `/api/listings`, cioè nella VETRINA — ed è quel
+  che la rende componibile con categoria, prezzo, regione e filtri, e
+  paginata come tutto il resto, senza una riga in più. `/api/search`
+  resta un GUSCIO che chiama lo stesso giudice, per i client rimasti
+  in cache: `busta=1` risponde ancora `{annunci, ai}` con `ai` a
+  FALSO, che adesso è semplicemente vero per tutti.
+  LO STEMMER È SNOWBALL, e non una tabella di desinenze fatta in casa
+  (decisione di Andrea: «ci vuole un sistema già collaudato, non per
+  forza le prime 5 lettere»): `snowballstemmer`, Python puro, ~100 KB,
+  zero dipendenze, l'algoritmo che sta sotto Lucene, Elasticsearch e
+  PostgreSQL. `collezione`, `collezionismo` e `collezionista`
+  diventano tutte `collezion`. Import FAIL-OPEN ma DICHIARATO
+  all'avvio (il patto della chiave dei contenuti digitali): senza il
+  pacchetto si ripiega sul TRONCAMENTO, più grossolano e mai muto.
+  IL TRONCAMENTO A 5 NON È SOLO IL RIPIEGO, è anche una toppa a un
+  difetto vero dello stemmer, MISURATO e non temuto: su 28 coppie
+  singolare/plurale di un mercatino ne sbaglia 4 — «tastiera →
+  tastier» ma «tastiere → tast», e così telefono/telefoni,
+  cassettiera, caffettiera (Snowball tratta '-iera' come una desinenza
+  e sul plurale arriva prima un'altra regola). Il 14%, e dentro ci
+  sono le parole che la gente scrive davvero. Su tutti e quattro i
+  casi le due radici divergenti hanno le prime CINQUE lettere in
+  comune: da lì la cura — `termini()` indicizza e cerca TUTT'E DUE le
+  forme, in «o». Cinque e non quattro perché quattro impasta cose
+  diverse («coll» prende collana, collo, collega).
+  L'INDICE è `annunci_fts` (FTS5, `rowid` = `annunci.id`) con QUATTRO
+  campi separati perché BM25 li possa PESARE: titolo 10, categoria 4,
+  descrizione 2, zona 1 — una parola nel titolo vale cinque volte la
+  stessa parola persa in fondo a una descrizione, ed è la lezione di
+  `sottocategoria_indovina`. Il punteggio di BM25 è NEGATIVO e più
+  basso vuol dire meglio: l'ORDER BY crescente non è un refuso.
+  I SINONIMI ENTRANO NELL'INDICE, NON NELLA DOMANDA, ed è la scelta
+  che tiene veloce la ricerca: espandere la DOMANDA vuol dire una
+  query che si allunga con quante parole conosciamo — e la domanda si
+  fa a ogni tasto —, espandere l'INDICE costa una volta sola, quando
+  l'annuncio si scrive. Nel quarto campo ci stanno la categoria, la
+  sottocategoria con la sua etichetta e i sinonimi di tutt'e due:
+  così «pc» trova l'Informatica e «hifi» l'Audio e video, e i due
+  cataloghi di sinonimi che il progetto ha già si mettono a servire
+  anche la ricerca senza un dizionario nuovo da tenere in pari.
+  L'INDICE SI TIENE IN PARI DA SOLO, e questa è la riga da non
+  ammorbidire: a invalidarlo è un TRIGGER SQL (`ricerca_v` a zero su
+  ogni UPDATE di titolo/descrizione/zona/categoria/sottocategoria), e
+  a rifarlo `riallinea_ricerca`. I posti che riscrivono il testo di un
+  annuncio sono SETTE e diventeranno otto — un elenco a memoria
+  invecchia e RIMPICCIOLISCE, la lezione del titolo nudo nelle
+  notifiche — mentre un trigger non si può dimenticare, e copre gratis
+  anche `importa_nostr.py`, che scrive dritto nel database e di questa
+  colonna non sa niente (e deve restare cieco: dev'essere lanciabile
+  su un Barattolo più vecchio). Il trigger INVALIDA e basta — stemmare
+  vuole Python. La riparazione gira in DUE posti: la passata d'avvio
+  (`scalda_ricerca`, un evento di startup e NON `init_db`, che gira
+  all'import quando lo stemmer non è ancora definito) e la strada
+  calda della ricerca, 300 righe per volta — così un annuncio appena
+  pubblicato si trova SUBITO senza aspettare un giro d'orologio, e chi
+  cerca non paga l'attesa di un import da cinquecento righe.
+  `VERSIONE_RICERCA` è la leva: alzarla di uno rifà tutto l'indice al
+  primo avvio, ed è quel che si tocca cambiando stemmer, campi o pesi.
+  LA DOMANDA si prova STRETTA e poi LARGA (tutte le parole, poi almeno
+  una): «tastiera meccanica» deve dare le tastiere meccaniche e non
+  tutte le tastiere, ma su un catalogo piccolo l'intersezione è spesso
+  vuota — e una vetrina vuota, quando qualcosa da mostrare c'era, è
+  peggio di una imprecisa. Ogni parola è un GRUPPO (radice «o»
+  troncamento) e sono i gruppi a legarsi in «e»; l'ULTIMA parola è un
+  prefisso, perché chi digita ce l'ha quasi sempre a metà. I termini
+  escono da `normalizza` — il setaccio di casa, lo STESSO del filtro
+  parole e del motore geografico — quindi sono solo lettere e cifre e
+  non possono spezzare la stringa FTS da fuori.
+  CON UNA RICERCA ATTIVA L'ORDINE È LA PERTINENZA, e il cursore keyset
+  non serve più: quello pagina su una COLONNA, e un punteggio colonna
+  non è. Si pagina sulla POSIZIONE nella rosa (`r{quanti ne ho già
+  visti}`), stabile perché il punteggio è deterministico. I FILTRI si
+  applicano alla ROSA INTERA e non alla pagina, o le pagine
+  uscirebbero di lunghezze diverse e il totale direbbe il falso: una
+  lettura in più per ricerca, e in cambio il conto è esatto. Le voci
+  di Ordina restano scritte nel campo e non si applicano finché si
+  cerca — la stessa regola per cui il filtro di un'occasione si porta
+  dietro il suo ordine. Tetto `TETTO_RICERCA` 500.
+  FAIL-OPEN NEL VERSO GIUSTO: `cerca_ids` torna `None` — e non una
+  lista vuota — quando l'indice non c'è (un SQLite senza FTS5, un
+  indice rotto). Sono due cose diverse, e chi chiama ripiega sul LIKE
+  di ieri invece di dire «nessun risultato», che sarebbe una bugia.
+  E IL FAIL-OPEN VALE ANCHE ALL'AVVIO, che è dove il prezzo dell'errore
+  è più alto: FTS5 è una funzione OPZIONALE di SQLite, e senza il `try`
+  sul `CREATE VIRTUAL TABLE` una build che non ce l'ha farebbe esplodere
+  `init_db` — cioè non «la ricerca peggiore», ma **il mercatino giù**.
+  Lo stesso `try` sta su `riallinea_ricerca`, ed è arrivato da una
+  PROVA e non da una rilettura: la prima stesura guardava le spalle
+  solo a chi LEGGE, quindi il server partiva e la prima ricerca dava
+  500 — perché la riparazione SCRIVE nell'indice. Il caso si gira per
+  davvero in CI, con una connessione che alza come farebbe quella
+  build.
+  I NUMERI, misurati su un catalogo grande come quello di produzione
+  (900 annunci, descrizioni vere): la passata d'avvio **1,0 secondo**
+  una volta sola, una ricerca **0,7 ms**, e a regime la passata non
+  costa niente (0,3 ms, non trova nulla da fare).
+  LA TRAPPOLA DEL DOPPIO FILTRO, trovata costruendo e sorvegliata da
+  una sentinella: `renderGrid` rifiltrava la griglia con un
+  `includes(q)` sul testo, e coi dati vivi avrebbe buttato via PROPRIO
+  i risultati che l'indice trova per radice o per categoria —
+  «collezionismo» che pesca l'annuncio che dice «collezione» sarebbe
+  sparito nell'ultimo passo. La ricerca nuova non avrebbe funzionato,
+  e non ci sarebbe stato un errore da nessuna parte: il modo più
+  silenzioso in cui questo cantiere poteva fallire. Ora quel filtro
+  vive SOLO in DEMO, dove il server non c'è.
+  `ultimaRicercaAI` RESTA, E IL NOME MENTE APPOSTA (ago 2026, scoperto
+  spezzando questo cantiere fuori dal commit in cui era nato). La
+  prima stesura lo cancellava — era la guardia con cui `caricaAltri`
+  usciva subito sui risultati dell'AI, e senza AI non serviva più —
+  ma nel frattempo il BARATTOLO IN VETRINA gli ha dato un SECONDO
+  mestiere: `renderGrid(items)` disegna una lista CHIUSA e conta su
+  quel flag per non paginare. Toglierlo avrebbe spento lo scroll
+  infinito del barattolo senza un errore da nessuna parte, e a dirlo
+  è stata una prova di QUELL'ALTRO cantiere («la pagina 2 non si
+  chiede su una lista chiusa»), non la rilettura di questo.
+  Quindi il flag e la firma `renderGrid(items)` restano, col nome che
+  ormai racconta una storia finita — è il patto dei nomi interni
+  (`.lampo-was`, `pacco`, `sconto_pacco_*`): si rinominano i testi,
+  mai le chiavi. E DUE ASSERZIONI HANNO DOVUTO ANDARSENE, che è la
+  parte da ricordare: «renderGrid non riceve più una lista da fuori»
+  e «niente più guardia sui risultati AI» erano VERE quando la
+  ricerca AI era l'unica a passare una lista, e sono diventate la
+  certificazione della rimozione di una funzione viva. Una prova che
+  afferma un'ASSENZA invecchia il giorno in cui qualcun altro dà a
+  quella cosa un secondo lavoro.
+  IL COLLAUDO È ESEGUIBILE (`collaudo_ricerca.py`, il server VERO su un
+  database usa-e-getta): il caso che ha aperto il cantiere, la
+  composizione coi filtri, l'unione delle pagine, il totale, l'indice
+  che si ripara, e che venduto/rimosso/revisione non escano MAI. Due
+  fixture ci stanno APPOSTA e vanno tenute — un annuncio in
+  Collezionismo il cui testo non nomina nessuna collezione (senza,
+  togliere la categoria dall'indice non fa fallire niente) e uno che
+  ripete la parola quattro volte in descrizione (senza, appiattire i
+  pesi di BM25 non fa fallire niente): tutt'e due sono mutazioni
+  sopravvissute al primo giro di tortura, e il collaudo le ha
+  imparate da lì.
+  RESTA DA FARE: il completamento automatico mentre si digita
+  (`prefix='2 3 4'` è già nell'indice apposta, e i termini veri li
+  espone `fts5vocab` senza una tabella da mantenere) e il «forse
+  intendevi» con `difflib`, che è già il motore di
+  `suggerisci_comune`.
   ANCHE LO SCARICATORE DI FOTO È UNO SOLO (ago 2026, audit):
   `scarica_foto_url` in server.py, con `url_foto_ammesso` sulla
   partenza E su ogni salto (`_RedirectControllato`), timeout e tetto
@@ -2708,10 +2849,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Nostr. Ora l'import RICEVE lo scaricatore del server, ed è il patto
   del `vaglio`: quel che ha bisogno delle guardie del server vive nel
   server, e lo script lanciato a mano resta identico.
-  La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
-  300): match LIKE sulle parole della query + i più recenti a
-  riempire — compromesso dichiarato: il sinonimo puro fuori dai 300
-  più freschi può sfuggire. FOTO: accanto a ogni JPEG pieno nasce
+  FOTO: accanto a ogni JPEG pieno nasce
   `a{id}_{i}{ver}_min.jpg` (vedi ricetta miniature più sotto) — nel DB
   restano SOLO i nomi pieni, `_min` è convenzione che il frontend
   deriva (`fotoMini`); backfill idempotente all'avvio
@@ -3269,10 +3407,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con lo spazio fatto a mano. Ora ci passano tutte e 33 le cifre che
   una persona legge come parole di Barattolo (notifiche, avvisi ai
   moderatori, polso ordini, messaggi d'errore, memo della invoice).
-  RESTANO FUORI QUATTRO, e sono la stessa famiglia delle eccezioni
-  dell'euro: una riga di journal (log diagnostico, un lettore solo),
-  la riga del catalogo che va in pasto ad Haiku, e le due righe di
-  prosa del NIP-99 che ripetono i tag a parole.
+  RESTANO FUORI TRE, e sono la stessa famiglia delle eccezioni
+  dell'euro: una riga di journal (log diagnostico, un lettore solo) e
+  le due righe di prosa del NIP-99 che ripetono i tag a parole.
+  I DUE CONTI SONO SCESI DI UNO ALL'AGO 2026, e va detto perché è il
+  genere di numero che sembra sbagliato: il superstite in più era la
+  riga del catalogo che andava in pasto ad Haiku, e se n'è andata con
+  la ricerca AI (vedi «LA RICERCA È UNA SOLA»).
   E IL RIFIUTO DI `paga_venditore` HA TRE MOTIVI, non uno, e ognuno
   vuole le sue parole: una bolt11 che non si decodifica NON «chiede
   None sats» — è **illeggibile**, e l'avviso lo dice. Sembra cosmesi e
@@ -4710,7 +4851,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `arricchisci_righe_vetrina` (si chiamava `espandi_distintivi_
   vetrina` finché faceva una cosa sola) è il COLLO DI BOTTIGLIA da
   cui passano tutte e sei le rotte che diventano card — vetrina,
-  negozio, singolo, miei, ricerca AI, preferiti. È lì che si
+  negozio, singolo, miei, ricerca, preferiti. È lì che si
   aggiungono i campi derivati, ed è per questo che `zona_comune` non
   ha bisogno di nessun ripiego lato client: le rotte che servono
   l'annuncio INTERO (`/api/search`, `/api/listings/miei`) passano da
@@ -6687,7 +6828,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mai raddoppiarlo. Dice che si può prolungare.
   SUPERFICIE: `u.ferie_fino AS venditore_ferie` in `CAMPI_VETRINA` a
   costo ZERO (il JOIN su `u` c'era già), quindi arriva in un colpo
-  solo a vetrina, negozio, singolo, miei, ricerca AI e preferiti;
+  solo a vetrina, negozio, singolo, miei, ricerca e preferiti;
   `ferie_fino` nel profilo di `/api/negozio`; `ferie_leve` in
   `/api/me` (il client non hardcoda mai un tetto, il patto di
   `max_barattolo`). Endpoint `POST /api/me/ferie` col pattern di
@@ -7640,7 +7781,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   decide il flag `ultimo` col giudice puro `ultimo_pezzo(quantita,
   quantita_max)` e lo POPPA — grezzo racconterebbe «ne ha venduti N»,
   un dato nuovo che nessuno ha chiesto, e il pop copre anche le rotte
-  che servono l'annuncio intero con `a.*` (ricerca AI, i tuoi annunci).
+  che servono l'annuncio intero con `a.*` (ricerca, i tuoi annunci).
   È il pattern di `zona_comune`: un campo derivato che porta già dentro
   la risposta alla domanda.
   IL BADGE «ULTIMO» esiste solo dove la scarsità è una NOTIZIA — ne ha
@@ -10463,7 +10604,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
   `prezzo_sats` resta l'EQUIVALENTE al cambio di pubblicazione (serve
-  al tetto, alla ricerca AI e come ripiego display). Il pagamento è
+  al tetto, all'indice della ricerca e come ripiego display). Il pagamento è
   SEMPRE in sats: `compra()` converte al cambio corrente alla
   creazione della invoice (la vita della invoice, 15 min, È il lock
   del prezzo: scaduta, si riconverte; 503 se il cambio non è mai
@@ -10829,7 +10970,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (non è un indietro), mentre arrivandoci da un'altra radice si ritrova
   la vetrina dov'era — che è la convenzione dei tab.
   DUE DENTI DELLO STESSO LUCCHETTO, e servono tutt'e due: il CONTO
-  delle card (`n`) dice che la griglia è ancora quella — ricerca AI,
+  delle card (`n`) dice che la griglia è ancora quella — una ricerca,
   potatura, un annuncio sparito fanno ripartire dalla cima invece di
   atterrare nel vuoto, che il cantiere dichiara peggio di niente — e
   `loadListings` BUTTA `vetrinaPos` accanto al giro, perché due vetrine
@@ -17300,7 +17441,7 @@ sola, nessuna sopravvive. Più il giro dal vivo sul server locale con le
 misure a mano — 90 card e 4200px ritrovati identici da dettaglio,
 negozio, carrello e pagina d'acquisto, salto multiplo compreso; e i
 casi che NON devono ripristinare, verificati uno per uno: vetrina
-ricaricata mentre si è via (→ cima, mai il clamp in fondo), ricerca AI,
+ricaricata mentre si è via (→ cima, mai il clamp in fondo), ricerca,
 cambio categoria, tab Esplora su Esplora, deep link `/annuncio/{id}`.
 Più due screenshot CDP prima/dopo identici pixel per pixel, e zero
 errori JS. Un difetto PREESISTENTE trovato di striscia e chiuso qui: il
@@ -19066,6 +19207,65 @@ momento da guardare col journal aperto, perché da lì in poi si possono
 aprire link fuori da Barattolo. DA GUARDARE al primo giro: il primo
 banner in coda (che il moderatore veda la foto e il dominio) e il primo
 approvato sulla pagina del negozio.
+La ricerca diventa una sola, e l'AI ne esce (ago 2026, decisione di
+Andrea: «l'AI nella ricerca eliminala proprio»). Cercando
+«collezionismo» ora si trovano gli annunci che dicono «collezione» e
+quelli della categoria Collezionismo — che il LIKE di ieri non
+guardava nemmeno. Sotto c'è FTS5, che è dentro SQLite da sempre (zero
+dipendenze, zero compilazioni), con lo stemmer italiano di Snowball
+per le desinenze e i sinonimi delle categorie cotti DENTRO l'indice.
+Vive in `/api/listings`, cioè nella vetrina: si compone coi filtri e
+pagina come tutto il resto, e `/api/search` resta un guscio per i
+client in cache. Vedi Architettura, «LA RICERCA È UNA SOLA», per lo
+stemmer misurato (su 28 coppie singolare/plurale ne sbaglia 4 —
+tastiera, telefono, cassettiera, caffettiera — e da lì esce il
+troncamento a 5), per il trigger che invalida al posto di sette
+chiamanti da ricordare, e per la trappola del doppio filtro nel
+client, che è il modo più silenzioso in cui questo cantiere poteva
+fallire.
+Collaudato: **+29 prove** in modalità severa (3926 → 3955 contro il
+main del giorno; è il DELTA il numero difendibile, che il totale
+dipende dal ramo su cui il cantiere atterra — questo è nato dentro un
+commit più grosso poi spezzato in tre), più una famiglia ROVESCIATA —
+certificava il freno della ricerca AI e adesso certifica che di quella
+strada non resti niente — e un collaudo
+ESEGUIBILE, `collaudo_ricerca.py`, col server VERO su un database
+usa-e-getta: 32 verdi (NON rilanciato nello split: su quella macchina
+manca `fastapi`). Più **UNDICI MUTAZIONI** del codice, una per
+riga sorvegliata (categoria fuori dall'indice, via i sinonimi, pesi
+di BM25 appiattiti, via il troncamento, ordine di pertinenza perso,
+indice che non si ripara sulla strada calda, filtri applicati alla
+pagina invece che alla rosa, cursore che non avanza, totale che
+mente, giro stretto saltato, trigger che non invalida): ognuna
+diventa rossa da sola. LE PRIME DUE erano SOPRAVVISSUTE al primo
+giro, ed è la parte da ricordare: il catalogo di prova non aveva né
+un annuncio la cui categoria è l'unica cosa che lo fa trovare, né uno
+che ripete la parola in descrizione — le due fixture sono nate dalla
+tortura e non dal piano. Più il giro dal vivo col server acceso su un
+database usa-e-getta (le cinque domande di esempio, coi totali che
+tornano) e il parse del client con node.
+NON COLLAUDATO QUI, e va detto: su questa macchina non c'è un browser
+connesso, quindi il giro VISIVO non è stato fatto — la searchbar, lo
+scorrimento infinito su una ricerca e la tirata di aggiornamento
+dentro una ricerca vanno guardati dal telefono.
+NON SI ROMPE NIENTE SE FTS5 NON C'È: provato per davvero con una
+connessione che alza come farebbe un SQLite senza quel modulo — il
+server parte, lo dice nel journal, e la ricerca ripiega sul LIKE di
+ieri (10 risultati su «poster», gli stessi di prima).
+IN PRODUZIONE: il deploy fa nascere la colonna `ricerca_v` (a zero,
+cioè tutto da indicizzare), la tabella `annunci_fts` e i due trigger;
+al primo avvio la passata indicizza tutti gli annunci e lo dice con
+una riga («🔎 Indice di ricerca: N annunci indicizzati»). PRIMA del
+riavvio serve `pip install snowballstemmer` nell'ambiente del
+servizio: senza, il server parte lo stesso e la ricerca lavora a
+troncamento — e la riga d'avvio lo dichiara. DA GUARDARE al primo
+giro: quella riga, e le prime ricerche vere in produzione (se
+`snowballstemmer` manca, «tastiere» e «tastiera» smettono di
+trovarsi fra loro). Se il config del VPS ha una riga
+`TETTO_RICERCHE_AI_ORA`, è diventata INERTE e si può togliere.
+RESTA DA FARE, il secondo passo di questo cantiere: il completamento
+automatico mentre si digita e il «forse intendevi» — i mattoni sono
+già in casa (l'indice dei prefissi, `fts5vocab`, `difflib`).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

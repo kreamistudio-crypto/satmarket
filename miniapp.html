@@ -3949,8 +3949,9 @@ document.getElementById('cartello')?.remove();</script>
       <div class="scoprire-strip" id="scoprireStrip"></div>
     </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
-         prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
-         euro") resta com'e': questi servono a chi sfoglia.
+         prezzo. Sono un'altra cosa dalla ricerca per parole, e si
+         COMPONGONO con lei: chi cerca «bici» e poi stringe il prezzo
+         resta dentro la sua ricerca.
          I conteggi vivono QUI, incolonnati accanto ai controlli: una
          fascia sola tra le pillole e le foto. La riga dei pionieri
          compare solo se il server manda il numero (interruttore spento
@@ -6189,6 +6190,13 @@ let vetrinaGiro = 0;
    display:none) e si rilegge SOLO tornando indietro. Vive per la
    sessione, come i filtri: niente localStorage. */
 let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
+/* `ultimaRicercaAI` NON se n'e' andata con la ricerca AI, ed e' il
+   punto in cui questo cantiere ne ha incontrato un altro: il nome
+   nasce dalla ricerca vecchia, ma il flag ha ormai un SECONDO
+   mestiere — «la griglia mostra una lista chiusa, non paginare» —
+   che serve al barattolo in vetrina (`renderGrid(items)`). Resta
+   com'e', ed e' il patto dei nomi interni (`.lampo-was`, `pacco`,
+   `sconto_pacco_*`): si rinominano i testi, mai le chiavi. */
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
@@ -6248,9 +6256,12 @@ let filtroReg = '';          // regione ('' = tutta l'Italia)
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
   if (activeCat !== 'Tutto') p.set('cat', activeCat);
-  /* La ricerca semplice lato server e' della vetrina anonima:
-     dentro Telegram il campo Cerca parla con l'AI */
-  if (VETRINA) { const q = el('q').value.trim(); if (q) p.set('q', q); }
+  /* LA RICERCA E' DI TUTTI (ago 2026): vive qui dentro, quindi vale
+     per gli anonimi come per chi è dentro Telegram — prima questa
+     riga era `if (VETRINA)`, perché di là il campo Cerca parlava con
+     l'AI. In DEMO non si manda: lì il server non c'è, e a filtrare i
+     dati finti pensa renderGrid */
+  if (!DEMO) { const q = el('q').value.trim(); if (q) p.set('q', q); }
   /* l'ordine EFFETTIVO: quello scelto, o quello ereditato dalla
      spunta dell'occasione (vedi ordinaEffettivo) */
   const _ord = ordinaEffettivo();
@@ -7442,8 +7453,10 @@ async function aggiornaVista(){
   const v = ptrVista();
   if (v === 'esplora') {
     if (DEMO) { renderGrid(); return; }
-    /* la ricerca AI non si rifa' da sola (costerebbe credito a ogni
-       tirata): si torna alla vetrina, che e' cio' che il gesto chiede */
+    /* la ricerca ci va dentro da sola: `paramsVetrina` legge il campo
+       Cerca, quindi tirando giu' su una ricerca si rilegge QUELLA —
+       che e' cio' che il gesto chiede. Prima non poteva, che rifare
+       la ricerca AI a ogni tirata era credito buttato. */
     await loadListings();
     renderGrid();
     if (!VETRINA) { try { await caricaPreferiti(); aggiornaJarCards(); } catch(e){} }
@@ -8097,8 +8110,18 @@ function vaiEsplora(){
 let prossimaLampo = 0;   // unix della prima lampo che scade in griglia
 let prossimoAccordo = 0; // e la prima offerta accettata che scade
 function renderGrid(items){
-  ultimaRicercaAI = !!items;   // coi risultati AI lo scroll non pagina
-  const q = el('q').value.trim().toLowerCase();
+  /* `items` e' la LISTA CHIUSA (il barattolo in vetrina): quando c'e'
+     si disegna quella e lo scroll infinito resta spento. */
+  ultimaRicercaAI = !!items;
+  /* LA RICERCA LA FA IL SERVER (ago 2026), e questa riga e' quella da
+     non ammorbidire: la risposta arriva GIA' filtrata dall'indice, e
+     riapplicare qui un `includes` butterebbe via proprio i risultati
+     che l'indice ha trovato per RADICE o per CATEGORIA — cercando
+     «collezionismo» l'annuncio che dice «collezione» sparirebbe
+     nell'ultimo passo, cioe' la ricerca nuova non funzionerebbe e non
+     ci sarebbe un errore da nessuna parte. In DEMO invece il server
+     non c'e' e il filtro e' questo. */
+  const q = DEMO ? el('q').value.trim().toLowerCase() : '';
   let data = items || vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
@@ -8497,36 +8520,21 @@ async function doSearch(){
     return;
   }
   if (DEMO) {
-    /* In demo: filtro semplice. Col backend attivo qui parte la
-       ricerca AI in linguaggio naturale (capisce "sotto i 100k" ecc.) */
+    /* In demo non c'è nessun server che cerchi: filtro sui dati
+       finti, che è quel che renderGrid sa già fare */
     renderGrid();
-    toast('Col backend attivo qui cerca l\'AI 🧠');
-  } else if (VETRINA) {
-    /* Anonimi: ricerca semplice LATO SERVER (LIKE su titolo,
-       descrizione e zona), paginata come la vetrina: si cerca su
-       TUTTI gli annunci, non solo sulle pagine gia' caricate. La
-       ricerca AI resta a chi e' dentro Telegram (pubblica, sarebbe
-       credito API regalato ai bot) */
-    loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
-  } else {
-    /* busta=1: la risposta dice anche SE l'AI è stata usata. Un
-       server vecchio ignora il parametro e risponde con l'array di
-       sempre, quindi si accettano tutt'e due le forme. */
-    const r = await fetch(
-      `${API_BASE}/search?busta=1&q=${encodeURIComponent(q)}`,
-      {headers:{'X-Tg-Init-Data': authHdr()}});
-    const d = await r.json();
-    const ris = (Array.isArray(d) ? d : (d.annunci || [])).map(mapListing);
-    /* Anche i risultati AI entrano nel catalogo: openDetail deve
-       trovarli pure se vengono da oltre le pagine caricate */
-    inCatalogo(ris);
-    renderGrid(ris);
-    /* Quando l'AI non c'è (quota oraria finita, o chiamata fallita) i
-       risultati arrivano dal filtro per parole: si dice, invece di
-       far sembrare che l'AI abbia capito poco. */
-    if (!Array.isArray(d) && d.ai === false)
-      toast('🔎 Ricerca veloce per parole: l\'AI torna fra un\'ora', 5000);
+    return;
   }
+  /* UNA STRADA SOLA per tutti (ago 2026), autenticati e anonimi: la
+     ricerca vive dentro la VETRINA — `/api/listings?q=` — quindi è
+     paginata come il resto e si compone con categoria, prezzo,
+     regione e filtri senza una riga in più. Prima erano due, e
+     rispondevano diverso alla stessa domanda: il LIKE sulla frase
+     intera per gli anonimi, e Haiku per chi era dentro Telegram (con
+     `/api/search`, che ora è solo un guscio per i client rimasti in
+     cache). Con l'AI se n'è andato anche il toast che diceva quando
+     non c'era. */
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
 /* ---------------- negozio del venditore ---------------- */
@@ -25431,8 +25439,8 @@ async function avvia(){
   }
 }
 /* Le sentinelle dello scroll infinito: un osservatore per griglia,
-   armato una volta per sempre. Le guardie (demo, ricerca AI, fine
-   lista, caricamento in corso) vivono DENTRO le callback: qui non
+   armato una volta per sempre. Le guardie (demo, fine lista,
+   caricamento in corso) vivono DENTRO le callback: qui non
    serve sapere in che modalita' siamo. Una vista nascosta non
    interseca mai: le sentinelle degli altri pannelli tacciono da sole.
    600px di anticipo: la pagina dopo arriva prima che si veda il fondo. */

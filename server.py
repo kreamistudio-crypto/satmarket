@@ -655,13 +655,11 @@ try:
 except ImportError:
     ORE_INITDATA = 24
 
-# Quante ricerche AI puo' fare un utente in un'ora (0 = nessun freno).
-# Trenta e' larghissima per una persona e stretta per uno script: e'
-# il numero che si tara quando ci sara' un dato d'uso vero.
-try:
-    from config import TETTO_RICERCHE_AI_ORA
-except ImportError:
-    TETTO_RICERCHE_AI_ORA = 30
+# `TETTO_RICERCHE_AI_ORA` non esiste piu' (ago 2026): era il freno
+# della ricerca AI, e la ricerca AI non c'e' piu' — l'indice full-text
+# non chiama nessuno e non ha niente da frenare. Una riga rimasta nel
+# config del VPS e' INERTE, il patto dei nomi che non cambiano
+# significato.
 
 # LA PORTA DELL'IFRAME (ago 2026, col widget). Nasce SPENTA e il
 # perche' e' scritto per esteso in `no_iframe`: e' l'unica riga di
@@ -3031,7 +3029,20 @@ def init_db():
                     # `servizio_dove` ('' = online, il caso che non
                     # chiede niente) decide la guardia della zona.
                     "durata_min INTEGER DEFAULT 0",
-                    "servizio_dove TEXT DEFAULT ''"):
+                    "servizio_dove TEXT DEFAULT ''",
+                    # LA RICERCA (ago 2026): il timbro dell'indice
+                    # full-text. 0 = questa riga non e' indicizzata, o
+                    # il suo testo e' cambiato dopo l'ultima passata;
+                    # altrimenti la VERSIONE_RICERCA con cui e' stata
+                    # scritta, cosi' cambiando la ricetta (lo stemmer,
+                    # i campi, i sinonimi) basta alzare quel numero e
+                    # l'indice si rifa' da solo. Il DEFAULT 0 e' anche
+                    # la migrazione: tutte le righe di ieri nascono da
+                    # reindicizzare, e la prima passata d'avvio le
+                    # prende. A rimetterlo a 0 quando il testo cambia
+                    # e' un TRIGGER, non i chiamanti: vedi
+                    # `riallinea_ricerca`.
+                    "ricerca_v INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3079,6 +3090,68 @@ def init_db():
     # (asta_scadenza, id) per le aste vive — chi scade prima in testa.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_asta "
                 "ON annunci(stato, asta_scadenza, id)")
+    # L'INDICE FULL-TEXT DELLA RICERCA (ago 2026). FTS5 e' dentro
+    # SQLite da sempre: nessuna dipendenza, nessuna compilazione — la
+    # stessa macchina che sta sotto a mezzo mondo. Il `rowid` E'
+    # `annunci.id`, ed e' quel che tiene le due tabelle legate senza
+    # una colonna in piu'.
+    # I QUATTRO CAMPI SONO SEPARATI perche' BM25 li possa PESARE
+    # diverso: una parola nel titolo conta piu' della stessa parola
+    # persa in fondo a una descrizione (la lezione di
+    # `sottocategoria_indovina`, dove il titolo pesa 2 e la
+    # descrizione 1). Dentro non ci va il testo dell'annuncio ma le
+    # sue RADICI — vedi `radici()`: e' quello a far trovare
+    # «collezione» cercando «collezionismo».
+    # `prefix='2 3 4'` fa l'indice dei prefissi corti, che serve al
+    # completamento automatico mentre si digita (l'ultima parola di
+    # una ricerca e' quasi sempre a meta').
+    # SOTTO `try`, E NON E' PRUDENZA GENERICA: FTS5 e' una funzione
+    # OPZIONALE di SQLite: c'e' in tutte le build che contano ed e'
+    # compilata di serie da anni, ma «quasi certamente» non basta
+    # quando il prezzo dell'errore e' che `init_db` esplode e IL
+    # MERCATINO NON PARTE. Tutto il resto della ricerca e' gia'
+    # fail-open — `cerca_ids` torna None e si ripiega sul LIKE di ieri
+    # — e questo era l'unico anello che poteva ancora far cadere
+    # l'avvio. Il journal lo dice, che un fail-open muto non e' un
+    # fail-open.
+    try:
+        con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS annunci_fts "
+                    "USING fts5(titolo, descrizione, zona, categoria, "
+                    "tokenize='unicode61', prefix='2 3 4')")
+    except sqlite3.Error as e:
+        print(f"⚠️  Indice di ricerca non creato ({e}): la ricerca "
+              "lavora col filtro per parole di ieri", flush=True)
+    # IL TIMBRO LO AZZERA UN TRIGGER, NON I CHIAMANTI, ed e' la
+    # decisione che tiene in piedi tutto il resto: i posti che
+    # riscrivono il testo di un annuncio sono sette (pubblica,
+    # modifica, modifica firmata, import CSV, i due dell'import Nostr,
+    # lo spostamento di categoria) e diventeranno otto — un elenco a
+    # memoria invecchia e RIMPICCIOLISCE, la lezione del titolo nudo
+    # nelle notifiche. Il trigger invece non si puo' dimenticare, e
+    # copre gratis anche `importa_nostr.py`, che scrive dritto nel
+    # database e di questa colonna non sa niente (e deve restare
+    # cieco: dev'essere lanciabile su un Barattolo piu' vecchio).
+    # Il trigger INVALIDA e basta — stemmare vuole Python — e a
+    # rifare l'indice e' `riallinea_ricerca`.
+    try:
+        con.execute("""
+            CREATE TRIGGER IF NOT EXISTS annunci_ricerca_scaduta
+            AFTER UPDATE OF titolo, descrizione, zona, categoria,
+                            sottocategoria ON annunci
+            WHEN NEW.ricerca_v <> 0
+            BEGIN UPDATE annunci SET ricerca_v=0 WHERE id=NEW.id; END""")
+    except sqlite3.Error as e:
+        print(f"⚠️  Trigger della ricerca non creato ({e})", flush=True)
+    # Nessun `DELETE FROM annunci` esiste oggi, ed e' per questo che
+    # il trigger c'e': il giorno che ne nascesse uno, l'indice non
+    # deve restare a raccontare un annuncio che non c'e' piu'.
+    try:
+        con.execute("""
+            CREATE TRIGGER IF NOT EXISTS annunci_ricerca_sparita
+            AFTER DELETE ON annunci
+            BEGIN DELETE FROM annunci_fts WHERE rowid=OLD.id; END""")
+    except sqlite3.Error:
+        pass
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
@@ -9523,11 +9596,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         _sql, _par = _where_sped_gratis(_camb, _ora)
         dove += _sql
         par += _par
-    if q.strip():
-        # Ricerca semplice per la vetrina anonima (l'AI resta riservata
-        # agli autenticati): LIKE su titolo, descrizione e zona.
-        dove += " AND (a.titolo LIKE ? OR a.descrizione LIKE ? OR a.zona LIKE ?)"
-        par += [f"%{q.strip()}%"] * 3
+    # (la ricerca per parole vive piu' in basso, dopo `con = db()`:
+    # l'indice full-text vuole una connessione)
     # Filtro prezzo min/max: chi guarda in euro scrive euro, e la
     # conversione la fa il server col cambio corrente (la stessa
     # fonte del pagamento). Il confronto e' sempre su prezzo_sats:
@@ -9549,27 +9619,81 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         dove += " AND a.prezzo_sats <= ?"
         par.append(int(prezzo_max))
     con = db()
+    # LA RICERCA PER PAROLE (ago 2026): passa dall'indice full-text —
+    # radici, sinonimi e categoria — e NON dal LIKE sulla frase
+    # intera. Vedi «LA RICERCA E' UNA SOLA».
+    # Si ripara un po' d'indice prima di cercarci dentro: cosi' un
+    # annuncio appena pubblicato si trova SUBITO, senza aspettare un
+    # giro d'orologio. Col tetto, che chi cerca non deve pagare
+    # l'attesa di un import da cinquecento righe.
+    ordinati = None
+    if q.strip():
+        riallinea_ricerca(con, 300)
+        ids_q = cerca_ids(con, q.strip())
+        if ids_q is None:
+            # Indice non disponibile: la ricerca di ieri, che qualche
+            # risultato lo da'. Mai una vetrina vuota che finge.
+            dove += (" AND (a.titolo LIKE ? OR a.descrizione LIKE ? "
+                     "OR a.zona LIKE ?)")
+            par += [f"%{q.strip()}%"] * 3
+        else:
+            # I FILTRI SI APPLICANO ALLA ROSA INTERA, non alla pagina,
+            # o le pagine uscirebbero di lunghezze diverse e il totale
+            # direbbe il falso. Una lettura in piu' per una ricerca, e
+            # in cambio il conto e' esatto.
+            segni = ",".join("?" * len(ids_q)) or "NULL"
+            vivi = {r[0] for r in con.execute(
+                f"SELECT a.id FROM annunci a "
+                "JOIN utenti u ON u.tg_id = a.venditore_id "
+                f"WHERE {dove} AND a.id IN ({segni})", par + ids_q)} \
+                if ids_q else set()
+            ordinati = [i for i in ids_q if i in vivi]
     if not limit:
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
         # risposta e' IDENTICA a prima.
-        righe = [dict(r) for r in con.execute(
-            f"SELECT {campi} FROM annunci a "
-            "JOIN utenti u ON u.tg_id = a.venditore_id "
-            f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
-            par + [TETTO_LEGACY])]
+        righe = (_righe_per_id(con, campi, ordinati[:TETTO_LEGACY])
+                 if ordinati is not None else
+                 arricchisci_righe_vetrina([dict(r) for r in con.execute(
+                     f"SELECT {campi} FROM annunci a "
+                     "JOIN utenti u ON u.tg_id = a.venditore_id "
+                     f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+                     par + [TETTO_LEGACY])]))
         con.close()
-        return arricchisci_righe_vetrina(righe)
+        return righe
     limit = min(limit, LIMITE_PAGINA_MAX)
-    righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore,
-                                     ordina)
-    risposta = {"annunci": arricchisci_righe_vetrina(righe),
-                "cursore": prossimo}
+    totale_ricerca = None
+    if ordinati is not None:
+        # CON UNA RICERCA ATTIVA L'ORDINE E' LA PERTINENZA, e il
+        # cursore keyset non serve piu': quello pagina su una COLONNA
+        # (data o prezzo), e il punteggio di una ricerca colonna non
+        # e'. Si pagina sulla POSIZIONE nella rosa — «r{quanti ne ho
+        # gia' visti}» — che e' stabile perche' il punteggio e'
+        # deterministico: la stessa domanda da' sempre la stessa fila.
+        # Le voci di Ordina restano scritte nel campo e non si
+        # applicano finche' si cerca: chi cerca vuole la cosa piu'
+        # pertinente in cima, ed e' la stessa regola per cui il filtro
+        # di un'occasione si porta dietro il suo ordine.
+        inizio = (int(cursore[1:]) if cursore[:1] == "r"
+                  and cursore[1:].isdigit() else 0)
+        righe = _righe_per_id(con, campi, ordinati[inizio:inizio + limit])
+        prossimo = (f"r{inizio + limit}"
+                    if inizio + limit < len(ordinati) else None)
+        totale_ricerca = len(ordinati)
+    else:
+        righe, prossimo = pagina_annunci(con, campi, dove, par, limit,
+                                         cursore, ordina)
+        righe = arricchisci_righe_vetrina(righe)
+    risposta = {"annunci": righe, "cursore": prossimo}
     if not cursore:
         # Solo in prima pagina: il totale della vista corrente (per
         # l'etichetta "N oggetti") e i conteggi GLOBALI per categoria
         # (le pillole devono dire la verita' anche a pagine parziali).
-        risposta["totale"] = con.execute(
+        # Con una ricerca attiva il totale e' la rosa gia' contata: la
+        # WHERE da sola non lo saprebbe dire, che la rosa la decide
+        # l'indice.
+        risposta["totale"] = totale_ricerca if totale_ricerca is not None \
+            else con.execute(
             f"SELECT COUNT(*) AS n FROM annunci a WHERE {dove}",
             par).fetchone()["n"]
         risposta["conteggi"] = {
@@ -11914,10 +12038,10 @@ def _leve_stato():
                   ORE_INITDATA, allarme=not ORE_INITDATA,
                   spento="un initData catturato apre quell'account per "
                          "sempre: è il freno d'emergenza, non una scelta"),
-            _leva("Ricerche AI per utente all'ora", "TETTO_RICERCHE_AI_ORA",
-                  TETTO_RICERCHE_AI_ORA,
-                  spento="nessun freno: ogni ricerca è una chiamata ad "
-                         "Anthropic, e un ciclo banale brucia il credito"),
+            _leva("Stemmer della ricerca", "pip install snowballstemmer",
+                  _STEMMER is not None,
+                  spento="la ricerca lavora a troncamento invece che a "
+                         "radici: più grossolana, mai muta"),
             _leva("Porta dell'iframe chiusa", "PROTEGGI_IFRAME",
                   PROTEGGI_IFRAME,
                   spento="chiunque può incorniciare Barattolo nel proprio "
@@ -12401,43 +12525,308 @@ async def messaggio_utente_admin(tg_id: int, req: Request,
     return {"ok": True}
 
 
-# ---------------------- API: RICERCA AI -----------------------------
+# ------------------------- API: LA RICERCA --------------------------
+# LA RICERCA E' UNA SOLA (ago 2026, decisione di Andrea: «l'AI nella
+# ricerca eliminala proprio»). Fino a ieri erano DUE, e rispondevano
+# diverso alla stessa domanda: per gli anonimi un LIKE sulla FRASE
+# INTERA in titolo/descrizione/zona — quindi «bici da corsa» non
+# trovava «bicicletta da corsa», e «collezionismo» non trovava la
+# categoria Collezionismo, che il LIKE nemmeno guardava — e per chi
+# era dentro Telegram Haiku, cioe' l'unica rotta del progetto dove UNA
+# richiesta di un utente qualunque era UNA chiamata al modello, con un
+# prompt di dimensione massima FISSA: la shortlist si riempiva fino a
+# 300 annunci anche quando la domanda non trovava niente, quindi ogni
+# ricerca costava uguale, tanto.
+# Adesso e' un indice full-text di casa: deterministico, senza rete,
+# senza credito, uguale per tutti — e PROVABILE IN CI, che di un'AI
+# non si puo' dire. Il ripiego dell'AI (il match sulla frase intera)
+# era per giunta la strada che si vedeva proprio quando le cose
+# andavano male, cioe' la peggiore da lasciare zoppa.
+# DOVE VIVE: dentro `/api/listings`, cioe' nella VETRINA — ed e' quel
+# che la rende componibile con categoria, prezzo, regione e filtri, e
+# paginata come tutto il resto, senza una riga in piu'. `/api/search`
+# resta come guscio per i client vecchi rimasti in cache.
 
-# Con centinaia di annunci il catalogo intero non entra piu' nel
-# prompt: all'AI arriva una SHORTLIST — prima i match letterali sulle
-# parole della richiesta, poi i piu' recenti a riempire. Compromesso
-# dichiarato: un annuncio che combacia SOLO per sinonimo e non e' tra
-# i piu' freschi puo' sfuggire. L'AI continua a fare la parte fine
-# (sinonimi, prezzo, zona) dentro la rosa.
-TETTO_CATALOGO_AI = 300
+# La ricetta dell'indice. Alzarla di uno fa reindicizzare TUTTO al
+# primo avvio: e' la leva da girare quando cambia lo stemmer, o i
+# campi, o i sinonimi che ci entrano dentro.
+VERSIONE_RICERCA = 1
 
-# Il freno della ricerca AI (ago 2026, audit). Era l'unica rotta dove
-# UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
-# con un prompt di dimensione massima FISSA: il catalogo si riempie
-# fino a 300 annunci anche quando la domanda non trova niente, quindi
-# ogni ricerca costa uguale, tanto. L'unico recinto era
-# l'autenticazione — che lo passa chiunque abbia un account.
-# Pattern di IMPORT_QUOTA, con l'ora al posto del giorno: dizionario
-# in memoria, si azzera al riavvio e va bene cosi' (le raffiche vere
-# durano meno di un riavvio).
-RICERCA_QUOTA: dict[int, list] = {}     # tg_id -> [ora, ricerche]
+# Il tetto dei risultati di una ricerca. Oltre non si pagina: chi
+# scorre mille risultati non li guarda, e a stringere c'e' il resto
+# del pannello Filtri.
+TETTO_RICERCA = 500
+
+# LO STEMMER E' SNOWBALL, e non una tabella di desinenze fatta in casa
+# (decisione di Andrea: «ci vuole un sistema gia' collaudato, non per
+# forza le prime 5 lettere»). `snowballstemmer` e' Python puro, ~100
+# KB, zero dipendenze, ed e' l'algoritmo che sta sotto Lucene,
+# Elasticsearch e PostgreSQL: le regole dell'italiano le ha scritte
+# qualcun altro vent'anni fa e sono state pestate da mezzo mondo.
+# Import FAIL-OPEN come Pillow e coincurve — ma DICHIARATO all'avvio,
+# il patto della chiave dei contenuti digitali: un fail-open che non
+# si vede nemmeno da chi guarda il server non e' dichiarato, e'
+# soltanto silenzio.
+try:
+    import snowballstemmer
+    _STEMMER = snowballstemmer.stemmer("italian")
+except Exception:
+    _STEMMER = None
+    print("⚠️  snowballstemmer non c'è: la ricerca lavora a troncamento "
+          "invece che a radici (più grossolana, mai muta). "
+          "pip install snowballstemmer")
 
 
-def _ricerca_ai_concessa(tg_id: int) -> bool:
-    """Consuma un gettone della quota oraria. False = si risponde col
-    filtro per parole, che non costa niente e qualche risultato lo
-    da' — meglio di un vicolo cieco."""
-    if not TETTO_RICERCHE_AI_ORA:       # 0 = nessun freno
-        return True
-    ora = time.strftime("%Y-%m-%d %H")
-    voce = RICERCA_QUOTA.get(tg_id)
-    if not voce or voce[0] != ora:
-        voce = [ora, 0]
-        RICERCA_QUOTA[tg_id] = voce
-    if voce[1] >= TETTO_RICERCHE_AI_ORA:
-        return False
-    voce[1] += 1
-    return True
+def radice(parola: str) -> str:
+    """La radice di una parola italiana: 'collezione', 'collezionismo'
+    e 'collezionista' diventano tutte 'collezion'; 'biciclette' e
+    'bicicletta' diventano 'biciclett'. E' questo a far trovare l'una
+    cercando l'altra.
+
+    VALE A INDICE E A DOMANDA INSIEME, ed e' la riga da non
+    ammorbidire: se le due parti stemmassero in modo diverso non si
+    incontrerebbero mai, e la ricerca tornerebbe vuota senza un errore
+    e senza una riga di journal.
+
+    Le parole di due lettere si lasciano stare: sotto non c'e'
+    desinenza da togliere, e accorciarle impasterebbe cose diverse.
+
+    SENZA lo stemmer si ripiega sul TRONCAMENTO, che sulla famiglia
+    che conta ottiene lo stesso ('collezione' e 'collezionismo'
+    finiscono tutt'e due su 'collez'): piu' grossolano — impasta anche
+    parole che non c'entrano — ma mai muto.
+    """
+    p = (parola or "").strip()
+    if len(p) < 3:
+        return p
+    if _STEMMER is None:
+        return p[:6]
+    return _STEMMER.stemWord(p) or p
+
+
+def termini(parola: str) -> tuple[str, ...]:
+    """I termini con cui una parola entra nell'indice — e con cui la
+    si cerca. Sono DUE: la radice, e il TRONCAMENTO a cinque lettere.
+
+    IL TRONCAMENTO NON E' UN RIPIEGO, e' la toppa a un difetto vero
+    dello stemmer, MISURATO e non temuto: su 28 coppie
+    singolare/plurale di un mercatino ne sbaglia 4 — «tastiera →
+    tastier» ma «tastiere → tast», e cosi' telefono/telefoni,
+    cassettiera, caffettiera (Snowball tratta '-iera' come una
+    desinenza da togliere, e sul plurale arriva prima un'altra
+    regola). Chi cerca «tastiere» non troverebbe «tastiera»: il 14%
+    delle coppie, e dentro ci sono le parole che la gente scrive
+    davvero.
+    Su tutti e quattro i casi le due radici divergenti hanno le prime
+    CINQUE lettere in comune, ed e' da li' che esce la cura: si
+    indicizzano tutt'e due le forme e si cercano in «o». Cinque e non
+    quattro perche' quattro impasta cose diverse ('coll' prende
+    collana, collo, collega); cinque discrimina quanto una parola
+    corta.
+    Il prezzo dichiarato e' un indice piu' grosso — al piu' il doppio
+    dei termini — e qualche accostamento in piu' nel giro largo, che
+    BM25 ricaccia in fondo perche' pesa quante volte una parola
+    combacia davvero."""
+    p = (parola or "").strip()
+    if len(p) < 3:
+        return (p,) if p else ()
+    r = radice(p)
+    corto = p[:5]
+    return (r,) if r == corto else (r, corto)
+
+
+def radici(testo: str) -> list[str]:
+    """Il testo ridotto ai termini dell'indice. Passa da `normalizza`,
+    che e' il setaccio di casa (minuscole, accenti sciolti,
+    punteggiatura in spazi) — lo STESSO del filtro parole, degli
+    avvisi di ricerca e del motore geografico: un secondo setaccio
+    direbbe 'citta' di qua e 'città' di la', e i due lati non si
+    incontrerebbero mai."""
+    return [t for p in normalizza(testo).split() if len(p) >= 2
+            for t in termini(p)]
+
+
+# I SINONIMI ENTRANO NELL'INDICE, NON NELLA DOMANDA (ago 2026), ed e'
+# la scelta che tiene veloce la ricerca: espandere la DOMANDA vuol
+# dire una query che si allunga con quante parole conosciamo — e la
+# domanda si fa a ogni tasto —, espandere l'INDICE costa una volta
+# sola, quando l'annuncio si scrive. Cosi' «pc» trova gli annunci di
+# Informatica e «hifi» quelli di Audio e video, e i due cataloghi di
+# sinonimi che il progetto ha gia' — quello delle categorie e quello
+# delle sottocategorie — si mettono a servire anche la ricerca senza
+# una riga di dizionario nuova da tenere in pari.
+_SINONIMI_DI_CATEGORIA: dict[str, list[str]] = {}
+for _parola_sin, _cat_sin in SINONIMI_CATEGORIA.items():
+    _SINONIMI_DI_CATEGORIA.setdefault(_cat_sin, []).append(_parola_sin)
+
+
+def _campi_indice(r) -> tuple[str, str, str, str]:
+    """I quattro campi che finiscono in `annunci_fts`, gia' in radici.
+
+    Il quarto NON e' solo la categoria: ci stanno anche l'etichetta
+    della sottocategoria e i sinonimi di tutt'e due. E' un campo suo e
+    non un pezzo del titolo perche' BM25 lo possa pesare per conto
+    proprio — deve valere piu' di una parola persa in descrizione e
+    meno del titolo, che e' quello che il venditore ha scelto."""
+    cat = r["categoria"] or ""
+    chiavi = r.keys() if hasattr(r, "keys") else r
+    sotto = (r["sottocategoria"] or "") if "sottocategoria" in chiavi else ""
+    voci = [cat] + _SINONIMI_DI_CATEGORIA.get(cat, [])
+    if sotto:
+        voci += [e for i, e in SOTTOCATEGORIE.get(cat, ()) if i == sotto]
+        voci += list(SINONIMI_SOTTOCATEGORIA.get(cat, {}).get(sotto, ()))
+    return (" ".join(radici(r["titolo"])),
+            " ".join(radici(r["descrizione"])),
+            " ".join(radici(r["zona"])),
+            " ".join(radici(" ".join(voci))))
+
+
+def _indicizza(con, r) -> None:
+    """Riscrive la riga nell'indice. Prima si toglie e poi si rimette:
+    in FTS5 non esiste un UPDATE per rowid, e due copie della stessa
+    riga farebbero contare due volte ogni parola nel punteggio."""
+    con.execute("DELETE FROM annunci_fts WHERE rowid=?", (r["id"],))
+    con.execute("INSERT INTO annunci_fts"
+                "(rowid, titolo, descrizione, zona, categoria) "
+                "VALUES(?,?,?,?,?)", (r["id"],) + _campi_indice(r))
+    con.execute("UPDATE annunci SET ricerca_v=? WHERE id=?",
+                (VERSIONE_RICERCA, r["id"]))
+
+
+def riallinea_ricerca(con, tetto: int = 0) -> int:
+    """Rifa' l'indice delle righe che il trigger ha invalidato (o che
+    non ci sono mai entrate). Idempotente, e si puo' interrompere a
+    meta': quel che resta lo prende il giro dopo.
+
+    E' un SISTEMA AUTO-RIPARANTE e non una catena di ganci da
+    ricordare — il pattern di `riallinea_quantita_max` e della passata
+    dei distintivi: chi scrive un annuncio non deve sapere che esiste
+    una ricerca, e il giorno che nasce l'ottavo posto che riscrive un
+    titolo l'indice lo segue da solo.
+
+    `tetto` limita quanto si lavora in un colpo: sulla strada calda
+    della ricerca si ripara un po' per volta invece di far aspettare
+    chi cerca dietro a un import da 500 righe. Torna quante righe ha
+    rifatto."""
+    sql = ("SELECT id, titolo, descrizione, zona, categoria, sottocategoria "
+           "FROM annunci WHERE ricerca_v<>?")
+    if tetto:
+        sql += f" LIMIT {int(tetto)}"
+    # FAIL-OPEN COME `cerca_ids`, e questo `try` e' arrivato da una
+    # prova e non da una rilettura: su un SQLite senza FTS5 il server
+    # partiva (l'indice non si crea, e lo si dice) ma la prima ricerca
+    # dava 500 — perche' la riparazione SCRIVE nell'indice, e a
+    # guardarsi le spalle era solo chi legge. Qui non c'e' niente da
+    # salvare: se l'indice non c'e' non si ripara, e la ricerca
+    # ripiega sul LIKE di ieri.
+    try:
+        righe = con.execute(sql, (VERSIONE_RICERCA,)).fetchall()
+        for r in righe:
+            _indicizza(con, r)
+        if righe:
+            con.commit()
+        return len(righe)
+    except sqlite3.Error as e:
+        print(f"⚠️  Indice di ricerca non riparato ({e})", flush=True)
+        return 0
+
+
+def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
+    """La domanda dell'utente tradotta in due query FTS5: la STRETTA
+    (tutte le parole) e la LARGA (almeno una).
+
+    SI PROVA PRIMA LA STRETTA E POI LA LARGA, ed e' il compromesso che
+    regge a tutti i volumi: «tastiera meccanica» deve dare le tastiere
+    meccaniche e non tutte le tastiere del mercatino, ma su un
+    catalogo piccolo l'intersezione e' spesso vuota — e una vetrina
+    vuota, quando qualcosa da mostrare c'era, e' peggio di una vetrina
+    imprecisa.
+
+    OGNI PAROLA E' UN GRUPPO, non un termine: dentro ci stanno la sua
+    radice e il suo troncamento in «o» (vedi `termini`), e sono i
+    GRUPPI a legarsi in «e». Cosi' «tastiera meccanica» vuole tutt'e
+    due le parole, ma ognuna nella forma che combacia.
+
+    L'ULTIMA PAROLA E' UN PREFISSO perche' chi digita ce l'ha quasi
+    sempre a meta': cercando «collezio» si vede gia' qualcosa. I
+    termini escono da `normalizza`, quindi sono solo lettere e cifre e
+    non possono contenere la virgoletta che chiuderebbe la stringa —
+    si virgoletta lo stesso, che una guardia che oggi non serve e' la
+    guardia che regge domani."""
+    parole = [p for p in normalizza(q).split() if len(p) >= 2]
+    if not parole:
+        return ("", "")
+    gruppi = []
+    for i, p in enumerate(parole):
+        coda = "*" if prefisso and i == len(parole) - 1 else ""
+        voci = [f'"{t}"{coda}' for t in termini(p)]
+        gruppi.append(voci[0] if len(voci) == 1
+                      else "(" + " OR ".join(voci) + ")")
+    return (" AND ".join(gruppi), " OR ".join(gruppi))
+
+
+def cerca_ids(con, q: str, tetto: int = TETTO_RICERCA,
+              prefisso: bool = True) -> list[int] | None:
+    """Gli id degli annunci che rispondono alla domanda, DAL PIU'
+    PERTINENTE. Torna `None` — e non una lista vuota — quando l'indice
+    non c'e': sono due cose diverse, e chi chiama deve poter ripiegare
+    sul LIKE di ieri invece di dire «nessun risultato», che sarebbe
+    una bugia.
+
+    I PESI di BM25 sono l'ordine delle cose: il titolo e' quello che
+    il venditore ha scelto per farsi trovare, la categoria e' un fatto
+    dichiarato, la descrizione e' prosa e la zona e' un luogo — una
+    parola nel titolo vale cinque volte la stessa parola in
+    descrizione. Il punteggio di BM25 e' NEGATIVO e piu' basso vuol
+    dire meglio: l'ORDER BY crescente non e' un refuso.
+
+    Lo STATO non si guarda qui: l'indice tiene tutti gli annunci e a
+    dire quali si mostrano restano le WHERE della vetrina, che quelle
+    regole le sanno gia' tutte (venduti, ferie, revisione...)."""
+    stretta, larga = _domanda_fts(q, prefisso)
+    if not stretta:
+        return []
+    try:
+        for domanda in (stretta, larga):
+            righe = con.execute(
+                "SELECT rowid FROM annunci_fts WHERE annunci_fts MATCH ? "
+                "ORDER BY bm25(annunci_fts, 10.0, 2.0, 1.0, 4.0) LIMIT ?",
+                (domanda, tetto)).fetchall()
+            if righe:
+                return [r[0] for r in righe]
+        return []
+    except sqlite3.Error as e:
+        # FTS5 assente (un SQLite molto vecchio) o indice rotto: la
+        # ricerca non deve sparire, torna quella di ieri.
+        print(f"⚠️  Indice di ricerca non disponibile ({e}): uso il LIKE")
+        return None
+
+
+@app.on_event("startup")
+async def scalda_ricerca():
+    """La passata d'avvio: indicizza tutto quel che manca — al primo
+    deploy sono TUTTI gli annunci (la colonna nasce a zero), poi solo
+    quel che e' cambiato mentre il server era spento, che di solito e'
+    niente.
+
+    NON e' in `init_db`, ed e' una ragione di ordine e non di gusto:
+    quella gira all'import del modulo, quando lo stemmer e i giudici
+    di qui non sono ancora stati definiti. Qui invece si e' dopo, e
+    prima che uvicorn accetti la prima richiesta — la stessa finestra
+    di `scalda_cambio`.
+
+    Fail-open: se qualcosa va storto la ricerca ripara comunque un po'
+    per volta a ogni domanda, e il server parte."""
+    try:
+        con = db()
+        quante = riallinea_ricerca(con)
+        con.close()
+        if quante:
+            print(f"🔎 Indice di ricerca: {quante} annunci indicizzati "
+                  f"(stemmer {'sì' if _STEMMER else 'NO, a troncamento'})",
+                  flush=True)
+    except Exception as e:
+        print(f"⚠️  Indice di ricerca non scaldato: {e}", flush=True)
 
 
 # IL FRENO DEI CODICI SCONTO (ago 2026), gemello del precedente. Serve
@@ -12489,93 +12878,55 @@ def _codice_tentativo_speso(tg_id: int) -> None:
 
 @app.get("/api/search")
 def cerca(q: str, busta: int = 0, x_tg_init_data: str = Header(""),
-                  barattolo_sessione: str = Cookie("")):
-    """Ricerca in linguaggio naturale: l'AI legge la richiesta
-    ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci.
+          barattolo_sessione: str = Cookie("")):
+    """Il GUSCIO della ricerca di ieri, per i client rimasti in cache.
 
-    `busta=1` avvolge la risposta in {annunci, ai} per dire QUANDO
-    l'AI non e' stata usata (quota finita, o chiamata fallita): senza
-    il parametro resta l'array di sempre, e un client vecchio in cache
-    vede i risultati come li ha sempre visti — il patto della
-    paginazione."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    base = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-            "u.npub AS venditore_npub, "
-            "u.npub_verificata AS venditore_npub_verificata, "
-            "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
-            "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
-            "AS venditore_avatar, "
-            "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
-            " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
-            "u.rating FROM annunci a "
-            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")
+    Da quando la ricerca vive in `/api/listings` questa rotta non ha
+    piu' un motore suo: chiama lo stesso giudice e risponde nella
+    forma di sempre. `busta=1` continua a rispondere `{annunci, ai}`
+    con `ai` a FALSO — che adesso e' semplicemente vero per tutti, e
+    il client vecchio lo dice con la sua riga «ricerca veloce per
+    parole», che e' onesta.
+    Resta AUTENTICATA com'era: non e' piu' credito da difendere, ma
+    aprire una superficie che non serve piu' a nessuno sarebbe solo
+    superficie (la lezione di `/api/comuni`)."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    # Le parole "sostanziose" della richiesta (>=3 lettere, max 6)
-    parole = [p for p in re.findall(r"\w+", q.lower()) if len(p) >= 3][:6]
-    annunci = []
-    if parole:
+    riallinea_ricerca(con, 300)
+    ids = cerca_ids(con, q)
+    if ids is None:                     # indice assente: il LIKE di ieri
+        parole = [p for p in re.findall(r"\w+", q.lower()) if len(p) >= 3][:6]
         cond = " OR ".join("(a.titolo LIKE ? OR a.descrizione LIKE ? "
                            "OR a.categoria LIKE ? OR a.zona LIKE ?)"
-                           for _ in parole)
-        par = [f"%{p}%" for p in parole for _ in range(4)]
-        annunci = [dict(r) for r in con.execute(
-            base + f" AND ({cond}) ORDER BY a.creato DESC LIMIT ?",
-            par + [TETTO_CATALOGO_AI])]
-    if len(annunci) < TETTO_CATALOGO_AI:
-        # Si riempie la rosa coi piu' freschi: l'AI vede sempre un
-        # catalogo pieno e puo' pescare i sinonimi che il LIKE non sa.
-        ids = tuple(a["id"] for a in annunci) or (0,)
-        annunci += [dict(r) for r in con.execute(
-            base + f" AND a.id NOT IN ({','.join('?' * len(ids))}) "
+                           for _ in parole) or "0"
+        righe = con.execute(
+            f"SELECT a.id FROM annunci a WHERE a.stato='attivo' AND ({cond}) "
             "ORDER BY a.creato DESC LIMIT ?",
-            list(ids) + [TETTO_CATALOGO_AI - len(annunci)])]
-    annunci = arricchisci_righe_vetrina(annunci)
+            [f"%{p}%" for p in parole for _ in range(4)] + [TETTO_RICERCA])
+        ids = [r[0] for r in righe]
+    annunci = _righe_per_id(con, CAMPI_VETRINA, ids, "a.stato='attivo'")
     con.close()
-    def risposta(righe, ai_usata=True):
-        return {"annunci": righe, "ai": ai_usata} if busta else righe
+    return {"annunci": annunci, "ai": False} if busta else annunci
 
-    def filtro_semplice():
-        ql = q.lower()
-        return [a for a in annunci
-                if ql in (a["titolo"] + a["descrizione"]).lower()]
 
-    if not annunci:
-        return risposta([])
-    # Il freno PRIMA di costruire il catalogo: a quota finita non si
-    # spende nemmeno il tempo di impaginare 300 annunci.
-    if not _ricerca_ai_concessa(user["id"]):
-        return risposta(filtro_semplice(), False)
+def _righe_per_id(con, campi: str, ids: list[int],
+                  dove: str = "1=1") -> list[dict]:
+    """Le righe di vetrina degli id dati, NELL'ORDINE IN CUI ARRIVANO.
 
-    catalogo = "\n".join(
-        f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
-        f"{a['prezzo_sats']} sats"
-        + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
-        + (f" | {CONDIZIONI[condizione_da_mostrare(a)]}"
-           if condizione_da_mostrare(a) in CONDIZIONI else "")
-        + (f" | ne restano {a['quantita']}"
-           if (a.get("quantita") or 1) > 1 else "")
-        + f" | {a['zona']} | {a['descrizione'][:120]}"
-        for a in annunci)
-    try:
-        r = ai.messages.create(
-            model=MODELLO_RICERCA, max_tokens=200, timeout=20,
-            system=("Sei il motore di ricerca di un mercatino. Data la richiesta "
-                    "dell'utente e il catalogo, rispondi SOLO con un array JSON "
-                    "degli ID pertinenti, dal piu' rilevante. Capisci sinonimi "
-                    "(bici=mtb=bicicletta) e vincoli di prezzo/zona. "
-                    "Le categorie del catalogo sono: "
-                    + ", ".join(CATEGORIE) + ". Se la richiesta indica una "
-                    "categoria (es. 'giochi per bambini'), privilegiala. "
-                    "Nessun risultato pertinente = []"),
-            messages=[{"role": "user",
-                       "content": f"RICHIESTA: {q}\n\nCATALOGO:\n{catalogo}"}])
-        ids = json.loads("".join(b.text for b in r.content if b.type == "text")
-                         .replace("```json", "").replace("```", "").strip())
-        per_id = {a["id"]: a for a in annunci}
-        return risposta([per_id[i] for i in ids if i in per_id])
-    except Exception as e:
-        print(f"Ricerca AI fallita, uso filtro semplice: {e}")
-        return risposta(filtro_semplice(), False)
+    Quell'ordine e' il punteggio della ricerca, e SQL non lo conosce:
+    si rimette in fila in Python, o `IN (...)` servirebbe le righe
+    nell'ordine che gli pare — cioe' la pertinenza si perderebbe
+    proprio nell'ultimo passo, che e' il modo piu' silenzioso in cui
+    una ricerca puo' smettere di funzionare (i risultati ci sono
+    tutti, solo nell'ordine sbagliato)."""
+    if not ids:
+        return []
+    segni = ",".join("?" * len(ids))
+    righe = {r["id"]: dict(r) for r in con.execute(
+        f"SELECT {campi} FROM annunci a "
+        "JOIN utenti u ON u.tg_id = a.venditore_id "
+        f"WHERE {dove} AND a.id IN ({segni})", ids)}
+    return arricchisci_righe_vetrina([righe[i] for i in ids if i in righe])
 
 
 # ------------------------- API: OFFERTE -----------------------------
@@ -23983,12 +24334,10 @@ def pulisci_avvisi():
     oggi = time.strftime("%Y-%m-%d")
     for tg_id in [t for t, v in AVVISI_QUOTA.items() if v[0] != oggi]:
         AVVISI_QUOTA.pop(tg_id, None)
-    # e i gettoni delle ricerche AI delle ore passate: la scopa serve
-    # solo a non far crescere il dizionario per sempre — il rinnovo
-    # della quota e' implicito nella lettura, come per gli avvisi
+    # (i gettoni delle ricerche AI non ci sono piu': la ricerca non
+    # chiama nessuno e non ha una quota da spazzare — ma l'ORA resta,
+    # che la usa la scopa dei codici sconto qui sotto)
     ora = time.strftime("%Y-%m-%d %H")
-    for tg_id in [t for t, v in RICERCA_QUOTA.items() if v[0] != ora]:
-        RICERCA_QUOTA.pop(tg_id, None)
     # e i gettoni dei codici sconto sbagliati, per la stessa ragione
     for tg_id in [t for t, v in CODICE_QUOTA.items() if v[0] != ora]:
         CODICE_QUOTA.pop(tg_id, None)
