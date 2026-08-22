@@ -20819,6 +20819,237 @@ def prove_widget():
           ".catch(" in cw and "a mano" in cw)
 
 
+def prove_scoprire():
+    """LA SEZIONE «Da scoprire» IN HOME (ago 2026): due card
+    rettangolari sotto le categorie che accendono i filtri
+    dell'occasione — le offerte a tempo e gli sconti dei negozi — in
+    attesa delle sponsorizzate, quando la lista arrivera' dal server.
+
+    Le due cose che qui possono rompersi in silenzio: la card che
+    promette una vetrina che la spunta poi non da' (se il flag della
+    busta smettesse di passare dal predicato del filtro), e la card
+    che resta a schermo quando la sua occasione non esiste — la
+    decisione di Andrea e' che SPARISCE, e una sezione con un titolo
+    e niente sotto e' peggio di nessuna sezione."""
+    print("\n[la sezione «Da scoprire»]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. LA ROTTA DELL'ASSET: whitelist a tupla (il patto di
+    # FILE_FONT) + revalidazione (il patto delle illustrazioni: i file
+    # si ridisegnano sotto lo stesso nome).
+    ra = pezzo("asset_scoprire")
+    prova("la whitelist e' la tupla dei due nomi", True,
+          'FILE_SCOPRIRE = ("lampo.webp", "sconto.webp")' in src)
+    prova("...e la rotta la interroga", True,
+          "if nome not in FILE_SCOPRIRE:" in ra)
+    prova("la rotta serve col 304 e la revalidazione", True,
+          "_file_con_etag" in ra and '"public, no-cache"' in ra)
+    # NIENTE prova d'esistenza dei due .webp, APPOSTA (il precedente
+    # di tutto.webp): i banner li disegna Andrea, e una CI rossa in
+    # attesa di un asset educa a non guardarla. Si aggiunge col commit
+    # delle immagini; fino ad allora la card mostra il ripiego
+    # emoji+testo — degradazione, non regressione.
+
+    # ---- 2. I FLAG DELLA BUSTA passano da _where_occasioni: il
+    # predicato della card E' quello del filtro, mai una WHERE
+    # ricopiata — o la card promette una vetrina che la spunta non da'.
+    _lista = src[src.index("async def lista_annunci("):
+                 src.index("async def pubblica(")]
+    prova("i flag della busta passano da _where_occasioni", True,
+          '("lampo", (1, 0, 0)), ("sconto", (0, 0, 1))' in _lista
+          and "_where_occasioni(*_flags, _camb, _ora)" in _lista)
+    prova('...ed escono come risposta["occasioni"]', True,
+          'risposta["occasioni"] = occ' in _lista)
+    # EXISTS e non COUNT: basta sapere se c'e', ci si ferma alla prima
+    prova("il flag si ferma alla prima riga", True,
+          '+ _w + " LIMIT 1", _wp).fetchone() else 0' in _lista)
+    # e sui SOLI attivi: l'eseguibile qui sotto gira una REPLICA della
+    # query, quindi la base del server va guardata nel suo testo — o
+    # una lampo su un rimosso accenderebbe la card
+    prova("...e guarda i soli attivi", True,
+          "\"SELECT 1 FROM annunci a WHERE a.stato='attivo'\"" in _lista)
+
+    # ---- 3. ESEGUIBILE: la query composta del flag, girata davvero
+    # su un database gemello — una sentinella direbbe che la chiamata
+    # c'e', mai che il flag risponda giusto.
+    import sqlite3
+    amb = {}
+    exec(pezzo("_eur_interi"), amb)
+    exec(pezzo("_sql_articolo_sats"), amb)
+    exec(pezzo("_sql_soglia_negozio"), amb)
+    amb["SCONTO_PACCO_ATTIVO"] = True
+    exec(pezzo("_where_occasioni"), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                "venditore_id INT, stato TEXT, prezzo_sats INT, "
+                "prezzo_eur REAL, valuta TEXT, lampo_percento INT, "
+                "lampo_scadenza INT, asta_base_sats INT, "
+                "asta_scadenza INT)")
+    con.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT, "
+                "sped_gratis_soglia INT, sped_gratis_soglia_eur INT, "
+                "sped_gratis_valuta TEXT, sconto_pacco_percento INT, "
+                "sconto_pacco_criterio TEXT, sconto_pacco_valore INT, "
+                "sconto_pacco_valore_eur INT, "
+                "sconto_pacco_valore_valuta TEXT)")
+    ORA = 1_000_000
+    con.execute("INSERT INTO utenti VALUES(1,0,0,0,'sats',"
+                "15,'valore',45000,0,'sats')")
+    # una lampo viva, un annuncio sopra la soglia a valore, e una
+    # lampo viva su un annuncio RIMOSSO (il flag guarda i soli attivi)
+    con.executemany("INSERT INTO annunci VALUES(?,1,?,?,0,'sats',"
+                    "?,?,0,0)",
+                    [(1, "attivo", 10_000, 20, ORA + 999),
+                     (2, "attivo", 60_000, 0, 0),
+                     (3, "rimosso", 10_000, 20, ORA + 999)])
+
+    def _flag(a, flags):
+        # la stessa forma del blocco della busta
+        w, wp = a["_where_occasioni"](*flags, 55_000.0, ORA)
+        return 1 if con.execute(
+            "SELECT 1 FROM annunci a WHERE a.stato='attivo'"
+            + w + " LIMIT 1", wp).fetchone() else 0
+
+    prova("con una lampo viva il flag si accende", 1,
+          _flag(amb, (1, 0, 0)))
+    prova("il negozio sopra soglia accende lo sconto", 1,
+          _flag(amb, (0, 0, 1)))
+    # la lampo dell'attivo scade: resta viva solo quella del RIMOSSO,
+    # e il flag deve spegnersi — e' la guardia sullo stato
+    con.execute("UPDATE annunci SET lampo_scadenza=? WHERE id=1",
+                (ORA - 1,))
+    prova("scaduta la lampo (viva solo sul rimosso), il flag tace", 0,
+          _flag(amb, (1, 0, 0)))
+    # a leva spenta il flag dello sconto tace, come il filtro: mai una
+    # card che porta a una vetrina senza il segno promesso
+    ambs = {}
+    exec(pezzo("_eur_interi"), ambs)
+    exec(pezzo("_sql_articolo_sats"), ambs)
+    exec(pezzo("_sql_soglia_negozio"), ambs)
+    ambs["SCONTO_PACCO_ATTIVO"] = False
+    exec(pezzo("_where_occasioni"), ambs)
+    prova("a leva spenta il flag dello sconto tace", 0,
+          _flag(ambs, (0, 0, 1)))
+    con.close()
+
+    # ---- 4. IL CLIENT: la sezione, il renderer, il gesto.
+    prova("la sezione sta fra le categorie e gli strumenti", True,
+          mini.index('id="catSez"') < mini.index('id="scoprireSez"')
+          < mini.index('<div class="strumenti">'))
+    prova("...e nasce nascosta: la accendono i flag", True,
+          '<div id="scoprireSez" style="display:none">' in mini)
+    # il censimento ESATTO dei chiamanti: renderChips (il giro di
+    # sempre), toccaScoperta (l'anello prima della rete) e i due rami
+    # DEMO del pannello Filtri, dove renderChips non passa
+    prova("renderScoprire ha i suoi quattro chiamanti", 4,
+          mini.count("renderScoprire();"))
+    _rs = pezzo_js(mini, "function renderScoprire(){", "\n}")
+    prova("senza card vive sparisce la sezione intera", True,
+          "el('scoprireSez').style.display = vive.length ? '' : 'none';"
+          in _rs)
+    # il display si scrive PRIMA della firma (la lezione di
+    # renderStriscia: scritto dopo, tornando dal barattolo la firma
+    # uguale lascerebbe la sezione spenta per sempre)
+    prova("...e il display si scrive prima della firma", True,
+          _rs.index("style.display") < _rs.index("scoprireFirma"))
+    # coi dati vivi decide il server; in DEMO i giudici che poi
+    # FILTRANO (lampoAttiva, scontoQui): demo e vetrina non divergono
+    prova("i flag vivi vengono dal server", True,
+          "occasioniServer && occasioniServer.lampo" in mini
+          and "occasioniServer && occasioniServer.sconto" in mini)
+    prova("...e in DEMO giudicano lampoAttiva e scontoQui", (True, True),
+          ("listings.some(l => lampoAttiva(l))" in mini,
+           "listings.some(l => scontoQui(l, 1))" in mini))
+    # img e ripiego FRATELLI ADIACENTI (la lezione dell'emoji delle
+    # categorie, chiusa dentro un altro span la regola non matcha mai):
+    # fra l'apertura dell'img e la riserva ci sono solo due «<»
+    _i = _rs.index('<img src="/assets/scoprire/')
+    _t = _rs[_i:_rs.index('sc-riserva', _i)]
+    prova("il ripiego e' il fratello adiacente dell'immagine", (2, 1),
+          (_t.count("<"), _t.count("<span")))
+    prova("...e il CSS lo spegne da fratello", True,
+          ".scoprire-card img + .sc-riserva{display:none}" in mini)
+    # NIENTE min-height sulla striscia, divergenza VOLUTA da
+    # .cat-strip: la sezione puo' non esserci, e uno spazio riservato
+    # per una cosa assente sarebbe un buco
+    _css = mini[mini.index(".scoprire-strip{"):
+                mini.index(".scoprire-card img + .sc-riserva")]
+    prova("nessuno spazio riservato per una sezione che puo' mancare",
+          False, "min-height" in _css)
+    prova("l'anello e' quello della card categoria", True,
+          ".scoprire-card.attiva{outline:2.5px solid var(--sats);"
+          in mini)
+    # IL GESTO: il ritocco spegne, e si scrive quel che scriverebbe
+    # il pannello (stato + checkbox + bottone Filtri + campo-bottone)
+    _ts = pezzo_js(mini, "function toccaScoperta(id){", "\n}")
+    prova("il ritocco della card accesa spegne", True,
+          "filtroLampo = !acceso;" in _ts
+          and "filtroSconto = !acceso;" in _ts)
+    prova("...e il gesto scrive quel che scrive il pannello", True,
+          "el('filtriBtn').classList.toggle('attivo', filtriVivi());"
+          in _ts and "aggiornaPicker('ordinaSel');" in _ts)
+    # NON tocca ordinaVista (divergenza da vaiAste, deliberata: il
+    # pannello non azzera mai la scelta esplicita, e l'eredita'
+    # dell'ordinamento parla da sola via ordinaEffettivo)
+    prova("il gesto non tocca mai la scelta dell'ordinamento", False,
+          "ordinaVista" in _ts)
+    # e NIENTE cronologia, NIENTE ramo: i filtri non sono mai stati
+    # in chiaveVetrina, e il ramo resta alle sole Aste
+    prova("...ne' la cronologia o il ramo della vetrina", (False, False),
+          ("ramoVetrina" in _ts, "navRiflette" in _ts))
+    # IL RAMO DEMO RIDISEGNA LE PILLOLE (ago 2026, trovato col giro
+    # CDP di questo cantiere): il renderChips in testa ad avvia()
+    # parte con DEMO ancora false, quindi senza questa chiamata nel
+    # catch la striscia delle categorie E «Da scoprire» in demo non
+    # comparivano affatto — e un riordino la toglierebbe per primo,
+    # perche' sembra un doppione del giro d'avvio.
+    _demo = mini[mini.index("Backend non raggiungibile"):]
+    _demo = _demo[:_demo.index("renderOrders();")]
+    prova("il ramo demo ridisegna le pillole e le strisce", True,
+          "renderChips();" in _demo)
+
+    # ---- 5. IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea):
+    # il bottone resta FERMO — bersaglio, anello e :active — e a
+    # muoversi e' la sola immagine, ognuna col SUO movimento (la
+    # sveglia squilla, la scatola respira).
+    _card = mini[mini.index(".scoprire-card{"):
+                 mini.index(".scoprire-card:active")]
+    prova("la card non si anima: il bersaglio sta fermo", False,
+          "animation" in _card)
+    prova("...col premuto di casa", True,
+          ".scoprire-card:active{transform:translateY(1px)}" in mini)
+    prova("...e l'overflow che ritaglia il moto", True,
+          "overflow:hidden" in _card)
+    # il legame e' SELETTORE -> dichiarazione, non due presenze
+    # slegate: «sc-respiro in mini» restava vero anche con tutte e
+    # due le card sullo squillo, perche' la DEFINIZIONE dei keyframes
+    # c'e' comunque (prova vacua, l'ha detto la tortura)
+    def _anim(sel):
+        _r = mini[mini.index(sel):]
+        return _r[:_r.index("}")]
+    prova("la sveglia squilla e la scatola respira", (True, True),
+          ("sc-squillo" in _anim('.scoprire-card[data-id="lampo"] img{'),
+           "sc-respiro" in _anim('.scoprire-card[data-id="sconto"] img{')))
+    # IL FONDO NON SI SCOPRE MAI, ed e' aritmetica: con l'origine al
+    # centro uno scale>=1 puo' solo ritagliare, e il fremito ruota
+    # un'immagine gia' ingrandita del 7%. Niente translate e niente
+    # scale sotto 1 nei due keyframes. (L'ancora di chiusura e' la
+    # riserva e non la riga del reduce: quella la muove la mutazione
+    # A3, e una prova che ESPLODE si porta via le sorelle.)
+    _kf = mini[mini.index("@keyframes sc-squillo"):
+               mini.index(".sc-riserva{")]
+    prova("il fondo non si scopre: mai sotto scale(1), mai translate",
+          (False, False, True),
+          ("scale(0" in _kf, "translate" in _kf, "scale(1.07)" in _kf))
+    # lo spegnimento deve VINCERE per specificita': col selettore nudo
+    # perdeva contro [data-id="lampo"] img e i disegni si muovevano
+    # anche in reduced-motion — la sentinella diceva che la regola
+    # c'era, il giro CDP ha detto che non vinceva mai
+    prova("...e reduced-motion spegne il disegno (e VINCE)", True,
+          ".scoprire-card[data-id] img{animation:none}" in mini)
+
+
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
@@ -22925,6 +23156,7 @@ def main():
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri, prove_prezzo_accordo,
+              prove_scoprire,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget,
               prove_script_nel_workflow,

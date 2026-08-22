@@ -9370,6 +9370,24 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             r["regione"]: r["n"] for r in con.execute(
                 "SELECT regione, COUNT(*) AS n FROM annunci "
                 "WHERE stato='attivo' AND regione!='' GROUP BY regione")}
+        # LE OCCASIONI PER LA SEZIONE «Da scoprire» (ago 2026): la card
+        # delle offerte a tempo (e quella degli sconti) SPARISCE quando
+        # non c'e' niente da mostrare — decisione di Andrea — quindi il
+        # client deve sapere se un'occasione esiste. Il predicato e' LO
+        # STESSO del filtro (_where_occasioni, mai una WHERE ricopiata):
+        # la card promette la vetrina che la spunta poi da', o si
+        # ricompra il bug «filtro che mostra la card sbagliata». Flag
+        # GLOBALI come conteggi e regioni (non seguono categoria ne'
+        # ricerca): la card dice «nel mercatino ci sono occasioni», e
+        # dentro un reparto a vuoto parla l'empty state. EXISTS e non
+        # COUNT: basta sapere se c'e', e si ferma alla prima riga.
+        occ = {}
+        for _nome, _flags in (("lampo", (1, 0, 0)), ("sconto", (0, 0, 1))):
+            _w, _wp = _where_occasioni(*_flags, _camb, _ora)
+            occ[_nome] = 1 if con.execute(
+                "SELECT 1 FROM annunci a WHERE a.stato='attivo'"
+                + _w + " LIMIT 1", _wp).fetchone() else 0
+        risposta["occasioni"] = occ
         # I pionieri viaggiano insieme (niente giro di rete in piu');
         # a interruttore spento la chiave non c'e' e il frontend non
         # disegna la riga.
@@ -30533,6 +30551,32 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
     # cambia arriva subito quello nuovo. Il timbro ?b= negli URL del
     # client e' servito una tantum a ripulire le cache scritte quando
     # qui c'era max-age=86400.
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
+# I banner della sezione «Da scoprire» in home (ago 2026): per ora due
+# card fisse — le offerte a tempo e gli sconti dei negozi — disegnate
+# da Andrea. Cartella SUA e non assets/categorie/, deliberato:
+# ritaglia_categorie.py fa il glob di quella cartella e ogni .webp
+# entrerebbe nella mediana del pareggio dell'inchiostro, che su un
+# banner full-bleed non significa niente e sposterebbe le sorelle.
+# Il nome ARRIVA dal client, quindi whitelist a tupla (il patto di
+# FILE_FONT); i nomi sono le chiavi dei filtri che le card accendono,
+# e restano quelli per sempre.
+FILE_SCOPRIRE = ("lampo.webp", "sconto.webp")
+
+
+@app.get("/assets/scoprire/{nome}")
+def asset_scoprire(nome: str, if_none_match: str = Header("")):
+    if nome not in FILE_SCOPRIRE:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "scoprire", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    # REVALIDAZIONE come le illustrazioni delle categorie, e per la
+    # stessa ragione: i file si ridisegnano sotto lo stesso nome
+    # (niente timbro ?b= negli URL: no-cache dal primo giorno).
     return _file_con_etag(percorso, "image/webp", "public, no-cache",
                           if_none_match)
 

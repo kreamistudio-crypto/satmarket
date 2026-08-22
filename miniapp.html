@@ -815,6 +815,83 @@
      e' la striscia qui sopra — «Tutto» in testa, le vuote in fondo —
      e con lei se ne sono andate le regole .sfoglia-griglia e
      .cat-tile (griglia, piastrelle-colonna, velo sotto il nome). */
+
+  /* ---------- «Da scoprire» ---------- */
+  /* La fila dei banner sotto le categorie: card rettangolari 250x115
+     (decisione di Andrea: larghe, da banner — a 320px una quasi piena
+     piu' uno spicchio della seconda, il taglio al bordo dice che ce
+     n'e' altre). Il testo sta DENTRO il disegno (750x345, colori
+     fissi nei due temi come tutto cio' che vive su una foto):
+     l'etichetta la porta l'aria-label. Niente min-height sulla
+     striscia, e la divergenza da .cat-strip e' voluta: le card
+     spariscono quando non c'e' l'occasione, e uno spazio riservato
+     per una cosa assente sarebbe un buco. */
+  .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
+    overscroll-behavior-x:contain;scrollbar-width:none;
+    padding:8px var(--pad) 2px}
+  .scoprire-strip::-webkit-scrollbar{display:none}
+  .scoprire-card{flex:0 0 auto;position:relative;width:250px;
+    aspect-ratio:250/115;border-radius:14px;overflow:hidden;
+    background:var(--cat-fondo);cursor:pointer}
+  .scoprire-card:active{transform:translateY(1px)}
+  /* L'anello e' quello della card categoria accesa: stesso gesto
+     (tocca per filtrare, ritocca per uscire), stessa grammatica. */
+  .scoprire-card.attiva{outline:2.5px solid var(--sats);
+    outline-offset:2px}
+  .scoprire-card img{position:absolute;inset:0;width:100%;height:100%;
+    display:block;object-fit:cover}
+  /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
+     ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
+     resta FERMO — e con lui bersaglio, anello e :active — quindi il
+     problema del tocco su un bersaglio in moto non esiste per
+     costruzione, e a muoversi e' la sola immagine dentro
+     l'overflow:hidden, che la ritaglia). OGNI CARD HA IL SUO
+     MOVIMENTO, dal soggetto del disegno: la SVEGLIA delle offerte a
+     tempo SQUILLA — un fremito di rotazione di mezzo secondo ogni
+     quattro, mai un tremolio continuo che friggerebbe in vetrina — e
+     la scatola degli sconti RESPIRA, uno zoom lento e ampio.
+     IL FONDO NON SI SCOPRE MAI, ed e' aritmetica e non speranza: con
+     l'origine al centro uno scale>=1 puo' solo ritagliare, mai
+     scoprire, quindi il respiro parte da scale(1); e il fremito
+     ruota un'immagine GIA' ingrandita del 7% — la rotazione di 1.4°
+     scopre negli angoli ~3px (250/2 x sin 1.4°), il 7% ne copre 4 sul
+     lato corto. Chi alza i gradi rifa' quel conto.
+     (Le forme sono proposte sulle DESCRIZIONI dei disegni — i file
+     li deve ancora consegnare Andrea: si ritarano guardandoli.) */
+  .scoprire-card[data-id="lampo"] img{
+    animation:sc-squillo 4s linear infinite}
+  .scoprire-card[data-id="sconto"] img{
+    animation:sc-respiro 6s ease-in-out infinite}
+  @keyframes sc-squillo{
+    0%{transform:scale(1.07) rotate(0)}
+    3%{transform:scale(1.07) rotate(1.4deg)}
+    6%{transform:scale(1.07) rotate(-1.4deg)}
+    9%{transform:scale(1.07) rotate(1deg)}
+    12%{transform:scale(1.07) rotate(-.6deg)}
+    15%,100%{transform:scale(1.07) rotate(0)}
+  }
+  @keyframes sc-respiro{
+    0%,100%{transform:scale(1)}
+    50%{transform:scale(1.055)}
+  }
+  /* Lo spegnimento deve VINCERE per specificita': col selettore nudo
+     `.scoprire-card img` perdeva contro `[data-id="lampo"] img` e i
+     disegni si muovevano anche in reduced-motion — la sentinella
+     sulla forma diceva che la regola c'era, il giro CDP ha detto che
+     non vinceva mai (ago 2026). `[data-id]` pareggia l'attributo e
+     vince per ordine. */
+  @media (prefers-reduced-motion:reduce){
+    .scoprire-card[data-id] img{animation:none}}
+  /* Il ripiego se il banner non arriva (DEMO da file://, o il file
+     non ancora disegnato): emoji + testo dell'app, crema fissa sul
+     bruno del fondo — che e' scuro in tutti e due i temi. Il
+     selettore e' il FRATELLO ADIACENTE, la lezione dell'emoji delle
+     categorie: img e riserva devono restare adiacenti nel markup. */
+  .sc-riserva{position:absolute;inset:0;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;color:#FAF4E4;font-size:13px;font-weight:800}
+  .sc-riserva .sc-emoji{font-size:30px;line-height:1}
+  .scoprire-card img + .sc-riserva{display:none}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
@@ -3786,6 +3863,21 @@ document.getElementById('cartello')?.remove();</script>
       <div class="section-label">Esplora per categorie</div>
       <div class="cat-strip" id="catStrip"></div>
     </div>
+    <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
+         filtri dell'occasione — oggi due fisse (offerte a tempo,
+         sconti dei negozi), domani la lista arrivera' dal server per
+         le sponsorizzazioni. Ogni card SPARISCE quando la sua
+         occasione non esiste (decisione di Andrea), e senza card
+         sparisce la sezione intera: per questo qui NON c'e' nessuna
+         min-height riservata — uno spazio riservato per una cosa che
+         puo' legittimamente non esserci sarebbe un buco. Niente salto
+         di layout sul percorso vivo: i flag arrivano CON la prima
+         pagina, cioe' prima del primo renderGrid (la lezione della
+         fascia test). -->
+    <div id="scoprireSez" style="display:none">
+      <div class="section-label">Da scoprire</div>
+      <div class="scoprire-strip" id="scoprireStrip"></div>
+    </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
          euro") resta com'e': questi servono a chi sfoglia.
@@ -5983,6 +6075,10 @@ let vetrinaGiro = 0;
 let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
+let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
+                             // scoprire»: null = server vecchio o busta
+                             // mai arrivata, e la sezione non si disegna
+                             // (un'assenza non e' una bugia)
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
 let datiVivi = false;   // al primo carico vero il seme demo si butta
 
@@ -6190,7 +6286,10 @@ function applicaFiltri(){
      vetrina in scadenza (trovato dal vivo, non leggendo il codice) */
   aggiornaPicker('ordinaSel');
   el('filtriBox').style.display = 'none';
-  if (DEMO) { renderGrid(); return; }
+  /* l'anello delle card «Da scoprire» segue le spunte anche in DEMO,
+     dove il giro non passa da renderChips (coi dati vivi ci pensa
+     loadListings) */
+  if (DEMO) { renderScoprire(); renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
@@ -6217,7 +6316,7 @@ function azzeraFiltri(){
   aggiornaPicker('ordinaSel');   /* l'eredita' e' appena caduta */
   el('filtriBox').style.display = 'none';
   if (!cera) return;
-  if (DEMO) { renderGrid(); return; }
+  if (DEMO) { renderScoprire(); renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
@@ -6262,6 +6361,7 @@ async function loadListings(anonimo){
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
+  if (j.occasioni) occasioniServer = j.occasioni;
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   if (j.protezione_percento !== undefined)
     protPercento = Number(j.protezione_percento) || 0;
@@ -7262,6 +7362,7 @@ function renderChips(){
      barattolo qui sotto esce con un return, e da li' la striscia —
      che proprio in quel caso deve sparire — non la rifarebbe nessuno. */
   renderStriscia();
+  renderScoprire();
   /* A BARATTOLO ACCESO la fila dice una cosa sola: dove sei, e come si
      esce. Le categorie non hanno senso qui — filtrare dieci oggetti
      che hai scelto tu non serve a niente, e quelle pillole chiamano il
@@ -7524,6 +7625,92 @@ function renderStriscia(){
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
       <span class="cat-eti">${esc(c)}</span>
     </a>`).join('');
+}
+
+/* «DA SCOPRIRE» (ago 2026): la fila dei banner sotto le categorie.
+   Oggi due card FISSE che accendono i filtri dell'occasione; il
+   renderer mangia una LISTA dove ogni voce dichiara immagine, giudice
+   di vita e stato — ed e' la preparazione alle sponsorizzate: quel
+   giorno la lista arrivera' dal server (una chiave nella busta di
+   prima pagina) e a cambiare sara' la FONTE, non il renderer.
+   LA CARD SPARISCE QUANDO LA SUA OCCASIONE NON ESISTE (decisione di
+   Andrea): coi dati vivi lo dice `occasioniServer`, che il server
+   calcola con LO STESSO predicato del filtro (_where_occasioni) — la
+   card promette la vetrina che la spunta poi da'. In DEMO giudicano i
+   giudici di casa sugli stessi dati che il filtro poi filtra
+   (lampoAttiva, scontoQui): demo e vetrina non divergono. I flag sono
+   GLOBALI come i conteggi delle pillole: dentro un reparto il filtro
+   si compone col cat come dal pannello, e a vuoto parla l'empty
+   state. Il testo vive DENTRO il disegno (decisione di Andrea):
+   l'app porta l'aria-label, e il ripiego emoji+testo compare solo
+   dove il banner non arriva. */
+const SCOPRIRE = [
+  {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
+   vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
+                    : !!(occasioniServer && occasioniServer.lampo),
+   accesa: () => filtroLampo},
+  {id: 'sconto', file: 'sconto.webp', emoji: '🎁', testo: 'Sconti dei negozi',
+   vivo: () => DEMO ? listings.some(l => scontoQui(l, 1))
+                    : !!(occasioniServer && occasioniServer.sconto),
+   accesa: () => filtroSconto},
+];
+let scoprireFirma = '';
+function renderScoprire(){
+  /* Col barattolo la sezione se ne va come le categorie; senza card
+     vive sparisce TUTTA, titolo compreso — una sezione con un titolo
+     e niente sotto e' peggio di nessuna sezione. Il display si scrive
+     PRIMA del controllo della firma (la lezione di renderStriscia:
+     scritto dopo, tornando dal barattolo la firma uguale lascerebbe
+     la sezione spenta per sempre). */
+  const vive = vistaBarattolo ? [] : SCOPRIRE.filter(v => v.vivo());
+  el('scoprireSez').style.display = vive.length ? '' : 'none';
+  if (!vive.length) return;
+  /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
+     solo quando cambia qualcosa, mai mentre si guarda. */
+  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')).join('|');
+  if (firma === scoprireFirma) return;
+  scoprireFirma = firma;
+  /* img e .sc-riserva devono restare FRATELLI ADIACENTI: il ripiego
+     si spegne con `img + .sc-riserva`, la lezione dell'emoji delle
+     categorie (chiusa in un altro span, la regola non matcha mai). */
+  el('scoprireStrip').innerHTML = vive.map(v => `
+    <div class="scoprire-card${v.accesa() ? ' attiva' : ''}" role="button"
+         tabindex="0" data-id="${v.id}" aria-label="${v.testo}"
+         aria-pressed="${v.accesa() ? 'true' : 'false'}"
+         onclick="toccaScoperta(this.dataset.id)"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
+      <img src="/assets/scoprire/${v.file}" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${v.testo}</span>
+    </div>`).join('');
+}
+/* Il gesto della card: accende il suo filtro, e IL RITOCCO DELLA CARD
+   ACCESA SPEGNE — il gesto del barattolino e della card categoria. E'
+   la scorciatoia della STESSA spunta del pannello Filtri, quindi
+   scrive quel che scriverebbe applicaFiltri: stato + checkbox +
+   bottone «Filtri» + campo-bottone dell'ordinamento. NON tocca
+   `ordinaVista` (divergenza da vaiAste, deliberata): il pannello non
+   azzera mai la scelta esplicita, e l'eredita' «⚡ Chi scade prima»
+   parla da sola via ordinaEffettivo quando l'utente non ha scelto
+   niente. NIENTE cronologia e NIENTE ramoVetrina nuovo: i filtri non
+   sono mai stati in chiaveVetrina — un'entry che navApplica non sa
+   ricostruire e' una bugia del motore — e il ramo resta alle sole
+   Aste. L'indietro si comporta come coi filtri dal pannello. */
+function toccaScoperta(id){
+  haptic();
+  const acceso = id === 'sconto' ? filtroSconto : filtroLampo;
+  if (id === 'sconto') {
+    filtroSconto = !acceso;
+    if (el('filtroScontoInp')) el('filtroScontoInp').checked = !acceso;
+  } else {
+    filtroLampo = !acceso;
+    if (el('filtroLampoInp')) el('filtroLampoInp').checked = !acceso;
+  }
+  el('filtriBtn').classList.toggle('attivo', filtriVivi());
+  aggiornaPicker('ordinaSel');
+  renderScoprire();   /* l'anello risponde al tocco, prima della rete */
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
 /* LA BARRA DELLE CATEGORIE SI INCOLLA QUANDO LE CARD SE NE VANNO.
@@ -24483,6 +24670,13 @@ async function avviaVetrina(){
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
     renderJarTesta();          // ...il cassetto dei preferiti no: spento
+    /* le pillole e le due strisce si ridisegnano ADESSO che DEMO e'
+       vera: il giro di renderChips in testa ad avvia() e' partito con
+       DEMO ancora false, quindi la striscia delle categorie (e con
+       lei «Da scoprire») usciva dalla sua guardia a mani vuote e in
+       demo non compariva niente (ago 2026, trovato col giro CDP del
+       cantiere «Da scoprire») */
+    renderChips();
     renderGrid(); renderOrders();
   }
 }
