@@ -3680,6 +3680,78 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   qualunque cosa su chi controlla un evento. Da quel momento la
   piattaforma NON tocca più quell'evento: anche il ritiro passa da una
   firma sua (azione 'ritira' = kind 5 dal suo browser).
+  IL TAG `client` DICE CHI HA COMPOSTO, NON CHI FIRMA (ago 2026, il
+  cantiere della classifica: eravamo probabilmente terzi per prodotti
+  su Nostr e nella classifica dei marketplace di Nostrology non
+  comparivamo — 4.038 annunci «untagged» su ~4.800, e noi lì dentro).
+  LA RICOGNIZIONE, fatta sui relay veri e non dedotta: Nostrology
+  attribuisce dal tag `client` sui 30402 stessi e legge la SOLA
+  POSIZIONE 1, il nome — «merchant-manager» e «Amethyst» stanno in
+  classifica con tag nudi a 2 posizioni, e gli stessi Shopstr portano
+  indirizzi 31990 diversi a ogni evento (pubkey variabili, `d`
+  casuali: irrisolvibili). Il raggruppamento è per stringa ESATTA
+  («BTCPayServer-Shopstr» è una voce separata): il nome è
+  `NOME_CLIENT_NOSTR = "Barattolo"` e NON SI RITOCCA MAI PIÙ — c'è la
+  sentinella sul letterale. GammaMarkets non c'entra (verificato: la
+  spec non ha un tag di origine).
+  LA REGOLA (decisione di Andrea, che ha ROVESCIATO la sua prima
+  formulazione «mai su ciò che firmano altri»): il tag sta su OGNI
+  evento 30402 che COMPONIAMO NOI, chiunque lo firmi — piattaforma,
+  BIVIO, e la modifica firmata degli importati. Il perché del
+  rovesciamento è la semantica NIP-89, che è anche la pratica di
+  fatto: i 215 seller di Shopstr in classifica sono eventi firmati
+  dagli UTENTI col tag di Shopstr sopra — il tag dice l'APP usata,
+  non il proprietario. Fuori restano solo gli eventi che arrivano dai
+  relay e leggiamo e basta. Sulla modifica firmata il precedente del
+  footer promozionale NON vale: quello scrive nella DESCRIZIONE, cioè
+  nel testo del venditore; il tag sta nei metadati e non tocca una
+  parola sua (la docstring di `evento_annuncio_importato` è emendata,
+  non riscritta).
+  LA MECCANICA È QUASI GRATIS, ed è il pregio del funnel unico:
+  `tag_client()` accanto alla fabbrica — forma piena NIP-89
+  `["client","Barattolo","31990:{pubkey}:barattolo",relay]`, e senza
+  `_NOSTR` il nome nudo, che è la sola posizione che conta: fail-open
+  nel verso giusto — più UN append in `evento_annuncio` (che copre da
+  solo prima pubblicazione, ogni sold/active e il BIVIO, perché
+  `firme_nostr_da_fare` ne eredita `base["tags"]` senza una riga) e
+  UNO in `evento_annuncio_importato`. I compositori di 30402 sono DUE
+  e il censimento in `prove.py` conta i siti (`firma_evento(30402` +
+  `"kind": 30402`) contro gli append: il terzo compositore di domani
+  fa rossa la prova se non porta il suo. FUORI, dichiarato: i kind 5
+  (una cancellazione non sostituisce niente e Nostrology non li
+  legge), le note promo kind 1 (cantierino a parte, se mai), e i DM
+  NIP-17 MAI — un tag identificante su un canale cifrato è un
+  metadato regalato.
+  L'HANDLER 31990 (`d="barattolo"`, `k=30402`, content = profilo
+  JSON) lo pubblica lo script una tantum: addressable, idempotente,
+  niente template web per-evento (i nostri URL vogliono l'id numerico
+  e il bech32 non si traduce).
+  LA RIPUBBLICAZIONE DEGLI ESISTENTI è `ripubblica_tag_client.py`,
+  che GIRA SUL VPS (nsec vera + database vero): anteprima di serie e
+  `--scrivi`, `--relay` per il collaudo, ZERO copie della fabbrica
+  (importa server dentro main() — init_db gira, dichiarato — e riusa
+  `evento_annuncio` vera: una copia divergerebbe al primo campo
+  nuovo), la testa `nostr_event_id` si scrive SOLO con ≥1 relay OK e
+  commit PER RIGA, lotti LOTTO_NOSTR con PAUSA_NOSTR. Il perimetro è
+  la WHERE `contatto_nostr='' AND nostr_event_id<>'' AND
+  nostr_autore=''`: i soli che possiamo rifirmare NOI.
+  I BIVIO GIÀ IN PIAZZA RESTANO AL CORSO NATURALE (decisione di
+  Andrea): accodarli in `firme_nostr` vorrebbe dire bussare a gente
+  che non ha chiesto niente per un metadato che serve a noi, coi
+  solleciti che insistono su chi non torna. Erano ≥17 di ≥7 venditori
+  al 22 ago 2026 (campione dai relay, troncato): si rifanno da soli
+  alla prima modifica, vendita o rimborso, e la classifica ci metterà
+  un po' a vederli tutti.
+  LA TORTURA HA TROVATO LA SENTINELLA CHE LEGGEVA LA PROSA, per
+  l'ennesima volta: «lo script rifirma solo i nostri» cercava
+  `nostr_autore=''` nel file intero, e la STESSA condizione vive
+  nella docstring dello script — la WHERE mutilata restava verde.
+  Ora l'ancora è la coda della SELECT vera (`AND nostr_autore=''
+  ORDER BY id`). Sette mutazioni, sette rosse.
+  DOPO IL DEPLOY, il giro che manca da qui: lo script sul VPS (prima
+  la prova generale su una COPIA del db), la contro-verifica dai
+  relay (i 30402 `barattolo-*` devono portare il tag), e nei giorni
+  dopo dev.nostrolo.gy/marketplaces deve mostrare «Barattolo».
   Post automatici (lug 2026): la piattaforma racconta i fatti — ogni
   nuovo annuncio in vetrina esce da solo come nota Nostr kind-1
   (chiave piattaforma, tag `t=barattolo`, foto come URL nel content)
