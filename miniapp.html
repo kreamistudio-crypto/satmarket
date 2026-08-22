@@ -897,6 +897,24 @@
     gap:4px;color:#FAF4E4;font-size:13px;font-weight:800}
   .sc-riserva .sc-emoji{font-size:30px;line-height:1}
   .scoprire-card img + .sc-riserva{display:none}
+  /* IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE SI MUOVE
+     (ago 2026, decisione di Andrea che ROVESCIA il testo-nel-disegno
+     della nascita): e' un FRATELLO dell'img e mai un suo involucro —
+     l'animazione vive sull'img, quindi il titolo e' fermo PER
+     COSTRUZIONE — e atterra nella ZONA QUIETA che i due fondi
+     riservano a sinistra: la leggibilita' la garantisce il DISEGNO,
+     e la misura in CI la prova del contrasto sui file veri (crema
+     sul bruno della fascia: >=4.5 sul PIXEL PEGGIORE, misurati
+     ~11-12; la prova campiona una fascia piu' larga del titolo, il
+     margine dell'onda). Crema FISSA nei due temi, come tutto cio'
+     che vive su una foto. Si mostra SOLO con l'immagine (img ~), o
+     sull'errore raddoppierebbe il testo della riserva; largo 96px:
+     oltre, sul fondo della sveglia, comincia il primo cartellino. */
+  .sc-titolo{position:absolute;left:14px;top:0;bottom:0;width:96px;
+    display:none;flex-direction:column;justify-content:center;
+    font-family:'Baloo 2',system-ui,sans-serif;font-size:17px;
+    line-height:1.15;font-weight:800;color:#FAF4E4}
+  .scoprire-card img ~ .sc-titolo{display:flex}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
@@ -7686,7 +7704,8 @@ function renderScoprire(){
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
       <img src="/assets/scoprire/${v.file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
-      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${v.testo}</span>
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${v.testo}</span
+      ><span class="sc-titolo" aria-hidden="true">${v.testo}</span>
     </div>`).join('');
 }
 /* Il gesto della card: accende il suo filtro, e IL RITOCCO DELLA CARD

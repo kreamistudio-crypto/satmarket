@@ -21095,6 +21095,57 @@ def prove_scoprire():
     # della striscia lo ritagliava (visto da Andrea)
     prova("l'anello ha l'aria per il bordo di sotto", True,
           "padding:8px var(--pad) 6px}" in mini)
+
+    # ---- 6. IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE
+    # SI MUOVE (ago 2026, decisione di Andrea che ROVESCIA il
+    # testo-nel-disegno della nascita).
+    # Fratello dell'img e mai un involucro: l'animazione vive
+    # sull'img e il titolo e' fermo PER COSTRUZIONE — la sua regola
+    # non deve guadagnare un'animation, mai.
+    _tit = mini[mini.index(".sc-titolo{"):]
+    _tit = _tit[:_tit.index("}")]
+    prova("il titolo non si anima: e' fermo per costruzione", False,
+          "animation" in _tit)
+    # si mostra SOLO con l'immagine, o sull'errore raddoppierebbe il
+    # testo della riserva (che il titolo lo porta gia')
+    prova("il titolo si mostra solo con l'immagine", (True, True),
+          ("display:none" in _tit,
+           ".scoprire-card img ~ .sc-titolo{display:flex}" in mini))
+    # tre: l'aria-label della card, la riserva e il titolo — un
+    # quarto posto sarebbe un doppione da guardare
+    prova("...e il testo e' quello del catalogo, tre volte", 3,
+          _rs.count("${v.testo}"))
+    # LA PROVA DEL CONTRASTO, sui file veri e non sulle intenzioni
+    # (il patto del pareggio dell'inchiostro): il titolo atterra
+    # nella ZONA QUIETA dei fondi — left:14 largo 96 sulla card
+    # 250x115, cioe' x 42..330 sull'immagine 750x345 — e si campiona
+    # fino a 342, PIU' LARGO del titolo: il margine dell'onda, che
+    # sposta il disegno di qualche pixel. Il contrasto e' col PIXEL
+    # PEGGIORE, non con la media: basta una chiazza chiara sotto una
+    # lettera. Misurati alla nascita: 11.4 (lampo) e 12.0 (sconto) —
+    # un ridisegno che scalda la fascia si sente da qui.
+    try:
+        from PIL import Image as _Im
+
+        def _lum(px):
+            def _c(v):
+                v /= 255
+                return v / 12.92 if v <= 0.04045 else (
+                    (v + 0.055) / 1.055) ** 2.4
+            return (0.2126 * _c(px[0]) + 0.7152 * _c(px[1])
+                    + 0.0722 * _c(px[2]))
+
+        _lc = _lum((250, 244, 228))          # la crema del titolo
+        for _f in ("lampo.webp", "sconto.webp"):
+            _im = _Im.open(os.path.join(
+                "assets", "scoprire", _f)).convert("RGB")
+            _lmax = max(_lum(_im.getpixel((x, y)))
+                        for y in range(30, 315, 3)
+                        for x in range(42, 342, 3))
+            prova(f"la fascia del titolo regge la crema ({_f})", True,
+                  (_lc + .05) / (_lmax + .05) >= 4.5)
+    except ImportError:
+        salta("contrasto del titolo: serve Pillow")
     # lo spegnimento deve VINCERE per specificita': col selettore nudo
     # perdeva contro [data-id="lampo"] img e i disegni si muovevano
     # anche in reduced-motion — la sentinella diceva che la regola
