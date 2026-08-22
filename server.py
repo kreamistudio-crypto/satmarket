@@ -4652,6 +4652,36 @@ def guardia_venditore_digitale(tg_id: int, consegna: str,
             f"inizia con una spedizione o un ritiro in zona")
 
 
+def strade_annuncio(a) -> set:
+    """LE STRADE CHE UN ANNUNCIO OFFRE, e sono UNA cosa sola (ago
+    2026). Queste sei righe vivevano scritte a mano in CINQUE posti —
+    `_strade_asta`, il preventivo mono, `compra()`, e in forma
+    «solo fisiche» i due rami del set — piu' il gemello JS
+    `stradeConsegna`. Cinque copie da tenere in pari sono il modo di
+    farle divergere, ed e' la lezione gia' pagata da `_sped_pacco`
+    («tenerne tre in pari sarebbe stato il modo di farli divergere»).
+    IL PERCHE' NON E' ESTETICO, ed e' quello che rende questa
+    estrazione un prerequisito e non un riordino: se un giorno una
+    delle copie resta indietro, quel percorso costruisce un insieme
+    VUOTO — e l'insieme vuoto non e' un errore, e' la strada storica.
+    L'ordine nasce con `consegna_scelta=''`, cioe' senza nessun timer,
+    senza nessun sollecito mirato, e `segna_spedito` lo accetta: il
+    silenzio peggiore che questo codice possa produrre.
+    Il SET vuole le sole strade FISICHE e le ottiene sottraendo il
+    digitale — mai una seconda lista: un annuncio digitale PURO da'
+    l'insieme vuoto, che e' esattamente il 400 «si compra da solo»,
+    e una combo da' la sua strada fisica. Chi aggiunge una modalita'
+    la aggiunge QUI, e la eredita ogni chiamante."""
+    strade = set()
+    if a["consegna"] in ("spedizione", "entrambe"):
+        strade.add("spedizione")
+    if a["consegna"] in ("ritiro", "entrambe"):
+        strade.add("ritiro")
+    if a["consegna"] == "digitale" or a["anche_digitale"]:
+        strade.add("digitale")
+    return strade
+
+
 MESI_IT = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
            "luglio", "agosto", "settembre", "ottobre", "novembre",
            "dicembre")
@@ -13886,14 +13916,7 @@ def _strade_asta(a) -> set:
     scrive mai via_punto, quindi gli ordini d'asta non hanno mai la
     busta — se un giorno servira', e' un cantiere suo (via e punto
     dentro la scelta del vincitore)."""
-    strade = set()
-    if a["consegna"] in ("spedizione", "entrambe"):
-        strade.add("spedizione")
-    if a["consegna"] in ("ritiro", "entrambe"):
-        strade.add("ritiro")
-    if a["consegna"] == "digitale" or a["anche_digitale"]:
-        strade.add("digitale")
-    return strade
+    return strade_annuncio(a)
 
 
 def _chiudi_una_asta(annuncio_id: int, cambio: float):
@@ -15296,11 +15319,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # Un solo-ritiro e un solo-spedizione non viaggiano insieme.
     strade = {"spedizione", "ritiro"}
     for a in tutti.values():
-        sue = set()
-        if a["consegna"] in ("spedizione", "entrambe"):
-            sue.add("spedizione")
-        if a["consegna"] in ("ritiro", "entrambe"):
-            sue.add("ritiro")
+        # le sole FISICHE: il digitale si sottrae al giudice unico
+        # invece di avere una seconda lista — un digitale puro da'
+        # l'insieme vuoto, che e' il 400 qui sotto
+        sue = strade_annuncio(a) - {"digitale"}
         if not sue:
             con.close()
             if a["consegna"] == "digitale":
@@ -16057,13 +16079,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # conversione col suo falso ≈
     unitario_eur = _eur_effettivo(a, off, adesso)
     articolo_eur = round(unitario_eur * richiesti, 2) if unitario_eur else 0.0
-    disponibili = set()
-    if a["consegna"] in ("spedizione", "entrambe"):
-        disponibili.add("spedizione")
-    if a["consegna"] in ("ritiro", "entrambe"):
-        disponibili.add("ritiro")
-    if a["consegna"] == "digitale" or a["anche_digitale"]:
-        disponibili.add("digitale")
+    disponibili = strade_annuncio(a)
     # La spedizione gratis del negozio: sul mono vale come sul set (la
     # forma lo permette, vedi _sped_gratis), e la MISURA e' lo stesso
     # lordo in euro che la soglia dello sconto confronta di la'. Da non
@@ -16338,11 +16354,10 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # L'intersezione delle strade fisiche, coi 400 di _compra_set
     strade = {"spedizione", "ritiro"}
     for a in tutti.values():
-        sue = set()
-        if a["consegna"] in ("spedizione", "entrambe"):
-            sue.add("spedizione")
-        if a["consegna"] in ("ritiro", "entrambe"):
-            sue.add("ritiro")
+        # le sole FISICHE: il digitale si sottrae al giudice unico
+        # invece di avere una seconda lista — un digitale puro da'
+        # l'insieme vuoto, che e' il 400 qui sotto
+        sue = strade_annuncio(a) - {"digitale"}
         if not sue:
             con.close()
             if a["consegna"] == "digitale":
@@ -16688,13 +16703,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # sorpresa perche' mostra comunque i sats veri della risposta.
     # (Il blocco sta PRIMA del fail-fast dello stock dal ago 2026:
     # la ripresa qui sotto confronta la scelta con l'ordine pendente.)
-    disponibili = set()
-    if a["consegna"] in ("spedizione", "entrambe"):
-        disponibili.add("spedizione")
-    if a["consegna"] in ("ritiro", "entrambe"):
-        disponibili.add("ritiro")
-    if a["consegna"] == "digitale" or a["anche_digitale"]:
-        disponibili.add("digitale")
+    disponibili = strade_annuncio(a)
     scelta = d.get("consegna", "")
     if not disponibili:
         scelta = ""
