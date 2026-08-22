@@ -14955,6 +14955,54 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e la coda si riempie di proposte diverse secondo chi le ha chieste.
   Fail-open totale come la moderazione: lotto saltato = si riprova al
   giro dopo.
+  LA REGOLA «BITCOIN» È TEMATICA (ago 2026, dal campo: 19 proposte, e
+  UNDICI tiravano fuori da «Bitcoin» sacche, poster cypherpunk e
+  magliette — Andrea le scartava a mano). Non era il modello a
+  disobbedire: il prompt insegnava «hardware e nodi» con quattro
+  esempi tutti apparecchi (la lezione della coppia bici/cuffie: gli
+  esempi insegnano il confine più della regola), mentre l'albero delle
+  sottocategorie ha «merch» e «poster-stampe» sotto Bitcoin da quando
+  è stato disegnato — con dentro alla lettera `maglietta`, `sacca`,
+  `borsa`. Si è corretta una premessa parziale, MAI inseguito il
+  modello (la regola di casa, come quando cadde «usato»): la riga
+  nuova dice che a decidere è il TEMA e non il tipo di oggetto, con la
+  coppia delle due magliette che insegna il confine e la clausola
+  sull'elettronica generica che RESTA — era l'unica del testo vecchio
+  che funzionava. La riga è UNA con DUE consumatori (lo script a mano
+  e `ricategorizza_automatico`, che importa `PROMPT` e `RIGA`): la
+  correzione vale per tutti e due.
+  E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
+  gemello di collaudo_impersonazione.py che a questo prompt mancava,
+  da rilanciare a OGNI ritocco. Nove casi con l'atteso accanto: i
+  cinque di Andrea (sacca, poster, le DUE magliette — quella qualunque
+  STA in Bitcoin e deve USCIRNE, il caso affilato apposta che
+  impedisce a «tematico» di assorbire troppo — e il NerdMiner che il
+  prompt vecchio indovinava già) più quattro regressioni
+  (portatile→Informatica, Jade→Bitcoin, l'alimentatore che sorveglia
+  la clausola tenuta, e il NON SO che sopravvive). A differenza del
+  fratello si IMPORTA — ricategorizza.py chiede il config dentro
+  main() apposta — quindi usa chiedi() e catalogo() VERI, e le
+  sentinelle di prove.py leggono la tabella COME DATO: niente finestra
+  di caratteri da tarare, che è la fragilità dichiarata del fratello.
+  La regola del confronto è UNA per tutti i casi
+  (`fuori.get(id, ora) == atteso`: chiedi() ritorna i soli
+  spostamenti, «resta dov'è» non ha un valore speciale) e il conto
+  separa lo SPOSTATO MALE — il caso grave: tira un annuncio fuori da
+  casa sua, e se ne accorge solo il venditore — dal non spostato.
+  `--secco` stampa prompt e corpo SENZA chiamare (una spia registra
+  quel che chiedi() spedirebbe: l'unica verifica possibile senza
+  chiave), `--crudo` la risposta grezza (cinque righe attorno a
+  messages.create, mai una copia di chiedi); esce 2 a chiave assente,
+  che un giro saltato non si scambi per un giro riuscito. Torturato
+  con sei mutazioni, ognuna rossa da sola.
+  ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
+  (`python collaudo_ricategorizza.py`), atteso 9/9: chi lo rilancia
+  scriva QUI il conto COL NOME di quel che cade — se cadono la
+  maglietta qualunque o l'alimentatore la regola assorbe troppo e va
+  stretta, se cadono i tre tematici non ha insegnato abbastanza.
+  L'atteso segue il PROMPT, mai il modello. Dopo il giro,
+  `ricategorizza.py --rifai` sul VPS è una SCELTA di Andrea, non un
+  deploy: rifà le domande anche sui già decisi.
 - `sposta_a_mano.py` (lug 2026) — gli spostamenti che decidi tu, quando
   l'AI ha sbagliato o ha detto NON SO. Prende `pezzo di titolo=Categoria`
   (o `id=Categoria`), pesca gli attivi e scrive le proposte in coda come
