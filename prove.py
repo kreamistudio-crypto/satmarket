@@ -22377,6 +22377,25 @@ def prove_servizi():
                  "Ti seguo finche' non sei soddisfatto"):
         prova(f"«{caso[:34]}» e' nel collaudo", True, caso in col)
 
+    # --- IL PATTO SI DICHIARA PRIMA, o non e' un patto: e' una
+    # sorpresa che si scopre in disputa. Sono i due posti del codice
+    # digitale — la trust-note nella scheda e la voce in «Dove il
+    # deposito non puo' proteggerti» — e la regola qui non e' «vince
+    # chi ha consegnato» (quel fatto non ce l'abbiamo) ma «si
+    # guardano le CONDIZIONI».
+    prova("la scheda dichiara il patto prima dell'acquisto", True,
+          'id="notaServizio"' in mini)
+    prova("...e dice che i sats non si muovono da soli", True,
+          "non si muovono da soli</b>: si sbloccano quando confermi"
+          in mini)
+    prova("...e che in disputa si guardano le condizioni", True,
+          "un moderatore guarda se le <b>condizioni</b> c'erano" in mini)
+    prova("«Il pagamento protetto» ha la sua voce", True,
+          "Di una prestazione non vediamo niente." in mini)
+    prova("...e dice che l'appuntamento e il collegamento sono i fatti",
+          True, "l'appuntamento era stato concordato da tutti e due"
+          in mini)
+
     # --- i pannelli dell'ordine. NON basta che le funzioni esistano:
     # la tortura le ha viste MONTATE MAI e nessuna prova arrossire —
     # tre buchi trovati rompendo, non rileggendo.
