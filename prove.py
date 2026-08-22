@@ -1127,6 +1127,16 @@ def prove_ricategorizza():
     # L'unica clausola del testo vecchio che funzionava, e RESTA.
     prova("...e la clausola sull'elettronica resta", True,
           "elettronica generica" in ric.PROMPT)
+    # IL PRIMO GIRO VERO DEL COLLAUDO (ago 2026): 13/14 due volte, a
+    # cadere la SACCA «col logo Bitcoin» — il modello leggeva la
+    # formula come proprieta' delle magliette, perche' viveva solo
+    # nella coppia (il simbolo ₿ invece lo riconosceva). La cura e'
+    # questa riga, mirata: la regola non si allarga.
+    prova("...e la coppia vale per ogni oggetto (la sacca)", True,
+          "La coppia vale per OGNI oggetto" in ric.PROMPT
+          and "anche una sacca o una tazza col logo bitcoin sono "
+              "«Bitcoin»" in ric.PROMPT
+          and "sia come simbolo ₿ sia scritto a parole" in ric.PROMPT)
     # IL SECONDO GIRO (ago 2026, dal campo): la regola tematica
     # assorbiva troppo — tre «Sat's Oil» da Alimenti a Bitcoin per il
     # «Sat» nel nome, e il «Manifesto Hacker» spinto verso Arte. La

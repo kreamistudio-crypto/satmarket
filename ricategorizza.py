@@ -118,12 +118,24 @@ PROMPT = (
     # L'OGGETTO, non il nome del prodotto — la stessa lezione gia'
     # pagata dal prompt della moderazione, dove «sat» e' la MONETA e
     # una somiglianza di nome non e' mai un motivo.
+    # E IL PRIMO GIRO VERO DEL COLLAUDO HA PAGATO SUBITO (ago 2026):
+    # 13/14 DUE VOLTE, a cadere la SACCA «col logo Bitcoin» —
+    # spostata in Abbigliamento con la risposta grezza pulita
+    # («1: Abbigliamento»): una scelta, non una riga storta. La
+    # maglietta col SIMBOLO ₿ restava giusta: il modello leggeva
+    # «col logo bitcoin» come proprieta' delle magliette della
+    # coppia, perche' la formula compariva solo li'. La cura e' la
+    # riga «la coppia vale per OGNI oggetto», mirata: la regola non
+    # si allarga — i casi 4 e 8 del collaudo la presidiano.
     "- «Bitcoin» e' un reparto TEMATICO, non un reparto di hardware: "
     "ci sta tutto cio' che parla di bitcoin e di cultura cypherpunk "
     "— portafogli hardware, miner, nodi, libri, poster, magliette, "
     "sacche, adesivi. A decidere e' il TEMA, non il tipo di oggetto: "
     "una maglietta col logo bitcoin e' «Bitcoin», una maglietta "
-    "qualunque e' «Abbigliamento», e un poster cypherpunk resta "
+    "qualunque e' «Abbigliamento». La coppia vale per OGNI oggetto, "
+    "non solo per le magliette: anche una sacca o una tazza col logo "
+    "bitcoin sono «Bitcoin», e il logo conta sia come simbolo ₿ sia "
+    "scritto a parole. Un poster cypherpunk resta "
     "«Bitcoin» anche se e' una stampa d'arte. MA il tema dev'essere "
     "L'OGGETTO, non il nome del prodotto: un olio o una birra in "
     "edizione bitcoin restano «Alimenti e bevande» — «sat» o "

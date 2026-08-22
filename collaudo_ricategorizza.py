@@ -70,8 +70,13 @@ CASI = [
     ("Sacca in cotone col logo Bitcoin",
      "Sacca zaino con cordoncino, stampa arancione, mai usata.",
      "Bitcoin", "Bitcoin",
-     "il caso vero di produzione: le sacche erano fra gli undici "
-     "spostamenti sbagliati verso «Altro»"),
+     "REGRESSIONE PERMANENTE — il caso vero di produzione (era fra "
+     "gli undici verso «Altro»), e al primo giro vero del collaudo "
+     "e' CADUTO DUE VOLTE (13/14, risposta grezza «Abbigliamento»: "
+     "una scelta, non una riga storta). La maglietta col simbolo ₿ "
+     "restava giusta: il modello leggeva «col logo bitcoin» come "
+     "proprieta' delle magliette, perche' la formula viveva solo "
+     "nella coppia. Da qui la riga «la coppia vale per OGNI oggetto»"),
     ("Poster cypherpunk, stampa numerata",
      "Stampa 50x70 su carta opaca, edizione numerata a mano.",
      "Bitcoin", "Bitcoin",
