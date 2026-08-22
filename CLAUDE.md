@@ -1672,18 +1672,56 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Tutto» o di spegnere il barattolo da un reparto.
   LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO, e devono comportarsi
   come le card (ago 2026, difetto dal campo): passano da
-  `apriCategoria`, che SPINGE un gradino. Prima chiamavano `setCat`
-  diretto, che su una radice SOSTITUISCE — misurato: tre reparti di
-  fila lasciavano la cronologia a ZERO gradini, e al secondo indietro
-  si usciva dall'app. Ed è la porta che si usa scorrendo, cioè quasi
-  sempre. «Tutto» resta `setCat`: tornare a una radice non scava un
-  gradino nuovo, ed è già la regola scritta in `navRiflette`.
+  `apriCategoria`. Prima chiamavano `setCat` diretto, che su una
+  radice SOSTITUISCE — misurato: il reparto si mangiava la home e
+  l'indietro usciva dall'app senza passarci. Ed è la porta che si usa
+  scorrendo, cioè quasi sempre.
+  IL REPARTO È UN GRADINO SOLO (ago 2026, decisione di Andrea che
+  ROVESCIA il giro prima — «l'indietro ripercorre i reparti
+  visitati»): dalla home si SPINGE una volta, i cambi
+  reparto→reparto SOSTITUISCONO, e l'indietro riporta SUBITO alla
+  home con tutti gli articoli — un tocco e sei fuori, da qualunque
+  catena di reparti. IL PUSH RESTA OBBLIGATORIO e non si può fare
+  tutto a replace: nella PWA il gesto è di SISTEMA e non passa da
+  `navIndietro` — l'entry sotto deve esistere PRIMA che il gesto
+  arrivi, o il primo indietro da un reparto uscirebbe dal sito (la
+  trappola documentata della radice madre).
+  E CHI TORNA A «TUTTO» CONSUMA IL GRADINO, che è la metà delicata:
+  ritocco della card accesa, pillola «Tutto» e tab Esplora passano da
+  `tornaATutto` — se il gradino era stato spinto dalla home si fa un
+  VERO passo indietro invece di sostituire, perché sostituendo
+  resterebbero due entry identiche impilate: un indietro che non fa
+  niente, e quello dopo che butta fuori dall'app. `navGradinoReparto`
+  registra la PROFONDITÀ del gradino e non un booleano — da un
+  dettaglio aperto sopra il reparto il pop atterrerebbe sul reparto e
+  non sulla home, e il ramo Aste non è la home — e si azzera in
+  `setCat('Tutto')`, da qualunque strada ci si arrivi. Il pop è
+  `history.back()` DIRETTO e mai `navIndietro`: la serratura dei
+  350ms è del doppio canale dello stesso gesto, e qui il gesto è un
+  tocco — strozzato, morirebbe in silenzio. Un reload perde la
+  variabile e il ritorno degrada sulla sostituzione: dichiarato, mai
+  peggio di ieri. DA SFOGLIA tutto invariato: lì il gradino è della
+  piastrella e l'indietro riporta allo scaffale — e quel gradino non
+  si consuma mai (sotto non c'è la home).
   RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (decisione di Andrea): è
   lo stesso gesto del barattolino in testata — si tocca per filtrare,
   si ritocca per uscire — ed è per questo che nella fila non esiste
-  nessuna card «Tutto» in più. Anche quel ritorno sostituisce invece
-  di spingere, così l'indietro continua a ripercorrere i reparti
-  VISITATI e non i ripensamenti.
+  nessuna card «Tutto» in più. Il ritorno passa da `tornaATutto`,
+  come le altre maniglie.
+  E LA RICERCA SPEGNE IL REPARTO (ago 2026, stessa decisione, punti 2
+  e 3 del giro): premere invio con una query da dentro un reparto
+  spegne l'anello e cerca su TUTTI gli articoli — prima «cerco un
+  faro d'auto e mi esce il risultato con Alimenti ancora
+  selezionato». L'AI non ha MAI filtrato per categoria (e ora c'è la
+  prova che resti così): a filtrare erano la DEMO e la vetrina
+  anonima via `activeCat`, che `spegniReparto` azzera. NIENTE setCat
+  lì dentro, ed è la riga da non «uniformare»: ricaricherebbe la
+  prima pagina intera in GARA con la fetch dei risultati — vincerebbe
+  chi arriva ultimo, cioè a caso. Lo stato si spegne a mano, e la
+  categoria muore PRIMA di consumare il gradino: così navApplica
+  trova la entry identica alla propria e non ridisegna niente sotto i
+  risultati. L'invio a campo VUOTO non spegne: è un «ricomincia la
+  vista», non una ricerca, e il reparto resta suo.
   LA SEZIONE DELLE CARD STA FUORI DALL'HEADER per una ragione sua, ed
   è misurata: l'header a 320px occupa già ~176px su 568 — con le card
   dentro salirebbe a ~280, cioè la vetrina si guarderebbe da una
@@ -17861,6 +17899,9 @@ su una radice quello SOSTITUISCE, quindi tre reparti di fila
 lasciavano zero gradini e al secondo indietro si usciva dall'app.
 Dalle card funzionava gia' (misurato prima di toccare: 0→1→2→3).
 Adesso le pillole passano da `apriCategoria` come le card.
+(La cronologia A RITROSO e' stata ROVESCIATA il giorno dopo — vedi
+«IL REPARTO E' UN GRADINO SOLO» qui sotto: le pillole passano ancora
+da apriCategoria, ma il gradino e' uno e l'indietro torna alla home.)
 2) LA BARRA COMPARIVA DI COLPO: si spegneva col `display`, da cui non
 si transiziona niente. Ora e' un velo con la sua scivolata, spenta da
 reduced-motion. 3) IL BUCO DI 6px sotto l'header tornando da un
@@ -17882,6 +17923,30 @@ l'indietro a ritroso, il velo che a 150 ms sta a 0,96 di opacita', il
 buco che passa da 6px a -1 (il bordo dell'header), zero emoji in dieci
 campioni dall'avvio, il ritocco, il desktop e i due temi.
 IN PRODUZIONE basta il deploy.
+Il reparto e' un gradino solo, e la ricerca lo spegne (ago 2026, tre
+punti di Andrea in un giro, il primo ROVESCIA quello di ieri):
+l'indietro dopo una o piu' categorie riporta SUBITO alla home — dalla
+home si spinge una volta, i cambi reparto→reparto sostituiscono — e
+chi torna a «Tutto» (ritocco, pillola, tab) CONSUMA il gradino con un
+vero passo indietro, o resterebbero due entry identiche impilate: un
+indietro morto, e quello dopo che butta fuori dall'app. Il push resta
+obbligatorio per la PWA, dove il gesto e' di sistema e l'entry deve
+esistere prima. Piu' la ricerca che guarda TUTTI gli articoli e
+spegne l'anello del reparto (l'AI non ha mai filtrato per categoria:
+a filtrare erano DEMO e vetrina anonima). Vedi «IL REPARTO E' UN
+GRADINO SOLO» in Architettura per la profondita' registrata, il
+history.back() diretto e la ragione per cui spegniReparto non passa
+MAI da setCat. Collaudato: 4456 prove verdi (+13, quattro che
+CAMBIANO LATO col perche') e la tortura a 16 mutazioni — compresa
+quella che rimette la bandierina incondizionata di ieri — tutte
+uccise; giro dal vivo sul server locale con la catena dei tre
+reparti, il pop alla profondita' giusta dopo un dettaglio, Sfoglia
+intatta e la ricerca «Vasetti» da dentro Elettronica che trova gli
+Alimenti con l'anello spento. IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna leva, nessuna rotta — solo client. DA GUARDARE dal
+telefono, nei DUE contesti (Mini App e PWA): entrare in tre reparti e
+uscire con UN gesto, e il ritocco della card accesa seguito da un
+solo indietro per chiudere l'app.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
