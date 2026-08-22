@@ -1700,14 +1700,55 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   350ms è del doppio canale dello stesso gesto, e qui il gesto è un
   tocco — strozzato, morirebbe in silenzio. Un reload perde la
   variabile e il ritorno degrada sulla sostituzione: dichiarato, mai
-  peggio di ieri. DA SFOGLIA tutto invariato: lì il gradino è della
-  piastrella e l'indietro riporta allo scaffale — e quel gradino non
-  si consuma mai (sotto non c'è la home).
+  peggio di ieri. [Il caso «DA SFOGLIA» è morto con la pagina, ago
+  2026 — vedi la voce della card «Tutto», sotto.]
   RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (decisione di Andrea): è
   lo stesso gesto del barattolino in testata — si tocca per filtrare,
   si ritocca per uscire — ed è per questo che nella fila non esiste
   nessuna card «Tutto» in più. Il ritorno passa da `tornaATutto`,
-  come le altre maniglie.
+  come le altre maniglie. [La seconda metà è ROVESCIATA dall'ago
+  2026: la card «Tutto» esiste, in testa — voce sotto. Il ritocco
+  resta.]
+  LA CARD «TUTTO» IN TESTA E LA MORTE DI SFOGLIA (ago 2026, due
+  decisioni di Andrea in un giro). 1) In TESTA alla fila c'è la card
+  «Tutto», che ROVESCIA il «nessuna card in più» qui sopra: è una
+  card come le altre — illustrazione SUA
+  (`assets/categorie/tutto.webp`), anello acceso quando nessun
+  reparto lo è — e il tocco passa da `tornaATutto`
+  (`tornaATuttoDaTocco`): MAI `apriCategoria`, che da un reparto
+  SOSTITUIREBBE invece di consumare il gradino della home; a «Tutto»
+  già acceso non fa niente (un setCat lì ricaricherebbe la prima
+  pagina per un tocco a vuoto). «tutto» NON è una categoria: la
+  rotta delle illustrazioni lo ammette da una whitelist allargata di
+  UNA voce dichiarata (`SLUG_ILLUSTRAZIONI`), mentre
+  `SLUG_CATEGORIE` resta il vocabolario di /categoria/{slug} e
+  /categoria/tutto resta un nome inventato. Il calore copre anche
+  lui (`scaldaSfoglia` gira su CATS intero, non più slice(1)).
+  2) LA PAGINA SFOGLIA NON ESISTE PIÙ, e con lei la card «Tutte le
+  categorie» in coda: la fila È la mappa — «Tutto» in testa, le
+  vuote in fondo — e la pagina dietro l'ultima card era rimasta un
+  doppione con una porta sola. COSA NON C'ENTRA: le rotte
+  /categoria/{slug} sono pagine del SERVER (cartello, sitemap,
+  `apriCategoriaDaUrl`: intatti). LE ENTRY VECCHIE della cronologia
+  degradano su Esplora — le `'sfoglia|X'` nel ramo esplora di
+  `navRendiVista` (com'era già), le `v:'sfoglia'` in un ramo NUOVO
+  prima del `go(b.v)` di default: senza, `go('sfoglia')`
+  esploderebbe su una vista che non c'è. I FERRI restano coi nomi
+  loro (`ordineSfoglia`, `scaldaSfoglia`: il patto dei nomi
+  interni); il ramo «da un'altra vista» di `apriCategoria` resta da
+  CINTURA (oggi ogni porta del reparto vive dentro Esplora); i morti
+  sono `renderSfoglia`, `sfogliaFirma`, `sfogliaDaRifare`,
+  `view-sfoglia`, le regole CSS della griglia e delle
+  piastrelle-colonna, e la cella in coda con la griglia in
+  miniatura. La sentinella che vieta il ritorno della card in coda
+  legge anche i commenti — l'ha dimostrato al primo giro, prendendo
+  il nome della classe scritto nella lapide CSS.
+  DA FARE quando arriva `tutto.webp` (Andrea ha l'illustrazione):
+  `ritaglia_categorie.py --scrivi` e la prova d'esistenza in
+  prove.py, che oggi manca APPOSTA — il file non c'è ancora, e una
+  CI rossa in attesa di un asset educa a non guardarla. Fino ad
+  allora la card mostra l'emoji di ripiego 🛍️: degradazione, non
+  regressione.
   E LA RICERCA SPEGNE IL REPARTO (ago 2026, stessa decisione, punti 2
   e 3 del giro): premere invio con una query da dentro un reparto
   spegne l'anello e cerca su TUTTI gli articoli — prima «cerco un
@@ -1793,14 +1834,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   parola lunga sopra il disegno lo schiaccerebbe), due righe al
   massimo. La sezione è alta 157px: chi allarga la card rifà quel
   conto — a 96px se ne vedono due e mezza.
-  IN CODA LA CARD «TUTTE LE CATEGORIE», che è due cose insieme: la
+  [MORTA, ago 2026 — vedi «LA CARD "TUTTO" IN TESTA E LA MORTE DI
+  SFOGLIA», sopra.] IN CODA LA CARD «TUTTE LE CATEGORIE», che è due
+  cose insieme: la
   fine dichiarata della fila e **l'unica porta rimasta allo scaffale**.
   Non porta un'illustrazione perché non è un reparto — il segno è la
   griglia in miniatura, la stessa che il tab Sfoglia aveva per icona —
   e il suo velo sta al 28% e non al 12% delle icone della nav: là è
   inchiostro su carta, qui crema su bruno, e al 12% due dei quattro
   riquadri sparivano (visto a schermo, non leggendo il foglio).
-  SFOGLIA DIVENTA UNA VISTA INTERNA, il patto di /sicurezza e
+  [SUPERATA, ago 2026: la pagina non esiste proprio più — restano vere
+  le degradazioni delle entry.] SFOGLIA DIVENTA UNA VISTA INTERNA, il
+  patto di /sicurezza e
   /privacy: esce da `RADICI` (quindi si SPINGE e l'indietro riporta in
   home invece di uscire dall'app), `voceNav` la mappa su 'esplora', e
   il ramo `ramoVetrina='sfoglia'` NON ESISTE PIÙ. La pagina non si
@@ -1854,7 +1899,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessuno. Così i cinque posti che già rifanno le pillole valgono per
   tutte e due le file, e non nasce un secondo elenco da tenere in pari.
 
-  LA PAGINA «SFOGLIA» (lug 2026): le categorie come vetrina, quarta
+  LA PAGINA «SFOGLIA» (lug 2026) [MORTA, ago 2026 — la voce resta per
+  la storia delle illustrazioni e del pareggio, che oggi vivono nella
+  striscia della home; il rapporto 85.9×75 di ritaglia_categorie.py è
+  tarato ancora su QUEL riquadro, ed è per questo che il riquadro
+  della card in home non è quadrato]: le categorie come vetrina, quarta
   radice della nav — griglia a due colonne di piastrelle illustrate,
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
   Profilo; niente barra di ricerca, che vive in Esplora e duplicarla
@@ -17947,6 +17996,35 @@ colonna, nessuna leva, nessuna rotta — solo client. DA GUARDARE dal
 telefono, nei DUE contesti (Mini App e PWA): entrare in tre reparti e
 uscire con UN gesto, e il ritocco della card accesa seguito da un
 solo indietro per chiudere l'app.
+La card «Tutto» apre la fila, e Sfoglia non esiste più (ago 2026, due
+decisioni di Andrea in un giro): in testa alla striscia c'è la card
+«Tutto» — illustrata come le sorelle, il tocco passa da tornaATutto e
+consuma il gradino della home, il ritocco della card accesa resta —
+e la card «Tutte le categorie» in coda è morta con la pagina intera:
+la fila È la mappa, e la pagina dietro l'ultima card era un doppione
+con una porta sola. Verificato quel che la rimozione doveva
+garantire: nessuna porta residua (go('sfoglia') a zero in tutto il
+client), /categoria/{slug} intatte (pagine del server: cartello,
+sitemap, apriCategoriaDaUrl), e le entry vecchie della cronologia che
+degradano su Esplora — v:'sfoglia' ha il suo ramo in navRendiVista, o
+il go() di default esploderebbe. Vedi Architettura, «LA CARD "TUTTO"
+IN TESTA E LA MORTE DI SFOGLIA», per la whitelist SLUG_ILLUSTRAZIONI
+(«tutto» non è una categoria) e per cosa resta col nome vecchio.
+Collaudato: 4463 prove verdi (le nuove su porta-zero, card in testa
+coi suoi quattro comportamenti, degradazione, whitelist) e NOVE
+mutazioni una per riga sorvegliata, ognuna rossa da sola — la decima
+l'aveva presa il primo giro: la sentinella della card in coda legge
+anche i commenti, e ha pescato il nome della classe nella lapide CSS.
+Più il giro dal vivo via CDP a 375px: 28 celle, anello che segue il
+reparto e card portata in vista, UN gradino (d 0→1→1→0),
+reparto→reparto che sostituisce, tocco a vuoto che non fa niente,
+pillole appiccicate con «Tutto», zero errori JS. IN PRODUZIONE basta
+il deploy: nessuna colonna, nessuna leva, nessuna rotta nuova (la
+rotta delle illustrazioni allarga la whitelist di una voce). DA FARE:
+tutto.webp non è ancora nel repo — quando Andrea lo mette,
+ritaglia_categorie.py --scrivi e la prova d'esistenza in prove.py;
+fino ad allora la card mostra l'emoji di ripiego.
+
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
