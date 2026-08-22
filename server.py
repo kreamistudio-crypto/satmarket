@@ -2885,6 +2885,19 @@ def init_db():
                     # l'import orario riscriverebbe l'annuncio da capo
                     # (piu' l'invariante che le due non stiano insieme).
                     "nostr_autore TEXT DEFAULT ''",
+                    # nostr_event_vecchio (ago 2026, IL TRASLOCO):
+                    # l'evento NOSTRO che aspetta la lapide, dopo che
+                    # quello del venditore e' nato al suo posto
+                    # ('' = niente da cancellare, ed e' lo stato
+                    # normale). Esiste perche' il trasloco pubblica
+                    # PRIMA e cancella DOPO — decisione di Andrea, cosi'
+                    # l'annuncio non sparisce mai dalla piazza — e la
+                    # firma del venditore SOVRASCRIVE nostr_event_id:
+                    # senza questa colonna il nostro id sarebbe perduto
+                    # nell'istante stesso in cui serve, e resterebbe in
+                    # piazza per sempre un evento nostro che nessuno sa
+                    # piu' di avere.
+                    "nostr_event_vecchio TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0",
                     "nostr_origine_d TEXT DEFAULT ''",
@@ -21894,6 +21907,7 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Firma non valida")
     imp = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
                       (b["annuncio_id"],)).fetchone()
+    vecchio = None       # il nostro evento da seppellire, se c'e'
     if b["azione"] == "ritira":
         # Ritirato: la riga torna com'era prima di Nostr, e nessun
         # gancio la ripubblichera' piu' (sono tutti solo_aggiornamento).
@@ -21914,12 +21928,34 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
         print(f"⚠️ Firma su annuncio #{b['annuncio_id']}, diventato "
               f"importato: nessuna testa scritta")
     else:
+        # IL TRASLOCO, il passaggio di consegne: se quell'annuncio era
+        # in piazza a nome NOSTRO, adesso che il suo evento e' nato il
+        # nostro va cancellato — e l'id da cancellare si legge QUI,
+        # nell'unico istante in cui esiste ancora, perche' la riga sotto
+        # sta per sovrascriverlo.
+        vecchio = con.execute(
+            "SELECT nostr_event_id FROM annunci WHERE id=? "
+            "AND nostr_autore='' AND nostr_event_id<>''",
+            (b["annuncio_id"],)).fetchone()
         con.execute("UPDATE annunci SET nostr_event_id=?, nostr_autore=? "
                     "WHERE id=?", (ev["id"], pubkey, b["annuncio_id"]))
+        if vecchio:
+            # Si SCRIVE e non si azzera mai da qui: una lapide gia' in
+            # attesa non deve poter sparire per una seconda firma, o
+            # quell'evento resterebbe nostro e vivo per sempre.
+            con.execute("UPDATE annunci SET nostr_event_vecchio=? "
+                        "WHERE id=?",
+                        (vecchio["nostr_event_id"], b["annuncio_id"]))
     con.execute("DELETE FROM firme_nostr WHERE annuncio_id=?",
                 (b["annuncio_id"],))
     con.commit()
     con.close()
+    if vecchio:
+        # Subito, senza aspettare il giro dell'orologio: il doppione in
+        # piazza dura quanto questa riga. Fail-open come ogni gancio
+        # Nostr — se non riesce, `trasloca_annunci_nostr` riprova.
+        asyncio.create_task(_seppellisci_vecchio(
+            b["annuncio_id"], vecchio["nostr_event_id"]))
     return {"ok": True, "evento": ev["id"]}
 
 
@@ -23273,6 +23309,21 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
               f"#{annuncio_id}: {e}")
 
 
+def _lapide_nostra(annuncio_id: int, event_id: str) -> dict:
+    """La NIP-09 (kind 5) su un evento firmato da NOI, gia' firmata
+    con la chiave della piattaforma.
+
+    Vive qui e in nessun altro posto, e non e' pignoleria: un kind 5
+    con la coordinata `a` storta i relay lo ACCETTANO lo stesso e non
+    cancella niente — cioe' un ritiro che sembra riuscito. Due copie
+    di queste tre righe sarebbero due modi di sbagliarla."""
+    return firma_evento(5, [
+        ["e", event_id],
+        ["a", f"30402:{_NOSTR[1]}:barattolo-{annuncio_id}"],
+        ["k", "30402"]],
+        "Annuncio rimosso da Barattolo")
+
+
 async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
     """Chiede ai relay di cancellare l'evento di un annuncio
     (NIP-09, kind 5). Di serie e' fire-and-forget come sopra
@@ -23300,12 +23351,8 @@ async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
             con.close()
             return 0
         con.close()
-        evento = firma_evento(5, [
-            ["e", a["nostr_event_id"]],
-            ["a", f"30402:{_NOSTR[1]}:barattolo-{annuncio_id}"],
-            ["k", "30402"]],
-            "Annuncio rimosso da Barattolo")
-        ok = await _spedisci_ai_relay(evento)
+        ok = await _spedisci_ai_relay(
+            _lapide_nostra(annuncio_id, a["nostr_event_id"]))
         if esigi_ok and not ok:
             print(f"⚠️ Ritiro #{annuncio_id}: nessun relay ha accettato, "
                   "non e' cambiato nulla")
@@ -23321,6 +23368,136 @@ async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
     except Exception as e:
         print(f"⚠️ Ritiro Nostr saltato per l'annuncio #{annuncio_id}: {e}")
         return 0
+
+
+async def _seppellisci_vecchio(annuncio_id: int, event_id: str) -> bool:
+    """Cancella dai relay l'evento NOSTRO che il venditore ha appena
+    sostituito col suo, e solo allora dimentica il suo id.
+
+    L'ordine e' quello: si azzera la colonna DOPO che almeno un relay
+    ha accettato. Con l'ordine rovesciato un relay muto ci farebbe
+    perdere l'unico filo verso quell'evento, e resterebbe in piazza per
+    sempre accanto a quello del venditore — cioe' esattamente il
+    doppione che questo giro esiste per chiudere. Restando in colonna,
+    ci riprova il giro dopo."""
+    if not _NOSTR or not event_id:
+        return False
+    try:
+        ok = await _spedisci_ai_relay(_lapide_nostra(annuncio_id, event_id))
+        if not ok:
+            print(f"⚠️ Trasloco #{annuncio_id}: il nostro evento vecchio "
+                  "non si e' cancellato, si riprova")
+            return False
+        con = db()
+        con.execute("UPDATE annunci SET nostr_event_vecchio='' WHERE id=?",
+                    (annuncio_id,))
+        con.commit()
+        con.close()
+        print(f"🟣 Trasloco #{annuncio_id}: il vecchio evento di Barattolo "
+              f"e' stato cancellato ({ok}/{len(RELAYS_VERIFICA)} relay)")
+        return True
+    except Exception as e:
+        print(f"⚠️ Trasloco #{annuncio_id}: lapide saltata, si riprova ({e})")
+        return False
+
+
+try:
+    from config import TRASLOCO_NOSTR
+except ImportError:
+    # Nasce ACCESA, al contrario di IMPORT_NOSTR_APERTO e delle leve
+    # del denaro: qui non esce niente verso nessuno che non l'abbia
+    # chiesto — si cancella un evento NOSTRO e si prepara una firma che
+    # l'utente puo' semplicemente non dare. Resta un interruttore
+    # perche' cancellare dai relay non si disfa.
+    TRASLOCO_NOSTR = True
+try:
+    from config import MAX_TRASLOCO_GIRO
+except ImportError:
+    MAX_TRASLOCO_GIRO = 200   # per giro, che il primo passa sul pregresso
+
+
+async def trasloca_annunci_nostr():
+    """IL TRASLOCO (ago 2026, decisione di Andrea): gli annunci finiti
+    in piazza a nome di BARATTOLO passano sull'account del venditore
+    appena lui dimostra di avere una chiave Nostr sua.
+
+    IL BIVIO di `annuncio_su_nostr` vale solo da quel momento in
+    avanti: chi prova la chiave oggi si ritrova la roba di ieri
+    intestata a noi, e li' resterebbe per sempre. Questo giro chiude il
+    buco per il passato E per il futuro senza un solo gancio nei
+    QUATTRO punti in cui una chiave diventa provata (login Nostr,
+    collegamento, accesso abilitato, npub verificata): un posto solo,
+    che si fa una domanda sola e si ripara da se'. Quattro ganci
+    sarebbero quattro cose da ricordare, e il quinto punto di domani
+    non li erediterebbe.
+
+    LA NOTA kind-1 NON SI TOCCA, ed e' la meta' da non confondere:
+    quella e' Barattolo che RACCONTA un annuncio nuovo ai suoi lettori
+    — il gemello esatto del post nel canale Telegram — e resta sul
+    nostro account, che e' il nostro canale. A traslocare e'
+    l'ANNUNCIO (kind 30402), che dice CHI VENDE: quello e' suo.
+    ⚠️ La colonna di quella nota qui non si nomina nemmeno a parole:
+    una sentinella conta il suo nome in questo corpo, e citarla in un
+    commento la fa diventare rossa (ci si e' inciampati scrivendola).
+
+    PRIMA NASCE IL SUO, POI MUORE IL NOSTRO (decisione di Andrea, e la
+    strada scartata era l'opposta): cosi' l'annuncio non sparisce mai
+    dalla piazza. Il prezzo, dichiarato: fra le due cose lo stesso
+    oggetto esiste DUE volte con due firme diverse — pochi secondi nel
+    caso normale, perche' chi prova la chiave sta nell'app e il suo
+    browser svuota la coda subito; finche' non torna, nel caso
+    peggiore. La strada opposta (cancella e poi aspetta) non lascerebbe
+    mai un doppione ma toglierebbe l'annuncio dalla piazza per tutto il
+    tempo dell'attesa.
+
+    SI ACCODA E BASTA, qui: la nsec ce l'ha solo lui (regola ferrea 2),
+    quindi il server prepara e il BROWSER firma — e' la coda che
+    esiste gia', non un secondo meccanismo. Un annuncio che ha gia' una
+    riga in coda si salta: chiedere due firme per la stessa cosa e'
+    esattamente cio' che la PK di `firme_nostr` evita."""
+    if not TRASLOCO_NOSTR or not _NOSTR:
+        return
+    con = db()
+    # Chi e' rimasto indietro: un evento vivo, firmato da NOI
+    # (nostr_autore=''), su un annuncio NATO QUI (contatto_nostr='':
+    # gli importati sono gia' del venditore per costruzione) e senza
+    # una firma gia' in coda.
+    righe = con.execute(
+        "SELECT a.id, a.venditore_id, u.npub, u.npub_verificata, "
+        "       u.npub_accesso "
+        "FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id "
+        "LEFT JOIN firme_nostr f ON f.annuncio_id=a.id "
+        "WHERE a.nostr_event_id<>'' AND a.nostr_autore='' "
+        "  AND a.contatto_nostr='' AND f.annuncio_id IS NULL "
+        "ORDER BY a.id LIMIT ?", (MAX_TRASLOCO_GIRO,)).fetchall()
+    # La chiave provata la decide `chiave_nostr_provata` e non una
+    # WHERE: la sua regola (npub_accesso, oppure il badge ma solo se
+    # VERIFICATO) e' quella di notifica() e dei ponti, e riscriverla in
+    # SQL sarebbe il secondo posto che un giorno dice un'altra cosa su
+    # a chi si intesta un annuncio in piazza.
+    accodati = 0
+    for r in righe:
+        if not chiave_nostr_provata(r):
+            continue
+        accoda_firma(con, r["id"], r["venditore_id"], "pubblica")
+        accodati += 1
+    if accodati:
+        con.commit()
+    # I nostri eventi vecchi rimasti appesi: qui il venditore ha gia'
+    # firmato il suo, quindi la piazza e' a posto e manca solo la
+    # lapide. E' anche la rete di sicurezza del relay muto.
+    appesi = con.execute(
+        "SELECT id, nostr_event_vecchio FROM annunci "
+        "WHERE nostr_event_vecchio<>'' ORDER BY id LIMIT ?",
+        (MAX_TRASLOCO_GIRO,)).fetchall()
+    con.close()
+    if accodati:
+        print(f"🟣 Trasloco: {accodati} annunci aspettano la firma del "
+              "loro venditore per passare sul suo account")
+    for a in appesi:
+        await _seppellisci_vecchio(a["id"], a["nostr_event_vecchio"])
+        await asyncio.sleep(0.5)     # mai una raffica verso i relay
 
 
 # ---------- I POST AUTOMATICI: la piattaforma racconta i fatti -------
@@ -29157,6 +29334,13 @@ async def orologio():
             await sollecita_servizi_fermi()
         except Exception as e:
             print(f"⚠️ Solleciti servizi fermi saltati: {e}")
+        try:
+            # PRIMA il trasloco e poi il sollecito, e l'ordine conta:
+            # cosi' chi entra in coda adesso puo' gia' essere richiamato
+            # da questo stesso giro, invece di aspettarne un altro
+            await trasloca_annunci_nostr()
+        except Exception as e:
+            print(f"⚠️ Trasloco degli annunci su Nostr saltato: {e}")
         try:
             await sollecita_firme_nostr()
         except Exception as e:

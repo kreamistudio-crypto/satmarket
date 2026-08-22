@@ -736,6 +736,13 @@ def prove_anello():
         # inciampati scrivendo questa prova: l'ha detto lei, non la
         # rilettura).
         exec(pezzo("accoda_firma"), amb)
+        # ...e `_lapide_nostra` per la stessa ragione: da quando il
+        # ritiro e il trasloco compongono la NIP-09 in un posto solo,
+        # `ritira_da_nostr` la chiama — e senza, il suo try/except si
+        # mangerebbe il NameError lasciando la coda vuota senza dire
+        # perche'. E' la lezione di sempre: chi ESTRAE una funzione ne
+        # eredita le dipendenze, e l'ambiente della prova va con lei.
+        exec(pezzo("_lapide_nostra"), amb)
         exec("async " + pezzo("ritira_da_nostr"), amb)
         exec("async " + corpo_rit, amb)
         try:
@@ -7184,6 +7191,219 @@ def prove_firme_nostr():
     # Nessun 🧊 ai moderatori: qui non ci sono sats fermi
     prova("nessuna segnalazione ai moderatori", False,
           "notifica_admin" in soll)
+
+
+def prove_trasloco_nostr():
+    """IL TRASLOCO (ago 2026, decisione di Andrea): gli annunci finiti
+    in piazza a nome di Barattolo passano sull'account del venditore
+    appena lui dimostra la sua chiave.
+
+    Le due cose da sorvegliare sono di famiglie diverse. La prima e'
+    un NON FATTO — la nota kind-1 di Barattolo NON si trasloca: quella
+    e' il gemello del post nel canale Telegram, e chi la portasse via
+    insieme all'annuncio spegnerebbe il nostro canale un annuncio alla
+    volta. La seconda e' un ORDINE: il nostro evento vecchio si
+    dimentica solo DOPO che un relay ha accettato la lapide, o
+    resterebbe in piazza per sempre accanto a quello del venditore."""
+    import asyncio
+    import sqlite3
+    import time
+    print("\n[il trasloco degli annunci su Nostr]")
+
+    corpo = pezzo("trasloca_annunci_nostr")
+    sepp = pezzo("_seppellisci_vecchio")
+    fatta = pezzo("firma_nostr_fatta")
+
+    # 1. LA NOTA kind-1 RESTA NOSTRA. E' la meta' che si confonde: a
+    #    traslocare e' l'ANNUNCIO (30402, dice chi vende), non il post
+    #    con cui Barattolo lo racconta ai suoi lettori.
+    for nome, testo in (("il giro", corpo), ("la lapide", sepp)):
+        prova(f"{nome} non tocca la nota kind-1 di Barattolo", False,
+              "post_nostr_id" in testo)
+
+    # 2. Qui non si firma NIENTE per conto del venditore: la nsec ce
+    #    l'ha solo lui (regola ferrea 2), quindi si accoda e basta.
+    prova("il trasloco accoda, non firma", True, "accoda_firma" in corpo)
+    prova("...e non costruisce l'evento dell'annuncio", False,
+          "evento_annuncio" in corpo)
+    prova("...e l'azione accodata e' la nascita", True,
+          '"pubblica"' in corpo)
+
+    # 3. Chi si trasloca: un evento VIVO, firmato da NOI, su un
+    #    annuncio NATO QUI. Ognuna di queste tre e' una porta che, se
+    #    cade, manda il trasloco sull'annuncio sbagliato — il piu'
+    #    grave e' `nostr_autore`, che senza chiederebbe una seconda
+    #    firma su un evento che il venditore ha gia' firmato.
+    for pezzetto, perche in (
+            ("a.nostr_event_id<>''", "solo chi e' davvero in piazza"),
+            ("a.nostr_autore=''", "solo gli eventi firmati da NOI"),
+            ("a.contatto_nostr=''", "mai gli importati, gia' suoi")):
+        prova(f"si trasloca {perche}", True, pezzetto in corpo)
+    prova("...e mai due firme per lo stesso annuncio", True,
+          "f.annuncio_id IS NULL" in corpo)
+
+    # 4. La chiave provata la decide il GIUDICE UNICO e non una WHERE:
+    #    la sua regola (npub_accesso, o il badge ma solo VERIFICATO) e'
+    #    quella di notifica() e dei ponti, e riscritta in SQL sarebbe
+    #    il secondo posto che un giorno dice un'altra cosa su a chi si
+    #    intesta un annuncio in piazza.
+    prova("la chiave provata passa dal giudice unico", True,
+          "chiave_nostr_provata" in corpo)
+    prova("...e non da una WHERE scritta a mano", False,
+          "npub_verificata=1" in corpo)
+
+    # 5. L'ORDINE della lapide: si azzera la colonna DOPO l'ok dei
+    #    relay. Rovesciato, un relay muto ci farebbe perdere l'unico
+    #    filo verso quell'evento.
+    prova("la lapide chiede ai relay", True, "_spedisci_ai_relay" in sepp)
+    i = sepp.index("if not ok")
+    j = sepp.index("nostr_event_vecchio=''")
+    prova("...e dimentica il vecchio SOLO dopo l'ok", True, i < j)
+
+    # 6. Il passaggio di consegne: il nostro id si legge PRIMA che la
+    #    firma del venditore lo sovrascriva — e' l'unico istante in cui
+    #    esiste ancora.
+    i = fatta.index("SELECT nostr_event_id FROM annunci")
+    j = fatta.index("UPDATE annunci SET nostr_event_id=?, nostr_autore=?")
+    prova("il vecchio id si legge prima di sovrascriverlo", True, i < j)
+    prova("...e una lapide gia' in attesa non si azzera da li'", False,
+          "nostr_event_vecchio=''" in fatta)
+    prova("...e la lapide parte subito, senza aspettare l'orologio", True,
+          "_seppellisci_vecchio" in fatta)
+
+    # 7. La lapide NIP-09 sui nostri eventi vive in UN posto solo: con
+    #    la coordinata `a` storta i relay la accettano lo stesso e non
+    #    cancella niente — un ritiro che sembra riuscito.
+    prova("la lapide nostra si costruisce in un posto solo", 1,
+          _SORGENTE.count('["a", f"30402:{_NOSTR[1]}:barattolo-'))
+    # Tre: la definizione piu' i suoi DUE chiamanti — il ritiro di
+    # sempre e la lapide del trasloco. Un quarto vorrebbe dire che
+    # qualcuno l'ha rifatta a mano da qualche parte.
+    prova("...e la usano sia il ritiro sia il trasloco", 3,
+          _SORGENTE.count("_lapide_nostra("))
+
+    # 8. Gira nell'orologio, e PRIMA del sollecito: chi entra in coda
+    #    adesso puo' gia' essere richiamato da questo stesso giro.
+    orol = pezzo("orologio")
+    prova("il trasloco gira nell'orologio", True,
+          "await trasloca_annunci_nostr()" in orol)
+    prova("...e prima del sollecito delle firme", True,
+          orol.index("trasloca_annunci_nostr") <
+          orol.index("sollecita_firme_nostr"))
+
+    # 9. La leva, e la colonna che nasce vuota (cioe' niente da
+    #    seppellire: e' lo stato normale, e anche la migrazione)
+    prova("la leva spegne il trasloco", True,
+          "if not TRASLOCO_NOSTR" in corpo)
+    prova("la colonna nasce vuota", True,
+          '"nostr_event_vecchio TEXT DEFAULT \'\'"' in _SORGENTE)
+
+    # 10. LA PROVA REGINA, ed e' ESEGUIBILE: il giro vero su un
+    #     database vero. Una sentinella sulla forma dice che la WHERE
+    #     e' scritta cosi', mai che scelga gli annunci giusti — e qui
+    #     sbagliare vuol dire chiedere a qualcuno di firmare la roba di
+    #     un altro.
+    amb = {"time": time, "asyncio": asyncio, "print": lambda *a, **k: None,
+           "RELAYS_VERIFICA": ["r"], "_NOSTR": ("sk", "b" * 64),
+           "TRASLOCO_NOSTR": True, "MAX_TRASLOCO_GIRO": 200}
+    i = _SORGENTE.index("CHARSET_BECH32 = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("_bech32_polymod"), amb)
+    exec(pezzo("npub_to_hex"), amb)
+    exec(pezzo("hex_to_npub"), amb)
+    exec(pezzo("chiave_nostr_provata"), amb)
+    exec(pezzo("accoda_firma"), amb)
+    exec("async " + pezzo("trasloca_annunci_nostr"), amb)
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+            nostr_event_id TEXT DEFAULT '', nostr_autore TEXT DEFAULT '',
+            contatto_nostr TEXT DEFAULT '',
+            nostr_event_vecchio TEXT DEFAULT '');
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, npub TEXT DEFAULT '',
+            npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '');
+        CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,
+            tg_id INTEGER, azione TEXT, creato INTEGER);
+    """)
+    npub_a, npub_b = amb["hex_to_npub"]("a" * 64), amb["hex_to_npub"]("c" * 64)
+    con.executemany("INSERT INTO utenti(tg_id, npub, npub_verificata, "
+                    "npub_accesso) VALUES(?,?,?,?)", [
+        (1, "", 0, npub_a),        # entra con la sua chiave
+        (2, npub_b, 1, ""),        # badge VERIFICATO
+        (3, npub_b, 0, ""),        # npub nuda: una dichiarazione, non una prova
+        (4, "", 0, "")])           # nessuna chiave
+    con.executemany(
+        "INSERT INTO annunci(id, venditore_id, nostr_event_id, nostr_autore, "
+        "contatto_nostr, nostr_event_vecchio) VALUES(?,?,?,?,?,?)", [
+        (10, 1, "ev10", "", "", ""),          # SI: nostro, chiave d'accesso
+        (11, 2, "ev11", "", "", ""),          # SI: nostro, badge verificato
+        (12, 3, "ev12", "", "", ""),          # no: npub nuda
+        (13, 4, "ev13", "", "", ""),          # no: nessuna chiave
+        (14, 1, "ev14", "d" * 64, "", ""),    # no: gia' firmato da lui
+        (15, 1, "ev15", "", "e" * 64, ""),    # no: importato, gia' suo
+        (16, 1, "", "", "", ""),              # no: non e' mai stato in piazza
+        (17, 1, "ev17", "", "", ""),          # no: firma gia' in coda
+        (18, 1, "nuovo", "a" * 64, "", "ev18")])  # appeso: manca la lapide
+    con.execute("INSERT INTO firme_nostr VALUES(17, 1, 'sold', 0)")
+    con.commit()
+
+    class Finta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass          # la connessione la chiude la prova, non il pezzo
+
+    sepolti = []
+
+    async def finto_seppellisci(aid, ev):
+        sepolti.append((aid, ev))
+        return True
+
+    amb["db"] = lambda: Finta()
+    amb["_seppellisci_vecchio"] = finto_seppellisci
+    asyncio.run(amb["trasloca_annunci_nostr"]())
+
+    in_coda = {r["annuncio_id"]: r["azione"] for r in
+               con.execute("SELECT * FROM firme_nostr").fetchall()}
+    prova("traslocano SOLO gli annunci nostri di chi ha una chiave provata",
+          {10, 11, 17}, set(in_coda))
+    prova("...e l'azione e' la nascita sul suo account", ["pubblica"] * 2,
+          [in_coda[10], in_coda[11]])
+    prova("...e una firma gia' in coda non si riscrive", "sold", in_coda[17])
+    prova("il nostro evento vecchio va sepolto", [(18, "ev18")], sepolti)
+
+    # E a leva spenta non si muove NIENTE: ne' una riga in coda, ne'
+    # una lapide verso i relay.
+    con.execute("DELETE FROM firme_nostr")
+    con.commit()
+    sepolti.clear()
+    amb["TRASLOCO_NOSTR"] = False
+    asyncio.run(amb["trasloca_annunci_nostr"]())
+    prova("a leva spenta non si accoda niente", 0,
+          con.execute("SELECT COUNT(*) c FROM firme_nostr").fetchone()["c"])
+    prova("...e non si cancella niente dai relay", [], sepolti)
+    con.close()
+
+    # SI SEPPELLISCE SOLO CIO' CHE ABBIAMO FIRMATO NOI, ed e' la riga
+    # piu' pericolosa del cantiere: una NIP-09 kind-5 su un evento del
+    # VENDITORE gli cancellerebbe l'annuncio dai relay — cioe' il
+    # danno peggiore che questa funzione possa fare, e per giunta
+    # irreversibile. A dirlo e' `nostr_autore=''`, e la mutazione che
+    # lo toglie e' SOPRAVVISSUTA al primo giro di tortura: le due
+    # sentinelle qui sotto sono nate da li'.
+    prova("il giro pesca SOLO gli eventi nostri", True,
+          "a.nostr_autore=''" in corpo)
+    prova("...e la lettura del vecchio, dentro la firma, pure", True,
+          "AND nostr_autore='' AND nostr_event_id<>''" in fatta)
+    # E LA LAPIDE SI SCRIVE NELLA SUA COLONNA: `nostr_event_vecchio` e
+    # non `nostr_event_id`. Scambiarle vorrebbe dire prendere l'evento
+    # APPENA firmato dal venditore per uno nostro — e seppellire
+    # quello. Anche questa e' arrivata dalla tortura.
+    prova("il vecchio si timbra nella colonna sua", True,
+          "SET nostr_event_vecchio=?" in fatta)
 
 
 def prove_bip353():
@@ -24182,7 +24402,8 @@ def main():
               prove_savers_proprietario, prove_barattolo_in_testata,
               prove_barattolo_filtra,
               prove_messaggio_admin, prove_avviso_contatto,
-              prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
+              prove_forma_tracking, prove_bip353, prove_firme_nostr,
+              prove_trasloco_nostr, prove_conta_feedback,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
