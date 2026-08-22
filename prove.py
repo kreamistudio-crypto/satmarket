@@ -21904,6 +21904,136 @@ def prove_consegna_firmata():
           in pezzo_js(mini, "async function publish()"))
 
 
+def prove_servizi():
+    """I SERVIZI (ago 2026): la quinta modalita' di consegna.
+
+    Barattolo non puo' giudicare se la lezione c'e' stata — avviene su
+    Meet, fuori. Puo' giudicare se le CONDIZIONI per farla c'erano, e
+    tutto il cantiere discende da li': l'appuntamento e il luogo
+    dell'incontro diventano fatti NOSTRI, registrati prima e accettati
+    da entrambi.
+
+    La prima prova e' ESEGUIBILE apposta: una sentinella direbbe che
+    il tetto c'e', mai che risponda giusto al filo."""
+    print("\n[i servizi]")
+    # niente `time` nell'ambiente: il giudice e' pura aritmetica su
+    # tre interi, ed e' precisamente cio' che lo rende torturabile
+    # senza un orologio
+    amb = {}
+    exec(pezzo("appuntamento_ammesso"), amb)
+    ok = amb["appuntamento_ammesso"]
+    ora = 1_756_000_000
+    # --- il giudice puro del tetto, girato per davvero
+    prova("una data nel passato non si propone", False, ok(ora - 1, ora, 60))
+    prova("...nemmeno l'istante esatto di adesso", False, ok(ora, ora, 60))
+    prova("fra un minuto si", True, ok(ora + 60, ora, 60))
+    prova("AL FILO dei 60 giorni si accetta", True,
+          ok(ora + 60 * 86400, ora, 60))
+    prova("...e un secondo oltre no", False, ok(ora + 60 * 86400 + 1, ora, 60))
+    # Lo zero CHIUDE, non apre: una leva che a zero spalanca e' la
+    # forma con cui un refuso nel config diventa un anno di sats fermi
+    prova("tetto a 0 = nessuna data ammessa, mai «nessun tetto»", False,
+          ok(ora + 3600, ora, 0))
+    prova("...e un tetto negativo idem", False, ok(ora + 3600, ora, -1))
+
+    # --- il giudice delle strade: la quinta non ne inventa nessuna
+    amb2 = {}
+    exec(pezzo("strade_annuncio"), amb2)
+    strade = amb2["strade_annuncio"]
+
+    def ann(consegna, dig=0):
+        return {"consegna": consegna, "anche_digitale": dig}
+    prova("un servizio non offre strade fisiche", set(),
+          strade(ann("servizio")))
+    # ...ed e' per questo che il SET lo esclude GRATIS: la sottrazione
+    # del digitale lascia l'insieme vuoto, che e' il 400 «si compra da
+    # solo». Zero righe nel carrello.
+    prova("...quindi il carrello lo rifiuta senza una riga apposta",
+          set(), strade(ann("servizio")) - {"digitale"})
+    prova("regressione: la spedizione resta la spedizione",
+          {"spedizione"}, strade(ann("spedizione")))
+    prova("regressione: entrambe restano due", {"spedizione", "ritiro"},
+          strade(ann("entrambe")))
+    prova("regressione: la combo tiene la sua strada fisica",
+          {"ritiro", "digitale"}, strade(ann("ritiro", 1)))
+    prova("regressione: un digitale puro sparisce dal set", set(),
+          strade(ann("digitale")) - {"digitale"})
+
+    # --- la condizione: la scala non descrive un'ora di lezione
+    amb3 = {}
+    i = _SORGENTE.index("CATEGORIE_SENZA_CONDIZIONE = frozenset(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb3)
+    exec(pezzo("senza_condizione"), amb3)
+    sc = amb3["senza_condizione"]
+    prova("a un servizio non si chiede in che condizioni e'", True,
+          sc("Altro", "servizio"))
+    prova("regressione: al digitale nemmeno", True, sc("Altro", "digitale"))
+    prova("regressione: a una bici si", False, sc("Biciclette", "spedizione"))
+
+    # --- dove si svolge: decide una guardia, non e' un ornamento
+    amb4 = {}
+    i = _SORGENTE.index("SERVIZIO_DOVE = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb4)
+    exec(pezzo("servizio_dove_da_payload"), amb4)
+    dove = amb4["servizio_dove_da_payload"]
+    prova("«presenza» si legge", "presenza",
+          dove({"servizio_dove": "presenza"}, "servizio"))
+    prova("un valore storto vale '' e non un 400", "",
+          dove({"servizio_dove": "sulla luna"}, "servizio"))
+    # Fuori dal servizio si azzera SEMPRE: la forma di anche_digitale,
+    # che non resta in colonna a dire una cosa che nessuno guardera'
+    prova("fuori dal servizio si azzera, anche se arriva", "",
+          dove({"servizio_dove": "presenza"}, "spedizione"))
+
+    # --- le sentinelle: le righe che un riordino toglie per prime
+    src = _SORGENTE
+    prova("la leva nasce SPENTA nel codice", True,
+          "SERVIZI_ATTIVI = False" in src)
+    prova("...e sta nel giudice unico dei payload, non nei chiamanti",
+          True, 'consegna == "servizio" and not SERVIZI_ATTIVI'
+          in pezzo("consegna_da_payload"))
+    prova("...cosi' a leva spenta la modalita' ricade su '' e non 400",
+          True, 'consegna = ""' in pezzo("consegna_da_payload"))
+    prova("la leva esiste anche nel config d'esempio", True,
+          "SERVIZI_ATTIVI = False" in open(
+              "config_esempio.py", encoding="utf-8").read())
+    prova("il tetto dei 60 giorni e' una leva, non un numero sparso",
+          True, "SERVIZIO_MAX_GIORNI" in src)
+    # RIPROPORRE AZZERA LA CONFERMA: senza, il venditore sposterebbe la
+    # data dopo il sì e si terrebbe il fatto accettato — cioe' la prova
+    # su cui il moderatore poggia
+    # Le stringhe SQL vivono spezzate su piu' righe, e nella PIEGA
+    # («... venditore_id=? "» a capo «"AND stato=...») due sentinelle
+    # si erano gia' nascoste al censimento — la lezione di _fmt_sats.
+    # Si ricuce prima di cercare, o si certifica una guardia che non
+    # si e' guardata.
+    def cuci(t):
+        return re.sub(r'"\s*\n\s*"', "", t)
+
+    prop = cuci(pezzo("proponi_appuntamento"))
+    prova("riproporre azzera la conferma del compratore", True,
+          "appuntamento_confermato_il=0" in prop)
+    prova("...e conta la proposta", True,
+          "appuntamento_proposte=appuntamento_proposte+1" in prop)
+    prova("il venditore propone solo su un ordine suo e 'locked'", True,
+          "venditore_id=? AND stato='locked'" in prop)
+    prova("...e solo su un servizio", True,
+          'consegna_scelta"] != "servizio"' in prop)
+    conf = cuci(pezzo("conferma_appuntamento"))
+    prova("la conferma e' del COMPRATORE", True,
+          "compratore_id=? AND stato='locked'" in conf)
+    # Il CAS e' la protezione dalla corsa vera: il venditore che sposta
+    # la data mentre il compratore conferma quella di prima
+    prova("...col CAS sulla data, o si conferma una data sparita", True,
+          "AND appuntamento_il=? AND appuntamento_confermato_il=0" in conf)
+    prova("...e confermare due volte non e' un errore", True,
+          'if o["appuntamento_confermato_il"]:' in conf)
+    prova("nessuna delle due rotte tocca i sats", True,
+          not any(x in prop + conf for x in
+                  ("_sblocca_sats", "_rimborsa_compratore", "prezzo_sats",
+                   "paga_venditore")))
+
+
 def prove_feedback_confermato():
     """IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026): chi ha
     comprato vota appena dichiara di aver ricevuto l'oggetto, senza
@@ -22125,6 +22255,7 @@ def main():
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
+              prove_servizi,
               prove_sintassi_client,
               prove_foto_vuota):
         try:

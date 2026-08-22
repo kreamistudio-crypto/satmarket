@@ -4804,6 +4804,9 @@ def strade_annuncio(a) -> set:
 MESI_IT = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
            "luglio", "agosto", "settembre", "ottobre", "novembre",
            "dicembre")
+# L'ordine e' quello di time.localtime().tm_wday: 0 = lunedi'.
+GIORNI_IT = ("lunedì", "martedì", "mercoledì", "giovedì", "venerdì",
+             "sabato", "domenica")
 
 
 def data_ferie(ts: int) -> str:
@@ -13113,6 +13116,35 @@ def _asta_viva(a, adesso: int) -> bool:
     return a["asta_base_sats"] > 0 and a["asta_scadenza"] > adesso
 
 
+def appuntamento_ammesso(quando: int, adesso: int,
+                         max_giorni: int) -> bool:
+    """UNA DATA SI PUO' PROPORRE? (ago 2026) Deve stare nel FUTURO e
+    non oltre `max_giorni` — oltre, i sats resterebbero in cassaforte
+    per mesi, ed e' anche il primo punto che il parere legale
+    guardera'.
+    Prende tre INT e non una riga, il patto di `in_ferie`: lo stesso
+    giudice serve la rotta del venditore, quella della conferma e la
+    prova in CI, che gira senza database e senza orologio.
+    AL FILO ESATTO si accetta (`<=`), come `_asta_viva` e `in_ferie`:
+    un tetto che rifiuta il suo stesso numero e' un tetto che dice
+    un'altra cifra da quella scritta nel config.
+    `max_giorni <= 0` non vuol dire «nessun tetto» ma «nessuna data
+    ammessa», ed e' deliberato: qui lo zero non e' una leva spenta —
+    se un domani si vorra' togliere il tetto, si alza il numero. Una
+    leva che a zero apre invece di chiudere e' la forma con cui un
+    refuso nel config diventa un anno di sats fermi.
+    E QUELLA REGOLA NON HA BISOGNO DI UNA RIGA: l'aritmetica la da'
+    gia' — con `max_giorni` a zero il tetto e' `adesso`, e una data
+    nel futuro non ci sta sotto. La guardia esplicita c'e' stata per
+    un'ora ed e' uscita perche' la TORTURA l'ha trovata: toglierla non
+    faceva fallire niente, cioe' era una riga che fingeva di fare
+    qualcosa. Le due prove sullo zero e sul negativo restano, e adesso
+    sorvegliano l'aritmetica invece di una ridondanza."""
+    if quando <= adesso:
+        return False
+    return quando <= adesso + max_giorni * 86400
+
+
 def in_ferie(ferie_fino: int, adesso: int) -> bool:
     """IL NEGOZIO E' CHIUSO? (ago 2026) Gate in LETTURA sulla data di
     rientro — lo stesso patto di lampo e asta: alla scadenza il
@@ -14981,6 +15013,23 @@ def _prezzo_lampo(a, percento: int):
     if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
         return 0, max(0.01, round(a["prezzo_eur"] * (100 - percento) / 100, 2))
     return max(1, a["prezzo_sats"] * (100 - percento) // 100), 0.0
+
+
+def _quando_appuntamento(ts: int) -> str:
+    """L'appuntamento come lo legge una persona: «giovedì 4 settembre
+    alle 18:30». Il giorno della settimana c'e' apposta — su una data
+    lontana e' quello che si controlla per primo.
+
+    ⚠️ E' l'ora del SERVER, come ogni resa di questo file, e qui la
+    cosa pesa piu' che altrove: su un pacco l'orario non decide
+    niente, su una lezione E' il prodotto. Finche' il mercatino e'
+    italiano l'ora e' quella giusta per tutti; il giorno che non lo
+    sara' piu', questa e' la funzione da cui ripartire — e la resa
+    vera andra' fatta nel CLIENT, che il fuso di chi guarda lo sa,
+    lasciando qui il timestamp."""
+    s = time.localtime(ts)
+    return (f"{GIORNI_IT[s.tm_wday]} {s.tm_mday} {MESI_IT[s.tm_mon - 1]} "
+            f"alle {time.strftime('%H:%M', s)}")
 
 
 def _quando_scade(ts: int) -> str:
@@ -17910,6 +17959,125 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
                        "ritiro</b>: lo trovi nell'ordine, ora puoi "
                        "spedire.")
     return {"ok": True, "punto_ritiro": punto, "tipo_punto": tipo}
+
+
+@app.post("/api/orders/{ordine_id}/appuntamento")
+async def proponi_appuntamento(ordine_id: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """IL VENDITORE PROPONE quando si fa (ago 2026). Solo lui, solo su
+    'locked', solo sulla via servizio.
+
+    LA FORMA E' UN ACCORDO DEGENERE, e la ragione e' tutta nel
+    moderatore: una data che il venditore scrive e basta resterebbe la
+    sua parola, mentre una data CONFERMATA e' un fatto accettato da
+    entrambi — ed e' precisamente cio' che in disputa manca. Niente
+    ping-pong pero': se non va bene, il compratore non controproprone
+    (quello e' un secondo flusso con la sua macchina), il venditore ne
+    propone un'altra. Il pattern e' quello di scegli_consegna_ordine:
+    finche' il dato manca, NESSUNA finestra parte.
+
+    RIPROPORRE AZZERA LA CONFERMA, ed e' la riga da non ammorbidire:
+    senza, un venditore sposterebbe la data DOPO che il compratore ha
+    detto sì e si terrebbe il fatto accettato — cioe' esattamente la
+    prova su cui il moderatore poggia. Le proposte si CONTANO (il
+    patto di busta_correzioni): uno stallo per rinvii dev'essere
+    visibile, o si vedrebbe l'ultima data e la si crederebbe l'unica.
+
+    Il tetto lo tiene il giudice puro `appuntamento_ammesso`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        quando = int(d.get("quando") or 0)
+    except (TypeError, ValueError):
+        quando = 0
+    adesso = int(time.time())
+    if not appuntamento_ammesso(quando, adesso, SERVIZIO_MAX_GIORNI):
+        raise HTTPException(400, f"Scegli una data e un'ora nel futuro, "
+                                 f"entro {SERVIZIO_MAX_GIORNI} giorni")
+    con = db()
+    # La guardia di proprieta' sta DENTRO la WHERE col 400 dei
+    # fratelli: chi enumera non impara la differenza fra «non e' tuo»
+    # e «non esiste».
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"] != "servizio":
+        con.close()
+        raise HTTPException(400, "Questo ordine non è un servizio")
+    if o["appuntamento_il"] == quando:
+        # niente da fare: non si conta una proposta che non cambia
+        # niente, e non si azzera una conferma gia' data
+        con.close()
+        return {"ok": True, "quando": quando,
+                "confermato": bool(o["appuntamento_confermato_il"])}
+    primo = not o["appuntamento_il"]
+    con.execute("UPDATE ordini SET appuntamento_il=?, "
+                "appuntamento_proposto_il=?, appuntamento_confermato_il=0, "
+                "appuntamento_proposte=appuntamento_proposte+1, "
+                "appuntamento_mosso_il=?, aggiornato=? WHERE id=?",
+                (quando, adesso, 0 if primo else adesso, adesso, ordine_id))
+    con.commit()
+    con.close()
+    await notifica(o["compratore_id"],
+                   f"📅 <b>{'Appuntamento proposto' if primo else 'Appuntamento spostato'}</b> "
+                   f"per l'ordine #{ordine_id}: "
+                   f"<b>{_quando_appuntamento(quando)}</b>. "
+                   f"Aprilo nella Mini App e confermalo — finché non lo "
+                   f"confermi non parte nessun conto alla rovescia.")
+    return {"ok": True, "quando": quando, "confermato": False}
+
+
+@app.post("/api/orders/{ordine_id}/appuntamento/conferma")
+async def conferma_appuntamento(ordine_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """IL COMPRATORE CONFERMA. Un tocco, e da qui in poi la data e' un
+    fatto accettato da tutti e due — il primo dei due che il
+    moderatore legge in disputa.
+
+    Niente body: non c'e' niente da scegliere, si conferma la data che
+    si ha davanti. Il CAS su `appuntamento_il` e' la protezione dalla
+    corsa vera di questo flusso — il venditore che sposta la data
+    mentre il compratore sta confermando quella di prima: senza,
+    resterebbe confermata una data che nessuno dei due ha piu' in
+    mente. Con lui il compratore prende il 409, rilegge e conferma
+    quella nuova."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"] != "servizio":
+        con.close()
+        raise HTTPException(400, "Questo ordine non è un servizio")
+    if not o["appuntamento_il"]:
+        con.close()
+        raise HTTPException(400, "Il venditore non ha ancora proposto "
+                                 "una data")
+    if o["appuntamento_confermato_il"]:
+        con.close()          # idempotente: confermare due volte non e'
+        return {"ok": True, "quando": o["appuntamento_il"]}   # un errore
+    adesso = int(time.time())
+    fatto = con.execute(
+        "UPDATE ordini SET appuntamento_confermato_il=?, aggiornato=? "
+        "WHERE id=? AND appuntamento_il=? AND appuntamento_confermato_il=0",
+        (adesso, adesso, ordine_id, o["appuntamento_il"])).rowcount
+    con.commit()
+    con.close()
+    if not fatto:
+        raise HTTPException(409, "La data è cambiata mentre confermavi: "
+                                 "riapri l'ordine e guarda quella nuova")
+    await notifica(o["venditore_id"],
+                   f"✅ <b>Appuntamento confermato</b> per l'ordine "
+                   f"#{ordine_id}: <b>{_quando_appuntamento(o['appuntamento_il'])}</b>. "
+                   f"Lascia il collegamento nell'ordine, così chi ha "
+                   f"comprato lo trova senza scrivere a nessuno.")
+    return {"ok": True, "quando": o["appuntamento_il"]}
 
 
 @app.post("/api/orders/{ordine_id}/nota")
