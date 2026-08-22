@@ -1708,6 +1708,72 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invece che vuoto. `prove.py` difende il patto: chiavi ∈ CATEGORIE,
   id unici e kebab, niente «altro», i giudici nei loro casi, il
   dizionario allineato all'albero voce per voce.
+  LA SEZIONE «DA SCOPRIRE» (ago 2026, decisione di Andrea): sotto la
+  striscia delle categorie una fila di card RETTANGOLARI (250x115) che
+  accendono i filtri dell'occasione — oggi due fisse, le offerte a
+  tempo e gli sconti dei negozi; nasceranno per le SPONSORIZZAZIONI, e
+  la preparazione e' tutta qui: il renderer (`renderScoprire`, catalogo
+  client `SCOPRIRE`) mangia una LISTA dove ogni voce dichiara immagine,
+  giudice di vita e tocco — il giorno delle sponsorizzate la lista
+  arrivera' dal server nella busta di prima pagina, e a cambiare sara'
+  la FONTE, non il renderer (tabella, pagamento e coda admin sono un
+  cantiere loro).
+  LA CARD SPARISCE QUANDO LA SUA OCCASIONE NON ESISTE (decisione di
+  Andrea; senza card vive sparisce la sezione INTERA, titolo compreso):
+  il flag e' `occasioni` {lampo, sconto} nella busta di prima pagina,
+  EXISTS sui soli attivi calcolato con LO STESSO `_where_occasioni` del
+  filtro — mai una WHERE ricopiata, o la card promette una vetrina che
+  la spunta poi non da'. Flag GLOBALI come `conteggi` (dentro un
+  reparto il filtro si compone col cat, a vuoto parla l'empty state);
+  chiave assente = server vecchio = sezione spenta, un'assenza non e'
+  una bugia. NIENTE min-height riservata, divergenza VOLUTA da
+  .cat-strip: uno spazio riservato per una sezione che puo' non
+  esserci sarebbe un buco — e niente salto sul percorso vivo, i flag
+  arrivano CON la prima pagina, prima del primo renderGrid. In DEMO
+  giudicano i giudici che poi FILTRANO (lampoAttiva, scontoQui).
+  IL GESTO E' QUELLO DELLA CARD CATEGORIA: tocca per filtrare, ritocca
+  per uscire, anello arancione da accesa (`toccaScoperta` scrive quel
+  che scrive il pannello: stato + checkbox + bottone Filtri +
+  campo-bottone). NON tocca `ordinaVista` (divergenza da vaiAste,
+  deliberata: il pannello non azzera mai la scelta esplicita, e
+  l'eredita' «chi scade prima» parla da sola) e NIENTE cronologia ne'
+  ramoVetrina nuovo: i filtri non sono mai stati in chiaveVetrina, e
+  il ramo resta alle sole Aste.
+  LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 750x345
+  WebP pieno bordo a bordo col TESTO DENTRO il disegno (decisione di
+  Andrea; l'app porta l'aria-label). Cartella SUA e MAI
+  assets/categorie/: ritaglia_categorie.py fa il glob della cartella e
+  un banner full-bleed inquinerebbe la mediana del pareggio. Rotta
+  `/assets/scoprire/{nome}` col calco delle illustrazioni (tupla
+  `FILE_SCOPRIRE`, `_file_con_etag`, `public, no-cache`: i file si
+  ridisegnano sotto lo stesso nome). DA FARE quando Andrea consegna i
+  file: la prova d'esistenza in prove.py, che oggi manca APPOSTA (il
+  precedente di tutto.webp) — fino ad allora il ripiego emoji+testo.
+  IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in due tempi:
+  prima il dondolio alla mascotte della card intera, ROVESCIATO
+  un'ora dopo): il bottone resta FERMO — bersaglio, anello e :active,
+  quindi il tocco su un bersaglio in moto non esiste per costruzione —
+  e ogni immagine ha il SUO movimento, dal soggetto: la SVEGLIA
+  squilla (`sc-squillo`, fremito di rotazione di mezzo secondo ogni
+  quattro, mai un tremolio continuo) e la scatola RESPIRA
+  (`sc-respiro`, zoom lento). IL FONDO NON SI SCOPRE MAI ed e'
+  aritmetica: scale>=1 con l'origine al centro puo' solo ritagliare, e
+  il fremito ruota un'immagine gia' al 7% (1.4° scoprono ~3px, il 7%
+  ne copre 4) — misurato sui pixel al picco di rotazione, non sperato.
+  Le forme sono proposte sulle DESCRIZIONI dei disegni: si ritarano
+  coi file veri.
+  DUE DIFETTI TROVATI DAL VIVO e non leggendo: 1) in DEMO pura la
+  striscia delle CATEGORIE non compariva piu' affatto — il
+  renderChips d'avvio parte con DEMO ancora false, e nel catch della
+  demo non lo richiamava nessuno (regressione della guardia
+  `datiVivi`): una riga nel catch cura tutte e due le strisce; 2) lo
+  spegnimento reduced-motion PERDEVA per specificita' contro
+  `[data-id="lampo"] img` — la sentinella sulla forma diceva che la
+  regola c'era, il giro CDP ha detto che non vinceva mai: ora
+  `[data-id] img` pareggia l'attributo e vince per ordine.
+  MISURE: la sezione pesa ~157px a 320 (misurata), e nei giorni senza
+  occasioni costa zero. A 320 una card quasi piena piu' uno spicchio
+  della seconda, il taglio al bordo dice che ce n'e' altre.
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
   le stesse 27 figure della pagina Sfoglia, nello stesso ordine (per
@@ -15359,7 +15425,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    Google — vedi «I FONT VENGONO IN CASA»),
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
-   calcolata dal catalogo), `/assets/mascotte.jpeg`,
+   calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
+   della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
+   ago 2026), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
