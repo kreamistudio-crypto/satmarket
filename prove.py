@@ -2597,9 +2597,16 @@ def prove_busta_ritiro():
           True, "adesso - r[\"da_quando\"]" in sr)
     prova("il venditore riceve SOLO l'ultimo squillo", True,
           'r["solleciti_punto"] == PROMEMORIA_CONFERMA_MAX - 1' in sr)
+    # Il contatore dei punti non chiude piu' i due MAX (ago 2026: il
+    # settimo e' quello dei servizi), quindi la sentinella non puo'
+    # piu' ancorarsi alla parentesi di chiusura — cerca la sua riga.
     prova("la coda dei fermi impara il sesto contatore", True,
-          "COALESCE(o.solleciti_punto,0)) AS promemoria," in _SORGENTE
-          and "COALESCE(o.sollecito_punto_il,0)) AS promemoria_il,"
+          "COALESCE(o.solleciti_punto,0)" in _SORGENTE
+          and "COALESCE(o.sollecito_punto_il,0)" in _SORGENTE)
+    prova("...e il settimo, quello dei servizi", True,
+          "COALESCE(o.solleciti_appuntamento,0)) AS promemoria,"
+          in _SORGENTE
+          and "COALESCE(o.sollecito_appuntamento_il,0)) AS promemoria_il,"
           in _SORGENTE)
     _mini = open("miniapp.html", encoding="utf-8").read()
     prova("client: la hint dice da quanto, non quanto resta", True,
@@ -2886,6 +2893,9 @@ def prove_busta_ritiro():
         indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
         sollecito_punto_il INT DEFAULT 0, solleciti_punto INT DEFAULT 0,
+        sollecito_appuntamento_il INT DEFAULT 0,
+        solleciti_appuntamento INT DEFAULT 0,
+        appuntamento_il INT DEFAULT 0,
         solleciti_conferma INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
@@ -18301,10 +18311,24 @@ def prove_ordini_fermi():
     # che trasforma un NULL in uno zero, cioe' in una riga che compare
     # in cima invece di sparire
     case = SQL[SQL.index("CASE o.stato"):SQL.index("END AS fermo_da")]
-    prova("ogni ramo dell'ancora e' un COALESCE", 4,
-          len(re.findall(r"(?:WHEN '\w+' THEN|ELSE)\s*COALESCE\(", case)))
+    # 'locked' si e' sdoppiato (ago 2026: il servizio si ancora
+    # all'appuntamento, vedi sotto), quindi i rami col COALESCE in
+    # testa sono 5 e non piu' 4 — il ramo esterno di 'locked' apre un
+    # CASE annidato invece di un COALESCE, e a rispondere sono i suoi
+    # due THEN.
+    prova("ogni ramo dell'ancora e' un COALESCE", 5,
+          len(re.findall(r"(?:WHEN '\w+' THEN|THEN|ELSE)\s*COALESCE\(",
+                         case)))
     prova("l'ancora di 'locked' e' `creato`, mai `aggiornato`", True,
-          "WHEN 'locked' THEN COALESCE(o.creato, 0)" in SQL)
+          "ELSE COALESCE(o.creato, 0) END" in SQL)
+    # ...E IL SERVIZIO SI ANCORA ALL'APPUNTAMENTO, che e' l'unico modo
+    # per non mostrare come «fermo» un ordine che sta solo aspettando
+    # una data. Il ripiego resta `creato`: un servizio senza
+    # appuntamento e' fermo davvero, ed e' il caso piu' importante.
+    prova("...ma il servizio si ancora all'appuntamento", True,
+          "COALESCE(NULLIF(o.appuntamento_il,0), o.creato, 0)" in SQL)
+    prova("...col ripiego su creato per chi una data non ce l'ha", True,
+          "NULLIF(o.appuntamento_il,0), o.creato" in SQL)
     # i terminali stanno fuori, e 'creato' con loro: li' i sats non
     # sono ancora in cassaforte, e se ne occupa controlla_abbandonati
     prova("la porta e' il complemento dei terminali", True,
@@ -18394,6 +18418,9 @@ def prove_ordini_fermi():
           solleciti_incasso INT DEFAULT 0, sollecito_incasso_il INT DEFAULT 0,
           solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0,
           solleciti_punto INT DEFAULT 0, sollecito_punto_il INT DEFAULT 0,
+          solleciti_appuntamento INT DEFAULT 0,
+          sollecito_appuntamento_il INT DEFAULT 0,
+          appuntamento_il INT DEFAULT 0,
           indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
           sbloccato_auto_il INT DEFAULT 0);
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
@@ -18446,6 +18473,13 @@ def prove_ordini_fermi():
     metti(con, 15, 'locked', venditore_id=-9, solleciti_venditore=4,
           sollecito_venditore_il=ORA - 2 * G)
     metti(con, 16, 'locked', consegna_scelta='ritiro', solleciti_ritiro=5)
+    # I SERVIZI (ago 2026): l'ancora e' l'appuntamento, non `creato` —
+    # e il 17 e' l'unica riga di questa coda che SPARISCE apposta.
+    metti(con, 17, 'locked', consegna_scelta='servizio',
+          appuntamento_il=ORA + 45 * G)      # la lezione e' fra 45 giorni
+    metti(con, 18, 'locked', consegna_scelta='servizio',
+          appuntamento_il=ORA - 20 * G)      # ...ed e' passata da 20
+    metti(con, 19, 'locked', consegna_scelta='servizio')  # data mai fissata
     con.execute("INSERT INTO ordine_righe VALUES(1,7,'Miele',2),(2,7,'Cera',1)")
     con.commit()
 
@@ -18467,6 +18501,16 @@ def prove_ordini_fermi():
     for id, stato in ((10, 'released'), (11, 'refunded'),
                       (12, 'annullato'), (13, 'creato')):
         prova(f"'{stato}' resta fuori", False, id in visti)
+    # IL SERVIZIO CHE ASPETTA NON E' FERMO, ed e' la prima riga di
+    # questa coda che si nasconde da sola: senza, ogni lezione
+    # prenotata con un mese d'anticipo comparirebbe al giorno 10
+    # travestita da caso scoperto, e la coda smetterebbe di essere
+    # letta.
+    prova("il servizio con l'appuntamento nel futuro NON c'e'", False,
+          17 in visti)
+    prova("...ma appena la data e' passata torna", True, 18 in visti)
+    prova("...e quello senza data e' fermo davvero, dal giorno uno",
+          True, 19 in visti)
     prova("l'ancora vuota sta in CIMA, non sparisce", 6, visti[0])
     prova("...e il resto e' dal piu' fermo", True,
           [r["fermo_da"] for r in righe] ==
@@ -22083,6 +22127,52 @@ def prove_servizi():
           "accesso_testo" not in dis)
     prova("la nota del servizio arriva davvero al moderatore", True,
           "+ nota_servizio" in _SORGENTE)
+
+    # --- la riga che protegge la regola cardinale
+    sp = cuci(pezzo("segna_spedito"))
+    prova("un servizio non si «spedisce»", True,
+          'o["consegna_scelta"] == "servizio"' in sp)
+    # Senza, il servizio passerebbe tutte le guardie e arriverebbe a
+    # `stato='shipped', spedito_il=?` — e da li' i due rami FISICI
+    # dell'auto-sblocco, che il giorno del rientro lo chiuderebbero
+    # sulla PAROLA DEL VENDITORE.
+    sc = cuci(pezzo("controlla_scadenze"))
+    prova("...e i due rami fisici lo escludono comunque", 2,
+          sc.count("consegna_scelta NOT IN ('digitale','servizio')"))
+
+    # --- il sollecito: il gemello dei ritiri
+    ss = cuci(pezzo("sollecita_servizi_fermi"))
+    prova("il sollecito guarda i servizi in 'locked'", True,
+          "o.stato='locked' AND o.consegna_scelta='servizio'" in ss)
+    # L'ancora e' l'appuntamento e MAI `aggiornato`: deposita_invoice
+    # scrive `aggiornato` proprio su 'locked', quindi il venditore
+    # potrebbe rimandare il proprio promemoria all'infinito
+    # ri-salvando la sua invoice d'incasso — la trappola gia' pagata
+    # tre volte.
+    prova("...ancorato all'appuntamento, col ripiego su creato", True,
+          "COALESCE(NULLIF(o.appuntamento_il,0), o.creato)" in ss)
+    prova("...e MAI ad `aggiornato`", True, "o.aggiornato" not in ss)
+    prova("...con colonne SUE, mai un contatore ereditato", True,
+          "solleciti_appuntamento=solleciti_appuntamento+1" in ss)
+    prova("bussa a ENTRAMBE le parti, come il gemello dei ritiri", True,
+          ss.count("await notifica(r[") == 4)
+    prova("...e al tetto UNA segnalazione ai moderatori, poi silenzio",
+          1, ss.count("notifica_admin("))
+    prova("il sollecito non tocca i sats", True,
+          not any(x in ss for x in ("_sblocca_sats", "_rimborsa_compratore",
+                                    "paga_venditore")))
+    # Il libro mastro: un servizio non ha una spedizione da regalare,
+    # come il ritiro e il codice online. Senza questa riga il
+    # controllo tacerebbe su una riga incoerente — e un allarme che
+    # non puo' suonare e' peggio di nessun allarme.
+    prova("il libro mastro sa che un servizio non spedisce", True,
+          "IN ('ritiro','digitale','servizio')" in _SORGENTE)
+    prova("gira nell'orologio", True,
+          "await sollecita_servizi_fermi()" in _SORGENTE)
+    # LEFT JOIN: un set ha annuncio_id=0 e con l'INNER sparirebbe in
+    # silenzio — la lezione gia' pagata tre volte
+    prova("...col LEFT JOIN, o i set spariscono", True,
+          "LEFT JOIN annunci a ON a.id=o.annuncio_id" in ss)
 
 
 def prove_feedback_confermato():

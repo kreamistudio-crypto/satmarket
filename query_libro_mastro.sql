@@ -205,7 +205,7 @@ SELECT '16c) SPEDIZIONE RISPARMIATA DOVE NON SI SPEDIVA (vuoto)' AS controllo;
 -- un ritiro o un codice online non hanno una tariffa da regalare
 SELECT id, stato, consegna_scelta, sped_gratis_sats
   FROM ordini WHERE sped_gratis_sats > 0
-   AND consegna_scelta IN ('ritiro','digitale');
+   AND consegna_scelta IN ('ritiro','digitale','servizio');
 
 SELECT '16d) ORDINE NASCOSTO SU UNO STATO NON FINALE (vuoto)' AS controllo;
 -- il nascondere (ago 2026) è ammesso solo su released/refunded, gli

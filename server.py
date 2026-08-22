@@ -11101,7 +11101,23 @@ _SQL_FERMI = (
     "    o.indirizzo_atteso, o.indirizzo_il, "
     "    o.venditore_id, o.compratore_id, a.titolo, "
     "    CASE o.stato "
-    "      WHEN 'locked' THEN COALESCE(o.creato, 0) "
+    # IL SERVIZIO NON E' FERMO: STA ASPETTANDO UNA DATA (ago
+    # 2026). Con l'ancora a `creato` una lezione fissata fra 45
+    # giorni comparirebbe qui al decimo, con `promemoria` a zero —
+    # cioe' travestita da «caso scoperto», che e' precisamente cio'
+    # che questa coda esiste per far vedere. Il conto parte
+    # dall'appuntamento, e finche' quello e' nel futuro la riga NON
+    # C'E'.
+    # ⚠️ E' LA PRIMA RIGA DI QUESTA CODA CHE SI NASCONDE DA SOLA, ed
+    # e' il contrario di quel che il commento qui sopra raccomanda
+    # («uno zero fa comparire la riga in CIMA, mai sparire»). E'
+    # giusto — un ordine che aspetta una data non e' fermo — ma
+    # andava scritto, o fra sei mesi sembrera' un bug. Il ripiego
+    # resta `creato`: un servizio senza appuntamento e' fermo
+    # davvero, ed e' anzi il caso piu' importante da vedere.
+    "      WHEN 'locked' THEN CASE WHEN o.consegna_scelta='servizio' "
+    "             THEN COALESCE(NULLIF(o.appuntamento_il,0), o.creato, 0) "
+    "             ELSE COALESCE(o.creato, 0) END "
     "      WHEN 'shipped' THEN COALESCE(NULLIF(o.spedito_il,0), o.creato, 0) "
     "      WHEN 'delivered' THEN COALESCE(NULLIF(o.consegnato,0), "
     "                             NULLIF(o.spedito_il,0), o.creato, 0) "
@@ -11116,13 +11132,15 @@ _SQL_FERMI = (
     "        COALESCE(o.solleciti_conferma,0), "
     "        COALESCE(o.solleciti_incasso,0), "
     "        COALESCE(o.solleciti_busta,0), "
-    "        COALESCE(o.solleciti_punto,0)) AS promemoria, "
+    "        COALESCE(o.solleciti_punto,0), "
+    "        COALESCE(o.solleciti_appuntamento,0)) AS promemoria, "
     "    MAX(COALESCE(o.sollecito_venditore_il,0), "
     "        COALESCE(o.sollecito_ritiro_il,0), "
     "        COALESCE(o.sollecito_conferma_il,0), "
     "        COALESCE(o.sollecito_incasso_il,0), "
     "        COALESCE(o.sollecito_busta_il,0), "
-    "        COALESCE(o.sollecito_punto_il,0)) AS promemoria_il, "
+    "        COALESCE(o.sollecito_punto_il,0), "
+    "        COALESCE(o.sollecito_appuntamento_il,0)) AS promemoria_il, "
     # raggiungibile = la regola di notifica(): Telegram se il tg_id e'
     # positivo, Nostr solo da una chiave del possesso DIMOSTRATO. Un
     # nativo Nostr che ha perso la chiave non lo sente nessuno, e
@@ -18685,6 +18703,24 @@ async def segna_spedito(ordine_id: int, req: Request,
         raise HTTPException(400, "Questo ordine è a consegna digitale: "
                                  "consegna il contenuto dal pannello "
                                  "dedicato dell'ordine")
+    if o["consegna_scelta"] == "servizio":
+        # ⚠️ LA RIGA CHE PROTEGGE LA REGOLA CARDINALE, e senza di lei
+        # il servizio passerebbe tutte le guardie qui sotto (niente
+        # asta, niente indirizzo atteso, niente via punto) e
+        # arriverebbe dritto a `stato='shipped', spedito_il=?`.
+        # Da li' l'ordine entrerebbe nei due rami FISICI di
+        # controlla_scadenze — che oggi non girano, ma il giorno del
+        # rientro col tracking verificato sbloccherebbero una lezione
+        # sulla PAROLA DEL VENDITORE, cioe' esattamente cio' che il
+        # disarmo dell'auto-sblocco ha tolto col pacco mai spedito.
+        # Un servizio non ha niente da spedire e resta in 'locked'
+        # fino alla conferma di chi ha comprato.
+        con.close()
+        raise HTTPException(400, "Questo ordine è un servizio: non c'è "
+                                 "niente da spedire. Lascia il "
+                                 "collegamento nell'ordine; i sats "
+                                 "arrivano quando chi ha comprato "
+                                 "conferma.")
     if not o["consegna_scelta"]:
         # L'ordine nato da un'ASTA aspetta la scelta del vincitore:
         # niente spedizione e nessuna finestra di tutela prima della
@@ -18977,7 +19013,12 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                                      "non può spedire")
     adesso = int(time.time())
     digitale = o["consegna_scelta"] == "digitale"
-    finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale
+    # Il SERVIZIO tiene la finestra CORTA del digitale, e per la
+    # stessa ragione: li' un codice si manda in minuti, qui una data
+    # si propone in minuti. Quel che manca non e' un pacco da
+    # imballare — e' un messaggio.
+    servizio = o["consegna_scelta"] == "servizio"
+    finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale or servizio
                 else SOLLECITO_MANUALE_ORE) * 3600
     if finestra <= 0 or o["creato"] + finestra > adesso:
         con.close()
@@ -19013,12 +19054,17 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     # deve dirlo — non e' cortesia, e' la verita' statistica.
     await notifica(o["venditore_id"],
                    f"👋 <b>Un promemoria gentile per «{titolo}»</b>\n"
-                   + ("Chi ha comprato aspetta ancora il codice."
+                   + ("Chi ha comprato aspetta ancora la data."
+                      if servizio else
+                      "Chi ha comprato aspetta ancora il codice."
                       if digitale else
                       "Chi ha comprato aspetta ancora il pacco.")
                    + " Nessun problema se è stata una giornata storta: "
                      "quando puoi, apri l'ordine nella Mini App e "
-                   + ("<b>consegna il contenuto</b>."
+                   + ("<b>proponi l'appuntamento</b> e lascia il "
+                      "collegamento."
+                      if servizio else
+                      "<b>consegna il contenuto</b>."
                       if digitale else
                       "<b>segna la spedizione</b> col tracciamento.")
                    + " I sats sono già nel deposito di garanzia e "
@@ -25513,11 +25559,19 @@ async def controlla_scadenze():
         # spedito» del venditore, che nessuno verifica.
         scaduti_consegna = [r["id"] for r in con.execute(
             "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
-            "AND consegnato < ? AND consegna_scelta != 'digitale'",
+            "AND consegnato < ? "
+            # il SERVIZIO non entra qui nemmeno il giorno del
+            # rientro: la sua ancora sarebbe `spedito_il`, che un
+            # servizio non ha, ma la cintura si scrive comunque —
+            # e' la riga che protegge la regola cardinale se un
+            # domani qualcuno facesse passare un servizio da
+            # segna_spedito
+            "AND consegna_scelta NOT IN ('digitale','servizio')",
             (adesso - ORE_CONFERMA * 3600,))]
         scaduti_silenzio = [r["id"] for r in con.execute(
             "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
-            "AND spedito_il < ? AND consegna_scelta != 'digitale'",
+            "AND spedito_il < ? "
+            "AND consegna_scelta NOT IN ('digitale','servizio')",
             (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
     # Il digitale ha le SUE finestre, corte: un codice si prova
     # subito, non viaggia in furgone. consegnato = la rivelazione
@@ -25679,6 +25733,100 @@ async def sollecita_ritiri_fermi():
                     f"si muove. Serve un occhio umano.")
         except Exception as e:
             print(f"⚠️ Sollecito ritiro saltato (#{r['id']}): {e}")
+
+
+async def sollecita_servizi_fermi():
+    """IL SERVIZIO CHE NON SI CHIUDE (ago 2026): il gemello di
+    `sollecita_ritiri_fermi`, e lo e' per la ragione che quella
+    docstring dice gia' — «senza dichiarazioni i sats non si muovono
+    MAI da soli: la cura non e' un auto-sblocco (verso chi?), e' il
+    promemoria alle due parti, che ora hanno entrambe una leva».
+    Un servizio e' il ritiro in zona senza il luogo e con una data.
+
+    DUE POPOLAZIONI, e la differenza e' CHI aspetta chi:
+
+    1) l'appuntamento non c'e' ancora — nessuno ha proposto niente, e
+       il conto parte da `creato`. Qui aspetta CHI HA COMPRATO, e a
+       dover agire e' il venditore.
+    2) l'appuntamento e' passato e nessuno ha confermato la ricezione.
+       Qui il conto parte DALL'APPUNTAMENTO, mai da `creato`: prima di
+       quella data non c'e' niente di fermo, e bussare sarebbe
+       chiamare «problema» un'attesa normale.
+
+    L'ancora NON e' mai `aggiornato`, ed e' la trappola gia' pagata
+    tre volte (sollecita_incassi, sollecita_venditori_fermi, la coda
+    dei fermi): `deposita_invoice` scrive `aggiornato` proprio su
+    'locked', quindi il venditore potrebbe rimandare all'infinito il
+    promemoria ri-salvando la propria invoice d'incasso.
+
+    Colonne SUE (`sollecito_appuntamento_il`/`solleciti_appuntamento`):
+    un contatore ereditato salterebbe dritto al tetto. Stesse leve del
+    sollecito incassi, come il gemello; al tetto UNA segnalazione ai
+    moderatori e poi silenzio — il patto dei solleciti."""
+    if SOLLECITO_INCASSO_GIORNI <= 0:
+        return                       # leva a zero = funzione spenta
+    adesso = int(time.time())
+    passo = SOLLECITO_INCASSO_GIORNI * 86400
+    con = db()
+    # LEFT JOIN su annunci: la lezione gia' pagata tre volte — un set
+    # ha annuncio_id=0 e con l'INNER sparirebbe in silenzio.
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.prezzo_sats, "
+        "o.solleciti_appuntamento, o.appuntamento_il, "
+        "o.appuntamento_confermato_il, o.accesso_il, a.titolo "
+        "FROM ordini o LEFT JOIN annunci a ON a.id=o.annuncio_id "
+        "WHERE o.stato='locked' AND o.consegna_scelta='servizio' "
+        "AND o.solleciti_appuntamento <= ? "
+        # la forma POSITIVA sempre: mai un `!=` su consegna_scelta,
+        # o il mondo di ieri rientrerebbe da una porta di servizio
+        "AND MAX(COALESCE(NULLIF(o.appuntamento_il,0), o.creato), "
+        "        o.sollecito_appuntamento_il) < ?",
+        (SOLLECITO_INCASSO_MAX, adesso - passo))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        con.execute("UPDATE ordini SET sollecito_appuntamento_il=?, "
+                    "solleciti_appuntamento=solleciti_appuntamento+1 "
+                    "WHERE id=?", (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        titolo = html.escape((r["titolo"] or "il vostro accordo")[:60])
+        try:
+            if r["solleciti_appuntamento"] >= SOLLECITO_INCASSO_MAX:
+                await notifica_admin(
+                    f"🧊 <b>Servizio fermo:</b> ordine #{r['id']} "
+                    f"(«{titolo}»), <b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
+                    f"cassaforte e nessuna delle due parti si muove. "
+                    f"Serve un occhio umano.")
+            elif not r["appuntamento_il"]:
+                # nessuno ha ancora proposto: la palla e' del venditore
+                await notifica(r["venditore_id"],
+                    f"📅 <b>«{titolo}» aspetta una data.</b> Chi ha "
+                    f"comprato ha già pagato: apri l'ordine nella Mini "
+                    f"App e proponi giorno e ora. Se non riesci più a "
+                    f"farlo, dillo — potrà farsi rimborsare.")
+                await notifica(r["compratore_id"],
+                    f"📅 <b>«{titolo}»: il venditore non ha ancora "
+                    f"proposto una data.</b> Gliel'abbiamo ricordato. I "
+                    f"tuoi sats sono fermi nel deposito di garanzia e "
+                    f"non si muovono da soli; se preferisci non "
+                    f"aspettare, dall'ordine puoi aprire una disputa.")
+            else:
+                # la data e' passata: si chiude confermando
+                await notifica(r["compratore_id"],
+                    f"🎓 <b>«{titolo}» risulta ancora da concludere.</b> "
+                    f"Se la prestazione c'è stata, apri l'ordine e "
+                    f"conferma: i sats vanno al venditore. Se non c'è "
+                    f"stata, dall'ordine puoi aprire una disputa.")
+                await notifica(r["venditore_id"],
+                    f"🎓 <b>«{titolo}» risulta ancora da concludere.</b> "
+                    f"I sats si sbloccano quando chi ha comprato "
+                    f"conferma. Se non si fa vivo lo solleciteremo noi, "
+                    f"e poi guarderà un moderatore.")
+        except Exception as e:
+            print(f"⚠️ Sollecito servizio saltato (#{r['id']}): {e}")
 
 
 async def sollecita_conferme_ferme():
@@ -27716,6 +27864,17 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Solleciti ritiri fermi saltati: {e}")
         try:
+            # accanto al suo gemello dei ritiri, e PRIMA di
+            # sollecita_conferme_ferme per la stessa ragione della
+            # staffetta dei punti: chi ha gia' sentito squillare qui
+            # non deve sentire due campanelli nello stesso battito
+            # (il servizio resta in 'locked', quindi oggi le due
+            # popolazioni non si toccano — ma l'ordine e' la
+            # garanzia, non la coincidenza)
+            await sollecita_servizi_fermi()
+        except Exception as e:
+            print(f"⚠️ Solleciti servizi fermi saltati: {e}")
+        try:
             await sollecita_firme_nostr()
         except Exception as e:
             print(f"⚠️ Solleciti firme Nostr saltati: {e}")
@@ -28391,9 +28550,10 @@ CONTROLLI_LIBRO_MASTRO = (
      "WHERE sped_gratis_sats>0 AND spedizione_sats>0"),
     ("spedizione risparmiata dove non si spediva",
      "nessuna tariffa e' stata offerta, perche' non ce n'era una: un "
-     "ritiro o un codice online non hanno spedizione da regalare",
+     "ritiro, un codice online o un servizio non hanno spedizione "
+     "da regalare",
      "SELECT id FROM ordini WHERE sped_gratis_sats>0 "
-     "AND consegna_scelta IN ('ritiro','digitale')"),
+     "AND consegna_scelta IN ('ritiro','digitale','servizio')"),
     ("pezzi della testata",
      "ordini.quantita non e' la somma dei pezzi delle righe",
      "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
