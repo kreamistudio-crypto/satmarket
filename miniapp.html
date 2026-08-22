@@ -1669,11 +1669,11 @@
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
   nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
-  /* Il quinto posto della barra: uno spaziatore elastico che tiene il
-     tondo del Vendi al centro esatto con quattro voci. Non e' un
-     bottone, quindi nav button non lo pesca: la flex-basis se la
-     prende da qui. */
-  .nav-vuoto{flex:1}
+  /* Lo SPAZIATORE della barra NON ESISTE PIU' (ago 2026, e una
+     sentinella vieta perfino il suo nome, commenti compresi): il
+     quinto posto se l'e' preso il tasto P2P, che da nav button
+     eredita il flex:1 di tutti — il + resta la terza di cinque
+     celle equilarghe senza una regola dedicata. */
   /* Il lockup nella barra: esiste solo da desktop in su */
   .nav-logo{display:none}
 
@@ -3638,9 +3638,8 @@
     .nav-logo:active{transform:translateY(1px)}
     .nav-logo:focus-visible{outline:2px solid var(--sats);outline-offset:3px}
     /* in topbar le voci sono pillole appaiate a destra (flex:0 0 auto)
-       e a spingerle ci pensa il margin-right del logo: uno spaziatore
-       elastico qui romperebbe l'allineamento */
-    .nav-vuoto{display:none}
+       e a spingerle ci pensa il margin-right del logo — anche il P2P,
+       che qui e' una pillola come le sorelle */
     /* la topbar e' alta 60px fissi: 42px ci stanno centrati senza
        toccare nulla (e il margine negativo mobile qui non serve) */
     .nav-logo .brand-jar{width:42px;height:42px;border-radius:13px;margin:0}
@@ -4092,6 +4091,29 @@ document.getElementById('cartello')?.remove();</script>
       <!-- la LENTE della nav, la stessa icona di Esplora: un cuore
            solo per le icone, e l'emoji 🛍️ cambiava forma da un
            telefono all'altro -->
+      <button class="btn orange" onclick="vaiEsplora()">
+        <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
+        Torna al mercatino</button>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: P2P, COMING SOON (ago 2026) ============
+       Il tasto in nav c'e' da subito, la funzione no: si annuncia
+       prima di esistere, il patto del martelletto. Calco esatto di
+       view-astepresto: markup FISSO e nessun dato utente dentro —
+       mai un esc() da ricordare, e vale anche in DEMO e in vetrina
+       anonima. Il TEASER resta VAGO apposta (decisione di Andrea):
+       cosa arriva lo dira' il suo cantiere, e questi testi si
+       riscriveranno allora. Il ₿ nel .big e' il ripiego della
+       mascotte (il meccanismo e' .empty-mascotte + .big), come il
+       🔨 delle aste — in arancio via token, che da glifo di testo
+       erediterebbe il grigio muted dell'.empty. -->
+  <div class="view" id="view-p2ppresto">
+    <div class="empty" style="padding-top:34px">
+      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+      <div class="big" style="color:var(--sats)">₿</div>
+      <b class="empty-title">Qualcosa di nuovo è in arrivo</b>
+      <span>Stiamo preparando qualcosa per i tuoi sats.</span>
       <button class="btn orange" onclick="vaiEsplora()">
         <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
         Torna al mercatino</button>
@@ -5030,19 +5052,14 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <nav>
-    <!-- Quattro voci in CINQUE posti, col + di Vendi al centro esatto.
-         Il quinto e' vuoto apposta: con quattro bottoni soli il Vendi
-         finirebbe al 37,5% invece che a meta'.
-         DALL'AGO 2026 IL POSTO VUOTO STA FRA ESPLORA E VENDI: era la
-         cella di «Sfoglia», che se n'e' andato dalla barra quando le
-         categorie sono diventate card in home — e li' restera' finche'
-         non ci andra' la voce nuova. Gli Ordini restano comunque
-         all'ESTREMA destra, dove il pollice li trova senza guardare.
-         Lo spaziatore e' un <span> e non un bottone spento apposta:
-         non prende tocchi e non parla ai lettori di schermo. Da
-         desktop sparisce e le quattro voci tornano appaiate. Il
-         Profilo vive nel tasto tappo in testata (mobile) e qui in coda
-         solo da desktop -->
+    <!-- Cinque voci in CINQUE posti, col + di Vendi al centro esatto
+         perche' e' la TERZA di cinque celle equilarghe (flex:1).
+         IL POSTO VUOTO NON ESISTE PIU' (ago 2026): era la cella di
+         «Sfoglia», tenuta libera da uno spaziatore «finche' non ci
+         andra' la voce nuova» — la voce e' arrivata, ed e' il P2P.
+         Gli Ordini restano comunque all'ESTREMA destra, dove il
+         pollice li trova senza guardare. Il Profilo vive nel tasto
+         tappo in testata (mobile) e qui in coda solo da desktop -->
     <!-- Il logo TORNA AL MERCATINO (ago 2026): da desktop e' la
          convenzione di ogni sito, e qui la strada c'era gia' —
          `vaiEsplora()`, la stessa del tab, che riporta alla radice
@@ -5067,13 +5084,22 @@ document.getElementById('cartello')?.remove();</script>
          testata, "l'ho messo via" sulle card, "dove sono" qui), la
          lente invece non dice niente altrove: e' libera -->
     <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg></span>Esplora</button>
-    <span class="nav-vuoto" aria-hidden="true"></span>
+    <!-- P2P: la ₿ A TRATTO (ago 2026), nel posto che lo spaziatore
+         teneva libero. Il tasto c'e' da subito e porta al suo «coming
+         soon»: si annuncia prima di esistere, il patto del
+         martelletto a leva spenta. Una ₿ disegnata non esisteva nel
+         progetto (il lockup e' CSS a pseudo-elementi, il resto e'
+         glifo di testo): questa e' NUOVA, con la grammatica delle
+         sorelle — monocromatica, currentColor, inchiostro dentro
+         [2,22] tratto compreso, velo al 12%, fuori squadra di un
+         pelo. -->
+    <button id="nav-p2p" onclick="vaiP2P()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M8 5.6h4.6a3 3 0 0 1 .1 6H8zM8 11.6h5.3a3.25 3.25 0 0 1 0 6.5H8z"/><path d="M8 5.6h4.6a3 3 0 0 1 .1 6H8"/><path d="M8 11.6h5.3a3.25 3.25 0 0 1 0 6.5H8"/><path d="M8 5.6v12.5"/><path d="M10.3 5.6V3.4"/><path d="M13.1 5.6V3.6"/><path d="M10.3 20.6V18.1"/><path d="M13.1 20.4V18.1"/></svg></span>P2P</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
-    <!-- Aste: il MARTELLETTO (ago 2026), nello slot che aspettava
-         proprio lui. Compare SOLO a leva accesa (aggiornaAstaVisibilita
-         lo scambia con lo spaziatore, cosi' il Vendi resta al centro
-         esatto: gli slot sono sempre cinque). Monocromatico come le
-         sorelle: si accende in arancio con currentColor, la
+    <!-- Aste: il MARTELLETTO (ago 2026). Il markup della barra e'
+         STATICO — a leva spenta il tasto resta e porta al suo «coming
+         soon» (vaiAste), mai una cella accesa e spenta a runtime, che
+         era il posto dove il + poteva scentrarsi. Monocromatico come
+         le sorelle: si accende in arancio con currentColor, la
          convenzione della nav non cambia. Inchiostro dentro [2,22],
          la mano di tagliaSVG. -->
     <button id="nav-aste" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
@@ -6608,6 +6634,8 @@ function voceNav(view){
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
   else if (view === 'astepresto') view = 'aste';
+  /* ...e il gemello del P2P accende la sua: stessa ragione */
+  else if (view === 'p2ppresto') view = 'p2p';
   /* Il ramo resta alle sole ASTE: quello di Sfoglia non esiste piu'.
      LA RIGA CHE SI ROVESCIA, col suo motivo — «MA LA NAV MENTIVA»:
      entrando in un reparto si accendeva Esplora su una vetrina
@@ -6655,6 +6683,18 @@ function vaiAste(){
   if (typeof navRiflette === 'function') navRiflette();
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
+
+/* P2P (ago 2026): il tasto c'e', la funzione no — porta SEMPRE al
+   «coming soon», ovunque (anche DEMO e vetrina anonima: markup fisso,
+   la risposta e' una sola). Niente giudice ne' leva APPOSTA: quando
+   lo scambio nascera', il calco della leva e' asteAccese() — due
+   fonti, /api/me e la busta di prima pagina — ma e' di quel cantiere.
+   Radice sorella: si SOSTITUISCE fra i tab e l'indietro passa da
+   Esplora, la convenzione di casa. */
+function vaiP2P(){
+  haptic();
+  go('p2ppresto');
 }
 
 function go(view){
@@ -6817,10 +6857,10 @@ function ripristinaMieiPos(){
    non esiste proprio: delle sue entry nella cronologia di qualcuno si
    occupa navRendiVista, che le fa ricadere su Esplora. */
 const RADICI = new Set(['esplora','vendi','affari','profilo',
-  /* il «coming soon» delle aste: ci si arriva da un tab, quindi e' una
-     radice sorella — si SOSTITUISCE come le altre e l'indietro passa
+  /* i «coming soon» di aste e P2P: ci si arriva da un tab, quindi
+     radici sorelle — si SOSTITUISCE come le altre e l'indietro passa
      da Esplora, mai un gradino che intrappola */
-  'astepresto']);
+  'astepresto','p2ppresto']);
 /* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
    quella del giorno prima): da ogni altra radice l'indietro passa da
    Esplora, e solo da Esplora si esce. E' come si comportano Subito e

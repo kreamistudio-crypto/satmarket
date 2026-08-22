@@ -16849,8 +16849,13 @@ def prove_seo():
     # (prima vista interna, poi morta del tutto: le sole tracce
     # ammesse sono le degradazioni delle entry vecchie)
     i_r = testo_mini.index("const RADICI = ")
+    # la fessura si ancora alla CHIUSURA del Set, non a un numero di
+    # caratteri: con la finestra fissa (era 260) ogni voce aggiunta
+    # spinge la coda fuori vista e la prova diventa CIECA in silenzio
+    # — successo col P2P, che ha allungato il blocco oltre il bordo
+    blocco_radici = testo_mini[i_r:testo_mini.index("]);", i_r) + 3]
     prova("«sfoglia» e' fuori da RADICI", False,
-          "'sfoglia'" in testo_mini[i_r:i_r + 260])
+          "'sfoglia'" in blocco_radici)
     prova("...e la nav non la conosce piu'", False,
           "'sfoglia'" in pezzo_js(
               testo_mini, "function voceNav(view){", "\n}\n"))
@@ -16966,25 +16971,63 @@ def prove_seo():
     prova("la ricerca AI non conosce la categoria", False,
           "cat" in _SORGENTE[_i_cerca:_SORGENTE.index('"""', _i_cerca)])
 
-    # --- 16quater) LA BARRA TORNA A CINQUE CELLE ------------------
-    # Quattro voci e uno spaziatore: e' lui a tenere il + al centro
-    # esatto (misurato: 180,0 su 360). Lo spaziatore ha ripreso il
-    # posto di «Sfoglia», cioe' PRIMA del Vendi — messo altrove il +
-    # scivola, e a occhio non se ne accorge nessuno.
+    # --- 16quater) LA BARRA E' A CINQUE CELLE PIENE ---------------
+    # Cinque voci equilarghe (flex:1): e' questo a tenere il + al
+    # centro esatto (misurato: 180,0 su 360). Dall'ago 2026 lo
+    # spaziatore non esiste piu': il posto di «Sfoglia», PRIMA del
+    # Vendi, se l'e' preso il P2P — messo altrove il + scivola, e a
+    # occhio non se ne accorge nessuno. La regex ammette le CIFRE
+    # negli id apposta: «nav-p2p» col solo [a-z] non verrebbe contato
+    # e «cinque celle» direbbe quattro.
     barra = testo_mini[testo_mini.index("<nav>"):
                        testo_mini.index("</nav>")]
-    celle = [a or b for a, b in _re.findall(
-        r'<(?:button id="(nav-[a-z]+)"|span class="(nav-vuoto)")', barra)]
+    celle = _re.findall(r'<button id="(nav-[a-z0-9]+)"', barra)
     prova("cinque celle in tutto", 5, len(celle))
     prova("...e il + di Vendi e' la terza", "nav-vendi", celle[2])
-    prova("...con lo spaziatore fra Esplora e Vendi", "nav-vuoto", celle[1])
-    # il markup della barra e' STATICO: niente piu' celle accese e
-    # spente a runtime, che era il posto dove il + poteva scentrarsi
-    # secondo lo stato di una leva
-    prova("nessuna cella si accende a runtime", False,
-          "document.querySelector('.nav-vuoto')" in testo_mini)
+    # CAMBIATA DI LATO (ago 2026): qui si chiedeva lo spaziatore
+    # nav-vuoto fra Esplora e Vendi — quel posto l'ha preso la voce
+    # nuova, come il commento della barra prometteva dall'inizio
+    prova("...col P2P fra Esplora e Vendi", "nav-p2p", celle[1])
+    # il markup della barra e' STATICO: niente celle accese e spente
+    # a runtime, che era il posto dove il + poteva scentrarsi secondo
+    # lo stato di una leva — e dello spaziatore non resta NIENTE,
+    # nemmeno una regola CSS orfana (il precedente di .sped-badge:
+    # una regola morta fa credere a chi legge che qualcosa la usi)
+    prova("dello spaziatore non resta niente", 0,
+          testo_mini.count("nav-vuoto"))
     prova("...e il tasto Aste nasce visibile", False,
           '<button id="nav-aste" style="display:none"' in testo_mini)
+
+    # --- 16quinquies) IL TASTO P2P E IL SUO COMING SOON (ago 2026) -
+    # Il tasto c'e', la funzione no: porta SEMPRE alla vista
+    # «Qualcosa di nuovo e' in arrivo» — il patto del martelletto a
+    # leva spenta, ma qui NESSUNA leva: la risposta e' una sola,
+    # ovunque (anche DEMO e vetrina anonima). Radice sorella sul
+    # calco di astepresto.
+    prova("p2ppresto e' una RADICE (ci si arriva da un tab)", True,
+          "'p2ppresto'" in blocco_radici)
+    prova("la nav accende la voce P2P dal coming soon", True,
+          "view === 'p2ppresto') view = 'p2p'" in pezzo_js(
+              testo_mini, "function voceNav(view){", "\n}\n"))
+    _vp = pezzo_js(testo_mini, "function vaiP2P(){", "\n}")
+    prova("vaiP2P porta al coming soon", True,
+          "go('p2ppresto')" in _vp)
+    # nessun giudice e nessuna leva APPOSTA: il giorno che lo scambio
+    # nascera' qui entrera' il calco di asteAccese(), e questa prova
+    # cambiera' lato col suo perche'
+    prova("...senza giudici ne' rami: la risposta e' una sola", False,
+          "if (" in _vp)
+    prova("...e la cella della barra lo chiama", True,
+          '<button id="nav-p2p" onclick="vaiP2P()"' in testo_mini)
+    prova("niente pull-to-refresh: non c'e' nulla da rileggere", True,
+          "p2ppresto" not in testo_mini[
+              testo_mini.index("VISTE_PTR = "):
+              testo_mini.index("VISTE_PTR = ") + 120])
+    # la vista e' markup FISSO senza dati utente (mai un esc() da
+    # ricordare): nella sua fetta nessuna interpolazione puo' entrare
+    _fv = testo_mini.index('id="view-p2ppresto"')
+    prova("la vista P2P e' markup fisso, senza interpolazioni", False,
+          "${" in testo_mini[_fv:testo_mini.index("============", _fv)])
 
     # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
     # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa
@@ -21846,10 +21889,13 @@ def prove_pagina_dati():
               f'"{k}": ' in _SORGENTE)
 
     # --- 3) l'impianto della vista, sul calco della sorella
+    # (la fessura si ancora alla chiusura del Set, non a un numero di
+    # caratteri: la lezione della finestra fissa di 16ter — ogni voce
+    # aggiunta a RADICI spingeva la coda fuori vista)
+    _ir = mini.index("RADICI = ")
     prova("dati: la vista non e' una radice (l'indietro torna indietro)",
-          True, "'privacy'" in mini and "RADICI = " in mini
-          and "'privacy'" not in mini[mini.index("RADICI = "):
-                                      mini.index("RADICI = ") + 200])
+          True, "'privacy'" in mini
+          and "'privacy'" not in mini[_ir:mini.index("]);", _ir) + 3])
     prova("dati: la nav accende Esplora", True,
           "'sicurezza','privacy'" in mini.replace(" ", ""))
     prova("dati: niente pull-to-refresh (non c'e' nulla da rileggere)",
