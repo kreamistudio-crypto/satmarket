@@ -18080,6 +18080,104 @@ async def conferma_appuntamento(ordine_id: int,
     return {"ok": True, "quando": o["appuntamento_il"]}
 
 
+@app.post("/api/orders/{ordine_id}/accesso")
+async def deposita_accesso(ordine_id: int, req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """IL VENDITORE LASCIA IL COLLEGAMENTO dentro l'ordine: il link
+    della videoconferenza, o il punto preciso per chi va di persona.
+    E' il calco della busta di ritiro, e lo e' per la stessa ragione
+    vera — non per somiglianza: chi non ha ne' username Telegram ne'
+    npub non potrebbe darlo in nessun altro modo. E' la QUARTA volta
+    che quel caso bussa (la busta, l'indirizzo di casa, la nota, e
+    adesso questo).
+
+    CIFRATO come la busta, e come lei il moderatore ne vede il SE e il
+    QUANDO, mai il contenuto: `accesso_il` e' il secondo dei due fatti
+    su cui la disputa poggia — «il link era depositato in tempo?» — e
+    le correzioni si contano, perche' un link cambiato a disputa
+    aperta e' esattamente cio' che quel contatore esiste per mostrare.
+
+    Deposito da 'locked' e da 'dispute': il secondo perche' un link
+    sbagliato si corregge SOLO da qui — il moderatore non puo', non lo
+    legge. `accesso_il` resta il PRIMO deposito e non si muove piu':
+    e' un'ancora, e un'ancora che si sposta non e' piu' un fatto.
+
+    Qui non si tocca ne' lo stato ne' l'appuntamento: la macchina
+    dell'escrow non sa che questo campo esiste."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    testo = " ".join(str(d.get("accesso") or "").split())
+    if not testo:
+        raise HTTPException(400, "Scrivi il collegamento (o il punto "
+                                 "preciso dell'incontro)")
+    # 400 esplicito, mai il troncamento silenzioso: un link tagliato
+    # e' un link rotto, ed e' la lezione del PIN della busta.
+    if len(testo) > 1000:
+        raise HTTPException(400, "Il collegamento è troppo lungo "
+                                 "(massimo 1000 caratteri)")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('locked','dispute')",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"] != "servizio":
+        con.close()
+        raise HTTPException(400, "Questo ordine non è un servizio")
+    adesso = int(time.time())
+    primo = not o["accesso_il"]
+    con.execute(
+        "UPDATE ordini SET accesso_testo=?, accesso_il=?, "
+        "accesso_corretto_il=?, accesso_correzioni=accesso_correzioni+? "
+        "WHERE id=?",
+        (_cifra_contenuto(testo), o["accesso_il"] or adesso,
+         0 if primo else adesso, 0 if primo else 1, ordine_id))
+    con.commit()
+    con.close()
+    # STATICA: il collegamento non entra mai nell'HTML di una
+    # notifica — si legge nell'ordine, sotto esc().
+    await notifica(o["compratore_id"],
+                   f"🔗 <b>{'Il collegamento è pronto' if primo else 'Il collegamento è cambiato'}</b> "
+                   f"per l'ordine #{ordine_id}: lo trovi nell'ordine, "
+                   f"nella Mini App.")
+    return {"ok": True, "accesso_il": o["accesso_il"] or adesso}
+
+
+@app.get("/api/orders/{ordine_id}/accesso")
+async def leggi_accesso(ordine_id: int,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Le due PARTI leggono il collegamento. Il moderatore MAI, da
+    nessuna strada: in disputa gli arrivano il SE e il QUANDO, che e'
+    tutto cio' che gli serve per giudicare le condizioni — il patto
+    della busta, parola per parola.
+
+    GET PURO: leggere un link non e' una ricevuta e non muove niente.
+    E' la differenza col contenuto digitale, dove la prima lettura E'
+    la rivelazione: li' il codice letto e' il bene, qui il link aperto
+    non e' la lezione — ed e' la ragione per cui su un servizio non
+    esiste nessuna finestra automatica.
+
+    L'autorizzazione sta PRIMA dell'esistenza: chi non c'entra riceve
+    la stessa risposta di un ordine che non esiste, cosi' chi enumera
+    non impara niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["accesso_il"]:
+        raise HTTPException(404, "Il venditore non ha ancora lasciato "
+                                 "il collegamento")
+    return {"ok": True, "accesso": _decifra_contenuto(o["accesso_testo"]),
+            "accesso_il": o["accesso_il"]}
+
+
 @app.post("/api/orders/{ordine_id}/nota")
 async def indica_nota(ordine_id: int, req: Request,
                       x_tg_init_data: str = Header(""),
@@ -23838,6 +23936,60 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         nota_indirizzo = (
             f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
             f"leggono solo le parti: non è mostrato ai moderatori.")
+    # IL SERVIZIO (ago 2026): la lezione avviene su Meet, fuori — qui
+    # dentro non c'e' NIENTE, e la regola dichiarata all'acquisto e'
+    # che si giudicano le CONDIZIONI, non il fatto. I due fatti sono
+    # l'appuntamento CONFERMATO e il collegamento depositato in tempo:
+    # tutti e due nostri, tutti e due col loro quando. Del
+    # collegamento si dice il SE e il QUANDO, mai il contenuto — il
+    # patto della busta.
+    # E IL TERZO NUMERO E' IL RIPETUTO, che e' la sola difesa vera che
+    # abbiamo: un link morto non lo possiamo aprire per sapere se
+    # funzionava, ma un venditore che accumula dispute su questa via
+    # e' un fatto NOSTRO. Le dispute VINTE contano piu' delle perse —
+    # cinquanta no-show a proprio favore sono il profilo, non la
+    # sfortuna. ATTENZIONE: il ripetuto smaschera il recidivo e NON
+    # l'ondata (chi incassa cinquanta lezioni lo fa prima che la
+    # prima disputa sia decisa): a quella risponde SERVIZIO_MAX_APERTI.
+    nota_servizio = ""
+    if o["consegna_scelta"] == "servizio":
+        if o["appuntamento_confermato_il"]:
+            quando_a = _quando_appuntamento(o["appuntamento_il"])
+            stato_app = f"appuntamento {quando_a}, CONFERMATO dall'acquirente"
+        elif o["appuntamento_il"]:
+            stato_app = (f"appuntamento {_quando_appuntamento(o['appuntamento_il'])}, "
+                         f"MAI confermato dall'acquirente")
+        else:
+            stato_app = "appuntamento MAI proposto dal venditore"
+        np = o["appuntamento_proposte"]
+        if np > 1:
+            stato_app += f" (spostato {np - 1} volt{'a' if np == 2 else 'e'})"
+        if o["accesso_il"]:
+            quando_l = time.strftime("%d/%m/%Y %H:%M",
+                                     time.localtime(o["accesso_il"]))
+            stato_link = f"collegamento lasciato il {quando_l}"
+            nl = o["accesso_correzioni"]
+            if nl:
+                stato_link += (f", poi cambiato {nl} "
+                               f"volt{'a' if nl == 1 else 'e'}")
+        else:
+            stato_link = "collegamento MAI lasciato"
+        vinte = con.execute(
+            "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? "
+            "AND disputata=1 AND stato='released'",
+            (o["venditore_id"],)).fetchone()["n"]
+        perse = con.execute(
+            "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? "
+            "AND disputata=1 AND stato='refunded'",
+            (o["venditore_id"],)).fetchone()["n"]
+        nota_servizio = (
+            f"\n🎓 SERVIZIO: {stato_app}; {stato_link} (il collegamento "
+            f"lo leggono solo le parti: non è mostrato ai moderatori). "
+            f"Regola dichiarata all'acquisto: Barattolo non può sapere "
+            f"se la prestazione c'è stata — si giudica se le CONDIZIONI "
+            f"c'erano."
+            f"\n📊 Dispute di questo venditore: {vinte} decise a suo "
+            f"favore, {perse} a favore di chi ha comprato.")
     # LA NOTA DEL COMPRATORE, e qui la regola SI ROVESCIA: di indirizzo
     # e busta il moderatore vede il SE e il QUANDO, di questa vede anche
     # il COSA — esce da /api/orders come ogni altra colonna, ed e' una
@@ -23858,7 +24010,8 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
                               "decisione." + nota_digitale + nota_punto
-                              + nota_indirizzo + avviso_nota)
+                              + nota_indirizzo + nota_servizio
+                              + avviso_nota)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "
@@ -24299,6 +24452,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # cancellazione e indirizzo_atteso — che servono al client per
         # sapere quale pannello disegnare senza poter sbirciare.
         r.pop("indirizzo", "")
+        # Il collegamento del servizio idem: si legge solo da
+        # /accesso, e solo le due parti. `accesso_il` e le correzioni
+        # ESCONO — sono il SE e il QUANDO, cioe' il secondo dei due
+        # fatti su cui la disputa poggia, e servono al client per
+        # sapere quale pannello disegnare senza poter sbirciare.
+        r.pop("accesso_testo", "")
         # e del documento non esce nemmeno il NOME DEL FILE: e' la
         # maniglia sul disco, e non serve a nessun client — resta il
         # flag, come per il contenuto digitale

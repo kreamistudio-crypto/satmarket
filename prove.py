@@ -22033,6 +22033,57 @@ def prove_servizi():
                   ("_sblocca_sats", "_rimborsa_compratore", "prezzo_sats",
                    "paga_venditore")))
 
+    # --- il collegamento: il calco della busta, col suo patto
+    dep = cuci(pezzo("deposita_accesso"))
+    leg = cuci(pezzo("leggi_accesso"))
+    prova("il collegamento si deposita CIFRATO", True,
+          "_cifra_contenuto(testo)" in dep)
+    # accesso_il e' un'ANCORA: il primo deposito, e non si muove piu'.
+    # Un'ancora che si sposta non e' piu' un fatto — e questo e' il
+    # secondo dei due su cui il moderatore poggia.
+    # ⚠️ Si guarda dentro la TUPLA DELL'UPDATE e non nel corpo: la
+    # stessa espressione vive anche nel `return`, quindi cercarla
+    # larga trovava sempre quella — una sentinella che non poteva
+    # fallire, presa dalla tortura e non dalla rilettura.
+    prova("...e accesso_il resta il PRIMO deposito", True,
+          '(_cifra_contenuto(testo), o["accesso_il"] or adesso,' in dep)
+    prova("...mentre le correzioni si contano", True,
+          "accesso_correzioni=accesso_correzioni+?" in dep)
+    prova("si corregge anche in disputa (il moderatore non puo')", True,
+          "stato IN ('locked','dispute')" in dep)
+    prova("la notifica non porta il collegamento nell'HTML", True,
+          "{testo}" not in dep and "accesso_testo}" not in dep)
+    prova("lo leggono le due PARTI", True,
+          "compratore_id=? OR venditore_id=?" in leg)
+    # Il GET e' PURO: leggere un link non e' una ricevuta. E' la
+    # differenza col contenuto digitale, dove la prima lettura E' la
+    # rivelazione — li' il codice letto e' il bene, qui il link aperto
+    # non e' la lezione.
+    prova("...e la lettura non scrive NIENTE", True,
+          "UPDATE" not in leg and "commit" not in leg)
+    prova("il collegamento non esce mai da /api/orders", True,
+          'r.pop("accesso_testo", "")' in _SORGENTE)
+
+    # --- la nota al moderatore: i due fatti e il ripetuto
+    dis = cuci(pezzo("apri_disputa"))
+    prova("in disputa il moderatore legge lo stato dell'appuntamento",
+          True, "MAI proposto dal venditore" in dis)
+    prova("...e se il compratore l'aveva confermato", True,
+          "CONFERMATO dall'acquirente" in dis)
+    prova("...e se il collegamento c'era, col suo quando", True,
+          "collegamento MAI lasciato" in dis)
+    # Il ripetuto e' la sola difesa vera: il link morto non lo
+    # possiamo aprire, ma le dispute di un venditore sono un fatto
+    # nostro. Le VINTE contano piu' delle perse.
+    prova("...e quante dispute ha gia' VINTO questo venditore", True,
+          "AND disputata=1 AND stato='released'" in dis)
+    prova("...e quante ne ha perse", True,
+          "AND disputata=1 AND stato='refunded'" in dis)
+    prova("ma il contenuto del collegamento NON gli arriva", True,
+          "accesso_testo" not in dis)
+    prova("la nota del servizio arriva davvero al moderatore", True,
+          "+ nota_servizio" in _SORGENTE)
+
 
 def prove_feedback_confermato():
     """IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026): chi ha
