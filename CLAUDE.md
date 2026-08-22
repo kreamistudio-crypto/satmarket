@@ -15050,18 +15050,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   resta «Bitcoin» anche se è una stampa d'arte. La guardia contro lo
   stringere troppo sono i tre casi tematici del collaudo, che devono
   continuare a restare in Bitcoin.
+  E IL TERZO GIRO HA TROVATO L'ALTRO ASSE (ago 2026, dal campo): una
+  consulenza sui wallet bitcoin restava in «Bitcoin» invece di andare
+  in «Lezioni e corsi» — lo stesso pendolo del Sat's Oil rovesciato,
+  il modello guardava il TEMA e ignorava che l'oggetto è una
+  PRESTAZIONE. La regola (decisione di Andrea): LE PRESTAZIONI
+  BATTONO IL TEMA — lezione, corso, consulenza o lavoro su
+  commissione vanno in «Lezioni e corsi» o «Lavoro e servizi»
+  qualunque sia l'argomento; una consulenza su bitcoin è «Lezioni e
+  corsi», un hardware wallet è «Bitcoin». È una voce SUA del prompt e
+  non una clausola di quella su Bitcoin, perché vale per ogni
+  argomento — un corso di cucina non è «Alimenti e bevande» — ed è il
+  gemello lato macchina dell'ortogonalità già decisa per i due
+  reparti («la categoria dice COSA compri, la strada COME arriva»).
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
-  da rilanciare a OGNI ritocco. Dodici casi con l'atteso accanto: i
-  cinque di Andrea (sacca, poster, le DUE magliette — quella qualunque
-  STA in Bitcoin e deve USCIRNE, il caso affilato apposta che
-  impedisce a «tematico» di assorbire troppo — e il NerdMiner che il
-  prompt vecchio indovinava già), i TRE del secondo giro (il Sat's
+  da rilanciare a OGNI ritocco. Quattordici casi con l'atteso accanto:
+  i cinque di Andrea (sacca, poster, le DUE magliette — quella
+  qualunque STA in Bitcoin e deve USCIRNE, il caso affilato apposta
+  che impedisce a «tematico» di assorbire troppo — e il NerdMiner che
+  il prompt vecchio indovinava già), i TRE del secondo giro (il Sat's
   Oil che resta olio, la birra gemella con altre parole — se cade
   solo lei, la cura ha imparato il nome invece della regola — e il
-  Manifesto Hacker che non migra verso Arte) più quattro regressioni
-  (portatile→Informatica, Jade→Bitcoin, l'alimentatore che sorveglia
-  la clausola tenuta, e il NON SO che sopravvive). A differenza del
+  Manifesto Hacker che non migra verso Arte), i DUE del terzo (la
+  consulenza sui wallet che ESCE da Bitcoin verso «Lezioni e corsi»,
+  e il corso di cucina gemello su un ALTRO tema — se cade solo lui,
+  la cura ha imparato «bitcoin» invece della regola delle
+  prestazioni) più quattro regressioni (portatile→Informatica,
+  Jade→Bitcoin, l'alimentatore che sorveglia la clausola tenuta, e il
+  NON SO che sopravvive). A differenza del
   fratello si IMPORTA — ricategorizza.py chiede il config dentro
   main() apposta — quindi usa chiedi() e catalogo() VERI, e le
   sentinelle di prove.py leggono la tabella COME DATO: niente finestra
@@ -15078,11 +15095,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che un giro saltato non si scambi per un giro riuscito. Torturato
   con sei mutazioni, ognuna rossa da sola.
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
-  (`python collaudo_ricategorizza.py`), atteso 12/12: chi lo rilancia
+  (`python collaudo_ricategorizza.py`), atteso 14/14: chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
-  maglietta qualunque, l'alimentatore o l'olio la regola assorbe
-  troppo e va stretta, se cadono i tematici non ha insegnato
-  abbastanza.
+  maglietta qualunque, l'alimentatore, l'olio o la consulenza la
+  regola assorbe troppo e va stretta, se cadono i tematici non ha
+  insegnato abbastanza.
   L'atteso segue il PROMPT, mai il modello. Dopo il giro,
   `ricategorizza.py --rifai` sul VPS è una SCELTA di Andrea, non un
   deploy: rifà le domande anche sui già decisi.
