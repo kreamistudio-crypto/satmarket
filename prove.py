@@ -16321,8 +16321,19 @@ def prove_seo():
     prova("l'emoji segue l'immagine senza niente in mezzo", True,
           _re.search(r'onerror="this\.remove\(\)"\s*><span class="cat-emoji"',
                      fig) is not None)
-    prova("...e la regola che la spegne esiste", True,
-          ".cat-quad img[data-ok] + .cat-emoji{display:none}" in testo_mini)
+    # LA REGOLA GUARDA L'ESISTENZA DELL'IMMAGINE e non piu' il suo
+    # `data-ok` (ago 2026, difetto dal campo): cosi' l'emoji resta
+    # spenta per tutto il caricamento e si accende solo quando
+    # `onerror` toglie l'img — cioe' solo dove la figura non arrivera'
+    # mai. Prima si vedeva un lampo di emoji su ogni card, a ogni
+    # apertura; adesso il quadrato aspetta, come il fondo a strisce
+    # delle card degli annunci.
+    prova("l'emoji aspetta la figura, e non lampeggia", True,
+          ".cat-quad img + .cat-emoji{display:none}" in testo_mini)
+    # (la forma col `data-ok` resta viva in SFOGLIA, dove le figure
+    #  sono gia scaldate: qui si guarda solo la striscia)
+    prova("...e non guarda piu' il data-ok", False,
+          ".cat-quad img[data-ok] + .cat-emoji" in testo_mini)
     # L'ORDINE E' QUELLO DI SFOGLIA E NON UNA SECONDA CLASSIFICA: due
     # ordinamenti sullo stesso catalogo direbbero due mappe diverse a
     # due dita di distanza. E' anche cio' che tiene i chiamanti di
@@ -16373,6 +16384,20 @@ def prove_seo():
     prova("...ed e' renderChips", True,
           "renderStriscia();" in pezzo_js(
               testo_mini, "function renderChips(){", "\n}\n"))
+    # LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO (ago 2026, difetto dal
+    # campo): chiamavano `setCat` diretto, che su una radice
+    # SOSTITUISCE — tre reparti di fila lasciavano la cronologia a
+    # ZERO gradini, e al secondo indietro si usciva dall'app. Adesso
+    # passano da `apriCategoria`, che spinge, e l'indietro ripercorre
+    # i reparti visitati. «Tutto» resta setCat: tornare a una radice
+    # non scava un gradino nuovo (la regola di navRiflette).
+    rc = pezzo_js(testo_mini, "function renderChips(){", "\n}\n")
+    prova("le pillole passano da apriCategoria", True,
+          "apriCategoria(this.dataset.cat)" in rc)
+    prova("...e «Tutto» no, che e' un ritorno", True,
+          "setCat('Tutto')" in rc)
+    prova("...col nome in data-cat, mai dentro l'onclick", True,
+          'data-cat="${esc(c)}"' in rc and "setCat('${c}')" not in rc)
     # LA PORTA ALLO SCAFFALE: una sola, e c'e'. Due occorrenze perche'
     # la card in coda si tocca anche da tastiera (onclick + onkeydown).
     prova("a Sfoglia ci si arriva dalla card in coda", 2,
@@ -16386,27 +16411,51 @@ def prove_seo():
     # In cima il reparto si sceglie dalle CARD e le pillole non
     # esistono; appena la striscia esce di vista si incollano sotto
     # l'header, cosi' la categoria si cambia in qualsiasi momento.
-    prova("le pillole sono uscite dall'header", True,
-          testo_mini.index('id="chips"') > testo_mini.index('class="trust-line"'))
-    # FUORI DALL'HEADER e non e' un gusto: l'header ha backdrop-filter,
-    # che crea un containing block per i discendenti position:fixed —
-    # la barra si posizionerebbe rispetto a lui invece che allo schermo
+    # LE CINQUE PROVE QUI SOTTO HANNO CAMBIATO LATO (ago 2026, dal
+    # campo): la barra era piazzata a mano allo schermo, e bastava un
+    # istante in cui l'header non era ancora al suo posto perche'
+    # restasse un BUCO di 6px in mezzo — misurato con una sonda sulle
+    # scritture: il numero era giusto quando veniva letto e sbagliato
+    # un fotogramma dopo. Adesso e' APPESA all'header e lo segue per
+    # costruzione, quindi il buco non puo' esistere.
     testa = testo_mini[testo_mini.index("<header>"):
                        testo_mini.index("</header>")]
-    # la CLASSE e non l'id: chi rimettesse una fila di pillole li'
-    # dentro con un altro id avrebbe lo stesso il containing block
-    # sbagliato, e la sentinella non se ne accorgerebbe (l'ha detto
-    # la tortura, non la rilettura)
-    prova("...davvero fuori: nell'header non ce n'e' traccia", False,
+    prova("la barra e' appesa DENTRO l'header", True,
           'class="chips"' in testa)
-    prova("...e stanno sotto la sezione delle card", True,
-          testo_mini.index('id="catStrip"') < testo_mini.index('id="chips"'))
-    # nascoste di serie: due elenchi della stessa cosa uno sotto
-    # l'altro erano il difetto che il cantiere e' nato per togliere
-    prova("nascoste finche' le card sono in vista", True,
-          "\n  .chips{display:none;" in testo_mini)
-    prova("...e da appiccicate sono fuori dal flusso", True,
-          ".chips.appiccicate{display:flex;position:fixed;" in testo_mini)
+    # con find() e non index(): se la barra esce dall'header questa
+    # prova dev'essere ROSSA, non esplodere portandosi dietro tutte
+    # quelle dopo (la lezione, alla terza volta)
+    prova("...come ULTIMO figlio, sotto la riga di fiducia", True,
+          0 <= testa.find('class="trust-line"')
+          < testa.find('class="chips"'))
+    prova("...ancorata al suo bordo inferiore", True,
+          "position:absolute;top:100%;left:0;right:0" in testo_mini)
+    # absolute e NON fixed: l'header ha backdrop-filter, che per i
+    # figli fixed fa da containing block — si posizionerebbero
+    # rispetto a lui comunque, ma senza seguirlo quando si stacca
+    prova("...e mai fixed, che li' dentro non seguirebbe niente", False,
+          ".chips{display:flex" in testo_mini
+          and "position:fixed" in testo_mini[
+              testo_mini.index("  .chips{display:flex"):
+              testo_mini.index("  .chips{display:flex") + 400])
+    # SI SPEGNE COL VELO E NON COL `display`: da none a flex non si
+    # transiziona niente, e la barra sbucava di colpo come un errore
+    prova("si spegne col velo, non col display", True,
+          "opacity:0;visibility:hidden;pointer-events:none" in testo_mini)
+    prova("...e la comparsa e' graduale", True,
+          "transition:opacity .18s ease, transform .18s ease" in testo_mini)
+    prova("...con la scivolata spenta da reduced-motion", True,
+          "@media (prefers-reduced-motion:reduce){.chips{transition:none}}"
+          in testo_mini)
+    prova("...e da accesa toglie il velo", True,
+          ".chips.appiccicate{opacity:1;visibility:visible;"
+          "pointer-events:auto;" in testo_mini)
+    # e il posizionamento a mano non deve tornare: con lui tornerebbe
+    # il buco, l'ascoltatore di scroll e la guardia sulla vista
+    prova("nessun `top` scritto a mano", False,
+          "chipsPosizione" in testo_mini or "chipsScroll" in testo_mini)
+    prova("...e nessun ascoltatore di scroll per la barra", False,
+          "addEventListener('scroll', chips" in testo_mini)
     # A DECIDERE E' LA SEZIONE, non una soglia di scroll a numero: col
     # filtro acceso la sezione e' display:none, quindi non interseca e
     # la barra resta accesa — senza le pillole, da un reparto non si
@@ -16416,17 +16465,12 @@ def prove_seo():
           and ".observe(el('catSez'))" in testo_mini)
     prova("...col verso giusto (fuori vista = barra accesa)", True,
           "chipsAppiccicate(!voce.isIntersecting)" in testo_mini)
-    # IL TOP SEGUE L'HEADER: fissato una volta sola, col filtro acceso
-    # la barra compariva mentre si era ancora in cima (header non
-    # «stuck») e scorrendo restava un buco in mezzo. L'ascoltatore
-    # vive solo mentre la barra e' accesa, ed e' passivo.
-    ca = pezzo_js(testo_mini, "function chipsAppiccicate(attive){", "\n}\n")
-    prova("l'ascoltatore si attacca solo con la barra accesa", True,
-          "addEventListener('scroll', chipsScroll, {passive: true})" in ca)
-    prova("...e si stacca quando la barra se ne va", True,
-          "removeEventListener('scroll', chipsScroll)" in ca)
-    prova("...e lavora al piu' una volta per fotogramma", True,
-          "requestAnimationFrame(chipsPosizione)" in testo_mini)
+    # LE TRE PROVE DELL'ASCOLTATORE SONO MORTE COL CODICE CHE
+    # SORVEGLIAVANO: il `top` non si scrive piu' a mano, quindi non
+    # c'e' piu' niente da rincorrere allo scroll. A tenere chiusa
+    # quella strada ci sono le due qui sopra, che ne vietano il
+    # ritorno — e valgono di piu', perche' dicono che il difetto non
+    # puo' ripresentarsi invece di dire che e' curato.
 
     # --- 16ter) SFOGLIA E' UNA VISTA INTERNA ----------------------
     # Senza il suo tab non e' piu' una radice: si SPINGE, e l'indietro
@@ -16452,6 +16496,11 @@ def prove_seo():
     # Senza, il reparto si mangiava la home e l'indietro usciva
     # dall'app: difetto trovato dal vivo, non leggendo.
     ac = pezzo_js(testo_mini, "function apriCategoria(c){", "\n}\n")
+    # RITOCCARE LA CARD ACCESA TORNA A «TUTTO», il gesto del
+    # barattolino in testata — ed e' per questo che nella fila non
+    # esiste nessuna card «Tutto» in piu'.
+    prova("ritoccare il reparto acceso lo spegne", True,
+          "if (c === activeCat) { haptic(); setCat('Tutto'); return; }" in ac)
     prova("la discesa sa da che porta si e' entrati", True,
           "const restiamoQui = el('view-esplora').classList.contains('active');"
           in ac)

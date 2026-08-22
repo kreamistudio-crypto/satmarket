@@ -1635,27 +1635,55 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (tutte e 27, le vuote in fondo). È la stessa divisione che c'era fra
   chips e Sfoglia, portata a un dito di distanza — e adesso le due non
   si vedono mai insieme.
-  LA BARRA STA FUORI DALL'HEADER, e non è una scelta di gusto:
-  l'header ha `backdrop-filter`, che crea un containing block per i
-  discendenti `position:fixed` — lì dentro la barra si posizionerebbe
-  rispetto a LUI invece che allo schermo. Fuori dal flusso, in più, la
-  sua comparsa non sposta di un pixel la vetrina che si sta
-  scorrendo: niente salto e niente compensazione dello scroll (che era
-  l'altra strada, e litiga con lo scorrimento inerziale).
+  LA BARRA È APPESA ALL'HEADER (`position:absolute; top:100%`), e
+  questa riga ROVESCIA quella di due giri prima («sta FUORI, fissata
+  allo schermo»). Il perché di allora era vero — l'header ha
+  `backdrop-filter`, che per i figli `fixed` fa da containing block —
+  ma la cura era peggiore del male: il `top` andava scritto a mano, e
+  bastava un istante in cui l'header non era ancora al suo posto
+  perché restasse un BUCO di 6px in mezzo (difetto dal campo, tornando
+  in vetrina da un annuncio). Misurato con una sonda sulle scritture:
+  al momento del ricalcolo l'header dichiarava 154px e un fotogramma
+  dopo ne misurava 148 — il numero era giusto quando veniva letto e
+  sbagliato subito dopo. ANCORATA non c'è nessun numero da rincorrere:
+  la barra segue l'header per costruzione, quando si stacca in cima e
+  quando torna giù. `absolute` e non `fixed`: dentro l'header un fixed
+  si ancorerebbe a lui comunque (è il containing block), ma senza
+  seguirlo.
+  E SPARISCE CON LA VISTA, che era l'altra metà dello stesso difetto:
+  cambiando pagina `#catSez` si nasconde col suo genitore, quindi per
+  l'osservatore era «fuori vista» e la barra restava ACCESA sopra il
+  dettaglio e sopra il Profilo, fissa in cima allo schermo. Adesso
+  vive dentro l'header di Esplora: quando quella vista se ne va, se ne
+  va anche lei — senza una guardia da ricordare.
+  Fuori dal flusso resta: comparendo non sposta di un pixel la vetrina
+  che si sta scorrendo (niente salto e niente compensazione dello
+  scroll, che era l'altra strada e litiga con lo scorrimento
+  inerziale).
+  SI SPEGNE COL VELO E NON COL `display`: da `none` a `flex` non si
+  transiziona niente, e la barra sbucava di colpo come un errore
+  (difetto dal campo). Ora `opacity` + `visibility` + una scivolata di
+  8px, 180 ms, spenta da `prefers-reduced-motion`.
   A DECIDERE È LA SEZIONE E NON UNA SOGLIA DI SCROLL: un
   IntersectionObserver su `#catSez` — e col filtro acceso quella
   sezione è `display:none`, quindi non interseca niente e la barra
   resta accesa. Non è un caso particolare da ricordare: è la stessa
   domanda che risponde giusto, ed è quel che permette di tornare a
   «Tutto» o di spegnere il barattolo da un reparto.
-  IL `top` SEGUE L'HEADER e non si fissa una volta sola (difetto visto
-  dal vivo): col filtro acceso la barra compare mentre si è ancora in
-  CIMA — l'header non è «stuck» e il suo bordo inferiore è più in
-  basso, in collaudo c'è pure la barra delle identità finte — e
-  scorrendo restava un buco in mezzo, con la vetrina che ci passava.
-  L'ascoltatore di scroll vive SOLO mentre la barra è accesa, è
-  passivo e lavora al più una volta per fotogramma: negli altri
-  momenti non c'è proprio.
+  LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO, e devono comportarsi
+  come le card (ago 2026, difetto dal campo): passano da
+  `apriCategoria`, che SPINGE un gradino. Prima chiamavano `setCat`
+  diretto, che su una radice SOSTITUISCE — misurato: tre reparti di
+  fila lasciavano la cronologia a ZERO gradini, e al secondo indietro
+  si usciva dall'app. Ed è la porta che si usa scorrendo, cioè quasi
+  sempre. «Tutto» resta `setCat`: tornare a una radice non scava un
+  gradino nuovo, ed è già la regola scritta in `navRiflette`.
+  RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (decisione di Andrea): è
+  lo stesso gesto del barattolino in testata — si tocca per filtrare,
+  si ritocca per uscire — ed è per questo che nella fila non esiste
+  nessuna card «Tutto» in più. Anche quel ritorno sostituisce invece
+  di spingere, così l'indietro continua a ripercorrere i reparti
+  VISITATI e non i ripensamenti.
   LA SEZIONE DELLE CARD STA FUORI DALL'HEADER per una ragione sua, ed
   è misurata: l'header a 320px occupa già ~176px su 568 — con le card
   dentro salirebbe a ~280, cioè la vetrina si guarderebbe da una
@@ -1771,9 +1799,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   accende più il tasto Aste né spegne lo spaziatore — due righe che
   muovevano a runtime cose che ormai non cambiano mai erano solo un
   secondo posto dove il ＋ poteva scentrarsi.
-  IN DEMO (file://) le illustrazioni non arrivano e restano le emoji
-  di ripiego: degradazione, non regressione — verificato, le 27 card
-  si leggono lo stesso.
+  L'EMOJI ASPETTA LA FIGURA (ago 2026, difetto dal campo): il
+  selettore che la spegne guarda l'ESISTENZA dell'immagine
+  (`img + .cat-emoji`) e non più il suo `data-ok`, quindi resta spenta
+  per tutto il caricamento e si accende solo quando `onerror` toglie
+  l'img — cioè solo dove la figura non arriverà mai. Prima si vedeva
+  un lampo di emoji su ogni card a ogni apertura; adesso il quadrato
+  aspetta, come il fondo a strisce delle card degli annunci. Verificato
+  campionando ogni 200 ms dall'avvio: zero emoji, sempre.
+  IN DEMO (file://) le illustrazioni non arrivano affatto, `onerror`
+  scatta e restano le emoji: degradazione, non regressione —
+  verificato, le 27 card si leggono lo stesso.
   LA STRISCIA HA UN CHIAMANTE SOLO, `renderChips`, ed è in TESTA e non
   in coda: il ramo del barattolo esce con un `return`, e da lì la
   striscia — che proprio in quel caso deve sparire — non la rifarebbe
@@ -17818,6 +17854,34 @@ di «la riga viene eseguita». Piu' il giro dal vivo via CDP: l'ordine
 per numero, zero emoji sopra le figure arrivate, la card accesa anche
 quando sta in fondo alla fila, il barattolo, il tema scuro e la catena
 dell'indietro. IN PRODUZIONE basta il deploy.
+Quattro difetti della striscia, chiusi (ago 2026, dal campo):
+1) LA CRONOLOGIA NON ANDAVA A RITROSO passando da un reparto
+all'altro — ma solo dalle PILLOLE, che chiamavano `setCat` diretto:
+su una radice quello SOSTITUISCE, quindi tre reparti di fila
+lasciavano zero gradini e al secondo indietro si usciva dall'app.
+Dalle card funzionava gia' (misurato prima di toccare: 0→1→2→3).
+Adesso le pillole passano da `apriCategoria` come le card.
+2) LA BARRA COMPARIVA DI COLPO: si spegneva col `display`, da cui non
+si transiziona niente. Ora e' un velo con la sua scivolata, spenta da
+reduced-motion. 3) IL BUCO DI 6px sotto l'header tornando da un
+annuncio: il `top` era scritto a mano e veniva letto in un istante in
+cui l'header dichiarava 154px invece di 148 (sonda sulle scritture).
+La barra e' ora APPESA all'header in CSS: nessun numero da rincorrere,
+e sparisce con la vista — l'altra meta' dello stesso difetto, che la
+lasciava accesa sopra il dettaglio. 4) IL LAMPO DI EMOJI all'apertura:
+il selettore guardava il `data-ok` invece dell'esistenza
+dell'immagine, ora il quadrato aspetta come il fondo delle card degli
+annunci. Piu' il RITOCCO sulla card accesa che torna a «Tutto», il
+gesto del barattolino (decisione di Andrea).
+Collaudato: 4443 prove verdi (13 nuove, 6 che hanno CAMBIATO LATO e 3
+MORTE col codice che sorvegliavano) e 10 mutazioni, 10 uccise — una
+esplodeva invece di essere rossa e si portava dietro le prove dopo di
+lei, riscritta con find(): e' la terza volta, ed e' sempre la stessa
+lezione. Piu' il giro dal vivo: i tre reparti dalle pillole con
+l'indietro a ritroso, il velo che a 150 ms sta a 0,96 di opacita', il
+buco che passa da 6px a -1 (il bordo dell'header), zero emoji in dieci
+campioni dall'avvio, il ritocco, il desktop e i due temi.
+IN PRODUZIONE basta il deploy.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale

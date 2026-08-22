@@ -575,18 +575,29 @@
      compatte, ma dentro il flusso accanto a un campo (form avvisi)
      invece che assoluta dentro la searchbar */
   .cur-seg.inriga{position:static;transform:none;flex:0 0 auto}
-  /* nascoste finche' le card sono in vista: in cima il reparto si
+  /* Nascoste finche' le card sono in vista: in cima il reparto si
      sceglie da quelle, e due elenchi della stessa cosa uno sotto
-     l'altro erano il difetto che il cantiere e' nato per togliere */
-  .chips{display:none;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
-    padding:8px var(--pad);scrollbar-width:none}
+     l'altro erano il difetto che il cantiere e' nato per togliere.
+     SI SPENGONO COL VELO E NON COL `display`, ed e' quel che permette
+     alla comparsa di essere GRADUALE: da `none` a `flex` non si
+     transiziona niente, e la barra sbucava di colpo come un errore
+     (difetto dal campo). Fuori dal flusso lo sono comunque, quindi
+     invisibili non occupano un pixel. `visibility` accompagna
+     l'opacita' perche' da spenta non prenda tocchi. */
+  .chips{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+    padding:8px var(--pad);scrollbar-width:none;
+    position:absolute;top:100%;left:0;right:0;z-index:19;
+    opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-8px);
+    transition:opacity .18s ease, transform .18s ease, visibility .18s}
   .chips::-webkit-scrollbar{display:none}
+  @media (prefers-reduced-motion:reduce){.chips{transition:none}}
   /* la barra appiccicata: fuori dal flusso, quindi comparendo non
      sposta la vetrina; il `top` lo scrive il JS, che e' l'unico a
      sapere dove finisce l'header (cambia col tema, col desktop e
      con la barra di collaudo). z-index 19: sotto l'header (20),
      sotto la nav e sotto i fogli — non ruba mai un tocco. */
-  .chips.appiccicate{display:flex;position:fixed;left:0;right:0;z-index:19;
+  .chips.appiccicate{opacity:1;visibility:visible;pointer-events:auto;
+    transform:none;
     background:var(--header-bg);backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line)}
   .chip{
@@ -776,7 +787,14 @@
     display:block;object-fit:contain;object-position:50% 50%}
   .cat-quad .cat-emoji{position:absolute;inset:0;display:flex;
     align-items:center;justify-content:center;font-size:30px;line-height:1}
-  .cat-quad img[data-ok] + .cat-emoji{display:none}
+  /* L'EMOJI ASPETTA, come il fondo a strisce delle card degli
+     annunci (ago 2026, difetto dal campo): il selettore guarda
+     l'ESISTENZA dell'immagine e non piu' il suo `data-ok`, quindi
+     resta spenta per tutto il tempo del caricamento e si accende solo
+     quando `onerror` toglie l'img — cioe' solo dove la figura non
+     arrivera' mai. Prima si vedeva un lampo di emoji su ogni card, a
+     ogni apertura. */
+  .cat-quad img + .cat-emoji{display:none}
   /* Il nome sta SOTTO il quadrato e non dentro: a 84px una parola
      lunga sopra il disegno lo schiaccerebbe, e qui la card e' piccola
      apposta. Due righe al massimo, poi i puntini. */
@@ -3641,10 +3659,6 @@
        e a spingerle ci pensa il margin-right del logo: uno spaziatore
        elastico qui romperebbe l'allineamento */
     .nav-vuoto{display:none}
-    /* la barra delle categorie segue la colonna dell'app, come tutto
-       il resto: a tutta larghezza sembrerebbe una barra di sistema */
-    .chips.appiccicate{left:50%;right:auto;transform:translateX(-50%);
-      width:min(100%, 960px);padding-left:var(--pad);padding-right:var(--pad)}
     /* la topbar e' alta 60px fissi: 42px ci stanno centrati senza
        toccare nulla (e il margine negativo mobile qui non serve) */
     .nav-logo .brand-jar{width:42px;height:42px;border-radius:13px;margin:0}
@@ -3841,6 +3855,26 @@ document.getElementById('cartello')?.remove();</script>
            spiega: stesso testo di sempre, col › che dice che si tocca
            (il tour la cerca per classe, e la classe non cambia) -->
       <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
+      <!-- LE PILLOLE COMPAIONO QUANDO LE CARD SE NE VANNO (ago 2026,
+           decisione di Andrea): in cima il reparto si sceglie dalle
+           card, e i nomi qui non si vedono; appena la striscia esce di
+           vista scorrendo, questa barra compare sotto l'header — cosi'
+           la categoria si cambia in qualsiasi momento, senza tornare
+           su.
+           E' ANCORATA ALL'HEADER (`position:absolute; top:100%`) e non
+           piazzata a mano allo schermo: sta APPESA sotto di lui per
+           costruzione, quindi non puo' esistere nessun buco in mezzo —
+           il numero che ce lo metteva veniva letto in un istante in cui
+           l'header misurava ancora 154px invece di 148 (difetto dal
+           campo, trovato con una sonda sulle scritture). Absolute e non
+           fixed perche' l'header ha `backdrop-filter`, che per i figli
+           fixed fa da containing block: si posizionerebbero rispetto a
+           lui comunque, ma senza seguirlo quando si stacca.
+           Fuori dal flusso resta: comparendo non sposta di un pixel la
+           vetrina che si sta scorrendo. E sparisce con la vista, che e'
+           l'altra meta' del difetto: prima restava accesa sopra il
+           dettaglio e sopra il Profilo. -->
+      <div class="chips" id="chips"></div>
     </header>
     <!-- La porta fissa al canale durante il rodaggio: la riempie
          renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
@@ -3873,19 +3907,6 @@ document.getElementById('cartello')?.remove();</script>
       <div class="section-label">Esplora per categorie</div>
       <div class="cat-strip" id="catStrip"></div>
     </div>
-    <!-- LE PILLOLE COMPAIONO QUANDO LE CARD SE NE VANNO (ago 2026,
-         decisione di Andrea): in cima il reparto si sceglie dalle
-         card, e i nomi qui sotto non esistono; appena la striscia
-         esce di vista scorrendo, questa barra si incolla sotto
-         l'header — cosi' la categoria si cambia in qualsiasi
-         momento, senza tornare su.
-         STA FUORI DALL'HEADER, e non e' una scelta di gusto: l'header
-         ha `backdrop-filter`, che crea un containing block per i
-         discendenti `position:fixed` — la barra si posizionerebbe
-         rispetto a lui invece che allo schermo. Fuori dal flusso, in
-         piu', la sua comparsa non sposta di un pixel la vetrina che
-         si sta scorrendo. -->
-    <div class="chips" id="chips"></div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
          euro") resta com'e': questi servono a chi sfoglia.
@@ -7335,8 +7356,21 @@ function renderChips(){
      Sta in TESTA e non in coda: la fila scorre di lato, e una pillola
      accesa in fondo non la vedrebbe nessuno. */
   const scelta = (activeCat!=='Tutto' && !conta[activeCat]) ? [activeCat] : [];
+  /* LE PILLOLE SONO L'ALTRA PORTA DEL REPARTO, e devono comportarsi
+     come le card (ago 2026, difetto dal campo): passano da
+     `apriCategoria`, che SPINGE un gradino — cosi' l'indietro
+     ripercorre i reparti visitati invece di saltare tutti in una volta
+     alla home. Prima chiamavano `setCat` diretto, che su una radice
+     SOSTITUISCE: tre reparti di fila lasciavano la cronologia a zero
+     gradini, e al secondo indietro si usciva dall'app.
+     «Tutto» resta `setCat`, ed e' la regola gia' scritta in
+     navRiflette: tornare a una radice non scava un gradino nuovo.
+     Il nome viaggia in `data-cat` e non piu' dentro la stringa JS
+     dell'onclick — il patto delle card, e un difetto storico in meno. */
   el('chips').innerHTML = ['Tutto',...scelta,...cats].map(c=>
-    `<div class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
+    `<div class="chip ${c===activeCat?'active':''}" data-cat="${esc(c)}"
+       onclick="${c==='Tutto' ? `setCat('Tutto')`
+                              : 'apriCategoria(this.dataset.cat)'}">${esc(c)}</div>`).join('');
 }
 function setCat(c){
   activeCat=c; renderChips(); haptic();
@@ -7572,33 +7606,18 @@ function renderStriscia(){
    serve — senza le pillole, da un reparto non si potrebbe piu'
    tornare a «Tutto» ne' spegnere il barattolo. Non e' un caso
    particolare da ricordare, e' la stessa domanda che risponde giusto.
-   IL `top` SEGUE L'HEADER e non si fissa una volta sola, ed e' un
-   difetto visto dal vivo: col filtro acceso la barra compare mentre
-   si e' ancora in CIMA — l'header non e' «stuck» e il suo bordo
-   inferiore e' piu' in basso (in collaudo c'e' anche la barra delle
-   identita' finte sopra) — e scorrendo restava un buco fra i due, con
-   la vetrina che ci passava in mezzo. L'ascoltatore vive SOLO mentre
-   la barra e' accesa, e' passivo e lavora al piu' una volta per
-   fotogramma: negli altri momenti non c'e' proprio. */
-let chipsSegue = 0;
-function chipsPosizione(){
-  chipsSegue = 0;
-  const c = el('chips'), h = document.querySelector('#view-esplora header');
-  if (c && h) c.style.top = Math.max(0, h.getBoundingClientRect().bottom) + 'px';
-}
-const chipsScroll = () => {
-  if (!chipsSegue) chipsSegue = requestAnimationFrame(chipsPosizione);
-};
+   DOVE STA LA BARRA non lo decide piu' il JS: e' APPESA all'header
+   (`position:absolute; top:100%`), quindi lo segue per costruzione —
+   quando si stacca in cima scorrendo, quando torna giu', e quando
+   sparisce insieme alla vista. Prima il `top` si scriveva a mano, e
+   bastava un istante in cui l'header non era ancora al suo posto
+   perche' restasse un buco di 6px in mezzo: il numero copiato era
+   giusto quando veniva letto e sbagliato un fotogramma dopo.
+   Con lui se ne sono andati l'ascoltatore di scroll e la guardia
+   sulla vista attiva — due cose che esistevano solo per rincorrere
+   quel numero. */
 function chipsAppiccicate(attive){
-  const c = el('chips');
-  if (!c) return;
-  if (attive) {
-    chipsPosizione();
-    addEventListener('scroll', chipsScroll, {passive: true});
-  } else {
-    removeEventListener('scroll', chipsScroll);
-  }
-  c.classList.toggle('appiccicate', attive);
+  el('chips')?.classList.toggle('appiccicate', attive);
 }
 /* Armato una volta sola sulla sezione, che vive in pagina per sempre
    (si nasconde, non si smonta): l'osservatore non va mai riattaccato. */
@@ -7616,6 +7635,16 @@ if (window.IntersectionObserver) {
    DISCESA, non un cambio di tab — l'indietro deve riportare al
    mercatino intero, da qualunque porta si sia entrati. */
 function apriCategoria(c){
+  /* RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (ago 2026, decisione di
+     Andrea): e' lo stesso gesto del barattolino in testata — si tocca
+     per filtrare, si ritocca per uscire — e per questo non esiste
+     nessuna card «Tutto» in piu' nella fila.
+     Il ritorno passa da `setCat` e NON alza la bandierina: tornare al
+     mercatino intero e' un ritorno a una radice, non una discesa, e
+     la regola di navRiflette dice gia' che li' si sostituisce. Cosi'
+     la cronologia non si riempie di gradini che dicono la stessa
+     cosa, e l'indietro continua a ripercorrere i reparti VISITATI. */
+  if (c === activeCat) { haptic(); setCat('Tutto'); return; }
   /* La nav accende ESPLORA: dall'ago 2026 in un reparto si scende
      dalla home (la striscia illustrata) o dallo scaffale, che e' a
      sua volta una vista interna di Esplora — quindi non c'e' piu' un
