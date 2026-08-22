@@ -4213,6 +4213,171 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nelle SELECT di `/api/search` e `/api/listings/miei`. La route
   `GET /negozio/{chi}` serve la solita miniapp.html (no-cache): è il
   link condivisibile barattolo.store/negozio/{username|codice}.
+  IL BANNER DEL NEGOZIO 🖼 (ago 2026): il venditore appende la sua
+  insegna sopra il catalogo — una foto e un link al suo sito. Vive SOLO
+  sulla pagina del suo negozio: NIENTE IN HOME (decisione di Andrea),
+  quella è pubblicità vera e ha un cantiere suo (la preparazione c'è
+  già ed è `renderScoprire`, che «mangia una lista» e aspetta che la
+  fonte diventi il server).
+  È LA PRIMA VOLTA CHE L'APP APRE UN INDIRIZZO SCRITTO DA UN UTENTE
+  DAVANTI A UN ALTRO UTENTE, ed è la riga da cui discende tutto il
+  resto: prima di questo cantiere ogni link esterno lo COSTRUIVAMO noi
+  da valori filtrati (`t.me/{username}`, `njump.me/{npub}`, 17track, le
+  mappe dei punti, il canale del rodaggio), e l'unico non-nostro era
+  l'`auth_url` del bunker NIP-46 — che però è del PROPRIETARIO stesso,
+  e ha già la sua whitelist di schema più il gesto obbligatorio.
+  LO SBLOCCO È IL LIVELLO, `BANNER_LIVELLO = "avviato"` (150 XP e UN
+  affare concluso, decisione di Andrea): con «pratico» — 600 XP e 5
+  affari — oggi non ce l'avrebbe quasi nessuno, la porta non si
+  aprirebbe mai e la funzione nascerebbe morta. MA NON È IL FRENO, ed è
+  la cosa da non dimenticare: a commissione SPESA un livello si compra
+  con due account e un ordine finto (`proposte/roadmap-gamification-
+  aste.md:192-208` lo dichiara già), quindi il livello è un filtro alla
+  CODA e il freno vero è la REVISIONE UMANA. Il giudice esiste lo
+  stesso con una condizione sola (`banner_porta_aperta`), ed è il
+  motivo per cui vale la pena averlo: il giorno che la porta si potrà
+  anticipare pagando, ad allargarsi è QUELLA riga e nessun'altra.
+  `livello_minimo` è obbligatorio e senza default (la lezione di
+  `atteso_sats`), e un id di livello sconosciuto vale PIÙ dell'ultimo
+  gradino e mai zero — fail-closed come `importo_invoice`: una leva
+  scritta a mano e storta deve chiudere la porta, non spalancarla.
+  LA REVISIONE È UMANA E OBBLIGATORIA, e non è una scelta di comodo:
+  `moderazione_ai` manda ad Haiku una STRINGA «TITOLO/DESCRIZIONE» e
+  non una lista di blocchi, quindi un'immagine non ci sta
+  STRUTTURALMENTE; e il prompt dice che «se il testo non c'è non si
+  conclude niente, la risposta è OK» — cioè un banner fatto di immagine
+  e URL uscirebbe OK per costruzione. Un «Assistenza Barattolo, tocca
+  qui» DIPINTO DENTRO la foto è il caso dell'impersonazione in una
+  forma che nessuna moderazione testuale può vedere.
+  IL LINK HA UN GIUDICE SOLO, `link_banner_ammesso(url, vietati, casa)`,
+  puro e girato in CI, e torna `(url, "")` o `("", motivo)` — la forma
+  di `_leggi_verdetto`, perché il rifiuto deve DIRE cosa non va: sei
+  ragioni e un messaggio solo manderebbero a cercare il guasto dalla
+  parte sbagliata. Le regole, ognuna col suo perché: solo `https` (su
+  http non c'è nessuna lettura innocente nel 2026); niente credenziali
+  nell'URL (`https://tizio:x@sito-vero.it`, l'inganno visivo più
+  vecchio che ci sia); host solo ASCII **e niente punycode** —
+  `barattolo.store` scritto con la «a» cirillica è indistinguibile a
+  occhio, e il punycode è la forma CODIFICATA di quello, quindi
+  ammetterlo riaprirebbe la porta che `isascii` ha appena chiuso;
+  niente IP nudi, `localhost` o porte diverse dalla 443; MAI il nostro
+  dominio (letto da `URL_PUBBLICO`, non scritto due volte), che
+  sarebbe un link inutile o uno che sembra ufficiale; e
+  `BANNER_LINK_VIETATI`.
+  QUELLA DEGLI ACCORCIATORI È **LA** RIGA CHE REGGE LA MODERAZIONE: un
+  `bit.ly/xyz` si approva pulito e il giorno dopo punta altrove, quindi
+  il link dev'essere ISPEZIONABILE o non lo si può giudicare affatto.
+  Match sul dominio, sottodomini compresi. NON ci sono le pagine «tutti
+  i miei link» (linktr.ee e simili): quelle una pagina ce l'hanno
+  davvero e sono il modo in cui un venditore piccolo si presenta —
+  vietarle fermerebbe gente onesta, che è l'errore già pagato col
+  «barattolo» vaso di vetro. ⚠️ È una leva-LISTA: va aggiunta a mano al
+  censimento in `prove.py`, o la suite ESPLODE invece di diventare
+  rossa.
+  E CAMBIARE IL LINK — O LA FOTO — RIMANDA IN REVISIONE: senza, si fa
+  approvare un sito pulito e lo si scambia il giorno dopo. Da qui le
+  DUE COPPIE DI CAMPI (`banner_foto`/`banner_link` vivi,
+  `banner_foto_att`/`banner_link_att` in attesa): approvare una
+  modifica non deve spegnere il banner che è già in vetrina —
+  all'approvazione l'attesa diventa viva e il FILE vecchio se ne va
+  (il pattern di `_scrivi_avatar`), al rifiuto si svuota l'attesa e il
+  vivo non si tocca.
+  IL DIFETTO CHE SOLO IL GIRO DAL VIVO HA TROVATO, e vale più della
+  cura: lo stato è UNO ma i campi sono DUE, quindi chiedendo una
+  modifica `banner_stato` torna in 'revisione' mentre le colonne vive
+  sono ancora quelle approvate — e `_banner_pubblico`, guardando il
+  solo 'attivo', **spegneva l'insegna per tutto il tempo dell'attesa**,
+  cioè esattamente il contrario di ciò che le due coppie esistono per
+  garantire. Le prove erano verdi: guardavano le COLONNE del database e
+  non quel che vede chi passa. Adesso il giudice ammette
+  `("attivo", "revisione")` e c'è la prova che ci gira sopra.
+  `rifiutato` ≠ `spento` sono DUE stati apposta: il primo non è mai
+  stato in vetrina, il secondo sì e un moderatore l'ha tolto — sono due
+  frasi diverse da dire a chi aspetta. E un RIFIUTATO non si riapre,
+  dichiarato: la sua attesa è stata buttata col file, quindi non c'è
+  più niente da riaccendere — si richiede.
+  L'USCITA SI CHIEDE, col DOMINIO nella testata del foglio: chi tocca
+  deve sapere dove va, ed è l'unica cosa che rende onesto tutto il
+  resto — un inganno del genere vive sul fatto che chi tocca non
+  guarda. Il banner NON è un `<a href>` ma un `role="button"` che passa
+  da `apriLinkBanner`: così non esiste un href su cui un
+  `target="_blank"` possa scavalcare la conferma, e non c'è nessun URL
+  da scappare dentro un attributo. L'URL vive in `negozioCorrente` e
+  MAI dentro l'onclick (il patto di `linkCanaleTest`), e si esce col
+  pattern di casa — `tg.openLink` dentro Telegram, `window.open` con
+  `noopener` fuori. Il dominio si vede SEMPRE anche sotto il banner:
+  un'insegna che nasconde dove porta è il difetto.
+  LA FOTO è il calco di `_salva_avatar` (`_salva_banner`, `ImageOps.fit`
+  a 1200×400, nome versionato `ban_{negozio}_{ts}.jpg`, sesta forma in
+  `NOME_FOTO`, saltata da `genera_miniature_mancanti` come gli `av_`).
+  RAPPORTO 3:1 e non un'altezza libera: la testata del negozio è già
+  lunga — 226px misurati nel caso minimo, ~618 nel tipico prima della
+  prima card — e a 360px il banner ne aggiunge 109 (misurati 96/109/114
+  a 320/360/375). E NON passa da `_foto_vuota`, ed è la riga da non
+  «uniformare»: quel giudice è nato per la MERCE, dove una foto piatta
+  è una foto rotta, mentre un'insegna che è una tinta unita col logo
+  sopra è grafica legittima — lì il rifiuto direbbe il falso. Da
+  `_e_immagine` invece ci passa (il PDF rinominato `.jpg`).
+  LA MODERAZIONE È UNA GEMELLA E NON UN RIUSO: `avvisa_revisione` e
+  `decidi_revisione` leggono e scrivono `annunci`, e il banner è il
+  PRIMO oggetto moderabile che vive su `utenti` — nessuna guardia
+  esistente lo copre. `avvisa_banner` manda con **sendPhoto** (il
+  moderatore deve VEDERE l'insegna, che è metà di ciò su cui decide;
+  l'altra metà è il dominio) con la tastiera `ban:ok|no:{tg_id}` —
+  niente token in memoria, autorizza `e_admin` sul tocco;
+  `decidi_banner` ha quattro esiti (approva | rifiuta | spegni |
+  riaccendi) con l'UPDATE sempre CONDIZIONATO sullo stato letto, così
+  il secondo moderatore trova il 409. Il motivo si scrive in un CAMPO
+  IN RIGA e mai in un `prompt()` di sistema — quelli nel client non
+  esistono più, e c'è il censimento che lo verifica.
+  DOVE NON ENTRA, e c'è una prova per ognuno: negli **og:image** del
+  negozio (un'anteprima col NOSTRO nome e la pubblicità di un altro
+  sito è l'impersonazione con la nostra faccia sopra: `_seo_negozio`
+  resta su `IMMAGINE_BRAND`), nel **widget** (quel riquadro vive sul
+  sito di un estraneo, e il link di un terzo dentro è una catena che
+  non controlliamo), nel cartello SEO, nella sitemap, sul canale, su
+  Nostr. E i campi GREZZI non escono mai da `/api/negozio`: un banner
+  in revisione o spento non ha nessun motivo di far sapere in giro dove
+  punterebbe.
+  IN FERIE RESTA (le ferie sono di Barattolo, non della sua bottega:
+  gli annunci restano visibili e l'insegna li segue), ma SENZA NESSUN
+  ANNUNCIO ATTIVO non si mostra — ed è la condizione che si dimentica:
+  senza, un account diventa un cartellone a costo zero (pubblichi un
+  annuncio, apri la porta, ritiri l'annuncio, e l'insegna resta lì per
+  sempre). La domanda si fa con `bool(annunci)` e non con una query in
+  più, perché quella è esattamente la pagina 1 degli attivi; e il
+  banner esce SOLO in prima pagina, come gli esauriti e i feedback.
+  IL PAGAMENTO È DICHIARATO E NON COSTRUITO (decisione di Andrea: la
+  tappa 1 è il banner, zero righe di denaro). Il giorno che si farà,
+  quel che si compra è **la PORTA e non il banner** — così nessun
+  rimborso è mai dovuto: la porta resta aperta anche se un banner viene
+  rifiutato o spento, e se ne rifà un altro. E QUEL CANTIERE È IL LIBRO
+  MASTRO, NON LA INVOICE: `crea_invoice_escrow` ha oggi TRE chiamanti
+  (`compra`, `_compra_set`, `punta`) e tutti e tre scrivono subito una
+  riga in `ordini`/`rilanci` — il primo incasso nostro romperebbe il
+  metodo di riconciliazione scritto in questo file («si incrociano gli
+  incassi LNbits coi `payment_hash` noti a `ordini` + `rilanci`; ogni
+  incasso senza riga è un orfano»), e ogni banner pagato sembrerebbe un
+  orfano. Serviranno una tabella `pagamenti`, i tre rami nell'orologio,
+  un controllo nella ronda, il riuso del paySheet sul calco di
+  `inviaPuntata` — e questa voce da aggiornare. NIENTE colonna
+  `banner_sbloccato_il` finché quel cantiere non c'è: non si aggiunge
+  una colonna per una cosa che non esiste (il precedente è
+  `utenti.comune`, inerte).
+  IL RISCHIO DI PRODOTTO RESTA SCRITTO E NON RISOLTO: il banner è il
+  primo posto in cui OSPITIAMO il gesto di portare l'affare fuori
+  dall'escrow, e oggi nessuna regola lo vieta (il prompt non ha una
+  voce sulla disintermediazione). Vietare l'e-commerce è stato valutato
+  e SCARTATO: un moderatore non può sapere cosa vende quel sito né cosa
+  venderà domani, e una regola che non si fa rispettare è peggio di
+  nessuna regola. Se in rodaggio si vedrà usato per disintermediare, la
+  leva è il perimetro del link. La regola che resta è quella già
+  scritta per l'impersonazione: **non deve RIVOLGERSI a chi legge come
+  farebbe la piattaforma**.
+  LEVE: `BANNER_NEGOZIO_ATTIVO` nasce SPENTA nel codice, come
+  `SERVIZI_ATTIVI` e `ASTA_ABILITATA` e per la stessa ragione — apre
+  una superficie di rischio e si accende dal VPS con un gesto, mai per
+  effetto di un deploy — più `BANNER_LIVELLO` e `BANNER_LINK_VIETATI`.
   Login web dal browser: `POST /api/login/telegram` riceve i dati
   firmati dal Login Widget ufficiale e apre una sessione — tabella
   `sessioni` (in DB SOLO l'hash SHA-256 del token), cookie
@@ -18845,6 +19010,45 @@ ripiego ₿ da file://. IN PRODUZIONE basta il deploy: nessuna colonna,
 nessuna leva, nessuna rotta — solo client. DA GUARDARE dal telefono:
 il tocco vero dentro Telegram e nella PWA (il gesto indietro di
 sistema dal coming soon), e la ₿ accesa sullo schermo vero.
+
+Il banner del negozio 🖼 (ago 2026): il venditore appende la sua insegna
+sopra il catalogo — una foto e un link al suo sito — e vive SOLO sulla
+pagina del suo negozio (niente in home: quella è pubblicità vera e ha un
+cantiere suo). Le decisioni di Andrea: lo sblocco è il LIVELLO
+(«avviato», non «pratico», che oggi non ce l'avrebbe quasi nessuno e la
+funzione nascerebbe morta), il link può portare a QUALSIASI sito suo con
+la sola regola già scritta per l'impersonazione, sta sotto il riquadro
+venditore, e in ferie RESTA mentre a vetrina vuota sparisce. **Il
+pagamento che anticipa la porta è dichiarato e non costruito**: questa
+tappa è il banner e basta, zero righe di denaro.
+LA COSA DA SAPERE PRIMA DI TOCCARLO: è la prima volta che l'app apre un
+indirizzo scritto da un utente davanti a un ALTRO utente, e il freno non
+è il livello — a commissione spenta quello si compra con due account —
+ma la REVISIONE UMANA, che è anche l'unica possibile: l'AI di casa legge
+testo, e un banner è un'immagine. Vedi Architettura, «IL BANNER DEL
+NEGOZIO», per il giudice del link riga per riga (accorciatori, omografi,
+punycode, il nostro dominio) e per le due coppie di campi che tengono
+acceso il banner vivo mentre una modifica aspetta.
+Collaudato: 4826 prove verdi (le nuove: il giudice del link su 22 casi,
+la porta col suo fail-closed, `_banner_pubblico` sui suoi, e
+`decidi_banner` girata DAVVERO su sqlite in memoria per tutti e quattro
+gli esiti più il 409 del secondo moderatore) e **29 MUTAZIONI, 29
+uccise, zero sopravvissute** — una per riga sorvegliata, su una copia
+del repo. Più il giro dal vivo col server vero su un database
+usa-e-getta e Chrome via CDP a 320/360/375 nei due temi: rapporto 3:1
+esatto, zero sbordo, il tocco che apre la conferma col dominio in
+testata e NON naviga, i tre casi in cui il banner non esce (pagina 2,
+revisione, vetrina vuota), il caricamento coi suoi sei rifiuti, la coda
+del moderatore, il 409 e il 403. E LÌ È SALTATO FUORI IL DIFETTO che le
+prove non vedevano — chiedendo una modifica il banner già approvato
+spariva dalla vetrina: le colonne erano giuste, la vetrina no.
+IN PRODUZIONE il deploy da solo non cambia niente: le otto colonne
+nascono coi loro default e `BANNER_NEGOZIO_ATTIVO` è SPENTA nel codice.
+Si accende scrivendo la riga nel config del VPS e riavviando — ed è il
+momento da guardare col journal aperto, perché da lì in poi si possono
+aprire link fuori da Barattolo. DA GUARDARE al primo giro: il primo
+banner in coda (che il moderatore veda la foto e il dominio) e il primo
+approvato sulla pagina del negozio.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
