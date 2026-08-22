@@ -7708,6 +7708,28 @@ function renderScoprire(){
       ><span class="sc-titolo" aria-hidden="true">${v.testo}</span>
     </div>`).join('');
 }
+/* LO SCROLL DELL'ACCENSIONE E' UNO SOLO per le due strisce («Da
+   scoprire» e le card categoria): porta `sez` sotto l'header, e a
+   cambiare e' solo il PUNTO D'ARRIVO — la fila stessa per le
+   occasioni, la riga «N oggetti» per i reparti (vedi scorriAlReparto).
+   L'ALTEZZA dell'header e MAI il suo rect.bottom, ed e' misurato:
+   prima dello scroll l'header puo' non essere ancora incollato (la
+   barra del collaudo/web gli sta sopra) e il bottom del momento conta
+   anche quella — 225 contro i 164 veri, cioe' un arrivo 61px troppo
+   corto. Da incollato, top:0, l'altezza E' il bottom.
+   L'addendo delle PILLOLE tiene l'arrivo fuori dalla fascia dove la
+   barra appiccicata vive: se si accende, non copre niente.
+   Scivolata morbida, secca con reduced-motion (tourRidotto e' il
+   giudice di casa di quella preferenza). */
+function scorriSottoHeader(sez){
+  if (!sez) return;
+  const hdr = document.querySelector('#view-esplora header');
+  const sotto = (hdr ? hdr.offsetHeight : 0)
+              + (el('chips') ? el('chips').offsetHeight : 0) + 4;
+  window.scrollTo({
+    top: Math.max(0, scrollY + sez.getBoundingClientRect().top - sotto),
+    behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
 /* Il gesto della card: accende il suo filtro, e IL RITOCCO DELLA CARD
    ACCESA SPEGNE — il gesto del barattolino e della card categoria. E'
    la scorciatoia della STESSA spunta del pannello Filtri, quindi
@@ -7738,31 +7760,15 @@ function toccaScoperta(id){
      NON fino alla griglia: la fila si incolla SOTTO l'header, cosi'
      le card restano in vista con l'anello acceso — il gesto e la sua
      conferma non si separano, e il ritocco per uscire e' ancora li' —
-     e la griglia filtrata compare subito sotto.
-     L'ALTEZZA dell'header e MAI il suo rect.bottom, ed e' misurato:
-     prima dello scroll l'header puo' non essere ancora incollato (la
-     barra del collaudo/web gli sta sopra) e il bottom del momento
-     conta anche quella — 225 contro i 164 veri, cioe' un arrivo 61px
-     troppo corto. Da incollato, top:0, l'altezza E' il bottom.
-     L'addendo delle PILLOLE tiene la fila fuori dalla fascia dove la
-     barra appiccicata vive: di fatto all'arrivo resta in vista un
-     filo della sezione categorie (che tiene l'osservatore
-     intersecante, barra spenta) — e se la barra si accendesse, non
-     coprirebbe comunque le card.
+     e la griglia filtrata compare subito sotto. La meccanica (offset,
+     scivolata, reduced-motion) vive in scorriSottoHeader, condivisa
+     con lo scroll dei reparti: qui cambia solo il punto d'arrivo —
+     di fatto all'arrivo resta in vista un filo della sezione
+     categorie (che tiene l'osservatore intersecante, barra spenta).
      IL RITOCCO CHE SPEGNE NON SCORRE: e' un annulla, si resta dove
-     si e'. Scivolata morbida, secca con reduced-motion (tourRidotto
-     e' il giudice di casa di quella preferenza). Il precedente e'
-     alternaBarattolo col suo scrollTo(0,0): «la griglia e'
-     un'altra». */
-  if (!acceso) {
-    const hdr = document.querySelector('#view-esplora header');
-    const sotto = (hdr ? hdr.offsetHeight : 0)
-                + (el('chips') ? el('chips').offsetHeight : 0) + 4;
-    window.scrollTo({
-      top: Math.max(0, scrollY
-           + el('scoprireSez').getBoundingClientRect().top - sotto),
-      behavior: tourRidotto() ? 'auto' : 'smooth'});
-  }
+     si e'. Il precedente e' alternaBarattolo col suo scrollTo(0,0):
+     «la griglia e' un'altra». */
+  if (!acceso) scorriSottoHeader(el('scoprireSez'));
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
@@ -7796,6 +7802,43 @@ if (window.IntersectionObserver) {
     ([voce]) => chipsAppiccicate(!voce.isIntersecting),
     {threshold: 0}
   ).observe(el('catSez'));
+}
+
+/* AL TOCCO CHE ACCENDE LA PAGINA SCORRE anche qui, come per «Da
+   scoprire» — ma PIU' GIU' (ago 2026, decisione di Andrea): l'arrivo
+   e' la riga «N oggetti» (.strumenti) incollata sotto header e
+   pillole, cosi' in vista c'e' la MERCE e non la striscia. La
+   conferma del gesto non si perde, e MISURATA e' cosi' (CDP a
+   320/360/375): all'arrivo resta in vista la CODA della striscia —
+   il nome del reparto acceso col suo pezzo d'anello, in una fascia
+   di ~55px sotto l'header — quindi l'osservatore interseca ancora e
+   la barra delle pillole resta SPENTA, come per «Da scoprire»; il
+   ritocco e' ancora li', sulla stessa card. Le pillole appiccicate
+   arrivano solo scorrendo oltre. IL RITOCCO CHE SPEGNE NON SCORRE
+   (e' un annulla: passa da tornaATutto, che qui non arriva mai), e
+   non scorre nemmeno chi atterra da un motore (apriCategoriaDaUrl
+   non passa da apriCategoria).
+   IL MOMENTO e' la differenza con «Da scoprire», dove la griglia
+   resta piena e si scorre subito: qui apriCategoria l'ha appena
+   SVUOTATA e la pagina e' troppo corta — lo scroll clamperebbe quasi
+   a zero e il gesto sembrerebbe di nuovo non fare niente. Quindi coi
+   dati vivi si ARMA una bandierina che renderGrid consuma al primo
+   render — quello della categoria appena chiesta — e SOLO con la
+   vista ancora attiva: se nel frattempo si e' aperta una scheda,
+   scorrere sotto i piedi di un'altra pagina sarebbe il danno
+   peggiore, e la bandierina si butta senza scorrere. In DEMO setCat
+   renderizza in SINCRONO prima di arrivare qui (e go() ha gia' fatto
+   il suo scrollTo): si scorre subito.
+   L'ARRIVO vive in una funzione sola, scorriAlReparto, per i suoi
+   DUE chiamanti (il ramo DEMO e il consumo in renderGrid): scritto
+   due volte, il punto d'arrivo e' quello che un giorno diverge. */
+let scrollRepartoInAttesa = false;
+function scorriAlReparto(){
+  scorriSottoHeader(document.querySelector('.strumenti'));
+}
+function armaScrollReparto(){
+  if (DEMO) { scorriAlReparto(); return; }
+  scrollRepartoInAttesa = true;
 }
 
 /* Dalla card (in home o nello scaffale) alla vetrina filtrata. setCat
@@ -7869,6 +7912,9 @@ function apriCategoria(c){
   setCat(c);
   if (!restiamoQui) { navSpingi = true; navGradinoReparto = 0; }
   go('esplora');
+  /* DOPO go(), che chiude con lo scrollTo della vista: prima, lo
+     scroll dell'accensione verrebbe riportato in cima un rigo dopo */
+  armaScrollReparto();
 }
 
 /* Il gradino del reparto si CONSUMA quando lo si e' spinto dalla home
@@ -8059,6 +8105,15 @@ function renderGrid(items){
      un numero solo invece di frugare nel DOM ogni secondo. */
   prossimaLampo = data.reduce((min, l) => lampoAttiva(l)
     ? (min ? Math.min(min, l.lampoFine) : l.lampoFine) : min, 0);
+  /* Lo scroll del reparto armato da armaScrollReparto (coi dati vivi
+     la griglia era appena svuotata e la pagina troppo corta): si
+     consuma al PRIMO render, e SOLO con la vista ancora attiva — se
+     nel frattempo si e' aperta un'altra pagina, la bandierina si
+     butta senza scorrere. Il perche' intero sta sopra apriCategoria. */
+  if (scrollRepartoInAttesa) {
+    scrollRepartoInAttesa = false;
+    if (el('view-esplora').classList.contains('active')) scorriAlReparto();
+  }
 }
 
 /* «👥 54 pionieri»: la gente che è già entrata nel mercatino, sotto il

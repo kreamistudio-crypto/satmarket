@@ -21173,34 +21173,93 @@ def prove_scoprire():
     # AL TOCCO CHE ACCENDE LA PAGINA SCORRE (ago 2026, dal campo: la
     # griglia sta sotto la piega e il gesto sembrava non fare
     # niente) — la fila si incolla sotto l'header, NON fino alla
-    # griglia: le card restano in vista con l'anello.
+    # griglia: le card restano in vista con l'anello. Dall'ago 2026
+    # la meccanica vive nel giudice unico scorriSottoHeader,
+    # condiviso con lo scroll dei reparti: qui resta solo la chiamata
+    # col SUO punto d'arrivo.
     prova("il tocco che accende porta la fila sotto l'header", 1,
-          _ts.count("window.scrollTo"))
+          _ts.count("scorriSottoHeader("))
     # IL RITOCCO NON SCORRE (e' un annulla): lo scroll vive DENTRO il
     # ramo che accende — e PRIMA del ramo DEMO, o la demo resterebbe
     # ferma
     prova("...solo nel ramo che accende, e anche in DEMO",
           (True, True),
-          (_ts.index("if (!acceso) {") < _ts.index("window.scrollTo"),
-           _ts.index("window.scrollTo") < _ts.index("if (DEMO)")))
+          ("if (!acceso) scorriSottoHeader(el('scoprireSez'));" in _ts,
+           0 <= _ts.find("scorriSottoHeader") < _ts.find("if (DEMO)")))
+    # IL GIUDICE UNICO DELLO SCROLL: la meccanica in un posto solo per
+    # le due strisce — a cambiare e' solo il punto d'arrivo.
+    _ss = pezzo_js(mini, "function scorriSottoHeader(sez){", "\n}")
+    prova("lo scroll dell'accensione e' il giudice unico", 1,
+          _ss.count("window.scrollTo"))
     # L'OFFSET CONTA DUE ADDENDI, e il secondo non e' ovvio: a fila
     # incollata la barra delle pillole appiccicate e' ACCESA (la
     # sezione categorie e' fuori vista) e senza il suo addendo
-    # coprirebbe il bordo alto delle card
+    # coprirebbe il bordo alto dell'arrivo
     prova("...e l'offset conta header E pillole appiccicate",
           (True, True),
-          ("#view-esplora header" in _ts,
-           "el('chips') ? el('chips').offsetHeight" in _ts))
+          ("#view-esplora header" in _ss,
+           "el('chips') ? el('chips').offsetHeight" in _ss))
     # L'ALTEZZA dell'header e MAI il suo rect.bottom (misurato: prima
     # dello scroll l'header puo' non essere ancora incollato — la
     # barra del collaudo/web gli sta sopra — e il bottom del momento
     # conta anche quella: 225 contro 164, un arrivo 61px corto)
     prova("...con l'ALTEZZA dell'header, mai il suo bottom",
           (True, False),
-          ("hdr.offsetHeight" in _ts,
-           "hdr.getBoundingClientRect" in _ts))
+          ("hdr.offsetHeight" in _ss,
+           "hdr.getBoundingClientRect" in _ss))
     prova("...con la scivolata secca in reduced-motion", True,
-          "tourRidotto() ? 'auto' : 'smooth'" in _ts)
+          "tourRidotto() ? 'auto' : 'smooth'" in _ss)
+    # LO SCROLL DEL REPARTO (ago 2026, decisione di Andrea): il tocco
+    # su una card categoria scorre come «Da scoprire» ma PIU' GIU' —
+    # l'arrivo e' la riga «N oggetti» (.strumenti), cosi' in vista
+    # c'e' la merce. L'arrivo vive in scorriAlReparto, UN posto per i
+    # suoi due chiamanti: scritto due volte, e' quello che diverge.
+    _sr = pezzo_js(mini, "function scorriAlReparto(){", "\n}")
+    prova("l'arrivo del reparto e' la riga «N oggetti»", True,
+          "scorriSottoHeader(document.querySelector('.strumenti'))"
+          in _sr)
+    prova("...scritto in un posto solo", 1,
+          mini.count("scorriSottoHeader(document.querySelector"))
+    # apriCategoria ARMA dopo go() (che chiude col suo scrollTo della
+    # vista: prima, lo scroll verrebbe riportato in cima un rigo
+    # dopo); il RITOCCO che spegne passa da tornaATutto, che non
+    # arriva mai qui — e non scorre.
+    _ac = pezzo_js(mini, "function apriCategoria(c){", "\n}")
+    # con find() e non index(): una riga tolta deve far ROSSA questa
+    # prova, non farla esplodere portandosi dietro le sorelle (l'ha
+    # detto la tortura: la mutazione 1 si mangiava 19 prove)
+    prova("apriCategoria arma lo scroll dopo go()", True,
+          0 <= _ac.find("go('esplora');") < _ac.find("armaScrollReparto();"))
+    _tt = pezzo_js(mini, "function tornaATutto(){", "\n}")
+    prova("...e il ritocco che spegne resta fermo", (False, False),
+          ("scorri" in _tt, "scrollTo" in _tt))
+    # ...come chi atterra da un motore: apriCategoriaDaUrl non passa
+    # da apriCategoria e non deve guadagnare uno scroll suo
+    _au = pezzo_js(mini, "function apriCategoriaDaUrl(){", "\n}")
+    prova("...e chi atterra da un motore parte dalla cima", False,
+          "scorri" in _au or "armaScroll" in _au)
+    # IL MOMENTO: apriCategoria ha appena SVUOTATO la griglia e la
+    # pagina e' troppo corta (a 320px lo scroll clamperebbe quasi a
+    # zero) — coi dati vivi si arma una bandierina che renderGrid
+    # consuma al primo render; in DEMO setCat ha gia' renderizzato in
+    # sincrono e si scorre subito.
+    _ar = pezzo_js(mini, "function armaScrollReparto(){", "\n}")
+    prova("in DEMO si scorre subito, coi dati vivi si arma",
+          (True, True),
+          ("if (DEMO) { scorriAlReparto(); return; }" in _ar,
+           "scrollRepartoInAttesa = true;" in _ar))
+    # il consumo sta in CODA a renderGrid: bandierina azzerata PRIMA
+    # di scorrere, e MAI uno scroll fuori dalla vista — se nel
+    # frattempo si e' aperta una scheda, scorrere sotto i piedi di
+    # un'altra pagina sarebbe il danno peggiore, e la bandierina si
+    # butta senza scorrere
+    _rg = pezzo_js(mini, "function renderGrid(items){", "\n}")
+    prova("renderGrid consuma la bandierina e azzera prima", True,
+          0 <= _rg.find("scrollRepartoInAttesa = false;")
+          < _rg.find("classList.contains('active')) scorriAlReparto();"))
+    prova("...solo con la vista ancora attiva", True,
+          "if (el('view-esplora').classList.contains('active')) "
+          "scorriAlReparto();" in _rg)
     # IL RAMO DEMO RIDISEGNA LE PILLOLE (ago 2026, trovato col giro
     # CDP di questo cantiere): il renderChips in testa ad avvia()
     # parte con DEMO ancora false, quindi senza questa chiamata nel
