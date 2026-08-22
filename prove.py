@@ -1127,6 +1127,16 @@ def prove_ricategorizza():
     # L'unica clausola del testo vecchio che funzionava, e RESTA.
     prova("...e la clausola sull'elettronica resta", True,
           "elettronica generica" in ric.PROMPT)
+    # IL SECONDO GIRO (ago 2026, dal campo): la regola tematica
+    # assorbiva troppo — tre «Sat's Oil» da Alimenti a Bitcoin per il
+    # «Sat» nel nome, e il «Manifesto Hacker» spinto verso Arte. La
+    # contro-regola e' quella gia' pagata dal prompt della
+    # moderazione: una somiglianza di nome non e' mai un motivo.
+    prova("...e il nome non e' il tema (il secondo giro)", True,
+          "il tema dev'essere L'OGGETTO, non il nome del prodotto"
+          in ric.PROMPT)
+    prova("...e il poster a tema non migra verso Arte", True,
+          "poster cypherpunk resta «Bitcoin»" in ric.PROMPT)
 
 
 # ====================================================================
@@ -1144,7 +1154,8 @@ def prove_collaudo_ricategorizza():
     import ricategorizza as ric
     cat = ric.catalogo()
 
-    prova("i nove casi del piano ci sono", True, len(cr.CASI) >= 9)
+    prova("i dodici casi ci sono (nove del piano + il secondo giro)",
+          True, len(cr.CASI) >= 12)
     prova("ogni «ora sta in» e' una categoria vera del catalogo", [],
           [t for t, _, ora, _, _ in cr.CASI if ora not in cat])
     prova("ogni atteso e' una categoria vera del catalogo", [],
@@ -1164,6 +1175,15 @@ def prove_collaudo_ricategorizza():
     prova("il NON SO ha il suo caso («Altro» che resta «Altro»)", True,
           any(ora == "Altro" and att == "Altro"
               for _, _, ora, att, _ in cr.CASI))
+    # Il secondo giro: l'olio a tema resta olio — il nome non e' il
+    # tema. Ancorata al caso di campo per NOME, non con un any()
+    # generico: la birra gemella lo terrebbe verde anche se qualcuno
+    # riscrivesse l'atteso del Sat's Oil su una categoria vera.
+    prova("il Sat's Oil resta in Alimenti (il caso di campo)", True,
+          any(t.startswith("Sat's Oil")
+              and ora == "Alimenti e bevande"
+              and att == "Alimenti e bevande"
+              for t, _, ora, att, _ in cr.CASI))
     # Il collaudo usa i pezzi VERI: un prompt in due copie e' un
     # prompt che diverge, e una copia di chiedi() pure.
     src = open("collaudo_ricategorizza.py", encoding="utf-8").read()

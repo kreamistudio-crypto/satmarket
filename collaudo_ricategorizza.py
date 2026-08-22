@@ -91,6 +91,30 @@ CASI = [
      "Elettronica", "Bitcoin",
      "quello che il prompt VECCHIO indovinava gia': deve continuare"),
 
+    # --- il secondo giro (ago 2026, dal campo): la regola tematica
+    #     assorbiva TROPPO — tre «Sat's Oil» proposti da Alimenti a
+    #     Bitcoin per il «Sat» nel nome, e il «Manifesto Hacker»
+    #     spinto verso Arte. Da qui la contro-regola: il tema
+    #     dev'essere L'OGGETTO, non il nome del prodotto — la stessa
+    #     lezione gia' pagata dal prompt della moderazione («sat» e'
+    #     la moneta, una somiglianza di nome non e' mai un motivo).
+    ("Sat's Oil 🫒 GENESIS EDITION",
+     "Olio extravergine di oliva, raccolta 2025, bottiglia da 500ml.",
+     "Alimenti e bevande", "Alimenti e bevande",
+     "il caso vero del secondo giro: e' olio, non merce a tema — "
+     "«sat» nel nome non basta a spostare un prodotto d'uso"),
+    ("Birra artigianale 21 Million, IPA da 33cl",
+     "Luppolata, piccolo lotto, etichetta a tema bitcoin.",
+     "Alimenti e bevande", "Alimenti e bevande",
+     "la gemella con altre parole: se cade solo questa, la cura ha "
+     "imparato il nome invece della regola"),
+    ("Manifesto Hacker, stampa 70x100",
+     "The Conscience of a Hacker in serigrafia, edizione limitata.",
+     "Bitcoin", "Bitcoin",
+     "l'altro caso del secondo giro: il poster a tema resta "
+     "«Bitcoin», non migra verso «Arte e artigianato» solo perche' "
+     "e' una stampa"),
+
     # --- le regressioni: il file guarda tutto il prompt, non solo
     #     la cura -----------------------------------------------------
     ("Portatile Dell i5",

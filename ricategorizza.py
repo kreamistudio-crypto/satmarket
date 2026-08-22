@@ -110,12 +110,25 @@ PROMPT = (
     # corretta una premessa parziale, mai inseguito il modello — e a
     # dire se il modello ha capito c'e' collaudo_ricategorizza.py,
     # da rilanciare a OGNI ritocco di questo prompt.
+    # E IL SECONDO GIRO HA TROVATO L'EFFETTO OPPOSTO (ago 2026, dal
+    # campo): le undici sparite, ma tre «Sat's Oil» proposti da
+    # Alimenti a Bitcoin per il «Sat» nel NOME, e il «Manifesto
+    # Hacker» spinto verso Arte perche' e' una stampa. Da qui la
+    # contro-regola (decisione di Andrea): il tema dev'essere
+    # L'OGGETTO, non il nome del prodotto — la stessa lezione gia'
+    # pagata dal prompt della moderazione, dove «sat» e' la MONETA e
+    # una somiglianza di nome non e' mai un motivo.
     "- «Bitcoin» e' un reparto TEMATICO, non un reparto di hardware: "
-    "ci sta tutto cio' che parla di bitcoin — portafogli hardware, "
-    "miner, nodi, libri, poster, magliette, sacche, adesivi. A "
-    "decidere e' il TEMA, non il tipo di oggetto: una maglietta col "
-    "logo bitcoin e' «Bitcoin», una maglietta qualunque e' "
-    "«Abbigliamento». Non ci sta l'elettronica generica.\n"
+    "ci sta tutto cio' che parla di bitcoin e di cultura cypherpunk "
+    "— portafogli hardware, miner, nodi, libri, poster, magliette, "
+    "sacche, adesivi. A decidere e' il TEMA, non il tipo di oggetto: "
+    "una maglietta col logo bitcoin e' «Bitcoin», una maglietta "
+    "qualunque e' «Abbigliamento», e un poster cypherpunk resta "
+    "«Bitcoin» anche se e' una stampa d'arte. MA il tema dev'essere "
+    "L'OGGETTO, non il nome del prodotto: un olio o una birra in "
+    "edizione bitcoin restano «Alimenti e bevande» — «sat» o "
+    "«bitcoin» nel NOME non bastano mai a spostare un prodotto "
+    "d'uso. Non ci sta l'elettronica generica.\n"
     "- «Informatica» e' per computer, portatili, componenti e "
     "periferiche; «Telefonia» per telefoni e accessori; «Elettronica» "
     "resta per il resto.\n"
