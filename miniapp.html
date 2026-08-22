@@ -5870,6 +5870,10 @@ function mapOrder(o){
        STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
        ed e' lo stato che apre il campo nell'ordine */
     puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
+    appuntamentoIl:o.appuntamento_il||0,
+    appuntamentoConfermatoIl:o.appuntamento_confermato_il||0,
+    appuntamentoProposte:o.appuntamento_proposte||0,
+    accessoIl:o.accesso_il||0,
     /* la rete scelta da chi compra ('' = non dichiarata: ordini
        storici, venditore senza reti, o via diversa dal punto) */
     retePunto:o.rete_punto||'', tipoPunto:o.tipo_punto||'',
@@ -15872,11 +15876,29 @@ function openOrder(id){
     const oreRestanti = (digitale && o.consegnato)
       ? Math.max(0, Math.ceil((o.consegnato + TEMPI.confermaDig*3600 - Date.now()/1000)/3600)) : 0;
     const ritiro = o.consegnaScelta==='ritiro';
+    /* IL SERVIZIO (ago 2026): il passo di mezzo racconta
+       l'appuntamento, che e' l'unico fatto che quella strada ha. Tre
+       stati, e il secondo e' quello che conta — «proposto» non e'
+       «concordato», e il moderatore su quella differenza ci decide. */
+    const servizio = o.consegnaScelta==='servizio';
     steps = [
       passoDeposito,
       /* vedi «I TESTI PARLANO A CHI LEGGE» nel ramo della disputa: qui
          a essere nominato e' il VENDITORE, quindi si gira a lui */
-      digitale
+      servizio
+        ? {t: o.appuntamentoConfermatoIl ? 'Appuntamento concordato'
+             : o.appuntamentoIl ? 'Appuntamento proposto'
+             : 'Appuntamento da fissare',
+           d: o.appuntamentoConfermatoIl
+               ? esc(dataAppuntamento(o.appuntamentoIl))
+               : o.appuntamentoIl
+               ? (o.role==='seller'
+                   ? 'Aspetti la conferma di chi ha comprato'
+                   : 'Confermalo, o per noi la data non è concordata')
+               : (o.role==='seller'
+                   ? 'Proponi tu giorno e ora'
+                   : 'Il venditore deve ancora proporre giorno e ora')}
+        : digitale
         ? {t:'Contenuto consegnato',d:o.role==='seller'
             ? (o.contenutoPresente?'Hai consegnato il contenuto in piattaforma':'Consegni il contenuto qui in piattaforma')
             : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma')}
@@ -16116,7 +16138,7 @@ function openOrder(id){
           <h4>🤝 Consegna in zona</h4>
           <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì l'acquirente conferma la ricezione, e se tace lo sollecitiamo noi.</div>
           <button class="btn orange" onclick="markConsegnaMano()">🤝 Ho consegnato l'oggetto a mano</button>
-        </div>` : `
+        </div>` : o.consegnaScelta==='servizio' ? pannelloServizioVenditore(o) : `
         <div class="payout">
           <h4>📦 Spedisci ${o.righe.length ? 'il set (un pacco solo)' : 'l\'oggetto'}</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
@@ -16160,6 +16182,7 @@ function openOrder(id){
       ${pannelloNota(o)}
       ${pannelloIndirizzoCasa(o)}
       ${pannelloBustaRitiro(o)}
+      ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
@@ -16179,7 +16202,7 @@ function openOrder(id){
             e taceva il costo. Sul DIGITALE 'delivered' resta vivo: la'
             lo scrive la rivelazione del codice, che e' una ricevuta
             vera, e i due bottoni qui sotto lo servono ancora. */''}
-      ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
             raccontava uno solo: «Hai confermato… per te e' tutto
             fatto!», che a chi l'affare l'ha chiuso un TIMER dice
@@ -19453,6 +19476,144 @@ let bustaDocVisto = {};
    cosi' l'anello parte al gesto e non a ogni ridisegno */
 let bustaSvelata = 0;
 
+/* ---- IL SERVIZIO: l'appuntamento e il collegamento (ago 2026) ----
+   Il venditore PROPONE la data, il compratore la CONFERMA, e finche'
+   non l'ha confermata non parte nessuna finestra. La conferma non e'
+   cerimonia: e' cio' che trasforma la data detta da uno in un fatto
+   accettato da ENTRAMBI — il primo dei due su cui il moderatore
+   poggia quando deve giudicare le CONDIZIONI. */
+function dataAppuntamento(ts){
+  if (!ts) return '';
+  /* la resa e' LOCALE al telefono di chi guarda, ed e' l'unico posto
+     dove l'ora si puo' dire giusta a tutti: il server la scrive in
+     ora sua, e su una lezione l'ora E' il prodotto */
+  return new Date(ts * 1000).toLocaleString('it-IT',
+    {weekday:'long', day:'numeric', month:'long',
+     hour:'2-digit', minute:'2-digit'});
+}
+function pannelloServizioVenditore(o){
+  const quando = o.appuntamentoIl, conf = o.appuntamentoConfermatoIl;
+  const testoData = !quando
+    ? `<div class="hint">I sats sono al sicuro in cassaforte. Proponi giorno e ora: chi ha comprato conferma con un tocco, e da lì siete d'accordo tutti e due.</div>`
+    : conf
+    ? `<div class="hint">✅ <b>${esc(dataAppuntamento(quando))}</b> — confermato da chi ha comprato. Se serve puoi ancora spostarlo, ma dovrà confermare di nuovo.</div>`
+    : `<div class="hint">📅 Hai proposto <b>${esc(dataAppuntamento(quando))}</b>, e stiamo aspettando la conferma. Se non arriva puoi proporne un'altra.</div>`;
+  const testoLink = o.accessoIl
+    ? `<div class="hint">✅ Lasciato il ${esc(dataAppuntamento(o.accessoIl))}. Lo vede solo chi ha comprato — i moderatori no. Puoi ancora cambiarlo.</div>`
+    : `<div class="hint">Lascia qui il link della videoconferenza (o il punto preciso, se vi vedete di persona): chi ha comprato lo trova nell'ordine, senza doverti scrivere.</div>`;
+  return `
+        <div class="payout">
+          <h4>🎓 L'appuntamento</h4>
+          ${testoData}
+          <input id="servQuando" type="datetime-local">
+          <button class="btn orange" onclick="proponiAppuntamento(this)">📅 ${quando ? 'Proponi un&#39;altra data' : 'Proponi la data'}</button>
+          <div style="margin-top:14px"></div>
+          <h4>🔗 Il collegamento</h4>
+          ${testoLink}
+          <input id="servAccesso" maxlength="1000" placeholder="Es. https://meet.example.com/abc-defg-hij">
+          <button class="btn ghost" onclick="depositaAccesso(this)">🔗 ${o.accessoIl ? 'Cambia il collegamento' : 'Lascia il collegamento'}</button>
+        </div>`;
+}
+/* Il lato di chi ha comprato: conferma la data, e legge il
+   collegamento quando c'e'. La lettura e' PURA — aprire un link non
+   e' una ricevuta, ed e' la differenza col codice digitale, dove la
+   prima lettura E' la rivelazione. */
+function pannelloServizioCompratore(o){
+  if (o.consegnaScelta !== 'servizio' || o.role !== 'buyer') return '';
+  if (!['locked','dispute'].includes(o.state)) return '';
+  const quando = o.appuntamentoIl, conf = o.appuntamentoConfermatoIl;
+  const testoData = !quando
+    ? `<div class="hint">Il venditore non ha ancora proposto una data. Gliel'abbiamo ricordato: i tuoi sats restano fermi nel deposito di garanzia e non si muovono da soli.</div>`
+    : conf
+    ? `<div class="hint">✅ <b>${esc(dataAppuntamento(quando))}</b> — confermato. Quando la prestazione c'è stata, conferma qui sotto e i sats vanno al venditore.</div>`
+    : `<div class="hint">📅 Il venditore propone <b>${esc(dataAppuntamento(quando))}</b>. Se ti va bene confermalo: finché non lo fai, per noi la data non è concordata.</div>
+      <button class="btn orange" onclick="confermaAppuntamento(this)">✅ Confermo, ci sono</button>`;
+  const testoLink = o.accessoIl
+    ? `<div style="margin-top:10px"></div>
+      <div class="hint">🔗 Il venditore ha lasciato il collegamento.</div>
+      <div id="servAccessoTesto"></div>
+      <button class="btn ghost" onclick="mostraAccesso(this)">🔗 Mostra il collegamento</button>`
+    : quando
+    ? `<div style="margin-top:10px"></div>
+      <div class="hint">⏳ Il collegamento non c'è ancora: lo lascia il venditore, e lo trovi qui.</div>`
+    : '';
+  return `
+    <div class="payout">
+      <h4>🎓 L'appuntamento</h4>
+      ${testoData}
+      ${testoLink}
+    </div>`;
+}
+async function proponiAppuntamento(btn){
+  const v = el('servQuando')?.value;
+  if (!v) { toast('Scegli giorno e ora'); return; }
+  const quando = Math.floor(new Date(v).getTime() / 1000);
+  /* il velo IMMEDIATO, ma col suo testo: qui non si muove un sat —
+     si protegge `appuntamento_proposte`, che il moderatore legge in
+     disputa, dal doppio tocco su rete lenta */
+  const fine = bottoneInAttesa(btn, 'Invio la proposta…');
+  try {
+    const r = await fetch(`${API}/orders/${currentOrder.id}/appuntamento`, {
+      method:'POST', headers:{'Content-Type':'application/json',
+        'X-Tg-Init-Data':authHdr()}, credentials:'include',
+      body: JSON.stringify({quando})});
+    const d = await r.json();
+    if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    toast('📅 Proposta inviata');
+    openOrder(currentOrder.id);
+  } catch(e) { toast('Non è andata, riprova'); }
+  finally { fine(); }
+}
+async function confermaAppuntamento(btn){
+  const fine = bottoneInAttesa(btn, 'Confermo…');
+  try {
+    const r = await fetch(
+      `${API}/orders/${currentOrder.id}/appuntamento/conferma`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()},
+       credentials:'include'});
+    const d = await r.json();
+    if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    toast('✅ Appuntamento confermato');
+    openOrder(currentOrder.id);
+  } catch(e) { toast('Non è andata, riprova'); }
+  finally { fine(); }
+}
+async function depositaAccesso(btn){
+  const v = (el('servAccesso')?.value || '').trim();
+  if (!v) { toast('Scrivi il collegamento'); return; }
+  /* come sopra: a rischiare il doppio conteggio e'
+     `accesso_correzioni`, non i sats */
+  const fine = bottoneInAttesa(btn, 'Salvo il collegamento…');
+  try {
+    const r = await fetch(`${API}/orders/${currentOrder.id}/accesso`, {
+      method:'POST', headers:{'Content-Type':'application/json',
+        'X-Tg-Init-Data':authHdr()}, credentials:'include',
+      body: JSON.stringify({accesso: v})});
+    const d = await r.json();
+    if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    toast('🔗 Collegamento salvato');
+    openOrder(currentOrder.id);
+  } catch(e) { toast('Non è andata, riprova'); }
+  finally { fine(); }
+}
+async function mostraAccesso(btn){
+  /* una LETTURA: l'attesa si ritarda, o su rete viva il velo
+     lampeggerebbe per cinque millisecondi — la lezione del codice di
+     ritiro. E il GET e' puro: non c'e' niente da proteggere. */
+  const fine = attesaRitardata(btn, 'Apro il collegamento…');
+  try {
+    const r = await fetch(`${API}/orders/${currentOrder.id}/accesso`, {
+      headers:{'X-Tg-Init-Data':authHdr()}, credentials:'include'});
+    const d = await r.json();
+    if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    const box = el('servAccessoTesto');
+    if (box) box.innerHTML = '<div class="mono" style="word-break:break-all;'
+      + 'user-select:all;font-weight:800;margin:8px 0">'
+      + esc(d.accesso) + '</div>';
+    btn.remove();
+  } catch(e) { toast('Non è andata, riprova'); }
+  finally { fine(); }
+}
 function pannelloBustaRitiro(o){
   if (!o.viaPunto || o.role==='admin') return '';
   const quando = o.bustaIl
