@@ -737,8 +737,13 @@
      della galleria a foto singola).
      Il padding laterale e' quello di casa: allinea la prima card
      all'etichetta sopra e fa respirare l'ultima. */
+  /* Il `min-height` e' lo SPAZIO RISERVATO: la fila non si disegna
+     finche' i conteggi non sono veri (o comparirebbe in ordine di
+     catalogo per poi rimescolarsi), e senza questa riga quei ~300 ms
+     sarebbero un buco che poi spinge giu' la vetrina. E' l'altezza di
+     una cella con l'etichetta su due righe. */
   .cat-strip{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
-    scrollbar-width:none;padding:8px var(--pad) 2px}
+    scrollbar-width:none;padding:8px var(--pad) 2px;min-height:115px}
   .cat-strip::-webkit-scrollbar{display:none}
   /* 84px + 8 di gap: a 320px (288 utili) si vedono tre card intere e
      20px della quarta — il TAGLIO al bordo e' il segnale che ce n'e'
@@ -747,6 +752,16 @@
   .cat-cella{flex:0 0 auto;width:84px;text-decoration:none;
     display:flex;flex-direction:column;cursor:pointer}
   .cat-cella:active{transform:translateY(1px)}
+  /* LA CARD DEL REPARTO IN CUI SI E' ENTRATI RESTA ACCESA: si vede da
+     cosa sono filtrati gli articoli qui sotto, e la fila resta la
+     mappa invece di sparire. L'anello e' l'arancio di casa, lo stesso
+     che dice «sei qui» sul tappo del Profilo e sulla voce della nav;
+     sta FUORI dal quadrato (`outline` con `offset`) perche' non deve
+     rubare un pixel all'illustrazione ne' spostare le vicine — un
+     bordo lo farebbe. */
+  .cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats);
+    outline-offset:2px}
+  .cat-cella.attiva .cat-eti{font-weight:800;color:var(--sats-text)}
   .cat-quad{position:relative;aspect-ratio:1;border-radius:14px;
     overflow:hidden;background:var(--cat-fondo)}
   /* IL RIQUADRO DELLA FIGURA NON E' QUADRATO, ed e' voluto: il
@@ -7483,25 +7498,54 @@ function renderSfoglia(){
    l'emoji di ripiego sotto. */
 let strisciaFirma = '';
 function renderStriscia(){
-  /* Con un filtro acceso la sezione se ne va: a dire dove sei ci sono
-     le pillole, che restano appiccicate in cima. Si NASCONDE e non si
-     svuota — tornando a «Tutto» la fila e' gia' li', senza un giro di
-     render e senza che le figure lampeggino. */
-  const filtro = vistaBarattolo || activeCat !== 'Tutto';
-  el('catSez').style.display = filtro ? 'none' : '';
-  if (filtro) return;
+  /* Col BARATTOLO acceso la sezione se ne va: li' non c'e' nessuna
+     categoria da illuminare, e le pillole dicono gia' dove sei. Con
+     una CATEGORIA scelta invece la striscia RESTA e la sua card si
+     accende (ago 2026, decisione di Andrea che rovescia il primo
+     giro): si vede da cosa si stanno filtrando gli articoli qui
+     sotto, e si cambia reparto senza tornare indietro.
+     Si NASCONDE e non si svuota — tornando indietro la fila e' gia'
+     li', senza un giro di render e senza che le figure lampeggino. */
+  el('catSez').style.display = vistaBarattolo ? 'none' : '';
+  if (vistaBarattolo) return;
+  /* NON SI DISEGNA FINCHE' I CONTEGGI NON SONO VERI, ed e' la stessa
+     lezione gia' pagata dalle pillole: senza numeri `ordineSfoglia`
+     restituisce l'ordine di CATALOGO, e per i ~300 ms che separano
+     l'avvio dalla prima pagina si vedeva una mappa che poi si
+     riordinava da sola sotto gli occhi. Lo spazio resta riservato
+     (`min-height` sulla striscia), quindi l'attesa non fa saltare la
+     pagina: si vede comparire la fila, mai una fila che si rimescola.
+     La domanda e' la stessa di `contaCategorie`, scritta qui perche'
+     quel giudice lo chiama `ordineSfoglia` e non questa funzione. */
+  if (!(DEMO || datiVivi || conteggiServer)) return;
   const voci = ordineSfoglia();
-  const firma = voci.join('|');
+  /* La firma dice ANCHE quale card e' accesa: senza, entrare in un
+     reparto non ridisegnerebbe niente — l'ordine non cambia — e la
+     card non si illuminerebbe mai.
+     Cosi' la fila si rifa' quando cambia l'ordine O il reparto, e in
+     nessun altro caso: le figure non lampeggiano. */
+  const firma = voci.join('|') + '#' + activeCat;
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
+  /* La card accesa si porta in vista, che illuminata fuori schermo
+     non la vede nessuno: si scrive `scrollLeft` a mano, perche' la
+     funzione del browser che porta in vista un elemento sposta anche
+     la pagina in VERTICALE — e qui non c'e' niente da scorrere in su.
+     (Il suo nome non si scrive nemmeno qui: c'e' la prova che lo
+     vieta, e legge anche i commenti.) */
+  setTimeout(() => {
+    const a = el('catStrip').querySelector('.cat-cella.attiva');
+    if (a) el('catStrip').scrollLeft =
+      Math.max(0, a.offsetLeft - (el('catStrip').clientWidth - a.offsetWidth) / 2);
+  }, 0);
   el('catStrip').innerHTML = voci.map(c => `
-    <a class="cat-cella" data-cat="${esc(c)}"
+    <a class="cat-cella${c === activeCat ? ' attiva' : ''}" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
       <span class="cat-quad"><span class="cat-fig"><img src="${urlIllustrazione(c)}"
            alt="" loading="lazy" decoding="async"${caldaOk(c)}
            onload="this.dataset.ok=1" onerror="this.remove()"
-        ></span><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
+        ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
       <span class="cat-eti">${esc(c)}</span>
     </a>`).join('')
     /* La porta alla mappa intera, e la fine dichiarata della fila:

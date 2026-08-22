@@ -16307,11 +16307,22 @@ def prove_seo():
     # che questo cantiere esiste per non creare.
     st = pezzo_js(testo_mini, "function renderStriscia(){", "\n}\n")
     prova("le card della striscia sono collegamenti veri", True,
-          '<a class="cat-cella"' in st and 'href="/categoria/' in st)
+          '<a class="cat-cella' in st and 'href="/categoria/' in st)
     prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
           "this.dataset.cat" in st)
     prova("...con l'illustrazione PIENA, la stessa di Sfoglia", True,
           "urlIllustrazione(c)" in st and "caldaOk(c)" in st)
+    # L'EMOJI DI RIPIEGO E' FRATELLA DELL'IMMAGINE, e non e' un
+    # dettaglio di stile: a spegnerla e' `img[data-ok] + .cat-emoji`,
+    # un selettore di FRATELLO ADIACENTE. Con l'img chiusa dentro un
+    # altro span la regola non matcha mai e l'emoji resta SOPRA
+    # l'illustrazione — successo, e in produzione erano 27 su 27.
+    fig = st[st.index("<img src="):st.index("</span></span>")]
+    prova("l'emoji segue l'immagine senza niente in mezzo", True,
+          _re.search(r'onerror="this\.remove\(\)"\s*><span class="cat-emoji"',
+                     fig) is not None)
+    prova("...e la regola che la spegne esiste", True,
+          ".cat-quad img[data-ok] + .cat-emoji{display:none}" in testo_mini)
     # L'ORDINE E' QUELLO DI SFOGLIA E NON UNA SECONDA CLASSIFICA: due
     # ordinamenti sullo stesso catalogo direbbero due mappe diverse a
     # due dita di distanza. E' anche cio' che tiene i chiamanti di
@@ -16321,14 +16332,39 @@ def prove_seo():
           "ordineSfoglia()" in st)
     prova("...e non si riconta le categorie da se'", False,
           "contaCategorie(" in st)
-    # con un filtro acceso si NASCONDE e non si svuota: tornando a
-    # «Tutto» la fila e' gia' li', senza un giro di render e senza che
-    # le figure lampeggino
-    prova("col filtro acceso la sezione si nasconde", True,
-          "style.display = filtro ? 'none' : ''" in st)
-    prova("...e non si svuota", False, "innerHTML = ''" in st)
-    prova("...e il filtro e' la categoria O il barattolo", True,
-          "vistaBarattolo || activeCat !== 'Tutto'" in st)
+    # LE DUE PROVE QUI SOTTO HANNO CAMBIATO LATO (ago 2026, decisione
+    # di Andrea): certificavano che entrando in un reparto la sezione
+    # SPARISSE. Adesso resta, e la sua card si accende — a sparire e'
+    # solo col barattolo, che una categoria da illuminare non ce l'ha.
+    prova("col barattolo la sezione si nasconde", True,
+          "style.display = vistaBarattolo ? 'none' : ''" in st)
+    prova("...e con una CATEGORIA invece resta", False,
+          "activeCat !== 'Tutto'" in st.split("const voci")[0])
+    prova("...e non si svuota mai", False, "innerHTML = ''" in st)
+    # LA CARD DEL REPARTO RESTA ACCESA, e si porta in vista: illuminata
+    # fuori schermo non la vedrebbe nessuno. `scrollLeft` a mano e non
+    # scrollIntoView, che sposterebbe anche la pagina in verticale.
+    prova("la card del reparto si accende", True,
+          "${c === activeCat ? ' attiva' : ''}" in st)
+    prova("...e l'anello e' l'arancio di casa", True,
+          ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
+          in testo_mini)
+    prova("...e si porta in vista senza muovere la pagina", True,
+          "if (a) el('catStrip').scrollLeft =" in st
+          and "scrollIntoView" not in st)
+    # LA FIRMA DICE ANCHE IL REPARTO: senza, entrare in una categoria
+    # non ridisegna niente (l'ordine non cambia) e la card non si
+    # illumina mai — il difetto lo prende questa riga, non l'occhio.
+    prova("la firma conosce il reparto acceso", True,
+          "voci.join('|') + '#' + activeCat" in st)
+    # NON SI DISEGNA FINCHE' I CONTEGGI NON SONO VERI: senza numeri
+    # `ordineSfoglia` da' l'ordine di CATALOGO, e per i ~300 ms prima
+    # della prima pagina la mappa si riordinava sotto gli occhi (lo
+    # stesso difetto gia' pagato dalle pillole col seme della demo).
+    prova("niente fila finche' i conteggi non sono veri", True,
+          "if (!(DEMO || datiVivi || conteggiServer)) return;" in st)
+    prova("...e intanto lo spazio resta riservato", True,
+          "min-height:115px" in testo_mini)
     # un chiamante solo, ed e' renderChips: cosi' i cinque posti che
     # gia' rifanno le pillole valgono per tutte e due le file, e non
     # nasce un secondo elenco da tenere allineato

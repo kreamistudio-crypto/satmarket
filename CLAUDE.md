@@ -1660,10 +1660,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è misurata: l'header a 320px occupa già ~176px su 568 — con le card
   dentro salirebbe a ~280, cioè la vetrina si guarderebbe da una
   fessura.
-  CON UN FILTRO ACCESO LA SEZIONE SPARISCE (categoria scelta o
-  barattolo): a dire dove sei ci sono le pillole, che quello stato lo
-  dicono già. Si NASCONDE e non si svuota — tornando a «Tutto» la fila
-  è già lì, senza un giro di render e senza che le figure lampeggino.
+  LA CARD DEL REPARTO IN CUI SI ENTRA RESTA ACCESA (ago 2026,
+  decisione di Andrea che ROVESCIA il primo giro, dove la sezione
+  spariva del tutto): la striscia resta, la sua card prende l'anello
+  arancione — quello che dice «sei qui» sul tappo del Profilo e sulla
+  voce della nav — e sotto si vedono gli articoli di quel reparto. Si
+  vede da cosa sono filtrati, e si cambia reparto senza tornare
+  indietro. L'anello è un `outline` con `offset` e non un bordo: sta
+  FUORI dal quadrato, quindi non ruba un pixel all'illustrazione e non
+  sposta le vicine. Col BARATTOLO invece la sezione se ne va: lì non
+  c'è nessuna categoria da illuminare. Si NASCONDE e non si svuota —
+  tornando indietro la fila è già lì, senza un giro di render e senza
+  che le figure lampeggino.
+  E LA CARD ACCESA SI PORTA IN VISTA scrivendo `scrollLeft` a mano:
+  illuminata fuori schermo non la vedrebbe nessuno, e la funzione del
+  browser che porta in vista un elemento sposterebbe anche la pagina
+  in verticale — dove non c'è niente da scorrere.
+  LA FIRMA DICE ANCHE QUALE CARD È ACCESA, e senza quel pezzo il
+  cantiere non funziona affatto: entrando in un reparto l'ordine non
+  cambia, quindi la firma sarebbe identica, il render uscirebbe subito
+  e la card non si illuminerebbe MAI. C'è la prova.
+  LA FILA NON SI DISEGNA FINCHÉ I CONTEGGI NON SONO VERI, ed è la
+  stessa lezione già pagata dalle pillole col seme della demo: senza
+  numeri `ordineSfoglia` restituisce l'ordine di CATALOGO, e per i
+  ~300 ms fra l'avvio e la prima pagina si vedeva una mappa che poi si
+  riordinava da sola sotto gli occhi (difetto vero, segnalato da
+  Andrea). Lo spazio resta riservato — `min-height` sulla striscia,
+  l'altezza di una cella — quindi l'attesa non fa saltare la pagina:
+  si vede comparire la fila, mai una fila che si rimescola. Misurato:
+  la sezione è alta 157px dal primo fotogramma alla fine.
+  L'EMOJI DI RIPIEGO È FRATELLA DELL'IMMAGINE, e non è un dettaglio di
+  stile: a spegnerla è `img[data-ok] + .cat-emoji`, un selettore di
+  FRATELLO ADIACENTE. Alla nascita l'`img` stava chiusa dentro un
+  altro `<span>`, quindi la regola non matchava mai e l'emoji restava
+  SOPRA l'illustrazione — in produzione erano 27 su 27, e non si
+  notava perché quei disegni somigliano alle emoji che coprivano.
+  La prova guarda che fra il tag dell'immagine e l'emoji non ci sia
+  nient'altro: è l'unica cosa che rende il selettore capace di
+  scattare.
   L'ORDINE VIENE DA `ordineSfoglia` E DA NESSUN ALTRO POSTO: due
   ordinamenti sullo stesso catalogo direbbero due mappe diverse a due
   dita di distanza. È anche ciò che tiene i chiamanti di
@@ -17764,6 +17798,26 @@ può provare da qui: l'apertura dentro Telegram e nella PWA
 installata, e il gesto indietro di sistema dopo essere entrati in un
 reparto dalla card.
 
+Tre difetti della striscia, chiusi (ago 2026, segnalati da Andrea):
+1) L'ORDINE si vedeva sbagliato all'avvio — la fila si disegnava
+prima che i conteggi arrivassero, quindi in ordine di CATALOGO, e si
+riordinava sotto gli occhi ~300 ms dopo: adesso non si disegna finche'
+i numeri non sono veri, con lo spazio riservato per non far saltare la
+pagina (misurato: 157px dal primo fotogramma). 2) LE EMOJI di ripiego
+restavano SOPRA le illustrazioni — 27 su 27 in produzione — perche' il
+selettore che le spegne vuole immagine ed emoji FRATELLI, e l'immagine
+era chiusa dentro un altro span. 3) LA CARD DEL REPARTO ORA RESTA
+ACCESA (rovescia la scelta del primo giro, dove la sezione spariva):
+anello arancione, card portata in vista, e sotto gli articoli di
+quella categoria; l'indietro riporta alla home intera prima di uscire
+dall'app. Vedi Architettura, «LE CATEGORIE IN HOME».
+Collaudato: 4436 prove verdi (8 nuove, 2 che hanno CAMBIATO LATO col
+perche' scritto) e 9 mutazioni, 9 uccise — una era sopravvissuta e ha
+fatto rinforzare la sua sentinella, che diceva «la riga c'e'» invece
+di «la riga viene eseguita». Piu' il giro dal vivo via CDP: l'ordine
+per numero, zero emoji sopra le figure arrivate, la card accesa anche
+quando sta in fondo alla fila, il barattolo, il tema scuro e la catena
+dell'indietro. IN PRODUZIONE basta il deploy.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
