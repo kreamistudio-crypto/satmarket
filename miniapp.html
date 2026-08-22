@@ -575,8 +575,20 @@
      compatte, ma dentro il flusso accanto a un campo (form avvisi)
      invece che assoluta dentro la searchbar */
   .cur-seg.inriga{position:static;transform:none;flex:0 0 auto}
-  .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+  /* nascoste finche' le card sono in vista: in cima il reparto si
+     sceglie da quelle, e due elenchi della stessa cosa uno sotto
+     l'altro erano il difetto che il cantiere e' nato per togliere */
+  .chips{display:none;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+    padding:8px var(--pad);scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
+  /* la barra appiccicata: fuori dal flusso, quindi comparendo non
+     sposta la vetrina; il `top` lo scrive il JS, che e' l'unico a
+     sapere dove finisce l'header (cambia col tema, col desktop e
+     con la barra di collaudo). z-index 19: sotto l'header (20),
+     sotto la nav e sotto i fogli — non ruba mai un tocco. */
+  .chips.appiccicate{display:flex;position:fixed;left:0;right:0;z-index:19;
+    background:var(--header-bg);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
   .chip{
     flex:0 0 auto;border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
     padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;
@@ -3614,6 +3626,10 @@
        e a spingerle ci pensa il margin-right del logo: uno spaziatore
        elastico qui romperebbe l'allineamento */
     .nav-vuoto{display:none}
+    /* la barra delle categorie segue la colonna dell'app, come tutto
+       il resto: a tutta larghezza sembrerebbe una barra di sistema */
+    .chips.appiccicate{left:50%;right:auto;transform:translateX(-50%);
+      width:min(100%, 960px);padding-left:var(--pad);padding-right:var(--pad)}
     /* la topbar e' alta 60px fissi: 42px ci stanno centrati senza
        toccare nulla (e il margine negativo mobile qui non serve) */
     .nav-logo .brand-jar{width:42px;height:42px;border-radius:13px;margin:0}
@@ -3806,7 +3822,6 @@ document.getElementById('cartello')?.remove();</script>
           </div>
         </div>
       </form>
-      <div class="chips" id="chips"></div>
       <!-- La riga di fiducia e' anche la porta alla pagina che la
            spiega: stesso testo di sempre, col › che dice che si tocca
            (il tour la cerca per classe, e la classe non cambia) -->
@@ -3843,6 +3858,19 @@ document.getElementById('cartello')?.remove();</script>
       <div class="section-label">Esplora per categorie</div>
       <div class="cat-strip" id="catStrip"></div>
     </div>
+    <!-- LE PILLOLE COMPAIONO QUANDO LE CARD SE NE VANNO (ago 2026,
+         decisione di Andrea): in cima il reparto si sceglie dalle
+         card, e i nomi qui sotto non esistono; appena la striscia
+         esce di vista scorrendo, questa barra si incolla sotto
+         l'header — cosi' la categoria si cambia in qualsiasi
+         momento, senza tornare su.
+         STA FUORI DALL'HEADER, e non e' una scelta di gusto: l'header
+         ha `backdrop-filter`, che crea un containing block per i
+         discendenti `position:fixed` — la barra si posizionerebbe
+         rispetto a lui invece che allo schermo. Fuori dal flusso, in
+         piu', la sua comparsa non sposta di un pixel la vetrina che
+         si sta scorrendo. -->
+    <div class="chips" id="chips"></div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
          euro") resta com'e': questi servono a chi sfoglia.
@@ -7489,6 +7517,52 @@ function renderStriscia(){
       <span class="cat-quad"><svg viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M3.6 5.5c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.5 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.5-.7-1.5-1.6z"/><path d="M13.4 5.4c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.7-1.6-1.6z"/><path d="M3.5 14.9c0-.9.7-1.6 1.6-1.6H9c.9 0 1.6.7 1.6 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6z"/><path class="velo" d="M13.4 14.8c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.6-1.6-1.5z"/></svg></span>
       <span class="cat-eti">Tutte le categorie</span>
     </div>`;
+}
+
+/* LA BARRA DELLE CATEGORIE SI INCOLLA QUANDO LE CARD SE NE VANNO.
+   Un IntersectionObserver sulla sezione, non un ascoltatore di
+   scroll: quello lavora a ogni fotogramma per una domanda che cambia
+   due volte in tutta la sessione.
+   COL FILTRO ACCESO LA SEZIONE E' `display:none`, quindi non
+   interseca niente e la barra resta accesa: e' esattamente quel che
+   serve — senza le pillole, da un reparto non si potrebbe piu'
+   tornare a «Tutto» ne' spegnere il barattolo. Non e' un caso
+   particolare da ricordare, e' la stessa domanda che risponde giusto.
+   IL `top` SEGUE L'HEADER e non si fissa una volta sola, ed e' un
+   difetto visto dal vivo: col filtro acceso la barra compare mentre
+   si e' ancora in CIMA — l'header non e' «stuck» e il suo bordo
+   inferiore e' piu' in basso (in collaudo c'e' anche la barra delle
+   identita' finte sopra) — e scorrendo restava un buco fra i due, con
+   la vetrina che ci passava in mezzo. L'ascoltatore vive SOLO mentre
+   la barra e' accesa, e' passivo e lavora al piu' una volta per
+   fotogramma: negli altri momenti non c'e' proprio. */
+let chipsSegue = 0;
+function chipsPosizione(){
+  chipsSegue = 0;
+  const c = el('chips'), h = document.querySelector('#view-esplora header');
+  if (c && h) c.style.top = Math.max(0, h.getBoundingClientRect().bottom) + 'px';
+}
+const chipsScroll = () => {
+  if (!chipsSegue) chipsSegue = requestAnimationFrame(chipsPosizione);
+};
+function chipsAppiccicate(attive){
+  const c = el('chips');
+  if (!c) return;
+  if (attive) {
+    chipsPosizione();
+    addEventListener('scroll', chipsScroll, {passive: true});
+  } else {
+    removeEventListener('scroll', chipsScroll);
+  }
+  c.classList.toggle('appiccicate', attive);
+}
+/* Armato una volta sola sulla sezione, che vive in pagina per sempre
+   (si nasconde, non si smonta): l'osservatore non va mai riattaccato. */
+if (window.IntersectionObserver) {
+  new IntersectionObserver(
+    ([voce]) => chipsAppiccicate(!voce.isIntersecting),
+    {threshold: 0}
+  ).observe(el('catSez'));
 }
 
 /* Dalla card (in home o nello scaffale) alla vetrina filtrata. setCat

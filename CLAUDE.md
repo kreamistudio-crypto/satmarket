@@ -1620,18 +1620,46 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   numero di annunci, `ordineSfoglia`) — e il tab «Sfoglia» esce dalla
   barra. Le categorie smettono di essere un elenco di nomi in un altro
   posto e diventano la prima cosa che si vede.
-  LE PILLOLE RESTANO, E RESTANO DOVE SONO: `renderChips` non si tocca
-  di una riga. Le due file dicono cose diverse APPOSTA — le pillole
-  sono il COMANDO (solo i reparti pieni, «Tutto» in testa, dentro
-  l'header APPICCICATO, quindi a portata da qualunque punto della
-  pagina), la striscia è la MAPPA (tutte e 27, le vuote in fondo, e
-  scorre via con la pagina). È la stessa divisione che c'era fra chips
-  e Sfoglia, portata a un dito di distanza.
-  LA SEZIONE STA FUORI DALL'HEADER, ed è misurato e non a occhio:
-  l'header a 320px occupa già ~176px su 568 — con le card dentro
-  salirebbe a ~280, cioè la vetrina si guarderebbe da una fessura.
-  Quindi le card scorrono via e a restare appiccicate sono le pillole,
-  che il reparto lo fanno cambiare comunque.
+  LE PILLOLE COMPAIONO QUANDO LE CARD SE NE VANNO (decisione di
+  Andrea, in due tempi: prima restavano dov'erano, poi «i bottoni
+  attuali non devono più esistere»). In cima l'ordine è ricerca →
+  «Ogni acquisto è protetto…» → le card: dei nomi in pillola non c'è
+  traccia, che due elenchi della stessa cosa uno sotto l'altro erano
+  il difetto che questo cantiere è nato per togliere. Appena la
+  striscia esce di vista scorrendo, la barra dei nomi si INCOLLA sotto
+  l'header — così il reparto si cambia in qualsiasi momento senza
+  tornare su. Il contenuto di `renderChips` non si tocca: cambia solo
+  DOVE vive la fila e QUANDO si vede.
+  LE DUE FILE DICONO COSE DIVERSE APPOSTA: le pillole sono il COMANDO
+  (solo i reparti pieni, «Tutto» in testa), la striscia è la MAPPA
+  (tutte e 27, le vuote in fondo). È la stessa divisione che c'era fra
+  chips e Sfoglia, portata a un dito di distanza — e adesso le due non
+  si vedono mai insieme.
+  LA BARRA STA FUORI DALL'HEADER, e non è una scelta di gusto:
+  l'header ha `backdrop-filter`, che crea un containing block per i
+  discendenti `position:fixed` — lì dentro la barra si posizionerebbe
+  rispetto a LUI invece che allo schermo. Fuori dal flusso, in più, la
+  sua comparsa non sposta di un pixel la vetrina che si sta
+  scorrendo: niente salto e niente compensazione dello scroll (che era
+  l'altra strada, e litiga con lo scorrimento inerziale).
+  A DECIDERE È LA SEZIONE E NON UNA SOGLIA DI SCROLL: un
+  IntersectionObserver su `#catSez` — e col filtro acceso quella
+  sezione è `display:none`, quindi non interseca niente e la barra
+  resta accesa. Non è un caso particolare da ricordare: è la stessa
+  domanda che risponde giusto, ed è quel che permette di tornare a
+  «Tutto» o di spegnere il barattolo da un reparto.
+  IL `top` SEGUE L'HEADER e non si fissa una volta sola (difetto visto
+  dal vivo): col filtro acceso la barra compare mentre si è ancora in
+  CIMA — l'header non è «stuck» e il suo bordo inferiore è più in
+  basso, in collaudo c'è pure la barra delle identità finte — e
+  scorrendo restava un buco in mezzo, con la vetrina che ci passava.
+  L'ascoltatore di scroll vive SOLO mentre la barra è accesa, è
+  passivo e lavora al più una volta per fotogramma: negli altri
+  momenti non c'è proprio.
+  LA SEZIONE DELLE CARD STA FUORI DALL'HEADER per una ragione sua, ed
+  è misurata: l'header a 320px occupa già ~176px su 568 — con le card
+  dentro salirebbe a ~280, cioè la vetrina si guarderebbe da una
+  fessura.
   CON UN FILTRO ACCESO LA SEZIONE SPARISCE (categoria scelta o
   barattolo): a dire dove sei ci sono le pillole, che quello stato lo
   dicono già. Si NASCONDE e non si svuota — tornando a «Tutto» la fila
@@ -17700,9 +17728,10 @@ Le categorie in home diventano card a scorrimento (ago 2026,
 decisione di Andrea): sotto l'header di Esplora una fila di card
 quadrate illustrate — le stesse 27 figure di Sfoglia, nello stesso
 ordine — e il tab «Sfoglia» esce dalla barra, lasciando il suo posto
-alla voce che verrà. Le pillole coi nomi restano dove sono e come
-sono: scorrendo, le card vanno via e le pillole restano appiccicate,
-così il reparto si cambia da qualunque punto della pagina. Sfoglia
+alla voce che verrà. In cima i nomi in pillola non esistono più:
+compaiono appiccicati sotto l'header appena le card escono di vista
+scorrendo, così il reparto si cambia in qualsiasi momento senza
+tornare su — e le due file non si vedono mai insieme. Sfoglia
 resta, dietro l'ultima card («Tutte le categorie»), e diventa una
 vista interna come /privacy: la nav accende Esplora e l'indietro
 riporta in home. Vedi Architettura, «LE CATEGORIE IN HOME», per il

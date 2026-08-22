@@ -16346,6 +16346,52 @@ def prove_seo():
     prova("...perche' il tab non esiste piu'", False,
           'id="nav-sfoglia"' in testo_mini)
 
+    # --- 16bis-2) LA BARRA DELLE CATEGORIE SI INCOLLA -------------
+    # In cima il reparto si sceglie dalle CARD e le pillole non
+    # esistono; appena la striscia esce di vista si incollano sotto
+    # l'header, cosi' la categoria si cambia in qualsiasi momento.
+    prova("le pillole sono uscite dall'header", True,
+          testo_mini.index('id="chips"') > testo_mini.index('class="trust-line"'))
+    # FUORI DALL'HEADER e non e' un gusto: l'header ha backdrop-filter,
+    # che crea un containing block per i discendenti position:fixed —
+    # la barra si posizionerebbe rispetto a lui invece che allo schermo
+    testa = testo_mini[testo_mini.index("<header>"):
+                       testo_mini.index("</header>")]
+    # la CLASSE e non l'id: chi rimettesse una fila di pillole li'
+    # dentro con un altro id avrebbe lo stesso il containing block
+    # sbagliato, e la sentinella non se ne accorgerebbe (l'ha detto
+    # la tortura, non la rilettura)
+    prova("...davvero fuori: nell'header non ce n'e' traccia", False,
+          'class="chips"' in testa)
+    prova("...e stanno sotto la sezione delle card", True,
+          testo_mini.index('id="catStrip"') < testo_mini.index('id="chips"'))
+    # nascoste di serie: due elenchi della stessa cosa uno sotto
+    # l'altro erano il difetto che il cantiere e' nato per togliere
+    prova("nascoste finche' le card sono in vista", True,
+          "\n  .chips{display:none;" in testo_mini)
+    prova("...e da appiccicate sono fuori dal flusso", True,
+          ".chips.appiccicate{display:flex;position:fixed;" in testo_mini)
+    # A DECIDERE E' LA SEZIONE, non una soglia di scroll a numero: col
+    # filtro acceso la sezione e' display:none, quindi non interseca e
+    # la barra resta accesa — senza le pillole, da un reparto non si
+    # potrebbe piu' tornare a «Tutto» ne' spegnere il barattolo.
+    prova("a decidere e' la sezione delle card", True,
+          "new IntersectionObserver(" in testo_mini
+          and ".observe(el('catSez'))" in testo_mini)
+    prova("...col verso giusto (fuori vista = barra accesa)", True,
+          "chipsAppiccicate(!voce.isIntersecting)" in testo_mini)
+    # IL TOP SEGUE L'HEADER: fissato una volta sola, col filtro acceso
+    # la barra compariva mentre si era ancora in cima (header non
+    # «stuck») e scorrendo restava un buco in mezzo. L'ascoltatore
+    # vive solo mentre la barra e' accesa, ed e' passivo.
+    ca = pezzo_js(testo_mini, "function chipsAppiccicate(attive){", "\n}\n")
+    prova("l'ascoltatore si attacca solo con la barra accesa", True,
+          "addEventListener('scroll', chipsScroll, {passive: true})" in ca)
+    prova("...e si stacca quando la barra se ne va", True,
+          "removeEventListener('scroll', chipsScroll)" in ca)
+    prova("...e lavora al piu' una volta per fotogramma", True,
+          "requestAnimationFrame(chipsPosizione)" in testo_mini)
+
     # --- 16ter) SFOGLIA E' UNA VISTA INTERNA ----------------------
     # Senza il suo tab non e' piu' una radice: si SPINGE, e l'indietro
     # riporta in home invece di uscire dall'app (il patto di /privacy).
