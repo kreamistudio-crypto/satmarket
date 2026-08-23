@@ -4823,23 +4823,120 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sempre). La domanda si fa con `bool(annunci)` e non con una query in
   più, perché quella è esattamente la pagina 1 degli attivi; e il
   banner esce SOLO in prima pagina, come gli esauriti e i feedback.
-  IL PAGAMENTO È DICHIARATO E NON COSTRUITO (decisione di Andrea: la
-  tappa 1 è il banner, zero righe di denaro). Il giorno che si farà,
-  quel che si compra è **la PORTA e non il banner** — così nessun
-  rimborso è mai dovuto: la porta resta aperta anche se un banner viene
-  rifiutato o spento, e se ne rifà un altro. E QUEL CANTIERE È IL LIBRO
-  MASTRO, NON LA INVOICE: `crea_invoice_escrow` ha oggi TRE chiamanti
-  (`compra`, `_compra_set`, `punta`) e tutti e tre scrivono subito una
-  riga in `ordini`/`rilanci` — il primo incasso nostro romperebbe il
-  metodo di riconciliazione scritto in questo file («si incrociano gli
-  incassi LNbits coi `payment_hash` noti a `ordini` + `rilanci`; ogni
-  incasso senza riga è un orfano»), e ogni banner pagato sembrerebbe un
-  orfano. Serviranno una tabella `pagamenti`, i tre rami nell'orologio,
-  un controllo nella ronda, il riuso del paySheet sul calco di
-  `inviaPuntata` — e questa voce da aggiornare. NIENTE colonna
-  `banner_sbloccato_il` finché quel cantiere non c'è: non si aggiunge
-  una colonna per una cosa che non esiste (il precedente è
-  `utenti.comune`, inerte).
+  LA PORTA SI ANTICIPA PAGANDO (ago 2026, tappa 2 — e questa voce
+  ROVESCIA «IL PAGAMENTO È DICHIARATO E NON COSTRUITO», che qui
+  descriveva una cosa da fare): `BANNER_PREZZO_SATS` (10.000) e la
+  porta si apre subito. DUE STRADE PER LA STESSA PORTA (decisione di
+  Andrea): chi arriva al livello continua ad averla gratis, e
+  `banner_porta_aperta` diventa un OR — l'allargamento di QUELLA riga
+  e di nessun'altra, come il suo commento prometteva dal giorno in
+  cui è nata. Il quarto argomento è obbligatorio e senza default (la
+  lezione di `atteso_sats`), e IL PAGAMENTO VINCE SUL FAIL-CLOSED del
+  gradino ignoto: chi ha pagato ha pagato, anche se `BANNER_LIVELLO`
+  nel config è scritto male.
+  UNA TANTUM ORA, A TEMPO DOPO (decisione di Andrea): la colonna
+  `utenti.banner_sbloccato_il` è una DATA e non un booleano — il
+  giorno dell'abbonamento si aggiunge una scadenza senza migrare
+  niente. E la data NON si riscrive se c'è già
+  (`AND banner_sbloccato_il=0`): è quella del PRIMO sblocco.
+  MA IL CANTIERE NON È IL BANNER, È IL LIBRO MASTRO, ed è la parte
+  da leggere per prima: finora ogni fattura in entrata era escrow per
+  conto di terzi, e il metodo di riconciliazione scritto in questo
+  file («si incrociano gli incassi LNbits coi `payment_hash` noti a
+  `ordini` + `rilanci`; ogni incasso senza riga è un orfano») sarebbe
+  diventato falso il giorno stesso — ogni banner pagato sembrerebbe
+  un orfano. Da qui la tabella `pagamenti`, che nasce GENERICA con un
+  `motivo` ('banner'; le sponsorizzazioni sono la stessa famiglia) e
+  una riga PER FATTURA, il modello di `rilanci`. L'importo si
+  FOTOGRAFA in colonna: la leva può cambiare domani, e la ricevuta
+  deve dire quel che si è pagato. Il memo è `Barattolo sblocco banner
+  #{tg_id}`, riconoscibile a colpo d'occhio nel registro LNbits —
+  che è tutto ciò che la riconciliazione a mano chiede; i tre memo
+  esistenti non si toccano.
+  L'ENDPOINT NON HA UN 400 DOPO LA FATTURA, e va scritto perché: qui
+  non c'è nessuna risorsa contesa — niente stock, niente gara —
+  quindi l'unica corsa possibile è il doppio tocco, che la RIPRESA
+  chiude da sola ripresentando la stessa invoice (è per questo che
+  `pagamenti.invoice` esiste, il calco della ripresa del pentito).
+  Nessun rifiuto dopo la invoice vuol dire NESSUNA FATTURA ORFANA
+  possibile — `fai_puntata` un 409 lì ce l'ha e lo dichiara, qui non
+  serve ed è meglio così. Le guardie prima: leva, prezzo>0, negozio,
+  porta già aperta (nessuno paga per una cosa che ha), ripresa.
+  `_incassa_sblocco` è il funnel dei TRE chiamanti (il poll, il
+  riacciuffo, l'ultimo sguardo) e apre la porta NELLA STESSA
+  transazione del pagamento: è ciò che rende impossibile lo stato
+  «ha pagato e la porta è chiusa», che nessuna eccezione
+  segnalerebbe e che solo la ronda andrebbe a scoprire.
+  DUE RAMI NELL'OROLOGIO E NON TRE, e il terzo si dichiara non
+  necessario: `controlla_annullati` riacciuffa le lapidi pagate e
+  `controlla_abbandonati` guarda i 'creato' a fattura morta, ma LA
+  PURGA NON SI FA. Per gli ordini serve a liberare stock e la guardia
+  «affare in corso»; qui una lapide non blocca niente (la guardia
+  della ripresa guarda i soli 'creato' freschi), e cancellarla
+  toglierebbe il `payment_hash`, cioè l'unico filo verso quel
+  pagamento — il buco chiuso ad ago 2026 con «nessuna riga si
+  cancella senza aver chiesto a LNbits». Queste righe sono il
+  REGISTRO CONTABILE del nostro primo incasso: restano per sempre.
+  LA FUSIONE NON ERA NEL PIANO e l'ha trovata il censimento delle
+  tabelle figlie, non la lettura: il nativo Nostr che paga e poi
+  collega Telegram perdeva i suoi 10.000 sats, perché
+  `banner_sbloccato_il` vive su `utenti` e la riga negativa muore lì
+  dentro. I pagamenti seguono l'utente e la porta pure, tenendo la
+  data PIÙ VECCHIA. ⚠️ Il censimento che l'ha trovata legge anche i
+  COMMENTI: la sentinella che difende quell'UPDATE guarda il CODICE
+  (`codice(fus)`), o la parola nel commento che lo spiega la
+  terrebbe verde a riga tolta — l'ha detto la tortura.
+  IL RIMBORSO C'È MA NON È MAI DOVUTO (decisione di Andrea): quello
+  che si compra è la PORTA e non il banner — se l'insegna viene
+  rifiutata se ne carica un'altra — e la conferma lo dice PRIMA di
+  pagare. Ma `_rimborsa_sblocco` esiste lo stesso, calco di
+  `_paga_rimborso` (lock per riga, guardia sullo stato, guardia sul
+  congelamento: su INCERTO non si ritenta MAI da soli), perché un
+  incasso senza una strada indietro è un incasso che nessuno può
+  correggere il giorno che la ragione c'è davvero. MAI AUTOMATICO:
+  `POST /api/admin/pagamenti/{id}/rimborsa`, col 403 prima di leggere
+  il body, e la porta «↩︎ Rimborsa uno sblocco» nel pannello admin —
+  per NUMERO, che il moderatore ha nell'avviso «Sblocco banner
+  pagato». LA CINTURA DELL'IMPORTO SI EREDITA (`paga_venditore` vuole
+  `atteso_sats` senza default), ed è esattamente ciò per cui quel
+  parametro è obbligatorio: la strada d'uscita nata oggi non può far
+  partire una cifra diversa da quella incassata. Le uscite del denaro
+  diventano QUATTRO, e il censimento delle guardie sull'INCERTO
+  cresce a mano come quello delle leve-lista: se quel numero CALA,
+  qualcuno ha tolto una guardia.
+  IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea): i sats
+  tornano, la porta si richiude e il banner si spegne, nella stessa
+  transazione. Se il venditore ha ANCHE il livello la porta resta
+  aperta da lì, ed è giusto — si disfa il pagamento, non i diritti
+  guadagnati, e a dirlo è il giudice, che è un OR e del rimborso non
+  sa niente. ⚠️ E IL RAMO CHE NON PAGA NON TOCCA NIENTE: chiudere una
+  porta già pagata per un rimborso che non è partito toglierebbe il
+  diritto senza restituire i sats — il modo peggiore di sbagliare
+  qui, e c'è la sentinella.
+  QUATTRO CONTROLLI NELLA RONDA (27 → 31), e per ognuno la domanda
+  d'ammissione ha risposta no perché ogni coppia di UPDATE vive nella
+  stessa transazione: sblocco pagato e porta chiusa, porta aperta
+  senza pagamento, sblocco pagato due volte, rimborsato e porta
+  ancora aperta. DA NON AGGIUNGERE, e verrebbe voglia: «una lapide
+  senza payment_hash» e «un 'creato' vecchio» — quest'ultimo è lo
+  stato normale finché l'orologio non passa, cioè un allarme che
+  suona sul normale.
+  IL paySHEET HA DUE TESTI (decisione di Andrea): «Blocca N sats a
+  garanzia … finché non confermi di aver ricevuto l'oggetto» su una
+  tassa sono due frasi false, dette nell'istante in cui qualcuno sta
+  per pagarci. `vestiPaySheet(modo)` con 'escrow' e 'tassa', e IL
+  VESTITO HA UNA REGIA SOLA — dentro `mostraQr`, che è il collo di
+  bottiglia di tutti i flussi che aprono il foglio, e il modo si
+  DERIVA da `pagamentoCorrente`. La prima stesura lo metteva a mano
+  nello sblocco, e il giro DAL VIVO ha mostrato il buco: nessuno
+  rimetteva il testo dell'escrow, quindi dopo una tassa l'ordine
+  successivo prometteva «questi sats non sono un deposito» su un
+  deposito — il rovescio esatto del difetto che i due testi esistono
+  per togliere. Il markup NASCE vestito da escrow (fail-soft: chi
+  dimentica la regia mostra la frase di ieri, non una vuota) e il
+  cambio d'abito CONSERVA la cifra, perché il titolo contiene
+  `#payAmount` e riscriverlo lo ricrea vuoto — è quella riga a
+  rendere la funzione idempotente, cioè chiamabile da un posto solo.
   IL RISCHIO DI PRODOTTO RESTA SCRITTO E NON RISOLTO: il banner è il
   primo posto in cui OSPITIAMO il gesto di portare l'affare fuori
   dall'escrow, e oggi nessuna regola lo vieta (il prompt non ha una
@@ -20412,6 +20509,56 @@ nessuno tocca il bottone non cambia niente di quel che si vede.
 DA GUARDARE al primo giro: i primi like veri, e soprattutto che i
 numeri delle due pagine siano DIVERSI — è quella la domanda per cui
 il cantiere esiste.
+
+La porta del banner si anticipa pagando (ago 2026, tappa 2): 10.000
+sats e la porta si apre subito — ed è il PRIMO INCASSO che Barattolo
+fa per sé, perché finora ogni fattura in entrata era escrow per conto
+di terzi. Le decisioni di Andrea: una tantum ora ma la colonna è una
+DATA (il giorno dell'abbonamento non serve migrare niente), due strade
+per la stessa porta (chi arriva al livello ce l'ha gratis: il giudice
+diventa un OR), il rimborso mai automatico ma possibile al moderatore,
+e il paySheet coi due testi — «a garanzia … finché non confermi di aver
+ricevuto l'oggetto» su una tassa sono due frasi false. Vedi
+Architettura, «LA PORTA SI ANTICIPA PAGANDO», per la tabella
+`pagamenti` (che è il vero contenuto del cantiere: senza, il metodo di
+riconciliazione con LNbits diventava falso il giorno stesso e ogni
+banner pagato sembrava un orfano), per l'endpoint che NON ha un 400
+dopo la fattura, e per la PURGA che non si fa.
+TRE COSE TROVATE COSTRUENDO E NON LEGGENDO, ed è la parte da
+ricordare: 1) LA FUSIONE — il nativo Nostr che paga e poi collega
+Telegram perdeva i suoi 10.000 sats, e a dirlo è stato il censimento
+delle tabelle figlie; 2) IL VESTITO DEL paySHEET — nessuno rimetteva
+il testo dell'escrow, quindi dopo una tassa l'ordine successivo
+prometteva «questi sats non sono un deposito» su un deposito, e la
+cura non è stata una chiamata in tre posti ma una regia sola dentro
+`mostraQr`; 3) LA CONFERMA DEL RIMBORSO che non faceva NIENTE — la
+chiave sbagliata (`azione:` invece di `poi:`), un foglio che si apre,
+si legge e chiude senza agire: da lì la sentinella che chiede a tutti
+e dodici i chiamanti di portare la loro azione.
+Collaudato: 5358 prove verdi (erano 5251) e VENTICINQUE MUTAZIONI, una
+per riga sorvegliata, ognuna rossa da sola — e la tortura ha fatto il
+suo mestiere due volte: ha trovato tre sentinelle che guardavano se una
+cosa ESISTE invece che se è USATA, e soprattutto IL BANCO STESSO
+MENTIVA (torturava una copia mai rinfrescata, quindi le mutazioni
+giravano su un codice di ore prima: adesso ricopia sempre e si ferma se
+il conto della baseline non combacia con la repo). Più
+`collaudo_sblocco_banner.py`, 54 verdi con LNbits simulato: il giro
+vero su database usa-e-getta, i due rami dell'orologio, la lapide col
+riacciuffo, il rimborso nei suoi quattro casi (non parte → la porta
+resta APERTA; riesce → porta chiusa e insegna spenta; il secondo giro
+non paga due volte; chi ha il livello tiene la porta), la ronda che
+tace e la regressione di chi ha il livello. E il giro dal vivo via CDP
+a 320/360/375 nei due temi.
+IN PRODUZIONE il deploy fa girare due migrazioni additive (la tabella
+`pagamenti` e la colonna, a 0/'') e NON cambia niente: la funzione resta
+dietro `BANNER_NEGOZIO_ATTIVO`, che nasce spenta. Il prezzo si spegne
+da solo con `BANNER_PREZZO_SATS = 0`, e allora resta la sola strada del
+livello. DA GUARDARE al primo giro vero: il primo sblocco pagato dentro
+Telegram — che l'avviso «💰 Sblocco banner pagato» arrivi ai moderatori
+col numero del pagamento, e che la ronda TACCIA; e la riconciliazione
+su LNbits, dove il memo «Barattolo sblocco banner #tg_id» dev'essere
+l'unico incasso nuovo senza una riga in `ordini`/`rilanci` — e averla
+invece in `pagamenti`.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
