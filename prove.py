@@ -22907,6 +22907,28 @@ def prove_scoprire():
     prova("il titolo si mostra solo con l'immagine", (True, True),
           ("display:none" in _tit,
            ".scoprire-card img ~ .sc-titolo{display:flex}" in mini))
+    # IL P2P HA UNA REGOLA SUA (ago 2026, decisione di Andrea): il suo
+    # titolo e' tre caratteri, e nella scatola tarata su un titolo
+    # lungo si perdeva in un angolo. SOLO il suo: le sorelle quella
+    # scatola la riempiono davvero, e allargarle le manderebbe a capo
+    # — quindi l'override e' UNO, e la base non si tocca.
+    prova("il titolo del P2P ha la sua regola, e solo lui", (True, 1),
+          ('.scoprire-card[data-id="p2p"] .sc-titolo{'
+           'left:22px;font-size:20px}' in mini,
+           mini.count('data-id="p2p"] .sc-titolo{')))
+    prova("...e nessun'altra card sposta il suo titolo", 0,
+          sum(mini.count('data-id="%s"] .sc-titolo{' % _i)
+              for _i in ("lampo", "sconto")))
+    # ...e la fascia del contrasto LEGGE quell'override, o
+    # continuerebbe a sorvegliare dove il titolo stava ieri: e' la
+    # riga che tiene vera la prova del contrasto qui sotto (torturata
+    # spingendo l'override oltre il filo del disegno — rossa la sua,
+    # verdi le sorelle).
+    _io = open("prove.py", encoding="utf-8").read()
+    prova("la fascia legge la regola della card, non solo la base",
+          (True, True),
+          ("_ov = _blocco('.scoprire-card[data-id=" in _io,
+           '_num(_ov, "left:", _num(_base, "left:"))' in _io))
     # tre: l'aria-label della card, la riserva e il titolo — un
     # quarto posto sarebbe un doppione da guardare
     prova("...e il testo e' quello del catalogo, tre volte", 3,
@@ -22946,18 +22968,36 @@ def prove_scoprire():
 
         _lc = _lum((250, 244, 228))          # la crema del titolo
         # la geometria viene dal CSS e non da qui: chi ritocca
-        # .sc-titolo sposta la fascia senza toccare la prova
-        _t = mini[mini.index(".sc-titolo{"):]
-        _t = _t[:_t.index("}")]
+        # .sc-titolo sposta la fascia senza toccare la prova.
+        # E SI LEGGE LA REGOLA CHE VALE PER QUELLA CARD, non solo la
+        # base (ago 2026): il P2P ha il titolo piu' a destra e piu'
+        # grande, e una fascia calcolata sulla base guarderebbe dove
+        # il suo titolo stava IERI — certificherebbe un pezzo di
+        # disegno che nessuna lettera tocca piu', lasciando scoperto
+        # quello dove sono finite. L'id della card E' il nome del file
+        # (il patto di FILE_SCOPRIRE), quindi il legame fra la regola
+        # e il banner non ha bisogno di un secondo elenco.
+        def _blocco(sel):
+            _i = mini.find(sel)
+            if _i < 0:
+                return ""
+            _r = mini[_i + len(sel):]
+            return _r[:_r.index("}")]
 
-        def _num(chiave):
-            _p = _t[_t.index(chiave) + len(chiave):]
+        def _num(_b, chiave, se_manca=None):
+            if chiave not in _b:
+                return se_manca
+            _p = _b[_b.index(chiave) + len(chiave):]
             return float(re.match(r"[\d.]+", _p).group())
 
-        _sx, _largo = _num("left:"), _num("width:")
-        _corpo, _passo = _num("font-size:"), _num("line-height:")
+        _base = _blocco(".sc-titolo{")
+        _largo, _passo = _num(_base, "width:"), _num(_base, "line-height:")
         _F, _ALTA, _M = 3, 115, 12      # 750/250; la card; il margine dell'onda
         for _f, _testo in BANNER.items():
+            _ov = _blocco('.scoprire-card[data-id="%s"] .sc-titolo{'
+                          % _f.rsplit(".", 1)[0])
+            _sx = _num(_ov, "left:", _num(_base, "left:"))
+            _corpo = _num(_ov, "font-size:", _num(_base, "font-size:"))
             _im = _Im.open(os.path.join(
                 "assets", "scoprire", _f)).convert("RGB")
             # un em per carattere: stima per ECCESSO, mai per difetto

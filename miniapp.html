@@ -944,6 +944,21 @@
     font-family:'Baloo 2',system-ui,sans-serif;font-size:17px;
     line-height:1.15;font-weight:800;color:#FAF4E4}
   .scoprire-card img ~ .sc-titolo{display:flex}
+  /* IL TITOLO DEL P2P STA PIU' A DESTRA E PIU' GRANDE, e SOLO il suo
+     (ago 2026, decisione di Andrea): «P2P» e' tre caratteri, e nella
+     scatola tarata su «Sconti dei negozi» si perdeva in un angolo.
+     Le sorelle non si toccano — i loro titoli quella scatola la
+     riempiono davvero, e allargarli li manderebbe a capo.
+     MISURATO PRIMA DI FISSARLO, e i numeri sono la ragione di QUESTI
+     numeri: spostare a destra fa DUE lavori, allontana dalla scia che
+     sale a destra e scavalca la sua coda in basso a sinistra (a
+     left:14 un corpo da 21 non passerebbe, a left:18 si). Il filo del
+     disegno sta a x=289 sull'immagine; qui l'inchiostro vero finisce
+     a 166 e la fascia sorvegliata a 258, cioe' 10px CSS di margine.
+     Chi lo sposta ancora o lo ingrandisce lo sente dalla CI — la
+     fascia del contrasto legge QUESTA regola, non piu' la sola base:
+     senza, avrebbe continuato a guardare dove il titolo stava ieri. */
+  .scoprire-card[data-id="p2p"] .sc-titolo{left:22px;font-size:20px}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =

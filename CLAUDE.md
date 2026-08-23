@@ -1888,9 +1888,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lunghi o — sui corti — pretende che il disegno sia scuro dove
   nessuna lettera arrivera' MAI. Si deriva dal `testo` del catalogo e
   dalla geometria del CSS (`left`, `width`, `font-size`,
-  `line-height`, letti dal foglio e non ribattuti), quindi si aggiorna
-  DA SOLA: allungare un titolo allarga la fascia, e se il disegno non
-  ci arriva la CI lo dice. LA LARGHEZZA SI STIMA A UN EM PER
+  `line-height`, letti dal foglio e non ribattuti) — e dalla REGOLA
+  CHE VALE PER QUELLA CARD e non dalla sola base, da quando il P2P ha
+  il titolo suo: una fascia calcolata sulla base guarderebbe dove quel
+  titolo stava IERI, cioe' certificherebbe un pezzo di disegno che
+  nessuna lettera tocca piu' lasciando scoperto quello dove sono
+  finite. L'id della card E' il nome del file (il patto di
+  FILE_SCOPRIRE), quindi il legame fra la regola e il banner non vuole
+  un secondo elenco. Cosi' si aggiorna DA SOLA: allungare o spostare
+  un titolo muove la fascia, e se il disegno non ci arriva la CI lo
+  dice — torturata spingendo l'override oltre il filo, dove diventa
+  rossa la sua e restano verdi le sorelle. LA LARGHEZZA SI STIMA A UN EM PER
   CARATTERE — in CI un font non si sa misurare (niente fontTools), ma
   un glifo non e' mai piu' largo del corpo del testo nemmeno in un
   font pesante, quindi la stima sbaglia SEMPRE per eccesso, cioe'
@@ -1903,9 +1911,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   allentata di un pixel (10,98 e 12,04; la card nuova sta a 14,41).
   ⚠️ E IL TITOLO E' «P2P» PER UNA RAGIONE MISURATA, non per gusto:
   «P2P in arrivo» andava a capo e occupava tutta la scatola da 96px,
-  e li' sbatteva contro l'onda dorata del disegno — su UNA riga il
-  margine e' 78px CSS di titolo, oltre i quali quel disegno va
-  rifatto. Chi lo allunga rimisuri, o lo sente dalla CI.
+  e li' sbatteva contro l'onda dorata del disegno. Chi lo allunga
+  rimisuri, o lo sente dalla CI.
+  E STA PIU' A DESTRA E PIU' GRANDE DELLE SORELLE (ago 2026,
+  decisione di Andrea): `left:22px; font-size:20px`, contro i 14 e i
+  17 della base — tre caratteri nella scatola tarata su «Sconti dei
+  negozi» si perdevano in un angolo. SOLO il suo, ed e' la meta' da
+  non uniformare: i titoli delle sorelle quella scatola la riempiono
+  davvero, e allargarli li manderebbe a capo.
+  SPOSTARE A DESTRA FA DUE LAVORI, ed e' la cosa che leggendo il
+  disegno non si vede: allontana dalla scia che sale a destra E
+  scavalca la sua coda in basso a sinistra — a `left:14` un corpo da
+  21 NON passerebbe, a `left:18` si. Chi tara questi due numeri li
+  muova insieme.
+  I NUMERI, misurati sul file vero e non estrapolati: il disegno
+  regge fino a x=289 sull'immagine; l'inchiostro VERO di «P2P»
+  finisce a 166 (misurato a schermo, non dedotto: 41px CSS di
+  margine) e la fascia sorvegliata a 258, cioe' **10px CSS**. E' la
+  fascia a decidere, non l'inchiostro — la CI guarda quella — quindi
+  il margine da leggere e' il secondo, ed e' stretto apposta: la
+  stima a un em per carattere e' 1,8 volte la larghezza vera, e chi
+  sposta ancora a destra o ingrandisce ancora lo sente subito.
   IL FILE E' `assets/scoprire/p2p.webp`, 750x345 come le sorelle, e
   arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
   (ImageOps.fit LANCZOS q92 method=6).
