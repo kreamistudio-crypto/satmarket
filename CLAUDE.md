@@ -15976,10 +15976,79 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'aveva tolto da qui. È un quarto caso che la lapide non aveva
   previsto, e per chiuderlo servirebbe distinguere «nato non
   pubblicato» da «tolto»: è una decisione, non una riga.
-  QUELLO CHE NON C'È ANCORA, dichiarato: il
-  registro agganciato in `_incassa_ordine` e la notifica di vendita
-  col «−N su …» (tappa 4: oggi le pendenti si leggono e si spengono,
-  ma a scriverle non c'è ancora nessuno), gli endpoint e il cassetto
+  IL REGISTRO SCRITTO (ago 2026, tappa 4): fino a ieri le pendenti si
+  LEGGEVANO (`_saldo_pendente`) e si SPEGNEVANO (`rifletti_pendenti`),
+  ma a METTERCI UNA RIGA non c'era nessuno — quindi ogni vendita fatta
+  qui veniva rialzata dal sync entro l'ora, e sul pezzo unico il
+  'venduto' risorgeva. Non falliva da solo: nessuna eccezione, nessun
+  log, solo un numero che torna su. Adesso `registra_uscita_negozio`
+  scrive nella STESSA transazione dello stock — la pendente e il pezzo
+  che se n'è andato sono lo stesso fatto — e i ganci sono DUE:
+  `_incassa_ordine`, cioè il funnel da cui passano tutte e tre le
+  strade dell'accredito, e `_rimborsa_compratore`. C'è la prova che
+  restino due: il terzo di domani (un annullo, uno storno) deve venire
+  a leggere questa voce.
+  `tipo` È OBBLIGATORIO E SENZA DEFAULT (la lezione di `atteso_sats`):
+  è il SEGNO del movimento, e chi lo dimentica lo sente da Python
+  invece di scrivere una vendita al posto di un rimborso. E si passa
+  da `da_connettore` e mai da una colonna a mano: su una riga «a due
+  teste» quel giudice risponde 'nostr', quindi non si registra niente
+  — il verso prudente, che quella riga il libro mastro la segnala già
+  come guasto suo. Idempotente per COSTRUZIONE e non per attenzione di
+  chi chiama (la UNIQUE, come `xp_eventi`), e un `INSERT OR IGNORE`
+  che non scrive non finisce nell'elenco, quindi nemmeno nella
+  notifica.
+  IL RIMBORSO È LA METÀ CHE SI DIMENTICA, e senza di lui la tappa 4
+  introdurrebbe un difetto peggiore di quello che cura: una vendita
+  rimborsata continuerebbe a sottrarre un pezzo fantasma A OGNI GIRO,
+  per sempre. Due casi e due comportamenti: se il negozio non l'aveva
+  ancora scalata le due si CANCELLANO (la vendita passa ad
+  `'annullata'`, terzo stato del registro, e al venditore non si dice
+  niente — là non è mai successo nulla); se l'aveva già fatto i pezzi
+  vanno RIMESSI, e la riga `'rimborso'` con delta POSITIVO è insieme
+  la correzione del conto e la cosa da dirgli.
+  DA LÌ IL SALDO COL SEGNO, che è il cambio di contratto della tappa:
+  `_pendenti` contava dei PEZZI e chi lo leggeva li sottraeva
+  (`- abs(...)`), e col registro che adesso contiene anche i rimborsi
+  quel valore assoluto avrebbe NASCOSTO DUE VOLTE dei pezzi che ci
+  sono. Ora è `_saldo_pendente` — il nome dice il segno — e
+  `quantita_corretta(esterno, saldo)` fa `max(0, esterno + saldo)`: è
+  la convenzione che lo schema di `connettori_uscite` dichiara dal
+  primo giorno («negativo = venduto qui; positivo = rimborso»). Le due
+  prove di ieri hanno cambiato lato col perché scritto.
+  E `rifletti_pendenti` GUARDA IL VERSO: un calo del negozio spegne le
+  VENDITE in attesa, una risalita spegne i RIMBORSI — righe di segno
+  opposto al movimento non si toccano. Senza, il venditore che rimette
+  a magazzino i pezzi di un reso spegnerebbe con quella risalita una
+  vendita pendente che non c'entra niente, e da lì in poi il conto
+  sarebbe storto per sempre.
+  LA RIGA CHE IL VENDITORE LEGGE è il giudice puro `_coda_magazzino`
+  (righe in, testo out: si tortura in CI invece di guardarlo
+  soltanto), in fondo alla notifica perché è l'unica cosa che gli
+  chiede di uscire da Barattolo — «📦 Aggiorna il magazzino sul tuo
+  negozio: −2 «Miele»». IL «PERCHÉ» NON SI TOGLIE, ed è la metà che
+  conta: finché la fase 2 non scrive sul suo negozio, quel prodotto di
+  là risulta ancora disponibile, e un venditore che non lo sa lo
+  scopre vendendo due volte l'ultimo pezzo — dirlo a ogni vendita è il
+  prezzo dichiarato della sola lettura. Il titolo è testo del
+  VENDITORE su un tubo HTML: si tronca PRIMA e si escapa DOPO.
+  E I DUE FIX SHOPIFY, che erano la coda della tappa 3 (ago 2026):
+  1) IL `Link` SI SEGUE MA NON DOVE VUOLE LUI. Là il cursore è opaco e
+  l'indirizzo della pagina dopo lo scrive il negozio, quindi si lega
+  all'HOST DEL COLLEGAMENTO — è la stessa regola che su Woo viene
+  gratis perché le pagine si numerano. Senza, chi risponde su quel
+  dominio poteva far bussare il server a un host qualunque col token
+  di quel negozio in mano: il guardiano del trasporto ferma gli
+  indirizzi privati, non gli estranei pubblici. E ALZA, non si ferma —
+  fermarsi consegnerebbe alla riconciliazione un catalogo LETTO A
+  METÀ, che sulle sparizioni si fida.
+  2) IL TETTO LATENTE, il gemello di quello che su Woo si era pagato
+  per davvero: reggeva solo perché la pagina è da 250 e il tetto 200,
+  e alzare `MAX_PRODOTTI_CONNETTORE` a 250 avrebbe troncato in
+  silenzio. Qui il conto esatto non serve: se dopo il ciclo c'è ancora
+  un `url`, c'è ancora una pagina — lo dice Shopify stesso nel suo
+  header, quindi è esatto e non un'euristica.
+  QUELLO CHE NON C'È ANCORA, dichiarato: gli endpoint e il cassetto
   (tappa 5). E `origine_scorta` — la coordinata che serve al
   decremento — NON esiste come colonna: è fase 2, e non si aggiunge
   una colonna per una cosa che non c'è (il precedente di
@@ -19844,6 +19913,39 @@ un WooCommerce vero — i certificati di un self-hosted, i permessi
 veri di una chiave (le impostazioni le legge una chiave «Read»), e
 soprattutto un negozio configurato coi prezzi al netto, che è il caso
 su cui questa tappa dice di no.
+
+E la TAPPA 4 (ago 2026): il registro delle uscite, finalmente
+SCRITTO. Dalla tappa 2 le pendenti si leggevano e si spegnevano, ma a
+metterci una riga non c'era nessuno — quindi ogni vendita fatta qui
+sarebbe stata rialzata dal sync entro l'ora, e sul pezzo unico il
+'venduto' sarebbe risorto. Adesso `registra_uscita_negozio` scrive
+nella stessa transazione dello stock, coi ganci in `_incassa_ordine`
+(il funnel di tutte e tre le strade dell'accredito) e in
+`_rimborsa_compratore`; il venditore legge in fondo alla notifica la
+riga operativa «📦 Aggiorna il magazzino sul tuo negozio: −2 «Miele»»,
+col PERCHÉ, che è la metà che conta. Vedi la voce in Architettura,
+«IL REGISTRO SCRITTO», per il rimborso — la metà che si dimentica, e
+senza la quale la tappa 4 introdurrebbe un difetto peggiore di quello
+che cura — e per il SALDO COL SEGNO, il cambio di contratto che ne
+discende (`- abs(...)` avrebbe nascosto due volte dei pezzi che ci
+sono). Nello stesso giro i due fix Shopify che erano in coda alla
+tappa 3: l'host della pagina successiva legato al collegamento, e il
+tetto che non tronca più in silenzio.
+Collaudata: 5105 prove verdi (le nuove GIRANO il registro su un
+database di cartone — il giro chiuso vendita → rimborso → saldo — e i
+due lettori Shopify sulle loro due strade) più
+`collaudo_connettori.py` a 69 verdi (era 54), dove `_incassa_ordine`
+e `_rimborsa_compratore` VERE scrivono il registro e il sync poi non
+rialza niente; e 18 mutazioni, una per riga sorvegliata.
+IN PRODUZIONE il deploy non cambia niente: nessuna colonna, nessuna
+migrazione — `connettori_uscite` e i suoi stati esistevano già — e
+`CONNETTORI_NEGOZIO_APERTI` è ancora SPENTA nel codice, quindi finché
+nessuno collega un negozio il registro resta vuoto e i due ganci non
+scrivono una riga.
+DA GUARDARE al rodaggio: la PRIMA vendita vera su un annuncio
+importato — che il venditore legga la riga del magazzino e che il
+giro d'ora dopo non gli rialzi la giacenza — e il primo reso, che è
+il caso in cui il registro deve tornare in pari da solo.
 
 La barra delle pillole si legge (ago 2026, due cose dal campo): la
 pillola del reparto scelto si porta al CENTRO della fila invece di
