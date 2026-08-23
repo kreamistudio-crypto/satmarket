@@ -3107,6 +3107,40 @@
     color:var(--ink);box-shadow:0 2px 0 var(--ink);margin-top:0}
   .btn.mini:active{transform:translateY(2px);box-shadow:none}
   .btn[disabled]{opacity:.5;pointer-events:none}
+  /* LA RIGA DEL CAMPO FILE (ago 2026, dal campo): il chip col nome e
+     il «togli» finivano SOTTO il bottone, e il «togli» centrato —
+     MISURATO prima di toccare: tre righe e 152px, col bottone e il
+     link larghi 254px per un chip che ne chiede 155. La causa e' che
+     `.btn` nasce `width:100%`, che dentro un flex si prende la riga
+     intera; il flex-wrap poi mandava a capo gli altri due.
+     Una CLASSE e non due `style=` gemelli: i due campi — la busta e
+     la foto del contenuto — sono lo stesso mestiere, e copiati a mano
+     divergono al primo ritocco (la lezione di `.fila-promesse`).
+     IL CHIP VA A CAPO INTERO, NON A PUNTINI, ed e' la riga che il
+     giro a schermo ha corretto: senza il wrap il nome si riduceva a
+     «...» (31px MISURATI a 320), che e' peggio del difetto di
+     partenza — li' almeno si leggeva. Col wrap il chip non ci sta
+     alla sua base e scende, portandosi dietro il «togli», che gli
+     resta ACCANTO invece di essere centrato su una riga sua: e' quel
+     che dava fastidio. I puntini restano per il nome lunghissimo,
+     dove nemmeno da solo ci sta. */
+  .campo-file{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    margin-top:6px}
+  .campo-file .btn{width:auto;margin-top:0;flex:0 0 auto}
+  /* il nome e il «togli» sono UN item solo, o a certe larghezze si
+     separano — misurato a 375: il chip restava accanto al bottone e
+     il «togli» scendeva DA SOLO, cioe' il gesto lontano dalla cosa
+     su cui agisce. Avvolti, vanno a capo insieme. */
+  .campo-file .cf-chip{display:flex;align-items:center;gap:8px;
+    min-width:0;flex:0 1 auto}
+  /* i puntini sono del NOME DEL FILE (`.mono`) e non della prosa: il
+     ramo del «togli» ci mette una FRASE, e una frase troncata a
+     «...al salvatag...» e' peggio di una frase a capo — visto a
+     schermo. Il nome invece puo' essere lungo a piacere e di lui
+     basta l'inizio. */
+  .campo-file .hint{min-width:0;margin:0}
+  .campo-file .hint.mono{overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
 
   /* ---------- FIRMA: la cassaforte escrow ----------
      Dal redesign e' il recinto verde tratteggiato: i sats "nel
@@ -16961,10 +16995,21 @@ function openOrder(id){
                : (o.role==='seller'
                    ? 'Proponi tu giorno e ora'
                    : 'Il venditore deve ancora proporre giorno e ora')}
+        /* IL PASSO CHE DEVE ANCORA SUCCEDERE PARLA AL FUTURO (ago
+           2026): al compratore la riga diceva «il venditore consegna»
+           mentre il venditore deve ancora farlo. Non serve guardare
+           lo stato del passo: la riga distingue gia' fatto e non
+           fatto col FLAG, e non con `progress` — consegna_digitale
+           scrive lo stato e il contenuto nella STESSA transazione,
+           quindi contenutoPresente e' falso esattamente quando il
+           passo e' `now` (o `todo`) e vero quando e' `done`. Al
+           futuro va il SOLO ramo del compratore: al venditore
+           «Consegni il contenuto qui» non e' un'attesa ma
+           un'istruzione — dice DOVE si consegna. */
         : digitale
         ? {t:'Contenuto consegnato',d:o.role==='seller'
             ? (o.contenutoPresente?'Hai consegnato il contenuto in piattaforma':'Consegni il contenuto qui in piattaforma')
-            : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma')}
+            : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegnerà il contenuto in piattaforma')}
         : ritiro
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
         : {t:'Oggetto spedito',     d:o.tracking?rigaSpedizione()
@@ -21193,9 +21238,9 @@ function campoFotoContenuto(o, c){
     <div style="margin-top:10px">
       <div class="hint">🖼 Se il buono ha un <b>codice a barre</b> o un QR, allega qui la foto: trascriverlo a mano non basta. Il testo serve comunque — scrivici almeno dove si riscatta.</div>
       <input type="file" id="digFile" accept="application/pdf,image/*" style="display:none" onchange="scegliFotoContenuto(this)">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
-        <button class="btn ghost" onclick="el('digFile').click()">${gia||digDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
-        ${riga}
+      <div class="campo-file">
+        <button class="btn ghost mini" onclick="el('digFile').click()">${gia||digDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
+        ${riga ? `<span class="cf-chip">${riga}</span>` : ''}
       </div>
     </div>`;
 }
@@ -22016,9 +22061,9 @@ function campoDocumentoBusta(o, b){
     <div style="margin-top:10px">
       <div class="hint">📄 Oppure, se il corriere ti manda l'etichetta o il <b>QR</b> del locker, caricalo qui: un PIN si riscrive, un QR no. PDF o immagine, fino a 15 MB.</div>
       <input type="file" id="bustaFile" accept="application/pdf,image/*" style="display:none" onchange="scegliDocBusta(this)">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
-        <button class="btn ghost" onclick="el('bustaFile').click()">${gia||bustaDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
-        ${riga}
+      <div class="campo-file">
+        <button class="btn ghost mini" onclick="el('bustaFile').click()">${gia||bustaDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
+        ${riga ? `<span class="cf-chip">${riga}</span>` : ''}
       </div>
     </div>`;
 }

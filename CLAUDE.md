@@ -20992,11 +20992,40 @@ chiaro come già fa il testo — la riga d'avvio lo dichiara. DA
 GUARDARE al primo giro: il primo buono cartaceo vero consegnato con
 la foto dentro Telegram, e che il compratore la veda solo dopo aver
 rivelato.
-SEGNALATO E NON TOCCATO (fuori perimetro): nel campo del file il chip
-col nome e il «togli» vanno a capo sotto il bottone, e il «togli»
-finisce centrato — `.btn` è a larghezza piena. È il layout del
-GEMELLO della busta, copiato riga per riga apposta: si sistema per
-tutti e due o per nessuno.
+LA RIGA DEL CAMPO FILE, PER TUTTI E DUE (ago 2026, il giro dopo,
+chiesto da Andrea): il chip col nome e il «togli» andavano a capo
+sotto il bottone e il «togli» finiva centrato a tutta larghezza,
+sembrando un secondo bottone principale. MISURATO prima di toccare —
+**tre righe e 152px**, col bottone e il link larghi 254px per un chip
+che ne chiede 155 — e la causa è che `.btn` nasce `width:100%`, che
+dentro un flex si prende la riga intera.
+UNA CLASSE E NON DUE `style=` GEMELLI (`.campo-file`): i due campi —
+la busta e la foto del contenuto — sono lo stesso mestiere, e copiati
+a mano divergono al primo ritocco (la lezione di `.fila-promesse`).
+Il bottone passa a `.btn.mini`, che esiste già ed è nato per questo:
+«la ricetta del ghost in formato da riga».
+DUE COSE LE HA CORRETTE IL GIRO A SCHERMO, e nessuna delle due si
+vedeva leggendo il foglio. 1) SENZA IL WRAP il nome si riduceva a
+«🖼 …» — **31px MISURATI a 320** — che è peggio del difetto di
+partenza: lì almeno si leggeva. Col wrap il chip non ci sta alla sua
+base e scende INTERO. 2) IL NOME E IL «TOGLI» SONO UN ITEM SOLO
+(`.cf-chip`): a 375 il chip restava accanto al bottone e il «togli»
+scendeva DA SOLO — il gesto lontano dalla cosa su cui agisce.
+E I PUNTINI SONO DEL NOME, NON DELLA PROSA: il ramo del «togli in
+attesa» ci mette una FRASE, e «…verrà tolta al salvatag…» è peggio di
+una frase a capo. La regola vive su `.hint.mono`, che è il vestito del
+nome file; la frase resta libera di andare a capo.
+Risultato: **87px invece di 152**, uguale a 320, 360 e 375 — bottone
+compatto sopra, «nome — togli» accanto sotto.
+Provato: 5481 verdi (7 sentinelle nuove, fra cui il CENSIMENTO che i
+campi file sono DUE — il terzo di domani viene a leggere questa riga
+invece di ricopiarsi uno stile) e CINQUE MUTAZIONI, cinque uccise;
+più il giro dal vivo a 320/360/375 nei due temi su tutti gli stati dei
+DUE campi (senza file, file scelto, file già caricato, «togli» in
+attesa), zero errori JS e nessuno sbordo. ⚠️ L'ancora della mutazione
+del chip è AMBIGUA apposta — la coda del template è identica nei due
+gemelli, che è il punto del cantiere: se ne muta UNA e la sentinella
+che ne conta DUE diventa rossa.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

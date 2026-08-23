@@ -4113,6 +4113,41 @@ def prove_foto_contenuto():
     prova("...e le due copie dell'ordine restano allineate", True,
           "orders.find(x=>x.id===currentOrder.id)" in _cc)
 
+    # --- 7) LA RIGA DEL CAMPO FILE, per TUTTI E DUE ---------------
+    # Le prove stanno qui perche' il cantiere e' nato da questo
+    # campo, ma la regola e' CONDIVISA con la busta: sono lo stesso
+    # mestiere, e il difetto era identico su tutti e due.
+    # IL DIFETTO, misurato prima di toccarlo: tre righe e 152px, col
+    # bottone e il «togli» larghi 254px per un chip che ne chiede 155
+    # — `.btn` nasce `width:100%` e dentro un flex si prende la riga.
+    # Il conto e' DUE e non un numero a caso: e' il censimento dei
+    # campi file, e il terzo di domani deve venire a leggere questa
+    # riga invece di ricopiarsi uno stile.
+    prova("i campi file passano dalla classe, e sono DUE", 2,
+          mini.count('<div class="campo-file">'))
+    # lo `style=` gemello non torna: era la copia a mano che li
+    # faceva divergere (la lezione di `.fila-promesse`)
+    prova("...e nessuno se lo riscrive a mano", 0,
+          mini.count('display:flex;align-items:center;gap:8px;'
+                     'flex-wrap:wrap;margin-top:6px'))
+    # LA RIGA CHE TOGLIE IL DIFETTO: senza, il bottone torna a
+    # prendersi la riga intera e gli altri due vanno a capo
+    prova("dentro la riga il bottone e' largo quanto il suo testo",
+          True, ".campo-file .btn{width:auto" in mini)
+    # il nome e il «togli» sono UN item: a 375 si separavano — il
+    # gesto lontano dalla cosa su cui agisce
+    prova("il nome e il «togli» sono un item solo", 2,
+          mini.count('<span class="cf-chip">'))
+    prova("...e il loro involucro non si spezza", True,
+          ".campo-file .cf-chip{display:flex" in mini)
+    # I PUNTINI SONO DEL NOME, NON DELLA PROSA: il ramo del «togli»
+    # ci mette una frase, e «...al salvatag...» e' peggio di una
+    # frase a capo (visto a schermo)
+    prova("i puntini valgono per il nome del file", True,
+          ".campo-file .hint.mono{overflow:hidden" in mini)
+    prova("...e non per la prosa che gli sta accanto", True,
+          ".campo-file .hint{min-width:0;margin:0}" in mini)
+
 
 def prove_indirizzo_casa():
     """L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — li'
