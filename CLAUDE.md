@@ -1506,7 +1506,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `pilloleModalita` idem nella scheda, e soprattutto `servizio_dove` e
   `durata_min` NON erano in `CAMPI_VETRINA`: il venditore li
   dichiarava nel form, il server li scriveva in colonna, e tornavano
-  solo alla sua pagina di MODIFICA. Chi comprava non sapeva se la
+  solo alla sua pagina di MODIFICA. [FALSO A META', scoperto ago 2026:
+  il server NON li scriveva affatto — vedi «IL DOVE DEL SERVIZIO»,
+  sotto, nella voce dei servizi.] Chi comprava non sapeva se la
   lezione fosse online o di persona né che durasse un'ora — e la
   DURATA è metà del «definito» che il prompt della moderazione
   pretende: la chiedevamo e poi la nascondevamo. Il testo lo compone
@@ -6944,8 +6946,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessun sollecito, e `segna_spedito` lo accetta** — il silenzio
   peggiore. Ora è `strade_annuncio(a)`, l'idioma di casa.
   IL MODELLO: colonne additive (`annunci.durata_min`,
-  `annunci.servizio_dove` — `online`|`presenza`, che NON è un ornamento:
-  decide la guardia della zona) e su `ordini` l'appuntamento
+  `annunci.servizio_dove` — `online`|`presenza`|`''`, dall'ago 2026
+  SOLO informativo: vedi «IL DOVE DEL SERVIZIO» qui sotto) e su
+  `ordini` l'appuntamento
   (`appuntamento_il`, `_proposto_il`, `_confermato_il` — **0 = nessuna
   finestra parte**, è il `busta_il` di questo cantiere —, `_proposte`,
   `_mosso_il`), l'accesso (`accesso_testo` CIFRATO con
@@ -6994,6 +6997,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e adesso lo sono anche le parole: `invitoNota(servizio)` per i TRE
   posti che le scrivono (segnaposto, cassa, ordine), o direbbero tre
   cose diverse sullo stesso campo.
+  IL DOVE DEL SERVIZIO (ago 2026, tre cose dal campo e una quarta
+  trovata costruendo). 1) Le pillole «online / di persona» non si
+  illuminavano: usavano la classe `on`, che nel foglio non veste
+  nessuna `.consegna-pill` — la classe accesa e' `attiva`, come per
+  tutte le sorelle. Il valore cambiava, il vestito no, e nessuna
+  sentinella guardava quelle due pillole. 2) LA ZONA NON E' PIU'
+  OBBLIGATORIA «DI PERSONA» (decisione di Andrea): un servizio a
+  domicilio si fa a casa del CLIENTE, e il venditore non sa dove. Via
+  il secondo 400 di `guardia_zona_condizione`, il toast di publish e
+  la label; resta facoltativa, e se scritta dev'essere un comune come
+  per tutti. 3) IL CAMPO E' FACOLTATIVO, col terzo stato `''` = non
+  dichiarato (decisione di Andrea, che ROVESCIA il «NON e' un
+  ornamento: decide la guardia» della nascita): nessuna pillola nasce
+  accesa, il ritocco spegne (il gesto del barattolino), e la scheda
+  dice «📅 Su appuntamento · 1 ora» invece di inventare una
+  videoconferenza. Si tiene perche' ha DUE lettori veri — la pillola
+  della scheda e il title del 📅 in card — e costa una riga; togliere
+  proprio la scelta era l'alternativa, scartata: chi compra perderebbe
+  la risposta «mi collego o mi faccio trovare?» PRIMA di pagare (dopo
+  c'e' il collegamento depositato, che e' gia' dove-agnostico). Si
+  rivede col primo conto sui servizi veri. 4) E NON SI SCRIVEVA: il
+  giudice calcolava il dove per la sola guardia e lo buttava, l'INSERT
+  di `pubblica` e l'UPDATE di `modifica` non nominavano ne'
+  `servizio_dove` ne' `durata_min`, e la scheda leggeva il DEFAULT per
+  sempre — «In videoconferenza» senza durata, qualunque cosa il
+  venditore avesse dichiarato. Le prove guardavano il giudice, la
+  SELECT e il payload del client: LA SCRITTURA IN MEZZO NON LA
+  GUARDAVA NESSUNO, ed e' il buco per cui e' passato. Nasce
+  `durata_da_payload` (gemello del giudice del dove: 0 fuori dal
+  servizio, storto = 0 e mai un 400) e le due colonne entrano nei due
+  scrittori, con la sentinella che conta i segnaposto dell'INSERT e il
+  collaudo eseguibile `collaudo_servizio_dove.py`, che pubblica per
+  davvero e RILEGGE dal database — l'unica cosa che dimostra che il
+  valore arriva. `iconeCard` e `pilloleModalita` hanno il terzo ramo.
+  L'import CSV e la modifica firmata restano fuori: il servizio non
+  passa di la'.
   E LA REVISIONE INSEGNA INVECE DI DIRE SOLO NO (ago 2026, decisione di
   Andrea): a chi scrive «ti sviluppo quello che ti serve», «un
   moderatore lo controllerà» è vero e INUTILE — non dice cosa manca né
@@ -21103,3 +21142,12 @@ Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
+
+Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
+segnati da Andrea — non sono ancora decisi, sono da riprendere):
+- il LUOGO DEL RITIRO A MANO salvato e richiamato a ogni annuncio: il
+  gemello dei punti di ritiro salvati, per chi consegna in zona sempre
+  nello stesso posto;
+- «I MIEI ANNUNCI» resa più fruibile;
+- i PRIVILEGI DEI PIONIERI (la coorte esiste già, non dà ancora niente);
+- il LOCKER DI RISERVA: un secondo punto se il primo non va.
