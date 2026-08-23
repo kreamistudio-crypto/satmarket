@@ -15813,8 +15813,131 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   squillo orario per dire «tutto invariato» è il modo di farsi
   zittire il bot, e col bot zitto si perdono le notifiche degli
   ordini.
-  QUELLO CHE NON C'È ANCORA, dichiarato: il traduttore Woo (tappa 3 —
-  il posto c'è, `TRADUTTORI`/`LETTORI` sono dizionari a innesti), il
+  IL DIALETTO WOOCOMMERCE (ago 2026, tappa 3): stesso mestiere,
+  altre parole — e tre trappole che il gemello Shopify non ha.
+  1) I TIPI CHE NON SAPPIAMO TRATTARE sono TRE (`SALTI_WOO`), e
+  `external` è quello che si dimentica: `variable` è il
+  multi-variante di sempre e `grouped` un contenitore senza prezzo
+  suo, mentre l'affiliazione un prezzo ce l'ha e sembra un prodotto
+  normale — solo che il suo bottone porta su un ALTRO sito, quindi
+  comprarla qui non vorrebbe dire niente.
+  2) `manage_stock` NON È UN BOOLEANO, ed è la trappola gemella
+  della variante di default: può essere la STRINGA `'parent'` (le
+  varianti che ereditano il magazzino dal padre), che in Python è
+  VERA — quindi il confronto è col VALORE (`in (True, 1)`) e non
+  con la verità, o si scriverebbe qui la giacenza di un ALTRO
+  prodotto. Il caso di prova porta un NUMERO accanto a `'parent'`
+  apposta: con lo `stock_quantity` a None anche la versione
+  sbagliata risponderebbe «non lo so», e la prova non direbbe
+  niente (la lezione di `_pare_recapito`).
+  3) LE DUE FACCE DELL'ESAURITO: chi non fa gestire il magazzino a
+  Woo ma dichiara `stock_status: outofstock` sta dicendo un FATTO, e
+  vale ZERO; `onbackorder` invece resta IGNOTO — sul suo negozio
+  quel prodotto si compra ancora, e scriverci zero lo spegnerebbe
+  qui. E la visibilità sono DUE domande e non una (`status`
+  pubblicato E `catalog_visibility` non nascosto).
+  L'IVA È LA DOMANDA CHE DECIDE LA TAPPA, e Woo non la risponde nel
+  PRODOTTO: `price` è la cifra COM'È STATA SCRITTA nel pannello, e col
+  negozio configurato «prezzi inseriti SENZA le tasse» quella cifra è
+  il NETTO — su un'aliquota al 22% metteremmo in vetrina un prezzo più
+  basso del 18% di quello che sul suo sito si paga davvero, e il
+  venditore lo scoprirebbe INCASSANDO. L'ALIQUOTA NON SI INDOVINA
+  (dipende dalla classe di tassazione e dal paese di chi compra:
+  `/taxes` dà una tabella, non un numero), quindi `prezzi_finiti_woo`
+  legge le due impostazioni del negozio — `woocommerce_calc_taxes` e
+  `woocommerce_prices_include_tax` — e decide: tasse spente o prezzi
+  con l'IVA dentro si leggono com'è, prezzi al netto NO.
+  E ALZA INVECE DI SALTARE LE RIGHE, ed è la riga da capire prima di
+  toccarla: una riga saltata NON entra in `viste`, quindi la
+  riconciliazione la tratterebbe come sparita dal negozio e la
+  SPEGNEREBBE — saltare tutto il catalogo vorrebbe dire spegnere la
+  vetrina di quel venditore in un colpo. Un catalogo di cui non
+  sappiamo leggere i prezzi è un catalogo che NON SI È POTUTO
+  LEGGERE, cioè la stessa cosa di una rete caduta: si conta l'errore,
+  la vetrina resta com'era, e il motivo vero finisce in
+  `ultimo_errore`. FAIL-CLOSED su ciò che non si sa (impostazioni
+  illeggibili, 403, campo assente), come `importo_invoice`: fra un
+  connettore che non parte — visibile, diagnosticabile, zero danno —
+  e dei prezzi forse sbagliati del 22% su cose che si comprano, si
+  sceglie il primo. LA PORTA CHE MANCA, dichiarata: chi vende al
+  netto apposta (i negozi B2B) oggi resta fuori, e la leva sarebbe
+  un'aliquota dichiarata nel cassetto del collegamento — una colonna
+  e un campo, cioè roba della tappa 5, e non si aggiunge una colonna
+  per una cosa che non esiste.
+  IL GUARDIANO ANTI-SSRF STA NEL TRASPORTO, e gira su OGNI chiamata e
+  non solo sulla prima: `url_api_ammesso` è la prima riga di
+  `chiama_api_negozio`, quindi ogni lettore futuro la eredita senza
+  doversene ricordare — e nessuno se la ricopia (c'è la prova). Serve
+  soprattutto qui, che l'indirizzo di un Woo LO SCRIVE L'UTENTE
+  mentre il dominio Shopify è di un'azienda sola.
+  E QUI DENTRO GLI URL SI COSTRUISCONO, MAI SI SEGUONO: Shopify pagina
+  con un cursore opaco e l'indirizzo della pagina dopo lo scrive LUI
+  nell'header `Link`, Woo pagina con un NUMERO — quindi l'indirizzo lo
+  componiamo dal `url_negozio` del collegamento e non c'è modo che il
+  negozio ci mandi altrove. La sentinella non dice «non guardare la
+  risposta» (le intestazioni si leggono eccome, `X-WP-Total` viene da
+  lì): dice che l'unica assegnazione di `url` nasce da `base`.
+  `_base_woo` è la cintura di FORMA e non sostituisce la guardia del
+  server — non risolve nessun nome — ma impedisce che da qui esca un
+  URL con dentro una porta, una query o delle credenziali
+  (`https://ck:cs@vero.it`, l'inganno di `link_banner_ammesso`); il
+  percorso è ammesso apposta, che parecchi Woo vivono in una
+  sottocartella. E le chiavi viaggiano in BASIC AUTH e mai in query
+  string, che è l'altra strada che la documentazione di Woo concede:
+  un segreto in un URL finisce nei log di ogni proxy che sta in mezzo.
+  LA BUSTA INTERA DELLE CREDENZIALI: il server passa al lettore il
+  DIZIONARIO e non un campo — Shopify ha un token, Woo una chiave e un
+  segreto — e a sapere che forma hanno è il lettore. Col `token` nella
+  firma il server avrebbe dovuto conoscere le credenziali di ogni
+  piattaforma, che è la stessa cosa che i traduttori esistono per non
+  far sapere a nessuno.
+  NIENTE TETTI IN SILENZIO, ed è un difetto VERO preso provando e non
+  leggendo: con cento prodotti per pagina e un tetto di duecento si
+  atterra ESATTAMENTE sul tetto, quindi il confronto «ne ho letti più
+  del tetto?» — che su Shopify scatta perché la pagina è da 250 — non
+  scattava mai, e il catalogo si troncava senza dirlo (il venditore
+  sarebbe andato a cercare i prodotti mancanti da tutt'altra parte).
+  Il conto vero lo dice WordPress in `X-WP-Total`, e quando c'è
+  COMANDA DA SOLO: senza quella precedenza un negozio con esattamente
+  duecento prodotti — due pagine piene — si sentirebbe dire «ce n'è
+  ancora» a ogni giro, per sempre. Senza l'header vale il fatto che
+  l'ultima pagina era piena. ⚠️ La stessa forma è LATENTE nel lettore
+  Shopify: regge solo perché `PER_PAGINA` (250) è più grande del
+  tetto, e alzare `MAX_PRODOTTI_CONNETTORE` a 250 lo farebbe troncare
+  in silenzio.
+  LE PAGINE SI SCORRONO PER ID CRESCENTE e non col default (la data di
+  pubblicazione): con quello basta che il venditore ritocchi un
+  prodotto mentre stiamo paginando perché una riga scivoli fra due
+  pagine e non la si veda — cioè un prodotto dichiarato sparito e
+  spento per sbaglio. L'id non si muove.
+  E L'INVARIANTE DI CASA VALE ANCHE ALLA NASCITA (difetto della tappa
+  2 che il dialetto Woo rende quotidiano): `venduto <=> quantita = 0`
+  si applicava ai soli aggiornamenti, quindi un prodotto che arriva
+  GIÀ esaurito nasceva 'attivo' con zero pezzi — in vetrina un
+  annuncio comprabile all'occhio che alla cassa dice di no — e nessuna
+  scopa lo raddrizza (quella d'avvio va nell'altro verso: mette a zero
+  i venduti). Raro su Shopify, normale su Woo, dove `outofstock` è il
+  modo consueto di dire «finito» senza far gestire il magazzino.
+  LA TORTURA A 20 MUTAZIONI (una per riga sorvegliata, tutte uccise)
+  HA RIPAGATO LA LEZIONE DEL `find()`: la sentinella che chiede
+  «l'IVA si chiede PRIMA di leggere una pagina» era scritta con
+  `.index()`, e la mutazione che TOGLIE quella riga non la faceva
+  diventare rossa — la faceva ESPLODERE, portandosi dietro
+  ventidue sorelle. Più la trappola della PROSA, per l'ennesima
+  volta: `traduci_woo` la sua aliquota la NOMINA nella docstring per
+  dire che non la tocca, quindi la sentinella che cerca quella parola
+  diventava rossa per colpa di una spiegazione — da lì `_senza_prosa`,
+  che toglie la docstring dove `codice()` toglie i soli commenti `#`.
+  E accanto alla prova della PAROLA c'è quella del GESTO: sul prezzo
+  non c'è nessuna moltiplicazione e nessuna divisione.
+  IMPERFEZIONE DICHIARATA E NON CHIUSA, ereditata dalla tappa 2 e resa
+  frequente da Woo: 'rimosso' non risorge MAI, ma un prodotto che
+  arriva `draft` o `hidden` NASCE 'rimosso' — quindi il giorno che il
+  venditore lo pubblica lo scudo lo tiene fuori per sempre, e nessuno
+  l'aveva tolto da qui. È un quarto caso che la lapide non aveva
+  previsto, e per chiuderlo servirebbe distinguere «nato non
+  pubblicato» da «tolto»: è una decisione, non una riga.
+  QUELLO CHE NON C'È ANCORA, dichiarato: il
   registro agganciato in `_incassa_ordine` e la notifica di vendita
   col «−N su …» (tappa 4: oggi le pendenti si leggono e si spengono,
   ma a scriverle non c'è ancora nessuno), gli endpoint e il cassetto
@@ -19650,6 +19773,38 @@ mangiata un pezzo a ogni riallineamento del venditore, fino a zero.
 Le tappe che seguono: Woo, il registro agganciato in
 `_incassa_ordine` con la notifica di vendita, endpoint + cassetto, e
 il rodaggio con uno store di prova prima dell'accensione dal VPS.
+
+E la TAPPA 3 (ago 2026): il dialetto WOOCOMMERCE — il traduttore coi
+suoi tre tipi che non sappiamo trattare, la trappola di
+`manage_stock: 'parent'`, le due facce dell'esaurito — più le due cose
+che Shopify non ha: l'indirizzo che LO SCRIVE L'UTENTE (guardiano nel
+trasporto, URL costruiti e mai seguiti, Basic auth) e soprattutto
+L'IVA, che Woo non dichiara nel prodotto. Vedi la voce in
+Architettura, «IL DIALETTO WOOCOMMERCE», per il perché
+`prezzi_finiti_woo` ALZA invece di saltare le righe (una riga saltata
+verrebbe spenta dalla riconciliazione: saltare tutto = spegnere la
+vetrina in un colpo) e per la porta che manca, dichiarata e non
+costruita (l'aliquota nel cassetto, tappa 5).
+Collaudata: 5054 prove verdi (le nuove girano i pezzi invece di
+guardarli — il traduttore sui suoi casi, `prezzi_finiti_woo` su un
+negozio di cartone nei cinque, il lettore sul tetto) più
+`collaudo_connettori.py` a 54 verdi (era 35) col SECONDO negozio
+finto, dove la prova che conta è che coi prezzi al netto **nessun
+annuncio si spegne**; e **20 MUTAZIONI, 20 uccise**, una per riga
+sorvegliata. Il primo giro ne ha lasciate vive due — tutte e due
+sentinelle mie, la prosa della docstring e il `.index()` che ESPLODE
+invece di diventare rossa — e ha trovato DUE DIFETTI VERI che
+leggendo non si vedevano: il catalogo troncato in silenzio a
+duecento prodotti esatti, e l'invariante `venduto <=> quantita = 0`
+che non valeva alla NASCITA (su Woo un prodotto già esaurito nasceva
+'attivo' con zero pezzi: comprabile all'occhio, rifiutato alla cassa).
+IN PRODUZIONE il deploy non cambia niente: nessuna colonna, nessuna
+migrazione, e `CONNETTORI_NEGOZIO_APERTI` è ancora SPENTA nel codice.
+DA GUARDARE al rodaggio, ed è il pezzo che in locale non si può fare:
+un WooCommerce vero — i certificati di un self-hosted, i permessi
+veri di una chiave (le impostazioni le legge una chiave «Read»), e
+soprattutto un negozio configurato coi prezzi al netto, che è il caso
+su cui questa tappa dice di no.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
