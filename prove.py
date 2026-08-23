@@ -2140,8 +2140,21 @@ def prove_niente_passo_intermedio():
           "consegnato=?" in corpo("leggi_contenuto_digitale"))
 
     # --- 3) LA STANZA RESTA: da 'delivered' si esce ancora -------
-    prova("il server accetta 'delivered' da due porte", 2,
-          _SORGENTE.count("'locked','shipped','delivered'"))
+    # Il censimento NOMINA invece di contare (ago 2026): il numero
+    # secco diceva «due» e bastava cambiarlo per far passare la terza
+    # — mentre chi accetta quello stato va DETTO, perche' le ragioni
+    # sono diverse. Le prime due sono uscite vere; la terza e' un
+    # INGRESSO CHE RIFIUTA: `consegna_digitale` lo fa entrare apposta
+    # per poter dire «l'hai gia' rivelato» invece del «non permesso»
+    # che vale per tutto, e da li' non si corregge niente.
+    _porte = {_SORGENTE[_SORGENTE.rfind("def ", 0, _m) + 4:
+                        _SORGENTE.index("(", _SORGENTE.rfind("def ", 0, _m))]
+              for _m in [_i for _i in range(len(_SORGENTE))
+                         if _SORGENTE.startswith(
+                             "'locked','shipped','delivered'", _i)]}
+    prova("chi accetta 'delivered' e' dichiarato",
+          {"conferma_ricezione", "apri_disputa", "consegna_digitale"},
+          _porte)
     for f in ("conferma_ricezione", "apri_disputa"):
         prova(f"{f}: 'delivered' e' ancora nella WHERE", True,
               "'locked','shipped','delivered'" in corpo(f))
@@ -3064,13 +3077,14 @@ def prove_busta_ritiro():
             _t = mini.rfind("function ", 0, _m.start())
             fuori.add(mini[_t + 9:mini.index("(", _t + 9)])
         return fuori
-    # Cinque dall'ago 2026: il collegamento del servizio e' la quinta,
-    # ed e' una lettura come le altre — il GET e' puro, aprire un link
-    # non e' una ricevuta (a differenza del codice digitale, dove la
-    # prima lettura E' la rivelazione).
-    prova("l'attesa ritardata la chiamano solo le cinque LETTURE",
+    # Sette dall'ago 2026, e le due ultime sono la foto del contenuto:
+    # aprirla e rileggerla per correggerla sono GET puri, come il
+    # collegamento del servizio. La sola lettura che NON sta qui e' la
+    # rivelazione del codice digitale, dove leggere E' la ricevuta.
+    prova("l'attesa ritardata la chiamano solo le sette LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
-           "apriDocBusta", "mostraAccesso"},
+           "apriDocBusta", "mostraAccesso",
+           "apriFotoContenuto", "apriCorrezioneContenuto"},
           _chi_chiama("attesaRitardata(btn,"))
     # IL GEMELLO: chi non passa un testo si prende «Invio sats in
     # corso…», quindi il default puo' restare SOLO a chi i sats li
@@ -3744,7 +3758,7 @@ def prove_contenuto_digitale_forma():
     # --- 1) L'ANCORA SU OGNI RAMO ---------------------------------
     # la lezione della busta: senza, il ridisegno non trova casa
     # proprio sul ramo che qualcuno aggiungera' domani
-    prova("ogni ramo del pannello digitale porta la sua ancora", 3,
+    prova("ogni ramo del pannello digitale porta la sua ancora", 4,
           mini.count('<div class="payout" id="digPannello">'))
 
     # --- 2) CHI RIDISEGNA IN PLACE --------------------------------
@@ -3923,6 +3937,181 @@ def prove_contenuto_digitale_forma():
           "e senza nodo non tocca niente", -180,
           _js.loads(_r2.stdout.strip()) if _r2.returncode == 0
           else f"ERRORE: {_r2.stderr[:200]}")
+
+
+def prove_foto_contenuto():
+    """LA FOTO DEL CONTENUTO E LA SUA FINESTRA (ago 2026).
+
+    Un buono cartaceo si riscatta col codice a barre: la foto e' un
+    ALLEGATO al testo, che resta obbligatorio — cosi' il percorso
+    della RICEVUTA non cambia di una riga, ed e' la ragione per cui
+    questo cantiere non tocca la rotta che rivela.
+    E IL CONTENUTO SI CORREGGE FINCHE' NESSUNO L'HA GUARDATO: il
+    confine non e' lo stato ma `consegnato = 0`. Le due domande che
+    contano — chi puo' correggere, e chi puo' vedere i byte — sono
+    guardie, e una guardia che cade non fallisce da sola: lascia
+    passare qualcuno."""
+    print("\n[la foto del contenuto e la finestra della correzione]")
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    _cd = _senza_prosa(pezzo("consegna_digitale"))
+    # ⚠️ SENZA LA PROSA: la docstring di quella rotta nomina
+    # apposta i suoi header e la regola ferrea 3, quindi le
+    # sentinelle che li cercano resterebbero verdi anche a header
+    # tolti — l'ha detto la tortura, non la rilettura.
+    _lf = _senza_prosa(pezzo("leggi_foto_contenuto"))
+
+    # --- 1) LA FINESTRA DELLA CORREZIONE --------------------------
+    # il gate si allarga a 'shipped' — senza, la correzione non
+    # esisterebbe affatto — ma il confine vero e' la ricevuta
+    prova("la correzione entra da 'shipped'", True,
+          "stato IN ('locked','shipped','delivered')" in _cd)
+    # ⚠️ E 'delivered' CI STA APPOSTA: senza, la guardia della ricevuta
+    # non scatterebbe MAI — la rivelazione scrive `consegnato` e lo
+    # stato nello stesso UPDATE, quindi l'ordine rivelato uscirebbe
+    # gia' dalla SELECT e chi corregge tardi si sentirebbe dire
+    # «Operazione non permessa», muto proprio dove serve un perche'.
+    # L'ha trovato il giro dal vivo, non la rilettura: era una guardia
+    # che prometteva d'essere esercitata e non lo era mai.
+    prova("...e si ferma alla RICEVUTA e non allo stato", True,
+          'correzione and o["consegnato"]' in _cd)
+    # ⚠️ E IL RAMO DELLA CONSEGNA PARTE SOLO DA 'locked', che e' il
+    # difetto trovato dalla tortura: col gate scritto `== "shipped"`
+    # un ordine 'delivered' cadrebbe nell'ELSE — cioe' riscriverebbe
+    # stato, contenuto e ancora DOPO la rivelazione, che e' proprio
+    # cio' che questo cantiere esiste per impedire. La forma negativa
+    # non e' un vezzo: e' l'unica che tiene con tre stati in porta.
+    prova("...e il ramo della consegna parte SOLO da 'locked'", True,
+          'correzione = o["stato"] != "locked"' in _cd)
+    # LA CINTURA: la corsa non puo' esserci (nessun await fra la
+    # lettura e la scrittura della ricevuta), ma il confine si ripete
+    # nell'UPDATE — chi arriva un istante dopo trova rowcount 0
+    prova("l'UPDATE della correzione ripete la guardia", True,
+          "WHERE id=? AND stato='shipped' AND consegnato=0" in _cd)
+    prova("...e il rowcount a zero e' un 409, non un silenzio", True,
+          "if not cur.rowcount:" in _cd and "409," in _cd)
+    # E IL FILE APPENA SCRITTO SE NE VA CON LUI, e l'ha detto la
+    # tortura: sul 409 quel file e' gia' sul disco e nessuna colonna
+    # lo cita piu' — senza la riga che lo toglie resterebbe un
+    # orfano cifrato a ogni correzione arrivata tardi, e non se ne
+    # accorgerebbe nessuno (non alza, non scrive, occupa e basta).
+    _r409 = _cd[_cd.index("if not cur.rowcount:"):_cd.index("409,")]
+    prova("...e il file appena scritto non resta orfano", True,
+          "os.remove(os.path.join(CONTENUTI_DIR, file_nome))"
+          in _r409)
+    # L'ANCORA IMMOBILE: quella colonna e' il conto di
+    # ORE_SILENZIO_DIGITALE, e riscriverla farebbe ripartire da capo
+    # il tempo del compratore — la trappola gia' pagata tre volte.
+    # Si guarda DENTRO il ramo della correzione: nel corpo intero la
+    # riga c'e' comunque, che la consegna la scrive eccome
+    _i = _cd.index("if correzione:")
+    _upd_corr = _cd[_i:_cd.index("    else:", _i)]
+    prova("la correzione non tocca l'ancora della finestra", True,
+          "spedito_il" not in codice(_upd_corr))
+    prova("...ne' lo stato, che e' gia' quello giusto", True,
+          "SET stato=" not in codice(_upd_corr))
+    # il conto delle correzioni sale da SOLO in SQL: letto e riscritto
+    # in Python sarebbe il posto dove due correzioni vicine se ne
+    # mangiano una
+    prova("il conto delle correzioni sale in SQL", True,
+          "contenuto_correzioni=contenuto_correzioni+1" in _cd)
+
+    # --- 2) IL TESTO SI CONSERVA ----------------------------------
+    # la dichiarazione e' la PRESENZA della chiave (il patto dello
+    # stock): correggere la sola foto non deve poter cancellare il
+    # testo per distrazione, e un client di ieri non manda niente
+    prova("chiave assente = il testo si conserva", True,
+          '"contenuto" in d' in _cd
+          and "if not porta_testo and correzione:" in _cd)
+
+    # --- 3) I BYTE: CHI LI PUO' VEDERE ----------------------------
+    # la regola del TESTO e non quella della busta — il moderatore in
+    # disputa legge, e' dichiarato in CLAUDE.md e nella pagina «I tuoi
+    # dati» — PIU' un gate che la busta non ha
+    prova("il compratore vede i byte solo DOPO la rivelazione", True,
+          'o["consegnato"]' in _lf)
+    prova("...e il moderatore solo negli stati di disputa", True,
+          'e_admin(user["id"]) and o["stato"] in' in _lf)
+    # L'ANTI-ORACOLO: l'estraneo e l'ordine inesistente si prendono
+    # lo STESSO 400, che e' l'unica cosa che conta — la forma e' il
+    # calco del fratello del TESTO (SELECT per id, guardia in
+    # Python) e non quello della busta, che l'admin non lo ammette.
+    # E qui e' pure PIU' STRETTA: la proprieta' si guarda PRIMA del
+    # 404 sull'immagine, mentre il fratello del testo quel 404 lo
+    # da' a chiunque (oracolo parziale, preesistente e non mio).
+    _i400 = _lf.index('"Operazione non permessa"')
+    prova("l'estraneo e l'ordine inesistente rispondono uguale",
+          True, 'if not o or (user["id"] not in' in _lf)
+    prova("...e la proprieta' si guarda PRIMA dell'immagine",
+          True, _i400 < _lf.index("Nessuna immagine"))
+    # gli header della busta, riga per riga: su un telefono prestato
+    # una copia in cache e' una copia del bene comprato
+    for _h in ("no-store", "nosniff", "sandbox"):
+        prova("i byte escono con " + _h, True, _h in _lf)
+    # e la cartella non la serve NESSUNA rotta (regola ferrea 3): il
+    # censimento e' sul percorso, non sul nome della costante
+    prova("la cartella dei contenuti non e' servita da nessuna rotta",
+          0, srv.count('"/contenuti'))
+
+    # --- 4) DA /api/orders ESCE IL SOLO FLAG ----------------------
+    # il nome del file e' la maniglia sul disco e non serve a nessun
+    # client; il conto delle correzioni si', che e' un fatto
+    _strip = pezzo("miei_ordini")
+    prova("da /api/orders esce il flag, mai il nome del file", True,
+          'r["contenuto_documento"] = bool(r.pop("contenuto_file", ""))'
+          in _strip
+          and 'r.pop("contenuto_file_nome"' in _strip)
+
+    # --- 5) IL MODERATORE LEGGE UN FATTO --------------------------
+    # nella nota della disputa entra CHE c'e' un'immagine e QUANTE
+    # correzioni, mai il contenuto — il calco della busta
+    _ad = pezzo("apri_disputa")
+    prova("la nota al moderatore dice il fatto dell'immagine", True,
+          "un'immagine allegata" in _ad)
+    prova("...e il conto delle correzioni", True,
+          "corretto" in _ad and "contenuto_correzioni" in _ad)
+
+    # --- 6) IL CLIENT ---------------------------------------------
+    _pan = pezzo_js(mini, "function pannelloContenutoDigitale(o){")
+    # il giudice della finestra e' UNO e nomina la ricevuta: due
+    # condizioni scritte a mano direbbero due cose diverse sullo
+    # stesso ordine
+    prova("il client giudica la finestra sulla RICEVUTA", True,
+          "const correggibile = o.role==='seller' && o.state==='shipped'"
+          in _pan and "!o.consegnato" in _pan)
+    # LA FINESTRA SI DICE, o il venditore non sa di averla: e' il
+    # difetto che la sola guardia non chiude
+    prova("...e la nomina a chi puo' usarla", True,
+          "puoi ancora correggerlo" in _pan)
+    prova("il form di correzione nasce PIENO", True,
+          "${esc(testo||'')}</textarea>" in _pan)
+    # il ridisegno segue DOVE VIVE il form: dentro il pannello si
+    # riscrive da solo, nel corpo dell'ordine si passa dall'involucro
+    _rd = pezzo_js(mini, "function ridisegnaDigitale(){")
+    prova("il ridisegno della foto sceglie in place o l'ancora", True,
+          "ridisegnaContenuto()" in _rd
+          and "riapriOrdineFermo(currentOrder.id, '#digForm')" in _rd)
+    # E IL TESTO APPENA SCRITTO SOPRAVVIVE, che e' il difetto trovato
+    # dal vivo: si scrive il codice, si allega la foto e la textarea
+    # rinasce vuota — in consegna perche' si rifa' tutto il corpo, in
+    # correzione perche' il campo nasce col testo SALVATO
+    prova("...e il testo digitato sopravvive al ridisegno", True,
+          "el('digContenuto').value" in _rd
+          and "scritto" in _rd)
+    prova("...e l'ancora del form di consegna esiste", 1,
+          mini.count('<div class="payout" id="digForm">'))
+    # il file scelto e la correzione aperta non passano da un ordine
+    # all'altro
+    _oo = pezzo_js(mini, "function openOrder(id){")[:900]
+    prova("il file scelto muore col cambio d'ordine", True,
+          "digDoc = null;" in _oo and "digCorreggo = 0;" in _oo)
+    # la copia scaricata non sopravvive a una correzione: sarebbe
+    # l'immagine VECCHIA mostrata come se fosse quella nuova
+    _cc = pezzo_js(mini, "async function consegnaContenuto(btn){")
+    prova("la copia scaricata muore quando l'immagine cambia", True,
+          "revokeObjectURL" in _cc)
+    prova("...e le due copie dell'ordine restano allineate", True,
+          "orders.find(x=>x.id===currentOrder.id)" in _cc)
 
 
 def prove_indirizzo_casa():
@@ -27636,6 +27825,7 @@ def main():
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
+              prove_foto_contenuto,
               prove_indirizzo_casa,
               prove_nota_compratore,
               prove_nascondi_ordine,

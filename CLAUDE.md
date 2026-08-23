@@ -6453,27 +6453,91 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   uno scroll interno dentro una pagina che scorre è un difetto già
   pagato. Sopra ~1500 caratteri il pannello diventa lungo: il clamp si
   aggiunge se qualcuno vedrà un contenuto lungo davvero.
-  3) LA FOTO NEL CONTENUTO — un buono cartaceo si riscatta col codice
-  a barre — È DECISA E NON COSTRUITA (decisione di Andrea): sarà un
-  ALLEGATO al testo, che resta obbligatorio, quindi il percorso della
-  RICEVUTA non si tocca. Il quadro, per chi la costruirà: cartella sua
-  (`contenuti/`, mai `foto/` che è pubblica per costruzione, mai
-  `buste/` che è un'altra famiglia), nome imprevedibile, byte cifrati
-  con `_cifra_blob`, il tipo dai BYTE con `FIRME_DOC_BUSTA`; la
-  leggono le due parti **e il moderatore in disputa** (la regola del
-  TESTO, non quella della busta), col gate in più che **il compratore
-  la vede solo dopo la rivelazione** — il codice a barre È il bene, e
-  sbirciarlo da una porta di servizio salterebbe la ricevuta; al
-  moderatore in disputa il FATTO «(con un'immagine allegata)», come
-  per la busta; e alla chiusura il file RESTA, come il testo, che è la
-  prova in disputa e la ricevuta di chi ha comprato.
-  ⚠️ E IL QUADRO HA FATTO EMERGERE UN LIMITE: `consegna_digitale`
-  accetta solo `stato='locked'`, quindi una volta consegnato il
-  contenuto NON si corregge più — a differenza della busta, che si
-  corregge fino a `dispute`. È giusto (la rivelazione è una ricevuta
-  su un contenuto fotografato, e correggerlo dopo romperebbe la prova
-  in disputa) e vuol dire che **una foto sbagliata non si sostituisce**:
-  nessuna correzione, e lo dirà il form.
+  3) LA FOTO NEL CONTENUTO (ago 2026, costruita): un buono cartaceo si
+  riscatta col codice a barre, e trascriverlo a mano non basta. È un
+  ALLEGATO al testo, che resta obbligatorio (decisione di Andrea) —
+  ed è la scelta che rende piccolo il cantiere: il percorso della
+  RIVELAZIONE, cioè il pezzo più delicato del sistema, non cambia di
+  una riga. Cartella sua (`contenuti/`, mai `foto/` che è pubblica per
+  costruzione, mai `buste/` che è un'altra famiglia con un altro ciclo
+  di vita), nome imprevedibile (`d{ordine}_{token_hex(8)}`), byte
+  cifrati con `_cifra_blob` — stessa chiave e stessi prefissi del
+  testo, nessuna ricetta nuova da tenere in pari — e il tipo lo dicono
+  i BYTE e non l'etichetta (`FIRME_DOC_BUSTA` si riusa così com'è: la
+  lezione del PDF rinominato `.jpg`, che qui pesa di più perché quel
+  tipo torna indietro come `Content-Type`). Il tetto è quello della
+  busta (`MAX_DOC_BUSTA`, 15 MB) e NON una leva nuova: il quadro ne
+  proponeva una a 8, e riusare quella che c'è è una leva in meno da
+  dichiarare — il censimento del config resta pulito.
+  CHI LA VEDE: le due parti **e il moderatore in disputa** (la regola
+  del TESTO e non quella della busta), col gate in più che **il
+  compratore la vede solo dopo la rivelazione** — il codice a barre È
+  il bene comprato, e sbirciarlo da una porta di servizio vorrebbe
+  dire due porte per un fatto che deve restare uno. La rotta è il
+  calco di `leggi_documento_busta` (`no-store`, `nosniff`, CSP
+  sandbox, autorizzazione PRIMA dell'esistenza) ed è pure PIÙ STRETTA
+  del fratello del testo, che il suo 404 lo dà a chiunque. Da
+  `/api/orders` escono il solo FLAG e il conto delle correzioni, mai
+  il nome del file; al moderatore in disputa il FATTO «(con
+  un'immagine allegata)», mai il contenuto; alla chiusura il file
+  RESTA, come il testo — è la prova in disputa e la ricevuta di chi ha
+  comprato.
+  E IL CONTENUTO SI CORREGGE FINCHÉ NESSUNO L'HA GUARDATO (ago 2026,
+  decisione di Andrea che ROVESCIA il limite dichiarato dal quadro —
+  «nessuna correzione dopo la consegna»). Il perché di allora era il
+  confine sbagliato, non il principio: la prova in disputa nasce con
+  la RICEVUTA, e fra la consegna e la rivelazione c'è una finestra
+  vera in cui il contenuto non l'ha visto nessuno — lì correggere non
+  tocca niente. **IL CONFINE È `consegnato = 0`, NON LO STATO.** Dopo,
+  no: nemmeno in disputa, a differenza della busta, che una ricevuta
+  non ce l'ha e si corregge fino a `dispute`.
+  LA CORSA NON ESISTE, e non è una speranza: `leggi_contenuto_digitale`
+  legge la riga e scrive `consegnato` SENZA un await in mezzo, quindi
+  nel server mono-processo quel blocco è atomico (il patto
+  anti-doppione di `compra()`). La CINTURA è l'UPDATE condizionato,
+  che ripete `AND stato='shipped' AND consegnato=0`: chi arriva un
+  istante dopo trova rowcount 0 e si prende un 409, invece di
+  riscrivere una prova già letta — e il file appena scritto se ne va
+  col rifiuto, o resterebbe un orfano cifrato sul disco.
+  ⚠️ E 'delivered' STA NELLA SELECT APPOSTA, che è la riga da non
+  «pulire»: la rivelazione scrive `consegnato` e `stato='delivered'`
+  nello STESSO UPDATE, quindi senza quello stato in porta la guardia
+  della ricevuta NON SCATTEREBBE MAI — l'ordine rivelato uscirebbe già
+  dalla SELECT e chi corregge tardi si sentirebbe dire «Operazione non
+  permessa», muto proprio dove serve un perché. Era una guardia che
+  prometteva d'essere esercitata e non lo era mai (il difetto di
+  `_npub_venditore`), e a dirlo è stato il giro DAL VIVO, non la
+  rilettura. Da lì anche la forma NEGATIVA del gate
+  (`correzione = o["stato"] != "locked"`): scritta `== "shipped"`, un
+  ordine 'delivered' cadrebbe nell'ELSE — cioè riscriverebbe stato,
+  contenuto e ancora DOPO la rivelazione, che è precisamente ciò che
+  questo cantiere esiste per impedire. L'ha trovato la TORTURA.
+  LE ALTRE DUE RIGHE DA NON AMMORBIDIRE: la correzione NON tocca
+  `spedito_il`, che è l'ancora di `ORE_SILENZIO_DIGITALE` — riscriverla
+  farebbe ripartire da capo il tempo che il compratore ha per guardare,
+  la trappola dell'ancora mobile già pagata tre volte — e nemmeno lo
+  stato, che è già quello giusto; e la dichiarazione è la PRESENZA
+  della chiave nel payload (il patto dello stock), quindi correggere
+  la sola foto non può cancellare il testo per distrazione, e un
+  client di ieri che non manda niente conserva tutto.
+  QUEL CHE RESTA FUORI, dichiarato: se il compratore ha già rivelato,
+  la correzione è chiusa — il caso «me ne accorgo dopo che l'ha visto»
+  non è coperto, e il rimedio resta scrivergli o la disputa.
+  LA FINESTRA SI DICE, o il venditore non sa di averla: la riga è nel
+  form di consegna («se sbagli, puoi correggerlo da qui finché
+  l'acquirente non lo rivela») e nella testa del pannello, col conto
+  delle correzioni accanto — che è un fatto, e in disputa il moderatore
+  lo legge comunque. È la metà che la sola guardia non chiude.
+  E IL TESTO APPENA SCRITTO SOPRAVVIVE AL RIDISEGNO, difetto trovato
+  dal vivo: si scriveva il codice, si allegava la foto e la textarea
+  rinasceva VUOTA — in consegna perché si rifà tutto il corpo
+  dell'ordine, in correzione perché il campo nasce col testo SALVATO e
+  non con quello digitato. `ridisegnaDigitale` lo tiene e lo rimette.
+  IL RIDISEGNO SEGUE DOVE VIVE IL FORM, ed è la regola di sopra
+  applicata: in correzione il form sta DENTRO `#digPannello` e si
+  riscrive da solo (la pagina non si muove di un pixel), alla consegna
+  sta nel corpo dell'ordine — che solo `openOrder` sa rifare — e lì si
+  passa da `riapriOrdineFermo` con l'ancora `#digForm`.
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
@@ -20781,6 +20845,61 @@ col numero del pagamento, e che la ronda TACCIA; e la riconciliazione
 su LNbits, dove il memo «Barattolo sblocco banner #tg_id» dev'essere
 l'unico incasso nuovo senza una riga in `ordini`/`rilanci` — e averla
 invece in `pagamenti`.
+
+La foto del contenuto digitale, e la finestra per correggerlo (ago
+2026, terzo punto del giro dal campo, ora costruito): un buono
+cartaceo si riscatta col codice a barre, e trascriverlo a mano non
+basta — il venditore allega la foto, e il testo resta obbligatorio,
+quindi il percorso della RIVELAZIONE non cambia di una riga. La foto
+vive cifrata in una cartella sua e non esce da nessuna parte tranne
+la sua rotta; il compratore la vede solo DOPO aver rivelato, perché
+quel codice a barre È il bene comprato.
+E IL CONTENUTO SI CORREGGE FINCHÉ NESSUNO L'HA GUARDATO — decisione
+di Andrea che ROVESCIA il limite che il quadro aveva dichiarato
+(«nessuna correzione dopo la consegna»), e aveva ragione lui: il
+principio era giusto e il confine sbagliato. La prova in disputa
+nasce con la RICEVUTA, quindi fra la consegna e la rivelazione c'è
+una finestra vera in cui correggere non tocca niente — **il confine è
+`consegnato = 0`, non lo stato.** Vedi Architettura, «IL CONTENUTO SI
+LEGGE DOVE COMPARE», per le righe da non ammorbidire: l'ancora della
+finestra che non si muove, la chiave assente che conserva il testo, e
+soprattutto il 'delivered' che sta nella SELECT APPOSTA.
+IL GIRO DAL VIVO HA TROVATO QUEL CHE LA LETTURA NON VEDEVA, ed è la
+parte da ricordare: la guardia della ricevuta NON POTEVA SCATTARE —
+la rivelazione scrive `consegnato` e `stato='delivered'` nello stesso
+UPDATE, quindi l'ordine rivelato usciva già dalla SELECT e chi
+correggeva tardi si sentiva dire «Operazione non permessa», muto
+proprio dove serve un perché. Era una guardia che prometteva d'essere
+esercitata e non lo era mai. E il TESTO APPENA SCRITTO si perdeva
+allegando la foto, perché il ridisegno rifà la textarea.
+Collaudato: **5448 prove verdi** e **25 MUTAZIONI, 25 uccise**, una
+per riga sorvegliata — ed è stata la tortura a trovare il difetto
+peggiore, il gate scritto `== "shipped"` che avrebbe fatto cadere un
+ordine 'delivered' nel ramo della CONSEGNA, cioè riscritto stato e
+contenuto dopo la rivelazione. Più DUE banchi eseguibili col server
+acceso: le rotte vere su un database usa-e-getta (49 verdi — il testo
+cifrato `f2:`, i byte cifrati sul disco, il compratore che non
+sbircia, l'estraneo indistinguibile dall'ordine inesistente, le
+quattro correzioni col testo che si conserva, l'ancora ferma, il file
+vecchio che se ne va, la porta che si chiude dopo la rivelazione, il
+moderatore in disputa) e il giro nel BROWSER via CDP (29 verdi, zero
+errori JS: il file scelto col chip, la consegna, la correzione con la
+pagina che non salta, l'immagine aperta in pagina, e nessuno sbordo a
+320/360/375 nei due temi).
+IN PRODUZIONE il deploy fa girare cinque migrazioni additive su
+`ordini` (tutte a 0/'') e crea la cartella `contenuti/`; nessuna leva
+nuova, nessuno stato nuovo, e il client vecchio in cache non conosce
+le due chiavi in più e si comporta come oggi. ⚠️ Sul VPS
+`CHIAVE_CONTENUTI_DIGITALI` dev'esserci, o le foto si scrivono in
+chiaro come già fa il testo — la riga d'avvio lo dichiara. DA
+GUARDARE al primo giro: il primo buono cartaceo vero consegnato con
+la foto dentro Telegram, e che il compratore la veda solo dopo aver
+rivelato.
+SEGNALATO E NON TOCCATO (fuori perimetro): nel campo del file il chip
+col nome e il «togli» vanno a capo sotto il bottone, e il «togli»
+finisce centrato — `.btn` è a larghezza piena. È il layout del
+GEMELLO della busta, copiato riga per riga apposta: si sistema per
+tutti e due o per nessuno.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

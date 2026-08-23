@@ -8,6 +8,9 @@ import_tmp/
 # I documenti di ritiro: cifrati sul disco, ma chi ha quel file
 # ritira il pacco — non escono di qui in nessun modo
 buste/
+# Le foto del contenuto digitale: cifrate sul disco, e quel file E' il
+# bene comprato (il codice a barre di un buono). Stessa regola.
+contenuti/
 
 # Python
 __pycache__/

@@ -3573,6 +3573,27 @@ def init_db():
                     # MAI in /api/orders: si legge solo dall'endpoint
                     # /contenuto, che fa da ricevuta di lettura.
                     "contenuto_digitale TEXT DEFAULT ''",
+                    # LA FOTO DEL CONTENUTO (ago 2026): un buono
+                    # cartaceo si riscatta col codice a barre, e
+                    # trascriverlo a mano non basta. E' un ALLEGATO al
+                    # testo, che resta obbligatorio — cosi' il
+                    # percorso della RICEVUTA non si tocca. I byte
+                    # NON stanno in foto/ (la' dentro un nome che si
+                    # indovina e' roba pubblica, e questa foto E' il
+                    # bene comprato): vivono in contenuti/ cifrati, e
+                    # li serve una rotta che chiede chi sei. In
+                    # colonna solo il nome sul disco, il tipo e il
+                    # nome originale.
+                    "contenuto_file TEXT DEFAULT ''",
+                    "contenuto_file_tipo TEXT DEFAULT ''",
+                    "contenuto_file_nome TEXT DEFAULT ''",
+                    # le correzioni si contano e si timbrano, come per
+                    # la busta: il contenuto si corregge finche' il
+                    # compratore non l'ha rivelato, e in disputa il
+                    # moderatore deve sapere che e' cambiato e quando.
+                    # Fatti, mai il contenuto.
+                    "contenuto_correzioni INTEGER DEFAULT 0",
+                    "contenuto_corretto_il INTEGER DEFAULT 0",
                     # quantita (lug 2026): i pezzi dell'ordine.
                     # prezzo_sats resta il TOTALE in cassaforte (invoice,
                     # rimborso integrale e CSV non cambiano semantica);
@@ -6695,6 +6716,15 @@ os.makedirs(FOTO_DIR, exist_ok=True)
 # /api/orders/{id}/busta-ritiro/file, che chiede chi sei.
 BUSTE_DIR = "buste"
 os.makedirs(BUSTE_DIR, exist_ok=True)
+
+# La foto del contenuto digitale ha la SUA cartella e non riusa
+# buste/, ed e' la stessa ragione per cui buste/ non e' foto/: sono
+# due famiglie con due cicli di vita — la busta serve a ritirare un
+# pacco e finisce col ritiro, questa E' il bene comprato e resta.
+# Mescolarle vorrebbe dire che una purga scritta per l'una passa
+# sull'altra senza che nessuno se ne accorga.
+CONTENUTI_DIR = "contenuti"
+os.makedirs(CONTENUTI_DIR, exist_ok=True)
 
 # 15 MB (decisione di Andrea) sui byte VERI, mai sulla stringa base64.
 MAX_DOC_BUSTA = 15 * 1024 * 1024
@@ -20317,47 +20347,197 @@ async def consegna_digitale(ordine_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
                             barattolo_sessione: str = Cookie("")):
     """Il venditore consegna il contenuto (buono, codice, licenza):
-    e' il gemello digitale di segna_spedito. Solo su ordini pagati
-    (locked) con consegna digitale scelta."""
+    e' il gemello digitale di segna_spedito. E LO CORREGGE FINCHE'
+    NESSUNO L'HA GUARDATO, che e' la stessa rotta col confine spostato
+    (ago 2026, decisione di Andrea).
+
+    IL CONFINE NON E' LO STATO, E' LA RICEVUTA. Il primo disegno
+    diceva «nessuna correzione dopo la consegna» e prendeva
+    stato='locked' per confine: piu' rigido del necessario, perche'
+    fra la consegna e la rivelazione c'e' una finestra vera in cui il
+    contenuto NON L'HA ANCORA VISTO NESSUNO — e li' correggere non
+    tocca nessuna prova. Il confine giusto e' `consegnato = 0`: da
+    quel momento il contenuto e' fotografato dalla ricevuta e non si
+    riscrive piu', nemmeno in disputa (a differenza della busta, che
+    ricevuta non ne ha e si corregge fino a 'dispute').
+    LA CORSA NON ESISTE, e non e' una speranza: `leggi_contenuto_
+    digitale` legge la riga e scrive `consegnato` SENZA un await in
+    mezzo, quindi nel server mono-processo quel blocco e' atomico (il
+    patto anti-doppione di compra()). In piu' l'UPDATE della
+    correzione ripete la condizione: chi arriva un istante dopo la
+    rivelazione trova rowcount 0 e si sente dire di no, invece di
+    riscrivere una prova gia' letta.
+    QUEL CHE RESTA FUORI, dichiarato: se il compratore ha gia'
+    rivelato, la correzione e' chiusa — quindi il caso «me ne accorgo
+    dopo che l'ha visto» non e' coperto, e il rimedio resta consegnare
+    di nuovo scrivendosi, o la disputa.
+    LA FOTO (ago 2026) e' un ALLEGATO e il testo resta obbligatorio:
+    cosi' la rivelazione non cambia di una riga — sarebbe stata l'altra
+    strada («testo OPPURE foto», il calco della busta), e tocca il
+    percorso della ricevuta, che e' il pezzo piu' delicato del
+    sistema."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
+    # La dichiarazione e' la PRESENZA della chiave, mai il valore (il
+    # patto dello stock): in correzione un client che non manda
+    # `contenuto` CONSERVA quello che c'e' — e cosi' correggere la
+    # sola foto non puo' cancellare il testo per distrazione.
+    porta_testo = "contenuto" in d
     contenuto = (d.get("contenuto") or "").strip()
-    if not contenuto:
-        raise HTTPException(400, "Scrivi il contenuto da consegnare "
-                                 "(codice, istruzioni, link di riscatto)")
     if len(contenuto) > 4000:
         raise HTTPException(400, "Il contenuto è troppo lungo "
                                  "(massimo 4000 caratteri)")
+    doc = d.get("file")
+    togli_doc = bool(d.get("file_togli"))
+    # Il vaglio del documento sta PRIMA della connessione, che e' puro
+    # e non ha bisogno del database: il 400 non lascia un `con` aperto
+    # dietro di se' (la lezione della busta). Il giudice e' quello
+    # della busta e non se ne scrive un secondo: il nome resta il suo,
+    # che e' il patto dei nomi interni — a cambiare e' chi lo chiama.
+    raw = est = ""
+    tipo_doc = ""
+    if doc and not togli_doc:
+        raw, tipo_doc, est = _documento_busta(doc)
     con = db()
+    # 'delivered' entra APPOSTA e non e' un allargamento: da li' non
+    # si corregge niente — a rifiutare e' la guardia della ricevuta,
+    # due righe piu' giu', che senza questo stato non scatterebbe MAI
+    # (la rivelazione scrive `consegnato` e lo stato insieme). Quel
+    # che si guadagna e' il MESSAGGIO: chi arriva tardi legge perche',
+    # invece del «non permesso» che vale per tutto.
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
-                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+                    "AND stato IN ('locked','shipped','delivered')",
+                    (ordine_id, user["id"])).fetchone()
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
     if o["consegna_scelta"] != "digitale":
         con.close()
         raise HTTPException(400, "Questo ordine non è a consegna digitale")
+    correzione = o["stato"] != "locked"
+    # il caso che il gate 'shipped' fa entrare e che va fermato qui:
+    # rivelato = fotografato, e da li' non si riscrive piu'
+    if correzione and o["consegnato"]:
+        con.close()
+        raise HTTPException(400, "L'acquirente ha già rivelato il "
+                                 "contenuto: da qui non si corregge più. "
+                                 "Scrivigli per mandargliene un altro, o "
+                                 "aspetta che apra una disputa.")
+    if not porta_testo and correzione:
+        contenuto = _decifra_contenuto(o["contenuto_digitale"])
+    if not contenuto:
+        con.close()
+        raise HTTPException(400, "Scrivi il contenuto da consegnare "
+                                 "(codice, istruzioni, link di riscatto)")
+    vecchio = o["contenuto_file"]
+    if togli_doc:
+        file_nome = tipo_doc = etichetta = ""
+    elif raw:
+        # nome IMPREVEDIBILE come per la busta: la cartella non e'
+        # servita da nessuna rotta, ma un nome che si indovina invita
+        # a provarci — e questa foto E' il bene comprato
+        file_nome = f"d{ordine_id}_{secrets.token_hex(8)}.{est}"
+        etichetta = _etichetta_documento(d.get("file_nome"), est)
+    else:
+        # chiave assente: si CONSERVA (il patto dello stock)
+        file_nome = vecchio
+        tipo_doc = o["contenuto_file_tipo"]
+        etichetta = o["contenuto_file_nome"]
+    # Il file si scrive PRIMA della colonna: se il disco dice di no il
+    # database resta com'era, e il venditore riprova su un ordine
+    # intatto invece di trovarsi una colonna che punta al nulla.
+    if raw:
+        try:
+            with open(os.path.join(CONTENUTI_DIR, file_nome), "wb") as out:
+                out.write(_cifra_blob(raw))
+        except Exception as e:
+            con.close()
+            print(f"⚠️ Ordine #{ordine_id}: foto del contenuto non "
+                  f"scritta: {e}")
+            raise HTTPException(503, "Non riesco a salvare l'immagine "
+                                     "adesso: riprova fra poco")
     adesso = int(time.time())
-    con.execute("UPDATE ordini SET stato='shipped', "
-                "corriere='Consegna digitale', tracking='', spedito_il=?, "
-                "contenuto_digitale=?, aggiornato=? WHERE id=?",
-                (adesso, _cifra_contenuto(contenuto), adesso, ordine_id))
+    if correzione:
+        # L'UPDATE CONDIZIONATO ripete la guardia della ricevuta: e'
+        # la cintura contro la rivelazione arrivata nel frattempo.
+        # E NON TOCCA `spedito_il`, che e' l'ANCORA della finestra di
+        # ORE_SILENZIO_DIGITALE: riscriverla farebbe ripartire da capo
+        # il tempo che il compratore ha per guardare — la trappola
+        # dell'ancora mobile, gia' pagata tre volte. Nemmeno lo stato,
+        # che e' gia' quello giusto.
+        cur = con.execute(
+            "UPDATE ordini SET contenuto_digitale=?, contenuto_file=?, "
+            "contenuto_file_tipo=?, contenuto_file_nome=?, "
+            "contenuto_correzioni=contenuto_correzioni+1, "
+            "contenuto_corretto_il=?, aggiornato=? "
+            "WHERE id=? AND stato='shipped' AND consegnato=0",
+            (_cifra_contenuto(contenuto), file_nome, tipo_doc, etichetta,
+             adesso, adesso, ordine_id))
+        if not cur.rowcount:
+            con.rollback()
+            con.close()
+            # il file appena scritto non lo cita piu' nessuna colonna:
+            # se ne va di qui, o resterebbe un orfano cifrato sul
+            # disco a ogni correzione arrivata tardi
+            if raw:
+                try:
+                    os.remove(os.path.join(CONTENUTI_DIR, file_nome))
+                except OSError:
+                    pass
+            raise HTTPException(409, "L'acquirente ha rivelato il "
+                                     "contenuto proprio adesso: la "
+                                     "correzione non è stata applicata.")
+    else:
+        con.execute("UPDATE ordini SET stato='shipped', "
+                    "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                    "contenuto_digitale=?, contenuto_file=?, "
+                    "contenuto_file_tipo=?, contenuto_file_nome=?, "
+                    "aggiornato=? WHERE id=?",
+                    (adesso, _cifra_contenuto(contenuto), file_nome,
+                     tipo_doc, etichetta, adesso, ordine_id))
     con.commit()
     con.close()
+    # il vecchio se ne va DOPO il commit, e solo se non e' piu' quello
+    # buono: il pattern di _scrivi_avatar, o si accumulano orfani
+    if vecchio and vecchio != file_nome:
+        try:
+            os.remove(os.path.join(CONTENUTI_DIR, vecchio))
+        except OSError:
+            pass
     # La traccia nel journal: COSA e' stato consegnato (impronta, mai
     # il testo: nel journal non entrano segreti) e quando. In disputa
-    # e' la prova che il contenuto rivelato e' quello consegnato.
+    # e' la prova che il contenuto rivelato e' quello consegnato — e
+    # con le correzioni le impronte diventano una SEQUENZA, che e'
+    # esattamente quel che serve per raccontare cos'e' cambiato.
     impronta = hashlib.sha256(contenuto.encode("utf-8")).hexdigest()[:16]
-    print(f"💾 Ordine #{ordine_id}: contenuto digitale consegnato "
-          f"({len(contenuto)} caratteri, impronta {impronta})")
-    await notifica(o["compratore_id"],
-                   f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
-                   f"tuo acquisto digitale! Rivelalo nella Mini App e "
-                   f"provalo subito: dalla rivelazione hai "
-                   f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
-                   f"se qualcosa non va, poi l'acquisto è definitivo. "
-                   f"⚠️ Un codice, una volta rivelato, non torna indietro.")
-    return {"ok": True, "stato": "shipped"}
+    if raw:
+        stato_doc = f"{tipo_doc} da {len(raw)} byte"
+    elif togli_doc:
+        stato_doc = "tolta"
+    else:
+        stato_doc = "confermata" if file_nome else "assente"
+    print(f"💾 Ordine #{ordine_id}: contenuto digitale "
+          f"{'corretto' if correzione else 'consegnato'} "
+          f"({len(contenuto)} caratteri, impronta {impronta}, "
+          f"immagine {stato_doc})")
+    if correzione:
+        # statica come le sorelle: nell'HTML di un avviso il contenuto
+        # non ci entra per costruzione
+        await notifica(o["compratore_id"],
+                       "💾 <b>Il venditore ha aggiornato il contenuto</b> "
+                       "del tuo acquisto digitale: apri l'ordine e rivela "
+                       "quello nuovo.")
+    else:
+        await notifica(o["compratore_id"],
+                       f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
+                       f"tuo acquisto digitale! Rivelalo nella Mini App e "
+                       f"provalo subito: dalla rivelazione hai "
+                       f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
+                       f"se qualcosa non va, poi l'acquisto è definitivo. "
+                       f"⚠️ Un codice, una volta rivelato, non torna indietro.")
+    return {"ok": True, "stato": "shipped",
+            "correzioni": o["contenuto_correzioni"] + (1 if correzione else 0),
+            "documento": bool(file_nome)}
 
 
 @app.get("/api/orders/{ordine_id}/contenuto")
@@ -20404,7 +20584,74 @@ async def leggi_contenuto_digitale(ordine_id: int,
                        f"{ORE_CONFERMA_DIGITALE} ore per provarlo, poi i "
                        f"sats si sbloccano automaticamente.")
     return {"ok": True, "contenuto": _decifra_contenuto(o["contenuto_digitale"]),
-            "rivelato": rivelato}
+            "rivelato": rivelato,
+            # della foto qui esce solo la SCHEDA — c'e', come si chiama,
+            # di che tipo e': i byte stanno di la', dietro la loro
+            # rotta, e non si trascinano in ogni lettura (il patto della
+            # busta)
+            "documento": bool(o["contenuto_file"]),
+            "documento_nome": o["contenuto_file_nome"],
+            "documento_tipo": o["contenuto_file_tipo"],
+            "correzioni": o["contenuto_correzioni"]}
+
+
+@app.get("/api/orders/{ordine_id}/contenuto/file")
+async def leggi_foto_contenuto(ordine_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """I byte della foto del contenuto, decifrati al volo. Le regole
+    sono quelle del documento di ritiro riga per riga — niente
+    cartella montata (regola ferrea 3), niente nome indovinabile,
+    niente cache (`no-store`), autorizzazione PRIMA dell'esistenza —
+    con DUE differenze che vengono dal bene che c'e' dentro.
+    1) IL MODERATORE LA LEGGE, negli stati di disputa: e' la regola
+    del TESTO e non quella della busta, ed e' gia' dichiarata (sul
+    contenuto digitale il moderatore legge; sulla busta mai).
+    2) IL COMPRATORE LA VEDE SOLO DOPO LA RIVELAZIONE. Un codice a
+    barre E' il bene comprato: servirlo prima vorrebbe dire farglielo
+    sbirciare da una porta di servizio senza che scatti la ricevuta,
+    cioe' due porte per un fatto che deve restare uno. E il 400 lo
+    DICE, invece di far finta che la foto non ci sia: quel flag il
+    compratore ce l'ha gia' in /api/orders, e negarlo sarebbe una
+    bugia inutile.
+    GET PURO come i gemelli: guardare la foto non e' una seconda
+    ricevuta — quella l'ha gia' fatta la rivelazione."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    con.close()
+    admin_disputa = (o and e_admin(user["id"]) and o["stato"] in
+                     ("dispute", "return_pending", "return_shipped", "refund"))
+    if not o or (user["id"] not in (o["compratore_id"], o["venditore_id"])
+                 and not admin_disputa):
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["contenuto_file"]:
+        raise HTTPException(404, "Nessuna immagine su questo ordine")
+    if user["id"] == o["compratore_id"] and not o["consegnato"]:
+        raise HTTPException(400, "Rivela prima il contenuto: l'immagine "
+                                 "fa parte di quello che stai per rivelare.")
+    try:
+        with open(os.path.join(CONTENUTI_DIR, o["contenuto_file"]), "rb") as f:
+            raw = _decifra_blob(f.read())
+    except OSError:
+        raw = None
+    if raw is None:
+        # una frase non e' un'immagine: qui si dice che non si puo'
+        # aprire, invece di consegnare byte che nessun lettore capisce
+        raise HTTPException(503, "L'immagine non si riesce ad aprire: "
+                                 "chiedi al venditore di ricaricarla")
+    etichetta = _etichetta_documento(o["contenuto_file_nome"], "jpg")
+    return Response(
+        content=raw,
+        media_type=o["contenuto_file_tipo"] or "application/octet-stream",
+        headers={"Content-Disposition": f'inline; filename="{etichetta}"',
+                 "Cache-Control": "no-store, private",
+                 # non e' MAI una pagina: se un domani ci finisse dentro
+                 # un SVG o un HTML travestito, il browser non deve
+                 # eseguirlo sul nostro dominio
+                 "X-Content-Type-Options": "nosniff",
+                 "Content-Security-Policy": "sandbox; default-src 'none'"})
 
 
 @app.post("/api/orders/{ordine_id}/sollecita")
@@ -26385,6 +26632,19 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             "AND disputata=1", (o["compratore_id"],)).fetchone()["n"]
         rivelato = ("contenuto RIVELATO" if o["consegnato"]
                     else "contenuto non ancora rivelato")
+        # la foto e le correzioni sono FATTI, come per la busta: dicono
+        # se il venditore ha dato qualcosa di inquadrabile e se il
+        # contenuto e' cambiato prima che venisse letto. Il contenuto
+        # in se' il moderatore lo legge dal dettaglio, che qui e' la
+        # differenza dichiarata con la busta.
+        if o["contenuto_file"]:
+            rivelato += ", con un'immagine allegata"
+        n = o["contenuto_correzioni"]
+        if n:
+            quando = time.strftime("%d/%m/%Y %H:%M",
+                                   time.localtime(o["contenuto_corretto_il"]))
+            rivelato += (f"; corretto {n} volt{'a' if n == 1 else 'e'} "
+                         f"prima della rivelazione (ultima il {quando})")
         nota_digitale = (
             f"\n💾 Bene DIGITALE ({rivelato}; il contenuto si legge "
             f"dal dettaglio ordine). Regola dichiarata all'acquisto: "
@@ -27019,6 +27279,14 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
         # rivelare senza poterlo sbirciare.
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
+        # E della foto non esce nemmeno il NOME DEL FILE: e' la
+        # maniglia sul disco e non serve a nessun client — resta il
+        # flag, come per il documento della busta. Le CORREZIONI
+        # invece escono: sono un fatto, e il venditore ci legge se ha
+        # gia' corretto (il moderatore le ha nella nota di disputa).
+        r["contenuto_documento"] = bool(r.pop("contenuto_file", ""))
+        r.pop("contenuto_file_tipo", "")
+        r.pop("contenuto_file_nome", "")
         # La busta di consegna idem: nome e codice si leggono solo da
         # /busta-ritiro, e SOLO le due parti (l'admin mai). busta_il e
         # le colonne delle correzioni invece ESCONO: sono il SE e il

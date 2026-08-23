@@ -6304,6 +6304,11 @@ function mapOrder(o){
     /* consegna digitale (lug 2026): il contenuto NON viaggia mai in
        /api/orders — solo il flag, il testo lo serve /contenuto */
     contenutoPresente:!!o.contenuto_presente,
+    /* della FOTO del contenuto arrivano il solo flag e il conto delle
+       correzioni: i byte stanno dietro la loro rotta, e il nome del
+       file e' la maniglia sul disco — non serve a nessun client */
+    contenutoDocumento:!!o.contenuto_documento,
+    contenutoCorrezioni:o.contenuto_correzioni||0,
     /* l'indirizzo di casa (ago 2026): il testo non esce da qui — si
        legge solo da /indirizzo, e solo le due parti. Qui arrivano i
        FATTI: se e' atteso, se e quando e' stato scritto, quante volte
@@ -16820,7 +16825,15 @@ function openOrder(id){
      ordine all'altro; il confronto con l'id serve perche' qui si
      RIENTRA anche solo per ridisegnare lo stesso ordine (e' cosi'
      che il chip del file compare) */
-  if (!currentOrder || currentOrder.id !== id) bustaDoc = null;
+  if (!currentOrder || currentOrder.id !== id) {
+    bustaDoc = null;
+    /* e con lui l'immagine del contenuto, per la stessa ragione: un
+       file scelto su un ordine non si porta su un altro. La
+       correzione aperta nemmeno — e li' il confronto sull'id non
+       basterebbe, perche' `digCorreggo` E' un id: si azzera secco */
+    digDoc = null;
+    digCorreggo = 0;
+  }
   currentOrder = orders.find(o=>o.id===id);
   const o = currentOrder, s = o.state;
   stellaScelta = 0;   // il voto non inviato non sopravvive al cambio d'ordine
@@ -17167,10 +17180,12 @@ function openOrder(id){
           <div class="hint">L'asta è conclusa e i sats sono al sicuro in cassaforte. Il vincitore sta scegliendo come riceverlo: ti avviso appena decide — fino ad allora non c'è nulla da spedire, e nessun timer parte.</div>
         </div>`:''}
       ${o.role==='seller' && s==='locked' && !(o.asta && !o.consegnaScelta) ? (o.consegnaScelta==='digitale' ? `
-        <div class="payout">
+        <div class="payout" id="digForm">
           <h4>💾 Consegna il contenuto</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Scrivi qui il contenuto (codice, istruzioni, link di riscatto): l'acquirente lo rivelerà con un tocco, che fa da ricevuta. 💡 Tieni uno screenshot datato del saldo o della validità: in disputa, le prove decidono.</div>
           <textarea id="digContenuto" maxlength="4000" style="min-height:72px" placeholder="Es. Codice: XXXX-YYYY-ZZZZ — si riscatta su esempio.it/riscatta"></textarea>
+          ${campoFotoContenuto(o, null)}
+          <div class="hint" style="margin-top:10px">✏️ Se sbagli, puoi correggerlo da qui finché l'acquirente non lo rivela.</div>
           <button class="btn orange" onclick="consegnaContenuto(this)">💾 Consegna il contenuto</button>
         </div>` : o.consegnaScelta==='ritiro' ? `
         <div class="payout">
@@ -20419,11 +20434,13 @@ function bottoneInAttesa(btn, testo){
    aprirebbe una finestra di 180ms in cui la fattura si paga due
    volte. Chi legge un bigliettino non ha niente da proteggere: la
    sua guardia e' una bandierina in memoria, che non si vede.
-   I CHIAMANTI SONO QUATTRO E SONO TUTTI LETTURE (ago 2026): le
+   I CHIAMANTI SONO SETTE E SONO TUTTI LETTURE (ago 2026): le
    istruzioni di ritiro, il contenuto digitale riletto dal venditore,
-   l'indirizzo di consegna, il documento della busta. Il censimento
-   in CI li NOMINA invece di contarli, cosi' il quinto di domani
-   viene a rileggere questa riga.
+   l'indirizzo di consegna, il documento della busta, il collegamento
+   del servizio, e le due della foto del contenuto — aprirla e
+   rileggerla per correggerla. Il censimento in CI li NOMINA invece
+   di contarli, cosi' l'ottavo di domani viene a rileggere questa
+   riga.
    E «LETTURA» NON VUOL DIRE «GET»: rivelaContenuto legge e basta, ma
    quella lettura E' la ricevuta, e non torna indietro — quindi resta
    col velo immediato, che li' e' proprio la guardia. */
@@ -21040,13 +21057,37 @@ function pannelloContenutoDigitale(o){
      rilegge vede il contenuto comparire esattamente dove aveva il
      dito — li' la pagina non si muove di un pixel, che il ridisegno
      e' del solo pannello. */
+  /* LA FINESTRA DELLA CORREZIONE, e va DETTA: si puo' correggere
+     finche' l'acquirente non ha rivelato, e quel momento non lo
+     decide il venditore — se non gliela si nomina, non sa di averla.
+     Il conto delle correzioni esce da /api/orders: e' un fatto, e in
+     disputa il moderatore lo legge comunque. */
+  const correggibile = o.role==='seller' && o.state==='shipped'
+                       && !o.consegnato;
+  const corr = o.contenutoCorrezioni
+    ? ` Corretto ${o.contenutoCorrezioni===1?'una volta':o.contenutoCorrezioni+' volte'}.` : '';
   const testa = o.role==='seller'
     ? (o.consegnato?`L'acquirente l'ha rivelato il ${quando}.`
-                   :'In attesa che l\'acquirente lo riveli.')
-      + ' Puoi rileggere ciò che hai consegnato:'
+       : 'In attesa che l\'acquirente lo riveli: finché non lo fa, puoi ancora correggerlo.')
+      + corr + ' Puoi rileggere ciò che hai consegnato:'
     : o.role==='admin' ? 'Il contenuto è custodito dalla piattaforma:'
     : quando ? `👁 Rivelato il ${quando} — la rivelazione fa da ricevuta.`
     : 'La rivelazione fa da ricevuta: il contenuto è tuo.';
+  const c = digDati[o.id];
+  /* IL FORM DI CORREZIONE vive DENTRO il pannello, ed e' cio' che gli
+     fa ereditare il ridisegno in place: il venditore corregge senza
+     che la pagina si muova. La textarea nasce PIENA perche' il gesto
+     che l'ha aperto ha gia' riletto — un campo vuoto salvato pieno
+     sarebbe peggio del difetto che cura. */
+  if (digCorreggo === o.id && correggibile) return `
+    <div class="payout" id="digPannello">
+      <h4>✏️ Correggi il contenuto</h4>
+      <div class="hint">L'acquirente non l'ha ancora rivelato, quindi puoi ancora cambiarlo: appena lo rivela questo non si tocca più. Lo avvisiamo del cambio.</div>
+      <textarea id="digContenuto" maxlength="4000" style="min-height:72px" placeholder="Es. Codice: XXXX-YYYY-ZZZZ — si riscatta su esempio.it/riscatta">${esc(testo||'')}</textarea>
+      ${campoFotoContenuto(o, c)}
+      <button class="btn orange" style="margin-top:10px" onclick="consegnaContenuto(this)">💾 Aggiorna il contenuto</button>
+      <button class="btn ghost" onclick="annullaCorrezione()">Annulla</button>
+    </div>`;
   /* il testo gia' in mano: la resa la sceglie `formaCodice` — cifre
      grandi per un codice, blocco di lettura per le istruzioni — e la
      copia ce l'ha dentro, quindi qui NON si aggiunge un secondo
@@ -21057,6 +21098,8 @@ function pannelloContenutoDigitale(o){
       <div class="hint">${testa}</div>
       ${resaCodice(testo, {copia: 'copiaContenuto()',
                            aria: 'Copia il contenuto'})}
+      ${bloccoFotoContenuto(o, c)}
+      ${correggibile ? `<button class="btn ghost" style="margin-top:10px" onclick="apriCorrezioneContenuto(this)">✏️ Correggi</button>` : ''}
     </div>`;
   /* venditore (rilettura senza effetti), compratore a rivelazione
      avvenuta su un altro dispositivo, moderatore in disputa */
@@ -21065,6 +21108,7 @@ function pannelloContenutoDigitale(o){
       <h4>💾 Contenuto consegnato</h4>
       <div class="hint">${testa}</div>
       <button class="btn ghost" style="margin-top:10px" onclick="mostraContenuto(this)">👁 Mostra il contenuto</button>
+      ${correggibile ? `<button class="btn ghost" onclick="apriCorrezioneContenuto(this)">✏️ Correggi</button>` : ''}
     </div>`;
   return '';
 }
@@ -21095,7 +21139,147 @@ async function caricaContenutoDigitale(){
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
   contenutoRivelato[currentOrder.id] = d.contenuto || '';
+  /* la SCHEDA della foto viaggia con la lettura del testo (i byte no:
+     stanno dietro la loro rotta e non si trascinano a ogni giro) */
+  digDati[currentOrder.id] = {documento: !!d.documento,
+    documentoNome: d.documento_nome || '',
+    documentoTipo: d.documento_tipo || ''};
   return d;
+}
+
+/* ---- LA FOTO DEL CONTENUTO (ago 2026) ----
+   Un buono cartaceo si riscatta col codice a barre, e trascriverlo a
+   mano non basta. E' un ALLEGATO al testo, che resta obbligatorio:
+   cosi' la rivelazione non cambia di una riga.
+   E SI CORREGGE FINCHE' NESSUNO L'HA GUARDATA — il confine non e' lo
+   stato ma la RICEVUTA (`consegnato = 0`), che e' la stessa regola
+   detta con l'ancora giusta: fra la consegna e la rivelazione il
+   contenuto non l'ha visto nessuno, quindi li' non c'e' nessuna prova
+   da rispettare. Dopo, no: nemmeno in disputa (a differenza della
+   busta, che una ricevuta non ce l'ha). */
+let digDati = {};      // ordineId -> scheda della foto
+let digDoc = null;     // il file scelto e non ancora consegnato
+let digDocVisto = {};  // objectURL dei byte gia' scaricati
+let digCorreggo = 0;   // l'ordine di cui si sta correggendo il contenuto
+
+/* il campo del venditore: sceglie il file, lo vede come chip, lo puo'
+   togliere. E' il calco di `campoDocumentoBusta`, col suo stesso
+   patto: chiave assente = si conserva, `togli` e' il gesto esplicito */
+function campoFotoContenuto(o, c){
+  const gia = (c && c.documento) || (!c && o.contenutoDocumento);
+  const nomeGia = (c && c.documentoNome) || "l'immagine che hai caricato";
+  let riga = '';
+  if (digDoc && digDoc.togli)
+    riga = `<span class="hint">🗑 l'immagine verrà tolta al salvataggio</span>
+            <button class="btn link" onclick="annullaFotoContenuto()">annulla</button>`;
+  else if (digDoc)
+    riga = `<span class="hint mono">🖼 ${esc(digDoc.nome)}</span>
+            <button class="btn link" onclick="annullaFotoContenuto()">togli</button>`;
+  else if (gia)
+    riga = `<span class="hint mono">🖼 ${esc(nomeGia)}</span>
+            <button class="btn link" onclick="togliFotoContenuto()">togli</button>`;
+  return `
+    <div style="margin-top:10px">
+      <div class="hint">🖼 Se il buono ha un <b>codice a barre</b> o un QR, allega qui la foto: trascriverlo a mano non basta. Il testo serve comunque — scrivici almeno dove si riscatta.</div>
+      <input type="file" id="digFile" accept="application/pdf,image/*" style="display:none" onchange="scegliFotoContenuto(this)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn ghost" onclick="el('digFile').click()">${gia||digDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
+        ${riga}
+      </div>
+    </div>`;
+}
+
+/* chi legge: l'immagine si apre IN PAGINA — un codice a barre si
+   inquadra, e mandare qualcuno a cercare un download e' il modo di
+   perderlo; il PDF, che in pagina non si disegna, si scarica e lo si
+   DICE (la lezione del documento di ritiro) */
+function bloccoFotoContenuto(o, c){
+  if (!c || !c.documento) return '';
+  const visto = digDocVisto[o.id];
+  const immagine = (c.documentoTipo||'').startsWith('image/');
+  if (visto && immagine) return `
+    <div class="hint" style="margin-top:10px">🖼 ${esc(c.documentoNome||'Immagine del contenuto')}:</div>
+    <img src="${visto}" alt="Immagine del contenuto" style="width:100%;border-radius:var(--radius);margin-top:6px;background:#fff">`;
+  return `
+    <div class="hint" style="margin-top:10px">🖼 Il venditore ha allegato un'immagine${c.documentoNome?': '+esc(c.documentoNome):''}.</div>
+    <button class="btn ghost" style="margin-top:6px" onclick="apriFotoContenuto(this)">${immagine?'🖼 Mostra l\'immagine':'📄 Apri il documento'}</button>`;
+}
+
+function scegliFotoContenuto(input){
+  const f = input.files && input.files[0];
+  input.value = '';                    // o riscegliere lo stesso file tace
+  if (!f) return;
+  if (f.size > 15*1024*1024) { toast('Il file è troppo pesante (massimo 15 MB)'); return; }
+  const r = new FileReader();
+  /* il silenzio e' il difetto gia' pagato con le foto: un lettore che
+     fallisce lo dice */
+  r.onerror = ()=> toast('Non riesco a leggere questo file: riprova');
+  r.onload = ()=>{ digDoc = {dati:r.result, nome:f.name||'immagine'};
+                   ridisegnaDigitale(); };
+  r.readAsDataURL(f);
+}
+function togliFotoContenuto(){ digDoc = {togli:true}; ridisegnaDigitale(); }
+function annullaFotoContenuto(){ digDoc = null; ridisegnaDigitale(); }
+
+/* IL RIDISEGNO SEGUE DOVE VIVE IL FORM: in correzione sta dentro
+   `#digPannello` e si riscrive da solo; alla consegna sta nel corpo
+   dell'ordine, che solo `openOrder` sa rifare — e li' si passa
+   dall'involucro, cosi' il chip del file compare senza che la pagina
+   torni in cima. */
+function ridisegnaDigitale(){
+  /* IL TESTO APPENA SCRITTO SOPRAVVIVE AL RIDISEGNO, ed e' un difetto
+     trovato dal vivo e non leggendo: si scrive il codice, si allega
+     la foto, e la textarea rinasce VUOTA — in consegna perche' si
+     rifa' tutto il corpo dell'ordine, in correzione perche' il
+     campo nasce col testo SALVATO e non con quello digitato. Si
+     tiene e si rimette, che e' la stessa cura del chip del file. */
+  const scritto = el('digContenuto') ? el('digContenuto').value : null;
+  if (digCorreggo) ridisegnaContenuto();
+  else riapriOrdineFermo(currentOrder.id, '#digForm');
+  if (scritto !== null && el('digContenuto'))
+    el('digContenuto').value = scritto;
+}
+
+async function apriFotoContenuto(btn){
+  haptic();
+  const o = currentOrder, c = digDati[o.id];
+  let url = digDocVisto[o.id];
+  if (!url){
+    const ripristina = attesaRitardata(btn, 'Apro l\'immagine…');
+    const r = await fetch(`${API_BASE}/orders/${o.id}/contenuto/file`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok){
+      const d = await r.json().catch(()=>({}));
+      ripristina(); toast(d.detail||'Non riesco ad aprire l\'immagine'); return;
+    }
+    url = URL.createObjectURL(await r.blob());
+    digDocVisto[o.id] = url;
+    ripristina();
+  }
+  if ((c?.documentoTipo||'').startsWith('image/')) { ridisegnaContenuto(); return; }
+  const a = document.createElement('a');
+  a.href = url; a.download = c?.documentoNome || 'contenuto.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('📄 Documento scaricato: lo trovi fra i tuoi file');
+}
+
+/* la correzione RILEGGE prima di aprire il form, ed e' il motivo per
+   cui e' un gesto solo: con la textarea vuota il venditore
+   cancellerebbe il testo credendo di toccare la sola immagine (il
+   server lo para conservando, ma un campo vuoto che si salva pieno e'
+   peggio del difetto che cura) */
+async function apriCorrezioneContenuto(btn){
+  haptic();
+  const ripristina = attesaRitardata(btn, 'Apro il contenuto…');
+  const d = await caricaContenutoDigitale();
+  ripristina();
+  if (!d) return;
+  digDoc = null;
+  digCorreggo = currentOrder.id;
+  ridisegnaContenuto();
+}
+function annullaCorrezione(){
+  digCorreggo = 0; digDoc = null; ridisegnaContenuto();
 }
 
 async function rivelaContenuto(btn){
@@ -21143,27 +21327,71 @@ function copiaContenuto(){
     .catch(()=>toast('Tieni premuto sul testo per copiarlo'));
 }
 
+/* la stessa funzione consegna e CORREGGE: il server distingue dallo
+   stato, e qui il gesto e' lo stesso — cambiano il confirm, il toast
+   e dove si atterra */
 async function consegnaContenuto(btn){
   haptic();
+  const correzione = digCorreggo === currentOrder.id;
   const testo = (el('digContenuto').value||'').trim();
   if (!testo) { toast('Scrivi il contenuto da consegnare'); return; }
-  if (!confirm('Consegnare questo contenuto all\'acquirente?\n\nLa piattaforma lo registra come prova della consegna; l\'acquirente lo rivelerà con un tocco.')) return;
-  const ripristina = bottoneInAttesa(btn, '💾 Consegno il codice…');
+  if (!confirm(correzione
+      ? 'Aggiornare il contenuto?\n\nL\'acquirente non l\'ha ancora rivelato: riceve un avviso e rivelerà quello nuovo. Appena lo rivela, questo non si tocca più.'
+      : 'Consegnare questo contenuto all\'acquirente?\n\nLa piattaforma lo registra come prova della consegna; l\'acquirente lo rivelerà con un tocco.')) return;
+  const ripristina = bottoneInAttesa(btn, correzione
+    ? '💾 Aggiorno il contenuto…' : '💾 Consegno il codice…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegna-digitale`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({contenuto: testo})});
+    /* chiave `file` assente = si conserva quel che c'e', il patto
+       dello stock: si manda solo quando c'e' un gesto */
+    body: JSON.stringify(Object.assign({contenuto: testo},
+      digDoc && digDoc.togli ? {file_togli:1} :
+      digDoc ? {file:digDoc.dati, file_nome:digDoc.nome} : {}))});
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
   currentOrder.state = 'shipped'; currentOrder.contenutoPresente = true;
   currentOrder.corriere = 'Consegna digitale';
+  currentOrder.contenutoDocumento = !!d.documento;
+  currentOrder.contenutoCorrezioni = d.correzioni || 0;
   contenutoRivelato[currentOrder.id] = testo;
+  /* la scheda della foto si riscrive con quel che il SERVER dice
+     (`d.documento`), non con quel che si sperava: se il file non e'
+     entrato, qui non deve restarne traccia. Nome e tipo si tengono
+     da chi li conosce — il file appena scelto se c'e' un gesto, la
+     scheda di prima se il gesto non c'e' stato (il patto dello
+     stock, che qui vale anche in memoria) */
+  const _sched = digDati[currentOrder.id] || {};
+  const _scelto = digDoc && !digDoc.togli ? digDoc : null;
+  digDati[currentOrder.id] = {
+    documento: !!d.documento,
+    documentoNome: _scelto ? _scelto.nome
+                   : (d.documento ? (_sched.documentoNome || '') : ''),
+    documentoTipo: _scelto ? (_scelto.dati.slice(5).split(';')[0] || '')
+                   : (d.documento ? (_sched.documentoTipo || '') : '')};
+  /* l'immagine e' cambiata: la copia scaricata non vale piu' */
+  if (digDoc && digDocVisto[currentOrder.id]) {
+    URL.revokeObjectURL(digDocVisto[currentOrder.id]);
+    delete digDocVisto[currentOrder.id];
+  }
+  digDoc = null;
   /* le due copie allineate, come nella rivelazione: `openOrder`
      rilegge da qui */
   const viva = orders.find(x=>x.id===currentOrder.id);
   if (viva) { viva.state = 'shipped'; viva.contenutoPresente = true;
-              viva.corriere = 'Consegna digitale'; }
+              viva.corriere = 'Consegna digitale';
+              viva.contenutoDocumento = !!d.documento;
+              viva.contenutoCorrezioni = d.correzioni || 0; }
+  if (correzione) {
+    /* la correzione non cambia lo stato: fuori dal pannello non si
+       muove niente, quindi si ridisegna in place e la pagina resta
+       ferma per davvero */
+    digCorreggo = 0;
+    ridisegnaContenuto();
+    toast('💾 Contenuto aggiornato: l\'acquirente è stato avvisato');
+    return;
+  }
   /* qui l'ancora e' la cassaforte e non il pannello, ed e' dichiarato:
      il riquadro dove stava il dito SPARISCE (era il form di consegna)
      e quello del contenuto prima non esisteva, quindi la promessa e'
