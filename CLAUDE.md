@@ -1875,6 +1875,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   transiziona niente, e la barra sbucava di colpo come un errore
   (difetto dal campo). Ora `opacity` + `visibility` + una scivolata di
   8px, 180 ms, spenta da `prefers-reduced-motion`.
+  LA PILLOLA ACCESA STA AL CENTRO DELLA FILA (ago 2026, dal campo):
+  restava troppo a sinistra, e scorrendo non si capiva piu' dove si
+  fosse. È LO STESSO GESTO DELLA CARD nella striscia, quindi il giudice
+  è UNO — `centraNellaFila(fila, voce)`, chiamato da `renderChips`,
+  da `renderStriscia` e da `chipsAppiccicate` quando la barra compare
+  (renderChips può girare con la vista nascosta, dove non c'è niente da
+  misurare): la stessa formula scritta in due posti direbbe due centri
+  diversi a due dita di distanza, e le due file si vedono quasi insieme.
+  NON SI USA `offsetLeft`, ed è la trappola da non ricalcare: quello è
+  relativo all'offsetParent, cioè al primo antenato POSIZIONATO —
+  `.chips` lo è (absolute) e `.cat-strip` no — quindi per la STRISCIA il
+  conto partiva dal corpo della pagina, ed era giusto solo finché la
+  fila comincia a x=0: sopra i 520px, con `#app` centrato, il centro
+  era sbagliato di mezza pagina (difetto latente, chiuso qui di
+  striscia). Coi rect non resta nessuna precondizione da ricordare.
+  LA PRIMA E L'ULTIMA NON RESTANO MEZZE TAGLIATE, e non serve un ramo
+  apposta: il browser clampa `scrollLeft` a [0, scrollWidth −
+  clientWidth], quindi l'ultima si ferma a filo del bordo destro —
+  intera, col respiro del padding, solo non centrata, che dopo di lei
+  non c'è più niente da scorrere. MISURATO a 375px: la pillola di mezzo
+  a 188 su 188, l'ultima con 16px d'aria a destra (il `var(--pad)`
+  della fila), la prima col clamp allo zero. Che il giudice RISPONDA
+  giusto non lo dicono le sentinelle — lo dice il banco che lo fa
+  girare con node su una fila di cartone (`prove_centro_fila`), dove il
+  clamp è modellato come lo fa il browser.
+  IL FONDO NON LASCIA PASSARE NIENTE (ago 2026, dal campo): a `.92` col
+  blur la vetrina che scorre si vedeva passare dietro la testata E
+  dietro questa barra, che veste lo stesso `--header-bg` — sfocata, ma
+  si vedeva, nei due temi. Ora il token è `var(--bg)`: la testata È la
+  stessa carta della pagina, e a separarla c'è il bordo di sotto.
+  E COL FONDO PIENO IL `backdrop-filter` SE N'È ANDATO da tutti e due:
+  sopra una carta opaca non può cambiare un pixel, e resterebbe una
+  sfocatura calcolata a ogni fotogramma sulla superficie più scorsa
+  dell'app. Non toglie niente a nessuno, ed è la riga che il commento
+  del markup nominava: il containing block dei figli `absolute` — la
+  barra appesa qui sotto — lo dà il `position:sticky`, che è già un
+  posizionamento. Il `--nav-bg` NON si tocca: `.96` è un'altra
+  superficie (bianco di giorno, la carta delle card di sera) e a quella
+  densità non passa niente.
   A DECIDERE È LA SEZIONE E NON UNA SOGLIA DI SCROLL: un
   IntersectionObserver su `#catSez` — e col filtro acceso quella
   sezione è `display:none`, quindi non interseca niente e la barra
@@ -19805,6 +19844,30 @@ un WooCommerce vero — i certificati di un self-hosted, i permessi
 veri di una chiave (le impostazioni le legge una chiave «Read»), e
 soprattutto un negozio configurato coi prezzi al netto, che è il caso
 su cui questa tappa dice di no.
+
+La barra delle pillole si legge (ago 2026, due cose dal campo): la
+pillola del reparto scelto si porta al CENTRO della fila invece di
+restare a sinistra — un giudice solo per lei e per la card della
+striscia, coi rect e non con `offsetLeft`, che chiude di striscia un
+centro sbagliato della striscia sopra i 520px — e il fondo della
+testata e della barra diventa OPACO, che a `.92` col blur la vetrina si
+vedeva passare dietro. Col fondo pieno se n'è andato anche il
+`backdrop-filter`, che sopra una carta opaca non può cambiare un pixel.
+Vedi Architettura, «LE CATEGORIE IN HOME», per la trappola
+dell'offsetParent e per la risposta all'ultima pillola: il clamp del
+browser la ferma a filo del bordo destro, intera.
+Collaudato: 5067 prove verdi (14 nuove, una ROVESCIATA col perché — la
+formula non vive più dentro la striscia) e UNDICI MUTAZIONI, una per
+riga sorvegliata, ognuna rossa da sola, di cui due prese SOLO dal banco
+che fa girare il giudice (il centro che diventa un quarto, il verso del
+conto rovesciato: la forma resta giusta e a dirlo può essere solo
+l'esecuzione). Più il giro dal vivo col server locale su una COPIA del
+database, a 320/360/375 nei due temi: centro esatto alle tre larghezze,
+l'ultima pillola intera coi suoi 16px d'aria, il fondo `rgb()` pieno
+senza blur e la vetrina che non passa più (chiesto a
+`elementsFromPoint`, non all'occhio), zero errori JS.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
+rotta — solo client.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
