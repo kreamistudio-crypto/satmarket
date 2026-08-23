@@ -25371,7 +25371,13 @@ def prove_banner_negozio():
     async def _notif2(tg, testo): detti2.append((tg, testo))
     async def _notif_admin2(testo): detti2.append(("admin", testo))
 
-    amb5 = {"db": _G2, "time": __import__("time"),
+    # ⚠️ `Request` SERVE ANCHE SE NON SI USA: sta nell'annotazione di
+    # `sblocca_banner`, e in Python 3.14 le annotazioni si valutano
+    # PIGRAMENTE — quindi in locale l'exec passa e in CI, con un
+    # Python piu' vecchio, esplode con NameError. Gli altri ambienti
+    # di questo file ce l'hanno tutti: l'avevo dimenticato qui, e a
+    # dirlo e' stata la CI, non la suite.
+    amb5 = {"db": _G2, "time": __import__("time"), "Request": object,
             "HTTPException": _H2, "Header": lambda d="": d,
             "Cookie": lambda d="": d,
             "crea_invoice_escrow": _finta_invoice,
