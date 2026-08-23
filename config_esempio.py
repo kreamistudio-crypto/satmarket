@@ -54,6 +54,14 @@ PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
                              # 0 = spenta
 GIORNI_DATA_ANNUNCIO = 60    # «pubblicato N giorni fa» nel dettaglio:
                              # oltre questi giorni la riga non si mostra
+VETRINA_PER_VENDITORE = 3    # «3 ogni 30» (ago 2026): in testa alla
+                             # vetrina un venditore non ne occupa piu' di
+                             # N. Non e' un filtro ma un riordino a
+                             # «tornate» (gli N piu' recenti di ognuno,
+                             # poi i successivi): nessun annuncio sparisce,
+                             # cambia solo l'ordine. 0 = spento, «piu'
+                             # recenti prima» e basta. Vuole SQLite >= 3.25
+                             # (sotto si spegne da sola e l'avvio lo dice)
 AUTO_SBLOCCO_ATTIVO = False  # IL DISARMO (ago 2026): False = i sats non
                              # si muovono MAI senza un gesto umano. Gatea
                              # i soli rami FISICI dell'orologio; le due

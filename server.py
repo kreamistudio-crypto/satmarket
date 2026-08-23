@@ -515,6 +515,25 @@ try:
 except ImportError:
     GIORNI_DATA_ANNUNCIO = 60
 
+# «3 OGNI 30» (ago 2026, decisione di Andrea): nella prima finestra
+# della vetrina un venditore non ne occupa piu' di N. NON e' un filtro
+# — e' un RIORDINO a «tornate» (vedi pagina_annunci): nessuna riga
+# sparisce, `totale` resta vero e il keyset resta senza stato. 0 =
+# spento, il mondo di ieri byte per byte. Vale sul solo ordinamento di
+# default di /api/listings: un ordine esplicito (prezzo, lampo, asta)
+# e la ricerca hanno il loro, e negozio/miei sono di un venditore solo.
+# FAIL-OPEN DICHIARATO: vuole le window function (SQLite >= 3.25,
+# 2018); sotto, la leva si spegne da sola e l'avvio lo dice.
+try:
+    from config import VETRINA_PER_VENDITORE
+except ImportError:
+    VETRINA_PER_VENDITORE = 3
+if VETRINA_PER_VENDITORE and sqlite3.sqlite_version_info < (3, 25):
+    print("⚠️ SQLite " + sqlite3.sqlite_version + " senza window function: "
+          "VETRINA_PER_VENDITORE spenta, la vetrina resta «piu' recenti "
+          "prima» senza il riordino a tornate")
+    VETRINA_PER_VENDITORE = 0
+
 # I post automatici (la piattaforma che racconta i fatti) sono nati
 # dopo: i config.py gia' compilati possono non avere le chiavi. I
 # default valgono da soli: post ACCESI (i canali sono giovani, il
@@ -9789,29 +9808,77 @@ ORDINAMENTI = {
 }
 
 
-def pagina_annunci(con, campi, dove, par, limit, cursore, ordina=""):
+def pagina_annunci(con, campi, dove, par, limit, cursore, ordina="",
+                   per_venditore=0):
     """Una pagina di annunci nell'ordine chiesto (default: nuovi
     prima). Chiede una riga in piu' del limite: se arriva, c'e'
     un'altra pagina e l'ultima riga tenuta diventa il prossimo
     segnalibro '{chiave}_{id}'. Un cursore storto (o un ordinamento
     sconosciuto) vale come il default: mai un errore (fail-safe
-    verso client vecchi o link rotti)."""
+    verso client vecchi o link rotti).
+
+    LE TORNATE (ago 2026, «3 ogni 30»): con `per_venditore` > 0 e
+    l'ordinamento di default, ogni annuncio prende il RANGO dentro il
+    suo venditore (1º, 2º, 3º… per data) e la tornata e' il rango
+    diviso N — la tornata 0 sono gli N piu' recenti di OGNI venditore,
+    in ordine di data, poi la tornata 1, e cosi' via. E' una
+    PERMUTAZIONE della rosa, non un filtro: nessuna riga sparisce,
+    quindi il `totale` di chi chiama resta vero e lo scorrimento
+    ricompone la rosa intera; e il keyset resta senza stato, con una
+    chiave in piu' davanti — il cursore diventa
+    '{tornata}_{creato}_{id}'. Il rango si calcola al volo (niente
+    colonna da tenere in pari coi ~48 UPDATE di annunci) sulla rosa
+    FILTRATA: dentro un reparto conta fra gli annunci di quel
+    venditore in quel reparto.
+    ⚠️ IL CURSORE STA FUORI DALLA CTE, ed e' la riga da non spostare:
+    dentro, il rango si ricalcolerebbe sul RESIDUO e a ogni pagina il
+    venditore ripartirebbe da 1 — N per pagina, cioe' il tetto che
+    non morde e la vetrina che si riempie di lui, in silenzio.
+    Un cursore a DUE pezzi (un client fermo a meta' scorrimento a
+    cavallo del deploy) cade nel ramo di sempre: prima pagina, mai un
+    errore — una pagina ripetuta una volta, dichiarato."""
     chiave, verso, op = ORDINAMENTI.get(ordina, ORDINAMENTI[""])
-    q = (f"SELECT {campi} FROM annunci a "
-         f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
+    tornate = per_venditore > 0 and chiave == "creato"
+    if tornate:
+        # la CTE ha lo stesso FROM della query del totale (niente `u.`:
+        # `dove` e' gia' JOIN-free, il patto di _sql_soglia_negozio)
+        q = ("WITH r AS (SELECT a.id, (ROW_NUMBER() OVER (PARTITION BY "
+             "a.venditore_id ORDER BY a.creato DESC, a.id DESC) - 1) / ? "
+             f"AS tornata FROM annunci a WHERE {dove}) "
+             f"SELECT {campi}, r.tornata AS _tornata FROM r "
+             "JOIN annunci a ON a.id = r.id "
+             "JOIN utenti u ON u.tg_id = a.venditore_id")
+        par = [per_venditore] + par
+    else:
+        q = (f"SELECT {campi} FROM annunci a "
+             f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
     if cursore:
         try:
-            c, i = cursore.split("_")
-            par = par + [int(c), int(i)]
-            q += f" AND (a.{chiave}, a.id) {op} (?, ?)"
+            if tornate:
+                t, c, i = cursore.split("_")
+                par = par + [int(t), int(t), int(c), int(i)]
+                q += (" WHERE r.tornata > ? OR (r.tornata = ? "
+                      f"AND (a.{chiave}, a.id) {op} (?, ?))")
+            else:
+                c, i = cursore.split("_")
+                par = par + [int(c), int(i)]
+                q += f" AND (a.{chiave}, a.id) {op} (?, ?)"
         except (ValueError, AttributeError):
             pass
-    q += f" ORDER BY a.{chiave} {verso}, a.id {verso} LIMIT ?"
+    q += ((" ORDER BY r.tornata, " if tornate else " ORDER BY ")
+          + f"a.{chiave} {verso}, a.id {verso} LIMIT ?")
     righe = [dict(r) for r in con.execute(q, par + [limit + 1])]
     prossimo = None
     if len(righe) > limit:
         righe = righe[:limit]
-        prossimo = f"{righe[-1][chiave]}_{righe[-1]['id']}"
+        u = righe[-1]
+        prossimo = (f"{u['_tornata']}_" if tornate else "") + \
+            f"{u[chiave]}_{u['id']}"
+    if tornate:
+        # il rango e' un attrezzo della paginazione, non un dato: non
+        # esce (il patto di quantita_max)
+        for r in righe:
+            r.pop("_tornata", None)
     return righe, prossimo
 
 
@@ -10144,13 +10211,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
         # risposta e' IDENTICA a prima.
+        # Stesso ordine della vetrina paginata (le tornate comprese):
+        # una verita' sola, anche per chi legge l'array di ieri. Il
+        # cursore si butta.
         righe = (_righe_per_id(con, campi, ordinati[:TETTO_LEGACY])
                  if ordinati is not None else
-                 arricchisci_righe_vetrina([dict(r) for r in con.execute(
-                     f"SELECT {campi} FROM annunci a "
-                     "JOIN utenti u ON u.tg_id = a.venditore_id "
-                     f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
-                     par + [TETTO_LEGACY])]))
+                 arricchisci_righe_vetrina(pagina_annunci(
+                     con, campi, dove, par, TETTO_LEGACY, "",
+                     per_venditore=VETRINA_PER_VENDITORE)[0]))
         con.close()
         return righe
     limit = min(limit, LIMITE_PAGINA_MAX)
@@ -10174,7 +10242,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         totale_ricerca = len(ordinati)
     else:
         righe, prossimo = pagina_annunci(con, campi, dove, par, limit,
-                                         cursore, ordina)
+                                         cursore, ordina,
+                                         per_venditore=VETRINA_PER_VENDITORE)
         righe = arricchisci_righe_vetrina(righe)
     risposta = {"annunci": righe, "cursore": prossimo}
     if not cursore:
@@ -13109,6 +13178,10 @@ def _leve_stato():
             _leva("«Pubblicato N giorni fa» fino a (giorni)",
                   "GIORNI_DATA_ANNUNCIO", GIORNI_DATA_ANNUNCIO,
                   spento="la data non si mostra mai nel dettaglio"),
+            _leva("Annunci per venditore in testa alla vetrina",
+                  "VETRINA_PER_VENDITORE", VETRINA_PER_VENDITORE,
+                  spento="la vetrina e' «piu' recenti prima» e basta: un "
+                         "catalogo grosso si prende le prime pagine"),
             _leva("Annunci nel barattolo", "MAX_PREFERITI", MAX_PREFERITI),
             _leva("Pezzi per annuncio", "MAX_QUANTITA_ANNUNCIO",
                   MAX_QUANTITA_ANNUNCIO),

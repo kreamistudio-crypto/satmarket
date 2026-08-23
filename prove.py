@@ -28083,6 +28083,217 @@ def prove_connettori_cassetto():
     prova("...e che ricollegare e' un catalogo nuovo", True,
           "come annunci nuovi" in sc)
 
+def _ambiente_tornate():
+    """`pagina_annunci` VERA su un database di cartone: annunci e
+    utenti col minimo che la query tocca."""
+    import sqlite3
+    amb = {}
+    i = _SORGENTE.index("ORDINAMENTI = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n}\n", i) + 3], amb)
+    exec(pezzo("pagina_annunci"), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT);"
+        "CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER,"
+        " creato INTEGER, prezzo_sats INTEGER, stato TEXT DEFAULT 'attivo',"
+        " categoria TEXT DEFAULT 'Altro');")
+    return amb, con
+
+
+def _semina(con, venditori):
+    """`venditori` = {tg_id: quanti annunci}; i piu' recenti sono quelli
+    del PRIMO venditore dell'elenco (il catalogo appena importato, che
+    e' il caso del cantiere), e `creato` cresce riga per riga."""
+    t, i = 1_000_000, 0
+    for v, n in reversed(list(venditori.items())):
+        con.execute("INSERT INTO utenti VALUES(?,?)", (v, f"v{v}"))
+        for _ in range(n):
+            i += 1; t += 1
+            con.execute("INSERT INTO annunci(id,venditore_id,creato,"
+                        "prezzo_sats) VALUES(?,?,?,?)", (i, v, t, i * 10))
+    con.commit()
+
+
+def _scorri(amb, con, limit, per_venditore=3, ordina="", tetto=200):
+    """Tutte le pagine, come farebbe `caricaAltri`: una lista di
+    pagine, ognuna una lista di (id, venditore_id)."""
+    pagine, cursore, giri = [], "", 0
+    while True:
+        righe, cursore = amb["pagina_annunci"](
+            con, "a.id, a.venditore_id, a.creato, a.prezzo_sats",
+            "a.stato='attivo'", [], limit, cursore or "", ordina,
+            per_venditore=per_venditore)
+        pagine.append([(r["id"], r["venditore_id"]) for r in righe])
+        giri += 1
+        if not cursore or giri > tetto:
+            break
+    return pagine
+
+
+def prove_tornate():
+    """«3 OGNI 30» (ago 2026): il riordino a tornate della vetrina.
+    Si gira il pezzo vero su sqlite in memoria, perche' qui il modo
+    tipico di fallire non e' un'eccezione — e' una prima pagina
+    piena di un venditore solo, o un annuncio che non compare mai,
+    che non alzano niente."""
+    print("\n[tornate]")
+    from collections import Counter
+    try:
+        amb, con = _ambiente_tornate()
+    except Exception as e:
+        salta("le tornate", f"l'ambiente non si monta: {e}")
+        return
+
+    # IL CASO DEL QUADRO: un venditore con 25 righe piu' recenti di
+    # tutte, e dieci venditori con 3 annunci a testa — cioe' una prima
+    # tornata da 33, piu' lunga della pagina. (Con meno di 30 righe
+    # nella prima tornata il resto della pagina e' per forza del
+    # catalogo grosso: e' il riparto equo, ed e' il caso di sotto.)
+    _semina(con, {1: 25, **{v: 3 for v in range(2, 12)}})
+    tutti = {r[0] for r in con.execute("SELECT id FROM annunci")}
+    totale = con.execute("SELECT COUNT(*) FROM annunci "
+                         "WHERE stato='attivo'").fetchone()[0]
+
+    # senza la leva e' il mondo di ieri: il catalogo grosso in testa
+    ieri = _scorri(amb, con, 30, per_venditore=0)
+    prova("leva a 0: la prima pagina e' tutta del catalogo grosso", 25,
+          Counter(v for _, v in ieri[0])[1])
+    prova("leva a 0: il cursore e' a due pezzi (il formato di ieri)", 2,
+          len(amb["pagina_annunci"](con, "a.id, a.creato", "a.stato='attivo'",
+                                    [], 30, "", "")[1].split("_")))
+
+    # LA REGOLA: nella prima finestra un venditore ne occupa al piu' 3
+    pagine = _scorri(amb, con, 30)
+    conta = Counter(v for _, v in pagine[0])
+    prova("prima pagina: il catalogo grosso ne occupa 3, non 25", 3,
+          conta[1])
+    prova("...e nessun altro ne ha piu' di 3", True,
+          max(conta.values()) <= 3)
+    prova("la prima pagina e' PIENA: riordinare non accorcia", 30,
+          len(pagine[0]))
+
+    # LA PROVA REGINA: e' una permutazione, non un filtro — l'unione
+    # delle pagine e' la rosa, senza doppioni, e il totale di sempre
+    # (il COUNT sulla WHERE) resta VERO.
+    visti = [i for p in pagine for i, _ in p]
+    prova("l'unione delle pagine e' ESATTAMENTE la rosa", tutti,
+          set(visti))
+    prova("zero doppioni fra una pagina e l'altra", len(tutti),
+          len(visti))
+    prova("il COUNT(*) della WHERE dice quante card scorrono", totale,
+          len(visti))
+    # il rimandato NON si perde: il 25º annuncio del catalogo grosso
+    # arriva, in coda
+    quarto = con.execute("SELECT id FROM annunci WHERE venditore_id=1 "
+                         "ORDER BY creato DESC, id DESC LIMIT 1 OFFSET 3"
+                         ).fetchone()[0]
+    prova("il 4º annuncio del catalogo grosso e' rimandato, non perso",
+          True, quarto in visti and visti.index(quarto) >= 30)
+
+    # dentro la tornata vale «piu' recenti prima»
+    def creati(ids):
+        return [con.execute("SELECT creato FROM annunci WHERE id=?",
+                            (i,)).fetchone()[0] for i in ids]
+    prima_tornata = [i for i, _ in pagine[0]]   # tutta tornata 0 (33 > 30)
+    prova("dentro la tornata l'ordine resta per data, dal piu' nuovo",
+          sorted(creati(prima_tornata), reverse=True), creati(prima_tornata))
+
+    # LA TRAPPOLA DEL KEYSET DENTRO LA CTE, con un caso che la
+    # DISTINGUE: col cursore dentro, il rango si ricalcola sul residuo
+    # e alla pagina dopo il catalogo grosso ripartirebbe da 1 — cioe'
+    # 3 per PAGINA, il tetto che non morde. Qui A ha 8 annunci tutti
+    # piu' recenti, dieci venditori ne hanno 1, pagine da 6: la
+    # tornata 0 e' A1-A3 + i dieci, quindi la pagina 2 NON contiene A.
+    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
+    _semina(con, {1: 8, **{v: 1 for v in range(2, 12)}})
+    pagine = _scorri(amb, con, 6)
+    prova("pagina 2: il catalogo grosso NON riparte da 1 (keyset fuori "
+          "dalla CTE)", 0, Counter(v for _, v in pagine[1])[1])
+    visti = [i for p in pagine for i, _ in p]
+    vend = [v for p in pagine for _, v in p]
+    prova("...e i suoi annunci dal 4º in poi arrivano DOPO i singoli",
+          [1] * 5, vend[-5:])
+    prova("anche qui: unione = rosa, zero doppioni", (18, 18),
+          (len(set(visti)), len(visti)))
+    # POCHI VENDITORI: le tornate degradano al riparto equo invece di
+    # lasciare pagine corte (con 5 venditori «3 ogni 30» non esiste)
+    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
+    _semina(con, {v: 20 for v in range(1, 6)})
+    p1 = _scorri(amb, con, 30)[0]
+    prova("cinque venditori: la prima pagina resta piena", 30, len(p1))
+    prova("...e nessuno ne ha piu' di 6 (due tornate da 3)", 6,
+          max(Counter(v for _, v in p1).values()))
+    # e quando la prima tornata e' piu' CORTA della pagina, il resto
+    # lo riempie chi ha altro da mostrare: il caso del quadro con i
+    # piccoli da 1, 2 o 3 annunci (21 righe) da' al grosso 3+3+3
+    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
+    _semina(con, {1: 25, **{v: 1 + v % 3 for v in range(2, 12)}})
+    p1 = _scorri(amb, con, 30)[0]
+    prova("prima tornata corta: i 3 del grosso, poi i piccoli, poi ancora "
+          "lui a tornate di 3", [1] * 3 + [0] * 21 + [1] * 6,
+          [int(v == 1) for _, v in p1])
+
+    # l'ordinamento esplicito NON dirada: chi chiede il prezzo lo vuole
+    # intero, e il cursore resta a due pezzi
+    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
+    _semina(con, {1: 25, **{v: 1 for v in range(2, 12)}})
+    righe, cur = amb["pagina_annunci"](
+        con, "a.id, a.venditore_id, a.prezzo_sats", "a.stato='attivo'", [],
+        10, "", "prezzo_giu", per_venditore=3)
+    prova("ordina=prezzo: le tornate non si applicano", 10,
+          Counter(r["venditore_id"] for r in righe)[1])
+    prova("ordina=prezzo: cursore a due pezzi", 2, len(cur.split("_")))
+    # un cursore a DUE pezzi con le tornate accese (il client fermo a
+    # meta' scorrimento a cavallo del deploy): prima pagina, mai un 500
+    righe, _ = amb["pagina_annunci"](
+        con, "a.id, a.venditore_id, a.creato", "a.stato='attivo'", [], 30,
+        "1000010_10", "", per_venditore=3)
+    prova("cursore di ieri sulle tornate: prima pagina, non un errore",
+          30, len(righe))
+    # il rango non esce dalle righe: e' un attrezzo, non un dato
+    righe, _ = amb["pagina_annunci"](
+        con, "a.id, a.creato", "a.stato='attivo'", [], 5, "", "",
+        per_venditore=3)
+    prova("`_tornata` non esce dalle righe", False,
+          any("_tornata" in r for r in righe))
+
+    # --- LE SENTINELLE -------------------------------------------------
+    p = codice(pezzo("pagina_annunci"))
+    # `find` e mai `index`: una mutazione che sposta l'ancora deve fare
+    # ROSSA la riga, non farla esplodere portandosi dietro le sorelle
+    inizio = p.find("WITH r AS (")
+    fine = p.find("AS tornata FROM annunci a WHERE {dove}) ")
+    prova("la CTE si chiude subito dopo `dove`: niente cursore dentro",
+          True, 0 < inizio < fine)
+    cte = p[inizio:fine] if 0 < inizio < fine else p
+    prova("il cursore sta FUORI dalla CTE (nessun `?`-keyset dentro)",
+          False, "cursore" in cte or "tornata >" in cte)
+    prova("la CTE ha il FROM della query del totale (niente `u.`)", False,
+          " u." in cte or "JOIN utenti" in cte)
+    prova("le tornate valgono solo sull'ordinamento di default", True,
+          'per_venditore > 0 and chiave == "creato"' in p)
+    la = codice(pezzo("lista_annunci"))
+    prova("lista_annunci passa la leva nei DUE rami (paginato e legacy)",
+          2, la.count("per_venditore=VETRINA_PER_VENDITORE"))
+    prova("il ramo legacy non ha piu' una ORDER BY scritta a mano", False,
+          "ORDER BY a.creato DESC, a.id DESC LIMIT ?" in la)
+    for f in ("miei_annunci", "negozio"):
+        prova(f"{f} NON dirada (un venditore solo)", False,
+              "per_venditore" in codice(pezzo(f)))
+    prova("la leva nasce a 3 nel codice", True,
+          "VETRINA_PER_VENDITORE = 3" in _SORGENTE)
+    prova("fail-open dichiarato sotto SQLite 3.25", True,
+          "sqlite3.sqlite_version_info < (3, 25)" in _SORGENTE
+          and "VETRINA_PER_VENDITORE = 0" in _SORGENTE)
+    prova("il pannello delle leve la conosce", True,
+          '"VETRINA_PER_VENDITORE", VETRINA_PER_VENDITORE' in
+          codice(pezzo("_leve_stato")))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client non legge MAI dentro il cursore (e' del server)",
+          False, "vetrinaCursore.split" in mini or "cursore.split" in mini)
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -28255,6 +28466,7 @@ def main():
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
               prove_connettori_cassetto,
+              prove_tornate,
               prove_config_esempio):
         try:
             f()
