@@ -34023,16 +34023,19 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
                           if_none_match)
 
 
-# I banner della sezione «Da scoprire» in home (ago 2026): per ora due
-# card fisse — le offerte a tempo e gli sconti dei negozi — disegnate
-# da Andrea. Cartella SUA e non assets/categorie/, deliberato:
+# I banner della sezione «Da scoprire» in home (ago 2026): le due card
+# delle occasioni — le offerte a tempo e gli sconti dei negozi — piu'
+# quella del P2P, che invece di accendere un filtro porta al suo
+# «coming soon». Disegnati da Andrea. Cartella SUA e non
+# assets/categorie/, deliberato:
 # ritaglia_categorie.py fa il glob di quella cartella e ogni .webp
 # entrerebbe nella mediana del pareggio dell'inchiostro, che su un
 # banner full-bleed non significa niente e sposterebbe le sorelle.
 # Il nome ARRIVA dal client, quindi whitelist a tupla (il patto di
-# FILE_FONT); i nomi sono le chiavi dei filtri che le card accendono,
-# e restano quelli per sempre.
-FILE_SCOPRIRE = ("lampo.webp", "sconto.webp")
+# FILE_FONT); i nomi sono gli ID delle card (per le due occasioni,
+# anche le chiavi dei filtri che accendono), e restano quelli per
+# sempre.
+FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp")
 
 
 @app.get("/assets/scoprire/{nome}")

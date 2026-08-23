@@ -1825,6 +1825,90 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
   al bordo dice che ce n'e' altre.
+  LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
+  alla fila — non accende un filtro, porta al «coming soon» del P2P,
+  dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
+  quella pagina ci si arriva solo da un tab, cioe' per curiosita'.
+  E' IL SECONDO TIPO DI TOCCO della fila, e NON e' una deroga: le
+  SPONSORIZZATE porteranno a un annuncio, cioe' navigheranno anche
+  loro — il dispatch e' la preparazione che questa lista aspettava
+  comunque, non un caso particolare aperto per una card. Una voce che
+  dichiara un `tocca` se ne va da `toccaScoperta` PRIMA di sfiorare i
+  filtri (niente stato, checkbox, scroll, richiesta), e il dispatch
+  sta in TESTA apposta: sotto c'e' la grammatica dell'interruttore, e
+  una card che interruttore non e' non deve poterci cadere dentro. Per
+  la stessa ragione il template le toglie l'ARIA-PRESSED, che direbbe
+  «false» per sempre su una cosa che non si accende; il `role=button`
+  invece resta a tutte (porta altrove come il tasto della barra, e non
+  e' un link: l'URL non si tocca). L'haptic lo da' la strada che si
+  prende — `vaiP2P` ha il suo, e batterlo due volte si sente.
+  SPARISCE A CHI HA GIA' VOTATO, ed e' la meta' che regge tutto: fa il
+  suo mestiere e si toglie di mezzo quando l'ha fatto, invece di
+  ripetere un invito gia' accolto (il patto degli hint contestuali,
+  «sparisce da solo quando smette di essere vero»). Ed e' cio' che
+  RESTITUISCE alla sezione la possibilita' di sparire: una card FISSA
+  gliel'avrebbe tolta per sempre, e quel `display:none` e' la
+  proprieta' piu' forte del blocco — nei giorni senza occasioni costa
+  zero. C'e' la prova che gira: votato e senza occasioni, la sezione
+  e' ancora spenta.
+  ...MA SOLO QUANDO SI SA (`interessiNoti`), ed e' la riga che
+  leggendo non si vede: prima di /api/me `interessiMiei` e' vuoto
+  tanto per chi non ha votato quanto per chi non gliel'abbiamo ancora
+  chiesto, e senza quel flag la card comparirebbe e sparirebbe ~300 ms
+  dopo a chi il voto l'ha gia' dato — la lezione del seme della demo
+  nelle pillole, sulla stessa striscia. Il flag si alza nei QUATTRO
+  punti in cui la risposta diventa nota (/api/me, la vetrina anonima e
+  i due rami DEMO, dove nessuno ha votato PER COSTRUZIONE), e nel ramo
+  autenticato sta ACCANTO alla lista e PRIMA del `loadListings` che
+  disegna la sezione: piu' in la' sarebbe lo stesso lampo, spostato.
+  E DOPO IL VOTO LA CARD SE NE VA DA SOLA: `renderScoprire` in coda a
+  `toggleInteresse` — i chiamanti salgono a CINQUE — perche' da li' in
+  poi nessun altro giro ripassa da `renderChips` (chi torna in Esplora
+  col gesto indietro non rifa' le pillole), e resterebbe a schermo un
+  invito gia' accolto.
+  IN TESTA E NON IN CODA (decisione di Andrea, col costo ACCETTATO e
+  misurato): a 320px si vede una card quasi piena piu' uno spicchio,
+  quindi chi non scorre non vede piu' le offerte a tempo. La spinta
+  dura poco proprio perche' la card si toglie da sola.
+  IL PREZZO SULLA MISURA E' DICHIARATO, e va ricordato il giorno che
+  si leggeranno i numeri (decisione di Andrea): dando la card al P2P e
+  non alle Aste, il DUELLO fra i due like non vale piu' — il P2P vince
+  perche' e' piu' esposto, non perche' lo aspetta piu' gente. Si
+  guarda la CRESCITA ASSOLUTA del P2P, non il confronto.
+  IL MOVIMENTO E' IL SUO: il ₿ PULSA (`sc-alone`, 1→1.06 su 9s) —
+  ogni card ha il suo, dal soggetto, e qui il soggetto e' un simbolo
+  che ILLUMINA una scia, quindi il moto e' l'alone che si avvicina e
+  si ritira. Piu' ampio e piu' lento del respiro della scatola
+  (1.055 su 6s) cosi' non e' la copia della sorella. Un'ONDA era
+  sbagliata e non si riproponga: quel simbolo e' rigido, e ruotarlo si
+  legge come un disegno storto.
+  LA FASCIA DEL CONTRASTO E' DI OGNI CARD, non piu' una per tutte, ed
+  e' il pezzo che questo cantiere ha dovuto cambiare: i titoli hanno
+  lunghezze diverse, e una fascia sola o e' troppo stretta per i
+  lunghi o — sui corti — pretende che il disegno sia scuro dove
+  nessuna lettera arrivera' MAI. Si deriva dal `testo` del catalogo e
+  dalla geometria del CSS (`left`, `width`, `font-size`,
+  `line-height`, letti dal foglio e non ribattuti), quindi si aggiorna
+  DA SOLA: allungare un titolo allarga la fascia, e se il disegno non
+  ci arriva la CI lo dice. LA LARGHEZZA SI STIMA A UN EM PER
+  CARATTERE — in CI un font non si sa misurare (niente fontTools), ma
+  un glifo non e' mai piu' largo del corpo del testo nemmeno in un
+  font pesante, quindi la stima sbaglia SEMPRE per eccesso, cioe'
+  verso la fascia piu' larga; VERIFICATA col giro a schermo, dove
+  l'inchiostro vero di «P2P» arriva a x=127 contro i 207 della fascia
+  (1,8 volte). Oltre la scatola il titolo va a capo, e li' si torna
+  alla fascia conservativa di sempre (tutta l'altezza), perche'
+  quante righe diventino non lo sappiamo. Le due sorelle restano
+  misurate ESATTAMENTE come prima: la loro garanzia non si e'
+  allentata di un pixel (10,98 e 12,04; la card nuova sta a 14,41).
+  ⚠️ E IL TITOLO E' «P2P» PER UNA RAGIONE MISURATA, non per gusto:
+  «P2P in arrivo» andava a capo e occupava tutta la scatola da 96px,
+  e li' sbatteva contro l'onda dorata del disegno — su UNA riga il
+  margine e' 78px CSS di titolo, oltre i quali quel disegno va
+  rifatto. Chi lo allunga rimisuri, o lo sente dalla CI.
+  IL FILE E' `assets/scoprire/p2p.webp`, 750x345 come le sorelle, e
+  arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
+  (ImageOps.fit LANCZOS q92 method=6).
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
   le stesse 27 figure della pagina Sfoglia, nello stesso ordine (per

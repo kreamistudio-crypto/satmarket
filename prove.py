@@ -22488,8 +22488,9 @@ def prove_scoprire():
     # FILE_FONT) + revalidazione (il patto delle illustrazioni: i file
     # si ridisegnano sotto lo stesso nome).
     ra = pezzo("asset_scoprire")
-    prova("la whitelist e' la tupla dei due nomi", True,
-          'FILE_SCOPRIRE = ("lampo.webp", "sconto.webp")' in src)
+    prova("la whitelist e' la tupla dei nomi delle card", True,
+          'FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp")'
+          in src)
     prova("...e la rotta la interroga", True,
           "if nome not in FILE_SCOPRIRE:" in ra)
     prova("la rotta serve col 304 e la revalidazione", True,
@@ -22497,18 +22498,28 @@ def prove_scoprire():
     # I due banner ci sono (la prova e' nata COL loro commit, il
     # precedente di tutto.webp: prima mancava apposta — una CI rossa
     # in attesa di un asset educa a non guardarla).
-    for _f in ("lampo.webp", "sconto.webp"):
+    # nome del file -> titolo che l'app ci scrive sopra: serve alla
+    # fascia del contrasto qui sotto, che si deriva dal titolo
+    BANNER = {"lampo.webp": "Offerte a tempo",
+              "sconto.webp": "Sconti dei negozi",
+              "p2p.webp": "P2P"}
+    for _f in BANNER:
         prova(f"il banner {_f} esiste", True,
               os.path.exists(os.path.join("assets", "scoprire", _f)))
     # ...e sono ESATTAMENTE 750x345, il triplo della card 250x115: un
     # ratio diverso verrebbe ritagliato da object-fit:cover in
     # silenzio, e il disegno di Andrea perderebbe i bordi senza che
     # nessuno lo veda.
+    # i titoli dell'elenco sono quelli VERI del catalogo, o la
+    # fascia del contrasto (qui sotto, derivata dal titolo)
+    # misurerebbe la lunghezza di un titolo inventato
+    prova("...e i titoli dichiarati sono quelli del catalogo", True,
+          all(f"testo: '{_t}'" in mini for _t in BANNER.values()))
     try:
         from PIL import Image as _Im
-        prova("...e misurano 750x345", [(750, 345)] * 2,
+        prova("...e misurano 750x345", [(750, 345)] * len(BANNER),
               [_Im.open(os.path.join("assets", "scoprire", _f)).size
-               for _f in ("lampo.webp", "sconto.webp")])
+               for _f in BANNER])
     except ImportError:
         salta("misura dei banner: serve Pillow")
 
@@ -22601,10 +22612,17 @@ def prove_scoprire():
     prova("...e nasce nascosta: la accendono i flag", True,
           '<div id="scoprireSez" style="display:none">' in mini)
     # il censimento ESATTO dei chiamanti: renderChips (il giro di
-    # sempre), toccaScoperta (l'anello prima della rete) e i due rami
-    # DEMO del pannello Filtri, dove renderChips non passa
-    prova("renderScoprire ha i suoi quattro chiamanti", 4,
+    # sempre), toccaScoperta (l'anello prima della rete), i due rami
+    # DEMO del pannello Filtri (dove renderChips non passa) e —
+    # dall'ago 2026 — toggleInteresse: la card «P2P» legge
+    # `interessiMiei`, e dopo il voto nessun altro giro ripasserebbe
+    # di qui (chi torna in Esplora col gesto indietro non rifa' le
+    # pillole), quindi resterebbe a schermo un invito gia' accolto.
+    prova("renderScoprire ha i suoi cinque chiamanti", 5,
           mini.count("renderScoprire();"))
+    prova("...e il quinto e' il voto sulla funzione in arrivo", True,
+          "renderScoprire();" in pezzo_js(
+              mini, "async function toggleInteresse(f){", "\n}"))
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}")
     prova("senza card vive sparisce la sezione intera", True,
           "el('scoprireSez').style.display = vive.length ? '' : 'none';"
@@ -22659,6 +22677,72 @@ def prove_scoprire():
     # in chiaveVetrina, e il ramo resta alle sole Aste
     prova("...ne' la cronologia o il ramo della vetrina", (False, False),
           ("ramoVetrina" in _ts, "navRiflette" in _ts))
+
+    # ---- 4bis. LA CARD CHE NAVIGA (ago 2026): «P2P» non
+    # accende un filtro, porta al «coming soon» dove si vota. E' il
+    # secondo tipo di tocco della fila — e la preparazione delle
+    # sponsorizzate, che porteranno a un annuncio.
+    # IL DISPATCH STA IN TESTA: sotto c'e' la grammatica
+    # dell'interruttore (stato, checkbox, filtriBtn, la richiesta), e
+    # una card che interruttore non e' non deve poterci cadere dentro.
+    # Con find() e non index(): una riga tolta deve far ROSSA questa
+    # prova, non farla esplodere portandosi via le sorelle.
+    prova("il tocco che naviga esce prima di ogni filtro", True,
+          0 <= _ts.find("if (voce && voce.tocca) { voce.tocca(); return; }")
+          < _ts.find("filtroLampo = !acceso;"))
+    # ...e prima anche dell'haptic: vaiP2P ha il suo, e batterlo due
+    # volte si sente
+    prova("...e l'haptic lo da' la strada che si prende", True,
+          _ts.find("voce.tocca(); return;") < _ts.find("haptic();"))
+    # LA VOCE: in TESTA (decisione di Andrea, col costo sulle offerte
+    # a tempo accettato e misurato), e NON e' un interruttore.
+    _cat = mini[mini.index("const SCOPRIRE = ["):
+                mini.index("let scoprireFirma")]
+    prova("la card del P2P e' la prima della fila", True,
+          0 <= _cat.find("{id: 'p2p',") < _cat.find("{id: 'lampo',")
+          < _cat.find("{id: 'sconto',"))
+    prova("...e il suo tocco porta al «coming soon»", True,
+          "tocca: () => vaiP2P()" in _cat)
+    # SPARISCE A CHI HA GIA' VOTATO: e' tutto il suo mestiere, ed e'
+    # anche cio' che restituisce alla sezione la possibilita' di
+    # sparire (una card fissa gliel'avrebbe tolta per sempre — quel
+    # display:none e' la proprieta' piu' forte del blocco).
+    prova("sparisce a chi ha gia' votato", True,
+          "vivo: () => interessiNoti && !interessiMiei.includes('p2p')"
+          in _cat)
+    # ...MA SOLO QUANDO SI SA: senza il flag la card comparirebbe e
+    # sparirebbe ~300ms dopo a chi il voto l'ha gia' dato (la lezione
+    # del seme della demo nelle pillole). Il flag si alza dove la
+    # risposta diventa nota: /api/me, la vetrina anonima e i due rami
+    # DEMO — quattro posti, censiti.
+    prova("il flag nasce falso e si alza dove si sa", (True, 4),
+          ("let interessiNoti = false;" in mini,
+           mini.count("interessiNoti = true;")))
+    # nel ramo autenticato sta ACCANTO alla lista e PRIMA del
+    # loadListings che disegna la sezione: piu' in la' sarebbe il
+    # lampo di ieri, solo spostato
+    _av = pezzo_js(mini, "async function avvia(){", "\n}")
+    _i = _av.find("interessiMiei = me.interessi_miei || [];")
+    prova("...e nel ramo autenticato arriva con la lista", True,
+          0 <= _i and "interessiNoti = true;" in _av[_i:_i + 120])
+    prova("...prima del giro che disegna la sezione", True,
+          0 <= _av.find("interessiNoti = true;")
+          < _av.find("await loadListings()"))
+    # L'ARIA-PRESSED E' DELL'INTERRUTTORE: su una card che naviga
+    # direbbe «false» per sempre su una cosa che non si accende. Il
+    # role="button" invece resta per tutt'e due (porta altrove come
+    # il tasto della barra, e non e' un link: l'URL non si tocca).
+    prova("l'aria-pressed lo portano le sole card interruttore", True,
+          "const premuto = v.tocca ? ''" in _rs)
+    # ...e il role resta `button` per tutte (porta altrove come il
+    # tasto della barra, e non e' un link). Si conta nel MARKUP
+    # che la funzione restituisce, non nella fetta intera: li'
+    # dentro c'e' anche il commento che lo nomina, e una prova
+    # che legge la prosa e' una prova che diventa rossa per colpa
+    # di una spiegazione.
+    _mk = _rs[_rs.index("return `"):]
+    prova("...e il role resta button per tutte", 1,
+          _mk.count('role="button"'))
     # AL TOCCO CHE ACCENDE LA PAGINA SCORRE (ago 2026, dal campo: la
     # griglia sta sotto la piega e il gesto sembrava non fare
     # niente) — la fila si incolla sotto l'header, NON fino alla
@@ -22828,14 +22912,27 @@ def prove_scoprire():
     prova("...e il testo e' quello del catalogo, tre volte", 3,
           _rs.count("${v.testo}"))
     # LA PROVA DEL CONTRASTO, sui file veri e non sulle intenzioni
-    # (il patto del pareggio dell'inchiostro): il titolo atterra
-    # nella ZONA QUIETA dei fondi — left:14 largo 96 sulla card
-    # 250x115, cioe' x 42..330 sull'immagine 750x345 — e si campiona
-    # fino a 342, PIU' LARGO del titolo: il margine dell'onda, che
-    # sposta il disegno di qualche pixel. Il contrasto e' col PIXEL
-    # PEGGIORE, non con la media: basta una chiazza chiara sotto una
-    # lettera. Misurati alla nascita: 11.4 (lampo) e 12.0 (sconto) —
-    # un ridisegno che scalda la fascia si sente da qui.
+    # (il patto del pareggio dell'inchiostro): il titolo atterra nella
+    # ZONA QUIETA dei fondi, e si campiona col PIXEL PEGGIORE e non
+    # con la media — basta una chiazza chiara sotto una lettera.
+    # LA FASCIA E' DI OGNI CARD, non una per tutte (ago 2026, col
+    # titolo «P2P»): i titoli hanno lunghezze diverse, e una fascia
+    # sola o e' troppo stretta per i lunghi o — sui corti — pretende
+    # che il disegno sia scuro dove nessuna lettera arrivera' MAI.
+    # Si deriva dal `testo` del catalogo e dalla geometria del CSS,
+    # quindi si aggiorna DA SOLA: allungare un titolo allarga la
+    # fascia, e se il disegno non ci arriva la CI lo dice — che e' il
+    # modo in cui questa garanzia non diventa una riga da ricordare.
+    # LA LARGHEZZA SI STIMA A UN EM PER CARATTERE: non sappiamo
+    # misurare un font in CI (niente fontTools), ma un glifo non e'
+    # mai piu' largo del corpo del testo nemmeno in un font pesante —
+    # quindi la stima sbaglia SEMPRE per eccesso, cioe' verso la
+    # fascia piu' larga. Oltre la scatola il titolo va a capo, e li'
+    # si torna alla fascia conservativa di sempre (tutta l'altezza),
+    # perche' quante righe diventino non lo sappiamo.
+    # Misurati: 11.4 (lampo) e 12.0 (sconto) sulla fascia piena,
+    # 14.4 (p2p) sulla sua riga — un ridisegno che scalda la fascia
+    # di una card si sente da qui.
     try:
         from PIL import Image as _Im
 
@@ -22848,12 +22945,34 @@ def prove_scoprire():
                     + 0.0722 * _c(px[2]))
 
         _lc = _lum((250, 244, 228))          # la crema del titolo
-        for _f in ("lampo.webp", "sconto.webp"):
+        # la geometria viene dal CSS e non da qui: chi ritocca
+        # .sc-titolo sposta la fascia senza toccare la prova
+        _t = mini[mini.index(".sc-titolo{"):]
+        _t = _t[:_t.index("}")]
+
+        def _num(chiave):
+            _p = _t[_t.index(chiave) + len(chiave):]
+            return float(re.match(r"[\d.]+", _p).group())
+
+        _sx, _largo = _num("left:"), _num("width:")
+        _corpo, _passo = _num("font-size:"), _num("line-height:")
+        _F, _ALTA, _M = 3, 115, 12      # 750/250; la card; il margine dell'onda
+        for _f, _testo in BANNER.items():
             _im = _Im.open(os.path.join(
                 "assets", "scoprire", _f)).convert("RGB")
+            # un em per carattere: stima per ECCESSO, mai per difetto
+            _w = len(_testo) * _corpo
+            if _w <= _largo:            # ci sta in riga: fascia stretta
+                _h = _corpo * _passo
+                _y0 = round((_ALTA - _h) / 2 * _F) - _M
+                _y1 = round((_ALTA + _h) / 2 * _F) + _M
+                _x1 = round((_sx + _w) * _F) + _M
+            else:                       # va a capo: la fascia di sempre
+                _y0, _y1 = 30, 315
+                _x1 = round((_sx + _largo) * _F) + _M
             _lmax = max(_lum(_im.getpixel((x, y)))
-                        for y in range(30, 315, 3)
-                        for x in range(42, 342, 3))
+                        for y in range(_y0, _y1, 3)
+                        for x in range(round(_sx * _F), _x1, 3))
             prova(f"la fascia del titolo regge la crema ({_f})", True,
                   (_lc + .05) / (_lmax + .05) >= 4.5)
     except ImportError:
@@ -22865,6 +22984,144 @@ def prove_scoprire():
     prova("...e reduced-motion spegne il disegno (e VINCE)", True,
           ".scoprire-card[data-id] img{animation:none}" in mini)
 
+
+def prove_scoprire_p2p(mini=None, node=None):
+    """LA CARD CHE NAVIGA, FATTA GIRARE (ago 2026): «P2P»
+    e' la prima della fila, porta al «coming soon» invece di accendere
+    un filtro, e sparisce a chi ha gia' votato.
+
+    Le sentinelle di prove_scoprire dicono che il dispatch C'E' e che
+    sta in testa; nessuna puo' dire che la card GIUSTA compaia, che il
+    tocco che naviga non sfiori un filtro, e — la cosa che vale piu' di
+    tutte — che la sezione possa ancora SPARIRE, cioe' la proprieta'
+    che una card fissa le avrebbe tolto per sempre. Qui il catalogo,
+    renderScoprire e toccaScoperta si fanno girare per davvero con un
+    DOM di cartone."""
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    print("\n[«Da scoprire»: la card che naviga, girata]")
+    if mini is None:
+        mini = open("miniapp.html", encoding="utf-8").read()
+    if node is None:
+        node = _sh.which("node")
+    if not node:
+        salta("la card che naviga: serve node")
+        return
+
+    def _fetta(inizio, fine):
+        i = mini.index(inizio)
+        j = mini.index(fine, i)
+        return mini[i:j + len(fine)]
+
+    # IL PEZZO VERO, non una sua copia: catalogo + i due giudici del
+    # gesto, ritagliati dal client.
+    pezzi = (_fetta("const SCOPRIRE = [", "\n];")
+             + "\nlet scoprireFirma = '';\n"
+             + _fetta("function renderScoprire(){", "\n}") + "\n"
+             + _fetta("function toccaScoperta(id){", "\n}"))
+    js = _CARTONE_SCOPRIRE + pezzi + _BANCO_SCOPRIRE
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode not in (0, 1):
+        prova("il banco della card che naviga gira", "",
+              (r.stderr or "")[:400])
+        return
+    esiti = dict(l.split("|", 1)[::-1] for l in
+                 (r.stdout or "").splitlines() if "|" in l)
+    # UN BANCO MUTO E' ROSSO: se il pezzo esplode, node esce 1 e
+    # stdout resta vuoto — passare oltre in silenzio vorrebbe dire
+    # scambiare un banco che non gira per un banco verde.
+    if not esiti:
+        prova("il banco della card che naviga gira", "",
+              (r.stderr or "nessuna uscita")[:300])
+        return
+    for che, avuto in esiti.items():
+        prova(che, "ok", avuto)
+
+
+# Il DOM di cartone: solo quel che il pezzo tocca davvero. Uno stub
+# non deve MAI mentire su un'assenza (la lezione di
+# prove_avvio_client: con querySelectorAll a mani vuote il corpo non
+# veniva eseguito e la prova passava anche col guasto dentro).
+_CARTONE_SCOPRIRE = """
+const nodi = {};
+const nodo = id => nodi[id] || (nodi[id] = {
+  id, innerHTML: '', style: {display: ''}, checked: false,
+  classList: {toggle(){}, add(){}, remove(){}}, offsetHeight: 0});
+const el = id => nodo(id);
+let scritte = [];
+function haptic(){ scritte.push('haptic'); }
+function aggiornaPicker(x){ scritte.push('picker:' + x); }
+function filtriVivi(){ return filtroLampo || filtroSconto; }
+function scorriSottoHeader(){ scritte.push('scroll'); }
+function renderGrid(){ scritte.push('renderGrid'); }
+function loadListings(){ scritte.push('loadListings');
+  return Promise.resolve(); }
+function vaiP2P(){ scritte.push('vaiP2P'); }
+function lampoAttiva(){ return false; }
+function scontoQui(){ return false; }
+let DEMO = false, vistaBarattolo = false, listings = [];
+let filtroLampo = false, filtroSconto = false;
+let occasioniServer = null, interessiNoti = false, interessiMiei = [];
+"""
+
+_BANCO_SCOPRIRE = """
+function dice(che, atteso, avuto){
+  const ok = JSON.stringify(atteso) === JSON.stringify(avuto);
+  console.log((ok ? 'ok' : 'atteso ' + JSON.stringify(atteso)
+    + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
+}
+const idCard = () =>
+  (nodi['scoprireStrip'].innerHTML.match(/data-id="([a-z0-9]+)"/g)
+   || []).map(s => s.slice(9, -1));
+const rifai = () => { scoprireFirma = ''; renderScoprire(); };
+
+occasioniServer = {lampo: 1, sconto: 1};
+rifai();
+dice("finche non si sa, la card del P2P non c e",
+     ['lampo','sconto'], idCard());
+
+interessiNoti = true;
+rifai();
+dice("appena si sa, il P2P e il primo della fila",
+     ['p2p','lampo','sconto'], idCard());
+const suo = nodi['scoprireStrip'].innerHTML
+  .split('data-id="p2p"')[1].split('>')[0];
+dice("...e non porta l aria-pressed dell interruttore", false,
+     suo.includes('aria-pressed'));
+
+scritte = [];
+toccaScoperta('p2p');
+dice('il suo tocco porta al coming soon', ['vaiP2P'], scritte);
+dice('...e non sfiora nessun filtro', [false, false],
+     [filtroLampo, filtroSconto]);
+
+scritte = [];
+toccaScoperta('lampo');
+dice('la lampo accende il suo filtro come sempre', true, filtroLampo);
+dice('...con lo scroll e la richiesta di sempre',
+     ['haptic','picker:ordinaSel','scroll','loadListings'], scritte);
+filtroLampo = false;
+
+interessiMiei = ['p2p'];
+rifai();
+dice("a chi ha gia votato la card sparisce", ['lampo','sconto'],
+     idCard());
+
+occasioniServer = {lampo: 0, sconto: 0};
+rifai();
+dice('...e senza occasioni la sezione sparisce ancora INTERA',
+     'none', nodi['scoprireSez'].style.display);
+
+interessiMiei = [];
+rifai();
+dice('chi non ha votato la vede anche senza occasioni', ['p2p'],
+     idCard());
+"""
 
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
@@ -27376,6 +27633,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri, prove_prezzo_accordo,
               prove_scoprire,
+              prove_scoprire_p2p,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_script_nel_workflow,
