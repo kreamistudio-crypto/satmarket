@@ -13519,7 +13519,10 @@ def _censimento(acceso):
                  "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE",
                  "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
                  "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE",
-                 "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO"):
+                 "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO",
+                 "CONNETTORI_NEGOZIO_APERTI", "MAX_PRODOTTI_CONNETTORE",
+                 "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
+                 "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE"):
         amb[nome] = acceso and 24
     # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
     # decide il bot e il giudice e' `canale_id()`, che va a leggere il
@@ -14554,6 +14557,21 @@ def prove_leve():
           "config", voci_off["/vetrina"]["valore"])
     prova("il percorso del database non e' una leva",
           False, "DB" in voci_on)
+    # I CONNETTORI (ago 2026): la porta sta nel PRIMO gruppo — quello
+    # di cio' che apre porte — perche' accesa il server va a bussare
+    # all'API di un negozio di qualcun altro con le sue credenziali in
+    # mano. I cinque numeri stanno in un gruppo loro, che e' un'altra
+    # cosa: sono limiti, non interruttori.
+    prova("la porta dei negozi sta nel primo gruppo", True,
+          any(v["chiave"] == "CONNETTORI_NEGOZIO_APERTI"
+              for v in gruppi_on[0]["voci"]))
+    prova("...e spiega cosa comporta l'accensione", True,
+          "credenziali" in voci_on["CONNETTORI_NEGOZIO_APERTI"].get("nota", ""))
+    prova("...e da spenta non dice niente", False,
+          "nota" in voci_off["CONNETTORI_NEGOZIO_APERTI"])
+    prova("i cinque numeri dei negozi hanno un gruppo loro", True,
+          any(g["gruppo"].startswith("🏪") and len(g["voci"]) == 5
+              for g in gruppi_on))
 
     # --- 2) LA FORMA ---------------------------------------------
     prova("ogni gruppo ha delle voci", True,
@@ -26222,16 +26240,17 @@ def prove_config_esempio():
 
     prova("il codice legge delle leve dal config", True,
           len(dal_codice) > 100)
-    # ⚠️ IL DEBITO E' UN ELENCO ESATTO e non una tolleranza: cosi' la
-    # settima che qualcuno dimentica fa rossa questa riga il giorno
-    # stesso, e chi ne dichiara una la toglie da qui. Sono sei leve di
-    # altri cantieri (la revisione, la busta di consegna, i solleciti
-    # delle firme Nostr) trovate mentre si chiudeva quello dei
-    # connettori: si NOMINANO invece di lasciarle sparire in un
-    # «<= 6», che e' il modo in cui un debito diventa un'abitudine.
-    DEBITO = {"MODERAZIONE_REVISIONE", "PROMEMORIA_BUSTA_GIORNI",
-              "REVISIONE_ATTESA_ORE", "REVISIONE_SOLLECITO_GIORNI",
-              "SOLLECITO_FIRME_GIORNI", "SOLLECITO_FIRME_MAX"}
+    # ⚠️ IL DEBITO E' VUOTO, ed e' l'affermazione piu' forte delle due:
+    # NESSUNA leva letta dal codice manca dal file da cui si copia. Ci
+    # e' arrivato in due tempi (ago 2026) — il censimento e' nato con
+    # SEI eccezioni di altri cantieri (la revisione, la busta di
+    # consegna, i solleciti delle firme Nostr), NOMINATE una per una
+    # invece di sparire in un «<= 6», e sono state dichiarate il
+    # giorno dopo. L'elenco resta qui a zero apposta: chi domani
+    # aggiunge una leva senza scriverla nel config d'esempio trova
+    # questa riga rossa, e la strada giusta e' dichiararla — non
+    # rimettere il suo nome qui dentro.
+    DEBITO = set()
     prova("ogni leva letta dal codice sta nel config d'esempio",
           sorted(DEBITO), sorted(dal_codice - dichiarate))
     # L'ALTRA DIREZIONE E' PULITA, e va tenuta tale: una riga che si

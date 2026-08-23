@@ -79,6 +79,16 @@ PROMEMORIA_SPEDIZIONE_GIORNI = 5  # ordine 'locked' col pacco mai partito:
                              # primo squillo al venditore (0 = spento)
 PROMEMORIA_DIGITALE_ORE = 48 # idem per il codice online mai consegnato:
                              # ore, non giorni — un codice si manda subito
+PROMEMORIA_BUSTA_GIORNI = 3  # spedizione a un punto, istruzioni NON
+                             # ancora depositate: dopo quanti giorni
+                             # dalla spedizione si ricorda al venditore
+                             # di mettere nome e codice di ritiro
+                             # dentro l'ordine. Il transito dura 1-3
+                             # giorni: al terzo o il pacco e' lento o
+                             # il codice e' nel dimenticatoio.
+                             # Nessun gate su «ho spedito»: i due
+                             # momenti restano separati come nella
+                             # realta' (0 = spento)
 PROMEMORIA_RITIRO_GIORNI = 2 # spedizione a un punto, istruzioni gia'
                              # depositate: ogni quanti giorni si ricorda
                              # a chi ha comprato di andare a ritirare
@@ -436,6 +446,21 @@ VENDITORE_ID = 222   # a chi intestare gli annunci importati:
 # Nostr e incollala SOLO nel config.py del server: mai in chat, mai
 # su GitHub. Finche' resta il segnaposto, la funzione e' spenta.
 NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
+# Chi una chiave Nostr sua ce l'ha vede i propri annunci uscire sul
+# PROPRIO account, e a firmare e' il suo browser: la nsec ce l'ha solo
+# lui. Se quella chiave non e' a portata di mano — bunker spento,
+# estensione assente, o e' entrato con la nsec incollata, che per
+# scelta non conserviamo — la firma resta in coda e senza un
+# promemoria l'utente non sa nemmeno che quella coda esiste.
+# UNO per persona e non per annuncio (dieci annunci farebbero dieci
+# messaggi), e dopo il tetto silenzio: chi non collega la chiave ha
+# deciso. Niente segnalazione ai moderatori — qui non ci sono sats
+# fermi da nessuna parte, solo una vetrina in meno.
+# ⚠️ Segue la levetta «💡 Suggerimenti sui miei annunci» del Profilo:
+# e' un consiglio su come stanno i propri annunci, cioe' la famiglia
+# di messaggi che quella levetta governa.
+SOLLECITO_FIRME_GIORNI = 7   # ogni quanto si ribussa (0 = spento)
+SOLLECITO_FIRME_MAX = 3      # quante volte in tutto, poi silenzio
 
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
@@ -479,6 +504,26 @@ TRASLOCO_NOSTR = True
 # venditore vero: il tetto e' quel che lo spalma invece di chiedere a
 # qualcuno venti firme in una volta.
 MAX_TRASLOCO_GIRO = 200
+
+# --- La terza via della moderazione (l'AI segnala, l'admin decide) ----
+# Un verdetto DUBBIO dell'AI non blocca e non pubblica: l'annuncio
+# nasce in stato 'revisione' — invisibile al pubblico esattamente come
+# se fosse stato rifiutato — e aspetta che un moderatore lo pubblichi o
+# lo rifiuti, dai bottoni ✅/❌ del bot o dal Profilo.
+# Il costo e' la CODA, non il rischio: in revisione non c'e' niente
+# online. False = il binario di ieri, il dubbio torna a valere come
+# vietato — e' il freno d'emergenza, non una scelta.
+MODERAZIONE_REVISIONE = True
+REVISIONE_ATTESA_ORE = 24    # serve SOLO ai testi onesti verso chi ha
+                             # pubblicato («di solito entro N ore»):
+                             # non e' una scadenza, non fa scattare
+                             # niente — meglio un'attesa dichiarata che
+                             # un silenzio
+REVISIONE_SOLLECITO_GIORNI = 2  # una notifica aggregata al giorno ai
+                             # moderatori finche' la coda non si
+                             # svuota (0 = mai). L'annuncio RESTA in
+                             # attesa: non va online da solo nemmeno
+                             # dopo mille solleciti
 
 # --- Categorie proposte da sola (la coda dei moderatori) --------------
 # Dopo ogni giro d'import l'AI guarda gli annunci arrivati dai relay (e

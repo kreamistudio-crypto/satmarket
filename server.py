@@ -12348,6 +12348,15 @@ def _leve_stato():
                          "sito: è com'è sempre stato, e accenderla è una "
                          "stretta — ma prima va provata la Mini App da "
                          "Telegram Web, che gira in un iframe"),
+            _leva("Negozi collegati (Shopify e WooCommerce)",
+                  "CONNETTORI_NEGOZIO_APERTI",
+                  bool(CONNETTORI_NEGOZIO_APERTI),
+                  acceso="il server va a bussare all'API del negozio di "
+                         "qualcun altro con le sue credenziali in mano, "
+                         "crea annunci e manda notifiche. È anche "
+                         "l'interruttore d'emergenza: False e riavvia — i "
+                         "collegamenti restano in tabella e gli annunci "
+                         "dove sono, semplicemente nessuno li rilegge"),
             _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
                   webhook_attivo(),
                   spento="il bot manda e basta: niente /start, niente "
@@ -12710,6 +12719,23 @@ def _leve_stato():
                   bool(RIEPILOGO_IMMAGINE),
                   spento="il riepilogo del lunedì esce senza la figura "
                          "dei tre barattoli, solo testo"),
+        ]},
+        {"gruppo": "🏪 Negozi collegati", "voci": [
+            _leva("Prodotti letti per giro", "MAX_PRODOTTI_CONNETTORE",
+                  MAX_PRODOTTI_CONNETTORE),
+            _leva("Giri falliti prima dell'avviso", "CONNETTORI_ERRORI_MAX",
+                  CONNETTORI_ERRORI_MAX,
+                  spento="il collegamento non si dichiara rotto mai, e il "
+                         "venditore non viene avvisato che il suo catalogo "
+                         "ha smesso di aggiornarsi"),
+            _leva("Negozi per venditore", "MAX_CONNETTORI_VENDITORE",
+                  MAX_CONNETTORI_VENDITORE),
+            _leva("Freno dell'«🔄 Aggiorna ora» (secondi)",
+                  "CONNETTORI_SYNC_MANUALE_S", CONNETTORI_SYNC_MANUALE_S,
+                  spento="il bottone non ha più freno verso il server di "
+                         "qualcun altro, che ha i suoi limiti di richieste"),
+            _leva("Tetto delle tariffe dichiarate (€)",
+                  "MAX_TARIFFA_CONNETTORE", MAX_TARIFFA_CONNETTORE),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
