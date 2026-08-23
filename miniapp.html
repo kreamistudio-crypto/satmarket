@@ -1483,13 +1483,14 @@
   .empty .empty-mascotte + .big{display:none}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 
-  /* ---------- «Lo aspetto»: il like delle funzioni in arrivo ----------
+  /* ---------- «Avvisami»: il like delle funzioni in arrivo ----------
      Vive dentro .empty delle due pagine «Qualcosa di nuovo e' in
-     arrivo». Zero token nuovi: il bottone e' l'orange di casa (il
-     gesto principale di quella pagina, mentre «Torna al mercatino»
-     scende a ghost — due pieni in fila si farebbero concorrenza), il
-     conto e' l'arancio dei numeri e la promessa e' il muted della
-     prosa. Chiaro e scuro gratis.
+     arrivo», ed e' l'UNICO bottone che hanno: l'uscita se n'e' andata
+     (decisione di Andrea) perche' la nav ha gia' Esplora e quelle due
+     sono RADICI — il gesto indietro ci passa da solo. Zero token
+     nuovi: il bottone e' l'orange di casa, il conto e' l'arancio dei
+     numeri e la riga sotto e' il muted della prosa. Chiaro e scuro
+     gratis.
      Il margine sopra e' della COPPIA e non del bottone: dentro .empty
      i .btn hanno gia' il loro `margin:18px auto 0`, e qui serve
      staccare il blocco dal testo che lo precede. */
@@ -4206,12 +4207,14 @@ document.getElementById('cartello')?.remove();</script>
         <!-- LA PROMESSA STA QUI E NON DOPO IL TOCCO (decisione di
              Andrea: il like e' anche un'iscrizione): chi preme deve
              saperlo PRIMA, o scoprirebbe di essersi iscritto a
-             qualcosa dopo averlo fatto. -->
-        <div class="interesse-promessa">Ti avvisiamo appena arriva</div>
+             qualcosa dopo averlo fatto.
+             E DICE QUANTO, non CHE: «ti avvisiamo» lo dice gia' il
+             bottone, e ripeterlo sarebbe la stessa frase due volte a
+             due centimetri. Il messaggio SOLO — che e' la lingua dei
+             solleciti, dove chi si stufa blocca il bot — non lo dice
+             nessun altro. -->
+        <div class="interesse-promessa">Un solo messaggio, il giorno che arriva.</div>
       </div>
-      <button class="btn ghost" onclick="vaiEsplora()">
-        <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
-        Torna al mercatino</button>
     </div>
   </div>
 
@@ -4248,12 +4251,14 @@ document.getElementById('cartello')?.remove();</script>
         <!-- LA PROMESSA STA QUI E NON DOPO IL TOCCO (decisione di
              Andrea: il like e' anche un'iscrizione): chi preme deve
              saperlo PRIMA, o scoprirebbe di essersi iscritto a
-             qualcosa dopo averlo fatto. -->
-        <div class="interesse-promessa">Ti avvisiamo appena arriva</div>
+             qualcosa dopo averlo fatto.
+             E DICE QUANTO, non CHE: «ti avvisiamo» lo dice gia' il
+             bottone, e ripeterlo sarebbe la stessa frase due volte a
+             due centimetri. Il messaggio SOLO — che e' la lingua dei
+             solleciti, dove chi si stufa blocca il bot — non lo dice
+             nessun altro. -->
+        <div class="interesse-promessa">Un solo messaggio, il giorno che arriva.</div>
       </div>
-      <button class="btn ghost" onclick="vaiEsplora()">
-        <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
-        Torna al mercatino</button>
     </div>
   </div>
 
@@ -8446,7 +8451,7 @@ function renderInteresse(){
     const n = interessiServer[f] | 0;
     const mio = interessiMiei.includes(f);
     const b = box.querySelector('.btn');
-    b.textContent = mio ? '✓ Lo aspetti' : '✋ Lo aspetto';
+    b.textContent = mio ? '✓ Ti avviseremo' : '🔔 Avvisami';
     /* l'arancio e' del gesto da fare: chi l'ha gia' fatto vede il
        ghost, e il pieno resta uno solo in pagina */
     b.className = 'btn ' + (mio ? 'ghost' : 'orange');
@@ -8494,8 +8499,7 @@ async function toggleInteresse(f){
       ? interessiMiei.concat(interessiMiei.includes(f) ? [] : [f])
       : interessiMiei.filter(x => x !== f);
     renderInteresse();
-    toast(d.interessa ? 'Segnato! Ti avvisiamo appena arriva 🔔'
-                      : 'Tolto');
+    toast(d.interessa ? 'Segnato 🔔' : 'Tolto');
   } catch(e) { toast('Rete assente: riprova'); }
   finally { interesseInCorso = false; }
 }

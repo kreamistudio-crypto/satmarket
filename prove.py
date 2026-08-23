@@ -10731,8 +10731,19 @@ def prove_interesse():
     # (decisione di Andrea), quindi il testo lo dice PRIMA del tocco —
     # chi preme deve saperlo, o scoprirebbe di essersi iscritto a
     # qualcosa dopo averlo fatto.
-    prova("la pagina promette l'avviso, e prima del tocco", 2,
-          mini.count("Ti avvisiamo appena arriva</div>"))
+    # A DIRLA E' IL BOTTONE (ago 2026, decisione di Andrea): da «Lo
+    # aspetto», che diceva l'ATTESA, a «Avvisami», che dice la
+    # PROMESSA. Il verbo del bottone e' la promessa stessa, quindi
+    # sparire da li' sarebbe perderla.
+    prova("il bottone promette l'avviso", True,
+          " Avvisami';" in ren and " Ti avviseremo'" in ren)
+    # ...e la riga sotto NON lo ripete piu': dice QUANTO, che e'
+    # l'unica cosa che ne' il bottone ne' il conto dicono — ed e' la
+    # lingua dei solleciti, dove chi si stufa blocca il bot.
+    prova("...e la riga sotto dice quanti messaggi, non che ci sono", 2,
+          mini.count("Un solo messaggio, il giorno che arriva.</div>"))
+    prova("...senza ripetere il verbo del bottone", 0,
+          mini.count("Ti avvisiamo appena arriva"))
     # ...e la promessa ha un debito scritto dove chi accendera' la
     # funzione ci passa per forza. Se un domani si toglie la promessa
     # dal testo, si tolga anche il debito — e viceversa.
@@ -10741,12 +10752,20 @@ def prove_interesse():
     prova("il debito e' scritto sulla tabella", True,
           "avvisa_sconto_su_mono" in schema and "timbri" in schema)
 
-    # --- 9) «TORNA AL MERCATINO» SCENDE A GHOST ------------------
-    # L'arancio e' del gesto principale, e su questa pagina il gesto
-    # principale e' diventato il like: due pieni in fila si farebbero
-    # concorrenza (la regola del recinto escrow).
-    prova("l'uscita e' un ghost, non un secondo pieno", 0,
-          mini.count('<button class="btn orange" onclick="vaiEsplora()">'))
+    # --- 9) IL LIKE E' L'UNICO BOTTONE DELLA PAGINA --------------
+    # L'uscita se n'e' andata (ago 2026, decisione di Andrea): la nav
+    # ha gia' Esplora, e queste due sono RADICI — il gesto indietro ci
+    # passa da solo. Un bottone che rifa' quel che fa la barra e' una
+    # porta in piu' su una stanza con la porta gia' aperta, e rubava
+    # l'unico pieno al gesto per cui la pagina esiste.
+    for vista in ("astepresto", "p2ppresto"):
+        i2 = mini.index('id="view-%s"' % vista)
+        fetta = mini[i2:mini.index("============", i2)]
+        prova("la vista %s non ha piu' un'uscita sua" % vista, 0,
+              fetta.count("vaiEsplora()"))
+        prova("...e il like e' il suo unico bottone" if vista == "p2ppresto"
+              else "...e il like e' il suo unico bottone (aste)", 1,
+              fetta.count("<button"))
 
     prove_interesse_gira()
 
@@ -10845,7 +10864,11 @@ def prove_interesse_client():
     mini = open("miniapp.html", encoding="utf-8").read()
     i = mini.index("function renderInteresse(){")
     corpo = mini[i:mini.index("\n}\n", i) + 3]
-    mano, spunta = chr(0x270B), chr(0x2713)
+    # coi chr() e non con gli escape: negli heredoc del tool Bash un
+    # escape unicode arriva sul disco senza il backslash, e la stringa
+    # ATTESA di una prova diventa un'altra cosa — con «atteso» e
+    # «avuto» che a schermo sembrano identici
+    campana, spunta = chr(0x1F514), chr(0x2713)
     stub = """
 globalThis.fmt = n => String(n);
 function box(f){
@@ -10862,11 +10885,11 @@ globalThis.document = { querySelectorAll: () => BOXES };
     casi = [
         ("il like da mettere: arancio e il conto",
          False, {"p2p": 12, "aste": 0}, [],
-         {"display": "", "btn": mano + " Lo aspetto", "cls": "btn orange",
+         {"display": "", "btn": campana + " Avvisami", "cls": "btn orange",
           "conta": "12 lo aspettano", "pressed": "false"}),
         ("il like gia' messo: ghost e aria-pressed",
          False, {"p2p": 12, "aste": 0}, ["p2p"],
-         {"btn": spunta + " Lo aspetti", "cls": "btn ghost",
+         {"btn": spunta + " Ti avviseremo", "cls": "btn ghost",
           "pressed": "true"}),
         ("a zero si dice «Sii il primo», mai uno zero",
          False, {"p2p": 0, "aste": 0}, [], {"conta": "Sii il primo"}),

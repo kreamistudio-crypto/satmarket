@@ -2437,10 +2437,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   arriva, e mostrarne uno sarebbe inventarlo — la regola di
   `renderPionieri` e del cassetto wallet. Idem senza la busta (server
   di ieri): un'assenza non è una bugia.
-  «TORNA AL MERCATINO» SCENDE A GHOST: l'arancio è del gesto
-  principale, e su quelle pagine il gesto principale è diventato il
-  like — due pieni in fila si farebbero concorrenza (la regola del
-  recinto escrow).
+  I TESTI DICONO LA PROMESSA E NON L'ATTESA (ago 2026, decisione di
+  Andrea): «🔔 Avvisami» e, una volta premuto, «✓ Ti avviseremo» — il
+  verbo del bottone È la promessa, e sparire da lì sarebbe perderla.
+  LA CAMPANELLA E NON IL FULMINE, ed è il precedente che decide: 🔔 è
+  già il segno dell'avviso in casa — «🔔 Avvisami se arriva» dopo una
+  ricerca a vuoto è lo STESSO verbo e la stessa funzione, quindi le
+  due cose diventano parenti — mentre ⚡ nell'app significa Lightning
+  (Compra subito, Wallet e incassi, «Pagabile in Satoshi») e su un
+  bottone si leggerebbe come un pagamento.
+  IL CONTO RESTA «12 LO ASPETTANO»: col verbo nuovo non ripete più
+  niente, e dice il TERMOMETRO — quanti aspettano la funzione, che è
+  il dato per cui il cantiere esiste, non «quanti vogliono la
+  notifica», che è più povero.
+  E LA RIGA SOTTO DICE QUANTO, NON CHE: «Un solo messaggio, il giorno
+  che arriva». «Ti avvisiamo» lo dice già il bottone a un centimetro,
+  e ripeterlo sarebbe la stessa frase due volte; il messaggio SOLO non
+  lo dice nessun altro, ed è la lingua dei solleciti — chi si stufa
+  blocca il bot, e col bot bloccato si perdono le notifiche degli
+  ordini. Stessa ragione per cui il TOAST si è accorciato a
+  «Segnato 🔔»: conferma il gesto, la promessa la porta il bottone che
+  è appena cambiato sotto il dito. C'è la prova che quella frase non
+  ricompaia da nessuna parte.
+  E L'USCITA NON C'È PIÙ (ago 2026, decisione di Andrea, che ROVESCIA
+  il «"Torna al mercatino" scende a ghost» del primo giro): il like è
+  l'UNICO bottone di quelle due pagine. La nav ha già Esplora e quelle
+  sono RADICI — il gesto indietro ci passa da solo — quindi un bottone
+  che rifà il mestiere della barra era una porta in più su una stanza
+  con la porta già aperta, e rubava l'unico pieno al gesto per cui la
+  pagina esiste. Cade con lui anche la ragione del ghost: non c'è più
+  nessun secondo bottone con cui fare concorrenza. C'è la prova, per
+  vista, che di bottoni ne resti UNO e che `vaiEsplora` non si nomini
+  più là dentro.
   ⚠️ IL DEBITO, e sta scritto sul commento della tabella perché è lì
   che si atterra: **il like NON è solo un termometro, è anche
   un'ISCRIZIONE** (decisione di Andrea) — il testo promette «ti
@@ -20344,8 +20372,9 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
 rotta — solo client.
 
 Il like sulle funzioni in arrivo (ago 2026): sulle due pagine «in
-arrivo» si mette un «✋ Lo aspetto» e il totale si vede a tutti — serve
-a sapere quale cantiere aprire per primo. Le quattro decisioni di
+arrivo» si preme «🔔 Avvisami» e il totale si vede a tutti — serve a
+sapere quale cantiere aprire per primo. Il bottone è l'UNICO di quelle
+pagine: l'uscita se n'è andata, che la nav ha già Esplora. Le quattro decisioni di
 Andrea: il like è ANCHE un'iscrizione (il testo promette l'avviso, e
 il debito è scritto sulla tabella perché il cantiere che accenderà la
 funzione lo mantenga), l'anonimo in vetrina vede il numero e col tocco
