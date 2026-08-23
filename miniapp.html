@@ -4861,7 +4861,14 @@ document.getElementById('cartello')?.remove();</script>
         <label class="cons-riga" id="sellConsServRiga" style="display:none"><input type="checkbox" id="sellConsServ" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">📅</span>È un servizio<span class="cons-sub">lezione, consulenza: una prestazione con una durata</span></span></label>
         <div id="sellServOpzioni" style="display:none;margin-top:8px">
           <div style="display:flex;gap:8px" class="consegna-scelta">
-            <button type="button" class="pill consegna-pill on" id="sellServOnline" onclick="setServDove('online')">💻 Online</button>
+            <!-- DOVE si svolge e' FACOLTATIVO (ago 2026, decisione di
+                 Andrea): nessuna pillola nasce accesa, '' = «non
+                 dichiarato» e la scheda dice solo «Su appuntamento».
+                 Ritoccare la pillola accesa la spegne, il gesto del
+                 barattolino. La classe accesa e' `attiva`, quella di
+                 TUTTE le .consegna-pill: nate con `on`, che nel foglio
+                 non veste niente, non si sono mai illuminate. -->
+            <button type="button" class="pill consegna-pill" id="sellServOnline" onclick="setServDove('online')">💻 Online</button>
             <button type="button" class="pill consegna-pill" id="sellServPresenza" onclick="setServDove('presenza')">📍 Di persona</button>
           </div>
           <div class="sats-input" style="margin-top:8px"><input id="sellServDurata" type="number" inputmode="numeric" min="1" placeholder="60"><span class="suffix" style="pointer-events:none">minuti</span></div>
@@ -6125,7 +6132,8 @@ function iconeCard(l){
      domanda vera di chi sfoglia: online o vicino a me. */
   if (l.consegna === 'servizio')
     i += `<span title="${l.servDove === 'presenza'
-      ? 'Di persona, su appuntamento' : 'In videoconferenza, su appuntamento'
+      ? 'Di persona, su appuntamento' : l.servDove === 'online'
+      ? 'In videoconferenza, su appuntamento' : 'Su appuntamento'
       }">📅</span>`;
   return i ? `<span class="ico">${i}</span>` : '';
 }
@@ -10217,8 +10225,11 @@ function pilloleModalita(l){
      due righe piu' giu' racconta il patto; questa dice il fatto. */
   if (l.consegna==='servizio') {
     const d = durataTesto(l.durataMin);
+    /* DOVE e' facoltativo (ago 2026): non dichiarato = «Su
+       appuntamento», mai un «In videoconferenza» inventato */
     p.push(`<span class="pill">📅 ${l.servDove === 'presenza'
-      ? 'Di persona' : 'In videoconferenza'}${d ? ' \u00b7 ' + d : ''}</span>`);
+      ? 'Di persona' : l.servDove === 'online' ? 'In videoconferenza'
+      : 'Su appuntamento'}${d ? ' \u00b7 ' + d : ''}</span>`);
   }
   return p.join('');
 }
@@ -24254,17 +24265,21 @@ function consegnaForm(){
                  : rit ? 'ritiro' : dig ? 'digitale' : '';
   return {consegna, anche_digitale: (dig && (sped || rit)) ? 1 : 0};
 }
-/* DOVE si svolge: 'online' | 'presenza'. Vive in una variabile e non
-   nel DOM perche' il form si ridisegna, ed e' la stessa ragione per
-   cui la quantita' scelta vive in `qtaScelta`. */
-let servDove = 'online';
+/* DOVE si svolge: 'online' | 'presenza' | '' (non dichiarato). Vive
+   in una variabile e non nel DOM perche' il form si ridisegna, ed e'
+   la stessa ragione per cui la quantita' scelta vive in `qtaScelta`.
+   E' SOLO INFORMATIVO (ago 2026, decisione di Andrea): fino a ieri
+   decideva la guardia della zona — «di persona» la esigeva — ma un
+   servizio a domicilio si fa a casa del cliente, e il venditore non
+   sa dove. La zona resta facoltativa per ogni servizio, come per chi
+   spedisce e basta. Ritoccare la pillola accesa la spegne (il terzo
+   stato), il gesto del barattolino; `impostaConsegnaForm` passa di
+   qui a stato azzerato, cosi' non fa mai un toggle a vuoto. */
+let servDove = '';
 function setServDove(v){
-  servDove = v;
-  el('sellServOnline')?.classList.toggle('on', v==='online');
-  el('sellServPresenza')?.classList.toggle('on', v==='presenza');
-  /* la zona diventa obbligatoria di persona: il server lo esige
-     (guardia_zona_condizione), e la label lo deve dire PRIMA */
-  aggiornaConsegnaForm();
+  servDove = (v === servDove || (v !== 'online' && v !== 'presenza')) ? '' : v;
+  el('sellServOnline')?.classList.toggle('attiva', servDove==='online');
+  el('sellServPresenza')?.classList.toggle('attiva', servDove==='presenza');
 }
 /* Il verso opposto: dai valori salvati alle caselle (precompilazione
    della modifica e reset del form). */
@@ -24274,7 +24289,8 @@ function impostaConsegnaForm(c, ancheDig, dove, durata){
   el('sellConsDig').checked = c==='digitale' || !!ancheDig;
   if (el('sellConsServ')) el('sellConsServ').checked = c==='servizio';
   if (el('sellServDurata')) el('sellServDurata').value = durata || '';
-  setServDove(dove === 'presenza' ? 'presenza' : 'online');
+  servDove = '';
+  setServDove(dove || '');        /* '' spegne tutte e due */
 }
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
@@ -24561,14 +24577,12 @@ function aggiornaConsegnaForm(){
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
   const zl = el('zonaLabel');
-  /* Il servizio DI PERSONA vuole il comune per la stessa ragione del
-     ritiro (chi viene deve sapere dove), e il server lo esige: la
-     label lo dice PRIMA, o l'errore arriva dopo il viaggio con le
-     foto in base64. Online no: li' un luogo non esiste. */
-  const servQui = serv && servDove === 'presenza';
+  /* Il servizio NON la esige, nemmeno di persona (ago 2026, decisione
+     di Andrea): a domicilio si lavora a casa del cliente, e il
+     venditore non sa dove. Resta facoltativa, e se scritta dev'essere
+     un comune come per tutti. */
   if (zl) zl.textContent =
     rit ? 'Zona — il tuo comune, obbligatorio per il ritiro'
-    : servQui ? 'Zona — il tuo comune, obbligatorio di persona'
     : 'Zona (facoltativa)';
   aggiornaSpedHint();
   aggiornaCondizioneForm();   /* il solo-codice-online non la chiede */
@@ -25108,14 +25122,6 @@ async function publish(){
   if (mostraConsegna && el('sellConsRitiro').checked
       && !el('sellZone').value.trim()) {
     toast('Per il ritiro in zona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
-  }
-  /* Il servizio DI PERSONA vuole il comune per la stessa ragione del
-     ritiro, e il server lo esige (guardia_zona_condizione): il
-     controllo sta QUI perche' l'errore arrivi PRIMA del viaggio con
-     le foto in base64 — la lezione del gemello qui sopra. */
-  if (mostraConsegna && el('sellConsServ')?.checked
-      && servDove === 'presenza' && !el('sellZone').value.trim()) {
-    toast('Per un servizio di persona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
   }
   /* LA DURATA E' META' DELLA DEFINIZIONE, ed e' il motivo per cui una
      prestazione si puo' vendere qui: «un'ora di conversazione» e' una

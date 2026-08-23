@@ -24789,6 +24789,16 @@ def prove_consegna_firmata():
     prova("la condizione la valida sempre lei", True,
           alza(d={**d_cat, "condizione": ""}, consegna="spedizione",
                esigi_luogo=False))
+    # IL SERVIZIO NON LA ESIGE MAI (ago 2026): nemmeno «di persona» —
+    # a domicilio si lavora a casa del cliente. La zona scritta passa
+    # comunque dalla seconda regola, come tutti.
+    ambz["senza_condizione"] = lambda cat, cons: cons == "servizio"
+    prova("servizio di persona senza zona: PASSA", False,
+          alza(d={"categoria": "Altro", "zona": "",
+                  "servizio_dove": "presenza"}, consegna="servizio"))
+    prova("...e con una zona storta blocca come tutti", True,
+          alza(d={"categoria": "Altro", "zona": "Pvia",
+                  "servizio_dove": "presenza"}, consegna="servizio"))
     prova("il permesso si deve SCRIVERE (di serie e' severa)", True,
           "esigi_luogo: bool = True" in pezzo("guardia_zona_condizione"))
 
@@ -25005,6 +25015,40 @@ def prove_servizi():
     # che non resta in colonna a dire una cosa che nessuno guardera'
     prova("fuori dal servizio si azzera, anche se arriva", "",
           dove({"servizio_dove": "presenza"}, "spedizione"))
+    prova("il non dichiarato vale '' (terzo stato, lecito)", "",
+          dove({}, "servizio"))
+    exec(pezzo("durata_da_payload"), amb4)
+    dur = amb4["durata_da_payload"]
+    prova("la durata si legge", 60, dur({"durata_min": "60"}, "servizio"))
+    prova("...storta vale 0 e mai un 400", 0,
+          dur({"durata_min": "un'ora"}, "servizio"))
+    prova("...negativa vale 0", 0, dur({"durata_min": -5}, "servizio"))
+    prova("...fuori dal servizio si azzera", 0,
+          dur({"durata_min": 60}, "spedizione"))
+    # LE DUE COLONNE SI SCRIVONO (ago 2026): per tre settimane non le
+    # scriveva nessuno — il giudice calcolava il dove per la sola
+    # guardia della zona e lo buttava, INSERT e UPDATE non le
+    # nominavano, e la scheda leggeva il DEFAULT per sempre. Le prove
+    # guardavano il giudice, la SELECT e il payload del client: la
+    # scrittura in mezzo non la guardava nessuno, ed e' esattamente il
+    # buco per cui il difetto e' passato.
+    pb = codice(pezzo("pubblica"))
+    i = pb.index("INSERT INTO annunci(")
+    ins = pb[i:pb.index("last_insert_rowid", i)]
+    prova("pubblica SCRIVE servizio_dove e durata_min", True,
+          "servizio_dove,durata_min)" in ins
+          and "servizio_dove_da_payload(d, consegna)" in ins
+          and "durata_da_payload(d, consegna)" in ins)
+    prova("...con un segnaposto per colonna", True,
+          ins[ins.index("annunci("):ins.index("VALUES")].count(",") + 1
+          == ins[ins.index("VALUES("):].split(")")[0].count("?"))
+    md = codice(pezzo("modifica_annuncio"))
+    i = md.index("UPDATE annunci SET titolo=?")
+    upd = md[i:md.index("decadute_prezzo", i)]
+    prova("modifica SCRIVE servizio_dove e durata_min", True,
+          "servizio_dove=?, durata_min=? WHERE id=?" in upd
+          and "servizio_dove_da_payload(d, consegna)" in upd
+          and "durata_da_payload(d, consegna)" in upd)
 
     # --- le sentinelle: le righe che un riordino toglie per prime
     src = _SORGENTE
@@ -25412,10 +25456,36 @@ def prove_servizi():
           and 'profilo["servizio_leve"]' in _SORGENTE)
     prova("la spunta spegne le altre tre strade", True,
           "el('sellConsSped').checked = false;" in mini)
-    prova("la zona lo dice PRIMA, di persona", True,
+    # LA ZONA NON SI ESIGE DI PERSONA (ago 2026, decisione di Andrea —
+    # le due righe qui sotto hanno CAMBIATO LATO: certificavano la
+    # label «obbligatorio di persona» e il toast di publish, cioe' la
+    # regola che fermava chi lavora a domicilio, a casa del cliente,
+    # dove il venditore non sa dove).
+    prova("la zona NON dice piu' «obbligatorio di persona»", False,
           "obbligatorio di persona" in mini)
-    prova("...e publish la esige", True,
+    prova("...e publish non la esige", False,
           "servDove === 'presenza' && !el('sellZone').value.trim()" in mini)
+    prova("...ne' il server (il ramo di guardia_zona_condizione e' morto)",
+          False, 'servizio_dove_da_payload(d, consegna) == "presenza"'
+          in codice(pezzo("guardia_zona_condizione")))
+    # LE PILLOLE SI ACCENDONO CON `attiva` (ago 2026, dal campo: nate
+    # con `on`, che nessuna regola .consegna-pill veste, non si sono
+    # mai illuminate — il valore cambiava, il vestito no)
+    sd = pezzo_js(mini, "function setServDove(")
+    prova("le pillole del dove si accendono con `attiva`", 2,
+          sd.count("classList.toggle('attiva'"))
+    prova("...e mai con `on`", False, "toggle('on'" in sd)
+    prova("...e nel markup nessuna nasce accesa (terzo stato '')", True,
+          'class="pill consegna-pill" id="sellServOnline"' in mini
+          and 'class="pill consegna-pill" id="sellServPresenza"' in mini
+          and "let servDove = '';" in mini)
+    prova("il ritocco spegne (terzo stato)", True,
+          "v === servDove" in sd)
+    # Il non dichiarato non inventa una videoconferenza: dice «Su
+    # appuntamento» in card e nella scheda
+    prova("la scheda sa dire «Su appuntamento»", True,
+          "'Su appuntamento'" in pezzo_js(mini, "function pilloleModalita(")
+          and "'Su appuntamento'" in pezzo_js(mini, "function iconeCard("))
     # La durata e' meta' della definizione: e' cio' che rende una
     # prestazione vendibile qui («un'ora di conversazione» sì, «ti
     # sviluppo quello che ti serve» no)

@@ -3321,8 +3321,12 @@ def init_db():
                     # sviluppo quello che ti serve» no — e serve a
                     # sapere quando l'appuntamento e' FINITO, che e'
                     # un'altra cosa da quando comincia.
-                    # `servizio_dove` ('' = online, il caso che non
-                    # chiede niente) decide la guardia della zona.
+                    # `servizio_dove` ('' = non dichiarato, un valore
+                    # lecito per sempre) e' SOLO informativo: dice alla
+                    # scheda se ci si collega o ci si trova. Dall'ago
+                    # 2026 non decide nessuna guardia — la zona resta
+                    # facoltativa anche di persona, che un servizio a
+                    # domicilio si fa a casa del cliente.
                     "durata_min INTEGER DEFAULT 0",
                     "servizio_dove TEXT DEFAULT ''",
                     # LA RICERCA (ago 2026): il timbro dell'indice
@@ -5391,21 +5395,45 @@ SERVIZIO_DOVE = ("online", "presenza")
 
 def servizio_dove_da_payload(d: dict, consegna: str) -> str:
     """DOVE si svolge una prestazione: 'online' | 'presenza' | ''.
-    Non e' un ornamento — decide una GUARDIA: un servizio in presenza
-    vuole il comune per la stessa ragione del ritiro (chi viene deve
-    sapere dove), uno online un luogo non ce l'ha e non gliela si puo'
-    chiedere.
+    E' SOLO INFORMATIVO (ago 2026, decisione di Andrea, che ROVESCIA
+    la docstring di ieri — «decide una GUARDIA»): serve alla scheda a
+    dire se ci si collega o ci si trova, e a niente altro. Fino a ieri
+    «presenza» esigeva il comune come il ritiro; ma un servizio a
+    domicilio si fa a casa del CLIENTE, e il venditore non sa dove —
+    la zona e' facoltativa per ogni servizio, come per chi spedisce e
+    basta. '' = NON DICHIARATO, ed e' un valore lecito per sempre: la
+    scheda dice «Su appuntamento» e non inventa una videoconferenza.
     Fuori dal servizio vale '' sempre, anche se arriva qualcosa: e' la
     forma di `anche_digitale`, che si azzera dove non ha senso invece
     di restare in colonna a dire una cosa che nessuno guardera' mai.
     Sconosciuto = '' e mai un 400, come `consegna_da_payload`: il
     client non decide i cataloghi, e un valore storto non deve far
-    fallire una pubblicazione — a valle '' vale come 'online', che e'
-    il caso che non chiede niente a nessuno."""
+    fallire una pubblicazione."""
     if consegna != "servizio":
         return ""
     dove = (d.get("servizio_dove") or "").strip()
     return dove if dove in SERVIZIO_DOVE else ""
+
+
+def durata_da_payload(d: dict, consegna: str) -> int:
+    """QUANTO dura la prestazione, in minuti (0 = non dichiarata). Il
+    gemello di `servizio_dove_da_payload`, con le stesse due regole:
+    fuori dal servizio vale 0 anche se arriva qualcosa, e un valore
+    storto vale 0 e mai un 400 — la durata la esige il CLIENT, dove si
+    guida chi pubblica; il server la tollera, che e' il patto degli
+    storici e dei client di ieri.
+    E' nato ad ago 2026 perche' le due colonne NON SI SCRIVEVANO: il
+    giudice del dove calcolava il valore per la sola guardia della
+    zona e poi lo buttava, l'INSERT di pubblica() e l'UPDATE di
+    modifica() non le nominavano, e la scheda leggeva per sempre il
+    DEFAULT — «In videoconferenza» senza durata, qualunque cosa il
+    venditore avesse dichiarato."""
+    if consegna != "servizio":
+        return 0
+    try:
+        return max(0, int(d.get("durata_min") or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def strade_annuncio(a) -> set:
@@ -9132,20 +9160,11 @@ def guardia_zona_condizione(d: dict, consegna: str,
                                      "comune valido: scegli il tuo dai "
                                      "suggerimenti del campo Zona "
                                      "(es. «Pavia (PV)»)")
-        # Il servizio IN PRESENZA (ago 2026): stessa regola del
-        # ritiro, messaggio SUO — chi vende una lezione a domicilio
-        # non capirebbe una frase sul «ritiro in zona». Online no: li'
-        # un luogo non esiste, e chiederlo sarebbe una domanda senza
-        # risposta. Sta accanto alla prima regola e NON dentro la
-        # seconda: `esigi_luogo` spegne solo «la zona dev'essere un
-        # comune», e questa e' «la zona ci vuole».
-        if (consegna == "servizio"
-                and servizio_dove_da_payload(d, consegna) == "presenza"
-                and not zona):
-            raise HTTPException(400, "Per un servizio di persona serve un "
-                                     "comune valido: scegli il tuo dai "
-                                     "suggerimenti del campo Zona "
-                                     "(es. «Pavia (PV)»)")
+        # Il SERVIZIO non la esige MAI, nemmeno «di persona» (ago
+        # 2026, decisione di Andrea — qui c'era un secondo 400, il
+        # gemello del ritiro): a domicilio si lavora a casa del
+        # cliente, e il venditore non sa dove. Resta facoltativa, e se
+        # scritta passa dalla seconda regola come tutti.
         if esigi_luogo and zona and coordinate_da_zona(zona) == (0.0, 0.0):
             raise HTTPException(400, messaggio_zona_storta(zona))
     return condizione
@@ -10480,8 +10499,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "spedizione_punto_dichiarata,"
         "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
         "anche_digitale,condizione,quantita,quantita_max,stato,creato,"
-        "asta_base_sats,asta_scadenza,asta_creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "asta_base_sats,asta_scadenza,asta_creato,"
+        # la prestazione (ago 2026): dove e quanto dura — le due
+        # colonne che per tre settimane nessuno scriveva
+        "servizio_dove,durata_min) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
@@ -10498,7 +10520,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
          # alla pubblicazione: la coda non mangia la durata
          prezzo_sats if asta_secondi else 0,
          adesso + asta_secondi if asta_secondi else 0,
-         adesso if asta_secondi else 0))
+         adesso if asta_secondi else 0,
+         servizio_dove_da_payload(d, consegna),
+         durata_da_payload(d, consegna)))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -11456,7 +11480,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         # il massimo non si assegna MAI secco: una modifica che abbassa
         # la quantita' non deve cancellare la memoria dei pezzi avuti
         "quantita_max=MAX(quantita_max,?), stato=?, "
-        "modificato=? WHERE id=?",
+        "modificato=?, servizio_dove=?, durata_min=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
@@ -11464,7 +11488,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          extra_sats, extra_eur, taglia, anche_dig,
          condizione, quantita, quantita,
          "revisione" if in_revisione else "attivo",
-         int(time.time()), annuncio_id))
+         int(time.time()),
+         servizio_dove_da_payload(d, consegna),
+         durata_da_payload(d, consegna), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
