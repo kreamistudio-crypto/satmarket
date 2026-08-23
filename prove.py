@@ -3156,17 +3156,36 @@ def prove_busta_ritiro():
     else:
         _esc = mini[mini.index("const esc = s =>"):
                     mini.index("const el = id =>")]
-        _pc = pezzo_js(mini, "function piattoCodice(b, svelato){", "\n}") + "\n}"
+        # dal cantiere della forma il piatto e' un involucro: si
+        # portano anche il giudice e la resa, o il programma esplode
+        # con un ReferenceError invece di dire qualcosa
+        # la soglia si LEGGE dal client e non si ribatte qui: due
+        # numeri da tenere in pari sono due che un giorno divergono
+        _sog = re.search(r"const SOGLIA_PIATTO = \d+;", mini).group(0)
+        _pc = (_sog + "\n"
+               + pezzo_js(mini, "function formaCodice(testo){", "\n}") + "\n}"
+               + pezzo_js(mini, "function resaCodice(testo, o){", "\n}") + "\n}"
+               + pezzo_js(mini, "function piattoCodice(b, svelato){", "\n}")
+               + "\n}")
         _prog = (_esc + _pc + "\nconst casi = ["
                  "piattoCodice({codice:'8842-7193'}, true),"
                  "piattoCodice({codice:'8842-7193'}, false),"
                  "piattoCodice({codice:''}, true),"
-                 "piattoCodice({codice:'<b>X</b>'}, false)];"
+                 "piattoCodice({codice:'<b>X</b>'}, false),"
+                 # il codice InPost da 24 cifre RESTA un piatto: e' il
+                 # caso vero che gira oggi, e la soglia e' scelta anche
+                 # per non degradarlo
+                 "piattoCodice({codice:'881234567890123456789012'}, false),"
+                 # ...e il link di un QR non lo e' piu': e' il caso che
+                 # al piatto faceva male, e adesso trova il blocco
+                 "piattoCodice({codice:'https://inpost.it/qr/"
+                 "AbCdEf123456'}, false)];"
                  "console.log(JSON.stringify(casi.map(h => ({"
                  "  vuoto: h === '',"
                  "  anello: h.includes('codice-svelato'),"
                  "  copia: h.includes('onclick=\"copiaBusta()\"'),"
                  "  parola: h.includes('Tocca per copiare'),"
+                 "  piatto: h.includes('codice-piatto'),"
                  "  crudo: h.includes('<b>X')}))));")
         _f3 = _tf3.NamedTemporaryFile("w", suffix=".js", delete=False,
                                       encoding="utf-8")
@@ -3176,15 +3195,22 @@ def prove_busta_ritiro():
                        timeout=60, encoding="utf-8")
         os.unlink(_f3.name)
         prova("piattoCodice: anello solo al gesto, copia sempre, "
-              "codice vuoto = niente piatto",
+              "codice vuoto = niente piatto, e il link del QR va al blocco",
               [{"vuoto": False, "anello": True, "copia": True,
-                "parola": True, "crudo": False},
+                "parola": True, "piatto": True, "crudo": False},
                {"vuoto": False, "anello": False, "copia": True,
-                "parola": True, "crudo": False},
+                "parola": True, "piatto": True, "crudo": False},
                {"vuoto": True, "anello": False, "copia": False,
-                "parola": False, "crudo": False},
+                "parola": False, "piatto": False, "crudo": False},
                {"vuoto": False, "anello": False, "copia": True,
-                "parola": True, "crudo": False}],
+                "parola": True, "piatto": True, "crudo": False},
+               # le 24 cifre: piatto, come oggi
+               {"vuoto": False, "anello": False, "copia": True,
+                "parola": True, "piatto": True, "crudo": False},
+               # il link: blocco, quindi niente piatto e niente
+               # «Tocca per copiare» — la copia c'e' lo stesso
+               {"vuoto": False, "anello": False, "copia": True,
+                "parola": False, "piatto": False, "crudo": False}],
               _js3.loads(_r3.stdout.strip()) if _r3.returncode == 0
               else f"ERRORE: {_r3.stderr[:160]}")
 
@@ -3680,6 +3706,223 @@ def prove_busta_ritiro():
           vero.execute("SELECT solleciti_punto FROM ordini "
                        "ORDER BY id").fetchall())
     vero.close()
+
+
+def prove_contenuto_digitale_forma():
+    """IL CONTENUTO DIGITALE: il salto, e la forma di quel che compare
+    (ago 2026, dal campo).
+
+    IL SALTO era lo stesso del codice di ritiro — `openOrder` rifa' la
+    vista e finisce in `go()`, che riporta in cima — ma la cura non
+    poteva essere la stessa, ed e' la riga che questo blocco difende:
+    SI RIDISEGNA IN PLACE QUANDO IL FATTO VIVE DENTRO IL PANNELLO, SI
+    RIAPRE CON L'ANCORA QUANDO IL FATTO ESCE DAL PANNELLO. Il venditore
+    che rilegge non cambia niente fuori dal pannello (e riaprire gli
+    cancellerebbe la invoice a meta' e il voto scelto); la rivelazione
+    invece cambia lo stato, e con lui lo stepper, la trust-note e il
+    bottone «libera i sats» — il solo pannello direbbe il falso proprio
+    dove conta.
+
+    LA FORMA: tre superfici dicono la stessa cosa — il contenuto
+    digitale, il codice di ritiro, il collegamento del servizio — e
+    ognuna aveva la resa dell'ALTRA sbagliata. Adesso il giudice e' uno
+    e le rese sono due, e la prova che conta le fa GIRARE: le
+    sentinelle dicono che il codice c'e', mai che il conto torni."""
+    print("\n[il contenuto digitale: il salto e la forma]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ⚠️ TRE SENTINELLE DI QUESTO BLOCCO GUARDANO IL CODICE E NON LA
+    # PROSA, e non e' pignoleria: i commenti qui attorno NOMINANO
+    # apposta quel che e' stato tolto — il monospazio che spezzava le
+    # parole, lo scorrimento morbido che renderebbe visibile la
+    # compensazione — e cercarli larghi le farebbe diventare rosse per
+    # colpa di una spiegazione. E' la lezione gia' pagata altrove, e
+    # in questo cantiere e' costata due giri.
+    def _nudo(t):
+        return re.sub(r"/\*.*?\*/", "", t, flags=re.S)
+
+    # --- 1) L'ANCORA SU OGNI RAMO ---------------------------------
+    # la lezione della busta: senza, il ridisegno non trova casa
+    # proprio sul ramo che qualcuno aggiungera' domani
+    prova("ogni ramo del pannello digitale porta la sua ancora", 3,
+          mini.count('<div class="payout" id="digPannello">'))
+
+    # --- 2) CHI RIDISEGNA IN PLACE --------------------------------
+    _rc = pezzo_js(mini, "function ridisegnaContenuto(){")
+    prova("ridisegnaContenuto riscrive UN nodo", True,
+          "digPannello" in _rc and "outerHTML" in _rc)
+    prova("...e non riapre la vista", True,
+          "openOrder" not in _rc and "go(" not in _rc)
+    # un outerHTML vuoto CANCELLA il pannello: la guardia e' la stessa
+    # del gemello, e per la stessa ragione
+    prova("...e non cancella il pannello su un costruttore vuoto", True,
+          "if (html)" in _rc)
+    _mc = pezzo_js(mini, "async function mostraContenuto(btn){")
+    prova("il venditore che rilegge NON riapre l'ordine", False,
+          "openOrder" in _mc)
+    prova("...ridisegna il solo pannello", True,
+          "ridisegnaContenuto()" in _mc)
+    # il censimento dei cinque chiamanti dell'attesa ritardata copre
+    # gia' questa riga: qui si tiene ferma perche' e' una LETTURA
+    prova("...e l'attesa resta quella ritardata", True,
+          "attesaRitardata(btn," in _mc)
+
+    # --- 3) CHI RIAPRE, MA FERMO ----------------------------------
+    _rv = pezzo_js(mini, "async function rivelaContenuto(btn){")
+    prova("la rivelazione riapre l'ordine ancorata al pannello", True,
+          "riapriOrdineFermo(currentOrder.id, '#digPannello')" in _rv)
+    prova("...e non passa piu' da un openOrder nudo", False,
+          "openOrder(" in _rv)
+    # il velo IMMEDIATO resta: li' e' la guardia contro il secondo
+    # tocco su una cosa che non torna indietro
+    prova("...e la rivelazione tiene il velo immediato", True,
+          "bottoneInAttesa(btn," in _rv)
+    # `openOrder` rilegge da orders.find: senza questa riga lo stato
+    # scritto evapora alla prima loadOrders, e il compratore resta col
+    # codice rivelato e nessun bottone di conferma
+    prova("...e lo stato si scrive anche sulla riga viva di orders",
+          True, "orders.find(x=>x.id===currentOrder.id)" in _rv
+          and "viva.state = 'delivered'" in _rv)
+    _cc = pezzo_js(mini, "async function consegnaContenuto(btn){")
+    prova("anche la consegna riapre ferma, ancorata alla cassaforte",
+          True, "riapriOrdineFermo(currentOrder.id, "
+                "'#orderContent .vault')" in _cc)
+    prova("...e allinea le due copie", True,
+          "viva.state = 'shipped'" in _cc)
+
+    # --- 4) L'INVOLUCRO -------------------------------------------
+    _rf = pezzo_js(mini, "function riapriOrdineFermo(id, ancora){")
+    prova("l'involucro misura prima e dopo", 2,
+          _rf.count("getBoundingClientRect().top"))
+    prova("...e compensa con scrollBy", True, "window.scrollBy(0," in _rf)
+    prova("...senza toccare la posizione della vetrina", False,
+          "posizioneDaRendere" in _rf)
+    # la guardia sta sul NODO e non sul numero: una `top` di 0 e'
+    # legittima, e con un `if (!prima)` la compensazione salterebbe
+    # proprio li'
+    prova("...e la guardia guarda il nodo, non il numero", True,
+          "prima === undefined" in _rf)
+    # LA FIRMA DI openOrder NON SI TOCCA: prove.py affetta il suo
+    # corpo ancorandosi alla riga di dichiarazione, e un secondo
+    # argomento non farebbe una prova rossa — farebbe esplodere il
+    # blocco del dettaglio, portandosi via le sorelle dopo di lui
+    prova("la firma di openOrder non ha guadagnato argomenti", 1,
+          mini.count("function openOrder(id){"))
+    # LA CINTURA D'AMBIENTE: la compensazione vive in un task solo e
+    # per questo non si vede. Con uno scorrimento morbido diventerebbe
+    # un'animazione, cioe' il salto tornerebbe visibile al rallentatore
+    _stile = _nudo(mini[mini.index("<style>"):mini.index("</style>")])
+    prova("nessuno scorrimento morbido nel foglio", False,
+          "scroll-behavior:smooth" in _stile.replace(" ", ""))
+
+    # --- 5) LA FORMA: le tre superfici ----------------------------
+    _pd = pezzo_js(mini, "function pannelloContenutoDigitale(o){")
+    prova("il contenuto rivelato passa dalla resa condivisa", True,
+          "resaCodice(testo," in _pd)
+    # la copia sta DENTRO la resa: un secondo bottone sarebbe doppio
+    prova("...e non aggiunge un secondo bottone di copia", False,
+          'onclick="copiaContenuto()">📋 Copia<' in _pd)
+    # il muro grigio di ieri: 12,5px muted in monospazio su mezza
+    # pagina di istruzioni
+    prova("...e il testo non torna nel monospazio grigio", False,
+          'class="hint mono" style="user-select:all' in _pd)
+    _ma = pezzo_js(mini, "async function mostraAccesso(btn){")
+    prova("il collegamento del servizio passa dalla stessa resa", True,
+          "resaCodice(d.accesso," in _ma)
+    # il difetto vero: break-all spezza le parole a meta', e li' la
+    # cosa da leggere e' proprio un link intero
+    prova("...e non spezza piu' le parole a meta'", False,
+          "word-break:break-all" in _nudo(_ma))
+    prova("il piatto della busta e' rimasto un involucro della resa",
+          True, "resaCodice(b.codice," in
+          pezzo_js(mini, "function piattoCodice(b, svelato){"))
+    _rs = pezzo_js(mini, "function resaCodice(testo, o){")
+    prova("il testo esce sempre scappato", 2, _rs.count("esc(testo)"))
+    # il blocco NON e' un bottone, ed e' la differenza da non
+    # uniformare: su cinquecento caratteri si vuole SELEZIONARE, non
+    # copiare tutto con un tocco
+    prova("il blocco non e' un bottone, e la copia sta sotto", True,
+          '<div class="codice-blocco">' in _rs
+          and "📋 Copia tutto" in _rs)
+    # l'anello dice «il codice e' comparso QUI»: attorno a un blocco
+    # alto non direbbe niente
+    prova("...e l'anello resta del solo piatto", 1,
+          _rs.count("codice-svelato"))
+    _css = mini[mini.index(".codice-blocco{"):]
+    _css = _css[:_css.index("}")]
+    prova("il blocco spezza solo dove serve", True,
+          "overflow-wrap:anywhere" in _css
+          and "word-break:break-all" not in _css)
+    prova("...e la selezione resta libera", True,
+          "user-select:text" in _css)
+    # e' il bene comprato, non una nota di servizio: il grigio lo
+    # faceva sembrare un piede di pagina
+    prova("...e il testo e' inchiostro, non grigio", True,
+          "color:var(--ink)" in _css)
+
+    # --- 6) I DUE PEZZI CHE SI FANno GIRARE -----------------------
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il giudice della forma e l'involucro rispondono giusto",
+              "node non installato")
+        return
+    _sog = re.search(r"const SOGLIA_PIATTO = (\d+);", mini)
+    _fc = (_sog.group(0) + "\n"
+           + pezzo_js(mini, "function formaCodice(testo){"))
+    _n = int(_sog.group(1))
+    _prog = (_fc + "\nconsole.log(JSON.stringify(["
+             "formaCodice('8842'),"                    # un PIN corto
+             "formaCodice('X'.repeat(%d)),"            # al filo
+             "formaCodice('X'.repeat(%d)),"            # un carattere oltre
+             "formaCodice('due\\nrighe'),"             # la firma della prosa
+             # un link di Meet e' CORTO (36): senza la regola
+             # dell'indirizzo finirebbe nel piatto, dove il break-all
+             # delle cifre lo taglia a meta' parola
+             "formaCodice('https://meet.google.com/abc-defg-hij'),"
+             "formaCodice(''),"
+             "formaCodice(null)]));" % (_n, _n + 1))
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    # il testo su PIU' RIGHE e' istruzioni SEMPRE, per corto che sia:
+    # gli a capo sono la firma della prosa e nessuna lunghezza li puo'
+    # smentire. E il vuoto non deve esplodere.
+    prova("il giudice della forma: il filo, gli a capo, il vuoto",
+          ["piatto", "piatto", "blocco", "blocco", "blocco",
+           "piatto", "piatto"],
+          _js.loads(_r.stdout.strip()) if _r.returncode == 0
+          else f"ERRORE: {_r.stderr[:200]}")
+
+    # l'involucro su un DOM di cartone: il conto della compensazione
+    # non lo dice nessuna sentinella sulla forma
+    _prog2 = ("let scrollato = 0, top = 300;\n"
+              "const window = {scrollBy: (x, y) => { scrollato += y; }};\n"
+              "const document = {querySelector: () => ({"
+              "  getBoundingClientRect: () => ({top})})};\n"
+              "const openOrder = () => { top = 120; };\n"
+              + pezzo_js(mini, "function riapriOrdineFermo(id, ancora){")
+              + "\nriapriOrdineFermo(1, '#x');\n"
+              # e col nodo che non c'e' non si compensa niente
+              + "const senzaNodo = [];\n"
+              "document.querySelector = () => null;\n"
+              "riapriOrdineFermo(1, '#x');\n"
+              "console.log(JSON.stringify(scrollato));")
+    _f2 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8")
+    _f2.write(_prog2)
+    _f2.close()
+    _r2 = _sp.run([_node, _f2.name], capture_output=True, text=True,
+                  timeout=60, encoding="utf-8")
+    os.unlink(_f2.name)
+    prova("l'involucro compensa esattamente lo spostamento del nodo, "
+          "e senza nodo non tocca niente", -180,
+          _js.loads(_r2.stdout.strip()) if _r2.returncode == 0
+          else f"ERRORE: {_r2.stderr[:200]}")
 
 
 def prove_indirizzo_casa():
@@ -27095,7 +27338,8 @@ def main():
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
-              prove_busta_ritiro, prove_indirizzo_casa,
+              prove_busta_ritiro, prove_contenuto_digitale_forma,
+              prove_indirizzo_casa,
               prove_nota_compratore,
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,

@@ -3367,6 +3367,34 @@
     letter-spacing:.02em;word-break:break-all;white-space:pre-wrap;
     user-select:all;-webkit-user-select:all}
   .codice-tocca{font-size:12px;font-weight:700;opacity:.9}
+  /* L'ALTRA RESA: mezza pagina di istruzioni non e' un codice, e la
+     forma lo dice. FONT DI LETTURA e non monospazio — il mono
+     distingue 0 da O su un PIN, ma su cinquecento caratteri di prosa
+     e' il font peggiore che ci sia (chi ha un codice puro cade nel
+     PIATTO, che il mono ce l'ha). INCHIOSTRO e non --muted: e' il bene
+     comprato, non una nota di servizio, ed era il grigio a farlo
+     sembrare un piede di pagina.
+     `overflow-wrap:anywhere` e MAI `word-break:break-all`: il primo
+     spezza solo quando la parola non ci sta (un URL lungo), il secondo
+     spezza sempre — ed e' il difetto che si vede oggi sul collegamento
+     del servizio, con le parole tagliate a meta'.
+     SELEZIONE LIBERA e non `user-select:all`, che e' del piatto: li'
+     si vuole tutto il codice in un tocco, qui si vuole poter prendere
+     UNA riga — un link, una data — e per il resto c'e' «Copia tutto».
+     La carta e' quella della textarea del pannello, non l'arancio
+     velato del piatto: su quindici righe quel fondo e' troppo, e
+     l'accento va tenuto per la cosa che si batte al banco.
+     NIENTE CLAMP e niente «mostra tutto», dichiarato: il tetto e' 4000
+     caratteri, il caso vero e' 500 (~12 righe) e la pagina scorre da
+     se'. Uno scroll interno dentro una pagina che scorre e' un difetto
+     gia' pagato altrove; il clamp si aggiunge se qualcuno vedra' un
+     contenuto lungo davvero. */
+  .codice-blocco{
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    padding:11px 13px;margin-top:10px;
+    font-size:14px;font-weight:600;line-height:1.55;color:var(--ink);
+    white-space:pre-wrap;overflow-wrap:anywhere;
+    user-select:text;-webkit-user-select:text}
   /* L'IMPULSO DELLA RIVELAZIONE: un anello arancio si allarga dal
      piatto e svanisce — mezzo secondo, UNA VOLTA SOLA. E' l'anello
      dell'impulso dello scatto, con la sua stessa ragione: sta FUORI
@@ -7030,6 +7058,51 @@ function ripristinaMieiPos(){
   mieiRipristina = false;
   if (mieiPos && mieiPos.n === el('myListings').children.length)
     window.scrollTo(0, mieiPos.y);
+}
+
+/* RIAPRIRE SENZA SALTARE (ago 2026). La regola e' una frase, e vale
+   per ogni gesto dentro un ordine: SI RIDISEGNA IN PLACE QUANDO IL
+   FATTO VIVE DENTRO IL PANNELLO (il calco e' `ridisegnaBusta`), SI
+   RIAPRE CON L'ANCORA QUANDO IL FATTO ESCE DAL PANNELLO.
+   La rivelazione del contenuto digitale e' il secondo caso: cambia lo
+   stato, e con lui lo stepper, la trust-note «⏳ Contenuto rivelato» e
+   il bottone «libera i sats» — tre blocchi fuori dal pannello, di cui
+   uno SOPRA. Ridisegnare il solo pannello lascerebbe lo stepper a dire
+   il falso proprio dove conta («restano ~N ore per confermare»).
+   LA COMPENSAZIONE E' UNA FLIP: si misura il nodo prima, si ridisegna,
+   si rimisura e si sposta lo scorrimento della differenza — cosi' il
+   pannello resta ESATTAMENTE dove stava sullo schermo anche se sopra
+   cambia altezza.
+   NON C'E' FOTOGRAMMA INTERMEDIO, e non e' una speranza:
+   getBoundingClientRect forza il LAYOUT e non il paint, e le due
+   misure con openOrder in mezzo stanno nello stesso task sincrono —
+   il browser dipinge una volta sola, gia' compensata.
+   ⚠️ Vale finche' non esiste `scroll-behavior:smooth`, che
+   trasformerebbe la compensazione in un'animazione visibile: c'e' la
+   sentinella, ed e' la riga da non ammorbidire.
+   L'ANCORA E' UN SELETTORE E NON UN id, ed e' voluto: `consegnaContenuto`
+   si ancora a `#orderContent .vault`, che un id non lo puo' avere (una
+   sentinella ne confronta il markup letterale, indentazione compresa).
+   Ancora assente, o nodo che non c'e': si riapre come sempre, cioe' il
+   comportamento di ieri — la garanzia e' la tipografia, non un ramo.
+   E LA FIRMA DI openOrder NON SI TOCCA: prove.py affetta il corpo di
+   quella funzione ancorandosi alla sua riga di dichiarazione, quindi
+   un secondo argomento non fa una prova rossa — fa ESPLODERE il
+   blocco, portandosi via le decine di sorelle che vengono dopo. Da
+   qui l'involucro.
+   ⚠️ E quella riga qui NON SI CITA nemmeno a titolo di esempio: la
+   trappola e' la stessa, ed e' costata un giro — scrivendola in
+   questo commento lo slice si e' ancorato QUI invece che alla
+   funzione, e due prove di tutt'altro cantiere sono diventate rosse. */
+function riapriOrdineFermo(id, ancora){
+  const prima = document.querySelector(ancora)?.getBoundingClientRect().top;
+  openOrder(id);
+  const nodo = document.querySelector(ancora);
+  /* la guardia sta sul NODO e non sul numero: una `top` di 0 e'
+     legittima (l'ancora a filo del bordo alto), e con un `if (!prima)`
+     la compensazione salterebbe proprio li' */
+  if (prima === undefined || !nodo) return;
+  window.scrollBy(0, nodo.getBoundingClientRect().top - prima);
 }
 
 /* ---------------- il gesto indietro ----------------
@@ -20859,29 +20932,70 @@ function pannelloContenutoDigitale(o){
   const quando = o.consegnato
     ? new Date(o.consegnato*1000).toLocaleString('it-IT',
         {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
-  if (testo !== undefined) return `
-    <div class="payout">
-      <h4>💾 Contenuto consegnato</h4>
-      <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(testo)}</div>
-      ${o.role==='buyer' && quando ? `<div class="hint" style="margin-top:8px">👁 Rivelato il ${quando} — la rivelazione fa da ricevuta.</div>`:''}
-      <button class="btn ghost" style="margin-top:10px" onclick="copiaContenuto()">📋 Copia</button>
-    </div>`;
-  if (o.role==='buyer' && o.state==='shipped') return `
-    <div class="payout">
+  /* il ramo della RIVELAZIONE viene per primo, ma solo finche' il
+     testo non c'e': appena c'e', si mostra quello (era gia' cosi',
+     cambia l'ordine di lettura e non il comportamento) */
+  if (testo === undefined && o.role==='buyer' && o.state==='shipped') return `
+    <div class="payout" id="digPannello">
       <h4>🔓 Rivela il contenuto</h4>
       <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: un codice, una volta rivelato, non torna indietro. Provalo subito — hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.</div>
       <div class="hint mono" style="letter-spacing:3px">••••-••••-••••</div>
       <button class="btn orange" style="margin-top:10px" onclick="rivelaContenuto(this)">🔓 Rivela — mi prendo ${TEMPI.confermaDig}h per provarlo</button>
     </div>`;
+  /* LA TESTA E' UNA per i due rami che restano, ed e' la lezione della
+     busta: se il ramo col testo avesse una testa SUA, il contenuto
+     nascerebbe piu' in alto del bottone che ha sostituito e il gesto
+     tornerebbe a «rivelare altrove». Cosi' invece il venditore che
+     rilegge vede il contenuto comparire esattamente dove aveva il
+     dito — li' la pagina non si muove di un pixel, che il ridisegno
+     e' del solo pannello. */
+  const testa = o.role==='seller'
+    ? (o.consegnato?`L'acquirente l'ha rivelato il ${quando}.`
+                   :'In attesa che l\'acquirente lo riveli.')
+      + ' Puoi rileggere ciò che hai consegnato:'
+    : o.role==='admin' ? 'Il contenuto è custodito dalla piattaforma:'
+    : quando ? `👁 Rivelato il ${quando} — la rivelazione fa da ricevuta.`
+    : 'La rivelazione fa da ricevuta: il contenuto è tuo.';
+  /* il testo gia' in mano: la resa la sceglie `formaCodice` — cifre
+     grandi per un codice, blocco di lettura per le istruzioni — e la
+     copia ce l'ha dentro, quindi qui NON si aggiunge un secondo
+     bottone «Copia», che sarebbe doppio sul piatto */
+  if (testo !== undefined) return `
+    <div class="payout" id="digPannello">
+      <h4>💾 Contenuto consegnato</h4>
+      <div class="hint">${testa}</div>
+      ${resaCodice(testo, {copia: 'copiaContenuto()',
+                           aria: 'Copia il contenuto'})}
+    </div>`;
   /* venditore (rilettura senza effetti), compratore a rivelazione
      avvenuta su un altro dispositivo, moderatore in disputa */
   if (o.role==='seller' || o.consegnato || o.role==='admin') return `
-    <div class="payout">
+    <div class="payout" id="digPannello">
       <h4>💾 Contenuto consegnato</h4>
-      <div class="hint">${o.role==='seller' ? (o.consegnato?`L'acquirente l'ha rivelato il ${quando}.`:'In attesa che l\'acquirente lo riveli.')+' Puoi rileggere ciò che hai consegnato:' : 'Il contenuto è custodito dalla piattaforma:'}</div>
+      <div class="hint">${testa}</div>
       <button class="btn ghost" style="margin-top:10px" onclick="mostraContenuto(this)">👁 Mostra il contenuto</button>
     </div>`;
   return '';
+}
+
+/* IL RIDISEGNO E' DEL SOLO PANNELLO, ed e' il gemello di
+   `ridisegnaBusta`: qui il fatto vive DENTRO il pannello — il
+   venditore rilegge quel che ha consegnato e non cambia nessuno
+   stato — quindi stepper, testa e bottoni restano identici byte per
+   byte e non c'e' niente da riaprire.
+   E RIAPRIRE NON SAREBBE SOLO INUTILE, SAREBBE DISTRUTTIVO, che e' la
+   ragione forte: sotto c'e' `payoutPanel` con la textarea della
+   invoice, e `openOrder` la CANCELLA a meta' (e' il motivo per cui
+   esiste `aggiornaCifreOrdine`); e azzera `stellaScelta`, cioe' chi
+   aveva gia' toccato tre stelle e poi tocca «Mostra il contenuto»
+   perdeva il voto.
+   `if (html)` obbligatorio: il costruttore puo' tornare vuoto, e un
+   outerHTML vuoto cancellerebbe il pannello. */
+function ridisegnaContenuto(){
+  const p = el('digPannello');
+  if (!p) return;
+  const html = pannelloContenutoDigitale(currentOrder);
+  if (html) p.outerHTML = html;
 }
 
 async function caricaContenutoDigitale(){
@@ -20900,9 +21014,24 @@ async function rivelaContenuto(btn){
   const d = await caricaContenutoDigitale();
   ripristina();
   if (!d) return;
+  /* lo stato si scrive ANCHE sulla riga viva di `orders`, e non e' un
+     di piu': `openOrder` rilegge da `orders.find`, quindi se nel
+     frattempo e' passata una `loadOrders` quel che sta qui evapora —
+     e il compratore si ritroverebbe il codice rivelato, lo stepper che
+     dice ancora «il venditore consegna» e NESSUN bottone di conferma
+     (sul digitale compaiono solo da 'delivered'). E' la lezione di
+     `setTipoPuntoOrdine`, che scrive sulle due copie per la stessa
+     ragione. */
+  const rivelato = d.rivelato || Math.floor(Date.now()/1000);
   currentOrder.state = 'delivered';
-  currentOrder.consegnato = d.rivelato || Math.floor(Date.now()/1000);
-  openOrder(currentOrder.id);
+  currentOrder.consegnato = rivelato;
+  const viva = orders.find(x=>x.id===currentOrder.id);
+  if (viva) { viva.state = 'delivered'; viva.consegnato = rivelato; }
+  /* QUI IL FATTO ESCE DAL PANNELLO — cambiano lo stepper, la
+     trust-note e il bottone «libera i sats» — quindi si riapre
+     davvero, ma ancorati al pannello: la pagina non salta e il
+     contenuto nasce dove stava il dito */
+  riapriOrdineFermo(currentOrder.id, '#digPannello');
   toast(`👁 Contenuto rivelato: hai ${TEMPI.confermaDig} ore per provarlo`);
 }
 
@@ -20911,7 +21040,7 @@ async function mostraContenuto(btn){
   const ripristina = attesaRitardata(btn, 'Apro il contenuto…');
   const d = await caricaContenutoDigitale();
   ripristina();
-  if (d) openOrder(currentOrder.id);
+  if (d) ridisegnaContenuto();
 }
 
 function copiaContenuto(){
@@ -20939,7 +21068,18 @@ async function consegnaContenuto(btn){
   currentOrder.state = 'shipped'; currentOrder.contenutoPresente = true;
   currentOrder.corriere = 'Consegna digitale';
   contenutoRivelato[currentOrder.id] = testo;
-  openOrder(currentOrder.id);
+  /* le due copie allineate, come nella rivelazione: `openOrder`
+     rilegge da qui */
+  const viva = orders.find(x=>x.id===currentOrder.id);
+  if (viva) { viva.state = 'shipped'; viva.contenutoPresente = true;
+              viva.corriere = 'Consegna digitale'; }
+  /* qui l'ancora e' la cassaforte e non il pannello, ed e' dichiarato:
+     il riquadro dove stava il dito SPARISCE (era il form di consegna)
+     e quello del contenuto prima non esisteva, quindi la promessa e'
+     «la pagina non salta», non «il codice nasce dove stava il dito».
+     `.vault` non puo' avere un id: c'e' una sentinella che ne
+     confronta il markup letterale. */
+  riapriOrdineFermo(currentOrder.id, '#orderContent .vault');
   toast('💾 Contenuto consegnato: l\'acquirente è stato avvisato');
 }
 
@@ -21085,6 +21225,18 @@ async function depositaAccesso(btn){
   } catch(e) { toast('Non è andata, riprova'); }
   finally { fine(); }
 }
+/* la copia di pagina del collegamento: prima il testo viveva solo nel
+   DOM, e senza non ci sarebbe niente da copiare. Dichiarata PRIMA di
+   chi la usa, che e' la lezione della zona morta temporale. */
+let accessoLetto = {};
+function copiaAccesso(){
+  haptic();
+  const t = accessoLetto[currentOrder?.id];
+  if (!t) return;
+  navigator.clipboard?.writeText(t)
+    .then(()=>toast('📋 Collegamento copiato'))
+    .catch(()=>toast('Tieni premuto sul testo per copiarlo'));
+}
 async function mostraAccesso(btn){
   /* una LETTURA: l'attesa si ritarda, o su rete viva il velo
      lampeggerebbe per cinque millisecondi — la lezione del codice di
@@ -21095,10 +21247,18 @@ async function mostraAccesso(btn){
       headers:{'X-Tg-Init-Data':authHdr()}, credentials:'include'});
     const d = await r.json();
     if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    /* LA FORMA E' QUELLA DELLE ALTRE DUE (ago 2026): un link di
+       videochiamata e' quasi sempre lungo, e il monospazio con
+       `word-break:break-all` lo spezzava a meta' parola — cioe' la
+       cosa che qui si deve leggere e copiare per intero. Adesso lo
+       decide `formaCodice`: una stanza «rossi-abc-def» resta un
+       piatto, un link di Meet diventa un blocco di lettura col suo
+       «Copia tutto». La copia passa dalla copia di pagina, che e'
+       anche il ripiego quando gli appunti dicono di no. */
+    accessoLetto[currentOrder.id] = d.accesso || '';
     const box = el('servAccessoTesto');
-    if (box) box.innerHTML = '<div class="mono" style="word-break:break-all;'
-      + 'user-select:all;font-weight:800;margin:8px 0">'
-      + esc(d.accesso) + '</div>';
+    if (box) box.innerHTML = resaCodice(d.accesso, {
+      copia: 'copiaAccesso()', aria: 'Copia il collegamento'});
     btn.remove();
   } catch(e) { toast('Non è andata, riprova'); }
   finally { fine(); }
@@ -21194,22 +21354,82 @@ function pannelloBustaRitiro(o){
   return '';
 }
 
-/* IL PIATTO DEL CODICE: il bottone che l'ha rivelato, trasformato.
-   Non e' un <div> travestito — resta un bottone, perche' un bottone
-   e' quello che e' diventato: si tocca e COPIA. L'aria-label lo dice
-   ai lettori di schermo, che l'icona non la vedono.
-   Il codice resta selezionabile a mano (user-select:all) dentro il
-   bottone: e' la strada del ripiego che `copiaBusta` promette quando
-   gli appunti non ci sono, e senza sarebbe una promessa falsa.
-   Codice vuoto = niente piatto: c'e' il caso vero del venditore che
-   manda il solo QR, e un piatto vuoto sarebbe un bottone che copia
-   il nulla. */
-function piattoCodice(b, svelato){
-  if (!b.codice) return '';
+/* ---- LA FORMA DI QUEL CHE IL VENDITORE HA CONSEGNATO (ago 2026) ----
+   TRE superfici dicono la stessa cosa — il contenuto digitale, il
+   codice di ritiro della busta, il collegamento del servizio — e fino
+   a ieri ognuna aveva la resa dell'ALTRA sbagliata: il digitale solo
+   il testo piccolo grigio in monospazio (perfetto per una nota di
+   servizio, un muro su mezza pagina di istruzioni per riscattare un
+   buono), la busta solo il piatto a 19px (perfetto per un PIN, un muro
+   enorme su un link di QR), il servizio il monospazio con
+   `word-break:break-all`, cioe' un link di Meet spezzato a meta'
+   parola.
+   Adesso il giudice e' UNO e le rese sono DUE, e la scelta la fa il
+   TESTO: un codice si batte a un banco e vuole cifre grandi, delle
+   istruzioni si leggono e vogliono un font di lettura. Chi aggiunge la
+   quarta superficie chiama `resaCodice` e ha finito.
+
+   LA SOGLIA E' MISURATA e non scelta a occhio (ago 2026, col font
+   vero via CDP): nel piatto ci stanno 21 caratteri per riga a 320px,
+   25 a 360, 26 a 375 — e' monospazio, quindi il conto non dipende da
+   quali caratteri siano. 42 sono DUE righe piene alla larghezza piu'
+   stretta che serviamo, che e' il tetto: due righe di cifre grandi si
+   leggono ancora a colpo d'occhio, tre sono un muro.
+   Il numero e' scelto anche per non degradare il caso vero che oggi
+   funziona — un codice InPost da 24 cifre resta un piatto (e a 375
+   sta su una riga sola) — e per mandare al blocco quel che al piatto
+   fa male: il link di un QR, che di caratteri ne ha 60-100.
+   Chi la ritocca RIMISURI: un codice che va a capo tre volte e' meno
+   leggibile del blocco, e una prosa corta finita nel piatto si legge
+   come un codice che non e'. */
+const SOGLIA_PIATTO = 42;
+function formaCodice(testo){
+  const t = String(testo || '');
+  /* PIU' RIGHE = istruzioni, sempre: gli a capo sono la firma della
+     prosa, e nessuna lunghezza li puo' smentire.
+     E UN INDIRIZZO WEB VA AL BLOCCO ANCHE SE E' CORTO, che e' la
+     scoperta del cantiere: un link di videochiamata sta comodamente
+     sotto la soglia (36 caratteri per quelli di Meet), ma nel piatto
+     lo prenderebbe il `break-all` delle cifre — che per un PIN di
+     ventiquattro numeri e' giusto e su un indirizzo lo taglia a meta'
+     parola. Un indirizzo non si batte a un banco: si legge intero e
+     si copia, ed e' esattamente quel che il blocco sa fare. */
+  return (t.includes('\n') || t.includes('://')
+          || t.length > SOGLIA_PIATTO) ? 'blocco' : 'piatto';
+}
+
+/* IL PIATTO resta quello che era (vedi il CSS): il bottone che ha
+   rivelato il codice, TRASFORMATO — si tocca e COPIA. Non e' un <div>
+   travestito, e l'aria-label lo dice ai lettori di schermo.
+   IL BLOCCO invece NON e' un bottone, ed e' la differenza da non
+   uniformare: toccare cinquecento caratteri per copiarli tutti non e'
+   il gesto che uno vuole fare — li' si vuole SELEZIONARE una riga —
+   quindi la copia sta in un bottone suo, sotto. E niente anello:
+   `.codice-svelato` dice «il codice e' comparso QUI», e attorno a un
+   blocco alto non direbbe niente; a dirlo e' il testo che compare.
+   Il testo passa sempre da esc(), che e' roba scritta da una persona
+   e finisce dentro un template. */
+function resaCodice(testo, o){
+  if (!testo) return '';
+  const op = o || {};
+  const copia = op.copia || '';
+  if (formaCodice(testo) === 'piatto') return `
+      <button type="button" class="btn codice-piatto${op.svelato?' codice-svelato':''}"
+        style="margin-top:10px" aria-label="${esc(op.aria||'Copia')}"
+        onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
   return `
-      <button type="button" class="btn codice-piatto${svelato?' codice-svelato':''}"
-        style="margin-top:10px" aria-label="Copia il codice di ritiro"
-        onclick="copiaBusta()"><span class="mono codice-cifre">${esc(b.codice)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
+      <div class="codice-blocco">${esc(testo)}</div>
+      <button class="btn ghost" style="margin-top:8px"
+        onclick="${copia}">📋 Copia tutto</button>`;
+}
+
+/* Codice vuoto = niente piatto: c'e' il caso vero del venditore che
+   manda il solo QR, e un piatto vuoto sarebbe un bottone che copia il
+   nulla. Il nome resta questo — e' quello di casa, e le sentinelle
+   della busta lo cercano nel suo ramo. */
+function piattoCodice(b, svelato){
+  return resaCodice(b.codice, {svelato, copia: 'copiaBusta()',
+                               aria: 'Copia il codice di ritiro'});
 }
 
 /* ---- LA NOTA DEL COMPRATORE nell'ordine (ago 2026) ----

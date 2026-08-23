@@ -6260,6 +6260,110 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   importati restano fuori per natura (consegna '': per consegnare il
   codice il venditore deve essere in piattaforma). Modello CSV con la
   riga d'esempio `digitale` (parser già coperto dal giudice unico).
+  IL CONTENUTO SI LEGGE DOVE COMPARE (ago 2026, tre cose dal campo, e
+  le prime due sono un cantiere solo). 1) LA PAGINA NON SALTA PIÙ:
+  toccando «🔓 Rivela» si tornava in cima, ed era il difetto già
+  curato per il codice di ritiro — `openOrder` rifà la vista e
+  finisce in `go()`, che riporta a zero. 2) LA FORMA: il contenuto
+  viveva in un `.hint mono` (12,5px, grigio, monospazio), che su un
+  codice di sei caratteri è troppo piccolo per essere battuto a un
+  banco e su mezza pagina di istruzioni per riscattare un buono — il
+  caso vero — è un muro. E il gemello della busta aveva il difetto
+  SPECULARE: il piatto a 19px col `break-all` è perfetto per un PIN e
+  diventa un muro enorme su un link di QR.
+  LA CURA DEL SALTO SI SPACCA IN DUE, ED È LA RIGA DA TENERE: **si
+  ridisegna in place quando il fatto vive DENTRO il pannello, si
+  riapre con l'ANCORA quando il fatto ne esce.** `mostraContenuto` (il
+  venditore che rilegge) non cambia niente fuori dal pannello, quindi
+  è il calco letterale di `ridisegnaBusta`; `rivelaContenuto` invece
+  cambia lo STATO, e con lui lo stepper («Restano ~N ore», cioè
+  l'informazione che conta in quel momento), la trust-note e il
+  bottone «libera i sats» — tre blocchi fuori dal pannello, uno dei
+  quali SOPRA: il solo pannello direbbe il falso.
+  DA LÌ `riapriOrdineFermo(id, ancora)`: misura il nodo, riapre,
+  rimisura e compensa con `scrollBy` — una FLIP, così il pannello
+  resta esattamente dove stava sullo schermo anche se sopra cambia
+  altezza (MISURATO: scarto 0px a 320/360/375). Non c'è fotogramma
+  intermedio perché `getBoundingClientRect` forza il LAYOUT e non il
+  paint, e le due misure con `openOrder` in mezzo stanno nello stesso
+  task: il browser dipinge una volta sola, già compensata. ⚠️ Vale
+  finché non esiste `scroll-behavior:smooth`, e c'è la sentinella.
+  ⚠️ LA FIRMA DI `openOrder` NON SI TOCCA — da qui l'involucro invece
+  di un secondo argomento: `prove.py` affetta il corpo di quella
+  funzione ancorandosi alla sua riga di dichiarazione, quindi un
+  argomento in più non fa una prova rossa, fa ESPLODERE il blocco
+  portandosi via le decine di sorelle dopo di lui. E QUELLA RIGA NON
+  SI CITA NEMMENO IN UN COMMENTO: scritta per avvisare, ha spostato
+  lo slice sul commento stesso e ha fatto diventare rosse due prove di
+  tutt'altro cantiere. È la stessa trappola di `nome_pezzo` e del
+  «lampo», presa mentre la si spiegava.
+  E LA CURA CHIUDE DUE DIFETTI VIVI che non erano nel piano: riaprire
+  CANCELLAVA la invoice scritta a metà nel pannello d'incasso (è la
+  ragione per cui esiste `aggiornaCifreOrdine`) e azzerava
+  `stellaScelta`, cioè il voto già toccato spariva. Più il terzo, che
+  è il gemello di una lezione vecchia: la rivelazione scriveva lo
+  stato SOLO su `currentOrder`, e `openOrder` rilegge da
+  `orders.find` — con una `loadOrders` in mezzo il compratore si
+  ritrovava il codice rivelato, lo stepper che dice «il venditore
+  consegna» e NESSUN bottone di conferma.
+  LA FORMA È UN GIUDICE E DUE RESE, condivisi dalle TRE superfici —
+  la terza è il collegamento del SERVIZIO, che Andrea non aveva
+  nominato e che è entrato con la sua decisione: era monospazio con
+  `word-break:break-all`, cioè un link di Meet spezzato a metà parola.
+  `formaCodice` decide, `resaCodice` rende, e `piattoCodice` resta il
+  nome di casa come involucro di una riga (le sentinelle della busta
+  lo cercano nel suo ramo, e il suo HTML è IDENTICO a prima —
+  verificato caso per caso contro la versione precedente, che è più
+  forte di uno screenshot).
+  LA SOGLIA È MISURATA: nel piatto ci stanno **21 caratteri per riga a
+  320px** (25 a 360, 26 a 375 — è monospazio, quindi il conto non
+  dipende dai caratteri), quindi 42 sono DUE righe piene alla
+  larghezza più stretta, che è il tetto. Il numero è scelto anche per
+  non degradare il caso vero che gira oggi (un codice InPost da 24
+  cifre resta un piatto) e per mandare al blocco il link di un QR. Chi
+  la ritocca RIMISURI.
+  E UN INDIRIZZO WEB VA AL BLOCCO ANCHE SE È CORTO, che è la scoperta
+  del cantiere e l'ha detta una prova, non la rilettura: un link di
+  Meet fa 36 caratteri, cioè starebbe sotto la soglia — ma nel piatto
+  lo prenderebbe il `break-all` delle cifre, che per un PIN è giusto e
+  su un indirizzo taglia a metà parola. Un indirizzo non si batte a un
+  banco: si legge intero e si copia.
+  IL BLOCCO NON È UN BOTTONE, ed è la differenza da non uniformare:
+  toccare cinquecento caratteri per copiarli tutti non è il gesto che
+  uno vuole — lì si vuole SELEZIONARE una riga — quindi selezione
+  libera e «📋 Copia tutto» sotto. Font di LETTURA e non monospazio
+  (il mono distingue 0 da O su un PIN, su mezza pagina di prosa è il
+  font peggiore), INCHIOSTRO e non `--muted` (è il bene comprato, non
+  una nota di servizio), `overflow-wrap:anywhere` e MAI `break-all`.
+  Niente anello: `.codice-svelato` dice «il codice è comparso QUI», e
+  attorno a un blocco alto non direbbe niente. Contrasti misurati:
+  13,55 di giorno e 14,14 di sera.
+  NIENTE CLAMP e niente «mostra tutto», dichiarato: il tetto è 4000
+  caratteri, il caso vero è 500 (~12 righe) e la pagina scorre da sé —
+  uno scroll interno dentro una pagina che scorre è un difetto già
+  pagato. Sopra ~1500 caratteri il pannello diventa lungo: il clamp si
+  aggiunge se qualcuno vedrà un contenuto lungo davvero.
+  3) LA FOTO NEL CONTENUTO — un buono cartaceo si riscatta col codice
+  a barre — È DECISA E NON COSTRUITA (decisione di Andrea): sarà un
+  ALLEGATO al testo, che resta obbligatorio, quindi il percorso della
+  RICEVUTA non si tocca. Il quadro, per chi la costruirà: cartella sua
+  (`contenuti/`, mai `foto/` che è pubblica per costruzione, mai
+  `buste/` che è un'altra famiglia), nome imprevedibile, byte cifrati
+  con `_cifra_blob`, il tipo dai BYTE con `FIRME_DOC_BUSTA`; la
+  leggono le due parti **e il moderatore in disputa** (la regola del
+  TESTO, non quella della busta), col gate in più che **il compratore
+  la vede solo dopo la rivelazione** — il codice a barre È il bene, e
+  sbirciarlo da una porta di servizio salterebbe la ricevuta; al
+  moderatore in disputa il FATTO «(con un'immagine allegata)», come
+  per la busta; e alla chiusura il file RESTA, come il testo, che è la
+  prova in disputa e la ricevuta di chi ha comprato.
+  ⚠️ E IL QUADRO HA FATTO EMERGERE UN LIMITE: `consegna_digitale`
+  accetta solo `stato='locked'`, quindi una volta consegnato il
+  contenuto NON si corregge più — a differenza della busta, che si
+  corregge fino a `dispute`. È giusto (la rivelazione è una ricevuta
+  su un contenuto fotografato, e correggerlo dopo romperebbe la prova
+  in disputa) e vuol dire che **una foto sbagliata non si sostituisce**:
+  nessuna correzione, e lo dirà il form.
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
@@ -13484,6 +13588,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   E L'ATTESA NON PARLA PIÙ DI SATS: l'attesa di serie dice «Invio sats
   in corso…», che su una LETTURA è falso — qui non si muove un sat, e
   il pannello lo ripete due righe più giù.
+  LA REGOLA DEL RIDISEGNO È UNA FRASE (ago 2026, col cantiere del
+  contenuto digitale, che ha ereditato questa cura e ha dovuto
+  spaccarla in due): **si ridisegna in place quando il fatto vive
+  DENTRO il pannello, si riapre con l'ANCORA quando il fatto ne
+  esce.** La busta è il primo caso e basta a sé — aprirla non cambia
+  niente fuori dal suo riquadro; la rivelazione del contenuto
+  digitale è il secondo, e il solo pannello direbbe il falso proprio
+  dove conta (vedi «IL CONTENUTO SI LEGGE DOVE COMPARE»).
   E ASPETTA PRIMA DI FARSI VEDERE (ago 2026, dal campo: il barattolino
   compariva e spariva, e un segnale più corto di un battito di ciglia
   si legge come un guasto invece che come un'attesa). MISURATO prima
