@@ -91,6 +91,26 @@ async def _muta(*a, **k):
     return None
 
 
+# Il pagamento in USCITA: di serie non parte (nessun Lightning
+# address, nessuna invoice depositata) — e' lo stato normale, e i
+# giri che vogliono il rimborso riuscito accendono ESITO[0].
+ESITO = ["non_pagato"]
+
+
+async def _finta_uscita(bolt11, atteso_sats):
+    """Il gemello di `paga_venditore`. Prende `atteso_sats` senza
+    default come l'originale: se un domani la cintura sparisse dal
+    chiamante, qui esploderebbe invece di pagare a caso."""
+    USCITE.append((bolt11, atteso_sats))
+    return ESITO[0]
+
+
+async def _finto_address(indirizzo, sats):
+    return f"lnbc-da-{indirizzo}-{sats}"
+
+
+server.paga_venditore = _finta_uscita
+server.invoice_da_ln_address = _finto_address
 server.crea_invoice_escrow = _finta_invoice
 server.invoice_pagata = _finta_pagata
 server.notifica = _muta
@@ -325,6 +345,92 @@ def main():
         con.close()
     prova("...e la ronda tace anche dopo la fusione", [], rotti2)
 
+    print("\n[il rimborso del moderatore]")
+    utente(6, "ff88")
+    come(6)
+    r7 = asyncio.run(server.sblocca_banner(None, "", ""))
+    paga(r7["payment_hash"])
+    asyncio.run(server.verifica_pagamento_sblocco(r7["pagamento_id"],
+                                                  "", ""))
+    pid = r7["pagamento_id"]
+    prova("la porta e' aperta prima del rimborso", True,
+          (campo(6, "banner_sbloccato_il") or 0) > 0)
+    # il banner c'e' ed e' in vetrina: il rimborso deve spegnerlo
+    con = db()
+    con.execute("UPDATE utenti SET banner_stato='attivo', "
+                "banner_foto='ban_x.jpg' WHERE tg_id=6")
+    con.commit()
+    con.close()
+
+    # --- il rimborso che NON parte: la porta non si tocca --------
+    # E' il caso in cui sbagliare costa di piu': chiudere la porta
+    # per un rimborso mai partito toglie il diritto senza
+    # restituire i sats.
+    ESITO[0] = server.NON_PAGATO
+    quante = len(USCITE)
+    esito = asyncio.run(server._rimborsa_sblocco(pid, 999))
+    prova("il rimborso non riuscito lo dice", False, esito["ok"])
+    prova("...e la porta resta APERTA", True,
+          (campo(6, "banner_sbloccato_il") or 0) > 0)
+    prova("...e il pagamento resta 'pagato'", "pagato",
+          db().execute("SELECT stato FROM pagamenti WHERE id=?",
+                       (pid,)).fetchone()["stato"])
+    prova("...e nessun sat e' uscito", quante, len(USCITE))
+
+    # --- con un Lightning address il rimborso parte --------------
+    con = db()
+    con.execute("UPDATE utenti SET ln_address='chi@wallet.it' "
+                "WHERE tg_id=6")
+    con.commit()
+    con.close()
+    ESITO[0] = server.PAGATO
+    esito = asyncio.run(server._rimborsa_sblocco(pid, 999))
+    prova("il rimborso riesce", True, esito["ok"])
+    prova("...e paga ESATTAMENTE i sats incassati", 10_000,
+          USCITE[-1][1])
+    prova("...il pagamento diventa 'rimborsato'", "rimborsato",
+          db().execute("SELECT stato FROM pagamenti WHERE id=?",
+                       (pid,)).fetchone()["stato"])
+    prova("...la porta si richiude", 0,
+          campo(6, "banner_sbloccato_il"))
+    prova("...e l'insegna esce dalla vetrina", "spento",
+          campo(6, "banner_stato"))
+    prova("...e resta scritto CHI ha deciso", 999,
+          db().execute("SELECT rimborso_da FROM pagamenti WHERE id=?",
+                       (pid,)).fetchone()["rimborso_da"])
+
+    # --- il secondo giro non paga due volte ----------------------
+    quante = len(USCITE)
+    esito = asyncio.run(server._rimborsa_sblocco(pid, 999))
+    prova("il secondo rimborso esce a mani vuote", "rimborsato",
+          esito["stato"])
+    prova("...senza far uscire un altro sat", quante, len(USCITE))
+
+    # --- e la porta si puo' ricomprare ---------------------------
+    r8 = asyncio.run(server.sblocca_banner(None, "", ""))
+    prova("dopo il rimborso si puo' pagare di nuovo", True,
+          bool(r8.get("invoice")))
+    asyncio.run(server.annulla_pagamento_sblocco(r8["pagamento_id"],
+                                                 "", ""))
+
+    # --- chi ha ANCHE il livello tiene la porta ------------------
+    # il rimborso disfa il PAGAMENTO, non i diritti guadagnati: a
+    # dirlo e' il giudice, che e' un OR e non sa niente del
+    # rimborso.
+    prova("chi ha il livello tiene la porta anche da rimborsato",
+          True,
+          server.banner_porta_aperta(9000, 40, server.BANNER_LIVELLO,
+                                     0))
+
+    rotti3 = []
+    for nome, perche, sql in server.CONTROLLI_LIBRO_MASTRO:
+        con = db()
+        if con.execute(sql).fetchall():
+            rotti3.append(nome)
+        con.close()
+    prova("...e la ronda tace anche dopo il rimborso", [], rotti3)
+    ESITO[0] = "non_pagato"
+
     print("\n[la regressione: chi ha il livello]")
     come(2)
     prova("non gli si offre di pagare", 0,
@@ -332,7 +438,15 @@ def main():
                        ).fetchone()["n"])
     prova("...e la sua porta non e' mai stata sbloccata a pagamento", 0,
           campo(2, "banner_sbloccato_il"))
-    prova("nessun sat e' uscito da nessuna parte", [], USCITE)
+    # QUESTA ASSERZIONE HA CAMBIATO LATO col rimborso, ed e' il
+    # verso giusto: diceva «nessun sat e' uscito» quando il cantiere
+    # non aveva NESSUNA strada d'uscita, e cancellarla avrebbe tolto
+    # la sola riga che sorveglia le uscite inattese. Adesso dice che
+    # l'unica uscita e' quella chiesta da un moderatore, per
+    # l'importo esatto: incassare non fa uscire un sat da nessuna
+    # parte, e a farne uscire uno e' solo un gesto di una persona.
+    prova("l'unico sat uscito e' il rimborso, e all'importo esatto",
+          [10_000], [q for _, q in USCITE])
 
     print(f"\n=== {VERDI[0]} verdi, {ROSSE[0]} rotte ===")
     return 1 if ROSSE[0] else 0

@@ -12123,6 +12123,14 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
         "  COALESCE(a.titolo, '') AS titolo "
         "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.payout_stato='incerto' "
+        "UNION ALL "
+        # il terzo tipo: il rimborso di uno sblocco. Non ha un
+        # annuncio (la porta e' dell'UTENTE), quindi il titolo dice
+        # cos'e' — chi modera guarda una lista sola.
+        "SELECT 'sblocco' AS tipo, p.id, p.payout_hash, p.aggiornato, "
+        "  p.stato, p.importo_sats AS importo, "
+        "  'sblocco banner' AS titolo "
+        "FROM pagamenti p WHERE p.payout_stato='incerto' "
         "ORDER BY aggiornato ASC")]
     con.close()
     return righe
@@ -12149,10 +12157,11 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     d = await leggi_json(req)
     tipo, riga_id = d.get("tipo", ""), int(d.get("id") or 0)
     esito = d.get("esito", "")
-    if tipo not in ("ordine", "rimborso") or esito not in ("uscito",
-                                                           "non_uscito"):
+    if tipo not in ("ordine", "rimborso", "sblocco") or esito not in (
+            "uscito", "non_uscito"):
         raise HTTPException(400, "Decisione non valida")
-    tabella = "ordini" if tipo == "ordine" else "rimborsi_asta"
+    tabella = {"ordine": "ordini", "rimborso": "rimborsi_asta",
+               "sblocco": "pagamenti"}[tipo]
     con = db()
     cur = con.execute(
         f"UPDATE {tabella} SET payout_stato=?, aggiornato=? "
@@ -12169,6 +12178,11 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     # Quale delle due strade dipende da chi aspettava i sats.
     if tipo == "rimborso":
         return await _paga_rimborso(riga_id)
+    if tipo == "sblocco":
+        # il timbro 'uscito' e' gia' scritto: la funzione lo vede,
+        # NON paga di nuovo e va dritta alla chiusura — contatori,
+        # notifiche e stato finale restano in un posto solo.
+        return await _rimborsa_sblocco(riga_id, user["id"])
     con = db()
     o = con.execute("SELECT payout_verso FROM ordini WHERE id=?",
                     (riga_id,)).fetchone()
@@ -12181,6 +12195,54 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     if o["payout_verso"] == "compratore":
         return await _rimborsa_compratore(riga_id)
     return await _sblocca_sats(riga_id)
+
+
+@app.post("/api/admin/pagamenti/{pagamento_id}/rimborsa")
+async def rimborsa_sblocco_admin(pagamento_id: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: restituisce i sats di uno sblocco.
+
+    Il 403 sta PRIMA di leggere il body, che e' il patto del
+    messaggio ai singoli utenti: chi non modera non deve nemmeno
+    poter far leggere al server quel che ha scritto.
+
+    La `invoice` nel body e' FACOLTATIVA e serve al caso in cui il
+    venditore non abbia un Lightning address: si deposita e la
+    cascata la usa. Dev'essere di ESATTAMENTE l'importo incassato —
+    a dirlo non e' questa rotta ma la cintura di `paga_venditore`,
+    che la eredita per costruzione."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    bolt11 = (d.get("invoice") or "").strip()
+    if bolt11:
+        con = db()
+        cur = con.execute(
+            "UPDATE pagamenti SET invoice_rimborso=? WHERE id=? "
+            "AND stato='pagato'", (bolt11, pagamento_id))
+        con.commit()
+        con.close()
+        if cur.rowcount == 0:
+            raise HTTPException(400, "Questo pagamento non è in "
+                                     "stato «pagato»")
+    esito = await _rimborsa_sblocco(pagamento_id, user["id"])
+    if not esito.get("ok"):
+        if esito.get("incerto"):
+            raise HTTPException(409, "Questo pagamento è congelato: "
+                                     "decidilo dalla coda «🧊 "
+                                     "Pagamenti da verificare»")
+        if esito.get("stato") == "rimborsato":
+            raise HTTPException(409, "Era già stato rimborsato")
+        if esito.get("stato") != "pagato":
+            raise HTTPException(400, "Questo pagamento non è in "
+                                     "stato «pagato»")
+        raise HTTPException(502, "Il rimborso non è partito: serve "
+                                 "una invoice dell'importo esatto, "
+                                 "o un Lightning address sul suo "
+                                 "profilo")
+    return esito
 
 
 # --- La coda degli ordini fermi (ago 2026) ---------------------------
@@ -22320,6 +22382,124 @@ async def _incassa_sblocco(pagamento_id: int) -> dict:
     except Exception as e:
         print(f"⚠️ Polso dello sblocco non partito: {e}")
     return {"stato": "pagato"}
+
+
+# --- Il rimborso dello sblocco (ago 2026) ---------------------------
+# NESSUN RIMBORSO E' MAI DOVUTO, ed e' scritto nella conferma che il
+# venditore tocca: quello che compra e' la PORTA, non il banner —
+# se l'insegna viene rifiutata ne carica un'altra, e i sats restano
+# nostri. Ma un moderatore deve poterlo fare lo stesso (decisione di
+# Andrea): un incasso senza una strada indietro e' un incasso che
+# nessuno puo' correggere quando la ragione c'e' davvero — un
+# doppio pagamento sfuggito alle guardie, uno sblocco venduto e poi
+# spento da noi. Mai automatico, sempre un gesto di una persona.
+_lucchetti_sblocco = defaultdict(asyncio.Lock)
+
+
+async def _rimborsa_sblocco(pagamento_id: int,
+                            moderatore_id: int = 0) -> dict:
+    """Il calco di `_paga_rimborso`, e le tre righe che condivide
+    con lui sono quelle che contano: lock per riga (mai due uscite
+    in parallelo), guardia sullo stato (chi arriva a cose fatte esce
+    a mani vuote) e guardia sul congelamento — su INCERTO non si
+    ritenta MAI da soli, che e' il patto di `_sblocca_sats`.
+
+    LA CINTURA DELL'IMPORTO SI EREDITA: `paga_venditore` vuole
+    `atteso_sats` obbligatorio e senza default, quindi anche questa
+    strada d'uscita — che nasce oggi — non puo' far uscire una cifra
+    diversa da quella incassata. E' esattamente cio' per cui quel
+    parametro e' senza default.
+
+    E IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea): i
+    sats tornano, la porta si chiude e il banner si spegne. Se il
+    venditore ha ANCHE il livello la porta resta aperta da li', ed e'
+    giusto: si disfa il pagamento, non i diritti guadagnati — e a
+    dirlo e' il giudice, che e' un OR e non sa niente di questa
+    funzione."""
+    async with _lucchetti_sblocco[pagamento_id]:
+        con = db()
+        p = con.execute("SELECT * FROM pagamenti WHERE id=?",
+                        (pagamento_id,)).fetchone()
+        if not p:
+            con.close()
+            return {"ok": False, "stato": "?"}
+        if p["stato"] != "pagato":
+            con.close()
+            return {"ok": p["stato"] == "rimborsato",
+                    "stato": p["stato"]}
+        if p["payout_stato"] == "incerto":
+            con.close()
+            return {"ok": False, "stato": p["stato"], "incerto": True}
+        u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (p["tg_id"],)).fetchone()
+        importo = p["importo_sats"]      # integrale, al sat
+        bolt11 = ""
+        if p["payout_stato"] != "uscito":
+            bolt11 = p["invoice_rimborso"]
+            if not bolt11 and u and u["ln_address"]:
+                bolt11 = await invoice_da_ln_address(u["ln_address"],
+                                                     importo)
+        esito = (PAGATO if p["payout_stato"] == "uscito"
+                 else await paga_venditore(bolt11, importo) if bolt11
+                 else NON_PAGATO)
+        if esito == INCERTO:
+            await _congela_pagamento(
+                con, "pagamenti", pagamento_id, bolt11, "pagante",
+                f"Rimborso dello sblocco banner #{pagamento_id} "
+                f"a #{p['tg_id']}: "
+                f"<b>{_fmt_sats(importo)} sats</b>.")
+            return {"ok": False, "stato": p["stato"], "incerto": True}
+
+        adesso = int(time.time())
+        if esito == PAGATO:
+            con.execute(
+                "UPDATE pagamenti SET stato='rimborsato', "
+                "rimborso_il=?, rimborso_da=?, aggiornato=? "
+                "WHERE id=? AND stato='pagato'",
+                (adesso, moderatore_id, adesso, pagamento_id))
+            # la porta si richiude e l'insegna si spegne, nella
+            # stessa transazione dei sats restituiti: un gesto solo
+            con.execute("UPDATE utenti SET banner_sbloccato_il=0 "
+                        "WHERE tg_id=?", (p["tg_id"],))
+            con.execute(
+                "UPDATE utenti SET banner_stato='spento' "
+                "WHERE tg_id=? AND banner_stato IN "
+                "('attivo','revisione')", (p["tg_id"],))
+            con.commit()
+            con.close()
+            registra_moderazione("admin", "rimborso_sblocco",
+                                 f"pagamento #{pagamento_id}, "
+                                 f"{_fmt_sats(importo)} sats",
+                                 venditore_id=p["tg_id"],
+                                 deciso_da=moderatore_id)
+            await notifica(
+                p["tg_id"],
+                f"↩️ <b>Sblocco rimborsato:</b> "
+                f"{_fmt_sats(importo)} sats stanno tornando sul tuo "
+                "wallet. ⚡\n\nLa porta del banner si richiude e "
+                "l'insegna esce dalla vetrina. Se pensi che sia un "
+                "errore, scrivici.")
+            return {"ok": True, "stato": "rimborsato"}
+
+        # NON pagato: la invoice depositata si azzera e lo stato
+        # RESTA 'pagato' — la porta non si tocca finche' i sats non
+        # sono tornati davvero. Mai chiudere una porta gia' pagata
+        # per un rimborso che non e' partito.
+        con.execute("UPDATE pagamenti SET invoice_rimborso='', "
+                    "aggiornato=? WHERE id=?", (adesso, pagamento_id))
+        con.commit()
+        con.close()
+        try:
+            await notifica_admin(
+                f"⚠️ <b>Rimborso dello sblocco non riuscito</b> "
+                f"(pagamento #{pagamento_id}, "
+                f"{_fmt_sats(importo)} sats): il pagamento automatico "
+                "non è partito. Serve una invoice di esattamente "
+                "quell'importo, oppure il venditore deve mettere un "
+                "Lightning address nel Profilo.")
+        except Exception as e:
+            print(f"⚠️ Avviso del rimborso non partito: {e}")
+        return {"ok": False, "stato": "pagato"}
 
 
 async def avvisa_banner(tg_id: int):

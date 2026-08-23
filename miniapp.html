@@ -22897,6 +22897,22 @@ async function loadAdminStats(){
         </div>
         <div id="admUtenteEsiti"></div>
       </div>
+      <!-- IL RIMBORSO DI UNO SBLOCCO (ago 2026). Nessun rimborso e'
+           mai dovuto — quello che si compra e' la PORTA, non il
+           banner, e la conferma lo dice prima di pagare — ma un
+           incasso senza una strada indietro e' un incasso che
+           nessuno puo' correggere il giorno che la ragione c'e'
+           davvero. Per NUMERO come l'ordine, e il numero il
+           moderatore ce l'ha: sta nell'avviso «Sblocco banner
+           pagato» che gli arriva all'incasso. -->
+      <div style="margin-top:14px">
+        <div class="section-label">↩︎ Rimborsa uno sblocco</div>
+        <div class="sub" style="margin-top:6px">I sats tornano indietro, la porta si richiude e l'insegna esce dalla vetrina. Il numero è nell'avviso «Sblocco banner pagato».</div>
+        <div class="filtri-riga" style="margin-top:8px">
+          <input id="admSbloccoId" type="number" inputmode="numeric" placeholder="Numero del pagamento">
+          <button class="btn ghost" onclick="chiediRimborsoSblocco()">Rimborsa</button>
+        </div>
+      </div>
       ${boxLeve(leve)}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
@@ -22919,6 +22935,39 @@ async function apriOrdinePerId(numero){
     await loadOrders(id); renderOrders();
     if (!orders.find(o=>o.id===id)) { toast(`L'ordine #${id} non esiste`); return; }
     openOrder(id);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* Il rimborso di uno sblocco, dal moderatore. Chiede prima, perche'
+   e' l'unico gesto del pannello che fa USCIRE dei sats — e dice le
+   due cose che non si disfano da sole: i sats partono, e la porta
+   che quel venditore aveva pagato si richiude. Il foglio e' quello
+   unico di casa, mai un confirm() di sistema. */
+function chiediRimborsoSblocco(){
+  const id = +(el('admSbloccoId')?.value || 0);
+  if (!id) { toast('Scrivi il numero del pagamento'); return; }
+  chiediConferma({
+    titolo: 'Rimborsare lo sblocco?',
+    corpo: `I sats del pagamento #${id} tornano al venditore, la `
+      + 'porta del banner si richiude e l\'insegna esce dalla '
+      + 'vetrina. Se ha anche il livello, la porta gli resta aperta '
+      + 'da lì.',
+    etichetta: 'Rimborsa',
+    poi: () => rimborsaSblocco(id) });
+}
+
+async function rimborsaSblocco(id){
+  const b = event?.target;
+  try {
+    const r = await fetch(`${API_BASE}/admin/pagamenti/${id}/rimborsa`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),
+                               'Content-Type':'application/json'},
+       body: JSON.stringify({})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Rimborso non riuscito', 7000); return; }
+    toast('↩︎ Rimborsato: i sats stanno tornando');
+    loadAdminStats();   /* la lista si rifa': quel
+       pagamento non e' piu' rimborsabile */
   } catch(e) { toast('Rete assente: riprova'); }
 }
 

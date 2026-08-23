@@ -2544,10 +2544,17 @@ def prove_pagamento_incerto():
     # come successo, senza che nessuna prova funzionale si rompa.
     prova("sentinella: paga_venditore non si legge come booleano", [],
           re.findall(r"(?:and|not|if) await paga_venditore\(", _SORGENTE))
-    prova("sentinella: tutt'e tre le uscite guardano l'INCERTO", 3,
-          _SORGENTE.count("esito == INCERTO"))
-    prova("sentinella: tutt'e tre si fermano se sono congelate", 3,
-          _SORGENTE.count('payout_stato"] == "incerto"'))
+    # QUATTRO dall'ago 2026: la quarta e' `_rimborsa_sblocco`, il
+    # rimborso del primo incasso nostro. Il conto cresce A MANO,
+    # come il censimento delle leve-lista, ed e' il verso giusto:
+    # una strada d'uscita NUOVA che non guardasse l'INCERTO
+    # leggerebbe «non lo sappiamo» come «e' andata bene», e i sats
+    # uscirebbero due volte. Se questo numero CALA, qualcuno ha
+    # tolto una guardia.
+    prova("sentinella: tutt'e quattro le uscite guardano l'INCERTO",
+          4, _SORGENTE.count("esito == INCERTO"))
+    prova("sentinella: tutt'e quattro si fermano se sono congelate",
+          4, _SORGENTE.count('payout_stato"] == "incerto"'))
     prova("sentinella: il congelamento scrive CHI aspettava i sats",
           True, "payout_verso=?" in pezzo("_congela_pagamento"))
     # e la coda admin non deve indovinare la strada dallo stato
@@ -18909,8 +18916,47 @@ def prove_fogli_di_casa():
     # degli undici che chiede prima di MUOVERE DEI SATS: per questo
     # il suo corpo deve dire le due cose che non si disfano — si paga
     # una volta sola, e un banner rifiutato non li restituisce.
-    prova("i gesti che passano dalla domanda unica sono undici", 11,
+    # DODICI col rimborso di uno sblocco, che e' il secondo dei dodici
+    # a muovere dei sats — e l'unico che li fa USCIRE: per questo il
+    # suo corpo dice le due cose che non si disfano da sole, i sats
+    # che partono e la porta gia' pagata che si richiude.
+    prova("i gesti che passano dalla domanda unica sono dodici", 12,
           solo_codice(mini).count("chiediConferma({"))
+    # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
+    # la quale il foglio si apre, si legge e NON FA NIENTE — il
+    # bottone chiude e basta. Non e' teorico: e' successo scrivendo
+    # il rimborso dello sblocco (`azione:` invece di `poi:`), e a
+    # trovarlo e' stato il giro dal vivo, perche' il conteggio qui
+    # sopra passava liscio. `chiediConferma` legge `c.poi`, e su un
+    # AVVISO — la conferma degenere, un bottone solo — l'azione e'
+    # un niente che chiude, quindi vale il permesso esplicito.
+    _cod = solo_codice(mini)
+
+    def _blocco(da):
+        """Il literal della chiamata, a graffe BILANCIATE: una
+        finestra a caratteri fissi taglia i corpi lunghi e fa
+        gridare al lupo su chiamanti sani (provato: ne accusava
+        cinque su dodici)."""
+        i = _cod.index('{', da)
+        d, j = 0, i
+        while j < len(_cod):
+            if _cod[j] == '{':
+                d += 1
+            elif _cod[j] == '}':
+                d -= 1
+                if d == 0:
+                    return _cod[i:j + 1]
+            j += 1
+        return _cod[i:]
+
+    _muti, _da = [], 0
+    while (_da := _cod.find("chiediConferma({", _da)) >= 0:
+        _b = _blocco(_da)
+        if "poi:" not in _b and "avviso:" not in _b:
+            _muti.append(_b[:70].replace("\r\n", " "))
+        _da += 1
+    prova("...e ognuno porta la sua azione (o e' un avviso)", [],
+          _muti)
     _sbl = fetta("function chiediSblocco(", "async function sbloccaBanner")
     prova("...e quello dello sblocco dice che si paga una volta sola",
           True, "una volta sola" in _sbl)
@@ -25413,6 +25459,69 @@ def prove_banner_negozio():
     prova("chi ha pagato non puo' pagare due volte", True, _due)
     prova("...e la fattura resta una sola", 1, len(fatture))
     con2.close()
+
+
+    # --- IL RIMBORSO DEL MODERATORE ------------------------------
+    # Nessun rimborso e' mai dovuto (lo dice la conferma prima di
+    # pagare), ma la strada indietro deve esistere: un incasso che
+    # nessuno puo' correggere e' un incasso che il giorno dello
+    # sbaglio vero resta li'. Qui le sentinelle sulla FORMA; il
+    # giro vero — porta chiusa, banner spento, i sats che tornano —
+    # sta in `collaudo_sblocco_banner.py`, che lo fa girare.
+    print("\n[il rimborso dello sblocco]")
+    _rim = pezzo("_rimborsa_sblocco")
+    prova("il rimborso ha il suo lucchetto: mai due uscite in "
+          "parallelo", True,
+          "_lucchetti_sblocco[pagamento_id]" in _rim)
+    prova("...e non ritenta su un pagamento congelato", True,
+          'payout_stato"] == "incerto"' in _rim)
+    prova("...e su INCERTO congela invece di indovinare", True,
+          "esito == INCERTO" in _rim
+          and '"pagamenti", pagamento_id' in _rim)
+    # LA CINTURA SI EREDITA: `paga_venditore` vuole l'atteso senza
+    # default, quindi nemmeno la strada d'uscita nata oggi puo' far
+    # partire una cifra diversa da quella incassata.
+    prova("...e paga esattamente l'importo incassato", True,
+          "paga_venditore(bolt11, importo)" in _rim
+          and "importo = p[\"importo_sats\"]" in _rim)
+    # IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea), e
+    # nella STESSA transazione dei sats restituiti.
+    _ok = _rim[_rim.index("if esito == PAGATO:"):
+               _rim.index("# NON pagato")]
+    prova("il rimborso richiude la porta e spegne l'insegna", True,
+          "banner_sbloccato_il=0" in _ok
+          and "banner_stato='spento'" in _ok)
+    # ...E IL RAMO CHE NON PAGA NON TOCCA NIENTE: chiudere una
+    # porta gia' pagata per un rimborso che non e' partito
+    # toglierebbe il diritto senza restituire i sats — il modo
+    # peggiore di sbagliare qui.
+    _no = _rim[_rim.index("# NON pagato"):]
+    prova("...mentre il rimborso fallito lascia la porta aperta",
+          True,
+          "banner_sbloccato_il" not in _no
+          and "invoice_rimborso=''" in _no)
+    # il moderatore resta scritto nel registro, come ogni sua
+    # decisione: chi ha rimborsato, quanto, e su quale pagamento
+    prova("...e chi ha deciso resta nel registro", True,
+          'registra_moderazione("admin", "rimborso_sblocco"' in _rim
+          and "deciso_da=moderatore_id" in _rim)
+    # L'ENDPOINT: il 403 PRIMA di leggere il body — il patto del
+    # messaggio ai singoli utenti.
+    _ep = pezzo("rimborsa_sblocco_admin")
+    prova("l'endpoint del rimborso e' dei soli moderatori", True,
+          _ep.index("e_admin") < _ep.index("leggi_json"))
+    # LA CODA 🧊 CONOSCE IL TERZO TIPO, o un rimborso congelato non
+    # comparirebbe in nessuna lista e resterebbe li' per sempre.
+    _coda = pezzo("coda_pagamenti")
+    prova("la coda dei congelati ha anche gli sblocchi", True,
+          "'sblocco' AS tipo" in _coda
+          and "FROM pagamenti p WHERE p.payout_stato='incerto'"
+          in _coda)
+    _dec = pezzo("decidi_pagamento")
+    prova("...e la decisione sa dove mandarlo", True,
+          '"sblocco": "pagamenti"' in _dec
+          and "_rimborsa_sblocco(riga_id, user[\"id\"])" in _dec)
+
 
 
 def prove_connettori():
