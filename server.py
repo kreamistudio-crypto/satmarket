@@ -29282,6 +29282,383 @@ async def ricategorizza_automatico():
         print(f"⚠️ Ricategorizzazione automatica saltata: {e}")
 
 
+# --- I CONNETTORI DEL NEGOZIO (ago 2026) -----------------------------
+# Chi ha gia' un e-commerce collega il catalogo dal Profilo e i suoi
+# prodotti compaiono qui. La fonte di verita' sta FUORI, come per
+# Nostr; il mestiere di leggerla e tenerla in pari vive in
+# `importa_negozio.py`, che e' puro apposta. Qui c'e' quel che ha
+# bisogno delle guardie: il trasporto HTTP, la moderazione, il giro.
+#
+# LA LEVA NASCE FALSE NEL CODICE, come IMPORT_NOSTR_APERTO e per la
+# stessa ragione: importare cataloghi altrui e mandare notifiche non
+# deve poter cominciare come EFFETTO COLLATERALE di un deploy — il
+# config del VPS non ha la chiave, quindi con un default True
+# basterebbe un `git pull` e un riavvio. Si accende con un gesto,
+# guardando il primo giro col journal aperto, ed e' anche
+# l'interruttore d'emergenza.
+try:
+    from config import CONNETTORI_NEGOZIO_APERTI
+except ImportError:
+    CONNETTORI_NEGOZIO_APERTI = False
+
+SECONDI_SYNC_CONNETTORI = 3600
+_prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
+
+# Quanti prodotti leggere per connettore per giro. Il target
+# dichiarato (200 articoli) passa tutto in un giro; un catalogo enorme
+# si digerisce in piu' tornate invece di tenere in ostaggio l'orologio,
+# e il report lo dice al venditore.
+MAX_PRODOTTI_CONNETTORE = 200
+
+# Shopify concede 2 richieste al secondo sulla REST: fra una pagina e
+# l'altra si respira.
+PAUSA_PAGINE_SHOPIFY = 0.6
+
+# Dopo quanti giri falliti di fila il collegamento si dichiara rotto e
+# il venditore riceve UN avviso. Cinque ore di silenzio sono un
+# problema vero; un negozio che non risponde per mezz'ora no.
+CONNETTORI_ERRORI_MAX = 5
+
+
+def url_api_ammesso(url: str) -> bool:
+    """Il guardiano delle chiamate alle API di un negozio.
+
+    E' `url_foto_ammesso` con DUE strette in piu', e non una copia: la
+    regola sull'host — risolto davvero, e mai su indirizzi privati,
+    loopback o link-local — vive in un posto solo, o le due divergono
+    al primo ritocco.
+    Le strette: solo `https` (le chiavi Woo viaggiano in basic auth,
+    e su http sarebbero un token regalato a chiunque stia sulla
+    strada) e nessuna porta diversa dalla 443. Serve soprattutto a
+    WooCommerce, dove l'indirizzo lo scrive l'utente e puo' essere
+    qualunque cosa; per Shopify il dominio si normalizza al
+    collegamento, e questo resta la cintura."""
+    try:
+        p = urlparse(url)
+        if p.scheme != "https" or p.port not in (None, 443):
+            return False
+    except ValueError:
+        return False
+    return url_foto_ammesso(url)
+
+
+class _NienteRedirect(urllib.request.HTTPRedirectHandler):
+    """Su un'API un redirect NON e' un salto da seguire: e' un errore.
+    Piu' severo delle foto — la' il redirect si controlla e si segue,
+    perche' i CDN delle immagini ne vivono — perche' qui in mano
+    abbiamo il token di un negozio, e seguire un Location scritto da
+    chi risponde vorrebbe dire consegnarlo a un indirizzo che non
+    abbiamo mai giudicato."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(
+            newurl, code, "l'API ha risposto con un redirect", headers, fp)
+
+
+_APRITORE_API = urllib.request.build_opener(_NienteRedirect)
+
+# Il tetto sulla risposta: una pagina di catalogo con 250 prodotti sta
+# largamente sotto, e oltre non e' piu' un catalogo.
+TETTO_RISPOSTA_API = 5_000_000
+
+
+def chiama_api_negozio(metodo: str, url: str,
+                       intestazioni: dict) -> tuple[int, dict, dict]:
+    """L'UNICO tubo verso il negozio di un venditore. Torna
+    `(stato, json, intestazioni)`; ALZA su rete morta, redirect,
+    risposta illeggibile o indirizzo non ammesso.
+
+    Alza e non torna vuoto, ed e' la riga da non ammorbidire: chi
+    chiama distingue «il catalogo e' vuoto» da «il catalogo non si e'
+    potuto leggere», e confondere le due cose spegnerebbe la vetrina
+    di quel venditore al primo singhiozzo di rete.
+
+    NELLE ECCEZIONI E NEI LOG NON FINISCONO MAI LE CREDENZIALI: si
+    dice lo stato e un pezzo di corpo, mai le intestazioni — un token
+    in un journal e' un token pubblico.
+
+    Sincrona: va chiamata in asyncio.to_thread."""
+    if not url_api_ammesso(url):
+        raise RuntimeError("indirizzo non ammesso")
+    req = urllib.request.Request(url, method=metodo, headers={
+        "User-Agent": "Barattolo/1.0", "Accept": "application/json",
+        **(intestazioni or {})})
+    try:
+        with _APRITORE_API.open(req, timeout=15) as r:
+            raw = r.read(TETTO_RISPOSTA_API + 1)
+            testa = dict(r.headers.items())
+            stato = r.status
+    except urllib.error.HTTPError as e:
+        # un 4xx e' una risposta, non un guasto: il chiamante la legge
+        # (401 = token sbagliato, 404 = negozio inesistente) e la
+        # racconta al venditore con parole sue
+        corpo = b""
+        try:
+            corpo = e.read(4000)
+        except Exception:
+            pass
+        return e.code, _json_o_niente(corpo), dict(e.headers.items() or {})
+    if len(raw) > TETTO_RISPOSTA_API:
+        raise RuntimeError("risposta troppo grande")
+    return stato, _json_o_niente(raw), testa
+
+
+def _json_o_niente(raw: bytes) -> dict:
+    try:
+        letto = json.loads(raw.decode("utf-8", "replace") or "{}")
+    except Exception:
+        return {}
+    return letto if isinstance(letto, dict) else {"lista": letto}
+
+
+def _salva_foto_connettore(annuncio_id: int, indice: int,
+                           url: str) -> str | None:
+    """Lo scaricatore che il modulo riceve: la filiera di casa e non i
+    byte grezzi. `scarica_foto_url` porta le guardie anti-SSRF,
+    `normalizza_foto_import` fa la compressione UNICA e
+    `_salva_una_foto` scrive il pieno e il francobollo — la stessa
+    strada dell'import CSV, che e' quella giusta (l'import Nostr
+    scrive i byte com'erano per una ragione sua: la' i relay sono la
+    fonte di verita' anche sui file)."""
+    preso = scarica_foto_url(url)
+    if not preso:
+        return None
+    raw = normalizza_foto_import(preso[0])
+    if not raw:
+        return None
+    return _salva_una_foto(annuncio_id, indice, raw, int(time.time()))
+
+
+def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:
+    """Divide le righe tradotte in (da giudicare, gia' viste).
+
+    E' `_da_giudicare` con la chiave al posto del tag `d`, e vale la
+    stessa regola: LA MODERAZIONE SI PAGA UNA VOLTA SOLA. Un catalogo
+    da 200 articoli costa dieci chiamate al primo giro e ZERO ai
+    successivi, finche' un testo non cambia — senza questa divisione
+    sarebbero dieci chiamate ogni ora, per farsi ridire la stessa cosa
+    sugli stessi prodotti.
+    Si ri-giudica quando cambia il TESTO e non quando cambia il
+    prodotto: un ritocco al prezzo o allo stock non puo' cambiare un
+    verdetto. E mai cio' che non e' piu' attivo — in revisione aspetta
+    un umano, rimosso e' stato deciso."""
+    con = db()
+    nuove, note = [], []
+    for r in righe:
+        if r.get("saltato_perche"):
+            continue
+        riga = con.execute(
+            "SELECT stato, titolo, descrizione FROM annunci "
+            "WHERE connettore_id=? AND origine_chiave=?",
+            (connettore["id"], r["origine_chiave"])).fetchone()
+        if riga is None:
+            nuove.append(r)                      # mai vista: si giudica
+        elif riga["stato"] != "attivo":
+            note.append(r)                       # gia' decisa, o in attesa
+        elif (riga["titolo"], riga["descrizione"]) == (r["titolo"],
+                                                       r["descrizione"]):
+            note.append(r)                       # identica a ieri
+        else:
+            nuove.append(r)                      # il testo e' cambiato
+    con.close()
+    return nuove, note
+
+
+async def _modera_righe_negozio(righe: list) -> tuple[list, dict]:
+    """I due strati sulle righe nuove. Torna `(ammesse, marchi)`:
+    `marchi` e' `{chiave: motivo}` e fa nascere la riga in revisione.
+
+    Strato 1, le parole: porta chiusa, la riga non entra e resta nel
+    registro. Strato 2, l'AI a lotti: MARCHIO e mai scarto — un dubbio
+    su un catalogo vero e' quasi sempre un falso positivo, e in
+    revisione l'annuncio non e' pubblico comunque (il patto di
+    «l'AI segnala, non decide»)."""
+    ammesse, marchi = [], {}
+    voci = []
+    for r in righe:
+        vietato = controlla_vietato(r["titolo"], r["descrizione"])
+        if vietato:
+            registra_moderazione("parole", "vietato", vietato, r["titolo"])
+            print(f"    ⛔ fermato dal filtro parole: {r['titolo'][:40]}")
+            continue
+        ammesse.append(r)
+        voci.append((len(voci), r["titolo"], r["descrizione"]))
+    if not ammesse:
+        return [], {}
+    # a lotti come l'import CSV: ~20 per chiamata, tre in volo
+    verdetti = {}
+    semaforo = asyncio.Semaphore(PARALLELI_MODERAZIONE)
+
+    async def lotto(fetta, base):
+        async with semaforo:
+            fuori = await moderazione_ai_lotto(fetta)
+        for k, v in (fuori or {}).items():
+            verdetti[base + k] = v
+
+    compiti = []
+    for i in range(0, len(voci), LOTTO_MODERAZIONE):
+        fetta = voci[i:i + LOTTO_MODERAZIONE]
+        compiti.append(lotto([(n - i, t, d) for n, t, d in fetta], i))
+    if compiti:
+        await asyncio.gather(*compiti)
+    for n, (esito, motivo) in verdetti.items():
+        if 0 <= n < len(ammesse):
+            marchi[ammesse[n]["origine_chiave"]] = (esito, motivo)
+    return ammesse, marchi
+
+
+async def sincronizza_connettori():
+    """Il giro dei cataloghi collegati: una volta all'ora, un
+    connettore alla volta, fail-open.
+
+    L'ORDINE DELLE FASI e' quello che tiene onesto il resto —
+    leggi TUTTO, traduci, vaglia, riconcilia — e la prima e' la piu'
+    delicata: le sparizioni si giudicano solo su un catalogo
+    COMPLETO, quindi un errore di rete non deve mai arrivare alla
+    riconciliazione. Per questo `leggi_catalogo_*` alza e qui si esce
+    prima di toccare una riga."""
+    global _prossimo_giro_connettori
+    if not CONNETTORI_NEGOZIO_APERTI:
+        return
+    if time.time() < _prossimo_giro_connettori:
+        return
+    # l'appuntamento PRIMA del tentativo: anche un errore aspetta la
+    # prossima ora, niente tempeste (il patto dell'import Nostr)
+    _prossimo_giro_connettori = time.time() + SECONDI_SYNC_CONNETTORI
+    import importa_negozio
+    con = db()
+    collegati = con.execute(
+        "SELECT * FROM connettori WHERE stato='attivo' ORDER BY id"
+    ).fetchall()
+    con.close()
+    if not collegati:
+        return
+    # il cambio si legge UNA volta per giro e vale per tutti: la
+    # lezione dell'import Nostr, dove dieci venditori erano dieci
+    # letture e dieci conversioni diverse nello stesso giro
+    cambio = cambio_per_import()
+    for riga in collegati:
+        try:
+            await _un_connettore(dict(riga), cambio, importa_negozio)
+        except Exception as e:
+            print(f"⚠️ Connettore #{riga['id']} saltato: {e}")
+
+
+async def _un_connettore(c: dict, cambio: dict, importa_negozio):
+    """Un giro per un collegamento. Le eccezioni le prende il
+    chiamante: qui dentro si distingue solo il fallimento di LETTURA
+    (che si conta, e a soglia dichiara rotto il collegamento) da tutto
+    il resto."""
+    lettore = importa_negozio.LETTORI.get(c["fonte"])
+    if not lettore:
+        return
+    credenziali = json.loads(_decifra_contenuto(c["credenziali"]) or "{}")
+    try:
+        prodotti, avviso = await asyncio.to_thread(
+            lettore, c["url_negozio"], credenziali.get("token", ""),
+            chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
+    except Exception as e:
+        await _connettore_in_errore(c, str(e)[:200])
+        return
+    righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
+    # la moderazione sulle sole righe nuove o col testo cambiato
+    nuove, note = _righe_da_giudicare(righe, c)
+    marchi = {}
+    if nuove:
+        try:
+            ammesse, marchi = await _modera_righe_negozio(nuove)
+        except Exception as e:
+            # FAIL-CLOSED sui mai giudicati, come per Nostr: cio' che
+            # la moderazione non ha potuto guardare non entra, e il
+            # giro dopo ci riprova. Chi era gia' passato continua ad
+            # aggiornarsi: tenerlo fermo perche' oggi l'AI tace
+            # sarebbe un danno senza guadagno.
+            print(f"⚠️ Moderazione del catalogo non conclusa, "
+                  f"le righe nuove aspettano il prossimo giro: {e}")
+            ammesse = []
+        viste = {r["origine_chiave"] for r in ammesse} | \
+                {r["origine_chiave"] for r in note}
+        righe = [r for r in righe
+                 if r.get("saltato_perche") or r["origine_chiave"] in viste]
+    con = db()
+    try:
+        esito = importa_negozio.riconcilia_connettore(
+            con, c, righe, _salva_foto_connettore,
+            {k: v[1] for k, v in marchi.items()})
+    finally:
+        con.close()
+    if avviso:
+        esito["saltati"].append({"titolo": "", "perche": avviso})
+    await _chiudi_giro_connettore(c, esito)
+
+
+async def _connettore_in_errore(c: dict, errore: str):
+    """Un giro di lettura fallito: si conta, e alla soglia il
+    collegamento si dichiara rotto e il venditore lo viene a sapere.
+    NIENTE spegnimenti: un negozio che non risponde non e' un negozio
+    vuoto, e la vetrina resta com'era."""
+    con = db()
+    con.execute("UPDATE connettori SET errori_di_fila=errori_di_fila+1, "
+                "ultimo_errore=?, ultimo_giro=? WHERE id=?",
+                (errore, int(time.time()), c["id"]))
+    quanti = con.execute("SELECT errori_di_fila FROM connettori WHERE id=?",
+                         (c["id"],)).fetchone()[0]
+    if quanti >= CONNETTORI_ERRORI_MAX:
+        con.execute("UPDATE connettori SET stato='errore' WHERE id=?",
+                    (c["id"],))
+    con.commit()
+    con.close()
+    print(f"⚠️ Connettore #{c['id']} ({c['fonte']}): {errore}")
+    if quanti == CONNETTORI_ERRORI_MAX:
+        # UNA volta, quando la soglia si tocca: al giro dopo il
+        # collegamento non e' piu' 'attivo' e qui non ci si passa
+        await notifica(
+            c["tg_id"],
+            f"🔌 <b>Il collegamento col tuo negozio non risponde</b>\n\n"
+            f"Ho provato {quanti} volte a leggere il catalogo di "
+            f"{html.escape(c['url_negozio'])} e non ci sono riuscito.\n\n"
+            f"I tuoi annunci restano dove sono, ma non si aggiornano "
+            f"più. Controlla il collegamento dal Profilo, in "
+            f"«🏪 Il tuo negozio»: se il token è scaduto basta "
+            f"rifarlo.")
+
+
+async def _chiudi_giro_connettore(c: dict, esito: dict):
+    """Il report resta nel database (il venditore lo legge quando
+    apre, non quando gira l'orologio) e la notifica parte SOLO se e'
+    successo qualcosa: uno squillo orario per dire «tutto invariato»
+    e' il modo di farsi zittire il bot, e col bot zitto si perdono le
+    notifiche degli ordini."""
+    con = db()
+    con.execute("UPDATE connettori SET ultimo_giro=?, ultimo_esito=?, "
+                "ultimo_errore='', errori_di_fila=0 WHERE id=?",
+                (int(time.time()), json.dumps(esito), c["id"]))
+    con.commit()
+    con.close()
+    if not (esito["nuovi"] or esito["spenti"] or esito["in_revisione"]
+            or esito["falliti"]):
+        return
+    pezzi = []
+    if esito["nuovi"]:
+        pezzi.append(f"{esito['nuovi']} in vetrina")
+    if esito["spenti"]:
+        pezzi.append(f"{esito['spenti']} tolti (non sono più sul negozio)")
+    if esito["in_revisione"]:
+        pezzi.append(f"{esito['in_revisione']} in revisione")
+    if esito["falliti"]:
+        pezzi.append(f"{len(esito['falliti'])} non passati")
+    coda = ""
+    if esito["saltati"]:
+        primi = "\n".join(
+            f"• {html.escape(s['titolo'] or '—')}: {html.escape(s['perche'])}"
+            for s in esito["saltati"][:5])
+        coda = f"\n\nSaltati:\n{primi}"
+    await notifica(
+        c["tg_id"],
+        f"🏪 <b>Il tuo catalogo è aggiornato</b>\n\n"
+        f"{', '.join(pezzi)}.{coda}")
+
+
 def pulisci_import():
     """La scopa dell'import in blocco: via i lavori scaduti (mai
     quelli in corsa), gli ZIP orfani rimasti in import_tmp da piu'
@@ -29691,6 +30068,15 @@ async def orologio():
             await importa_nostr_periodico()
         except Exception as e:
             print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
+                  f"un'ora): {e}")
+        try:
+            # I cataloghi collegati, subito dopo l'import Nostr: sono
+            # lo stesso mestiere (una fonte esterna che comanda) e
+            # condividono il dopo-giro — la ricategorizzazione, che
+            # gira in coda a quello, pesca gia' anche le loro righe.
+            await sincronizza_connettori()
+        except Exception as e:
+            print(f"⚠️ Sync dei negozi collegati saltato (riprovo tra "
                   f"un'ora): {e}")
         try:
             await rinfresca_profili_nostr()

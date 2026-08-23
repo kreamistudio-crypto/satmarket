@@ -1,0 +1,594 @@
+"""Il catalogo di un e-commerce diventa annunci di Barattolo.
+
+IL GEMELLO DI `importa_nostr.py`, e la parentela e' voluta: e' lo
+stesso mestiere — leggere un catalogo che vive FUORI e tenerlo in pari
+qui — con le stesse tre idee portanti (il match su una chiave stabile,
+lo scudo anti-resurrezione, «cio' che la fonte non dichiara non si
+inventa»). Cambia da dove arrivano i dati e chi li firma.
+
+MA QUESTO FILE NON GIRA DA SOLO, ed e' la differenza da capire prima
+di toccarlo: `importa_nostr.py` ha un `main()` perche' la npub sta nel
+config ed e' PUBBLICA — chiunque puo' rileggere quegli eventi. Qui le
+credenziali sono token di un sistema altrui, vivono cifrate nel
+database e non devono passare da nessun config in chiaro. Quindi niente
+`main()`, e le colonne nuove si danno per esistenti (le crea `init_db`
+del server, che e' l'unico a chiamarci).
+
+IL PATTO DELLE FUNZIONI INIETTATE, lo stesso del `vaglio` di Nostr:
+qui dentro non c'e' NESSUNA chiamata di rete e nessuna scrittura di
+file. Il trasporto HTTP (`chiama`), lo scaricatore delle foto
+(`salva_foto`) e il cambio arrivano dal server, che ha le guardie —
+anti-SSRF, tetti, timeout, la filiera della compressione unica. Cosi'
+i traduttori e la riconciliazione restano PURI, cioe' collaudabili in
+`prove.py` con un catalogo di cartone.
+"""
+import json
+import re
+import sqlite3
+import time
+
+# La versione dell'API Shopify vive in una COSTANTE e non dentro gli
+# URL: quelle date hanno un ciclo di deprecazione (Shopify ne ritira
+# una ogni anno), e il giorno che va alzata dev'esserci UN posto da
+# toccare, non sei stringhe sparse.
+VERSIONE_API_SHOPIFY = "2024-07"
+
+# Quanto si legge in un colpo. 250 e' il massimo che Shopify concede
+# per pagina; il tetto vero al giro lo mette il server
+# (MAX_PRODOTTI_CONNETTORE), che sa quanto puo' tenere occupato
+# l'orologio.
+PER_PAGINA = 250
+
+# I tagli del testo, IDENTICI alle colonne del database. Non sono un
+# gusto: sono la ragione per cui `testo_negozio` esiste (vedi sotto).
+MAX_TITOLO = 120
+MAX_DESCRIZIONE = 1500
+
+# Quante foto si tengono per annuncio: la stessa misura del form e
+# dell'import CSV.
+MAX_FOTO = 5
+
+
+# --- IL TESTO CANONICO ------------------------------------------------
+
+def _spoglia_html(testo: str) -> str:
+    """La descrizione di un prodotto arriva in HTML (`body_html` su
+    Shopify, `description` su Woo). Qui diventa testo piano UNA volta
+    sola, e il punto e' proprio «una volta»: se a spogliarlo fosse chi
+    scrive nel database e non anche chi lo GIUDICA, la moderazione
+    leggerebbe un testo e la vetrina un altro — cioe' l'impronta non
+    combacerebbe mai e ogni giro ripagherebbe l'AI per dire la stessa
+    cosa.
+    Niente parser: si tolgono i tag, si rendono i «a capo» dei
+    paragrafi e si sciolgono le poche entita' che contano. Un
+    e-commerce scrive HTML semplice, e una libreria in piu' per
+    guadagnare le virgolette tipografiche non vale la dipendenza."""
+    if not testo:
+        return ""
+    t = re.sub(r"(?is)<(script|style).*?</\1>", " ", testo)
+    # i tag che vanno a capo davvero: il resto sparisce senza lasciare
+    # traccia, o le parole si incollerebbero fra loro
+    t = re.sub(r"(?i)<br\s*/?>", "\n", t)
+    t = re.sub(r"(?i)</(p|div|li|tr|h[1-6])>", "\n", t)
+    t = re.sub(r"(?i)<li[^>]*>", "· ", t)
+    # i tag INLINE spariscono senza lasciare spazio, o un
+    # «<b>a mano</b>.» diventerebbe «a mano .» — il grassetto sta in
+    # mezzo a una frase, non fra due frasi
+    t = re.sub(r"(?i)</?(b|strong|i|em|u|s|span|a|small|code|sup|sub)"
+               r"(\s[^>]*)?>", "", t)
+    t = re.sub(r"<[^>]+>", " ", t)
+    for entita, segno in (("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"),
+                          ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'"),
+                          ("&apos;", "'"), ("&euro;", "€")):
+        t = t.replace(entita, segno)
+    # gli spazi si collassano, i capoversi restano (al massimo uno)
+    t = re.sub(r"[ \t\r\f\v]+", " ", t)
+    # e lo spazio davanti alla punteggiatura, che i tag lasciano dietro
+    t = re.sub(r" +([.,;:!?])", r"\1", t)
+    t = re.sub(r" *\n *", "\n", t)
+    t = re.sub(r"\n{2,}", "\n", t)
+    return t.strip()
+
+
+def testo_negozio(prodotto: dict, fonte: str) -> tuple[str, str]:
+    """Titolo e descrizione come finiranno nel database, troncati.
+
+    IL CUORE CONDIVISO fra chi scrive e chi giudica — il gemello di
+    `testo_evento`, e vale la stessa lezione: se i due divergessero,
+    un prodotto fermo sembrerebbe cambiato a ogni giro (e si
+    ripagherebbe la moderazione per sempre), oppure — peggio — uno
+    cambiato sembrerebbe fermo e il testo nuovo entrerebbe in vetrina
+    senza che nessuno l'abbia guardato."""
+    if fonte == "woo":
+        titolo = prodotto.get("name") or ""
+        grezza = prodotto.get("description") or prodotto.get(
+            "short_description") or ""
+    else:
+        titolo = prodotto.get("title") or ""
+        grezza = prodotto.get("body_html") or ""
+    desc = _spoglia_html(grezza)
+    # il trattino e' il ripiego di casa per la descrizione vuota
+    return titolo.strip()[:MAX_TITOLO], (desc or "—")[:MAX_DESCRIZIONE]
+
+
+# --- I TRADUTTORI -----------------------------------------------------
+# Ognuno prende un prodotto COME L'API LO DA' e restituisce la RIGA
+# NORMALIZZATA che la riconciliazione sa scrivere. Sono l'unico posto
+# che conosce la forma di Shopify o di Woo: aggiungere una terza
+# piattaforma vuol dire scrivere un traduttore e nient'altro.
+#
+# Una riga saltata NON e' un errore: torna col suo `saltato_perche`, e
+# il report lo dice al venditore. Un catalogo dove tre prodotti su
+# quaranta non passano dev'essere un catalogo con trentasette annunci
+# e tre righe di spiegazione, mai un giro fallito.
+
+def _sats_da_eur(eur: float, cambio: dict) -> int | None:
+    """L'equivalente in sats di un prezzo in euro, con la RICETTA DEL
+    SERVER (`prezzo_da_payload`): stesso arrotondamento e stesso
+    pavimento a 1 sat. Se le due divergessero, la vetrina direbbe una
+    cifra e la fattura un'altra.
+    `None` quando il cambio non c'e': il chiamante salta la riga
+    invece di inventare un numero — e' la regola dell'avviso EUR
+    («meglio un match perso che uno sbagliato»)."""
+    tasso = (cambio or {}).get("EUR") or 0
+    if tasso <= 0 or eur <= 0:
+        return None
+    return max(1, round(eur / tasso * 1e8))
+
+
+def _numero(v) -> float:
+    """I prezzi arrivano come stringhe ('7.50'), a volte con la
+    virgola, a volte vuoti o nulli."""
+    if v is None:
+        return 0.0
+    try:
+        return float(str(v).strip().replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def traduci_shopify(p: dict, cambio: dict) -> dict:
+    """Un prodotto Shopify diventa una riga normalizzata."""
+    riga = {"origine_chiave": str(p.get("id") or ""),
+            "saltato_perche": "", "titolo": "", "descrizione": "",
+            "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
+            "foto": [], "categoria_grezza": "", "attivo": True}
+    titolo, descrizione = testo_negozio(p, "shopify")
+    riga["titolo"], riga["descrizione"] = titolo, descrizione
+    if not riga["origine_chiave"] or not titolo:
+        riga["saltato_perche"] = "senza id o senza titolo"
+        return riga
+    varianti = p.get("variants") or []
+    # ATTENZIONE, la trappola di Shopify: un prodotto ha SEMPRE almeno
+    # una variante, anche quando nel pannello non se ne vede nessuna —
+    # quella e' la variante «di default». Quindi il salto guarda `> 1`,
+    # e un prodotto normale non ci cade mai.
+    if len(varianti) > 1:
+        riga["saltato_perche"] = f"ha {len(varianti)} varianti"
+        return riga
+    if not varianti:
+        riga["saltato_perche"] = "senza prezzo"
+        return riga
+    v = varianti[0]
+    riga["prezzo_eur"] = round(_numero(v.get("price")), 2)
+    sats = _sats_da_eur(riga["prezzo_eur"], cambio)
+    if not sats:
+        riga["saltato_perche"] = ("senza prezzo" if riga["prezzo_eur"] <= 0
+                                  else "cambio non disponibile")
+        return riga
+    riga["prezzo_sats"] = sats
+    # LO STOCK NON TRACCIATO NON E' ZERO, ed e' la riga da non
+    # ammorbidire: chi non fa gestire il magazzino a Shopify vende
+    # senza contare i pezzi, e scriverci 0 spegnerebbe il suo catalogo
+    # intero al primo giro. `None` = «non lo sappiamo», e la
+    # riconciliazione lascia stare la colonna.
+    if v.get("inventory_management"):
+        riga["quantita"] = int(v.get("inventory_quantity") or 0)
+    # la coordinata che servira' al decremento (fase 2). Si LEGGE gia'
+    # adesso perche' costa zero e sta nella stessa risposta, ma non si
+    # scrive da nessuna parte finche' quella fase non esiste.
+    riga["scorta"] = str(v.get("inventory_item_id") or "")
+    riga["foto"] = [i.get("src") for i in (p.get("images") or [])
+                    if i.get("src")][:MAX_FOTO]
+    riga["categoria_grezza"] = (p.get("product_type") or "").strip() or \
+        (p.get("tags") or "").split(",")[0].strip()
+    # draft e archived non sono in vetrina sul suo negozio: non devono
+    # esserlo nemmeno qui
+    riga["attivo"] = (p.get("status") or "active") == "active"
+    return riga
+
+
+TRADUTTORI = {"shopify": traduci_shopify}
+
+
+def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
+    """Il dispatch: una lista di prodotti diventa una lista di righe
+    normalizzate. Chi aggiunge una piattaforma aggiunge una voce a
+    TRADUTTORI e non tocca nient'altro."""
+    tr = TRADUTTORI.get(fonte)
+    if not tr:
+        return []
+    return [tr(p, cambio) for p in prodotti if isinstance(p, dict)]
+
+
+# --- LA LETTURA DEL CATALOGO ------------------------------------------
+# `chiama(metodo, url, intestazioni)` la passa il server: torna
+# `(stato, corpo_json, intestazioni_risposta)` oppure alza. Qui dentro
+# c'e' solo la PAGINAZIONE, che e' la parte che cambia da una
+# piattaforma all'altra ed e' anche quella che si sbaglia.
+
+def _prossima_pagina_shopify(intestazioni: dict) -> str:
+    """Shopify pagina col header `Link`, non con un numero:
+    `<https://...page_info=abc>; rel="next"`. Va letto cosi' e non
+    ricostruito a mano — il `page_info` e' opaco e la sua vita e'
+    breve."""
+    link = ""
+    for k, v in (intestazioni or {}).items():
+        if k.lower() == "link":
+            link = v or ""
+            break
+    for pezzo in link.split(","):
+        if 'rel="next"' in pezzo:
+            m = re.search(r"<([^>]+)>", pezzo)
+            if m:
+                return m.group(1)
+    return ""
+
+
+def leggi_catalogo_shopify(dominio: str, token: str, chiama,
+                           tetto: int = 200) -> tuple[list, str]:
+    """Il catalogo, pagina per pagina. Torna `(prodotti, avviso)`:
+    l'avviso non e' un errore ma una cosa da dire al venditore — oggi
+    solo «il catalogo e' piu' grande del tetto, il resto al prossimo
+    giro».
+
+    ALZA se la chiamata fallisce, e non torna una lista vuota: le due
+    cose sono diverse e confonderle sarebbe il guasto peggiore di
+    questo file — un catalogo che non si e' potuto LEGGERE, preso per
+    un catalogo VUOTO, spegnerebbe tutti gli annunci del venditore
+    (vedi `riconcilia_connettore`, che sulle sparizioni si fida)."""
+    prodotti = []
+    url = (f"https://{dominio}/admin/api/{VERSIONE_API_SHOPIFY}"
+           f"/products.json?limit={PER_PAGINA}")
+    intestazioni = {"X-Shopify-Access-Token": token}
+    while url and len(prodotti) < tetto:
+        stato, corpo, risposta = chiama("GET", url, intestazioni)
+        if stato != 200:
+            raise RuntimeError(f"Shopify ha risposto {stato}")
+        prodotti.extend((corpo or {}).get("products") or [])
+        url = _prossima_pagina_shopify(risposta)
+    avviso = ""
+    if len(prodotti) > tetto:
+        avviso = (f"il catalogo ha piu' di {tetto} prodotti: "
+                  f"il resto arriva ai giri successivi")
+        prodotti = prodotti[:tetto]
+    return prodotti, avviso
+
+
+LETTORI = {"shopify": leggi_catalogo_shopify}
+
+
+# --- LO STOCK ---------------------------------------------------------
+
+def quantita_corretta(esterno: int, pendenti: int) -> int:
+    """La giacenza da scrivere QUI, viste le vendite che il negozio di
+    la' non sa ancora.
+
+    E' LA FUNZIONE CHE TIENE IN PIEDI LA FASE 1. Il sync ricopre
+    `quantita` dalla lettura esterna a ogni giro: senza questa
+    sottrazione, una vendita fatta su Barattolo verrebbe RIALZATA
+    entro l'ora — e sul pezzo unico il 'venduto' risorgerebbe, perche'
+    la regola dice che uno stock esterno tornato sopra zero riaccende
+    l'annuncio (serve al ricarico legittimo del miele).
+    Quindi: o il venditore ha gia' riallineato il suo magazzino, e
+    allora `esterno` e' gia' giusto e le pendenti sono state spente al
+    giro in cui il calo si e' visto; o non l'ha fatto, e le sottraiamo
+    noi. Mai sotto zero."""
+    return max(0, int(esterno) - abs(int(pendenti or 0)))
+
+
+def rifletti_pendenti(con, annuncio_id: int, visto_prima: int,
+                      adesso_esterno: int) -> int:
+    """Il venditore ha riallineato il suo magazzino? Allora le vendite
+    che gli avevamo segnalato sono ARRIVATE, e smettono di sottrarsi.
+
+    SENZA QUESTA FUNZIONE LA CORREZIONE SI MANGIA LO STOCK: vendo un
+    pezzo qui (esterno 10, locale 9, una pendente da 1), il venditore
+    scala il suo magazzino a 9, e al giro dopo `quantita_corretta(9, 1)`
+    direbbe 8 — la stessa vendita contata due volte, e cosi' a ogni
+    riallineamento, fino a zero. E' il difetto che la fase 1
+    introdurrebbe curando il suo: peggiore dell'originale, perche'
+    silenzioso.
+
+    IL CALO SI ATTRIBUISCE ALLE PENDENTI PIU' VECCHIE, fino a
+    concorrenza: si spegne solo quel che il calo copre per intero —
+    una riga da 3 pezzi contro un calo di 2 resta pendente, che
+    spezzarla vorrebbe dire inventare mezza vendita.
+    IMPERFEZIONE DICHIARATA, e va nei due versi: un calo dovuto a una
+    vendita sul LORO sito puo' spegnere una pendente nostra (e allora
+    il locale resta un filo piu' alto del vero: e' la finestra della
+    collisione rara, quella che l'escrow copre); un venditore che non
+    riallinea MAI tiene il locale piu' basso del suo negozio, che e'
+    il verso prudente e glielo dice ogni notifica di vendita. La fase
+    2 — il decremento scritto da noi — toglie l'euristica di mezzo."""
+    calo = int(visto_prima) - int(adesso_esterno)
+    if visto_prima < 0 or calo <= 0:
+        return 0
+    try:
+        righe = con.execute(
+            "SELECT id, delta FROM connettori_uscite "
+            "WHERE annuncio_id=? AND stato='pendente' ORDER BY id",
+            (annuncio_id,)).fetchall()
+    except sqlite3.OperationalError:
+        return 0
+    spente, resto = 0, calo
+    for r in righe:
+        quanti = abs(int(r[1] or 0))
+        if quanti > resto:
+            break
+        con.execute("UPDATE connettori_uscite SET stato='riflessa', "
+                    "aggiornato=? WHERE id=?", (int(time.time()), r[0]))
+        resto -= quanti
+        spente += 1
+    return spente
+
+
+def _pendenti(con, annuncio_id: int) -> int:
+    """Quanti pezzi di questo annuncio sono stati venduti qui e non
+    risultano ancora scalati sul negozio. Fail-open sul database che
+    non ha ancora la tabella: senza registro si vale zero, cioe' il
+    comportamento di chi non ha mai venduto niente."""
+    try:
+        r = con.execute(
+            "SELECT COALESCE(SUM(delta), 0) FROM connettori_uscite "
+            "WHERE annuncio_id=? AND stato='pendente'",
+            (annuncio_id,)).fetchone()
+        return abs(int(r[0] or 0))
+    except sqlite3.OperationalError:
+        return 0
+
+
+# --- LA RICONCILIAZIONE -----------------------------------------------
+
+def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
+    """Spegne una riga e annulla gli ordini mai pagati.
+
+    E' lo SPECCHIO di `importa_nostr.spegni_annuncio`, ricopiato e non
+    importato: dieci righe contro il trascinarsi dietro
+    websocket-client, che quel file esige in cima. I sats in escrow non
+    c'entrano mai — un annuncio con un affare in corso non e' piu'
+    'attivo', e i chiamanti filtrano su quello."""
+    adesso = int(time.time())
+    con.execute("UPDATE annunci SET stato=? WHERE id=?",
+                (stato, annuncio_id))
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE annuncio_id=? AND stato='creato'",
+                (adesso, annuncio_id))
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE stato='creato' AND id IN (SELECT ordine_id "
+                "FROM ordine_righe WHERE annuncio_id=?)",
+                (adesso, annuncio_id))
+
+
+def _riga_locale(con, connettore_id: int, chiave: str):
+    """Il match, e ne basta UNO: la chiave del prodotto sul negozio.
+
+    NIENTE ADOZIONE PER TITOLO, ed e' una decisione con una storia:
+    l'import Nostr ce l'ha per ragioni sue (gli eventi di ieri non
+    avevano una coordinata) e l'ha pagata col caso delle «due teste» —
+    una riga NATIVA adottata da fuori perde Modifica e rifornimento, e
+    il venditore non capisce perche'. Qui la chiave c'e' sempre,
+    quindi il caso non deve nemmeno potersi presentare: se esiste gia'
+    un annuncio omonimo nato qui, ne nasce uno NUOVO e il report lo
+    dice — «se e' lo stesso oggetto, ritira quello vecchio»."""
+    return con.execute(
+        "SELECT id, stato, foto, origine_foto, quantita, "
+        "origine_stock_visto FROM annunci "
+        "WHERE connettore_id=? AND origine_chiave=?",
+        (connettore_id, chiave)).fetchone()
+
+
+def _foto_locali(con, annuncio_id: int, urls: list, salva_foto) -> str:
+    """Scarica le foto e torna il JSON dei nomi locali. Un download
+    fallito lascia l'URL com'era: meglio una foto che arriva dal
+    negozio del venditore che nessuna foto (e' la regola di
+    `localizza_foto`)."""
+    nomi = []
+    for i, u in enumerate(urls or []):
+        nome = None
+        try:
+            nome = salva_foto(annuncio_id, i, u)
+        except Exception as e:
+            print(f"    ⚠️ foto non salvata ({str(u)[:60]}): {e}")
+        nomi.append(nome or u)
+    return json.dumps(nomi) if nomi else ""
+
+
+def riconcilia_connettore(con, connettore: dict, righe: list,
+                          salva_foto, revisioni=None) -> dict:
+    """Porta il catalogo tradotto dentro `annunci`, e torna il report.
+
+    L'ORDINE DELLE DOMANDE e' quello di `importa_venditore`, che e' il
+    fratello maggiore di questa funzione: si ritrova la riga per
+    chiave; se non c'e' ma esiste SPENTA, non si risuscita; altrimenti
+    si aggiorna o si crea.
+
+    QUELLO CHE NON SI RICOPRE MAI: la categoria e la sottocategoria
+    gia' scelte (una scelta fatta a mano qui non si cancella ogni ora
+    col silenzio di un e-commerce), e la consegna, che viene dal
+    CASSETTO del collegamento e non dal negozio.
+
+    `revisioni` e' il marchio della moderazione: `{chiave: motivo}`.
+    Una riga marchiata nasce — o torna — in `stato='revisione'`, cioe'
+    invisibile al pubblico finche' un moderatore non dice la sua.
+    """
+    revisioni = revisioni or {}
+    adesso = int(time.time())
+    cid = connettore["id"]
+    fonte = connettore["fonte"]
+    esito = {"nuovi": 0, "aggiornati": 0, "invariati": 0, "spenti": 0,
+             "riaccesi": 0, "in_revisione": 0, "saltati": [], "falliti": []}
+    viste = set()
+
+    for r in righe:
+        if r.get("saltato_perche"):
+            esito["saltati"].append({"titolo": r.get("titolo", "")[:60],
+                                     "perche": r["saltato_perche"]})
+            continue
+        chiave = r["origine_chiave"]
+        viste.add(chiave)
+        try:
+            _una_riga(con, connettore, r, salva_foto, revisioni, esito,
+                      adesso)
+        except Exception as e:
+            # Una riga che esplode e' una voce del report, mai il giro
+            # morto: e' il patto di `_crea_riga_con_guardia`
+            # dell'import CSV.
+            esito["falliti"].append({"titolo": r.get("titolo", "")[:60],
+                                     "perche": str(e)[:120]})
+            print(f"    ⚠️ riga saltata ({r.get('titolo', '')[:40]}): {e}")
+
+    # --- LE SPARIZIONI ------------------------------------------------
+    # Un prodotto che non c'e' piu' nel catalogo COMPLETO si spegne. Il
+    # chiamante non deve mai arrivare qui con una lettura parziale: un
+    # errore di rete a meta' paginazione svuoterebbe la vetrina di quel
+    # venditore, ed e' il motivo per cui `leggi_catalogo_*` ALZA invece
+    # di tornare una lista corta.
+    for riga in con.execute(
+            "SELECT id, titolo, origine_chiave FROM annunci "
+            "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
+            (cid,)).fetchall():
+        if riga["origine_chiave"] in viste:
+            continue
+        spegni_annuncio(con, riga["id"], "rimosso")
+        esito["spenti"] += 1
+        print(f"    🗑 tolto dal negozio: {riga['titolo'][:50]}")
+
+    con.commit()
+    print(f"  🏪 {fonte} #{cid}: {esito['nuovi']} nuovi, "
+          f"{esito['aggiornati']} aggiornati, {esito['invariati']} invariati, "
+          f"{esito['spenti']} spenti, {len(esito['saltati'])} saltati")
+    return esito
+
+
+def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
+              esito: dict, adesso: int):
+    """Il corpo del ciclo, per riga. Sta fuori dal `for` perche' ogni
+    riga ha il suo `try`: cosi' il fallimento di una non si porta
+    dietro le altre."""
+    cid = connettore["id"]
+    chiave = r["origine_chiave"]
+    gia = _riga_locale(con, cid, chiave)
+    marchio = revisioni.get(chiave)
+
+    # --- lo scudo anti-resurrezione -----------------------------------
+    # La differenza con Nostr e' DICHIARATA e va tenuta:
+    # · 'rimosso' non risorge MAI. E' la lapide dei connettori: l'ha
+    #   tolto il venditore da qui, un moderatore, o e' sparito dal
+    #   negozio. Per tornare serve un prodotto nuovo (chiave nuova).
+    # · 'venduto' RISORGE se la giacenza esterna torna sopra zero, e
+    #   qui e' il contrario di Nostr apposta: per un negozio il
+    #   ricarico del miele e' routine, non una resurrezione — tenerlo
+    #   spento sarebbe il difetto, non la guardia.
+    if gia and gia["stato"] == "rimosso":
+        esito["saltati"].append({"titolo": r["titolo"][:60],
+                                 "perche": "gia' rimosso qui: "
+                                           "non si ricrea da solo"})
+        return
+
+    quantita = r.get("quantita")
+    if quantita is not None and gia:
+        # PRIMA si spengono le pendenti che il calo esterno copre, POI
+        # si sottrae quel che resta: nell'ordine opposto la vendita
+        # appena riconosciuta si sottrarrebbe un'ultima volta, e il
+        # numero scenderebbe di uno a ogni riallineamento.
+        rifletti_pendenti(con, gia["id"], gia["origine_stock_visto"],
+                          quantita)
+        quantita = quantita_corretta(quantita, _pendenti(con, gia["id"]))
+
+    if gia:
+        _aggiorna(con, gia, r, connettore, salva_foto, marchio, quantita,
+                  esito, adesso)
+        return
+
+    # --- la riga nuova ------------------------------------------------
+    stato = "revisione" if marchio else ("attivo" if r["attivo"]
+                                         else "rimosso")
+    cur = con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+        "prezzo_sats,zona,foto,valuta,prezzo_eur,quantita,quantita_max,"
+        "consegna,spedizione_eur,spedizione_punto_eur,"
+        "spedizione_punto_dichiarata,spedizione_extra_eur,"
+        "fonte,connettore_id,origine_chiave,origine_foto,"
+        "origine_stock_visto,creato,modificato,stato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (connettore["tg_id"], r["titolo"], r["descrizione"],
+         r.get("categoria") or "Altro", r["prezzo_sats"],
+         connettore["zona"], "", "eur", r["prezzo_eur"],
+         1 if quantita is None else quantita,
+         1 if quantita is None else quantita,
+         connettore["consegna"], connettore["spedizione_eur"],
+         connettore["spedizione_punto_eur"],
+         connettore["spedizione_punto_dichiarata"],
+         connettore["spedizione_extra_eur"],
+         connettore["fonte"], cid, chiave,
+         json.dumps(r["foto"]) if r["foto"] else "",
+         -1 if r.get("quantita") is None else r["quantita"],
+         adesso, adesso, stato))
+    nuovo = cur.lastrowid
+    # le foto DOPO l'insert: il nome del file vuole l'id
+    foto = _foto_locali(con, nuovo, r["foto"], salva_foto)
+    if foto:
+        con.execute("UPDATE annunci SET foto=? WHERE id=?", (foto, nuovo))
+    con.commit()          # commit per riga: un crash a meta' giro
+    #                       lascia solo annunci completi
+    esito["nuovi"] += 1
+    if marchio:
+        esito["in_revisione"] += 1
+    print(f"    🏪 {r['titolo'][:50]} — {r['prezzo_eur']:.2f} € "
+          f"[{r.get('categoria') or 'Altro'}]")
+
+
+def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
+              quantita, esito: dict, adesso: int):
+    """La riga c'e' gia': si ricopre il contenuto (la fonte comanda) e
+    si lascia stare tutto il resto."""
+    foto_url = json.dumps(r["foto"]) if r["foto"] else ""
+    if foto_url and foto_url == (gia["origine_foto"] or ""):
+        foto = gia["foto"]          # stesse foto: niente ri-download
+    else:
+        foto = _foto_locali(con, gia["id"], r["foto"], salva_foto)
+    con.execute(
+        "UPDATE annunci SET titolo=?, descrizione=?, prezzo_sats=?, "
+        "valuta='eur', prezzo_eur=?, foto=?, origine_foto=?, "
+        "origine_stock_visto=?, modificato=? WHERE id=?",
+        (r["titolo"], r["descrizione"], r["prezzo_sats"], r["prezzo_eur"],
+         foto, foto_url,
+         -1 if r.get("quantita") is None else r["quantita"],
+         adesso, gia["id"]))
+    if quantita is not None:
+        con.execute("UPDATE annunci SET quantita=?, "
+                    "quantita_max=MAX(quantita_max,?) WHERE id=?",
+                    (quantita, quantita, gia["id"]))
+    # --- lo stato -----------------------------------------------------
+    if marchio:
+        # il testo e' cambiato e la moderazione non sa piu' approvarlo:
+        # torna in attesa, come una modifica fatta dal form
+        con.execute("UPDATE annunci SET stato='revisione' "
+                    "WHERE id=? AND stato='attivo'", (gia["id"],))
+        esito["in_revisione"] += 1
+    elif not r["attivo"]:
+        if gia["stato"] != "rimosso":
+            spegni_annuncio(con, gia["id"], "rimosso")
+            esito["spenti"] += 1
+    elif gia["stato"] == "venduto" and (quantita or 0) > 0:
+        con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
+                    (gia["id"],))
+        esito["riaccesi"] += 1
+        print(f"    ↑ tornato in vetrina: {r['titolo'][:50]}")
+    elif gia["stato"] == "attivo" and quantita == 0:
+        # l'invariante di casa: venduto <=> quantita = 0
+        con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                    (gia["id"],))
+    con.commit()
+    esito["aggiornati"] += 1

@@ -53,6 +53,7 @@ jobs:
              censimento_spedizione.py ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
              presenta_release.py config_esempio.py
+             importa_negozio.py collaudo_connettori.py
              assegna_sottocategorie.py ripulisci_avatar_min.py
              anteprime.py collaudo_impersonazione.py
              stima_coda_moderazione.py recupera_cambi_ordini.py

@@ -24717,6 +24717,261 @@ def prove_connettori():
               and f'"ON {sopra}"' in ini)
 
 
+def prove_connettori_sync():
+    """IL MODULO E IL GIRO (ago 2026, tappa 2): i traduttori, il testo
+    canonico, la correzione dello stock e il trasporto.
+
+    Le funzioni pure si GIRANO — un traduttore si prova dandogli un
+    prodotto, non rileggendolo — e per il resto si guarda la forma,
+    coi due punti che possono rompere qualcosa in silenzio: il
+    trasporto che segue un redirect (e porta un token dove non
+    l'abbiamo mai giudicato) e un catalogo letto a meta' scambiato per
+    un catalogo vuoto (che spegnerebbe la vetrina di un venditore)."""
+    print("\n[i connettori: modulo, traduttori, giro]")
+    import sqlite3
+    src = open("importa_negozio.py", encoding="utf-8").read()
+
+    amb = {}
+    exec(compile(src, "importa_negozio.py", "exec"), amb)
+    traduci = amb["traduci_shopify"]
+    spoglia = amb["_spoglia_html"]
+    testo = amb["testo_negozio"]
+    corretta = amb["quantita_corretta"]
+
+    def prodotto(**kw):
+        base = {"id": 7, "title": "Miele", "body_html": "<p>Buono</p>",
+                "status": "active", "product_type": "Alimenti",
+                "variants": [{"price": "7.50", "inventory_quantity": 12,
+                              "inventory_management": "shopify",
+                              "inventory_item_id": 700}],
+                "images": [{"src": "https://cdn/x.jpg"}]}
+        base.update(kw)
+        return base
+
+    CAMBIO = {"EUR": 100_000.0}          # 1000 sats = 1 €
+
+    # --- il traduttore, girato ------------------------------------
+    r = traduci(prodotto(), CAMBIO)
+    prova("Shopify: il prodotto normale passa", "", r["saltato_perche"])
+    prova("...col prezzo in euro e l'equivalente in sats", (7.5, 7_500),
+          (r["prezzo_eur"], r["prezzo_sats"]))
+    prova("...la chiave e' l'id del prodotto", "7", r["origine_chiave"])
+    prova("...e la giacenza arriva dal negozio", 12, r["quantita"])
+    # LA TRAPPOLA DI SHOPIFY: un prodotto ha SEMPRE almeno una
+    # variante (quella «di default», che nel pannello non si vede).
+    # Un salto scritto su `len(variants) >= 1` non farebbe passare
+    # NESSUN prodotto, e sarebbe un catalogo vuoto senza un errore.
+    prova("la variante di default NON e' un multi-variante", "",
+          traduci(prodotto(variants=[{"price": "1.00"}]),
+                  CAMBIO)["saltato_perche"])
+    due = traduci(prodotto(variants=[{"price": "1.00"},
+                                     {"price": "2.00"}]), CAMBIO)
+    prova("due varianti si saltano, DICENDOLO", "ha 2 varianti",
+          due["saltato_perche"])
+    # «non tracciato» non e' «zero»: chi non fa gestire il magazzino a
+    # Shopify vende senza contare i pezzi, e uno zero gli spegnerebbe
+    # il catalogo intero al primo giro
+    prova("lo stock non tracciato resta ignoto", None,
+          traduci(prodotto(variants=[{"price": "1.00",
+                                      "inventory_quantity": 0,
+                                      "inventory_management": None}]),
+                  CAMBIO)["quantita"])
+    prova("draft e archived non sono in vetrina",
+          [False, False, True],
+          [traduci(prodotto(status="draft"), CAMBIO)["attivo"],
+           traduci(prodotto(status="archived"), CAMBIO)["attivo"],
+           traduci(prodotto(), CAMBIO)["attivo"]])
+    prova("senza prezzo si salta", "senza prezzo",
+          traduci(prodotto(variants=[{"price": "0"}]),
+                  CAMBIO)["saltato_perche"])
+    # SENZA CAMBIO NON SI INVENTA UN NUMERO: la riga aspetta il giro
+    # dopo, ed e' la regola dell'avviso EUR («meglio un match perso
+    # che uno sbagliato»)
+    prova("senza cambio la riga aspetta", "cambio non disponibile",
+          traduci(prodotto(), {})["saltato_perche"])
+
+    # --- il testo canonico ----------------------------------------
+    prova("l'HTML si spoglia", "Raccolto a mano.",
+          spoglia("<p>Raccolto <b>a mano</b>.</p>"))
+    # IL CASO CHE SEPARA LE DUE CURE, e l'ha chiesto la tortura: col
+    # solo «via lo spazio prima della punteggiatura» anche l'esempio
+    # qui sopra tornerebbe giusto, quindi quella prova non dice niente
+    # sui tag inline. Un tag DENTRO una parola invece lo dice: senza
+    # la riga che li toglie senza lasciare spazio, «per<b>fetto</b>»
+    # diventa «per fetto».
+    prova("...e i tag inline non spezzano le parole", "perfetto",
+          spoglia("per<b>fetto</b>"))
+    prova("...script e stili non entrano", "Testo",
+          spoglia("<style>x{}</style><script>a()</script>Testo"))
+    prova("...e le entita' si sciolgono", "€12 & 5",
+          spoglia("&euro;12 &amp; 5"))
+    t, d = testo({"title": "x" * 300, "body_html": "y" * 4000}, "shopify")
+    prova("il testo si tronca come le colonne del database", (120, 1500),
+          (len(t), len(d)))
+    prova("la descrizione vuota ha il trattino di casa", "—",
+          testo({"title": "T", "body_html": ""}, "shopify")[1])
+    # IL CUORE CONDIVISO: chi scrive e chi giudica devono chiamare LA
+    # STESSA funzione. Se divergessero, un prodotto fermo sembrerebbe
+    # cambiato a ogni giro (e si ripagherebbe la moderazione per
+    # sempre), o uno cambiato sembrerebbe fermo e il testo nuovo
+    # entrerebbe in vetrina senza che nessuno l'abbia guardato.
+    prova("il traduttore passa dal testo canonico", True,
+          "testo_negozio(p, \"shopify\")" in src)
+    # e il giudice confronta la RIGA TRADOTTA, cioe' quel che il testo
+    # canonico ha gia' prodotto: se leggesse il prodotto grezzo
+    # (`title`, `body_html`) confronterebbe un testo intero con uno
+    # troncato, non combacerebbero MAI, e ogni giro ripagherebbe l'AI
+    # per dire la stessa cosa sugli stessi prodotti.
+    giud = codice(pezzo("_righe_da_giudicare"))
+    prova("...e il giudice confronta la riga gia' tradotta", True,
+          'r["titolo"]' in giud and 'r["descrizione"]' in giud)
+    prova("...mai i campi grezzi del negozio", False,
+          "body_html" in giud or '"title"' in giud)
+
+    # --- la correzione dello stock --------------------------------
+    prova("quantita_corretta: senza pendenti non tocca niente", 10,
+          corretta(10, 0))
+    prova("...con una pendente sottrae", 9, corretta(10, 1))
+    prova("...e non va mai sotto zero", 0, corretta(1, 5))
+    # L'ORDINE E' LA PROVA: prima si spengono le pendenti che il calo
+    # esterno copre, poi si sottrae quel che resta. Al contrario, la
+    # vendita appena riconosciuta si sottrarrebbe un'ultima volta e il
+    # numero scenderebbe di uno a ogni riallineamento, fino a zero.
+    corpo = codice(_pezzo_da(src, "_una_riga"))
+    prova("nel sync si riflette PRIMA di sottrarre", True,
+          corpo.index("rifletti_pendenti") < corpo.index("quantita_corretta"))
+    # e la riflessione si gira per davvero, su un registro di cartone
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY "
+                "AUTOINCREMENT, annuncio_id INT, delta INT, stato TEXT, "
+                "aggiornato INT)")
+    for delta in (-1, -3):
+        con.execute("INSERT INTO connettori_uscite(annuncio_id,delta,stato) "
+                    "VALUES(1,?,'pendente')", (delta,))
+    rifletti = amb["rifletti_pendenti"]
+    prova("il calo che copre una pendente la spegne", 1,
+          rifletti(con, 1, 10, 9))
+    # una riga da 3 contro un calo di 2 resta pendente: spezzarla
+    # vorrebbe dire inventare mezza vendita
+    prova("...quella che non copre resta", 0, rifletti(con, 1, 9, 7))
+    prova("...e senza una lettura di ieri non si conclude niente", 0,
+          rifletti(con, 1, -1, 5))
+    con.close()
+
+    # --- il trasporto ---------------------------------------------
+    prova("url_api_ammesso: solo https, e la porta 443",
+          [True, False, False],
+          [srv_url("https://x.myshopify.com/a"),
+           srv_url("http://x.myshopify.com/a"),
+           srv_url("https://x.myshopify.com:8080/a")])
+    prova("...e la regola sull'host resta UNA (non una copia)", True,
+          "url_foto_ammesso(url)" in codice(pezzo("url_api_ammesso")))
+    # SU UN'API IL REDIRECT E' UN ERRORE: seguirlo vorrebbe dire
+    # consegnare il token di un negozio a un indirizzo che non abbiamo
+    # mai giudicato.
+    tra = codice(pezzo("chiama_api_negozio"))
+    i_cls = _SORGENTE.index("class _NienteRedirect")
+    classe = codice(_SORGENTE[i_cls:_SORGENTE.index("\n\n\n", i_cls)])
+    prova("il trasporto non segue i redirect", True,
+          "_APRITORE_API" in tra and "raise urllib.error.HTTPError" in classe)
+    prova("...ha un timeout e un tetto sulla risposta", True,
+          "timeout=15" in tra and "TETTO_RISPOSTA_API" in tra)
+    # UN TOKEN IN UN JOURNAL E' UN TOKEN PUBBLICO. Si guarda il GESTO
+    # e non la parola: `credenziali` vive in due righe sole — la
+    # decifratura e il passaggio al lettore — e non entra mai in una
+    # riga che stampa o che scrive `ultimo_errore`.
+    unc = codice(pezzo("_un_connettore"))
+    stampe = [r for r in (unc + "\n" + tra).split("\n")
+              if "print(" in r or "ultimo_errore" in r]
+    prova("le credenziali non finiscono mai in un print", [],
+          [r.strip()[:40] for r in stampe
+           if "credenzial" in r or "token" in r or "intestazioni" in r])
+
+    # --- il giro --------------------------------------------------
+    giro = codice(pezzo("sincronizza_connettori"))
+    prova("la leva nasce FALSE nel codice", True,
+          "CONNETTORI_NEGOZIO_APERTI = False" in _SORGENTE)
+    prova("...e il giro la guarda per primo", True,
+          giro.index("CONNETTORI_NEGOZIO_APERTI") < giro.index("for riga"))
+    # l'appuntamento PRIMA del tentativo: anche un errore aspetta la
+    # prossima ora, niente tempeste (il patto dell'import Nostr)
+    prova("l'appuntamento si fissa prima di provare", True,
+          giro.index("_prossimo_giro_connettori = time.time()")
+          < giro.index("import importa_negozio"))
+    # UNA volta per giro E PRIMA del ciclo: dentro il `for` sarebbe una
+    # lettura per connettore, cioe' conversioni diverse per annunci
+    # dello stesso giro — la lezione gia' pagata dall'import Nostr. Il
+    # conteggio da solo non basta a dirlo: serve la POSIZIONE.
+    prova("il cambio si legge UNA volta per giro", 1,
+          giro.count("cambio_per_import()"))
+    prova("...e prima del ciclo, non dentro", True,
+          giro.index("cambio_per_import()") < giro.index("for riga in"))
+    prova("un connettore che esplode non ferma gli altri", True,
+          "except Exception as e" in giro and "for riga in collegati" in giro)
+    # ...e lo stesso DENTRO il catalogo, riga per riga: il patto di
+    # `_crea_riga_con_guardia` dell'import CSV — un prodotto storto e'
+    # una voce del report, mai trentanove annunci che non entrano.
+    # L'eccezione dev'essere quella LARGA: con una stretta il primo
+    # errore che non si era previsto si porta via il resto del giro.
+    ric = codice(_pezzo_da(src, "riconcilia_connettore"))
+    prova("una riga che esplode non ferma le altre", True,
+          "except Exception as e" in ric and 'esito["falliti"].append' in ric)
+    # LE SPARIZIONI SI GIUDICANO SOLO SU UN CATALOGO COMPLETO: se la
+    # lettura alzasse a meta' paginazione e il chiamante la prendesse
+    # per un catalogo corto, spegnerebbe gli annunci che non ha visto.
+    lettore = codice(_pezzo_da(src, "leggi_catalogo_shopify"))
+    prova("una lettura fallita ALZA, non torna una lista corta", True,
+          "raise RuntimeError" in lettore)
+    uno = codice(pezzo("_un_connettore"))
+    prova("...e il giro esce prima di toccare una riga", True,
+          "_connettore_in_errore" in uno
+          and uno.index("_connettore_in_errore") < uno.index("traduci"))
+    # ...e il GESTO, non la parola: la docstring di quella funzione
+    # dice «NIENTE spegnimenti» apposta, e una sentinella che cerca
+    # «spegni» diventerebbe rossa per colpa della spiegazione
+    err = codice(pezzo("_connettore_in_errore"))
+    prova("un negozio muto non spegne niente", [],
+          [g for g in ("spegni_annuncio(", "UPDATE annunci") if g in err])
+    # la moderazione: fail-CLOSED sui mai giudicati, come per Nostr
+    prova("se la moderazione tace, le righe nuove aspettano", True,
+          "ammesse = []" in uno)
+    # e il riepilogo NON parte a ogni giro: uno squillo orario per
+    # dire «tutto invariato» e' il modo di farsi zittire il bot
+    chiudi = codice(pezzo("_chiudi_giro_connettore"))
+    prova("il riepilogo parte solo se e' successo qualcosa", True,
+          "return" in chiudi and 'esito["nuovi"]' in chiudi)
+
+    # --- il modulo resta puro -------------------------------------
+    # nessuna rete e nessun import di server: il trasporto e lo
+    # scaricatore arrivano INIETTATI (il patto del `vaglio`), ed e'
+    # quel che rende i traduttori collaudabili qui sopra.
+    # gli IMPORT e non le parole: «socket» vive dentro
+    # «websocket-client» in una docstring, e cercarlo nudo
+    # renderebbe rossa la prova per colpa di una spiegazione
+    for vietato in ("import server", "import urllib", "import requests",
+                    "import httpx", "import socket"):
+        prova(f"il modulo non fa «{vietato}»", False,
+              vietato in codice(src))
+    prova("...e non ha un main(): le credenziali non passano da un "
+          "config in chiaro", False, "__main__" in src)
+
+
+def _pezzo_da(sorgente, nome, fine="\n\n\n"):
+    """`pezzo()` per un file diverso da server.py."""
+    i = sorgente.index(f"def {nome}(")
+    return sorgente[i:sorgente.index(fine, i)]
+
+
+def srv_url(u):
+    """`url_api_ammesso` girata davvero, con un risolutore di cartone:
+    l'host non si chiede alla rete (in CI non c'e'), ma la forma
+    dell'indirizzo si giudica per intero."""
+    from urllib.parse import urlparse
+    amb = {"urlparse": urlparse, "url_foto_ammesso": lambda _u: True}
+    exec(pezzo("url_api_ammesso"), amb)
+    return amb["url_api_ammesso"](u)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -24781,7 +25036,7 @@ def main():
               prove_sintassi_client,
               prove_banner_negozio,
               prove_foto_vuota,
-              prove_connettori):
+              prove_connettori, prove_connettori_sync):
         try:
             f()
         except Exception as e:
