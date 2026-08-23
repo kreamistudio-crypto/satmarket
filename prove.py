@@ -23103,7 +23103,7 @@ def prove_scoprire():
     # — quindi l'override e' UNO, e la base non si tocca.
     prova("il titolo del P2P ha la sua regola, e solo lui", (True, 1),
           ('.scoprire-card[data-id="p2p"] .sc-titolo{'
-           'left:26px;font-size:20px}' in mini,
+           'left:30px;font-size:20px}' in mini,
            mini.count('data-id="p2p"] .sc-titolo{')))
     prova("...e nessun'altra card sposta il suo titolo", 0,
           sum(mini.count('data-id="%s"] .sc-titolo{' % _i)

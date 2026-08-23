@@ -1914,7 +1914,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e li' sbatteva contro l'onda dorata del disegno. Chi lo allunga
   rimisuri, o lo sente dalla CI.
   E STA PIU' A DESTRA E PIU' GRANDE DELLE SORELLE (ago 2026,
-  decisione di Andrea): `left:26px; font-size:20px`, contro i 14 e i
+  decisione di Andrea): `left:30px; font-size:20px`, contro i 14 e i
   17 della base — tre caratteri nella scatola tarata su «Sconti dei
   negozi» si perdevano in un angolo. SOLO il suo, ed e' la meta' da
   non uniformare: i titoli delle sorelle quella scatola la riempiono
@@ -1925,18 +1925,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   21 NON passerebbe, a `left:18` si. Chi tara questi due numeri li
   muova insieme.
   I NUMERI, misurati sul file vero e non estrapolati: il disegno
-  regge fino a x=289 sull'immagine; l'inchiostro VERO di «P2P»
-  finisce a 178 (misurato a schermo, non dedotto: 37px CSS di
-  margine) e la fascia sorvegliata a 270, cioe' **6px CSS**. E' la
+  regge fino a x=289 sull'immagine — non e' una stima, e' un MURO:
+  alla colonna 290 il contrasto crolla da 12,1 a 2,66 nel giro di due
+  pixel, perche' li' comincia la scia dorata. L'inchiostro VERO di
+  «P2P» finisce a 190 (misurato a schermo, non dedotto: 33px CSS di
+  margine) e la fascia sorvegliata a 282, cioe' **2px CSS**. E' la
   fascia a decidere, non l'inchiostro — la CI guarda quella — quindi
   il margine da leggere e' il secondo, ed e' stretto apposta: la
   stima a un em per carattere e' 1,8 volte la larghezza vera.
   SPOSTARE COSTA UNO A UNO: ogni px CSS a destra si mangia 3px di
   fascia, e il filo del disegno non si muove (la banda si accorcia a
   sinistra e si allunga a destra della stessa misura). Da `left:22`,
-  dove il margine era di 10px CSS, si e' arrivati a 26; a 28 restano
-  4px CSS e a 30 due — oltre non si va senza ridisegnare, e non e'
-  un'opinione: e' la tabella che la CI ricalcola da sola.
+  dove il margine era di 10px CSS, si e' arrivati a 30 in tre passi.
+  ⚠️ **QUESTO E' IL CAPOLINEA**, e va detto perche' la CI da sola non
+  lo direbbe: a 31 resta 1,3px CSS, a 32 tre decimi, e a 33 la prova
+  passa ancora ma SOLO PER UN INCIDENTE — la fascia si campiona a
+  passo 3 e a quel valore la griglia salta esattamente la colonna 290.
+  Dal 34 in giu' e' rossa. Chi vuole spostarlo ancora ridisegni il
+  banner o accorci il campionamento: muovere il numero e basta
+  vorrebbe dire appoggiarsi a un buco della griglia.
   IL FILE E' `assets/scoprire/p2p.webp`, 750x345 come le sorelle, e
   arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
   (ImageOps.fit LANCZOS q92 method=6).
