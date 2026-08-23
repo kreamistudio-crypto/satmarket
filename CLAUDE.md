@@ -367,7 +367,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   meno grave — e da quando l'AI segnala e non decide quel caso finisce
   comunque in coda, sotto gli occhi di un moderatore. L'atteso è stato
   RIMESSO a DUBBIO (vedi la voce sua, sopra): col prossimo giro il
-  conto deve tornare **19/19**. CHI LO RILANCIA SCRIVA QUI IL NOME di
+  conto deve tornare **19/19** — ED È TORNATO: il 23 ago 2026 Andrea
+  l'ha rilanciato sul VPS coi sei casi dei servizi in coda, **25/25**,
+  nessuno caduto. CHI LO RILANCIA SCRIVA QUI IL NOME di
   quel che cade: un «18/19» senza nome è un numero su cui fra sei mesi
   nessuno può agire, ed è esattamente il rumore in cui una regressione
   vera si perde. Vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL
@@ -4399,10 +4401,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella docstring dello script — la WHERE mutilata restava verde.
   Ora l'ancora è la coda della SELECT vera (`AND nostr_autore=''
   ORDER BY id`). Sette mutazioni, sette rosse.
-  DOPO IL DEPLOY, il giro che manca da qui: lo script sul VPS (prima
-  la prova generale su una COPIA del db), la contro-verifica dai
-  relay (i 30402 `barattolo-*` devono portare il tag), e nei giorni
-  dopo dev.nostrolo.gy/marketplaces deve mostrare «Barattolo».
+  FATTO (23 ago 2026, Andrea sul VPS): lo script ha ripubblicato
+  **79 eventi** col tag client, e dev.nostrolo.gy/marketplaces mostra
+  «Barattolo» **TERZO, con 82 annunci**. Verificato, non più da
+  guardare.
   E IL BIVIO VALE ANCHE ALL'INDIETRO (ago 2026, decisione di Andrea):
   `trasloca_annunci_nostr` nell'orologio porta sull'account del
   venditore gli annunci finiti in piazza a nome NOSTRO prima che lui
@@ -6970,8 +6972,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ⚠️ `collaudo_impersonazione.py` ha SEI casi nuovi in CODA (25 in
   tutto): le sue sentinelle cercano l'esito in una finestra di 400/500
   caratteri dopo il nome del caso, quindi spostare le voci esistenti le
-  rompe. VA RILANCIATO SUL VPS con la chiave vera — è l'unica cosa che
-  dice se il modello ha capito il confine nuovo.
+  rompe. VA RILANCIATO SUL VPS con la chiave vera a ogni ritocco — è
+  l'unica cosa che dice se il modello ha capito il confine nuovo.
+  Rilanciato il 23 ago 2026: **25/25**, i sei casi dei servizi passano
+  tutti.
   COSA RESTA FUORI, dichiarato: sedute multiple e ricorrenze · il
   servizio nei set (escluso gratis) e all'asta · `anche_servizio` ·
   rimborsi parziali · QUALUNQUE auto-sblocco · la videochiamata dentro
@@ -17152,8 +17156,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per le magliette: anche una sacca o una tazza col logo bitcoin
   sono "Bitcoin", e il logo conta sia come simbolo ₿ sia scritto a
   parole». La sacca è REGRESSIONE PERMANENTE nel collaudo, col
-  racconto nel suo perché. Il giro dopo la cura è da rifare: atteso
-  14/14.
+  racconto nel suo perché. Il giro dopo la cura, rifatto da Andrea sul
+  VPS il 23 ago 2026: **14/14**, la sacca compresa.
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
   da rilanciare a OGNI ritocco. Quattordici casi con l'atteso accanto:
@@ -17186,7 +17190,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che un giro saltato non si scambi per un giro riuscito. Torturato
   con sei mutazioni, ognuna rossa da sola.
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
-  (`python collaudo_ricategorizza.py`), atteso 14/14: chi lo rilancia
+  (`python collaudo_ricategorizza.py`), atteso 14/14 — e 14/14 è
+  uscito il 23 ago 2026: chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
   maglietta qualunque, l'alimentatore, l'olio o la consulenza la
   regola assorbe troppo e va stretta, se cadono i tematici non ha
@@ -19367,7 +19372,8 @@ fuori posto era «Assistenza Barattolo — supporto agli utenti», atteso
 VIETATO e risposta DUBBIO — un «caso cattivo passato», il tipo meno
 grave, che ora finisce comunque in coda. L'atteso è stato rimesso a
 DUBBIO, che è quello che il prompt insegna: col prossimo giro il conto
-torna 19/19), e `stima_coda_moderazione.py` sui rifiuti
+torna 19/19 — ed è tornato, **25/25** il 23 ago 2026 coi sei casi dei
+servizi), e `stima_coda_moderazione.py` sui rifiuti
 veri di 30 giorni dice che la coda passa da **7 a 14, cioè 0,2 annunci
 in più al giorno**. 2171 prove verdi, nove mutazioni tutte rosse, e UNA
 prova che ha cambiato lato: chiedeva che «VIETATO: impersonazione»
@@ -20596,10 +20602,12 @@ niente**: `SERVIZI_ATTIVI` nasce FALSE nel codice, come
 IMPORT_NOSTR_APERTO e per la stessa ragione — la si accende dal config
 del VPS con un gesto, guardando il primo giro. `SERVIZIO_MAX_APERTI`
 nasce a 0 (spenta) e si alza solo se in rodaggio si vede una raffica.
-DA FARE PRIMA DI ACCENDERE, ed è il pezzo che in locale non si può
-fare: `python collaudo_impersonazione.py` sul VPS con la chiave vera —
-i sei casi nuovi dicono se il modello ha capito il confine
-definito/su misura, e l'atteso segue il PROMPT, mai il modello.
+FATTO PRIMA DI ACCENDERE (23 ago 2026, Andrea sul VPS):
+`collaudo_impersonazione.py` con la chiave vera dà **25/25** — i sei
+casi nuovi dicono che il modello ha capito il confine definito/su
+misura, e l'atteso segue il PROMPT, mai il modello. `SERVIZI_ATTIVI` è
+ACCESA nel config del VPS dallo stesso giorno, insieme a
+`CONNETTORI_NEGOZIO_APERTI` e `BANNER_NEGOZIO_ATTIVO`.
 DA GUARDARE al primo giro vero: la prima lezione comprata dentro
 Telegram (proposta → conferma → «c'è stata» → sats sbloccati) e la
 prima disputa, dove la nota al moderatore è l'unica cosa su cui
