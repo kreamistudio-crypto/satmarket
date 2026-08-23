@@ -572,13 +572,32 @@ RICATEGORIZZA_AUTO = True
 CONNETTORI_NEGOZIO_APERTI = False
 
 # Quanti prodotti si leggono per collegamento a ogni giro. Il target
-# dichiarato (cataloghi da ~200 articoli) passa tutto in un giro solo;
-# un catalogo piu' grande si digerisce in piu' tornate, e il report lo
-# dice al venditore invece di troncare in silenzio.
+# dichiarato (cataloghi da ~200 articoli) passa tutto in un giro solo.
+# ⚠️ ABBASSARLO NON DISTRIBUISCE NIENTE, ed e' la cosa da sapere prima
+# di toccarlo: quel che non si legge non si puo' distinguere da quel
+# che il venditore ha tolto dal negozio, quindi una lettura corta
+# SOSPENDE le sparizioni per quel giro (fino ad ago 2026 le spegneva
+# invece, per sempre: 'rimosso' non risorge). Il catalogo oltre il
+# tetto semplicemente non entra, e il report lo dice al venditore.
+# Per far entrare un catalogo grande un po' per volta c'e' la leva qui
+# sotto, che e' un'altra cosa.
 # ⚠️ Oltre 250 il catalogo di Shopify comincia a paginarsi davvero, e
 # li' il suo limite di richieste al secondo torna a contare: prima di
 # alzarlo tanto, va rimessa una pausa dentro il ciclo del lettore.
 MAX_PRODOTTI_CONNETTORE = 200
+
+# Quanti annunci NUOVI nascono per collegamento a ogni giro (0 =
+# nessun tetto). Il catalogo si legge SEMPRE tutto — quindi le
+# sparizioni restano vere e i prezzi di quel che vendi gia' si
+# aggiornano come sempre — e a scaglioni entra solo l'INGRESSO in
+# vetrina.
+# IL CASO CHE LA CHIEDE: la vetrina e' ordinata per data, e un
+# catalogo entra tutto nello stesso secondo. Cinque negozi collegati
+# insieme sono mille annunci che si prendono le prime pagine, e chi
+# vende una cosa sola sparisce. Con trenta all'ora un catalogo da
+# duecento entra in una giornata, e la home resta di tutti.
+# Non risolve il monopolio della prima pagina: lo diluisce.
+MAX_NUOVI_CONNETTORE_GIRO = 30
 
 # Dopo quanti giri falliti di FILA il collegamento si dichiara rotto e
 # il venditore riceve UN avviso (uno solo: alla soglia, poi silenzio —

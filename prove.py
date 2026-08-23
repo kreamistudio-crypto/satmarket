@@ -14367,6 +14367,7 @@ def _censimento(acceso):
                  "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE",
                  "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO",
                  "CONNETTORI_NEGOZIO_APERTI", "MAX_PRODOTTI_CONNETTORE",
+                 "MAX_NUOVI_CONNETTORE_GIRO",
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE"):
         amb[nome] = acceso and 24
@@ -15406,8 +15407,8 @@ def prove_leve():
     # I CONNETTORI (ago 2026): la porta sta nel PRIMO gruppo — quello
     # di cio' che apre porte — perche' accesa il server va a bussare
     # all'API di un negozio di qualcun altro con le sue credenziali in
-    # mano. I cinque numeri stanno in un gruppo loro, che e' un'altra
-    # cosa: sono limiti, non interruttori.
+    # mano. I numeri stanno in un gruppo loro, che e' un'altra cosa:
+    # sono limiti, non interruttori.
     prova("la porta dei negozi sta nel primo gruppo", True,
           any(v["chiave"] == "CONNETTORI_NEGOZIO_APERTI"
               for v in gruppi_on[0]["voci"]))
@@ -15415,9 +15416,21 @@ def prove_leve():
           "credenziali" in voci_on["CONNETTORI_NEGOZIO_APERTI"].get("nota", ""))
     prova("...e da spenta non dice niente", False,
           "nota" in voci_off["CONNETTORI_NEGOZIO_APERTI"])
-    prova("i cinque numeri dei negozi hanno un gruppo loro", True,
-          any(g["gruppo"].startswith("🏪") and len(g["voci"]) == 5
+    # ...e il conto NON si scrive a mano: erano «i cinque», poi il tetto
+    # degli annunci nuovi per giro li ha fatti sei, e un numero in una
+    # prova e' un numero da ricordarsi di aggiornare. Quel che conta e'
+    # che il gruppo esista e non sia vuoto.
+    prova("i numeri dei negozi hanno un gruppo loro", True,
+          any(g["gruppo"].startswith("🏪") and len(g["voci"]) >= 5
               for g in gruppi_on))
+    # E LA LEVA CHE DISTRIBUISCE L'INGRESSO C'E', col suo «cosa
+    # comporta» da spenta: a zero un catalogo collegato entra tutto
+    # insieme e si prende le prime pagine della vetrina.
+    prova("...e il tetto degli annunci nuovi e' fra loro", True,
+          "MAX_NUOVI_CONNETTORE_GIRO" in voci_on)
+    prova("...e da zero dice cosa comporta", True,
+          "vetrina" in voci_off.get("MAX_NUOVI_CONNETTORE_GIRO",
+                                    {}).get("nota", ""))
 
     # --- 2) LA FORMA ---------------------------------------------
     prova("ogni gruppo ha delle voci", True,
@@ -23567,8 +23580,141 @@ def prove_sintassi_client():
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
     prove_centro_fila(mini, node)
+    prove_riempimento(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
+
+
+def prove_riempimento(mini, node):
+    """LO SCORRIMENTO CHE NON SI PIANTA (ago 2026), fatto girare.
+
+    `caricaAltri` e le sue tre sorelle sono chiamate SOLO da un
+    IntersectionObserver, e un osservatore notifica le TRANSIZIONI:
+    se dopo l'append la sentinella resta dentro il margine non c'e'
+    nessuna nuova intersezione, la callback non riparte piu' e lo
+    scorrimento si ferma CON IL CURSORE ANCORA VALIDO — senza spinner,
+    senza errore, e a chi guarda sembra che il mercatino finisca li'.
+    Oggi non morde perche' le pagine sono sempre piene tranne
+    l'ultima; morde il giorno che una esce corta.
+
+    Le sentinelle direbbero che il `for` c'e'. Le domande vere sono
+    tre e sono tutte «cosa risponde»: continua finche' lo schermo e'
+    scoperto, si ferma quando la lista e' finita, e non gira
+    all'infinito se il server risponde male."""
+    import re as _re, subprocess as _sp, tempfile as _tf
+    fn = pezzo_js(mini, "function osservaSentinella(", "\n}\n") + "\n}\n"
+    # LE DUE COSTANTI SI LEGGONO DAL CLIENT, non si ribattono qui: col
+    # valore scritto nel banco la mutazione che toglie la cintura del
+    # giro infinito restava verde — il banco misurava sé stesso. L'ha
+    # detto la tortura.
+    cost = "".join(
+        m.group(0) + "\n" for m in _re.finditer(
+            r"const (MARGINE_SENTINELLA|MAX_GIRI_RIEMPIMENTO) = \d+;", mini))
+    banco = cost + r"""
+/* il modulo gira in strict mode: quel che il browser regala come
+   globale qui va dichiarato, o l'assegnazione alza */
+let innerHeight = 800, el, IntersectionObserver;
+const window = {IntersectionObserver: true};
+""" + fn + r"""
+const rosse = [];
+function att(nome, atteso, avuto){
+  const a = JSON.stringify(atteso), b = JSON.stringify(avuto);
+  if (a !== b) rosse.push(nome + ': atteso ' + a + ', avuto ' + b);
+}
+/* Il banco: una sentinella che sta a `top` px dal bordo alto, e una
+   callback che dice quante volte e' stata chiamata. Ogni pagina
+   «appesa» spinge la sentinella piu' in basso di `passo` px — che e'
+   quel che fa il DOM quando la griglia cresce. */
+function banco({top, passo, pagine}){
+  const stato = {top, giri: 0};
+  const nodo = {getBoundingClientRect: () => ({top: stato.top})};
+  const doc = {gridSentinella: nodo};
+  el = id => doc[id];
+  let osserva = null;
+  IntersectionObserver = function(cb){
+    this.observe = () => { osserva = () => cb([{isIntersecting: true}]); };
+  };
+  osservaSentinella('gridSentinella', async () => {
+    stato.giri++;
+    if (stato.giri > pagine) return false;   // la lista e' finita
+    stato.top += passo;
+    return true;
+  });
+  return {stato, scatta: () => osserva()};
+}
+/* L'ATTESA E' LA PARTE DELICATA DEL BANCO: l'osservatore lancia
+   `riempi()` SENZA await — e deve farlo, un IntersectionObserver non
+   aspetta nessuno — quindi `scatta()` torna subito e un `await` su di
+   lei non aspetta un bel niente. Un banco scritto cosi' misura il
+   numero di microtask che gli capita di aver smaltito, cioe' dice
+   numeri a caso (qui diceva 2 dappertutto). Il `setTimeout` e' un
+   macrotask: quando arriva, tutti i microtask pendenti — cioe' il
+   loop intero, che non aspetta rete — sono finiti. */
+const posa = () => new Promise(r => setTimeout(r, 0));
+/* 1) IL CASO DEL CANTIERE: una pagina corta lascia la sentinella
+      dentro il margine, e senza il riempimento il giro sarebbe UNO.
+      Qui lo schermo si copre al terzo. */
+const corto = banco({top: 100, passo: 500, pagine: 99});
+corto.scatta(); await posa();
+att('la pagina corta non pianta lo scorrimento', 3, corto.stato.giri);
+/* 2) LO SCHERMO PIENO FERMA IL GIRO: una pagina piena porta la
+      sentinella oltre il margine, e si chiede una volta sola. */
+const pieno = banco({top: 100, passo: 5000, pagine: 99});
+pieno.scatta(); await posa();
+att('una pagina piena chiede una volta sola', 1, pieno.stato.giri);
+/* 3) LA FINE DELLA LISTA FERMA IL GIRO anche a schermo scoperto: e'
+      il patto con le callback — `false` vuol dire «non c'e' altro»,
+      e senza quel patto qui si girerebbe fino al tetto. */
+const finito = banco({top: 100, passo: 0, pagine: 2});
+finito.scatta(); await posa();
+att('la lista finita ferma il giro', 3, finito.stato.giri);
+/* 4) LA CINTURA: un server che dicesse sempre «ce n'e' ancora»
+      lasciando lo schermo scoperto non deve poter tenere il telefono
+      in un ciclo senza fine. */
+const bugiardo = banco({top: 100, passo: 0, pagine: 9999});
+bugiardo.scatta(); await posa();
+att('il giro infinito ha una cintura', MAX_GIRI_RIEMPIMENTO,
+    bugiardo.stato.giri);
+/* 5) E DUE INTERSEZIONI RAVVICINATE non fanno due giri sovrapposti:
+      la seconda trova il riempimento in corso e se ne va.
+      IL CASO E' A LISTA GIA' FINITA (`pagine: 0`) apposta: con una
+      lista lunga i due giri si spartiscono lo stesso lavoro e il
+      totale torna lo stesso, quindi il caso non direbbe niente — e
+      infatti la mutazione che toglie la guardia era sopravvissuta.
+      Cosi' invece la differenza e' netta: una chiamata con la
+      guardia, due senza. */
+const doppio = banco({top: 100, passo: 0, pagine: 0});
+doppio.scatta(); doppio.scatta(); await posa();
+att('due tocchi ravvicinati non raddoppiano le pagine', 1,
+    doppio.stato.giri);
+console.log(JSON.stringify(rosse));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".mjs", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco); percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il riempimento gira", "", (r.stderr or "")[:300])
+        return
+    prova("il riempimento risponde giusto in tutti i casi",
+          "[]", (r.stdout or "").strip())
+    # IL PATTO DALL'ALTRA PARTE: il banco gira con una callback di
+    # cartone, quindi non si accorge se una delle quattro VERE smette
+    # di dire quanto ha appeso — e senza quel conto il riempimento si
+    # ferma al primo giro, cioe' torna esattamente il difetto di
+    # partenza. E' un CENSIMENTO e non un elenco: la quinta sentinella
+    # di domani entra nel conto da sola, e chi la scrive senza il
+    # `return` lo sente qui.
+    mute = []
+    for nome in _re.findall(r"osservaSentinella\('[^']+', (\w+)\)", mini):
+        corpo = pezzo_js(mini, f"async function {nome}(", "\n}\n")
+        if not _re.search(r"return (nuovi\.length|aggiunti) > 0", corpo):
+            mute.append(nome)
+    prova("ogni callback dice se ha appeso righe", [], mute)
+    prova("...e le sentinelle censite sono tutte", 4,
+          len(_re.findall(r"osservaSentinella\('", mini)))
 
 
 def prove_avvio_client(mini=None, node=None):
@@ -26742,13 +26888,19 @@ def prove_connettori_sync():
     # tetto, o anche la versione sbagliata direbbe l'avviso — perche'
     # avrebbe letto piu' prodotti del tetto e il vecchio confronto
     # scatterebbe lo stesso.
-    letti, avviso = leggi_sh("mio.myshopify.com", cred_sh,
-                             negozio_sh([4, 2]), 4)
+    letti, avviso, completo = leggi_sh("mio.myshopify.com", cred_sh,
+                                       negozio_sh([4, 2]), 4)
     prova("Shopify: il catalogo lungo si tronca al tetto", 4, len(letti))
     prova("...MA lo dice, invece di troncare in silenzio", True,
           bool(avviso))
-    prova("...e il catalogo corto non produce falsi allarmi", "",
-          leggi_sh("mio.myshopify.com", cred_sh, negozio_sh([3]), 200)[1])
+    # ...E LO DICE ANCHE AL CODICE, non solo al venditore: e' il terzo
+    # valore, ed e' quello che disarma le sparizioni. Prima il
+    # troncamento era una lista corta indistinguibile da un catalogo
+    # piccolo, e tutto cio' che stava oltre il tetto veniva spento —
+    # per sempre, che 'rimosso' non risorge.
+    prova("...e dichiara la lettura PARZIALE", False, completo)
+    prova("...e il catalogo corto non produce falsi allarmi", ("", True),
+          leggi_sh("mio.myshopify.com", cred_sh, negozio_sh([3]), 200)[1:])
     uno = codice(pezzo("_un_connettore"))
     prova("...e il giro esce prima di toccare una riga", True,
           0 <= uno.find("_connettore_in_errore") < uno.find("traduci"))
@@ -26987,24 +27139,37 @@ def prove_connettori_woo():
             return 200, {"lista": fetta}, testa
         return chiama
 
-    letti, avviso = leggi("https://x.it", cred, catalogo(30), 200)
+    letti, avviso, completo = leggi("https://x.it", cred, catalogo(30), 200)
     prova("il catalogo corto si legge tutto, senza avvisi",
-          (30, ""), (len(letti), avviso))
+          (30, "", True), (len(letti), avviso, completo))
     # IL CASO CHE HA CHIESTO LA CURA, e non si vedeva leggendo: con
     # cento prodotti per pagina e un tetto di duecento si atterra
     # ESATTAMENTE sul tetto, quindi «ne ho letti piu' del tetto?» non
     # scatta mai — e il catalogo si troncava senza dirlo.
-    letti, avviso = leggi("https://x.it", cred, catalogo(250), 200)
+    letti, avviso, completo = leggi("https://x.it", cred, catalogo(250), 200)
     prova("il catalogo lungo si tronca al tetto", 200, len(letti))
     prova("...MA lo dice, col conto vero", True,
           "250" in avviso and "200" in avviso)
-    letti, avviso = leggi("https://x.it", cred, catalogo(250, False), 200)
-    prova("...e lo dice anche senza `X-WP-Total`", True, bool(avviso))
+    prova("...e dichiara la lettura PARZIALE", False, completo)
+    # E LA CODA DELL'AVVISO E' LA META' CHE CONTA: la frase di ieri
+    # prometteva «il resto arriva ai giri successivi» ed era falsa —
+    # nessuno dei due lettori tiene un cursore fra un giro e l'altro.
+    # Quel che il venditore deve sapere e' l'altra cosa: finche' il
+    # catalogo non ci sta, i prodotti che toglie dal negozio non si
+    # spengono qui.
+    prova("...e dice che le sparizioni sono sospese", True,
+          "non spegniamo" in avviso)
+    prova("...e non promette piu' un resto che non arriva", True,
+          "giri successivi" not in avviso)
+    letti, avviso, completo = leggi("https://x.it", cred,
+                                    catalogo(250, False), 200)
+    prova("...e lo dice anche senza `X-WP-Total`", True,
+          bool(avviso) and not completo)
     # ...senza pero' dire «ce n'e' ancora» a un negozio che ne ha
     # esattamente duecento: il conto vero, quando c'e', comanda da
     # solo — altrimenti quel venditore leggerebbe l'avviso per sempre
-    prova("il conto esatto non produce falsi allarmi", "",
-          leggi("https://x.it", cred, catalogo(200), 200)[1])
+    prova("il conto esatto non produce falsi allarmi", ("", True),
+          leggi("https://x.it", cred, catalogo(200), 200)[1:])
     # e una lettura fallita ALZA, come il gemello Shopify: le
     # sparizioni si giudicano solo su un catalogo COMPLETO
     def rotto(metodo, url, intestazioni):
@@ -27339,6 +27504,182 @@ def srv_url(u):
     amb = {"urlparse": urlparse, "url_foto_ammesso": lambda _u: True}
     exec(pezzo("url_api_ammesso"), amb)
     return amb["url_api_ammesso"](u)
+
+
+def prove_connettori_ingresso():
+    """L'INGRESSO IN VETRINA (ago 2026): le sparizioni si giudicano
+    solo su un catalogo COMPLETO, e le righe nuove entrano a scaglioni.
+
+    IL GUASTO CHE CHIUDE, ed era vivo da due tappe: il tetto di lettura
+    troncava il catalogo e consegnava alla riconciliazione una lista
+    corta — che sulle sparizioni si fida — quindi tutto cio' che stava
+    oltre il duecentesimo prodotto passava a 'rimosso'. Per sempre: lo
+    scudo anti-resurrezione non lo ricrea, serve una chiave nuova.
+    Il commento sopra quel ciclo diceva gia' «il chiamante non deve mai
+    arrivare qui con una lettura parziale», e la difesa costruita era
+    che una lettura FALLITA alza — ma il troncamento non alza: torna
+    una lista corta e basta.
+
+    Qui si GIRA la riconciliazione vera su un database di cartone. Una
+    sentinella direbbe che l'`if` c'e'; solo l'esecuzione dice che
+    l'annuncio e' ancora attivo dopo il giro, ed e' quella la domanda
+    a cui risponde il venditore che guarda la sua vetrina."""
+    print("\n[i connettori: sparizioni e ingresso a scaglioni]")
+    import sqlite3
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    riconcilia = m["riconcilia_connettore"]
+
+    CONNETTORE = {"id": 7, "fonte": "woo", "tg_id": 111, "zona": "Pavia (PV)",
+                  "consegna": "spedizione", "spedizione_eur": 0.0,
+                  "spedizione_punto_eur": 0.0,
+                  "spedizione_punto_dichiarata": 0,
+                  "spedizione_extra_eur": 0.0}
+
+    def banco():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              venditore_id INT, titolo TEXT, descrizione TEXT,
+              categoria TEXT, prezzo_sats INT, zona TEXT, foto TEXT,
+              valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
+              consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
+              spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              fonte TEXT, connettore_id INT, origine_chiave TEXT,
+              origine_foto TEXT, origine_stock_visto INT,
+              creato INT, modificato INT, stato TEXT);
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              stato TEXT, aggiornato INT);
+            CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+        """)
+        return con
+
+    def riga(chiave, titolo="Miele", attivo=True, quantita=5, **kw):
+        r = {"origine_chiave": chiave, "titolo": titolo,
+             "descrizione": "Buono", "prezzo_sats": 1000,
+             "prezzo_eur": 7.5, "foto": [], "quantita": quantita,
+             "attivo": attivo}
+        r.update(kw)
+        return r
+
+    def stati(con):
+        return {r["origine_chiave"]: r["stato"] for r in con.execute(
+            "SELECT origine_chiave, stato FROM annunci ORDER BY id")}
+
+    def gira(con, righe, **kw):
+        return riconcilia(con, CONNETTORE, righe, lambda *a: None, {}, **kw)
+
+    # --- 1) `completo` e' OBBLIGATORIO E SENZA DEFAULT ------------
+    # La lezione di `atteso_sats`: la domanda si eredita, e chi la
+    # dimentica lo sente da Python invece che da un venditore che
+    # guarda la sua vetrina svuotata. Se un domani qualcuno le desse
+    # un default, questa prova e' l'unica che se ne accorge.
+    con = banco()
+    prova("`completo` non ha un default: chi lo dimentica lo sente", True,
+          "riconcilia_connettore() missing 1 required keyword-only "
+          "argument: 'completo'" in _alza(
+              lambda: riconcilia(con, CONNETTORE, [], lambda *a: None)))
+
+    # --- 2) catalogo COMPLETO: le sparizioni funzionano ----------
+    con = banco()
+    gira(con, [riga("a"), riga("b")], completo=True)
+    prova("il catalogo completo crea le righe", {"a": "attivo", "b": "attivo"},
+          stati(con))
+    esito = gira(con, [riga("a")], completo=True)
+    prova("...e quel che non c'e' piu' si spegne",
+          ({"a": "attivo", "b": "rimosso"}, 1), (stati(con), esito["spenti"]))
+
+    # --- 3) catalogo PARZIALE: nessuna sparizione ----------------
+    # IL CASO DEL CANTIERE, e la coppia col punto 2 e' il punto: le
+    # stesse identiche righe, la stessa identica chiamata, e a cambiare
+    # e' solo la risposta alla domanda «e' tutto?».
+    con = banco()
+    gira(con, [riga("a"), riga("b")], completo=True)
+    esito = gira(con, [riga("a")], completo=False)
+    prova("la lettura parziale NON spegne quel che non ha visto",
+          ({"a": "attivo", "b": "attivo"}, 0),
+          (stati(con), esito["spenti"]))
+    prova("...e lo dichiara nel report", True, esito["parziale"])
+
+    # --- 4) le righe SALTATE non sono righe sparite --------------
+    # Il secondo buco della stessa famiglia: `viste` si riempiva DOPO
+    # il `continue` delle saltate, quindi bastava che un prodotto gia'
+    # in vetrina diventasse multi-variante — o che la moderazione non
+    # riuscisse a guardarlo — perche' sparisse per sempre.
+    con = banco()
+    gira(con, [riga("a"), riga("b")], completo=True)
+    esito = gira(con, [riga("a"),
+                       riga("b", saltato_perche="multi-variante")],
+                 completo=True)
+    prova("una riga saltata resta in vetrina, non si spegne",
+          ({"a": "attivo", "b": "attivo"}, 0),
+          (stati(con), esito["spenti"]))
+
+    # --- 5) il tetto delle righe NUOVE ---------------------------
+    # E' l'opposto del tetto di lettura: quello TRONCAVA la vista e
+    # mutilava il catalogo, questo legge tutto — quindi le sparizioni
+    # restano vere — e distribuisce solo l'ingresso in vetrina.
+    con = banco()
+    tutte = [riga(c) for c in "abcde"]
+    esito = gira(con, tutte, completo=True, max_nuovi=2)
+    prova("il tetto fa nascere solo le prime", (2, 3),
+          (esito["nuovi"], esito["rimandati"]))
+    prova("...e le rimandate NON si spengono: non sono sparite",
+          ({"a": "attivo", "b": "attivo"}, 0), (stati(con), esito["spenti"]))
+    # LA PROMESSA CHE ORA E' VERA: «il resto arriva ai giri
+    # successivi». Con lo stesso catalogo, al giro dopo entrano le
+    # altre — le prime due si ritrovano per chiave e si aggiornano.
+    esito = gira(con, tutte, completo=True, max_nuovi=2)
+    prova("al giro dopo entrano le successive", (2, 2, 1),
+          (esito["nuovi"], esito["aggiornati"], esito["rimandati"]))
+    esito = gira(con, tutte, completo=True, max_nuovi=2)
+    prova("...finche' il catalogo non e' tutto dentro", (1, 4, 0),
+          (esito["nuovi"], esito["aggiornati"], esito["rimandati"]))
+    prova("...e allora ci sono tutte", 5, len(stati(con)))
+
+    # --- 5-bis) IL CHIAMANTE, che il banco non puo' vedere -------
+    # Le prove qui sopra girano la riconciliazione con i parametri
+    # GIUSTI, quindi restano verdi anche se il server smettesse di
+    # passarli: e' quel che ha detto la tortura, non la rilettura.
+    uno = codice(pezzo("_un_connettore"))
+    prova("il server passa la parzialita' della lettura, non `True`",
+          True, "completo=completo," in uno)
+    prova("...e il tetto viene dalla leva, non da uno zero", True,
+          "max_nuovi=MAX_NUOVI_CONNETTORE_GIRO" in uno)
+    # E LE RIGHE NON AMMESSE SI MARCANO, NON SI TOLGONO: una riga tolta
+    # dalla lista non arriva alle sparizioni, che la leggono come «non
+    # c'e' piu' sul negozio». Su una riga nuova non cambiava niente, ma
+    # `nuove` contiene anche gli annunci GIA' IN VETRINA col testo
+    # cambiato — quindi bastava un singhiozzo dell'AI per spegnerli.
+    prova("le righe non giudicate si marcano", True,
+          'r["saltato_perche"] = MSG_RIGA_NON_GIUDICATA' in uno)
+    prova("...e non si tolgono dalla lista", [],
+          [r for r in ("righe = [r for r in righe",) if r in uno])
+
+    # --- 6) il tetto tocca l'INGRESSO, mai la tenuta in pari -----
+    # Un prezzo che cambia si scrive comunque: chi vende gia' non
+    # aspetta il proprio turno per aggiornarsi.
+    con = banco()
+    gira(con, [riga("a", prezzo_sats=1000)], completo=True)
+    gira(con, [riga("a", prezzo_sats=2000), riga("b")],
+         completo=True, max_nuovi=0)
+    prova("a tetto zero entrano tutte, come ieri", 2, len(stati(con)))
+    # ...E IL CASO SI SCEGLIE IN MODO CHE POSSA FALLIRE SOLO PER QUELLA
+    # RAGIONE (la lezione di `_pare_recapito`, ripagata qui dalla
+    # tortura): la riga che esiste va messa DOPO le nuove, cosi' quando
+    # il giro ci arriva il tetto e' GIA' esaurito. Col catalogo scritto
+    # nell'ordine naturale — l'esistente per prima — il tetto non e'
+    # ancora pieno, e anche la versione che ferma gli aggiornamenti
+    # passerebbe.
+    con = banco()
+    gira(con, [riga("a", prezzo_sats=1000)], completo=True)
+    gira(con, [riga("b"), riga("c"), riga("a", prezzo_sats=2000)],
+         completo=True, max_nuovi=2)
+    prova("il tetto non ferma l'aggiornamento di chi c'e' gia'", 2000,
+          con.execute("SELECT prezzo_sats FROM annunci "
+                      "WHERE origine_chiave='a'").fetchone()[0])
 
 
 def prove_connettori_cassetto():
@@ -27877,6 +28218,7 @@ def main():
               prove_foto_vuota,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
+              prove_connettori_ingresso,
               prove_connettori_cassetto,
               prove_config_esempio):
         try:

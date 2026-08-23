@@ -58,6 +58,32 @@ MAX_DESCRIZIONE = 1500
 # dell'import CSV.
 MAX_FOTO = 5
 
+# Quel che si dice al venditore quando il catalogo non ci sta nel
+# tetto di lettura, e la seconda meta' e' quella che prima MANCAVA: la
+# frase di ieri prometteva «il resto arriva ai giri successivi», ed
+# era falsa — nessuno dei due lettori tiene un cursore fra un giro e
+# l'altro, quindi ogni ora si rilegge da pagina 1 e si taglia allo
+# stesso punto. Il resto non arrivava mai: veniva letto, tagliato e
+# (prima della cura) spento.
+# UN POSTO SOLO per i due lettori: due frasi che dicono la stessa cosa
+# sono due frasi che un giorno dicono cose diverse.
+MSG_TRONCATO_CODA = (
+    ": gli altri non entrano, e finche' e' cosi' non spegniamo qui i "
+    "prodotti che togli dal negozio — non sapremmo distinguerli da "
+    "quelli che non abbiamo letto"
+)
+
+
+def _msg_troncato(tetto: int, totale: int = 0) -> str:
+    """La testa cambia, la coda no. Il conto VERO si dice quando c'e'
+    (Woo lo mette in `X-WP-Total`), perche' «ne hai 250 e ne leggiamo
+    200» si capisce e «ne hai piu' di 200» si subisce; ma la parte che
+    NON puo' mancare in nessuno dei due casi e' la seconda."""
+    testa = (f"il tuo negozio ha {totale} prodotti e ne leggiamo "
+             f"{tetto} per volta" if totale else
+             f"il tuo catalogo ha piu' di {tetto} prodotti")
+    return testa + MSG_TRONCATO_CODA
+
 
 # --- IL TESTO CANONICO ------------------------------------------------
 
@@ -399,11 +425,17 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
     # il catalogo si troncherebbe senza dirlo. Qui il conto esatto non
     # serve: se dopo il ciclo un `url` c'e' ancora, c'e' ANCORA UNA
     # PAGINA — lo dice Shopify stesso nel suo header.
-    avviso = ""
-    if url or len(prodotti) > tetto:
-        avviso = (f"il catalogo ha piu' di {tetto} prodotti: "
-                  f"il resto arriva ai giri successivi")
-    return prodotti[:tetto], avviso
+    # E IL TRONCAMENTO SI DICHIARA COME FATTO, non come prosa: e' il
+    # terzo valore della tupla, e senza di lui questa funzione mentiva
+    # al suo unico lettore. Il commento delle sparizioni dice «il
+    # chiamante non deve mai arrivare qui con una lettura parziale», e
+    # la difesa costruita era che una lettura fallita ALZA — ma il
+    # tetto NON alza: torna una lista corta, cioe' produce esattamente
+    # la lettura parziale che quel commento teme, e i prodotti oltre
+    # il tetto venivano spenti per sempre.
+    completo = not url and len(prodotti) <= tetto
+    avviso = "" if completo else _msg_troncato(tetto)
+    return prodotti[:tetto], avviso, completo
 
 
 # --- WOOCOMMERCE ------------------------------------------------------
@@ -628,16 +660,12 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
     # anche che NON ne restano — senza questa precedenza un negozio
     # con esattamente duecento prodotti (due pagine piene) si
     # sentirebbe dire «ce n'e' ancora» a ogni giro, per sempre.
-    avviso = ""
     if totale:
-        if totale > tetto:
-            avviso = (f"il tuo negozio ha {totale} prodotti e ne leggiamo "
-                      f"{tetto} per volta: il resto arriva ai giri "
-                      f"successivi")
-    elif restano or len(prodotti) > tetto:
-        avviso = (f"il catalogo ha piu' di {tetto} prodotti: "
-                  f"il resto arriva ai giri successivi")
-    return prodotti[:tetto], avviso
+        completo = totale <= tetto
+    else:
+        completo = not restano and len(prodotti) <= tetto
+    avviso = "" if completo else _msg_troncato(tetto, totale)
+    return prodotti[:tetto], avviso, completo
 
 
 LETTORI = {"shopify": leggi_catalogo_shopify, "woo": leggi_catalogo_woo}
@@ -804,7 +832,8 @@ def _foto_locali(con, annuncio_id: int, urls: list, salva_foto) -> str:
 
 
 def riconcilia_connettore(con, connettore: dict, righe: list,
-                          salva_foto, revisioni=None) -> dict:
+                          salva_foto, revisioni=None, *,
+                          completo: bool, max_nuovi: int = 0) -> dict:
     """Porta il catalogo tradotto dentro `annunci`, e torna il report.
 
     L'ORDINE DELLE DOMANDE e' quello di `importa_venditore`, che e' il
@@ -820,25 +849,58 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     `revisioni` e' il marchio della moderazione: `{chiave: motivo}`.
     Una riga marchiata nasce — o torna — in `stato='revisione'`, cioe'
     invisibile al pubblico finche' un moderatore non dice la sua.
+
+    `completo` E' OBBLIGATORIO E SENZA DEFAULT, ed e' la lezione di
+    `atteso_sats`: dice se `righe` e' il catalogo INTERO. Su una
+    lettura parziale le sparizioni non si possono giudicare — quel che
+    non e' stato letto e quel che il venditore ha tolto si somigliano
+    troppo — e prima di questa riga il tetto di lettura produceva
+    esattamente quella parzialita' in silenzio, spegnendo per sempre
+    i prodotti oltre il duecentesimo (e 'rimosso' non risorge).
+    Senza default apposta: ogni strada futura eredita la domanda, e
+    chi la dimentica lo sente da Python invece che da un venditore.
+
+    `max_nuovi` e' quante righe NUOVE nascono in questo giro (0 =
+    nessun tetto). Non e' un fratello del tetto di lettura, e' il suo
+    opposto: quello TRONCAVA la vista e mutilava il catalogo, questo
+    legge tutto — quindi le sparizioni restano vere — e distribuisce
+    solo l'INGRESSO in vetrina. E' anche l'unica riga che rende vera
+    la promessa «il resto arriva ai giri successivi»: al giro dopo le
+    righe gia' create si ritrovano per chiave e il tetto tocca alle
+    prossime.
     """
     revisioni = revisioni or {}
     adesso = int(time.time())
     cid = connettore["id"]
     fonte = connettore["fonte"]
     esito = {"nuovi": 0, "aggiornati": 0, "invariati": 0, "spenti": 0,
-             "riaccesi": 0, "in_revisione": 0, "saltati": [], "falliti": []}
+             "riaccesi": 0, "in_revisione": 0, "rimandati": 0,
+             "parziale": not completo, "saltati": [], "falliti": []}
     viste = set()
 
     for r in righe:
+        # `viste` SI RIEMPIE SEMPRE, ed e' la riga da non spostare piu'
+        # in basso: dice «questa chiave c'e' ANCORA sul negozio», che
+        # e' l'unica domanda a cui le sparizioni rispondono. Non dice
+        # «l'abbiamo scritta»: una riga rimandata dal tetto, saltata
+        # dal traduttore (un multi-variante) o non ammessa dalla
+        # moderazione e' una riga che sul negozio esiste eccome —
+        # spegnerla come «tolta dal venditore» e' una bugia, e per
+        # giunta irreversibile ('rimosso' non risorge).
+        # Prima stava DOPO il `continue` delle saltate, e bastava che
+        # un prodotto gia' in vetrina diventasse multi-variante — o che
+        # l'AI avesse un singhiozzo sul suo testo cambiato — perche'
+        # sparisse per sempre.
+        viste.add(r["origine_chiave"])
         if r.get("saltato_perche"):
             esito["saltati"].append({"titolo": r.get("titolo", "")[:60],
                                      "perche": r["saltato_perche"]})
             continue
         chiave = r["origine_chiave"]
-        viste.add(chiave)
         try:
             _una_riga(con, connettore, r, salva_foto, revisioni, esito,
-                      adesso)
+                      adesso,
+                      max_nuovi <= 0 or esito["nuovi"] < max_nuovi)
         except Exception as e:
             # Una riga che esplode e' una voce del report, mai il giro
             # morto: e' il patto di `_crea_riga_con_guardia`
@@ -853,28 +915,47 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     # errore di rete a meta' paginazione svuoterebbe la vetrina di quel
     # venditore, ed e' il motivo per cui `leggi_catalogo_*` ALZA invece
     # di tornare una lista corta.
-    for riga in con.execute(
-            "SELECT id, titolo, origine_chiave FROM annunci "
-            "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
-            (cid,)).fetchall():
-        if riga["origine_chiave"] in viste:
-            continue
-        spegni_annuncio(con, riga["id"], "rimosso")
-        esito["spenti"] += 1
-        print(f"    🗑 tolto dal negozio: {riga['titolo'][:50]}")
+    # MA IL TETTO DI LETTURA NON ALZAVA, e passava di qui indisturbato:
+    # per due tappe questo `for` ha avuto il potere di spegnere tutto
+    # cio' che stava oltre il duecentesimo prodotto, in silenzio e per
+    # sempre. Adesso la domanda si fa, e la risposta arriva da chi ha
+    # letto — non si deduce qui, che da questa parte un catalogo corto
+    # e un catalogo piccolo sono indistinguibili.
+    # SI SBAGLIA NEL VERSO GIUSTO: sospendere le sparizioni lascia in
+    # vetrina un annuncio che il venditore ha tolto (lo toglie lui, o
+    # il giro dopo se il catalogo ci sta), spegnerle a torto toglie
+    # merce vera a chi vende senza che nessuno lo sappia.
+    if completo:
+        for riga in con.execute(
+                "SELECT id, titolo, origine_chiave FROM annunci "
+                "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
+                (cid,)).fetchall():
+            if riga["origine_chiave"] in viste:
+                continue
+            spegni_annuncio(con, riga["id"], "rimosso")
+            esito["spenti"] += 1
+            print(f"    🗑 tolto dal negozio: {riga['titolo'][:50]}")
+    else:
+        print(f"    ⏸ lettura parziale: le sparizioni non si giudicano")
 
     con.commit()
     print(f"  🏪 {fonte} #{cid}: {esito['nuovi']} nuovi, "
           f"{esito['aggiornati']} aggiornati, {esito['invariati']} invariati, "
-          f"{esito['spenti']} spenti, {len(esito['saltati'])} saltati")
+          f"{esito['spenti']} spenti, {esito['rimandati']} rimandati, "
+          f"{len(esito['saltati'])} saltati")
     return esito
 
 
 def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
-              esito: dict, adesso: int):
+              esito: dict, adesso: int, puo_creare: bool = True):
     """Il corpo del ciclo, per riga. Sta fuori dal `for` perche' ogni
     riga ha il suo `try`: cosi' il fallimento di una non si porta
-    dietro le altre."""
+    dietro le altre.
+
+    `puo_creare` a False rimanda la sola NASCITA: chi c'e' gia' si
+    aggiorna come sempre. E' il tetto di `max_nuovi` visto da qui, e
+    tocca l'ingresso in vetrina, mai la tenuta in pari del prezzo o
+    della giacenza di quel che si vende gia'."""
     cid = connettore["id"]
     chiave = r["origine_chiave"]
     gia = _riga_locale(con, cid, chiave)
@@ -912,6 +993,14 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
         return
 
     # --- la riga nuova ------------------------------------------------
+    # IL TETTO STA QUI E NON PIU' IN ALTO, ed e' la differenza fra
+    # distribuire e mutilare: la riga e' stata LETTA (quindi e' in
+    # `viste` e non passa per sparita), semplicemente non nasce oggi.
+    # Il giro dopo si ritrova per chiave — o nasce, se il tetto la
+    # lascia passare.
+    if not puo_creare:
+        esito["rimandati"] += 1
+        return
     stato = "revisione" if marchio else ("attivo" if r["attivo"]
                                          else "rimosso")
     # L'INVARIANTE DI CASA VALE ANCHE ALLA NASCITA, e non solo agli

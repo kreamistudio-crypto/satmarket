@@ -734,6 +734,88 @@ def main():
                       (tazza["id"],)).fetchone()[0])
     con.close()
 
+    # ---- 13-bis. IL CATALOGO PIU' GRANDE DEL TETTO -------------------
+    # IL GUASTO DEL §0, sul percorso VERO. Il tetto di lettura
+    # troncava il catalogo e consegnava alla riconciliazione una lista
+    # corta — che sulle sparizioni si fida — quindi tutto cio' che
+    # stava oltre passava a 'rimosso'. Per sempre: lo scudo
+    # anti-resurrezione non lo ricrea, serve una chiave nuova.
+    # `prove.py` gira la riconciliazione da sola; qui passa il SERVER,
+    # che e' l'unico posto dove si vede se i due parametri arrivano
+    # davvero fin la'. E se un domani qualcuno li perde per strada,
+    # questo blocco MOSTRA il difetto — annunci spenti che si contano —
+    # invece di descriverlo.
+    # SI USA IL CONNETTORE WOO: a questo punto del collaudo quello
+    # Shopify e' 'rotto' apposta (i cinque giri a vuoto della sezione
+    # 10) e il giro non lo rilegge piu'.
+    print("\n[il catalogo piu' grande del tetto: nessuno si spegne]")
+    # I VASETTI SI AGGIUNGONO, non sostituiscono il catalogo: quel che
+    # sparisce dal negozio si spegne, e 'rimosso' non risorge — con un
+    # `CATALOGO_WOO[:] =` la Tazza e la Tovaglia morirebbero qui, e a
+    # cadere sarebbero le prove DOPO questa (successo: e' cosi' che si
+    # e' scoperto).
+    woo_prima = list(CATALOGO_WOO)
+    CATALOGO_WOO.extend([prodotto_woo(100 + i, f"Vasetto {i}", "3.00",
+                                      stock=2) for i in range(6)])
+    tetto_prima = SRV.MAX_PRODOTTI_CONNETTORE
+    nuovi_prima = SRV.MAX_NUOVI_CONNETTORE_GIRO
+
+    def quanti(prefisso, solo_attivi=True):
+        return len([a for a in annunci(wid)
+                    if a["origine_chiave"].startswith(prefisso)
+                    and (a["stato"] == "attivo" or not solo_attivi)])
+
+    def report():
+        con = SRV.db()
+        r = json.loads(con.execute(
+            "SELECT ultimo_esito FROM connettori WHERE id=?",
+            (wid,)).fetchone()[0])
+        con.close()
+        return r
+
+    try:
+        # il tetto si prende dal catalogo, non da un numero scritto a
+        # mano: cosi' resta «ci stanno tutti» anche se un domani il
+        # collaudo aggiunge un prodotto Woo piu' su
+        SRV.MAX_PRODOTTI_CONNETTORE = len(CATALOGO_WOO)
+        SRV.MAX_NUOVI_CONNETTORE_GIRO = 0    # nessun tetto all'ingresso
+        giro()
+        prova("col catalogo intero entrano tutti i vasetti", 6,
+              quanti("10"))
+        prova("...e la lettura si dichiara completa", False,
+              report()["parziale"])
+        # ...e adesso il tetto tronca: il negozio non e' cambiato di
+        # una riga, ma noi ne leggiamo la meta'. Prima di questa cura
+        # i tre vasetti oltre il tetto passavano a 'rimosso'.
+        SRV.MAX_PRODOTTI_CONNETTORE = 3
+        giro()
+        prova("il tetto tronca, e NESSUN annuncio si spegne", 6,
+              quanti("10"))
+        prova("...e il report dichiara la lettura parziale", True,
+              report()["parziale"])
+        prova("...dicendo al venditore che le sparizioni sono sospese",
+              True, any("non spegniamo" in s["perche"]
+                        for s in report()["saltati"]))
+        # ---- e il tetto sull'INGRESSO, che e' l'altra cosa -----------
+        # Legge tutto (quindi le sparizioni restano vere) e distribuisce
+        # solo la nascita: e' la leva contro l'ondata in vetrina.
+        SRV.MAX_PRODOTTI_CONNETTORE = 50
+        SRV.MAX_NUOVI_CONNETTORE_GIRO = 2
+        CATALOGO_WOO.extend([prodotto_woo(200 + i, f"Tisana {i}", "5.00",
+                                          stock=1) for i in range(5)])
+        giro()
+        prova("le righe nuove entrano a scaglioni", 2, quanti("20"))
+        prova("...e il report dice quante ne restano", 3,
+              report()["rimandati"])
+        prova("...mentre le altre non si spengono: sono sul negozio", 6,
+              quanti("10"))
+        giro()
+        prova("...e al giro dopo arrivano le successive", 4, quanti("20"))
+    finally:
+        SRV.MAX_PRODOTTI_CONNETTORE = tetto_prima
+        SRV.MAX_NUOVI_CONNETTORE_GIRO = nuovi_prima
+        CATALOGO_WOO[:] = woo_prima
+
     # ---- 14. il pezzo che NON viene da un negozio --------------------
     print("\n[un annuncio nato qui non entra nel registro]")
     con = SRV.db()

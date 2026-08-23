@@ -13077,6 +13077,10 @@ def _leve_stato():
         {"gruppo": "🏪 Negozi collegati", "voci": [
             _leva("Prodotti letti per giro", "MAX_PRODOTTI_CONNETTORE",
                   MAX_PRODOTTI_CONNETTORE),
+            _leva("Annunci nuovi per giro", "MAX_NUOVI_CONNETTORE_GIRO",
+                  MAX_NUOVI_CONNETTORE_GIRO,
+                  spento="un catalogo collegato entra tutto insieme, e "
+                         "si prende le prime pagine della vetrina"),
             _leva("Giri falliti prima dell'avviso", "CONNETTORI_ERRORI_MAX",
                   CONNETTORI_ERRORI_MAX,
                   spento="il collegamento non si dichiara rotto mai, e il "
@@ -30370,6 +30374,25 @@ try:
 except ImportError:
     MAX_PRODOTTI_CONNETTORE = 200
 
+# Quante righe NUOVE nascono per giro. NON e' un fratello del tetto
+# qui sopra, e' il suo opposto: quello dice quanto si LEGGE — e
+# leggere poco mutila il catalogo, perche' le sparizioni si giudicano
+# su cio' che si e' visto — questo dice quanti annunci ENTRANO IN
+# VETRINA, e leggere tutto resta la regola.
+# IL CASO CHE LO CHIEDE: cinque negozi collegati al rodaggio, duecento
+# prodotti a testa, e la vetrina e' ordinata per data — chi vende una
+# cosa sola sparisce sotto mille righe nate nello stesso secondo
+# (`riconcilia_connettore` calcola `adesso` UNA volta per tutto il
+# catalogo). Con trenta all'ora un catalogo da duecento entra in una
+# giornata invece che in un istante, e nel frattempo la home resta di
+# tutti. 0 = nessun tetto, cioe' il comportamento di ieri.
+# NON RISOLVE il monopolio della prima pagina, lo diluisce: quello e'
+# un cantiere di ordinamento, e va deciso a parte.
+try:
+    from config import MAX_NUOVI_CONNETTORE_GIRO
+except ImportError:
+    MAX_NUOVI_CONNETTORE_GIRO = 30
+
 # Dopo quanti giri falliti di fila il collegamento si dichiara rotto e
 # il venditore riceve UN avviso. Cinque ore di silenzio sono un
 # problema vero; un negozio che non risponde per mezz'ora no.
@@ -30647,6 +30670,10 @@ def _coda_magazzino(uscite: list) -> str:
             "Erano già stati scalati di là, e adesso sono tornati.")
 
 
+MSG_RIGA_NON_GIUDICATA = ("la moderazione non ha potuto guardarlo in "
+                          "questo giro: ci riproviamo al prossimo")
+
+
 def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:
     """Divide le righe tradotte in (da giudicare, gia' viste).
 
@@ -30788,7 +30815,7 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
             # un token, Woo una chiave e un segreto, e a sapere che forma
             # hanno e' il lettore — qui si sa solo che sono un dizionario
-            prodotti, avviso = await asyncio.to_thread(
+            prodotti, avviso, completo = await asyncio.to_thread(
                 lettore, c["url_negozio"], credenziali,
                 chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
         except Exception as e:
@@ -30812,13 +30839,31 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
                 ammesse = []
             viste = {r["origine_chiave"] for r in ammesse} | \
                     {r["origine_chiave"] for r in note}
-            righe = [r for r in righe
-                     if r.get("saltato_perche") or r["origine_chiave"] in viste]
+            # SI MARCANO, NON SI TOLGONO, ed e' il gemello della riga
+            # di `viste` in `riconcilia_connettore`: una riga tolta
+            # dalla lista non arriva alle sparizioni, che la leggono
+            # come «non c'e' piu' sul negozio» e la spengono per
+            # sempre. Su una riga NUOVA non cambiava niente (non c'e'
+            # ancora un annuncio da spegnere), ma `nuove` contiene
+            # anche gli annunci GIA' IN VETRINA col testo cambiato —
+            # quindi bastava un singhiozzo dell'AI, che qui vale
+            # `ammesse = []`, per spegnerli tutti. Il commento del
+            # fail-closed qui sopra promette il contrario alla lettera
+            # («chi era gia' passato continua ad aggiornarsi»), e da
+            # oggi e' vero: marcata, la riga non si scrive ma resta
+            # nel catalogo letto — e il venditore la trova fra i
+            # saltati del report invece di non trovarla piu'.
+            for r in righe:
+                if not r.get("saltato_perche") and \
+                        r["origine_chiave"] not in viste:
+                    r["saltato_perche"] = MSG_RIGA_NON_GIUDICATA
         con = db()
         try:
             esito = importa_negozio.riconcilia_connettore(
                 con, c, righe, _salva_foto_connettore,
-                {k: v[1] for k, v in marchi.items()})
+                {k: v[1] for k, v in marchi.items()},
+                completo=completo,
+                max_nuovi=MAX_NUOVI_CONNETTORE_GIRO)
         finally:
             con.close()
         if avviso:
@@ -30883,6 +30928,13 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
         pezzi.append(f"{esito['in_revisione']} in revisione")
     if esito["falliti"]:
         pezzi.append(f"{len(esito['falliti'])} non passati")
+    # I RIMANDATI SI DICONO, o un catalogo che entra a scaglioni si
+    # legge come un catalogo che entra male: il venditore vede trenta
+    # prodotti su duecento e non sa che gli altri stanno arrivando.
+    # `.get` perche' l'ultimo esito di ieri e' gia' nel database senza
+    # queste chiavi, e il cassetto lo rilegge.
+    if esito.get("rimandati"):
+        pezzi.append(f"{esito['rimandati']} in arrivo ai prossimi giri")
     coda = ""
     if esito["saltati"]:
         primi = "\n".join(

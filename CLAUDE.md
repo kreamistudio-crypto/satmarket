@@ -3768,7 +3768,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
   scroll infinito con sentinelle + IntersectionObserver (vetrina,
   negozio, tuoi annunci; guardie DENTRO le callback: demo, ricerca
-  AI, fine lista). ATTENZIONE alla separazione: `vetrina` = pagine
+  AI, fine lista).
+  L'OSSERVATORE NOTIFICA LE TRANSIZIONI, NON LO STATO (ago 2026): se
+  dopo l'append la sentinella resta dentro il `rootMargin` non c'è
+  nessuna nuova intersezione, la callback non riparte più e **lo
+  scorrimento si pianta col cursore ANCORA VALIDO** — nessuno
+  spinner, nessun errore, e a chi guarda sembra che il mercatino
+  finisca lì. Non morde finché le pagine sono piene tranne l'ultima;
+  morde il giorno che una esce corta — cioè il giorno che si dirada
+  la vetrina per venditore. La cura è un giro di RIEMPIMENTO dentro
+  `osservaSentinella`, che è la fabbrica UNICA delle quattro
+  sentinelle: la eredita anche la quinta di domani. Il patto con le
+  callback è che dicano se hanno appeso righe — `false` (o niente)
+  ferma il giro, ed è così che «la lista è finita» e «la lista
+  continua» restano due risposte diverse; `MAX_GIRI_RIEMPIMENTO` è la
+  cintura contro un server che dicesse sempre «ce n'è ancora».
+  ⚠️ NON SI VERIFICA DAL BROWSER PANE: lì `document.visibilityState`
+  è `hidden` e **nessun IntersectionObserver emette** (provato con una
+  spia: zero, anche con la sentinella dentro il viewport, anche dopo
+  `resize_window` — e senza quello `innerHeight` è 0, che fa mentire
+  ogni misura). Da lì si esclude solo la regressione grossolana
+  (l'app parte, la prima pagina si disegna, non carica tutto in un
+  colpo); il COMPORTAMENTO del loop lo prova `prove_riempimento` con
+  un banco node su un DOM di cartone. E in quel banco l'attesa è la
+  parte delicata: l'osservatore lancia `riempi()` senza await — deve
+  farlo — quindi un `await` sullo scatto non aspetta niente e il banco
+  misura i microtask che gli capita di aver smaltito (diceva 2
+  dappertutto). Ci vuole un `setTimeout`, che è un macrotask. ATTENZIONE alla separazione: `vetrina` = pagine
   accumulate, ciò che la griglia disegna; `listings` = CATALOGO per
   openDetail, ci confluiscono negozio/risultati AI/deep-link SENZA
   sversare in griglia (`inCatalogo` update-or-push; in DEMO stesso
@@ -16787,6 +16813,65 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di `_censimento` in `prove.py`: là `_leve_stato` gira dentro un
   config finto, e un nome che manca non fa una prova rossa — fa
   ESPLODERE la prova con un NameError.
+  IL TETTO DI LETTURA SPEGNEVA IL RESTO DEL CATALOGO (ago 2026, il
+  guasto più grave della fase 1, trovato guardando cosa sarebbe
+  successo al rodaggio coi cinque negozi veri). `riconcilia_connettore`
+  spegne quel che non ha visto, e il commento sopra quel ciclo lo
+  dichiara: «il chiamante non deve mai arrivare qui con una lettura
+  parziale». La difesa costruita era che `leggi_catalogo_*` ALZA su un
+  errore di rete — ma **il TRONCAMENTO non alza**: torna
+  `prodotti[:tetto]` normalmente, cioè produce esattamente la lettura
+  parziale che quel commento teme. Ogni prodotto oltre il duecentesimo
+  passava a 'rimosso', e 'rimosso' non risorge: per tornare serve una
+  chiave nuova sul negozio. In più la frase dell'avviso era FALSA —
+  «il resto arriva ai giri successivi», mentre nessuno dei due lettori
+  tiene un cursore fra un giro e l'altro: ogni ora si rilegge da
+  pagina 1 e si taglia allo stesso punto.
+  LA CURA È CHE IL FATTO SI DICHIARI: i lettori tornano
+  `(prodotti, avviso, completo)` e `riconcilia_connettore` prende
+  `completo` **keyword-only e SENZA DEFAULT** (la lezione di
+  `atteso_sats`: la domanda si eredita, e chi la dimentica lo sente da
+  Python invece che da un venditore che guarda la sua vetrina
+  svuotata). Su una lettura parziale le sparizioni si SOSPENDONO e il
+  report lo dice. SI SBAGLIA NEL VERSO GIUSTO: sospenderle lascia in
+  vetrina un annuncio che il venditore ha tolto — se ne va al giro in
+  cui il catalogo ci sta, o lo toglie lui — mentre spegnerle a torto
+  toglie merce vera a chi vende, in silenzio e per sempre.
+  ⚠️ QUINDI ABBASSARE `MAX_PRODOTTI_CONNETTORE` NON DISTRIBUISCE
+  NIENTE: adesso è sicuro, ma quel che sta oltre il tetto non entra —
+  e per far entrare un catalogo grande un po' per volta c'è l'altra
+  leva.
+  IL SECONDO BUCO ERA LA MODERAZIONE, stessa famiglia e altra porta:
+  le righe non ammesse venivano TOLTE da `righe`, quindi non
+  arrivavano a `viste` e le sparizioni le leggevano come «non c'è più
+  sul negozio». Su una riga NUOVA non cambiava niente (non c'è ancora
+  un annuncio da spegnere), ma `nuove` contiene anche **gli annunci
+  già in vetrina col testo cambiato** — quindi bastava un singhiozzo
+  dell'AI (`ammesse = []`, il fail-closed) per spegnerli tutti, mentre
+  il commento accanto prometteva il contrario alla lettera («chi era
+  già passato continua ad aggiornarsi»). Ora si MARCANO col loro
+  `saltato_perche` invece di sparire, e `viste.add` sta PRIMA del
+  `continue` delle saltate — che copre anche il prodotto diventato
+  multi-variante, terzo caso della stessa famiglia.
+  `MAX_NUOVI_CONNETTORE_GIRO` (30) È L'OPPOSTO DEL TETTO DI LETTURA,
+  e la distinzione è tutta qui: quello TRONCA la vista e mutila il
+  catalogo, questo legge tutto — quindi le sparizioni restano vere —
+  e distribuisce solo l'INGRESSO in vetrina. È anche l'unica riga che
+  rende VERA la promessa «il resto arriva ai giri successivi»: al giro
+  dopo le righe già create si ritrovano per chiave e il tetto tocca
+  alle prossime. Il caso che la chiede è l'ONDATA: la vetrina è
+  ordinata per data e `riconcilia_connettore` calcola `adesso` UNA
+  volta per tutto il catalogo, quindi cinque negozi collegati insieme
+  sono mille righe nate nello stesso secondo che si prendono le prime
+  pagine, e chi vende una cosa sola sparisce. NON RISOLVE quel
+  problema, lo DILUISCE: il monopolio della prima pagina è un cantiere
+  di ORDINAMENTO, e va deciso a parte (il quadro delle quattro strade
+  — distribuire, tetto per venditore, separare i negozi, cambiare
+  l'ordinamento — è stato fatto ad ago 2026: la risposta di Andrea è
+  «3 ogni 30», da costruire dopo aver guardato i numeri veri).
+  Il tetto tocca la sola NASCITA (`puo_creare`): chi c'è già si
+  aggiorna come sempre — un prezzo che cambia non aspetta il proprio
+  turno.
   QUELLO CHE NON C'È ANCORA, dichiarato: `origine_scorta` — la
   coordinata che serve al decremento — NON esiste come colonna: è
   fase 2, e non si aggiunge una colonna per una cosa che non c'è (il

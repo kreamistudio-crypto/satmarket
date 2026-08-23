@@ -6748,6 +6748,11 @@ async function caricaAltri(){
     inCatalogo(nuovi);
     if (nuovi.length)
       el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+    /* il patto di `osservaSentinella`: true = ho appeso righe, chiedi
+       ancora se lo schermo e' scoperto. Le vie d'uscita qui sopra
+       tornano `undefined`, che vale «fermati» — ed e' giusto: senza
+       cursore, o superati da un altro giro, non c'e' altro da chiedere */
+    return nuovi.length > 0;
   } catch(e) {} finally { vetrinaCaricando = false; }
 }
 /* `ordine` (solo ai moderatori) aggiunge alla lista quel numero anche
@@ -9085,8 +9090,8 @@ async function caricaAltriNegozio(){
     inCatalogo(nuovi);
     if (nuovi.length)
       el('negozioGrid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
-  } catch(e) {}
-  negozioPag.caricando = false;
+    return nuovi.length > 0;    // il patto di `osservaSentinella`
+  } catch(e) {} finally { negozioPag.caricando = false; }
 }
 
 /* La sfilza delle medagliette: sole iconcine nei cerchietti d'oro,
@@ -10985,6 +10990,7 @@ async function caricaAltriOggetti(){
   if (DEMO || !altriPag.cursore || altriPag.caricando) return;
   const giro = altriGiro;
   altriPag.caricando = true;
+  let aggiunti = 0;    // il patto di `osservaSentinella`, letto in fondo
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(
@@ -10999,11 +11005,16 @@ async function caricaAltriOggetti(){
     const g = document.querySelector('#detailContent .altri-griglia');
     if (g && nuovi.length)
       g.insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+    aggiunti = nuovi.length;
   } catch(e) {}
   /* solo a giro invariato: sul ramo catch con dettaglio gia' cambiato
      si scriverebbe sull'oggetto NUOVO, sbloccandogli una pagina che
      non ha mai chiesto */
   if (giro === altriGiro) altriPag.caricando = false;
+  /* e il conto si dice DOPO quella riga, non con un `return` dentro il
+     try: li' salterebbe lo sblocco, ed e' la stessa trappola che quel
+     commento descrive */
+  return aggiunti > 0;
 }
 
 /* ---------------- il SET: «Riempi il barattolo» (lug 2026) ----------------
@@ -22548,8 +22559,8 @@ async function caricaAltriMiei(){
     myListings = myListings.concat(nuovi);
     if (nuovi.length && el('myListings'))
       el('myListings').insertAdjacentHTML('beforeend', nuovi.map(rigaMioAnnuncio).join(''));
-  } catch(e) {}
-  mieiCaricando = false;
+    return nuovi.length > 0;    // il patto di `osservaSentinella`
+  } catch(e) {} finally { mieiCaricando = false; }
 }
 
 /* L'annuncio in revisione resta visibile al proprietario, onesto e
@@ -26825,12 +26836,49 @@ async function avvia(){
    serve sapere in che modalita' siamo. Una vista nascosta non
    interseca mai: le sentinelle degli altri pannelli tacciono da sole.
    600px di anticipo: la pagina dopo arriva prima che si veda il fondo. */
+/* IL MARGINE E' UNO SOLO, e serve a due mestieri: l'osservatore lo usa
+   per chiamare in anticipo, il riempimento per chiedersi «lo schermo e'
+   ancora scoperto?». Scritti in due posti direbbero due cose diverse. */
+const MARGINE_SENTINELLA = 600;
+/* La cintura contro il giro infinito. Non serve a nessun caso vero —
+   il server rende una pagina PIENA ogni volta che lascia un cursore —
+   ma qui un difetto del server diventerebbe un ciclo che non molla il
+   telefono, e quello e' il genere di guasto che si paga caro. */
+const MAX_GIRI_RIEMPIMENTO = 10;
+
+/* L'OSSERVATORE NOTIFICA LE TRANSIZIONI, NON LO STATO (ago 2026): se
+   dopo l'append la sentinella resta dentro il margine, non c'e' nessuna
+   nuova intersezione e la callback non riparte piu' — lo scorrimento si
+   pianta CON IL CURSORE ANCORA VALIDO, e siccome non c'e' ne' uno
+   spinner ne' un «fine lista», a chi guarda sembra che il mercatino
+   finisca li'. Non era un difetto finche' le pagine sono state sempre
+   piene tranne l'ultima; lo diventa il giorno che una pagina esce
+   corta, per qualunque ragione — e la ragione arrivera', perche' e'
+   esattamente quel che fa un diradamento per venditore.
+   La cura sta QUI e non nelle quattro callback: e' la fabbrica unica
+   delle sentinelle, quindi la eredita anche la quinta di domani.
+   Il patto con le callback e' che dicano se hanno aggiunto qualcosa —
+   `false` (o niente) ferma il giro: e' cosi' che «la lista e' finita» e
+   «la lista continua» restano due risposte diverse. */
 function osservaSentinella(id, cb){
   const s = el(id);
   if (!s || !('IntersectionObserver' in window)) return;
+  const scoperta = () =>
+    s.getBoundingClientRect().top < innerHeight + MARGINE_SENTINELLA;
+  let inCorso = false;
+  const riempi = async () => {
+    if (inCorso) return;      // il giro precedente sta ancora chiedendo
+    inCorso = true;
+    try {
+      for (let giro = 0; giro < MAX_GIRI_RIEMPIMENTO; giro++) {
+        if (!await cb()) break;      // niente di nuovo: si e' alla fine
+        if (!scoperta()) break;      // lo schermo e' pieno, basta cosi'
+      }
+    } finally { inCorso = false; }
+  };
   new IntersectionObserver(voci => {
-    if (voci.some(v => v.isIntersecting)) cb();
-  }, {rootMargin: '600px'}).observe(s);
+    if (voci.some(v => v.isIntersecting)) riempi();
+  }, {rootMargin: MARGINE_SENTINELLA + 'px'}).observe(s);
 }
 osservaSentinella('gridSentinella', caricaAltri);
 osservaSentinella('negozioSentinella', caricaAltriNegozio);
