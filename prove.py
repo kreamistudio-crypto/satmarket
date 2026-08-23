@@ -89,6 +89,26 @@ def reale(nome):
     return amb[nome]
 
 
+def _pezzi_registro():
+    """Il registro delle uscite e la sua coda, VERI, con le
+    dipendenze montate.
+
+    `reale()` da solo non basta: `registra_uscita_negozio` chiama il
+    giudice dell'origine, che a sua volta ne chiama un altro, e
+    `_coda_magazzino` vuole `html` — un ambiente vuoto le farebbe
+    alzare NameError a meta' funnel. E' la lezione gia' scritta («chi
+    estrae una funzione ne eredita le dipendenze»), qui a due
+    gradini."""
+    import html as _h
+    import time as _t
+    amb = {"html": _h, "time": _t}
+    exec(pezzo("origine_annuncio"), amb)
+    exec(pezzo("da_connettore"), amb)
+    exec(pezzo("registra_uscita_negozio"), amb)
+    exec(pezzo("_coda_magazzino"), amb)
+    return amb
+
+
 def foto_finta(larghezza=60, altezza=40):
     """Una FOTO per le prove, non una tinta unita. Da quando esiste
     _foto_vuota (ago 2026) una tela di un colore solo viene rifiutata —
@@ -15121,6 +15141,7 @@ def prove_ricevuta_compratore():
     import types
 
     _coda = reale("_coda_ricevuta")
+    _reg = _pezzi_registro()
     # l'indirizzo di casa (ago 2026) ha allargato la firma di due
     # bool: qui si chiama col MONDO DI IERI (mai chiesto, mai
     # scritto), cosi' le prove storiche restano quelle di sempre e i
@@ -15216,10 +15237,16 @@ def prove_ricevuta_compratore():
               annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
             CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
               quantita INT, stato TEXT, contatto_nostr TEXT DEFAULT '',
-              taglia_pacco TEXT DEFAULT '');
+              taglia_pacco TEXT DEFAULT '',
+              fonte TEXT DEFAULT '', connettore_id INT DEFAULT 0);
             CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
               compratore_id INT, ordine_id INT, stato TEXT,
               aggiornato INT DEFAULT 0);
+            CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY
+              AUTOINCREMENT, connettore_id INT, annuncio_id INT,
+              ordine_id INT, delta INT, tipo TEXT,
+              stato TEXT DEFAULT 'pendente', creato INT, aggiornato INT,
+              UNIQUE(ordine_id, annuncio_id, tipo));
         """)
         con.execute("INSERT INTO annunci(id,titolo,quantita,stato) "
                     "VALUES(3,?,1,'attivo')", (titolo,))
@@ -15262,7 +15289,13 @@ def prove_ricevuta_compratore():
                "stima_taglia_set": lambda t: "",
                "_righe_ordine": reale("_righe_ordine"),
                "_titolo_ordine": reale("_titolo_ordine"),
-               "_coda_ricevuta": coda, "_fmt_sats": reale("_fmt_sats")}
+               "_coda_ricevuta": coda, "_fmt_sats": reale("_fmt_sats"),
+               # il registro dei negozi collegati (tappa 4) passa dal
+               # funnel: `reale()` non basta da solo, che questa
+               # funzione ha delle dipendenze sue — chi estrae un
+               # pezzo ne eredita le dipendenze
+               **{k: _reg[k] for k in ("registra_uscita_negozio",
+                                       "_coda_magazzino")}}
         exec("async " + pezzo("_incassa_ordine"), amb)
         _aio.run(amb["_incassa_ordine"](7))
         return detto
@@ -24964,10 +24997,19 @@ def prove_connettori_sync():
           "body_html" in giud or '"title"' in giud)
 
     # --- la correzione dello stock --------------------------------
-    prova("quantita_corretta: senza pendenti non tocca niente", 10,
+    # LE DUE QUI SOTTO HANNO CAMBIATO LATO (ago 2026, tappa 4): il
+    # secondo argomento non e' piu' un CONTEGGIO di pezzi venduti ma
+    # il SALDO col segno del registro — negativo quel che il negozio
+    # deve ancora scalare, positivo quel che deve ancora rimettere.
+    # Col `- abs(...)` di ieri un rimborso avrebbe SOTTRATTO invece di
+    # aggiungere, cioe' nascosto due volte dei pezzi che ci sono; ed e'
+    # la convenzione che lo schema di `connettori_uscite` dichiara dal
+    # primo giorno.
+    prova("quantita_corretta: senza saldo non tocca niente", 10,
           corretta(10, 0))
-    prova("...con una pendente sottrae", 9, corretta(10, 1))
-    prova("...e non va mai sotto zero", 0, corretta(1, 5))
+    prova("...una vendita in attesa sottrae", 9, corretta(10, -1))
+    prova("...un rimborso in attesa AGGIUNGE", 13, corretta(10, 3))
+    prova("...e non va mai sotto zero", 0, corretta(1, -5))
     # L'ORDINE E' LA PROVA: prima si spengono le pendenti che il calo
     # esterno copre, poi si sottrae quel che resta. Al contrario, la
     # vendita appena riconosciuta si sottrarrebbe un'ultima volta e il
@@ -24991,6 +25033,19 @@ def prove_connettori_sync():
     prova("...quella che non copre resta", 0, rifletti(con, 1, 9, 7))
     prova("...e senza una lettura di ieri non si conclude niente", 0,
           rifletti(con, 1, -1, 5))
+    # IL VERSO CONTA (tappa 4): un calo del negozio spegne le VENDITE,
+    # una risalita i RIMBORSI. Senza, il venditore che rimette a
+    # magazzino i pezzi di un reso spegnerebbe con quella risalita una
+    # vendita pendente che non c'entra niente — e da li' in poi il
+    # conto sarebbe storto per sempre, in silenzio.
+    con.execute("INSERT INTO connettori_uscite(annuncio_id,delta,stato) "
+                "VALUES(2,-2,'pendente')")
+    con.execute("INSERT INTO connettori_uscite(annuncio_id,delta,stato) "
+                "VALUES(2,3,'pendente')")
+    prova("una risalita non tocca una vendita in attesa", 0,
+          rifletti(con, 2, 7, 9))
+    prova("...ma spegne il rimborso che copre", 1, rifletti(con, 2, 7, 10))
+    prova("...e il calo resta della vendita", 1, rifletti(con, 2, 10, 8))
     con.close()
 
     # --- il trasporto ---------------------------------------------
@@ -25057,6 +25112,69 @@ def prove_connettori_sync():
     lettore = codice(_pezzo_da(src, "leggi_catalogo_shopify"))
     prova("una lettura fallita ALZA, non torna una lista corta", True,
           "raise RuntimeError" in lettore)
+    # --- e le due cose che si SEGUONO, girate ---------------------
+    # Shopify pagina con un cursore OPACO: l'indirizzo della pagina
+    # dopo non si puo' comporre, lo scrive il negozio nell'header
+    # `Link` — quindi si lega all'HOST DEL COLLEGAMENTO. Senza, chi
+    # risponde su quel dominio puo' far bussare il server a un host
+    # qualunque col token di quel negozio in mano: il guardiano del
+    # trasporto ferma gli indirizzi privati, non gli estranei
+    # pubblici.
+    leggi_sh = amb["leggi_catalogo_shopify"]
+
+    def negozio_sh(pagine, host="mio.myshopify.com"):
+        """`pagine` = quanti prodotti per pagina, in fila."""
+        stato = {"n": 0}
+
+        def chiama(metodo, url, intestazioni):
+            i = stato["n"]
+            stato["n"] += 1
+            quanti = pagine[i] if i < len(pagine) else 0
+            prodotti = [{"id": 1000 + i * 500 + k, "title": f"p{k}",
+                         "status": "active",
+                         "variants": [{"price": "1.00"}]}
+                        for k in range(quanti)]
+            testa = {}
+            if i + 1 < len(pagine):
+                testa = {"Link": f'<https://{host}/x?page_info=abc>; '
+                                 f'rel="next"'}
+            return 200, {"products": prodotti}, testa
+        return chiama
+
+    cred_sh = {"token": "shpat_finto"}
+    prova("Shopify: le pagine si concatenano", 6,
+          len(leggi_sh("mio.myshopify.com", cred_sh,
+                       negozio_sh([4, 2]), 200)[0]))
+    # E ALZA, non si ferma: fermarsi vorrebbe dire consegnare alla
+    # riconciliazione un catalogo LETTO A META', che sulle sparizioni
+    # si fida — cioe' spegnere gli annunci non visti.
+    prova("...ma una pagina su un ALTRO host ALZA",
+          "la pagina successiva punta a un altro indirizzo",
+          _alza(lambda: leggi_sh("mio.myshopify.com", cred_sh,
+                                 negozio_sh([4, 2], "altro.example"), 200)))
+    # ...e un host scritto in un altro maiuscolo E' LO STESSO host: un
+    # confronto sensibile alle maiuscole non aprirebbe nessuna porta,
+    # chiuderebbe un catalogo VERO — e sarebbe un rifiuto senza motivo
+    # che nessuno saprebbe spiegare.
+    prova("...mentre lo stesso host in MAIUSCOLO passa", 6,
+          len(leggi_sh("mio.myshopify.com", cred_sh,
+                       negozio_sh([4, 2], "MIO.MyShopify.com"), 200)[0]))
+    # IL TETTO LATENTE, gemello di quello che su Woo si e' pagato per
+    # davvero: qui regge solo perche' la pagina e' da 250 e il tetto
+    # 200. Il conto esatto non serve — se dopo il ciclo c'e' ancora un
+    # `url`, c'e' ancora una pagina, e lo dice Shopify stesso.
+    # IL CASO SI SCEGLIE IN MODO CHE POSSA FALLIRE SOLO PER QUELLA
+    # RAGIONE (la lezione di `_pare_recapito`): si atterra ESATTI sul
+    # tetto, o anche la versione sbagliata direbbe l'avviso — perche'
+    # avrebbe letto piu' prodotti del tetto e il vecchio confronto
+    # scatterebbe lo stesso.
+    letti, avviso = leggi_sh("mio.myshopify.com", cred_sh,
+                             negozio_sh([4, 2]), 4)
+    prova("Shopify: il catalogo lungo si tronca al tetto", 4, len(letti))
+    prova("...MA lo dice, invece di troncare in silenzio", True,
+          bool(avviso))
+    prova("...e il catalogo corto non produce falsi allarmi", "",
+          leggi_sh("mio.myshopify.com", cred_sh, negozio_sh([3]), 200)[1])
     uno = codice(pezzo("_un_connettore"))
     prova("...e il giro esce prima di toccare una riga", True,
           "_connettore_in_errore" in uno
@@ -25403,6 +25521,212 @@ def prove_connettori_woo():
            "_intestazioni_woo(credenziali)" in lett])
 
 
+def prove_connettori_registro():
+    """IL REGISTRO DELLE USCITE (ago 2026, tappa 4): a scriverlo,
+    finalmente, c'e' qualcuno.
+
+    Dalla tappa 2 il registro si LEGGEVA (`_saldo_pendente`) e si
+    SPEGNEVA (`rifletti_pendenti`), ma nessuno ci metteva una riga —
+    quindi ogni vendita fatta qui veniva rialzata dal sync entro
+    l'ora, e sul pezzo unico il 'venduto' risorgeva. E' il difetto
+    peggiore di questa fase perche' non fallisce da solo: nessuna
+    eccezione, nessun log, solo un numero che torna su.
+
+    Qui il registro si GIRA su un database di cartone — le sentinelle
+    direbbero che la funzione esiste, mai che il saldo torni giusto
+    dopo una vendita e il suo rimborso."""
+    print("\n[i connettori: il registro delle uscite]")
+    import sqlite3
+    amb = _pezzi_registro()
+    registra = amb["registra_uscita_negozio"]
+    coda = amb["_coda_magazzino"]
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    saldo = m["_saldo_pendente"]
+    rifletti = m["rifletti_pendenti"]
+    corretta = m["quantita_corretta"]
+
+    def banco():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+              contatto_nostr TEXT DEFAULT '', fonte TEXT DEFAULT '',
+              connettore_id INT DEFAULT 0);
+            CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY
+              AUTOINCREMENT, connettore_id INT, annuncio_id INT,
+              ordine_id INT, delta INT, tipo TEXT,
+              stato TEXT DEFAULT 'pendente', creato INT, aggiornato INT,
+              UNIQUE(ordine_id, annuncio_id, tipo));
+        """)
+        # 1 = da un negozio Woo · 2 = nato qui · 3 = importato da Nostr
+        con.execute("INSERT INTO annunci(id,titolo,fonte,connettore_id) "
+                    "VALUES(1,'Miele di castagno','woo',7)")
+        con.execute("INSERT INTO annunci(id,titolo) VALUES(2,'Bici')")
+        con.execute("INSERT INTO annunci(id,titolo,contatto_nostr) "
+                    "VALUES(3,'Poster','npub1abc')")
+        return con
+
+    def riga(aid, q=1):
+        return {"annuncio_id": aid, "quantita": q, "titolo": "?"}
+
+    def righe_registro(con, aid):
+        return [(r["tipo"], r["delta"], r["stato"]) for r in con.execute(
+            "SELECT tipo, delta, stato FROM connettori_uscite "
+            "WHERE annuncio_id=? ORDER BY id", (aid,))]
+
+    # --- chi entra nel registro e chi no --------------------------
+    con = banco()
+    fuori = registra(con, 42, [riga(1, 2), riga(2, 1), riga(3, 1)],
+                     "vendita")
+    prova("nel registro entra solo cio' che viene da un negozio",
+          [("vendita", -2, "pendente")], righe_registro(con, 1))
+    prova("...l'annuncio nato qui non ci entra", [], righe_registro(con, 2))
+    # IL GIUDICE DELL'ORIGINE E' UNO: su una riga «a due teste» risponde
+    # 'nostr', quindi non si registra niente — il verso prudente, che
+    # quella riga il libro mastro la segnala gia' come guasto suo.
+    prova("...e nemmeno quello importato da Nostr", [],
+          righe_registro(con, 3))
+    prova("e l'elenco per il venditore nomina solo il negozio",
+          [("Miele di castagno", 2, -2)],
+          [(u["titolo"], u["pezzi"], u["delta"]) for u in fuori])
+    prova("il saldo dice i pezzi che il negozio non sa", -2, saldo(con, 1))
+
+    # IDEMPOTENTE PER COSTRUZIONE e non per attenzione di chi chiama:
+    # la UNIQUE para il retry, il doppio gancio e il riavvio a meta'.
+    # E la seconda volta l'elenco e' VUOTO, quindi non si rinotifica.
+    rifatto = registra(con, 42, [riga(1, 2)], "vendita")
+    prova("due volte lo stesso ordine non raddoppia niente",
+          ([("vendita", -2, "pendente")], []),
+          (righe_registro(con, 1), rifatto))
+    con.close()
+
+    # --- il rimborso PRIMA che il negozio scali -------------------
+    # Le due si cancellano: la' non e' mai successo niente, quindi non
+    # c'e' nessun magazzino da rimettere a posto e non si dice niente.
+    # Senza, la pendente resterebbe a sottrarre un pezzo fantasma PER
+    # SEMPRE — il difetto che la tappa 4 introdurrebbe curando il suo.
+    con = banco()
+    registra(con, 42, [riga(1, 2)], "vendita")
+    detto = registra(con, 42, [riga(1, 2)], "rimborso")
+    prova("il rimborso prima del negozio spegne la vendita",
+          [("vendita", -2, "annullata")], righe_registro(con, 1))
+    prova("...e non c'e' niente da dire al venditore", [], detto)
+    prova("...e il saldo torna a zero", 0, saldo(con, 1))
+    con.close()
+
+    # --- il rimborso DOPO ------------------------------------------
+    # Il negozio l'aveva gia' scalata: i pezzi vanno RIMESSI, e questa
+    # riga e' insieme la correzione del conto e la cosa da dire.
+    con = banco()
+    registra(con, 42, [riga(1, 2)], "vendita")
+    con.execute("UPDATE connettori_uscite SET stato='riflessa'")
+    detto = registra(con, 42, [riga(1, 2)], "rimborso")
+    prova("il rimborso dopo il negozio chiede di rimettere i pezzi",
+          [("vendita", -2, "riflessa"), ("rimborso", 2, "pendente")],
+          righe_registro(con, 1))
+    prova("...e il saldo li RIMETTE, non li toglie", 2, saldo(con, 1))
+    # il giro chiuso: il negozio dice 8 (ha scalato la vendita), noi
+    # sappiamo che i due pezzi sono tornati -> 10
+    prova("...quindi la giacenza qui torna quella vera", 10,
+          corretta(8, saldo(con, 1)))
+    # ...e quando il venditore li rimette davvero, la pendente si
+    # spegne e il conto resta in pari
+    rifletti(con, 1, 8, 10)
+    prova("e appena li rimette il saldo si azzera", (0, 10),
+          (saldo(con, 1), corretta(10, saldo(con, 1))))
+    con.close()
+
+    # --- l'ordine delle pendenti ----------------------------------
+    # CI SI FERMA ALLA PRIMA CHE NON CI STA, e non si va a pescare la
+    # piu' piccola piu' avanti: i movimenti si attribuiscono dalla
+    # pendente PIU' VECCHIA, e saltarla vorrebbe dire raccontare che
+    # il negozio ha scalato la vendita di ieri lasciando in sospeso
+    # quella di ieri l'altro. Il caso ha DUE righe dello stesso segno
+    # con la grande davanti, o un `continue` al posto del `break` non
+    # si distinguerebbe (la lezione di `_pare_recapito`).
+    con = banco()
+    for d in (-3, -1):
+        con.execute("INSERT INTO connettori_uscite(annuncio_id,delta,"
+                    "stato) VALUES(1,?,'pendente')", (d,))
+    prova("un calo che non copre la piu' vecchia si ferma li'", 0,
+          rifletti(con, 1, 10, 8))
+    prova("...e il saldo resta intero", -4, saldo(con, 1))
+    con.close()
+
+    # --- il tipo e' obbligatorio ----------------------------------
+    # SENZA DEFAULT apposta (la lezione di `atteso_sats`): e' il SEGNO
+    # del movimento, e chi lo dimentica lo sente da Python invece di
+    # scrivere una vendita al posto di un rimborso.
+    con = banco()
+    prova("un tipo sconosciuto non entra nel registro", True,
+          bool(_alza(lambda: registra(con, 1, [riga(1)], "boh"))))
+    prova("...e il registro resta vuoto", [], righe_registro(con, 1))
+    reg = codice(pezzo("registra_uscita_negozio"))
+    prova("il tipo non ha un default", True,
+          "tipo: str)" in reg and "tipo: str =" not in reg)
+    # NIENTE commit e NIENTE notifica qui dentro: si scrive nella
+    # transazione del chiamante, e le parole partono DOPO il commit
+    prova("il registro non committa e non parla", [],
+          [g for g in ("commit()", "notifica(", "await") if g in reg])
+    con.close()
+
+    # --- la coda che il venditore legge ---------------------------
+    prova("senza uscite non si dice niente", "", coda([]))
+    testo = coda([{"titolo": "Miele <b>bio</b>", "pezzi": 2, "delta": -2}])
+    prova("la vendita chiede di scalare il magazzino", True,
+          "Aggiorna il magazzino" in testo and "−2" in testo)
+    # IL «PERCHE'» NON SI TOGLIE: finche' la fase 2 non scrive sul suo
+    # negozio, quel prodotto di la' risulta ancora disponibile — e un
+    # venditore che non lo sa lo scopre vendendo due volte l'ultimo
+    # pezzo.
+    prova("...e dice perche' tocca a lui", True,
+          "non lo scrive" in testo and "ancora disponibile" in testo)
+    # il titolo e' testo del VENDITORE su un tubo HTML: si tronca
+    # PRIMA e si escapa DOPO, o un «<» spegne la notifica in silenzio
+    prova("...col titolo scappato", True,
+          "&lt;b&gt;" in testo and "<b>Aggiorna" in testo)
+    reso = coda([{"titolo": "Miele", "pezzi": 3, "delta": 3}])
+    prova("il rimborso chiede di RIMETTERLI", True,
+          "Rimetti a magazzino" in reso and "+3" in reso)
+    prova("...e non dice di scalare niente", False,
+          "Aggiorna il magazzino" in reso)
+
+    # --- i due ganci ----------------------------------------------
+    # NELLA STESSA TRANSAZIONE DELLO STOCK: la pendente e il pezzo che
+    # se n'e' andato sono lo stesso fatto, e un commit che ne salvasse
+    # solo uno lascerebbe il sync a rialzare una vendita vera.
+    inc = codice(pezzo("_incassa_ordine"))
+    # ...e si guarda il commit CHE SEGUE la registrazione, non il
+    # primo del corpo: `_incassa_ordine` ne ha un altro molto prima,
+    # nel ramo del CAS perso, e ancorarsi a quello farebbe dire alla
+    # sentinella il contrario di quel che vede.
+    i_reg = inc.find("registra_uscita_negozio")
+    dopo = inc[i_reg:] if i_reg >= 0 else ""
+    prova("l'incasso registra dentro la transazione dello stock", True,
+          '"vendita")' in inc
+          and 0 <= inc.find("UPDATE annunci SET quantita=MAX") < i_reg)
+    prova("...e committa PRIMA di dire qualcosa a chiunque", True,
+          0 <= dopo.find("con.commit()") < dopo.find("await "))
+    prova("...e la coda arriva in fondo al messaggio del venditore",
+          True,
+          0 <= inc.find("_coda_magazzino(magazzino)")
+          < inc.find('notifica(o["venditore_id"], msg)'))
+    rim = codice(pezzo("_rimborsa_compratore"))
+    prova("il rimborso rimette in pari il registro", True,
+          '"rimborso")' in rim
+          and 0 <= rim.find("registra_uscita_negozio")
+          < rim.find("con.commit()"))
+    # ...e i chiamanti sono ESATTAMENTE questi due: il terzo di domani
+    # (un annullo, uno storno) deve venire a leggere questa voce. Si
+    # conta il CHIAMANTE e non il nome, o la definizione entrerebbe
+    # nel conto e la sentinella direbbe tre dove ce ne sono due.
+    prova("i ganci del registro sono due", 2,
+          codice(_SORGENTE).count("registra_uscita_negozio(con,")
+          - codice(_SORGENTE).count("def registra_uscita_negozio(con,"))
+
+
 def _senza_prosa(testo):
     """Il corpo di una funzione senza la sua docstring.
 
@@ -25509,7 +25833,7 @@ def main():
               prove_banner_negozio,
               prove_foto_vuota,
               prove_connettori, prove_connettori_sync,
-              prove_connettori_woo):
+              prove_connettori_woo, prove_connettori_registro):
         try:
             f()
         except Exception as e:

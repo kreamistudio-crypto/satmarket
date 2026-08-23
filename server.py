@@ -2574,7 +2574,11 @@ def init_db():
         ordine_id INTEGER NOT NULL,
         delta INTEGER NOT NULL,        -- negativo = venduto qui; positivo = rimborso
         tipo TEXT NOT NULL,            -- 'vendita' | 'rimborso'
-        stato TEXT DEFAULT 'pendente', -- pendente | riflessa
+        -- pendente = il negozio non lo sa ancora | riflessa = la sua
+        -- lettura si e' mossa e il conto e' in pari | annullata = la
+        -- vendita e' stata rimborsata PRIMA che il negozio la
+        -- scalasse, quindi la' non e' mai successo niente
+        stato TEXT DEFAULT 'pendente', -- pendente | riflessa | annullata
         creato INTEGER,
         aggiornato INTEGER,
         -- l'idempotenza di xp_eventi: un retry, un doppio gancio o un
@@ -18939,6 +18943,13 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                 (adesso, e["annuncio_id"]))
             decadute += [{"compratore_id": v["compratore_id"],
                           "titolo": e["titolo"]} for v in vive]
+    # IL REGISTRO DEI NEGOZI COLLEGATI, nella STESSA transazione dello
+    # stock: la pendente e il pezzo che se n'e' andato sono lo stesso
+    # fatto, e un commit che ne salvasse solo uno lascerebbe il sync a
+    # rialzare una vendita vera (o a sottrarre una vendita mai
+    # avvenuta). Le righe che non vengono da un negozio non producono
+    # niente: il giudice dell'origine risponde per loro.
+    magazzino = registra_uscita_negozio(con, ordine_id, righe, "vendita")
     con.commit()
     for e in esauriti:
         # Anche la piazza Nostr deve sapere che l'oggetto e' andato
@@ -19014,6 +19025,11 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # dei bool proprio per non poterlo interpolare.
     if o["nota_compratore"]:
         msg += "\n\n" + _coda_nota(False, True)
+    # ...e in fondo la riga operativa di chi ha un negozio collegato:
+    # e' l'ULTIMA cosa che legge perche' e' l'unica che gli chiede di
+    # uscire da Barattolo. Vuota per tutti gli altri.
+    if magazzino:
+        msg += "\n\n" + _coda_magazzino(magazzino)
     await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
@@ -25294,6 +25310,16 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                             "quantita_max=MAX(quantita_max,quantita+?), "
                             "stato='attivo' WHERE id=?",
                             (r["quantita"], r["quantita"], r["annuncio_id"]))
+            # IL REGISTRO VA RIMESSO IN PARI, o la vendita rimborsata
+            # continuerebbe a sottrarre un pezzo fantasma A OGNI GIRO,
+            # per sempre: il sync ricopre la giacenza dalla lettura
+            # esterna e la pendente e' quel che la corregge. Se il
+            # negozio non l'aveva ancora scalata le due si cancellano in
+            # silenzio; se l'aveva gia' fatto, i pezzi vanno RIMESSI e
+            # glielo si dice. Stessa transazione dello stock, per la
+            # ragione del gemello in `_incassa_ordine`.
+            magazzino = registra_uscita_negozio(con, ordine_id, righe,
+                                                "rimborso")
             con.commit()
             titolo = html.escape(_titolo_ordine(righe)[:60])
             con.close()
@@ -25315,7 +25341,9 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                            "⚖️ La disputa è stata risolta a favore dell'acquirente: "
                            "i sats gli sono stati rimborsati e l'annuncio è tornato "
                            "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
-                           "nella Mini App.")
+                           "nella Mini App."
+                           + ("\n\n" + _coda_magazzino(magazzino)
+                              if magazzino else ""))
             # Il polso dei moderatori: anche gli esiti storti contano
             await polso_ordini_admin(
                 f"↩️ <b>Ordine rimborsato al compratore:</b> «{titolo}» — "
@@ -29427,6 +29455,110 @@ def _salva_foto_connettore(annuncio_id: int, indice: int,
     if not raw:
         return None
     return _salva_una_foto(annuncio_id, indice, raw, int(time.time()))
+
+
+def registra_uscita_negozio(con, ordine_id: int, righe: list,
+                            tipo: str) -> list:
+    """Le righe di un ordine che vengono da un negozio COLLEGATO
+    finiscono nel registro delle uscite (ago 2026, tappa 4). Torna
+    l'elenco di cosa dire al venditore: `[{titolo, pezzi, delta}]`.
+
+    E' IL PEZZO CHE MANCAVA ALLA FASE 1: il registro si leggeva e si
+    spegneva gia' dalla tappa 2 (`_saldo_pendente`,
+    `rifletti_pendenti`), ma a SCRIVERLO non c'era nessuno — quindi
+    ogni vendita fatta qui veniva rialzata dal sync entro l'ora, e sul
+    pezzo unico il 'venduto' risorgeva. Il buco non fallisce da solo:
+    nessuna eccezione, nessun log, solo un numero che torna su.
+
+    `tipo` E' OBBLIGATORIO E SENZA DEFAULT (la lezione di
+    `atteso_sats`): e' il segno del movimento, e chi lo dimentica lo
+    sente da Python invece di scrivere una vendita al posto di un
+    rimborso.
+
+    SI PASSA DA `da_connettore` E MAI DA UNA COLONNA A MANO: il
+    giudice dell'origine e' uno, e su una riga «a due teste»
+    (`contatto_nostr` e `fonte` insieme) risponde 'nostr' — cioe' non
+    si registra niente, che e' il verso prudente: quella riga il libro
+    mastro la segnala gia' come guasto suo.
+
+    IDEMPOTENTE PER COSTRUZIONE, e non per attenzione di chi chiama:
+    la UNIQUE `(ordine_id, annuncio_id, tipo)` para il retry, il
+    doppio gancio e il riavvio a meta' — la stessa cintura di
+    `xp_eventi`. Un `INSERT OR IGNORE` che non scrive non finisce
+    nell'elenco, quindi nemmeno nella notifica.
+
+    NIENTE `commit` e nessuna `notifica` qui dentro: si scrive nella
+    transazione del chiamante, che ha gia' aperto la sua, e le parole
+    partono DOPO il commit — il patto di tutto il resto del file."""
+    if tipo not in ("vendita", "rimborso"):
+        raise ValueError(f"tipo di uscita sconosciuto: {tipo!r}")
+    adesso = int(time.time())
+    fuori = []
+    for r in righe:
+        a = con.execute(
+            "SELECT contatto_nostr, fonte, connettore_id, titolo "
+            "FROM annunci WHERE id=?", (r["annuncio_id"],)).fetchone()
+        if not a or not da_connettore(a):
+            continue
+        pezzi = int(r["quantita"] or 1)
+        if tipo == "rimborso":
+            # SE LA VENDITA NON E' ANCORA ARRIVATA AL NEGOZIO, LE DUE
+            # SI CANCELLANO: la' non e' mai successo niente, quindi non
+            # c'e' nessun magazzino da rimettere a posto e al venditore
+            # non si dice niente. Si spegne la pendente e basta — senza,
+            # resterebbe a sottrarre un pezzo fantasma per sempre, che
+            # e' il difetto che la tappa 4 introdurrebbe curando il suo.
+            cur = con.execute(
+                "UPDATE connettori_uscite SET stato='annullata', "
+                "aggiornato=? WHERE ordine_id=? AND annuncio_id=? "
+                "AND tipo='vendita' AND stato='pendente'",
+                (adesso, ordine_id, r["annuncio_id"]))
+            if cur.rowcount:
+                continue
+            # ...altrimenti il negozio l'aveva gia' scalata: i pezzi
+            # vanno RIMESSI, e questa riga e' insieme la correzione del
+            # conto e la cosa da dire.
+        cur = con.execute(
+            "INSERT OR IGNORE INTO connettori_uscite(connettore_id,"
+            "annuncio_id,ordine_id,delta,tipo,stato,creato,aggiornato) "
+            "VALUES(?,?,?,?,?,'pendente',?,?)",
+            (a["connettore_id"], r["annuncio_id"], ordine_id,
+             -pezzi if tipo == "vendita" else pezzi, tipo, adesso, adesso))
+        if cur.rowcount:
+            fuori.append({"titolo": a["titolo"] or r.get("titolo") or "?",
+                          "pezzi": pezzi,
+                          "delta": -pezzi if tipo == "vendita" else pezzi})
+    return fuori
+
+
+def _coda_magazzino(uscite: list) -> str:
+    """La riga operativa che il venditore legge in coda alla notifica:
+    cosa deve toccare sul SUO negozio, e perche' tocca a lui.
+
+    E' UN GIUDICE PURO — righe in, testo out — cosi' si tortura in CI
+    invece di guardarlo soltanto; e il titolo e' testo del VENDITORE
+    su un tubo HTML, quindi si tronca PRIMA e si escapa DOPO (la
+    lezione dell'avviso di spedizione).
+
+    IL «PERCHE'» NON SI TOGLIE, ed e' la meta' che conta: finche' la
+    fase 2 non scrive sul suo negozio, quel prodotto di la' risulta
+    ancora disponibile — e un venditore che non lo sa lo scopre
+    vendendo due volte l'ultimo pezzo. Dirlo a ogni vendita e' il
+    prezzo dichiarato della sola lettura."""
+    if not uscite:
+        return ""
+    vendite = [u for u in uscite if u["delta"] < 0]
+    voci = "\n".join(
+        f"• <b>{'−' if u['delta'] < 0 else '+'}{u['pezzi']}</b> "
+        f"«{html.escape(str(u['titolo'])[:40])}»" for u in uscite)
+    if vendite:
+        return ("📦 <b>Aggiorna il magazzino sul tuo negozio:</b>\n"
+                f"{voci}\n"
+                "Barattolo il tuo catalogo lo legge ma non lo scrive: "
+                "finché non lo scali, di là risulta ancora disponibile.")
+    return ("📦 <b>Rimetti a magazzino sul tuo negozio:</b>\n"
+            f"{voci}\n"
+            "Erano già stati scalati di là, e adesso sono tornati.")
 
 
 def _righe_da_giudicare(righe: list, connettore: dict) -> tuple[list, list]:

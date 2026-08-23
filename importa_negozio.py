@@ -316,6 +316,17 @@ def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
 # c'e' solo la PAGINAZIONE, che e' la parte che cambia da una
 # piattaforma all'altra ed e' anche quella che si sbaglia.
 
+_HOST_HTTPS = re.compile(r"https://([A-Za-z0-9.-]+)(?:[:/?#]|$)")
+
+
+def _host_di(url: str) -> str:
+    """L'host di un indirizzo https, minuscolo, o '' se non lo e'.
+    Con una regex e non con `urllib.parse`, che qui dentro non entra
+    (il patto del modulo puro: nessun import che sappia di rete)."""
+    m = _HOST_HTTPS.match(str(url or "").strip())
+    return m.group(1).lower() if m else ""
+
+
 def _prossima_pagina_shopify(intestazioni: dict) -> str:
     """Shopify pagina col header `Link`, non con un numero:
     `<https://...page_info=abc>; rel="next"`. Va letto cosi' e non
@@ -355,6 +366,7 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
     stessa cosa che i traduttori esistono per non far sapere a
     nessuno."""
     prodotti = []
+    atteso = str(dominio or "").strip().lower()
     url = (f"https://{dominio}/admin/api/{VERSIONE_API_SHOPIFY}"
            f"/products.json?limit={PER_PAGINA}")
     intestazioni = {"X-Shopify-Access-Token":
@@ -364,13 +376,34 @@ def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
         if stato != 200:
             raise RuntimeError(f"Shopify ha risposto {stato}")
         prodotti.extend((corpo or {}).get("products") or [])
-        url = _prossima_pagina_shopify(risposta)
+        # L'INDIRIZZO DELLA PAGINA DOPO LO SCRIVE IL NEGOZIO, e qui il
+        # cursore e' opaco: non si puo' comporre, si puo' solo seguire
+        # — quindi si lega all'HOST DEL COLLEGAMENTO. E' la stessa
+        # regola scritta per Woo, dove viene gratis perche' li' le
+        # pagine si numerano. Senza, chi risponde su quel dominio puo'
+        # far bussare il server a un host qualunque con in mano il
+        # token di quel negozio: il guardiano del trasporto ferma gli
+        # indirizzi privati, non gli estranei pubblici.
+        # E ALZA, non si ferma: fermarsi vorrebbe dire consegnare alla
+        # riconciliazione un catalogo LETTO A META', che sulle
+        # sparizioni si fida — cioe' spegnere gli annunci non visti.
+        prossima = _prossima_pagina_shopify(risposta)
+        if prossima and _host_di(prossima) != atteso:
+            raise RuntimeError(
+                "la pagina successiva punta a un altro indirizzo")
+        url = prossima
+    # NIENTE TETTI IN SILENZIO: il gemello Woo lo pagava per davvero, e
+    # qui la stessa forma era LATENTE — regge solo perche' la pagina e'
+    # da 250 e il tetto 200, quindi il confronto scatta; alzando
+    # MAX_PRODOTTI_CONNETTORE a 250 si atterrerebbe esatti sul tetto e
+    # il catalogo si troncherebbe senza dirlo. Qui il conto esatto non
+    # serve: se dopo il ciclo un `url` c'e' ancora, c'e' ANCORA UNA
+    # PAGINA — lo dice Shopify stesso nel suo header.
     avviso = ""
-    if len(prodotti) > tetto:
+    if url or len(prodotti) > tetto:
         avviso = (f"il catalogo ha piu' di {tetto} prodotti: "
                   f"il resto arriva ai giri successivi")
-        prodotti = prodotti[:tetto]
-    return prodotti, avviso
+    return prodotti[:tetto], avviso
 
 
 # --- WOOCOMMERCE ------------------------------------------------------
@@ -612,27 +645,37 @@ LETTORI = {"shopify": leggi_catalogo_shopify, "woo": leggi_catalogo_woo}
 
 # --- LO STOCK ---------------------------------------------------------
 
-def quantita_corretta(esterno: int, pendenti: int) -> int:
-    """La giacenza da scrivere QUI, viste le vendite che il negozio di
-    la' non sa ancora.
+def quantita_corretta(esterno: int, saldo: int) -> int:
+    """La giacenza da scrivere QUI, visti i movimenti che il negozio
+    di la' non sa ancora.
 
     E' LA FUNZIONE CHE TIENE IN PIEDI LA FASE 1. Il sync ricopre
     `quantita` dalla lettura esterna a ogni giro: senza questa
-    sottrazione, una vendita fatta su Barattolo verrebbe RIALZATA
+    correzione, una vendita fatta su Barattolo verrebbe RIALZATA
     entro l'ora — e sul pezzo unico il 'venduto' risorgerebbe, perche'
     la regola dice che uno stock esterno tornato sopra zero riaccende
     l'annuncio (serve al ricarico legittimo del miele).
     Quindi: o il venditore ha gia' riallineato il suo magazzino, e
     allora `esterno` e' gia' giusto e le pendenti sono state spente al
-    giro in cui il calo si e' visto; o non l'ha fatto, e le sottraiamo
-    noi. Mai sotto zero."""
-    return max(0, int(esterno) - abs(int(pendenti or 0)))
+    giro in cui il movimento si e' visto; o non l'ha fatto, e lo
+    correggiamo noi. Mai sotto zero.
+
+    IL SALDO HA UN SEGNO, e dalla tappa 4 non e' piu' un conteggio:
+    NEGATIVO sono i pezzi venduti qui che il negozio non ha ancora
+    scalato, POSITIVO quelli rimborsati qui che non ha ancora
+    rimesso. E' la convenzione che lo schema di `connettori_uscite`
+    dichiara dal primo giorno («negativo = venduto qui; positivo =
+    rimborso»), e il `- abs(...)` di ieri — nato quando nel registro
+    c'erano le sole vendite — sul rimborso avrebbe SOTTRATTO invece di
+    aggiungere, cioe' nascosto due volte dei pezzi che ci sono."""
+    return max(0, int(esterno) + int(saldo or 0))
 
 
 def rifletti_pendenti(con, annuncio_id: int, visto_prima: int,
                       adesso_esterno: int) -> int:
-    """Il venditore ha riallineato il suo magazzino? Allora le vendite
-    che gli avevamo segnalato sono ARRIVATE, e smettono di sottrarsi.
+    """Il venditore ha riallineato il suo magazzino? Allora i
+    movimenti che gli avevamo segnalato sono ARRIVATI, e smettono di
+    correggere.
 
     SENZA QUESTA FUNZIONE LA CORREZIONE SI MANGIA LO STOCK: vendo un
     pezzo qui (esterno 10, locale 9, una pendente da 1), il venditore
@@ -642,10 +685,16 @@ def rifletti_pendenti(con, annuncio_id: int, visto_prima: int,
     introdurrebbe curando il suo: peggiore dell'originale, perche'
     silenzioso.
 
-    IL CALO SI ATTRIBUISCE ALLE PENDENTI PIU' VECCHIE, fino a
-    concorrenza: si spegne solo quel che il calo copre per intero —
-    una riga da 3 pezzi contro un calo di 2 resta pendente, che
-    spezzarla vorrebbe dire inventare mezza vendita.
+    IL MOVIMENTO SI ATTRIBUISCE ALLE PENDENTI PIU' VECCHIE, fino a
+    concorrenza: si spegne solo quel che copre per intero — una riga
+    da 3 pezzi contro un calo di 2 resta pendente, che spezzarla
+    vorrebbe dire inventare mezza vendita.
+    E SI GUARDA IL VERSO (tappa 4): un calo del negozio spegne le
+    VENDITE in attesa, una risalita spegne i RIMBORSI — righe di
+    segno opposto al movimento non si toccano. Senza, il venditore
+    che rimette a magazzino i pezzi di un reso spegnerebbe con quella
+    risalita una vendita pendente che non c'entra niente, e da li' in
+    poi il conto sarebbe storto per sempre.
     IMPERFEZIONE DICHIARATA, e va nei due versi: un calo dovuto a una
     vendita sul LORO sito puo' spegnere una pendente nostra (e allora
     il locale resta un filo piu' alto del vero: e' la finestra della
@@ -653,8 +702,8 @@ def rifletti_pendenti(con, annuncio_id: int, visto_prima: int,
     riallinea MAI tiene il locale piu' basso del suo negozio, che e'
     il verso prudente e glielo dice ogni notifica di vendita. La fase
     2 — il decremento scritto da noi — toglie l'euristica di mezzo."""
-    calo = int(visto_prima) - int(adesso_esterno)
-    if visto_prima < 0 or calo <= 0:
+    movimento = int(adesso_esterno) - int(visto_prima)
+    if visto_prima < 0 or movimento == 0:
         return 0
     try:
         righe = con.execute(
@@ -663,29 +712,37 @@ def rifletti_pendenti(con, annuncio_id: int, visto_prima: int,
             (annuncio_id,)).fetchall()
     except sqlite3.OperationalError:
         return 0
-    spente, resto = 0, calo
+    spente, resto = 0, abs(movimento)
     for r in righe:
-        quanti = abs(int(r[1] or 0))
-        if quanti > resto:
+        delta = int(r[1] or 0)
+        if delta == 0 or (delta > 0) != (movimento > 0):
+            continue          # verso opposto: questo movimento non e' suo
+        if abs(delta) > resto:
             break
         con.execute("UPDATE connettori_uscite SET stato='riflessa', "
                     "aggiornato=? WHERE id=?", (int(time.time()), r[0]))
-        resto -= quanti
+        resto -= abs(delta)
         spente += 1
     return spente
 
 
-def _pendenti(con, annuncio_id: int) -> int:
-    """Quanti pezzi di questo annuncio sono stati venduti qui e non
-    risultano ancora scalati sul negozio. Fail-open sul database che
-    non ha ancora la tabella: senza registro si vale zero, cioe' il
-    comportamento di chi non ha mai venduto niente."""
+def _saldo_pendente(con, annuncio_id: int) -> int:
+    """Il SALDO col segno dei movimenti che il negozio non sa ancora:
+    negativo se qui si e' venduto piu' di quanto si sia rimborsato.
+
+    IL NOME DICE IL SEGNO, e il vecchio `_pendenti` non c'e' piu'
+    apposta: quello contava dei PEZZI e chi lo leggeva li sottraeva:
+    col registro che dalla tappa 4 contiene anche i rimborsi, un
+    conteggio senza segno avrebbe nascosto due volte dei pezzi che
+    ci sono. Fail-open sul database che non ha ancora la tabella:
+    senza registro il saldo e' zero, cioe' il comportamento di chi
+    non ha mai venduto niente."""
     try:
         r = con.execute(
             "SELECT COALESCE(SUM(delta), 0) FROM connettori_uscite "
             "WHERE annuncio_id=? AND stato='pendente'",
             (annuncio_id,)).fetchone()
-        return abs(int(r[0] or 0))
+        return int(r[0] or 0)
     except sqlite3.OperationalError:
         return 0
 
@@ -846,7 +903,8 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
         # numero scenderebbe di uno a ogni riallineamento.
         rifletti_pendenti(con, gia["id"], gia["origine_stock_visto"],
                           quantita)
-        quantita = quantita_corretta(quantita, _pendenti(con, gia["id"]))
+        quantita = quantita_corretta(quantita,
+                                     _saldo_pendente(con, gia["id"]))
 
     if gia:
         _aggiorna(con, gia, r, connettore, salva_foto, marchio, quantita,

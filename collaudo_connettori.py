@@ -32,7 +32,12 @@ Le altre domande che si fanno insieme a quella:
     invariato, all'AI non si chiede niente;
   · quel che il negozio non dichiara non si inventa (lo stock non
     tracciato) e quel che non sappiamo trattare si salta DICENDOLO
-    (i multi-variante).
+    (i multi-variante);
+  · a SCRIVERE il registro c'e' `_incassa_ordine` (tappa 4), e un
+    annuncio nato qui non ci entra;
+  · un reso lo rimette in pari — se il negozio non aveva ancora
+    scalato la vendita le due si cancellano in silenzio, se l'aveva
+    gia' fatto i pezzi vanno rimessi e glielo si dice.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. L'API del
@@ -65,6 +70,7 @@ NOTIFICHE = []          # (tg_id, testo)
 
 CAMBIO = 100_000.0      # 1 BTC = 100.000 €, cioe' 1000 sats = 1 €
 VENDITORE = 222
+COMPRATORE = 111
 
 
 def prova(nome, atteso, avuto):
@@ -199,6 +205,17 @@ def avvio():
     async def niente(*a, **k):
         return None
     server.notifica_admin = niente
+    # Il giro di una vendita vera (tappa 4) passa dal funnel
+    # dell'accredito: quel che non c'entra col registro si spegne —
+    # le due piazze, il polso dei moderatori e il cambio, che
+    # altrimenti andrebbe a chiedere a CoinGecko.
+    server.polso_ordini_admin = niente
+    server.annuncio_su_nostr = niente
+    server.promo_venduto = niente
+
+    async def cambio_finto():
+        return CAMBIO
+    server.cambio_btc_eur = cambio_finto
 
     async def annota(tg_id, testo, *a, **k):
         NOTIFICHE.append((tg_id, testo))
@@ -249,6 +266,39 @@ def uno(cid, chiave):
         if a["origine_chiave"] == str(chiave):
             return a
     return None
+
+
+def ordine_pagato(annuncio_id, pezzi=1):
+    """Un ordine appena pagato, pronto per `_incassa_ordine`.
+
+    Si scrive a mano perche' quel che si prova qui non e' il checkout
+    — quello ha i suoi collaudi — ma cosa succede al REGISTRO quando
+    i sats arrivano in cassaforte."""
+    adesso = int(time.time())
+    con = SRV.db()
+    cur = con.execute(
+        "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
+        "prezzo_sats,quantita,stato,consegna_scelta,creato,aggiornato) "
+        "VALUES(?,?,?,?,?,'creato','spedizione',?,?)",
+        (annuncio_id, COMPRATORE, VENDITORE, 20_000 * pezzi, pezzi,
+         adesso, adesso))
+    con.commit()
+    oid = cur.lastrowid
+    con.close()
+    return oid
+
+
+def rimborsa(ordine_id):
+    """La disputa decisa a favore del compratore. `payout_stato` a
+    'uscito' fa prendere a `_rimborsa_compratore` il ramo PAGATO
+    senza chiedere niente a Lightning: qui non si prova il pagamento,
+    si prova che il registro torni in pari."""
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='dispute', payout_stato='uscito' "
+                "WHERE id=?", (ordine_id,))
+    con.commit()
+    con.close()
+    return asyncio.run(SRV._rimborsa_compratore(ordine_id))
 
 
 def main():
@@ -577,6 +627,124 @@ def main():
     giro()
     prova("col negozio senza tasse il prezzo si legge com'e'", 18.0,
           uno(wid, 11)["prezzo_eur"])
+
+    # ---- 13. IL REGISTRO SCRITTO DA UNA VENDITA VERA ----------------
+    # Fin qui le pendenti erano state messe A MANO: era il modo di
+    # provare la CORREZIONE dello stock senza avere ancora chi la
+    # scrive. Dalla tappa 4 a scriverla c'e' `_incassa_ordine`, cioe'
+    # il funnel da cui passano tutte e tre le strade dell'accredito —
+    # e questa e' la prova che il giro si chiude da solo.
+    print("\n[la vendita vera scrive il registro, e non si rialza]")
+    tazza = uno(wid, 11)
+    NOTIFICHE.clear()
+    ordine = ordine_pagato(tazza["id"], pezzi=2)
+    asyncio.run(SRV._incassa_ordine(ordine))
+    con = SRV.db()
+    uscite = [(r[0], r[1], r[2]) for r in con.execute(
+        "SELECT tipo, delta, stato FROM connettori_uscite "
+        "WHERE annuncio_id=? ORDER BY id", (tazza["id"],))]
+    con.close()
+    prova("la vendita lascia la pendente, col segno",
+          [("vendita", -2, "pendente")], uscite)
+    prova("...e lo stock locale e' sceso", 3, uno(wid, 11)["quantita"])
+    venditore = [t for chi, t in NOTIFICHE if chi == VENDITORE]
+    prova("il venditore riceve la riga operativa", True,
+          bool(venditore) and "Aggiorna il magazzino" in venditore[-1]
+          and "−2" in venditore[-1])
+    prova("...e la riga dice perche' tocca a lui", True,
+          "non lo scrive" in venditore[-1])
+    # LA PROVA CHE CONTA: il negozio non sa ancora niente (di la' sono
+    # sempre 5), e il sync NON deve rialzare la vendita.
+    giro()
+    prova("il sync non rialza la vendita fatta qui", 3,
+          uno(wid, 11)["quantita"])
+    # ...e quando il venditore scala il suo magazzino, il conto resta
+    # giusto invece di sottrarre due volte
+    CATALOGO_WOO[0] = prodotto_woo(11, "Tazza in ceramica", "18.00",
+                                   stock=3)
+    giro()
+    prova("quando il venditore riallinea, il conto non si sdoppia", 3,
+          uno(wid, 11)["quantita"])
+    con = SRV.db()
+    prova("...e la pendente si spegne da sola", "riflessa",
+          con.execute("SELECT stato FROM connettori_uscite WHERE "
+                      "annuncio_id=? AND tipo='vendita'",
+                      (tazza["id"],)).fetchone()[0])
+    con.close()
+
+    # ---- 14. il pezzo che NON viene da un negozio --------------------
+    print("\n[un annuncio nato qui non entra nel registro]")
+    con = SRV.db()
+    cur = con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,categoria,prezzo_sats,"
+        "quantita,quantita_max,stato,creato) "
+        "VALUES(?,'Bici da corsa','Biciclette',90000,1,1,'attivo',?)",
+        (VENDITORE, int(time.time())))
+    nativo = cur.lastrowid
+    con.commit()
+    con.close()
+    NOTIFICHE.clear()
+    asyncio.run(SRV._incassa_ordine(ordine_pagato(nativo)))
+    con = SRV.db()
+    quante = con.execute("SELECT COUNT(*) FROM connettori_uscite "
+                         "WHERE annuncio_id=?", (nativo,)).fetchone()[0]
+    con.close()
+    prova("niente registro per chi e' nato qui", 0, quante)
+    prova("...e niente riga sul magazzino nella notifica", False,
+          any("magazzino" in t for chi, t in NOTIFICHE if chi == VENDITORE))
+
+    # ---- 15. IL RESO RIMETTE IN PARI --------------------------------
+    # Senza questo, la vendita rimborsata continuerebbe a sottrarre un
+    # pezzo fantasma A OGNI GIRO, per sempre: il sync ricopre la
+    # giacenza dalla lettura esterna, e la pendente e' quel che la
+    # corregge. Non fallisce da solo — un numero un po' piu' basso, e
+    # basta.
+    print("\n[il reso rimette in pari il registro]")
+    # (a) rimborso PRIMA che il negozio scali: le due si cancellano
+    tovaglia = uno(wid, 17)
+    ord_a = ordine_pagato(tovaglia["id"])
+    asyncio.run(SRV._incassa_ordine(ord_a))
+    NOTIFICHE.clear()
+    rimborsa(ord_a)
+    con = SRV.db()
+    stati = [r[0] for r in con.execute(
+        "SELECT stato FROM connettori_uscite WHERE annuncio_id=? "
+        "ORDER BY id", (tovaglia["id"],))]
+    con.close()
+    prova("il rimborso prima del negozio spegne la vendita",
+          ["annullata"], stati)
+    prova("...e al venditore non si chiede niente", False,
+          any("magazzino" in t for chi, t in NOTIFICHE if chi == VENDITORE))
+    giro()
+    prova("...e il sync non sottrae piu' niente", 1,
+          uno(wid, 17)["quantita"])
+
+    # (b) rimborso DOPO: i pezzi vanno RIMESSI, e glielo si dice
+    ord_b = ordine_pagato(tazza["id"], pezzi=1)
+    asyncio.run(SRV._incassa_ordine(ord_b))
+    con = SRV.db()
+    con.execute("UPDATE connettori_uscite SET stato='riflessa' "
+                "WHERE ordine_id=?", (ord_b,))
+    con.commit()
+    con.close()
+    NOTIFICHE.clear()
+    rimborsa(ord_b)
+    con = SRV.db()
+    reso = con.execute(
+        "SELECT delta, stato FROM connettori_uscite WHERE ordine_id=? "
+        "AND tipo='rimborso'", (ord_b,)).fetchone()
+    con.close()
+    prova("il rimborso dopo il negozio chiede di rimettere i pezzi",
+          (1, "pendente"), (reso[0], reso[1]))
+    venditore = [t for chi, t in NOTIFICHE if chi == VENDITORE]
+    prova("...e glielo si dice", True,
+          bool(venditore) and "Rimetti a magazzino" in venditore[-1]
+          and "+1" in venditore[-1])
+    # il negozio dice ancora 3 (aveva scalato la vendita), ma noi
+    # sappiamo che il pezzo e' tornato: 4
+    giro()
+    prova("...e la giacenza qui dice la verita', non quella del negozio",
+          4, uno(wid, 11)["quantita"])
 
     print("\n" + "=" * 62)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
