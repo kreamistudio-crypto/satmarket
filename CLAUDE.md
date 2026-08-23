@@ -15631,9 +15631,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   è uno solo, cambia solo chi firma l'evento.
   Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
   in backlog).
-- I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi c'è la
-  TAPPA 1: schema, giudice, censimento. Il resto è dichiarato qui e
-  non ancora costruito): chi ha già un e-commerce collega il catalogo
+- I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi ci sono
+  le TAPPE 1 e 2: schema, giudice, censimento, il modulo col
+  traduttore Shopify e il giro orario a leva spenta. Il resto è
+  dichiarato qui e non ancora costruito): chi ha già un e-commerce
+  collega il catalogo
   dal Profilo e i suoi prodotti compaiono qui, invece di
   ripubblicarli a mano. Sono cinque persone vere, cataloghi fino a
   ~200 articoli, quasi tutti mono-variante, listini in euro.
@@ -15744,16 +15746,83 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   debito che questo cantiere paga, perché `contatto_nostr` non ne ha
   mai avuto uno e ci passano l'import orario, il dopo-import e la
   deduplica dei doppioni.
-  QUELLO CHE NON C'È ANCORA, dichiarato: il modulo `importa_negozio.py`
-  (traduttori a innesti + testo canonico condiviso fra chi scrive e
-  chi giudica, la lezione di `testo_evento`), il giro di sync col suo
-  tetto per giro, la moderazione col pattern `_da_giudicare` (200
-  articoli = 10 chiamate Haiku UNA TANTUM, poi zero finché un testo
-  non cambia), il registro agganciato in `_incassa_ordine`, gli
-  endpoint e il cassetto. E `origine_scorta` — la coordinata che
-  serve al decremento — NON esiste: è fase 2, e non si aggiunge una
-  colonna per una cosa che non c'è (il precedente di
-  `banner_sbloccato_il`).
+  IL MODULO È PURO E NON GIRA DA SOLO (tappa 2), ed è la differenza
+  col gemello Nostr da capire prima di toccarlo: `importa_nostr.py` ha
+  un `main()` perché la npub sta nel config ed è PUBBLICA, qui le
+  credenziali sono token di un sistema altrui e vivono cifrate nel
+  database — niente `main()`, e le colonne nuove si danno per
+  esistenti. Dentro non c'è NESSUNA chiamata di rete e nessuna
+  scrittura di file: trasporto (`chiama`), scaricatore
+  (`_salva_foto_connettore`) e cambio arrivano INIETTATI dal server,
+  che ha le guardie — il patto del `vaglio`, ed è quel che rende
+  traduttori e riconciliazione collaudabili con un catalogo di
+  cartone. `VERSIONE_API_SHOPIFY` è una costante e non vive dentro
+  gli URL: quelle date hanno un ciclo di deprecazione.
+  IL TRADUTTORE, e le due trappole: un prodotto Shopify ha SEMPRE
+  almeno una variante (quella «di default», che nel pannello non si
+  vede), quindi il salto dei multi-variante guarda `> 1` — scritto
+  `>= 1` non passerebbe NESSUN prodotto, cioè un catalogo vuoto senza
+  un errore; e «stock non tracciato» NON è «zero pezzi» — chi non fa
+  gestire il magazzino a Shopify vende senza contare, e uno zero gli
+  spegnerebbe il catalogo intero al primo giro (`quantita=None`, la
+  colonna non si tocca, e il report lo dice).
+  LA CORREZIONE DELLO STOCK È IN DUE PEZZI, e il secondo l'ha chiesto
+  il collaudo: `quantita_corretta(esterno, pendenti)` sottrae le
+  vendite che il negozio non sa ancora, e `rifletti_pendenti` le
+  SPEGNE quando il calo esterno le copre. Senza la seconda la fase 1
+  introdurrebbe un difetto peggiore di quello che cura: vendo un
+  pezzo (esterno 10, locale 9, una pendente), il venditore riallinea a
+  9, e al giro dopo `quantita_corretta(9, 1)` direbbe 8 — la stessa
+  vendita contata due volte, a ogni riallineamento, fino a zero.
+  L'ORDINE È SORVEGLIATO (prima riflettere, poi sottrarre): al
+  contrario la vendita appena riconosciuta si sottrarrebbe un'ultima
+  volta. Il calo si attribuisce alle pendenti più vecchie e solo se le
+  copre per intero — una riga da 3 contro un calo di 2 resta pendente,
+  che spezzarla vorrebbe dire inventare mezza vendita. IMPERFEZIONE
+  DICHIARATA nei due versi: un calo dovuto a una vendita sul LORO sito
+  può spegnere una pendente nostra (locale un filo più alto del vero:
+  è la finestra della collisione rara, quella che l'escrow copre), e
+  chi non riallinea mai tiene il locale più basso del suo negozio (il
+  verso prudente, e glielo dice ogni notifica). La fase 2 toglie
+  l'euristica di mezzo.
+  LE RIGHE DA NON AMMORBIDIRE DEL GIRO: `leggi_catalogo_*` **ALZA**
+  invece di tornare una lista corta — un catalogo letto a metà preso
+  per un catalogo VUOTO spegnerebbe la vetrina di quel venditore, ed è
+  il motivo per cui `_un_connettore` esce prima di toccare una riga;
+  su un'API il REDIRECT è un errore e non un salto da seguire (più
+  severo delle foto: qui in mano c'è il token di un negozio, e
+  seguire un Location scritto da chi risponde vorrebbe dire
+  consegnarlo a un indirizzo mai giudicato); un negozio muto non
+  spegne NIENTE (si conta l'errore, e a `CONNETTORI_ERRORI_MAX` il
+  collegamento si dichiara rotto con UN avviso); e le credenziali non
+  entrano mai in un `print` né in `ultimo_errore` — un token in un
+  journal è un token pubblico.
+  `url_api_ammesso` è `url_foto_ammesso` con DUE strette (solo https,
+  porta 443) e NON una copia: la regola sull'host vive in un posto
+  solo, o le due divergono al primo ritocco.
+  LA MODERAZIONE SI PAGA UNA VOLTA SOLA (`_righe_da_giudicare`, il
+  gemello di `_da_giudicare`): 200 articoli = 10 chiamate Haiku al
+  primo giro e ZERO ai successivi, finché un testo non cambia. Il
+  giudice confronta la riga GIÀ TRADOTTA e mai i campi grezzi del
+  negozio: `title` e `body_html` non sono troncati né spogliati,
+  quindi non combacerebbero MAI col database e ogni giro ripagherebbe
+  l'AI per dire la stessa cosa. Fail-CLOSED sui mai giudicati (le
+  righe nuove aspettano il giro dopo), fail-open su chi era già
+  passato.
+  IL RIEPILOGO AL VENDITORE PARTE SOLO SE È SUCCESSO QUALCOSA: uno
+  squillo orario per dire «tutto invariato» è il modo di farsi
+  zittire il bot, e col bot zitto si perdono le notifiche degli
+  ordini.
+  QUELLO CHE NON C'È ANCORA, dichiarato: il traduttore Woo (tappa 3 —
+  il posto c'è, `TRADUTTORI`/`LETTORI` sono dizionari a innesti), il
+  registro agganciato in `_incassa_ordine` e la notifica di vendita
+  col «−N su …» (tappa 4: oggi le pendenti si leggono e si spengono,
+  ma a scriverle non c'è ancora nessuno), gli endpoint e il cassetto
+  (tappa 5). E `origine_scorta` — la coordinata che serve al
+  decremento — NON esiste come colonna: è fase 2, e non si aggiunge
+  una colonna per una cosa che non c'è (il precedente di
+  `banner_sbloccato_il`); il traduttore la LEGGE già perché costa zero
+  e sta nella stessa risposta.
 - `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
   il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
   rimasti nelle caselle di ieri (un portatile in «Elettronica» invece
@@ -19554,11 +19623,33 @@ lo stesso — quindi restava verde anche togliendo la migrazione. Una
 sentinella sul nome certifica che qualcuno l'ha scritto, mai che il
 GESTO ci sia.
 IN PRODUZIONE il deploy non cambia niente: le migrazioni sono additive
-e non esiste ancora nessuna strada che scriva `fonte`. Le tappe che
-seguono: il modulo coi traduttori e il giro di sync (leva spenta), Woo
-col guardiano anti-SSRF delle API, il registro delle vendite non
-riflesse, endpoint + cassetto, e il collaudo eseguibile prima
-dell'accensione dal VPS.
+e non esiste ancora nessuna strada che scriva `fonte`.
+
+E la TAPPA 2 (ago 2026): `importa_negozio.py` col traduttore Shopify,
+il trasporto con le sue guardie e il giro orario — a leva
+`CONNETTORI_NEGOZIO_APERTI` SPENTA nel codice, quindi anche qui il
+deploy non fa succedere niente. Vedi la voce in Architettura per il
+modulo puro che non gira da solo, la correzione dello stock in due
+pezzi e le righe da non ammorbidire.
+Collaudata: 5009 prove verdi, `collaudo_connettori.py` (35 verdi: il
+giro VERO su database usa-e-getta con un negozio Shopify di cartone —
+primo giro, moderazione pagata una volta sola, prezzo che cambia, la
+prova regina dello stock, sparizioni, scudo, rete che cade,
+collegamento che si dichiara rotto) e **30 mutazioni, 30 uccise**.
+QUATTRO ERANO SOPRAVVISSUTE al primo giro, tutte sentinelle mie
+scritte male, e sono la lezione da tenere: una cadeva sulla PROSA di
+una docstring (`codice()` toglie i commenti `#`, non le docstring),
+una contava le occorrenze senza guardare la POSIZIONE (il cambio
+spostato dentro il ciclo restava «una volta»), una non distingueva
+due cure che si coprivano a vicenda (serviva il tag inline DENTRO una
+parola), e una certificava una guardia che il codice rendeva
+irraggiungibile.
+E IL DIFETTO PIÙ GROSSO L'HA TROVATO IL COLLAUDO, non la rilettura:
+senza `rifletti_pendenti` la correzione dello stock si sarebbe
+mangiata un pezzo a ogni riallineamento del venditore, fino a zero.
+Le tappe che seguono: Woo, il registro agganciato in
+`_incassa_ordine` con la notifica di vendita, endpoint + cassetto, e
+il rodaggio con uno store di prova prima dell'accensione dal VPS.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
