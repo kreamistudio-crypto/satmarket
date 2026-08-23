@@ -16220,15 +16220,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a chi mette mano al VPS (funziona, ma solo col valore che le ha
   dato chi l'ha scritta), una riga DICHIARATA e non letta da nessuno
   è una promessa che non si mantiene. La seconda direzione è PULITA e
-  va tenuta tale; la prima ha SEI DEBITI, e si NOMINANO
+  va tenuta tale; la prima è VUOTA, ed è l'affermazione più forte
+  delle due — nessuna leva letta dal codice manca dal file da cui si
+  copia. Ci è arrivata in DUE TEMPI, e il metodo vale più del
+  risultato: il censimento è nato con SEI eccezioni di altri cantieri
   (`MODERAZIONE_REVISIONE`, `PROMEMORIA_BUSTA_GIORNI`, le due della
-  revisione, le due dei solleciti delle firme Nostr) invece di
-  sparire in un «≤ 6», che è il modo in cui un debito diventa
-  un'abitudine: l'elenco è ESATTO, quindi il settimo che qualcuno
-  dimentica fa rossa la riga il giorno stesso e chi ne dichiara uno
-  lo toglie da lì. Il censimento GUARDA LA CARTELLA e non tiene un
-  secondo elenco di script — la lezione di
-  `prove_script_nel_workflow`.
+  revisione, le due dei solleciti delle firme Nostr) NOMINATE una per
+  una invece di sparire in un «≤ 6» — che è il modo in cui un debito
+  diventa un'abitudine — e il giorno dopo sono state dichiarate, ognuna
+  nella FAMIGLIA a cui appartiene (la busta fra i promemoria della sua
+  strada, la revisione in una sezione sua, le firme sotto la chiave con
+  cui Barattolo pubblica): il file si legge per famiglie, e una leva
+  messa in fondo «dove c'era posto» è un'altra leva che non si trova.
+  L'ELENCO RESTA A ZERO APPOSTA: chi domani aggiunge una leva senza
+  scriverla nel file trova la riga rossa, e la strada giusta è
+  dichiararla — non rimettere il suo nome lì dentro. Il censimento
+  GUARDA LA CARTELLA e non tiene un secondo elenco di script — la
+  lezione di `prove_script_nel_workflow`.
+  E IL PANNELLO «⚙️ STATO DELLE LEVE» LE CONOSCE (ago 2026, decisione
+  di Andrea): `CONNETTORI_NEGOZIO_APERTI` sta nel PRIMO gruppo, quello
+  di ciò che apre porte, perché accesa il server va a bussare all'API
+  di un negozio di qualcun altro con le sue credenziali in mano — e la
+  sua nota si legge da ACCESA, come `IMPORT_NOSTR_APERTO`, che è lo
+  stato che la merita. I cinque numeri stanno in un gruppo loro,
+  «🏪 Negozi collegati», dopo Nostr e i canali: sono la terza fonte che
+  viene da FUORI, cioè lo stesso posto che hanno in `config_esempio.py`
+  — e sono LIMITI, non interruttori, che è un'altra cosa.
+  ⚠️ Chi aggiunge una leva al pannello la aggiunga anche all'ambiente
+  di `_censimento` in `prove.py`: là `_leve_stato` gira dentro un
+  config finto, e un nome che manca non fa una prova rossa — fa
+  ESPLODERE la prova con un NameError.
   QUELLO CHE NON C'È ANCORA, dichiarato: `origine_scorta` — la
   coordinata che serve al decremento — NON esiste come colonna: è
   fase 2, e non si aggiunge una colonna per una cosa che non c'è (il
@@ -20169,9 +20190,15 @@ erano costanti nel codice e sono diventate leve vere prima di
 dichiararle, che una riga da copiare la quale non cambia niente è
 peggio di una riga che manca. A tenere chiuso il punto c'è
 `prove_config_esempio`, che censisce le due direzioni fra il codice e
-il file da cui si copia — vedi la voce in Architettura, anche per i
-SEI DEBITI di altri cantieri che il censimento ha trovato e che ora
-sono nominati uno per uno.
+il file da cui si copia — vedi la voce in Architettura. Il giorno dopo
+(ago 2026, decisione di Andrea) si sono chiusi anche i SEI DEBITI di
+altri cantieri che quel censimento aveva trovato: la revisione, la
+busta di consegna e i solleciti delle firme Nostr sono dichiarati
+ognuno nella sua famiglia, e l'elenco delle eccezioni è VUOTO — che è
+l'affermazione più forte. E il pannello «⚙️ Stato delle leve» ha
+imparato i connettori: la porta nel primo gruppo, i cinque numeri in
+un gruppo loro. Sei mutazioni in più, una per riga sorvegliata, ognuna
+rossa da sola.
 DA GUARDARE quando si accenderà, ed è il pezzo che in locale non si
 può fare: il primo collegamento vero a uno store di sviluppo — che il
 401 di un token sbagliato arrivi come un 400 leggibile, che il
