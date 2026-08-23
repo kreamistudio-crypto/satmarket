@@ -4551,6 +4551,46 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   frasi diverse da dire a chi aspetta. E un RIFIUTATO non si riapre,
   dichiarato: la sua attesa è stata buttata col file, quindi non c'è
   più niente da riaccendere — si richiede.
+  «https://» È IL PREFISSO DEL CAMPO, NON UNA COSA DA DIGITARE (ago
+  2026, decisione di Andrea): sta a sinistra dentro il riquadro, in
+  grigio, e nell'input si scrive quel che viene DOPO — così si vede
+  che è obbligatorio senza doverlo battere, e senza che nessuno provi
+  a scrivere `http://` in un campo che il server rifiuterebbe.
+  IL GUSCIO PRENDE IL BORDO (`.campo-pre`) e l'input resta NUDO, o si
+  vedrebbero due riquadri uno dentro l'altro; il fuoco lo prende il
+  guscio col `:focus-within`, così l'anello è quello di sempre. La
+  regola nomina `.field` (`.field .campo-pre input`) apposta: batte
+  `.field input` per SPECIFICITÀ e non per ordine — la lezione del €
+  dell'asta. E l'input NON è più `type="url"`: dentro c'è un indirizzo
+  senza schema, che per la validazione nativa del browser è invalido,
+  e l'anello rosso comparirebbe su un campo scritto giusto.
+  CHI INCOLLA UN INDIRIZZO INTERO NON DEVE RITROVARSI
+  «https://https://…»: `linkSenzaSchema` toglie lo schema IN TESTA e
+  solo lì — dentro il resto (`sito.it/?u=http://…`) è un pezzo
+  dell'indirizzo e non un doppione — a maiuscole indifferenti e
+  RIPETUTO finché ce n'è uno (un incollato sbagliato può portarne
+  due). ANCHE `http://` se ne va, ed è voluto: il prefisso grigio è lì
+  a un dito, quindi non si cambia niente di nascosto, e quel link il
+  server lo rifiuterebbe comunque («su http non c'è nessuna lettura
+  innocente nel 2026»). Il campo VUOTO resta vuoto e non diventa
+  «https://», o il messaggio che si legge non sarebbe più «Scrivi il
+  link del tuo sito».
+  Si ripulisce a ogni tasto (`ripuliscilinkBanner`) ma SOLO quando il
+  valore cambia davvero: riscriverlo sempre sposterebbe il cursore in
+  fondo mentre si corregge in mezzo. E a comporre l'indirizzo per il
+  POST è `linkBannerIntero` e mai il campo letto a mano, o partirebbe
+  senza schema. Il `maxlength` è 292 = i 300 del server meno il
+  prefisso; la cintura vera resta `link_banner_ammesso`.
+  LA PROVA CHE CONTA lo fa GIRARE con node sui suoi dieci casi: le
+  sentinelle dicono che il giudice esiste, mai che risponda giusto —
+  e qui la domanda è proprio cosa risponde a un indirizzo incollato.
+  E LA PORTA CHIUSA NON È UNA TRUST-NOTE (ago 2026, decisione di
+  Andrea): il riquadro verde è il registro della FIDUCIA — il deposito
+  di garanzia — e lì non si rassicura nessuno, si dice come si apre
+  una porta. Prosa normale, la stessa che il cassetto porta poche
+  righe più giù a porta aperta: un cassetto, una voce. ⚠️ Il nome di
+  quella classe non si scrive nemmeno nel commento che spiega perché
+  non c'è: la sentinella legge anche i commenti.
   L'USCITA SI CHIEDE, col DOMINIO nella testata del foglio: chi tocca
   deve sapere dove va, ed è l'unica cosa che rende onesto tutto il
   resto — un inganno del genere vive sul fatto che chi tocca non

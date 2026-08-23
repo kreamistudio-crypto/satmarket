@@ -3107,6 +3107,21 @@
     padding:12px 14px;font:inherit;font-weight:600;outline:none;
   }
   .field input:focus,.field textarea:focus{border-color:var(--ink)}
+  /* IL PREFISSO FISSO di un campo indirizzo: «https://» in grigio a
+     sinistra, DENTRO il riquadro, e l'utente scrive quel che viene
+     dopo. Il bordo passa al GUSCIO e l'input resta nudo, o si
+     vedrebbero due riquadri uno dentro l'altro; il fuoco lo prende il
+     guscio col :focus-within, cosi' l'anello e' quello di sempre.
+     La regola nomina `.field` apposta: batte `.field input` per
+     SPECIFICITA' e non per ordine (la lezione del € dell'asta). */
+  .campo-pre{display:flex;align-items:center;
+    border:1.5px solid var(--field-line);background:var(--card);
+    border-radius:14px;padding:0 14px}
+  .campo-pre:focus-within{border-color:var(--ink)}
+  .campo-pre .pre{color:var(--muted);font-weight:700;flex:0 0 auto}
+  .field .campo-pre input{flex:1 1 auto;min-width:0;width:auto;
+    border:0;background:none;border-radius:0;padding:12px 0}
+  .field .campo-pre input:focus{border:0}
   /* Le select del foglio-picker sono depositi nascosti: se un domani
      una regola desse un `display` alle select (le nostre le pescano
      per tag: `.field select`, `.strumenti select`) l'attributo hidden
@@ -18820,10 +18835,18 @@ function renderBanner(){
        resta la sola spiegazione di cosa sia il banner: un'assenza,
        mai una bugia. */
     const perche = bannerLeve.motivo ? esc(bannerLeve.motivo) + ' ' : '';
+    /* SCRITTA NORMALE, senza riquadro (ago 2026, decisione di Andrea):
+       il riquadro verde e' il registro della FIDUCIA — il deposito di
+       garanzia — e qui non si rassicura nessuno: si dice come si apre
+       una porta. E' la stessa forma della prosa che il cassetto porta
+       poche righe piu' giu' a porta aperta: un cassetto, una voce.
+       (Il nome di quella classe non si scrive nemmeno qui: la
+       sentinella legge anche i commenti.) */
     box.innerHTML = `
-      <div class="trust-note" style="margin-bottom:0">🔒 <span><b>${
-        perche}</b>È l'insegna che puoi appendere sopra il tuo catalogo
-        — una foto e il link al tuo sito.</span></div>`;
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        🔒 <b style="color:var(--ink)">${perche}</b>È l'insegna che puoi
+        appendere sopra il tuo catalogo — una foto e il link al tuo
+        sito.</div>`;
     return;
   }
   const vivo = b.stato === 'attivo' && b.foto;
@@ -18855,8 +18878,13 @@ function renderBanner(){
     <div id="bannerErrore"></div>
     <div class="field" style="margin-top:12px">
       <label for="bannerLink">Il link del tuo sito</label>
-      <input type="url" id="bannerLink" placeholder="https://ilmiosito.it"
-             inputmode="url" autocomplete="off" maxlength="300">
+      <div class="campo-pre">
+        <span class="pre" aria-hidden="true">https://</span>
+        <input type="text" id="bannerLink" placeholder="ilmiosito.it"
+               aria-label="Il link del tuo sito, dopo https://"
+               inputmode="url" autocomplete="off" maxlength="292"
+               oninput="ripuliscilinkBanner(this)">
+      </div>
     </div>
     <div class="field">
       <label for="bannerFile">L'immagine (larga e bassa, 3:1)</label>
@@ -18894,9 +18922,38 @@ async function scegliFotoBanner(files){
     : 'Questa immagine non si riesce a leggere: provane un\'altra.';
 }
 
+/* IL PREFISSO E' FUORI DAL CAMPO, quindi qui dentro si scrive quel che
+   viene DOPO — e chi incolla un indirizzo intero non deve ritrovarsi
+   «https://https://ilmiosito.it». Lo schema si toglie IN TESTA e solo
+   li': dentro il resto (`sito.it/?u=http://…`) e' un pezzo
+   dell'indirizzo e non un doppione. Si ripete finche' ce n'e' uno —
+   un incollato sbagliato puo' portarne due — e vale anche MAIUSCOLO.
+   ANCHE `http://` se ne va, ed e' voluto: il prefisso grigio e' li' a
+   un dito, quindi non si cambia niente di nascosto, e un http il
+   server lo rifiuterebbe comunque (su http non c'e' nessuna lettura
+   innocente nel 2026: la regola di `link_banner_ammesso`).
+   Il campo VUOTO resta vuoto e non diventa «https://»: il messaggio
+   che si legge dev'essere quello di sempre, «Scrivi il link del tuo
+   sito». Il tetto del campo e' 292 = 300 del server meno il prefisso,
+   e la cintura vera resta di la'. */
+const PRE_LINK = 'https://';
+function linkSenzaSchema(v){
+  return String(v == null ? '' : v).trim().replace(/^(?:https?:\/\/)+/i, '');
+}
+function linkBannerIntero(){
+  const resto = linkSenzaSchema(el('bannerLink')?.value || '');
+  return resto ? PRE_LINK + resto : '';
+}
+/* Si riscrive SOLO quando cambia davvero: riscrivere a ogni tasto
+   sposterebbe il cursore in fondo mentre si sta correggendo in mezzo. */
+function ripuliscilinkBanner(inp){
+  const pulito = linkSenzaSchema(inp.value);
+  if (pulito !== inp.value) inp.value = pulito;
+}
+
 async function salvaBanner(btn){
   haptic();
-  const link = (el('bannerLink')?.value || '').trim();
+  const link = linkBannerIntero();
   const box = el('bannerErrore');
   if (box) box.innerHTML = '';
   const dillo = t => {

@@ -24428,8 +24428,90 @@ def prove_banner_negozio():
           "si sblocca" not in rb and "affare concluso" not in rb)
     prova("...e un server di ieri non lascia una frase falsa", True,
           "bannerLeve.motivo ?" in rb)
+    # LA PORTA CHIUSA NON E' UNA TRUST-NOTE (ago 2026, decisione di
+    # Andrea): il verde e' il registro della fiducia — l'escrow — e
+    # qui si dice soltanto come si apre una porta. Prosa normale,
+    # quella che il cassetto ha gia' a porta aperta.
+    chiusa = rb[rb.index("if (!bannerLeve.porta_aperta)"):
+                rb.index("const vivo =")]
+    prova("il messaggio della porta chiusa non ha il riquadro verde",
+          True, "trust-note" not in chiusa)
     prova("il 400 si rende dentro il cassetto, non in un toast", True,
           "bannerErrore" in pezzo_js(mini, "async function salvaBanner(", "\n}"))
+
+    # ---- 10. Il campo del link: «https://» e' il PREFISSO ----------
+    # Sta a sinistra, in grigio, dentro il riquadro: si vede che e'
+    # obbligatorio senza doverlo digitare. Da li' la domanda che
+    # decide: chi incolla un indirizzo intero non deve ritrovarsi
+    # «https://https://...».
+    campo = mini[mini.index('<label for="bannerLink">'):
+                 mini.index('<label for="bannerFile">')]
+    prova("il prefisso e' scritto nel campo", True,
+          '<span class="pre" aria-hidden="true">https://</span>' in campo)
+    # L'ORDINE CONTA: il prefisso sta PRIMA dell'input, o si leggerebbe
+    # «ilmiosito.it https://»
+    prova("...e sta prima dell'input", True,
+          campo.index('class="pre"') < campo.index("<input"))
+    # NON PIU' `type="url"`: dentro c'e' un indirizzo SENZA schema, che
+    # per la validazione nativa del browser e' invalido — l'anello
+    # rosso comparirebbe su un campo scritto giusto.
+    prova("l'input non e' piu' un type=url", True,
+          'type="text"' in campo and 'type="url"' not in campo)
+    prova("chi ascolta lo sente lo stesso (aria-label)", True,
+          "dopo https://" in campo)
+    # Il tetto del campo e' quello del server MENO il prefisso, che di
+    # la' si conta sul link INTERO
+    prova("il tetto del campo lascia posto al prefisso", True,
+          'maxlength="292"' in campo)
+    prova("il ripulitore e' agganciato a ogni tasto", True,
+          'oninput="ripuliscilinkBanner(this)"' in campo)
+    # IL GUSCIO PRENDE IL BORDO e vince per SPECIFICITA', non per
+    # ordine: `.field input` ha lo stesso peso, e un riordino del
+    # foglio rimetterebbe due riquadri uno dentro l'altro.
+    prova("il guscio veste il campo, l'input resta nudo", True,
+          ".field .campo-pre input{" in mini and
+          ".campo-pre:focus-within{" in mini)
+    # E salvaBanner COMPONE col giudice invece di leggere il campo a
+    # mano: da li' partirebbe l'indirizzo senza schema.
+    sb = pezzo_js(mini, "async function salvaBanner(", "\n}")
+    prova("il POST parte dal giudice, non dal campo", True,
+          "linkBannerIntero()" in sb and "el('bannerLink')" not in sb)
+    # LA PROVA CHE CONTA e' quella che lo fa GIRARE: le sentinelle
+    # dicono che il giudice ESISTE, mai che risponda giusto — e qui la
+    # domanda e' proprio cosa risponde a un indirizzo incollato.
+    import json as _jsb, shutil as _shb, subprocess as _spb, tempfile as _tfb
+    _nodeb = _shb.which("node")
+    if not _nodeb:
+        salta("linkBannerIntero risponde giusto", "node non installato")
+    else:
+        _pre = mini[mini.index("const PRE_LINK ="):
+                    mini.index("function linkSenzaSchema(")]
+        _g = (_pre
+              + pezzo_js(mini, "function linkSenzaSchema(v){", "\n}") + "\n}"
+              + pezzo_js(mini, "function linkBannerIntero(){", "\n}") + "\n}")
+        _casi = ["", "   ", "ilmiosito.it", "https://ilmiosito.it",
+                 "HTTPS://Sito.it", "http://sito.it", "https://https://x.it",
+                 "  https://x.it  ", "www.x.it", "x.it/?u=http://y.it"]
+        _prog = (_g + "\nlet V='';const el = () => ({value: V});"
+                 "console.log(JSON.stringify(" + _jsb.dumps(_casi) +
+                 ".map(v => { V = v; return linkBannerIntero(); })));")
+        _fb = _tfb.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _fb.write(_prog)
+        _fb.close()
+        _rb = _spb.run([_nodeb, _fb.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        os.unlink(_fb.name)
+        prova("linkBannerIntero: il vuoto resta vuoto, lo schema in testa "
+              "se ne va (doppio, MAIUSCOLO e http compresi) e quello "
+              "DENTRO l'indirizzo resta",
+              ["", "",
+               "https://ilmiosito.it", "https://ilmiosito.it",
+               "https://Sito.it", "https://sito.it", "https://x.it",
+               "https://x.it", "https://www.x.it",
+               "https://x.it/?u=http://y.it"],
+              _jsb.loads(_rb.stdout.strip()) if _rb.returncode == 0
+              else "ERRORE: " + _rb.stderr[:160])
 
 
 def main():
