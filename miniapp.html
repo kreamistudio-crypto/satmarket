@@ -4901,6 +4901,23 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
 
+
+      <!-- IL NEGOZIO COLLEGATO (ago 2026, tappa 5): chi ha gia' un
+           e-commerce collega il catalogo e i suoi prodotti compaiono
+           qui, invece di ripubblicarli a mano.
+           STA ACCANTO A «Importa in blocco», e non fra le politiche
+           di negozio piu' in basso: quei due rispondono alla STESSA
+           domanda — come fai entrare il tuo catalogo — e il
+           collegamento e' la versione che si tiene in pari da sola,
+           l'import CSV quella una-tantum.
+           In DEMO e in vetrina il cassetto sparisce, il patto del
+           wallet; e sparisce anche a leva spenta, che una porta su un
+           muro e' peggio di nessuna porta. -->
+      <div class="acc" id="accConnettori">
+        <button class="acc-h" onclick="toggleAcc('accConnettori')"><span class="em">🏪</span>Il tuo negozio <span class="conta" id="connettoriConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="connettoriBlocco"></div></div>
+      </div>
+
       <!-- Doppioni su Nostr: compare SOLO se /api/me trova coppie
            sospette (doppio cittadino con lo stesso oggetto due volte
            sui relay). Per tutti gli altri il cassetto non esiste. -->
@@ -17814,6 +17831,7 @@ function renderIdentita(){
         ${nostrFotoOk ? pillFoto('nostr','🟣 Nostr') : ''}
         ${pillFoto('nessuna','Nessuna')}</div>`;
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
+  renderConnettori();
   renderAvvisi();
   renderSpedizioniere();
   renderPuntiRitiro();
@@ -18645,6 +18663,315 @@ function eliminaCodice(id){
       myCodici = null;
       await renderCodici();
       toast('Codice eliminato');
+    }});
+}
+
+/* ============ IL NEGOZIO COLLEGATO (ago 2026, tappa 5) ============
+   Il cassetto «🏪 Il tuo negozio»: collega un e-commerce, lo metti in
+   pausa, lo rileggi a comando, lo scolleghi.
+
+   E' una LISTA con un tetto, quindi il modello e' renderCodici e non
+   i due cassetti delle promesse — che sono una regola sola.
+   LE CIFRE VENGONO DAL SERVER (`connettoriLeve`) e mai da qui: il
+   tetto dei collegamenti, le piattaforme, le strade di consegna e la
+   pausa fra due «Aggiorna ora» sono leve, e il client non hardcoda
+   mai una leva (il patto di max_barattolo). */
+let myConnettori = null;      /* cache, azzerata dopo ogni mutazione */
+let connettoriLeve = null;    /* le leve vengono dal server, mai qui */
+let connInModifica = 0;
+let bozzaConn = null;
+
+function bozzaCon(){
+  if (!bozzaConn) {
+    const fonti = (connettoriLeve && connettoriLeve.fonti) || [];
+    bozzaConn = {fonte: (fonti[0] || {}).id || 'shopify',
+                 consegna: 'spedizione'};
+  }
+  return bozzaConn;
+}
+
+/* «quando l'ho letto l'ultima volta», in forma relativa. Sta qui e
+   non fra i formattatori di casa perche' e' l'unico posto che se lo
+   chiede: dataRiga() parla di annunci e conta in GIORNI, e un
+   catalogo si rilegge ogni ora. */
+function quandoGiro(ts){
+  if (!ts) return 'mai letto';
+  const s = Math.floor(Date.now() / 1000) - ts;
+  if (s < 90) return 'letto adesso';
+  if (s < 5400) return `letto ${Math.round(s / 60)} minuti fa`;
+  if (s < 172800) return `letto ${Math.round(s / 3600)} ore fa`;
+  return 'letto il ' + new Date(ts * 1000).toLocaleDateString('it-IT');
+}
+
+async function renderConnettori(){
+  const box = el('connettoriBlocco');
+  if (!box) return;
+  const sez = el('accConnettori');
+  if (DEMO || VETRINA || !(connettoriLeve && connettoriLeve.attivo)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  if (!myConnettori) {
+    try {
+      const r = await fetch(`${API_BASE}/me/connettori`,
+                            {headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json();
+      myConnettori = d.connettori || [];
+      connettoriLeve = {...connettoriLeve, ...d};
+    } catch(e) { myConnettori = []; }
+  }
+  const tetto = connettoriLeve.max || 3;
+  el('connettoriConta').textContent = `(${myConnettori.length} di ${tetto})`;
+  const b = bozzaCon();
+  const woo = b.fonte === 'woo';
+  const pill = (v, testo, campo) =>
+    `<button onclick="connPill('${campo}','${v}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  const az = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
+  const NOMI_CONS = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro in zona',
+                     entrambe:'🚚🤝 Tutt\'e due'};
+  const riga = c => {
+    /* LO STATO SI LEGGE PRIMA DEI NUMERI: un collegamento rotto o in
+       pausa e' la sola cosa da vedere, e il conto degli annunci di
+       ieri sotto non aiuta nessuno. */
+    const rotto = c.stato === 'errore';
+    const pausa = c.stato === 'pausa';
+    const colore = rotto ? 'var(--danger)' : pausa ? 'var(--muted)' : 'var(--ink)';
+    const stato = rotto ? '⚠️ non risponde' : pausa ? '⏸ in pausa'
+                : c.in_corso ? '🔄 lo sto leggendo…' : quandoGiro(c.ultimo_giro);
+    return `<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
+      <div style="display:flex;align-items:center;gap:6px">
+        ${/* `overflow-wrap:anywhere` e non solo `min-width:0`:
+              l'indirizzo di un negozio e' una parola SENZA SPAZI, e
+              una scatola che si stringe non spezza il contenuto — a
+              320px passava SOTTO i quattro bottoni (visto a schermo,
+              nessuna prova poteva prenderlo). E' la lezione del
+              riquadro venditore, dove un token lungo allargava
+              addirittura la pagina. */''}
+        <div style="flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.5px;font-weight:700;line-height:1.4;color:${colore}">
+          ${esc(c.nome_fonte)} · <b class="mono">${esc(c.url_negozio)}</b><br>
+          <span style="font-weight:600;color:var(--muted)">${fmt(c.annunci)} ${c.annunci === 1 ? 'annuncio' : 'annunci'} in vetrina · ${esc(stato)}</span>
+        </div>
+        ${pausa || rotto ? '' : `<button style="${az}" title="Aggiorna ora" onclick="sincronizzaConnettore(${c.id})">🔄</button>`}
+        <button style="${az}" title="Modifica" onclick="modificaConnettore(${c.id})">✏️</button>
+        <button style="${az}" title="${c.stato==='attivo'?'Metti in pausa':'Riattiva'}" onclick="pausaConnettore(${c.id})">${c.stato==='attivo'?'⏸':'▶️'}</button>
+        <button style="${az}" title="Scollega" onclick="scollegaConnettore(${c.id})">🔌</button>
+      </div>
+      ${c.ultimo_errore ? `<div style="font-size:12px;color:var(--danger);font-weight:700;margin-top:4px;line-height:1.4">${esc(c.ultimo_errore)}</div>` : ''}
+    </div>`;
+  };
+  const pieno = myConnettori.length >= tetto && !connInModifica;
+  const inMod = connInModifica
+    ? (myConnettori.find(x => x.id === connInModifica) || null) : null;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+      Hai già un negozio online? Collegalo e i suoi prodotti entrano
+      qui da soli, con prezzo e giacenza aggiornati ogni ora.
+      <b style="color:var(--ink)">Barattolo il tuo catalogo lo legge,
+      non lo scrive</b>: quando vendi qui, il magazzino di là lo
+      aggiorni tu — te lo ricordiamo a ogni vendita.</div>
+    <div id="connettoriErrore"></div>
+    ${myConnettori.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
+    ${pieno ? `<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
+    <div class="section-label" style="margin-top:14px">${inMod ? 'Modifica il collegamento' : 'Collega un negozio'}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${((connettoriLeve.fonti)||[]).map(f => pill(f.id, esc(f.nome), 'fonte')).join('')}</div>
+    <div class="field" style="margin-top:10px"><label>Indirizzo del negozio</label>
+      <input id="connUrl" autocomplete="off" placeholder="${woo ? 'https://ilmionegozio.it' : 'ilmionegozio.myshopify.com'}"
+        value="${esc(b.url || '')}"></div>
+    ${/* LE CHIAVI NON TORNANO MAI INDIETRO: il server le scrive e non
+          le rilegge a nessuno, quindi in modifica il campo nasce VUOTO
+          e vuoto vuol dire «lascia quelle di prima». E' il patto dello
+          stock, detto dove si vede. */''}
+    ${woo ? `
+    <div class="field"><label>Consumer key</label>
+      <input id="connCk" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarla' : 'ck_…'}" value=""></div>
+    <div class="field"><label>Consumer secret</label>
+      <input id="connCs" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'cs_…'}" value=""></div>`
+    : `
+    <div class="field"><label>Token dell'app privata</label>
+      <input id="connTok" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'shpat_…'}" value=""></div>`}
+    <div class="section-label" style="margin-top:12px">Come arriva la merce</div>
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:4px">
+      Si dichiara qui una volta e vale per <b style="color:var(--ink)">tutti</b>
+      gli annunci di questo negozio, anche quelli già entrati: il tuo
+      e-commerce le spedizioni le organizza a modo suo, e tradurle
+      sarebbe indovinare.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${((connettoriLeve.consegne)||[]).map(v => pill(v, NOMI_CONS[v] || v, 'consegna')).join('')}</div>
+    <div class="field" style="margin-top:10px"><label>Zona${b.consegna==='spedizione'?' (facoltativa)':''}</label>
+      <input id="connZona" list="zonaList" autocomplete="off"
+        placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)"
+        value="${esc(b.zona || '')}"></div>
+    ${b.consegna === 'ritiro' ? '' : `
+    <div class="field"><label>Costo di spedizione (€)</label>
+      <input id="connSped" inputmode="decimal" autocomplete="off"
+        placeholder="0 = la offri tu" value="${esc(b.sped || '')}"></div>
+    <div class="field"><label>Costo verso un punto di ritiro (€, facoltativo)</label>
+      <input id="connPunto" inputmode="decimal" autocomplete="off"
+        placeholder="vuoto = come a casa" value="${esc(b.punto || '')}"></div>
+    <div class="field"><label>Ogni pezzo in più (€)</label>
+      <input id="connExtra" inputmode="decimal" autocomplete="off"
+        placeholder="0 = niente supplemento" value="${esc(b.extra || '')}"></div>`}
+    <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? '💾 Salva le modifiche' : '🏪 Collega il negozio'}</button>
+    ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
+}
+
+/* il testo scritto si tiene PRIMA di ridisegnare, o toccare una
+   pillola cancellerebbe l'indirizzo appena battuto. Le CHIAVI no: si
+   riscrivono, e tenerle in una variabile vorrebbe dire tenere un
+   token nella memoria della pagina piu' a lungo del necessario. */
+function connLeggiCampi(){
+  const b = bozzaCon();
+  const v = id => (el(id) ? el(id).value : undefined);
+  ['url:connUrl', 'zona:connZona', 'sped:connSped', 'punto:connPunto',
+   'extra:connExtra'].forEach(coppia => {
+    const [k, id] = coppia.split(':');
+    const t = v(id);
+    if (t !== undefined) b[k] = t;
+  });
+  return b;
+}
+
+function connPill(campo, valore){
+  haptic();
+  const b = connLeggiCampi();
+  b[campo] = valore;
+  renderConnettori();
+}
+
+function modificaConnettore(id){
+  const c = (myConnettori || []).find(x => x.id === id);
+  if (!c) return;
+  haptic();
+  connInModifica = id;
+  bozzaConn = {fonte: c.fonte, url: c.url_negozio, consegna: c.consegna,
+               zona: c.zona,
+               sped: c.spedizione_eur ? String(c.spedizione_eur) : '',
+               punto: c.spedizione_punto_dichiarata
+                      ? String(c.spedizione_punto_eur) : '',
+               extra: c.spedizione_extra_eur
+                      ? String(c.spedizione_extra_eur) : ''};
+  renderConnettori();
+}
+
+function annullaModificaConnettore(){
+  haptic();
+  connInModifica = 0;
+  bozzaConn = null;
+  renderConnettori();
+}
+
+async function salvaConnettore(btn){
+  haptic();
+  const b = connLeggiCampi();
+  const corpo = {fonte: b.fonte, url_negozio: b.url || '',
+                 consegna: b.consegna, zona: b.zona || ''};
+  if (b.consegna !== 'ritiro') {
+    corpo.spedizione_eur = b.sped || 0;
+    corpo.spedizione_extra_eur = b.extra || 0;
+    /* LA DICHIARAZIONE E' LA PRESENZA DELLA CHIAVE, mai il valore (il
+       patto di spedizione_punto_dichiarata): il campo vuoto NON manda
+       niente, e vale «come a casa» — mandarci uno zero direbbe
+       «gratis», che e' un'altra cosa. */
+    if ((b.punto || '').trim() !== '') corpo.spedizione_punto_eur = b.punto;
+  }
+  const chiavi = b.fonte === 'woo'
+    ? {consumer_key: (el('connCk')||{}).value || '',
+       consumer_secret: (el('connCs')||{}).value || ''}
+    : {token: (el('connTok')||{}).value || ''};
+  /* in modifica il campo vuoto vuol dire «tieni quelle di prima»:
+     senza la chiave nel payload il server conserva */
+  if (Object.values(chiavi).some(v => v.trim() !== '')) corpo.credenziali = chiavi;
+  if (connInModifica) corpo.id = connInModifica;
+  const dove = el('connettoriErrore');
+  if (dove) dove.innerHTML = '';
+  /* «Provo…» e non «Salvo…»: il server chiama davvero il negozio
+     prima di scrivere, e su rete lenta l'attesa e' quella */
+  const ripristina = bottoneInAttesa(btn, '🏪 Provo il collegamento…');
+  try {
+    const r = await fetch(`${API_BASE}/me/connettori`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      /* IL RIFIUTO SI RENDE DENTRO IL CASSETTO, la ricetta delle
+         ferie: qui c'e' un valore da CORREGGERE — un token, un
+         indirizzo — e in un toast sparirebbe in tre secondi. */
+      if (dove) dove.innerHTML =
+        `<div class="trust-note" style="margin-top:10px">⚠️ <span style="white-space:pre-line">${esc(d.detail || 'Non ci sono riuscito, riprova')}</span></div>`;
+      else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
+      return;
+    }
+    myConnettori = null;
+    connInModifica = 0;
+    bozzaConn = null;
+    await renderConnettori();
+    toast(d.primo_giro ? 'Collegato: sto leggendo il catalogo 🏪'
+                       : 'Collegamento aggiornato', 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+async function pausaConnettore(id){
+  haptic();
+  try {
+    await fetch(`${API_BASE}/me/connettori/${id}/pausa`, {method:'POST',
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    myConnettori = null;
+    await renderConnettori();
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function sincronizzaConnettore(id){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/me/connettori/${id}/sincronizza`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito', 6000); return; }
+    /* NON SI ASPETTA LA FINE (il server risponde subito e legge in
+       sottofondo): si dice cosa sta succedendo e dove arrivera' il
+       riepilogo, invece di far credere che sia gia' finito */
+    myConnettori = null;
+    await renderConnettori();
+    toast('Sto rileggendo il catalogo: il riepilogo arriva fra poco 🔄',
+          6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function scollegaConnettore(id){
+  const c = (myConnettori || []).find(x => x.id === id);
+  if (!c) return;
+  /* LA DOMANDA PASSA DAL FOGLIO DI CASA, mai dal confirm() di
+     sistema, ed e' anche la guardia contro il doppio tocco.
+     IL TESTO DICE LE DUE COSE CHE NON SI DISFANO: gli annunci si
+     spengono (senza il giro che li tiene in pari la giacenza qui
+     mentirebbe entro un giorno) e ricollegare e' un catalogo NUOVO —
+     il match e' collegamento + prodotto, quindi le righe di ieri non
+     si ritrovano. */
+  chiediConferma({
+    titolo: 'Scollegare il negozio?',
+    corpo: `I ${fmt(c.annunci)} annunci arrivati da ${c.url_negozio} `
+         + `escono dalla vetrina: senza il collegamento non si `
+         + `aggiornano più, e la giacenza qui direbbe il falso. `
+         + `Gli ordini già pagati restano tuoi e vanno spediti. `
+         + `Se un giorno lo ricolleghi, il catalogo entra da capo `
+         + `come annunci nuovi.`,
+    etichetta: 'Scollega',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/me/connettori/${id}/scollega`,
+                  {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      myConnettori = null;
+      await renderConnettori();
+      /* «I tuoi annunci» si rilegge: quelle righe sono appena uscite
+         dalla vetrina, e la lista di sopra le mostrerebbe ancora
+         attive */
+      await loadMyListings();
+      renderMyListings();
+      toast(`Negozio scollegato: ${fmt(d.spenti || 0)} annunci tolti dalla vetrina`,
+            6000);
     }});
 }
 
@@ -25453,6 +25780,12 @@ async function avvia(){
                     valuta: me.sped_gratis_valuta || 'eur'};
     spedGratisLeve = me.sped_gratis_leve || null;   // idem
     spedGratisBozza = null;                         // idem, stessa ragione
+    /* il negozio collegato: la leva decide se il cassetto esiste, e
+       la lista si rilegge da /api/me/connettori — puo' essere
+       cambiata (un giro dell'orologio, un errore) mentre eravamo
+       altrove; la bozza si butta come le sorelle */
+    connettoriLeve = me.connettori_leve || null;
+    myConnettori = null; bozzaConn = null; connInModifica = 0;
     codiciLeve = me.codici_sconto_leve || null;     // idem
     myCodici = null;        // la lista si rilegge: puo' essere cambiata
     bozzaCodice = null;     // e la bozza si butta, o resterebbe fissata

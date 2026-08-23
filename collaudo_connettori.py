@@ -39,6 +39,20 @@ Le altre domande che si fanno insieme a quella:
     scalato la vendita le due si cancellano in silenzio, se l'aveva
     gia' fatto i pezzi vanno rimessi e glielo si dice.
 
+E dalla tappa 5 anche gli ENDPOINT del cassetto, chiamati per davvero:
+  · un token che il negozio rifiuta non lascia in piedi una riga —
+    «si prova prima di crederci», e la prova e' che il collegamento
+    NON viene scritto;
+  · le credenziali non escono mai dal server: si guarda il JSON vero
+    che il client riceverebbe, non la forma della funzione;
+  · la consegna dichiarata nel cassetto scende anche sulle righe gia'
+    entrate — la Modifica sugli annunci di un connettore e' chiusa
+    apposta, quindi senza quella riga un errore sarebbe per sempre;
+  · in pausa il catalogo non si rilegge e gli annunci restano;
+  · un estraneo non vede e non tocca, e «non e' tuo» si racconta come
+    «non esiste»;
+  · scollegare spegne gli annunci e non lascia il registro orfano.
+
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. L'API del
 negozio non viene mai chiamata — c'e' un catalogo in memoria — quindi
@@ -130,14 +144,26 @@ def prodotto_woo(pid, nome, prezzo="7.50", stock=12, gestito=True,
             "categories": [{"id": 1, "name": categoria}]}
 
 
+TOKEN_BUONO = ["shpat_finto"]   # il negozio sa dire di no (tappa 5)
+
+
 def api_finta(metodo, url, intestazioni):
-    """Al posto di `chiama_api_negozio`. Non guarda le credenziali:
-    qui non si prova l'autenticazione, si prova il giro — a smistare
-    e' l'indirizzo, che i due dialetti costruiscono diverso."""
+    """Al posto di `chiama_api_negozio`. A smistare e' l'indirizzo,
+    che i due dialetti costruiscono diverso.
+
+    IL TOKEN SHOPIFY SI GUARDA, e serve alla tappa 5: «si prova prima
+    di crederci» si puo' provare solo contro un negozio che sappia
+    dire di NO — con un'API che risponde 200 a chiunque, un token
+    sbagliato e uno buono si comporterebbero allo stesso modo e la
+    prova non direbbe niente. Woo resta senza: le sue chiavi viaggiano
+    in basic auth, e quel che li' interessa e' l'IVA."""
     LETTURE.append(url)
     if ERRORE_API[0]:
         raise RuntimeError(ERRORE_API[0])
     if "/wp-json/" not in url:
+        if (intestazioni or {}).get("X-Shopify-Access-Token") \
+                not in TOKEN_BUONO:
+            return 401, {"errors": "Invalid API key or access token"}, {}
         return 200, {"products": list(CATALOGO)}, {}
     # --- WooCommerce ---
     if url.endswith("/settings/general"):
@@ -299,6 +325,42 @@ def rimborsa(ordine_id):
     con.commit()
     con.close()
     return asyncio.run(SRV._rimborsa_compratore(ordine_id))
+
+
+# --- GLI ENDPOINT (tappa 5) -------------------------------------------
+# Il cassetto si prova chiamando le rotte VERE: `verifica_utente` e
+# `leggi_json` si sostituiscono con due stub (il pattern di
+# collaudo_feedback_confermato) e il resto e' il server di sempre.
+
+def come(tg_id):
+    SRV.verifica_utente = lambda *a, **k: {
+        "id": tg_id, "nome": f"U{tg_id}", "first_name": f"U{tg_id}",
+        "username": f"u{tg_id}", "admin": False}
+
+
+def chiama(fn, *args, corpo=None):
+    if corpo is not None:
+        async def leggi(_req):
+            return corpo
+        SRV.leggi_json = leggi
+    return asyncio.run(fn(*args))
+
+
+def errore(fn, *args, corpo=None):
+    """Il codice e il messaggio di un rifiuto, o None se e' passato."""
+    try:
+        chiama(fn, *args, corpo=corpo)
+        return None
+    except Exception as e:
+        return (getattr(e, "status_code", type(e).__name__),
+                str(getattr(e, "detail", e)))
+
+
+def quanti_connettori():
+    con = SRV.db()
+    n = con.execute("SELECT COUNT(*) AS n FROM connettori").fetchone()[0]
+    con.close()
+    return n
 
 
 def main():
@@ -745,6 +807,141 @@ def main():
     giro()
     prova("...e la giacenza qui dice la verita', non quella del negozio",
           4, uno(wid, 11)["quantita"])
+
+
+    # ---- 7. il cassetto e i suoi endpoint (tappa 5) -----------------
+    print("\n[tappa 5: il cassetto e i suoi endpoint]")
+    come(VENDITORE)
+    CATALOGO[:] = [prodotto(41, "Sale grosso", "2.00", stock=5)]
+    prima = quanti_connettori()
+
+    # SI PROVA PRIMA DI CREDERCI: un token che il negozio rifiuta non
+    # deve lasciare in piedi un collegamento «attivo» che non porta
+    # niente — e a dirlo, senza questa riga, ci vorrebbero cinque giri
+    # dell'orologio.
+    esito = errore(SRV.salva_connettore, None, corpo={
+        "fonte": "shopify", "url_negozio": "nuovo.myshopify.com",
+        "credenziali": {"token": "shpat_sbagliato"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    prova("il token sbagliato si rifiuta subito", 400,
+          esito and esito[0])
+    prova("...col motivo vero (il 401 del negozio)", True,
+          bool(esito) and "401" in esito[1])
+    prova("...e NON lascia una riga scritta", prima, quanti_connettori())
+
+    # il collegamento vero, dall'endpoint
+    fuori = chiama(SRV.salva_connettore, None, corpo={
+        "fonte": "shopify", "url_negozio": "HTTPS://Nuovo.MyShopify.com/",
+        "credenziali": {"token": "shpat_finto"},
+        "consegna": "entrambe", "zona": "Pavia (PV)",
+        "spedizione_eur": "4,90", "spedizione_extra_eur": 1.5})
+    nid = fuori["connettore"]["id"]
+    prova("il collegamento nasce", prima + 1, quanti_connettori())
+    prova("...con l'indirizzo normalizzato", "nuovo.myshopify.com",
+          fuori["connettore"]["url_negozio"])
+    prova("...e la virgola dei decimali si legge", 4.9,
+          fuori["connettore"]["spedizione_eur"])
+    # LE CREDENZIALI NON ESCONO MAI, ed e' la riga per cui la whitelist
+    # in uscita esiste: qui si guarda il JSON VERO che il client
+    # riceverebbe, non la forma della funzione
+    lista = chiama(SRV.lista_connettori)
+    riga = [c for c in lista["connettori"] if c["id"] == nid][0]
+    prova("nel JSON non c'e' traccia delle chiavi", [],
+          [k for k in riga if "credenzial" in k or "token" in k])
+    prova("...e nemmeno nei valori", True,
+          "shpat_finto" not in json.dumps(lista))
+    # ...ma nel database ci sono, cifrate quanto il config permette
+    con = SRV.db()
+    blob = con.execute("SELECT credenziali FROM connettori WHERE id=?",
+                       (nid,)).fetchone()[0]
+    con.close()
+    prova("le chiavi sono nel database dietro un prefisso", True,
+          blob.startswith("plain:") or blob.startswith("f2:"))
+
+    # IL PRIMO GIRO PARTE SUBITO: chi ha appena visto che il catalogo
+    # si legge non deve aspettare l'ora tonda. (Il create_task del
+    # collegamento muore col suo loop: qui si chiede lo stesso lavoro
+    # a mano, che e' la stessa funzione.)
+    asyncio.run(SRV._sync_uno(nid))
+    prova("il catalogo entra in vetrina", 1, len(annunci(nid)))
+    entrato = annunci(nid)[0]
+    prova("...con la consegna dichiarata nel cassetto", "entrambe",
+          entrato["consegna"])
+    prova("...e la zona del collegamento", "Pavia (PV)", entrato["zona"])
+
+    # LA DICHIARAZIONE SCENDE SULLE RIGHE GIA' ENTRATE, o chi sbaglia
+    # la prima volta se la terrebbe addosso per sempre: la Modifica
+    # sugli annunci di un connettore e' chiusa apposta.
+    chiama(SRV.salva_connettore, None, corpo={
+        "id": nid, "fonte": "shopify", "url_negozio": "nuovo.myshopify.com",
+        "consegna": "ritiro", "zona": "Carmagnola (TO)"})
+    dopo = annunci(nid)[0]
+    prova("cambiare la dichiarazione tocca anche il pregresso",
+          ("ritiro", "Carmagnola (TO)"), (dopo["consegna"], dopo["zona"]))
+    # e la geografia segue la zona, che e' derivata e non chiesta
+    prova("...e la geografia la segue", True,
+          dopo["lat"] != 0.0 and dopo["regione"] == "Piemonte")
+    # LE CHIAVI NON SI RIBATTONO per correggere una tariffa: chiave
+    # assente = conserva (il patto dello stock)
+    con = SRV.db()
+    ancora = con.execute("SELECT credenziali FROM connettori WHERE id=?",
+                         (nid,)).fetchone()[0]
+    con.close()
+    prova("...e le chiavi restano quelle di prima", blob, ancora)
+
+    # LA PAUSA: il giro non lo guarda piu', ma gli annunci restano
+    chiama(SRV.pausa_connettore, nid)
+    CATALOGO[:] = []          # sul negozio non c'e' piu' niente
+    giro()
+    prova("in pausa il catalogo non si rilegge", 1,
+          len([a for a in annunci(nid) if a["stato"] == "attivo"]))
+    prova("...e il giro a mano si rifiuta", 400,
+          (errore(SRV.sincronizza_uno_a_mano, nid) or [None])[0])
+    chiama(SRV.pausa_connettore, nid)     # riacceso
+    CATALOGO[:] = [prodotto(41, "Sale grosso", "2.00", stock=5)]
+
+    # IL FRENO DEL GIRO A MANO: `ultimo_giro` e' appena stato scritto
+    prova("«aggiorna ora» ha un freno", 400,
+          (errore(SRV.sincronizza_uno_a_mano, nid) or [None])[0])
+    con = SRV.db()
+    con.execute("UPDATE connettori SET ultimo_giro=0 WHERE id=?", (nid,))
+    con.commit()
+    con.close()
+    prova("...che si apre col tempo", {"ok": True},
+          chiama(SRV.sincronizza_uno_a_mano, nid))
+
+    # UN ESTRANEO NON VEDE E NON TOCCA: la proprieta' sta nella WHERE,
+    # e la risposta e' la stessa che darebbe un id inesistente — chi
+    # enumera non impara niente.
+    come(COMPRATORE)
+    prova("un estraneo non vede i collegamenti altrui", [],
+          chiama(SRV.lista_connettori)["connettori"])
+    suo = errore(SRV.pausa_connettore, nid)
+    inesistente = errore(SRV.pausa_connettore, 99999)
+    prova("...e «non e' tuo» si racconta come «non esiste»",
+          inesistente, suo)
+    come(VENDITORE)
+
+    # SCOLLEGARE: la riga se ne va, gli annunci si spengono e il
+    # registro delle uscite non resta orfano.
+    con = SRV.db()
+    con.execute("INSERT INTO connettori_uscite(connettore_id,annuncio_id,"
+                "ordine_id,delta,tipo,creato,aggiornato) "
+                "VALUES(?,?,?,-1,'vendita',0,0)",
+                (nid, annunci(nid)[0]["id"], 777))
+    con.commit()
+    con.close()
+    esito = chiama(SRV.scollega_connettore, nid)
+    prova("scollegare spegne gli annunci", 1, esito["spenti"])
+    prova("...e la vetrina non ne tiene nessuno", [],
+          [a for a in annunci(nid) if a["stato"] != "rimosso"])
+    prova("...la riga del collegamento non c'e' piu'", prima,
+          quanti_connettori())
+    con = SRV.db()
+    resti = con.execute("SELECT COUNT(*) AS n FROM connettori_uscite "
+                        "WHERE connettore_id=?", (nid,)).fetchone()[0]
+    con.close()
+    prova("...e il registro non resta orfano", 0, resti)
 
     print("\n" + "=" * 62)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

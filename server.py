@@ -20821,6 +20821,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "soglie_sats": list(SPED_GRATIS_SOGLIE_SATS),
         "min_eur": SPED_GRATIS_MIN_EUR,
         "min_sats": SPED_GRATIS_MIN_SATS}
+    # IL NEGOZIO COLLEGATO, per il cassetto «🏪» (ago 2026, tappa 5):
+    # le leve stanno in un posto solo (`_connettori_leve`) e le
+    # rilegge anche la lista — due elenchi direbbero due cose sullo
+    # stesso cassetto. `attivo` e' anche cio' che lo nasconde quando
+    # la leva e' spenta, cosi' il client non chiede una lista che non
+    # potrebbe usare.
+    profilo["connettori_leve"] = _connettori_leve()
     # I CODICI SCONTO: le cifre delle pillole vengono da qui e mai dal
     # client — il patto di LAMPO_SCONTI. `attivo` e' anche cio' che
     # nasconde il cassetto quando la leva e' spenta.
@@ -29338,14 +29345,56 @@ _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 # e il report lo dice al venditore.
 MAX_PRODOTTI_CONNETTORE = 200
 
-# Shopify concede 2 richieste al secondo sulla REST: fra una pagina e
-# l'altra si respira.
-PAUSA_PAGINE_SHOPIFY = 0.6
-
 # Dopo quanti giri falliti di fila il collegamento si dichiara rotto e
 # il venditore riceve UN avviso. Cinque ore di silenzio sono un
 # problema vero; un negozio che non risponde per mezz'ora no.
 CONNETTORI_ERRORI_MAX = 5
+
+# Quanti negozi puo' collegare un venditore. Due sono il caso vero
+# (uno Shopify e un Woo, o il negozio e il magazzino), tre lasciano
+# aria; oltre non e' piu' «il mio negozio».
+MAX_CONNETTORI_VENDITORE = 3
+
+# Ogni quanto si puo' chiedere A MANO una rilettura. Il freno non e'
+# per noi: e' per il negozio dell'ALTRO, che ha i suoi limiti di
+# richieste al minuto, e per il nostro orologio, che il giro lo fa
+# comunque ogni ora. L'ancora e' `ultimo_giro`, che si scrive in
+# TUTTI E DUE i rami — riuscito (`_chiudi_giro_connettore`) e fallito
+# (`_connettore_in_errore`) — cosi' un negozio rotto non si puo'
+# martellare col bottone. Il gemello e' SOLLECITO_MANUALE_PAUSA_ORE:
+# li' il freno protegge una persona, qui un server di qualcun altro.
+CONNETTORI_SYNC_MANUALE_S = 300
+
+# Il tetto sulle tariffe del cassetto, in euro. Non e' un giudizio su
+# quanto costi spedire — quello lo sa il venditore, non noi (la regola
+# di MAX_QUANTITA_ANNUNCIO) — e' la cintura contro lo zero in piu'
+# battuto per sbaglio.
+MAX_TARIFFA_CONNETTORE = 500.0
+
+# Le piattaforme che sappiamo leggere. E' il GEMELLO di
+# `importa_negozio.LETTORI` e vive qui perche' il client deve poterle
+# offrire senza sapere niente del modulo; a tenerli in pari c'e' una
+# prova, che due cataloghi divergenti offrirebbero un collegamento che
+# poi nessun lettore sa leggere. I nomi da mostrare li da' gia'
+# NOMI_ORIGINE, che e' l'unico posto dove «woo» diventa
+# «WooCommerce».
+FONTI_NEGOZIO = ("shopify", "woo")
+
+# Le strade di consegna che un negozio collegato puo' dichiarare, e
+# sono le tre FISICHE. Niente 'digitale' — il codice si consegna
+# premendo un bottone QUI, e un e-commerce quel bottone non ce l'ha:
+# e' la stessa regola gia' scritta per i tag NIP-99, dove
+# `estrai_commercio` butta via la consegna digitale apposta — e niente
+# 'servizio', che non e' merce che viaggia.
+CONSEGNE_NEGOZIO = ("spedizione", "ritiro", "entrambe")
+
+# Chi e' in mezzo a un giro. Serve da quando il giro si puo' chiedere
+# a mano (tappa 5): il bottone e l'orologio possono capitare insieme,
+# e due riconciliazioni concorrenti sullo stesso catalogo si
+# scriverebbero addosso. E' il patto anti-valanga di _AVATAR_IN_CORSO:
+# un insieme in memoria, che al riavvio si svuota — e va bene, perche'
+# al riavvio non c'e' nessun giro in volo.
+_CONNETTORI_IN_CORSO = set()
 
 
 def url_api_ammesso(url: str) -> bool:
@@ -29680,51 +29729,66 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
     """Un giro per un collegamento. Le eccezioni le prende il
     chiamante: qui dentro si distingue solo il fallimento di LETTURA
     (che si conta, e a soglia dichiara rotto il collegamento) da tutto
-    il resto."""
+    il resto.
+
+    E UNO ALLA VOLTA PER COLLEGAMENTO (ago 2026, tappa 5): da quando
+    il giro si puo' chiedere anche col bottone «Aggiorna ora», il
+    tocco e l'orologio possono capitare insieme — e due
+    riconciliazioni concorrenti sullo stesso catalogo si
+    scriverebbero addosso (le sparizioni si giudicano su cio' che
+    l'ALTRA sta ancora scrivendo). La guardia sta QUI e non nei due
+    chiamanti, che sarebbero due posti da tenere in pari e un terzo
+    da ricordarsi domani."""
     lettore = importa_negozio.LETTORI.get(c["fonte"])
     if not lettore:
         return
-    credenziali = json.loads(_decifra_contenuto(c["credenziali"]) or "{}")
-    try:
-        # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
-        # un token, Woo una chiave e un segreto, e a sapere che forma
-        # hanno e' il lettore — qui si sa solo che sono un dizionario
-        prodotti, avviso = await asyncio.to_thread(
-            lettore, c["url_negozio"], credenziali,
-            chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
-    except Exception as e:
-        await _connettore_in_errore(c, str(e)[:200])
+    if c["id"] in _CONNETTORI_IN_CORSO:
         return
-    righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
-    # la moderazione sulle sole righe nuove o col testo cambiato
-    nuove, note = _righe_da_giudicare(righe, c)
-    marchi = {}
-    if nuove:
-        try:
-            ammesse, marchi = await _modera_righe_negozio(nuove)
-        except Exception as e:
-            # FAIL-CLOSED sui mai giudicati, come per Nostr: cio' che
-            # la moderazione non ha potuto guardare non entra, e il
-            # giro dopo ci riprova. Chi era gia' passato continua ad
-            # aggiornarsi: tenerlo fermo perche' oggi l'AI tace
-            # sarebbe un danno senza guadagno.
-            print(f"⚠️ Moderazione del catalogo non conclusa, "
-                  f"le righe nuove aspettano il prossimo giro: {e}")
-            ammesse = []
-        viste = {r["origine_chiave"] for r in ammesse} | \
-                {r["origine_chiave"] for r in note}
-        righe = [r for r in righe
-                 if r.get("saltato_perche") or r["origine_chiave"] in viste]
-    con = db()
+    _CONNETTORI_IN_CORSO.add(c["id"])
     try:
-        esito = importa_negozio.riconcilia_connettore(
-            con, c, righe, _salva_foto_connettore,
-            {k: v[1] for k, v in marchi.items()})
+        credenziali = json.loads(_decifra_contenuto(c["credenziali"]) or "{}")
+        try:
+            # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
+            # un token, Woo una chiave e un segreto, e a sapere che forma
+            # hanno e' il lettore — qui si sa solo che sono un dizionario
+            prodotti, avviso = await asyncio.to_thread(
+                lettore, c["url_negozio"], credenziali,
+                chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
+        except Exception as e:
+            await _connettore_in_errore(c, str(e)[:200])
+            return
+        righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
+        # la moderazione sulle sole righe nuove o col testo cambiato
+        nuove, note = _righe_da_giudicare(righe, c)
+        marchi = {}
+        if nuove:
+            try:
+                ammesse, marchi = await _modera_righe_negozio(nuove)
+            except Exception as e:
+                # FAIL-CLOSED sui mai giudicati, come per Nostr: cio' che
+                # la moderazione non ha potuto guardare non entra, e il
+                # giro dopo ci riprova. Chi era gia' passato continua ad
+                # aggiornarsi: tenerlo fermo perche' oggi l'AI tace
+                # sarebbe un danno senza guadagno.
+                print(f"⚠️ Moderazione del catalogo non conclusa, "
+                      f"le righe nuove aspettano il prossimo giro: {e}")
+                ammesse = []
+            viste = {r["origine_chiave"] for r in ammesse} | \
+                    {r["origine_chiave"] for r in note}
+            righe = [r for r in righe
+                     if r.get("saltato_perche") or r["origine_chiave"] in viste]
+        con = db()
+        try:
+            esito = importa_negozio.riconcilia_connettore(
+                con, c, righe, _salva_foto_connettore,
+                {k: v[1] for k, v in marchi.items()})
+        finally:
+            con.close()
+        if avviso:
+            esito["saltati"].append({"titolo": "", "perche": avviso})
+        await _chiudi_giro_connettore(c, esito)
     finally:
-        con.close()
-    if avviso:
-        esito["saltati"].append({"titolo": "", "perche": avviso})
-    await _chiudi_giro_connettore(c, esito)
+        _CONNETTORI_IN_CORSO.discard(c["id"])
 
 
 async def _connettore_in_errore(c: dict, errore: str):
@@ -29792,6 +29856,558 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
         c["tg_id"],
         f"🏪 <b>Il tuo catalogo è aggiornato</b>\n\n"
         f"{', '.join(pezzi)}.{coda}")
+
+
+# --- IL CASSETTO E I SUOI ENDPOINT (ago 2026, tappa 5) ---------------
+# Fin qui il collegamento si scriveva a mano nel database (il collaudo
+# lo faceva, e lo dichiarava). Qui nasce il gesto: «🏪 Il tuo negozio»
+# nel Profilo — collega, metti in pausa, aggiorna ora, scollega.
+#
+# LE DUE COSE CHE RENDONO QUESTA TAPPA DIVERSA DALLE SORELLE
+# (spedizioniere, sconto, ferie), e sono la ragione per cui non e' un
+# semplice copia-incolla del loro pattern:
+#  1. QUI SI SCRIVE UNA CREDENZIALE SU UN SISTEMA DI UN ALTRO. Non
+#     esce mai piu' dal server (whitelist in uscita, non blacklist), e
+#     senza CHIAVE_CONTENUTI_DIGITALI il collegamento si RIFIUTA — il
+#     patto dell'indirizzo di casa: un PIN di ritiro in chiaro e' una
+#     degradazione accettabile, un token che puo' scrivere sul negozio
+#     di qualcuno no.
+#  2. SI PROVA PRIMA DI CREDERCI, il patto di `/canale`: il
+#     collegamento si salva solo se il catalogo si legge davvero. Un
+#     token sbagliato deve dirlo ADESSO, col motivo vero, non fra
+#     un'ora e in silenzio — quando a guardare non c'e' nessuno.
+
+
+def _connettori_leve() -> dict:
+    """Le leve del cassetto, in un posto solo: le legge `/api/me` (per
+    decidere se il cassetto esiste) e le rilegge la lista. Due elenchi
+    direbbero due cose sullo stesso cassetto, e il client non hardcoda
+    mai un tetto (il patto di `max_barattolo`)."""
+    return {"attivo": bool(CONNETTORI_NEGOZIO_APERTI),
+            "max": MAX_CONNETTORI_VENDITORE,
+            "fonti": [{"id": f, "nome": NOMI_ORIGINE.get(f, f)}
+                      for f in FONTI_NEGOZIO],
+            "consegne": list(CONSEGNE_NEGOZIO),
+            "pausa_s": CONNETTORI_SYNC_MANUALE_S,
+            "max_tariffa": MAX_TARIFFA_CONNETTORE}
+
+
+def _connettore_pubblico(con, c) -> dict:
+    """La riga come la legge il SUO venditore.
+
+    LE CREDENZIALI NON ESCONO MAI, e a garantirlo e' la FORMA: si
+    ELENCANO i campi che escono invece di prendere la riga intera e
+    toglierne uno — la regola di CAMPI_VETRINA. Con la blacklist la
+    colonna che qualcuno aggiungera' fra sei mesi uscirebbe da sola;
+    con la whitelist resta dentro finche' non la si nomina.
+
+    Il conto degli annunci e il report dell'ultimo giro si leggono
+    qui e non nel client: sono due domande al database, e un cassetto
+    non ne fa nessuna."""
+    try:
+        esito = json.loads(c["ultimo_esito"] or "{}")
+    except Exception:
+        esito = {}
+    quanti = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci WHERE connettore_id=? "
+        "AND stato IN ('attivo','revisione')", (c["id"],)).fetchone()["n"]
+    return {
+        "id": c["id"],
+        "fonte": c["fonte"],
+        "nome_fonte": NOMI_ORIGINE.get(c["fonte"], c["fonte"]),
+        "url_negozio": c["url_negozio"],
+        "stato": c["stato"],
+        "consegna": c["consegna"],
+        "spedizione_eur": c["spedizione_eur"],
+        "spedizione_punto_eur": c["spedizione_punto_eur"],
+        "spedizione_punto_dichiarata": c["spedizione_punto_dichiarata"],
+        "spedizione_extra_eur": c["spedizione_extra_eur"],
+        "zona": c["zona"],
+        "ultimo_giro": c["ultimo_giro"],
+        "ultimo_errore": c["ultimo_errore"],
+        "errori_di_fila": c["errori_di_fila"],
+        "annunci": quanti,
+        "esito": esito,
+        "in_corso": c["id"] in _CONNETTORI_IN_CORSO,
+        # Quanto manca al prossimo «Aggiorna ora»: lo conta il SERVER
+        # anche se il client potrebbe — e' il numero dove vive un
+        # off-by-one, la lezione di `mancano_pezzi`.
+        "riprova_fra": max(0, (c["ultimo_giro"] or 0)
+                           + CONNETTORI_SYNC_MANUALE_S - int(time.time()))}
+
+
+def _url_connettore(fonte: str, grezzo) -> str:
+    """L'indirizzo del negozio, nella forma che il lettore vuole.
+
+    Shopify vive su un dominio di un'azienda sola, quindi si
+    NORMALIZZA (via lo schema, via la barra finale, minuscolo) e si
+    pretende `nome.myshopify.com`: e' anche cio' che rende sicuro
+    l'aggancio della pagina successiva, che si lega all'host del
+    collegamento — con un dominio scritto storto quel confronto non
+    combacerebbe mai e la seconda pagina si perderebbe.
+    Woo passa da `_base_woo`, che e' la cintura di FORMA del modulo:
+    la guardia vera resta nel trasporto (`url_api_ammesso`) e gira su
+    OGNI chiamata, non solo su questa."""
+    testo = str(grezzo or "").strip().rstrip("/")
+    if fonte == "shopify":
+        testo = re.sub(r"^https?://", "", testo, flags=re.I).lower()
+        testo = testo.split("/")[0]
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*\.myshopify\.com", testo):
+            raise HTTPException(400, "L'indirizzo di un negozio Shopify è "
+                                     "«nome.myshopify.com» (lo trovi in "
+                                     "Impostazioni → Dominii, sotto "
+                                     "«dominio myshopify.com»)")
+        return testo
+    import importa_negozio
+    try:
+        return importa_negozio._base_woo(testo)
+    except Exception:
+        raise HTTPException(400, "L'indirizzo del negozio dev'essere un "
+                                 "https:// (es. «https://ilmionegozio.it», "
+                                 "o la sottocartella dove vive WooCommerce)")
+
+
+def _credenziali_negozio(fonte: str, d: dict):
+    """La busta delle credenziali, o None se il payload non la porta.
+
+    NONE VUOL DIRE «CONSERVA», ed e' il patto dello stock e della
+    tariffa punto: si corregge una tariffa senza dover ribattere il
+    token, e un client rimasto in cache non svuota un campo che non
+    conosce. Il gesto per cambiarle e' scriverle.
+
+    OGNI PIATTAFORMA HA LA SUA BUSTA e a saperlo e' il lettore: qui si
+    controlla solo che i campi ci siano e non siano vuoti — la forma
+    di un token non la sappiamo, e inventarci una regex sarebbe
+    un'euristica nostra che ferma un collegamento vero (la lezione di
+    FORME_TRACKING)."""
+    grezzo = d.get("credenziali")
+    if grezzo is None:
+        return None
+    if not isinstance(grezzo, dict):
+        raise HTTPException(400, "Chiavi del negozio non leggibili")
+    campi = (("token",) if fonte == "shopify"
+             else ("consumer_key", "consumer_secret"))
+    busta = {c: str(grezzo.get(c) or "").strip() for c in campi}
+    if not all(busta.values()):
+        raise HTTPException(400, "Servono le chiavi del negozio: "
+                                 + ("il token dell'app privata"
+                                    if fonte == "shopify"
+                                    else "la Consumer key e il Consumer "
+                                         "secret di WooCommerce"))
+    return busta
+
+
+def _tariffa_negozio(d: dict, chiave: str, se_manca: float) -> float:
+    """Una tariffa del cassetto, in euro.
+
+    `se_manca` e' quel che resta quando la chiave NON c'e' — il patto
+    dello stock: un client rimasto in cache non deve azzerare un costo
+    che non conosce. Zero SCRITTO invece e' un valore («la offro io»),
+    ed e' la distinzione che questa funzione esiste per non perdere."""
+    if chiave not in d:
+        return se_manca
+    try:
+        v = float(str(d.get(chiave) or 0).replace(",", "."))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Le tariffe di spedizione vanno scritte "
+                                 "in euro (es. 5 oppure 4,90)")
+    if v < 0 or v > MAX_TARIFFA_CONNETTORE:
+        raise HTTPException(400, f"Una tariffa di spedizione va da 0 a "
+                                 f"{_fmt_eur(MAX_TARIFFA_CONNETTORE)} €")
+    return round(v, 2)
+
+
+def _zona_negozio(zona: str, consegna: str) -> str:
+    """La zona del collegamento: una per tutte le sue righe.
+
+    LE DUE REGOLE SONO QUELLE DEL FORM VENDI — col ritiro il comune e'
+    d'obbligo, e una zona COMPILATA dev'essere un luogo vero — e si
+    ripetono qui invece di passare da `guardia_zona_condizione`, che
+    e' il giudice unico di pubblica e modifica ma chiede anche la
+    CONDIZIONE: un annuncio nato da un negozio non ce l'ha e non puo'
+    averla (la fonte non la dichiara, e non si inventa), quindi
+    piegarlo per riusarlo vorrebbe dire dargli un permesso in piu' —
+    la stessa ragione per cui `salva_punto_ritiro` non riusa
+    `rete_da_payload`. Il precedente e' l'import CSV, che la stessa
+    regola la ripete con le parole della sua superficie.
+    IL MESSAGGIO invece resta UNO (`messaggio_zona_storta`), ed e' la
+    meta' che non deve divergere: form, import e cassetto dicono la
+    stessa cosa a chi ha scritto la stessa cosa."""
+    zona = (zona or "").strip()
+    if COMUNI:
+        if consegna in ("ritiro", "entrambe") and not zona:
+            raise HTTPException(400, "Per il ritiro in zona serve un comune "
+                                     "valido (es. «Pavia (PV)»)")
+        if zona and coordinate_da_zona(zona) == (0.0, 0.0):
+            raise HTTPException(400, messaggio_zona_storta(zona))
+    # arricchita della sigla come in pubblica(): il dato e' pulito
+    # ovunque senza rimedi in visualizzazione
+    return arricchisci_zona(zona)
+
+
+async def _prova_negozio(fonte: str, url: str, credenziali: dict):
+    """SI PROVA PRIMA DI CREDERCI (il patto di `/canale`, dove il bot
+    manda un messaggio di collaudo prima di salvare un canale): il
+    collegamento si scrive solo se il catalogo si legge davvero.
+
+    Senza, un token sbagliato si scoprirebbe al primo giro
+    dell'orologio — cioe' fra un'ora, e in silenzio: il venditore
+    vedrebbe un collegamento «attivo» che non porta niente, e a dirlo
+    ci vorrebbero cinque giri falliti.
+    SI LEGGE UNA PAGINA SOLA e con un tetto di UNO: qui non interessa
+    il catalogo, interessa che la porta si apra — e su Woo passa da
+    qui anche la domanda sull'IVA, che e' la cosa piu' utile da
+    sentirsi dire adesso invece che al primo giro."""
+    import importa_negozio
+    lettore = importa_negozio.LETTORI.get(fonte)
+    if not lettore:
+        raise HTTPException(400, "Piattaforma sconosciuta")
+    try:
+        await asyncio.to_thread(lettore, url, credenziali,
+                                chiama_api_negozio, 1)
+    except Exception as e:
+        # il motivo VERO e non un generico: «ha risposto 401» manda a
+        # rifare il token, «non e' un https» a correggere l'indirizzo.
+        # Le credenziali non ci finiscono mai — il modulo e il
+        # trasporto dicono lo stato e l'indirizzo, mai le intestazioni.
+        raise HTTPException(400, f"Non riesco a leggere il catalogo di "
+                                 f"{url}: {str(e)[:160]}")
+
+
+def _applica_dichiarazione(con, cid: int, c: dict):
+    """La consegna dichiarata nel cassetto scende su TUTTE le righe di
+    quel negozio, e non solo su quelle che arriveranno.
+
+    E' quel che lo schema promette da sempre — «LA CONSEGNA SI
+    DICHIARA QUI, UNA VOLTA, e vale per tutte le righe di questo
+    negozio» — e senza questa funzione la promessa sarebbe falsa per
+    il pregresso: `riconcilia_connettore` non ricopre mai la consegna
+    (viene dal cassetto, non dal negozio), quindi chi sbaglia la prima
+    dichiarazione se la terrebbe addosso per sempre su duecento
+    annunci, senza nessuna strada per correggerla — la Modifica sugli
+    annunci di un connettore e' chiusa apposta.
+    LA GEOGRAFIA SEGUE LA ZONA, che e' derivata e non chiesta: senza,
+    la sigla cambierebbe in vetrina e il filtro per regione
+    continuerebbe a dire quella di ieri.
+    I 'rimosso' restano com'erano: quella e' storia, e non si
+    riscrive."""
+    lat, lon = coordinate_da_zona(c["zona"])
+    con.execute(
+        "UPDATE annunci SET consegna=?, spedizione_eur=?, "
+        "spedizione_punto_eur=?, spedizione_punto_dichiarata=?, "
+        "spedizione_extra_eur=?, zona=?, lat=?, lon=?, regione=? "
+        "WHERE connettore_id=? AND stato<>'rimosso'",
+        (c["consegna"], c["spedizione_eur"], c["spedizione_punto_eur"],
+         c["spedizione_punto_dichiarata"], c["spedizione_extra_eur"],
+         c["zona"], lat, lon, regione_da_zona(c["zona"]), cid))
+
+
+async def _sync_uno(cid: int):
+    """Un giro per un solo collegamento: lo chiama il bottone
+    «Aggiorna ora» e il primo giro subito dopo il collegamento.
+
+    Le eccezioni si fermano qui come nel giro grande, e per la stessa
+    ragione: gira in un `create_task`, e un'eccezione che risale
+    finisce in un warning di asyncio che non legge nessuno.
+
+    NON TOCCA L'APPUNTAMENTO DEL GIRO GRANDE, che e' di TUTTI: un
+    tocco su un collegamento non deve spostare l'orologio degli altri
+    — ne' rimandare il giro di questo, che ha gia' il suo freno in
+    `ultimo_giro`.
+    ⚠️ Il nome di quel gate non si scrive nemmeno qui dentro: la
+    sentinella che verifica che questa funzione non lo tocchi legge
+    anche la prosa, e citarlo la farebbe diventare rossa per colpa di
+    una spiegazione."""
+    import importa_negozio
+    con = db()
+    riga = con.execute("SELECT * FROM connettori WHERE id=? AND "
+                       "stato='attivo'", (cid,)).fetchone()
+    con.close()
+    if not riga:
+        return
+    try:
+        await _un_connettore(dict(riga), cambio_per_import(),
+                             importa_negozio)
+    except Exception as e:
+        print(f"⚠️ Connettore #{cid} saltato: {e}")
+
+
+@app.get("/api/me/connettori")
+async def lista_connettori(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = con.execute("SELECT * FROM connettori WHERE tg_id=? ORDER BY id",
+                        (user["id"],)).fetchall()
+    fuori = [_connettore_pubblico(con, r) for r in righe]
+    con.close()
+    return {"connettori": fuori, **_connettori_leve()}
+
+
+@app.post("/api/me/connettori")
+async def salva_connettore(req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Collega un negozio, o aggiorna un collegamento che c'e' gia'.
+
+    L'ORDINE DEI PASSI E' IL VINCOLO: si valida tutto, si legge la
+    riga di ieri (per il «conserva»), si PROVA il negozio, e solo
+    dopo si scrive. Al contrario, un token sbagliato lascerebbe in
+    piedi una riga che il giro dell'orologio prova e riprova per
+    cinque volte prima di dire qualcosa.
+    E LA PROVA COSTA UNA CHIAMATA DI RETE, quindi si fa SOLO quando
+    cambia qualcosa che il negozio possa rifiutare — le chiavi o
+    l'indirizzo. Correggere una tariffa a negozio giu' dev'essere
+    possibile: e' una dichiarazione nostra, non una domanda a loro."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not CONNETTORI_NEGOZIO_APERTI:
+        raise HTTPException(400, "I collegamenti col negozio non sono "
+                                 "attivi")
+    d = await leggi_json(req)
+    cid = int(d.get("id") or 0)
+    fonte = (d.get("fonte") or "").strip()
+    if fonte not in FONTI_NEGOZIO:
+        raise HTTPException(400, "Piattaforma sconosciuta: "
+                            + ", ".join(NOMI_ORIGINE.get(f, f)
+                                        for f in FONTI_NEGOZIO))
+    url = _url_connettore(fonte, d.get("url_negozio"))
+    cred = _credenziali_negozio(fonte, d)
+    consegna = (d.get("consegna") or "").strip()
+    if consegna not in CONSEGNE_NEGOZIO:
+        raise HTTPException(400, "Dicci come arriva la merce di questo "
+                                 "negozio: spedizione, ritiro o tutt'e due")
+    zona = _zona_negozio(d.get("zona") or "", consegna)
+
+    con = db()
+    vecchio = None
+    if cid:
+        # la proprieta' sta nella WHERE, mai in una SELECT prima: e la
+        # stessa risposta a «non e' tuo» e «non esiste», che chi
+        # enumera non impari niente
+        vecchio = con.execute("SELECT * FROM connettori WHERE id=? AND "
+                              "tg_id=?", (cid, user["id"])).fetchone()
+        if not vecchio:
+            con.close()
+            raise HTTPException(400, "Collegamento non trovato")
+    else:
+        quanti = con.execute("SELECT COUNT(*) AS n FROM connettori "
+                             "WHERE tg_id=?", (user["id"],)).fetchone()["n"]
+        if quanti >= MAX_CONNETTORI_VENDITORE:
+            con.close()
+            raise HTTPException(400, f"Hai già "
+                                     f"{MAX_CONNETTORI_VENDITORE} negozi "
+                                     f"collegati: scollegane uno per "
+                                     f"aggiungerne un altro.")
+    tariffe = (
+        _tariffa_negozio(d, "spedizione_eur",
+                         vecchio["spedizione_eur"] if vecchio else 0.0),
+        _tariffa_negozio(d, "spedizione_punto_eur",
+                         vecchio["spedizione_punto_eur"] if vecchio else 0.0),
+        # la DICHIARAZIONE e' la presenza della chiave e mai il valore
+        # (il patto di spedizione_punto_dichiarata): vuoto non e' zero
+        1 if "spedizione_punto_eur" in d
+        else (vecchio["spedizione_punto_dichiarata"] if vecchio else 0),
+        _tariffa_negozio(d, "spedizione_extra_eur",
+                         vecchio["spedizione_extra_eur"] if vecchio else 0.0))
+    if cred is None:
+        if not vecchio:
+            con.close()
+            raise HTTPException(400, "Servono le chiavi del negozio")
+        blob = vecchio["credenziali"]
+        da_provare = json.loads(_decifra_contenuto(blob) or "{}")
+    else:
+        # IL FAIL-OPEN SI FERMA QUI, ed e' la riga che il cantiere ha
+        # deciso prima di tutte le altre: un token che puo' scrivere
+        # sul negozio di qualcuno non si tiene in 'plain:'. In
+        # collaudo si', o il mercatino di prova non potrebbe collegare
+        # niente (la deroga dell'indirizzo di casa, parola per parola).
+        if (not CHIAVE_CONTENUTI_DIGITALI or Fernet is None) \
+                and not MODALITA_COLLAUDO:
+            con.close()
+            raise HTTPException(503, "Il collegamento col negozio non è "
+                                     "disponibile in questo momento: "
+                                     "riprova più tardi")
+        blob = _cifra_contenuto(json.dumps(cred))
+        da_provare = cred
+    con.close()
+
+    if cred is not None or not vecchio or vecchio["url_negozio"] != url:
+        await _prova_negozio(fonte, url, da_provare)
+
+    adesso = int(time.time())
+    con = db()
+    try:
+        if vecchio:
+            con.execute(
+                "UPDATE connettori SET fonte=?, url_negozio=?, "
+                "credenziali=?, consegna=?, spedizione_eur=?, "
+                "spedizione_punto_eur=?, spedizione_punto_dichiarata=?, "
+                "spedizione_extra_eur=?, zona=? WHERE id=? AND tg_id=?",
+                (fonte, url, blob, consegna, *tariffe, zona, cid,
+                 user["id"]))
+        else:
+            cur = con.execute(
+                "INSERT INTO connettori(tg_id,fonte,url_negozio,"
+                "credenziali,consegna,spedizione_eur,spedizione_punto_eur,"
+                "spedizione_punto_dichiarata,spedizione_extra_eur,zona,"
+                "creato) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (user["id"], fonte, url, blob, consegna, *tariffe, zona,
+                 adesso))
+            cid = cur.lastrowid
+    except sqlite3.IntegrityError:
+        con.close()
+        # la UNIQUE(fonte, url_negozio) e' il giudice, non una SELECT
+        # prima: un catalogo con due padroni sarebbe una riga che
+        # vince a caso
+        raise HTTPException(400, "Questo negozio è già collegato a un "
+                                 "account Barattolo")
+    _applica_dichiarazione(con, cid, {"consegna": consegna,
+                                      "spedizione_eur": tariffe[0],
+                                      "spedizione_punto_eur": tariffe[1],
+                                      "spedizione_punto_dichiarata":
+                                          tariffe[2],
+                                      "spedizione_extra_eur": tariffe[3],
+                                      "zona": zona})
+    con.commit()
+    riga = con.execute("SELECT * FROM connettori WHERE id=?",
+                       (cid,)).fetchone()
+    fuori = _connettore_pubblico(con, riga)
+    con.close()
+    # IL PRIMO GIRO PARTE SUBITO, e solo alla nascita: chi ha appena
+    # visto che il catalogo si legge non deve aspettare l'ora tonda
+    # per vedere un annuncio. Sui ritocchi no — la dichiarazione e'
+    # gia' scesa sulle righe qui sopra, e rileggere il negozio non
+    # aggiungerebbe niente.
+    if not vecchio and riga["stato"] == "attivo":
+        asyncio.create_task(_sync_uno(cid))
+    return {"ok": True, "connettore": fuori, "primo_giro": not vecchio}
+
+
+@app.post("/api/me/connettori/{conn_id}/pausa")
+async def pausa_connettore(conn_id: int, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Spegne o riaccende un collegamento.
+
+    IN PAUSA GLI ANNUNCI RESTANO DOVE SONO, ed e' tutta la differenza
+    con lo scollegamento: qui si smette di LEGGERE — il giro filtra
+    `stato='attivo'` — la' si taglia il ponte. Il prezzo dichiarato e'
+    che da quel momento la giacenza qui puo' divergere da quella di
+    la', ed e' esattamente cio' che si vuole quando si mette in pausa
+    per sistemare qualcosa sul proprio negozio.
+    RIACCENDERE AZZERA IL CONTO DEGLI ERRORI, ed e' il gesto vero dopo
+    aver rifatto un token: senza, un collegamento tornato buono si
+    ridichiarerebbe rotto al primo giro che va storto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    c = con.execute("SELECT stato FROM connettori WHERE id=? AND tg_id=?",
+                    (conn_id, user["id"])).fetchone()
+    if not c:
+        con.close()
+        raise HTTPException(400, "Collegamento non trovato")
+    nuovo = "pausa" if c["stato"] == "attivo" else "attivo"
+    if nuovo == "attivo":
+        con.execute("UPDATE connettori SET stato='attivo', "
+                    "errori_di_fila=0, ultimo_errore='' WHERE id=?",
+                    (conn_id,))
+    else:
+        # l'errore RESTA scritto: e' il motivo per cui si e' in pausa,
+        # e cancellarlo toglierebbe l'unica cosa da leggere
+        con.execute("UPDATE connettori SET stato='pausa' WHERE id=?",
+                    (conn_id,))
+    con.commit()
+    con.close()
+    return {"ok": True, "stato": nuovo}
+
+
+@app.post("/api/me/connettori/{conn_id}/scollega")
+async def scollega_connettore(conn_id: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Taglia il ponte: la riga se ne va e gli annunci si spengono.
+
+    SPEGNERE NON E' UN DI PIU', e' la sola cosa onesta: senza il giro
+    che la tiene in pari, la giacenza di quelle righe mentirebbe entro
+    un giorno — si venderebbe qui roba che di la' non c'e' piu'.
+    `spegni_annuncio` e' lo stesso che usa il sync per le sparizioni,
+    quindi gli ordini mai pagati diventano lapidi come sempre; quelli
+    coi sats in cassaforte NON si toccano e non fermano niente — vivono
+    per conto loro, e il venditore deve spedirli comunque. Bloccare qui
+    vorrebbe dire che un catalogo da duecento righe non si scollega
+    finche' l'ultimo ordine non e' chiuso.
+
+    LE USCITE SE NE VANNO CON LUI: `connettori_uscite` e' il registro
+    di cio' che quel negozio non sa ancora, e un registro di un negozio
+    che non c'e' piu' non lo legge nessuno — il giro che lo
+    spegnerebbe non passera' mai piu'.
+
+    RICOLLEGARE E' UN CATALOGO NUOVO, dichiarato (e il confirm del
+    client lo dice): il match e' `connettore_id + chiave`, quindi le
+    righe di ieri non si ritrovano e ne nascono di nuove. E' la
+    conseguenza della decisione scritta nello schema — «la riga E' il
+    registro, e scollegare e' cancellarla»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    import importa_negozio
+    con = db()
+    c = con.execute("SELECT id FROM connettori WHERE id=? AND tg_id=?",
+                    (conn_id, user["id"])).fetchone()
+    if not c:
+        con.close()
+        raise HTTPException(400, "Collegamento non trovato")
+    spenti = 0
+    for riga in con.execute("SELECT id FROM annunci WHERE connettore_id=? "
+                            "AND stato<>'rimosso'", (conn_id,)).fetchall():
+        importa_negozio.spegni_annuncio(con, riga["id"], "rimosso")
+        spenti += 1
+    con.execute("DELETE FROM connettori_uscite WHERE connettore_id=?",
+                (conn_id,))
+    con.execute("DELETE FROM connettori WHERE id=? AND tg_id=?",
+                (conn_id, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "spenti": spenti}
+
+
+@app.post("/api/me/connettori/{conn_id}/sincronizza")
+async def sincronizza_uno_a_mano(conn_id: int,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """«🔄 Aggiorna ora»: il giro dell'orologio, a comando.
+
+    NON ASPETTA LA FINE, ed e' deliberato: leggere duecento prodotti e
+    farli passare dalla moderazione puo' prendere un minuto, e una
+    richiesta HTTP che resta appesa un minuto dentro la WebView di
+    Telegram si legge come un guasto. Parte in sottofondo e il
+    riepilogo arriva dove arriva sempre — la notifica del bot e il
+    report dentro il cassetto.
+    IL FRENO E' DOPPIO E NON DUE VOLTE LO STESSO: `ultimo_giro` e' il
+    ritmo verso il negozio dell'ALTRO (si scrive anche sui giri
+    falliti, cosi' un negozio rotto non si martella), e
+    `_CONNETTORI_IN_CORSO` para il doppio tocco su rete lenta, dove il
+    freno del tempo non ha ancora niente da guardare."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not CONNETTORI_NEGOZIO_APERTI:
+        raise HTTPException(400, "I collegamenti col negozio non sono "
+                                 "attivi")
+    con = db()
+    c = con.execute("SELECT id, stato, ultimo_giro FROM connettori "
+                    "WHERE id=? AND tg_id=?",
+                    (conn_id, user["id"])).fetchone()
+    con.close()
+    if not c:
+        raise HTTPException(400, "Collegamento non trovato")
+    if c["stato"] != "attivo":
+        raise HTTPException(400, "Il collegamento è in pausa: riattivalo "
+                                 "prima di rileggere il catalogo")
+    if conn_id in _CONNETTORI_IN_CORSO:
+        raise HTTPException(400, "Sto già leggendo questo catalogo: "
+                                 "aspetta che finisca")
+    manca = (c["ultimo_giro"] or 0) + CONNETTORI_SYNC_MANUALE_S \
+        - int(time.time())
+    if manca > 0:
+        raise HTTPException(400, f"L'ho appena letto: potrai richiederlo "
+                                 f"fra {max(1, manca // 60)} minuti (si "
+                                 f"aggiorna comunque da solo ogni ora)")
+    asyncio.create_task(_sync_uno(conn_id))
+    return {"ok": True}
 
 
 def pulisci_import():

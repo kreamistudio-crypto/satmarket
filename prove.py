@@ -18475,7 +18475,12 @@ def prove_fogli_di_casa():
     # altri due sono il «togli il banner» del venditore e il
     # rifiuto/spegnimento del moderatore — che e' anche il posto dove
     # un prompt() sarebbe tornato a nascondersi, e non c'e'.
-    prova("i gesti che passano dalla domanda unica sono nove", 9,
+    # DIECI dall'ago 2026: il decimo e' «scollega il negozio», che
+    # e' anche il piu' distruttivo dei dieci — la riga del
+    # collegamento se ne va e i suoi annunci escono dalla vetrina —
+    # e per questo il suo corpo dice le due cose che non si disfano:
+    # gli annunci si spengono, e ricollegare e' un catalogo NUOVO.
+    prova("i gesti che passano dalla domanda unica sono dieci", 10,
           solo_codice(mini).count("chiediConferma({"))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):
@@ -23382,8 +23387,38 @@ def prove_consegna_firmata():
                   "anche_digitale"):
         prova(f"fase 2: {fuori} resta fuori dall'UPDATE firmato", False,
               fuori in corpo2)
-    prova("l'UPDATE della consegna vive in DUE posti soli", 2,
+    # ⚠️ HA CAMBIATO LATO (ago 2026, tappa 5 dei connettori): i posti
+    # sono TRE, e il terzo e' `_applica_dichiarazione` — la consegna
+    # che il venditore dichiara nel cassetto «🏪 Il tuo negozio» scende
+    # su tutte le righe di QUEL negozio. Non e' un allentamento: e'
+    # quel che lo schema di `connettori` promette da sempre («si
+    # dichiara qui, UNA volta, e vale per tutte le righe»), e senza
+    # quella riga la promessa sarebbe falsa per il pregresso —
+    # `riconcilia_connettore` non ricopre mai la consegna, e la
+    # Modifica sugli annunci di un connettore e' chiusa apposta:
+    # chi sbaglia la prima dichiarazione se la terrebbe addosso per
+    # sempre su duecento annunci.
+    # QUEL CHE LA PROVA CONTINUA A GARANTIRE e' la stessa cosa di
+    # ieri, ed e' la riga sotto: il terzo UPDATE non puo' toccare una
+    # riga che non sia di un connettore — la sua WHERE lo lega a
+    # `connettore_id`, quindi un nativo o un importato da Nostr non lo
+    # vede nemmeno.
+    prova("la consegna si scrive in QUATTRO posti soli", 4,
           src.count("consegna=?"))
+    # Il TERZO: la consegna che il venditore dichiara nel cassetto
+    # scende su tutte le righe di QUEL negozio — e la sua WHERE lo
+    # lega a `connettore_id`, quindi un nativo o un importato da Nostr
+    # non lo vede nemmeno.
+    _dich = codice(pezzo("_applica_dichiarazione"))
+    prova("...il terzo tocca solo le righe di quel negozio", True,
+          "consegna=?" in _dich and "WHERE connettore_id=?" in _dich)
+    # Il QUARTO non e' un annuncio: e' la riga del COLLEGAMENTO, cioe'
+    # la dichiarazione stessa. Sta in un'altra tabella e non puo'
+    # toccare la vetrina.
+    _salva = codice(pezzo("salva_connettore"))
+    prova("...e il quarto scrive il collegamento, non un annuncio", True,
+          "UPDATE connettori SET" in _salva
+          and "UPDATE annunci" not in _salva)
 
     # --- SENTINELLE: il client --------------------------------------
     mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
@@ -25015,8 +25050,16 @@ def prove_connettori_sync():
     # vendita appena riconosciuta si sottrarrebbe un'ultima volta e il
     # numero scenderebbe di uno a ogni riallineamento, fino a zero.
     corpo = codice(_pezzo_da(src, "_una_riga"))
+    # ⚠️ COL `find()` E NON COL `.index()`, ed e' la regola di casa
+    # pagata tre volte: `.index()` ALZA quando la mutazione toglie la
+    # riga sorvegliata, e una prova che ESPLODE non e' rossa — si
+    # porta dietro tutte le sorelle che vengono dopo, e il conto
+    # smette di dire qualcosa. Il `0 <=` davanti non e' un ornamento:
+    # `find()` torna -1, e senza quella meta' «-1 < qualcosa» sarebbe
+    # un PASSAGGIO su una riga che non c'e' piu'.
     prova("nel sync si riflette PRIMA di sottrarre", True,
-          corpo.index("rifletti_pendenti") < corpo.index("quantita_corretta"))
+          0 <= corpo.find("rifletti_pendenti")
+          < corpo.find("quantita_corretta"))
     # e la riflessione si gira per davvero, su un registro di cartone
     con = sqlite3.connect(":memory:")
     con.execute("CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY "
@@ -25082,12 +25125,13 @@ def prove_connettori_sync():
     prova("la leva nasce FALSE nel codice", True,
           "CONNETTORI_NEGOZIO_APERTI = False" in _SORGENTE)
     prova("...e il giro la guarda per primo", True,
-          giro.index("CONNETTORI_NEGOZIO_APERTI") < giro.index("for riga"))
+          0 <= giro.find("CONNETTORI_NEGOZIO_APERTI")
+          < giro.find("for riga"))
     # l'appuntamento PRIMA del tentativo: anche un errore aspetta la
     # prossima ora, niente tempeste (il patto dell'import Nostr)
     prova("l'appuntamento si fissa prima di provare", True,
-          giro.index("_prossimo_giro_connettori = time.time()")
-          < giro.index("import importa_negozio"))
+          0 <= giro.find("_prossimo_giro_connettori = time.time()")
+          < giro.find("import importa_negozio"))
     # UNA volta per giro E PRIMA del ciclo: dentro il `for` sarebbe una
     # lettura per connettore, cioe' conversioni diverse per annunci
     # dello stesso giro — la lezione gia' pagata dall'import Nostr. Il
@@ -25095,7 +25139,7 @@ def prove_connettori_sync():
     prova("il cambio si legge UNA volta per giro", 1,
           giro.count("cambio_per_import()"))
     prova("...e prima del ciclo, non dentro", True,
-          giro.index("cambio_per_import()") < giro.index("for riga in"))
+          0 <= giro.find("cambio_per_import()") < giro.find("for riga in"))
     prova("un connettore che esplode non ferma gli altri", True,
           "except Exception as e" in giro and "for riga in collegati" in giro)
     # ...e lo stesso DENTRO il catalogo, riga per riga: il patto di
@@ -25177,8 +25221,7 @@ def prove_connettori_sync():
           leggi_sh("mio.myshopify.com", cred_sh, negozio_sh([3]), 200)[1])
     uno = codice(pezzo("_un_connettore"))
     prova("...e il giro esce prima di toccare una riga", True,
-          "_connettore_in_errore" in uno
-          and uno.index("_connettore_in_errore") < uno.index("traduci"))
+          0 <= uno.find("_connettore_in_errore") < uno.find("traduci"))
     # ...e il GESTO, non la parola: la docstring di quella funzione
     # dice «NIENTE spegnimenti» apposta, e una sentinella che cerca
     # «spegni» diventerebbe rossa per colpa della spiegazione
@@ -25768,6 +25811,372 @@ def srv_url(u):
     return amb["url_api_ammesso"](u)
 
 
+def prove_connettori_cassetto():
+    """IL CASSETTO E I SUOI ENDPOINT (ago 2026, tappa 5): «🏪 Il tuo
+    negozio» nel Profilo — collega, pausa, aggiorna ora, scollega.
+
+    LE DUE RIGHE CHE QUESTE PROVE ESISTONO PER DIFENDERE, e sono
+    quelle che rendono questa tappa diversa dalle sorelle
+    (spedizioniere, sconto, ferie):
+     1. QUI SI SCRIVE UNA CREDENZIALE SU UN SISTEMA DI UN ALTRO. Non
+        deve uscire mai piu' dal server, e la garanzia e' la FORMA —
+        una whitelist di campi in uscita, non una riga presa intera a
+        cui se ne toglie una: con la blacklist la colonna che qualcuno
+        aggiungera' fra sei mesi uscirebbe da sola.
+     2. SI PROVA PRIMA DI CREDERCI. Senza, un token sbagliato lascia
+        in piedi un collegamento «attivo» che non porta niente, e a
+        dirlo ci vogliono cinque giri dell'orologio — cioe' cinque ore
+        di silenzio.
+    I giudici si GIRANO e non si guardano soltanto: una sentinella
+    direbbe che `_url_connettore` esiste, mai che normalizzi
+    «HTTPS://Mio.MyShopify.com/» nella forma che il lettore poi
+    confronta con l'host della pagina successiva."""
+    print("\n[i connettori: il cassetto e i suoi endpoint]")
+
+    class _Http(Exception):
+        def __init__(self, code, detail=""):
+            self.code = code
+            self.detail = detail
+            super().__init__(detail)
+
+    def _errore(fn, *a):
+        """Il codice di un rifiuto, o None se e' passato."""
+        try:
+            fn(*a)
+            return None
+        except _Http as e:
+            return e.code
+
+    def _dettaglio(fn, *a):
+        try:
+            fn(*a)
+            return None
+        except _Http as e:
+            return e.detail
+
+    def _valore(fn, *a):
+        """Il risultato, o il codice del rifiuto. NESSUNA chiamata
+        nuda a un giudice dentro una prova: la mutazione che lo fa
+        alzare farebbe ESPLODERE la funzione invece di lasciarla
+        rossa, e un'esplosione si porta dietro tutte le sorelle —
+        e' la stessa ragione per cui qui non si usa `.index()`."""
+        try:
+            return fn(*a)
+        except _Http as e:
+            return e.code
+
+    # --- I DUE CATALOGHI, INCROCIATI ------------------------------
+    # FONTI_NEGOZIO vive nel server (il client deve poter offrire le
+    # piattaforme senza sapere niente del modulo) e LETTORI vive nel
+    # modulo: due elenchi divergenti offrirebbero un collegamento che
+    # poi nessun lettore sa leggere.
+    amb = {}
+    # il taglio alla TONDA e non al primo \n: MODALITA_CONSEGNA sta su
+    # due righe, e fermarsi al fine-riga darebbe una tupla mai chiusa
+    for riga in ("FONTI_NEGOZIO = (", "CONSEGNE_NEGOZIO = (",
+                 "MODALITA_CONSEGNA = ("):
+        i = _SORGENTE.index(riga)
+        exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    imp = open("importa_negozio.py", encoding="utf-8").read()
+    j = imp.index("LETTORI = {")
+    lettori = re.findall(r'"([a-z]+)":', imp[j:imp.index("}", j)])
+    prova("le piattaforme del server sono quelle del modulo",
+          sorted(lettori), sorted(amb["FONTI_NEGOZIO"]))
+    # Le tre strade FISICHE e basta: 'digitale' no — il codice si
+    # consegna premendo un bottone QUI, e un e-commerce quel bottone
+    # non ce l'ha (la regola gia' scritta per i tag NIP-99) — e
+    # 'servizio' nemmeno, che non e' merce che viaggia.
+    prova("un negozio dichiara le sole strade fisiche",
+          ["entrambe", "ritiro", "spedizione"],
+          sorted(amb["CONSEGNE_NEGOZIO"]))
+    prova("...e sono tutte strade vere del catalogo di casa", [],
+          [c for c in amb["CONSEGNE_NEGOZIO"]
+           if c not in amb["MODALITA_CONSEGNA"]])
+
+    # --- LE CREDENZIALI NON ESCONO MAI ----------------------------
+    pub = codice(pezzo("_connettore_pubblico"))
+    prova("la riga in uscita e' una whitelist, non una riga spogliata",
+          [], [g for g in ("dict(c)", "dict(riga)", "**c", "pop(")
+               if g in pub])
+    prova("...e la parola «credenziali» non ci compare", False,
+          "credenzial" in pub)
+    lista = codice(pezzo("lista_connettori"))
+    prova("la lista passa dal giudice unico dell'uscita", True,
+          "_connettore_pubblico(" in lista and "SELECT *" in lista)
+    # e il conto si fa nel SERVER: un cassetto non fa domande al
+    # database, e il numero che manca lo scrive chi ha quello vero
+    prova("...e il conto degli annunci lo fa lui", True,
+          "COUNT(*)" in pub and "connettore_id=?" in pub)
+
+    # --- SI PROVA PRIMA DI CREDERCI -------------------------------
+    salva = codice(pezzo("salva_connettore"))
+    prova("il negozio si prova PRIMA dell'INSERT", True,
+          0 <= salva.find("await _prova_negozio(")
+          < salva.find("INSERT INTO connettori"))
+    prova("...e prima dell'UPDATE", True,
+          0 <= salva.find("await _prova_negozio(")
+          < salva.find("UPDATE connettori SET"))
+    # LA PROVA COSTA UNA CHIAMATA DI RETE, quindi si fa SOLO quando
+    # cambia qualcosa che il negozio possa rifiutare: correggere una
+    # tariffa a negozio giu' dev'essere possibile, che quella e' una
+    # dichiarazione nostra e non una domanda a loro.
+    prova("...ma solo quando cambiano chiavi o indirizzo", True,
+          'cred is not None or not vecchio or vecchio["url_negozio"] != url'
+          in salva)
+    provaneg = codice(pezzo("_prova_negozio"))
+    prova("la prova legge UNA pagina sola", True,
+          "chiama_api_negozio, 1)" in provaneg)
+    prova("...e il motivo del rifiuto e' quello VERO", True,
+          "str(e)[:160]" in provaneg)
+    # niente connessione aperta mentre si parla con la rete: la si
+    # chiude PRIMA della prova e se ne riapre una per scrivere
+    prova("nessuna connessione aperta durante la chiamata", True,
+          0 <= salva.find("con.close()\n\n    if cred is not None")
+          < salva.find("await _prova_negozio("))
+
+    # --- IL FAIL-OPEN SI FERMA QUI --------------------------------
+    # un PIN di ritiro in chiaro e' una degradazione accettabile, un
+    # token che puo' scrivere sul negozio di qualcuno no: il 503 e' la
+    # riga decisa prima di tutte le altre.
+    prova("senza chiave il collegamento si rifiuta", True,
+          "HTTPException(503" in salva
+          and "not CHIAVE_CONTENUTI_DIGITALI or Fernet is None" in salva)
+    prova("...tranne in collaudo, la deroga dell'indirizzo di casa",
+          True, "not MODALITA_COLLAUDO" in salva)
+    prova("...e le chiavi si scrivono cifrate", True,
+          "_cifra_contenuto(json.dumps(cred))" in salva)
+
+    # --- LA PROPRIETA' STA NELLA WHERE ----------------------------
+    # mai una SELECT per solo id: la stessa risposta a «non e' tuo» e
+    # «non esiste», che chi enumera non impari niente
+    for nome in ("lista_connettori", "salva_connettore",
+                 "pausa_connettore", "scollega_connettore",
+                 "sincronizza_uno_a_mano"):
+        prova(f"{nome}: la proprieta' e' nella WHERE", True,
+              "tg_id=?" in codice(pezzo(nome)))
+
+    # --- SCOLLEGARE ------------------------------------------------
+    scoll = codice(pezzo("scollega_connettore"))
+    prova("scollegare spegne gli annunci", True,
+          "spegni_annuncio(" in scoll)
+    prova("...e porta via il registro delle uscite", True,
+          "DELETE FROM connettori_uscite WHERE connettore_id=?" in scoll)
+    prova("...e la riga del collegamento", True,
+          "DELETE FROM connettori WHERE id=?" in scoll)
+    # NON BLOCCA SUGLI AFFARI IN CORSO, ed e' una decisione: gli
+    # ordini coi sats in cassaforte vivono per conto loro e il
+    # venditore deve spedirli comunque — bloccare qui vorrebbe dire
+    # che un catalogo da duecento righe non si scollega finche'
+    # l'ultimo ordine non e' chiuso.
+    prova("...e non chiede il permesso agli ordini vivi", False,
+          "_ordini_vivi_annuncio" in scoll)
+    prova("la storia non si riscrive: i rimossi restano", True,
+          "stato<>'rimosso'" in scoll)
+
+    # --- UNO ALLA VOLTA --------------------------------------------
+    uno = codice(pezzo("_un_connettore"))
+    prova("un collegamento non fa due giri insieme", True,
+          "_CONNETTORI_IN_CORSO.add(" in uno
+          and 'if c["id"] in _CONNETTORI_IN_CORSO:' in uno)
+    prova("...e il posto si libera comunque (finally)", True,
+          "finally:" in uno and "_CONNETTORI_IN_CORSO.discard(" in uno)
+    # la guardia sta DENTRO, non nei chiamanti: sarebbero due posti da
+    # tenere in pari e un terzo da ricordarsi domani
+    for chi in ("sincronizza_connettori", "_sync_uno"):
+        prova(f"{chi} non si scrive una guardia sua", False,
+              "_CONNETTORI_IN_CORSO" in codice(pezzo(chi)))
+
+    # --- IL GIRO A COMANDO -----------------------------------------
+    manuale = codice(pezzo("sincronizza_uno_a_mano"))
+    prova("il giro a mano guarda la leva", True,
+          "CONNETTORI_NEGOZIO_APERTI" in manuale)
+    prova("...non aspetta la fine", True,
+          "asyncio.create_task(_sync_uno(" in manuale)
+    # IL FRENO E' DOPPIO E NON DUE VOLTE LO STESSO: `ultimo_giro` e' il
+    # ritmo verso il negozio dell'altro (si scrive anche sui giri
+    # falliti, cosi' un negozio rotto non si martella), l'insieme in
+    # memoria para il doppio tocco su rete lenta — dove il freno del
+    # tempo non ha ancora niente da guardare.
+    prova("...e ha i due freni", True,
+          "CONNETTORI_SYNC_MANUALE_S" in manuale
+          and "_CONNETTORI_IN_CORSO" in manuale)
+    prova("l'ancora del freno e' ultimo_giro", True,
+          'c["ultimo_giro"]' in manuale)
+    # e `ultimo_giro` si scrive DAVVERO in tutti e due i rami, o il
+    # freno non frenerebbe proprio dove serve
+    for chi, ramo in (("_chiudi_giro_connettore", "riuscito"),
+                      ("_connettore_in_errore", "fallito")):
+        prova(f"...e il ramo {ramo} lo scrive", True,
+              "ultimo_giro=?" in codice(pezzo(chi)))
+    sync = codice(pezzo("_sync_uno"))
+    prova("il giro a mano non sposta l'appuntamento di tutti", False,
+          "_prossimo_giro_connettori" in sync)
+    prova("...e non lascia risalire un'eccezione", True,
+          "except Exception as e" in sync)
+
+    # --- I GIUDICI, GIRATI -----------------------------------------
+    a2 = {"re": re, "HTTPException": _Http}
+    exec(pezzo("_url_connettore"), a2)
+    url = a2["_url_connettore"]
+    prova("shopify: l'indirizzo si normalizza", "mio.myshopify.com",
+          _valore(url, "shopify", "HTTPS://Mio.MyShopify.com/"))
+    prova("...anche col percorso appresso", "mio.myshopify.com",
+          _valore(url, "shopify", "mio.myshopify.com/admin"))
+    for storto in ("mionegozio.it", "shopify.com", "", "mio.myshopify.co"):
+        prova(f"shopify rifiuta «{storto}»", 400,
+              _errore(url, "shopify", storto))
+    # Woo passa dalla cintura di FORMA del modulo, e la guardia vera
+    # resta nel trasporto (gira su OGNI chiamata, non solo su questa)
+    prova("woo: l'https passa", "https://ilmionegozio.it",
+          _valore(url, "woo", "https://ilmionegozio.it/"))
+    prova("woo: la sottocartella pure", "https://sito.it/shop",
+          _valore(url, "woo", "https://sito.it/shop"))
+    for storto in ("http://sito.it", "sito.it", "https://ck:cs@sito.it"):
+        prova(f"woo rifiuta «{storto}»", 400, _errore(url, "woo", storto))
+
+    a3 = {"HTTPException": _Http}
+    exec(pezzo("_credenziali_negozio"), a3)
+    cred = a3["_credenziali_negozio"]
+    # CHIAVE ASSENTE = CONSERVA: si corregge una tariffa senza dover
+    # ribattere il token, e un client rimasto in cache non svuota un
+    # campo che non conosce (il patto dello stock)
+    prova("credenziali: la chiave assente conserva", None,
+          _valore(cred, "shopify", {"fonte": "shopify"}))
+    prova("credenziali: shopify vuole il token", {"token": "shpat_x"},
+          _valore(cred, "shopify",
+                  {"credenziali": {"token": " shpat_x "}}))
+    prova("credenziali: woo ne vuole due",
+          {"consumer_key": "ck", "consumer_secret": "cs"},
+          _valore(cred, "woo",
+                  {"credenziali": {"consumer_key": "ck",
+                                   "consumer_secret": "cs"}}))
+    prova("credenziali: una meta' non basta", 400,
+          _errore(cred, "woo", {"credenziali": {"consumer_key": "ck"}}))
+    prova("credenziali: il vuoto non basta", 400,
+          _errore(cred, "shopify", {"credenziali": {"token": "  "}}))
+
+    a4 = {"HTTPException": _Http, "MAX_TARIFFA_CONNETTORE": 500.0,
+          "_fmt_eur": lambda x: "500,00"}
+    exec(pezzo("_tariffa_negozio"), a4)
+    tar = a4["_tariffa_negozio"]
+    prova("tariffa: la chiave assente conserva", 7.5,
+          _valore(tar, {}, "spedizione_eur", 7.5))
+    # ZERO SCRITTO E' UN VALORE («la offro io»), e la distinzione e'
+    # tutto il punto: vuoto non e' zero
+    prova("tariffa: lo zero scritto e' zero", 0.0,
+          _valore(tar, {"spedizione_eur": 0}, "spedizione_eur", 7.5))
+    prova("tariffa: la virgola si legge", 4.9,
+          _valore(tar, {"spedizione_eur": "4,90"},
+                  "spedizione_eur", 0.0))
+    prova("tariffa: il negativo si rifiuta", 400,
+          _errore(tar, {"spedizione_eur": -1}, "spedizione_eur", 0.0))
+    prova("tariffa: oltre il tetto si rifiuta", 400,
+          _errore(tar, {"spedizione_eur": 501}, "spedizione_eur", 0.0))
+    prova("tariffa: la parola storta si rifiuta", 400,
+          _errore(tar, {"spedizione_eur": "cinque"}, "spedizione_eur", 0.0))
+
+    # la zona: le due regole del form Vendi, col MESSAGGIO di casa
+    a5 = {"HTTPException": _Http, "COMUNI": {"pavia": (1.0, 2.0)},
+          "coordinate_da_zona": lambda z: ((1.0, 2.0) if "Pavia" in z
+                                           else (0.0, 0.0)),
+          "messaggio_zona_storta": lambda z: "MESSAGGIO DI CASA",
+          "arricchisci_zona": lambda z: z}
+    exec(pezzo("_zona_negozio"), a5)
+    zona = a5["_zona_negozio"]
+    prova("zona: col ritiro il comune e' d'obbligo", 400,
+          _errore(zona, "", "ritiro"))
+    prova("zona: senza ritiro puo' restare vuota", "",
+          _valore(zona, "", "spedizione"))
+    prova("zona: compilata dev'essere un luogo", 400,
+          _errore(zona, "spedisco in tutta Italia", "spedizione"))
+    prova("zona: e il messaggio e' quello di casa", "MESSAGGIO DI CASA",
+          _dettaglio(zona, "spedisco ovunque", "spedizione"))
+    prova("zona: un comune vero passa", "Pavia (PV)",
+          _valore(zona, "Pavia (PV)", "entrambe"))
+    # senza dataset la regola geografica si spegne, come il resto
+    # della geografia (fail-open dichiarato)
+    a5["COMUNI"] = {}
+    prova("zona: senza dataset non si blocca niente", "Marte",
+          _valore(zona, "Marte", "ritiro"))
+
+    # --- LA DICHIARAZIONE SCENDE SULLE RIGHE ------------------------
+    dich = codice(pezzo("_applica_dichiarazione"))
+    prova("la dichiarazione tocca solo quel negozio", True,
+          "WHERE connettore_id=? AND stato<>'rimosso'" in dich)
+    # LA GEOGRAFIA SEGUE LA ZONA, che e' derivata e non chiesta:
+    # senza, la sigla cambierebbe in vetrina e il filtro per regione
+    # continuerebbe a dire quella di ieri
+    prova("...e la geografia segue la zona", True,
+          "coordinate_da_zona(" in dich and "regione_da_zona(" in dich)
+    prova("...e la chiama chi salva", True,
+          "_applica_dichiarazione(con, cid" in salva)
+
+    # --- IL CENSIMENTO DEI NOMI ------------------------------------
+    # ⚠️ LA TRAPPOLA CHE HA APERTO QUESTA PROVA, e non e' teorica: il
+    # cassetto era nato con un `_url_negozio` suo, e un `_url_negozio`
+    # ESISTEVA GIA' (quello degli indirizzi parlanti, duemila righe
+    # piu' in giu'). Python non fiata: l'ultimo `def` vince, quindi
+    # l'endpoint avrebbe chiamato in silenzio la funzione del cantiere
+    # SEO. E' la stessa famiglia della chiave doppia in `acqDati` —
+    # codice lecito, significato sbagliato — e a quel livello non
+    # guardava nessuno.
+    import ast as _ast
+    import collections as _coll
+    conti = _coll.Counter()
+    for nodo in _ast.parse(_SORGENTE).body:
+        if isinstance(nodo, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            conti[nodo.name] += 1
+    prova("nessun nome di funzione e' definito due volte", [],
+          sorted(n for n, q in conti.items() if q > 1))
+
+    # --- IL CLIENT --------------------------------------------------
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    prova("il cassetto esiste", True,
+          'id="accConnettori"' in mini and 'id="connettoriBlocco"' in mini)
+    prova("...ed e' nella catena del Profilo", True,
+          "renderConnettori();\n  renderAvvisi();" in mini)
+    rc = pezzo_js(mini, "async function renderConnettori()")
+    # in DEMO e in vetrina non c'e' niente da collegare, e a leva
+    # spenta il cassetto sarebbe una porta su un muro
+    prova("il cassetto sparisce dove non serve", True,
+          "DEMO || VETRINA || !(connettoriLeve && connettoriLeve.attivo)"
+          in rc)
+    # LE CIFRE VENGONO DAL SERVER: il tetto, le piattaforme e le
+    # strade sono leve, e il client non hardcoda mai una leva
+    prova("...e le voci vengono dal server", True,
+          "connettoriLeve.fonti" in rc and "connettoriLeve.consegne" in rc)
+    prova("...compreso il tetto", True, "connettoriLeve.max" in rc)
+    # LE CHIAVI NON TORNANO MAI INDIETRO: i tre campi nascono VUOTI
+    # anche in modifica, e vuoto vuol dire «lascia quelle di prima»
+    prova("il campo delle chiavi nasce sempre vuoto", 3,
+          rc.count('value=""></div>'))
+    prova("...e in modifica lo dice", True,
+          "lascia vuoto per non cambiarlo" in rc)
+    mod = pezzo_js(mini, "function modificaConnettore(")
+    prova("...e la modifica non se le porta dietro", [],
+          [g for g in ("credenziali", "token", "consumer") if g in mod])
+    sal = pezzo_js(mini, "async function salvaConnettore(")
+    # la DICHIARAZIONE e' la presenza della chiave e mai il valore: il
+    # campo vuoto NON manda niente, e vale «come a casa» — uno zero
+    # direbbe «gratis», che e' un'altra cosa
+    prova("la tariffa punto si manda solo se scritta", True,
+          "if ((b.punto || '').trim() !== '') corpo.spedizione_punto_eur"
+          in sal)
+    prova("...e le chiavi solo se scritte", True,
+          "if (Object.values(chiavi).some(v => v.trim() !== ''))" in sal)
+    # il 400 si rende DENTRO il cassetto, la ricetta delle ferie: qui
+    # c'e' un valore da CORREGGERE, e in un toast sparirebbe
+    prova("il rifiuto si legge dentro il cassetto", True,
+          "connettoriErrore" in sal)
+    sc = pezzo_js(mini, "function scollegaConnettore(")
+    prova("scollegare passa dalla domanda unica", True,
+          "chiediConferma({" in sc)
+    # IL TESTO DICE LE DUE COSE CHE NON SI DISFANO
+    prova("...e dice che gli annunci escono dalla vetrina", True,
+          "escono dalla vetrina" in sc)
+    prova("...e che ricollegare e' un catalogo nuovo", True,
+          "come annunci nuovi" in sc)
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -25833,7 +26242,8 @@ def main():
               prove_banner_negozio,
               prove_foto_vuota,
               prove_connettori, prove_connettori_sync,
-              prove_connettori_woo, prove_connettori_registro):
+              prove_connettori_woo, prove_connettori_registro,
+              prove_connettori_cassetto):
         try:
             f()
         except Exception as e:
