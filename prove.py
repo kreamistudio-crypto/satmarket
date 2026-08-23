@@ -24974,13 +24974,29 @@ def prove_servizi():
 
     def ann(consegna, dig=0):
         return {"consegna": consegna, "anche_digitale": dig}
-    prova("un servizio non offre strade fisiche", set(),
+    # LA QUINTA STRADA E' UNA STRADA (ago 2026, con SERVIZI_ATTIVI gia'
+    # accesa in produzione): qui c'era scritto «un servizio non offre
+    # strade» == set(), cioe' la prova CERTIFICAVA il buco — con
+    # l'insieme vuoto compra() nasceva su '' (nessun appuntamento,
+    # nessun sollecito, segna_spedito che accetta), mentre il gemello
+    # JS la strada la conosceva. Ha CAMBIATO LATO col perche'.
+    prova("un servizio offre la SUA strada, e una sola", {"servizio"},
           strade(ann("servizio")))
-    # ...ed e' per questo che il SET lo esclude GRATIS: la sottrazione
-    # del digitale lascia l'insieme vuoto, che e' il 400 «si compra da
-    # solo». Zero righe nel carrello.
-    prova("...quindi il carrello lo rifiuta senza una riga apposta",
-          set(), strade(ann("servizio")) - {"digitale"})
+    # ...e il SET la sottrae insieme al digitale: l'insieme vuoto e' il
+    # 400 «si compra da sola». Niente strade fisiche inventate.
+    prova("...e il carrello lo rifiuta sottraendola", set(),
+          strade(ann("servizio")) - {"digitale", "servizio"})
+    prova("...nei DUE rami del set", 2,
+          _SORGENTE.count('strade_annuncio(a) - {"digitale", "servizio"}'))
+    prova("...col suo 400 che lo dice", 2,
+          _SORGENTE.count('prestazione: si compra da sola, fuori dal set'))
+    prova("il default di compra la sceglie prima del digitale", True,
+          'else "servizio" if "servizio" in disponibili\r\n'
+          '                  else "digitale")' in _SORGENTE
+          or 'else "servizio" if "servizio" in disponibili\n'
+          '                  else "digitale")' in _SORGENTE)
+    prova("il preventivo la enumera", True,
+          '_entra("servizio", 0, False)' in pezzo("_strade_preventivo"))
     prova("regressione: la spedizione resta la spedizione",
           {"spedizione"}, strade(ann("spedizione")))
     prova("regressione: entrambe restano due", {"spedizione", "ritiro"},

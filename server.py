@@ -5463,6 +5463,14 @@ def strade_annuncio(a) -> set:
         strade.add("ritiro")
     if a["consegna"] == "digitale" or a["anche_digitale"]:
         strade.add("digitale")
+    # IL SERVIZIO MANCAVA (ago 2026, trovato con SERVIZI_ATTIVI gia'
+    # accesa in produzione): il gemello JS `stradeConsegna` lo
+    # conosceva, questo no — quindi per una prestazione l'insieme era
+    # VUOTO, cioe' esattamente il silenzio descritto qui sopra:
+    # l'ordine nasceva su '' senza appuntamento, senza solleciti, e
+    # `segna_spedito` lo accettava. Il set lo sottrae come il digitale.
+    if a["consegna"] == "servizio":
+        strade.add("servizio")
     return strade
 
 
@@ -17178,13 +17186,16 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # le sole FISICHE: il digitale si sottrae al giudice unico
         # invece di avere una seconda lista — un digitale puro da'
         # l'insieme vuoto, che e' il 400 qui sotto
-        sue = strade_annuncio(a) - {"digitale"}
+        sue = strade_annuncio(a) - {"digitale", "servizio"}
         if not sue:
             con.close()
             if a["consegna"] == "digitale":
                 raise HTTPException(400, f"«{a['titolo'][:40]}» si consegna "
                     f"solo come codice online: si compra da solo, "
                     f"fuori dal set")
+            if a["consegna"] == "servizio":
+                raise HTTPException(400, f"«{a['titolo'][:40]}» è una "
+                    f"prestazione: si compra da sola, fuori dal set")
             raise HTTPException(400, f"«{a['titolo'][:40]}» non dichiara "
                 f"una modalità di consegna: si compra da solo, "
                 f"fuori dal set")
@@ -17751,6 +17762,10 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
                 _entra(v, sped, stima_sped, sped_eur, extra)
     if "digitale" in disponibili:
         _entra("digitale", 0, False)
+    # la prestazione: niente da spedire, niente tariffa — la cassa del
+    # client conosce gia' la via (nomeVia, la nota), mancava il server
+    if "servizio" in disponibili:
+        _entra("servizio", 0, False)
     if not fuori:
         # Annuncio storico senza modalita': il flusso di sempre, una
         # pseudo-strada '' — il client non disegna la scelta e il body
@@ -18213,13 +18228,16 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         # le sole FISICHE: il digitale si sottrae al giudice unico
         # invece di avere una seconda lista — un digitale puro da'
         # l'insieme vuoto, che e' il 400 qui sotto
-        sue = strade_annuncio(a) - {"digitale"}
+        sue = strade_annuncio(a) - {"digitale", "servizio"}
         if not sue:
             con.close()
             if a["consegna"] == "digitale":
                 raise HTTPException(400, f"«{a['titolo'][:40]}» si consegna "
                     f"solo come codice online: si compra da solo, "
                     f"fuori dal set")
+            if a["consegna"] == "servizio":
+                raise HTTPException(400, f"«{a['titolo'][:40]}» è una "
+                    f"prestazione: si compra da sola, fuori dal set")
             raise HTTPException(400, f"«{a['titolo'][:40]}» non dichiara "
                 f"una modalità di consegna: si compra da solo, "
                 f"fuori dal set")
@@ -18572,6 +18590,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # com'era per 'entrambe'), il digitale solo se e' l'unica
         scelta = ("spedizione" if "spedizione" in disponibili
                   else "ritiro" if "ritiro" in disponibili
+                  else "servizio" if "servizio" in disponibili
                   else "digitale")
 
     # La VIA della spedizione (ago 2026, pagina d'acquisto): 'casa' e'

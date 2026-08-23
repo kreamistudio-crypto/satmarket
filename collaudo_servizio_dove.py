@@ -92,8 +92,18 @@ def avvio():
     async def zitta(*a, **k):
         return None
 
+    async def invoice_finta(sats, memo, expiry=None):
+        return {"payment_hash": "hashcollaudo",
+                "payment_request": f"lnbc{sats}collaudo"}
+
+    async def cambio_finto():
+        return 100_000.0
+
     server.moderazione_ai = ok_ai
     server.notifica = zitta
+    server.crea_invoice_escrow = invoice_finta
+    server.invoice_pagata = lambda *a, **k: False
+    server.cambio_btc_eur = cambio_finto
     server.polso_ordini_admin = lambda *a, **k: None
     server.avvisa_admin_annuncio = zitta if hasattr(server, "avvisa_admin_annuncio") else None
     return db
@@ -115,6 +125,20 @@ def modifica(aid, corpo):
         return corpo
     SRV.leggi_json = leggi
     return asyncio.run(SRV.modifica_annuncio(aid, None))
+
+
+def compra(corpo):
+    async def leggi(_req):
+        return corpo
+    SRV.leggi_json = leggi
+    return asyncio.run(SRV.compra(None))
+
+
+def preventivo(corpo):
+    async def leggi(_req):
+        return corpo
+    SRV.leggi_json = leggi
+    return asyncio.run(SRV.preventivo_ordine(None))
 
 
 def main():
@@ -187,6 +211,31 @@ def main():
     x = riga(a1)
     prova("cambiata strada: dove e durata si azzerano", ("", 0),
           (x["servizio_dove"], x["durata_min"]))
+
+    # --- LA STRADA ESISTE (ago 2026, con la leva gia' accesa in
+    # produzione): `strade_annuncio` non conosceva 'servizio', quindi
+    # l'ordine nasceva su '' — senza appuntamento, senza solleciti, e
+    # segna_spedito lo accettava. Qui il giro VERO: preventivo e compra.
+    chi({"id": 111, "nome": "Compra", "first_name": "Compra",
+         "username": "compra"})
+    prv = preventivo({"annuncio_id": a3, "quantita": 1})
+    vie = [v["via"] for v in prv["strade"]]
+    prova("il preventivo enumera la via 'servizio'", ["servizio"], vie)
+    ordine = compra({"annuncio_id": a3, "quantita": 1})
+    o = vero.execute("SELECT consegna_scelta, spedizione_sats FROM ordini "
+                     "WHERE id=?", (ordine["ordine_id"],)).fetchone()
+    prova("compra senza scelta: l'ordine nasce su 'servizio'", "servizio",
+          o["consegna_scelta"])
+    prova("...senza spedizione", 0, o["spedizione_sats"])
+    alza("una via che non offre: 400",
+         lambda: compra({"annuncio_id": a3, "quantita": 1,
+                         "consegna": "spedizione"}), "modalit")
+    alza("il carrello la rifiuta, col suo messaggio",
+         lambda: compra({"righe": [{"annuncio_id": a3, "quantita": 1},
+                                   {"annuncio_id": a2, "quantita": 1}]}),
+         "prestazione")
+    chi({"id": 222, "nome": "Vende", "first_name": "Vende",
+         "username": "vende"})
 
     # --- la vetrina li porta (CAMPI_VETRINA)
     v = asyncio.run(SRV.annuncio_singolo(a3)) if hasattr(SRV, "annuncio_singolo") else None
