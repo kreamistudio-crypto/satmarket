@@ -16048,12 +16048,162 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   silenzio. Qui il conto esatto non serve: se dopo il ciclo c'è ancora
   un `url`, c'è ancora una pagina — lo dice Shopify stesso nel suo
   header, quindi è esatto e non un'euristica.
-  QUELLO CHE NON C'È ANCORA, dichiarato: gli endpoint e il cassetto
-  (tappa 5). E `origine_scorta` — la coordinata che serve al
-  decremento — NON esiste come colonna: è fase 2, e non si aggiunge
-  una colonna per una cosa che non c'è (il precedente di
-  `banner_sbloccato_il`); il traduttore la LEGGE già perché costa zero
-  e sta nella stessa risposta.
+  IL CASSETTO E I SUOI ENDPOINT (ago 2026, tappa 5): «🏪 Il tuo
+  negozio» nel Profilo — collega, metti in pausa, aggiorna ora,
+  scollega. Sta accanto a «📥 Importa in blocco» e NON fra le
+  politiche di negozio più in basso: quei due rispondono alla STESSA
+  domanda — come fai entrare il tuo catalogo — e il collegamento è la
+  versione che si tiene in pari da sola, l'import CSV quella
+  una-tantum. Il nome del cassetto non è una scelta di adesso: lo
+  fissava già la notifica del collegamento rotto, che manda «dal
+  Profilo, in «🏪 Il tuo negozio»».
+  LE DUE COSE CHE RENDONO QUESTA TAPPA DIVERSA DALLE SORELLE
+  (spedizioniere, sconto, ferie), ed è la ragione per cui non è un
+  copia-incolla del loro pattern.
+  1) QUI SI SCRIVE UNA CREDENZIALE SU UN SISTEMA DI UN ALTRO. Non
+  esce mai più dal server, e la garanzia è la FORMA:
+  `_connettore_pubblico` ELENCA i campi che escono invece di prendere
+  la riga intera e toglierne uno — la regola di `CAMPI_VETRINA`, e la
+  differenza si vede fra sei mesi, quando la colonna nuova uscirebbe
+  da sola dalla blacklist e resta dentro con la whitelist. E senza
+  `CHIAVE_CONTENUTI_DIGITALI` il collegamento si RIFIUTA col 503: è il
+  patto dell'indirizzo di casa, parola per parola — un PIN di ritiro
+  in chiaro è una degradazione accettabile, un token che può scrivere
+  sul negozio di qualcuno no. In collaudo si scrive `plain:`, la
+  stessa deroga, o il mercatino di prova non potrebbe collegare
+  niente.
+  2) SI PROVA PRIMA DI CREDERCI, il patto di `/canale`: il
+  collegamento si salva SOLO se il catalogo si legge davvero, e il 400
+  porta il motivo VERO («ha risposto 401» manda a rifare il token,
+  «non è un https» a correggere l'indirizzo). Senza, un token
+  sbagliato lascerebbe in piedi una riga «attiva» che non porta
+  niente, e a dirlo ci vorrebbero CINQUE giri dell'orologio — cioè
+  cinque ore di silenzio. Si legge UNA pagina con tetto UNO: non
+  interessa il catalogo, interessa che la porta si apra — e su Woo
+  passa da lì anche la domanda sull'IVA, che è la cosa più utile da
+  sentirsi dire adesso invece che al primo giro.
+  MA LA PROVA COSTA UNA CHIAMATA DI RETE, quindi si fa SOLO quando
+  cambia qualcosa che il negozio possa rifiutare — le chiavi o
+  l'indirizzo: correggere una tariffa a negozio giù dev'essere
+  possibile, che quella è una dichiarazione NOSTRA e non una domanda
+  a loro.
+  CHIAVE ASSENTE = CONSERVA, il patto dello stock e della tariffa
+  punto, e qui vale per le CREDENZIALI: si corregge una tariffa senza
+  ribattere il token, e un client rimasto in cache non svuota un campo
+  che non conosce. Nel cassetto il campo delle chiavi nasce VUOTO
+  anche in modifica — non tornano mai indietro dal server — e vuoto
+  vuol dire «lascia quelle di prima», scritto nel segnaposto.
+  LA DICHIARAZIONE SCENDE SU TUTTE LE RIGHE DI QUEL NEGOZIO
+  (`_applica_dichiarazione`), non solo su quelle che arriveranno: è
+  quel che lo schema promette da sempre («si dichiara qui, UNA volta,
+  e vale per tutte le righe»), e senza sarebbe falso per il pregresso
+  — `riconcilia_connettore` non ricopre MAI la consegna, e la Modifica
+  sugli annunci di un connettore è chiusa apposta, quindi chi sbaglia
+  la prima dichiarazione se la terrebbe addosso per sempre su
+  duecento annunci. La GEOGRAFIA segue la zona (lat, lon, regione):
+  è derivata e non chiesta, e senza quel pezzo la sigla cambierebbe
+  in vetrina mentre il filtro per regione direbbe quella di ieri. I
+  'rimosso' restano com'erano: quella è storia.
+  ⚠️ DA QUI LA SENTINELLA DELL'UNICO UPDATE HA CAMBIATO LATO: i posti
+  che scrivono `consegna=?` sono QUATTRO — tre su `annunci` (modifica,
+  modifica firmata, la dichiarazione) e il quarto sulla riga del
+  COLLEGAMENTO, che è un'altra tabella. Non è un allentamento: quel
+  che la prova continua a garantire è che il terzo sia legato a
+  `connettore_id`, cioè che non possa toccare un nativo né un
+  importato da Nostr.
+  LA PAUSA NON È LO SCOLLEGAMENTO: in pausa si smette di LEGGERE (il
+  giro filtra `stato='attivo'`) e GLI ANNUNCI RESTANO — il prezzo
+  dichiarato è che da lì la giacenza qui può divergere da quella di
+  là, ed è esattamente quel che si vuole mentre si sistema qualcosa
+  sul proprio negozio. Riaccendere AZZERA il conto degli errori, ed è
+  il gesto vero dopo aver rifatto un token; l'errore scritto invece
+  RESTA in pausa, che è l'unica cosa da leggere lì.
+  SCOLLEGARE TAGLIA IL PONTE: la riga se ne va (lo schema lo dice —
+  «la riga È il registro, e scollegare è cancellarla») e gli annunci
+  si SPENGONO, che non è un di più: senza il giro che li tiene in
+  pari la loro giacenza mentirebbe entro un giorno, e si venderebbe
+  qui roba che di là non c'è più. NON blocca sugli affari in corso —
+  gli ordini coi sats in cassaforte vivono per conto loro e il
+  venditore deve spedirli comunque, mentre bloccare vorrebbe dire che
+  un catalogo da duecento righe non si scollega finché l'ultimo
+  ordine non è chiuso. Le USCITE se ne vanno con lui: un registro di
+  un negozio che non c'è più non lo legge nessuno, perché il giro che
+  lo spegnerebbe non passerà mai.
+  RICOLLEGARE È UN CATALOGO NUOVO, dichiarato e detto nel confirm: il
+  match è `connettore_id + chiave`, quindi le righe di ieri non si
+  ritrovano e ne nascono di nuove (le vecchie restano 'rimosso'). È
+  la conseguenza diretta della decisione dello schema, non un
+  incidente.
+  «AGGIORNA ORA» NON ASPETTA LA FINE, ed è deliberato: leggere
+  duecento prodotti e farli passare dalla moderazione può prendere un
+  minuto, e una richiesta HTTP appesa un minuto dentro la WebView di
+  Telegram si legge come un guasto. Parte in sottofondo e il
+  riepilogo arriva dove arriva sempre — la notifica del bot e il
+  report dentro il cassetto.
+  IL FRENO È DOPPIO E NON DUE VOLTE LO STESSO: `ultimo_giro`
+  (`CONNETTORI_SYNC_MANUALE_S`, 300s) è il ritmo verso il negozio
+  DELL'ALTRO, che ha i suoi limiti di richieste — e si scrive in
+  TUTTI E DUE i rami, riuscito e fallito, così un negozio rotto non
+  si può martellare col bottone; `_CONNETTORI_IN_CORSO` para il
+  doppio tocco su rete lenta, dove il freno del tempo non ha ancora
+  niente da guardare. Quella guardia sta DENTRO `_un_connettore` e
+  non nei due chiamanti: sarebbero due posti da tenere in pari e un
+  terzo da ricordarsi domani — e il caso non è teorico, il tocco e
+  l'orologio possono capitare insieme e due riconciliazioni
+  concorrenti sullo stesso catalogo si scriverebbero addosso (le
+  sparizioni si giudicano su ciò che l'altra sta ancora scrivendo).
+  Il giro a mano NON tocca l'appuntamento del giro grande, che è di
+  tutti.
+  IL PRIMO GIRO PARTE SUBITO dopo il collegamento, e solo alla
+  nascita: chi ha appena visto che il catalogo si legge non deve
+  aspettare l'ora tonda per vedere un annuncio. Sui ritocchi no — la
+  dichiarazione è già scesa sulle righe, e rileggere il negozio non
+  aggiungerebbe niente.
+  LE STRADE DICHIARABILI SONO LE TRE FISICHE (`CONSEGNE_NEGOZIO`):
+  niente 'digitale' — il codice si consegna premendo un bottone QUI, e
+  un e-commerce quel bottone non ce l'ha, la stessa regola già scritta
+  per i tag NIP-99 — e niente 'servizio', che non è merce che viaggia.
+  `FONTI_NEGOZIO` è il gemello di `importa_negozio.LETTORI` e vive nel
+  server perché il client deve poter offrire le piattaforme senza
+  sapere niente del modulo; a tenerli in pari c'è una prova, che due
+  cataloghi divergenti offrirebbero un collegamento che poi nessun
+  lettore sa leggere. I NOMI da mostrare li dà `NOMI_ORIGINE`, che è
+  l'unico posto dove «woo» diventa «WooCommerce».
+  LA ZONA RIPETE LE DUE REGOLE DEL FORM VENDI invece di passare da
+  `guardia_zona_condizione`: quello è il giudice unico di pubblica e
+  modifica ma chiede anche la CONDIZIONE, che un annuncio nato da un
+  negozio non ha e non può avere (la fonte non la dichiara, e non si
+  inventa) — piegarlo per riusarlo vorrebbe dire dargli un permesso
+  in più, la stessa ragione per cui `salva_punto_ritiro` non riusa
+  `rete_da_payload`. Il precedente è l'import CSV, che la stessa
+  regola la ripete con le parole della sua superficie. IL MESSAGGIO
+  invece resta UNO (`messaggio_zona_storta`): è la metà che non deve
+  divergere.
+  ⚠️ LA TRAPPOLA DEL NOME, ed è la cosa che questo cantiere ha
+  scoperto per caso: il cassetto era nato con un `_url_negozio` suo, e
+  un `_url_negozio` ESISTEVA GIÀ — quello degli indirizzi parlanti,
+  duemila righe più in giù. Python non fiata: l'ultimo `def` vince,
+  quindi l'endpoint avrebbe chiamato in silenzio la funzione del
+  cantiere SEO, e la prima cosa a esplodere è stata una prova di
+  tutt'altro. È la stessa famiglia della chiave doppia in `acqDati` —
+  codice lecito, significato sbagliato — e a quel livello non guardava
+  nessuno: da lì il CENSIMENTO dei `def` di primo livello di
+  server.py, che oggi passa con zero duplicati e domani prende il
+  successivo il giorno stesso.
+  `PAUSA_PAGINE_SHOPIFY` NON C'È PIÙ (ago 2026): era una costante che
+  prometteva una pausa fra due pagine e non la prendeva NESSUNO — la
+  stessa famiglia dell'`except` che non può scattare, che «promette
+  una guardia che nessuno esercita». Il limite di Shopify (2
+  richieste al secondo) resta vero e resta lontano: col tetto a 200 e
+  la pagina da 250 la seconda pagina quasi non esiste, e ogni giro
+  costa comunque un round-trip. Chi un domani alzasse
+  `MAX_PRODOTTI_CONNETTORE` fino a paginare davvero rimetta una pausa
+  VERA dentro il ciclo, non una costante accanto.
+  QUELLO CHE NON C'È ANCORA, dichiarato: `origine_scorta` — la
+  coordinata che serve al decremento — NON esiste come colonna: è
+  fase 2, e non si aggiunge una colonna per una cosa che non c'è (il
+  precedente di `banner_sbloccato_il`); il traduttore la LEGGE già
+  perché costa zero e sta nella stessa risposta.
 - `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
   il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
   rimasti nelle caselle di ieri (un portatile in «Elettronica» invece
@@ -19946,6 +20096,49 @@ DA GUARDARE al rodaggio: la PRIMA vendita vera su un annuncio
 importato — che il venditore legga la riga del magazzino e che il
 giro d'ora dopo non gli rialzi la giacenza — e il primo reso, che è
 il caso in cui il registro deve tornare in pari da solo.
+
+E la TAPPA 5 (ago 2026), che chiude la FASE 1: «🏪 Il tuo negozio»
+nel Profilo e i suoi cinque endpoint — collega, pausa, aggiorna ora,
+scollega, e la lista. Fin qui il collegamento si scriveva a mano nel
+database (il collaudo lo faceva, e lo dichiarava). Vedi la voce in
+Architettura, «IL CASSETTO E I SUOI ENDPOINT», per le due righe che
+rendono questa tappa diversa dalle sorelle — la credenziale su un
+sistema di un altro (whitelist in uscita, 503 senza chiave) e il «si
+prova prima di crederci» — e per la dichiarazione che scende anche
+sul pregresso, senza la quale un errore alla prima riga sarebbe per
+sempre su duecento annunci.
+Nello stesso giro le tre code rimaste: i cinque `.index()` di
+`prove_connettori_sync` diventati `find()` (la forma che è già
+esplosa due volte mangiandosi le sorelle), `PAUSA_PAGINE_SHOPIFY`
+tolta perché prometteva una pausa che nessuno prendeva, e le chiavi
+WooCommerce (`ck_`/`cs_` più 40 esadecimali) entrate nello scanner dei
+segreti — sono il primo segreto del progetto che non passa da
+config_esempio.py, quindi si riconoscono dalla FORMA come la nsec.
+Collaudata: 5193 prove verdi (86 nuove, e una che ha CAMBIATO LATO
+col perché scritto) più `collaudo_connettori.py` a 94 verdi (era 69),
+dove gli endpoint girano PER DAVVERO — il token sbagliato che non
+lascia una riga scritta, il JSON in cui le chiavi non compaiono né
+come campo né come valore, la dichiarazione che scende sul pregresso,
+la pausa, i due freni del bottone, l'estraneo che riceve la stessa
+risposta di un id inesistente, e lo scollegamento che non lascia il
+registro orfano. Più 23 mutazioni, una per riga sorvegliata.
+E UN DIFETTO TROVATO DALLE PROVE E NON DALLA RILETTURA, che vale più
+della cura: il cassetto era nato con un `_url_negozio` suo e quel nome
+ESISTEVA GIÀ nel file (gli indirizzi parlanti) — Python non fiata,
+l'ultimo `def` vince, e l'endpoint avrebbe chiamato in silenzio la
+funzione del cantiere SEO. Da lì il censimento dei `def` duplicati.
+IN PRODUZIONE il deploy non cambia niente: nessuna colonna, nessuna
+migrazione, e `CONNETTORI_NEGOZIO_APERTI` è ancora SPENTA nel codice
+— quindi il cassetto non compare a nessuno finché la riga non entra
+nel config del VPS.
+⚠️ E QUELLA RIGA IN `config_esempio.py` NON C'È: la leva ha il suo
+default nel codice e funziona, ma chi va a cercarla dove si copiano
+le altre non la trova. Va aggiunta prima del rodaggio.
+DA GUARDARE quando si accenderà, ed è il pezzo che in locale non si
+può fare: il primo collegamento vero a uno store di sviluppo — che il
+401 di un token sbagliato arrivi come un 400 leggibile, che il
+WooCommerce coi prezzi al netto si rifiuti dicendo perché, e che il
+primo giro dopo il collegamento entri da solo senza aspettare l'ora.
 
 La barra delle pillole si legge (ago 2026, due cose dal campo): la
 pillola del reparto scelto si porta al CENTRO della fila invece di
