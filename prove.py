@@ -10589,6 +10589,319 @@ def prove_reti_corriere():
 
 
 # ====================================================================
+
+def prove_interesse():
+    """IL LIKE SULLE FUNZIONI IN ARRIVO (ago 2026).
+
+    Le due pagine «Qualcosa di nuovo e' in arrivo» dicevano che
+    qualcosa arriva e basta: adesso chi ci capita puo' dire «lo
+    aspetto», e il totale si vede. Serve a decidere quale cantiere
+    aprire per primo.
+    Le sentinelle qui sotto dicono che i pezzi esistono; a dire che
+    RISPONDONO giusto sono le due famiglie che GIRANO — il toggle su
+    sqlite in memoria e renderInteresse con node."""
+    print("\n[il like sulle funzioni in arrivo]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA WHITELIST, che e' il recinto ----------------------
+    # Quel nome arriva dal CLIENT e finisce in una colonna: senza il
+    # recinto chiunque puo' riempire la tabella di funzioni che non
+    # esistono, e il giorno che se ne aggiunge una vera i conti sono
+    # gia' sporchi. E' il patto di TIMBRI_SUGGERIMENTO.
+    prova("le funzioni in arrivo sono una whitelist", True,
+          'INTERESSI = ("p2p", "aste")' in src)
+    tog = pezzo("toggle_interesse")
+    prova("...e l'endpoint la controlla", True,
+          "if funzione not in INTERESSI:" in tog)
+    # PRIMA dell'INSERT: dopo, la riga sarebbe gia' scritta.
+    prova("...PRIMA di scrivere qualunque cosa", True,
+          tog.index("not in INTERESSI") < tog.index("INSERT INTO interessi"))
+    # Autenticazione obbligatoria: un like senza identita' si conta
+    # due volte, e il numero e' l'unica cosa che questa rotta produce.
+    prova("l'identita' e' obbligatoria", True,
+          "verifica_utente(" in tog and "utente_se_autenticato" not in tog)
+    # Il patto anti-doppione: niente await fra la lettura e l'INSERT.
+    prova("niente await nel corpo (il blocco resta atomico)", False,
+          "await " in codice(tog))
+    # Prima si prova a togliere, come nel gemello: il like si leva
+    # comunque, anche da una riga di una funzione uscita di catalogo.
+    prova("prima si toglie, poi si mette", True,
+          tog.index("DELETE FROM interessi") < tog.index("INSERT INTO interessi"))
+
+    # --- 2) CHI HA VOTATO NON ESCE MAI ---------------------------
+    # Il numero e' pubblico e anonimo, i nomi no: la regola di
+    # _conta_savers, e qui la si guarda dove potrebbe rompersi.
+    conta = pezzo("_conta_interessi")
+    prova("il conteggio non seleziona nessun tg_id", True,
+          "tg_id" not in conta.split('"""')[-1])
+    tutti = pezzo("_interessi_tutti")
+    prova("...e nemmeno quello di tutte le funzioni", True,
+          "tg_id" not in tutti.split('"""')[-1])
+
+    # --- 3) I DUE CANALI -----------------------------------------
+    # I TOTALI stanno nella busta di PRIMA PAGINA e non in /api/me, ed
+    # e' la stessa ragione per cui ci sta `asta_abilitata`: in vetrina
+    # /api/me non esiste, e senza questa riga l'anonimo vedrebbe la
+    # pagina muta.
+    lista = pezzo("lista_annunci")
+    prova("i totali viaggiano nella busta di prima pagina", True,
+          'risposta["interessi"] = _interessi_tutti(con)' in lista)
+    me = pezzo("mio_profilo")
+    prova("il MIO like sta in /api/me", True,
+          'profilo["interessi_miei"] = interessi_miei' in me)
+    # ...e si legge con la connessione ancora aperta, come i punti
+    prova("...letto prima della close", True,
+          me.index("_interessi_miei(con") < me.index("con.close()"))
+
+    # --- 4) LA FUSIONE, e il GESTO e non il nome ------------------
+    # Il censimento delle tabelle figlie (in prove_punti_salvati)
+    # cerca la stringa `interessi` in tutta la funzione, e i DELETE la
+    # nominano lo stesso: resterebbe verde anche togliendo la
+    # migrazione. Qui si chiede il GESTO — ed e' la lezione scritta
+    # per `connettori`.
+    fus = pezzo("esegui_fusione")
+    prova("la fusione migra i like", True,
+          "UPDATE OR IGNORE interessi SET tg_id=? WHERE tg_id=?" in fus)
+    # LA LITURGIA DEI VICINI E NON L'UPDATE SECCO: la PK contiene il
+    # tg_id, quindi le due meta' possono aver votato tutt'e due la
+    # stessa funzione — e li' l'UPDATE secco ALZA (provato piu' sotto,
+    # girandolo). Due meta' della stessa persona non valgono due voti.
+    prova("...in unione, come i preferiti", True,
+          "DELETE FROM interessi WHERE tg_id=?" in fus)
+
+    # --- 5) IL CLIENT: markup fisso, mai interpolazioni -----------
+    # LA RIGA DA NON ROMPERE: le due viste sono markup FISSO, e il
+    # segnaposto esiste apposta per non tradirlo (il pattern di
+    # #pionieriRiga e dei data-tempo). La sentinella storica «la vista
+    # P2P e' markup fisso» vive piu' su e deve restare verde: qui si
+    # guarda che il blocco nuovo sia fatto per non romperla.
+    for f in ("p2p", "aste"):
+        prova(f"il segnaposto c'e' nella vista {f}", True,
+              f'<div class="interesse" id="interesse-{f}" '
+              f'data-funzione="{f}" style="display:none">' in mini)
+    # display:none e non `hidden`: una regola d'autore col display
+    # scavalca l'attributo (la lezione delle select nascoste).
+    prova("...nascosto col display e non con hidden", False,
+          'class="interesse"' in mini and 'data-funzione="p2p" hidden' in mini)
+    ren = pezzo_js(mini, "function renderInteresse(){", "\n}")
+    prova("il render scrive con textContent, mai innerHTML", True,
+          "textContent" in ren and "innerHTML" not in ren)
+
+    # --- 6) IL NUMERO LO SCRIVE IL SERVER ------------------------
+    # Mai un +/-1 a occhio: qui il conto E' la sostanza della pagina.
+    tg = pezzo_js(mini, "async function toggleInteresse(f){", "\n}")
+    prova("il client non calcola il numero", True,
+          "d.quanti" in tg
+          and not re.search(r"interessiServer\[f\]\s*[+-]{2}", tg)
+          and not re.search(r"interessiServer\[f\]\s*[+-]=", tg))
+    # La guardia del doppio tocco e' una BANDIERINA, non il velo che
+    # blocca l'app: quello e' per i gesti irreversibili sui sats, e
+    # attesaRitardata ha un censimento che nomina i suoi chiamanti.
+    prova("la guardia e' una bandierina, non il velo dei sats", True,
+          "interesseInCorso" in tg
+          and "bottoneInAttesa" not in tg and "attesaRitardata" not in tg)
+    # In vetrina non si vota: serve un'identita', o la stessa persona
+    # vale due voti. La porta e' quella di sempre.
+    prova("in vetrina il tocco apre l'invito", True,
+          "if (VETRINA)" in tg and "invitoTelegram(" in tg)
+    prova("...e in demo non si scrive niente", True, "if (DEMO)" in tg)
+
+    # --- 7) IL RENDER SI CHIAMA DA go(), non dai due tab ---------
+    # E' la riga che leggendo non si vede: vaiP2P/vaiAste sono gli
+    # ingressi dal TAB, ma alle stesse viste ci si torna col gesto
+    # indietro e dalla cronologia — che cadono nel go(b.v) generico di
+    # navRendiVista e da vaiP2P non passano mai.
+    g = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("il like si ridisegna dal ramo di go()", True,
+          "if (view==='p2ppresto' || view==='astepresto') renderInteresse();"
+          in g)
+    prova("...e non da vaiP2P", False,
+          "renderInteresse" in pezzo_js(mini, "function vaiP2P(){", "\n}"))
+    # e i due canali lo richiamano quando atterrano (arrivano
+    # separati, e la pagina puo' essere gia' aperta)
+    prova("la busta di prima pagina lo ridisegna", True,
+          "if (j.interessi) { interessiServer = j.interessi; "
+          "renderInteresse(); }" in mini)
+    prova("...e /api/me pure", True,
+          "interessiMiei = me.interessi_miei || [];" in mini)
+
+    # --- 8) LA PROMESSA, e il debito che apre --------------------
+    # Il like NON e' solo un termometro: e' anche un'iscrizione
+    # (decisione di Andrea), quindi il testo lo dice PRIMA del tocco —
+    # chi preme deve saperlo, o scoprirebbe di essersi iscritto a
+    # qualcosa dopo averlo fatto.
+    prova("la pagina promette l'avviso, e prima del tocco", 2,
+          mini.count("Ti avvisiamo appena arriva</div>"))
+    # ...e la promessa ha un debito scritto dove chi accendera' la
+    # funzione ci passa per forza. Se un domani si toglie la promessa
+    # dal testo, si tolga anche il debito — e viceversa.
+    i = src.index("CREATE TABLE IF NOT EXISTS interessi(")
+    schema = src[i:src.index("PRIMARY KEY(tg_id, funzione)", i)]
+    prova("il debito e' scritto sulla tabella", True,
+          "avvisa_sconto_su_mono" in schema and "timbri" in schema)
+
+    # --- 9) «TORNA AL MERCATINO» SCENDE A GHOST ------------------
+    # L'arancio e' del gesto principale, e su questa pagina il gesto
+    # principale e' diventato il like: due pieni in fila si farebbero
+    # concorrenza (la regola del recinto escrow).
+    prova("l'uscita e' un ghost, non un secondo pieno", 0,
+          mini.count('<button class="btn orange" onclick="vaiEsplora()">'))
+
+    prove_interesse_gira()
+
+
+def prove_interesse_gira():
+    """Il toggle e la fusione fatti GIRARE su sqlite in memoria.
+
+    Una sentinella dice che la PK c'e'; solo girandola si vede che il
+    secondo like della stessa persona non raddoppia il conto, e che la
+    fusione di due meta' che hanno votato tutt'e due lascia UNA riga —
+    che e' il caso per cui li' serve `UPDATE OR IGNORE` e non l'UPDATE
+    secco dei `connettori`."""
+    import sqlite3
+    src = _SORGENTE
+    i = src.index("CREATE TABLE IF NOT EXISTS interessi(")
+    schema = src[i:src.index("ON interessi(funzione);", i)
+                 + len("ON interessi(funzione);")]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    amb = {"sqlite3": sqlite3, "INTERESSI": ("p2p", "aste")}
+    for nome in ("_conta_interessi", "_interessi_tutti", "_interessi_miei"):
+        exec(pezzo(nome), amb)
+
+    def like(tg, f):
+        """Il cuore dell'endpoint: prima togliere, poi mettere."""
+        tolto = con.execute(
+            "DELETE FROM interessi WHERE tg_id=? AND funzione=?",
+            (tg, f)).rowcount
+        if not tolto:
+            con.execute("INSERT INTO interessi(tg_id, funzione, creato) "
+                        "VALUES(?,?,?)", (tg, f, 0))
+        con.commit()
+        return not tolto
+
+    prova("il like si mette", True, like(111, "p2p"))
+    prova("...e si conta", 1, amb["_conta_interessi"](con, "p2p"))
+    like(111, "p2p")
+    like(111, "p2p")
+    prova("lo stesso utente non raddoppia (la PK)",
+          1, amb["_conta_interessi"](con, "p2p"))
+    like(222, "p2p")
+    like(222, "aste")
+    prova("due persone contano due", 2, amb["_conta_interessi"](con, "p2p"))
+    prova("i totali escono per funzione",
+          {"p2p": 2, "aste": 1}, amb["_interessi_tutti"](con))
+    prova("i miei sono i miei",
+          ["aste", "p2p"], sorted(amb["_interessi_miei"](con, 222)))
+    like(222, "p2p")
+    prova("il like si toglie", 1, amb["_conta_interessi"](con, "p2p"))
+
+    # LA FUSIONE, col caso che conta: due meta' che hanno votato
+    # tutt'e due la STESSA funzione.
+    like(222, "p2p")
+    prova("prima della fusione i voti sono due",
+          2, amb["_conta_interessi"](con, "p2p"))
+    con.execute("UPDATE OR IGNORE interessi SET tg_id=? WHERE tg_id=?",
+                (111, 222))
+    con.execute("DELETE FROM interessi WHERE tg_id=?", (222,))
+    con.commit()
+    prova("la fusione ne lascia UNO", 1, amb["_conta_interessi"](con, "p2p"))
+    prova("...e non perde l'altra funzione",
+          1, amb["_conta_interessi"](con, "aste"))
+    prova("...e non lascia righe orfane", 0, con.execute(
+        "SELECT COUNT(*) FROM interessi WHERE tg_id=222").fetchone()[0])
+
+    # E il perche' della liturgia: l'UPDATE secco ALZA. Se un domani
+    # qualcuno lo «semplifica», la fusione non fallisce con una riga
+    # sbagliata — fallisce del tutto, in mezzo a una transazione.
+    con.execute("INSERT INTO interessi VALUES(333,'p2p',0)")
+    alza = False
+    try:
+        con.execute("UPDATE interessi SET tg_id=? WHERE tg_id=?", (111, 333))
+    except sqlite3.IntegrityError:
+        alza = True
+    prova("l'UPDATE secco alzerebbe (per questo serve OR IGNORE)",
+          True, alza)
+    con.close()
+
+    prove_interesse_client()
+
+
+def prove_interesse_client():
+    """renderInteresse fatta GIRARE con node su un DOM di cartone.
+
+    Le sentinelle dicono che la funzione c'e' ed e' una; a dire che a
+    zero scrive «Sii il primo» e che in DEMO non disegna niente c'e'
+    solo questa. Senza node si SALTA contando (il patto di salta): in
+    CI, con PROVE_SEVERE, una saltata vale una fallita."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("il like risponde giusto sui suoi stati",
+              "node non installato")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index("function renderInteresse(){")
+    corpo = mini[i:mini.index("\n}\n", i) + 3]
+    mano, spunta = chr(0x270B), chr(0x2713)
+    stub = """
+globalThis.fmt = n => String(n);
+function box(f){
+  const dentro = {btn:{textContent:'',className:'',attrs:{},
+                       setAttribute(k,v){this.attrs[k]=v}},
+                  conta:{textContent:''}};
+  return {dataset:{funzione:f}, style:{display:''},
+          querySelector: s => s === '.btn' ? dentro.btn : dentro.conta,
+          _d: dentro};
+}
+const BOXES = [box('p2p'), box('aste')];
+globalThis.document = { querySelectorAll: () => BOXES };
+"""
+    casi = [
+        ("il like da mettere: arancio e il conto",
+         False, {"p2p": 12, "aste": 0}, [],
+         {"display": "", "btn": mano + " Lo aspetto", "cls": "btn orange",
+          "conta": "12 lo aspettano", "pressed": "false"}),
+        ("il like gia' messo: ghost e aria-pressed",
+         False, {"p2p": 12, "aste": 0}, ["p2p"],
+         {"btn": spunta + " Lo aspetti", "cls": "btn ghost",
+          "pressed": "true"}),
+        ("a zero si dice «Sii il primo», mai uno zero",
+         False, {"p2p": 0, "aste": 0}, [], {"conta": "Sii il primo"}),
+        ("e uno solo lo aspetta, al singolare",
+         False, {"p2p": 1, "aste": 0}, [], {"conta": "1 lo aspetta"}),
+        ("in DEMO il blocco non c'e' affatto",
+         True, {"p2p": 12, "aste": 3}, [], {"display": "none"}),
+        ("busta mai arrivata: un'assenza, non uno zero",
+         False, None, [], {"display": "none"}),
+    ]
+    for nome, demo, srv, miei, atteso in casi:
+        js = (stub
+              + "\nglobalThis.DEMO = %s;" % _json.dumps(demo)
+              + "\nlet interessiServer = %s;" % _json.dumps(srv)
+              + "\nlet interessiMiei = %s;\n" % _json.dumps(miei)
+              + corpo
+              + "\nrenderInteresse();\nconst b = BOXES[0];"
+              + "\nconsole.log(JSON.stringify({display:b.style.display,"
+                "btn:b._d.btn.textContent, cls:b._d.btn.className,"
+                "conta:b._d.conta.textContent,"
+                "pressed:b._d.btn.attrs['aria-pressed']}));")
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as f:
+            f.write(js)
+            percorso = f.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", timeout=30)
+        os.unlink(percorso)
+        if r.returncode:
+            prova(nome, "esce pulito", (r.stderr or "").strip()[:120])
+            continue
+        avuto = _json.loads(r.stdout)
+        prova(nome, atteso, {k: avuto.get(k) for k in atteso})
+
+# ====================================================================
 def prove_punti_salvati():
     """I PUNTI DI RITIRO CHE CHI COMPRA SI TIENE (ago 2026).
 
@@ -26319,6 +26632,7 @@ def main():
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_barattolo_in_testata,
+              prove_interesse,
               prove_barattolo_filtra,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr,

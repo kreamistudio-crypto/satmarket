@@ -2213,6 +2213,49 @@ def init_db():
     -- — sarebbe una scansione della tabella intera.
     CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
       ON preferiti(annuncio_id);
+    CREATE TABLE IF NOT EXISTS interessi(
+        -- «lo aspetto»: il like sulle funzioni ancora da costruire
+        -- (ago 2026). Le pagine «Qualcosa di nuovo e' in arrivo»
+        -- dicevano che qualcosa arriva e basta: chi ci capitava non
+        -- aveva modo di dire che la aspetta, e noi non sapevamo
+        -- quanti fossero. Serve a decidere quale cantiere aprire per
+        -- primo.
+        -- UNA TABELLA E NON DUE COLONNE SU `utenti`, ed e' il punto
+        -- che decide tutto il resto: «un like per persona» e' la PK e
+        -- non un controllo da ricordare, «si puo' togliere» e' il
+        -- DELETE, il totale e' un COUNT — e soprattutto la funzione
+        -- in arrivo di domani costa ZERO migrazioni. Con le colonne
+        -- ogni «coming soon» futuro sarebbe una colonna, un backfill
+        -- e un punto in piu' in /api/me: la stessa decisione presa
+        -- tre volte.
+        -- CHI ha messo il like non esce MAI, come per `preferiti`: il
+        -- numero e' pubblico e anonimo, i nomi no.
+        -- ATTENZIONE, IL DEBITO CHE QUESTA TABELLA APRE (decisione di
+        -- Andrea): il like NON e' solo un termometro, e' anche
+        -- un'ISCRIZIONE — il testo della pagina promette «ti
+        -- avvisiamo appena arriva». Quindi il cantiere che ACCENDERA'
+        -- una di queste funzioni deve mandare il messaggio a chi sta
+        -- qui dentro, e la forma e' gia' decisa cosi' non si
+        -- ridiscute: una funzione una-tantum col timbro in `timbri`,
+        -- il calco di `avvisa_sconto_su_mono` — timbro PRIMA degli
+        -- invii (un errore di rete puo' perdere un avviso di
+        -- cortesia, mai raddoppiarlo), `notifica()` per il
+        -- multi-canale, il journal che nomina i destinatari.
+        -- Non si costruisce oggi: non si aggiunge codice per una
+        -- cosa che non esiste ancora.
+        -- E se un domani si togliesse la promessa dal testo, si tolga
+        -- anche questo debito — e viceversa.
+        tg_id INTEGER NOT NULL,
+        funzione TEXT NOT NULL,       -- 'p2p', 'aste' (whitelist INTERESSI)
+        creato INTEGER,
+        PRIMARY KEY(tg_id, funzione)
+    );
+    -- La PK comincia col tg_id, quindi il conteggio per FUNZIONE —
+    -- che gira su ogni prima pagina della vetrina — senza questo
+    -- indice sarebbe una scansione (la lezione di
+    -- idx_preferiti_annuncio, un piano piu' su).
+    CREATE INDEX IF NOT EXISTS idx_interessi_funzione
+      ON interessi(funzione);
     CREATE TABLE IF NOT EXISTS punti_ritiro(
         -- I punti di ritiro che CHI COMPRA si tiene (ago 2026): il
         -- locker sotto casa non cambia, e riscriverlo a ogni acquisto
@@ -5813,6 +5856,16 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # I like sulle funzioni in arrivo seguono l'utente, e in
+        # UNIONE come i preferiti: la PK contiene il tg_id, quindi le
+        # due meta' possono aver votato tutt'e due la stessa funzione
+        # e la collisione e' reale — con l'UPDATE secco di
+        # `connettori` questa riga alzerebbe. Una sola riga basta, ed
+        # e' anche cio' che tiene onesto il conteggio: due meta' della
+        # stessa persona non valgono due voti.
+        con.execute("UPDATE OR IGNORE interessi SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM interessi WHERE tg_id=?", (id_nostr,))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -10068,6 +10121,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ACCESE — cioe' una bugia. Era l'imperfezione dichiarata di
         # aggiornaAstaVisibilita, e questa e' la riga che la chiude.
         risposta["asta_abilitata"] = bool(ASTA_ABILITATA)
+        # QUANTI ASPETTANO LE FUNZIONI IN ARRIVO (ago 2026): il
+        # numero che le due pagine «Qualcosa di nuovo e' in arrivo»
+        # mostrano sotto il bottone. Viaggia qui e non in /api/me per
+        # la stessa ragione della riga sopra: e' PUBBLICO, e in
+        # vetrina /api/me non esiste — senza, l'anonimo vedrebbe la
+        # pagina muta. Gratis: questa risposta il client la chiede
+        # gia' all'avvio, quindi zero giri di rete in piu'.
+        risposta["interessi"] = _interessi_tutti(con)
         # IL CAMBIO, cosi' il client non lo chiede per conto suo (ago
         # 2026): prima ogni browser interrogava CoinGecko da solo — N
         # utenti N chiamate, e soprattutto DUE verita', perche' il «≈»
@@ -10534,6 +10595,92 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
     con.close()
     return {"ok": True, "salvato": not tolto, "conteggio": conteggio,
             "barattoli": barattoli}
+
+
+# ------------------ IL LIKE SULLE FUNZIONI IN ARRIVO -----------------
+# «Lo aspetto» sulle pagine «Qualcosa di nuovo e' in arrivo» (ago
+# 2026). Il calco di toggle_preferito, e non e' una somiglianza
+# casuale: il problema e' lo stesso — un gesto per persona, che si
+# toglie, e un totale pubblico e anonimo.
+#
+# IL NOME DELLA FUNZIONE E' UNA WHITELIST e non testo libero, ed e' la
+# riga da non ammorbidire: quel nome arriva dal CLIENT e finisce in
+# una colonna, quindi senza il recinto chiunque puo' riempire la
+# tabella di funzioni che non esistono — e il giorno che se ne
+# aggiunge una vera i conti sono gia' sporchi. E' il patto di
+# TIMBRI_SUGGERIMENTO, whitelist per la stessa ragione.
+# Chi aggiunge una pagina «in arrivo» aggiunge il suo nome qui, e nel
+# farlo si rilegge il debito scritto sulla tabella.
+INTERESSI = ("p2p", "aste")
+
+
+def _conta_interessi(con, funzione: str) -> int:
+    """Quante persone aspettano QUELLA funzione. Il numero e'
+    pubblico, i nomi no — la regola di _conta_savers, e per la stessa
+    ragione qui dentro non si seleziona nessun tg_id."""
+    return con.execute("SELECT COUNT(*) FROM interessi WHERE funzione=?",
+                       (funzione,)).fetchone()[0]
+
+
+def _interessi_tutti(con) -> dict:
+    """I totali di tutte le funzioni in una query sola: viaggiano
+    nella busta di prima pagina della vetrina, che e' l'unico canale
+    che arriva anche agli ANONIMI (/api/me non ce l'hanno). Le
+    funzioni che non ha ancora votato nessuno non compaiono nel GROUP
+    BY e restano a 0."""
+    conto = {f: 0 for f in INTERESSI}
+    try:
+        for r in con.execute("SELECT funzione, COUNT(*) AS n FROM interessi "
+                             "GROUP BY funzione"):
+            if r["funzione"] in conto:
+                conto[r["funzione"]] = r["n"]
+    except sqlite3.OperationalError:
+        pass          # tabella non ancora creata: zero, mai un errore
+    return conto
+
+
+def _interessi_miei(con, tg_id: int) -> list:
+    """Quali ha gia' votato QUESTA persona: serve al client per sapere
+    se il bottone e' acceso. Sta in /api/me e non nella busta pubblica
+    — e' un fatto suo."""
+    try:
+        return [r["funzione"] for r in con.execute(
+            "SELECT funzione FROM interessi WHERE tg_id=?", (tg_id,))
+            if r["funzione"] in INTERESSI]
+    except sqlite3.OperationalError:
+        return []
+
+
+@app.post("/api/interessi/{funzione}")
+def toggle_interesse(funzione: str, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    # Autenticazione OBBLIGATORIA: un like senza identita' si conta
+    # due volte, e il numero e' l'unica cosa che questa funzione
+    # produce. In vetrina il client non arriva nemmeno qui — apre il
+    # foglio-invito, il patto di startBuy.
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if funzione not in INTERESSI:
+        raise HTTPException(400, "Funzione sconosciuta")
+    con = db()
+    # Prima si prova a togliere, come nel gemello: cosi' il like si
+    # leva comunque, anche da una riga nata quando quella funzione era
+    # ancora in catalogo.
+    tolto = con.execute("DELETE FROM interessi WHERE tg_id=? AND funzione=?",
+                        (user["id"], funzione)).rowcount
+    if not tolto:
+        # Niente await fra qui e il commit: nel server mono-processo il
+        # blocco e' atomico (il patto anti-doppione).
+        con.execute("INSERT INTO interessi(tg_id, funzione, creato) "
+                    "VALUES(?,?,?)",
+                    (user["id"], funzione, int(time.time())))
+    con.commit()
+    # Il numero fresco viaggia nella risposta e il client scrive
+    # QUELLO: mai un +/-1 a occhio, che sbaglia appena due dispositivi
+    # toccano la stessa cosa (la lezione di toggle_preferito). Qui pesa
+    # di piu': il numero E' la sostanza di quella pagina.
+    quanti = _conta_interessi(con, funzione)
+    con.close()
+    return {"ok": True, "interessa": not tolto, "quanti": quanti}
 
 
 @app.get("/api/me/preferiti")
@@ -20716,6 +20863,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # si monta piu' in basso, col suo commento, ma la lettura sta qui
     # perche' e' qui che il database e' ancora aperto.
     punti_miei = _punti_resi(_punti_utente(con, user["id"]))
+    # Quali funzioni in arrivo ha gia' votato: con la connessione
+    # ancora aperta, come i punti qui sopra.
+    interessi_miei = _interessi_miei(con, user["id"])
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -20751,6 +20901,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
     profilo["max_barattolo"] = MAX_PREFERITI
+    # IL SUO like sulle funzioni in arrivo: solo per accendere il
+    # bottone. I TOTALI stanno nella busta di prima pagina della
+    # vetrina, che arriva anche agli anonimi — qui c'e' solo il fatto
+    # suo, e chi ha votato non esce mai da nessun'altra parte.
+    profilo["interessi_miei"] = interessi_miei
     # LE RETI: le SUE, e il catalogo. Due chiavi e non una, ed e' la
     # riga da non «semplificare»: `spedizionieri` E' IL CATALOGO da
     # quando esiste, e il client rimasto in cache la legge cosi' —

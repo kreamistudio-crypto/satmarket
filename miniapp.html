@@ -1483,6 +1483,24 @@
   .empty .empty-mascotte + .big{display:none}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 
+  /* ---------- «Lo aspetto»: il like delle funzioni in arrivo ----------
+     Vive dentro .empty delle due pagine «Qualcosa di nuovo e' in
+     arrivo». Zero token nuovi: il bottone e' l'orange di casa (il
+     gesto principale di quella pagina, mentre «Torna al mercatino»
+     scende a ghost — due pieni in fila si farebbero concorrenza), il
+     conto e' l'arancio dei numeri e la promessa e' il muted della
+     prosa. Chiaro e scuro gratis.
+     Il margine sopra e' della COPPIA e non del bottone: dentro .empty
+     i .btn hanno gia' il loro `margin:18px auto 0`, e qui serve
+     staccare il blocco dal testo che lo precede. */
+  .interesse{margin-top:20px}
+  /* .empty .btn e' width:auto e centrato: il bottone lo eredita */
+  .interesse .btn{margin-top:0}
+  .interesse-conta{margin-top:10px;font-weight:800;font-size:15px;
+    color:var(--sats-text)}
+  .interesse-promessa{margin-top:4px;font-size:12.5px;color:var(--muted);
+    font-weight:600}
+
   /* ---------- hero di Esplora: esiste solo da desktop in su ---------- */
   .hero{display:none}
 
@@ -4172,7 +4190,26 @@ document.getElementById('cartello')?.remove();</script>
       <!-- la LENTE della nav, la stessa icona di Esplora: un cuore
            solo per le icone, e l'emoji 🛍️ cambiava forma da un
            telefono all'altro -->
-      <button class="btn orange" onclick="vaiEsplora()">
+      <!-- IL LIKE (ago 2026): «lo aspetto», per sapere quanta gente
+           aspetta questa cosa prima di decidere quale cantiere aprire.
+           SEGNAPOSTO VUOTO e non interpolazione, il pattern di
+           #pionieriRiga e dei data-tempo: il render ci scrive dentro
+           con textContent. Nasce nascosto — i numeri arrivano con la
+           busta di prima pagina, e una cifra che si corregge da sola
+           sotto gli occhi e' peggio di un attimo di attesa (la lezione
+           della striscia delle categorie). In DEMO non compare MAI:
+           li' non c'e' server, e un conto sarebbe un numero inventato. -->
+      <div class="interesse" id="interesse-aste" data-funzione="aste" style="display:none">
+        <button class="btn orange" type="button"
+                onclick="toggleInteresse('aste')"></button>
+        <div class="interesse-conta"></div>
+        <!-- LA PROMESSA STA QUI E NON DOPO IL TOCCO (decisione di
+             Andrea: il like e' anche un'iscrizione): chi preme deve
+             saperlo PRIMA, o scoprirebbe di essersi iscritto a
+             qualcosa dopo averlo fatto. -->
+        <div class="interesse-promessa">Ti avvisiamo appena arriva</div>
+      </div>
+      <button class="btn ghost" onclick="vaiEsplora()">
         <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
         Torna al mercatino</button>
     </div>
@@ -4195,7 +4232,26 @@ document.getElementById('cartello')?.remove();</script>
       <div class="big" style="color:var(--sats)">₿</div>
       <b class="empty-title">Qualcosa di nuovo è in arrivo</b>
       <span>Stiamo preparando qualcosa per i tuoi sats.</span>
-      <button class="btn orange" onclick="vaiEsplora()">
+      <!-- IL LIKE (ago 2026): «lo aspetto», per sapere quanta gente
+           aspetta questa cosa prima di decidere quale cantiere aprire.
+           SEGNAPOSTO VUOTO e non interpolazione, il pattern di
+           #pionieriRiga e dei data-tempo: il render ci scrive dentro
+           con textContent. Nasce nascosto — i numeri arrivano con la
+           busta di prima pagina, e una cifra che si corregge da sola
+           sotto gli occhi e' peggio di un attimo di attesa (la lezione
+           della striscia delle categorie). In DEMO non compare MAI:
+           li' non c'e' server, e un conto sarebbe un numero inventato. -->
+      <div class="interesse" id="interesse-p2p" data-funzione="p2p" style="display:none">
+        <button class="btn orange" type="button"
+                onclick="toggleInteresse('p2p')"></button>
+        <div class="interesse-conta"></div>
+        <!-- LA PROMESSA STA QUI E NON DOPO IL TOCCO (decisione di
+             Andrea: il like e' anche un'iscrizione): chi preme deve
+             saperlo PRIMA, o scoprirebbe di essersi iscritto a
+             qualcosa dopo averlo fatto. -->
+        <div class="interesse-promessa">Ti avvisiamo appena arriva</div>
+      </div>
+      <button class="btn ghost" onclick="vaiEsplora()">
         <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
         Torna al mercatino</button>
     </div>
@@ -6253,6 +6309,15 @@ let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
                              // mai arrivata, e la sezione non si disegna
                              // (un'assenza non e' una bugia)
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
+/* IL LIKE SULLE FUNZIONI IN ARRIVO (ago 2026). Due stati e non uno,
+   perche' vengono da due canali diversi e per una ragione:
+   · i TOTALI sono pubblici e arrivano nella busta di prima pagina,
+     l'unico canale che tocca anche gli ANONIMI (/api/me non ce
+     l'hanno) — null = busta mai arrivata o server vecchio, e il
+     blocco non si disegna: un'assenza non e' una bugia;
+   · il MIO like arriva da /api/me ed e' un fatto suo. */
+let interessiServer = null;   // {p2p: 12, aste: 34}
+let interessiMiei = [];       // ['p2p'] — quali ho gia' votato io
 let datiVivi = false;   // al primo carico vero il seme demo si butta
 
 /* Un server vecchio risponde con l'array nudo: lo si legge come
@@ -6539,6 +6604,10 @@ async function loadListings(anonimo){
   if (j.regioni) regioniServer = j.regioni;
   if (j.occasioni) occasioniServer = j.occasioni;
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
+  /* i totali del like: arrivano di qui perche' e' l'unico canale che
+     tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
+     essere gia' aperta, che la busta atterra dopo l'avvio. */
+  if (j.interessi) { interessiServer = j.interessi; renderInteresse(); }
   if (j.protezione_percento !== undefined)
     protPercento = Number(j.protezione_percento) || 0;
   if (j.offerta_minima_percento !== undefined)
@@ -6868,6 +6937,13 @@ function go(view){
   /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
      senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
      l'utente puo' aver verificato la npub */
+  /* Le due pagine «in arrivo»: il like si ridisegna QUI e non in
+     vaiP2P/vaiAste, ed e' la riga che non si vede leggendo. Quelle due
+     sono gli ingressi dal TAB, ma alle stesse viste ci si torna col
+     gesto indietro e dalla cronologia — che per loro cadono nel
+     go(b.v) generico di navRendiVista e da vaiP2P non passano mai.
+     Qui invece ci passa ogni strada. */
+  if (view==='p2ppresto' || view==='astepresto') renderInteresse();
   if (view==='vendi') {
     aggiornaContattoHint();
     /* e le due righe delle politiche, per la stessa ragione: fra un
@@ -8344,6 +8420,84 @@ function renderPionieri(){
   if (!mostra) return;
   r.innerHTML = `<span class="conta">${pionieri}</span> `
     + `pionier${pionieri===1?'e':'i'}`;
+}
+
+/* «LO ASPETTO»: il like sulle pagine delle funzioni in arrivo (ago
+   2026). Serve a sapere quanta gente aspetta una cosa prima di
+   decidere quale cantiere aprire per primo — e a chi lo mette
+   promette un avviso il giorno che arriva.
+   SCRIVE COL textContent E NON COL innerHTML, ed e' cio' che tiene
+   vera la sentinella «la vista e' markup fisso»: li' dentro non entra
+   nessuna interpolazione, quindi non c'e' mai un esc() da ricordare.
+   Riguarda la vista ATTIVA e non prende argomenti: i chiamanti sono
+   tre e nessuno dei tre sa quale pagina si stia guardando. */
+function renderInteresse(){
+  document.querySelectorAll('.interesse').forEach(box => {
+    const f = box.dataset.funzione;
+    /* IN DEMO IL BLOCCO NON C'E' AFFATTO: li' non c'e' server, il
+       numero non arriva, e mostrarne uno sarebbe inventarlo — la
+       regola di renderPionieri e del cassetto wallet, che in demo
+       sparisce. Senza la busta (server di ieri) idem: un'assenza non
+       e' una bugia. */
+    const mostra = !DEMO && interessiServer
+      && interessiServer[f] !== undefined;
+    box.style.display = mostra ? '' : 'none';
+    if (!mostra) return;
+    const n = interessiServer[f] | 0;
+    const mio = interessiMiei.includes(f);
+    const b = box.querySelector('.btn');
+    b.textContent = mio ? '✓ Lo aspetti' : '✋ Lo aspetto';
+    /* l'arancio e' del gesto da fare: chi l'ha gia' fatto vede il
+       ghost, e il pieno resta uno solo in pagina */
+    b.className = 'btn ' + (mio ? 'ghost' : 'orange');
+    b.setAttribute('aria-pressed', mio ? 'true' : 'false');
+    /* A ZERO NON SI SCRIVE UNO ZERO (decisione di Andrea): su una
+       pagina che deve incuriosire, «0 persone» scoraggia proprio chi
+       arriva per primo. Il singolare esiste, come per i pionieri. */
+    box.querySelector('.interesse-conta').textContent =
+      !n ? 'Sii il primo' : n === 1 ? '1 lo aspetta' : `${fmt(n)} lo aspettano`;
+  });
+}
+
+/* La bandierina del doppio tocco, e NON bottoneInAttesa/attesaRitardata:
+   quelle alzano un velo che blocca l'app intera — la guardia giusta per
+   un gesto irreversibile sui sats, sproporzionata per un like che si
+   toglie ritoccando (e attesaRitardata ha in CI un censimento che
+   NOMINA i suoi chiamanti, tutti letture). Niente `disabled` sul
+   bottone, per la ragione di sempre: .btn:disabled sbiadisce, cioe'
+   sarebbe un lampo al posto di quello che si voleva togliere. */
+let interesseInCorso = false;
+
+async function toggleInteresse(f){
+  haptic();
+  /* In vetrina il like non si puo' contare — serve un'identita', o la
+     stessa persona vale due voti — e la porta e' quella di sempre. */
+  if (VETRINA) {
+    invitoTelegram("Per dire che aspetti questa novità serve l'app vera "
+      + "dentro Telegram: così ti avvisiamo appena arriva.");
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  if (interesseInCorso) return;
+  interesseInCorso = true;
+  try {
+    const r = await fetch(`${API_BASE}/interessi/${f}`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    /* IL NUMERO LO SCRIVE IL SERVER, mai un +/-1 a occhio: qui il
+       conto E' la sostanza della pagina, e mostrarne uno che poi si
+       corregge da solo sarebbe peggio dei 200 ms di attesa (la
+       lezione di togglePreferito). */
+    if (interessiServer) interessiServer[f] = d.quanti | 0;
+    interessiMiei = d.interessa
+      ? interessiMiei.concat(interessiMiei.includes(f) ? [] : [f])
+      : interessiMiei.filter(x => x !== f);
+    renderInteresse();
+    toast(d.interessa ? 'Segnato! Ti avvisiamo appena arriva 🔔'
+                      : 'Tolto');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { interesseInCorso = false; }
 }
 
 /* ============ I COLLEGAMENTI VERI (ago 2026) ====================
@@ -25807,6 +25961,11 @@ async function avvia(){
     if (me.max_barattolo > 0) MAX_PREFERITI = Number(me.max_barattolo);
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();
+    /* quali funzioni in arrivo ho gia' votato: accende il bottone
+       giusto se la pagina e' gia' aperta (i due canali arrivano
+       separati, e questo puo' atterrare per ultimo) */
+    interessiMiei = me.interessi_miei || [];
+    renderInteresse();
     servizioLeve = me.servizio_leve || null;
     aggiornaServizioVisibilita();
     npubCodice = ''; lnAddrModifica = false;

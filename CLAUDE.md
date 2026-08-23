@@ -2363,6 +2363,120 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   media query, e chi la allarga o la stringe rilegga i due numeri
   del filo. La «leva standard da tablet» (sole icone sotto ~900px)
   resta la strada se un giorno le voci crescessero ancora.
+  «LO ASPETTO»: IL LIKE SULLE FUNZIONI IN ARRIVO (ago 2026, decisione
+  di Andrea): sulle due pagine «in arrivo» — P2P e Aste — si mette un
+  like, e il totale si vede a tutti. Serve a sapere quanta gente
+  aspetta una cosa PRIMA di decidere quale cantiere aprire per primo:
+  a quelle pagine ci si arriva da un tab, cioè per curiosità, ed è la
+  popolazione che nessuno stava misurando.
+  UNA TABELLA E NON DUE COLONNE, ed è il punto che decide tutto il
+  resto: `interessi(tg_id, funzione, creato, PK(tg_id, funzione))`, il
+  calco di `preferiti` — «un like per persona» è la PK e non un
+  controllo da ricordare, «si può togliere» è il DELETE, il totale è
+  un COUNT, e **la funzione in arrivo di domani costa ZERO
+  migrazioni**. Con due colonne su `utenti` (`like_p2p`, `like_aste`)
+  ogni «coming soon» futuro sarebbe una colonna, un backfill e un
+  punto in più in /api/me: la stessa decisione presa tre volte. Più
+  `idx_interessi_funzione`, che la PK comincia col tg_id e il
+  conteggio per FUNZIONE gira su ogni prima pagina della vetrina (la
+  lezione di `idx_preferiti_annuncio`).
+  IL NOME DELLA FUNZIONE È UNA WHITELIST (`INTERESSI`) e non testo
+  libero: quel nome arriva dal CLIENT e finisce in una colonna, quindi
+  senza il recinto chiunque riempie la tabella di funzioni che non
+  esistono — e il giorno che se ne aggiunge una vera i conti sono già
+  sporchi. È il patto di `TIMBRI_SUGGERIMENTO`, e il controllo sta
+  PRIMA dell'INSERT. Chi aggiunge una pagina «in arrivo» mette il suo
+  nome lì, e nel farlo rilegge il debito scritto sulla tabella.
+  DUE CANALI E ZERO FETCH NUOVI: i TOTALI sono pubblici e viaggiano
+  nella busta di PRIMA PAGINA di `/api/listings`, accanto ad
+  `asta_abilitata` e per la STESSA ragione — in vetrina `/api/me` non
+  esiste, e senza quella riga l'anonimo vedrebbe la pagina muta; il
+  MIO like sta in `/api/me` (`interessi_miei`) ed è un fatto suo.
+  CHI ha votato non esce MAI, la regola di `preferiti`: il numero è
+  pubblico e anonimo, i nomi no — c'è la prova che nella query del
+  conteggio non compaia un `tg_id`.
+  L'IDENTITÀ È OBBLIGATORIA sull'endpoint (`verifica_utente`, mai
+  `utente_se_autenticato`): un like senza identità si conta due volte,
+  e il numero è l'unica cosa che questa funzione produce. In VETRINA
+  il client non ci arriva nemmeno — apre il foglio-invito, il patto di
+  `startBuy`: chi arriva dal web e aspetta il P2P è precisamente
+  l'informazione che serve, e la porta gliela apriamo.
+  IL SEGNAPOSTO, NON L'INTERPOLAZIONE, ed è la riga da non rompere: le
+  due viste sono markup FISSO e c'è la sentinella che lo pretende
+  (nella fetta di `view-p2ppresto` non deve comparire nessun `${`).
+  Quindi il markup porta un `<div class="interesse">` VUOTO e a
+  scriverci dentro è `renderInteresse` col `textContent` — il pattern
+  di `#pionieriRiga` e dei `<span data-tempo>`: la sentinella resta
+  verde E resta vera, e lì dentro non c'è mai un `esc()` da ricordare.
+  Nascosto col `display:none` e MAI con `hidden`, che una regola
+  d'autore col display lo scavalca (la lezione delle select).
+  IL RENDER SI CHIAMA DAL RAMO DI `go()` e non da `vaiP2P`/`vaiAste`,
+  ed è la riga che leggendo non si vede: quelli sono gli ingressi dal
+  TAB, ma alle stesse viste ci si torna col gesto indietro e dalla
+  cronologia — che per loro cadono nel `go(b.v)` generico di
+  `navRendiVista` e da `vaiP2P` non passano MAI. Più i due canali, che
+  lo richiamano quando atterrano: arrivano separati, e la pagina può
+  essere già aperta.
+  IL NUMERO LO SCRIVE IL SERVER, mai un ±1 a occhio (`d.quanti` nella
+  risposta): è la lezione di `togglePreferito`, e qui pesa di più
+  perché **il conto È la sostanza di quella pagina** — mostrarne uno
+  che poi si corregge da solo sarebbe peggio dei 200 ms di attesa.
+  E LA GUARDIA DEL DOPPIO TOCCO È UNA BANDIERINA
+  (`interesseInCorso`), non `bottoneInAttesa` né `attesaRitardata`:
+  quelle alzano un velo che blocca l'app intera — la guardia giusta
+  per un gesto irreversibile sui sats, sproporzionata per un like che
+  si toglie ritoccando — e `attesaRitardata` ha in CI un censimento
+  che NOMINA i suoi chiamanti, tutti letture. Niente `disabled` sul
+  bottone: `.btn:disabled` sbiadisce, cioè sarebbe un lampo al posto
+  di quello che si voleva togliere.
+  A ZERO SI DICE «SII IL PRIMO» (decisione di Andrea, che ROVESCIA la
+  regola di casa «lo zero non scrive niente»): su una pagina che deve
+  incuriosire uno zero scoraggia proprio chi arriva per primo, ed è il
+  primo che serve. Da 1 in su il conto, col singolare.
+  IN DEMO IL BLOCCO NON C'È AFFATTO: lì non c'è server, il numero non
+  arriva, e mostrarne uno sarebbe inventarlo — la regola di
+  `renderPionieri` e del cassetto wallet. Idem senza la busta (server
+  di ieri): un'assenza non è una bugia.
+  «TORNA AL MERCATINO» SCENDE A GHOST: l'arancio è del gesto
+  principale, e su quelle pagine il gesto principale è diventato il
+  like — due pieni in fila si farebbero concorrenza (la regola del
+  recinto escrow).
+  ⚠️ IL DEBITO, e sta scritto sul commento della tabella perché è lì
+  che si atterra: **il like NON è solo un termometro, è anche
+  un'ISCRIZIONE** (decisione di Andrea) — il testo promette «ti
+  avvisiamo appena arriva», e la promessa si legge PRIMA del tocco,
+  o uno scoprirebbe di essersi iscritto dopo averlo fatto. Quindi il
+  cantiere che ACCENDERÀ una di queste funzioni deve mandare il
+  messaggio a chi sta nella tabella, e la forma è già decisa così non
+  si ridiscute: una una-tantum col timbro in `timbri`, il calco di
+  `avvisa_sconto_su_mono` — timbro PRIMA degli invii, `notifica()`
+  per il multi-canale, il journal che nomina i destinatari. Non si
+  costruisce oggi (non si aggiunge codice per una cosa che non
+  esiste), e se un domani si togliesse la promessa dal testo si tolga
+  anche il debito — e viceversa: c'è la sentinella su tutt'e due.
+  IL GIORNO CHE LA FUNZIONE NASCE non c'è niente da fare, ed è il
+  pregio della forma: il bottone se ne va da solo — la pagina muore
+  col cantiere che la accende (per le aste succede già: `vaiAste` a
+  leva accesa non ci passa) — e LE RIGHE RESTANO per sempre
+  (decisione di Andrea), che «quanti lo aspettavano» resti una domanda
+  con una risposta. Nessuna scopa, nessuna leva, nessuna migrazione:
+  la tabella diventa inerte per quella funzione, come `utenti.comune`.
+  ⚠️ E IL NOME È `interesse` E MAI `attesa`, verificato prima di
+  scrivere una riga: nel client «attesa» significa già un'altra cosa —
+  il velo che blocca l'app mentre una richiesta viaggia
+  (`attesaOverlay`, `.attesa-jar`, `bottoneInAttesa`, `attesaOre`) — e
+  chiamarlo così sarebbe la trappola del doppio significato già pagata
+  con «lampo» e con «nota» dentro `renderAcquisto`.
+  LA FUSIONE LO MIGRA in UNIONE (`UPDATE OR IGNORE` + `DELETE`) e NON
+  con l'UPDATE secco di `connettori`: qui la PK CONTIENE il `tg_id`,
+  quindi le due metà possono aver votato tutt'e due la stessa funzione
+  — e l'UPDATE secco lì ALZA (provato girandolo, non dedotto). Due
+  metà della stessa persona non valgono due voti. La riga non è
+  facoltativa: il censimento delle tabelle figlie in `prove.py` pesca
+  ogni `CREATE TABLE` con un `tg_id` e pretende che la fusione la
+  nomini — ma quello cerca il NOME, che i DELETE nominano lo stesso,
+  quindi accanto c'è la prova che chiede il GESTO (la lezione di
+  `connettori`).
   LE ICONE SONO NOSTRE (lug 2026): tre SVG al posto delle emoji
   🛍️🗂️🤝, che cambiavano forma da un telefono all'altro e non
   seguivano i token del tema — LENTE per Esplora, PIASTRELLE per
@@ -20228,6 +20342,47 @@ senza blur e la vetrina che non passa più (chiesto a
 `elementsFromPoint`, non all'occhio), zero errori JS.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
 rotta — solo client.
+
+Il like sulle funzioni in arrivo (ago 2026): sulle due pagine «in
+arrivo» si mette un «✋ Lo aspetto» e il totale si vede a tutti — serve
+a sapere quale cantiere aprire per primo. Le quattro decisioni di
+Andrea: il like è ANCHE un'iscrizione (il testo promette l'avviso, e
+il debito è scritto sulla tabella perché il cantiere che accenderà la
+funzione lo mantenga), l'anonimo in vetrina vede il numero e col tocco
+viene invitato a entrare, a zero si dice «Sii il primo» invece di uno
+zero, e le righe restano per sempre. Il punto che decide è una TABELLA
+e non due colonne: «un like per persona» è la PK, e la funzione in
+arrivo di domani costa zero migrazioni. Vedi Architettura, «LO
+ASPETTO», per la whitelist del nome, per il segnaposto che tiene vera
+la sentinella del markup fisso, e per il nome `interesse` che NON è
+`attesa` (nel client quella parola significa già il velo che blocca).
+Collaudato: 5256 prove verdi (46 nuove, fra cui due famiglie
+ESEGUIBILI — il toggle e la fusione su sqlite in memoria, e
+`renderInteresse` girata con node sui suoi sei stati: le sentinelle
+dicono che i pezzi esistono, mai che rispondano giusto) e **DICIOTTO
+MUTAZIONI, diciotto uccise**, una per riga sorvegliata — whitelist
+tolta e spostata dopo l'INSERT, PK tolta, UPDATE secco al posto della
+liturgia, migrazione tolta, `tg_id` rimesso nel conteggio, identità
+resa facoltativa, totali spostati fuori dalla busta, ±1 ottimistico
+nel client, DEMO che disegna, «Sii il primo» sostituito da uno zero,
+promessa tolta dal testo, render tolto dal ramo di `go()`, innerHTML
+al posto di textContent, ghost tornato pieno, guardia della vetrina
+tolta, bandierina sostituita dal velo dei sats, debito cancellato.
+Più il giro col server VERO su un database usa-e-getta (15 verifiche:
+metti/togli, i due canali, la whitelist che risponde 400 e NON scrive,
+il 401 senza identità, e l'anonimo che vede il numero ma non chi ha
+votato) e il giro visivo via CDP a 320/360/375 nei due temi — zero
+sbordo, zero scorrimento laterale, zero errori JS — coi casi che il
+testo non può dire: il tocco che vota, il ritorno DALLA CRONOLOGIA
+(che non passa da `vaiP2P` ed è la ragione per cui il render sta nel
+ramo di `go()`), la vetrina che apre l'invito e la DEMO che non
+disegna niente.
+IN PRODUZIONE basta il deploy: la tabella nasce vuota, nessuna leva,
+nessuna migrazione di dati, nessuna rotta pubblica nuova — e finché
+nessuno tocca il bottone non cambia niente di quel che si vede.
+DA GUARDARE al primo giro: i primi like veri, e soprattutto che i
+numeri delle due pagine siano DIVERSI — è quella la domanda per cui
+il cantiere esiste.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
