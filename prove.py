@@ -24956,6 +24956,343 @@ def prove_connettori_sync():
           "config in chiaro", False, "__main__" in src)
 
 
+def prove_connettori_woo():
+    """WOOCOMMERCE (ago 2026, tappa 3): il dialetto, l'indirizzo che
+    lo scrive l'utente, e l'IVA.
+
+    Le tre cose che qui possono rompersi in SILENZIO, ed e' per
+    quelle che ci sono le prove: un prezzo al netto dell'IVA importato
+    come se fosse quello finale (il venditore lo scopre incassando),
+    un catalogo troncato senza dirlo (va a cercare i prodotti
+    mancanti da tutt'altra parte), e un URL costruito da noi che
+    finisce per puntare dove il negozio dice (cioe' le chiavi di un
+    altro consegnate a un host mai giudicato)."""
+    print("\n[i connettori: il dialetto WooCommerce]")
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    amb = {}
+    exec(compile(src, "importa_negozio.py", "exec"), amb)
+    traduci = amb["traduci_woo"]
+    testo = amb["testo_negozio"]
+    base_woo = amb["_base_woo"]
+    CAMBIO = {"EUR": 100_000.0}          # 1000 sats = 1 €
+
+    def prodotto(**kw):
+        b = {"id": 5, "name": "Miele", "description": "<p>Buono</p>",
+             "type": "simple", "status": "publish", "price": "7.50",
+             "manage_stock": True, "stock_quantity": 12,
+             "stock_status": "instock",
+             "images": [{"src": "https://cdn/x.jpg"}],
+             "categories": [{"name": "Alimentari"}]}
+        b.update(kw)
+        return b
+
+    # --- il traduttore, girato ------------------------------------
+    r = traduci(prodotto(), CAMBIO)
+    prova("Woo: il prodotto semplice passa", "", r["saltato_perche"])
+    prova("...col prezzo in euro e l'equivalente in sats", (7.5, 7_500),
+          (r["prezzo_eur"], r["prezzo_sats"]))
+    prova("...la chiave e' l'id del prodotto", "5", r["origine_chiave"])
+    prova("...e la giacenza arriva dal negozio", 12, r["quantita"])
+    # I TRE TIPI CHE NON SAPPIAMO TRATTARE, ognuno col suo motivo:
+    # `external` e' quello che si dimentica, perche' un prezzo ce l'ha
+    # e sembra un prodotto normale — ma il suo bottone porta su un
+    # ALTRO sito, quindi comprarlo qui non vorrebbe dire niente.
+    prova("i tipi che non sappiamo trattare si saltano, DICENDOLO",
+          ["ha piu' varianti", "e' un gruppo di prodotti",
+           "si compra su un altro sito"],
+          [traduci(prodotto(type=t), CAMBIO)["saltato_perche"]
+           for t in ("variable", "grouped", "external")])
+    # LA TRAPPOLA GEMELLA DELLA VARIANTE DI DEFAULT: `manage_stock`
+    # non e' un booleano — puo' essere la STRINGA 'parent', che in
+    # Python e' VERA. Scritto `if p.get("manage_stock"):` quel
+    # prodotto passerebbe con `stock_quantity` a None e `int(None)`
+    # alzerebbe: una riga persa nel report invece di un annuncio.
+    # IL CASO SI SCEGLIE IN MODO CHE POSSA FALLIRE SOLO PER LA RAGIONE
+    # CHE SI SORVEGLIA (la lezione di `_pare_recapito`): con
+    # `stock_quantity` a None anche la versione sbagliata risponderebbe
+    # «non lo so», e la prova non direbbe niente. Con un NUMERO
+    # accanto, `if p.get("manage_stock"):` scriverebbe 7 — cioe' la
+    # giacenza di un altro prodotto.
+    prova("«manage_stock: parent» NON e' una giacenza",
+          None, traduci(prodotto(manage_stock="parent", stock_quantity=7),
+                        CAMBIO)["quantita"])
+    prova("...e una giacenza a zero e' zero, non «non lo so»",
+          0, traduci(prodotto(stock_quantity=0), CAMBIO)["quantita"])
+    # chi non gestisce il magazzino ma dichiara «esaurito» sta dicendo
+    # un FATTO, non un'assenza
+    prova("«esaurito» senza magazzino vale zero", 0,
+          traduci(prodotto(manage_stock=False, stock_quantity=None,
+                           stock_status="outofstock"),
+                  CAMBIO)["quantita"])
+    # ...e il rovescio: su ordinazione si compra ancora, sul suo sito
+    prova("...ma «su ordinazione» resta ignoto", None,
+          traduci(prodotto(manage_stock=False, stock_quantity=None,
+                           stock_status="onbackorder"),
+                  CAMBIO)["quantita"])
+    prova("lo stock non tracciato resta ignoto", None,
+          traduci(prodotto(manage_stock=False, stock_quantity=None),
+                  CAMBIO)["quantita"])
+    # ...e l'INVARIANTE DI CASA vale anche alla NASCITA e non solo agli
+    # aggiornamenti: senza quella riga un prodotto che arriva GIA'
+    # esaurito nascerebbe 'attivo' con zero pezzi — in vetrina un
+    # annuncio comprabile all'occhio che alla cassa dice di no — e
+    # nessuna scopa lo raddrizza, che quella d'avvio va nell'altro
+    # verso (mette a zero i venduti). Raro su Shopify, QUOTIDIANO qui.
+    nasce = _senza_prosa(codice(_pezzo_da(src, "_una_riga")))
+    prova("venduto <=> quantita 0 vale anche alla nascita", True,
+          'if stato == "attivo" and quantita == 0:' in nasce
+          and 'stato = "venduto"' in nasce)
+    # DUE DOMANDE E NON UNA: pubblicato, e visibile nello scaffale
+    prova("non pubblicato e nascosto non sono in vetrina",
+          [False, False, False, True],
+          [traduci(prodotto(status="draft"), CAMBIO)["attivo"],
+           traduci(prodotto(status="private"), CAMBIO)["attivo"],
+           traduci(prodotto(catalog_visibility="hidden"),
+                   CAMBIO)["attivo"],
+           traduci(prodotto(), CAMBIO)["attivo"]])
+    prova("senza prezzo si salta", "senza prezzo",
+          traduci(prodotto(price="", regular_price=""),
+                  CAMBIO)["saltato_perche"])
+    prova("...ma il regular_price fa da ripiego", 3.0,
+          traduci(prodotto(price="", regular_price="3.00"),
+                  CAMBIO)["prezzo_eur"])
+    prova("senza cambio la riga aspetta", "cambio non disponibile",
+          traduci(prodotto(), {})["saltato_perche"])
+    # il testo canonico e' lo STESSO di Shopify, col dialetto suo
+    prova("la descrizione Woo viene da `description`", "Buono",
+          testo(prodotto(), "woo")[1])
+    prova("...col ripiego sulla short_description", "Corto",
+          testo({"name": "T", "description": "",
+                 "short_description": "<p>Corto</p>"}, "woo")[1])
+
+    # --- L'IVA ----------------------------------------------------
+    # WooCommerce non dice nel PRODOTTO se `price` include le tasse:
+    # dipende da un'impostazione del negozio. Se i prezzi sono scritti
+    # al netto, importarli com'e' vorrebbe dire mettere in vetrina una
+    # cifra piu' bassa di quella che sul suo sito si paga davvero.
+    prezzi_finiti = amb["prezzi_finiti_woo"]
+
+    def negozio(generale, tasse, stato=200):
+        def chiama(metodo, url, intestazioni):
+            if url.endswith("/settings/general"):
+                return stato, {"lista": generale}, {}
+            if url.endswith("/settings/tax"):
+                return stato, {"lista": tasse}, {}
+            return 200, {"lista": []}, {}
+        return chiama
+
+    def voce(chiave, valore):
+        return [{"id": chiave, "value": valore}]
+
+    def esito(generale, tasse, stato=200):
+        try:
+            prezzi_finiti("https://x.it", {}, negozio(generale, tasse, stato))
+            return "passa"
+        except RuntimeError as e:
+            return "netto" if "NETTO" in str(e) else "non lo sappiamo"
+
+    prova("tasse spente: il prezzo e' quello finale", "passa",
+          esito(voce("woocommerce_calc_taxes", "no"), []))
+    prova("prezzi con l'IVA dentro: si legge com'e'", "passa",
+          esito(voce("woocommerce_calc_taxes", "yes"),
+                voce("woocommerce_prices_include_tax", "yes")))
+    prova("prezzi al NETTO: il catalogo non si legge", "netto",
+          esito(voce("woocommerce_calc_taxes", "yes"),
+                voce("woocommerce_prices_include_tax", "no")))
+    # FAIL-CLOSED su cio' che non si sa, come `importo_invoice`: fra
+    # un connettore che non parte (visibile, zero danno) e dei prezzi
+    # forse sbagliati del 22% su cose che si comprano, il primo.
+    prova("...e se non si sa, nemmeno",
+          ["non lo sappiamo"] * 3,
+          [esito([], []),
+           esito(voce("woocommerce_calc_taxes", "yes"), []),
+           esito(voce("woocommerce_calc_taxes", "no"), [], stato=403)])
+    # ALZA, e non salta le righe una per una: una riga saltata NON
+    # entra in `viste`, quindi la riconciliazione la tratterebbe come
+    # sparita dal negozio e la SPEGNEREBBE — saltare tutto il catalogo
+    # vorrebbe dire spegnere la vetrina di quel venditore in un colpo.
+    corpo = codice(_pezzo_da(src, "prezzi_finiti_woo"))
+    prova("l'IVA storta ALZA, non marchia le righe", True,
+          "raise RuntimeError" in corpo
+          and "saltato_perche" not in corpo)
+    # ...e `find` e non `index`, che e' la regola di casa gia' pagata
+    # una volta: con `index` la mutazione che TOGLIE la riga non fa
+    # diventare rossa questa prova — la fa ESPLODERE, e si porta
+    # dietro tutte le sorelle che vengono dopo (qui ventidue). Col
+    # `find` l'assenza vale -1, e il `0 <=` la trasforma in un rosso.
+    lett = codice(_pezzo_da(src, "leggi_catalogo_woo"))
+    prova("...e la domanda si fa PRIMA di leggere una pagina", True,
+          0 <= lett.find("prezzi_finiti_woo") < lett.find("while True"))
+    # e il traduttore non corregge nessuna aliquota per conto suo:
+    # l'aliquota dipende dalla classe del prodotto e dal paese di chi
+    # compra, quindi indovinarla vorrebbe dire scrivere un prezzo che
+    # non e' il suo
+    # ...e si guarda il CODICE senza la prosa: questa funzione la sua
+    # aliquota la NOMINA, nella docstring, per dire che non la tocca —
+    # e una sentinella che leggesse anche quella diventerebbe rossa
+    # per colpa di una spiegazione (la trappola gia' pagata da
+    # `_decifra_contenuto`).
+    trad = _senza_prosa(codice(_pezzo_da(src, "traduci_woo")))
+    prova("il traduttore non inventa nessuna aliquota", [],
+          [g for g in ("tax", "iva", "1.22", "0.22") if g in trad.lower()])
+    # e la prova del GESTO accanto a quella della parola: sul prezzo
+    # non c'e' nessuna moltiplicazione e nessuna divisione — l'unica
+    # aritmetica ammessa e' l'arrotondamento al centesimo
+    prova("...e sul prezzo non fa nessun conto", [],
+          [s for s in ("*", "/") if s in trad])
+
+    # --- il tetto: niente tronchi in silenzio ---------------------
+    leggi = amb["leggi_catalogo_woo"]
+    per_pagina = amb["PER_PAGINA_WOO"]
+    cred = {"consumer_key": "ck", "consumer_secret": "cs"}
+
+    def catalogo(quanti, header=True):
+        def chiama(metodo, url, intestazioni):
+            if "/settings/" in url:
+                return 200, {"lista": voce("woocommerce_calc_taxes",
+                                           "no")}, {}
+            pagina = int(re.search(r"[?&]page=(\d+)", url).group(1))
+            inizio = (pagina - 1) * per_pagina
+            fetta = [{"id": k, "name": f"p{k}", "type": "simple",
+                      "price": "1.00", "status": "publish"}
+                     for k in range(inizio,
+                                    min(inizio + per_pagina, quanti))]
+            testa = {"X-WP-Total": str(quanti)} if header else {}
+            return 200, {"lista": fetta}, testa
+        return chiama
+
+    letti, avviso = leggi("https://x.it", cred, catalogo(30), 200)
+    prova("il catalogo corto si legge tutto, senza avvisi",
+          (30, ""), (len(letti), avviso))
+    # IL CASO CHE HA CHIESTO LA CURA, e non si vedeva leggendo: con
+    # cento prodotti per pagina e un tetto di duecento si atterra
+    # ESATTAMENTE sul tetto, quindi «ne ho letti piu' del tetto?» non
+    # scatta mai — e il catalogo si troncava senza dirlo.
+    letti, avviso = leggi("https://x.it", cred, catalogo(250), 200)
+    prova("il catalogo lungo si tronca al tetto", 200, len(letti))
+    prova("...MA lo dice, col conto vero", True,
+          "250" in avviso and "200" in avviso)
+    letti, avviso = leggi("https://x.it", cred, catalogo(250, False), 200)
+    prova("...e lo dice anche senza `X-WP-Total`", True, bool(avviso))
+    # ...senza pero' dire «ce n'e' ancora» a un negozio che ne ha
+    # esattamente duecento: il conto vero, quando c'e', comanda da
+    # solo — altrimenti quel venditore leggerebbe l'avviso per sempre
+    prova("il conto esatto non produce falsi allarmi", "",
+          leggi("https://x.it", cred, catalogo(200), 200)[1])
+    # e una lettura fallita ALZA, come il gemello Shopify: le
+    # sparizioni si giudicano solo su un catalogo COMPLETO
+    def rotto(metodo, url, intestazioni):
+        if "/settings/" in url:
+            return 200, {"lista": voce("woocommerce_calc_taxes", "no")}, {}
+        return 500, {}, {}
+    prova("una pagina fallita ALZA, non torna una lista corta",
+          "WooCommerce ha risposto 500",
+          _alza(lambda: leggi("https://x.it", cred, rotto, 200)))
+    # L'ORDINE E' PER ID: col default (la data) basta che il venditore
+    # ritocchi un prodotto mentre paginiamo perche' una riga scivoli
+    # fra due pagine — cioe' un prodotto dichiarato sparito e spento
+    # per sbaglio
+    prova("le pagine si scorrono per id crescente", True,
+          "orderby=id&order=asc" in lett)
+
+    # --- l'indirizzo, che lo scrive l'utente ----------------------
+    prova("_base_woo: l'https si accetta, col percorso e senza",
+          ["https://sito.it", "https://sito.it/shop"],
+          [base_woo("https://sito.it/"), base_woo("https://sito.it/shop")])
+    prova("...e tutto il resto si rifiuta",
+          ["rifiutato"] * 6,
+          ["rifiutato" if _alza(lambda u=u: base_woo(u)) else "AMMESSO"
+           for u in ("http://sito.it", "https://sito.it:8443",
+                     "https://ck:cs@sito.it", "https://sito.it/a?b=1",
+                     "ftp://sito.it", "")])
+    # LA GUARDIA VERA STA NEL TRASPORTO e gira su OGNI chiamata, non
+    # solo sulla prima: e' li' che l'host si risolve davvero e si
+    # rifiutano gli indirizzi privati. Nel modulo non c'e' rete, e
+    # `_base_woo` e' solo la cintura di forma.
+    tra = codice(pezzo("chiama_api_negozio"))
+    prova("il guardiano sta DENTRO il trasporto", True,
+          0 <= tra.find("url_api_ammesso(url)")
+          < tra.find("urllib.request"))
+    prova("...e nessun lettore se lo ricopia", [],
+          [n for n in ("leggi_catalogo_shopify", "leggi_catalogo_woo")
+           if "url_api_ammesso" in codice(_pezzo_da(src, n))])
+    # QUI DENTRO GLI URL SI COSTRUISCONO, MAI SI SEGUONO: Shopify
+    # pagina con un cursore opaco e l'indirizzo della pagina dopo lo
+    # scrive LUI (header `Link`), Woo pagina con un numero — quindi
+    # l'indirizzo lo componiamo dal `url_negozio` del collegamento e
+    # non c'e' modo che il negozio ci mandi altrove.
+    prova("il lettore Woo non segue nessun indirizzo altrui", [],
+          [g for g in ("_prossima_pagina", "Link") if g in lett])
+    # LE INTESTAZIONI SI LEGGONO ECCOME (`X-WP-Total` viene da li'):
+    # la regola non e' «non guardare la risposta», e' «non prendere da
+    # lei un INDIRIZZO». Quindi si conta l'unica assegnazione di
+    # `url`, e si guarda che nasca da `base` — cioe' dal collegamento.
+    prova("...e l'unico URL nasce da `base`", (1, 1),
+          (lett.count("url = "), lett.count('url = (f"{base}/wp-json/')))
+
+    # --- le chiavi ------------------------------------------------
+    # BASIC AUTH e mai la query string, che e' l'altra strada che la
+    # documentazione di Woo concede: un segreto in un URL finisce nei
+    # log di ogni proxy che sta in mezzo.
+    prova("le chiavi viaggiano in Basic auth", True,
+          "Authorization" in codice(_pezzo_da(src, "_intestazioni_woo")))
+    prova("...e mai dentro un indirizzo", [],
+          [g for g in ("consumer_key=", "consumer_secret=") if g in src])
+    prova("senza chiavi non si chiama nessuno", "mancano le chiavi "
+          "del negozio",
+          _alza(lambda: amb["_intestazioni_woo"]({})))
+    # UN TOKEN IN UN JOURNAL E' UN TOKEN PUBBLICO: nel modulo le
+    # credenziali vivono in due funzioni sole e non entrano MAI in una
+    # riga che stampa.
+    prova("il modulo non stampa mai le credenziali", [],
+          [r.strip()[:40] for r in codice(src).split("\n")
+           if "print(" in r and ("credenzial" in r or "consumer" in r
+                                 or "intestazioni" in r)])
+
+    # --- il dispatch ----------------------------------------------
+    prova("le due piattaforme sono in catalogo",
+          (["shopify", "woo"], ["shopify", "woo"]),
+          (sorted(amb["TRADUTTORI"]), sorted(amb["LETTORI"])))
+    # IL SERVER PASSA LA BUSTA INTERA e non un campo: Shopify ha un
+    # token, Woo una chiave e un segreto, e a sapere che forma hanno
+    # e' il lettore — col `token` nella firma il server avrebbe dovuto
+    # conoscere le credenziali di ogni piattaforma, che e' la stessa
+    # cosa che i traduttori esistono per non far sapere a nessuno.
+    unc = codice(pezzo("_un_connettore"))
+    prova("il server passa le credenziali INTERE al lettore", True,
+          "lettore, c[\"url_negozio\"], credenziali," in unc)
+    prova("...e ogni lettore ci pesca quel che gli serve",
+          [True, True],
+          ['(credenziali or {}).get("token"' in
+           codice(_pezzo_da(src, "leggi_catalogo_shopify")),
+           "_intestazioni_woo(credenziali)" in lett])
+
+
+def _senza_prosa(testo):
+    """Il corpo di una funzione senza la sua docstring.
+
+    `codice()` toglie i commenti `#` e basta: una funzione che nella
+    docstring NOMINA la cosa che dichiara di non fare — «qui non si
+    corregge nessuna IVA» — farebbe diventare rossa una sentinella
+    che cerca quella parola, cioe' rossa per colpa di una
+    spiegazione. E' la stessa trappola gia' pagata da
+    `_decifra_contenuto` e dal `print` del ripiego di Telegram."""
+    pezzi = testo.split('"""')
+    return pezzi[0] + "".join(pezzi[2:]) if len(pezzi) > 2 else testo
+
+
+def _alza(azione):
+    """Il messaggio dell'eccezione, o '' se non alza. Serve alle
+    prove che devono dire «questa strada e' chiusa»: con un
+    try/except scritto a mano dentro ogni caso, una prova che NON
+    alza passerebbe in silenzio."""
+    try:
+        azione()
+        return ""
+    except Exception as e:
+        return str(e)
+
+
 def _pezzo_da(sorgente, nome, fine="\n\n\n"):
     """`pezzo()` per un file diverso da server.py."""
     i = sorgente.index(f"def {nome}(")
@@ -25036,7 +25373,8 @@ def main():
               prove_sintassi_client,
               prove_banner_negozio,
               prove_foto_vuota,
-              prove_connettori, prove_connettori_sync):
+              prove_connettori, prove_connettori_sync,
+              prove_connettori_woo):
         try:
             f()
         except Exception as e:

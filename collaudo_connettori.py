@@ -8,8 +8,9 @@ fare e' far GIRARE il sync: le sue prove non hanno un database, non
 hanno un catalogo e non scrivono un annuncio.
 
 Questo script chiude quel buco. Fa partire il SERVER VERO su un
-database usa-e-getta, con un negozio Shopify finto al posto dell'API,
-e chiede le cose che solo l'esecuzione puo' dire.
+database usa-e-getta, con due negozi finti al posto dell'API — uno
+Shopify e uno WooCommerce — e chiede le cose che solo l'esecuzione
+puo' dire.
 
 LA PROVA REGINA DELLA FASE 1 e' una sola: **una vendita fatta qui non
 viene rialzata dal giro dopo**. Il sync ricopre la giacenza dalla
@@ -86,6 +87,15 @@ CATALOGO = []
 ERRORE_API = [None]     # se pieno, l'API alza: la rete che cade
 LETTURE = []            # gli URL chiesti, per contare le pagine
 
+# --- IL WOOCOMMERCE DI CARTONE ---------------------------------------
+# Un secondo negozio, con l'altro dialetto e con la cosa che Shopify
+# non ha: le due impostazioni da cui dipende il significato di
+# `price`. `IVA_WOO` a 'no' vuol dire «prezzi scritti al NETTO», cioe'
+# il caso in cui il catalogo NON si deve leggere.
+CATALOGO_WOO = []
+TASSE_WOO = ["yes"]     # woocommerce_calc_taxes
+IVA_WOO = ["yes"]       # woocommerce_prices_include_tax
+
 
 def prodotto(pid, titolo, prezzo="7.50", stock=12, stato="active",
              varianti=1, gestito=True, foto=("https://cdn.esempio/a.jpg",),
@@ -100,13 +110,38 @@ def prodotto(pid, titolo, prezzo="7.50", stock=12, stato="active",
             "images": [{"src": u} for u in foto]}
 
 
+def prodotto_woo(pid, nome, prezzo="7.50", stock=12, gestito=True,
+                 tipo="simple", stato="publish", visibile="visible",
+                 disponibile="instock", desc="<p>Buono</p>",
+                 foto=("https://cdn.esempio/w.jpg",), categoria="Casa"):
+    return {"id": pid, "name": nome, "description": desc, "type": tipo,
+            "status": stato, "catalog_visibility": visibile,
+            "price": prezzo, "regular_price": prezzo,
+            "manage_stock": gestito,
+            "stock_quantity": stock if gestito else None,
+            "stock_status": disponibile,
+            "images": [{"src": u} for u in foto],
+            "categories": [{"id": 1, "name": categoria}]}
+
+
 def api_finta(metodo, url, intestazioni):
-    """Al posto di `chiama_api_negozio`. Non guarda il token: qui non
-    si prova l'autenticazione, si prova il giro."""
+    """Al posto di `chiama_api_negozio`. Non guarda le credenziali:
+    qui non si prova l'autenticazione, si prova il giro — a smistare
+    e' l'indirizzo, che i due dialetti costruiscono diverso."""
     LETTURE.append(url)
     if ERRORE_API[0]:
         raise RuntimeError(ERRORE_API[0])
-    return 200, {"products": list(CATALOGO)}, {}
+    if "/wp-json/" not in url:
+        return 200, {"products": list(CATALOGO)}, {}
+    # --- WooCommerce ---
+    if url.endswith("/settings/general"):
+        return 200, {"lista": [{"id": "woocommerce_calc_taxes",
+                                "value": TASSE_WOO[0]}]}, {}
+    if url.endswith("/settings/tax"):
+        return 200, {"lista": [{"id": "woocommerce_prices_include_tax",
+                                "value": IVA_WOO[0]}]}, {}
+    return (200, {"lista": list(CATALOGO_WOO)},
+            {"X-WP-Total": str(len(CATALOGO_WOO))})
 
 
 def avvio():
@@ -175,12 +210,17 @@ def collega(fonte="shopify", url="mio.myshopify.com", consegna="spedizione",
             zona="Carmagnola (TO)"):
     """Scrive il collegamento a mano: l'endpoint arriva alla tappa 5,
     e quel che si prova qui e' il GIRO."""
+    # ogni piattaforma ha la sua busta: Shopify un token, Woo una
+    # chiave e un segreto — ed e' il LETTORE a sapere che forma hanno
+    chiavi = ({"consumer_key": "ck_finta",
+               "consumer_secret": "cs_segretissima"} if fonte == "woo"
+              else {"token": "shpat_finto"})
     con = SRV.db()
     cur = con.execute(
         "INSERT INTO connettori(tg_id,fonte,url_negozio,credenziali,"
         "consegna,spedizione_eur,zona,creato) VALUES(?,?,?,?,?,?,?,?)",
         (VENDITORE, fonte, url,
-         SRV._cifra_contenuto(json.dumps({"token": "shpat_finto"})),
+         SRV._cifra_contenuto(json.dumps(chiavi)),
          consegna, 5.0, zona, int(time.time())))
     con.commit()
     cid = cur.lastrowid
@@ -421,6 +461,122 @@ def main():
           len([n for n in NOTIFICHE if "non risponde" in n[1]]))
     giro()
     prova("...e da li' il giro lo salta", "errore", stato)
+
+    # ---- 11. il secondo dialetto -------------------------------------
+    # Da qui in avanti il connettore Shopify e' in 'errore', quindi il
+    # giro guarda solo il Woo: e' quel che serve per leggere le due
+    # sezioni che seguono senza confondere i due negozi.
+    print("\n[WooCommerce: l'altro dialetto]")
+    wid = collega(fonte="woo", url="https://ilmionegozio.it")
+    CATALOGO_WOO[:] = [
+        prodotto_woo(11, "Tazza in ceramica", "14.00", stock=8),
+        prodotto_woo(12, "Maglietta", "20.00", tipo="variable"),
+        prodotto_woo(13, "Corso di cucina", "80.00", tipo="external"),
+        prodotto_woo(14, "Set di posate", "35.00", tipo="grouped"),
+        prodotto_woo(15, "Sapone all'olio", "6.00", gestito=False,
+                     disponibile="outofstock"),
+        prodotto_woo(16, "Vaso di scorta", "9.00", visibile="hidden"),
+        prodotto_woo(17, "Tovaglia su ordinazione", "22.00",
+                     gestito=False, disponibile="onbackorder"),
+    ]
+    giro()
+    prova("entra quel che sappiamo trattare",
+          {"Tazza in ceramica", "Tovaglia su ordinazione"},
+          {a["titolo"] for a in annunci(wid) if a["stato"] == "attivo"})
+    tazza = uno(wid, 11)
+    prova("il prezzo e' il listino in EURO, coi sats al cambio del giro",
+          (14.0, "eur", 14_000),
+          (tazza["prezzo_eur"], tazza["valuta"], tazza["prezzo_sats"]))
+    prova("l'origine dice WooCommerce", ("woo", wid, "11"),
+          (tazza["fonte"], tazza["connettore_id"], tazza["origine_chiave"]))
+    prova("la giacenza arriva dal negozio", 8, tazza["quantita"])
+    con = SRV.db()
+    esito = json.loads(con.execute(
+        "SELECT ultimo_esito FROM connettori WHERE id=?", (wid,)
+    ).fetchone()[0])
+    con.close()
+    # I TRE TIPI CHE NON SAPPIAMO TRATTARE, e `external` e' quello che
+    # si dimentica: un prezzo ce l'ha e sembra un prodotto normale, ma
+    # il suo bottone porta su un ALTRO sito.
+    prova("i tre tipi che non sappiamo trattare si saltano, col motivo",
+          {"Maglietta": "ha piu' varianti",
+           "Set di posate": "e' un gruppo di prodotti",
+           "Corso di cucina": "si compra su un altro sito"},
+          {s["titolo"]: s["perche"] for s in esito["saltati"]
+           if s["titolo"] in ("Maglietta", "Set di posate",
+                              "Corso di cucina")})
+    # L'INVARIANTE DI CASA VALE ANCHE ALLA NASCITA: un prodotto che
+    # arriva GIA' esaurito non deve nascere 'attivo' con zero pezzi —
+    # sarebbe un annuncio comprabile all'occhio che alla cassa dice di
+    # no, e nessuna scopa lo raddrizza. Su Woo e' il caso quotidiano.
+    sapone = uno(wid, 15)
+    prova("chi arriva gia' esaurito nasce «venduto», non «attivo»",
+          ("venduto", 0), (sapone["stato"], sapone["quantita"]))
+    prova("il prodotto nascosto nello scaffale non entra in vetrina",
+          "rimosso", uno(wid, 16)["stato"])
+    # ...e il rovescio: «su ordinazione» sul suo sito si compra ancora,
+    # quindi la giacenza resta IGNOTA e non diventa zero
+    prova("«su ordinazione» resta comprabile", ("attivo", 1),
+          (uno(wid, 17)["stato"], uno(wid, 17)["quantita"]))
+    prova("...e si annota che la giacenza non la sappiamo", -1,
+          uno(wid, 17)["origine_stock_visto"])
+    prova("la consegna viene dal CASSETTO anche qui",
+          ("spedizione", 5.0), (tazza["consegna"], tazza["spedizione_eur"]))
+
+    # ---- 12. L'IVA -----------------------------------------------------
+    # LA PROVA CHE CONTA DELLA TAPPA 3. WooCommerce non dice nel
+    # prodotto se `price` include le tasse: dipende da un'impostazione
+    # del negozio. Con i prezzi scritti al NETTO, importarli com'e'
+    # vorrebbe dire mettere in vetrina una cifra piu' bassa di quella
+    # che sul suo sito si paga — e il venditore lo scoprirebbe
+    # incassando.
+    print("\n[l'IVA: un prezzo che non e' il prezzo non si importa]")
+    vivi = [(a["id"], a["stato"]) for a in annunci(wid)]
+    quante = len(NOTIFICHE)
+    IVA_WOO[0] = "no"          # «prezzi inseriti SENZA le tasse»
+    giro()
+    prova("col netto il catalogo non si legge: nessun prezzo cambia",
+          vivi, [(a["id"], a["stato"]) for a in annunci(wid)])
+    # ...ed e' QUESTA la ragione per cui `prezzi_finiti_woo` ALZA invece
+    # di marchiare le righe una per una: una riga saltata non entra in
+    # `viste`, quindi la riconciliazione la tratterebbe come sparita
+    # dal negozio e la spegnerebbe — saltare tutto il catalogo
+    # vorrebbe dire spegnere la vetrina di quel venditore in un colpo.
+    prova("...e SOPRATTUTTO nessun annuncio si spegne",
+          {"Tazza in ceramica", "Tovaglia su ordinazione"},
+          {a["titolo"] for a in annunci(wid) if a["stato"] == "attivo"})
+    con = SRV.db()
+    c = con.execute("SELECT errori_di_fila, ultimo_errore FROM connettori "
+                    "WHERE id=?", (wid,)).fetchone()
+    con.close()
+    prova("l'errore si conta, come una rete caduta", 1, c[0])
+    prova("...e il motivo VERO resta scritto, per il venditore", True,
+          "NETTO" in (c[1] or ""))
+    prova("...senza mai le chiavi nel messaggio", False,
+          "cs_segretissima" in (c[1] or ""))
+    prova("nessuno viene svegliato per un giro solo", quante,
+          len(NOTIFICHE))
+    # e il rientro: rimessa l'impostazione, il giro riprende da solo
+    IVA_WOO[0] = "yes"
+    CATALOGO_WOO[0] = prodotto_woo(11, "Tazza in ceramica", "16.00",
+                                   stock=5)
+    giro()
+    tazza = uno(wid, 11)
+    prova("sistemata l'impostazione, il catalogo torna a scorrere",
+          (16.0, 16_000, 5),
+          (tazza["prezzo_eur"], tazza["prezzo_sats"], tazza["quantita"]))
+    con = SRV.db()
+    prova("...e il conto degli errori si azzera", 0,
+          con.execute("SELECT errori_di_fila FROM connettori WHERE id=?",
+                      (wid,)).fetchone()[0])
+    con.close()
+    # LE TASSE SPENTE sono l'altro caso lecito: il prezzo e' quel che e'
+    TASSE_WOO[0], IVA_WOO[0] = "no", "no"
+    CATALOGO_WOO[0] = prodotto_woo(11, "Tazza in ceramica", "18.00",
+                                   stock=5)
+    giro()
+    prova("col negozio senza tasse il prezzo si legge com'e'", 18.0,
+          uno(wid, 11)["prezzo_eur"])
 
     print("\n" + "=" * 62)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

@@ -29554,8 +29554,11 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
         return
     credenziali = json.loads(_decifra_contenuto(c["credenziali"]) or "{}")
     try:
+        # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
+        # un token, Woo una chiave e un segreto, e a sapere che forma
+        # hanno e' il lettore — qui si sa solo che sono un dizionario
         prodotti, avviso = await asyncio.to_thread(
-            lettore, c["url_negozio"], credenziali.get("token", ""),
+            lettore, c["url_negozio"], credenziali,
             chiama_api_negozio, MAX_PRODOTTI_CONNETTORE)
     except Exception as e:
         await _connettore_in_errore(c, str(e)[:200])

@@ -22,6 +22,7 @@ anti-SSRF, tetti, timeout, la filiera della compressione unica. Cosi'
 i traduttori e la riconciliazione restano PURI, cioe' collaudabili in
 `prove.py` con un catalogo di cartone.
 """
+import base64
 import json
 import re
 import sqlite3
@@ -33,11 +34,20 @@ import time
 # toccare, non sei stringhe sparse.
 VERSIONE_API_SHOPIFY = "2024-07"
 
+# Il gemello di Woo. WooCommerce vive dentro WordPress, quindi la
+# versione sta nel PERCORSO (`/wp-json/wc/v3/`) e non in una data:
+# la v3 e' ferma dal 2018 e non ha un ciclo di ritiro annunciato.
+VERSIONE_API_WOO = "wc/v3"
+
 # Quanto si legge in un colpo. 250 e' il massimo che Shopify concede
 # per pagina; il tetto vero al giro lo mette il server
 # (MAX_PRODOTTI_CONNETTORE), che sa quanto puo' tenere occupato
 # l'orologio.
 PER_PAGINA = 250
+
+# WordPress ne concede 100 e non 250, ed e' un tetto SUO: chiederne di
+# piu' non fa una pagina piu' grande, fa un 400.
+PER_PAGINA_WOO = 100
 
 # I tagli del testo, IDENTICI alle colonne del database. Non sono un
 # gusto: sono la ragione per cui `testo_negozio` esiste (vedi sotto).
@@ -198,7 +208,96 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
     return riga
 
 
-TRADUTTORI = {"shopify": traduci_shopify}
+# I TIPI DI PRODOTTO WOO CHE NON SAPPIAMO TRATTARE, e ognuno col suo
+# perche' scritto: un annuncio di Barattolo e' UNA cosa con UN prezzo
+# e UNA giacenza, e questi tre non lo sono.
+# · `variable` e' il gemello del multi-variante di Shopify (taglie,
+#   colori: `annunci` e' piatto, e le varianti sono un cantiere loro);
+# · `grouped` e' un contenitore che rimanda ad altri prodotti e un
+#   prezzo suo non ce l'ha;
+# · `external` e' il prodotto in affiliazione: il bottone porta su un
+#   ALTRO sito, quindi comprarlo qui non vorrebbe dire niente — ed e'
+#   quello che si dimentica, perche' un prezzo ce l'ha.
+SALTI_WOO = {"variable": "ha piu' varianti",
+             "grouped": "e' un gruppo di prodotti",
+             "external": "si compra su un altro sito"}
+
+
+def traduci_woo(p: dict, cambio: dict) -> dict:
+    """Un prodotto WooCommerce diventa una riga normalizzata.
+
+    IL PREZZO SI LEGGE COM'E', ed e' la riga che regge su una
+    promessa fatta a monte: `leggi_catalogo_woo` ha gia' chiesto al
+    negozio se i suoi prezzi sono quelli che si pagano (vedi
+    `prezzi_finiti_woo`) e ha ALZATO se non lo erano. Qui non si
+    corregge nessuna IVA e non si indovina nessuna aliquota — se un
+    domani qualcuno togliesse quel controllo, questa funzione
+    comincerebbe a scrivere in vetrina un prezzo che non e' il prezzo
+    di nessuno, in silenzio."""
+    riga = {"origine_chiave": str(p.get("id") or ""),
+            "saltato_perche": "", "titolo": "", "descrizione": "",
+            "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
+            "foto": [], "categoria_grezza": "", "attivo": True}
+    titolo, descrizione = testo_negozio(p, "woo")
+    riga["titolo"], riga["descrizione"] = titolo, descrizione
+    if not riga["origine_chiave"] or not titolo:
+        riga["saltato_perche"] = "senza id o senza titolo"
+        return riga
+    tipo = str(p.get("type") or "simple").lower()
+    if tipo in SALTI_WOO:
+        riga["saltato_perche"] = SALTI_WOO[tipo]
+        return riga
+    # `price` e' gia' il prezzo EFFICACE (lo sconto, se c'e'); il
+    # `regular_price` e' il ripiego per i temi che lasciano `price`
+    # vuoto sui prodotti mai visitati.
+    riga["prezzo_eur"] = round(
+        _numero(p.get("price") or p.get("regular_price")), 2)
+    sats = _sats_da_eur(riga["prezzo_eur"], cambio)
+    if not sats:
+        riga["saltato_perche"] = ("senza prezzo" if riga["prezzo_eur"] <= 0
+                                  else "cambio non disponibile")
+        return riga
+    riga["prezzo_sats"] = sats
+    # --- LA GIACENZA, e qui c'e' la trappola gemella della variante di
+    # default di Shopify: `manage_stock` non e' un booleano, puo'
+    # essere la STRINGA 'parent' — le varianti che ereditano il
+    # magazzino dal prodotto padre — e in Python quella stringa e'
+    # VERA. Il confronto e' quindi col VALORE e non con la verita':
+    # scritto `if p.get("manage_stock"):` si scriverebbe qui la
+    # giacenza di un ALTRO prodotto (quella del padre), oppure, col
+    # numero assente, si alzerebbe su `int(None)` — una riga persa nel
+    # report invece di un annuncio.
+    gestito = p.get("manage_stock")
+    scorte = p.get("stock_quantity")
+    if gestito in (True, 1) and scorte is not None:
+        riga["quantita"] = int(scorte)
+    elif str(p.get("stock_status") or "") == "outofstock":
+        # NON gestisce il magazzino ma dichiara «esaurito»: quello e'
+        # un fatto, non un'assenza, e vale zero. Il rovescio —
+        # 'onbackorder' — resta IGNOTO apposta: sul suo negozio quel
+        # prodotto si compra, e scriverci zero lo spegnerebbe qui.
+        riga["quantita"] = 0
+    riga["foto"] = [i.get("src") for i in (p.get("images") or [])
+                    if isinstance(i, dict) and i.get("src")][:MAX_FOTO]
+    categorie = [c.get("name") for c in (p.get("categories") or [])
+                 if isinstance(c, dict) and c.get("name")]
+    riga["categoria_grezza"] = (categorie[0] if categorie else "").strip()
+    # DUE DOMANDE E NON UNA: `status` dice se e' pubblicato (draft,
+    # pending e private non sono in vetrina da lui), `catalog_
+    # visibility` se si vede nel negozio — un prodotto 'publish' ma
+    # 'hidden' e' roba che tiene fuori dallo scaffale apposta.
+    riga["attivo"] = (str(p.get("status") or "publish") == "publish" and
+                      str(p.get("catalog_visibility") or "visible")
+                      != "hidden")
+    # la coordinata del decremento (fase 2): su Woo si scrive sul
+    # prodotto stesso, non su una riga di magazzino a parte. Si legge
+    # gia' adesso perche' costa zero, e non si scrive da nessuna parte
+    # finche' quella fase non esiste.
+    riga["scorta"] = str(p.get("id") or "")
+    return riga
+
+
+TRADUTTORI = {"shopify": traduci_shopify, "woo": traduci_woo}
 
 
 def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
@@ -235,7 +334,7 @@ def _prossima_pagina_shopify(intestazioni: dict) -> str:
     return ""
 
 
-def leggi_catalogo_shopify(dominio: str, token: str, chiama,
+def leggi_catalogo_shopify(dominio: str, credenziali: dict, chiama,
                            tetto: int = 200) -> tuple[list, str]:
     """Il catalogo, pagina per pagina. Torna `(prodotti, avviso)`:
     l'avviso non e' un errore ma una cosa da dire al venditore — oggi
@@ -246,11 +345,20 @@ def leggi_catalogo_shopify(dominio: str, token: str, chiama,
     cose sono diverse e confonderle sarebbe il guasto peggiore di
     questo file — un catalogo che non si e' potuto LEGGERE, preso per
     un catalogo VUOTO, spegnerebbe tutti gli annunci del venditore
-    (vedi `riconcilia_connettore`, che sulle sparizioni si fida)."""
+    (vedi `riconcilia_connettore`, che sulle sparizioni si fida).
+
+    IL SECONDO ARGOMENTO E' LA BUSTA INTERA delle credenziali e non il
+    token, ed e' il cambio della tappa 3: Shopify ne ha una sola, Woo
+    ne ha due (chiave e segreto), e ogni lettore si prende quel che
+    gli serve. Con `token` nella firma il server avrebbe dovuto sapere
+    che forma hanno le credenziali di ogni piattaforma — cioe' la
+    stessa cosa che i traduttori esistono per non far sapere a
+    nessuno."""
     prodotti = []
     url = (f"https://{dominio}/admin/api/{VERSIONE_API_SHOPIFY}"
            f"/products.json?limit={PER_PAGINA}")
-    intestazioni = {"X-Shopify-Access-Token": token}
+    intestazioni = {"X-Shopify-Access-Token":
+                    (credenziali or {}).get("token", "")}
     while url and len(prodotti) < tetto:
         stato, corpo, risposta = chiama("GET", url, intestazioni)
         if stato != 200:
@@ -265,7 +373,241 @@ def leggi_catalogo_shopify(dominio: str, token: str, chiama,
     return prodotti, avviso
 
 
-LETTORI = {"shopify": leggi_catalogo_shopify}
+# --- WOOCOMMERCE ------------------------------------------------------
+# La differenza che decide tutto il resto: il negozio Shopify vive su
+# `nome.myshopify.com` — un dominio di un'azienda sola, normalizzato al
+# collegamento — mentre L'INDIRIZZO DI UN WOO LO SCRIVE L'UTENTE e puo'
+# essere qualunque cosa. Da li' le tre righe da non ammorbidire:
+#
+#  1. LA GUARDIA STA NEL TRASPORTO, cioe' in `url_api_ammesso` dentro
+#     `chiama_api_negozio`, e gira su OGNI chiamata — non solo sulla
+#     prima. E' il server ad averla, non questo modulo (qui non c'e'
+#     rete, e' il patto del `vaglio`): quindi ogni lettore futuro la
+#     eredita senza doversene ricordare.
+#  2. QUI DENTRO GLI URL SI COSTRUISCONO, MAI SI SEGUONO. Shopify
+#     pagina con un cursore opaco e l'indirizzo della pagina dopo lo
+#     scrive LUI nell'header `Link`; Woo pagina con un numero, quindi
+#     l'indirizzo lo componiamo noi dal `url_negozio` del collegamento
+#     e non c'e' NESSUN modo che il negozio ci mandi altrove — cioe'
+#     che si faccia consegnare le chiavi di un altro a un host che non
+#     abbiamo mai giudicato.
+#  3. `_base_woo` e' la cintura di forma: rifiuta tutto quello che non
+#     e' `https://host[/percorso]`. Non sostituisce la guardia del
+#     server — non risolve nessun nome e non sa niente di indirizzi
+#     privati — ma impedisce che da qui esca un URL con dentro una
+#     porta, una query o delle credenziali (`https://ck:cs@vero.it`,
+#     l'inganno visivo di `link_banner_ammesso`).
+
+_FORMA_BASE_WOO = re.compile(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~-]+)*")
+
+
+def _base_woo(url_negozio: str) -> str:
+    """L'indirizzo del negozio, ripulito, o alza.
+
+    Il percorso e' ammesso apposta: parecchi Woo vivono in una
+    sottocartella (`https://sito.it/shop`), e pretendere la radice
+    taglierebbe fuori negozi veri."""
+    base = str(url_negozio or "").strip().rstrip("/")
+    if not _FORMA_BASE_WOO.fullmatch(base):
+        raise RuntimeError(
+            "l'indirizzo del negozio non e' un https:// che sappiamo "
+            "chiamare")
+    return base
+
+
+def _intestazioni_woo(credenziali: dict) -> dict:
+    """Le chiavi di WooCommerce viaggiano in BASIC AUTH e mai in
+    query string, che e' l'altra strada che la sua documentazione
+    concede: un segreto in un URL finisce nei log di ogni proxy che
+    sta in mezzo, e per giunta nei nostri se un domani qualcuno
+    stampasse l'indirizzo di una chiamata fallita."""
+    ck = str((credenziali or {}).get("consumer_key") or "")
+    cs = str((credenziali or {}).get("consumer_secret") or "")
+    if not ck or not cs:
+        raise RuntimeError("mancano le chiavi del negozio")
+    coppia = base64.b64encode(f"{ck}:{cs}".encode()).decode()
+    return {"Authorization": f"Basic {coppia}"}
+
+
+def _valore_impostazione(corpo, chiave: str):
+    """Il valore di una impostazione dentro la risposta di
+    `/settings/{gruppo}`, che e' una LISTA di voci `{id, value, ...}`.
+
+    Torna `None` quando non si trova, e la differenza con la stringa
+    vuota e' tutto il punto: chi chiama tratta il `None` come «non lo
+    sappiamo» e si ferma, invece di prendere un'assenza per una
+    risposta.
+    ATTENZIONE alla forma che arriva: il trasporto del server incarta
+    le liste in `{"lista": [...]}` (`_json_o_niente`), quindi qui si
+    accettano tutt'e due — e anche la voce singola, che e' quel che
+    risponde `/settings/{gruppo}/{id}`."""
+    voci = corpo
+    if isinstance(corpo, dict):
+        voci = corpo.get("lista")
+        if voci is None:
+            voci = [corpo] if corpo.get("id") else []
+    for v in voci or []:
+        if isinstance(v, dict) and v.get("id") == chiave:
+            valore = v.get("value")
+            return "" if valore is None else str(valore)
+    return None
+
+
+MSG_IVA_ESCLUSA = (
+    "i prezzi del tuo negozio sono scritti al NETTO dell'IVA: "
+    "cosi' non sappiamo quanto si paga davvero. Su WooCommerce, "
+    "Impostazioni → Tasse → «Prezzi inseriti con le tasse»")
+MSG_IVA_IGNOTA = (
+    "non riusciamo a sapere come sono scritti i prezzi del tuo "
+    "negozio (le impostazioni non rispondono): il catalogo aspetta")
+
+
+def prezzi_finiti_woo(base: str, intestazioni: dict, chiama) -> None:
+    """Il prezzo di un prodotto Woo E' quello che si paga? Se non lo
+    e', o non lo sappiamo, si ALZA e il catalogo non si legge.
+
+    E' LA DOMANDA PIU' IMPORTANTE DI QUESTA TAPPA, e la ragione e'
+    che WooCommerce non la risponde nel prodotto: `price` e' la cifra
+    COM'E' STATA SCRITTA nel pannello, e se il negozio e' configurato
+    «prezzi inseriti SENZA le tasse» quella cifra e' il netto — cioe'
+    su un'aliquota al 22% importeremmo in vetrina un prezzo piu' basso
+    del 18% di quello che sul suo sito il cliente paga davvero. Il
+    venditore lo scoprirebbe incassando, che e' il modo peggiore.
+    L'ALIQUOTA NON SI INDOVINA: dipende dalla classe di tassazione del
+    prodotto e dal paese di chi compra (`/taxes` ne restituisce una
+    tabella, non un numero), quindi correggere a mano vorrebbe dire
+    scrivere un prezzo che non e' il suo — ed e' esattamente quel che
+    questo progetto non fa mai col denaro.
+
+    PERCHE' ALZA INVECE DI SALTARE LE RIGHE, ed e' la riga da capire
+    prima di toccarla: una riga saltata NON entra in `viste`, quindi
+    la riconciliazione la tratterebbe come sparita dal negozio e la
+    SPEGNEREBBE. Saltare tutto il catalogo vorrebbe dire spegnere la
+    vetrina di quel venditore in un colpo. Un catalogo di cui non
+    sappiamo leggere i prezzi e' un catalogo che NON SI E' POTUTO
+    LEGGERE — la stessa cosa di una rete caduta — e il giro lo tratta
+    cosi': si conta l'errore, la vetrina resta com'era, e il motivo
+    vero finisce in `ultimo_errore`, dove il venditore lo legge.
+
+    FAIL-CLOSED su cio' che non si sa, come `importo_invoice`: fra un
+    connettore che non parte (visibile, diagnosticabile, zero danno) e
+    dei prezzi forse sbagliati del 22% su cose che si comprano, si
+    sceglie il primo.
+
+    LA PORTA CHE MANCA, dichiarata: chi vende al netto apposta (i
+    negozi B2B) oggi resta fuori. La leva sarebbe un'aliquota
+    dichiarata dal venditore nel cassetto del collegamento — una
+    colonna e un campo, cioe' roba della tappa 5 — e finche' non c'e'
+    non si aggiunge una colonna per una cosa che non esiste."""
+    stato, corpo, _ = chiama(
+        "GET", f"{base}/wp-json/{VERSIONE_API_WOO}/settings/general",
+        intestazioni)
+    if stato != 200:
+        raise RuntimeError(MSG_IVA_IGNOTA)
+    tasse = _valore_impostazione(corpo, "woocommerce_calc_taxes")
+    if tasse is None:
+        raise RuntimeError(MSG_IVA_IGNOTA)
+    if tasse != "yes":
+        return          # le tasse sono spente: il prezzo e' quel che e'
+    stato, corpo, _ = chiama(
+        "GET", f"{base}/wp-json/{VERSIONE_API_WOO}/settings/tax",
+        intestazioni)
+    if stato != 200:
+        raise RuntimeError(MSG_IVA_IGNOTA)
+    incluse = _valore_impostazione(corpo, "woocommerce_prices_include_tax")
+    if incluse is None:
+        raise RuntimeError(MSG_IVA_IGNOTA)
+    if incluse != "yes":
+        raise RuntimeError(MSG_IVA_ESCLUSA)
+
+
+def _quanti_in_tutto(intestazioni) -> int:
+    """Quanti prodotti ha il negozio, secondo lui: WordPress lo dice
+    in `X-WP-Total` su ogni pagina. 0 = non l'ha detto.
+    Le chiavi si confrontano in minuscolo perche' un header non ha un
+    maiuscolo canonico (la lezione di `_prossima_pagina_shopify`)."""
+    for k, v in (intestazioni or {}).items():
+        if str(k).lower() == "x-wp-total":
+            try:
+                return int(str(v).strip())
+            except ValueError:
+                return 0
+    return 0
+
+
+def _prodotti_dalla_risposta(corpo) -> list:
+    """WooCommerce risponde con una lista nuda; il trasporto del
+    server la incarta in `{"lista": [...]}`. Si accettano tutt'e due,
+    e si tiene solo cio' che e' un prodotto."""
+    voci = corpo
+    if isinstance(corpo, dict):
+        voci = corpo.get("lista") or []
+    return [p for p in (voci or []) if isinstance(p, dict)]
+
+
+def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
+                       tetto: int = 200) -> tuple[list, str]:
+    """Il catalogo di un WooCommerce, pagina per pagina.
+
+    ALZA come il gemello Shopify, e per la stessa ragione: le
+    sparizioni si giudicano solo su un catalogo COMPLETO, quindi una
+    lettura a meta' non deve MAI tornare come una lista corta.
+
+    L'ORDINE E' PER ID CRESCENTE e non e' un vezzo: il default di
+    WooCommerce e' la data di pubblicazione, e con quello basta che il
+    venditore ritocchi un prodotto mentre stiamo paginando perche' una
+    riga scivoli fra due pagine e non la si veda — cioe' un prodotto
+    dichiarato sparito e spento per sbaglio. L'id non si muove."""
+    base = _base_woo(url_negozio)
+    intestazioni = _intestazioni_woo(credenziali)
+    prezzi_finiti_woo(base, intestazioni, chiama)
+    prodotti, pagina, restano = [], 1, False
+    totale = 0
+    while True:
+        url = (f"{base}/wp-json/{VERSIONE_API_WOO}/products"
+               f"?per_page={PER_PAGINA_WOO}&page={pagina}"
+               f"&orderby=id&order=asc")
+        stato, corpo, risposta = chiama("GET", url, intestazioni)
+        if stato != 200:
+            raise RuntimeError(f"WooCommerce ha risposto {stato}")
+        totale = totale or _quanti_in_tutto(risposta)
+        fetta = _prodotti_dalla_risposta(corpo)
+        prodotti.extend(fetta)
+        # la pagina corta e' la fine: WordPress non ha un cursore, e
+        # chiedere la pagina dopo l'ultima risponde 400
+        if len(fetta) < PER_PAGINA_WOO:
+            break
+        if len(prodotti) >= tetto:
+            # ci si ferma perche' il tetto e' arrivato, non perche' il
+            # catalogo e' finito: l'ultima pagina era PIENA
+            restano = True
+            break
+        pagina += 1
+    # NIENTE TETTI IN SILENZIO, ed e' un difetto vero preso provando e
+    # non leggendo: con cento prodotti per pagina e un tetto di
+    # duecento si atterra ESATTAMENTE sul tetto, quindi il confronto
+    # «ne ho letti piu' del tetto?» non scatta mai e il catalogo si
+    # troncherebbe senza dirlo — il venditore andrebbe a cercare i
+    # prodotti mancanti da tutt'altra parte. Il conto vero lo dice
+    # WordPress in `X-WP-Total`; senza quell'header vale il fatto che
+    # l'ultima pagina era piena.
+    # E IL CONTO VERO COMANDA DA SOLO: quando `X-WP-Total` c'e' dice
+    # anche che NON ne restano — senza questa precedenza un negozio
+    # con esattamente duecento prodotti (due pagine piene) si
+    # sentirebbe dire «ce n'e' ancora» a ogni giro, per sempre.
+    avviso = ""
+    if totale:
+        if totale > tetto:
+            avviso = (f"il tuo negozio ha {totale} prodotti e ne leggiamo "
+                      f"{tetto} per volta: il resto arriva ai giri "
+                      f"successivi")
+    elif restano or len(prodotti) > tetto:
+        avviso = (f"il catalogo ha piu' di {tetto} prodotti: "
+                  f"il resto arriva ai giri successivi")
+    return prodotti[:tetto], avviso
+
+
+LETTORI = {"shopify": leggi_catalogo_shopify, "woo": leggi_catalogo_woo}
 
 
 # --- LO STOCK ---------------------------------------------------------
@@ -514,6 +856,17 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     # --- la riga nuova ------------------------------------------------
     stato = "revisione" if marchio else ("attivo" if r["attivo"]
                                          else "rimosso")
+    # L'INVARIANTE DI CASA VALE ANCHE ALLA NASCITA, e non solo agli
+    # aggiornamenti: venduto <=> quantita = 0. Senza questa riga un
+    # prodotto che arriva GIA' esaurito nascerebbe 'attivo' con zero
+    # pezzi — in vetrina un annuncio comprabile all'occhio che alla
+    # cassa risponde di no, e nessuna scopa lo raddrizza (quella
+    # d'avvio va nell'altro verso: mette a zero i venduti).
+    # E' un caso raro su Shopify e QUOTIDIANO su Woo, dove
+    # `stock_status: outofstock` e' il modo normale di dire «finito»
+    # senza far gestire il magazzino a WooCommerce.
+    if stato == "attivo" and quantita == 0:
+        stato = "venduto"
     cur = con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,foto,valuta,prezzo_eur,quantita,quantita_max,"
