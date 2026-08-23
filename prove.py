@@ -1832,6 +1832,12 @@ def prove_abbandonati():
                      "annuncio_id INT, tg_id INT, puntata_id INT, "
                      "rilancio_id INT, importo_sats INT, motivo TEXT, "
                      "stato TEXT, creato INT, aggiornato INT)")
+        # gli sblocchi del banner: il quarto pagamento in entrata, che
+        # i due rami dell'orologio guardano insieme agli altri
+        vero.execute("CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, "
+                     "tg_id INT, motivo TEXT, importo_sats INT, "
+                     "payment_hash TEXT, invoice TEXT, stato TEXT, "
+                     "creato INT, pagato_il INT, aggiornato INT)")
         ora = int(_t.time())
         vero.executemany("INSERT INTO ordini VALUES(?,?,?,?,?)", [
             (1, "creato", "hash-pagato", ora - 2000, 0),   # pagato, mai visto
@@ -11112,6 +11118,30 @@ def prove_punti_salvati():
     NOTE = {"utenti", "firme_nostr", "doppioni_ignorati"}
     prova("ogni tabella figlia dell'utente e' nominata nella fusione",
           [], [t for t in con_tg if t not in NOTE and t not in fus])
+    # ⚠️ IL CENSIMENTO QUI SOPRA LEGGE ANCHE I COMMENTI, ed e' la
+    # trappola di casa: togliendo l'UPDATE dei `pagamenti` resta la
+    # parola nel commento che lo spiega, e la riga resta verde — l'ha
+    # detto la TORTURA, non la rilettura. Quindi il pezzo che muove i
+    # soldi si guarda nel CODICE, senza commenti.
+    _fus_codice = codice(fus)
+    prova("i pagamenti seguono l'utente: l'UPDATE c'e' davvero", True,
+          "UPDATE pagamenti SET tg_id=?" in _fus_codice)
+    # E LA PORTA CHE HANNO APERTO: il nativo Nostr che paga lo sblocco
+    # e poi collega Telegram perderebbe i suoi sats, perche'
+    # `banner_sbloccato_il` vive su `utenti` e la riga negativa muore.
+    # SI GUARDA LA LETTURA, non il nome della variabile: `_sbl_n = 0`
+    # lascia il nome dov'e' e la porta a terra — l'ha detto la
+    # TORTURA, che la sentinella di ieri («_sbl_n compare») la
+    # passava liscia. E' la stessa famiglia del sito che ESISTE ma
+    # non lo chiama nessuno.
+    prova("...e con loro la porta che hanno aperto", True,
+          'n["banner_sbloccato_il"]' in _fus_codice
+          and 'p["banner_sbloccato_il"]' in _fus_codice
+          and "UPDATE utenti SET banner_sbloccato_il=?" in _fus_codice)
+    # si tiene la data PIU' VECCHIA: e' quella del primo sblocco, e la
+    # fusione non deve poterla spostare in avanti
+    prova("...tenendo la data del primo sblocco", True,
+          "_sbl_n < _sbl_p" in _fus_codice)
 
     # --- il client ------------------------------------------------------
     # LA COLLOCAZIONE E' PORTANTE: in DEMO `apriAcquisto` monta
@@ -11353,6 +11383,19 @@ def prove_pagina_acquisto():
         j = src.index("INSERT INTO ordini", i)
         prova(f"{chi}: zero await tra invoice e INSERT", False,
               "await " in codice(src[i:j]))
+    # IL QUARTO CHIAMANTE (ago 2026): lo sblocco del banner scrive in
+    # `pagamenti` e non in `ordini`, quindi il giro qui sopra NON lo
+    # vedeva — sarebbe nato scoperto proprio il chiamante nuovo, che
+    # e' l'unico caso in cui questa sentinella serve davvero.
+    i = src.index("crea_invoice_escrow(", src.index("def sblocca_banner("))
+    j = src.index("INSERT INTO pagamenti", i)
+    prova("sblocca_banner: zero await tra invoice e INSERT", False,
+          "await " in codice(src[i:j]))
+    # E IL CENSIMENTO DEI CHIAMANTI, che vale piu' dell'elenco: sono
+    # QUATTRO, e il quinto di domani lo sente da qui invece di
+    # scoprirlo il giorno che un incasso resta senza riga.
+    prova("chi conia una fattura in entrata e' quattro", 4,
+          codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
     #    imperfezione dichiarata): ne' il costo ne' il testo.
@@ -12426,7 +12469,11 @@ def prove_libro_mastro():
           sconto_pacco_percento INT DEFAULT 0,
           sped_gratis_soglia INT DEFAULT 0,
           sped_gratis_soglia_eur INT DEFAULT 0,
-          sped_gratis_valuta TEXT DEFAULT 'eur');
+          sped_gratis_valuta TEXT DEFAULT 'eur',
+          banner_sbloccato_il INT DEFAULT 0);
+        CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
+          motivo TEXT, riferimento TEXT DEFAULT '', importo_sats INT,
+          stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '');
         CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
           WHERE motivo IN ('perdente','annullo_admin');
         CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)
@@ -12507,6 +12554,17 @@ def prove_libro_mastro():
                 (666, 'pezzi',  2, 0,     0,   'eur',  10, 50000, 0,  'sats'),
                 (777, 'entrambi', 3, 0,   25,  'eur',  10, 0,     0,  'eur'),
                 (444, 'pezzi',  0, 0,     0,   'eur',  0,  0,     0,  'eur');
+        -- UNO SBLOCCO SANO: ha pagato e la porta si e' aperta. Piu'
+        -- una LAPIDE e una fattura ancora viva, che sono i due stati
+        -- normali e non devono suonare — e un RIMBORSATO con la
+        -- porta richiusa, che e' il gesto del moderatore andato a
+        -- buon fine.
+        UPDATE utenti SET banner_sbloccato_il=500 WHERE tg_id=222;
+        INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato)
+          VALUES(1, 222, 'banner', 10000, 'pagato'),
+                (2, 333, 'banner', 10000, 'annullato'),
+                (3, 333, 'banner', 10000, 'creato'),
+                (4, 555, 'banner', 10000, 'rimborsato');
         """)
         return con
 
@@ -12658,6 +12716,19 @@ def prove_libro_mastro():
         ("UPDATE ordini SET indirizzo='via Roma 1', indirizzo_il=99, "
          "indirizzo_purgato_il=100 WHERE id=4",
          "indirizzo fuori contratto", "4"),
+        # LO SBLOCCO DEL BANNER, e sono i quattro modi in cui il primo
+        # incasso nostro puo' rompersi SENZA che niente alzi la voce:
+        # nessuna eccezione, nessuna riga di journal, nessuna prova
+        # rossa — solo qualcuno che ha pagato e non ha avuto niente.
+        ("UPDATE utenti SET banner_sbloccato_il=0 WHERE tg_id=222",
+         "sblocco pagato e porta chiusa", "1"),
+        ("UPDATE utenti SET banner_sbloccato_il=700 WHERE tg_id=444",
+         "porta del banner aperta senza pagamento", "444"),
+        ("INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato) "
+         "VALUES(9, 222, 'banner', 10000, 'pagato')",
+         "sblocco pagato due volte", "1"),
+        ("UPDATE utenti SET banner_sbloccato_il=500 WHERE tg_id=555",
+         "sblocco rimborsato e porta ancora aperta", "4"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -18834,8 +18905,84 @@ def prove_fogli_di_casa():
     # collegamento se ne va e i suoi annunci escono dalla vetrina —
     # e per questo il suo corpo dice le due cose che non si disfano:
     # gli annunci si spengono, e ricollegare e' un catalogo NUOVO.
-    prova("i gesti che passano dalla domanda unica sono dieci", 10,
+    # UNDICI con lo sblocco a pagamento del banner, ed e' l'unico
+    # degli undici che chiede prima di MUOVERE DEI SATS: per questo
+    # il suo corpo deve dire le due cose che non si disfano — si paga
+    # una volta sola, e un banner rifiutato non li restituisce.
+    prova("i gesti che passano dalla domanda unica sono undici", 11,
           solo_codice(mini).count("chiediConferma({"))
+    _sbl = fetta("function chiediSblocco(", "async function sbloccaBanner")
+    prova("...e quello dello sblocco dice che si paga una volta sola",
+          True, "una volta sola" in _sbl)
+    prova("...e che un rifiuto non restituisce i sats", True,
+          "non tornano indietro" in _sbl)
+    # I TRE DISPATCH DEL paySheet, che sono il punto in cui questo
+    # cantiere poteva rompere i tre flussi di ieri: quel foglio
+    # serve QUATTRO pagamenti (ordine, set, puntata, sblocco) e a
+    # dire quale sia e' una variabile-modalita'. Le tre sentinelle
+    # qui sotto sono nate dalla TORTURA, che le ha viste mancare:
+    # senza, «Ho pagato» verifica un ORDINE che non esiste,
+    # «Annulla» manda lo sblocco sulla strada di un ordine, e il
+    # foglio promette «a garanzia» dei sats che non tornano.
+    _paid = fetta("function sheetPaid(", "function simulatePaid(")
+    prova("«Ho pagato» conosce lo sblocco", True,
+          "verificaSblocco(pagamentoCorrente)" in _paid)
+    _ann = fetta("async function annullaPagamento(",
+                 "function sheetPaid(")
+    # IL TERNARIO, non la stringa: `const url = false ? ...` lascia
+    # il percorso scritto li' e manda lo sblocco sulla strada
+    # dell'ordine — un 404, e il pagamento resta 'creato' finche'
+    # non passa l'orologio. Sopravvissuta alla prima tortura.
+    prova("«Annulla» ha la strada dello sblocco, non quella "
+          "dell'ordine", True,
+          "pag ? `${API_BASE}/pagamenti/${pag}/annulla`" in _ann
+          and "pagamentoCorrente = null;" in _ann)
+    _vesti = fetta("function vestiPaySheet(", "let astaInfo")
+    prova("il paySheet ha i due modi, e la tassa non dice "
+          "«a garanzia»", True,
+          "modo === 'tassa'" in _vesti
+          and "non sono un deposito" in _vesti)
+    # ...E IL VESTITO HA UNA REGIA SOLA, che e' la cura del difetto
+    # trovato DAL VIVO: la prima stesura lo metteva a mano nello
+    # sblocco e nessuno rimetteva quello dell'escrow, quindi dopo
+    # una tassa l'ordine successivo prometteva «questi sats non sono
+    # un deposito» su un deposito — il rovescio esatto del difetto
+    # che i due testi esistono per togliere. Adesso il modo si
+    # DERIVA dalla variabile-modalita' dentro `mostraQr`, che e' il
+    # collo di bottiglia di tutti i flussi che aprono il foglio.
+    _qr = fetta("async function mostraQr(",
+                "async function annullaPagamento(")
+    prova("il vestito lo decide mostraQr, dalla variabile-modalita'",
+          True,
+          "vestiPaySheet(pagamentoCorrente ? 'tassa' : 'escrow')"
+          in _qr)
+    # e NESSUN flusso se lo veste a mano: due regie sono due posti
+    # che un giorno dicono due cose diverse sullo stesso foglio.
+    prova("...e nessun flusso lo veste per conto suo", 1,
+          solo_codice(mini).count("vestiPaySheet(")
+          - solo_codice(mini).count("function vestiPaySheet("))
+    # LA CIFRA NON SI PERDE nel cambio d'abito: il titolo contiene
+    # `#payAmount`, e riscriverlo lo ricrea vuoto — senza questa
+    # riga l'importo sparirebbe da OGNI paySheet, che e' il prezzo
+    # di avere una regia sola.
+    prova("...e il cambio d'abito non perde l'importo", 2,
+          _vesti.count("el('payAmount').textContent = cifra;"))
+    # e il MARKUP nasce col testo dell'escrow: un flusso che si
+    # dimenticasse di vestirlo mostra la frase di ieri (che per tre
+    # flussi su quattro e' anche quella giusta) invece di una
+    # casella vuota — fail-soft, che qui e' testo e non denaro.
+    _mk = mini[mini.index('id="payTitolo"'):]
+    prova("...e il markup nasce vestito da escrow", True,
+          "a garanzia" in _mk[:600])
+    # L'AZZERAMENTO nei tre flussi di sempre, o l'«Annulla» di un
+    # giro colpisce il pagamento di quello prima: e' la stessa
+    # ragione per cui `rilancioCorrente` si azzera gia' li'.
+    for chi, dove, fine in (
+            ("startBuy", "async function startBuy(", "async function ann"),
+            ("startBuySet", "async function startBuySet(", "async function inviaPuntata("),
+            ("inviaPuntata", "async function inviaPuntata(", "async function startBuy(")):
+        prova("%s azzera lo sblocco del giro prima" % chi, True,
+              "pagamentoCorrente = null;" in fetta(dove, fine))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):
         f = fetta(dove, "async function invia")
@@ -24625,10 +24772,29 @@ def prove_banner_negozio():
         tipo = "INTEGER DEFAULT 0" if c.endswith("_il") else "TEXT DEFAULT ''"
         prova(f"la colonna {c} e' fra le migrazioni additive", True,
               f'"{c} {tipo}"' in src)
-    # NIENTE colonna del pagamento: non si aggiunge una colonna per un
-    # cantiere che non c'e' (il precedente e' `utenti.comune`, inerte).
-    prova("nessuna colonna per un pagamento che non esiste", False,
-          "banner_sbloccato_il" in src)
+    # LA COLONNA DEL PAGAMENTO ORA C'E', e questa prova ha CAMBIATO
+    # LATO (ago 2026, la tappa 2): fino a ieri chiedeva che
+    # `banner_sbloccato_il` NON esistesse — «non si aggiunge una
+    # colonna per un cantiere che non c'e'», il precedente di
+    # `utenti.comune`. Il cantiere adesso c'e', quindi la prova
+    # diventa la sua gemella positiva invece di sparire: il nome era
+    # gia' stato scelto allora, e resta quello.
+    prova("la colonna dello sblocco pagato e' fra le migrazioni", True,
+          '"banner_sbloccato_il INTEGER DEFAULT 0"' in src)
+    prova("...e il prezzo e' una leva col suo default", True,
+          "BANNER_PREZZO_SATS = 10_000" in src)
+    prova("...anche nel config d'esempio", True,
+          "BANNER_PREZZO_SATS = 10_000"
+          in open("config_esempio.py", encoding="utf-8").read())
+    # LA TABELLA E' IL VERO CONTENUTO DEL CANTIERE: senza una riga
+    # per ogni incasso nostro, la riconciliazione con LNbits («ogni
+    # incasso senza riga e' un orfano») diventerebbe falsa il giorno
+    # stesso — ed e' un metodo che da SQL non si puo' rifare.
+    prova("la tabella dei pagamenti esiste", True,
+          "CREATE TABLE IF NOT EXISTS pagamenti(" in src)
+    for c in ("motivo TEXT NOT NULL", "importo_sats INTEGER NOT NULL",
+              "payment_hash TEXT DEFAULT ''", "invoice TEXT DEFAULT ''"):
+        prova(f"...con la colonna {c.split()[0]}", True, c in src)
 
     # ---- 2. IL GIUDICE DEL LINK, girato per davvero ---------------
     amb = {"re": _re, "urlparse": _up, "LINK_BANNER_MAX": 300}
@@ -24691,22 +24857,52 @@ def prove_banner_negozio():
     exec(pezzo("banner_porta_aperta"), amb2)
     porta, grad = amb2["banner_porta_aperta"], amb2["_gradino_livello"]
     prova("chi non ha concluso niente resta fuori", False,
-          porta(0, 0, "avviato"))
+          porta(0, 0, "avviato", 0))
     prova("...e nemmeno con gli XP ma zero affari", False,
-          porta(5000, 0, "avviato"))
+          porta(5000, 0, "avviato", 0))
     prova("un affare concluso e 150 XP: passa", True,
-          porta(150, 1, "avviato"))
+          porta(150, 1, "avviato", 0))
     prova("chi e' piu' avanti passa comunque (la scala)", True,
-          porta(9000, 40, "avviato"))
+          porta(9000, 40, "avviato", 0))
     prova("col gradino alto, chi e' avviato non passa", False,
-          porta(150, 1, "pratico"))
+          porta(150, 1, "pratico", 0))
     # FAIL-CLOSED: una leva scritta a mano e storta deve CHIUDERE la
     # porta, mai spalancarla a tutti. E' la ragione per cui il gradino
     # sconosciuto vale piu' dell'ultimo e non zero.
     prova("un livello inventato chiude la porta a chiunque", False,
-          porta(999999, 999, "livello-che-non-esiste"))
+          porta(999999, 999, "livello-che-non-esiste", 0))
     prova("...perche' il gradino ignoto vale piu' dell'ultimo", True,
           grad("boh") > grad("maestro"))
+
+    # LA SECONDA CHIAVE: LO SBLOCCO PAGATO (ago 2026, la tappa 2).
+    # Due strade per la stessa porta, e basta una — quindi le prove
+    # qui sopra provano ANCHE che il pagamento non e' diventato
+    # obbligatorio: passano tutte con `sbloccato_il` a zero.
+    prova("chi ha pagato entra senza il livello", True,
+          porta(0, 0, "avviato", 1_700_000_000))
+    prova("...e chi non ha ne' l'uno ne' l'altro resta fuori", False,
+          porta(0, 0, "avviato", 0))
+    prova("chi ha il livello entra senza pagare", True,
+          porta(150, 1, "avviato", 0))
+    # IL PAGAMENTO VINCE SUL FAIL-CLOSED, ed e' la riga da non
+    # ammorbidire: quel fail-closed difende la porta da una LEVA
+    # scritta storta, mai da una ricevuta. Chi ha pagato ha pagato.
+    prova("chi ha pagato entra anche col gradino scritto storto", True,
+          porta(0, 0, "livello-che-non-esiste", 1_700_000_000))
+    # La data e' una DATA e non un flag: un timestamp qualunque apre,
+    # e il giorno dell'abbonamento la scadenza si aggiunge qui.
+    prova("una data vecchia apre come una nuova", True,
+          porta(0, 0, "avviato", 1))
+    # I due argomenti in coda sono OBBLIGATORI (la lezione di
+    # `atteso_sats`): chi li dimentica lo sente da Python, invece di
+    # chiudere in silenzio la porta a chi ha pagato.
+    try:
+        porta(0, 0, "avviato")
+        _obbl = False
+    except TypeError:
+        _obbl = True
+    prova("lo sblocco e' un argomento obbligatorio, senza default",
+          True, _obbl)
 
     # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago
     # 2026, dal campo): il messaggio nominava il solo affare concluso,
@@ -25081,6 +25277,142 @@ def prove_banner_negozio():
                "https://x.it/?u=http://y.it"],
               _jsb.loads(_rb.stdout.strip()) if _rb.returncode == 0
               else "ERRORE: " + _rb.stderr[:160])
+
+    # ---- 11. LO SBLOCCO A PAGAMENTO, girato per davvero ------------
+    # Il primo incasso che Barattolo fa per se'. Le sentinelle dicono
+    # che le guardie ci sono; solo GIRANDOLE si vede che rispondono
+    # giusto — e qui il modo di sbagliare non alza niente: si conia
+    # una fattura di troppo, o si apre una porta che nessuno ha
+    # pagato, e nessuna eccezione lo racconta.
+    con2 = _sq.connect(":memory:")
+    con2.row_factory = _sq.Row
+    con2.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, negozio TEXT,
+        xp INT DEFAULT 0, vendite_ok INT DEFAULT 0,
+        acquisti_ok INT DEFAULT 0, banner_sbloccato_il INT DEFAULT 0);
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
+        importo_sats INT, payment_hash TEXT DEFAULT '',
+        invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
+        creato INT, pagato_il INT DEFAULT 0, aggiornato INT);
+      INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok)
+        VALUES(1,'ab12',0,0,0),      -- nudo: la porta e' chiusa
+             (2,'cd34',5000,9,9),   -- ce l'ha col LIVELLO
+             (3,'ef56',0,0,0);      -- paghera'
+    """)
+    con2.commit()
+
+    class _G2:
+        def __getattr__(self, n): return getattr(con2, n)
+        def close(self): pass
+
+    class _H2(Exception):
+        def __init__(self, code, detail=""):
+            self.code = code
+            super().__init__(detail)
+
+    fatture = []
+
+    async def _finta_invoice(sats, memo, expiry=900):
+        # LNbits SIMULATO: un collaudo non conia fatture vere senza
+        # che nessuno l'abbia chiesto
+        fatture.append((sats, memo))
+        return {"payment_hash": f"hash{len(fatture)}",
+                "payment_request": f"lnbc{len(fatture)}"}
+
+    detti2 = []
+
+    async def _notif2(tg, testo): detti2.append((tg, testo))
+    async def _notif_admin2(testo): detti2.append(("admin", testo))
+
+    amb5 = {"db": _G2, "time": __import__("time"),
+            "HTTPException": _H2, "Header": lambda d="": d,
+            "Cookie": lambda d="": d,
+            "crea_invoice_escrow": _finta_invoice,
+            "INVOICE_EXPIRY": 900, "BANNER_NEGOZIO_ATTIVO": True,
+            "BANNER_PREZZO_SATS": 10_000, "BANNER_LIVELLO": "avviato",
+            "MSG_BANNER_SPENTO": "spento",
+            "MSG_SBLOCCO_SPENTO": "sblocco spento",
+            "MSG_SBLOCCO_GIA": "La porta è già aperta",
+            "notifica": _notif2, "notifica_admin": _notif_admin2,
+            "_fmt_sats": lambda n: str(n),
+            "app": type("A", (), {"post": lambda *a, **k:
+                                  (lambda f: f)})()}
+    amb5["LIVELLI"] = amb2["LIVELLI"]   # la scala, gia' montata sopra
+    exec(pezzo("livello_utente"), amb5)
+    exec(pezzo("_gradino_livello"), amb5)
+    exec(pezzo("banner_porta_aperta"), amb5)
+    exec("async " + pezzo("_incassa_sblocco"), amb5)
+    exec("async " + pezzo("sblocca_banner"), amb5)
+    sblocca = amb5["sblocca_banner"]
+    incassa = amb5["_incassa_sblocco"]
+
+    def chi(n):
+        amb5["verifica_utente"] = lambda h, s: {"id": n}
+
+    # CHI HA GIA' LA PORTA NON PUO' PAGARE: e' la guardia che
+    # protegge l'utente da noi — nessuno deve comprare cio' che ha.
+    chi(2)
+    try:
+        _aio.run(sblocca(None))
+        _gia = False
+    except Exception as e:
+        _gia = "già aperta" in str(e)
+    prova("chi ha la porta col livello non puo' pagare", True, _gia)
+    prova("...e nessuna fattura e' stata coniata", 0, len(fatture))
+
+    # il giro vero: si conia UNA fattura e nasce UNA riga
+    chi(3)
+    r1 = _aio.run(sblocca(None))
+    prova("la fattura si conia per il prezzo della leva", (1, 10_000),
+          (len(fatture), fatture[0][0]))
+    prova("...col memo che si riconosce nel registro LNbits", True,
+          "sblocco banner" in fatture[0][1])
+    prova("...e la riga nasce 'creato'", ("creato", 10_000),
+          tuple(con2.execute("SELECT stato, importo_sats FROM pagamenti "
+                             "WHERE id=?", (r1["pagamento_id"],)).fetchone()))
+
+    # LA RIPRESA: chi ritocca il bottone si rivede LA SUA fattura, e
+    # non se ne conia una seconda — che sarebbe un secondo incasso
+    # possibile per la stessa porta.
+    r2 = _aio.run(sblocca(None))
+    prova("il secondo tocco ripresenta la stessa fattura",
+          (r1["pagamento_id"], True),
+          (r2["pagamento_id"], bool(r2.get("ripresa"))))
+    prova("...e non ne conia una seconda", 1, len(fatture))
+    prova("...e la riga resta UNA", 1,
+          con2.execute("SELECT COUNT(*) FROM pagamenti").fetchone()[0])
+
+    # L'INCASSO: la porta si apre NELLA STESSA transazione, ed e' cio'
+    # che rende impossibile lo stato «ha pagato e la porta e' chiusa»
+    # — quello che nessuna eccezione racconterebbe.
+    detti2.clear()
+    e1 = _aio.run(incassa(r1["pagamento_id"]))
+    prova("incassato: la riga e' pagata", "pagato", e1["stato"])
+    prova("...e la porta si e' aperta nello stesso giro", True,
+          (con2.execute("SELECT banner_sbloccato_il FROM utenti "
+                        "WHERE tg_id=3").fetchone()[0] or 0) > 0)
+    prova("...il venditore lo viene a sapere", True,
+          any(t == 3 for t, _ in detti2))
+    prova("...e i moderatori pure: e' il primo incasso nostro", True,
+          any(t == "admin" for t, _ in detti2))
+
+    # IDEMPOTENTE: il poll e l'orologio possono arrivare insieme, e il
+    # secondo giro non deve rinotificare nessuno.
+    detti2.clear()
+    e2 = _aio.run(incassa(r1["pagamento_id"]))
+    prova("il secondo giro non fa niente", "pagato", e2["stato"])
+    prova("...e non rinotifica nessuno", 0, len(detti2))
+
+    # e ora che la porta e' aperta, non si puo' ripagare
+    try:
+        _aio.run(sblocca(None))
+        _due = False
+    except Exception as e:
+        _due = "già aperta" in str(e)
+    prova("chi ha pagato non puo' pagare due volte", True, _due)
+    prova("...e la fattura resta una sola", 1, len(fatture))
+    con2.close()
 
 
 def prove_connettori():

@@ -314,3 +314,45 @@ SELECT '20) I PAGAMENTI CONGELATI (non è un guasto: è la coda)' AS polso;
 SELECT id, stato, payout_stato, payout_verso, payout_hash,
        datetime(aggiornato, 'unixepoch', 'localtime') AS da_quando
   FROM ordini WHERE payout_stato = 'incerto' ORDER BY aggiornato;
+
+SELECT '17e) LO SBLOCCO PAGATO DEL BANNER' AS controllo;
+-- I QUATTRO MODI in cui il primo incasso nostro puo' rompersi senza
+-- che niente alzi la voce. Devono stampare "(nessuna riga)".
+-- 1) ha pagato e la porta non si e' aperta
+SELECT p.id, p.tg_id, p.importo_sats,
+       datetime(p.pagato_il, 'unixepoch', 'localtime') AS pagato
+  FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
+ WHERE p.motivo = 'banner' AND p.stato = 'pagato'
+   AND COALESCE(u.banner_sbloccato_il, 0) = 0;
+-- 2) la porta si e' aperta senza che nessuno abbia pagato
+SELECT u.tg_id, u.negozio,
+       datetime(u.banner_sbloccato_il, 'unixepoch', 'localtime') AS aperta
+  FROM utenti u WHERE COALESCE(u.banner_sbloccato_il, 0) > 0
+   AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id = u.tg_id
+     AND p.motivo = 'banner' AND p.stato IN ('pagato','rimborsato'));
+-- 3) pagato due volte la stessa porta
+SELECT tg_id, motivo, COUNT(*) AS quanti, SUM(importo_sats) AS sats
+  FROM pagamenti WHERE stato = 'pagato'
+ GROUP BY tg_id, motivo, riferimento HAVING COUNT(*) > 1;
+-- 4) rimborsato ma la porta e' rimasta aperta
+SELECT p.id, p.tg_id FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
+ WHERE p.motivo = 'banner' AND p.stato = 'rimborsato'
+   AND COALESCE(u.banner_sbloccato_il, 0) > 0
+   AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id = p.tg_id
+     AND q.motivo = 'banner' AND q.stato = 'pagato');
+
+SELECT '21) IL POLSO DEGLI INCASSI NOSTRI (non e'' un allarme)' AS polso;
+-- Quanto ha incassato Barattolo per se', e in che stato sono le righe.
+-- E' anche la lista da incrociare col registro LNbits: il memo dice
+-- «Barattolo sblocco banner #tg_id», e ogni incasso di quel tipo
+-- DEVE avere una riga qui — altrimenti e' un orfano.
+SELECT motivo, stato, COUNT(*) AS quanti, SUM(importo_sats) AS sats
+  FROM pagamenti GROUP BY motivo, stato ORDER BY motivo, stato;
+-- le ultime dieci, per guardarle una per una
+SELECT id, tg_id, motivo, importo_sats, stato, payment_hash,
+       datetime(creato, 'unixepoch', 'localtime') AS quando
+  FROM pagamenti ORDER BY id DESC LIMIT 10;
+-- e i congelati di questa tabella (il gemello della 20)
+SELECT id, tg_id, stato, payout_stato, payout_hash,
+       datetime(aggiornato, 'unixepoch', 'localtime') AS da_quando
+  FROM pagamenti WHERE payout_stato = 'incerto' ORDER BY aggiornato;

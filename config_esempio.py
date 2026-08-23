@@ -222,6 +222,13 @@ BANNER_NEGOZIO_ATTIVO = False   # interruttore generale (False = spento)
 # quasi nessuno e la funzione nascerebbe morta.
 # I gradini sono: nuovo · avviato · pratico · esperto · maestro.
 BANNER_LIVELLO = "avviato"
+# Il PREZZO per anticipare la porta senza aspettare il livello (tappa
+# 2): chi ha fretta paga e la apre subito. Si paga UNA VOLTA e vale
+# per sempre. E' il primo incasso che Barattolo fa per se', quindi
+# ogni sblocco lascia una riga nella tabella `pagamenti`: senza,
+# sembrerebbe un orfano al giro di riconciliazione con LNbits.
+# 0 = sblocco a pagamento spento, resta solo la strada del livello.
+BANNER_PREZZO_SATS = 10_000
 # Gli accorciatori, ed e' la riga che regge la moderazione del link: un
 # «bit.ly/xyz» si approva pulito e domani punta altrove, quindi il link
 # dev'essere ISPEZIONABILE. Match sul dominio, sottodomini compresi.

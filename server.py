@@ -979,6 +979,19 @@ try:
     from config import BANNER_LIVELLO
 except ImportError:
     BANNER_LIVELLO = "avviato"
+# IL PREZZO DELLA PORTA (ago 2026, tappa 2): chi non ha il livello la
+# apre pagando. E' il PRIMO incasso che Barattolo fa per se' — finora
+# ogni invoice in entrata era escrow per conto di terzi — e per questo
+# il cantiere vero non e' la fattura ma il LIBRO MASTRO: senza una
+# riga che lo registri, ogni sblocco pagato sembrerebbe un orfano al
+# giro di riconciliazione (vedi la tabella `pagamenti`).
+# 0 = sblocco a pagamento SPENTO: resta solo la strada del livello.
+# E' il freno d'emergenza, non una taratura — la cifra si cambia
+# scrivendo un altro numero, non azzerandolo.
+try:
+    from config import BANNER_PREZZO_SATS
+except ImportError:
+    BANNER_PREZZO_SATS = 10_000
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -1738,19 +1751,33 @@ def _gradino_livello(id_livello: str) -> int:
     return len(LIVELLI) + 1
 
 
-def banner_porta_aperta(xp: int, affari: int, livello_minimo: str) -> bool:
-    """Chi puo' CHIEDERE un banner. Oggi la porta la apre solo il
-    livello, ed e' un filtro alla CODA e non un premio: a commissione
-    spenta un livello si compra con due account e un ordine finto,
-    quindi il freno vero resta la revisione umana.
-    IL GIUDICE ESISTE ANCHE CON UNA CONDIZIONE SOLA, ed e' il motivo
-    per cui vale la pena averlo: il giorno che la porta si potra'
-    anticipare pagando, ad allargarsi e' QUESTA riga e nessun'altra.
-    `livello_minimo` e' obbligatorio e senza default apposta (la
-    lezione di `atteso_sats`): chi lo dimentica lo sente da Python
-    invece di ereditare in silenzio una soglia che non ha scelto."""
-    return livello_utente(xp, affari)["numero"] >= _gradino_livello(
-        livello_minimo)
+def banner_porta_aperta(xp: int, affari: int, livello_minimo: str,
+                        sbloccato_il: int) -> bool:
+    """Chi puo' CHIEDERE un banner. DUE STRADE per la stessa porta, e
+    basta una: il LIVELLO, che si guadagna commerciando, oppure lo
+    SBLOCCO PAGATO (tappa 2, ago 2026) — chi ha fretta anticipa.
+    Il livello resta un filtro alla CODA e non un premio: a
+    commissione spenta si compra con due account e un ordine finto,
+    quindi il freno vero e' e resta la revisione umana. Il pagamento
+    non lo indebolisce: e' l'altra porta, non una scorciatoia alla
+    moderazione — quel che si compra e' il DIRITTO DI CHIEDERE.
+    ERA LA RIGA GIA' DICHIARATA: «il giorno che la porta si potra'
+    anticipare pagando, ad allargarsi e' QUESTA riga e nessun'altra».
+    Ed e' andata cosi': i due chiamanti passano un campo in piu'.
+    IL PAGAMENTO VINCE SUL FAIL-CLOSED del gradino ignoto, ed e' la
+    riga da non ammorbidire: chi ha pagato ha pagato, anche se
+    `BANNER_LIVELLO` nel config e' scritto storto — quel fail-closed
+    difende la porta da una leva sbagliata, mai da una ricevuta.
+    `sbloccato_il` e' la DATA dello sblocco e non un booleano
+    (decisione di Andrea): oggi si paga una volta e vale per sempre,
+    e il giorno dell'abbonamento la scadenza si aggiunge qui senza
+    migrare una riga.
+    I DUE argomenti in coda sono obbligatori e SENZA DEFAULT apposta
+    (la lezione di `atteso_sats`): chi li dimentica lo sente da
+    Python, invece di chiudere in silenzio la porta a chi ha pagato
+    o di ereditare una soglia che non ha scelto."""
+    return bool(sbloccato_il) or livello_utente(
+        xp, affari)["numero"] >= _gradino_livello(livello_minimo)
 
 
 # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago 2026,
@@ -2535,6 +2562,58 @@ def init_db():
         valore REAL DEFAULT 0,        -- euro per BTC
         quando INTEGER DEFAULT 0      -- quando l'abbiamo letto (unix)
     );
+    CREATE TABLE IF NOT EXISTS pagamenti(
+        -- IL PRIMO INCASSO CHE BARATTOLO FA PER SE' (ago 2026, la
+        -- tappa 2 del banner). Fino a ieri ogni invoice in entrata
+        -- era escrow per conto di terzi, e la riconciliazione
+        -- poggiava su UNA affermazione: «crea_invoice_escrow e'
+        -- l'unica cosa che emette fatture in entrata, e tutti i suoi
+        -- chiamanti scrivono subito una riga in `ordini` o
+        -- `rilanci` — ogni incasso senza riga e' un orfano». Un
+        -- quarto chiamante la falsifica il giorno stesso: questa
+        -- tabella e' la riga che la tiene vera, ed e' il vero
+        -- contenuto di quel cantiere (il libro mastro, non la
+        -- fattura).
+        -- GENERICA CON UN TIPO, perche' le sponsorizzazioni sono la
+        -- stessa famiglia e non devono ricomprarsi tutto: `motivo`
+        -- dice PER COSA si paga. Il modello e' `rilanci`: una riga
+        -- per FATTURA, con la sua lapide.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        motivo TEXT NOT NULL,           -- 'banner' (domani: 'sponsor'...)
+        riferimento TEXT DEFAULT '',    -- '' per il banner: la porta e'
+                                        -- dell'UTENTE, non di un annuncio.
+                                        -- Servira' alle sponsorizzate.
+        importo_sats INTEGER NOT NULL,  -- FOTOGRAFATO alla fattura: la leva
+                                        -- puo' cambiare domani e la ricevuta
+                                        -- deve dire quel che si e' pagato
+        payment_hash TEXT DEFAULT '',
+        invoice TEXT DEFAULT '',        -- la bolt11: serve alla RIPRESA, come
+                                        -- `ordini.invoice` (chi ritocca il
+                                        -- bottone si rivede la SUA fattura,
+                                        -- non una seconda)
+        stato TEXT DEFAULT 'creato',    -- creato | pagato | annullato (la
+                                        -- lapide) | rimborsato
+        creato INTEGER,
+        pagato_il INTEGER DEFAULT 0,
+        aggiornato INTEGER,
+        -- il rimborso del moderatore: mai dovuto, mai automatico
+        rimborso_il INTEGER DEFAULT 0,
+        rimborso_da INTEGER DEFAULT 0,      -- quale moderatore
+        invoice_rimborso TEXT DEFAULT '',
+        payout_stato TEXT DEFAULT '',      -- '' | incerto | uscito
+        payout_hash TEXT DEFAULT '',
+        payout_verso TEXT DEFAULT ''       -- sempre 'pagante': c'e' una
+                                            -- strada sola, ma si tiene per
+                                            -- avere una colonna in meno da
+                                            -- ricordare (come rimborsi_asta)
+    );
+    -- i due rami dell'orologio: chi guarda le fatture vive e le lapidi
+    CREATE INDEX IF NOT EXISTS idx_pagamenti_stato
+        ON pagamenti(stato, creato);
+    -- «questa porta e' gia' pagata?», la domanda di ogni giro
+    CREATE INDEX IF NOT EXISTS idx_pagamenti_utente
+        ON pagamenti(tg_id, motivo, stato);
     CREATE TABLE IF NOT EXISTS timbri(
         -- QUANDO UN AVVISO PERIODICO HA SUONATO L'ULTIMA VOLTA (ago
         -- 2026, da un caso vero: il termometro delle sottocategorie e'
@@ -2972,7 +3051,15 @@ def init_db():
                     "banner_stato TEXT DEFAULT ''",
                     "banner_motivo TEXT DEFAULT ''",
                     "banner_chiesto_il INTEGER DEFAULT 0",
-                    "banner_deciso_il INTEGER DEFAULT 0"):
+                    "banner_deciso_il INTEGER DEFAULT 0",
+                    # QUANDO la porta e' stata sbloccata pagando (0 = mai:
+                    # resta la strada del livello). E' una DATA e non un
+                    # flag — decisione di Andrea — cosi' il giorno
+                    # dell'abbonamento la scadenza si aggiunge senza
+                    # migrare niente. La scrive `_incassa_sblocco` e la
+                    # azzera il rimborso del moderatore: nessun'altra
+                    # strada la tocca.
+                    "banner_sbloccato_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -5899,6 +5986,30 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # per costruzione, e con lui migrano senza una riga.)
         con.execute("UPDATE connettori SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # I PAGAMENTI SEGUONO L'UTENTE, e con loro LA PORTA CHE HANNO
+        # APERTO (ago 2026). Non l'aveva previsto il piano: l'ha
+        # trovato lo stesso censimento delle tabelle figlie, ed e' un
+        # caso vero — il nativo Nostr che paga lo sblocco del banner e
+        # poi collega Telegram perderebbe i suoi 10.000 sats, perche'
+        # `banner_sbloccato_il` vive su `utenti` e la riga negativa
+        # muore qui dentro.
+        # LA DATA SI PORTA SOLO SE DI LA' NON C'E' GIA', e si tiene la
+        # PIU' VECCHIA: e' la data del PRIMO sblocco, e la fusione non
+        # deve poterla spostare in avanti (la stessa regola del
+        # `MAX(quantita_max)` e dell'`AND banner_sbloccato_il=0` di
+        # `_incassa_sblocco`).
+        # UNA RIGA SOLA come i connettori: `pagamenti` non ha nessuna
+        # UNIQUE che nomini il tg_id — due sblocchi delle due meta'
+        # sono due righe legittime, e la ronda del libro mastro li
+        # vede come «pagato due volte», che dopo una fusione e'
+        # esattamente la verita' da guardare.
+        con.execute("UPDATE pagamenti SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        _sbl_n = (n["banner_sbloccato_il"] or 0) if n else 0
+        _sbl_p = (p["banner_sbloccato_il"] or 0) if p else 0
+        if _sbl_n and (not _sbl_p or _sbl_n < _sbl_p):
+            con.execute("UPDATE utenti SET banner_sbloccato_il=? "
+                        "WHERE tg_id=?", (_sbl_n, id_telegram))
         # Le offerte seguono l'utente da entrambi i lati del banco;
         # le trattative tra le due meta' (auto-offerte, dopo la
         # fusione) muoiono qui, come i feedback degli auto-scambi.
@@ -12771,6 +12882,10 @@ def _leve_stato():
                   allarme=bool(BANNER_NEGOZIO_ATTIVO)),
             _leva("Banner: livello che apre la porta", "BANNER_LIVELLO",
                   BANNER_LIVELLO),
+            _leva("Banner: prezzo per anticipare la porta (sats)",
+                  "BANNER_PREZZO_SATS", int(BANNER_PREZZO_SATS or 0),
+                  spento="si apre solo col livello: nessuno puo' "
+                         "anticiparla pagando"),
             _leva("Banner: domini vietati", "BANNER_LINK_VIETATI",
                   len(BANNER_LINK_VIETATI),
                   spento="nessun accorciatore fermato: un link corto si "
@@ -20953,14 +21068,23 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # direbbero due cose diverse).
     _xp_ban = (u["xp"] or 0) if u else 0
     _aff_ban = ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0
+    _sbl_ban = (u["banner_sbloccato_il"] or 0) if u else 0
     _porta_ban = bool(u) and banner_porta_aperta(
-        _xp_ban, _aff_ban, BANNER_LIVELLO)
+        _xp_ban, _aff_ban, BANNER_LIVELLO, _sbl_ban)
     profilo["banner_leve"] = {
         "attivo": bool(BANNER_NEGOZIO_ATTIVO),
         "livello": BANNER_LIVELLO,
         "livello_nome": next(
             (l[3] for l in LIVELLI if l[2] == BANNER_LIVELLO), ""),
         "porta_aperta": _porta_ban,
+        # IL PREZZO ARRIVA DAL SERVER e il client non lo scrive mai a
+        # mano (il patto di `max_barattolo`): a 0 lo sblocco a
+        # pagamento e' spento e il bottone non nasce affatto.
+        "prezzo_sats": int(BANNER_PREZZO_SATS or 0),
+        # QUANDO l'ha pagata: serve al cassetto per dire «l'hai
+        # sbloccata» invece di ripetere la strada del livello a chi
+        # l'ha gia' percorsa in un altro modo.
+        "sbloccato_il": _sbl_ban,
         # A porta chiusa il MOTIVO viaggia gia' scritto, ed e' lo
         # STESSO testo del 400: il cassetto non lo ricompone (due
         # prose sulla stessa porta divergono al primo ritocco) e
@@ -21934,14 +22058,16 @@ async def salva_banner_negozio(req: Request,
     d = await leggi_json(req)
     con = db()
     u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
-                    "banner_foto_att FROM utenti WHERE tg_id=?",
+                    "banner_foto_att, banner_sbloccato_il "
+                    "FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     if not u or not u["negozio"]:
         con.close()
         raise HTTPException(400, "Il tuo negozio non è ancora pronto")
     _xp = u["xp"] or 0
     _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
-    if not banner_porta_aperta(_xp, _affari, BANNER_LIVELLO):
+    if not banner_porta_aperta(_xp, _affari, BANNER_LIVELLO,
+                               u["banner_sbloccato_il"] or 0):
         con.close()
         raise HTTPException(400, msg_banner_chiuso(_xp, _affari,
                                                    BANNER_LIVELLO))
@@ -21993,6 +22119,207 @@ async def togli_banner_negozio(x_tg_init_data: str = Header(""),
               (u["banner_foto_att"] if u else "")):
         _togli_banner_file(f)
     return {"ok": True, "stato": ""}
+
+
+# --- LA PORTA SI ANTICIPA PAGANDO (ago 2026, la tappa 2) ------------
+# Il primo incasso che Barattolo fa per se'. Quel che si compra e' LA
+# PORTA e non il banner (decisione di Andrea), ed e' la riga che
+# rende onesto tutto il resto: un banner rifiutato o spento non da'
+# diritto a niente — se ne rifa' un altro, e la porta resta aperta.
+# Lo si dice PRIMA di pagare, nel foglio della conferma.
+#
+# LE GUARDIE STANNO TUTTE PRIMA DELLA FATTURA, e la ragione e' la
+# regola di casa: un 400 dopo `crea_invoice_escrow` lascerebbe una
+# fattura orfana, cioe' sats che possono arrivare senza una riga su
+# cui posarsi. Qui si puo' fare meglio del calco di `fai_puntata`,
+# che un 409 dopo la fattura ce l'ha e lo dichiara: LA
+# QUARTA GUARDIA NON SERVE — non c'e' nessuna risorsa contesa (niente
+# stock, nessuna gara, nessuno che possa soffiare la porta a un
+# altro), quindi l'unica corsa possibile e' il doppio tocco, e quella
+# la chiude la RIPRESA qui sotto. Nessun ricontrollo dopo la fattura,
+# e nessun await fra la fattura e l'INSERT.
+MSG_SBLOCCO_SPENTO = ("Lo sblocco a pagamento non è attivo: il banner "
+                      "si prende col livello")
+MSG_SBLOCCO_GIA = "La porta è già aperta: il banner puoi chiederlo adesso"
+
+
+@app.post("/api/me/banner/sblocca")
+async def sblocca_banner(req: Request,
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """La fattura che apre la porta del banner.
+
+    LA RIPRESA, e non un rifiuto: chi ha gia' una fattura viva si
+    rivede LA SUA (`pagamenti.invoice` esiste per questo, come
+    `ordini.invoice`). Il 400 «hai gia' una fattura in corso» di
+    `fai_puntata` qui sarebbe piu' povero — la' la cifra puo' essere
+    cambiata perche' la gara e' andata avanti, qui il prezzo e' lo
+    stesso e la fattura di prima e' ancora buona.
+
+    CHI HA GIA' LA PORTA NON PUO' PAGARE, ed e' la guardia che
+    protegge l'utente da noi: nessuno deve poter comprare una cosa
+    che ha gia' — ne' chi ha il livello, ne' chi ha gia' pagato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not BANNER_NEGOZIO_ATTIVO:
+        raise HTTPException(400, MSG_BANNER_SPENTO)
+    prezzo = int(BANNER_PREZZO_SATS or 0)
+    if prezzo <= 0:
+        raise HTTPException(400, MSG_SBLOCCO_SPENTO)
+    con = db()
+    u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
+                    "banner_sbloccato_il FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not u or not u["negozio"]:
+        con.close()
+        raise HTTPException(400, "Il tuo negozio non è ancora pronto")
+    _xp = u["xp"] or 0
+    _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+    if banner_porta_aperta(_xp, _affari, BANNER_LIVELLO,
+                           u["banner_sbloccato_il"] or 0):
+        con.close()
+        raise HTTPException(400, MSG_SBLOCCO_GIA)
+    adesso = int(time.time())
+    # LA RIPRESA: la finestra e' quella fisica del pagamento (30
+    # minuti), la stessa di `_riservati` — copre la vita della
+    # fattura (15) piu' il giro dell'orologio che la seppellisce.
+    viva = con.execute(
+        "SELECT * FROM pagamenti WHERE tg_id=? AND motivo='banner' "
+        "AND stato='creato' AND creato>=?",
+        (user["id"], adesso - 1800)).fetchone()
+    if viva and viva["invoice"]:
+        con.close()
+        return {"pagamento_id": viva["id"], "invoice": viva["invoice"],
+                "payment_hash": viva["payment_hash"],
+                "importo_sats": viva["importo_sats"],
+                "scadenza_invoice": INVOICE_EXPIRY, "ripresa": True}
+    # L'UNICO await. Il memo e' riconoscibile a colpo d'occhio nel
+    # registro LNbits — che e' tutto cio' che la riconciliazione a
+    # mano chiede — e NON somiglia ai tre dell'escrow, che non si
+    # toccano.
+    inv = await crea_invoice_escrow(
+        prezzo, f"Barattolo sblocco banner #{user['id']}")
+    # Da qui al commit NESSUN await: il patto mono-processo.
+    con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
+                "importo_sats,payment_hash,invoice,stato,creato,"
+                "aggiornato) VALUES(?,'banner','',?,?,?,'creato',?,?)",
+                (user["id"], prezzo, inv["payment_hash"],
+                 inv["payment_request"], adesso, adesso))
+    pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    return {"pagamento_id": pid, "invoice": inv["payment_request"],
+            "payment_hash": inv["payment_hash"], "importo_sats": prezzo,
+            "scadenza_invoice": INVOICE_EXPIRY}
+
+
+@app.post("/api/pagamenti/{pagamento_id}/verifica")
+async def verifica_pagamento_sblocco(pagamento_id: int,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """Il poll dello sblocco, gemello di `verifica_rilancio`.
+    La guardia di proprieta' sta DENTRO la WHERE: chi enumera non
+    impara niente — «non e' tuo» e «non esiste» rispondono uguale."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    p = con.execute("SELECT id, stato, payment_hash FROM pagamenti "
+                    "WHERE id=? AND tg_id=?",
+                    (pagamento_id, user["id"])).fetchone()
+    con.close()          # niente transazione aperta durante l'await
+    if not p:
+        raise HTTPException(400, "Operazione non permessa")
+    if p["stato"] != "creato":
+        return {"stato": p["stato"]}
+    if not await invoice_pagata(p["payment_hash"]):
+        return {"stato": "in_attesa"}
+    return await _incassa_sblocco(pagamento_id)
+
+
+@app.post("/api/pagamenti/{pagamento_id}/annulla")
+async def annulla_pagamento_sblocco(pagamento_id: int,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """Chi ci ripensa: la fattura 'creato' diventa la LAPIDE
+    'annullato' — mai un DELETE, che un saldo arrivato dopo deve avere
+    una riga su cui atterrare, e `controlla_annullati` lo riacciuffa.
+    Il gemello di `annulla_rilancio`: pagamento controllato PRIMA,
+    CAS sullo stato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    p = con.execute("SELECT * FROM pagamenti WHERE id=? AND tg_id=?",
+                    (pagamento_id, user["id"])).fetchone()
+    con.close()
+    if not p or p["stato"] != "creato":
+        raise HTTPException(400, "Operazione non permessa")
+    if await invoice_pagata(p["payment_hash"]):
+        raise HTTPException(409, "Questo pagamento risulta già arrivato: "
+                                 "niente da annullare — attendi un attimo "
+                                 "che la porta si apra")
+    con = db()
+    cur = con.execute("UPDATE pagamenti SET stato='annullato', "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (int(time.time()), pagamento_id))
+    con.commit()
+    con.close()
+    if cur.rowcount == 0:
+        raise HTTPException(409, "Il pagamento è arrivato proprio adesso: "
+                                 "la porta si sta aprendo")
+    return {"ok": True}
+
+
+async def _incassa_sblocco(pagamento_id: int) -> dict:
+    """I sats sono arrivati: si registra il pagamento E SI APRE LA
+    PORTA, nella STESSA transazione — ed e' quello che rende
+    impossibile lo stato «ha pagato e la porta e' chiusa», che
+    nessuna eccezione segnalerebbe e che solo la ronda del libro
+    mastro andrebbe a scoprire.
+    Estratta come `_incassa_ordine` perche' la chiamano in TRE: il
+    poll del telefono, il riacciuffo delle lapidi e l'ultimo sguardo
+    sugli abbandonati. Non ricontrolla la fattura: l'ha appena
+    chiesta il chiamante.
+    LA PORTA NON SI RISCRIVE SE C'E' GIA' (`AND banner_sbloccato_il=0`):
+    la data e' quella del PRIMO sblocco, e un secondo pagamento — che
+    le guardie impediscono, ma la ronda sorveglia lo stesso — non
+    deve poterla spostare in avanti."""
+    adesso = int(time.time())
+    con = db()
+    p = con.execute("SELECT * FROM pagamenti WHERE id=?",
+                    (pagamento_id,)).fetchone()
+    if not p or p["stato"] != "creato":
+        stato = p["stato"] if p else "annullato"
+        con.close()
+        return {"stato": stato}
+    cur = con.execute("UPDATE pagamenti SET stato='pagato', pagato_il=?, "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (adesso, adesso, pagamento_id))
+    if cur.rowcount == 0:
+        # ha vinto un altro giro (il poll, o l'orologio): esce a mani
+        # vuote e non rinotifica nessuno
+        con.commit()
+        con.close()
+        return {"stato": "pagato"}
+    con.execute("UPDATE utenti SET banner_sbloccato_il=? WHERE tg_id=? "
+                "AND banner_sbloccato_il=0", (adesso, p["tg_id"]))
+    con.commit()
+    con.close()
+    # Dopo il commit, mai prima. Al venditore la porta aperta; ai
+    # moderatori il fatto: e' il primo incasso nostro, e si guarda.
+    try:
+        await notifica(p["tg_id"],
+                       "🖼 <b>Porta aperta!</b> Hai sbloccato il banner "
+                       f"del negozio per {_fmt_sats(p['importo_sats'])} "
+                       "sats.\n\nOra puoi chiederlo dal Profilo, in "
+                       "«🖼 Banner del negozio». Lo guarderà un "
+                       "moderatore prima che vada in vetrina.")
+    except Exception as e:
+        print(f"⚠️ Avviso dello sblocco non partito: {e}")
+    try:
+        await notifica_admin(
+            f"💰 <b>Sblocco banner pagato.</b> "
+            f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
+            f"(pagamento #{pagamento_id}).")
+    except Exception as e:
+        print(f"⚠️ Polso dello sblocco non partito: {e}")
+    return {"stato": "pagato"}
 
 
 async def avvisa_banner(tg_id: int):
@@ -26100,6 +26427,11 @@ async def controlla_annullati():
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
         (adesso - RILANCIO_STANTIO,))]
+    # gli sblocchi del banner: stessa finestra degli ordini, che la
+    # loro fattura vive gli stessi 15 minuti
+    sblocchi = [dict(r) for r in con.execute(
+        "SELECT id, payment_hash FROM pagamenti WHERE stato='annullato' "
+        "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     con.close()
     for o in ordini:
         try:
@@ -26157,6 +26489,31 @@ async def controlla_annullati():
             await _paga_rimborso(rid)
         except Exception as e:
             print(f"⚠️ Riacciuffo rilancio #{ril['id']} saltato: {e}")
+    # LO SBLOCCO ANNULLATO E POI PAGATO: chi ci ripensa e paga lo
+    # stesso ha comunque comprato la porta, e gliela si apre — la
+    # stessa regola degli ordini («chi paga ha comprato»). Il CAS di
+    # `_incassa_sblocco` guarda 'creato', quindi la lapide va prima
+    # resuscitata; il timbro fresco su `creato` la tiene fuori dalla
+    # finestra della RIPRESA, che altrimenti gli ripresenterebbe una
+    # fattura ormai saldata.
+    for p in sblocchi:
+        try:
+            if not await invoice_pagata(p["payment_hash"]):
+                continue
+            con = db()
+            cur = con.execute(
+                "UPDATE pagamenti SET stato='creato', creato=?, "
+                "aggiornato=? WHERE id=? AND stato='annullato'",
+                (int(time.time()), int(time.time()), p["id"]))
+            con.commit()
+            con.close()
+            if cur.rowcount == 0:
+                continue
+            print(f"⚠️ Sblocco banner #{p['id']} annullato ma pagato: "
+                  f"riacciuffato")
+            await _incassa_sblocco(p["id"])
+        except Exception as e:
+            print(f"⚠️ Riacciuffo sblocco #{p['id']} saltato: {e}")
 
 
 async def controlla_abbandonati():
@@ -26206,6 +26563,10 @@ async def controlla_abbandonati():
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
         "AND creato < ?", (adesso - RILANCIO_EXPIRY,))]
+    sblocchi = [dict(r) for r in con.execute(
+        "SELECT id, payment_hash FROM pagamenti WHERE stato='creato' "
+        "AND payment_hash != '' AND creato < ?",
+        (adesso - INVOICE_EXPIRY,))]
     con.close()
     for o in ordini:
         try:
@@ -26276,6 +26637,33 @@ async def controlla_abbandonati():
             await _paga_rimborso(rid)
         except Exception as e:
             print(f"⚠️ Ultimo sguardo sul rilancio #{ril['id']} saltato: {e}")
+    # LO SBLOCCO DEL BANNER, stessa liturgia: chi ha pagato e non e'
+    # tornato si vede aprire la porta lo stesso, chi non ha pagato
+    # prende la LAPIDE. La riga NON si cancella mai — nemmeno quando
+    # sara' vecchia di mesi: e' il registro contabile del nostro
+    # primo incasso, ed e' esattamente cio' su cui poggia la
+    # riconciliazione con LNbits. Per questo qui non c'e' nessuna
+    # purga gemella di `pulisci_ordini_fantasma`: la' la lapide si
+    # spazza perche' tiene occupato lo stock, qui non tiene niente.
+    for p in sblocchi:
+        try:
+            if await invoice_pagata(p["payment_hash"]):
+                print(f"⚠️ Sblocco banner #{p['id']} pagato e mai "
+                      f"verificato: riacciuffato")
+                await _incassa_sblocco(p["id"])
+                continue
+            con = db()
+            con.execute("UPDATE pagamenti SET stato='annullato', "
+                        "aggiornato=? WHERE id=? AND stato='creato'",
+                        (int(time.time()), p["id"]))
+            con.commit()
+            con.close()
+        except Exception as e:
+            # FAIL-OPEN NEL VERSO GIUSTO: LNbits muto = la riga resta
+            # 'creato' e si riprova al giro dopo. Meglio una riga che
+            # si attarda che un pagamento perso di vista.
+            print(f"⚠️ Ultimo sguardo sullo sblocco #{p['id']} "
+                  f"saltato: {e}")
 
 
 @app.post("/api/orders/{ordine_id}/annulla")
@@ -31822,6 +32210,49 @@ CONTROLLI_LIBRO_MASTRO = (
     #   legittimamente un ordine).
     # - «codice scaduto usato»: NO, la scadenza si puo' accorciare
     #   dopo e un ordine di ieri diventerebbe illegale domani.
+
+    # --- lo sblocco pagato del banner (ago 2026) -------------------
+    # Il primo incasso nostro, e questi quattro controlli sono il
+    # motivo per cui il cantiere si chiama «il libro mastro» e non
+    # «la fattura»: qui una violazione non alza niente e non scrive
+    # niente — qualcuno ha pagato e la porta non si e' aperta, e a
+    # dirlo non c'e' nessun altro.
+    ("sblocco pagato e porta chiusa",
+     "ha pagato lo sblocco del banner e la porta non si e' aperta: "
+     "sats incassati e niente in cambio",
+     "SELECT p.id FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id "
+     "WHERE p.motivo='banner' AND p.stato='pagato' "
+     "AND COALESCE(u.banner_sbloccato_il,0)=0"),
+    ("porta del banner aperta senza pagamento",
+     "la porta risulta sbloccata ma non c'e' nessun pagamento che "
+     "l'abbia aperta: si e' aperta da sola",
+     "SELECT u.tg_id FROM utenti u WHERE COALESCE(u.banner_sbloccato_il,0)>0 "
+     "AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id=u.tg_id "
+     "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato'))"),
+    ("sblocco pagato due volte",
+     "due pagamenti riusciti per la stessa porta: qualcuno ha pagato "
+     "due volte una cosa che si compra una volta sola",
+     "SELECT MIN(id) FROM pagamenti WHERE stato='pagato' "
+     "GROUP BY tg_id, motivo, riferimento HAVING COUNT(*) > 1"),
+    ("sblocco rimborsato e porta ancora aperta",
+     "i sats sono tornati indietro ma la porta e' rimasta aperta: il "
+     "rimborso disfa il pagamento, e questo non l'ha disfatto",
+     "SELECT p.id FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id "
+     "WHERE p.motivo='banner' AND p.stato='rimborsato' "
+     "AND COALESCE(u.banner_sbloccato_il,0)>0 "
+     "AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id=p.tg_id "
+     "AND q.motivo='banner' AND q.stato='pagato')"),
+    # E QUALI NON NASCONO QUI, con la stessa domanda:
+    # - «una lapide senza payment_hash»: NO, e' innocua e non dice
+    #   niente a nessuno — una riga 'annullato' non tiene occupato
+    #   niente (a differenza degli ordini, dove la lapide prenota lo
+    #   stock: per questo li' c'e' una purga e qui no).
+    # - «un 'creato' vecchio di ore»: NO, e' lo stato NORMALE fra la
+    #   fattura scaduta e il giro dell'orologio che la seppellisce —
+    #   un allarme che suona sul normale e' peggio di nessun allarme.
+    # - «pagato senza banner in vetrina»: NO, e' il caso piu' comune
+    #   che ci sia — si compra LA PORTA, e chiedere il banner e' un
+    #   gesto che viene dopo, quando pare a lui.
 )
 
 TIMBRO_LIBRO_MASTRO = "libro_mastro"     # il giorno dell'ultima ronda

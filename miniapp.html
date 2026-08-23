@@ -5299,12 +5299,21 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet-bg" id="sheetBg" onclick="tapFuoriSheet()"></div>
   <div class="sheet" id="paySheet">
     <div class="grab"></div>
-    <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
+    <!-- IL TITOLO E IL PATTO SONO CONDIZIONALI (ago 2026, con lo
+         sblocco a pagamento del banner): tre flussi su quattro qui
+         depositano sats a GARANZIA, ma il quarto paga una tassa
+         alla piattaforma — e «a garanzia … finche' non confermi di
+         aver ricevuto l'oggetto» li' sarebbero due frasi false,
+         scritte nel momento in cui qualcuno sta per pagarci.
+         Il markup NASCE col testo dell'escrow: un flusso che
+         dimenticasse `vestiPaySheet` mostra la frase di ieri, mai
+         una vuota. -->
+    <h3 id="payTitolo">Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
     <!-- Il conto scomposto (articolo/spedizione/protezione): compare
          solo quando c'e' qualcosa oltre all'articolo -->
     <div class="conto-scomposto" id="payScomposto" style="margin-bottom:8px"></div>
     <div id="payEurNota" style="display:none;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px"></div>
-    <div style="font-size:13px;color:var(--muted);font-weight:600">
+    <div id="payPatto" style="font-size:13px;color:var(--muted);font-weight:600">
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
     </div>
     <div class="qr" id="payQr"></div>
@@ -13737,6 +13746,7 @@ async function startBuySet(){
   if (setScelte.size < 2)
     { toast('Con un oggetto solo c\'è l\'acquisto di sempre: aprilo dalla sua scheda'); return; }
   rilancioCorrente = null;
+  pagamentoCorrente = null;
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
@@ -14410,6 +14420,50 @@ function lbZoomA(px, py, s2){
 
 /* ---------------- acquisto / escrow ---------------- */
 let pollTimer = null, currentOrderId = null;
+/* La TERZA modalita' del paySheet (ago 2026): lo sblocco del banner.
+   Come `rilancioCorrente` per le puntate, e' lei a dire a `sheetPaid`
+   e ad `annullaPagamento` quale pagamento hanno davanti — e va
+   azzerata all'ingresso degli altri flussi, o l'«Annulla» di un giro
+   colpirebbe il pagamento di quello prima. */
+let pagamentoCorrente = null;
+
+/* IL PAYSHEET SERVE DUE MESTIERI DIVERSI, e da qui lo dice.
+   Tre flussi su quattro depositano sats a GARANZIA e li riavranno se
+   qualcosa va storto; lo sblocco del banner invece PAGA NOI, e li'
+   «a garanzia … finche' non confermi di aver ricevuto l'oggetto»
+   sarebbero due frasi false — dette, per giunta, nell'istante in cui
+   qualcuno sta per pagarci. Due modi, un posto solo.
+   Il markup nasce col testo dell'ESCROW, quindi un flusso che si
+   dimenticasse di chiamarla mostra la frase di ieri e non una vuota:
+   e' testo, e qui il fail-soft e' meglio del silenzio. */
+function vestiPaySheet(modo){
+  const t = el('payTitolo'), p = el('payPatto');
+  if (!t || !p) return;
+  /* LA CIFRA NON SI PERDE: il titolo contiene `#payAmount`, e
+     riscriverlo lo ricrea VUOTO — chi avesse gia' scritto
+     l'importo lo vedrebbe sparire. Conservandola la funzione
+     diventa idempotente, ed e' cio' che permette di chiamarla da
+     un posto solo (mostraQr) invece che da ogni flusso. */
+  const cifra = (el('payAmount') || {}).textContent || '';
+  if (modo === 'tassa'){
+    t.innerHTML = 'Sblocca per <span class="mono" id="payAmount" '
+      + 'style="color:var(--sats)"></span> '
+      + '<span style="font-size:12px;color:var(--muted)">sats</span>';
+    p.innerHTML = 'Paga con qualsiasi wallet Lightning. Questi sats '
+      + '<b style="color:var(--ink)">non sono un deposito</b>: pagano '
+      + 'lo sblocco, e non tornano indietro.';
+    el('payAmount').textContent = cifra;
+    return;
+  }
+  t.innerHTML = 'Blocca <span class="mono" id="payAmount" '
+    + 'style="color:var(--sats)"></span> '
+    + '<span style="font-size:12px;color:var(--muted)">sats</span> '
+    + 'a garanzia';
+  p.innerHTML = 'Paga con qualsiasi wallet Lightning. I sats restano '
+    + '<b style="color:var(--trust)">bloccati e al sicuro</b> finché '
+    + 'non confermi di aver ricevuto l\'oggetto.';
+  el('payAmount').textContent = cifra;
+}
 
 /* ================= ASTE: la scheda e la puntata =================
    Puntare = PAGARE: il foglio chiede il TOTALE che si offre, il
@@ -14594,6 +14648,9 @@ function puntaDigitata(){
        : (versato ? ` — il totale ${fmt(v)} conta i ${fmt(versato)} già in cassaforte` : ''));
 }
 async function inviaPuntata(btn){
+  pagamentoCorrente = null;  /* stesso patto: il paySheet torna alle
+                                puntate, e l'Annulla non puo' colpire
+                                uno sblocco di un giro prima */
   const l = currentListing; if (!l) return;
   const v = parseInt(String(el('puntaImporto').value).replace(/\D/g, ''), 10) || 0;
   if (!v) { toast('Scrivi il totale che offri'); return; }
@@ -14749,6 +14806,7 @@ async function convertiAsta(id){
 async function startBuy(){
   haptic();
   rilancioCorrente = null;   /* il paySheet torna al poll degli ordini */
+  pagamentoCorrente = null;
   currentOrderId = null;     /* l'Annulla non deve mai colpire un ordine
                                 di un giro precedente */
   if (VETRINA) {
@@ -15015,6 +15073,17 @@ function caricaQrcode(){
 let qrGiro = 0;   /* il caricamento e' async: un giro vecchio arrivato
                      in ritardo non deve disegnare sopra quello nuovo */
 async function mostraQr(invoice){
+  /* IL VESTITO SEGUE LA VARIABILE-MODALITA', da un posto solo.
+     La prima stesura lo metteva a mano in `sbloccaBanner`, e il
+     giro DAL VIVO ha mostrato il buco: nessuno rimetteva il testo
+     dell'escrow, quindi dopo uno sblocco l'ordine successivo
+     prometteva «questi sats non sono un deposito» su un deposito —
+     il rovescio esatto del difetto che questi due testi esistono
+     per togliere. `mostraQr` e' il collo di bottiglia di TUTTI i
+     flussi che aprono il foglio (ordine, set, ripiego del wallet,
+     puntata, sblocco), quindi il flusso nuovo di domani eredita il
+     vestito giusto senza doverselo ricordare. */
+  vestiPaySheet(pagamentoCorrente ? 'tassa' : 'escrow');
   const box = el('payQr'), giro = ++qrGiro;
   /* si disegna solo una bolt11 vera: in demo (stringa finta) e negli
      stati d'attesa il riquadro resta nascosto, mai un QR bugiardo */
@@ -15064,12 +15133,15 @@ async function mostraQr(invoice){
    pagamenti: l'ordine di sempre e la fattura di puntata (rilancio). */
 async function annullaPagamento(){
   if (DEMO || VETRINA) { navIndietro(); return; }
-  const ril = rilancioCorrente, oid = currentOrderId;
-  if (!ril && !oid) { navIndietro(); return; }
-  const cosa = ril ? 'questa fattura di puntata' : 'questo ordine';
+  const ril = rilancioCorrente, oid = currentOrderId,
+        pag = pagamentoCorrente;
+  if (!ril && !oid && !pag) { navIndietro(); return; }
+  const cosa = pag ? 'questo sblocco'
+             : ril ? 'questa fattura di puntata' : 'questo ordine';
   if (!confirm(`Annullo ${cosa}.\n\nSe hai già pagato, NON annullare: chiudi il foglio e attendi la verifica.`))
     return;
-  const url = ril ? `${API_BASE}/rilanci/${ril}/annulla`
+  const url = pag ? `${API_BASE}/pagamenti/${pag}/annulla`
+            : ril ? `${API_BASE}/rilanci/${ril}/annulla`
                   : `${API_BASE}/orders/${oid}/annulla`;
   const r = await fetch(url, {method:'POST',
                               headers:{'X-Tg-Init-Data':authHdr()}});
@@ -15081,9 +15153,11 @@ async function annullaPagamento(){
     return;
   }
   if (ril) rilancioCorrente = null;
+  if (pag) pagamentoCorrente = null;
   navIndietro();
-  toast(ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
-  if (!ril) { await loadOrders(); renderOrders(); }
+  toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
+      : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
+  if (!ril && !pag) { await loadOrders(); renderOrders(); }
 }
 
 /* Il foglio-invito della vetrina: spiega e accompagna verso il bot */
@@ -15255,9 +15329,11 @@ Object.keys(PICKER).forEach(aggiornaPicker);
 function sheetPaid(){
   if (DEMO) return simulatePaid();
   toast('Verifico il pagamento…');
-  /* il paySheet serve due pagamenti: l'ordine di sempre e la fattura
-     di puntata (rilancioCorrente pieno = e' lei) */
-  if (rilancioCorrente) verificaPuntata(rilancioCorrente);
+  /* il paySheet serve TRE pagamenti: l'ordine di sempre, la fattura
+     di puntata e lo sblocco del banner — a dirlo e' la variabile
+     -modalita' che il flusso ha valorizzato */
+  if (pagamentoCorrente) verificaSblocco(pagamentoCorrente);
+  else if (rilancioCorrente) verificaPuntata(rilancioCorrente);
   else verificaOrdine(currentOrderId);
 }
 
@@ -19380,11 +19456,22 @@ function renderBanner(){
        poche righe piu' giu' a porta aperta: un cassetto, una voce.
        (Il nome di quella classe non si scrive nemmeno qui: la
        sentinella legge anche i commenti.) */
+    /* LA SECONDA STRADA (ago 2026): chi ha fretta anticipa la porta
+       pagando. Il bottone nasce solo se il server manda un prezzo — a
+       leva spenta `prezzo_sats` e' 0 e qui non compare niente, che un
+       bottone verso un muro e' peggio di nessun bottone. La cifra
+       arriva da la' e non si scrive mai a mano (il patto di
+       `max_barattolo`). */
+    const prezzo = (bannerLeve.prezzo_sats || 0);
     box.innerHTML = `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         🔒 <b style="color:var(--ink)">${perche}</b>È l'insegna che puoi
         appendere sopra il tuo catalogo — una foto e il link al tuo
-        sito.</div>`;
+        sito.</div>`
+      + (prezzo ? `
+      <button class="btn orange" style="margin-top:12px"
+              onclick="chiediSblocco()">⚡ Sbloccalo subito per
+        ${fmt(prezzo)} sats</button>` : '');
     return;
   }
   const vivo = b.stato === 'attivo' && b.foto;
@@ -19535,6 +19622,94 @@ async function togliBanner(){
       renderBanner();
       toast('🗑 Banner tolto');
     }});
+}
+
+/* ---- LA PORTA SI ANTICIPA PAGANDO (ago 2026, la tappa 2) --------
+   Chi non ha il livello apre la porta con una fattura. Il calco e'
+   `inviaPuntata`, che e' l'unico altro flusso a portare nel paySheet
+   un pagamento che NON e' un ordine: cifra piatta, conto scritto a
+   mano (`contoScomposto` su una cifra sola torna stringa vuota),
+   `#payEurNota` come riga di spiegazione, e una variabile-modalita'
+   che governa «✓ Ho pagato» e «Annulla».
+   QUEL CHE SI COMPRA E' LA PORTA, NON IL BANNER, e la conferma lo
+   dice PRIMA che parta un sat: il banner passa comunque da un
+   moderatore, e se lo rifiuta i sats non tornano indietro. Dirlo
+   dopo sarebbe una sorpresa; dirlo qui e' il patto. ---- */
+function chiediSblocco(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
+  const prezzo = (bannerLeve && bannerLeve.prezzo_sats) || 0;
+  if (!prezzo) return;
+  chiediConferma({
+    titolo: 'Sbloccare il banner?',
+    corpo: `Paghi ${fmt(prezzo)} sats e la porta si apre subito. `
+         + 'Si paga una volta sola, non è un abbonamento.\n\n'
+         + 'Quello che compri è la porta, non il banner: l\'insegna '
+         + 'passa comunque da un moderatore, e se la rifiuta i sats '
+         + 'non tornano indietro — ne carichi un\'altra.',
+    etichetta: 'Paga e sblocca',
+    poi: () => sbloccaBanner()});
+}
+
+async function sbloccaBanner(){
+  /* le altre due modalita' si spengono qui, o l'«Annulla» di questo
+     foglio colpirebbe un ordine o una puntata di un giro prima */
+  rilancioCorrente = null;
+  currentOrderId = null;
+  pagamentoCorrente = null;
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/me/banner/sblocca`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  pagamentoCorrente = d.pagamento_id;
+  el('payAmount').textContent = fmt(d.importo_sats);
+  /* il conto si scrive a mano: una cifra piatta non ha voci da
+     scomporre, e `contoScomposto` su di lei torna stringa vuota */
+  el('payScomposto').innerHTML = '';
+  const nota = el('payEurNota');
+  nota.style.display = '';
+  nota.textContent = d.ripresa
+    ? 'È la fattura che avevi già chiesto: vale ancora.'
+    : 'La fattura vale 15 minuti.';
+  el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  aggiornaPayHint();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => verificaSblocco(pagamentoCorrente), 4000);
+}
+
+async function verificaSblocco(pid){
+  if (!pid) return;
+  try {
+    const r = await fetch(`${API_BASE}/pagamenti/${pid}/verifica`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'in_attesa' || d.stato === 'creato') return;
+    pagamentoCorrente = null;
+    closeSheet();              /* qui e' giusto: spegne anche il poll */
+    if (d.stato === 'pagato'){
+      /* LA PORTA E' APERTA DI LA', e qui si aggiorna lo stato locale
+         invece di rileggere tutto il profilo: `/api/me` non ha un
+         lettore riusabile — vive dentro `avvia()` — ed e' il pattern
+         che il cassetto usa gia' dopo un salvataggio. Al prossimo
+         giro vero il server dira' la stessa cosa. */
+      if (bannerLeve){
+        bannerLeve.porta_aperta = true;
+        bannerLeve.sbloccato_il = Math.floor(Date.now() / 1000);
+        bannerLeve.motivo = '';
+      }
+      renderBanner();
+      apriCassettoProfilo('accBanner');
+      toast('🖼 Porta aperta! Ora puoi chiedere il tuo banner', 6000);
+      return;
+    }
+    toast('Questo sblocco non è più in attesa', 5000);
+  } catch(e) {}
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
