@@ -19210,8 +19210,8 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
         # MAI «i sats partono solo quando confermi»: sul digitale il
         # tempo cammina da solo. Il come e il quando li dice la
         # notifica della consegna, che arriva col contenuto.
-        return ("il venditore ti consegna il contenuto qui dentro, e "
-                "ti avvisiamo appena è pronto da rivelare.")
+        return ("il venditore ti consegnerà il contenuto qui dentro, "
+                "e ti avvisiamo appena è pronto da rivelare.")
     if consegna == "ritiro":
         return ("mettetevi d'accordo con il venditore per il ritiro. "
                 "Quando hai l'oggetto in mano, confermalo nella Mini "
