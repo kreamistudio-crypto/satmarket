@@ -7048,8 +7048,16 @@ def prove_pausa():
     # le due guardie di ieri non si sono allentate
     prova("l'asta resta fuori (e' a pezzo unico)", True,
           'a["asta_base_sats"] > 0' in ric)
-    prova("l'importato resta fuori (la quantita' vive sui relay)", True,
-          'a["contatto_nostr"]' in ric)
+    # QUESTA HA CAMBIATO LATO (ago 2026, coi connettori dei negozi):
+    # chiedeva `a["contatto_nostr"]`, cioe' la sola origine che
+    # esisteva. Adesso la guardia e' PIU' LARGA e passa dal giudice —
+    # la giacenza di una riga importata vive dove vive la merce, su
+    # Nostr come su uno Shopify collegato — quindi la sentinella
+    # vecchia diventerebbe la certificazione di un buco: un catalogo
+    # Woo con lo stock ricaricabile da qui, che il primo sync
+    # ricoprirebbe in silenzio.
+    prova("chi arriva da fuori resta fuori (la giacenza vive li')", True,
+          "origine_annuncio(a)" in ric and "msg_stock_altrove" in ric)
 
     # ---- 25-31: le offerte ----------------------------------------
     TRE = "('proposta','controproposta','accettata')"
@@ -14288,7 +14296,11 @@ def prove_vetrina_canale():
           "_spedisci_ai_relay" in lam or "firma_evento" in lam)
     # LE GUARDIE DI CHI POSTA, tutte e tre: un negozio chiuso o un
     # annuncio importato non si annunciano in piazza.
-    for guardia in ("stato", "contatto_nostr", "in_ferie"):
+    # LA SECONDA HA CAMBIATO LATO (ago 2026): era `contatto_nostr`, ed
+    # e' diventata il giudice — le promo restano chiuse anche a chi
+    # arriva da un negozio collegato, che al primo giro sarebbero
+    # duecento post in canale, cioe' una raffica.
+    for guardia in ("stato", "origine_annuncio", "in_ferie"):
         prova(f"la lampo guarda {guardia}", True, guardia in lam)
     prova("...e che la lampo sia ancora viva", True, "lampo_scadenza" in lam)
     # IL BUDGET ORARIO: senza, il tetto dei post si aggirerebbe
@@ -24514,6 +24526,197 @@ def prove_banner_negozio():
               else "ERRORE: " + _rb.stderr[:160])
 
 
+def prove_connettori():
+    """I CONNETTORI DEL NEGOZIO — le fondamenta (ago 2026, tappa 1):
+    lo schema, il giudice dell'origine e il censimento delle guardie.
+
+    IL PERCHE' DEL GIUDICE, che e' quello che queste prove
+    difendono: fino a ieri «e' un importato» si scriveva
+    `contatto_nostr != ''` in una ventina di siti, e andava bene
+    finche' la fonte esterna era UNA. Con la seconda ognuno di quei
+    siti diventa una DECISIONE (la modifica si blocca come per Nostr,
+    le lampo restano ammesse, le promo del canale no), e una
+    decisione presa in venti posti e' una decisione che fra sei mesi
+    ne dice venti diverse.
+    Il giudice si GIRA e non si guarda soltanto: una sentinella
+    direbbe che esiste ed e' uno, mai che risponda giusto — ed e'
+    proprio la risposta a decidere se una riga di Shopify si puo'
+    modificare da qui."""
+    print("\n[i connettori del negozio: schema, giudice, censimento]")
+    import sqlite3
+
+    # --- IL GIUDICE, GIRATO --------------------------------------
+    amb = {}
+    exec(pezzo("origine_annuncio"), amb)
+    exec(pezzo("da_connettore"), amb)
+    exec(pezzo("chiave_origine"), amb)
+    i = _SORGENTE.index("NOMI_ORIGINE = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    exec(pezzo("nome_origine"), amb)
+    exec(pezzo("msg_modifica_altrove"), amb)
+    exec(pezzo("msg_stock_altrove"), amb)
+    origine = amb["origine_annuncio"]
+    chiave = amb["chiave_origine"]
+    connettore = amb["da_connettore"]
+
+    def riga(**kw):
+        base = {"contatto_nostr": "", "fonte": "", "connettore_id": 0}
+        base.update(kw)
+        return base
+
+    prova("origine: nato qui", "", origine(riga()))
+    prova("origine: importato da Nostr", "nostr",
+          origine(riga(contatto_nostr="npub1abc")))
+    prova("origine: da Shopify", "shopify",
+          origine(riga(fonte="shopify", connettore_id=7)))
+    prova("origine: da WooCommerce", "woo",
+          origine(riga(fonte="woo", connettore_id=3)))
+    # Nostr viene PRIMA, e non e' l'ordine che capita: `contatto_nostr`
+    # e' una npub (npub_to_hex ci passa nella modifica firmata), e una
+    # riga importata dai relay non ha e non avra' mai `fonte` piena.
+    prova("origine: Nostr ha la precedenza", "nostr",
+          origine(riga(contatto_nostr="npub1x", fonte="woo")))
+    # IL RAMO DI COMPATIBILITA': una SELECT che non chiede la colonna
+    # nuova (o un database piu' vecchio della migrazione) non deve
+    # esplodere — su una sqlite3.Row la colonna che manca alza
+    # IndexError, su un dict KeyError, e il giudice ne prende due.
+    prova("origine: la riga senza la colonna nuova non esplode", "",
+          origine({"contatto_nostr": ""}))
+    _c = sqlite3.connect(":memory:")
+    _c.row_factory = sqlite3.Row
+    _c.execute("CREATE TABLE vecchi(contatto_nostr TEXT)")
+    _c.execute("INSERT INTO vecchi VALUES('')")
+    prova("origine: nemmeno su una sqlite3.Row di ieri", "",
+          origine(_c.execute("SELECT * FROM vecchi").fetchone()))
+    _c.close()
+
+    prova("da_connettore: solo i negozi collegati",
+          [False, False, True, True],
+          [connettore(riga()),
+           connettore(riga(contatto_nostr="npub1abc")),
+           connettore(riga(fonte="shopify", connettore_id=1)),
+           connettore(riga(fonte="woo", connettore_id=2))])
+
+    # LA CHIAVE DICE IL POSTO PRECISO, e il caso che si dimentica e'
+    # l'ultimo: uno stesso venditore puo' avere DUE collegamenti (due
+    # cataloghi, due magazzini), e 'shopify' == 'shopify' li farebbe
+    # passare per lo stesso posto nella guardia del set.
+    prova("chiave: '' per chi e' nato qui", "", chiave(riga()))
+    prova("chiave: la npub per Nostr", "npub1abc",
+          chiave(riga(contatto_nostr="npub1abc")))
+    prova("chiave: il COLLEGAMENTO e non la piattaforma",
+          ["conn:7", "conn:9"],
+          [chiave(riga(fonte="woo", connettore_id=7)),
+           chiave(riga(fonte="woo", connettore_id=9))])
+
+    # --- I DUE MESSAGGI ------------------------------------------
+    # «modificalo dal tuo client Nostr» detto a un negoziante Shopify
+    # lo manda a cercare una cosa che non ha.
+    prova("il rifiuto della modifica nomina il posto giusto",
+          [True, True],
+          ["client Nostr" in amb["msg_modifica_altrove"](
+              riga(contatto_nostr="npub1abc")),
+           "negozio Shopify" in amb["msg_modifica_altrove"](
+               riga(fonte="shopify", connettore_id=1))])
+    prova("e quello della giacenza pure",
+          [True, True],
+          ["Nostr" in amb["msg_stock_altrove"](
+              riga(contatto_nostr="npub1abc")),
+           "negozio WooCommerce" in amb["msg_stock_altrove"](
+               riga(fonte="woo", connettore_id=1))])
+
+    # --- IL CENSIMENTO DELLE GUARDIE -----------------------------
+    # Le funzioni che decidono qualcosa su «arriva da fuori» devono
+    # passare dal giudice. Si guarda il CODICE e non i commenti: qui
+    # la prosa nomina `contatto_nostr` apposta, per spiegare perche'
+    # non si legge piu' a mano.
+    for nome in ("ricarica_quantita", "modifica_annuncio", "_compra_set",
+                 "_preventivo_set", "_drena_promo", "promo_lampo",
+                 "arricchisci_zone_esistenti", "ricategorizza_automatico"):
+        c = codice(pezzo(nome))
+        prova(f"censimento: {nome} non legge piu' contatto_nostr a mano",
+              0, c.count("contatto_nostr"))
+        prova(f"censimento: {nome} passa dal giudice", True,
+              any(g in c for g in ("origine_annuncio", "chiave_origine",
+                                   "SQL_ORIGINE_ESTERNA",
+                                   "msg_stock_altrove",
+                                   "msg_modifica_altrove")))
+    # La costante SQL nomina TUTTE E DUE le colonne: scritta a meta'
+    # lascerebbe fuori una fonte in silenzio, e a scoprirlo sarebbe
+    # solo chi conta le righe di una vetrina.
+    i = _SORGENTE.index("SQL_ORIGINE_ESTERNA = ")
+    sql = _SORGENTE[i:_SORGENTE.index("\n", i)]
+    prova("la forma SQL guarda le due colonne",
+          [True, True], ["contatto_nostr" in sql, "fonte" in sql])
+
+    # --- LO SCHEMA -----------------------------------------------
+    # Le due tabelle nascono in init_db, e le colonne nuove sono
+    # ADDITIVE col loro default: il deploy non cambia una riga di
+    # quelle che ci sono gia'.
+    ini = pezzo("init_db", "\n\ndef ")
+    for tavolo in ("connettori", "connettori_uscite"):
+        prova(f"init_db crea {tavolo}", True,
+              f"CREATE TABLE IF NOT EXISTS {tavolo}(" in ini)
+    for colonna, difetto in (("fonte", "TEXT DEFAULT ''"),
+                             ("connettore_id", "INTEGER DEFAULT 0"),
+                             ("origine_chiave", "TEXT DEFAULT ''"),
+                             ("origine_foto", "TEXT DEFAULT ''"),
+                             # -1 e' «mai letta», che e' un'altra cosa
+                             # da «zero pezzi»: con lo 0 il registro
+                             # crederebbe a un calo che non c'e' stato
+                             ("origine_stock_visto", "INTEGER DEFAULT -1")):
+        prova(f"annunci.{colonna} nasce additiva ({difetto})", True,
+              f'"{colonna} {difetto}"' in ini)
+    # L'idempotenza del registro: la UNIQUE e' il giudice, e non si
+    # chiede a chi scrive di ricordarsi «l'ho gia' accodata?» (il
+    # patto di xp_eventi). Un retry, un doppio gancio o un riavvio a
+    # meta' ci sbattono contro invece di contare due volte la stessa
+    # vendita.
+    prova("il registro delle uscite ha la sua UNIQUE", True,
+          "UNIQUE(ordine_id, annuncio_id, tipo)" in ini)
+    # E un negozio ha un padrone solo: due righe sullo stesso
+    # url_negozio sarebbero un catalogo conteso, e a vincere sarebbe
+    # quella che il sync tocca per ultima.
+    prova("un negozio non si collega due volte", True,
+          "UNIQUE(fonte, url_negozio)" in ini)
+    # --- LA FUSIONE ----------------------------------------------
+    # Chi fonde i suoi due account (nativo Nostr + Telegram) non deve
+    # perdere il ponte col suo e-commerce: senza, il catalogo smette
+    # di aggiornarsi e nessuno se ne accorge fino al primo prezzo
+    # sbagliato. NON l'aveva previsto il piano: l'ha trovato il
+    # censimento delle tabelle figlie, che guarda lo SCHEMA.
+    # E QUESTE TRE RIGHE NON SONO UN DOPPIONE di quel censimento, ed
+    # e' la lezione della tortura: quello cerca il NOME `connettori`
+    # in tutta la funzione, e i due DELETE lo nominano lo stesso —
+    # quindi resta verde anche togliendo la migrazione, cioe'
+    # certifica una riga che non c'e' piu'. Qui si chiede il GESTO.
+    fus = pezzo("esegui_fusione")
+    prova("la fusione MIGRA i negozi collegati", True,
+          "UPDATE connettori SET tg_id=? WHERE tg_id=?" in fus)
+    # E NON la liturgia dei vicini, ed e' una correzione trovata
+    # PROVANDO invece che ragionando: `UPDATE OR IGNORE` + DELETE
+    # serve dove la UNIQUE contiene il tg_id (preferiti,
+    # punti_ritiro), cioe' dove la migrazione puo' collidere. Qui la
+    # UNIQUE e' `(fonte, url_negozio)`: lo stesso negozio non si
+    # collega due volte nemmeno da due account, quindi quei DELETE
+    # non troverebbero MAI una riga — codice morto travestito da
+    # cintura.
+    prova("...senza la pulizia che non potrebbe mai servire",
+          [False, False],
+          ["DELETE FROM connettori WHERE tg_id=?" in fus,
+           "DELETE FROM connettori_uscite" in fus])
+
+    for indice, sopra in (("idx_annunci_origine",
+                           "annunci(connettore_id, origine_chiave)"),
+                          # il debito che questo cantiere paga: ci
+                          # passano l'import orario da Nostr, il
+                          # dopo-import e la deduplica dei doppioni
+                          ("idx_annunci_nostr", "annunci(contatto_nostr)")):
+        prova(f"l'indice {indice} c'e'", True,
+              f'"CREATE INDEX IF NOT EXISTS {indice} "' in ini
+              and f'"ON {sopra}"' in ini)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -24577,7 +24780,8 @@ def main():
               prove_servizi,
               prove_sintassi_client,
               prove_banner_negozio,
-              prove_foto_vuota):
+              prove_foto_vuota,
+              prove_connettori):
         try:
             f()
         except Exception as e:

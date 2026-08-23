@@ -2507,6 +2507,83 @@ def init_db():
         valore TEXT DEFAULT '',       -- il giorno, o quel che il chiamante timbra
         quando INTEGER DEFAULT 0      -- quando l'abbiamo scritto (unix)
     );
+    CREATE TABLE IF NOT EXISTS connettori(
+        -- IL PONTE COL NEGOZIO DEL VENDITORE (ago 2026): chi ha gia' un
+        -- e-commerce collega il catalogo e i prodotti compaiono qui,
+        -- invece di ripubblicarli a mano. La fonte di verita' sta FUORI,
+        -- come per Nostr — ma con due differenze che decidono la forma:
+        -- il venditore e' GIA' un utente (niente scoperta, niente
+        -- benvenuto: il legame nasce da un suo gesto nel Profilo), e la
+        -- lista NON si deduce come `venditori_nostr_attivi`, perche' un
+        -- e-commerce non ha l'equivalente del kind-5 con cui uscire.
+        -- Qui la riga E' il registro, e scollegare e' cancellarla.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        fonte TEXT NOT NULL,              -- 'shopify' | 'woo'
+        url_negozio TEXT NOT NULL,        -- nome.myshopify.com | https://... (Woo)
+        -- Il token del venditore, JSON cifrato con _cifra_contenuto
+        -- (prefisso f2:, la ricetta dei contenuti digitali). MAI in
+        -- chiaro: e' una credenziale su un sistema di un altro, e senza
+        -- CHIAVE_CONTENUTI_DIGITALI il collegamento si rifiuta con un
+        -- 503 onesto invece di scriverla in plain: (il patto
+        -- dell'indirizzo di casa, che il rischio non lo corre chi
+        -- decide).
+        credenziali TEXT NOT NULL,
+        stato TEXT DEFAULT 'attivo',      -- attivo | pausa | errore
+        -- LA CONSEGNA SI DICHIARA QUI, UNA VOLTA, e vale per tutte le
+        -- righe di questo negozio: i campi di Shopify e Woo non
+        -- combaciano coi nostri (tariffe per zona, classi di spedizione,
+        -- flat rate...) e tradurli sarebbe indovinare. Le tariffe sono
+        -- in EUR e basta, che il listino di un e-commerce e' in euro.
+        consegna TEXT DEFAULT '',
+        spedizione_eur REAL DEFAULT 0,
+        spedizione_punto_eur REAL DEFAULT 0,
+        spedizione_punto_dichiarata INTEGER DEFAULT 0,
+        spedizione_extra_eur REAL DEFAULT 0,
+        zona TEXT DEFAULT '',             -- la zona di tutte le righe
+        ultimo_giro INTEGER DEFAULT 0,
+        ultimo_esito TEXT DEFAULT '',     -- JSON del report dell'ultimo giro
+        ultimo_errore TEXT DEFAULT '',
+        errori_di_fila INTEGER DEFAULT 0, -- a soglia -> stato='errore'
+        creato INTEGER,
+        -- due utenti non collegano lo stesso negozio: sarebbe un
+        -- catalogo con due padroni, e la seconda riga vincerebbe a caso
+        UNIQUE(fonte, url_negozio)
+    );
+    CREATE INDEX IF NOT EXISTS idx_connettori_tg ON connettori(tg_id);
+    CREATE TABLE IF NOT EXISTS connettori_uscite(
+        -- LE VENDITE DI QUI CHE IL NEGOZIO DI LA' NON SA ANCORA (ago
+        -- 2026). Serve a una cosa sola, ed e' quella che tiene in piedi
+        -- il cantiere: il sync RICOPRE `quantita` dalla lettura
+        -- esterna, quindi senza questo registro una vendita fatta qui
+        -- verrebbe RIALZATA al giro dopo — e sul pezzo unico il
+        -- 'venduto' risorgerebbe. Con le pendenti in mano, la quantita'
+        -- si corregge (`quantita_corretta`) e il caso non esiste mai.
+        -- FASE 1 (sola lettura): la riga nasce 'pendente' quando si
+        -- vende qui, il venditore riceve nella notifica di vendita la
+        -- riga operativa («aggiorna il magazzino: -2 su ...»), e
+        -- diventa 'riflessa' quando la lettura esterna cala.
+        -- FASE 2 (decremento a monte): la stessa riga diventa la CODA
+        -- di un drenatore che scrive sul negozio — niente da buttare,
+        -- si aggiungono le colonne dei ritentativi e lo stato
+        -- 'fallito'. Per questo il nome parla di USCITE e non di
+        -- promemoria: dice cosa sono, non cosa ne facciamo oggi.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        connettore_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        ordine_id INTEGER NOT NULL,
+        delta INTEGER NOT NULL,        -- negativo = venduto qui; positivo = rimborso
+        tipo TEXT NOT NULL,            -- 'vendita' | 'rimborso'
+        stato TEXT DEFAULT 'pendente', -- pendente | riflessa
+        creato INTEGER,
+        aggiornato INTEGER,
+        -- l'idempotenza di xp_eventi: un retry, un doppio gancio o un
+        -- riavvio a meta' sbattono contro il vincolo invece di
+        -- accodare due volte lo stesso movimento
+        UNIQUE(ordine_id, annuncio_id, tipo)
+    );
+    CREATE INDEX IF NOT EXISTS idx_uscite_annuncio
+        ON connettori_uscite(annuncio_id, stato);
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -3107,7 +3184,37 @@ def init_db():
                     # prende. A rimetterlo a 0 quando il testo cambia
                     # e' un TRIGGER, non i chiamanti: vedi
                     # `riallinea_ricerca`.
-                    "ricerca_v INTEGER DEFAULT 0"):
+                    "ricerca_v INTEGER DEFAULT 0",
+                    # I CONNETTORI DEL NEGOZIO (ago 2026): da dove
+                    # arriva questa riga, quando non e' nata qui.
+                    # `fonte` NON assorbe `contatto_nostr`, ed e' una
+                    # decisione: quella colonna e' una npub — la
+                    # modifica firmata ci fa npub_to_hex, la deduplica
+                    # ci confronta le chiavi — e allargarla a un'
+                    # etichetta la farebbe mentire al primo Woo. Le due
+                    # si leggono INSIEME in un posto solo,
+                    # `origine_annuncio`.
+                    # '' = nato qui (o importato da Nostr, che lo dice
+                    # `contatto_nostr`); altrimenti 'shopify' | 'woo'.
+                    "fonte TEXT DEFAULT ''",
+                    "connettore_id INTEGER DEFAULT 0",
+                    # l'id del prodotto sul negozio: e' la CHIAVE del
+                    # match a ogni giro, e l'unica — niente adozione
+                    # per titolo, che e' la lezione delle «due teste»
+                    # (adottare una riga nata qui le toglierebbe
+                    # Modifica e rifornimento, in silenzio).
+                    "origine_chiave TEXT DEFAULT ''",
+                    # gli URL delle foto sul negozio: se non cambiano
+                    # non si riscarica niente (il patto di
+                    # `nostr_origine_foto`).
+                    "origine_foto TEXT DEFAULT ''",
+                    # l'ultima giacenza LETTA sul negozio. Serve a
+                    # capire se il venditore ha riallineato il suo
+                    # magazzino dopo una vendita fatta qui: un calo
+                    # rispetto a questa spegne una pendente di
+                    # `connettori_uscite`. -1 = mai letta, che e'
+                    # diverso da «zero pezzi».
+                    "origine_stock_visto INTEGER DEFAULT -1"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3155,6 +3262,18 @@ def init_db():
     # (asta_scadenza, id) per le aste vive — chi scade prima in testa.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_asta "
                 "ON annunci(stato, asta_scadenza, id)")
+    # Il match della riconciliazione dei connettori (ago 2026): a ogni
+    # giro si cerca la riga di QUEL prodotto di QUEL collegamento, e
+    # sono centinaia di letture per catalogo.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_origine "
+                "ON annunci(connettore_id, origine_chiave)")
+    # E il debito che questo cantiere paga: `contatto_nostr` non ha
+    # mai avuto un indice, e ci passano l'import orario da Nostr, il
+    # dopo-import e la deduplica dei doppioni. Reggeva coi numeri di
+    # ieri; con due strade esterne invece di una non c'e' motivo di
+    # continuare a scandire la tabella.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_nostr "
+                "ON annunci(contatto_nostr)")
     # L'INDICE FULL-TEXT DELLA RICERCA (ago 2026). FTS5 e' dentro
     # SQLite da sempre: nessuna dipendenza, nessuna compilazione — la
     # stessa macchina che sta sotto a mezzo mondo. Il `rowid` E'
@@ -5145,6 +5264,94 @@ def strade_annuncio(a) -> set:
     return strade
 
 
+# La forma SQL del giudice qui sotto, per le WHERE che devono dire
+# «arriva da fuori, da qualunque parte». Una costante e non una
+# stringa ricopiata: chi aggiunge la terza fonte la aggiunge in DUE
+# posti soli, questo e `origine_annuncio`.
+SQL_ORIGINE_ESTERNA = "(a.contatto_nostr!='' OR a.fonte!='')"
+
+
+def origine_annuncio(a) -> str:
+    """DA DOVE ARRIVA QUESTA RIGA: '' = nata qui | 'nostr' | 'shopify'
+    | 'woo'. E' l'UNICO posto che sa leggere le due colonne insieme
+    (ago 2026, coi connettori dei negozi).
+    IL PERCHE' DI UN GIUDICE invece del test a mano: fino a ieri
+    «e' un importato» si scriveva `contatto_nostr != ''` in una
+    ventina di siti, e andava bene finche' la fonte esterna era UNA.
+    Con la seconda, ognuno di quei siti diventa una decisione — la
+    modifica si blocca come per Nostr, le lampo restano ammesse, le
+    promo del canale no — e una decisione presa in venti posti e' una
+    decisione che fra sei mesi ne dice venti diverse.
+    ATTENZIONE, `contatto_nostr` viene PRIMA e non e' l'ordine che
+    capita: quella colonna e' una npub (npub_to_hex ci passa nella
+    modifica firmata, la deduplica ci confronta le chiavi), e una riga
+    importata da Nostr non ha e non avra' mai `fonte` piena — mentre
+    il contrario, un domani, potrebbe non essere vero."""
+    if a["contatto_nostr"]:
+        return "nostr"
+    try:
+        return a["fonte"] or ""
+    except (KeyError, IndexError):
+        # una SELECT che non chiede la colonna nuova (o un database
+        # piu' vecchio della migrazione): non e' un connettore
+        return ""
+
+
+def da_connettore(a) -> bool:
+    """La domanda corta: «arriva da un negozio collegato?». Il giudice
+    sopra risponde CHI, questo risponde SE — e sono due domande
+    diverse abbastanza spesso da meritare due nomi."""
+    return origine_annuncio(a) in ("shopify", "woo")
+
+
+# Come si chiama il posto, davanti a chi legge.
+NOMI_ORIGINE = {"nostr": "Nostr", "shopify": "Shopify",
+                "woo": "WooCommerce"}
+
+
+def nome_origine(a) -> str:
+    return NOMI_ORIGINE.get(origine_annuncio(a), "")
+
+
+def chiave_origine(a) -> str:
+    """DA QUALE POSTO PRECISO, per la guardia dell'origine unica del
+    set: '' = nato qui, la npub per Nostr, `conn:7` per un negozio
+    collegato. Non basta `origine_annuncio`, ed e' il caso che si
+    dimentica: uno stesso venditore puo' avere DUE collegamenti
+    (Shopify e Woo, o due Woo), cioe' due cataloghi e due magazzini —
+    e 'shopify' == 'shopify' li farebbe passare per lo stesso posto."""
+    o = origine_annuncio(a)
+    if o == "nostr":
+        return a["contatto_nostr"] or ""
+    if o:
+        return f"conn:{a['connettore_id']}"
+    return ""
+
+
+def msg_modifica_altrove(a) -> str:
+    """Il 400 a chi prova a cambiare QUI il testo di una riga che vive
+    ALTROVE. Due frasi e non una: «modificalo dal tuo client Nostr»
+    detto a un negoziante Shopify manderebbe a cercare una cosa che
+    non ha, ed e' esattamente il genere di riga che fa scrivere
+    all'assistenza invece di risolvere."""
+    if origine_annuncio(a) == "nostr":
+        return ("Questo annuncio è importato da Nostr: modificalo dal "
+                "tuo client Nostr, qui si aggiorna da solo entro un'ora")
+    return (f"Questo annuncio arriva dal tuo negozio {nome_origine(a)}: "
+            "modificalo lì, qui si aggiorna da solo entro un'ora")
+
+
+def msg_stock_altrove(a) -> str:
+    """Il gemello per la giacenza: lo stock di una riga importata vive
+    dove vive la merce, e ricaricarlo qui durerebbe fino al primo
+    giro di sync."""
+    if origine_annuncio(a) == "nostr":
+        return ("Questo annuncio è importato da Nostr: la quantità non "
+                "vive qui")
+    return (f"Questo annuncio arriva dal tuo negozio {nome_origine(a)}: "
+            "la quantità vive lì, e qui si aggiorna da sola")
+
+
 MESI_IT = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
            "luglio", "agosto", "settembre", "ottobre", "novembre",
            "dicembre")
@@ -5615,6 +5822,26 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE punti_ritiro SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM punti_ritiro WHERE tg_id=?", (id_nostr,))
+        # I NEGOZI COLLEGATI seguono l'utente (ago 2026), o chi fonde i
+        # suoi due account perderebbe il ponte col suo e-commerce — e
+        # con lui il catalogo, che senza collegamento smette di
+        # aggiornarsi senza dirlo a nessuno. Non l'aveva previsto il
+        # piano: l'ha trovato il censimento delle tabelle figlie, che
+        # guarda lo SCHEMA e chiede che ogni `tg_id` sia nominato qui.
+        # UNA RIGA SOLA, e non la liturgia `UPDATE OR IGNORE` + DELETE
+        # dei vicini: quella serve dove la UNIQUE contiene il `tg_id`
+        # (preferiti, punti_ritiro, avvisi_notificati), cioe' dove la
+        # migrazione puo' collidere con una riga gemella dell'altra
+        # meta'. Qui la UNIQUE e' `(fonte, url_negozio)` e non nomina
+        # il tg_id: lo stesso negozio non si collega due volte NEMMENO
+        # da due account diversi — la seconda persona lo sente al
+        # collegamento — quindi la collisione non puo' nascere e un
+        # IGNORE con la sua pulizia sarebbe codice morto, cioe' una
+        # guardia che promette d'essere esercitata e non lo e' mai.
+        # (Le uscite non hanno un `tg_id` loro: seguono il connettore
+        # per costruzione, e con lui migrano senza una riga.)
+        con.execute("UPDATE connettori SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # Le offerte seguono l'utente da entrambi i lati del banco;
         # le trattative tra le due meta' (auto-offerte, dopo la
         # fusione) muoiono qui, come i feedback degli auto-scambi.
@@ -7418,14 +7645,16 @@ def backfill_coordinate():
 def arricchisci_zone_esistenti():
     """Migrazione morbida (lug 2026): la sigla entra anche nelle zone
     degli annunci gia' in vetrina — solo dove il comune e' riconosciuto
-    senza ambiguita' (arricchisci_zona non inventa mai) e MAI sugli
-    importati da Nostr: l'import orario riscrive la loro zona dai
-    relay, che restano la fonte di verita'. Idempotente come il
+    senza ambiguita' (arricchisci_zona non inventa mai) e MAI su quelli
+    che arrivano da fuori: l'import orario riscrive la loro zona dalla
+    fonte, che resta la verita' — i relay per Nostr, il cassetto del
+    collegamento per un negozio (ago 2026). Idempotente come il
     backfill delle coordinate: al secondo avvio non tocca piu' nulla."""
     try:
         con = db()
-        righe = con.execute("SELECT id, zona FROM annunci "
-                            "WHERE zona!='' AND contatto_nostr=''").fetchall()
+        righe = con.execute("SELECT a.id, a.zona FROM annunci a "
+                            "WHERE a.zona!='' AND NOT "
+                            + SQL_ORIGINE_ESTERNA).fetchall()
         toccate = 0
         for r in righe:
             nuova = arricchisci_zona(r["zona"])
@@ -10617,10 +10846,12 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     if not a:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    if a["contatto_nostr"]:
+    # Lo stock di una riga importata vive dove vive la merce — su
+    # Nostr come su un negozio collegato: ricaricarlo qui durerebbe
+    # fino al primo giro di sync, che lo ricopre dalla fonte.
+    if origine_annuncio(a):
         con.close()
-        raise HTTPException(400, "Questo annuncio è importato da Nostr: "
-                                 "la quantità non vive qui")
+        raise HTTPException(400, msg_stock_altrove(a))
     if a["asta_base_sats"] > 0:
         # L'asta e' a pezzo unico, anche da venduta: il «rimetti in
         # vendita» qui gonfierebbe lo stock di una gara gia' chiusa.
@@ -10745,11 +10976,11 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                                      "aspetta la decisione dei moderatori, "
                                      "poi potrai modificarlo")
         raise HTTPException(400, "Operazione non permessa")
-    if a["contatto_nostr"]:
+    # Il testo di una riga importata lo riscrive il sync a ogni giro:
+    # una modifica fatta qui sparirebbe entro l'ora, e in silenzio.
+    if origine_annuncio(a):
         con.close()
-        raise HTTPException(400, "Questo annuncio è importato da Nostr: "
-                                 "modificalo dal tuo client Nostr, qui si "
-                                 "aggiorna da solo entro un'ora")
+        raise HTTPException(400, msg_modifica_altrove(a))
     if a["asta_base_sats"] > 0:
         # Un'asta non si modifica MAI (regola del cantiere: base,
         # durata e testo si bloccano alla prima puntata; e senza
@@ -16435,16 +16666,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # vanno i sats, ed e' giusto che il conto lo segua; ma non dice da
     # DOVE arriva la merce, e un account che raccogliesse roba di piu'
     # persone passerebbe la guardia con un id solo — come e' successo.
-    # L'origine di un annuncio e' `contatto_nostr`: '' = nato qui,
-    # altrimenti la chiave che l'ha firmato. Un set deve avere UNA
-    # origine sola, e non e' pignoleria da inventario: cio' che e'
-    # nato qui e cio' che vive su una chiave altrove non sta nello
-    # stesso scatolone nemmeno nella vita vera.
+    # L'origine di un annuncio la dice `chiave_origine`: '' = nato
+    # qui, la chiave che l'ha firmato se viene da Nostr, il
+    # collegamento preciso se viene da un negozio (ago 2026 — e la'
+    # e' il NEGOZIO a contare, non la piattaforma: due cataloghi
+    # dello stesso venditore sono due magazzini). Un set deve avere
+    # UNA origine sola, e non e' pignoleria da inventario: cio' che
+    # e' nato qui e cio' che vive altrove non sta nello stesso
+    # scatolone nemmeno nella vita vera.
     # ATTENZIONE a cosa NON fa: non avrebbe fermato il fantasma, che
     # aveva una chiave sola. A fermare quello e' il tappo
     # (chiave_di_casa + il controllo dell'autore nell'import); questa
     # e' la cintura che regge se un giorno il tappo salta.
-    origini = {(a["contatto_nostr"] or "") for a in tutti.values()}
+    origini = {chiave_origine(a) for a in tutti.values()}
     if len(origini) > 1:
         con.close()
         raise HTTPException(400, "Questi oggetti non arrivano tutti dallo "
@@ -17481,7 +17715,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
     guardia_ferie(con, venditore_id)   # il gemello di _compra_set
-    origini = {(a["contatto_nostr"] or "") for a in tutti.values()}
+    origini = {chiave_origine(a) for a in tutti.values()}
     if len(origini) > 1:
         con.close()
         raise HTTPException(400, "Questi oggetti non arrivano tutti dallo "
@@ -23922,7 +24156,7 @@ async def _drena_promo():
                 "u.negozio AS venditore_negozio "
                 "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
                 "WHERE a.id=?", (i,)).fetchone()
-            if a and a["stato"] == "attivo" and not a["contatto_nostr"] \
+            if a and a["stato"] == "attivo" and not origine_annuncio(a) \
                     and not in_ferie(a["ferie_fino"], adesso_f):
                 annunci.append(dict(a))
         con.close()
@@ -24094,7 +24328,7 @@ async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
             (annuncio_id,)).fetchone()
         con.close()
         adesso = time.time()
-        if not a or a["stato"] != "attivo" or a["contatto_nostr"] \
+        if not a or a["stato"] != "attivo" or origine_annuncio(a) \
                 or in_ferie(a["ferie_fino"], int(adesso)) \
                 or a["lampo_scadenza"] <= adesso:
             return
@@ -28983,8 +29217,11 @@ async def ricategorizza_automatico():
             "WHERE a.stato='attivo' "
             # gli importati (nascono in «Altro») e chiunque sia in
             # «Altro»: i nativi con una categoria vera l'ha scelta una
-            # persona, e non si corregge
-            "  AND (a.contatto_nostr!='' OR a.categoria='Altro') "
+            # persona, e non si corregge. Da ago 2026 «importato» vuol
+            # dire anche «arriva da un negozio collegato», che nasce
+            # in «Altro» per la stessa ragione — la categoria del suo
+            # e-commerce non e' la nostra.
+            f"  AND ({SQL_ORIGINE_ESTERNA} OR a.categoria='Altro') "
             # deciso e' deciso (qualunque categoria abbia adesso), e
             # cio' che e' gia' in coda non si richiede
             "  AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
