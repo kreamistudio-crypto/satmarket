@@ -16199,6 +16199,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   costa comunque un round-trip. Chi un domani alzasse
   `MAX_PRODOTTI_CONNETTORE` fino a paginare davvero rimetta una pausa
   VERA dentro il ciclo, non una costante accanto.
+  LE SEI LEVE STANNO DOVE SI COPIA (ago 2026, chiesto da Andrea:
+  «è il file da cui copio quando metto mano al VPS, e senza quelle non
+  le trovo»): `CONNETTORI_NEGOZIO_APERTI`, `MAX_PRODOTTI_CONNETTORE`,
+  `CONNETTORI_ERRORI_MAX`, `MAX_CONNETTORI_VENDITORE`,
+  `CONNETTORI_SYNC_MANUALE_S`, `MAX_TARIFFA_CONNETTORE` — in
+  `config_esempio.py`, ognuna col suo perché, accanto alle altre due
+  fonti che vengono da FUORI (l'import Nostr e la
+  ricategorizzazione), che è dove uno le cerca.
+  CINQUE ERANO COSTANTI E SONO DIVENTATE LEVE, ed è l'ordine da non
+  invertire: dichiararle nel file d'esempio SENZA cablarle sarebbe
+  stata la seconda famiglia di difetti qui sotto — una riga che si
+  copia nel config, si riavvia, e non cambia niente. Cioè
+  esattamente `PAUSA_PAGINE_SHOPIFY`, tolta due ore prima nello
+  stesso cantiere.
+  DA LÌ IL CENSIMENTO, `prove_config_esempio`, che è la cosa che
+  tiene chiuso questo punto invece di riaprirlo al prossimo cantiere.
+  Guarda le DUE direzioni, che sono due difetti diversi e tutti e due
+  silenziosi: una leva LETTA dal codice e non dichiarata è invisibile
+  a chi mette mano al VPS (funziona, ma solo col valore che le ha
+  dato chi l'ha scritta), una riga DICHIARATA e non letta da nessuno
+  è una promessa che non si mantiene. La seconda direzione è PULITA e
+  va tenuta tale; la prima ha SEI DEBITI, e si NOMINANO
+  (`MODERAZIONE_REVISIONE`, `PROMEMORIA_BUSTA_GIORNI`, le due della
+  revisione, le due dei solleciti delle firme Nostr) invece di
+  sparire in un «≤ 6», che è il modo in cui un debito diventa
+  un'abitudine: l'elenco è ESATTO, quindi il settimo che qualcuno
+  dimentica fa rossa la riga il giorno stesso e chi ne dichiara uno
+  lo toglie da lì. Il censimento GUARDA LA CARTELLA e non tiene un
+  secondo elenco di script — la lezione di
+  `prove_script_nel_workflow`.
   QUELLO CHE NON C'È ANCORA, dichiarato: `origine_scorta` — la
   coordinata che serve al decremento — NON esiste come colonna: è
   fase 2, e non si aggiunge una colonna per una cosa che non c'è (il
@@ -20110,11 +20140,14 @@ sempre su duecento annunci.
 Nello stesso giro le tre code rimaste: i cinque `.index()` di
 `prove_connettori_sync` diventati `find()` (la forma che è già
 esplosa due volte mangiandosi le sorelle), `PAUSA_PAGINE_SHOPIFY`
-tolta perché prometteva una pausa che nessuno prendeva, e le chiavi
-WooCommerce (`ck_`/`cs_` più 40 esadecimali) entrate nello scanner dei
-segreti — sono il primo segreto del progetto che non passa da
-config_esempio.py, quindi si riconoscono dalla FORMA come la nsec.
-Collaudata: 5193 prove verdi (86 nuove, e una che ha CAMBIATO LATO
+tolta perché prometteva una pausa che nessuno prendeva, e le
+credenziali dei negozi entrate nello scanner dei segreti — le chiavi
+WooCommerce (`ck_`/`cs_` più 40 esadecimali) e i token Shopify
+(`shpat_` e i suoi tre fratelli): sono i primi segreti del progetto
+che non passano da config_esempio.py, quindi si riconoscono dalla
+FORMA come la nsec, e le lunghezze sono LARGHE in coda come per il
+token del bot.
+Collaudata: 5206 prove verdi (99 nuove, e una che ha CAMBIATO LATO
 col perché scritto) più `collaudo_connettori.py` a 94 verdi (era 69),
 dove gli endpoint girano PER DAVVERO — il token sbagliato che non
 lascia una riga scritta, il JSON in cui le chiavi non compaiono né
@@ -20131,9 +20164,14 @@ IN PRODUZIONE il deploy non cambia niente: nessuna colonna, nessuna
 migrazione, e `CONNETTORI_NEGOZIO_APERTI` è ancora SPENTA nel codice
 — quindi il cassetto non compare a nessuno finché la riga non entra
 nel config del VPS.
-⚠️ E QUELLA RIGA IN `config_esempio.py` NON C'È: la leva ha il suo
-default nel codice e funziona, ma chi va a cercarla dove si copiano
-le altre non la trova. Va aggiunta prima del rodaggio.
+E LE SEI LEVE SONO IN `config_esempio.py`, col loro perché: cinque
+erano costanti nel codice e sono diventate leve vere prima di
+dichiararle, che una riga da copiare la quale non cambia niente è
+peggio di una riga che manca. A tenere chiuso il punto c'è
+`prove_config_esempio`, che censisce le due direzioni fra il codice e
+il file da cui si copia — vedi la voce in Architettura, anche per i
+SEI DEBITI di altri cantieri che il censimento ha trovato e che ora
+sono nominati uno per uno.
 DA GUARDARE quando si accenderà, ed è il pezzo che in locale non si
 può fare: il primo collegamento vero a uno store di sviluppo — che il
 401 di un token sbagliato arrivi come un 400 leggibile, che il
