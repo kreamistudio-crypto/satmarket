@@ -16953,9 +16953,13 @@ def prove_seo():
     prova("...e l'anello e' l'arancio di casa", True,
           ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
           in testo_mini)
+    # CAMBIA LATO (ago 2026): la formula non vive piu' qui dentro —
+    # la barra delle pillole fa lo stesso gesto, e due copie direbbero
+    # due centri diversi a due dita di distanza. Qui si chiede solo
+    # che la striscia passi dal giudice unico.
     prova("...e si porta in vista senza muovere la pagina", True,
-          "if (a) el('catStrip').scrollLeft =" in st
-          and "scrollIntoView" not in st)
+          "centraNellaFila(" in st and "scrollIntoView" not in st)
+    prova("...e la formula non e' ribattuta qui", False, "offsetLeft" in st)
     # LA FIRMA DICE ANCHE IL REPARTO: senza, entrare in una categoria
     # non ridisegna niente (l'ordine non cambia) e la card non si
     # illumina mai — il difetto lo prende questa riga, non l'occhio.
@@ -17078,6 +17082,71 @@ def prove_seo():
     prova("a decidere e' la sezione delle card", True,
           "new IntersectionObserver(" in testo_mini
           and ".observe(el('catSez'))" in testo_mini)
+
+    # --- LA PILLOLA ACCESA STA AL CENTRO (ago 2026, dal campo) ---
+    # Scorrendo con un reparto scelto la pillola restava troppo a
+    # sinistra e non si capiva piu' dove si fosse. E' lo stesso gesto
+    # della card nella striscia, quindi UN giudice solo: due copie
+    # della formula direbbero due centri diversi a due dita di
+    # distanza. Che RISPONDA giusto non lo dicono queste righe — lo
+    # dice il banco che lo fa girare (prove_centro_fila).
+    prova("il centro della fila ha un giudice solo", True,
+          testo_mini.count("function centraNellaFila(") == 1)
+    centra = pezzo_js(testo_mini, "function centraNellaFila(", "\n}\n")
+    # `offsetLeft` e' relativo all'offsetParent: .chips e' posizionato
+    # e .cat-strip no, quindi per la striscia il conto partirebbe dal
+    # corpo della pagina — giusto solo finche' la fila comincia a x=0
+    prova("...e misura coi rect, mai con offsetLeft", True,
+          "getBoundingClientRect()" in centra and "offsetLeft" not in centra)
+    # nel CORPO del giudice, non in tutto il client: altrove quella
+    # funzione e' legittima (i cassetti, il tour, il campo Zona) — qui
+    # sposterebbe anche la pagina in verticale, dove non c'e' niente
+    # da scorrere in su
+    prova("...e mai la funzione che sposta anche la pagina", False,
+          "scrollIntoView" in centra)
+    # a fila non impaginata (vista nascosta) non si scrive niente: un
+    # conto su un clientWidth a zero e' una posizione a caso
+    prova("...e su una fila non impaginata non scrive", True,
+          "!fila.clientWidth) return" in centra)
+    prova("le pillole passano dal giudice", True,
+          "centraNellaFila(el('chips'), el('chips')"
+          ".querySelector('.chip.active'))" in
+          pezzo_js(testo_mini, "function renderChips(){", "\n}\n"))
+    # e comparendo si ricentra: renderChips puo' essere girato con la
+    # vista nascosta, dove non c'e' niente da misurare — qui la fila
+    # e' in pagina per certo, che a dirlo e' l'osservatore
+    prova("...e la barra che compare si ricentra", True,
+          "centraNellaFila(" in pezzo_js(
+              testo_mini, "function chipsAppiccicate(attive){", "\n}\n"))
+
+    # --- IL FONDO E' OPACO (ago 2026, dal campo) -----------------
+    # A .92 col blur la vetrina che scorre si vedeva passare dietro la
+    # testata E dietro la barra delle pillole, che veste lo stesso
+    # token. Opaco vuol dire la carta della pagina: a separarla c'e'
+    # il bordo di sotto.
+    def _fetta(apri):
+        """la regola CSS che comincia con `apri`, fino alla sua
+        chiusura: con find() e non index(), che una regola rinominata
+        deve far diventare ROSSA la prova, non esplodere portandosi
+        dietro tutte quelle dopo (la lezione, all'ennesima volta)"""
+        i = testo_mini.find(apri)
+        if i < 0:
+            return ""
+        return testo_mini[i:testo_mini.find("}", i)]
+    prova("il fondo della testata e' opaco nei due temi", True,
+          testo_mini.count("--header-bg:var(--bg);") == 2)
+    prova("...e la trasparenza non torna", False, "--header-bg:rgba" in testo_mini)
+    prova("...e le pillole vestono lo stesso fondo", True,
+          "background:var(--header-bg);" in _fetta("  .chips.appiccicate{"))
+    # col fondo pieno la sfocatura non puo' cambiare un pixel, e
+    # resterebbe una passata per fotogramma sulla superficie piu'
+    # scorsa dell'app. Il containing block dei figli `absolute` — la
+    # barra appesa sotto — lo da' il position:sticky.
+    prova("...e col fondo pieno il blur se n'e' andato", False,
+          "backdrop-filter" in _fetta("\n  header{")
+          or "backdrop-filter" in _fetta("  .chips.appiccicate{"))
+    prova("...ma la testata resta posizionata, o la barra si stacca",
+          True, "position:sticky;top:0;z-index:20" in _fetta("\n  header{"))
     prova("...col verso giusto (fuori vista = barra accesa)", True,
           "chipsAppiccicate(!voce.isIntersecting)" in testo_mini)
     # LE TRE PROVE DELL'ASCOLTATORE SONO MORTE COL CODICE CHE
@@ -22078,6 +22147,71 @@ def prove_altri_scorrimento():
           '"esauriti": esauriti' in neg and '"feedback": feedback' in neg)
 
 
+def prove_centro_fila(mini, node):
+    """IL GIUDICE DEL CENTRO, FATTO GIRARE (ago 2026): le sentinelle
+    dicono che esiste ed e' uno, mai che RISPONDA giusto — e la
+    domanda vera («l'ultima pillola non resta mezza tagliata?») e' una
+    risposta in pixel, non una riga da rileggere.
+    La funzione si estrae dal sorgente e si gira su una fila di
+    cartone che modella quel che fa il browser: i rect seguono lo
+    scorrimento, e `scrollLeft` si clampa da solo a
+    [0, scrollWidth - clientWidth] — ed e' quel clamp a rispondere,
+    senza un ramo apposta, alle due voci di bordo."""
+    import subprocess as _sp, tempfile as _tf
+    fn = pezzo_js(mini, "function centraNellaFila(", "\n}\n") + "\n}\n"
+    banco = fn + r"""
+function fila(clientWidth, larghezze, gap){
+  const f = {clientWidth, _s: 0, sinistra: 100};
+  let x = 0;
+  const voci = larghezze.map(w => { const v = {w, x}; x += w + gap; return v; });
+  const scrollWidth = Math.max(x - gap, 0);
+  Object.defineProperty(f, 'scrollLeft', {
+    get(){ return f._s; },
+    set(v){ f._s = Math.max(0, Math.min(v, Math.max(0, scrollWidth - clientWidth))); }
+  });
+  f.getBoundingClientRect = () => ({left: f.sinistra, width: clientWidth});
+  f.voci = voci.map(v => ({
+    width: v.w,
+    getBoundingClientRect: () => ({left: f.sinistra - f._s + v.x, width: v.w})
+  }));
+  return f;
+}
+const rosse = [];
+function att(nome, atteso, avuto){
+  if (Math.abs(atteso - avuto) > 0.51) rosse.push(nome + ': atteso ' + atteso + ', avuto ' + avuto);
+}
+const L = Array(10).fill(90);            // scrollWidth 972, vista 300
+function conVoce(n){ const f = fila(300, L, 8); centraNellaFila(f, f.voci[n]); return f; }
+function bordo(n){
+  const f = conVoce(n);
+  return f.voci[n].getBoundingClientRect().left - f.getBoundingClientRect().left;
+}
+att('la prima resta a filo, mai fuori', 0, bordo(0));
+att('una di mezzo va al centro', 300 / 2, bordo(4) + 90 / 2);
+att("l'ultima e' clampata a fine corsa", 972 - 300, conVoce(9).scrollLeft);
+att("...e si vede INTERA, col bordo destro a filo", 300, bordo(9) + 90);
+const corta = fila(300, [80, 80], 8); centraNellaFila(corta, corta.voci[1]);
+att('fila piu corta della vista: non si muove', 0, corta.scrollLeft);
+const spenta = fila(0, L, 8); spenta._s = 42; centraNellaFila(spenta, spenta.voci[4]);
+att('vista nascosta: non scrive niente', 42, spenta.scrollLeft);
+const larga = fila(300, L, 8); larga.sinistra = 380;   // #app centrato
+centraNellaFila(larga, larga.voci[4]);
+att('fila spostata a destra: stesso centro', 105,
+    larga.voci[4].getBoundingClientRect().left - larga.getBoundingClientRect().left);
+console.log(JSON.stringify(rosse));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco); percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True)
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il giudice del centro gira", "", (r.stderr or "")[:200])
+        return
+    prova("il centro della fila risponde giusto in tutti i casi",
+          "[]", (r.stdout or "").strip())
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -22118,6 +22252,7 @@ def prove_sintassi_client():
     r = _sp.run([node, "--check", "sw.js"], capture_output=True, text=True)
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
+    prove_centro_fila(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
 

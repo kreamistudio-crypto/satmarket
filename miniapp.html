@@ -179,7 +179,17 @@
     --jar-riflesso:#BFE3F0;
     /* i colori "di servizio" che prima erano fissi nelle regole:
        tokenizzati per la dark mode, in chiaro identici a prima */
-    --header-bg:rgba(250,244,228,.92); --nav-bg:rgba(255,255,255,.96);
+    /* IL FONDO DELL'HEADER E' OPACO, ed e' la carta della pagina
+       (ago 2026, dal campo): a .92 col blur la vetrina che scorre
+       si vedeva passare dietro la testata e dietro la barra delle
+       pillole, che questo stesso token veste — sfocata, ma si
+       vedeva, nei due temi. `var(--bg)` e non il colore ribattuto:
+       la testata E' la stessa carta della pagina, e a separarla
+       c'e' il bordo di sotto.
+       Il --nav-bg resta com'e': .96 e' un'altra superficie (bianco
+       di giorno, la carta delle card di sera) e a quella densita'
+       non passa niente. */
+    --header-bg:var(--bg); --nav-bg:rgba(255,255,255,.96);
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
     /* ---- LA SPEDIZIONE GRATUITA: UN COLORE SOLO, IN TUTTA L'APP ----
@@ -283,7 +293,7 @@
     --chip-bg:#37301F;
     --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
-    --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
+    --header-bg:var(--bg); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
     /* --ship-bg/--ship-text servono ai badge di STATO dell'ordine
        («spedito»): quelli si', al buio si scuriscono come le sorelle.
@@ -396,9 +406,16 @@
   html{zoom:var(--fs-zoom,1)}
 
   /* ---------- header ---------- */
+  /* NIENTE `backdrop-filter` da quando il fondo e' opaco (ago 2026):
+     sopra una carta piena non puo' cambiare un pixel, e resterebbe
+     una sfocatura calcolata a ogni fotogramma sulla superficie piu'
+     scorsa dell'app. Non toglie niente a nessuno: il containing
+     block dei figli `absolute` — la barra delle pillole, appesa qui
+     sotto — lo da' il `position:sticky`, che e' gia' un
+     posizionamento. */
   header{
     position:sticky;top:0;z-index:20;background:var(--header-bg);
-    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    border-bottom:1px solid var(--line);
     padding:14px var(--pad) 10px;
   }
   /* gap 8 e non 10 (ago 2026, col barattolo in testata): sono quattro
@@ -600,7 +617,7 @@
      sotto la nav e sotto i fogli — non ruba mai un tocco. */
   .chips.appiccicate{opacity:1;visibility:visible;pointer-events:auto;
     transform:none;
-    background:var(--header-bg);backdrop-filter:blur(10px);
+    background:var(--header-bg);
     border-bottom:1px solid var(--line)}
   .chip{
     flex:0 0 auto;border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
@@ -7511,6 +7528,34 @@ function contaCategorie(){
     listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
   return conta;
 }
+/* LA VOCE ACCESA SI PORTA AL CENTRO DELLA SUA FILA, e il gesto e' UNO
+   per tutte e due — la striscia delle card e la barra delle pillole:
+   la stessa formula scritta in due posti direbbe due centri diversi a
+   due dita di distanza.
+   NON SI USA `offsetLeft`, ed e' la trappola da non ricalcare: quello
+   e' relativo all'offsetParent, cioe' al primo antenato POSIZIONATO —
+   `.chips` lo e' (absolute), `.cat-strip` no — quindi per la striscia
+   il conto partirebbe dal corpo della pagina, ed e' giusto solo
+   finche' la fila comincia a x=0 (sotto i 520px lo e', sopra no: il
+   #app e' centrato). Coi rect non resta nessuna precondizione da
+   ricordare, e il centro e' giusto a ogni larghezza.
+   `scrollLeft` a mano e non la funzione del browser che porta in vista
+   un elemento: quella sposterebbe anche la pagina in VERTICALE, e qui
+   non c'e' niente da scorrere in su. C'e' la prova che il corpo non la
+   nomini — altrove nel client e' legittima e si usa apposta.
+   LA PRIMA E L'ULTIMA VOCE NON RESTANO MEZZE TAGLIATE, e non serve un
+   ramo apposta: il browser clampa `scrollLeft` a [0, scrollWidth -
+   clientWidth], quindi l'ultima si ferma a filo del bordo destro —
+   intera, solo non centrata, che dopo di lei non c'e' piu' niente da
+   scorrere. Lo stesso in testa, dove il clamp e' lo zero.
+   A fila non ancora impaginata (vista nascosta, clientWidth 0) non si
+   centra niente: non c'e' niente da misurare, e un conto su un zero
+   scriverebbe una posizione a caso. */
+function centraNellaFila(fila, voce){
+  if (!fila || !voce || !fila.clientWidth) return;
+  const f = fila.getBoundingClientRect(), v = voce.getBoundingClientRect();
+  fila.scrollLeft += (v.left - f.left) - (fila.clientWidth - v.width) / 2;
+}
 function renderChips(){
   /* La striscia illustrata si ridisegna DA QUI, ed e' il suo unico
      chiamante: i cinque posti che gia' rifanno le pillole (avvia,
@@ -7561,6 +7606,11 @@ function renderChips(){
     `<div class="chip ${c===activeCat?'active':''}" data-cat="${esc(c)}"
        onclick="${c==='Tutto' ? `tornaATutto()`
                               : 'apriCategoria(this.dataset.cat)'}">${esc(c)}</div>`).join('');
+  /* AL CENTRO E NON A SINISTRA (ago 2026, dal campo): con un reparto
+     scelto la pillola accesa restava troppo in la' a sinistra, e
+     scorrendo non si capiva piu' dove si fosse. Stesso gesto della
+     card nella striscia, stesso giudice. */
+  centraNellaFila(el('chips'), el('chips').querySelector('.chip.active'));
 }
 function setCat(c){
   activeCat=c; renderChips(); haptic();
@@ -7748,11 +7798,8 @@ function renderStriscia(){
      la pagina in VERTICALE — e qui non c'e' niente da scorrere in su.
      (Il suo nome non si scrive nemmeno qui: c'e' la prova che lo
      vieta, e legge anche i commenti.) */
-  setTimeout(() => {
-    const a = el('catStrip').querySelector('.cat-cella.attiva');
-    if (a) el('catStrip').scrollLeft =
-      Math.max(0, a.offsetLeft - (el('catStrip').clientWidth - a.offsetWidth) / 2);
-  }, 0);
+  setTimeout(() => centraNellaFila(
+    el('catStrip'), el('catStrip').querySelector('.cat-cella.attiva')), 0);
   /* LA CARD «TUTTO» IN TESTA (ago 2026, decisione di Andrea che
      ROVESCIA il primo giro, «nessuna card Tutto in piu' nella
      fila»): la fila apre col mercatino intero, come le pillole. E'
@@ -7929,6 +7976,12 @@ function toccaScoperta(id){
    quel numero. */
 function chipsAppiccicate(attive){
   el('chips')?.classList.toggle('appiccicate', attive);
+  /* e comparendo si riporta al centro la pillola accesa: renderChips
+     puo' essere girato con la vista nascosta — clientWidth 0, niente
+     da misurare, nessun centro scritto — mentre qui la fila e' in
+     pagina per certo, che a dirlo e' l'osservatore. */
+  if (attive) centraNellaFila(el('chips'),
+                              el('chips')?.querySelector('.chip.active'));
 }
 /* Armato una volta sola sulla sezione, che vive in pagina per sempre
    (si nasconde, non si smonta): l'osservatore non va mai riattaccato. */
