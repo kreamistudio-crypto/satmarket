@@ -492,6 +492,69 @@ MAX_TRASLOCO_GIRO = 200
 # si lanciano quando vuoi).
 RICATEGORIZZA_AUTO = True
 
+# --- I connettori del negozio (Shopify e WooCommerce) -----------------
+# Chi ha gia' un e-commerce lo collega dal Profilo, in
+# «🏪 Il tuo negozio», e i suoi prodotti compaiono qui: prezzo e
+# giacenza si tengono in pari da soli, un giro all'ora. E' la terza
+# fonte che viene da FUORI, dopo Nostr e l'import CSV.
+#
+# SOLA LETTURA (fase 1), ed e' la cosa da sapere prima di accendere:
+# Barattolo il catalogo lo LEGGE e non lo SCRIVE. Quando si vende qui,
+# il magazzino sul negozio dell'utente lo aggiorna LUI — glielo diciamo
+# in coda a ogni notifica di vendita — e nel frattempo la giacenza di
+# qui resta giusta lo stesso (le vendite non ancora riflesse stanno nel
+# registro `connettori_uscite`). Il decremento a monte e' la fase 2, e
+# si fara' quando i volumi o una lamentela lo chiederanno.
+#
+# Nasce SPENTA come IMPORT_NOSTR_APERTO e per la STESSA ragione:
+# accesa, il server va a bussare all'API di un negozio di qualcun
+# altro con le sue credenziali in mano, crea annunci e manda
+# notifiche. Una cosa cosi' si accende di proposito, guardando il
+# primo giro col journal aperto — mai per il solo fatto di aver
+# aggiornato il codice sul VPS. Questa riga e' anche l'interruttore
+# d'emergenza: rimettila False e riavvia (i collegamenti restano in
+# tabella, gli annunci dove sono; semplicemente nessuno li rilegge).
+# ⚠️ Serve anche CHIAVE_CONTENUTI_DIGITALI: senza, il collegamento si
+# rifiuta con un 503 invece di scrivere in chiaro il token di un
+# negozio — e' il patto dell'indirizzo di casa.
+CONNETTORI_NEGOZIO_APERTI = False
+
+# Quanti prodotti si leggono per collegamento a ogni giro. Il target
+# dichiarato (cataloghi da ~200 articoli) passa tutto in un giro solo;
+# un catalogo piu' grande si digerisce in piu' tornate, e il report lo
+# dice al venditore invece di troncare in silenzio.
+# ⚠️ Oltre 250 il catalogo di Shopify comincia a paginarsi davvero, e
+# li' il suo limite di richieste al secondo torna a contare: prima di
+# alzarlo tanto, va rimessa una pausa dentro il ciclo del lettore.
+MAX_PRODOTTI_CONNETTORE = 200
+
+# Dopo quanti giri falliti di FILA il collegamento si dichiara rotto e
+# il venditore riceve UN avviso (uno solo: alla soglia, poi silenzio —
+# il patto dei solleciti). Cinque giri sono cinque ore di silenzio, che
+# e' un problema vero; un negozio che non risponde per mezz'ora no.
+# Gli annunci non si spengono MAI per un errore di lettura: un negozio
+# muto non e' un negozio vuoto.
+CONNETTORI_ERRORI_MAX = 5
+
+# Quanti negozi puo' collegare un venditore. Due sono il caso vero
+# (uno Shopify e un Woo, oppure il negozio e il magazzino), tre
+# lasciano aria; oltre non e' piu' «il mio negozio».
+MAX_CONNETTORI_VENDITORE = 3
+
+# Ogni quanto si puo' chiedere A MANO una rilettura col bottone
+# «🔄 Aggiorna ora», in secondi. Il freno non e' per noi: e' per il
+# server di qualcun altro, che ha i suoi limiti di richieste. Il
+# timbro si scrive anche sui giri FALLITI, cosi' un negozio rotto non
+# si puo' martellare col bottone; il giro automatico dell'ora resta
+# comunque.
+CONNETTORI_SYNC_MANUALE_S = 300
+
+# Il tetto sulle tariffe di spedizione dichiarate nel cassetto, in
+# euro. Non e' un giudizio su quanto costi spedire — quello lo sa il
+# venditore, non noi, com'e' per MAX_QUANTITA_ANNUNCIO — e' la
+# cintura contro lo zero in piu' battuto per sbaglio.
+MAX_TARIFFA_CONNETTORE = 500.0
+
 # --- Post automatici (la piattaforma racconta i fatti) ----------------
 # Ogni nuovo annuncio in vetrina viene annunciato dai canali di
 # Barattolo: una nota Nostr (con la chiave piattaforma qui sopra) e un

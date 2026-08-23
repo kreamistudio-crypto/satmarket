@@ -117,15 +117,21 @@ jobs:
       # qualunque segreto futuro che rispetti la convenzione dei
       # segnaposto INCOLLA_QUI di config_esempio.py.
       #
-      # E le CHIAVI DI WOOCOMMERCE (ago 2026, coi connettori del
-      # negozio): quelle una forma ce l'hanno — `ck_` e `cs_` seguiti
-      # da 40 esadecimali — e non un nome, perche' non stanno nel
-      # config: vivono cifrate nel database, e nel repo non devono
-      # entrare in nessun modo. Sono il primo segreto del progetto che
-      # non passa da config_esempio.py, ed e' per questo che si
-      # riconosce dalla FORMA come la nsec e la chiave Anthropic.
+      # E LE CREDENZIALI DEI NEGOZI COLLEGATI (ago 2026, coi
+      # connettori): quelle una forma ce l'hanno — `ck_` e `cs_` di
+      # WooCommerce seguiti da 40 esadecimali, e i token di Shopify,
+      # che cominciano per `shpat_` (app privata), `shpca_`, `shppa_`
+      # o `shpss_` — e non un nome, perche' non stanno nel config:
+      # vivono cifrate nel database, e nel repo non devono entrare in
+      # nessun modo. Sono i primi segreti del progetto che non passano
+      # da config_esempio.py, ed e' per questo che si riconoscono
+      # dalla FORMA come la nsec e la chiave Anthropic.
+      # Le lunghezze sono LARGHE in coda (`{32,}`, `{40,}`) come per
+      # il token del bot: meglio un falso allarme da guardare che un
+      # segreto vero che passa perche' il formato e' cambiato di un
+      # carattere.
       FORME: >-
-        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40}
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}
       # E la chiave Nostr in esadecimale nudo, che ha una regola sua
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione

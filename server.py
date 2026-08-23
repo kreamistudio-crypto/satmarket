@@ -29343,17 +29343,31 @@ _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 # dichiarato (200 articoli) passa tutto in un giro; un catalogo enorme
 # si digerisce in piu' tornate invece di tenere in ostaggio l'orologio,
 # e il report lo dice al venditore.
-MAX_PRODOTTI_CONNETTORE = 200
+# ⚠️ Alzandolo oltre PER_PAGINA (250) il catalogo di Shopify si
+# paginerebbe davvero, e li' il limite di richieste al secondo torna a
+# contare: chi lo fa rimetta una pausa VERA dentro il ciclo del
+# lettore — una costante accanto non frena niente (la lezione di
+# PAUSA_PAGINE_SHOPIFY).
+try:
+    from config import MAX_PRODOTTI_CONNETTORE
+except ImportError:
+    MAX_PRODOTTI_CONNETTORE = 200
 
 # Dopo quanti giri falliti di fila il collegamento si dichiara rotto e
 # il venditore riceve UN avviso. Cinque ore di silenzio sono un
 # problema vero; un negozio che non risponde per mezz'ora no.
-CONNETTORI_ERRORI_MAX = 5
+try:
+    from config import CONNETTORI_ERRORI_MAX
+except ImportError:
+    CONNETTORI_ERRORI_MAX = 5
 
 # Quanti negozi puo' collegare un venditore. Due sono il caso vero
 # (uno Shopify e un Woo, o il negozio e il magazzino), tre lasciano
 # aria; oltre non e' piu' «il mio negozio».
-MAX_CONNETTORI_VENDITORE = 3
+try:
+    from config import MAX_CONNETTORI_VENDITORE
+except ImportError:
+    MAX_CONNETTORI_VENDITORE = 3
 
 # Ogni quanto si puo' chiedere A MANO una rilettura. Il freno non e'
 # per noi: e' per il negozio dell'ALTRO, che ha i suoi limiti di
@@ -29363,13 +29377,19 @@ MAX_CONNETTORI_VENDITORE = 3
 # (`_connettore_in_errore`) — cosi' un negozio rotto non si puo'
 # martellare col bottone. Il gemello e' SOLLECITO_MANUALE_PAUSA_ORE:
 # li' il freno protegge una persona, qui un server di qualcun altro.
-CONNETTORI_SYNC_MANUALE_S = 300
+try:
+    from config import CONNETTORI_SYNC_MANUALE_S
+except ImportError:
+    CONNETTORI_SYNC_MANUALE_S = 300
 
 # Il tetto sulle tariffe del cassetto, in euro. Non e' un giudizio su
 # quanto costi spedire — quello lo sa il venditore, non noi (la regola
 # di MAX_QUANTITA_ANNUNCIO) — e' la cintura contro lo zero in piu'
 # battuto per sbaglio.
-MAX_TARIFFA_CONNETTORE = 500.0
+try:
+    from config import MAX_TARIFFA_CONNETTORE
+except ImportError:
+    MAX_TARIFFA_CONNETTORE = 500.0
 
 # Le piattaforme che sappiamo leggere. E' il GEMELLO di
 # `importa_negozio.LETTORI` e vive qui perche' il client deve poterle

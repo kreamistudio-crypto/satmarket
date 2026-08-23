@@ -26177,6 +26177,105 @@ def prove_connettori_cassetto():
     prova("...e che ricollegare e' un catalogo nuovo", True,
           "come annunci nuovi" in sc)
 
+def prove_config_esempio():
+    """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
+    campo: le sei leve dei connettori erano cablate, funzionavano col
+    loro default nel codice, e in quel file non c'erano — quindi chi
+    andava a cercarle dove si cercano le altre non le trovava).
+
+    LE DUE DIREZIONI SONO DUE DIFETTI DIVERSI, e sono tutt'e due
+    silenziosi:
+     · una leva LETTA dal codice e non dichiarata li' dentro e'
+       invisibile a chi mette mano al VPS — funziona, ma solo col
+       valore che le ha dato chi l'ha scritta;
+     · una riga dichiarata li' dentro e NON letta da nessuno e' una
+       promessa che non si mantiene: la si copia nel config, si
+       riavvia, e non cambia niente. E' la famiglia di
+       PAUSA_PAGINE_SHOPIFY, la costante che prometteva una pausa che
+       non prendeva nessuno.
+    Il censimento GUARDA LA CARTELLA e non tiene un secondo elenco di
+    script (la lezione di `prove_script_nel_workflow`): la leva che
+    qualcuno leggera' da un file nuovo entra nel conto da sola."""
+    print("\n[il config d'esempio, da cui si copia]")
+    import ast as _ast
+
+    def lette(percorso):
+        fuori = set()
+        try:
+            albero = _ast.parse(open(percorso, encoding="utf-8").read())
+        except SyntaxError:
+            return fuori
+        for nodo in _ast.walk(albero):
+            if isinstance(nodo, _ast.ImportFrom) and nodo.module == "config":
+                fuori |= {a.name for a in nodo.names}
+        return fuori
+
+    dal_codice = set()
+    for f in os.listdir(QUI):
+        if f.endswith(".py") and f != "config.py":
+            dal_codice |= lette(os.path.join(QUI, f))
+    dichiarate = {
+        n.targets[0].id
+        for n in _ast.parse(open(os.path.join(QUI, "config_esempio.py"),
+                                 encoding="utf-8").read()).body
+        if isinstance(n, _ast.Assign) and isinstance(n.targets[0], _ast.Name)}
+
+    prova("il codice legge delle leve dal config", True,
+          len(dal_codice) > 100)
+    # ⚠️ IL DEBITO E' UN ELENCO ESATTO e non una tolleranza: cosi' la
+    # settima che qualcuno dimentica fa rossa questa riga il giorno
+    # stesso, e chi ne dichiara una la toglie da qui. Sono sei leve di
+    # altri cantieri (la revisione, la busta di consegna, i solleciti
+    # delle firme Nostr) trovate mentre si chiudeva quello dei
+    # connettori: si NOMINANO invece di lasciarle sparire in un
+    # «<= 6», che e' il modo in cui un debito diventa un'abitudine.
+    DEBITO = {"MODERAZIONE_REVISIONE", "PROMEMORIA_BUSTA_GIORNI",
+              "REVISIONE_ATTESA_ORE", "REVISIONE_SOLLECITO_GIORNI",
+              "SOLLECITO_FIRME_GIORNI", "SOLLECITO_FIRME_MAX"}
+    prova("ogni leva letta dal codice sta nel config d'esempio",
+          sorted(DEBITO), sorted(dal_codice - dichiarate))
+    # L'ALTRA DIREZIONE E' PULITA, e va tenuta tale: una riga che si
+    # copia nel config e non cambia niente e' peggio di una riga che
+    # manca — quella almeno non promette.
+    prova("...e ogni riga del config d'esempio la legge qualcuno", [],
+          sorted(dichiarate - dal_codice))
+
+    # E LE SEI DEI CONNETTORI CI SONO, che e' il caso che ha aperto
+    # questa prova: cinque erano costanti nel codice e sono diventate
+    # leve vere: dichiararle senza cablarle sarebbe stata la seconda
+    # famiglia di difetti qui sopra.
+    for leva in ("CONNETTORI_NEGOZIO_APERTI", "MAX_PRODOTTI_CONNETTORE",
+                 "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
+                 "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE"):
+        prova(f"{leva}: cablata e dichiarata", (True, True),
+              (leva in dal_codice, leva in dichiarate))
+    # e la leva che ACCENDE nasce spenta nel codice, come
+    # IMPORT_NOSTR_APERTO e per la stessa ragione: un `git pull` non
+    # deve poter far cominciare le chiamate ai negozi di qualcun altro
+    prova("...e quella che accende nasce spenta", True,
+          "CONNETTORI_NEGOZIO_APERTI = False" in _SORGENTE)
+
+    # --- LO SCANNER DEI SEGRETI -----------------------------------
+    # Le credenziali dei negozi collegati sono i primi segreti che NON
+    # passano da config_esempio.py: vivono cifrate nel database, e nel
+    # repo non devono entrare in nessun modo. Quindi si riconoscono
+    # dalla FORMA, come la nsec e la chiave Anthropic, e non dal nome
+    # della variabile come le chiavi LNbits.
+    wf = open(os.path.join(QUI, ".github", "workflows", "prove.yml"),
+              encoding="utf-8").read()
+    i = wf.index("FORME: >-")
+    forme = wf[i + len("FORME: >-"):wf.index("\n", i + 10)]
+    prova("lo scanner conosce le chiavi WooCommerce", True,
+          "(ck|cs)_[0-9a-f]{40,}" in forme)
+    prova("...e i token Shopify", True,
+          "shp(at|ca|pa|ss)_[0-9a-f]{32,}" in forme)
+    # ⚠️ LA FORMA STA SU UNA RIGA SOLA, e non e' un vezzo: `FORME` e'
+    # uno scalare FOLDED (`>-`), e YAML unisce due righe con uno
+    # SPAZIO in mezzo — cioe' dentro la regex, che da li' non
+    # matcherebbe piu' niente e lo scanner direbbe «pulito» per
+    # sempre.
+    prova("...e sta tutta su una riga", True, "\n" not in forme.strip())
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -26243,7 +26342,8 @@ def main():
               prove_foto_vuota,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
-              prove_connettori_cassetto):
+              prove_connettori_cassetto,
+              prove_config_esempio):
         try:
             f()
         except Exception as e:
