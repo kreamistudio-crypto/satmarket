@@ -15631,6 +15631,129 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   è uno solo, cambia solo chi firma l'evento.
   Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
   in backlog).
+- I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi c'è la
+  TAPPA 1: schema, giudice, censimento. Il resto è dichiarato qui e
+  non ancora costruito): chi ha già un e-commerce collega il catalogo
+  dal Profilo e i suoi prodotti compaiono qui, invece di
+  ripubblicarli a mano. Sono cinque persone vere, cataloghi fino a
+  ~200 articoli, quasi tutti mono-variante, listini in euro.
+  IL CANTIERE SI SPEZZA IN DUE (decisione di Andrea davanti alle
+  3.000 righe del piano intero): FASE 1 sola lettura — si importa e
+  si tiene aggiornato ogni ora; quando si vende qui lo stock locale
+  scala e il venditore aggiorna il suo negozio a mano, e glielo
+  diciamo nella notifica di vendita. FASE 2 il decremento a monte
+  (scrivere l'inventario sul loro sito), con la coda e i ritentativi:
+  ~400-500 righe, quando i volumi o una lamentela lo chiederanno.
+  IL CONTO CHE HA DECISO LO SPACCO, e va tenuto perché è il numero da
+  rifare quando si crescerà: sovravendita vera = lo stesso pezzo
+  comprato sui due canali prima che il venditore riallinei. Con lo
+  stock >1 due vendite insieme non sovravendono niente, quindi il
+  caso vero è l'ULTIMO PEZZO; a ~2 vendite al mese per negozio e
+  qualche ordine a settimana sul loro sito spalmato su 50-200
+  prodotti, fanno **nell'ordine di 0-1 collisioni l'anno in tutto** —
+  e ognuna la copre l'escrow (sats in cassaforte, rimborso
+  integrale). Il decremento a monte non è la cura di un
+  sanguinamento: è la rifinitura che si compra quando serve.
+  MA LA FASE 1 NON È «SCALA E BASTA», ed è la riga che si sbaglia per
+  prima: il pericolo non è la collisione rara, è IL NOSTRO STESSO
+  SYNC. Il giro ricopre `quantita` dalla lettura esterna, quindi
+  senza registro ogni vendita fatta qui verrebbe RIALZATA al giro
+  dopo — e sul pezzo unico il 'venduto' risorgerebbe (la regola
+  «venduto risorge se lo stock esterno torna >0», che serve al
+  ricarico legittimo del miele). Da qui `connettori_uscite`: le
+  vendite di qui che il negozio di là non sa ancora, e
+  `quantita_corretta(esterno, pendenti)` che le sottrae. È la stessa
+  tabella che la fase 2 drenerà — niente da buttare.
+  LE DECISIONI DI ANDREA: pull con token incollato (niente plugin da
+  installare sul loro sito: sarebbe un secondo codebase da mantenere
+  per sempre, e coprirebbe solo Woo; webhook = v2); i multi-variante
+  SI SALTANO con l'avviso nel report (`annunci` è piatto, e il target
+  è quasi tutto mono-variante — le varianti sono un cantiere loro);
+  Shopify e Woo insieme, traduttori a innesti; 503 senza
+  `CHIAVE_CONTENUTI_DIGITALI` (un token che può scrivere sul negozio
+  di un altro non si tiene in `plain:`); scollegare spegne gli
+  annunci (senza sync lo stock mentirebbe entro un giorno); promo del
+  canale escluse in v1 (200 post al primo giro sono una raffica).
+  IL GIUDICE DELL'ORIGINE è la tappa 1 e la parte che regge tutto il
+  resto: fino a ieri «è un importato» si scriveva `contatto_nostr !=
+  ''` in una ventina di siti, e andava bene finché la fonte esterna
+  era UNA. Con la seconda ognuno di quei siti diventa una DECISIONE —
+  la modifica si blocca come per Nostr, la ricarica dello stock pure,
+  le lampo e le offerte restano AMMESSE (la decisione già presa per
+  Nostr), le promo del canale no, la consegna digitale MAI (il codice
+  si consegna premendo un bottone QUI, che è la stessa ragione dei
+  relay) — e una decisione presa in venti posti fra sei mesi ne dice
+  venti diverse. `origine_annuncio(a)` ('' | 'nostr' | 'shopify' |
+  'woo') è l'unico posto che legge le due colonne insieme, con la sua
+  forma SQL `SQL_ORIGINE_ESTERNA`; `da_connettore` è la domanda
+  corta; `chiave_origine` dice il posto PRECISO ('' / la npub /
+  `conn:7`) e serve alla guardia dell'origine unica del set — il caso
+  che si dimentica è che uno stesso venditore può avere DUE
+  collegamenti, cioè due cataloghi e due magazzini, e 'shopify' ==
+  'shopify' li farebbe passare per lo stesso posto.
+  `contatto_nostr` NON si allarga a etichetta, ed è deliberato:
+  quella colonna è una npub — `npub_to_hex` ci passa nella modifica
+  firmata, la deduplica ci confronta le chiavi — e mentirebbe al
+  primo Woo. Nel giudice viene PRIMA perché una riga importata dai
+  relay non ha e non avrà mai `fonte` piena, mentre il contrario un
+  domani potrebbe non essere vero. Più il ramo di compatibilità (una
+  SELECT che non chiede la colonna nuova, o un database più vecchio
+  della migrazione): su una `sqlite3.Row` la colonna mancante alza
+  IndexError, su un dict KeyError, e il giudice ne prende due.
+  I DUE TESTI VIVONO COL GIUDICE (`msg_modifica_altrove`,
+  `msg_stock_altrove`): «modificalo dal tuo client Nostr» detto a un
+  negoziante Shopify lo manda a cercare una cosa che non ha, ed è
+  precisamente la riga che fa scrivere all'assistenza invece di
+  risolvere.
+  LA FUSIONE MIGRA I NEGOZI COLLEGATI, e non l'aveva previsto il
+  piano: l'ha trovato il CENSIMENTO delle tabelle figlie in
+  `prove.py` — quello che guarda lo SCHEMA, pesca ogni `CREATE TABLE`
+  con un `tg_id` e chiede che `esegui_fusione` la nomini. Chi fonde i
+  suoi due account avrebbe perso il ponte col suo e-commerce, e con
+  lui il catalogo, che senza collegamento smette di aggiornarsi senza
+  dirlo a nessuno.
+  UNA RIGA SOLA e non la liturgia dei vicini, ed è una correzione
+  trovata PROVANDO invece che ragionando: `UPDATE OR IGNORE` + DELETE
+  serve dove la UNIQUE contiene il `tg_id` (preferiti, punti_ritiro,
+  avvisi_notificati), cioè dove la migrazione può collidere con una
+  riga gemella dell'altra metà. Qui la UNIQUE è
+  `(fonte, url_negozio)` e non nomina il tg_id — lo stesso negozio
+  non si collega due volte NEMMENO da due account diversi, la seconda
+  persona lo sente al collegamento — quindi la collisione non può
+  nascere e quei DELETE sarebbero codice morto travestito da cintura,
+  cioè una guardia che promette d'essere esercitata e non lo è mai
+  (la lezione dell'except irraggiungibile di `_npub_venditore`).
+  LO SCHEMA della fase 1: `connettori` (tg_id, fonte, url_negozio,
+  credenziali JSON cifrate con `_cifra_contenuto`, stato, la CONSEGNA
+  dichiarata QUI una volta per tutte le righe — i campi di Shopify e
+  Woo non combaciano coi nostri e tradurli sarebbe indovinare —,
+  zona, il report dell'ultimo giro, `UNIQUE(fonte, url_negozio)`);
+  `connettori_uscite` (il registro, con la `UNIQUE(ordine_id,
+  annuncio_id, tipo)` che è il giudice dell'idempotenza — il patto di
+  `xp_eventi`: non si chiede a chi scrive di ricordarsi «l'ho già
+  accodata?»); e su `annunci` cinque colonne additive — `fonte`,
+  `connettore_id`, `origine_chiave` (l'id del prodotto sul negozio, e
+  il match a ogni giro è QUELLO e solo quello: **niente adozione per
+  titolo**, che è la lezione delle «due teste» — adottare una riga
+  nata qui le toglierebbe Modifica e rifornimento, in silenzio),
+  `origine_foto` (il patto di `nostr_origine_foto`: se gli URL non
+  cambiano non si riscarica niente) e `origine_stock_visto`, dove
+  **-1 = mai letta** e non 0, che «zero pezzi» è un'altra cosa e col
+  default sbagliato il registro crederebbe a un calo mai avvenuto.
+  Più i due indici: quello del match, e `idx_annunci_nostr` — il
+  debito che questo cantiere paga, perché `contatto_nostr` non ne ha
+  mai avuto uno e ci passano l'import orario, il dopo-import e la
+  deduplica dei doppioni.
+  QUELLO CHE NON C'È ANCORA, dichiarato: il modulo `importa_negozio.py`
+  (traduttori a innesti + testo canonico condiviso fra chi scrive e
+  chi giudica, la lezione di `testo_evento`), il giro di sync col suo
+  tetto per giro, la moderazione col pattern `_da_giudicare` (200
+  articoli = 10 chiamate Haiku UNA TANTUM, poi zero finché un testo
+  non cambia), il registro agganciato in `_incassa_ordine`, gli
+  endpoint e il cassetto. E `origine_scorta` — la coordinata che
+  serve al decremento — NON esiste: è fase 2, e non si aggiunge una
+  colonna per una cosa che non c'è (il precedente di
+  `banner_sbloccato_il`).
 - `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
   il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
   rimasti nelle caselle di ieri (un portatile in «Elettronica» invece
@@ -19403,6 +19526,39 @@ trovarsi fra loro). Se il config del VPS ha una riga
 RESTA DA FARE, il secondo passo di questo cantiere: il completamento
 automatico mentre si digita e il «forse intendevi» — i mattoni sono
 già in casa (l'indice dei prefissi, `fts5vocab`, `difflib`).
+
+I connettori del negozio, le fondamenta (ago 2026, tappa 1 di 5 della
+FASE 1): cinque venditori con un e-commerce vogliono importare il
+catalogo invece di ripubblicarlo a mano. Il cantiere è spezzato in due
+per decisione di Andrea — sola lettura adesso, il decremento a monte
+quando i volumi lo chiederanno (il conto dice 0-1 collisioni l'anno, e
+ognuna la copre l'escrow) — e questa tappa non cambia NIENTE di
+visibile: `fonte` nasce vuota per tutti. Ci sono lo schema (le due
+tabelle, cinque colonne additive, due indici fra cui quello che
+mancava a `contatto_nostr`), il giudice unico dell'origine col suo
+censimento delle guardie, e la fusione che migra i negozi collegati —
+il pezzo che il piano non aveva previsto e che ha trovato il
+censimento delle tabelle figlie. Vedi «I CONNETTORI DEL NEGOZIO» in
+Architettura per le decisioni, il conto della sovravendita e la lista
+di cosa non c'è ancora.
+Collaudata: 4960 prove verdi (le nuove girano il giudice invece di
+guardarlo soltanto — una sentinella direbbe che esiste ed è uno, mai
+che risponda giusto), due sentinelle che hanno CAMBIATO LATO col
+perché scritto (certificavano la guardia stretta di ieri, cioè un
+catalogo Woo con lo stock ricaricabile da qui), la migrazione girata
+su una COPIA del database vero (900 annunci intatti, idempotente al
+secondo giro) e **18 mutazioni, 18 uccise**. La prima stesura ne
+lasciava viva una, ed è la lezione del giro: il censimento generico
+cerca il NOME della tabella dentro la fusione, e i DELETE lo nominano
+lo stesso — quindi restava verde anche togliendo la migrazione. Una
+sentinella sul nome certifica che qualcuno l'ha scritto, mai che il
+GESTO ci sia.
+IN PRODUZIONE il deploy non cambia niente: le migrazioni sono additive
+e non esiste ancora nessuna strada che scriva `fonte`. Le tappe che
+seguono: il modulo coi traduttori e il giro di sync (leva spenta), Woo
+col guardiano anti-SSRF delle API, il registro delle vendite non
+riflesse, endpoint + cassetto, e il collaudo eseguibile prima
+dell'accensione dal VPS.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
