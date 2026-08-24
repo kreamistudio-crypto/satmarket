@@ -7200,7 +7200,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ritardo, c'è una cosa che si perde e non torna.
   Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
   la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
-  con al massimo UNA controproposta. Tabella `offerte` (annuncio,
+  con un ping-pong CORTO e a forbice — vedi «IL COMPRATORE
+  RILANCIA», sotto: fino a due rilanci, e ogni mossa stringe.
+  Tabella `offerte` (annuncio,
   parti, `valuta` fotografata dal listino, importo_sats/importo_eur
   della proposta e contro_sats/contro_eur della controproposta — uno
   dei due campi sempre 0; UN solo campo `scadenza` riscritto a ogni
@@ -7220,13 +7222,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   comprare direttamente»; qui il cambio non serve MAI: mai 503),
   `POST /api/offerte/{id}/rispondi` (azione accetta|rifiuta|contro;
   gate di ruolo per stato: proposta = venditore, controproposta =
-  compratore e il ping-pong finisce li'; contro > offerta e
+  compratore, che accetta, rifiuta o RILANCIA; contro > offerta e
   ≤ listino; scadenza controllata anche inline), `GET
   /api/me/offerte` (busta con le leve: il client non hardcoda cifre),
   `offerte_da_agire` in /api/me e `offerta_minima_percento` nella
   busta di prima pagina. L'acquisto: `compra()` con `offerta_id` =
   stessa strada di sempre ma articolo alla cifra pattuita
-  (`_importo_accordo`: la contro se c'e', senno' la proposta; EUR
+  (`_importo_accordo`: la contro se c'e', senno' la proposta — e
+  regge col rilancio grazie al CONSOLIDAMENTO, vedi sotto; EUR
   convertito alla invoice col cambio_ordine, drift/tetto/protezione
   invariati); il legame `offerte.ordine_id` si scrive NELLA stessa
   transazione dell'INSERT; invoice viva gia' in corso = 400 (pagare
@@ -7333,6 +7336,167 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dicendo «non è tra le tue offerte» su una trattativa che c'è, e
   proprio sugli account più attivi. Una riga nell'ORDER BY, e il
   taglio cade sulle chiuse.
+  IL COMPRATORE RILANCIA (ago 2026, chiesto da Andrea): davanti a una
+  controproposta si poteva solo accettare o rifiutare, e rilanciare si
+  faceva a mano — rifiuta, torna sull'annuncio, rifai un'offerta —
+  BRUCIANDO uno dei tre tentativi di `MAX_OFFERTE_ANNUNCIO`. Ora è un
+  gesto solo, da dove si sta già: «↔ Rilancia», la cifra nuova, e al
+  venditore arriva la notifica con le sue tre uscite.
+  IL MODELLO È LA FORBICE, ed è la parte da leggere prima di toccare
+  qualunque riga, perché è ciò che rende sicuro tutto il resto:
+  `importo_*` è il PAVIMENTO (l'offerta corrente di chi compra),
+  `contro_*` è il SOFFITTO (la richiesta corrente di chi vende), e lo
+  STATO dice di chi è il turno. Ogni mossa stringe la forbice DAL SUO
+  LATO — il rilancio alza il pavimento, la ricontroproposta abbassa il
+  soffitto — mai il contrario. La trattativa converge per COSTRUZIONE
+  e non solo per il tetto dei giri. Le due colonne non cambiano
+  significato: prendono quello che avevano già, detto meglio.
+  IL CONSOLIDAMENTO È LA RIGA CHE VALE IL CANTIERE. `_importo_accordo`
+  decide quale cifra finisce nella invoice — «la contro se c'è,
+  altrimenti la proposta» — e la sua docstring lo giustificava così:
+  «solo il compratore può accettarla, quindi se c'è l'accordo è
+  quello». **Quella premessa è precisamente ciò che il rilancio
+  distrugge**: dopo un rilancio `contro_*` è piena ma l'accordo è il
+  pavimento NUOVO, quindi il venditore accetterebbe e nascerebbe un
+  ordine alla cifra che il compratore aveva appena RIFIUTATO.
+  E NESSUNA PROVA SE NE ACCORGEREBBE: preventivo e invoice leggono la
+  STESSA funzione e concorderebbero fra loro, quindi il patto
+  «preventivo == compra al sat» qui è CIECO — l'unico testimone
+  sarebbe una notifica Telegram. La cura è una riga condizionata
+  nell'UPDATE del ramo `accetta`: accettando da 'proposta' si azzerano
+  anche `contro_sats`/`contro_eur`. Da lì `_importo_accordo` resta
+  INTATTA e la sua garanzia diventa «in stato accettata, contro_* è
+  valorizzata solo se l'accordo è quello» — vera per costruzione.
+  LA STRADA SCARTATA, da non riproporre: azzerare `contro_*` al
+  RILANCIO. Sembra più semplice ed è la stessa cosa a occhio, ma butta
+  via il SOFFITTO — al giro dopo non c'è più niente contro cui
+  verificare che il venditore scenda, e per riaverlo servirebbero due
+  colonne nuove che direbbero quasi la stessa cosa. La forbice ha
+  bisogno di tutti e due i lati.
+  IL PREZZO DEL CONSOLIDAMENTO È DICHIARATO: la correttezza di
+  `_importo_accordo` in stato 'accettata' dipende da un UPDATE che sta
+  ALTROVE. Si sorveglia con una prova che ESEGUE la funzione sulla
+  riga RILETTA dal database dopo un rilancio-e-accettazione, mai con
+  una sentinella sul sorgente — e col collaudo eseguibile, che è
+  l'unica cosa che dimostra che dalla fattura esce la cifra giusta.
+  L'AZIONE VIVE DENTRO `rispondi_offerta`, ed è il rovescio esatto
+  dell'argomento del ritiro: quel gate risponde alla domanda «di chi è
+  il turno», e su una 'controproposta' il turno È GIÀ del compratore —
+  quindi il rilancio non chiede nessuna deroga, aggiunge un terzo
+  verbo a uno stato in cui quel soggetto muove già. Ed è il gemello
+  speculare della CONTROPROPOSTA e non del ritiro: stessa liturgia
+  riga per riga — leggi una cifra, verifica che converga, gira lo
+  stato, riapri la finestra, avvisa l'altra parte. Due gemelli in due
+  rotte diverse sarebbero due posti in cui si legge una cifra di
+  denaro. Effetto voluto: il gate diventa SIMMETRICO, tre azioni per
+  parte.
+  LE DECISIONI DI ANDREA, che non si rediscutono: DUE rilanci per
+  trattativa (`MAX_RILANCI_OFFERTA`), il rilancio NON consuma i tre
+  tentativi per annuncio, la cifra deve CONVERGERE, e converge DA
+  TUTT'E DUE I LATI — anche il venditore non può risalire sopra la sua
+  richiesta di prima. Le 48 ore ripartono a ogni mossa.
+  IL TETTO È 2 E NON 5, e il motivo è un conto: la vita massima di una
+  trattativa passa da 5 a 13 giorni (sei mosse da 48h più le 24h di
+  pagamento). L'annuncio non si blocca mai — vince chi paga — ma un
+  oggetto in trattativa per due settimane SEMBRA bloccato, e le
+  notifiche al venditore sullo stesso annuncio possono raddoppiare.
+  «NON CONSUMA UN TENTATIVO» NON È UNA REGOLA SCRITTA, è il fatto che
+  il rilancio NON FA INSERT: resta la stessa riga, quindi `attive` e
+  `totali` di `fai_offerta` non la contano due volte. Il freno unico
+  diventa il contatore `giri`, ed è per questo che è l'UNICO controllo
+  del libro mastro che lo guarda.
+  LE GUARDIE STANNO IN ORDINE, e le prime due PRIMA di leggere il
+  payload: il tetto dei giri e lo spazio nella forbice non dipendono
+  da cosa si è scritto, quindi chiedere la cifra per poi dire di no
+  sarebbe far compilare un campo che non si poteva usare. Poi il
+  parsing, poi «deve superare la tua offerta di prima», poi «deve
+  restare sotto la richiesta del venditore — se ci arrivi, accettala».
+  NIENTE CAS E NIENTE `guardia_ferie`, e sono due scelte argomentate:
+  il doppio tocco si respinge DA SOLO — il secondo POST rilegge
+  'proposta', dove a muovere è il venditore, e prende il 400 di sempre
+  senza mandare una seconda notifica — e un rilancio non stringe
+  nessun accordo, esattamente come la controproposta, che di ferie non
+  ne ha mai avute.
+  LO STATO TORNA A 'proposta', E NON È UNA PREFERENZA: la terna
+  ('proposta','controproposta','accettata') è quotata in OTTO punti di
+  server.py ed è sorvegliata da tre prove — un quarto stato
+  obbligherebbe ad allargarli tutti — e `offerte_da_agire` accende il
+  pallino dal lato giusto SENZA che nessuno tocchi la sua query.
+  Ereditano gratis anche `scadenze_offerte`, il filtro delle vive del
+  client, `conAccordo`, il freno della lampo e il «Ritira», che il
+  compratore ritrova perché la riga è di nuovo sua.
+  `giri` E NON `rilanci`: `rilanci` è già una TABELLA (le puntate
+  d'asta, oltre cento occorrenze nel file), e una colonna omonima
+  renderebbe illeggibile ogni sentinella testuale e ogni riga di SQL
+  letta di fretta. Migrazione additiva, nessun backfill: lo zero qui è
+  la verità e non un ripiego.
+  IL GIUDICE DELLA CONVERGENZA È PURO (`_spazio_rilancio`) E LAVORA IN
+  CENTESIMI, mai in float: 0,01 non è rappresentabile, e un
+  `contro_eur - importo_eur > 0.01` direbbe di sì dove spazio non ce
+  n'è — aprendo un campo che poi rifiuta ogni numero, che è peggio di
+  un campo che non c'è. ⚠️ E IL CASO DI PROVA CHE LO DIMOSTRA NON È
+  QUELLO OVVIO: con 10,00 e 10,01 il float sbaglia dal verso giusto
+  (0,00999… è già minore di 0,01) e la prova passerebbe comunque. A
+  distinguere è **1,10 contro 1,11**, dove la sottrazione fa
+  0,010000000000000009 — cioè MAGGIORE. La lezione di `_pare_recapito`,
+  per l'ennesima volta: un caso di prova va scelto in modo che possa
+  fallire solo per la ragione che si vuole sorvegliare.
+  `_cifra_da_payload` È ESTRATTA e non copiata (decisione di Andrea):
+  il ramo `contro` leggeva la cifra in una dozzina di righe e il
+  rilancio ne aveva bisogno uguali — due implementazioni di «come si
+  legge un importo nella valuta del listino» sono esattamente la
+  famiglia di guasti che `_cifra_accordo` esiste per prevenire.
+  IL VINCOLO SIMMETRICO SUL VENDITORE è la riga che un riordino
+  toglierebbe per prima, perché sembra una cortesia: quando `contro_*`
+  è GIÀ piena siamo dopo un rilancio, e la nuova richiesta dev'essere
+  più BASSA della precedente. Senza, la forbice si apre invece di
+  stringersi — il venditore potrebbe chiedere più di prima subito dopo
+  che gli abbiamo scritto «tu chiedevi X», e il tetto dei giri
+  resterebbe l'unica fine della trattativa. Nessuno ci rimette dei
+  sats (non si paga niente senza un sì), ma chi ha rilanciato si
+  ritroverebbe peggio di com'era.
+  IL CLIENT NON HARDCODA IL TETTO: arriva nella busta di
+  `/api/me/offerte` (`max_rilanci`), e chiave assente = server di ieri
+  = niente bottone — fail-closed, che è il verso giusto, perché
+  l'endpoint direbbe comunque 400. Il bottone compare SOLO se restano
+  giri E c'è spazio: un invito a fare una cosa che il server poi
+  rifiuta è peggio di nessun invito. Dentro, il box del venditore
+  RIUSATO alla lettera (per una data offerta si disegna o un ramo o
+  l'altro, mai tutti e due) e una riga muted col campo legale e il
+  giro — «Tra X e Y · rilancio 1 di 2» — che è l'unica cosa che il
+  compratore non può dedurre guardando la riga.
+  NIENTE `chiediConferma`, ed è argomentato e sorvegliato: la
+  controproposta non chiede niente perché si sta già scrivendo una
+  cifra in un campo, e una domanda in più sarebbe un ostacolo e non
+  una tutela — il rilancio è quel gesto dall'altro lato del tavolo. E
+  una prova CONTA due `chiediConferma({` in `rispondiOfferta`: un
+  terzo foglio la fa rossa.
+  ⚠️ IL RAMO CHE LEGGE IL CAMPO deve nominare anche il rilancio, o il
+  bottone «Invia» manda una cifra VUOTA e il server risponde 400 — un
+  gesto che non funziona senza che niente lo dica. C'è la sentinella,
+  e l'ha chiesta la tortura: era l'unica mutazione sopravvissuta al
+  secondo giro.
+  IL LIBRO MASTRO guadagna DUE controlli — i giri dentro il tetto, e
+  la forbice coerente (`importo_* < contro_*` quando tutti e due sono
+  pieni) — e passano la domanda d'ammissione: non esiste uno stato
+  transitorio legittimo in cui siano falsi. ⚠️ Lo schema gemello di
+  `prove.py` non aveva la tabella `offerte`, e senza aggiungerla
+  l'intera prova del libro mastro MUORE di OperationalError invece di
+  diventare rossa.
+  IL COLLAUDO ESEGUIBILE è `collaudo_rilancio.py`: il server VERO su
+  un database usa-e-getta con LNbits finto, il giro completo fino
+  all'INVOICE, e la bolt11 confrontata al sat con la cifra pattuita.
+  ⚠️ E LE SUE ASSERZIONI SI SCRIVONO COL `str()`: quando una guardia
+  cade la funzione torna il DICT della risposta invece della stringa
+  dell'errore, e un `esito.startswith` su un dict ESPLODE — cioè il
+  collaudo muore col traceback invece di stampare un NO, e la
+  mutazione sembra sopravvissuta. L'ha detto la tortura del collaudo,
+  non la rilettura.
+  IMPERFEZIONI DICHIARATE: `MAX_OFFERTE_ANNUNCIO` continua a contare
+  anche le RITIRATE (difetto preesistente, non toccato); e una
+  trattativa viva non trattiene il venditore che parte per le ferie
+  (`_impegni_aperti` guarda solo le accettate), col rilancio che
+  moltiplica il tempo che si butta — anche quello preesistente.
   IL COMPRATORE RITIRA (ago 2026, caso vero: un'offerta mandata per
   sbaglio non si poteva togliere in nessun modo — si aspettava la
   scadenza o si chiedeva al venditore di rifiutarla, e intanto la
@@ -7350,7 +7514,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SI RITIRA DA 'proposta' E DA 'accettata', mai da 'controproposta' —
   lì il compratore ha già «Rifiuta», che fa la stessa identica cosa e
   avvisa: due nomi per lo stesso gesto sarebbero un bivio senza
-  risposta giusta davanti a chi deve scegliere.
+  risposta giusta davanti a chi deve scegliere. (Dall'ago 2026 su
+  quello stato le uscite sono TRE — accetta, rifiuta, rilancia — e
+  la lettera regge lo stesso: nessuna delle tre è un ritiro.)
   QUI NON C'È MAI ESCROW, ed è la riga da non ammorbidire: un'offerta
   è la cedola che serve a FABBRICARE un ordine, e finché l'ordine non
   c'è non si è mosso un sat. Quando l'ordine c'è già, IL PREZZO VIVE
@@ -7419,8 +7585,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Frontend: «Ritira» (`.btn danger-ghost`, la veste di «Rifiuta») nei
   due rami del compratore — nel ramo accettata dentro un flex, che
   `.btn` è `width:100%` e due bottoni nudi si impilerebbero a tutta
-  larghezza: è l'unico punto in cui il markup di `renderOfferte` cambia,
-  e la card resta della stessa altezza (misurato prima/dopo).
+  larghezza. Non è più l'unico punto in cui il markup di
+  `renderOfferte` cambia — col rilancio il ramo del compratore su
+  'controproposta' guadagna un terzo bottone e il suo box — ma la
+  card del RITIRO resta della stessa altezza (misurato prima/dopo).
   LA DOMANDA SI FA COL FOGLIO DI CASA — mai il `confirm()` del sistema
   operativo — e il foglio è quello UNICO, `#confermaSheet`: vedi «LA
   DOMANDA, UNA VOLTA SOLA» più sotto. Il gesto è spezzato in due:
