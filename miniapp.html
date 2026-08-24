@@ -6398,6 +6398,19 @@ function mapOrder(o){
     /* la rete scelta da chi compra ('' = non dichiarata: ordini
        storici, venditore senza reti, o via diversa dal punto) */
     retePunto:o.rete_punto||'', tipoPunto:o.tipo_punto||'',
+    /* L'OBIEZIONE DI CHI VENDE sul punto (ago 2026): `puntoObiettatoIl`
+       e' insieme il quando e il flag «c'e' qualcosa in sospeso», come
+       `bustaIl`. La nota e le proposte sono testo del VENDITORE e alla
+       resa passano SEMPRE da esc(); il motivo e' un id del nostro
+       catalogo e si rende da `motivoPunto`. Le proposte arrivano gia'
+       come lista dal server: qui non si fa nessun JSON.parse — se un
+       giorno arrivasse storto, `||[]` lascia il riquadro senza bottoni
+       invece di spegnere il render. */
+    puntoObiezione:o.punto_obiezione||'',
+    puntoObiezioneNota:o.punto_obiezione_nota||'',
+    puntoProposte:Array.isArray(o.punto_proposte)?o.punto_proposte:[],
+    puntoObiettatoIl:o.punto_obiettato_il||0,
+    puntoObiezioni:o.punto_obiezioni||0,
     /* la nota del compratore (ago 2026): testo libero — alla resa
        passa SEMPRE da esc(). A differenza dell'indirizzo e della busta
        il TESTO viaggia in /api/orders, quindi lo legge anche l'ADMIN
@@ -17474,6 +17487,7 @@ function openOrder(id){
             non c'e' davvero — con la rete scelta il venditore la
             legge nell'ordine e non ha piu' niente da concordare. */''}
       ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker/punto di ritiro: indica il punto qui sotto.' : (o.retePunto ? `Il compratore indicherà il punto <b>${esc(o.retePunto)}</b> qui nell'ordine.` : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.')}</div>` : ''}
+      ${obiezioneCompratore(o)}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
            RETE DI SICUREZZA della scelta anticipata — il punto si
@@ -17624,6 +17638,7 @@ function openOrder(id){
                 spedizione comprare. Gli ordini di ieri non hanno il
                 tipo e ricadono sulla forma di prima. */''}
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b> — <b>${esc(o.puntoRitiro)}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}</div>` : ''}
+          ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
@@ -21607,6 +21622,27 @@ const TIPI_PUNTO = [
   {id:'locker', emoji:'🔒', nome:'Locker automatico', breve:'Locker'},
   {id:'banco',  emoji:'🏪', nome:'Punto di ritiro',   breve:'Punto'}];
 
+/* PERCHE' UN PUNTO NON VA BENE: il gemello di MOTIVI_PUNTO del server,
+   e `prove.py` incrocia i due elenchi voce per voce — se divergessero,
+   chi vende sceglierebbe un motivo che il server rifiuta con un 400
+   che non spiega niente. */
+const MOTIVI_PUNTO = [
+  {id:'rete',        nome:'Non è della mia rete'},
+  {id:'inesistente', nome:'Questo punto non esiste'},
+  {id:'altro',       nome:'Altro'}];
+const MAX_PROPOSTE_PUNTO = 3;
+
+/* Il motivo come lo leggono le TRE superfici che lo scrivono — il
+   pannello di chi vende, il riquadro di chi compra, la coda dei
+   moderatori: giudice UNICO, che tre copie della stessa tabellina
+   divergono al primo ritocco di un'etichetta.
+   Il motivo IGNOTO non si inventa e non esplode: e' quel che vedrebbe
+   un client rimasto in cache il giorno che si aggiunge una voce. */
+function motivoPunto(id){
+  const m = MOTIVI_PUNTO.find(x => x.id === id);
+  return m ? m.nome : 'Non va bene';
+}
+
 /* Il nome del punto come lo legge chi spedisce: «Locker InPost»,
    «Punto Poste Italiane», «Locker» se la rete non c'e'. Giudice UNICO
    delle superfici che lo scrivono (il pannello del venditore, la riga
@@ -21618,6 +21654,180 @@ function nomePunto(tipo, rete){
   return parti.join(' ') || 'Punto di ritiro';
 }
 
+
+/* L'OBIEZIONE SUL PUNTO (ago 2026) — due pannelli speculari, il calco
+   di pannelloServizioVenditore/Compratore.
+
+   LO STATO DEL FORM VIVE FUORI DAL DOM (`obiezioneForm`), il patto di
+   `acqDati.puntoAperto`: il pannello si ridisegna a ogni tocco delle
+   pillole, e uno stato solo-DOM si richiuderebbe sotto le dita. Porta
+   l'id dell'ordine con se', cosi' cambiando ordine il form e' chiuso
+   per costruzione — senza un azzeramento da ricordarsi in openOrder. */
+let obiezioneForm = {ordine:0, aperto:false, motivo:''};
+
+const obiezioneApertaQui = o =>
+  obiezioneForm.ordine === o.id && obiezioneForm.aperto;
+
+/* Il pannello di CHI VENDE, dentro «📦 Spedisci»: a obiezione aperta
+   dice lo stato, altrimenti offre il bottone. «Segna come spedito»
+   RESTA in tutti e due i casi, ed e' deliberato — se nel frattempo si
+   sono chiariti in chat, spedire e' esattamente quel che deve poter
+   fare, e la spedizione chiude l'obiezione da sola. */
+function obiezioneVenditore(o){
+  if (!o.viaPunto || !o.puntoRitiro || o.state !== 'locked'
+      || o.role !== 'seller') return '';
+  if (o.puntoObiettatoIl) return `
+    <div id="obiezionePannello" class="hint" style="background:var(--sats-soft);color:var(--sats-text);border-radius:var(--radius);padding:8px 10px;margin-top:6px">
+      ⏳ <b>Hai segnalato:</b> «${esc(motivoPunto(o.puntoObiezione))}»${o.puntoObiezioneNota ? ` — ${esc(o.puntoObiezioneNota)}` : ''}.
+      Stiamo aspettando che l'acquirente indichi un punto nuovo; appena
+      lo fa lo vedi qui e puoi spedire.
+      <button type="button" class="btn mini" style="margin-top:6px"
+        onclick="apriObiezione()">Segnala di nuovo</button>
+    </div>`;
+  if (!obiezioneApertaQui(o)) return `
+    <div id="obiezionePannello">
+      <button type="button" class="btn mini" style="margin-top:6px"
+        onclick="apriObiezione()">Questo punto non va bene</button>
+    </div>`;
+  const proposte = [0, 1, 2].slice(0, MAX_PROPOSTE_PUNTO);
+  return `
+    <div id="obiezionePannello" class="ind-campi" style="margin-top:6px">
+      <div class="hint">Dillo all'acquirente: riceve un avviso e
+        indica un punto nuovo. Finché non lo fa, non ti chiediamo più
+        di spedire.</div>
+      <div class="fila-reti" style="margin-top:8px">${MOTIVI_PUNTO.map(m =>
+        `<button type="button" class="pill${obiezioneForm.motivo===m.id?' pill-trust':''}"
+           data-motivo="${m.id}" onclick="setMotivoObiezione(this.dataset.motivo)"
+           style="cursor:pointer">${esc(m.nome)}</button>`).join('')}</div>
+      <label for="obiezioneNota">Vuoi aggiungere qualcosa? (facoltativo)</label>
+      <textarea id="obiezioneNota" style="min-height:38px" maxlength="200"
+        placeholder="Es. quel locker è stato chiuso a maggio"></textarea>
+      <div class="hint" style="margin-top:8px">Puoi proporgliene fino a
+        ${MAX_PROPOSTE_PUNTO}: li sceglie con un tocco. (facoltativo)</div>
+      ${proposte.map(i => `<textarea id="obiezioneProposta${i}" style="min-height:38px"
+        maxlength="120" placeholder="Punto alternativo ${i+1}"></textarea>`).join('')}
+      <button class="btn orange" onclick="inviaObiezione(this)">Segnala il problema</button>
+      <button class="btn ghost" onclick="chiudiObiezione()">Annulla</button>
+    </div>`;
+}
+
+/* Il pannello di CHI COMPRA, sopra il campo del punto: AMBRA e non
+   rosso — il rosso e' della disputa, e qui non c'e' un problema
+   conclamato ma un punto da correggere (il registro di `notaFermo`).
+   Le proposte sono BOTTONI che riempiono il campo che c'e' gia': non
+   e' un endpoint nuovo, e' `salvaPuntoRitiro` di sempre — e' quel che
+   fa di tutto il giro una rotta sola. */
+function obiezioneCompratore(o){
+  if (!o.puntoObiettatoIl || !o.viaPunto || o.state !== 'locked'
+      || o.role === 'seller') return '';
+  const mio = o.role === 'buyer';
+  return `
+    <div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">
+      📦 <span><b>${mio ? 'Il venditore non può spedire a questo punto'
+                        : 'Il venditore ha segnalato un problema col punto'}.</b>
+      Motivo: «${esc(motivoPunto(o.puntoObiezione))}»${o.puntoObiezioneNota
+        ? ` — ${esc(o.puntoObiezioneNota)}` : ''}.
+      ${o.puntoProposte.length ? `${mio ? 'Ne ha proposti altri: toccane uno'
+        : 'Ne ha proposti altri'}${mio ? ' e salva' : ''}.`
+        : (mio ? 'Indicane un altro qui sotto.' : '')}
+      ${mio ? 'I tuoi sats restano al sicuro nel deposito di garanzia.' : ''}
+      ${/* DENTRO lo span, e non fratello dell'emoji: `.trust-note` e'
+          un flex ROW, quindi un <div> appeso qui fuori diventa il
+          terzo figlio della RIGA — le proposte si incolonnano
+          strette a destra del testo invece di stare sotto a tutta
+          larghezza. Visto a 320px sullo screenshot, non nelle
+          misure: non sbordava, quindi le sonde erano verdi. */''}
+      ${(mio && o.puntoProposte.length) ? `<div class="fila-reti" style="margin-top:8px">${
+        o.puntoProposte.map((p, i) =>
+          `<button type="button" class="btn mini" data-i="${i}"
+             onclick="usaPuntoProposto(this.dataset.i)">📍 ${esc(p)}</button>`).join('')
+      }</div>` : ''}</span>
+    </div>`;
+}
+
+/* Il ridisegno IN PLACE, mai `openOrder`: la lezione del codice di
+   ritiro — riaprire l'ordine riporta la pagina in cima e butta via il
+   tracciamento scritto a meta'. Qui il fatto vive tutto dentro il
+   pannello, quindi si riscrive il solo pannello. */
+function ridisegnaObiezione(){
+  const p = el('obiezionePannello');
+  if (!p || !currentOrder) return;
+  const html = obiezioneVenditore(currentOrder);
+  if (html) p.outerHTML = html;
+}
+
+function apriObiezione(){
+  haptic();
+  obiezioneForm = {ordine: currentOrder?.id || 0, aperto: true, motivo: ''};
+  ridisegnaObiezione();
+  el('obiezioneNota')?.focus({preventScroll: true});
+}
+
+function chiudiObiezione(){
+  obiezioneForm = {ordine: 0, aperto: false, motivo: ''};
+  ridisegnaObiezione();
+}
+
+function setMotivoObiezione(id){
+  haptic();
+  /* il testo gia' scritto sopravvive al ridisegno: il patto di
+     `ridisegnaDigitale` — le pillole non devono far perdere una riga
+     che qualcuno stava componendo */
+  const nota = el('obiezioneNota')?.value || '';
+  const prop = [0,1,2].map(i => el('obiezioneProposta'+i)?.value || '');
+  obiezioneForm.motivo = id;
+  ridisegnaObiezione();
+  if (el('obiezioneNota')) el('obiezioneNota').value = nota;
+  prop.forEach((v, i) => { const c = el('obiezioneProposta'+i); if (c) c.value = v; });
+}
+
+/* Il tocco su una proposta: riempie il campo del punto e basta — a
+   salvare resta il bottone di sempre, cosi' il gesto che scrive il
+   punto e' UNO e non ce n'e' uno «di accettazione» che possa un
+   giorno divergere. */
+function usaPuntoProposto(i){
+  haptic();
+  const p = (currentOrder?.puntoProposte || [])[Number(i)];
+  const campo = el('puntoRitiroInp');
+  if (!p || !campo) return;
+  campo.value = p;
+  campo.focus({preventScroll: true});
+  campo.setSelectionRange(p.length, p.length);
+  toast('📍 Scelto — ora salva');
+}
+
+async function inviaObiezione(btn){
+  const o = currentOrder;
+  if (!o) return;
+  if (!obiezioneForm.motivo) { toast('Scegli il motivo'); return; }
+  const nota = (el('obiezioneNota')?.value || '').trim();
+  const proposte = [0,1,2]
+    .map(i => (el('obiezioneProposta'+i)?.value || '').trim())
+    .filter(Boolean);
+  const fine = bottoneInAttesa(btn, 'Invio la segnalazione…');
+  try {
+    const r = await fetch(`${API_BASE}/orders/${o.id}/punto/obietta`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({motivo: obiezioneForm.motivo, nota, proposte})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non è stato possibile segnalare'); return; }
+    obiezioneForm = {ordine:0, aperto:false, motivo:''};
+    o.puntoObiezione = d.motivo; o.puntoObiezioneNota = d.nota;
+    o.puntoProposte = d.proposte || []; o.puntoObiettatoIl = Math.floor(Date.now()/1000);
+    o.puntoObiezioni = (o.puntoObiezioni || 0) + 1;
+    /* la riga viva in `orders` e non solo `currentOrder`, che puo'
+       essere un oggetto DETACHED se la lista si e' ricaricata */
+    const viva = orders.find(x => x.id === o.id);
+    if (viva && viva !== o) Object.assign(viva, {
+      puntoObiezione:o.puntoObiezione, puntoObiezioneNota:o.puntoObiezioneNota,
+      puntoProposte:o.puntoProposte, puntoObiettatoIl:o.puntoObiettatoIl,
+      puntoObiezioni:o.puntoObiezioni});
+    ridisegnaObiezione();
+    toast('📦 Segnalato — l\'acquirente riceve un avviso');
+  } catch(e) { toast('Errore di rete'); }
+  finally { fine(); }
+}
 function linkMappePunti(reti){
   const dichiarate = Array.isArray(reti) ? reti : (reti ? [reti] : []);
   /* niente reti = non si sa, quindi tutte; con le reti si tengono
@@ -24307,6 +24517,13 @@ const rigaFermo = o => {
         <span class="mono" style="white-space:nowrap;font-weight:800;color:var(--sats-deep)">${fmt(o.importo)} sats</span>
       </div>
       <div class="sub" style="margin-top:4px">${esc(NOMI_STATO_FERMO[o.stato] || o.stato)} · ${via} · fermo da <b>${o.fermo_da ? `${g} giorni` : 'sempre (data assente)'}</b></div>
+      ${/* CHI ASPETTA CHI: senza questa riga l'ordine col punto
+            contestato si legge come «venditore che non spedisce»
+            — e' lo stesso 'locked' fermo da N giorni — mentre il
+            venditore ha gia' fatto la sua parte e la palla e' di
+            chi compra. E' la ragione per cui `punto_obiettato_il`
+            esce dalla coda. */''}
+      ${o.punto_obiettato_il ? `<div class="sub" style="margin-top:2px;color:var(--sats-text)">⏳ <b>aspetta l'acquirente</b>: il venditore ha contestato il punto di ritiro</div>` : ''}
       <div class="sub" style="margin-top:2px">${o.promemoria
         ? `🔔 ${o.promemoria} promemoria, l'ultimo il ${new Date(o.promemoria_il*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`
         : '🔕 <b>mai sollecitato</b>: nessun promemoria copre questo caso'}${

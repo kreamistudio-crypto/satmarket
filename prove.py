@@ -3036,9 +3036,19 @@ def prove_busta_ritiro():
           "COALESCE(o.solleciti_punto,0)" in _SORGENTE
           and "COALESCE(o.sollecito_punto_il,0)" in _SORGENTE)
     prova("...e il settimo, quello dei servizi", True,
-          "COALESCE(o.solleciti_appuntamento,0)) AS promemoria,"
+          "COALESCE(o.solleciti_appuntamento,0)," in _SORGENTE
+          and "COALESCE(o.sollecito_appuntamento_il,0)," in _SORGENTE)
+    # ...e l'OTTAVO, il punto contestato (ago 2026). E' lui a
+    # chiudere i due MAX adesso, quindi tocca a lui l'ancora sulla
+    # parentesi — e la sorella qui sopra ha perso la sua, che
+    # sarebbe diventata cieca al primo contatore nuovo.
+    # SENZA QUESTA RIGA la coda direbbe «🔕 mai sollecitato» su un
+    # ordine bussato tre volte, cioe' il contrario del caso che
+    # quel campo esiste per far vedere.
+    prova("...e l'ottavo, il punto contestato", True,
+          "COALESCE(o.solleciti_obiezione,0)) AS promemoria,"
           in _SORGENTE
-          and "COALESCE(o.sollecito_appuntamento_il,0)) AS promemoria_il,"
+          and "COALESCE(o.sollecito_obiezione_il,0)) AS promemoria_il,"
           in _SORGENTE)
     _mini = open("miniapp.html", encoding="utf-8").read()
     prova("client: la hint dice da quanto, non quanto resta", True,
@@ -3359,6 +3369,10 @@ def prove_busta_ritiro():
         sollecito_appuntamento_il INT DEFAULT 0,
         solleciti_appuntamento INT DEFAULT 0,
         appuntamento_il INT DEFAULT 0,
+        punto_obiezione TEXT DEFAULT '',
+        punto_obiezione_nota TEXT DEFAULT '',
+        punto_proposte TEXT DEFAULT '',
+        punto_obiettato_il INT DEFAULT 0,
         solleciti_conferma INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
@@ -11221,6 +11235,16 @@ def prove_reti_corriere():
              src.index("\n", src.index("ID_TIPI_PUNTO = "))], amb)
     exec(pezzo("tipo_punto_da_payload"), amb)
     tipo_da_payload = amb["tipo_punto_da_payload"]
+    # i motivi dell'obiezione e il tetto delle proposte (ago 2026):
+    # stessa ricetta, cosi' il gemello client si incrocia coi VALORI
+    # veri del server e non con una copia scritta qui.
+    j = src.index("MOTIVI_PUNTO = ((")
+    exec(src[j:src.index(chr(10) + "ID_MOTIVI_PUNTO", j)], amb)
+    exec(src[src.index("ID_MOTIVI_PUNTO = "):
+             src.index(chr(10), src.index("ID_MOTIVI_PUNTO = "))], amb)
+    exec(src[src.index("MAX_PROPOSTE_PUNTO = "):
+             src.index(chr(10), src.index("MAX_PROPOSTE_PUNTO = "))], amb)
+    exec(pezzo("_obiezione_da_payload"), amb)
 
     prova("i due tipi, cogli id per sempre e le etichette ritoccabili",
           [("locker", "Locker automatico", "Locker"),
@@ -11272,10 +11296,26 @@ def prove_reti_corriere():
           'if "tipo_punto" in d else (o["tipo_punto"] or "")' in corpo_pr2)
 
     # --- il client ---------------------------------------------------
+    # ⚠️ LA FETTA SI FERMA AL VICINO DI CASA, e il vicino CAMBIA:
+    # era ancorata a `function nomePunto` finche' era lei a venire
+    # subito dopo, e col catalogo dei motivi in mezzo (ago 2026)
+    # questa riga ha cominciato a leggere CINQUE id invece di due —
+    # rossa, per fortuna, ma sarebbe potuta diventare cieca. Adesso
+    # il confine e' la costante SUCCESSIVA, che e' un'ancora vera.
     prova("il catalogo client e' il gemello del server (id per id)",
           [t[0] for t in amb["TIPI_PUNTO"]],
           re.findall(r"\{id:'(\w+)'", mini[mini.index("const TIPI_PUNTO"):
-                                           mini.index("function nomePunto")]))
+                                           mini.index("const MOTIVI_PUNTO")]))
+    # I MOTIVI dell'obiezione, stesso patto: se i due elenchi
+    # divergessero, chi vende sceglierebbe un motivo che il server
+    # rifiuta con un 400 che non spiega niente.
+    prova("...e il catalogo dei motivi pure", [m[0] for m in amb["MOTIVI_PUNTO"]],
+          re.findall(r"\{id:'(\w+)'", mini[mini.index("const MOTIVI_PUNTO"):
+                                           mini.index("const MAX_PROPOSTE_PUNTO")]))
+    prova("...con le loro etichette", True,
+          all(m[1] in mini for m in amb["MOTIVI_PUNTO"]))
+    prova("...e il tetto delle proposte non diverge", True,
+          f"const MAX_PROPOSTE_PUNTO = {amb['MAX_PROPOSTE_PUNTO']};" in mini)
     prova("...e le etichette combaciano", True,
           all(t[1] in mini and t[2] in mini for t in amb["TIPI_PUNTO"]))
     prova("il nome che il venditore legge ha un giudice UNO", 1,
@@ -11729,8 +11769,8 @@ def prove_punti_salvati():
     # riga lo dice — prima non la contava nessuno.
     prova("il normalizzatore ha UN posto solo", 1,
           src.count("def _testo_punto("))
-    prova("...e QUATTRO chiamanti (i due acquisti, la correzione, il "
-          "salvataggio)", 4,
+    prova("...e CINQUE chiamanti (i due acquisti, la correzione, il "
+          "salvataggio, e le proposte dell'obiezione)", 5,
           src.count("_testo_punto(") - src.count("def _testo_punto("))
     prova("...e nessuno se lo riscrive a mano", 0,
           codice(src).count('" ".join(str(d.get("punto_ritiro")'))
@@ -13189,6 +13229,8 @@ def prove_libro_mastro():
           nascosto_compratore INT DEFAULT 0,
           nascosto_venditore INT DEFAULT 0,
           codice_sconto TEXT DEFAULT '', codice_sconto_id INT DEFAULT 0,
+          punto_obiezione TEXT DEFAULT '', punto_obiettato_il INT DEFAULT 0,
+          punto_obiezioni INT DEFAULT 0,
           venditore_id INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           annuncio_id INT, quantita INT, unitario_sats INT,
@@ -13492,6 +13534,16 @@ def prove_libro_mastro():
          "sblocco pagato due volte", "1"),
         ("UPDATE utenti SET banner_sbloccato_il=500 WHERE tg_id=555",
          "sblocco rimborsato e porta ancora aperta", "4"),
+        # L'OBIEZIONE SUL PUNTO (ago 2026): il timbro senza il motivo e'
+        # una guardia caduta a meta' UPDATE. Il ramo che morde davvero
+        # e' l'altro — un'obiezione fuori dalla via punto — perche' li'
+        # l'ordine viene ZITTITO in sollecita_venditori_fermi senza che
+        # nessun altro promemoria lo raccolga: la WHERE del suo
+        # sollecito esige via_punto=1. Un ordine coi sats in cassaforte
+        # che non squilla piu' da nessuna parte, e in silenzio.
+        ("UPDATE ordini SET punto_obiettato_il=900, punto_obiezione='' "
+         "WHERE id=1",
+         "obiezione sul punto fuori contratto", "1"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -21133,6 +21185,288 @@ def prove_sollecito_a_comando():
 
 
 # ====================================================================
+def prove_obiezione_punto():
+    """IL PUNTO DI RITIRO SI CONCORDA (ago 2026).
+
+    Il punto lo scrive chi compra ed e' testo libero: puo' essere un
+    locker che non esiste, o di una rete che quel venditore non serve.
+    Davanti a quel caso il venditore non aveva NESSUN bottone —
+    `segna_spedito` guarda solo che il punto CI SIA, `indica_punto_
+    ritiro` e' del solo compratore, e la chat puo' non esistere.
+    Adesso obietta, e chi compra risponde col gesto che ha gia'
+    (scrivere il punto), che CHIUDE l'obiezione.
+
+    LA RIGA CHE RENDE VERO TUTTO E' IL SILENZIO nella WHERE di
+    `sollecita_venditori_fermi`: senza, il venditore continuerebbe a
+    sentirsi dire «segna la spedizione» per una cosa che non puo'
+    fare, mentre a chi compra parte l'invito alla disputa.
+    Si prova GIRANDO l'endpoint e il giudice, non guardandoli: una
+    sentinella dice che la guardia c'e', mai che rifiuti il caso
+    giusto senza scrivere niente."""
+    print("\n[il punto di ritiro si concorda]")
+    import asyncio
+    import html as _html
+    import json as _json
+    import sqlite3
+    import time as _t
+
+    src = _SORGENTE
+
+    class _Err(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+            super().__init__(f"{codice}: {testo}")
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    def codice_di(azione):
+        """Il codice HTTP del rifiuto, o 0 se non alza."""
+        try:
+            azione()
+            return 0
+        except _Err as e:
+            return e.codice
+
+    # --- 1) il giudice del payload, GIRATO ---------------------------
+    amb = {"HTTPException": _Err}
+    i = src.index("MOTIVI_PUNTO = ((")
+    exec(src[i:src.index(chr(10) + "ID_MOTIVI_PUNTO", i)], amb)
+    for nome in ("ID_MOTIVI_PUNTO = ", "MAX_PROPOSTE_PUNTO = ", "MAX_NOTA = "):
+        j = src.index(nome)
+        exec(src[j:src.index(chr(10), j)], amb)
+    exec(pezzo("_testo_punto"), amb)
+    exec(pezzo("_obiezione_da_payload"), amb)
+    giudica = amb["_obiezione_da_payload"]
+
+    prova("il motivo del catalogo passa", ("rete", "", []),
+          giudica({"motivo": "rete"}))
+    prova("...anche con maiuscole e spazi", "inesistente",
+          giudica({"motivo": "  Inesistente "})[0])
+    for storto in ("", "boh", None, "  "):
+        prova(f"il motivo {storto!r} si rifiuta", 400,
+              codice_di(lambda s=storto: giudica({"motivo": s})))
+    # LA NOTA SI RIFIUTA, NON SI TRONCA: una prosa tagliata a meta' puo'
+    # INVERTIRSI («il locker c'e', ma non il mio» -> «...ma non»), e qui
+    # il client di ieri non esiste — il campo nasce oggi.
+    prova("la nota lunga si RIFIUTA (non si tronca)", 400,
+          codice_di(lambda: giudica({"motivo": "altro", "nota": "x" * 201})))
+    prova("...quella al filo passa", 200,
+          len(giudica({"motivo": "altro", "nota": "x" * 200})[1]))
+    prova("la nota diventa UNA riga", "a b c",
+          giudica({"motivo": "altro", "nota": " a\n b  c "})[1])
+    # LE PROPOSTE SI LIMANO INVECE (il patto di quantita_tollerante):
+    # un client che ne manda cinque non deve far fallire una
+    # segnalazione — tre restano comunque una scelta vera.
+    prova("le proposte si limano al tetto", 3,
+          len(giudica({"motivo": "rete",
+                       "proposte": ["a", "b", "c", "d", "e"]})[2]))
+    prova("...le vuote si scartano", ["Via Roma 1"],
+          giudica({"motivo": "rete",
+                   "proposte": ["", "  ", "Via Roma 1", None]})[2])
+    prova("...e i doppioni pure (due bottoni uguali non sono una scelta)",
+          ["Via Roma 1"],
+          giudica({"motivo": "rete",
+                   "proposte": ["Via Roma 1", "Via  Roma   1"]})[2])
+    prova("...e passano dallo STESSO taglio del punto (120)", 120,
+          len(giudica({"motivo": "rete", "proposte": ["z" * 200]})[2][0]))
+    prova("una lista che lista non e' vale zero proposte", [],
+          giudica({"motivo": "rete", "proposte": "Via Roma 1"})[2])
+
+    # --- 2) l'endpoint, GIRATO su un database di cartone --------------
+    def db_finto():
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript("""
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INT,
+              compratore_id INT, stato TEXT, via_punto INT DEFAULT 0,
+              punto_ritiro TEXT DEFAULT '', tipo_punto TEXT DEFAULT '',
+              punto_obiezione TEXT DEFAULT '',
+              punto_obiezione_nota TEXT DEFAULT '',
+              punto_proposte TEXT DEFAULT '',
+              punto_obiettato_il INT DEFAULT 0,
+              punto_obiezioni INT DEFAULT 0, aggiornato INT DEFAULT 0);
+            INSERT INTO ordini(id,venditore_id,compratore_id,stato,
+              via_punto,punto_ritiro) VALUES
+              (1, 222, 111, 'locked', 1, 'Locker InPost Via Roma 1'),
+              (2, 222, 111, 'locked', 1, ''),
+              (3, 222, 111, 'locked', 0, ''),
+              (4, 222, 111, 'shipped', 1, 'Locker InPost Via Roma 1');
+        """)
+        return c
+
+    def obietta(ordine, chi, corpo, c):
+        avvisi = []
+
+        async def json_finto(_req):
+            return corpo
+
+        async def notifica_finta(tg_id, testo, *a, **k):
+            avvisi.append((tg_id, testo))
+
+        a2 = dict(amb)
+        a2.update({"Request": object, "Header": lambda d: d,
+                   "Cookie": lambda d: d, "HTTPException": _Err,
+                   "verifica_utente": lambda *x: {"id": chi},
+                   "leggi_json": json_finto, "notifica": notifica_finta,
+                   "db": lambda: _SenzaClose(c), "json": _json,
+                   "html": _html,
+                   "time": type("t", (), {"time": staticmethod(lambda: 900)})})
+        exec("async " + pezzo("obietta_punto"), a2)
+        r = asyncio.run(a2["obietta_punto"](ordine, None, "", ""))
+        return r, avvisi
+
+    c = db_finto()
+    r, avvisi = obietta(1, 222, {"motivo": "rete",
+                                 "nota": "quel locker è chiuso",
+                                 "proposte": ["Locker InPost Via Verdi 3"]}, c)
+    riga = c.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il venditore obietta: il motivo va in colonna", "rete",
+          riga["punto_obiezione"])
+    prova("...col suo timbro", 900, riga["punto_obiettato_il"])
+    prova("...e il contatore sale", 1, riga["punto_obiezioni"])
+    prova("...le proposte come JSON", ["Locker InPost Via Verdi 3"],
+          _json.loads(riga["punto_proposte"]))
+    # IL PUNTO NON SI TOCCA: a correggerlo e' chi compra, ed e' il
+    # gesto che chiude l'obiezione.
+    prova("...e il punto resta quello di chi compra",
+          "Locker InPost Via Roma 1", riga["punto_ritiro"])
+    prova("chi compra riceve l'avviso", 111, avvisi[0][0])
+    # IL TESTO DEL VENDITORE NON ENTRA MAI NELL'HTML della notifica:
+    # nota e proposte si leggono nell'ordine sotto esc(); li' dentro va
+    # solo l'etichetta del motivo, che e' NOSTRA.
+    prova("...e nell'avviso non c'e' il suo testo", True,
+          "chiuso" not in avvisi[0][1] and "Verdi" not in avvisi[0][1])
+    prova("...ma c'e' l'etichetta del motivo", True,
+          "Non è della mia rete" in avvisi[0][1])
+
+    # i rifiuti, e nessuno di loro scrive una riga
+    for ordine, chi, perche in (
+            (1, 111, "il compratore non obietta"),
+            (1, 999, "l'estraneo nemmeno"),
+            (4, 222, "e nemmeno su un ordine gia' spedito"),
+            (3, 222, "niente obiezione su una strada che non e' il punto"),
+            # SI OBIETTA SOLO SU UN PUNTO CHE C'E': «via punto, punto
+            # vuoto» ha gia' il suo gate in segna_spedito e il suo
+            # promemoria — due strade per lo stesso caso sarebbero una
+            # che promette quel che l'altra nega.
+            (2, 222, "...ne' su un punto che non c'e' ancora")):
+        c2 = db_finto()
+        prova(f"{perche}: 400", 400,
+              codice_di(lambda o=ordine, u=chi, k=c2:
+                        obietta(o, u, {"motivo": "rete"}, k)))
+        prova("...e non scrive niente", 0,
+              c2.execute("SELECT COUNT(*) FROM ordini "
+                         "WHERE punto_obiettato_il>0").fetchone()[0])
+
+    # --- 3) il silenzio, che e' la meta' che conta -------------------
+    sv = codice(pezzo("sollecita_venditori_fermi"))
+    prova("il promemoria al venditore TACE sul punto contestato", True,
+          '"AND o.punto_obiettato_il = 0 "' in sv)
+    spc = codice(pezzo("sollecita_punti_obiettati"))
+    prova("il sollecito nuovo guarda la via punto", True,
+          "o.via_punto=1" in spc and "o.punto_obiettato_il > 0" in spc)
+    # L'ANCORA MAI `aggiornato`: deposita_invoice accetta il venditore
+    # proprio su 'locked' e la riscrive — la trappola gia' pagata
+    # quattro volte.
+    prova("...si ancora al timbro dell'obiezione, MAI ad `aggiornato`",
+          True,
+          "o.punto_obiettato_il + ?" in spc and "o.aggiornato" not in spc)
+    prova("...ha colonne SUE (un contatore ereditato salta al tetto)",
+          True,
+          "solleciti_obiezione=solleciti_obiezione+1" in spc
+          and "sollecito_obiezione_il=?" in spc)
+    prova("...bussa a CHI COMPRA a ogni squillo", True,
+          'notifica(r["compratore_id"]' in spc)
+    prova("...e al venditore SOLO l'ultimo", True,
+          'r["solleciti_obiezione"] == PROMEMORIA_CONFERMA_MAX - 1' in spc)
+    prova("...al tetto il 🧊 ai moderatori", True, "notifica_admin" in spc)
+    prova("...e il titolo passa da html.escape", True,
+          'html.escape((r["titolo"]' in spc)
+    prova("la leva a zero spegne la popolazione", True,
+          "if PROMEMORIA_OBIEZIONE_GIORNI <= 0" in spc)
+    # LA RIGA INTERA e non la sottostringa (la lezione del reaper,
+    # ripagata qui): cercando il nome, un
+    # «pass  # await sollecita_punti_obiettati()» lasciava la
+    # sentinella verde con la funzione mai chiamata — provato, era
+    # l'unica mutazione sopravvissuta al primo giro di tortura.
+    prova("l'orologio lo chiama", True,
+          any(r.strip() == "await sollecita_punti_obiettati()"
+              for r in pezzo("orologio").splitlines()))
+
+    # --- 4) scrivere il punto CHIUDE l'obiezione ---------------------
+    ip = codice(pezzo("indica_punto_ritiro"))
+    prova("il punto nuovo azzera l'obiezione", True,
+          "punto_obiezione=''" in ip and "punto_obiettato_il=0" in ip)
+    # LA MEMORIA RESTA: il contatore e' quel che il moderatore legge in
+    # disputa — il patto di busta_correzioni.
+    prova("...ma NON il contatore, che e' la memoria del moderatore",
+          True, "punto_obiezioni=0" not in ip)
+    prova("e la spedizione la chiude pure (se si sono chiariti in chat)",
+          True, "punto_obiettato_il=0" in codice(pezzo("segna_spedito")))
+
+    # --- 5) la coda dei fermi ----------------------------------------
+    prova("la coda impara il campo che dice chi aspetta", True,
+          '"    o.punto_obiettato_il, "' in src)
+
+    # --- 6) il client -------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def fetta(da, a):
+        return mini[mini.index(da):mini.index(a)]
+
+    prova("il giudice del motivo e' UNO", 1,
+          mini.count("function motivoPunto"))
+    prova("...e lo chiamano le superfici che lo scrivono", 2,
+          mini.count("motivoPunto(") - mini.count("function motivoPunto("))
+    prova("lo stato del form vive FUORI dal DOM", True,
+          "let obiezioneForm" in mini)
+    prova("...e porta l'id dell'ordine (cambiando ordine e' chiuso)",
+          True, "obiezioneForm.ordine === o.id" in mini)
+    # IL RIDISEGNO IN PLACE e mai openOrder: la lezione del codice di
+    # ritiro — riaprire l'ordine riporta la pagina in cima.
+    rid = fetta("function ridisegnaObiezione", "function apriObiezione")
+    prova("il pannello si ridisegna in place", True, "p.outerHTML = html" in rid)
+    prova("...e NON riapre l'ordine", 0, rid.count("openOrder("))
+    prova("il testo scritto sopravvive al tocco sulle pillole", True,
+          "el('obiezioneNota')?.value" in
+          fetta("function setMotivoObiezione", "function usaPuntoProposto"))
+    # ACCETTARE UNA PROPOSTA NON E' UN ENDPOINT SUO: e'
+    # salvaPuntoRitiro di sempre, col testo dentro il campo. Se un
+    # giorno qualcuno ci mette una fetch, il gesto che scrive il punto
+    # diventa due — e i due possono divergere.
+    usa = fetta("function usaPuntoProposto", "async function inviaObiezione")
+    prova("accettare una proposta non chiama nessun endpoint", 0,
+          usa.count("fetch("))
+    prova("...riempie il campo del punto che c'e' gia'", True,
+          "el('puntoRitiroInp')" in usa)
+    vend = fetta("function obiezioneVenditore", "function obiezioneCompratore")
+    comp = fetta("function obiezioneCompratore", "function ridisegnaObiezione")
+    for nome, f in (("venditore", vend), ("compratore", comp)):
+        prova(f"la nota del venditore passa da esc() ({nome})", True,
+              "esc(o.puntoObiezioneNota)" in f)
+    prova("...e le proposte pure", True, "esc(p)" in comp)
+    # AMBRA E NON ROSSO: il rosso e' della disputa, e qui non c'e' un
+    # problema conclamato ma un punto da correggere.
+    prova("il riquadro di chi compra e' AMBRA e non rosso", True,
+          "var(--sats-soft)" in comp and "--warn-bg" not in comp)
+    # LE PROPOSTE STANNO DENTRO LO SPAN, e non e' un dettaglio di
+    # markup: `.trust-note` e' un flex ROW, quindi un <div> appeso
+    # come fratello dell'emoji diventa il TERZO figlio della riga —
+    # le proposte si incolonnano strette a destra del testo invece
+    # di stare sotto a tutta larghezza. Non sborda, quindi le misure
+    # restano verdi: l'ha visto lo SCREENSHOT a 320px, e questa e'
+    # la riga che impedisce al prossimo riordino di rimetterlo fuori.
+    # `find` e mai `index`: chi TOGLIE il markup deve trovare una
+    # riga rossa, non far ESPLODERE la prova portandosi dietro le
+    # sorelle — la lezione gia' pagata tre volte in questo file.
+    prova("le proposte stanno DENTRO lo span del testo", True,
+          0 <= comp.find("usaPuntoProposto")
+          < comp.find("</div>` : ''}</span>"))
+
+
 def prove_ordini_fermi():
     """LA CODA DEGLI ORDINI FERMI (ago 2026) e la riga che resta.
 
@@ -21246,7 +21580,13 @@ def prove_ordini_fermi():
                                  + tetto * passo,
         "busta mai depositata": leva("PROMEMORIA_BUSTA_GIORNI") + tetto * passo,
         "ritiro fermo": inc_passo * (inc_tetto + 1),
-        "incasso fermo": inc_passo * (inc_tetto + 1)}
+        "incasso fermo": inc_passo * (inc_tetto + 1),
+        # il punto contestato (ago 2026): 2 + 3x3 = g.11, cioe' DOPO
+        # la soglia della coda. Chi stringe la finestra a 1 fa
+        # rossa questa riga, ed e' il punto: il 🧊 non deve mai
+        # partire prima che la riga sia visibile ai moderatori.
+        "punto contestato": leva("PROMEMORIA_OBIEZIONE_GIORNI")
+                            + tetto * passo}
     soglia = leva("CODA_FERMI_GIORNI")
     for nome, giorno in ghiacci.items():
         prova(f"la coda apre PRIMA del 🧊 «{nome}» (g.{giorno})", True,
@@ -21287,6 +21627,9 @@ def prove_ordini_fermi():
           spedito_il INT DEFAULT 0, consegnato INT DEFAULT 0,
           consegna_scelta TEXT DEFAULT '', via_punto INT DEFAULT 0,
           disputata INT DEFAULT 0,
+          punto_obiettato_il INT DEFAULT 0,
+          solleciti_obiezione INT DEFAULT 0,
+          sollecito_obiezione_il INT DEFAULT 0,
           solleciti_venditore INT DEFAULT 0,
           sollecito_venditore_il INT DEFAULT 0,
           solleciti_ritiro INT DEFAULT 0, sollecito_ritiro_il INT DEFAULT 0,
@@ -30462,6 +30805,7 @@ def main():
               prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
+              prove_obiezione_punto,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri, prove_prezzo_accordo,

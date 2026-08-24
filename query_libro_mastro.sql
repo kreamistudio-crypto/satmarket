@@ -228,6 +228,22 @@ SELECT id, stato, via_punto, indirizzo_il, indirizzo_purgato_il,
     OR (indirizzo <> '' AND via_punto = 1)
     OR (indirizzo_purgato_il > 0 AND indirizzo <> '');
 
+SELECT '16f) OBIEZIONE SUL PUNTO FUORI CONTRATTO (vuoto)' AS controllo;
+-- il venditore che segnala un punto sbagliato (ago 2026): timbro e
+-- motivo si scrivono nello stesso UPDATE e solo sulla via punto. Il
+-- secondo ramo è quello che morde: un'obiezione aperta fuori dalla via
+-- punto zittisce `sollecita_venditori_fermi` senza che nessun altro
+-- promemoria raccolga quell'ordine — la sua WHERE esige via_punto=1 —
+-- cioè un ordine coi sats in cassaforte che non squilla più da nessuna
+-- parte.
+SELECT id, stato, via_punto, punto_obiettato_il, punto_obiezioni,
+       CASE WHEN punto_obiezione = '' THEN 'nessun motivo'
+            ELSE punto_obiezione END AS motivo
+  FROM ordini
+ WHERE (punto_obiettato_il > 0) <> (punto_obiezione <> '')
+    OR (punto_obiettato_il > 0 AND via_punto = 0)
+    OR (punto_obiezioni = 0 AND punto_obiettato_il > 0);
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.

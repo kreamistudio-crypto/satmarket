@@ -104,6 +104,18 @@ PROMEMORIA_RITIRO_GIORNI = 2 # spedizione a un punto, istruzioni gia'
                              # giacenza dura pochi giorni, e un passo
                              # piu' lungo cadrebbe a pacco gia' tornato.
                              # 0 = spento, NON «piu' lento»)
+PROMEMORIA_OBIEZIONE_GIORNI = 2  # il venditore ha detto che il punto
+                             # indicato non va bene (un locker che non
+                             # esiste, o di una rete che non serve):
+                             # dopo quanti giorni si ricorda a chi ha
+                             # comprato di indicarne un altro. Da li'
+                             # in poi il promemoria della spedizione
+                             # TACE — la palla non e' piu' del
+                             # venditore. Due giorni perche' la
+                             # risposta e' un tocco, e non subito: chi
+                             # risponde in un'ora non merita un
+                             # sollecito. Cadenza e tetto sono quelli
+                             # di PROMEMORIA_CONFERMA_* (0 = spento)
 SOLLECITO_MANUALE_ORE = 48   # il promemoria A COMANDO: dopo quante ore
                              # dal pagamento chi ha comprato puo'
                              # sollecitare lui la spedizione (0 = mai)

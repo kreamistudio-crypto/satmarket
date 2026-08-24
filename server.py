@@ -919,6 +919,25 @@ except ImportError:
                                        # e' ~3 giorni: al secondo si fa
                                        # ancora in tempo ad andare
 
+# IL PUNTO CONTESTATO (ago 2026): quando il venditore segnala che il
+# punto di ritiro non va bene, la palla passa a chi compra — e da li'
+# il promemoria e' SUO. Questa e' la finestra del primo squillo;
+# cadenza e tetto sono quelli di PROMEMORIA_CONFERMA_* (un posto solo
+# da cambiare batte due da tenere uguali), come per la busta.
+# DUE GIORNI perche' la risposta e' un tocco: si sceglie uno dei punti
+# proposti, o se ne scrive un altro. Non subito, che magari risponde
+# in un'ora e un promemoria immediato sarebbe l'unica cosa sgarbata di
+# tutto il giro.
+# ⚠️ IL CONTO DEL 🧊 DIPENDE DA QUESTO NUMERO: 2 + 3x3 = giorno 11, cioe'
+# DOPO CODA_FERMI_GIORNI (10) — l'invariante «se il 🧊 e' partito, la
+# riga c'e'» regge, e una prova lo rifa' dai default. Chi lo abbassa a
+# 1 la trova rossa, ed e' il punto.
+try:
+    from config import PROMEMORIA_OBIEZIONE_GIORNI
+except ImportError:
+    PROMEMORIA_OBIEZIONE_GIORNI = 2    # 0 = questa popolazione e'
+                                       # spenta (il patto delle sorelle)
+
 # L'INDIRIZZO NON RESTA (ago 2026): la finestra per gli ordini che si
 # chiudono SENZA la conferma del compratore — un rimborso, una disputa
 # decisa da un moderatore. Chi conferma la ricezione invece lo perde
@@ -3832,6 +3851,65 @@ def init_db():
                     # dedurlo dal testo del punto: «tabaccheria» in un
                     # indirizzo non e' una prova.
                     "tipo_punto TEXT DEFAULT ''",
+
+                    # L'OBIEZIONE DEL VENDITORE SUL PUNTO (ago 2026):
+                    # il punto lo scrive chi compra, ed e' testo libero
+                    # — puo' essere un locker che non esiste, o un
+                    # punto di una rete che quel venditore non serve.
+                    # Davanti a quel caso il venditore non aveva NESSUN
+                    # bottone: `segna_spedito` guarda solo che il punto
+                    # CI SIA (mai che sia giusto), `indica_punto_ritiro`
+                    # e' del solo compratore, e la chat puo' non
+                    # esistere — e' la QUINTA volta che quel caso bussa
+                    # (la busta, l'indirizzo di casa, la nota, il
+                    # collegamento del servizio, e adesso questo), solo
+                    # che qui e' peggio: chi vende legge «per i problemi
+                    # c'e' la disputa» e la disputa da 'locked' la apre
+                    # SOLO chi compra.
+                    # LA FORMA E' QUELLA DELL'APPUNTAMENTO e non quella
+                    # delle offerte, ed e' la riga da cui discende tutto
+                    # il resto: NIENTE colonna `stato` — lo stato si
+                    # deriva dai timestamp, cosi' `ordini.stato`, che e'
+                    # la macchina vera, non si tocca — e NIENTE
+                    # ping-pong: il venditore obietta, chi compra
+                    # risponde col gesto che ha GIA' (scrivere il
+                    # punto), e quel gesto CHIUDE l'obiezione. Per
+                    # questo accettare una proposta non e' un endpoint
+                    # nuovo: e' `indica_punto_ritiro` di sempre.
+                    # NON E' UN'ATTESA NUOVA, ed e' la ragione per cui
+                    # si poteva fare: quell'ordine era GIA' fermo — chi
+                    # vende non PUO' spedire — solo che nessuno sapeva
+                    # di chi fosse la palla, e i promemoria la davano
+                    # al venditore (vedi il silenzio nella WHERE di
+                    # sollecita_venditori_fermi).
+                    "punto_obiezione TEXT DEFAULT ''",
+                    # la nota libera, facoltativa: il motivo secco
+                    # sopra si legge a colpo d'occhio e non invecchia,
+                    # questa dice il caso particolare
+                    "punto_obiezione_nota TEXT DEFAULT ''",
+                    # I PUNTI PROPOSTI dal venditore, JSON list (il
+                    # pattern di `annunci.foto`) e MAI i pipe di
+                    # `avvisi_ricerca.categorie`: un punto e' testo
+                    # libero e un «|» dentro spezzerebbe la lista in
+                    # silenzio.
+                    "punto_proposte TEXT DEFAULT ''",
+                    # IL `busta_il` DI QUESTO CANTIERE: insieme il
+                    # QUANDO, il flag «obiezione aperta» (a 0 non c'e'
+                    # niente in sospeso) e l'ANCORA del sollecito.
+                    "punto_obiettato_il INTEGER DEFAULT 0",
+                    # le obiezioni si CONTANO (il patto di
+                    # `busta_correzioni` e di `appuntamento_proposte`):
+                    # uno stallo dev'essere visibile al moderatore, o
+                    # si vedrebbe l'ultima e la si crederebbe l'unica.
+                    # NON e' un tetto: nessuna guardia lo legge.
+                    "punto_obiezioni INTEGER DEFAULT 0",
+                    # Colonne SUE del sollecito, mai ereditate: un
+                    # contatore preso in prestito salta dritto al tetto.
+                    # Il nome e' `obiezione` e non `punto` perche'
+                    # `sollecito_punto_*` e' gia' del compratore che non
+                    # ritira al punto — due attese diverse, due nomi.
+                    "sollecito_obiezione_il INTEGER DEFAULT 0",
+                    "solleciti_obiezione INTEGER DEFAULT 0",
                     # LA NOTA DEL COMPRATORE (ago 2026): quel che chi
                     # compra deve poter dire sull'OGGETTO — la taglia,
                     # il numero, la variante. Prima si diceva in chat,
@@ -9396,6 +9474,23 @@ TIPI_PUNTO = (("locker", "Locker automatico", "Locker"),
               ("banco", "Punto di ritiro", "Punto"))
 ID_TIPI_PUNTO = tuple(t[0] for t in TIPI_PUNTO)
 
+# PERCHE' UN PUNTO NON VA BENE (ago 2026): i motivi che il venditore
+# puo' dare quando obietta. Id per sempre ed etichette ritoccabili
+# senza migrazioni, il patto di CONDIZIONI e di TIPI_PUNTO.
+# POCHI E CHIUSI, e la ragione e' il MODERATORE: in disputa un motivo
+# secco si legge a colpo d'occhio e si puo' contare, mentre della prosa
+# va letta. La riga libera resta accanto (`punto_obiezione_nota`) per
+# il caso particolare — e 'altro' esiste apposta per chi fuori elenco
+# ci finisce davvero, o si costringerebbe a scegliere una voce falsa.
+MOTIVI_PUNTO = (("rete", "Non è della mia rete"),
+                ("inesistente", "Questo punto non esiste"),
+                ("altro", "Altro"))
+ID_MOTIVI_PUNTO = tuple(m[0] for m in MOTIVI_PUNTO)
+# Quanti punti alternativi puo' proporre in un colpo: tre bastano a
+# dare una scelta vera e stanno in una schermata. Non e' una leva del
+# config — non muove denaro e non apre niente, e' la forma del foglio.
+MAX_PROPOSTE_PUNTO = 3
+
 
 def tipo_punto_da_payload(grezzo: str) -> str:
     """Il tipo di punto scelto da chi compra: 'locker' | 'banco'.
@@ -12595,6 +12690,12 @@ _SQL_FERMI = (
     # perche' un ordine e' fermo: la via punto lo diceva gia', e da
     # oggi anche «aspetta l'indirizzo» e' una ragione che esiste
     "    o.indirizzo_atteso, o.indirizzo_il, "
+    # ...e da oggi «aspetta che il compratore corregga il punto», che
+    # e' la ragione piu' facile da scambiare per l'altra: senza questo
+    # campo la riga direbbe «locked, fermo da N giorni» e chi modera
+    # penserebbe a un venditore che non spedisce, mentre qui il
+    # venditore ha fatto la sua parte e la palla e' di chi compra.
+    "    o.punto_obiettato_il, "
     "    o.venditore_id, o.compratore_id, a.titolo, "
     "    CASE o.stato "
     # IL SERVIZIO NON E' FERMO: STA ASPETTANDO UNA DATA (ago
@@ -12629,14 +12730,16 @@ _SQL_FERMI = (
     "        COALESCE(o.solleciti_incasso,0), "
     "        COALESCE(o.solleciti_busta,0), "
     "        COALESCE(o.solleciti_punto,0), "
-    "        COALESCE(o.solleciti_appuntamento,0)) AS promemoria, "
+    "        COALESCE(o.solleciti_appuntamento,0), "
+    "        COALESCE(o.solleciti_obiezione,0)) AS promemoria, "
     "    MAX(COALESCE(o.sollecito_venditore_il,0), "
     "        COALESCE(o.sollecito_ritiro_il,0), "
     "        COALESCE(o.sollecito_conferma_il,0), "
     "        COALESCE(o.sollecito_incasso_il,0), "
     "        COALESCE(o.sollecito_busta_il,0), "
     "        COALESCE(o.sollecito_punto_il,0), "
-    "        COALESCE(o.sollecito_appuntamento_il,0)) AS promemoria_il, "
+    "        COALESCE(o.sollecito_appuntamento_il,0), "
+    "        COALESCE(o.sollecito_obiezione_il,0)) AS promemoria_il, "
     # raggiungibile = la regola di notifica(): Telegram se il tg_id e'
     # positivo, Nostr solo da una chiave del possesso DIMOSTRATO. Un
     # nativo Nostr che ha perso la chiave non lo sente nessuno, e
@@ -13061,6 +13164,14 @@ def _leve_stato():
                   spento="il venditore che non deposita il codice di "
                          "ritiro non squilla: il compratore resta davanti "
                          "a un locker chiuso, in silenzio"),
+            _leva("Punto contestato: primo squillo a chi compra (giorni)",
+                  "PROMEMORIA_OBIEZIONE_GIORNI",
+                  PROMEMORIA_OBIEZIONE_GIORNI,
+                  spento="il venditore puo' segnalare che il punto non "
+                         "va bene, ma poi nessuno lo ricorda a chi "
+                         "deve correggerlo: l'ordine resta fermo in "
+                         "silenzio, e il promemoria della spedizione "
+                         "tace comunque"),
             _leva("Ritiro al punto: primo squillo e passo (giorni)",
                   "PROMEMORIA_RITIRO_GIORNI", PROMEMORIA_RITIRO_GIORNI,
                   spento="chi ha già le istruzioni non riceve nessun "
@@ -19975,16 +20086,171 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
         if "tipo_punto" in d else (o["tipo_punto"] or "")
     cambiato = ((o["punto_ritiro"] or "") != punto
                 or (o["tipo_punto"] or "") != tipo)
-    con.execute("UPDATE ordini SET punto_ritiro=?, tipo_punto=? WHERE id=?",
+    # SCRIVERE IL PUNTO CHIUDE L'OBIEZIONE (ago 2026), ed e' cio' che
+    # rende il giro nuovo un endpoint solo: accettare una proposta del
+    # venditore non e' un gesto suo — e' QUESTO gesto, col testo
+    # proposto dentro il campo. Si azzera anche quando il compratore
+    # riscrive lo stesso identico punto: e' comunque una risposta, e
+    # tenere aperta l'obiezione lo terrebbe nella popolazione dei
+    # solleciti per una cosa a cui ha gia' risposto.
+    # `punto_obiezioni` NON si azzera: e' la memoria che il moderatore
+    # legge in disputa — il patto di `busta_correzioni`.
+    apriva = bool(o["punto_obiettato_il"])
+    con.execute("UPDATE ordini SET punto_ritiro=?, tipo_punto=?, "
+                "punto_obiezione='', punto_obiezione_nota='', "
+                "punto_proposte='', punto_obiettato_il=0 WHERE id=?",
                 (punto, tipo, ordine_id))
     con.commit()
     con.close()
-    if cambiato:
+    if cambiato or apriva:
         await notifica(o["venditore_id"],
-                       "📦 <b>Il compratore ha indicato il punto di "
-                       "ritiro</b>: lo trovi nell'ordine, ora puoi "
-                       "spedire.")
+                       "📦 <b>Il compratore ha "
+                       + ("risposto alla tua segnalazione" if apriva
+                          else "indicato il punto di ritiro")
+                       + "</b>: lo trovi nell'ordine, ora puoi "
+                         "spedire.")
     return {"ok": True, "punto_ritiro": punto, "tipo_punto": tipo}
+
+
+def _obiezione_da_payload(d) -> tuple:
+    """L'obiezione del venditore sul punto: (motivo, nota, proposte).
+
+    UN GIUDICE SOLO, il patto di `rete_da_payload` e di
+    `tipo_punto_da_payload`: prende il payload e restituisce i tre
+    campi gia' come vanno in colonna, cosi' l'endpoint non normalizza
+    niente per conto suo e la prova in CI gira senza database.
+
+    IL MOTIVO E' UNA WHITELIST e il 400 sta qui: quel valore arriva dal
+    CLIENT e finisce in una colonna che il moderatore legge in disputa
+    — senza il recinto ci si ritrova motivi che non esistono, e il
+    giorno che se ne aggiunge uno vero i conti sono gia' sporchi (il
+    patto di TIMBRI_SUGGERIMENTO e di INTERESSI).
+
+    LA NOTA SI RIFIUTA, NON SI TRONCA (la regola di `_nota_da_payload`,
+    e per la stessa ragione): una prosa tagliata a meta' resta
+    leggibile e puo' INVERTIRSI — «il locker c'e', ma non il mio»
+    diventa «il locker c'e', ma non». Il tetto e' MAX_NOTA, che e' gia'
+    quello dell'altra riga di prosa fra le due parti.
+
+    LE PROPOSTE SI LIMANO INVECE (il patto di `quantita_tollerante`):
+    un client che ne manda cinque non deve far fallire una
+    segnalazione — le tre che restano sono comunque una scelta vera.
+    Ognuna passa da `_testo_punto`, cioe' dallo STESSO taglio del punto
+    dell'ordine: una proposta troncata a una misura e il punto a
+    un'altra sarebbero due testi diversi per la stessa cosa, e il
+    tocco che accetta scriverebbe qualcosa che non combacia. I
+    doppioni si tolgono, che due bottoni identici non sono una scelta.
+    """
+    motivo = str(d.get("motivo") or "").strip().lower()
+    if motivo not in ID_MOTIVI_PUNTO:
+        raise HTTPException(400, "Motivo sconosciuto: "
+                                 + ", ".join(ID_MOTIVI_PUNTO))
+    nota = " ".join(str(d.get("nota") or "").split())
+    if len(nota) > MAX_NOTA:
+        raise HTTPException(400, f"La spiegazione è troppo lunga: "
+                                 f"massimo {MAX_NOTA} caratteri")
+    grezze = d.get("proposte")
+    proposte = []
+    for g in grezze if isinstance(grezze, list) else []:
+        p = _testo_punto(g)
+        if p and p not in proposte:
+            proposte.append(p)
+    return motivo, nota, proposte[:MAX_PROPOSTE_PUNTO]
+
+
+@app.post("/api/orders/{ordine_id}/punto/obietta")
+async def obietta_punto(ordine_id: int, req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """IL VENDITORE DICE CHE IL PUNTO NON VA BENE (ago 2026), e puo'
+    proporne altri. Solo lui, solo su 'locked', solo sulla via punto.
+
+    IL CASO VERO: chi compra scrive il punto in un campo di testo
+    libero che nessuno verifica — `segna_spedito` controlla che il
+    punto CI SIA, mai che sia giusto — quindi puo' indicare un locker
+    che non esiste, o un punto di una rete che quel venditore non
+    serve. Davanti a quel caso il venditore non aveva NESSUNA strada:
+    correggere e' del solo compratore (`indica_punto_ritiro`), la
+    disputa da 'locked' pure (`apri_disputa` filtra `compratore_id`),
+    e la chat puo' non esistere — chi non ha ne' username ne' npub
+    legge «le trattative non sono necessarie: per i problemi c'e' la
+    disputa», che e' precisamente la porta che non puo' aprire.
+
+    NON APRE UN'ATTESA NUOVA, ed e' la riga da capire prima di toccare
+    qualunque cosa qui: quell'ordine era GIA' fermo — il venditore non
+    PUO' spedire — solo che nessuno sapeva di chi fosse la palla, e i
+    promemoria automatici la davano a LUI («segna la spedizione»)
+    mentre invitavano chi compra alla disputa. Qui si dichiara di chi
+    e' il turno, e il silenzio nella WHERE di
+    `sollecita_venditori_fermi` e' la meta' che rende vera la promessa.
+
+    NIENTE COLONNA `stato` e niente ping-pong, il patto
+    dell'appuntamento del servizio: lo stato si deriva da
+    `punto_obiettato_il`, cosi' `ordini.stato` — la macchina vera — non
+    si tocca; e a rispondere e' il gesto che chi compra ha GIA'
+    (scrivere il punto), che CHIUDE l'obiezione. Per questo accettare
+    una proposta non e' un endpoint suo.
+
+    SI OBIETTA SOLO SU UN PUNTO CHE C'E': «via punto, punto vuoto» ha
+    gia' il suo gate in `segna_spedito` e il suo promemoria, e
+    obiettare sul nulla vorrebbe dire due strade per lo stesso caso.
+
+    NESSUN CAS, e va scritto perche' i fratelli ce l'hanno: qui scrive
+    una parte sola e non c'e' nessuna corsa: il compratore non tocca
+    queste colonne — le AZZERA scrivendo il punto, ed e' un'altra
+    transazione che al piu' arriva prima o dopo, mai in mezzo. Il
+    doppio tocco su rete lenta lo para il velo di `bottoneInAttesa`,
+    la stessa ragione di `proponiAppuntamento`: qui non si muove un
+    sat, si protegge `punto_obiezioni`, che il moderatore legge.
+
+    Il testo del venditore non entra MAI nell'HTML della notifica —
+    solo l'etichetta del motivo, che e' NOSTRA: nota e proposte si
+    leggono nell'ordine sotto esc(), il patto di
+    `indica_punto_ritiro`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    motivo, nota, proposte = _obiezione_da_payload(d)
+    con = db()
+    # La guardia di proprieta' sta DENTRO la WHERE col 400 dei
+    # fratelli: chi enumera non impara la differenza fra «non e' tuo» e
+    # «non esiste».
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["via_punto"]:
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "un punto di ritiro")
+    if not o["punto_ritiro"]:
+        con.close()
+        raise HTTPException(400, "L'acquirente non ha ancora indicato "
+                                 "nessun punto: appena lo scrive potrai "
+                                 "segnalargli un problema")
+    adesso = int(time.time())
+    con.execute("UPDATE ordini SET punto_obiezione=?, "
+                "punto_obiezione_nota=?, punto_proposte=?, "
+                "punto_obiettato_il=?, "
+                "punto_obiezioni=punto_obiezioni+1, aggiornato=? "
+                "WHERE id=?",
+                (motivo, nota, json.dumps(proposte, ensure_ascii=False)
+                 if proposte else "", adesso, adesso, ordine_id))
+    con.commit()
+    con.close()
+    etichetta = dict(MOTIVI_PUNTO)[motivo]
+    await notifica(o["compratore_id"],
+                   f"📦 <b>Il punto di ritiro che hai indicato non va "
+                   f"bene</b> per l'ordine #{ordine_id}: «{etichetta}». "
+                   + (f"Il venditore ne ha proposti {len(proposte)}: "
+                      f"aprilo nella Mini App e scegline uno, oppure "
+                      f"indicane un altro tu." if proposte else
+                      "Aprilo nella Mini App e indicane un altro — "
+                      "finché non lo fai il pacco non può partire.")
+                   + " I tuoi sats restano al sicuro nel deposito di "
+                     "garanzia.")
+    return {"ok": True, "motivo": motivo, "nota": nota,
+            "proposte": proposte}
 
 
 @app.post("/api/orders/{ordine_id}/appuntamento")
@@ -20773,7 +21039,19 @@ async def segna_spedito(ordine_id: int, req: Request,
                                  "nell'ordine potrai segnare la "
                                  "spedizione (se serve, ricordaglielo "
                                  "in chat)")
+    # LA SPEDIZIONE CHIUDE L'OBIEZIONE (ago 2026): se il venditore
+    # segnala che il punto non va bene e poi spedisce lo stesso — si
+    # sono chiariti in chat, o ha cambiato idea — l'obiezione non deve
+    # restare appesa su un ordine 'shipped', dove nessuno puo' piu'
+    # rispondere: il campo del compratore si chiude con lo stato, e
+    # `sollecita_punti_obiettati` filtra 'locked'. Resterebbe una riga
+    # aperta per sempre, e il libro mastro non la vedrebbe (per lui
+    # timbro e motivo sono coerenti). Sulle altre vie i campi sono gia'
+    # a zero: scriverli e' innocuo e tiene l'UPDATE uno solo.
+    # `punto_obiezioni` NON si azzera: e' la memoria del moderatore.
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
+                "punto_obiezione='', punto_obiezione_nota='', "
+                "punto_proposte='', punto_obiettato_il=0, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
                 (corriere, tracking, int(time.time()), int(time.time()),
                  ordine_id))
@@ -27811,6 +28089,21 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
         # rivelare senza poterlo sbirciare.
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
+        # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
+        # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
+        # quella e' una scelta dello schema e il client non deve
+        # ereditarla — un JSON.parse di la' sarebbe il secondo posto
+        # che sa come sono serializzati, e il primo a rompersi il
+        # giorno che cambia. A differenza della busta e
+        # dell'indirizzo qui NON si toglie niente: sono testo del
+        # venditore scritto PER il compratore, e il moderatore in
+        # disputa deve poterlo leggere — come la nota di chi compra.
+        # Fail-open sul JSON storto: lista vuota, mai un 500 sulla
+        # lista degli ordini.
+        try:
+            r["punto_proposte"] = json.loads(r.get("punto_proposte") or "[]")
+        except (ValueError, TypeError):
+            r["punto_proposte"] = []
         # E della foto non esce nemmeno il NOME DEL FILE: e' la
         # maniglia sul disco e non serve a nessun client — resta il
         # flag, come per il documento della busta. Le CORREZIONI
@@ -29323,6 +29616,20 @@ async def sollecita_venditori_fermi():
             "LEFT JOIN annunci a ON a.id = o.annuncio_id "
             "WHERE o.stato='locked' AND o.consegna_scelta=? "
             "AND o.solleciti_venditore <= ? "
+            # IL SILENZIO MENTRE LA PALLA E' DEL COMPRATORE (ago 2026),
+            # ed e' la riga che rende vero tutto il cantiere
+            # dell'obiezione: con un punto di ritiro contestato il
+            # venditore NON PUO' spedire, e senza questa clausola
+            # continuerebbe a sentirsi dire «segna la spedizione» —
+            # un rimprovero a vuoto, per giunta accompagnato
+            # dall'invito alla disputa che parte al primo squillo verso
+            # chi compra. E' la stessa ragione per cui la strada non
+            # dichiarata resta fuori due righe piu' su.
+            # A rispondere ci pensa `sollecita_punti_obiettati`, che ha
+            # la popolazione COMPLEMENTARE e i destinatari invertiti.
+            # Sul ramo 'digitale' e' innocua per costruzione: li'
+            # `via_punto` e' 0, quindi il campo vale sempre 0.
+            "AND o.punto_obiettato_il = 0 "
             "AND MAX(o.creato + ?, o.sollecito_venditore_il + ?) < ?",
             (strada, PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
     if not righe:
@@ -29596,6 +29903,124 @@ async def sollecita_ritiri_al_punto():
                     f"garanzia finché l'affare non si chiude.")
         except Exception as e:
             print(f"⚠️ Promemoria ritiro saltato (#{r['id']}): {e}")
+
+
+async def sollecita_punti_obiettati():
+    """IL PUNTO CONTESTATO E MAI CORRETTO (ago 2026): il venditore ha
+    detto che il punto non va bene, e adesso la palla e' di chi compra.
+
+    E' LA POPOLAZIONE COMPLEMENTARE di `sollecita_venditori_fermi`, che
+    proprio per questo tace sugli ordini con `punto_obiettato_il > 0`:
+    li' aspettiamo il venditore, qui il compratore, e i destinatari
+    sono INVERTITI — chi compra a ogni squillo (e' lui che deve
+    rispondere), il venditore solo all'ULTIMO, per dirgli che la palla
+    passa ai moderatori. Prima non avrebbe niente da fare: ha gia'
+    segnalato, e un allarme su un'attesa normale e' rumore.
+
+    L'ANCORA E' `punto_obiettato_il`, mai `aggiornato` — la trappola
+    gia' pagata quattro volte (`deposita_invoice` accetta il venditore
+    proprio su 'locked' e riscrive `aggiornato`). Si sposta quando il
+    venditore ri-obietta, ed e' giusto: e' un fatto nuovo, e il conto
+    di chi deve rispondere riparte da li'. Che cosi' il venditore possa
+    rimandare il PROPRIO 🧊 e' innocuo e dichiarato — lo rimanda a suo
+    danno, e per farlo deve segnalare due volte.
+
+    IL 🧊 CADE AL GIORNO 11 (PROMEMORIA_OBIEZIONE_GIORNI + tetto x
+    passo, coi default 2 + 3x3), cioe' DOPO CODA_FERMI_GIORNI: la riga
+    e' gia' nella coda dei fermi quando il ghiaccio parte, e
+    l'invariante «se il 🧊 e' partito, la riga c'e'» regge. La prova lo
+    rifa' dai default: chi stringe la finestra la trova rossa.
+
+    QUI NON SI CHIUDE IL CASO DEL COMPRATORE CHE SPARISCE, ed e'
+    dichiarato: al tetto si tace e l'ordine resta 'locked', perche' la
+    sola uscita da li' e' in mano a lui (`apri_disputa` filtra
+    `compratore_id`). Quel che si guadagna e' che nella coda dei fermi
+    «il compratore non risponde» e «il venditore non spedisce»
+    smettono di confondersi — e chi modera vede quale dei due."""
+    if PROMEMORIA_OBIEZIONE_GIORNI <= 0 or PROMEMORIA_CONFERMA_GIORNI <= 0:
+        return                       # niente finestra o niente passo
+    adesso = int(time.time())
+    passo = PROMEMORIA_CONFERMA_GIORNI * 86400
+    finestra = PROMEMORIA_OBIEZIONE_GIORNI * 86400
+    con = db()
+    # LEFT JOIN su annunci: la lezione gia' pagata quattro volte — un
+    # set ha annuncio_id=0 e con l'INNER sparirebbe in silenzio.
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+        "o.prezzo_sats, o.solleciti_obiezione, o.punto_obiezione, "
+        "o.punto_proposte, o.punto_obiettato_il, a.titolo "
+        "FROM ordini o LEFT JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='locked' AND o.via_punto=1 "
+        # la forma POSITIVA, mai un `!=`: il mondo di ieri non deve
+        # poter rientrare da una porta di servizio
+        "AND o.punto_obiettato_il > 0 "
+        "AND o.solleciti_obiezione <= ? "
+        "AND MAX(o.punto_obiettato_il + ?, o.sollecito_obiezione_il + ?) < ?",
+        (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_obiezione_il=?, "
+                    "solleciti_obiezione=solleciti_obiezione+1 "
+                    "WHERE id=?", (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio.
+        titolo = html.escape((r["titolo"] or "il tuo acquisto")[:60])
+        # l'etichetta del motivo e' NOSTRA e si puo' interpolare; la
+        # nota e le proposte no — quelle si leggono nell'ordine sotto
+        # esc(), il patto della notifica dell'obiezione.
+        etichetta = dict(MOTIVI_PUNTO).get(r["punto_obiezione"] or "",
+                                           "Non va bene")
+        quante = len(json.loads(r["punto_proposte"] or "[]"))
+        # i giorni si contano dal delta VERO e mai dalla leva: se il
+        # server e' stato spento, il primo squillo dira' «da 9 giorni»
+        # invece di 2 — vero, mentre «2, 5, 8» e' un'aspirazione.
+        giorni = max(1, (adesso - r["punto_obiettato_il"]) // 86400)
+        quanti = f"{giorni} giorni" if giorni > 1 else "1 giorno"
+        try:
+            if r["solleciti_obiezione"] < PROMEMORIA_CONFERMA_MAX:
+                await notifica(r["compratore_id"],
+                    f"📦 <b>«{titolo}» aspetta un punto di ritiro "
+                    f"nuovo.</b> Il venditore ha segnalato da {quanti} "
+                    f"che quello che hai indicato non va bene: "
+                    f"«{etichetta}». "
+                    + (f"Apri l'ordine: ne ha proposti {quante} e ne "
+                       f"scegli uno con un tocco." if quante else
+                       "Apri l'ordine e indicane un altro.")
+                    + " Finché non lo fai il pacco non può partire, e "
+                      "i tuoi sats restano nel deposito di garanzia.")
+                if r["solleciti_obiezione"] == PROMEMORIA_CONFERMA_MAX - 1:
+                    # SOLO l'ultimo: prima ha gia' fatto la sua parte,
+                    # e ripeterglielo sarebbe rumore.
+                    await notifica(r["venditore_id"],
+                        f"📦 <b>«{titolo}» è ancora fermo.</b> "
+                        f"L'acquirente non ha ancora corretto il punto "
+                        f"di ritiro dopo la tua segnalazione di "
+                        f"{quanti} fa. Gli stiamo scrivendo: se non "
+                        f"risponde, la prossima volta la segnaliamo a "
+                        f"un moderatore.")
+            else:
+                # Il tetto e' passato: tocca a un umano, e da qui in poi
+                # silenzio — il patto dei solleciti. L'importo e' il
+                # TOTALE e non il netto: qui non si sa ancora chi lo
+                # prende, e l'esito probabile e' il rimborso.
+                await notifica_admin(
+                    f"🧊 <b>Punto di ritiro contestato:</b> ordine "
+                    f"#{r['id']}, «{titolo}» — "
+                    f"{_fmt_sats(r['prezzo_sats'])} sats in cassaforte. "
+                    f"Il venditore ha segnalato «{etichetta}» "
+                    f"{quanti} fa e l'acquirente non ha corretto il "
+                    f"punto. Serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Promemoria punto contestato saltato (#{r['id']}): {e}")
 
 
 async def sollecita_rimborsi_puntate():
@@ -32402,6 +32827,16 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Promemoria venditori fermi saltati: {e}")
         try:
+            # la POPOLAZIONE COMPLEMENTARE di quello qui sopra: il
+            # punto di ritiro contestato dal venditore e mai corretto.
+            # Gira SUBITO DOPO apposta — i due si escludono per
+            # costruzione (la WHERE di sopra tace su
+            # `punto_obiettato_il > 0`), e tenerli adiacenti fa vedere
+            # a chi legge che sono le due facce della stessa attesa
+            await sollecita_punti_obiettati()
+        except Exception as e:
+            print(f"⚠️ Promemoria punti contestati saltati: {e}")
+        try:
             # la busta di consegna mai depositata: e' il sostituto
             # del gate su segna_spedito — parole, mai sats
             await sollecita_buste_ferme()
@@ -33172,6 +33607,30 @@ CONTROLLI_LIBRO_MASTRO = (
      "OR (busta_il>0) <> (busta_codice<>'') "
      "OR (busta_il>0 AND via_punto=0) "
      "OR (busta_corretta_il>0 AND busta_il=0)"),
+    # L'OBIEZIONE SUL PUNTO (ago 2026), il calco della busta qui sopra
+    # e per la stessa ragione: timbro e motivo si scrivono nello STESSO
+    # UPDATE e solo sulla via punto, quindi non esiste uno stato
+    # transitorio legittimo in cui questa e' falsa — la domanda che
+    # decide se un invariante entra in questa lista.
+    # Il terzo ramo e' quello che morde davvero: un'obiezione aperta su
+    # un ordine che non e' via punto vorrebbe dire che una guardia e'
+    # caduta, e quell'ordine sarebbe ZITTITO in
+    # sollecita_venditori_fermi senza che nessun altro promemoria lo
+    # raccolga (la sua WHERE esige `via_punto=1`) — cioe' un ordine che
+    # non squilla piu' da nessuna parte.
+    # DA NON AGGIUNGERE, e verra' in mente: «obiezione aperta senza
+    # punto». E' vietata all'ingresso, ma il compratore puo' correggere
+    # e chiudere in un'altra transazione, quindi guardarla insieme al
+    # timbro non aggiunge niente e il vuoto del punto non e' mai
+    # possibile (indica_punto_ritiro rifiuta il vuoto).
+    ("obiezione sul punto fuori contratto",
+     "il timbro e il motivo si scrivono nello stesso UPDATE e solo "
+     "sulla via punto: una riga spaiata e' una guardia caduta, e "
+     "l'ordine resterebbe zitto in tutti e due i promemoria",
+     "SELECT id FROM ordini "
+     "WHERE (punto_obiettato_il>0) <> (punto_obiezione<>'') "
+     "OR (punto_obiettato_il>0 AND via_punto=0) "
+     "OR (punto_obiezioni=0 AND punto_obiettato_il>0)"),
     # L'INDIRIZZO DI CASA. Il terzo ramo e' quello che vale davvero:
     # rende VERIFICABILE la promessa pubblica invece che raccontata —
     # se la scopa ha timbrato ma il testo e' ancora li', quello che
