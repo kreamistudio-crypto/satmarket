@@ -13015,6 +13015,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dettaglio in vetrina con l'invito; annuncio sparito = toast e si
   resta in Esplora). Il link t.me/startapp è rimandato: servirebbe
   la Mini App nominata su BotFather e il link web copre già tutti.
+  IL LINK CONDIVISO DICE ANCHE DA CHI SI COMPRA (ago 2026, PR #19 di
+  Alan): un annuncio mandato a un amico portava titolo e prezzo e
+  basta — su un mercatino la persona è metà della decisione. La riga
+  «Annuncio di @rosina» si aggiunge al TESTO e mai al LINK, che resta
+  l'indirizzo parlante di sempre, cioè anche il canonical; e la
+  compone `condividiAnnuncio` e non `condividiLink`, che è il tubo
+  condiviso con /sicurezza e /privacy, dove nessun venditore c'è da
+  nominare.
+  UN MODO SOLO DI DIRE LA PERSONA, in cascata: username Telegram →
+  nome → npub. «@rosina (Rosina)» sarebbe la stessa persona detta due
+  volte. E IL TRATTINO NON È UN NOME: `mapListing` mette '—' quando il
+  nome manca, e senza quella guardia si condividerebbe «Annuncio di
+  —», che è peggio del silenzio — senza nessuno dei tre la riga non si
+  scrive affatto.
+  L'ULTIMO GRADINO VUOLE IL POSSESSO DIMOSTRATO (correzione
+  dell'integrazione, ed è la riga da non ammorbidire): si dice
+  `sellerNpub` solo con `sellerNpubOk`. La regola era già scritta ed è
+  più stretta di quella dei ponti — «la npub dichiarata ma non
+  verificata la vede SOLO il proprietario nel suo Profilo» — e in
+  tutto il client nessuno rende quella stringa: si legge
+  `sellerNpubOk` per accendere il 🟣 e basta, quindi questo sarebbe
+  stato il primo posto a mostrarla. Qui pesa il doppio, perché un
+  testo condiviso viaggia INOLTRATO: una chiave auto-dichiarata
+  attribuirebbe l'annuncio al profilo Nostr di un'altra persona, che
+  è il caso già nominato per il post di canale. Non verificata: si
+  tace, la stessa scelta del trattino.
+  LA PROVA CHE CONTA GIRA CON NODE (`condividiAnnuncio` su un tubo di
+  cartone che registra url e testo, sei casi): le sentinelle dicono
+  che le righe ci sono, mai che la CASCATA scelga nel suo ordine —
+  «l.username ?» dentro un testo non dice chi vince — e mai che il
+  testo composto sia quello che PARTE. E DUE SENTINELLE NON POTEVANO
+  FALLIRE, per l'ennesima volta e sempre allo stesso modo: quella del
+  link cercava l'indirizzo con un `in`, quindi un `?da=${chi}`
+  appiccicato in coda la lasciava verde — cioè era cieca proprio sul
+  caso che nominava — e nessuna guardava la CHIAMATA, quindi `testo`
+  poteva essere calcolato e buttato via con tutte le altre ancora
+  verdi su codice morto. Adesso l'ancora del link tiene la VIRGOLA che
+  chiude l'argomento, e una riga guarda che il testo si consegni.
   Galleria del dettaglio coi pallini stile Vinted (`.foto-dots`,
   via il vecchio badge 📷 N): uno per foto in basso al centro,
   l'attivo pieno, aggiornati sull'evento scroll della striscia
