@@ -24516,6 +24516,13 @@ def prove_condivisione_venditore():
     prova("...in cascata, un modo solo per persona", True,
           "l.username ?" in ca and "l.seller" in ca
           and "l.sellerNpub" in ca)
+    # E L'ULTIMO GRADINO VUOLE LA npub PROVATA: `sellerNpub` e' la
+    # DICHIARATA, e in tutto il client non la rende nessuno — si
+    # legge `sellerNpubOk` per il 🟣 e basta. In un testo che viene
+    # INOLTRATO una chiave non verificata attribuirebbe l'annuncio a
+    # un'altra persona.
+    prova("...e la npub si dice solo se VERIFICATA", True,
+          "l.sellerNpubOk ? l.sellerNpub" in ca)
     prova("...col trattino escluso, che segnaposto non e' un nome",
           True, "l.seller !== '—'" in ca)
     prova("...e senza nessuno dei tre la riga non si scrive", True,
@@ -24523,14 +24530,99 @@ def prove_condivisione_venditore():
     # Il LINK non si tocca: e' l'indirizzo parlante, e il testo gli
     # sta accanto. Se un domani qualcuno ci infilasse il venditore
     # dentro, l'indirizzo smetterebbe di combaciare col canonical.
+    # ⚠️ L'ancora tiene la VIRGOLA che chiude l'argomento: scritta
+    # senza, la sentinella NON POTEVA FALLIRE su un'AGGIUNTA in coda
+    # (`...?da=${chi}`) — cioe' proprio sul caso che nomina. L'ha
+    # detto la tortura, non la rilettura.
     prova("il link resta l'indirizzo parlante di sempre", True,
-          "/annuncio/${l.id}${s ? '-' + s : ''}" in ca)
+          "`${location.origin}/annuncio/${l.id}${s ? '-' + s : ''}`,"
+          in ca)
+    # E il testo composto e' quello che si CONSEGNA: senza questa
+    # riga `testo` poteva essere calcolato e poi buttato via, con
+    # tutte le sentinelle qui sopra ancora verdi su codice morto.
+    prova("...e il testo composto e' quello che parte", True,
+          "    testo, l.title);" in ca)
     # E i tre campi ESISTONO davvero in mapListing: se uno sparisse,
     # la cascata scivolerebbe sul successivo senza un errore — la
     # riga direbbe una cosa diversa da quella che si e' scritta.
     ml = pezzo_js(mini, "function mapListing(", "\n}\n")
     for campo in ("seller:", "username:", "sellerNpub:"):
         prova(f"...e `{campo}` arriva da mapListing", True, campo in ml)
+
+    # E LA PROVA CHE RISPONDE: `condividiAnnuncio` fatta GIRARE con
+    # node, col tubo della condivisione sostituito da un registratore.
+    # Le sentinelle qui sopra dicono che le righe ci sono, mai che la
+    # CASCATA scelga nel suo ordine — «l.username ?» e «l.seller» in
+    # un testo non dicono chi vince — e mai che il testo composto sia
+    # quello che parte davvero. Senza node si SALTA contando (il patto
+    # di `salta`): in CI le dipendenze si installano apposta.
+    import json as _jsC, shutil as _shC, subprocess as _spC
+    import tempfile as _tfC
+    _node = _shC.which("node")
+    if not _node:
+        salta("condividiAnnuncio risponde giusto", "node non installato")
+    else:
+        _base = dict(id=7, title="Poster", price=12000, valuta="sats",
+                     slug="poster")
+        _casi = [
+            # lo username vince, e nome e npub non si ripetono.
+            # ⚠️ LA npub QUI E' VERIFICATA APPOSTA: senza, la
+            # mutazione che ROVESCIA la cascata (npub davanti a
+            # username) passava liscia — l'ordine non era esercitato
+            # da nessun caso. L'ha detto la tortura.
+            dict(_base, username="rosina", seller="Rosina",
+                 sellerNpub="npub1abc", sellerNpubOk=True),
+            # niente username: parla il nome, e la npub verificata
+            # resta indietro — il secondo gradino della stessa prova
+            dict(_base, username="", seller="Rosina",
+                 sellerNpub="npub1abc", sellerNpubOk=True),
+            # il trattino NON e' un nome: si scende alla npub, ma
+            # solo perche' e' VERIFICATA
+            dict(_base, username="", seller="\u2014",
+                 sellerNpub="npub1abc", sellerNpubOk=True),
+            # ...e quella soltanto DICHIARATA non si dice affatto
+            dict(_base, username="", seller="\u2014",
+                 sellerNpub="npub1abc", sellerNpubOk=False),
+            # nessuno dei tre: la riga non si scrive affatto
+            dict(_base, username="", seller="\u2014", sellerNpub=""),
+            # e senza slug il link resta quello di sempre
+            dict(_base, slug="", username="rosina", seller="Rosina",
+                 sellerNpub=""),
+        ]
+        _t = ("Poster \u2014 12000 sats su Barattolo \U0001fad9\n"
+              "{}Pagamento in satoshi")
+        _u = "https://barattolo.store/annuncio/7"
+        _atteso = [
+            [_u + "-poster", _t.format("Annuncio di @rosina\n")],
+            [_u + "-poster", _t.format("Annuncio di Rosina\n")],
+            [_u + "-poster", _t.format("Annuncio di npub1abc\n")],
+            [_u + "-poster", _t.format("")],
+            [_u + "-poster", _t.format("")],
+            [_u, _t.format("Annuncio di @rosina\n")],
+        ]
+        _prog = (
+            "const location = {origin: 'https://barattolo.store'};\n"
+            "const fmt = n => String(n);\n"
+            "const fmtEur = n => String(n);\n"
+            "let visto = null, currentListing = null;\n"
+            "function condividiLink(url, testo, titolo)"
+            "{ visto = [url, testo]; }\n"
+            + ca + "\n}\n"
+            + "const esiti = " + _jsC.dumps(_casi)
+            + ".map(c => { currentListing = c;"
+              " condividiAnnuncio(); return visto; });\n"
+            "console.log(JSON.stringify(esiti));\n")
+        _f = _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8")
+        _f.write(_prog)
+        _f.close()
+        _r = _spC.run([_node, _f.name], capture_output=True, text=True,
+                      timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        prova("condividiAnnuncio risponde giusto sui sei casi",
+              _atteso,
+              _jsC.loads(_r.stdout.strip()) if _r.returncode == 0
+              else "ERRORE: " + _r.stderr[:200])
 
 
 def prove_altri_scorrimento():

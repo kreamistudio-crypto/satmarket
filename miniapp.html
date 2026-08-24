@@ -18411,9 +18411,18 @@ function condividiAnnuncio(){
      che il payload usa per il nome mancante, non un nome).
      Il testo lo compone questa funzione e non `condividiLink`, che e'
      il tubo condiviso con la pagina del deposito: la' non c'e' nessun
-     venditore da nominare. */
+     venditore da nominare.
+     ⚠️ L'ULTIMO GRADINO VUOLE LA npub VERIFICATA, ed e' la regola
+     gia' scritta: la npub DICHIARATA la vede solo il proprietario nel
+     suo Profilo, e in tutto il resto del client non la rende nessuno
+     (si legge `sellerNpubOk` per accendere il 🟣, mai la stringa).
+     Qui pesa di piu' che altrove — un testo condiviso viaggia
+     INOLTRATO — e senza quella guardia si attribuirebbe l'annuncio
+     alla chiave di un'altra persona. Non verificata: si tace, che e'
+     la stessa scelta del trattino. */
   const chi = l.username ? `@${l.username}`
-    : (l.seller && l.seller !== '—' ? l.seller : (l.sellerNpub || ''));
+    : (l.seller && l.seller !== '—' ? l.seller
+       : (l.sellerNpubOk ? l.sellerNpub || '' : ''));
   const testo = `${l.title} — ${prezzo} su Barattolo 🫙`
     + (chi ? `\nAnnuncio di ${chi}` : '')
     + `\nPagamento in satoshi`;
