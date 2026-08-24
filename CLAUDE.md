@@ -5469,6 +5469,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   guardi tutti e tre i suoi campi (la Zona di Vendi, il comune degli
   avvisi, la zona del connettore), che condividono la rotta e non la
   resa.
+  E LA ZONA NON SI SPORCA COL TESTO DI PRIMA (ago 2026, caso dal
+  campo: «scrivo gub, tocco il comune suggerito e A VOLTE non me lo
+  prende»). L'INTERMITTENZA DICEVA GIÀ TUTTO — due gesti in gara, non
+  un problema del testo: lo spazio in coda non c'entra, `normalizza`
+  fa strip e collassa gli spazi, quindi «gub » e «gub» danno lo stesso
+  prefisso (verificato girando la funzione, non rileggendola).
+  LA CORSA: `controllaZona` legge il testo PRIMA dell'await e scrive
+  `zonaStorta` DOPO, senza guardare se il campo sia ancora quello. E
+  il ramo RIUSCITO esce con un `return` SENZA riazzerare il flag,
+  perché si fida dell'azzeramento in testa alla PROPRIA chiamata —
+  che è la riga da capire, perché è quella che rende il difetto
+  possibile. Quindi: blur su «gub » (fetch lenta), tocco sul
+  suggerimento, Pubblica rifà il controllo e trova «Gubbio (PG)»
+  buono; se in mezzo atterra la risposta di «gub », il flag resta
+  sporco, Pubblica blocca e a schermo resta «"gub" non è un comune
+  italiano» su un campo che dice Gubbio. È la lezione di
+  `vetrinaGiro`, su un campo di testo.
+  LA CURA È UNA RIGA DOPO L'AWAIT — se il campo si è mosso, la
+  risposta vecchia si butta — E IL CONFRONTO È COL TESTO E NON CON UN
+  CONTATORE: è il dato su cui quella risposta è stata chiesta, quindi
+  non nasce un secondo stato da tenere in pari (il giro serve dove il
+  dato non è in mano a chi risponde, come la vetrina paginata).
+  LA PROVA È IL BANCO CHE L'HA RIPRODOTTA, ed è l'unica forma che
+  poteva servire: `controllaZona` VERA su un DOM di cartone con DUE
+  latenze diverse, perché QUALE risposta atterri per ultima non lo
+  dice nessuna sentinella sulla forma. Dentro c'è anche IL VERSO
+  OPPOSTO — la risposta buona di prima non deve zittire l'avviso sul
+  testo storto di adesso — che è la metà che si perde curando di
+  fretta, e la mutazione «esce sempre» la fa rossa da sola.
+  FUORI restano `suggerisciZona` (riscrive il solo `<datalist>` e non
+  tocca il flag: una risposta tardiva mostra al più i suggerimenti di
+  un prefisso precedente, che il browser filtra sul valore corrente) e
+  il gemello degli avvisi di ricerca, che ha la stessa forma ma non ha
+  un flag capace di bloccare un salvataggio.
+  DA PROVARE SUL TELEFONO, che in locale non si può: se dentro la
+  WebView il tocco su un'opzione del datalist emetta il `blur` PRIMA
+  di riempire il campo. Non cambia la cura — la guardia copre tutti e
+  due gli ordini — ma è lì che si guarda se il caso ricapita.
   Import CSV: righe col ritiro e zona vuota o irriconoscibile =
   SCARTO in anteprima («forse Pavia (PV)?»), senza ritiro resta
   l'AVVISO morbido. Dataset assente = tutto riconosciuto, la funzione
