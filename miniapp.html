@@ -16690,7 +16690,9 @@ async function inviaRiscossione(btn){
       el('sheetBg').classList.remove('open');
     riscuotiId = 0;
     toast(d.stato==='riscosso' ? '↩️ Rimborso in arrivo sul tuo wallet!'
-                               : 'Il pagamento non è riuscito: riprova', 6000);
+          : d.non_chiesto ? 'Invoice salvata. Il nostro nodo non risponde: '
+                            + 'il rimborso riparte da solo, non hai perso niente'
+                            : 'Il pagamento non è riuscito: riprova', 6000);
     await loadPuntate(); renderPuntate();
   } catch(e) {
     nota.style.color = 'var(--danger)';
@@ -21331,6 +21333,10 @@ async function adminResolve(esito, btn){
   toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
       : d.stato==='released' ? '⚡ Sats consegnati al venditore'
       : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
+      /* Al moderatore si dice quale dei due e' successo: «in attesa
+         del metodo di incasso» quando il nodo tace manderebbe a
+         cercare una invoice che c'e' gia'. */
+      : d.non_chiesto ? '⚖️ Deciso. Il pagamento non è potuto partire ora (il nostro nodo non risponde): riparte da solo'
       : '⚖️ Deciso: in attesa del metodo di incasso della parte vincente');
   openOrder(currentOrder.id);
 }
@@ -21354,6 +21360,10 @@ async function saveSellerInvoice(btn){
   if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
   if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
   else if (d.stato==='refunded') { currentOrder.state='refunded'; toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
+  /* Prima del ramo 'refund', o chi ha appena depositato una invoice
+     BUONA si sentirebbe dire di rifarla mentre a tacere e' il nodo. */
+  else if (d.non_chiesto) { currentOrder.sellerInvoice=inv;
+    toast('✓ Invoice salvata. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli'); }
   else if (d.stato==='refund') { toast('Il pagamento non è riuscito: riprova con una invoice nuova'); }
   else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
   openOrder(currentOrder.id);
@@ -21372,6 +21382,13 @@ async function confirmReceived(btn){
   ripristina();
   if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
   if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
+  /* NON_CHIESTO: il nostro nodo non ha risposto, quindi l'ordine e'
+     rimasto ESATTAMENTE dov'era. Va letto `d.stato` invece di
+     scrivere 'confirmed' a mano: senza, chi compra vedrebbe
+     «confermato», non ripremerebbe il bottone, e il promemoria
+     automatico che gli resta gli sembrerebbe sbagliato. */
+  else if (d.non_chiesto) { currentOrder.state = d.stato || currentOrder.state;
+    toast('✅ Confermato. Il pagamento non è potuto partire ora — problema nostro, non tuo: i sats sono nel deposito e ci riproviamo da soli'); }
   else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
   openOrder(currentOrder.id);
 }

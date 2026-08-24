@@ -148,10 +148,13 @@ SELECT id, venditore_id, stato, contatto_nostr, nostr_event_id
 
 SELECT '15) PAYOUT FUORI CONTRATTO (deve essere vuoto)' AS controllo;
 SELECT id, payout_stato FROM ordini
- WHERE payout_stato NOT IN ('', 'incerto', 'uscito')
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare')
  UNION ALL
 SELECT id, payout_stato FROM rimborsi_asta
- WHERE payout_stato NOT IN ('', 'incerto', 'uscito');
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare')
+ UNION ALL
+SELECT id, payout_stato FROM pagamenti
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare');
 
 SELECT '16) PROMESSE DI SCONTO CHE NON POSSONO SCATTARE (vuoto)' AS controllo;
 -- Qui non si perdono sats: si perde una vendita, e in silenzio. Un

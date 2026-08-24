@@ -89,6 +89,22 @@ def reale(nome):
     return amb[nome]
 
 
+def _classe(nome):
+    """Come `reale`, ma per una classe. Serve a LnbitsMuto, e la
+    ragione e' che RIDICHIARARLA qui darebbe una classe DIVERSA da
+    quella di produzione: `decodifica_invoice` alzerebbe la sua e
+    `paga_venditore` cercherebbe la nostra, quindi l'`except` che
+    laggiu' scatta qui non scatterebbe — e la prova direbbe verde su
+    un meccanismo che non funziona."""
+    amb = {}
+    i = _SORGENTE.index(f"class {nome}(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    return amb[nome]
+
+
+LnbitsMuto = _classe("LnbitsMuto")
+
+
 def _pezzi_registro():
     """Il registro delle uscite e la sua coda, VERI, con le
     dipendenze montate.
@@ -2391,10 +2407,11 @@ def prove_importo_uscita():
                "importo_invoice": _importo, "notifica_admin": _admin,
                "print": lambda *a, **k: None,
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
-               # i tre esiti (ago 2026): qui interessa il rifiuto, ma
-               # senza i nomi la funzione non gira nemmeno
+               # i quattro esiti (ago 2026): qui interessa il rifiuto,
+               # ma senza i nomi la funzione non gira nemmeno
                "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-               "INCERTO": "incerto",
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "LnbitsMuto": LnbitsMuto,
                # e il formattatore dei sats, che l'avviso ai
                # moderatori usa da quando un satoshi si scrive in un
                # modo solo: chi estrae una funzione ne eredita le
@@ -2515,36 +2532,93 @@ def prove_pagamento_incerto():
         return None
 
     ESITI = {"PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-             "INCERTO": "incerto"}
+             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+             "LnbitsMuto": LnbitsMuto, "_sospendi_pagamento": lambda *a: None}
 
-    # --- 1. I tre esiti di paga_venditore ---------------------------
-    def paga(codice=200, muto=False, chiesto=1000):
-        uscite = []
+    # --- 1. I quattro esiti di paga_venditore -----------------------
+    def paga(codice=200, muto=False, chiesto=1000, muto_decode=False):
+        uscite, avvisi = [], []
 
         async def _importo(_b):
+            # `muto_decode` e' il caso nuovo (ago 2026): non e' il NODO
+            # a tacere mentre paga, e' la DOMANDA che lo precede — «
+            # quanto chiede questa fattura?» — a non aver ricevuto
+            # risposta. Da li' nessun sat si e' mosso.
+            if muto_decode:
+                raise LnbitsMuto("decode: LNbits ha risposto 520")
             return chiesto
 
+        async def _avvisa(t):
+            avvisi.append(t)
+
         amb = {"httpx": _finto_lnbits(uscite, codice, muto),
-               "importo_invoice": _importo, "notifica_admin": _niente,
+               "importo_invoice": _importo, "notifica_admin": _avvisa,
                "print": lambda *a, **k: None,
                # chi estrae una funzione ne eredita le dipendenze
                "_fmt_sats": reale("_fmt_sats"),
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
         exec(pezzo_async("paga_venditore"), amb)
-        return gira(amb["paga_venditore"]("lnbc1", 1000)), len(uscite)
+        return (gira(amb["paga_venditore"]("lnbc1", 1000)),
+                len(uscite), len(avvisi))
 
-    prova("nodo che risponde ok: PAGATO", ("pagato", 1), paga())
-    prova("nodo che risponde no: NON_PAGATO", ("non_pagato", 1),
+    prova("nodo che risponde ok: PAGATO", ("pagato", 1, 0), paga())
+    prova("nodo che risponde no: NON_PAGATO", ("non_pagato", 1, 0),
           paga(codice=500))
-    prova("nodo che TACE: INCERTO, non un fallimento", ("incerto", 1),
+    prova("nodo che TACE: INCERTO, non un fallimento", ("incerto", 1, 0),
           paga(muto=True))
-    prova("importo storto: NON_PAGATO e zero uscite", ("non_pagato", 0),
+    prova("importo storto: NON_PAGATO e zero uscite", ("non_pagato", 0, 1),
           paga(chiesto=999))
+
+    # --- 1-bis. Dove nasce la distinzione: decodifica_invoice --------
+    # SOLO 400 e 422 parlano della FATTURA. Tutto il resto parla del
+    # canale, e prima finiva nello stesso `None` — da li' il ramo del
+    # rifiuto cancellava la invoice di un venditore per un 520 nostro.
+    def decodifica(codice=200, esplode=False):
+        uscite = []
+
+        class Rotto:
+            def __init__(self, **kw):
+                pass
+
+            async def __aenter__(self):
+                raise ConnectionError("nodo irraggiungibile")
+
+            async def __aexit__(self, *a):
+                return False
+
+        amb = {"httpx": (__import__("types").SimpleNamespace(
+                   AsyncClient=Rotto) if esplode
+                   else _finto_lnbits(uscite, codice)),
+               "LNBITS_URL": "http://x", "LNBITS_INVOICE_KEY": "k",
+               "LnbitsMuto": LnbitsMuto}
+        exec(pezzo_async("decodifica_invoice"), amb)
+        try:
+            return gira(amb["decodifica_invoice"]("lnbc1"))
+        except LnbitsMuto:
+            return "muto"
+
+    prova("decode: 400 vuol dire che la FATTURA non si legge",
+          None, decodifica(codice=400))
+    prova("decode: 422 idem", None, decodifica(codice=422))
+    prova("decode: 520 e' il CANALE, non la fattura",
+          "muto", decodifica(codice=520))
+    prova("decode: 502 idem", "muto", decodifica(codice=502))
+    # la chiave rifiutata: imperfezione dichiarata, diventa «non lo so»
+    prova("decode: 401 non accusa la fattura", "muto", decodifica(codice=401))
+    prova("decode: rete caduta e' il canale", "muto", decodifica(esplode=True))
+    prova("decode: 200 risponde come sempre", {}, decodifica())
+    # IL QUARTO ESITO (ago 2026). Le due cose che si guardano sono
+    # quelle che NON succedono: nessuna POST verso la chiave che paga —
+    # cioe' il pagamento non e' partito — e NESSUN avviso ai moderatori,
+    # perche' un guasto nostro non e' un tentativo di prelievo.
+    prova("decode muto: NON_CHIESTO, zero uscite, zero avvisi",
+          ("non_chiesto", 0, 0), paga(muto_decode=True))
 
     # --- 2. _sblocca_sats: il congelamento --------------------------
     # Un ordine vero in un database vero (in memoria), e tutto il
     # resto di cartone: quello che si guarda e' la riga dopo.
-    def mondo(payout_stato="", esiti=("incerto",)):
+    def mondo(payout_stato="", esiti=("incerto",), muta=False,
+              invoice=""):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
         vero.execute(
@@ -2556,7 +2630,7 @@ def prove_pagamento_incerto():
             "sbloccato_auto_il INT DEFAULT 0)")
         vero.execute(
             "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
-            f"'',0,0,'{payout_stato}','','',0)")
+            f"'{invoice}',0,0,'{payout_stato}','','',0)")
         vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                      "vendite_ok INT, acquisti_ok INT)")
         vero.execute("INSERT INTO utenti VALUES(222,'io@wallet.tld',0,0)")
@@ -2584,6 +2658,10 @@ def prove_pagamento_incerto():
         async def _address(addr, importo):
             # OGNI chiamata conia una fattura NUOVA: e' esattamente il
             # motivo per cui un ritentativo pagherebbe due volte
+            if muta:
+                # il nostro nodo non risponde alla rilettura: la
+                # fattura del wallet e' stata coniata e SCARTATA
+                raise LnbitsMuto("decode: LNbits ha risposto 520")
             coniate.append(addr)
             return f"lnbc-nuova-{len(coniate)}"
 
@@ -2609,6 +2687,9 @@ def prove_pagamento_incerto():
                "html": __import__("html"),
                "print": lambda *a, **k: None, **ESITI}
         exec(pezzo_async("_congela_pagamento"), amb)
+        # il timbro VERO, non la lambda di ESITI: quel che si guarda e'
+        # proprio quel che scrive — e quel che NON scrive
+        exec(pezzo("_sospendi_pagamento"), amb)
         exec(pezzo_async("_sblocca_sats"), amb)
         return amb["_sblocca_sats"], vero, tentativi, coniate
 
@@ -2654,6 +2735,69 @@ def prove_pagamento_incerto():
           ("released", "", ""), riga(vero))
     vero.close()
 
+    # --- 2-bis. NON_CHIESTO: quel che NON si tocca ------------------
+    # E' il cuore del cantiere di ago 2026, e si guarda una riga sola:
+    # la invoice che il venditore aveva incollato deve essere ANCORA
+    # LI'. Prima veniva cancellata, e il venditore riceveva pure la
+    # notizia che il suo wallet non aveva risposto come doveva.
+    # (a) la strada dell'invoice INCOLLATA A MANO: `paga_venditore` ha
+    #     chiesto il decode, non ha avuto risposta, e torna NON_CHIESTO
+    sblocca, vero, tentativi, coniate = mondo(esiti=("non_chiesto",),
+                                              invoice="lnbc-del-venditore")
+    prima = dict(vero.execute("SELECT * FROM ordini WHERE id=1").fetchone())
+    gira(sblocca(1))
+    dopo = dict(vero.execute("SELECT * FROM ordini WHERE id=1").fetchone())
+    prova("non chiesto: la invoice del venditore NON si cancella",
+          "lnbc-del-venditore", dopo["invoice_venditore"])
+    prova("non chiesto: la riga si timbra e lo stato resta com'era",
+          ("delivered", "da_riprovare", "venditore"), riga(vero))
+    # `aggiornato` e' l'ANCORA dei promemoria e della coda dei fermi:
+    # toccarla farebbe ripartire da capo l'attesa di qualcuno
+    prova("non chiesto: `aggiornato` non si muove",
+          prima["aggiornato"], dopo["aggiornato"])
+    # e nient'altro della riga si muove: solo le due colonne del timbro
+    prova("non chiesto: nient'altro cambia nella riga",
+          ["payout_stato", "payout_verso"],
+          sorted(k for k in prima if prima[k] != dopo[k]))
+    vero.close()
+
+    # (a-bis) e se a chiudere era stato un TIMER, il ramo mite deve
+    #     lasciarne traccia: e' quel che il giro rilegge per sapere
+    #     con che parole notificare, e senza l'ordine ripreso direbbe
+    #     al venditore «l'acquirente ha confermato la ricezione»
+    sblocca, vero, _, _ = mondo(esiti=("non_chiesto",),
+                                invoice="lnbc-del-venditore")
+    gira(sblocca(1, automatico=True))
+    prova("non chiesto: il timbro del timer resta scritto", True,
+          vero.execute("SELECT sbloccato_auto_il FROM ordini "
+                       "WHERE id=1").fetchone()[0] > 0)
+    vero.close()
+
+    # (b) la strada del LIGHTNING ADDRESS, che e' quella che gira da
+    #     sola senza che nessuno guardi: qui a tacere e' la rilettura
+    #     della fattura appena coniata dal wallet del venditore, e
+    #     l'eccezione deve arrivare fin qui invece di travestirsi da
+    #     «nessun metodo di pagamento»
+    sblocca, vero, tentativi, coniate = mondo(muta=True)
+    gira(sblocca(1))
+    prova("non chiesto (address): si timbra, non si va in 'confirmed'",
+          ("delivered", "da_riprovare", "venditore"), riga(vero))
+    prova("non chiesto (address): nessun pagamento tentato",
+          0, len(tentativi))
+    vero.close()
+
+    # e il giro dopo, col nodo tornato, paga davvero
+    sblocca, vero, tentativi, _ = mondo(esiti=("pagato",),
+                                        invoice="lnbc-del-venditore")
+    vero.execute("UPDATE ordini SET payout_stato='da_riprovare', "
+                 "payout_verso='venditore' WHERE id=1")
+    gira(sblocca(1))
+    prova("da riprovare: il timbro non blocca il ritentativo",
+          "released", riga(vero)[0])
+    prova("da riprovare: si riusa la invoice di prima, non se ne conia",
+          [("lnbc-del-venditore", 1000)], tentativi)
+    vero.close()
+
     # --- 3. SENTINELLE ----------------------------------------------
     # Il tri-stato sparisce in un riordino: basta che qualcuno rimetta
     # un `if await paga_venditore(...)` e «incerto» torna a leggersi
@@ -2676,6 +2820,118 @@ def prove_pagamento_incerto():
     # e la coda admin non deve indovinare la strada dallo stato
     prova("sentinella: la coda admin legge payout_verso, non lo stato",
           True, 'payout_verso"] == "compratore"' in pezzo("decidi_pagamento"))
+
+    # --- 4. SENTINELLE DEL QUARTO ESITO (ago 2026) ------------------
+    # LA PIU' PERICOLOSA DI TUTTO IL CANTIERE: NON_CHIESTO e' sicuro da
+    # ritentare SOLO perche' nasce prima che il nodo venga toccato. Se
+    # un domani quel ramo scivolasse dopo la chiamata che paga, un
+    # ritentativo automatico coprirebbe un pagamento davvero in volo e
+    # i sats uscirebbero due volte — cioe' esattamente il disastro che
+    # l'INCERTO esiste per impedire, reintrodotto dalla sua cura.
+    pv4 = codice(pezzo("paga_venditore"))
+    prova("sentinella: il quarto esito nasce PRIMA della chiave che paga",
+          True, ("except LnbitsMuto" in pv4
+                 and pv4.index("except LnbitsMuto")
+                 < pv4.index("LNBITS_ADMIN_KEY")))
+    # gemelle del conto a mano dell'INCERTO, stessa ragione
+    prova("sentinella: tutt'e quattro le uscite guardano il NON_CHIESTO",
+          4, _SORGENTE.count("esito == NON_CHIESTO"))
+    prova("sentinella: tutt'e quattro sanno prenderlo dall'eccezione",
+          4, _SORGENTE.count("esito = NON_CHIESTO"))
+    # IL TIMBRO E' MITE: se un giorno tocca `aggiornato` fa ripartire da
+    # capo l'attesa dei promemoria e della coda dei fermi, e se avvisa
+    # qualcuno diventa il rumore che il quarto esito esiste per togliere
+    # ⚠️ SENZA LA PROSA: la docstring di quel timbro NOMINA apposta
+    # `aggiornato` per dire che non lo tocca, e una sentinella che
+    # cerca la parola diventerebbe rossa per colpa della spiegazione.
+    sp = codice(_senza_prosa(pezzo("_sospendi_pagamento")))
+    prova("sentinella: il timbro non tocca l'ancora dei promemoria",
+          True, "aggiornato" not in sp)
+    prova("sentinella: il timbro non avvisa nessuno",
+          True, "notifica" not in sp)
+    prova("sentinella: il timbro non chiede il payment_hash",
+          True, "_payment_hash" not in sp)
+    # L'AZZERAMENTO VIVE NEL GIRO, e CONDIZIONATO: senza la clausola
+    # cancellerebbe il timbro di un moderatore ('incerto') o quello di
+    # un pagamento gia' verificato ('uscito').
+    rip = codice(pezzo("riprova_pagamenti_sospesi"))
+    prova("sentinella: il giro azzera il timbro, e solo il suo",
+          True, "AND payout_stato='da_riprovare'" in rip)
+    # ...e si ferma alla prima riga che tace ancora, o busserebbe ai
+    # wallet di venti venditori per niente a ogni battito
+    prova("sentinella: il giro si ferma al primo silenzio",
+          True, 'if esito.get("non_chiesto"):' in rip and "break" in rip)
+    # `automatico` non si perde, o l'ordine chiuso da un timer e ripreso
+    # dal giro direbbe «l'acquirente ha confermato la ricezione»
+    prova("sentinella: la ripresa rilegge se era un timer",
+          True, "automatico=bool(" in rip)
+    # e il ramo mite di _sblocca_sats quel timbro lo SCRIVE, o non ci
+    # sarebbe niente da rileggere. ⚠️ Si guarda la SCRITTURA e non la
+    # parola: l'ha detto la tortura, un `_ = ("UPDATE ordini SET
+    # sbloccato_auto_il=` lasciava verde la prima stesura.
+    prova("sentinella: il ramo mite timbra anche il timer",
+          True, 'con.execute("UPDATE ordini SET sbloccato_auto_il='
+          in codice(pezzo("_sblocca_sats")).split("esito == NON_CHIESTO")[1]
+          .split("if esito == PAGATO")[0])
+    # `_payment_hash` la ingoia APPOSTA: e' l'unico punto del file dove
+    # e' la risposta giusta, perche' li' il congelamento vale piu'
+    # dell'hash — e senza questa riga al prossimo riordino qualcuno
+    # «aggiusta» quell'except e il congelamento salta proprio quando i
+    # sats possono essere usciti davvero.
+    prova("sentinella: _payment_hash resta fail-open sul canale muto",
+          True, "except Exception" in codice(pezzo("_payment_hash")))
+    # e il ramo del Lightning address deve RILANCIARE, o la cura
+    # coprirebbe l'invoice a mano e lascerebbe scoperto l'incasso
+    # automatico, che e' la strada che gira senza che nessuno guardi.
+    # ⚠️ NON basta che la parola ci sia — l'ha detto la tortura: un
+    # `except LnbitsMuto: return None` la lascerebbe verde. Si guarda il
+    # GESTO, e sotto si fa GIRARE la funzione.
+    _lna = codice(_senza_prosa(pezzo("invoice_da_ln_address")))
+    prova("sentinella: l'address rilancia invece di ingoiare",
+          True, "except LnbitsMuto:" in _lna
+          and "raise" in _lna.split("except LnbitsMuto:")[1]
+          .split("except Exception")[0])
+
+    def address(muto_decode):
+        """La funzione VERA, col wallet del beneficiario di cartone:
+        quel che si guarda e' se l'eccezione ESCE o viene ingoiata."""
+        async def _importo(_b):
+            if muto_decode:
+                raise LnbitsMuto("decode: LNbits ha risposto 520")
+            return 100
+
+        amb = {"httpx": _finto_lnurl(
+                   {"tag": "payRequest", "minSendable": 1,
+                    "maxSendable": 10**9, "callback": "http://w/cb"},
+                   "lnbc1-coniata"),
+               "importo_invoice": _importo,
+               "print": lambda *a, **k: None, "LnbitsMuto": LnbitsMuto}
+        exec(pezzo_async("invoice_da_ln_address"), amb)
+        try:
+            return gira(amb["invoice_da_ln_address"]("io@wallet.tld", 100))
+        except LnbitsMuto:
+            return "muto"
+
+    prova("address: col nodo vivo la fattura si rilegge e passa",
+          "lnbc1-coniata", address(False))
+    prova("address: col nodo muto l'eccezione ESCE, non diventa None",
+          "muto", address(True))
+
+    # --- 5. I QUATTRO RAMI DEL CLIENT -------------------------------
+    # Chi ha appena premuto un bottone merita una risposta vera; chi non
+    # ha premuto niente non merita un allarme — per questo dal ramo mite
+    # non parte NESSUNA notifica e ci sono invece questi quattro toast.
+    cl = open("miniapp.html", encoding="utf-8").read()
+    prova("client: i quattro gesti sanno leggere il quarto esito",
+          4, cl.count("d.non_chiesto"))
+    # IL PEGGIORE ERA IL PRIMO: `confirmReceived` scriveva 'confirmed'
+    # in locale su tutto cio' che non era 'released', quindi chi compra
+    # vedeva «confermato» su un ordine rimasto dov'era, non riprovava, e
+    # il promemoria automatico che gli resta gli sembrava sbagliato.
+    _cr = cl[cl.index("async function confirmReceived"):]
+    _cr = _cr[:_cr.index("\nasync function")]
+    prova("client: chi conferma non si vede riscrivere lo stato a mano",
+          True, "d.non_chiesto" in _cr and "d.stato || currentOrder.state" in _cr)
 
 
 def prove_disputa_incagliata():
@@ -13381,6 +13637,22 @@ def prove_libro_mastro():
     trovati = gira(con)
     prova("database sano: NESSUN controllo trova niente (silenzio)",
           {}, trovati)
+    con.close()
+
+    # ...e «da riprovare» e' uno stato SANO (ago 2026): durante un
+    # disservizio di LNbits quelle righe sono il funzionamento previsto,
+    # e un allarme che suona sul normale e' peggio di nessun allarme —
+    # e' la stessa ragione per cui 'incerto' e' escluso dalla ronda.
+    # Senza questa riga, allargare il dominio non lo sorveglia nessuno:
+    # l'ha detto la tortura, che ha visto sopravvivere la mutazione che
+    # riportava il controllo ai tre valori di ieri.
+    con = db_sano()
+    con.executescript("UPDATE ordini SET payout_stato='da_riprovare' "
+                      "WHERE id=1;"
+                      "UPDATE rimborsi_asta SET payout_stato='da_riprovare' "
+                      "WHERE id=1;")
+    prova("«da riprovare» non e' un valore fuori contratto",
+          {}, gira(con))
     con.close()
 
     # --- GIRO 2: una riga rotta alla volta --------------------------
@@ -26819,9 +27091,13 @@ def prove_porta_timer():
                "_fmt_sats": reale("_fmt_sats"),
                "notifica": notifica_finta,
                "paga_venditore": mai, "invoice_da_ln_address": mai,
-               "_congela_pagamento": mai,
+               "_congela_pagamento": mai, "_sospendi_pagamento": mai,
                "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-               "INCERTO": "incerto"}
+               # NON_CHIESTO serve anche dove l'eccezione non arriva
+               # mai: `if esito == NON_CHIESTO:` si valuta a OGNI giro,
+               # e senza il nome la prova ESPLODE invece di fallire.
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "LnbitsMuto": LnbitsMuto}
         exec("async " + sbl, amb)
         esito = asyncio.run(amb["_sblocca_sats"](7, automatico=automatico))
         riga = con.execute("SELECT * FROM ordini WHERE id=7").fetchone()

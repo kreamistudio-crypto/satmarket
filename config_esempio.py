@@ -284,6 +284,14 @@ BANNER_LINK_VIETATI = (
 # Gli stessi controlli si lanciano a mano con query_libro_mastro.sql.
 CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 
+# Quando il nostro nodo Lightning non risponde, un pagamento in uscita
+# non parte e la riga si timbra «da riprovare» invece di dichiararsi
+# fallita: la fattura del venditore resta buona e nessuno viene
+# accusato. A ogni battito dell'orologio se ne riprendono al massimo
+# tante — e comunque il giro si ferma alla prima che tace ancora,
+# perche' se il nodo e' muto per una lo e' per tutte.
+MAX_RIPRESE_GIRO = 20
+
 # --- Sconto carrello (chi prende piu' cose paga meno) ----------------
 # Il venditore premia chi compra piu' articoli in un ordine solo: UNA
 # regola per tutto il suo negozio — «da N articoli, −X%» — senza

@@ -61,7 +61,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `amount_msat` una volta sola, la `pr` mai restituita nuda): questo
   controllo sparisce in un riordino senza rompere nessuna prova
   funzionale, ed è esattamente il tipo di riga che va sorvegliata.
-  E `paga_venditore` HA TRE ESITI, non due (ago 2026, la voce media
+  E `paga_venditore` HA QUATTRO ESITI (ago 2026): PAGATO, NON_PAGATO,
+  INCERTO e **NON_CHIESTO** — la voce dei tre sta qui sotto, il quarto
+  è più giù, sotto «NON HO POTUTO CHIEDERE».
+  I TRE ESITI storici (ago 2026, la voce media
   più grave dell'audit): PAGATO, NON_PAGATO e **INCERTO**. La POST
   verso LNbits stava senza `try`: se il nodo pagava ma non riusciva a
   rispondere entro i 60 secondi, l'eccezione risaliva, il database non
@@ -3884,6 +3887,99 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   genere di numero che sembra sbagliato: il superstite in più era la
   riga del catalogo che andava in pasto ad Haiku, e se n'è andata con
   la ricerca AI (vedi «LA RICERCA È UNA SOLA»).
+  NON HO POTUTO CHIEDERE (ago 2026, dal campo: Spark giù, LNbits a 520
+  — è il QUARTO esito, `NON_CHIESTO`). Prima di pagare si chiede a
+  LNbits quanto vale la bolt11, e finché quella domanda taceva il
+  codice rispondeva NON_PAGATO: da lì il sistema si sentiva autorizzato
+  a **CANCELLARE la invoice del venditore**, a dirgli che il suo wallet
+  non aveva risposto come doveva, e a segnalare ai moderatori un
+  tentativo di prelievo. Tre cose false in fila, su un guasto nostro —
+  e sul ramo del Lightning address anche a buttare una fattura appena
+  coniata dal suo wallet. Più un quarto sintomo su un'altra porta: chi
+  provava a impostare l'indirizzo si sentiva dire di controllare se
+  l'aveva scritto giusto, e l'aveva scritto benissimo.
+  I QUATTRO VERBI, ed è tutta la voce: NON_PAGATO = «ho chiesto e mi ha
+  detto di no»; INCERTO = «ho chiesto e non so»; NON_CHIESTO = «non ho
+  potuto chiedere», cioè NESSUN SAT SI È MOSSO e la fattura è ancora
+  buona. Il primo autorizza a cancellare, il secondo a congelare, il
+  terzo a NIENTE.
+  PERCHÉ NON SI RIUSA INCERTO, che è la prima cosa che viene in mente
+  (e che Andrea aveva scelto, col ragionamento giusto su NON_PAGATO):
+  quello vuol dire «forse i sats sono usciti», e per questo CONGELA e
+  chiede un umano — riusarlo direbbe una seconda bugia e metterebbe un
+  ordine in coda a un moderatore per OGNI ordine che capita durante un
+  disservizio. E IL NOME NON È «SOSPESO»: in casa quella parola
+  significa già le promesse senza cambio e la commissione — la trappola
+  del doppio significato già pagata con «lampo», «attesa» e «nota».
+  LA DISTINZIONE NASCE IN `decodifica_invoice`, che separa PER STATUS:
+  **solo 400 e 422 parlano della fattura**, tutto il resto parla del
+  canale e alza `LnbitsMuto`. IMPERFEZIONE DICHIARATA: ci finisce anche
+  il 401 di una chiave scaduta, che diventa un guasto SILENZIOSO — non
+  si corregge trattandolo come una fattura illeggibile (sarebbe di
+  nuovo accusare un venditore per un errore nostro), ed è l'argomento
+  che rende l'avviso giornaliero NON facoltativo: è il caso che campa
+  per settimane, perché con la chiave rotta sui soli pagamenti in
+  uscita gli acquisti funzionano benissimo mentre nessuno incassa più.
+  `LnbitsMuto` è **l'unica eccezione di casa** in un file che non ne ha,
+  e la ragione è che il segnale deve SALTARE DUE FRAME che di questa
+  distinzione non hanno niente da dire (`importo_invoice`, che è il
+  giudice unico dell'importo, e `invoice_da_ln_address`). Le due
+  alternative sbagliano nel verso pericoloso: una costante-sentinella
+  di ritorno sporcherebbe il tipo `int | None` e il chiamante che
+  scrive `chiesto != atteso_sats` la leggerebbe come UN IMPORTO
+  SBAGLIATO — lo stesso guasto di oggi, senza più il `None` a vederlo.
+  LA RIGA PIÙ PERICOLOSA DEL CANTIERE è la POSIZIONE: NON_CHIESTO è
+  sicuro da ritentare SOLO perché nasce prima che il nodo venga
+  toccato, e se scivolasse dopo la chiamata che paga un ritentativo
+  automatico coprirebbe un pagamento in volo — cioè il disastro che
+  l'INCERTO esiste per impedire, reintrodotto dalla sua cura. C'è la
+  sentinella, e il nome della chiave non si scrive nemmeno nel commento
+  che lo spiega: quella prova legge anche la prosa (ci si è inciampati
+  scrivendolo).
+  IL RAMO MITE non tocca NIENTE: né stato, né colonna invoice, né
+  `aggiornato` (l'ancora dei promemoria, la trappola già pagata tre
+  volte), e non avvisa nessuno. Scrive solo `payout_stato='da_riprovare'`
+  + `payout_verso` — un timbro PASSIVO che nessuna guardia esistente
+  intercetta — e sta DOPO il ramo INCERTO e PRIMA di quello PAGATO, che
+  non è estetica: una sentinella di `_rimborsa_sblocco` affetta il
+  sorgente da «if esito == PAGATO:» in giù.
+  E LA META' CHE CONTA È `riprova_pagamenti_sospesi` nell'orologio, o
+  si sarebbe scambiato un danno rumoroso con un silenzio (la condizione
+  di Andrea). Non serve a TROVARE le righe ma a non trovarne troppe:
+  una ripresa basata sugli stati riconierebbe una fattura dal wallet di
+  OGNI venditore fermo a ogni battito. TRE RIGHE DA NON AMMORBIDIRE:
+  1) il timbro si azzera QUI e con l'UPDATE CONDIZIONATO a
+  'da_riprovare' — nel ramo riuscito `payout_stato` può valere
+  'uscito', e riscriverlo cancellerebbe il timbro di un moderatore;
+  senza, una riga risolta resterebbe timbrata per sempre e il giro
+  conierebbe una fattura ogni dieci minuti; 2) `automatico` si rilegge
+  da `sbloccato_auto_il`, che il ramo mite scrive apposta (i rami che
+  lo scrivono diventano TRE) — senza, l'ordine chiuso da un timer e
+  ripreso da qui direbbe «l'acquirente ha confermato la ricezione»;
+  3) UNA RIGA ALLA VOLTA, e stop alla prima che tace ancora: se il nodo
+  è muto per una lo è per tutte, e insistere vorrebbe dire bussare ai
+  wallet di venti venditori per niente. L'avviso ai moderatori suona
+  **solo se a fine giro ne restano** — un singhiozzo di trenta secondi
+  si risolve al battito dopo e non ci arriva mai, senza soglie orarie
+  da tarare.
+  LE QUATTRO PORTE rispondono **503** con `MSG_LNBITS_MUTO` e non
+  scrivono la colonna: i due depositi di invoice, il rimborso admin, e
+  `salva_ln_address` — dove la scelta è stata rovesciata in corsa
+  (avevo proposto il fail-open, cioè salvare dichiarando che non si era
+  potuto verificare): la docstring di quella funzione promette di
+  verificarlo dal vivo, e salvare senza verificare la renderebbe falsa
+  — **una regola che non si fa rispettare è peggio di nessuna regola**.
+  Il costo è che per la durata del disservizio non si può impostare un
+  indirizzo NUOVO; chi ce l'ha già non è toccato.
+  `_payment_hash` invece la INGOIA apposta, ed è l'unico posto dove è
+  giusto: sta sulla strada dell'INCERTO, dove LNbits è malata per
+  definizione, e lì il congelamento vale più dell'hash.
+  LA TORTURA HA TROVATO TRE SENTINELLE MIE CHE GUARDAVANO SE UNA PAROLA
+  ESISTE INVECE DEL GESTO, ed è la lezione del giro: `except LnbitsMuto`
+  restava verde con un `return None` dentro, «timbra il timer» restava
+  verde con un `_ = ("UPDATE …`, e il dominio nuovo del libro mastro non
+  lo sorvegliava NESSUNO. Le prime due ora guardano il gesto e in più
+  FANNO GIRARE il pezzo; la terza è una riga in `prove_libro_mastro`.
   E IL RIFIUTO DI `paga_venditore` HA TRE MOTIVI, non uno, e ognuno
   vuole le sue parole: una bolt11 che non si decodifica NON «chiede
   None sats» — è **illeggibile**, e l'avviso lo dice. Sembra cosmesi e

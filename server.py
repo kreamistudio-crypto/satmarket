@@ -2933,6 +2933,7 @@ def init_db():
         rimborso_da INTEGER DEFAULT 0,      -- quale moderatore
         invoice_rimborso TEXT DEFAULT '',
         payout_stato TEXT DEFAULT '',      -- '' | incerto | uscito
+                                           -- | da_riprovare
         payout_hash TEXT DEFAULT '',
         payout_verso TEXT DEFAULT ''       -- sempre 'pagante': c'e' una
                                             -- strada sola, ma si tiene per
@@ -3995,7 +3996,12 @@ def init_db():
                     # i sats erano partiti, e il prossimo giro chiude
                     # l'ordine SENZA pagare di nuovo — cosi' il ramo
                     # riuscito di sempre si riusa dov'e', invece di
-                    # riscriverlo qui in copia.
+                    # riscriverlo qui in copia. E dall'ago 2026 c'e' il
+                    # quarto valore, 'da_riprovare': non abbiamo potuto
+                    # CHIEDERE a LNbits, quindi nessun sat si e' mosso e
+                    # nessuna guardia si attiva — e' un timbro passivo,
+                    # e serve solo a `riprova_pagamenti_sospesi` per
+                    # sapere dove tornare.
                     "payout_stato TEXT DEFAULT ''",
                     "payout_hash TEXT DEFAULT ''",
                     # CHI stava per essere pagato. Non si deduce dallo
@@ -4942,7 +4948,7 @@ async def invoice_pagata(payment_hash: str) -> bool:
         return r.status_code == 200 and r.json().get("paid", False)
 
 
-# I tre esiti di un pagamento in uscita (ago 2026, audit). INCERTO non
+# I quattro esiti di un pagamento in uscita (ago 2026, audit). INCERTO non
 # e' un fallimento: e' «non lo so» — LNbits puo' aver pagato davvero e
 # non essere riuscito a dircelo. Un fallimento si ritenta, un «non lo
 # so» MAI, e la ragione e' precisa: sul ramo del Lightning address ogni
@@ -4951,7 +4957,61 @@ async def invoice_pagata(payment_hash: str) -> bool:
 # salverebbe Lightning, che una fattura gia' saldata non la paga due
 # volte — ma e' proprio il ramo che NON si usa quando le cose vanno
 # storte, perche' li' la invoice si azzera e si riparte dall'address.)
+#
+# E IL QUARTO E' NON_CHIESTO (ago 2026, dal campo: Spark giu', LNbits a
+# 520). I tre di sopra rispondono tutti alla stessa domanda — «com'e'
+# andata la richiesta di pagamento?» — e ne davano una anche quando la
+# richiesta NON ERA PARTITA: prima di pagare si chiede a LNbits quanto
+# vale la bolt11, e se a tacere e' quella domanda li' il vecchio codice
+# rispondeva NON_PAGATO. Da li' il sistema si sentiva autorizzato a
+# CANCELLARE la invoice del venditore, a dirgli che il suo wallet non
+# aveva risposto come doveva, e a segnalare ai moderatori un tentativo
+# di prelievo — tre cose false in fila, su un guasto nostro.
+# I QUATTRO VERBI, ed e' tutta la voce: NON_PAGATO = «ho chiesto e mi ha
+# detto di no»; INCERTO = «ho chiesto e non so com'e' finita»;
+# NON_CHIESTO = «non ho potuto chiedere», cioe' NESSUN SAT SI E' MOSSO e
+# la fattura del venditore e' ancora buona. Il primo autorizza a
+# cancellare, il secondo a congelare, il terzo a NIENTE: si timbra la
+# riga e si riprova da soli (vedi `riprova_pagamenti_sospesi`).
+# PERCHE' NON SI RIUSA INCERTO, che verrebbe in mente: quello vuol dire
+# «forse i sats sono usciti» e per questo CONGELA e chiede un umano.
+# Qui lo sappiamo, che non sono usciti — non abbiamo nemmeno chiamato
+# il nodo — e congelare direbbe una seconda bugia, per giunta mettendo
+# un ordine in coda a un moderatore per OGNI ordine che capita durante
+# un disservizio.
+# E IL NOME NON E' «SOSPESO» nel vocabolario degli esiti: in casa quella
+# parola significa gia' le promesse di negozio senza cambio e la
+# commissione sospesa — la trappola del doppio significato gia' pagata
+# con «lampo», «attesa» e «nota».
 PAGATO, NON_PAGATO, INCERTO = "pagato", "non_pagato", "incerto"
+NON_CHIESTO = "non_chiesto"
+
+
+class LnbitsMuto(Exception):
+    """Non siamo riusciti a CHIEDERE a LNbits: 520, 502, chiave
+    rifiutata, rete caduta. Non e' un fallimento del pagamento — e'
+    un fallimento del CANALE, e la differenza e' che qui nessun sat si
+    e' mosso e nessun dato di nessuno e' diventato meno valido.
+
+    PERCHE' UN'ECCEZIONE, in un file che non ne ha nessuna di sue: il
+    segnale deve SALTARE DUE FRAME che di questa distinzione non hanno
+    niente da dire — `importo_invoice`, che e' il giudice unico
+    dell'importo, e `invoice_da_ln_address` — per arrivare a chi la
+    decisione la prende. Le due alternative sbagliano nel verso
+    pericoloso: una costante-sentinella di ritorno sporcherebbe il tipo
+    `int | None` di `importo_invoice`, e il chiamante distratto che
+    scrive `chiesto != atteso_sats` la leggerebbe come UN IMPORTO
+    SBAGLIATO, cioe' cadrebbe nel ramo del rifiuto — lo stesso guasto di
+    oggi, ma senza piu' il `None` a vederlo; una tupla `(sats, motivo)`
+    romperebbe l'ergonomia del giudice in tutti e quattro i suoi
+    chiamanti. E' la stessa ragione per cui `paga_venditore` non e' un
+    booleano: un valore che si puo' leggere per sbaglio come «no»
+    quando vuol dire «non lo so» e' una bugia.
+    IL RAGGIO D'AZIONE E' ENUMERABILE, ed e' la proprieta' che la rende
+    difendibile: la alzano `decodifica_invoice` e nessun altro, e a
+    guardarla sono i quattro chiamanti di `importo_invoice`, i cinque di
+    `invoice_da_ln_address` e le quattro funzioni d'uscita. Chi ne
+    aggiunge uno lo sente dalle sentinelle in prove.py."""
 
 
 async def paga_venditore(invoice: str, atteso_sats: int) -> str:
@@ -4978,7 +5038,22 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
     successo, e messa sotto un «not» che e' un fallimento — sono
     entrambe bugie, e una sentinella in prove.py verifica che nessuno
     la rimetta li'."""
-    chiesto = await importo_invoice(invoice)
+    try:
+        chiesto = await importo_invoice(invoice)
+    except LnbitsMuto as e:
+        # NON HO POTUTO CHIEDERE (ago 2026). Sta QUI, prima della
+        # cintura e prima di ogni notifica, e la posizione e' la cosa
+        # piu' delicata del cantiere: NON_CHIESTO e' sicuro da ritentare
+        # SOLO perche' e' strutturalmente impossibile dopo la chiamata
+        # che paga — se un domani finisse dopo, un ritentativo
+        # automatico coprirebbe un pagamento davvero in volo e i sats
+        # uscirebbero due volte. C'e' la sentinella che tiene questo
+        # blocco sopra quella chiamata; e il nome della chiave non si
+        # scrive qui nemmeno per spiegarlo, che quella sentinella legge
+        # anche la prosa (ci si e' inciampati scrivendo questa riga).
+        print(f"🔁 Pagamento NON CHIESTO ({e}): la fattura non si e' potuta "
+              f"verificare. Niente e' partito, niente si tocca.")
+        return NON_CHIESTO
     if chiesto is None or atteso_sats <= 0 or chiesto != atteso_sats:
         # I motivi del rifiuto sono tre e vogliono parole diverse: una
         # bolt11 che non si decodifica non «chiede None sats», e'
@@ -5025,7 +5100,16 @@ async def _payment_hash(bolt11: str) -> str:
     """Il payment_hash di una bolt11: e' il numero che un moderatore
     cerca su LNbits per sapere se quel pagamento e' uscito davvero.
     Fail-open — se anche questa chiamata tace, resta il congelamento,
-    che e' la parte che conta."""
+    che e' la parte che conta.
+
+    E MANGIA ANCHE LnbitsMuto, DELIBERATAMENTE (ago 2026): qui si arriva
+    da `_congela_pagamento`, cioe' dalla strada dell'INCERTO, dove LNbits
+    e' malata PER DEFINIZIONE — se il decode tacesse e l'eccezione
+    risalisse, salterebbe il congelamento proprio nel momento in cui dei
+    sats possono essere usciti davvero. L'avviso ai moderatori quel caso
+    lo prevede gia' e dice che l'hash non si e' potuto leggere. E' l'unico
+    punto del file dove ingoiarla e' la risposta giusta: c'e' la
+    sentinella, o al prossimo riordino qualcuno la «aggiusta»."""
     try:
         dec = await decodifica_invoice(bolt11)
         return str((dec or {}).get("payment_hash", ""))[:100]
@@ -5062,6 +5146,35 @@ async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
 
+def _sospendi_pagamento(con, tabella: str, riga_id: int, verso: str):
+    """Il gemello mite di `_congela_pagamento`: non abbiamo potuto
+    CHIEDERE, quindi non c'e' niente da congelare e nessuno da avvisare
+    — si timbra la riga perche' il giro dell'orologio sappia dove
+    tornare, e basta. `tabella` e' un letterale del nostro codice.
+    Chiude la connessione che riceve, come il gemello.
+
+    TRE COSE CHE NON FA, e ognuna e' una riga da non rimettere.
+    1) NON tocca `aggiornato`: quella e' l'ANCORA dei promemoria e della
+       coda «⏸ Ordini fermi», e riscriverla farebbe ripartire da capo
+       l'attesa di qualcuno — la trappola gia' pagata tre volte. E' anche
+       il motivo per cui questo timbro e' una funzione SOLA invece di
+       quattro copie: in quattro copie la quarta un giorno lo scrive, e
+       il sollecito degli incassi smette di suonare per sempre senza che
+       una prova diventi rossa. (Il precedente e' `pulisci_indirizzi`.)
+    2) NON avvisa nessuno: chi non ha premuto niente non merita un
+       allarme, e chi ha premuto ha gia' il suo toast.
+    3) NON chiede il payment_hash: non c'e' nessun pagamento in volo da
+       cercare su LNbits — e' l'intera differenza col gemello.
+    `payout_verso` invece si scrive, perche' CHI aspettava i sats non si
+    deduce dallo stato: un ordine in disputa puo' essere sulla strada del
+    venditore o su quella del compratore, e indovinare vorrebbe dire
+    riprovare a favore della persona sbagliata."""
+    con.execute(f"UPDATE {tabella} SET payout_stato='da_riprovare', "
+                "payout_verso=? WHERE id=?", (verso, riga_id))
+    con.commit()
+    con.close()
+
+
 def netto_venditore(prezzo_sats: int) -> int:
     """Quanto incassa il venditore: prezzo meno la commissione."""
     return int(prezzo_sats * (100 - COMMISSIONE_PERCENTO) / 100)
@@ -5070,14 +5183,37 @@ def netto_venditore(prezzo_sats: int) -> int:
 async def decodifica_invoice(bolt11: str) -> dict | None:
     """Chiede a LNbits di leggere la invoice del venditore, per
     controllare che l'importo sia giusto PRIMA di salvarla.
-    Ritorna il JSON decodificato, o None se la invoice non e' valida."""
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(f"{LNBITS_URL}/api/v1/payments/decode",
-                         headers={"X-Api-Key": LNBITS_INVOICE_KEY},
-                         json={"data": bolt11})
-        if r.status_code >= 300:
-            return None
-        return r.json()
+    Ritorna il JSON decodificato, o None se la invoice non e' valida.
+
+    QUI NASCEVA LA CONFUSIONE (ago 2026): `status >= 300 -> None` metteva
+    nello stesso cassetto «questa non e' una invoice» e «il mio servizio
+    sta male», e da quel None il ramo del rifiuto di `paga_venditore`
+    cancellava la fattura di un venditore per un 520 nostro.
+    SOLO 400 E 422 PARLANO DELLA FATTURA — e' quel che LNbits risponde a
+    una bolt11 storta. Tutto il resto parla del CANALE e alza LnbitsMuto:
+    fail-safe nel verso giusto, perche' nel dubbio si dice «non lo so»,
+    che non cancella niente e non accusa nessuno.
+    IMPERFEZIONE DICHIARATA: ci finisce dentro anche il 401 di una chiave
+    scaduta, che diventa cosi' un guasto SILENZIOSO (prima era rumoroso,
+    a modo suo). Non si corregge trattando il 401 come una fattura
+    illeggibile — sarebbe di nuovo azzerare invoice e accusare venditori
+    per un errore di configurazione NOSTRO — ed e' l'argomento che rende
+    l'avviso giornaliero di `riprova_pagamenti_sospesi` non facoltativo:
+    quello e' il caso che campa per settimane, perche' con la chiave
+    rotta sui soli pagamenti in uscita gli acquisti continuano a
+    funzionare benissimo mentre nessuno incassa piu'."""
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"{LNBITS_URL}/api/v1/payments/decode",
+                             headers={"X-Api-Key": LNBITS_INVOICE_KEY},
+                             json={"data": bolt11})
+    except Exception as e:
+        raise LnbitsMuto(f"decode non riuscito ({type(e).__name__}: {e})")
+    if r.status_code in (400, 422):
+        return None          # la bolt11 non si legge: colpa della fattura
+    if r.status_code >= 300:
+        raise LnbitsMuto(f"decode: LNbits ha risposto {r.status_code}")
+    return r.json()
 
 
 async def importo_invoice(bolt11: str) -> int | None:
@@ -5130,6 +5266,17 @@ def diagnosi_ln_address(dominio: str) -> str:
         return "inesistente"
 
 
+# Quel che si dice a chi bussa a una porta mentre il nostro nodo tace
+# (ago 2026). Vive in un posto solo perche' lo dicono QUATTRO porte
+# diverse — i due depositi di invoice, il salvataggio del Lightning
+# address e il rimborso dello sblocco — e la cosa da non sbagliare e'
+# la seconda frase: chi ha appena incollato una fattura buona deve
+# leggere che il problema NON e' la sua.
+MSG_LNBITS_MUTO = ("Non riusciamo a verificarla in questo momento: "
+                   "il nostro nodo Lightning non risponde. Non è un "
+                   "problema di quello che hai scritto — riprova fra "
+                   "qualche minuto.")
+
 # Il consiglio a chi resta senza incassi automatici. Vive in un posto
 # solo perche' lo dicono DUE errori diversi e devono dire la stessa
 # cosa — con un esempio concreto e il come, non un rimprovero.
@@ -5175,6 +5322,20 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
                       f"sats, la invoice ne vale {chiesto}. Scartata.")
                 return None
             return pr
+    except LnbitsMuto:
+        # LA RIGA DA NON AMMORBIDIRE (ago 2026): l'`except` qui sotto e'
+        # larghissimo e ingoierebbe anche questa, e il chiamante vedrebbe
+        # una bolt11 falsa — cadendo nel suo `else NON_PAGATO` senza
+        # nemmeno passare da `paga_venditore`. Cioe' la cura coprirebbe
+        # la invoice incollata a mano e lascerebbe scoperto l'incasso
+        # AUTOMATICO, che e' la strada che gira da sola senza che nessuno
+        # guardi: la lezione piu' larga del cantiere della cintura,
+        # ripagata qui.
+        # E LA DISTINZIONE E' TUTTA QUI: il wallet del VENDITORE che tace
+        # resta `None` — li' «il tuo wallet non ha risposto come doveva»
+        # e' vero, ed e' giusto scartare la fattura. Solo il silenzio del
+        # NOSTRO nodo diventa NON_CHIESTO.
+        raise
     except Exception:
         return None
 
@@ -12951,6 +13112,15 @@ async def rimborsa_sblocco_admin(pagamento_id: int, req: Request,
             raise HTTPException(409, "Questo pagamento è congelato: "
                                      "decidilo dalla coda «🧊 "
                                      "Pagamenti da verificare»")
+        if esito.get("non_chiesto"):
+            # Il 502 qui sotto direbbe che serve una invoice: falso, e
+            # manderebbe un moderatore a cercare il guasto dalla parte
+            # sbagliata. Qui non abbiamo potuto chiedere, e il giro
+            # dell'orologio ci riprova da solo.
+            raise HTTPException(503, "Il nostro nodo Lightning non "
+                                     "risponde: il rimborso non è "
+                                     "partito e nulla è cambiato. "
+                                     "Ci riproviamo da soli fra poco.")
         if esito.get("stato") == "rimborsato":
             raise HTTPException(409, "Era già stato rimborsato")
         if esito.get("stato") != "pagato":
@@ -16226,21 +16396,33 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (r["tg_id"],)).fetchone()
         importo = r["importo_sats"]      # integrale, al sat
-        bolt11 = ""
-        if r["payout_stato"] != "uscito":
-            bolt11 = r["invoice_riscossione"]
-            if not bolt11 and u and u["ln_address"]:
-                bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
         titolo = html.escape((r["titolo"] or "un'asta")[:60])
-        esito = (PAGATO if r["payout_stato"] == "uscito"
-                 else await paga_venditore(bolt11, importo) if bolt11
-                 else NON_PAGATO)
+        bolt11 = ""
+        try:
+            if r["payout_stato"] != "uscito":
+                bolt11 = r["invoice_riscossione"]
+                if not bolt11 and u and u["ln_address"]:
+                    bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
+            esito = (PAGATO if r["payout_stato"] == "uscito"
+                     else await paga_venditore(bolt11, importo) if bolt11
+                     else NON_PAGATO)
+        except LnbitsMuto as e:
+            print(f"🔁 Rimborso d'asta #{rimborso_id}: {e}")
+            esito = NON_CHIESTO
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
                 f"Riscossione del rimborso d'asta #{rimborso_id} "
                 f"(«{titolo}»): <b>{_fmt_sats(importo)} sats</b>.")
             return {"ok": False, "stato": r["stato"], "incerto": True}
+        if esito == NON_CHIESTO:
+            # Qui il giro serve piu' che altrove: i perdenti d'asta e
+            # l'eccedenza passano da `chiudi_aste` UNA volta sola, e
+            # senza la ripresa un'asta intera resterebbe muta dopo che
+            # ai perdenti abbiamo appena scritto «il tuo versato torna
+            # indietro adesso».
+            _sospendi_pagamento(con, "rimborsi_asta", rimborso_id, "puntatore")
+            return {"ok": False, "stato": r["stato"], "non_chiesto": True}
 
         if esito == PAGATO:
             con.execute("UPDATE rimborsi_asta SET stato='riscosso', "
@@ -16422,7 +16604,12 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     if not r or r["stato"] != "da_riscuotere":
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    importo_sats = await importo_invoice(bolt11)
+    try:
+        importo_sats = await importo_invoice(bolt11)
+    except LnbitsMuto:
+        con.close()      # la colonna NON si scrive: una invoice non
+        #                  verificata non entra dove poi si paga
+        raise HTTPException(503, MSG_LNBITS_MUTO)
     if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
@@ -22738,7 +22925,22 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         if "@" not in addr or "." not in addr.split("@")[-1]:
             raise HTTPException(400, "Formato non valido: dev'essere tipo nome@wallet.com")
         # Verifica dal vivo: il wallet risponde e accetta almeno 100 sats?
-        if not await invoice_da_ln_address(addr, 100):
+        # E se a non rispondere siamo NOI, si dice cosi' invece di dare
+        # la colpa all'indirizzo (ago 2026): prima questo punto mandava
+        # a caccia di un refuso che non c'era, e col segnale nuovo
+        # sarebbe diventato un 500 nudo.
+        # PERCHE' 503 E NON «SALVA LO STESSO» (decisione di Andrea): la
+        # docstring qui sopra promette che prima di salvarlo lo
+        # verifichiamo dal vivo, e salvare senza verificare la
+        # renderebbe falsa — una regola che non si fa rispettare e'
+        # peggio di nessuna regola. Il costo e' piccolo e reversibile:
+        # per la durata del disservizio non si puo' impostare un
+        # indirizzo NUOVO, e chi ce l'ha gia' non e' toccato.
+        try:
+            valido = await invoice_da_ln_address(addr, 100)
+        except LnbitsMuto:
+            raise HTTPException(503, MSG_LNBITS_MUTO)
+        if not valido:
             # PERCHE' due messaggi (ago 2026): un indirizzo Phoenix e'
             # scritto benissimo, semplicemente parla un'altra lingua —
             # e dirgli «controlla di averlo scritto giusto» lo manda a
@@ -23831,14 +24033,18 @@ async def _rimborsa_sblocco(pagamento_id: int,
                         (p["tg_id"],)).fetchone()
         importo = p["importo_sats"]      # integrale, al sat
         bolt11 = ""
-        if p["payout_stato"] != "uscito":
-            bolt11 = p["invoice_rimborso"]
-            if not bolt11 and u and u["ln_address"]:
-                bolt11 = await invoice_da_ln_address(u["ln_address"],
-                                                     importo)
-        esito = (PAGATO if p["payout_stato"] == "uscito"
-                 else await paga_venditore(bolt11, importo) if bolt11
-                 else NON_PAGATO)
+        try:
+            if p["payout_stato"] != "uscito":
+                bolt11 = p["invoice_rimborso"]
+                if not bolt11 and u and u["ln_address"]:
+                    bolt11 = await invoice_da_ln_address(u["ln_address"],
+                                                         importo)
+            esito = (PAGATO if p["payout_stato"] == "uscito"
+                     else await paga_venditore(bolt11, importo) if bolt11
+                     else NON_PAGATO)
+        except LnbitsMuto as e:
+            print(f"🔁 Rimborso dello sblocco #{pagamento_id}: {e}")
+            esito = NON_CHIESTO
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "pagamenti", pagamento_id, bolt11, "pagante",
@@ -23846,6 +24052,13 @@ async def _rimborsa_sblocco(pagamento_id: int,
                 f"a #{p['tg_id']}: "
                 f"<b>{_fmt_sats(importo)} sats</b>.")
             return {"ok": False, "stato": p["stato"], "incerto": True}
+        if esito == NON_CHIESTO:
+            # La porta del banner NON si chiude: il ramo che non paga
+            # non deve togliere un diritto gia' pagato — e qui, a
+            # maggior ragione, non e' nemmeno detto che il rimborso non
+            # riesca al giro dopo.
+            _sospendi_pagamento(con, "pagamenti", pagamento_id, "pagante")
+            return {"ok": False, "stato": p["stato"], "non_chiesto": True}
 
         adesso = int(time.time())
         if esito == PAGATO:
@@ -27125,7 +27338,13 @@ async def deposita_invoice(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Operazione non permessa")
 
-    importo_sats = await importo_invoice(bolt11)
+    try:
+        importo_sats = await importo_invoice(bolt11)
+    except LnbitsMuto:
+        con.close()      # e la colonna resta com'era: chi ha incollato
+        #                  una fattura buona non la perde per un guasto
+        #                  nostro, e non gli si dice che e' sbagliata
+        raise HTTPException(503, MSG_LNBITS_MUTO)
     if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
@@ -27195,19 +27414,44 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # l'ha verificato su LNbits: non si conia nessuna fattura e
         # non si chiama il nodo, si va dritti al ramo riuscito.
         bolt11 = ""
-        if o["payout_stato"] != "uscito":
-            bolt11 = o["invoice_venditore"]
-            if not bolt11 and v and v["ln_address"]:
-                bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
-        esito = (PAGATO if o["payout_stato"] == "uscito"
-                 else await paga_venditore(bolt11, netto) if bolt11
-                 else NON_PAGATO)
+        try:
+            if o["payout_stato"] != "uscito":
+                bolt11 = o["invoice_venditore"]
+                if not bolt11 and v and v["ln_address"]:
+                    bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
+            esito = (PAGATO if o["payout_stato"] == "uscito"
+                     else await paga_venditore(bolt11, netto) if bolt11
+                     else NON_PAGATO)
+        except LnbitsMuto as e:
+            print(f"🔁 Ordine #{ordine_id}: {e}")
+            esito = NON_CHIESTO
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
                 f"Incasso del venditore sull'ordine #{ordine_id}: "
                 f"<b>{_fmt_sats(netto)} sats</b>.")
             return {"ok": False, "stato": o["stato"], "incerto": True}
+        if esito == NON_CHIESTO:
+            # Non si e' potuto chiedere: la riga resta ESATTAMENTE
+            # com'era — stato, invoice del venditore, ancore — e ci
+            # torna `riprova_pagamenti_sospesi`. Sta qui, DOPO l'INCERTO
+            # e PRIMA del PAGATO, e non e' estetica: la sentinella di
+            # `_rimborsa_sblocco` in prove.py affetta il sorgente da
+            # «if esito == PAGATO:» in giu', e un ramo nuovo la' dentro
+            # le farebbe leggere quel che non deve.
+            # IL TIMBRO DEL TIMER SI SCRIVE ANCHE QUI, ed e' la riga che
+            # impedisce alla cura di reintrodurre una bugia: senza,
+            # l'ordine chiuso da un timer e ripreso dal giro tornerebbe
+            # qui come chiamata NON automatica, e direbbe al venditore
+            # «L'acquirente ha confermato la ricezione» — cioe' proprio
+            # la famiglia di messaggi falsi che questo cantiere chiude.
+            # I rami che lo scrivono diventano tre, come dice il commento
+            # di `auto_il` qui sopra.
+            con.execute("UPDATE ordini SET sbloccato_auto_il="
+                        "MAX(sbloccato_auto_il, ?) WHERE id=?",
+                        (auto_il, ordine_id))
+            _sospendi_pagamento(con, "ordini", ordine_id, "venditore")
+            return {"ok": False, "stato": o["stato"], "non_chiesto": True}
 
         if esito == PAGATO:
             # Il titolo di cortesia copre anche i set («primo + N altri»)
@@ -27378,20 +27622,29 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         importo = o["prezzo_sats"]
 
         bolt11 = ""
-        if o["payout_stato"] != "uscito":
-            bolt11 = o["invoice_rimborso"]
-            if not bolt11 and c_utente and c_utente["ln_address"]:
-                bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
-                                                     importo)
-        esito = (PAGATO if o["payout_stato"] == "uscito"
-                 else await paga_venditore(bolt11, importo) if bolt11
-                 else NON_PAGATO)
+        try:
+            if o["payout_stato"] != "uscito":
+                bolt11 = o["invoice_rimborso"]
+                if not bolt11 and c_utente and c_utente["ln_address"]:
+                    bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
+                                                         importo)
+            esito = (PAGATO if o["payout_stato"] == "uscito"
+                     else await paga_venditore(bolt11, importo) if bolt11
+                     else NON_PAGATO)
+        except LnbitsMuto as e:
+            print(f"🔁 Rimborso sull'ordine #{ordine_id}: {e}")
+            esito = NON_CHIESTO
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "compratore",
                 f"Rimborso al compratore sull'ordine #{ordine_id}: "
                 f"<b>{_fmt_sats(importo)} sats</b>.")
             return {"ok": False, "stato": o["stato"], "incerto": True}
+        if esito == NON_CHIESTO:
+            # Gemello del ramo di `_sblocca_sats`: la riga resta com'era
+            # — `invoice_rimborso` compresa — e ci torna il giro.
+            _sospendi_pagamento(con, "ordini", ordine_id, "compratore")
+            return {"ok": False, "stato": o["stato"], "non_chiesto": True}
 
         if esito == PAGATO:
             cambio = await cambio_btc_eur()
@@ -30429,6 +30682,119 @@ async def sollecita_rimborsi_puntate():
             print(f"⚠️ Sollecito rimborso saltato (#{r['id']}): {e}")
 
 
+try:
+    from config import MAX_RIPRESE_GIRO
+except ImportError:
+    MAX_RIPRESE_GIRO = 20        # quante righe sospese per battito
+
+TIMBRO_SOSPESI = "pagamenti_sospesi"   # il giorno dell'ultimo avviso
+
+
+async def riprova_pagamenti_sospesi():
+    """LA META' CHE CONTA del quarto esito (ago 2026): senza di lei
+    avremmo scambiato un danno rumoroso con un silenzio.
+
+    `NON_CHIESTO` lascia la riga esattamente com'era, e per la maggior
+    parte delle strade va benissimo — il timer del digitale la ripesca
+    da solo al battito dopo, la disputa resta nella coda del moderatore,
+    il venditore che rideposita una invoice fa ripartire tutto. Ma
+    QUATTRO casi non li ripassa nessuno: la conferma di ricezione di un
+    ordine FISICO (li' l'auto-sblocco e' disarmato), il reso ricevuto, i
+    perdenti d'asta — che passano una volta sola — e gli ordini in
+    'refund'. Senza questo giro aspetterebbero la coda «⏸ Ordini fermi»,
+    cioe' dieci giorni.
+
+    PERCHE' SERVE IL TIMBRO, e non basta guardare gli stati: una ripresa
+    che pescasse «tutti i confirmed» riconierebbe una fattura dal wallet
+    di OGNI venditore fermo a ogni battito, per sempre — il gesto che
+    l'INCERTO esiste per impedire. Il timbro restringe la ripresa alle
+    righe dove SAPPIAMO che il tentativo si e' fermato prima del nodo, e
+    li' riconiare e' sicuro perche' nessuna fattura e' mai stata pagata.
+
+    LE TRE RIGHE DA NON AMMORBIDIRE.
+    1) IL TIMBRO SI AZZERA QUI, non nelle funzioni d'uscita: nel ramo
+       riuscito `payout_stato` puo' valere 'uscito' e riscriverlo
+       cancellerebbe il timbro di un moderatore. L'UPDATE e' CONDIZIONATO
+       a 'da_riprovare', quindi se il ritentativo e' finito in INCERTO —
+       e `_congela_pagamento` ha gia' scritto 'incerto' — non morde.
+       Questo giro e' lo spazzino del proprio timbro, e senza questa riga
+       una riga risolta resterebbe timbrata per sempre.
+    2) `automatico` NON SI PERDE: si rilegge da `sbloccato_auto_il`, che
+       il ramo sospeso ha scritto apposta. Senza, un ordine chiuso da un
+       timer e ripreso da qui direbbe al venditore «L'acquirente ha
+       confermato la ricezione».
+    3) UNA RIGA ALLA VOLTA, E SI FERMA ALLA PRIMA CHE TACE ANCORA: se il
+       nodo e' muto per una lo e' per tutte, e insistere vorrebbe dire
+       bussare ai wallet di venti venditori per niente a ogni battito —
+       maleducazione verso servizi di terzi, e la strada per farsi
+       limitare. Costo massimo per giro: UNA fattura coniata a vuoto."""
+    con = db()
+    righe = []
+    for tab in ("ordini", "rimborsi_asta", "pagamenti"):
+        try:
+            righe += [(tab, r["id"], r["payout_verso"]) for r in con.execute(
+                f"SELECT id, payout_verso FROM {tab} "
+                "WHERE payout_stato='da_riprovare' ORDER BY id")]
+        except Exception as e:
+            print(f"⚠️ Ripresa, tabella {tab} saltata: {e}")
+    con.close()
+    if not righe:
+        return
+    ripresi = 0
+    for tab, riga_id, verso in righe[:MAX_RIPRESE_GIRO]:
+        try:
+            if tab == "rimborsi_asta":
+                esito = await _paga_rimborso(riga_id)
+            elif tab == "pagamenti":
+                esito = await _rimborsa_sblocco(riga_id, 0)
+            elif verso == "compratore":
+                esito = await _rimborsa_compratore(riga_id)
+            else:
+                # Il timbro del timer dice se questo sblocco era
+                # automatico: le parole delle notifiche dipendono da li'.
+                con = db()
+                o = con.execute("SELECT sbloccato_auto_il FROM ordini "
+                                "WHERE id=?", (riga_id,)).fetchone()
+                con.close()
+                esito = await _sblocca_sats(
+                    riga_id, automatico=bool(o and o["sbloccato_auto_il"]))
+        except Exception as e:
+            print(f"⚠️ Ripresa saltata ({tab} #{riga_id}): {e}")
+            continue
+        if esito.get("non_chiesto"):
+            break            # il nodo tace ancora: inutile insistere
+        con = db()
+        con.execute(f"UPDATE {tab} SET payout_stato='' "
+                    "WHERE id=? AND payout_stato='da_riprovare'",
+                    (riga_id,))
+        con.commit()
+        con.close()
+        ripresi += 1
+    rimasti = len(righe) - ripresi
+    print(f"🔁 Pagamenti da riprovare: {len(righe)}, ripresi {ripresi}, "
+          f"restano {rimasti}")
+    # L'AVVISO SUONA SOLO SE A FINE GIRO NE RESTANO, ed e' la condizione
+    # che lo rende un allarme invece che rumore: un singhiozzo di trenta
+    # secondi si risolve al battito dopo e non arriva mai qui — nessun
+    # messaggio, e senza soglie orarie da tarare. Un guasto vero invece
+    # produce UN messaggio al giorno (il patto dei solleciti), ed e'
+    # quello che si legge il giorno della chiave scaduta, quando gli
+    # acquisti funzionano e nessuno incassa piu'.
+    oggi = time.strftime("%Y-%m-%d")
+    if rimasti and timbro_letto(TIMBRO_SOSPESI) != oggi:
+        timbro_scrivi(TIMBRO_SOSPESI, oggi)
+        try:
+            await notifica_admin(
+                f"🔁 <b>Pagamenti in uscita fermi:</b> {rimasti}. "
+                f"Non riusciamo a farci leggere le fatture da LNbits, "
+                f"quindi <b>non e' partito niente</b> e nessun dato si e' "
+                f"perso: le invoice sono al loro posto e si riprova da "
+                f"soli a ogni giro. Se dura, guarda il nodo — e controlla "
+                f"che le chiavi LNbits siano ancora buone.")
+        except Exception as e:
+            print(f"⚠️ Avviso pagamenti fermi non partito: {e}")
+
+
 async def sollecita_incassi():
     """Il promemoria degli incassi fermi: un ordine 'confirmed' senza
     metodo d'incasso non fa rumore da solo — la notifica della
@@ -33121,6 +33487,14 @@ async def orologio():
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
         try:
+            # Prima di bussare a qualcuno, si riprova quel che era
+            # rimasto in sospeso: un ordine ripreso qui non deve poi
+            # ricevere il promemoria di un incasso che nel frattempo
+            # e' partito.
+            await riprova_pagamenti_sospesi()
+        except Exception as e:
+            print(f"⚠️ Ripresa dei pagamenti saltata: {e}")
+        try:
             await sollecita_incassi()
         except Exception as e:
             print(f"⚠️ Solleciti incasso saltati: {e}")
@@ -33945,11 +34319,25 @@ CONTROLLI_LIBRO_MASTRO = (
      "WHERE (contro_sats>0 AND importo_sats>=contro_sats) "
      "OR (contro_eur>0 AND importo_eur>=contro_eur)"),
     ("payout fuori contratto",
-     "payout_stato con un valore che non esiste ('' | incerto | uscito)",
+     "payout_stato con un valore che non esiste "
+     "('' | incerto | uscito | da_riprovare)",
      "SELECT id FROM ordini "
-     "WHERE payout_stato NOT IN ('','incerto','uscito') "
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare') "
      "UNION ALL SELECT id FROM rimborsi_asta "
-     "WHERE payout_stato NOT IN ('','incerto','uscito')"),
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare') "
+     # La terza tabella mancava da quando il banner le ha dato la
+     # colonna (ago 2026): buco preesistente, tre righe, e non ha
+     # stati transitori legittimi come non li hanno le due sorelle.
+     "UNION ALL SELECT id FROM pagamenti "
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare')"),
+    # NB: «sospeso da troppo tempo» NON e' un controllo, ed e' la
+    # domanda che verra' in mente: durante un'interruzione di LNbits il
+    # database e' SANO e quelle righe sono il funzionamento previsto —
+    # esattamente come 'incerto', escluso qui sotto per le stesse
+    # parole. Un allarme a soglia oraria renderebbe l'unica risposta
+    # della ronda dipendente da un orologio, cosa che nessun altro
+    # controllo fa. L'allarme sul tempo vive in
+    # `riprova_pagamenti_sospesi`, che e' un'altra cosa.
     # NB: «shipped via punto senza busta» NON e' un controllo, e va
     # ricordato perche' verra' in mente: e' lo stato NORMALE del
     # flusso durante il transito (il codice arriva quando il pacco e'
