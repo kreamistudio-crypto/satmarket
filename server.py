@@ -7747,9 +7747,9 @@ def _comuni_nome() -> dict:
     return _COMUNI_NOME
 
 
-def _comuni_prefisso() -> list[tuple[str, str, dict]]:
-    """Le DUE chiavi con cui l'autocomplete cerca, precalcolate:
-    (nome, nome+sigla, la voce da servire).
+def _comuni_prefisso() -> list[tuple[str, str, str, dict]]:
+    """Le TRE chiavi con cui l'autocomplete cerca, precalcolate:
+    (nome, nome+sigla, nome senza preposizioni, la voce da servire).
 
     La seconda e' quella che mancava (ago 2026, caso dal campo su
     «Gubbio»): la tendina PROPONE «Gubbio (PG)» — e' il formato che
@@ -7757,28 +7757,44 @@ def _comuni_prefisso() -> list[tuple[str, str, dict]]:
     cercava sul SOLO nome, quindi chi tornava a ritoccare un campo
     GIA' compilato si vedeva la lista svuotarsi e lo leggeva come
     «il mio comune non c'e'». Il valore restava buono: a non
-    trovarlo era il solo suggerimento. Un autocomplete non deve
-    proporre un formato che poi non sa piu' cercare.
-    E' precalcolata pigra come le due sorelle, ma qui la ragione e'
-    anche il COSTO: l'endpoint gira a ogni tasto su un server
-    mono-processo, e normalizzare 7.900 nomi per battuta costa 10 ms
-    BLOCCANTI (16 con la chiave in piu'). Cosi' la ricerca sta sotto
-    il mezzo millisecondo e i 25 ms della costruzione si pagano una
-    volta sola — misurati, non stimati.
-    La chiave composta e' la STESSA espressione di carica_comuni e
-    non una seconda ricetta: normalizza('Gubbio PG') e' una chiave
-    che quel dizionario ha gia' registrato, quindi il suggerimento e
-    il riconoscimento della zona non possono divergere.
-    NON ci sono gli alias senza preposizioni («reggio emilia»): la
-    tendina quel formato non lo propone, quindi non e' questo il
-    difetto — chi lo scrive a mano resta senza suggerimento pur
-    avendo una zona valida, ed e' dichiarato."""
+    trovarlo era il solo suggerimento.
+    LA REGOLA CHE NE ESCE: un autocomplete deve saper cercare OGNI
+    forma che la zona poi riconosce — quella che propone lui e
+    quella che la gente scrive. La terza chiave e' la seconda meta'
+    di quel principio (ago 2026, il giro dopo): «reggio emilia» e
+    «cassano ionio» sono zone VALIDE — carica_comuni ne registra
+    l'alias apposta, e' come le scrivono tutti — e restavano senza
+    suggerimento, cioe' l'imperfezione dichiarata di ieri. Adesso
+    propongono il nome UFFICIALE con la sigla, che e' anche il modo
+    di guadagnare la forma canonica a chi digita l'alias.
+    Le tre chiavi sono le STESSE espressioni di carica_comuni e di
+    _comuni_nome, non seconde ricette: se divergessero, il
+    suggerimento e il riconoscimento della zona direbbero due cose
+    diverse sullo stesso testo e non se ne accorgerebbe nessuno.
+    QUI NON SI FILTRA su COMUNI come fanno le due sorelle, ed e'
+    voluto: un alias CONTESO («castro») per loro e' un vicolo cieco
+    perche' suggeriscono il testo dell'alias, mentre qui si propone
+    sempre «Nome (SIGLA)», che e' valido per costruzione — e
+    proporre entrambi gli omonimi e' proprio il servizio che si
+    vuole rendere.
+    Precalcolata pigra come le sorelle, ma qui la ragione e' anche
+    il COSTO: l'endpoint gira a ogni tasto su un server
+    mono-processo, e normalizzare 7.900 nomi per battuta costava 10
+    ms BLOCCANTI. Cosi' la ricerca sta sotto il millisecondo e i 30
+    ms della costruzione si pagano una volta sola — misurati. I tre
+    campi sono FISSI e l'alias assente ripete il nome: un `any()` su
+    una tupla di lunghezza variabile e' leggibile ma costa il triplo
+    (1,5 ms contro 0,5), misurato anche quello."""
     global _COMUNI_PREFISSO
     if _COMUNI_PREFISSO is None:
-        _COMUNI_PREFISSO = [
-            (normalizza(c["nome"]),
-             normalizza(f"{c['nome']} {c['provincia']}"), c)
-            for c in COMUNI_LISTA]
+        _COMUNI_PREFISSO = []
+        for c in COMUNI_LISTA:
+            nome = normalizza(c["nome"])
+            senza = " ".join(p for p in nome.split()
+                             if p not in PREPOSIZIONI_COMUNI)
+            _COMUNI_PREFISSO.append(
+                (nome, normalizza(f"{c['nome']} {c['provincia']}"),
+                 senza if senza and senza != nome else nome, c))
     return _COMUNI_PREFISSO
 
 
@@ -23523,9 +23539,10 @@ async def cerca_comuni(q: str = "",
                        barattolo_sessione: str = Cookie("")):
     """Suggerimenti per i campi comune (la Zona di Vendi e il comune
     degli avvisi di ricerca): primi 10 comuni per prefisso — del nome
-    («gub» -> Gubbio) OPPURE del nome con la sigla («gubbio pg»),
-    che e' la forma che questa stessa tendina propone e che finisce
-    in colonna. Il perche' della seconda sta su _comuni_prefisso.
+    («gub» -> Gubbio), del nome con la sigla («gubbio pg», la forma
+    che questa stessa tendina propone e che finisce in colonna) o del
+    nome senza preposizioni («reggio emilia»). Sono le tre forme che
+    la zona sa riconoscere: il perche' sta su _comuni_prefisso.
     Autenticato come tutto cio' che non e' vetrina. E' stata PUBBLICA
     per due giorni, per il filtro «Vicino a me» che viveva anche nella
     vetrina anonima: morto quello, e' tornata dov'era — non perche'
@@ -23537,8 +23554,9 @@ async def cerca_comuni(q: str = "",
     if len(prefisso) < 2:
         return {"comuni": []}
     trovati = []
-    for nome, con_sigla, voce in _comuni_prefisso():
-        if nome.startswith(prefisso) or con_sigla.startswith(prefisso):
+    for nome, con_sigla, senza_prep, voce in _comuni_prefisso():
+        if (nome.startswith(prefisso) or con_sigla.startswith(prefisso)
+                or senza_prep.startswith(prefisso)):
             trovati.append(voce)
             if len(trovati) == 10:
                 break

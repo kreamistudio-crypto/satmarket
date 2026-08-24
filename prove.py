@@ -199,12 +199,13 @@ def prove_autocomplete_comuni():
 
     amb = {"re": re, "unicodedata": unicodedata, "csv": csv, "os": os,
            "COMUNI": {}, "COMUNI_LISTA": [], "_COMUNI_PREFISSO": None,
-           "PREPOSIZIONI_COMUNI": set(),
            # l'endpoint non deve poter chiedere chi sei: qui la
            # guardia e' uno stub, e che ci sia DAVVERO lo dice la
            # sentinella in fondo
            "verifica_utente": lambda *a, **k: None,
            "Header": lambda d="": d, "Cookie": lambda d="": d}
+    i = _SORGENTE.index("PREPOSIZIONI_COMUNI = {")
+    exec(_SORGENTE[i:_SORGENTE.index("}", i) + 1], amb)
     for f in ("normalizza", "carica_comuni", "_comuni_prefisso",
               "cerca_comuni"):
         exec(pezzo(f), amb)
@@ -241,6 +242,33 @@ def prove_autocomplete_comuni():
     prova("accenti e maiuscole indifferenti", True,
           "Gualtieri Sicaminò" in cerca("GUALTIERI SICAMINO"))
     prova("un prefisso che non esiste tace", [], cerca("zzq"))
+    # LA TERZA CHIAVE (ago 2026, il giro dopo): «reggio emilia» e
+    # «cassano ionio» sono zone VALIDE — carica_comuni ne registra
+    # l'alias senza preposizioni apposta — e restavano senza
+    # suggerimento. Chi le digita ottiene il nome UFFICIALE.
+    prova("l'alias senza preposizioni propone il nome vero",
+          ["Reggio nell'Emilia"], cerca("reggio emilia"))
+    prova("...anche a meta' («reggio em»)", ["Reggio nell'Emilia"],
+          cerca("reggio em"))
+    prova("...e l'altro caso di casa («cassano ionio»)",
+          ["Cassano all'Ionio"], cerca("cassano ionio"))
+    # la zona che l'alias fa riconoscere e il nome che si propone
+    # devono essere lo STESSO comune, o si suggerirebbe una forma
+    # che il campo poi non accetta
+    prova("l'alias e la zona parlano dello stesso comune", True,
+          amb["normalizza"]("Reggio nell'Emilia") in amb["COMUNI"])
+    # e una voce non si propone due volte perche' ha tre chiavi
+    prova("nessun doppione con tre chiavi", True,
+          all(len(set(cerca(p))) == len(cerca(p))
+              for p in ("reggio", "san", "castel", "ca")))
+    # L'alias non allarga la ricerca a caso: resta un PREFISSO.
+    # «emilia» sta DENTRO l'alias «reggio emilia» ma non in testa,
+    # quindi e' il caso che distingue startswith da una ricerca a
+    # pezzi — con «in» al suo posto qui uscirebbe Reggio. (Il primo
+    # caso scritto, «emilia reggio», non poteva fallire: non e'
+    # sottostringa di niente, e restava vuoto comunque.)
+    prova("il prefisso resta un prefisso, non una sottostringa", [],
+          cerca("emilia"))
 
     # La chiave composta e' quella di carica_comuni e non una
     # seconda ricetta: se divergessero, la tendina proporrebbe una
