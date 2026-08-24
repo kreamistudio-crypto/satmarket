@@ -3680,6 +3680,83 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   testo non si seleziona, e se la clipboard fa i capricci la strada a
   mano deve restare aperta; quando non riesce lo si DICE, che è la
   regola del codice di @trackbot.
+
+  IL FEED DI GOOGLE MERCHANT (ago 2026): `GET /feed/google.xml`, RSS
+  2.0 col namespace `g`, generato al volo e in cache 15 minuti come la
+  sitemap. Nessuna tabella, nessun job, una rotta esplicita (regola
+  ferrea 3).
+  LA VALUTA È IL MURO, ed è la cosa da leggere prima di toccare una
+  riga: Merchant Center accetta SOLO codici ISO 4217 — **BTC per
+  Google non esiste** — e pretende che il prezzo del feed COMBACI con
+  quello della pagina di destinazione. Un disallineamento non
+  disapprova un annuncio: a ventotto giorni **sospende l'ACCOUNT**.
+  Quindi i sats si convertono in euro, ed è una DECISIONE DI ANDREA
+  presa sapendo il rischio — il prezzo in euro di un listino in sats
+  si muove col cambio mentre Google ricontrolla la pagina quando gli
+  pare. La strada sicura (mandare i soli listini nati in EUR) è stata
+  proposta e scartata.
+  QUEL CHE RIDUCE IL RISCHIO, e che è fatto: feed e pagina leggono lo
+  STESSO cambio dalla STESSA fonte (`cambio_noto_ora`, la cache, mai
+  la rete), e il JSON-LD di un annuncio in sats dichiara adesso DUE
+  offerte — prima l'EUR, che è quella che Google legge, poi la BTC,
+  che resta la cifra esatta. Prima le due cifre divergevano SEMPRE e
+  per costruzione (la pagina diceva BTC, il feed euro); adesso possono
+  divergere solo per il TEMPO che passa fra i due crawl. `_prezzo_ld_eur`
+  è quella riga, e senza di lei il feed non poteva funzionare.
+  CHI RESTA FUORI, e ognuno per una ragione sua: le ASTE (quel prezzo
+  è una BASE, non un prezzo d'acquisto — dichiararlo vorrebbe dire
+  promettere una cifra a cui l'oggetto non si compra), le LAMPO VIVE
+  (scadono in ore mentre il feed vive in cache per giorni: è la stessa
+  ragione per cui l'anteprima dei link dichiara il listino), chi non
+  ha una FOTO (`image_link` è obbligatoria, e il ripiego al brand
+  delle anteprime qui NON va bene — un feed col nostro logo su ogni
+  prodotto è una disapprovazione in blocco) e chi non ha un prezzo
+  dicibile in euro. Ferie ed esauriti ci stanno invece, ma
+  `out_of_stock`: è la verità, e toglierli e rimetterli a ogni rientro
+  farebbe ballare il feed.
+  LA CONDIZIONE È OBBLIGATORIA e dove manca vale `used` (decisione di
+  Andrea: è un mercatino dell'usato, ed è il default statisticamente
+  vero), CON UNA ECCEZIONE che non è un ripensamento: dove la
+  condizione non vuol dire niente — alimenti, bellezza, buoni, codice
+  online — la merce è nuova per definizione, e «usato» su un vasetto
+  di miele sarebbe una dichiarazione FALSA a Google, che le
+  misrepresentation le sanziona. Il giudice è `senza_condizione`, lo
+  stesso di form, dettaglio, vetrina, NIP-99 e import: qui non nasce
+  nessuna regola nuova. `da_sistemare` → `used` e MAI `refurbished`,
+  la stessa mappatura sbagliata già evitata nei dati strutturati.
+  TRE COSE LE HA TROVATE IL PRIMO FEED GENERATO SUI DATI VERI, non la
+  rilettura, ed è la parte da tenere. 1) LA DESCRIZIONE portava la
+  nostra CODA PROMOZIONALE — «Prezzo: 26000 sats — zona: … 🫙⚡ In
+  vendita su Barattolo … https://…» — che rientra dall'import quando
+  il venditore ripubblica da un client suo: Google **disapprova le
+  descrizioni che contengono prezzi, spedizione o link**, e quel
+  «26000 sats» è per giunta la cifra che contraddice il `g:price` in
+  euro. Si taglia dal nostro marcatore in poi, con la riga «Prezzo:»
+  che lo precede; il DATO NON SI TOCCA — cambia solo cosa si racconta
+  a Google — e un «Prezzo:» scritto dal venditore resta, perché la
+  riga si toglie solo quando è attaccata al marcatore. 2) Gli
+  INDIRIZZI DEL VENDITORE nella descrizione (due su trentasei): via
+  anche quelli, e nella scheda vera restano interi. 3) Il `g:brand`
+  diceva il nome del VENDITORE, cioè «Barattolo» su ogni prodotto —
+  il nome di chi vende non è la marca di uno shoyu, e con
+  `identifier_exists: no` Google non la chiede: la marca si OMETTE
+  invece di inventarla.
+  `CODA_PROMO_NIP99` PORTA IL SUFFISSO APPOSTA: `CODA_PROMO` esiste
+  già ed è la coda dei post del canale. Chiamarla così la
+  sovrascriveva, e `evento_annuncio` si sarebbe ritrovato una LISTA
+  dentro una f-string — cioè le note Nostr rotte. L'ha presa il primo
+  feed generato dal vivo.
+  LA LEVA `FEED_MERCHANT` nasce ACCESA (non muove denaro e non manda
+  niente a nessuno: espone una rotta che racconta quel che la vetrina
+  racconta già) ma è un interruttore e non una costante, ed è il
+  punto: se Merchant Center comincia a lamentarsi il feed va spento IN
+  FRETTA, con una riga nel config e un riavvio.
+  RESTA DA FARE PRIMA DI ATTIVARLO, e non è codice: una POLITICA DI
+  RESO pubblica e raggiungibile senza login (Merchant Center la
+  pretende; il reso nel flusso ordini c'è ed è descritto, ma non c'è
+  una pagina che lo dichiari a chi non è ancora entrato) e la
+  dichiarazione di essere un MARKETPLACE MULTI-VENDITORE. Senza,
+  il feed viene rifiutato comunque.
   E DA QUI È NATO `_fmt_eur` (ago 2026): **un euro si scrive in un modo
   solo in tutta l'app**. Gemello di `_fmt_sats`, con la VIRGOLA dei
   decimali — col punto una cifra grande si legge per un fattore mille —
@@ -3699,9 +3776,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   peggio —, e la riga del catalogo che va in pasto ad Haiku, che una
   persona non legge. Il CSV la virgola ce l'ha già per conto suo.
   LA SENTINELLA che rende il principio verificabile invece che
-  raccomandato conta tre cose: zero `:.2f} €`, tre `:.2f} EUR` (i soli
-  che una persona non legge) e otto `:.2f}` in tutto, che è il
-  censimento completo dei superstiti. Serve perché QUESTA FAMIGLIA SI
+  raccomandato conta tre cose: zero `:.2f} €`, CINQUE `:.2f} EUR` (i
+  soli che una persona non legge: le due righe del NIP-99, il catalogo
+  dell'AI e i DUE del prezzo del feed) e DODICI `:.2f}` in tutto, che è
+  il censimento completo dei superstiti.
+  ⚠️ QUESTI NUMERI SI LEGGONO IN `prove.py` E NON QUI: erano già
+  scivolati prima del feed (la prosa diceva «otto» dove la sentinella
+  contava nove), ed è la natura di un numero scritto in prosa accanto
+  a uno che una macchina verifica. Se i due non combaciano, quello
+  giusto è quello che gira. Serve perché QUESTA FAMIGLIA SI
   NASCONDE: cercando il solo `€` il primo censimento ne aveva mancati
   tre, tutti che scrivevano «EUR» a parole, ed è stata la sentinella a
   prenderli — non la lettura del codice. Se quei numeri cambiano, o è
@@ -17532,6 +17615,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/widget/negozio/{chi}` (le UNICHE pagine fatte per stare
    nell'iframe di un estraneo — tutte le altre lo vietano con
    `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
+
+   per ore), `/feed/google.xml` (il feed di Merchant Center, spento
+   dalla leva `FEED_MERCHANT`),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
    da ago 2026 i font stanno in casa e non li chiede più nessuno a
@@ -21145,6 +21231,59 @@ attesa), zero errori JS e nessuno sbordo. ⚠️ L'ancora della mutazione
 del chip è AMBIGUA apposta — la coda del template è identica nei due
 gemelli, che è il punto del cantiere: se ne muta UNA e la sentinella
 che ne conta DUE diventa rossa.
+
+Il feed di Google Merchant (ago 2026): `GET /feed/google.xml`, RSS 2.0
+col namespace `g`, in cache 15 minuti come la sitemap. LA VALUTA È IL
+MURO — Merchant Center accetta solo ISO 4217, BTC per Google non
+esiste, e il prezzo del feed deve COMBACIARE con la pagina: un
+disallineamento a ventotto giorni sospende l'ACCOUNT. Decisione di
+Andrea: si mandano TUTTI convertendo i sats in euro, sapendo il
+rischio (la strada sicura — i soli listini nati in EUR — è stata
+proposta e scartata). Quel che riduce il rischio ed è fatto: feed e
+pagina leggono lo STESSO cambio dalla STESSA fonte, e il JSON-LD di un
+annuncio in sats dichiara adesso due offerte, prima l'EUR poi la BTC —
+prima le due cifre divergevano SEMPRE e per costruzione. Vedi
+Architettura, «IL FEED DI GOOGLE MERCHANT», per chi resta fuori (aste,
+lampo vive, senza foto) e per la condizione, che dove manca vale
+`used` tranne dove la merce è nuova per definizione.
+TRE COSE LE HA TROVATE IL PRIMO FEED GENERATO SUI DATI VERI e non la
+rilettura, ed è la parte da ricordare: la descrizione portava la
+nostra coda promozionale (con dentro un prezzo in sats e due link —
+Google disapprova le descrizioni che contengono prezzi, spedizione o
+link); due descrizioni su trentasei avevano l'indirizzo web del
+venditore; e il `g:brand` diceva «Barattolo» su ogni prodotto, che il
+nome di chi vende non è la marca di uno shoyu. Più una collisione di
+nome vera: `CODA_PROMO` esisteva già ed è la coda dei post del canale,
+e la costante nuova la sovrascriveva — cioè le note Nostr rotte.
+Collaudato: **+43 prove** in modalità severa (3926 → 3969 contro il
+main del giorno; è il DELTA il numero difendibile — il totale dipende
+dal ramo su cui il cantiere atterra, e questo è nato dentro un commit
+più grosso poi spezzato in tre) e TREDICI
+MUTAZIONI del codice, una per riga sorvegliata (alimenti dichiarati
+usati, prezzo inventato senza cambio, asta e lampo dentro il feed,
+link e coda promozionale rimasti, caratteri di controllo passati, leva
+che non spegne, JSON-LD tornato a dire solo BTC, euro non più per
+primo, euro raddoppiato sui listini in euro): ognuna diventa rossa da
+sola. UNA ERA SOPRAVVISSUTA al primo giro — proprio quella del JSON-LD,
+cioè la riga che rende possibile il feed — perché la prova guardava se
+la funzione ESISTE e non se viene USATA; ora `_ld_annuncio` gira per
+davvero. Più l'XML fatto parsare con dentro un titolo ostile (tag,
+virgolette e caratteri di controllo), e il feed generato dal vivo col
+server acceso sui 36 annunci del database di collaudo: XML ben
+formato, zero link in descrizione, zero brand, prezzi in euro.
+NON COLLAUDATO QUI: la rotta non ha un collaudo eseguibile suo — è
+stata provata a mano col server acceso, non da uno script.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
+la leva ha il default nel codice. MA IL FEED NON SI ATTIVA ANCORA, e
+mancano tre cose che non sono codice: una POLITICA DI RESO pubblica e
+raggiungibile senza login, la dichiarazione di MARKETPLACE
+MULTI-VENDITORE, e il numero che manca — quanti annunci attivi hanno
+il listino in euro e quanti in sats, che dice quanto è grosso il
+rischio di disallineamento. DA GUARDARE al primo giro vero: la
+diagnostica di Merchant Center dopo il primo scaricamento, e in
+particolare quanti prodotti escono `used` su merce che nuova lo è
+davvero (nel database di collaudo sono 36 su 36, perché quasi nessuno
+dichiara la condizione).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
