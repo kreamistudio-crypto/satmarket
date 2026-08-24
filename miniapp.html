@@ -2771,6 +2771,14 @@
   .seller .who{flex:1;min-width:0}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
+  /* LA CLASSIFICA: la riga e' un `.seller` con due pezzi in piu' —
+     la posizione a sinistra e la freccia a destra, come il
+     riquadro venditore del dettaglio. Nessun colore nuovo: le
+     medaglie sono glifi a colori propri. */
+  .cl-pos{flex:0 0 auto;min-width:24px;text-align:center;
+    font-weight:800;font-size:14px;color:var(--muted)}
+  .cl-fr{margin-left:auto;flex:0 0 auto;color:var(--muted);
+    font-size:20px;line-height:1}
   /* La sfilza dei distintivi accanto al nome del venditore: emoji
      nude in fila con un piccolo respiro (niente cerchietti d'oro:
      nude e sovrapposte si impasterebbero — l'oro resta alle tessere
@@ -4844,6 +4852,25 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: LA CLASSIFICA ============ -->
+  <!-- I migliori del mercatino. Vista INTERNA come sicurezza e privacy:
+       fuori da RADICI, quindi navRiflette la spinge e il gesto indietro
+       funziona gratis; voceNav la fa ricadere su «esplora».
+       Il markup e' un GUSCIO: la lista la scrive renderClassifica() col
+       textContent e con esc(), che qui dentro passano NOMI di persone —
+       e il tocco su una riga porta al negozio col solo codice filtrato
+       dall'alfabeto, il patto di renderNegozio.
+       Il bottone che la apre vive in fondo al Profilo, accanto a «Il
+       pagamento protetto» e «I tuoi dati»: e' una porta verso una
+       vista, non un cassetto. -->
+  <div class="view" id="view-classifica">
+    <button class="back" onclick="navIndietro()">← Torna</button>
+    <div class="sicu">
+      <div class="section-label">🏆 La classifica</div>
+      <div id="classificaCorpo"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: VENDI ============ -->
   <div class="view" id="view-vendi">
     <div class="form">
@@ -5322,6 +5349,12 @@ document.getElementById('cartello')?.remove();</script>
            due sono il recinto del dettaglio e la riga di fiducia della
            vetrina): qui la si cerca a mente fredda, non davanti a un
            acquisto. Non e' un cassetto — non ha niente da aprire. -->
+      <!-- La porta della classifica. Nasce NASCOSTA e la accende
+           renderProfilo solo se il server dice che la funzione e'
+           accesa: un bottone che porta a una pagina spenta e'
+           peggio di un bottone che non c'e'. In DEMO e in VETRINA
+           non compare mai, il patto del cassetto wallet. -->
+      <button class="btn ghost" id="profiloClassifica" style="display:none;margin-top:20px" onclick="apriClassifica()">🏆 La classifica del mercatino</button>
       <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
       <button class="btn ghost" style="margin-top:10px" onclick="apriPrivacy()">🔐 I tuoi dati</button>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
@@ -7046,7 +7079,7 @@ function voceNav(view){
      entry vecchie della cronologia non arrivano qui — le degrada
      navRendiVista prima di rendere qualunque cosa. */
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
-       'acquisto','offertapresto'].includes(view)) view = 'esplora';
+       'acquisto','offertapresto','classifica'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -9258,6 +9291,126 @@ function apriPrivacy(ancora){
   if (e) { e.scrollIntoView({block:'start'}); window.scrollBy(0, -16); }
 }
 function tornaDaPrivacy(){ navIndietro(); }
+
+/* ===================== LA CLASSIFICA (ago 2026) =====================
+   I migliori del mercatino, in una pagina raggiungibile dal Profilo.
+   Il conto lo fa il SERVER (media pesata sulle persone x commercio):
+   qui non si calcola niente, si disegna — e il punteggio non arriva
+   nemmeno, apposta. Si mostrano la POSIZIONE e i FATTI su cui poggia,
+   che sono anche quel che permette a chi guarda di giudicare da se'.
+
+   Il vestito e' quello di casa: `.seller` per la riga (lo stesso
+   blocco avatar+nome+reputazione del negozio e del Profilo) e
+   `.tema-pill` per il filtro. Nessuna classe nuova da tarare, e la
+   riga si legge uguale alle sue sorelle. */
+const CLASSIFICA_SOGLIE = [0, 4, 4.5];
+let classificaDati = null;      /* l'ultima risposta del server */
+let classificaFiltro = 0;       /* stato di SESSIONE, mai localStorage */
+
+async function apriClassifica(){
+  /* In DEMO e in VETRINA la pagina non esiste: la' non c'e' un server
+     che la calcoli, e un numero inventato sarebbe peggio del niente —
+     il patto del cassetto wallet. Il bottone non compare nemmeno, e
+     questa e' la cintura per ogni altra strada. */
+  if (DEMO || VETRINA) return;
+  go('classifica');
+  const box = el('classificaCorpo');
+  if (box && !classificaDati) box.innerHTML =
+    '<div class="hint">Preparo la classifica…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/classifica`,
+                          {headers:{'X-Tg-Init-Data': authHdr()}});
+    classificaDati = r.ok ? await r.json() : null;
+  } catch(e){ classificaDati = null; }
+  renderClassifica();
+}
+
+/* Le pillole compaiono SOLO se filtrano davvero: se nessuno sta sotto
+   la soglia, quella pillola darebbe la stessa lista con un tocco in
+   piu'. E' la regola di `condFiltrabile` (il filtro condizione DORME
+   dove non vuol dire niente) e della card che sparisce quando la sua
+   occasione non esiste. Oggi, con tutte le medie a 5,00, non ne
+   compare nessuna — ed e' giusto cosi'. */
+function soglieClassificaUtili(voci){
+  return CLASSIFICA_SOGLIE.filter(s => !s || voci.some(v => v.media < s));
+}
+
+function filtraClassifica(soglia){
+  classificaFiltro = soglia;
+  haptic();
+  renderClassifica();
+}
+
+function rigaClassifica(v, mia){
+  /* Negli onclick viaggia SOLO il codice negozio passato dal
+     filtro-alfabeto: il patto anti-XSS di renderNegozio. Senza codice
+     la riga non e' toccabile — meglio ferma che rotta. */
+  const cod = (v.negozio || '').replace(/[^A-Za-z0-9]/g, '');
+  const apre = cod ? ` onclick="apriNegozio('${cod}')" style="cursor:pointer"` : '';
+  const medaglia = v.posizione <= 3 && !mia
+    ? ['🥇','🥈','🥉'][v.posizione - 1] : '';
+  /* Le stelle come in negozio e nel Profilo: la media c'e' sempre (in
+     classifica ci si entra con almeno un voto), quindi qui la guardia
+     «solo con un rating vero» non ha un ramo da coprire. */
+  const rep = `<span class="stars">${'★'.repeat(Math.round(v.media))}</span> `
+    + `${v.media.toFixed(2).replace('.', ',')}`
+    + `${contaFeedback(v.voti, v.persone)} · 🤝 ${fmt(v.affari)}`;
+  return `
+    <div class="seller"${apre}>
+      <div class="cl-pos">${medaglia || v.posizione + '°'}</div>
+      <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
+      <div class="who" style="min-width:0">
+        <b>${esc(v.nome)}</b>${titoloRiga(v.titolo)}
+        <div class="rep">${rep}</div>
+      </div>
+      ${cod ? '<div class="cl-fr">›</div>' : ''}
+    </div>`;
+}
+
+function renderClassifica(){
+  const box = el('classificaCorpo');
+  if (!box) return;
+  const d = classificaDati;
+  if (!d || !d.attiva){
+    box.innerHTML = '<div class="hint">La classifica non è '
+      + 'disponibile in questo momento.</div>';
+    return;
+  }
+  const voci = d.voci || [];
+  if (!voci.length){
+    box.innerHTML = '<div class="hint">Ancora nessuno in classifica: '
+      + 'ci si entra col primo affare concluso e il primo feedback '
+      + 'ricevuto.</div>';
+    return;
+  }
+  const viste = voci.filter(v => v.media >= classificaFiltro);
+  const soglie = soglieClassificaUtili(voci);
+  const pillole = soglie.length > 1 ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
+      ${soglie.map(s => `<button class="tema-pill${classificaFiltro===s?' active':''}" onclick="filtraClassifica(${s})">${s ? '⭐ ' + String(s).replace('.', ',') + '+' : 'Tutti'}</button>`).join('')}
+    </div>` : '';
+  /* LA RIGA CHE SPIEGA UN'APPARENZA (scelta di Andrea): quando tutte
+     le medie sono uguali, l'ordine lo decide il commercio — e senza
+     dirlo uno legge sette nomi con «5,00» accanto e non capisce
+     perche' e' settimo. La decide il SERVER sui dati veri, quindi
+     sparisce da sola il giorno che arriva il primo voto diverso. */
+  const spiega = d.medie_piene
+    ? '<div class="hint">Per ora hanno tutti la stessa media: a fare '
+      + 'la differenza è quanto si è commerciato.</div>' : '';
+  /* La TUA riga esce solo a te e solo se non sei nei primi: chi sta in
+     fondo non compare mai in una lista che vedono gli altri. */
+  const mia = d.mia ? `
+    <div class="section-label" style="margin-top:22px">La tua posizione</div>
+    ${rigaClassifica(d.mia, true)}` : '';
+  box.innerHTML = `
+    <div class="hint">I primi ${fmt(voci.length)} su ${fmt(d.totale)} in
+      classifica. Conta la media dei feedback — pesata su quante persone
+      diverse ti hanno votato — e quanto si è commerciato.</div>
+    ${spiega}${pillole}
+    ${viste.map(v => rigaClassifica(v, false)).join('')}
+    ${viste.length ? '' : '<div class="hint">Nessuno con questa media.</div>'}
+    ${mia}`;
+}
 
 /* IL CONTATTO PER I TUOI DATI (ago 2026, deciso da Andrea): la chat
    diretta su Telegram, scritta nel markup della pagina.
@@ -18108,6 +18261,7 @@ let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
 let myLivello = null;            // il grado DERIVATO dal server
+let myClassifica = false;        // la leva della classifica, dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -18151,6 +18305,11 @@ function renderProfilo(){
     ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}
     ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
+  /* La porta della classifica si accende solo se la funzione e'
+     accesa sul server: un bottone che porta a una pagina spenta e'
+     peggio di un bottone che non c'e'. */
+  if (el('profiloClassifica')) el('profiloClassifica').style.display =
+    (myClassifica && !DEMO && !VETRINA) ? '' : 'none';
   renderLnAddress();
   renderLivello();
   renderDistintivi();
@@ -27658,6 +27817,7 @@ async function avvia(){
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
+    myClassifica = !!me.classifica_attiva;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';

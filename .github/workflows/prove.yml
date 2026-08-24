@@ -68,7 +68,7 @@ jobs:
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
              collaudo_tornate.py collaudo_rilancio.py
              collaudo_punto_concordato.py
-             classifica_prova.py
+             classifica_prova.py collaudo_classifica.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.

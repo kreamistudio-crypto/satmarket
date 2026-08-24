@@ -844,6 +844,37 @@ ORE_CAMBIO_VALIDO = 24
 # il percorso caldo, col suo raffreddamento da un minuto.
 CAMBIO_RINFRESCO_S = 60
 
+# --- La classifica del mercatino --------------------------------------
+# Chi sono i migliori, in una pagina sola: media pesata sulle PERSONE
+# che ti hanno votato, moltiplicata per il commercio (i soli XP degli
+# ordini, compressi col logaritmo). Entra chi ha almeno un affare
+# concluso e almeno un voto da un «recensore reale» — uno che a sua
+# volta ha commerciato con qualcun altro: chi si fabbrica venti
+# identita' e se le fa votare non entra affatto.
+# NASCE SPENTA, e non perche' muova denaro: perche' nessuno sa quante
+# righe escono finche' non si guarda. Il conto lo da'
+# `python classifica_prova.py`, che legge e basta.
+CLASSIFICA_ATTIVA = False
+CLASSIFICA_TOP = 20             # quanti nomi escono in pubblico. Chi sta
+                                # sotto vede solo la SUA posizione, e a
+                                # nessun altro esce.
+CLASSIFICA_K = 5                # quanto pesa la media del mercatino su
+                                # chi ha pochi voti: alto = piu' severo
+                                # coi nuovi, basso = una recensione sola
+                                # decide. 5 = servono ~5 persone perche'
+                                # la tua media conti per meta' come tua,
+                                # ed e' il valore MISURATO che fa passare
+                                # «4,8 da 50 persone» davanti a «5,0 da
+                                # 2»: con 3 vinceva ancora chi ha due voti.
+CLASSIFICA_XP_RIF = 1000        # gli XP-ordine che valgono il bonus
+                                # pieno (~1.000 € commerciati da
+                                # venditore). Oltre si continua a
+                                # salire, ma pianissimo: e' un
+                                # logaritmo.
+CLASSIFICA_PESO_XP = 0.25       # quanto puo' contare il commercio, al
+                                # massimo: +25% sulla fiducia. 0 = la
+                                # classifica torna la sola media.
+
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.
 # True  = test locale con gli utenti finti (Compratore/Venditore/Admin),

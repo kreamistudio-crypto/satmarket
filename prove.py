@@ -14006,6 +14006,249 @@ def _codice_rifiuto(funzione, init, errore):
     return None
 
 
+def _amb_classifica():
+    """Il giudice della classifica, estratto dal sorgente."""
+    amb = {"math": __import__("math"),
+           "CLASSIFICA_XP_RIF": 1000, "CLASSIFICA_PESO_XP": 0.25,
+           "CLASSIFICA_K": 5}
+    for f in ("_recensore_reale", "_classifica_utenti", "_medie_tutte_piene"):
+        exec(pezzo(f), amb)
+    return amb
+
+
+def prove_classifica():
+    """LA CLASSIFICA (ago 2026).
+
+    Le sentinelle dicono che il giudice esiste ed e' uno; a dire che
+    RISPONDE GIUSTO c'e' solo il banco che lo fa girare — ed e' la
+    sesta volta che questo file lo impara. Qui sotto ci sono tutti e
+    due, e i casi del banco sono quelli che DECIDONO: la coppia che ha
+    aperto il cantiere (5,0 da due persone contro 4,8 da cinquanta) e
+    le due facce del farming."""
+    print("\n[la classifica]")
+    amb = _amb_classifica()
+    cl = amb["_classifica_utenti"]
+    piene = amb["_medie_tutte_piene"]
+
+    # IL MERCATINO DI FONDO, e non e' un contorno: la media globale la
+    # fanno TUTTI, quindi un caso costruito su due soli utenti misura
+    # se stesso. Qui dietro c'e' gente votata 3 e 4, come in un
+    # mercatino vero, e M viene ~4,66.
+    def fondo():
+        voti = [(50 + i, 900 + i, v) for i, v in
+                enumerate([3, 4, 4, 3, 5, 4, 3, 4, 5, 4])]
+        contro = {900 + i: {999} for i in range(10)}
+        affari = {50 + i: 2 for i in range(10)}
+        return voti, contro, affari
+
+    # --- il caso che ha aperto il cantiere -------------------------
+    # Uno con 5,0 su due voti non vale uno con 4,8 su cinquanta: la
+    # media bayesiana tira verso quella del mercatino chi ha pochi
+    # voti, e la tira di meno a chi ne ha tanti.
+    voti, contro, affari = fondo()
+    voti += [(1, 100, 5), (1, 101, 5)]
+    for i in range(50):
+        voti.append((2, 200 + i, 5 if i % 5 else 4))    # media 4,8
+    for da in [100, 101] + [200 + i for i in range(50)]:
+        contro[da] = {999}                 # tutti hanno commerciato altrove
+    affari.update({1: 2, 2: 50})
+    fuori = cl(voti, contro, {}, affari)
+    prova("chi ha 4,8 da 50 persone passa davanti a 5,0 da 2",
+          [2, 1], [r["id"] for r in fuori if r["id"] in (1, 2)])
+
+    # IL LIMITE DELLA BAYESIANA, e va conosciuto prima di tarare K:
+    # se una media sta SOPRA e l'altra SOTTO quella del mercatino, non
+    # si invertono MAI, per nessun K — la formula tira tutti verso M,
+    # e chi parte sopra resta sopra. Quindi K non decide «chi vince»
+    # in generale: decide QUANTO servono i numeri a chi ne ha pochi, e
+    # il caso qui sopra si ribalta solo perche' 4,8 e 5,0 stanno dalla
+    # stessa parte di 4,66. Con K=3 vinceva ancora chi ha DUE voti.
+    voti, contro, affari = fondo()
+    voti += [(1, 100, 5), (2, 200 + 0, 4)]
+    contro[100] = {999}
+    contro[200] = {999}
+    affari.update({1: 1, 2: 1})
+    for k in (1, 5, 50, 500):
+        ordine = [r["id"] for r in cl(voti, contro, {}, affari, k=k)
+                  if r["id"] in (1, 2)]
+        prova(f"sopra e sotto la media globale non si invertono (K={k})",
+              [1, 2], ordine)
+
+    # --- il FARMER PIGRO: 40 voti da una persona sola --------------
+    # Valgono UNO: la bayesiana pesa sulle PERSONE, non sui voti.
+    voti, contro, affari = fondo()
+    voti += [(1, 100, 5) for _ in range(40)]
+    voti += [(2, 200 + i, 5) for i in range(4)]
+    contro[100] = {999}
+    for i in range(4):
+        contro[200 + i] = {999}
+    affari.update({1: 40, 2: 4})
+    fuori = cl(voti, contro, {}, affari)
+    prova("40 voti da UNA persona valgono meno di 4 da quattro",
+          [2, 1], [r["id"] for r in fuori if r["id"] in (1, 2)])
+    prova("...e i voti si contano tutti, le persone no",
+          (40, 1), next((r["voti"], r["persone"])
+                        for r in fuori if r["id"] == 1))
+
+    # --- il FARMER DILIGENTE: venti identita' che si votano ---------
+    # NON ENTRA AFFATTO: nessuna delle sue identita' ha un affare con
+    # un terzo, quindi i suoi recensori reali sono zero e a zero non
+    # si passa il gate. E' il freno scelto da Andrea.
+    voti = [(1, 500 + i, 5) for i in range(20)]
+    contro = {1: {500 + i for i in range(20)}}
+    for i in range(20):
+        contro[500 + i] = {1}              # commerciano SOLO con lui
+    prova("il farmer con venti identita' non entra affatto",
+          [], [r["id"] for r in cl(voti, contro, {}, {1: 20})])
+    # ...e senza il freno sarebbe primo: e' la misura di cosa fa il
+    # freno, e la riga che lo script di prova stampa sui dati veri.
+    prova("...mentre senza il freno sarebbe in classifica",
+          [1], [r["id"] for r in cl(voti, contro, {}, {1: 20},
+                                    solo_reali=False)])
+
+    # --- L'ARITMETICA, COL NUMERO ----------------------------------
+    # LE PROVE SULL'ORDINE SONO DEBOLI, e l'ha detto la tortura: tre
+    # mutazioni sono sopravvissute a tutte quelle qui sopra — il
+    # divisore che conta i voti invece delle persone, la formula
+    # additiva al posto della moltiplicativa, e la media globale
+    # calcolata su TUTTI i voti invece che sui soli che entrano.
+    # L'ordine e' invariante a un sacco di deformazioni: a distinguerle
+    # c'e' solo il VALORE, calcolato qui a mano una volta per tutte.
+    #
+    #   utente 1: TRE voti da UNA persona (5, 4, 3) -> media 4,0
+    #   utente 2: un voto da un'altra persona (5)
+    #   utente 3: dieci voti da un complice che commercia solo con lui,
+    #             quindi SCARTATI — e non devono spostare la media
+    #             globale, che viene (5+4+3+5)/4 = 4,25
+    #   xp d'ordine dell'utente 1: 999, cioe' log10(1000) tondo
+    voti = ([(1, 100, 5), (1, 100, 4), (1, 100, 3), (2, 200, 5)]
+            + [(3, 300, 5) for _ in range(10)])
+    contro = {100: {999}, 200: {999}, 300: {3}}
+    fuori = cl(voti, contro, {1: 999}, {1: 3, 2: 1, 3: 10})
+    uno = next(r for r in fuori if r["id"] == 1)
+    prova("la media e' quella dei voti ricevuti", 4.0, uno["media"])
+    prova("...le persone sono UNA, i voti TRE", (1, 3),
+          (uno["persone"], uno["voti"]))
+    prova("...e il punteggio e' esattamente quello calcolato a mano",
+          True, abs(uno["punti"] - 5.260264460129354) < 1e-12)
+    # Se la media globale contasse anche i dieci voti scartati verrebbe
+    # 4,79 invece di 4,25, e il punteggio 5,818 invece di 5,260: e' la
+    # mutazione che nessuna prova sull'ordine vedeva.
+    prova("...che NON e' quello con la media globale sporca",
+          False, abs(uno["punti"] - 5.818284028035579) < 1e-9)
+
+    # --- il gate d'ingresso ----------------------------------------
+    voti = [(1, 100, 5), (2, 100, 5)]
+    contro = {100: {999}}
+    prova("chi non ha affari conclusi non entra",
+          [1], [r["id"] for r in cl(voti, contro, {}, {1: 3})])
+    prova("chi non ha voti non entra", [],
+          [r["id"] for r in cl([], {}, {}, {7: 10})])
+    prova("l'auto-voto non conta", [],
+          [r["id"] for r in cl([(1, 1, 5)], {1: {2}}, {}, {1: 5})])
+
+    # --- il commercio -----------------------------------------------
+    # A parita' di fiducia comanda chi ha commerciato di piu', e il
+    # logaritmo comprime: dieci volte gli XP non danno dieci volte il
+    # bonus.
+    voti = [(1, 100, 5), (2, 101, 5)]
+    contro = {100: {999}, 101: {999}}
+    fuori = cl(voti, contro, {1: 100, 2: 3000}, {1: 5, 2: 5})
+    prova("a pari media passa avanti chi ha commerciato di piu'",
+          [2, 1], [r["id"] for r in fuori])
+    a, b = fuori[1]["punti"], fuori[0]["punti"]
+    prova("...ma il logaritmo comprime (30x gli XP non fa 30x)",
+          True, (b / a) < 1.15)
+    # E se il peso e' zero, la classifica torna la sola media.
+    fuori = cl(voti, contro, {1: 100, 2: 3000}, {1: 5, 2: 5}, peso=0)
+    prova("a peso zero il commercio non sposta niente",
+          [1, 2], [r["id"] for r in fuori])
+
+    # --- il pareggio e' deterministico ------------------------------
+    # Due righe identiche non devono scambiarsi di posto a ogni
+    # richiesta: la lezione del pareggio del podio e del cursore.
+    voti = [(1, 100, 5), (2, 101, 5)]
+    ids = [[r["id"] for r in cl(voti, {100: {9}, 101: {9}}, {},
+                                {1: 1, 2: 1})] for _ in range(3)]
+    prova("a pari punteggio l'ordine non balla", [[1, 2]] * 3, ids)
+
+    # --- la riga che spiega un'apparenza ----------------------------
+    prova("con tutte le medie uguali la riga si accende", True,
+          piene([{"media": 5.0}, {"media": 5.0}, {"media": 5.0}]))
+    prova("...con una media diversa si spegne", False,
+          piene([{"media": 5.0}, {"media": 4.5}]))
+    prova("...e con una riga sola non c'e' niente da spiegare", False,
+          piene([{"media": 5.0}]))
+    # E si guarda la fetta VISIBILE: col conto su TUTTE le righe, il
+    # giorno che il venticinquesimo prende un 4 la riga si spegne
+    # mentre i primi venti mostrano ancora una colonna di «5,00»
+    # identici — cioe' proprio nel caso per cui esiste.
+    tutte = [{"media": 5.0}] * 3 + [{"media": 4.0}]
+    prova("una media diversa FUORI dai primi non spegne la riga", True,
+          piene(tutte[:3]))
+    prova("...mentre sul mercatino INTERO la riga sarebbe spenta", False,
+          piene(tutte))
+    prova("...e a spegnerla e' una media diversa DENTRO i primi", False,
+          piene([{"media": 5.0}, {"media": 4.0}]))
+
+    # --- LE SENTINELLE ----------------------------------------------
+    giu = codice(pezzo("_classifica_utenti"))
+    prova("il giudice e' PURO: non tocca il database", True,
+          "execute(" not in giu and "db()" not in giu)
+    letture = codice(pezzo("_dati_classifica"))
+    prova("in classifica entrano i SOLI XP degli ordini", True,
+          "WHERE tipo='ordine'" in letture)
+    prova("...e gli affari si contano dagli ordini released", True,
+          "stato='released'" in letture)
+    # LEGGE E BASTA, come controlla_libro_mastro: nessuna scrittura in
+    # tutta la strada della classifica.
+    strada = letture + codice(pezzo("classifica_ora")) + \
+        codice(pezzo("classifica"))
+    for verbo in ("INSERT", "UPDATE ", "DELETE"):
+        prova(f"la classifica non scrive niente ({verbo.strip()})",
+              True, verbo not in strada)
+    end = codice(pezzo("classifica"))
+    prova("a leva spenta l'endpoint non calcola niente", True,
+          'if not CLASSIFICA_ATTIVA:' in end
+          and 'return {"attiva": False}' in end)
+    prova("l'identita' e' FACOLTATIVA (la pagina e' pubblica)", True,
+          "utente_se_autenticato(" in end)
+    # I campi si ELENCANO, e i tre che non escono MAI non compaiono
+    # nella voce: il tg_id, gli XP — /api/negozio li toglie apposta dal
+    # pubblico — e il punteggio, che sarebbe un numero opaco.
+    voce = end[end.index("def voce("):]
+    voce = voce[:voce.index("return {\"attiva\"")]
+    for campo in ('"id":', '"xp":', '"punti":'):
+        prova(f"dalla voce pubblica non esce {campo}", True,
+              campo not in voce)
+    prova("...e la posizione personale esce solo a chi non e' nei primi",
+          True, 'io_["posizione"] > CLASSIFICA_TOP' in end)
+    # La riga che spiega guarda la FETTA VISIBILE e non tutta la
+    # classifica: senza il taglio si spegnerebbe davanti a una colonna
+    # di medie identiche (il difetto trovato dal vivo).
+    prova("la riga «medie piene» si decide sulla fetta visibile", True,
+          "_medie_tutte_piene(righe[:CLASSIFICA_TOP])"
+          in codice(pezzo("classifica_ora")))
+
+    html = open("miniapp.html", encoding="utf-8").read()
+    riga = html[html.index("function rigaClassifica("):]
+    riga = riga[:riga.index("\nfunction ")]
+    prova("il client scappa i nomi", True, "esc(v.nome)" in riga)
+    prova("...e negli onclick va solo il codice filtrato", True,
+          "replace(/[^A-Za-z0-9]/g, '')" in riga)
+    apri = html[html.index("async function apriClassifica("):]
+    apri = apri[:apri.index("\n}")]
+    prova("in DEMO e in VETRINA la pagina non si apre", True,
+          "if (DEMO || VETRINA) return;" in apri)
+    prova("il bottone del Profilo si accende solo a leva accesa", True,
+          "myClassifica && !DEMO && !VETRINA" in html)
+    prova("la vista e' interna (l'indietro riporta a Esplora)", True,
+          "'acquisto','offertapresto','classifica'" in html)
+    prova("...e NON e' una radice", True,
+          "'classifica'" not in html[html.index("const RADICI"):
+                                     html.index("const RADICI") + 260])
+
+
 def prove_conta_feedback():
     """Da quante PERSONE arrivano i feedback (ago 2026). Il conteggio
     esiste per una ragione sola: sul negozio pubblico i voti escono
@@ -14024,9 +14267,12 @@ def prove_conta_feedback():
     html = open("miniapp.html", encoding="utf-8").read()
     prova("il client ha un giudice unico", True,
           "function contaFeedback(" in html)
-    # Due soli posti la mostrano (negozio e Profilo) e devono passare
-    # entrambi da li', o diventano due rese diverse della stessa cosa
-    prova("i due posti lo usano tutti e due", 2,
+    # TRE posti la mostrano — negozio, Profilo e la CLASSIFICA (ago
+    # 2026) — e devono passare tutti da li', o diventano tre rese
+    # diverse della stessa cosa. Il conto e' un CENSIMENTO: il
+    # quarto di domani fa rossa questa riga e viene a leggere il
+    # perche' invece di ricopiarsi la regola della soglia.
+    prova("i tre posti lo usano tutti e tre", 3,
           html.count("contaFeedback(") - 1)   # -1 = la definizione
 
     # La regola della soglia, rifatta qui: la seconda cifra parla SOLO
@@ -14745,7 +14991,9 @@ def _censimento(acceso):
                  "CONNETTORI_NEGOZIO_APERTI", "MAX_PRODOTTI_CONNETTORE",
                  "MAX_NUOVI_CONNETTORE_GIRO",
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
-                 "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE"):
+                 "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
+                 "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
+                 "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -30782,6 +31030,7 @@ def main():
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr,
               prove_trasloco_nostr, prove_conta_feedback,
+              prove_classifica,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,

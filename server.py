@@ -1759,6 +1759,204 @@ def livello_utente(xp: int, affari: int) -> dict:
             "nome_prossimo": pross[3] if pross else ""}
 
 
+# ------------------- LA CLASSIFICA (ago 2026) ------------------------
+# Chi sono i migliori del mercatino, in una pagina sola. Rovescia una
+# decisione scritta («Classifica fuori dalla v1 — farmare oggi e'
+# gratis: misurerebbe il tempo libero, non il commercio»), e il modo
+# in cui la rovescia E' la sostanza: non «facciamola lo stesso», ma
+# cambiare COSA si misura, cosi' che farmare non paghi piu'.
+#
+# LA FORMULA (scelta di Andrea): due fattori che si MOLTIPLICANO.
+#
+#     punteggio = F * (1 + PESO * C)
+#     F = (persone * media + K * M) / (persone + K)     la FIDUCIA
+#     C = log10(1 + xp_ordini) / log10(1 + RIF)         il COMMERCIO
+#
+# F e' una media bayesiana, e risponde alla frase che ha aperto il
+# cantiere: uno con 5,0 su due voti non vale uno con 4,8 su cinquanta.
+# Una media con pochi voti viene tirata verso quella del mercatino;
+# piu' gente ti vota, piu' la tua media conta come tua. Si spiega in
+# una riga — «una media vale di piu' quando la dicono piu' persone» —
+# ed e' la formula del Top 250 di IMDb, non un'invenzione di casa.
+#
+# PERSONE E MAI `n_feedback`: 40 voti da un account solo pesano come
+# UNO. La colonna `utenti.n_recensori` esiste dall'ago 2026 proprio
+# per questo, ma QUI NON SI LEGGE: la classifica riconta dai voti che
+# entrano davvero (sotto), e la fonte e' la tabella `feedback` — la
+# colonna e' una cache arrotondata a un decimale, e puo' restare
+# indietro (nel database di collaudo lo e' gia').
+#
+# SOLO GLI XP DEGLI ORDINI (`tipo='ordine'`), e gli altri sei tipi
+# restano fuori: sono gli unici che sono costati un pagamento
+# Lightning vero. Visita giornaliera, pubblicazione, profilo completo
+# e distintivi misurano presenza, non commercio — e sono precisamente
+# quelli che si farmano con un tocco. E' la stessa regola del
+# tariffario, applicata a chi guarda invece che a chi guadagna.
+#
+# IL LOGARITMO COMPRIME: da 100 a 1.000 XP il bonus va da +16% a
+# +25%, da 1.000 a 10.000 arriva a +33%. Raddoppiare il volume non
+# raddoppia niente — senza, un affare da 4.000 € varrebbe piu' di
+# trecento piccoli, che e' la ragione per cui i LIVELLI hanno due
+# chiavi.
+#
+# SI MOLTIPLICA E NON SI SOMMA, ed e' la riga che tiene fuori dalla
+# cima la persona sbagliata: il commercio AMPLIFICA la fiducia invece
+# di sostituirla, quindi chi ha una media bassa non risale comprando
+# volume. Provata la formula additiva sugli stessi casi: metteva primo
+# chi ha 4,2 di media e 120 affari.
+#
+# ⚠️ OGGI LA PARTE BAYESIANA E' INERTE, ed e' un fatto misurato sul
+# VPS e non una previsione: in classifica entrano 14 persone e hanno
+# TUTTE media 5,00. Con media globale 5, `(p*5 + K*5)/(p+K)` fa 5 per
+# chiunque — quindi F e' identico per tutti e a ordinare e' il solo
+# commercio. Le persone contano per CHI ENTRA, non per DOVE STA.
+# Non e' un difetto della formula: e' un mercatino giovane dove
+# nessuno ha ancora preso un voto basso. Il giorno che arriva il primo
+# 3, F ricomincia a mordere da solo, senza toccare una riga. Va detto
+# a chi guarda la pagina, o uno legge sette nomi con la stessa media e
+# non capisce perche' e' settimo: ci pensa `_medie_tutte_piene`.
+try:
+    from config import CLASSIFICA_ATTIVA
+except ImportError:
+    # SPENTA di serie, il patto di ASTA_ABILITATA e BANNER_NEGOZIO_ATTIVO
+    # — ma per una ragione sua: non muove denaro e non apre link, pero'
+    # nessuno sa quante righe escono finche' non si guarda. Si accende
+    # dal VPS dopo aver letto il conto di `classifica_prova.py`, e si
+    # spegne con una riga.
+    CLASSIFICA_ATTIVA = False
+try:
+    from config import CLASSIFICA_TOP
+except ImportError:
+    CLASSIFICA_TOP = 20         # quanti nomi escono in pubblico
+try:
+    from config import CLASSIFICA_K
+except ImportError:
+    # CINQUE e non tre, ed e' MISURATO: e' il valore che rende vera
+    # la frase con cui il cantiere e' nato. Su un mercatino con media
+    # globale 4,66, «5,0 da 2 persone» contro «4,8 da 50» da K=3
+    # esce 4,7966 contro 4,7921 — vince chi ha DUE voti — e da K=5
+    # esce 4,7579 contro 4,7874, che e' l'ordine giusto.
+    CLASSIFICA_K = 5            # quanto pesa la media del mercatino
+try:
+    from config import CLASSIFICA_XP_RIF
+except ImportError:
+    CLASSIFICA_XP_RIF = 1000    # gli XP-ordine che valgono il bonus pieno
+try:
+    from config import CLASSIFICA_PESO_XP
+except ImportError:
+    CLASSIFICA_PESO_XP = 0.25   # quanto puo' contare il commercio, al max
+
+
+def _recensore_reale(da: int, chi: int, controparti: dict) -> bool:
+    """IL FRENO (scelta di Andrea): conta come «persona» solo chi ha a
+    sua volta concluso almeno un affare con QUALCUN ALTRO che non sia
+    me.
+
+    Va piu' lontano di quanto sembri: chi si fabbrica venti identita' e
+    se le fa votare non entra NEMMENO IN CLASSIFICA — nessuna di quelle
+    venti ha un affare con un terzo, quindi i suoi recensori reali sono
+    zero e a zero non si passa il gate d'ingresso.
+
+    ALZA IL COSTO, NON LO CHIUDE, e va dichiarato: il farmer puo' far
+    commerciare le sue identita' FRA LORO prima di votarsi, e allora
+    diventano tutte «reali». Chiuderla davvero vorrebbe dire la
+    transitivita' da un seme fidato — un web-of-trust vero, che e' un
+    cantiere suo — oppure la commissione, che e' il freno che il
+    roadmap aspettava e che oggi e' a zero."""
+    return bool(controparti.get(da, ()) and
+                (set(controparti[da]) - {chi}))
+
+
+def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
+                       affari: dict, k=None, rif=None, peso=None,
+                       solo_reali: bool = True) -> list:
+    """IL GIUDICE, ed e' PURO: prende righe e ritorna la lista
+    ordinata, senza toccare il database. E' quel che lo rende
+    torturabile in CI e riusabile da `classifica_prova.py` — il patto
+    di `_coda_ricevuta` e `_regola_sconto`, «prende i CAMPI e non la
+    riga».
+
+    `voti` = [(per_tg_id, da_tg_id, voto)], `controparti` = per ogni
+    utente l'insieme di chi gli sta dall'altra parte di un ordine
+    `released`, `affari` = quanti ordini conclusi ha.
+
+    GATE D'INGRESSO: almeno un affare concluso E almeno un voto di
+    quelli che entrano nel conto. Chi non ha mai commerciato non c'e' —
+    e' una classifica del commercio, non degli iscritti.
+
+    `solo_reali=False` serve allo script di misura per far vedere cosa
+    cambierebbe senza il freno: in produzione non lo passa nessuno."""
+    # `None` e non `or`: ZERO e' un valore valido e non un
+    # «non passato» — `CLASSIFICA_PESO_XP = 0` promette nel config
+    # che la classifica torni la sola media, e con `or` quella
+    # promessa sarebbe falsa (ricadrebbe sul default). L'ha detto
+    # una prova, non la rilettura.
+    k = CLASSIFICA_K if k is None else k
+    rif = CLASSIFICA_XP_RIF if rif is None else rif
+    peso = CLASSIFICA_PESO_XP if peso is None else peso
+    per = {}
+    for chi, da, voto in voti:
+        if chi == da:
+            continue                # l'auto-voto non esiste (403), cintura
+        if solo_reali and not _recensore_reale(da, chi, controparti):
+            continue
+        per.setdefault(chi, []).append((da, voto))
+    quanti = sum(len(l) for l in per.values())
+    # La media del mercatino si calcola sui SOLI voti che entrano: se
+    # si contassero anche quelli scartati, il freno deciderebbe chi
+    # entra ma non come si pesa, e le due cose divergerebbero.
+    media_globale = (sum(v for l in per.values() for _, v in l) / quanti
+                     if quanti else 0.0)
+    fuori = []
+    for chi, l in per.items():
+        if affari.get(chi, 0) < 1:
+            continue
+        persone = len({da for da, _ in l})
+        media = sum(v for _, v in l) / len(l)
+        xp = xp_ordini.get(chi, 0)
+        fiducia = ((persone * media + k * media_globale)
+                   / (persone + k))
+        commercio = math.log10(1 + xp) / math.log10(1 + rif)
+        fuori.append({
+            "id": chi,
+            "media": media,
+            "voti": len(l),
+            "persone": persone,
+            "affari": affari.get(chi, 0),
+            "xp": xp,
+            "punti": fiducia * (1 + peso * commercio),
+        })
+    # A pari punteggio comanda l'id, o due righe identiche si
+    # scambierebbero di posto a ogni richiesta (la lezione del pareggio
+    # del podio e del cursore keyset).
+    fuori.sort(key=lambda r: (-r["punti"], r["id"]))
+    return fuori
+
+
+def _medie_tutte_piene(righe: list) -> bool:
+    """LA RIGA CHE SPIEGA UN'APPARENZA (scelta di Andrea): quando tutti
+    hanno la stessa media, chi guarda legge sette nomi con «5,00»
+    accanto e non capisce perche' e' settimo.
+
+    E' un GIUDIZIO DERIVATO DAI DATI e non un testo fisso: si accende
+    finche' e' vero e sparisce da solo quando arriva il primo voto
+    diverso — il patto degli hint contestuali («sparisce da solo quando
+    smette di essere vero») e della riga «nessun venditore usa piu'
+    questa rete». Nessuna soglia da tarare.
+
+    Serve almeno DUE righe: con una sola non c'e' nessun ordine da
+    spiegare.
+
+    ⚠️ E SI GUARDANO LE RIGHE CHE SI VEDONO, non tutta la classifica —
+    trovato col giro DAL VIVO e non rileggendo. Col conto su TUTTI, il
+    giorno che il venticinquesimo prende un 4 la riga sparisce mentre i
+    primi venti mostrano ancora una colonna di «5,00» identici: cioe'
+    si spegne esattamente nel caso per cui esiste. Guardando la fetta
+    visibile, la frase e' anche VERA su quel che c'e' a schermo."""
+    return len(righe) > 1 and len({round(r["media"], 2)
+                                   for r in righe}) == 1
+
+
 # ---------------------- I TITOLI (ago 2026) --------------------------
 # Il distintivo dice «ho fatto», il titolo dice «chi sono» — ed e' la
 # parte che si SCEGLIE. Il requisito e' sempre un fatto gia' calcolato
@@ -11384,6 +11582,141 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     return risposta
 
 
+# La classifica si calcola IN RAM e non in SQL, e non e' un vezzo: non
+# esiste un indice su `ordini(venditore_id/compratore_id)`, quindi un
+# EXISTS per riga di feedback degenererebbe in un loop annidato. Quattro
+# SELECT semplici e il resto in Python — il pattern di
+# `arricchisci_righe_vetrina`, che i campi derivati li calcola di la'.
+# MISURATO e non stimato: il calcolo puro costa 0,1 ms sui numeri di
+# oggi, 2,5 ms a 1.000 utenti con 3.000 feedback, 26,5 ms a 10.000
+# utenti con 30.000. NIENTE COLONNA MATERIALIZZATA: il progetto ha gia'
+# la regola «derivato, mai in colonna» per livelli e distintivi, e una
+# colonna invecchierebbe a ogni feedback. Il segnale per cambiare idea
+# e' la latenza dell'endpoint, non un numero di utenti.
+CACHE_CLASSIFICA = 60           # secondi, il calco di conta_pionieri
+_classifica_cache = {"quando": 0.0, "righe": [], "piene": False}
+
+
+def _dati_classifica(con):
+    """Le quattro letture, e nient'altro.
+
+    Gli AFFARI si contano dagli ORDINI e non da `vendite_ok`/
+    `acquisti_ok`: quelli sono gli unici contatori incrementali del
+    progetto, e la fonte costa una scansione che stiamo gia' facendo
+    per le controparti."""
+    controparti, affari = {}, {}
+    for r in con.execute("SELECT venditore_id, compratore_id FROM ordini "
+                         "WHERE stato='released'"):
+        v, c = r["venditore_id"], r["compratore_id"]
+        affari[v] = affari.get(v, 0) + 1
+        affari[c] = affari.get(c, 0) + 1
+        if v != c:
+            controparti.setdefault(v, set()).add(c)
+            controparti.setdefault(c, set()).add(v)
+    voti = [(r["per_tg_id"], r["da_tg_id"], r["voto"])
+            for r in con.execute("SELECT per_tg_id, da_tg_id, voto "
+                                 "FROM feedback")]
+    xp = {r["tg_id"]: r["p"] for r in con.execute(
+        "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
+        "WHERE tipo='ordine' GROUP BY tg_id")}
+    return voti, controparti, xp, affari
+
+
+def classifica_ora(con) -> tuple:
+    """La classifica di adesso, con la cache di un minuto. Ritorna
+    (righe, medie_tutte_piene). LEGGE E BASTA, come
+    `controlla_libro_mastro`: nessuna scrittura, da nessuna parte."""
+    adesso = time.time()
+    if adesso - _classifica_cache["quando"] < CACHE_CLASSIFICA:
+        return _classifica_cache["righe"], _classifica_cache["piene"]
+    voti, controparti, xp, affari = _dati_classifica(con)
+    righe = _classifica_utenti(voti, controparti, xp, affari)
+    # Sulla fetta VISIBILE e non su tutta la classifica: la riga spiega
+    # quel che chi guarda ha davanti (vedi `_medie_tutte_piene`).
+    piene = _medie_tutte_piene(righe[:CLASSIFICA_TOP])
+    _classifica_cache.update(quando=adesso, righe=righe, piene=piene)
+    return righe, piene
+
+
+@app.get("/api/classifica")
+def classifica(x_tg_init_data: str = Header(""),
+               barattolo_sessione: str = Cookie("")):
+    """I migliori del mercatino. PUBBLICA come /api/listings — la
+    reputazione di un venditore e' gia' pubblica sulla sua pagina, qui
+    cambia solo che si leggono insieme.
+
+    L'identita' e' FACOLTATIVA e serve a una cosa sola: chi ce l'ha
+    riceve IN PIU' la sua riga e la sua posizione, che a nessun altro
+    escono. Chi sta in fondo non compare mai in una lista che vedono
+    gli altri (scelta di Andrea): fuori escono i primi
+    CLASSIFICA_TOP e basta.
+
+    COSA NON ESCE MAI, ed e' la parte da non allentare: il `tg_id`
+    (che in vetrina non compare da nessuna parte), gli XP — /api/negozio
+    li toglie apposta dal pubblico, «gli XP sono roba di chi li ha, e un
+    numero altrui non aiuta nessuno a decidere se fidarsi», e USARLI per
+    ordinare non rovescia quella riga mentre PUBBLICARLI si — e il
+    PUNTEGGIO, che sarebbe un numero opaco da spiegare. Si mostrano la
+    posizione e i FATTI su cui poggia: media, da quante persone,
+    quanti affari. Sono anche quel che permette a chi guarda di
+    giudicare da se', che e' il meccanismo su cui la tolleranza agli
+    ordini fasulli conta.
+
+    I campi si ELENCANO uno per uno invece di togliere quelli di
+    troppo da un dict: la regola di CAMPI_VETRINA, e la differenza si
+    vede il giorno che il giudice ritorna una chiave nuova."""
+    if not CLASSIFICA_ATTIVA:
+        return {"attiva": False}
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        righe, piene = classifica_ora(con)
+        chi = {r["id"] for r in righe[:CLASSIFICA_TOP]}
+        io_ = None
+        if user:
+            for i, r in enumerate(righe, 1):
+                if r["id"] == user["id"]:
+                    io_ = dict(r, posizione=i)
+                    break
+        # Un giro solo sui nomi, e solo per quelli che escono davvero
+        serve = set(chi)
+        if io_:
+            serve.add(io_["id"])
+        ana = {}
+        if serve:
+            segni = ",".join("?" * len(serve))
+            ana = {r["tg_id"]: r for r in con.execute(
+                "SELECT tg_id, nome, negozio, titolo, "
+                "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
+                f"END) AS avatar FROM utenti WHERE tg_id IN ({segni})",
+                tuple(serve))}
+    finally:
+        con.close()
+
+    def voce(r, posizione):
+        u = ana.get(r["id"]) or {}
+        return {"posizione": posizione,
+                "nome": (u["nome"] if u and u["nome"] else "") or "—",
+                "negozio": (u["negozio"] if u else "") or "",
+                "avatar": (u["avatar"] if u else "") or "",
+                "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
+                "media": round(r["media"], 2),
+                "voti": r["voti"],
+                "persone": r["persone"],
+                "affari": r["affari"]}
+
+    return {"attiva": True,
+            "voci": [voce(r, i) for i, r in enumerate(
+                righe[:CLASSIFICA_TOP], 1)],
+            "totale": len(righe),
+            "medie_piene": piene,
+            # La tua riga esce solo se sei DENTRO la classifica e FUORI
+            # dai primi: dentro i primi la vedi gia', e chi non entra
+            # non ha una posizione da dire.
+            "mia": (voce(io_, io_["posizione"])
+                    if io_ and io_["posizione"] > CLASSIFICA_TOP else None)}
+
+
 @app.post("/api/listings/{annuncio_id}/rimuovi")
 async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
                                              barattolo_sessione: str = Cookie("")):
@@ -13523,6 +13856,23 @@ def _leve_stato():
                   MAX_QUANTITA_ANNUNCIO),
             _leva("Annunci diversi in un carrello", "MAX_RIGHE_SET",
                   MAX_RIGHE_SET),
+        ]},
+        {"gruppo": "🏆 Classifica", "voci": [
+            _leva("La classifica del mercatino", "CLASSIFICA_ATTIVA",
+                  bool(CLASSIFICA_ATTIVA),
+                  acceso="la pagina è raggiungibile e i primi "
+                         f"{CLASSIFICA_TOP} nomi sono pubblici",
+                  spento="la pagina non esiste per nessuno: l'endpoint "
+                         "risponde «spenta» e il bottone non compare"),
+            _leva("Nomi in pubblico", "CLASSIFICA_TOP", CLASSIFICA_TOP),
+            _leva("Peso della media del mercatino", "CLASSIFICA_K",
+                  CLASSIFICA_K),
+            _leva("XP-ordine per il bonus pieno", "CLASSIFICA_XP_RIF",
+                  CLASSIFICA_XP_RIF),
+            _leva("Quanto può contare il commercio", "CLASSIFICA_PESO_XP",
+                  CLASSIFICA_PESO_XP,
+                  spento="la classifica torna la sola media, e chi "
+                         "commercia non guadagna posizioni"),
         ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
@@ -22279,6 +22629,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["livello"] = livello_utente(
         u["xp"] if u else 0,
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
+    # La porta della classifica: il client non deve mostrare un
+    # bottone che porta a una pagina spenta. Esce il FATTO e non le
+    # tarature — K, RIF e il peso sono roba del giudice, e un
+    # numero in piu' qui non aiuterebbe nessuno a decidere niente.
+    profilo["classifica_attiva"] = bool(CLASSIFICA_ATTIVA)
     # Stessa regola dei distintivi: catalogo COMPLETO col flag, cosi'
     # chi non ha ancora sbloccato un titolo vede comunque cosa c'e' e
     # cosa serve — che e' la molla.
