@@ -2323,9 +2323,26 @@
      la lezione del listino barrato della scheda. */
   .sconto-tag{background:var(--trust-soft);color:var(--trust);
     border-radius:999px;padding:1px 8px 2px;font-size:11px;font-weight:800}
-  .acq-prezzo .acq-barrato{font-size:11.5px;color:var(--muted);
+  /* IL BARRATO HA IMPARATO ALTRE TRE CASE (ago 2026, col prezzo di
+     lancio del banner): la stessa veste serve il titolo del
+     paySheet, la testata della conferma e il cassetto del banner,
+     e una classe nuova
+     sarebbe stata la seconda copia da tenere in pari (il
+     precedente di .av-foto, che ha imparato un secondo genitore
+     per la stessa ragione).
+     ⚠️ LE FAMIGLIE DI SELETTORI SONO DUE, e la seconda non e' un
+     di piu': senza, la barratura taglia dentro «sats» — la
+     lezione scritta qui sopra, che si paga solo a schermo. Chi
+     aggiunge una QUINTA casa la aggiunge a TUTT'E DUE. */
+  .acq-prezzo .acq-barrato,
+  #payTitolo .acq-barrato,
+  #confTestata .acq-barrato,
+  #bannerBlocco .acq-barrato{font-size:11.5px;color:var(--muted);
     font-weight:600;text-decoration:line-through}
-  .acq-prezzo .acq-barrato .unit{display:inline-block}
+  .acq-prezzo .acq-barrato .unit,
+  #payTitolo .acq-barrato .unit,
+  #confTestata .acq-barrato .unit,
+  #bannerBlocco .acq-barrato .unit{display:inline-block}
   /* LA FILA DELLE PROMESSE — UNA VESTE SOLA (ago 2026, decisione di
      Andrea; nata in Paga, dal 13 ago 2026 la portano ANCHE il
      carrello e «Altri oggetti»: la classe e' .fila-promesse sui tre
@@ -14663,6 +14680,23 @@ let pollTimer = null, currentOrderId = null;
    azzerata all'ingresso degli altri flussi, o l'«Annulla» di un giro
    colpirebbe il pagamento di quello prima. */
 let pagamentoCorrente = null;
+/* Il PIENO barrato del titolo, quando il foglio veste la tassa (ago
+   2026): 0 = niente barrato. E' una variabile-modalita' come la sua
+   vicina, e il vestito la LEGGE — mai un nodo scritto da fuori.
+   LA STRADA SBAGLIATA, provata sulla carta e scartata: mettere il
+   nodo nel solo ramo 'tassa' e riempirlo da `sbloccaBanner`. Il
+   markup NASCE vestito da escrow, e li' quel nodo non c'e' — quindi
+   al primo sblocco dopo un avvio (o dopo un ordine) si scriverebbe
+   su `null`, DOPO che la fattura sul server esiste gia': il foglio
+   non si aprirebbe e chi paga non vedrebbe niente. `#payAmount`
+   sopravvive perche' lo ricreano ENTRAMBI i rami; un nodo di un ramo
+   solo quella proprieta' non ce l'ha.
+   NON SI AZZERA negli altri flussi, ed e' deliberato: il ramo escrow
+   non la legge MAI, quindi e' fail-soft per costruzione — mentre
+   `pagamentoCorrente` quel debito ce l'ha perche' governa «Annulla»
+   e «Ho pagato», cioe' denaro. Una variabile da azzerare in tre
+   posti e' una variabile che il quarto flusso di domani dimentica. */
+let sbloccoPieno = 0;
 
 /* IL PAYSHEET SERVE DUE MESTIERI DIVERSI, e da qui lo dice.
    Tre flussi su quattro depositano sats a GARANZIA e li riavranno se
@@ -14683,7 +14717,20 @@ function vestiPaySheet(modo){
      un posto solo (mostraQr) invece che da ogni flusso. */
   const cifra = (el('payAmount') || {}).textContent || '';
   if (modo === 'tassa'){
-    t.innerHTML = 'Sblocca per <span class="mono" id="payAmount" '
+    /* IL BARRATO SI DERIVA, come il modo: `sbloccoPieno` e' gia'
+       stata giudicata da chi conosce le due cifre, qui si RENDE.
+       Cosi' rivestire il foglio lo ridisegna sempre uguale, e il
+       ramo escrow qui sotto non lo nomina — quindi non c'e' niente
+       da ripulire, per costruzione e non per memoria.
+       STA PRIMA DELLA CIFRA E SENZA UNITA' SUA (visto a schermo):
+       dopo, si leggeva «10 000 sats 20 000 sats» — la stessa parola
+       due volte a tre centimetri. Messo davanti, il «sats» in fondo
+       vale per tutt'e due, ed e' la forma dei listini. */
+    const pieno = sbloccoPieno > 0
+      ? '<span class="mono acq-barrato">' + fmt(sbloccoPieno)
+        + '</span> ' : '';
+    t.innerHTML = 'Sblocca per ' + pieno
+      + '<span class="mono" id="payAmount" '
       + 'style="color:var(--sats)"></span> '
       + '<span style="font-size:12px;color:var(--muted)">sats</span>';
     p.innerHTML = 'Paga con qualsiasi wallet Lightning. Questi sats '
@@ -19956,11 +20003,21 @@ function renderBanner(){
        arriva da la' e non si scrive mai a mano (il patto di
        `max_barattolo`). */
     const prezzo = (bannerLeve.prezzo_sats || 0);
+    /* IL LISTINO STA NELLA PROSA E NON NEL BOTTONE: dentro un
+       `.btn orange` il barrato non prenderebbe la sua veste (il
+       selettore vive su altre tre case), e soprattutto il bottone
+       deve portare UNA cifra sola — quella che si paga. Qui sopra
+       si dice da dove viene lo sconto, li' sotto quanto costa. */
+    const pieno = (bannerLeve.prezzo_pieno_sats || 0) > prezzo
+      ? bannerLeve.prezzo_pieno_sats : 0;
     box.innerHTML = `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         🔒 <b style="color:var(--ink)">${perche}</b>È l'insegna che puoi
         appendere sopra il tuo catalogo — una foto e il link al tuo
         sito.</div>`
+      + (prezzo && pieno ? `
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
+        <s class="acq-barrato">${fmt(pieno)} <span class="unit">sats</span></s> <b style="color:var(--ink)">offerta di lancio</b></div>` : '')
       + (prezzo ? `
       <button class="btn orange" style="margin-top:12px"
               onclick="chiediSblocco()">⚡ Sbloccalo subito per
@@ -20133,8 +20190,20 @@ function chiediSblocco(){
   if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
   const prezzo = (bannerLeve && bannerLeve.prezzo_sats) || 0;
   if (!prezzo) return;
+  /* IL BARRATO VA NELLA TESTATA e non nel corpo, ed e' l'unico
+     posto dove puo' stare: `confCorpo` si scrive col textContent
+     — il patto dei testi NUDI — quindi li' un <s> uscirebbe a
+     lettere. La testata e' innerHTML e oggi questo foglio non la
+     usa: stessa forma di `testataOfferta`.
+     E' il momento in cui si DECIDE di pagare, quindi la
+     promozione vale qui piu' che nel paySheet, dove la decisione
+     e' gia' presa. */
+  const pieno = (bannerLeve.prezzo_pieno_sats || 0) > prezzo
+    ? bannerLeve.prezzo_pieno_sats : 0;
   chiediConferma({
     titolo: 'Sbloccare il banner?',
+    testata: pieno
+      ? `<s class="acq-barrato">${fmt(pieno)} <span class="unit">sats</span></s><b>offerta di lancio</b>` : '',
     corpo: `Paghi ${fmt(prezzo)} sats e la porta si apre subito. `
          + 'Si paga una volta sola, non è un abbonamento.\n\n'
          + 'Quello che compri è la porta, non il banner: l\'insegna '
@@ -20158,15 +20227,28 @@ async function sbloccaBanner(){
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   } catch(e) { toast('Rete assente: riprova'); return; }
   pagamentoCorrente = d.pagamento_id;
+  /* IL BARRATO SI GIUDICA CONTRO LA FATTURA, mai contro la leva
+     (`bannerLeve.prezzo_sats`): sulla RIPRESA si paga un importo
+     fotografato mezz'ora fa, e nel frattempo il prezzo puo'
+     essere cambiato — confrontando la leva si barrerebbe una
+     cifra che con questa fattura non c'entra. Qui c'e' l'unico
+     posto che conosce tutt'e due i numeri, quindi si decide una
+     volta sola; e sta PRIMA di `mostraQr`, che e' la regia del
+     vestito e la legge. */
+  const _pieno = (bannerLeve && bannerLeve.prezzo_pieno_sats) || 0;
+  sbloccoPieno = _pieno > d.importo_sats ? _pieno : 0;
   el('payAmount').textContent = fmt(d.importo_sats);
   /* il conto si scrive a mano: una cifra piatta non ha voci da
      scomporre, e `contoScomposto` su di lei torna stringa vuota */
   el('payScomposto').innerHTML = '';
   const nota = el('payEurNota');
   nota.style.display = '';
-  nota.textContent = d.ripresa
+  /* la parola sta nella nota e non nel titolo: li' il barrato dice
+     gia' il fatto, e la riga sotto dice che e' a tempo */
+  const _lancio = sbloccoPieno ? 'Offerta di lancio. ' : '';
+  nota.textContent = _lancio + (d.ripresa
     ? 'È la fattura che avevi già chiesto: vale ancora.'
-    : 'La fattura vale 15 minuti.';
+    : 'La fattura vale 15 minuti.');
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   el('sheetBg').classList.add('open');

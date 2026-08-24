@@ -14695,6 +14695,13 @@ def _censimento(acceso):
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE"):
         amb[nome] = acceso and 24
+    # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
+    # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
+    # pieno il giudice direbbe «uguali, nessuna promozione» e la riga
+    # uscirebbe SPENTA pure a leve accese — la prova certificherebbe
+    # il contrario di quel che il pannello fa. Con 70 contro 7 il
+    # barrato esce; a leve spente `acceso and` lo azzera da solo.
+    amb["BANNER_PREZZO_PIENO_SATS"] = acceso and 70
     # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
     # decide il bot e il giudice e' `canale_id()`, che va a leggere il
     # database. Qui si stuba — al pannello interessa il FATTO, e
@@ -14720,7 +14727,14 @@ def _censimento(acceso):
         amb["TELEGRAM_CANALE_ID"] = ""
         amb["CHIAVE_CONTENUTI_DIGITALI"] = ""
         amb["ADMIN_IDS"] = []
-    for f in ("webhook_attivo", "_leva", "_elenco", "_leve_stato"):
+    # ⚠️ `_prezzo_banner` va exec'ato PRIMA di `_leve_stato`, che lo
+    # chiama: senza, `__missing__` lo risolve a 7 e la prova non
+    # diventa rossa — ESPLODE con «int object is not callable»,
+    # e chi la legge va a cercare dalla parte sbagliata. E' la
+    # stessa trappola che il docstring di `_ConfigFinto` avverte
+    # per le leve-LISTA, con una causa nuova.
+    for f in ("webhook_attivo", "_leva", "_elenco",
+              "_prezzo_banner", "_leve_stato"):
         exec(pezzo(f), amb)
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -15755,6 +15769,28 @@ def prove_leve():
     prova("...e da zero dice cosa comporta", True,
           "vetrina" in voci_off.get("MAX_NUOVI_CONNETTORE_GIRO",
                                     {}).get("nota", ""))
+
+    # IL PIENO BARRATO DEL BANNER, e qui la prova non guarda la leva
+    # ma il GIUDICE: e' alla lettera la trappola che questa pagina
+    # esiste per non far ricadere. Nel censimento acceso il prezzo
+    # vale 7 (il default di `__missing__`) e il pieno 70, quindi il
+    # barrato esce 70; a leve spente il pieno e' 0 e con lui il
+    # giudizio — che e' anche il caso «promozione spenta».
+    prova("il pannello dice il pieno EFFETTIVO, non la costante",
+          70, voci_on.get("BANNER_PREZZO_PIENO_SATS", {}).get("valore"))
+    prova("...e a leva spenta dice 0", 0,
+          voci_off.get("BANNER_PREZZO_PIENO_SATS", {}).get("valore"))
+    # LA NOTA COPRE ANCHE IL CASO STORTO: un moderatore che legge 0
+    # deve poter distinguere «l'ho spenta io» da «l'ho scritta piu'
+    # bassa del prezzo e non morde».
+    prova("...dicendo che vale anche col pieno non piu' alto", True,
+          "piu' ALTO" in voci_off.get("BANNER_PREZZO_PIENO_SATS",
+                                      {}).get("nota", ""))
+    # E CHIEDE AL GIUDICE PER DAVVERO: senza questa, il pannello
+    # potrebbe tornare alla costante e le due righe qui sopra
+    # resterebbero verdi per caso (70 > 7 in tutti e due i modi).
+    prova("...e il valore passa dal giudice", True,
+          "_prezzo_banner(" in codice(pezzo("_leve_stato")))
 
     # --- 2) LA FORMA ---------------------------------------------
     prova("ogni gruppo ha delle voci", True,
@@ -27006,6 +27042,41 @@ def prove_banner_negozio():
     prova("...anche nel config d'esempio", True,
           "BANNER_PREZZO_SATS = 10_000"
           in open("config_esempio.py", encoding="utf-8").read())
+    # E IL PIENO BARRATO, la sua gemella (ago 2026). ⚠️ Le quattro
+    # righe cercano il letterale CON l'underscore: chi riformatta un
+    # default le fa rosse tutte insieme, ed e' voluto — quei due
+    # numeri sono la sola cosa che tiene in pari il codice e il file
+    # da cui si copia sul VPS.
+    prova("il pieno barrato e' una leva col suo default", True,
+          "BANNER_PREZZO_PIENO_SATS = 20_000" in src)
+    prova("...anche nel config d'esempio", True,
+          "BANNER_PREZZO_PIENO_SATS = 20_000"
+          in open("config_esempio.py", encoding="utf-8").read())
+    # LA RIGA DA NON AMMORBIDIRE: il pieno e' un ORNAMENTO, e
+    # l'endpoint che stacca la fattura non lo nomina AFFATTO — non
+    # nella invoice, non nell'INSERT, non nella risposta. Chi lo fa
+    # entrare la' dentro fa uscire dalla cassaforte una cifra che
+    # nessuno ha incassato, e la ricevuta smette di dire quel che si
+    # e' pagato. Si guarda il CODICE e non i commenti: la funzione lo
+    # nomina apposta nel suo, per dire che non lo tocca.
+    prova("il pieno non entra nella fattura dello sblocco", False,
+          "PIENO" in codice(pezzo("sblocca_banner")))
+    # E IL PROFILO GIUDICA, invece di mandare la leva GREZZA: senza
+    # questa riga il cassetto riceverebbe un listino anche quando non
+    # e' piu' alto del prezzo, e barrerebbe una cifra uguale alla sua
+    # — la mutazione era SOPRAVVISSUTA al primo giro di tortura.
+    _mp = codice(pezzo("mio_profilo"))
+    prova("il profilo manda il pieno GIUDICATO", True,
+          '"prezzo_pieno_sats": _pz_ban[1]' in _mp)
+    # ...e la leva grezza la nomina UNA volta sola: dentro la
+    # chiamata al giudice. Un secondo uso li' dentro sarebbe la
+    # strada da cui la costante rientra.
+    prova("...e la leva la nomina solo per darla al giudice", 1,
+          _mp.count("BANNER_PREZZO_PIENO_SATS"))
+    # ...e nemmeno nelle due strade del denaro a valle, che leggono
+    # SOLO l'importo fotografato in colonna.
+    for _f in ("_incassa_sblocco", "_rimborsa_sblocco"):
+        prova(f"...ne' in {_f}", False, "PIENO" in codice(pezzo(_f)))
     # LA TABELLA E' IL VERO CONTENUTO DEL CANTIERE: senza una riga
     # per ogni incasso nostro, la riconciliazione con LNbits («ogni
     # incasso senza riga e' un orfano») diventerebbe falsa il giorno
@@ -27123,6 +27194,39 @@ def prove_banner_negozio():
         _obbl = True
     prova("lo sblocco e' un argomento obbligatorio, senza default",
           True, _obbl)
+
+    # ---- 3-bis. IL PREZZO E IL SUO BARRATO (ago 2026) -------------
+    # Il pieno e' un ORNAMENTO e non entra mai nel conto: qui si
+    # prova QUANDO si mostra, e i tre casi che NON lo mostrano
+    # valgono piu' di quello che lo mostra.
+    exec(pezzo("_prezzo_banner"), amb2)
+    pz = amb2["_prezzo_banner"]
+    prova("una promozione vera si barra", (10_000, 20_000),
+          pz(10_000, 20_000))
+    # UGUALE: la stessa cifra sopra se' stessa non e' una riga, e'
+    # un refuso — ed e' anche il modo di spegnere la promozione.
+    prova("un pieno UGUALE al prezzo non si barra", (10_000, 0),
+          pz(10_000, 10_000))
+    # PIU' BASSO: barrarlo si leggerebbe come un aumento. Serve una
+    # prova SUA, o la mutazione `>` -> `!=` passerebbe liscia.
+    prova("...e un pieno piu' BASSO nemmeno", (10_000, 0),
+          pz(10_000, 5_000))
+    prova("il pieno non dichiarato non si barra", (10_000, 0),
+          pz(10_000, 0))
+    # A prezzo spento non c'e' niente in vendita, quindi niente da
+    # barrare: un listino accanto a un bottone che non nasce.
+    prova("a sblocco spento non si barra niente", (0, 0),
+          pz(0, 20_000))
+    prova("...e un prezzo negativo vale zero, non se stesso", (0, 0),
+          pz(-5, 20_000))
+    prova("i None non esplodono", (0, 0), pz(None, None))
+    # IL CONTRATTO DEL CLIENT, in una riga: mai un listino senza un
+    # bottone che lo sconti — se la seconda cifra c'e', c'e' anche
+    # la prima.
+    prova("un barrato implica sempre un prezzo", True,
+          all(not b or p > 0 for p, b in
+              (pz(a, c) for a in (0, -1, 10_000)
+               for c in (0, 5_000, 10_000, 20_000))))
 
     # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago
     # 2026, dal campo): il messaggio nominava il solo affare concluso,
@@ -27423,6 +27527,115 @@ def prove_banner_negozio():
           True, "trust-note" not in chiusa)
     prova("il 400 si rende dentro il cassetto, non in un toast", True,
           "bannerErrore" in pezzo_js(mini, "async function salvaBanner(", "\n}"))
+
+    # ---- 9-bis. IL PREZZO DI LANCIO, BARRATO (ago 2026) -----------
+    # Il pieno arriva GIA' GIUDICATO dal server (>0 solo se c'e' una
+    # promozione vera): di qua si legge e si disegna, mai si giudica
+    # una seconda volta — il patto di `_sconto_pubblico`.
+    prova("il cassetto legge il pieno dal server", True,
+          "bannerLeve.prezzo_pieno_sats" in chiusa)
+    # IL VESTITO DEL BARRATO VIVE IN QUATTRO CASE, e le due famiglie
+    # di selettori vanno tenute in pari: senza la seconda la
+    # barratura taglia dentro «sats», che e' una lezione gia' scritta
+    # nel foglio e che nessuna prova sorvegliava (la mutazione che la
+    # toglieva e' sopravvissuta al primo giro).
+    for _casa in ("#payTitolo", "#confTestata", "#bannerBlocco"):
+        prova(f"il barrato ha la sua veste in {_casa}", True,
+              f"{_casa} .acq-barrato{{" in mini
+              or f"{_casa} .acq-barrato," in mini)
+        prova(f"...e li' «sats» non si spezza", True,
+              f"{_casa} .acq-barrato .unit" in mini)
+    # LA CIFRA NON SI SCRIVE MAI A MANO: il client non conosce il
+    # listino, lo riceve (il patto di `max_barattolo`).
+    prova("...e nessuna cifra e' battuta li' dentro", True,
+          "20000" not in chiusa and "20.000" not in chiusa)
+    # IL LISTINO STA NELLA PROSA e non dentro il bottone: li' il
+    # barrato non prenderebbe la sua veste, e il bottone deve portare
+    # UNA cifra sola — quella che si paga.
+    _btn = chiusa[chiusa.index('<button class=\"btn orange\"'):]
+    prova("il barrato non finisce dentro il bottone", True,
+          "acq-barrato" in chiusa and "acq-barrato" not in _btn)
+    # IL BARRATO SI DERIVA DA UNA VARIABILE-MODALITA', come il modo:
+    # un nodo nel solo ramo 'tassa' non esisterebbe ancora quando
+    # `sbloccaBanner` ci scrive (il markup NASCE vestito da escrow),
+    # e si scriverebbe su null DOPO che la fattura esiste gia': il
+    # foglio non si aprirebbe e chi paga non vedrebbe niente.
+    _vesti = pezzo_js(mini, "function vestiPaySheet(modo){", "\n}")
+    _tassa = _vesti[_vesti.index("if (modo === 'tassa')"):]
+    # LA PROVA CHE CONTA LO FA GIRARE, e non lo guarda: la sentinella
+    # di prima chiedeva che i due nomi comparissero nel ramo, e
+    # restava VERDE con la concatenazione tolta — il barrato
+    # calcolato e poi buttato via. L'ha detto la tortura, non la
+    # rilettura. Qui `vestiPaySheet` gira su un DOM di cartone e si
+    # guarda il titolo che ne esce, che e' la sola domanda vera:
+    # «il barrato ci finisce dentro?».
+    # node serve solo qui dentro, e come nelle sorelle si prende in
+    # locale: senza, si SALTA contando — il patto di `salta`.
+    import json as _js, shutil as _sh, subprocess as _sp
+    node = _sh.which("node")
+    if node:
+        _corpo = pezzo_js(mini, "function vestiPaySheet(modo){", "\n}")
+        _js_v = (
+            "const N={};const el=i=>N[i]||(N[i]={innerHTML:'',textContent:''});"
+            "const fmt=n=>String(n);let sbloccoPieno=0;"
+            + _corpo + "\n}\n"
+            "sbloccoPieno=20000;el('payAmount').textContent='10000';"
+            "vestiPaySheet('tassa');const con=el('payTitolo').innerHTML;"
+            "sbloccoPieno=0;vestiPaySheet('tassa');"
+            "const senza=el('payTitolo').innerHTML;"
+            "vestiPaySheet('escrow');"
+            "const esc=el('payTitolo').innerHTML;"
+            "console.log(JSON.stringify({con,senza,esc,"
+            "cifra:el('payAmount').textContent}));")
+        _r = _sp.run([node, "-e", _js_v], capture_output=True,
+                     text=True, encoding="utf-8")
+        try:
+            _t = _js.loads((_r.stdout or "").strip())
+        except Exception:
+            _t = {"con": (_r.stderr or "")[:200], "senza": "",
+                  "esc": "", "cifra": ""}
+        prova("col pieno, il titolo della tassa PORTA il barrato", True,
+              "acq-barrato" in _t["con"] and "20000" in _t["con"])
+        prova("...a pieno zero non lo porta", True,
+              "acq-barrato" not in _t["senza"])
+        prova("...e il ramo escrow non lo porta MAI", True,
+              "acq-barrato" not in _t["esc"] and "garanzia" in _t["esc"])
+        # E LA CIFRA NON SI PERDE nel giro: e' la ragione per cui
+        # `vestiPaySheet` la conserva, e adesso c'e' la prova.
+        prova("...e la cifra sopravvive a tre vestizioni", "10000",
+              _t["cifra"])
+    else:
+        salta("il titolo della tassa col barrato (serve node)")
+    # ...e il ramo escrow non lo nomina: e' cio' che rende il cambio
+    # d'abito pulito PER COSTRUZIONE, senza una riga di pulizia da
+    # ricordare in ogni flusso che apre il foglio.
+    _escrow = _vesti[_vesti.index("a garanzia"):]
+    prova("...e il ramo escrow non lo nomina affatto", True,
+          "sbloccoPieno" not in _escrow and "acq-barrato" not in _escrow)
+    # LA CINTURA: si giudica contro l'importo DELLA FATTURA e mai
+    # contro la leva — sulla RIPRESA si paga una cifra fotografata
+    # mezz'ora fa, e nel frattempo il prezzo puo' essere cambiato.
+    _sb = pezzo_js(mini, "async function sbloccaBanner(){", "\n}")
+    prova("il barrato del foglio si giudica sulla fattura", True,
+          "sbloccoPieno = _pieno > d.importo_sats" in _sb)
+    # E STA PRIMA DELLA REGIA: `mostraQr` veste il foglio leggendo
+    # quella variabile, quindi scriverla dopo la mostrerebbe un giro
+    # in ritardo — la gemella della mutazione su `payAmount`.
+    prova("...e si scrive prima di mostraQr", True,
+          _sb.index("sbloccoPieno =") < _sb.index("mostraQr("))
+    # LA PAROLA sta nei tre posti e in nessun altro: e' l'unica cosa
+    # che dice che il prezzo e' temporaneo, e non promette una data.
+    _conf = pezzo_js(mini, "function chiediSblocco(){", "\n}")
+    for _dove, _p in (("il cassetto", chiusa), ("il foglio", _sb),
+                      ("la conferma", _conf)):
+        prova(f"«offerta di lancio» in {_dove}", True,
+              "offerta di lancio" in _p.lower())
+    # IL BARRATO DELLA CONFERMA VA NELLA TESTATA: `confCorpo` si
+    # scrive col textContent — il patto dei testi NUDI — quindi un
+    # <s> nel corpo uscirebbe a lettere.
+    prova("la conferma barra nella testata, non nel corpo", True,
+          "testata:" in _conf and "<s class=" in _conf
+          and "<s class=" not in _conf[_conf.index("corpo:"):])
 
     # ---- 10. Il campo del link: «https://» e' il PREFISSO ----------
     # Sta a sinistra, in grigio, dentro il riquadro: si vede che e'

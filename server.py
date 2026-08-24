@@ -1049,6 +1049,22 @@ try:
     from config import BANNER_PREZZO_SATS
 except ImportError:
     BANNER_PREZZO_SATS = 10_000
+# E IL PREZZO PIENO, quello BARRATO accanto (ago 2026): la cifra qui
+# sopra e' un'offerta di lancio, e senza una seconda leva non c'era
+# modo di dirlo — si leggeva come il listino.
+# NON ENTRA MAI NEL CONTO, ed e' la riga da non ammorbidire: quel che
+# si paga resta BANNER_PREZZO_SATS, e `sblocca_banner` questo nome non
+# lo nomina affatto (c'e' la sentinella). E' un ORNAMENTO — la
+# parentela e' con `ordini.sconto_sats`, la colonna TESTIMONE che non
+# e' un motore.
+# Si spegne mettendolo a 0 o UGUALE al prezzo: barrare la stessa cifra
+# sopra se' stessa non e' una riga, e' un refuso (la regola di
+# `piuBasso`), e un pieno piu' BASSO non si barra mai — si leggerebbe
+# come un aumento. A giudicare e' `_prezzo_banner`, in un posto solo.
+try:
+    from config import BANNER_PREZZO_PIENO_SATS
+except ImportError:
+    BANNER_PREZZO_PIENO_SATS = 20_000
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -1835,6 +1851,31 @@ def banner_porta_aperta(xp: int, affari: int, livello_minimo: str,
     o di ereditare una soglia che non ha scelto."""
     return bool(sbloccato_il) or livello_utente(
         xp, affari)["numero"] >= _gradino_livello(livello_minimo)
+
+
+def _prezzo_banner(prezzo: int, pieno: int) -> tuple:
+    """Quanto si paga per la porta, e quanto si BARRA accanto.
+
+    Torna `(paga, barrato)`, e la seconda meta' e' un ORNAMENTO: il
+    conto e' sempre e solo la prima. Chi lo dimentica farebbe uscire
+    dalla cassaforte una cifra che nessuno ha incassato — la stessa
+    trappola di `ordini.sconto_sats`, che e' una colonna TESTIMONE.
+    IL BARRATO SOLO SE STRETTAMENTE MAGGIORE, e i tre casi che cadono
+    valgono piu' di quello che passa: UGUALE non e' una riga ma un
+    refuso (la regola di `piuBasso` — la stessa cifra sopra se'
+    stessa), ed e' anche il modo di SPEGNERE la promozione senza una
+    leva in piu'; piu' BASSO non si barra MAI, perche' si leggerebbe
+    come un aumento; e a prezzo spento non c'e' niente in vendita,
+    quindi niente da barrare.
+    Degrada IN SILENZIO (decisione di Andrea): nessun allarme, che una
+    leva scritta storta non deve poter spegnere una vetrina — e a dire
+    perche' non morde c'e' la nota del pannello delle leve.
+    PURA, e prende i CAMPI e non le leve (il patto di `in_ferie` e di
+    `_regola_sconto`): cosi' la servono il profilo e il pannello, e si
+    tortura in CI senza un config."""
+    paga = max(0, int(prezzo or 0))
+    barrato = int(pieno or 0)
+    return paga, (barrato if paga > 0 and barrato > paga else 0)
 
 
 # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago 2026,
@@ -13195,6 +13236,20 @@ def _leve_stato():
                   "BANNER_PREZZO_SATS", int(BANNER_PREZZO_SATS or 0),
                   spento="si apre solo col livello: nessuno puo' "
                          "anticiparla pagando"),
+            # IL VALORE E' QUELLO EFFETTIVO, dal giudice e non dalla
+            # costante: e' alla lettera la trappola che questa pagina
+            # esiste per non far ricadere. Un pieno che non morde
+            # (uguale al prezzo, o piu' basso) qui si legge 0, e a
+            # dire PERCHE' e' la nota — senza, un moderatore che ha
+            # scritto 5.000 nel config non saprebbe distinguere «l'ho
+            # spenta io» da «ho sbagliato a scriverla».
+            _leva("Banner: prezzo pieno barrato (sats)",
+                  "BANNER_PREZZO_PIENO_SATS",
+                  _prezzo_banner(BANNER_PREZZO_SATS,
+                                 BANNER_PREZZO_PIENO_SATS)[1],
+                  spento="nessun barrato: si vede la sola cifra che si "
+                         "paga (e' cosi' anche quando il pieno non e' "
+                         "piu' ALTO del prezzo)"),
             _leva("Banner: domini vietati", "BANNER_LINK_VIETATI",
                   len(BANNER_LINK_VIETATI),
                   spento="nessun accorciatore fermato: un link corto si "
@@ -21791,6 +21846,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     _sbl_ban = (u["banner_sbloccato_il"] or 0) if u else 0
     _porta_ban = bool(u) and banner_porta_aperta(
         _xp_ban, _aff_ban, BANNER_LIVELLO, _sbl_ban)
+    _pz_ban = _prezzo_banner(BANNER_PREZZO_SATS,
+                             BANNER_PREZZO_PIENO_SATS)
     profilo["banner_leve"] = {
         "attivo": bool(BANNER_NEGOZIO_ATTIVO),
         "livello": BANNER_LIVELLO,
@@ -21800,7 +21857,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # IL PREZZO ARRIVA DAL SERVER e il client non lo scrive mai a
         # mano (il patto di `max_barattolo`): a 0 lo sblocco a
         # pagamento e' spento e il bottone non nasce affatto.
-        "prezzo_sats": int(BANNER_PREZZO_SATS or 0),
+        "prezzo_sats": _pz_ban[0],
+        # E IL PIENO BARRATO accanto, GIA' GIUDICATO: esce >0 SOLO
+        # quando c'e' una promozione vera — la regola d'oro di
+        # `_sconto_pubblico`, cosi' il client legge e non giudica.
+        # Un client rimasto in cache non conosce la chiave e non
+        # disegna niente: un'omissione, mai una bugia.
+        "prezzo_pieno_sats": _pz_ban[1],
         # QUANDO l'ha pagata: serve al cassetto per dire «l'hai
         # sbloccata» invece di ripetere la strada del livello a chi
         # l'ha gia' percorsa in un altro modo.
