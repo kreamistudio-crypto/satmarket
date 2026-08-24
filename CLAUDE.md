@@ -2315,96 +2315,163 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   vetrina filtrata in una richiesta sola), ma da dentro l'app quel
   link non si poteva PRENDERE — chi voleva mandarlo doveva ricordarsi
   l'indirizzo a memoria. È il difetto da cui è nato `sicuShare`.
-  NON SULLA CARD DELLA STRISCIA (decisione di Andrea): è larga 84px e
-  ha già DUE gesti — tocca per filtrare, ritocca per uscire — e un
-  terzo bersaglio lì è ciò che il progetto rifiuta altrove (il
-  barattolino e il rifornimento non convivono mai sullo stesso
-  angolo); l'unico gesto rimasto sarebbe un long-press, che non lo
-  scopre nessuno. E la striscia è la MAPPA, mentre condividere è
-  un'AZIONE: le azioni vivono dove c'è il contesto, la regola dei
-  badge della coda «⏸ Ordini fermi», che sono solo navigazione. Sta
-  DENTRO la vetrina filtrata, dove ci arriva anche chi il link lo
-  riceve e può quindi ri-condividerlo.
-  E NEMMENO DENTRO LA RIGA `.strumenti`, ed è MISURATO e non stimato:
-  a 320 col caso peggiore («830 risultati») l'etichetta
-  dell'ordinamento ha ESATTAMENTE i 62px che le servono; con una
-  quarta pillola scende a 34 — «Più recenti» diventa «Più …», e
-  «Prezzo: dal più basso» e «dal più alto» diventano tutt'e due
-  «Pre…», cioè due voci diverse che si leggono UGUALI. È lo stesso
-  muro per cui da quella riga sono state tolte le emoji dei contatori
-  (~22px l'una) per farla stare a 360. Quindi una riga sua
-  (`.cat-share`), sotto, e SOPRA il pannello Filtri: aperto quello, un
-  bottone in coda sembrerebbe parte del form dei filtri.
-  IL PREZZO È VERTICALE E STA SCRITTO: ~37px, cioè la griglia dopo
-  `scorriAlReparto` passa da 249 a **212** a 320×568 (265 → 228 a 360
-  e 375). Si spendono solo DENTRO un reparto, e l'arrivo dello scroll
-  NON si muove (219): il bottone è un FRATELLO di `.strumenti`, non un
-  figlio. Chi allarga quella riga rifaccia questo conto.
-  IL GIUDICE È `renderCondividiCategoria`, TRE clausole e tre ragioni
-  DIVERSE — nessuna ridondante: senza reparto non c'è niente da
-  condividere («Tutto» è la home, che un link ce l'ha già); col
-  BARATTOLO acceso `activeCat` può essere rimasta accesa
-  (`alternaBarattolo` non l'azzera) ma quella vetrina non è il reparto
-  — è la ragione per cui lì `body.solo-barattolo` spegne anche Ordina
-  e Filtri; in DEMO `location.origin` non è un indirizzo e il link
-  uscirebbe rotto, il patto di `sicuShare`. `VETRINA` NON c'è, ed è
-  deliberato: chi arriva dal web è proprio chi condivide, e un
-  `!VETRINA` lo spegnerebbe dove serve di più. Sul ramo ASTE nemmeno
-  (`vaiAste` non azzera `activeCat`): il filtro delle aste è roba
-  della VISTA come il prezzo o l'ordinamento, e un controllo che
-  sparisce passando fra due tab per una ragione invisibile è il
-  contrario di «un gesto, un significato». E sulla RICERCA niente:
-  `doSearch` chiama `spegniReparto()`, quindi il reparto è spento PER
-  COSTRUZIONE — c'è la prova che difende quella costruzione invece di
-  ricopiarla nel giudice. Vive in `renderChips` e non in `renderGrid`
-  perché `spegniReparto` chiama la prima e NON la seconda: là il
-  bottone sopravvivrebbe al reparto spento fino all'arrivo dei
-  risultati, o per sempre se la fetch fallisce. E in TESTA come la
-  striscia, per una ragione in più: col barattolo deve SPARIRE, e
-  sotto il `return` non lo spegnerebbe nessuno.
-  LA PAROLA PORTA LA PROMESSA — «Condividi **LA** categoria», mai
-  «questa pagina» come la sorella di `/sicurezza`: il link è del
-  REPARTO e non della vista, non porta filtri, prezzo, regione,
-  ordinamento né il ramo Aste, e non potrebbe (`/categoria/{slug}` non
-  li sa portare e il server non li leggerebbe). «Questa» punterebbe a
-  ciò che si sta guardando; l'articolo determinativo punta alla COSA.
-  Una parola, zero pixel, e diventa una sentinella secca.
+  IL GESTO È IL TOCCO LUNGO SULLA CARD (ago 2026, decisione di Andrea
+  che ROVESCIA il giro prima, «NON SULLA CARD DELLA STRISCIA»). IL
+  PERCHÉ DI ALLORA VA TENUTO perché è ancora tutto vero: la card è
+  larga 84px e ha già DUE gesti (tocca per filtrare, ritocca per
+  uscire), un terzo bersaglio lì è ciò che il progetto rifiuta altrove
+  (il barattolino e il rifornimento non convivono mai sullo stesso
+  angolo), l'unico gesto rimasto è un long-press CHE NON LO SCOPRE
+  NESSUNO, e la striscia è la MAPPA mentre condividere è un'AZIONE.
+  IL PERCHÉ CHE LO SUPERA È UN NUMERO: il bottone costava UNA RIGA
+  VERTICALE — ~37px tolti alla griglia DENTRO OGNI REPARTO, cioè la
+  prima fila di card scesa da 249 a 212 a 320×568 — e il gesto non
+  costa un pixel (misurato: la sezione resta 157px ESATTI a
+  320/360/375 nei due temi, e la pagina non scorre di lato). Il costo
+  della scopribilità è ACCETTATO da Andrea, e a pagarlo il meno
+  possibile c'è l'accenno.
+  L'ACCENNO È UN TOAST, UNA VOLTA SOLA, ed è la risposta alla domanda
+  «c'è un modo di farlo scoprire senza aggiungere pixel?»: al PRIMO
+  ingresso in un reparto, 900 ms dopo, «💡 Tieni premuta una categoria
+  per condividerla» per 4,2 secondi. Un TOAST e non una riga perché è
+  sovrapposto — se ne va da solo e non sposta niente, l'unica forma a
+  zero pixel di layout — e si consuma col timbro degli hint
+  (`barattolo_hint.condcat`): per dispositivo e per sempre.
+  LA GUARDIA È `DEMO` E NON `hintAttivi()`, ed è una divergenza VOLUTA:
+  gli altri hint parlano di cose che un anonimo non può fare, questo
+  annuncia un gesto che in VETRINA funziona benissimo — e chi arriva
+  dal web è precisamente chi condivide. La guardia è quella del GESTO:
+  si accenna solo dove il gesto esiste.
+  IL FILTRO NON DEVE SCATTARE AL RILASCIO, ed è la convivenza che
+  Andrea ha chiesto di guardare: al `pointerup` il browser manda
+  COMUNQUE un click sulla card, quindi senza la bandierina
+  `premutaFatta` chi condivide si ritroverebbe anche DENTRO il reparto
+  — o FUORI, se la card premuta era quella accesa, dove il tocco è il
+  ritocco che esce. DUE righe da non ammorbidire: il `preventDefault()`
+  viene PRIMA della bandierina (dopo, il click seguirebbe l'href della
+  card e ricaricherebbe 900 KB), e la bandierina SI AZZERA a ogni
+  `pointerdown` — senza, un gesto lungo che NON produce un click (il
+  dito che scivola, il foglio di sistema che si prende il rilascio) la
+  lascerebbe alzata a mangiare il tocco successivo.
+  IL GESTO È DELEGATO SULLA STRISCIA e non poteva essere altrimenti:
+  `renderStriscia` riscrive l'innerHTML della fila, quindi ascoltatori
+  appesi alle celle morirebbero al primo render. E le celle non
+  guadagnano un terzo `onclick`: il gesto guarda
+  `.cat-cella[data-cat]`, cioè la card «Tutto» resta fuori PER
+  COSTRUZIONE senza un ramo apposta — quella un link ce l'ha già, è la
+  home. Lo scorrimento ANNULLA (`PREMUTA_SCARTO` 10px, più
+  `pointerup`/`pointercancel`/`pointerleave` e lo `scroll` della fila):
+  la striscia si scorre di lato, e senza quella riga chi la scorre si
+  ritroverebbe un foglio di condivisione in faccia. `PREMUTA_MS` è 500
+  e non 400: sotto, il gesto scatta scorrendo piano.
+  IL MENU DEL SISTEMA VA SPENTO, MA SOLO COL DITO: la card è un `<a>`
+  VERO (i crawler devono poterla seguire) e su un link il tocco lungo
+  apre il menu del telefono, che si prenderebbe il nostro gesto — da
+  cui `-webkit-touch-callout:none` con la selezione spenta, e il
+  `contextmenu` fermato SOLO quando `pointerType !== 'mouse'`. Sul
+  computer il tasto destro su un link vero è esattamente ciò che quel
+  link esiste per offrire, e resta (verificato dal vivo).
+  LA FUNZIONE PRENDE LA CATEGORIA e NON legge `activeCat`: si condivide
+  LA CARD PREMUTA, che può non essere il reparto acceso — leggendo la
+  variabile si manderebbe in giro il link di un'altra cosa, e quel
+  difetto non fallisce: manda il link sbagliato, e basta. LE DUE
+  CINTURE stanno lì dentro, dove il link si COSTRUISCE, così le eredita
+  ogni strada futura invece di vivere in un giudice a parte: in DEMO
+  `location.origin` non è un indirizzo (il patto di `sicuShare`) e
+  «Tutto» non è un reparto. `VETRINA` NON c'è, ed è deliberato.
   E NESSUN CONTEGGIO nel testo che accompagna il link, ed è la riga da
   non «migliorare»: il numero a schermo è quello della VISTA, e dentro
   un messaggio che non invecchia si leggerebbe come quello della
   categoria. Il conto vero lo mette il SERVER nell'`og:description`,
   dove è fresco per costruzione.
-  L'ANTEPRIMA HA TITOLO, DESCRIZIONE, URL E CANONICAL SUOI MA
-  L'IMMAGINE GENERICA (imperfezione dichiarata, decisione di Andrea):
-  `_seo_categoria` non passa `immagine=` a `_testa_seo`, quindi ricade
-  su `IMMAGINE_BRAND` — l'icona 512×512, la stessa di home, negozio,
-  `/sicurezza` e `/privacy`. L'illustrazione del reparto NON si può
-  usare com'è: è WebP e scontornata su TRASPARENZA, cioè esattamente
-  l'asset che il commento di `IMMAGINE_BRAND` dichiara inadatto («un
-  barattolo scontornato lo comporrebbe ogni client sul fondo che gli
-  pare»). LA STRADA, per il giorno che servirà: comporre le 30 figure
-  sul bruno `--cat-fondo` in JPEG opachi (600×600 basta per la card
-  grande di tutti), una rotta col calco di `/assets/categorie`, e
-  `_seo_categoria` che passa la tupla — più un giro vero su Telegram e
-  WhatsApp, che le anteprime si cachano a lungo e non si bustano.
-  IL REPARTO VUOTO tiene il bottone: il link funziona e l'anteprima
-  dice la verità («Ancora nessun oggetto in questo reparto»). Non si
-  gata sul conteggio, ed è deliberato: quel numero è della VISTA — coi
-  filtri attivi può essere zero su un reparto pieno — mentre il
-  bottone parla del reparto.
-  DUE LEZIONI DEL CANTIERE, e sono di metodo. 1) La verifica dal vivo
-  cercava `noindex` nell'HTML servito e lo trovava NEL MIO STESSO
-  COMMENTO, finito dentro la pagina: la trappola che questo file
-  ripete da mesi, presa mentre la si scriveva. Da lì ogni sentinella
-  di questa voce guarda il CODICE e mai la prosa. 2) La tortura a 21
-  mutazioni ha trovato DUE sentinelle mie che non potevano fallire —
-  «la scala tiene `toast(link`», che matchava il `.catch` della riga
-  sopra, e «il bottone sta fuori da `.strumenti`», che si faceva
-  ingannare dal `</div>` di `.conta-blocco` (ora è un conto di tag
-  BILANCIATI). Più tre `.index()` diventati `.find()`: chi TOGLIE il
-  bottone deve trovare una rossa, non far ESPLODERE `prove_seo`
-  portandosi dietro le sorelle — è la terza volta che questo file lo
-  impara.
+  IL LINK È DEL REPARTO E NON DELLA VISTA: non porta filtri, prezzo,
+  regione, ordinamento né il ramo Aste, e non potrebbe
+  (`/categoria/{slug}` non li sa portare e il server non li
+  leggerebbe). Col gesto sulla card la proprietà è più netta di quando
+  c'era il bottone: si preme una CATEGORIA, non la pagina che si sta
+  guardando.
+  LA STRADA SCARTATA RESTA MISURATA, e vale la pena tenerla perché è
+  quella che torna in mente: una quarta pillola dentro la riga
+  `.strumenti`. A 320 col caso peggiore («830 risultati») l'etichetta
+  dell'ordinamento ha ESATTAMENTE i 62px che le servono; con una
+  pillola in più scende a 34 — «Più recenti» diventa «Più …», e
+  «Prezzo: dal più basso» e «dal più alto» diventano tutt'e due
+  «Pre…», cioè due voci diverse che si leggono UGUALI. È lo stesso
+  muro per cui da quella riga sono state tolte le emoji dei contatori.
+  L'ANTEPRIMA HA LA FIGURA DEL SUO REPARTO (ago 2026, e questa voce
+  ROVESCIA l'imperfezione dichiarata il giorno prima, «l'immagine resta
+  generica»): titolo, descrizione, url, canonical E immagine sono suoi.
+  La strada è quella che era già scritta qui, seguita alla lettera —
+  le illustrazioni sono WebP scontornate su TRASPARENZA, cioè l'asset
+  che il commento di `IMMAGINE_BRAND` dichiara inadatto («un barattolo
+  scontornato lo comporrebbe ogni client sul fondo che gli pare»),
+  quindi si compongono su un fondo OPACO.
+  QUANDO SI GENERANO: **una volta sola, a mano**, con `python
+  og_categorie.py --scrivi`, e i JPEG si COMMITTANO. Mai al volo:
+  Pillow è un import fail-open, e comporre dentro la richiesta di un
+  crawler vorrebbe dire mettere una dipendenza facoltativa sul percorso
+  di un'anteprima. Lo script è idempotente (confronta i byte prima di
+  scrivere) e di serie fa l'ANTEPRIMA, come le sorelle di casa.
+  DOVE SI SALVANO: `assets/og/{slug}.jpg`, cartella SUA e MAI
+  `assets/categorie/` — `ritaglia_categorie.py` fa il glob di quella, e
+  un file 1200×630 a pieno bordo le inquinerebbe la mediana del
+  pareggio dell'inchiostro (la ragione per cui anche
+  `assets/scoprire/` è separata). 29 file, 15-30 KB l'uno.
+  CHI AGGIUNGE UNA CATEGORIA NUOVA, finché non rilancia lo script,
+  vede quel reparto ricadere sul BRAND — e non è un guasto, è la
+  regola: `_immagine_reparto` CHIEDE L'ESISTENZA AL DISCO, ed è la riga
+  da non ammorbidire, perché **un `og:image` che risponde 404 è PEGGIO
+  di nessun `og:image`** (diversi crawler, non trovandolo, non
+  disegnano la card affatto). Con la sola whitelist derivata (`FILE_OG`
+  da `SLUG_CATEGORIE`) la voce nuova entrerebbe nel vocabolario un
+  istante prima che il file esista, e la card si romperebbe. Quindi
+  l'aggiunta di una categoria porta anche la sua figura, e a dirlo c'è
+  la prova: ogni voce di `CATEGORIE` deve avere il suo `.jpg`, e chi ne
+  aggiunge una senza generarlo trova la CI rossa.
+  LE MISURE, ognuna col suo perché: 1200×630 è il rapporto 1,91:1 delle
+  card GRANDI e sta sopra il lato minimo di tutti e tre i crawler
+  (Telegram 200, WhatsApp 300, Facebook 200); RGB e mai RGBA, che
+  l'alpha è precisamente il difetto che questo cantiere toglie; sotto i
+  600 KB di WhatsApp, il tetto più basso dei tre, oltre il quale
+  l'immagine viene scartata del tutto. Il fondo è il bruno
+  `--cat-fondo` del tema CHIARO, FISSO: un'anteprima si cacha per
+  giorni e viaggia inoltrata, quindi non può seguire il tema di
+  nessuno. La figura sta dentro un riquadro 540×470 — il rapporto ~1,15
+  di quello della striscia, così il pareggio dell'inchiostro continua a
+  dire la verità — con `ImageOps.contain` e MAI `thumbnail`, CHE NON
+  INGRANDISCE MAI: col secondo i disegni piccoli restavano francobolli
+  in mezzo a una tela enorme (visto guardando un foglio di contatto,
+  non leggendo il codice).
+  LO SLUG DELLO SCRIPT È QUELLO DI `slug_categoria`, ALLA LETTERA: una
+  terza ricetta dello stesso nome è il posto da cui un giorno
+  divergono, e i file finirebbero con un nome che la rotta non serve.
+  C'è la prova. LA ROTTA è `GET /assets/og/{nome}` col calco di
+  `/assets/categorie`: whitelist DERIVATA dal catalogo,
+  `_file_con_etag` e `public, no-cache` — i file si ridisegnano sotto
+  lo stesso nome, e la revalidazione è ciò che permette di rifarli
+  senza rinominarli. «tutto» NON ha la sua figura, ed è voluto:
+  `/categoria/tutto` non è un reparto, e il vocabolario delle pagine è
+  chiuso su `CATEGORIE`.
+  IL REPARTO VUOTO tiene tutto: il link funziona, la card si disegna e
+  l'anteprima dice la verità («Ancora nessun oggetto in questo
+  reparto»), col `noindex` e senza canonical.
+  TRE LEZIONI DI METODO, e sono la parte che serve fra sei mesi. 1) La
+  verifica dal vivo cercava `noindex` nell'HTML servito e lo trovava
+  NEL MIO STESSO COMMENTO, finito dentro la pagina: la trappola che
+  questo file ripete da mesi, presa mentre la si scriveva. Da lì ogni
+  sentinella di questa voce guarda il CODICE e mai la prosa. 2) IL
+  BANCO HA MENTITO TRE VOLTE nel giro del gesto, e tutte e tre in modo
+  INTERMITTENTE, che è il peggior modo di mentire: la pagina era scorsa
+  e la striscia stava a y=-60, la fila si CENTRA da sola sulla card
+  accesa e «Tutto» finiva a x negativa, e soprattutto il TOUR di
+  benvenuto si RIARMA a ogni giro — il giro prima azzera
+  `barattolo_hint`, che è anche il suo timbro — col suo velo che COPRE
+  la striscia. Da lì il banco riporta la pagina in cima, scorre la fila
+  e ha una GUARDIA con `elementFromPoint`: se il dito non cade sulla
+  card si ferma DICENDOLO, invece di produrre otto rosse che sembrano
+  del codice. 3) Un `str.replace` senza `assert` non si era applicato e
+  credevo di aver aggiunto un'attesa che non c'era: la regola di casa,
+  ripagata.
 
   LA PAGINA «SFOGLIA» (lug 2026) [MORTA, ago 2026 — la voce resta per
   la storia delle illustrazioni e del pareggio, che oggi vivono nella
@@ -21943,6 +22010,54 @@ attesa), zero errori JS e nessuno sbordo. ⚠️ L'ancora della mutazione
 del chip è AMBIGUA apposta — la coda del template è identica nei due
 gemelli, che è il punto del cantiere: se ne muta UNA e la sentinella
 che ne conta DUE diventa rossa.
+
+Il reparto si condivide col tocco lungo, e l'anteprima è la sua (ago
+2026, due decisioni di Andrea in un giro): via il bottone «Condividi la
+categoria» — costava una riga verticale dentro OGNI reparto, ~37px
+tolti alla griglia — e al suo posto il tocco lungo sulla card della
+striscia, che non costa un pixel (misurato: la sezione resta 157px
+esatti a 320/360/375). Il costo della scopribilità è accettato, e a
+pagarlo il meno possibile c'è un TOAST una-tantum al primo ingresso in
+un reparto: l'unica forma a zero pixel di layout, con la guardia su
+`DEMO` e non su `hintAttivi()` perché in vetrina il gesto funziona e
+chi arriva dal web è precisamente chi condivide. La convivenza coi due
+gesti che la card aveva già è la bandierina `premutaFatta`, azzerata a
+ogni `pointerdown`: al rilascio il browser manda comunque un click, e
+senza quella riga chi condivide si ritroverebbe anche dentro il reparto
+— o fuori, se la card premuta era quella accesa. E l'anteprima del link
+adesso porta la FIGURA del reparto invece dell'icona generica: 29 JPEG
+opachi 1200×630 composti una volta sola da `og_categorie.py` e
+committati, con la rotta a whitelist derivata e il ripiego sul brand
+quando il file non c'è. Vedi Architettura, «IL REPARTO SI CONDIVIDE»,
+per le due righe da non ammorbidire (il `preventDefault` prima della
+bandierina, l'esistenza chiesta al disco) e per le tre lezioni di
+metodo del banco che mentiva a giri alterni.
+Collaudato: 5791 prove verdi sull'ALBERO ISOLATO — HEAD più i soli
+hunk di questo cantiere, che è la sola cosa che risponde a «questo
+commit, da solo, sta in piedi?» visto che la copia di lavoro è
+condivisa con un'altra sessione — e **VENTI MUTAZIONI, venti uccise**,
+una per riga sorvegliata. Più due giri dal vivo via CDP con eventi
+TOUCH veri (`Input.dispatchTouchEvent`, così il click dopo il rilascio
+lo genera il BROWSER, che è precisamente la cosa da verificare): 17/17
+sul gesto — il tocco corto che filtra, il lungo che condivide LA CARD
+PREMUTA senza far scattare il filtro, il tocco dopo che torna a
+filtrare, lo scorrimento che annulla, «Tutto» che resta fuori,
+l'accenno che arriva una volta sola — e 17/17 sui bordi (DEMO inerte,
+tasto destro del mouse conservato, le misure a tre larghezze nei due
+temi). Più `anteprime.py`, che simula gli User-Agent di Telegram,
+WhatsApp, Facebook, Slack e dei client Nostr con la loro lettura
+parziale: tutti e cinque vedono la stessa cosa, tutti e tre i limiti
+dicono «card grande», e l'ultimo meta cade al byte 1401.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva — i 29 JPEG viaggiano col commit.
+⚠️ DA FARE DOPO IL DEPLOY, ed è il pezzo che da qui non si può fare:
+incollare un link di reparto in Telegram e in WhatsApp e GUARDARE la
+card — le due app la trattano diversamente, e l'anteprima si vede solo
+dal vivo. Si prova con un reparto qualunque (i link sono pubblici e non
+c'è niente di usa-e-getta da creare), ma UNA VOLTA SOLA per reparto:
+Telegram e WhatsApp cachano le card per giorni e dal nostro lato non si
+bustano, quindi se qualcosa non va si ricontrolla su un ALTRO slug
+invece di riprovare sullo stesso.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
