@@ -22237,6 +22237,182 @@ GUARDARE al primo giro: la prima obiezione vera dentro Telegram — che
 il compratore riceva la notifica, e soprattutto che il venditore
 SMETTA di ricevere il promemoria della merce mai partita.
 
+  LA CLASSIFICA DEL MERCATINO 🏆 (ago 2026): i migliori in una pagina
+  raggiungibile dal Profilo, ordinati per reputazione — non la sola
+  media dei feedback, ma pesata col commercio. ROVESCIA una decisione
+  scritta (`proposte/roadmap-gamification-aste.md`: «classifica fuori
+  dalla v1, farmare oggi è gratis: misurerebbe il tempo libero, non il
+  commercio»), e il modo in cui la rovescia È la sostanza del cantiere:
+  non «facciamola lo stesso» ma CAMBIARE COSA SI MISURA, così che
+  farmare non paghi più.
+  LA FORMULA vive in un giudice PURO, `_classifica_utenti` — prende
+  righe e ritorna la lista ordinata, niente database dentro: è quel che
+  la fa girare in CI e la fa riusare allo script della tappa 0.
+    punteggio = F × (1 + PESO · C)
+    F = (persone · media + K · M) / (persone + K)      la FIDUCIA
+    C = log10(1 + xp_ordini) / log10(1 + RIF)          il COMMERCIO
+  `F` È UNA MEDIA BAYESIANA e risponde alla frase che ha aperto il
+  cantiere: uno con 5,0 su due recensioni non vale uno con 4,8 su
+  cinquanta. Una media con pochi voti si tira verso quella del
+  mercatino, e più persone ti votano più la tua media conta come tua.
+  Si spiega in una riga — «una media vale di più quando la dicono più
+  persone» — ed è la formula del Top 250 di IMDb, non un'invenzione di
+  casa.
+  `persone` E NON `n_feedback`, ed è metà del freno: quaranta voti da un
+  account solo pesano come UNO. La colonna `utenti.n_recensori` esiste
+  dall'ago 2026 proprio per questa domanda, ma la classifica NON la
+  legge — la ricalcola coi soli recensori reali, dalla tabella
+  `feedback`, che è la fonte: quella colonna è una cache arrotondata a
+  un decimale e può restare indietro.
+  MOLTIPLICATIVO E NON ADDITIVO: il commercio AMPLIFICA la fiducia
+  invece di sostituirla, quindi chi ha una media bassa non risale
+  comprando volume. È la riga che tiene fuori dalla cima «la persona
+  sbagliata» — nel confronto la formula additiva metteva PRIMO chi ha
+  4,2 di media e 120 affari.
+  IL LOGARITMO COMPRIME il commercio: senza, un affare da 4.000 €
+  varrebbe più di trecento piccoli. Con: da 100 a 1.000 XP il bonus
+  passa da +16% a +25%, da 1.000 a 10.000 arriva a +33% — raddoppiare
+  il volume non raddoppia niente.
+  E SOLO GLI XP DEGLI ORDINI (`tipo='ordine'`, gli altri sei tipi
+  restano fuori): sono gli unici che costano un pagamento Lightning
+  vero. Visita giornaliera, pubblicazione, profilo completo e distintivi
+  misurano PRESENZA e non commercio — e sono precisamente quelli che si
+  farmano con un tocco. Il registro `xp_eventi` ha già la colonna: è una
+  WHERE, non un cantiere.
+  K = 5 E NON 3, ed è MISURATO e non scelto a orecchio: a K=3 la frase
+  che ha aperto il cantiere è FALSA — 5,0 da due persone rende 4,7966 e
+  4,8 da cinquanta rende 4,7921, cioè il primo passa davanti. Da 4 in su
+  regge. Il numero sta nel config col conto accanto.
+  ⚠️ E C'È UN LIMITE DELLA BAYESIANA da sapere PRIMA di tarare K, che è
+  la scoperta del cantiere: quando le due medie stanno una SOPRA e una
+  SOTTO la media del mercatino, NESSUN K le inverte — K decide solo
+  quanto chi ha pochi voti viene tirato verso M. Due casi del banco
+  fallivano proprio per questo (la media globale, calcolata sui soli due
+  utenti di prova, stava in mezzo), e da lì è nato il `fondo()` che
+  semina utenti di sfondo. C'è la prova che tortura il limite su K = 1,
+  5, 50, 500.
+  IL FRENO È IL RECENSORE REALE (scelta di Andrea): conta come PERSONA
+  solo chi ha a sua volta concluso almeno un affare con QUALCUN ALTRO
+  che non sia me. Va più lontano di quanto sembri — il farmer che si
+  fabbrica venti identità e se le fa votare NON ENTRA AFFATTO: nessuna
+  di quelle venti ha un affare con un terzo, quindi i suoi recensori
+  reali sono zero, e a zero non si passa il gate d'ingresso.
+  ALZA IL COSTO, NON LO CHIUDE, E VA DICHIARATO: il farmer può far
+  commerciare le sue identità FRA LORO prima di votarsi — due ordini in
+  più a testa e diventano tutte «reali». Il costo cresce (più pagamenti,
+  più fee, più tempo), la cosa non diventa impossibile. A chiuderla
+  davvero sarebbe la transitività da un seme fidato — un web-of-trust
+  vero, che è un cantiere suo — oppure la COMMISSIONE, che è il freno
+  che il roadmap aspettava e che oggi è a 0.
+  GLI ALTRI TRE FRENI erano già in casa: i soli XP d'ordine, la
+  bayesiana che pesa le persone, e la riga «da N persone» accanto al
+  nome, che fa autodenunciare chi farma — la stessa informazione già
+  decisa per il conteggio dei recensori.
+  IL GATE D'INGRESSO è ≥1 affare concluso e ≥1 voto da un recensore
+  reale. I COMPRATORI CI SONO, non solo i venditori: gli affari contano
+  da tutte e due le parti, e il nome di chi compra è già pubblico da
+  quando i feedback del negozio dicono chi li ha scritti. Da guardare al
+  primo giro: se dà fastidio, il gate diventa `vendite_ok >= 1`.
+  COSA NON ESCE MAI, ed è la parte da non allentare: il `tg_id` (che in
+  vetrina non compare da nessuna parte), gli XP — `/api/negozio` li
+  toglie apposta dal pubblico, «gli XP sono roba di chi li ha, e un
+  numero altrui non aiuta nessuno a decidere se fidarsi», e USARLI per
+  ordinare non rovescia quella riga mentre PUBBLICARLI sì — e il
+  PUNTEGGIO, che sarebbe un numero opaco da spiegare e non lo sarebbe
+  mai abbastanza. Si mostrano la POSIZIONE e i FATTI su cui poggia:
+  media, da quante persone, quanti affari. Sono anche quel che permette
+  a chi guarda di giudicare da sé, che è il meccanismo su cui la
+  tolleranza agli ordini fasulli conta.
+  I CAMPI SI ELENCANO uno per uno invece di togliere quelli di troppo da
+  un dict: la regola di `CAMPI_VETRINA`, e la differenza si vede il
+  giorno che il giudice ritorna una chiave nuova.
+  LA TUA RIGA esce solo a te e solo se NON sei nei primi
+  `CLASSIFICA_TOP`: chi sta in fondo non compare mai in una lista che
+  vedono gli altri, e chi è nei primi la vede già.
+  LA RIGA CHE SPIEGA UN'APPARENZA (chiesta da Andrea guardando il conto
+  vero): con tutte le medie uguali l'ordine lo decide il commercio, e
+  senza dirlo uno legge sette nomi con «5,00» accanto e non capisce
+  perché è settimo. È DERIVATA DAI DATI e non un testo fisso — si
+  accende finché è vero e sparisce da sola il giorno che arriva il primo
+  voto diverso: il patto degli hint contestuali («sparisce da solo
+  quando smette di essere vero») e della riga «nessun venditore usa più
+  questa rete». Nessuna soglia da tarare.
+  ⚠️ E GUARDA LE RIGHE CHE SI VEDONO, non tutta la classifica — è il
+  difetto che il giro DAL VIVO ha trovato e la rilettura no: col conto
+  su TUTTE le righe, il giorno che il venticinquesimo prende un 4 la
+  riga sparisce mentre i primi venti mostrano ancora una colonna di
+  «5,00» identici, cioè si spegne esattamente nel caso per cui esiste.
+  Guardando la fetta visibile la frase è anche VERA su quel che c'è a
+  schermo. Nel collaudo la prova ha CAMBIATO LATO col perché scritto, e
+  ha guadagnato il rovescio (con la fetta più larga la riga si spegne).
+  LE PILLOLE DEL FILTRO (Tutti · ⭐4+ · ⭐4,5+) compaiono SOLO se
+  filtrano davvero: se nessuno sta sotto la soglia, quella pillola
+  darebbe la stessa lista con un tocco in più — la regola di
+  `condFiltrabile` (il filtro condizione DORME dove non vuol dire
+  niente) e della card che sparisce quando la sua occasione non esiste.
+  Oggi, con tutte le medie a 5,00, non ne compare nessuna. Filtrano la
+  media VERA e non il punteggio, lato client sulla lista già in memoria
+  (zero rete per un tocco); stato di SESSIONE, mai localStorage.
+  IL COSTO È MISURATO e non stimato: 0,1 ms oggi · 2,5 ms a 1.000 utenti
+  e 3.000 feedback · 26,5 ms a 10.000 e 30.000, più le quattro letture.
+  Il calcolo sta IN RAM e non in SQL perché non esiste un indice su
+  `ordini(venditore_id/compratore_id)` e un EXISTS per riga di feedback
+  degenererebbe — ed è il pattern di casa (`arricchisci_righe_vetrina`
+  calcola in Python, il dizionario dei comuni vive in RAM). Cache di 60
+  s in memoria, il calco di `conta_pionieri`. NIENTE COLONNA
+  MATERIALIZZATA: il progetto ha già la regola «derivato, mai in
+  colonna» per livelli e distintivi, e una colonna invecchierebbe a ogni
+  feedback. Il segnale per cambiare idea è la LATENZA dell'endpoint, non
+  un numero di utenti.
+  `GET /api/classifica` è PUBBLICA come `/api/listings` e l'identità è
+  FACOLTATIVA (`utente_se_autenticato`): serve a una cosa sola, la
+  propria riga. LEGGE E BASTA, come `controlla_libro_mastro` — c'è la
+  prova che nella strada intera non compaia un INSERT, un UPDATE o un
+  DELETE, e il collaudo confronta il dump di `utenti`, `feedback` e
+  `xp_eventi` prima e dopo.
+  LA VISTA È INTERNA, il patto di `/sicurezza` e `/privacy`: fuori da
+  `RADICI` — quindi si SPINGE e il gesto indietro riporta a Esplora —
+  `voceNav` la mappa su 'esplora', nessun ramo in `navRendiVista` (il
+  contenuto si ridisegna dal `go(b.v)` finale) e fuori da `VISTE_PTR`.
+  In DEMO e in VETRINA NON ESISTE: là non c'è un server che la calcoli e
+  un numero inventato sarebbe peggio del niente (il patto del cassetto
+  wallet), quindi il bottone non compare e `apriClassifica` ha la
+  cintura per ogni altra strada.
+  IL VESTITO È QUELLO DI CASA e non una classe nuova da tarare:
+  `.seller` per la riga (lo stesso blocco avatar+nome+reputazione del
+  negozio e del Profilo) e `.tema-pill` per il filtro — la riga si legge
+  uguale alle sue sorelle. Negli onclick viaggia SOLO il codice negozio
+  passato dal filtro-alfabeto, il patto di `renderNegozio`; senza codice
+  la riga non è toccabile, meglio ferma che rotta.
+  LEVE: `CLASSIFICA_ATTIVA` nasce SPENTA nel codice, il patto di
+  `ASTA_ABILITATA` e `BANNER_NEGOZIO_ATTIVO` — non perché muova denaro,
+  ma perché nessuno sa ancora quante righe escono: si accende dal config
+  del VPS dopo aver guardato il conto. Più `CLASSIFICA_TOP` (20),
+  `CLASSIFICA_K` (5), `CLASSIFICA_XP_RIF` (1000), `CLASSIFICA_PESO_XP`
+  (0,25). ⚠️ Tutte e cinque vanno anche nell'ambiente di `_censimento`
+  in `prove.py`, o quella prova non diventa rossa: ESPLODE con
+  NameError.
+  ⚠️ E `peso=0` DEVE ESSERE UN VALORE, non un «non passato»: la prima
+  stesura scriveva `peso or CLASSIFICA_PESO_XP` e uno zero ricadeva sul
+  default, cioè rendeva FALSA la promessa scritta nel config («0 = la
+  classifica torna la sola media»). L'ha trovato una PROVA e non la
+  rilettura, ed è il motivo per cui i tre parametri si leggono con
+  `is None`.
+  LA MISURA VIENE PRIMA (tappa 0): i dati locali sono finti e non ci si
+  tara niente, quindi `classifica_prova.py` — che LEGGE E BASTA, il
+  calco di `stima_coda_moderazione.py`, e legge il giudice dal TESTO di
+  `server.py` invece di importarlo (la lezione di `ricategorizza.py`) —
+  l'ha lanciato Andrea sul VPS. IL CONTO: **14 entrano, il freno ne
+  tiene fuori 3**, e hanno TUTTI media 5,00 — quindi oggi la classifica
+  ordina di fatto per VOLUME, ed è anche la ragione per cui la riga che
+  spiega esiste.
+  RESTA FUORI, dichiarato: nessuna rotta `/classifica` condivisibile (la
+  porta è il bottone; aggiungerla è il calco di `/sicurezza` ed è una
+  decisione a parte, con SEO, anteprima e sitemap); niente classifica
+  mensile né opt-in; e NESSUNA NOTIFICA — nessuno viene avvisato che è
+  salito o sceso, che una classifica che scrive in chat è la famiglia di
+  messaggi che fa bloccare il bot.
+
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
