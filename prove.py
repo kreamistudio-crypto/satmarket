@@ -17018,6 +17018,7 @@ def _amb_seo():
                  "SEGNO_CORPO = ", "MAX_SLUG = ", "_ID_PERCORSO = ",
                  "META_NOINDEX = ", "TETTO_CARTELLO = ",
                  "CACHE_SEO_HOME = ", "CAMPI_CARTELLO = ",
+                 "OG_REPARTO = ",
                  "TETTO_SITEMAP = ", "CACHE_SITEMAP = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -17035,7 +17036,8 @@ def _amb_seo():
               "_prezzo_promo", "_pare_recapito", "_slug",
               "_id_da_percorso", "_chi_da_percorso",
               "_attr", "_testo", "_ld", "_meta_anteprima", "_taglia_meta",
-              "_immagine_anteprima", "_testa_seo", "_url_annuncio",
+              "_immagine_anteprima", "_immagine_reparto",
+              "_testa_seo", "_url_annuncio",
               "_url_negozio", "_categoria_da_slug", "_schede_cartello",
               "_link_categorie", "_seo_niente", "_prezzo_ld",
               "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
@@ -18722,110 +18724,227 @@ def prove_seo():
         # un'altra cosa da quella che quel bottone promette
         prova(f"...e resta i soli appunti", False, "condividiLink(" in f)
 
-    # IL POSTO. Il bottone vive DENTRO la vetrina filtrata e non sulla
-    # card della striscia: quella e' larga 84px e ha gia' DUE gesti
-    # (tocca per filtrare, ritocca per uscire), e un terzo bersaglio li'
-    # e' cio' che il progetto rifiuta altrove.
-    prova("il reparto si condivide da dentro la vetrina", True,
-          'id="catShare"' in testo_mini
-          and 'onclick="condividiCategoria()"' in testo_mini)
-    prova("...e non dalla card della striscia (ha gia' due gesti)",
-          False, "condividiCategoria" in st)
-    # ...e NON come quarta pillola della riga `.strumenti`. MISURATO a
-    # 320 col caso peggiore («830 risultati»): oggi l'etichetta
-    # dell'ordinamento ha i 62px che le servono, con la pillola in piu'
-    # scende a 34 — «Piu' recenti» diventa «Piu' …», e le due voci del
-    # prezzo diventano tutt'e due «Pre…», cioe' due voci diverse che si
-    # leggono uguali. Il bottone e' un FRATELLO della riga: fra i due
-    # ci dev'essere la chiusura del suo div.
-    # ⚠️ `find` e non `index`, ed e' la lezione gia' pagata due volte:
-    # chi TOGLIE il bottone farebbe ESPLODERE questa funzione — e una
-    # prova che esplode non e' una rossa, si porta dietro tutte le
-    # sorelle che vengono dopo. Cosi' invece diventa rossa lei sola.
-    _is = testo_mini.find('<div class="strumenti">')
-    _ib = testo_mini.find('id="catShare"')
-    _ifb = testo_mini.find('<div id="filtriBox"')
-    prova("il bottone e' in pagina", True, _ib > 0)
-    # ⚠️ IL CONTO DEV'ESSERE BILANCIATO, non «c'e' un </div> in mezzo»:
-    # dentro `.strumenti` vive gia' `.conta-blocco` con le sue due
-    # righe, quindi di `</div>` ce n'e' comunque — e la sentinella
-    # scritta cosi' restava verde col bottone spostato DENTRO la riga
-    # (l'ha detto la tortura). Se il div di `.strumenti` e' chiuso
-    # prima del bottone, aperture e chiusure pareggiano.
-    _fetta = testo_mini[_is:_ib] if _ib > 0 else "<div"
-    prova("il bottone sta FUORI dalla riga .strumenti", True,
-          _fetta.count("<div") == _fetta.count("</div>"))
-    prova("...e SOPRA il pannello Filtri", True, 0 < _ib < _ifb)
-    prova("...e ha il suo vestito", True, ".cat-share{" in testo_mini)
+    # IL POSTO: NON C'E' PIU' UN BOTTONE (ago 2026, decisione di Andrea
+    # che ROVESCIA il giro prima). Il reparto si condivide TENENDO
+    # PREMUTA la sua card nella striscia: il bottone occupava una riga
+    # sua — ~37px tolti alla griglia dentro OGNI reparto — e il gesto
+    # non costa un pixel. Il costo e' che un tocco lungo non lo scopre
+    # nessuno, ed e' ACCETTATO: a dirlo c'e' l'accenno una-tantum.
+    # Queste tre hanno CAMBIATO LATO: certificavano il bottone, cioe'
+    # quel che si e' appena deciso di togliere.
+    for morto in ("cat-share", "catShare", "renderCondividiCategoria"):
+        prova(f"del bottone non resta niente: «{morto}»", 0,
+              testo_mini.count(morto))
 
-    # LA FUNZIONE: passa dalla scala unica e non si ricopia i ripieghi
-    # (e' il difetto per cui `condividiLink` e' stata estratta).
-    cc = pezzo_js(testo_mini, "function condividiCategoria(){", "\n}\n")
+    # IL GESTO E' DELEGATO SULLA STRISCIA, e non poteva essere
+    # altrimenti: `renderStriscia` riscrive l'innerHTML della fila, e
+    # ascoltatori appesi alle celle morirebbero al primo render.
+    prova("il gesto vive sulla striscia", 1,
+          testo_mini.count("fila.addEventListener('pointerdown'"))
+    # ...e le celle restano coi loro DUE gesti in markup: il terzo non
+    # aggiunge un onclick, o sarebbero tre bersagli su 84px
+    prova("...e la card non guadagna un terzo onclick", [],
+          [x for x in ("condividiCategoria", "premuta") if x in st])
+    # LA CARD «Tutto» RESTA FUORI PER COSTRUZIONE, senza un ramo
+    # apposta: il gesto guarda le celle con `data-cat`, e quella non
+    # ce l'ha — «Tutto» e' la home, che un link ce l'ha gia'.
+    prova("il gesto prende le sole card di un reparto", True,
+          "closest?.('.cat-cella[data-cat]')" in testo_mini)
+
+    # LO SCORRIMENTO ANNULLA: la fila scorre di lato, e senza questa
+    # riga chi la scorre si ritroverebbe un foglio di condivisione in
+    # faccia.
+    prova("il dito che scorre annulla il gesto", True,
+          "PREMUTA_SCARTO" in testo_mini
+          and "premutaFerma()" in pezzo_js(
+              testo_mini, "fila.addEventListener('pointermove'", "});"))
+    for ev in ("pointerup", "pointercancel", "pointerleave"):
+        prova(f"...e cosi' «{ev}»", True, f"'{ev}'" in testo_mini)
+
+    # IL FILTRO NON DEVE SCATTARE AL RILASCIO, ed e' la convivenza che
+    # Andrea ha chiesto di guardare: al pointerup il browser manda
+    # comunque un click sulla card, quindi senza la bandierina chi
+    # condivide si ritroverebbe anche DENTRO il reparto — o FUORI, se
+    # la card premuta era quella accesa (li' il tocco e' il ritocco che
+    # esce).
+    at = pezzo_js(testo_mini, "function apriCategoriaDaTocco(e, c){", "\n}\n")
+    prova("dopo il gesto lungo il filtro non scatta", True,
+          "if (premutaFatta) { premutaFatta = false; return; }" in at)
+    # ⚠️ e il preventDefault viene PRIMA: dopo, il click seguirebbe
+    # l'href e ricaricherebbe 900 KB
+    prova("...e il preventDefault viene prima della bandierina", True,
+          0 <= at.find("e.preventDefault()") < at.find("premutaFatta"))
+    # LA BANDIERINA SI AZZERA AL GESTO DOPO, ed e' cio' che impedisce a
+    # un gesto lungo senza click (il dito che scivola, il foglio di
+    # sistema che si prende il rilascio) di lasciarla alzata a mangiare
+    # il tocco successivo.
+    pd = pezzo_js(testo_mini, "fila.addEventListener('pointerdown'", "});")
+    prova("ogni gesto nuovo riparte pulito", True,
+          "premutaFatta = false;" in pd)
+
+    # IL MENU DEL SISTEMA. La card e' un `<a>` VERO (i crawler devono
+    # poterla seguire), e su un link il tocco lungo apre il menu del
+    # telefono: senza queste due righe il nostro gesto finirebbe sotto
+    # quello del sistema operativo.
+    prova("il callout di iOS e' spento sulla card", True,
+          "-webkit-touch-callout:none" in testo_mini)
+    prova("...e la selezione del testo pure", True,
+          "user-select:none;-webkit-user-select:none" in testo_mini)
+    cm = pezzo_js(testo_mini, "fila.addEventListener('contextmenu'", "});")
+    prova("il menu di Android si spegne solo col dito", True,
+          "if (!premutaTopo) e.preventDefault();" in cm)
+    # ...e non col MOUSE: sul computer il tasto destro su un link vero
+    # e' esattamente cio' che quel link esiste per offrire
+    prova("...e il mouse tiene il suo tasto destro", True,
+          "e.pointerType === 'mouse'" in testo_mini)
+
+    # LA FUNZIONE PRENDE LA CATEGORIA e non legge `activeCat`: premendo
+    # si condivide LA CARD PREMUTA, che puo' non essere il reparto
+    # acceso. Leggendo la variabile si manderebbe in giro il link di
+    # un'altra cosa — un difetto che non fallisce: manda il link
+    # sbagliato, e basta.
+    cc = pezzo_js(testo_mini, "function condividiCategoria(c){", "\n}\n")
+    prova("la funzione prende la categoria premuta", True,
+          "slugCat(c)" in cc)
+    prova("...e non legge il reparto acceso", False, "activeCat" in cc)
     prova("passa dalla scala unica", True, "condividiLink(" in cc)
     prova("...e non si ricopia nessun gradino", [],
           [x for x in ("navigator.share", "clipboard", "t.me/share",
                        "shareURL") if x in cc])
-    # lo slug e' il gemello di `slug_categoria`, non un quarto elenco
-    prova("il link usa lo slug del gemello", True,
-          "/categoria/${slugCat(activeCat)}" in cc)
     prova("...e nessun dominio battuto a mano", False, "http" in cc)
-    # il testo dice la COSA, come le due sorelle di /sicurezza e
-    # /privacy — e NESSUN CONTEGGIO ci viaggia dentro: il numero che si
-    # vede a schermo e' quello della VISTA (filtri, regione,
-    # ordinamento), e dentro un messaggio che non invecchia si
-    # leggerebbe come quello della categoria. Il conto vero lo mette il
-    # server nell'og:description, dove e' fresco per costruzione.
+    # LE DUE CINTURE, e stanno QUI — dove il link si costruisce — cosi'
+    # le eredita ogni strada futura invece di vivere in un giudice a
+    # parte: in DEMO location.origin non e' un indirizzo (il patto di
+    # sicuShare/privShare), e /categoria/tutto non e' un reparto.
+    prova("in DEMO non si costruisce nessun link", True, "DEMO" in cc)
+    prova("...e il catalogo e' la seconda cintura", True,
+          "CATS.includes(c)" in cc and "'Tutto'" in cc)
+    # ...ma in VETRINA anonima funziona eccome: chi arriva dal web e'
+    # proprio chi condivide
+    prova("in vetrina anonima si condivide", False, "VETRINA" in cc)
+    # il testo dice la COSA, come le due sorelle — e NESSUN CONTEGGIO
+    # ci viaggia dentro: il numero a schermo e' quello della VISTA
+    # (filtri, regione, ordinamento), e dentro un messaggio che non
+    # invecchia si leggerebbe come quello della categoria
     prova("il testo dice la cosa, non il nome della vista", True,
           "in vendita su Barattolo" in cc)
     prova("...e nessun conteggio ci viaggia dentro", [],
           [x for x in ("nTot", "vetrinaTotale", "data.length",
                        "conteggi") if x in cc])
 
-    # IL GIUDICE, clausola per clausola — comprese quelle che NON ci
-    # sono. `vaiAste` non azzera `activeCat`, quindi ramo Aste e reparto
-    # convivono e il bottone resta: il filtro delle aste e' roba della
-    # VISTA, che il link non porta.
-    rc = pezzo_js(testo_mini, "function renderCondividiCategoria(){",
-                  "\n}\n")
-    prova("il bottone c'e' solo con un reparto acceso", True,
-          "activeCat !== 'Tutto'" in rc)
-    prova("...mai col barattolo (li' la vetrina non e' il reparto)",
-          True, "!vistaBarattolo" in rc)
-    prova("...mai in DEMO (li' location.origin non e' un indirizzo)",
-          True, "!DEMO" in rc)
-    prova("...ma in vetrina anonima SI': e' proprio chi condivide",
-          False, "VETRINA" in rc)
-    prova("...e nessuna clausola sul ramo Aste", False, "ramoVetrina" in rc)
+    # L'ACCENNO, che e' il prezzo del gesto nascosto: una volta sola,
+    # al primo ingresso in un reparto, e a ZERO PIXEL DI LAYOUT —
+    # quindi un TOAST (sovrapposto, se ne va da solo) e mai una riga.
+    ac = pezzo_js(testo_mini, "function accennaCondivisione(){", "\n}\n")
+    prova("l'accenno e' un toast, non una riga in pagina", True,
+          "toast(" in ac and "hintline" not in ac)
+    prova("...e si consuma col timbro degli hint", True,
+          "hintDismesso('condcat')" in ac and "dismettiHint('condcat')" in ac)
+    # LA GUARDIA E' `DEMO` E NON `hintAttivi()`, ed e' una divergenza
+    # voluta: gli altri hint parlano di cose che un anonimo non puo'
+    # fare, questo annuncia un gesto che in VETRINA funziona — e chi
+    # arriva dal web e' proprio chi condivide. La guardia e' quella del
+    # gesto: si accenna solo dove il gesto esiste.
+    prova("si accenna solo dove il gesto esiste", True,
+          "if (DEMO ||" in ac and "hintAttivi" not in ac)
+    prova("l'accenno ha un chiamante solo", 1,
+          testo_mini.count("accennaCondivisione();"))
+    ap = pezzo_js(testo_mini, "function apriCategoria(c){", "\n}\n")
+    prova("...ed e' l'apertura di un reparto", True,
+          "accennaCondivisione();" in ap)
 
-    # UN CHIAMANTE SOLO, e SOPRA il return del barattolo: sotto,
-    # uscendo dal barattolo con un reparto acceso, il bottone non
-    # tornerebbe mai piu' — difetto vero e invisibile a occhio.
-    prova("la decisione ha un chiamante solo", 1,
-          testo_mini.count("renderCondividiCategoria();"))
-    ch = pezzo_js(testo_mini, "function renderChips(){", "\n}\n")
-    _ic = ch.find("renderCondividiCategoria();")
-    prova("...e sta sopra il return del barattolo", True,
-          0 <= _ic < ch.find("if (vistaBarattolo)"))
+    # --- 16quater) L'ANTEPRIMA DEL REPARTO (ago 2026) --------------
+    # Fino a ieri il link di una categoria usciva con l'icona generica
+    # di Barattolo, la stessa di home, negozio, /sicurezza e /privacy:
+    # titolo, descrizione, url e canonical erano suoi e l'IMMAGINE no.
+    # Adesso ognuno dei 29 reparti ha la sua figura, composta una
+    # volta da og_categorie.py e COMMITTATA.
+    # il catalogo e lo slug si prendono dall'AMBIENTE: qui `cat` e
+    # `slug` sono altre cose (in prove_seo `cat` e' un nome di
+    # categoria, non la lista — ci sono cascato al primo giro)
+    _cat = list(amb["CATEGORIE"])
+    _slug = amb["slug_categoria"]
+    _og = [c for c in _cat
+           if not os.path.exists("assets/og/%s.jpg" % _slug(c))]
+    prova("ogni reparto ha la sua anteprima", [], _og)
+    # ...e «tutto» NON ce l'ha, ed e' voluto: /categoria/tutto non e'
+    # un reparto — il vocabolario delle pagine e' chiuso su CATEGORIE.
+    prova("...e «tutto» non e' un reparto", False,
+          os.path.exists("assets/og/tutto.jpg"))
 
-    # IL PATTO DI COSTRUZIONE CON LA RICERCA: il giudice non ha una
-    # clausola sulla ricerca PERCHE' c'e' questa riga. Toglierla
-    # lascerebbe «Condividi la categoria» sopra risultati di tutt'altro
-    # reparto.
-    ds = pezzo_js(testo_mini, "async function doSearch(){", "\n}\n")
-    prova("cercare spegne il reparto, e con lui il bottone", True,
-          "if (q && activeCat !== 'Tutto') spegniReparto();" in ds)
+    try:
+        from PIL import Image as _Img
+    except ImportError:
+        salta("le misure delle anteprime dei reparti",
+              "Pillow non e' installata")
+    else:
+        _misure, _pesi, _alfa = set(), [], []
+        for c in _cat:
+            im = _Img.open("assets/og/%s.jpg" % _slug(c))
+            _misure.add(im.size)
+            _alfa.append(im.mode)
+            _pesi.append(os.path.getsize("assets/og/%s.jpg" % _slug(c)))
+        # 1200x630 e' il rapporto 1.91:1 delle card GRANDI: sotto il
+        # lato minimo di WhatsApp (300) la card grande non si disegna
+        prova("le anteprime sono tutte 1200x630", {(1200, 630)}, _misure)
+        # OPACHE, ed e' la ragione per cui esistono: un'immagine con
+        # l'alpha ogni client la compone sul fondo che gli pare
+        prova("...e opache, mai con l'alpha", {"RGB"}, set(_alfa))
+        # ...e sotto il tetto piu' basso dei tre (WhatsApp, 600 KB):
+        # oltre, l'immagine viene scartata del tutto
+        prova("...e sotto il tetto di WhatsApp", True, max(_pesi) < 600_000)
 
-    # LA PAROLA PORTA LA PROMESSA: il link e' del REPARTO e non della
-    # vista — non porta filtri, ordinamento ne' ricerca. «Questa
-    # pagina» (la formula della sorella di /sicurezza) punterebbe a
-    # cio' che si sta guardando; l'articolo determinativo punta alla
-    # cosa. E la riga e' markup FISSO: nessun esc() da ricordare.
-    _riga = testo_mini[_ib:testo_mini.find("</button>", _ib)] if _ib > 0 \
-        else ""
-    prova("la riga del bottone e' markup fisso", False, "${" in _riga)
-    prova("...e dice «la categoria», mai «questa pagina»", True,
-          "Condividi la categoria" in _riga
-          and "questa pagina" not in _riga)
+    # LA ROTTA: whitelist DERIVATA dal catalogo, come le illustrazioni
+    # — uno slug inventato non diventa mai un percorso — e la cartella
+    # e' SUA, mai assets/categorie/, che ritaglia_categorie.py fa il
+    # glob di quella e un file full-bleed le inquinerebbe la mediana
+    # del pareggio dell'inchiostro.
+    prova("la rotta dell'anteprima ha la whitelist derivata", True,
+          'FILE_OG = {f"{s}.jpg" for s in SLUG_CATEGORIE}' in _SORGENTE
+          and "nome not in FILE_OG" in _SORGENTE)
+    prova("...e serve dalla cartella sua", True,
+          'os.path.join("assets", "og", nome)' in _SORGENTE)
+    prova("...col tipo giusto e la revalidazione", True,
+          '_file_con_etag(percorso, "image/jpeg", "public, no-cache"'
+          in _SORGENTE)
+
+    # IL GIUDICE CHIEDE L'ESISTENZA AL DISCO, ed e' la riga da non
+    # ammorbidire: un og:image che risponde 404 e' PEGGIO di nessun
+    # og:image — diversi crawler, non trovandolo, non disegnano la
+    # card affatto. Quindi una categoria nuova, finche' nessuno ha
+    # lanciato og_categorie.py, ricade sul brand.
+    ir = pezzo("_immagine_reparto")
+    prova("l'anteprima si dichiara solo se il file c'e'", True,
+          "os.path.exists(" in ir)
+    prova("...e se non c'e' ricade sul brand", True,
+          "return IMMAGINE_BRAND" in ir)
+    prova("...e il reparto la usa", True,
+          "immagine=_immagine_reparto(slug)" in pezzo("_seo_categoria"))
+    # ...e la GIRA per davvero, che una sentinella dice che il ramo
+    # c'e' e mai che risponda giusto
+    prova("il reparto dichiara la sua figura",
+          ("https://barattolo.store/assets/og/biciclette.jpg", 1200, 630),
+          amb["_immagine_reparto"]("biciclette"))
+    prova("...e uno slug senza file ricade sul brand",
+          amb["IMMAGINE_BRAND"], amb["_immagine_reparto"]("mai-esistita"))
+
+    # LO SLUG DELLO SCRIPT E' QUELLO DI `slug_categoria`, alla lettera:
+    # una terza ricetta dello stesso nome e' il posto da cui un giorno
+    # divergono, e i file finirebbero con un nome che la rotta non
+    # serve.
+    _ogpy = open("og_categorie.py", encoding="utf-8").read()
+    prova("lo script fa lo slug come il server", True,
+          'c.lower().replace(" ", "-")' in _ogpy)
+    # ...e IL SERVER NON COMPONE AL VOLO: i file si committano, o
+    # Pillow — che e' un import fail-open, quindi puo' mancare —
+    # finirebbe dentro la richiesta di un crawler, con la sua latenza.
+    # La domanda si fa sui DUE pezzi che servono l'anteprima e non su
+    # tutto server.py, che di Pillow ne usa eccome (le foto, gli
+    # avatar, il podio del lunedi'): una sentinella larga qui sarebbe
+    # rossa per colpa di un'altra funzione.
+    prova("l'anteprima non si compone al volo", [],
+          [x for x in ("PIL", "Image", "open(")
+           if x in ir or x in pezzo("asset_og")])
 
     # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
     # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa

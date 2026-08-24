@@ -34222,6 +34222,33 @@ def _seo_negozio(chi: str):
     return f"{_testo(nome)} — il negozio su Barattolo", testa, corpo
 
 
+# Le misure dell'anteprima di un reparto: le SAPPIAMO, perche' la tela
+# la dipinge og_categorie.py sempre uguale — quindi si dichiarano (il
+# ramo di _meta_anteprima che le omette e' per i francobolli, dove il
+# lato dipende dalla foto).
+OG_REPARTO = (1200, 630)
+
+
+def _immagine_reparto(slug: str):
+    """L'anteprima del reparto — il disegno sul bruno di casa — o
+    quella generica se il file non c'e'.
+
+    L'ESISTENZA SI CHIEDE AL DISCO, ed e' la riga da non ammorbidire:
+    un og:image che risponde 404 e' PEGGIO di nessun og:image, perche'
+    diversi crawler non trovandolo non disegnano la card AFFATTO — e
+    lo dice gia' il commento di _immagine_anteprima. Quindi una
+    categoria aggiunta al catalogo prima che qualcuno abbia lanciato
+    og_categorie.py ricade sul brand e la sua card resta intera; a
+    ricordare che manca c'e' una prova che diventa rossa da sola.
+    Una domanda al disco a richiesta, mai in cache: una cache qui
+    terrebbe invisibile un file appena generato fino al riavvio, e la
+    rotta dei reparti non e' la home (che una cache ce l'ha, ed e' la
+    sola che la meritava)."""
+    if os.path.exists(os.path.join("assets", "og", f"{slug}.jpg")):
+        return (f"{URL_PUBBLICO}/assets/og/{slug}.jpg", *OG_REPARTO)
+    return IMMAGINE_BRAND
+
+
 def _seo_categoria(slug: str):
     """(titolo, testa, corpo) di un reparto. Vocabolario chiuso: uno
     slug sconosciuto non diventa mai una query. Il noindex sulla
@@ -34248,7 +34275,7 @@ def _seo_categoria(slug: str):
         f"{nome} — Barattolo",
         f"{conto}: si paga in satoshi, e i sats restano nel deposito di "
         f"garanzia finché la merce non è arrivata.",
-        url, indicizza=quanti > 0)
+        url, immagine=_immagine_reparto(slug), indicizza=quanti > 0)
     corpo = (f"<h1>{_testo(nome)}</h1><p>{_testo(conto)}</p>{schede}"
              f"{_link_categorie()}")
     # Il nome viene dal catalogo chiuso, quindi oggi non ha niente da
@@ -34928,6 +34955,41 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 # anche le chiavi dei filtri che accendono), e restano quelli per
 # sempre.
 FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp")
+
+
+# Le anteprime dei reparti (ago 2026): l'og:image di
+# /categoria/{slug}, cioe' la figura che si vede quando qualcuno
+# incolla il link di una categoria in chat. NON sono le illustrazioni
+# della striscia: quelle sono WebP scontornati su TRASPARENZA, cioe'
+# esattamente l'asset che il commento di IMMAGINE_BRAND dichiara
+# inadatto a un'anteprima — «un barattolo scontornato lo comporrebbe
+# ogni client sul fondo che gli pare» — e per giunta in un formato che
+# non tutti i crawler digeriscono. Qui il disegno arriva gia' composto
+# sul bruno di casa in JPEG opaco da og_categorie.py, e i file si
+# COMMITTANO: comporre al volo vorrebbe dire Pillow (un import
+# fail-open, che puo' mancare) dentro la richiesta di un crawler.
+# Cartella SUA e MAI assets/categorie/, per la ragione di
+# assets/scoprire/: ritaglia_categorie.py fa il glob di quella
+# cartella e un file full-bleed le inquinerebbe la mediana del
+# pareggio dell'inchiostro, spostando le sorelle.
+# La whitelist e' DERIVATA dal catalogo come per le illustrazioni —
+# uno slug inventato non diventa mai un percorso — e NON ammette
+# «tutto»: /categoria/tutto non e' un reparto.
+FILE_OG = {f"{s}.jpg" for s in SLUG_CATEGORIE}
+
+
+@app.get("/assets/og/{nome}")
+def asset_og(nome: str, if_none_match: str = Header("")):
+    if nome not in FILE_OG:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "og", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    # Revalidazione come le due sorelle: i nomi non sono versionati e
+    # il file si puo' ridisegnare (basta rifare l'illustrazione e
+    # rilanciare og_categorie.py).
+    return _file_con_etag(percorso, "image/jpeg", "public, no-cache",
+                          if_none_match)
 
 
 @app.get("/assets/scoprire/{nome}")
