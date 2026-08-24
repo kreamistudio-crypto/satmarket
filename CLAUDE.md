@@ -22050,14 +22050,15 @@ parziale: tutti e cinque vedono la stessa cosa, tutti e tre i limiti
 dicono «card grande», e l'ultimo meta cade al byte 1401.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva — i 29 JPEG viaggiano col commit.
-⚠️ DA FARE DOPO IL DEPLOY, ed è il pezzo che da qui non si può fare:
-incollare un link di reparto in Telegram e in WhatsApp e GUARDARE la
-card — le due app la trattano diversamente, e l'anteprima si vede solo
-dal vivo. Si prova con un reparto qualunque (i link sono pubblici e non
-c'è niente di usa-e-getta da creare), ma UNA VOLTA SOLA per reparto:
-Telegram e WhatsApp cachano le card per giorni e dal nostro lato non si
-bustano, quindi se qualcosa non va si ricontrolla su un ALTRO slug
-invece di riprovare sullo stesso.
+VERIFICATO DAL VIVO (ago 2026, Andrea su Telegram e WhatsApp): un link
+di reparto incollato in chat mostra la FIGURA del suo reparto in tutte
+e due le app. Non è più da guardare — era il pezzo che da qui non si
+poteva fare, perché l'anteprima si vede solo dal vivo e le due app la
+trattano diversamente.
+LA NOTA SUL CACHING RESTA, e vale per ogni anteprima futura: Telegram e
+WhatsApp tengono la card per giorni e dal nostro lato non si bustano,
+quindi si prova UNA VOLTA SOLA per slug — se qualcosa non va si
+ricontrolla su un ALTRO reparto invece di riprovare sullo stesso.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
