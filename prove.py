@@ -183,6 +183,81 @@ def prove_filtro_italiano():
 
 
 # ====================================================================
+def prove_autocomplete_comuni():
+    """La tendina dei comuni deve saper cercare il formato che
+    PROPONE (ago 2026, caso dal campo su «Gubbio»): cercava sul solo
+    nome, quindi «Gubbio (PG)» — il valore che lei stessa mette nel
+    campo, e che finisce in colonna — non trovava piu' niente, e chi
+    tornava a ritoccare la zona lo leggeva come «il mio comune non
+    c'e'».
+    Si fa GIRARE l'endpoint vero: una sentinella direbbe che il ramo
+    esiste, mai che nella risposta ci sia Gubbio."""
+    print("\n[autocomplete dei comuni]")
+    import csv
+    import re
+    import unicodedata
+
+    amb = {"re": re, "unicodedata": unicodedata, "csv": csv, "os": os,
+           "COMUNI": {}, "COMUNI_LISTA": [], "_COMUNI_PREFISSO": None,
+           "PREPOSIZIONI_COMUNI": set(),
+           # l'endpoint non deve poter chiedere chi sei: qui la
+           # guardia e' uno stub, e che ci sia DAVVERO lo dice la
+           # sentinella in fondo
+           "verifica_utente": lambda *a, **k: None,
+           "Header": lambda d="": d, "Cookie": lambda d="": d}
+    for f in ("normalizza", "carica_comuni", "_comuni_prefisso",
+              "cerca_comuni"):
+        exec(pezzo(f), amb)
+    amb["carica_comuni"]()
+    prova("il dataset comuni si carica", True,
+          len(amb["COMUNI_LISTA"]) > 7000)
+
+    def cerca(q):
+        return [c["nome"] for c in amb["cerca_comuni"](q)["comuni"]]
+
+    # il caso dal campo, nelle due forme: quella che si digita e
+    # quella che la tendina scrive da se'
+    prova("«gub» propone Gubbio", ["Gubbio"], cerca("gub"))
+    prova("«Gubbio (PG)» propone Gubbio", ["Gubbio"],
+          cerca("Gubbio (PG)"))
+    prova("...e «Gubbio (P» a mezza sigla", ["Gubbio"],
+          cerca("Gubbio (P"))
+    prova("...e la forma senza parentesi", ["Gubbio"],
+          cerca("gubbio pg"))
+    # la sigla non apre una seconda strada: non si cerca PER sigla,
+    # o «PG» tirerebbe fuori i 59 comuni di una provincia che
+    # nessuno sta scrivendo
+    prova("la sola sigla non propone nulla", [], cerca("PG"))
+    # e gli omonimi restano distinguibili, che e' il motivo per cui
+    # la tendina propone la sigla
+    prova("«castro bg» arriva a un solo Castro", 1,
+          len(cerca("castro bg")))
+    prova("«castro» li propone tutti", True, len(cerca("castro")) > 1)
+    # le regressioni della tendina di sempre
+    prova("un carattere solo tace", [], cerca("g"))
+    prova("il tetto resta 10", 10, len(cerca("ca")))
+    prova("nome composto con lo spazio", True,
+          "Gualdo Tadino" in cerca("gualdo ta"))
+    prova("accenti e maiuscole indifferenti", True,
+          "Gualtieri Sicaminò" in cerca("GUALTIERI SICAMINO"))
+    prova("un prefisso che non esiste tace", [], cerca("zzq"))
+
+    # La chiave composta e' quella di carica_comuni e non una
+    # seconda ricetta: se divergessero, la tendina proporrebbe una
+    # forma che la zona poi non riconosce (o il contrario), e non se
+    # ne accorgerebbe nessuno.
+    nz = amb["normalizza"]
+    prova("la forma composta e' una chiave viva del dizionario", True,
+          all(nz(f"{c['nome']} {c['provincia']}") in amb["COMUNI"]
+              for c in amb["COMUNI_LISTA"]))
+    corpo = codice(pezzo("cerca_comuni"))
+    prova("l'endpoint resta autenticato", True,
+          "verifica_utente(" in corpo)
+    prova("...e non normalizza piu' 7.900 nomi per battuta", 1,
+          corpo.count("normalizza("))
+
+
+# ====================================================================
 def prove_testo_evento():
     """Il testo di un evento e' il cuore CONDIVISO fra chi scrive
     l'annuncio e chi decide se la moderazione l'ha gia' giudicato: se
@@ -28484,7 +28559,8 @@ def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_filtro_italiano, prove_testo_evento,
+    for f in (prove_filtro_italiano, prove_autocomplete_comuni,
+              prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
               prove_anello, prove_categorie,
