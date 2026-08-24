@@ -18677,6 +18677,136 @@ def prove_seo():
     prova("nella fascia stretta il lockup cede", True,
           ".nav-logo .lockup{display:none}" in testo_mini[_if:_if + 120])
 
+    # --- 16ter) IL REPARTO SI CONDIVIDE (ago 2026) -----------------
+    # Le 27 pagine /categoria/{slug} esistevano dal cantiere «farsi
+    # trovare» — ci si ATTERRA gia' bene — ma da dentro l'app quel link
+    # non si poteva PRENDERE: il difetto da cui e' nato `sicuShare`.
+    #
+    # ⚠️ OGNI SENTINELLA QUI GUARDA IL CODICE E MAI LA PROSA: i commenti
+    # del cantiere nominano apposta cio' che vietano («questa pagina»,
+    # «noindex», i gradini della scala), e una sentinella che inciampa
+    # nella propria documentazione non sorveglia niente. E' l'errore
+    # che ho fatto scrivendo la verifica dal vivo, dove `"noindex" in
+    # html` matchava il mio stesso commento dentro la pagina servita.
+    #
+    # LA SCALA DELLA CONDIVISIONE non aveva NESSUNA sentinella, e i
+    # chiamanti sono diventati quattro: se ne perde un gradino e chi
+    # sta su quel ramo resta muto, senza che niente fallisca.
+    cl = pezzo_js(testo_mini, "async function condividiLink(", "\n}\n")
+    # ⚠️ L'ULTIMO GRADINO SI CERCA COL SUO «else»: `toast(link` da solo
+    # vive anche nel `.catch` della riga sopra, quindi la sentinella
+    # scritta cosi' NON POTEVA FALLIRE — togliendo il ripiego finale
+    # restava verde. L'ha detto la tortura, non la rilettura.
+    for gradino in ("tg.shareURL", "t.me/share/url", "navigator.share",
+                    "navigator.clipboard", "else toast(link"):
+        prova(f"la scala della condivisione tiene «{gradino}»", True,
+              gradino in cl)
+
+    # IL POSTO. Il bottone vive DENTRO la vetrina filtrata e non sulla
+    # card della striscia: quella e' larga 84px e ha gia' DUE gesti
+    # (tocca per filtrare, ritocca per uscire), e un terzo bersaglio li'
+    # e' cio' che il progetto rifiuta altrove.
+    prova("il reparto si condivide da dentro la vetrina", True,
+          'id="catShare"' in testo_mini
+          and 'onclick="condividiCategoria()"' in testo_mini)
+    prova("...e non dalla card della striscia (ha gia' due gesti)",
+          False, "condividiCategoria" in st)
+    # ...e NON come quarta pillola della riga `.strumenti`. MISURATO a
+    # 320 col caso peggiore («830 risultati»): oggi l'etichetta
+    # dell'ordinamento ha i 62px che le servono, con la pillola in piu'
+    # scende a 34 — «Piu' recenti» diventa «Piu' …», e le due voci del
+    # prezzo diventano tutt'e due «Pre…», cioe' due voci diverse che si
+    # leggono uguali. Il bottone e' un FRATELLO della riga: fra i due
+    # ci dev'essere la chiusura del suo div.
+    # ⚠️ `find` e non `index`, ed e' la lezione gia' pagata due volte:
+    # chi TOGLIE il bottone farebbe ESPLODERE questa funzione — e una
+    # prova che esplode non e' una rossa, si porta dietro tutte le
+    # sorelle che vengono dopo. Cosi' invece diventa rossa lei sola.
+    _is = testo_mini.find('<div class="strumenti">')
+    _ib = testo_mini.find('id="catShare"')
+    _ifb = testo_mini.find('<div id="filtriBox"')
+    prova("il bottone e' in pagina", True, _ib > 0)
+    # ⚠️ IL CONTO DEV'ESSERE BILANCIATO, non «c'e' un </div> in mezzo»:
+    # dentro `.strumenti` vive gia' `.conta-blocco` con le sue due
+    # righe, quindi di `</div>` ce n'e' comunque — e la sentinella
+    # scritta cosi' restava verde col bottone spostato DENTRO la riga
+    # (l'ha detto la tortura). Se il div di `.strumenti` e' chiuso
+    # prima del bottone, aperture e chiusure pareggiano.
+    _fetta = testo_mini[_is:_ib] if _ib > 0 else "<div"
+    prova("il bottone sta FUORI dalla riga .strumenti", True,
+          _fetta.count("<div") == _fetta.count("</div>"))
+    prova("...e SOPRA il pannello Filtri", True, 0 < _ib < _ifb)
+    prova("...e ha il suo vestito", True, ".cat-share{" in testo_mini)
+
+    # LA FUNZIONE: passa dalla scala unica e non si ricopia i ripieghi
+    # (e' il difetto per cui `condividiLink` e' stata estratta).
+    cc = pezzo_js(testo_mini, "function condividiCategoria(){", "\n}\n")
+    prova("passa dalla scala unica", True, "condividiLink(" in cc)
+    prova("...e non si ricopia nessun gradino", [],
+          [x for x in ("navigator.share", "clipboard", "t.me/share",
+                       "shareURL") if x in cc])
+    # lo slug e' il gemello di `slug_categoria`, non un quarto elenco
+    prova("il link usa lo slug del gemello", True,
+          "/categoria/${slugCat(activeCat)}" in cc)
+    prova("...e nessun dominio battuto a mano", False, "http" in cc)
+    # il testo dice la COSA, come le due sorelle di /sicurezza e
+    # /privacy — e NESSUN CONTEGGIO ci viaggia dentro: il numero che si
+    # vede a schermo e' quello della VISTA (filtri, regione,
+    # ordinamento), e dentro un messaggio che non invecchia si
+    # leggerebbe come quello della categoria. Il conto vero lo mette il
+    # server nell'og:description, dove e' fresco per costruzione.
+    prova("il testo dice la cosa, non il nome della vista", True,
+          "in vendita su Barattolo" in cc)
+    prova("...e nessun conteggio ci viaggia dentro", [],
+          [x for x in ("nTot", "vetrinaTotale", "data.length",
+                       "conteggi") if x in cc])
+
+    # IL GIUDICE, clausola per clausola — comprese quelle che NON ci
+    # sono. `vaiAste` non azzera `activeCat`, quindi ramo Aste e reparto
+    # convivono e il bottone resta: il filtro delle aste e' roba della
+    # VISTA, che il link non porta.
+    rc = pezzo_js(testo_mini, "function renderCondividiCategoria(){",
+                  "\n}\n")
+    prova("il bottone c'e' solo con un reparto acceso", True,
+          "activeCat !== 'Tutto'" in rc)
+    prova("...mai col barattolo (li' la vetrina non e' il reparto)",
+          True, "!vistaBarattolo" in rc)
+    prova("...mai in DEMO (li' location.origin non e' un indirizzo)",
+          True, "!DEMO" in rc)
+    prova("...ma in vetrina anonima SI': e' proprio chi condivide",
+          False, "VETRINA" in rc)
+    prova("...e nessuna clausola sul ramo Aste", False, "ramoVetrina" in rc)
+
+    # UN CHIAMANTE SOLO, e SOPRA il return del barattolo: sotto,
+    # uscendo dal barattolo con un reparto acceso, il bottone non
+    # tornerebbe mai piu' — difetto vero e invisibile a occhio.
+    prova("la decisione ha un chiamante solo", 1,
+          testo_mini.count("renderCondividiCategoria();"))
+    ch = pezzo_js(testo_mini, "function renderChips(){", "\n}\n")
+    _ic = ch.find("renderCondividiCategoria();")
+    prova("...e sta sopra il return del barattolo", True,
+          0 <= _ic < ch.find("if (vistaBarattolo)"))
+
+    # IL PATTO DI COSTRUZIONE CON LA RICERCA: il giudice non ha una
+    # clausola sulla ricerca PERCHE' c'e' questa riga. Toglierla
+    # lascerebbe «Condividi la categoria» sopra risultati di tutt'altro
+    # reparto.
+    ds = pezzo_js(testo_mini, "async function doSearch(){", "\n}\n")
+    prova("cercare spegne il reparto, e con lui il bottone", True,
+          "if (q && activeCat !== 'Tutto') spegniReparto();" in ds)
+
+    # LA PAROLA PORTA LA PROMESSA: il link e' del REPARTO e non della
+    # vista — non porta filtri, ordinamento ne' ricerca. «Questa
+    # pagina» (la formula della sorella di /sicurezza) punterebbe a
+    # cio' che si sta guardando; l'articolo determinativo punta alla
+    # cosa. E la riga e' markup FISSO: nessun esc() da ricordare.
+    _riga = testo_mini[_ib:testo_mini.find("</button>", _ib)] if _ib > 0 \
+        else ""
+    prova("la riga del bottone e' markup fisso", False, "${" in _riga)
+    prova("...e dice «la categoria», mai «questa pagina»", True,
+          "Condividi la categoria" in _riga
+          and "questa pagina" not in _riga)
+
     # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
     # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa
     # funzionare gli indirizzi parlanti senza toccare il client: chi la

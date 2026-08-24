@@ -663,6 +663,27 @@
   .strumenti .campo-scelta .cs-val{display:block;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   .strumenti .campo-scelta .cs-freccia{font-size:11px}
+  /* «Condividi la categoria»: il VESTITO e' quello delle pillole di
+     `.strumenti` — si legge come la seconda riga della stessa fascia,
+     non come un bottone nuovo — ma la CASA e' una riga sua, e non e'
+     un vezzo: dentro `.strumenti` una quarta pillola strozza
+     l'ordinamento. Misurato a 320 (il caso peggiore, «830 risultati»):
+     oggi l'etichetta ha i 62px che le servono e con la pillola in piu'
+     scende a 34 — «Piu' recenti» diventa «Piu' …», e «Prezzo: dal piu'
+     basso» e «dal piu' alto» diventano tutt'e due «Pre…», cioe' due
+     voci diverse che si leggono uguali. E' lo stesso muro per cui da
+     quella riga sono state tolte le emoji dei contatori (~22px l'una)
+     per farla stare a 360.
+     Il prezzo di questa scelta e' verticale e sta scritto qui: ~37px,
+     cioe' la griglia dopo `scorriAlReparto` passa da 249 a 212 a
+     320x568. Si spendono solo DENTRO un reparto. Il bottone e' un
+     FRATELLO di `.strumenti` e non un figlio: l'arrivo dello scroll
+     resta dov'era. */
+  .cat-share{display:block;margin:8px var(--pad) 0 auto;
+    font:700 12.5px/1.2 Nunito,sans-serif;color:var(--muted);
+    background:var(--card);border:1.5px solid var(--line);
+    border-radius:999px;padding:6px 12px;cursor:pointer}
+  .cat-share:active{transform:translateY(1px)}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
   .filtri-riga{display:flex;gap:8px}
@@ -4140,6 +4161,24 @@ document.getElementById('cartello')?.remove();</script>
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
     </div>
+    <!-- Il link del reparto si poteva raggiungere ma non PRENDERE: chi
+         voleva mandarlo a qualcuno doveva ricordarsi l'indirizzo a
+         memoria — il difetto da cui e' nato `sicuShare`, qui identico.
+         Nasce nascosto: a decidere e' `renderCondividiCategoria`.
+         SOPRA il pannello Filtri e non sotto: aperto quello, un
+         bottone in coda sembrerebbe parte del form dei filtri.
+         DICE «LA categoria» e mai «questa pagina» come la sorella di
+         /sicurezza, ed e' la parola a portare la promessa: il link e'
+         del REPARTO, non della vista — non porta filtri, prezzo,
+         regione, ordinamento ne' il ramo Aste, e non potrebbe
+         (/categoria/{slug} non li sa portare e il server non li
+         leggerebbe). «Questa» punterebbe a cio' che si sta guardando;
+         l'articolo determinativo punta alla cosa.
+         Markup FISSO: niente `${...}` qui dentro, quindi nessun esc()
+         da ricordare — e il nome del reparto e' gia' acceso a un
+         centimetro sopra, sulla pillola e sulla card. -->
+    <button type="button" class="cat-share" id="catShare"
+            style="display:none" onclick="condividiCategoria()">🔗 Condividi la categoria</button>
     <div id="filtriBox" style="display:none">
       <div class="filtri-riga">
         <input id="filtroMinInp" inputmode="decimal" placeholder="Prezzo min">
@@ -7854,6 +7893,41 @@ function centraNellaFila(fila, voce){
   const f = fila.getBoundingClientRect(), v = voce.getBoundingClientRect();
   fila.scrollLeft += (v.left - f.left) - (fila.clientWidth - v.width) / 2;
 }
+/* «🔗 Condividi la categoria»: la superficie che segue il reparto, nel
+   posto dove le superfici del reparto si scrivono gia'.
+   TRE COSE LO SPENGONO, e sono tre ragioni DIVERSE — nessuna e'
+   ridondante:
+   · senza reparto non c'e' niente da condividere: «Tutto» e' la home,
+     che un link ce l'ha gia';
+   · col BARATTOLO acceso `activeCat` puo' essere rimasta accesa
+     (alternaBarattolo non l'azzera), ma quella vetrina non e' il
+     reparto — sono le cose che hai messo via — e il link direbbe
+     un'altra cosa: e' la stessa ragione per cui li' `body.solo-barattolo`
+     spegne Ordina e Filtri;
+   · in DEMO `location.origin` e' "null" e il link uscirebbe rotto, il
+     patto di `sicuShare`/`privShare` alla lettera.
+   IN VETRINA ANONIMA C'E' ECCOME, ed e' deliberato: chi arriva dal web
+   e' proprio chi condivide, e un `!VETRINA` qui lo spegnerebbe dove
+   serve di piu'.
+   SULLE ASTE NESSUNA CLAUSOLA: `vaiAste` non azzera `activeCat`, quindi
+   ramo e reparto convivono e il bottone resta. Il filtro «solo aste» e'
+   roba della VISTA come il prezzo o l'ordinamento — che il link non
+   porta — e un controllo che sparisce passando fra due tab, per una
+   ragione invisibile, e' il contrario di «un gesto, un significato».
+   E SULLA RICERCA nemmeno: `doSearch` chiama `spegniReparto()` quando
+   c'e' una query, quindi il reparto e' spento PER COSTRUZIONE. C'e' la
+   prova che difende quella costruzione, invece di ricopiarla qui.
+   La decisione si rifa' a OGNI giro e non una volta all'avvio, come in
+   `apriSicurezza`: DEMO cambia sotto i piedi (il ripiego quando il
+   backend tace). Girare a vista NASCOSTA non fa danno — qui si scrive
+   un `display` e non si misura niente, il contrario di
+   `centraNellaFila`, che su una fila non impaginata esce subito. */
+function renderCondividiCategoria(){
+  const b = el('catShare');
+  if (!b) return;
+  b.style.display = (!DEMO && !vistaBarattolo && activeCat !== 'Tutto')
+    ? '' : 'none';
+}
 function renderChips(){
   /* La striscia illustrata si ridisegna DA QUI, ed e' il suo unico
      chiamante: i cinque posti che gia' rifanno le pillole (avvia,
@@ -7861,7 +7935,12 @@ function renderChips(){
      vivi) valgono per tutte e due le file, e non nasce un secondo
      elenco da tenere allineato. In TESTA e non in coda: il ramo del
      barattolo qui sotto esce con un return, e da li' la striscia —
-     che proprio in quel caso deve sparire — non la rifarebbe nessuno. */
+     che proprio in quel caso deve sparire — non la rifarebbe nessuno.
+     LO STESSO VALE PER IL BOTTONE «Condividi la categoria», e per una
+     ragione in piu': col barattolo acceso deve SPARIRE, e sotto il
+     return non lo spegnerebbe nessuno — uscendo dal barattolo con un
+     reparto acceso non tornerebbe mai piu'. */
+  renderCondividiCategoria();
   renderStriscia();
   renderScoprire();
   /* A BARATTOLO ACCESO la fila dice una cosa sola: dove sei, e come si
@@ -18335,6 +18414,33 @@ function condividiPrivacy(){
   return condividiLink(`${location.origin}/privacy`,
     'Che dati raccoglie Barattolo, e per quanto 🫙',
     'I tuoi dati');
+}
+
+/* La terza della famiglia: il link di un REPARTO. Le 27 pagine
+   /categoria/{slug} esistono dal cantiere «farsi trovare» — ci si
+   ATTERRA gia' bene (CATEGORIA_URL legge il percorso e apre la vetrina
+   filtrata in una richiesta sola) — ma da qui dentro quel link non si
+   poteva PRENDERE.
+   Lo slug passa da `slugCat`, il gemello di `slug_categoria` in
+   server.py che prove.py tiene allineato: ricalcolarlo qui a mano
+   sarebbe il terzo elenco della stessa cosa.
+   Il testo che accompagna dice la COSA e non il nome della vista, come
+   le due sorelle: si manda a chi ha detto «cerco una bici», che dei
+   nostri reparti non sa niente. E rima con l'og:title che il server
+   mette nell'anteprima («Biciclette — Barattolo»).
+   NESSUN CONTEGGIO nel testo, ed e' la riga da non «migliorare»: il
+   numero che si vede a schermo e' quello della VISTA — filtri,
+   regione e ordinamento compresi — e viaggerebbe dentro un messaggio
+   che non invecchia come se fosse quello della categoria. Il conto
+   vero lo mette il SERVER nell'og:description, dove e' fresco per
+   costruzione.
+   La cintura su «Tutto»: il bottone li' non c'e', ma /categoria/tutto
+   non e' un reparto — `_categoria_da_slug` ha il vocabolario CHIUSO su
+   CATEGORIE — e la pagina ricadrebbe sui meta generici col noindex. */
+function condividiCategoria(){
+  if (activeCat === 'Tutto') return;
+  return condividiLink(`${location.origin}/categoria/${slugCat(activeCat)}`,
+    `${activeCat} in vendita su Barattolo 🫙`, activeCat);
 }
 
 /* «Come mi vedono gli altri»: NON una vista nuova — si apre la
