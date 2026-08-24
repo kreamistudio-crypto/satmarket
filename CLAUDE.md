@@ -2309,6 +2309,102 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   striscia — che proprio in quel caso deve sparire — non la rifarebbe
   nessuno. Così i cinque posti che già rifanno le pillole valgono per
   tutte e due le file, e non nasce un secondo elenco da tenere in pari.
+  IL REPARTO SI CONDIVIDE (ago 2026): le 27 pagine
+  `/categoria/{slug}` esistono dal cantiere «farsi trovare» e ci si
+  ATTERRA già bene (`CATEGORIA_URL` legge il percorso e apre la
+  vetrina filtrata in una richiesta sola), ma da dentro l'app quel
+  link non si poteva PRENDERE — chi voleva mandarlo doveva ricordarsi
+  l'indirizzo a memoria. È il difetto da cui è nato `sicuShare`.
+  NON SULLA CARD DELLA STRISCIA (decisione di Andrea): è larga 84px e
+  ha già DUE gesti — tocca per filtrare, ritocca per uscire — e un
+  terzo bersaglio lì è ciò che il progetto rifiuta altrove (il
+  barattolino e il rifornimento non convivono mai sullo stesso
+  angolo); l'unico gesto rimasto sarebbe un long-press, che non lo
+  scopre nessuno. E la striscia è la MAPPA, mentre condividere è
+  un'AZIONE: le azioni vivono dove c'è il contesto, la regola dei
+  badge della coda «⏸ Ordini fermi», che sono solo navigazione. Sta
+  DENTRO la vetrina filtrata, dove ci arriva anche chi il link lo
+  riceve e può quindi ri-condividerlo.
+  E NEMMENO DENTRO LA RIGA `.strumenti`, ed è MISURATO e non stimato:
+  a 320 col caso peggiore («830 risultati») l'etichetta
+  dell'ordinamento ha ESATTAMENTE i 62px che le servono; con una
+  quarta pillola scende a 34 — «Più recenti» diventa «Più …», e
+  «Prezzo: dal più basso» e «dal più alto» diventano tutt'e due
+  «Pre…», cioè due voci diverse che si leggono UGUALI. È lo stesso
+  muro per cui da quella riga sono state tolte le emoji dei contatori
+  (~22px l'una) per farla stare a 360. Quindi una riga sua
+  (`.cat-share`), sotto, e SOPRA il pannello Filtri: aperto quello, un
+  bottone in coda sembrerebbe parte del form dei filtri.
+  IL PREZZO È VERTICALE E STA SCRITTO: ~37px, cioè la griglia dopo
+  `scorriAlReparto` passa da 249 a **212** a 320×568 (265 → 228 a 360
+  e 375). Si spendono solo DENTRO un reparto, e l'arrivo dello scroll
+  NON si muove (219): il bottone è un FRATELLO di `.strumenti`, non un
+  figlio. Chi allarga quella riga rifaccia questo conto.
+  IL GIUDICE È `renderCondividiCategoria`, TRE clausole e tre ragioni
+  DIVERSE — nessuna ridondante: senza reparto non c'è niente da
+  condividere («Tutto» è la home, che un link ce l'ha già); col
+  BARATTOLO acceso `activeCat` può essere rimasta accesa
+  (`alternaBarattolo` non l'azzera) ma quella vetrina non è il reparto
+  — è la ragione per cui lì `body.solo-barattolo` spegne anche Ordina
+  e Filtri; in DEMO `location.origin` non è un indirizzo e il link
+  uscirebbe rotto, il patto di `sicuShare`. `VETRINA` NON c'è, ed è
+  deliberato: chi arriva dal web è proprio chi condivide, e un
+  `!VETRINA` lo spegnerebbe dove serve di più. Sul ramo ASTE nemmeno
+  (`vaiAste` non azzera `activeCat`): il filtro delle aste è roba
+  della VISTA come il prezzo o l'ordinamento, e un controllo che
+  sparisce passando fra due tab per una ragione invisibile è il
+  contrario di «un gesto, un significato». E sulla RICERCA niente:
+  `doSearch` chiama `spegniReparto()`, quindi il reparto è spento PER
+  COSTRUZIONE — c'è la prova che difende quella costruzione invece di
+  ricopiarla nel giudice. Vive in `renderChips` e non in `renderGrid`
+  perché `spegniReparto` chiama la prima e NON la seconda: là il
+  bottone sopravvivrebbe al reparto spento fino all'arrivo dei
+  risultati, o per sempre se la fetch fallisce. E in TESTA come la
+  striscia, per una ragione in più: col barattolo deve SPARIRE, e
+  sotto il `return` non lo spegnerebbe nessuno.
+  LA PAROLA PORTA LA PROMESSA — «Condividi **LA** categoria», mai
+  «questa pagina» come la sorella di `/sicurezza`: il link è del
+  REPARTO e non della vista, non porta filtri, prezzo, regione,
+  ordinamento né il ramo Aste, e non potrebbe (`/categoria/{slug}` non
+  li sa portare e il server non li leggerebbe). «Questa» punterebbe a
+  ciò che si sta guardando; l'articolo determinativo punta alla COSA.
+  Una parola, zero pixel, e diventa una sentinella secca.
+  E NESSUN CONTEGGIO nel testo che accompagna il link, ed è la riga da
+  non «migliorare»: il numero a schermo è quello della VISTA, e dentro
+  un messaggio che non invecchia si leggerebbe come quello della
+  categoria. Il conto vero lo mette il SERVER nell'`og:description`,
+  dove è fresco per costruzione.
+  L'ANTEPRIMA HA TITOLO, DESCRIZIONE, URL E CANONICAL SUOI MA
+  L'IMMAGINE GENERICA (imperfezione dichiarata, decisione di Andrea):
+  `_seo_categoria` non passa `immagine=` a `_testa_seo`, quindi ricade
+  su `IMMAGINE_BRAND` — l'icona 512×512, la stessa di home, negozio,
+  `/sicurezza` e `/privacy`. L'illustrazione del reparto NON si può
+  usare com'è: è WebP e scontornata su TRASPARENZA, cioè esattamente
+  l'asset che il commento di `IMMAGINE_BRAND` dichiara inadatto («un
+  barattolo scontornato lo comporrebbe ogni client sul fondo che gli
+  pare»). LA STRADA, per il giorno che servirà: comporre le 30 figure
+  sul bruno `--cat-fondo` in JPEG opachi (600×600 basta per la card
+  grande di tutti), una rotta col calco di `/assets/categorie`, e
+  `_seo_categoria` che passa la tupla — più un giro vero su Telegram e
+  WhatsApp, che le anteprime si cachano a lungo e non si bustano.
+  IL REPARTO VUOTO tiene il bottone: il link funziona e l'anteprima
+  dice la verità («Ancora nessun oggetto in questo reparto»). Non si
+  gata sul conteggio, ed è deliberato: quel numero è della VISTA — coi
+  filtri attivi può essere zero su un reparto pieno — mentre il
+  bottone parla del reparto.
+  DUE LEZIONI DEL CANTIERE, e sono di metodo. 1) La verifica dal vivo
+  cercava `noindex` nell'HTML servito e lo trovava NEL MIO STESSO
+  COMMENTO, finito dentro la pagina: la trappola che questo file
+  ripete da mesi, presa mentre la si scriveva. Da lì ogni sentinella
+  di questa voce guarda il CODICE e mai la prosa. 2) La tortura a 21
+  mutazioni ha trovato DUE sentinelle mie che non potevano fallire —
+  «la scala tiene `toast(link`», che matchava il `.catch` della riga
+  sopra, e «il bottone sta fuori da `.strumenti`», che si faceva
+  ingannare dal `</div>` di `.conta-blocco` (ora è un conto di tag
+  BILANCIATI). Più tre `.index()` diventati `.find()`: chi TOGLIE il
+  bottone deve trovare una rossa, non far ESPLODERE `prove_seo`
+  portandosi dietro le sorelle — è la terza volta che questo file lo
+  impara.
 
   LA PAGINA «SFOGLIA» (lug 2026) [MORTA, ago 2026 — la voce resta per
   la storia delle illustrazioni e del pareggio, che oggi vivono nella
