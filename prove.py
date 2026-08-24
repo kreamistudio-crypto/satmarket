@@ -19598,6 +19598,40 @@ def prove_rilancio_offerta():
           "toggleContro(${o.id})" in rend
           and "rispondiOfferta(${o.id},'contro')" in rend)
 
+    # --- 3bis) LA FORMA DEI BOTTONI (ago 2026, dal campo) ------
+    # Il RIFIUTA era `.danger-ghost`, cioe' testo nudo senza fondo
+    # ne' bordo: accanto a un bottone pieno non si leggeva come un
+    # bottone. Adesso e' `.allarme`, il rosso velato che in casa
+    # veste gia' chi TOGLIE — e la sezione Offerte non deve avere
+    # piu' NESSUN testuale, o la forma vecchia resta a due righe di
+    # distanza (ci si e' inciampati: il «Ritira» del ramo proposta
+    # era rimasto indietro, e l'ha visto il giro a schermo).
+    # ⚠️ SI CONTA SUL CODICE E NON SULLA FETTA NUDA: `pezzo_js` i
+    # commenti non li toglie, e il commento qui accanto nomina
+    # apposta `danger-ghost` per dire perche' non c'e' piu'. La
+    # trappola di casa, presa mentre la si scriveva.
+    solo = re.sub(r"/\*[\s\S]*?\*/", "", rend)
+    prova("nelle Offerte non resta nessun bottone testuale", 0,
+          solo.count("danger-ghost"))
+    # QUATTRO: i due «Rifiuta» dei due rami e i due «Ritira» (la
+    # proposta in attesa e l'accordo da pagare).
+    prova("...e i distruttivi parlano tutti la stessa lingua", 4,
+          solo.count("btn allarme"))
+    # LA COPPIA STA A META' E META' con la base al 50% e non a
+    # ZERO: `.allarme` ha un bordo da 2px e con `flex:1` (basis 0)
+    # si somma FUORI dalla base — il Rifiuta verrebbe 4px piu'
+    # largo dell'Accetta. E' la lezione dei bottoni del pannello
+    # Filtri e della barra d'acquisto, alla terza volta.
+    prova("accetta e rifiuta sono larghi uguali", 4,
+          solo.count("flex:1 1 50%"))
+    # E LA DISPOSIZIONE E' A RIGHE, NON A WRAP: col wrap il terzo
+    # bottone andava a capo DA SOLO alla sua larghezza naturale,
+    # diverso a ogni schermo. Due righe esplicite: la coppia che
+    # decide sopra, la terza via sotto — attaccata al campo che
+    # apre, cosi' il gesto e il suo campo non si separano.
+    prova("i bottoni delle offerte non vanno a capo da soli", 0,
+          solo.count("flex-wrap:wrap"))
+
     # --- 4) E I DUE GIUDICI SI FANNO GIRARE ---------------------
     # Le sentinelle dicono che esistono, mai che rispondano uguale al
     # server: due regole sul denaro tenute in pari solo per testo sono

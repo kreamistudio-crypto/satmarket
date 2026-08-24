@@ -16415,7 +16415,7 @@ function renderOfferte(){
            un'uscita, non un invito. */
         azioni = `
           <div style="display:flex;justify-content:flex-end;margin-top:10px">
-            <button class="btn danger-ghost" style="margin:0;width:auto;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
+            <button class="btn allarme" style="margin:0;width:auto;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
           </div>`;
       }
       else {
@@ -16428,11 +16428,11 @@ function renderOfferte(){
            bloccato — ma ora va ridetto dove il numero si vede. */
         azioni = `
           ${(o.quantita||0) > 1 ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: l'annuncio resta in vetrina e vince chi paga per primo.</div>` : ''}
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
-            <button class="btn ghost" style="flex:1;margin:0" onclick="toggleContro(${o.id})">↔ Controproponi</button>
-            <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn primary" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
+            <button class="btn allarme" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
           </div>
+          <button class="btn ghost" style="margin:8px 0 0" onclick="toggleContro(${o.id})">↔ Controproponi</button>
           <div id="controBox_${o.id}" style="display:none;margin-top:8px">
             <!-- Il campo LARGO e usabile, il bottone proporzionato: il
                  .btn ha width:100% e senza flex:none schiacciava il campo
@@ -16453,6 +16453,29 @@ function renderOfferte(){
            appena detto per quanti pezzi si tratta, e ripetere le due
            facce due volte renderebbe la riga illeggibile */
         stato = `Il venditore propone <b>${cifraPezzi(o.valuta,o.contro_sats,o.contro_eur,o.quantita||0)}</b> (avevi offerto ${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}${(o.quantita||0)>1?' al pezzo':''}) · entro ~${ore}h`;
+        /* LA FORMA DEI BOTTONI (ago 2026, dal campo: «hanno una
+           forma vecchia, diversa dal resto dell'app»). Il difetto
+           era il RIFIUTA: `.danger-ghost` e' testo nudo — niente
+           fondo, niente bordo, niente ombra — e accanto a un
+           bottone pieno non si legge come un bottone. Adesso e'
+           `.allarme`, il rosso VELATO che in casa veste gia' chi
+           TOGLIE (la disputa, l'elimina, la rimozione admin):
+           nessun colore nuovo, la forma di tutti gli altri.
+           LA DISPOSIZIONE E' DUE RIGHE E NON UN WRAP, ed e' la
+           riga da non «semplificare»: col `flex-wrap` i tre
+           bottoni andavano a capo secondo lo spazio, quindi a 320
+           il terzo scendeva DA SOLO alla sua larghezza naturale —
+           storto, e diverso a ogni larghezza. Cosi' invece la
+           coppia che DECIDE (accetta verde, rifiuta rosso) sta su
+           una riga a meta' e meta', e la terza via prende la riga
+           sotto, attaccata al campo che apre: il gesto e il suo
+           campo non si separano mai.
+           `flex:1 1 50%` e non `flex:1`: con la base a ZERO il
+           bordo da 2px di .allarme si somma FUORI dalla base e il
+           Rifiuta viene 4px piu' largo dell'Accetta — la lezione
+           gia' pagata dai bottoni del pannello Filtri e dalla
+           barra d'acquisto. Col box-sizing globale la base al 50%
+           E' la misura finale. */
         /* Il RILANCIO (ago 2026): davanti a una controproposta non
            si e' piu' costretti a prendere o lasciare. Il bottone
            compare solo se restano giri E se fra le due cifre c'e'
@@ -16463,11 +16486,11 @@ function renderOfferte(){
            tutti e due, quindi gli id non possono collidere. */
         const puoiRil = rilanciRimasti(o) > 0 && spazioRilancio(o);
         azioni = `
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
-            ${puoiRil ? `<button class="btn ghost" style="flex:1;margin:0" onclick="toggleContro(${o.id})">↔ Rilancia</button>` : ''}
-            <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn primary" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
+            <button class="btn allarme" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
           </div>
+          ${puoiRil ? `<button class="btn ghost" style="margin:8px 0 0" onclick="toggleContro(${o.id})">↔ Rilancia</button>` : ''}
           ${puoiRil ? `<div id="controBox_${o.id}" style="display:none;margin-top:8px">
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
@@ -16490,7 +16513,7 @@ function renderOfferte(){
         azioni = `
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn orange" style="flex:1;margin:0" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>
-            <button class="btn danger-ghost" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
+            <button class="btn allarme" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
           </div>`;
       } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
     }
