@@ -988,6 +988,10 @@ try:
     from config import MAX_OFFERTE_ANNUNCIO
 except ImportError:
     MAX_OFFERTE_ANNUNCIO = 3       # tentativi totali per compratore per annuncio
+try:
+    from config import MAX_RILANCI_OFFERTA
+except ImportError:
+    MAX_RILANCI_OFFERTA = 2        # rilanci del compratore per trattativa
 
 # IL NEGOZIO IN FERIE (ago 2026): il venditore che parte chiude la
 # bottega con la data di rientro. Gli annunci RESTANO in vetrina, col
@@ -2401,6 +2405,9 @@ def init_db():
         scadenza INTEGER DEFAULT 0,      -- il prossimo appuntamento:
                                          -- risposta oppure pagamento
         ordine_id INTEGER DEFAULT 0,     -- l'ordine nato dall'offerta
+        giri INTEGER DEFAULT 0,          -- quante volte il compratore
+                                         -- ha rilanciato (0 = mai, ed e'
+                                         -- la verita' e non un ripiego)
         quantita INTEGER DEFAULT 0,      -- i pezzi dell'accordo (0 = non
                                          -- dichiarata: le offerte nate
                                          -- prima del cantiere, quantita
@@ -3562,6 +3569,16 @@ def init_db():
     # si esaurisce da se' in ≤72 ore (48 di risposta + 24 di pagamento).
     try:
         con.execute("ALTER TABLE offerte ADD COLUMN quantita INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    # I GIRI del rilancio (ago 2026). Stesso patto della gemella:
+    # niente backfill, e lo zero e' la verita' — sulle trattative
+    # gia' aperte al deploy nessuno ha mai rilanciato.
+    # ⚠️ Si chiama `giri` e non `rilanci` APPOSTA: `rilanci` e' gia'
+    # una TABELLA (le puntate d'asta), e una colonna omonima
+    # renderebbe illeggibile ogni riga di SQL letta di fretta.
+    try:
+        con.execute("ALTER TABLE offerte ADD COLUMN giri INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
     # Migrazioni per spedizione, consegna e resi
@@ -13154,6 +13171,10 @@ def _leve_stato():
                   ORE_PAGAMENTO_OFFERTA),
             _leva("Tentativi per annuncio", "MAX_OFFERTE_ANNUNCIO",
                   MAX_OFFERTE_ANNUNCIO),
+            _leva("Rilanci per trattativa", "MAX_RILANCI_OFFERTA",
+                  MAX_RILANCI_OFFERTA,
+                  spento="chi riceve una controproposta puo' solo "
+                         "accettare o rifiutare"),
             _leva("Negozio in ferie", "FERIE_ATTIVE", bool(FERIE_ATTIVE),
                   spento="nessuno può chiudere la bottega (chi è già in "
                          "ferie rientra lo stesso alla sua data)"),
@@ -13832,6 +13853,51 @@ def _importo_accordo(off) -> tuple[int, float]:
     if off["contro_sats"] > 0 or off["contro_eur"] > 0:
         return off["contro_sats"], off["contro_eur"]
     return off["importo_sats"], off["importo_eur"]
+
+
+def _cifra_da_payload(valuta: str, grezzo) -> tuple[int, float, float]:
+    """La cifra che arriva dal client, nella valuta del LISTINO.
+
+    Torna `(sats, eur, numero)`: due colonne — una delle quali resta
+    sempre 0, come in tabella — e il valore su cui si confronta. Gli
+    euro accettano la virgola, che e' come si scrive un prezzo qui.
+    Una cifra illeggibile vale ZERO e cade da sola sul pavimento del
+    chiamante: non c'e' un ramo d'errore da ricordarsi.
+
+    Estratta dalla controproposta quando e' nato il rilancio: leggono
+    lo stesso genere di numero, e tenerne due copie sarebbe il posto
+    da cui un domani divergono."""
+    grezzo = str(grezzo if grezzo is not None else "").strip()
+    if valuta == "eur":
+        try:
+            eur = round(float(grezzo.replace(",", ".")), 2)
+        except ValueError:
+            eur = 0.0
+        return 0, eur, eur
+    try:
+        sats = int(float(grezzo))
+    except ValueError:
+        sats = 0
+    return sats, 0.0, sats
+
+
+def _spazio_rilancio(valuta: str, imp_sats: int, imp_eur: float,
+                     contro_sats: int, contro_eur: float) -> bool:
+    """C'e' posto per una cifra IN MEZZO fra l'offerta e la richiesta?
+
+    E' la domanda della FORBICE: `importo_*` e' il pavimento (quel che
+    offre chi compra), `contro_*` il soffitto (quel che chiede chi
+    vende), e ogni mossa stringe da un lato solo. Quando i due si
+    toccano non c'e' piu' niente da proporre: si accetta o si rifiuta,
+    e il bottone del rilancio non deve nemmeno comparire.
+
+    IN CENTESIMI E MAI IN FLOAT: 0.01 non e' rappresentabile, e un
+    `contro_eur - imp_eur > 0.01` direbbe di si' dove spazio non ce
+    n'e' — aprendo un campo che poi rifiuta ogni numero, che e' peggio
+    di un campo che non c'e'."""
+    if valuta == "eur":
+        return round(contro_eur * 100) - round(imp_eur * 100) > 1
+    return contro_sats - imp_sats > 1
 
 
 def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
@@ -16445,7 +16511,8 @@ def mie_offerte(x_tg_init_data: str = Header(""),
             "minima_percento": OFFERTA_MINIMA_PERCENTO,
             "ore_risposta": ORE_RISPOSTA_OFFERTA,
             "ore_pagamento": ORE_PAGAMENTO_OFFERTA,
-            "max_offerte": MAX_OFFERTE_ANNUNCIO}
+            "max_offerte": MAX_OFFERTE_ANNUNCIO,
+            "max_rilanci": MAX_RILANCI_OFFERTA}
 
 
 @app.post("/api/offerte/{offerta_id}/rispondi")
@@ -16484,7 +16551,11 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         chi_muove, ammesse = off["venditore_id"], ("accetta", "rifiuta",
                                                    "contro")
     elif off["stato"] == "controproposta":
-        chi_muove, ammesse = off["compratore_id"], ("accetta", "rifiuta")
+        # Tre azioni anche di qua: il gate risponde a «di chi e' il
+        # turno», e qui il turno e' suo. Da quando c'e' il rilancio
+        # la macchina e' simmetrica — tre mosse per parte.
+        chi_muove = off["compratore_id"]
+        ammesse = ("accetta", "rifiuta", "rilancia")
     else:
         con.close()
         raise HTTPException(400, "Questa offerta è già chiusa")
@@ -16527,8 +16598,25 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         # chiuso sarebbe impagabile, ed e' il tipo di trappola che
         # vale una riga in piu'.
         guardia_ferie(con, off["venditore_id"])
+        # IL CONSOLIDAMENTO, ed e' la riga che tiene in piedi tutto
+        # il rilancio: chi accetta FISSA la cifra, e l'altro campo
+        # si spegne. Accettando da 'proposta' l'accordo e'
+        # importo_*, quindi contro_* va azzerata — se restasse
+        # piena (e col rilancio puo' esserlo: e' il soffitto della
+        # forbice) `_importo_accordo` direbbe la vecchia richiesta
+        # del venditore, e la invoice uscirebbe alla cifra che il
+        # compratore aveva appena RIFIUTATO rilanciando.
+        # NESSUNA prova se ne accorgerebbe da sola: preventivo e
+        # invoice concordano fra loro — leggono la stessa funzione
+        # — quindi il patto «preventivo == compra al sat» qui e'
+        # cieco, e l'unico testimone sarebbe una notifica.
+        # Accettando da 'controproposta' invece l'accordo E'
+        # contro_*, e si lascia dov'e': `_importo_accordo` le da'
+        # la precedenza ed e' giusto cosi'.
+        azzera = ", contro_sats=0, contro_eur=0" \
+            if off["stato"] == "proposta" else ""
         con.execute("UPDATE offerte SET stato='accettata', scadenza=?, "
-                    "aggiornato=? WHERE id=?",
+                    "aggiornato=?" + azzera + " WHERE id=?",
                     (adesso + ORE_PAGAMENTO_OFFERTA * 3600, adesso,
                      offerta_id))
         con.commit()
@@ -16567,24 +16655,94 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                 f"«{titolo}». L'annuncio resta in vetrina come sempre.")
         return {"ok": True, "stato": "rifiutata"}
 
+    if azione == "rilancia":
+        # IL RILANCIO (ago 2026): chi compra non e' piu' costretto a
+        # scegliere fra prendere o lasciare. Rifiutare e rioffrire si
+        # poteva gia', ma a mano — dall'annuncio, e bruciando uno dei
+        # tentativi: qui e' un gesto solo e non consuma niente, perche'
+        # NON NASCE UNA RIGA. E' la stessa trattativa che continua.
+        #
+        # LA FORBICE: `importo_*` e' il pavimento (l'offerta di chi
+        # compra), `contro_*` il soffitto (la richiesta di chi vende), e
+        # ogni mossa stringe dal suo lato — mai il contrario. Da qui la
+        # trattativa converge per COSTRUZIONE, non solo per il tetto dei
+        # giri.
+        #
+        # Le due guardie che seguono stanno PRIMA di leggere il
+        # payload, e non e' un dettaglio: non dipendono da cosa si e'
+        # scritto, quindi chiedere la cifra per poi dire di no sarebbe
+        # far compilare un campo che non si poteva usare.
+        if off["giri"] >= MAX_RILANCI_OFFERTA:
+            con.close()
+            raise HTTPException(400, f"Hai già rilanciato "
+                                     f"{MAX_RILANCI_OFFERTA} volte su "
+                                     f"questa trattativa: ora puoi "
+                                     f"accettare o rifiutare 🙂")
+        if not _spazio_rilancio(off["valuta"], off["importo_sats"],
+                                off["importo_eur"], off["contro_sats"],
+                                off["contro_eur"]):
+            con.close()
+            raise HTTPException(400, "Fra la tua offerta e la richiesta "
+                                     "del venditore non c'è spazio per "
+                                     "una cifra in mezzo: accetta o "
+                                     "rifiuta 🙂")
+        nuovo_sats, nuovo_eur, nuovo = _cifra_da_payload(off["valuta"],
+                                                         d.get("importo"))
+        if off["valuta"] == "eur":
+            offerto, soffitto = off["importo_eur"], off["contro_eur"]
+        else:
+            offerto, soffitto = off["importo_sats"], off["contro_sats"]
+        if nuovo <= offerto:
+            con.close()
+            raise HTTPException(400, "Il rilancio deve superare la tua "
+                                     "offerta di prima")
+        if nuovo >= soffitto:
+            con.close()
+            raise HTTPException(400, "Il rilancio deve restare sotto la "
+                                     "richiesta del venditore — se ci "
+                                     "arrivi, accettala 🙂")
+        # Il soffitto RESTA in colonna: serve al giro dopo, per tenere
+        # la controproposta del venditore sotto quella di prima. A
+        # spegnerlo e' l'accettazione, che consolida (vedi sopra).
+        # `giri+1` si fa fare a SQL, mai leggendo e riscrivendo.
+        # Lo stato torna a 'proposta' — e non e' una preferenza: la
+        # terna degli stati vivi e' quotata in otto punti del file, e
+        # `offerte_da_agire` accende il pallino dal lato giusto senza
+        # che nessuno tocchi la sua query.
+        con.execute("UPDATE offerte SET stato='proposta', importo_sats=?, "
+                    "importo_eur=?, giri=giri+1, scadenza=?, aggiornato=? "
+                    "WHERE id=?",
+                    (nuovo_sats, nuovo_eur,
+                     adesso + ORE_RISPOSTA_OFFERTA * 3600, adesso,
+                     offerta_id))
+        con.commit()
+        con.close()
+        # Niente CAS qui: il doppio tocco si respinge da solo. Il
+        # secondo POST rilegge 'proposta', dove a muovere e' il
+        # venditore, e prende il 400 di sempre — nessuna notifica in
+        # doppio. E' la ragione per cui nemmeno la controproposta ne ha
+        # uno.
+        chiedevi = (_cifra_offerta(off["valuta"], off["contro_sats"],
+                                   off["contro_eur"])
+                    + (" al pezzo" if pezzi > 1 else ""))
+        await notifica(off["venditore_id"],
+            f"↔ <b>Rilancio!</b> Per «{titolo}» l'acquirente sale a "
+            f"{_cifra_accordo(off['valuta'], nuovo_sats, nuovo_eur, pezzi)} "
+            f"(tu chiedevi {chiedevi}). Puoi accettare, rifiutare o fare "
+            f"un'altra controproposta entro {ORE_RISPOSTA_OFFERTA} ore."
+            f"{link_off}")
+        return {"ok": True, "stato": "proposta"}
+
     # Controproposta: la cifra del venditore, sopra l'offerta ricevuta
     # e mai sopra il listino (a quel punto tanto vale il prezzo pieno).
-    grezzo = str(d.get("importo", "")).strip()
-    contro_sats, contro_eur = 0, 0.0
+    contro_sats, contro_eur, contro = _cifra_da_payload(
+        off["valuta"], d.get("importo"))
     if off["valuta"] == "eur":
-        try:
-            contro_eur = round(float(grezzo.replace(",", ".")), 2)
-        except ValueError:
-            contro_eur = 0.0
-        contro, offerto, listino = (contro_eur, off["importo_eur"],
-                                    off["listino_eur"])
+        offerto, listino = off["importo_eur"], off["listino_eur"]
+        soffitto = off["contro_eur"]
     else:
-        try:
-            contro_sats = int(float(grezzo))
-        except ValueError:
-            contro_sats = 0
-        contro, offerto, listino = (contro_sats, off["importo_sats"],
-                                    off["listino_sats"])
+        offerto, listino = off["importo_sats"], off["listino_sats"]
+        soffitto = off["contro_sats"]
     if contro <= offerto:
         con.close()
         raise HTTPException(400, "La controproposta deve superare "
@@ -16594,6 +16752,19 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         con.close()
         raise HTTPException(400, "La controproposta non può superare il "
                                  "prezzo dell'annuncio")
+    # E MAI SOPRA LA PROPRIA RICHIESTA DI PRIMA: quando `contro_*`
+    # e' gia' piena siamo dopo un rilancio, e la forbice deve
+    # stringersi da tutt'e due i lati. Senza questa riga il
+    # venditore potrebbe chiedere PIU' di prima subito dopo che gli
+    # abbiamo scritto «tu chiedevi X» — nessuno ci rimette dei sats
+    # (non si paga niente senza un si'), ma chi ha rilanciato si
+    # ritroverebbe peggio di com'era, e il tetto dei giri
+    # resterebbe l'unica fine della trattativa.
+    if soffitto and contro >= soffitto:
+        con.close()
+        raise HTTPException(400, "La tua richiesta di prima era più "
+                                 "bassa: una controproposta nuova "
+                                 "deve scendere, non risalire")
     con.execute("UPDATE offerte SET stato='controproposta', contro_sats=?, "
                 "contro_eur=?, scadenza=?, aggiornato=? WHERE id=?",
                 (contro_sats, contro_eur,
@@ -16722,8 +16893,16 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     # trattativa si dice sempre all'altra parte (il rifiuto lo fa nei
     # due versi). Titolo scappato all'assegnazione, una volta sola.
     titolo = html.escape(off["titolo"][:60])
-    cifra = _cifra_accordo(off["valuta"], *_importo_accordo(off),
-                           off["quantita"])
+    # La cifra la decide lo STATO, e non `_importo_accordo` da
+    # sola: su 'proposta' col rilancio la contro_* del venditore e'
+    # ancora in colonna (e' il soffitto), ma a ritirarsi qui e'
+    # l'offerta di chi compra — dire la richiesta dell'altro
+    # sarebbe raccontargli una cifra che nessuno ha ritirato.
+    # Su 'accettata' invece l'accordo e' stato consolidato da chi
+    # ha accettato, e il giudice di sempre risponde giusto.
+    quale = (_importo_accordo(off) if off["stato"] == "accettata"
+             else (off["importo_sats"], off["importo_eur"]))
+    cifra = _cifra_accordo(off["valuta"], *quale, off["quantita"])
     if off["stato"] == "accettata":
         # Qui aveva detto si' e aspettava dei sats: «nessun sat si era
         # mosso» e' la riga che conta, poteva credere di averli in
@@ -32869,6 +33048,21 @@ CONTROLLI_LIBRO_MASTRO = (
      "modificarla ne' rifornirla, e la coppia sparisce dalla deduplica",
      "SELECT id FROM annunci "
      "WHERE contatto_nostr<>'' AND nostr_event_id<>''"),
+    # --- la forbice della trattativa (ago 2026, col rilancio) ------
+    # Due invarianti veri: nessuno stato transitorio legittimo li rende
+    # falsi, e a violarli si finisce per far pagare la cifra sbagliata.
+    ("giri di rilancio fuori scala",
+     "una trattativa ha piu' rilanci di quanti il tetto ne conceda: "
+     "il contatore e' la sola cintura, perche' il rilancio non "
+     "consuma i tentativi per annuncio",
+     "SELECT id FROM offerte WHERE giri < 0 OR giri > 9"),
+    ("forbice aperta al contrario",
+     "l'offerta ha raggiunto o superato la richiesta del venditore "
+     "mentre tutt'e due sono in colonna: la forbice deve stringersi, "
+     "e da qui in poi `_importo_accordo` puo' dire la cifra sbagliata",
+     "SELECT id FROM offerte "
+     "WHERE (contro_sats>0 AND importo_sats>=contro_sats) "
+     "OR (contro_eur>0 AND importo_eur>=contro_eur)"),
     ("payout fuori contratto",
      "payout_stato con un valore che non esiste ('' | incerto | uscito)",
      "SELECT id FROM ordini "

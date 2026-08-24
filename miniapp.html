@@ -16355,6 +16355,34 @@ function svelaOfferta(id){
   riga.scrollIntoView({block:'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
   riga.classList.add('off-svelata');
 }
+/* Il gemello di _spazio_rilancio: c'e' posto per una cifra IN MEZZO
+   fra l'offerta e la richiesta? Quando i due si toccano il bottone del
+   rilancio non deve nemmeno comparire — un campo che rifiuta ogni
+   numero e' peggio di un campo che non c'e'.
+   In CENTESIMI e mai in float, come di la': 0.01 non e'
+   rappresentabile, e un confronto diretto direbbe di si' dove spazio
+   non ce n'e'. Il server resta comunque il giudice. */
+function spazioRilancio(o){
+  return o.valuta === 'eur'
+    ? Math.round(o.contro_eur * 100) - Math.round(o.importo_eur * 100) > 1
+    : o.contro_sats - o.importo_sats > 1;
+}
+/* Quante volte si puo' ancora rilanciare. Il tetto arriva dal SERVER
+   (la busta di /me/offerte) e non si scrive mai qui: un numero cablato
+   direbbe una cosa e l'endpoint un'altra il giorno che la leva cambia.
+   Chiave assente = server di ieri = niente bottone, che e' il verso
+   giusto in cui sbagliare (l'endpoint direbbe comunque 400). */
+function rilanciRimasti(o){
+  const tetto = (offerteDati && offerteDati.max_rilanci) || 0;
+  return Math.max(0, tetto - (o.giri || 0));
+}
+/* Il campo legale, detto a chi scrive: e' l'unica cosa che il
+   compratore non puo' dedurre da solo guardando la riga. */
+function campoRilancio(o){
+  const su = o.valuta === 'eur' ? o.importo_eur + 0.01 : o.importo_sats + 1;
+  const giu = o.valuta === 'eur' ? o.contro_eur - 0.01 : o.contro_sats - 1;
+  return `Tra ${cifraOff(o.valuta, su, su)} e ${cifraOff(o.valuta, giu, giu)}`;
+}
 function renderOfferte(){
   const blocco = el('offerteBlocco'); if (!blocco) return;
   const svelare = offertaDaSvelare; offertaDaSvelare = 0;
@@ -16425,11 +16453,30 @@ function renderOfferte(){
            appena detto per quanti pezzi si tratta, e ripetere le due
            facce due volte renderebbe la riga illeggibile */
         stato = `Il venditore propone <b>${cifraPezzi(o.valuta,o.contro_sats,o.contro_eur,o.quantita||0)}</b> (avevi offerto ${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}${(o.quantita||0)>1?' al pezzo':''}) · entro ~${ore}h`;
+        /* Il RILANCIO (ago 2026): davanti a una controproposta non
+           si e' piu' costretti a prendere o lasciare. Il bottone
+           compare solo se restano giri E se fra le due cifre c'e'
+           ancora spazio: un invito a fare una cosa che il server
+           poi rifiuta e' peggio di nessun invito.
+           Il box e' quello del venditore, riusato alla lettera —
+           per una data offerta si disegna O un ramo O l'altro, mai
+           tutti e due, quindi gli id non possono collidere. */
+        const puoiRil = rilanciRimasti(o) > 0 && spazioRilancio(o);
         azioni = `
-          <div style="display:flex;gap:8px;margin-top:10px">
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
+            ${puoiRil ? `<button class="btn ghost" style="flex:1;margin:0" onclick="toggleContro(${o.id})">↔ Rilancia</button>` : ''}
             <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
-          </div>`;
+          </div>
+          ${puoiRil ? `<div id="controBox_${o.id}" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
+                     style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
+              <span style="font-weight:800;color:var(--muted);flex:none">${o.valuta==='eur'?'€':'sats'}</span>
+              <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'rilancia')">Invia</button>
+            </div>
+            <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${campoRilancio(o)} · rilancio ${(o.giri||0)+1} di ${(offerteDati&&offerteDati.max_rilanci)||0}</div>
+          </div>` : ''}`;
       } else stato = `Hai controproposto <b>${cifraPezzi(o.valuta,o.contro_sats,o.contro_eur,o.quantita||0)}</b> · in attesa dell'acquirente (~${ore}h)`;
     } else {   /* accettata: si aspetta solo il pagamento */
       if (compro) {
@@ -16471,9 +16518,13 @@ function rispondiOfferta(id, azione){
   haptic();
   const o = offerteMie.find(x=>x.id===id); if (!o) return;
   let importo = '';
-  if (azione==='contro') {
+  if (azione==='contro' || azione==='rilancia') {
     importo = String(el('contro_'+id)?.value||'').trim();
-    if (!importo) { toast('Scrivi la tua controproposta'); return; }
+    if (!importo) {
+      toast(azione==='rilancia' ? 'Scrivi la tua cifra'
+                                : 'Scrivi la tua controproposta');
+      return;
+    }
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
   }
   /* I testi sono NUDI: qui le cifre si scrivono a mano, che cifraOff
@@ -16516,7 +16567,10 @@ function rispondiOfferta(id, azione){
       poi: () => inviaRisposta(id, azione, importo)});
     return;
   }
-  inviaRisposta(id, azione, importo);   /* la controproposta non chiede */
+  /* ne' la controproposta ne' il rilancio chiedono conferma: si sta
+     gia' scrivendo una cifra in un campo, e una domanda in piu'
+     sarebbe un ostacolo, non una tutela. */
+  inviaRisposta(id, azione, importo);
 }
 async function inviaRisposta(id, azione, importo){
   try {
@@ -16528,6 +16582,7 @@ async function inviaRisposta(id, azione, importo){
     if (!r.ok) toast(d.detail||'Operazione non riuscita', 5000);
     else toast(azione==='accetta' ? '🤝 Accordo fatto!'
              : azione==='rifiuta' ? 'Offerta rifiutata'
+             : azione==='rilancia' ? '↔ Rilancio inviato'
              : '↔ Controproposta inviata');
   } catch(e) { toast('Rete assente: riprova'); }
   loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })

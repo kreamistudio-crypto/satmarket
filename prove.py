@@ -13204,6 +13204,9 @@ def prove_libro_mastro():
         CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,
           annuncio_id INT, puntata_id INT, rilancio_id INT DEFAULT 0,
           importo_sats INT, motivo TEXT, payout_stato TEXT DEFAULT '');
+        CREATE TABLE offerte(id INTEGER PRIMARY KEY, importo_sats INT
+          DEFAULT 0, importo_eur REAL DEFAULT 0, contro_sats INT
+          DEFAULT 0, contro_eur REAL DEFAULT 0, giri INT DEFAULT 0);
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
           stato TEXT, contatto_nostr TEXT DEFAULT '',
           nostr_event_id TEXT DEFAULT '');
@@ -13236,6 +13239,12 @@ def prove_libro_mastro():
           VALUES(1, 0, 29300, 3200, 10, 500, 3);
         INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,unitario_sats)
           VALUES(1, 7, 2, 10000), (1, 8, 1, 12000);
+        -- DUE TRATTATIVE SANE: una forbice aperta come si deve
+        -- (70.000 sotto, 80.000 sopra) e una proposta senza
+        -- controproposta, dove il soffitto a zero NON e' una
+        -- forbice chiusa — e nessuno dei due deve fiatare.
+        INSERT INTO offerte VALUES(1,70000,0,80000,0,1);
+        INSERT INTO offerte VALUES(2,70000,0,0,0,0);
         -- UN MONO SANO: nessuna riga, nessuno sconto
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita)
           VALUES(2, 9, 50000, 5);
@@ -13377,6 +13386,13 @@ def prove_libro_mastro():
          "annuncio a due teste", "7"),
         ("UPDATE ordini SET payout_stato='boh' WHERE id=1",
          "payout fuori contratto", "1"),
+        # la forbice si apre: l'offerta ha raggiunto la richiesta, e
+        # da li' in poi la cifra dell'accordo puo' essere quella
+        # sbagliata — e' il guasto che costa sats
+        ("UPDATE offerte SET importo_sats=80000 WHERE id=1",
+         "forbice aperta al contrario", "1"),
+        ("UPDATE offerte SET giri=99 WHERE id=2",
+         "giri di rilancio fuori scala", "2"),
         # la promessa che non puo' scattare, nei suoi tre modi: qui non
         # si perdono sats, si perde una vendita — e in silenzio
         ("UPDATE utenti SET sconto_pacco_criterio='peso' WHERE tg_id=222",
@@ -19246,8 +19262,11 @@ def prove_link_offerte():
     # --- 1) chi ha una mossa da fare va nelle Offerte ---------------
     prova("l'offerta ricevuta porta il venditore a rispondere", True,
           "{URL_PUBBLICO}/offerta/{offerta_id}" in offe)
-    prova("accettata e controproposta portano alle Offerte", 2,
-          risp.count("{link_off}"))
+    # TRE e non due da quando c'e' il rilancio: accettata,
+    # controproposta e rilancio sono i tre gesti che lasciano
+    # all'altra parte una pedina da muovere nella scheda Ordini.
+    prova("i tre gesti che aspettano una risposta portano alle "
+          "Offerte", 3, risp.count("{link_off}"))
 
     # --- 2) ...e chi non ce l'ha resta sull'annuncio ----------------
     # E' la meta' che si perde uniformando: su una RIFIUTATA
@@ -19353,6 +19372,287 @@ def prove_deep_link_offerta():
     # Ordini e' display:none — l'arrivo finirebbe in cima alla pagina.
     prova("...e non passa dallo scroll dei reparti", False,
           "scorriSottoHeader" in sv)
+
+
+def prove_rilancio_offerta():
+    """IL COMPRATORE RILANCIA (ago 2026): davanti a una controproposta
+    non e' piu' costretto a prendere o lasciare.
+
+    LA PROVA REGINA e' l'ultima di questo blocco, e vale il cantiere:
+    dopo un rilancio il venditore ACCETTA, e la cifra che finisce
+    nell'accordo dev'essere il rilancio — non la controproposta che il
+    compratore aveva appena rifiutato. Quel guasto non fallisce da
+    solo: preventivo e invoice leggono la stessa funzione e
+    concorderebbero fra loro, quindi il patto «preventivo == compra al
+    sat» qui e' cieco. Per questo si RILEGGE dal database e si esegue
+    `_importo_accordo` vera, invece di cercare una riga nel sorgente."""
+    print("\n[il rilancio del compratore]")
+    import asyncio
+    import sqlite3
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    puro = {}
+    for f in ("_fmt_sats", "_fmt_eur", "_cifra_offerta", "_cifra_accordo",
+              "_importo_accordo", "_spazio_rilancio", "_cifra_da_payload"):
+        exec(pezzo(f), puro)
+
+    # --- 1) il giudice della forbice, girato sui suoi casi ----------
+    sp = puro["_spazio_rilancio"]
+    prova("c'e' spazio fra 70.000 e 80.000", True,
+          sp("sats", 70000, 0, 80000, 0))
+    prova("...e fra 70.000 e 70.002 (un sat in mezzo)", True,
+          sp("sats", 70000, 0, 70002, 0))
+    prova("ma non fra 70.000 e 70.001: i due si toccano", False,
+          sp("sats", 70000, 0, 70001, 0))
+    # IL CASO DEI CENTESIMI, quello che un confronto in float sbaglia:
+    # con `contro - imp > 0.01` questo direbbe di si', e il campo si
+    # aprirebbe per rifiutare poi qualunque numero.
+    prova("in euro 10,00 e 10,01 non lasciano spazio", False,
+          sp("eur", 0, 10.00, 0, 10.01))
+    # E QUESTO E' IL CASO CHE MORDE: in float 1,11 - 1,10 fa
+    # 0,010000000000000009, cioe' MAGGIORE di 0,01 — un confronto
+    # diretto aprirebbe il campo su una forbice chiusa. Col caso
+    # di sopra non si vedrebbe: li' il float sbaglia dal verso
+    # giusto e la prova passerebbe lo stesso.
+    prova("...e nemmeno 1,10 e 1,11 (dove il float direbbe di si')",
+          False, sp("eur", 0, 1.10, 0, 1.11))
+    prova("...ma 10,00 e 10,02 si", True, sp("eur", 0, 10.00, 0, 10.02))
+
+    # --- 2) il giro vero, con rispondi_offerta VERA -----------------
+    def mondo():
+        v = sqlite3.connect(":memory:")
+        v.row_factory = sqlite3.Row
+        v.execute(
+            "CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT, "
+            "compratore_id INT, venditore_id INT, valuta TEXT, "
+            "importo_sats INT, importo_eur REAL, contro_sats INT, "
+            "contro_eur REAL, stato TEXT, scadenza INT, ordine_id INT, "
+            "quantita INT, giri INT, creato INT, aggiornato INT)")
+        v.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, "
+                  "stato TEXT, prezzo_sats INT, prezzo_eur REAL)")
+        v.execute("INSERT INTO annunci VALUES(7,'Miele di castagno',"
+                  "'attivo',100000,0)")
+        futuro = 9_000_000_000
+        # una controproposta viva: offerta 70.000, richiesta 80.000
+        v.execute("INSERT INTO offerte VALUES(1,7,111,222,'sats',70000,0,"
+                  "80000,0,'controproposta',?,0,1,0,0,0)", (futuro,))
+        # gia' al tetto dei rilanci
+        v.execute("INSERT INTO offerte VALUES(2,7,111,222,'sats',70000,0,"
+                  "80000,0,'controproposta',?,0,1,9,0,0)", (futuro,))
+        # i due si toccano: niente spazio in mezzo
+        v.execute("INSERT INTO offerte VALUES(3,7,111,222,'sats',70000,0,"
+                  "70001,0,'controproposta',?,0,1,0,0,0)", (futuro,))
+        v.commit()
+        return v
+
+    def rispondi(v, oid, chi, azione, importo=None):
+        detti = []
+
+        class Con:
+            def execute(self, *a):
+                return v.execute(*a)
+
+            def commit(self):
+                v.commit()
+
+            def close(self):
+                pass
+
+        async def _notifica(tg_id, testo):
+            detti.append((tg_id, testo))
+
+        async def _leggi(req):
+            return {"azione": azione, "importo": importo}
+
+        amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
+               "html": __import__("html"), "time": __import__("time"),
+               "leggi_json": _leggi, "guardia_ferie": lambda c, t: None,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "URL_PUBBLICO": "https://barattolo.store",
+               "ORE_RISPOSTA_OFFERTA": 48, "ORE_PAGAMENTO_OFFERTA": 24,
+               "MAX_RILANCI_OFFERTA": 2,
+               "STATI_OFFERTA_VIVI": ("proposta", "controproposta",
+                                      "accettata")}
+        amb.update({k: puro[k] for k in
+                    ("_cifra_accordo", "_cifra_offerta", "_importo_accordo",
+                     "_spazio_rilancio", "_cifra_da_payload")})
+        exec("async " + pezzo("rispondi_offerta"), amb)
+        try:
+            e = asyncio.new_event_loop().run_until_complete(
+                amb["rispondi_offerta"](oid, None))
+            return e, detti
+        except _H as e:
+            return f"{e.code} {e.detail}", detti
+
+    def riga(v, i):
+        return v.execute("SELECT * FROM offerte WHERE id=?", (i,)).fetchone()
+
+    # --- il rilancio buono ------------------------------------------
+    v = mondo()
+    esito, detti = rispondi(v, 1, 111, "rilancia", "75000")
+    r = riga(v, 1)
+    prova("il rilancio riporta la trattativa al venditore",
+          ({"ok": True, "stato": "proposta"}, "proposta", 75000),
+          (esito, r["stato"], r["importo_sats"]))
+    prova("...e conta il giro", 1, r["giri"])
+    # IL SOFFITTO RESTA: e' quello che al giro dopo impedisce al
+    # venditore di risalire. Azzerarlo qui sembra piu' pulito ed e' la
+    # strada che apre la forbice invece di stringerla.
+    prova("...la richiesta del venditore resta in colonna", 80000,
+          r["contro_sats"])
+    atteso = __import__("time").time() + 48 * 3600
+    prova("...e la finestra di risposta riparte da capo", True,
+          abs(r["scadenza"] - atteso) < 90)
+    prova("il venditore lo viene a sapere, con le due cifre", True,
+          len(detti) == 1 and detti[0][0] == 222
+          and "75.000 sats" in detti[0][1] and "80.000" in detti[0][1])
+
+    # --- i rifiuti ---------------------------------------------------
+    v2 = mondo()
+    prova("non si rilancia sotto la propria offerta di prima",
+          "400 Il rilancio deve superare la tua offerta di prima",
+          rispondi(v2, 1, 111, "rilancia", "60000")[0])
+    prova("...ne' sopra la richiesta del venditore: li' si accetta",
+          True, str(rispondi(v2, 1, 111, "rilancia", "90000")[0])
+          .startswith("400 Il rilancio deve restare sotto"))
+    prova("al tetto dei giri si accetta o si rifiuta", True,
+          str(rispondi(v2, 2, 111, "rilancia", "75000")[0])
+          .startswith("400 Hai già rilanciato"))
+    prova("senza spazio in mezzo non si rilancia", True,
+          str(rispondi(v2, 3, 111, "rilancia", "70000")[0])
+          .startswith("400 Fra la tua offerta"))
+    # IL TURNO: su una controproposta muove chi compra, e basta.
+    prova("il venditore non rilancia al posto suo",
+          "400 Operazione non permessa",
+          rispondi(v2, 1, 222, "rilancia", "75000")[0])
+
+    # --- il vincolo SIMMETRICO: la richiesta non risale -------------
+    v3 = mondo()
+    rispondi(v3, 1, 111, "rilancia", "75000")   # ora e' 'proposta'
+    prova("il venditore non puo' chiedere piu' di prima", True,
+          str(rispondi(v3, 1, 222, "contro", "85000")[0])
+          .startswith("400 La tua richiesta di prima"))
+    esito, _ = rispondi(v3, 1, 222, "contro", "78000")
+    prova("...ma puo' scendere: la forbice si stringe",
+          ({"ok": True, "stato": "controproposta"}, 78000),
+          (esito, riga(v3, 1)["contro_sats"]))
+
+    # --- LA PROVA REGINA --------------------------------------------
+    # Rilancio a 75.000 e il venditore accetta: l'accordo dev'essere
+    # 75.000, non gli 80.000 che il compratore aveva rifiutato.
+    v4 = mondo()
+    rispondi(v4, 1, 111, "rilancia", "75000")
+    esito, detti = rispondi(v4, 1, 222, "accetta")
+    r = riga(v4, 1)
+    prova("il venditore accetta il rilancio", "accettata", r["stato"])
+    prova("...e il consolidamento spegne la richiesta vecchia", 0,
+          r["contro_sats"])
+    # RILETTA DAL DATABASE e passata al giudice VERO: e' l'unica forma
+    # che dimostra quale cifra finira' nella invoice.
+    prova("L'ACCORDO E' IL RILANCIO, non la cifra rifiutata",
+          (75000, 0), puro["_importo_accordo"](r))
+    prova("...e la notifica dice la stessa cifra dell'accordo", True,
+          len(detti) == 1 and "75.000 sats" in detti[0][1]
+          and "80.000" not in detti[0][1])
+
+    # --- 3) il client dice le stesse cose del server ------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rend = pezzo_js(mini, "function renderOfferte()",
+                    "\nfunction toggleContro")
+    # Il bottone compare SOLO se restano giri E c'e' spazio: un invito
+    # a fare una cosa che il server poi rifiuta e' peggio di nessun
+    # invito. E il tetto arriva dalla busta, mai scritto qui.
+    prova("il bottone si offre solo quando il server direbbe di si'",
+          True, "rilanciRimasti(o) > 0 && spazioRilancio(o)" in rend)
+    prova("...e il tetto viene dal server", False,
+          "max_rilanci: 2" in mini or "giri||0) < 2" in rend)
+    # E IL TETTO DEV'ESSERE NELLA BUSTA, o il client non lo sa e
+    # il bottone non compare mai: fail-closed, giusto, ma la
+    # funzione sarebbe morta senza che nulla fallisse.
+    prova("mie_offerte porta il tetto dei rilanci", True,
+          '"max_rilanci": MAX_RILANCI_OFFERTA' in pezzo("mie_offerte"))
+    prova("...e il client lo legge da li', mai da un numero suo",
+          True,
+          "offerteDati.max_rilanci" in pezzo_js(
+              mini, "function rilanciRimasti(o){", "\n}"))
+    prova("il rilancio riusa il campo del venditore", True,
+          "rispondiOfferta(${o.id},'rilancia')" in rend)
+    # E IL RAMO CHE LEGGE IL CAMPO deve valere anche per il
+    # rilancio: senza, il bottone Invia manda una cifra VUOTA e il
+    # server risponde 400 — un gesto che non funziona senza che
+    # niente lo dica. La forma si guarda nel codice perche' il
+    # client qui non si puo' far girare.
+    risp = pezzo_js(mini, "function rispondiOfferta(id, azione){",
+                    "\nasync function inviaRisposta")
+    prova("il campo si legge anche quando l'azione e' un rilancio",
+          True, "azione==='contro' || azione==='rilancia'" in risp)
+    prova("...e il toast dice la parola giusta a chi ha rilanciato",
+          True, "Scrivi la tua cifra" in risp)
+    # Il ramo del venditore su 'proposta' resta quello di sempre: il
+    # rilancio non gli ha tolto niente.
+    prova("...e il venditore tiene le sue tre azioni", True,
+          "toggleContro(${o.id})" in rend
+          and "rispondiOfferta(${o.id},'contro')" in rend)
+
+    # --- 4) E I DUE GIUDICI SI FANNO GIRARE ---------------------
+    # Le sentinelle dicono che esistono, mai che rispondano uguale al
+    # server: due regole sul denaro tenute in pari solo per testo sono
+    # la famiglia di guasti da cui _cifra_accordo e' nata.
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("spazioRilancio risponde come il server",
+              "node non installato")
+    else:
+        # pezzo_js ESCLUDE il marcatore di fine, quindi la graffa
+        # va rimessa: senza, il programma non e' un programma e
+        # l'errore parla della riga sbagliata.
+        giud = pezzo_js(mini, "function spazioRilancio(o){",
+                        "\n}") + "\n}"
+        # I CASI SI SCRIVONO UNA VOLTA SOLA e la tabella JS si
+        # DERIVA da loro: due elenchi da tenere in pari a mano
+        # sono esattamente il difetto che questa prova esiste per
+        # non avere — e ci si e' gia' inciampati aggiungendone
+        # uno di qua e non di la'.
+        casi = [("sats", 70000, 0, 80000, 0),
+                ("sats", 70000, 0, 70001, 0),
+                ("sats", 70000, 0, 70002, 0),
+                ("eur", 0, 10.00, 0, 10.01),
+                ("eur", 0, 1.10, 0, 1.11),
+                ("eur", 0, 10.00, 0, 10.02)]
+        tabella = ",\n".join(
+            "  ['%s',%s,%s,%s,%s]" % c for c in casi)
+        _prog = (giud + "\nconst casi = [\n" + tabella + "\n];\n"
+                 "console.log(JSON.stringify(casi.map(c => "
+                 "spazioRilancio({valuta:c[0],importo_sats:c[1],"
+                 "importo_eur:c[2],contro_sats:c[3],contro_eur:c[4]}))));")
+        _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+        _f.write(_prog)
+        _f.close()
+        _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        prova("i due giudici della forbice dicono la stessa cosa",
+              [sp(*c) for c in casi],
+              _js.loads(_r.stdout.strip()) if _r.returncode == 0
+              else f"ERRORE: {_r.stderr[:160]}")
+
+    # --- e il caso di ieri non si e' mosso ---------------------------
+    # Accettare una controproposta senza rilanci: l'accordo resta la
+    # contro, e il consolidamento non deve toccarla.
+    v5 = mondo()
+    rispondi(v5, 1, 111, "accetta")
+    r = riga(v5, 1)
+    prova("accettando la controproposta l'accordo resta la sua cifra",
+          (80000, 0), puro["_importo_accordo"](r))
 
 
 def prove_ritiro_offerta():
@@ -29252,7 +29552,7 @@ def main():
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
               prove_ritiro_offerta, prove_link_offerte,
-              prove_deep_link_offerta,
+              prove_deep_link_offerta, prove_rilancio_offerta,
               prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,

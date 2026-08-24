@@ -201,6 +201,11 @@ ORE_RISPOSTA_OFFERTA = 48    # senza risposta l'offerta scade da sola
 ORE_PAGAMENTO_OFFERTA = 24   # tempo per pagare dopo l'accettazione
 MAX_OFFERTE_ANNUNCIO = 3     # tentativi totali per compratore per
                              # annuncio (una offerta attiva alla volta)
+MAX_RILANCI_OFFERTA = 2      # quante volte chi compra puo' RILANCIARE
+                             # invece di accettare o rifiutare una
+                             # controproposta. NON consuma i tentativi
+                             # qui sopra: resta la stessa trattativa.
+                             # 0 = spento, cioe' il ping-pong di ieri.
 
 # --- Negozio in ferie ------------------------------------------------
 # Il venditore che parte chiude la bottega con la data di rientro. Gli

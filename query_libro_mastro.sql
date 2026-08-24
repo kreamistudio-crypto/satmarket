@@ -356,3 +356,19 @@ SELECT id, tg_id, motivo, importo_sats, stato, payment_hash,
 SELECT id, tg_id, stato, payout_stato, payout_hash,
        datetime(aggiornato, 'unixepoch', 'localtime') AS da_quando
   FROM pagamenti WHERE payout_stato = 'incerto' ORDER BY aggiornato;
+
+SELECT '22) LA FORBICE DELLE TRATTATIVE (col rilancio, ago 2026)' AS forbice;
+-- `importo_*` e' il pavimento (l'offerta di chi compra), `contro_*` il
+-- soffitto (la richiesta di chi vende): ogni mossa stringe da un lato,
+-- e i due non devono MAI incrociarsi. Se succede, da li' in poi
+-- `_importo_accordo` puo' dire la cifra sbagliata — e nessun
+-- confronto preventivo/invoice se ne accorge, perche' leggono la
+-- stessa funzione.
+SELECT id, stato, giri, importo_sats, contro_sats, importo_eur, contro_eur
+  FROM offerte
+ WHERE (contro_sats > 0 AND importo_sats >= contro_sats)
+    OR (contro_eur > 0 AND importo_eur >= contro_eur);
+-- e il contatore dei giri fuori scala: e' la sola cintura del
+-- ping-pong, visto che il rilancio non consuma i tentativi per
+-- annuncio.
+SELECT id, stato, giri FROM offerte WHERE giri < 0 OR giri > 9;
