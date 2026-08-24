@@ -5154,8 +5154,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gradino ignoto: chi ha pagato ha pagato, anche se `BANNER_LIVELLO`
   nel config è scritto male.
   E IL PREZZO È UN'OFFERTA DI LANCIO (ago 2026, decisione di Andrea):
-  accanto ai 10.000 che si pagano si legge il pieno BARRATO, 20.000,
-  con la resa che lampo e sconto usano già. Le leve sono DUE e
+  accanto ai 20.000 che si pagano si legge il pieno BARRATO, 40.000,
+  col chip «−50%», e la resa è quella che lampo e sconto usano già. Le leve sono DUE e
   `BANNER_PREZZO_SATS` NON cambia significato — resta la cifra che si
   paga, il patto dei nomi di casa — mentre `BANNER_PREZZO_PIENO_SATS`
   è **solo** il barrato.
@@ -5213,18 +5213,66 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (visto a schermo, non leggendo): dopo, si leggeva «10 000 sats
   20 000 sats» — la stessa parola due volte a tre centimetri. Davanti,
   il «sats» in fondo vale per tutt'e due, ed è la forma dei listini.
-  NEL CASSETTO il listino sta nella PROSA sopra il bottone e non
-  dentro: lì il barrato non prenderebbe la sua veste, e il bottone
-  deve portare UNA cifra sola — quella che si paga. NELLA CONFERMA va
-  nella TESTATA, che è innerHTML: `confCorpo` si scrive col
-  textContent — il patto dei testi NUDI — quindi un `<s>` nel corpo
-  uscirebbe a lettere.
-  NIENTE PERCENTUALE nel chip: 20.000→10.000 farebbe un −50% tondo,
-  ma 15.000→10.000 farebbe −33,33%. Qui non c'è una regola
-  percentuale come lo sconto del negozio: c'è un prezzo di lancio, e
-  si dice la parola. E niente chip VERDE: `--sconto` significa già
-  «sconto carrello del negozio», e un colore che significa una cosa
-  non se ne prende un'altra (la regola di `--tg-soft`).
+  NEL CASSETTO IL LISTINO STA DENTRO IL BOTTONE (ago 2026, decisione
+  di Andrea, e ROVESCIA la riga di ieri — «sta nella PROSA sopra, che
+  dentro un `.btn orange` il barrato non prenderebbe la sua veste, e
+  il bottone deve portare UNA cifra sola»). Il perché di allora era
+  una CONSTATAZIONE e non una regola: la veste non c'era, e adesso
+  c'è; e l'altra metà cade perché è proprio il CONFRONTO la cosa da
+  mettere sotto il dito — nella prosa si vedeva troppo piccolo. Qui
+  sopra resta la PAROLA, che il chip non dice; i numeri stanno tutti
+  in un posto solo. NELLA CONFERMA il barrato va nella TESTATA, che è
+  innerHTML: `confCorpo` si scrive col textContent — il patto dei
+  testi NUDI — quindi un `<s>` nel corpo uscirebbe a lettere.
+  IL BOTTONE È A DUE RIGHE, e non è un vezzo: MISURATO a 320px, dove
+  il cassetto concede ~258px, «⚡ Sbloccalo subito per 40 000 20 000
+  sats −50%» non ci sta in nessun modo — e ci stava a stento già ieri
+  con la sola cifra. Col wrap le due metà vanno a capo INTERE (sono
+  due span, non due parole), quindi il verbo sopra e il confronto
+  sotto: mai un a-capo dove capita, e il confronto non si spezza mai
+  (è un nowrap). Misurato dopo: 81px alle tre larghezze, riga cifre
+  22px, zero sbordo.
+  E LA PERCENTUALE SI DICE, MA SOLO QUANDO È TONDA (ago 2026,
+  decisione di Andrea, e questa riga ROVESCIA il «NIENTE PERCENTUALE»
+  di ieri — il cui perché però RESTA e diventa la condizione): allora
+  la regola era «20.000→10.000 farebbe un −50% tondo, ma
+  15.000→10.000 farebbe −33,33%, e qui non c'è una regola percentuale
+  come lo sconto del negozio». Vero: e infatti non ne nasce una — la
+  percentuale è un ORNAMENTO DELL'ORNAMENTO, e si aggiunge la sola
+  condizione in cui la parola «metà» è vera. Il giudice torna un
+  TERZO valore, 0 quando `paga × 100 % pieno ≠ 0`: 40.000 su 20.000
+  dà 50 e si legge, 30.000 su 20.000 farebbe 33,33% e TACE. MAI
+  arrotondata, in nessun verso — è la cura dell'unitario scontato
+  della pagina Paga, parola per parola: «un numero che non torna
+  moltiplicando si legge come un bug».
+  IL BARRATO NON DIPENDE DA LEI, ed è la riga da non ammorbidire: una
+  promozione storta di qualche sat si barra lo stesso e a mancare è
+  il solo chip — chi lega le due cose spegne una promozione vera per
+  colpa di un ornamento. C'è la prova, e si vede solo GIRANDOLA (una
+  sentinella direbbe che i due nomi ci sono, mai che siano
+  indipendenti).
+  E IL CHIP HA UNA CINTURA PIÙ STRETTA DEL BARRATO, per la stessa
+  distinzione: il barrato dice un FATTO («c'è un listino più alto») e
+  vale su qualunque fattura, il chip dice un CONTO — e il server lo
+  giudica sul prezzo di OGGI. Sulla RIPRESA si paga un importo
+  fotografato mezz'ora fa, quindi il chip si mostra solo se la
+  fattura è al prezzo corrente; altrimenti resta il solo barrato, e
+  mai un ricalcolo nel client.
+  IL CHIP È UN CARTELLINO e non prende un colore SUO: sono i due
+  valori di `.tag-price` — crema #FFF8EA e inchiostro #23282C — già
+  in casa e già FISSI nei due temi per la stessa ragione (un'etichetta
+  di carta non cambia di notte). NIENTE VERDE: `--sconto` significa
+  già «sconto carrello del negozio», e un colore che significa una
+  cosa non se ne prende un'altra (la regola di `--tg-soft`).
+  LA STRADA PROVATA E MISURATA PRIMA, che va tenuta perché è quella
+  che viene in mente: il traslucido bianco dello stepper dentro
+  «Acquista» (`.qta-mini`). Sull'arancio rende **1,89** col testo
+  bianco — MENO del testo che gli sta accanto (2,30) — e questo chip
+  deve farsi LEGGERE, non accompagnare. Col cartellino sta a **14,08**
+  e non cambia fra i due temi. Là il traslucido va bene perché i suoi
+  − e + sono a 17px; qui il testo è 12. Fuori dall'arancio il chip
+  prende `--chip-bg`, o sulla carta sparirebbe: è la lezione già
+  pagata da `.qta-mini`, un cuore solo di markup e due vestiti.
   «OFFERTA DI LANCIO» E MAI «RODAGGIO» (decisione di Andrea): nel
   client quella parola significa già la fase di test — la fascia 🚧,
   il cartello, il canale — e darle un secondo significato è la
@@ -5235,11 +5283,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sdoppiarsi in una classe nuova — il precedente di `.av-foto` — e le
   FAMIGLIE DI SELETTORI SONO DUE: chi aggiunge una casa la aggiunge a
   tutt'e due, o la barratura taglia dentro «sats».
-  ⚠️ IL DEBITO CHE RESTA, e va deciso a rodaggio: i 20.000 non li ha
+  ⚠️ IL DEBITO CHE RESTA, e va deciso a rodaggio: i 40.000 non li ha
   mai pagati NESSUNO, e niente fa scadere la promozione — un listino
   barrato che non è mai stato un listino è la cosa che questo file
   chiama altrove «una regola che non si fa rispettare». O il pieno
-  diventa vero alla fine del rodaggio, o la parola va cambiata.
+  diventa vero alla fine del rodaggio, o la parola va cambiata. E col
+  chip il debito pesa di più: «−50%» è un'affermazione più forte di
+  una cifra sbarrata.
   ⚠️ E `_censimento` in `prove.py` ESPLODE se lo si dimentica, in due
   modi: `_prezzo_banner` va exec'ato PRIMA di `_leve_stato` che lo
   chiama (senza, `__missing__` lo risolve a 7 e la prova muore con
@@ -5256,6 +5306,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   script lasciato nella radice della copia fa scattare
   `prove_script_nel_workflow`, e con la baseline sporca il criterio
   «0 fallite» promuove OGNI mutazione — si confronta il NUMERO.
+  E AL SECONDO GIRO (26 mutazioni, 26 uccise) ne ha trovati altri
+  DUE, tutti e due colori e cifre che nessuna prova guardava: la
+  percentuale del profilo, che con un numero battuto a mano lì dentro
+  avrebbe detto «−50%» su qualunque coppia di cifre, e il bianco
+  velato del barrato dentro l'arancio.
+  ⚠️ E UN ACCENTO COMBINANTE È ENTRATO NEL CLIENT scrivendo la prosa
+  del cassetto: «e» + U+0300 si vede IDENTICO a «è» sullo schermo, ma
+  è un altro carattere — nessuna ricerca testuale lo trova, nessuna
+  sentinella che cerchi quella parola scatta, e certi font lo rendono
+  male. L'ha preso la tortura, con l'ancora che «non si trovava»: da
+  lì la prova che tiene il sorgente in NFC, accanto a quella dei
+  commenti CSS. È la stessa famiglia — codice lecito, significato
+  sbagliato — e a quel livello non guardava nessuno.
   UNA TANTUM ORA, A TEMPO DOPO (decisione di Andrea): la colonna
   `utenti.banner_sbloccato_il` è una DATA e non un booleano — il
   giorno dell'abbonamento si aggiunge una scadenza senza migrare
