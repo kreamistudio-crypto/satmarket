@@ -7264,6 +7264,75 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con l'accordo mostra il banner 🤝 e i totali pattuiti (`artStima`
   dentro totaleStima) — pillole consegna, NWC, nota EUR ereditati
   gratis; startBuy e compraSubito mandano `offerta_id` (0 = ignorato).
+  IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica
+  della controproposta diceva «Accetta o rifiuta dalla scheda Ordini» e
+  allegava un link a `/annuncio/{id}` — il testo mandava in un posto e
+  il link in un altro, e chi toccava atterrava sulla scheda dove i
+  bottoni non ci sono. Le trattative si rispondono in `renderOfferte`,
+  cioè nella sezione «💰 Offerte» in cima agli Ordini, e fino a ieri non
+  esisteva NESSUN deep-link che ci portasse: l'unica strada era
+  `go('affari')`, cioè toccare il tab a mano.
+  LA REGOLA È UNA FRASE e decide tutti i casi senza un elenco da
+  ricordare: **il link porta dove c'è il gesto da fare**. Ne cambiano
+  TRE — l'offerta ricevuta (il venditore deve rispondere), l'accettata
+  (il compratore paga, e «⚡ Paga ora» sta lì) e la controproposta — e
+  ne restano QUATTRO: le due che non chiedono niente non guadagnano un
+  link, e il rifiuto col ritiro restano su `/annuncio/{id}`, perché lì
+  il gesto è rioffrire o comprare a prezzo pieno.
+  ⚠️ `link` NON si sostituisce, gli si affianca `link_off`: quella
+  variabile è condivisa dai tre rami di `rispondi_offerta`, e
+  cambiarla tutta manderebbe sulle Offerte anche il RIFIUTO — dove una
+  rifiutata non si disegna affatto (renderOfferte filtra le sole vive)
+  e chi tocca atterrerebbe su una pagina che non lo nomina. C'è la
+  prova nei due versi, che fino a ieri i link nelle notifiche non li
+  sorvegliava nessuno: scambiarne uno non faceva rossa una riga.
+  LA ROTTA `/offerta/{id}` NON LEGGE IL DATABASE, ed è la riga da non
+  ammorbidire: una trattativa è roba di due persone e quella testa la
+  vede chiunque abbia il link, quindi un meta ricavato dalla riga
+  sarebbe un oracolo servito prima ancora di sapere chi bussa. Meta
+  generici e `noindex`, il caso di `/miniapp.html` e non quello delle
+  tre gemelle con `_seo_o_generici`; parametro TESTO e non `int`, o
+  tornerebbe il 422 che la costituzione fail-open di quel blocco
+  dichiara morto — e non leggendo niente non c'è nemmeno un id da
+  convertire. E NON si aggiunge un «Disallow: /offerta/» in
+  robots.txt: è l'anti-pattern già scritto sopra quella rotta — una
+  pagina vietata non viene scaricata, quindi il suo noindex non viene
+  mai letto e l'indirizzo nudo si indicizza lo stesso.
+  DA LÌ L'ANTI-ORACOLO VIENE PER COSTRUZIONE, e non da un ramo scritto
+  apposta: il client cerca `#off_{id}` fra le righe che ha appena
+  disegnato, e quelle sono per definizione **le sue e le vive**.
+  Trattativa chiusa, di un altro e mai esistita collassano in una
+  domanda sola, con UN messaggio solo — «non è tra le tue offerte
+  aperte» — che è vero in tutti e tre. Mai il silenzio: una pagina che
+  si apre e non fa niente si legge come un guasto.
+  LA BANDIERINA SI CONSUMA SU TUTTE E DUE LE USCITE di `renderOfferte`,
+  e la seconda è quella che si dimentica: l'uscita corta è il caso
+  «non ho più nessuna trattativa viva», cioè proprio quello in cui il
+  link va spiegato. Si legge e si AZZERA nel render, il patto di
+  `bustaSvelata`: il «una volta sola» sta nella bandierina e mai
+  nell'animazione, così un ridisegno qualunque non la rifà partire.
+  ⚠️ `svelaOfferta` sta SOPRA `renderOfferte` e non fra lei e
+  `toggleContro`: le sentinelle del ritiro affettano il sorgente fra
+  quelle due, e una funzione nuova in mezzo allargherebbe la fetta
+  senza far diventare rossa niente.
+  E NON SI USA `scorriSottoHeader`, che è il ferro dei reparti: misura
+  l'header di Esplora, che in vista Ordini è `display:none` — l'arrivo
+  finirebbe in cima alla pagina invece che sulla riga. Vale
+  `scrollIntoView({block:'center'})`, col `tourRidotto()` delle
+  sorelle per la scivolata.
+  L'ANONIMO NON RESTA FUORI: in vetrina e in DEMO le offerte non
+  esistono affatto, quindi non si va su Ordini a mostrargli il vuoto —
+  si apre l'invito, che ha già dentro la porta Nostr; e siccome ogni
+  login fa `location.reload()`, l'URL sopravvive e il deep-link rigira
+  da autenticato. Chi riceve il DM su Nostr ci arriva.
+  E `mie_offerte` METTE PRIMA LE VIVE (difetto PREESISTENTE chiuso
+  qui): il taglio a 30 righe non guardava lo stato, quindi un
+  venditore con trenta trattative CHIUSE di recente si vedeva la
+  sezione «Offerte» vuota pur avendone di aperte — le concluse gli
+  occupavano tutti i posti. Il deep-link lo avrebbe reso peggio,
+  dicendo «non è tra le tue offerte» su una trattativa che c'è, e
+  proprio sugli account più attivi. Una riga nell'ORDER BY, e il
+  taglio cade sulle chiuse.
   IL COMPRATORE RITIRA (ago 2026, caso vero: un'offerta mandata per
   sbaglio non si poteva togliere in nessun modo — si aspettava la
   scadenza o si chiedeva al venditore di rifiutarla, e intanto la
