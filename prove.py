@@ -18024,11 +18024,48 @@ def prove_seo():
     # LA TRAPPOLA PEGGIORE: dimenticare la chiamata in avviaVetrina()
     # vuol dire che funziona in Telegram e in collaudo e NON funziona
     # esattamente per chi arriva dai motori.
+    # Si guarda DENTRO i due corpi e non si contano le chiamate:
+    # il conteggio diceva «due» senza dire DOVE, e dall'ago 2026 le
+    # viste che non aspettano dati si anticipano — quindi qualcuna
+    # e' chiamata due volte nello stesso avvio (la seconda e' un
+    # no-op per via della bandierina) e il numero non torna piu'.
+    # Guardare i corpi e' anche l'affermazione PIU' FORTE: dice che
+    # nessuno dei due avvii se la dimentica.
+    corpo_vetr = pezzo_js(testo_mini, "async function avviaVetrina(){",
+                          "\n}\n")
     for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
               "apriPrivacyDaUrl", "apriCategoriaDaUrl",
               "apriOffertaDaUrl"):
-        prova(f"{f} si chiama da avvia() E da avviaVetrina()", 2,
-              testo_mini.count(f"{f}();"))
+        prova(f"{f} si chiama da avvia()", True,
+              f"{f}();" in corpo_avvia)
+        prova(f"...e da avviaVetrina()", True,
+              f"{f}();" in corpo_vetr)
+
+    # LE DUE PAGINE DI SOLO TESTO SI ANTICIPANO, e le altre no: la
+    # loro vista e' markup fisso, quindi mostrarla subito e' un
+    # guadagno secco — mentre dettaglio e negozio senza dati sono
+    # una pagina VUOTA, e tre secondi di vuoto sono peggio di mezzo
+    # secondo di home.
+    for f in ("apriSicurezzaDaUrl", "apriPrivacyDaUrl"):
+        prova(f"{f} si chiama PRIMA del primo giro di rete", True,
+              corpo_avvia.index(f"{f}();")
+              < corpo_avvia.index("await fetch"))
+    for f in ("apriAnnuncioDaUrl", "apriNegozioDaUrl"):
+        prova(f"...mentre {f} aspetta i dati", True,
+              corpo_avvia.index(f"{f}();")
+              > corpo_avvia.index("await fetch"))
+    # E LA TRATTATIVA VA ANTICIPATA DOPO IL /me MA PRIMA DELLA
+    # VETRINA: prima non si sa chi sei (e in vetrina la vista Ordini
+    # non esiste), dopo si e' gia' visto la home piena.
+    prova("l'offerta si anticipa prima della prima pagina", True,
+          corpo_avvia.index("apriOffertaDaUrl();")
+          < corpo_avvia.index("await loadListings();"))
+    # ...ma DOPO il /me, e sono le due meta' della stessa riga: piu'
+    # su non si sa chi sei, e in vetrina la vista Ordini non esiste
+    # affatto — si aprirebbe la scheda e un istante dopo l'invito.
+    prova("...ma dopo il /me, dove l'identita' e' nota", True,
+          corpo_avvia.index("apriOffertaDaUrl();")
+          > corpo_avvia.index("await fetch"))
 
     # --- 14) NESSUN GEMELLO CLIENT DI _slug ------------------------
     # E' la sentinella d'ARCHITETTURA: lo slug arriva dal server, e chi

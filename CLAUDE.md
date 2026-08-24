@@ -7336,6 +7336,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dicendo «non è tra le tue offerte» su una trattativa che c'è, e
   proprio sugli account più attivi. Una riga nell'ORDER BY, e il
   taglio cade sulle chiuse.
+  E LA VISTA GIUSTA ARRIVA PRIMA DELLA HOME (ago 2026, dal campo:
+  «toccando il link di una controproposta l'app va prima in home e poi
+  salta»). I deep-link si applicavano in CODA all'avvio, dopo sei giri
+  di rete: si vedeva l'intelaiatura di Esplora per tutto il
+  caricamento e poi la home PIENA per mezzo secondo, prima del salto.
+  MISURATO coi fotogrammi e non dedotto, a 4 Mbps: 433 ms di home
+  piena sull'offerta, 499 sull'annuncio, 647 su «Il pagamento
+  protetto», 717 sul negozio. La CATEGORIA no — lì la cura c'era già
+  (`preparaCategoriaDaUrl`, sincrona e prima del primo fetch), e per
+  una ragione diversa: là si anticipava la RICHIESTA, non la vista.
+  SI ANTICIPA SOLO CIÒ CHE NON ASPETTA DATI, ed è la riga da non
+  allargare: «Il pagamento protetto» e «I tuoi dati» sono markup
+  FISSO, quindi vanno in testa ad `avvia()` e si vedono appena lo
+  script gira; il DETTAGLIO e il NEGOZIO no, perché la loro vista
+  senza dati è una pagina VUOTA — e tre secondi di vuoto sono peggio
+  di mezzo secondo di home. Per loro la cura vera è uno scheletro, ed
+  è un'altra decisione: restano dove sono, dichiarati.
+  L'OFFERTA STA IN MEZZO e si anticipa DOPO il `/me`: prima non si sa
+  chi sei, e in vetrina la vista Ordini non esiste affatto (là il
+  deep-link apre l'invito) — quindi l'anticipo va dove DEMO e VETRINA
+  sono false per costruzione, cioè nel ramo autenticato, e prima di
+  `loadListings`. Le funzioni sono quelle di sempre e hanno già la
+  bandierina one-shot: la chiamata in coda diventa un no-op, e non
+  nasce un secondo elenco da tenere in pari.
+  IL PREZZO È DICHIARATO: `go('affari')` chiede da sé ordini, offerte
+  e puntate, e l'avvio li richiede più sotto — tre richieste in
+  doppio, in parallelo, solo per chi arriva da un link di trattativa.
+  ⚠️ E IL RESTO NON È NOSTRO: a 4 Mbps il documento arriva a ~3,2
+  secondi e la vista giusta compare 72 ms dopo — misurato. Quei tre
+  secondi di Esplora vuota sono il PESO della pagina, non l'ordine
+  delle chiamate, e chi volesse toglierli guardi lì e non qui.
+  IL CENSIMENTO DEI CHIAMANTI HA CAMBIATO FORMA per questo: contava
+  DUE chiamate a testa — «una per avvio» — e col deep-link anticipato
+  una funzione compare due volte nello STESSO avvio. Adesso guarda
+  dentro i due CORPI, che è anche l'affermazione più forte: il
+  conteggio diceva «due» senza dire dove, e la trappola vera è
+  dimenticarne una in `avviaVetrina` — cioè funzionare in Telegram e
+  in collaudo e NON funzionare per chi arriva dai motori.
   IL COMPRATORE RILANCIA (ago 2026, chiesto da Andrea): davanti a una
   controproposta si poteva solo accettare o rifiutare, e rilanciare si
   faceva a mano — rifiuta, torna sull'annuncio, rifai un'offerta —

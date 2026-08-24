@@ -26967,6 +26967,25 @@ async function avviaVetrina(){
 }
 
 async function avvia(){
+  /* LA VISTA GIUSTA PRIMA DEL PRIMO FETCH (ago 2026, dal campo:
+     «toccando il link di una controproposta l'app va prima in home
+     e poi salta»). Il deep-link si applicava in CODA all'avvio,
+     dopo sei giri di rete: si vedeva l'intelaiatura di Esplora per
+     tutto il caricamento e poi la home PIENA per mezzo secondo,
+     prima del salto — misurato coi fotogrammi, 433 ms sull'offerta
+     e fino a 717 sul negozio.
+     QUI CI VANNO SOLO LE VISTE CHE NON ASPETTANO DATI, ed e' la
+     riga da non allargare: «Il pagamento protetto» e «I tuoi dati»
+     sono markup FISSO, quindi mostrarle subito e' un guadagno
+     secco. Il dettaglio e il negozio no: la loro vista senza dati
+     e' una pagina vuota, e tre secondi di vuoto sono peggio di
+     mezzo secondo di home. L'offerta ha bisogno di sapere CHI sei
+     e si anticipa piu' sotto, appena il /me risponde.
+     Le funzioni sono quelle di sempre e hanno gia' la loro
+     bandierina one-shot: le chiamate in coda diventano no-op, e
+     non nasce un secondo elenco da tenere in pari. */
+  apriSicurezzaDaUrl();
+  apriPrivacyDaUrl();
   /* PRIMA di ogni fetch: se si atterra su /categoria/{slug}, la prima
      pagina dev'essere gia' quella del reparto — una richiesta sola
      invece di una vetrina intera scaricata per buttarla via. */
@@ -27115,6 +27134,23 @@ async function avvia(){
         + `<button onclick="apriNostrSheet()" title="Prova il login Nostr: qui la crittografia vera funziona anche in locale" style="font:inherit;border:1px dashed var(--sats-text);background:transparent;color:var(--sats-text);border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🟣 nostr</button>`;
     } else if (WEB) barraWeb(me.nome || 'amico');
     else b.style.display = 'none';
+    /* IL DEEP-LINK DELLA TRATTATIVA, appena si sa chi sei e PRIMA
+       della vetrina: da qui in poi DEMO e VETRINA sono false per
+       costruzione, quindi il ramo dell'invito non puo' scattare e
+       si va dritti negli Ordini invece di passare dalla home.
+       `go('affari')` si carica da solo ordini, offerte e puntate,
+       quindi la sezione si popola in parallelo al resto del boot;
+       la chiamata in coda resta ed e' un no-op (bandierina).
+       IL PREZZO E' DICHIARATO: `go('affari')` chiede ordini,
+       offerte e puntate, e l'avvio li richiede piu' sotto — tre
+       richieste in doppio, in parallelo, solo per chi arriva da un
+       link di trattativa. Si pagano volentieri: la sezione si
+       popola prima, e senza l'anticipo si vedrebbe la home piena.
+       ⚠️ RESTA FUORI DALLA NOSTRA PORTATA il tempo prima che lo
+       script esista: a 4 Mbps il documento arriva a ~3,2s e la
+       vista giusta compare 72 ms dopo — misurato. Quei tre secondi
+       sono il PESO della pagina, non l'ordine delle chiamate. */
+    apriOffertaDaUrl();
     await loadListings();
     /* LE CARD SUBITO (ago 2026, registrato coi fotogrammi): la
        griglia si disegnava dopo ANCHE ordini, preferiti, offerte e
