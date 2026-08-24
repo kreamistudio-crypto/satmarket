@@ -25403,6 +25403,18 @@ def prove_commenti_css(mini=None):
     prova("nessun «*/» che non chiude niente (il commento aperto male "
           "si mangia la regola dopo)", [], orfani)
     prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
+    # NESSUN ACCENTO COMBINANTE (ago 2026, da un guasto vero fatto
+    # scrivendo il chip del prezzo di lancio): «e» + U+0300 si vede
+    # IDENTICO a «è» sullo schermo, ma e' un altro carattere —
+    # nessuna ricerca testuale lo trova, nessuna sentinella che
+    # cerchi quella parola scatta, e certi font lo rendono male. Il
+    # resto del file usa le forme precomposte, e questa riga tiene
+    # il sorgente in NFC senza doverci pensare.
+    import unicodedata as _ud
+    _comb = [mini[max(0, i - 30):i + 1].splitlines()[-1]
+             for i, c in enumerate(mini) if _ud.combining(c)]
+    prova("nessun accento combinante (si vede uguale e non si "
+          "trova piu')", [], _comb)
 
 
 def _chiavi_literal(src, apertura):
@@ -27319,9 +27331,9 @@ def prove_banner_negozio():
     prova("la colonna dello sblocco pagato e' fra le migrazioni", True,
           '"banner_sbloccato_il INTEGER DEFAULT 0"' in src)
     prova("...e il prezzo e' una leva col suo default", True,
-          "BANNER_PREZZO_SATS = 10_000" in src)
+          "BANNER_PREZZO_SATS = 20_000" in src)
     prova("...anche nel config d'esempio", True,
-          "BANNER_PREZZO_SATS = 10_000"
+          "BANNER_PREZZO_SATS = 20_000"
           in open("config_esempio.py", encoding="utf-8").read())
     # E IL PIENO BARRATO, la sua gemella (ago 2026). ⚠️ Le quattro
     # righe cercano il letterale CON l'underscore: chi riformatta un
@@ -27329,9 +27341,9 @@ def prove_banner_negozio():
     # numeri sono la sola cosa che tiene in pari il codice e il file
     # da cui si copia sul VPS.
     prova("il pieno barrato e' una leva col suo default", True,
-          "BANNER_PREZZO_PIENO_SATS = 20_000" in src)
+          "BANNER_PREZZO_PIENO_SATS = 40_000" in src)
     prova("...anche nel config d'esempio", True,
-          "BANNER_PREZZO_PIENO_SATS = 20_000"
+          "BANNER_PREZZO_PIENO_SATS = 40_000"
           in open("config_esempio.py", encoding="utf-8").read())
     # LA RIGA DA NON AMMORBIDIRE: il pieno e' un ORNAMENTO, e
     # l'endpoint che stacca la fattura non lo nomina AFFATTO — non
@@ -27349,6 +27361,12 @@ def prove_banner_negozio():
     _mp = codice(pezzo("mio_profilo"))
     prova("il profilo manda il pieno GIUDICATO", True,
           '"prezzo_pieno_sats": _pz_ban[1]' in _mp)
+    # E LA PERCENTUALE PURE, che e' la gemella e mancava: senza,
+    # un numero battuto a mano li' dentro passerebbe liscio, e il
+    # chip direbbe «−50%» su qualunque coppia di cifre. L'ha detto
+    # la tortura, non la rilettura.
+    prova("...e la percentuale, dallo stesso giudice", True,
+          '"prezzo_percento": _pz_ban[2]' in _mp)
     # ...e la leva grezza la nomina UNA volta sola: dentro la
     # chiamata al giudice. Un secondo uso li' dentro sarebbe la
     # strada da cui la costante rientra.
@@ -27482,32 +27500,65 @@ def prove_banner_negozio():
     # valgono piu' di quello che lo mostra.
     exec(pezzo("_prezzo_banner"), amb2)
     pz = amb2["_prezzo_banner"]
-    prova("una promozione vera si barra", (10_000, 20_000),
-          pz(10_000, 20_000))
+    prova("una promozione vera si barra", (20_000, 40_000, 50),
+          pz(20_000, 40_000))
     # UGUALE: la stessa cifra sopra se' stessa non e' una riga, e'
     # un refuso — ed e' anche il modo di spegnere la promozione.
-    prova("un pieno UGUALE al prezzo non si barra", (10_000, 0),
-          pz(10_000, 10_000))
+    prova("un pieno UGUALE al prezzo non si barra", (20_000, 0, 0),
+          pz(20_000, 20_000))
     # PIU' BASSO: barrarlo si leggerebbe come un aumento. Serve una
     # prova SUA, o la mutazione `>` -> `!=` passerebbe liscia.
-    prova("...e un pieno piu' BASSO nemmeno", (10_000, 0),
-          pz(10_000, 5_000))
-    prova("il pieno non dichiarato non si barra", (10_000, 0),
-          pz(10_000, 0))
+    prova("...e un pieno piu' BASSO nemmeno", (20_000, 0, 0),
+          pz(20_000, 5_000))
+    prova("il pieno non dichiarato non si barra", (20_000, 0, 0),
+          pz(20_000, 0))
     # A prezzo spento non c'e' niente in vendita, quindi niente da
     # barrare: un listino accanto a un bottone che non nasce.
-    prova("a sblocco spento non si barra niente", (0, 0),
-          pz(0, 20_000))
-    prova("...e un prezzo negativo vale zero, non se stesso", (0, 0),
-          pz(-5, 20_000))
-    prova("i None non esplodono", (0, 0), pz(None, None))
+    prova("a sblocco spento non si barra niente", (0, 0, 0),
+          pz(0, 40_000))
+    prova("...e un prezzo negativo vale zero, non se stesso", (0, 0, 0),
+          pz(-5, 40_000))
+    prova("i None non esplodono", (0, 0, 0), pz(None, None))
     # IL CONTRATTO DEL CLIENT, in una riga: mai un listino senza un
     # bottone che lo sconti — se la seconda cifra c'e', c'e' anche
     # la prima.
     prova("un barrato implica sempre un prezzo", True,
-          all(not b or p > 0 for p, b in
-              (pz(a, c) for a in (0, -1, 10_000)
-               for c in (0, 5_000, 10_000, 20_000))))
+          all(not b or p > 0 for p, b, _ in
+              (pz(a, c) for a in (0, -1, 20_000)
+               for c in (0, 5_000, 20_000, 40_000))))
+
+    # ---- E LA PERCENTUALE, che si dice SOLO quando e' tonda ------
+    # E' la cura dell'unitario scontato della pagina Paga, parola
+    # per parola: «un numero che non torna moltiplicando si legge
+    # come un bug». Quindi qui NON nasce una regola percentuale —
+    # resta un prezzo di lancio — si aggiunge la sola condizione in
+    # cui la parola «meta'» e' vera.
+    prova("meta' esatta: si dice −50%", 50, pz(20_000, 40_000)[2])
+    # Un secondo caso TONDO che meta' non e': senza, un «50»
+    # scritto a mano al posto del conto passerebbe liscio.
+    prova("...e un quinto esatto si dice −20%", 20,
+          pz(20_000, 25_000)[2])
+    # LA RIGA CHE VALE IL CANTIERE: 33,33% TACE, e il barrato
+    # RESTA. Chi lega il barrato alla percentuale spegne una
+    # promozione vera per colpa di un ornamento.
+    prova("una percentuale non tonda TACE", 0, pz(20_000, 30_000)[2])
+    prova("...ma il barrato resta", 30_000, pz(20_000, 30_000)[1])
+    prova("e non si arrotonda MAI, in nessun verso", 0,
+          pz(3, 7)[2])
+    prova("senza barrato non c'e' percentuale", 0,
+          pz(20_000, 20_000)[2])
+    # Il contratto del client, il gemello di quello qui sopra: mai
+    # un chip senza la cifra sbarrata accanto a cui sta.
+    prova("una percentuale implica sempre un barrato", True,
+          all(not c or b > 0 for _, b, c in
+              (pz(a, d) for a in (0, -1, 20_000, 3)
+               for d in (0, 5_000, 20_000, 25_000, 30_000, 40_000, 7))))
+    # E la percentuale sta SEMPRE fra 1 e 99: uno 0% non e' un
+    # chip da mostrare, e un 100% vorrebbe dire regalarlo.
+    prova("...e sta sempre fra 1 e 99", True,
+          all(c == 0 or 1 <= c <= 99 for _, _, c in
+              (pz(a, d) for a in (0, 1, 3, 20_000)
+               for d in (0, 1, 2, 7, 25_000, 40_000, 2_000_000))))
 
     # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago
     # 2026, dal campo): il messaggio nominava il solo affare concluso,
@@ -27829,13 +27880,71 @@ def prove_banner_negozio():
     # LA CIFRA NON SI SCRIVE MAI A MANO: il client non conosce il
     # listino, lo riceve (il patto di `max_barattolo`).
     prova("...e nessuna cifra e' battuta li' dentro", True,
-          "20000" not in chiusa and "20.000" not in chiusa)
-    # IL LISTINO STA NELLA PROSA e non dentro il bottone: li' il
-    # barrato non prenderebbe la sua veste, e il bottone deve portare
-    # UNA cifra sola — quella che si paga.
-    _btn = chiusa[chiusa.index('<button class=\"btn orange\"'):]
-    prova("il barrato non finisce dentro il bottone", True,
-          "acq-barrato" in chiusa and "acq-barrato" not in _btn)
+          not any(c in chiusa for c in
+                  ("20000", "20.000", "40000", "40.000", "50%")))
+    # IL LISTINO STA NEL BOTTONE, e questa prova ha CAMBIATO LATO
+    # (ago 2026, decisione di Andrea): chiedeva l'opposto — «il
+    # barrato non ci finisce dentro» — col motivo che li' non
+    # prenderebbe la sua veste. Quel motivo era una constatazione e
+    # non una regola: la veste non c'era, e adesso c'e'. Nella
+    # prosa il confronto si vedeva troppo piccolo, ed e' il
+    # confronto la cosa da mettere sotto il dito.
+    _btn = chiusa[chiusa.index('<button class=\"btn orange sblocca-cta'):]
+    prova("il barrato finisce DENTRO il bottone", True,
+          "acq-barrato" in _btn)
+    prova("...e il chip della percentuale con lui", True,
+          "pz-chip" in _btn)
+    # LA PAROLA RESTA NELLA PROSA, che il chip non la dice: «−50%»
+    # e' un fatto, «offerta di lancio» e' il PERCHE' — e senza si
+    # perderebbe la risposta a «e quando finisce?».
+    prova("...e la parola resta sopra, fuori dal bottone", True,
+          "offerta di lancio" in chiusa
+          and "offerta di lancio" not in _btn)
+    # LE DUE META' VANNO A CAPO INTERE: sono due span e non due
+    # parole, quindi il verbo sopra e il confronto sotto — mai un
+    # a-capo dove capita. MISURATO a 320px, dove il cassetto
+    # concede ~258px e la riga unica non ci sta in nessun modo.
+    prova("il bottone e' a due righe, e il confronto non si spezza",
+          True, ".sblocca-cta{flex-wrap:wrap" in mini
+          and ".sblocca-cta .sc-cifre{white-space:nowrap" in mini)
+    # IL CHIP E' UN CARTELLINO e non prende un colore SUO: sono i
+    # due valori di `.tag-price`, gia' in casa e gia' FISSI nei due
+    # temi (un'etichetta di carta non cambia di notte). NIENTE
+    # VERDE: `--sconto` significa gia' «sconto carrello del
+    # negozio», e un colore che significa una cosa non se ne prende
+    # un'altra (la regola di --tg-soft).
+    # I DUE VALORI SONO QUELLI DEL CARTELLINO, e la prova li lega:
+    # chi ne cambia uno solo scopre di aver inventato un colore.
+    _chip = mini[mini.index(".pz-chip{"):][:260]
+    # E IL BARRATO DENTRO L'ARANCIO e' bianco velato: `--muted`
+    # li' sparirebbe. La regola vince per SPECIFICITA' su quella
+    # delle quattro case, non per ordine — e nessuna prova la
+    # sorvegliava (la mutazione e' sopravvissuta al primo giro).
+    prova("il barrato nell'arancio e' bianco velato", True,
+          "#bannerBlocco .btn.orange .acq-barrato{color:rgba(255,255,255"
+          in mini)
+    prova("il chip veste il cartellino, e non il verde", True,
+          "#FFF8EA" in _chip and "#23282C" in _chip
+          and "--sconto" not in _chip)
+    prova("...coi due valori presi da .tag-price", True,
+          "background:#FFF8EA;border:2px solid #23282C" in mini)
+    # E NON SEGUE IL TEMA, per la ragione del cartellino: vive
+    # sull'arancio, che di notte non cambia.
+    prova("...e non segue il tema", True,
+          "var(--" not in _chip[:_chip.index("}")])
+    # E FUORI DALL'ARANCIO prende `--chip-bg`, o sulla carta il
+    # bianco velato sparirebbe: e' la lezione gia' pagata da
+    # `.qta-mini` — un cuore solo di markup, due vestiti.
+    prova("...e sul foglio prende il token della carta", True,
+          "#payTitolo .pz-chip{background:var(--chip-bg)" in mini)
+    # LA PERCENTUALE ARRIVA GIUDICATA: il client non la calcola, o
+    # sarebbe il secondo posto da cui un giorno il chip direbbe un
+    # numero che moltiplicando non torna.
+    prova("il chip legge la percentuale dal server", True,
+          "bannerLeve.prezzo_percento" in chiusa)
+    prova("...e non la calcola mai di qua", True,
+          not any(g in chiusa for g in ("100 -", "100-", "/ pieno",
+                                        "/pieno", "Math.round")))
     # IL BARRATO SI DERIVA DA UNA VARIABILE-MODALITA', come il modo:
     # un nodo nel solo ramo 'tassa' non esisterebbe ancora quando
     # `sbloccaBanner` ci scrive (il markup NASCE vestito da escrow),
@@ -27858,15 +27967,18 @@ def prove_banner_negozio():
         _corpo = pezzo_js(mini, "function vestiPaySheet(modo){", "\n}")
         _js_v = (
             "const N={};const el=i=>N[i]||(N[i]={innerHTML:'',textContent:''});"
-            "const fmt=n=>String(n);let sbloccoPieno=0;"
+            "const fmt=n=>String(n);let sbloccoPieno=0,sbloccoPct=0;"
             + _corpo + "\n}\n"
-            "sbloccoPieno=20000;el('payAmount').textContent='10000';"
+            "sbloccoPieno=40000;sbloccoPct=50;"
+            "el('payAmount').textContent='20000';"
             "vestiPaySheet('tassa');const con=el('payTitolo').innerHTML;"
+            "sbloccoPct=0;vestiPaySheet('tassa');"
+            "const muta=el('payTitolo').innerHTML;"
             "sbloccoPieno=0;vestiPaySheet('tassa');"
             "const senza=el('payTitolo').innerHTML;"
             "vestiPaySheet('escrow');"
             "const esc=el('payTitolo').innerHTML;"
-            "console.log(JSON.stringify({con,senza,esc,"
+            "console.log(JSON.stringify({con,muta,senza,esc,"
             "cifra:el('payAmount').textContent}));")
         _r = _sp.run([node, "-e", _js_v], capture_output=True,
                      text=True, encoding="utf-8")
@@ -27874,16 +27986,26 @@ def prove_banner_negozio():
             _t = _js.loads((_r.stdout or "").strip())
         except Exception:
             _t = {"con": (_r.stderr or "")[:200], "senza": "",
-                  "esc": "", "cifra": ""}
+                  "muta": "", "esc": "", "cifra": ""}
         prova("col pieno, il titolo della tassa PORTA il barrato", True,
-              "acq-barrato" in _t["con"] and "20000" in _t["con"])
+              "acq-barrato" in _t["con"] and "40000" in _t["con"])
+        prova("...e il chip della percentuale accanto", True,
+              "pz-chip" in _t["con"] and "−50%" in _t["con"])
+        # LA RIGA CHE VALE IL CANTIERE: a percentuale muta il
+        # barrato RESTA. Chi lega le due cose spegne una
+        # promozione vera per colpa di un ornamento, e lo si vede
+        # solo girandolo — una sentinella direbbe che i due nomi
+        # ci sono, mai che siano indipendenti.
+        prova("...e a percentuale muta resta il solo barrato", True,
+              "acq-barrato" in _t["muta"] and "pz-chip" not in _t["muta"])
         prova("...a pieno zero non lo porta", True,
               "acq-barrato" not in _t["senza"])
         prova("...e il ramo escrow non lo porta MAI", True,
-              "acq-barrato" not in _t["esc"] and "garanzia" in _t["esc"])
+              "acq-barrato" not in _t["esc"]
+              and "pz-chip" not in _t["esc"] and "garanzia" in _t["esc"])
         # E LA CIFRA NON SI PERDE nel giro: e' la ragione per cui
         # `vestiPaySheet` la conserva, e adesso c'e' la prova.
-        prova("...e la cifra sopravvive a tre vestizioni", "10000",
+        prova("...e la cifra sopravvive a quattro vestizioni", "20000",
               _t["cifra"])
     else:
         salta("il titolo della tassa col barrato (serve node)")
@@ -27892,7 +28014,8 @@ def prove_banner_negozio():
     # ricordare in ogni flusso che apre il foglio.
     _escrow = _vesti[_vesti.index("a garanzia"):]
     prova("...e il ramo escrow non lo nomina affatto", True,
-          "sbloccoPieno" not in _escrow and "acq-barrato" not in _escrow)
+          "sbloccoPieno" not in _escrow and "acq-barrato" not in _escrow
+          and "sbloccoPct" not in _escrow)
     # LA CINTURA: si giudica contro l'importo DELLA FATTURA e mai
     # contro la leva — sulla RIPRESA si paga una cifra fotografata
     # mezz'ora fa, e nel frattempo il prezzo puo' essere cambiato.
@@ -27904,6 +28027,19 @@ def prove_banner_negozio():
     # in ritardo — la gemella della mutazione su `payAmount`.
     prova("...e si scrive prima di mostraQr", True,
           _sb.index("sbloccoPieno =") < _sb.index("mostraQr("))
+    # LA PERCENTUALE HA UNA CINTURA PIU' STRETTA DEL BARRATO: il
+    # server la giudica sul prezzo di OGGI, quindi sulla RIPRESA —
+    # dove si paga un importo fotografato mezz'ora fa — direbbe un
+    # numero che con QUELLA fattura non torna. Il barrato invece
+    # resta: dice un fatto, non un conto.
+    prova("il chip vale solo sulla fattura di oggi", True,
+          "d.importo_sats === ((bannerLeve && bannerLeve.prezzo_sats)"
+          in _sb)
+    prova("...e nemmeno lui si calcola nel client", True,
+          "prezzo_percento" in _sb
+          and not any(g in _sb for g in ("100 -", "Math.round")))
+    prova("...e si scrive anche lui prima di mostraQr", True,
+          _sb.index("sbloccoPct =") < _sb.index("mostraQr("))
     # LA PAROLA sta nei tre posti e in nessun altro: e' l'unica cosa
     # che dice che il prezzo e' temporaneo, e non promette una data.
     _conf = pezzo_js(mini, "function chiediSblocco(){", "\n}")

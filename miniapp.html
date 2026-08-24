@@ -2364,6 +2364,43 @@
   #payTitolo .acq-barrato .unit,
   #confTestata .acq-barrato .unit,
   #bannerBlocco .acq-barrato .unit{display:inline-block}
+  /* DENTRO IL BOTTONE ARANCIO il barrato non puo' essere
+     `--muted`: sull'arancio pieno sparirebbe. Prende il BIANCO
+     VELATO, che e' la lingua che quel bottone ha gia' (il chip
+     traslucido dello stepper dentro «Acquista»), e vince per
+     SPECIFICITA' sulla riga qui sopra, non per ordine. */
+  #bannerBlocco .btn.orange .acq-barrato{color:rgba(255,255,255,.72)}
+  /* IL CHIP E' UN CARTELLINO, e non prende un colore SUO: sono i
+     due valori di `.tag-price` — crema #FFF8EA e inchiostro
+     #23282C — gia' in casa e gia' FISSI nei due temi per la
+     stessa ragione (un'etichetta di carta non cambia di notte).
+     NIENTE VERDE: `--sconto` significa gia' «sconto carrello del
+     negozio», e un colore che significa una cosa non se ne prende
+     un'altra (la regola di --tg-soft).
+     LA STRADA PROVATA E MISURATA PRIMA: il traslucido bianco
+     dello stepper dentro «Acquista» (`.qta-mini`). Sull'arancio
+     rende 1,89 col testo bianco — MENO del testo che gli sta
+     accanto (2,30) — e questo chip deve farsi leggere, non
+     accompagnare. Col cartellino sta a 14,3. Li' il traslucido va
+     bene perche' i suoi − e + sono a 17px; qui il testo e' 12. */
+  .pz-chip{font-size:12px;font-weight:800;font-style:normal;
+    padding:1px 6px 2px;border-radius:8px;
+    background:#FFF8EA;color:#23282C}
+  /* Fuori dall'arancio il traslucido bianco sparirebbe sulla
+     carta: e' la lezione gia' pagata da `.qta-mini`, e il token
+     c'e' nei due temi — un cuore solo di markup, due vestiti. */
+  #payTitolo .pz-chip{background:var(--chip-bg);color:var(--sats-text)}
+  /* IL BOTTONE PORTA DUE RIGHE, e non e' un vezzo: MISURATO a
+     320px, dove il cassetto concede ~258px, «⚡ Sbloccalo subito
+     per 40 000 20 000 sats −50%» non ci sta in nessun modo — e ci
+     stava a stento gia' ieri con la sola cifra. Col wrap le due
+     meta' vanno a capo INTERE (sono due span, non due parole),
+     quindi il verbo sopra e il confronto sotto: mai un a-capo
+     dove capita, e a 375 le due righe restano due (il confronto
+     non si spezza mai, e' un nowrap). */
+  .sblocca-cta{flex-wrap:wrap;row-gap:1px;line-height:1.25}
+  .sblocca-cta .sc-cifre{white-space:nowrap;display:inline-flex;
+    align-items:center;gap:6px}
   /* LA FILA DELLE PROMESSE — UNA VESTE SOLA (ago 2026, decisione di
      Andrea; nata in Paga, dal 13 ago 2026 la portano ANCHE il
      carrello e «Altri oggetti»: la classe e' .fila-promesse sui tre
@@ -14773,7 +14810,7 @@ let pagamentoCorrente = null;
    `pagamentoCorrente` quel debito ce l'ha perche' governa «Annulla»
    e «Ho pagato», cioe' denaro. Una variabile da azzerare in tre
    posti e' una variabile che il quarto flusso di domani dimentica. */
-let sbloccoPieno = 0;
+let sbloccoPieno = 0, sbloccoPct = 0;
 
 /* IL PAYSHEET SERVE DUE MESTIERI DIVERSI, e da qui lo dice.
    Tre flussi su quattro depositano sats a GARANZIA e li riavranno se
@@ -14806,10 +14843,17 @@ function vestiPaySheet(modo){
     const pieno = sbloccoPieno > 0
       ? '<span class="mono acq-barrato">' + fmt(sbloccoPieno)
         + '</span> ' : '';
+    /* IL CHIP STA DOVE STA LA CIFRA CHE SI PAGA, ed e' la regola
+       che decide anche dove NON sta: nella conferma quella cifra
+       vive nel CORPO (textContent), quindi li' il chip non
+       avrebbe una cifra accanto a cui stare e resta la parola. */
+    const chip = sbloccoPct > 0
+      ? ' <i class="pz-chip">−' + sbloccoPct + '%</i>' : '';
     t.innerHTML = 'Sblocca per ' + pieno
       + '<span class="mono" id="payAmount" '
       + 'style="color:var(--sats)"></span> '
-      + '<span style="font-size:12px;color:var(--muted)">sats</span>';
+      + '<span style="font-size:12px;color:var(--muted)">sats</span>'
+      + chip;
     p.innerHTML = 'Paga con qualsiasi wallet Lightning. Questi sats '
       + '<b style="color:var(--ink)">non sono un deposito</b>: pagano '
       + 'lo sblocco, e non tornano indietro.';
@@ -20143,13 +20187,22 @@ function renderBanner(){
        arriva da la' e non si scrive mai a mano (il patto di
        `max_barattolo`). */
     const prezzo = (bannerLeve.prezzo_sats || 0);
-    /* IL LISTINO STA NELLA PROSA E NON NEL BOTTONE: dentro un
-       `.btn orange` il barrato non prenderebbe la sua veste (il
-       selettore vive su altre tre case), e soprattutto il bottone
-       deve portare UNA cifra sola — quella che si paga. Qui sopra
-       si dice da dove viene lo sconto, li' sotto quanto costa. */
+    /* IL LISTINO STA NEL BOTTONE (ago 2026, decisione di Andrea,
+       e ROVESCIA la riga di ieri: «sta nella prosa, che dentro un
+       `.btn orange` il barrato non prenderebbe la sua veste»).
+       Il perche' di allora era una CONSTATAZIONE e non una
+       regola — la veste non c'era — e adesso c'e'; l'altra meta'
+       («il bottone porta UNA cifra sola») cade perche' e' proprio
+       il CONFRONTO la cosa da mettere sotto il dito: nella prosa
+       si vedeva troppo piccolo. Qui sopra resta la PAROLA, che il
+       chip non dice; i numeri stanno tutti in un posto solo. */
     const pieno = (bannerLeve.prezzo_pieno_sats || 0) > prezzo
       ? bannerLeve.prezzo_pieno_sats : 0;
+    /* LA PERCENTUALE ARRIVA GIUDICATA dal server e non si
+       calcola qui: esce >0 solo quando la divisione e' esatta, e
+       rifarla di qua sarebbe il secondo posto da cui un giorno il
+       chip direbbe un numero che moltiplicando non torna. */
+    const pct = pieno ? (bannerLeve.prezzo_percento || 0) : 0;
     box.innerHTML = `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         🔒 <b style="color:var(--ink)">${perche}</b>È l'insegna che puoi
@@ -20157,11 +20210,14 @@ function renderBanner(){
         sito.</div>`
       + (prezzo && pieno ? `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
-        <s class="acq-barrato">${fmt(pieno)} <span class="unit">sats</span></s> <b style="color:var(--ink)">offerta di lancio</b></div>` : '')
+        Adesso è in <b style="color:var(--ink)">offerta di lancio</b>.</div>` : '')
       + (prezzo ? `
-      <button class="btn orange" style="margin-top:12px"
-              onclick="chiediSblocco()">⚡ Sbloccalo subito per
-        ${fmt(prezzo)} sats</button>` : '');
+      <button class="btn orange sblocca-cta" style="margin-top:12px"
+              onclick="chiediSblocco()"><span>⚡ Sbloccalo subito</span>
+        <span class="sc-cifre">${pieno
+          ? `<s class="acq-barrato">${fmt(pieno)}</s> ` : ''}${fmt(prezzo)}
+          sats${pct ? ` <i class="pz-chip">−${pct}%</i>` : ''}</span></button>`
+        : '');
     return;
   }
   const vivo = b.stato === 'attivo' && b.foto;
@@ -20377,6 +20433,18 @@ async function sbloccaBanner(){
      vestito e la legge. */
   const _pieno = (bannerLeve && bannerLeve.prezzo_pieno_sats) || 0;
   sbloccoPieno = _pieno > d.importo_sats ? _pieno : 0;
+  /* LA PERCENTUALE HA UNA CINTURA PIU' STRETTA DEL BARRATO, e la
+     differenza e' quel che dicono: il barrato dice un FATTO («c'e'
+     un listino piu' alto») e vale su qualunque fattura, il chip
+     dice un CONTO — e il server lo giudica sul prezzo di OGGI.
+     Sulla RIPRESA si paga un importo fotografato mezz'ora fa:
+     con la leva cambiata nel frattempo il chip direbbe un numero
+     che con QUESTA fattura non torna. Quindi si mostra solo se la
+     fattura e' al prezzo corrente, e altrimenti resta il solo
+     barrato — mai un ricalcolo di qua. */
+  sbloccoPct = (sbloccoPieno
+    && d.importo_sats === ((bannerLeve && bannerLeve.prezzo_sats) || 0))
+    ? (bannerLeve.prezzo_percento || 0) : 0;
   el('payAmount').textContent = fmt(d.importo_sats);
   /* il conto si scrive a mano: una cifra piatta non ha voci da
      scomporre, e `contoScomposto` su di lei torna stringa vuota */

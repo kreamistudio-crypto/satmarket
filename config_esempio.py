@@ -241,8 +241,8 @@ BANNER_LIVELLO = "avviato"
 # ogni sblocco lascia una riga nella tabella `pagamenti`: senza,
 # sembrerebbe un orfano al giro di riconciliazione con LNbits.
 # 0 = sblocco a pagamento spento, resta solo la strada del livello.
-BANNER_PREZZO_SATS = 10_000
-# Il prezzo PIENO, quello BARRATO accanto: dice che i 10.000 qui
+BANNER_PREZZO_SATS = 20_000
+# Il prezzo PIENO, quello BARRATO accanto: dice che i 20.000 qui
 # sopra sono un'offerta di lancio e non il listino. NON ENTRA MAI NEL
 # CONTO — chi paga paga la cifra scontata, e la ricevuta la fotografa
 # in colonna — quindi cambiarlo non muove un sat di quel che si
@@ -251,7 +251,10 @@ BANNER_PREZZO_SATS = 10_000
 # stessa non e' una riga, e' un refuso. Un pieno piu' BASSO del prezzo
 # non si barra mai (si leggerebbe come un aumento) e degrada in
 # silenzio, senza allarmi.
-BANNER_PREZZO_PIENO_SATS = 20_000
+# E il chip «−N%» accanto al barrato compare SOLO se lo sconto e'
+# tondo: 40.000 → 20.000 fa −50% e si legge, 30.000 → 20.000
+# farebbe −33,33% e resta il solo barrato. Non si arrotonda mai.
+BANNER_PREZZO_PIENO_SATS = 40_000
 # Gli accorciatori, ed e' la riga che regge la moderazione del link: un
 # «bit.ly/xyz» si approva pulito e domani punta altrove, quindi il link
 # dev'essere ISPEZIONABILE. Match sul dominio, sottodomini compresi.

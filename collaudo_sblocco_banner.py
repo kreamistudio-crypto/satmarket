@@ -50,8 +50,8 @@ _RIGHE = [
     "GIORNI_AUTO_SBLOCCO = 10",
     "MODELLO_RICERCA = 'claude-haiku-4-5-20251001'",
     "BANNER_NEGOZIO_ATTIVO = True",
-    "BANNER_PREZZO_SATS = 10000",
-    "BANNER_PREZZO_PIENO_SATS = 20000",
+    "BANNER_PREZZO_SATS = 20000",
+    "BANNER_PREZZO_PIENO_SATS = 40000",
 ]
 with open(_conf, "w", encoding="utf-8") as f:
     f.write(chr(10).join(_RIGHE) + chr(10))
@@ -175,13 +175,17 @@ def main():
     d = asyncio.run(server.mio_profilo("", ""))  # /api/me
     prova("chi e' nudo trova la porta chiusa", False,
           d["banner_leve"]["porta_aperta"])
-    prova("...e il prezzo per aprirla arriva dal server", 10000,
+    prova("...e il prezzo per aprirla arriva dal server", 20000,
           d["banner_leve"]["prezzo_sats"])
     # IL PIENO BARRATO accanto, e la riga che conta e' la SECONDA:
     # quel che si paga NON si muove di un sat. Il pieno e' un
     # ornamento, e la fattura qui sotto lo dimostra.
-    prova("...col pieno barrato accanto, gia' giudicato", 20000,
+    prova("...col pieno barrato accanto, gia' giudicato", 40000,
           d["banner_leve"]["prezzo_pieno_sats"])
+    # E LA PERCENTUALE, che il client non calcola: 40.000 su
+    # 20.000 e' meta' esatta, quindi si dice.
+    prova("...e la percentuale, tonda", 50,
+          d["banner_leve"]["prezzo_percento"])
     prova("...col motivo gia' scritto", True,
           "si sblocca col livello" in d["banner_leve"]["motivo"])
     come(2)
@@ -203,11 +207,11 @@ def main():
     print("\n[la fattura]")
     r = asyncio.run(server.sblocca_banner(None, "", ""))
     pid = r["pagamento_id"]
-    prova("la fattura chiede il prezzo della leva", 10000, r["importo_sats"])
+    prova("la fattura chiede il prezzo della leva", 20000, r["importo_sats"])
     # ...E NON IL PIENO, che e' la riga da non ammorbidire: un
     # ornamento che finisse nella bolt11 farebbe pagare il listino a
     # chi ha letto l'offerta di lancio.
-    prova("...e la bolt11 chiede quella, non il pieno", 10000,
+    prova("...e la bolt11 chiede quella, non il pieno", 20000,
           FATTURE[r["payment_hash"]]["sats"])
     prova("...e nel registro LNbits si riconosce", True,
           "sblocco banner" in FATTURE[r["payment_hash"]]["memo"])
@@ -397,7 +401,7 @@ def main():
     ESITO[0] = server.PAGATO
     esito = asyncio.run(server._rimborsa_sblocco(pid, 999))
     prova("il rimborso riesce", True, esito["ok"])
-    prova("...e paga ESATTAMENTE i sats incassati", 10_000,
+    prova("...e paga ESATTAMENTE i sats incassati", 20_000,
           USCITE[-1][1])
     prova("...il pagamento diventa 'rimborsato'", "rimborsato",
           db().execute("SELECT stato FROM pagamenti WHERE id=?",
@@ -457,7 +461,7 @@ def main():
     # l'importo esatto: incassare non fa uscire un sat da nessuna
     # parte, e a farne uscire uno e' solo un gesto di una persona.
     prova("l'unico sat uscito e' il rimborso, e all'importo esatto",
-          [10_000], [q for _, q in USCITE])
+          [20_000], [q for _, q in USCITE])
 
     print("\n[la promozione che non morde]")
     # IL PIENO E' UN ORNAMENTO, e queste tre righe sono la prova che
@@ -466,15 +470,23 @@ def main():
     # guarda che il prezzo NON si sposti mai di un sat.
     come(1)
     _vero = server.BANNER_PREZZO_PIENO_SATS
-    for _pieno, _atteso, _perche in (
-            (10000, 0, "un pieno UGUALE al prezzo non si barra"),
-            (5000, 0, "...e uno piu' BASSO nemmeno"),
-            (0, 0, "...e uno non dichiarato neppure"),
-            (20000, 20000, "...mentre una promozione vera si barra")):
+    for _pieno, _atteso, _pct, _perche in (
+            (20000, 0, 0, "un pieno UGUALE al prezzo non si barra"),
+            (5000, 0, 0, "...e uno piu' BASSO nemmeno"),
+            (0, 0, 0, "...e uno non dichiarato neppure"),
+            (40000, 40000, 50, "...mentre una promozione vera si barra"),
+            # E IL CASO CHE VALE IL CANTIERE: 20.000 su 30.000 fa
+            # 33,33% — il chip TACE e il barrato RESTA. Chi lega
+            # le due cose spegne una promozione vera per colpa di
+            # un ornamento.
+            (30000, 30000, 0, "...e una non tonda si barra lo stesso"),
+            (25000, 25000, 20, "...mentre un quinto esatto si dice")):
         server.BANNER_PREZZO_PIENO_SATS = _pieno
         _d = asyncio.run(server.mio_profilo("", ""))
         prova(_perche, _atteso, _d["banner_leve"]["prezzo_pieno_sats"])
-        prova("...e il prezzo che si paga non si muove", 10000,
+        prova("...e la percentuale che va con lui", _pct,
+              _d["banner_leve"]["prezzo_percento"])
+        prova("...e il prezzo che si paga non si muove", 20000,
               _d["banner_leve"]["prezzo_sats"])
     server.BANNER_PREZZO_PIENO_SATS = _vero
 

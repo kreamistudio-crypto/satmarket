@@ -1048,7 +1048,7 @@ except ImportError:
 try:
     from config import BANNER_PREZZO_SATS
 except ImportError:
-    BANNER_PREZZO_SATS = 10_000
+    BANNER_PREZZO_SATS = 20_000
 # E IL PREZZO PIENO, quello BARRATO accanto (ago 2026): la cifra qui
 # sopra e' un'offerta di lancio, e senza una seconda leva non c'era
 # modo di dirlo — si leggeva come il listino.
@@ -1064,7 +1064,7 @@ except ImportError:
 try:
     from config import BANNER_PREZZO_PIENO_SATS
 except ImportError:
-    BANNER_PREZZO_PIENO_SATS = 20_000
+    BANNER_PREZZO_PIENO_SATS = 40_000
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -1856,7 +1856,7 @@ def banner_porta_aperta(xp: int, affari: int, livello_minimo: str,
 def _prezzo_banner(prezzo: int, pieno: int) -> tuple:
     """Quanto si paga per la porta, e quanto si BARRA accanto.
 
-    Torna `(paga, barrato)`, e la seconda meta' e' un ORNAMENTO: il
+    Torna `(paga, barrato, percento)`, e le due code sono ORNAMENTI: il
     conto e' sempre e solo la prima. Chi lo dimentica farebbe uscire
     dalla cassaforte una cifra che nessuno ha incassato — la stessa
     trappola di `ordini.sconto_sats`, che e' una colonna TESTIMONE.
@@ -1872,10 +1872,23 @@ def _prezzo_banner(prezzo: int, pieno: int) -> tuple:
     perche' non morde c'e' la nota del pannello delle leve.
     PURA, e prende i CAMPI e non le leve (il patto di `in_ferie` e di
     `_regola_sconto`): cosi' la servono il profilo e il pannello, e si
-    tortura in CI senza un config."""
+    tortura in CI senza un config.
+    E LA PERCENTUALE SI DICE SOLO QUANDO E' TONDA (ago 2026): il
+    terzo valore e' 0 quando la divisione non e' esatta — 40.000 su
+    20.000 fa 50 e si legge, 15.000 su 10.000 farebbe 33,33% e TACE.
+    E' la cura dell'unitario scontato della pagina Paga, parola per
+    parola: «un numero che non torna moltiplicando si legge come un
+    bug». Quindi qui NON nasce una regola percentuale come lo sconto
+    del negozio — resta un prezzo di lancio, e la percentuale e' un
+    ornamento dell'ornamento: si aggiunge la sola condizione in cui
+    la parola «meta'» e' vera. MAI arrotondata, in nessun verso.
+    IL BARRATO NON DIPENDE DA LEI: una promozione storta di qualche
+    sat si barra lo stesso, e a mancare e' il solo chip."""
     paga = max(0, int(prezzo or 0))
     barrato = int(pieno or 0)
-    return paga, (barrato if paga > 0 and barrato > paga else 0)
+    barrato = barrato if paga > 0 and barrato > paga else 0
+    tonda = barrato and paga * 100 % barrato == 0
+    return paga, barrato, (100 - paga * 100 // barrato) if tonda else 0
 
 
 # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago 2026,
@@ -13249,7 +13262,16 @@ def _leve_stato():
                                  BANNER_PREZZO_PIENO_SATS)[1],
                   spento="nessun barrato: si vede la sola cifra che si "
                          "paga (e' cosi' anche quando il pieno non e' "
-                         "piu' ALTO del prezzo)"),
+                         "piu' ALTO del prezzo)",
+                  # Il chip della percentuale non e' una leva e non ha
+                  # una riga sua: e' derivato. Ma il caso in cui TACE
+                  # non si deduce dal numero — chi scrive 30.000 vede
+                  # il barrato e non il chip — quindi lo dice qui, che
+                  # e' l'unico posto dove uno va a cercarlo.
+                  acceso="il chip −N% compare SOLO se lo sconto e' "
+                         "tondo (40.000 → 20.000 = −50%); con una "
+                         "cifra che non divide esatta resta il solo "
+                         "barrato"),
             _leva("Banner: domini vietati", "BANNER_LINK_VIETATI",
                   len(BANNER_LINK_VIETATI),
                   spento="nessun accorciatore fermato: un link corto si "
@@ -21864,6 +21886,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # Un client rimasto in cache non conosce la chiave e non
         # disegna niente: un'omissione, mai una bugia.
         "prezzo_pieno_sats": _pz_ban[1],
+        # E LA PERCENTUALE, che il client NON calcola: esce >0 solo
+        # quando la divisione e' esatta, o si leggerebbe un −33%
+        # che moltiplicando non torna (la cura dell'unitario
+        # scontato della pagina Paga). Il barrato non dipende da
+        # lei: a percentuale muta resta la sola cifra sbarrata.
+        "prezzo_percento": _pz_ban[2],
         # QUANDO l'ha pagata: serve al cassetto per dire «l'hai
         # sbloccata» invece di ripetere la strada del livello a chi
         # l'ha gia' percorsa in un altro modo.
