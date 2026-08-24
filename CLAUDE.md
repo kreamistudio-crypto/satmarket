@@ -5057,6 +5057,109 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lezione di `atteso_sats`), e IL PAGAMENTO VINCE SUL FAIL-CLOSED del
   gradino ignoto: chi ha pagato ha pagato, anche se `BANNER_LIVELLO`
   nel config è scritto male.
+  E IL PREZZO È UN'OFFERTA DI LANCIO (ago 2026, decisione di Andrea):
+  accanto ai 10.000 che si pagano si legge il pieno BARRATO, 20.000,
+  con la resa che lampo e sconto usano già. Le leve sono DUE e
+  `BANNER_PREZZO_SATS` NON cambia significato — resta la cifra che si
+  paga, il patto dei nomi di casa — mentre `BANNER_PREZZO_PIENO_SATS`
+  è **solo** il barrato.
+  IL PIENO NON ENTRA MAI NEL CONTO, ed è la riga da non ammorbidire:
+  `sblocca_banner` NON CAMBIA DI UNA RIGA — non nella fattura, non
+  nell'INSERT, non nella risposta — e la parentela è con
+  `ordini.sconto_sats`, la colonna TESTIMONE che non è un motore. Le
+  sentinelle guardano il CODICE e non i commenti (la funzione il pieno
+  lo nomina apposta nel suo, per dire che non lo tocca), e coprono
+  anche `_incassa_sblocco` e `_rimborsa_sblocco`.
+  IL GIUDICE È UNO E PURO, `_prezzo_banner(prezzo, pieno)` accanto a
+  `banner_porta_aperta`: torna `(paga, barrato)` e i TRE casi che NON
+  barrano valgono più di quello che barra — UGUALE non è una riga ma
+  un refuso (la regola di `piuBasso`: la stessa cifra sopra sé
+  stessa) ed è anche il modo di SPEGNERE la promozione senza una leva
+  in più; più BASSO non si barra MAI, che si leggerebbe come un
+  aumento; e a prezzo spento non c'è niente in vendita, quindi niente
+  da barrare. Degrada IN SILENZIO (decisione di Andrea): nessun
+  allarme, che una leva storta non deve poter spegnere una vetrina —
+  a dire perché non morde c'è la nota del pannello delle leve, che il
+  valore lo chiede al GIUDICE e non alla costante (senza, un
+  moderatore che legge 0 non distingue «l'ho spenta io» da «l'ho
+  scritta più bassa del prezzo»).
+  LA RICEVUTA NON SI MUOVE, e non c'era niente da fare: il DDL lo
+  dichiara già — «`importo_sats` FOTOGRAFATO alla fattura: la leva
+  può cambiare domani e la ricevuta deve dire quel che si è pagato» —
+  e i tre lettori la rispettano (l'INSERT scrive `prezzo`, la RIPRESA
+  torna `viva["importo_sats"]`, e `_rimborsa_sblocco` legge la
+  colonna, da cui eredita la cintura di `paga_venditore`). Chi paga
+  10.000 li rivede per sempre, rimborso compreso. Per la stessa
+  ragione NIENTE colonna del pieno in `pagamenti`: un listino non è
+  una ricevuta, e il libro mastro non guadagna controlli — «l'importo
+  pagato è diverso dalla leva di oggi» è lo stato NORMALE che quella
+  colonna esiste per produrre, cioè l'allarme che suona sul normale.
+  IL BARRATO SI DERIVA DA UNA VARIABILE-MODALITÀ, `sbloccoPieno`,
+  come il modo — e il ramo `'tassa'` di `vestiPaySheet` la LEGGE. LA
+  STRADA SBAGLIATA va tenuta perché è quella che viene in mente per
+  prima: mettere il nodo nel solo ramo tassa e riempirlo da
+  `sbloccaBanner`. Il markup NASCE vestito da escrow, quindi al primo
+  sblocco dopo un avvio (o dopo un ordine) si scriverebbe su `null`
+  DOPO che la fattura sul server esiste già: il foglio non si
+  aprirebbe e chi paga non vedrebbe niente. `#payAmount` sopravvive
+  perché lo ricreano ENTRAMBI i rami; un nodo di un ramo solo quella
+  proprietà non ce l'ha. Con la variabile il ramo escrow non la legge
+  mai, quindi non c'è NIENTE da ripulire — per costruzione e non per
+  memoria — e per la stessa ragione non si azzera negli altri flussi
+  (`pagamentoCorrente` quel debito ce l'ha perché governa «Annulla» e
+  «Ho pagato», cioè denaro).
+  LA CINTURA GIUDICA CONTRO LA FATTURA e mai contro la leva: sulla
+  RIPRESA si paga un importo fotografato mezz'ora fa, e nel frattempo
+  il prezzo può essere cambiato — `sbloccaBanner` è l'unico posto che
+  conosce tutt'e due i numeri, quindi decide una volta sola, e PRIMA
+  di `mostraQr`, che è la regia del vestito.
+  NEL TITOLO IL BARRATO STA PRIMA DELLA CIFRA E SENZA UNITÀ SUA
+  (visto a schermo, non leggendo): dopo, si leggeva «10 000 sats
+  20 000 sats» — la stessa parola due volte a tre centimetri. Davanti,
+  il «sats» in fondo vale per tutt'e due, ed è la forma dei listini.
+  NEL CASSETTO il listino sta nella PROSA sopra il bottone e non
+  dentro: lì il barrato non prenderebbe la sua veste, e il bottone
+  deve portare UNA cifra sola — quella che si paga. NELLA CONFERMA va
+  nella TESTATA, che è innerHTML: `confCorpo` si scrive col
+  textContent — il patto dei testi NUDI — quindi un `<s>` nel corpo
+  uscirebbe a lettere.
+  NIENTE PERCENTUALE nel chip: 20.000→10.000 farebbe un −50% tondo,
+  ma 15.000→10.000 farebbe −33,33%. Qui non c'è una regola
+  percentuale come lo sconto del negozio: c'è un prezzo di lancio, e
+  si dice la parola. E niente chip VERDE: `--sconto` significa già
+  «sconto carrello del negozio», e un colore che significa una cosa
+  non se ne prende un'altra (la regola di `--tg-soft`).
+  «OFFERTA DI LANCIO» E MAI «RODAGGIO» (decisione di Andrea): nel
+  client quella parola significa già la fase di test — la fascia 🚧,
+  il cartello, il canale — e darle un secondo significato è la
+  trappola già pagata con «lampo» e con «attesa». «Lancio» in più non
+  si aggancia a una fase che finirà prima della promozione.
+  IL VESTITO DEL BARRATO HA IMPARATO TRE CASE (`#payTitolo`,
+  `#confTestata`, `#bannerBlocco` accanto a `.acq-prezzo`) invece di
+  sdoppiarsi in una classe nuova — il precedente di `.av-foto` — e le
+  FAMIGLIE DI SELETTORI SONO DUE: chi aggiunge una casa la aggiunge a
+  tutt'e due, o la barratura taglia dentro «sats».
+  ⚠️ IL DEBITO CHE RESTA, e va deciso a rodaggio: i 20.000 non li ha
+  mai pagati NESSUNO, e niente fa scadere la promozione — un listino
+  barrato che non è mai stato un listino è la cosa che questo file
+  chiama altrove «una regola che non si fa rispettare». O il pieno
+  diventa vero alla fine del rodaggio, o la parola va cambiata.
+  ⚠️ E `_censimento` in `prove.py` ESPLODE se lo si dimentica, in due
+  modi: `_prezzo_banner` va exec'ato PRIMA di `_leve_stato` che lo
+  chiama (senza, `__missing__` lo risolve a 7 e la prova muore con
+  «int object is not callable» invece di diventare rossa), e la leva
+  va messa a mano fra i numeri — lasciata al 7 implicito varrebbe
+  QUANTO il prezzo, e la prova certificherebbe il contrario di quel
+  che il pannello fa.
+  LA TORTURA HA TROVATO QUATTRO BUCHI, tutti nelle prove e non nel
+  codice, e la lezione è sempre la stessa: «il ramo tassa rende il
+  barrato» chiedeva che i due nomi comparissero nel ramo, e restava
+  VERDE con la concatenazione tolta — il barrato calcolato e poi
+  buttato via. Adesso `vestiPaySheet` GIRA su un DOM di cartone e si
+  guarda il titolo che ne esce. E il BANCO ha mentito due volte: uno
+  script lasciato nella radice della copia fa scattare
+  `prove_script_nel_workflow`, e con la baseline sporca il criterio
+  «0 fallite» promuove OGNI mutazione — si confronta il NUMERO.
   UNA TANTUM ORA, A TEMPO DOPO (decisione di Andrea): la colonna
   `utenti.banner_sbloccato_il` è una DATA e non un booleano — il
   giorno dell'abbonamento si aggiunge una scadenza senza migrare
