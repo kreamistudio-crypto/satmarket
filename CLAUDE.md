@@ -14146,6 +14146,151 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sempre; chi arriva dopo ha anche la riga discreta nel form Vendi
   (`#sellSpedizioniereHint`, solo a chi spedisce senza rete
   dichiarata).
+  IL PUNTO SI CONCORDA (ago 2026, caso vero: il venditore spedisce con
+  InPost e chi compra indica un punto Poste, o un locker che non
+  esiste). Il punto è testo LIBERO che nessuno verifica — `segna_
+  spedito` controlla che ci SIA, mai che sia giusto — e davanti a un
+  punto sbagliato il venditore non aveva NESSUNA strada: correggere è
+  del solo compratore (`indica_punto_ritiro`), la disputa da 'locked'
+  pure (`apri_disputa` filtra `compratore_id`), e la chat può non
+  esistere — chi non ha né username né npub legge «per i problemi c'è
+  la disputa», che è precisamente la porta che non può aprire.
+  NON APRE UN'ATTESA NUOVA, ed è la riga da capire prima di toccare
+  qualunque cosa qui: quell'ordine era GIÀ fermo — il venditore non
+  PUÒ spedire — solo che nessuno sapeva di chi fosse la palla, e i
+  promemoria la davano a LUI («segna la spedizione») mentre
+  invitavano chi compra alla disputa. Il cantiere dichiara di chi è
+  il turno; il resto c'era già.
+  LE TRE DECISIONI DI ANDREA: obiezione + proposta (il venditore dice
+  il motivo e può proporne fino a 3, chi compra ne accetta uno con un
+  tocco — COSTO ZERO sugli ordini che vanno bene); al tetto si
+  sollecita e poi 🧊, mai una decadenza (il punto resterebbe
+  sbagliato) e mai un silenzio-uguale-consenso; motivo a scelta più
+  nota libera — il motivo secco si legge a colpo d'occhio dal
+  moderatore, la nota dice il caso particolare.
+  LA FORMA È L'APPUNTAMENTO E NON LE OFFERTE, e il perché va tenuto:
+  le offerte vivono FUORI dall'ordine con sats mai mossi e una
+  scadenza che UCCIDE (dentro un `locked` non c'è niente che possa
+  decadere), il loro giudice è una CIFRA confrontabile mentre un
+  punto è testo libero, e l'appuntamento non ha colonna `stato` — lo
+  deriva da un timbro, così `ordini.stato`, che è la macchina vera,
+  non si tocca. Da qui il perimetro: NIENTE colonna `stato` e niente
+  ping-pong — il venditore obietta (e le obiezioni SI CONTANO, il
+  patto di `busta_correzioni`), e a rispondere è il gesto che chi
+  compra ha GIÀ.
+  SCRIVERE IL PUNTO CHIUDE L'OBIEZIONE, ed è ciò che fa di tutto il
+  giro UNA rotta sola: accettare una proposta non è un endpoint suo —
+  è `indica_punto_ritiro` col testo proposto dentro il campo, e il
+  client lo riempie senza chiamare nessuno. Si azzera anche
+  riscrivendo lo stesso identico punto: è comunque una risposta, e
+  tenere aperta l'obiezione lo lascerebbe nei solleciti per una cosa
+  a cui ha già risposto. `punto_obiezioni` NON si azzera MAI: è la
+  memoria che il moderatore legge in disputa.
+  LA SPEDIZIONE LA CHIUDE ANCHE LEI: se si sono chiariti in chat il
+  venditore spedisce lo stesso — obiettare NON è un lucchetto, e
+  «Segna come spedito» resta — e l'obiezione non deve restare appesa
+  su un ordine 'shipped', dove il campo del compratore è chiuso e il
+  sollecito filtra 'locked'. Resterebbe aperta per sempre, e il libro
+  mastro non la vedrebbe (per lui timbro e motivo sono coerenti).
+  SI OBIETTA SOLO SU UN PUNTO CHE C'È: «via punto, punto vuoto» ha già
+  il suo gate in `segna_spedito` e il suo promemoria, e obiettare sul
+  nulla sarebbero due strade per lo stesso caso.
+  IL GIUDICE È UNO, `_obiezione_da_payload` (il patto di
+  `rete_da_payload`), e le sue tre regole non sono uniformi apposta:
+  il MOTIVO è una whitelist col 400 (quel valore arriva dal client e
+  finisce in una colonna che il moderatore legge — il patto di
+  `TIMBRI_SUGGERIMENTO`); la NOTA si RIFIUTA e non si tronca (la
+  regola di `_nota_da_payload`: una prosa tagliata può INVERTIRSI —
+  «il locker c'è, ma non il mio» diventa «il locker c'è, ma non»); le
+  PROPOSTE si LIMANO (il patto di `quantita_tollerante`: un client
+  che ne manda cinque non deve far fallire una segnalazione), e
+  ognuna passa dallo STESSO `_testo_punto` del punto dell'ordine — un
+  taglio diverso e il tocco che accetta scriverebbe qualcosa che non
+  combacia.
+  NESSUN CAS, e va scritto perché i fratelli ce l'hanno: qui scrive
+  una parte sola e non c'è nessuna corsa — il compratore quelle
+  colonne le AZZERA scrivendo il punto, ed è un'altra transazione che
+  al più arriva prima o dopo, mai in mezzo. Il doppio tocco su rete
+  lenta lo para il velo di `bottoneInAttesa`: non si muove un sat, si
+  protegge `punto_obiezioni`.
+  LA NOTIFICA È STATICA SUL MOTIVO: nell'HTML entra solo l'ETICHETTA,
+  che è NOSTRA — nota e proposte si leggono nell'ordine sotto `esc()`,
+  il patto di `indica_punto_ritiro`. C'è la prova nei due versi.
+  LE DUE RIGHE CHE RENDONO VERA LA PROMESSA. 1) IL SILENZIO:
+  `sollecita_venditori_fermi` guadagna `AND o.punto_obiettato_il = 0`
+  — mentre la palla è del compratore, il venditore non viene
+  rimproverato per una cosa che non può fare. Sul ramo digitale è
+  innocua (`via_punto` è 0). 2) IL PROMEMORIA NUOVO,
+  `sollecita_punti_obiettati`, che è la popolazione COMPLEMENTARE:
+  destinatari INVERTITI — chi compra a ogni squillo (è lui che deve
+  rispondere), il venditore solo all'ULTIMO, per dirgli che la palla
+  passa ai moderatori; prima non avrebbe niente da fare, e un allarme
+  su un'attesa normale è rumore.
+  L'ANCORA È `punto_obiettato_il` E MAI `aggiornato` — la trappola
+  già pagata quattro volte (`deposita_invoice` accetta il venditore
+  proprio su 'locked' e la riscrive). Si sposta quando il venditore
+  RI-obietta, ed è giusto: è un fatto nuovo. Che così possa rimandare
+  il PROPRIO 🧊 è innocuo e dichiarato — lo rimanda a suo danno, e per
+  farlo deve segnalare due volte.
+  IL 🧊 CADE AL GIORNO 11 (`PROMEMORIA_OBIEZIONE_GIORNI` 2 + tetto ×
+  passo, riusati da `PROMEMORIA_CONFERMA_*`: un posto solo da
+  cambiare batte due da tenere uguali), cioè DOPO `CODA_FERMI_GIORNI`
+  — l'invariante «se il 🧊 è partito, la riga c'è» regge, e la prova
+  lo rifà dai default: chi stringe la finestra la trova rossa.
+  Colonne SUE del sollecito (`sollecito_obiezione_il`,
+  `solleciti_obiezione`), che un contatore ereditato salterebbe dritto
+  al tetto, ed entrano in ENTRAMBI i `MAX` di `_SQL_FERMI` o la coda
+  direbbe «🔕 mai sollecitato» su righe già bussate.
+  QUESTO CANTIERE NON CHIUDE IL COMPRATORE CHE SPARISCE, dichiarato:
+  al tetto si tace e l'ordine resta 'locked', perché la sola uscita da
+  lì è in mano a lui. Chiuderlo vuol dire dare al venditore una via
+  d'uscita da 'locked' — il buco già dichiarato («cantiere suo perché
+  tocca il percorso dei soldi»). Il guadagno è che nella coda dei
+  fermi «il compratore non risponde» e «il venditore non spedisce»
+  smettono di confondersi, e `punto_obiettato_il` esce da `_SQL_FERMI`
+  proprio per dire quale dei due.
+  IL LIBRO MASTRO guadagna «obiezione sul punto fuori contratto»
+  (timbro e motivo si scrivono nello stesso UPDATE, quindi non esiste
+  uno stato transitorio legittimo in cui divergono — la domanda che
+  decide), col gemello in `query_libro_mastro.sql`.
+  NEL CLIENT lo stato del form vive FUORI dal DOM (`obiezioneForm`, il
+  patto di `acqDati.puntoAperto`: il pannello si ridisegna a ogni
+  tocco delle pillole e uno stato solo-DOM si richiuderebbe sotto le
+  dita) e PORTA CON SÉ L'ID DELL'ORDINE, così cambiando ordine il form
+  è chiuso per costruzione, senza un azzeramento da ricordare in
+  `openOrder`. Il ridisegno è IN PLACE e mai `openOrder` — la lezione
+  del codice di ritiro: riaprire riporta la pagina in cima e butta il
+  tracciamento scritto a metà; qui il fatto vive tutto dentro il
+  pannello, quindi si riscrive il solo pannello. Il riquadro di chi
+  compra è AMBRA e non rosso: il rosso è della disputa, e qui non c'è
+  un problema conclamato ma un punto da correggere (il registro di
+  `notaFermo`).
+  ⚠️ E LE PROPOSTE STANNO DENTRO LO `<span>` DEL TESTO, che non è un
+  dettaglio di markup: `.trust-note` è un flex ROW, quindi un `<div>`
+  appeso come fratello dell'emoji diventa il TERZO figlio della RIGA —
+  le proposte si incolonnano strette a destra del testo invece di
+  stare sotto a tutta larghezza. NON SBORDA, quindi le misure restano
+  verdi: l'ha visto lo SCREENSHOT a 320px, e c'è la sentinella che
+  impedisce al prossimo riordino di rimetterlo fuori.
+  PROVATO: 30 mutazioni, 30 uccise — e la sola sopravvissuta al primo
+  giro era una sentinella MIA che cercava il NOME della funzione
+  nell'orologio invece della RIGA, quindi un «pass  # await …» la
+  lasciava verde con la chiamata mai eseguita. È la lezione del reaper,
+  ripagata alla lettera: la forma giusta era già in casa, dieci righe
+  più su, e l'avevo ricalcata male. Più
+  `collaudo_punto_concordato.py`, che cammina il giro vero sul server
+  VERO (ordine via punto → obiezione con due proposte → il compratore
+  ne accetta una → il pacco parte) coi rifiuti e l'anti-oracolo
+  provati sul database vero — ed è TORTURATO a sua volta, che un banco
+  che passa al primo giro e non si è mai visto rosso non prova niente.
+  ⚠️ E IL GIRO DAL VIVO HA TROVATO UNA TRAPPOLA DI METODO che vale
+  oltre questo cantiere: la porta del server locale era occupata da
+  UN'ALTRA SESSIONE, uvicorn non si è legato e il banco interrogava il
+  server di qualcun altro — ogni riga rossa per la ragione sbagliata.
+  Il rimedio non è cambiare porta: è il MARCATORE
+  (`/api/marcatore-collaudo`) che dice di chi è il server, e il banco
+  che si RIFIUTA di girare se non è il suo — la stessa forma del «giro
+  a codice intatto» della tortura.
   IL PUNTO NELL'ORDINE, SENZA UN VALORE NUOVO DI consegna_scelta (il
   precedente è anche_digitale, ortogonale): la strada punto è
   `consegna_scelta='spedizione'` + `ordini.punto_ritiro` (il testo)
@@ -22059,6 +22204,38 @@ LA NOTA SUL CACHING RESTA, e vale per ogni anteprima futura: Telegram e
 WhatsApp tengono la card per giorni e dal nostro lato non si bustano,
 quindi si prova UNA VOLTA SOLA per slug — se qualcosa non va si
 ricontrolla su un ALTRO reparto invece di riprovare sullo stesso.
+
+Il punto di ritiro si concorda (ago 2026, caso vero dal campo): il
+venditore che trova un punto sbagliato — un locker che non esiste, o di
+una rete che non serve — ora può dirlo e proporne fino a tre; chi compra
+ne accetta uno con un tocco, che è il gesto che ha già, e quel gesto
+CHIUDE l'obiezione. Zero costo sugli ordini che vanno bene, zero stati
+nuovi, zero rotte per accettare. E le due righe che rendono vera la
+promessa: mentre la palla è del compratore il venditore non viene più
+rimproverato per la merce mai partita, e a bussare è un promemoria coi
+destinatari invertiti. Vedi Architettura, «IL PUNTO SI CONCORDA», per la
+forma presa dall'appuntamento e non dalle offerte (col perché), per il
+🧊 che cade al giorno 11 — dopo la coda dei fermi — e per quel che NON
+si chiude: il compratore che sparisce, dove al tetto si tace e l'unica
+uscita resta la sua disputa.
+Provato: 5891 prove verdi (le nuove) e **30 MUTAZIONI, 30 uccise** — la
+sola sopravvissuta al primo giro era una sentinella mia che cercava il
+NOME della funzione nell'orologio invece della riga, cioè la lezione del
+reaper ripagata alla lettera. Più `collaudo_punto_concordato.py` (46
+verdi: il giro vero sul server VERO su un database usa-e-getta, i
+rifiuti e l'anti-oracolo sul database vero, i due promemoria e la ronda
+che tace), TORTURATO a sua volta su sei mutazioni; e il giro dal vivo a
+320/360/375 nei due temi (96 verifiche, zero sbordo, zero errori JS),
+che ha trovato quel che le misure non vedevano — le proposte
+incolonnate strette a destra del testo, perché `.trust-note` è un flex
+ROW: non sbordava, quindi le sonde erano verdi.
+IN PRODUZIONE basta il deploy: sette colonne additive nascono coi loro
+default (obiezione spenta per tutti), una leva sola col default nel
+codice, nessuna migrazione di dati, nessuno stato nuovo — e un client
+vecchio in cache non conosce i campi e si comporta come oggi. DA
+GUARDARE al primo giro: la prima obiezione vera dentro Telegram — che
+il compratore riceva la notifica, e soprattutto che il venditore
+SMETTA di ricevere il promemoria della merce mai partita.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
