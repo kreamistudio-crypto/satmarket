@@ -19467,7 +19467,13 @@ def prove_rilancio_offerta():
         async def _leggi(req):
             return {"azione": azione, "importo": importo}
 
+        # ⚠️ `Request` SERVE ANCHE SE NON SI USA: in Python 3.12 le
+        # annotazioni della firma si valutano alla definizione, e
+        # `req: Request` alza NameError — mentre in locale (3.14,
+        # PEP 649) sono pigre e non si vede. E la prova non diventa
+        # rossa: ESPLODE, portandosi dietro tutte le sue sorelle.
         amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
+               "Request": object,
                "html": __import__("html"), "time": __import__("time"),
                "leggi_json": _leggi, "guardia_ferie": lambda c, t: None,
                "Header": lambda d="": d, "Cookie": lambda d="": d,
@@ -24183,6 +24189,68 @@ def prove_script_nel_workflow():
     prova("il repo ha degli script da compilare", True, len(nostri) > 10)
     fuori = [f for f in nostri if f not in riga]
     prova("...e sono TUTTI nel compileall del workflow", [], fuori)
+
+
+def prove_annotazioni_negli_ambienti():
+    """`Request` NELL'AMBIENTE DI OGNI ENDPOINT MONTATO (ago 2026, da
+    una CI rossa che in locale era verde).
+
+    Chi monta un endpoint con `exec(pezzo("..."))` gli monta anche le
+    dipendenze — e' la lezione gia' scritta («chi estrae una funzione
+    ne eredita le dipendenze»). Ma la FIRMA e' una dipendenza che non
+    si vede: `async def rispondi_offerta(offerta_id: int, req: Request,
+    ...)` nomina `Request`, e in Python 3.12 le annotazioni si valutano
+    ALLA DEFINIZIONE — quindi senza quel nome l'exec alza NameError.
+
+    IN LOCALE NON SI RIPRODUCE, ed e' tutto il motivo per cui questa
+    prova esiste: da 3.14 le annotazioni sono PIGRE (PEP 649) e la
+    stessa riga passa. La suite esce verde sul portatile e rossa in
+    CI — e non con una prova rossa, ma con una prova ESPLOSA, che si
+    porta dietro tutte le sue sorelle: la volta che e' successo il
+    conto e' sceso di trenta senza che nessuna riga dicesse quali.
+
+    Il censimento guarda le funzioni di server.py che hanno `Request`
+    in firma, trova chi le monta in prove.py e chiede che l'ambiente
+    piu' vicino sopra l'exec definisca quel nome. PERIMETRO
+    DICHIARATO: prende gli `exec` diretti e non chi si fa dare il
+    testo da un aiutante (`_pezzo_eseguibile` & co.) — meglio una rete
+    che prende il caso vero che nessuna rete.
+    """
+    srv = open("server.py", encoding="utf-8").read()
+    pv = open("prove.py", encoding="utf-8").read()
+
+    # le funzioni che hanno Request in firma: si guarda dalla riga del
+    # `def` alla parentesi che la chiude
+    con_request = set()
+    for m in re.finditer(r"^(?:async )?def (\w+)\(", srv, re.M):
+        nome = m.group(1)
+        # la testa finisce dove si CHIUDE la parentesi del def, e si
+        # conta: cercare la prima `):` sbaglia sulle firme che
+        # tornano un tipo (`) -> dict:`) — li' salta al `):` di
+        # un'ALTRA funzione piu' giu' e pesca il suo Request.
+        liv, k = 1, m.end()
+        while liv and k < len(srv):
+            liv += (srv[k] == "(") - (srv[k] == ")")
+            k += 1
+        testa = srv[m.end():k]
+        if "Request" in testa:
+            con_request.add(nome)
+    prova("ci sono endpoint con Request in firma", True,
+          len(con_request) > 20)
+
+    scoperti = []
+    for m in re.finditer(r'exec\((?:"async " \+ )?pezzo\("(\w+)"\)', pv):
+        nome = m.group(1)
+        if nome not in con_request:
+            continue
+        prima = pv.rfind("amb = {", 0, m.start())
+        if prima < 0:
+            scoperti.append(nome + " (nessun ambiente sopra)")
+            continue
+        if '"Request"' not in pv[prima:m.start()]:
+            scoperti.append(nome)
+    prova("ogni endpoint montato ha Request nel suo ambiente",
+          [], scoperti)
 
 
 def prove_altri_scorrimento():
@@ -29598,6 +29666,7 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_script_nel_workflow,
+              prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,
               prove_pagina_dati,
               prove_font,
