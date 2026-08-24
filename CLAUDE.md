@@ -15693,6 +15693,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   proposito i soli appunti — copiano e basta, e passare anche loro
   dalla scala aprirebbe il selettore chat di Telegram, che è un'altra
   cosa da quella che quel bottone promette oggi.
+  MA L'ULTIMO GRADINO LO MERITANO UGUALE (ago 2026): erano rimasti
+  alla forma PRE-SCALA — `navigator.clipboard?.writeText(link).then(…)`
+  — che in un contesto non sicuro (http nudo, WebView vecchie) non fa
+  NIENTE e non lo dice: l'optional chaining corto-circuita TUTTA la
+  catena, `.then` e `.catch` compresi, quindi né appunti né toast né
+  errore. Un bottone che tace. Ora l'ultimo gradino vive in un posto
+  solo — `copiaLink(link, fatto)`, che lo chiamano la scala e i due
+  del negozio — e c'è la sentinella che i due NON passino da
+  `condividiLink`, cioè che la decisione qui sopra resti.
+  LA GUARDIA DEMO INVECE NON SERVE, ed è la metà da non aggiungere
+  «per simmetria»: da `file://` quei bottoni non nascono affatto,
+  perché la loro condizione è `(v.username||v.negozio)` e
+  `(myUsername||myNegozio)` e in DEMO quei quattro sono vuoti — li
+  riempie solo `/api/me`. Verificato aprendo la pagina, non dedotto:
+  zero bottoni nel Profilo e zero nel negozio. Una guardia lì sarebbe
+  una guardia che non può scattare, cioè peggio di niente — la
+  lezione dell'`except` irraggiungibile di `_npub_venditore`.
   E `apriSicurezza(ancora)`/`tornaDaSicurezza()` ricordano da
   dove si veniva (il patto di `tornaDalNegozio`, con la vista di
   partenza che può essersi svuotata). Vale anche per gli anonimi in
