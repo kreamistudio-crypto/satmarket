@@ -14219,6 +14219,11 @@ function openDetail(id){
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <!-- Il duplicato sta subito dopo Modifica, che l'ordine
+                della colonna e' occasione → ritocco → stock → uscita:
+                qui si riapre lo STESSO form, e chi cerca «modifica»
+                si trova accanto «fanne un altro uguale». -->
+           <button class="btn ghost" onclick="duplicaListing(${l.id})">📄 Crea un annuncio simile</button>
            <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
                 e' obbligatoria: le tre strade che aprivano il foglio
                 erano tutte gatate sull'esaurito, quindi senza questa
@@ -24115,6 +24120,11 @@ async function rimuoviModerazione(id){
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
+/* la COPIA (ago 2026): titolo dell'originale, '' = non si copia.
+   Sta QUI e non accanto a `duplicaListing` perche' la legge anche
+   `editListing`, che vive piu' in alto: una `let` piu' in basso
+   sarebbe in zona morta — la lezione del motore di navigazione. */
+let duplicandoDa = '';
 let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
 /* «su QUESTA modifica firmata la consegna si dichiara» (ago 2026).
    Non basta `editandoNostr`, e il caso che lo chiede sono i due
@@ -24661,7 +24671,7 @@ function editListing(id){
   const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
   if (!l) { toast('Annuncio non trovato'); return; }
   haptic();
-  editandoId = id; editandoTitolo = l.title;
+  editandoId = id; editandoTitolo = l.title; duplicandoDa = '';
   /* Un annuncio importato da Nostr si puo' modificare solo FIRMANDO
      con la propria chiave (doppio cittadino): il form lo dice e il
      salvataggio prende la strada firmata. Senza chiave d'accesso il
@@ -24670,6 +24680,28 @@ function editListing(id){
   /* il digitale resta fuori dalla strada firmata: v. consegnaFirmata */
   consegnaFirmata = editandoNostr && (l.consegna||'') !== 'digitale'
                     && !l.ancheDigitale;
+  riempiFormDa(l);
+  sellFoto = []; fotoAttuali = (l.photos||[]).slice();
+  renderFotoPreview(); aggiornaFormVendi();
+  /* Entrare in modifica e' una DISCESA, non un cambio di tab: Vendi e'
+     una radice e senza la bandierina l'entry SOSTITUIREBBE quella di
+     partenza — lo swipe indietro atterrava in Esplora invece che su
+     «I tuoi annunci» (o sul dettaglio, per l'altra porta). Stessa
+     eccezione della discesa in un reparto, alzata subito prima del
+     go() che la consuma. */
+  navSpingi = true;
+  go('vendi'); window.scrollTo(0, 0);
+}
+
+/* IL GIUDICE UNICO DEI CAMPI (ago 2026, col duplicato): riempie il
+   form Vendi da un annuncio, e lo chiamano in DUE — la modifica e la
+   copia. Due copie di questo elenco divergerebbero al primo campo
+   nuovo, e a divergere sarebbe sempre la seconda: chi aggiunge un
+   campo pensa alla modifica, che è la strada che conosce.
+   Le FOTO stanno fuori apposta, ed è la sola cosa che i due
+   chiamanti trattano diverso: in modifica sono quelle di prima e si
+   tengono, in copia vanno ricaricate (vedi `duplicaListing`). */
+function riempiFormDa(l){
   el('sellTitle').value = l.title;
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
@@ -24709,16 +24741,99 @@ function editListing(id){
     el('sellSpedExtra').value = ex > 0 ? ex : '';
   }
   aggiornaSpedCampo();
-  sellFoto = []; fotoAttuali = (l.photos||[]).slice();
+}
+
+/* ---------------- CREA UN ANNUNCIO SIMILE (ago 2026) ----------------
+   Chi vende dodici varianti dello stesso poster non deve ricompilare
+   dodici volte categoria, zona, condizione, spedizione e taglia: si
+   parte da una copia e si cambia quel che cambia davvero.
+
+   È il form della MODIFICA con `editandoId` a null — cioè publish()
+   CREA invece di salvare — e i campi li riempie lo stesso giudice,
+   `riempiFormDa`. Non è una scorciatoia: è ciò che impedisce alla
+   copia di dimenticarsi un campo il giorno che ne nasce uno nuovo.
+
+   COSA NON SI COPIA, e ognuno per una ragione sua:
+     · l'ASTA — è un modo di vendere e un evento a tempo, non un
+       metadato dell'oggetto: la copia nasce a prezzo fisso, e chi la
+       vuole all'asta la spunta lui (il toggle si spegne apposta,
+       perché a `editandoId` null `aggiornaFormVendi` non lo tocca);
+     · la LAMPO e le OFFERTE — vivono sull'annuncio di partenza;
+     · il legame con NOSTR: la copia di un importato nasce NATIVA, ed
+       è la cosa giusta — l'evento sui relay è di chi l'ha firmato, e
+       noi ne stiamo facendo un annuncio nuovo, non un secondo
+       riflesso (`editandoNostr` si spegne).
+   La QUANTITÀ invece si copia: chi vende a lotti ha lo stesso stock. */
+async function duplicaListing(id){
+  const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  haptic();
+  editandoId = null; editandoTitolo = '';
+  editandoNostr = false;               // la copia è sempre di casa
+  duplicandoDa = l.title;
+  riempiFormDa(l);
+  if (el('sellAsta') && el('sellAsta').checked){
+    el('sellAsta').checked = false; aggiornaAstaForm();
+  }
+  /* le foto dell'originale NON sono «attuali»: quelle sono dell'altro
+     annuncio, e questo qui non ne ha ancora nessuna */
+  sellFoto = []; fotoAttuali = [];
   renderFotoPreview(); aggiornaFormVendi();
-  /* Entrare in modifica e' una DISCESA, non un cambio di tab: Vendi e'
-     una radice e senza la bandierina l'entry SOSTITUIREBBE quella di
-     partenza — lo swipe indietro atterrava in Esplora invece che su
-     «I tuoi annunci» (o sul dettaglio, per l'altra porta). Stessa
-     eccezione della discesa in un reparto, alzata subito prima del
-     go() che la consuma. */
   navSpingi = true;
   go('vendi'); window.scrollTo(0, 0);
+  /* IL FUOCO SUL TITOLO, che è la prima cosa da cambiare: due annunci
+     con lo stesso identico titolo si confondono in vetrina. Il testo
+     resta selezionato, così si riscrive sopra senza cancellare. */
+  const t = el('sellTitle');
+  if (t) { t.focus({preventScroll: true}); t.select(); }
+  /* Le foto si ricopiano DOPO aver mostrato il form: sono un giro di
+     rete, e chi duplica deve poter già cominciare a scrivere. */
+  copiaFotoOriginale(l);
+}
+
+/* LE FOTO SI COPIANO QUANDO SI PUÒ, e questo è il pezzo che rende il
+   duplicato una comodità vera invece che mezza: rimettere cinque foto
+   a mano è il lavoro più pesante che resterebbe.
+   Si passa dalla filiera di sempre — un dataURL dentro `sellFoto`,
+   come se le avesse appena scelte — quindi il server le salva verbatim
+   (il patto della compressione unica: un JPEG non si ricomprime) e la
+   copia si ritrova FILE SUOI, che sopravvivono alla cancellazione
+   dell'originale.
+   FAIL-OPEN, ed è la ragione per cui non blocca niente: le foto di un
+   annuncio importato da Nostr stanno su host di terzi e il fetch cade
+   sul CORS. Se non si riesce, il form resta con le sue caselle vuote e
+   lo si DICE — mai lasciar credere che le foto ci siano. */
+async function copiaFotoOriginale(l){
+  const foto = (l.photos || []).slice(0, 5);
+  if (!foto.length || DEMO) return;
+  el('photoPreview').innerHTML =
+    '<div style="width:100%;font-size:12px;color:var(--muted);'
+    + 'font-weight:600">Copio le foto dell\'originale…</div>';
+  const prese = [];
+  for (const url of foto) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const b = await r.blob();
+      if (!b.type.startsWith('image/')) continue;
+      prese.push(await new Promise((ok, no) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(fr.result);
+        fr.onerror = no;
+        fr.readAsDataURL(b);
+      }));
+    } catch (e) { /* host di terzi, rete: si prosegue senza */ }
+  }
+  /* si scrive solo se siamo ancora nella copia: chi nel frattempo è
+     andato altrove (o ha aperto una modifica) non deve ritrovarsi le
+     foto di un altro annuncio sotto le dita */
+  if (!duplicandoDa || editandoId) return;
+  sellFoto = prese;
+  renderFotoPreview();
+  if (!prese.length)
+    toast('Le foto non si sono potute copiare: scegline di nuove', 5000);
+  else if (prese.length < foto.length)
+    toast(`Copiate ${prese.length} foto su ${foto.length}`, 4000);
 }
 
 /* LE DUE STRADE CHE BUTTANO VIA chiedono, e chiedono UGUALE: la ✕ in
@@ -24737,19 +24852,30 @@ function editListing(id){
    lui vivrebbe dentro Telegram e non altrove — meta' garanzia, che e'
    la trappola gia' dichiarata per la ✕ del carrello. */
 function annullaModificaChiedendo(){
-  if (!editandoId) { navIndietro(); return; }
+  if (!editandoId && !duplicandoDa) { navIndietro(); return; }
+  /* La COPIA ha le sue parole: qui non c'è nessun annuncio «che resta
+     com'è in vetrina» — non è ancora nato — e dirlo sarebbe una
+     rassicurazione su una cosa che non esiste. */
+  /* UNA chiamata sola e i testi che variano, non due chiamate: il
+     censimento dei gesti che passano dalla domanda unica conta il
+     letterale `chiediConferma({`, e sdoppiarlo qui gli farebbe contare
+     due gesti dove ce n'è uno. */
+  const copia = duplicandoDa && !editandoId;
   chiediConferma({
-    titolo: 'Annullare la modifica?',
-    corpo: 'Le modifiche che non hai salvato si perdono. '
-         + 'L\'annuncio resta com\'è adesso in vetrina.',
-    etichetta: 'Annulla la modifica',
+    titolo: copia ? 'Lasciare perdere la copia?' : 'Annullare la modifica?',
+    corpo: copia
+      ? 'Quello che hai scritto si perde. L\'annuncio da cui sei '
+        + 'partito non si tocca.'
+      : 'Le modifiche che non hai salvato si perdono. '
+        + 'L\'annuncio resta com\'è adesso in vetrina.',
+    etichetta: copia ? 'Lascia perdere' : 'Annulla la modifica',
     poi: () => { annullaModifica(); uscitaDopoAnnullo = true; navIndietro(); }
   });
 }
 
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
-  editandoNostr = false;
+  editandoNostr = false; duplicandoDa = '';
   consegnaFirmata = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
@@ -24809,7 +24935,16 @@ function aggiornaFormVendi(){
       : `✏️ Stai modificando «${esc(editandoTitolo)}»`;
     btn.textContent = editandoNostr ? '🟣 Firma e salva' : '✏️ Salva le modifiche';
   } else {
-    b.style.display = 'none';
+    /* LA TERZA FACCIA DEL FORM (ago 2026): la COPIA. Non è la
+       modifica — si pubblica un annuncio NUOVO, quindi il bottone
+       resta quello di sempre — ma non è nemmeno un form vuoto, e chi
+       ci arriva deve sapere da dove vengono i campi già pieni.
+       Il banner lo dice, e dice anche l'unica cosa che la copia NON
+       si porta dietro quando non ci riesce: le foto. */
+    b.style.display = duplicandoDa ? 'block' : 'none';
+    if (duplicandoDa)
+      b.innerHTML = `📄 Stai creando un annuncio simile a `
+        + `«${esc(duplicandoDa)}»: cambia quel che ti serve e pubblica.`;
     btn.textContent = '⚡ Pubblica annuncio';
     if (el('sellTitolo')) el('sellTitolo').textContent = 'Metti in vendita';
     if (el('sellFotoEtichetta'))
@@ -24823,9 +24958,12 @@ function aggiornaFormVendi(){
       '3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.';
   }
   /* le due uscite della modifica compaiono e spariscono insieme:
-     sono lo stesso gesto in due posti */
-  if (el('sellAnnulla')) el('sellAnnulla').style.display = editandoId ? '' : 'none';
-  if (el('sellChiudi')) el('sellChiudi').style.display = editandoId ? '' : 'none';
+     sono lo stesso gesto in due posti.
+     ...e valgono anche per la COPIA: anche lì c'è del lavoro da
+     buttare via, e senza uscita si resterebbe col form pieno. */
+  const uscita = (editandoId || duplicandoDa) ? '' : 'none';
+  if (el('sellAnnulla')) el('sellAnnulla').style.display = uscita;
+  if (el('sellChiudi')) el('sellChiudi').style.display = uscita;
   /* Le foto degli importati vivono sui relay: qui non si cambiano
      (v1, invariato). */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
@@ -25248,7 +25386,10 @@ async function publish(){
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
-  sellFoto = []; renderFotoPreview();
+  /* la copia è finita: il banner deve sparire col form che si svuota,
+     o resterebbe a dire «stai copiando X» davanti a un form vuoto */
+  duplicandoDa = '';
+  sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
