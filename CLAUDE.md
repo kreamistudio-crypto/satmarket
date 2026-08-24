@@ -5400,6 +5400,75 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   («Nome (SIGLA)») solo sui nomi che coordinate_da_zona sa poi
   riconoscere (i contesi
   tipo Castro non si suggeriscono mai: sarebbe un vicolo cieco).
+  LA TENDINA SA CERCARE OGNI FORMA CHE LA ZONA RICONOSCE (ago 2026,
+  caso dal campo: «scrivo Gubbio e non me lo trova»). LA DIAGNOSI VA
+  LETTA PRIMA DELLA CURA, perché rovescia l'istinto: nel dataset
+  Gubbio c'era (una riga sola, nessun omonimo) e `_chiave_comune` lo
+  riconosceva in TUTTE le forme provate — «Gubbio», «Gubbio (PG)»,
+  «Zona Gubbio», «Vicino Gubbio», e col fuzzy perfino «gubio». Non
+  era rotto né il dato né il riconoscimento: taceva il SOLO
+  suggerimento, ed è la distinzione che ha reso il cantiere piccolo.
+  IL DIFETTO ERA CHE L'AUTOCOMPLETE PROPONEVA UN FORMATO CHE POI NON
+  SAPEVA PIÙ CERCARE: `/api/comuni` confrontava il prefisso col SOLO
+  nome, mentre la tendina scrive nel campo «Gubbio (PG)» — la forma
+  che distingue gli omonimi e che finisce in colonna. Quindi chi
+  tornava a ritoccare un campo GIÀ compilato si vedeva la lista
+  svuotarsi, e lo leggeva come «il mio comune non c'è». Il valore
+  restava buono e l'annuncio si pubblicava: a mancare era il solo
+  cartello.
+  LA REGOLA CHE NE ESCE, e vale per ogni campo che suggerisce: si
+  cerca su OGNI forma che il riconoscimento poi accetta — quella che
+  propone la tendina e quella che la gente scrive. Da lì le TRE
+  chiavi di `_comuni_prefisso`: il nome, il nome+SIGLA, e il nome
+  SENZA PREPOSIZIONI («reggio emilia», «cassano ionio»), che è la
+  seconda metà del principio (decisione di Andrea il giorno dopo:
+  «chi scrive reggio emilia merita il suggerimento come gli altri») —
+  quelle sono zone valide, `carica_comuni` ne registra l'alias
+  apposta, e restavano senza suggerimento. Chi digita l'alias adesso
+  guadagna il nome UFFICIALE con la sigla.
+  LE TRE CHIAVI SONO LE STESSE ESPRESSIONI di `carica_comuni` e di
+  `_comuni_nome`, mai seconde ricette: se divergessero, tendina e
+  zona direbbero due cose diverse sullo stesso testo e non se ne
+  accorgerebbe nessuno. C'è la prova che la forma composta sia una
+  chiave VIVA del dizionario, e la mutazione che scrive la sigla a
+  mano (`nome + " " + provincia`, senza normalizzare) diventa rossa:
+  la sigla è maiuscola, «gubbio PG» non è «gubbio pg».
+  QUI NON SI FILTRA SU `COMUNI` come fanno le due sorelle, ed è
+  voluto: per loro un alias CONTESO è un vicolo cieco perché
+  suggeriscono il TESTO dell'alias, mentre qui si propone sempre
+  «Nome (SIGLA)», valido per costruzione — e proporre ENTRAMBI gli
+  omonimi è esattamente il servizio che si vuole rendere.
+  LA SIGLA NON APRE UNA SECONDA STRADA: «PG» da sola non propone
+  niente, o tirerebbe fuori i comuni di una provincia che nessuno sta
+  scrivendo. Si cerca «nome+sigla», mai «sigla».
+  IL PRECALCOLO NON È UN'OTTIMIZZAZIONE GRATUITA, è il modo di
+  pagare la chiave in più: quell'endpoint gira A OGNI TASTO su un
+  server mono-processo, e normalizzare 7.900 nomi per battuta costava
+  10 ms BLOCCANTI (16 con due chiavi, 23 con tre). Precalcolate una
+  volta — pigre come le due sorelle — la ricerca sta a 0,5 ms e i 30
+  ms della costruzione si pagano al primo tasto della prima sessione.
+  Misurati, non stimati. I TRE CAMPI SONO FISSI e l'alias assente
+  RIPETE IL NOME: un `any()` su una tupla di lunghezza variabile è
+  più leggibile e costa il triplo (1,5 ms contro 0,5), misurato anche
+  quello.
+  LA PROVA CHE CONTA FA GIRARE L'ENDPOINT VERO (`pezzo()` lo estrae
+  senza l'`async` e senza decoratore, quindi è una funzione normale):
+  una sentinella direbbe che il ramo esiste, mai che nella risposta
+  ci sia Gubbio.
+  E LA LEZIONE DELLA TORTURA, per l'ennesima volta: la prova che
+  doveva impedire all'alias di diventare una ricerca a PEZZI era
+  scritta con «emilia reggio» e NON POTEVA FALLIRE — quel testo non è
+  sottostringa di nessun nome, quindi restava vuoto anche col
+  `startswith` mutato in `in`. Il caso che morde è «emilia», che sta
+  DENTRO l'alias ma non in testa. Un caso di prova va scelto in modo
+  che possa fallire solo per la ragione che si vuole sorvegliare — e
+  a dirlo è stata la mutazione, non la rilettura.
+  ⚠️ E IL DIFETTO ERA SU UNA SUPERFICIE SOLA: gli avvisi di ricerca
+  hanno lo stesso endpoint ma propongono il NOME NUDO, quindi lì il
+  formato proposto era già quello cercato. Chi tocca `/api/comuni`
+  guardi tutti e tre i suoi campi (la Zona di Vendi, il comune degli
+  avvisi, la zona del connettore), che condividono la rotta e non la
+  resa.
   Import CSV: righe col ritiro e zona vuota o irriconoscibile =
   SCARTO in anteprima («forse Pavia (PV)?»), senza ritiro resta
   l'AVVISO morbido. Dataset assente = tutto riconosciuto, la funzione
