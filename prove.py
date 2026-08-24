@@ -17451,7 +17451,8 @@ def prove_anteprime():
                     '@app.get("/annuncio/{aid}")',
                     '@app.get("/categoria/{slug}")',
                     '@app.get("/sicurezza")',
-                    '@app.get("/privacy")')
+                    '@app.get("/privacy")',
+                    '@app.get("/offerta/{oid}")')
     for rotta in ROTTE_PAGINA:
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
@@ -17471,6 +17472,17 @@ def prove_anteprime():
     # chi ne aggiunge una senza elencarla trova la CI rossa.
     prova("le rotte che servono la pagina sono tutte in elenco",
           len(ROTTE_PAGINA), _SORGENTE.count("return _pagina_con_meta("))
+    # /offerta/{id} e' l'unica rotta-pagina che NON deve leggere il
+    # database: una trattativa e' roba di due persone, e quella
+    # testa la vede chiunque abbia il link. E' da qui che
+    # l'anti-oracolo viene per costruzione — offerta chiusa,
+    # altrui e inesistente escono identiche — quindi un domani che
+    # qualcuno «migliora» l'anteprima, lo sente da questa riga.
+    i = _SORGENTE.index('@app.get("/offerta/{oid}")')
+    corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    prova("/offerta non legge il database (una trattativa e' privata)",
+          True, "META_NOINDEX" in corpo and "_seo_" not in corpo
+          and "db()" not in corpo and "con.execute" not in corpo)
 
 
 def prove_seo():
@@ -17825,6 +17837,13 @@ def prove_seo():
           any("cccc3333" in x for x in loc))
     prova("...ne' i reparti vuoti", False,
           any("/categoria/animali" in x for x in loc))
+    # E LE TRATTATIVE NON CI ENTRANO PROPRIO: la pagina di
+    # un'offerta porta il noindex, e le due cose non possono
+    # contraddirsi (Search Console lo segnala). Qui non basta che
+    # oggi non ci sia per costruzione: la riga dice che non deve
+    # entrarci nemmeno il giorno che qualcuno allarga la mappa.
+    prova("...ne' le trattative, che sono private", False,
+          any("/offerta/" in x for x in loc))
     # IL RECAPITO NON ENTRA NELLA MAPPA, ed e' la prova che il caso dal
     # campo non puo' tornare: il negozio c'e' (ha merce), ma il suo
     # <loc> e' il codice nudo e del Lightning address non resta traccia
@@ -17990,7 +18009,8 @@ def prove_seo():
     # vuol dire che funziona in Telegram e in collaudo e NON funziona
     # esattamente per chi arriva dai motori.
     for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
-              "apriPrivacyDaUrl", "apriCategoriaDaUrl"):
+              "apriPrivacyDaUrl", "apriCategoriaDaUrl",
+              "apriOffertaDaUrl"):
         prova(f"{f} si chiama da avvia() E da avviaVetrina()", 2,
               testo_mini.count(f"{f}();"))
 
@@ -18577,7 +18597,9 @@ def prove_seo():
             ("NEGOZIO_URL", "/negozio/ab12cd34-la-bottega", "ab12cd34"),
             ("NEGOZIO_URL", "/negozio/mario_rossi", "mario_rossi"),
             ("CATEGORIA_URL", "/categoria/casa-e-giardino",
-             "casa-e-giardino")):
+             "casa-e-giardino"),
+            ("OFFERTA_URL", "/offerta/42", "42"),
+            ("OFFERTA_URL", "/offerta/42-la-trattativa", "42")):
         m = _re.search(rf"const {nome} = location\.pathname\.match\("
                        r"/(.+?)/\);", testo_mini)
         if not m:
@@ -19202,6 +19224,135 @@ def prove_ai_segnala():
     for parola in ("INSERT", "UPDATE", "DELETE", "commit"):
         prova(f"lo strumento della stima non {parola.lower()}", False,
               parola in corpo)
+
+
+def prove_link_offerte():
+    """IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la
+    notifica della controproposta diceva «rispondi dalla scheda Ordini»
+    e allegava il link all'ANNUNCIO — il testo mandava in un posto e il
+    link in un altro, e chi toccava atterrava dove i bottoni non ci
+    sono.
+
+    Qui si prova la regola in tutt'e due i versi: le tre notifiche che
+    hanno una mossa da fare nelle Offerte ci portano, e le due che non
+    ce l'hanno restano sull'annuncio. Fino a ieri i link nelle
+    notifiche non li sorvegliava NESSUNO — nessuna prova nominava
+    URL_PUBBLICO — quindi scambiarne uno non faceva rossa una riga."""
+    print("\n[il link delle offerte porta dove si accetta]")
+    risp = pezzo("rispondi_offerta")
+    offe = pezzo("fai_offerta")
+    riti = pezzo("ritira_offerta")
+
+    # --- 1) chi ha una mossa da fare va nelle Offerte ---------------
+    prova("l'offerta ricevuta porta il venditore a rispondere", True,
+          "{URL_PUBBLICO}/offerta/{offerta_id}" in offe)
+    prova("accettata e controproposta portano alle Offerte", 2,
+          risp.count("{link_off}"))
+
+    # --- 2) ...e chi non ce l'ha resta sull'annuncio ----------------
+    # E' la meta' che si perde uniformando: su una RIFIUTATA
+    # renderOfferte non disegna niente (filtra le sole vive), quindi
+    # quel link porterebbe a una pagina che non nomina chi tocca.
+    prova("il rifiuto resta sull'annuncio: li' ci si rioffre", 1,
+          risp.count("{link}"))
+    prova("...e il link dell'annuncio non e' sparito", True,
+          "{URL_PUBBLICO}/annuncio/{off['annuncio_id']}" in risp)
+    prova("il ritiro dell'accordo resta sull'annuncio", True,
+          "{URL_PUBBLICO}/annuncio/{off['annuncio_id']}" in riti)
+
+    # --- 3) le due che non hanno un link non lo guadagnano ----------
+    # Chi non deve fare niente non riceve una porta: e' il patto di
+    # sempre, e un link di cortesia qui sarebbe rumore.
+    dopo = risp[risp.index('"accetta"'):]
+    prova("la controproposta accettata non porta link", False,
+          "stata accettata: l'acquirente ha{link" in dopo)
+
+    # --- 4) la scheda Ordini resta nominata dove ci si va -----------
+    # La prosa non e' stata toccata: il link adesso ci PORTA invece di
+    # limitarsi a descrivere la strada.
+    prova("il testo continua a dire dove si risponde", True,
+          "Rispondi dalla scheda Ordini" in offe)
+
+
+def prove_deep_link_offerta():
+    """Il link atterra sulla RIGA, e quando non la trova lo dice.
+
+    Le tre cose che questo cantiere puo' rompere in silenzio: la
+    bandierina consumata su una sola delle due uscite di renderOfferte
+    (e allora chi non ha piu' offerte vive vede una pagina che non gli
+    dice niente), il deep-link che chiede qualcosa al server (e allora
+    nasce l'oracolo che qui non esiste), e i tre casi raccontati con
+    tre testi diversi (e allora chi enumera impara)."""
+    print("\n[il link atterra sulla riga]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ao = pezzo_js(mini, "function apriOffertaDaUrl(){", "\n}\n")
+    rend = pezzo_js(mini, "function renderOfferte()", "\nfunction toggleContro")
+
+    # --- la bandierina si consuma su ENTRAMBE le uscite -------------
+    # Quella corta e' il caso «non ho piu' nessuna trattativa viva»:
+    # senza, il link aperto su un'offerta chiusa non dice NIENTE, che
+    # e' esattamente il silenzio che il cantiere esiste per togliere.
+    prova("la riga si svela su tutte e due le uscite del render", 2,
+          rend.count("svelaOfferta(svelare)"))
+    prova("...e la bandierina si legge e si AZZERA, come la busta", True,
+          "offertaDaSvelare = 0;" in rend)
+    prova("ogni riga porta il suo id", True, 'id="off_${o.id}"' in rend)
+
+    # --- il deep-link non chiede niente a nessuno -------------------
+    # L'unica fonte e' /api/me/offerte, che filtra sulle due parti: la
+    # riga si cerca fra quelle appena disegnate. Un fetch qui aprirebbe
+    # la porta che la rotta del server tiene chiusa non leggendo nulla.
+    prova("il deep-link non interroga il server", False, "fetch(" in ao)
+    prova("in vetrina si apre l'invito, non la scheda vuota", True,
+          "invitoTelegram(" in ao and "DEMO || VETRINA" in ao)
+
+    # --- UN messaggio per i tre casi: e' l'anti-oracolo -------------
+    prova("non piu' viva, altrui e inesistente dicono la STESSA cosa", 1,
+          mini.count("non \u00e8 tra le tue offerte aperte"))
+
+    # --- la scivolata secca con reduced-motion ---------------------
+    sv = pezzo_js(mini, "function svelaOfferta(id){", "\n}\n")
+    prova("la scivolata rispetta reduced-motion", True, "tourRidotto()" in sv)
+
+    # --- e la riga dev'esserci, per gli account che contano ------
+    # Il taglio a 30 di mie_offerte non guardava lo stato: trenta
+    # trattative CHIUSE di recente nascondevano quelle vive, e il
+    # link avrebbe detto «non e' tra le tue» su una che c'e'.
+    # La query si estrae dal sorgente e si GIRA: una sentinella sul
+    # testo direbbe che la riga esiste, mai che ordini giusto.
+    import sqlite3 as _sq
+    import re as _r2
+    mie = pezzo("mie_offerte")
+    pezzi = _r2.findall(r'"(.*?)"', mie[mie.index("SELECT o.*"):])
+    sql = "".join(pezzi)
+    sql = sql[:sql.index("LIMIT")] + "LIMIT 30"
+    # solo le colonne che l'ordinamento tocca: il resto della SELECT
+    # non c'entra con la domanda «chi sopravvive al taglio?»
+    sql = "SELECT o.id" + sql[sql.index(" FROM offerte o"):]
+    sql = sql.replace("JOIN annunci a ON a.id = o.annuncio_id", "")
+    sql = sql.replace("LEFT JOIN utenti uc ON uc.tg_id = "
+                      "o.compratore_id", "")
+    sql = sql.replace("LEFT JOIN utenti uv ON uv.tg_id = "
+                      "o.venditore_id", "")
+    c = _sq.connect(":memory:")
+    c.execute("CREATE TABLE offerte(id INTEGER PRIMARY KEY, stato TEXT,"
+              " aggiornato INT, compratore_id INT, venditore_id INT)")
+    # una viva VECCHIA, e trenta concluse tutte piu' fresche di lei
+    c.execute("INSERT INTO offerte VALUES(1,'controproposta',10,7,9)")
+    for k in range(30):
+        c.execute("INSERT INTO offerte VALUES(?,'conclusa',?,7,9)",
+                  (100 + k, 500 + k))
+    ids = [r[0] for r in c.execute(sql, (7, 7)).fetchall()]
+    prova("la trattativa viva sopravvive al taglio a 30", True,
+          1 in ids)
+    # ...e DENTRO le vive comanda ancora la data, com'e' sempre stato
+    c.execute("INSERT INTO offerte VALUES(2,'proposta',900,7,9)")
+    ids = [r[0] for r in c.execute(sql, (7, 7)).fetchall()]
+    prova("...e fra le vive comanda la piu' fresca", [2, 1], ids[:2])
+    # NON scorriSottoHeader: misura l'header di Esplora, che in vista
+    # Ordini e' display:none — l'arrivo finirebbe in cima alla pagina.
+    prova("...e non passa dallo scroll dei reparti", False,
+          "scorriSottoHeader" in sv)
 
 
 def prove_ritiro_offerta():
@@ -29100,7 +29251,9 @@ def main():
               prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
-              prove_ritiro_offerta, prove_fogli_di_casa,
+              prove_ritiro_offerta, prove_link_offerte,
+              prove_deep_link_offerta,
+              prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,

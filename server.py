@@ -16410,7 +16410,7 @@ async def fai_offerta(annuncio_id: int, req: Request,
         + f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
         f"una controproposta. Senza risposta entro "
         f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
-        f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
@@ -16430,7 +16430,15 @@ def mie_offerte(x_tg_init_data: str = Header(""),
         "LEFT JOIN utenti uc ON uc.tg_id = o.compratore_id "
         "LEFT JOIN utenti uv ON uv.tg_id = o.venditore_id "
         "WHERE o.compratore_id=? OR o.venditore_id=? "
-        "ORDER BY o.aggiornato DESC LIMIT 30",
+        # PRIMA LE VIVE, e non e' un ornamento: il taglio a 30 non
+        # guarda lo stato, quindi un venditore con trenta trattative
+        # CHIUSE di recente si vedeva la sezione «Offerte» vuota pur
+        # avendone di aperte — le concluse gli occupavano tutti i
+        # posti. Difetto vecchio, che il link diretto renderebbe
+        # peggio: direbbe «non e' tra le tue offerte» su una
+        # trattativa che c'e'. Cosi' il taglio cade sulle chiuse.
+        "ORDER BY (o.stato IN ('proposta','controproposta',"
+        "'accettata')) DESC, o.aggiornato DESC LIMIT 30",
         (user["id"], user["id"])).fetchall()
     con.close()
     return {"offerte": [dict(r) for r in righe],
@@ -16485,7 +16493,16 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         raise HTTPException(400, "Operazione non permessa")
 
     titolo = html.escape(off["titolo"][:60])
+    # DUE link, e non uno: la regola e' che il link porti DOVE C'E'
+    # IL GESTO. Chi deve muovere una pedina nella scheda Ordini ci
+    # va (`link_off`); chi non ha piu' niente da fare li' torna
+    # all'annuncio, dove semmai si rioffre o si compra a prezzo
+    # pieno. Sostituire `link` del tutto manderebbe anche il RIFIUTO
+    # sulle Offerte, dove una rifiutata non si disegna affatto —
+    # renderOfferte filtra le sole vive — e chi tocca atterrerebbe
+    # su una pagina che non lo nomina.
     link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
+    link_off = f"\n{URL_PUBBLICO}/offerta/{offerta_id}"
     # I pezzi dell'accordo: 0 (le offerte di ieri) e 1 dicono la sola
     # cifra, com'e' sempre stato — vedi _cifra_accordo. Niente «or 0»:
     # la colonna e' un INTEGER DEFAULT 0 e l'ALTER ha riempito le righe
@@ -16523,7 +16540,7 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                 f"pagare dalla scheda Ordini. I tuoi sats finiscono nel "
                 f"deposito di garanzia, come sempre. Occhio: l'annuncio "
                 f"resta in vetrina, se qualcuno paga il prezzo pieno prima "
-                f"di te l'offerta decade.{link}")
+                f"di te l'offerta decade.{link_off}")
         else:
             contro = _cifra_accordo(off["valuta"], off["contro_sats"],
                                     off["contro_eur"], pezzi)
@@ -16593,7 +16610,7 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         f"🤝 <b>Controproposta!</b> Per «{titolo}» il venditore ti propone "
         f"{_cifra_accordo(off['valuta'], contro_sats, contro_eur, pezzi)} "
         f"(avevi offerto {avevi}). Accetta o rifiuta dalla scheda Ordini "
-        f"entro {ORE_RISPOSTA_OFFERTA} ore.{link}")
+        f"entro {ORE_RISPOSTA_OFFERTA} ore.{link_off}")
     return {"ok": True, "stato": "controproposta"}
 
 
@@ -34388,6 +34405,35 @@ def pagina_annuncio(aid: str):
     titolo, testa, corpo = _seo_o_generici(_seo_annuncio,
                                            _id_da_percorso(aid))
     return _pagina_con_meta(testa, titolo, corpo)
+
+
+@app.get("/offerta/{oid}")
+def pagina_offerta(oid: str):
+    """Il link che porta DOVE SI ACCETTA: le trattative si rispondono
+    nella sezione «Offerte» della scheda Ordini, e fino a ieri le
+    notifiche mandavano all'ANNUNCIO — cioe' dove i bottoni non ci
+    sono. La regola e' una: il link porta dove c'e' il gesto da fare.
+
+    QUESTA PAGINA NON LEGGE IL DATABASE, ed e' la riga da non
+    ammorbidire: una trattativa e' roba di due persone, e questa testa
+    la vede chiunque abbia il link — un meta ricavato dalla riga
+    sarebbe un oracolo servito prima ancora di sapere chi bussa. Meta
+    generici e noindex, il caso di /miniapp.html e non quello delle tre
+    gemelle qui sopra. Da qui l'anti-oracolo viene per COSTRUZIONE:
+    offerta chiusa, altrui e inesistente escono identiche, e a dire
+    l'unica cosa vera («non e' tra le tue offerte aperte») e' il client,
+    che la cerca fra le righe che ha appena disegnato — le sue e vive.
+
+    Il parametro e' TESTO e non un intero per la stessa ragione della
+    gemella dell'annuncio: `int` rimetterebbe il 422 di FastAPI che
+    quel commento dichiara morto. Qui non si legge niente, quindi non
+    c'e' nemmeno un id da convertire: si ignora.
+    E NON si aggiunge un «Disallow: /offerta/» in robots.txt —
+    l'istinto davanti a una pagina privata e' quello, ed e'
+    l'anti-pattern scritto sopra la rotta di robots: una pagina
+    vietata non viene scaricata, quindi il suo noindex non viene mai
+    letto, e l'indirizzo nudo si indicizza lo stesso."""
+    return _pagina_con_meta(META_GENERICI + META_NOINDEX)
 
 
 @app.get("/categoria/{slug}")

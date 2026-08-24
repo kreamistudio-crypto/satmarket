@@ -3476,6 +3476,18 @@
     /* si SPEGNE, non si ferma: con animation-play-state resterebbe un
        anello piantato attorno al piatto per sempre */
     .codice-svelato{animation:none}}
+  /* La riga della trattativa che si e' arrivati a vedere dal link
+     della notifica. Stesso calco del piatto del codice: mezzo
+     secondo, una volta sola, e il «once» sta nella bandierina
+     `offertaDaSvelare` e non nell'animazione — un ridisegno
+     qualunque della sezione non lo rifa' partire. */
+  .off-svelata{animation:impulsoOfferta .5s ease-out 1 both}
+  @keyframes impulsoOfferta{
+    from{box-shadow:0 0 0 0 var(--sats)}
+    to{box-shadow:0 0 0 9px transparent}}
+  @media (prefers-reduced-motion:reduce){
+    /* si SPEGNE, non si ferma: la lezione del piatto del codice */
+    .off-svelata{animation:none}}
   .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
     font-weight:800;font-size:13px;margin-top:10px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
@@ -16316,13 +16328,42 @@ async function inviaRiscossione(btn){
 
 /* La sezione in testa alla scheda Ordini: solo le trattative VIVE
    (le chiuse le raccontano le notifiche). Compare solo se non e' vuota. */
+/* Il link della notifica atterra QUI: non basta portare alla scheda
+   Ordini, la riga giusta va anche trovata. La bandierina si legge e
+   si AZZERA nel render — il patto di `bustaSvelata` — cosi' il
+   «una volta sola» non dipende dall'animazione.
+   ⚠️ Questa funzione sta SOPRA renderOfferte apposta: le sentinelle
+   del ritiro affettano il sorgente da `renderOfferte` fino a
+   `toggleContro`, e una funzione nuova in mezzo allargherebbe quella
+   fetta senza far diventare rossa nessuna prova.
+   E NON si usa `scorriSottoHeader`: quello misura l'header di
+   Esplora, che in vista Ordini e' display:none — l'arrivo
+   finirebbe in cima alla pagina invece che sulla riga. */
+let offertaDaSvelare = 0;
+function svelaOfferta(id){
+  const riga = el('off_' + id);
+  /* UN messaggio per tre casi — trattativa non piu' viva, di
+     un altro, mai esistita — ed e' l'anti-oracolo: la riga si
+     cerca fra quelle appena disegnate, che sono per costruzione
+     le mie e le vive. Chi enumera non impara niente, e il testo
+     e' vero in tutti e tre. Mai il silenzio: una pagina che si
+     apre e non fa niente si legge come un guasto. */
+  if (!riga) {
+    toast('Questa trattativa non è tra le tue offerte aperte', 5000);
+    return;
+  }
+  riga.scrollIntoView({block:'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  riga.classList.add('off-svelata');
+}
 function renderOfferte(){
   const blocco = el('offerteBlocco'); if (!blocco) return;
+  const svelare = offertaDaSvelare; offertaDaSvelare = 0;
   const vive = (DEMO||VETRINA) ? []
     : offerteMie.filter(o => ['proposta','controproposta','accettata'].includes(o.stato));
   if (!vive.length) {
     blocco.style.display='none';
     el('offDot')?.classList.remove('on');
+    if (svelare) svelaOfferta(svelare);
     return;
   }
   blocco.style.display='';
@@ -16406,7 +16447,7 @@ function renderOfferte(){
           </div>`;
       } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
     }
-    return `<div class="order" style="cursor:default">
+    return `<div class="order" id="off_${o.id}" style="cursor:default">
       <div class="row">
         <div class="order-left">
           <span class="order-ic">${ic}</span>
@@ -16419,6 +16460,7 @@ function renderOfferte(){
       </div>${azioni}</div>`;
   }).join('');
   el('offDot')?.classList.toggle('on', daAgire>0);
+  if (svelare) svelaOfferta(svelare);
 }
 function toggleContro(id){
   haptic();
@@ -26746,6 +26788,36 @@ function apriCategoriaDaUrl(){
   navRiflette();
 }
 
+/* /offerta/{id} — il link della notifica di una trattativa. Le
+   offerte si accettano nella scheda Ordini, e fino a ieri il link
+   portava all'ANNUNCIO: il testo diceva «rispondi dalla scheda
+   Ordini» e il tocco atterrava dove i bottoni non ci sono. La
+   regola e' che il link porti DOVE C'E' IL GESTO.
+   SINCRONA e senza await: loadOfferte() non rigetta mai (ha il suo
+   try/catch dentro), quindi go('affari') arriva comunque a
+   renderOfferte — una richiesta, un render, nessuna corsa.
+   La regex NON e' ancorata in coda, la lezione di ANNUNCIO_URL:
+   oggi non ci sono slug su /offerta, ma un `$` messo per pulizia
+   ammazzerebbe in silenzio ogni forma futura. */
+const OFFERTA_URL = location.pathname.match(/^\/offerta\/(\d+)/);
+let offertaAperta = false;
+function apriOffertaDaUrl(){
+  if (!OFFERTA_URL || offertaAperta) return;
+  offertaAperta = true;
+  /* In vetrina e in DEMO le offerte non esistono affatto —
+     renderOfferte esce subito — quindi non si va su Ordini a
+     mostrare il vuoto: si apre l'invito, che ha gia' dentro la
+     porta Nostr. E siccome ogni login ricarica la pagina, l'URL
+     sopravvive e questo giro si rifa' da autenticati: chi riceve
+     il DM su Nostr non resta fuori. */
+  if (DEMO || VETRINA) {
+    invitoTelegram('La tua trattativa ti aspetta dentro Barattolo: entra e la trovi nella scheda Ordini.');
+    return;
+  }
+  offertaDaSvelare = Number(OFFERTA_URL[1]);
+  go('affari');
+}
+
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
@@ -26771,6 +26843,7 @@ async function avviaVetrina(){
     apriSicurezzaDaUrl();
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
+    apriOffertaDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
     modaleTest(bannerInstallaPwa);
@@ -26992,6 +27065,7 @@ async function avvia(){
     apriSicurezzaDaUrl();
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
+    apriOffertaDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });
