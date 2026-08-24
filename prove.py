@@ -18898,9 +18898,16 @@ def prove_offerta_quantita():
     # IL CAMPO DICE «AL PEZZO» mentre si digita, e solo coi pezzi >1:
     # chi ne vuole tre ragiona sul TOTALE e rischia di scrivere 120
     # intendendo il totale mentre ne sta offrendo 360
+    # Dall'ago 2026 la riga vive nel GIUDICE UNICO, che serve tutte
+    # e tre le superfici (il foglio, la controproposta del venditore
+    # e il rilancio del compratore): l'affermazione e' la stessa,
+    # cambia il posto in cui si guarda.
+    suf = pezzo_js(mini, "function suffissoUnita(valuta, quantita){",
+                   "\n}") + "\n}"
     prova("il campo dice «al pezzo» mentre si scrive", True,
-          "qtaScelta > 1 ? '<span class=\"off-alpezzo\">al pezzo</span>'"
-          in mini)
+          '<span class="off-alpezzo">al pezzo</span>' in suf)
+    prova("...ma solo con piu' di un pezzo", True,
+          "(quantita || 0) > 1" in suf)
     prova("...e col pezzo singolo tace", True,
           ".off-alpezzo{display:block" in mini)
     # SOTTO IL MINIMO NIENTE TOTALE: due righe dove ne serve una
@@ -18977,7 +18984,7 @@ def prove_offerta_quantita():
           "const vc = valutaOfferta(l);" in fogjs
           and "return valutaVista==='eur' ? 'eur' : 'sats';" in mini)
     prova("...portando il simbolo della valuta MOSTRATA", True,
-          "el('offSuffisso').innerHTML = (vc==='eur' ? '€' : 'sats')"
+          "el('offSuffisso').innerHTML = suffissoUnita(vc,"
           in fogjs)
     # L'ANCORA E' QUELLO CHE IMPEDISCE ALLA CIFRA DI DERIVARE: si
     # tiene la cifra com'e' stata scritta e la valuta in cui lo e'
@@ -19637,6 +19644,17 @@ def prove_rilancio_offerta():
     # apre, cosi' il gesto e il suo campo non si separano.
     prova("i bottoni delle offerte non vanno a capo da soli", 0,
           solo.count("flex-wrap:wrap"))
+    # LE TRE SUPERFICI DEL SUFFISSO passano dal giudice unico, e
+    # nessuna scrive l'unita' a mano: sono le tre volte in cui una
+    # cifra UNITARIA si digita in un campo, e se una tacesse chi
+    # compra scriverebbe il totale credendo di offrire quello.
+    prova("i due box inline chiedono l'unita' al giudice", 2,
+          rend.count("suffissoUnita(o.valuta, o.quantita)"))
+    prova("...e nessuno se la scrive a mano", 0,
+          solo.count("'eur'?'€':'sats'")
+          + solo.count("'eur' ? '€' : 'sats'"))
+    prova("le superfici che chiedono una cifra unitaria sono TRE", 3,
+          mini.count("suffissoUnita(") - 1)
 
     # --- 4) E I DUE GIUDICI SI FANNO GIRARE ---------------------
     # Le sentinelle dicono che esistono, mai che rispondano uguale al

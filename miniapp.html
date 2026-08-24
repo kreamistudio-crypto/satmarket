@@ -15933,8 +15933,7 @@ function aggiornaFoglioOfferta(){
      di scrivere 120 intendendo il totale mentre ne sta offrendo 360.
      Prima lo si scopriva dalla riga sotto, cioe' DOPO aver scritto.
      Solo coi pezzi scelti >1: col pezzo singolo sarebbe rumore. */
-  el('offSuffisso').innerHTML = (vc==='eur' ? '€' : 'sats')
-    + (qtaScelta > 1 ? '<span class="off-alpezzo">al pezzo</span>' : '');
+  el('offSuffisso').innerHTML = suffissoUnita(vc, qtaScelta);
   offertaDigitata();
 }
 /* L'oninput del campo: pianta l'ANCORA e poi lascia rendere. E' il
@@ -16376,6 +16375,29 @@ function rilanciRimasti(o){
   const tetto = (offerteDati && offerteDati.max_rilanci) || 0;
   return Math.max(0, tetto - (o.giri || 0));
 }
+/* L'UNITA' DEL CAMPO, e il «al pezzo» quando serve (ago 2026, dal
+   campo: «nel campo del rilancio non si capisce che la cifra e' per
+   PEZZO — su un'offerta da tre pezzi uno scrive il totale e
+   sbaglia»). In tutta l'app la cifra di una trattativa e'
+   UNITARIA: il minimo, il listino e i due estremi del rilancio si
+   confrontano al pezzo, e il totale lo dice `cifraPezzi` con le due
+   facce. Ma chi vuole tre pezzi ragiona sul TOTALE, e un campo muto
+   lo lascia sbagliare — poi lo scopre dalla riga sotto, cioe' DOPO
+   aver scritto.
+   IL FOGLIO DELL'OFFERTA LO DICEVA GIA' e i due box inline no:
+   quindi non e' una parola nuova, e' la LINGUA DI CASA portata
+   dove mancava. Un giudice solo per tutte e tre le superfici —
+   l'offerta iniziale, la controproposta del venditore e il
+   rilancio del compratore — perche' tre rese della stessa cosa
+   divergono al primo ritocco, e qui a divergere sarebbe il
+   significato di una cifra di denaro.
+   SOLO CON PIU' DI UN PEZZO: sul pezzo singolo «al pezzo» e'
+   rumore, e ruberebbe larghezza al campo dove si scrive. */
+function suffissoUnita(valuta, quantita){
+  return (valuta === 'eur' ? '€' : 'sats')
+    + ((quantita || 0) > 1
+        ? '<span class="off-alpezzo">al pezzo</span>' : '');
+}
 /* Il campo legale, detto a chi scrive: e' l'unica cosa che il
    compratore non puo' dedurre da solo guardando la riga. */
 function campoRilancio(o){
@@ -16441,7 +16463,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none">${o.valuta==='eur'?'€':'sats'}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
             </div>
           </div>`;
@@ -16495,7 +16517,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none">${o.valuta==='eur'?'€':'sats'}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'rilancia')">Invia</button>
             </div>
             <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${campoRilancio(o)} · rilancio ${(o.giri||0)+1} di ${(offerteDati&&offerteDati.max_rilanci)||0}</div>
