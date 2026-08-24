@@ -20247,6 +20247,22 @@ async function controllaZona(){
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) return;
     const d = await r.json();
+    /* IL CAMPO PUO' ESSERSI MOSSO MENTRE LA RISPOSTA VIAGGIAVA, e da
+       li' in giu' si scrive: senza questa riga la risposta VECCHIA
+       atterra sul testo NUOVO. Caso dal campo (ago 2026, «a volte non
+       me lo prende»): si scrive «gub », il blur parte sul testo
+       vecchio, si tocca il suggerimento «Gubbio (PG)» e poi Pubblica —
+       che rifa' il controllo e lo trova buono. Ma il ramo riuscito
+       esce con un `return` SENZA riazzerare zonaStorta, perche' si
+       fida dell'azzeramento in testa alla PROPRIA chiamata: se in
+       mezzo atterra la risposta di «gub », il flag resta sporco e
+       Pubblica blocca mostrando «"gub" non e' un comune» su un campo
+       che dice Gubbio. Intermittente perche' dipende da chi arriva
+       ultimo — e' la lezione di `vetrinaGiro`, su un campo di testo.
+       Il confronto e' col TESTO e non con un contatore: e' il dato su
+       cui la risposta e' stata chiesta, quindi non serve altro stato
+       da tenere in pari. */
+    if (el('sellZone').value.trim() !== testo) return;
     if (d.riconosciuto) return;         // c'e' un comune: silenzio
     zonaStorta = true;
     /* il nome del comune vive in una variabile, mai dentro l'onclick

@@ -24082,10 +24082,113 @@ def prove_sintassi_client():
     prove_avvio_client(mini, node)
     prove_centro_fila(mini, node)
     prove_pct_libera(node)
+    prove_corsa_zona(mini, node)
     prove_riempimento(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
 
+
+
+
+def prove_corsa_zona(mini, node):
+    """LA CORSA FRA IL TOCCO E IL BLUR, fatta girare (ago 2026,
+    caso dal campo: «scrivo gub, tocco il suggerimento e a volte
+    non me lo prende»).
+    `controllaZona` legge il testo PRIMA dell'await e scrive
+    zonaStorta DOPO: la risposta di «gub » puo' atterrare sul campo
+    che ormai dice «Gubbio (PG)». E il ramo riuscito esce con un
+    `return` senza riazzerare il flag — si fida dell'azzeramento in
+    testa alla PROPRIA chiamata — quindi il flag resta sporco e
+    Pubblica blocca su una zona buona.
+    Una sentinella direbbe che la guardia c'e'; QUALE risposta
+    atterri per ultima lo dice solo un banco che le fa correre
+    davvero, con due latenze diverse."""
+    if not node:
+        salta("la corsa della zona non si riproduce",
+              "node non installato")
+        return
+    import subprocess as _sp, tempfile as _tf
+    fn = pezzo_js(mini, "async function controllaZona()", "\n}\n") + "\n}\n"
+    banco = _TAVOLA_ZONA + fn + _PROVE_ZONA
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco); percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+    os.unlink(percorso)
+    prova("la corsa fra il tocco e il blur non sporca la zona",
+          "tutte verdi", (r.stdout or r.stderr or "").strip())
+
+
+_TAVOLA_ZONA = r"""
+let VALORE = 'gub ';           // quel che c'e' nel campo
+let LENTE = {};                // testo -> ritardo della risposta
+const NODI = {
+  sellZone: {get value(){ return VALORE; }, set value(v){ VALORE = v; },
+             scrollIntoView(){}},
+  zonaHint: {style: {display: 'none'}, innerHTML: ''},
+  sellConsRitiro: {checked: false},
+};
+function el(id){ return NODI[id]; }
+const DEMO = false, VETRINA = false, API_BASE = '/api';
+function authHdr(){ return 'x'; }
+function esc(s){ return String(s); }
+function haptic(){}
+let zonaSuggerita = '';
+const RISPOSTE = {
+  'gub': {riconosciuto: false, suggerimento: 'Gubbio (PG)'},
+  'Gubbio (PG)': {riconosciuto: true, suggerimento: ''},
+};
+function fetch(url){
+  const testo = decodeURIComponent(url.split('testo=')[1] || '');
+  const d = RISPOSTE[testo] || {riconosciuto: false, suggerimento: ''};
+  return new Promise(ok => setTimeout(
+    () => ok({ok: true, json: async () => d}), LENTE[testo] || 0));
+}
+const attendi = ms => new Promise(r => setTimeout(r, ms));
+"""
+
+_PROVE_ZONA = r"""
+(async () => {
+  const rosse = [];
+  function att(nome, atteso, avuto){
+    if (String(atteso) !== String(avuto))
+      rosse.push(nome + ': atteso ' + atteso + ', avuto ' + avuto);
+  }
+  // Il caso dal campo: blur su «gub » con risposta LENTA, tocco sul
+  // suggerimento, poi il controllo di publish() con risposta veloce.
+  // La risposta vecchia atterra per ULTIMA.
+  LENTE = {'gub': 120, 'Gubbio (PG)': 10};
+  VALORE = 'gub '; NODI.zonaHint.style.display = 'none';
+  const blur = controllaZona();
+  await attendi(20);
+  VALORE = 'Gubbio (PG)';
+  const pub = controllaZona();
+  await Promise.all([blur, pub]);
+  att('il campo giusto non risulta storto', false, zonaStorta);
+  att('...e nessun avviso resta a schermo', 'none',
+      NODI.zonaHint.style.display);
+  // Il verso opposto, che e' la meta' da non perdere curando: la
+  // risposta BUONA di prima non deve zittire l'avviso sul testo
+  // storto che c'e' adesso.
+  LENTE = {'Gubbio (PG)': 120, 'gub': 10};
+  VALORE = 'Gubbio (PG)'; NODI.zonaHint.style.display = 'none';
+  const a = controllaZona();
+  await attendi(20);
+  VALORE = 'gub ';
+  const b = controllaZona();
+  await Promise.all([a, b]);
+  att('il campo storto risulta storto', true, zonaStorta);
+  att('...e l\'avviso si vede', 'block', NODI.zonaHint.style.display);
+  // e senza nessuna corsa il caso normale non cambia
+  LENTE = {};
+  VALORE = 'gub '; await controllaZona();
+  att('da solo, il testo storto e\' storto', true, zonaStorta);
+  VALORE = 'Gubbio (PG)'; await controllaZona();
+  att('da solo, il testo buono e\' buono', false, zonaStorta);
+  console.log(rosse.length ? 'ROSSE: ' + rosse.join(' | ') : 'tutte verdi');
+})();
+"""
 
 def prove_riempimento(mini, node):
     """LO SCORRIMENTO CHE NON SI PIANTA (ago 2026), fatto girare.
