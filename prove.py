@@ -439,6 +439,14 @@ def prove_tag_client():
     i = _SORGENTE.index("CONDIZIONE_NIP99 = {")
     exec(_SORGENTE[i:_SORGENTE.index(
         "\n\n\n", _SORGENTE.index("def tag_commercio"))], amb)
+    # ...e la CODA PROMOZIONALE, che `evento_annuncio` compone e
+    # `_descrizione_feed` riconosce per toglierla: da quando e' una
+    # COSTANTE (col cantiere del feed) va data anche qui, o il pezzo
+    # esplode con un NameError. E' la lezione di sempre — chi estrae
+    # una costante ne eredita le dipendenze, e l'ambiente della prova
+    # va con lei.
+    i = _SORGENTE.index("CODA_PROMO_NIP99 = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     exec(pezzo("evento_annuncio"), amb)
     exec(pezzo("evento_annuncio_importato"), amb)
 
