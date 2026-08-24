@@ -9430,6 +9430,7 @@ def prove_valuta_soglia():
                "SCONTO_PACCO_MIN_SOGLIA": 2,
                "SCONTO_PACCO_MIN_VALORE_EUR": 1,
                "SCONTO_PACCO_MIN_VALORE_SATS": 1,
+               "SCONTO_PACCO_MIN_PERCENTO": 5,
                "SCONTO_PACCO_MAX_PERCENTO": 30,
                "SPED_GRATIS_MIN_EUR": 1, "SPED_GRATIS_MIN_SATS": 1,
                "MSG_CLIENT_VECCHIO": "RIAPRI"}
@@ -9508,6 +9509,56 @@ def prove_valuta_soglia():
           (isinstance(r, dict), stato()["sped_gratis_soglia"],
            stato()["sped_gratis_soglia_eur"],
            stato()["sped_gratis_valuta"]))
+
+    # ================================================================
+    # IL CAMPO LIBERO E IL SUO PAVIMENTO (ago 2026): la percentuale si
+    # scrive a mano, quindi una cifra qualunque arriva all'endpoint. Il
+    # 12 e' il caso che ha aperto il cantiere — il server lo accettava
+    # GIA', a rifiutarlo era il client che non aveva dove scriverlo —
+    # e il 2 e' quel che il campo libero rende possibile per la prima
+    # volta: uno sconto che non si nota.
+    # ================================================================
+    corri("imposta_sconto_pacco", {"percento": 0})
+    prima = stato()
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "pezzi", "soglia": 3, "percento": 12})
+    prova("il 12 si salva, ed e' il caso che ha aperto il cantiere",
+          (True, 12), (isinstance(r, dict),
+                       stato()["sconto_pacco_percento"]))
+    prima = stato()
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "pezzi", "soglia": 3, "percento": 2})
+    prova("...ma il 2 no: sotto il pavimento e' rumore, non un'offerta",
+          True, isinstance(r, str) and r.startswith("400"))
+    prova("...e il messaggio dice l'INTERVALLO, non il solo tetto",
+          True, isinstance(r, str) and "5%" in r and "30%" in r)
+    prova("...e la promessa di prima non si e' mossa", prima, stato())
+    # IL FILO, nei due versi: il pavimento e il tetto sono INCLUSIVI —
+    # chi scrive esattamente la cifra che la riga gli dice dev'essere
+    # ammesso, mai rifiutato per un «<»
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "pezzi", "soglia": 3, "percento": 5})
+    prova("al filo del pavimento si passa", (True, 5),
+          (isinstance(r, dict), stato()["sconto_pacco_percento"]))
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "pezzi", "soglia": 3, "percento": 30})
+    prova("al filo del tetto si passa", (True, 30),
+          (isinstance(r, dict), stato()["sconto_pacco_percento"]))
+    prima = stato()
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "pezzi", "soglia": 3, "percento": 31})
+    prova("un passo sopra il tetto no", True,
+          isinstance(r, str) and r.startswith("400"))
+    prova("...e niente si e' mosso", prima, stato())
+    # ⚠️ LA RIGA CHE IL PAVIMENTO NON DEVE TOCCARE: `percento: 0` e' lo
+    # SPEGNIMENTO e non ha guardie — il patto del rientro dalle ferie.
+    # Con la cintura scritta come un `percento < MIN` secco, prima del
+    # ramo dello spegnimento, un venditore non potrebbe piu' TOGLIERE
+    # la sua promessa: si accorgerebbe di essere in trappola solo
+    # provandoci.
+    r = corri("imposta_sconto_pacco", {"percento": 0})
+    prova("lo spegnimento NON passa dal pavimento", (True, 0),
+          (isinstance(r, dict), stato()["sconto_pacco_percento"]))
 
     # ================================================================
     # 'ENTRAMBI' VUOLE DUE SOGLIE SERIE (ago 2026): chi accende due
@@ -10717,6 +10768,125 @@ def prove_sped_gratis():
     prova("l'endpoint legge soglia_eur e non la chiave in sats", True,
           'd.get("soglia_eur")' in corpo_ep
           and 'd.get("soglia")' not in corpo_ep)
+
+    # ================================================================
+    # IL CAMPO LIBERO DELLA PERCENTUALE (ago 2026): un venditore
+    # voleva il 12% e non poteva scriverlo da NESSUNA delle due gambe,
+    # perche' la percentuale non e' per criterio — e' UN campo solo
+    # sotto tutte e due. Il server il 12 lo accettava GIA'; a
+    # rifiutarlo era il client, che non aveva dove scriverlo.
+    # ================================================================
+    for f in ("pctLibera", "campoPctLibera", "pctFuori"):
+        prova(f"il campo della percentuale: {f} e' scritta UNA volta", 1,
+              mini.count(f"function {f}("))
+    # I DUE CASSETTI LO MONTANO TUTTI E DUE, ed e' il senso del giro:
+    # aprirne uno solo rimetterebbe l'asimmetria da spiegare ogni
+    # volta, un cassetto piu' in la' (decisione di Andrea).
+    prova("...e lo montano tutti e due i cassetti", 2,
+          mini.count("campoPctLibera('"))
+    prova("...quello dello sconto sugli articoli", True,
+          "campoPctLibera('sconto'" in mini)
+    prova("...e quello dei codici", True,
+          "campoPctLibera('codici'" in mini)
+    # ⚠️ NON SI RIUSA LA COPPIA DELLE SOGLIE, ed e' lo stesso divieto
+    # che quella coppia ha gia' scritto per gli usi dei codici: sceglie
+    # il campo IN BASE ALLA VALUTA, e innestarci un terzo «quale»
+    # farebbe passare una PERCENTUALE dentro un percorso che commuta
+    # unita'. Le due tabelle restano DUE, e la nuova non ha un `campo`
+    # variabile: di unita' ce n'e' una e non cambia mai.
+    prova("le due tabelle dei campi liberi restano due", (1, 1),
+          (mini.count("const SOGLIE_LIBERE = {"),
+           mini.count("const PCT_LIBERE = {")))
+    _pl = pezzo_js(mini, "function pctLibera(")
+    prova("...e quella della percentuale non commuta nessuna unita'",
+          False, "valuta" in _pl)
+    # I LIMITI VENGONO DAL SERVER, il patto di lampoLeve: una cifra
+    # scritta qui direbbe un intervallo suo il giorno che la leva
+    # cambia, e il venditore si vedrebbe rifiutare un numero che il
+    # cassetto gli aveva appena promesso.
+    _pf = pezzo_js(mini, "function pctFuori(")
+    prova("l'intervallo lo dice il server, mai il client", True,
+          "min_percento" in _pf and "max_percento" in _pf)
+    for cifra in ("5", "30"):
+        prova(f"...e nel giudice non c'e' un {cifra} scritto a mano",
+              False, f"= {cifra}" in _pf or f"< {cifra}" in _pf)
+    # NIENTE CLAMP MUTO, la regola della gemella: a limare sarebbe il
+    # client, e il venditore vedrebbe un numero che non ha scritto.
+    for vietato in ("Math.max", "Math.min"):
+        prova(f"il campo della percentuale non lima: niente {vietato}",
+              False, vietato in _pl)
+    prova("...e scrive INTERI: «−12%» e non «−12,5%»",
+          True, "parseInt(" in _pl and "parseFloat(" not in _pl)
+    # LE PILLOLE RESTANO, e restano il CONSIGLIO (decisione di
+    # Andrea): il campo si riempie toccandole — la ricetta della
+    # lampo, dove i chip riempiono il campo invece di sostituirlo — e
+    # una pillola accesa su un numero diverso da quello scritto sopra
+    # sarebbe la stessa bugia del campo che mente.
+    prova("le pillole della percentuale non se ne vanno: DUE file",
+          2, mini.count("map(p => pill(p, `−${p}%`, 'pct'))"))
+    prova("...quella dei codici e' ancora al suo posto", 1,
+          mini.count("(codiciLeve.sconti||[]).map(p => pill(p, "
+                     "`−${p}%`, 'pct'))"))
+    prova("...e il campo le rimette in riga a ogni tasto", True,
+          '[data-campo="pct"]' in _pl)
+    # LA RIGA DEI LIMITI COMPARE SOLO FUORI INTERVALLO, mai come
+    # cartello fisso: e' la lezione del foglio dell'offerta — dirlo
+    # prima che serva affianca due numeri che non c'entrano con quello
+    # che si sta scrivendo. Ma quando serve c'e', ed e' la lampo.
+    _cp = pezzo_js(mini, "function campoPctLibera(")
+    prova("la riga dei limiti c'e' solo fuori intervallo", True,
+          "fuori ?" in _cp and "fuori.min" in _cp)
+
+    # ---- e le due cinture del SERVER, che sono la verita' ----
+    # IL PAVIMENTO DELLO SCONTO sta nel ramo che ACCENDE, mai prima:
+    # `percento <= 0` e' lo spegnimento e non ha guardie (il patto del
+    # rientro dalle ferie). Con la cintura scritta sopra quel ramo un
+    # venditore non potrebbe piu' togliere la sua promessa, e se ne
+    # accorgerebbe solo provandoci. L'indentazione lo dice: otto spazi
+    # = dentro l'else, quattro = fuori da tutto.
+    _ep = src[src.index("async def imposta_sconto_pacco("):
+              src.index("async def imposta_sped_gratis(")]
+    prova("il pavimento dello sconto sta nel ramo che accende", True,
+          "        if not (SCONTO_PACCO_MIN_PERCENTO <= percento" in _ep)
+    prova("...e il tetto da solo non c'e' piu'", False,
+          "if percento > SCONTO_PACCO_MAX_PERCENTO:" in _ep)
+    prova("...e il messaggio dice l'intervallo", True,
+          "SCONTO_PACCO_MIN_PERCENTO}% al " in _ep)
+    # IL GEMELLO DEI CODICI, aperto NELLO STESSO GIRO (decisione di
+    # Andrea): il `< 1` di prima non era uno spegnimento — un codice si
+    # mette in pausa col suo bottone — quindi il pavimento prende il
+    # suo posto invece di aggiungersi.
+    _ec = src[src.index("async def salva_codice_sconto("):
+              src.index("async def pausa_codice_sconto(")]
+    prova("il pavimento del codice ha preso il posto del `< 1`",
+          (True, False),
+          ("CODICI_SCONTO_MIN_PERCENTO <= percento" in _ec,
+           "percento < 1" in _ec))
+    prova("...e anche lui dice l'intervallo", True,
+          "CODICI_SCONTO_MIN_PERCENTO}% al " in _ec)
+    # LE DUE LEVE VIAGGIANO AL CLIENT, o la riga dei limiti non
+    # saprebbe cosa scrivere e il campo tornerebbe a inventarsi un
+    # intervallo suo: il patto di lampoLeve.
+    prova("il pavimento dello sconto esce in /api/me", 1,
+          src.count('"min_percento": SCONTO_PACCO_MIN_PERCENTO'))
+    prova("...e quello dei codici da TUTTE E DUE le sue buste", 2,
+          src.count('"min_percento": CODICI_SCONTO_MIN_PERCENTO'))
+    # IL PAVIMENTO NON E' UN TETTO, e la differenza va tenuta: i due
+    # TETTI compongono la cascata col «vince il maggiore», quindi
+    # devono restare pari o il fondo dichiarato si sposta; due
+    # pavimenti diversi non compongono niente. Qui si chiede solo che
+    # nessuno li scriva a mano nel codice.
+    for leva in ("SCONTO_PACCO_MIN_PERCENTO", "CODICI_SCONTO_MIN_PERCENTO"):
+        prova("%s nasce a 5 nel codice" % leva, True,
+              "    %s = 5" % leva in src)
+        # ...e il pannello «⚙️ Stato delle leve» la conosce: e' la
+        # pagina che esiste perche' nessuno debba ricordare a memoria
+        # con che numeri gira il server, e una leva che non compare li'
+        # e' una leva che si scopre solo leggendo il codice. L'ha
+        # chiesto la tortura: toglierla dal pannello non faceva rossa
+        # nessuna riga.
+        prova("...e il pannello delle leve la conosce", True,
+              '"Sconto minimo (%%)", "%s"' % leva in src)
 
 
 # ====================================================================
@@ -23584,6 +23754,199 @@ def prove_altri_scorrimento():
           '"esauriti": esauriti' in neg and '"feedback": feedback' in neg)
 
 
+_TAVOLA = """
+/* La fila di pillole di cartone e le due leve di un finto config.
+   I LIMITI STANNO QUI e non nel giudice: cambiandoli piu' sotto le
+   risposte devono seguire — se seguono, il client non ne ha una sua
+   scritta a mano, ed e' il caso che nessuna sentinella prenderebbe. */
+let scontoPaccoLeve = {min_percento: 5, max_percento: 30,
+                       sconti: [5, 10, 15, 20]};
+let codiciLeve = {min_percento: 5, max_percento: 30,
+                  sconti: [5, 10, 15, 20]};
+let scontoPaccoBozza = {pct: 10};
+let bozzaCodice = {pct: 10};
+function bozzaCod(){ return bozzaCodice; }
+const nodi = {};
+function el(id){ return nodi[id]; }
+/* LE PILLOLE STANNO IN UN BOX, e il finto querySelectorAll lo legge
+   dal selettore: senza, una voce che punta al box dell-altro
+   cassetto passerebbe liscia — e sarebbe la stessa bugia del campo
+   che mente, con le pillole di un cassetto riscritte dall-altro.
+   L-ha chiesto la tortura, non la rilettura. */
+let pillole = {};
+const document = {querySelectorAll(sel){
+  if (sel.indexOf('[data-campo="pct"]') < 0) return [];
+  const box = sel.slice(1, sel.indexOf(' '));
+  return pillole[box] || [];
+}};
+function apparecchia(quale){
+  const box = quale === 'sconto' ? 'scontoPaccoBlocco' : 'codiciBlocco';
+  pillole = {};
+  pillole[box] = [5, 10, 15, 20].map(v => (
+    {dataset: {campo: 'pct', v: String(v)}, style: {}}));
+  pillole.viste = pillole[box];
+  nodi['pct-' + quale] = {style: {}};
+  nodi['pct-avviso-' + quale] = {textContent: 'x'};
+}
+const rosse = [];
+function att(nome, atteso, avuto){
+  const a = JSON.stringify(atteso), b = JSON.stringify(avuto);
+  if (a !== b) rosse.push(nome + ': atteso ' + a + ', avuto ' + b);
+}
+function accese(){
+  return pillole.viste.filter(p => p.style.background === 'var(--sats)')
+                .map(p => p.dataset.v);
+}
+"""
+
+_PROVE = """
+/* --- il caso che ha aperto il cantiere: il 12 --- */
+apparecchia('sconto');
+pctLibera('sconto', '12');
+att('il 12 finisce nella bozza', 12, scontoPaccoBozza.pct);
+att('...e nessuna pillola resta accesa su un altro numero', [], accese());
+att('...e il campo si accende al posto loro', 'var(--sats)',
+    nodi['pct-sconto'].style.borderColor);
+att('...e la riga dei limiti tace', '',
+    nodi['pct-avviso-sconto'].textContent);
+
+/* --- una cifra CHE UNA PILLOLA DICE: si accende lei e il campo si
+       spegne, o si vedrebbero due scelte per lo stesso numero --- */
+apparecchia('sconto');
+pctLibera('sconto', '15');
+att('una cifra in elenco accende la sua pillola', ['15'], accese());
+att('...e il campo si spegne', 'var(--line)',
+    nodi['pct-sconto'].style.borderColor);
+
+/* --- sotto il pavimento: rosso, la riga parla, e LA CIFRA NON SI
+       LIMA — un clamp muto sarebbe un numero mai scritto --- */
+apparecchia('sconto');
+pctLibera('sconto', '2');
+att('il 2 resta 2: nessun clamp muto', 2, scontoPaccoBozza.pct);
+att('...il campo diventa rosso', 'var(--danger)',
+    nodi['pct-sconto'].style.borderColor);
+att('...e la riga dice quale intervallo vale', 'Lo sconto va dal 5% al 30%',
+    nodi['pct-avviso-sconto'].textContent);
+
+/* --- sopra il tetto, lo stesso --- */
+apparecchia('sconto');
+pctLibera('sconto', '31');
+att('anche il 31 e fuori', 'var(--danger)',
+    nodi['pct-sconto'].style.borderColor);
+
+/* --- IL FILO NEI DUE VERSI: chi scrive esattamente la cifra che la
+       riga gli dice dev'essere ammesso, mai rifiutato per un «<» --- */
+apparecchia('sconto');
+pctLibera('sconto', '5');
+att('al filo del pavimento non e fuori', 'var(--line)',
+    nodi['pct-sconto'].style.borderColor);
+apparecchia('sconto');
+pctLibera('sconto', '30');
+att('al filo del tetto nemmeno', '',
+    nodi['pct-avviso-sconto'].textContent);
+
+/* --- il campo svuotato non e un errore: e un campo da riempire --- */
+apparecchia('sconto');
+pctLibera('sconto', '');
+att('svuotare azzera senza gridare', [0, ''],
+    [scontoPaccoBozza.pct, nodi['pct-avviso-sconto'].textContent]);
+
+/* --- I LIMITI VENGONO DALLE LEVE: si cambiano nel finto config e le
+       risposte seguono. Se non seguissero, il giudice avrebbe un
+       intervallo suo — e il venditore si vedrebbe rifiutare un numero
+       che il cassetto gli aveva appena promesso. --- */
+scontoPaccoLeve = {min_percento: 12, max_percento: 20, sconti: [15]};
+apparecchia('sconto');
+pctLibera('sconto', '5');
+att('col pavimento a 12 il 5 diventa fuori', 'var(--danger)',
+    nodi['pct-sconto'].style.borderColor);
+att('...e la riga dice le cifre NUOVE', 'Lo sconto va dal 12% al 20%',
+    nodi['pct-avviso-sconto'].textContent);
+
+/* --- IL SECONDO CASSETTO passa dalla SUA bozza e dalle SUE leve: una
+       voce che punta alla bozza sbagliata scriverebbe la percentuale
+       di un codice dentro la regola del negozio, in silenzio --- */
+apparecchia('codici');
+scontoPaccoBozza.pct = 0;
+pctLibera('codici', '12');
+att('il codice scrive nella SUA bozza', 12, bozzaCodice.pct);
+att('...e non tocca quella dello sconto', 0, scontoPaccoBozza.pct);
+
+/* --- e il markup che nasce porta il valore e il suo avviso --- */
+const html = campoPctLibera('sconto', 2, [5, 10, 15, 20]);
+att('il campo nasce col valore dentro', true,
+    html.indexOf('value="2"') >= 0);
+att('...e con la riga dei limiti gia scritta', true,
+    html.indexOf('dal 12% al 20%') >= 0);
+const vuoto = campoPctLibera('sconto', 0, [5, 10, 15, 20]);
+att('a zero il campo nasce VUOTO: uno 0 sarebbe una scelta', true,
+    vuoto.indexOf('value=""') >= 0);
+
+/* --- L-ACCENSIONE ALLA NASCITA e- un ramo SUO: pctLibera la scrive
+       in place a ogni tasto, campoPctLibera la coce nel markup — e
+       chi riapre il cassetto passa solo di qui. Senza queste, il
+       campo di un venditore che ha salvato il 12 tornerebbe spento,
+       col cassetto che non mostra NESSUNA scelta accesa. L-ha chiesto
+       la tortura: toglierla dal markup non faceva rossa una riga. --- */
+scontoPaccoLeve = {min_percento: 5, max_percento: 30,
+                   sconti: [5, 10, 15, 20]};
+const suo = campoPctLibera('sconto', 12, [5, 10, 15, 20]);
+att('una cifra fuori elenco nasce ACCESA', true,
+    suo.indexOf('var(--sats)') >= 0);
+const inElenco = campoPctLibera('sconto', 15, [5, 10, 15, 20]);
+att('...e una che una pillola dice nasce spenta', false,
+    inElenco.indexOf('var(--sats)') >= 0);
+const rotto = campoPctLibera('sconto', 2, [5, 10, 15, 20]);
+att('...e una fuori intervallo nasce ROSSA', true,
+    rotto.indexOf('var(--danger)') >= 0);
+console.log(JSON.stringify(rosse));
+"""
+
+def prove_pct_libera(node):
+    """IL CAMPO LIBERO DELLA PERCENTUALE, FATTO GIRARE (ago 2026).
+
+    Le sentinelle dicono che la coppia esiste, che e' UNA e che non
+    lima — mai che RISPONDA giusto, e la domanda vera e' proprio
+    quella: scrivendo 12 la bozza porta 12, la pillola del 10 si
+    spegne e il campo si accende al posto suo; scrivendo 2 il campo
+    diventa rosso e la riga dice l'intervallo. E' la sesta volta che
+    una prova sulla forma certifica un ramo che nessuno ha esercitato:
+    quella classe va sempre in coppia con una che gira il pezzo.
+    LA CIFRA NON SI LIMA: 2 resta 2 nella bozza — a rifiutarlo e' il
+    400 del server — e il banco lo chiede, perche' un clamp muto qui
+    sarebbe un numero che il venditore non ha scritto.
+    I LIMITI arrivano dalle LEVE del banco e non da una cifra scritta
+    nel giudice: cambiandole nel finto config, le risposte devono
+    seguire — se seguono, il client non ne ha una sua."""
+    import subprocess as _sp, tempfile as _tf
+    if not node:
+        salta("il campo della percentuale risponde giusto",
+              "node non installato")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # LA TABELLA E- QUELLA VERA, estratta dal client: una di
+    # cartone proverebbe se stessa, e il caso che il banco deve
+    # prendere e- proprio la voce che punta alla bozza sbagliata
+    pezzi = pezzo_js(mini, "const PCT_LIBERE = {") + chr(10)
+    pezzi += "".join(
+        pezzo_js(mini, "function %s(" % f) + chr(10)
+        for f in ("pctFuori", "campoPctLibera", "pctLibera"))
+    banco = _TAVOLA + pezzi + _PROVE
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il campo della percentuale gira", "",
+              (r.stderr or "")[:300])
+        return
+    prova("il campo della percentuale risponde giusto in tutti i casi",
+          "[]", (r.stdout or "").strip())
+
+
 def prove_centro_fila(mini, node):
     """IL GIUDICE DEL CENTRO, FATTO GIRARE (ago 2026): le sentinelle
     dicono che esiste ed e' uno, mai che RISPONDA giusto — e la
@@ -23690,6 +24053,7 @@ def prove_sintassi_client():
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
     prove_centro_fila(mini, node)
+    prove_pct_libera(node)
     prove_riempimento(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)

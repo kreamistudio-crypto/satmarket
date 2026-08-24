@@ -9232,6 +9232,105 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   una convenzione nuova, la colonna ha la stessa forma delle sorelle
   (`INTEGER DEFAULT 0`), e una soglia è una promessa di bottega — «da
   50 €», non «da 49,90», che è un trucco da listino.
+  LA PERCENTUALE SI SCRIVE A MANO (ago 2026, dal campo: un venditore
+  voleva il 12% e non poteva inserirlo «né sulla gamba a pezzi né su
+  quella a valore»). LA DIAGNOSI E' META' DELLA VOCE: la percentuale
+  NON e' per criterio — e' UN campo solo sotto tutte e due le gambe —
+  quindi chi prova a pezzi e poi a valore cambia due volte la cosa
+  sbagliata, e il difetto si racconta peggio di com'e'. E IL SERVER IL
+  12 LO ACCETTAVA GIA': `percento` e' un intero con la sola cintura del
+  tetto, e `SCONTO_PACCO_SCONTI` non e' mai stato un vocabolario —
+  nessuna validazione lo nomina, e' la lista dei CONSIGLI. A rifiutare
+  il 12 era il client, che non aveva un posto dove scriverlo.
+  E' LA RICETTA DELLA LAMPO (decisione di Andrea), che quel campo ce
+  l'ha da sempre e arriva al 70%: le pillole RIEMPIONO il campo invece
+  di sostituirlo — restano il consiglio — e chi ha una cifra sua la
+  scrive accanto. L'asimmetria fra i due cassetti e la sorella piu'
+  aggressiva non era una decisione: era una svista mai dichiarata.
+  I DUE SI APRONO INSIEME (decisione di Andrea): lo sconto sugli
+  articoli e il CODICE SCONTO — «chi ottiene il 12 sul carrello lo
+  chiede sul codice il giorno dopo, e un'asimmetria fra i due sarebbe
+  da spiegare ogni volta».
+  ⚠️ NON SI RIUSA `campoSogliaLibera`/`sogliaLibera`, ed e' lo stesso
+  divieto che quella coppia ha gia' scritto per gli usi dei codici:
+  quella sceglie il campo IN BASE ALLA VALUTA, e innestarci un terzo
+  «quale» farebbe passare una PERCENTUALE dentro un percorso che
+  commuta unita' — il posto piu' facile in cui un numero diventa
+  un'altra cosa. La coppia nuova e' `campoPctLibera`/`pctLibera` con la
+  sua tabella `PCT_LIBERE`, e non ha un `campo` variabile: di unita' ce
+  n'e' una e non cambia mai. Non ridisegna il cassetto (un re-render
+  toglierebbe il fuoco a ogni tasto) e riscrive in place le TRE cose
+  che dipendono dal numero: le pillole, l'accensione del campo, la riga
+  dei limiti.
+  IL PAVIMENTO NASCE COL CAMPO, e prima non serviva: finche' la
+  percentuale era un elenco chiuso partiva da 5 per costruzione, e una
+  cintura sarebbe stata una guardia che nessuno esercita.
+  `SCONTO_PACCO_MIN_PERCENTO` e `CODICI_SCONTO_MIN_PERCENTO` nascono a
+  **5**, lo stesso numero della lampo e per la stessa ragione
+  (decisione di Andrea): «uno sconto dell'1% è un rumore, non
+  un'offerta» — solo che qui non dura sei ore, sta in vetrina.
+  ⚠️ IL PAVIMENTO NON TOCCA LO SPEGNIMENTO, ed e' la riga da non
+  ammorbidire: `percento <= 0` e' un ramo suo che arriva PRIMA e non ha
+  guardie (il patto del rientro dalle ferie). Scritto come un
+  `percento < MIN` secco sopra quel ramo, un venditore non potrebbe
+  piu' TOGLIERE la sua promessa, e se ne accorgerebbe solo provandoci —
+  c'e' la sentinella sull'indentazione e il caso eseguibile.
+  Sui CODICI invece lo zero non era uno spegnimento (un codice si mette
+  in pausa col suo bottone), quindi il pavimento prende il posto del
+  `< 1` invece di aggiungersi a un ramo che non c'e'.
+  TENERLI PARI E' UN CONSIGLIO E NON UNA REGOLA, al contrario dei due
+  TETTI: quelli col «vince il maggiore» compongono la cascata, quindi
+  il FONDO dichiarato (lampo 70% + sconto 30% = il 21% del listino)
+  dipende dal max() dei due; un pavimento non compone niente, dice solo
+  se una promessa si puo' accendere. Se un giorno si volesse un codice
+  mirato piu' timido di una regola pubblica, si abbassa quello e non si
+  sposta nessun fondo.
+  IL MESSAGGIO DICE L'INTERVALLO e non il solo tetto: da quando la
+  cifra si scrive a mano chi sbaglia non sa da che parte ha sbagliato,
+  e «al massimo 30%» a chi ha scritto 2 manda a cercare dalla parte
+  opposta.
+  LA RIGA DEI LIMITI COMPARE SOLO FUORI INTERVALLO, mai come cartello
+  fisso: e' la lezione del foglio dell'offerta — dirlo prima che serva
+  affianca due numeri che non c'entrano con quello che si sta
+  scrivendo. Ma quando serve c'e', ed e' la lampo: chi scrive 2 lo sa
+  subito invece di premere Salva per sentirsi dire no. Il campo si
+  accende in ARANCIO quando porta una cifra che nessuna pillola dice
+  («acceso» = «scelto», il patto della gemella) e in ROSSO quando e'
+  fuori intervallo — accenderlo in arancio direbbe «scelto» su un
+  numero che il server rifiuta. Contrasti misurati: 5,18 di giorno e
+  5,48 di sera.
+  NIENTE CLAMP MUTO, la regola della gemella: a limare sarebbe il
+  client, e il venditore vedrebbe un numero che non ha scritto — a dire
+  la cifra ci sono la riga e il 400, che il cassetto rende dentro di
+  se'. E i limiti vengono dal SERVER (`min_percento`/`max_percento`
+  nelle tre buste): una cifra scritta nel client direbbe un intervallo
+  suo il giorno che la leva cambia, e il venditore si vedrebbe
+  rifiutare un numero che il cassetto gli aveva appena promesso.
+  IL COSTO DEL NUMERO NON TONDO E' MISURATO e non temuto: l'unitario
+  scontato in pagina Paga si mostra solo se `(unitario * pct) % 100 ==
+  0`, e sui prezzi veri il 12 sta ESATTAMENTE dove sta il 10 (99,2%) —
+  vuole un multiplo di 25, mentre 5 e 15 ne vogliono gia' 20. I soli
+  che stringono sono i primi rispetto a 100 (7, 11, 13, 17, 19, 23,
+  29), che pretendono un unitario multiplo di 100: anche li' il ramo
+  solo-tag e' una cintura che non scatta quasi mai. Da rimisurare se i
+  prezzi del catalogo smettessero di essere tondi.
+  Provato: le sentinelle, un banco NODE che fa GIRARE il giudice (le
+  sentinelle dicono che esiste ed e' uno, mai che risponda giusto —
+  e il banco modella anche il BOX delle pillole, o una voce che punta
+  al cassetto sbagliato passerebbe liscia: l'ha chiesto la tortura), il
+  banco eseguibile degli endpoint coi casi del filo nei due versi, e
+  **19 mutazioni, 19 uccise**. Tre buchi li ha trovati la tortura e non
+  la rilettura: il pannello delle leve che nessuna prova copriva,
+  l'accensione ALLA NASCITA del campo (un ramo diverso da quella in
+  place: senza, il campo di chi ha salvato il 12 tornerebbe spento) e
+  il box delle pillole. Piu' il giro DAL VIVO col server vero su un
+  database usa-e-getta — il 12 che arriva in colonna passando dalla
+  rotta, il 2 rifiutato col messaggio giusto, lo spegnimento ancora
+  senza guardie, il codice al 12% creato e quello all'1% no — e quello
+  VISIVO a 320/360/375 nei due temi, dove il campo si digita davvero:
+  zero sbordo, zero errori JS, e la cifra salvata che si ritrova accesa
+  riaprendo il cassetto.
+
   IL CASSETTO NON SPIEGA PIÙ LA VALUTA (ago 2026, decisione di Andrea
   nel giro dell'asciugatura): `notaSoglia(valuta)` — la funzione a due
   testi che diceva, accanto al toggle, cosa comporta ognuna delle due

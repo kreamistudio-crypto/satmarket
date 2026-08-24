@@ -241,6 +241,22 @@ try:
     from config import SCONTO_PACCO_MAX_PERCENTO
 except ImportError:
     SCONTO_PACCO_MAX_PERCENTO = 30   # un guardrail, non un giudizio
+# IL PAVIMENTO, e nasce col campo libero (ago 2026): finche' la
+# percentuale era un elenco chiuso partiva da 5 per costruzione, e una
+# cintura sarebbe stata una guardia che nessuno esercita. Da quando si
+# scrive a mano un «1» passerebbe, e uno sconto dell'1% e' precisamente
+# quel «non si nota» che la lampo vieta col suo LAMPO_MIN_PERCENTO —
+# solo che qui non dura sei ore: sta in vetrina.
+# STESSO NUMERO della lampo, e per la stessa ragione (decisione di
+# Andrea): sotto il 5% non e' un'offerta, e' rumore.
+# ATTENZIONE, NON fa da guardia allo SPEGNIMENTO: `percento <= 0` e' un
+# ramo suo che arriva prima e non ha guardie — il patto del rientro
+# dalle ferie, togliere una promessa non e' mai un problema. Questo
+# pavimento vale solo dove una promessa si ACCENDE.
+try:
+    from config import SCONTO_PACCO_MIN_PERCENTO
+except ImportError:
+    SCONTO_PACCO_MIN_PERCENTO = 5
 # Le pillole del criterio a VALORE, e LA VALUTA DELLA SOGLIA LA SCEGLIE
 # IL VENDITORE (ago 2026, decisione di Andrea chiesta dalla comunita',
 # che SUPERA quella di due giorni prima — «la soglia a valore e' in
@@ -419,6 +435,24 @@ try:
     from config import CODICI_SCONTO_MAX_PERCENTO
 except ImportError:
     CODICI_SCONTO_MAX_PERCENTO = 30
+
+# IL PAVIMENTO, gemello di SCONTO_PACCO_MIN_PERCENTO e nato con lui
+# (ago 2026, decisione di Andrea: i due si aprono INSIEME col campo
+# libero, o chi ottiene il 12 sul carrello lo chiede sul codice il
+# giorno dopo e l'asimmetria va spiegata ogni volta).
+# TENERLO PARI al gemello e' un CONSIGLIO e non una regola, al
+# contrario dei due TETTI: quelli col «vince il maggiore» compongono la
+# cascata, quindi il fondo dichiarato dipende dal max() dei due — un
+# pavimento non compone niente, dice solo se una promessa si puo'
+# accendere. Se un giorno si volesse un codice mirato piu' timido di
+# una regola pubblica, si abbassa questo e non si sposta nessun fondo.
+# LO ZERO qui NON e' uno spegnimento — un codice si mette in pausa col
+# suo bottone — quindi questa cintura prende il posto del `< 1` di
+# prima invece di aggiungersi a un ramo che non c'e'.
+try:
+    from config import CODICI_SCONTO_MIN_PERCENTO
+except ImportError:
+    CODICI_SCONTO_MIN_PERCENTO = 5
 
 # Le pillole del venditore, il patto di LAMPO_SCONTI: il client non
 # hardcoda mai una cifra, le riceve da /api/me.
@@ -13045,6 +13079,8 @@ def _leve_stato():
             _leva("Soglia minima a valore (sats)",
                   "SCONTO_PACCO_MIN_VALORE_SATS",
                   SCONTO_PACCO_MIN_VALORE_SATS),
+            _leva("Sconto minimo (%)", "SCONTO_PACCO_MIN_PERCENTO",
+                  SCONTO_PACCO_MIN_PERCENTO),
             _leva("Sconto massimo (%)", "SCONTO_PACCO_MAX_PERCENTO",
                   SCONTO_PACCO_MAX_PERCENTO),
         ]},
@@ -13069,6 +13105,11 @@ def _leve_stato():
                   spento="nessun codice vale piu' alla cassa e il "
                          "cassetto del venditore risponde 400; le righe "
                          "restano e tornano vive riaccendendo"),
+            _leva("Sconto minimo (%)", "CODICI_SCONTO_MIN_PERCENTO",
+                  CODICI_SCONTO_MIN_PERCENTO,
+                  acceso="tenerlo pari al gemello e' un consiglio, non "
+                       "una regola: un pavimento non compone nessuna "
+                       "cascata"),
             _leva("Sconto massimo (%)", "CODICI_SCONTO_MAX_PERCENTO",
                   CODICI_SCONTO_MAX_PERCENTO,
                   acceso="tenerlo pari a quello dello sconto articoli: "
@@ -21577,6 +21618,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "min_soglia": SCONTO_PACCO_MIN_SOGLIA,
         "min_valore_eur": SCONTO_PACCO_MIN_VALORE_EUR,
         "min_valore_sats": SCONTO_PACCO_MIN_VALORE_SATS,
+        # il pavimento viaggia col tetto: il campo libero della
+        # percentuale scrive la sua riga di limiti con QUESTI due, mai
+        # con una cifra sua — il patto di lampoLeve.minimo/massimo
+        "min_percento": SCONTO_PACCO_MIN_PERCENTO,
         "max_percento": SCONTO_PACCO_MAX_PERCENTO}
     # E la spedizione gratis sopra soglia, per il cassetto «🚚»: le
     # soglie proposte sono le pillole del venditore, i minimi servono
@@ -21608,6 +21653,7 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "max": CODICI_SCONTO_MAX_PER_VENDITORE,
         "sconti": list(CODICI_SCONTO_PERCENTI),
         "durate": list(CODICI_SCONTO_DURATE_GIORNI),
+        "min_percento": CODICI_SCONTO_MIN_PERCENTO,
         "max_percento": CODICI_SCONTO_MAX_PERCENTO,
         "max_usi": CODICI_SCONTO_MAX_USI}
     # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
@@ -22239,10 +22285,20 @@ async def imposta_sconto_pacco(req: Request,
                     f"{minimo} € di merce: sotto non è uno sconto sugli "
                     f"articoli, è un ribasso di listino — e quello si fa "
                     f"sul prezzo.")
-        if percento > SCONTO_PACCO_MAX_PERCENTO:
+        # LE DUE CINTURE INSIEME, e il messaggio dice l'INTERVALLO: da
+        # quando la percentuale si scrive a mano (ago 2026) chi sbaglia
+        # non sa da che parte ha sbagliato, e «al massimo 30%» a chi ha
+        # scritto 2 manda a cercare dalla parte opposta.
+        # Il pavimento NON tocca lo spegnimento: quello e' il ramo
+        # `percento <= 0` qui sopra, che di guardie non ne ha.
+        if not (SCONTO_PACCO_MIN_PERCENTO <= percento
+                <= SCONTO_PACCO_MAX_PERCENTO):
             raise HTTPException(400,
-                f"Lo sconto sugli articoli arriva al massimo al "
-                f"{SCONTO_PACCO_MAX_PERCENTO}%.")
+                f"Lo sconto sugli articoli va dal "
+                f"{SCONTO_PACCO_MIN_PERCENTO}% al "
+                f"{SCONTO_PACCO_MAX_PERCENTO}%: sotto non si nota, e "
+                f"uno sconto che non si nota è rumore. Per togliere la "
+                f"promessa c'è il bottone apposta.")
     con = db()
     con.execute("UPDATE utenti SET sconto_pacco_criterio=?, "
                 "sconto_pacco_valore_valuta=?, sconto_pacco_percento=?, "
@@ -23704,6 +23760,7 @@ async def lista_codici_sconto(x_tg_init_data: str = Header(""),
             "attivo": bool(CODICI_SCONTO_ATTIVI),
             "sconti": list(CODICI_SCONTO_PERCENTI),
             "durate": list(CODICI_SCONTO_DURATE_GIORNI),
+            "min_percento": CODICI_SCONTO_MIN_PERCENTO,
             "max_percento": CODICI_SCONTO_MAX_PERCENTO,
             "max_usi": CODICI_SCONTO_MAX_USI}
 
@@ -23738,8 +23795,13 @@ async def salva_codice_sconto(req: Request,
         giorni = int(d.get("giorni") or 0)
     except (TypeError, ValueError):
         raise HTTPException(400, "Numeri del codice non leggibili")
-    if percento < 1 or percento > CODICI_SCONTO_MAX_PERCENTO:
-        raise HTTPException(400, f"Lo sconto di un codice va da 1% a "
+    # IL PAVIMENTO AL POSTO DEL `< 1` (ago 2026, col campo libero): un
+    # codice all'1% non e' un'offerta, e' rumore — la stessa ragione
+    # della gemella, e qui lo zero non era comunque uno spegnimento.
+    if not (CODICI_SCONTO_MIN_PERCENTO <= percento
+            <= CODICI_SCONTO_MAX_PERCENTO):
+        raise HTTPException(400, f"Lo sconto di un codice va dal "
+                                 f"{CODICI_SCONTO_MIN_PERCENTO}% al "
                                  f"{CODICI_SCONTO_MAX_PERCENTO}%.")
     if usi_max < 0 or usi_max > CODICI_SCONTO_MAX_USI:
         raise HTTPException(400, f"Gli usi di un codice arrivano a "

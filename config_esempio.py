@@ -309,6 +309,12 @@ SCONTO_PACCO_MIN_VALORE_EUR = 1  # la gemella a valore: una cintura
                                 # giudizio su quanto debba valere un
                                 # carrello
 SCONTO_PACCO_MIN_VALORE_SATS = 1  # idem, in sats
+SCONTO_PACCO_MIN_PERCENTO = 5   # sotto non e' un'offerta, e' rumore:
+                                # lo stesso numero della lampo. Serve da
+                                # quando la percentuale si scrive a mano
+                                # (prima l'elenco partiva da 5 da se');
+                                # NON tocca lo spegnimento, che e' un
+                                # ramo suo senza guardie
 SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
 
 # --- Spedizione gratis sopra soglia ----------------------------------
@@ -351,6 +357,12 @@ CODICI_SCONTO_MAX_PERCENTO = 30  # TIENILO PARI a SCONTO_PACCO_MAX_
                                 # PERCENTO: con «vince il maggiore» il
                                 # tetto della cascata e' il max dei due,
                                 # e alzare solo questo sposta il fondo
+CODICI_SCONTO_MIN_PERCENTO = 5   # il gemello del pavimento dello
+                                # sconto articoli. Tenerlo pari e' un
+                                # CONSIGLIO e non una regola come per i
+                                # tetti: un pavimento non compone la
+                                # cascata, dice solo se una promessa si
+                                # puo' accendere
 CODICI_SCONTO_PERCENTI = (5, 10, 15, 20)     # le pillole del venditore
 CODICI_SCONTO_DURATE_GIORNI = (7, 30, 90, 0)  # lo 0 = senza scadenza
 CODICI_SCONTO_MAX_PER_VENDITORE = 20   # quanti codici puo' avere

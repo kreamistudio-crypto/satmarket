@@ -18736,6 +18736,109 @@ function sogliaLibera(quale, v){
   }
 }
 
+/* ---- IL CAMPO LIBERO DELLA PERCENTUALE (ago 2026) ----
+   Un venditore voleva il 12% e non poteva scriverlo da NESSUNA delle
+   due gambe: la percentuale non e' per criterio, e' UN campo solo
+   sotto tutte e due — quindi chi provava a pezzi e poi a valore
+   cambiava due volte la cosa sbagliata. Il SERVER il 12 lo accettava
+   gia' (un intero fino al tetto, e SCONTO_PACCO_SCONTI non e' mai
+   stato un vocabolario: e' la lista dei consigli); a rifiutarlo era il
+   client, che non aveva un posto dove scriverlo.
+   E' LA RICETTA DELLA LAMPO (decisione di Andrea), che quel campo ce
+   l'ha da sempre e arriva al 70%: le pillole RIEMPIONO il campo invece
+   di sostituirlo — restano il consiglio — e chi ha una cifra sua la
+   scrive accanto. L'asimmetria fra i due cassetti e la sorella piu'
+   aggressiva non era una decisione: era una svista non dichiarata.
+   ⚠️ NON si riusa campoSogliaLibera/sogliaLibera, e il divieto e' lo
+   stesso che quella coppia ha gia' scritto per gli usi dei codici:
+   quella sceglie il campo IN BASE ALLA VALUTA, e innestarci un terzo
+   «quale» farebbe passare una PERCENTUALE dentro un percorso che
+   commuta unita' — il posto piu' facile in cui un numero diventa
+   un'altra cosa. Qui di unita' ce n'e' una e non cambia mai.
+   NON RIDISEGNA IL CASSETTO, il vincolo della gemella: un re-render
+   toglierebbe il fuoco a ogni tasto. Si riscrivono in place le tre
+   cose che dipendono dal numero — le pillole, l'accensione del campo e
+   la riga dei limiti. */
+const PCT_LIBERE = {
+  sconto: {box: 'scontoPaccoBlocco', bozza: () => scontoPaccoBozza,
+           leve: () => scontoPaccoLeve},
+  codici: {box: 'codiciBlocco', bozza: () => bozzaCod(),
+           leve: () => codiciLeve}};
+
+/* fuori intervallo? La domanda vive in un posto solo perche' la fanno
+   in tre — il campo che nasce, ogni tasto, e la riga dei limiti — e
+   tre copie direbbero tre cose sullo stesso numero. I limiti vengono
+   dal SERVER (min_percento/max_percento): qui non c'e' una cifra
+   inventata, il patto di lampoLeve. */
+function pctFuori(quale, v){
+  const L = PCT_LIBERE[quale].leve() || {};
+  const min = L.min_percento || 0, max = L.max_percento || 100;
+  return v > 0 && (v < min || v > max) ? {min, max} : null;
+}
+
+function campoPctLibera(quale, valore, voci){
+  /* `value` vuoto quando la cifra non c'e': uno «0» scritto nel campo
+     si leggerebbe come una scelta, e non lo e'.
+     IL CAMPO SI ACCENDE quando porta una cifra che nessuna pillola
+     dice — «acceso» qui vuol dire «scelto», e senza questo una cifra
+     libera lascerebbe il cassetto con NESSUNA scelta accesa. E si
+     accende in ROSSO quando la cifra e' fuori intervallo: accenderla
+     in arancio direbbe «scelto» su un numero che il server rifiuta. */
+  const suo = valore > 0 && !(voci || []).includes(valore);
+  const fuori = pctFuori(quale, valore);
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--muted)">
+      <span>oppure</span>
+      <input id="pct-${quale}" type="number" inputmode="numeric"
+        min="1" step="1" value="${valore > 0 ? valore : ''}"
+        oninput="pctLibera('${quale}', this.value)"
+        aria-label="Sconto in percentuale"
+        style="font:inherit;width:72px;padding:6px 8px;border:1px solid ${
+          fuori ? 'var(--danger)' : suo ? 'var(--sats)' : 'var(--line)'
+        };border-radius:8px;background:transparent;color:var(--ink);font-weight:${suo&&!fuori?800:400}">
+      <span>%</span></div>
+    ${/* LA RIGA DEI LIMITI COMPARE SOLO FUORI INTERVALLO, mai come
+          cartello fisso (la lezione del foglio dell'offerta): dirlo
+          prima che serva e' rumore, e affianca due numeri che non
+          c'entrano con quello che si sta scrivendo. Ma quando serve
+          c'e', ed e' la lampo: chi scrive 2 lo sa subito invece di
+          premere Salva per sentirsi dire no. */''}
+    <div id="pct-avviso-${quale}" style="font-size:12.5px;font-weight:700;color:var(--danger);margin-top:6px">${
+      fuori ? `Lo sconto va dal ${fuori.min}% al ${fuori.max}%` : ''}</div>`;
+}
+
+function pctLibera(quale, v){
+  const q = PCT_LIBERE[quale], b = q && q.bozza();
+  if (!b) return;
+  /* interi: una percentuale e' «−12%» e non «−12,5%», e la colonna del
+     server e' un INTEGER. Cifra illeggibile o vuota = 0, cioe'
+     «manca»: NON si lima al minimo qui, che sarebbe un clamp muto — a
+     dire la cifra ci sono la riga qui sotto e il 400 del server. */
+  const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
+  b.pct = n > 0 ? n : 0;
+  /* le pillole tornano a dire la verita': scrivendo una cifra libera
+     quasi mai una combacia, e una pillola accesa su un numero diverso
+     da quello scritto sopra e' la stessa bugia del campo che mente */
+  let combacia = false;
+  document.querySelectorAll(`#${q.box} [data-campo="pct"]`).forEach(p => {
+    const on = Number(p.dataset.v) === b.pct;
+    if (on) combacia = true;
+    p.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+    p.style.background = on ? 'var(--sats)' : 'transparent';
+    p.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  const fuori = pctFuori(quale, b.pct);
+  const inp = el(`pct-${quale}`);
+  if (inp){
+    const suo = b.pct > 0 && !combacia;
+    inp.style.borderColor = fuori ? 'var(--danger)'
+                          : suo ? 'var(--sats)' : 'var(--line)';
+    inp.style.fontWeight = suo && !fuori ? 800 : 400;
+  }
+  const avv = el(`pct-avviso-${quale}`);
+  if (avv) avv.textContent = fuori
+    ? `Lo sconto va dal ${fuori.min}% al ${fuori.max}%` : '';
+}
+
 function sogliaMancante(quale, idErrore){
   /* Il campo vuoto NON e' uno spegnimento, ed e' il motivo per cui
      questa guardia esiste: sul lato spedizione una soglia <= 0 e' lo
@@ -18870,6 +18973,7 @@ function renderScontoPacco(){
     <div class="section-label" style="margin-top:12px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
+    ${campoPctLibera('sconto', b.pct, scontoPaccoLeve.sconti||[])}
     <button class="btn orange" onclick="setScontoPacco()">
       ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
     ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
@@ -19035,6 +19139,7 @@ async function renderCodici(){
     <div class="section-label" style="margin-top:10px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(codiciLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
+    ${campoPctLibera('codici', b.pct, codiciLeve.sconti||[])}
     <div class="section-label" style="margin-top:12px">Per quanto vale</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(codiciLeve.durate||[]).map(g => pill(g, durata(g), 'giorni')).join('')}</div>
