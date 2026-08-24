@@ -18693,14 +18693,34 @@ def prove_seo():
     # chiamanti sono diventati quattro: se ne perde un gradino e chi
     # sta su quel ramo resta muto, senza che niente fallisca.
     cl = pezzo_js(testo_mini, "async function condividiLink(", "\n}\n")
-    # ⚠️ L'ULTIMO GRADINO SI CERCA COL SUO «else»: `toast(link` da solo
-    # vive anche nel `.catch` della riga sopra, quindi la sentinella
-    # scritta cosi' NON POTEVA FALLIRE — togliendo il ripiego finale
-    # restava verde. L'ha detto la tortura, non la rilettura.
     for gradino in ("tg.shareURL", "t.me/share/url", "navigator.share",
-                    "navigator.clipboard", "else toast(link"):
+                    "copiaLink("):
         prova(f"la scala della condivisione tiene «{gradino}»", True,
               gradino in cl)
+    # L'ULTIMO GRADINO vive in un posto solo, e lo condivide coi DUE
+    # «condividi il negozio», che erano rimasti alla forma pre-scala.
+    # ⚠️ Il ripiego si cerca COL SUO NUMERO e in DUE copie: `toast(link`
+    # da solo vive anche nel `.catch`, quindi la sentinella scritta
+    # cosi' NON POTEVA FALLIRE — l'ha detto la tortura, non la
+    # rilettura.
+    cp = pezzo_js(testo_mini, "function copiaLink(", "\n}\n")
+    prova("l'ultimo gradino sa copiare", True, "navigator.clipboard" in cp)
+    prova("...e se non puo' scrive il link, mai il silenzio", 2,
+          cp.count("toast(link, 5000)"))
+    prova("...e ce n'e' uno solo", 1,
+          testo_mini.count("function copiaLink("))
+    for chi in ("condividiNegozio", "condividiMioNegozio"):
+        f = pezzo_js(testo_mini, "function %s(){" % chi, "\n}\n")
+        prova(f"{chi} passa dall'ultimo gradino", True, "copiaLink(" in f)
+        # la forma vecchia taceva: l'optional chaining corto-circuita
+        # TUTTA la catena, `.then` compreso — ne' appunti ne' toast ne'
+        # errore (riprodotto in un contesto senza clipboard)
+        prova(f"...e non torna alla forma muta", False,
+              "navigator.clipboard?." in f)
+        # ...ma restano i soli APPUNTI, di proposito: passarli dalla
+        # scala aprirebbe il selettore chat di Telegram, che e'
+        # un'altra cosa da quella che quel bottone promette
+        prova(f"...e resta i soli appunti", False, "condividiLink(" in f)
 
     # IL POSTO. Il bottone vive DENTRO la vetrina filtrata e non sulla
     # card della striscia: quella e' larga 84px e ha gia' DUE gesti

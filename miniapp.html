@@ -9469,9 +9469,7 @@ function condividiNegozio(){
   const v = negozioCorrente;
   if (!v) return;
   const link = `${location.origin}/negozio/${encodeURIComponent(v.username || v.negozio)}`;
-  navigator.clipboard?.writeText(link)
-    .then(()=>toast('📋 Link del negozio copiato'))
-    .catch(()=>toast(link, 5000));
+  copiaLink(link, '📋 Link del negozio copiato');
 }
 
 /* ---------------- dettaglio ---------------- */
@@ -18374,12 +18372,28 @@ async function condividiLink(link, testo, titolo){
     try { await navigator.share({title: titolo, text: testo, url: link}); return; }
     catch(e) { if (e.name === 'AbortError') return; }  // ripensamento: fine
   }
-  /* niente clipboard (contesti non sicuri): almeno il link nel toast,
-     mai il silenzio */
-  if (navigator.clipboard) navigator.clipboard.writeText(link)
-    .then(()=>toast('Link copiato 🔗'))
+  return copiaLink(link, 'Link copiato 🔗');
+}
+
+/* L'ULTIMO GRADINO DELLA SCALA, in un posto solo: si copia negli
+   appunti e, se non si puo', si scrive il link nel toast — mai il
+   silenzio. Lo chiamano la scala qui sopra e i DUE «condividi il
+   negozio», che restano di proposito i soli appunti (passarli dalla
+   scala aprirebbe il selettore chat di Telegram, che e' un'altra cosa
+   da quella che quel bottone promette) ma l'ultimo gradino lo
+   meritano uguale.
+   ⚠️ `navigator.clipboard?.writeText(...).then(...)` NON basta e non
+   alza nemmeno: l'optional chaining corto-circuita TUTTA la catena,
+   `.then` e `.catch` compresi — quindi in un contesto non sicuro
+   (http nudo, WebView vecchie) non succede NIENTE: ne' appunti, ne'
+   toast, ne' errore. E' la forma in cui i due del negozio erano
+   rimasti, ed e' stata RIPRODOTTA e non dedotta: zero toast e zero
+   errori JS, cioe' un bottone che non fa niente e non lo dice. */
+function copiaLink(link, fatto){
+  if (navigator.clipboard) return navigator.clipboard.writeText(link)
+    .then(()=>toast(fatto))
     .catch(()=>toast(link, 5000));
-  else toast(link, 5000);
+  toast(link, 5000);
 }
 
 function condividiAnnuncio(){
@@ -18509,9 +18523,7 @@ function apriAnteprimaWidget(){
 
 function condividiMioNegozio(){
   const link = `${location.origin}/negozio/${encodeURIComponent(myUsername || myNegozio)}`;
-  navigator.clipboard?.writeText(link)
-    .then(()=>toast('📋 Link del tuo negozio copiato'))
-    .catch(()=>toast(link, 5000));
+  copiaLink(link, '📋 Link del tuo negozio copiato');
 }
 
 /* ---- "Le tue identità": la doppia cittadinanza a colpo d'occhio.
