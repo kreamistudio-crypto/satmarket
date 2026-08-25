@@ -27426,6 +27426,28 @@ def prove_deploy():
     prova("...e recupera il giro dopo uno spegnimento", True,
           "Persistent=true" in timer)
 
+    # L'AMBIENTE DEL SERVIZIO, che e' la riga che si perde per prima
+    # (ago 2026, guasto vero): un servizio systemd non eredita HOME,
+    # quindi git non trova ne' /root/.gitconfig ne'
+    # /root/.git-credentials, e il `git fetch` sul remoto HTTPS
+    # fallisce a ogni giro — IN SILENZIO, perche' deploy.sh ripiega e
+    # se ne va: il mercatino resta indietro per ore e da fuori sembra
+    # soltanto che non ci sia niente di nuovo.
+    # SI GUARDA IL CORPO E NON LA PROSA: qui i commenti cominciano
+    # per `;` e quel guasto lo raccontano per esteso, quindi una
+    # sentinella sul testo intero resterebbe verde a riga tolta — la
+    # stessa trappola gia' pagata da `sh` in cima a questa funzione.
+    corpo = "\n".join(r for r in unita.split("\n")
+                      if not r.lstrip().startswith(";"))
+    prova("il servizio si dichiara HOME", True,
+          "Environment=HOME=/root" in corpo)
+    # e la dichiara DOVE conta: in [Unit] quella chiave systemd non
+    # la applica (al piu' una riga di warning al caricamento, che non
+    # guarda nessuno), cioe' il guasto tornerebbe identico con la
+    # riga ancora li' da leggere.
+    prova("...nel blocco [Service]", True,
+          "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
+
 
 def prove_podio_sfondo():
     """IL PODIO SUL DISEGNO VERO (ago 2026, chiesto da Andrea).
