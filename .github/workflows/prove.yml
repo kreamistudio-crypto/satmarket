@@ -145,6 +145,17 @@ jobs:
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione
       # di FORME — la guardano in due, e due copie divergono.
+      # I SEGNAPOSTI: quel che NON e' un segreto pur avendone la
+      # forma. `INCOLLA_QUI` e' il config d'esempio; il secondo e' la
+      # chiave di cartone dei BANCHI, che per costruire un modulo
+      # `config` finto puo' capitare scrivano `NOME = "valore"` — la
+      # forma di un file di configurazione, che questa regola cerca
+      # apposta e non sa distinguere da una chiave vera.
+      # ⚠️ Stanno QUI e non a mano nei due passi, o divergono: e'
+      # gia' successo alle FORME. E si esclude il VALORE e mai il
+      # file: un collaudo che un domani portasse una chiave vera
+      # resterebbe preso.
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5
@@ -188,7 +199,7 @@ jobs:
           # i segnaposto del config d'esempio, che sono l'unica cosa che
           # deve combaciare qui dentro.
           if git ls-files -z | xargs -0 grep -nIE "$FORME" \
-               | grep -v INCOLLA_QUI ; then
+               | grep -vE "$SEGNAPOSTI" ; then
             echo "::error::Sembra esserci una chiave vera in un file"
             exit 1
           fi
@@ -219,7 +230,7 @@ jobs:
       - name: E nemmeno nella cronologia
         run: |
           if git log --all -p --no-color | grep -a '^+' \
-               | grep -aE "$FORME" | grep -av INCOLLA_QUI ; then
+               | grep -aE "$FORME" | grep -avE "$SEGNAPOSTI" ; then
             echo "::error::Un segreto e' passato dalla repo in passato: va RUOTATO"
             exit 1
           fi

@@ -19758,9 +19758,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   chiave VERA lo farebbe nella forma naturale, e lo scanner la
   prenderebbe. Il precedente e' `prove_script_nel_workflow`, ed e' la
   seconda volta che un banco nuovo inciampa in una regola della CI:
-  quando ne nasce uno, si lancia lo scanner in locale PRIMA di
-  spingere — le `FORME` si copiano dal workflow, che e' l'unico posto
-  dove vivono. IMPERFEZIONE DICHIARATA nel file: `git log -p` non
+  quando ne nasce uno, si lanciano TUTT'E DUE i passi in locale PRIMA
+  di spingere — le variabili si copiano dal workflow, che e' l'unico
+  posto dove vivono.
+  E IL `setattr` NON BASTA UNA VOLTA CHE LA RIGA E' NELLA STORIA: il
+  secondo passo guarda le righe AGGIUNTE di TUTTA la cronologia, e li'
+  quel commit resta per sempre — riscrivere la storia di `main` gia'
+  spinto non e' una cura, e' un danno peggiore. Da qui i SEGNAPOSTI
+  (`env: SEGNAPOSTI`, accanto a `FORME`): quel che non e' un segreto
+  pur avendone la forma. Erano gia' due — `INCOLLA_QUI` scritto a mano
+  in tutti e due i passi, cioe' una divergenza in attesa — e adesso
+  vivono in un posto solo, che e' la stessa regola gia' scritta per le
+  FORME.
+  ⚠️ SI ESCLUDE IL VALORE E MAI IL FILE, ed e' la riga da non
+  ammorbidire: con un'esclusione per NOME DI FILE («i collaudi non si
+  guardano») una chiave vera incollata per sbaglio in un banco
+  passerebbe liscia. Provato a mano, ed e' la prova che rende
+  l'allentamento verificabile invece che sperato: sei righe che devono
+  essere PRESE (la chiave vera nel config, la chiave vera IN UN
+  COLLAUDO, l'admin key, il webhook, la chiave Woo, il token Shopify) e
+  tre che devono passare (i due segnaposto, piu' la riga vecchia nella
+  storia). IMPERFEZIONE DICHIARATA nel file: `git log -p` non
   mostra i diff dei MERGE, quindi un segreto introdotto risolvendo un
   conflitto sfuggirebbe.
   Su Windows serve `PYTHONIOENCODING=utf-8`,
