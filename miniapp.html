@@ -15354,19 +15354,28 @@ async function verificaPuntata(rid){
     }
   } catch(e) {}
 }
+/* Dal foglio di casa e non piu' dal confirm() di sistema (ago 2026,
+   come tutti i gesti del client): in omaggio arriva la guardia del
+   doppio tocco — confermaAzione + il velo di eseguiConferma — che
+   questi ritiri non avevano. */
 async function ritiraPuntata(){
   const l = currentListing; if (!l) return;
   const mia = astaInfo && astaInfo.mia;
   const v = (mia && mia.versato_sats) || 0;
-  if (!confirm(`Il ritiro è DEFINITIVO: non potrai rientrare in questa asta.\nI tuoi ${fmt(v)} sats tornano in «Da riscuotere». Confermi?`))
-    return;
-  const r = await fetch(`${API_BASE}/aste/${l.id}/ritirati`,
-    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
-  toast(d.riscosso ? '↩️ Ritirato: rimborso in arrivo sul tuo wallet'
-                   : '💰 Ritirato: i sats sono in «Da riscuotere»', 6000);
-  caricaAsta(l.id);
+  chiediConferma({
+    titolo: 'Ti ritiri dall\'asta?',
+    corpo: `Il ritiro è DEFINITIVO: non potrai rientrare in questa `
+         + `asta. I tuoi ${fmt(v)} sats tornano in «Da riscuotere».`,
+    etichetta: 'Sì, mi ritiro',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/aste/${l.id}/ritirati`,
+        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
+      toast(d.riscosso ? '↩️ Ritirato: rimborso in arrivo sul tuo wallet'
+                       : '💰 Ritirato: i sats sono in «Da riscuotere»', 6000);
+      caricaAsta(l.id);
+    }});
 }
 async function ritiraEccedenza(){
   /* il leader proxy incassa il budget NON esposto: definitivo — la
@@ -15375,15 +15384,21 @@ async function ritiraEccedenza(){
   const mia = astaInfo && astaInfo.mia; if (!mia) return;
   const ecc = Math.max(0, mia.versato_sats - mia.offerto_sats);
   if (!ecc) { toast('Non c\'è eccedenza da ritirare'); return; }
-  if (!confirm(`Ritiri l'eccedenza (${fmt(ecc)} sats)? È DEFINITIVO: la puntata torna secca a ${fmt(mia.offerto_sats)} sats e su quest'asta il rilancio automatico si chiude (le puntate normali restano).`))
-    return;
-  const r = await fetch(`${API_BASE}/aste/${l.id}/ritira-eccedenza`,
-    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
-  toast(d.riscosso ? '↩️ Eccedenza in arrivo sul tuo wallet'
-                   : '💰 L\'eccedenza è in «Da riscuotere»', 6000);
-  caricaAsta(l.id);
+  chiediConferma({
+    titolo: `Ritiri l'eccedenza (${fmt(ecc)} sats)?`,
+    corpo: `È DEFINITIVO: la puntata torna secca a `
+         + `${fmt(mia.offerto_sats)} sats e su quest'asta il rilancio `
+         + `automatico si chiude (le puntate normali restano).`,
+    etichetta: 'Sì, ritira',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/aste/${l.id}/ritira-eccedenza`,
+        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
+      toast(d.riscosso ? '↩️ Eccedenza in arrivo sul tuo wallet'
+                       : '💰 L\'eccedenza è in «Da riscuotere»', 6000);
+      caricaAsta(l.id);
+    }});
 }
 /* Il rilancio di un'asta deserta: si scegli la durata a pillole, come
    nel form Vendi. La variabile e' SUA e non `sellAstaGiorni`: un
@@ -15439,15 +15454,23 @@ async function inviaRilancio(btn){
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
 }
+/* La firma resta `async` anche se il corpo non attende piu': e'
+   l'ancora di due fette in prove.py, e la lezione di openOrder dice
+   di non muoverla. Vale per ogni funzione convertita al foglio. */
 async function convertiAsta(id){
-  if (!confirm('Converti a prezzo fisso alla base? L\'asta finisce qui.'))
-    return;
-  const r = await fetch(`${API_BASE}/aste/${id}/converti`,
-    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(d.detail || 'Conversione non riuscita', 6000); return; }
-  toast('🏷 Ora è in vendita a prezzo fisso');
-  await loadListings(); openDetail(id);
+  chiediConferma({
+    titolo: 'Converti a prezzo fisso?',
+    corpo: 'L\'annuncio torna in vendita alla base d\'asta. '
+         + 'L\'asta finisce qui.',
+    etichetta: 'Converti',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/aste/${id}/converti`,
+        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(d.detail || 'Conversione non riuscita', 6000); return; }
+      toast('🏷 Ora è in vendita a prezzo fisso');
+      await loadListings(); openDetail(id);
+    }});
 }
 
 async function startBuy(){
@@ -15785,26 +15808,35 @@ async function annullaPagamento(){
   if (!ril && !oid && !pag) { navIndietro(); return; }
   const cosa = pag ? 'questo sblocco'
              : ril ? 'questa fattura di puntata' : 'questo ordine';
-  if (!confirm(`Annullo ${cosa}.\n\nSe hai già pagato, NON annullare: chiudi il foglio e attendi la verifica.`))
-    return;
-  const url = pag ? `${API_BASE}/pagamenti/${pag}/annulla`
-            : ril ? `${API_BASE}/rilanci/${ril}/annulla`
-                  : `${API_BASE}/orders/${oid}/annulla`;
-  const r = await fetch(url, {method:'POST',
-                              headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) {
-    /* il caso tipico: il pagamento e' arrivato nella corsa — il
-       foglio resta aperto e il poll fara' il suo mestiere */
-    toast(d.detail || 'Annullo non riuscito', 6000);
-    return;
-  }
-  if (ril) rilancioCorrente = null;
-  if (pag) pagamentoCorrente = null;
-  navIndietro();
-  toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
-      : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
-  if (!ril && !pag) { await loadOrders(); renderOrders(); }
+  /* Il foglio di casa si apre SOPRA il paySheet, e regge per
+     costruzione: sta dopo di lui nel DOM (quindi navPila lo mette in
+     cima e il gesto indietro chiude prima lui), eseguiConferma fa la
+     chiusura MIRATA che tiene il velo, e il pollTimer non si tocca. */
+  chiediConferma({
+    titolo: `Annulli ${cosa}?`,
+    corpo: 'Se hai già pagato, NON annullare: torna indietro e '
+         + 'attendi la verifica.',
+    etichetta: 'Sì, annulla',
+    poi: async () => {
+      const url = pag ? `${API_BASE}/pagamenti/${pag}/annulla`
+                : ril ? `${API_BASE}/rilanci/${ril}/annulla`
+                      : `${API_BASE}/orders/${oid}/annulla`;
+      const r = await fetch(url, {method:'POST',
+                                  headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) {
+        /* il caso tipico: il pagamento e' arrivato nella corsa — il
+           foglio resta aperto e il poll fara' il suo mestiere */
+        toast(d.detail || 'Annullo non riuscito', 6000);
+        return;
+      }
+      if (ril) rilancioCorrente = null;
+      if (pag) pagamentoCorrente = null;
+      navIndietro();
+      toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
+          : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
+      if (!ril && !pag) { await loadOrders(); renderOrders(); }
+    }});
 }
 
 /* Il foglio-invito della vetrina: spiega e accompagna verso il bot */
@@ -21355,31 +21387,35 @@ function attesaRitardata(btn, testo){
 
 async function adminResolve(esito, btn){
   haptic();
-  const msg = esito==='rimborso'
-    ? 'Rimborsare SUBITO tutti i sats all\'acquirente?\n\nL\'annuncio tornerà in vetrina. La decisione è definitiva.'
+  const [titolo, corpo] = esito==='rimborso'
+    ? ['Rimborsi subito l\'acquirente?',
+       'Tutti i sats tornano all\'acquirente e l\'annuncio torna in vetrina.\n\nLa decisione è definitiva.']
     : esito==='reso'
-    ? 'Rimborso PREVIA RESTITUZIONE?\n\nL\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.'
-    : 'Consegnare i sats al venditore?\n\nLa decisione è definitiva.';
-  if (!confirm(msg)) return;
-  if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
-  const ripristina = bottoneInAttesa(btn);
-  const r = await fetch(`${API_BASE}/admin/orders/${currentOrder.id}/risolvi`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({esito})});
-  const d = await r.json().catch(()=>({}));
-  ripristina();
-  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state = d.stato || 'dispute';
-  toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
-      : d.stato==='released' ? '⚡ Sats consegnati al venditore'
-      : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
-      /* Al moderatore si dice quale dei due e' successo: «in attesa
-         del metodo di incasso» quando il nodo tace manderebbe a
-         cercare una invoice che c'e' gia'. */
-      : d.non_chiesto ? '⚖️ Deciso. Il pagamento non è potuto partire ora (il nostro nodo non risponde): riparte da solo'
-      : '⚖️ Deciso: in attesa del metodo di incasso della parte vincente');
-  openOrder(currentOrder.id);
+    ? ['Rimborso previa restituzione?',
+       'L\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.']
+    : ['Consegni i sats al venditore?', 'La decisione è definitiva.'];
+  chiediConferma({titolo, corpo, etichetta: 'Decidi così',
+    poi: async () => {
+      if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
+      const ripristina = bottoneInAttesa(btn);
+      const r = await fetch(`${API_BASE}/admin/orders/${currentOrder.id}/risolvi`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify({esito})});
+      const d = await r.json().catch(()=>({}));
+      ripristina();
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+      currentOrder.state = d.stato || 'dispute';
+      toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
+          : d.stato==='released' ? '⚡ Sats consegnati al venditore'
+          : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
+          /* Al moderatore si dice quale dei due e' successo: «in attesa
+             del metodo di incasso» quando il nodo tace manderebbe a
+             cercare una invoice che c'e' gia'. */
+          : d.non_chiesto ? '⚖️ Deciso. Il pagamento non è potuto partire ora (il nostro nodo non risponde): riparte da solo'
+          : '⚖️ Deciso: in attesa del metodo di incasso della parte vincente');
+      openOrder(currentOrder.id);
+    }});
 }
 
 async function saveSellerInvoice(btn){
@@ -21412,36 +21448,49 @@ async function saveSellerInvoice(btn){
 
 async function confirmReceived(btn){
   haptic();
-  if (!confirm('Confermi di aver ricevuto l\'oggetto e che è tutto ok?\n\nI sats verranno sbloccati DEFINITIVAMENTE al venditore.')) return;
-  if (DEMO) {
-    currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); openOrder(currentOrder.id); return;
-  }
-  const ripristina = bottoneInAttesa(btn);
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/conferma`, {
-    method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  ripristina();
-  if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
-  if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
-  /* NON_CHIESTO: il nostro nodo non ha risposto, quindi l'ordine e'
-     rimasto ESATTAMENTE dov'era. Va letto `d.stato` invece di
-     scrivere 'confirmed' a mano: senza, chi compra vedrebbe
-     «confermato», non ripremerebbe il bottone, e il promemoria
-     automatico che gli resta gli sembrerebbe sbagliato. */
-  else if (d.non_chiesto) { currentOrder.state = d.stato || currentOrder.state;
-    toast('✅ Confermato. Il pagamento non è potuto partire ora — problema nostro, non tuo: i sats sono nel deposito e ci riproviamo da soli'); }
-  else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
-  openOrder(currentOrder.id);
+  /* Il confirm del gesto piu' consequenziale dell'app dice il FATTO
+     irreversibile, ed e' la regola: il corpo non si ammorbidisce. */
+  chiediConferma({
+    titolo: 'Confermi di aver ricevuto l\'oggetto?',
+    corpo: 'E che è tutto ok: i sats verranno sbloccati '
+         + 'DEFINITIVAMENTE al venditore.',
+    etichetta: 'Libera i sats',
+    poi: async () => {
+      if (DEMO) {
+        currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); openOrder(currentOrder.id); return;
+      }
+      const ripristina = bottoneInAttesa(btn);
+      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/conferma`, {
+        method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      ripristina();
+      if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
+      if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
+      /* NON_CHIESTO: il nostro nodo non ha risposto, quindi l'ordine e'
+         rimasto ESATTAMENTE dov'era. Va letto `d.stato` invece di
+         scrivere 'confirmed' a mano: senza, chi compra vedrebbe
+         «confermato», non ripremerebbe il bottone, e il promemoria
+         automatico che gli resta gli sembrerebbe sbagliato. */
+      else if (d.non_chiesto) { currentOrder.state = d.stato || currentOrder.state;
+        toast('✅ Confermato. Il pagamento non è potuto partire ora — problema nostro, non tuo: i sats sono nel deposito e ci riproviamo da soli'); }
+      else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
+      openOrder(currentOrder.id);
+    }});
 }
 async function annullaOrdine(){
   haptic();
-  if (!confirm('Annullare questo ordine non pagato?\n\nSe hai già pagato, NON annullare: attendi la verifica.')) return;
-  if (DEMO) { orders = orders.filter(x=>x.id!==currentOrder.id); renderOrders(); go('affari'); toast('✖️ Ordine annullato'); return; }
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/annulla`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  await loadOrders(); renderOrders();
-  toast('✖️ Ordine annullato'); go('affari');
+  chiediConferma({
+    titolo: 'Annulli questo ordine non pagato?',
+    corpo: 'Se hai già pagato, NON annullare: attendi la verifica.',
+    etichetta: 'Sì, annulla',
+    poi: async () => {
+      if (DEMO) { orders = orders.filter(x=>x.id!==currentOrder.id); renderOrders(); go('affari'); toast('✖️ Ordine annullato'); return; }
+      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/annulla`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+      await loadOrders(); renderOrders();
+      toast('✖️ Ordine annullato'); go('affari');
+    }});
 }
 
 const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost',
@@ -22118,15 +22167,22 @@ function setTipoPuntoOrdine(t){
 }
 async function markConsegnaMano(){
   haptic();
-  if (!confirm(`Confermi di aver consegnato l'oggetto a mano?\n\nDa adesso l'acquirente può confermare la ricezione, e i sats ti arrivano con la sua conferma. Se non si fa vivo gli mandiamo un promemoria, poi interviene un moderatore.`)) return;
-  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona'; toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id); return; }
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({corriere:'Ritiro in zona', tracking:''})});
-  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona';
-  toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id);
+  chiediConferma({
+    titolo: 'Hai consegnato l\'oggetto a mano?',
+    corpo: 'Da adesso l\'acquirente può confermare la ricezione, e i '
+         + 'sats ti arrivano con la sua conferma. Se non si fa vivo '
+         + 'gli mandiamo un promemoria, poi interviene un moderatore.',
+    etichetta: 'Sì, consegnato',
+    poi: async () => {
+      if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona'; toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id); return; }
+      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify({corriere:'Ritiro in zona', tracking:''})});
+      if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+      currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona';
+      toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id);
+    }});
 }
 
 /* ---- consegna digitale (lug 2026): il contenuto passa DENTRO
@@ -22386,7 +22442,16 @@ function annullaCorrezione(){
 
 async function rivelaContenuto(btn){
   haptic();
-  if (!confirm(`Rivelare il contenuto?\n\nUn codice rivelato non torna indietro. Provalo subito: hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.`)) return;
+  chiediConferma({
+    titolo: 'Riveli il contenuto?',
+    corpo: `Un codice rivelato non torna indietro. Provalo subito: `
+         + `hai ${TEMPI.confermaDig} ore per aprire una disputa se `
+         + `qualcosa non va, poi l'acquisto è definitivo.`,
+    etichetta: '🔓 Rivela',
+    /* resta una CLOSURE e non una funzione a parte: le prove affettano
+       il corpo di rivelaContenuto e devono trovarci dentro l'ancora,
+       il velo e le due copie dello stato */
+    poi: async () => {
   const ripristina = bottoneInAttesa(btn, '🔓 Rivelo il contenuto…');
   const d = await caricaContenutoDigitale();
   ripristina();
@@ -22410,6 +22475,7 @@ async function rivelaContenuto(btn){
      contenuto nasce dove stava il dito */
   riapriOrdineFermo(currentOrder.id, '#digPannello');
   toast(`👁 Contenuto rivelato: hai ${TEMPI.confermaDig} ore per provarlo`);
+    }});
 }
 
 async function mostraContenuto(btn){
@@ -22437,9 +22503,14 @@ async function consegnaContenuto(btn){
   const correzione = digCorreggo === currentOrder.id;
   const testo = (el('digContenuto').value||'').trim();
   if (!testo) { toast('Scrivi il contenuto da consegnare'); return; }
-  if (!confirm(correzione
-      ? 'Aggiornare il contenuto?\n\nL\'acquirente non l\'ha ancora rivelato: riceve un avviso e rivelerà quello nuovo. Appena lo rivela, questo non si tocca più.'
-      : 'Consegnare questo contenuto all\'acquirente?\n\nLa piattaforma lo registra come prova della consegna; l\'acquirente lo rivelerà con un tocco.')) return;
+  chiediConferma({
+    titolo: correzione ? 'Aggiorni il contenuto?'
+                       : 'Consegni questo contenuto?',
+    corpo: correzione
+      ? 'L\'acquirente non l\'ha ancora rivelato: riceve un avviso e rivelerà quello nuovo. Appena lo rivela, questo non si tocca più.'
+      : 'La piattaforma lo registra come prova della consegna; l\'acquirente lo rivelerà con un tocco.',
+    etichetta: correzione ? 'Aggiorna' : 'Consegna',
+    poi: async () => {
   const ripristina = bottoneInAttesa(btn, correzione
     ? '💾 Aggiorno il contenuto…' : '💾 Consegno il codice…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegna-digitale`, {
@@ -22502,6 +22573,7 @@ async function consegnaContenuto(btn){
      confronta il markup letterale. */
   riapriOrdineFermo(currentOrder.id, '#orderContent .vault');
   toast('💾 Contenuto consegnato: l\'acquirente è stato avvisato');
+    }});
 }
 
 /* ---- la busta di consegna (ago 2026): nome del destinatario e
@@ -23601,25 +23673,35 @@ async function resoSpedito(){
 
 async function resoRicevuto(btn){
   haptic();
-  if (!confirm('Confermi di aver ricevuto il reso?\n\nL\'acquirente verrà rimborsato integralmente.')) return;
-  if (DEMO) { currentOrder.state='refunded'; toast('↩️ Acquirente rimborsato'); openOrder(currentOrder.id); return; }
-  const ripristina = bottoneInAttesa(btn);
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-ricevuto`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  ripristina();
-  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state = d.stato || 'refund';
-  toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
-  openOrder(currentOrder.id);
+  chiediConferma({
+    titolo: 'Hai ricevuto il reso?',
+    corpo: 'L\'acquirente verrà rimborsato integralmente.',
+    etichetta: 'Sì, rimborsa',
+    poi: async () => {
+      if (DEMO) { currentOrder.state='refunded'; toast('↩️ Acquirente rimborsato'); openOrder(currentOrder.id); return; }
+      const ripristina = bottoneInAttesa(btn);
+      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-ricevuto`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      ripristina();
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+      currentOrder.state = d.stato || 'refund';
+      toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
+      openOrder(currentOrder.id);
+    }});
 }
 async function openDispute(){
-  if (!confirm('Aprire una disputa? I sats restano bloccati finché un moderatore non decide.')) return;
-  if (DEMO) { currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id); return; }
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/disputa`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id);
+  chiediConferma({
+    titolo: 'Apri una disputa?',
+    corpo: 'I sats restano bloccati finché un moderatore non decide.',
+    etichetta: '⚠️ Apri la disputa',
+    poi: async () => {
+      if (DEMO) { currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id); return; }
+      const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/disputa`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+      currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id);
+    }});
 }
 
 /* ---------------- vendi ---------------- */
@@ -24783,22 +24865,31 @@ const rigaPagamento = p => `
     </div>`;
 
 /* Qui si muovono sats veri in tutt'e due i versi, quindi si chiede
-   sempre — e la domanda dice cosa succede, non «sei sicuro?». */
+   sempre — e la domanda dice cosa succede, non «sei sicuro?». Il
+   foglio di casa porta anche la guardia del doppio tocco, che sul
+   ramo «non è uscito» vale doppio: due tocchi sarebbero due riprove
+   dello stesso pagamento. */
 async function decidiPagamento(tipo, id, esito){
-  const msg = esito==='uscito'
-    ? 'Confermi che su LNbits quel pagamento risulta USCITO?\n\nL\'affare verrà chiuso come pagato, senza far partire nessun altro pagamento.'
-    : 'Confermi che su LNbits NON è uscito niente?\n\nIl pagamento tornerà a partire normalmente: se invece era uscito, uscirebbe una seconda volta.';
-  if (!confirm(msg)) return;
-  try {
-    const r = await fetch(`${API_BASE}/admin/pagamenti/decidi`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({tipo, id, esito})});
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(j.detail || 'Non è andata'); loadAdminStats(); return; }
-    toast(esito==='uscito' ? '✅ Affare chiuso' : '↩︎ Il pagamento può ripartire');
-  } catch(e) { toast('Non è andata'); }
-  loadAdminStats();
+  chiediConferma({
+    titolo: esito==='uscito'
+      ? 'Su LNbits risulta USCITO?'
+      : 'Su LNbits NON è uscito niente?',
+    corpo: esito==='uscito'
+      ? 'L\'affare verrà chiuso come pagato, senza far partire nessun altro pagamento.'
+      : 'Il pagamento tornerà a partire normalmente: se invece era uscito, uscirebbe una seconda volta.',
+    etichetta: esito==='uscito' ? '✅ È uscito' : '↩︎ Non è uscito',
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/admin/pagamenti/decidi`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({tipo, id, esito})});
+        const j = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(j.detail || 'Non è andata'); loadAdminStats(); return; }
+        toast(esito==='uscito' ? '✅ Affare chiuso' : '↩︎ Il pagamento può ripartire');
+      } catch(e) { toast('Non è andata'); }
+      loadAdminStats();
+    }});
 }
 
 /* La riga di un annuncio in attesa: titolo, prezzo, venditore, motivo

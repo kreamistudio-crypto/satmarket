@@ -20990,9 +20990,9 @@ def prove_fogli_di_casa():
     prova("...ed e' registrato in closeSheet", True,
           "rilancioSheet" in chiudi)
     ril = fetta("function rilanciaAsta(", "function renderRilancioDurate(")
-    # la fine e' convertiAsta e non il foglio dopo: fra le due c'e' un
-    # confirm() ancora vivo (uno dei gesti sui sats, non di questo
-    # cantiere) e la fetta larga se lo pescava — l'ha detto la prova
+    # la fine e' convertiAsta e non il foglio dopo: fra le due viveva
+    # un confirm() (convertito anche lui, ago 2026) e la fetta larga
+    # se lo pescava — l'ha detto la prova. Il taglio resta com'era.
     inv = fetta("async function inviaRilancio(", "async function convertiAsta(")
     prova("il rilancio non chiede piu' niente al sistema", False,
           "prompt(" in ril or "confirm(" in ril
@@ -21096,8 +21096,22 @@ def prove_fogli_di_casa():
     # a muovere dei sats — e l'unico che li fa USCIRE: per questo il
     # suo corpo dice le due cose che non si disfano da sole, i sats
     # che partono e la porta gia' pagata che si richiude.
-    prova("i gesti che passano dalla domanda unica sono dodici", 12,
-          solo_codice(mini).count("chiediConferma({"))
+    # VENTICINQUE dall'ago 2026: il censimento dei confirm() di
+    # sistema (29 siti, piu' dei «gesti sui sats e admin» che questo
+    # file dichiarava — la lezione dell'elenco a memoria) ha aperto la
+    # conversione di TUTTI, a gruppi. I tredici del primo gruppo sono
+    # il percorso dei sats: i due ritiri d'asta, la conversione a
+    # prezzo fisso, l'annullo nel paySheet (il foglio si apre SOPRA un
+    # foglio: regge perche' sta dopo di lui nel DOM e la chiusura di
+    # eseguiConferma e' mirata), la decisione della disputa, la
+    # conferma di ricezione, l'annullo dell'ordine, la consegna a
+    # mano, la rivelazione e la consegna del contenuto, il reso
+    # ricevuto, la disputa, e la decisione di un pagamento incerto —
+    # dove la guardia del doppio tocco che il foglio porta in omaggio
+    # vale doppio: due tocchi su «non e' uscito» sono due riprove
+    # dello stesso pagamento.
+    prova("i gesti che passano dalla domanda unica sono venticinque",
+          25, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
