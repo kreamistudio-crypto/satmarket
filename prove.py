@@ -7117,13 +7117,20 @@ def prove_barattolo_in_striscia():
           "della card P2P)", True,
           "href" not in card and 'role="button"' in card
           and 'tabindex="0"' in card)
-    # ...e col TRATTO SUO (ago 2026, tarato a schermo): il 2 di serie,
-    # giusto sui cerchietti da 34/40px, reso a 56 faceva ~4,7px —
-    # fuori famiglia con le illustrazioni delle sorelle. A 1.3 rende
-    # ~3px, il peso del bordo bianco del vaso della monstera.
+    # ...e col TRATTO SUO (ago 2026, tarato a schermo in DUE giri): il
+    # 2 di serie, giusto sui cerchietti da 34/40px, reso a 56 faceva
+    # ~4,7px — fuori famiglia con le illustrazioni delle sorelle. Il
+    # primo giro si era fermato a 1.3 e ad Andrea il vetro pesava
+    # ancora: 1.15 (~2,7px) e' l'appena-prima del limite, che e'
+    # l'1.1 dove il coperchio si sfilaccia.
     prova("il vetro nasce GIA' al livello del barattolo, mai lv0 secco",
           True,
-          "jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.3)" in card)
+          "jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)" in card)
+    # il riflesso scende col vetro: piu' spesso del vetro si
+    # leggerebbe come un graffio, non come luce
+    prova("...e il riflesso scende col vetro assottigliato", True,
+          "const lux = t < 2 ? 1 : 1.3;" in pezzo_js(
+              mini, "function jarSVG(livello, misura, tratto){", "\n}\n"))
     prova("il tocco e' il toggle di sempre", True,
           'onclick="alternaBarattolo()"' in card)
     prova("...anche da tastiera: un <a> senza href non riceve click",
@@ -25011,6 +25018,16 @@ def prove_scoprire():
     # uguale lascerebbe la sezione spenta per sempre)
     prova("...e il display si scrive prima della firma", True,
           _rs.index("style.display") < _rs.index("scoprireFirma"))
+    # COL BARATTOLO RESTANO LE SOLE CARD CHE NAVIGANO (ago 2026,
+    # decisione di Andrea, che EMENDA il «col barattolo la sezione se
+    # ne va» del primo giro): le card-interruttore accendono filtri
+    # del server, e il loro tocco passa da loadListings, che spegne il
+    # filtro prima del fetch — butterebbero fuori dal barattolo in
+    # silenzio. La card che naviga porta a una pagina e funziona
+    # uguale. Il comportamento lo prova il banco eseguibile qui sotto;
+    # questa dice che il criterio e' `tocca`, non un elenco di id.
+    prova("col barattolo restano le sole card che navigano", True,
+          "(!vistaBarattolo || v.tocca) && v.vivo()" in _rs)
     # coi dati vivi decide il server; in DEMO i giudici che poi
     # FILTRANO (lampoAttiva, scontoQui): demo e vetrina non divergono
     prova("i flag vivi vengono dal server", True,
@@ -25542,6 +25559,15 @@ interessiMiei = [];
 rifai();
 dice('chi non ha votato la vede anche senza occasioni', ['p2p'],
      idCard());
+
+occasioniServer = {lampo: 1, sconto: 1};
+vistaBarattolo = true;
+rifai();
+dice('col barattolo resta la sola card che naviga', ['p2p'], idCard());
+interessiMiei = ['p2p'];
+rifai();
+dice('...e col P2P gia votato la sezione sparisce intera', 'none',
+     nodi['scoprireSez'].style.display);
 """
 
 def prove_script_nel_workflow():

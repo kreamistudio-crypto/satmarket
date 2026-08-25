@@ -8364,7 +8364,7 @@ function renderStriscia(){
        tabindex="0" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"
        aria-pressed="${vistaBarattolo}" onclick="alternaBarattolo()"
        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternaBarattolo()}">
-      <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.3)}</span>
+      <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)}</span>
       <span class="cat-eti">Nel tuo barattolo</span>
     </a>` : '') + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
@@ -8438,16 +8438,22 @@ const SCOPRIRE = [
 ];
 let scoprireFirma = '';
 function renderScoprire(){
-  /* Col barattolo la sezione se ne va — le sue card accendono FILTRI
-     del server, che sulla lista chiusa del barattolo non hanno senso
-     (le categorie invece dall'ago 2026 RESTANO: li' c'e' la card del
-     barattolo da illuminare); senza card vive sparisce TUTTA, titolo
-     compreso — una sezione con un titolo e niente sotto e' peggio di
-     nessuna sezione. Il display si scrive PRIMA del controllo della
-     firma (la lezione storica di renderStriscia: scritto dopo,
-     tornando dal barattolo la firma uguale lascerebbe la sezione
-     spenta per sempre). */
-  const vive = vistaBarattolo ? [] : SCOPRIRE.filter(v => v.vivo());
+  /* Col barattolo restano le sole card che NAVIGANO (ago 2026,
+     decisione di Andrea): le card-INTERRUTTORE accendono filtri del
+     server, che sulla lista chiusa del barattolo non hanno senso — il
+     loro tocco passa da loadListings, che spegne il filtro prima del
+     fetch, quindi butterebbero fuori dal barattolo in silenzio. La
+     card che NAVIGA (il P2P, e domani le sponsorizzate) porta a una
+     pagina, e dentro il barattolo funziona uguale. Con una card sola
+     la sezione resta, titolo compreso; senza card vive sparisce
+     TUTTA — una sezione con un titolo e niente sotto e' peggio di
+     nessuna sezione (le categorie invece dall'ago 2026 RESTANO
+     sempre: li' c'e' la card del barattolo da illuminare). Il display
+     si scrive PRIMA del controllo della firma (la lezione storica di
+     renderStriscia: scritto dopo, tornando dal barattolo la firma
+     uguale lascerebbe la sezione spenta per sempre). */
+  const vive = SCOPRIRE.filter(v =>
+    (!vistaBarattolo || v.tocca) && v.vivo());
   el('scoprireSez').style.display = vive.length ? '' : 'none';
   if (!vive.length) return;
   /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
@@ -24122,14 +24128,17 @@ const livelloBarattolo = n =>
    `tratto` (ago 2026): il vetro nasce a 2, tarato sui cerchietti da
    34/40px — reso a 56 nella card della striscia faceva ~4,7px, fuori
    famiglia con le illustrazioni delle sorelle, che sono a tratto piu'
-   fine. Chi rende grande passa un tratto suo (la striscia: 1.3,
-   tarato a schermo accanto alle sorelle); il riflesso scende con lui,
-   che un riflesso piu' spesso del vetro si legge come un graffio. */
+   fine. Chi rende grande passa un tratto suo (la striscia: 1.15,
+   tarato a schermo in DUE giri accanto alle sorelle — il primo si era
+   fermato a 1.3, e ad Andrea il vetro pesava ancora; il limite e'
+   l'1.1, dove il coperchio si sfilaccia, e ci si ferma appena prima);
+   il riflesso scende con lui, che un riflesso piu' spesso del vetro
+   si legge come un graffio. */
 let jarClipN = 0;
 function jarSVG(livello, misura, tratto){
   const clip = 'jarClip' + (++jarClipN);
   const t = tratto || 2;
-  const lux = t < 2 ? 1.1 : 1.3;
+  const lux = t < 2 ? 1 : 1.3;
   return `<svg class="jar-ico lv${livello}" width="${misura||18}" height="${misura||18}" viewBox="0 0 24 24" aria-hidden="true">
     <defs><clipPath id="${clip}"><rect x="7" y="6.5" width="10" height="14" rx="3"/></clipPath></defs>
     <g clip-path="url(#${clip})"><rect class="jar-liq" x="7" y="6.5" width="10" height="14"/></g>
