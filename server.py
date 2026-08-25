@@ -1713,29 +1713,61 @@ XP_PER_EURO = 1             # un euro, un punto
 # Il venditore prende piu' del compratore perche' VENDERE E' IL LATO
 # SCARSO: un mercatino muore per mancanza di merce, mai di curiosi.
 XP_RUOLO = {"venditore": 1.0, "compratore": 0.6}
-AZIONI_XP = {
-    "visita": 1,            # presenza, non merito
-    "annuncio": 5,          # UNO al giorno, o si pubblica spazzatura
-    "feedback": 10,         # uno per ordine, come il feedback stesso
-    "incassi": 20,          # Lightning address impostato, una volta sola
-    "identita": 15,         # npub verificata, Telegram collegato
-    "distintivo": 25,
-}
+
+# IL PERIMETRO, E VIVE IN UN POSTO SOLO (ago 2026, decisione di
+# Andrea): gli XP sono il COMMERCIO e nient'altro. Comprare e vendere
+# danno punti; visitare, pubblicare, lasciare un feedback, mettere il
+# Lightning address, verificare la npub e prendere un distintivo no.
+# IL PERCHE' E' IL CANTIERE IN UNA RIGA: il numero che si vede dev'essere
+# il numero che conta. Nel Profilo se ne leggevano 244 e nel rank ne
+# contavano 123, e guardando non c'era modo di capirlo — perche'
+# `utenti.xp` non aveva mai avuto una definizione SCRITTA: era «la
+# somma del registro» in _ricalcola_xp, «la somma di quel che i ganci
+# hanno sommato» in assegna_xp, e una terza scritta a mano nella WHERE
+# della classifica. Tre posti, tre perimetri impliciti, nessun nome.
+# UNA COSTANTE E NON UN `tipo='ordine'` SPARSO, ed e' la meta' che
+# conta: il giorno che qualcuno aggiunge un gancio nuovo, col
+# letterale il numero si gonfia in silenzio, con la costante deve
+# passare DI QUI e prendere una decisione che ha un nome sopra — e non
+# aggiungerlo e' la scelta sicura di serie. In piu' `grep XP_COMMERCIO`
+# da' tutto l'invariante in un colpo.
+XP_COMMERCIO = ("ordine",)
 
 
-def oggi_locale() -> str:
-    """Il giorno di oggi, ora del server ('2026-08-05'). Locale e non
-    UTC: chi apre l'app alle 23 di sera e alle 8 del mattino dopo deve
-    vedere due giorni, non uno — e' l'ora che ha lui sull'orologio."""
-    return time.strftime("%Y-%m-%d", time.localtime())
+def sql_xp_commercio(colonna: str = "tipo") -> tuple:
+    """Il perimetro tradotto in SQL: (frammento, parametri). I lettori
+    lo chiamano invece di riscrivere la condizione a mano, o il giorno
+    che il perimetro si allarga uno dei tre resta indietro."""
+    segni = ",".join("?" for _ in XP_COMMERCIO)
+    return (f"{colonna} IN ({segni})", list(XP_COMMERCIO))
+
+
+# LAPIDE (ago 2026). Qui viveva il tariffario delle azioni di
+# presenza — visita 1, annuncio 5, feedback 10, incassi 20, identita'
+# 15, distintivo 25 — coi suoi otto ganci e con `oggi_locale()`, che
+# serviva a mettere il giorno dentro il riferimento e cosi' a fare da
+# tetto giornaliero. Se n'e' andato col perimetro: quelle azioni non
+# danno piu' punti, quindi il tariffario non ha piu' niente da tariffare.
+# IL PREZZO E' DICHIARATO, ed e' l'unica cosa di questo cantiere che
+# non si disfa: gli XP non si ricalcolano dai dati veri come i
+# distintivi, quindi le righe che da oggi non si scrivono NON
+# ESISTERANNO. Se un domani si volesse riaprire il perimetro — mettiamo
+# ai feedback — il backfill sarebbe impossibile per tutto l'intervallo.
+# E' la stessa asimmetria che il DDL di `xp_eventi` annuncia gia'.
+# Le righe VECCHIE invece restano tutte: il registro e' append-only e
+# non si e' cancellato niente, quindi tornando indietro i numeri si
+# rimettono da soli — e' il motivo per cui questo cantiere lascia stare
+# il registro e tocca solo una cache.
 
 
 def _ricalcola_xp(con, tg_id: int):
     """Rifa' utenti.xp dal registro. Nessun commit: e' del chiamante.
     E' cio' che rende la fusione un caso NON speciale — si migrano le
     righe e si ricalcola, come per rating e feedback."""
+    dove, par = sql_xp_commercio()
     n = con.execute("SELECT COALESCE(SUM(punti),0) AS s FROM xp_eventi "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()["s"]
+                    f"WHERE tg_id=? AND {dove}",
+                    [tg_id] + par).fetchone()["s"]
     con.execute("UPDATE utenti SET xp=? WHERE tg_id=?", (n, tg_id))
     return n
 
@@ -1754,8 +1786,16 @@ def assegna_xp(con, tg_id: int, tipo: str, punti: int,
         (tg_id, tipo, int(punti), riferimento, int(time.time())))
     if not r.rowcount:
         return 0            # gia' pagato: e' il retry, ed e' innocuo
-    con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
-                (int(punti), tg_id))
+    # LA GUARDIA STA ANCHE QUI, e non solo nel ricalcolo: le due sono
+    # due strade verso lo stesso numero — l'incrementale e il
+    # ricalcolo — e con due perimetri diversi la cache dipenderebbe da
+    # QUALE e' girata per ultima (un gancio somma, poi una fusione
+    # chiama _ricalcola_xp e glieli toglie). Un numero che oscilla,
+    # non riproducibile e invisibile: il guasto di oggi, aggravato.
+    # Con la guardia sono la stessa strada PER COSTRUZIONE.
+    if tipo in XP_COMMERCIO:
+        con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
+                    (int(punti), tg_id))
     return int(punti)
 
 
@@ -1798,11 +1838,25 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
 # la stessa idea per cui frequenza e importo valgono entrambi.
 # Derivati, mai in colonna: si ricalcolano da xp e dai contatori, come
 # i distintivi si ricalcolano dai dati veri.
+# LE SOGLIE SONO TARATE SUI NUMERI VERI (ago 2026, misura sul VPS col
+# gemello `livelli_prova.py`) e non a occhio: col perimetro del solo
+# commercio gli XP calano per tutti, e soglie ferme avrebbero fatto
+# SCENDERE di gradino gente che non ha fatto niente. Il tetto di
+# «avviato» era 59, quindi 50 — nessuno scende e chi era entrato dalla
+# porta del banner col livello se la tiene. Le tre alte non le ha
+# ancora raggiunte nessuno, quindi sono scelte libere tenendo il
+# rapporto della scala vecchia diviso tre: in euro venduti fanno
+# ~45, ~190, ~790 e ~3000.
+# ⚠️ Le soglie vanno cambiate NELLO STESSO DEPLOY del riallineamento:
+# deployare il riallineamento con le soglie di ieri farebbe scendere
+# tutti per un giro, e chi guarda vedrebbe un declassamento vero.
+# Le soglie degli AFFARI non si toccano: quelle il perimetro non le ha
+# mai riguardate.
 LIVELLI = [(0, 0, "nuovo", "Nuovo arrivato"),
-           (150, 1, "avviato", "Bottega avviata"),
-           (600, 5, "pratico", "Mercante pratico"),
-           (2500, 15, "esperto", "Mercante esperto"),
-           (9000, 40, "maestro", "Maestro del banco")]
+           (50, 1, "avviato", "Bottega avviata"),
+           (200, 5, "pratico", "Mercante pratico"),
+           (800, 15, "esperto", "Mercante esperto"),
+           (3000, 40, "maestro", "Maestro del banco")]
 
 
 def livello_utente(xp: int, affari: int) -> dict:
@@ -1986,12 +2040,38 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
             "persone": persone,
             "affari": affari.get(chi, 0),
             "xp": xp,
-            "punti": fiducia * (1 + peso * commercio),
+            # F e C escono INTERI perche' `classifica_prova.py` li
+            # mostri senza doverli ricavare dal punteggio: invertire la
+            # formula e' scriverla una seconda volta al contrario, e
+            # quella copia si e' gia' rotta una volta (l'inversione non
+            # sapeva dello smorzamento). In pubblico non escono: `voce()`
+            # elenca i campi a mano.
+            "fiducia": fiducia,
+            "commercio": commercio,
+            "punti": fiducia * (1 + peso * commercio * smorzo),
         })
-    # A pari punteggio comanda l'id, o due righe identiche si
-    # scambierebbero di posto a ogni richiesta (la lezione del pareggio
-    # del podio e del cursore keyset).
-    fuori.sort(key=lambda r: (-r["punti"], r["id"]))
+    # A PARI PUNTEGGIO COMANDA IL MERITO, E L'ID PER ULTIMO.
+    # Lo smorzamento NON scioglie i pareggi, e non poteva: quando la
+    # media e' uguale a quella del mercatino la fiducia vale ESATTAMENTE
+    # M per qualunque `persone`, e senza XP d'ordine il bonus e' zero —
+    # cioe' il mercatino di oggi, dove hanno tutti 5,00. Li' due righe
+    # hanno gli stessi punti bit per bit, e a decidere resta questa
+    # chiave: prima le PERSONE (la fiducia piu' larga vince, ed e' la
+    # stessa cosa che dice lo smorzamento un gradino piu' su), poi gli
+    # AFFARI.
+    # E VA DETTO COSA SI STA SCEGLIENDO (decisione di Andrea): a pari
+    # punteggio LA FREQUENZA BATTE IL VALORE — due affari da 15 € vanno
+    # davanti a uno da 40, che danno gli stessi XP. Non e' ovvio, ed e'
+    # meglio di un id, che non significa niente.
+    # La MEDIA e' stata provata in questa chiave e tolta: a pari persone
+    # due medie diverse danno GIA' punti diversi (senza XP il punteggio
+    # e' esattamente la fiducia), quindi li' sarebbe codice morto — una
+    # guardia che promette d'essere esercitata e non lo e' mai.
+    # L'id resta in coda e NON e' un merito: e' il determinismo — due
+    # righe identiche non devono scambiarsi di posto a ogni richiesta
+    # (la lezione del pareggio del podio e del cursore keyset).
+    fuori.sort(key=lambda r: (-r["punti"], -r["persone"], -r["affari"],
+                              r["id"]))
     return fuori
 
 
@@ -2342,6 +2422,65 @@ def riallinea_quantita_max(con):
     le righe salite sopra il massimo, e nessun giro puo' abbassarlo."""
     con.execute("UPDATE annunci SET quantita_max=quantita "
                 "WHERE quantita>quantita_max")
+
+
+def riallinea_xp_commercio(con):
+    """Rimette `utenti.xp` d'accordo col perimetro: la somma dei soli
+    eventi di COMMERCIO. E' il backfill del cantiere «gli XP sono solo
+    commercio» — prima la cache sommava tutti e sette i tipi, quindi
+    dopo il deploy ogni profilo che aveva punti di presenza e' piu'
+    alto del vero finche' non ci passa di qui.
+    BIDIREZIONALE, e non e' un di piu': la WHERE tocca le righe che non
+    combaciano IN NESSUNO DEI DUE VERSI, quindi ripara anche una cache
+    piu' BASSA — che e' quel che lascerebbe dietro uno script vecchio
+    lanciato dopo il deploy, o un rollback e ritorno.
+    Idempotente: al secondo giro non trova niente, non scrive e tace.
+    PARLA, e le gemelle no: questa toglie punti a persone vere, e un
+    numero che cala in silenzio e' il modo peggiore di presentarsi —
+    la riga nel journal e' quel che permette di dire, guardando, se e
+    quanto e' successo."""
+    dove, par = sql_xp_commercio()
+    r = con.execute(
+        "UPDATE utenti SET xp=COALESCE((SELECT SUM(punti) FROM xp_eventi "
+        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0) "
+        "WHERE xp<>COALESCE((SELECT SUM(punti) FROM xp_eventi "
+        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0)", par + par)
+    if r.rowcount:
+        print(f"🧮 XP riallineati al commercio: {r.rowcount} utenti",
+              flush=True)
+    return r.rowcount
+
+
+def riallinea_titoli_decaduti(con):
+    """Chi indossa un titolo di LIVELLO che non ha piu' torna a
+    «Nessuno». Serve perche' col perimetro nuovo qualcuno puo' scendere
+    di gradino, e un titolo e' un grado: portarne uno che non si ha
+    piu' e' l'unica cosa che questo cantiere puo' far dire di falso a
+    un profilo.
+    I titoli-livello si DERIVANO da TITOLI (`serve[0] == 'livello'`) e
+    non si elencano a mano, o il titolo aggiunto domani resterebbe
+    addosso a chi non lo merita. Il confronto passa da
+    `_gradino_livello` e da `livello_utente`, cioe' dai giudici di
+    sempre: nessuna regola riscritta.
+    Idempotente e silenzioso quando non tocca niente, come le gemelle."""
+    serve = {t["id"]: t["serve"][1] for t in TITOLI
+             if t["serve"][0] == "livello"}
+    if not serve:
+        return 0
+    segni = ",".join("?" for _ in serve)
+    tolti = 0
+    for u in con.execute(
+            f"SELECT tg_id, titolo, xp, vendite_ok, acquisti_ok FROM utenti "
+            f"WHERE titolo IN ({segni})", list(serve)).fetchall():
+        affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+        ora = livello_utente(u["xp"] or 0, affari)["numero"]
+        if _gradino_livello(serve[u["titolo"]]) > ora:
+            con.execute("UPDATE utenti SET titolo='' WHERE tg_id=?",
+                        (u["tg_id"],))
+            tolti += 1
+    if tolti:
+        print(f"🎖 Titoli decaduti tolti: {tolti}", flush=True)
+    return tolti
 
 
 def riallinea_spedizionieri(con):
@@ -3258,18 +3397,27 @@ def init_db():
                     # rating e n_feedback, quindi rimozione admin e
                     # fusione si sistemano da sole.
                     "n_recensori INTEGER DEFAULT 0",
-                    # xp (ago 2026): la SOMMA del registro xp_eventi,
-                    # tenuta qui perche' ogni card e ogni profilo la
-                    # legge e non si fa una SUM per riga. Cache, non
-                    # verita': si rifa' da capo con _ricalcola_xp, che
-                    # e' cio' che rende la fusione un caso non
-                    # speciale (si sommano i registri e si ricalcola).
-                    # xp_ultimo_giorno e' il giorno LOCALE dell'ultima
-                    # visita premiata: serve solo a non rifare la
-                    # scrittura mille volte al giorno — a impedire il
-                    # doppio punto ci pensa comunque la UNIQUE del
-                    # registro, questa e' cortesia verso il database.
+                    # xp (ago 2026): la somma degli eventi di
+                    # COMMERCIO del registro — il perimetro e'
+                    # XP_COMMERCIO e vive in un posto solo. Tenuta qui
+                    # perche' ogni card e ogni profilo la legge e non
+                    # si fa una SUM per riga. Cache, non verita': si
+                    # rifa' da capo con _ricalcola_xp, che e' cio' che
+                    # rende la fusione un caso non speciale (si
+                    # sommano i registri e si ricalcola), e la rimette
+                    # in pari a ogni avvio riallinea_xp_commercio.
+                    # Il registro invece tiene TUTTO, anche i tipi
+                    # fuori perimetro: sono storia, e restano.
                     "xp INTEGER DEFAULT 0",
+                    # xp_ultimo_giorno: LAPIDE (ago 2026). Era il
+                    # giorno locale dell'ultima visita premiata, e da
+                    # quando la visita non da' punti non la scrive piu'
+                    # nessuno. NON SI TOGLIE, ed e' la regola di casa
+                    # (il precedente e' utenti.comune): una colonna non
+                    # si toglie mai, e qui toglierla renderebbe
+                    # VELENOSO un rollback — il server vecchio la
+                    # ri-ALTERerebbe a '' e ricomincerebbe a timbrare
+                    # le visite di tutti da capo.
                     "xp_ultimo_giorno TEXT DEFAULT ''",
                     # coorte (ago 2026): in che ondata e' arrivato.
                     # CONGELATA al primo calcolo — la posizione in una
@@ -4581,6 +4729,11 @@ def init_db():
     # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
     # nome della rete nel cassetto senza che nessuno gliel'abbia tolti.
     riallinea_spedizionieri(con)
+    # PRIMA gli XP e POI i titoli: il secondo giudica sul numero che
+    # il primo ha appena rimesso in pari, e all'incontrario toglierebbe
+    # (o lascerebbe) i gradi guardando la cache di ieri.
+    riallinea_xp_commercio(con)
+    riallinea_titoli_decaduti(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
     # per annuncio a ogni acquisto: e' la prima query calda su ordini
     # (finora la tabella viveva senza indici).
@@ -5049,11 +5202,6 @@ async def login_nostr(req: Request, response: Response):
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
-    # La firma Schnorr ha appena dimostrato il possesso della chiave:
-    # per lui la npub e' verificata dalla nascita, e vale come per chi
-    # su Telegram ci passa dalla nota pubblica. Stesso riferimento, o
-    # un nativo che poi verifica di nuovo verrebbe pagato due volte.
-    await premia_xp(tg_id, "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "nuovo": True}
 
 
@@ -6544,11 +6692,6 @@ async def premia_distintivi(tg_id: int):
         print(f"⚠️ Distintivi saltati per {tg_id}: {e}")
         return
     for did in nuovi:
-        # Un distintivo vale anche XP. Il riferimento e' il badge, che
-        # e' gia' unico per utente: se un giorno i distintivi si
-        # potessero riassegnare, questo non ripagherebbe comunque.
-        await premia_xp(tg_id, "distintivo", AZIONI_XP["distintivo"],
-                        f"badge:{did}")
         dd = next(d for d in DISTINTIVI if d["id"] == did)
         await notifica(tg_id,
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
@@ -6963,10 +7106,6 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # ...e gli XP si risommano dal registro appena migrato: e' il
         # motivo per cui utenti.xp e' una cache e non la verita'.
         _ricalcola_xp(con, id_telegram)
-        # Le due identita' sono adesso una sola, ed e' un traguardo:
-        # vale come la npub verificata, e una volta sola.
-        assegna_xp(con, id_telegram, "identita", AZIONI_XP["identita"],
-                   "telegram")
         # I contatori sommati possono far scattare distintivi nuovi
         # (Specchiato, rodato...): valutazione silenziosa, li vedra'
         # al prossimo giro di Profilo.
@@ -11624,13 +11763,6 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
         accoda_match(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
-    # Pubblicare vale XP UNA volta al giorno, e il tetto non e' scritto
-    # da nessuna parte: e' il riferimento «giorno:...» che, con la
-    # UNIQUE del registro, lascia passare solo il primo annuncio.
-    # Senza, la strada piu' veloce per salire sarebbe pubblicare
-    # spazzatura — e la regola del tariffario dice il contrario.
-    await premia_xp(user["id"], "annuncio", AZIONI_XP["annuncio"],
-                    f"giorno:{oggi_locale()}")
     # Il venditore irraggiungibile lo viene a sapere SUBITO, una volta
     # sola (timbro): la riga del form gliel'ha appena detto, questo e'
     # il richiamo in chat. Solo sul ramo attivo — il testo dice «in
@@ -12342,9 +12474,10 @@ def _dati_classifica(con):
                 "SELECT per_tg_id, da_tg_id, voto FROM feedback "
                 "WHERE ordine_id NOT IN "
                 "(SELECT id FROM ordini WHERE prova=1)")]
+    dove, par = sql_xp_commercio()
     xp = {r["tg_id"]: r["p"] for r in con.execute(
         "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
-        "WHERE tipo='ordine' GROUP BY tg_id")}
+        f"WHERE {dove} GROUP BY tg_id", par)}
     return voti, controparti, xp, affari
 
 
@@ -12377,15 +12510,35 @@ def classifica(x_tg_init_data: str = Header(""),
     gli altri (scelta di Andrea): fuori escono i primi
     CLASSIFICA_TOP e basta.
 
-    COSA NON ESCE MAI, ed e' la parte da non allentare: il `tg_id`
-    (che in vetrina non compare da nessuna parte), gli XP — /api/negozio
-    li toglie apposta dal pubblico, «gli XP sono roba di chi li ha, e un
-    numero altrui non aiuta nessuno a decidere se fidarsi», e USARLI per
-    ordinare non rovescia quella riga mentre PUBBLICARLI si — e il
-    PUNTEGGIO, che sarebbe un numero opaco da spiegare. Si mostrano la
-    posizione e i FATTI su cui poggia: media, da quante persone,
-    quanti affari. Sono anche quel che permette a chi guarda di
-    giudicare da se', che e' il meccanismo su cui la tolleranza agli
+    IL PUNTEGGIO ESCE, ×100 e arrotondato (ago 2026, decisione di
+    Andrea), e ROVESCIA meta' della riga che stava qui — «sarebbe un
+    numero opaco da spiegare». Il perche': senza, l'ordine delle righe
+    non si legge. Con tutte le medie a 5,00 si vedono sette nomi
+    identici in sette posizioni diverse, e chi guarda non ha modo di
+    capire cosa li separa — cioe' la classifica non risponde alla sola
+    domanda per cui esiste. ×100 perche' un numero fra 5,51 e 5,90 si
+    confronta male e si confonde con la media che gli sta accanto.
+
+    LA CONSEGUENZA E' DICHIARATA E ACCETTATA: il punteggio e'
+    INVERTIBILE. Media, persone e affari escono gia' in riga, quindi da
+    qui si ricava quanto uno ha commerciato — e dopo il cantiere del
+    perimetro gli XP sono esattamente questo. Non e' un effetto
+    collaterale: e' una scelta di prodotto presa sapendolo, ed e' per
+    questo che sta scritta anche nella pagina «I tuoi dati», che
+    dichiara cosa e' pubblico. La FORMULA per esteso non si ripete qui:
+    vive in un posto solo, il commentone del giudice.
+
+    COSA NON ESCE ANCORA, ed e' la parte da non allentare: il `tg_id`
+    (che in vetrina non compare da nessuna parte) e gli XP in chiaro —
+    /api/negozio li toglie apposta dal pubblico. Che dal punteggio si
+    possano ricavare non li rende un campo: un numero da cui si deduce
+    e un numero che si legge sono due cose diverse, e la seconda
+    inviterebbe a confrontarlo con quello del Profilo, che e' lo
+    stesso ma detto in un'altra unita'.
+
+    Accanto restano i FATTI su cui il punteggio poggia: media, da
+    quante persone, quanti affari. Sono quel che permette a chi guarda
+    di giudicare da se', che e' il meccanismo su cui la tolleranza agli
     ordini fasulli conta.
 
     I campi si ELENCANO uno per uno invece di togliere quelli di
@@ -12427,6 +12580,9 @@ def classifica(x_tg_init_data: str = Header(""),
                 "avatar": (u["avatar"] if u else "") or "",
                 "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
                 "media": round(r["media"], 2),
+                # ×100 e arrotondato: e' il numero che si legge, e il
+                # solo posto dove il punteggio prende una forma.
+                "punteggio": round(r["punti"] * 100),
                 "voti": r["voti"],
                 "persone": r["persone"],
                 "affari": r["affari"]}
@@ -24014,12 +24170,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         if user["id"] in FONDATORI and not u["titolo"]:
             con.execute("UPDATE utenti SET titolo='t_fondatore' "
                         "WHERE tg_id=?", (user["id"],))
-        giorno = oggi_locale()
-        if (u["xp_ultimo_giorno"] or "") != giorno:
-            assegna_xp(con, user["id"], "visita", AZIONI_XP["visita"],
-                       f"giorno:{giorno}")
-            con.execute("UPDATE utenti SET xp_ultimo_giorno=? WHERE tg_id=?",
-                        (giorno, user["id"]))
+        # (Qui si timbrava la visita del giorno. Il commit RESTA: serve
+        # ad assegna_coorte e al titolo dei fondatori, qui sopra.)
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -24452,13 +24604,6 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
-    # Un indirizzo che INCASSA vale XP, una volta sola. Solo se c'e'
-    # davvero: la stessa POST serve anche a cancellarlo, e togliere
-    # non e' un traguardo. Chi lo toglie tiene i punti — il registro
-    # e' append-only, e questo qui e' un fatto successo.
-    if addr:
-        await premia_xp(user["id"], "incassi", AZIONI_XP["incassi"],
-                        "ln_address")
     sbloccati = 0
     for oid in incassi:
         r = await _sblocca_sats(oid)
@@ -26709,7 +26854,6 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
     await premia_distintivi(user["id"])
-    await premia_xp(user["id"], "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "verificata": True}
 
 
@@ -31324,11 +31468,6 @@ async def lascia_feedback(ordine_id: int, req: Request,
         raise
     finally:
         con.close()
-    # Lasciare il feedback vale XP a CHI LO LASCIA: e' il gesto che
-    # tiene in piedi la reputazione di tutti, e senza un incentivo lo
-    # fa solo chi e' arrabbiato. Uno per ordine, come il feedback.
-    await premia_xp(user["id"], "feedback", AZIONI_XP["feedback"],
-                    f"ordine:{ordine_id}")
     stelle = "★" * voto
     await notifica(per,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "

@@ -30,10 +30,12 @@ LA FORMULA VIVA, per esteso (da leggere accanto ai numeri):
 - `M` e' la media del mercatino sui SOLI voti che entrano: una media
   con pochi voti viene tirata verso di lei.
 - `xp_ordini` sono i SOLI eventi `tipo='ordine'` — gli unici costati un
-  pagamento Lightning vero. Il Profilo mostra la somma di TUTTI i tipi
-  (visite, pubblicazioni, feedback, profilo completo): quindi il numero
-  del Profilo e' sempre piu' alto di `xp-ord`, ed e' il perimetro della
-  classifica, non un disallineamento.
+  pagamento Lightning vero. Dall'ago 2026 e' anche il perimetro degli
+  XP del PROFILO: i due numeri sono lo stesso numero, ed e' il cantiere
+  «gli XP sono solo commercio». Prima non lo erano — nel Profilo se ne
+  leggevano 244 e qui 123 — e quella differenza era dichiarata proprio
+  in queste righe: il registro tiene ancora tutti i tipi, ma nella
+  somma che si vede entra solo il commercio.
 - Si MOLTIPLICA e non si somma: il commercio amplifica la fiducia.
 
 LE DUE ALTERNATIVE DEL CONFRONTO non stanno nel server e vivono qui, ed
@@ -245,9 +247,9 @@ def sezione_2(cl, M, top, con_id, peso):
         print(f"        ... e altri {len(cl) - top} sotto il {top}o")
     print("\n   fiducia = (pers*media + K*M)/(pers+K); punti = fiducia*"
           "(1+bonus).")
-    print("   xp-ord conta i SOLI eventi tipo='ordine': il Profilo somma")
-    print("   TUTTI i tipi (visite, pubblicazioni, feedback...), quindi")
-    print("   li' il numero e' piu' alto. E' il perimetro, non un buco.")
+    print("   xp-ord conta i SOLI eventi tipo='ordine', ed e' anche il")
+    print("   numero che si legge nel Profilo: dall'ago 2026 il perimetro")
+    print("   e' uno solo. Il registro tiene ancora gli altri tipi.")
 
 
 def sezione_3(cl, top, con_id, peso):

@@ -111,9 +111,16 @@ def recupera(con, attesi, cost):
             rapporto["eventi"] += r.rowcount
             rapporto["utenti"].add(tg)
     for tg in sorted(rapporto["utenti"]):
+        # SOLO IL COMMERCIO, come `_ricalcola_xp` e come il
+        # riallineamento d'avvio: senza il filtro questo UPDATE
+        # rimetterebbe dentro i punti di presenza, e il riavvio dopo
+        # li ritoglierebbe. Il perimetro vero e' XP_COMMERCIO in
+        # server.py; qui si ricopia perche' lo script gira da solo,
+        # e a tenerli in pari c'e' una prova.
         con.execute(
             "UPDATE utenti SET xp=(SELECT COALESCE(SUM(punti),0) "
-            "FROM xp_eventi WHERE tg_id=?) WHERE tg_id=?", (tg, tg))
+            "FROM xp_eventi WHERE tg_id=? AND tipo IN ('ordine')) "
+            "WHERE tg_id=?", (tg, tg))
     return rapporto
 
 

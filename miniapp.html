@@ -2807,6 +2807,15 @@
     font-weight:800;font-size:14px;color:var(--muted)}
   .cl-fr{margin-left:auto;flex:0 0 auto;color:var(--muted);
     font-size:20px;line-height:1}
+  /* Il punteggio: un posto SUO a destra, e non in coda alla riga
+     della reputazione — quella porta gia' stelle, media, conteggio e
+     affari, e a 320px un numero in piu' la manderebbe a capo. Mono
+     come ogni cifra di casa, e `margin-left:auto` per spingerlo a
+     destra: quando la freccia non c'e' (riga non toccabile) il numero
+     resta comunque al suo posto. */
+  .cl-punti{margin-left:auto;flex:0 0 auto;font-weight:800;
+    font-size:14px;font-family:var(--mono);color:var(--ink)}
+  .cl-punti + .cl-fr{margin-left:6px}
   /* La sfilza dei distintivi accanto al nome del venditore: emoji
      nude in fila con un piccolo respiro (niente cerchietti d'oro:
      nude e sovrapposte si impasterebbero — l'oro resta alle tessere
@@ -4713,7 +4722,8 @@ document.getElementById('cartello')?.remove();</script>
       <ul class="sicu-lista">
         <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
-        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello.</li>
+        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano una cosa sola — quanto hai comprato e venduto.</li>
+        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
       </ul>
@@ -9476,9 +9486,13 @@ function tornaDaPrivacy(){ navIndietro(); }
 /* ===================== LA CLASSIFICA (ago 2026) =====================
    I migliori del mercatino, in una pagina raggiungibile dal Profilo.
    Il conto lo fa il SERVER (media pesata sulle persone x commercio):
-   qui non si calcola niente, si disegna — e il punteggio non arriva
-   nemmeno, apposta. Si mostrano la POSIZIONE e i FATTI su cui poggia,
-   che sono anche quel che permette a chi guarda di giudicare da se'.
+   qui non si calcola niente, si disegna — il punteggio arriva gia'
+   fatto, ×100 e arrotondato, e questa riga ROVESCIA quella di prima
+   («il punteggio non arriva nemmeno, apposta»). Il perche' e' che
+   senza di lui l'ordine non si legge: con tutte le medie a 5,00 si
+   vedono sette nomi identici in sette posizioni diverse. Accanto
+   restano i FATTI su cui poggia — media, persone, affari — che sono
+   quel che permette a chi guarda di giudicare da se'.
 
    Il vestito e' quello di casa: `.seller` per la riga (lo stesso
    blocco avatar+nome+reputazione del negozio e del Profilo) e
@@ -9545,6 +9559,7 @@ function rigaClassifica(v, mia){
         <b>${esc(v.nome)}</b>${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
       </div>
+      <div class="cl-punti" title="Punteggio: media dei voti e commercio">${fmt(v.punteggio || 0)}</div>
       ${cod ? '<div class="cl-fr">›</div>' : ''}
     </div>`;
 }
@@ -9572,13 +9587,21 @@ function renderClassifica(){
       ${soglie.map(s => `<button class="tema-pill${classificaFiltro===s?' active':''}" onclick="filtraClassifica(${s})">${s ? '⭐ ' + String(s).replace('.', ',') + '+' : 'Tutti'}</button>`).join('')}
     </div>` : '';
   /* LA RIGA CHE SPIEGA UN'APPARENZA (scelta di Andrea): quando tutte
-     le medie sono uguali, l'ordine lo decide il commercio — e senza
-     dirlo uno legge sette nomi con «5,00» accanto e non capisce
-     perche' e' settimo. La decide il SERVER sui dati veri, quindi
-     sparisce da sola il giorno che arriva il primo voto diverso. */
+     le medie sono uguali, l'ordine lo decidono il commercio e le
+     PERSONE — e senza dirlo uno legge sette nomi con «5,00» accanto e
+     non capisce perche' e' settimo. La decide il SERVER sui dati veri,
+     quindi sparisce da sola il giorno che arriva il primo voto
+     diverso.
+     LE PERSONE SI NOMINANO, ed e' il cantiere dello smorzamento: da
+     quante persone diverse arriva la fiducia pesa sul bonus del
+     commercio, e a pari punteggio decide l'ordine — che e' proprio il
+     caso di questa riga, dove senza XP i punti sono identici bit per
+     bit. Scritta per essere vera anche a leva SPENTA: li' le persone
+     contano comunque, sul pareggio. */
   const spiega = d.medie_piene
     ? '<div class="hint">Per ora hanno tutti la stessa media: a fare '
-      + 'la differenza è quanto si è commerciato.</div>' : '';
+      + 'la differenza sono quanto si è commerciato e da quante '
+      + 'persone diverse si è stati votati.</div>' : '';
   /* La TUA riga esce solo a te e solo se non sei nei primi: chi sta in
      fondo non compare mai in una lista che vedono gli altri. */
   const mia = d.mia ? `
@@ -9586,8 +9609,9 @@ function renderClassifica(){
     ${rigaClassifica(d.mia, true)}` : '';
   box.innerHTML = `
     <div class="hint">I primi ${fmt(voci.length)} su ${fmt(d.totale)} in
-      classifica. Conta la media dei feedback — pesata su quante persone
-      diverse ti hanno votato — e quanto si è commerciato.</div>
+      classifica. Conta la media dei feedback, quanto si è commerciato,
+      e da quante persone diverse ti hanno votato.
+      Il numero a destra è il punteggio che decide l'ordine.</div>
     ${spiega}${pillole}
     ${viste.map(v => rigaClassifica(v, false)).join('')}
     ${viste.length ? '' : '<div class="hint">Nessuno con questa media.</div>'}
@@ -19211,6 +19235,7 @@ function renderLivello(){
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
+    <div class="hint" style="margin-top:6px">Gli XP contano il commercio: comprare e vendere. È lo stesso numero che pesa in classifica.</div>
     <div class="barra-xp"><i style="width:${q}%"></i></div>
     <div class="hint">${manca}</div>
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
@@ -19230,7 +19255,7 @@ function renderLivello(){
    Sono le stesse di LIVELLI in server.py — chi ne cambia una la
    cambia in tutti e due i posti, o la barra mente. prove.py le
    incrocia, come fa per le categorie senza condizione. */
-const SOGLIE_LIV = [0, 150, 600, 2500, 9000];
+const SOGLIE_LIV = [0, 50, 200, 800, 3000];
 
 async function setTitolo(id){
   haptic();

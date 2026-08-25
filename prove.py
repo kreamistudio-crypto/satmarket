@@ -15049,8 +15049,12 @@ def prove_classifica():
     prova("il giudice e' PURO: non tocca il database", True,
           "execute(" not in giu and "db()" not in giu)
     letture = codice(pezzo("_dati_classifica"))
-    prova("in classifica entrano i SOLI XP degli ordini", True,
-          "WHERE tipo='ordine'" in letture)
+    # Dall'ago 2026 il perimetro e' UNO e vive in `XP_COMMERCIO`: qui
+    # si guarda che questo lettore ci passi, invece di ricopiarsi la
+    # condizione — o il giorno che il perimetro cambia, uno dei tre
+    # resta indietro in silenzio.
+    prova("in classifica entrano i SOLI XP del commercio", True,
+          "sql_xp_commercio(" in letture and "tipo='ordine'" not in letture)
     prova("...e gli affari si contano dagli ordini released", True,
           "stato='released'" in letture)
     # LEGGE E BASTA, come controlla_libro_mastro: nessuna scrittura in
@@ -15189,8 +15193,13 @@ def prove_xp():
 
     amb = {"time": time}
     i = _SORGENTE.index("FISSO_XP_ORDINE = ")
-    exec(_SORGENTE[i:_SORGENTE.index("AZIONI_XP = {", i)], amb)
-    for f in ("oggi_locale", "_ricalcola_xp", "assegna_xp", "xp_ordine"):
+    # La fine della fetta e' la prima funzione che si exec-a a parte:
+    # cosi' dentro ci finiscono il tariffario, XP_COMMERCIO e il
+    # giudice del perimetro, e il marcatore non e' una riga che un
+    # riordino puo' togliere. (Era `AZIONI_XP = {`, morto con la
+    # lapide del tariffario.)
+    exec(_SORGENTE[i:_SORGENTE.index("def _ricalcola_xp", i)], amb)
+    for f in ("_ricalcola_xp", "assegna_xp", "xp_ordine"):
         exec(pezzo(f), amb)
     xp_ordine, assegna_xp = amb["xp_ordine"], amb["assegna_xp"]
 
@@ -15237,14 +15246,27 @@ def prove_xp():
           assegna_xp(con, 900, "ordine", 180, "ordine:1:compratore"))
     prova("punti a zero non scrivono", 0,
           assegna_xp(con, 900, "visita", 0, "x"))
-    # La visita: il tetto giornaliero non e' scritto da nessuna parte,
-    # lo fa il riferimento col giorno dentro
-    prova("la visita di oggi", 1,
+    # IL PERIMETRO (ago 2026): un tipo fuori da XP_COMMERCIO lascia la
+    # sua riga nel registro — e' storia, e la UNIQUE fa il suo mestiere
+    # come sempre — ma NON muove la cache. Le due cose si guardano
+    # separate apposta: e' la distinzione fra il registro e la somma.
+    prova("il perimetro e' il solo commercio", ("ordine",),
+          amb["XP_COMMERCIO"])
+    prima = somma(901)
+    prova("un tipo fuori perimetro scrive la sua riga", 1,
           assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
-    prova("la stessa visita non ripaga", 0,
+    prova("...ma NON muove la cache", prima, somma(901))
+    prova("...e la riga c'e' lo stesso", 1,
+          con.execute("SELECT COUNT(*) c FROM xp_eventi WHERE tg_id=901 "
+                      "AND tipo='visita'").fetchone()["c"])
+    prova("...quindi la UNIQUE fa il suo mestiere anche fuori", 0,
           assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
-    prova("quella di domani si'", 1,
-          assegna_xp(con, 901, "visita", 1, "giorno:2026-08-06"))
+    # LE DUE STRADE DICONO LO STESSO NUMERO, ed e' il motivo per cui la
+    # guardia sta anche in assegna_xp: con due perimetri diversi la
+    # cache dipenderebbe da quale e' girata per ultima.
+    assegna_xp(con, 901, "ordine", 40, "ordine:9:venditore")
+    prova("scrittura e ricalcolo dicono lo stesso numero",
+          somma(901), amb["_ricalcola_xp"](con, 901))
 
     # Il ricalcolo e' la rete: la cache si puo' sporcare, il registro no
     con.execute("UPDATE utenti SET xp=99999 WHERE tg_id=900")
@@ -15257,9 +15279,169 @@ def prove_xp():
     assegna_xp(con, 900, "visita", 1, "giorno:2026-08-06")
     con.execute("UPDATE OR IGNORE xp_eventi SET tg_id=900 WHERE tg_id=901")
     con.execute("DELETE FROM xp_eventi WHERE tg_id=901")
-    prova("fondendo, il giorno doppio conta una volta", 482,
+    prova("fondendo, il giorno doppio resta UNA riga", 1,
+          con.execute("SELECT COUNT(*) c FROM xp_eventi WHERE tg_id=900 "
+                      "AND tipo='visita' AND riferimento='giorno:2026-08-06'"
+                      ).fetchone()["c"])
+    prova("...e nella somma entra il solo commercio", 520,
           amb["_ricalcola_xp"](con, 900))
+
+    # IL RIALLINEAMENTO D'AVVIO, girato per davvero: e' il backfill del
+    # cantiere, e la cosa che deve fare e' BIDIREZIONALE.
+    exec(pezzo("riallinea_xp_commercio"), amb)
+    riallinea = amb["riallinea_xp_commercio"]
+    con.execute("UPDATE utenti SET xp=99999 WHERE tg_id=900")
+    con.execute("INSERT INTO utenti(tg_id, xp) VALUES(902, 7)")
+    # TRE e non due: la terza e' 901, che la fusione qui sopra ha
+    # svuotato del registro senza toccargli la cache — nel server quella
+    # riga muore, qui resta, ed e' il caso che il riallineamento deve
+    # saper ripulire comunque.
+    prova("il riallineamento tocca le righe storte", 3, riallinea(con))
+    prova("...e le rimette sul commercio", 520, somma(900))
+    prova("...anche quando la cache era piu' BASSA (rollback)", 0,
+          somma(902))
+    # ⚠️ IL CASO CHE DISCRIMINA IL VERSO: 902 ha zero eventi, quindi
+    # anche un confronto SBAGLIATO (`xp >` invece di `xp <>`) lo
+    # toccherebbe lo stesso — quel caso non prova il bidirezionale.
+    # Qui la cache e' piu' bassa del vero E il registro non e' vuoto:
+    # con `>` questa riga resterebbe storta per sempre, ed e' quel che
+    # lascia dietro uno script vecchio lanciato dopo il deploy.
+    con.execute("INSERT INTO utenti(tg_id, xp) VALUES(903, 1)")
+    assegna_xp(con, 903, "ordine", 70, "ordine:70:venditore")
+    con.execute("UPDATE utenti SET xp=1 WHERE tg_id=903")
+    prova("...e la rimette in su, non solo in giu'", 1, riallinea(con))
+    prova("...col numero del registro", 70, somma(903))
+    prova("il secondo giro non trova niente", 0, riallinea(con))
+
+    # LA PROVA CHE E' IL CANTIERE, e vale piu' di tutte le sentinelle
+    # messe insieme: il numero che si legge nel PROFILO e quello che
+    # pesa nel RANK devono essere LO STESSO NUMERO. Erano 244 contro
+    # 123, e guardando non c'era modo di capirlo. Qui si girano tutte
+    # e due le strade vere — la cache riallineata e la lettura della
+    # classifica — e si confrontano.
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+      compratore_id INTEGER, stato TEXT, prova INTEGER DEFAULT 0);
+    CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,
+      per_tg_id INTEGER, voto INTEGER);
+    """)
+    exec(pezzo("_dati_classifica"), amb)
+    _, _, xp_rank, _ = amb["_dati_classifica"](con)
+    prova("il Profilo e il rank dicono LO STESSO NUMERO",
+          somma(900), xp_rank.get(900, 0))
+    prova("...e non e' zero, o non proverebbe niente", True, somma(900) > 0)
     con.close()
+
+    # IL TITOLO CHE DECADE, girato su un mercatino di cartone: chi
+    # scende di gradino non porta piu' un grado che non ha. E' la sola
+    # cosa che questo cantiere poteva far dire di FALSO a un profilo.
+    db2 = os.path.join(tempfile.mkdtemp(), "tit.db")
+    con2 = sqlite3.connect(db2)
+    con2.row_factory = sqlite3.Row
+    con2.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, titolo TEXT DEFAULT '',
+      xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0,
+      acquisti_ok INTEGER DEFAULT 0);
+    INSERT INTO utenti(tg_id, titolo, xp, vendite_ok) VALUES
+      (10, 't_pratico', 30, 1),      -- sceso: il titolo non lo ha piu'
+      (11, 't_pratico', 900, 20),    -- lo ha eccome: non si tocca
+      (12, 't_nostrano', 0, 0),      -- non e' un titolo di LIVELLO
+      (13, '', 0, 0);                -- niente titolo, niente da fare
+    """)
+    for blocco in ("COORTI = [", "LIVELLI = [", "TITOLI = ("):
+        j = _SORGENTE.index(blocco)
+        exec(_SORGENTE[j:_SORGENTE.index("\n\n\n", j)], amb)
+    for f in ("livello_utente", "_gradino_livello",
+              "riallinea_titoli_decaduti"):
+        exec(pezzo(f), amb)
+    prova("il titolo decaduto se ne va", 1,
+          amb["riallinea_titoli_decaduti"](con2))
+
+    def tit(t):
+        return con2.execute("SELECT titolo FROM utenti WHERE tg_id=?",
+                            (t,)).fetchone()["titolo"]
+
+    prova("...a chi non ha piu' il grado", "", tit(10))
+    prova("...e non a chi ce l'ha", "t_pratico", tit(11))
+    prova("i titoli che non sono di livello non si toccano",
+          "t_nostrano", tit(12))
+    prova("il secondo giro non tocca niente", 0,
+          amb["riallinea_titoli_decaduti"](con2))
+    con2.close()
+
+    # --- LE SENTINELLE DEL PERIMETRO --------------------------------
+    # Il perimetro e' un INVARIANTE, e la sua forza sta nell'essere
+    # dichiarato UNA volta: e' quel che fa si' che il gancio scritto
+    # fra sei mesi debba passare da qui invece di gonfiare il numero
+    # in silenzio.
+    src = codice(_SORGENTE)
+    prova("il perimetro si dichiara UNA volta sola", 1,
+          src.count("XP_COMMERCIO = ("))
+    for f in ("_ricalcola_xp", "_dati_classifica", "riallinea_xp_commercio"):
+        prova(f"{f} passa dal giudice del perimetro", True,
+              "sql_xp_commercio(" in codice(pezzo(f)))
+    prova("...e assegna_xp guarda la costante", True,
+          "in XP_COMMERCIO" in codice(pezzo("assegna_xp")))
+    # Nessuno riscrive la condizione a mano: e' il modo in cui i tre
+    # lettori tornerebbero a dire tre cose diverse.
+    prova("nessun tipo='ordine' scritto a mano", 0,
+          src.count("tipo='ordine'") + src.count('tipo="ordine"'))
+
+    # `utenti.xp` si scrive dai TRE posti dichiarati e da nessun altro.
+    prova("la cache degli XP ha tre scrittori", 3,
+          src.count("UPDATE utenti SET xp="))
+
+    # UN SOLO GANCIO, ed e' quello degli ordini: gli altri otto sono
+    # andati via col perimetro. La def non conta (ha un nome diverso).
+    # `await premia_xp(` e non `premia_xp(` secco: il secondo conta
+    # anche la definizione, e la sentinella direbbe due per sempre.
+    prova("resta un gancio solo, ed e' l'ordine", 1,
+          src.count("await premia_xp("))
+    prova("...e premia il commercio", True,
+          'premia_xp(chi, "ordine"' in src)
+    # Il tariffario e il giorno locale sono morti: se tornano, torna
+    # anche il perimetro largo.
+    prova("il tariffario non esiste piu'", 0, src.count("AZIONI_XP"))
+    prova("...ne' il giorno della visita", 0, src.count("oggi_locale"))
+    # ...MA LA COLONNA RESTA: toglierla renderebbe velenoso un
+    # rollback (il server vecchio la ri-ALTERerebbe e ricomincerebbe a
+    # timbrare le visite di tutti).
+    prova("la colonna della visita resta", True,
+          "xp_ultimo_giorno TEXT DEFAULT ''" in _SORGENTE)
+
+    # IL RIALLINEAMENTO SI CHIAMA ALL'AVVIO, e si guarda la RIGA e non
+    # il nome: nel file il nome compare comunque (la def, la docstring
+    # della gemella), quindi cercarlo non potrebbe fallire — e' la
+    # lezione del reaper, pagata piu' di una volta.
+    avvio = codice(pezzo("init_db"))
+    prova("il riallineamento si chiama all'avvio", True,
+          "riallinea_xp_commercio(con)" in avvio)
+    prova("...e con lui i titoli decaduti", True,
+          "riallinea_titoli_decaduti(con)" in avvio)
+    # PRIMA gli XP e POI i titoli: al contrario il secondo giudicherebbe
+    # sulla cache di ieri.
+    prova("...e in quest'ordine", True,
+          avvio.index("riallinea_xp_commercio(con)")
+          < avvio.index("riallinea_titoli_decaduti(con)"))
+
+    # IL PUNTEGGIO ESCE: a dirlo c'era il solo collaudo_classifica.py,
+    # che in CI non gira — quindi togliendo la riga nessuno fiatava.
+    voce = codice(pezzo("classifica"))
+    prova("il punteggio esce, ×100 e arrotondato", True,
+          'round(r["punti"] * 100)' in voce)
+    prova("...e gli XP in chiaro no", True,
+          '"xp": r' not in voce and '"id": r' not in voce)
+
+    # I DUE SCRIPT A MANO: rifacevano la cache SENZA filtro, quindi
+    # dopo il cantiere ri-gonfiavano in silenzio gli utenti toccati e
+    # il riavvio dopo li sgonfiava — un numero che oscilla ATTRAVERSO
+    # UN REBOOT e' il guasto piu' difficile da farsi credere.
+    for nome in ("marca_prove.py", "recupera_xp_ordini.py"):
+        with open(nome, encoding="utf-8") as fh:
+            t = fh.read()
+        prova(f"{nome} non ri-gonfia la cache", True,
+              "UPDATE utenti SET xp=" not in t
+              or "tipo IN ('ordine')" in t)
 
 
 # ====================================================================
@@ -15297,8 +15479,11 @@ def prove_coorti_titoli():
           livello(4010, 1)["nome"])
     prova("...con quindici affari e' esperto", "Mercante esperto",
           livello(4010, 15)["nome"])
+    # Venti affari da POCO: la cifra e' scesa con le soglie (ago 2026),
+    # il caso e' lo stesso — gli XP sotto la soglia del gradino dopo
+    # non si comprano col numero di affari.
     prova("venti affari da poco non bastano", "Bottega avviata",
-          livello(200, 20)["nome"])
+          livello(60, 20)["nome"])
     prova("in cima non c'e' un prossimo", "",
           livello(99999, 99)["nome_prossimo"])
 

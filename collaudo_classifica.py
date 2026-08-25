@@ -185,10 +185,23 @@ def main() -> int:
     chiavi = set(r["voci"][0])
     prova("dalla voce non esce il tg_id", False, "id" in chiavi)
     prova("...ne' gli XP", False, "xp" in chiavi)
-    prova("...ne' il punteggio", False, "punti" in chiavi)
+    # IL PUNTEGGIO ESCE, ed e' un CAMBIO DI LATO col suo perche' (ago
+    # 2026, decisione di Andrea): senza, l'ordine delle righe non si
+    # legge — con tutte le medie a 5,00 si vedono nomi identici in
+    # posizioni diverse. Esce ×100 e arrotondato; il campo grezzo
+    # `punti` invece non esce, ed e' la riga che resta.
+    prova("...ne' il punteggio grezzo", False, "punti" in chiavi)
+    prova("il punteggio esce ×100 e arrotondato", True,
+          isinstance(r["voci"][0].get("punteggio"), int)
+          and r["voci"][0]["punteggio"] > 0)
     prova("escono i fatti su cui poggia la posizione",
           {"posizione", "nome", "negozio", "avatar", "titolo",
-           "media", "voti", "persone", "affari"}, chiavi)
+           "media", "voti", "persone", "affari", "punteggio"}, chiavi)
+    # L'ORDINE SI LEGGE, che e' la ragione per cui il numero esce: chi
+    # sta sopra ha un punteggio maggiore o uguale a chi sta sotto.
+    punti = [v["punteggio"] for v in r["voci"]]
+    prova("...e i punteggi scendono con la posizione", punti,
+          sorted(punti, reverse=True))
 
     # IL FARMER non c'e', da nessuna parte.
     tutti = SRV.classifica()
