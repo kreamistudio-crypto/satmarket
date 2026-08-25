@@ -87,8 +87,18 @@ def leggi(con):
     facendo per le controparti."""
     controparti = defaultdict(set)
     affari = defaultdict(int)
-    for r in con.execute("SELECT venditore_id, compratore_id FROM ordini "
-                         "WHERE stato='released'"):
+    # `prova=0` come in _dati_classifica: le due letture devono dire la
+    # stessa cosa, o il prima/dopo mente. Il ripiego copre un database
+    # di prima della colonna (lo stile del try su xp_eventi qui sotto).
+    try:
+        righe = list(con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini "
+            "WHERE stato='released' AND prova=0"))
+    except sqlite3.OperationalError:
+        righe = list(con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini "
+            "WHERE stato='released'"))
+    for r in righe:
         v, c = r["venditore_id"], r["compratore_id"]
         affari[v] += 1
         affari[c] += 1
@@ -96,9 +106,16 @@ def leggi(con):
             controparti[v].add(c)
             controparti[c].add(v)
 
-    voti = [(r["per_tg_id"], r["da_tg_id"], r["voto"])
-            for r in con.execute("SELECT per_tg_id, da_tg_id, voto "
-                                 "FROM feedback")]
+    try:
+        voti = [(r["per_tg_id"], r["da_tg_id"], r["voto"])
+                for r in con.execute(
+                    "SELECT per_tg_id, da_tg_id, voto FROM feedback "
+                    "WHERE ordine_id NOT IN "
+                    "(SELECT id FROM ordini WHERE prova=1)")]
+    except sqlite3.OperationalError:
+        voti = [(r["per_tg_id"], r["da_tg_id"], r["voto"])
+                for r in con.execute("SELECT per_tg_id, da_tg_id, voto "
+                                     "FROM feedback")]
 
     xp = {}
     try:

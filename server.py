@@ -1537,13 +1537,16 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         posizione=q("SELECT COUNT(*) FROM utenti WHERE registrato<? "
                     "OR (registrato=? AND tg_id<=?)",
                     u["registrato"], u["registrato"], tg_id),
+        # `prova=0` ovunque si conti il COMMERCIO: gli ordini di
+        # collaudo marcati da marca_prove.py non fanno curriculum
         vendite=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
-                  "AND stato='released'", tg_id),
+                  "AND stato='released' AND prova=0", tg_id),
         acquisti=q("SELECT COUNT(*) FROM ordini WHERE compratore_id=? "
-                   "AND stato='released'", tg_id),
+                   "AND stato='released' AND prova=0", tg_id),
         # disputa persa: il venditore se fini' in rimborso, il
         # compratore se i sats andarono comunque al venditore
         dispute_perse=q("SELECT COUNT(*) FROM ordini WHERE disputata=1 "
+                        "AND prova=0 "
                         "AND ((venditore_id=? AND stato='refunded') OR "
                         "(compratore_id=? AND stato='released'))",
                         tg_id, tg_id),
@@ -1557,7 +1560,7 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         # minuti (pulisci_ordini_fantasma): creato+30min e' il tetto
         # fisico del pagamento. Margine a favore del venditore.
         lampo=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
-                "AND stato='released' AND spedito_il>0 "
+                "AND stato='released' AND prova=0 AND spedito_il>0 "
                 "AND spedito_il-creato <= ?", tg_id, 86400 + 1800))
 
 
@@ -4481,6 +4484,19 @@ def init_db():
     con.execute("UPDATE ordini SET disputata=1 WHERE disputata=0 AND stato "
                 "IN ('dispute','return_pending','return_shipped',"
                 "'refund','refunded')")
+    # L'ORDINE DI PROVA (ago 2026): i collaudi fatti in produzione
+    # mentre l'app si costruiva. NON si cancellano — la riconciliazione
+    # con LNbits incrocia i suoi incassi coi payment_hash di QUESTE
+    # righe, e un DELETE fabbricherebbe proprio gli orfani che quel
+    # metodo esiste per trovare — si MARCANO, e i lettori che contano
+    # il COMMERCIO (classifica, distintivi) li saltano. Il CSV
+    # contabile li TIENE, deliberato: sono sats mossi davvero.
+    # La colonna la scrive SOLO marca_prove.py, a mano e in lista
+    # esplicita: nessuna strada del server la tocca mai.
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN prova INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # Riallineamento quantita (lug 2026, idempotente a ogni avvio):
     # l'invariante venduto <=> quantita=0 vale anche sul pregresso
     # (i venduti di ieri sono nati col DEFAULT 1) e ripara gli
@@ -12004,17 +12020,25 @@ def _dati_classifica(con):
     progetto, e la fonte costa una scansione che stiamo gia' facendo
     per le controparti."""
     controparti, affari = {}, {}
+    # `prova=0`: i collaudi marcati non sono commercio, e qui pesano
+    # DOPPIO — fanno curriculum E rendono «reali» i recensori
     for r in con.execute("SELECT venditore_id, compratore_id FROM ordini "
-                         "WHERE stato='released'"):
+                         "WHERE stato='released' AND prova=0"):
         v, c = r["venditore_id"], r["compratore_id"]
         affari[v] = affari.get(v, 0) + 1
         affari[c] = affari.get(c, 0) + 1
         if v != c:
             controparti.setdefault(v, set()).add(c)
             controparti.setdefault(c, set()).add(v)
+    # I feedback sulle prove si tolgono con la valvola admin, ma la
+    # classifica non deve dipendere da una pulizia a mano: cintura.
+    # NOT IN e non un JOIN: su qualunque riga strana il voto RESTA
+    # (fail-open), si esclude solo cio' che e' marcato per certo.
     voti = [(r["per_tg_id"], r["da_tg_id"], r["voto"])
-            for r in con.execute("SELECT per_tg_id, da_tg_id, voto "
-                                 "FROM feedback")]
+            for r in con.execute(
+                "SELECT per_tg_id, da_tg_id, voto FROM feedback "
+                "WHERE ordine_id NOT IN "
+                "(SELECT id FROM ordini WHERE prova=1)")]
     xp = {r["tg_id"]: r["p"] for r in con.execute(
         "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
         "WHERE tipo='ordine' GROUP BY tg_id")}

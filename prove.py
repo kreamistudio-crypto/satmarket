@@ -31650,6 +31650,200 @@ def _scorri(amb, con, limit, per_venditore=3, ordina="", tetto=200):
     return pagine
 
 
+def prove_ordini_prova():
+    """GLI ORDINI DI PROVA E IL RECUPERO DEL PREGRESSO (ago 2026).
+
+    I collaudi fatti in produzione si MARCANO (`ordini.prova=1`), mai
+    cancellati: la riconciliazione LNbits incrocia gli incassi coi
+    payment_hash di quelle righe, e un DELETE fabbricherebbe gli
+    orfani che quel metodo cerca. I lettori del COMMERCIO (classifica,
+    distintivi) imparano `prova=0`; il CSV contabile li tiene.
+    E il pregresso VERO — gli affari chiusi prima del gancio XP —
+    si ricostruisce con recupera_xp_ordini.py, deterministico sulla
+    UNIQUE del registro.
+
+    Le sentinelle dicono che i filtri esistono; che i due script
+    RISPONDANO GIUSTO lo dice solo il banco che li fa girare — la
+    lezione presa ormai una decina di volte."""
+    print("\n[gli ordini di prova e il recupero del pregresso]")
+
+    # --- le sentinelle sulla forma ---------------------------------
+    prova("la migrazione della colonna esiste", True,
+          "ALTER TABLE ordini ADD COLUMN prova INTEGER DEFAULT 0"
+          in _SORGENTE)
+    dc = codice(pezzo("_dati_classifica"))
+    prova("la classifica conta gli affari con prova=0", True,
+          "stato='released' AND prova=0" in dc)
+    prova("...e i voti sulle prove restano fuori (cintura sul NOT IN)",
+          True, "(SELECT id FROM ordini WHERE prova=1)" in dc)
+    dd = codice(pezzo("_dati_distintivi"))
+    prova("i quattro conteggi dei distintivi saltano le prove", 4,
+          dd.count("prova=0"))
+    cp = open("classifica_prova.py", encoding="utf-8").read()
+    prova("classifica_prova.py e' allineata (stessa WHERE)", True,
+          "stato='released' AND prova=0" in cp
+          and "(SELECT id FROM ordini WHERE prova=1)" in cp)
+    prova("...col ripiego per un database di prima della colonna", 2,
+          codice(cp).count("except sqlite3.OperationalError")
+          - codice(cp).count("nessuna tabella xp_eventi"))
+
+    # --- il banco: i due script girano su un database di cartone ---
+    import contextlib
+    import io
+    import sqlite3 as sq
+    import marca_prove
+    import recupera_xp_ordini as rec
+
+    con = sq.connect(":memory:")
+    con.row_factory = sq.Row
+    con.executescript("""
+      CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INTEGER,
+        compratore_id INTEGER, venditore_id INTEGER,
+        prezzo_sats INTEGER, stato TEXT, creato INTEGER,
+        aggiornato INTEGER, cambio_eur REAL DEFAULT 0,
+        cambio_ordine REAL DEFAULT 0, prova INTEGER DEFAULT 0);
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,
+        vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
+        xp INTEGER DEFAULT 0);
+      CREATE TABLE xp_eventi(id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER, tipo TEXT, punti INTEGER, riferimento TEXT,
+        creato INTEGER, UNIQUE(tg_id, tipo, riferimento));
+      CREATE TABLE feedback(id INTEGER PRIMARY KEY, ordine_id INTEGER,
+        da_tg_id INTEGER, per_tg_id INTEGER, voto INTEGER);
+      CREATE TABLE badge_utente(tg_id INTEGER, badge_id TEXT,
+        ottenuto_il INTEGER, PRIMARY KEY(tg_id, badge_id));
+    """)
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
+        (1, "V", 2, 0, 20), (2, "C", 0, 1, 11),
+        (3, "L", 1, 0, 0), (4, "M", 0, 1, 0)])
+    con.executemany(
+        "INSERT INTO ordini(id, compratore_id, venditore_id, "
+        "prezzo_sats, stato, creato, aggiornato, cambio_eur, "
+        "cambio_ordine) VALUES(?,?,?,?,?,?,?,?,?)", [
+            (82, 2, 1, 1823, "released", 100, 200, 0, 0),
+            (83, 2, 1, 100, "released", 110, 210, 0, 0),
+            (31, 4, 3, 50000, "released", 360, 410, 56000, 10000),
+            (28, 4, 3, 50000, "released", 250, 300, 56000, 0),
+            (29, 4, 3, 20000, "released", 350, 400, 0, 50000),
+            (30, 4, 3, 500, "released", 500, 0, 0, 0),
+            (91, 2, 1, 9000, "released", 240, 260, 0, 0),
+            (55, 4, 3, 700, "refunded", 260, 270, 0, 0)])
+    con.executemany(
+        "INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+        "creato) VALUES(?,?,?,?,?)", [
+            (1, "ordine", 11, "ordine:82:venditore", 200),
+            (2, "ordine", 6, "ordine:82:compratore", 200),
+            (1, "ordine", 9, "ordine:91:venditore", 260),
+            (2, "ordine", 5, "ordine:91:compratore", 260)])
+    con.execute("INSERT INTO feedback VALUES(7, 82, 2, 1, 5)")
+    zitto = lambda: contextlib.redirect_stdout(io.StringIO())
+
+    # marca_prove: il perimetro si rifiuta PRIMA di scrivere
+    with zitto():
+        niente = marca_prove.marca(con, [55])
+    prova("un non-released ferma marca_prove senza scrivere",
+          (None, 1), (niente, con.execute(
+              "SELECT vendite_ok FROM utenti WHERE tg_id=3")
+              .fetchone()[0]))
+    with zitto():
+        niente = marca_prove.marca(con, [9999])
+    prova("un id inesistente ferma marca_prove", None, niente)
+
+    # marca_prove: il giro vero sull'82
+    with zitto():
+        r = marca_prove.marca(con, [82])
+    prova("l'82 e' marcato", 1, con.execute(
+        "SELECT prova FROM ordini WHERE id=82").fetchone()[0])
+    prova("i suoi due eventi XP se ne vanno, gli altri restano", 2,
+          con.execute("SELECT COUNT(*) FROM xp_eventi "
+                      "WHERE tipo='ordine'").fetchone()[0])
+    prova("la cache XP si rifa' dal registro", (9, 5),
+          tuple(con.execute("SELECT xp FROM utenti WHERE tg_id=1")
+                .fetchone()) +
+          tuple(con.execute("SELECT xp FROM utenti WHERE tg_id=2")
+                .fetchone()))
+    prova("i contatori scendono di uno", (1, 0),
+          (con.execute("SELECT vendite_ok FROM utenti WHERE tg_id=1")
+           .fetchone()[0],
+           con.execute("SELECT acquisti_ok FROM utenti WHERE tg_id=2")
+           .fetchone()[0]))
+    prova("il feedback si ELENCA per la valvola admin, mai toccato",
+          ([7], 1), (r["feedback"], con.execute(
+              "SELECT COUNT(*) FROM feedback").fetchone()[0]))
+    with zitto():
+        r2 = marca_prove.marca(con, [82])
+    prova("il secondo giro e' un no-op: niente doppio decremento",
+          ([82], 1), (r2["saltati"], con.execute(
+              "SELECT vendite_ok FROM utenti WHERE tg_id=1")
+              .fetchone()[0]))
+    with zitto():
+        marca_prove.marca(con, [83])
+    prova("il pavimento dei contatori e' ZERO, mai un negativo",
+          (0, 0), (con.execute(
+              "SELECT vendite_ok FROM utenti WHERE tg_id=1")
+              .fetchone()[0], con.execute(
+              "SELECT acquisti_ok FROM utenti WHERE tg_id=2")
+              .fetchone()[0]))
+
+    # recupera_xp_ordini: le costanti dal SERVER, mai a memoria
+    cost = rec.estrai_costanti(_SORGENTE)
+    prova("le costanti XP si leggono dal server", (10, 1, 1.0, 0.6),
+          (cost["fisso"], cost["per_euro"],
+           cost["ruoli"]["venditore"], cost["ruoli"]["compratore"]))
+    try:
+        rec.estrai_costanti("niente di niente")
+        esploso = False
+    except RuntimeError:
+        esploso = True
+    prova("...e senza costanti ci si ferma (fail-closed)", True,
+          esploso)
+    prova("la formula e' quella viva: 50k sats a 56k€/BTC", (38, 22),
+          (rec.punti_ordine(50000, 56000, "venditore", cost),
+           rec.punti_ordine(50000, 56000, "compratore", cost)))
+
+    prova("il perimetro derivato: released, non prova, zero eventi",
+          [28, 29, 30, 31], rec.perimetro(con))
+    with zitto():
+        niente = rec.recupera(con, [28], cost)
+    prova("lista che non combacia = si ferma senza scrivere",
+          (None, 2), (niente, con.execute(
+              "SELECT COUNT(*) FROM xp_eventi WHERE tipo='ordine'")
+              .fetchone()[0]))
+    with zitto():
+        r = rec.recupera(con, [28, 29, 30, 31], cost)
+    prova("otto eventi nuovi, due per ordine", 8, r["eventi"])
+    prova("con TUTTI E DUE i cambi vince la chiusura, mai la creazione",
+          38, con.execute(
+              "SELECT punti FROM xp_eventi WHERE riferimento="
+              "'ordine:31:venditore'").fetchone()[0])
+    prova("il cambio giusto per ognuno: chiusura, creazione, fisso",
+          (38, 20, 10), tuple(con.execute(
+              "SELECT punti FROM xp_eventi WHERE riferimento=?",
+              (f"ordine:{o}:venditore",)).fetchone()[0]
+              for o in (28, 29, 30)))
+    prova("...e il compratore al suo 60%", (22, 12, 6),
+          tuple(con.execute(
+              "SELECT punti FROM xp_eventi WHERE riferimento=?",
+              (f"ordine:{o}:compratore",)).fetchone()[0]
+              for o in (28, 29, 30)))
+    prova("la data dell'evento e' lo sblocco (aggiornato, o creato)",
+          (300, 500), (con.execute(
+              "SELECT creato FROM xp_eventi WHERE riferimento="
+              "'ordine:28:venditore'").fetchone()[0], con.execute(
+              "SELECT creato FROM xp_eventi WHERE riferimento="
+              "'ordine:30:venditore'").fetchone()[0]))
+    prova("la cache dei recuperati si rifa' (106 e 62)", (106, 62),
+          (con.execute("SELECT xp FROM utenti WHERE tg_id=3")
+           .fetchone()[0],
+           con.execute("SELECT xp FROM utenti WHERE tg_id=4")
+           .fetchone()[0]))
+    with zitto():
+        r = rec.recupera(con, [], cost)
+    prova("svuotato il perimetro, il giro dopo non scrive niente",
+          0, r["eventi"])
+    con.close()
+
+
 def prove_tornate():
     """«3 OGNI 30» (ago 2026): il riordino a tornate della vetrina.
     Si gira il pezzo vero su sqlite in memoria, perche' qui il modo
@@ -32111,6 +32305,7 @@ def main():
               prove_connettori_ingresso,
               prove_connettori_cassetto,
               prove_tornate,
+              prove_ordini_prova,
               prove_tutorial,
               prove_config_esempio):
         try:
