@@ -2580,6 +2580,27 @@ def init_db():
     -- — sarebbe una scansione della tabella intera.
     CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
       ON preferiti(annuncio_id);
+    CREATE TABLE IF NOT EXISTS barattoli_condivisi(
+        -- il barattolo condiviso col link (ago 2026): la FOTOGRAFIA
+        -- del barattolo che il proprietario ha scelto di pubblicare.
+        -- Fotografia e non vista viva: congela la LISTA di id — mai i
+        -- prezzi o gli stati, che si rileggono freschi a ogni apertura
+        -- — e quello che si salva dopo non si vede finche' non si
+        -- aggiorna con un gesto. Il token e' la maniglia del link:
+        -- casuale (token_hex), MAI derivato dal tg_id o dal codice
+        -- negozio — chi conosce il negozio non deve poter indovinare
+        -- il barattolo. In CHIARO e non hashato come `sessioni`,
+        -- deliberato: va RIMOSTRATO al proprietario nel foglio, e non
+        -- e' una credenziale d'account ma la maniglia di una lista che
+        -- ha scelto di pubblicare (il contenuto sta gia' in chiaro in
+        -- `preferiti`). La revoca e' il DELETE della riga; ricondividere
+        -- dopo genera un token NUOVO, e i link vecchi restano morti.
+        tg_id INTEGER PRIMARY KEY,
+        token TEXT UNIQUE,
+        ids TEXT NOT NULL DEFAULT '[]',  -- JSON: gli annuncio_id, in ordine
+        creato INTEGER,
+        aggiornato INTEGER               -- l'ultima fotografia
+    );
     CREATE TABLE IF NOT EXISTS interessi(
         -- «lo aspetto»: il like sulle funzioni ancora da costruire
         -- (ago 2026). Le pagine «Qualcosa di nuovo e' in arrivo»
@@ -6659,6 +6680,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE punti_ritiro SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM punti_ritiro WHERE tg_id=?", (id_nostr,))
+        # IL BARATTOLO CONDIVISO segue l'utente (ago 2026): la PK e' il
+        # tg_id, quindi la liturgia dei vicini — se le due meta' hanno
+        # condiviso tutt'e due, vince la fotografia della meta' Telegram
+        # (quella che sopravvive) e il link della meta' che muore si
+        # spegne: due liste della stessa persona non restano in giro.
+        con.execute("UPDATE OR IGNORE barattoli_condivisi SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM barattoli_condivisi WHERE tg_id=?",
+                    (id_nostr,))
         # I NEGOZI COLLEGATI seguono l'utente (ago 2026), o chi fonde i
         # suoi due account perderebbe il ponte col suo e-commerce — e
         # con lui il catalogo, che senza collegamento smette di
@@ -11637,6 +11667,132 @@ def miei_preferiti(x_tg_init_data: str = Header(""),
         (user["id"],))]
     con.close()
     return arricchisci_righe_vetrina(righe)
+
+
+# Il barattolo condiviso (ago 2026): la forma del token e la fotografia.
+# 32 esadecimali esatti — cio' che non ha quella forma risponde senza
+# nemmeno toccare il database (il pattern di _id_da_percorso).
+_TOKEN_BARATTOLO = re.compile(r"[0-9a-f]{32}")
+MSG_BARATTOLO_NON_CONDIVISO = "Questo barattolo non è condiviso"
+
+
+def _fotografia_barattolo(con, tg_id):
+    """Gli id da fotografare: il barattolo di ADESSO, senza i rimossi.
+
+    I rimossi non si fotografano nemmeno (lo scudo anti-resurrezione:
+    un annuncio tolto non deve rientrare in giro da un link); i venduti
+    SI', perche' in pagina si mostrano spenti e col rifornimento possono
+    tornare. L'ordine e' quello del barattolo, dal salvato piu' recente."""
+    return [r["annuncio_id"] for r in con.execute(
+        "SELECT p.annuncio_id FROM preferiti p "
+        "JOIN annunci a ON a.id = p.annuncio_id "
+        "WHERE p.tg_id=? AND a.stato IN ('attivo','venduto') "
+        "ORDER BY p.creato DESC LIMIT 100", (tg_id,))]
+
+
+@app.post("/api/me/barattolo-condiviso")
+async def barattolo_condiviso(req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Crea, aggiorna o revoca il link del barattolo condiviso.
+
+    FOTOGRAFIA, non vista viva: si congela la LISTA di id — i prezzi e
+    gli stati si rileggono freschi a ogni apertura della pagina. `crea`
+    e' idempotente (mai due token per la stessa persona: se il link c'e'
+    gia', si ripresenta); `aggiorna` tiene lo STESSO token e rifa' la
+    fotografia — il link gia' in giro si aggiorna, ed e' il modello
+    della lista che si cura, onesto verso la scelta «fotografia» perche'
+    niente compare senza questo gesto; `revoca` e' il DELETE, senza
+    NESSUNA guardia (il patto del rientro dalle ferie: togliere non si
+    ostacola mai) e idempotente. Ricondividere dopo la revoca genera un
+    token NUOVO: i link vecchi restano morti per sempre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    azione = str(d.get("azione") or "")
+    if azione not in ("crea", "aggiorna", "revoca"):
+        raise HTTPException(400, "Azione sconosciuta")
+    con = db()
+    adesso = int(time.time())
+    if azione == "revoca":
+        con.execute("DELETE FROM barattoli_condivisi WHERE tg_id=?",
+                    (user["id"],))
+        con.commit()
+        con.close()
+        return {"ok": True, "condiviso": None}
+    riga = con.execute("SELECT token, ids, aggiornato FROM "
+                       "barattoli_condivisi WHERE tg_id=?",
+                       (user["id"],)).fetchone()
+    if azione == "crea" and riga:
+        # Idempotente: il link c'e' gia', si ripresenta com'e' — mai un
+        # secondo token, e mai una fotografia rifatta di soppiatto.
+        con.close()
+        return {"ok": True, "condiviso": {
+            "token": riga["token"], "quanti": len(json.loads(riga["ids"])),
+            "aggiornato": riga["aggiornato"]}}
+    if azione == "aggiorna" and not riga:
+        con.close()
+        raise HTTPException(400, "Non hai un barattolo condiviso da "
+                                 "aggiornare")
+    ids = _fotografia_barattolo(con, user["id"])
+    if not ids:
+        con.close()
+        raise HTTPException(400, "Il barattolo è vuoto: non c'è niente "
+                                 "da condividere")
+    if riga:
+        # L'aggiornamento tiene il token: e' la stessa lista, curata.
+        token = riga["token"]
+        con.execute("UPDATE barattoli_condivisi SET ids=?, aggiornato=? "
+                    "WHERE tg_id=?", (json.dumps(ids), adesso, user["id"]))
+    else:
+        # Il token nasce SOLO da token_hex: mai dal tg_id, mai dal
+        # codice negozio — il barattolo non dev'essere indovinabile.
+        token = secrets.token_hex(16)
+        con.execute("INSERT INTO barattoli_condivisi"
+                    "(tg_id, token, ids, creato, aggiornato) "
+                    "VALUES(?,?,?,?,?)",
+                    (user["id"], token, json.dumps(ids), adesso, adesso))
+    con.commit()
+    con.close()
+    return {"ok": True, "condiviso": {"token": token, "quanti": len(ids),
+                                      "aggiornato": adesso}}
+
+
+@app.get("/api/barattolo/{token}")
+def barattolo_pubblico(token: str):
+    """La pagina pubblica di un barattolo condiviso: la lista, ANONIMA.
+
+    Del proprietario non esce NIENTE — ne' nome, ne' avatar, ne' codice
+    negozio, ne' tg_id: chi riceve il link sa da chi arriva, e un link
+    inoltrato a terzi non deve legare la lista a una persona (e' la
+    mitigazione piu' forte del rischio-trattativa). I venditori dei
+    singoli annunci sono pubblici per natura, come in vetrina.
+    Le righe si rileggono FRESCHE: prezzi veri, venduto spento, rimosso
+    sparito — la fotografia congela la lista, mai gli stati. Token
+    inesistente e revocato rispondono IDENTICI (la riga assente e' la
+    stessa cosa): chi prova non impara niente."""
+    if not _TOKEN_BARATTOLO.fullmatch(token or ""):
+        raise HTTPException(404, MSG_BARATTOLO_NON_CONDIVISO)
+    con = db()
+    riga = con.execute("SELECT ids FROM barattoli_condivisi WHERE token=?",
+                       (token,)).fetchone()
+    if not riga:
+        con.close()
+        raise HTTPException(404, MSG_BARATTOLO_NON_CONDIVISO)
+    ids = json.loads(riga["ids"])
+    righe = []
+    if ids:
+        segnaposto = ",".join("?" * len(ids))
+        righe = [dict(r) for r in con.execute(
+            f"SELECT {CAMPI_VETRINA}, a.stato FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            f"WHERE a.id IN ({segnaposto}) "
+            "AND a.stato IN ('attivo','venduto')", ids)]
+    con.close()
+    # L'ordine e' quello della fotografia, non quello della SELECT.
+    posto = {aid: i for i, aid in enumerate(ids)}
+    righe.sort(key=lambda r: posto.get(r["id"], len(ids)))
+    return {"annunci": arricchisci_righe_vetrina(righe),
+            "quanti": len(righe)}
 
 
 @app.get("/api/negozio/{chi}")
@@ -23236,6 +23392,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Quali funzioni in arrivo ha gia' votato: con la connessione
     # ancora aperta, come i punti qui sopra.
     interessi_miei = _interessi_miei(con, user["id"])
+    # Lo stato del barattolo condiviso, per il foglio del Profilo:
+    # token, quanti oggetti nella fotografia e quando. Solo suo.
+    _bc = con.execute("SELECT token, ids, aggiornato FROM "
+                      "barattoli_condivisi WHERE tg_id=?",
+                      (user["id"],)).fetchone()
+    barattolo_cond = ({"token": _bc["token"],
+                       "quanti": len(json.loads(_bc["ids"])),
+                       "aggiornato": _bc["aggiornato"]} if _bc else None)
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -23276,6 +23440,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # vetrina, che arriva anche agli anonimi — qui c'e' solo il fatto
     # suo, e chi ha votato non esce mai da nessun'altra parte.
     profilo["interessi_miei"] = interessi_miei
+    # IL BARATTOLO CONDIVISO: lo stato per il foglio (null = mai
+    # condiviso o revocato — sono la stessa cosa, la riga non c'e').
+    profilo["barattolo_condiviso"] = barattolo_cond
     # LE RETI: le SUE, e il catalogo. Due chiavi e non una, ed e' la
     # riga da non «semplificare»: `spedizionieri` E' IL CATALOGO da
     # quando esiste, e il client rimasto in cache la legge cosi' —
@@ -36661,6 +36828,23 @@ def pagina_offerta(oid: str):
     l'anti-pattern scritto sopra la rotta di robots: una pagina
     vietata non viene scaricata, quindi il suo noindex non viene mai
     letto, e l'indirizzo nudo si indicizza lo stesso."""
+    return _pagina_con_meta(META_GENERICI + META_NOINDEX)
+
+
+@app.get("/barattolo/{token}")
+def pagina_barattolo(token: str):
+    """Il barattolo condiviso: la lista dei desideri di qualcuno, dal
+    suo link. Meta GENERICI e noindex, il caso di /offerta e per la
+    stessa ragione portata fino in fondo: QUESTA PAGINA NON LEGGE IL
+    DATABASE, quindi la lista non entra MAI nei meta — ed e' la
+    GARANZIA DELLA REVOCA, non una rinuncia: l'anteprima social cachata
+    da Telegram o WhatsApp sopravvive alla revoca, ma non ha mai avuto
+    dentro niente da mostrare. Un meta per-token («il barattolo di N
+    oggetti») sembrerebbe un ornamento e sarebbe il buco.
+    Il parametro e' TESTO: qui non si converte niente, si ignora — la
+    forma la giudica l'API, a zero letture. Fuori dalla sitemap (una
+    lista personale non si propone ai motori) e MAI un «Disallow:
+    /barattolo/» in robots.txt, l'anti-pattern di sempre."""
     return _pagina_con_meta(META_GENERICI + META_NOINDEX)
 
 

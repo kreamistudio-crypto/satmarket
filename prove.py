@@ -7505,6 +7505,218 @@ def prove_barattolo_filtra():
               else f"ERRORE: {_r.stderr[:160]}")
 
 
+def prove_barattolo_condiviso():
+    """IL BARATTOLO CONDIVISO (ago 2026): la lista dei desideri col suo
+    link — FOTOGRAFIA e non vista viva, token casuale opt-in e
+    revocabile, pagina ANONIMA, venduti spenti e rimossi mai.
+
+    Le righe da non ammorbidire, una per prova: il token nasce SOLO da
+    token_hex (mai dal tg_id o dal codice negozio: il barattolo non
+    dev'essere indovinabile da chi conosce il negozio); la pagina
+    pubblica legge SOLO gli id dalla tabella (del proprietario non esce
+    niente); i rimossi non si fotografano nemmeno e non escono; la
+    forma del token si giudica PRIMA di toccare il database; e nel
+    client l'avvertimento sta PRIMA del bottone che crea il link."""
+    print("\n[il barattolo condiviso]")
+    src = _SORGENTE
+    pz = pezzo("barattolo_condiviso")
+    pub = pezzo("barattolo_pubblico")
+    foto = pezzo("_fotografia_barattolo")
+
+    # --- 1) IL TOKEN: casuale, mai derivato ---
+    prova("il token nasce da token_hex(16)", True,
+          "token = secrets.token_hex(16)" in pz)
+    prova("...mai dal codice negozio", False, "negozio" in codice(pz))
+    prova("...e la forma si giudica a 32 esadecimali esatti", True,
+          '_TOKEN_BARATTOLO = re.compile(r"[0-9a-f]{32}")' in src)
+
+    # --- 2) LA PAGINA PUBBLICA E' ANONIMA ---
+    # Del proprietario non esce NIENTE: la sola lettura sulla tabella
+    # prende gli id fotografati — ne' tg_id, ne' nome, ne' negozio.
+    prova("dalla tabella si leggono SOLO gli id fotografati", True,
+          "SELECT ids FROM barattoli_condivisi WHERE token=?" in pub)
+    # find() e non index(): la mutazione che toglie la guardia deve
+    # fare ROSSA questa riga, non farla esplodere mangiandosi le
+    # sorelle (la lezione presa tre volte).
+    _cp = codice(pub)
+    prova("...e la forma storta non tocca il database", True,
+          0 <= _cp.find("fullmatch") < _cp.find("db()"))
+    prova("token inesistente e revocato rispondono IDENTICI", 2,
+          codice(pub).count("MSG_BARATTOLO_NON_CONDIVISO"))
+
+    # --- 3) GLI STATI: venduti spenti, rimossi mai ---
+    prova("la fotografia non prende i rimossi", True,
+          "IN ('attivo','venduto')" in foto)
+    prova("...e la pagina rifiltra fresca (il rimosso di DOPO sparisce)",
+          True, "IN ('attivo','venduto')" in pub)
+
+    # --- 4) LA FUSIONE, col GESTO e non solo col nome ---
+    # Il censimento delle tabelle figlie esige il NOME dentro
+    # esegui_fusione; qui si chiede la LITURGIA (la PK contiene il
+    # tg_id: UPDATE OR IGNORE + DELETE, il patto di punti_ritiro).
+    fus = pezzo("esegui_fusione")
+    prova("la fusione migra il barattolo condiviso col gesto giusto",
+          True, "UPDATE OR IGNORE barattoli_condivisi" in fus
+          and "DELETE FROM barattoli_condivisi WHERE tg_id=?" in fus)
+
+    # --- 5) LO STATO IN /api/me, per il foglio ---
+    prova("/api/me porta lo stato del barattolo condiviso", True,
+          'profilo["barattolo_condiviso"]' in src)
+
+    # --- 6) IL CLIENT: l'avvertimento PRIMA del tocco ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ajs = pezzo_js(mini, "function apriJarShare(){", "\n}\n")
+    prova("l'avvertimento sta PRIMA del bottone che crea il link", True,
+          0 <= ajs.find("vedrà la lista") < ajs.find("Crea il link"))
+    prova("...e dice che la pagina non fa il nome", True,
+          "non fa il tuo nome" in ajs)
+    prova("il campo del link e' readonly, mai disabled", True,
+          'id="jarShareLink" readonly' in mini)
+    prova("il link non si interpola negli onclick (il patto di "
+          "linkCanaleTest)", True,
+          "condividiJarLink()" in ajs and "condividiLink('" not in ajs)
+    prova("il foglio e' registrato in closeSheet", True,
+          "el('jarShareSheet').classList.remove('open');" in mini)
+    # La conferma della revoca si apre SOPRA questo foglio, e navPila
+    # ordina per posizione nel DOM: messo dopo, il gesto indietro
+    # chiuderebbe questo invece della domanda (il patto del paySheet).
+    prova("il foglio sta PRIMA di confermaSheet nel DOM", True,
+          0 <= mini.find('id="jarShareSheet"')
+          < mini.find('id="confermaSheet"'))
+    # La vista ospite: lista chiusa (renderGrid con l'argomento), lo
+    # spegnimento nel prefisso di loadListings accanto al gemello del
+    # proprietario, e la regex non ancorata in coda (la lezione di
+    # ANNUNCIO_URL).
+    ab = pezzo_js(mini, "async function apriBarattoloDaUrl(){", "\n}\n")
+    prova("la vista ospite e' la lista chiusa di renderGrid", True,
+          "renderGrid(righe);" in ab)
+    ll = pezzo_js(mini, "async function loadListings(anonimo){", "\n}\n")
+    prova("chi ricarica la vetrina spegne anche la vista ospite", True,
+          0 <= ll.find("spegniOspite();") < ll.find("await fetch"))
+    prova("la regex del deep-link non e' ancorata in coda", True,
+          "match(/^\\/barattolo\\/([0-9a-f]+)/)" in mini)
+
+    # --- 7) E SI FA GIRARE: gli endpoint VERI su sqlite in memoria ---
+    # Le sentinelle dicono che le righe ci sono, mai che rispondano
+    # giusto: la lezione presa nove volte.
+    import sqlite3
+
+    class _Exc(Exception):
+        def __init__(self, status, detail=""):
+            self.status, self.detail = status, detail
+
+    class _Con:
+        """La connessione vera con la close() a vuoto: gli endpoint
+        chiudono, e su :memory: chiudere butterebbe il database."""
+        def __init__(self, c): self._c = c
+        def execute(self, *a): return self._c.execute(*a)
+        def commit(self): self._c.commit()
+        def close(self): pass
+
+    vera = sqlite3.connect(":memory:")
+    vera.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS barattoli_condivisi(")
+    vera.executescript(src[i:src.index(
+        "CREATE TABLE IF NOT EXISTS interessi(", i)])
+    vera.executescript("""
+        CREATE TABLE preferiti(tg_id, annuncio_id, creato);
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+                             venditore_id INTEGER DEFAULT 0);
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY);
+        INSERT INTO utenti VALUES(0);
+        INSERT INTO annunci VALUES(1,'attivo',0),(2,'venduto',0),
+                                  (3,'rimosso',0);
+        INSERT INTO preferiti VALUES(111,1,30),(111,2,20),(111,3,10);
+    """)
+    con = _Con(vera)
+    db_chiamate = []
+
+    def _db():
+        db_chiamate.append(1)
+        return con
+
+    amb = {"secrets": __import__("secrets"), "json": __import__("json"),
+           "time": __import__("time"), "re": re,
+           "HTTPException": _Exc, "Request": object,
+           "Header": lambda *a, **k: "", "Cookie": lambda *a, **k: "",
+           "verifica_utente": lambda *a, **k: {"id": amb["_tg"]},
+           "db": _db, "_tg": 111,
+           "arricchisci_righe_vetrina": lambda righe: righe,
+           "CAMPI_VETRINA": "a.id"}
+    exec(foto, amb)
+    # l'await di leggi_json diventa il dict passato: il resto del corpo
+    # e' quello VERO, riga per riga
+    exec(pz.replace("await leggi_json(req)", "req"), amb)
+    i = src.index("_TOKEN_BARATTOLO = ")
+    exec(src[i:src.index("\n", src.index(
+        "MSG_BARATTOLO_NON_CONDIVISO", i))], amb)
+    exec(pub, amb)
+
+    def chiama(f, *a):
+        try:
+            return f(*a)
+        except _Exc as e:
+            return e
+
+    crea = chiama(amb["barattolo_condiviso"], {"azione": "crea"})
+    tok = crea["condiviso"]["token"]
+    prova("crea: il token e' 32 esadecimali", True,
+          bool(amb["_TOKEN_BARATTOLO"].fullmatch(tok)))
+    prova("...e la fotografia salta il rimosso", 2,
+          crea["condiviso"]["quanti"])
+    vera.execute("INSERT INTO annunci VALUES(4,'attivo',0)")
+    vera.execute("INSERT INTO preferiti VALUES(111,4,40)")
+    ricrea = chiama(amb["barattolo_condiviso"], {"azione": "crea"})
+    prova("crea e' idempotente: stesso token", tok,
+          ricrea["condiviso"]["token"])
+    prova("...e NON rifotografa di soppiatto", 2,
+          ricrea["condiviso"]["quanti"])
+    agg = chiama(amb["barattolo_condiviso"], {"azione": "aggiorna"})
+    prova("aggiorna tiene il token (il link in giro si aggiorna)",
+          tok, agg["condiviso"]["token"])
+    prova("...e la fotografia nuova conta il salvato nuovo", 3,
+          agg["condiviso"]["quanti"])
+
+    # LA PAGINA PUBBLICA: l'ordine e' quello della fotografia, il
+    # rimosso di DOPO sparisce, il venduto resta col suo stato.
+    vera.execute("UPDATE annunci SET stato='rimosso' WHERE id=4")
+    vera.commit()
+    pag = chiama(amb["barattolo_pubblico"], tok)
+    prova("la pagina rilegge fresca: il rimosso di dopo sparisce",
+          [1, 2], [r["id"] for r in pag["annunci"]])
+    prova("...col venduto presente e dichiarato", "venduto",
+          dict(pag["annunci"][1])["stato"])
+    db_chiamate.clear()
+    storto = chiama(amb["barattolo_pubblico"], "NON-UN-TOKEN")
+    prova("la forma storta e' un 404 a ZERO letture", (404, 0),
+          (storto.status, len(db_chiamate)))
+    finto = chiama(amb["barattolo_pubblico"], "cd" * 16)
+    prova("...e l'inesistente risponde con le stesse parole",
+          storto.detail, finto.detail)
+
+    # LA REVOCA: subito, senza guardie, idempotente — e ricondividere
+    # genera un token NUOVO (i link vecchi restano morti).
+    rev = chiama(amb["barattolo_condiviso"], {"azione": "revoca"})
+    prova("la revoca risponde col nulla onesto", None, rev["condiviso"])
+    prova("...e la riga non c'e' piu'", 0, vera.execute(
+        "SELECT COUNT(*) FROM barattoli_condivisi").fetchone()[0])
+    dopo = chiama(amb["barattolo_pubblico"], tok)
+    prova("il link revocato e' morto subito", 404, dopo.status)
+    prova("revocare due volte non alza", None, chiama(
+        amb["barattolo_condiviso"], {"azione": "revoca"})["condiviso"])
+    nuovo = chiama(amb["barattolo_condiviso"], {"azione": "crea"})
+    prova("ricondividere genera un token NUOVO", True,
+          nuovo["condiviso"]["token"] != tok)
+    amb["_tg"] = 222
+    prova("il barattolo vuoto non ha niente da condividere", 400,
+          chiama(amb["barattolo_condiviso"], {"azione": "crea"}).status)
+    prova("...e aggiornare senza un link e' un 400 onesto", 400,
+          chiama(amb["barattolo_condiviso"], {"azione": "aggiorna"}).status)
+    prova("l'azione sconosciuta pure", 400, chiama(
+        amb["barattolo_condiviso"], {"azione": "boh"}).status)
+    vera.close()
+
+
 def prove_ferie():
     """IL NEGOZIO IN FERIE (ago 2026): si guarda, non si compra.
     Le due cose che questa famiglia difende: il gate e' in LETTURA
@@ -18189,7 +18401,8 @@ def prove_anteprime():
                     '@app.get("/categoria/{slug}")',
                     '@app.get("/sicurezza")',
                     '@app.get("/privacy")',
-                    '@app.get("/offerta/{oid}")')
+                    '@app.get("/offerta/{oid}")',
+                    '@app.get("/barattolo/{token}")')
     for rotta in ROTTE_PAGINA:
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
@@ -18218,6 +18431,17 @@ def prove_anteprime():
     i = _SORGENTE.index('@app.get("/offerta/{oid}")')
     corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
     prova("/offerta non legge il database (una trattativa e' privata)",
+          True, "META_NOINDEX" in corpo and "_seo_" not in corpo
+          and "db()" not in corpo and "con.execute" not in corpo)
+    # /barattolo/{token} ha la STESSA regola, portata fino in fondo:
+    # non leggere il database e' la GARANZIA DELLA REVOCA — l'anteprima
+    # social cachata sopravvive alla revoca, ma se la lista non e' mai
+    # entrata nei meta non ha niente da mostrare. Un meta per-token
+    # («il barattolo di N oggetti») sembrerebbe un ornamento e sarebbe
+    # il buco.
+    i = _SORGENTE.index('@app.get("/barattolo/{token}")')
+    corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    prova("/barattolo non legge il database (la garanzia della revoca)",
           True, "META_NOINDEX" in corpo and "_seo_" not in corpo
           and "db()" not in corpo and "con.execute" not in corpo)
 
@@ -18756,7 +18980,7 @@ def prove_seo():
                           "\n}\n")
     for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
               "apriPrivacyDaUrl", "apriCategoriaDaUrl",
-              "apriOffertaDaUrl"):
+              "apriOffertaDaUrl", "apriBarattoloDaUrl"):
         prova(f"{f} si chiama da avvia()", True,
               f"{f}();" in corpo_avvia)
         prova(f"...e da avviaVetrina()", True,
@@ -21274,8 +21498,11 @@ def prove_fogli_di_casa():
     # crescere per conversione: i confirm() sono FINITI, e a dirlo e'
     # il censimento qui sotto. Un gesto nuovo che adotta il foglio
     # alza il numero a mano, come sempre.
-    prova("i gesti che passano dalla domanda unica sono quaranta",
-          40, solo_codice(mini).count("chiediConferma({"))
+    # QUARANTUNO (ago 2026): la revoca del barattolo condiviso — un
+    # link che muore per chiunque ce l'abbia si chiede prima, e il
+    # corpo dice il costo vero (ricondividendo il link sara' NUOVO).
+    prova("i gesti che passano dalla domanda unica sono quarantuno",
+          41, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -31779,7 +32006,7 @@ def main():
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_barattolo_in_striscia,
               prove_interesse,
-              prove_barattolo_filtra,
+              prove_barattolo_filtra, prove_barattolo_condiviso,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr,
               prove_trasloco_nostr, prove_conta_feedback,

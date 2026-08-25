@@ -558,6 +558,23 @@
      conteggio resta, che dice quanti oggetti hai messo da parte. */
   body.solo-barattolo .strumenti #ordinaSelBtn,
   body.solo-barattolo .strumenti #filtriBtn{display:none}
+  /* ...e la vista OSPITE (il barattolo condiviso di qualcun altro) li
+     nasconde per la stessa ragione: la lista e' chiusa, e quei
+     controlli chiamano un server che di quella lista non sa niente.
+     Regola SUA e non un selettore in piu' sulla riga qui sopra: quella
+     stringa la esige una sentinella, e le due viste restano due. */
+  body.barattolo-ospite .strumenti #ordinaSelBtn,
+  body.barattolo-ospite .strumenti #filtriBtn{display:none}
+  /* la riga del barattolo condiviso di qualcun altro: la ricetta della
+     fascia del rodaggio (fondo velato, bordo ₿) — un cartello, non un
+     CTA. Il testo cede coi puntini, il bottone d'uscita mai. */
+  .ospite-riga{display:flex;align-items:center;gap:10px;
+    margin:10px var(--pad) 0;padding:10px 12px;
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:var(--radius);color:var(--sats-text);
+    font-weight:700;font-size:13.5px}
+  .ospite-riga span{flex:1 1 auto;min-width:0}
+  .ospite-riga .btn.mini{flex:0 0 auto;margin:0}
   /* in nav vive solo da desktop (come il tappo): su mobile la nav e'
      la tab bar in basso e la levetta sta gia' in testata */
   nav .tema-btn{display:none}
@@ -4193,6 +4210,14 @@ document.getElementById('cartello')?.remove();</script>
          fascia sola tra le pillole e le foto. La riga dei pionieri
          compare solo se il server manda il numero (interruttore spento
          nel config, demo o server vecchio = niente riga). -->
+    <!-- Il barattolo condiviso di QUALCUN ALTRO, aperto dal suo link:
+         la riga dice cos'e' la lista che si sta guardando (o che non e'
+         piu' condivisa) e da' l'uscita. Nasce spenta, la scrive
+         ospiteRiga() col textContent: nessun testo utente ci passa. -->
+    <div id="ospiteRiga" class="ospite-riga" style="display:none">
+      <span id="ospiteTesto"></span>
+      <button type="button" class="btn mini" onclick="chiudiOspite()">Vai al mercatino</button>
+    </div>
     <div class="strumenti">
       <div class="conta-blocco">
         <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
@@ -4704,9 +4729,14 @@ document.getElementById('cartello')?.remove();</script>
         <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
         <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello.</li>
-        <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu.</li>
+        <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
       </ul>
+
+      <h3 id="priv-barattolo">Il barattolo condiviso</h3>
+      <p>Il barattolo resta privato finché non decidi tu: dal Profilo puoi creare un <b>link</b> che mostra la lista delle cose che hai messo da parte. È come pubblicare una lista di desideri — chi apre il link vede cosa ti interessa comprare, anche un venditore con cui stai trattando se il link gli arriva. Va fatto sapendolo, e te lo diciamo lì, <b>prima</b> del tocco che crea il link.</p>
+      <p>La pagina del link <b>non fa il tuo nome</b>: niente nome, niente foto, niente negozio. Chi lo riceve da te sa di chi è, ma un link girato a terzi non lega la lista a una persona. E mostra una <b>fotografia</b>, non il barattolo vivo: quello che salvi dopo non si vede finché non la aggiorni tu, con un gesto.</p>
+      <p><b>La revoca</b> è un tocco e il link muore subito: la pagina si rilegge dai nostri dati a ogni apertura, non c'è una copia che sopravviva. Tre limiti onesti, però: chi aveva la pagina già aperta la vede finché non ricarica; l'anteprima del link che Telegram o WhatsApp tengono in cache può durare qualche giorno, ma mostra solo il titolo generico — la lista, in quell'anteprima, non c'è mai entrata; e uno screenshot resta, come per ogni cosa pubblicata. Se un domani ricondividi, il link sarà nuovo: quello vecchio resta morto.</p>
 
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
       <p>Quattro cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
@@ -5563,6 +5593,25 @@ document.getElementById('cartello')?.remove();</script>
     <div class="conto-scomposto" id="nwcScomposto"></div>
     <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET: CONDIVIDI IL BARATTOLO (ago 2026) ============
+       Il link della propria lista di desideri. L'AVVERTIMENTO sta QUI,
+       PRIMA del tocco che crea il link (decisione di Andrea): chi apre
+       il link vedra' cosa mi interessa comprare — anche un venditore in
+       trattativa — ed e' un gesto da fare sapendolo, come pubblicare
+       una lista di desideri. Il corpo lo scrive apriJarShare() nei due
+       stati (mai condiviso / condiviso): nessun testo utente ci passa,
+       il token e' esadecimale per costruzione.
+       STA PRIMA DI #confermaSheet NEL DOM, e non e' un caso: la
+       conferma della revoca si apre SOPRA questo foglio, e navPila
+       ordina per posizione — messo dopo, il gesto indietro chiuderebbe
+       questo invece della domanda (il precedente del paySheet). -->
+  <div class="sheet" id="jarShareSheet" role="dialog" aria-modal="true"
+       aria-labelledby="jarShareTit">
+    <div class="grab"></div>
+    <h3 id="jarShareTit">🔗 Condividi il barattolo</h3>
+    <div id="jarShareCorpo"></div>
   </div>
 
   <!-- ============ SHEET: SVUOTA IL PACCO (ago 2026) ============
@@ -6862,6 +6911,9 @@ async function loadListings(anonimo){
      in aggiornaVista per la ricerca AI: «si torna alla vetrina, che e'
      cio' che il gesto chiede». */
   spegniBarattolo();
+  /* ...e con lui la vista OSPITE del barattolo condiviso di qualcun
+     altro: stessa regola, stesso posto — l'uscita per costruzione. */
+  spegniOspite();
   const opz = (VETRINA || anonimo) ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
   const r = await fetch(`${API_BASE}/listings?${paramsVetrina()}`, opz);
   if (!r.ok) throw new Error('vetrina non disponibile');
@@ -8882,9 +8934,10 @@ function renderGrid(items){
      quando c'e' una ricerca o una categoria attiva */
   /* col barattolo acceso sono «oggetti» e non «risultati»: non sono il
      risultato di una ricerca, sono le cose che hai messo da parte — e
-     a dire QUALI c'e' la pillola accesa un centimetro sopra */
+     a dire QUALI c'e' la pillola accesa un centimetro sopra (e per il
+     barattolo condiviso di un altro lo dice la riga ospite) */
   el('gridLabel').innerHTML = `<span class="conta">${nTot}</span> `
-    + ((items||q||activeCat!=='Tutto') && !vistaBarattolo
+    + ((items||q||activeCat!=='Tutto') && !vistaBarattolo && !barattoloOspite
         ? `risultat${nTot===1?'o':'i'}`
         : `oggett${nTot===1?'o':'i'}`);
   renderPionieri();
@@ -15961,6 +16014,7 @@ function closeSheet(){
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
+  el('jarShareSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
@@ -24152,6 +24206,10 @@ const preferitiInVetrina = () => myPreferiti.filter(l=>l.stato==='attivo');
    constatazione la fa gia' il titolone dello stato vuoto, e ripeterla
    nel corpo erano le stesse parole due volte di fila; nel cassetto un
    titolo non c'e', e servono tutt'e due. */
+/* Lo stato del barattolo condiviso, da /api/me: {token, quanti,
+   aggiornato} o null (mai condiviso, o revocato: per il server sono
+   la stessa cosa — la riga non c'e'). */
+let myBarattoloCond = null;
 const BARATTOLO_VUOTO = 'Il tuo barattolo è vuoto';
 const BARATTOLO_INVITO = 'Metti da parte gli annunci che ti piacciono '
   + 'col 🫙 sulla loro foto.';
@@ -24589,9 +24647,19 @@ function renderPreferiti(){
   const jarEm = el('preferitiJar');
   if (jarEm && !jarEm.querySelector('svg')) jarEm.innerHTML = jarSVG(0, 20);
   aggiornaBarattolo();
+  /* Il bottone del link: c'e' quando c'e' qualcosa da condividere
+     (attivi o venduti: la fotografia prende anche gli esauriti, che
+     in pagina si mostrano spenti e col rifornimento tornano) — e c'e'
+     COMUNQUE quando un link e' gia' in giro, anche a barattolo
+     svuotato: la revoca deve restare raggiungibile. */
+  const daCondividere = myPreferiti.some(
+    l => l.stato === 'attivo' || l.stato === 'venduto');
+  const btnShare = (daCondividere || myBarattoloCond)
+    ? `<button class="btn ghost" style="margin-top:10px" onclick="apriJarShare()">🔗 Condividi il barattolo</button>`
+    : '';
   if (!myPreferiti.length) {
     box.innerHTML = `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">
-      ${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}</div>`;
+      ${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}</div>` + btnShare;
     return;
   }
   box.innerHTML = myPreferiti.map(l => {
@@ -24622,7 +24690,120 @@ function renderPreferiti(){
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${luogoPunto(l)}</div>
     </div>`;
-  }).join('');
+  }).join('') + btnShare;
+}
+
+/* ---- il barattolo condiviso: il foglio del link (ago 2026) ---- */
+/* Quanti oggetti entrerebbero nella fotografia di ADESSO: attivi e
+   venduti, la stessa domanda che fa il server. */
+const contaFotografia = () => myPreferiti.filter(
+  l => l.stato === 'attivo' || l.stato === 'venduto').length;
+
+/* Il foglio nei due stati. L'AVVERTIMENTO sta nello stato «mai
+   condiviso», PRIMA del bottone che crea — e' la decisione di Andrea:
+   un gesto di privacy si fa sapendolo, non lo si scopre dopo. Qui non
+   passa nessun testo utente (il token e' esadecimale per costruzione),
+   quindi il template e' statico. */
+function apriJarShare(){
+  const box = el('jarShareCorpo');
+  if (!box) return;
+  if (!myBarattoloCond) {
+    box.innerHTML = `
+      <div style="font-size:13px;color:var(--ink);font-weight:600;line-height:1.5;margin-bottom:10px">
+        Chi apre il link vedrà la lista delle cose che ti interessa
+        comprare — anche un venditore con cui stai trattando, se il
+        link gli arriva. È come pubblicare una lista di desideri: un
+        gesto tuo, da fare sapendolo.</div>
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:12px">
+        La pagina non fa il tuo nome, e mostra la <b>fotografia di
+        adesso</b> (${contaFotografia()} oggett${contaFotografia()===1?'o':'i'}):
+        quello che salverai dopo non si vede finché non la aggiorni.
+        Puoi revocare il link quando vuoi.</div>
+      <button class="btn orange" onclick="jarShareAzione('crea', this)">🔗 Crea il link</button>
+      <button class="btn ghost" onclick="navIndietro()">Annulla</button>`;
+  } else {
+    const link = jarShareLinkUrl();
+    const quando = new Date((myBarattoloCond.aggiornato||0)*1000)
+      .toLocaleDateString('it-IT');
+    box.innerHTML = `
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:10px">
+        La fotografia è del <b>${quando}</b> — ${myBarattoloCond.quanti}
+        oggett${myBarattoloCond.quanti===1?'o':'i'}. Chi ha il link vede
+        quella: quello che salvi dopo non c'è finché non la aggiorni.</div>
+      <input id="jarShareLink" readonly value="${link}"
+        style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;padding:10px;border-radius:10px;border:1.5px solid var(--bordo, #E8DFC9);background:var(--card);color:var(--ink)">
+      <button class="btn orange" style="margin-top:12px" onclick="condividiJarLink()">🔗 Condividi il link</button>
+      <button class="btn ghost" onclick="copiaJarLink()">📋 Copia il link</button>
+      <button class="btn ghost" onclick="jarShareAzione('aggiorna', this)">🔄 Aggiorna la fotografia (${contaFotografia()} di adesso)</button>
+      <button class="btn danger-ghost" onclick="revocaJarShare()">Revoca il link</button>
+      <button class="btn ghost" onclick="navIndietro()">Chiudi</button>`;
+  }
+  el('sheetBg').classList.add('open');
+  el('jarShareSheet').classList.add('open');
+}
+
+/* Il link vive in una funzione e MAI interpolato negli onclick (il
+   patto di linkCanaleTest): il token e' esadecimale per costruzione,
+   ma la regola non fa eccezioni che poi diventano abitudini. */
+const jarShareLinkUrl = () => myBarattoloCond
+  ? `${location.origin}/barattolo/${myBarattoloCond.token}` : '';
+function condividiJarLink(){
+  const l = jarShareLinkUrl(); if (!l) return;
+  condividiLink(l, 'Le cose che ho messo da parte su Barattolo 🫙');
+}
+function copiaJarLink(){
+  const l = jarShareLinkUrl(); if (!l) return;
+  copiaLink(l, 'Link copiato 🔗');
+}
+
+/* Crea o aggiorna: il velo IMMEDIATO di bottoneInAttesa — non si
+   muovono sats, ma si scrive, e il doppio tocco su rete lenta non
+   deve chiedere due volte. Lo stato nuovo lo dice il SERVER (mai
+   dedotto): si riscrive myBarattoloCond dalla risposta e si ridisegna
+   il foglio in place. */
+async function jarShareAzione(azione, btn){
+  haptic();
+  const fine = bottoneInAttesa(btn, azione === 'crea'
+    ? 'Creo il link…' : 'Aggiorno la fotografia…');
+  try {
+    const r = await fetch(`${API_BASE}/me/barattolo-condiviso`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json',
+                'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({azione})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci siamo riusciti: riprova'); return; }
+    myBarattoloCond = d.condiviso || null;
+    apriJarShare();
+    renderPreferiti();
+    toast(azione === 'crea' ? 'Link creato 🔗' : 'Fotografia aggiornata 📸');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { fine(); }
+}
+
+/* La revoca chiede col foglio di casa, che si apre SOPRA questo (il
+   precedente del paySheet: confermaSheet sta dopo nel DOM). Il corpo
+   dice il costo VERO: subito morto per tutti, e ricondividendo il
+   link sara' NUOVO. */
+function revocaJarShare(){
+  chiediConferma({titolo: 'Revochi il link?',
+    corpo: 'Il link smette di funzionare subito, per chiunque ce l\'abbia.\n\n'
+      + 'Se un domani lo ricondividi, il link sarà nuovo: quello vecchio resta morto.',
+    etichetta: 'Revoca il link',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/me/barattolo-condiviso`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({azione: 'revoca'})});
+      if (!r.ok) { toast('Non ci siamo riusciti: riprova'); return; }
+      myBarattoloCond = null;
+      /* il foglio sotto e' rimasto aperto: si ridisegna nello stato
+         «mai condiviso», che dopo una revoca e' la verita' */
+      apriJarShare();
+      renderPreferiti();
+      toast('Link revocato');
+    }});
 }
 
 /* ---- statistiche del mercatino (solo moderatori) ---- */
@@ -28005,6 +28186,78 @@ function apriOffertaDaUrl(){
   go('affari');
 }
 
+/* /barattolo/{token} — il barattolo condiviso di qualcun altro (ago
+   2026): la sua lista di desideri come lista CHIUSA sopra la vetrina,
+   ANONIMA (la pagina non fa il nome di nessuno: chi riceve il link sa
+   da chi arriva, e un link inoltrato a terzi non deve legare la lista
+   a una persona). Le card sono fresche — prezzi veri, venduto spento —
+   perche' la fotografia congela la LISTA, mai gli stati.
+   La regex NON e' ancorata in coda, la lezione di ANNUNCIO_URL. */
+const BARATTOLO_URL = location.pathname.match(/^\/barattolo\/([0-9a-f]+)/);
+let barattoloAperto = false;
+/* le righe della lista chiusa in mostra, o null: e' il gemello ospite
+   di vistaBarattolo, e si spegne nello stesso posto (loadListings) */
+let barattoloOspite = null;
+
+/* La riga sopra la griglia: dice cos'e' la lista che si guarda, col
+   textContent — nessun testo utente ci passa, ma la via pulita resta
+   quella. Vuota = spenta. */
+function ospiteRiga(testo){
+  const r = el('ospiteRiga');
+  if (!r) return;
+  el('ospiteTesto').textContent = testo;
+  r.style.display = testo ? 'flex' : 'none';
+}
+
+/* Lo spegnimento della vista ospite, chiamato dal prefisso SINCRONO di
+   loadListings accanto a spegniBarattolo: qualunque ricarica della
+   vetrina (categoria, ricerca, tirata) torna al mercatino senza un
+   elenco di casi da ricordare. */
+function spegniOspite(){
+  if (barattoloOspite) {
+    barattoloOspite = null;
+    document.body.classList.remove('barattolo-ospite');
+  }
+  ospiteRiga('');
+}
+
+/* L'uscita col bottone: la riga si spegne comunque (anche quando dice
+   solo «non piu' condiviso», dove sotto c'e' gia' la vetrina), e se la
+   lista era in mostra si ricarica il mercatino. */
+function chiudiOspite(){
+  const cera = !!barattoloOspite;
+  spegniOspite();
+  if (cera) loadListings().then(()=>renderGrid()).catch(()=>{});
+}
+
+async function apriBarattoloDaUrl(){
+  if (!BARATTOLO_URL || barattoloAperto) return;
+  barattoloAperto = true;
+  /* in DEMO da file:// non si arriva (il pathname non matcha); questa
+     e' la cintura per il ripiego demo a server muto, dove una lista
+     vera non c'e' e non si inventa */
+  if (DEMO) return;
+  try {
+    /* API pubblica, senza header: la vede chiunque abbia il link */
+    const r = await fetch(`${API_BASE}/barattolo/${BARATTOLO_URL[1]}`);
+    if (!r.ok) {
+      /* revocato o mai esistito (per il server sono la stessa cosa):
+         lo si dice sopra la vetrina normale, mai una pagina muta */
+      ospiteRiga('🫙 Questo barattolo non è più condiviso');
+      return;
+    }
+    const j = await r.json();
+    const righe = (j.annunci || []).map(mapListing);
+    /* nel catalogo anche i venduti: la scheda spenta si apre (lo
+       stesso insieme di stati di /api/listings/{id}) */
+    inCatalogo(righe);
+    barattoloOspite = righe;
+    document.body.classList.add('barattolo-ospite');
+    ospiteRiga(`🫙 Un barattolo condiviso — ${righe.length} oggett${righe.length===1?'o':'i'}`);
+    renderGrid(righe);
+  } catch(e) {}
+}
+
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
@@ -28031,6 +28284,7 @@ async function avviaVetrina(){
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     apriOffertaDaUrl();
+    apriBarattoloDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
     modaleTest(bannerInstallaPwa);
@@ -28202,6 +28456,9 @@ async function avvia(){
     interessiMiei = me.interessi_miei || [];
     interessiNoti = true;   // ...e da adesso l'assenza vuol dire «non ha votato»
     renderInteresse();
+    /* lo stato del barattolo condiviso (null = mai condiviso o
+       revocato): serve al foglio e al bottone nel cassetto */
+    myBarattoloCond = me.barattolo_condiviso || null;
     servizioLeve = me.servizio_leve || null;
     aggiornaServizioVisibilita();
     npubCodice = ''; lnAddrModifica = false;
@@ -28293,6 +28550,7 @@ async function avvia(){
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     apriOffertaDaUrl();
+    apriBarattoloDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });
