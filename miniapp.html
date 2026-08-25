@@ -4738,6 +4738,7 @@ document.getElementById('cartello')?.remove();</script>
       <ul class="sicu-lista">
         <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
+        <li>Il tuo <b>Lightning address</b>, se lo imposti per incassare da solo: è un <span class="mono">nome@dominio</span>, come una mail, e ce l'abbiamo <b>in chiaro</b> — è lì che ti mandiamo i sats quando un affare si chiude, quindi dobbiamo poterlo leggere. Non esce da nessuna parte: non lo vede chi compra, non lo vedono i moderatori.</li>
         <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano una cosa sola — quanto hai comprato e venduto.</li>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
@@ -4797,6 +4798,13 @@ document.getElementById('cartello')?.remove();</script>
              l'unica senza scadenza: per questo la strada per toglierla
              sta nella stessa riga, invece che da qualche altra parte. -->
         <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «📍 Punti di ritiro», con una ✕ accanto a ognuno.</li>
+        <!-- Terza voce senza scadenza, e la ragione e' quella delle
+             altre due: ce l'ha messo LUI. ⚠️ Questa riga si e' potuta
+             scrivere solo dall'ago 2026, quando il bottone per
+             toglierlo e' nato: prima il server la stringa vuota la
+             accettava ma dal client non si arrivava, e «finche' non lo
+             togli» sarebbe stata una porta che non si apre. -->
+        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «⚡ Incassi e pagamenti», col suo bottone.</li>
         <!-- Ricade sotto «tutto il resto non ha una scadenza», ma si
              nomina lo stesso: e' testo LIBERO scritto da una persona, e
              chi lo scrive ha diritto di sapere che resta. La strada per
@@ -4852,7 +4860,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Un cookie solo</b>, e serve a tenerti dentro se entri dal browser: contiene un numero casuale, e nel database c'è soltanto la sua impronta.</li>
         <li><b>Non vendiamo niente a nessuno</b> e non ti profiliamo. Non c'è pubblicità, quindi non c'è nessuno a cui rivenderti.</li>
         <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: è facoltativo e sparisce con l'indirizzo.</li>
-        <li><b>Il tuo wallet non passa da qui.</b> Se lo colleghi, la connessione resta sul tuo dispositivo e non arriva mai ai nostri server.</li>
+        <li><b>La connessione al tuo wallet non passa da qui.</b> Se lo colleghi, resta sul tuo dispositivo e non arriva mai ai nostri server. Il <b>Lightning address</b> è un'altra cosa e ce l'abbiamo, se lo imposti: qui sopra c'è cos'è e per quanto.</li>
       </ul>
       <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
 
@@ -19012,7 +19020,8 @@ function renderLnAddress(){
         ⚡ Incassi automatici su <span class="mono">${esc(myLnAddress)}</span></div>
       <div style="margin-top:4px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         Ogni vendita conclusa arriva da sola qui.</div>
-      <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>`;
+      <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>
+      <button class="btn danger-ghost" onclick="rimuoviLnAddress()">🗑 Rimuovi l'indirizzo</button>`;
     return;
   }
   box.innerHTML = `
@@ -19027,6 +19036,7 @@ function renderLnAddress(){
 async function salvaLnAddressProfilo(btn){
   haptic();
   const addr = el('lnAddrProfilo').value.trim().toLowerCase();
+  if (!addr && myLnAddress) return rimuoviLnAddress();
   if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
     toast('Formato non valido: dev\'essere tipo nome@wallet.com'); return;
   }
@@ -19044,6 +19054,42 @@ async function salvaLnAddressProfilo(btn){
   toast(d.incassi_sbloccati > 0
     ? '⚡ Attivato! E gli incassi in attesa sono partiti da soli 🔓'
     : '⚡ Incassi automatici attivati!');
+}
+
+/* L'indirizzo si TOGLIE, ed e' il calco di `rimuoviNpub`: la stessa
+   POST con la stringa vuota, che il server accetta da sempre — la
+   porta c'era, dal client non si apriva (le due funzioni che salvano
+   hanno la guardia del formato, e il campo svuotato prendeva «formato
+   non valido»). Senza questo bottone la pagina «I tuoi dati» non
+   potrebbe dire «finche' non lo togli», che e' la formula con cui
+   quella pagina nomina ogni dato senza scadenza.
+   LA CONFERMA DICE LA CONSEGUENZA e non il gesto: togliere l'indirizzo
+   non cancella un contatto, RIPORTA GLI INCASSI A MANO — e gli ordini
+   gia' confermati restano fermi finche' non si incolla una invoice.
+   Chi non lo sapesse lo scoprirebbe alla prima vendita. */
+async function rimuoviLnAddress(){
+  haptic();
+  if (!myLnAddress) return;
+  chiediConferma({
+    titolo: 'Rimuovere il tuo Lightning address?',
+    corpo: 'Gli incassi tornano a mano: a ogni vendita dovrai incollare '
+         + 'tu una invoice per farti pagare, e gli ordini gia\' '
+         + 'confermati restano in attesa finche\' non lo fai.'
+         + '\n\nPuoi rimetterlo quando vuoi.',
+    etichetta: '🗑 Rimuovi',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/me/ln-address`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify({ln_address: ''})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 7000); return; }
+      myLnAddress = d.ln_address || '';
+      lnAddrModifica = false;
+      renderLnAddress();
+      renderChecklist();
+      toast('Indirizzo rimosso: gli incassi tornano a mano');
+    }});
 }
 
 /* ---- badge Nostr del profilo: npub auto-dichiarata + verifica con

@@ -13054,6 +13054,144 @@ def prove_punti_salvati():
           True, "finché non li togli" in priv
           and "Punti di ritiro" in priv)
 
+    # Il Lightning address e' il dato piu' longevo del profilo —
+    # nome@dominio, in CHIARO, senza scadenza — e fino all'ago 2026 la
+    # pagina non lo nominava affatto, mentre una riga di «Cosa non
+    # facciamo» prometteva il contrario: «il tuo wallet non passa da
+    # qui», vera per NWC (che vive in localStorage) e FALSA per
+    # l'indirizzo, che e' quel che un venditore chiama il suo wallet.
+    # ⚠️ Le due prove qui sotto si ancorano alla VOCE e non alla
+    # pagina: «Lightning address» ci vive in tre punti e «in chiaro»
+    # in quattro, quindi cercarli nella pagina intera le rendeva
+    # verdi anche con la voce mutilata — la tortura le ha trovate
+    # tutte e due sopravvissute.
+    _voce = priv[priv.index("Il tuo <b>Lightning address</b>"):]
+    _voce = _voce[:_voce.index("</li>")]
+    prova("l'elenco di cosa nasce nomina il Lightning address", True,
+          "Lightning address" in _voce)
+    prova("...e dice la parte scomoda: ce l'abbiamo in chiaro", True,
+          "in chiaro" in _voce)
+    prova("...e perche' ci serve leggerlo, non solo che ce l'abbiamo",
+          True, "ti mandiamo i sats" in _voce)
+    prova("...e per quanto, con la strada per toglierlo", True,
+          "finché non lo togli" in priv
+          and "Incassi e pagamenti" in priv)
+    # La riga che diceva il falso non deve tornare: la promessa e' sulla
+    # CONNESSIONE (NWC), mai sul wallet nudo.
+    prova("la promessa sul wallet parla della connessione", True,
+          "connessione al tuo wallet non passa" in priv)
+    prova("...e non promette piu' che «il wallet non passa da qui»",
+          False, "<b>Il tuo wallet non passa" in priv)
+
+    # E LA PORTA CHE QUELLA PAGINA PROMETTE ESISTE DAVVERO: e' la meta'
+    # che una sentinella sui testi non direbbe. Il server la stringa
+    # vuota l'ha sempre accettata, dal client non si arrivava — le due
+    # funzioni che salvano hanno la guardia del formato, quindi il campo
+    # svuotato prendeva «formato non valido»: un vicolo cieco.
+    prova("il bottone per togliere l'indirizzo c'e'", True,
+          'onclick="rimuoviLnAddress()"' in mini)
+    prova("...e manda la stringa vuota, il calco di rimuoviNpub", True,
+          "JSON.stringify({ln_address: ''})"
+          in pezzo_js(mini, "async function rimuoviLnAddress"))
+    _sln = pezzo_js(mini, "async function salvaLnAddressProfilo")
+    prova("...e il campo svuotato delega alla rimozione", True,
+          "if (!addr && myLnAddress) return rimuoviLnAddress();" in _sln)
+    # L'ORDINE E' LA SOSTANZA: sotto la guardia del formato la delega
+    # non scatterebbe mai, e la riga della pagina tornerebbe falsa.
+    prova("...e la delega viene PRIMA della guardia del formato", True,
+          _sln.index("return rimuoviLnAddress()")
+          < _sln.index("Formato non valido"))
+
+    # E SI FA GIRARE. Il caso che solo l'esecuzione prende e' il campo
+    # svuotato da chi un indirizzo NON ce l'ha: li' la delega non deve
+    # scattare — una conferma «rimuovo?» su un niente e' un vicolo
+    # cieco travestito da cortesia — e la guardia del formato deve
+    # dire la sua come ha sempre fatto.
+    import json as _js4, os as _os4, shutil as _sh4
+    import subprocess as _sp4, tempfile as _tf4
+    _node4 = _sh4.which("node")
+    if not _node4:
+        salta("il gesto della rimozione risponde giusto", "node non installato")
+    else:
+        _prog4 = ("""
+let myLnAddress = '', lnAddrModifica = false, CAMPO = '';
+const API_BASE = '/api';
+const reg = [];
+function haptic(){}
+function toast(t){ reg.push({toast: t}); }
+function authHdr(){ return ''; }
+function renderLnAddress(){ reg.push({render: 1}); }
+function renderChecklist(){ reg.push({checklist: 1}); }
+function bottoneInAttesa(){ reg.push({velo: 1}); return () => {}; }
+function el(){ return {value: CAMPO}; }
+function chiediConferma(o){
+  reg.push({conferma: o.titolo, corpo: o.corpo}); return o.poi();
+}
+async function fetch(u, o){
+  reg.push({post: u, body: o.body});
+  return {ok: true, json: async () => ({ln_address: \'\'})};
+}
+""" + pezzo_js(mini, "async function rimuoviLnAddress")
+              + pezzo_js(mini, "async function salvaLnAddressProfilo") + """
+(async () => {
+  const out = {};
+  // `chiediConferma` non si attende (ne' qui ne' in rimuoviNpub: e'
+  // una regia, non una promessa), quindi la coda del gesto arriva
+  // DOPO il return — un await sulla funzione non aspetta niente e il
+  // banco leggerebbe i microtask che gli capita di aver smaltito. Ci
+  // vuole un macrotask, ed e' la stessa lezione del banco degli
+  // osservatori: si aspetta prima di leggere, e prima di azzerare, o
+  // la coda di un giro inquina quello dopo.
+  const respiro = () => new Promise(r => setTimeout(r, 5));
+  const giro = async (nome, indirizzo, campo, f) => {
+    await respiro();
+    myLnAddress = indirizzo; CAMPO = campo; reg.length = 0;
+    await f();
+    await respiro();
+    out[nome] = {passi: reg.map(r => Object.keys(r)[0]).join(","),
+                 body: (reg.find(r => r.post) || {}).body || "",
+                 corpo: (reg.find(r => r.conferma) || {}).corpo || "",
+                 toast: (reg.filter(r => r.toast).pop() || {}).toast || ""};
+  };
+  await giro("cintura", "", "", () => rimuoviLnAddress());
+  await giro("rimuove", "a@b.com", "", () => rimuoviLnAddress());
+  await giro("delega", "a@b.com", "", () => salvaLnAddressProfilo({}));
+  await giro("vuotoSenza", "", "", () => salvaLnAddressProfilo({}));
+  console.log(JSON.stringify(out));
+})();
+""")
+        _f4 = _tf4.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f4.write(_prog4)
+        _f4.close()
+        _r4 = _sp4.run([_node4, _f4.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        _os4.unlink(_f4.name)
+        _e4 = (_js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
+               else {"errore": _r4.stderr[:300]})
+        prova("senza indirizzo il gesto non chiede e non manda niente",
+              "", _e4.get("cintura", {}).get("passi", "ERRORE"))
+        prova("...col suo indirizzo chiede, manda, ridisegna e lo dice",
+              "conferma,post,render,checklist,toast",
+              _e4.get("rimuove", {}).get("passi", "ERRORE"))
+        prova("...e quel che manda e' la stringa VUOTA",
+              '{"ln_address":""}',
+              _e4.get("rimuove", {}).get("body", "ERRORE"))
+        prova("...e la conferma dice la conseguenza, non il gesto",
+              True, "a mano" in _e4.get("rimuove", {}).get("corpo", ""))
+        # La delega passa dalla rimozione INTERA: stessi passi, e in
+        # testa non c'e' il velo — il return precede `bottoneInAttesa`.
+        prova("il campo svuotato delega, e non alza il velo per conto suo",
+              "conferma,post,render,checklist,toast",
+              _e4.get("delega", {}).get("passi", "ERRORE"))
+        # ⚠️ Il caso che tiene onesta la delega: chi un indirizzo non
+        # ce l'ha non deve vedersi chiedere se toglierlo.
+        prova("...ma senza un indirizzo da togliere non chiede niente",
+              "toast", _e4.get("vuotoSenza", {}).get("passi", "ERRORE"))
+        prova("...e gli dice quel che gli ha sempre detto", True,
+              "Formato non valido"
+              in _e4.get("vuotoSenza", {}).get("toast", ""))
+
 
 # ====================================================================
 def prove_pagina_acquisto():
@@ -22764,8 +22902,8 @@ def prove_fogli_di_casa():
     # busta diretta — dichiarare che il codice va al compratore
     # silenzia i promemoria e avvisa l'acquirente, e va detto PRIMA
     # del tocco.
-    prova("i gesti che passano dalla domanda unica sono quarantadue",
-          42, solo_codice(mini).count("chiediConferma({"))
+    prova("i gesti che passano dalla domanda unica sono quarantatre",
+          43, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
