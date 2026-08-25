@@ -8106,8 +8106,53 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `ev.prompt()` (l'API d'installazione PWA, che ci deve restare) e i
   commenti che raccontano la storia — e che si tortura su un finto
   prompt, o certificherebbe una pulizia senza aver guardato.
-  RESTANO i `confirm()` dei gesti sui sats e quelli admin: sono
-  dichiarati e si affrontano a gruppi, non tutti insieme.
+  E DALL'AGO 2026 IL CENSIMENTO È COMPLETO: **zero `confirm()` e zero
+  `alert()`**, con la stessa prova e lo stesso predicato — i «gesti
+  sui sats e admin» che questa riga dichiarava superstiti erano in
+  realtà 29 SITI (la lezione dell'elenco a memoria: nove stavano
+  fuori perfino dal perimetro dichiarato), convertiti a
+  `chiediConferma` in tre gruppi — sats, admin, neutri. La voce del
+  cantiere è qui sotto.
+  I CONFIRM() SONO FINITI (ago 2026, dal campo: Andrea ha visto la
+  finestra di sistema sullo sblocco dei sats). Il censimento diceva
+  29 siti — 13 sul percorso dei sats, 8 admin, 10 neutri, con
+  `adminResolve` e `decidiPagamento` in due famiglie — e la
+  conversione è andata a gruppi in quell'ordine, coi pattern GIÀ IN
+  CASA: la closure `poi` inline per i resti corti (eliminaCodice), e
+  il `manda` coi rami che non chiedono per gli esiti multipli
+  (decidiBanner — i due confirm di `decidiRevisione` si fondono in
+  UNA chiamata, «pubblica» passa dritto). I chiamanti del foglio
+  salgono a QUARANTA, e il conteggio smette di crescere per
+  conversione: da qui in poi lo muove solo un gesto nuovo.
+  LA GUARDIA DEL DOPPIO TOCCO ARRIVA IN OMAGGIO (`confermaAzione` +
+  il velo di `eseguiConferma`), e sette gesti sui sats non ce
+  l'avevano — `decidiPagamento` in testa, dove due tocchi su «non è
+  uscito» sono due riprove dello stesso pagamento: provato dal vivo,
+  doppio tocco = UNA POST.
+  IL FOGLIO SOPRA UN FOGLIO REGGE PER COSTRUZIONE, ed è il caso di
+  `annullaPagamento` dentro il paySheet: `confermaSheet` sta DOPO di
+  lui nel DOM, quindi `navPila` lo mette in cima e il gesto indietro
+  chiude prima lui; la chiusura di `eseguiConferma` è MIRATA (il
+  velo resta se sotto c'è un altro foglio) e il `pollTimer` non si
+  tocca. Provato dal vivo con una invoice vera: il ripensamento
+  chiude solo il foglio, l'annullo annulla.
+  TRE RIGHE DA NON AMMORBIDIRE: 1) le FIRME delle funzioni convertite
+  non si toccano — l'`async` resta anche dove il corpo non attende
+  più, perché parecchie sono ancore di fette in prove.py
+  (`convertiAsta`, `annullaPagamento`, `rivelaContenuto(btn){`…) e
+  cambiarle non fa una prova rossa, fa ESPLODERE il blocco; 2) i
+  corpi di `rivelaContenuto` e `consegnaContenuto` restano CLOSURE
+  INLINE e mai funzioni a parte: le prove che li affettano devono
+  trovarci dentro l'ancora, il velo e le due copie dello stato (il
+  primo tentativo li aveva spezzati, e l'hanno detto le prove);
+  3) `#confCorpo` ha `white-space:pre-line` — i corpi convertiti
+  portano i `\n\n` dei vecchi confirm come capoversi veri, e senza
+  collassano in un muro (succedeva già, in silenzio, a chiediSblocco
+  e decidiBanner). C'è la sentinella.
+  E IL CENSIMENTO CHIUDE: zero `confirm()` e zero `alert()` in tutto
+  il client, il gemello di quello del prompt() col suo autotest. Nei
+  commenti che raccontano la storia si scrive «confirm()» a
+  parentesi vuota, che è ciò che il predicato esclude.
   L'OFFERTA SI PORTA DIETRO I PEZZI (ago 2026): il venditore accettava
   un prezzo unitario a quantita' INDETERMINATA — `articolo = unitario
   * richiesti` e `richiesti` arrivava dal client senza nessun legame
