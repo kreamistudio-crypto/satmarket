@@ -71,7 +71,7 @@ jobs:
              collaudo_busta_diretta.py
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
-             marca_prove.py recupera_xp_ordini.py
+             marca_prove.py recupera_xp_ordini.py livelli_prova.py
              collaudo_offerta_carrello.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
