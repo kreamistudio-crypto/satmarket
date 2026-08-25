@@ -8364,7 +8364,7 @@ function renderStriscia(){
        tabindex="0" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"
        aria-pressed="${vistaBarattolo}" onclick="alternaBarattolo()"
        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternaBarattolo()}">
-      <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56)}</span>
+      <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.3)}</span>
       <span class="cat-eti">Nel tuo barattolo</span>
     </a>` : '') + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
@@ -24118,17 +24118,25 @@ const livelloBarattolo = n =>
    liquido nella clip dell'interno (id univoco per istanza: piu'
    barattoli in pagina non si rubano la clip), riflesso celeste
    sul fianco (--jar-riflesso: e' vetro, non plastica). Il livello
-   e' la classe lv0-4, la regia e' aggiornaBarattolo(). */
+   e' la classe lv0-4, la regia e' aggiornaBarattolo().
+   `tratto` (ago 2026): il vetro nasce a 2, tarato sui cerchietti da
+   34/40px — reso a 56 nella card della striscia faceva ~4,7px, fuori
+   famiglia con le illustrazioni delle sorelle, che sono a tratto piu'
+   fine. Chi rende grande passa un tratto suo (la striscia: 1.3,
+   tarato a schermo accanto alle sorelle); il riflesso scende con lui,
+   che un riflesso piu' spesso del vetro si legge come un graffio. */
 let jarClipN = 0;
-function jarSVG(livello, misura){
+function jarSVG(livello, misura, tratto){
   const clip = 'jarClip' + (++jarClipN);
+  const t = tratto || 2;
+  const lux = t < 2 ? 1.1 : 1.3;
   return `<svg class="jar-ico lv${livello}" width="${misura||18}" height="${misura||18}" viewBox="0 0 24 24" aria-hidden="true">
     <defs><clipPath id="${clip}"><rect x="7" y="6.5" width="10" height="14" rx="3"/></clipPath></defs>
     <g clip-path="url(#${clip})"><rect class="jar-liq" x="7" y="6.5" width="10" height="14"/></g>
-    <rect x="5.5" y="5" width="13" height="16.5" rx="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
-    <rect x="8" y="2" width="8" height="3" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
-    <path class="jar-lux" d="M9.4 9.4c-.55 1.15-.55 2.85 0 4" fill="none" stroke-width="1.3" stroke-linecap="round"/>
-    <path class="jar-lux" d="M9.45 15.6c-.12.65-.05 1.25.15 1.8" fill="none" stroke-width="1.3" stroke-linecap="round"/>
+    <rect x="5.5" y="5" width="13" height="16.5" rx="4.5" fill="none" stroke="currentColor" stroke-width="${t}"/>
+    <rect x="8" y="2" width="8" height="3" rx="1.5" fill="none" stroke="currentColor" stroke-width="${t}"/>
+    <path class="jar-lux" d="M9.4 9.4c-.55 1.15-.55 2.85 0 4" fill="none" stroke-width="${lux}" stroke-linecap="round"/>
+    <path class="jar-lux" d="M9.45 15.6c-.12.65-.05 1.25.15 1.8" fill="none" stroke-width="${lux}" stroke-linecap="round"/>
   </svg>`;
 }
 

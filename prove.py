@@ -7117,8 +7117,13 @@ def prove_barattolo_in_striscia():
           "della card P2P)", True,
           "href" not in card and 'role="button"' in card
           and 'tabindex="0"' in card)
+    # ...e col TRATTO SUO (ago 2026, tarato a schermo): il 2 di serie,
+    # giusto sui cerchietti da 34/40px, reso a 56 faceva ~4,7px —
+    # fuori famiglia con le illustrazioni delle sorelle. A 1.3 rende
+    # ~3px, il peso del bordo bianco del vaso della monstera.
     prova("il vetro nasce GIA' al livello del barattolo, mai lv0 secco",
-          True, "jarSVG(livelloBarattolo(contaBarattolo()), 56)" in card)
+          True,
+          "jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.3)" in card)
     prova("il tocco e' il toggle di sempre", True,
           'onclick="alternaBarattolo()"' in card)
     prova("...anche da tastiera: un <a> senza href non riceve click",
