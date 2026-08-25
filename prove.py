@@ -7344,6 +7344,20 @@ def prove_barattolo_filtra():
     prova("...ed e' renderGrid a decidere, dall'argomento", True,
           "ultimaRicercaAI = !!items" in rg)
 
+    # --- 4bis) ACCENDENDO SI SCORRE AGLI ANNUNCI, SPEGNENDO NO ---
+    # (ago 2026, dal campo: toccando il barattolo la vetrina non
+    # scendeva, mentre toccando una categoria si'.) Stesso giudice
+    # delle card categoria — scorriAlReparto — chiamato in SINCRONO,
+    # perche' la lista chiusa si renderizza subito: il ramo DEMO di
+    # armaScrollReparto, senza bandierina. Il ritocco che spegne
+    # resta fermo (la regola del ritocco della card categoria), e il
+    # torna-in-cima della nascita non deve tornare in nessuno dei due
+    # versi.
+    prova("accendendo il barattolo si scorre agli annunci", True,
+          "if (vistaBarattolo) scorriAlReparto();" in alt)
+    prova("...e spegnendo si resta dove si e'", False,
+          "scrollTo" in alt)
+
     # --- 5) IL TESTO DEL VUOTO IN UN POSTO SOLO, IN DUE PEZZI ---
     # E' l'unica cosa che le due superfici avevano davvero duplicata.
     # I due pezzi (constatazione + invito) sono nati guardando lo
@@ -7416,11 +7430,21 @@ def prove_barattolo_filtra():
           True, "c===activeCat && !vistaBarattolo" in rc)
     prova("...con la ✕ che resta il gesto d'uscita", True,
           "🫙 Nel tuo barattolo ✕" in rc)
-    # «Tutto» col filtro acceso lo SPEGNE, dalle due maniglie che
-    # setCat (e con lui loadListings → spegniBarattolo) non coprirebbe:
-    # la card a categoria gia' Tutto, e il tab Esplora nello stesso caso.
+    # «Tutto» col filtro acceso lo SPEGNE — e da una categoria TORNA
+    # anche al mercatino intero. PROVA CHE HA CAMBIATO LATO (ago 2026,
+    # bug dal campo, misurato col giro CDP): il vecchio ramo —
+    # alternaBarattolo e basta — spegneva il filtro lasciando la
+    # vetrina ancora filtrata sul reparto, cioe' la card diceva
+    # «Tutto» sopra «Casa e giardino». Da una categoria si passa da
+    # tornaATutto (il filtro lo spegne loadListings prima del fetch);
+    # alternaBarattolo resta al solo caso a categoria gia' Tutto,
+    # dove niente ricaricherebbe.
     tt = pezzo_js(mini, "function tornaATuttoDaTocco(e){", "\n}\n")
-    prova("«Tutto» col filtro acceso lo spegne (la card)", True,
+    prova("«Tutto» col filtro acceso da una categoria torna a Tutto",
+          True,
+          "if (activeCat === 'Tutto') { alternaBarattolo(); return; }"
+          in tt and "haptic(); tornaATutto(); return;" in tt)
+    prova("...e il ramo che spegneva e basta non esiste piu'", False,
           "if (vistaBarattolo) { alternaBarattolo(); return; }" in tt)
     ve = pezzo_js(mini, "function vaiEsplora(){", "\n}\n")
     prova("...e il tab Esplora pure, dove setCat non girera'", True,
@@ -19165,8 +19189,15 @@ def prove_seo():
     # RITOCCARE LA CARD ACCESA TORNA A «TUTTO», il gesto del
     # barattolino in testata — ed e' per questo che nella fila non
     # esiste nessuna card «Tutto» in piu'.
-    prova("ritoccare il reparto acceso lo spegne", True,
-          "if (c === activeCat) { haptic(); tornaATutto(); return; }" in ac)
+    # ...MA SOLO A BARATTOLO SPENTO (ago 2026, bug dal campo, misurato
+    # col giro CDP): col filtro acceso nessuna categoria e'
+    # visivamente accesa mentre activeCat porta ancora il reparto di
+    # prima — senza la guardia, il tocco su quella pillola "spenta"
+    # finiva su «Tutto» invece che nel reparto toccato.
+    prova("ritoccare il reparto acceso lo spegne (a barattolo spento)",
+          True,
+          "if (c === activeCat && !vistaBarattolo) "
+          "{ haptic(); tornaATutto(); return; }" in ac)
     prova("la discesa sa da che porta si e' entrati", True,
           "const restiamoQui = el('view-esplora').classList.contains('active');"
           in ac)
@@ -25129,7 +25160,9 @@ def prove_scoprire():
     # su una card categoria scorre come «Da scoprire» ma PIU' GIU' —
     # l'arrivo e' la riga «N oggetti» (.strumenti), cosi' in vista
     # c'e' la merce. L'arrivo vive in scorriAlReparto, UN posto per i
-    # suoi due chiamanti: scritto due volte, e' quello che diverge.
+    # suoi tre chiamanti (il ramo DEMO, il consumo in renderGrid, e
+    # l'accensione del barattolo): scritto due volte, e' quello che
+    # diverge.
     _sr = pezzo_js(mini, "function scorriAlReparto(){", "\n}")
     prova("l'arrivo del reparto e' la riga «N oggetti»", True,
           "scorriSottoHeader(document.querySelector('.strumenti'))"

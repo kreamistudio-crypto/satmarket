@@ -8546,8 +8546,8 @@ function toccaScoperta(id){
      di fatto all'arrivo resta in vista un filo della sezione
      categorie (che tiene l'osservatore intersecante, barra spenta).
      IL RITOCCO CHE SPEGNE NON SCORRE: e' un annulla, si resta dove
-     si e'. Il precedente e' alternaBarattolo col suo scrollTo(0,0):
-     «la griglia e' un'altra». */
+     si e' — la regola di tutta la famiglia (card categoria, e
+     dall'ago 2026 anche la card del barattolo). */
   if (!acceso) scorriSottoHeader(el('scoprireSez'));
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -8617,8 +8617,10 @@ if (window.IntersectionObserver) {
    renderizza in SINCRONO prima di arrivare qui (e go() ha gia' fatto
    il suo scrollTo): si scorre subito.
    L'ARRIVO vive in una funzione sola, scorriAlReparto, per i suoi
-   DUE chiamanti (il ramo DEMO e il consumo in renderGrid): scritto
-   due volte, il punto d'arrivo e' quello che un giorno diverge. */
+   TRE chiamanti (il ramo DEMO, il consumo in renderGrid, e
+   l'accensione del barattolo — che renderizza in sincrono e scorre
+   subito): scritto due volte, il punto d'arrivo e' quello che un
+   giorno diverge. */
 let scrollRepartoInAttesa = false;
 function scorriAlReparto(){
   scorriSottoHeader(document.querySelector('.strumenti'));
@@ -8644,8 +8646,16 @@ function apriCategoria(c){
      passa da tornaATutto: il gradino del reparto, se era stato spinto
      dalla home, si CONSUMA con un vero passo indietro — sostituendo
      resterebbero due entry identiche impilate, un indietro che non fa
-     niente e quello dopo che butta fuori dall'app. */
-  if (c === activeCat) { haptic(); tornaATutto(); return; }
+     niente e quello dopo che butta fuori dall'app.
+     MA SOLO A BARATTOLO SPENTO (ago 2026, bug dal campo, misurato col
+     giro CDP): col filtro acceso nessuna categoria e' visivamente
+     accesa — l'active e' soppresso, il filtro vero e' il barattolo —
+     ma activeCat porta ancora il reparto di prima, e il tocco su
+     quella pillola "spenta" finiva su «Tutto» invece che nel reparto
+     toccato. Col barattolo acceso ogni categoria e' un'USCITA verso
+     quel reparto: si apre come le altre, e il filtro lo spegne
+     loadListings prima del fetch. */
+  if (c === activeCat && !vistaBarattolo) { haptic(); tornaATutto(); return; }
   /* La nav accende ESPLORA: in un reparto si scende dalla home —
      card della striscia o pillole appiccicate, e dall'ago 2026,
      morta la pagina Sfoglia, non c'e' altra porta — quindi non c'e'
@@ -9080,11 +9090,19 @@ function apriCategoriaDaTocco(e, c){
 function tornaATuttoDaTocco(e){
   if (!clickNostro(e)) return;
   e.preventDefault();
-  /* col filtro del barattolo acceso «Tutto» significa spegnerlo: a
-     categoria gia' Tutto, senza questo ramo, il tocco sarebbe un
-     no-op e la card direbbe «Tutto» sopra una griglia di preferiti
-     (l'haptic lo mette alternaBarattolo, non si suona due volte) */
-  if (vistaBarattolo) { alternaBarattolo(); return; }
+  /* col filtro del barattolo acceso «Tutto» significa spegnerlo — e
+     da una CATEGORIA anche TORNARE al mercatino intero (ago 2026, bug
+     dal campo, misurato: il vecchio ramo spegneva e basta, e la card
+     «Tutto» lasciava la vetrina ancora filtrata sul reparto). Da una
+     categoria basta tornaATutto: il filtro lo spegne loadListings
+     prima del fetch, come per ogni ricarica. alternaBarattolo resta
+     al solo caso a categoria gia' Tutto, dove niente ricaricherebbe e
+     il tocco sarebbe un no-op (l'haptic li' lo mette lui, non si
+     suona due volte). */
+  if (vistaBarattolo) {
+    if (activeCat === 'Tutto') { alternaBarattolo(); return; }
+    haptic(); tornaATutto(); return;
+  }
   haptic();
   if (activeCat !== 'Tutto') tornaATutto();
 }
@@ -24319,10 +24337,15 @@ function alternaBarattolo(){
   vistaBarattolo = !vistaBarattolo;
   scriviStatoBarattolo();
   renderGrid(vistaBarattolo ? preferitiInVetrina() : undefined);
-  /* si torna in cima: la griglia e' un'altra, e la posizione di prima
-     non vuol dire piu' niente (la stessa ragione per cui loadListings
-     butta vetrinaPos) */
-  window.scrollTo(0, 0);
+  /* ACCENDENDO la pagina scorre agli annunci come per le card
+     categoria — stesso giudice, scorriAlReparto — e SUBITO, perche'
+     qui il render della lista chiusa e' sincrono: e' il ramo DEMO di
+     armaScrollReparto, senza bandierina. IL RITOCCO CHE SPEGNE NON
+     SCORRE (ago 2026, decisione di Andrea che ROVESCIA il
+     torna-in-cima della nascita, uguale nei due versi): e' un
+     annulla, si resta dove si e' — la regola del ritocco della card
+     categoria, che passa da tornaATutto e allo scroll non arriva. */
+  if (vistaBarattolo) scorriAlReparto();
 }
 
 /* Le superfici che seguono lo stato, in un posto solo: l'anello sulla
