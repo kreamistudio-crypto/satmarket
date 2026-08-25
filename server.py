@@ -2659,6 +2659,18 @@ def init_db():
         -- listino (che e' unitario, come il minimo e la controproposta)
         -- e moltiplica alla fine, cosi' la divisione a ritroso di
         -- _righe_ordine resta esatta. Quanti pezzi lo dice `quantita`.
+        -- L'OFFERTA SUL CARRELLO (ago 2026) e' una riga con
+        -- annuncio_id=0 — il pattern della testata degli ordini — e
+        -- le sue figlie in offerte_righe. LI' la cifra e' il TOTALE
+        -- degli articoli (un carrello misto non ha un unitario), e
+        -- `quantita` resta 0 APPOSTA: i pezzi vivono nelle figlie, e
+        -- un numero in testata farebbe moltiplicare chi legge (il
+        -- cifraPezzi del client). Il ping-pong e' agnostico: importo,
+        -- contro, giri, scadenza e stato valgono identici sui totali.
+        -- L'accordo atterra sull'ordine come voce di TESTATA
+        -- (ordini.accordo_sats), MAI spalmato sugli unitari — solo
+        -- SET (>=2 righe), quindi la divisione a ritroso del mono non
+        -- lo vede mai.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         annuncio_id INTEGER NOT NULL,
         compratore_id INTEGER NOT NULL,
@@ -2693,6 +2705,31 @@ def init_db():
         ON offerte(compratore_id);
     CREATE INDEX IF NOT EXISTS idx_offerte_venditore
         ON offerte(venditore_id);
+    CREATE TABLE IF NOT EXISTS offerte_righe(
+        -- le figlie dell'offerta sul carrello (ago 2026): cosa e
+        -- quanto, FOTOGRAFATI alla proposta. Titolo e unitario sono
+        -- fotografie per display e notifiche (un annuncio sparito non
+        -- deve ammutolire la trattativa: il pattern di ordine_righe);
+        -- alla risposta e al pagamento si giudica sempre sul listino
+        -- CORRENTE, mai su queste copie. Si scrivono nella STESSA
+        -- transazione della testata e muoiono con lei (la fusione le
+        -- cancella PRIMA del DELETE delle auto-trattative, o
+        -- resterebbero orfane).
+        offerta_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        quantita INTEGER NOT NULL DEFAULT 1,
+        unitario_sats INTEGER DEFAULT 0,
+        unitario_eur REAL DEFAULT 0,
+        titolo TEXT DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_offerte_righe_offerta
+        ON offerte_righe(offerta_id);
+    -- per annuncio: le decadenze (esaurito, prezzo cambiato) e il
+    -- freno della lampo cercano «quali offerte di carrello contengono
+    -- questo annuncio», e senza indice sarebbe una scansione a ogni
+    -- vendita
+    CREATE INDEX IF NOT EXISTS idx_offerte_righe_annuncio
+        ON offerte_righe(annuncio_id);
     CREATE TABLE IF NOT EXISTS offerte_lampo(
         -- lo STORICO dei lanci: la lampo attiva vive sulle colonne
         -- annunci.lampo_* (una sola per annuncio, lettura pubblica
@@ -4165,6 +4202,22 @@ def init_db():
                     # (dedurla da sconto/articolo direbbe 9,99%). Si
                     # scrive SOLO se lo sconto e' scattato davvero.
                     "sconto_percento INTEGER DEFAULT 0",
+                    # L'ACCORDO DI CARRELLO (ago 2026), la seconda voce
+                    # di TESTATA: Σ(unitario lordo × qta) − il totale
+                    # pattuito nell'offerta sul carrello, mai negativo
+                    # (chi paga paga sempre il meglio dei due: se il
+                    # mucchio a listino e' sceso sotto il pattuito, si
+                    # paga il listino e qui resta 0). SOLO sui set:
+                    # l'offerta di carrello vuole >=2 righe per
+                    # costruzione, quindi la divisione a ritroso del
+                    # mono non la vede mai. E vale parola per parola
+                    # l'avvertimento di sconto_sats qui sopra —
+                    # TESTIMONE, NON MOTORE: l'unico numero che comanda
+                    # e' prezzo_sats, che nasce gia' al pattuito. Sotto
+                    # un accordo gli sconti si spengono (il pattuito E'
+                    # il prezzo degli articoli), quindi sconto_sats e
+                    # accordo_sats non sono mai pieni insieme.
+                    "accordo_sats INTEGER DEFAULT 0",
                     # LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): la
                     # tariffa che il compratore NON ha pagato. Vale
                     # parola per parola l'avvertimento qui sopra —
@@ -15353,7 +15406,8 @@ def _sconto_pacco_eur(articolo_eur: float, percento: int) -> float:
 
 
 def _conto_ordine(articolo: int, sped: int, prot_percento: int,
-                  comm_percento: int, sconto: int = 0) -> dict:
+                  comm_percento: int, sconto: int = 0,
+                  accordo: int = 0) -> dict:
     """Le righe del conto: protezione col floor (//100) sul solo
     articolo, mai un sat piu' del promesso. La commissione e' una riga
     INFORMATIVA e NON entra nel totale del compratore: oggi e' sospesa
@@ -15367,10 +15421,19 @@ def _conto_ordine(articolo: int, sped: int, prot_percento: int,
     NETTO: la percentuale sta sul prezzo che si paga davvero, ed e' la
     stessa strada che gia' seguono lampo e accordo, che abbassano
     l'articolo prima di arrivare qui. Il default a 0 tiene il ramo mono
-    identico a ieri, byte per byte."""
-    netto = max(0, articolo - max(0, sconto))
+    identico a ieri, byte per byte.
+    L'ACCORDO DI CARRELLO (ago 2026) e' la SECONDA voce di testata, con
+    lo stesso patto dello sconto: la sottrazione avviene qui e SOLO
+    qui. Sono due parametri e non uno perche' sono due fatti diversi da
+    raccontare (la promessa del negozio, il prezzo pattuito in due) —
+    ma nel conto non convivono mai: sotto un accordo di carrello gli
+    sconti si spengono (il pattuito E' gia' il prezzo degli articoli,
+    deciso a mano guardando QUESTO carrello), quindi al piu' uno dei
+    due e' > 0. Il default a 0 tiene ogni ramo di ieri identico."""
+    netto = max(0, articolo - max(0, sconto) - max(0, accordo))
     prot = netto * prot_percento // 100
-    return {"articolo": articolo, "sconto": sconto, "netto": netto,
+    return {"articolo": articolo, "sconto": sconto, "accordo": accordo,
+            "netto": netto,
             "spedizione": sped, "protezione": prot,
             "commissione": netto * comm_percento // 100,
             "totale": netto + sped + prot}
