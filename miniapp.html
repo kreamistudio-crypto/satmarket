@@ -9703,13 +9703,18 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
 /* SOLO ADMIN: rimozione di un commento abusivo dal negozio.
    Il rating del venditore si ricalcola da solo lato server. */
 async function rimuoviFeedback(fid){
-  if (!confirm('Rimuovere questo feedback? Il rating verrà ricalcolato.')) return;
-  const r = await fetch(`${API_BASE}/admin/feedback/${fid}/rimuovi`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
-  toast('🧹 Feedback rimosso');
-  if (negozioCorrente) apriNegozio(negozioCorrente.negozio || negozioCorrente.username);
+  chiediConferma({
+    titolo: 'Rimuovi questo feedback?',
+    corpo: 'Il rating del venditore verrà ricalcolato.',
+    etichetta: 'Rimuovi',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/admin/feedback/${fid}/rimuovi`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+      toast('🧹 Feedback rimosso');
+      if (negozioCorrente) apriNegozio(negozioCorrente.negozio || negozioCorrente.username);
+    }});
 }
 
 /* Il biglietto da visita del venditore: link pubblico, si apre anche
@@ -24746,19 +24751,25 @@ async function inviaMessaggioAdmin(){
   const testo = (el('admMsgTesto')?.value || '').trim();
   if (!u) return;
   if (!testo) { toast('Scrivi il messaggio'); return; }
-  if (!confirm(`Invii questo messaggio a ${u.nome||'#'+u.tg_id}?\n\nParte UNA volta, dal bot. È a senso unico: se risponde al bot, la risposta non arriva a noi.`)) return;
-  try {
-    const r = await fetch(`${API_BASE}/admin/utenti/${admMsgDest}/messaggio`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({testo})});
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(j.detail || 'Non è partito'); return; }
-    toast('📨 Inviato');
-    admMsgDest = 0;
-    if (el('admUtenteCerca')) el('admUtenteCerca').value = '';
-    el('admUtenteEsiti').innerHTML = '';
-  } catch(e) { toast('Rete assente: riprova'); }
+  chiediConferma({
+    titolo: `Invii questo messaggio a ${u.nome||'#'+u.tg_id}?`,
+    corpo: 'Parte UNA volta, dal bot. È a senso unico: se risponde '
+         + 'al bot, la risposta non arriva a noi.',
+    etichetta: '📨 Invia',
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/admin/utenti/${admMsgDest}/messaggio`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({testo})});
+        const j = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(j.detail || 'Non è partito'); return; }
+        toast('📨 Inviato');
+        admMsgDest = 0;
+        if (el('admUtenteCerca')) el('admUtenteCerca').value = '';
+        el('admUtenteEsiti').innerHTML = '';
+      } catch(e) { toast('Rete assente: riprova'); }
+    }});
 }
 
 /* --- Gli ordini fermi (ago 2026) --------------------------------
@@ -24998,22 +25009,27 @@ async function decidiCategorie(i, esito){
   const ids = g.annunci.map(a => a.id).filter(id => !g.esclusi.has(id));
   if (esito==='applica' && !ids.length) return;
   const quanti = esito==='applica' ? ids.length : g.annunci.length;
-  if (!confirm(esito==='applica'
-      ? `Sposto ${quanti} annunci da «${g.da}» a «${g.a}»?`
-      : `Lascio dove sono i ${quanti} annunci di «${g.da}»? La proposta sparisce.`))
-    return;
-  haptic();
-  try {
-    const r = await fetch(`${API_BASE}/admin/categorie/decidi`, {
-      method:'POST', headers:{'Content-Type':'application/json',
-        'X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({esito, da:g.da, a:g.a,
-        ids: esito==='applica' ? ids : []})});
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(j.detail||'Non è andata'); loadAdminStats(); return; }
-    toast(esito==='applica' ? `🗂 Spostati ${j.quanti}` : 'Lasciati dov\'erano');
-  } catch(e) { toast('Rete assente'); }
-  loadAdminStats();
+  chiediConferma({
+    titolo: esito==='applica'
+      ? `Sposti ${quanti} annunci da «${g.da}» a «${g.a}»?`
+      : `Li lasci dove sono?`,
+    corpo: esito==='applica'
+      ? 'L\'evento Nostr degli annunci nati qui si aggiorna da solo.'
+      : `I ${quanti} annunci restano in «${g.da}» e la proposta sparisce.`,
+    etichetta: esito==='applica' ? '✅ Sposta' : 'Lascia dove sono',
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/admin/categorie/decidi`, {
+          method:'POST', headers:{'Content-Type':'application/json',
+            'X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({esito, da:g.da, a:g.a,
+            ids: esito==='applica' ? ids : []})});
+        const j = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(j.detail||'Non è andata'); loadAdminStats(); return; }
+        toast(esito==='applica' ? `🗂 Spostati ${j.quanti}` : 'Lasciati dov\'erano');
+      } catch(e) { toast('Rete assente'); }
+      loadAdminStats();
+    }});
 }
 
 /* ---- i cassetti del pannello dei moderatori (ago 2026) ----
@@ -25176,20 +25192,31 @@ function boxLeve(gruppi){
    webhook spento. */
 async function decidiRevisione(id, esito){
   haptic();
-  if (esito==='rifiuta' && !confirm('Rifiutare questo annuncio? Il venditore riceverà un messaggio gentile (e nessun annuncio andrà online).')) return;
-  if (esito==='riapri' && !confirm('Rimettere questo annuncio in attesa di decisione? Esce dalla vetrina (e dai canali, se ci era andato) finché non decidi di nuovo.')) return;
-  try {
-    const r = await fetch(`${API_BASE}/admin/listings/${id}/revisione`,
-      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-       body: JSON.stringify({esito})});
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(d.detail||'Operazione non riuscita', 4000); }
-    else toast(esito==='pubblica' ? '✅ Pubblicato in vetrina'
-             : esito==='riapri' ? '↩︎ Rimesso in attesa di decisione'
-             : '❌ Rifiutato, venditore avvisato');
-  } catch(e) { toast('Rete assente: riprova'); return; }
-  await loadListings(); renderGrid();
-  loadAdminStats();
+  const manda = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/admin/listings/${id}/revisione`,
+        {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+         body: JSON.stringify({esito})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita', 4000); }
+      else toast(esito==='pubblica' ? '✅ Pubblicato in vetrina'
+               : esito==='riapri' ? '↩︎ Rimesso in attesa di decisione'
+               : '❌ Rifiutato, venditore avvisato');
+    } catch(e) { toast('Rete assente: riprova'); return; }
+    await loadListings(); renderGrid();
+    loadAdminStats();
+  };
+  /* pubblicare non chiede: e' l'esito atteso della coda — il pattern
+     di decidiBanner, dove approvare passa dritto */
+  if (esito==='pubblica') return manda();
+  chiediConferma({
+    titolo: esito==='rifiuta' ? 'Rifiuti questo annuncio?'
+                              : 'Lo rimetti in attesa?',
+    corpo: esito==='rifiuta'
+      ? 'Il venditore riceverà un messaggio gentile (e nessun annuncio andrà online).'
+      : 'Esce dalla vetrina (e dai canali, se ci era andato) finché non decidi di nuovo.',
+    etichetta: esito==='rifiuta' ? '❌ Rifiuta' : '↩︎ Riapri',
+    poi: manda});
 }
 
 /* Il pallino sul tappo del Profilo: c'e' qualcosa da moderare.
@@ -25237,13 +25264,19 @@ async function deleteListing(id, dalDettaglio){
 /* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
 async function rimuoviModerazione(id){
   haptic();
-  if (!confirm('Rimuovere questo annuncio perché viola le regole?')) return;
-  const r = await fetch(`${API_BASE}/admin/listings/${id}/rimuovi`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-  await loadListings(); renderGrid();
-  toast('🛡 Annuncio rimosso'); go('esplora');
+  chiediConferma({
+    titolo: 'Rimuovi questo annuncio?',
+    corpo: 'Lo stai rimuovendo perché viola le regole: sparisce dal '
+         + 'mercatino, da Nostr e dal canale.',
+    etichetta: '🛡 Rimuovi',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/admin/listings/${id}/rimuovi`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+      await loadListings(); renderGrid();
+      toast('🛡 Annuncio rimosso'); go('esplora');
+    }});
 }
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate

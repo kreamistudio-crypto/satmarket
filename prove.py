@@ -21110,8 +21110,13 @@ def prove_fogli_di_casa():
     # dove la guardia del doppio tocco che il foglio porta in omaggio
     # vale doppio: due tocchi su «non e' uscito» sono due riprove
     # dello stesso pagamento.
-    prova("i gesti che passano dalla domanda unica sono venticinque",
-          25, solo_codice(mini).count("chiediConferma({"))
+    # TRENTA col secondo gruppo, i moderatori: il feedback abusivo, il
+    # messaggio a un utente, lo spostamento di categorie, la revisione
+    # (i suoi DUE rami che chiedono si fondono in UNA chiamata, il
+    # pattern di decidiBanner: pubblicare passa dritto) e la rimozione
+    # per violazione.
+    prova("i gesti che passano dalla domanda unica sono trenta",
+          30, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
