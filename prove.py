@@ -31274,6 +31274,124 @@ def prove_config_esempio():
     # sempre.
     prova("...e sta tutta su una riga", True, "\n" not in forme.strip())
 
+def prove_tutorial():
+    """«TUTORIAL» PER TUTTI, «TRATTAMI DA NUOVO» AGLI ADMIN (ago 2026).
+    La riga da non ammorbidire: in `barattolo_hint` non vive il solo
+    tour — ci vivono OTTO timbri, e cinque sono rifiuti ESPLICITI di
+    chi guarda (i «Non ora» del wallet, del Lightning address e delle
+    due npub, piu' la X del banner web). Un bottone che TUTTI possono
+    toccare non li puo' cancellare: la regola di casa e' che un
+    «Non ora» spegne per sempre. Ad azzerare tutto resta il bottone
+    degli admin, che serve al collaudo dal vivo.
+    E LE SENTINELLE NON BASTANO, che e' la lezione presa nove volte:
+    dicono che la riga c'e', mai che i sette timbri SOPRAVVIVANO. In
+    coda il giudice si fa GIRARE su un localStorage di cartone."""
+    print("\n[«Tutorial» per tutti]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rt = pezzo_js(mini, "function riavviaTour(){", "\n}\n")
+
+    # --- 1) IL SOLO TIMBRO `tour` ---
+    prova("il tutorial rimette il solo tour", True, "delete h.tour" in rt)
+    # `removeItem` e' il gesto del bottone admin: qui dentro sarebbe la
+    # cancellazione degli otto timbri travestita da tutorial
+    prova("...e non azzera la memoria degli hint", 0, rt.count("removeItem"))
+    # il cartello del rodaggio ha il suo giorno, e non e' un hint
+    prova("...ne' il giorno del cartello", False, "TEST_CHIAVE" in rt)
+    # CENSIMENTO e non elenco: nel corpo non deve comparire NESSUN
+    # altro id di hint, quindi il timbro nuovo di domani ci entra da se'
+    altri = [k for k in ("nwc", "lnaddr", "npubverifica", "nostrpub",
+                         "condcat", "checklistvista", "barraweb")
+             if k in rt]
+    prova("...e nessun altro timbro e' nominato", [], altri)
+
+    # --- 2) IL TIMBRO TORNA SE IL TOUR NON PARTE ---
+    # Senza, ripartirebbe A SORPRESA alla prossima apertura invece che
+    # adesso, che e' quel che il tocco chiedeva.
+    prova("se il tour non parte il timbro torna com'era", True,
+          "if (!tourInCorso) {" in rt and "h.tour = prima" in rt)
+
+    # --- 3) LE DUE PORTE RESTANO DUE ---
+    td = pezzo_js(mini, "function trattamiDaNuovo(){", "\n}\n")
+    prova("«Trattami da nuovo» resta degli admin", True,
+          "if (!isAdmin) return;" in td)
+    prova("...ed e' lui ad azzerare tutto", True,
+          "removeItem(HINT_CHIAVE)" in td and "removeItem(TEST_CHIAVE)" in td)
+    prova("il tutorial ha un chiamante solo", 1,
+          mini.count('riavviaTour()"'))
+
+    # --- 4) IL BOTTONE C'E' DOVE IL TOUR PUO' PARTIRE ---
+    # `hintAttivi()` e' la stessa guardia che tourBenvenuto interroga
+    # per prima: un bottone che porta a un muro e' peggio di un bottone
+    # che non c'e'.
+    rp = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    prova("il bottone si accende con hintAttivi()", True,
+          "el('profiloTutorial').style.display" in rp
+          and "hintAttivi() ? '' : 'none'" in rp)
+    prova("...e nasce nascosto", True,
+          'id="profiloTutorial" style="display:none' in mini)
+
+    # --- 5) E SI FA GIRARE ---
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("riavviaTour tocca il solo tour", "node non installato")
+        return
+    letti = pezzo_js(mini, "function hintLetti(){", "\n}\n")
+    _prog = (
+        "const HINT_CHIAVE = 'barattolo_hint';\n"
+        "const magazzino = {\n"
+        "  barattolo_hint: JSON.stringify({tour:1, nwc:2, lnaddr:3,\n"
+        "    npubverifica:4, nostrpub:5, condcat:6, checklistvista:7,\n"
+        "    barraweb:8}),\n"
+        "  barattolo_test: '2026-8-25',\n"
+        "};\n"
+        "const localStorage = {\n"
+        "  getItem: k => (k in magazzino) ? magazzino[k] : null,\n"
+        "  setItem: (k, v) => { magazzino[k] = v; },\n"
+        "  removeItem: k => { delete magazzino[k]; },\n"
+        "};\n"
+        "let tourInCorso = false, partito = false;\n"
+        "let andati = [], detti = [];\n"
+        "function haptic(){}\n"
+        "function go(v){ andati.push(v); }\n"
+        "function toast(t){ detti.push(t); }\n"
+        "function tourBenvenuto(){ tourInCorso = partito; }\n"
+        + letti + "\n}\n" + rt + "\n}\n"
+        # il caso normale: il tour parte
+        "partito = true; riavviaTour();\n"
+        "const dopo = JSON.parse(magazzino.barattolo_hint);\n"
+        # la vetrina vuota: il tour non parte e il timbro torna
+        "magazzino.barattolo_hint = JSON.stringify({tour:1, nwc:2});\n"
+        "tourInCorso = false; partito = false; riavviaTour();\n"
+        "const muto = JSON.parse(magazzino.barattolo_hint);\n"
+        "console.log(JSON.stringify({\n"
+        "  restano: Object.keys(dopo).sort(),\n"
+        "  cartello: magazzino.barattolo_test,\n"
+        "  esplora: andati[0],\n"
+        "  muto: Object.keys(muto).sort(),\n"
+        "  detto: detti.length,\n"
+        "}));")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("riavviaTour gira", True, "ERRORE: %s" % _r.stderr[:200])
+        return
+    d = _js.loads(_r.stdout.strip())
+    prova("i sette timbri sopravvivono, se ne va il solo tour",
+          ["barraweb", "checklistvista", "condcat", "lnaddr", "nostrpub",
+           "npubverifica", "nwc"], d["restano"])
+    prova("...e il giorno del cartello resta", "2026-8-25", d["cartello"])
+    prova("...e il tour vive in vetrina: ci si va", "esplora", d["esplora"])
+    prova("a vetrina vuota il timbro torna com'era",
+          ["nwc", "tour"], d["muto"])
+    prova("...e si dice perche'", 1, d["detto"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -31354,6 +31472,7 @@ def main():
               prove_connettori_ingresso,
               prove_connettori_cassetto,
               prove_tornate,
+              prove_tutorial,
               prove_config_esempio):
         try:
             f()

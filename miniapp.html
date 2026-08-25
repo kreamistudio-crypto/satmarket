@@ -5354,6 +5354,14 @@ document.getElementById('cartello')?.remove();</script>
            accesa: un bottone che porta a una pagina spenta e'
            peggio di un bottone che non c'e'. In DEMO e in VETRINA
            non compare mai, il patto del cassetto wallet. -->
+      <!-- «Tutorial»: il giro di benvenuto si rivede quando si vuole.
+           Nasce NASCOSTO e lo accende renderProfilo dove il tour puo'
+           partire davvero — mai in DEMO ne' in VETRINA, dove
+           hintAttivi() e' falsa: un bottone che porta a un muro e'
+           peggio di un bottone che non c'e'. Rimette il SOLO tour, e
+           i «Non ora» degli altri suggerimenti restano spenti. -->
+      <button class="btn ghost" id="profiloTutorial" style="display:none;margin-top:20px" onclick="riavviaTour()"
+        title="Rivedi il giro di benvenuto: le quattro tappe che raccontano il mercatino. I suggerimenti che hai già spento restano spenti.">👋 Tutorial</button>
       <button class="btn ghost" id="profiloClassifica" style="display:none;margin-top:20px" onclick="apriClassifica()">🏆 La classifica del mercatino</button>
       <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
       <button class="btn ghost" style="margin-top:10px" onclick="apriPrivacy()">🔐 I tuoi dati</button>
@@ -11035,6 +11043,35 @@ function chiudiTour(){
   el('tour').removeEventListener('touchmove', bloccaTourTocco);
   document.removeEventListener('keydown', tastoTour);
   bannerInstallaPwa();   // il banner installa riottiene la sua occasione
+}
+/* «Tutorial»: il tour di benvenuto si rivede quando si vuole, e per
+   TUTTI — non solo per gli admin. Rimette in gioco il SOLO timbro
+   `tour` e lascia dov'erano gli altri sette di `barattolo_hint`: i
+   «Non ora» degli hint (wallet, ln address, npub) e la ✕ del banner
+   web sono rifiuti ESPLICITI di chi guarda, e la regola di casa e'
+   che spengono per sempre — un bottone che tutti possono toccare non
+   la rovescia. Ad azzerare TUTTO resta «Trattami da nuovo», che e'
+   degli admin e serve al collaudo dal vivo. Nemmeno `barattolo_test`
+   si tocca: il cartello del rodaggio ha il suo giorno. */
+function riavviaTour(){
+  haptic();
+  const h = hintLetti();
+  const prima = h.tour;            // per rimetterlo se il tour non parte
+  delete h.tour;
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  go('esplora');                   // le quattro tappe vivono tutte li'
+  tourBenvenuto();
+  /* Il tour non parte se non c'e' niente da illuminare: una vetrina
+     filtrata a vuoto, il barattolo acceso e vuoto. Allora il timbro
+     si RIMETTE com'era — senza, ripartirebbe a sorpresa alla prossima
+     apertura invece che adesso, che e' quel che il tocco chiedeva. */
+  if (!tourInCorso) {
+    if (prima) {
+      h.tour = prima;
+      try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+    }
+    toast("Qui non c'è niente da mostrare: togli i filtri e riprova");
+  }
 }
 /* ---------------- cartello «fase di test» ----------------
    L'avviso di rodaggio all'apertura. Interruttore, testo e link del
@@ -18307,6 +18344,10 @@ function renderProfilo(){
     ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}
     ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
+  /* «Tutorial» c'e' dove il tour puo' partire davvero: hintAttivi()
+     e' la stessa guardia che tourBenvenuto interroga per prima. */
+  if (el('profiloTutorial')) el('profiloTutorial').style.display =
+    hintAttivi() ? '' : 'none';
   /* La porta della classifica si accende solo se la funzione e'
      accesa sul server: un bottone che porta a una pagina spenta e'
      peggio di un bottone che non c'e'. */
