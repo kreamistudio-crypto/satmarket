@@ -19324,13 +19324,7 @@ function renderLivello(){
     ? Math.max(0, Math.min(100, Math.round(
         (myXp - daQui) / (myLivello.xp_prossimo - daQui) * 100)))
     : 100;
-  const manca = myLivello.xp_prossimo
-    ? `Al prossimo grado (<b>${esc(myLivello.nome_prossimo)}</b>) mancano
-       ${fmt(Math.max(0, myLivello.xp_prossimo - myXp))} XP` +
-      (myLivello.affari_prossimo > myAffari
-        ? ` e ${fmt(myLivello.affari_prossimo - myAffari)} affari conclusi`
-        : '')
-    : 'Sei in cima alla scala. 🫙';
+  const manca = fraseManca(myLivello, myXp, myAffari);
   /* SOLO gli sbloccati (ago 2026, decisione di Andrea): mostrare
      quelli chiusi era una molla finche' tutti erano raggiungibili,
      ma «Fondatore» non lo potra' ottenere piu' nessuno — e una
@@ -19391,6 +19385,38 @@ function fraseXp(r){
   else if (a) m = "i tuoi vengono tutti dagli acquisti. " + XP_PESO;
   else m = "comprare e vendere.";
   return "Gli XP contano il commercio: " + m + " " + XP_CODA;
+}
+
+/* Quanto manca al prossimo grado. TRE cose che la riga di prima
+   sbagliava tutte insieme, e tutte nella stessa frase (ago 2026, dal
+   campo: «Al prossimo grado (Bottega avviata) mancano 0 XP e 1 affari
+   conclusi»).
+   1) LO ZERO NON SI SCRIVE — la stessa regola della riga qui sotto:
+   chi ha gli XP e non gli affari si sentiva chiedere una cosa che
+   aveva gia', ed e' alla lettera il difetto che il rifiuto del banner
+   ha gia' pagato una volta («il messaggio nominava il solo affare
+   concluso... e andava a cercare dalla parte sbagliata»).
+   2) IL SINGOLARE: «1 affari conclusi». La stessa distinzione il
+   server la fa gia' in `msg_banner_chiuso`; qui mancava.
+   3) IL VERBO, che segue quel che resta: «manca 1 affare concluso»,
+   «mancano 120 XP», e il PLURALE davanti a due pezzi qualunque siano
+   i numeri — due soggetti uniti da «e» vogliono il verbo plurale.
+   IL RAMO A MANI VUOTE E' UNA CINTURA E NON UN CASO: dai numeri del
+   server non ci si arriva — `livello_utente` tiene il gradino piu'
+   alto che soddisfa ENTRAMBE le soglie, quindi al prossimo ne manca
+   sempre almeno una — ma una frase rotta e' peggio di una riga in
+   piu', e il giudice si prova anche li'. */
+function fraseManca(liv, xp, affari){
+  if (!liv || !liv.xp_prossimo) return "Sei in cima alla scala. 🫙";
+  const dx = Math.max(0, liv.xp_prossimo - xp);
+  const da = Math.max(0, (liv.affari_prossimo || 0) - affari);
+  const pezzi = [];
+  if (dx) pezzi.push(`${fmt(dx)} XP`);
+  if (da) pezzi.push(`${fmt(da)} affar` + (da === 1 ? "e concluso" : "i conclusi"));
+  const grado = `Al prossimo grado (<b>${esc(liv.nome_prossimo)}</b>) `;
+  if (!pezzi.length) return grado + "ci sei.";
+  const solo_uno = pezzi.length === 1 && (dx === 1 || da === 1);
+  return grado + (solo_uno ? "manca " : "mancano ") + pezzi.join(" e ");
 }
 
 async function setTitolo(id){

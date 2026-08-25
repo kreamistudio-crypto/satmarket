@@ -28531,7 +28531,11 @@ def prove_frase_xp(mini, node):
     # I PEZZI SONO QUELLI VERI, estratti dal client: due costanti di
     # cartone proverebbero se stesse, e la cosa da guardare e' proprio
     # che testa e coda restino scritte UNA volta sola.
-    pezzi = (pezzo_js(mini, "const XP_PESO = ", "\n}\n") + "\n}\n")
+    # `esc` e' quello VERO e non uno di cartone: il giudice ci passa
+    # il nome del gradino, e un finto proverebbe se stesso.
+    pezzi = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+             + pezzo_js(mini, "const XP_PESO = ", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function fraseManca(", "\n}\n") + "\n}\n")
     banco = "const fmt = n => n.toLocaleString('it-IT')" \
             ".replace(/\\./g,'\\u202F');\n" + pezzi + r"""
 const rosse = [];
@@ -28559,7 +28563,45 @@ att('la testa si scrive una volta sola', [due, solaC, solaV]
     .every(f => f.startsWith('Gli XP contano il commercio: ')));
 att('i numeri passano da fmt (spazio stretto, mai il punto)',
     fraseXp({vendite: 12000, acquisti: 1}).includes('12\u202F000'));
-console.log(JSON.stringify(rosse));
+/* QUANTO MANCA AL PROSSIMO GRADO: tre difetti nella stessa frase
+   («mancano 0 XP e 1 affari conclusi»), e ognuno ha il suo caso. */
+const rosseM = [];
+function attM(nome, cond){ if (!cond) rosseM.push(nome); }
+const G = (xpP, afP) => ({xp_prossimo: xpP, affari_prossimo: afP,
+                          nome_prossimo: 'Bottega avviata'});
+const soloAf = fraseManca(G(50, 1), 76, 0);    // il caso dal campo
+const soloXp = fraseManca(G(200, 5), 80, 9);
+const unXp   = fraseManca(G(200, 5), 199, 9);
+const tuttiE = fraseManca(G(200, 5), 80, 2);
+const unoEuno = fraseManca(G(200, 5), 199, 4);
+const cima   = fraseManca({xp_prossimo: 0}, 9999, 99);
+const vuoto  = fraseManca(G(50, 1), 76, 3);    // la cintura
+/* Il nome del gradino viene dal CATALOGO e non da una persona, quindi
+   `esc` li' e' una cintura — ma senza un caso che la esercita nessuna
+   prova diventerebbe rossa togliendola (l'ha detto la tortura). */
+const cattivo = fraseManca({xp_prossimo: 200, affari_prossimo: 5,
+                            nome_prossimo: '<img src=x>'}, 80, 2);
+attM("LO ZERO NON SI SCRIVE: niente <<0 XP>>", !soloAf.includes('XP'));
+attM("...e niente <<0 affari>> dall'altro lato", !soloXp.includes('affar'));
+attM("IL SINGOLARE: 1 affare concluso, mai <<1 affari>>",
+     soloAf.includes('1 affare concluso') && !soloAf.includes('affari'));
+attM("...e il plurale da 2 in su", tuttiE.includes('3 affari conclusi'));
+attM("IL VERBO segue quel che resta: manca, con uno solo",
+     soloAf.includes(') manca 1 affare') && !soloAf.includes('mancano'));
+attM("...manca anche con 1 XP", unXp.includes(') manca 1 XP'));
+attM("...mancano con piu' d'uno", soloXp.includes(') mancano 120 XP'));
+attM("...e mancano con DUE pezzi, qualunque siano i numeri",
+     unoEuno.includes(') mancano 1 XP e 1 affare concluso'));
+attM("i due pezzi si uniscono con <<e>>",
+     tuttiE.includes('120 XP e 3 affari conclusi'));
+attM("in cima alla scala non si chiede niente",
+     cima.includes('cima alla scala') && !cima.includes('manca'));
+attM("la cintura non lascia una frase rotta",
+     vuoto.includes('ci sei.') && !vuoto.includes('manca'));
+attM("il grado si nomina sempre", [soloAf, soloXp, tuttiE, vuoto]
+     .every(f => f.includes('<b>Bottega avviata</b>')));
+attM("...e il suo nome passa da esc", cattivo.includes('&lt;img src=x&gt;'));
+console.log(JSON.stringify([rosse, rosseM]));
 """
     with _tfx.NamedTemporaryFile("w", suffix=".js", delete=False,
                                  encoding="utf-8") as f:
@@ -28571,8 +28613,14 @@ console.log(JSON.stringify(rosse));
     if r.returncode != 0:
         prova("la riga degli XP gira", "", (r.stderr or "")[:300])
         return
-    prova("la riga degli XP risponde giusto in tutti i casi",
-          "[]", (r.stdout or "").strip())
+    import json as _jsx
+    try:
+        _xp, _mc = _jsx.loads(r.stdout or "[]")
+    except Exception:
+        prova("le righe del cassetto girano", "", (r.stdout or "")[:300])
+        return
+    prova("la riga degli XP risponde giusto in tutti i casi", [], _xp)
+    prova("...e quella di quanto manca al prossimo grado", [], _mc)
 
     # --- LE SENTINELLE DEL CLIENT -----------------------------------
     giu = pezzo_js(mini, "function fraseXp(", "\n}\n")
@@ -28588,6 +28636,22 @@ console.log(JSON.stringify(rosse));
           mini.count("${fraseXp(myXpRuoli)}"))
     prova("...e la vecchia riga fissa non c'e' piu'", False,
           "commercio: comprare e vendere. \u00c8 lo stesso" in mini)
+    # --- E LA RIGA DI QUANTO MANCA (ago 2026, dal campo) -------------
+    # «mancano 0 XP e 1 affari conclusi»: tre difetti in una frase.
+    gm = pezzo_js(mini, "function fraseManca(", "\n}\n")
+    prova("il cassetto passa dal giudice di quanto manca", 1,
+          mini.count("fraseManca(myLivello, myXp, myAffari)"))
+    # LO ZERO NON SI SCRIVE: la cifra entra solo DENTRO un `if`, mai
+    # concatenata comunque — era il difetto che si stava riparando.
+    prova("...e lo zero non arriva mai nella frase", True,
+          "if (dx) pezzi.push" in gm and "if (da) pezzi.push" in gm)
+    prova("...il singolare c'e', e il plurale pure", True,
+          "e concluso" in gm and "i conclusi" in gm)
+    prova("...e il verbo ha tutt'e due le forme", True,
+          '"manca "' in gm and '"mancano "' in gm)
+    # La frase fissa di prima non deve tornare da nessuna parte
+    prova("la frase fissa di prima non c'e' piu'", False,
+          "Math.max(0, myLivello.xp_prossimo" in mini)
 
 
 def prove_corsa_zona(mini, node):

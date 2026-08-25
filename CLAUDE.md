@@ -6721,6 +6721,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   classifica» resta in TUTTI E TRE i casi (scelta mia, da confermare):
   quel fatto è vero per chiunque, e farlo sparire nei due casi nuovi
   sarebbe arbitrario.
+  E LA RIGA DI SOTTO DICEVA TRE COSE STORTE INSIEME (ago 2026, dal
+  campo): «Al prossimo grado (Bottega avviata) mancano **0 XP e 1
+  affari conclusi**». 1) LO ZERO SI SCRIVEVA — la stessa regola che la
+  riga qui sopra rispetta due centimetri più in su, e il difetto è
+  quello già pagato dal rifiuto del banner, che «nominava il solo
+  affare concluso» e mandava a cercare dalla parte sbagliata: chi ha
+  gli XP e non gli affari si sentiva chiedere una cosa che aveva già.
+  2) NIENTE SINGOLARE, e quella distinzione il server la fa già in
+  `msg_banner_chiuso`. 3) IL VERBO restava plurale davanti a un pezzo
+  solo.
+  IL GIUDICE È UNO, `fraseManca(liv, xp, affari)`, e le tre regole
+  stanno tutte lì: la cifra entra SOLO dentro un `if` (è così che lo
+  zero non può arrivare nella frase — non c'è un ramo che lo tolga
+  dopo), il singolare guarda il numero, e IL VERBO GUARDA QUANTI PEZZI
+  RESTANO E NON I NUMERI: due soggetti uniti da «e» vogliono il
+  plurale anche quando sono «1 XP e 1 affare» — c'è la prova, ed è la
+  riga che una cura frettolosa sbaglia.
+  IL RAMO A MANI VUOTE È UNA CINTURA E NON UN CASO: dai numeri del
+  server non ci si arriva — `livello_utente` tiene il gradino più alto
+  che soddisfa ENTRAMBE le soglie, quindi al prossimo ne manca sempre
+  almeno una — ma una frase rotta è peggio di una riga in più, e il
+  giudice si prova anche lì.
+  ⚠️ E VA DOPO `fraseXp`, NON PRIMA, ed è la lezione del giro:
+  `pezzo_js` ritaglia dalla firma alla prima chiusura a colonna zero,
+  quindi un giudice infilato in mezzo si mangia la fetta del vicino —
+  `fraseXp` restava fuori dal banco node e la prova diceva «is not
+  defined». **L'ordine fra due dichiarazioni di funzione non conta per
+  il browser: conta per chi le ritaglia.** Stessa ragione per cui il
+  banco estrae `esc` VERO dal client invece di darsene uno di cartone:
+  quello proverebbe sé stesso, e la mutazione che lascia il nome del
+  gradino nudo passerebbe liscia (l'ha chiesta la tortura).
   Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
   pubblico i voti escono senza nomi, di proposito — mostrare chi ha
   comprato rivelerebbe gli acquisti altrui —, ma senza un secondo
@@ -23745,6 +23776,25 @@ accesa sul VPS (Andrea, 24 ago), quindi il podio compare al deploy per
 tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
 condivisione sulla striscia (la card del barattolo non deve entrarci)
 e il podio dentro Telegram vero.
+
+E la riga di quanto manca al prossimo grado dice tre cose giuste (ago
+2026, dal campo: «mancano 0 XP e 1 affari conclusi» — lo zero scritto,
+nessun singolare, il verbo sempre plurale). Erano TRE difetti nella
+stessa frase, quindi si sistemano insieme: giudice unico `fraseManca`,
+zero server, zero colonne, zero leve. Vedi Architettura, in coda a «DA
+CHE LATO VENGONO GLI XP», per la regola del verbo (guarda quanti pezzi
+restano, non i numeri) e per la lezione dell'ordine fra due funzioni,
+che non conta per il browser e conta per `pezzo_js`.
+Collaudata: 6 prove nuove — il DELTA misurato sull'albero isolato
+(6481 → 6487), che il totale dipende dal ramo su cui si atterra — e
+**TREDICI MUTAZIONI, tredici uccise**, una per riga sorvegliata. Fra
+queste, quella che lascia il nome del gradino NUDO: senza il caso col
+nome cattivo sarebbe sopravvissuta, e l'ha chiesta la tortura. Più il
+giro DAL VIVO col server su un database usa-e-getta, col caso vero di
+Andrea seminato (76 XP e zero affari): «manca 1 affare concluso» letto
+a schermo, più il plurale, i due pezzi insieme e la cima della scala,
+a 320/360/375 nei due temi — zero scorrimento laterale, zero errori JS.
+IN PRODUZIONE basta il deploy: solo client.
 
 Il barattolo si condivide col suo link (ago 2026, il punto 3 del giro
 della card): fotografia e non vista viva, token casuale opt-in e
