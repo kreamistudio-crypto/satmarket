@@ -8519,7 +8519,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ridondante — a dirlo resta la parentesi della riga.
   Via la riga «se accetta pagheresti…», che
   diceva un totale SENZA la spedizione — cioe' una cosa incompleta —
-  al suo posto la riga «Offri X al pezzo × 3 = Y». Via «Annulla», al
+  al suo posto la riga viva (che nello stesso mese ha cambiato forma
+  due volte: prima il totale davanti, poi il totale in superficie —
+  vedi le due voci qui sotto). Via «Annulla», al
   suo posto la ✕ in alto a destra (`.pacco-x`, il ✕ di casa: un secondo
   nome per la stessa forma sarebbe peggio del nome che invecchia), che
   chiude con `navIndietro()` e mai `closeSheet()`.
@@ -8578,6 +8580,128 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sospetto successivo è la `max-height` che cambia durante
   l'animazione: il foglio è ancorato in basso, quindi accorciandosi
   muove il bordo alto — e si vede solo sul telefono.
+  IL TOTALE IN SUPERFICIE (ago 2026, decisione di Andrea che EMENDA
+  «LA CIFRA RESTA L'UNITARIO» qui sopra — e la emenda per METÀ, che è
+  la riga da leggere due volte): **la superficie parla il totale, la
+  sostanza resta unitaria**. Coi pezzi >1 il campo, le pillole, il
+  minimo detto e il campo legale del rilancio dicono quanto si paga IN
+  TUTTO; la divisione ÷ pezzi avviene UNA volta all'invio, e da lì in
+  giù non cambia niente — colonne, guardie, notifiche, ordine e
+  vetrina restano quelli di ieri. È il pattern del toggle valuta: il
+  campo è una VISTA, il listino è la sostanza. Le tre ragioni per cui
+  l'unitario resta la sostanza non sono state smentite da niente:
+  restano scritte sopra, e valgono ancora.
+  IL PERCHÉ È L'UNITÀ UNICA: sul carrello la cifra è per forza un
+  totale (là non esiste un unitario), e con l'offerta singola che
+  parlava al pezzo la stessa app avrebbe chiesto due unità diverse
+  nella stessa schermata. Il «al pezzo» sotto il campo — la toppa che
+  quel rischio lo dichiarava invece di toglierlo — è morto con la sua
+  regola CSS, e le sentinelle di ieri hanno CAMBIATO LATO col perché.
+  IL FLOOR NON BUCA IL MINIMO, ed è ciò che rende la conversione
+  sicura: `floor(tot/q) ≥ min ⇔ tot ≥ min×q`, quindi il minimo si
+  GIUDICA sull'unitario derivato — la stessa cifra che il server
+  confronta — e si DICE in totale. Sull'euro si divide in CENTESIMI
+  INTERI (`Math.floor(Math.round(tot*100)/q)/100`), o la polvere dei
+  float farebbe uscire un centesimo in più.
+  E LA RIGA VIVA MOSTRA IL RICOMPOSTO, mai il numero digitato: si
+  ripassa dall'unitario e si rimoltiplica, così chi legge non vede mai
+  una cifra che moltiplicando non torna. `suffissoUnita` ha perso il
+  secondo argomento: dice la valuta, e basta.
+
+  L'OFFERTA SUL CARRELLO 🛒 (ago 2026, decisione di Andrea): UNA cifra
+  per tutto il carrello — più articoli dello stesso venditore — e sopra
+  la trattativa di sempre, che sui totali vale identica: il ping-pong è
+  AGNOSTICO (importo, contro, giri e scadenza sono numeri, non prezzi).
+  Il bottone «Fai un'offerta» in fondo alla cassa del set portava a un
+  coming soon; adesso apre il suo foglio.
+  LA TESTATA È UN'OFFERTA CON `annuncio_id=0` — il pattern della
+  testata degli ordini — con le figlie in `offerte_righe` fotografate
+  alla proposta (titolo e unitario per display e notifiche; alla
+  risposta e al pagamento si giudica SEMPRE sul listino CORRENTE, mai
+  su quelle copie). **`quantita=0` in testata**, o `cifraPezzi` nel
+  client moltiplicherebbe una cifra che è già un totale.
+  L'ATTERRAGGIO È UNA VOCE DI TESTATA E MAI UNA SPALMATURA:
+  `ordini.accordo_sats`, col patto di `sconto_sats` parola per parola
+  — **è una colonna TESTIMONE, non un motore**. A comandare è
+  `prezzo_sats`, che nasce già scontato: chi leggesse `accordo_sats`
+  per RIALZARE un'uscita farebbe uscire dall'escrow DI ALTRI ORDINI la
+  differenza, e la cintura di `paga_venditore` non lo vedrebbe (per lei
+  dovuto e bolt11 combacerebbero). C'è la sentinella sulle tre strade
+  d'uscita. Le righe dell'ordine restano LORDE, quindi la divisione a
+  ritroso dell'unitario non si tocca — ed è anche il motivo per cui
+  l'offerta di carrello è solo-SET per costruzione: con una riga sola
+  la cassa devia sul mono, dove l'offerta singola c'è già.
+  AL PAGAMENTO `accordo = max(0, Σlordo_corrente − pattuito)`, ed è la
+  protezione del compratore: una lampo o un listino calato non fanno
+  mai pagare più del corrente — chi paga paga sempre il meglio dei due.
+  GLI SCONTI SI SPENGONO (il carrello del negozio e il codice, che nel
+  body prende un 400 esplicito): il totale pattuito È il prezzo degli
+  articoli, deciso a mano guardando QUESTO carrello, e nessuna promessa
+  generale lo ritocca. LA SPEDIZIONE GRATIS INVECE RESTA e misura il
+  PATTUITO — quel che si paga davvero per la merce — e protezione e
+  commissione seguono, che si calcolano sul netto.
+  LE DECADENZE, che erano la domanda esplicita di Andrea: un pezzo
+  ESAURITO fa decadere l'offerta, pendente o accettata (la composizione
+  non è più onorabile); lo stock sceso SOTTO la quantità no — accettare
+  non riserva, e al pagamento c'è il 400 onesto col nome del pezzo, che
+  se il venditore rifornisce entro la scadenza si paga; il PREZZO
+  cambiato fa decadere le sole pendenti, che l'accordo stretto è
+  assoluto; le FERIE trattengono la partenza del venditore
+  (`_impegni_aperti`); l'annuncio rimosso o in revisione lo prende
+  l'orologio entro dieci minuti.
+  L'ESCLUSIONE È RECIPROCA, nei due versi e col nome del pezzo: due
+  trattative sullo stesso oggetto potrebbero produrre DUE accordi, e al
+  pagamento uno sconto doppio.
+  LA TRAPPOLA DEL CANTIERE ERANO I JOIN: la testata ha `annuncio_id=0`,
+  quindi ogni INNER JOIN su `annunci` la fa sparire IN SILENZIO — e
+  sparire vuol dire un 404 muto dove si risponde, un venditore che
+  chiude le ferie con un accordo vivo, una lista in cui la trattativa
+  più grossa non c'è. Sono diventati LEFT in quattro punti, e il
+  censimento in `prove.py` li ancora alla query DI QUELLA FUNZIONE:
+  le fette di `pezzo()` qui sono larghe (quella di `rispondi_offerta`
+  arriva a 19.000 caratteri e si porta dentro le vicine), quindi
+  cercare «LEFT JOIN annunci» nudo era una sentinella che non poteva
+  fallire — l'ha detto la tortura. `scadenze_offerte` invece NON
+  diventa un LEFT: ha una query SUA, perché la condizione di morte è
+  un'altra («esiste una figlia il cui annuncio non è più attivo») e
+  l'EXISTS negato copre anche l'annuncio CANCELLATO, che un `a.stato`
+  non vedrebbe.
+  ⚠️ `offerte_righe` NON HA UNA COLONNA `id`, ed è la lezione più cara
+  del cantiere: due bug della stessa famiglia in due giorni — la ronda
+  che chiedeva `r.id` (sul database vero esplodeva, e avrebbe mandato
+  il 🧊 quotidiano) e `_accordo_carrello` che faceva `ORDER BY id` (il
+  pagamento sarebbe esploso). **Tutte e due le volte le prove erano
+  verdi**, perché i cartoni davano alla tabella un id che il DDL non
+  ha; a prenderli sono stati il collaudo eseguibile e una segnalazione
+  dalla sessione accanto. Adesso c'è il censimento che estrae le
+  colonne dal DDL VERO invece di elencarle, e le figlie si leggono per
+  `rowid` — che è anche l'ordine della proposta.
+  IL FOGLIO NON HA IL TOGGLE €/₿, ed è una DEVIAZIONE DICHIARATA dal
+  piano: la valuta del carrello è UNA sola ('eur' solo se tutte le
+  righe sono a listino EUR, il principio del `totale_eur` del set) e
+  non cambia col foglio aperto — quindi non c'è nessuna conversione da
+  ancorare, e l'ancora del foglio singolo qui non serve.
+  LA CASSA IN MODALITÀ ACCORDO: `acqDati.accordoId` **sta nella
+  firma** (`'acc'+id+'|'+firmaSet()`), o la cache servirebbe un conto
+  senza accordo; il cassetto del codice non nasce, il bottone
+  dell'offerta nemmeno (la trattativa è chiusa), il «torna al
+  carrello» sparisce — lì aggiungere sarebbe un invito a rompere
+  l'accordo — e nel conto c'è la riga «🤝 Accordo», gemella di quella
+  dello sconto: a zero non compare.
+  IL COLLAUDO ESEGUIBILE è `collaudo_offerta_carrello.py` (55 verdi):
+  il giro vero proposta→contro→rilancio→accetta→paga sul server VERO
+  con LNbits finto, la bolt11 confrontata AL SAT, gli sconti spenti
+  provati GIRANDO il conto nei DUE mondi (lo stesso carrello sconta
+  senza accordo e non sconta con — la forma non lo saprebbe dire), le
+  decadenze una per una, la fusione senza figlie orfane e la ronda che
+  TACE. Il body porta quantità STORTE apposta: coi numeri giusti le due
+  strade darebbero lo stesso conto e la prova non proverebbe che a
+  comandare sono le figlie — anche questo l'ha chiesto la tortura.
+  RESTA FUORI, dichiarato: la ripresa del pentito del set (non esiste,
+  non si inventa), il ⚡ NWC che resta del solo mono, l'offerta di
+  carrello per gli anonimi e in DEMO, e la contro-proposta per RIGA
+  («ti accetto questi due ma non quello») — chi vuole trattare per
+  pezzo rifiuta e aspetta le offerte singole, e si rivede a rodaggio.
   LESSICO (deciso lug 2026): la scheda per gli utenti si chiama
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
@@ -12512,9 +12636,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   strada resta comunque: la ← in testata riporta al carrello.
   I DUE SECONDARI vivono nel `.ctrl-fondo` dopo «Paga» e solo sul set
   («Chiedi info» → `ctrlChiediInfo`; «Fai un'offerta» →
-  `view-offertapresto`, che resta il «presto disponibile» non
-  costruito). Sul singolo non ci sono: l'offerta ce l'ha la scheda col
-  suo bottone in barra. Il ⚡ NWC resta del solo mono — regola che
+  `apriOffertaCarrello`, che dall'ago 2026 apre il suo foglio: qui
+  c'era `view-offertapresto`, «il presto disponibile non costruito»,
+  ed è MORTA con la sua vista — le entry vecchie della cronologia
+  degradano su Esplora, il ramo gemello di quello di Sfoglia. Vedi
+  «L'OFFERTA SUL CARRELLO»). Sul singolo non ci sono: l'offerta ce
+  l'ha la scheda col suo bottone in barra. E in modalità ACCORDO non
+  c'è nemmeno quello: la trattativa è già chiusa. Il ⚡ NWC resta del solo mono — regola che
   esisteva nel codice SENZA una sentinella, e dopo la fusione è una
   riga che si può rompere senza accorgersene.
   IL FONDO È APPICCICATO ANCHE PER IL CARRELLO, che se lo prende
@@ -23258,6 +23386,49 @@ vecchio in cache non vede il bottone e vive come oggi. DA GUARDARE al
 primo giro: il primo promemoria vero della busta dentro Telegram, e
 che al venditore arrivi il testo del codice e non quello della
 spedizione.
+
+L'offerta sul carrello, e il totale in superficie (ago 2026, decisioni
+di Andrea): «Fai un'offerta» in fondo alla cassa del set apriva un
+coming soon, e adesso apre il suo foglio — UNA cifra per tutto il
+carrello, la trattativa di sempre sopra (contro, rilancio, accetta), e
+al pagamento la voce di TESTATA `accordo_sats` che non spalma niente
+sugli unitari. E nello stesso giro l'unità si è unificata IN
+SUPERFICIE: anche sull'offerta del singolo con più pezzi i campi dove
+si digita parlano il TOTALE, mentre la sostanza resta unitaria —
+sennò la stessa app avrebbe chiesto due unità diverse a due dita di
+distanza. Vedi Architettura, «L'OFFERTA SUL CARRELLO» e «IL TOTALE IN
+SUPERFICIE», per l'atterraggio, le decadenze una per una e la trappola
+dei JOIN.
+COLLAUDATO: 6238 prove verdi (il blocco nuovo delle sentinelle
+strutturali) più `collaudo_offerta_carrello.py` — 55 verdi, il server
+VERO su un database usa-e-getta con LNbits finto: il giro completo
+proposta→contro→rilancio→accetta→paga con la bolt11 confrontata AL
+SAT, preventivo == compra, gli sconti spenti provati GIRANDO il conto
+nei due mondi, le decadenze della tabella una per una, la fusione
+senza figlie orfane, la ronda che tace. Più **26 MUTAZIONI, 26
+uccise**, una per riga sorvegliata.
+E LA TORTURA HA FATTO IL SUO MESTIERE, che è la parte da ricordare:
+ha trovato due mutazioni MIRATE MALE (colpivano `fai_offerta` invece
+del gemello carrello: le due funzioni hanno righe identiche, e la
+prima occorrenza nel file è quella singola), una INERTE (`[] or X`
+vale X), e soprattutto **un buco vero del collaudo** — il body
+mandava le quantità GIUSTE, quindi «il client si ignora» non era
+provato da niente; adesso le manda storte apposta. Nel giro delle
+sentinelle ne ha trovate altre quattro che non potevano fallire, per
+la ragione di sempre: la fetta di `pezzo()` era così larga da
+contenere anche le funzioni vicine col loro LEFT JOIN.
+DUE BUG DELLA STESSA FAMIGLIA IN DUE GIORNI, e li ha presi solo il
+codice che GIRA: `offerte_righe` non ha una colonna `id` — la ronda le
+chiedeva `r.id` (segnalato dalla sessione accanto) e la lettura delle
+figlie faceva `ORDER BY id`. Le prove erano verdi tutte e due le
+volte, perché i cartoni davano alla tabella un id che il DDL non ha.
+IN PRODUZIONE: due migrazioni additive (`offerte_righe`,
+`ordini.accordo_sats` a 0), nessuna leva nuova, nessuna rotta di
+pagina — e un client vecchio in cache non conosce le chiavi e vive
+come oggi. DA GUARDARE al primo giro: la prima offerta di carrello
+vera dentro Telegram (che al venditore arrivi UNA notifica con
+l'elenco, mai N), e il primo accordo pagato con la bolt11 confrontata
+su LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
