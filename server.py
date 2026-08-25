@@ -17222,6 +17222,21 @@ async def fai_offerta(annuncio_id: int, req: Request,
         raise HTTPException(400, "Hai già un'offerta in corso su questo "
                                  "annuncio: aspetta la risposta del "
                                  "venditore")
+    # L'ESCLUSIONE RECIPROCA con l'offerta sul carrello (ago 2026), il
+    # verso singolo→carrello: se questo annuncio sta dentro una mia
+    # offerta di carrello viva, due trattative sullo stesso pezzo
+    # potrebbero produrre DUE accordi — e al pagamento uno sconto
+    # doppio. Il gemello (carrello→singolo) vive in fai_offerta_carrello.
+    dentro = con.execute(
+        "SELECT 1 FROM offerte o JOIN offerte_righe r ON r.offerta_id=o.id "
+        "WHERE o.annuncio_id=0 AND o.compratore_id=? AND r.annuncio_id=? "
+        "AND o.stato IN ('proposta','controproposta','accettata') "
+        "LIMIT 1", (user["id"], annuncio_id)).fetchone()
+    if dentro:
+        con.close()
+        raise HTTPException(400, "Questo oggetto è dentro la tua offerta "
+                                 "sul carrello: aspetta quella risposta, "
+                                 "o ritira l'offerta sul carrello")
     totali = con.execute(
         "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
         "compratore_id=?", (annuncio_id, user["id"])).fetchone()["n"]
@@ -17264,6 +17279,263 @@ async def fai_offerta(annuncio_id: int, req: Request,
         + f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
         f"una controproposta. Senza risposta entro "
         f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
+        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
+    return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
+
+
+@app.post("/api/offerte/carrello")
+async def fai_offerta_carrello(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """L'offerta sul TOTALE del carrello (ago 2026): UNA cifra per
+    tutti gli articoli — piu' annunci dello stesso venditore — e sopra
+    la trattativa di sempre, che sui totali vale identica (il
+    ping-pong e' agnostico: importo, contro, giri e scadenza sono
+    numeri). La testata e' una riga di `offerte` con annuncio_id=0 e
+    le figlie in offerte_righe, fotografate alla proposta; l'accordo
+    accettato si paghera' come ordine-set con la voce di testata
+    accordo_sats — mai spalmato sugli unitari.
+    QUI NON SI MUOVE UN SAT, come in fai_offerta: e' la cedola che
+    serve a fabbricare un ordine.
+    LA COMPOSIZIONE SI GIUDICA COME UN SET (stesso venditore, stessa
+    origine, strade fisiche compatibili, niente aste ne' digitali
+    puri): un'offerta su un mucchio che non si puo' comprare insieme
+    sarebbe una promessa che il pagamento poi nega.
+    LA VALUTA e' 'eur' solo se TUTTE le righe sono a listino EUR (il
+    principio del totale_eur del set: un totale misto non ha una
+    valuta nativa e parla sats); nel misto le righe EUR si convertono
+    al cambio CORRENTE per la somma dei listini — 503 se il cambio
+    manca, mai un numero inventato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    # --- Le righe: 2..MAX_RIGHE_SET, annunci distinti, quantita sane
+    grezze = d.get("righe") or []
+    if not isinstance(grezze, list) or len(grezze) < 2:
+        raise HTTPException(400, "L'offerta sul carrello vuole almeno due "
+                                 "oggetti diversi: per uno solo c'è "
+                                 "l'offerta di sempre, dalla sua scheda")
+    if len(grezze) > MAX_RIGHE_SET:
+        raise HTTPException(400, f"Un carrello ha al massimo "
+                                 f"{MAX_RIGHE_SET} oggetti diversi")
+    richieste = {}      # annuncio_id -> quantita (l'ordine di arrivo conta)
+    for r in grezze:
+        try:
+            aid = int(r.get("annuncio_id") or 0)
+            qta = max(1, int(r.get("quantita") or 1))
+        except (TypeError, ValueError, AttributeError):
+            raise HTTPException(400, "Righe del carrello non leggibili")
+        if aid <= 0:
+            raise HTTPException(400, "Righe del carrello non leggibili")
+        if aid in richieste:
+            raise HTTPException(400, "Lo stesso oggetto compare due volte: "
+                                     "alza la quantità invece")
+        richieste[aid] = qta
+
+    con = db()
+    seg = ",".join("?" * len(richieste))
+    tutti = {a["id"]: a for a in con.execute(
+        f"SELECT * FROM annunci WHERE id IN ({seg})",
+        tuple(richieste)).fetchall()}
+    for aid in richieste:
+        a = tutti.get(aid)
+        if not a or a["stato"] != "attivo":
+            con.close()
+            # detail di un 404, JSON che il client rende col SUO esc():
+            # niente html.escape (il patto di nome_pezzo nel set)
+            nome_pezzo = a["titolo"][:40] if a else "Uno degli oggetti"
+            raise HTTPException(404, f"«{nome_pezzo}» non è più "
+                                     f"disponibile: toglilo dal carrello "
+                                     f"e riprova")
+        if _asta(a):
+            con.close()
+            raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
+                                     f"l'offerta giusta è una puntata 🔨")
+    venditori = {a["venditore_id"] for a in tutti.values()}
+    if len(venditori) > 1:
+        con.close()
+        raise HTTPException(400, "Un carrello contiene solo oggetti dello "
+                                 "stesso venditore")
+    venditore_id = venditori.pop()
+    if venditore_id == user["id"]:
+        con.close()
+        raise HTTPException(400, "Non puoi fare un'offerta sui tuoi "
+                                 "stessi annunci")
+    # In ferie non si tratta, la regola di fai_offerta
+    guardia_ferie(con, venditore_id)
+    # Una origine sola, la cintura del set (vedi _compra_set)
+    origini = {chiave_origine(a) for a in tutti.values()}
+    if len(origini) > 1:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non arrivano tutti dallo "
+                                 "stesso posto: si trattano uno per volta")
+    # Le strade fisiche devono intersecarsi, o l'accordo sarebbe
+    # impagabile: stessa domanda di _compra_set, senza scegliere niente
+    strade = {"spedizione", "ritiro"}
+    for a in tutti.values():
+        sue = strade_annuncio(a) - {"digitale", "servizio"}
+        if not sue:
+            con.close()
+            raise HTTPException(400, f"«{a['titolo'][:40]}» si compra da "
+                                     f"solo, fuori dal carrello")
+        strade &= sue
+    if not strade:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non viaggiano insieme: "
+                                 "uno si consegna solo a mano e un altro "
+                                 "solo con la spedizione")
+    # Le quantita' si LIMANO allo stock, mai uno scarto (il patto di
+    # fai_offerta): un numero fuori scala non fa fallire una trattativa
+    for aid in richieste:
+        richieste[aid] = min(richieste[aid], max(1, tutti[aid]["quantita"]))
+
+    # --- La valuta e la somma dei listini. L'await del cambio sta QUI,
+    # PRIMA delle guardie di conteggio: fra i COUNT e l'INSERT il
+    # blocco resta atomico (il patto anti-doppione).
+    valuta = ("eur" if all(a["valuta"] == "eur" and a["prezzo_eur"] > 0
+                           for a in tutti.values()) else "sats")
+    cambio = 0.0
+    if valuta == "sats" and any(a["valuta"] == "eur" and a["prezzo_eur"] > 0
+                                for a in tutti.values()):
+        cambio = await cambio_btc_eur()
+        if cambio <= 0:
+            con.close()
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+    lst_sats, lst_eur, figlie = 0, 0.0, []
+    for aid, qta in richieste.items():
+        a = tutti[aid]
+        if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+            u_eur = a["prezzo_eur"]
+            # la conversione di _unitario_effettivo; senza cambio (il
+            # carrello tutto-EUR, dove la somma parla euro) il sats
+            # fotografato e' l'equivalente di pubblicazione — una
+            # fotografia per il display, mai un numero su cui si paga
+            u_sats = (max(1, round(a["prezzo_eur"] / cambio * 1e8))
+                      if cambio > 0 else a["prezzo_sats"])
+        else:
+            u_eur = 0.0
+            u_sats = a["prezzo_sats"]
+        lst_sats += u_sats * qta
+        lst_eur = round(lst_eur + u_eur * qta, 2)
+        figlie.append({"annuncio_id": aid, "quantita": qta,
+                       "unitario_sats": u_sats, "unitario_eur": u_eur,
+                       "titolo": a["titolo"]})
+
+    # --- La cifra, nella valuta del carrello (EUR con la virgola)
+    grezzo = str(d.get("importo", "")).strip()
+    imp_sats, imp_eur = 0, 0.0
+    if valuta == "eur":
+        try:
+            imp_eur = round(float(grezzo.replace(",", ".")), 2)
+        except ValueError:
+            imp_eur = 0.0
+        importo, listino = imp_eur, lst_eur
+    else:
+        try:
+            imp_sats = int(float(grezzo))
+        except ValueError:
+            imp_sats = 0
+        importo, listino = imp_sats, lst_sats
+    if importo <= 0:
+        con.close()
+        raise HTTPException(400, "Importo non valido")
+    if importo >= listino:
+        con.close()
+        raise HTTPException(400, "La tua offerta è pari o superiore alla "
+                                 "somma dei listini: puoi comprare "
+                                 "direttamente 🙂")
+    # Il minimo sulla SOMMA dei listini, le formule di fai_offerta
+    # (sui sats per ECCESSO: mai sotto la percentuale promessa)
+    if valuta == "eur":
+        minimo = round(listino * OFFERTA_MINIMA_PERCENTO / 100, 2)
+    else:
+        minimo = (listino * OFFERTA_MINIMA_PERCENTO + 99) // 100
+    if importo < minimo:
+        con.close()
+        raise HTTPException(400, "Le offerte su questo carrello partono "
+                                 f"da {_cifra_offerta(valuta, minimo, minimo)}")
+
+    # --- Le guardie di conteggio, senza await fino all'INSERT.
+    # UNA offerta di carrello viva per coppia compratore-venditore, e
+    # il tetto dei tentativi per coppia (il calco delle due di
+    # fai_offerta, dove la coppia era compratore-annuncio).
+    attive = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=0 AND "
+        "compratore_id=? AND venditore_id=? AND stato IN "
+        "('proposta','controproposta','accettata')",
+        (user["id"], venditore_id)).fetchone()["n"]
+    if attive:
+        con.close()
+        raise HTTPException(400, "Hai già un'offerta sul carrello in "
+                                 "corso con questo venditore: aspetta "
+                                 "la sua risposta")
+    totali = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=0 AND "
+        "compratore_id=? AND venditore_id=?",
+        (user["id"], venditore_id)).fetchone()["n"]
+    if totali >= MAX_OFFERTE_ANNUNCIO:
+        con.close()
+        raise HTTPException(400, f"Hai già fatto {MAX_OFFERTE_ANNUNCIO} "
+                                 "offerte sul carrello a questo "
+                                 "venditore: è il momento del prezzo "
+                                 "pieno 🙂")
+    # L'ESCLUSIONE RECIPROCA, il verso carrello→singolo: una riga con
+    # un'offerta per-articolo viva dello stesso compratore fermerebbe
+    # due trattative sullo stesso pezzo — e al pagamento due accordi.
+    # Il gemello (singolo→carrello) vive in fai_offerta.
+    doppia = con.execute(
+        f"SELECT a.titolo FROM offerte o JOIN annunci a "
+        f"ON a.id = o.annuncio_id "
+        f"WHERE o.compratore_id=? AND o.annuncio_id IN ({seg}) AND "
+        f"o.stato IN ('proposta','controproposta','accettata') LIMIT 1",
+        (user["id"], *richieste)).fetchone()
+    if doppia:
+        con.close()
+        raise HTTPException(400, f"Hai già un'offerta in corso su "
+                                 f"«{doppia['titolo'][:40]}»: chiudi "
+                                 f"quella, o toglilo dal carrello")
+    adesso = int(time.time())
+    scadenza = adesso + ORE_RISPOSTA_OFFERTA * 3600
+    con.execute(
+        "INSERT INTO offerte(annuncio_id,compratore_id,venditore_id,"
+        "valuta,importo_sats,importo_eur,stato,scadenza,quantita,"
+        "creato,aggiornato) "
+        "VALUES(0,?,?,?,?,?,?,?,0,?,?)",
+        (user["id"], venditore_id, valuta,
+         imp_sats, imp_eur, "proposta", scadenza, adesso, adesso))
+    offerta_id = con.execute(
+        "SELECT last_insert_rowid() AS i").fetchone()["i"]
+    # Le figlie nella STESSA transazione della testata: nessuna
+    # finestra in cui l'una esiste senza le altre
+    for f in figlie:
+        con.execute(
+            "INSERT INTO offerte_righe(offerta_id,annuncio_id,quantita,"
+            "unitario_sats,unitario_eur,titolo) VALUES(?,?,?,?,?,?)",
+            (offerta_id, f["annuncio_id"], f["quantita"],
+             f["unitario_sats"], f["unitario_eur"], f["titolo"]))
+    con.commit()
+    con.close()
+    # UNA notifica al venditore, mai N (la famiglia che fa bloccare il
+    # bot): l'elenco delle righe, ognuna scappata — le notifiche sono
+    # HTML e un «<» spegnerebbe l'avviso in silenzio.
+    titolo = html.escape((figlie[0]["titolo"] or "?")[:40])
+    altre = " · ".join(
+        html.escape((f["titolo"] or "?")[:40])
+        + (f" ×{f['quantita']}" if f["quantita"] > 1 else "")
+        for f in figlie[1:])
+    prima_qta = f" ×{figlie[0]['quantita']}" if figlie[0]["quantita"] > 1 else ""
+    await notifica(venditore_id,
+        f"💰 <b>Hai ricevuto un'offerta sul carrello!</b> Qualcuno ti "
+        f"offre {_cifra_offerta(valuta, imp_sats, imp_eur)} in tutto per "
+        f"{len(figlie)} articoli: «{titolo}»{prima_qta}"
+        + (f" · {altre}" if altre else "")
+        + f" (listino {_cifra_offerta(valuta, lst_sats, lst_eur)}). "
+        f"Accettare non blocca niente: gli annunci restano in vetrina e "
+        f"vince chi paga per primo. Rispondi dalla scheda Ordini: puoi "
+        f"accettare, rifiutare o fare una controproposta sul totale. "
+        f"Senza risposta entro {ORE_RISPOSTA_OFFERTA} ore l'offerta "
+        f"scade da sola."
         f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 

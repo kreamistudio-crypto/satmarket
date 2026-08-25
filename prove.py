@@ -27665,7 +27665,12 @@ def prove_servizi():
     # 400 «si compra da sola». Niente strade fisiche inventate.
     prova("...e il carrello lo rifiuta sottraendola", set(),
           strade(ann("servizio")) - {"digitale", "servizio"})
-    prova("...nei DUE rami del set", 2,
+    # ...e dall'offerta sul carrello (ago 2026) i rami sono TRE: la
+    # composizione di un'offerta si giudica come un set — un'offerta su
+    # un mucchio che non si puo' comprare insieme sarebbe una promessa
+    # che il pagamento poi nega — quindi anche fai_offerta_carrello
+    # sottrae digitale e servizio con la stessa riga.
+    prova("...nei TRE rami del set (coi carrelli in offerta)", 3,
           _SORGENTE.count('strade_annuncio(a) - {"digitale", "servizio"}'))
     prova("...col suo 400 che lo dice", 2,
           _SORGENTE.count('prestazione: si compra da sola, fuori dal set'))
