@@ -16880,6 +16880,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   temi col server vero (riempimento in place, tutte le strade di
   accensione/spegnimento, la barra appiccicata, la classifica dal
   podio, zero sbordo, zero errori JS).
+  I TRE DIFETTI DEL PRIMO DEPLOY DELLA CARD (ago 2026, dal campo,
+  riprodotti e misurati col giro CDP prima di toccare — e NESSUNO era
+  la corsa con `spegniBarattolo`, che era il sospetto: la categoria
+  DIVERSA ha sempre funzionato). 1) Dentro il barattolo, toccare la
+  categoria DA CUI si era entrati finiva su «Tutto»: il ramo-ritocco
+  di `apriCategoria` (`c === activeCat`) scattava sulla activeCat di
+  prima, che col filtro acceso non è accesa da nessuna parte
+  (l'`active` è soppresso). Ora vale solo a barattolo SPENTO: col
+  filtro acceso ogni categoria è un'USCITA verso quel reparto, che si
+  apre come le altre — il filtro lo spegne `loadListings` come per
+  ogni ricarica. 2) Il CONTRARIO: la card «Tutto» col barattolo
+  acceso da una categoria spegneva e basta — il ramo esplicito di
+  `tornaATuttoDaTocco`, nato per il caso a categoria già Tutto,
+  scattava per QUALUNQUE categoria — e lasciava la vetrina ancora
+  filtrata sul reparto sotto una card che diceva «Tutto». Da una
+  categoria ora passa da `tornaATutto`; `alternaBarattolo` resta al
+  solo caso già-Tutto, dove niente ricaricherebbe. La sentinella che
+  certificava il ramo vecchio ha CAMBIATO LATO col perché.
+  3) L'ACCENSIONE ORA SCORRE agli annunci come le card categoria —
+  stesso giudice, `scorriAlReparto` (i chiamanti salgono a TRE), in
+  SINCRONO perché la lista chiusa si renderizza subito: il ramo DEMO
+  di `armaScrollReparto`, senza bandierina. IL RITOCCO CHE SPEGNE
+  RESTA FERMO, e il torna-in-cima della nascita è morto nei due versi
+  (la regola del ritocco della card categoria). Tortura a 5
+  mutazioni, una per riga sorvegliata, tutte uccise; sette scenari
+  misurati prima e dopo, più la regressione del ritocco a barattolo
+  spento.
+  E IL TRATTO DELLA CARD È TARATO (ago 2026, il debito dichiarato del
+  piano): il vetro a stroke 2 — giusto sui cerchietti da 34/40px —
+  reso a 56 faceva ~4,7px, fuori famiglia con le illustrazioni
+  accanto. `jarSVG` guadagna il terzo parametro `tratto` e la
+  striscia passa 1.3 (~3px resi, il peso del bordo bianco del vaso
+  della monstera: scelto a schermo su quattro candidate — 2, 1.5,
+  1.3, 1.1 — accanto alle sorelle), col riflesso che scende a 1.1
+  perché un riflesso più spesso del vetro si legge come un graffio.
+  Cerchietti e cassetto restano al 2 di sempre.
   IL BARATTOLINO FILTRA LA HOME (ago 2026, decisione di Andrea): un
   tocco e la vetrina mostra i soli annunci del barattolo, SENZA
   cambiare vista; si spegne ritoccandolo, dalla pillola in vetrina, o
