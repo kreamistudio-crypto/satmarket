@@ -1829,10 +1829,9 @@
   /* L'unitario in coda alla riga dell'offerta: piu' piccolo del
      totale, che e' quello che si legge per primo. */
   .off-unitario{font-size:12px;font-weight:600;color:var(--muted)}
-  /* «al pezzo» sotto l'unita' del campo: a CAPO e non in riga, o a
-     320px il suffisso si mangia il campo dove si scrive. */
-  .off-alpezzo{display:block;font-size:11px;font-weight:700;
-    line-height:1.1;white-space:nowrap}
+  /* (la .off-alpezzo — «al pezzo» sotto l'unita' del campo — e' morta
+     col totale in superficie, ago 2026: i campi delle trattative
+     parlano il totale e la toppa non ha piu' niente da toppare) */
   /* Il numero statico dentro un bottone: sul tasto offerta, e su
      «Acquista» quando un accordo ha gia' fissato i pezzi. Non cede
      MAI — a stringersi e' la parola, come nella riga meta della
@@ -16527,12 +16526,40 @@ function offertaSconto(l, p){
     ? Math.round(l.priceEur*(100-p))/100
     : Math.round(l.price*(100-p)/100);
 }
-/* ...lo stesso sconto, letto nella valuta del campo: serve al
+/* IL TOTALE IN SUPERFICIE (ago 2026, decisione di Andrea): coi pezzi
+   scelti >1 il campo, le pillole, il minimo e la riga parlano il
+   TOTALE — l'unita' si e' unificata con l'offerta sul carrello, che
+   parla totali per natura, e il «al pezzo» accanto al campo era la
+   toppa su un rischio che cosi' si toglie alla radice. LA SOSTANZA
+   RESTA UNITARIA: colonne, guardie e server non cambiano di una riga
+   — la conversione ÷ pezzi avviene UNA volta, all'invio, col FLOOR
+   (mai offrire piu' di quanto scritto: floor(tot/pezzi) >= min ⇔
+   tot >= min×pezzi, quindi il minimo non si buca). E' il pattern del
+   toggle valuta: il campo e' una vista, il listino e' la sostanza. */
+const offPezzi = () => Math.max(1, qtaScelta || 1);
+/* il totale scontato nella valuta del LISTINO: l'unitario di
+   offertaSconto per i pezzi scelti (eur a 2 decimali) */
+function offTotaleSconto(l, p){
+  const u = offertaSconto(l, p), q = offPezzi();
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? Math.round(u*q*100)/100 : u*q;
+}
+/* ...lo stesso totale, letto nella valuta del campo: serve al
    segnaposto e a capire quale pillola e' accesa, che si guardano
    tutt'e due in quello che si VEDE. */
-function offertaScontoIn(l, p, valuta){
+function offTotaleScontoIn(l, p, valuta){
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  return offConverti(offertaSconto(l, p), inEur ? 'eur' : 'sats', valuta);
+  return offConverti(offTotaleSconto(l, p), inEur ? 'eur' : 'sats', valuta);
+}
+/* ...e l'UNITARIO che partira' all'invio, derivato dal totale scritto
+   (valuta del listino). Sull'euro si lavora in CENTESIMI interi, o il
+   floor mangerebbe un centesimo sulla polvere dei float (46,50 / 3
+   puo' leggersi 15,4999…). */
+function offUnitarioDa(l, tot){
+  const q = offPezzi();
+  if (q <= 1) return tot;
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? Math.floor(Math.round(tot*100)/q)/100 : Math.floor(tot/q);
 }
 /* La cifra dell'offerta nella valuta LETTA, con la regola del ≈ di
    cifraCtrl. Ma se la vista chiede una conversione e il cambio non e'
@@ -16594,19 +16621,19 @@ function aggiornaFoglioOfferta(){
     campo.value = offTestoCampo(offCifraIn(vc), vc);
   }
   campo.inputMode = vc==='eur' ? 'decimal' : 'numeric';
-  campo.placeholder = vc==='eur' ? fmtEur(offertaScontoIn(l, 15, vc))
-                                 : fmt(offertaScontoIn(l, 15, vc));
+  campo.placeholder = vc==='eur' ? fmtEur(offTotaleScontoIn(l, 15, vc))
+                                 : fmt(offTotaleScontoIn(l, 15, vc));
   /* Il simbolo accanto e' quello della valuta MOSTRATA: si vede
      sempre in cosa si sta scrivendo — era il secondo mezzo bug, che
      un campo muto lasciava indovinare. Al server la cifra ci arriva
      comunque nella valuta del listino, l'unica in cui l'accordo
      esiste: a convertirla e' inviaOfferta, una volta sola.
-     E DICE «AL PEZZO» MENTRE SI DIGITA (ago 2026): la cifra e'
-     l'unitario, ma chi vuole tre pezzi ragiona sul TOTALE e rischia
-     di scrivere 120 intendendo il totale mentre ne sta offrendo 360.
-     Prima lo si scopriva dalla riga sotto, cioe' DOPO aver scritto.
-     Solo coi pezzi scelti >1: col pezzo singolo sarebbe rumore. */
-  el('offSuffisso').innerHTML = suffissoUnita(vc, qtaScelta);
+     IL «AL PEZZO» E' MORTO COL TOTALE IN SUPERFICIE (ago 2026): coi
+     pezzi >1 il campo parla il TOTALE — che e' cio' su cui chi vuole
+     tre pezzi ragiona comunque — quindi il rischio che quella riga
+     toppava (scrivere 120 intendendo il totale mentre si offriva
+     360) non esiste piu' alla radice. */
+  el('offSuffisso').innerHTML = suffissoUnita(vc);
   offertaDigitata();
 }
 /* L'oninput del campo: pianta l'ANCORA e poi lascia rendere. E' il
@@ -16651,9 +16678,10 @@ function offertaChip(scelta){
     /* L'ancora si pianta nella valuta del LISTINO, cosi' il −10% e'
        esattamente −10% qualunque cosa il campo stia mostrando: la
        cifra che parte e' quella giusta al sat, e a convertirla per
-       gli occhi ci pensa il render. */
+       gli occhi ci pensa il render. Dall'ago 2026 e' il TOTALE
+       scontato (l'unitario × i pezzi scelti): il campo parla totali. */
     const inEur = l.valuta==='eur' && l.priceEur>0;
-    offCifra = offertaSconto(l, Number(scelta));
+    offCifra = offTotaleSconto(l, Number(scelta));
     offCifraValuta = inEur ? 'eur' : 'sats';
     campo.value = offTestoCampo(offCifraIn(offCampoValuta), offCampoValuta);
     offertaDigitata();
@@ -16688,7 +16716,12 @@ function offertaDigitata(){
      nella valuta del CAMPO, che e' l'unica con cui ha senso
      confrontare le pillole, perche' e' il numero che si vede. */
   const vc = offCampoValuta || valutaOfferta(l);
+  /* `v` e' il TOTALE scritto, nella valuta del listino; `u` e'
+     l'unitario che partirebbe all'invio (il floor di offUnitarioDa):
+     e' su di LUI che si giudica il minimo — la stessa cifra che
+     giudichera' il server, mai un'algebra parallela. */
   const v = offCifraIn(inEur ? 'eur' : 'sats');
+  const u = offUnitarioDa(l, v);
   const vv = offCifraIn(vc);
   /* La pillola accesa si DEDUCE dalla cifra: «Personalizzato» quando
      non e' nessuno dei due sconti. Cosi' chi parte da −10% e poi
@@ -16699,22 +16732,28 @@ function offertaDigitata(){
   document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
     const p = b.dataset.p;
     const tol = vc==='eur' ? 0.005 : 0.5;
-    const suo = x => Math.abs(vv - offertaScontoIn(l, x, vc)) < tol;
+    const suo = x => Math.abs(vv - offTotaleScontoIn(l, x, vc)) < tol;
     b.classList.toggle('attiva', vv > 0 && (p === 'libero'
       ? !(suo(10) || suo(20)) : suo(Number(p))));
   });
   /* L'avviso del minimo compare SOLO quando serve — cioe' quando la
-     cifra ci finisce sotto. A leva 0 non esiste nessuna soglia. */
+     cifra ci finisce sotto. A leva 0 non esiste nessuna soglia.
+     Si giudica l'UNITARIO derivato e si DICE il totale: il campo
+     parla totali, e un minimo detto al pezzo si confronterebbe con
+     un numero che non e' quello sotto le dita. */
   const min = offertaMinimo(l);
-  const sotto = offertaMinPercento > 0 && v > 0
-                && (inEur ? v < min.eur : v < min.sats);
+  const sotto = offertaMinPercento > 0 && u > 0
+                && (inEur ? u < min.eur : u < min.sats);
   el('offMinimo').style.display = sotto ? '' : 'none';
-  if (sotto)
+  if (sotto) {
+    const mu = offMinimoIn(l, min, vc), q = offPezzi();
+    const minTot = vc==='eur' ? Math.round(mu*q*100)/100 : mu*q;
     el('offMinimo').innerHTML = `Troppo bassa: il minimo è `
-      + `${offCifraTesto(offMinimoIn(l, min, vc), vc,
+      + `${offCifraTesto(minTot, vc,
                          vc !== (inEur ? 'eur' : 'sats'))} `
       + `(${offertaMinPercento}% `
-      + `del listino${qtaScelta > 1 ? ', al pezzo' : ''})`;
+      + `del listino${q > 1 ? ', in tutto' : ''})`;
+  }
   /* SOTTO IL MINIMO NIENTE TOTALE: calcolare il totale di un'offerta
      che non si puo' inviare e' rumore, e affianca due righe nel
      momento in cui ne serve una sola. Torna da se' appena la cifra
@@ -16728,10 +16767,19 @@ function offertaDigitata(){
      sono. La cifra vera che parte resta quella del listino: la dice
      il paySheet, dove il numero e' definitivo. */
   const conv = vc !== (inEur ? 'eur' : 'sats');
-  const unitaria = offCifraTesto(vv, vc, conv);
-  if (qtaScelta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
+  if (qtaScelta <= 1) {
+    riga.innerHTML = `Offri <b class="mono">${offCifraTesto(vv, vc, conv)}</b>`;
+    return;
+  }
+  /* Coi pezzi >1 la riga dice il RICOMPOSTO — l'unitario del floor
+     per i pezzi — che e' quel che parte davvero: mai un numero che
+     non torna moltiplicando. Se differisce dal digitato di qualche
+     spicciolo, il ricomposto e' quello onesto. */
+  const uCampo = offConverti(u, inEur ? 'eur' : 'sats', vc);
+  const unitaria = offCifraTesto(uCampo, vc, conv);
   const totale = offCifraTesto(
-    vc==='eur' ? Math.round(vv*qtaScelta*100)/100 : vv*qtaScelta, vc, conv);
+    vc==='eur' ? Math.round(uCampo*qtaScelta*100)/100 : uCampo*qtaScelta,
+    vc, conv);
   riga.innerHTML = `Offri <b class="mono">${totale}</b> per ${fmt(qtaScelta)} pezzi`
     + ` <span class="off-unitario">(${unitaria} al pezzo)</span>`;
 }
@@ -16741,10 +16789,18 @@ async function inviaOfferta(btn){
   /* Si manda SEMPRE la valuta del LISTINO: e' l'unica in cui
      l'accordo esiste, e l'unica che il server accetta. Il campo puo'
      parlarne un'altra — la conversione avviene QUI, una volta sola e
-     sull'ancora, mai su quel che il campo mostra adesso. */
+     sull'ancora, mai su quel che il campo mostra adesso.
+     E COI PEZZI >1 IL CAMPO PARLA IL TOTALE (ago 2026): al server
+     parte l'unitario di sempre — la divisione ÷ pezzi qui, UNA volta
+     e col floor (mai offrire piu' di quanto scritto), che e' anche
+     cio' che tiene il minimo: floor(tot/q) >= min ⇔ tot >= min×q. */
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  const cifra = offCifraIn(inEur ? 'eur' : 'sats');
-  if (!(cifra > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const totale = offCifraIn(inEur ? 'eur' : 'sats');
+  if (!(totale > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const cifra = offUnitarioDa(l, totale);
+  if (!(cifra > 0)) {
+    toast(`La cifra è troppo bassa per ${fmt(offPezzi())} pezzi`); return;
+  }
   const importo = inEur ? String(cifra.toFixed(2)).replace('.', ',')
                         : String(cifra);
   const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
@@ -17272,34 +17328,38 @@ function rilanciRimasti(o){
   const tetto = (offerteDati && offerteDati.max_rilanci) || 0;
   return Math.max(0, tetto - (o.giri || 0));
 }
-/* L'UNITA' DEL CAMPO, e il «al pezzo» quando serve (ago 2026, dal
-   campo: «nel campo del rilancio non si capisce che la cifra e' per
-   PEZZO — su un'offerta da tre pezzi uno scrive il totale e
-   sbaglia»). In tutta l'app la cifra di una trattativa e'
-   UNITARIA: il minimo, il listino e i due estremi del rilancio si
-   confrontano al pezzo, e il totale lo dice `cifraPezzi` con le due
-   facce. Ma chi vuole tre pezzi ragiona sul TOTALE, e un campo muto
-   lo lascia sbagliare — poi lo scopre dalla riga sotto, cioe' DOPO
-   aver scritto.
-   IL FOGLIO DELL'OFFERTA LO DICEVA GIA' e i due box inline no:
-   quindi non e' una parola nuova, e' la LINGUA DI CASA portata
-   dove mancava. Un giudice solo per tutte e tre le superfici —
+/* L'UNITA' DEL CAMPO (ago 2026, ROVESCIATA col totale in
+   superficie). La storia va tenuta intera: il «al pezzo» accanto ai
+   campi nacque dal caso vero «su un'offerta da tre pezzi uno scrive
+   il totale e sbaglia» — era la TOPPA sul rischio. Dall'ago 2026 i
+   campi delle trattative parlano il TOTALE (l'unita' si e' unificata
+   con l'offerta sul carrello, che parla totali per natura), quindi
+   quel rischio non esiste piu' alla radice e la toppa muore con lui:
+   il suffisso e' la sola valuta. La SOSTANZA resta unitaria — la
+   divisione ÷ pezzi la fanno inviaOfferta e rispondiOfferta, una
+   volta e col floor.
+   Resta un giudice solo per tutte e tre le superfici —
    l'offerta iniziale, la controproposta del venditore e il
    rilancio del compratore — perche' tre rese della stessa cosa
    divergono al primo ritocco, e qui a divergere sarebbe il
-   significato di una cifra di denaro.
-   SOLO CON PIU' DI UN PEZZO: sul pezzo singolo «al pezzo» e'
-   rumore, e ruberebbe larghezza al campo dove si scrive. */
-function suffissoUnita(valuta, quantita){
-  return (valuta === 'eur' ? '€' : 'sats')
-    + ((quantita || 0) > 1
-        ? '<span class="off-alpezzo">al pezzo</span>' : '');
+   significato di una cifra di denaro. */
+function suffissoUnita(valuta){
+  return valuta === 'eur' ? '€' : 'sats';
 }
 /* Il campo legale, detto a chi scrive: e' l'unica cosa che il
-   compratore non puo' dedurre da solo guardando la riga. */
+   compratore non puo' dedurre da solo guardando la riga. Coi pezzi
+   >1 i due estremi si dicono in TOTALE (unitario legale × pezzi):
+   col floor dell'invio, un totale dentro questo intervallo da'
+   sempre un unitario dentro il suo. La testata carrello (quantita=0)
+   parla gia' totali da se'. */
 function campoRilancio(o){
-  const su = o.valuta === 'eur' ? o.importo_eur + 0.01 : o.importo_sats + 1;
-  const giu = o.valuta === 'eur' ? o.contro_eur - 0.01 : o.contro_sats - 1;
+  let su = o.valuta === 'eur' ? o.importo_eur + 0.01 : o.importo_sats + 1;
+  let giu = o.valuta === 'eur' ? o.contro_eur - 0.01 : o.contro_sats - 1;
+  const q = o.annuncio_id ? (o.quantita||0) : 0;
+  if (q > 1) {
+    su = o.valuta==='eur' ? Math.round(su*q*100)/100 : su*q;
+    giu = o.valuta==='eur' ? Math.round(giu*q*100)/100 : giu*q;
+  }
   return `Tra ${cifraOff(o.valuta, su, su)} e ${cifraOff(o.valuta, giu, giu)}`;
 }
 function renderOfferte(){
@@ -17365,7 +17425,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
             </div>
           </div>`;
@@ -17419,7 +17479,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'rilancia')">Invia</button>
             </div>
             <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${campoRilancio(o)} · rilancio ${(o.giri||0)+1} di ${(offerteDati&&offerteDati.max_rilanci)||0}</div>
@@ -17482,6 +17542,26 @@ function rispondiOfferta(id, azione){
       return;
     }
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
+    /* IL TOTALE IN SUPERFICIE (ago 2026): coi pezzi >1 anche questi
+       campi parlano il TOTALE, e al server parte l'unitario di
+       sempre — la divisione ÷ pezzi qui, UNA volta e col floor
+       (l'invariante di inviaOfferta: mai piu' di quanto scritto, e
+       sull'euro si lavora in centesimi interi contro la polvere dei
+       float). La testata carrello (quantita=0) parla totali anche
+       sul server e non si tocca. */
+    const qq = o.annuncio_id ? (o.quantita||0) : 0;
+    if (qq > 1) {
+      const tot = o.valuta==='eur'
+        ? (parseFloat(importo.replace(',','.'))||0)
+        : (parseInt(importo,10)||0);
+      const u = o.valuta==='eur'
+        ? Math.floor(Math.round(tot*100)/qq)/100 : Math.floor(tot/qq);
+      if (!(u > 0)) {
+        toast(`La cifra è troppo bassa per ${fmt(qq)} pezzi`); return;
+      }
+      importo = o.valuta==='eur'
+        ? String(u.toFixed(2)).replace('.', ',') : String(u);
+    }
   }
   /* I testi sono NUDI: qui le cifre si scrivono a mano, che cifraOff
      e i suoi gemelli portano dentro dell'HTML. Sulla testata carrello

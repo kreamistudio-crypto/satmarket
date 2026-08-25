@@ -20240,21 +20240,38 @@ def prove_offerta_quantita():
     # fisso e' l'altro modo in cui nasce uno scatto (lezione picker)
     prova("il fuoco sul campo non trascina niente", True,
           "campo.focus({preventScroll:true})" in mini)
-    # IL CAMPO DICE «AL PEZZO» mentre si digita, e solo coi pezzi >1:
-    # chi ne vuole tre ragiona sul TOTALE e rischia di scrivere 120
-    # intendendo il totale mentre ne sta offrendo 360
-    # Dall'ago 2026 la riga vive nel GIUDICE UNICO, che serve tutte
-    # e tre le superfici (il foglio, la controproposta del venditore
-    # e il rilancio del compratore): l'affermazione e' la stessa,
-    # cambia il posto in cui si guarda.
-    suf = pezzo_js(mini, "function suffissoUnita(valuta, quantita){",
+    # IL «AL PEZZO» E' MORTO COL TOTALE IN SUPERFICIE (ago 2026,
+    # ROVESCIATE — erano le sentinelle della toppa): i campi delle
+    # trattative parlano il TOTALE, quindi il rischio che quella riga
+    # toppava (scrivere 120 intendendo il totale mentre si offrivano
+    # 360) non esiste piu' alla radice. Il suffisso e' la sola valuta,
+    # il giudice unico resta, e la divisione ÷ pezzi avviene
+    # all'invio, UNA volta e col floor — l'unica algebra che tiene il
+    # minimo senza una seconda regola: floor(tot/q) >= min ⇔
+    # tot >= min×q.
+    suf = pezzo_js(mini, "function suffissoUnita(valuta){",
                    "\n}") + "\n}"
-    prova("il campo dice «al pezzo» mentre si scrive", True,
-          '<span class="off-alpezzo">al pezzo</span>' in suf)
-    prova("...ma solo con piu' di un pezzo", True,
-          "(quantita || 0) > 1" in suf)
-    prova("...e col pezzo singolo tace", True,
+    prova("il suffisso non dice piu' «al pezzo»", False,
+          "off-alpezzo" in suf)
+    prova("...e la sua regola CSS e' morta con lui", False,
           ".off-alpezzo{display:block" in mini)
+    prova("le pillole riempiono col TOTALE scontato", True,
+          "offCifra = offTotaleSconto(l, Number(scelta));" in mini)
+    prova("l'invio divide UNA volta, col floor (e in centesimi interi"
+          " sull'euro)", True,
+          "const cifra = offUnitarioDa(l, totale);" in mini
+          and "? Math.floor(Math.round(tot*100)/q)/100 : Math.floor(tot/q);"
+          in mini)
+    prova("...anche contro e rilancio dividono all'invio", True,
+          "Math.floor(Math.round(tot*100)/qq)/100 : Math.floor(tot/qq);"
+          in mini)
+    prova("...e il minimo si giudica sull'UNITARIO derivato, come fara'"
+          " il server", True,
+          "(inEur ? u < min.eur : u < min.sats);" in mini)
+    prova("...ma si DICE in totale", True,
+          "del listino${q > 1 ? ', in tutto' : ''})" in mini)
+    prova("il campo legale del rilancio parla totali coi pezzi", True,
+          "su = o.valuta==='eur' ? Math.round(su*q*100)/100 : su*q;" in mini)
     # SOTTO IL MINIMO NIENTE TOTALE: due righe dove ne serve una
     prova("sotto il minimo la riga del totale sparisce", True,
           "if (v<=0 || sotto) { riga.textContent = ''; return; }" in mini)
@@ -20329,7 +20346,7 @@ def prove_offerta_quantita():
           "const vc = valutaOfferta(l);" in fogjs
           and "return valutaVista==='eur' ? 'eur' : 'sats';" in mini)
     prova("...portando il simbolo della valuta MOSTRATA", True,
-          "el('offSuffisso').innerHTML = suffissoUnita(vc,"
+          "el('offSuffisso').innerHTML = suffissoUnita(vc);"
           in fogjs)
     # L'ANCORA E' QUELLO CHE IMPEDISCE ALLA CIFRA DI DERIVARE: si
     # tiene la cifra com'e' stata scritta e la valuta in cui lo e'
@@ -20369,10 +20386,12 @@ def prove_offerta_quantita():
     # LE PILLOLE si confrontano nella valuta MOSTRATA — e' il numero
     # che si vede — ma piantano l'ancora in quella del LISTINO, cosi'
     # il −10% che parte e' esattamente −10% al sat
+    # ...e dall'ago 2026 il confronto e' sul TOTALE scontato: il campo
+    # parla totali, e la pillola si accende su quel che si vede
     prova("le pillole si confrontano in quel che si vede", True,
-          "Math.abs(vv - offertaScontoIn(l, x, vc)) < tol" in odig)
+          "Math.abs(vv - offTotaleScontoIn(l, x, vc)) < tol" in odig)
     prova("...e piantano l'ancora nella valuta del listino", True,
-          "offCifra = offertaSconto(l, Number(scelta));" in fog2
+          "offCifra = offTotaleSconto(l, Number(scelta));" in fog2
           and "offCifraValuta = inEur ? 'eur' : 'sats';" in fog2)
     # IL MINIMO: si CONFRONTA nella valuta del listino, che e' quella
     # su cui giudica il server, e si DICE in quella del campo,
@@ -20380,8 +20399,11 @@ def prove_offerta_quantita():
     # legge dev'essere ammesso, mai rifiutato per un centesimo.
     prova("il minimo si confronta come il server", True,
           "const v = offCifraIn(inEur ? 'eur' : 'sats');" in odig)
+    # (in TOTALE, dall'ago 2026: minTot = l'unitario del giudice per i
+    # pezzi scelti, detto nella lingua del campo)
     prova("...e si dice nella valuta del campo", True,
-          "offCifraTesto(offMinimoIn(l, min, vc), vc," in odig)
+          "const mu = offMinimoIn(l, min, vc), q = offPezzi();" in odig
+          and "offCifraTesto(minTot, vc," in odig)
     prova("...arrotondato per eccesso, o rifiuterebbe cio' che mostra",
           True, "Math.ceil(min.sats*eurPerSat*100)/100" in mini
           and "Math.ceil(min.eur/eurPerSat)" in mini)
@@ -20392,7 +20414,7 @@ def prove_offerta_quantita():
     i_inv = mini.index("async function inviaOfferta(")
     inv = mini[i_inv:mini.index("function apriLampo(", i_inv)]
     prova("l'invio converte verso il listino", True,
-          "const cifra = offCifraIn(inEur ? 'eur' : 'sats');" in inv)
+          "const totale = offCifraIn(inEur ? 'eur' : 'sats');" in inv)
     prova("...e non legge piu' il campo", False,
           "el('offImporto').value" in inv)
 
@@ -20995,11 +21017,12 @@ def prove_rilancio_offerta():
     prova("i bottoni delle offerte non vanno a capo da soli", 0,
           solo.count("flex-wrap:wrap"))
     # LE TRE SUPERFICI DEL SUFFISSO passano dal giudice unico, e
-    # nessuna scrive l'unita' a mano: sono le tre volte in cui una
-    # cifra UNITARIA si digita in un campo, e se una tacesse chi
-    # compra scriverebbe il totale credendo di offrire quello.
+    # nessuna scrive l'unita' a mano. Dall'ago 2026 il giudice dice la
+    # SOLA valuta (i campi parlano il totale, il «al pezzo» e' morto
+    # con la toppa): resta unico perche' tre rese della stessa cosa
+    # divergono al primo ritocco.
     prova("i due box inline chiedono l'unita' al giudice", 2,
-          rend.count("suffissoUnita(o.valuta, o.quantita)"))
+          rend.count("suffissoUnita(o.valuta)"))
     prova("...e nessuno se la scrive a mano", 0,
           solo.count("'eur'?'€':'sats'")
           + solo.count("'eur' ? '€' : 'sats'"))
