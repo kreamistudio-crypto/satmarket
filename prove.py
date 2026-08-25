@@ -21408,6 +21408,7 @@ def prove_sollecito_a_comando():
     ORA = 1_700_000_000
     LEVE = {"SOLLECITO_MANUALE_ORE": 48,
             "SOLLECITO_MANUALE_DIGITALE_ORE": 24,
+            "SOLLECITO_MANUALE_BUSTA_ORE": 24,
             "SOLLECITO_MANUALE_PAUSA_ORE": 24,
             "SOLLECITO_MANUALE_MAX": 3}
 
@@ -21422,6 +21423,16 @@ def prove_sollecito_a_comando():
             "solleciti_manuali INT DEFAULT 0, "
             "sollecito_venditore_il INT DEFAULT 0, "
             "solleciti_venditore INT DEFAULT 0, "
+            # la seconda fase (cantiere 44): la busta, coi suoi assi
+            "spedito_il INT DEFAULT 0, "
+            "via_punto INT DEFAULT 0, "
+            "busta_il INT DEFAULT 0, "
+            "sollecito_manuale_busta_il INT DEFAULT 0, "
+            "solleciti_manuali_busta INT DEFAULT 0, "
+            # ...e i contatori dell'AUTOMATICO della busta, che il
+            # bottone non deve toccare
+            "sollecito_busta_il INT DEFAULT 0, "
+            "solleciti_busta INT DEFAULT 0, "
             # il timbro del bottone GEMELLO, quello del venditore
             "sollecito_il INT DEFAULT 0)")
         vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
@@ -21484,7 +21495,49 @@ def prove_sollecito_a_comando():
              ORA - g, 0, 0, 0, 0),
         ]
         vero.executemany(
-            "INSERT INTO ordini VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0)", righe)
+            # colonne per NOME: le aggiunte della busta hanno i loro
+            # DEFAULT e le righe storiche non si riscrivono
+            "INSERT INTO ordini(id, compratore_id, venditore_id, "
+            "annuncio_id, stato, consegna_scelta, creato, aggiornato, "
+            "sollecito_manuale_il, solleciti_manuali, "
+            "sollecito_venditore_il, solleciti_venditore) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", righe)
+        g2 = 3600
+        vero.executemany(
+            # LA SECONDA FASE (cantiere 44): spedito verso un punto di
+            # ritiro, busta mai depositata — la maniglia del codice
+            "INSERT INTO ordini(id, compratore_id, venditore_id, "
+            "annuncio_id, stato, consegna_scelta, creato, aggiornato, "
+            "spedito_il, via_punto, busta_il, "
+            "sollecito_manuale_busta_il, solleciti_manuali_busta, "
+            "solleciti_manuali, sollecito_busta_il, solleciti_busta) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [
+             # pronto — e la fase 'locked' ha GIA' consumato i suoi tre
+             # squilli, che e' il punto del cantiere; l'automatico
+             # della busta ha gia' bussato una volta e non deve
+             # muoversi
+             (40, 111, 222, 7, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, ORA - 25 * g2, 1, 0, 0, 0, 3, ORA - 9 * g2, 1),
+             (41, 111, 222, 7, "shipped", "spedizione", ORA - 30 * g2,
+              ORA - g2, ORA - 23 * g2, 1, 0, 0, 0, 0, 0, 0),
+             # la busta e' gia' depositata: niente da ricordare
+             (42, 111, 222, 7, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, ORA - 25 * g2, 1, ORA - 2 * g2, 0, 0, 0, 0, 0),
+             # al tetto della fase busta
+             (43, 111, 222, 7, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, ORA - 25 * g2, 1, 0, ORA - 99 * g2, 3, 0, 0, 0),
+             # pausa della fase busta non ancora passata
+             (44, 111, 222, 7, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, ORA - 25 * g2, 1, 0, ORA - 2 * g2, 1, 0, 0, 0),
+             # lo shipped STORICO con spedito_il a zero: la
+             # popolazione senza nessun altro squillo
+             (45, 111, 222, 7, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, 0, 1, 0, 0, 0, 0, 0, 0),
+             # il titolo cattivo, anche su questa strada
+             (46, 111, 222, 8, "shipped", "spedizione", ORA - 60 * g2,
+              ORA - g2, ORA - 25 * g2, 1, 0, 0, 0, 0, 0, 0),
+            ])
         vero.commit()
         return vero
 
@@ -21745,6 +21798,87 @@ def prove_sollecito_a_comando():
               "WHERE id=?" in agg
               and "compratore_id" not in agg and "venditore_id" not in agg)
 
+    # --- 10-quinquies) LA SECONDA FASE: LA BUSTA (cantiere 44) ----
+    # Il buco messo a verbale il giorno prima: su 'shipped' verso un
+    # punto senza busta l'unico che SA dell'arrivo — il compratore,
+    # con l'avviso del corriere in mano — non aveva nessuna maniglia.
+    # Il bottone adesso c'e', coi SUOI contatori: la fase 'locked'
+    # puo' aver consumato i tre squilli, e un contatore ereditato
+    # lascerebbe senza maniglia proprio questa popolazione.
+    v = mondo()
+    prima = dict(riga(v, 40))
+    esito, db1, err = bussa(v, 40)
+    dopo = riga(v, 40)
+    prova("la busta: il promemoria parte", {"ok": True}, esito)
+    prova("...al venditore, una volta sola", [222], [t for t, _ in db1])
+    prova("...e il testo dice il fatto che sappiamo davvero", True,
+          "sta aspettando il codice di ritiro" in db1[0][1])
+    prova("...senza promettere un arrivo che non vediamo", False,
+          "è arrivato" in db1[0][1])
+    prova("...e dice dove guardare (la mail del corriere)", True,
+          "mail del corriere" in db1[0][1])
+    prova("...coi SUOI contatori", (ORA, 1),
+          (dopo["sollecito_manuale_busta_il"],
+           dopo["solleciti_manuali_busta"]))
+    prova("la fase locked esaurita NON blocca (il punto del cantiere)",
+          3, prima["solleciti_manuali"])
+    prova("...e i suoi contatori non si muovono",
+          (prima["sollecito_manuale_il"], prima["solleciti_manuali"]),
+          (dopo["sollecito_manuale_il"], dopo["solleciti_manuali"]))
+    prova("...e nemmeno quelli dell'AUTOMATICO della busta",
+          (prima["sollecito_busta_il"], prima["solleciti_busta"]),
+          (dopo["sollecito_busta_il"], dopo["solleciti_busta"]))
+    prova("...ordine immobile (stato, spedito_il, busta_il)",
+          (prima["stato"], prima["spedito_il"], prima["busta_il"]),
+          (dopo["stato"], dopo["spedito_il"], dopo["busta_il"]))
+    esito, db2, err = bussa(v, 40)
+    prova("la pausa vale anche sulla busta", 400, err and err.code)
+    prova("...senza mandare niente", [], db2)
+    esito, _, err = bussa(mondo(), 41)
+    prova("a 23 ore dalla spedizione e' presto", 400, err and err.code)
+    prova("...e il 400 dice del pacco in viaggio", True,
+          "partito da poco" in (err.detail or ""))
+    esito, db3, err = bussa(mondo(), 42)
+    prova("la busta gia' depositata resta fuori",
+          (400, "Operazione non permessa"),
+          (err and err.code, err and err.detail))
+    prova("...senza notifiche", [], db3)
+    prova("al tetto della fase busta non si bussa piu'", 400,
+          bussa(mondo(), 43)[2].code)
+    prova("...e la sua pausa morde", 400, bussa(mondo(), 44)[2].code)
+    esito, _, err = bussa(mondo(), 45)
+    prova("lo shipped storico (spedito_il=0) ha la maniglia",
+          {"ok": True}, esito)
+    esito, _, err = bussa(mondo(), 40, SOLLECITO_MANUALE_BUSTA_ORE=0)
+    prova("la leva a 0 spegne la fase busta", 400, err and err.code)
+    esito, db4, err = bussa(mondo(), 46)
+    prova("il titolo cattivo esce scappato anche qui", True,
+          "&lt;b&gt;" in db4[0][1])
+    prova("...coi grassetti PARI", db4[0][1].count("<b>"),
+          db4[0][1].count("</b>"))
+    # l'anti-oracolo copre anche la strada nuova: venditore ed
+    # estraneo sulla riga della busta ricevono il 400 dei fratelli
+    for chi5 in (222, 333):
+        v5 = mondo()
+        esito, db5, err = bussa(v5, 40, chi=chi5)
+        prova(f"anti-oracolo sulla busta (chi={chi5})",
+              (400, "Operazione non permessa", []),
+              (err and err.code, err and err.detail, db5))
+    # le sentinelle sulla forma: la WHERE fa entrare la busta, e le
+    # scritture restano letterali e SUE
+    prova("la WHERE dice spedito + via punto + busta vuota", True,
+          "OR o.stato='shipped' AND o.via_punto=1 " in c
+          and "AND o.busta_il=0)" in c)
+    prova("l'ancora della busta e' spedito_il", True,
+          'o["spedito_il"] + finestra' in corpo)
+    prova("le scritture della busta sono letterali", True,
+          "sollecito_manuale_busta_il=?" in corpo
+          and "solleciti_manuali_busta=solleciti_manuali_busta+1" in corpo)
+    # la traccia del cantiere 45 sta accanto al testo: il giorno che
+    # il codice va diretto al compratore, questo messaggio va zittito
+    prova("la traccia del cantiere 45 e' accanto al testo", True,
+          "CANTIERE 45" in c)
+
     # --- 11) il giudice del client -------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
     g = mini[mini.index("function statoSollecito("):]
@@ -21786,6 +21920,27 @@ def prove_sollecito_a_comando():
     prova("...e cosi' la pausa", True,
           "if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso))"
           in g)
+    # LA SECONDA FASE nel giudice (cantiere 44): shipped = la busta,
+    # coi suoi assi e i suoi contatori — e la stessa prova di NaN, che
+    # in DEMO quei campi non esistono
+    prova("la seconda fase del giudice: shipped e' la busta", True,
+          "o.state==='shipped'" in g
+          and "!o.viaPunto || o.bustaIl" in g)
+    prova("...con la finestra a prova di NaN da speditoIl", True,
+          "if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso))" in g)
+    prova("...e pausa e tetto sui SUOI contatori", True,
+          "o.sollecitiManualiBusta >= SOLLECITO.max" in g
+          and "o.sollecitoManualeBustaIl + SOLLECITO.pausa*3600" in g)
+    prova("...e il bottone chiede il codice di ritiro", True,
+          "il codice di ritiro" in b)
+    prova("la costante del client porta la leva della busta", True,
+          "busta:24" in mini[mini.index("const SOLLECITO = {"):
+                            mini.index("const SOLLECITO = {") + 80])
+    sv = mini[mini.index("async function sollecitaVenditore(btn){"):]
+    sv = sv[:sv.index("\n}")]
+    prova("dopo l'invio la patch sceglie la coppia della sua fase", True,
+          "o.sollecitiManualiBusta = (o.sollecitiManualiBusta||0)+1" in sv
+          and "o.sollecitiManuali++" in sv)
     prova("il dettaglio chiama la fabbrica del bottone", True,
           "${bottoneSollecito(o)}" in mini)
     # IL DOPPIO TOCCO: finche' la risposta e' per strada il bottone

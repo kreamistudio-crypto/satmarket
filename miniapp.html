@@ -6420,6 +6420,11 @@ function mapOrder(o){
     creato:o.creato||0,
     sollecitiManuali:o.solleciti_manuali||0,
     sollecitoManualeIl:o.sollecito_manuale_il||0,
+    /* la SECONDA FASE del promemoria a comando (cantiere 44): su
+       shipped-verso-punto senza busta si chiede il CODICE, coi suoi
+       contatori — la fase locked puo' aver consumato i suoi */
+    sollecitiManualiBusta:o.solleciti_manuali_busta||0,
+    sollecitoManualeBustaIl:o.sollecito_manuale_busta_il||0,
     /* la memoria della disputa: resta 1 per sempre anche a
        disputa risolta, ed e' cio' che rende un ordine finito in
        'confirmed'/'refund' ancora DECIDIBILE da un moderatore */
@@ -10337,9 +10342,10 @@ const TEMPI = {
    config.py                        →  SOLLECITO
    SOLLECITO_MANUALE_ORE               da
    SOLLECITO_MANUALE_DIGITALE_ORE      daDig
+   SOLLECITO_MANUALE_BUSTA_ORE         busta   (ore da speditoIl)
    SOLLECITO_MANUALE_PAUSA_ORE         pausa
    SOLLECITO_MANUALE_MAX               max      */
-const SOLLECITO = {da:48, daDig:24, pausa:24, max:3};
+const SOLLECITO = {da:48, daDig:24, busta:24, pausa:24, max:3};
 /* Il markup fisso della pagina «Il pagamento protetto» porta segnaposto
    vuoti invece dei numeri: li riempie questa, una volta all'avvio. Cosi'
    anche li' i tempi vengono da TEMPI e non possono divergere. */
@@ -23539,7 +23545,28 @@ async function depositaBusta(btn){
    e ogni confronto e' falso — cosi' NaN cade sul ramo «non c'e'», che
    e' il verso giusto. */
 function statoSollecito(o){
-  if (o.role!=='buyer' || o.state!=='locked') return '';
+  if (o.role!=='buyer') return '';
+  if (SOLLECITO.max<=0) return '';
+  const adesso = Date.now()/1000;
+  if (o.state==='shipped'){
+    /* LA SECONDA FASE: la busta (cantiere 44). Spedito verso un punto
+       di ritiro, codice mai depositato — chi sa dell'arrivo e' il
+       compratore, che ha appena ricevuto l'avviso del corriere.
+       Finestra da speditoIl coi SUOI contatori (la fase locked puo'
+       aver consumato i tre squilli); il NOT della forma positiva per
+       la DEMO, dove i campi non ci sono e NaN deve cadere sul ramo
+       «non c'e'». Uno shipped storico con speditoIl a zero passa da
+       subito, come sul server: quella popolazione non ha nessun
+       altro squillo. */
+    if (!o.viaPunto || o.bustaIl) return '';
+    if (SOLLECITO.busta<=0) return '';
+    if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso)) return '';
+    if (o.sollecitiManualiBusta >= SOLLECITO.max) return 'tetto';
+    if (!(o.sollecitoManualeBustaIl + SOLLECITO.pausa*3600 <= adesso))
+      return 'pausa';
+    return 'ok';
+  }
+  if (o.state!=='locked') return '';
   /* il ritiro in zona sta fuori (chi ha comprato conferma da solo);
      la via NON DICHIARATA invece entra — storici e importati da Nostr
      si spediscono eccome —, tranne sull'asta il cui vincitore non ha
@@ -23547,10 +23574,8 @@ function statoSollecito(o){
      domanda che si fa `segna_spedito` */
   if (o.consegnaScelta==='ritiro') return '';
   if (!o.consegnaScelta && o.asta) return '';
-  if (SOLLECITO.max<=0) return '';
   const ore = o.consegnaScelta==='digitale' ? SOLLECITO.daDig : SOLLECITO.da;
   if (ore<=0) return '';
-  const adesso = Date.now()/1000;
   if (!(o.creato + ore*3600 <= adesso)) return '';   // è ancora presto
   if (o.sollecitiManuali >= SOLLECITO.max) return 'tetto';
   if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso)) return 'pausa';
@@ -23655,7 +23680,8 @@ function bottoneSollecito(o){
   if (!st) return '';
   if (st === 'ok')
     return `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 `
-         + `Ricorda al venditore ${o.consegnaScelta==='digitale'
+         + `Ricorda al venditore ${o.state==='shipped'
+             ? 'il codice di ritiro' : o.consegnaScelta==='digitale'
              ? 'di mandarti il codice' : 'di spedire'}</button>`;
   return `<button class="btn ghost" disabled>🔔 ${st === 'tetto'
     ? `Hai già ricordato ${SOLLECITO.max} volte`
@@ -23685,10 +23711,17 @@ async function sollecitaVenditore(btn){
   }
   /* il conto si scrive sulla riga di `orders`, non su una copia:
      currentOrder puo' essere un oggetto DETACHED se nel frattempo la
-     lista si e' ricaricata, e la patch andrebbe persa */
+     lista si e' ricaricata, e la patch andrebbe persa. La coppia
+     giusta la dice lo stato: su shipped e' la fase della busta
+     (cantiere 44), coi suoi contatori. */
   const o = orders.find(x=>x.id===id) || currentOrder;
-  o.sollecitiManuali++;
-  o.sollecitoManualeIl = Math.floor(Date.now()/1000);
+  if (o.state==='shipped'){
+    o.sollecitiManualiBusta = (o.sollecitiManualiBusta||0)+1;
+    o.sollecitoManualeBustaIl = Math.floor(Date.now()/1000);
+  } else {
+    o.sollecitiManuali++;
+    o.sollecitoManualeIl = Math.floor(Date.now()/1000);
+  }
   openOrder(id);
   toast('🔔 Promemoria inviato al venditore');
 }

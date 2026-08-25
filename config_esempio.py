@@ -125,6 +125,16 @@ SOLLECITO_MANUALE_MAX = 3    # quanti in tutto: oltre resta la disputa
                              # (0 = il bottone non compare mai). I
                              # contatori dell'automatico qui sopra non
                              # si toccano: i due convivono
+SOLLECITO_MANUALE_BUSTA_ORE = 24  # e sugli ordini spediti verso un
+                             # punto di ritiro senza busta depositata:
+                             # dopo quante ore DALLA SPEDIZIONE chi ha
+                             # comprato puo' ricordare al venditore il
+                             # codice (0 = mai). Il transito piu' corto
+                             # e' un giorno: prima, il pacco non puo'
+                             # essere al punto e bussare e' rumore.
+                             # Pausa e tetto sono quelli qui sopra, i
+                             # contatori sono SUOI (la fase 'locked'
+                             # puo' aver consumato i tre squilli)
 SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # giorni un promemoria al venditore
                              # (0 = solleciti spenti)

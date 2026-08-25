@@ -884,6 +884,18 @@ try:
 except ImportError:
     SOLLECITO_MANUALE_MAX = 3          # tre in tutto, poi la strada
                                        # onesta e' la disputa
+try:
+    from config import SOLLECITO_MANUALE_BUSTA_ORE
+except ImportError:
+    SOLLECITO_MANUALE_BUSTA_ORE = 24   # la maniglia della busta
+                                       # (cantiere 44): dopo quante ore
+                                       # dalla spedizione chi ha
+                                       # comprato puo' ricordare il
+                                       # codice di ritiro. Il transito
+                                       # piu' corto e' un giorno:
+                                       # prima, il pacco non puo'
+                                       # essere al punto e bussare e'
+                                       # rumore
 # La busta di consegna (ago 2026): sugli ordini verso un punto di
 # ritiro il codice arriva al venditore quando il pacco e' GIA' al
 # punto — quindi NESSUN gate su segna_spedito (decisione di Andrea:
@@ -4026,6 +4038,16 @@ def init_db():
                     # `sollecito_il`, che e' il bottone del VENDITORE.
                     "sollecito_manuale_il INTEGER DEFAULT 0",
                     "solleciti_manuali INTEGER DEFAULT 0",
+                    # ...e la sua seconda fase (cantiere 44): su
+                    # 'shipped' verso un punto senza busta depositata
+                    # il promemoria a comando chiede il CODICE, non la
+                    # spedizione. Colonne SUE: la fase 'locked' puo'
+                    # aver consumato i suoi tre squilli («perche' non
+                    # spedisci»), e un contatore ereditato lascerebbe
+                    # senza maniglia proprio la popolazione per cui il
+                    # bottone esiste.
+                    "sollecito_manuale_busta_il INTEGER DEFAULT 0",
+                    "solleciti_manuali_busta INTEGER DEFAULT 0",
                     # il pagamento in uscita di cui non sappiamo l'esito
                     # (ago 2026, audit): '' = normale, 'incerto' =
                     # congelato, nessuna strada puo' ritentare finche'
@@ -13715,6 +13737,12 @@ def _leve_stato():
                   "SOLLECITO_MANUALE_MAX", SOLLECITO_MANUALE_MAX,
                   spento="il bottone non compare mai: chi ha pagato "
                          "aspetta l'automatico o apre una disputa"),
+            _leva("Promemoria a comando sul codice di ritiro: da "
+                  "quando (ore dalla spedizione)",
+                  "SOLLECITO_MANUALE_BUSTA_ORE", SOLLECITO_MANUALE_BUSTA_ORE,
+                  spento="chi ha pagato non può ricordare a mano il "
+                         "codice di ritiro: resta solo l'automatico, "
+                         "a giorni"),
             _leva("Busta di ritiro mai depositata: primo squillo (giorni)",
                   "PROMEMORIA_BUSTA_GIORNI", PROMEMORIA_BUSTA_GIORNI,
                   spento="il venditore che non deposita il codice di "
@@ -22346,6 +22374,16 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     Il ritiro in zona resta fuori (ha la sua sollecita_ritiri_fermi, e
     li' il compratore puo' gia' confermare da solo) e cosi' la strada
     non dichiarata: sarebbe un rimprovero a vuoto.
+    E LA SECONDA FASE E' LA BUSTA (cantiere 44): su 'shipped' verso un
+    punto di ritiro con la busta mai depositata il bottone chiede il
+    CODICE, non la spedizione — chi sa dell'arrivo e' il COMPRATORE,
+    che ha appena ricevuto l'avviso del corriere, mentre Barattolo coi
+    corrieri non parla e il suo promemoria automatico parte a giorni.
+    Finestra sua da `spedito_il` (SOLLECITO_MANUALE_BUSTA_ORE: il
+    transito piu' corto e' un giorno), contatori SUOI (la fase
+    'locked' puo' aver consumato i tre squilli), pausa e tetto di
+    famiglia. I contatori dell'automatico della busta non si toccano,
+    per la regola di sempre.
     Qui i sats non si muovono mai, solo parole; la notifica parte DOPO
     il commit."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -22359,14 +22397,21 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     o = con.execute("SELECT o.*, a.titolo FROM ordini o "
                     "LEFT JOIN annunci a ON a.id=o.annuncio_id "
                     "WHERE o.id=? AND o.compratore_id=? "
-                    "AND o.stato='locked' "
+                    "AND (o.stato='locked' "
                     # il ritiro in zona ha la sua sollecita_ritiri_fermi
                     # e li' chi ha comprato conferma da solo
-                    "AND o.consegna_scelta != 'ritiro'",
+                    "AND o.consegna_scelta != 'ritiro' "
+                    # la seconda fase (cantiere 44): spedito verso un
+                    # punto, busta mai depositata — qui si chiede il
+                    # codice di ritiro
+                    "OR o.stato='shipped' AND o.via_punto=1 "
+                    "AND o.busta_il=0)",
                     (ordine_id, user["id"])).fetchone()
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    # l'unico 'shipped' che la WHERE fa entrare e' quello della busta
+    busta = o["stato"] == "shipped"
     if not o["consegna_scelta"]:
         # LA STESSA DOMANDA CHE SI FA `segna_spedito` (ago 2026, dal
         # campo: il bottone non compariva su ordini vecchi e pagati da
@@ -22393,20 +22438,39 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     # si propone in minuti. Quel che manca non e' un pacco da
     # imballare — e' un messaggio.
     servizio = o["consegna_scelta"] == "servizio"
-    finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale or servizio
-                else SOLLECITO_MANUALE_ORE) * 3600
-    if finestra <= 0 or o["creato"] + finestra > adesso:
-        con.close()
-        raise HTTPException(400, "È ancora presto: dai al venditore un "
-                                 "po' di tempo, poi potrai sollecitarlo "
-                                 "da qui")
-    if o["solleciti_manuali"] >= SOLLECITO_MANUALE_MAX:
+    if busta:
+        # l'ancora e' `spedito_il`, immutabile su 'shipped' (la regola
+        # di correggi_tracking). Uno 'shipped' storico col campo a
+        # zero passa da subito, ed e' voluto: quella popolazione non
+        # riceve nessun altro squillo, e negarle anche la maniglia
+        # sarebbe il buco raddoppiato.
+        finestra = SOLLECITO_MANUALE_BUSTA_ORE * 3600
+        if finestra <= 0 or o["spedito_il"] + finestra > adesso:
+            con.close()
+            raise HTTPException(400, "È ancora presto: il pacco è "
+                                     "partito da poco. Dagli il tempo di "
+                                     "arrivare al punto, poi potrai "
+                                     "ricordare il codice da qui")
+    else:
+        finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale or servizio
+                    else SOLLECITO_MANUALE_ORE) * 3600
+        if finestra <= 0 or o["creato"] + finestra > adesso:
+            con.close()
+            raise HTTPException(400, "È ancora presto: dai al venditore "
+                                     "un po' di tempo, poi potrai "
+                                     "sollecitarlo da qui")
+    # le due fasi hanno i LORO contatori (vedi la docstring): qui si
+    # sceglie quale coppia leggere, le scritture restano letterali
+    conto = "solleciti_manuali_busta" if busta else "solleciti_manuali"
+    timbro = ("sollecito_manuale_busta_il" if busta
+              else "sollecito_manuale_il")
+    if o[conto] >= SOLLECITO_MANUALE_MAX:
         con.close()
         raise HTTPException(400, f"Hai già mandato {SOLLECITO_MANUALE_MAX} "
                                  "promemoria. Se il venditore non si fa "
                                  "vivo, apri una disputa: i tuoi sats sono "
                                  "al sicuro")
-    if o["sollecito_manuale_il"] > adesso - SOLLECITO_MANUALE_PAUSA_ORE * 3600:
+    if o[timbro] > adesso - SOLLECITO_MANUALE_PAUSA_ORE * 3600:
         con.close()
         raise HTTPException(400, "Hai già mandato un promemoria nelle "
                                  f"ultime {SOLLECITO_MANUALE_PAUSA_ORE} ore")
@@ -22419,11 +22483,38 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
             "SELECT titolo, quantita FROM ordine_righe "
             "WHERE ordine_id=? ORDER BY id", (ordine_id,))])
     titolo = html.escape((grezzo or "il tuo affare")[:60])
-    con.execute("UPDATE ordini SET sollecito_manuale_il=?, "
-                "solleciti_manuali=solleciti_manuali+1 WHERE id=?",
-                (adesso, ordine_id))
+    if busta:
+        con.execute("UPDATE ordini SET sollecito_manuale_busta_il=?, "
+                    "solleciti_manuali_busta=solleciti_manuali_busta+1 "
+                    "WHERE id=?", (adesso, ordine_id))
+    else:
+        con.execute("UPDATE ordini SET sollecito_manuale_il=?, "
+                    "solleciti_manuali=solleciti_manuali+1 WHERE id=?",
+                    (adesso, ordine_id))
     con.commit()
     con.close()
+    if busta:
+        # La prima riga dice un fatto che sappiamo DAVVERO — e' il
+        # compratore ad aver premuto — e non promette un arrivo che
+        # non possiamo verificare (decisione di Andrea: niente «e'
+        # arrivato al punto», Barattolo coi corrieri non parla).
+        # CANTIERE 45 (traccia, non costruito): se il venditore ha
+        # messo l'email del COMPRATORE sull'etichetta, il codice gli
+        # arriva diretto dal corriere e non passa da noi — questo
+        # messaggio direbbe una cosa sbagliata. Quel ramo
+        # (dichiararlo nell'ordine, e zittire busta e promemoria) e'
+        # un cantiere suo.
+        await notifica(o["venditore_id"],
+                       f"🔔 <b>Chi ha comprato «{titolo}» sta aspettando "
+                       "il codice di ritiro.</b>\n"
+                       "Controlla la mail del corriere — il codice "
+                       "arriva quando il pacco è al punto — poi apri "
+                       "l'ordine nella Mini App e <b>deposita il nome "
+                       "del destinatario e il codice</b>. La giacenza è "
+                       "corta: senza le istruzioni il pacco torna "
+                       "indietro, con le spese di reso. I sats sono già "
+                       "nel deposito di garanzia e aspettano te.")
+        return {"ok": True}
     # UN PROMEMORIA, NON UN RIMPROVERO: nella maggior parte dei casi
     # chi non ha spedito ha solo avuto una giornata storta, e il testo
     # deve dirlo — non e' cortesia, e' la verita' statistica.
@@ -30646,8 +30737,9 @@ async def sollecita_buste_ferme():
     gate su segna_spedito (decisione di Andrea: col gate il venditore
     non potrebbe dichiarare la spedizione per tutto il viaggio).
     Sorella di sollecita_venditori_fermi, ma squilla SOLO il venditore:
-    il compratore vede gia' «in attesa del codice» nell'ordine e ha i
-    suoi bottoni — nessuna azione nuova per lui, dichiarato.
+    il compratore vede gia' «in attesa del codice» nell'ordine e — dal
+    cantiere 44 — ha la sua maniglia a comando in sollecita_venditore,
+    che non tocca questi contatori (colonne diverse apposta).
     L'ancora e' `spedito_il`, immutabile su 'shipped' (correggi_
     tracking non lo tocca per regola dichiarata: riscriverlo farebbe
     ripartire l'attesa); primo squillo a PROMEMORIA_BUSTA_GIORNI, poi
