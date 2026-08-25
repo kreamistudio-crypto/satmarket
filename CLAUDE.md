@@ -1134,6 +1134,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Il client scrive il conto sulla riga di `orders` e non su
   `currentOrder`, che può essere un oggetto DETACHED se nel frattempo
   la lista si è ricaricata.
+  E LA SECONDA FASE È LA BUSTA (ago 2026, cantiere 44, dal buco messo
+  a verbale il giorno prima): su 'shipped' verso un punto di ritiro
+  con la busta mai depositata il bottone c'è di nuovo, e chiede il
+  CODICE — chi sa dell'arrivo è il COMPRATORE, con l'avviso del
+  corriere in mano, mentre Barattolo coi corrieri non parla e il
+  promemoria automatico parte al giorno 3. Finestra SUA
+  (`SOLLECITO_MANUALE_BUSTA_ORE`, 24 ore DALLA SPEDIZIONE: il
+  transito più corto è un giorno — prima, il pacco non può essere al
+  punto e bussare è rumore), pausa e tetto di famiglia (24h × 3, «un
+  posto solo da cambiare»), e contatori SUOI
+  (`sollecito_manuale_busta_il`/`solleciti_manuali_busta`): la fase
+  'locked' può aver consumato i tre squilli («perché non spedisci»),
+  e un contatore ereditato lascerebbe senza maniglia proprio la
+  popolazione per cui il bottone esiste. L'ancora è `spedito_il`
+  (immutabile su 'shipped', la regola di `correggi_tracking`), e lo
+  shipped STORICO con `spedito_il=0` passa da subito, dichiarato:
+  quella popolazione non riceve nessun altro squillo, e negarle anche
+  la maniglia sarebbe il buco raddoppiato. I contatori
+  dell'AUTOMATICO della busta non si toccano: il 🧊 non si sposta di
+  un minuto, la regola di sempre.
+  IL TESTO DICE IL FATTO CHE SAPPIAMO DAVVERO (decisione di Andrea):
+  «Chi ha comprato sta aspettando il codice di ritiro» — è il
+  compratore ad aver premuto — e MAI «è arrivato al punto», che
+  Barattolo non può verificare (c'è la prova che quelle parole non
+  compaiano); la riga dopo manda alla mail del corriere, e la coda
+  sui sats è quella di famiglia. CANTIERE 45 (traccia nel commento
+  accanto al testo, NON costruito): se il venditore ha messo l'email
+  del COMPRATORE sull'etichetta, il codice non passa da noi e questo
+  messaggio direbbe una cosa sbagliata — quel ramo (dichiararlo
+  nell'ordine, e zittire busta e promemoria) è un cantiere suo.
+  IL BOTTONE VIVE AL SITO UNICO delle azioni («🔔 Ricorda al venditore
+  il codice di ritiro»), non dentro il pannello della busta: l'ordine
+  della colonna è dichiarato — prima «libera i sats», poi le strade
+  per parlarsi — e un secondario sopra il principale lo romperebbe.
+  La riga «⏳ In attesa del codice» resta il fatto, il bottone la
+  maniglia.
   E DOPO IL 🧊 C'È UNA CODA (ago 2026): ogni sollecito bussa N volte,
   manda UNA segnalazione ai moderatori e poi tace per sempre — e quel
   🧊 era un messaggio Telegram e basta. Da lì in poi un ordine coi sats
@@ -14827,8 +14863,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nell'orologio (leva `PROMEMORIA_BUSTA_GIORNI` 3, 0 = spenta; cadenza
   e tetto RIUSATI da PROMEMORIA_CONFERMA_* come le sorelle; ancora
   `spedito_il`, colonne SUE `sollecito_busta_il`/`solleciti_busta`;
-  squilla SOLO il venditore — il compratore vede già l'attesa e ha i
-  suoi bottoni — e al tetto 🧊 ai moderatori, poi silenzio).
+  squilla SOLO il venditore — il compratore vede già l'attesa e, dal
+  cantiere 44, ha la sua maniglia a comando in `sollecita_venditore`,
+  che non tocca questi contatori — e al tetto 🧊 ai moderatori, poi
+  silenzio).
   E LA SORELLA SPECULARE, PER CHI HA COMPRATO (ago 2026): quella qui
   sopra guarda `busta_il=0` — il venditore che non deposita — e
   `sollecita_ritiri_al_punto` guarda la popolazione COMPLEMENTARE
@@ -22774,6 +22812,32 @@ accesa sul VPS (Andrea, 24 ago), quindi il podio compare al deploy per
 tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
 condivisione sulla striscia (la card del barattolo non deve entrarci)
 e il podio dentro Telegram vero.
+
+La maniglia del codice di ritiro (ago 2026, cantiere 44): il bottone
+«🔔 Ricorda al venditore» si apre anche sugli ordini 'shipped' verso un
+punto di ritiro senza busta depositata — la cura mirata del buco messo
+a verbale il giorno prima: chi sa dell'arrivo è il compratore, con
+l'avviso del corriere in mano, e non aveva nessuna maniglia mentre la
+giacenza (~3 giorni) correva. Finestra sua a 24 ore dalla spedizione
+(leva nuova `SOLLECITO_MANUALE_BUSTA_ORE`), pausa e tetto di famiglia
+(24h × 3), contatori SUOI (la fase 'locked' può aver consumato i tre
+squilli), e il testo che dice il fatto che sappiamo davvero — mai un
+arrivo che non possiamo verificare. `PROMEMORIA_BUSTA_GIORNI` resta a
+3, deciso: abbassarlo bussa a chi ha spedito ieri con un pacco ancora
+in viaggio. Vedi Architettura, «E LA SECONDA FASE È LA BUSTA», anche
+per la traccia del cantiere 45 (l'email del compratore
+sull'etichetta). Collaudato: 6057 prove verdi (34 nuove — l'endpoint
+girato DAVVERO sul mondo di cartone esteso con la fase busta:
+finestra, pausa, tetto, lo storico con `spedito_il=0` che ha la
+maniglia, l'anti-oracolo sulla strada nuova, il titolo cattivo
+scappato, e la fase locked esaurita che NON blocca, che è il punto del
+cantiere) e DIECI MUTAZIONI una per riga sorvegliata, ognuna rossa da
+sola. IN PRODUZIONE basta il deploy: le due colonne nascono a 0, la
+leva ha il default nel codice, nessuna rotta nuova — e un client
+vecchio in cache non vede il bottone e vive come oggi. DA GUARDARE al
+primo giro: il primo promemoria vero della busta dentro Telegram, e
+che al venditore arrivi il testo del codice e non quello della
+spedizione.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
