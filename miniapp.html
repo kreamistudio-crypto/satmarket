@@ -24093,6 +24093,9 @@ function statoSollecito(o){
        subito, come sul server: quella popolazione non ha nessun
        altro squillo. */
     if (!o.viaPunto || o.bustaIl) return '';
+    /* il codice dichiarato DIRETTO al compratore (cantiere 45): non
+       c'e' nessuna busta da aspettare, e il bottone non nasce */
+    if (o.bustaDirettaIl) return '';
     if (SOLLECITO.busta<=0) return '';
     if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso)) return '';
     if (o.sollecitiManualiBusta >= SOLLECITO.max) return 'tetto';

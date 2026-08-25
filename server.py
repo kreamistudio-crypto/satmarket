@@ -23433,9 +23433,12 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     "AND o.consegna_scelta != 'ritiro' "
                     # la seconda fase (cantiere 44): spedito verso un
                     # punto, busta mai depositata — qui si chiede il
-                    # codice di ritiro
+                    # codice di ritiro. E il codice dichiarato DIRETTO
+                    # al compratore (cantiere 45) non ha nessuna busta
+                    # da aspettare: il sollecito rimprovererebbe il
+                    # venditore per niente.
                     "OR o.stato='shipped' AND o.via_punto=1 "
-                    "AND o.busta_il=0)",
+                    "AND o.busta_il=0 AND o.busta_diretta_il=0)",
                     (ordine_id, user["id"])).fetchone()
     if not o:
         con.close()

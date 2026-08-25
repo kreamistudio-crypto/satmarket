@@ -22239,6 +22239,8 @@ def prove_sollecito_a_comando():
             "busta_il INT DEFAULT 0, "
             "sollecito_manuale_busta_il INT DEFAULT 0, "
             "solleciti_manuali_busta INT DEFAULT 0, "
+            # cantiere 45: il codice dichiarato DIRETTO al compratore
+            "busta_diretta_il INT DEFAULT 0, "
             # ...e i contatori dell'AUTOMATICO della busta, che il
             # bottone non deve toccare
             "sollecito_busta_il INT DEFAULT 0, "
@@ -22348,6 +22350,15 @@ def prove_sollecito_a_comando():
              (46, 111, 222, 8, "shipped", "spedizione", ORA - 60 * g2,
               ORA - g2, ORA - 25 * g2, 1, 0, 0, 0, 0, 0, 0),
             ])
+        # cantiere 45: il venditore ha dichiarato il codice DIRETTO al
+        # compratore — nessuna busta da aspettare, il bottone non nasce
+        vero.execute(
+            "INSERT INTO ordini(id, compratore_id, venditore_id, "
+            "annuncio_id, stato, consegna_scelta, creato, aggiornato, "
+            "spedito_il, via_punto, busta_diretta_il) "
+            "VALUES(47, 111, 222, 7, 'shipped', 'spedizione', ?, ?, "
+            "?, 1, ?)",
+            (ORA - 60 * g2, ORA - g2, ORA - 25 * g2, ORA - 20 * g2))
         vero.commit()
         return vero
 
@@ -22659,6 +22670,14 @@ def prove_sollecito_a_comando():
     esito, _, err = bussa(mondo(), 45)
     prova("lo shipped storico (spedito_il=0) ha la maniglia",
           {"ok": True}, esito)
+    # cantiere 45: col codice dichiarato DIRETTO al compratore non c'e'
+    # nessuna busta da aspettare — il bottone non nasce, e la risposta
+    # e' quella dei fratelli (chi enumera non impara niente)
+    esito, db45, err = bussa(mondo(), 47)
+    prova("la busta diretta al compratore resta fuori",
+          (400, "Operazione non permessa"),
+          (err and err.code, err and err.detail))
+    prova("...senza notifiche", [], db45)
     esito, _, err = bussa(mondo(), 40, SOLLECITO_MANUALE_BUSTA_ORE=0)
     prova("la leva a 0 spegne la fase busta", 400, err and err.code)
     esito, db4, err = bussa(mondo(), 46)
@@ -22676,9 +22695,10 @@ def prove_sollecito_a_comando():
               (err and err.code, err and err.detail, db5))
     # le sentinelle sulla forma: la WHERE fa entrare la busta, e le
     # scritture restano letterali e SUE
-    prova("la WHERE dice spedito + via punto + busta vuota", True,
+    prova("la WHERE dice spedito + via punto + busta vuota — e mai la "
+          "busta diretta (cantiere 45)", True,
           "OR o.stato='shipped' AND o.via_punto=1 " in c
-          and "AND o.busta_il=0)" in c)
+          and "AND o.busta_il=0 AND o.busta_diretta_il=0)" in c)
     prova("l'ancora della busta e' spedito_il", True,
           'o["spedito_il"] + finestra' in corpo)
     prova("le scritture della busta sono letterali", True,
@@ -22736,6 +22756,8 @@ def prove_sollecito_a_comando():
     prova("la seconda fase del giudice: shipped e' la busta", True,
           "o.state==='shipped'" in g
           and "!o.viaPunto || o.bustaIl" in g)
+    prova("...e la busta diretta lo spegne anche nel client", True,
+          "if (o.bustaDirettaIl) return '';" in g)
     prova("...con la finestra a prova di NaN da speditoIl", True,
           "if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso))" in g)
     prova("...e pausa e tetto sui SUOI contatori", True,
