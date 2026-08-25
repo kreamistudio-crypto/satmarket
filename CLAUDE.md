@@ -19745,7 +19745,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `INCOLLA_QUI` restano fuori: così la regola si estende da sola a
   ogni segreto futuro che rispetti quella convenzione. Le forme
   vivono in un posto solo (`env: FORME`), o i due passi
-  divergerebbero. IMPERFEZIONE DICHIARATA nel file: `git log -p` non
+  divergerebbero.
+  E I BANCHI NON SCRIVONO LA FORMA DI UN CONFIG (ago 2026, il job
+  `segreti` rosso su un collaudo nuovo): quella regex cerca
+  `NOME = "valore"` perche' e' la forma di un FILE DI CONFIGURAZIONE, e
+  non puo' distinguere una chiave vera da una di cartone. La regola e'
+  giusta e NON si allenta — a cedere e' il banco: in `prove.py` la
+  stessa chiave vive dentro un DIZIONARIO (due punti, non uguale), ed e'
+  per questo che quel file passa da sempre; un collaudo che costruisce
+  un modulo `config` finto la posa col `setattr`. Non e' un
+  aggiramento, ed e' la riga da capire: chi un domani ci incollasse la
+  chiave VERA lo farebbe nella forma naturale, e lo scanner la
+  prenderebbe. Il precedente e' `prove_script_nel_workflow`, ed e' la
+  seconda volta che un banco nuovo inciampa in una regola della CI:
+  quando ne nasce uno, si lancia lo scanner in locale PRIMA di
+  spingere — le `FORME` si copiano dal workflow, che e' l'unico posto
+  dove vivono. IMPERFEZIONE DICHIARATA nel file: `git log -p` non
   mostra i diff dei MERGE, quindi un segreto introdotto risolvendo un
   conflitto sfuggirebbe.
   Su Windows serve `PYTHONIOENCODING=utf-8`,
