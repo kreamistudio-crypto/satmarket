@@ -911,22 +911,48 @@
      sopra i 20 che la .cat-strip accetta per la sua quarta card, e il
      border-radius di 14 non se li mangia tutti. A 280 scenderebbero a
      16, cioe' poco piu' del raggio: una scheggia, non una card.
-     IL PREZZO E' MISURATO e sta sotto: dopo il tocco la griglia sopra
-     la nav a 320x568 passa da 74 a 59px. Lo scroll AL REPARTO invece
-     non si muove di un pixel (235px prima e dopo) — quello e'
-     ancorato alla riga «N oggetti», che sta SOTTO questa sezione. Niente min-height sulla
-     striscia, e la divergenza da .cat-strip e' voluta: le card
-     spariscono quando non c'e' l'occasione, e uno spazio riservato
-     per una cosa assente sarebbe un buco. */
-  /* Il padding di sotto e' 6 e non i 2 della .cat-strip, e non e'
-     un vezzo: l'anello .attiva (outline 2.5 + offset 2 = 4.5px)
-     sporge sotto il bordo della card, e l'overflow della striscia lo
-     RITAGLIAVA — il bordo basso dell'anello non si vedeva (ago 2026,
-     visto da Andrea). Alle categorie non succede perche' li' sotto
-     il quadrato c'e' l'etichetta. */
+     IL PREZZO E' MISURATO e sta sotto: dopo il tocco, a 320x568,
+     della prima riga di card sopra la nav se ne vedono 68,8px (erano
+     59 finche' la sezione pesava 176, e 74 con le card a 250x115).
+     ⚠️ QUEL NUMERO SI CONTA DALLA PRIMA CARD e non dal contenitore —
+     il #grid ha 14px di padding sopra — mentre i 249px dello scroll
+     AL REPARTO, qui sotto, si contano dal CONTENITORE: due
+     convenzioni che convivono da sempre, e chi rimisura una delle due
+     senza saperlo trova uno scarto di 14px e crede a una
+     regressione. Lo scroll al reparto infatti NON si muove di un
+     pixel (249 prima e dopo, misurati): e' ancorato alla riga
+     «N oggetti», che sta SOTTO questa sezione — quel che si accorcia
+     qui la fa salire nel documento, non nella finestra.
+     Niente min-height sulla striscia, e la divergenza da .cat-strip
+     e' voluta: le card spariscono quando non c'e' l'occasione, e uno
+     spazio riservato per una cosa assente sarebbe un buco. */
+  /* LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+     Andrea: «troppo staccata dalla striscia sopra»), e i due numeri
+     che la avvicinano sono quel che restava da stringere senza
+     toccare nessuna delle due file:
+     — l'etichetta prende MEZZO respiro invece dei 16px di ogni
+       .section-label (regola SUA, scoped, che le sorelle il respiro
+       intero se lo tengono: qui le due strisce sono parenti — la
+       mappa dei reparti e le occasioni — e il respiro di sezione le
+       raccontava come estranee);
+     — il padding di SOPRA scende da 8 a 6 e diventa simmetrico a
+       quello di sotto.
+     6 E' IL PAVIMENTO E NON UN GUSTO, ed e' la riga da non
+     ammorbidire: l'anello .attiva (outline 2.5 + offset 2 = 4.5px)
+     sporge FUORI dalla card, e sotto i 4,5 l'overflow della striscia
+     lo RITAGLIA — e' il difetto gia' pagato in basso (ago 2026, visto
+     da Andrea: il bordo dell'anello non si vedeva). Alle categorie
+     non succede perche' li' sotto il quadrato c'e' l'etichetta.
+     C'e' la prova, e non ribatte il 4,5: lo DERIVA dall'outline.
+     L'ETICHETTA RESTA DELLA SUA FILA, che e' il vincolo dell'altro
+     verso: sopra di lei ci sono 10px (8 piu' i 2 di coda della
+     .cat-strip) e sotto 6, quindi si legge come il titolo di quel
+     che viene dopo. Chi stringesse ancora l'8 la lascerebbe a meta'
+     strada fra le due file, cioe' di nessuno. */
+  #scoprireSez .section-label{padding-top:8px}
   .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
-    padding:8px var(--pad) 6px}
+    padding:6px var(--pad) 6px}
   .scoprire-strip::-webkit-scrollbar{display:none}
   .scoprire-card{flex:0 0 auto;position:relative;width:272px;
     aspect-ratio:272/130;border-radius:14px;overflow:hidden;

@@ -27033,6 +27033,37 @@ def prove_scoprire():
     prova("l'anello e' quello della card categoria", True,
           ".scoprire-card.attiva{outline:2.5px solid var(--sats);"
           in mini)
+    # LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+    # Andrea): mezzo respiro sopra l'etichetta invece dei 16px di ogni
+    # .section-label. La regola dev'essere SCOPED, ed e' meta' della
+    # prova: il respiro intero e' di TUTTE le altre sezioni, e
+    # stringerlo sul selettore nudo cambierebbe il ritmo di mezza app
+    # senza che nessuno se ne accorga.
+    _eti = re.search(r"#scoprireSez \.section-label\{padding-top:(\d+)px\}",
+                     mini)
+    prova("l'etichetta di «Da scoprire» ha un respiro suo, scoped",
+          True, bool(_eti))
+    _base = re.search(r"\.section-label\{\s*display:flex[^}]*?"
+                      r"padding:(\d+)px", mini, re.S)
+    prova("...e le sorelle tengono quello intero", True,
+          bool(_base) and int(_base.group(1)) == 16)
+    prova("...che e' il doppio del suo", int(_base.group(1)),
+          int(_eti.group(1)) * 2)
+    # I DUE PADDING DELLA STRISCIA NON SCENDONO SOTTO L'ANELLO, e il
+    # 4,5 NON si ribatte qui: si DERIVA dall'outline della card accesa
+    # (spessore + offset), che e' l'unico posto dove quel numero e'
+    # scritto. Sotto quella soglia l'overflow della striscia ritaglia
+    # il bordo dell'anello — il difetto gia' pagato in basso, che il
+    # giro dell'avvicinamento ha rischiato di ricomprarsi in alto.
+    _an = re.search(r"\.scoprire-card\.attiva\{outline:([\d.]+)px solid "
+                    r"var\(--sats\);\s*outline-offset:([\d.]+)px\}", mini)
+    prova("l'anello dichiara il suo ingombro nel CSS", True, bool(_an))
+    _sporge = float(_an.group(1)) + float(_an.group(2))
+    _pad = re.search(r"\.scoprire-strip\{[^}]*?padding:(\d+)px "
+                     r"var\(--pad\) (\d+)px\}", mini, re.S)
+    prova("la striscia dichiara i suoi due padding", True, bool(_pad))
+    prova("...e nessuno dei due ritaglia l'anello", True,
+          min(int(_pad.group(1)), int(_pad.group(2))) >= _sporge)
     # IL GESTO: il ritocco spegne, e si scrive quel che scriverebbe
     # il pannello (stato + checkbox + bottone Filtri + campo-bottone)
     _ts = pezzo_js(mini, "function toccaScoperta(id){", "\n}")
@@ -27262,11 +27293,14 @@ def prove_scoprire():
     prova("il fondo non si scopre: mai sotto scale(1), mai translate",
           (False, False, True),
           ("scale(0" in _kf, "translate" in _kf, "scale(1.05)" in _kf))
-    # e l'anello della card accesa ha l'ARIA per il bordo di sotto:
-    # outline 2.5 + offset 2 = 4.5px, e col padding a 2 l'overflow
-    # della striscia lo ritagliava (visto da Andrea)
-    prova("l'anello ha l'aria per il bordo di sotto", True,
-          "padding:8px var(--pad) 6px}" in mini)
+    # L'ARIA PER L'ANELLO la guarda la prova DERIVATA piu' su («nessuno
+    # dei due ritaglia l'anello»): questa ribatteva il padding alla
+    # lettera — «padding:8px var(--pad) 6px}» — ed e' diventata rossa
+    # il giorno che la sezione si e' avvicinata alle categorie (ago
+    # 2026), cioe' per un cambio LEGITTIMO. Una prova che inchioda i
+    # numeri invece della REGOLA fa questo: si mette di traverso a chi
+    # ritocca e non dice niente a chi sbaglia davvero (col letterale,
+    # un padding-top a 4 con quello di sotto a 6 sarebbe passato).
 
     # ---- 6. IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE
     # SI MUOVE (ago 2026, decisione di Andrea che ROVESCIA il

@@ -1871,10 +1871,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   unico `scorriSottoHeader`, condiviso con lo scroll dei reparti —
   che arriva PIU' GIU', vedi la voce sua sotto le categorie in home:
   qui cambia solo il punto d'arrivo, la fila stessa.
-  MISURE: la sezione pesa 176px a 320 (misurata; era 161 con le card
-  a 250x115, e 157 prima dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
+  MISURE: la sezione pesa 166px a 320 (misurata; erano 176 finche' e'
+  stata staccata dalle categorie, 161 con le card a 250x115, 157 prima
+  dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
   al bordo dice che ce n'e' altre.
+  LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+  Andrea: «troppo staccata dalla striscia sopra»). Non si e' toccata
+  nessuna delle due file: si e' stretto quel che stava in mezzo —
+  l'etichetta prende MEZZO respiro (8px invece dei 16 di ogni
+  .section-label, con una regola SUA scoped su #scoprireSez, che le
+  sorelle il respiro intero se lo tengono: qui le due strisce sono
+  PARENTI, la mappa dei reparti e le occasioni, e il respiro di
+  sezione le raccontava come estranee) e il padding di SOPRA della
+  striscia scende da 8 a 6, simmetrico a quello di sotto. Misurato a
+  320/360/375 nei due temi: il vuoto fra le due file passa da 31,9 a
+  23,9px, la sezione da 176 a 166.
+  6 E' IL PAVIMENTO E NON UN GUSTO, ed e' la riga da non ammorbidire:
+  l'anello .attiva sporge 4,5px (outline 2.5 + offset 2) e sotto
+  quella soglia l'overflow della striscia lo RITAGLIA — il difetto
+  gia' pagato in basso, che stringendo ancora si ricompra in alto
+  (misurato dopo: 1,5px d'aria sopra e sotto, l'anello intero). La
+  prova NON ribatte il 4,5: lo DERIVA dall'outline e guarda tutti e
+  due i padding, quindi il giorno che l'anello cresce lo dice la CI —
+  e con lei se n'e' andata quella che inchiodava il padding alla
+  lettera, diventata rossa per un cambio legittimo.
+  L'ETICHETTA RESTA DELLA SUA FILA, il vincolo dell'altro verso: 10px
+  sopra (gli 8 piu' i 2 di coda della .cat-strip) contro 6 sotto,
+  quindi si legge come il titolo di quel che viene dopo. Chi
+  stringesse ancora l'8 la lascerebbe a meta' strada fra le due file,
+  cioe' di nessuno.
+  LO SCROLL DEL TOCCO NON SI SPOSTA DI UN PIXEL, ed e' la cosa da
+  capire prima di ritoccare qui: `scorriSottoHeader` ancora la CIMA
+  della sezione, e i due padding tolti vivono DENTRO di lei — quindi
+  l'arrivo resta 219,4 a 320 (header 164 + pillole 51 + 4), la coda
+  delle categorie resta in vista (55px: l'osservatore interseca e la
+  barra delle pillole resta spenta, verificato) e a salire di 10px e'
+  quel che si VEDE — la fila delle occasioni e, con lei, la griglia.
+  Chi volesse spostare l'ARRIVO deve toccare qualcosa FUORI dalla
+  sezione (il padding-bottom della .cat-strip), non qui dentro.
   LE CARD SONO CRESCIUTE (ago 2026, decisione di Andrea: «un po' piu'
   grandi, soprattutto piu' ALTE»): da 250x115 a **272x130**, coi
   banner rigenerati dagli originali a 816x390. Le due misure sono
@@ -1897,11 +1932,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tutti. A 280 scenderebbero a 16, cioe' poco piu' del raggio: una
   scheggia, non una card. E' li' il capolinea, non nell'originale.
   IL PREZZO E' MISURATO E DICHIARATO: dopo il tocco su una card la
-  griglia sopra la nav a 320x568 passa da 74 a 59px. Lo scroll AL
-  REPARTO invece NON si muove (235px prima e dopo, «N oggetti» a
-  219,4): quello e' ancorato alla riga «N oggetti», che sta SOTTO
-  questa sezione — ed e' la ragione per cui i 249px dichiarati altrove
-  non c'entrano con questo cantiere.
+  griglia sopra la nav a 320x568 passa da 74 a 59px — e dall'ago 2026
+  risale a 68,8 con l'avvicinamento alle categorie (voce sopra). Lo
+  scroll AL REPARTO invece NON si muove (235px prima e dopo, «N
+  oggetti» a 219,4): quello e' ancorato alla riga «N oggetti», che sta
+  SOTTO questa sezione — ed e' la ragione per cui i 249px dichiarati
+  altrove non c'entrano con questo cantiere.
+  ⚠️ E I DUE NUMERI NON SI CONTANO DALLO STESSO POSTO, che e' la
+  trappola di chi rimisura: 74, 59 e 68,8 partono dalla prima CARD,
+  mentre i 249 (e i 235 qui accanto) partono dal CONTENITORE #grid,
+  che ha 14px di padding sopra. Uno scarto di 14 fra due misure «della
+  griglia» non e' una regressione: e' la convenzione cambiata sotto i
+  piedi.
   LA FASCIA DEL CONTRASTO MIGLIORA invece di peggiorare (11,8 / 12,0 /
   14,8 contro 10,7 / 11,9 / 12,9): e' in px CSS mentre il disegno si
   scala, quindi in proporzione copre meno immagine e resta dov'e'
