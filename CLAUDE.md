@@ -1790,7 +1790,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'eredita' «chi scade prima» parla da sola) e NIENTE cronologia ne'
   ramoVetrina nuovo: i filtri non sono mai stati in chiaveVetrina, e
   il ramo resta alle sole Aste.
-  LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 750x345
+  LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 816x390
   WebP pieno bordo a bordo, SENZA testo (ago 2026, decisione di
   Andrea che ROVESCIA il testo-nel-disegno della nascita: il titolo
   si muoveva col disegno). IL TITOLO LO SCRIVE L'APP (`.sc-titolo`,
@@ -1815,9 +1815,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/assets/scoprire/{nome}` col calco delle illustrazioni (tupla
   `FILE_SCOPRIRE`, `_file_con_etag`, `public, no-cache`: i file si
   ridisegnano sotto lo stesso nome). I file arrivano da Andrea a
-  2752x1536 e si portano a 750x345 col ritaglio CENTRATO (ImageOps.fit
-  LANCZOS q92 method=6, ~18% dell'altezza via, meta' e meta' —
-  approvato sui primi due); la prova d'esistenza e di misura vive in
+  2752x1536 e si portano a 816x390 col ritaglio CENTRATO (ImageOps.fit
+  LANCZOS q92 method=6, ~14% dell'altezza via, meta' e meta' —
+  approvato sui primi due; era ~18% quando la card era 250x115); la prova d'esistenza e di misura vive in
   prove.py dal commit dei primi file (prima mancava APPOSTA, il
   precedente di tutto.webp), e il ripiego emoji+testo resta per
   quando l'immagine non arriva.
@@ -1871,10 +1871,71 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   unico `scorriSottoHeader`, condiviso con lo scroll dei reparti —
   che arriva PIU' GIU', vedi la voce sua sotto le categorie in home:
   qui cambia solo il punto d'arrivo, la fila stessa.
-  MISURE: la sezione pesa 161px a 320 (misurata; era 157 prima
-  dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
+  MISURE: la sezione pesa 176px a 320 (misurata; era 161 con le card
+  a 250x115, e 157 prima dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
   al bordo dice che ce n'e' altre.
+  LE CARD SONO CRESCIUTE (ago 2026, decisione di Andrea: «un po' piu'
+  grandi, soprattutto piu' ALTE»): da 250x115 a **272x130**, coi
+  banner rigenerati dagli originali a 816x390. Le due misure sono
+  MISURATE e i numeri stanno qui perche' il prossimo che vorra'
+  crescere non li rifaccia da capo.
+  IL VINCOLO NON E' IL DISEGNO, ed e' il contrario di quel che si
+  teme: crescendo in ALTEZZA non se ne perde, se ne RECUPERA. Gli
+  originali sono 2752x1536 (rapporto 1,792) e il ritaglio ne usava
+  l'82% dell'altezza, adesso l'86% — a 250x115 il fondo della scatola
+  degli sconti era TAGLIATO, e ora si vede intero. Il limite
+  dell'originale e' il rapporto 1,792, sotto il quale si comincerebbe
+  a tagliare in LARGHEZZA: siamo a 2,092, lontani. E il file a 3x non
+  deve superare 2752 di larghezza, cioe' una card larga 917: mai.
+  IL VINCOLO E' LA FILA A 320px, e a decidere e' lo SPICCHIO della
+  seconda card — «il taglio al bordo dice che ce n'e' altre», due
+  righe piu' su, e' una promessa che si mantiene solo se resta
+  abbastanza card da vedere. Lo spicchio a 320 e' 296-W: a 272 sono
+  24px (64 a 360, 79 a 375), sopra i 20 che la .cat-strip accetta per
+  la sua quarta card, e il border-radius di 14 non se li mangia
+  tutti. A 280 scenderebbero a 16, cioe' poco piu' del raggio: una
+  scheggia, non una card. E' li' il capolinea, non nell'originale.
+  IL PREZZO E' MISURATO E DICHIARATO: dopo il tocco su una card la
+  griglia sopra la nav a 320x568 passa da 74 a 59px. Lo scroll AL
+  REPARTO invece NON si muove (235px prima e dopo, «N oggetti» a
+  219,4): quello e' ancorato alla riga «N oggetti», che sta SOTTO
+  questa sezione — ed e' la ragione per cui i 249px dichiarati altrove
+  non c'entrano con questo cantiere.
+  LA FASCIA DEL CONTRASTO MIGLIORA invece di peggiorare (11,8 / 12,0 /
+  14,8 contro 10,7 / 11,9 / 12,9): e' in px CSS mentre il disegno si
+  scala, quindi in proporzione copre meno immagine e resta dov'e'
+  scura. Per la stessa ragione il capolinea del P2P si allontana —
+  vedi la voce sua.
+  E IL CONTO DELL'ONDA MIGLIORA: serve W/H < (scale-1)/sin(θ) = 3,58,
+  e il rapporto scende da 2,17 a 2,09. Crescere in altezza mette il
+  fondo piu' al sicuro, non meno.
+  ⚠️ **E LA PROVA LEGGE LA MISURA DAL CSS**, invece di ribatterla: e'
+  la stessa regola che la fascia dichiarava gia' per se' («la
+  geometria viene dal CSS e non da qui»), portata anche alla misura
+  dei FILE. Erano tre numeri sparsi — 750, 345 e il 115 dentro la
+  fascia — e il giorno della card piu' grande andavano mossi tutti e
+  tre a mano; scritti nella prova, chi ritocca il CSS senza
+  rigenerare i banner non lo sente da NESSUNA parte e object-fit:cover
+  gli ritaglia il disegno in silenzio. Adesso `CARD_W, CARD_H`
+  escono da una regex sul CSS, la fascia larga si deriva
+  dall'altezza (erano `30, 315` in coordinate immagine, che con la
+  misura di ieri e' esattamente quel che la derivazione ridà: e' la
+  STESSA fascia, scritta in modo che non invecchi), e due sentinelle
+  vietano il ritorno a mano.
+  ⚠️ SCRIVERLE E' COSTATO DUE VOLTE LA STESSA TRAPPOLA, ed e' la
+  lezione da tenere: la prova che cerca una stringa LA CONTIENE LEI
+  STESSA, quindi resta rossa per sempre. La cura e' in due pezzi —
+  si guarda la REGIONE della fascia e non tutto il file, e si prende
+  l'ULTIMA occorrenza dell'ancora, perche' la prima e' la riga che la
+  cerca.
+  GLI ORIGINALI NON SONO NEL REPO (stanno nei Download di Andrea) e
+  si RITROVANO cosi', che e' l'unico modo onesto: si rigenera il
+  ritaglio dal candidato e lo si confronta pixel per pixel col file
+  in repo — la differenza media dev'essere ~1,5 su 255, cioe' la sola
+  compressione WebP. Un candidato sbagliato dà 36. Per questo NON
+  esiste uno script committato del ritaglio: non potrebbe girare per
+  nessuno, e sarebbe una promessa che non si mantiene.
   LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
@@ -1974,27 +2035,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scavalca la sua coda in basso a sinistra — a `left:14` un corpo da
   21 NON passerebbe, a `left:18` si. Chi tara questi due numeri li
   muova insieme.
-  I NUMERI, misurati sul file vero e non estrapolati: il disegno
-  regge fino a x=289 sull'immagine — non e' una stima, e' un MURO:
-  alla colonna 290 il contrasto crolla da 12,1 a 2,66 nel giro di due
-  pixel, perche' li' comincia la scia dorata. L'inchiostro VERO di
-  «P2P» finisce a 190 (misurato a schermo, non dedotto: 33px CSS di
-  margine) e la fascia sorvegliata a 282, cioe' **2px CSS**. E' la
-  fascia a decidere, non l'inchiostro — la CI guarda quella — quindi
-  il margine da leggere e' il secondo, ed e' stretto apposta: la
-  stima a un em per carattere e' 1,8 volte la larghezza vera.
-  SPOSTARE COSTA UNO A UNO: ogni px CSS a destra si mangia 3px di
-  fascia, e il filo del disegno non si muove (la banda si accorcia a
-  sinistra e si allunga a destra della stessa misura). Da `left:22`,
-  dove il margine era di 10px CSS, si e' arrivati a 30 in tre passi.
-  ⚠️ **QUESTO E' IL CAPOLINEA**, e va detto perche' la CI da sola non
-  lo direbbe: a 31 resta 1,3px CSS, a 32 tre decimi, e a 33 la prova
-  passa ancora ma SOLO PER UN INCIDENTE — la fascia si campiona a
-  passo 3 e a quel valore la griglia salta esattamente la colonna 290.
-  Dal 34 in giu' e' rossa. Chi vuole spostarlo ancora ridisegni il
-  banner o accorci il campionamento: muovere il numero e basta
-  vorrebbe dire appoggiarsi a un buco della griglia.
-  IL FILE E' `assets/scoprire/p2p.webp`, 750x345 come le sorelle, e
+  I NUMERI, misurati sul file vero e non estrapolati (RIFATTI ad ago
+  2026 con la card a 272x130: il file e' piu' largo, quindi la scia si
+  e' spostata e i numeri di prima non valevano piu'): il disegno regge
+  fino a x=318 sull'immagine da 816 — non e' una stima, e' un MURO:
+  li' comincia la scia dorata e il contrasto crolla nel giro di due
+  pixel. La fascia sorvegliata finisce a 282, cioe' **12px CSS** di
+  margine. E' la fascia a decidere, non l'inchiostro — la CI guarda
+  quella — e la stima a un em per carattere e' 1,8 volte la larghezza
+  vera. SPOSTARE COSTA UNO A UNO: ogni px CSS a destra si mangia 3px
+  di fascia, e il filo del disegno non si muove.
+  ⚠️ **IL CAPOLINEA ADESSO E' `left:42`** (era 33 a 250x115), e va
+  detto perche' la CI da sola non lo direbbe: fino a 42 la prova e'
+  verde, dal 43 e' rossa. IL MARGINE SI E' ALLARGATO DA SOLO col
+  crescere della card — da 3px CSS a 12 — perche' la fascia e' in px
+  CSS mentre la scia si scala col disegno: quel debito si allenta
+  ogni volta che le card crescono, e si STRINGE se un giorno
+  rimpicciolissero. Chi sposta ancora il titolo rimisuri invece di
+  fidarsi di questo numero, che e' il secondo che scriviamo qui.
+  IL FILE E' `assets/scoprire/p2p.webp`, 816x390 come le sorelle, e
   arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
   (ImageOps.fit LANCZOS q92 method=6).
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
