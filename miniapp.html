@@ -6811,9 +6811,23 @@ const condFiltrabile = () => !senzaCondizione(activeCat, '');
    un caso che nessuno ha chiesto. */
 function ordinaEffettivo(){
   if (ordinaVista) return ordinaVista;
-  if (filtroLampo && !filtroAsta) return 'lampo';
-  if (filtroAsta && !filtroLampo) return 'asta';
-  return '';
+  /* «UNA SOLA occasione», e le occasioni sono TRE: lo SCONTO conta
+     nel conteggio anche se una scadenza non ce l'ha. Senza di lui,
+     con «⚡ + 🎁» spuntate insieme si ereditava 'lampo' — e
+     quell'ordine sul server implica il suo filtro come VINCOLO DURO,
+     quindi l'unione delle due occasioni tornava alle sole lampo, in
+     silenzio: la vetrina mostrava meno di quel che le spunte
+     promettevano, e la stessa cosa dalle card e dal pannello (bug
+     dal campo, ago 2026 — la query del server era gia' giusta).
+     SI CONTA invece di confrontare le coppie: la quarta occasione di
+     domani ci entra da sola, mentre `&& !filtroX` a due a due va
+     riscritto ogni volta — ed e' precisamente il passo che qui non
+     era stato fatto quando lo sconto e' nato. */
+  if ([filtroLampo, filtroAsta, filtroSconto].filter(Boolean).length !== 1)
+    return '';
+  if (filtroLampo) return 'lampo';
+  if (filtroAsta) return 'asta';
+  return '';   /* lo sconto non ha una scadenza: niente da ereditare */
 }
 /* ...e l'etichetta che il campo-bottone mostra: l'ordine EFFETTIVO e
    non il valore del select, o il campo direbbe «Piu' recenti» mentre

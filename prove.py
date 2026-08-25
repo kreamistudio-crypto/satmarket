@@ -25463,10 +25463,22 @@ def prove_verde_e_filtri():
           "if (ordinaVista) return ordinaVista;" in _oe)
     # UNA SOLA occasione eredita: con due spunte non esiste una
     # scadenza sola da guardare, e l'ordine di sempre e' l'unica
-    # risposta onesta
-    prova("eredita solo con UNA occasione spuntata", (True, True),
-          ("if (filtroLampo && !filtroAsta) return 'lampo';" in _oe,
-           "if (filtroAsta && !filtroLampo) return 'asta';" in _oe))
+    # risposta onesta.
+    # LA PROVA HA CAMBIATO LATO (ago 2026, bug dal campo): chiedeva
+    # le due righe a coppie (`filtroLampo && !filtroAsta`), che dello
+    # SCONTO non sapevano niente — quindi certificava proprio il
+    # difetto, ereditando 'lampo' con «offerte a tempo» e «sconti dei
+    # negozi» spuntate insieme. Adesso si CONTA: le occasioni sono
+    # tre, e la quarta di domani entra nel conteggio da sola.
+    prova("eredita solo con UNA occasione spuntata", (True, False),
+          ("[filtroLampo, filtroAsta, filtroSconto].filter(Boolean)"
+           ".length !== 1" in _oe,
+           "!filtroAsta" in _oe or "!filtroLampo" in _oe))
+    # ...e lo SCONTO non eredita niente: una scadenza non ce l'ha, e
+    # inventargliene una vorrebbe dire un ordinamento che il server
+    # non ha (il vincolo duro pagina sulla colonna della scadenza).
+    prova("...e le due sole eredita' sono lampo e asta", 2,
+          _oe.count("return '") - _oe.count("return '';"))
     # IL CAMPO NON MENTE: mostra l'ordine EFFETTIVO e non il valore del
     # select — che con un'occasione spuntata direbbe «Piu' recenti» su
     # una vetrina in scadenza (la regola del pannello Filtri, dove la
@@ -27810,6 +27822,57 @@ console.log(JSON.stringify(rosse));
           "[]", (r.stdout or "").strip())
 
 
+def prove_ordina_ereditato(mini, node):
+    """L'ORDINE EREDITATO, FATTO GIRARE (ago 2026, bug dal campo:
+    «accendo Offerte a tempo e poi Sconti dei negozi, e gli sconti
+    spariscono»). Le sentinelle dicevano che il giudice esiste ed e'
+    uno, e passavano tutte: a mentire era la RISPOSTA, che con due
+    occasioni spuntate tornava 'lampo' — un ordinamento che sul server
+    implica il suo filtro come VINCOLO DURO in AND, quindi l'unione
+    (lampo OR sconto) tornava alle sole lampo.
+    LA QUERY DI `_where_occasioni` ERA ED E' GIUSTA, ed e' la parte da
+    ricordare: le 16 combinazioni provate su di lei non potevano
+    vedere niente, perche' il vincolo dell'ordinamento si aggiunge
+    nell'endpoint, DOPO — una prova su un pezzo giusto non dice niente
+    sul pezzo accanto.
+    Da qui il banco: le otto combinazioni delle tre spunte con
+    l'atteso scritto a mano, piu' la scelta esplicita che vince
+    sempre."""
+    import subprocess as _sp, tempfile as _tf
+    fn = pezzo_js(mini, "function ordinaEffettivo(){", "\n}") + "\n}"
+    banco = fn + r"""
+const attesi = {'000': '', '100': 'lampo', '010': 'asta', '001': '',
+                '101': '', '011': '', '110': '', '111': ''};
+let filtroLampo, filtroAsta, filtroSconto, ordinaVista;
+const rosse = [];
+for (const k of Object.keys(attesi)) {
+  const [l, a, s] = k.split('').map(Number);
+  filtroLampo = !!l; filtroAsta = !!a; filtroSconto = !!s; ordinaVista = '';
+  const avuto = ordinaEffettivo();
+  if (avuto !== attesi[k])
+    rosse.push('lampo=' + l + ' asta=' + a + ' sconto=' + s +
+               ": atteso '" + attesi[k] + "', avuto '" + avuto + "'");
+}
+/* LA SCELTA ESPLICITA VINCE SEMPRE, spunte o non spunte */
+filtroLampo = true; filtroAsta = false; filtroSconto = true;
+ordinaVista = 'prezzo_su';
+if (ordinaEffettivo() !== 'prezzo_su')
+  rosse.push('la scelta esplicita non vince sulle spunte');
+console.log(JSON.stringify(rosse));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco); percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il giudice dell'ordine gira", "", (r.stderr or "")[:200])
+        return
+    prova("l'ordine ereditato risponde giusto su tutte le combinazioni",
+          "[]", (r.stdout or "").strip())
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -27851,6 +27914,7 @@ def prove_sintassi_client():
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
     prove_centro_fila(mini, node)
+    prove_ordina_ereditato(mini, node)
     prove_pct_libera(node)
     prove_corsa_zona(mini, node)
     prove_riempimento(mini, node)

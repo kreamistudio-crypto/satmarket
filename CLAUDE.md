@@ -9412,6 +9412,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che su un'offerta a tempo è precisamente la notizia. Con DUE spunte
   insieme no, e non è una dimenticanza: lì non esiste una scadenza
   sola da guardare, e l'ordine di sempre è l'unica risposta onesta.
+  E LE OCCASIONI SONO TRE, IL CONTEGGIO LE CONTA TUTTE (ago 2026, bug
+  dal campo: «accendo Offerte a tempo, poi Sconti dei negozi, e gli
+  sconti spariscono»). `ordinaEffettivo` era rimasto alle coppie
+  (`filtroLampo && !filtroAsta`), che dello SCONTO non sapevano niente
+  — nato dopo — quindi con «⚡ + 🎁» ereditava 'lampo', e QUELL'ORDINE
+  IMPLICA IL SUO FILTRO COME VINCOLO DURO: l'unione tornava alle sole
+  lampo, in silenzio. LA QUERY ERA ED È GIUSTA — `_where_occasioni` le
+  univa in OR come deve — e le 16 combinazioni provate su di lei non
+  potevano vedere niente, perché il vincolo si aggiunge NELL'ENDPOINT,
+  dopo: una prova su un pezzo giusto non dice niente sul pezzo accanto.
+  Adesso si CONTA (`.filter(Boolean).length !== 1`) invece di
+  confrontare le coppie, e la quarta occasione di domani entra nel
+  conteggio da sola; lo SCONTO conta ma non eredita — una scadenza non
+  ce l'ha, e il keyset pagina su quella colonna. Il difetto valeva
+  identico dalle card «Da scoprire» e dal pannello Filtri, perché le
+  due porte scrivono le stesse variabili: una cura, un posto solo — e
+  `toccaScoperta` non c'entrava (accende la SUA spunta e basta, non
+  spegne la sorella). La prova non è una sentinella: un banco node fa
+  GIRARE il giudice sulle otto combinazioni delle tre spunte, che dire
+  «la riga c'è» non dice mai cosa risponde — e quella di ieri, scritta
+  a coppie, certificava proprio il difetto.
   LA SCELTA ESPLICITA VINCE SEMPRE (`ordinaEffettivo`, giudice unico
   dei tre chiamanti: il parametro al server, il campo-bottone e il
   ramo DEMO): l'eredità vale solo sul DEFAULT.
