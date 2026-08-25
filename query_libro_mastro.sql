@@ -22,14 +22,18 @@
 -- --- IL CONTO DEGLI ORDINI: qui una violazione costa sats ------------
 
 SELECT '1) ARITMETICA DELLA TESTATA (deve essere vuoto)' AS controllo;
--- prezzo_sats = Σ(unitario × quantità) − sconto + spedizione + protezione
+-- prezzo_sats = Σ(unitario × quantità) − sconto − accordo
+--             + spedizione + protezione
+-- (l'accordo sul carrello, ago 2026: la seconda voce sottrattiva di
+-- testata — le righe restano LORDE)
 SELECT o.id, o.prezzo_sats, SUM(r.unitario_sats*r.quantita) AS lordo,
-       o.sconto_sats, o.spedizione_sats, o.protezione_sats,
-       SUM(r.unitario_sats*r.quantita) - o.sconto_sats
+       o.sconto_sats, o.accordo_sats, o.spedizione_sats, o.protezione_sats,
+       SUM(r.unitario_sats*r.quantita) - o.sconto_sats - o.accordo_sats
          + o.spedizione_sats + o.protezione_sats AS atteso
   FROM ordini o JOIN ordine_righe r ON r.ordine_id = o.id
  GROUP BY o.id
 HAVING o.prezzo_sats <> SUM(r.unitario_sats*r.quantita) - o.sconto_sats
+                        - o.accordo_sats
                         + o.spedizione_sats + o.protezione_sats;
 
 SELECT '2) ARITMETICA DEL MONO (deve essere vuoto)' AS controllo;
@@ -81,6 +85,35 @@ SELECT '8) CARRELLI SENZA MERCE (deve essere vuoto)' AS controllo;
 SELECT o.id, o.stato, o.prezzo_sats FROM ordini o
  WHERE o.annuncio_id = 0
    AND NOT EXISTS (SELECT 1 FROM ordine_righe r WHERE r.ordine_id = o.id);
+
+-- --- L'ACCORDO SUL CARRELLO (ago 2026) -------------------------------
+
+SELECT '8b) ACCORDO SU UN MONO (deve essere vuoto)' AS controllo;
+-- è solo-SET per costruzione: la divisione a ritroso del mono non lo
+-- sottrae, e un accordo lì sbaglierebbe l'unitario in silenzio
+SELECT id, accordo_sats, prezzo_sats FROM ordini
+ WHERE annuncio_id <> 0 AND accordo_sats > 0;
+
+SELECT '8c) ACCORDO FUORI SCALA (deve essere vuoto)' AS controllo;
+SELECT o.id, o.accordo_sats, SUM(r.unitario_sats*r.quantita) AS lordo
+  FROM ordini o JOIN ordine_righe r ON r.ordine_id = o.id
+ WHERE o.accordo_sats <> 0
+ GROUP BY o.id
+HAVING o.accordo_sats < 0
+    OR o.accordo_sats > SUM(r.unitario_sats*r.quantita);
+
+SELECT '8d) OFFERTE DI CARRELLO SENZA RIGHE (deve essere vuoto)' AS controllo;
+SELECT o.id, o.stato FROM offerte o
+ WHERE o.annuncio_id = 0
+   AND NOT EXISTS (SELECT 1 FROM offerte_righe r WHERE r.offerta_id = o.id);
+
+SELECT '8e) RIGHE D''OFFERTA ORFANE (deve essere vuoto)' AS controllo;
+SELECT r.id, r.offerta_id, r.titolo FROM offerte_righe r
+ WHERE NOT EXISTS (SELECT 1 FROM offerte o WHERE o.id = r.offerta_id);
+
+SELECT '8f) OFFERTE MONO CON RIGHE FIGLIE (deve essere vuoto)' AS controllo;
+SELECT DISTINCT o.id, o.annuncio_id FROM offerte o
+  JOIN offerte_righe r ON r.offerta_id = o.id WHERE o.annuncio_id <> 0;
 
 -- --- L'ASTA: la cassa deve tornare -----------------------------------
 

@@ -18818,6 +18818,52 @@ def _codici_vivi(con, venditore_id: int, adesso: int) -> bool:
     return False
 
 
+def _accordo_carrello(con, user_id: int, off_id: int, scrivi: bool):
+    """L'accordo di CARRELLO al pagamento e al preventivo: la testata
+    accettata con le sue figlie, con le quattro guardie del mono
+    (stato+compratore, scadenza, invoice viva; la quarta — il
+    venditore dell'accordo == il venditore del set — la fa il
+    chiamante, che il venditore lo conosce dopo).
+    `scrivi` distingue compra dal preventivo: la' il DML dell'offerta
+    scaduta committa e solleva SUBITO (il patto del ricontrollo resta
+    vero), qui non si scrive MAI — 400 secco."""
+    off = con.execute(
+        "SELECT * FROM offerte WHERE id=? AND compratore_id=? AND "
+        "annuncio_id=0 AND stato='accettata'",
+        (off_id, user_id)).fetchone()
+    if not off:
+        con.close()
+        raise HTTPException(404, "Offerta non trovata o non più valida")
+    adesso = int(time.time())
+    if 0 < off["scadenza"] < adesso:
+        if scrivi:
+            con.execute("UPDATE offerte SET stato='scaduta', "
+                        "aggiornato=? WHERE id=?", (adesso, off_id))
+            con.commit()
+        con.close()
+        raise HTTPException(400, "Il tempo per pagare l'offerta sul "
+                                 "carrello è finito: l'offerta è scaduta")
+    if off["ordine_id"]:
+        viva = con.execute(
+            "SELECT id FROM ordini WHERE id=? AND stato='creato'",
+            (off["ordine_id"],)).fetchone()
+        if viva:
+            con.close()
+            raise HTTPException(400, "C'è già una invoice in corso per "
+                                     "questa offerta: pagala, oppure "
+                                     "annulla quell'ordine e riprova")
+    figlie = con.execute(
+        "SELECT * FROM offerte_righe WHERE offerta_id=? ORDER BY id",
+        (off_id,)).fetchall()
+    if len(figlie) < 2:
+        # non dovrebbe esistere: la testata nasce con >=2 figlie nella
+        # stessa transazione, e la fusione le cancella insieme — la
+        # cintura per il giorno che il libro mastro trovasse l'orfana
+        con.close()
+        raise HTTPException(404, "Offerta non trovata o non più valida")
+    return off, figlie
+
+
 async def _compra_set(user: dict, d: dict) -> dict:
     """Il ramo SET di compra() (lug 2026, «Riempi il barattolo»):
     piu' annunci DIVERSI dello stesso venditore in UN ordine solo —
@@ -18858,8 +18904,30 @@ async def _compra_set(user: dict, d: dict) -> dict:
         richieste[aid] = qta
         if off_id:
             offerte_chieste[aid] = off_id
+    try:
+        off_carr_id = int(d.get("offerta_carrello_id") or 0)
+    except (TypeError, ValueError):
+        off_carr_id = 0
 
     con = db()
+    # L'ACCORDO SUL CARRELLO (ago 2026): il totale pattuito comanda —
+    # le righe le costruisce il SERVER dalle figlie fotografate alla
+    # proposta, e il client si ignora (la regola della quantita'
+    # dell'accordo, portata alla testata). Le due cinture: mai insieme
+    # alle offerte per-riga (sono due strade per la stessa cifra), e
+    # mai un codice sconto sopra — il totale pattuito E' il prezzo
+    # degli articoli, deciso a mano guardando QUESTO carrello.
+    accordo_carrello = None
+    if off_carr_id:
+        if offerte_chieste:
+            con.close()
+            raise HTTPException(400, "L'accordo sul carrello e le "
+                                     "offerte sui singoli pezzi non si "
+                                     "sommano: o l'uno o le altre")
+        accordo_carrello, figlie_acc = _accordo_carrello(
+            con, user["id"], off_carr_id, scrivi=True)
+        richieste = {f["annuncio_id"]: max(1, f["quantita"] or 1)
+                     for f in figlie_acc}
     seg = ",".join("?" * len(richieste))
     tutti = {a["id"]: a for a in con.execute(
         f"SELECT * FROM annunci WHERE id IN ({seg})",
@@ -18867,12 +18935,25 @@ async def _compra_set(user: dict, d: dict) -> dict:
     for aid in richieste:
         a = tutti.get(aid)
         if not a or a["stato"] != "attivo":
-            con.close()
             # NON si scappa, e il nome della variabile lo dice: questo
             # non e' un titolo da notifica ma il detail di un 404, cioe'
             # JSON che il client rende col suo esc(). Un html.escape qui
             # farebbe leggere «Cuffie &lt;b&gt;AKG&lt;/b&gt;» a chi compra.
             nome_pezzo = a["titolo"][:40] if a else "Uno degli oggetti"
+            if accordo_carrello:
+                # la composizione non e' piu' onorabile: l'accordo
+                # decade QUI (il calco dell'accetta di rispondi_offerta)
+                # — il DML committa e solleva subito, il patto del
+                # ricontrollo resta vero
+                con.execute("UPDATE offerte SET stato='decaduta', "
+                            "aggiornato=? WHERE id=?",
+                            (int(time.time()), accordo_carrello["id"]))
+                con.commit()
+                con.close()
+                raise HTTPException(400, f"«{nome_pezzo}» non è più "
+                                         f"disponibile: l'offerta sul "
+                                         f"carrello decade")
+            con.close()
             raise HTTPException(404, f"«{nome_pezzo}» non è più disponibile: "
                                      f"toglilo dal set e riprova")
         if _asta(a):
@@ -18888,6 +18969,13 @@ async def _compra_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    # La quarta guardia dell'accordo (il calco del mono): il venditore
+    # dell'accordo dev'essere quello del set. Per costruzione lo e' —
+    # le righe vengono dalle figlie — ma una guardia che oggi non
+    # scatta e' quella che regge domani se la costruzione cambia.
+    if accordo_carrello and accordo_carrello["venditore_id"] != venditore_id:
+        con.close()
+        raise HTTPException(400, "L'accordo è con un altro venditore")
     # Il carrello e' di UN venditore alla volta, quindi una guardia
     # sola copre tutte le righe: se e' in ferie, non se ne compra
     # nessuna. Qui, prima della invoice.
@@ -19025,6 +19113,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
                 raise HTTPException(409, f"Qualcun altro sta già pagando "
                     f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
                     f"riprova tra pochi minuti")
+            if accordo_carrello:
+                # la quantita' e' pinnata dall'accordo: «scegli una
+                # quantita' piu' piccola» sarebbe un consiglio su una
+                # strada chiusa (la regola del messaggio della
+                # revisione). L'offerta NON decade: accettare non
+                # riserva, e se il venditore rifornisce entro la
+                # scadenza si paga.
+                raise HTTPException(400, f"L'accordo sul carrello vale "
+                                         f"per {qta} pezzi di "
+                                         f"«{a['titolo'][:40]}» e ne "
+                                         f"restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
             raise HTTPException(400, f"Di «{a['titolo'][:40]}» ne restano "
                                      f"solo {disponibile}: scegli una "
                                      f"quantità più piccola")
@@ -19099,6 +19200,13 @@ async def _compra_set(user: dict, d: dict) -> dict:
         ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
+    if accordo_carrello:
+        # L'ACCORDO SPEGNE LO SCONTO CARRELLO (e il codice ha gia'
+        # preso il suo 400): il totale pattuito e' il prezzo degli
+        # articoli, deciso a mano guardando questo carrello — nessuna
+        # promessa generale lo ritocca. La spedizione gratis invece
+        # RESTA, e misura il pattuito (piu' sotto).
+        regole_sc = []
     # IL CODICE SCONTO di questo negozio (che nel set e' UNO per
     # costruzione, quindi lo scope non e' mai ambiguo). Qui non c'e'
     # una ripresa da rispettare — _compra_set non ne ha — quindi
@@ -19111,6 +19219,15 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # Il gettone del freno si consuma SOLO qui, cioe' solo su un
     # tentativo fallito davvero.
     cod_nome = _codice_normalizza(d.get("codice_sconto"))
+    if accordo_carrello and cod_nome:
+        # il totale e' gia' pattuito, deciso a mano guardando QUESTO
+        # carrello: un codice sopra sarebbe un secondo sconto sulla
+        # stessa stretta di mano (e il client in modalita' accordo il
+        # cassetto non lo offre nemmeno)
+        con.close()
+        raise HTTPException(400, "Il totale è già pattuito: il codice "
+                                 "sconto non si applica a un'offerta "
+                                 "accettata")
     cod_pct, cod_id = 0, 0
     if cod_nome:
         cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
@@ -19215,13 +19332,34 @@ async def _compra_set(user: dict, d: dict) -> dict:
                      via if scelta == "spedizione" else "", cambio_ordine)
     sped = sp["sats"]
 
+    # IL PATTUITO DELL'ACCORDO SUL CARRELLO, e la voce di testata che
+    # ne discende: accordo = max(0, Σlordo − pattuito) — chi paga paga
+    # sempre il meglio dei due, una lampo o un listino calato non
+    # fanno mai pagare piu' del corrente (le righe restano LORDE, la
+    # sottrazione e' di testata come lo sconto). La conversione
+    # dell'accordo in EUR usa cambio_ordine: 'eur' ⇔ tutte le righe a
+    # listino EUR, quindi il 503 del cambio l'ha gia' dato
+    # serve_cambio_duro.
+    accordo_sats_v, pattuito = 0, 0
+    if accordo_carrello:
+        acc_s, acc_e = _importo_accordo(accordo_carrello)
+        if accordo_carrello["valuta"] == "eur":
+            pattuito = max(1, round(acc_e / cambio_ordine * 1e8))
+        else:
+            pattuito = acc_s
+        accordo_sats_v = max(0, articolo - pattuito)
     # La MISURA delle due promesse, contata UNA volta sola: e' cosi'
     # che «guardano lo stesso ARTICOLO» resta vero per costruzione
     # invece che per disciplina. Le due pure ricevono TUTTE E DUE le
     # facce dello stesso numero — i sats, che ci sono sempre, e gli
     # euro, che sono None senza conversione — e ognuna guarda quella
     # dell'unita' che il venditore ha dichiarato.
-    misura_eur = _eur_interi(articolo, cambio_misura)
+    # CON L'ACCORDO la misura e' il PATTUITO (articolo − accordo, cioe'
+    # quel che si paga davvero per la merce): la spedizione gratis
+    # resta viva e misura quello — senza accordo, misura_art ==
+    # articolo byte per byte.
+    misura_art = articolo - accordo_sats_v
+    misura_eur = _eur_interi(misura_art, cambio_misura)
     # Lo sconto carrello, sulla somma degli articoli e mai sulla
     # spedizione. Il tetto di rodaggio qui sopra ha gia' giudicato il
     # LORDO, ed e' l'ordine giusto: e' un vincolo del listino, non del
@@ -19230,7 +19368,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # VINCE IL MAGGIORE fra il codice sconto e la regola del negozio,
     # mai la somma: la percentuale del vincitore esce di qui, e `pct`
     # non si assegna piu' al momento della lettura delle regole.
-    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, pezzi,
+    sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
                                            regole_sc, cod_pct)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
@@ -19240,11 +19378,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # _strade_preventivo: preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
-    if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
+    if sped and _sped_gratis(misura_art, misura_eur, sog_gratis, val_sg):
         # la promessa offre la spedizione INTERA, supplemento compreso
         sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO, sconto)
+                          COMMISSIONE_PERCENTO, sconto, accordo_sats_v)
     prot, totale = conto["protezione"], conto["totale"]
 
     primo = righe[0]["titolo"]
@@ -19297,8 +19435,8 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
-        "codice_sconto,codice_sconto_id) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "codice_sconto,codice_sconto_id,accordo_sats) "
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
          punto, via_punto, rete, tipo, nota, ind, adesso if ind else 0,
@@ -19310,7 +19448,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
          sconto, pct if sconto else 0, sped_gratis_sats,
          # il NOME anche se il codice ha PERSO (lo confronta la
          # ripresa del mono), l'ID solo se ha VINTO (lo conta il tetto)
-         cod_nome, cod_id if chi_sc else 0))
+         cod_nome, cod_id if chi_sc else 0,
+         # la voce di testata dell'accordo sul carrello: TESTIMONE come
+         # sconto_sats — l'unico numero che comanda resta prezzo_sats
+         accordo_sats_v))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -19323,6 +19464,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # del mono): nessuna finestra in cui l'uno esiste senza l'altro
         con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
                     "WHERE id=?", (ordine_id, adesso, off["id"]))
+    if accordo_carrello:
+        # ...e il legame della TESTATA carrello, stessa regola
+        con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
+                    "WHERE id=?",
+                    (ordine_id, adesso, accordo_carrello["id"]))
     con.commit()
     con.close()
     # La taglia stimata del pacco unico: informativa, solo con la
@@ -19338,6 +19484,9 @@ async def _compra_set(user: dict, d: dict) -> dict:
             # sconto sono chiavi in piu' e si sommano da sole
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # l'accordo sul carrello, accanto allo sconto: il netto
+            # qui sopra li ha gia' sottratti tutti e due
+            "accordo_sats": accordo_sats_v, "pattuito_sats": pattuito,
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
             # il criterio e' la fotografia di COSA e' scattato, gemella
             # della percentuale: su un ordine sotto soglia direbbe
@@ -19390,7 +19539,8 @@ RIPRESA_INVOICE_S = 720
 def _strade_preventivo(righe: list, articolo: int, cambio: float,
                        disponibili: set, articolo_eur: float = 0.0,
                        sconto: int = 0, sconto_eur: float = 0.0,
-                       sped_gratis: bool = False) -> list:
+                       sped_gratis: bool = False,
+                       accordo: int = 0, accordo_eur: float = 0.0) -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
@@ -19432,7 +19582,7 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
 
     def _entra(v, sped, stima_sped, sped_eur=0.0, extra=None):
         conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
-                              COMMISSIONE_PERCENTO, sconto)
+                              COMMISSIONE_PERCENTO, sconto, accordo)
         tot_eur = 0.0
         # LA RIGA PIU' DELICATA DEL CANTIERE SCONTO: l'euro esatto
         # vuole anche uno sconto NATIVO. Se i sats fossero scontati e
@@ -19440,11 +19590,14 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
         # quella che si paga — e senza il ≈ davanti, cioe' una
         # precisione falsa. I due gemelli scattano insieme per
         # costruzione: questa e' la cintura per il giorno in cui uno
-        # dei due cambiasse.
+        # dei due cambiasse. L'ACCORDO sul carrello ha la stessa
+        # regola dello sconto: esatto solo se anche il pattuito e'
+        # nativo EUR.
         if (articolo_eur > 0 and conto["protezione"] == 0
                 and (sped == 0 or sped_eur > 0)
-                and (sconto == 0 or sconto_eur > 0)):
-            tot_eur = round(articolo_eur - sconto_eur
+                and (sconto == 0 or sconto_eur > 0)
+                and (accordo == 0 or accordo_eur > 0)):
+            tot_eur = round(articolo_eur - sconto_eur - accordo_eur
                             + (sped_eur if sped else 0.0), 2)
         e = {"via": v, "spedizione_sats": sped,
              "spedizione_eur": sped_eur if sped else 0.0,
@@ -19927,7 +20080,29 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         richieste[aid] = qta
         if off_id:
             offerte_chieste[aid] = off_id
+    try:
+        off_carr_id = int(d.get("offerta_carrello_id") or 0)
+    except (TypeError, ValueError):
+        off_carr_id = 0
     con = db()
+    # Lo specchio dell'accordo sul carrello, in SOLA lettura (la
+    # scaduta prende il 400 secco, mai un DML: il timbro spetta a
+    # compra). Le righe le costruisce il server dalle figlie, come di
+    # la'; il codice sconto sotto accordo si IGNORA — il client in
+    # modalita' accordo non offre il cassetto, e un 400 qui butterebbe
+    # indietro tutta la pagina (il patto del preventivo che risponde
+    # sempre 200 sul codice).
+    accordo_carrello = None
+    if off_carr_id:
+        if offerte_chieste:
+            con.close()
+            raise HTTPException(400, "L'accordo sul carrello e le "
+                                     "offerte sui singoli pezzi non si "
+                                     "sommano: o l'uno o le altre")
+        accordo_carrello, figlie_acc = _accordo_carrello(
+            con, user["id"], off_carr_id, scrivi=False)
+        richieste = {f["annuncio_id"]: max(1, f["quantita"] or 1)
+                     for f in figlie_acc}
     seg = ",".join("?" * len(richieste))
     tutti = {a["id"]: a for a in con.execute(
         f"SELECT * FROM annunci WHERE id IN ({seg})",
@@ -19937,6 +20112,12 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         if not a or a["stato"] != "attivo":
             con.close()
             titolo = a["titolo"][:40] if a else "Uno degli oggetti"
+            if accordo_carrello:
+                # qui non si scrive: a decaderla saranno compra() o
+                # scadenze_offerte — il preventivo dice solo la verita'
+                raise HTTPException(400, f"«{titolo}» non è più "
+                                         f"disponibile: l'offerta sul "
+                                         f"carrello decade")
             raise HTTPException(404, f"«{titolo}» non è più disponibile: "
                                      f"toglilo dal set e riprova")
         if _asta(a):
@@ -19952,6 +20133,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    if accordo_carrello and accordo_carrello["venditore_id"] != venditore_id:
+        con.close()
+        raise HTTPException(400, "L'accordo è con un altro venditore")
     guardia_ferie(con, venditore_id)   # il gemello di _compra_set
     origini = {chiave_origine(a) for a in tutti.values()}
     if len(origini) > 1:
@@ -19992,6 +20176,13 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                 raise HTTPException(409, f"Qualcun altro sta già pagando "
                     f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
                     f"riprova tra pochi minuti")
+            if accordo_carrello:
+                raise HTTPException(400, f"L'accordo sul carrello vale "
+                                         f"per {qta} pezzi di "
+                                         f"«{a['titolo'][:40]}» e ne "
+                                         f"restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
             raise HTTPException(400, f"Di «{a['titolo'][:40]}» ne restano "
                                      f"solo {disponibile}: scegli una "
                                      f"quantità più piccola")
@@ -20051,6 +20242,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
+    if accordo_carrello:
+        # l'accordo spegne lo sconto carrello, come in _compra_set
+        regole_sc = []
     # IL CODICE SCONTO, e qui la differenza col percorso che paga e'
     # tutta: SI RISPONDE SEMPRE 200. Un codice storto torna in una
     # chiave, accanto a un conto valido a prezzo pieno — e' il patto di
@@ -20063,7 +20257,10 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # E' QUESTO il posto in cui si prova un codice, quindi e' qui che
     # il freno morde: si GUARDA prima (a quota finita non si interroga
     # nemmeno il database) e si SPENDE solo se il tentativo e' fallito.
-    cod_nome = _codice_normalizza(d.get("codice_sconto"))
+    # sotto accordo il codice si ignora (mai un 400 dal preventivo) e
+    # il cassetto non si offre: il totale e' gia' pattuito
+    cod_nome = ("" if accordo_carrello
+                else _codice_normalizza(d.get("codice_sconto")))
     cod_pct, cod_id = 0, 0
     if cod_nome and _codice_quota_libera(user["id"]):
         cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
@@ -20072,6 +20269,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             _codice_tentativo_speso(user["id"])
     # il gemello del mono: il solo si'/no che gata il cassetto
     codici_vivi = _codici_vivi(con, venditore_id, int(time.time()))
+    if accordo_carrello:
+        # sotto accordo il cassetto non si offre: il totale e' pattuito
+        codici_vivi = False
 
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
@@ -20121,19 +20321,38 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     articolo_eur = (round(sum(round(e * q, 2) for e, q
                               in zip(eur_righe, richieste.values())), 2)
                     if all(e > 0 for e in eur_righe) else 0.0)
+    # IL PATTUITO DELL'ACCORDO SUL CARRELLO, lo specchio esatto di
+    # _compra_set: accordo = max(0, Σlordo − pattuito), e la misura
+    # delle promesse diventa il pattuito. L'euro dell'accordo serve
+    # alla cintura del totale_eur esatto, e si aziona solo dietro al
+    # fratello in sats (il pattern di sconto_eur).
+    accordo_sats_v, pattuito, accordo_eur = 0, 0, 0.0
+    if accordo_carrello:
+        acc_s, acc_e = _importo_accordo(accordo_carrello)
+        if accordo_carrello["valuta"] == "eur":
+            pattuito = max(1, round(acc_e / cambio * 1e8))
+        else:
+            pattuito = acc_s
+        accordo_sats_v = max(0, articolo - pattuito)
+        if (accordo_sats_v and articolo_eur
+                and accordo_carrello["valuta"] == "eur"):
+            accordo_eur = round(max(0.0, articolo_eur - acc_e), 2)
     # La MISURA delle due promesse, contata una volta sola. Da non
     # confondere con `articolo_eur` qui sopra, che e' l'euro NATIVO del
     # set (0 se una riga sola e' nata in sats) e serve al ≈: questa
-    # invece c'e' sempre, purche' il cambio ci sia.
-    misura_eur = _eur_interi(articolo, cambio)
+    # invece c'e' sempre, purche' il cambio ci sia. Con l'accordo la
+    # misura e' il pattuito — senza, misura_art == articolo byte per
+    # byte (il gemello di _compra_set).
+    misura_art = articolo - accordo_sats_v
+    misura_eur = _eur_interi(misura_art, cambio)
     # quanto manca a ognuna delle due promesse, NELL'UNITA' IN CUI E'
     # DICHIARATA: la chiave dell'altra unita' resta a zero, cosi'
     # nessuno puo' leggere dei sats come euro
-    _misura_sg = articolo if val_sg == "sats" else misura_eur
+    _misura_sg = misura_art if val_sg == "sats" else misura_eur
     # VINCE IL MAGGIORE, come nel mono: la percentuale del vincitore
     # esce di qui e la porta con se' anche l'euro nativo, due righe
     # piu' giu'.
-    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, pezzi,
+    sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
                                            regole_sc, cod_pct)
     # LA GAMBA PIU' VICINA, e qui fra TUTTE: nel set la raggiungibilita'
     # non si afferma (la composizione puo' sempre crescere di un altro
@@ -20144,14 +20363,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # codice copre gia' e' inutile qui come nel mono: aggiungere pezzi
     # non sposterebbe il totale di un sat.
     _sc_vive = [r for r in regole_sc if r[2] > cod_pct]
-    _g_sc = _gamba_invito(_sc_vive, pezzi, articolo, misura_eur)
+    _g_sc = _gamba_invito(_sc_vive, pezzi, misura_art, misura_eur)
     _crit_sc, _sog_sc, _val_sc, _manca_sc = (
         (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
     # il gemello in euro si aziona SOLO dietro al fratello in sats: la
     # decisione e' una sola, e sta di la' (vedi _sconto_pacco_eur)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO, sconto)
+                          COMMISSIONE_PERCENTO, sconto, accordo_sats_v)
     # `articolo_sats` e' il NETTO — ha sempre voluto dire «quanto paghi
     # per la merce», ed e' la cifra che con spedizione e protezione FA
     # il totale: cosi' un client fermo a ieri somma comunque giusto, e
@@ -20161,9 +20380,21 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     return {"set": True, "quantita": pezzi,
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # l'accordo sul carrello, accanto allo sconto: il netto
+            # qui sopra li ha gia' sottratti tutti e due
+            "accordo_sats": accordo_sats_v, "pattuito_sats": pattuito,
+            "accordo_eur": accordo_eur,
             "sconto_sats": sconto,
-            "articolo_eur": (round(articolo_eur - sconto_eur, 2)
-                             if articolo_eur else 0.0),
+            # l'euro nativo esiste solo se anche l'accordo e' nativo
+            # EUR (la cintura del totale_eur, portata anche qui): un
+            # accordo pattuito in sats su listini EUR — la valuta si
+            # fotografa alla proposta, e le accettate sopravvivono ai
+            # ritocchi — non ha un netto EUR esatto da dire
+            "articolo_eur": (round(articolo_eur - sconto_eur
+                                   - accordo_eur, 2)
+                             if articolo_eur
+                             and (not accordo_sats_v or accordo_eur)
+                             else 0.0),
             "articolo_lordo_eur": articolo_eur,
             "sconto_eur": sconto_eur,
             # la REGOLA esce anche quando non e' scattata: e' cosi' che
@@ -20259,8 +20490,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                           in richieste.items()], articolo,
                                          cambio, strade, articolo_eur,
                                          sconto, sconto_eur,
-                                         _sped_gratis(articolo, misura_eur,
-                                                      sog_gratis, val_sg)),
+                                         _sped_gratis(misura_art, misura_eur,
+                                                      sog_gratis, val_sg),
+                                         accordo_sats_v, accordo_eur),
             "righe": righe}
 
 
@@ -35024,9 +35256,11 @@ CONTROLLI_LIBRO_MASTRO = (
     # --- il conto degli ordini: qui una violazione costa sats -------
     ("aritmetica della testata",
      "il totale in cassaforte non combacia con la merce dell'ordine",
+     # dall'offerta sul carrello (ago 2026) la testata ha DUE voci
+     # sottrattive: lo sconto e l'accordo. Le righe restano LORDE.
      "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
      "GROUP BY o.id HAVING o.prezzo_sats <> "
-     "SUM(r.unitario_sats*r.quantita) - o.sconto_sats "
+     "SUM(r.unitario_sats*r.quantita) - o.sconto_sats - o.accordo_sats "
      "+ o.spedizione_sats + o.protezione_sats"),
     # «mono scontato» e' morto qui (ago 2026, il mono sconta): sarebbe
     # diventato un falso allarme permanente su ogni ordine legittimo.
@@ -35137,6 +35371,39 @@ CONTROLLI_LIBRO_MASTRO = (
      "una testata di set senza nemmeno una riga",
      "SELECT o.id FROM ordini o WHERE o.annuncio_id=0 AND NOT EXISTS "
      "(SELECT 1 FROM ordine_righe r WHERE r.ordine_id=o.id)"),
+    # --- l'accordo sul carrello (ago 2026) --------------------------
+    # E' solo-SET per costruzione (con una riga la cassa devia sul
+    # mono, dove c'e' l'offerta singola), e la divisione a ritroso del
+    # mono NON lo conosce: un accordo su un mono la romperebbe in
+    # silenzio, sbagliando l'unitario in ordine, notifiche e CSV.
+    ("accordo su un mono",
+     "accordo_sats su un ordine a pezzo singolo: la divisione a "
+     "ritroso dell'unitario non lo sottrae, e l'unitario mente",
+     "SELECT id FROM ordini WHERE annuncio_id<>0 AND accordo_sats>0"),
+    ("accordo fuori scala",
+     "accordo negativo, o piu' grande della merce che sconta (il "
+     "max(0, lordo - pattuito) non puo' produrlo)",
+     "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
+     "WHERE o.accordo_sats<>0 GROUP BY o.id HAVING o.accordo_sats < 0 "
+     "OR o.accordo_sats > SUM(r.unitario_sats*r.quantita)"),
+    # La forma di offerte/offerte_righe, il calco della coppia qui
+    # sopra: figlie e testata nascono nella stessa transazione e la
+    # fusione le cancella insieme — non esiste transitorio legittimo.
+    ("offerta di carrello senza righe",
+     "una testata d'offerta (annuncio_id=0) senza nemmeno una figlia: "
+     "il pagamento non saprebbe cosa costruire",
+     "SELECT o.id FROM offerte o WHERE o.annuncio_id=0 AND NOT EXISTS "
+     "(SELECT 1 FROM offerte_righe r WHERE r.offerta_id=o.id)"),
+    ("righe d'offerta orfane",
+     "figlie di un'offerta che non esiste piu': la fusione le "
+     "cancella PRIMA della testata, qualcuno ha rotto l'ordine",
+     "SELECT r.id FROM offerte_righe r WHERE NOT EXISTS "
+     "(SELECT 1 FROM offerte o WHERE o.id=r.offerta_id)"),
+    ("offerta mono con righe figlie",
+     "un'offerta su UN annuncio con delle figlie di carrello: due "
+     "verita' sulla stessa trattativa",
+     "SELECT DISTINCT o.id FROM offerte o "
+     "JOIN offerte_righe r ON r.offerta_id=o.id WHERE o.annuncio_id<>0"),
     # --- l'asta: la cassa deve tornare ------------------------------
     ("cassa dell'asta chiusa",
      "somma dei saldi <> esposto della vincitrice + registro dei "

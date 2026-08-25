@@ -9277,7 +9277,10 @@ def prove_supplemento_spedizione():
                      src.index("async def _preventivo_set(")]
     prova("preventivo mono: la quantita' arriva alla pura", True,
           "_strade_preventivo([(a, richiesti)]" in corpo_prev)
-    corpo_pset = src[src.index("async def _preventivo_set("):][:20_000]
+    # la fetta e' cresciuta con l'accordo sul carrello (ago 2026): a
+    # 20_000 la chiamata a _strade_preventivo restava fuori e la
+    # sentinella diceva di no a una riga che c'e'
+    corpo_pset = src[src.index("async def _preventivo_set("):][:26_000]
     prova("preventivo set: le quantita' si prendono da `richieste`",
           True, "[(tutti[aid], q) for aid, q" in corpo_pset)
     prova("...e MAI zippando due dizionari diversi", False,
@@ -10978,8 +10981,14 @@ def prove_sped_gratis():
     # rami di compra —: se ne spuntasse un quinto, il conto si
     # deciderebbe in un posto che nessuno ha confrontato con gli altri
     # (il -1 e' la definizione, che porta lo stesso testo)
-    prova("...e i chiamanti sono i quattro percorsi del conto", 4,
-          src.count("_sped_gratis(articolo, misura_eur"))
+    # HA CAMBIATO LATO (ago 2026, l'offerta sul carrello): i due
+    # percorsi del SET misurano `misura_art` — il pattuito quando c'e'
+    # un accordo, l'articolo byte per byte quando non c'e' — e i due
+    # del MONO restano sull'articolo. Il conto TOTALE resta quattro:
+    # 2 + 2, e chi ne aggiunge un quinto lo sente comunque.
+    prova("...e i chiamanti sono i quattro percorsi del conto", (2, 2),
+          (src.count("_sped_gratis(articolo, misura_eur"),
+           src.count("_sped_gratis(misura_art, misura_eur")))
     # ...e ricevono TUTTE E DUE le facce dell'articolo, sempre nello
     # stesso ordine: se un domani un percorso passasse solo l'euro, la
     # sua soglia in sats smetterebbe di scattare in silenzio
@@ -11091,10 +11100,17 @@ def prove_sped_gratis():
     # LA DECISIONE STA NELLO STESSO PUNTO nei tre percorsi: DOPO il
     # conto della tariffa. Se il preventivo decidesse prima, la pagina
     # direbbe «gratuita» dove la invoice risponde 503.
-    for chi, c2 in (("_compra_set", corpo_set), ("compra", corpo_mono)):
+    # (il set misura `misura_art` dall'accordo sul carrello, il mono
+    # l'articolo: la stessa riga, due nomi — vedi sopra)
+    for chi, c2, ancora in (
+            ("_compra_set", corpo_set, "_sped_gratis(misura_art"),
+            ("compra", corpo_mono, "_sped_gratis(articolo")):
+        # find() e non index(): un'ancora sparita deve fare UNA rossa,
+        # non un'esplosione che si porta via le sorelle (la regola di
+        # casa, gia' pagata tre volte)
+        i1, i2 = c2.find(ancora), c2.find("_conto_ordine(")
         prova(f"{chi}: si decide DOPO aver contato la tariffa", True,
-              c2.index("_sped_gratis(articolo, misura_eur")
-              < c2.index("_conto_ordine("))
+              0 <= i1 < i2)
 
     # ================================================================
     # IL PASSAGGIO ALL'EURO (ago 2026)
@@ -13789,6 +13805,7 @@ def prove_libro_mastro():
         con.executescript("""
         CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
           prezzo_sats INT, sconto_sats INT DEFAULT 0,
+          accordo_sats INT DEFAULT 0,
           sconto_percento INT DEFAULT 0, spedizione_sats INT DEFAULT 0,
           protezione_sats INT DEFAULT 0, quantita INT DEFAULT 1,
           sped_gratis_sats INT DEFAULT 0,
@@ -13820,9 +13837,14 @@ def prove_libro_mastro():
         CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,
           annuncio_id INT, puntata_id INT, rilancio_id INT DEFAULT 0,
           importo_sats INT, motivo TEXT, payout_stato TEXT DEFAULT '');
-        CREATE TABLE offerte(id INTEGER PRIMARY KEY, importo_sats INT
+        CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT
+          DEFAULT 1, importo_sats INT
           DEFAULT 0, importo_eur REAL DEFAULT 0, contro_sats INT
           DEFAULT 0, contro_eur REAL DEFAULT 0, giri INT DEFAULT 0);
+        CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+          offerta_id INT, annuncio_id INT, quantita INT DEFAULT 1,
+          unitario_sats INT DEFAULT 0, unitario_eur REAL DEFAULT 0,
+          titolo TEXT DEFAULT '');
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
           stato TEXT, contatto_nostr TEXT DEFAULT '',
           nostr_event_id TEXT DEFAULT '');
@@ -13859,8 +13881,21 @@ def prove_libro_mastro():
         -- (70.000 sotto, 80.000 sopra) e una proposta senza
         -- controproposta, dove il soffitto a zero NON e' una
         -- forbice chiusa — e nessuno dei due deve fiatare.
-        INSERT INTO offerte VALUES(1,70000,0,80000,0,1);
-        INSERT INTO offerte VALUES(2,70000,0,0,0,0);
+        INSERT INTO offerte VALUES(1,1,70000,0,80000,0,1);
+        INSERT INTO offerte VALUES(2,1,70000,0,0,0,0);
+        -- UN'OFFERTA SUL CARRELLO SANA (ago 2026): testata con
+        -- annuncio_id=0 e due figlie — nessun controllo deve fiatare
+        INSERT INTO offerte VALUES(3,0,25000,0,0,0,0);
+        INSERT INTO offerte_righe(offerta_id,annuncio_id,quantita,
+          unitario_sats) VALUES(3, 7, 2, 10000), (3, 8, 1, 12000);
+        -- E UN CARRELLO PAGATO CON L'ACCORDO (id 11): lordo 32.000,
+        -- accordo 7.000 (pattuito 25.000), spedizione 500 -> 25.500.
+        -- L'aritmetica della testata deve tornare col MENO accordo.
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,accordo_sats,
+          spedizione_sats,quantita)
+          VALUES(11, 0, 25500, 7000, 500, 3);
+        INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,unitario_sats)
+          VALUES(11, 7, 2, 10000), (11, 8, 1, 12000);
         -- UN MONO SANO: nessuna riga, nessuno sconto
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita)
           VALUES(2, 9, 50000, 5);
@@ -14003,6 +14038,24 @@ def prove_libro_mastro():
         ("INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita) "
          "VALUES(3, 0, 1000, 1)",
          "carrello senza merce", "3"),
+        # L'ACCORDO SUL CARRELLO (ago 2026): e' solo-SET per
+        # costruzione — su un mono la divisione a ritroso non lo
+        # sottrae e l'unitario mentirebbe in silenzio
+        ("UPDATE ordini SET accordo_sats=100 WHERE id=6",
+         "accordo su un mono", "6"),
+        # 99999 > il lordo 32.000: il max(0, lordo-pattuito) non puo'
+        # produrlo (sveglia anche l'aritmetica, ed e' giusto: due
+        # allarmi veri sulla stessa riga rotta)
+        ("UPDATE ordini SET accordo_sats=99999 WHERE id=11",
+         "accordo fuori scala", "11"),
+        # la forma di offerte/offerte_righe, i tre modi
+        ("DELETE FROM offerte_righe WHERE offerta_id=3",
+         "offerta di carrello senza righe", "3"),
+        ("INSERT INTO offerte_righe(id,offerta_id,annuncio_id) "
+         "VALUES(88, 4242, 9)",
+         "righe d'offerta orfane", "88"),
+        ("INSERT INTO offerte_righe(offerta_id,annuncio_id) VALUES(1, 9)",
+         "offerta mono con righe figlie", "1"),
         ("UPDATE puntate SET offerto_sats=101 WHERE id=1",
          "cassa dell'asta chiusa", "5"),
         ("DELETE FROM rimborsi_asta WHERE puntata_id=2",
