@@ -23180,9 +23180,10 @@ SMETTA di ricevere il promemoria della merce mai partita.
   LA FORMULA vive in un giudice PURO, `_classifica_utenti` — prende
   righe e ritorna la lista ordinata, niente database dentro: è quel che
   la fa girare in CI e la fa riusare allo script della tappa 0.
-    punteggio = F × (1 + PESO · C)
+    punteggio = F × (1 + PESO · C · S)
     F = (persone · media + K · M) / (persone + K)      la FIDUCIA
     C = log10(1 + xp_ordini) / log10(1 + RIF)          il COMMERCIO
+    S = persone / (persone + KD)                       lo SMORZAMENTO
   `F` È UNA MEDIA BAYESIANA e risponde alla frase che ha aperto il
   cantiere: uno con 5,0 su due recensioni non vale uno con 4,8 su
   cinquanta. Una media con pochi voti si tira verso quella del
@@ -23205,6 +23206,43 @@ SMETTA di ricevere il promemoria della merce mai partita.
   varrebbe più di trecento piccoli. Con: da 100 a 1.000 XP il bonus
   passa da +16% a +25%, da 1.000 a 10.000 arriva a +33% — raddoppiare
   il volume non raddoppia niente.
+  LO SMORZAMENTO DELLA FIDUCIA LARGA (ago 2026, `CLASSIFICA_KD`): il
+  bonus del commercio vale quanto è LARGA la fiducia che amplifica —
+  con `KD=2` chi ha un recensore solo se ne prende un terzo, chi ne ha
+  cinque cinque settimi, chi ne ha venti quasi tutto. La fiducia di uno
+  solo è un'opinione, non un curriculum.
+  SI SMORZA IL BONUS E NON LA FIDUCIA, ed è la riga da non ammorbidire:
+  la media resta la media, e chi non commercia non viene punito due
+  volte. Applicato a tutto il punteggio (o alla sola fiducia) chi ha un
+  recensore scenderebbe SOTTO la media del mercatino pur avendola presa
+  identica, che è un'altra cosa da quella che si vuole dire.
+  E `persone` E NON `voti`, per la ragione della bayesiana un gradino
+  più su: quaranta voti da un account solo devono pesare come UNO.
+  NASCE A ZERO, e a zero `persone/(persone + 0)` fa **1 esatto per
+  chiunque**: i punteggi restano IDENTICI BIT PER BIT a quelli di prima
+  dello smorzamento — verificato, il `5.260264460129354` inchiodato in
+  `prove.py` non si muove di un decimale. È voluto e non timidezza: il
+  valore si SCEGLIE guardando i numeri veri (`python
+  classifica_prova.py`, sezione 3, che affianca le tarature), che è il
+  patto con cui fu misurato K. Quindi il deploy non sposta un solo
+  punteggio, la misura passa dal GIUDICE VERO invece che da una
+  simulazione, e la scelta dopo la misura è una riga nel config del VPS
+  — zero codice.
+  ⚠️ IL DEFAULT NON SI SCRIVE NEL COMMENTO che lo spiega:
+  `classifica_prova._leggi_giudice` risolve le leve con una `re.search`
+  sul TESTO di server.py e prende la PRIMA occorrenza, quindi un
+  `CLASSIFICA_KD = 3` dentro una frase gli ruberebbe il numero in
+  silenzio. Si dice «a zero» in prosa, e la cintura è la regex ancorata
+  all'ASSEGNAZIONE (`^[ 	]*NOME\s*=`, con `re.M`): il rischio non è
+  teorico — nel file c'è già un `CLASSIFICA_PESO_XP = 0` dentro un
+  commento, innocuo solo perché sta DOPO la sua assegnazione.
+  ⚠️ E `kd is None` E MAI `kd or CLASSIFICA_KD`: qui lo zero pesa il
+  doppio delle sorelle, perché è proprio il DEFAULT — con l'`or` un
+  `kd=0` passato a mano ricadrebbe sulla costante, e la leva spenta
+  smetterebbe di essere spegnibile dal chiamante. Più il `max(…, 0)`,
+  che non è cosmesi: un KD negativo nel config azzera il denominatore e
+  fa cadere con un 500 una pagina PUBBLICA, che non è avvolta in nessun
+  fail-open.
   E SOLO GLI XP DEGLI ORDINI (`tipo='ordine'`, gli altri sei tipi
   restano fuori): sono gli unici che costano un pagamento Lightning
   vero. Visita giornaliera, pubblicazione, profilo completo e distintivi
@@ -23223,6 +23261,38 @@ SMETTA di ricevere il promemoria della merce mai partita.
   utenti di prova, stava in mezzo), e da lì è nato il `fondo()` che
   semina utenti di sfondo. C'è la prova che tortura il limite su K = 1,
   5, 50, 500.
+  IL PAREGGIO NON LO SCIOGLIE LO SMORZAMENTO, e non poteva: quando la
+  media è uguale a quella del mercatino la fiducia vale ESATTAMENTE M
+  per qualunque `persone` (è il limite qui sopra visto dall'altro lato),
+  e senza XP d'ordine il bonus è zero — quindi lo smorzamento
+  moltiplica uno zero. È il mercatino di oggi, dove hanno tutti 5,00 e
+  parecchi hanno zero XP: lì due righe hanno gli stessi punti BIT PER
+  BIT, ed è il caso che ha aperto il cantiere (Libertoshi con un
+  recensore e Luca con due, a decidere l'id).
+  LA CHIAVE È `persone → affari → id` (decisione di Andrea): prima le
+  PERSONE, che è la stessa cosa che dice lo smorzamento un gradino più
+  su — la regola del cantiere applicata al pareggio, non una regola
+  nuova da spiegare — e senza XP è l'unica che separa.
+  E VA DETTO COSA SI STA SCEGLIENDO col secondo criterio: **LA
+  FREQUENZA BATTE IL VALORE** — due affari da 15 € vanno davanti a uno
+  da 40, che danno gli stessi XP. Non è ovvio, ed è meglio di un id, che
+  non significa niente.
+  LA MEDIA È STATA PROVATA IN QUELLA CHIAVE E TOLTA, ed è una misura e
+  non un gusto: a pari persone due medie diverse danno GIÀ punti diversi
+  (senza XP il punteggio È esattamente la fiducia), quindi in terza
+  posizione sarebbe codice morto — una guardia che promette d'essere
+  esercitata e non lo è mai, la famiglia dell'`except` irraggiungibile
+  di `_npub_venditore`. Il fatto è stato portato ad Andrea invece di
+  implementarlo in silenzio, e la decisione è cambiata di conseguenza.
+  L'ID RESTA IN CODA E NON È UN MERITO: è il determinismo — due righe
+  identiche non devono scambiarsi di posto a ogni richiesta.
+  ⚠️ E LA PROVA DEL PAREGGIO DI IERI ERA UNA TAUTOLOGIA, la sesta della
+  famiglia che questo repo ha già smascherato: chiamava tre volte lo
+  stesso giudice sugli stessi dati e restava VERDE anche togliendo
+  `r["id"]` dalla chiave, perché `sort` è stabile e i dizionari sono
+  ordinati. Al suo posto si cambia l'ORDINE D'ARRIVO DEI VOTI, che è
+  l'unica cosa che l'id deve neutralizzare — e la mutazione che toglie
+  l'id adesso la fa rossa.
   IL FRENO È IL RECENSORE REALE (scelta di Andrea): conta come PERSONA
   solo chi ha a sua volta concluso almeno un affare con QUALCUN ALTRO
   che non sia me. Va più lontano di quanto sembri — il farmer che si
@@ -23336,6 +23406,15 @@ SMETTA di ricevere il promemoria della merce mai partita.
   uguale alle sue sorelle. Negli onclick viaggia SOLO il codice negozio
   passato dal filtro-alfabeto, il patto di `renderNegozio`; senza codice
   la riga non è toccabile, meglio ferma che rotta.
+  LA SESTA LEVA è `CLASSIFICA_KD` (0 = spenta), col suo `spento` nel
+  pannello — che scatta proprio sul default, ed è ciò che permette a un
+  moderatore che legge «0» di distinguere «spenta» da «tarata bassa».
+  ⚠️ Chi la aggiunge la metta ANCHE nella tupla del censimento leve di
+  `prove.py` e nello stub di `_amb_classifica`: senza la prima
+  `_ConfigFinto.__missing__` le dà 7 in tutti e due gli stati e la voce
+  esce «accesa» perfino nel censimento spento, senza il secondo l'`exec`
+  del giudice cerca una costante che lì non esiste e TUTTE le prove
+  della classifica esplodono con NameError invece di fallire.
   LEVE: `CLASSIFICA_ATTIVA` nasce SPENTA nel codice, il patto di
   `ASTA_ABILITATA` e `BANNER_NEGOZIO_ATTIVO` — non perché muova denaro,
   ma perché nessuno sa ancora quante righe escono: si accende dal config
