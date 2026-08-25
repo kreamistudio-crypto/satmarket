@@ -22750,6 +22750,12 @@ SMETTA di ricevere il promemoria della merce mai partita.
   davvero sarebbe la transitività da un seme fidato — un web-of-trust
   vero, che è un cantiere suo — oppure la COMMISSIONE, che è il freno
   che il roadmap aspettava e che oggi è a 0.
+  ⚠️ IL FRENO ECONOMICO ASPETTA UN EVENTO, NON UN CANTIERE (ago 2026,
+  decisione di Andrea di metterlo a verbale): il giorno che si accende
+  `COMMISSIONE_PERCENTO` questa riga diventa vera DA SOLA — farmare
+  comincia a costare una percentuale su ogni ordine finto, senza che
+  nessuno tocchi la classifica. Chi rilegge fra sei mesi non deve
+  cercare qui un lavoro da fare: deve solo sapere che la leva è quella.
   GLI ALTRI TRE FRENI erano già in casa: i soli XP d'ordine, la
   bayesiana che pesa le persone, e la riga «da N persone» accanto al
   nome, che fa autodenunciare chi farma — la stessa informazione già
