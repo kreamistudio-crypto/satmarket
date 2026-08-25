@@ -2157,10 +2157,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sposta le vicine. [La riga sul BARATTOLO che faceva sparire la
   sezione è ROVESCIATA dall'ago 2026: nella striscia c'è la card del
   barattolo, quindi anche col filtro acceso la fila resta e a
-  illuminarsi è LEI — vedi «LA CARD DEL BARATTOLO NELLA STRISCIA». A
-  sparire col barattolo resta la sola sezione «Da scoprire», le cui
-  card accendono filtri del server che su una lista chiusa non hanno
-  senso.]
+  illuminarsi è LEI — vedi «LA CARD DEL BARATTOLO NELLA STRISCIA». Col
+  barattolo da «Da scoprire» escono le sole card-INTERRUTTORE (i
+  filtri del server, senza senso su una lista chiusa); la card che
+  NAVIGA — il P2P — resta, dall'ago 2026: vedi l'emenda nella voce
+  della card del barattolo.]
   E LA CARD ACCESA SI PORTA IN VISTA scrivendo `scrollLeft` a mano:
   illuminata fuori schermo non la vedrebbe nessuno, e la funzione del
   browser che porta in vista un elemento sposterebbe anche la pagina
@@ -16847,9 +16848,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `activeCat` già 'Tutto' il tocco sarebbe un no-op e il filtro
   resterebbe acceso su una card che dice «Tutto») o toccando una
   categoria, che passa da `loadListings → spegniBarattolo` gratis.
-  «Da scoprire» invece SPARISCE col filtro, ed è l'unica sezione a
-  farlo: le sue card accendono filtri del server, senza senso su una
-  lista chiusa.
+  Da «Da scoprire» col filtro escono le sole card-INTERRUTTORE
+  (accendono filtri del server, senza senso su una lista chiusa — e
+  il loro tocco passa da `loadListings`, che spegnerebbe il barattolo
+  in silenzio); la card che NAVIGA resta, e la sezione sparisce
+  intera solo quando non resta niente di vivo (ago 2026, decisione di
+  Andrea che EMENDA il «sparisce col filtro» del primo giro — vedi
+  l'emenda nella voce della card del barattolo).
   E LA PILLOLA STA FRA LE ALTRE (il punto 6 di Andrea): col filtro
   acceso `renderChips` non sostituisce più tutto con la sola pillola
   d'uscita — mette `🫙 Nel tuo barattolo ✕` ACCESA IN TESTA (la
@@ -16907,15 +16912,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   mutazioni, una per riga sorvegliata, tutte uccise; sette scenari
   misurati prima e dopo, più la regressione del ritocco a barattolo
   spento.
-  E IL TRATTO DELLA CARD È TARATO (ago 2026, il debito dichiarato del
-  piano): il vetro a stroke 2 — giusto sui cerchietti da 34/40px —
-  reso a 56 faceva ~4,7px, fuori famiglia con le illustrazioni
-  accanto. `jarSVG` guadagna il terzo parametro `tratto` e la
-  striscia passa 1.3 (~3px resi, il peso del bordo bianco del vaso
-  della monstera: scelto a schermo su quattro candidate — 2, 1.5,
-  1.3, 1.1 — accanto alle sorelle), col riflesso che scende a 1.1
-  perché un riflesso più spesso del vetro si legge come un graffio.
-  Cerchietti e cassetto restano al 2 di sempre.
+  E IL TRATTO DELLA CARD È TARATO IN DUE GIRI (ago 2026, il debito
+  dichiarato del piano): il vetro a stroke 2 — giusto sui cerchietti
+  da 34/40px — reso a 56 faceva ~4,7px, fuori famiglia con le
+  illustrazioni accanto. `jarSVG` guadagna il terzo parametro
+  `tratto`; il primo giro si è fermato a 1.3 (~3px, il bordo del vaso
+  della monstera) e ad Andrea il vetro pesava ancora: il secondo
+  scende a **1.15** (~2,7px), che è l'appena-prima del limite — l'1.1,
+  dove il coperchio si sfilaccia. Il riflesso scende a 1.0 con lui,
+  perché un riflesso più spesso del vetro si legge come un graffio
+  (c'è la sentinella). Cerchietti e cassetto restano al 2 di sempre.
+  E LA CARD P2P ENTRA NEL BARATTOLO (ago 2026, decisione di Andrea):
+  da «Da scoprire» col filtro acceso escono le sole card-INTERRUTTORE
+  — il loro tocco passa da `loadListings`, che spegne il filtro prima
+  del fetch: butterebbero fuori dal barattolo in silenzio — mentre la
+  card che NAVIGA porta a una pagina e dentro il barattolo funziona
+  uguale (e il barattolo si ritrova intatto al ritorno: il filtro non
+  è in cronologia e nessuno ridisegna la griglia). Il criterio è
+  `tocca`, non un elenco di id: le sponsorizzate di domani, che
+  navigheranno anche loro, entrano da sole. Con una card sola la
+  sezione resta, titolo compreso, senza taglio al bordo (a card
+  singola non c'è altro da annunciare) e con l'altezza di sempre;
+  sparisce intera solo quando non resta niente di vivo — il P2P
+  votato col barattolo acceso, ed è il caso che il banco eseguibile
+  fa girare.
   IL BARATTOLINO FILTRA LA HOME (ago 2026, decisione di Andrea): un
   tocco e la vetrina mostra i soli annunci del barattolo, SENZA
   cambiare vista; si spegne ritoccandolo, dalla pillola in vetrina, o
