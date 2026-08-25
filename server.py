@@ -6710,6 +6710,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("UPDATE offerte SET venditore_id=? WHERE venditore_id=?",
                     (id_telegram, id_nostr))
+        # Le figlie delle offerte sul CARRELLO muoiono PRIMA della
+        # testata, o resterebbero orfane (offerte_righe non ha tg_id:
+        # si arriva dalla testata, e dopo il DELETE non c'e' piu' la
+        # strada per trovarle).
+        con.execute("DELETE FROM offerte_righe WHERE offerta_id IN "
+                    "(SELECT id FROM offerte WHERE compratore_id=? AND "
+                    "venditore_id=?)", (id_telegram, id_telegram))
         con.execute("DELETE FROM offerte WHERE compratore_id=? AND "
                     "venditore_id=?", (id_telegram, id_telegram))
         # Le gare d'asta seguono l'utente. Fatture e registro col
@@ -12127,6 +12134,19 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
                 "('proposta','controproposta','accettata')",
                 (int(time.time()), annuncio_id))
             decadute = [r["compratore_id"] for r in vive]
+        # ...e le offerte sul CARRELLO che contengono il pezzo (ago
+        # 2026): la composizione non e' piu' onorabile, accettate
+        # comprese — la stessa regola delle singole.
+        vive_c = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=0 "
+            "AND stato IN ('proposta','controproposta','accettata') AND "
+            "id IN (SELECT offerta_id FROM offerte_righe WHERE "
+            "annuncio_id=?)", (annuncio_id,)).fetchall()
+        for v in vive_c:
+            con.execute("UPDATE offerte SET stato='decaduta', "
+                        "aggiornato=? WHERE id=?",
+                        (int(time.time()), v["id"]))
+            decadute.append(v["compratore_id"])
     con.commit()
     con.close()
     if riattivato:
@@ -12335,6 +12355,22 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                         "WHERE annuncio_id=? AND stato IN "
                         "('proposta','controproposta')",
                         (int(time.time()), annuncio_id))
+        # ...e le offerte sul CARRELLO che contengono l'annuncio (ago
+        # 2026): la cifra era stata pensata su un mucchio il cui listino
+        # non esiste piu'. Solo le PENDENTI, la stessa regola delle
+        # singole — un accordo stretto sopravvive, e il max(0,...) del
+        # pagamento protegge il compratore se il listino scende.
+        decadute_carrello = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=0 "
+            "AND stato IN ('proposta','controproposta') AND id IN "
+            "(SELECT offerta_id FROM offerte_righe WHERE annuncio_id=?)",
+            (annuncio_id,)).fetchall()
+        for v in decadute_carrello:
+            con.execute("UPDATE offerte SET stato='decaduta', "
+                        "aggiornato=? WHERE id=?",
+                        (int(time.time()), v["id"]))
+    else:
+        decadute_carrello = []
     con.commit()
     con.close()
     # La notifica DOPO il commit, come sempre
@@ -12343,6 +12379,13 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"✏️ Il venditore ha ritoccato il prezzo di "
             f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
             f"interessa ancora, riproponi sul prezzo nuovo."
+            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+    for riga in decadute_carrello:
+        await notifica(riga["compratore_id"],
+            f"✏️ Il venditore ha ritoccato il prezzo di "
+            f"«{d['titolo'][:60]}», che è dentro la tua offerta sul "
+            f"carrello: l'offerta decade. Se ti interessa ancora, "
+            f"riproponi sul listino nuovo."
             f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
     conto_foto = {}
     if isinstance(d.get("foto"), list):
@@ -17311,6 +17354,20 @@ async def fai_offerta(annuncio_id: int, req: Request,
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
+def _titolo_offerta_carrello(con, offerta_id: int) -> str:
+    """Il titolo sintetico di un'offerta sul carrello, dal primo pezzo
+    fotografato: «Miele +2» (il pattern di _titolo_ordine). GREZZO
+    apposta: chi lo mette in una notifica lo scappa all'assegnazione
+    (la regola B6), chi lo mette in un detail JSON no."""
+    figlie = con.execute(
+        "SELECT titolo FROM offerte_righe WHERE offerta_id=?",
+        (offerta_id,)).fetchall()
+    if not figlie:
+        return "carrello"
+    base = (figlie[0]["titolo"] or "?")[:40]
+    return base + (f" +{len(figlie) - 1}" if len(figlie) > 1 else "")
+
+
 @app.post("/api/offerte/carrello")
 async def fai_offerta_carrello(req: Request,
                                x_tg_init_data: str = Header(""),
@@ -17580,7 +17637,10 @@ def mie_offerte(x_tg_init_data: str = Header(""),
         "a.prezzo_sats AS listino_sats, a.prezzo_eur AS listino_eur, "
         "a.consegna, uc.nome AS compratore_nome, uv.nome AS venditore_nome "
         "FROM offerte o "
-        "JOIN annunci a ON a.id = o.annuncio_id "
+        # LEFT dall'offerta sul carrello (annuncio_id=0): con l'INNER
+        # la trattativa piu' grossa sparirebbe proprio dalla lista in
+        # cui si risponde — la lezione dei set, di nuovo
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "LEFT JOIN utenti uc ON uc.tg_id = o.compratore_id "
         "LEFT JOIN utenti uv ON uv.tg_id = o.venditore_id "
         "WHERE o.compratore_id=? OR o.venditore_id=? "
@@ -17594,8 +17654,24 @@ def mie_offerte(x_tg_init_data: str = Header(""),
         "ORDER BY (o.stato IN ('proposta','controproposta',"
         "'accettata')) DESC, o.aggiornato DESC LIMIT 30",
         (user["id"], user["id"])).fetchall()
+    offs = [dict(r) for r in righe]
+    # Le figlie delle offerte sul carrello, allegate: il client
+    # disegna l'elenco (titoli fotografati × quantita') e il
+    # venditore giudica su quello. Una query per il lotto, mai una
+    # per riga.
+    ids_carrello = [o["id"] for o in offs if not o["annuncio_id"]]
+    if ids_carrello:
+        seg = ",".join("?" * len(ids_carrello))
+        per = {}
+        for f in con.execute(
+                f"SELECT * FROM offerte_righe WHERE offerta_id IN ({seg})",
+                tuple(ids_carrello)):
+            per.setdefault(f["offerta_id"], []).append(dict(f))
+        for o in offs:
+            if not o["annuncio_id"]:
+                o["righe"] = per.get(o["id"], [])
     con.close()
-    return {"offerte": [dict(r) for r in righe],
+    return {"offerte": offs,
             "minima_percento": OFFERTA_MINIMA_PERCENTO,
             "ore_risposta": ORE_RISPOSTA_OFFERTA,
             "ore_pagamento": ORE_PAGAMENTO_OFFERTA,
@@ -17616,14 +17692,18 @@ async def rispondi_offerta(offerta_id: int, req: Request,
     d = await leggi_json(req)
     azione = d.get("azione", "")
     con = db()
+    # LEFT JOIN dall'offerta sul carrello (ago 2026): la testata ha
+    # annuncio_id=0 e con l'INNER prenderebbe un 404 muto — la lezione
+    # dei set negli INNER JOIN, alla solita maniera.
     off = con.execute(
         "SELECT o.*, a.stato AS stato_annuncio, a.titolo, "
         "a.prezzo_sats AS listino_sats, a.prezzo_eur AS listino_eur "
-        "FROM offerte o JOIN annunci a ON a.id = o.annuncio_id "
+        "FROM offerte o LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.id=?", (offerta_id,)).fetchone()
     if not off:
         con.close()
         raise HTTPException(404, "Offerta non trovata")
+    carrello = not off["annuncio_id"]
     adesso = int(time.time())
     # La scadenza si controlla anche qui, non solo nell'orologio: chi
     # risponde a un'offerta gia' morta merita un no onesto subito.
@@ -17651,7 +17731,12 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Operazione non permessa")
 
-    titolo = html.escape(off["titolo"][:60])
+    titolo = html.escape(_titolo_offerta_carrello(con, offerta_id)
+                         if carrello else off["titolo"][:60])
+    # La frase che nomina l'oggetto: sul carrello «il carrello (Miele
+    # +2)», sul singolo le virgolette di sempre — cosi' i testi delle
+    # azioni restano UNO a testa invece di sdoppiarsi.
+    cosa = f"il carrello ({titolo})" if carrello else f"«{titolo}»"
     # DUE link, e non uno: la regola e' che il link porti DOVE C'E'
     # IL GESTO. Chi deve muovere una pedina nella scheda Ordini ci
     # va (`link_off`); chi non ha piu' niente da fare li' torna
@@ -17660,7 +17745,15 @@ async def rispondi_offerta(offerta_id: int, req: Request,
     # sulle Offerte, dove una rifiutata non si disegna affatto —
     # renderOfferte filtra le sole vive — e chi tocca atterrerebbe
     # su una pagina che non lo nomina.
-    link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
+    # Sul CARRELLO l'annuncio non c'e': il ritorno e' il negozio del
+    # venditore, dove si ricompone e si rioffre.
+    if carrello:
+        _neg = con.execute("SELECT negozio FROM utenti WHERE tg_id=?",
+                           (off["venditore_id"],)).fetchone()
+        link = (f"\n{URL_PUBBLICO}/negozio/{_neg['negozio']}"
+                if _neg and _neg["negozio"] else "")
+    else:
+        link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
     link_off = f"\n{URL_PUBBLICO}/offerta/{offerta_id}"
     # I pezzi dell'accordo: 0 (le offerte di ieri) e 1 dicono la sola
     # cifra, com'e' sempre stato — vedi _cifra_accordo. Niente «or 0»:
@@ -17673,8 +17766,29 @@ async def rispondi_offerta(offerta_id: int, req: Request,
 
     if azione == "accetta":
         # L'annuncio deve essere ancora in vetrina: su uno gia' venduto
-        # o rimosso l'accordo non ha piu' oggetto.
-        if off["stato_annuncio"] != "attivo":
+        # o rimosso l'accordo non ha piu' oggetto. Sul CARRELLO la
+        # domanda si fa a TUTTE le figlie — solo lo STATO, mai lo
+        # stock: accettare non riserva, e i pezzi che mancano li dice
+        # il pagamento col suo 400 onesto (se il venditore rifornisce
+        # entro la scadenza, si paga).
+        if carrello:
+            morta = con.execute(
+                "SELECT r.titolo FROM offerte_righe r WHERE "
+                "r.offerta_id=? AND NOT EXISTS (SELECT 1 FROM annunci a "
+                "WHERE a.id=r.annuncio_id AND a.stato='attivo') LIMIT 1",
+                (offerta_id,)).fetchone()
+            if morta:
+                con.execute("UPDATE offerte SET stato='decaduta', "
+                            "aggiornato=? WHERE id=?",
+                            (adesso, offerta_id))
+                con.commit()
+                con.close()
+                # detail JSON: il client lo rende col suo esc(), il
+                # patto di nome_pezzo
+                raise HTTPException(400,
+                    f"«{(morta['titolo'] or '?')[:40]}» non è più "
+                    f"disponibile: l'offerta sul carrello è decaduta")
+        elif off["stato_annuncio"] != "attivo":
             con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
                         "WHERE id=?", (adesso, offerta_id))
             con.commit()
@@ -17709,19 +17823,28 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                      offerta_id))
         con.commit()
         con.close()
+        # L'avviso sulla vetrina segue la specie: sul singolo decade
+        # chi si vede pagare il prezzo pieno davanti, sul carrello
+        # decade solo se un pezzo si ESAURISCE.
+        avviso_vetrina = ("Occhio: gli annunci restano in vetrina — se "
+                          "uno dei pezzi si esaurisce prima che tu "
+                          "paghi, l'offerta decade."
+                          if carrello else
+                          "Occhio: l'annuncio resta in vetrina, se "
+                          "qualcuno paga il prezzo pieno prima di te "
+                          "l'offerta decade.")
         if off["stato"] == "proposta":
             await notifica(off["compratore_id"],
-                f"🎉 <b>Offerta accettata!</b> Puoi comprare «{titolo}» a "
+                f"🎉 <b>Offerta accettata!</b> Puoi comprare {cosa} a "
                 f"{cifra_proposta}: hai {ORE_PAGAMENTO_OFFERTA} ore per "
                 f"pagare dalla scheda Ordini. I tuoi sats finiscono nel "
-                f"deposito di garanzia, come sempre. Occhio: l'annuncio "
-                f"resta in vetrina, se qualcuno paga il prezzo pieno prima "
-                f"di te l'offerta decade.{link_off}")
+                f"deposito di garanzia, come sempre. "
+                f"{avviso_vetrina}{link_off}")
         else:
             contro = _cifra_accordo(off["valuta"], off["contro_sats"],
                                     off["contro_eur"], pezzi)
             await notifica(off["venditore_id"],
-                f"🤝 La tua controproposta di {contro} per «{titolo}» è "
+                f"🤝 La tua controproposta di {contro} per {cosa} è "
                 f"stata accettata: l'acquirente ha "
                 f"{ORE_PAGAMENTO_OFFERTA} ore per pagare. Ti avvisiamo "
                 f"appena i sats sono nel deposito di garanzia.")
@@ -17735,12 +17858,14 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         if off["stato"] == "proposta":
             await notifica(off["compratore_id"],
                 f"Il venditore ha rifiutato la tua offerta di "
-                f"{cifra_proposta} per «{titolo}». Se vuoi puoi riprovare "
+                f"{cifra_proposta} per {cosa}. Se vuoi puoi riprovare "
                 f"con una cifra diversa, o comprare a prezzo pieno.{link}")
         else:
             await notifica(off["venditore_id"],
                 f"L'acquirente ha rifiutato la tua controproposta per "
-                f"«{titolo}». L'annuncio resta in vetrina come sempre.")
+                f"{cosa}. "
+                + ("Gli annunci restano" if carrello
+                   else "L'annuncio resta") + " in vetrina come sempre.")
         return {"ok": True, "stato": "rifiutata"}
 
     if azione == "rilancia":
@@ -17814,7 +17939,7 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                                    off["contro_eur"])
                     + (" al pezzo" if pezzi > 1 else ""))
         await notifica(off["venditore_id"],
-            f"↔ <b>Rilancio!</b> Per «{titolo}» l'acquirente sale a "
+            f"↔ <b>Rilancio!</b> Per {cosa} l'acquirente sale a "
             f"{_cifra_accordo(off['valuta'], nuovo_sats, nuovo_eur, pezzi)} "
             f"(tu chiedevi {chiedevi}). Puoi accettare, rifiutare o fare "
             f"un'altra controproposta entro {ORE_RISPOSTA_OFFERTA} ore."
@@ -17825,7 +17950,53 @@ async def rispondi_offerta(offerta_id: int, req: Request,
     # e mai sopra il listino (a quel punto tanto vale il prezzo pieno).
     contro_sats, contro_eur, contro = _cifra_da_payload(
         off["valuta"], d.get("importo"))
-    if off["valuta"] == "eur":
+    if carrello:
+        # Il listino del carrello e' la SOMMA dei listini CORRENTI
+        # delle figlie: serve il ricontrollo della composizione (una
+        # riga morta non ha un listino — e' l'unica azione oltre
+        # all'accetta che lo fa, dichiarato: le serve il numero) e,
+        # nel misto, il cambio di adesso — le regole di
+        # fai_offerta_carrello.
+        vive = con.execute(
+            "SELECT r.quantita, r.titolo, a.stato, a.valuta, "
+            "a.prezzo_sats, a.prezzo_eur FROM offerte_righe r "
+            "LEFT JOIN annunci a ON a.id=r.annuncio_id "
+            "WHERE r.offerta_id=?", (offerta_id,)).fetchall()
+        for r in vive:
+            if r["stato"] != "attivo":
+                con.execute("UPDATE offerte SET stato='decaduta', "
+                            "aggiornato=? WHERE id=?",
+                            (adesso, offerta_id))
+                con.commit()
+                con.close()
+                raise HTTPException(400,
+                    f"«{(r['titolo'] or '?')[:40]}» non è più "
+                    f"disponibile: l'offerta sul carrello è decaduta")
+        cambio = 0.0
+        if off["valuta"] == "sats" and any(
+                r["valuta"] == "eur" and r["prezzo_eur"] > 0 for r in vive):
+            cambio = await cambio_btc_eur()
+            if cambio <= 0:
+                con.close()
+                raise HTTPException(503, "Il cambio euro non è "
+                                         "disponibile in questo momento: "
+                                         "riprova tra qualche minuto")
+        lst_sats, lst_eur = 0, 0.0
+        for r in vive:
+            if r["valuta"] == "eur" and r["prezzo_eur"] > 0:
+                u = (max(1, round(r["prezzo_eur"] / cambio * 1e8))
+                     if cambio > 0 else r["prezzo_sats"])
+                lst_eur = round(lst_eur + r["prezzo_eur"] * r["quantita"], 2)
+            else:
+                u = r["prezzo_sats"]
+            lst_sats += u * r["quantita"]
+        if off["valuta"] == "eur":
+            offerto, listino = off["importo_eur"], lst_eur
+            soffitto = off["contro_eur"]
+        else:
+            offerto, listino = off["importo_sats"], lst_sats
+            soffitto = off["contro_sats"]
+    elif off["valuta"] == "eur":
         offerto, listino = off["importo_eur"], off["listino_eur"]
         soffitto = off["contro_eur"]
     else:
@@ -17866,7 +18037,7 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                             off["importo_eur"])
              + (" al pezzo" if pezzi > 1 else ""))
     await notifica(off["compratore_id"],
-        f"🤝 <b>Controproposta!</b> Per «{titolo}» il venditore ti propone "
+        f"🤝 <b>Controproposta!</b> Per {cosa} il venditore ti propone "
         f"{_cifra_accordo(off['valuta'], contro_sats, contro_eur, pezzi)} "
         f"(avevi offerto {avevi}). Accetta o rifiuta dalla scheda Ordini "
         f"entro {ORE_RISPOSTA_OFFERTA} ore.{link_off}")
@@ -17908,12 +18079,21 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     # «non e' tua» da «non esiste» — chi enumera non impara niente.
     off = con.execute(
         "SELECT o.*, a.titolo FROM offerte o "
-        "JOIN annunci a ON a.id = o.annuncio_id "
+        # LEFT: la testata dell'offerta sul carrello ha annuncio_id=0,
+        # e con l'INNER il ritiro risponderebbe un 400 muto (la
+        # lezione dei set)
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.id=? AND o.compratore_id=?",
         (offerta_id, user["id"])).fetchone()
     if not off:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    carrello = not off["annuncio_id"]
+    # Il titolo del carrello si legge ADESSO, a connessione aperta: la
+    # notifica parte dopo il commit e il close, e le figlie non si
+    # possono piu' chiedere da la'.
+    titolo_grezzo = (_titolo_offerta_carrello(con, offerta_id)
+                     if carrello else off["titolo"][:60])
     adesso = int(time.time())
     # La scadenza si controlla anche qui, come nel gemello — e non e'
     # pignoleria: senza, il ritiro di un'accettata gia' morta manderebbe
@@ -17979,8 +18159,10 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     # un'offerta!», quindi il silenzio lo lascerebbe a rispondere a un
     # fantasma — e nel progetto la chiusura unilaterale di una
     # trattativa si dice sempre all'altra parte (il rifiuto lo fa nei
-    # due versi). Titolo scappato all'assegnazione, una volta sola.
-    titolo = html.escape(off["titolo"][:60])
+    # due versi). Titolo scappato all'assegnazione, una volta sola —
+    # quello del carrello e' stato letto a connessione aperta, sopra.
+    titolo = html.escape(titolo_grezzo)
+    cosa = f"il carrello ({titolo})" if carrello else f"«{titolo}»"
     # La cifra la decide lo STATO, e non `_importo_accordo` da
     # sola: su 'proposta' col rilancio la contro_* del venditore e'
     # ancora in colonna (e' il soffitto), ma a ritirarsi qui e'
@@ -17991,22 +18173,26 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     quale = (_importo_accordo(off) if off["stato"] == "accettata"
              else (off["importo_sats"], off["importo_eur"]))
     cifra = _cifra_accordo(off["valuta"], *quale, off["quantita"])
+    # Sul carrello il link all'annuncio non esiste (e' il negozio del
+    # venditore stesso: inutile mandarcelo), e la vetrina e' plurale.
+    resta = ("i tuoi annunci restano in vetrina" if carrello
+             else "l'annuncio resta in vetrina")
+    link_ann = ("" if carrello
+                else f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}")
     if off["stato"] == "accettata":
         # Qui aveva detto si' e aspettava dei sats: «nessun sat si era
         # mosso» e' la riga che conta, poteva credere di averli in
         # arrivo.
         await notifica(off["venditore_id"],
-            f"L'acquirente ha ritirato l'accordo su «{titolo}» ({cifra}): "
-            f"non pagherà. Nessun sat si era mosso — l'annuncio resta in "
-            f"vetrina e torna comprabile a prezzo pieno da chiunque."
-            f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}")
+            f"L'acquirente ha ritirato l'accordo su {cosa} ({cifra}): "
+            f"non pagherà. Nessun sat si era mosso — {resta} e tutto "
+            f"torna comprabile a prezzo pieno da chiunque.{link_ann}")
     else:
         # Asciutta: non e' un evento nuovo, e' la correzione di uno
         # vecchio.
         await notifica(off["venditore_id"],
-            f"L'offerta di {cifra} per «{titolo}» è stata ritirata: non "
-            f"c'è più niente a cui rispondere. L'annuncio resta in "
-            f"vetrina come sempre.")
+            f"L'offerta di {cifra} per {cosa} è stata ritirata: non "
+            f"c'è più niente a cui rispondere. E {resta}, come sempre.")
     return {"ok": True, "stato": "ritirata"}
 
 
@@ -18133,9 +18319,16 @@ async def lancia_lampo(annuncio_id: int, req: Request,
     # dell'accordo pagherebbe comunque il meglio dei due (compra() fa
     # il minimo), ma il venditore non deve potersi rimangiare la
     # stretta di mano cambiando le carte in tavola.
+    # Anche l'accordo sul CARRELLO trattiene (ago 2026): la lampo morde
+    # il lordo, quindi il max(0, Σlordo − pattuito) del pagamento puo'
+    # cambiare l'accordo_sats sotto i piedi delle parti — stessa
+    # stretta di mano, stessa regola.
     accordo = con.execute(
-        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
-        "stato='accettata' AND scadenza>?", (annuncio_id, adesso)).fetchone()["n"]
+        "SELECT COUNT(*) AS n FROM offerte "
+        "WHERE stato='accettata' AND scadenza>? "
+        "AND (annuncio_id=? OR (annuncio_id=0 AND id IN "
+        "(SELECT offerta_id FROM offerte_righe WHERE annuncio_id=?)))",
+        (adesso, annuncio_id, annuncio_id)).fetchone()["n"]
     if accordo:
         con.close()
         raise HTTPException(400, "C'è una trattativa accettata in corso: "
@@ -18304,12 +18497,22 @@ def _impegni_aperti(con, tg_id: int) -> list:
                     f"{data_ferie(a['asta_scadenza'])}")
     # 3) Una stretta di mano gia' data: il compratore ha le sue ore
     #    per pagare, e in ferie non potrebbe. Scade da sola.
+    #    LEFT JOIN e non JOIN (ago 2026): l'accordo sul CARRELLO ha la
+    #    testata con annuncio_id=0, e con l'INNER un venditore
+    #    chiuderebbe le ferie con un accordo di carrello vivo — la
+    #    stessa lezione «terza volta» della docstring qui sopra.
     for o in con.execute(
-            "SELECT o.id, o.scadenza, a.titolo FROM offerte o "
-            "JOIN annunci a ON a.id = o.annuncio_id "
+            "SELECT o.id, o.annuncio_id, o.scadenza, a.titolo "
+            "FROM offerte o "
+            "LEFT JOIN annunci a ON a.id = o.annuncio_id "
             "WHERE o.venditore_id=? AND o.stato='accettata' "
             "ORDER BY o.scadenza", (tg_id,)):
-        voci.append(f"offerta accettata su «{o['titolo'][:40]}»: "
+        titolo = o["titolo"]
+        cosa = f"su «{(titolo or '?')[:40]}»"
+        if not o["annuncio_id"]:      # un CARRELLO: titolo sintetico
+            cosa = (f"sul carrello "
+                    f"({_titolo_offerta_carrello(con, o['id'])[:40]})")
+        voci.append(f"offerta accettata {cosa}: "
                     f"l'accordo scade da solo entro "
                     f"{ORE_PAGAMENTO_OFFERTA} ore")
     # 4) Un pagamento gia' in viaggio: verifica_pagamento non passa
@@ -20822,6 +21025,20 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                 (adesso, e["annuncio_id"]))
             decadute += [{"compratore_id": v["compratore_id"],
                           "titolo": e["titolo"]} for v in vive]
+        # ...e le offerte sul CARRELLO che contengono il pezzo
+        # esaurito (ago 2026): la composizione non e' piu' onorabile —
+        # accettate comprese, la stessa regola delle singole. Il 🕊 le
+        # avvisa col titolo del pezzo, che e' la ragione.
+        vive_c = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=0 "
+            "AND stato IN ('proposta','controproposta','accettata') AND "
+            "id IN (SELECT offerta_id FROM offerte_righe WHERE "
+            "annuncio_id=?)", (e["annuncio_id"],)).fetchall()
+        for v in vive_c:
+            con.execute("UPDATE offerte SET stato='decaduta', "
+                        "aggiornato=? WHERE id=?", (adesso, v["id"]))
+            decadute.append({"compratore_id": v["compratore_id"],
+                             "titolo": e["titolo"]})
     # IL REGISTRO DEI NEGOZI COLLEGATI, nella STESSA transazione dello
     # stock: la pendente e il pezzo che se n'e' andato sono lo stesso
     # fatto, e un commit che ne salvasse solo uno lascerebbe il sync a
@@ -24042,12 +24259,19 @@ async def imposta_ferie(req: Request,
     # a rispondere, e chi ha offerto deve poter cercare altrove subito.
     pendenti = []
     if fino:
+        # LEFT JOIN e non JOIN: le offerte sul CARRELLO hanno la
+        # testata con annuncio_id=0, e con l'INNER decadrebbero senza
+        # che nessuno lo dica a chi ha offerto (la lezione dei set).
         pendenti = [dict(r) for r in con.execute(
-            "SELECT o.id, o.compratore_id, a.titolo FROM offerte o "
-            "JOIN annunci a ON a.id = o.annuncio_id "
+            "SELECT o.id, o.annuncio_id, o.compratore_id, a.titolo "
+            "FROM offerte o "
+            "LEFT JOIN annunci a ON a.id = o.annuncio_id "
             "WHERE o.venditore_id=? AND o.stato IN "
             "('proposta','controproposta')", (user["id"],))]
         for o in pendenti:
+            if not o["annuncio_id"]:
+                o["titolo"] = _titolo_offerta_carrello(con, o["id"])
+                o["carrello"] = True
             con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
                         "WHERE id=?", (adesso, o["id"]))
     # ferie_avvisato torna a zero: il promemoria del rientro e' di
@@ -24058,10 +24282,15 @@ async def imposta_ferie(req: Request,
     con.close()
     for o in pendenti:
         try:
+            titolo = html.escape((o["titolo"] or "?")[:60])
+            cosa = (f"il carrello ({titolo})" if o.get("carrello")
+                    else f"«{titolo}»")
+            resta = ("Gli annunci restano" if o.get("carrello")
+                     else "L'annuncio resta")
             await notifica(o["compratore_id"],
-                f"🕊 Il venditore di «{html.escape((o['titolo'] or '?')[:60])}» "
-                f"è andato in ferie: la tua offerta decade. L'annuncio "
-                f"resta in vetrina — riapre il {data_ferie(fino)}, e da "
+                f"🕊 Il venditore di {cosa} "
+                f"è andato in ferie: la tua offerta decade. {resta} "
+                f"in vetrina — riapre il {data_ferie(fino)}, e da "
                 f"lì potrai riprovare.")
         except Exception as e:
             print(f"⚠️ Avviso decadenza per ferie saltato (#{o['id']}): {e}")
@@ -33635,13 +33864,38 @@ async def scadenze_offerte():
         "WHERE o.stato IN ('proposta','controproposta','accettata') AND "
         "(a.stato != 'attivo' OR (o.scadenza > 0 AND o.scadenza < ?))",
         (adesso,)).fetchall()
-    if not righe:
+    # LE OFFERTE SUL CARRELLO hanno una query LORO e non un LEFT JOIN
+    # nella prima (ago 2026): la condizione di morte non e' «l'annuncio
+    # non e' attivo» ma «ESISTE una figlia il cui annuncio non e' piu'
+    # attivo» — e l'EXISTS negato copre anche l'annuncio CANCELLATO,
+    # che un a.stato non vedrebbe. La query di sempre resta
+    # byte-identica: e' il modo di non toccare cio' che funziona.
+    carrelli = con.execute(
+        "SELECT o.*, EXISTS(SELECT 1 FROM offerte_righe r WHERE "
+        "r.offerta_id=o.id AND NOT EXISTS (SELECT 1 FROM annunci a "
+        "WHERE a.id=r.annuncio_id AND a.stato='attivo')) AS sparita "
+        "FROM offerte o WHERE o.annuncio_id=0 AND "
+        "o.stato IN ('proposta','controproposta','accettata') AND "
+        "(o.scadenza > 0 AND o.scadenza < ? OR EXISTS("
+        "SELECT 1 FROM offerte_righe r WHERE r.offerta_id=o.id AND "
+        "NOT EXISTS (SELECT 1 FROM annunci a WHERE a.id=r.annuncio_id "
+        "AND a.stato='attivo')))",
+        (adesso,)).fetchall()
+    if not righe and not carrelli:
         con.close()
         return
     for r in righe:
         nuovo = "decaduta" if r["stato_annuncio"] != "attivo" else "scaduta"
         con.execute("UPDATE offerte SET stato=?, aggiornato=? WHERE id=?",
                     (nuovo, adesso, r["id"]))
+    # I titoli sintetici si leggono ORA, a connessione aperta: le
+    # notifiche partono dopo il close.
+    titoli_carrello = {}
+    for r in carrelli:
+        titoli_carrello[r["id"]] = _titolo_offerta_carrello(con, r["id"])
+        con.execute("UPDATE offerte SET stato=?, aggiornato=? WHERE id=?",
+                    ("decaduta" if r["sparita"] else "scaduta",
+                     adesso, r["id"]))
     con.commit()
     con.close()
     for r in righe:
@@ -33672,6 +33926,39 @@ async def scadenze_offerte():
                     f"L'acquirente non ha completato il pagamento in "
                     f"tempo: l'offerta su «{titolo}» è scaduta e "
                     f"l'annuncio resta in vetrina.")
+        except Exception as e:
+            print(f"⚠️ Notifica di scadenza offerta saltata: {e}")
+    # Le offerte sul carrello, con le parole loro: la decadenza nomina
+    # il mucchio, mai un annuncio che non c'e'.
+    for r in carrelli:
+        titolo = html.escape(titoli_carrello.get(r["id"], "carrello"))
+        try:
+            if r["sparita"]:
+                await notifica(r["compratore_id"],
+                    f"Uno degli oggetti del carrello ({titolo}) non è "
+                    f"più disponibile: la tua offerta sul carrello "
+                    f"decade.")
+            elif r["stato"] == "proposta":
+                cifra = _cifra_accordo(r["valuta"], r["importo_sats"],
+                                       r["importo_eur"], 0)
+                await notifica(r["compratore_id"],
+                    f"⏳ La tua offerta di {cifra} per il carrello "
+                    f"({titolo}) è scaduta senza risposta. Gli annunci "
+                    f"sono ancora in vetrina, se vuoi riprovare.")
+            elif r["stato"] == "controproposta":
+                await notifica(r["venditore_id"],
+                    f"⏳ La tua controproposta per il carrello "
+                    f"({titolo}) è scaduta senza risposta "
+                    f"dell'acquirente.")
+            else:  # accettata, ma il pagamento non e' mai arrivato
+                cifra = _cifra_accordo(r["valuta"], *_importo_accordo(r), 0)
+                await notifica(r["compratore_id"],
+                    f"⏳ Il tempo per comprare il carrello ({titolo}) a "
+                    f"{cifra} è finito: l'offerta è scaduta.")
+                await notifica(r["venditore_id"],
+                    f"L'acquirente non ha completato il pagamento in "
+                    f"tempo: l'offerta sul carrello ({titolo}) è "
+                    f"scaduta e i tuoi annunci restano in vetrina.")
         except Exception as e:
             print(f"⚠️ Notifica di scadenza offerta saltata: {e}")
 

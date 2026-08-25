@@ -8034,8 +8034,13 @@ def prove_pausa():
     TRE = "('proposta','controproposta','accettata')"
     prova("le offerte vive si leggono sui tre stati", True,
           f"AND stato IN {TRE}" in ric)
+    # HA CAMBIATO LATO (ago 2026, l'offerta sul carrello): le
+    # occorrenze erano due — la SELECT delle vive e l'UPDATE che le
+    # decade — e sono diventate TRE con la SELECT delle offerte di
+    # CARRELLO che contengono il pezzo in pausa: anche loro decadono,
+    # la composizione non e' piu' onorabile.
     prova("...e decadono sugli stessi tre", True,
-          f"stato='decaduta'" in ric and ric.count(TRE) == 2)
+          f"stato='decaduta'" in ric and ric.count(TRE) == 3)
     prova("la decadenza sta DENTRO il ramo della pausa", True,
           prima(ric, "if esaurito_ora:", "stato='decaduta'"))
     prova("...e PRIMA del commit (una transazione sola)", True,
@@ -17154,6 +17159,9 @@ def prove_ricevuta_compratore():
             CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
               compratore_id INT, ordine_id INT, stato TEXT,
               aggiornato INT DEFAULT 0);
+            CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+              offerta_id INT, annuncio_id INT, quantita INT,
+              unitario_sats INT, unitario_eur REAL, titolo TEXT);
             CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY
               AUTOINCREMENT, connettore_id INT, annuncio_id INT,
               ordine_id INT, delta INT, tipo TEXT,
@@ -20384,7 +20392,12 @@ def prove_deep_link_offerta():
     # solo le colonne che l'ordinamento tocca: il resto della SELECT
     # non c'entra con la domanda «chi sopravvive al taglio?»
     sql = "SELECT o.id" + sql[sql.index(" FROM offerte o"):]
-    sql = sql.replace("JOIN annunci a ON a.id = o.annuncio_id", "")
+    # HA CAMBIATO LATO (ago 2026, l'offerta sul carrello): il JOIN su
+    # annunci e' diventato LEFT — la testata carrello ha annuncio_id=0
+    # e con l'INNER sparirebbe dalla lista in cui si risponde. Il
+    # replace deve togliere la forma NUOVA intera, o lascerebbe un
+    # «LEFT » orfano davanti al WHERE (successo: syntax error).
+    sql = sql.replace("LEFT JOIN annunci a ON a.id = o.annuncio_id", "")
     sql = sql.replace("LEFT JOIN utenti uc ON uc.tg_id = "
                       "o.compratore_id", "")
     sql = sql.replace("LEFT JOIN utenti uv ON uv.tg_id = "
