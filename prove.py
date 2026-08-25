@@ -26849,13 +26849,31 @@ def prove_scoprire():
     BANNER = {"lampo.webp": "Offerte a tempo",
               "sconto.webp": "Sconti dei negozi",
               "p2p.webp": "P2P"}
+    # LA MISURA DELLA CARD SI LEGGE DAL CSS, e non si ribatte qui: e'
+    # la stessa regola che la fascia del contrasto dichiara gia' per
+    # se' («la geometria viene dal CSS e non da qui»), portata anche
+    # alla misura dei file. Erano tre numeri sparsi — 750, 345 e il
+    # 115 dentro la fascia — e il giorno che la card e' cresciuta
+    # andavano mossi tutti e tre a mano; scritti qui, chi ritocca il
+    # CSS senza rigenerare i banner non lo sente da nessuna parte,
+    # e object-fit:cover gli ritaglia il disegno in silenzio.
+    _mis = re.search(r"\.scoprire-card\{[^}]*?width:(\d+)px[^}]*?"
+                     r"aspect-ratio:(\d+)/(\d+)", mini, re.S)
+    prova("la card dichiara la sua misura nel CSS", True, bool(_mis))
+    CARD_W, CARD_H = int(_mis.group(1)), int(_mis.group(3))
+    # ...e la larghezza dell'aspect-ratio E' la width, o i file
+    # sarebbero tagliati su un rapporto che la card non ha
+    prova("...e il rapporto combacia con la larghezza",
+          CARD_W, int(_mis.group(2)))
     for _f in BANNER:
         prova(f"il banner {_f} esiste", True,
               os.path.exists(os.path.join("assets", "scoprire", _f)))
-    # ...e sono ESATTAMENTE 750x345, il triplo della card 250x115: un
+    # ...e sono ESATTAMENTE 816x390, il triplo della card 272x130: un
     # ratio diverso verrebbe ritagliato da object-fit:cover in
     # silenzio, e il disegno di Andrea perderebbe i bordi senza che
-    # nessuno lo veda.
+    # nessuno lo veda. I tre numeri (CARD_W, CARD_H e il triplo) sono
+    # LA STESSA misura del CSS: chi cresce le card li muove insieme,
+    # o la prova diventa rossa il giro dopo.
     # i titoli dell'elenco sono quelli VERI del catalogo, o la
     # fascia del contrasto (qui sotto, derivata dal titolo)
     # misurerebbe la lunghezza di un titolo inventato
@@ -26863,7 +26881,7 @@ def prove_scoprire():
           all(f"testo: '{_t}'" in mini for _t in BANNER.values()))
     try:
         from PIL import Image as _Im
-        prova("...e misurano 750x345", [(750, 345)] * len(BANNER),
+        prova("...e misurano 816x390", [(CARD_W * 3, CARD_H * 3)] * len(BANNER),
               [_Im.open(os.path.join("assets", "scoprire", _f)).size
                for _f in BANNER])
     except ImportError:
@@ -27287,6 +27305,23 @@ def prove_scoprire():
           (True, True),
           ("_ov = _blocco('.scoprire-card[data-id=" in _io,
            '_num(_ov, "left:", _num(_base, "left:"))' in _io))
+    # ...e la fascia LARGA si deriva dall'ALTEZZA invece di portare due
+    # numeri in coordinate immagine (erano 30 e 315 su 345). Scritti a
+    # mano resterebbero a guardare dove il titolo stava alla misura di
+    # IERI, e il giorno della card piu' grande non se ne accorgerebbe
+    # nessuno: una fascia piu' STRETTA del vero passa sempre, ed e' il
+    # modo silenzioso in cui questa prova smetterebbe di provare
+    # qualcosa. Stessa ragione della riga qui sopra, sull'altro asse.
+    # ⚠️ DUE trappole in una riga, e le ho prese tutte e due scrivendo
+    # questa prova. 1) Si guarda la REGIONE della fascia e non tutto
+    # il file, o la prova trova la stringa dentro SE STESSA e resta
+    # rossa per sempre. 2) E si prende l'ULTIMA occorrenza dell'ancora,
+    # perche' la PRIMA e' la riga qui sotto — quella che la cerca.
+    _fascia = _io[_io.rindex("_QUIETE = 3, CARD_H"):]
+    prova("...e la fascia larga si deriva dall'altezza della card",
+          (True, False),
+          ("(_ALTA - _QUIETE) * _F" in _fascia,
+           "_y1 = 30, 315" in _fascia))
     # tre: l'aria-label della card, la riserva e il titolo — un
     # quarto posto sarebbe un doppione da guardare
     prova("...e il testo e' quello del catalogo, tre volte", 3,
@@ -27310,9 +27345,12 @@ def prove_scoprire():
     # fascia piu' larga. Oltre la scatola il titolo va a capo, e li'
     # si torna alla fascia conservativa di sempre (tutta l'altezza),
     # perche' quante righe diventino non lo sappiamo.
-    # Misurati: 11.4 (lampo) e 12.0 (sconto) sulla fascia piena,
-    # 14.4 (p2p) sulla sua riga — un ridisegno che scalda la fascia
-    # di una card si sente da qui.
+    # Misurati a 272x130: 11,8 (lampo) e 12,0 (sconto) sulla fascia
+    # piena, 14,8 (p2p) sulla sua riga — un ridisegno che scalda la
+    # fascia di una card si sente da qui. Crescendo la card i tre
+    # sono MIGLIORATI (erano 10,7 / 11,9 / 12,9 a 250x115): la fascia
+    # e' in px CSS mentre il disegno si scala, quindi in proporzione
+    # copre meno immagine e resta piu' a sinistra, dove e' scura.
     try:
         from PIL import Image as _Im
 
@@ -27350,7 +27388,15 @@ def prove_scoprire():
 
         _base = _blocco(".sc-titolo{")
         _largo, _passo = _num(_base, "width:"), _num(_base, "line-height:")
-        _F, _ALTA, _M = 3, 115, 12      # 750/250; la card; il margine dell'onda
+        # _F e' il triplo dei file, _ALTA la card, _M il margine
+        # dell'onda. _QUIETE sono i 10px CSS di margine sopra e sotto
+        # della fascia larga: erano scritti a mano in coordinate
+        # IMMAGINE (30 e 315 su 345), cioe' due numeri che il giorno
+        # della card piu' grande sarebbero rimasti a guardare dove il
+        # titolo stava ieri. Derivati, la fascia e' la STESSA e non
+        # invecchia piu': non e' un allentamento, e' la stessa regola
+        # scritta in modo che segua il CSS come gia' fa tutto il resto.
+        _F, _ALTA, _M, _QUIETE = 3, CARD_H, 12, 10
         for _f, _testo in BANNER.items():
             _ov = _blocco('.scoprire-card[data-id="%s"] .sc-titolo{'
                           % _f.rsplit(".", 1)[0])
@@ -27366,7 +27412,7 @@ def prove_scoprire():
                 _y1 = round((_ALTA + _h) / 2 * _F) + _M
                 _x1 = round((_sx + _w) * _F) + _M
             else:                       # va a capo: la fascia di sempre
-                _y0, _y1 = 30, 315
+                _y0, _y1 = _QUIETE * _F, (_ALTA - _QUIETE) * _F
                 _x1 = round((_sx + _largo) * _F) + _M
             _lmax = max(_lum(_im.getpixel((x, y)))
                         for y in range(_y0, _y1, 3)

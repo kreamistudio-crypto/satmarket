@@ -886,12 +886,35 @@
      .cat-tile (griglia, piastrelle-colonna, velo sotto il nome). */
 
   /* ---------- «Da scoprire» ---------- */
-  /* La fila dei banner sotto le categorie: card rettangolari 250x115
+  /* La fila dei banner sotto le categorie: card rettangolari 272x130
      (decisione di Andrea: larghe, da banner — a 320px una quasi piena
      piu' uno spicchio della seconda, il taglio al bordo dice che ce
-     n'e' altre). Il testo sta DENTRO il disegno (750x345, colori
+     n'e' altre). Il testo sta DENTRO il disegno (816x390, colori
      fissi nei due temi come tutto cio' che vive su una foto):
-     l'etichetta la porta l'aria-label. Niente min-height sulla
+     l'etichetta la porta l'aria-label.
+     LA MISURA E' CRESCIUTA (ago 2026, da 250x115: decisione di Andrea
+     «un po' piu' grandi, soprattutto piu' ALTE»), e i due numeri che
+     la fissano sono MISURATI e non scelti a occhio.
+     IL VINCOLO NON E' IL DISEGNO — crescendo in ALTEZZA non se ne
+     perde, se ne RECUPERA: gli originali sono 2752x1536 (rapporto
+     1,792) e il ritaglio ne usava l'82% dell'altezza, adesso l'86%
+     (a 250x115 il fondo della scatola degli sconti era TAGLIATO, e
+     ora si vede intero). Il limite dell'originale e' il rapporto
+     1,792, sotto il quale si comincerebbe a tagliare in LARGHEZZA:
+     siamo a 2,092, lontani. Chi ricrescera' ancora rifaccia quel
+     conto, e sappia che il file a 3x non deve superare 2752 di
+     larghezza — cioe' una card larga 917, che nessuno vorra' mai.
+     IL VINCOLO E' LA FILA A 320px, e a decidere e' lo SPICCHIO della
+     seconda card: «il taglio al bordo dice che ce n'e' altre», qui
+     sopra, e' una promessa che si mantiene solo se resta abbastanza
+     card da vedere. Lo spicchio a 320 e' 296-W — a 272 sono 24px,
+     sopra i 20 che la .cat-strip accetta per la sua quarta card, e il
+     border-radius di 14 non se li mangia tutti. A 280 scenderebbero a
+     16, cioe' poco piu' del raggio: una scheggia, non una card.
+     IL PREZZO E' MISURATO e sta sotto: dopo il tocco la griglia sopra
+     la nav a 320x568 passa da 74 a 59px. Lo scroll AL REPARTO invece
+     non si muove di un pixel (235px prima e dopo) — quello e'
+     ancorato alla riga «N oggetti», che sta SOTTO questa sezione. Niente min-height sulla
      striscia, e la divergenza da .cat-strip e' voluta: le card
      spariscono quando non c'e' l'occasione, e uno spazio riservato
      per una cosa assente sarebbe un buco. */
@@ -905,8 +928,8 @@
     overscroll-behavior-x:contain;scrollbar-width:none;
     padding:8px var(--pad) 6px}
   .scoprire-strip::-webkit-scrollbar{display:none}
-  .scoprire-card{flex:0 0 auto;position:relative;width:250px;
-    aspect-ratio:250/115;border-radius:14px;overflow:hidden;
+  .scoprire-card{flex:0 0 auto;position:relative;width:272px;
+    aspect-ratio:272/130;border-radius:14px;overflow:hidden;
     background:var(--cat-fondo);cursor:pointer}
   .scoprire-card:active{transform:translateY(1px)}
   /* L'anello e' quello della card categoria accesa: stesso gesto
@@ -931,8 +954,11 @@
      l'origine al centro uno scale>=1 puo' solo ritagliare, mai
      scoprire, quindi il respiro parte da scale(1); e l'onda ruota
      un'immagine GIA' ingrandita del 5% — la rotazione di 0.8° scopre
-     negli angoli ~1.8px (250/2 x sin 0.8°), il 5% ne copre quasi 3
-     sul lato corto. Chi alza i gradi rifa' quel conto. */
+     negli angoli ~1,9px (272/2 x sin 0.8°), il 5% ne copre 3,25 sul
+     lato corto (130). Chi alza i gradi rifa' quel conto, che in
+     forma generale e' W/H < (scale-1)/sin(θ) = 3,58: crescendo in
+     ALTEZZA il margine migliora — col rapporto sceso da 2,17 a 2,09
+     siamo piu' al sicuro di prima, non meno. */
   .scoprire-card[data-id="lampo"] img{
     animation:sc-onda 5s ease-in-out infinite}
   .scoprire-card[data-id="sconto"] img{
@@ -1005,8 +1031,11 @@
      numeri: spostare a destra fa DUE lavori, allontana dalla scia che
      sale a destra e scavalca la sua coda in basso a sinistra (a
      left:14 un corpo da 21 non passerebbe, a left:18 si). Il filo del
-     disegno sta a x=289 sull'immagine; qui l'inchiostro vero finisce
-     a 166 e la fascia sorvegliata a 258, cioe' 10px CSS di margine.
+     disegno sta a x=318 sull'immagine (816 di larghezza); qui la
+     fascia sorvegliata finisce a 282, cioe' 12px CSS di margine —
+     ed e' CRESCIUTO da quando la card e' piu' grande: erano 3px a
+     250x115, e quel «capolinea» si e' allontanato da solo, perche'
+     la fascia e' in px CSS mentre la scia si scala col disegno.
      Chi lo sposta ancora o lo ingrandisce lo sente dalla CI — la
      fascia del contrasto legge QUESTA regola, non piu' la sola base:
      senza, avrebbe continuato a guardare dove il titolo stava ieri. */
