@@ -13636,13 +13636,16 @@ def prove_pagina_acquisto():
           _testa.count("cur-seg"))
     prova("...la fabbrica del toggle e' una sola", 1,
           mini3.count("function toggleValuta("))
-    #    e il censimento delle SUPERFICI del toggle: otto in tutto il
+    #    e il censimento delle SUPERFICI del toggle: NOVE in tutto il
     #    client (searchbar, carrello, i due dell'offerta, il dettaglio,
     #    LA CASSA — che e' l'unica a passare da una fabbrica invece che
-    #    dal markup — l'ordine e il pannello). Chi ne aggiunge una lo
-    #    sente da qui, invece di scoprirlo da un toggle che non si
-    #    accende: e' aggiornaCurToggle a doverli conoscere tutti.
-    prova("...e le superfici del toggle sono otto", 8,
+    #    dal markup — l'ordine, il pannello, e dall'ago 2026 il foglio
+    #    dell'offerta sul CARRELLO). Chi ne aggiunge una lo sente da
+    #    qui, invece di scoprirlo da un toggle che non si accende: e'
+    #    aggiornaCurToggle a doverli conoscere tutti — ed e' anche il
+    #    motivo per cui quel foglio non ha inventato nessun comando
+    #    suo, ha aggiunto una superficie a quello che c'era gia'.
+    prova("...e le superfici del toggle sono nove", 9,
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
@@ -21512,8 +21515,192 @@ def prove_rilancio_offerta():
     prova("...e nessuno se la scrive a mano", 0,
           solo.count("'eur'?'€':'sats'")
           + solo.count("'eur' ? '€' : 'sats'"))
-    prova("le superfici che chiedono una cifra unitaria sono TRE", 3,
+    #    QUATTRO dall'ago 2026: il foglio dell'offerta sul CARRELLO
+    #    l'unita' se la SCRIVEVA A MANO ('eur' ? '€' : 'sats'), che e'
+    #    esattamente la forma che la prova qui sopra vieta — col
+    #    toggle e' passato al giudice, quindi il conto sale ed e' un
+    #    guadagno, non un allentamento.
+    prova("le superfici che chiedono una cifra unitaria sono QUATTRO", 4,
           mini.count("suffissoUnita(") - 1)
+
+    # --- 3bis) IL TOGGLE DEL FOGLIO CARRELLO E' UN RICALCO -------
+    # (ago 2026, chiesto da Andrea: «rifai l'ancora ricalcandola dal
+    # singolo, non reinventandola»). Quel che queste righe sorvegliano
+    # non e' che il toggle esista — quello si vede — ma che i FERRI
+    # siano quelli del gemello: l'aritmetica della conversione deve
+    # vivere in UN posto solo per tutti e due i fogli, o il giorno che
+    # si corregge un arrotondamento se ne corregge meta'.
+    _oc = pezzo_js(mini, "function offCarrDigitata(){", "\n}")
+    _oi = pezzo_js(mini, "function inviaOffertaCarrello(btn){", "\n}")
+    _oa = pezzo_js(mini, "function aggiornaFoglioOffCarr(){", "\n}")
+    _os = pezzo_js(mini, "function offCarrScritta(){", "\n}")
+    prova("il carrello converte col ferro del singolo, mai con l'aritmetica",
+          True,
+          "offConverti(" in pezzo_js(mini, "function offCarrCifraIn(",
+                                     "\n}")
+          and "offConverti(" in pezzo_js(mini, "function offCarrScontoIn(",
+                                         "\n}"))
+    # e NON se la riscrive: eurPerSat compare solo dove il gemello ce
+    # l'ha davvero (il minimo per eccesso, che offConverti non copre
+    # perche' li' l'arrotondamento va nell'altro verso)
+    prova("...e non moltiplica per il cambio per conto suo", 0,
+          _oc.count("eurPerSat") + _oi.count("eurPerSat")
+          + _oa.count("eurPerSat") + _os.count("eurPerSat"))
+    # L'ANCORA: la scrive SOLO l'oninput (e la pillola, che pianta la
+    # cifra esatta nella valuta dell'offerta). Se la scrivesse anche il
+    # render, un toggle riscriverebbe l'originale con la propria
+    # conversione e la cifra deriverebbe a ogni tocco — e' il difetto
+    # che l'ancora esiste per non avere, e nel gemello ha la sua
+    # sentinella identica.
+    prova("l'ancora del carrello la scrivono in due: l'input e la pillola",
+          2, mini.count("offCarr.cifraValuta ="))
+    prova("...e il render NON la tocca", 0,
+          _oc.count("offCarr.cifra =") + _oa.count("offCarr.cifra ="))
+    # DOVE la piantano non lo dice il conteggio qui sopra — l'ha detto
+    # la tortura, che con «due scritture» restava verde spostandone
+    # una. La pillola la pianta nella valuta dell'OFFERTA, cosi' il
+    # −10% e' esattamente −10% al sat qualunque cosa il campo stia
+    # mostrando; l'input in quella del CAMPO, che e' la lingua in cui
+    # si sta scrivendo. Scambiarle vuol dire un −10% convertito e
+    # riconvertito, cioe' non piu' −10%.
+    _ochip = pezzo_js(mini, "function offCarrChip(scelta){", "\n}")
+    prova("la pillola pianta l'ancora nella valuta dell'offerta", True,
+          "offCarr.cifraValuta = offCarr.valuta;" in _ochip)
+    prova("...e l'input in quella del campo", True,
+          "offCarr.cifraValuta = vc;" in _os)
+    # Il campo si riscrive SOLO al cambio di valuta, o normalizzerebbe
+    # sotto le dita quel che si sta ancora scrivendo.
+    prova("il campo si riscrive solo quando la valuta cambia davvero",
+          True, "if (vc !== offCarr.campoValuta) {" in _oa)
+    # ALL'INVIO parte SEMPRE la valuta dell'offerta: e' l'unica in cui
+    # l'accordo esiste, e nel body non c'e' nessun campo valuta — la
+    # deduce il server dalle righe. La mutazione che manda la cifra
+    # del CAMPO fa rossa questa riga.
+    prova("all'invio si manda la cifra nella valuta dell'offerta", True,
+          "offCarrCifraIn(offCarr.valuta)" in _oi)
+    prova("...e mai quella del campo", 0,
+          _oi.count("campoValuta"))
+    # IL MINIMO si GIUDICA nella valuta dell'offerta — la stessa cifra
+    # che giudichera' il server — e si DICE in quella del campo.
+    prova("il minimo si giudica sulla valuta dell'offerta", True,
+          "const v = offCarrCifraIn(offCarr.valuta);" in _oc
+          and "v < min" in _oc)
+    prova("...e si dice in quella del campo, per eccesso", True,
+          "offCarrMinimoIn(vc)" in _oc
+          and "Math.ceil" in pezzo_js(mini, "function offCarrMinimoIn(",
+                                      "\n}"))
+    # LE PILLOLE si confrontano nella valuta MOSTRATA (e' il numero che
+    # si vede) con la tolleranza di quella valuta.
+    prova("le pillole si confrontano nella valuta mostrata", True,
+          "offCarrScontoIn(x, vc)" in _oc
+          and "vc==='eur' ? 0.005 : 0.5" in _oc)
+    # IL ≈ STA SULLA FACCIA CONVERTITA E MAI SU QUELLA DELL'OFFERTA:
+    # e' la cifra che parte davvero, e un ≈ li' sopra direbbe che non
+    # e' ferma. Da qui discende anche che il ≈ non compare mai due
+    # volte nella stessa riga.
+    prova("il ≈ della riga viva sta sulla faccia convertita", True,
+          "offCifraTesto(vv, vc, conv)" in _oc
+          and "const conv = vc !== offCarr.valuta;" in _oc)
+    prova("...e la coda dice l'ALTRA faccia col suo", True,
+          "alt !== offCarr.valuta" in _oc)
+    # SENZA CAMBIO la coda non si scrive affatto: mai una conversione
+    # col valore di riserva (la regola di casa, e la stessa per cui
+    # senza cambio il toggle non si offre e la valuta resta la nativa).
+    prova("...ma solo col cambio vivo", True,
+          "if (cambioVivo) {" in _oc)
+    prova("senza cambio la valuta del campo resta quella dell'offerta",
+          True,
+          "if (!cambioVivo) return offCarr.valuta;"
+          in pezzo_js(mini, "function valutaOffCarr(){", "\n}"))
+    # E IL FOGLIO SEGUE IL TOGGLE: senza questa riga il campo direbbe
+    # una valuta e il simbolo accanto un'altra, che e' il mezzo bug
+    # gia' pagato dal gemello.
+    prova("setValuta ridisegna anche il foglio del carrello", True,
+          "aggiornaFoglioOffCarr();"
+          in pezzo_js(mini, "function setValuta(v){", "\n}"))
+    # LO STATO RESTA SUO: due fogli che scrivono nelle stesse variabili
+    # sono due fogli che un giorno si pestano.
+    prova("il carrello non tocca l'ancora del singolo", 0,
+          _oc.count("offCifra") + _oi.count("offCifra")
+          + _oa.count("offCifra") + _os.count("offCifra")
+          - _oc.count("offCifraTesto") - _oa.count("offCifraTesto"))
+
+    # --- 3ter) E L'ANCORA SI FA GIRARE ---------------------------
+    # Le sentinelle qui sopra dicono che l'ancora c'e'; che NON FACCIA
+    # DERIVARE la cifra lo dice solo l'esecuzione. Il caso che
+    # smaschera la deriva e' scelto apposta: 66661 sats non tornano a
+    # se' passando per gli euro (66661 -> 33,33 € -> 66660), quindi un
+    # render che riscrivesse l'ancora perderebbe un sat al primo
+    # toggle e un altro al terzo. Con l'ancora, dieci giri costano
+    # sempre la conversione del primo.
+    import json as _js2
+    import shutil as _sh2
+    import subprocess as _sp2
+    import tempfile as _tf2
+    _node2 = _sh2.which("node")
+    if not _node2:
+        salta("l'ancora del carrello non fa derivare la cifra",
+              "node non installato")
+    else:
+        _ferri = "".join(
+            pezzo_js(mini, f"function {nome}", "\n}") + "\n}\n"
+            for nome in ("offConverti(v, da, a){", "valutaOffCarr(){",
+                         "offCarrCifraIn(valuta){", "offCarrSconto(p){",
+                         "offCarrScontoIn(p, valuta){",
+                         "offCarrMinimo(){", "offCarrMinimoIn(valuta){"))
+        # Il mondo di cartone: un cambio TONDO (1 BTC = 50.000 €, cioe'
+        # 1 sat = 0,0005 €) cosi' gli attesi si scrivono a mano invece
+        # di derivarli dalla stessa formula — un atteso calcolato col
+        # codice che si sta provando non prova niente.
+        _prog = ("let offCarr = null, cambioVivo = true, valutaVista = 'eur';\n"
+                 "const eurPerSat = 0.0005, offertaMinPercento = 50;\n"
+                 + _ferri + """
+const out = {};
+// 1) la NON-DERIVA: ancora in sats, dieci letture alternate
+offCarr = {valuta:'sats', listinoSats:100000, listinoEur:0,
+           cifra:66661, cifraValuta:'sats', campoValuta:'sats'};
+const giro = [];
+for (let i = 0; i < 10; i++)
+  giro.push(offCarrCifraIn(i % 2 ? 'eur' : 'sats'));
+out.deriva = [...new Set(giro.filter((_, i) => i % 2 === 0))];
+out.derivaEur = [...new Set(giro.filter((_, i) => i % 2 === 1))];
+// 2) le due facce di un'ancora piantata in euro
+offCarr = {valuta:'eur', listinoSats:0, listinoEur:50,
+           cifra:50, cifraValuta:'eur', campoValuta:'eur'};
+out.eurInEur = offCarrCifraIn('eur');
+out.eurInSats = offCarrCifraIn('sats');
+// 3) la valuta del campo: col cambio muto resta quella dell'offerta
+out.vistaVivo = valutaOffCarr();
+cambioVivo = false;
+out.vistaMuto = valutaOffCarr();
+cambioVivo = true;
+// 4) la pillola nella valuta mostrata
+out.sconto10 = offCarrScontoIn(10, 'eur');
+out.sconto10Sats = offCarrScontoIn(10, 'sats');
+// 5) il minimo per ECCESSO: 50001 sats sono 25,0005 €, e dirlo
+//    25,00 sarebbe dire «va bene» a una cifra che di la' e' sotto
+offCarr = {valuta:'sats', listinoSats:100001, listinoEur:0,
+           cifra:0, cifraValuta:'', campoValuta:''};
+out.minNativo = offCarrMinimo();
+out.minInEur = offCarrMinimoIn('eur');
+console.log(JSON.stringify(out));
+""")
+        _f2 = _tf2.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f2.write(_prog)
+        _f2.close()
+        _r2 = _sp2.run([_node2, _f2.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        os.unlink(_f2.name)
+        _got = (_js2.loads(_r2.stdout.strip()) if _r2.returncode == 0
+                else {"errore": _r2.stderr[:200]})
+        prova("l'ancora del carrello non fa derivare la cifra",
+              {"deriva": [66661], "derivaEur": [33.33],
+               "eurInEur": 50, "eurInSats": 100000,
+               "vistaVivo": "eur", "vistaMuto": "eur",
+               "sconto10": 45, "sconto10Sats": 90000,
+               "minNativo": 50001, "minInEur": 25.01},
+              _got)
 
     # --- 4) E I DUE GIUDICI SI FANNO GIRARE ---------------------
     # Le sentinelle dicono che esistono, mai che rispondano uguale al
