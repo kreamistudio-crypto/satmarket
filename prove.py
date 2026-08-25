@@ -13166,9 +13166,11 @@ def prove_pagina_acquisto():
           ("codice_sconto" in _cr, "codRisp" in _cr))
     #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
     #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
-    #    c'e' e vale lo stesso ragionamento. La percentuale e' il NONO
-    #    argomento posizionale, e il CENSIMENTO qui sotto e' la sua
-    #    rete: chi ne aggiunge una chiamata e la dimentica lascia
+    #    c'e' e vale lo stesso ragionamento. La percentuale e' la
+    #    chiave `scontoPct` dell'oggetto (i dieci posizionali sono
+    #    morti col passaggio a oggetto, ago 2026, come il commento
+    #    della funzione prescriveva), e il CENSIMENTO qui sotto e' la
+    #    sua rete: chi ne aggiunge una chiamata e la dimentica lascia
     #    «Sconto» nudo, che e' un difetto che non alza niente e non si
     #    vede finche' non lo guarda qualcuno col conto scontato aperto.
     _cs = re.sub(r"/\*[\s\S]*?\*/", "",
@@ -13196,10 +13198,11 @@ def prove_pagina_acquisto():
             i += 1
         return js[dalla:i]
     # la DEFINIZIONE si esclude guardando il «function» che la precede,
-    # mai il nome del primo argomento: `contoScomposto(artS, ...)` di
-    # startBuy comincia per «art» come lei, e un filtro sul prefisso se
-    # la portava via — il censimento avrebbe detto «tutte a posto»
-    # guardandone CINQUE su sei
+    # mai la forma dell'argomento: quando i posizionali erano vivi, il
+    # filtro sul prefisso del primo nome («art») si portava via la
+    # chiamata di startBuy — il censimento avrebbe detto «tutte a
+    # posto» guardandone CINQUE su sei. Con l'oggetto la trappola
+    # cambia faccia ma il lookbehind resta la forma giusta.
     _pulito = re.sub(r"/\*[\s\S]*?\*/", "", mini3)
     _chiamate = [_chiamata(_pulito, m.start())
                  for m in re.finditer(r"(?<!function )contoScomposto\(",

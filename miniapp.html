@@ -10598,16 +10598,19 @@ function artStima(l){
 let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
-function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped,
-                        scontoPct, scontoOrigine){
-  /* ⚠️ IL DECIMO POSIZIONALE, ed e' una STRINGA e non un booleano
-     apposta: al sito di chiamata si legge COSA si sta passando
-     (`p.sconto_origine||''`, non un `1` muto). Il censimento delle sei
-     chiamate in prove.py esiste proprio perche' il nono si dimenticava,
-     e adesso conta anche questo.
-     DA SCRIVERE QUI: L'UNDICESIMO ARGOMENTO E' IL MOMENTO DI PASSARE
-     A UN OGGETTO come contoRighe(c). Sei siti da riscrivere una volta,
-     e l'undicesimo non arriverebbe mai. */
+function contoScomposto(c){
+  /* UN OGGETTO E NON PIU' DIECI POSIZIONALI (ago 2026): il commento
+     di ieri prescriveva che «l'undicesimo argomento e' il momento di
+     passare a un oggetto come contoRighe(c)» — l'undicesimo e'
+     arrivato (l'accordo di carrello) e il passaggio si e' fatto
+     PRIMA, a comportamento invariato: le chiavi tengono i nomi dei
+     vecchi posizionali e il corpo li destruttura, cosi' le righe
+     sotto non cambiano di un byte. Al sito di chiamata si continua a
+     leggere COSA si passa (`scontoOrigine: p.sconto_origine||''`,
+     mai un `1` muto), e il censimento delle chiamate in prove.py
+     resta la rete su percentuale e origine. */
+  const {art, sped, prot, tot, qta, sconto, suppl, pezziSped,
+         scontoPct, scontoOrigine} = c;
   const pezzi = qta || 1;
   /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
      riga «Articolo × N»: in un carrello l'articolo non ha un numero
@@ -14465,12 +14468,12 @@ async function startBuySet(){
   /* il foglio invoice si apre SOPRA la pagina, che resta sotto com'e'
      (niente chiusure: il velo fa il suo mestiere) */
   el('payAmount').textContent = circaS + fmt(c.tot);
-  el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot,
-                                                1, c.sconto||0,
-                                                (via && via.supplemento_sats)||0,
-                                                (via && via.pezzi)||0,
-                                                (p && p.sconto_percento)||0,
-                                                (p && p.sconto_origine)||'');
+  el('payScomposto').innerHTML = contoScomposto({art: c.art, sped: c.sped,
+    prot: c.prot, tot: c.tot, qta: 1, sconto: c.sconto||0,
+    suppl: (via && via.supplemento_sats)||0,
+    pezziSped: (via && via.pezzi)||0,
+    scontoPct: (p && p.sconto_percento)||0,
+    scontoOrigine: (p && p.sconto_origine)||''});
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -14495,11 +14498,13 @@ async function startBuySet(){
   }
   currentOrderId = d.ordine_id;
   el('payAmount').textContent = fmt(d.prezzo_sats);
-  el('payScomposto').innerHTML = contoScomposto(
-    d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
-    d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1,
-    d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-    d.sconto_percento||0, d.sconto_origine||'');
+  el('payScomposto').innerHTML = contoScomposto({
+    art: d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
+    sped: d.spedizione_sats||0, prot: d.protezione_sats||0,
+    tot: d.prezzo_sats, qta: 1,
+    sconto: d.sconto_sats||0, suppl: d.supplemento_sats||0,
+    pezziSped: d.pezzi||0,
+    scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
@@ -15599,13 +15604,13 @@ async function startBuy(){
         circaS = p ? ((p.stima || (via && via.stima)) ? '≈ ' : '')
                : stimaCirca(l);
   el('payAmount').textContent = circaS + fmt(totS);
-  el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS, totS,
-                                                (p && p.quantita) || qtaScelta,
-                                                scS,
-                                                (via && via.supplemento_sats)||0,
-                                                (via && via.pezzi)||0,
-                                                (p && p.sconto_percento)||0,
-                                                (p && p.sconto_origine)||'');
+  el('payScomposto').innerHTML = contoScomposto({art: artS, sped: spedS,
+    prot: protS, tot: totS,
+    qta: (p && p.quantita) || qtaScelta, sconto: scS,
+    suppl: (via && via.supplemento_sats)||0,
+    pezziSped: (via && via.pezzi)||0,
+    scontoPct: (p && p.sconto_percento)||0,
+    scontoOrigine: (p && p.sconto_origine)||''});
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
@@ -15633,11 +15638,13 @@ async function startBuy(){
   currentOrderId = d.ordine_id;
   if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
   if (d.prezzo_sats !== undefined)
-    el('payScomposto').innerHTML = contoScomposto(
-      d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
-      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-      d.sconto_percento||0, d.sconto_origine||'');
+    el('payScomposto').innerHTML = contoScomposto({
+      art: d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
+      sped: d.spedizione_sats||0, prot: d.protezione_sats||0,
+      tot: d.prezzo_sats, qta: d.quantita||1,
+      sconto: d.sconto_sats||0, suppl: d.supplemento_sats||0,
+      pezziSped: d.pezzi||0,
+      scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
@@ -15726,11 +15733,13 @@ function compraSubito(){
   }
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
-  el('nwcScomposto').innerHTML = contoScomposto(
-    p.articolo_lordo_sats||p.articolo_sats,
-    via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
-    p.quantita||1, p.sconto_sats||0, via.supplemento_sats||0, via.pezzi||0,
-    p.sconto_percento||0, p.sconto_origine||'');
+  el('nwcScomposto').innerHTML = contoScomposto({
+    art: p.articolo_lordo_sats||p.articolo_sats,
+    sped: via.spedizione_sats||0, prot: p.protezione_sats||0,
+    tot: via.totale_sats, qta: p.quantita||1,
+    sconto: p.sconto_sats||0, suppl: via.supplemento_sats||0,
+    pezziSped: via.pezzi||0,
+    scontoPct: p.sconto_percento||0, scontoOrigine: p.sconto_origine||''});
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -15761,11 +15770,13 @@ async function confermaCompraSubito(btn){
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
-    scompOrdine = d.prezzo_sats ? contoScomposto(
-      d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
-      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-      d.sconto_percento||0, d.sconto_origine||'') : '';
+    scompOrdine = d.prezzo_sats ? contoScomposto({
+      art: d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
+      sped: d.spedizione_sats||0, prot: d.protezione_sats||0,
+      tot: d.prezzo_sats, qta: d.quantita||1,
+      sconto: d.sconto_sats||0, suppl: d.supplemento_sats||0,
+      pezziSped: d.pezzi||0,
+      scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''}) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
