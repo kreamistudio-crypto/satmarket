@@ -14997,6 +14997,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
   senza nemmeno il bottone.
+  LA BUSTA DIRETTA (ago 2026, cantiere 45, dal campo): spedendo a un
+  locker il venditore può mettere i recapiti del COMPRATORE come
+  destinatario — il codice di ritiro glielo manda direttamente il
+  corriere, senza passare da Barattolo. Lì la riga «in attesa del
+  codice» diceva il falso e `sollecita_buste_ferme` rimproverava il
+  venditore per una busta che non sarebbe arrivata mai, fino al 🧊 su
+  un caso che non esiste. La cura è una DICHIARAZIONE del venditore,
+  mai un automatismo: la spunta nel form «📦 Spedisci» (solo via
+  punto — fuori, il flag si ignora: non ha oggetto) e — decisione di
+  Andrea — la PORTA TARDIVA nel pannello della busta
+  (`POST /api/orders/{id}/busta-diretta`): senza, chi dimentica la
+  spunta resterebbe sotto sollecito per sempre e l'unica uscita
+  sarebbe una busta finta. Il sollecito stesso NOMINA la porta
+  («dillo dall'ordine: smettiamo di chiedertelo»), ed è così che i
+  distratti la scoprono.
+  UNA COLONNA SOLA, `ordini.busta_diretta_il` (il pattern di
+  `busta_il`: il quando E il flag), e NESSUN bottone «annulla»: IL
+  DEPOSITO DELLA BUSTA LA AZZERA nello stesso unico UPDATE — la busta
+  supersede la dichiarazione, chi ha dichiarato per sbaglio deposita
+  e basta. Una scrittura sola = «depositata E dichiarata» non esiste
+  nemmeno per un istante, ed è uno dei due bracci nuovi di «busta
+  fuori contratto» nel libro mastro (l'altro è la dichiarazione fuori
+  dalla via punto: la guardia dell'endpoint e il gate di
+  `segna_spedito` la rendono impossibile — se compare, una guardia è
+  caduta). Gemello 16g in query_libro_mastro.sql, che il controllo
+  busta non l'aveva mai avuto.
+  CON LA DICHIARAZIONE: la riga d'attesa del compratore dice da dove
+  arriva il codice davvero — e la notifica di spedizione pure, ed è
+  LEI a correggere la promessa che `_coda_ricevuta` gli ha già fatto
+  al pagamento («ti avviseremo»), scritta quando la dichiarazione non
+  esiste ancora: imperfezione dichiarata. I solleciti tacciono, 🧊
+  compreso (stessa query); `sollecita_ritiri_al_punto` resta fuori
+  PER COSTRUZIONE senza una riga (esige `busta_il>0`, e il deposito
+  azzera): il promemoria «vai a ritirare» sui dichiarati TACE,
+  dichiarato — decisione di Andrea: il corriere ha i recapiti del
+  COMPRATORE e gli manda lui codice e giacenza, mentre il nostro
+  squillo sarebbe ancorato alla spedizione e busserebbe su un pacco
+  che viaggia ancora. E il moderatore in disputa legge il fatto CON
+  LA DATA, etichettato di PARTE («è una dichiarazione di parte, non
+  un fatto verificato»): la piattaforma non può verificarla, e «MAI
+  depositate» lì direbbe il falso.
+  L'ENDPOINT: guardia di proprietà DENTRO la WHERE col 400
+  anti-oracolo dei fratelli, UPDATE CONDIZIONATO (il doppio tocco su
+  rete lenta trova rowcount 0: ok senza seconda notifica), nessuna
+  ancora mossa, e con la busta già depositata la porta è chiusa —
+  dichiarare dopo non vuol dire niente. La notifica al compratore è
+  STATICA: la sua aspettativa cambia, gli era stato promesso il
+  codice nell'ordine.
+  E IL COLLAUDO ESEGUIBILE HA PAGATO FUORI DAL SUO PERIMETRO:
+  girando la ronda sul database VERO di init_db ha trovato un
+  controllo di un altro cantiere che esplodeva su una colonna che il
+  DDL non ha — verde sui cartoni di prove.py, che quella colonna ce
+  l'avevano, ed è la classe di bug che i cartoni non possono vedere
+  (curato dal suo cantiere). Il perimetro del check «sul sano» resta
+  STRETTO al controllo della busta, apposta: un controllo altrui
+  rotto non deve tingere di rosso questo collaudo.
   IL DOCUMENTO DI RITIRO (ago 2026, dal campo: al locker il corriere
   manda un PDF o un QR — un PIN si trascrive, un QR NO). È L'ALTRA
   STRADA PER IL CODICE e non un'aggiunta (decisione di Andrea): il
