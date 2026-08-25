@@ -23321,6 +23321,23 @@ SMETTA di ricevere il promemoria della merce mai partita.
   punteggio, la misura passa dal GIUDICE VERO invece che da una
   simulazione, e la scelta dopo la misura è una riga nel config del VPS
   — zero codice.
+  E LA MISURA È STATA FATTA: **KD = 2** (ago 2026, decisione di Andrea
+  sui numeri veri del VPS) — chi ha un recensore solo si prende un
+  TERZO del bonus, «che si sente senza azzerare». LE TRE TARATURE
+  DAVANO LO STESSO ORDINE, e questo è il fatto da tenere: con quasi
+  tutte le medie a 5,00 a ordinare è già il commercio, quindi a
+  decidere non è stato l'ordine ma la SEVERITÀ — **11 persone su 16
+  hanno un recensore solo**, e con KD=3 quella severità toccherebbe
+  quasi tutti in un mercatino ancora giovane. È esattamente la domanda
+  per cui esiste la §3b, ed è anche il segnale per rivedere il numero:
+  si ritara quando quel rapporto cambia, non a calendario.
+  ⚠️ E IL VALORE VIVE NEL CONFIG DEL VPS, non nel codice: nel codice il
+  default resta 0. Chi legge `CLASSIFICA_KD = 0` in `server.py` e ne
+  conclude che lo smorzamento è spento sta guardando il posto sbagliato
+  — lo dice il pannello «⚙️ Stato delle leve», che chiede al valore
+  VIVO e non alla costante (la trappola che quella pagina esiste per
+  non far ricadere). Stessa famiglia di `MAX_PREFERITI`: una riga
+  esplicita nel config del VPS vince sempre sul default.
   ⚠️ IL DEFAULT NON SI SCRIVE NEL COMMENTO che lo spiega:
   `classifica_prova._leggi_giudice` risolve le leve con una `re.search`
   sul TESTO di server.py e prende la PRIMA occorrenza, quindi un
