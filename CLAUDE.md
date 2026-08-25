@@ -12888,6 +12888,46 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sono localStorage puro, il server non c'entra (per questo non è un
   comando bot) e annunci/ordini/profilo non si toccano (azzera anche
   `barattolo_test`, la memoria del cartello qui sotto).
+  IL «TUTORIAL» È PER TUTTI, «TRATTAMI DA NUOVO» RESTA DEGLI ADMIN
+  (ago 2026, decisione di Andrea): il giro di benvenuto si rivede
+  quando si vuole — bottone «👋 Tutorial» in fondo al Profilo, sopra
+  la classifica — e `riavviaTour()` rimette in gioco il SOLO timbro
+  `tour`. LA RIGA DA NON AMMORBIDIRE, che è anche il motivo per cui
+  non bastava aprire a tutti il bottone admin: in `barattolo_hint`
+  non vive il solo tour, ci vivono OTTO timbri — `tour`, `condcat` e
+  `checklistvista` sono one-shot, ma `nwc`, `lnaddr`, `npubverifica`,
+  `nostrpub` e `barraweb` sono RIFIUTI ESPLICITI di chi guarda, e la
+  regola scritta sopra `hintLetti` è che «un "Non ora" li spegne per
+  sempre». Un bottone che tutti possono toccare non la rovescia: al
+  massimo uno si rivede il tour, mai i suggerimenti che aveva spento
+  — che tornerebbero su ogni annuncio pubblicato da lì in avanti. Per
+  la stessa ragione `barattolo_test` non si tocca: il cartello del
+  rodaggio ha il suo giorno, e azzerarlo lo rifà comparire a chi
+  l'aveva già chiuso stamattina.
+  IL TIMBRO TORNA SE IL TOUR NON PARTE, ed è la riga che leggendo non
+  si vede: `tourBenvenuto` esce a mani vuote quando non c'è niente da
+  illuminare (una vetrina filtrata a vuoto, il barattolo acceso e
+  vuoto), e senza il ripristino il tour ripartirebbe A SORPRESA alla
+  PROSSIMA apertura invece che adesso — cioè il contrario di quel che
+  il tocco chiedeva. Quando invece parte non c'è niente da rimettere:
+  `tourBenvenuto` si RICONSUMA il timbro alla comparsa (il patto
+  one-shot), quindi un istante dopo il tocco i timbri sono di nuovo
+  otto — e non è un difetto, è la prova che il giro si è chiuso.
+  IL BOTTONE NASCE NASCOSTO e lo accende `renderProfilo` su
+  `hintAttivi()`, che è la STESSA guardia che `tourBenvenuto`
+  interroga per prima: in DEMO e in VETRINA il tour non parte, e un
+  bottone che porta a un muro è peggio di un bottone che non c'è (la
+  regola di `bottoneRifornisci`). Zero server, zero colonne: gli hint
+  sono localStorage puro, ed è anche il motivo per cui il gesto vale
+  per DISPOSITIVO e non per persona.
+  NIENTE 🎓 NELL'ETICHETTA, ed è la trappola del doppio significato
+  già pagata con «lampo» e con «attesa»: dall'ago 2026 quel glifo è
+  il reparto «Lezioni e corsi». Il 👋 dice quel che il tour è, cioè
+  un benvenuto.
+  E LE SENTINELLE NON BASTAVANO: dicono che `delete h.tour` c'è, mai
+  che i sette timbri SOPRAVVIVANO — quello lo dice il banco che fa
+  girare `riavviaTour` con node su un localStorage di cartone e conta
+  cosa resta dentro. È la stessa lezione presa nove volte.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si
