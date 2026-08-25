@@ -4716,7 +4716,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3>L'indirizzo per la spedizione</h3>
       <p>Se scegli la <b>spedizione a casa</b>, l'indirizzo lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato e quando.</p>
       <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b>appena confermi di aver ricevuto l'oggetto viene cancellato</b> — da quel momento l'affare è chiuso e quello che succede fra te e il venditore non ci riguarda più. Se invece l'ordine si chiude <i>senza</i> la tua conferma — un rimborso, una disputa decisa da un moderatore — sparisce entro <b><span data-giorni-ind></span> giorni</b>. Finché l'ordine è aperto resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
-      <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore.</p>
+      <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore. Puoi lasciare <b>la tua email</b>, se vuoi che il codice di ritiro te lo mandi il corriere invece del venditore: è facoltativa, non è mai una condizione per comprare, e sparisce con l'ordine.</p>
 
       <h3>Dove stanno i sats, e per quanto</h3>
       <!-- Testo pesato con attenzione (deciso con Andrea): niente la
@@ -4806,11 +4806,16 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>La revoca</b> è un tocco e il link muore subito: la pagina si rilegge dai nostri dati a ogni apertura, non c'è una copia che sopravviva. Tre limiti onesti, però: chi aveva la pagina già aperta la vede finché non ricarica; l'anteprima del link che Telegram o WhatsApp tengono in cache può durare qualche giorno, ma mostra solo il titolo generico — la lista, in quell'anteprima, non c'è mai entrata; e uno screenshot resta, come per ogni cosa pubblicata. Se un domani ricondividi, il link sarà nuovo: quello vecchio resta morto.</p>
 
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
-      <p>Quattro cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
+      <p>Cinque cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
         <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio. Questo, se vuoi, puoi anche <b>tenertelo nel profilo</b> per non riscriverlo ogni volta: è l'unica delle quattro che si può salvare, e la ragione è che un punto di ritiro è un <i>luogo pubblico</i> — un locker, una tabaccheria — mentre casa tua no. Lo salvi con un tocco quando compri, mai da solo, e lo togli quando vuoi.</li>
         <li><b>Il codice</b> di un buono o di un prodotto digitale, che chi vende consegna qui dentro invece che in chat.</li>
+        <!-- LA QUINTA (ago 2026). E' l'unica che si puo' NON dare senza
+             perdere niente: chi non la lascia riceve il codice dal
+             venditore, come sempre. Va detto qui, o «facoltativa»
+             resterebbe una parola del pannello e non una promessa. -->
+        <li><b>La tua email</b>, se scegli il punto di ritiro e vuoi che il <b>codice del locker</b> te lo mandi direttamente il corriere. È facoltativa: senza, il codice arriva a chi vende, che te lo passa qui dentro. La legge <b>solo chi ti vende</b>, per stampare l'etichetta, e sparisce con l'ordine come l'indirizzo. <b>Il numero di telefono non te lo chiediamo mai</b>, nemmeno qui.</li>
         <!-- LA QUARTA (ago 2026). E' l'unica delle quattro che l'utente
              sceglie di scrivere, ed e' anche l'unica che RESTA: va
              detto qui e non solo fra le durate, perche' e' la voce che
@@ -4845,6 +4850,10 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="priv-durate">Per quanto teniamo le cose</h3>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>: fino alla tua conferma, o <span data-giorni-ind></span> giorni dalla chiusura senza conferma. Qui sopra c'è la storia per intero.</li>
+        <!-- L'email viaggia con la stessa scopa e con le stesse due
+             velocita': e' letteralmente lo stesso giro (pulisci_indirizzi),
+             e per questo la riga sta ACCANTO invece che in fondo. -->
+        <li><b>L'email per il corriere</b>: la stessa cosa, e con la stessa scopa — sparisce insieme all'indirizzo, alle stesse condizioni.</li>
         <li><b>La sessione del browser</b>, se entri dal web: <b><span data-durata="sessione"></span> giorni</b>, poi si rientra. Nel database non c'è il tuo accesso ma solo la sua impronta.</li>
         <li><b>L'accesso da dentro Telegram</b> vale <b><span data-durata="initdata"></span> ore</b>: dopo, riaprendo l'app, se ne fa uno nuovo.</li>
         <li><b>La memoria di quali avvisi ti abbiamo già mandato</b>: <b><span data-durata="avvisi"></span> giorni</b>, così lo stesso annuncio non ti risuona addosso.</li>
@@ -4888,6 +4897,7 @@ document.getElementById('cartello')?.remove();</script>
            la guardia alle due parti, il contenuto digitale ha il ramo
            admin_disputa. -->
       <p><b>Il tuo indirizzo non lo legge.</b> Quando si apre una disputa un moderatore guarda l'ordine per decidere, e del tuo indirizzo non vede niente nemmeno lì: gli risulta soltanto <i>se</i> l'hai indicato e quando, mai una riga di quello che hai scritto. Lo stesso vale per il nome e il codice di ritiro della busta e per il documento del corriere: quelli li leggono solo chi compra e chi vende.</p>
+      <p><b>La tua email per il corriere non la legge.</b> Vale la stessa regola dell'indirizzo, per la stessa ragione: gli risulta soltanto <i>se</i> l'avevi lasciata e quando, che è quello che gli serve per capire da dove doveva arrivare il codice. Il valore no.</p>
       <p><b>Il contenuto di un buono o di un codice digitale invece sì.</b> Se apri una disputa su un acquisto digitale, il moderatore lo legge. Non c'è modo di decidere quella lite senza guardarlo — è l'oggetto stesso del contendere, e chi la apre di solito dice proprio che quel codice non funziona.</p>
       <!-- LA QUARTA ASIMMETRIA (ago 2026), e per la STESSA ragione della
            precedente: e' l'oggetto del contendere. Va detta qui e non
@@ -4914,7 +4924,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Nessun tracciamento.</b> Niente analytics, niente pixel, niente cookie di terzi: nella pagina non c'è nessuno oltre a noi. Da agosto 2026 <b>nemmeno i caratteri</b> — prima li chiedevamo a Google, e a ogni apertura il tuo indirizzo IP arrivava a Google. Adesso stanno qui.</li>
         <li><b>Un cookie solo</b>, e serve a tenerti dentro se entri dal browser: contiene un numero casuale, e nel database c'è soltanto la sua impronta.</li>
         <li><b>Non vendiamo niente a nessuno</b> e non ti profiliamo. Non c'è pubblicità, quindi non c'è nessuno a cui rivenderti.</li>
-        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: è facoltativo e sparisce con l'indirizzo.</li>
+        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un'email puoi lasciarla nell'ordine, se vuoi il codice del locker dal corriere; un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: sono facoltativi tutti e due e spariscono con l'ordine. <b>Un campo per il telefono, da solo, in Barattolo non esiste.</b></li>
         <li><b>La connessione al tuo wallet non passa da qui.</b> Se lo colleghi, resta sul tuo dispositivo e non arriva mai ai nostri server. Il <b>Lightning address</b> è un'altra cosa e ce l'abbiamo, se lo imposti: qui sopra c'è cos'è e per quanto.</li>
       </ul>
       <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
@@ -6652,6 +6662,15 @@ function mapOrder(o){
        compratore — recapiti suoi sull'etichetta. Timestamp, 0 = mai;
        il deposito della busta la azzera lato server. */
     bustaDirettaIl:o.busta_diretta_il||0,
+    /* L'EMAIL PER IL CORRIERE (ago 2026, tappa B): il compratore la
+       lascia perche' il codice del locker gli arrivi DIRETTAMENTE dal
+       corriere. Il VALORE non viaggia mai in /api/orders — qui
+       arrivano i soli FATTI (il quando, le correzioni, il timbro
+       della cancellazione), e il testo lo serve /email-corriere alle
+       sole parti, MAI all'admin. */
+    emailCorriereIl:o.email_corriere_il||0,
+    emailCorriereCorrezioni:o.email_corriere_correzioni||0,
+    emailCorrierePurgataIl:o.email_corriere_purgata_il||0,
     /* del documento arriva il solo FLAG: il nome del file e' la
        maniglia sul disco e non esce mai, i byte men che meno */
     bustaDocumento:!!o.busta_documento,
@@ -18695,6 +18714,7 @@ function openOrder(id){
                 accanto al posto in cui si tocca — il peccato che il
                 punto ha gia' commesso e per cui e' stato corretto.
                 Stessa forma della riga dell'indirizzo, due sopra. */''}
+          ${(o.viaPunto && o.emailCorriereIl && !o.emailCorrierePurgataIl) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: la leggi nel riquadro qui sotto, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
           ${o.notaCompratore ? `<div class="hint">📝 L'acquirente ha lasciato una <b>nota</b>: la leggi nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
@@ -18714,6 +18734,7 @@ function openOrder(id){
       ${pannelloContenutoDigitale(o)}
       ${pannelloNota(o)}
       ${pannelloIndirizzoCasa(o)}
+      ${pannelloEmailCorriere(o)}
       ${pannelloBustaRitiro(o)}
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
@@ -23826,6 +23847,251 @@ function pannelloBustaRitiro(o){
       ${b ? bloccoDocumentoBusta(o, b) : ''}
     </div>`;
   return '';
+}
+
+
+/* ---- L'EMAIL PER IL CORRIERE (ago 2026, tappa B) ----
+   Il compratore la lascia perche' il codice del locker gli arrivi
+   DIRETTAMENTE dal corriere, senza passare dalla chat — che e'
+   precisamente cio' che chi non ha ne' username Telegram ne' npub NON
+   HA. E' FACOLTATIVA e non e' mai una condizione per comprare: chi non
+   la lascia continua come oggi, il codice arriva al venditore che lo
+   deposita nella busta.
+
+   IL CAMPO STA DIETRO UN LINK, la ricetta della nota del compratore:
+   l'ordine e' una pagina che si LEGGE, e un campo sempre aperto su una
+   cosa che quasi nessuno scrive e' spazio morto — e una tastiera che
+   si alza da sola su un pannello che non l'ha chiesta.
+   TRE STATI come il cassetto del punto: link / campo aperto / riga
+   compatta col «Cambia», che riapre PRECOMPILATO — mai ricominciare da
+   capo.
+
+   LO STATO VIVE IN `emailAperta` E MAI NEL DOM (il patto di
+   `acqDati.puntoAperto`): il pannello si ridisegna a ogni salvataggio,
+   e uno stato solo-DOM si richiuderebbe sotto le dita.
+
+   ⚠️ IL VALORE NON ARRIVA MAI DA /api/orders: si legge solo dalla sua
+   rotta, e per il compratore ci si passa alla PRIMA apertura del
+   cassetto — che e' anche l'unico momento in cui gli serve. */
+let emailLetta = {};      // ordineId -> l'email in chiaro
+let emailAperta = 0;      // l'ordine col cassetto aperto (0 = nessuno)
+let emailInCorso = false; // la bandierina del doppio tocco
+
+function pannelloEmailCorriere(o){
+  if (!o || !o.viaPunto) return '';
+  /* IL COMPRATORE, e solo su 'locked': dopo la spedizione l'etichetta
+     e' gia' stampata, quindi un'email nuova non ci arriverebbe MAI —
+     il server la rifiuta e qui non si offre. Al suo posto la riga che
+     dice cos'e' successo e porta al bottone «non mi e' arrivato il
+     codice», che da li' in poi e' la strada vera. */
+  if (o.role==='buyer'){
+    if (o.state==='locked'){
+      const aperta = emailAperta === o.id;
+      const scritta = emailLetta[o.id] || '';
+      const campo = `
+        <div class="hint">Il codice del locker te lo manderà il corriere a questo indirizzo, senza passare da qui. <b>Solo l'email</b> — il numero di telefono non lo chiediamo mai. La cancelliamo alla chiusura <span class="fine-frase">dell'ordine. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-indirizzo')">Che fine fa</button></span></div>
+        <div class="ind-campi">
+          <label for="emailCorriereInp">La tua email</label>
+          <input type="email" id="emailCorriereInp" autocomplete="email"
+            inputmode="email" maxlength="120" placeholder="latua@email.it"
+            value="${esc(scritta)}">
+        </div>
+        <div class="hint avviso-tracking" id="emailAvviso" style="display:none"></div>
+        <button class="btn orange" onclick="salvaEmailCorriere()">${o.emailCorriereIl ? "Aggiorna l'email" : "Salva l'email"}</button>
+        ${o.emailCorriereIl ? `<button class="btn ghost" onclick="togliEmailCorriere()">🗑 Togli l'email</button>` : ''}`;
+      const chiusa = o.emailCorriereIl
+        ? `<button type="button" class="via-riga punto-riga" aria-expanded="false"
+            onclick="apriEmailCorriere(this)"><span class="punto-testo">📧 ${esc(scritta || 'Email per il corriere')}</span><span class="punto-cambia">Cambia</span></button>`
+        : `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
+            onclick="apriEmailCorriere(this)">+ Ricevi il codice direttamente dal corriere</button>`;
+      return `<div class="payout" id="emailPannello">
+        <h4>📧 La tua email per il corriere</h4>
+        ${aperta ? campo : chiusa}
+      </div>`;
+    }
+    /* SPEDITO: il campo si chiude, e si dice PERCHE'. Il testo si
+       BIFORCA sulla busta diretta, e non e' una rifinitura: senza
+       quella dichiarazione l'email NON e' finita su nessuna
+       etichetta — il codice arriva al venditore come sempre —
+       quindi «il codice non ti arrivera'» sarebbe FALSO, e
+       manderebbe a cercare un guasto che non c'e'. Sul ramo
+       diretto invece la via d'uscita si TACE: ce l'ha gia' la nota
+       verde due righe piu' sotto (quella del cantiere della busta
+       diretta), e ripeterla sarebbe la stessa cosa detta due volte
+       a due dita di distanza — il difetto trovato dal giro DAL
+       VIVO, che una misura non poteva vedere. */
+    if (o.state==='shipped' && o.emailCorriereIl && !o.emailCorrierePurgataIl)
+      return `<div class="payout" id="emailPannello">
+        <h4>📧 La tua email per il corriere</h4>
+        <div class="hint">${o.bustaDirettaIl
+          ? "Il pacco è partito e l'email che hai lasciato è già sull'etichetta: da qui non si cambia più."
+          : "Il pacco è partito, e il venditore non ha usato la tua email: il <b>codice di ritiro</b> arriva a lui, che te lo passa qui nell'ordine."}</div>
+      </div>`;
+    return '';
+  }
+  /* IL VENDITORE la legge quando gli serve: al momento di comprare
+     l'etichetta. Il valore passa dalla sua rotta e non da /api/orders,
+     quindi c'e' il bottone che lo rivela — il calco della busta. */
+  if (o.role==='seller' && ['locked','shipped'].includes(o.state)){
+    if (!o.emailCorriereIl || o.emailCorrierePurgataIl) return '';
+    const mail = emailLetta[o.id] || '';
+    return `<div class="payout" id="emailPannello">
+      <h4>📧 Email dell'acquirente per il corriere</h4>
+      <div class="hint">L'acquirente ha lasciato un'email perché il <b>codice di ritiro</b> gli arrivi direttamente dal corriere. Se la metti come destinatario sull'etichetta, il codice non passa da qui — e nel pannello della spedizione spunta «il codice arriva direttamente a lui».</div>
+      ${mail
+        ? `<div class="hint" style="margin-top:8px"><b class="mono" style="user-select:all">${esc(mail)}</b></div>`
+        : `<button class="btn ghost" style="margin-top:10px" onclick="mostraEmailCorriere(this)">👁 Mostra l'email</button>`}
+    </div>`;
+  }
+  /* IL MODERATORE MAI, da nessuna strada: in disputa gli arriva il
+     FATTO con la data (la nota del server), e il valore no. */
+  return '';
+}
+
+/* Il ridisegno e' del SOLO pannello e MAI `openOrder`, la lezione del
+   codice di ritiro: riaprire riporta la pagina in cima e butta via
+   quel che si sta scrivendo. Il fatto vive tutto dentro il riquadro,
+   quindi vale la meta' semplice della regola. */
+function ridisegnaEmail(){
+  const p = el('emailPannello');
+  if (!p) return;
+  const html = pannelloEmailCorriere(currentOrder);
+  if (html) p.outerHTML = html;
+}
+
+function apriEmailCorriere(btn){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  emailAperta = o.id;
+  /* col valore gia' scritto si va a prenderlo PRIMA di disegnare, o il
+     campo si aprirebbe vuoto su un'email che c'e' — cioe' inviterebbe
+     a riscriverla da capo */
+  if (o.emailCorriereIl && !emailLetta[o.id]){
+    (async () => {
+      const ripristina = attesaRitardata(btn, "Apro l'email…");
+      await caricaEmailCorriere();
+      ripristina();
+      ridisegnaEmail();
+      metteFuocoEmail();
+    })();
+    return;
+  }
+  ridisegnaEmail();
+  metteFuocoEmail();
+}
+
+/* il fuoco vive SOLO qui e mai in un render: e' il gesto che chiede la
+   tastiera, non il disegno (la regola del cassetto della nota).
+   ⚠️ E IL CURSORE SI PORTA IN FONDO COL GIRO DI VALORE, mai con
+   `setSelectionRange`: su un <input type="email"> quel metodo NON
+   ESISTE — la specifica lo da' ai soli campi testuali — e alza un
+   InvalidStateError che si porta via il resto del gesto. Il difetto
+   l'ha trovato il giro DAL VIVO e non la rilettura: le sentinelle
+   dicevano che la riga c'era, e a schermo ogni apertura del campo
+   alzava. La promessa e' MISURATA e non supposta: col fuoco nudo il
+   carattere battuto atterra all'INIZIO ('Zabc@d.it'), col giro di
+   valore in FONDO — cioe' senza questa riga, chi riapre per
+   correggere scriverebbe davanti a quel che ha gia' scritto. */
+function metteFuocoEmail(){
+  const c = el('emailCorriereInp');
+  if (!c) return;
+  c.focus({preventScroll:true});
+  c.value = c.value;
+}
+
+async function caricaEmailCorriere(){
+  const o = currentOrder; if (!o) return '';
+  try {
+    const r = await fetch(`${API_BASE}/orders/${o.id}/email-corriere`, {
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return ''; }
+    emailLetta[o.id] = d.email || '';
+    return emailLetta[o.id];
+  } catch(e){ toast('Non ci sono riuscito, riprova', 6000); return ''; }
+}
+
+async function mostraEmailCorriere(btn){
+  haptic();
+  if (emailInCorso) return;
+  emailInCorso = true;
+  const ripristina = attesaRitardata(btn, "Apro l'email…");
+  const mail = await caricaEmailCorriere();
+  ripristina();
+  emailInCorso = false;
+  if (!mail) return;
+  ridisegnaEmail();
+}
+
+/* IL CONTROLLO DI FORMA CHIEDE, NON IMPEDISCE — la ricetta di
+   FORME_TRACKING: un'euristica nostra non deve fermare un indirizzo
+   vero (i domini nuovi nascono di continuo, e la forma di un'email
+   valida e' molto piu' larga di quel che si crede). Primo tocco =
+   avviso, secondo tocco sullo STESSO testo = si passa. */
+let emailForzata = '';
+function formaEmail(t){
+  return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(t);
+}
+
+async function salvaEmailCorriere(){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  const mail = (el('emailCorriereInp')?.value || '').trim();
+  const avviso = el('emailAvviso');
+  if (mail && !formaEmail(mail) && emailForzata !== mail){
+    emailForzata = mail;
+    if (avviso){
+      avviso.textContent = 'Non sembra un indirizzo email. Se è giusto '
+        + 'ritocca «Salva» e lo teniamo così.';
+      avviso.style.display = '';
+    }
+    return;
+  }
+  if (avviso) avviso.style.display = 'none';
+  await mandaEmailCorriere(mail);
+}
+
+async function togliEmailCorriere(){
+  haptic();
+  emailForzata = '';
+  await mandaEmailCorriere('');
+}
+
+async function mandaEmailCorriere(mail){
+  const o = currentOrder; if (!o) return;
+  /* NIENTE VELO D'ATTESA, ed e' la riga da non «uniformare» col
+     fratello che legge: quel velo ha in CI un censimento che NOMINA i
+     suoi chiamanti e sono tutte LETTURE — e' quell'invariante ad
+     accorgersi del gesto che un domani muovesse sats. Le due scritture
+     sorelle dell'ordine (salvaNota, salvaPuntoRitiro) non ne hanno
+     una, e questa e' della loro famiglia.
+     ⚠️ Il nome di quel velo non si scrive nemmeno qui: la sentinella
+     che verifica questa riga cerca proprio quella parola nel corpo, e
+     nominarla in un commento la fa rossa per colpa di una
+     spiegazione.
+     La bandierina invece resta: senza, due tocchi su rete lenta
+     manderebbero due volte lo stesso salvataggio. */
+  if (emailInCorso) return;
+  emailInCorso = true;
+  const r = await fetch(`${API_BASE}/orders/${o.id}/email-corriere`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({email_corriere: mail})});
+  const d = await r.json().catch(()=>({}));
+  emailInCorso = false;
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  emailLetta[o.id] = mail;
+  /* si scrive sulla riga di `orders` e non sul solo currentOrder, che
+     puo' essere DETACHED se la lista si e' ricaricata (la lezione dei
+     solleciti) */
+  const viva = orders.find(x => x.id === o.id);
+  o.emailCorriereIl = d.email_corriere_il || 0;
+  o.emailCorriereCorrezioni = d.email_corriere_correzioni || 0;
+  if (viva){ viva.emailCorriereIl = o.emailCorriereIl;
+    viva.emailCorriereCorrezioni = o.emailCorriereCorrezioni; }
+  emailAperta = 0;
+  ridisegnaEmail();
+  toast(mail ? '📧 Email salvata' : '🗑 Email tolta');
 }
 
 /* ---- LA FORMA DI QUEL CHE IL VENDITORE HA CONSEGNATO (ago 2026) ----

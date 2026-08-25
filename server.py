@@ -4708,6 +4708,40 @@ def init_db():
                     # segna_spedito di bloccare di colpo ogni ordine
                     # 'locked' gia' in produzione.
                     "indirizzo_atteso INTEGER DEFAULT 0",
+                    # L'EMAIL PER IL CORRIERE (ago 2026, tappa B): la
+                    # scorciatoia perche' il codice del locker arrivi
+                    # a chi compra DIRETTAMENTE dal corriere, invece
+                    # di passare dalla chat — che e' precisamente
+                    # quello che chi non ha ne' username Telegram ne'
+                    # npub NON HA. E' la terza volta che lo stesso
+                    # buco morde: ha fatto nascere la busta di
+                    # consegna, poi l'indirizzo di casa, adesso questo.
+                    # ⚠️ IL NOME DICE IL MESTIERE E CHIUDE LA PORTA AL
+                    # TELEFONO PER COSTRUZIONE: `recapito` inviterebbe
+                    # ad allargarlo, `email_corriere` no. Vale come
+                    # VINCOLO PERMANENTE (decisione di Andrea): il
+                    # numero di telefono non entra in Barattolo per
+                    # nessuna ragione, nemmeno se un domani un
+                    # corriere volesse l'SMS. Al locker serve la mail.
+                    # (Il telefono che gia' esiste vive DENTRO
+                    # l'indirizzo cifrato, e' facoltativo e sparisce
+                    # con lui: e' un'altra cosa e resta dov'e'.)
+                    # NON SI RIUSA LA COLONNA `indirizzo`, che verrebbe
+                    # in mente: il libro mastro ha gia' «indirizzo su
+                    # una riga via punto» come GUASTO, il giudice e'
+                    # cablato su `not via_punto` in tutti i chiamanti,
+                    # e l'endpoint di correzione rifiuta via_punto
+                    # esplicitamente. Sono due famiglie, e restano due.
+                    "email_corriere TEXT DEFAULT ''",
+                    # la PRIMA (0 = mai): il flag E il quando
+                    "email_corriere_il INTEGER DEFAULT 0",
+                    "email_corriere_corretta_il INTEGER DEFAULT 0",
+                    "email_corriere_correzioni INTEGER DEFAULT 0",
+                    # e QUANDO la scopa l'ha cancellata: la promessa
+                    # «trasporta, non conserva» diventa verificabile
+                    # solo grazie a questa colonna — il libro mastro
+                    # guarda «purgata ma ancora scritta».
+                    "email_corriere_purgata_il INTEGER DEFAULT 0",
                     "nascosto_compratore INTEGER DEFAULT 0",
                     "nascosto_venditore INTEGER DEFAULT 0",
                     # LA PORTA DEL TIMER (ago 2026): QUANDO uno sblocco
@@ -15734,6 +15768,122 @@ def _coda_nota(prima: bool, dopo: bool) -> str:
     return ""
 
 
+MAX_EMAIL_CORRIERE = 120
+
+
+def _email_corriere_da_payload(d) -> tuple:
+    """L'email che il compratore lascia perche' il codice del locker
+    gli arrivi DIRETTAMENTE dal corriere: (blob CIFRATO, testo).
+
+    TORNA TUTT'E DUE, il patto di _indirizzo_da_payload: il blob va in
+    colonna, il TESTO serve al chiamante per sapere se e' cambiata
+    davvero — e non si puo' dedurre dai blob, perche' Fernet non e'
+    deterministico e due cifrature della stessa email danno stringhe
+    diverse. Un chiamante che normalizzasse per conto suo sarebbe la
+    seconda ricetta dello stesso taglio.
+
+    ⚠️ SOLO L'EMAIL, MAI IL TELEFONO — vincolo permanente (decisione
+    di Andrea): al locker serve la mail e basta, e un numero e' piu'
+    identificante. Non si allarga «tanto e' lo stesso campo»: e' per
+    questo che il nome dice il mestiere.
+
+    IL DATO PASSA DA NOI, E VA DETTO COSI': non e' «non lo facciamo
+    passare» — transita, lo scriviamo su disco e lo cifriamo con una
+    chiave che sta sullo STESSO server, quindi finche' e' li' il
+    server lo puo' leggere. La pagina «I tuoi dati» lo dichiara gia'
+    di se': «al riparo da un database rubato, non da noi». Quel che
+    rende vera la parola e' un'altra cosa — che DURI POCO, cioe' la
+    scopa. Senza quella, «lo trasportiamo, non lo conserviamo»
+    sarebbe una frase e basta.
+
+    CIFRA QUI e non nei chiamanti (il patto di
+    _indirizzo_da_payload): basta che uno se ne dimentichi perche' un
+    recapito finisca in chiaro nel database, e c'e' la sentinella che
+    conta UNA chiamata sola.
+
+    CHIAVE ASSENTE E STRINGA VUOTA SONO LA STESSA COSA, al contrario
+    dell'indirizzo e per la ragione OPPOSTA: li' svuotare rimetterebbe
+    segna_spedito in trappola su un ordine gia' compilato, qui il
+    campo e' FACOLTATIVO e toglierlo e' un gesto legittimo — il patto
+    di _nota_da_payload.
+
+    NESSUN CONTROLLO DI FORMA, ed e' deliberato: l'euristica vive nel
+    CLIENT, dove CHIEDE invece di impedire (la ricetta di
+    FORME_TRACKING, che sta li' e non qui per la stessa ragione). Un
+    server che rifiuta un indirizzo vero per una regola NOSTRA e'
+    peggio di una domanda in piu'.
+
+    IL 400 E NON IL TRONCAMENTO (la regola della busta e della nota):
+    un recapito tagliato a meta' non e' un recapito piu' corto, e' un
+    recapito ROTTO — e chi l'ha scritto non lo saprebbe."""
+    testo = " ".join(str(d.get("email_corriere") or "").split())
+    if len(testo) > MAX_EMAIL_CORRIERE:
+        raise HTTPException(400, f"L'email è troppo lunga (massimo "
+                                 f"{MAX_EMAIL_CORRIERE} caratteri)")
+    if not testo:
+        return "", ""
+    if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+        # IL 503 E' QUELLO DELL'INDIRIZZO, con UNA differenza: li'
+        # blocca l'ACQUISTO (l'ordine non nasce), qui l'ordine esiste
+        # gia' e a non salvarsi e' il solo campo facoltativo — quindi
+        # non si perde niente, si dice che la scorciatoia adesso non
+        # c'e'. In collaudo si scrive 'plain:' come tutto il resto.
+        if not MODALITA_COLLAUDO:
+            raise HTTPException(503, "Questa scorciatoia non è "
+                                     "disponibile in questo momento: "
+                                     "riprova più tardi, oppure lascia "
+                                     "che il codice arrivi al venditore "
+                                     "come al solito")
+    return _cifra_contenuto(testo), testo
+
+
+def _coda_email_corriere(prima: bool, dopo: bool) -> str:
+    """Cosa dire al venditore quando l'email cambia. PURO come
+    _coda_nota: prende due BOOL e non il testo, quindi nell'HTML di
+    una notifica il recapito non ci puo' entrare PER COSTRUZIONE.
+
+    IL TESTO DICE COSA PUO' FARCI, non solo che c'e': senza quella
+    riga il venditore legge un'email e non sa che gli si sta offrendo
+    di metterla sull'etichetta al posto della propria — cioe' la
+    scorciatoia esisterebbe e non la userebbe nessuno.
+
+    E NON PROMETTE CHE FUNZIONA: dipende dal corriere e da come
+    compila l'etichetta, e noi non lo verifichiamo. «Puoi» e non
+    «cosi' gli arriva»."""
+    if dopo and not prima:
+        return ("📧 <b>L'acquirente ha lasciato un'email per il "
+                "corriere</b>: la trovi nell'ordine. Se la metti come "
+                "recapito del destinatario quando compri l'etichetta, "
+                "il codice di ritiro può arrivargli direttamente — e "
+                "tu non devi più depositarlo qui.")
+    if dopo:
+        return ("📧 <b>L'acquirente ha cambiato l'email per il "
+                "corriere</b>: rileggila nell'ordine prima di "
+                "comprare l'etichetta.")
+    if prima:
+        return ("📧 <b>L'acquirente ha tolto l'email per il "
+                "corriere</b>: il codice di ritiro tornerà a te, e lo "
+                "depositi nell'ordine come al solito.")
+    return ""
+
+
+def _email_corriere_letta(blob: str) -> str:
+    """L'email in chiaro, o '' se non si legge.
+
+    IL PARSE E' DIFENSIVO come quello dell'indirizzo, e per lo stesso
+    motivo: _decifra_contenuto e' fail-open per costruzione e su una
+    chiave cambiata restituisce una FRASE invece del testo. Qui la
+    frase non e' JSON da rompere — si vedrebbe stampata al posto
+    dell'indirizzo, che e' peggio: il venditore la copierebbe
+    sull'etichetta. Quindi si guarda che ci sia almeno una chiocciola,
+    che e' l'unica cosa che un'email ha sempre e una frase di scuse
+    non ha mai."""
+    if not blob:
+        return ""
+    testo = _decifra_contenuto(blob)
+    return testo if "@" in testo else ""
+
+
 def _tariffa_dichiarata(a, via: str) -> tuple:
     """(sats, eur) della tariffa di spedizione per la via chiesta:
     'punto' con la dichiarazione accesa usa le colonne punto — anche
@@ -22726,6 +22876,144 @@ async def leggi_indirizzo(ordine_id: int,
             "correzioni": o["indirizzo_correzioni"]}
 
 
+# --------- L'EMAIL PER IL CORRIERE (ago 2026, tappa B) ---------
+# Spedendo a un locker il venditore puo' mettere i recapiti del
+# COMPRATORE come destinatario: da li' il codice di ritiro glielo
+# manda il corriere, e da noi non passa. La META' che mancava era
+# procurarsi quel recapito senza la chat — che e' precisamente cio'
+# che chi non ha ne' username Telegram ne' npub NON HA.
+#
+# LE DECISIONI DI ANDREA, e sono la voce:
+#  - UN CAMPO SOLO, l'EMAIL. Il telefono non entra in Barattolo per
+#    nessuna ragione: vincolo permanente.
+#  - FACOLTATIVA, mai una condizione per comprare. Chi non la lascia
+#    continua come oggi: il codice arriva al venditore, che lo
+#    deposita nella busta.
+#  - DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
+#    Mai alla cassa: un campo facoltativo non sta sulla strada
+#    dell'acquisto.
+#  - IL MODERATORE VEDE CHE C'ERA, MAI QUALE. In disputa gli serve
+#    sapere se il codice e' stato consegnato, e quello lo legge dalla
+#    dichiarazione del venditore e dalla data: l'indirizzo non lo
+#    aiuta a decidere e gli mette in mano un dato personale che non
+#    gli serve — il precedente dell'indirizzo di casa.
+
+
+@app.post("/api/orders/{ordine_id}/email-corriere")
+async def indica_email_corriere(ordine_id: int, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE lascia (o toglie) l'email per il corriere.
+
+    IL GATE E' 'locked' + via punto, come il fratello del punto di
+    ritiro: dopo la spedizione l'etichetta e' gia' stampata, quindi
+    un'email nuova non ci arriverebbe MAI e lasciarla scrivere
+    sarebbe promettere una cosa che non succede. Il client al suo
+    posto dice cos'e' successo e porta al bottone «non mi e' arrivato
+    il codice», che e' la strada vera da li' in poi.
+
+    IL VUOTO SI ACCETTA (il patto della nota): e' facoltativa, e chi
+    ci ripensa deve poterla togliere. `email_corriere_il` invece NON
+    si azzera togliendola — e' il PRIMO, ed e' il fatto che il
+    moderatore legge in disputa.
+
+    NIENTE GATE SUL VENDITORE, ed e' la riga da non ammorbidire:
+    verrebbe naturale offrirla solo a chi dichiara la busta diretta,
+    ma quella dichiarazione arriva DOPO la spedizione — cioe' quando
+    questo campo e' gia' chiuso. Un gate cosi' non chiuderebbe mai,
+    e chiuderebbe sempre il campo a tutti.
+
+    La notifica al venditore e' STATICA: l'email non entra MAI in un
+    tubo HTML, e lui la legge dall'ordine sotto esc()."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    # il giudice PRIMA di aprire il db: un 400 non lascia mai una
+    # connessione dietro di se' (il patto dei fratelli)
+    mail, testo = _email_corriere_da_payload(d)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["via_punto"]:
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "un punto di ritiro")
+    adesso = int(time.time())
+    prima = bool(o["email_corriere"])
+    dopo = bool(mail)
+    # L'UPDATE E' CONDIZIONATO al cambio VERO, e il confronto NON puo'
+    # essere sui blob: Fernet non e' deterministico (IV casuale a ogni
+    # cifratura), quindi due blob della stessa email sono sempre
+    # DIVERSI e ogni salvataggio sembrerebbe un cambio. Si confronta
+    # il CHIARO — la lezione della ripresa del pentito, dove lo stesso
+    # errore avrebbe coniato una fattura nuova a ogni tocco.
+    if _email_corriere_letta(o["email_corriere"]) == testo:
+        con.close()
+        return {"ok": True, "email_corriere_il": o["email_corriere_il"],
+                "email_corriere_correzioni": o["email_corriere_correzioni"]}
+    correzione = prima and dopo
+    con.execute("UPDATE ordini SET email_corriere=?, email_corriere_il=?, "
+                "email_corriere_corretta_il=?, email_corriere_correzioni=? "
+                "WHERE id=?",
+                (mail, o["email_corriere_il"] or (adesso if dopo else 0),
+                 adesso if correzione else o["email_corriere_corretta_il"],
+                 (o["email_corriere_correzioni"] or 0)
+                 + (1 if correzione else 0), ordine_id))
+    con.commit()
+    con.close()
+    # Il journal dice CHE e' successo, mai COSA: un'email dentro i log
+    # del VPS sarebbe un'email fuori dalla promessa e fuori dalla
+    # scopa (il patto della busta e dell'indirizzo).
+    print(f"📧 Ordine #{ordine_id}: email per il corriere "
+          f"{'tolta' if not dopo else 'corretta' if correzione else 'indicata'}"
+          f" dal compratore")
+    await notifica(o["venditore_id"], _coda_email_corriere(prima, dopo))
+    return {"ok": True,
+            "email_corriere_il": o["email_corriere_il"]
+            or (adesso if dopo else 0),
+            "email_corriere_correzioni":
+                (o["email_corriere_correzioni"] or 0)
+                + (1 if correzione else 0)}
+
+
+@app.get("/api/orders/{ordine_id}/email-corriere")
+async def leggi_email_corriere(ordine_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """L'email si legge SOLO da qui, e solo le due parti.
+
+    IL MODERATORE MAI, da nessuna strada e in nessuno stato — la
+    regola dell'indirizzo di casa: in disputa gli arriva il FATTO
+    («il compratore aveva lasciato un'email per il corriere», con la
+    data) e mai il valore. Autorizzazione PRIMA dell'esistenza col
+    400 opaco: chi enumera gli id non impara niente.
+
+    GET PURO: leggere un recapito non e' una ricevuta e non sposta un
+    sat — nessuna scrittura, nessuno stato toccato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if o["email_corriere_purgata_il"]:
+        # la promessa mantenuta, detta a chi la incontra
+        quando = time.strftime("%d/%m/%Y",
+                               time.localtime(o["email_corriere_purgata_il"]))
+        raise HTTPException(404, f"L'email è stata cancellata il {quando}, "
+                                 f"alla chiusura dell'ordine")
+    mail = _email_corriere_letta(o["email_corriere"])
+    if not mail:
+        raise HTTPException(404, "Nessuna email su questo ordine")
+    return {"email": mail, "indicata_il": o["email_corriere_il"],
+            "corretta_il": o["email_corriere_corretta_il"],
+            "correzioni": o["email_corriere_correzioni"]}
+
+
 # ------------------ LA BUSTA DI CONSEGNA (ago 2026) ------------------
 # Per ritirare un pacco a un punto servono il NOME che il venditore ha
 # messo come destinatario (di fantasia: il corriere esige un nome, noi
@@ -28957,6 +29245,14 @@ def pulisci_indirizzi():
     parola «trasporta»: senza, «non lo conserviamo» sarebbe una frase
     e basta.
 
+    E DALL'AGO 2026 SPAZZA ANCHE L'EMAIL PER IL CORRIERE, che e' la
+    stessa promessa su un altro campo — il nome resta il suo (il patto
+    dei nomi interni: si rinominano i testi, mai le chiavi). QUI
+    DENTRO e non in una gemella: le due velocita' e il gate sulla leva
+    sono la parte delicata, e due copie divergono al primo ritocco;
+    le tre righe da non ammorbidire qui sotto valgono identiche per
+    tutte e due.
+
     DUE VELOCITA', ed e' una decisione di Andrea che viene dritta
     dalla regola di casa — «garantiamo la TRANSAZIONE, non la
     consegna»:
@@ -29019,10 +29315,30 @@ def pulisci_indirizzi():
                 "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
                 "AND stato='released' AND disputata=0",
                 (adesso,)).rowcount
+            # L'EMAIL PER IL CORRIERE VIAGGIA CON LUI (ago 2026), e
+            # sta QUI DENTRO e non in una gemella: le due velocita' e
+            # il gate sulla leva sono la parte delicata, e due copie
+            # divergono al primo ritocco — il patto gia' scritto nella
+            # docstring. Due UPDATE in piu' con la stessa forma, le
+            # stesse tre righe da non ammorbidire (la guardia
+            # `<>''`, `aggiornato` mai toccato, i soli stati
+            # assorbenti).
+            veloce += con.execute(
+                "UPDATE ordini SET email_corriere='', "
+                "email_corriere_purgata_il=? "
+                "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
+                "AND stato='released' AND disputata=0",
+                (adesso,)).rowcount
         # 2) LA FINESTRA: chi si e' chiuso senza quella conferma
         n = con.execute(
             "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
             "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
+            "AND stato IN ('released','refunded') AND aggiornato < ?",
+            (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
+        n += con.execute(
+            "UPDATE ordini SET email_corriere='', "
+            "email_corriere_purgata_il=? "
+            "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
             "AND stato IN ('released','refunded') AND aggiornato < ?",
             (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
         con.commit()
@@ -30057,6 +30373,30 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         nota_indirizzo = (
             f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
             f"leggono solo le parti: non è mostrato ai moderatori.")
+    # L'EMAIL PER IL CORRIERE: il FATTO e la data, MAI il valore
+    # (decisione di Andrea). Al moderatore serve sapere se il codice
+    # e' stato consegnato, e quello lo legge dalla dichiarazione del
+    # venditore qui sotto: un recapito non lo aiuta a decidere e gli
+    # mette in mano un dato personale che non gli serve — il
+    # precedente dell'indirizzo, alla lettera.
+    # ⚠️ QUI DENTRO NON SI DECIFRA NIENTE, e la sentinella che lo
+    # verifica legge anche i commenti: il nome della funzione che non
+    # si chiama non va scritto nemmeno qui.
+    nota_email = ""
+    if o["email_corriere_il"]:
+        quando_e = time.strftime("%d/%m/%Y %H:%M",
+                                 time.localtime(o["email_corriere_il"]))
+        stato_em = f"lasciata il {quando_e}"
+        ne = o["email_corriere_correzioni"]
+        if ne:
+            stato_em += (f", poi corretta {ne} "
+                         f"volt{'a' if ne == 1 else 'e'}")
+        if not o["email_corriere"] and not o["email_corriere_purgata_il"]:
+            stato_em += ", e poi TOLTA dall'acquirente"
+        nota_email = (
+            f"\n📧 L'acquirente aveva lasciato un'email per il "
+            f"corriere ({stato_em}). Il valore non è mostrato ai "
+            f"moderatori: serve a sapere SE la scorciatoia c'era.")
     # IL SERVIZIO (ago 2026): la lezione avviene su Meet, fuori — qui
     # dentro non c'e' NIENTE, e la regola dichiarata all'acquisto e'
     # che si giudicano le CONDIZIONI, non il fatto. I due fatti sono
@@ -30131,7 +30471,7 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
                               "decisione." + nota_digitale + nota_punto
-                              + nota_indirizzo + nota_servizio
+                              + nota_indirizzo + nota_email + nota_servizio
                               + avviso_nota)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
@@ -30657,6 +30997,13 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # cancellazione e indirizzo_atteso — che servono al client per
         # sapere quale pannello disegnare senza poter sbirciare.
         r.pop("indirizzo", "")
+        # E l'email per il corriere idem: si legge solo dalla sua
+        # rotta, e solo le due parti (l'admin MAI, nemmeno in
+        # disputa — li' gli arriva il FATTO con la data). Escono i
+        # fatti: il quando, le correzioni, il timbro della
+        # cancellazione. Servono al client per disegnare il cassetto
+        # senza poter sbirciare.
+        r.pop("email_corriere", "")
         # Il collegamento del servizio idem: si legge solo da
         # /accesso, e solo le due parti. `accesso_il` e le correzioni
         # ESCONO — sono il SE e il QUANDO, cioe' il secondo dei due
@@ -36719,6 +37066,21 @@ CONTROLLI_LIBRO_MASTRO = (
      "OR (indirizzo='' AND indirizzo_il>0 AND indirizzo_purgato_il=0) "
      "OR (indirizzo<>'' AND via_punto=1) "
      "OR (indirizzo_purgato_il>0 AND indirizzo<>'')"),
+    # L'EMAIL PER IL CORRIERE (ago 2026): il gemello, con TRE bracci
+    # invece di quattro. Manca «piena senza timbro» all'inverso —
+    # cioe' non si guarda `email_corriere='' AND email_corriere_il>0`,
+    # che sull'indirizzo e' un guasto e qui e' lo stato NORMALE di chi
+    # l'ha TOLTA: il campo e' facoltativo, il vuoto e' un gesto
+    # legittimo, e il timbro del PRIMO resta apposta (e' il fatto che
+    # il moderatore legge in disputa). Un allarme su un caso normale
+    # e' peggio di nessun allarme.
+    ("email per il corriere fuori contratto",
+     "l'email si scrive col suo timbro e solo sulla via punto, e "
+     "dopo la purga non deve restare niente",
+     "SELECT id FROM ordini "
+     "WHERE (email_corriere<>'' AND email_corriere_il=0) "
+     "OR (email_corriere<>'' AND via_punto=0) "
+     "OR (email_corriere_purgata_il>0 AND email_corriere<>'')"),
     # Passa la domanda che decide: il gate di nascondi_ordine ammette
     # solo released/refunded, che sono ASSORBENTI — non esiste uno
     # stato transitorio legittimo in cui questa e' falsa.
@@ -37167,7 +37529,8 @@ META_TESTO_SICUREZZA = (
 TITOLO_PRIVACY = "I tuoi dati — Barattolo"
 META_TESTO_PRIVACY = (
     "Cosa sappiamo di te, per quanto tempo e chi lo legge. E cosa non "
-    "raccogliamo: niente email, niente password, nessun tracciamento.")
+    "raccogliamo: niente password, nessun tracciamento, nessuna "
+    "pubblicità.")
 
 META_GENERICI = _meta_anteprima(TITOLO_HOME, META_TESTO_HOME, URL_PUBBLICO)
 

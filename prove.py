@@ -3508,11 +3508,26 @@ def prove_busta_ritiro():
     # aprirla e rileggerla per correggerla sono GET puri, come il
     # collegamento del servizio. La sola lettura che NON sta qui e' la
     # rivelazione del codice digitale, dove leggere E' la ricevuta.
-    prova("l'attesa ritardata la chiamano solo le sette LETTURE",
+    prova("l'attesa ritardata la chiamano solo le nove LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
            "apriDocBusta", "mostraAccesso",
-           "apriFotoContenuto", "apriCorrezioneContenuto"},
+           "apriFotoContenuto", "apriCorrezioneContenuto",
+           # l'email per il corriere (ago 2026): due LETTURE, e la sua
+           # SCRITTURA (mandaEmailCorriere) sta apposta fuori — le due
+           # scritture sorelle dell'ordine, salvaNota e
+           # salvaPuntoRitiro, un velo non ce l'hanno affatto, e questo
+           # elenco vale finche' resta di sole letture
+           "apriEmailCorriere", "mostraEmailCorriere"},
           _chi_chiama("attesaRitardata(btn,"))
+    # ⚠️ con find() e non index(): una prova che ESPLODE invece di
+    # farsi rossa si porta dietro tutte le sorelle dopo di lei — la
+    # lezione gia' pagata tre volte
+    _i = mini.find("async function mandaEmailCorriere(")
+    _f = mini.find(chr(10) + "async function", _i + 10)
+    _corpo_manda = mini[_i:_f] if _i >= 0 and _f > _i else ""
+    prova("...e la SCRITTURA dell'email ne resta fuori",
+          (True, False),
+          (bool(_corpo_manda), "attesaRitardata" in _corpo_manda))
     # IL GEMELLO: chi non passa un testo si prende «Invio sats in
     # corso…», quindi il default puo' restare SOLO a chi i sats li
     # muove davvero — e' cosi' che quella frase e' finita sopra il
@@ -5179,6 +5194,448 @@ def prove_indirizzo_casa():
     vero.close()
 
 
+def prove_email_corriere():
+    """L'EMAIL PER IL CORRIERE (ago 2026, tappa B).
+
+    Spedendo a un locker il venditore puo' mettere i recapiti del
+    COMPRATORE come destinatario — la busta diretta, cantiere 45 — e da
+    li' il codice glielo manda il corriere. La META' che mancava era
+    procurarsi quel recapito senza la chat, cioe' proprio cio' che chi
+    non ha ne' username Telegram ne' npub NON HA: e' la terza volta che
+    lo stesso buco morde (la busta, l'indirizzo, adesso questo).
+
+    LE DECISIONI DI ANDREA, e sono la voce:
+      - UN CAMPO SOLO, l'EMAIL. Il telefono non entra in Barattolo per
+        nessuna ragione: e' un vincolo permanente, e la prova che lo
+        sorveglia guarda il CODICE e non la prosa.
+      - FACOLTATIVA, mai una condizione per comprare.
+      - DENTRO L'ORDINE, DOPO IL PAGAMENTO.
+      - IL MODERATORE VEDE CHE C'ERA, MAI QUALE.
+
+    Le sentinelle dicono che i pezzi ci sono; a dire che RISPONDONO
+    giusto e' il banco in fondo, che fa girare i due endpoint VERI su
+    un database vero."""
+    import sqlite3, asyncio
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    giu = pezzo("_email_corriere_da_payload")
+    post = pezzo("indica_email_corriere")
+    get = pezzo("leggi_email_corriere")
+
+    # --- IL VINCOLO PERMANENTE: il telefono non entra --------------
+    # ⚠️ si guarda il CODICE e non il file: la parola «telefono» vive
+    # nella prosa (la docstring che dichiara il vincolo, i testi
+    # pubblici, il campo dell'INDIRIZZO che un telefono lo accetta da
+    # sempre), quindi una ricerca larga sarebbe rossa per colpa di una
+    # spiegazione.
+    prova("il giudice non conosce nessun telefono", False,
+          "telefono" in _senza_prosa(codice(giu)).lower())
+    prova("...ne' l'endpoint che scrive", False,
+          "telefono" in _senza_prosa(codice(post)).lower())
+    # il DDL si taglia da solo: e' l'unico posto dove quei nomi stanno
+    # dentro una dichiarazione di colonna
+    _ddl = src[src.index('"email_corriere TEXT'):
+               src.index('"email_corriere_purgata_il') + 200]
+    prova("il DDL ha le cinque colonne", 5,
+          _ddl.count('"email_corriere'))
+
+    # --- IL GIUDICE ------------------------------------------------
+    prova("cifra LUI e non i chiamanti", (1, 0),
+          (giu.count("_cifra_contenuto(testo)"),
+           codice(post).count("_cifra_contenuto")))
+    prova("il vuoto si ACCETTA (e' facoltativa)", True,
+          'return "", ""' in giu)
+    prova("torna la TUPLA: dai blob non si deduce niente, Fernet non "
+          "e' deterministico", True, "-> tuple" in giu)
+    prova("il tetto e' un 400 e mai un troncamento", True,
+          "HTTPException(400" in giu and "[:MAX_EMAIL" not in giu)
+    prova("...e la leva ha il suo nome", True,
+          "MAX_EMAIL_CORRIERE = 120" in src)
+    # IL CONTROLLO DI FORMA VIVE NEL CLIENT, la ricetta di
+    # FORME_TRACKING: un'euristica nostra non deve fermare un
+    # indirizzo vero, quindi CHIEDE e non impedisce
+    prova("il server la forma non la giudica", False,
+          "@" in codice(giu))
+    prova("...e il client la chiede senza impedire", True,
+          "function formaEmail(" in mini and "emailForzata" in mini)
+
+    # --- LA SUPERFICIE: il valore non esce da nessun'altra parte ----
+    prova("non esce da /api/orders", True,
+          'r.pop("email_corriere", "")' in src)
+    prova("...ma i FATTI si', o il client non saprebbe disegnare",
+          True, "emailCorriereIl:o.email_corriere_il" in mini)
+    prova("il moderatore non la legge MAI: la guardia e' alle due "
+          "parti", True,
+          "(compratore_id=? OR venditore_id=?)" in get)
+    prova("...e l'autorizzazione viene PRIMA dell'esistenza", True,
+          get.index("if not o:") < get.index("email_corriere_purgata_il"))
+    # ⚠️ QUI il nome della funzione che NON si chiama non si scrive
+    # nemmeno in un commento: questa prova legge il pezzo intero.
+    prova("in disputa esce il FATTO e non il valore", False,
+          "_email_corriere_letta" in pezzo("apri_disputa"))
+    prova("...e il fatto c'e', con la sua data", True,
+          "aveva lasciato un'email per il corriere" in src)
+
+    # --- IL GATE: 'locked' e via punto, e il perche' del venditore --
+    prova("solo il compratore, solo su locked", True,
+          "compratore_id=? \"\n                    \"AND stato='locked'"
+          in post or ("compratore_id=?" in post
+                      and "stato='locked'" in post))
+    prova("solo sulla via punto", True, 'if not o["via_punto"]' in post)
+    prova("il 400 e' quello opaco dei fratelli", True,
+          '400, "Operazione non permessa"' in post)
+    # NIENTE GATE SUL VENDITORE, ed e' la riga da non ammorbidire:
+    # verrebbe naturale offrire il campo solo a chi dichiara la busta
+    # diretta, ma quella dichiarazione arriva DOPO la spedizione —
+    # cioe' quando questo campo e' gia' chiuso.
+    prova("nessun gate sulla dichiarazione del venditore", False,
+          "busta_diretta_il" in codice(post))
+
+    # --- LA SCOPA: dentro pulisci_indirizzi, non in una gemella -----
+    scopa = _senza_prosa(pezzo("pulisci_indirizzi"))
+    prova("la scopa e' UNA: le due velocita' non si copiano", 2,
+          scopa.count("email_corriere_purgata_il=?"))
+    prova("...con la guardia che rende verificabile la promessa", 2,
+          scopa.count("email_corriere<>'' AND email_corriere_purgata_il=0"))
+    prova("...e NON tocca `aggiornato`", False,
+          "aggiornato=?" in scopa)
+    prova("...e solo gli stati assorbenti", False,
+          "'annullato'" in scopa)
+    prova("il libro mastro ha il suo controllo", True,
+          "email per il corriere fuori contratto" in src)
+
+    # --- IL CLIENT -------------------------------------------------
+    prova("client: il campo sta dietro un link discreto", True,
+          "+ Ricevi il codice direttamente dal corriere" in mini)
+    prova("client: il ridisegno e' del solo pannello, MAI openOrder",
+          False, "openOrder" in pezzo_js(mini, "function ridisegnaEmail("))
+    prova("client: lo stato vive in una variabile, non nel DOM", True,
+          "let emailAperta = 0;" in mini)
+    prova("client: il campo e' un <input type=email> con l'autofill",
+          True, 'type="email" id="emailCorriereInp" autocomplete="email"'
+          in mini)
+    prova("client: e prende il vestito dei campi dell'indirizzo, che "
+          "dentro .payout un input nudo esce col bordo del browser",
+          True, '<div class="ind-campi">' in mini)
+    # il fuoco vive SOLO nel gesto e mai in un render, o la tastiera si
+    # alzerebbe da sola aprendo l'ordine
+    prova("client: il fuoco sta nel gesto, non nel disegno", 1,
+          mini.count("function metteFuocoEmail("))
+    # ⚠️ IL DIFETTO CHE SOLO IL GIRO DAL VIVO HA VISTO: su un
+    # <input type="email"> `setSelectionRange` NON ESISTE (la specifica
+    # lo da' ai soli campi testuali) e alza un InvalidStateError che si
+    # porta via il resto del gesto — a schermo ogni apertura del campo
+    # alzava, e le sentinelle di ieri erano tutte verdi. Il cursore in
+    # fondo si tiene col giro di valore, che non puo' alzare su nessun
+    # tipo; e la promessa e' MISURATA: col fuoco nudo il carattere
+    # battuto atterra all'inizio.
+    _fuoco = pezzo_js(mini, "function metteFuocoEmail(")
+    prova("client: il cursore in fondo NON passa da setSelectionRange, "
+          "che su type=email alza", False, "setSelectionRange" in _fuoco)
+    prova("client: ...e ci va col giro di valore", True,
+          "c.value = c.value" in _fuoco)
+    prova("client: su 'shipped' il campo si chiude e si dice perche'",
+          True, "l'email che hai lasciato è già sull'etichetta" in mini)
+    # ⚠️ IL TESTO SI BIFORCA SULLA BUSTA DIRETTA, e sono DUE difetti
+    # trovati dal giro DAL VIVO che nessuna misura poteva vedere.
+    #   1) senza quella dichiarazione l'email non e' finita su nessuna
+    #      etichetta — il codice arriva al venditore come sempre —
+    #      quindi il ramo unico diceva il FALSO a meta' degli ordini;
+    #   2) sul ramo diretto la via d'uscita NON si ripete: ce l'ha gia'
+    #      la nota verde due righe piu' sotto, e ripeterla sarebbe la
+    #      stessa cosa detta due volte a due dita di distanza. Per la
+    #      stessa ragione qui non si nomina il bottone della maniglia,
+    #      che per giunta nasce solo a SOLLECITO_MANUALE_BUSTA_ORE
+    #      dalla spedizione.
+    _sped = pezzo_js(mini, "function pannelloEmailCorriere(")
+    prova("client: ...e il testo dello 'shipped' si biforca sulla busta "
+          "diretta", True, "${o.bustaDirettaIl" in _sped)
+    prova("client: ...senza busta diretta dice che l'email non e' stata "
+          "usata", True, "non ha usato la tua email" in _sped)
+    prova("client: ...e non ripete la via d'uscita della nota verde",
+          (False, False),
+          ("col bottone qui sotto" in _sped,
+           "Non mi è arrivato il codice" in _sped))
+    prova("client: il venditore la legge dalla sua rotta", True,
+          "mostraEmailCorriere(this)" in mini)
+    prova("client: il moderatore non ha nessun bottone", True,
+          "role==='seller'" in pezzo_js(mini, "function pannelloEmailCorriere(")
+          and "role==='admin'" not in
+          pezzo_js(mini, "function pannelloEmailCorriere("))
+
+    # --- I TESTI PUBBLICI: oggi nessuna riga era sorvegliata --------
+    prova("la pagina «Il pagamento protetto» dichiara l'email", True,
+          "se vuoi che il codice di ritiro te lo mandi il corriere"
+          in mini)
+    prova("«I tuoi dati» dice che il telefono non lo chiediamo mai",
+          True, "Il numero di telefono non te lo chiediamo mai" in mini)
+    prova("...e che un campo per il telefono non esiste", True,
+          "Un campo per il telefono, da solo, in Barattolo non esiste."
+          in mini)
+    prova("...e dichiara la durata, accanto all'indirizzo", True,
+          "sparisce insieme all'indirizzo" in mini)
+    prova("...e che il moderatore non la legge", True,
+          "La tua email per il corriere non la legge." in mini)
+    prova("i meta della privacy non promettono piu' «niente email»",
+          False, "niente email" in src)
+
+    # ================================================================
+    # IL FUNZIONALE: i due endpoint VERI su un database vero
+    # ================================================================
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
+        stato TEXT, via_punto INT DEFAULT 0, aggiornato INT DEFAULT 0,
+        email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+        email_corriere_corretta_il INT DEFAULT 0,
+        email_corriere_correzioni INT DEFAULT 0,
+        email_corriere_purgata_il INT DEFAULT 0,
+        indirizzo TEXT DEFAULT '', indirizzo_purgato_il INT DEFAULT 0,
+        disputata INT DEFAULT 0);
+      -- 1: via punto, pagato: il caso normale
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto)
+        VALUES(1, 111, 222, 'locked', 1);
+      -- 2: la spedizione a casa, che di email non ne vuole
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato)
+        VALUES(2, 111, 222, 'locked');
+      -- 3: gia' spedito: l'etichetta e' stampata, il campo si chiude
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
+        email_corriere, email_corriere_il)
+        VALUES(3, 111, 222, 'shipped', 1, 'plain:gia@qui.it', 500);
+      -- 4: chiuso e PURGATO: la promessa mantenuta
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
+        email_corriere_il, email_corriere_purgata_il)
+        VALUES(4, 111, 222, 'released', 1, 500, 900);
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    avvisi = []
+
+    async def _notifica(tg, testo):
+        avvisi.append((tg, testo))
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    class _T:
+        @staticmethod
+        def time():
+            return 9_000_000_000
+
+        @staticmethod
+        def strftime(f, t):
+            return "01/01/2000"
+
+        @staticmethod
+        def localtime(t=None):
+            return None
+
+    def _amb(chi):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "time": _T, "print": lambda *a, **k: None,
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MODALITA_COLLAUDO": True,
+               "MAX_EMAIL_CORRIERE": 120}
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        exec(pezzo("_email_corriere_letta"), amb)
+        exec(pezzo("_coda_email_corriere"), amb)
+        return amb
+
+    def corri(amb, nome, *args):
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb[nome](*args))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def scrivi(chi, oid, mail):
+        amb = _amb(chi)
+        exec("async " + pezzo("indica_email_corriere"), amb)
+        return corri(amb, "indica_email_corriere", oid,
+                     _Req({"email_corriere": mail}))
+
+    def leggi(chi, oid):
+        amb = _amb(chi)
+        exec("async " + pezzo("leggi_email_corriere"), amb)
+        return corri(amb, "leggi_email_corriere", oid)
+
+    def riga(i):
+        return vero.execute("SELECT * FROM ordini WHERE id=?",
+                            (i,)).fetchone()
+
+    prova("il venditore non la scrive", "400 Operazione non permessa",
+          scrivi(222, 1, "x@y.it"))
+    prova("l'estraneo nemmeno, e con la STESSA risposta",
+          "400 Operazione non permessa", scrivi(999, 1, "x@y.it"))
+    prova("l'ordine che non esiste: la stessa risposta ancora",
+          "400 Operazione non permessa", scrivi(111, 77, "x@y.it"))
+    prova("niente email sulla spedizione a casa", True,
+          str(scrivi(111, 2, "x@y.it")).startswith("400 Questo ordine"))
+    prova("dopo la spedizione il campo e' chiuso",
+          "400 Operazione non permessa", scrivi(111, 3, "altra@y.it"))
+
+    avvisi.clear()
+    r = scrivi(111, 1, "  Mario@Esempio.IT  ")
+    prova("il compratore la scrive", True, isinstance(r, dict))
+    prova("...e in colonna arriva CIFRATA col prefisso", True,
+          riga(1)["email_corriere"].startswith("plain:"))
+    prova("...con gli spazi ai bordi tolti", "Mario@Esempio.IT",
+          riga(1)["email_corriere"].split(":", 1)[1])
+    prova("...e il venditore riceve un avviso STATICO, mai il valore",
+          (1, False),
+          (len(avvisi), "Mario@Esempio.IT" in (avvisi[0][1] if avvisi else "")))
+    prova("...e il timbro del PRIMO c'e'", True, riga(1)["email_corriere_il"] > 0)
+
+    avvisi.clear()
+    scrivi(111, 1, "Mario@Esempio.IT")
+    prova("riscriverla identica non e' un cambio: niente avviso",
+          (0, 0), (len(avvisi), riga(1)["email_corriere_correzioni"]))
+
+    primo = riga(1)["email_corriere_il"]
+    scrivi(111, 1, "nuova@esempio.it")
+    prova("la correzione si conta", 1, riga(1)["email_corriere_correzioni"])
+    prova("...e il timbro del PRIMO non si muove", primo,
+          riga(1)["email_corriere_il"])
+
+    avvisi.clear()
+    scrivi(111, 1, "")
+    prova("togliersi si puo': il vuoto si accetta", "",
+          riga(1)["email_corriere"])
+    prova("...e il timbro del primo RESTA (e' il fatto della disputa)",
+          primo, riga(1)["email_corriere_il"])
+    prova("...e il venditore lo viene a sapere", 1, len(avvisi))
+
+    scrivi(111, 1, "letta@esempio.it")
+    prova("la leggono le due PARTI",
+          ("letta@esempio.it", "letta@esempio.it"),
+          (leggi(111, 1).get("email"), leggi(222, 1).get("email")))
+    prova("l'estraneo no, con la risposta dei fratelli",
+          "400 Operazione non permessa", leggi(999, 1))
+    dump = [tuple(x) for x in vero.execute("SELECT * FROM ordini")]
+    leggi(111, 1); leggi(222, 1)
+    prova("...e la lettura non scrive NIENTE", dump,
+          [tuple(x) for x in vero.execute("SELECT * FROM ordini")])
+    prova("il purgato lo dice a chi lo cerca", True,
+          str(leggi(111, 4)).startswith("404 L'email è stata cancellata"))
+    prova("un'email troppo lunga si rifiuta, non si tronca", True,
+          str(scrivi(111, 1, "a" * 130 + "@x.it")).startswith("400 "))
+
+    # ---- LA CIFRATURA VERA: non deterministica -------------------
+    # ⚠️ IL CASO CHE IL CARTONE NON POTEVA VEDERE, e l'ha trovato la
+    # tortura: senza chiave `_cifra_contenuto` scrive 'plain:', cioe'
+    # e' DETERMINISTICO — quindi confrontare i BLOB funzionerebbe, e
+    # la mutazione che rimette quel confronto restava verde. In
+    # produzione Fernet mette un IV casuale e la stessa email da' due
+    # stringhe diverse: ogni salvataggio sembrerebbe un cambio e
+    # manderebbe una notifica al venditore per niente. Qui la chiave
+    # c'e' e la Fernet e' di cartone, ma NON DETERMINISTICA come
+    # quella vera: e' l'unico modo di provare il caso invece di
+    # guardarlo.
+    class _FernetFinta:
+        n = 0
+
+        def __init__(self, chiave):
+            pass
+
+        def encrypt(self, b):
+            _FernetFinta.n += 1
+            return (str(_FernetFinta.n).encode() + b"|" + b)
+
+        def decrypt(self, b):
+            return b.split(b"|", 1)[1]
+
+    def _amb_cifrato(chi):
+        amb = _amb(chi)
+        amb["CHIAVE_CONTENUTI_DIGITALI"] = "x"
+        amb["Fernet"] = _FernetFinta
+        amb["_chiave_fernet"] = lambda v=None: b"k"
+        amb["base64"] = __import__("base64")
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        exec(pezzo("_email_corriere_letta"), amb)
+        exec("async " + pezzo("indica_email_corriere"), amb)
+        return amb
+
+    vero.execute("UPDATE ordini SET email_corriere='', email_corriere_il=0,"
+                 " email_corriere_correzioni=0 WHERE id=1")
+    vero.commit()
+    a1 = _amb_cifrato(111)
+    corri(a1, "indica_email_corriere", 1, _Req({"email_corriere": "x@y.it"}))
+    b1 = riga(1)["email_corriere"]
+    avvisi.clear()
+    a2 = _amb_cifrato(111)
+    corri(a2, "indica_email_corriere", 1, _Req({"email_corriere": "x@y.it"}))
+    b2 = riga(1)["email_corriere"]
+    prova("cifrata sul serio, due blob della stessa email DIFFERISCONO",
+          True, b1.startswith("f2:") and b1 != _FernetFinta.n * "x"
+          and b1 != ("f2:" + "x@y.it"))
+    prova("...eppure riscriverla identica non e' un cambio",
+          (b1, 0, 0),
+          (b2, len(avvisi), riga(1)["email_corriere_correzioni"]))
+
+    # ---- LA SCOPA: si fa GIRARE, non si conta ---------------------
+    # ⚠️ l'altro buco della tortura: la sentinella conta le stringhe, e
+    # una stringa dentro un `or` che non si esegue la lascia verde.
+    vero.executescript("""
+      UPDATE ordini SET email_corriere='plain:a@a.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='released', disputata=0, aggiornato=8999913600 WHERE id=1;
+      UPDATE ordini SET email_corriere='plain:b@b.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='refunded', aggiornato=500 WHERE id=2;
+      UPDATE ordini SET email_corriere='plain:c@c.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='locked', aggiornato=500 WHERE id=3;
+    """)
+    vero.commit()
+    detto_s = []
+    amb_s = {"db": Con, "time": _T, "print": lambda *a: detto_s.append(
+                 " ".join(str(x) for x in a)),
+             "GIORNI_INDIRIZZO": 10, "AUTO_SBLOCCO_ATTIVO": False}
+    exec(pezzo("pulisci_indirizzi"), amb_s)
+    prima_agg = riga(2)["aggiornato"]
+    amb_s["pulisci_indirizzi"]()
+    prova("la CORSIA VELOCE spazza l'email alla conferma",
+          ("", True), (riga(1)["email_corriere"],
+                       riga(1)["email_corriere_purgata_il"] > 0))
+    prova("la CORSIA LENTA la spazza a finestra scaduta",
+          ("", True), (riga(2)["email_corriere"],
+                       riga(2)["email_corriere_purgata_il"] > 0))
+    prova("...e l'ordine VIVO non si tocca", "plain:c@c.it",
+          riga(3)["email_corriere"])
+    prova("...e `aggiornato` non si muove mai", prima_agg,
+          riga(2)["aggiornato"])
+    prova("...e la scopa non e' saltata in silenzio", False,
+          any("saltata" in r for r in detto_s))
+    vero.close()
+
+
 def prove_nota_compratore():
     """LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
     dire sull'OGGETTO — la taglia, il numero, la variante.
@@ -5396,8 +5853,13 @@ def prove_nota_compratore():
           and "Nota per il venditore (facoltativa)" in mini)
     prova("client: il campo dice di non scriverci il recapito", True,
           "non il tuo recapito" in mini)
-    prova("la pagina «I tuoi dati» dichiara la quarta cosa", True,
-          "Quattro cose non ce le dai" in mini)
+    # ⚠️ CAMBIATA LATO (ago 2026): erano quattro, sono CINQUE — con
+    # l'email per il corriere. E' l'unico allarme automatico che
+    # scatta quando quella lista cresce, e per questo il numero si
+    # scrive a parole nel testo invece di essere contato: chi aggiunge
+    # una voce senza dirlo trova la CI rossa.
+    prova("la pagina «I tuoi dati» dichiara la quinta cosa", True,
+          "Cinque cose non ce le dai" in mini)
     prova("...e che la nota il moderatore la legge", True,
           "E la nota che hai scritto a chi vende, sì." in mini)
 
@@ -14315,6 +14777,10 @@ def prove_libro_mastro():
           busta_diretta_il INT DEFAULT 0,
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
+          email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+          email_corriere_corretta_il INT DEFAULT 0,
+          email_corriere_correzioni INT DEFAULT 0,
+          email_corriere_purgata_il INT DEFAULT 0,
           nascosto_compratore INT DEFAULT 0,
           nascosto_venditore INT DEFAULT 0,
           codice_sconto TEXT DEFAULT '', codice_sconto_id INT DEFAULT 0,
@@ -14697,6 +15163,24 @@ def prove_libro_mastro():
         ("UPDATE ordini SET indirizzo='via Roma 1', indirizzo_il=99, "
          "indirizzo_purgato_il=100 WHERE id=4",
          "indirizzo fuori contratto", "4"),
+        # L'EMAIL PER IL CORRIERE (ago 2026): tre bracci, e il caso
+        # che NON c'e' e' quello da ricordare — l'email TOLTA (vuota
+        # col timbro del primo) e' lo stato normale di chi ci ha
+        # ripensato, non un guasto.
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=0 "
+         "WHERE id=4",
+         "email per il corriere fuori contratto", "4"),
+        # ⚠️ il ramo del via_punto si pianta sull'ordine 2, che una
+        # busta non ce l'ha: sul 4 spegnere via_punto farebbe suonare
+        # ANCHE il controllo della busta, e un caso che puo' fallire
+        # per due ragioni non ne sorveglia nessuna (la lezione di
+        # _pare_recapito).
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=1 "
+         "WHERE id=2",
+         "email per il corriere fuori contratto", "2"),
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=1, "
+         "email_corriere_purgata_il=100 WHERE id=4",
+         "email per il corriere fuori contratto", "4"),
         # LO SBLOCCO DEL BANNER, e sono i quattro modi in cui il primo
         # incasso nostro puo' rompersi SENZA che niente alzi la voce:
         # nessuna eccezione, nessuna riga di journal, nessuna prova
@@ -30427,6 +30911,9 @@ def prove_servizi():
             indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
             indirizzo_corretto_il INT DEFAULT 0,
             indirizzo_correzioni INT DEFAULT 0,
+            email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+            email_corriere_correzioni INT DEFAULT 0,
+            email_corriere_purgata_il INT DEFAULT 0,
             nota_compratore TEXT DEFAULT '',
             appuntamento_il INT DEFAULT 0,
             appuntamento_confermato_il INT DEFAULT 0,
@@ -34316,6 +34803,7 @@ def main():
               prove_busta_ritiro, prove_contenuto_digitale_forma,
               prove_foto_contenuto,
               prove_indirizzo_casa,
+              prove_email_corriere,
               prove_nota_compratore,
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,

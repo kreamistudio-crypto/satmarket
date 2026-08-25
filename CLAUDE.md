@@ -16129,6 +16129,156 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   disputa continua a mandare le parti in chat per l'indirizzo del
   VENDITORE, che noi non abbiamo — l'asimmetria si vede solo adesso,
   ed è dichiarata, non risolta.
+  L'EMAIL PER IL CORRIERE (ago 2026, tappa B della busta diretta, e la
+  QUARTA volta che lo stesso buco morde): spedendo a un locker il
+  venditore può mettere i recapiti del COMPRATORE come destinatario —
+  la busta diretta, cantiere 45 — e da lì il codice di ritiro glielo
+  manda il corriere, senza passare da noi. La metà che mancava era
+  procurarsi quel recapito senza la chat, cioè precisamente quel che
+  **chi non ha né username Telegram né npub NON HA**: è lo stesso caso
+  vero che ha fatto nascere la busta di consegna, poi l'indirizzo di
+  casa, poi la nota.
+  LA PREMESSA DA CORREGGERE PRIMA DI TUTTO, o si racconta una cosa che
+  non è: «il dato non passa da noi» e «un campo cifrato nell'ordine che
+  sparisce alla chiusura» NON SONO LA STESSA COSA — la seconda lo fa
+  passare da noi. Transita, si scrive su disco, si cifra con una chiave
+  che sta sullo STESSO server, e il nostro codice lo legge per mostrarlo
+  al venditore. La pagina «I tuoi dati» lo dichiara già di sé. Le strade
+  che davvero non lo fanno passare sono due — la CHAT (che esclude i non
+  contattabili) e NIENTE AFFATTO (il venditore mette i propri recapiti e
+  deposita la busta, che resta il ripiego). Questa è la terza: **passa,
+  ma non resta**, ed è esattamente l'indirizzo di casa — «lo
+  trasportiamo, non lo conserviamo».
+  LE CINQUE DECISIONI DI ANDREA, e sono la voce.
+  1) **UN CAMPO SOLO, L'EMAIL. Il numero di telefono non entra in
+  Barattolo per nessuna ragione**: è un vincolo PERMANENTE, e non
+  scade nemmeno se un domani un corriere volesse l'SMS. Al locker
+  serve la mail, il telefono no. Lo sorvegliano due prove che guardano
+  il CODICE (`_senza_prosa`) e non la prosa: la parola vive nella
+  docstring che dichiara il vincolo, nei testi pubblici e nel campo
+  dell'INDIRIZZO, che un telefono lo accetta da sempre.
+  2) FACOLTATIVA, mai una condizione per comprare: chi non la lascia
+  continua come oggi — il codice arriva al venditore, che lo deposita
+  nella busta.
+  3) DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
+  Mai alla cassa: un campo facoltativo non sta sulla strada
+  dell'acquisto.
+  4) Su OGNI ordine via punto, senza gate sul venditore — ed è la riga
+  da non ammorbidire: verrebbe naturale offrirla solo a chi dichiara la
+  busta diretta, ma quella dichiarazione arriva DOPO la spedizione,
+  cioè quando questo campo è già chiuso. Un gate così non chiuderebbe
+  mai e chiuderebbe il campo a tutti.
+  5) **IL MODERATORE VEDE CHE C'ERA, MAI QUALE** — il precedente
+  dell'indirizzo, alla lettera: in disputa gli arriva il FATTO con la
+  data e le correzioni, che è quel che gli serve per capire da dove
+  doveva arrivare il codice. Il valore no, da nessuna strada e in
+  nessuno stato.
+  IL MODELLO è la forma dell'indirizzo meno `_atteso` (qui non c'è
+  nessun gate da armare): `email_corriere` cifrata col trasporto dei
+  contenuti digitali, più `_il` (il PRIMO, flag E quando), `_corretta_il`,
+  `_correzioni`, `_purgata_il`. **Il nome dice il mestiere e chiude la
+  porta al telefono per costruzione**: `recapito` inviterebbe ad
+  allargarlo, `email_corriere` no — è il patto di `nome_pezzo`. E NON si
+  riusa la colonna `indirizzo`: la sentinella del libro mastro ha già
+  `indirizzo<>'' AND via_punto=1` come guasto, e il giudice dell'altra è
+  cablato su `scelta=="spedizione" and not via_punto` in tutti e tre i
+  chiamanti.
+  IL GIUDICE TORNA LA TUPLA `(blob, testo)`, il patto di
+  `_indirizzo_da_payload`, e la ragione è la stessa: **Fernet non è
+  deterministico**, quindi due cifrature della stessa email danno
+  stringhe DIVERSE e dai blob non si può dedurre se sia cambiata. Il
+  chiamante confronta il CHIARO — con l'altro confronto ogni
+  salvataggio sembrerebbe un cambio e manderebbe una notifica al
+  venditore per niente. E CIFRA LUI e non i chiamanti (una chiamata
+  sola, c'è la prova): basta che uno se ne dimentichi perché
+  un'email finisca in chiaro.
+  IL VUOTO SI ACCETTA, al contrario dell'indirizzo e per la ragione
+  OPPOSTA: là svuotare rimetterebbe `segna_spedito` in trappola, qui è
+  facoltativa e va potuta togliere (il patto della nota). Ma
+  `email_corriere_il` NON si azzera togliendola: è il PRIMO, ed è il
+  fatto che il moderatore legge in disputa.
+  IL CONTROLLO DI FORMA VIVE NEL CLIENT, la ricetta di
+  `FORME_TRACKING`: a forma storta si CHIEDE e non si impedisce — primo
+  tocco avviso, secondo tocco sullo stesso testo si passa. Un'euristica
+  nostra non deve fermare un indirizzo vero, e la forma di un'email
+  valida è molto più larga di quel che si crede. Il SERVER la forma non
+  la giudica affatto (c'è la prova che nel giudice non compaia una
+  chiocciola), e il tetto è un 400 esplicito e MAI un troncamento: una
+  mail tagliata è una mail rotta.
+  SU 'shipped' IL CAMPO SI CHIUDE, come `indica_punto_ritiro`:
+  l'etichetta è già stampata, l'email nuova non ci arriverebbe mai, e
+  lasciarla scrivere sarebbe promettere una cosa che non succede. Al suo
+  posto la riga che lo dice e che porta al bottone «📮 Non mi è arrivato
+  il codice» della tappa A, che da lì in poi è la strada vera.
+  LA SCOPA È DENTRO `pulisci_indirizzi` e non in una gemella: le due
+  velocità e il gate su `AUTO_SBLOCCO_ATTIVO` sono la parte delicata, e
+  due copie divergono al primo ritocco — due UPDATE in più con la stessa
+  forma, e le tre righe da non ammorbidire (la guardia `<>''`,
+  `aggiornato` mai toccato, i soli stati assorbenti) valgono identiche.
+  Il nome resta il suo, il patto dei nomi interni.
+  IL LIBRO MASTRO ha TRE bracci e non quattro, e il quarto che MANCA è
+  quello da ricordare: non si guarda «vuota col timbro», che
+  sull'indirizzo è un guasto e qui è lo stato NORMALE di chi l'ha
+  TOLTA — il campo è facoltativo, il vuoto è un gesto legittimo, e un
+  allarme su un caso normale è peggio di nessun allarme.
+  I TESTI PUBBLICI sono la metà del cantiere, e la riga che ROVESCIA
+  davvero è quella di «Il pagamento protetto» — «la strada che ne chiede
+  di meno è il punto di ritiro: lì un indirizzo tuo non c'è proprio» —
+  che non era sorvegliata da niente. In «I tuoi dati» le cose che
+  chiediamo passano da quattro a CINQUE (è l'unico allarme automatico
+  che scatta quando quella lista cresce, e per questo il numero si
+  scrive a parole invece di essere contato), con la voce che dice anche
+  quel che il telefono non è; più la durata accanto all'indirizzo (è
+  letteralmente la stessa scopa) e la riga in «Cosa vede un
+  moderatore». `META_TESTO_PRIVACY` perde «niente email», che sarebbe
+  diventata una mezza bugia.
+  IL RISCHIO NUOVO SI SCRIVE E NON SI NASCONDE: un'email sbagliata può
+  atterrare su UNA PERSONA VERA, e il codice di ritiro arriverebbe a uno
+  sconosciuto che può andare a ritirare il pacco. Oggi quel codice ce
+  l'ha il venditore. Non si chiude: si attenua col controllo di forma,
+  con la correzione fino alla spedizione, e col promemoria della tappa A
+  che rompe il silenzio.
+  IMPERFEZIONE DICHIARATA: al pagamento `_coda_ricevuta` promette al
+  compratore «ti avviseremo», e chi lascia l'email dopo riceve il codice
+  da un'altra parte — è la stessa asimmetria già dichiarata per la
+  busta diretta, e a correggerla è la notifica di spedizione.
+  TRE DIFETTI LI HA TROVATI IL GIRO DAL VIVO E NON LA RILETTURA, ed è
+  la parte da tenere: le sentinelle dicevano che le righe c'erano, e a
+  schermo due di quelle righe facevano il contrario di quel che
+  promettevano.
+  1) IL CURSORE ALZAVA A OGNI APERTURA DEL CAMPO: `metteFuocoEmail`
+  chiamava `setSelectionRange`, che su un `<input type="email">` NON
+  ESISTE — la specifica lo dà ai soli campi testuali — e l'
+  InvalidStateError si portava via il resto del gesto. Il commento
+  accanto prometteva «il cursore in FONDO, o chi riapre per correggere
+  scriverebbe davanti a quel che ha già scritto», e la riga che doveva
+  mantenerlo era proprio quella che alzava: la promessa era mancata nel
+  caso esatto per cui esisteva. La cura è il GIRO DI VALORE
+  (`c.value = c.value`), che non può alzare su nessun tipo, e la
+  promessa è MISURATA e non supposta — battendo un carattere su un
+  campo appena messo a fuoco: col fuoco nudo atterra all'INIZIO
+  ('Zabc@d.it'), col giro di valore in FONDO. IL TIPO NON SI TOCCA:
+  `type="email"` dà la tastiera giusta e l'autofill, e c'è la
+  sentinella che lo pretende — a cedere è il modo di spostare il
+  caret, mai il campo.
+  2) IL TESTO DELLO 'shipped' DICEVA IL FALSO A METÀ DEGLI ORDINI:
+  «l'email che hai lasciato è già sull'etichetta» dà per scontata la
+  busta DIRETTA, e senza quella dichiarazione l'email non è finita su
+  nessuna etichetta — il codice arriva al venditore come sempre.
+  Adesso si BIFORCA su `bustaDirettaIl`: sul ramo diretto il fatto, su
+  quello normale «il venditore non ha usato la tua email: il codice di
+  ritiro arriva a lui, che te lo passa qui nell'ordine», che è la
+  verità e per giunta rassicura.
+  3) E LA VIA D'USCITA NON SI RIPETE: il testo mandava «al bottone qui
+  sotto», che è la stessa cosa che la nota verde del cantiere 45 dice
+  due righe più giù — la stessa cosa detta due volte a due dita di
+  distanza, il registro già pagato col nome del corriere sotto il
+  riquadro del punto. E per giunta quel bottone nasce solo a
+  `SOLLECITO_MANUALE_BUSTA_ORE` dalla spedizione, quindi per il primo
+  giorno — cioè proprio quando uno si accorge del refuso, appena
+  legge «ho spedito» — mandava a cercare una cosa che non c'era
+  ancora. C'è la prova che quel pannello non nomini né il bottone né
+  la sua etichetta.
   LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
   dire sull'OGGETTO — la taglia, il numero, la variante. Si scrive
   nella cassa prima di «Paga» e il venditore la legge dentro l'ordine,
@@ -23988,6 +24138,89 @@ usa-e-getta — **40 verifiche verdi** a 320/360/375 nei due temi: i due
 carrelli (misto e tutto-EUR), i dieci toggle che non spostano l'ancora
 di un sat, il minimo detto nella lingua del campo, e il cambio muto
 che spegne coda e toggle insieme. IN PRODUZIONE basta il deploy.
+
+L'email per il codice del locker (ago 2026, tappa B, dalla richiesta di
+un venditore vero in chat): chi compra può lasciare la sua email
+nell'ordine, così il codice del locker glielo manda direttamente il
+corriere invece del venditore. È la QUARTA volta che lo stesso buco
+morde — chi non ha né username Telegram né npub in chat non ci arriva —
+e la risposta è la terza strada: **passa, ma non resta**. Le cinque
+decisioni di Andrea (una sola email e **mai il telefono, vincolo
+permanente**; facoltativa; dentro l'ordine dopo il pagamento; su ogni
+ordine via punto senza gate sul venditore; il moderatore vede CHE c'era
+e mai QUALE) e la premessa da correggere — «cifrato nell'ordine» non
+vuol dire «non passa da noi» — stanno in Architettura, «L'EMAIL PER IL
+CORRIERE».
+Collaudata: **6580 prove verdi sull'albero ISOLATO** (HEAD più i soli
+hunk di questo cantiere: la copia di lavoro è condivisa con un'altra
+sessione, e la sua baseline era rossa per un cantiere che non è
+questo — è l'unica cosa che risponde a «questo commit, da solo, sta in
+piedi?»), con la famiglia nuova `prove_email_corriere` che fa GIRARE i
+due endpoint su un database di cartone; più
+`collaudo_email_corriere.py`, **39 verdi**, che cammina il giro intero
+col server VERO su un database usa-e-getta — l'email che in colonna
+arriva CIFRATA (`f2:`, con la chiave nel config finto: senza, il caso
+che conta non si potrebbe provare), il venditore che la legge e
+spedisce, il campo che si chiude dopo la spedizione, il moderatore che
+riceve il FATTO e non il valore, l'anti-oracolo verificato sul database
+vero, la scopa nelle due velocità, il caso normale che non cambia di un
+byte e la ronda che tace. Più la TORTURA: **21 mutazioni, 21
+uccise**, una per riga sorvegliata — il telefono che torna nel
+giudice, il tetto che tronca, l'email in chiaro, il confronto sui blob,
+il valore che esce da `/api/orders`, il moderatore che legge, le due
+corsie della scopa, i due rami del libro mastro, il campo che resta
+aperto sullo spedito, la guardia di proprietà fuori dalla WHERE, la
+lettura aperta all'admin. E il GIRO DAL VIVO via CDP a 320/360/375 nei
+due temi e dai TRE ruoli: **65 verifiche verdi e ZERO errori JS** —
+il link chiuso alto una riga, il campo aperto col tipo e l'autofill, la
+riga compatta che NON porta il valore (che in `/api/orders` non c'è) e
+lo precompila al tocco, i due rami dello spedito, il venditore che
+rivela e il moderatore che non ha nemmeno il pannello.
+QUATTRO LEZIONI DI METODO, e sono la parte che serve fra sei mesi.
+1) LA PROSA, per la quarta volta in un giro solo: tre sentinelle sono
+nate rosse per colpa di un COMMENTO — la docstring che dichiara il
+vincolo del telefono, quella della scopa che nomina `'annullato'`
+apposta per dire che non c'è, e un commento del client che nominava il
+velo d'attesa proprio per spiegare perché NON si chiama. Si stringono
+con `_senza_prosa`, o si toglie il nome dal commento.
+2) LA PROVA CHE NON PUÒ FALLIRE: «il valore non c'è nella nota» era
+verde anche con la nota VUOTA — passava per la ragione sbagliata.
+Adesso è in coppia con «la nota esiste».
+3) IL VELO D'ATTESA RESTA ALLE LETTURE: la scrittura dell'email non lo
+prende, perché le due scritture sorelle dell'ordine (`salvaNota`,
+`salvaPuntoRitiro`) non ce l'hanno, e quell'elenco vale finché resta di
+sole letture — è lui ad accorgersi del gesto che un domani muovesse
+sats.
+4) IL GIRO DAL VIVO HA TROVATO QUEL CHE LE MISURE NON DICEVANO, ed è
+la lezione più cara del cantiere: due righe facevano il CONTRARIO di
+quel che il loro commento prometteva, con tutte le sentinelle verdi —
+il cursore che alzava su `type="email"`, e il testo dello spedito che
+dava per scontata la busta diretta. La terza è di registro e si vede
+solo GUARDANDO: la via d'uscita scritta due volte a due dita di
+distanza. Stanno in Architettura, in coda alla voce.
+5) E IL BANCO CREDEVA DI ESSERE UN ALTRO: il login di collaudo vuole
+`id` e non `tg_id`, quindi il POST falliva in silenzio e la sessione
+restava quella di prima — tre righe rosse «del venditore» erano il
+COMPRATORE guardato due volte. Adesso il banco CHIEDE chi è (`myTgId`)
+e si ferma se non è chi crede, che è la stessa rete del marcatore sul
+server.
+6) IL FILTRO DEGLI HUNK SI RIFÀ AL MOMENTO DEL COMMIT: gli hunk
+dell'altra sessione sono cresciuti mentre lavoravo (quattro nuovi in
+`prove.py`), e un censimento di un'ora prima avrebbe portato via metà
+del suo lavoro.
+IN PRODUZIONE basta il deploy: cinque colonne additive che nascono
+vuote, nessuna leva nuova, nessuna migrazione di dati, nessuno stato
+nuovo — e un client rimasto in cache non conosce il campo e si comporta
+come oggi. ⚠️ Sul VPS `CHIAVE_CONTENUTI_DIGITALI` deve esserci, o il
+giudice risponde **503** e l'email non si salva dicendolo: qui il 503
+non blocca l'acquisto (l'ordine esiste già), ma un recapito in chiaro
+non si scrive — a differenza del PIN della busta, che è una
+degradazione accettabile e dichiarata.
+DA GUARDARE al primo giro: la prima email vera lasciata dentro Telegram
+— che il venditore la trovi nel suo riquadro al momento di comprare
+l'etichetta — e, al primo affare confermato, che sparisca con
+l'indirizzo entro dieci minuti (la riga 🏠 nel journal li conta
+insieme).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
