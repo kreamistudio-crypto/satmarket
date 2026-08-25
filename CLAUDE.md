@@ -17044,6 +17044,84 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `preferitiInVetrina` fatto girare con node sui suoi casi: le
   sentinelle dicono che esiste, mai che risponda giusto) e la tortura
   a 17 mutazioni, tutte uccise una per una.
+  IL BARATTOLO SI CONDIVIDE COL SUO LINK (ago 2026, decisione di
+  Andrea): la lista dei desideri esce dal dispositivo, ma come
+  FOTOGRAFIA e non come vista viva — chi ha il link vede la lista di
+  QUEL momento, non quello che il proprietario salverà dopo. È la
+  scelta più onesta verso chi condivide, ed è la regola da cui
+  discende il resto.
+  LA FOTOGRAFIA CONGELA GLI ID, MAI PREZZI E STATI: tabella
+  `barattoli_condivisi` (tg_id PK, token UNIQUE, ids JSON) e le card
+  si rileggono FRESCHE a ogni apertura — prezzi veri, venduto SPENTO
+  (lo scaffale vuoto), rimosso SPARITO (lo scudo anti-resurrezione:
+  non si fotografa nemmeno). «Aggiorna la fotografia» tiene lo STESSO
+  token — il link già in giro si aggiorna, ed è ancora una fotografia
+  perché niente compare senza il gesto del proprietario —; la REVOCA
+  è un DELETE senza guardie (il patto del rientro dalle ferie), e
+  ricondividere dopo genera un token NUOVO: i link vecchi restano
+  morti per sempre.
+  IL TOKEN È `token_hex(16)`, MAI derivato da tg_id o codice negozio
+  (chi conosce il negozio non deve poter indovinare il barattolo), in
+  CHIARO e non hashato — dichiarato nel DDL: va rimostrato nel
+  foglio, e non è una credenziale d'account ma la maniglia di una
+  lista che si è scelto di pubblicare. L'API pubblica valida la FORMA
+  (32 esadecimali, fullmatch) PRIMA di toccare il database — la forma
+  storta è un 404 a ZERO letture — e inesistente/revocato rispondono
+  con UN solo messaggio: chi enumera non impara niente. La risposta è
+  ANONIMA: né nome, né avatar, né negozio, né tg_id (i venditori dei
+  singoli annunci restano pubblici per natura, come in vetrina).
+  LA PAGINA `GET /barattolo/{token}` NON LEGGE MAI IL DATABASE
+  (`META_GENERICI + META_NOINDEX`), ed è LA GARANZIA DELLA REVOCA:
+  l'anteprima social cachata non ha mai avuto la lista dentro, quindi
+  non può sopravviverle. Una lista personale non si indicizza; e
+  NIENTE «Disallow: /barattolo/» in robots.txt, l'anti-pattern di
+  sempre. Fuori dalla sitemap per costruzione.
+  LA PAGINA È ANONIMA (decisione di Andrea): chi riceve il link sa da
+  chi arriva, ma un link INOLTRATO a terzi non lega la lista a una
+  persona — è la mitigazione più forte del rischio-trattativa.
+  L'AVVERTIMENTO STA PRIMA DEL TOCCO, ed è il testo che Andrea voleva
+  scritto bene: chi apre il link vedrà la lista delle cose che ti
+  interessa comprare — anche un venditore con cui stai trattando, se
+  il link gli arriva; è come pubblicare una lista di desideri, un
+  gesto tuo, da fare sapendolo. C'è la sentinella che l'avvertimento
+  PRECEDA il bottone che crea il link.
+  NEL CLIENT la vista OSPITE riusa la lista chiusa di sempre
+  (`renderGrid(items)` col flag che spegne la paginazione), con la
+  riga `#ospiteRiga` sopra la griglia («🫙 Un barattolo condiviso —
+  N oggetti» + «Vai al mercatino») e Ordina/Filtri nascosti — sono
+  del server, su una lista chiusa mentirebbero (la regola del filtro
+  barattolo; la regola CSS è SEPARATA da quella di solo-barattolo,
+  che una sentinella esige alla lettera). L'USCITA È PER COSTRUZIONE:
+  `spegniOspite()` nel prefisso sincrono di `loadListings`, dove si
+  spegne già il filtro — qualunque ricarica della vetrina torna al
+  mercatino senza un elenco di casi. Il deep-link sta nei DUE boot in
+  coda (la trappola documentata di `avviaVetrina`: senza, funziona in
+  Telegram e non per chi apre il link dal browser, che qui è il caso
+  PRINCIPE); token revocato = la stessa riga con «non è più
+  condiviso» e la vetrina sotto, mai una pagina muta. In DEMO da
+  file:// il pathname non matcha e non esiste nessun ramo.
+  IL FOGLIO `#jarShareSheet` sta PRIMA di `#confermaSheet` nel DOM
+  (navPila ordina per posizione: la domanda della revoca si apre
+  SOPRA il foglio), il campo del link è readonly e mai disabled (la
+  strada a mano deve restare, la regola del widget), e il link non si
+  interpola MAI negli onclick (il patto di linkCanaleTest). La revoca
+  passa da `chiediConferma` — il censimento sale a 41.
+  LA FUSIONE migra con UPDATE OR IGNORE + DELETE (la PK contiene il
+  tg_id, il calco di punti_ritiro), e il censimento delle tabelle
+  figlie la esige da solo.
+  LA VOCE IN «I TUOI DATI» dice la revoca COI SUOI LIMITI, perché una
+  promessa senza i limiti è quella che invecchia peggio: il link
+  muore subito (pagina e API rileggono a ogni apertura), chi aveva la
+  pagina già aperta la vede finché non ricarica, l'anteprima cachata
+  da Telegram/WhatsApp può sopravvivere ma mostra SOLO il titolo
+  generico (la lista non è mai entrata nei meta), e gli screenshot
+  restano, come per ogni cosa pubblicata. E la riga «si vede QUANTI
+  l'hanno salvato, mai CHI» è EMENDATA con la clausola del barattolo
+  condiviso, o sarebbe diventata una mezza bugia.
+  RESTA FUORI, dichiarato: meta per-token (MAI: è la garanzia della
+  revoca, non una rinuncia), notifiche («qualcuno ha aperto il tuo
+  barattolo» sarebbe sorveglianza), più liste per utente, scadenza
+  automatica del link.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
@@ -18898,7 +18976,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
    manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
    ancora), `/privacy` (la sorella, «I tuoi dati», ago 2026: stessa
-   liturgia, ancora facoltativa `#indirizzo`),
+   liturgia, ancora facoltativa `#indirizzo`), `/barattolo/{token}` (la
+   fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
+   NON legge mai il database — la garanzia della revoca),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
@@ -22812,6 +22892,37 @@ accesa sul VPS (Andrea, 24 ago), quindi il podio compare al deploy per
 tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
 condivisione sulla striscia (la card del barattolo non deve entrarci)
 e il podio dentro Telegram vero.
+
+Il barattolo si condivide col suo link (ago 2026, il punto 3 del giro
+della card): fotografia e non vista viva, token casuale opt-in e
+revocabile, pagina anonima col noindex, venduti spenti e rimossi mai,
+l'avvertimento PRIMA del tocco e la voce in «I tuoi dati» coi limiti
+della revoca. Vedi Architettura, «IL BARATTOLO SI CONDIVIDE COL SUO
+LINK». Collaudato: 6098 prove verdi (le eseguibili girano gli
+endpoint VERI su sqlite in memoria: crea idempotente senza
+rifotografare, aggiorna che tiene il token, revoca che rende il link
+morto, il token nuovo dopo, la pagina fresca col venduto e senza il
+rimosso, l'anti-oracolo) e **18 MUTAZIONI, 18 uccise**, una per riga
+sorvegliata — token derivato dal tg_id, SELECT col tg_id, guardia
+della forma tolta, fotografia coi rimossi, pagina che non rifiltra,
+crea che rifotografa di soppiatto, aggiorna che rigenera il token,
+revoca che non cancella, fusione senza DELETE, pagina che legge il
+db, noindex sparito, spegniOspite tolto, avvertimento spostato,
+disabled, deep-link via da avviaVetrina, regex ancorata, link
+nell'onclick, revoca senza domanda. Più il collaudo vivo col server
+del worktree su DB usa-e-getta: **24/24 sull'API** (il giro completo
+crea→apri→aggiorna→revoca→ricrea, l'ordine della fotografia, il
+venduto dichiarato, l'anti-oracolo sul database vero) e **25/26 nel
+browser** via CDP a 320/375 nei due temi — l'unico NO era il
+SELETTORE DEL BANCO e non un bug (le card sono `<div>` col gestore
+sull'`<a>` interno: cliccando l'`<a>` la scheda dell'esaurito si
+apre, verificato a mano), con zero errori JS e zero sbordo.
+IN PRODUZIONE basta il deploy: una tabella additiva che nasce vuota,
+zero leve, zero migrazioni di dati — e finché nessuno tocca
+«Condividi il barattolo» non cambia niente di visibile. DA GUARDARE
+al primo giro: il primo link vero condiviso in chat — l'anteprima
+DEVE restare la card generica del brand, che è la garanzia della
+revoca vista dal vivo — e la prima revoca, col link che muore subito.
 
 La maniglia del codice di ritiro (ago 2026, cantiere 44): il bottone
 «🔔 Ricorda al venditore» si apre anche sugli ordini 'shipped' verso un
