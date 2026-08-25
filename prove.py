@@ -7060,27 +7060,35 @@ def prove_savers_proprietario():
           ".trust-note.nota-punto,.trust-note.nota-savers{" in src[i - 40:i + 90])
 
 
-def prove_barattolo_in_testata():
-    """IL BARATTOLO IN TESTATA: la stessa icona che si riempie nel
-    cassetto del Profilo, accanto alla levetta del tema.
-    NATO SCORCIATOIA (ago 2026, richiesta di Andrea) e diventato un
-    FILTRO della vetrina nello stesso mese, sempre per decisione di
-    Andrea: un tocco e la home mostra i soli annunci del barattolo,
-    senza cambiare vista. Le prove che dicevano «porta al cassetto»
-    hanno CAMBIATO LATO invece di allentarsi — vedi la sezione 4.
-    Quel che NON e' cambiato, ed e' la prima cosa che queste prove
-    difendono: non e' una vista nuova, e la FONTE della lista resta
-    una sola (`myPreferiti`).
-    Prima del cantiere di nascita questa zona non aveva NESSUNA
-    sentinella: ne' il tappo, ne' la levetta, ne' la regia del
-    riempimento."""
-    print("\n[il barattolo in testata]")
+def prove_barattolo_in_striscia():
+    """LA CARD DEL BARATTOLO NELLA STRISCIA, E IL PODIO IN TESTATA
+    (ago 2026, decisione di Andrea): il barattolino di testata —
+    nato scorciatoia, diventato filtro — e' stato promosso a CARD
+    grande come le altre, accanto a «Tutto», col vetro che continua a
+    riempirsi; e il suo posto in testata l'ha preso il PODIO della
+    classifica (scelto fra otto candidate guardate a schermo), che ha
+    preso con se' anche la porta: il bottone in fondo al Profilo e'
+    morto.
+    QUESTE PROVE HANNO CAMBIATO CASA: nacquero come
+    prove_barattolo_in_testata, e le sentinelle sul cerchietto di
+    testata sono ROVESCIATE col perche' — mai allentate. Quel che NON
+    e' cambiato, ed e' la prima cosa che difendono: non e' una vista
+    nuova, la FONTE della lista resta una sola (`myPreferiti`), e a
+    livellare il vetro resta aggiornaBarattolo."""
+    print("\n[la card del barattolo, e il podio in testata]")
     import re as _re
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style"):mini.index("</style>")]
-    r = pezzo_js(mini, "function renderJarTesta(){", "\n}\n")
-    testa = "".join(_re.findall(r'<button class="jar-testa".*?</button>',
-                                mini, _re.S))
+    st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
+    # la fetta della card nel template della striscia
+    card = st[st.index("cella-barattolo"):st.index("voci.map(")]
+
+    # --- 0) IL CERCHIETTO DI TESTATA E' MORTO (rovesciate) ---
+    # Dicevano «due istanze jar-testa» e «renderJarTesta le regola»:
+    # certificavano il posto che questo cantiere ha svuotato.
+    prova("il barattolino di testata non esiste piu'", 0,
+          mini.count("jar-testa"))
+    prova("...e nemmeno la sua regia", 0, mini.count("renderJarTesta"))
 
     # --- 1) LA CLASSE NON PUO' CADERE NELL'ESCLUSIONE ---
     # L'elenco si LEGGE dal codice invece di ribatterlo: il giorno che
@@ -7091,57 +7099,83 @@ def prove_barattolo_in_testata():
     escluse = [c.strip().lstrip(".") for c in sel.split(",")]
     prova("l'esclusione di aggiornaBarattolo si legge dal codice",
           ["card-jar", "jar-btn"], escluse)
-    prova("la scorciatoia non porta nessuna classe esclusa", [],
-          [c for c in escluse if c in testa])
-    prova("...e la sua icona nasce dalla fabbrica unica", True, "jarSVG(" in r)
+    prova("la card non porta nessuna classe esclusa", [],
+          [c for c in escluse if c in card])
+    prova("...e il suo vetro nasce dalla fabbrica unica", True,
+          "jarSVG(" in card)
 
-    # --- 2) DUE ISTANZE, UNA CLASSE, UN GIRO SOLO ---
-    prova("le istanze in markup sono DUE", 2, mini.count('class="jar-testa"'))
-    prova("...e la regia le prende per classe, in un giro solo", 1,
-          r.count("querySelectorAll('.jar-testa')"))
-    prova("...mai per id: un id non si riusa in due", [],
-          [s for s in ("getElementById", "el('jarTesta", "#jarTesta") if s in r])
-    prova("una in testata e una in topbar", (1, 1),
-          (mini[:mini.index("</header>")].count('class="jar-testa"'),
-           mini[mini.index("<nav"):mini.index("</nav>")].count('class="jar-testa"')))
+    # --- 2) LA CARD: DOVE STA, E COSA NON PORTA ---
+    prova("la card sta FRA «Tutto» e le categorie", True,
+          0 <= st.find("urlIllustrazione('Tutto')")
+          < st.find("cella-barattolo") < st.find("voci.map("))
+    # senza data-cat resta fuori dal tocco lungo di condivisione PER
+    # COSTRUZIONE (il delegato guarda `.cat-cella[data-cat]`), come la
+    # card «Tutto»
+    prova("niente data-cat: fuori dal tocco lungo per costruzione", 0,
+          card.count("data-cat"))
+    prova("niente href: filtra, non naviga (role=button, il patto "
+          "della card P2P)", True,
+          "href" not in card and 'role="button"' in card
+          and 'tabindex="0"' in card)
+    prova("il vetro nasce GIA' al livello del barattolo, mai lv0 secco",
+          True, "jarSVG(livelloBarattolo(contaBarattolo()), 56)" in card)
+    prova("il tocco e' il toggle di sempre", True,
+          'onclick="alternaBarattolo()"' in card)
+    prova("...anche da tastiera: un <a> senza href non riceve click",
+          True, "onkeydown" in card)
+    prova("lo stato si dichiara a chi non vede l'anello", True,
+          "aria-pressed" in card)
+    prova("sulla card nessun numero: il livello E' il numero", [],
+          [s for s in ("jar-conta", "con-conta", "preferitiConta")
+           if s in card])
+    prova("...e il numero del cassetto resta uno solo", 1,
+          mini.count('id="preferitiConta"'))
+    # il vetro grande veste la crema fissa sul bruno del fondo (il
+    # patto delle illustrazioni: un disegno su un fondo che non segue
+    # il tema non lo segue nemmeno lui)
+    prova("il vetro della card e' crema fissa sul fondo bruno", True,
+          ".cella-barattolo .cat-quad{display:flex" in css
+          and "color:var(--cat-ink" in css)
 
-    # --- 3) LA GUARDIA E' QUELLA DI bottoneJar, NON QUELLA DEL TAPPO ---
+    # --- 3) LA GUARDIA E' QUELLA DI bottoneJar ---
     b = pezzo_js(mini, "function bottoneJar(l, classe, misura, prima){", "\n}\n")
     guardia = _re.search(r"if \((DEMO[^)]+)\) return ''", b).group(1)
     prova("la guardia del barattolino e' quella di sempre",
           "DEMO || VETRINA || !myTgId", guardia)
-    prova("la scorciatoia porta LA STESSA guardia", True, guardia in r)
-    prova("...cioe' guarda anche DEMO, non il solo !VETRINA del tappo",
-          True, "DEMO" in r)
-    # La RAGIONE della guardia e' cambiata col gesto (prima era il posto
-    # dove si portava, adesso e' che in DEMO il barattolo non esiste
-    # affatto), ma il fatto che la regge e' lo stesso ed e' ancora vero.
+    prova("la card porta LA STESSA guardia", True, guardia in st)
+    # La RAGIONE: in DEMO e in VETRINA il barattolo non esiste affatto,
+    # e una card che filtra il nulla e' un bottone che porta a un muro.
     rp = pezzo_js(mini, "function renderPreferiti(){", "\n}\n")
     prova("in DEMO il barattolo non esiste: e' la ragione della guardia",
           True, "if (DEMO || VETRINA) {" in rp and "display = 'none'" in rp)
 
-    # --- 4) IL GESTO: FILTRA LA VETRINA, E NON E' UNA VISTA NUOVA ---
-    # PROVA CHE HA CAMBIATO LATO (ago 2026): chiedeva che il barattolino
-    # portasse al cassetto — cioe' certificava il gesto che questo
-    # cantiere ha sostituito. Adesso chiede l'opposto, ed e'
-    # l'affermazione piu' forte delle due.
-    prova("il barattolino NON porta piu' al cassetto", 0,
+    # --- 4) LA FIRMA DICE ANCHE LO STATO DEL BARATTOLO ---
+    # Senza la J il primo render (prima di /me, myTgId vuoto)
+    # lascerebbe la card non nata per sempre; senza la B il toggle non
+    # accenderebbe l'anello.
+    prova("la firma porta presenza e stato della card", True,
+          "(jarCard ? 'J' : '')" in st
+          and "(vistaBarattolo ? 'B' : '')" in st)
+    # PROVA CHE HA CAMBIATO LATO (ago 2026): chiedeva che col barattolo
+    # la sezione andasse in display:none — adesso la striscia RESTA,
+    # che una card da illuminare finalmente c'e'.
+    prova("la striscia RESTA col filtro acceso", 0,
+          st.count("style.display = vistaBarattolo"))
+    prova("...e ad accendersi e' la SOLA card del barattolo", True,
+          "cella-barattolo${vistaBarattolo ? ' attiva' : ''}" in st
+          and "${activeCat === 'Tutto' && !vistaBarattolo ? ' attiva' : ''}"
+          in st
+          and "${c === activeCat && !vistaBarattolo ? ' attiva' : ''}"
+          in st)
+
+    # --- 5) IL GESTO: FILTRA LA VETRINA, E NON E' UNA VISTA NUOVA ---
+    prova("la card NON porta al cassetto", 0,
           mini.count("apriCassettoProfilo('accPreferiti')"))
-    prova("...accende il filtro, dalle due istanze gemelle", 2,
-          mini.count('onclick="alternaBarattolo()" title="Nel tuo barattolo"'))
     prova("...e quel cassetto resta uno solo", 1,
           mini.count('id="accPreferiti"'))
-    # QUESTA invece non cambia, ed e' la sentinella della decisione
-    # «si resta in view-esplora»: il filtro non deve diventare una
-    # radice, un ramo o una vista sua.
     prova("...e non si inventa una vista sua", [],
           [s for s in ("go('preferiti')", "go('barattolo')",
                        "view-preferiti", "view-barattolo") if s in mini])
-    # Anche questa ha cambiato lato: la lista adesso si DISEGNA in due
-    # posti (le righe del cassetto, le card della griglia) e sono due
-    # mestieri distinti — la scelta di Andrea. Quel che resta vero, e
-    # che conta, e' che la FONTE e' una sola e che a decidere cosa
-    # entra in vetrina c'e' UN giudice.
     prova("LA FONTE DELLA LISTA E' UNA SOLA", (1, 1, 1, 1),
           (mini.count("myPreferiti.map(l =>"),
            mini.count('id="preferitiBlocco"'),
@@ -7149,93 +7183,95 @@ def prove_barattolo_in_testata():
            mini.count("el('preferitiBlocco')")))
     prova("...e il giudice di cosa entra in vetrina e' UNO", 1,
           mini.count("const preferitiInVetrina = "))
+    # chi cambia lo stato ridisegna striscia E pillole in un colpo:
+    # e' cio' che spegne card e pillola SUBITO anche da spegniBarattolo
+    prova("chi cambia lo stato del filtro ridisegna le due file", 1,
+          pezzo_js(mini, "function scriviStatoBarattolo(){", "\n}\n")
+          .count("renderChips()"))
 
-    # --- 5) L'ORDINE NEL MARKUP E LA CATENA DEI MARGINI ---
+    # --- 6) IL NOME E' UNO: la card, il cassetto, la pillola ---
+    prova("la card ha il nome della lista che mostra", (1, 1),
+          (mini.count('title="Nel tuo barattolo"'),
+           mini.count('aria-label="Nel tuo barattolo"')))
+    prova("...anche nell'etichetta sotto il vetro", 1,
+          card.count('cat-eti">Nel tuo barattolo'))
+    i_acc = mini.index('id="accPreferiti"')
+    prova("...ed e' il nome che il cassetto porta davvero", True,
+          "Nel tuo barattolo" in mini[i_acc:i_acc + 400])
+    prova("...e quello che la pillola d'uscita dice in vetrina", True,
+          "🫙 Nel tuo barattolo ✕" in mini)
+
+    # --- 7) IL PODIO IN TESTATA ---
+    testa = "".join(_re.findall(r'<button class="podio-testa".*?</button>',
+                                mini, _re.S))
+    r = pezzo_js(mini, "function renderPodioTesta(){", "\n}\n")
+    prova("le istanze del podio sono DUE", 2,
+          mini.count('class="podio-testa"'))
+    prova("una in testata e una in topbar", (1, 1),
+          (mini[:mini.index("</header>")].count('class="podio-testa"'),
+           mini[mini.index("<nav"):mini.index("</nav>")]
+           .count('class="podio-testa"')))
+    prova("...e la regia le prende per classe, in un giro solo", 1,
+          r.count("querySelectorAll('.podio-testa')"))
+    # il gate e' la leva della classifica: la stessa condizione che
+    # accendeva il bottone del Profilo, morto con questo cantiere
+    prova("il gate e' la leva della classifica", True,
+          "myClassifica && !DEMO && !VETRINA" in r)
+    prova("l'SVG e' statico nel markup: niente lampo, niente innerHTML",
+          0, r.count("innerHTML"))
+    prova("...e il disegno sta nei due bottoni", 2,
+          mini.count('<rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/>'))
+    prova("il tocco apre la classifica, dalle due istanze", 2,
+          testa.count('onclick="apriClassifica()"'))
+    prova("niente aria-pressed: naviga, non toggla", 0,
+          testa.count("aria-pressed"))
+    prova("l'anello «sei in classifica» lo scrive go(), come il tappo",
+          True, "classList.toggle('attivo', view==='classifica')" in mini)
+    # PROVA CHE HA CAMBIATO LATO (ago 2026, decisione di Andrea: una
+    # porta sola): certificava il bottone in fondo al Profilo.
+    prova("la porta del Profilo e' morta", 0,
+          mini.count("profiloClassifica"))
+
+    # --- 8) L'ORDINE NEL MARKUP E LA CATENA DEI MARGINI ---
     def fetta(dopo, prima):
         i = mini.index(dopo)
         return mini[i:mini.index(prima, i)]
 
     for nome, f in (("testata", fetta('<div class="brand">', "</header>")),
                     ("topbar", fetta('<button id="nav-affari"', "</nav>"))):
-        prova(f"{nome}: l'ordine e' levetta → barattolo → tappo", True,
-              f.index('class="tema-btn"') < f.index('class="jar-testa"')
+        prova(f"{nome}: l'ordine e' levetta → podio → tappo", True,
+              f.index('class="tema-btn"') < f.index('class="podio-testa"')
               < f.index('class="avatar-btn"'))
     prova("la spinta a destra e' della levetta, che c'e' sempre", True,
           ".tema-btn{display:inline-flex;margin-left:auto}" in css)
-    i = css.index(".jar-testa{")
-    prova("...e non del barattolo, che si spegne", True,
+    i = css.index(".podio-testa{")
+    prova("...e non del podio, che si spegne a leva spenta", True,
           "margin-left:auto" not in css[i:i + 90])
-    # col + la regola smette di combaciare col barattolo in mezzo, e il
+    # col + la regola smette di combaciare col podio in mezzo, e il
     # tappo ricade sul suo auto: DUE auto-margini, e la levetta migra
     # in mezzo alla riga. Silenzioso, e si vede solo sui telefoni larghi.
     prova("il tappo non dipende piu' dall'ADIACENZA della levetta", 0,
           css.count(".tema-btn + .avatar-btn"))
     prova("...ma dalla sola PRECEDENZA, in tutte e due le regole", 2,
           css.count(".tema-btn ~ .avatar-btn"))
-    prova("la scorciatoia nasce spenta", True, ".jar-testa{display:none" in css)
-    prova("...e si accende solo dove deve, mai nuda", (1, 1, 0),
-          (css.count("header .brand .jar-testa.on{display:inline-flex}"),
-           css.count("nav .jar-testa.on{display:inline-flex"),
-           css.count("\n  .jar-testa.on{")))
+    prova("il podio nasce spento", True, ".podio-testa{display:none" in css)
+    prova("...e si accende solo dove deve, mai nudo", (1, 1, 0),
+          (css.count("header .brand .podio-testa.on{display:inline-flex}"),
+           css.count("nav .podio-testa.on{display:inline-flex"),
+           css.count("\n  .podio-testa.on{")))
     prova("il bersaglio di tocco e' piu' largo del cerchietto", True,
-          ".jar-testa::after{content:'';position:absolute;inset:-6px" in css)
+          ".podio-testa::after{content:'';position:absolute;inset:-6px" in css)
 
-    # --- 6) UN DISEGNO SOLO, INIETTATO UNA VOLTA, AL LIVELLO GIUSTO ---
+    # --- 9) UN DISEGNO SOLO PER IL VETRO ---
     prova("il vetro e' disegnato in un posto solo", 1,
           mini.count("<clipPath id="))
     prova("...e la clip resta a id unico per istanza", True,
           "'jarClip' + (++jarClipN)" in mini)
-    prova("l'icona nasce gia' al livello del barattolo", True,
-          "jarSVG(livelloBarattolo(contaBarattolo())" in r)
-    prova("...e si inietta una volta sola per nodo", True,
-          "!b.querySelector('svg')" in r)
-    prova("il vetro PRIMA, l'accensione DOPO", True,
-          r.index("innerHTML") < r.index("classList.toggle('on'"))
-    prova("nessuna regia nuova: a livellare resta aggiornaBarattolo", 0,
-          r.count("classList.add('lv") + r.count("lv4"))
-
-    # --- 7) LE CHIAMATE, E L'ORDINE IN avvia() ---
-    # Il conteggio era «pari al tappo» e non lo e' piu': da quando il
-    # barattolino e' un interruttore, la regia la richiama anche chi
-    # cambia lo stato del filtro. Resta l'affermazione che serviva —
-    # OVUNQUE si monta il tappo si monta anche lui — piu' quella nuova
-    # sul chiamante in piu'.
-    prova("si monta ovunque si monta il tappo", True,
-          mini.count("renderJarTesta()") >= mini.count("renderAvatar()"))
-    prova("...e chi cambia lo stato del filtro la richiama", 1,
-          pezzo_js(mini, "function scriviStatoBarattolo(){", "\n}\n")
-          .count("renderJarTesta()"))
-    i_avvia = mini.index("async function avvia(){")
-    prova("...e in avvia() esiste PRIMA che il riempimento giri", True,
-          mini.index("renderJarTesta()", i_avvia)
-          < mini.index("await caricaPreferiti()", i_avvia))
-
-    # --- 8) NIENTE NUMERO IN TESTATA ---
-    prova("in testata nessun numero: il livello E' il numero", [],
-          [s for s in ("jar-conta", "con-conta", "preferitiConta") if s in testa])
-    prova("...e il numero del cassetto resta uno solo", 1,
-          mini.count('id="preferitiConta"'))
-
-    # --- 9) LA VISTA E IL CASSETTO SI CHIAMANO UGUALE ---
-    # Diceva «scorciatoia e destinazione»: adesso non c'e' piu' una
-    # destinazione, ma il nome resta lo stesso da tutte e due le parti
-    # — la vetrina filtrata e il cassetto sono la stessa lista vista da
-    # due posti, e chiamarle in due modi sarebbe la bugia.
-    prova("il barattolino ha il nome della lista che mostra", (2, 2),
-          (mini.count('title="Nel tuo barattolo"'),
-           mini.count('aria-label="Nel tuo barattolo"')))
-    i_acc = mini.index('id="accPreferiti"')
-    prova("...ed e' il nome che il cassetto porta davvero", True,
-          "Nel tuo barattolo" in mini[i_acc:i_acc + 400])
-    prova("...e quello che la pillola d'uscita dice in vetrina", True,
-          "🫙 Nel tuo barattolo ✕" in mini)
-    # da quando e' un interruttore lo stato si dice anche a voce
-    prova("lo stato si dichiara a chi non vede l'anello", True,
-          "aria-pressed" in r)
 
     # --- 10) LO SPAZIO: LA TESSERA CEDE, E C'E' L'AIRBAG ---
     # A 320px il terzo cerchietto non ci stava: il lockup chiede 124px,
-    # la sottolinea 139, il fisso 152, e di contenuto ce n'e' 288.
+    # la sottolinea 139, il fisso 152, e di contenuto ce n'e' 288. Il
+    # conto non cambia col podio: i cerchietti restano tre.
     prova("sotto i 360 la tessera del logo cede il posto", True,
           "@media (max-width:359.98px){" in css
           and "header .brand-jar{display:none}" in css)
@@ -7350,9 +7386,14 @@ def prove_barattolo_filtra():
           mini[mini.index("const chiaveVetrina = "):
                mini.index("const chiaveVetrina = ") + 120])
 
-    # --- 8) LE DUE SUPERFICI CHE DICONO CHE E' ACCESO ---
-    prova("l'anello e' quello gia' imparato sul tappo", True,
-          ".jar-testa.attivo{box-shadow:0 0 0 2.5px var(--sats)" in css)
+    # --- 8) LE SUPERFICI CHE DICONO CHE E' ACCESO ---
+    # L'anello della card e' quello delle card di categoria (l'outline
+    # arancione condiviso), non piu' il box-shadow del cerchietto: la
+    # card VESTE .cat-cella.attiva come le sorelle.
+    prova("l'anello e' quello gia' imparato sulle card di categoria",
+          True,
+          ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
+          in css)
     prova("Ordina e Filtri si nascondono col barattolo acceso", True,
           "body.solo-barattolo .strumenti #ordinaSelBtn," in css
           and "body.solo-barattolo .strumenti #filtriBtn{display:none}"
@@ -7360,10 +7401,31 @@ def prove_barattolo_filtra():
     prova("...ma le loro variabili NON si azzerano (tornano uscendo)",
           [], [s for s in ("filtroCond = ''", "filtroReg = ''",
                            "filtroPrezzo = null") if s in alt])
+    # PROVA CHE HA CAMBIATO LATO (ago 2026, punto 6 di Andrea): la
+    # pillola d'uscita SOSTITUIVA tutto col return — adesso sta in
+    # TESTA alle pillole normali, accesa, e l'`active` delle categorie
+    # si sopprime (il filtro vero e' il barattolo: due pillole accese
+    # direbbero due filtri).
     rc = pezzo_js(mini, "function renderChips(){", "\n}\n")
-    prova("le categorie lasciano il posto alla pillola d'uscita", True,
-          "if (vistaBarattolo) {" in rc
-          and 'onclick="alternaBarattolo()"' in rc)
+    prova("la pillola del barattolo sta in testa alle altre, accesa",
+          True, "const jarPill = vistaBarattolo" in rc
+          and "jarPill + ['Tutto'" in rc)
+    prova("...senza mangiarsi le pillole col return di ieri", 0,
+          rc.count("if (vistaBarattolo) {"))
+    prova("...e col filtro acceso nessuna pillola categoria e' accesa",
+          True, "c===activeCat && !vistaBarattolo" in rc)
+    prova("...con la ✕ che resta il gesto d'uscita", True,
+          "🫙 Nel tuo barattolo ✕" in rc)
+    # «Tutto» col filtro acceso lo SPEGNE, dalle due maniglie che
+    # setCat (e con lui loadListings → spegniBarattolo) non coprirebbe:
+    # la card a categoria gia' Tutto, e il tab Esplora nello stesso caso.
+    tt = pezzo_js(mini, "function tornaATuttoDaTocco(e){", "\n}\n")
+    prova("«Tutto» col filtro acceso lo spegne (la card)", True,
+          "if (vistaBarattolo) { alternaBarattolo(); return; }" in tt)
+    ve = pezzo_js(mini, "function vaiEsplora(){", "\n}\n")
+    prova("...e il tab Esplora pure, dove setCat non girera'", True,
+          "if (vistaBarattolo && activeCat === 'Tutto') alternaBarattolo();"
+          in ve)
 
     # --- 9) TOGLIERE FA SPARIRE LA CARD (decisione di Andrea) ---
     # La vista dice «il tuo barattolo» e resta vera al secondo. E' la
@@ -14512,7 +14574,9 @@ def prove_classifica():
     apri = apri[:apri.index("\n}")]
     prova("in DEMO e in VETRINA la pagina non si apre", True,
           "if (DEMO || VETRINA) return;" in apri)
-    prova("il bottone del Profilo si accende solo a leva accesa", True,
+    # dall'ago 2026 la porta e' il PODIO in testata (il bottone del
+    # Profilo e' morto: le sue prove stanno in prove_barattolo_in_striscia)
+    prova("la porta si accende solo a leva accesa", True,
           "myClassifica && !DEMO && !VETRINA" in html)
     prova("la vista e' interna (l'indietro riporta a Esplora)", True,
           "'acquisto','offertapresto','classifica'" in html)
@@ -18837,20 +18901,23 @@ def prove_seo():
           "ordineSfoglia()" in st)
     prova("...e non si riconta le categorie da se'", False,
           "contaCategorie(" in st)
-    # LE DUE PROVE QUI SOTTO HANNO CAMBIATO LATO (ago 2026, decisione
-    # di Andrea): certificavano che entrando in un reparto la sezione
-    # SPARISSE. Adesso resta, e la sua card si accende — a sparire e'
-    # solo col barattolo, che una categoria da illuminare non ce l'ha.
-    prova("col barattolo la sezione si nasconde", True,
-          "style.display = vistaBarattolo ? 'none' : ''" in st)
-    prova("...e con una CATEGORIA invece resta", False,
+    # PROVE CHE HANNO CAMBIATO LATO DUE VOLTE (ago 2026): prima
+    # certificavano che entrando in un reparto la sezione sparisse,
+    # poi che a nasconderla restasse il solo barattolo. Con la CARD
+    # del barattolo nella fila (decisione di Andrea) non si nasconde
+    # PIU' MAI: una card da illuminare adesso c'e' sempre.
+    prova("la sezione non si nasconde piu', nemmeno col barattolo", 0,
+          st.count("style.display"))
+    prova("...e con una CATEGORIA resta com'e' sempre stato", False,
           "activeCat !== 'Tutto'" in st.split("const voci")[0])
     prova("...e non si svuota mai", False, "innerHTML = ''" in st)
     # LA CARD DEL REPARTO RESTA ACCESA, e si porta in vista: illuminata
     # fuori schermo non la vedrebbe nessuno. `scrollLeft` a mano e non
     # scrollIntoView, che sposterebbe anche la pagina in verticale.
+    # ...ma non col barattolo acceso: li' il filtro vero e' il suo, e
+    # due anelli direbbero due filtri (la vetrina mostra i preferiti)
     prova("la card del reparto si accende", True,
-          "${c === activeCat ? ' attiva' : ''}" in st)
+          "${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" in st)
     prova("...e l'anello e' l'arancio di casa", True,
           ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
           in testo_mini)
@@ -18905,8 +18972,10 @@ def prove_seo():
           0 <= st.find("urlIllustrazione('Tutto')") < st.find("voci.map("))
     prova("...con la sua figura e il suo calore", True,
           "caldaOk('Tutto')" in st)
-    prova("...e si accende quando nessun reparto e' acceso", True,
-          "cat-cella${activeCat === 'Tutto' ? ' attiva' : ''}" in st)
+    prova("...e si accende quando nessun filtro e' acceso "
+          "(nemmeno il barattolo)", True,
+          "cat-cella${activeCat === 'Tutto' && !vistaBarattolo"
+          " ? ' attiva' : ''}" in st)
     prova("la card in coda non esiste piu'", False,
           "cat-tutte" in testo_mini)
     # il tocco passa da tornaATutto e MAI da apriCategoria: da un
@@ -31468,7 +31537,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_savers_proprietario, prove_barattolo_in_testata,
+              prove_savers_proprietario, prove_barattolo_in_striscia,
               prove_interesse,
               prove_barattolo_filtra,
               prove_messaggio_admin, prove_avviso_contatto,

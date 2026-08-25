@@ -418,7 +418,8 @@
     border-bottom:1px solid var(--line);
     padding:14px var(--pad) 10px;
   }
-  /* gap 8 e non 10 (ago 2026, col barattolo in testata): sono quattro
+  /* gap 8 e non 10 (ago 2026, col terzo cerchietto in testata — il
+     barattolo allora, il podio della classifica oggi): sono quattro
      spazi, cioe' 8px recuperati sulla riga piu' stretta dell'app —
      misurata, a 320px non ne avanzava nemmeno uno */
   .brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -427,8 +428,9 @@
   /* 42px ma col margine negativo la riga resta alta come la colonna
      di testo (~38px): la testata non cresce di un pixel */
   .brand-jar{width:42px;height:42px;border-radius:13px;flex:0 0 auto;margin:-2px 0}
-  /* SOTTO I 360px LA TESSERA CEDE IL POSTO (ago 2026, col barattolo in
-     testata). La riga .brand e' MISURATA: il lockup «Barattolo⚡» chiede
+  /* SOTTO I 360px LA TESSERA CEDE IL POSTO (ago 2026, col terzo
+     cerchietto in testata — il barattolo allora, il podio oggi).
+     La riga .brand e' MISURATA: il lockup «Barattolo⚡» chiede
      124px, la sottolinea 139 (e' lei la piu' larga, non il titolo), il
      fisso 152 — e di contenuto a 320px ce n'e' 288. Questi 42+8 sono
      esattamente i pixel che mancavano al terzo cerchietto: senza la
@@ -505,22 +507,22 @@
      (che passano su Chiaro o Scuro; Auto resta solo la'). C'e' sempre,
      anche in vetrina anonima: il tema e' di chi guarda. */
   /* La ricetta del cerchietto di chrome: la dividono la levetta e il
-     barattolo (sotto). Non si prende da .share-btn, che vive SULLA
+     podio (sotto). Non si prende da .share-btn, che vive SULLA
      foto e ha colori fissi: qui sarebbe un buco chiaro nel tema scuro. */
-  .tema-btn,.jar-testa{flex:0 0 auto;width:34px;height:34px;
+  .tema-btn,.podio-testa{flex:0 0 auto;width:34px;height:34px;
     border:1.5px solid var(--line);border-radius:50%;background:var(--card);
     cursor:pointer;align-items:center;justify-content:center;
     font-size:15px;line-height:1;padding:0;box-shadow:0 2px 0 rgba(35,40,44,.12)}
   /* l'auto-margine che spinge il gruppo a destra sta sulla LEVETTA
-     apposta: e' l'unica dei tre che c'e' sempre — il barattolo si
-     spegne in demo e in vetrina, e dandolo a lui, a icona spenta, il
-     gruppo non verrebbe piu' spinto e levetta e tappo scivolerebbero
-     addosso al lockup. Regressione condizionale, cioe' invisibile in
-     sviluppo. */
+     apposta: e' l'unica dei tre che c'e' sempre — il podio si
+     spegne a leva spenta, in demo e in vetrina, e dandolo a lui, a
+     icona spenta, il gruppo non verrebbe piu' spinto e levetta e tappo
+     scivolerebbero addosso al lockup. Regressione condizionale, cioe'
+     invisibile in sviluppo. */
   .tema-btn{display:inline-flex;margin-left:auto}
-  .tema-btn:active,.jar-testa:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
+  .tema-btn:active,.podio-testa:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
   /* IL TAPPO DIPENDE DALLA PRECEDENZA, NON DALL'ADIACENZA (~ e non +,
-     ago 2026): fra la levetta e il tappo vive ora il barattolo, e col
+     ago 2026): fra la levetta e il tappo vive ora il podio, e col
      + questa regola smetterebbe di combaciare — il tappo ricadrebbe
      sul suo margin-left:auto di base, e con DUE auto-margini il flex
      si spartisce lo spazio libero a meta', spingendo la levetta in
@@ -528,28 +530,27 @@
      Lo zero spegne quell'auto: il ritmo dei tre cerchietti lo da' il
      solo gap della .brand, uguale fra tutti. */
   .tema-btn ~ .avatar-btn{margin-left:0}
-  /* ---- LA SCORCIATOIA AL BARATTOLO (ago 2026) ----
-     La stessa icona che si riempie nel cassetto del Profilo, in testata
-     accanto alla levetta: un tocco e si e' nel cassetto che c'e' gia'.
-     Non e' una vista nuova, e non deve diventarlo.
-     LA CLASSE NON PUO' ESSERE .jar-btn NE' .card-jar: quelle due sono
-     l'esclusione di aggiornaBarattolo (li' i barattolini raccontano
-     l'ANNUNCIO, vuoto/pieno, non il barattolo intero), e da dentro
-     quell'esclusione l'icona resterebbe a lv0 per sempre, in silenzio.
-     Col nome suo il riempimento arriva gratis, senza una regia nuova.
-     `color` DICHIARATO e non ereditato: il vetro e' stroke:currentColor,
-     e nella topbar vincerebbe `nav button{color:var(--muted)}` — le due
-     istanze direbbero due colori diversi. --ink e' esattamente il
-     colore del gemello nel cassetto (.acc-h), quindi la resa nei due
-     temi e' quella gia' a schermo oggi. */
-  .jar-testa{display:none;position:relative;color:var(--ink)}
-  header .brand .jar-testa.on{display:inline-flex}
+  /* ---- IL PODIO DELLA CLASSIFICA (ago 2026) ----
+     La porta della classifica, dove viveva il barattolino — che e'
+     diventato una CARD nella striscia delle categorie (decisione di
+     Andrea; vedi .cella-barattolo e renderStriscia). Il disegno e' il
+     podio a tre gradini, scelto fra otto candidate guardate a schermo:
+     SVG a tratto inline nel markup, statico — niente lampo, niente
+     innerHTML — che si distingue dalla levetta accanto perche' quella
+     e' un'emoji colorata e questo e' un tratto d'inchiostro.
+     `color` DICHIARATO e non ereditato: il tratto e' currentColor, e
+     nella topbar vincerebbe `nav button{color:var(--muted)}` — le due
+     istanze direbbero due colori diversi. */
+  .podio-testa{display:none;position:relative;color:var(--ink)}
+  header .brand .podio-testa.on{display:inline-flex}
   /* il bersaglio largo quanto il pollice, senza occupare layout: la
      ricetta di .card-jar e dei pallini della galleria */
-  .jar-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
-  /* IL FILTRO E' ACCESO: lo stesso anello arancione del tappo sulla
-     vista Profilo — un segno che si e' gia' imparato, non uno nuovo */
-  .jar-testa.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
+  .podio-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
+  /* SEI IN CLASSIFICA: lo stesso anello arancione del tappo sulla
+     vista Profilo — un segno che si e' gia' imparato, non uno nuovo.
+     Si vede da desktop (la topbar c'e' su ogni vista); su mobile la
+     testata vive in Esplora e la vista classifica la nasconde. */
+  .podio-testa.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
   /* ...e col barattolo acceso Ordina e Filtri non ci sono: quei
      controlli chiamano il SERVER, che del barattolo non sa niente. Le
      loro variabili restano VIVE e tornano uscendo (il patto dei filtri
@@ -829,6 +830,17 @@
   .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
     line-height:1.2;color:var(--ink);text-align:center}
+  /* LA CARD DEL BARATTOLO (ago 2026): il vetro di jarSVG al posto
+     dell'illustrazione, in crema FISSA sul bruno del fondo — un
+     disegno su un fondo che non segue il tema non lo segue nemmeno
+     lui, il patto delle illustrazioni (--cat-ink e' il token nato
+     accanto a --cat-fondo, e non ha un valore di sera apposta). Il
+     liquido resta --sats e il riflesso --jar-riflesso: e' lo stesso
+     barattolo del cassetto, solo piu' grande — il tratto (stroke 2
+     su viewBox 24) scala col disegno, e a 56px rende ~4.7px, il peso
+     pieno delle sorelle illustrate. */
+  .cella-barattolo .cat-quad{display:flex;align-items:center;
+    justify-content:center;color:var(--cat-ink,#F4F1EA)}
   /* La card «Tutto» in TESTA alla fila (ago 2026, decisione di Andrea
      che ROVESCIA il «nessuna card Tutto in piu'» del primo giro) non
      ha regole sue: veste .cat-cella, .cat-quad e l'anello .attiva come
@@ -3908,12 +3920,12 @@
     /* la levetta del tema in topbar: niente auto-margine (ci pensa
        gia' il margin-right del logo), spaziata come il tappo */
     nav .tema-btn{display:inline-flex;margin-left:10px;width:32px;height:32px}
-    /* la scorciatoia al barattolo, fra la levetta e il tappo come in
+    /* il podio della classifica, fra la levetta e il tappo come in
        testata: qui la .brand non esiste (sparisce sopra i 768), quindi
        senza questa riga da desktop non ci sarebbe */
-    nav .jar-testa.on{display:inline-flex;margin-left:10px;width:32px;height:32px}
+    nav .podio-testa.on{display:inline-flex;margin-left:10px;width:32px;height:32px}
     /* ~ e non +, la stessa ragione della gemella in testata: col
-       barattolo in mezzo l'adiacenza non combacia piu' */
+       podio in mezzo l'adiacenza non combacia piu' */
     nav .tema-btn ~ .avatar-btn{margin-left:10px}
 
     /* la hero: titolo grande e mascotte fluttuante, solo qui */
@@ -4086,7 +4098,7 @@ document.getElementById('cartello')?.remove();</script>
           <small>il mercatino in sats</small>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-        <button class="jar-testa" onclick="alternaBarattolo()" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
+        <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
         <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
@@ -4860,9 +4872,12 @@ document.getElementById('cartello')?.remove();</script>
        textContent e con esc(), che qui dentro passano NOMI di persone —
        e il tocco su una riga porta al negozio col solo codice filtrato
        dall'alfabeto, il patto di renderNegozio.
-       Il bottone che la apre vive in fondo al Profilo, accanto a «Il
-       pagamento protetto» e «I tuoi dati»: e' una porta verso una
-       vista, non un cassetto. -->
+       LA PORTA E' IL PODIO IN TESTATA (ago 2026, decisione di Andrea:
+       una porta sola — il bottone in fondo al Profilo e' morto con
+       lei). Due istanze come levetta e tappo, accese solo a leva viva.
+       CONSEGUENZA DICHIARATA: su mobile la testata vive in Esplora,
+       quindi dal Profilo la classifica non si raggiunge piu'; da
+       desktop la topbar c'e' ovunque. -->
   <div class="view" id="view-classifica">
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
@@ -5349,11 +5364,9 @@ document.getElementById('cartello')?.remove();</script>
            due sono il recinto del dettaglio e la riga di fiducia della
            vetrina): qui la si cerca a mente fredda, non davanti a un
            acquisto. Non e' un cassetto — non ha niente da aprire. -->
-      <!-- La porta della classifica. Nasce NASCOSTA e la accende
-           renderProfilo solo se il server dice che la funzione e'
-           accesa: un bottone che porta a una pagina spenta e'
-           peggio di un bottone che non c'e'. In DEMO e in VETRINA
-           non compare mai, il patto del cassetto wallet. -->
+      <!-- La porta della classifica NON vive piu' qui (ago 2026,
+           decisione di Andrea): e' il podio in testata, una porta
+           sola. -->
       <!-- «Tutorial»: il giro di benvenuto si rivede quando si vuole.
            Nasce NASCOSTO e lo accende renderProfilo dove il tour puo'
            partire davvero — mai in DEMO ne' in VETRINA, dove
@@ -5362,7 +5375,6 @@ document.getElementById('cartello')?.remove();</script>
            i «Non ora» degli altri suggerimenti restano spenti. -->
       <button class="btn ghost" id="profiloTutorial" style="display:none;margin-top:20px" onclick="riavviaTour()"
         title="Rivedi il giro di benvenuto: le quattro tappe che raccontano il mercatino. I suggerimenti che hai già spento restano spenti.">👋 Tutorial</button>
-      <button class="btn ghost" id="profiloClassifica" style="display:none;margin-top:20px" onclick="apriClassifica()">🏆 La classifica del mercatino</button>
       <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
       <button class="btn ghost" style="margin-top:10px" onclick="apriPrivacy()">🔐 I tuoi dati</button>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
@@ -5505,7 +5517,7 @@ document.getElementById('cartello')?.remove();</script>
          come arriva la roba -->
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-    <button class="jar-testa" onclick="alternaBarattolo()" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
+    <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
@@ -7189,6 +7201,8 @@ function go(view){
   el('nav-'+voceNav(view))?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
+  /* ...e la classifica accende il podio, per la stessa ragione */
+  document.querySelectorAll('.podio-testa').forEach(a=>a.classList.toggle('attivo', view==='classifica'));
   /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
      d'acquisto (solo mobile, ci pensa il CSS); su ogni altra vista torna */
   aggiornaBarraCompra(view);
@@ -8065,24 +8079,25 @@ function renderChips(){
      chiamante: i cinque posti che gia' rifanno le pillole (avvia,
      setCat, alternaBarattolo, apriCategoriaDaUrl, il giro dei dati
      vivi) valgono per tutte e due le file, e non nasce un secondo
-     elenco da tenere allineato. In TESTA e non in coda: il ramo del
-     barattolo qui sotto esce con un return, e da li' la striscia —
-     che proprio in quel caso deve sparire — non la rifarebbe nessuno.
+     elenco da tenere allineato. In TESTA per storia: quando il ramo
+     del barattolo usciva col return, da qui sotto la striscia non la
+     rifaceva nessuno — oggi non esce piu', ma l'ordine resta.
   */
   renderStriscia();
   renderScoprire();
-  /* A BARATTOLO ACCESO la fila dice una cosa sola: dove sei, e come si
-     esce. Le categorie non hanno senso qui — filtrare dieci oggetti
-     che hai scelto tu non serve a niente, e quelle pillole chiamano il
-     SERVER, che del barattolo non sa niente — quindi lasciano il posto
-     alla pillola d'uscita. E' anche la seconda strada per spegnere: il
-     barattolino in testata e' piccolo e sta in cima, e da solo non
-     basta a dire che il filtro e' acceso. */
-  if (vistaBarattolo) {
-    el('chips').innerHTML =
-      `<div class="chip active" onclick="alternaBarattolo()">🫙 Nel tuo barattolo ✕</div>`;
-    return;
-  }
+  /* A BARATTOLO ACCESO la sua pillola sta IN TESTA, accesa, e le
+     altre RESTANO (ago 2026, decisione di Andrea che rovescia il
+     primo giro, dove la pillola d'uscita sostituiva tutto): sono la
+     strada per uscire verso un reparto — il loro tocco passa da
+     apriCategoria, e loadListings spegne il filtro PRIMA del fetch
+     (spegniBarattolo), quindi il server serve la vetrina vera senza
+     una riga in piu'. L'`active` delle categorie si SOPPRIME: il
+     filtro vero e' il barattolo, e due pillole accese direbbero due
+     filtri. La ✕ resta il gesto d'uscita esplicito; il ritocco della
+     card nella striscia e' l'altro. */
+  const jarPill = vistaBarattolo
+    ? `<div class="chip active" onclick="alternaBarattolo()">🫙 Nel tuo barattolo ✕</div>`
+    : '';
   const conta = contaCategorie();
   const cats = CATS.slice(1).filter(c=>conta[c])
     .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
@@ -8107,8 +8122,8 @@ function renderChips(){
      vero passo indietro quando era della home.
      Il nome viaggia in `data-cat` e non piu' dentro la stringa JS
      dell'onclick — il patto delle card, e un difetto storico in meno. */
-  el('chips').innerHTML = ['Tutto',...scelta,...cats].map(c=>
-    `<div class="chip ${c===activeCat?'active':''}" data-cat="${esc(c)}"
+  el('chips').innerHTML = jarPill + ['Tutto',...scelta,...cats].map(c=>
+    `<div class="chip ${c===activeCat && !vistaBarattolo?'active':''}" data-cat="${esc(c)}"
        onclick="${c==='Tutto' ? `tornaATutto()`
                               : 'apriCategoria(this.dataset.cat)'}">${esc(c)}</div>`).join('');
   /* AL CENTRO E NON A SINISTRA (ago 2026, dal campo): con un reparto
@@ -8268,16 +8283,14 @@ function ordineSfoglia(){
    l'emoji di ripiego sotto. */
 let strisciaFirma = '';
 function renderStriscia(){
-  /* Col BARATTOLO acceso la sezione se ne va: li' non c'e' nessuna
-     categoria da illuminare, e le pillole dicono gia' dove sei. Con
-     una CATEGORIA scelta invece la striscia RESTA e la sua card si
-     accende (ago 2026, decisione di Andrea che rovescia il primo
-     giro): si vede da cosa si stanno filtrando gli articoli qui
-     sotto, e si cambia reparto senza tornare indietro.
-     Si NASCONDE e non si svuota — tornando indietro la fila e' gia'
-     li', senza un giro di render e senza che le figure lampeggino. */
-  el('catSez').style.display = vistaBarattolo ? 'none' : '';
-  if (vistaBarattolo) return;
+  /* Col BARATTOLO acceso la striscia RESTA e ad accendersi e' la SUA
+     card (ago 2026, decisione di Andrea che rovescia il giro in cui
+     la sezione spariva: adesso una card da illuminare c'e' — la
+     stessa ragione della card categoria, e la barra delle pillole
+     appiccicate torna a comparire scorrendo, con la pillola del
+     barattolo in mezzo alle altre). Con una CATEGORIA scelta idem:
+     si vede da cosa si stanno filtrando gli articoli qui sotto, e si
+     cambia reparto senza tornare indietro. */
   /* NON SI DISEGNA FINCHE' I CONTEGGI NON SONO VERI, ed e' la stessa
      lezione gia' pagata dalle pillole: senza numeri `ordineSfoglia`
      restituisce l'ordine di CATALOGO, e per i ~300 ms che separano
@@ -8289,12 +8302,23 @@ function renderStriscia(){
      quel giudice lo chiama `ordineSfoglia` e non questa funzione. */
   if (!(DEMO || datiVivi || conteggiServer)) return;
   const voci = ordineSfoglia();
+  /* La card del barattolo porta la guardia di bottoneJar, LETTERALE:
+     in DEMO e in VETRINA il barattolo non esiste affatto, e una card
+     che filtra il nulla e' un bottone che porta a un muro. */
+  const jarCard = !(DEMO || VETRINA || !myTgId);
   /* La firma dice ANCHE quale card e' accesa: senza, entrare in un
      reparto non ridisegnerebbe niente — l'ordine non cambia — e la
-     card non si illuminerebbe mai.
-     Cosi' la fila si rifa' quando cambia l'ordine O il reparto, e in
-     nessun altro caso: le figure non lampeggiano. */
-  const firma = voci.join('|') + '#' + activeCat;
+     card non si illuminerebbe mai. E dice SE la card del barattolo
+     c'e' e se il suo filtro e' acceso: senza la J, il primo render
+     gira prima di /me (myTgId vuoto) e al giro dopo la firma
+     identica lascerebbe la card non nata per sempre; senza la B il
+     toggle non accenderebbe l'anello.
+     Cosi' la fila si rifa' quando cambia l'ordine O il reparto O lo
+     stato del barattolo, e in nessun altro caso: le figure non
+     lampeggiano. Il LIVELLO del vetro invece non entra: a livellarlo
+     in place e' aggiornaBarattolo, senza un giro di render. */
+  const firma = voci.join('|') + '#' + activeCat
+    + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '');
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
   /* La card accesa si porta in vista, che illuminata fuori schermo
@@ -8316,17 +8340,34 @@ function renderStriscia(){
      reparto acceso resta comunque il gesto per uscire.
      La card «Tutte le categorie» in coda e' morta con la pagina
      Sfoglia (ago 2026): la fila E' la mappa, e finisce con l'ultima
-     vuota. */
+     vuota.
+     ACCANTO A «TUTTO» C'E' LA CARD DEL BARATTOLO (ago 2026, decisione
+     di Andrea: il barattolino di testata promosso a card grande come
+     le altre). Il vetro e' jarSVG cotto al livello giusto — mai lv0
+     secco, il patto del cerchietto di ieri — e da li' lo livella
+     aggiornaBarattolo in place, con la transizione: nessuna regia
+     nuova, nessuna immagine, nessun asset. E' un <a> SENZA href col
+     role=button (il patto della card P2P: porta a un filtro, non a un
+     URL) e SENZA data-cat, quindi resta fuori dal tocco lungo di
+     condivisione PER COSTRUZIONE, come «Tutto». Il tocco e' il toggle
+     di sempre: accende il filtro, il ritocco lo spegne. */
   el('catStrip').innerHTML = `
-    <a class="cat-cella${activeCat === 'Tutto' ? ' attiva' : ''}" href="/"
+    <a class="cat-cella${activeCat === 'Tutto' && !vistaBarattolo ? ' attiva' : ''}" href="/"
        onclick="tornaATuttoDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig"><img src="${urlIllustrazione('Tutto')}"
            alt="" loading="lazy" decoding="async"${caldaOk('Tutto')}
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">🛍️</span></span></span>
       <span class="cat-eti">Tutto</span>
-    </a>` + voci.map(c => `
-    <a class="cat-cella${c === activeCat ? ' attiva' : ''}" data-cat="${esc(c)}"
+    </a>` + (jarCard ? `
+    <a class="cat-cella cella-barattolo${vistaBarattolo ? ' attiva' : ''}" role="button"
+       tabindex="0" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"
+       aria-pressed="${vistaBarattolo}" onclick="alternaBarattolo()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternaBarattolo()}">
+      <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56)}</span>
+      <span class="cat-eti">Nel tuo barattolo</span>
+    </a>` : '') + voci.map(c => `
+    <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
       <span class="cat-quad"><span class="cat-fig"><img src="${urlIllustrazione(c)}"
@@ -8397,12 +8438,15 @@ const SCOPRIRE = [
 ];
 let scoprireFirma = '';
 function renderScoprire(){
-  /* Col barattolo la sezione se ne va come le categorie; senza card
-     vive sparisce TUTTA, titolo compreso — una sezione con un titolo
-     e niente sotto e' peggio di nessuna sezione. Il display si scrive
-     PRIMA del controllo della firma (la lezione di renderStriscia:
-     scritto dopo, tornando dal barattolo la firma uguale lascerebbe
-     la sezione spenta per sempre). */
+  /* Col barattolo la sezione se ne va — le sue card accendono FILTRI
+     del server, che sulla lista chiusa del barattolo non hanno senso
+     (le categorie invece dall'ago 2026 RESTANO: li' c'e' la card del
+     barattolo da illuminare); senza card vive sparisce TUTTA, titolo
+     compreso — una sezione con un titolo e niente sotto e' peggio di
+     nessuna sezione. Il display si scrive PRIMA del controllo della
+     firma (la lezione storica di renderStriscia: scritto dopo,
+     tornando dal barattolo la firma uguale lascerebbe la sezione
+     spenta per sempre). */
   const vive = vistaBarattolo ? [] : SCOPRIRE.filter(v => v.vivo());
   el('scoprireSez').style.display = vive.length ? '' : 'none';
   if (!vive.length) return;
@@ -8513,11 +8557,12 @@ function toccaScoperta(id){
    Un IntersectionObserver sulla sezione, non un ascoltatore di
    scroll: quello lavora a ogni fotogramma per una domanda che cambia
    due volte in tutta la sessione.
-   COL FILTRO ACCESO LA SEZIONE E' `display:none`, quindi non
-   interseca niente e la barra resta accesa: e' esattamente quel che
-   serve — senza le pillole, da un reparto non si potrebbe piu'
-   tornare a «Tutto» ne' spegnere il barattolo. Non e' un caso
-   particolare da ricordare, e' la stessa domanda che risponde giusto.
+   LA SEZIONE NON VA PIU' MAI IN `display:none` (ago 2026, con la card
+   del barattolo): anche col filtro acceso la striscia resta — c'e'
+   una card da illuminare — quindi l'osservatore risponde sempre alla
+   stessa domanda, in cima barra spenta e scorrendo barra accesa, con
+   la pillola del barattolo in mezzo alle altre quando il filtro e'
+   il suo. Nessun caso particolare da ricordare.
    DOVE STA LA BARRA non lo decide piu' il JS: e' APPESA all'header
    (`position:absolute; top:100%`), quindi lo segue per costruzione —
    quando si stacca in cima scorrendo, quando torna giu', e quando
@@ -8591,7 +8636,7 @@ function armaScrollReparto(){
    mercatino intero, da qualunque porta si sia entrati. */
 function apriCategoria(c){
   /* RITOCCARE LA CARD ACCESA TORNA A «TUTTO» (ago 2026, decisione di
-     Andrea): e' lo stesso gesto del barattolino in testata — si tocca
+     Andrea): e' lo stesso gesto della card del barattolo — si tocca
      per filtrare, si ritocca per uscire. Dall'ago 2026 in TESTA alla
      fila c'e' ANCHE la card «Tutto» (l'altra meta' della decisione,
      che ROVESCIA il «nessuna card in piu'» di allora): due maniglie
@@ -8713,6 +8758,11 @@ function vaiEsplora(){
      la home, setCat compreso), altrimenti setCat sostituisce e si
      prosegue come sempre */
   if (activeCat !== 'Tutto' && tornaATutto()) return;
+  /* col filtro del barattolo acceso il tab e' comunque un ritorno
+     alla vetrina intera: a categoria gia' Tutto setCat non girera'
+     (e loadListings con lui), quindi si spegne qui — chi tocca il
+     nome del tab si aspetta tutto il mercatino, non i suoi salvati */
+  if (vistaBarattolo && activeCat === 'Tutto') alternaBarattolo();
   /* il ramo si chiude anche quando la categoria era gia' Tutto: il
      tocco sul nome del tab e' sempre un ritorno alla radice, e non
      deve dipendere dallo stato di un'altra variabile per esserlo */
@@ -9030,6 +9080,11 @@ function apriCategoriaDaTocco(e, c){
 function tornaATuttoDaTocco(e){
   if (!clickNostro(e)) return;
   e.preventDefault();
+  /* col filtro del barattolo acceso «Tutto» significa spegnerlo: a
+     categoria gia' Tutto, senza questo ramo, il tocco sarebbe un
+     no-op e la card direbbe «Tutto» sopra una griglia di preferiti
+     (l'haptic lo mette alternaBarattolo, non si suona due volte) */
+  if (vistaBarattolo) { alternaBarattolo(); return; }
   haptic();
   if (activeCat !== 'Tutto') tornaATutto();
 }
@@ -9321,8 +9376,9 @@ let classificaFiltro = 0;       /* stato di SESSIONE, mai localStorage */
 async function apriClassifica(){
   /* In DEMO e in VETRINA la pagina non esiste: la' non c'e' un server
      che la calcoli, e un numero inventato sarebbe peggio del niente —
-     il patto del cassetto wallet. Il bottone non compare nemmeno, e
-     questa e' la cintura per ogni altra strada. */
+     il patto del cassetto wallet. Il podio in testata non compare
+     nemmeno (renderPodioTesta), e questa e' la cintura per ogni
+     altra strada. */
   if (DEMO || VETRINA) return;
   go('classifica');
   const box = el('classificaCorpo');
@@ -18399,11 +18455,6 @@ function renderProfilo(){
      e' la stessa guardia che tourBenvenuto interroga per prima. */
   if (el('profiloTutorial')) el('profiloTutorial').style.display =
     hintAttivi() ? '' : 'none';
-  /* La porta della classifica si accende solo se la funzione e'
-     accesa sul server: un bottone che porta a una pagina spenta e'
-     peggio di un bottone che non c'e'. */
-  if (el('profiloClassifica')) el('profiloClassifica').style.display =
-    (myClassifica && !DEMO && !VETRINA) ? '' : 'none';
   renderLnAddress();
   renderLivello();
   renderDistintivi();
@@ -24012,10 +24063,12 @@ let MAX_PREFERITI = 10;
    i rimossi non occupano posto (comprare libera spazio da solo) */
 const contaBarattolo = () => myPreferiti.filter(l=>l.stato==='attivo').length;
 
-/* IL BARATTOLINO FILTRA LA HOME (ago 2026): un tocco sulla
-   scorciatoia in testata e la vetrina mostra i soli annunci del
+/* IL BARATTOLO FILTRA LA HOME (ago 2026): un tocco sulla sua CARD
+   nella striscia (era il barattolino in testata, promosso a card
+   accanto a «Tutto») e la vetrina mostra i soli annunci del
    barattolo, SENZA cambiare vista; si spegne ritoccandola, dalla
-   pillola in vetrina, o da qualunque gesto che ricarichi la vetrina.
+   pillola ✕ fra le appiccicate, dal tocco su «Tutto», o da qualunque
+   gesto che ricarichi la vetrina.
    Stato di SESSIONE e mai localStorage: la' dentro vivono valuta,
    tema, corpo del testo, hint, cartello, festa, bunker e NWC. */
 let vistaBarattolo = false;
@@ -24207,9 +24260,9 @@ function aggiornaBarattolo(n){
        l'ANNUNCIO — vuoto/pieno —, non il barattolo intero: il loro
        livello lo fa aggiornaJarCards. Qui restano quelli che il
        barattolo lo raccontano davvero: il 🫙 dell'header del cassetto
-       e, dall'ago 2026, la scorciatoia in testata — che si riempie
+       e, dall'ago 2026, la CARD nella striscia — che si riempie
        gratis proprio perche' non porta nessuna di quelle due classi
-       (vedi renderJarTesta). */
+       (vedi la cella-barattolo in renderStriscia). */
     if (s.closest('.card-jar,.jar-btn')) return;
     s.classList.remove('lv0','lv1','lv2','lv3','lv4');
     s.classList.add(lv);
@@ -24219,42 +24272,25 @@ function aggiornaBarattolo(n){
     myPreferiti.length ? `(${n}/${MAX_PREFERITI})` : '';
 }
 
-/* ---- IL BARATTOLO IN TESTATA (ago 2026) ----
-   Due istanze gemelle come la levetta del tema e il tappo — testata
-   mobile e topbar desktop —, una classe sola, un querySelectorAll solo.
-   Qui si CREA il vetro e si decide se accendere; a riempirlo poi e'
-   aggiornaBarattolo, che le .jar-ico fuori dai bottoni delle card le
-   livella gia' tutte: nessuna regia nuova, e la scossa di festa di
-   togglePreferito arriva in omaggio.
-   DALL'AGO 2026 NON E' PIU' UNA SCORCIATOIA AL CASSETTO: e' il gesto
-   che FILTRA la vetrina (vedi alternaBarattolo). L'anello arancione
-   dice che il filtro e' acceso, ed e' lo stesso `.attivo` che il tappo
-   porta gia' quando la vista e' il Profilo.
-   LA GUARDIA E' QUELLA DI bottoneJar, NON QUELLA DEL TAPPO (che guarda
-   il solo !VETRINA), e la RAGIONE e' cambiata col gesto: prima era il
-   posto dove si portava (un cassetto che in demo renderPreferiti
-   nasconde), adesso e' che in DEMO e in VETRINA il barattolo non
-   esiste AFFATTO — bottoneJar non nasce e caricaPreferiti esce subito,
-   quindi sarebbe un filtro che non puo' mai avere niente dentro. Vale
-   lo stesso la regola di bottoneRifornisci: un bottone che porta a un
-   muro e' peggio di un bottone che non c'e'.
-   Il vetro PRIMA, l'accensione DOPO: nessuno vede mai un cerchietto
-   vuoto. E nasce GIA' al livello giusto invece che a zero — oggi in
-   avvia() l'ordine e' favorevole (questa gira prima di
-   caricaPreferiti), ma e' una riga che un riordino puo' spostare senza
-   che nulla esploda, e sarebbe un barattolo vuoto al primo sguardo e
-   pieno al primo tocco: un difetto che non segnala nessuno. */
-function renderJarTesta(){
-  const on = !(DEMO || VETRINA || !myTgId);
-  document.querySelectorAll('.jar-testa').forEach(b=>{
-    if (on && !b.querySelector('svg'))
-      b.innerHTML = jarSVG(livelloBarattolo(contaBarattolo()), 18);
-    b.classList.toggle('on', on);
-    b.classList.toggle('attivo', on && vistaBarattolo);
-    /* da quando e' un interruttore lo stato si dice anche a voce:
-       l'anello arancione lo vede solo chi guarda */
-    b.setAttribute('aria-pressed', on && vistaBarattolo ? 'true' : 'false');
-  });
+/* ---- IL PODIO IN TESTATA (ago 2026) ----
+   La porta della classifica, dove viveva il barattolino — che dall'ago
+   2026 e' una CARD nella striscia delle categorie (decisione di
+   Andrea; vedi renderStriscia). Due istanze gemelle come la levetta e
+   il tappo, una classe sola, un querySelectorAll solo. L'SVG e'
+   STATICO e inline nel markup — niente lampo, niente innerHTML: qui
+   non c'e' nessun livello da cuocere.
+   IL GATE E' LA LEVA, la stessa condizione che accendeva il bottone in
+   fondo al Profilo (morto con questo cantiere, decisione di Andrea:
+   una porta sola): un bottone che porta a una pagina spenta e' peggio
+   di un bottone che non c'e'. CONSEGUENZA DICHIARATA: su mobile la
+   testata vive solo in Esplora, quindi dal Profilo la classifica non
+   si raggiunge piu'; da desktop la topbar c'e' ovunque.
+   Niente aria-pressed: naviga, non toggla — l'anello .attivo (la
+   vista E' la classifica) lo scrive go(), accanto a quello del tappo. */
+function renderPodioTesta(){
+  const on = myClassifica && !DEMO && !VETRINA;
+  document.querySelectorAll('.podio-testa')
+    .forEach(b => b.classList.toggle('on', on));
 }
 
 /* IL GESTO: accende o spegne il filtro, e ridisegna. ZERO RETE, ed e'
@@ -24282,7 +24318,6 @@ function alternaBarattolo(){
   haptic();
   vistaBarattolo = !vistaBarattolo;
   scriviStatoBarattolo();
-  renderChips();
   renderGrid(vistaBarattolo ? preferitiInVetrina() : undefined);
   /* si torna in cima: la griglia e' un'altra, e la posizione di prima
      non vuol dire piu' niente (la stessa ragione per cui loadListings
@@ -24290,14 +24325,18 @@ function alternaBarattolo(){
   window.scrollTo(0, 0);
 }
 
-/* Le due superfici che seguono lo stato, in un posto solo: l'anello
-   sul barattolino e la classe sul body che nasconde Ordina e Filtri
-   (il linguaggio di casa di body.con-barra e body.senza-nav). Chi
-   scrive `vistaBarattolo` chiama questa, o l'anello resta acceso su
-   una vetrina intera. */
+/* Le superfici che seguono lo stato, in un posto solo: l'anello sulla
+   CARD nella striscia e la pillola fra le appiccicate — via
+   renderChips, che ridisegna tutte e due le file (la firma della
+   striscia porta lo stato apposta) — e la classe sul body che
+   nasconde Ordina e Filtri (il linguaggio di casa di body.con-barra e
+   body.senza-nav). Chi scrive `vistaBarattolo` chiama questa, o
+   l'anello resta acceso su una vetrina intera: cosi' anche
+   spegniBarattolo spegne card e pillola SUBITO, senza aspettare il
+   renderChips che loadListings fa a dati arrivati. */
 function scriviStatoBarattolo(){
   document.body.classList.toggle('solo-barattolo', vistaBarattolo);
-  renderJarTesta();
+  renderChips();
 }
 /* Lo SPEGNIMENTO, che ha un chiamante solo: loadListings. Vive qui e
    non la' per stare accanto a cio' che governa. */
@@ -27894,7 +27933,7 @@ async function avviaVetrina(){
     await loadListings(true);  // anonimo: nessun header, prima pagina
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
-    renderJarTesta();          // ...e il barattolo nemmeno: non c'e' cassetto
+    renderPodioTesta();        // ...e il podio nemmeno: la cintura di apriClassifica
     mostraBanner(BANNER_VETRINA);
     bottoneLoginTelegram();
     bottoneLoginNostr();
@@ -27917,7 +27956,7 @@ async function avviaVetrina(){
     myAvatar = '';             // dati finti, facce vere no: iniziale
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
-    renderJarTesta();          // ...il cassetto dei preferiti no: spento
+    renderPodioTesta();        // ...la classifica no: niente server che la calcoli
     interessiNoti = true;      // in demo non vota nessuno: si sa e basta
     /* le pillole e le due strisce si ridisegnano ADESSO che DEMO e'
        vera: il giro di renderChips in testa ad avvia() e' partito con
@@ -27956,7 +27995,7 @@ async function avvia(){
   preparaCategoriaDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; interessiNoti = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderJarTesta(); renderGrid(); renderOrders(); return;
+    DEMO = true; interessiNoti = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders(); return;
   }
   /* Il banner del rodaggio parte SUBITO, in parallelo col primo /me:
      quando le card saranno pronte la risposta e' gia' arrivata, e la
@@ -28087,7 +28126,10 @@ async function avvia(){
     renderIdentita();
     DEMO = false;
     renderAvatar();
-    renderJarTesta();
+    /* il podio si accende QUI, dove myClassifica e' appena arrivata;
+       la card del barattolo la disegna il renderChips di loadListings,
+       che da qui in poi gira con myTgId pieno */
+    renderPodioTesta();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
