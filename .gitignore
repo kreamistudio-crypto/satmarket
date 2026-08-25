@@ -28,6 +28,12 @@ __pycache__/
 # roba di lavoro, e puo' contenere i testi degli annunci degli utenti
 censimento*.txt
 
+# Roba del deploy sul VPS: la copia del database che deploy.sh mette
+# da parte prima di aggiornare, e il timbro del commit che ha fallito
+# (il freno che gli impedisce di riprovarlo ogni minuto)
+backup/
+.deploy-bocciato
+
 # Varie
 .DS_Store
 Thumbs.db

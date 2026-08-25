@@ -708,6 +708,11 @@ POST_AUTOMATICI = True
 # momento comanda la scelta salvata nel database — questa riga non la
 # tocca piu'. «/canale» senza argomenti dice qual e' quello in uso.
 TELEGRAM_CANALE_ID = ""
+# Dove va il RIEPILOGO del lunedi': vuoto = dove vanno gli annunci.
+# Anche questo e' solo il valore di PARTENZA — si cambia dal bot con
+# «/canale riepilogo @nomecanale». Il bot dev'essere amministratore
+# anche di questo, e puo' essere un canale diverso dall'altro.
+TELEGRAM_CANALE_RIEPILOGO = ""
 # ATTENZIONE (ago 2026): come per il canale, i tre numeri qui sotto
 # sono il valore di PARTENZA. Il ritmo si sceglie dal bot con
 # «/vetrina tutto | giorno | settimana» e da quel momento comanda la
@@ -729,7 +734,10 @@ PROMO_GIORNI_VENDITORE = 7
 # non si tocca — il listino e' ancora quello). Leva sua e non un ramo
 # di POST_AUTOMATICI, cosi' si spengono gli sconti senza spegnere
 # anche gli annunci nuovi. Consuma il budget di POST_MAX_ORA.
-POST_LAMPO_CANALE = True
+# SPENTA di serie (ago 2026): nel canale gli sconti non compaiono come
+# messaggi nuovi — si vedono in vetrina, col badge e il prezzo
+# barrato. True per raccontarli anche qui.
+POST_LAMPO_CANALE = False
 
 # --- Il riepilogo settimanale ----------------------------------------
 # Il LUNEDI' il canale racconta la settimana: quanti annunci nuovi,

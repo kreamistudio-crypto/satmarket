@@ -15947,12 +15947,18 @@ def prove_canale_bot():
               "hex_to_npub", "chiave_nostr_provata", "_npub_breve",
               "_npub_venditore",
               "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
-              "_hashtag_promo", "_firma_venditore", "_caption_canale"):
+              "_hashtag_promo", "_firma_venditore", "_tariffa_dichiarata",
+              "_sped_in_sats", "_costo_sped_promo", "_righe_consegna_promo",
+              "_vetrina_venditore", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
          "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
          "venditore": "Alan", "venditore_username": "AlanBimbati",
-         "venditore_negozio": "abc12345"}
+         "venditore_negozio": "abc12345",
+         "consegna": "entrambe", "anche_digitale": 0,
+         "spedizione_sats": 5000, "spedizione_eur": 0.0,
+         "spedizione_punto_dichiarata": 0,
+         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0}
     t = cap["_caption_canale"](a, 0)
     prova("il titolo c'e' in grassetto", True,
           "<b>Chitarra classica</b>" in t)
@@ -15975,6 +15981,69 @@ def prove_canale_bot():
           "#strumentimusicali" in t and "#barattolo" in t)
     prova("il ✅ Venduto si aggiunge in coda", True,
           cap["_caption_canale"](a, 0, venduto=True).endswith("✅ Venduto"))
+
+    # --- 2b) COME ARRIVA LA ROBA, e la vetrina del venditore -------
+    # Il post dice la strada di consegna: e' la domanda che si fa chi
+    # legge PRIMA di aprire, e finora nel canale non c'era.
+    prova("la spedizione nomina tutte e due le destinazioni", True,
+          "🚚 Spedizione a casa o a un punto di ritiro" in t)
+    prova("col suo costo", True, "5.000 sats" in t)
+    prova("e il ritiro in zona ha la riga sua", True,
+          "🤝 Ritiro in zona" in t)
+    solo_sped = cap["_caption_canale"](dict(a, consegna="spedizione"), 0)
+    prova("chi non ritira non lo promette", False,
+          "Ritiro in zona" in solo_sped)
+    gratis = cap["_caption_canale"](dict(a, spedizione_sats=0), 0)
+    prova("la spedizione a zero si dice gratuita", True,
+          "<b>gratuita</b>" in gratis)
+    dig = cap["_caption_canale"](dict(a, consegna="digitale"), 0)
+    prova("il codice online ha la sua riga", True,
+          "💾 Codice online" in dig)
+    prova("e non promette nessuna spedizione", False, "🚚" in dig)
+    combo = cap["_caption_canale"](dict(a, anche_digitale=1), 0)
+    prova("la combo dice tutte e tre le strade", True,
+          "🚚" in combo and "🤝" in combo and "💾" in combo)
+    # La consegna NON DICHIARATA (storici e importati da Nostr): non si
+    # promette una strada che nessuno ha scelto.
+    muto = cap["_caption_canale"](dict(a, consegna="", anche_digitale=0), 0)
+    prova("consegna non dichiarata = nessuna riga", True,
+          "🚚" not in muto and "🤝" not in muto and "💾" not in muto)
+    # LA TARIFFA ANCORATA ALL'EURO SENZA CAMBIO: si dice la strada, mai
+    # una cifra inventata (la regola dell'avviso EUR senza cambio).
+    ancorata = dict(a, spedizione_sats=0, spedizione_eur=4.50)
+    senza_cambio = cap["_caption_canale"](ancorata, 0)
+    prova("euro ancorato e cambio muto: la strada c'e'", True,
+          "🚚 Spedizione a casa o a un punto di ritiro" in senza_cambio)
+    prova("...ma senza cifra e senza «gratuita»", True,
+          "gratuita" not in senza_cambio and "4,50" not in senza_cambio)
+    prova("col cambio la cifra parla euro", True,
+          "4,50 €" in cap["_caption_canale"](ancorata, 60000))
+    # Due strade a prezzo diverso: «da» col MINIMO, mai due cifre.
+    due = dict(a, spedizione_punto_dichiarata=1,
+               spedizione_punto_sats=3000)
+    prova("tariffe diverse: «da» col minimo", True,
+          "da 3.000 sats" in cap["_caption_canale"](due, 0))
+
+    # LA CONTROPARTITA DEL FRENO: un post a settimana, ma quel post
+    # porta anche gli altri articoli del venditore.
+    altri = [{"id": 7, "titolo": "Amplificatore"},
+             {"id": 8, "titolo": "Leggio"}]
+    v = cap["_caption_canale"](a, 0, altri=altri)
+    prova("gli altri articoli sono linkati", True,
+          '<a href="https://barattolo.store/annuncio/7">Amplificatore</a>'
+          in v and "/annuncio/8" in v)
+    prova("e il negozio resta in coda come sempre", True,
+          "vedi il suo negozio" in v)
+    prova("senza altri articoli non compare la sezione", False,
+          "Anche in vendita" in t)
+    lungo = cap["_caption_canale"](a, 0, altri=[
+        {"id": 9, "titolo": "T" * 80}])
+    prova("il titolo lungo si tronca", True, "…</a>" in lungo)
+    prova("e passa da escape", True, "&lt;i&gt;" in cap["_caption_canale"](
+        a, 0, altri=[{"id": 9, "titolo": "<i>x</i>"}]))
+    # Nemmeno qui restano URL nudi: la sezione e' fatta di ancore.
+    prova("nessun URL nudo con la vetrina accesa", False,
+          "https://" in re.sub(r'href="[^"]*"', "", v))
 
     # Il venditore SENZA username (i nativi Nostr): niente «@», o
     # nascerebbe una menzione che Telegram non sa risolvere.
@@ -16085,9 +16154,16 @@ def prove_canale_bot():
           {n for n, c in _corpi.items() if "TELEGRAM_CANALE_ID" in c})
     # ...e ogni funzione che POSTA nel canale passa dal giudice.
     for f in ("_posta_promo_singolo", "_posta_promo_aggregato",
-              "promo_lampo", "riepilogo_settimana"):
+              "promo_lampo"):
         prova(f"{f} scrive col giudice", True,
               'chat_id": canale_id()' in pezzo(f))
+    # IL RIEPILOGO HA CAMBIATO LATO (ago 2026): va nel canale SUO,
+    # quindi qui si chiede il contrario — e la prova non sparisce, si
+    # rovescia: se una sola delle sue strade tornasse a `canale_id()`
+    # il post del lunedi' finirebbe di nuovo in mezzo agli annunci.
+    prova("riepilogo_settimana scrive col giudice SUO", True,
+          "canale_riepilogo()" in pezzo("riepilogo_settimana")
+          and "canale_id()" not in pezzo("riepilogo_settimana"))
     # L'ELENCO e non il conto: se qualcuno apre una settima bocca sul
     # canale, il diff di questa prova la NOMINA invece di dire «7 != 6»
     # e mandare a cercarla a mano.
@@ -16097,7 +16173,8 @@ def prove_canale_bot():
            "promo_lampo",             # lo sconto a tempo
            "promo_venduto",           # il ✅ sul post gia' fatto
            "promo_rimuovi",           # il post cancellato
-           "riepilogo_settimana",     # il lunedi'
+           # il riepilogo non c'e' piu': ha il suo canale (ci ricade
+           # dentro da solo, ma passando dal SUO giudice)
            "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale"},         # che il canale lo DICE, non ci posta
           {n for n, c in _corpi.items()
@@ -16141,6 +16218,44 @@ def prove_canale_bot():
     prova("il canale si prova prima di crederci", True,
           pezzo("comando_canale").index('"chat_id": arg')
           < pezzo("comando_canale").index("imposta_canale(arg)"))
+    # --- L'ANTEPRIMA IN PRIVATO (ago 2026) -----------------------
+    # GUARDARE NON DEVE CONSUMARE NIENTE, ed e' tutta la regola di
+    # questo comando: nessun timbro del venditore, nessun timbro del
+    # lunedi', nessun `post_canale_id` — o un'occhiata brucerebbe il
+    # turno di qualcuno che non ha ancora avuto il suo post.
+    # si guarda il CORPO e non la docstring: quella i nomi delle
+    # colonne li nomina apposta, per dire che non si toccano — ed e'
+    # la trappola di sempre (una sentinella che ci inciampa dentro si
+    # fa aggiustare riscrivendo la prosa invece del codice).
+    ant = codice(pezzo("comando_anteprima").split('"""')[2]
+                 + pezzo("_anteprima_riepilogo").split('"""')[2])
+    for scritto in ("promo_canale_il", "post_canale_id", "timbro_scrivi",
+                    "UPDATE", "INSERT", "commit"):
+        prova(f"l'anteprima non scrive {scritto}", False, scritto in ant)
+    # e va a CHI L'HA CHIESTA, mai nel canale: se ci finisse un
+    # `canale_id()` l'anteprima diventerebbe una pubblicazione.
+    prova("l'anteprima non parla col canale", False,
+          "canale_id()" in ant or "canale_riepilogo()" in ant)
+    prova("...e manda a chi l'ha chiesta", True,
+          '"chat_id": chat' in ant)
+    # LA STRADA E' QUELLA VERA: se l'anteprima si costruisse la
+    # caption da se', direbbe una cosa e il canale un'altra — cioe'
+    # proprio il difetto che il comando esiste per far vedere prima.
+    prova("l'anteprima riusa la caption del canale", True,
+          "_caption_canale(" in ant)
+    prova("...con gli altri articoli del venditore", True,
+          "_altri_del_venditore(" in ant)
+    prova("...e la figura del podio", True, "_salva_podio(" in ant)
+    prova("l'anteprima e' dei soli admin", True,
+          "e_admin_bot(mittente)" in pezzo("comando_anteprima"))
+    prova("chi non e' admin non impara che esiste", False,
+          "autorizzat" in
+          pezzo("comando_anteprima").split('"""')[2].lower())
+    # il comando dev'essere RAGGIUNGIBILE: la riga nel routing e' quel
+    # che si dimentica, e senza di lei il comando non esiste
+    prova("«/anteprima» e' agganciata al bot", True,
+          'testo.startswith("/anteprima")' in _SORGENTE
+          and "comando_anteprima(mittente, testo)" in _SORGENTE)
     # IL RECINTO DELLE IMPOSTAZIONI, che e' da NON allargare: mai
     # segreti (finiscono nei backup) e mai leve del DENARO — quelle
     # nascono spente nel codice apposta, perche' accenderle costi un
@@ -16152,6 +16267,7 @@ def prove_canale_bot():
     # ne sostituisce una vecchia. Chi ne aggiunge una la scrive qui, e
     # nel farlo si rilegge la regola.
     RECINTO = {"canale_telegram",   # dove parla il bot  (`/canale`)
+               "canale_riepilogo",  # dove va il lunedi' (`/canale riepilogo`)
                "ritmo_vetrina"}     # quanto parla       (`/vetrina`)
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
@@ -16409,8 +16525,26 @@ def prove_podio_riepilogo():
             exec(riga, amb)
         exec(next(r for r in _SORGENTE.split("\n")
                   if r.startswith("PODIO_LARGA")), amb)
+        # IL PODIO SU SFONDO entra nell'ambiente insieme ai suoi due
+        # cataloghi: `_salva_podio` lo prova per primo, e senza di lui
+        # cadrebbe nel proprio except tornando '' — cioe' questa
+        # famiglia di prove certificherebbe il disegno guardando un
+        # fail-open. Lo sfondo VERO qui non c'e' (e' un asset, non un
+        # sorgente), quindi la funzione si ripiega da sola e sotto si
+        # esercita il podio DISEGNATO, che e' quel che queste righe
+        # sorvegliano da sempre.
+        i = _SORGENTE.index("SFONDO_RIEPILOGO = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n]", i) + 2], amb)
+        # QUESTA FAMIGLIA ESERCITA IL PODIO DISEGNATO, che e' il
+        # RIPIEGO: senza questa riga, dal giorno in cui l'asset esiste
+        # nel repo `_salva_podio` comporrebbe sullo sfondo e queste
+        # prove guarderebbero un'altra figura — restando verdi a
+        # sorvegliare qualcosa che non gira piu' (e infatti «la figura
+        # e' della misura dichiarata» e' diventata rossa il giorno che
+        # il PNG e' entrato: l'ha detto la CI, non la rilettura).
+        amb["SFONDO_RIEPILOGO"] = "non-esiste-apposta.webp"
         for f in ("_foto_podio", "_barattolo", "disegna_figura",
-                  "_salva_podio"):
+                  "_podio_su_sfondo", "_salva_podio"):
             exec(pezzo(f), amb)
 
         con = sqlite3.connect(":memory:")
@@ -16578,6 +16712,35 @@ def prove_vetrina_canale():
     # andasse a leggerla, i due potrebbero divergere fra una SELECT e
     # l'altra e il pannello direbbe una posizione coi numeri di
     # un'altra.
+    # --- 7) I GIUDICI DEL CANALE DEL RIEPILOGO -------------------
+    amb["TELEGRAM_CANALE_RIEPILOGO"] = ""
+    amb["TELEGRAM_CANALE_ID"] = ""
+    amb["canale_id"] = lambda: "@vetrina"
+    amb["_CANALE_RIEPILOGO"] = None
+    for f in ("canale_riepilogo", "imposta_canale_riepilogo"):
+        exec(pezzo(f), amb)
+    # IL RIPIEGO E' IL CANALE DEGLI ANNUNCI E NON IL SILENZIO: un
+    # canale non configurato non deve poter far sparire un post
+    # settimanale senza che nessuno se ne accorga.
+    prova("senza riga vale il canale degli annunci", "@vetrina",
+          amb["canale_riepilogo"]())
+    amb["imposta_canale_riepilogo"]("@barattolostore")
+    prova("scelto: comanda il suo", "@barattolostore",
+          amb["canale_riepilogo"]())
+    prova("...e la riga e' nel database", "@barattolostore",
+          con.execute("SELECT valore FROM impostazioni WHERE chiave=?",
+                      ("canale_riepilogo",)).fetchone()[0])
+    # IL VUOTO NON SPEGNE, ed e' la differenza col fratello: li' il
+    # vuoto e' il gesto di chi vuole il silenzio, qui e' «rimettilo
+    # dove stanno gli altri». A spegnere c'e' RIEPILOGO_SETTIMANALE.
+    amb["imposta_canale_riepilogo"]("")
+    prova("il vuoto rimette il riepilogo cogli annunci", "@vetrina",
+          amb["canale_riepilogo"]())
+    prova("la cache si riallinea senza rileggere", "@barattolostore",
+          (amb["imposta_canale_riepilogo"]("@barattolostore"),
+           amb["canale_riepilogo"]())[1])
+
+
     prova("la riga la legge solo nome_ritmo", True,
           'impostazione("ritmo_vetrina"' in pezzo("nome_ritmo")
           and 'impostazione("ritmo_vetrina"' not in pezzo("ritmo_vetrina"))
@@ -16609,6 +16772,19 @@ def prove_vetrina_canale():
     sing = codice(pezzo("_posta_promo_singolo").split('"""')[2])
     prova("chi posta riceve il freno dal chiamante", True,
           "giorni > 0" in sing and "ritmo_vetrina" not in sing)
+
+    # LA LEVA DELLA LAMPO NASCE SPENTA (ago 2026, decisione di
+    # Andrea): nel canale gli sconti non escono come messaggi nuovi.
+    # E' una decisione di PRODOTTO e non una taratura, quindi vuole
+    # una riga che la tenga: la mutazione che la riaccende non faceva
+    # rossa nessuna prova (l'ha detto la tortura, non la rilettura).
+    riga_lampo = next(r for r in _SORGENTE.split("\n")
+                      if r.strip().startswith("POST_LAMPO_CANALE ="))
+    prova("la lampo nel canale nasce spenta", "False",
+          riga_lampo.split("=")[1].strip())
+    prova("...e il config d'esempio dice lo stesso", True,
+          "POST_LAMPO_CANALE = False" in
+          open("config_esempio.py", encoding="utf-8").read())
 
     # --- 3) LO SCONTO LAMPO NEL CANALE ---------------------------
     pl = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
@@ -16752,6 +16928,11 @@ def prove_vetrina_canale():
         a = {"db": lambda: ConFinta(), "time": TempoFinto(wday),
              "html": _html, "print": lambda *x, **k: None,
              "bot_api": bot_api_finta, "canale_id": lambda: "@vetrina",
+             # IL RIEPILOGO HA UN CANALE SUO: se qui uscisse @vetrina
+             # vorrebbe dire che il post del lunedi' e' tornato a
+             # seguire gli annunci, che e' proprio quel che si e'
+             # separato.
+             "canale_riepilogo": lambda: "@riepilogo",
              "URL_PUBBLICO": "https://barattolo.store",
              "RIEPILOGO_SETTIMANALE": True, "RIEPILOGO_MINIMO": minimo,
              "TIMBRO_RIEPILOGO": "riepilogo_settimana",
@@ -16771,7 +16952,9 @@ def prove_vetrina_canale():
         _aio.run(processo()["riepilogo_settimana"]())
     prova("tre deploy nello stesso lunedi': UN post solo", 1, len(mandati))
     testo = mandati[0]["text"]
-    prova("il post va nel canale", "@vetrina", mandati[0]["chat_id"])
+    # e va nel canale SUO, non in quello degli annunci
+    prova("il post va nel canale del riepilogo", "@riepilogo",
+          mandati[0]["chat_id"])
     prova("dice gli annunci nuovi", True, "🫙 3 nuovi annunci" in testo)
     prova("dice gli ordini", True, "🛒 3 ordini" in testo)
     prova("e la classifica col ×N solo dove serve", True,
@@ -26236,6 +26419,257 @@ dice('...e col P2P gia votato la sezione sparisce intera', 'none',
      nodi['scoprireSez'].style.display);
 """
 
+def prove_deploy():
+    """IL DEPLOY AUTOMATICO (ago 2026): la CI promuove, il VPS tira.
+
+    Qui non si prova «il deploy funziona» — quello lo dice il VPS — ma
+    le QUATTRO righe senza le quali si rivolta contro il mercatino: il
+    semaforo che parte solo a prove verdi, il freno che impedisce di
+    riprovare in eterno un commit rotto, il rollback, e la rotta della
+    salute che tocca il database invece di limitarsi a esistere."""
+    print("\n[il deploy automatico]")
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    # IL CORPO, non i commenti: questo script la prosa ce l'ha eccome
+    # — spiega perche' NON si usa `--force` e perche' non e' un
+    # «git pull && systemctl restart» in un cron — e una sentinella
+    # che ci inciampa dentro si fa aggiustare riscrivendo la prosa
+    # invece del codice. Ci si e' inciampati scrivendo queste righe,
+    # ed e' la stessa trappola gia' pagata due volte in Python.
+    sh = "\n".join(r for r in open("deploy.sh", encoding="utf-8")
+                   .read().split("\n") if not r.lstrip().startswith("#"))
+
+    # --- 1) IL SEMAFORO ------------------------------------------
+    # `pronto` lo alza SOLO la CI, e solo dopo le due domande. Senza
+    # il `needs` sarebbe un ref che avanza a prescindere, cioe' un
+    # commit rosso in produzione.
+    i = wf.index("  pronto:")
+    job = wf[i:]
+    prova("il semaforo aspetta prove E segreti", True,
+          "needs: [prove, segreti]" in job)
+    prova("...e alza il ref che il VPS guarda", True,
+          "HEAD:refs/heads/pronto" in job)
+    # --force NO: `pronto` deve poter solo AVANZARE. Se i due rami
+    # divergono qualcuno ha riscritto la storia, ed e' il momento in
+    # cui un deploy automatico deve fermarsi.
+    passo = job[job.index("Alza la bandierina"):]
+    prova("il push del semaforo non e' forzato", False, "--force" in passo)
+    # solo main, e solo sui push: una PR verde non mette niente online
+    prova("solo main", True, "github.ref == 'refs/heads/main'" in job)
+    prova("...e solo sui push", True,
+          "github.event_name == 'push'" in job)
+    # il permesso di scrittura sta SOLO li': gli altri due job restano
+    # in sola lettura, che e' la regola scritta in cima al workflow
+    prova("solo il semaforo puo' scrivere", 1,
+          wf.count("contents: write"))
+
+    # --- 2) IL VPS TIRA, E TIRA IL RAMO GIUSTO -------------------
+    prova("il deploy segue «pronto», non main", True,
+          'RAMO="${BARATTOLO_RAMO:-pronto}"' in sh)
+    prova("...e non tocca mai main", False, "origin/main" in sh)
+    # NESSUNA chiave della macchina dei sats nei secret di GitHub: se
+    # un giorno comparisse un `ssh` nel workflow, la direzione del
+    # deploy si e' rovesciata e va guardata.
+    prova("nessuna chiave del VPS nella CI", True,
+          "ssh" not in wf.lower() and "secrets." not in wf)
+
+    # --- 3) IL FRENO, che e' la riga che si dimentica ------------
+    # Dopo un rollback `pronto` resta AVANTI: senza il timbro del
+    # commit bocciato, il giro dopo — fra un minuto — riproverebbe lo
+    # stesso commit rotto, e poi ancora, riavviando il mercatino ogni
+    # sessanta secondi per sempre.
+    prova("un commit bocciato si timbra", True,
+          sh.count("> .deploy-bocciato") == 2)
+    prova("...e non si riprova da solo", True,
+          '"$LA" == "$BOCCIATO"' in sh)
+    prova("...ma un deploy riuscito lo cancella", True,
+          "rm -f .deploy-bocciato" in sh)
+    prova("il timbro non finisce nella repo", True,
+          ".deploy-bocciato" in open(".gitignore", encoding="utf-8").read())
+
+    # --- 4) IL ROLLBACK ------------------------------------------
+    # L'ORDINE conta: prima si guarda la salute, e solo se manca si
+    # torna indietro. E si torna al commit di PRIMA, non a qualcosa di
+    # calcolato al momento.
+    prova("il rollback torna al commit di prima", True,
+          'git reset --hard --quiet "$QUI"' in sh)
+    prova("...dopo aver chiesto alla salute", True,
+          sh.index("aspetta_che_stia_bene") < sh.index('reset --hard --quiet "$QUI"'))
+    prova("...e riavvia anche lui", True,
+          sh.count("systemctl restart") >= 2)
+    # se non compila non si riavvia nemmeno: il mercatino continua a
+    # girare con la versione di prima
+    prova("il codice si compila prima di riavviare", True,
+          sh.index("compileall") < sh.index("systemctl restart"))
+    # e il database si mette da parte PRIMA di toccare i file
+    prova("la copia del database viene prima del reset", True,
+          sh.index("sorgente.backup") < sh.index('reset --hard --quiet "$LA"'))
+    # ogni esito si dice: un aggiornamento silenzioso e' un
+    # aggiornamento di cui nessuno sa la data
+    prova("i tre esiti si raccontano", True, sh.count("avvisa ") >= 4)
+
+    # --- 5) LA ROTTA DELLA SALUTE --------------------------------
+    # TOCCA IL DATABASE apposta: un uvicorn che risponde ma non sa
+    # piu' aprire il mercatino e' il guasto che un health check sul
+    # solo processo NON vede.
+    sal = pezzo("salute")
+    prova("la salute legge dal database", True, "db()" in sal)
+    prova("...e sul guasto risponde 503", True, "503" in sal)
+    # e NON dice niente di piu': e' pubblica, quindi qui non entrano
+    # conteggi, versioni o percorsi — sono tutte cose che aiutano chi
+    # guarda il server da fuori a sapere cosa ha davanti.
+    for parola in ("VERSIONE", "COUNT", "DB", "config", "os.", "commit"):
+        prova(f"la salute non racconta {parola}", False, parola in sal)
+    # lo script la interroga davvero, e col --fail: un 503 senza
+    # quello passerebbe per una risposta buona
+    prova("il deploy chiede alla salute", True, "/api/salute" in sh)
+    prova("...e un 503 conta come muto", True, "--fail" in sh)
+
+    # --- 6) L'UNITA' systemd -------------------------------------
+    unita = open("deploy/barattolo-deploy.service", encoding="utf-8").read()
+    # LO SCRIPT SI COPIA PRIMA DI ESEGUIRLO: bash legge il file mentre
+    # lo esegue, e `git reset` lo riscrive a meta' corsa.
+    prova("lo script si copia prima di girare", True,
+          "cp /root/satmarket/deploy.sh /tmp/" in unita)
+    timer = open("deploy/barattolo-deploy.timer", encoding="utf-8").read()
+    prova("il timer batte ogni minuto", True,
+          "OnUnitActiveSec=1min" in timer)
+    prova("...e recupera il giro dopo uno spegnimento", True,
+          "Persistent=true" in timer)
+
+
+def prove_podio_sfondo():
+    """IL PODIO SUL DISEGNO VERO (ago 2026, chiesto da Andrea).
+
+    I tre piu' venduti finiscono nei vetri di
+    `assets/riepilogo-barattoli.png`. Non e' una sostituzione secca:
+    il podio DISEGNATO resta — serve ancora la fila dei negozi — e fa
+    da ripiego, cosi' il lunedi' non salta mai per un asset mancante.
+
+    Non una sentinella sul testo: l'immagine si compone su file veri e
+    si GUARDANO I PIXEL. Un riquadro sbagliato non alza nessuna
+    eccezione — incolla la foto nel posto sbagliato."""
+    print("\n[il podio sul disegno vero]")
+    try:
+        from PIL import Image as _Im, ImageOps as _IOps, ImageDraw as _IDraw
+    except ImportError:
+        salta("il podio sul disegno vero", "Pillow non installata")
+        return
+    import io as _io, os as _os, tempfile
+    amb = {"io": _io, "ImmaginePillow": _Im, "ImageOps": _IOps,
+           "ImageDraw": _IDraw, "print": lambda *a, **k: None}
+    i = _SORGENTE.index("SFONDO_RIEPILOGO = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n]", i) + 2], amb)
+    exec(pezzo("_podio_su_sfondo"), amb)
+    VETRI = amb["VETRI_RIEPILOGO"]
+    prova("i vetri sono tre", 3, len(VETRI))
+    prova("...e stanno tutti dentro l'immagine", True,
+          all(0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1
+              for x0, y0, x1, y1 in VETRI))
+    # IL PRIMO E' IL PIU' GRANDE: la classifica si legge dalla misura
+    # del barattolo. Se un giorno l'ordine si rovescia, il post
+    # direbbe che il piu' venduto e' l'ultimo.
+    aree = [(x1 - x0) * (y1 - y0) for x0, y0, x1, y1 in VETRI]
+    prova("il podio va dal barattolo piu' grande al piu' piccolo",
+          sorted(aree, reverse=True), aree)
+    with tempfile.TemporaryDirectory() as tmp:
+        # LO SFONDO DI PROVA HA I VETRI BUCATI, come il disegno vero:
+        # i tre riquadri sono trasparenti e il resto e' opaco. Con uno
+        # sfondo pieno le foto non si vedrebbero affatto — e' la
+        # tecnica dei due strati, e una prova su uno sfondo opaco
+        # certificherebbe il contrario di quel che succede.
+        sfondo = _os.path.join(tmp, "sfondo.png")
+        sf = _Im.new("RGBA", (1000, 545), (40, 25, 15, 255))
+        for x0, y0, x1, y1 in VETRI:
+            _IDraw.Draw(sf).rectangle(
+                (x0 * 1000, y0 * 545, x1 * 1000, y1 * 545),
+                fill=(255, 255, 255, 0))
+        sf.save(sfondo)
+        foto = []
+        for colore in ((255, 0, 0), (0, 255, 0), (0, 0, 255)):
+            p = _os.path.join(tmp, f"{colore}.jpg")
+            _Im.new("RGB", (400, 300), colore).save(p)
+            foto.append(p)
+        composta = amb["_podio_su_sfondo"](foto, sfondo)
+        prova("l'immagine si compone", True, composta is not None)
+        prova("...della misura dello sfondo", (1000, 545), composta.size)
+        for i, atteso in enumerate([(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
+            x0, y0, x1, y1 = VETRI[i]
+            px = composta.getpixel((int((x0 + x1) / 2 * 1000),
+                                    int((y0 + y1) / 2 * 545)))
+            prova(f"il {i + 1}° e' nel suo barattolo", True,
+                  all(abs(px[j] - atteso[j]) < 40 for j in range(3)))
+        # FUORI dai vetri il disegno non si tocca: l'angolo e' ancora
+        # il fondo bruno, non la tela bianca che sta sotto.
+        prova("l'angolo dello sfondo resta com'era", (40, 25, 15),
+              composta.getpixel((5, 5)))
+        # UN BARATTOLO SENZA FOTO RESTA VUOTO: e' una figura, non un
+        # buco — la stessa regola del podio disegnato.
+        c1 = amb["_podio_su_sfondo"]([foto[0], None, None], sfondo)
+        x0, y0, x1, y1 = VETRI[1]
+        # IL VETRO SENZA FOTO RESTA BIANCO, e non nero: la tela sotto
+        # e' bianca APPOSTA — un barattolo vuoto e' una figura, un
+        # buco nero si legge come un guasto (visto sulla prima
+        # anteprima, quando il vetro si convertiva in RGB).
+        prova("il barattolo senza foto resta BIANCO", True,
+              all(c > 240 for c in c1.getpixel(
+                  (int((x0 + x1) / 2 * 1000), int((y0 + y1) / 2 * 545)))))
+        # FAIL-OPEN: senza foto o senza sfondo si torna a mani vuote, e
+        # il chiamante ricade sul podio DISEGNATO.
+        prova("nessuna foto: si ripiega sul disegno", None,
+              amb["_podio_su_sfondo"]([None, None, None], sfondo))
+        prova("sfondo mancante: si ripiega, e nessuna eccezione", None,
+              amb["_podio_su_sfondo"](foto, "non-esiste.png"))
+        rotta = _os.path.join(tmp, "rotta.jpg")
+        open(rotta, "wb").write(b"non sono un jpeg")
+        c2 = amb["_podio_su_sfondo"]([rotta, foto[1], foto[2]], sfondo)
+        x0, y0, x1, y1 = VETRI[1]
+        px = c2.getpixel((int((x0 + x1) / 2 * 1000),
+                          int((y0 + y1) / 2 * 545)))
+        prova("una foto rotta non si porta via le altre", True,
+              px[1] > 200 and px[0] < 60)
+    # --- L'ASSET VERO ------------------------------------------
+    # Le coordinate dei vetri sono state MISURATE su questo file, non
+    # stimate: qui si chiede che ci cadano ancora dentro. Se un giorno
+    # il disegno si rifa' e i barattoli si spostano, queste righe lo
+    # dicono il giorno stesso invece che il lunedi' dopo, con le foto
+    # incollate a mezz'aria.
+    if not _os.path.exists(amb["SFONDO_RIEPILOGO"]):
+        salta("i vetri dell'asset vero",
+              f"manca {amb['SFONDO_RIEPILOGO']}")
+    else:
+        vero = _Im.open(amb["SFONDO_RIEPILOGO"])
+        prova("il disegno ha il canale alpha", True,
+              vero.mode in ("RGBA", "LA", "P"))
+        vero = vero.convert("RGBA")
+        L, A = vero.size
+        alpha = vero.split()[3].load()
+        for i, (x0, y0, x1, y1) in enumerate(VETRI):
+            # il centro del riquadro dev'essere BUCATO, o la foto
+            # finirebbe sotto il disegno e non si vedrebbe
+            prova(f"il {i + 1}° vetro e' bucato al centro", True,
+                  alpha[int((x0 + x1) / 2 * L),
+                        int((y0 + y1) / 2 * A)] < 40)
+            # ...e il riquadro non deve sbordare sul fondo opaco piu'
+            # di un filo: si contano i pixel trasparenti dentro
+            dentro = trasp = 0
+            for x in range(int(x0 * L), int(x1 * L), 4):
+                for y in range(int(y0 * A), int(y1 * A), 4):
+                    dentro += 1
+                    trasp += alpha[x, y] < 40
+            prova(f"...e sta quasi tutto dentro il {i + 1}° barattolo",
+                  True, trasp / dentro > 0.80)
+
+    # IL RIPIEGO E' SCRITTO NEL CHIAMANTE, e in quest'ordine: prima il
+    # disegno vero, poi quello fatto a matita.
+    sp = pezzo("_salva_podio")
+    prova("il salvataggio prova prima lo sfondo", True,
+          "_podio_su_sfondo(foto3) or disegna_figura(foto3)" in sp)
+    # e la FILA dei negozi continua a passare dal disegno: quel PNG ha
+    # tre barattoli di misure diverse, cioe' e' un podio e non una fila
+    prova("la fila dei negozi resta disegnata", True,
+          "disegna_figura(_foto_podio(con, tre), FILA_MISURE)" in _SORGENTE)
+
+
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
@@ -32518,7 +32952,8 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
-              prove_script_nel_workflow,
+              prove_script_nel_workflow, prove_deploy,
+              prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,
               prove_pagina_dati,

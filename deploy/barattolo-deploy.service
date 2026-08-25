@@ -1,0 +1,28 @@
+; Il deploy di Barattolo: guarda se c'e' un aggiornamento pronto e in
+; quel caso lo mette. Lo chiama il timer gemello, ogni minuto.
+;
+; SI COPIA LO SCRIPT PRIMA DI ESEGUIRLO, e non e' una stranezza: bash
+; legge un file mentre lo esegue, quindi se `git reset` lo riscrivesse
+; a meta' corsa la riga dopo sarebbe di un altro script. Con la copia,
+; il deploy in corso finisce col codice con cui e' partito e la
+; versione nuova dello script entra in vigore al giro dopo — che e'
+; anche l'ordine giusto.
+;
+; Installazione (una volta sola, da root):
+;     cp deploy/barattolo-deploy.* /etc/systemd/system/
+;     systemctl daemon-reload
+;     systemctl enable --now barattolo-deploy.timer
+
+[Unit]
+Description=Barattolo — mette in produzione quel che la CI ha promosso
+After=network-online.target barattolo.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/satmarket
+Environment=BARATTOLO_DIR=/root/satmarket
+ExecStart=/bin/bash -c 'cp /root/satmarket/deploy.sh /tmp/barattolo-deploy.sh && exec /bin/bash /tmp/barattolo-deploy.sh'
+; Un deploy che si impianta non deve restare appeso per sempre: il
+; giro dopo riprova da capo.
+TimeoutStartSec=300
