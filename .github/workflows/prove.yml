@@ -262,11 +262,21 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+      # La STORIA INTERA, e non e' un dettaglio: il checkout di serie e'
+      # SHALLOW (un commit solo), quindi git non puo' dimostrare che
+      # `pronto` sia un antenato di main e RIFIUTA il push anche quando
+      # divergenza non ce n'e'. Il primo giro era passato solo perche'
+      # CREAVA il ref; dal secondo push in poi cadeva sempre, con la
+      # bandierina ferma e la CI rossa a ogni commit di chiunque.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       # --force NO, e non e' pignoleria: `pronto` deve poter solo
       # AVANZARE lungo main. Se un giorno il push venisse rifiutato
       # vuol dire che i due rami hanno divergito — cioe' che qualcuno
       # ha riscritto la storia — ed e' esattamente il momento in cui
-      # un deploy automatico deve fermarsi e farsi guardare.
+      # un deploy automatico deve fermarsi e farsi guardare. Ed e' la
+      # storia intera qui sopra a rendere VERA questa riga: senza, un
+      # rifiuto non distingueva una divergenza da un clone corto.
       - name: Alza la bandierina per il VPS
         run: git push origin HEAD:refs/heads/pronto
