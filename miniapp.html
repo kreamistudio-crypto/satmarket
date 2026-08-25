@@ -5596,8 +5596,11 @@ document.getElementById('cartello')?.remove();</script>
          scrive chi apre: il titolo e' testo dell'utente e passa da
          esc(), come ovunque. -->
     <div id="confTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <!-- pre-line: i corpi portano i \n\n dei vecchi confirm() come
+         capoversi veri — senza, collassano in un muro di testo (era
+         gia' cosi' per chiediSblocco e decidiBanner, in silenzio) -->
     <div id="confCorpo" style="font-size:13px;color:var(--muted);font-weight:600;
-      line-height:1.5;margin-bottom:14px"></div>
+      line-height:1.5;margin-bottom:14px;white-space:pre-line"></div>
     <button class="btn orange" id="confOk" onclick="eseguiConferma(this)">Conferma</button>
     <!-- L'AVVISO E' LA CONFERMA DEGENERE (ago 2026): un foglio che non
          chiede niente — un bottone solo, e chiudere E' l'azione. Il
@@ -16637,7 +16640,12 @@ async function inviaLampo(btn){
 async function annullaLampo(){
   haptic();
   const l = currentListing; if (!l) return;
-  if (!confirm('Vuoi annullare l\'offerta lampo? Il prezzo torna subito pieno.')) return;
+  chiediConferma({
+    titolo: 'Annulli l\'offerta lampo?',
+    corpo: 'Il prezzo torna subito pieno. Il lancio resta contato nel '
+         + 'tetto settimanale.',
+    etichetta: 'Sì, annulla',
+    poi: async () => {
   try {
     const r = await fetch(`${API_BASE}/listings/${l.id}/lampo/annulla`, {
       method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
@@ -16647,6 +16655,7 @@ async function annullaLampo(){
     toast('Offerta lampo annullata: prezzo pieno');
     renderGrid(); openDetail(l.id);
   } catch(e) { toast('Rete assente: riprova'); }
+    }});
 }
 
 /* Le gare d'asta nella scheda Ordini: le puntate vive con lo stato
@@ -17995,7 +18004,11 @@ async function inviaFeedback(btn){
   haptic();
   if (!stellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
   const commento = (el('fbCommento').value||'').trim();
-  if (!confirm('Inviare questo feedback?\n\nÈ definitivo: non potrà essere modificato.')) return;
+  chiediConferma({
+    titolo: 'Invii questo feedback?',
+    corpo: 'È definitivo: non potrà essere modificato.',
+    etichetta: '⭐ Invia',
+    poi: async () => {
   if (DEMO) {
     currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
     stellaScelta = 0; toast('⭐ Feedback inviato!'); openOrder(currentOrder.id); return;
@@ -18011,6 +18024,7 @@ async function inviaFeedback(btn){
   stellaScelta = 0;
   toast('⭐ Grazie per il feedback!');
   openOrder(currentOrder.id);
+    }});
 }
 
 /* ---- l'avviso sul rischio del trasporto, una volta sola ----
@@ -18607,14 +18621,16 @@ async function ritiraDoppione(idNativo, tua){
      solo preparare la richiesta, e a firmarla e' il suo browser. */
   const coda = 'Il tuo annuncio originale non si tocca mai. E l\'annuncio '
     + 'qui su Barattolo resta attivo: solo, non sarà più pubblicato '
-    + 'su Nostr.\n\nProcedere?';
-  if (!confirm(tua
-    ? 'Ritiriamo dai relay Nostr l\'evento di questo annuncio.\n\n'
-      + 'È firmato con la tua chiave: la richiesta la prepariamo noi, '
-      + 'ma a firmarla sei tu — te la chiediamo alla prossima '
-      + 'apertura.\n\n' + coda
-    : 'Ritiriamo dai relay Nostr l\'evento di questo annuncio, quello '
-      + 'firmato da Barattolo.\n\n' + coda)) return;
+    + 'su Nostr.';
+  chiediConferma({
+    titolo: 'Ritiri il doppione dai relay?',
+    corpo: (tua
+      ? 'L\'evento è firmato con la tua chiave: la richiesta la '
+        + 'prepariamo noi, ma a firmarla sei tu — te la chiediamo '
+        + 'alla prossima apertura.\n\n'
+      : 'Ritiriamo l\'evento firmato da Barattolo.\n\n') + coda,
+    etichetta: '🟣 Ritira',
+    poi: async () => {
   try {
     const r = await fetch(`${API_BASE}/me/doppioni/${idNativo}/ritira`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
@@ -18632,6 +18648,7 @@ async function ritiraDoppione(idNativo, tua){
     renderDoppioni();
     toast('🟣 Doppione ritirato dai relay');
   } catch(e) { toast('Rete assente: riprova'); }
+    }});
 }
 
 async function ignoraDoppione(idImportato, idNativo){
@@ -19915,9 +19932,9 @@ function eliminaCodice(id){
   const c = (myCodici || []).find(x => x.id === id);
   if (!c) return;
   /* LA DOMANDA PASSA DAL FOGLIO DI CASA e non dal confirm() di
-     sistema: eliminaRicerca usa ancora quello — debito dichiarato —
-     ma una superficie NUOVA non lo aumenta. E chiediConferma e' anche
-     la guardia contro il doppio tocco. */
+     sistema — dall'ago 2026 come TUTTO il client: il debito di
+     eliminaRicerca, che questo commento dichiarava, e' chiuso. E
+     chiediConferma e' anche la guardia contro il doppio tocco. */
   chiediConferma({
     titolo: 'Eliminare il codice?',
     corpo: `«${c.codice}» non varrà più alla cassa. Gli ordini già `
@@ -20415,8 +20432,17 @@ async function setFerie(riapri){
     /* mezzogiorno locale: cosi' il giorno scelto e' quello giusto in
        qualunque fuso, senza sorprese da mezzanotte */
     fino = Math.floor(new Date(v + 'T12:00:00').getTime()/1000);
-  } else if (!confirm('Riapri il negozio adesso? I tuoi annunci tornano '
-                      + 'comprabili subito.')) return;
+  } else {
+    chiediConferma({
+      titolo: 'Riapri il negozio adesso?',
+      corpo: 'I tuoi annunci tornano comprabili subito.',
+      etichetta: '☀️ Riapri',
+      poi: () => inviaFerie(0)});
+    return;
+  }
+  inviaFerie(fino);
+}
+async function inviaFerie(fino){
   const box = el('ferieErrore');
   if (box) box.innerHTML = '';
   let d = {};
@@ -21093,12 +21119,19 @@ async function pausaRicerca(id){
 }
 
 async function eliminaRicerca(id){
-  if (!confirm('Elimino questo avviso di ricerca?')) return;
-  const r = await fetch(`${API_BASE}/me/avvisi-ricerca/${id}/elimina`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  if (!r.ok) { toast('Non ci sono riuscito, riprova', 6000); return; }
-  myRicerche = null; renderRicerche();
-  toast('🗑 Avviso eliminato');
+  /* era l'ultimo debito dichiarato del foglio di casa (il commento di
+     eliminaCodice lo nominava): chiuso con la conversione di tutti */
+  chiediConferma({
+    titolo: 'Elimini questo avviso di ricerca?',
+    corpo: 'Non riceverai più notifiche per questa ricerca.',
+    etichetta: 'Elimina',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/me/avvisi-ricerca/${id}/elimina`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) { toast('Non ci sono riuscito, riprova', 6000); return; }
+      myRicerche = null; renderRicerche();
+      toast('🗑 Avviso eliminato');
+    }});
 }
 
 /* il CTA di Esplora dopo una ricerca a vuoto: precompila un avviso
@@ -21232,12 +21265,15 @@ async function rimuoviNpub(){
     toast('🔑 Questa npub è il tuo unico modo di entrare: collega prima Telegram, poi potrai rimuoverla', 7000);
     return;
   }
-  let msg = 'Vuoi rimuovere la npub dal profilo?\n\n' +
-    'Perderai il badge 🟣 e gli altri utenti non potranno più ' +
+  let msg = 'Perderai il badge 🟣 e gli altri utenti non potranno più ' +
     'contattarti su Nostr. Se la reinserirai, dovrai verificarla di nuovo.';
   if (myNpubAccesso && myNpubAccesso === myNpub)
     msg += '\n\n⚠️ Questa chiave apre anche l\'account dal web: perderai pure l\'accesso con Nostr.';
-  if (!confirm(msg)) return;
+  chiediConferma({
+    titolo: 'Rimuovi la npub dal profilo?',
+    corpo: msg,
+    etichetta: '🗑 Rimuovi',
+    poi: async () => {
   if (DEMO) {
     myNpub = ''; myNpubVerified = false; npubCodice = '';
     if (el('npubInput')) el('npubInput').value = '';
@@ -21260,6 +21296,7 @@ async function rimuoviNpub(){
     ? 'npub rimossa: badge e accesso con Nostr spenti'
     : 'npub rimossa dal profilo');
   await loadListings(); renderGrid();
+    }});
 }
 
 async function saveNpub(){
@@ -21833,16 +21870,22 @@ async function scegliConsegnaOrdine(v){
   const o = currentOrder; if (!o) return;
   const NOMI = {spedizione:'la spedizione', ritiro:'il ritiro in zona',
                 digitale:'il codice online'};
-  if (!confirm(`Confermi ${NOMI[v]||v}? La scelta è definitiva.`)) return;
-  const r = await fetch(`${API_BASE}/orders/${o.id}/consegna`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({consegna:v})});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Scelta non riuscita', 6000); return; }
-  o.consegnaScelta = v;
-  toast('✔ Scelta fatta: il venditore prepara la consegna');
-  openOrder(o.id);
+  chiediConferma({
+    titolo: `Confermi ${NOMI[v]||v}?`,
+    corpo: 'La scelta è definitiva: il venditore prepara la consegna '
+         + 'su questa strada.',
+    etichetta: 'Conferma',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/orders/${o.id}/consegna`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify({consegna:v})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Scelta non riuscita', 6000); return; }
+      o.consegnaScelta = v;
+      toast('✔ Scelta fatta: il venditore prepara la consegna');
+      openOrder(o.id);
+    }});
 }
 /* Le mappe ufficiali dei punti di ritiro (ago 2026): il compratore
    non deve sapere il punto a memoria — apre la mappa in una scheda
@@ -23344,12 +23387,17 @@ async function depositaBusta(btn){
   if (!codice && !docResta) {
     toast('Serve il codice di ritiro, oppure carica il documento del corriere'); return; }
   const correzione = currentOrder.bustaIl > 0;
-  if (!confirm(correzione
-      ? 'Aggiornare le istruzioni di ritiro?\n\nL\'acquirente riceve un avviso e userà il nome e il codice nuovi.'
-      : 'Depositare le istruzioni di ritiro?\n\nL\'acquirente le leggerà nell\'ordine'
+  chiediConferma({
+    titolo: correzione ? 'Aggiorni le istruzioni di ritiro?'
+                       : 'Depositi le istruzioni di ritiro?',
+    corpo: correzione
+      ? 'L\'acquirente riceve un avviso e userà il nome e il codice nuovi.'
+      : 'L\'acquirente le leggerà nell\'ordine'
         + (currentOrder.state==='locked'
            ? ' (l\'avviso gli arriva quando segni la spedizione).'
-           : ' e riceve subito l\'avviso «il tuo pacco ti aspetta».'))) return;
+           : ' e riceve subito l\'avviso «il tuo pacco ti aspetta».'),
+    etichetta: correzione ? 'Aggiorna' : '📦 Deposita',
+    poi: async () => {
   const ripristina = bottoneInAttesa(btn, '📦 Deposito le istruzioni…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/busta-ritiro`, {
     method:'POST',
@@ -23380,6 +23428,7 @@ async function depositaBusta(btn){
   openOrder(currentOrder.id);
   toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
                    : '📦 Istruzioni depositate');
+    }});
 }
 
 /* IL PROMEMORIA A COMANDO (ago 2026): TRE STATI E NON DUE — '' il
@@ -25244,21 +25293,27 @@ function trattamiDaNuovo(){
 
 async function deleteListing(id, dalDettaglio){
   haptic();
-  if (!confirm('Eliminare questo annuncio dal mercatino?')) return;
-  if (DEMO) {
-    listings = listings.filter(l=>l.id!==id);
-    vetrina = listings;   // in demo restano lo stesso array
-  } else {
-    const r = await fetch(`${API_BASE}/listings/${id}/rimuovi`,
-      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-    await loadListings();
-  }
-  await loadMyListings();
-  renderMyListings(); renderGrid();
-  toast('🗑 Annuncio eliminato');
-  if (dalDettaglio) go('profilo');   /* la lista dei tuoi annunci ora vive lì */
+  chiediConferma({
+    titolo: 'Elimini questo annuncio?',
+    corpo: 'Sparisce dal mercatino, da Nostr e dal canale. Per '
+         + 'rimetterlo in vendita dovrai ripubblicarlo.',
+    etichetta: '🗑 Elimina',
+    poi: async () => {
+      if (DEMO) {
+        listings = listings.filter(l=>l.id!==id);
+        vetrina = listings;   // in demo restano lo stesso array
+      } else {
+        const r = await fetch(`${API_BASE}/listings/${id}/rimuovi`,
+          {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+        await loadListings();
+      }
+      await loadMyListings();
+      renderMyListings(); renderGrid();
+      toast('🗑 Annuncio eliminato');
+      if (dalDettaglio) go('profilo');   /* la lista dei tuoi annunci ora vive lì */
+    }});
 }
 
 /* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
@@ -27592,20 +27647,26 @@ async function importPrepara(btn){
 async function importAvvia(btn){
   haptic();
   if (!importBiglietto) return;
-  if (!confirm(`Confermi la pubblicazione di ${importValide} annunci?`)) return;
-  const ripristina = bottoneInAttesa(btn, '📥 Avvio l\'import…');
-  try{
-    const r = await fetch(`${API_BASE}/import/avvia`, {method:'POST',
-      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({biglietto: importBiglietto})});
-    const d = await r.json().catch(()=>({}));
-    ripristina();
-    if (!r.ok) { toast(d.detail || 'Import non partito, riprova'); return; }
-    el('importEsito').innerHTML = '';
-    if (importTimer) clearInterval(importTimer);
-    importTimer = setInterval(importPoll, 2000);
-    importPoll();
-  } catch(e){ ripristina(); toast('❌ Import non partito, riprova'); }
+  chiediConferma({
+    titolo: `Pubblichi ${importValide} annunci?`,
+    corpo: 'Vanno in vetrina tutti insieme; le righe dubbie restano '
+         + 'in revisione.',
+    etichetta: '📥 Pubblica',
+    poi: async () => {
+      const ripristina = bottoneInAttesa(btn, '📥 Avvio l\'import…');
+      try{
+        const r = await fetch(`${API_BASE}/import/avvia`, {method:'POST',
+          headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({biglietto: importBiglietto})});
+        const d = await r.json().catch(()=>({}));
+        ripristina();
+        if (!r.ok) { toast(d.detail || 'Import non partito, riprova'); return; }
+        el('importEsito').innerHTML = '';
+        if (importTimer) clearInterval(importTimer);
+        importTimer = setInterval(importPoll, 2000);
+        importPoll();
+      } catch(e){ ripristina(); toast('❌ Import non partito, riprova'); }
+    }});
 }
 
 async function importPoll(){

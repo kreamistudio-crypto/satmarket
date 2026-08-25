@@ -20968,6 +20968,24 @@ def prove_fogli_di_casa():
                          "const g = prompt('quanti giorni?');")))
     prova("l'API d'installazione PWA non e' un dialogo di sistema",
           True, "ev.prompt()" in mini)
+    # IL CENSIMENTO CHE CHIUDE (ago 2026): anche confirm() e alert()
+    # sono a ZERO — erano 29 confirm in tutto il client, piu' dei
+    # «gesti sui sats e admin» che CLAUDE.md dichiarava superstiti
+    # (la lezione dell'elenco a memoria), convertiti a chiediConferma
+    # in tre gruppi. Stesso predicato del prompt: i commenti che
+    # raccontano la storia scrivono «confirm()» a parentesi vuota
+    # (`chiediConferma(`/`eseguiConferma(` non matchano: la parola
+    # dentro e' «Conferma», non «confirm»). alert() nel client non
+    # c'e' mai stato, e adesso non puo' nascere.
+    prova("nessun confirm() di sistema nel client", 0,
+          len(re.findall(r"(?<!\.)\bconfirm\((?!\))", mini)))
+    prova("nessun alert() di sistema nel client", 0,
+          len(re.findall(r"(?<!\.)\balert\((?!\))", mini)))
+    prova("...e il predicato sa riconoscerne uno", (1, 1),
+          (len(re.findall(r"(?<!\.)\bconfirm\((?!\))",
+                          "if (!confirm('sicuro?')) return;")),
+           len(re.findall(r"(?<!\.)\balert\((?!\))",
+                          "alert('no');"))))
 
     def solo_codice(js):
         """Via i commenti di blocco e le righe di commento: senza,
@@ -21062,6 +21080,12 @@ def prove_fogli_di_casa():
           and "const poi = confermaAzione; if (!poi) return;" in esegui)
     prova("il corpo si scrive con textContent (testo NUDO, niente "
           "HTML da scappare)", True, "confCorpo').textContent" in chiedi)
+    # i corpi convertiti dai confirm() portano i \n\n come capoversi:
+    # senza pre-line collassano in un muro di testo (succedeva gia',
+    # in silenzio, a chiediSblocco e decidiBanner)
+    prova("...e i suoi capoversi restano capoversi (pre-line)", True,
+          "white-space:pre-line" in
+          mini[mini.index('id="confCorpo"'):mini.index('id="confOk"')])
     prova("la testata e' facoltativa e sparisce se non c'e'", True,
           "testata.style.display" in chiedi)
     prova("chiusura MIRATA, mai closeSheet", True,
@@ -21075,8 +21099,8 @@ def prove_fogli_di_casa():
     # quello il verso da sorvegliare. Cresce a mano quando un gesto
     # nuovo lo adotta, come il censimento delle leve-lista.
     # SEI dall'ago 2026: il sesto e' l'eliminazione di un codice
-    # sconto. Una superficie NUOVA non aumenta il debito dei confirm()
-    # di sistema — eliminaRicerca usa ancora quello, ed e' dichiarato.
+    # sconto. (Il debito di eliminaRicerca, dichiarato qui per mesi,
+    # e' chiuso col terzo gruppo della conversione — vedi sotto.)
     # NOVE col banner del negozio, e il piu' importante dei tre e'
     # il primo: l'USCITA da Barattolo, che chiede prima di aprire un
     # sito che non e' nostro e mostra il dominio nella testata. Gli
@@ -21115,8 +21139,15 @@ def prove_fogli_di_casa():
     # (i suoi DUE rami che chiedono si fondono in UNA chiamata, il
     # pattern di decidiBanner: pubblicare passa dritto) e la rimozione
     # per violazione.
-    prova("i gesti che passano dalla domanda unica sono trenta",
-          30, solo_codice(mini).count("chiediConferma({"))
+    # QUARANTA col terzo gruppo, i neutri — lampo, feedback, doppione
+    # Nostr, rientro dalle ferie, avviso di ricerca (il debito
+    # dichiarato, chiuso), npub, consegna d'asta, busta, eliminazione
+    # dell'annuncio, import CSV — e da qui il conteggio smette di
+    # crescere per conversione: i confirm() sono FINITI, e a dirlo e'
+    # il censimento qui sotto. Un gesto nuovo che adotta il foglio
+    # alza il numero a mano, come sempre.
+    prova("i gesti che passano dalla domanda unica sono quaranta",
+          40, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
