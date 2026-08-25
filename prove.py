@@ -20759,6 +20759,126 @@ def prove_offerta_quantita():
 
 
 # ====================================================================
+def prove_offerta_carrello():
+    """L'OFFERTA SUL CARRELLO, la FORMA (ago 2026).
+
+    Il giro vero — proposta, contro, rilancio, accetta, pagamento con
+    la bolt11 al sat, e le decadenze una per una — lo cammina
+    `collaudo_offerta_carrello.py`, che ha bisogno di un database.
+    Qui restano le righe che un riordino toglierebbe senza rompere
+    niente di visibile.
+
+    LA PRIMA E' LA LEZIONE DEL CANTIERE, e viene da DUE bug della
+    stessa famiglia in due giorni: `offerte_righe` non ha una colonna
+    `id`. La ronda ci ha chiesto `r.id` (e sul database vero
+    esplodeva, mandando il 🧊 quotidiano), `_accordo_carrello` ci ha
+    fatto `ORDER BY id` (e il pagamento sarebbe esploso). Tutte e due
+    le volte le prove erano verdi, perche' i cartoni davano alla
+    tabella un id che il DDL non ha. Questo censimento e' il tappo:
+    chiunque chieda quella colonna lo sente dalla CI."""
+    print("\n[l'offerta sul carrello: la forma]")
+    src = _SORGENTE
+    # --- 1. LA COLONNA CHE NON C'E'. Si estraggono le colonne dal DDL
+    #        VERO invece di elencarle: il giorno che la tabella ne
+    #        guadagna una, il censimento la impara da solo.
+    i = src.index("CREATE TABLE IF NOT EXISTS offerte_righe(")
+    # il taglio si ancora alla PARENTESI IN COLONNA e non a un «);»
+    # nudo: il commento del DDL nomina `ordine_righe)`, e una fine
+    # ingenua cade li' dentro lasciando fuori tutte le colonne.
+    # (`\n` e non `\r\n`: _SORGENTE si legge in modalita' TESTO, che
+    # traduce i fine-riga — server.py sul disco e' CRLF.)
+    ddl = src[i:src.index("\n    );", i)]
+    colonne = re.findall(r"^\s{8}(\w+) ", ddl, re.M)
+    prova("il DDL di offerte_righe si legge, e non ha «id»",
+          (True, False),
+          ("annuncio_id" in colonne, "id" in colonne))
+    # ...e nessuna query gliela chiede. Si guarda il CODICE (le
+    # docstring nominano `id` per dire che NON c'e': una prova che
+    # legge la prosa diventerebbe rossa per colpa di una spiegazione).
+    nudo = codice(src)
+    for quale, forma in (
+            ("l'ORDER BY della lettura",
+             "offerte_righe WHERE offerta_id=? ORDER BY id"),
+            ("il r.id della ronda", "SELECT r.id FROM offerte_righe"),
+            ("un SELECT id secco", "SELECT id FROM offerte_righe"),
+            ("un ordinamento nudo", "offerte_righe ORDER BY id")):
+        prova(f"nessuno chiede quella colonna: {quale}", 0,
+              nudo.count(forma))
+    # l'ordine delle figlie e' il ROWID, cioe' quello della proposta
+    prova("le figlie si leggono per rowid", True,
+          "FROM offerte_righe WHERE offerta_id=? ORDER BY rowid" in nudo)
+    # e la ronda cerca l'offerta MANCANTE, non la riga: e' quella il
+    # dato che serve a chi legge il 🧊
+    prova("la ronda pesca l'offerta orfana per offerta_id", True,
+          "SELECT DISTINCT r.offerta_id FROM offerte_righe r" in nudo)
+
+    # --- 2. IL CENSIMENTO DEI JOIN: la testata ha annuncio_id=0,
+    #        quindi ogni INNER JOIN su annunci la fa sparire in
+    #        silenzio — ed e' la trappola principale del cantiere.
+    # OGNI ANCORA E' LA QUERY DI QUELLA FUNZIONE, mai la parola «LEFT
+    # JOIN annunci» nuda: le fette di pezzo() qui sono larghe (quella
+    # di rispondi_offerta arriva a 19.000 caratteri e si porta dentro
+    # le vicine), quindi la parola generica la troverebbe COMUNQUE
+    # anche col JOIN mutato — una sentinella che non puo' fallire.
+    # L'ha detto la tortura, non la rilettura.
+    for fn, query in (
+            ("mie_offerte",
+             '"LEFT JOIN annunci a ON a.id = o.annuncio_id "\n'
+             '        "LEFT JOIN utenti uc'),
+            ("rispondi_offerta",
+             '"FROM offerte o LEFT JOIN annunci a ON a.id = o.annuncio_id "'),
+            ("ritira_offerta",
+             '"SELECT o.*, a.titolo FROM offerte o "'),
+            ("_impegni_aperti",
+             '"LEFT JOIN annunci a ON a.id = o.annuncio_id "\n'
+             '            "WHERE o.venditore_id=? AND o.stato=\'accettata\' "')):
+        prova(f"{fn}: il JOIN su annunci e' LEFT", 1, src.count(query))
+    # ritira_offerta: la sua query si riconosce dal SELECT, e il LEFT
+    # e' la riga dopo — si guardano insieme o l'ancora non dice niente
+    i_rit = src.index("async def ritira_offerta(")
+    prova("...e in ritira_offerta il LEFT segue quel SELECT", True,
+          "LEFT JOIN annunci a ON a.id = o.annuncio_id" in
+          src[i_rit:i_rit + 2600])      # la docstring e' lunga 2.143
+    # scadenze_offerte NON diventa un LEFT: ha una query SUA per i
+    # carrelli, perche' la condizione di morte e' un'altra («esiste
+    # una figlia il cui annuncio non e' piu' attivo») e l'EXISTS
+    # negato copre anche l'annuncio CANCELLATO, che un a.stato non
+    # vedrebbe. La query di sempre resta byte-identica.
+    prova("scadenze_offerte tiene la sua query di sempre", 1,
+          src.count('"FROM offerte o JOIN annunci a ON a.id = '
+                    'o.annuncio_id "'))
+    prova("...e una SECONDA per i carrelli, con l'EXISTS negato", 1,
+          src.count('"SELECT o.*, EXISTS(SELECT 1 FROM offerte_righe '
+                    'r WHERE "'))
+
+    # --- 3. L'ESCLUSIONE RECIPROCA, nei DUE versi. Una sola meta'
+    #        lascerebbe due trattative sullo stesso pezzo — e al
+    #        pagamento due accordi sulla stessa merce.
+    prova("verso singolo→carrello: fai_offerta guarda le figlie", True,
+          "JOIN offerte_righe r ON r.offerta_id=o.id"
+          in codice(pezzo("fai_offerta", "\n\n\n@app")))
+    prova("verso carrello→singolo: il gemello guarda le offerte",
+          True, "o.annuncio_id IN ({seg})"
+          in codice(pezzo("fai_offerta_carrello", "\n\n\n@app")))
+
+    # --- 4. La colonna TESTIMONE, il patto di sconto_sats: a comandare
+    #        e' `prezzo_sats`, che nasce gia' scontato. Chi leggesse
+    #        `accordo_sats` per RIALZARE un'uscita farebbe uscire
+    #        dall'escrow di ALTRI ordini la differenza, e la cintura di
+    #        paga_venditore non lo vedrebbe (per lei i conti
+    #        tornerebbero).
+    for fn in ("_sblocca_sats", "_rimborsa_compratore",
+               "deposita_invoice"):
+        prova(f"{fn}: cieco ad accordo_sats", False,
+              "accordo_sats" in codice(pezzo(fn)))
+    # ...e la sottrazione vive in UN posto solo, dove vive quella
+    # dello sconto: due sottrazioni sono un accordo applicato due volte
+    prova("la sottrazione dell'accordo sta nel conto, e li' soltanto",
+          True, "netto = max(0, articolo - max(0, sconto) - "
+                "max(0, accordo))" in codice(pezzo("_conto_ordine")))
+
+
+# ====================================================================
 def prove_sat_non_e_barattolo():
     """«SAT» E' LA MONETA, NON UN NOSTRO MARCHIO (ago 2026, falso
     positivo VERO dal campo: «Sat's Oil 🫒 GENESIS EDITION» bloccato
@@ -32938,6 +33058,7 @@ def main():
               prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
+              prove_offerta_carrello,
               prove_ritiro_offerta, prove_link_offerte,
               prove_deep_link_offerta, prove_rilancio_offerta,
               prove_fogli_di_casa,

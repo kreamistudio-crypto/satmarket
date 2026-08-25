@@ -19180,7 +19180,10 @@ def _accordo_carrello(con, user_id: int, off_id: int, scrivi: bool):
                                      "questa offerta: pagala, oppure "
                                      "annulla quell'ordine e riprova")
     figlie = con.execute(
-        "SELECT * FROM offerte_righe WHERE offerta_id=? ORDER BY id",
+        # rowid e MAI «id»: offerte_righe non ha quella colonna (il
+        # gemello del bug della ronda, preso dal collaudo eseguibile) —
+        # il rowid e' l'ordine d'inserimento, cioe' quello della proposta
+        "SELECT * FROM offerte_righe WHERE offerta_id=? ORDER BY rowid",
         (off_id,)).fetchall()
     if len(figlie) < 2:
         # non dovrebbe esistere: la testata nasce con >=2 figlie nella
