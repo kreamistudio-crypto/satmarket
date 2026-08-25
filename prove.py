@@ -5043,11 +5043,13 @@ def prove_nota_compratore():
     prova("client: ...ed e' montato nello scheletro, dopo le vie", True,
           "${vie}${note}${cassettoNota}" in mini)
     # ROVESCIATA (ago 2026, la nota per categoria): il default non e'
-    # piu' un false secco — lo decide notaApertaDefault, e i DUE
+    # piu' un false secco — lo decide notaApertaDefault, e i
     # costruttori devono passare dallo STESSO giudice, o mono e set
-    # aprirebbero il campo con due regole diverse.
-    prova("client: le due chiavi nascono nei DUE costruttori, dal giudice",
-          2, mini.count("notaAperta: notaApertaDefault("))
+    # aprirebbero il campo con due regole diverse. Il TERZO e' la
+    # cassa in modalita' accordo (pagaOffertaCarrello, ago 2026):
+    # anche li' un capo d'abbigliamento apre la nota da se'.
+    prova("client: le chiavi nascono nei TRE costruttori, dal giudice",
+          3, mini.count("notaAperta: notaApertaDefault("))
     prova("client: ...e il vecchio default secco non esiste piu'", 0,
           mini.count("notaAperta:false"))
     # IL DEFAULT APERTO NON ALZA LA TASTIERA: il focus sul campo nota
@@ -12547,8 +12549,11 @@ def prove_punti_salvati():
           fetta("function renderAcquisto(){").count("precompilaPunto("))
     # ...e la contro-prova che la fetta VEDE davvero: senza, uno zero
     # qui sopra sembrerebbe una promozione invece che una cecita'.
+    # il tetto e' salito con la modalita' accordo (ago 2026, ~45,5k):
+    # resta una cintura contro una fetta che ingoia il file, non una
+    # misura fine
     prova("(e la fetta del render e' quella giusta)", True,
-          0 < len(fetta("function renderAcquisto(){")) < 45000
+          0 < len(fetta("function renderAcquisto(){")) < 55000
           and "cassettoPunto" in fetta("function renderAcquisto(){"))
     prova("precompilaPunto ha UN chiamante solo", 1,
           mini.count("precompilaPunto(")
@@ -12876,8 +12881,10 @@ def prove_pagina_acquisto():
           "📍 Indica il punto di ritiro" in mini3)
     prova("...e anche la riga compatta ha perso il 📍", False,
           '>📍 <span class="punto-testo">' in mini3)
-    prova("...lo stato del cassetto nasce in acqDati (due costruttori)",
-          2, mini3.count("punto:'', puntoAperto:false"))
+    # il terzo costruttore e' la cassa in modalita' accordo
+    # (pagaOffertaCarrello, ago 2026)
+    prova("...lo stato del cassetto nasce in acqDati (tre costruttori)",
+          3, mini3.count("punto:'', puntoAperto:false"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
           True, 'value="${esc(d.punto)}"' in mini3)
     # dal cantiere delle reti la riga compatta porta anche il nome del
@@ -13506,16 +13513,26 @@ def prove_pagina_acquisto():
     _rac = pezzo_js(mini3, "function renderAcquisto(){", "\n}")
     prova("i secondari sono del solo carrello", True,
           "const secondari = d.tipo==='set'" in _rac)
-    prova("...e ci sono tutti e due", True,
+    #    CAMBIO DI LATO (ago 2026, l'offerta sul carrello): il bottone
+    #    non porta piu' al coming soon — apre il foglio VERO — e sotto
+    #    accordo non nasce affatto (la trattativa e' gia' chiusa, e il
+    #    server rifiuterebbe: una viva per coppia).
+    prova("...e ci sono tutti e due (l'offerta apre il foglio vero)", True,
           'onclick="ctrlChiediInfo()"' in _rac
-          and "onclick=\"go('offertapresto')\"" in _rac)
+          and 'onclick="apriOffertaCarrello()"' in _rac
+          and "go('offertapresto')" not in _rac)
+    prova("...ma niente offerta SU un accordo", True,
+          "d.accordoId ? '' : `<button" in _rac)
     #    IL BOTTONE CHE RIPORTA AL CARRELLO: solo sul carrello, e solo
     #    con un invito APERTO — sotto un «✅ Sconto −10%» sarebbe un
     #    invito a fare una cosa che non serve (decisione di Andrea).
-    prova("il «torna al carrello» e' del solo carrello, e solo con un"
-          " invito aperto", True,
-          "const tornaCarrello = (d.tipo==='set'"
-          " && pillole.includes('pill-barra'))" in _rac)
+    #    ...e MAI in modalita' accordo (ago 2026): li' la composizione
+    #    e' pinnata — sono le righe pattuite — e un invito ad
+    #    aggiungere sarebbe un invito a rompere l'accordo.
+    prova("il «torna al carrello» e' del solo carrello, con un invito"
+          " aperto e mai sotto accordo", True,
+          "const tornaCarrello = (d.tipo==='set' && !d.accordoId" in _rac
+          and "&& pillole.includes('pill-barra'))" in _rac)
     prova("...e sul singolo non nasce mai", 1,
           _rac.count("tornaCarrello = "))
     #    IL ⚡ RESTA DEL SOLO SINGOLO: il set paga dal paySheet (il suo
@@ -14894,8 +14911,13 @@ def prove_classifica():
     # Profilo e' morto: le sue prove stanno in prove_barattolo_in_striscia)
     prova("la porta si accende solo a leva accesa", True,
           "myClassifica && !DEMO && !VETRINA" in html)
+    # «offertapresto» e' uscita dall'elenco con la sua vista (ago 2026,
+    # l'offerta sul carrello): le entry vecchie degradano in
+    # navRendiVista, come quelle di 'sfoglia'
     prova("la vista e' interna (l'indietro riporta a Esplora)", True,
-          "'acquisto','offertapresto','classifica'" in html)
+          "'acquisto','classifica'" in html)
+    prova("...e il coming soon dell'offerta degrada su Esplora", True,
+          "if (b.v === 'offertapresto') return go('esplora');" in html)
     prova("...e NON e' una radice", True,
           "'classifica'" not in html[html.index("const RADICI"):
                                      html.index("const RADICI") + 260])
@@ -24666,9 +24688,10 @@ def prove_prezzo_accordo():
     _lo = pezzo_js(mini, "async function loadOfferte(){", "\n}")
     prova("la prossima scadenza si rifa' a ogni lettura", True,
           "ricalcolaProssimoAccordo();" in _lo)
-    # il predicato vive in un posto solo: loadOfferte ha CINQUE
-    # chiamanti (avvio, ingresso negli Ordini, invio, risposta, ritiro)
-    prova("il rinfresco ha un posto solo e cinque chiamanti", (1, 5),
+    # il predicato vive in un posto solo: loadOfferte ha SEI
+    # chiamanti (avvio, ingresso negli Ordini, invio, risposta,
+    # ritiro, e dall'ago 2026 l'invio dell'offerta sul CARRELLO)
+    prova("il rinfresco ha un posto solo e sei chiamanti", (1, 6),
           (mini.count("function rinfrescaAccordi("),
            mini.count("rinfrescaAccordi();")))
     # ...E SI ACCENDE ANCHE QUANDO L'ACCORDO SPARISCE. E' un difetto

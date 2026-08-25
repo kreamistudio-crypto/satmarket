@@ -4560,25 +4560,11 @@ document.getElementById('cartello')?.remove();</script>
     <div class="ctrl-corpo" id="acqCorpo"></div>
   </div>
 
-  <!-- ============ VISTA: L'OFFERTA SUL PACCO, PRESTO (ago 2026) ====
-       «Fai un'offerta» dalla cassa porta qui: l'offerta sull'intero
-       set e' un cantiere futuro, e una pagina che lo dice e' piu'
-       onesta di un bottone che non c'e'. Lo stile e' quello del
-       coming soon delle aste: markup fisso, nessun dato utente,
-       .empty con la mascotte — chiaro e scuro gratis. Vista interna
-       (non radice): l'indietro riporta alla cassa, e il bottone dice
-       «Torna indietro» invece di nominare il carrello — da qui si
-       torna al conto, non alla composizione. -->
-  <div class="view" id="view-offertapresto">
-    <div class="empty" style="padding-top:34px">
-      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
-      <div class="big">💰</div>
-      <b class="empty-title">L'offerta sul carrello sta arrivando</b>
-      <span>Presto potrai proporre il tuo prezzo per l'intero carrello.<br>
-        Sui singoli oggetti puoi già farlo, dalla loro scheda.</span>
-      <button class="btn orange" onclick="navIndietro()">← Torna indietro</button>
-    </div>
-  </div>
+  <!-- (La vista «offertapresto» — il coming soon dell'offerta sul
+       carrello — e' morta col cantiere che l'ha accesa, ago 2026: il
+       bottone della cassa apre il foglio vero. Le entry gia' scritte
+       nella cronologia di qualcuno degradano su Esplora, il ramo vive
+       in navRendiVista accanto a quello di 'sfoglia'.) -->
 
   <!-- ============ VISTA: IL PAGAMENTO PROTETTO ============ -->
   <!-- La pagina lunga del deposito di garanzia: ci si arriva dal
@@ -5777,6 +5763,35 @@ document.getElementById('cartello')?.remove();</script>
     <div id="offMinimo" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div>
     <div id="offRiga" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
+  </div>
+
+  <!-- ============ SHEET OFFERTA SUL CARRELLO (ago 2026) ============ -->
+  <!-- Il gemello SEMPLIFICATO di #offertaSheet: UNA cifra sul TOTALE
+       del carrello. NIENTE toggle €/₿ e niente ancora, deliberato:
+       la cifra si scrive nella valuta dell'OFFERTA — 'eur' solo se
+       TUTTE le righe sono a listino EUR, altrimenti 'sats' (la regola
+       del server) — che e' UNA e non cambia mai col foglio aperto,
+       quindi non esiste nessuna conversione da ancorare. Le pillole
+       RIEMPIONO il campo (il patto del gemello), il minimo e' sulla
+       SOMMA dei listini, la riga viva dice quel che parte. -->
+  <div class="sheet" id="offertaCarrelloSheet" role="dialog" aria-modal="true"
+       aria-labelledby="offCarrTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="offCarrTitolo">💰 Offri per tutto il carrello</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <!-- «N articoli · listino Σ»: la scrive il render -->
+    <div id="offCarrTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div class="consegna-scelta" id="offCarrChips" style="margin:0 0 10px"></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="offCarrImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offCarrDigitata()">
+      <span id="offCarrSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
+    </div>
+    <div id="offCarrMinimo" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div>
+    <div id="offCarrRiga" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaOffertaCarrello(this)">💰 Offri</button>
   </div>
 
   <!-- ============ SHEET PUNTATA D'ASTA (ago 2026) ============ -->
@@ -7159,7 +7174,7 @@ function voceNav(view){
      entry vecchie della cronologia non arrivano qui — le degrada
      navRendiVista prima di rendere qualunque cosa. */
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
-       'acquisto','offertapresto','classifica'].includes(view)) view = 'esplora';
+       'acquisto','classifica'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -7609,6 +7624,10 @@ function navRendiVista(b){
      Ricade sulla home — degradazione, non errore, il patto delle
      entry 'sfoglia|Casa e giardino' qui sopra. */
   if (b.v === 'sfoglia') return go('esplora');
+  /* ...e nemmeno «offertapresto» (ago 2026): il coming soon
+     dell'offerta sul carrello e' morto col foglio vero, ma una entry
+     gia' scritta puo' ancora nominarlo — stessa degradazione. */
+  if (b.v === 'offertapresto') return go('esplora');
   go(b.v);
 }
 
@@ -10669,13 +10688,14 @@ function contoScomposto(c){
      mai un `1` muto), e il censimento delle chiamate in prove.py
      resta la rete su percentuale e origine. */
   const {art, sped, prot, tot, qta, sconto, suppl, pezziSped,
-         scontoPct, scontoOrigine} = c;
+         scontoPct, scontoOrigine, accordo} = c;
   const pezzi = qta || 1;
   /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
      riga «Articolo × N»: in un carrello l'articolo non ha un numero
      solo, mentre i pezzi spediti sono la loro somma */
   const nSped = pezziSped || pezzi;
-  if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0)) return '';
+  if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0 || accordo > 0))
+    return '';
   const r = (n, t, b, meno) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${meno?'−':''}${fmt(n)} sats</span></div>`;
   return r(art, pezzi > 1 ? `Articolo × ${fmt(pezzi)}` : 'Articolo')
        /* lo sconto del negozio: e' l'ultimo schermo prima che i sats
@@ -10694,6 +10714,9 @@ function contoScomposto(c){
            ? r(sconto, `Sconto${scontoOrigine==='codice' ? ' codice' : ''}${scontoPct
                ? ` <span class="sconto-tag">−${scontoPct}%</span>` : ''}`,
                0, 1) : '')
+       /* l'accordo sul carrello: la riga gemella dello sconto (e a
+          zero non c'e' — il pattuito puo' essere gia' il lordo) */
+       + (accordo>0 ? r(accordo, '🤝 Accordo', 0, 1) : '')
        /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
           l'ha appena mostrata, e una riga che compare e sparisce
           sullo stesso schermo si legge come «il prezzo e' cambiato»
@@ -11791,6 +11814,15 @@ function contoRighe(c){
     + (c.sconto>0
         ? r(`Sconto${c.scontoOrigine==='codice' ? ' codice' : ''}${c.scontoPct ? ` <span class="sconto-tag">−${c.scontoPct}%</span>` : ''}`,
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
+    /* L'ACCORDO SUL CARRELLO (ago 2026), il calco della riga sconto:
+       la differenza fra il lordo corrente e il totale pattuito — puo'
+       essere ZERO anche con un accordo vivo (una lampo o un listino
+       calato sotto il pattuito: chi paga paga sempre il meglio dei
+       due), e a zero la riga non c'e': non si e' sottratto niente. La
+       cifra arriva POSITIVA dal server, il meno lo mette il giudice. */
+    + (c.accordo>0
+        ? r('🤝 Accordo', cifraCtrl(c.accordo, c.circa, c.accordoEur, 1),
+            'sconto') : '')
     /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
        «Commissione Barattolo» questa riga TRONCAVA a 320px —
        l'etichetta ne chiedeva 148 e ne aveva 135, e si leggeva
@@ -12132,8 +12164,15 @@ function viaDefault(vive){
 async function caricaPreventivo(){
   const d0 = acqDati; if (!d0) return;
   const body = d0.tipo==='set'
+    /* In modalita' accordo le offerte per riga si azzerano APPOSTA:
+       il server rifiuta la coesistenza (o l'accordo sul carrello o
+       le singole), e l'esclusione reciproca rende quel caso
+       impossibile solo per le offerte VIVE — una scaduta in cache lo
+       riaprirebbe. L'id dell'accordo viaggia in testata. */
     ? {righe: [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-        quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}))}
+        quantita:qta, offerta_id: d0.accordoId ? 0
+          : (offertaAccettataPer(id, true)?.id || 0)})),
+       ...(d0.accordoId ? {offerta_carrello_id: d0.accordoId} : {})}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
   /* IL CODICE SCONTO anche qui, ed e' il varco che conta: senza,
@@ -12158,8 +12197,14 @@ async function caricaPreventivo(){
     acqDati.preventivo = d;
     /* la firma segue il conto: dopo una potatura (rinfrescaSet) la
        composizione e' cambiata, e senza questa riga il rientro dal
-       carrello rifarebbe un fetch che non serve */
-    if (d0.tipo === 'set') acqDati.firma = firmaSet();
+       carrello rifarebbe un fetch che non serve.
+       IL PREFISSO DELL'ACCORDO SI CONSERVA: senza, la cassa normale
+       aperta poi sulla stessa composizione troverebbe la firma
+       uguale e riuserebbe dalla cache un conto CON l'accordo dentro
+       — un prezzo pattuito servito a chi non ha pattuito niente. */
+    if (d0.tipo === 'set')
+      acqDati.firma = (d0.accordoId ? 'acc' + d0.accordoId + '|' : '')
+        + firmaSet();
     /* il default lo dice viaDefault (spedizione prima, vedi sopra) —
        ma una via GIA' SCELTA si conserva se e' ancora viva (12 ago
        2026, con lo stepper): un ± non deve riportare chi aveva
@@ -12935,7 +12980,11 @@ function renderAcquisto(){
      sparire col testo dentro — es. il flag che cambia fra due
      preventivi mentre il campo porta un rifiutato da correggere. */
   const cassettoCodice =
-    (p.codici_esistono !== false || codScritto)
+    /* SOTTO ACCORDO NIENTE CODICE (ago 2026): il totale pattuito E' il
+       prezzo degli articoli, deciso a mano guardando QUESTO carrello —
+       il server risponde 400 a un codice nel body, e un cassetto che
+       porta a un 400 e' peggio di un cassetto che non c'e'. */
+    (!d.accordoId && (p.codici_esistono !== false || codScritto))
     ? `<div class="cassetto-cassa ${d.codiceAperto?'field':''}" id="acqCodiceCampo">
     ${d.codiceAperto ? codCampo : codChiuso}
   </div>`
@@ -13197,6 +13246,10 @@ function renderAcquisto(){
                                articolo, che direbbe 9,99%) */
                             scontoPct: p.sconto_percento||0,
                             scontoOrigine: p.sconto_origine||'',
+                            /* l'accordo sul carrello: la riga gemella
+                               dello sconto, cifre del server */
+                            accordo: p.accordo_sats||0,
+                            accordoEur: p.accordo_eur||0,
                             /* qui la via e' SCELTA, quindi il giudizio
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
@@ -13216,7 +13269,11 @@ function renderAcquisto(){
      La strada resta comunque: la ← in testata riporta al carrello.
      Da qui gli articoli NON si aggiungono — sono troppi e comporre in
      una cassa sarebbe confuso, e lo stepper vive nel carrello. */
-  const tornaCarrello = (d.tipo==='set' && pillole.includes('pill-barra'))
+  /* ...e MAI in modalita' accordo (ago 2026): li' la composizione e'
+     PINNATA — sono le righe pattuite, fotografate — e un invito ad
+     aggiungere sarebbe un invito a rompere l'accordo. */
+  const tornaCarrello = (d.tipo==='set' && !d.accordoId
+                         && pillole.includes('pill-barra'))
     ? `<button type="button" class="btn ghost torna-carrello" onclick="navIndietro()">← Aggiungi altro nel carrello</button>`
     : '';
   /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
@@ -13228,7 +13285,10 @@ function renderAcquisto(){
   const secondari = d.tipo==='set'
     ? `<div class="ctrl-secondari">
          <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
-         <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+         ${/* niente offerta SU un accordo: la trattativa e' gia'
+               chiusa, e il server rifiuterebbe comunque (una viva
+               per coppia) */''}
+         ${d.accordoId ? '' : `<button type="button" class="btn ghost" onclick="apriOffertaCarrello()">Fai un'offerta</button>`}
        </div>` : '';
   /* il «da» della corsa morbida si cattura PRIMA che l'innerHTML
      porti via i nodi — la meccanica intera (clientWidth, il computed
@@ -14509,8 +14569,14 @@ async function startBuySet(){
   pagamentoCorrente = null;
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
+  /* in modalita' accordo le offerte per riga si azzerano e l'id
+     dell'accordo viaggia in testata: il patto di caricaPreventivo —
+     i due body devono dire la stessa cosa, o pagina e invoice
+     divergono */
+  const accId = acqDati?.accordoId || 0;
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-    quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}));
+    quantita:qta, offerta_id: accId ? 0
+      : (offertaAccettataPer(id, true)?.id || 0)}));
   /* le cifre del foglio dal PREVENTIVO della pagina d'acquisto
      (stessi numeri per costruzione), con la stima client di ripiego */
   const p = acqDati?.preventivo;
@@ -14529,6 +14595,7 @@ async function startBuySet(){
   el('payAmount').textContent = circaS + fmt(c.tot);
   el('payScomposto').innerHTML = contoScomposto({art: c.art, sped: c.sped,
     prot: c.prot, tot: c.tot, qta: 1, sconto: c.sconto||0,
+    accordo: (p && p.accordo_sats)||0,
     suppl: (via && via.supplemento_sats)||0,
     pezziSped: (via && via.pezzi)||0,
     scontoPct: (p && p.sconto_percento)||0,
@@ -14539,11 +14606,14 @@ async function startBuySet(){
   aggiornaPayHint();
   el('payInvoice').textContent = 'creazione invoice…';
   mostraQr('');
+  /* sotto accordo il codice sconto non parte: il server lo rifiuta
+     (e il cassetto in cassa non nasce proprio) */
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({righe, ...corpoConsegna(),
-                          ...corpoCodiceSconto()})});
+                          ...(accId ? {offerta_carrello_id: accId}
+                                    : corpoCodiceSconto())})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) {
     toast(d.detail || 'Errore nella creazione dell\'ordine', 6000);
@@ -14561,7 +14631,8 @@ async function startBuySet(){
     art: d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
     sped: d.spedizione_sats||0, prot: d.protezione_sats||0,
     tot: d.prezzo_sats, qta: 1,
-    sconto: d.sconto_sats||0, suppl: d.supplemento_sats||0,
+    sconto: d.sconto_sats||0, accordo: d.accordo_sats||0,
+    suppl: d.supplemento_sats||0,
     pezziSped: d.pezzi||0,
     scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
@@ -16013,6 +16084,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
@@ -16691,6 +16763,222 @@ async function inviaOfferta(btn){
   finally { ripristina(); }
 }
 
+/* ---------------- l'offerta sul CARRELLO (ago 2026) ----------------
+   Il gemello SEMPLIFICATO dell'offerta singola: UNA cifra sul TOTALE
+   del carrello in composizione. NIENTE ancora e niente toggle,
+   deliberato: la valuta dell'offerta e' UNA — 'eur' solo se TUTTE le
+   righe sono a listino EUR, altrimenti 'sats' (la regola del server)
+   — e non cambia mai col foglio aperto, quindi non esiste nessuna
+   conversione da ancorare. Lo stato e' SUO (offCarr), mai
+   offCifra/qtaScelta del singolo: due fogli che scrivono nelle stesse
+   variabili sono due fogli che un giorno si pestano. */
+let offCarr = null;   // {valuta, listinoSats, listinoEur, n, pezzi}
+function apriOffertaCarrello(){
+  haptic();
+  if (VETRINA) {
+    invitoTelegram('Per fare un\'offerta serve l\'app vera dentro Telegram: '
+      + 'è lì che il venditore ti risponde.');
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const righe = [...setScelte].map(([id, q]) =>
+    ({l: listings.find(t=>t.id===id), q})).filter(r=>r.l);
+  if (righe.length < 2)
+    { toast('L\'offerta sul carrello vuole almeno due oggetti diversi'); return; }
+  /* in ferie non si tratta, la regola di apriOfferta — e il carrello
+     e' di UN venditore, quindi basta guardarne una */
+  const pausa = righe.find(r=>inFerie(r.l));
+  if (pausa) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(pausa.l.ferie)}`, 5000);
+    return;
+  }
+  /* La valuta e la SOMMA DEI LISTINI, le regole del server: nel misto
+     le righe EUR si convertono col cambio vivo (satsAnnuncio, che
+     senza cambio ripiega sull'equivalente di pubblicazione) — qui e'
+     una cifra per gli occhi, il giudice resta il server. */
+  const tuttoEur = righe.every(r=>r.l.valuta==='eur' && r.l.priceEur>0);
+  let lstS = 0, lstE = 0;
+  for (const {l, q} of righe){
+    lstS += satsAnnuncio(l) * q;
+    if (tuttoEur) lstE = Math.round((lstE + l.priceEur*q)*100)/100;
+  }
+  offCarr = {valuta: tuttoEur ? 'eur' : 'sats',
+             listinoSats: lstS, listinoEur: lstE,
+             n: righe.length, pezzi: pezziSet()};
+  el('offCarrTestata').innerHTML = `
+    <span style="font-size:28px">🛒</span>
+    <div style="min-width:0;flex:1">
+      <b style="display:block">${fmt(offCarr.n)} articoli${offCarr.pezzi>offCarr.n ? ` · ${fmt(offCarr.pezzi)} pezzi` : ''}</b>
+      <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${cifraOff(offCarr.valuta, lstS, lstE)}</span>
+    </div>`;
+  /* le pillole RIEMPIONO il campo, il patto del gemello */
+  el('offCarrChips').innerHTML =
+    [10,20].map(p => `<button class="consegna-pill" data-p="${p}" onclick="offCarrChip('${p}')">−${p}%</button>`).join('')
+    + `<button class="consegna-pill" data-p="libero" onclick="offCarrChip('libero')">Personalizzato</button>`;
+  const campo = el('offCarrImporto');
+  campo.value = '';
+  campo.inputMode = offCarr.valuta==='eur' ? 'decimal' : 'numeric';
+  campo.placeholder = offCarr.valuta==='eur'
+    ? fmtEur(offCarrSconto(15)) : fmt(offCarrSconto(15));
+  el('offCarrSuffisso').textContent = offCarr.valuta==='eur' ? '€' : 'sats';
+  offCarrDigitata();
+  el('sheetBg').classList.add('open');
+  el('offertaCarrelloSheet').classList.add('open');
+}
+/* la somma dei listini meno p%: EUR a 2 decimali, sats interi */
+function offCarrSconto(p){
+  return offCarr.valuta==='eur'
+    ? Math.round(offCarr.listinoEur*(100-p))/100
+    : Math.round(offCarr.listinoSats*(100-p)/100);
+}
+/* la cifra nel campo, letta nella valuta dell'offerta */
+function offCarrLetta(){
+  const grezzo = String(el('offCarrImporto').value||'').trim();
+  return offCarr.valuta==='eur'
+    ? (parseFloat(grezzo.replace(',','.'))||0)
+    : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+}
+/* il minimo sulla SOMMA dei listini, le formule del server (sui sats
+   per ECCESSO: il client non deve dire «va bene» a una cifra che di
+   la' viene rifiutata) */
+function offCarrMinimo(){
+  return offCarr.valuta==='eur'
+    ? Math.round(offCarr.listinoEur*offertaMinPercento)/100
+    : Math.floor((offCarr.listinoSats*offertaMinPercento+99)/100);
+}
+function offCarrChip(scelta){
+  haptic();
+  if (!offCarr) return;
+  const campo = el('offCarrImporto');
+  if (scelta !== 'libero') {
+    const v = offCarrSconto(Number(scelta));
+    campo.value = offCarr.valuta==='eur'
+      ? String(v.toFixed(2)).replace('.', ',') : String(v);
+    offCarrDigitata();
+    return;   /* il campo RESTA li', pronto a essere ritoccato */
+  }
+  campo.focus({preventScroll:true});
+  try { campo.select(); } catch(e) {}
+  offCarrDigitata();
+}
+function offCarrDigitata(){
+  if (!offCarr) return;
+  const v = offCarrLetta();
+  /* la pillola accesa si DEDUCE dalla cifra, il patto del gemello */
+  document.querySelectorAll('#offCarrChips .consegna-pill').forEach(b => {
+    const p = b.dataset.p;
+    const tol = offCarr.valuta==='eur' ? 0.005 : 0.5;
+    const suo = x => Math.abs(v - offCarrSconto(x)) < tol;
+    b.classList.toggle('attiva', v > 0 && (p === 'libero'
+      ? !(suo(10) || suo(20)) : suo(Number(p))));
+  });
+  const min = offCarrMinimo();
+  const sotto = offertaMinPercento > 0 && v > 0 && v < min;
+  el('offCarrMinimo').style.display = sotto ? '' : 'none';
+  if (sotto)
+    el('offCarrMinimo').innerHTML = `Troppo bassa: il minimo è `
+      + `${cifraOff(offCarr.valuta, min, min)} `
+      + `(${offertaMinPercento}% della somma dei listini)`;
+  /* sotto il minimo niente riga, il patto del gemello */
+  const riga = el('offCarrRiga');
+  if (v<=0 || sotto) { riga.textContent = ''; return; }
+  riga.innerHTML = `Offri <b class="mono">${cifraOff(offCarr.valuta, v, v)}</b>`
+    + ` in tutto per ${fmt(offCarr.n)} articoli`;
+}
+async function inviaOffertaCarrello(btn){
+  haptic();
+  if (!offCarr) return;
+  const v = offCarrLetta();
+  if (!(v > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const importo = offCarr.valuta==='eur'
+    ? String(v.toFixed(2)).replace('.', ',') : String(v);
+  /* le righe della composizione: quantita' e basta — le fotografie
+     (unitari, titoli) le fa il server, che e' l'unico a saperle vere */
+  const righe = [...setScelte].map(([id, qta]) =>
+    ({annuncio_id:id, quantita:qta}));
+  const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
+  try {
+    const r = await fetch(`${API_BASE}/offerte/carrello`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({righe, importo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
+    closeSheet();
+    toast('💰 Offerta inviata! Ti avvisiamo appena il venditore risponde', 5000);
+    loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+      .catch(()=>{});
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+/* Il titolo sintetico di una testata carrello: primo pezzo +N (il
+   pattern di _titolo_ordine, gemello di _titolo_offerta_carrello sul
+   server). I titoli sono FOTOGRAFATI alla proposta: un annuncio
+   sparito non ammutolisce la trattativa. */
+function titoloCarrello(o){
+  const r = o.righe||[];
+  if (!r.length) return 'Offerta sul carrello';
+  const base = r[0].titolo || '?';
+  return r.length>1 ? `${base} +${r.length-1}` : base;
+}
+/* ...e la somma dei listini FOTOGRAFATI, per la riga «listino» della
+   lista: alla risposta il server giudica sul corrente, questa e' la
+   fotografia che il compratore ha visto proponendo */
+function listinoCarrello(o){
+  let s = 0, e = 0;
+  for (const f of (o.righe||[])){
+    s += (f.unitario_sats||0) * (f.quantita||1);
+    e = Math.round((e + (f.unitario_eur||0) * (f.quantita||1))*100)/100;
+  }
+  return {sats:s, eur:e};
+}
+/* «Paga ora» sull'accordo di carrello: MAI pagaOfferta, che aprirebbe
+   il dettaglio dell'annuncio 0. Si ricostruisce la composizione dalle
+   figlie fotografate — le quantita' dell'accordo COMANDANO, e il
+   server le riscrive comunque dalle sue — e si apre la cassa in
+   modalita' accordo: composizione pinnata, il conto lo fa il server
+   con offerta_carrello_id. */
+async function pagaOffertaCarrello(id){
+  haptic();
+  const o = offerteMie.find(x=>x.id===id);
+  const righe = (o && o.righe) || [];
+  if (!righe.length) { toast('Offerta non trovata'); return; }
+  /* le card servono alla cassa (striscia, ferie, nota): chi manca dal
+     catalogo si va a prendere, il pattern di pagaOfferta */
+  for (const f of righe){
+    if (!listings.find(x=>x.id===f.annuncio_id)) {
+      try {
+        const r = await fetch(`${API_BASE}/listings/${f.annuncio_id}`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (r.ok) inCatalogo([mapListing(await r.json())]);
+      } catch(e) {}
+    }
+  }
+  setScelte = new Map(righe.map(f=>[f.annuncio_id,
+                                    Math.max(1, f.quantita||1)]));
+  const primo = listings.find(x=>x.id===righe[0].annuncio_id);
+  if (primo) {
+    currentListing = primo;
+    paccoDati = {sellerId: primo.sellerId, origineId: primo.id};
+  }
+  acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
+             accordoId:o.id,
+             /* la firma INCLUDE l'accordo, o la cassa normale aperta
+                poi sulla stessa composizione riuserebbe dalla cache
+                un conto col pattuito dentro (e viceversa) */
+             firma:'acc'+o.id+'|'+firmaSet(),
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             tipoPunto:'', puntoToccato:false, precompilato:false,
+             indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             nota:'', notaAperta: notaApertaDefault(righe.map(f =>
+               (listings.find(t=>t.id===f.annuncio_id)||{}).cat)),
+             codice:'', codiceAperto:false,
+             errore:''};
+  go('acquisto');
+  renderAcquisto();
+  caricaPreventivo();
+}
+
 /* ---------------- offerta lampo: il foglio del venditore ----------------
    Le leve arrivano da /api/me (lampo_leve: attive, sconti, minimo,
    massimo, ore) — mai cifre hardcodate qui. L'anteprima parla il
@@ -17029,11 +17317,16 @@ function renderOfferte(){
   let daAgire = 0;
   el('offerteList').innerHTML = vive.map(o => {
     const compro = o.compratore_id===myTgId;
+    /* la testata carrello (annuncio_id=0): titolo sintetico dalle
+       figlie fotografate, icona 🛒, e le cifre — che sono TOTALI —
+       escono giuste da sole perche' quantita=0 in testata fa tacere
+       il «× pezzi» di cifraPezzi */
+    const carr = !o.annuncio_id;
     const ore = Math.max(1, Math.ceil((o.scadenza - Date.now()/1000)/3600));
     let thumb = '';
     try { const nomi = o.foto ? JSON.parse(o.foto) : [];
           if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
-    const ic = thumb
+    const ic = carr ? '🛒' : thumb
       ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
       : '💰';
     let stato = '', azioni = '';
@@ -17058,7 +17351,7 @@ function renderOfferte(){
            meccanismo e' quello di sempre — l'annuncio non si e' mai
            bloccato — ma ora va ridetto dove il numero si vede. */
         azioni = `
-          ${(o.quantita||0) > 1 ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: l'annuncio resta in vetrina e vince chi paga per primo.</div>` : ''}
+          ${((o.quantita||0) > 1 || carr) ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: ${carr?'gli annunci restano':'l\'annuncio resta'} in vetrina e vince chi paga per primo.</div>` : ''}
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn primary" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
             <button class="btn allarme" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
@@ -17143,18 +17436,27 @@ function renderOfferte(){
            nudi si impilerebbero a tutta larghezza. */
         azioni = `
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn orange" style="flex:1;margin:0" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>
+            ${/* MAI pagaOfferta sulla testata carrello: aprirebbe il
+                  dettaglio dell'annuncio 0 — il suo «Paga ora»
+                  ricostruisce la composizione e apre la cassa in
+                  modalita' accordo */''}
+            <button class="btn orange" style="flex:1;margin:0" onclick="${carr ? `pagaOffertaCarrello(${o.id})` : `pagaOfferta(${o.annuncio_id})`}">⚡ Paga ora</button>
             <button class="btn allarme" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
           </div>`;
       } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
     }
+    /* la riga carrello: titolo sintetico, listino = somma delle
+       fotografie (le figlie), e l'ELENCO delle righe — il venditore
+       giudica su quello, e i titoli fotografati passano da esc() */
+    const lc = carr ? listinoCarrello(o) : null;
     return `<div class="order" id="off_${o.id}" style="cursor:default">
       <div class="row">
         <div class="order-left">
           <span class="order-ic">${ic}</span>
           <div class="order-main">
-            <b>${esc(o.titolo)}</b>
-            <div class="sub">${compro?'Stai comprando':'Stai vendendo'} · listino ${cifraOff(o.valuta,o.listino_sats,o.listino_eur)}</div>
+            <b>${carr ? '🛒 ' + esc(titoloCarrello(o)) : esc(o.titolo)}</b>
+            <div class="sub">${compro?'Stai comprando':'Stai vendendo'} · listino ${carr ? cifraOff(o.valuta, lc.sats, lc.eur) : cifraOff(o.valuta,o.listino_sats,o.listino_eur)}${carr ? ` · ${fmt((o.righe||[]).length)} articoli` : ''}</div>
+            ${carr ? `<div class="sub">${(o.righe||[]).map(f=>esc(f.titolo||'?')+((f.quantita||1)>1?` ×${f.quantita}`:'')).join(' · ')}</div>` : ''}
             <div class="sub">${stato}</div>
           </div>
         </div>
@@ -17182,11 +17484,14 @@ function rispondiOfferta(id, azione){
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
   }
   /* I testi sono NUDI: qui le cifre si scrivono a mano, che cifraOff
-     e i suoi gemelli portano dentro dell'HTML. */
-  const a = accordoDi(o), q = o.quantita||0;
+     e i suoi gemelli portano dentro dell'HTML. Sulla testata carrello
+     (quantita=0) la cifra E' gia' il totale: moltiplicarla per q
+     direbbe zero. */
+  const a = accordoDi(o), q = o.quantita||0, carr = !o.annuncio_id;
+  const qTot = carr ? 1 : q;
   const totale = o.valuta==='eur'
-    ? fmtEur(Math.round(a.eur*q*100)/100)+' €'
-    : fmt(a.sats*q)+' sats';
+    ? fmtEur(Math.round(a.eur*qTot*100)/100)+' €'
+    : fmt(a.sats*qTot)+' sats';
   if (azione==='accetta') {
     /* La prima riga non cambia MAI, ed e' quella che conta: da quando
        l'accordo porta un numero il venditore si sente piu' impegnato
@@ -17198,7 +17503,11 @@ function rispondiOfferta(id, azione){
       titolo: mio ? 'Accetti l\'offerta?' : 'Accetti la controproposta?',
       testata: testataOfferta(o),
       corpo: mio
-        ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in '
+        ? (carr ? 'Accettare non riserva niente: gli annunci restano in '
+            + 'vetrina e vince chi paga per primo. L\'accordo vale per '
+            + `l'intero carrello (${fmt((o.righe||[]).length)} articoli): `
+            + `se paga, incassi ${totale}.`
+          : 'Accettare non riserva l\'oggetto: l\'annuncio resta in '
           + 'vetrina e vince chi paga per primo.'
           + (q > 1
               ? ` L'accordo è per ${fmt(q)} pezzi al prezzo offerto: se `
@@ -17206,7 +17515,7 @@ function rispondiOfferta(id, azione){
               : q === 1
               ? ' L\'accordo è per un pezzo solo.'
               : ' Se l\'annuncio ha più pezzi, la cifra vale come prezzo '
-                + 'AL PEZZO per la quantità che sceglierà.')
+                + 'AL PEZZO per la quantità che sceglierà.'))
         : 'Avrai un tempo limitato per pagare.',
       etichetta: '✓ Accetta',
       poi: () => inviaRisposta(id, azione, importo)});
@@ -17272,6 +17581,11 @@ function chiediConferma(c){
    manca. Sta qui perche' la vogliono tutti i chiamanti che parlano di
    un'offerta, e ricopiarla sarebbe il secondo posto da tenere in pari. */
 function testataOfferta(o){
+  /* la testata carrello non ha ne' foto ne' titolo suo: il 🛒 e il
+     sintetico dalle figlie (o.titolo sarebbe null → 'null' a schermo) */
+  if (!o.annuncio_id)
+    return `<span style="font-size:28px">🛒</span>`
+      + `<b style="font-size:14px">${esc(titoloCarrello(o))}</b>`;
   let thumb = '';
   try { const nomi = o.foto ? JSON.parse(o.foto) : [];
         if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
