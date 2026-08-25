@@ -1961,6 +1961,21 @@ try:
     from config import CLASSIFICA_PESO_XP
 except ImportError:
     CLASSIFICA_PESO_XP = 0.25   # quanto puo' contare il commercio, al max
+try:
+    from config import CLASSIFICA_KD
+except ImportError:
+    # LO SMORZAMENTO DELLA FIDUCIA LARGA: il bonus del commercio vale
+    # quanto e' LARGA la fiducia che amplifica — con due persone chi ne
+    # ha una sola si prende un terzo del suo bonus, chi ne ha cinque
+    # cinque settimi, chi ne ha venti quasi tutto. La fiducia di uno
+    # solo e' un'opinione, non un curriculum.
+    # NASCE A ZERO, e a zero `persone/(persone+0)` fa 1 per chiunque:
+    # i punteggi restano IDENTICI bit per bit a quelli di prima dello
+    # smorzamento. E' voluto — il valore si SCEGLIE guardando i numeri
+    # veri (`python classifica_prova.py`, sezione 3, che affianca le
+    # tarature), il patto con cui fu misurato K. Finche' nessuno la
+    # alza dal config, l'unica cosa che cambia e' l'ordine dei pareggi.
+    CLASSIFICA_KD = 0           # persone per il bonus pieno del commercio
 
 
 def _recensore_reale(da: int, chi: int, controparti: dict) -> bool:
@@ -1985,7 +2000,7 @@ def _recensore_reale(da: int, chi: int, controparti: dict) -> bool:
 
 def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
                        affari: dict, k=None, rif=None, peso=None,
-                       solo_reali: bool = True) -> list:
+                       kd=None, solo_reali: bool = True) -> list:
     """IL GIUDICE, ed e' PURO: prende righe e ritorna la lista
     ordinata, senza toccare il database. E' quel che lo rende
     torturabile in CI e riusabile da `classifica_prova.py` — il patto
@@ -2010,6 +2025,14 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
     k = CLASSIFICA_K if k is None else k
     rif = CLASSIFICA_XP_RIF if rif is None else rif
     peso = CLASSIFICA_PESO_XP if peso is None else peso
+    # ZERO E' UN VALORE come per `peso`, e qui pesa il doppio: zero e'
+    # proprio il DEFAULT, quindi con `or` la leva esplicita `kd=0` — la
+    # prova che lo smorzamento si spegne — sarebbe indistinguibile da
+    # «non passato». NEGATIVO invece no: sotto zero il denominatore si
+    # azzera e una pagina PUBBLICA cadrebbe per un meno di troppo nel
+    # config, che qui non e' avvolto in nessun fail-open. Il meno vale
+    # come zero, cioe' come ieri.
+    kd = max(CLASSIFICA_KD if kd is None else kd, 0)
     per = {}
     for chi, da, voto in voti:
         if chi == da:
@@ -2033,6 +2056,13 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
         fiducia = ((persone * media + k * media_globale)
                    / (persone + k))
         commercio = math.log10(1 + xp) / math.log10(1 + rif)
+        # SI SMORZA IL BONUS, NON LA FIDUCIA: la media resta la media, e
+        # chi non commercia non viene punito due volte. Uno con un
+        # recensore solo e mille XP non deve stare davanti a uno con
+        # cinque recensori e gli stessi mille.
+        # `persone` e' almeno 1 per il gate d'ingresso e `kd` almeno 0
+        # per la riga qui sopra: il denominatore non e' mai zero.
+        smorzo = persone / (persone + kd)
         fuori.append({
             "id": chi,
             "media": media,
@@ -14806,6 +14836,11 @@ def _leve_stato():
                   CLASSIFICA_PESO_XP,
                   spento="la classifica torna la sola media, e chi "
                          "commercia non guadagna posizioni"),
+            _leva("Persone per il bonus pieno del commercio",
+                  "CLASSIFICA_KD", CLASSIFICA_KD,
+                  spento="il commercio conta pieno anche a chi ha un "
+                         "recensore solo: è la classifica di prima "
+                         "dello smorzamento"),
         ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",

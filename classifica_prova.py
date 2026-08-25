@@ -19,10 +19,11 @@ se qualcosa non si trova ci si ferma, mai una formula a memoria.
 
 LA FORMULA VIVA, per esteso (da leggere accanto ai numeri):
 
-    punteggio = F * (1 + PESO * C)
+    punteggio = F * (1 + PESO * C * S)
 
     F = (persone * media + K * M) / (persone + K)     la FIDUCIA
     C = log10(1 + xp_ordini) / log10(1 + RIF)         il COMMERCIO
+    S = persone / (persone + KD)                      lo SMORZAMENTO
 
 - `persone` sono i recensori REALI distinti, mai `n_feedback`: 40 voti
   da un account solo pesano come UNO. Reale = chi ha a sua volta
@@ -37,12 +38,22 @@ LA FORMULA VIVA, per esteso (da leggere accanto ai numeri):
   in queste righe: il registro tiene ancora tutti i tipi, ma nella
   somma che si vede entra solo il commercio.
 - Si MOLTIPLICA e non si somma: il commercio amplifica la fiducia.
+- `S` smorza il BONUS e non la fiducia: il commercio vale quanto e'
+  LARGA la fiducia che amplifica, perche' quella di uno solo e'
+  un'opinione e non un curriculum. A KD=0 vale 1 per chiunque e il
+  punteggio e' quello di prima dello smorzamento, bit per bit.
+- A PARI PUNTEGGIO l'ordine lo decidono le PERSONE, poi gli AFFARI, e
+  in fondo l'id (che non e' un merito: e' il determinismo). Serve
+  perche' lo smorzamento NON scioglie i pareggi — con la media uguale
+  a M la fiducia vale M per qualunque `persone`, e senza XP il bonus
+  e' zero: e' il mercatino di oggi, dove hanno tutti 5,00.
 
-LE DUE ALTERNATIVE DEL CONFRONTO non stanno nel server e vivono qui, ed
-e' legittimo: non sono copie, sono le candidate da guardare — la sola
-media (che e' il giudice con peso=0, quindi nemmeno lei e' una copia) e
-la SCARTATA «x persone», dove il bonus del commercio passa dal filtro
-persone/(persone+KD).
+LE ALTERNATIVE DEL CONFRONTO NON VIVONO PIU' QUI, e non sono copie:
+sono lo STESSO giudice chiamato con leve diverse — la sola media e' lui
+con `peso=0`, le tarature della §3 sono lui con `kd` diversi, e il
+mondo di prima dello smorzamento e' lui con `kd=0`. L'unica cosa di
+casa e' `KD_PROVA`, cioe' QUALI tarature affiancare: un elenco, non una
+formula.
 
 LEGGE E BASTA: il database si apre in SOLA LETTURA (`mode=ro`), non
 c'e' una sola INSERT/UPDATE/DELETE in tutto il file, e si puo' lanciare
@@ -60,9 +71,10 @@ import sys
 import sqlite3
 from collections import defaultdict
 
-# L'unico numero che resta di casa: lo smorzamento della candidata
-# «x persone» (§3), che nel server non esiste.
-KD = 2
+# LE TARATURE DA CONFRONTARE (§3): non e' una formula di casa — lo
+# smorzamento vive nel server e il suo valore si legge da li'. Questi
+# sono i valori che la §3 affianca a quello vivo per farlo scegliere.
+KD_PROVA = (1, 2, 3)
 
 
 # ------------------------ il giudice, dal server ----------------------
@@ -97,11 +109,19 @@ def _leggi_giudice():
         _cfg = None
 
     leve, fonti = {}, {}
-    for nome in ("CLASSIFICA_K", "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP"):
+    for nome in ("CLASSIFICA_K", "CLASSIFICA_XP_RIF",
+                 "CLASSIFICA_PESO_XP", "CLASSIFICA_KD"):
         v = getattr(_cfg, nome, None) if _cfg else None
         fonti[nome] = "config"
         if v is None:
-            m = re.search(nome + r"\s*=\s*([0-9]+(?:\.[0-9]+)?)", src)
+            # ANCORATO ALL'ASSEGNAZIONE e non a una menzione: senza
+            # `^[ \t]*` la prima occorrenza puo' essere una riga di
+            # COMMENTO che nomina la leva, e il numero si ruberebbe in
+            # silenzio (in server.py c'e' gia' un `CLASSIFICA_PESO_XP
+            # = 0` dentro un commento: innocuo solo perche' sta dopo).
+            m = re.search(
+                rf"^[ \t]*{nome}\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+                src, re.M)
             if not m:
                 return None
             v = float(m.group(1))
@@ -173,27 +193,16 @@ def leggi(con):
 
 # --------------------------- le derivazioni --------------------------
 
-def scomponi(righe, peso, rif):
-    """F e C non escono dal giudice: si RICOSTRUISCONO dal punteggio,
-    che con la formula viva e' esatto (punti = F*(1+peso*C)) — cosi'
-    non nasce una seconda copia della fiducia da tenere in pari."""
-    for r in righe:
-        c = math.log10(1 + r["xp"]) / math.log10(1 + rif)
-        r["commercio"] = c
-        r["fiducia"] = r["punti"] / (1 + peso * c)
-    return righe
-
-
-def variante_persone(righe, peso, kd=KD):
-    """La candidata SCARTATA del confronto: il bonus del commercio
-    smorzato da persone/(persone+KD) — piu' gente DISTINTA ti ha
-    votato, piu' il tuo commercio puo' amplificare."""
-    out = [dict(r, punti_var=r["fiducia"]
-                * (1 + peso * r["commercio"]
-                   * (r["persone"] / (r["persone"] + kd))))
-           for r in righe]
-    out.sort(key=lambda r: (-r["punti_var"], r["id"]))
-    return out
+# F E C NON SI RICOSTRUISCONO PIU': li ritorna il giudice.
+# Qui c'era `scomponi`, che li ricavava invertendo la formula
+# (`punti / (1 + peso*C)`) «cosi' non nasce una seconda copia della
+# fiducia da tenere in pari». L'inversione ERA quella copia, scritta
+# al contrario, e lo ha dimostrato rompendosi: col bonus smorzato
+# quella riga dava una fiducia piu' alta del vero, e con lei la media
+# del mercatino, che si deriva da qui.
+# Con lei se n'e' andata `variante_persone`, che simulava lo
+# smorzamento in casa: adesso e' il giudice a smorzare, e la §3 lo
+# chiama con `kd` diversi.
 
 
 def media_mercatino(righe, k):
@@ -228,6 +237,18 @@ def sezione_1(ana, affari, voti, con_reali, senza_reali):
         print("   una classifica. Qui il cantiere si ferma e si aspetta.")
 
 
+def distribuzione(cl):
+    """Da quante persone arriva la fiducia di ognuno.
+
+    E' il conto che decide la taratura: se sono quasi tutti a UN
+    recensore, lo smorzamento punisce quasi tutti e la scelta cambia."""
+    conta = {}
+    for r in cl:
+        chiave = r["persone"] if r["persone"] < 3 else 3
+        conta[chiave] = conta.get(chiave, 0) + 1
+    return conta
+
+
 def sezione_2(cl, M, top, con_id, peso):
     print(f"\n=== 2. LA CLASSIFICA VIVA, SCOMPOSTA (media del "
           f"mercatino: {M:.2f}) ===\n")
@@ -252,23 +273,68 @@ def sezione_2(cl, M, top, con_id, peso):
     print("   e' uno solo. Il registro tiene ancora gli altri tipi.")
 
 
-def sezione_3(cl, top, con_id, peso):
-    print("\n=== 3. LA SCARTATA «x persone», COI NUMERI ===\n")
+def sezione_3(cl, varianti, top, con_id, kd_vivo):
+    """LE TARATURE AFFIANCATE, per scegliere guardando.
+
+    Non c'e' nessuna formula qui: `varianti` sono classifiche VERE,
+    calcolate dal GIUDICE con `kd` diversi — la sola cosa che cambia
+    fra le colonne e' quel numero. Si stampa il punteggio x100 (quello
+    che si legge in pagina) e la posizione che ne verrebbe."""
+    print("\n=== 3. LO SMORZAMENTO, NELLE TARATURE DA SCEGLIERE ===\n")
     if not cl:
         print("   Nessuno entra: niente da confrontare.")
         return
-    print(f"   punti = fiducia * (1 + PESO * C * pers/(pers+{KD})): il")
+    print("   punti = fiducia * (1 + PESO * C * pers/(pers+KD)): il")
     print("   bonus del commercio passa dal filtro di quante persone")
-    print("   distinte ti hanno votato. «era» = la posizione viva.\n")
-    var = variante_persone(cl, peso)
-    pos_ora = {r["id"]: i for i, r in enumerate(cl, 1)}
-    print(f"    {'#':>2}  {'nome':<24} {'media':>5} {'pers':>4} "
-          f"{'xp-ord':>6} {'punti':>7} {'era':>4}")
-    for i, r in enumerate(var[:top], 1):
-        era = pos_ora[r["id"]]
-        print(f"    {i:2d}  {_nome(r, con_id):<24} {r['media']:5.2f} "
-              f"{r['persone']:4d} {r['xp']:6d} {r['punti_var']:7.3f} "
-              f"{era:4d}")
+    print("   distinte ti hanno votato, e chi ha un recensore solo se")
+    print(f"   ne prende una frazione. Adesso KD vale {kd_vivo:g}.")
+    if not kd_vivo:
+        print("   A ZERO lo smorzamento e' spento: la colonna «punti»")
+        print("   e' la classifica di adesso, le altre le candidate.")
+    print()
+    ora = {r["id"]: i for i, r in enumerate(cl, 1)}
+    pos = {kd: {r["id"]: i for i, r in enumerate(v, 1)}
+           for kd, v in varianti.items()}
+    pun = {kd: {r["id"]: r["punti"] for r in v}
+           for kd, v in varianti.items()}
+    testa = "".join(f"{'KD=' + str(kd):>11}" for kd in varianti)
+    print(f"    {'ora':>3}  {'nome':<22} {'pers':>4} {'xp-ord':>6} "
+          f"{'punti':>6}{testa}")
+    for i, r in enumerate(cl[:top], 1):
+        riga = (f"    {i:3d}  {_nome(r, con_id):<22} {r['persone']:4d} "
+                f"{r['xp']:6d} {round(r['punti'] * 100):6d}")
+        for kd in varianti:
+            riga += (f"{round(pun[kd][r['id']] * 100):7d}"
+                     f"{pos[kd][r['id']]:4d}")
+        print(riga)
+    print("\n   In ogni coppia: il punteggio x100 e la POSIZIONE che")
+    print("   quella taratura gli darebbe.\n")
+    # CHI SI SPOSTA, in chiaro: e' la sola cosa che si va a cercare.
+    for kd, v in varianti.items():
+        mossi = [f"{_nome(r, con_id).strip()} {ora[r['id']]}->{i}"
+                 for i, r in enumerate(v[:top], 1)
+                 if ora.get(r["id"]) and ora[r["id"]] != i]
+        print(f"   KD={kd}: " + (" · ".join(mossi) if mossi
+                                 else "nessuno si sposta"))
+
+
+def sezione_3b(cl):
+    """QUANTI RECENSORI HA CIASCUNO — il conto che decide la scelta.
+
+    Se sono quasi tutti a UNO, lo smorzamento non separa una
+    minoranza: tocca quasi tutti, e la taratura cambia di
+    conseguenza."""
+    print("\n=== 3b. DA QUANTE PERSONE ARRIVA LA FIDUCIA ===\n")
+    if not cl:
+        print("   Nessuno entra.")
+        return
+    d = distribuzione(cl)
+    for chiave, nome in ((1, "1 persona"), (2, "2 persone"),
+                         (3, "3 o piu'")):
+        print(f"   {nome:<12}{d.get(chiave, 0):5d}")
+    if d.get(1, 0) > len(cl) / 2:
+        print("\n   PIU' DELLA META' ha un recensore solo: qui lo")
+        print("   smorzamento tocca quasi tutti, non una minoranza.")
 
 
 def sezione_4(cl, senza, con_id):
@@ -322,6 +388,7 @@ def main() -> int:
     k = amb["CLASSIFICA_K"]
     rif = amb["CLASSIFICA_XP_RIF"]
     peso = amb["CLASSIFICA_PESO_XP"]
+    kd = amb["CLASSIFICA_KD"]
     giudice = amb["_classifica_utenti"]
 
     db = args[0] if args else None
@@ -336,7 +403,7 @@ def main() -> int:
         return 2
 
     print(f"Classifica di prova su {db} — sola lettura, "
-          f"K={k:g} RIF={rif:g} PESO={peso:g}")
+          f"K={k:g} RIF={rif:g} PESO={peso:g} KD={kd:g}")
     print("   (giudice e leve letti da server.py"
           + ("".join(f"; {n} dal config" for n, f in
                      amb["_fonti"].items() if f == "config") or "")
@@ -354,16 +421,21 @@ def main() -> int:
             r["nome"] = (u.get("nome") or "").strip() or "(senza nome)"
         return righe
 
-    cl = scomponi(con_nomi(giudice(
-        voti, controparti, xp, affari, k=k, rif=rif, peso=peso)),
-        peso, rif)
-    senza = con_nomi(giudice(
-        voti, controparti, xp, affari, k=k, rif=rif, peso=peso,
-        solo_reali=False))
+    def calcola(**extra):
+        return con_nomi(giudice(voti, controparti, xp, affari,
+                                k=k, rif=rif, peso=peso, **extra))
+
+    cl = calcola()
+    # LE TARATURE DA CONFRONTARE, calcolate dal giudice VERO: quella
+    # viva non si ripete fra le candidate, che sarebbe una colonna
+    # identica a «punti».
+    varianti = {v: calcola(kd=v) for v in KD_PROVA if v != kd}
+    senza = calcola(solo_reali=False)
 
     sezione_1(ana, affari, voti, cl, senza)
     sezione_2(cl, media_mercatino(cl, k), top, con_id, peso)
-    sezione_3(cl, top, con_id, peso)
+    sezione_3(cl, varianti, top, con_id, kd)
+    sezione_3b(cl)
     sezione_4(cl, senza, con_id)
     print("\nNiente e' stato scritto: il database e' stato aperto in "
           "sola lettura.\n")

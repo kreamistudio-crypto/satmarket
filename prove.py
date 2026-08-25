@@ -14902,7 +14902,7 @@ def _amb_classifica():
     """Il giudice della classifica, estratto dal sorgente."""
     amb = {"math": __import__("math"),
            "CLASSIFICA_XP_RIF": 1000, "CLASSIFICA_PESO_XP": 0.25,
-           "CLASSIFICA_K": 5}
+           "CLASSIFICA_K": 5, "CLASSIFICA_KD": 0}
     for f in ("_recensore_reale", "_classifica_utenti", "_medie_tutte_piene"):
         exec(pezzo(f), amb)
     return amb
@@ -15028,6 +15028,22 @@ def prove_classifica():
     # mutazione che nessuna prova sull'ordine vedeva.
     prova("...che NON e' quello con la media globale sporca",
           False, abs(uno["punti"] - 5.818284028035579) < 1e-9)
+    # LO SMORZAMENTO, COL SUO NUMERO. Lo stesso caso e' anche il
+    # discriminante di chi smorzasse coi VOTI invece che con le
+    # PERSONE: qui sono 3 voti da 1 persona, quindi il fattore e' 1/3 e
+    # non 1/4, e il numero cambia.
+    #   smorzo = persone/(persone+KD) = 1/(1+2) = 1/3
+    #   punti  = F * (1 + 0,25 * C * 1/3) = 4,55897704226534
+    due = next(r for r in cl(voti, contro, {1: 999}, {1: 3, 2: 1, 3: 10},
+                             kd=2) if r["id"] == 1)
+    prova("...e con lo smorzamento e' quello calcolato a mano", True,
+          abs(due["punti"] - 4.55897704226534) < 1e-12)
+    # F e C escono INTERI dal giudice, e il punteggio ci si ricompone:
+    # e' cio' che permette a `classifica_prova.py` di non riscrivere la
+    # formula al contrario per mostrarli.
+    prova("...e il punteggio si ricompone da fiducia e commercio", True,
+          abs(due["fiducia"] * (1 + 0.25 * due["commercio"] * (1 / 3))
+              - due["punti"]) < 1e-12)
 
     # --- il gate d'ingresso ----------------------------------------
     voti = [(1, 100, 5), (2, 100, 5)]
@@ -15056,13 +15072,78 @@ def prove_classifica():
     prova("a peso zero il commercio non sposta niente",
           [1, 2], [r["id"] for r in fuori])
 
-    # --- il pareggio e' deterministico ------------------------------
-    # Due righe identiche non devono scambiarsi di posto a ogni
-    # richiesta: la lezione del pareggio del podio e del cursore.
-    voti = [(1, 100, 5), (2, 101, 5)]
-    ids = [[r["id"] for r in cl(voti, {100: {9}, 101: {9}}, {},
-                                {1: 1, 2: 1})] for _ in range(3)]
-    prova("a pari punteggio l'ordine non balla", [[1, 2]] * 3, ids)
+    # --- LO SMORZAMENTO DELLA FIDUCIA LARGA -------------------------
+    # A pari media e pari commercio comanda da QUANTE persone arriva la
+    # fiducia: il bonus passa da persone/(persone+KD). Qui lo si chiede
+    # esplicito, che il default vivo e' ZERO.
+    voti = [(1, 100, 5), (2, 101, 5), (2, 102, 5)]
+    contro = {100: {9}, 101: {9}, 102: {9}}
+    arg = ({1: 999, 2: 999}, {1: 5, 2: 5})
+    fuori = cl(voti, contro, *arg, kd=2)
+    prova("a pari media e pari commercio comanda chi ha piu' persone",
+          [2, 1], [r["id"] for r in fuori])
+    # ...e a separarli e' il PUNTEGGIO, non il tie-break: senza questa,
+    # una mutazione che toglie lo smorzamento resterebbe verde grazie
+    # alla chiave del sort, che guarda le persone lo stesso.
+    prova("...e a separarli e' il punteggio, non il tie-break", True,
+          fuori[0]["punti"] > fuori[1]["punti"])
+    # LA LEVA A ZERO E' IL MONDO DI IERI, bit per bit: e' la promessa
+    # scritta nel config, ed e' anche il motivo per cui il deploy non
+    # sposta un punteggio.
+    ieri = cl(voti, contro, *arg, kd=0)
+    prova("a KD=0 il commercio non si smorza (il mondo di ieri)",
+          True, ieri[0]["punti"] == ieri[1]["punti"])
+    # ...e ZERO passato a mano dev'essere ZERO anche quando la costante
+    # dice altro: e' la prova che uccide il ritorno di `kd or ...`,
+    # invisibile finche' il default e' zero pure lui.
+    amb2 = _amb_classifica()
+    amb2["CLASSIFICA_KD"] = 3
+    exec(pezzo("_classifica_utenti"), amb2)
+    due = amb2["_classifica_utenti"](voti, contro, *arg, kd=0)
+    prova("...e KD=0 vale zero anche se la leva dice altro", True,
+          due[0]["punti"] == due[1]["punti"])
+    # Un KD negativo nel config non deve far CADERE una pagina PUBBLICA.
+    def _kd(v):
+        try:
+            return cl(voti, contro, *arg, kd=v)[0]["punti"]
+        except ZeroDivisionError:
+            return "cade"
+    prova("un KD negativo vale come zero", _kd(0), _kd(-5))
+
+    # --- IL PAREGGIO: DI MERITO, POI DETERMINISTICO -----------------
+    # Con la media uguale a quella del mercatino la fiducia vale
+    # ESATTAMENTE M per qualunque `persone`, e senza XP il bonus e'
+    # zero: i punti sono identici BIT PER BIT. E' il mercatino di oggi,
+    # dove hanno tutti 5,00 — ed e' il motivo per cui lo smorzamento da
+    # solo non basta e serve il tie-break.
+    voti = [(1, 100, 5), (1, 100, 5), (1, 100, 5),
+            (2, 101, 5), (2, 102, 5)]
+    contro = {100: {9}, 101: {9}, 102: {9}}
+    fuori = cl(voti, contro, {}, {1: 3, 2: 2})
+    prova("a XP zero il pareggio e' vero: gli stessi punti, non «quasi»",
+          True, fuori[0]["punti"] == fuori[1]["punti"])
+    prova("...e a pari punteggio comanda chi ha piu' PERSONE",
+          [2, 1], [r["id"] for r in fuori])
+    prova("...anche se l'altro ha piu' VOTI (3 da uno contro 2 da due)",
+          (3, 1), next((r["voti"], r["persone"])
+                       for r in fuori if r["id"] == 1))
+    # A pari persone comanda chi ha concluso piu' affari, e va detto
+    # cosa si sceglie: LA FREQUENZA BATTE IL VALORE — due affari da 15 €
+    # passano davanti a uno da 40, che danno gli stessi XP.
+    fuori = cl([(1, 100, 5), (2, 101, 5)], contro, {1: 50, 2: 50},
+               {1: 1, 2: 2})
+    prova("a pari persone comanda chi ha piu' affari",
+          [2, 1], [r["id"] for r in fuori])
+    # ...e in fondo l'id. LA PROVA NON CHIAMA TRE VOLTE LO STESSO
+    # GIUDICE: con la sort stabile e i dizionari ordinati sarebbe una
+    # tautologia — restava verde anche togliendo l'id dalla chiave, ed
+    # e' cosi' che era scritta. Cambia l'ORDINE D'ARRIVO dei voti, che
+    # e' l'unica cosa che l'id deve neutralizzare.
+    a_ = [(1, 100, 5), (2, 101, 5)]
+    ids = [[r["id"] for r in cl(v, contro, {}, {1: 1, 2: 1})]
+           for v in (a_, a_[::-1])]
+    prova("a pari tutto l'ordine non dipende da come arrivano i voti",
+          [[1, 2], [1, 2]], ids)
 
     # --- la riga che spiega un'apparenza ----------------------------
     prova("con tutte le medie uguali la riga si accende", True,
@@ -15117,6 +15198,23 @@ def prove_classifica():
     for campo in ('"id":', '"xp":', '"punti":'):
         prova(f"dalla voce pubblica non esce {campo}", True,
               campo not in voce)
+    # I DUE NUMERI DELLA LEVA NUOVA DEVONO DIRE LA STESSA COSA: il
+    # default nel codice e la riga del config d'esempio.
+    # Non e' un vezzo: `classifica_prova.py` prende il default DAL
+    # CODICE quando il config non ce l'ha, e un disallineamento gli
+    # farebbe stampare una classifica che il server non calcola.
+    # Il numero non si scrive qui: se Andrea ritara, questa si aggiorna
+    # da sola e resta rossa solo se i due file divergono.
+    def _dichiarato(nome, testo):
+        m = re.search(rf"^[ \t]*{nome}\s*=\s*([0-9.]+)", testo, re.M)
+        return m and m.group(1)
+    _cfg = open(os.path.join(QUI, "config_esempio.py"),
+                encoding="utf-8").read()
+    prova("il default di CLASSIFICA_KD si trova davvero", True,
+          _dichiarato("CLASSIFICA_KD", _SORGENTE) is not None)
+    prova("...e il config d'esempio dichiara lo stesso numero",
+          _dichiarato("CLASSIFICA_KD", _SORGENTE),
+          _dichiarato("CLASSIFICA_KD", _cfg))
     prova("...e la posizione personale esce solo a chi non e' nei primi",
           True, 'io_["posizione"] > CLASSIFICA_TOP' in end)
     # La riga che spiega guarda la FETTA VISIBILE e non tutta la
@@ -16077,7 +16175,8 @@ def _censimento(acceso):
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
-                 "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP"):
+                 "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
+                 "CLASSIFICA_KD"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -17358,6 +17457,16 @@ def prove_leve():
     # resterebbero verdi per caso (70 > 7 in tutti e due i modi).
     prova("...e il valore passa dal giudice", True,
           "_prezzo_banner(" in codice(pezzo("_leve_stato")))
+    # LO SMORZAMENTO DELLA CLASSIFICA: nasce a zero, e a zero un
+    # moderatore che legge «0» deve capire che quella e' la classifica
+    # di prima dello smorzamento e non una leva tarata bassa.
+    prova("lo smorzamento c'e' nel pannello", True,
+          "CLASSIFICA_KD" in voci_on)
+    prova("...e a zero dice che il commercio torna pieno per tutti",
+          True, "recensore solo" in voci_off.get("CLASSIFICA_KD",
+                                                 {}).get("nota", ""))
+    prova("...e acceso non dice niente", False,
+          "nota" in voci_on.get("CLASSIFICA_KD", {}))
 
     # --- 2) LA FORMA ---------------------------------------------
     prova("ogni gruppo ha delle voci", True,

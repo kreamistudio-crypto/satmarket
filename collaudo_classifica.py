@@ -78,6 +78,14 @@ def avvio():
     cfg.GIORNI_AUTO_SBLOCCO = 10
     cfg.CLASSIFICA_ATTIVA = True
     cfg.CLASSIFICA_TOP = 3          # basso apposta: fa esistere il «fuori»
+    # LO SMORZAMENTO SI PIANTA QUI, e non e' ridondante col default:
+    # il mercatino di cartone e' tarato sull'ordine che questo giro
+    # verifica, e con KD=1 due righe si scambiano — tre prove
+    # diventerebbero rosse per una ragione che non c'entra con cio' che
+    # guardano (quali campi escono dall'endpoint). A zero e' anche il
+    # default vivo, quindi oggi non cambia niente: cambia il giorno che
+    # il default si muove.
+    cfg.CLASSIFICA_KD = 0
     cfg.MODELLO_RICERCA = "claude-haiku-4-5-20251001"
     cfg.DB = db
     sys.modules["config"] = cfg
