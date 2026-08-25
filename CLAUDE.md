@@ -8683,11 +8683,73 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dalla sessione accanto. Adesso c'è il censimento che estrae le
   colonne dal DDL VERO invece di elencarle, e le figlie si leggono per
   `rowid` — che è anche l'ordine della proposta.
-  IL FOGLIO NON HA IL TOGGLE €/₿, ed è una DEVIAZIONE DICHIARATA dal
-  piano: la valuta del carrello è UNA sola ('eur' solo se tutte le
-  righe sono a listino EUR, il principio del `totale_eur` del set) e
-  non cambia col foglio aperto — quindi non c'è nessuna conversione da
-  ancorare, e l'ancora del foglio singolo qui non serve.
+  IL FOGLIO SI LEGGE NELLE DUE VALUTE (ago 2026, chiesto da Andrea, e
+  questa voce ROVESCIA quella di ieri — «il foglio non ha il toggle,
+  deviazione dichiarata dal piano»). IL PERCHÉ DI ALLORA VA TENUTO
+  PERCHÉ ERA VERO: la valuta di un'offerta di carrello è UNA sola
+  ('eur' solo se tutte le righe sono a listino EUR, il principio del
+  `totale_eur` del set) e non cambia col foglio aperto — quindi non
+  esisteva NESSUNA conversione da ancorare. Il perché che lo supera è
+  che «una valuta sola» riguarda la SOSTANZA e non la LETTURA: la
+  cifra che parte resta quella dell'offerta, ma il campo si può
+  leggere e scrivere nell'altra, esattamente come nel gemello singolo.
+  Senza, i due fogli tornavano a divergere — «e allora perché lì posso
+  scrivere in sats e qui no?» — che è il difetto che il giro del
+  totale in superficie era nato per togliere.
+  E LA VALUTA È FORZATA DAL SERVER, non dal client: `fai_offerta_
+  carrello` la DEDUCE dalle righe e nel body non c'è nessun campo
+  valuta — quindi il toggle non poteva e non può cambiare in cosa si
+  manda, e il server non cambia di una riga.
+  LA STRADA SCARTATA, e va tenuta perché è quella che torna in mente:
+  far ESISTERE l'accordo in sats su un carrello tutto-EUR
+  (`offerte.valuta='sats'`). Sposterebbe una garanzia — oggi quel
+  carrello non ha bisogno del cambio per esistere, perché al pagamento
+  il pattuito si converte con `cambio_ordine` e il 503 l'ha già dato
+  `serve_cambio_duro` — mentre con un pattuito FISSO in sats e i lordi
+  che si ricalcolano dal cambio a ogni tick, `max(0, Σlordo −
+  pattuito)` ballerebbe: **la stessa stretta di mano varrebbe uno
+  sconto diverso ogni mattina**. È l'asimmetria già scelta per le
+  soglie del negozio, vista dal rovescio.
+  L'ANCORA È RICALCATA E NON RIFATTA (la condizione di Andrea): i
+  ferri puri del gemello — `offConverti`, `offTestoCampo`,
+  `offCifraTesto`, `suffissoUnita` — si riusano TALI E QUALI, così
+  l'aritmetica della conversione vive in un posto solo per tutti e due
+  i fogli; a restare in proprio è il solo STATO, che vive DENTRO
+  `offCarr` (`cifra`, `cifraValuta`, `campoValuta`), perché due fogli
+  che scrivono nelle stesse variabili sono due fogli che un giorno si
+  pestano. L'unica funzione «nuova» che tocca l'aritmetica è
+  `offCarrCifraIn`, che è UNA riga e passa da `offConverti`.
+  LE TRE REGOLE DEL GEMELLO, ricalcate una per una: l'ancora la
+  scrivono l'ONINPUT (nella valuta del campo, che è la lingua in cui
+  si sta scrivendo) e la PILLOLA (in quella dell'OFFERTA, così il
+  −10% è esattamente −10% al sat qualunque cosa il campo mostri), e
+  il RENDER non la tocca MAI; il campo si riscrive solo quando la
+  valuta cambia DAVVERO (`campoValuta`), o normalizzerebbe sotto le
+  dita quel che si sta ancora scrivendo; e il MINIMO si giudica nella
+  valuta dell'offerta — la stessa cifra che giudicherà il server — e
+  si DICE in quella del campo, per ECCESSO.
+  E L'ALTRA FACCIA SI VEDE MENTRE SI SCRIVE (la seconda domanda di
+  Andrea): in coda alla riga viva la stessa cifra nell'altra valuta,
+  col ≈ SOLO quando è quella convertita — da cui discende che il ≈ non
+  compare mai due volte nella stessa riga, e che **la cifra senza ≈ è
+  sempre quella che parte**. È il pezzo che il gemello singolo NON fa,
+  e lì per una ragione sua: la sua riga ECHEGGIA il campo invece di
+  riconvertire la cifra del listino («50.000 sats» riletti fanno
+  50.008, e un campo che dice 50.000 con sotto un «≈ 50 008» si legge
+  come un guasto). Qui il caso non si presenta, perché la coda dice
+  l'ALTRA faccia dell'ANCORA e non una riconversione.
+  SENZA CAMBIO non si scrive niente: la coda sparisce e il toggle non
+  si offre — la valuta del campo resta quella dell'offerta, che è
+  sempre esatta. È la riga di `valutaOfferta`, ricalcata.
+  IL TOGGLE NON È «DEL FOGLIO»: è quello GLOBALE dell'app (`setValuta`,
+  `data-cur`, la preferenza in localStorage), quindi il cantiere ha
+  aggiunto una SUPERFICIE a un comando che c'era già — le superfici
+  salgono a NOVE e il censimento in `prove.py` viene a chiamare, che è
+  il suo mestiere. Col secondo censimento è arrivato un guadagno non
+  cercato: questo foglio l'unità se la SCRIVEVA A MANO
+  (`'eur' ? '€' : 'sats'`), cioè nella forma che una prova accanto già
+  vietava, e passando al giudice le superfici del suffisso salgono a
+  QUATTRO.
   LA CASSA IN MODALITÀ ACCORDO: `acqDati.accordoId` **sta nella
   firma** (`'acc'+id+'|'+firmaSet()`), o la cache servirebbe un conto
   senza accordo; il cassetto del codice non nasce, il bottone
@@ -23459,6 +23521,33 @@ come oggi. DA GUARDARE al primo giro: la prima offerta di carrello
 vera dentro Telegram (che al venditore arrivi UNA notifica con
 l'elenco, mai N), e il primo accordo pagato con la bolt11 confrontata
 su LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
+
+E il foglio dell'offerta sul carrello si legge nelle due valute (ago
+2026, chiesto da Andrea in due domande: «se tutti gli articoli sono in
+euro posso offrire in sats?» e «vorrei vedere la conversione mentre
+scrivo»). La risposta alla prima è che la valuta la forza il SERVER,
+che la deduce dalle righe — quindi si è aperto quel che si poteva
+aprire senza toccare il denaro: il campo si legge e si scrive
+nell'altra valuta, la cifra che parte resta quella dell'offerta. La
+seconda viene quasi in omaggio, ed è lo stesso meccanismo: la coda
+della riga viva dice l'altra faccia col ≈. Vedi Architettura, «IL
+FOGLIO SI LEGGE NELLE DUE VALUTE», per la strada scartata (l'accordo
+che ESISTE in sats su un carrello tutto-EUR, che farebbe ballare lo
+sconto col cambio) e per le tre regole del gemello ricalcate una per
+una. Zero server, zero colonne, zero leve: il cantiere è solo client.
+Collaudato: 6353 prove verdi in modalità severa sull'albero pulito (18
+nuove, più due censimenti che hanno CAMBIATO LATO col perché scritto)
+e **14 MUTAZIONI, 14 uccise** — la sola sopravvissuta al primo giro
+chiedeva DOVE la pillola pianta l'ancora, e il conteggio delle due
+scritture restava verde spostandone una: l'ha detto la tortura, non la
+rilettura. Più il banco node che FA GIRARE l'ancora sul caso che
+smaschera la deriva (66661 sats non tornano a sé passando per gli
+euro, quindi un render che riscrivesse l'ancora perderebbe un sat al
+primo toggle), e il giro DAL VIVO col server vero su un database
+usa-e-getta — **40 verifiche verdi** a 320/360/375 nei due temi: i due
+carrelli (misto e tutto-EUR), i dieci toggle che non spostano l'ancora
+di un sat, il minimo detto nella lingua del campo, e il cambio muto
+che spegne coda e toggle insieme. IN PRODUZIONE basta il deploy.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
