@@ -289,6 +289,11 @@ SELECT '16g) BUSTA FUORI CONTRATTO (vuoto)' AS controllo;
 -- direttamente al compratore» vive solo sulla via punto, e il deposito
 -- della busta la azzera nello STESSO UPDATE — «depositata E dichiarata»
 -- non ha nessuno stato transitorio legittimo.
+-- Il braccio del codice guarda la COLONNA e non il contenuto: dal
+-- cantiere del documento una busta col solo QR non ha un codice
+-- scritto, ed e' normale — non suona perche' _cifra_contenuto
+-- prefissa anche il vuoto, quindi dopo un deposito la colonna non
+-- e' mai ''. Quel che prende e' la colonna mai scritta col timbro.
 SELECT id, stato, via_punto, busta_il, busta_diretta_il
   FROM ordini
  WHERE (busta_il > 0) <> (busta_nome <> '')

@@ -3989,6 +3989,18 @@ def prove_busta_ritiro():
           and not _os.path.exists(_os.path.join(buste_dir, vecchio)))
     prova("...e il tipo lo segue", "application/pdf",
           o1["busta_file_tipo"])
+    # IL CODICE VUOTO NON E' UNA COLONNA VUOTA, ed e' il fatto da cui
+    # dipende in silenzio il libro mastro: il suo braccio
+    # «(busta_il>0) <> (busta_codice<>'')» controlla che le COLONNE si
+    # scrivano insieme al timbro, e su una busta col solo QR tace
+    # soltanto perche' il trasporto di casa prefissa anche il vuoto.
+    # Se un domani `_cifra_contenuto("")` tornasse '', quel braccio
+    # comincerebbe a suonare ogni giorno su un caso NORMALE — cioe' il
+    # modo in cui un allarme smette di essere letto. Qui si inchioda
+    # il fatto dove il valore NASCE; di la' una riga sana della ronda
+    # lo inchioda dove viene letto.
+    prova("il codice vuoto in colonna non e' vuoto: e' il trasporto",
+          True, o1["busta_codice"] == "plain:")
     resta = o1["busta_file"]
     deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1"})
     prova("chiave assente = si CONSERVA (il patto dello stock)", resta,
@@ -13973,6 +13985,7 @@ def prove_libro_mastro():
           busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
           busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
           busta_correzioni INT DEFAULT 0,
+          busta_file TEXT DEFAULT '',
           busta_diretta_il INT DEFAULT 0,
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
@@ -14093,6 +14106,20 @@ def prove_libro_mastro():
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
           busta_diretta_il)
           VALUES(10, 9, 1000, 'shipped', 1, 456);
+        -- UNA BUSTA COL SOLO DOCUMENTO (ago 2026): dal cantiere
+        -- del documento il codice SCRITTO e' facoltativo — basta
+        -- il QR del corriere — quindi questa riga e' NORMALE e la
+        -- ronda deve tacerci sopra. Tace per una ragione che non
+        -- si vede leggendo la query: `_cifra_contenuto('')` torna
+        -- il trasporto di casa ('plain:'), MAI la stringa vuota,
+        -- e senza quel fatto il braccio del codice suonerebbe ogni
+        -- giorno su un caso normale — cioe' il modo in cui un
+        -- allarme smette di essere letto. E' quel fatto che questa
+        -- riga tiene inchiodato.
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
+          busta_nome,busta_codice,busta_file,busta_il)
+          VALUES(12, 9, 1000, 'shipped', 1,
+                 'plain:Mario Rossi', 'plain:', 'b11_a1b2.jpg', 123);
         -- UN CODICE SANO e un ordine scontato da lui: il codice e'
         -- del venditore 222, l'ordine 7 e' del venditore 222, l'id e
         -- il nome ci sono tutti e due, e lo sconto e' scattato.

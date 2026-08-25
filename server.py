@@ -36156,6 +36156,22 @@ CONTROLLI_LIBRO_MASTRO = (
      "flag, nome e codice si scrivono nello stesso UPDATE e solo "
      "sulla via punto: una riga spaiata e' un deposito a meta' o una "
      "guardia caduta",
+     # ⚠️ IL BRACCIO DEL CODICE GUARDA LA COLONNA, NON IL CONTENUTO
+     # (ago 2026): dal cantiere del documento il codice SCRITTO e'
+     # facoltativo — basta il QR del corriere — quindi una busta col
+     # codice vuoto e' NORMALE, e qui non suona. Non suona pero' per
+     # una ragione che leggendo la riga non si vede: _cifra_contenuto
+     # prefissa anche il vuoto ('plain:'), quindi dopo un deposito
+     # quella colonna non e' MAI ''. Cio' che il braccio prende e' la
+     # colonna mai SCRITTA insieme al timbro, cioe' una guardia
+     # caduta. Il giorno che il trasporto smettesse di prefissare,
+     # questo suonerebbe ogni giorno su un caso normale — il modo in
+     # cui un allarme smette di essere letto: c'e' una riga sana
+     # nella ronda delle prove che tiene quel fatto inchiodato.
+     # DA NON AGGIUNGERE, e verra' in mente: «una busta depositata
+     # deve avere il codice O il documento». Lo garantisce gia'
+     # l'endpoint col suo 400, e in SQL non si puo' dire onestamente:
+     # dentro il cifrato non si guarda.
      # I due bracci della BUSTA DIRETTA (ago 2026, cantiere 45):
      # la dichiarazione vive solo sulla via punto (la guardia
      # dell'endpoint e il gate di segna_spedito la rendono
