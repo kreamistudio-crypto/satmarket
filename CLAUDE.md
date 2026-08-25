@@ -1159,11 +1159,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   compratore ad aver premuto — e MAI «è arrivato al punto», che
   Barattolo non può verificare (c'è la prova che quelle parole non
   compaiano); la riga dopo manda alla mail del corriere, e la coda
-  sui sats è quella di famiglia. CANTIERE 45 (traccia nel commento
-  accanto al testo, NON costruito): se il venditore ha messo l'email
-  del COMPRATORE sull'etichetta, il codice non passa da noi e questo
-  messaggio direbbe una cosa sbagliata — quel ramo (dichiararlo
-  nell'ordine, e zittire busta e promemoria) è un cantiere suo.
+  sui sats è quella di famiglia. IL CANTIERE 45 È STATO COSTRUITO
+  (ago 2026, e questa riga chiude la traccia che stava qui): se il
+  venditore ha messo l'email del COMPRATORE sull'etichetta il codice
+  non passa da noi, e questo messaggio direbbe una cosa sbagliata —
+  quindi la dichiarazione `busta_diretta_il` zittisce ANCHE questa
+  fase, col gate nella WHERE accanto a `busta_il=0` e col gemello in
+  `statoSollecito`, perché il bottone non nasca affatto: un bottone
+  che porta a un 400 è peggio di un bottone che non c'è.
+  DUE GATE E NON UNO, ed è la riga da non «unificare»: il promemoria
+  AUTOMATICO della busta ha la sua funzione e la sua query, questo ne
+  ha un'altra — «stessa query» vale fra gli automatici, mai fra
+  l'automatico e il bottone.
   IL BOTTONE VIVE AL SITO UNICO delle azioni («🔔 Ricorda al venditore
   il codice di ritiro»), non dentro il pannello della busta: l'ordine
   della colonna è dichiarato — prima «libera i sats», poi le strade
@@ -15258,9 +15265,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   guadagna «busta fuori contratto» (flag/nome/codice si scrivono nello
   stesso UPDATE e solo sulla via punto); da NON aggiungere, e verrà in
   mente: «shipped via punto senza busta» — è lo stato NORMALE del
-  transito, e sarebbe falso anche su tutto il pregresso. Le ASTE non
-  hanno la busta per costruzione (scegli_consegna_ordine non scrive
-  mai via_punto, dichiarato in _strade_asta). Client:
+  transito, e sarebbe falso anche su tutto il pregresso.
+  ⚠️ E IL BRACCIO DEL CODICE GUARDA LA COLONNA, NON IL CONTENUTO (ago
+  2026, difetto latente trovato e chiuso): dal cantiere del documento
+  il codice SCRITTO è facoltativo — basta il QR — quindi una busta col
+  codice vuoto è NORMALE. Non suona, ma NON per la ragione che si
+  legge nella riga: `_cifra_contenuto` prefissa anche il vuoto
+  ('plain:'), quindi dopo un deposito quella colonna non è MAI ''.
+  Ciò che il braccio prende è la colonna mai SCRITTA insieme al
+  timbro, cioè una guardia caduta — e il giorno che il trasporto
+  smettesse di prefissare comincerebbe a suonare ogni giorno su un
+  caso normale, che è il modo in cui un allarme smette di essere
+  letto. IL FATTO SI INCHIODA NEI DUE POSTI IN CUI VIVE: dove il
+  valore NASCE (una prova sul deposito col solo documento: in colonna
+  il codice vuoto è 'plain:') e dove viene LETTO (una riga sana della
+  ronda, una busta col solo QR su cui TUTTI i controlli devono
+  tacere). Un allarme silenzioso per ACCIDENTE è quello che si scopre
+  rotto il giorno che serve.
+  DA NON AGGIUNGERE, e verrà in mente anche questo: «una busta
+  depositata deve avere il codice O il documento». Lo garantisce già
+  l'endpoint col suo 400, e in SQL non si direbbe onestamente: dentro
+  il cifrato non si guarda.
+  Le ASTE non hanno la busta per costruzione (scegli_consegna_ordine
+  non scrive mai via_punto, dichiarato in _strade_asta). Client:
   `pannelloBustaRitiro(o)` accanto al pannello digitale, cache
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
@@ -15296,8 +15323,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   LEI a correggere la promessa che `_coda_ricevuta` gli ha già fatto
   al pagamento («ti avviseremo»), scritta quando la dichiarazione non
   esiste ancora: imperfezione dichiarata. I solleciti tacciono, 🧊
-  compreso (stessa query); `sollecita_ritiri_al_punto` resta fuori
-  PER COSTRUZIONE senza una riga (esige `busta_il>0`, e il deposito
+  compreso (stessa query) — E ANCHE QUELLO A COMANDO, che una query
+  SUA ce l'ha e quindi ha voluto il suo gate (vedi «E LA SECONDA FASE
+  È LA BUSTA»): «stessa query» copre gli automatici, mai il bottone.
+  `sollecita_ritiri_al_punto` resta fuori PER COSTRUZIONE senza una
+  riga (esige `busta_il>0`, e il deposito
   azzera): il promemoria «vai a ritirare» sui dichiarati TACE,
   dichiarato — decisione di Andrea: il corriere ha i recapiti del
   COMPRATORE e gli manda lui codice e giacenza, mentre il nostro
