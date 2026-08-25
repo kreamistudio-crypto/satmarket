@@ -282,6 +282,22 @@ SELECT id, stato, via_punto, punto_obiettato_il, punto_obiezioni,
     OR (punto_obiettato_il > 0 AND via_punto = 0)
     OR (punto_obiezioni = 0 AND punto_obiettato_il > 0);
 
+SELECT '16g) BUSTA FUORI CONTRATTO (vuoto)' AS controllo;
+-- la busta di consegna: flag, nome e codice si scrivono nello stesso
+-- UPDATE e solo sulla via punto. Gli ultimi due bracci sono la BUSTA
+-- DIRETTA (ago 2026, cantiere 45): la dichiarazione «il codice arriva
+-- direttamente al compratore» vive solo sulla via punto, e il deposito
+-- della busta la azzera nello STESSO UPDATE — «depositata E dichiarata»
+-- non ha nessuno stato transitorio legittimo.
+SELECT id, stato, via_punto, busta_il, busta_diretta_il
+  FROM ordini
+ WHERE (busta_il > 0) <> (busta_nome <> '')
+    OR (busta_il > 0) <> (busta_codice <> '')
+    OR (busta_il > 0 AND via_punto = 0)
+    OR (busta_corretta_il > 0 AND busta_il = 0)
+    OR (busta_diretta_il > 0 AND via_punto = 0)
+    OR (busta_diretta_il > 0 AND busta_il > 0);
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.

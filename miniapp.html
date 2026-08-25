@@ -6548,6 +6548,11 @@ function mapOrder(o){
        /busta-ritiro alle sole parti, MAI all'admin */
     bustaIl:o.busta_il||0, bustaCorrettaIl:o.busta_corretta_il||0,
     bustaCorrezioni:o.busta_correzioni||0,
+    /* la busta DIRETTA (ago 2026, cantiere 45): il venditore ha
+       dichiarato che il codice di ritiro arriva direttamente al
+       compratore — recapiti suoi sull'etichetta. Timestamp, 0 = mai;
+       il deposito della busta la azzera lato server. */
+    bustaDirettaIl:o.busta_diretta_il||0,
     /* del documento arriva il solo FLAG: il nome del file e' la
        maniglia sul disco e non esce mai, i byte men che meno */
     bustaDocumento:!!o.busta_documento,
@@ -18424,6 +18429,14 @@ function openOrder(id){
           ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
+          ${/* LA BUSTA DIRETTA (ago 2026, cantiere 45): la spunta sta
+                sotto la riga del codice, che gia' dice a chi arriva —
+                spuntandola la busta non si aspetta, la riga d'attesa
+                del compratore cambia testo e i promemoria tacciono.
+                Chi dimentica ha la porta tardiva nel pannello della
+                busta, che il sollecito stesso nomina. */''}
+          ${o.viaPunto ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
+            <input type="checkbox" id="shipBustaDiretta" style="margin-top:2px"> <span>Ho messo i recapiti dell'acquirente come destinatario: il codice di ritiro arriva direttamente a lui</span></label>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
           ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
                 riquadro qui sotto, e ripeterla qui sarebbe il dato
@@ -22376,13 +22389,25 @@ async function markShipped(){
   }
   /* la forma del codice: avvisa, non blocca (vedi FORME_TRACKING) */
   if (!trackingDaControllare(corriere, tracking, 'shipAvviso')) return;
-  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
+  /* la busta diretta: la spunta esiste solo sulla via punto — il
+     `?.checked` fa false dove il nodo non c'e', e il server fuori
+     dalla via punto la ignora comunque */
+  const bustaDiretta = !!el('shipBustaDiretta')?.checked;
+  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; if (bustaDiretta) currentOrder.bustaDirettaIl = Math.floor(Date.now()/1000); toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({corriere, tracking})});
+    body: JSON.stringify({corriere, tracking, busta_diretta: bustaDiretta})});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking;
+  /* anche sulla riga di orders, non solo su currentOrder: la lista
+     puo' essersi ricaricata e currentOrder essere un detached */
+  if (bustaDiretta && currentOrder.viaPunto) {
+    const ts = Math.floor(Date.now()/1000);
+    currentOrder.bustaDirettaIl = ts;
+    const riga = orders.find(x => x.id === currentOrder.id);
+    if (riga) riga.bustaDirettaIl = ts;
+  }
   toast('📦 Segnato come spedito'); openOrder(currentOrder.id);
 }
 
@@ -23375,9 +23400,13 @@ function pannelloBustaRitiro(o){
   if (o.role==='buyer'){
     if (!o.bustaIl)
       /* lo stato d'attesa visibile (decisione di Andrea, al posto del
-         gate): il venditore ha spedito, il codice arriva all'arrivo */
-      return o.state==='shipped' ? `
-      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>` : '';
+         gate): il venditore ha spedito, il codice arriva all'arrivo.
+         Con la BUSTA DIRETTA (cantiere 45) la riga di sempre direbbe
+         il falso — aspetta una cosa che non arrivera' mai — e al suo
+         posto si dice da dove arriva il codice davvero. */
+      return o.state!=='shipped' ? '' : (o.bustaDirettaIl ? `
+      <div class="trust-note">📦 <span><b>Il codice di ritiro ti arriva direttamente dal corriere</b>, ai recapiti che il venditore ha indicato come destinatario: non passerà dall'ordine. Se non ti arriva, scrivigli o apri una disputa.</span></div>` : `
+      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>`);
     /* IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed e' cio' che fa
        atterrare il codice dove stava il dito: se il pannello si
        riscrivesse per intero — il nome sopra, il codice sotto, come
@@ -23400,9 +23429,17 @@ function pannelloBustaRitiro(o){
      'dispute' — un PIN sbagliato lo corregge solo lui, il moderatore
      non puo' (non legge la busta) */
   if (o.role==='seller' && ['locked','shipped','dispute'].includes(o.state)){
+    /* la BUSTA DIRETTA dichiarata: la testa lo dice, il form resta —
+       il deposito E' l'annulla (lato server azzera la dichiarazione),
+       quindi chi si e' sbagliato deposita e basta */
+    const quandoDiretta = o.bustaDirettaIl
+      ? new Date(o.bustaDirettaIl*1000).toLocaleString('it-IT',
+          {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
     const testa = o.bustaIl
       ? `✓ Depositate il ${quando}${corr}. Se hai sbagliato qualcosa (il PIN, il nome), correggile da qui: l'acquirente riceve un avviso. Nemmeno i moderatori possono leggerle o correggerle per te.`
-      : (o.state==='locked'
+      : (o.bustaDirettaIl
+        ? `✓ Hai indicato che il codice di ritiro arriva direttamente all'acquirente (il ${quandoDiretta}). Se invece arriva a te, depositalo qui: la dichiarazione si annulla da sola.`
+        : o.state==='locked'
         ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando ti arriva.'
         : 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
     return `
@@ -23416,6 +23453,14 @@ function pannelloBustaRitiro(o){
         ${campoDocumentoBusta(o, b)}
         ${o.bustaIl && !b ? `<button class="btn ghost" style="margin-top:8px" onclick="mostraBusta(this)">👁 Rileggi ciò che hai depositato</button>` : ''}
         <button class="btn orange" style="margin-top:10px" onclick="depositaBusta(this)">📦 ${o.bustaIl?'Aggiorna le istruzioni':'Deposita le istruzioni'}</button>
+        ${/* LA PORTA TARDIVA (cantiere 45): chi ha spedito senza la
+              spunta resta sotto sollecito, e l'unica uscita sarebbe
+              una busta finta — da qui dichiara che il codice va
+              direttamente all'acquirente. Solo su 'shipped' (il
+              server rifiuta altrove) e solo finche' non c'e' ne'
+              busta ne' dichiarazione. */''}
+        ${(o.state==='shipped' && !o.bustaIl && !o.bustaDirettaIl) ? `
+        <div class="hint" style="margin-top:8px">Hai messo i recapiti dell'acquirente come destinatario? <button type="button" class="scopri-link" onclick="dichiaraBustaDiretta()">Il codice arriva direttamente a lui</button></div>` : ''}
       </div>`;
   }
   /* venditore fuori dagli stati di scrittura: rilettura e basta.
@@ -23965,9 +24010,50 @@ async function depositaBusta(btn){
     delete bustaDocVisto[currentOrder.id];
   }
   bustaDoc = null;
+  /* il deposito azzera la busta diretta (lo fa il server nello
+     stesso UPDATE): il client rispecchia, o la testa del pannello
+     direbbe ancora «arriva direttamente a lui» */
+  currentOrder.bustaDirettaIl = 0;
+  {const riga = orders.find(x => x.id === currentOrder.id);
+   if (riga) riga.bustaDirettaIl = 0;}
   openOrder(currentOrder.id);
   toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
                    : '📦 Istruzioni depositate');
+    }});
+}
+
+/* LA PORTA TARDIVA DELLA BUSTA DIRETTA (ago 2026, cantiere 45): chi
+   ha spedito senza la spunta dichiara da qui che il codice di ritiro
+   arriva direttamente all'acquirente. Conferma col foglio di casa —
+   la dichiarazione silenzia i promemoria e avvisa l'acquirente, va
+   detto PRIMA del tocco — poi il ridisegno e' IN PLACE
+   (ridisegnaBusta, mai openOrder: il fatto vive dentro il pannello,
+   e riaprire butterebbe un'eventuale bozza negli altri campi). */
+function dichiaraBustaDiretta(){
+  const o = currentOrder; if (!o) return;
+  chiediConferma({
+    titolo: 'Il codice va direttamente a lui?',
+    corpo: 'Confermi di aver messo i recapiti dell\'acquirente come '
+      + 'destinatario: il codice di ritiro glielo manda il corriere, '
+      + 'non passa dall\'ordine. Smettiamo di chiedertelo e avvisiamo '
+      + 'l\'acquirente.\n\nSe invece il codice arriva a te, potrai '
+      + 'sempre depositarlo qui: la dichiarazione si annulla da sola.',
+    etichetta: '📮 È così, dillo',
+    poi: async () => {
+      if (DEMO) { o.bustaDirettaIl = Math.floor(Date.now()/1000);
+                  ridisegnaBusta(); toast('📮 Segnato'); return; }
+      const r = await fetch(`${API_BASE}/orders/${o.id}/busta-diretta`, {
+        method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+      const ts = d.busta_diretta_il || Math.floor(Date.now()/1000);
+      o.bustaDirettaIl = ts;
+      /* anche sulla riga di orders: currentOrder puo' essere un
+         oggetto detached se la lista si e' ricaricata */
+      const riga = orders.find(x => x.id === o.id);
+      if (riga) riga.bustaDirettaIl = ts;
+      ridisegnaBusta();
+      toast('📮 Segnato: l\'acquirente è stato avvisato');
     }});
 }
 

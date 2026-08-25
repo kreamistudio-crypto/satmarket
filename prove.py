@@ -3229,6 +3229,37 @@ def prove_busta_ritiro():
     prova("il libro mastro sorveglia la busta fuori contratto", True,
           "busta fuori contratto" in _SORGENTE)
 
+    # --- LA BUSTA DIRETTA (ago 2026, cantiere 45): le forme ----------
+    # Il venditore dichiara che il codice di ritiro arriva
+    # direttamente al compratore. Le sentinelle guardano il CODICE
+    # (codice(): via i commenti — la prosa che racconta la clausola
+    # la renderebbe verde anche a clausola tolta), e la RIGA INTERA
+    # dove la lezione del reaper lo esige.
+    prova("il promemoria esclude la busta diretta (riga intera)", True,
+          '"AND o.busta_diretta_il=0 "' in codice(sb))
+    prova("il deposito azzera la dichiarazione, stessa scrittura",
+          True, '"busta_diretta_il=0, "' in codice(dep))
+    prova("la spedizione la timbra solo sulla via punto", True,
+          'busta_diretta and o["via_punto"]' in codice(sped)
+          and "busta_diretta_il=?" in codice(sped))
+    dich = pezzo("dichiara_busta_diretta").split('"""')[-1]
+    prova("la porta tardiva: guardia nella WHERE col 400 dei fratelli",
+          True, "AND stato='shipped' AND via_punto=1" in dich
+          and "Operazione non permessa" in dich)
+    prova("...con la busta depositata la porta e' chiusa", True,
+          'if o["busta_il"]:' in codice(dich))
+    prova("...idempotente: la scrittura e' condizionata", True,
+          "WHERE id=? AND busta_diretta_il=0" in codice(dich))
+    prova("...e non muove nessuna ancora", [],
+          [x for x in ("spedito_il", "aggiornato", "stato='shipped',")
+           if x in codice(dich)])
+    prova("la disputa racconta anche la dichiarazione, etichettata",
+          True, "busta_diretta_il" in ad
+          and "dichiarazione di" in ad)
+    prova("il mastro sorveglia i due bracci della busta diretta", True,
+          "OR (busta_diretta_il>0 AND via_punto=0) " in _SORGENTE
+          and "OR (busta_diretta_il>0 AND busta_il>0)" in _SORGENTE)
+
     # --- LA SORELLA SPECULARE: il compratore che non va a ritirare ---
     # Stessa famiglia, popolazione COMPLEMENTARE. Le righe qui sotto
     # sono tutte cadute almeno una volta sotto tortura: si rompono da
@@ -3347,6 +3378,33 @@ def prove_busta_ritiro():
           "esc(b.nome)" in mini and "esc(b.codice)" in mini)
     prova("client: aprire la busta non chiede conferme", False,
           "confirm" in pezzo_js(mini, "async function mostraBusta"))
+
+    # --- LA BUSTA DIRETTA, lato client (ago 2026, cantiere 45) ------
+    prova("la spunta della spedizione viaggia col body", True,
+          "shipBustaDiretta" in mini
+          and "busta_diretta: bustaDiretta" in mini)
+    prova("...e bustaDirettaIl sta in mapOrder", True,
+          "bustaDirettaIl:o.busta_diretta_il" in mini)
+    _bd = pezzo_js(mini, "function dichiaraBustaDiretta(){")
+    prova("la porta tardiva chiede col foglio di casa", True,
+          "chiediConferma({" in _bd)
+    prova("...e ridisegna IN PLACE, mai openOrder (il fatto vive "
+          "dentro il pannello)", True,
+          "ridisegnaBusta()" in _bd and "openOrder" not in _bd)
+    prova("...aggiornando anche la riga di orders, non solo il "
+          "detached", True, "orders.find(" in _bd)
+    # la riga d'attesa del compratore ha il ramo dichiarato: senza,
+    # direbbe «ti avviseremo» di un codice che non arrivera' mai
+    _pann = pezzo_js(mini, "function pannelloBustaRitiro(o){")
+    prova("la riga d'attesa ha il ramo della busta diretta", True,
+          "direttamente dal corriere" in _pann
+          and "In attesa del codice di ritiro." in _pann
+          and "o.bustaDirettaIl ?" in _pann)
+    # e il deposito rispecchia l'azzeramento del server, o la testa
+    # del pannello direbbe ancora «arriva direttamente a lui»
+    prova("il deposito azzera la dichiarazione anche nel client", True,
+          "currentOrder.bustaDirettaIl = 0;"
+          in pezzo_js(mini, "async function depositaBusta"))
 
     # --- IL CODICE DENTRO IL BOTTONE (ago 2026, dal campo) ---------
     # Tre cose in un cantiere solo: la pagina non salta piu', il
@@ -3618,6 +3676,7 @@ def prove_busta_ritiro():
         busta_correzioni INT DEFAULT 0,
         busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
         busta_file_nome TEXT DEFAULT '',
+        busta_diretta_il INT DEFAULT 0,
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
@@ -3770,6 +3829,80 @@ def prove_busta_ritiro():
           vero.execute("SELECT stato FROM ordini "
                        "WHERE id=3").fetchone()["stato"])
     avvisi.clear()
+
+    # --- LA BUSTA DIRETTA (ago 2026, cantiere 45) --------------------
+    # Il venditore dichiara che il codice di ritiro arriva
+    # direttamente al compratore: la spunta alla spedizione, la porta
+    # tardiva, e il deposito che azzera. Tutto GIRATO, mai guardato.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, punto_ritiro) "
+                 "VALUES(4, 111, 222, 'locked', 1, 'Locker InPost')")
+    # id 5: spedizione a casa — la spunta li' non ha oggetto
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato) VALUES(5, 111, 222, 'locked')")
+    vero.commit()
+    amb = _amb(222)
+    exec("async " + pezzo("segna_spedito"), amb)
+    corri(amb, "segna_spedito", 4,
+          _Req({"corriere": "InPost", "tracking": "1234567890",
+                "busta_diretta": True}))
+    o4 = vero.execute("SELECT * FROM ordini WHERE id=4").fetchone()
+    prova("la spunta alla spedizione timbra la dichiarazione", True,
+          o4["busta_diretta_il"] > 0 and o4["stato"] == "shipped")
+    prova("...e la notifica dice il corriere, mai «ti avviseremo»",
+          True, len(avvisi) == 1
+          and "direttamente il corriere" in avvisi[0][1]
+          and "Ti avviseremo" not in avvisi[0][1])
+    avvisi.clear()
+    corri(amb, "segna_spedito", 5,
+          _Req({"corriere": "BRT", "tracking": "1234567890",
+                "busta_diretta": True}))
+    prova("fuori dalla via punto la spunta non scrive niente", 0,
+          vero.execute("SELECT busta_diretta_il FROM ordini "
+                       "WHERE id=5").fetchone()[0])
+    avvisi.clear()
+    # LA PORTA TARDIVA: id 6, spedito senza la spunta (il distratto)
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, punto_ritiro, spedito_il, "
+                 "aggiornato) "
+                 "VALUES(6, 111, 222, 'shipped', 1, 'Punto Poste', "
+                 "1000, 1000)")
+    vero.commit()
+
+    def dichiara(chi, oid):
+        a2 = _amb(chi)
+        exec("async " + pezzo("dichiara_busta_diretta"), a2)
+        return corri(a2, "dichiara_busta_diretta", oid)
+
+    prova("il compratore non dichiara", "400 Operazione non permessa",
+          dichiara(111, 6))
+    prova("l'estraneo e l'ordine inesistente rispondono uguale",
+          dichiara(999, 6), dichiara(222, 777))
+    prova("fuori dalla via punto niente porta",
+          "400 Operazione non permessa", dichiara(222, 5))
+    prova("con la busta gia' depositata la porta e' chiusa", True,
+          str(dichiara(222, 1)).startswith("400 Le istruzioni"))
+    r6 = dichiara(222, 6)
+    prova("la dichiarazione tardiva timbra", True,
+          isinstance(r6, dict) and r6["busta_diretta_il"] > 0)
+    prova("...e avvisa il compratore col testo statico", True,
+          len(avvisi) == 1 and avvisi[0][0] == 111
+          and "direttamente dal corriere" in avvisi[0][1])
+    o6 = vero.execute("SELECT * FROM ordini WHERE id=6").fetchone()
+    prova("...senza muovere le ancore ne' lo stato",
+          (1000, 1000, "shipped"),
+          (o6["spedito_il"], o6["aggiornato"], o6["stato"]))
+    avvisi.clear()
+    r6b = dichiara(222, 6)
+    prova("il doppio tocco: ok idempotente e NESSUNA seconda notifica",
+          True, isinstance(r6b, dict) and avvisi == [])
+    # il deposito e' l'annulla naturale: azzera la dichiarazione
+    deposita(222, 6, busta)
+    o6 = vero.execute("SELECT * FROM ordini WHERE id=6").fetchone()
+    prova("il deposito azzera la dichiarazione (l'annulla naturale)",
+          True, o6["busta_il"] > 0 and o6["busta_diretta_il"] == 0)
+    avvisi.clear()
+
     # la lettura: le parti si', l'estraneo e l'inesistente uguali,
     # e il database non cambia di un byte
     dump = [tuple(r) for r in vero.execute(
@@ -3948,6 +4081,14 @@ def prove_busta_ritiro():
                  "stato, via_punto, spedito_il) "
                  "VALUES(9, 111, 222, 'shipped', 1, ?)",
                  (int(_t.time()) - 4 * 86400,))
+    # id 15: il caso AFFILATO della busta diretta — spedito da 5
+    # giorni, busta assente, MA dichiarato: senza la clausola nella
+    # WHERE squillerebbe insieme al 9, e la prova qui sotto direbbe
+    # [222, 222]. Copre anche il 🧊, che vive nella stessa query.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(15, 111, 222, 'shipped', 1, ?, ?)",
+                 (int(_t.time()) - 5 * 86400, int(_t.time()) - 5 * 86400))
     vero.commit()
     amb = {"db": Con, "notifica": _notifica,
            "notifica_admin": _notifica_admin_spia(avvisi),
@@ -13832,6 +13973,7 @@ def prove_libro_mastro():
           busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
           busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
           busta_correzioni INT DEFAULT 0,
+          busta_diretta_il INT DEFAULT 0,
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
           nascosto_compratore INT DEFAULT 0,
@@ -13945,6 +14087,12 @@ def prove_libro_mastro():
           busta_nome,busta_codice,busta_il)
           VALUES(4, 9, 1000, 'shipped', 1,
                  'plain:Mario Rossi', 'plain:PIN 4321', 123);
+        -- UNA BUSTA DIRETTA SANA (ago 2026, cantiere 45): via punto,
+        -- spedito, dichiarato e SENZA busta — che non arrivera' mai,
+        -- ed e' esattamente il caso: nessuno deve fiatare
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
+          busta_diretta_il)
+          VALUES(10, 9, 1000, 'shipped', 1, 456);
         -- UN CODICE SANO e un ordine scontato da lui: il codice e'
         -- del venditore 222, l'ordine 7 e' del venditore 222, l'id e
         -- il nome ci sono tutti e due, e lo sconto e' scattato.
@@ -14153,6 +14301,14 @@ def prove_libro_mastro():
          "busta fuori contratto", "4"),
         ("UPDATE ordini SET busta_il=0, busta_nome='', busta_codice='', "
          "busta_corretta_il=99 WHERE id=4",
+         "busta fuori contratto", "4"),
+        # ...e i due bracci della busta DIRETTA (cantiere 45): la
+        # dichiarazione fuori dalla via punto e' una guardia caduta,
+        # e «depositata E dichiarata» non esiste mai legittimamente —
+        # il deposito azzera la dichiarazione nella stessa scrittura
+        ("UPDATE ordini SET via_punto=0 WHERE id=10",
+         "busta fuori contratto", "10"),
+        ("UPDATE ordini SET busta_diretta_il=77 WHERE id=4",
          "busta fuori contratto", "4"),
         # il nascondere e' ammesso solo sugli stati assorbenti: un
         # flag su un ordine vivo e' una guardia caduta — e un ordine
@@ -21608,8 +21764,12 @@ def prove_fogli_di_casa():
     # QUARANTUNO (ago 2026): la revoca del barattolo condiviso — un
     # link che muore per chiunque ce l'abbia si chiede prima, e il
     # corpo dice il costo vero (ricondividendo il link sara' NUOVO).
-    prova("i gesti che passano dalla domanda unica sono quarantuno",
-          41, solo_codice(mini).count("chiediConferma({"))
+    # QUARANTADUE (ago 2026, cantiere 45): la porta tardiva della
+    # busta diretta — dichiarare che il codice va al compratore
+    # silenzia i promemoria e avvisa l'acquirente, e va detto PRIMA
+    # del tocco.
+    prova("i gesti che passano dalla domanda unica sono quarantadue",
+          42, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -28421,6 +28581,7 @@ def prove_servizi():
             via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
             busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
             busta_correzioni INT DEFAULT 0, busta_file TEXT DEFAULT '',
+            busta_diretta_il INT DEFAULT 0,
             indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
             indirizzo_corretto_il INT DEFAULT 0,
             indirizzo_correzioni INT DEFAULT 0,
@@ -28504,6 +28665,18 @@ def prove_servizi():
     prova("...e quante ne ha perse", True, "1 a favore di chi ha" in n4)
     prova("il contenuto del collegamento non c'e' MAI", True,
           "meet." not in n and "http" not in n)
+    # LA BUSTA DIRETTA in disputa (ago 2026, cantiere 45): sul
+    # dichiarato «MAI depositate» direbbe il falso — la nota dice la
+    # dichiarazione con la data, etichettata di PARTE: il moderatore
+    # pesa, non crede sulla parola
+    n5 = _disputa(consegna_scelta="spedizione", via_punto=1,
+                  punto_ritiro="Locker InPost",
+                  busta_diretta_il=ora - 3600)
+    prova("la disputa sul dichiarato dice la dichiarazione, di parte",
+          True, "ha DICHIARATO" in n5
+          and "dichiarazione di parte" in n5)
+    prova("...e non piu' il falso «MAI depositate»", False,
+          "MAI depositate" in n5)
 
     # --- il form Vendi
     mini = open("miniapp.html", encoding="utf-8").read()

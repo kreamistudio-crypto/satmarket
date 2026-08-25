@@ -4460,7 +4460,23 @@ def init_db():
                     # MAX di _SQL_FERMI, o la coda dira' «mai
                     # sollecitato» su righe bussate tre volte.
                     "sollecito_appuntamento_il INTEGER DEFAULT 0",
-                    "solleciti_appuntamento INTEGER DEFAULT 0"):
+                    "solleciti_appuntamento INTEGER DEFAULT 0",
+                    # LA BUSTA DIRETTA (ago 2026, cantiere 45): il
+                    # venditore ha dichiarato che il codice di ritiro
+                    # arriva DIRETTAMENTE al compratore — recapiti suoi
+                    # sull'etichetta del corriere — quindi la busta non
+                    # si aspetta: la riga «in attesa del codice» cambia
+                    # testo e sollecita_buste_ferme tace (col suo 🧊).
+                    # Timestamp della dichiarazione, 0 = mai (il
+                    # pattern di busta_il: insieme il flag e il
+                    # quando). Il DEPOSITO della busta la AZZERA nello
+                    # stesso UPDATE: la busta supersede la
+                    # dichiarazione, ed e' anche l'annulla naturale —
+                    # chi ha dichiarato per sbaglio deposita e basta,
+                    # nessun bottone di undo. E' una dichiarazione di
+                    # PARTE non verificabile: in disputa il moderatore
+                    # la legge etichettata cosi', con la sua data.
+                    "busta_diretta_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -22291,8 +22307,16 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
                                      "adesso: riprova fra poco")
     adesso = int(time.time())
     correzione = o["busta_il"] > 0
+    # IL DEPOSITO AZZERA LA BUSTA DIRETTA, nella stessa unica
+    # scrittura (c'e' la sentinella che le conta): la busta supersede
+    # la dichiarazione «il codice arriva direttamente al compratore»,
+    # ed e' anche il suo annulla naturale — chi aveva dichiarato per
+    # sbaglio deposita e basta. Una scrittura sola = mai lo stato
+    # «depositata E dichiarata» nemmeno per un istante, ed e'
+    # l'invariante che il libro mastro sorveglia.
     con.execute("UPDATE ordini SET busta_nome=?, busta_codice=?, "
                 "busta_file=?, busta_file_tipo=?, busta_file_nome=?, "
+                "busta_diretta_il=0, "
                 "busta_il=?, busta_corretta_il=?, busta_correzioni=? "
                 "WHERE id=?",
                 (_cifra_contenuto(nome), _cifra_contenuto(codice),
@@ -22339,6 +22363,69 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     return {"ok": True, "busta_il": o["busta_il"] or adesso,
             "busta_correzioni": o["busta_correzioni"]
             + (1 if correzione else 0)}
+
+
+@app.post("/api/orders/{ordine_id}/busta-diretta")
+async def dichiara_busta_diretta(ordine_id: int,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """LA PORTA TARDIVA della busta diretta (ago 2026, cantiere 45,
+    decisione di Andrea): chi ha spedito SENZA la spunta nel form
+    resta sotto sollecito per sempre, e l'unica uscita sarebbe una
+    busta finta — da qui dichiara a ordine gia' spedito che il codice
+    di ritiro arriva direttamente al compratore (recapiti suoi
+    sull'etichetta). Il sollecito stesso nomina questa porta.
+
+    Solo su 'shipped': su 'locked' la dichiarazione si da' con la
+    spunta di segna_spedito, e in disputa una dichiarazione fresca e'
+    solo materiale da chat — il moderatore legge quella che c'era.
+    La guardia di proprieta' sta DENTRO la WHERE col 400 dei
+    fratelli: estraneo, ordine inesistente, stato o via sbagliati
+    ricevono la stessa risposta — chi enumera non impara niente.
+    IDEMPOTENTE sul doppio tocco: l'UPDATE e' condizionato a
+    busta_diretta_il=0, e il secondo tocco su rete lenta trova
+    rowcount 0 e risponde ok SENZA seconda notifica (dichiarare due
+    volte la stessa cosa non e' un errore). Non tocca spedito_il,
+    aggiornato ne' lo stato: nessuna ancora si muove.
+    L'ANNULLA NON C'E' APPOSTA: se il codice arriva invece a lui,
+    deposita la busta — e il deposito azzera la dichiarazione da se'.
+    """
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato='shipped' AND via_punto=1",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["busta_il"]:
+        # Le istruzioni sono GIA' nell'ordine: dichiarare che il
+        # codice arriva altrove contraddirebbe la busta depositata.
+        con.close()
+        raise HTTPException(400, "Le istruzioni di ritiro sono già "
+                                 "nell'ordine: il compratore le legge "
+                                 "da lì")
+    adesso = int(time.time())
+    cur = con.execute("UPDATE ordini SET busta_diretta_il=? "
+                      "WHERE id=? AND busta_diretta_il=0",
+                      (adesso, ordine_id))
+    gia = cur.rowcount == 0
+    con.commit()
+    con.close()
+    if gia:
+        return {"ok": True, "busta_diretta_il": o["busta_diretta_il"]}
+    print(f"📦 Ordine #{ordine_id}: il venditore ha dichiarato la "
+          f"busta diretta (il codice di ritiro va al compratore)")
+    # L'aspettativa del compratore cambia — gli era stato promesso
+    # «ti avviseremo quando il codice sara' nell'ordine» — e glielo
+    # si dice. Testo STATICO, la lingua della famiglia busta.
+    await notifica(o["compratore_id"],
+                   "📦 <b>Aggiornamento sul ritiro</b>: il venditore ha "
+                   "indicato i tuoi recapiti come destinatario — il "
+                   "codice di ritiro ti arriva direttamente dal "
+                   "corriere, non dall'ordine. Se non ti arriva, "
+                   "scrivigli o apri una disputa dall'ordine.")
+    return {"ok": True, "busta_diretta_il": adesso}
 
 
 @app.get("/api/orders/{ordine_id}/busta-ritiro")
@@ -22486,6 +22573,12 @@ async def segna_spedito(ordine_id: int, req: Request,
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
+    # LA BUSTA DIRETTA (ago 2026, cantiere 45): il venditore dichiara
+    # che il codice di ritiro arriva DIRETTAMENTE al compratore —
+    # recapiti suoi sull'etichetta — quindi la busta non si aspetta.
+    # Vale solo sulla via punto (fuori non ha oggetto e si ignora);
+    # chiave assente = 0, che su 'locked' e' la verita' di sempre.
+    busta_diretta = bool(d.get("busta_diretta"))
     # 'Ritiro in zona' e' il gemello di 'Consegna a mano' per gli
     # ordini col ritiro scelto dal compratore: niente pacco, niente
     # tracciamento — ma il timer di sblocco d'ufficio parte uguale.
@@ -22578,11 +22671,17 @@ async def segna_spedito(ordine_id: int, req: Request,
     # timbro e motivo sono coerenti). Sulle altre vie i campi sono gia'
     # a zero: scriverli e' innocuo e tiene l'UPDATE uno solo.
     # `punto_obiezioni` NON si azzera: e' la memoria del moderatore.
+    # La dichiarazione della busta diretta viaggia nello stesso unico
+    # UPDATE: fuori dalla via punto si scrive 0, che su una riga
+    # appena uscita da 'locked' e' il valore che aveva gia'.
+    adesso = int(time.time())
+    diretta_ts = adesso if (busta_diretta and o["via_punto"]) else 0
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
                 "punto_obiezione='', punto_obiezione_nota='', "
                 "punto_proposte='', punto_obiettato_il=0, "
+                "busta_diretta_il=?, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
-                (corriere, tracking, int(time.time()), int(time.time()),
+                (corriere, tracking, diretta_ts, adesso, adesso,
                  ordine_id))
     con.commit()
     con.close()
@@ -22607,6 +22706,18 @@ async def segna_spedito(ordine_id: int, req: Request,
             # d'arrivo parte da QUI — una volta sola, mai il doppione
             # «in viaggio» + «ti aspetta».
             await notifica(o["compratore_id"], MSG_BUSTA_PRONTA)
+        elif diretta_ts:
+            # LA BUSTA DIRETTA: qui non si promette «il codice sara'
+            # nell'ordine», che non arrivera' mai — lo manda il
+            # corriere ai recapiti del compratore, e lo si dice.
+            dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
+                         f"<b>{track_e}</b>" if tracking else "")
+            await notifica(o["compratore_id"],
+                f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
+                f"ritiro</b>{dettaglio}! Il venditore ha indicato i "
+                f"tuoi recapiti come destinatario: il codice per "
+                f"ritirarlo te lo manda direttamente il corriere "
+                f"quando il pacco arriva.")
         else:
             # Il caso normale: il pacco parte, il codice arrivera'
             # al venditore quando il pacco e' al punto — e sara' il
@@ -29178,6 +29289,19 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                 stato_busta += (f", poi corrett{'a' if n == 1 else 'e'} "
                                 f"{n} volt{'a' if n == 1 else 'e'} "
                                 f"(ultima il {ultima})")
+        elif o["busta_diretta_il"]:
+            # LA BUSTA DIRETTA: «MAI depositate» qui direbbe il falso
+            # — il venditore ha dichiarato che il codice arriva
+            # direttamente all'acquirente. E' un FATTO con data, ma
+            # e' una dichiarazione di PARTE, e la nota lo etichetta
+            # cosi': il moderatore pesa, non crede sulla parola.
+            quando_d = time.strftime(
+                "%d/%m/%Y %H:%M", time.localtime(o["busta_diretta_il"]))
+            stato_busta = (f"il venditore ha DICHIARATO (il {quando_d}) "
+                           f"che il codice di ritiro arriva direttamente "
+                           f"all'acquirente, recapiti suoi "
+                           f"sull'etichetta — è una dichiarazione di "
+                           f"parte, non un fatto verificato")
         else:
             stato_busta = "istruzioni di ritiro MAI depositate"
         nota_punto = (
@@ -31400,7 +31524,13 @@ async def sollecita_buste_ferme():
     solleciti_busta): un contatore ereditato salterebbe al tetto. Al
     tetto il 🧊 ai moderatori — a quel punto il pacco e' probabilmente
     tornato indietro — poi silenzio, il patto dei solleciti. Qui i
-    sats non si muovono mai, solo parole; notifiche DOPO il commit."""
+    sats non si muovono mai, solo parole; notifiche DOPO il commit.
+    LA BUSTA DIRETTA TACE (ago 2026, cantiere 45): chi ha dichiarato
+    che il codice arriva direttamente al compratore non aspetta
+    niente, e il promemoria lo rimprovererebbe per una busta che non
+    arrivera' mai — la WHERE lo esclude, e col promemoria tace anche
+    il 🧊 (stessa query). Il testo del sollecito nomina la porta
+    tardiva: e' cosi' che chi ha dimenticato la spunta la scopre."""
     if PROMEMORIA_BUSTA_GIORNI <= 0 or PROMEMORIA_CONFERMA_GIORNI <= 0:
         return
     adesso = int(time.time())
@@ -31413,6 +31543,9 @@ async def sollecita_buste_ferme():
         # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
         "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.stato='shipped' AND o.via_punto=1 AND o.busta_il=0 "
+        # la busta diretta: il codice va al compratore, qui non c'e'
+        # niente da aspettare — ne' promemoria ne' 🧊
+        "AND o.busta_diretta_il=0 "
         "AND o.spedito_il>0 AND o.solleciti_busta <= ? "
         "AND MAX(o.spedito_il + ?, o.sollecito_busta_il + ?) < ?",
         (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
@@ -31442,7 +31575,10 @@ async def sollecita_buste_ferme():
                     f"apri l'ordine e deposita il nome del "
                     f"destinatario e il codice: senza, il compratore "
                     f"non può ritirare il pacco, e la giacenza scade "
-                    f"in pochi giorni.")
+                    f"in pochi giorni. Se invece il codice arriva "
+                    f"direttamente all'acquirente (hai messo i suoi "
+                    f"recapiti sull'etichetta), dillo dall'ordine: "
+                    f"smettiamo di chiedertelo.")
             else:
                 # Il tetto e' passato: tocca a un umano, poi silenzio.
                 await notifica_admin(
@@ -31524,6 +31660,18 @@ async def sollecita_ritiri_al_punto():
     di reso. E' il rovescio di sollecita_venditori_fermi, dove il
     compratore riceve solo il primo: li' il caso nasce grave e si
     attenua, qui nasce normale e si aggrava.
+
+    LA BUSTA DIRETTA RESTA FUORI APPOSTA (ago 2026, cantiere 45,
+    decisione di Andrea): sugli ordini dichiarati «il codice arriva
+    direttamente al compratore» questo promemoria NON squilla — e ci
+    resta fuori PER COSTRUZIONE, senza una riga: la WHERE esige
+    `busta_il>0`, e il deposito azzera la dichiarazione nello stesso
+    UPDATE, quindi le due popolazioni non si toccano mai. Il perche'
+    e' che li' il corriere ha i recapiti del COMPRATORE ed e' lui a
+    mandargli codice e promemoria di giacenza — il nostro squillo
+    duplicherebbe, ancorato per giunta alla spedizione e non
+    all'arrivo, che non sappiamo: busserebbe «vai a ritirare» su un
+    pacco che viaggia ancora.
 
     Qui i sats non si muovono mai, solo parole; notifiche DOPO il
     commit, ognuna nel suo try."""
@@ -35523,10 +35671,19 @@ CONTROLLI_LIBRO_MASTRO = (
      "flag, nome e codice si scrivono nello stesso UPDATE e solo "
      "sulla via punto: una riga spaiata e' un deposito a meta' o una "
      "guardia caduta",
+     # I due bracci della BUSTA DIRETTA (ago 2026, cantiere 45):
+     # la dichiarazione vive solo sulla via punto (la guardia
+     # dell'endpoint e il gate di segna_spedito la rendono
+     # impossibile altrove — se compare, una guardia e' caduta), e
+     # il deposito la azzera nello STESSO UPDATE, quindi «depositata
+     # E dichiarata» non ha nessuno stato transitorio legittimo:
+     # tutti e due passano la domanda d'ammissione.
      "SELECT id FROM ordini WHERE (busta_il>0) <> (busta_nome<>'') "
      "OR (busta_il>0) <> (busta_codice<>'') "
      "OR (busta_il>0 AND via_punto=0) "
-     "OR (busta_corretta_il>0 AND busta_il=0)"),
+     "OR (busta_corretta_il>0 AND busta_il=0) "
+     "OR (busta_diretta_il>0 AND via_punto=0) "
+     "OR (busta_diretta_il>0 AND busta_il>0)"),
     # L'OBIEZIONE SUL PUNTO (ago 2026), il calco della busta qui sopra
     # e per la stessa ragione: timbro e motivo si scrivono nello STESSO
     # UPDATE e solo sulla via punto, quindi non esiste uno stato
