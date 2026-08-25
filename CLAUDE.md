@@ -2154,10 +2154,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   vede da cosa sono filtrati, e si cambia reparto senza tornare
   indietro. L'anello è un `outline` con `offset` e non un bordo: sta
   FUORI dal quadrato, quindi non ruba un pixel all'illustrazione e non
-  sposta le vicine. Col BARATTOLO invece la sezione se ne va: lì non
-  c'è nessuna categoria da illuminare. Si NASCONDE e non si svuota —
-  tornando indietro la fila è già lì, senza un giro di render e senza
-  che le figure lampeggino.
+  sposta le vicine. [La riga sul BARATTOLO che faceva sparire la
+  sezione è ROVESCIATA dall'ago 2026: nella striscia c'è la card del
+  barattolo, quindi anche col filtro acceso la fila resta e a
+  illuminarsi è LEI — vedi «LA CARD DEL BARATTOLO NELLA STRISCIA». A
+  sparire col barattolo resta la sola sezione «Da scoprire», le cui
+  card accendono filtri del server che su una lista chiusa non hanno
+  senso.]
   E LA CARD ACCESA SI PORTA IN VISTA scrivendo `scrollLeft` a mano:
   illuminata fuori schermo non la vedrebbe nessuno, e la funzione del
   browser che porta in vista un elemento sposterebbe anche la pagina
@@ -16674,7 +16677,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (#BFE3F0, di sera più tenue #7FA3B5) — ovunque il barattolino
   compare (card, cerchietto del dettaglio, cassetto); dettaglio, non
   protagonista: non copre la lettura del livello.
-  IL BARATTOLO IN TESTATA (ago 2026, richiesta di Andrea): la stessa
+  IL BARATTOLO IN TESTATA (ago 2026, richiesta di Andrea) [SUPERATA
+  dall'ago 2026: il barattolino è diventato una CARD nella striscia
+  delle categorie e al suo posto in testata c'è il PODIO della
+  classifica — vedi «LA CARD DEL BARATTOLO NELLA STRISCIA», sotto. La
+  voce resta per le misure della testata e per la regola del `~`, che
+  valgono ORA PER IL PODIO parola per parola: stessa posizione, stessa
+  ricetta CSS, stesso ordine levetta→cerchietto→tappo]: la stessa
   icona che si riempie nel cassetto, accanto alla levetta del tema —
   `.jar-testa`, due istanze gemelle (testata mobile e topbar desktop)
   come la levetta e il tappo, una classe sola e un `querySelectorAll`
@@ -16793,6 +16802,84 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   avanzano 173px (verificato dal vivo a 1280: zero sbordo). Chi lo
   curerà: la leva standard da tablet sono le sole icone sotto ~900px
   (−208px).
+  LA CARD DEL BARATTOLO NELLA STRISCIA, E IL PODIO IN TESTATA (ago
+  2026, decisione di Andrea): il barattolino di testata era un
+  cerchietto da 34px, e col filtro acceso la striscia spariva del
+  tutto — adesso è una CARD grande come le altre, seconda della fila
+  ACCANTO a «Tutto», col vetro che continua a riempirsi; il posto in
+  testata l'ha preso il PODIO della classifica (la voce sua, sotto
+  «LA CLASSIFICA DEL MERCATINO»).
+  IL RIEMPIMENTO COSTA QUASI ZERO, ed è ciò che ha deciso la forma:
+  non un'immagine ma `jarSVG(livello, 56)` inline dentro il
+  `.cat-quad` — le classi lv0-4 e la transizione ci sono già, e
+  `aggiornaBarattolo` la livella DA SOLA perché la card non porta
+  nessuna delle due classi escluse (`.card-jar`/`.jar-btn`): la
+  scossa di festa di `togglePreferito` arriva in omaggio. Il livello
+  si CUOCE al render (mai lv0 secco: un barattolo vuoto al primo
+  sguardo e pieno al primo tocco è un difetto che non segnala
+  nessuno). Il vetro è CREMA FISSA (`--cat-ink`) sul bruno
+  `--cat-fondo` — un disegno su fondo fisso non segue il tema, il
+  patto delle illustrazioni — e liquido/riflesso restano i token di
+  sempre.
+  L'UNICO COSTO VERO È LA FIRMA della striscia, che guadagna due
+  pezzi: `J` (la card c'è — senza, il primo render gira PRIMA del /me
+  con `myTgId` vuoto e al secondo giro la firma identica lascerebbe
+  la card mai nata) e `B` (il filtro è acceso — senza, il toggle non
+  accenderebbe mai l'anello). Un toggle costa un re-render della
+  fila, come entrare in un reparto.
+  LA CARD È UN `<a>` SENZA href con role/button e tabindex (il
+  pattern della card P2P: non naviga, nessun URL da preservare) e
+  NIENTE `data-cat`, che non è una dimenticanza: il tocco lungo della
+  condivisione delega su `.cat-cella[data-cat]`, quindi la card ne
+  resta fuori PER COSTRUZIONE come già la card «Tutto» — un reparto
+  si condivide, il proprio barattolo no. La guardia è la STESSA
+  STRINGA di `bottoneJar` (`DEMO || VETRINA || !myTgId`, sentinella
+  che la estrae e confronta): in DEMO e in vetrina la card non nasce,
+  che là il barattolo non esiste affatto.
+  COL FILTRO ACCESO LA STRISCIA RESTA (il rovesciamento che rende
+  possibile tutto il resto: c'è finalmente una card da illuminare, la
+  stessa ragione del filtro categoria) con l'anello arancione sulla
+  card e l'`attiva` SOPPRESSO su «Tutto» e sulle categorie
+  (`&& !vistaBarattolo`): il filtro vero è il barattolo, due accese
+  mentirebbero. Si spegne col RITOCCO (il gesto delle card
+  categoria), dalla pillola, dal tocco su «Tutto» (card e tab: ramo
+  esplicito in `tornaATuttoDaTocco` e in `vaiEsplora`, perché a
+  `activeCat` già 'Tutto' il tocco sarebbe un no-op e il filtro
+  resterebbe acceso su una card che dice «Tutto») o toccando una
+  categoria, che passa da `loadListings → spegniBarattolo` gratis.
+  «Da scoprire» invece SPARISCE col filtro, ed è l'unica sezione a
+  farlo: le sue card accendono filtri del server, senza senso su una
+  lista chiusa.
+  E LA PILLOLA STA FRA LE ALTRE (il punto 6 di Andrea): col filtro
+  acceso `renderChips` non sostituisce più tutto con la sola pillola
+  d'uscita — mette `🫙 Nel tuo barattolo ✕` ACCESA IN TESTA (la
+  regola «una pillola accesa in fondo non la vede nessuno») seguita
+  dalle pillole normali spente, così scorrendo la barra appiccicata
+  la porta in mezzo alle altre e da lì si esce o si va dritti in un
+  reparto. L'observer su `#catSez` non ha guadagnato nessun caso
+  particolare: la sezione non va più MAI in `display:none`.
+  LA REGIA È UNA: `scriviStatoBarattolo` fa il toggle sul body E
+  chiama `renderChips()` (che ridisegna tutte e due le file — la
+  firma porta lo stato apposta), quindi anche `spegniBarattolo`
+  spegne card e pillola SUBITO senza aspettare il fetch;
+  `alternaBarattolo` ha perso la sua chiamata diretta (le occorrenze
+  nette di `renderChips()` nel file sono invariate, c'è la prova).
+  `renderJarTesta` È MORTA con le sue due `<button class="jar-testa">`
+  e il loro CSS; al posto suo `renderPodioTesta`, il cui racconto
+  vive nella voce della classifica. Il nome «Nel tuo barattolo» resta
+  UNO su tutte le superfici — card (title+aria-label+etichetta),
+  cassetto, pillola — la regola di sempre.
+  IL CASSETTO NEL PROFILO NON SI TOCCA: resta la GESTIONE (i «non più
+  disponibile» col Togli), mestieri distinti come da decisione già
+  presa. E il filtro resta fuori dalla cronologia: `chiaveVetrina`
+  non lo guarda, com'era e per la ragione già scritta nel motore.
+  PROVATO: tortura a 7 mutazioni una per riga sorvegliata (guardia
+  della card, data-cat, firma senza B, active non soppresso,
+  renderChips tolto dalla regia, gate del podio, podio dopo il
+  tappo), tutte uccise; giro dal vivo via CDP a 320/360/375 nei due
+  temi col server vero (riempimento in place, tutte le strade di
+  accensione/spegnimento, la barra appiccicata, la classifica dal
+  podio, zero sbordo, zero errori JS).
   IL BARATTOLINO FILTRA LA HOME (ago 2026, decisione di Andrea): un
   tocco e la vetrina mostra i soli annunci del barattolo, SENZA
   cambiare vista; si spegne ritoccandolo, dalla pillola in vetrina, o
@@ -16816,8 +16903,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non si potrebbe fare perché quelle card non ci sono. Non è un
   doppione: la FONTE è una sola, e l'unica cosa davvero duplicata era
   il TESTO del vuoto, che ora vive in un posto solo. 2) I FILTRI SI
-  NASCONDONO (Ordina e Filtri via, le pillole categoria lasciano il
-  posto alla pillola d'uscita) e le loro variabili restano VIVE: si
+  NASCONDONO (Ordina e Filtri via; le pillole categoria dall'ago 2026
+  RESTANO con quella del barattolo accesa in testa — alla nascita
+  lasciavano il posto alla sola pillola d'uscita) e le loro variabili
+  restano VIVE: si
   nascondono, non si azzerano — uscendo la vetrina è com'era. Il
   motivo tecnico è che quei controlli chiamano il SERVER, che del
   barattolo non sa niente, e il ramo che filtra lato client è gated su
@@ -22419,7 +22508,9 @@ il compratore riceva la notifica, e soprattutto che il venditore
 SMETTA di ricevere il promemoria della merce mai partita.
 
   LA CLASSIFICA DEL MERCATINO 🏆 (ago 2026): i migliori in una pagina
-  raggiungibile dal Profilo, ordinati per reputazione — non la sola
+  raggiungibile dal PODIO in testata (dall'ago 2026 — nacque in fondo
+  al Profilo, vedi la voce della card del barattolo per il trasloco),
+  ordinati per reputazione — non la sola
   media dei feedback, ma pesata col commercio. ROVESCIA una decisione
   scritta (`proposte/roadmap-gamification-aste.md`: «classifica fuori
   dalla v1, farmare oggi è gratis: misurerebbe il tempo libero, non il
@@ -22557,8 +22648,22 @@ SMETTA di ricevere il promemoria della merce mai partita.
   contenuto si ridisegna dal `go(b.v)` finale) e fuori da `VISTE_PTR`.
   In DEMO e in VETRINA NON ESISTE: là non c'è un server che la calcoli e
   un numero inventato sarebbe peggio del niente (il patto del cassetto
-  wallet), quindi il bottone non compare e `apriClassifica` ha la
+  wallet), quindi il podio non compare e `apriClassifica` ha la
   cintura per ogni altra strada.
+  LA PORTA È UNA ED È IL PODIO IN TESTATA (ago 2026, decisione di
+  Andrea): il bottone in fondo al Profilo è MORTO — due porte per la
+  stessa pagina sono un bivio, e il podio si vede da ogni vetrina
+  invece che in fondo a un'altra scheda. Il podio è un SVG statico
+  inline (tre gradini, la grammatica delle icone di casa: viewBox
+  «2 2 20 20», tratto 1.5 currentColor, velo 12% inline perché
+  `.velo` è scoped a `.nav-ico` — il precedente di ICO_LOCKER), due
+  istanze gemelle fra la levetta del tema e il tappo, gate
+  `myClassifica && !DEMO && !VETRINA` in `renderPodioTesta` (chiamata
+  DOPO il /me, dove `myClassifica` è appena arrivata, più i tre rami
+  anonimi/demo), anello `.attivo` da `go()` quando la vista è la
+  classifica (il registro del tappo). CONSEGUENZA DICHIARATA: su
+  mobile la testata vive solo in Esplora, quindi dal Profilo la
+  classifica non si raggiunge più — da desktop la topbar c'è ovunque.
   IL VESTITO È QUELLO DI CASA e non una classe nuova da tarare:
   `.seller` per la riga (lo stesso blocco avatar+nome+reputazione del
   negozio e del Profilo) e `.tema-pill` per il filtro — la riga si legge
@@ -22588,11 +22693,31 @@ SMETTA di ricevere il promemoria della merce mai partita.
   ordina di fatto per VOLUME, ed è anche la ragione per cui la riga che
   spiega esiste.
   RESTA FUORI, dichiarato: nessuna rotta `/classifica` condivisibile (la
-  porta è il bottone; aggiungerla è il calco di `/sicurezza` ed è una
+  porta è il podio in testata; aggiungerla è il calco di `/sicurezza` ed è una
   decisione a parte, con SEO, anteprima e sitemap); niente classifica
   mensile né opt-in; e NESSUNA NOTIFICA — nessuno viene avvisato che è
   salito o sceso, che una classifica che scrive in chat è la famiglia di
   messaggi che fa bloccare il bot.
+
+La card del barattolo nella striscia, e il podio in testata (ago 2026,
+i due cambi in home chiesti da Andrea): il barattolino di testata è
+diventato una card grande come le altre, accanto a «Tutto», col vetro
+che si riempie in place; al suo posto il PODIO della classifica (icona
+scelta da Andrea fra otto candidate guardate a schermo), e il bottone
+in fondo al Profilo è morto — una porta sola. Col filtro acceso la
+striscia RESTA (c'è la card da illuminare) e la pillola del barattolo
+sta accesa in testa fra le altre nella barra appiccicata. Vedi
+Architettura, «LA CARD DEL BARATTOLO NELLA STRISCIA», per la firma
+J/B, il niente-data-cat e la regia unica. Collaudato: 6016 prove verdi
+(rovesciate col perché: jar-testa a zero, la striscia che non si
+nasconde più, profiloClassifica a zero) e 7 mutazioni una per riga
+sorvegliata, tutte uccise; giro dal vivo via CDP a 320/360/375 nei due
+temi col server vero. IN PRODUZIONE basta il deploy: nessuna colonna,
+nessuna leva, nessuna rotta — solo client. `CLASSIFICA_ATTIVA` è GIÀ
+accesa sul VPS (Andrea, 24 ago), quindi il podio compare al deploy per
+tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
+condivisione sulla striscia (la card del barattolo non deve entrarci)
+e il podio dentro Telegram vero.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
