@@ -4854,6 +4854,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   except che non può scattare è peggio di niente: promette una guardia
   che nessuno esercita. A essere sorvegliata è quella VERA, dentro
   `chiave_nostr_provata`: togliendola, la prova diventa rossa.
+  IL POST DICE COME ARRIVA LA ROBA (ago 2026, chiesto da Andrea):
+  `_righe_consegna_promo` mette una riga per strada offerta, con le
+  icone e le parole della scheda — 🚚 spedizione (col costo), 🤝 ritiro
+  in zona, 💾 codice online. La spedizione nomina TUTTE E DUE le
+  destinazioni («a casa o a un punto di ritiro»), perché dall'ago 2026
+  la via punto si offre sempre dove c'è la spedizione: dirne una sola
+  sarebbe metà della verità proprio dove si decide se aprire. Consegna
+  NON DICHIARATA (storici e importati) = nessuna riga, il patto dei
+  filtri della vetrina. Il costo passa dai GIUDICI DEL CONTO
+  (`_tariffa_dichiarata`, `_sped_in_sats`) e non da una lettura a mano
+  delle colonne, o il canale prometterebbe una cifra che il checkout
+  smentisce; due strade a prezzo diverso si dicono con «da …» e il
+  MINIMO (nel post non c'è spazio per due cifre, e il minimo è l'unica
+  che non promette meno del vero); tariffa ancorata all'EURO col cambio
+  muto = la strada si dice e la cifra NO — mai un numero inventato, la
+  regola dell'avviso EUR senza cambio.
+  E PORTA LA VETRINA DEL VENDITORE (`_vetrina_venditore`,
+  `MAX_VETRINA_PROMO` 3): è LA CONTROPARTITA DEL FRENO — un post a
+  settimana, ma quel post non parla di un oggetto solo, linka anche gli
+  altri e il negozio. Così chi pubblica tre cose in un pomeriggio si
+  vede lo stesso senza prendersi tre post. Gli altri si leggono
+  (`_altri_del_venditore`) con le guardie della vetrina — solo
+  'attivo' — perché sono link che qualcuno tocca a giorni di distanza:
+  linkare un venduto vorrebbe dire mandare su uno scaffale vuoto chi
+  era venuto a comprare. `promo_venduto` li RILEGGE quando riscrive il
+  post col ✅, o la vetrina si perderebbe nell'edit. Titoli troncati
+  PRIMA e scappati DOPO (la lezione della ricevuta): la caption di
+  Telegram ha 1024 caratteri e un «<» spegnerebbe il post in silenzio.
   UN POST PER VENDITORE A SETTIMANA (ago 2026, decisione di Andrea):
   il canale è una SELEZIONE, non la vetrina. Leva
   `PROMO_GIORNI_VENDITORE` (7; 0 = nessun freno, emergenza e non
@@ -4945,8 +4973,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scontato, ognuno da `_prezzo_promo` — una regola sola per tutti i
   prezzi che escono dal canale; sul listino in EURO lo sconto si
   applica anche all'equivalente in sats, o la riga direbbe due sconti
-  diversi. Leva `POST_LAMPO_CANALE` (True di serie) per spegnere gli
-  sconti senza spegnere gli annunci nuovi.
+  diversi. Leva `POST_LAMPO_CANALE` per spegnere gli sconti senza
+  spegnere gli annunci nuovi.
+  E DALL'AGO 2026 NASCE SPENTA (decisione di Andrea, che ROVESCIA il
+  «True di serie» della nascita): nel canale gli sconti non devono
+  comparire come messaggi NUOVI — il canale è una SELEZIONE di
+  annunci, e una lampo è un secondo messaggio su una cosa già
+  raccontata, cioè esattamente il rumore che il freno di
+  `_un_post_per_venditore` esiste per togliere. NON SI PERDE NIENTE
+  dove si compra: il badge «⚡ −N%» e il listino barrato sono in
+  vetrina e nella scheda, e il filtro «⚡ Offerta a tempo» ordina da
+  sé per chi scade prima. Il codice resta tutto e si riaccende con una
+  riga nel config: chi lo fa sappia che consuma il budget orario dei
+  post, cioè che uno sconto può rubare il turno a un annuncio nuovo.
+
   IMPERFEZIONE DICHIARATA: se l'annuncio si vende mentre la lampo è
   viva, quel post resta senza il ✅ (l'originale ce l'ha). Il testo è
   DATATO — «solo fino alle 18:00» — e il link apre la scheda vera, che
@@ -4954,11 +4994,59 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   fastidio la leva è una colonna `post_lampo_id` più una riga in
   `promo_venduto`: qui si è scelto di non raddoppiare il ciclo di vita
   per un post che si autodata.
+  SI GUARDA PRIMA DI PUBBLICARE (ago 2026, chiesto da Andrea):
+  `/anteprima` manda in PRIVATO a chi lo chiede il post così come
+  uscirebbe nel canale — `/anteprima` l'ultimo annuncio pubblicabile,
+  `/anteprima 42` quello, `/anteprima riepilogo` il post del lunedì
+  coi tre barattoli. Fino a ieri l'unico modo di vedere com'era fatto
+  un post era PUBBLICARLO, cioè provare in piazza: e un post storto
+  nel canale non si disfa (l'edit tiene solo il ✅ Venduto).
+  GUARDARE NON CONSUMA NIENTE, ed è tutta la regola: nessun
+  `promo_canale_il`, nessun `post_canale_id`, nessun timbro del
+  lunedì, nessuna riga toccata — un'occhiata non deve bruciare il
+  turno di un venditore che il suo post non l'ha ancora avuto. C'è il
+  censimento che lo verifica, e guarda il CORPO e non la docstring,
+  che quelle colonne le nomina apposta per dire che non si toccano.
+  LA STRADA È QUELLA VERA (`_caption_canale`, `_altri_del_venditore`,
+  `_immagine_riepilogo`): un'anteprima che si costruisse il post da sé
+  direbbe una cosa e il canale un'altra, cioè proprio il difetto che
+  il comando esiste per far vedere prima. Cambia solo il `chat_id`, e
+  le guardie della vetrina qui NON si applicano — si guarda anche
+  l'annuncio di un venditore in ferie, che è quel che serve quando si
+  sta controllando qualcosa. Quando il riepilogo esce come TESTO il
+  comando DICE PERCHÉ (Pillow, lo sfondo, le foto): qui si sta
+  guardando proprio l'immagine, e un post che esce nudo in silenzio
+  manda a cercare il guasto nel posto sbagliato.
   IL RIEPILOGO DEL LUNEDÌ (ago 2026, chiesto da Andrea):
   `riepilogo_settimana` nell'orologio accanto al termometro — annunci
   nuovi, ordini e i tre articoli più venduti, nel canale e solo lì (su
   Nostr il pubblico è un altro). Timbro `TIMBRO_RIEPILOGO` nella
   tabella `timbri`, mai un globale.
+  HA UN CANALE SUO (ago 2026, decisione di Andrea: il riepilogo va su
+  @barattolostore): il racconto della settimana e la sfilza degli
+  annunci nuovi hanno due pubblici, e chi segue la vetrina non deve
+  per forza leggere i conti. Giudice `canale_riepilogo()` col pattern
+  di `canale_id()` — chiave `canale_riepilogo` nella tabella
+  `impostazioni` (il recinto passa a DUE chiavi più il ritmo), config
+  `TELEGRAM_CANALE_RIEPILOGO` come valore di PARTENZA, e si cambia dal
+  bot con `/canale riepilogo @nome` (un ramo del comando che c'è già:
+  è la stessa domanda — dove parla il bot — e un secondo comando col
+  nome quasi uguale è quel che si sbaglia col telefono in mano; SI
+  PROVA PRIMA DI CREDERCI come il fratello).
+  IL RIPIEGO È `canale_id()` E NON IL SILENZIO: senza una riga scritta
+  da nessuna parte il riepilogo esce dov'è sempre uscito — un canale
+  non configurato non deve poter far sparire un post settimanale senza
+  che nessuno se ne accorga. Per la stessa ragione qui il VUOTO NON
+  SPEGNE (a differenza di `imposta_canale`, dove il vuoto è il gesto
+  di chi vuole il silenzio): rimette il riepilogo dove vanno gli
+  annunci, e a spegnere c'è `RIEPILOGO_SETTIMANALE`, che è il posto
+  dove si va a cercare quando il lunedì non arriva niente.
+  ⚠️ Il censimento «chi parla col canale» in `prove.py` NON lo conta
+  più: la sua prova ha CAMBIATO LATO e adesso chiede il contrario —
+  che `riepilogo_settimana` non nomini MAI `canale_id()`. Se una sola
+  delle sue strade ci tornasse, il post finirebbe di nuovo in mezzo
+  agli annunci.
+
   MA QUI SI TIMBRA ANCHE QUANDO SI TACE, ed è la differenza col
   termometro — che invece esce PRIMA di timbrare quando la coda è
   sotto il minimo. Lì il conto è CUMULATIVO: saltare il turno lo
@@ -5012,6 +5100,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nostro alfabeto esiste già — è il livello 0 di `jarSVG` in vetrina,
   quello che dice «non l'hai ancora messo via» — quindi si legge come
   un barattolo vuoto e non come un errore.
+  E DALL'AGO 2026 IL PODIO SI COMPONE SUL DISEGNO VERO (chiesto da
+  Andrea con la sua immagine): le foto si incollano nei tre vetri
+  bianchi di `assets/riepilogo-barattoli.png` invece che nei barattoli
+  disegnati qui sotto. NON È UNA SOSTITUZIONE SECCA, ed è il pezzo da
+  capire: `_podio_su_sfondo` torna `None` se il file non c'è, se
+  Pillow non c'è o se nessuno dei tre ha una foto NOSTRA, e allora
+  `_salva_podio` ricade su `disegna_figura` — che resta viva e
+  collaudata. Così il lunedì non salta mai per un asset mancante, e
+  chi clona il repo senza quel PNG vede il podio di sempre.
+  LA FILA DEI NEGOZI RESTA DISEGNATA, ed è una conseguenza dichiarata
+  e non una dimenticanza: quel PNG ha tre barattoli di misure diverse,
+  cioè è un PODIO — la fila («ecco tre cose di questo negozio») ne
+  vuole tre uguali, e con quello sfondo non si può fare. Le due
+  superfici hanno quindi due stili: se un giorno darà fastidio, la
+  strada è un secondo disegno con tre barattoli uguali, non un ritocco
+  qui.
+  I RIQUADRI SONO FRAZIONI DEL LATO e non pixel (`VETRI_RIEPILOGO`):
+  lo sfondo si può rifare a un'altra risoluzione senza ritarare
+  niente. L'ordine è il PODIO come `PODIO_MISURE`, e c'è la prova che
+  le tre aree stiano in ordine decrescente — se si rovesciasse, il
+  post direbbe che il più venduto è l'ultimo. SI TARANO A OCCHIO con
+  `anteprima_riepilogo.py` (`--griglia` disegna i tre riquadri sullo
+  sfondo nudo): sono numeri che si guardano, non si deducono, e quello
+  script legge e basta — nessun timbro consumato. Un barattolo senza
+  foto resta vuoto anche lì: il vetro è una figura, non un buco.
   IL RIFLESSO CELESTE STA SOLO LÌ, ed è la riga da non ammorbidire:
   sopra una foto ogni forma di luce diventa una sbavatura. Provate e
   scartate GUARDANDOLE tutte e due — le due pennellate di `jarSVG` si
@@ -18921,8 +19034,57 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `grep -n "MAX_PREFERITI" ~/satmarket/config.py` — nessuna riga = vale
   il default e non c'è niente da fare; una riga con 20 = va cambiata a
   mano (o cancellata) e poi riavviato.
-- Deploy: commit+push su main → sul server `cd satmarket && git pull &&
-  systemctl restart barattolo`. Config e database NON viaggiano mai.
+- DEPLOY AUTOMATICO (ago 2026): commit+push su main, e basta. Entro un
+  minuto è online — se la CI è verde. Config e database NON viaggiano
+  mai (restano fuori dalla repo, e `git reset` non li tocca).
+  LA CATENA, in tre pezzi: 1) il job `pronto` del workflow fa avanzare
+  il ref `pronto` SOLO quando prove e controllo dei segreti sono
+  passati; 2) sul VPS un timer systemd chiama `deploy.sh` ogni minuto,
+  che guarda se quel ref si è mosso; 3) dopo il riavvio si chiede a
+  `/api/salute` e, se non risponde entro 45 secondi, si torna al
+  commit di prima e si riavvia ancora.
+  IL VPS TIRA, NON VIENE SPINTO, ed è una decisione di SICUREZZA e non
+  di comodità: nessuna chiave di quella macchina sta nei secret di
+  GitHub, quindi chi compromette GitHub — o una action di terzi — non
+  arriva al nodo Lightning. Per la stessa ragione «la CI è verde» non
+  è una domanda da fare a un'API con un token in mano: è il fatto
+  stesso che il ref si sia mosso. Un commit rosso resta su main e in
+  produzione non ci arriva mai.
+  IL FRENO È LA RIGA CHE SI DIMENTICA: dopo un rollback il ref `pronto`
+  resta AVANTI, quindi al giro dopo — fra un minuto — si riproverebbe
+  lo STESSO commit rotto, e poi ancora, riavviando il mercatino ogni
+  sessanta secondi per sempre. Il commit bocciato si timbra in
+  `.deploy-bocciato` e non si riprova da solo: per riprovarlo si
+  spinge un commit nuovo (che è anche quel che si dovrebbe fare)
+  oppure si lancia `./deploy.sh --forza` a mano, guardando.
+  `/api/salute` TOCCA IL DATABASE apposta (una lettura, la più piccola
+  che ci sia): un uvicorn che risponde ma non sa più aprire il file
+  del mercatino è esattamente il guasto che un health check sul solo
+  processo NON vede — e sarebbe quello che lascia online una versione
+  rotta credendola sana. È pubblica come `/api/listings`, quindi non
+  dice NIENT'ALTRO: niente conteggi, versioni, percorsi o nomi di
+  file, che sono tutte cose che aiutano chi guarda il server da fuori
+  a sapere cosa ha davanti. Il «cosa sta girando» lo dice il journal,
+  che è di chi ha le chiavi. Sul guasto risponde 503 e non un 200 con
+  «ok: false»: chi controlla la salute guarda il CODICE, e un guasto
+  travestito da risposta buona è il modo in cui un rollback non parte.
+  L'unità systemd COPIA lo script in /tmp prima di eseguirlo, e non è
+  una stranezza: bash legge un file mentre lo esegue, quindi se
+  `git reset` lo riscrivesse a metà corsa la riga dopo sarebbe di un
+  altro script. Il deploy in corso finisce col codice con cui è
+  partito e la versione nuova entra in vigore al giro dopo.
+  Il database si COPIA PRIMA di aggiornare (`backup/pre-deploy-*.db`,
+  le ultime 5) e si copia con l'API di sqlite invece che con `cp`: il
+  server sta girando, e un file copiato a caldo mentre qualcuno scrive
+  è un file che al momento del bisogno non si apre. Non sostituisce il
+  backup giornaliero — è la rete per i cinque minuti attorno al
+  deploy, quando gira anche `init_db` con le sue migrazioni.
+  A MANO, quando serve: `./deploy.sh --dimmi` dice a che punto sta
+  senza toccare niente, `--forza` riapplica e riavvia. Il primo giro
+  (installazione del timer) è in `deploy/barattolo-deploy.service` e
+  `.timer`. `prove.py` difende le quattro righe che contano — il
+  semaforo che aspetta i due job, il freno, l'ordine del rollback, e
+  la salute che non racconta niente di sé.
 - Webhook del bot: `TELEGRAM_WEBHOOK_SEGRETO` nel config del server
   (stringa casuale) e al riavvio si registra da solo (riga «🔔 Webhook
   Telegram» nel journal). ATTENZIONE: mai avviare MODALITA_COLLAUDO=False

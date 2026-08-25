@@ -1,0 +1,20 @@
+; Ogni minuto: nel caso normale sono un `git fetch` e un confronto fra
+; due sha, cioe' niente. Il minuto e' il ritardo massimo fra «la CI e'
+; diventata verde» e «e' online».
+;
+; Persistent=true: se il VPS e' stato spento (o riavviato) il giro si
+; recupera all'accensione invece di aspettare il minuto successivo —
+; cosi' una macchina che torna su si allinea da sola.
+
+[Unit]
+Description=Barattolo — controlla ogni minuto se c'e' un aggiornamento pronto
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Persistent=true
+Unit=barattolo-deploy.service
+
+[Install]
+WantedBy=timers.target

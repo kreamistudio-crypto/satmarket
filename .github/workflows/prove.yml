@@ -66,6 +66,7 @@ jobs:
              collaudo_pausa.py collaudo_due_teste.py
              collaudo_consegna_firmata.py collaudo_ricategorizza.py
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
+             anteprima_riepilogo.py
              collaudo_tornate.py collaudo_rilancio.py
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
@@ -237,3 +238,33 @@ jobs:
             exit 1
           fi
           echo "cronologia pulita"
+  # ---------------- IL SEMAFORO DEL DEPLOY (ago 2026) ---------------
+  #
+  # Il VPS non guarda `main`: guarda il ref `pronto`, e a farlo
+  # avanzare e' SOLO questo job, che parte solo quando le due domande
+  # di sopra hanno gia' risposto di si'. Cosi' «la CI e' verde» non e'
+  # una cosa che il server deve andare a chiedere a un'API con un
+  # token in mano: e' scritta nel fatto stesso che il ref si e' mosso.
+  #
+  # E' anche il motivo per cui il deploy e' PULL e non PUSH: nessuna
+  # chiave del server sta nei secret di questo repo. Da qui non si
+  # entra in produzione — si alza una bandierina, e a decidere cosa
+  # farne e' la macchina che i sats ce li ha davvero.
+  #
+  # Solo su main, e solo sui push: una PR verde non deve poter mettere
+  # niente in produzione.
+  pronto:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [prove, segreti]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # --force NO, e non e' pignoleria: `pronto` deve poter solo
+      # AVANZARE lungo main. Se un giorno il push venisse rifiutato
+      # vuol dire che i due rami hanno divergito — cioe' che qualcuno
+      # ha riscritto la storia — ed e' esattamente il momento in cui
+      # un deploy automatico deve fermarsi e farsi guardare.
+      - name: Alza la bandierina per il VPS
+        run: git push origin HEAD:refs/heads/pronto

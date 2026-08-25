@@ -581,6 +581,13 @@ try:
     from config import TELEGRAM_CANALE_ID
 except ImportError:
     TELEGRAM_CANALE_ID = ""
+# Il canale del RIEPILOGO del lunedi': vuoto = va dove vanno gli
+# annunci. Come l'altro, e' solo il valore di PARTENZA — si cambia dal
+# bot con «/canale riepilogo @nome».
+try:
+    from config import TELEGRAM_CANALE_RIEPILOGO
+except ImportError:
+    TELEGRAM_CANALE_RIEPILOGO = ""
 try:
     from config import POST_MAX_ORA
 except ImportError:
@@ -611,7 +618,16 @@ except ImportError:
 try:
     from config import POST_LAMPO_CANALE
 except ImportError:
-    POST_LAMPO_CANALE = True
+    # NASCE SPENTA (ago 2026, decisione di Andrea): nel canale gli
+    # sconti non devono comparire come messaggi NUOVI — il canale e'
+    # una selezione di annunci, e una lampo e' un secondo messaggio su
+    # una cosa gia' raccontata, cioe' esattamente il rumore che il
+    # freno di `_un_post_per_venditore` esiste per togliere. Lo sconto
+    # resta visibilissimo dove si compra: badge e prezzo barrato in
+    # vetrina, filtro «⚡ Offerta a tempo». Si riaccende con una riga
+    # nel config — e chi lo fa sappia che consuma il budget orario dei
+    # post, cioe' che uno sconto puo' rubare il turno a un annuncio.
+    POST_LAMPO_CANALE = False
 
 # LA RAFFICA RACCONTATA PER NEGOZIO (ago 2026, chiesto da Andrea): chi
 # pubblica piu' cose insieme ha un post SUO, con la figura dei
@@ -1400,6 +1416,7 @@ def db():
 # una seconda copia da tenere allineata.
 
 _CANALE = None          # None = mai letto; str = il valore che vale
+_CANALE_RIEPILOGO = None   # idem, ma per il post del lunedi'
 
 
 def impostazione(chiave: str, ripiego: str = "") -> str:
@@ -1436,6 +1453,36 @@ def canale_id() -> str:
         _CANALE = impostazione("canale_telegram", TELEGRAM_CANALE_ID)
     return _CANALE
 
+
+def canale_riepilogo() -> str:
+    """DOVE VA IL RIEPILOGO DEL LUNEDI' (ago 2026, decisione di
+    Andrea): un canale SUO — il racconto della settimana e la sfilza
+    degli annunci nuovi hanno due pubblici, e chi segue la vetrina non
+    deve per forza leggere i conti.
+
+    IL RIPIEGO E' `canale_id()` E NON IL SILENZIO: senza una riga
+    scritta da nessuna parte il riepilogo esce dov'e' sempre uscito —
+    un canale non configurato non deve poter far sparire un post
+    settimanale senza che nessuno se ne accorga. Per spegnerlo
+    davvero c'e' la leva `RIEPILOGO_SETTIMANALE`, che e' il posto
+    dove si va a cercare quando il lunedi' non arriva niente."""
+    global _CANALE_RIEPILOGO
+    if _CANALE_RIEPILOGO is None:
+        _CANALE_RIEPILOGO = impostazione("canale_riepilogo",
+                                         TELEGRAM_CANALE_RIEPILOGO)
+    return _CANALE_RIEPILOGO or canale_id()
+
+def imposta_canale_riepilogo(valore: str) -> str:
+    """Cambia il canale del riepilogo e riallinea la cache. Vuoto =
+    torna al ripiego, cioe' il canale degli annunci: qui la stringa
+    vuota NON e' lo spegnimento (a spegnere c'e' la leva), ed e' la
+    differenza con `imposta_canale` — li' il vuoto e' un gesto di chi
+    vuole il silenzio, qui e' «rimettili dove stanno gli altri»."""
+    global _CANALE_RIEPILOGO
+    valore = (valore or "").strip()
+    scrivi_impostazione("canale_riepilogo", valore)
+    _CANALE_RIEPILOGO = valore
+    return valore
 
 def imposta_canale(valore: str) -> str:
     """Cambia il canale e riallinea la cache. Stringa vuota = spento
@@ -7119,6 +7166,201 @@ async def _comando_sconosciuto(chat: int):
                "callback_data": "sfo:menu:0"}]])})
 
 
+async def comando_anteprima(mittente: dict, testo: str):
+    """`/anteprima` — il post del canale, mandato QUI in privato. Solo
+    admin.
+
+        /anteprima            l'ultimo annuncio pubblicabile
+        /anteprima 42         quell'annuncio
+        /anteprima riepilogo  il post del lunedì, coi tre barattoli
+
+    A COSA SERVE, ed è la ragione per cui esiste: fino a ieri l'unico
+    modo di vedere com'è fatto un post era pubblicarlo — cioè provare
+    in piazza, davanti a tutti, e un post storto nel canale non si
+    disfa (l'edit tiene solo il ✅ Venduto).
+
+    NON SI TIMBRA E NON SI SALVA NIENTE: nessun `promo_canale_il`,
+    nessun `post_canale_id`, nessun timbro del riepilogo, nessuna riga
+    toccata. Guardare non deve consumare il turno di un venditore né
+    bruciare il lunedì — e per lo stesso motivo un'anteprima non fa
+    nascere un ciclo di vita: quel post non esiste per il ✅ Venduto e
+    per la cancellazione, e va bene così perché non è nel canale.
+
+    LA STRADA È QUELLA VERA (`_caption_canale`, `_altri_del_venditore`,
+    `_immagine_riepilogo`): se l'anteprima si costruisse da sé
+    direbbe una cosa e il canale un'altra, che è esattamente il
+    difetto che questo comando esiste per far vedere PRIMA. Cambia
+    solo il `chat_id` — e le guardie della vetrina qui NON si
+    applicano: si può guardare anche l'annuncio di un venditore in
+    ferie o uno appena rimosso, che è quel che serve quando si sta
+    controllando qualcosa."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip().lower() if len(arg) == 2 else ""
+    if arg.startswith("riep"):
+        return await _anteprima_riepilogo(chat)
+    con = db()
+    if arg.isdigit():
+        riga = con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "u.username AS venditore_username, "
+            "u.negozio AS venditore_negozio FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.id=?",
+            (int(arg),)).fetchone()
+    else:
+        # l'ULTIMO che il canale racconterebbe: attivo e nato qui —
+        # un importato da Nostr non esce mai nel canale, e mostrarlo
+        # sarebbe un'anteprima di un post che non si farà
+        riga = con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "u.username AS venditore_username, "
+            "u.negozio AS venditore_negozio FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE a.stato='attivo' AND a.contatto_nostr='' "
+            "ORDER BY a.creato DESC, a.id DESC LIMIT 1").fetchone()
+    if not riga:
+        # «non c'e'» e «ci sono, ma nessuno di quelli che il canale
+        # racconta» sono due cose diverse: senza distinguerle, un
+        # mercatino pieno di soli importati risponderebbe «non trovo
+        # niente» e manderebbe a cercare il guasto dalla parte
+        # sbagliata.
+        attivi = con.execute(
+            "SELECT COUNT(*) AS n FROM annunci WHERE stato='attivo'"
+        ).fetchone()["n"] if not arg.isdigit() else 0
+        con.close()
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": (f"🤷 Non trovo l'annuncio <b>#{html.escape(arg)}</b>."
+                     if arg.isdigit() else
+                     (f"🤷 Ci sono {attivi} annunci attivi, ma sono tutti "
+                      "importati da Nostr: nel canale non escono mai."
+                      if attivi else
+                      "🤷 Non c'è nessun annuncio attivo da mostrare."))
+                    + "\n\nProva con <code>/anteprima 42</code> (il numero "
+                      "dell'annuncio) o <code>/anteprima riepilogo</code>.",
+            "parse_mode": "HTML"})
+    a = dict(riga)
+    altri = _altri_del_venditore(con, a)
+    con.close()
+    caption = _caption_canale(a, await cambio_btc_eur(), altri=altri)
+    foto = _foto_url_nostr(a.get("foto", ""))
+    nota = (f"👁 <i>Anteprima dell'annuncio #{a['id']} — così uscirebbe "
+            f"nel canale. Non è stato pubblicato niente.</i>")
+    r = None
+    if foto:
+        r = await bot_api("sendPhoto", {
+            "chat_id": chat, "photo": foto[0], "caption": caption,
+            "parse_mode": "HTML"})
+    if not (r and r.get("ok")):
+        # lo stesso ripiego di `_posta_promo_singolo`: senza foto (o
+        # con una foto che Telegram non digerisce) il post e' testo
+        await bot_api("sendMessage", {
+            "chat_id": chat, "text": caption, "parse_mode": "HTML"})
+    await bot_api("sendMessage", {"chat_id": chat, "text": nota,
+                                  "parse_mode": "HTML",
+                                  "reply_markup": tastiera_bot()})
+
+
+async def _anteprima_riepilogo(chat: int):
+    """Il post del lunedì mandato qui: il podio coi tre più venduti,
+    com'è ADESSO — la finestra è quella vera (sette giorni indietro da
+    oggi), non quella dell'ultimo lunedì: serve a guardare la figura,
+    non a rifare la storia.
+
+    IL TIMBRO NON SI TOCCA: guardare non deve bruciare il lunedì. La
+    figura invece si SCRIVE davvero in foto/ (il podio si manda per
+    URL, non a byte) con un nome che dice che è una prova — così non
+    si sovrascrive mai quella del riepilogo vero."""
+    con = db()
+    nuovi, ordini, top = _conta_settimana(con, int(time.time()) - 7 * 86400)
+    nome = _salva_podio(con, top, f"prova-{int(time.time())}")
+    con.close()
+    righe = [f"🫙 {nuovi} " + ("nuovi annunci" if nuovi != 1
+                              else "nuovo annuncio")]
+    if ordini:
+        righe.append(f"🛒 {ordini} " + ("ordini" if ordini != 1 else "ordine"))
+    venduti = " · ".join(
+        html.escape(t["titolo"] or "") + (f" ×{t['pezzi']}"
+                                          if t["pezzi"] > 1 else "")
+        for t in top if t["titolo"])
+    if venduti:
+        righe.append(f"🏆 I più venduti: {venduti}")
+    testo = ("📊 <b>La settimana di Barattolo</b>\n\n" + "\n".join(righe)
+             + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il mercatino</a>")
+    if nome:
+        r = await bot_api("sendPhoto", {
+            "chat_id": chat, "parse_mode": "HTML",
+            "photo": f"{URL_PUBBLICO}/foto/{nome}", "caption": testo})
+        if r and r.get("ok"):
+            return await bot_api("sendMessage", {"chat_id": chat,
+                "text": "👁 <i>Anteprima del riepilogo. Il turno del "
+                        "lunedì non è stato consumato.</i>",
+                "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    # PERCHE' non c'e' la figura lo si DICE, invece di mandare il testo
+    # e basta: qui si sta guardando proprio quella, e un post che esce
+    # nudo in silenzio manda a cercare il guasto nel posto sbagliato.
+    manca = []
+    if not RIEPILOGO_IMMAGINE:
+        manca.append("RIEPILOGO_IMMAGINE è spenta")
+    if not (ImmaginePillow and ImageDraw and ImageOps):
+        manca.append("Pillow non è installata")
+    if not top:
+        manca.append("questa settimana non ha venduto niente nessuno")
+    if not os.path.exists(SFONDO_RIEPILOGO):
+        manca.append(f"manca <code>{SFONDO_RIEPILOGO}</code> "
+                     "(il podio esce DISEGNATO)")
+    await bot_api("sendMessage", {"chat_id": chat, "text": testo,
+                                  "parse_mode": "HTML",
+                                  "disable_web_page_preview": True})
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": "👁 <i>Anteprima del riepilogo"
+                + (": " + ", ".join(manca) if manca else "")
+                + ".</i>",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
+async def _canale_riepilogo_comando(chat: int, arg: str):
+    """Il ramo «/canale riepilogo …»: dove va il post del lunedi'.
+
+    Stessa liturgia del fratello — SI PROVA PRIMA DI CREDERCI, o un id
+    sbagliato lo si scoprirebbe il lunedi' dopo, cioe' con un post
+    perso e nessuno che se ne accorge — ma il messaggio di prova dice
+    l'altra cosa (qui ci arriva il riepilogo, non gli annunci) e il
+    VUOTO non spegne: rimette il riepilogo dove vanno gli annunci."""
+    if not arg:
+        imposta_canale_riepilogo("")
+        dove = canale_riepilogo()
+        await notifica_admin(f"📊 Canale del riepilogo: torna al canale "
+                             f"degli annunci (da tg {chat})")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ Fatto: il riepilogo del lunedì torna dove vanno "
+                    "gli annunci"
+                    + (f" (<code>{html.escape(dove)}</code>)."
+                       if dove else ", che però adesso non c'è."),
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    r = await bot_api("sendMessage", {
+        "chat_id": arg, "parse_mode": "HTML",
+        "text": "📊 <b>Barattolo racconterà qui la sua settimana.</b>\n"
+                "Ogni lunedì: annunci nuovi, ordini e i più venduti."})
+    if not (r and r.get("ok")):
+        motivo = (r or {}).get("description") or "nessuna risposta"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"❌ Non riesco a scrivere in <code>"
+                    f"{html.escape(arg)}</code>.\nTelegram dice: "
+                    f"<i>{html.escape(str(motivo))}</i>\n\n"
+                    "Controlla che il bot sia amministratore del "
+                    "canale e che il nome sia scritto giusto.",
+            "parse_mode": "HTML"})
+    imposta_canale_riepilogo(arg)
+    await notifica_admin(f"📊 Canale del riepilogo cambiato in {arg} "
+                         f"(da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: il riepilogo del lunedì va in <code>"
+                f"{html.escape(arg)}</code>.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def comando_canale(mittente: dict, testo: str):
     """`/canale` — dove il bot annuncia i nuovi arrivi. Solo admin.
 
@@ -7130,16 +7372,30 @@ async def comando_canale(mittente: dict, testo: str):
         return await _comando_sconosciuto(chat)
     arg = testo.split(maxsplit=1)
     arg = arg[1].strip() if len(arg) == 2 else ""
+    # DUE DESTINAZIONI, UN COMANDO SOLO: «/canale riepilogo …» parla
+    # del post del lunedi'. E' la stessa domanda — dove parla il bot —
+    # e un secondo comando col nome quasi uguale e' il genere di cosa
+    # che si sbaglia col telefono in mano.
+    if arg.lower().split(maxsplit=1)[:1] == ["riepilogo"]:
+        return await _canale_riepilogo_comando(
+            chat, arg.split(maxsplit=1)[1].strip() if " " in arg else "")
     if not arg:
         ora = canale_id()
         stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
                  if ora else "Adesso non scrivo in nessun canale.")
+        riep = canale_riepilogo()
+        stato += ("\nIl riepilogo del lunedì va in <code>"
+                  f"{html.escape(riep)}</code>." if riep else
+                  "\nIl riepilogo del lunedì non ha dove andare.")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"📣 <b>Canale del mercatino</b>\n{stato}\n\n"
                     "Per cambiarlo: <code>/canale @nomecanale</code> "
                     "(oppure l'id numerico, che per i canali comincia "
                     "con <code>-100</code>).\n"
-                    "Per spegnerlo: <code>/canale spento</code>.\n\n"
+                    "Per spegnerlo: <code>/canale spento</code>.\n"
+                    "Per il riepilogo del lunedì: <code>/canale "
+                    "riepilogo @nomecanale</code> (senza nome, torna "
+                    "dove vanno gli annunci).\n\n"
                     "⚠️ Il bot dev'essere <b>amministratore</b> del "
                     "canale, o non riuscirà a pubblicare.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
@@ -7338,6 +7594,8 @@ async def gestisci_update(update: dict):
                     "nei tuoi ordini. Per tutto il resto, apri "
                     "Barattolo 👇",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if testo.startswith("/anteprima"):
+        return await comando_anteprima(mittente, testo)
     if testo.startswith("/canale"):
         return await comando_canale(mittente, testo)
     if testo.startswith("/vetrina"):
@@ -10667,6 +10925,35 @@ def conta_pionieri(con) -> int:
     quanti = con.execute("SELECT COUNT(*) AS n FROM utenti").fetchone()["n"]
     _pionieri_cache.update(quanti=quanti, quando=adesso)
     return quanti
+
+
+@app.get("/api/salute")
+def salute():
+    """«Sei viva?» — la rotta che il deploy interroga dopo il riavvio
+    per decidere se tenersi la versione nuova o tornare indietro.
+
+    TOCCA IL DATABASE APPOSTA (una lettura, la piu' piccola che ci
+    sia): un uvicorn che risponde ma non sa piu' aprire il file del
+    mercatino e' esattamente il guasto che un health check sul solo
+    processo NON vede — e sarebbe quello che lascia in produzione una
+    versione rotta credendola sana.
+
+    NON DICE NIENTE DI PIU', ed e' la riga da non ammorbidire: e'
+    pubblica come /api/listings, quindi qui non ci entrano conteggi,
+    versioni del codice, percorsi o nomi di file — sono tutte cose che
+    aiutano chi guarda il server da fuori a sapere cosa ha davanti. Il
+    «cosa sta girando» lo dice il journal del VPS, che e' di chi ha le
+    chiavi."""
+    try:
+        con = db()
+        con.execute("SELECT 1 FROM annunci LIMIT 1").fetchone()
+        con.close()
+    except Exception:
+        # 503 e non un 200 con «ok: false»: chi controlla la salute
+        # guarda il CODICE, e un guasto travestito da risposta buona
+        # e' il modo in cui un rollback non parte.
+        raise HTTPException(503, "non sto bene")
+    return {"ok": True}
 
 
 @app.get("/api/banner-test")
@@ -27457,7 +27744,103 @@ def _firma_venditore(a: dict) -> str:
     return riga
 
 
-def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
+MAX_VETRINA_PROMO = 3      # quanti altri articoli linka un post
+
+
+def _altri_del_venditore(con, a: dict, quanti: int = MAX_VETRINA_PROMO):
+    """Gli altri annunci ATTIVI dello stesso venditore, i piu' recenti
+    per primi. Legge e basta.
+    Le guardie sono quelle della vetrina — solo 'attivo', mai
+    l'annuncio del post — perche' questi sono link che qualcuno
+    tocchera' a giorni di distanza: linkare un venduto vorrebbe dire
+    mandare su uno scaffale vuoto chi era venuto a comprare."""
+    return [dict(r) for r in con.execute(
+        "SELECT id, titolo FROM annunci WHERE venditore_id=? "
+        "AND stato='attivo' AND id<>? ORDER BY creato DESC, id DESC "
+        "LIMIT ?", (a["venditore_id"], a["id"], quanti)).fetchall()]
+
+def _costo_sped_promo(a: dict, cambio: float) -> str:
+    """Quanto costa la spedizione, in una manciata di caratteri.
+
+    I GIUDICI SONO QUELLI DEL CONTO (`_tariffa_dichiarata`,
+    `_sped_in_sats`) e non una lettura a mano delle colonne: la regola
+    della retrocompat — una tariffa sola dichiarata vale per tutte e
+    due le strade — deve dire qui quel che dice alla cassa, o il
+    canale prometterebbe una cifra che il checkout smentisce.
+    QUANDO LE DUE STRADE DIVERGONO si scrive «da …» col MINIMO: nel
+    post non c'e' spazio per due cifre, e il minimo e' l'unica delle
+    due che non promette meno di quel che si paga davvero.
+    Col cambio muto una tariffa ancorata all'euro NON si converte e la
+    riga esce senza cifra: si dice la strada, mai un numero inventato
+    (la regola dell'avviso EUR senza cambio)."""
+    vie = ["casa"]
+    if a.get("spedizione_punto_dichiarata"):
+        vie.append("punto")
+    valori = []
+    for via in vie:
+        s, e = _tariffa_dichiarata(a, via)
+        v = _sped_in_sats(s, e or 0.0, cambio)
+        if v is None:
+            return ""
+        valori.append((v, s, e or 0.0))
+    v, s, e = min(valori)
+    if v <= 0:
+        return "<b>gratuita</b>"
+    da = "da " if len({x[0] for x in valori}) > 1 else ""
+    return f"{da}{_fmt_eur(e)} €" if e > 0 else f"{da}{_fmt_sats(s)} sats"
+
+def _righe_consegna_promo(a: dict, cambio: float) -> str:
+    """COME ARRIVA LA ROBA, nel post del canale (ago 2026, chiesto da
+    Andrea): una riga per strada offerta, con le stesse icone e le
+    stesse parole della scheda — 🚚 spedizione, 🤝 ritiro in zona,
+    💾 codice online.
+
+    La spedizione nomina TUTTE E DUE le destinazioni («a casa o a un
+    punto di ritiro») perche' dall'ago 2026 la via punto si offre
+    sempre dove c'e' la spedizione: dirne una sola sarebbe la meta'
+    della verita' proprio nel posto dove si decide se aprire.
+    Consegna NON DICHIARATA (gli storici e gli importati da Nostr) =
+    nessuna riga: su una strada che nessuno ha scelto non si promette
+    niente, che e' la regola gia' scritta per i filtri della vetrina."""
+    c = a.get("consegna") or ""
+    righe = []
+    if c in ("spedizione", "entrambe"):
+        riga = "🚚 Spedizione a casa o a un punto di ritiro"
+        costo = _costo_sped_promo(a, cambio)
+        if costo:
+            riga += f" — {costo}"
+        righe.append(riga)
+    if c in ("ritiro", "entrambe"):
+        righe.append("🤝 Ritiro in zona")
+    if c == "digitale" or a.get("anche_digitale"):
+        righe.append("💾 Codice online, subito")
+    return "\n".join(righe)
+
+def _vetrina_venditore(a: dict, altri: list) -> str:
+    """Gli altri articoli del venditore, linkati sotto al post.
+
+    E' la contropartita del freno (ago 2026, decisione di Andrea): un
+    post a settimana per venditore, ma quel post non parla di un
+    oggetto solo — porta anche gli altri e il negozio, cosi' il
+    venditore che pubblica tre cose in un pomeriggio si vede lo
+    stesso, senza tre post.
+    I titoli si TRONCANO prima e si scappano dopo (la lezione della
+    ricevuta): la caption di Telegram ha 1024 caratteri, e un «<» in
+    un titolo spegnerebbe il post in silenzio."""
+    if not altri:
+        return ""
+    voci = []
+    for x in altri:
+        t = (x.get("titolo") or "").strip()
+        if len(t) > 46:
+            t = t[:45].rstrip() + "…"
+        voci.append(f"\n• <a href=\"{URL_PUBBLICO}/annuncio/{x['id']}\">"
+                    f"{html.escape(t)}</a>")
+    return "\n\n🛍 Anche in vendita da lui:" + "".join(voci)
+
+
+def _caption_canale(a: dict, cambio: float, venduto: bool = False,
+                    altri: list | None = None) -> str:
     """La caption HTML del post nel canale Telegram (usata anche per
     RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
     serve salvarlo da nessuna parte — ed e' il motivo per cui questa
@@ -27478,8 +27861,12 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
     testo += f"\n💰 {_prezzo_promo(a, cambio)}"
     if a.get("zona"):
         testo += f"\n📍 {html.escape(a['zona'])}"
+    consegna = _righe_consegna_promo(a, cambio)
+    if consegna:
+        testo += f"\n{consegna}"
     testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
     testo += "\n⚡ Pagabile in Satoshi"
+    testo += _vetrina_venditore(a, altri or [])
     testo += f"\n\n{_firma_venditore(a)}"
     testo += f"\n\n{_hashtag_promo(a)}"
     if venduto:
@@ -27637,12 +28024,13 @@ async def _posta_promo_singolo(a: dict, giorni: int):
     # A freno spento NON si timbra, ed e' deliberato: un timbro scritto
     # mentre il ritmo e' «tutto» bloccherebbe per una settimana intera
     # ogni venditore il giorno che qualcuno stringe a «settimana».
+    con = db()
+    altri = _altri_del_venditore(con, a)
     if giorni > 0 and a.get("venditore_id"):
-        con = db()
         con.execute("UPDATE utenti SET promo_canale_il=? WHERE tg_id=?",
                     (int(time.time()), a["venditore_id"]))
         con.commit()
-        con.close()
+    con.close()
     post_nostr_id, post_canale_id = "", 0
     if _NOSTR:
         try:
@@ -27655,7 +28043,7 @@ async def _posta_promo_singolo(a: dict, giorni: int):
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
     if canale_id():
-        caption = _caption_canale(a, cambio)
+        caption = _caption_canale(a, cambio, altri=altri)
         foto = _foto_url_nostr(a.get("foto", ""))
         r = None
         if foto:
@@ -27835,7 +28223,7 @@ async def _posta_negozio(gruppo: list, giorni: int):
     r = None
     if nome:
         r = await bot_api("sendPhoto", {
-            "chat_id": canale_id(), "parse_mode": "HTML",
+            "chat_id": canale_riepilogo(), "parse_mode": "HTML",
             "photo": f"{URL_PUBBLICO}/foto/{nome}", "caption": testo})
     if not (r and r.get("ok")):
         await bot_api("sendMessage", {
@@ -28332,11 +28720,16 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
             "u.negozio AS venditore_negozio "
             "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
             "WHERE a.id=?", (annuncio_id,)).fetchone()
+        # gli altri articoli si RILEGGONO: il post riscritto col ✅ non
+        # deve perdere la vetrina che aveva da nuovo, e nel frattempo
+        # qualcuno di quei link puo' essere stato venduto — meglio la
+        # lista di oggi che tre link a scaffali vuoti
+        altri = _altri_del_venditore(con, dict(a)) if a else []
         con.close()
         if not a or not a["post_canale_id"] or not canale_id():
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
-                                  venduto=venduto)
+                                  venduto=venduto, altri=altri)
         dati = {"chat_id": canale_id(),
                 "message_id": a["post_canale_id"], "parse_mode": "HTML"}
         # Con la foto il testo vive nella caption, senza nel body — ma
@@ -35124,6 +35517,77 @@ def disegna_figura(foto3: list, misure=PODIO_MISURE):
     return tela
 
 
+# ---- IL PODIO SU SFONDO (ago 2026, chiesto da Andrea con l'immagine)
+# I tre barattoli DISEGNATI qui sopra restano, e servono ancora la
+# FILA dei negozi; per il podio del lunedi' pero' si usa il disegno
+# vero — `assets/riepilogo-barattoli.png` — e le foto si incollano nei
+# suoi tre vetri bianchi.
+#
+# NON E' UNA SOSTITUZIONE SECCA, ed e' il pezzo da capire: se il file
+# non c'e' (o Pillow non c'e', o una foto e' illeggibile) si ricade su
+# `disegna_figura`, che e' gia' collaudata — cosi' il lunedi' non
+# salta mai per un asset mancante, e chi clona il repo senza quel PNG
+# vede il podio di sempre.
+SFONDO_RIEPILOGO = "assets/riepilogo-barattoli.png"
+# I riquadri dei vetri, in FRAZIONI del lato e non in pixel: cosi' un
+# giorno si puo' rifare lo sfondo a un'altra risoluzione senza
+# ritarare niente. L'ordine e' quello del PODIO — il barattolo grande
+# in mezzo e' il primo, poi il medio a sinistra, poi il piccolo a
+# destra: la classifica si legge dalla misura, che e' anche il motivo
+# per cui il disegno ha tre barattoli diversi.
+# SI TARANO A OCCHIO con `anteprima_riepilogo.py --griglia`: sono
+# numeri che si guardano, non si deducono.
+VETRI_RIEPILOGO = [
+    (0.372, 0.243, 0.632, 0.881),   # 1° — il grande, in mezzo
+    (0.088, 0.404, 0.293, 0.917),   # 2° — il medio, a sinistra
+    (0.748, 0.495, 0.905, 0.927),   # 3° — il piccolo, a destra
+]
+
+
+def _podio_su_sfondo(foto3: list, sfondo: str = SFONDO_RIEPILOGO):
+    """Le foto dei tre piu' venduti incollate nei vetri del disegno.
+    Restituisce l'immagine Pillow, o None — e il None non e' un
+    errore: e' il ripiego sul podio DISEGNATO, che e' la strada di
+    sempre.
+
+    `foto3` sono percorsi (o None) gia' scelti dal chiamante: questa
+    funzione non sa niente di annunci e di database, e si prova su un
+    file — il patto delle pure.
+    ImageOps.fit RIEMPIE il vetro ritagliando quel che avanza: una
+    foto verticale lascerebbe due bande bianche, e un barattolo mezzo
+    vuoto si legge come un'immagine rotta. I vetri che avanzano
+    restano bianchi, che e' come sono disegnati."""
+    if not (ImmaginePillow and ImageOps and ImageDraw):
+        return None
+    if not any(foto3 or []):
+        return None                 # nessuna foto: meglio il disegno
+    try:
+        base = ImmaginePillow.open(sfondo).convert("RGB")
+    except Exception as e:
+        print(f"⚠️ Sfondo del podio non leggibile ({sfondo}): {e}")
+        return None
+    L, A = base.size
+    for percorso, (x0, y0, x1, y1) in zip(foto3, VETRI_RIEPILOGO):
+        if not percorso:
+            continue                # barattolo vuoto: e' una figura
+        try:
+            with ImmaginePillow.open(percorso) as f:
+                cx, cy = int((x1 - x0) * L), int((y1 - y0) * A)
+                pezzo = ImageOps.fit(
+                    f.convert("RGB"), (cx, cy),
+                    method=ImmaginePillow.Resampling.LANCZOS)
+                # gli angoli tondi seguono il vetro del disegno: un
+                # rettangolo secco dentro un barattolo si vede
+                maschera = ImmaginePillow.new("L", (cx, cy), 0)
+                ImageDraw.Draw(maschera).rounded_rectangle(
+                    (0, 0, cx - 1, cy - 1),
+                    radius=int(min(cx, cy) * .09), fill=255)
+                base.paste(pezzo, (int(x0 * L), int(y0 * A)), maschera)
+        except Exception as e:
+            print(f"⚠️ Foto del podio saltata ({percorso}): {e}")
+    return base
+
+
 def _salva_podio(con, top: list, oggi: str) -> str:
     """Compone la figura e la scrive in foto/. Torna il NOME del file,
     o '' se non si e' potuta fare — e allora il riepilogo esce come il
@@ -35139,8 +35603,10 @@ def _salva_podio(con, top: list, oggi: str) -> str:
         return ""
     try:
         nome = f"pod_{oggi}.jpg"
-        disegna_figura(_foto_podio(con, top)).save(
-            os.path.join(FOTO_DIR, nome), quality=88)
+        foto3 = _foto_podio(con, top)
+        # il disegno vero se c'e', il podio disegnato altrimenti
+        figura = _podio_su_sfondo(foto3) or disegna_figura(foto3)
+        figura.save(os.path.join(FOTO_DIR, nome), quality=88)
         return nome
     except Exception as e:
         print(f"⚠️ Podio del riepilogo saltato: {e}")
@@ -35197,7 +35663,7 @@ def _conta_settimana(con, da: int) -> tuple[int, int, list]:
 async def riepilogo_settimana():
     """Il post del lunedi' nel canale. Solo canale: su Nostr il
     pubblico e' un altro e non e' stato chiesto."""
-    if not (RIEPILOGO_SETTIMANALE and canale_id()):
+    if not (RIEPILOGO_SETTIMANALE and canale_riepilogo()):
         return
     oggi = time.strftime("%Y-%m-%d")
     if time.localtime().tm_wday != 0 or timbro_letto(TIMBRO_RIEPILOGO) == oggi:
@@ -35243,7 +35709,7 @@ async def riepilogo_settimana():
           + (f" col podio ({nome})" if nome else " (senza figura)"))
     if nome:
         r = await bot_api("sendPhoto", {
-            "chat_id": canale_id(), "parse_mode": "HTML",
+            "chat_id": canale_riepilogo(), "parse_mode": "HTML",
             "photo": f"{URL_PUBBLICO}/foto/{nome}", "caption": testo})
         if r and r.get("ok"):
             return
@@ -35251,7 +35717,7 @@ async def riepilogo_settimana():
         # grande...): meglio il riepilogo senza figura che nessuno.
         print("⚠️ Podio rifiutato da Telegram: esce il riepilogo di testo")
     await bot_api("sendMessage", {
-        "chat_id": canale_id(), "parse_mode": "HTML",
+        "chat_id": canale_riepilogo(), "parse_mode": "HTML",
         "disable_web_page_preview": True, "text": testo})
 
 
