@@ -22872,6 +22872,64 @@ SMETTA di ricevere il promemoria della merce mai partita.
   mensile né opt-in; e NESSUNA NOTIFICA — nessuno viene avvisato che è
   salito o sceso, che una classifica che scrive in chat è la famiglia di
   messaggi che fa bloccare il bot.
+  GLI ORDINI DI PROVA E IL PREGRESSO DEGLI XP (ago 2026, dal campo:
+  Andrea primo in classifica coi suoi collaudi di luglio). Due fatti
+  scoperti insieme guardando i numeri veri: «affari» e XP contano da
+  fonti DIVERSE — gli affari si ricalcolano da `ordini`, gli XP sono
+  un registro append-only nato ad ago 2026, quindi il commercio
+  pre-deploy non alzava il punteggio (asimmetria che non era
+  dichiarata da nessuna parte) — e i collaudi fatti in produzione
+  facevano curriculum e rendevano «reali» dei recensori.
+  LA COLONNA È `ordini.prova` (DEFAULT 0 = la migrazione), scritta
+  SOLO da `marca_prove.py` a mano e IN LISTA ESPLICITA: a decidere
+  cos'è una prova è Andrea, mai un'euristica sui titoli. NON SI
+  CANCELLA, ed è la riga che regge tutto: la riconciliazione LNbits
+  incrocia gli incassi coi `payment_hash` di quelle righe, e un
+  DELETE fabbricherebbe proprio gli orfani che quel metodo esiste per
+  trovare. Il CSV contabile li TIENE, deliberato: sono sats mossi
+  davvero.
+  I LETTORI che imparano `prova=0` sono i due del COMMERCIO:
+  `_dati_classifica` (affari, controparti, e i voti con la cintura
+  NOT IN — i feedback sulle prove si tolgono con la valvola admin,
+  ma la classifica non deve dipendere da una pulizia a mano) e
+  `_dati_distintivi` (quattro conteggi). `classifica_prova.py` è
+  allineata con la stessa WHERE più il ripiego per un database di
+  prima della colonna. Restano fuori, dichiarato: `_conta_settimana`
+  (guarda la settimana corrente, le prove sono di luglio) e il CSV.
+  `marca_prove.py`: timbra, toglie gli eventi XP e rifà la cache dal
+  registro, decrementa `vendite_ok`/`acquisti_ok` (incrementali:
+  nessun ricalcolo li rimette in pari da solo) SOLO nel giro in cui
+  il timbro passa 0→1 — il secondo lancio è un no-op — e mai sotto
+  zero; ELENCA i feedback per la valvola e i distintivi coi conteggi
+  rifatti (sono append-only: toglierli è una decisione a mano). Su
+  un id inesistente o non-released si ferma dicendolo, senza aver
+  scritto niente.
+  `recupera_xp_ordini.py`: il pregresso VERO — due eventi per ordine
+  con la formula viva, le cui costanti si estraggono dal TESTO di
+  server.py (fail-closed: senza, ci si ferma, mai punti a memoria).
+  IL CAMBIO in ordine di onestà: `cambio_eur` (chiusura, lo stesso
+  del gancio vivo) → `cambio_ordine` (creazione, un fatto REGISTRATO)
+  → soli punti fissi, MAI il cambio di oggi. La data dell'evento è
+  `aggiornato` (lo sblocco). IL PERIMETRO È DERIVATO CON LA LISTA
+  COME GUARDIA: «released, prova=0, zero eventi» deve dare
+  esattamente gli id passati, o si ferma senza scrivere. L'ORDINE È
+  VINCOLANTE: prima marca_prove, POI il recupero — al contrario
+  regalerebbe XP proprio ai collaudi.
+  Provato: 27 prove nuove col banco che fa GIRARE i due script su un
+  database di cartone (il pavimento a zero dei contatori e la
+  precedenza chiusura-su-creazione hanno i loro casi apposta: senza,
+  due mutazioni non potevano fallire) e 14 MUTAZIONI una per riga
+  sorvegliata, tutte uccise — cinque non si APPLICAVANO nemmeno al
+  primo giro, le ancore multi-riga coi CRLF: la trappola già a
+  verbale, ripagata.
+  IN PRODUZIONE, nell'ordine: deploy → `python marca_prove.py 4 6 7 8
+  9 10 11 12 18 29 82 --scrivi` (anteprima prima, senza flag) → la
+  valvola admin sui feedback che lo script elenca →
+  `python recupera_xp_ordini.py 28 31 33 36 37 --scrivi` →
+  `classifica_prova.py` per il prima/dopo. DA GUARDARE: le
+  controparti-collaudo che escono dal gate della classifica (è
+  l'effetto voluto), e i badge che lo script elenca come non più
+  meritati, da decidere riga per riga.
 
 La card del barattolo nella striscia, e il podio in testata (ago 2026,
 i due cambi in home chiesti da Andrea): il barattolino di testata è
