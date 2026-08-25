@@ -15434,6 +15434,99 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (curato dal suo cantiere). Il perimetro del check «sul sano» resta
   STRETTO al controllo della busta, apposta: un controllo altrui
   rotto non deve tingere di rosso questo collaudo.
+  E CHI ASPETTA NON RESTA PIÙ MUTO (ago 2026, la tappa A del giro
+  sull'email del corriere — l'unica costruita: il campo dei recapiti
+  resta un quadro finché non si guarda il numero degli ordini con
+  `busta_diretta_il > 0`). Un ordine dichiarato diretto era MUTO: tre
+  gate lo zittivano — `sollecita_buste_ferme` lo esclude,
+  `sollecita_ritiri_al_punto` esige `busta_il>0`, e il bottone a
+  comando aveva lo stesso gate — quindi il primo squillo cadeva al
+  giorno 10 (da `sollecita_conferme_ferme`) mentre la giacenza al
+  punto dura ~3 giorni: quando qualcuno bussava, il pacco era già
+  tornato indietro.
+  `sollecita_codici_diretti` È UNA SORELLA E NON UN ALLARGAMENTO, ed è
+  la decisione che regge tutto il resto — il piano diceva di allargare
+  `sollecita_ritiri_al_punto` («la stessa domanda su due binari
+  complementari»), e a smentirlo è stata la lettura del codice: un
+  ordine **PASSA** da una popolazione all'altra, perché è precisamente
+  il flusso della via d'uscita (chi compra dice «non è arrivato», il
+  venditore deposita la busta, e la dichiarazione si azzera nello
+  stesso UPDATE). Coi contatori condivisi il compratore arriverebbe al
+  tetto sulla prima fase e non sentirebbe MAI il «vai a ritirare»
+  della seconda. Colonne SUE (`sollecito_diretto_il`,
+  `solleciti_diretti`) e non `solleciti_punto`, per quella ragione e
+  non per simmetria.
+  IL TESTO DICE LA RIGA CHE IL CORRIERE NON MANDA MAI, ed è ciò che le
+  permette di stare accanto alle altre due senza ripeterle: il codice
+  glielo manda lui, la giacenza pure — quel che NON gli dice nessuno è
+  «se non ti è arrivato, ecco cosa fare su Barattolo». Da lì le due
+  cose che porta: **guarda la posta, anche nello spam** (il caso vero
+  più frequente) e la via d'uscita. E NON PROMETTE UN ARRIVO CHE NON
+  SAPPIAMO: l'ancora è `spedito_il` — quando il pacco arriva al punto
+  non ce lo dice nessuno — quindi mai «ti aspetta», che è la stessa
+  riga da non ammorbidire della sorella. C'è la prova che quelle
+  parole non compaiano.
+  IL RITMO NON HA LEVE NUOVE: `PROMEMORIA_RITIRO_GIORNI` (2) fa già da
+  finestra E da passo — squilli a 2, 4 e 6 giorni dalla spedizione —
+  col tetto `PROMEMORIA_CONFERMA_MAX` (3). A un giorno il pacco può
+  essere ancora in viaggio, a tre la giacenza è già cominciata.
+  NIENTE 🧊, per la ragione già scritta sulla sorella: cadrebbe
+  intorno al giorno 6-8, cioè PRIMA di `CODA_FERMI_GIORNI`, e
+  romperebbe l'invariante «se il 🧊 è partito, la riga c'è». Il caso lo
+  raccoglie la coda dei fermi al giorno 10, dove compare col suo
+  «🔕 mai sollecitato».
+  DESTINATARI: il compratore a ogni squillo (è lui che può agire), il
+  venditore SOLO ALL'ULTIMO — prima non ha niente da fare, e un
+  rimprovero su un'attesa normale è rumore.
+  DUE GUARDIE CHE LA SORELLA NON HA, e sono quelle che si dimenticano.
+  `AND o.spedito_il>0`: là `busta_il>0` garantisce l'ancora, qui sul
+  ramo nuovo `busta_il` è 0 per definizione, e senza guardia il MAX
+  varrebbe 0 su ogni `shipped` storico — una raffica al primo giro.
+  E `AND o.busta_il=0` è una CINTURA: il deposito azzera già la
+  dichiarazione, quindi lo stato «tutti e due pieni» non lo produce
+  nessuno — ed è precisamente ciò da cui una cintura difende.
+  E IL BOTTONE A COMANDO RIENTRA, col gate `busta_diretta_il=0` che
+  diventa un RAMO. Questo ROVESCIA una riga di casa («un bottone che
+  porta a un 400 è peggio di un bottone che non c'è»), e il perché di
+  allora resta vero: là il bottone non aveva niente da dire, perché il
+  codice era andato al compratore. Adesso ha un mestiere DIVERSO —
+  non chiede al venditore di depositare un codice che non ha, gli
+  RIFERISCE il fatto che solo chi compra può sapere: a destinazione
+  non è arrivato niente. Stessi contatori `sollecito_manuale_busta_*`,
+  stessa finestra, stesso tetto — bussare a mano non sposta il 🧊 di
+  un minuto, la regola di sempre.
+  E NON LO ACCUSA MAI DI AVER SBAGLIATO L'INDIRIZZO, ed è la riga da
+  non ammorbidire per simmetria col resto della famiglia: il recapito
+  può essere giusto e il messaggio finito nello spam, o il pacco non
+  essere ancora arrivato al punto. C'è la prova che quella parola non
+  compaia.
+  NEL CLIENT IL VERBO CAMBIA COL FATTO: «📮 Non mi è arrivato il
+  codice» al posto di «🔔 Ricorda al venditore…», e da spento
+  «segnalato» invece di «ricordato». UN SOLO `onclick`, e non è un
+  vezzo: la sentinella «da spento NON c'è nessun onclick» li CONTA, e
+  due — anche se tutti e due nel ramo acceso — la renderebbero cieca
+  (ci si è inciampati alla prima stesura). E il testo che mandava in
+  un vicolo cieco — «se non ti arriva, scrivigli o apri una disputa»,
+  cioè la chat, che è precisamente quel che chi non è contattabile non
+  ha — adesso porta a quel bottone.
+  LA TORTURA HA TROVATO DUE SENTINELLE MIE CHE NON POTEVANO FALLIRE, e
+  sono le due di sempre: la chiamata nell'orologio non la guardava
+  NESSUNO (adesso si chiede la RIGA INTERA e non il nome — la lezione
+  del reaper, alla terza volta), e il verbo del bottone era legato
+  alla sola PRESENZA della stringa, quindi un `false ?` al posto di
+  `diretta ?` la lasciava verde col bottone tornato muto. Dodici
+  mutazioni, dodici uccise solo dopo averle riscritte.
+  E IL BANCO ESEGUIBILE HA PAGATO PER DUE CASI CHE NON POTEVANO
+  FALLIRE PER LA RAGIONE CHE DICEVANO: «col codice depositato la
+  cintura chiude» passava per il PRIMO gate (il deposito azzera la
+  dichiarazione), e la guardia della spedizione non mordeva perché
+  ogni ordine di prova aveva `spedito_il` valorizzato. Adesso il primo
+  rimette la dichiarazione a mano — lo stato impossibile per
+  costruzione — e il secondo ha il suo `shipped` storico a zero.
+  IMPERFEZIONE DICHIARATA: al tetto si tace e l'ordine resta
+  'shipped'. Il compratore che sparisce non lo chiude questo cantiere:
+  serve una via d'uscita del venditore da lì, che tocca il percorso
+  dei soldi ed è un cantiere suo.
   IL DOCUMENTO DI RITIRO (ago 2026, dal campo: al locker il corriere
   manda un PDF o un QR — un PIN si trascrive, un QR NO). È L'ALTRA
   STRADA PER IL CODICE e non un'aggiunta (decisione di Andrea): il
