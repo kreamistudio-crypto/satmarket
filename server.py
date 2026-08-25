@@ -35520,15 +35520,17 @@ def disegna_figura(foto3: list, misure=PODIO_MISURE):
 # ---- IL PODIO SU SFONDO (ago 2026, chiesto da Andrea con l'immagine)
 # I tre barattoli DISEGNATI qui sopra restano, e servono ancora la
 # FILA dei negozi; per il podio del lunedi' pero' si usa il disegno
-# vero — `assets/riepilogo-barattoli.png` — e le foto si incollano nei
-# suoi tre vetri bianchi.
+# vero — `assets/riepilogo-barattoli.webp` — e le foto si incollano
+# nei suoi tre vetri bianchi. WebP come le 27 illustrazioni delle
+# categorie: il PNG di partenza pesava 3 MB, questo 76 KB, e a valle
+# la figura esce comunque in JPEG.
 #
 # NON E' UNA SOSTITUZIONE SECCA, ed e' il pezzo da capire: se il file
 # non c'e' (o Pillow non c'e', o una foto e' illeggibile) si ricade su
 # `disegna_figura`, che e' gia' collaudata — cosi' il lunedi' non
 # salta mai per un asset mancante, e chi clona il repo senza quel PNG
 # vede il podio di sempre.
-SFONDO_RIEPILOGO = "assets/riepilogo-barattoli.png"
+SFONDO_RIEPILOGO = "assets/riepilogo-barattoli.webp"
 # I riquadri dei vetri, in FRAZIONI del lato e non in pixel: cosi' un
 # giorno si puo' rifare lo sfondo a un'altra risoluzione senza
 # ritarare niente. L'ordine e' quello del PODIO — il barattolo grande
@@ -35538,54 +35540,65 @@ SFONDO_RIEPILOGO = "assets/riepilogo-barattoli.png"
 # SI TARANO A OCCHIO con `anteprima_riepilogo.py --griglia`: sono
 # numeri che si guardano, non si deducono.
 VETRI_RIEPILOGO = [
-    (0.372, 0.243, 0.632, 0.881),   # 1° — il grande, in mezzo
-    (0.088, 0.404, 0.293, 0.917),   # 2° — il medio, a sinistra
-    (0.748, 0.495, 0.905, 0.927),   # 3° — il piccolo, a destra
+    (0.371, 0.273, 0.629, 0.867),   # 1° — il grande, in mezzo
+    (0.089, 0.411, 0.289, 0.877),   # 2° — il medio, a sinistra
+    (0.748, 0.508, 0.912, 0.881),   # 3° — il piccolo, a destra
 ]
 
 
 def _podio_su_sfondo(foto3: list, sfondo: str = SFONDO_RIEPILOGO):
-    """Le foto dei tre piu' venduti incollate nei vetri del disegno.
+    """Le foto dei tre piu' venduti dentro i vetri del disegno.
     Restituisce l'immagine Pillow, o None — e il None non e' un
     errore: e' il ripiego sul podio DISEGNATO, che e' la strada di
     sempre.
 
+    DUE STRATI, E IL RITAGLIO LO FA IL VETRO. Nel disegno i vetri sono
+    TRASPARENTI (alpha 0) e non bianchi: sono BUCHI, fatti apposta per
+    metterci qualcosa dietro. Quindi le foto si incollano su una tela
+    BIANCA e il disegno ci va SOPRA — cosi' ognuna prende la forma
+    esatta del suo barattolo, angoli tondi e collo compresi, invece di
+    una maschera arrotondata disegnata a mano da noi, che al bordo non
+    combacerebbe mai. E' anche il motivo per cui i riquadri possono
+    debordare di un filo: quel che esce dal vetro lo copre il disegno.
+    LA TELA E' BIANCA E NON TRASPARENTE, ed e' la riga da non
+    ammorbidire: un vetro SENZA foto deve restare com'e' nel disegno,
+    cioe' un barattolo vuoto — che nel nostro alfabeto e' una figura e
+    non un buco (la regola del podio disegnato). Con la tela
+    trasparente uscirebbe nero, che si legge come un guasto: e' quel
+    che si e' visto guardando la prima anteprima, dove il vetro si
+    convertiva in RGB e il webp ci metteva lo zero.
+
     `foto3` sono percorsi (o None) gia' scelti dal chiamante: questa
     funzione non sa niente di annunci e di database, e si prova su un
-    file — il patto delle pure.
-    ImageOps.fit RIEMPIE il vetro ritagliando quel che avanza: una
-    foto verticale lascerebbe due bande bianche, e un barattolo mezzo
-    vuoto si legge come un'immagine rotta. I vetri che avanzano
-    restano bianchi, che e' come sono disegnati."""
-    if not (ImmaginePillow and ImageOps and ImageDraw):
+    file — il patto delle pure."""
+    if not (ImmaginePillow and ImageOps):
         return None
     if not any(foto3 or []):
         return None                 # nessuna foto: meglio il disegno
     try:
-        base = ImmaginePillow.open(sfondo).convert("RGB")
+        disegno = ImmaginePillow.open(sfondo).convert("RGBA")
     except Exception as e:
         print(f"⚠️ Sfondo del podio non leggibile ({sfondo}): {e}")
         return None
-    L, A = base.size
+    L, A = disegno.size
+    tela = ImmaginePillow.new("RGBA", (L, A), (255, 255, 255, 255))
     for percorso, (x0, y0, x1, y1) in zip(foto3, VETRI_RIEPILOGO):
         if not percorso:
-            continue                # barattolo vuoto: e' una figura
+            continue                # vetro vuoto: e' una figura
         try:
             with ImmaginePillow.open(percorso) as f:
                 cx, cy = int((x1 - x0) * L), int((y1 - y0) * A)
+                # ImageOps.fit RIEMPIE il vetro ritagliando quel che
+                # avanza: una foto verticale lascerebbe due bande
+                # bianche, e un barattolo mezzo vuoto si legge come
+                # un'immagine rotta.
                 pezzo = ImageOps.fit(
                     f.convert("RGB"), (cx, cy),
                     method=ImmaginePillow.Resampling.LANCZOS)
-                # gli angoli tondi seguono il vetro del disegno: un
-                # rettangolo secco dentro un barattolo si vede
-                maschera = ImmaginePillow.new("L", (cx, cy), 0)
-                ImageDraw.Draw(maschera).rounded_rectangle(
-                    (0, 0, cx - 1, cy - 1),
-                    radius=int(min(cx, cy) * .09), fill=255)
-                base.paste(pezzo, (int(x0 * L), int(y0 * A)), maschera)
+                tela.paste(pezzo, (int(x0 * L), int(y0 * A)))
         except Exception as e:
             print(f"⚠️ Foto del podio saltata ({percorso}): {e}")
-    return base
+    return ImmaginePillow.alpha_composite(tela, disegno).convert("RGB")
 
 
 def _salva_podio(con, top: list, oggi: str) -> str:

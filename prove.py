@@ -16350,6 +16350,14 @@ def prove_podio_riepilogo():
         # sorvegliano da sempre.
         i = _SORGENTE.index("SFONDO_RIEPILOGO = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n]", i) + 2], amb)
+        # QUESTA FAMIGLIA ESERCITA IL PODIO DISEGNATO, che e' il
+        # RIPIEGO: senza questa riga, dal giorno in cui l'asset esiste
+        # nel repo `_salva_podio` comporrebbe sullo sfondo e queste
+        # prove guarderebbero un'altra figura — restando verdi a
+        # sorvegliare qualcosa che non gira piu' (e infatti «la figura
+        # e' della misura dichiarata» e' diventata rossa il giorno che
+        # il PNG e' entrato: l'ha detto la CI, non la rilettura).
+        amb["SFONDO_RIEPILOGO"] = "non-esiste-apposta.webp"
         for f in ("_foto_podio", "_barattolo", "disegna_figura",
                   "_podio_su_sfondo", "_salva_podio"):
             exec(pezzo(f), amb)
@@ -26349,8 +26357,18 @@ def prove_podio_sfondo():
     prova("il podio va dal barattolo piu' grande al piu' piccolo",
           sorted(aree, reverse=True), aree)
     with tempfile.TemporaryDirectory() as tmp:
+        # LO SFONDO DI PROVA HA I VETRI BUCATI, come il disegno vero:
+        # i tre riquadri sono trasparenti e il resto e' opaco. Con uno
+        # sfondo pieno le foto non si vedrebbero affatto — e' la
+        # tecnica dei due strati, e una prova su uno sfondo opaco
+        # certificherebbe il contrario di quel che succede.
         sfondo = _os.path.join(tmp, "sfondo.png")
-        _Im.new("RGB", (1000, 545), (255, 255, 255)).save(sfondo)
+        sf = _Im.new("RGBA", (1000, 545), (40, 25, 15, 255))
+        for x0, y0, x1, y1 in VETRI:
+            _IDraw.Draw(sf).rectangle(
+                (x0 * 1000, y0 * 545, x1 * 1000, y1 * 545),
+                fill=(255, 255, 255, 0))
+        sf.save(sfondo)
         foto = []
         for colore in ((255, 0, 0), (0, 255, 0), (0, 0, 255)):
             p = _os.path.join(tmp, f"{colore}.jpg")
@@ -26365,13 +26383,19 @@ def prove_podio_sfondo():
                                     int((y0 + y1) / 2 * 545)))
             prova(f"il {i + 1}° e' nel suo barattolo", True,
                   all(abs(px[j] - atteso[j]) < 40 for j in range(3)))
-        prova("l'angolo dello sfondo resta com'era", True,
-              all(c > 240 for c in composta.getpixel((5, 5))))
+        # FUORI dai vetri il disegno non si tocca: l'angolo e' ancora
+        # il fondo bruno, non la tela bianca che sta sotto.
+        prova("l'angolo dello sfondo resta com'era", (40, 25, 15),
+              composta.getpixel((5, 5)))
         # UN BARATTOLO SENZA FOTO RESTA VUOTO: e' una figura, non un
         # buco — la stessa regola del podio disegnato.
         c1 = amb["_podio_su_sfondo"]([foto[0], None, None], sfondo)
         x0, y0, x1, y1 = VETRI[1]
-        prova("il barattolo senza foto resta vuoto", True,
+        # IL VETRO SENZA FOTO RESTA BIANCO, e non nero: la tela sotto
+        # e' bianca APPOSTA — un barattolo vuoto e' una figura, un
+        # buco nero si legge come un guasto (visto sulla prima
+        # anteprima, quando il vetro si convertiva in RGB).
+        prova("il barattolo senza foto resta BIANCO", True,
               all(c > 240 for c in c1.getpixel(
                   (int((x0 + x1) / 2 * 1000), int((y0 + y1) / 2 * 545)))))
         # FAIL-OPEN: senza foto o senza sfondo si torna a mani vuote, e
@@ -26388,6 +26412,38 @@ def prove_podio_sfondo():
                           int((y0 + y1) / 2 * 545)))
         prova("una foto rotta non si porta via le altre", True,
               px[1] > 200 and px[0] < 60)
+    # --- L'ASSET VERO ------------------------------------------
+    # Le coordinate dei vetri sono state MISURATE su questo file, non
+    # stimate: qui si chiede che ci cadano ancora dentro. Se un giorno
+    # il disegno si rifa' e i barattoli si spostano, queste righe lo
+    # dicono il giorno stesso invece che il lunedi' dopo, con le foto
+    # incollate a mezz'aria.
+    if not _os.path.exists(amb["SFONDO_RIEPILOGO"]):
+        salta("i vetri dell'asset vero",
+              f"manca {amb['SFONDO_RIEPILOGO']}")
+    else:
+        vero = _Im.open(amb["SFONDO_RIEPILOGO"])
+        prova("il disegno ha il canale alpha", True,
+              vero.mode in ("RGBA", "LA", "P"))
+        vero = vero.convert("RGBA")
+        L, A = vero.size
+        alpha = vero.split()[3].load()
+        for i, (x0, y0, x1, y1) in enumerate(VETRI):
+            # il centro del riquadro dev'essere BUCATO, o la foto
+            # finirebbe sotto il disegno e non si vedrebbe
+            prova(f"il {i + 1}° vetro e' bucato al centro", True,
+                  alpha[int((x0 + x1) / 2 * L),
+                        int((y0 + y1) / 2 * A)] < 40)
+            # ...e il riquadro non deve sbordare sul fondo opaco piu'
+            # di un filo: si contano i pixel trasparenti dentro
+            dentro = trasp = 0
+            for x in range(int(x0 * L), int(x1 * L), 4):
+                for y in range(int(y0 * A), int(y1 * A), 4):
+                    dentro += 1
+                    trasp += alpha[x, y] < 40
+            prova(f"...e sta quasi tutto dentro il {i + 1}° barattolo",
+                  True, trasp / dentro > 0.80)
+
     # IL RIPIEGO E' SCRITTO NEL CHIAMANTE, e in quest'ordine: prima il
     # disegno vero, poi quello fatto a matita.
     sp = pezzo("_salva_podio")

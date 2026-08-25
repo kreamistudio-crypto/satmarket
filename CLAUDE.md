@@ -5101,9 +5101,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   quello che dice «non l'hai ancora messo via» — quindi si legge come
   un barattolo vuoto e non come un errore.
   E DALL'AGO 2026 IL PODIO SI COMPONE SUL DISEGNO VERO (chiesto da
-  Andrea con la sua immagine): le foto si incollano nei tre vetri
-  bianchi di `assets/riepilogo-barattoli.png` invece che nei barattoli
-  disegnati qui sotto. NON È UNA SOSTITUZIONE SECCA, ed è il pezzo da
+  Andrea con la sua immagine): le foto vanno nei tre vetri di
+  `assets/riepilogo-barattoli.webp` invece che nei barattoli disegnati
+  qui sotto.
+  DUE STRATI, E IL RITAGLIO LO FA IL VETRO, ed è la scoperta che ha
+  cambiato la forma del cantiere: in quel disegno i vetri sono
+  TRASPARENTI e non bianchi — sono BUCHI, fatti apposta per metterci
+  qualcosa dietro. Quindi le foto si incollano su una tela e il
+  disegno ci va SOPRA (`alpha_composite`), e ognuna prende la sagoma
+  esatta del suo barattolo, collo e angoli tondi compresi, invece di
+  una maschera arrotondata disegnata da noi che al bordo non
+  combacerebbe mai. È anche il motivo per cui i riquadri possono
+  prendersi TUTTA l'area trasparente: quel che esce dal vetro lo copre
+  il disegno, che è opaco dappertutto.
+  LA TELA È BIANCA E NON TRASPARENTE, ed è la riga da non ammorbidire:
+  un vetro senza foto deve restare com'è nel disegno — un barattolo
+  vuoto, che nel nostro alfabeto è una figura e non un buco. Con la
+  tela trasparente uscirebbe NERO, e si legge come un guasto: è quel
+  che si è visto guardando la prima anteprima (il vetro convertito in
+  RGB, e il WebP che ci mette lo zero).
+  L'ASSET È WEBP CON ALPHA come le 27 illustrazioni delle categorie: il
+  PNG di partenza pesava 3 MB, questo 99 KB. Chi lo riesporta NON
+  scarti il canale alpha — senza, il disegno copre tutto e i barattoli
+  escono neri; c'è la prova, e la mutazione che lo appiattisce ne fa
+  rosse sette.
+  LE COORDINATE SONO MISURATE SUL FILE, non stimate: si trovano le tre
+  aree trasparenti e se ne prende il bounding box. Una prova le
+  riverifica sull'asset vero (ogni centro dev'essere bucato, e il
+  riquadro star dentro il suo barattolo per oltre l'80%), così un
+  disegno rifatto coi barattoli spostati lo dice il giorno stesso
+  invece che il lunedì dopo, con le foto incollate a mezz'aria. NON È UNA SOSTITUZIONE SECCA, ed è il pezzo da
   capire: `_podio_su_sfondo` torna `None` se il file non c'è, se
   Pillow non c'è o se nessuno dei tre ha una foto NOSTRA, e allora
   `_salva_podio` ricade su `disegna_figura` — che resta viva e
