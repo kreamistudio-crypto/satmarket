@@ -7536,10 +7536,18 @@ def prove_barattolo_filtra():
           mini.count("const BARATTOLO_INVITO = "))
     prova("il cassetto le dice tutte e due", True,
           "${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}" in mini)
+    # IL TITOLO NON RIPETE IL BARATTOLO (ago 2026, dal campo): in quel
+    # blocco il barattolo si vede gia' tre volte — la mascotte sopra
+    # (o il `.big`, che e' il suo ripiego: `.empty-mascotte + .big`),
+    # l'emoji dentro l'invito subito sotto, e la pillola accesa in
+    # cima alla fila. Il titolo era il quarto. La prova ha CAMBIATO
+    # LATO: prima chiedeva il prefisso, adesso lo vieta.
     prova("...e la vetrina mette la constatazione nel TITOLO e "
           "l'invito nel corpo", True,
-          "`🫙 ${BARATTOLO_VUOTO}`" in rg
+          "vistaBarattolo ? BARATTOLO_VUOTO" in rg
           and "textContent = BARATTOLO_INVITO;" in rg)
+    prova("...senza ripetere il barattolo dell'invito qui sotto", False,
+          "${BARATTOLO_VUOTO}`" in rg)
     prova("...senza che nessuno se le riscriva a mano", 0,
           mini.count("Il tuo barattolo è vuoto:"))
 
@@ -7555,6 +7563,18 @@ def prove_barattolo_filtra():
           'id="emptyEsplora"' in mini and 'onclick="alternaBarattolo()"'
           in mini[mini.index('id="emptyEsplora"'):
                   mini.index('id="emptyEsplora"') + 200])
+    # E PORTA LA LENTE DELLA NAV, non un'emoji sua (ago 2026, dal
+    # campo): un cuore solo per le icone — le borsette cambiavano
+    # forma da un telefono all'altro, ed e' la stessa cura gia' fatta
+    # al coming soon delle aste. La fetta e' quella del BOTTONE e non
+    # tutto il file: il glifo vecchio vive ancora, legittimo, come
+    # ripiego della card «Tutto» e dentro il banner della vetrina.
+    _btn_esplora = mini[mini.index('id="emptyEsplora"'):]
+    _btn_esplora = _btn_esplora[:_btn_esplora.index("</button>")]
+    prova("...con la LENTE della nav e non l'emoji delle borsette",
+          True,
+          'class="nav-ico"' in _btn_esplora
+          and "🛍" not in _btn_esplora)
 
     # --- 7) LO STATO E' DI SESSIONE, E FUORI DALLA CRONOLOGIA ---
     # In localStorage vivono valuta, tema, corpo del testo, hint,
@@ -13649,6 +13669,25 @@ def prove_pagina_acquisto():
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
+    # LA MISURA PIU' GRANDE E' SOLO DELLA SEARCHBAR (ago 2026, dal
+    # campo: li' dentro il campo Cerca, a 13px, si leggeva poco e il
+    # bersaglio era minuscolo). Vive su `#curSeg` e vince per
+    # SPECIFICITA' e non per ordine; la regola BASE non si tocca,
+    # perche' veste le altre otto superfici — fra cui il conto della
+    # pagina Paga, che questo progetto dichiara la piu' stretta di
+    # tutte. Allargarla per tutti non si vedrebbe qui: si vedrebbe di
+    # la', in un'etichetta mozzata.
+    prova("il toggle piu' grande e' scopato alla searchbar", True,
+          "#curSeg button{font-size:15px;padding:4px 12px}" in mini3)
+    prova("...e la regola base resta la misura di sempre", True,
+          "padding:4px 10px;font-weight:800" in mini3
+          and "font-size:13px;cursor:pointer" in mini3)
+    # E IL CAMPO RISERVA LO SPAZIO PER IL TOGGLE CRESCIUTO: le pillole
+    # stanno DENTRO il campo, in posizione assoluta, quindi a tenere
+    # il testo digitato lontano da loro c'e' solo questo padding —
+    # senza, si scriverebbe sotto l'euro.
+    prova("...e il campo Cerca gli lascia il posto", True,
+          "padding:11px 92px 11px 38px" in mini3)
     prova("...e la chiamano i due rami del render", 2,
           pezzo_js(mini3, "function renderAcquisto(){",
                    "\n}").count("${toggleValuta()}"))

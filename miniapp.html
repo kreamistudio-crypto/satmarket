@@ -596,7 +596,7 @@
   .searchbar input{
     flex:1;width:100%;
     border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
-    padding:11px 84px 11px 38px;font:inherit;font-weight:600;outline:none;
+    padding:11px 92px 11px 38px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
@@ -608,6 +608,18 @@
   .cur-seg button{border:0;background:none;padding:4px 10px;font-weight:800;
     font-size:13px;cursor:pointer;color:var(--muted);border-radius:999px}
   .cur-seg button.active{background:var(--ink);color:var(--on-ink)}
+  /* IL TOGGLE DELLA SEARCHBAR E' UN FILO PIU' GRANDE (ago 2026, dal
+     campo: a 13px si leggeva poco e il bersaglio era minuscolo). La
+     misura vive su `#curSeg` e NON sulla regola base, che veste altre
+     otto superfici — dal conto della pagina Paga alla testata del
+     carrello — dove nessuno ha chiesto niente e lo spazio e' un altro.
+     Vince per SPECIFICITA' (l'id) e non per ordine.
+     E CRESCE COL PADDING, cioe' cresce anche l'area toccabile: il
+     bersaglio passa da 28.7x26 a 34x30 (misurati). Sotto i 44px
+     raccomandati resta, e per arrivarci servirebbe un ::after che
+     sborda — che qui il contenitore RITAGLIA (`overflow:hidden`):
+     toglierlo e' un'altra decisione, e tocca tutte e nove. */
+  #curSeg button{font-size:15px;padding:4px 12px}
   /* La variante "in riga" del selettore valuta: stesse due pillole
      compatte, ma dentro il flusso accanto a un campo (form avvisi)
      invece che assoluta dentro la searchbar */
@@ -4335,7 +4347,11 @@ document.getElementById('cartello')?.remove();</script>
            costante unica, la stessa che dice il vuoto nel cassetto -->
       <span id="emptyBarattolo" style="display:none"></span>
       <button class="btn orange" id="emptyVendi" onclick="go('vendi')">+ Metti in vendita</button>
-      <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()">🛍 Esplora il mercatino</button>
+      <!-- la LENTE della nav, la stessa icona di Esplora: un cuore solo
+           per le icone, e l'emoji delle borsette cambiava forma da un
+           telefono all'altro. A 20px il tratto si rialza a 1.9, o
+           rimpicciolito si assottiglierebbe (il calco del coming soon) -->
+      <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>Esplora il mercatino</button>
       <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
     </div>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
@@ -9007,7 +9023,7 @@ function renderGrid(items){
   if (el('emptyEsplora'))
     el('emptyEsplora').style.display = vistaBarattolo ? '' : 'none';
   if (el('emptyTitolo')) el('emptyTitolo').textContent =
-    vistaBarattolo ? `🫙 ${BARATTOLO_VUOTO}`
+    vistaBarattolo ? BARATTOLO_VUOTO
     : vuotoAste ? '🔨 Nessuna asta in corso' : 'Il barattolo qui è vuoto';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
