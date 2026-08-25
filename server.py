@@ -35421,8 +35421,13 @@ CONTROLLI_LIBRO_MASTRO = (
     ("righe d'offerta orfane",
      "figlie di un'offerta che non esiste piu': la fusione le "
      "cancella PRIMA della testata, qualcuno ha rotto l'ordine",
-     "SELECT r.id FROM offerte_righe r WHERE NOT EXISTS "
-     "(SELECT 1 FROM offerte o WHERE o.id=r.offerta_id)"),
+     # l'id mostrato e' l'offerta MANCANTE, che e' quel che si cerca —
+     # e la tabella una colonna `id` non ce l'ha proprio (un `r.id`
+     # qui esplodeva sul database vero: le prove giravano su un
+     # cartone che divergeva dal DDL — trovato da un collaudo del
+     # cantiere accanto, che fa girare la ronda su init_db vero)
+     "SELECT DISTINCT r.offerta_id FROM offerte_righe r WHERE NOT "
+     "EXISTS (SELECT 1 FROM offerte o WHERE o.id=r.offerta_id)"),
     ("offerta mono con righe figlie",
      "un'offerta su UN annuncio con delle figlie di carrello: due "
      "verita' sulla stessa trattativa",

@@ -13841,7 +13841,11 @@ def prove_libro_mastro():
           DEFAULT 1, importo_sats INT
           DEFAULT 0, importo_eur REAL DEFAULT 0, contro_sats INT
           DEFAULT 0, contro_eur REAL DEFAULT 0, giri INT DEFAULT 0);
-        CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+        -- SENZA una colonna id, come il DDL VERO: il cartone che
+        -- gliene dava una teneva verde un «SELECT r.id» che sul
+        -- database vero esplodeva (trovato da un collaudo che gira la
+        -- ronda su init_db vero, non da queste prove — la lezione)
+        CREATE TABLE offerte_righe(
           offerta_id INT, annuncio_id INT, quantita INT DEFAULT 1,
           unitario_sats INT DEFAULT 0, unitario_eur REAL DEFAULT 0,
           titolo TEXT DEFAULT '');
@@ -14051,9 +14055,12 @@ def prove_libro_mastro():
         # la forma di offerte/offerte_righe, i tre modi
         ("DELETE FROM offerte_righe WHERE offerta_id=3",
          "offerta di carrello senza righe", "3"),
-        ("INSERT INTO offerte_righe(id,offerta_id,annuncio_id) "
-         "VALUES(88, 4242, 9)",
-         "righe d'offerta orfane", "88"),
+        # l'id che il controllo mostra e' l'offerta MANCANTE (4242),
+        # che e' quel che un moderatore cercherebbe: la tabella una
+        # colonna id non ce l'ha proprio
+        ("INSERT INTO offerte_righe(offerta_id,annuncio_id) "
+         "VALUES(4242, 9)",
+         "righe d'offerta orfane", "4242"),
         ("INSERT INTO offerte_righe(offerta_id,annuncio_id) VALUES(1, 9)",
          "offerta mono con righe figlie", "1"),
         ("UPDATE puntate SET offerto_sats=101 WHERE id=1",
@@ -17424,7 +17431,9 @@ def prove_ricevuta_compratore():
             CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
               compratore_id INT, ordine_id INT, stato TEXT,
               aggiornato INT DEFAULT 0);
-            CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+            -- senza colonna id, come il DDL vero (la lezione del
+            -- cartone che divergeva: vedi prove_libro_mastro)
+            CREATE TABLE offerte_righe(
               offerta_id INT, annuncio_id INT, quantita INT,
               unitario_sats INT, unitario_eur REAL, titolo TEXT);
             CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY

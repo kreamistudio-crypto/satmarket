@@ -108,7 +108,9 @@ SELECT o.id, o.stato FROM offerte o
    AND NOT EXISTS (SELECT 1 FROM offerte_righe r WHERE r.offerta_id = o.id);
 
 SELECT '8e) RIGHE D''OFFERTA ORFANE (deve essere vuoto)' AS controllo;
-SELECT r.id, r.offerta_id, r.titolo FROM offerte_righe r
+-- niente r.id: la tabella non ha quella colonna (il rowid c'e', ma
+-- l'offerta mancante e' il dato che si cerca)
+SELECT r.offerta_id, r.annuncio_id, r.titolo FROM offerte_righe r
  WHERE NOT EXISTS (SELECT 1 FROM offerte o WHERE o.id = r.offerta_id);
 
 SELECT '8f) OFFERTE MONO CON RIGHE FIGLIE (deve essere vuoto)' AS controllo;
