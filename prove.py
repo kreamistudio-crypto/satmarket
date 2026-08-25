@@ -3681,6 +3681,8 @@ def prove_busta_ritiro():
         indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
         sollecito_punto_il INT DEFAULT 0, solleciti_punto INT DEFAULT 0,
+        sollecito_diretto_il INT DEFAULT 0,
+        solleciti_diretti INT DEFAULT 0,
         sollecito_appuntamento_il INT DEFAULT 0,
         solleciti_appuntamento INT DEFAULT 0,
         appuntamento_il INT DEFAULT 0,
@@ -4245,6 +4247,150 @@ def prove_busta_ritiro():
     prova("...e a leva spenta il database non si tocca", prima,
           vero.execute("SELECT solleciti_punto FROM ordini "
                        "ORDER BY id").fetchall())
+
+    # --- LA TERZA SORELLA: IL CODICE CHE NON PASSA DA QUI ------------
+    # La busta DIRETTA (cantiere 45) zittiva tutte e tre le porte, e
+    # l'ordine restava muto fino al giorno 10 su una giacenza di tre.
+    # Anche qui non si guarda com'e' scritta la funzione: la si fa
+    # girare e si guarda CHI riceve cosa, in che giorno.
+    avsd = []
+    vero.execute("DELETE FROM ordini")
+    # id 20: dichiarato, spedito 2 giorni (e un'ora) fa. L'ora in piu'
+    # per la stessa ragione della sorella: il confronto e' STRETTO.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(20, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 2 * G - 3600, ora - 2 * G))
+    # id 21: la busta C'E' — e' della SORELLA, non di questa. Senza il
+    # gate `busta_diretta_il>0` riceverebbe due promemoria che si
+    # contraddicono.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il) "
+                 "VALUES(21, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 9 * G, ora - 8 * G))
+    # id 22: LA CINTURA. Dichiarato E con la busta depositata — oggi
+    # impossibile (il deposito azzera la dichiarazione), e per questo
+    # e' il caso che una sentinella sul testo non saprebbe distinguere:
+    # se un domani quell'UPDATE cambia, senza `busta_il=0` partirebbero
+    # due squilli sullo stesso ordine.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il, "
+                 "busta_diretta_il) "
+                 "VALUES(22, 111, 222, 'shipped', 1, ?, ?, ?)",
+                 (ora - 9 * G, ora - 8 * G, ora - 8 * G))
+    # id 23: LO 'shipped' STORICO col campo a zero. Senza la guardia
+    # `spedito_il>0` il MAX varrebbe 0 e questo squillerebbe al primo
+    # giro — la raffica che la sorella non rischia perche' `busta_il>0`
+    # le garantisce l'ancora.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(23, 111, 222, 'shipped', 1, 0, ?)",
+                 (ora - 30 * G,))
+    # id 24: un SET (annuncio_id=0), la lezione del LEFT JOIN
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il, "
+                 "annuncio_id) VALUES(24, 111, 222, 'shipped', 1, ?, ?, 0)",
+                 (ora - 3 * G, ora - 3 * G))
+    vero.commit()
+    async def _notifica_d(tg, testo):
+        avsd.append((tg, testo))
+
+    ambd = {"db": Con, "notifica": _notifica_d,
+            "notifica_admin": _notifica_admin_spia(avsd),
+            "_titolo_ordine": lambda righe: "un set",
+            "html": __import__("html"), "time": _t,
+            "PROMEMORIA_RITIRO_GIORNI": 2, "PROMEMORIA_CONFERMA_MAX": 3}
+    exec("async " + pezzo("sollecita_codici_diretti"), ambd)
+
+    def girod():
+        asyncio.new_event_loop().run_until_complete(
+            ambd["sollecita_codici_diretti"]())
+
+    girod()
+    prova("codice diretto: a 2 giorni squilla il SOLO compratore",
+          [111, 111], [a[0] for a in avsd])
+    dettod = " || ".join(t for _, t in avsd)
+    # LA RIGA CHE IL CORRIERE NON DICE MAI, ed e' la ragione per cui
+    # questa funzione puo' esistere accanto alla sorella
+    prova("...e gli dice di guardare anche nello spam", True,
+          "spam" in dettod)
+    prova("...e il SET c'e', col titolo dalle righe", True,
+          "un set" in dettod)
+    # IL TESTO DEV'ESSERE VERO ANCHE COL PACCO IN VIAGGIO: l'ancora e'
+    # la spedizione e non l'arrivo, che non sappiamo
+    prova("...e non promette un arrivo che non possiamo sapere", True,
+          "ti aspetta" not in dettod and "è arrivato al punto" not in dettod)
+    prova("...e nessun altro ordine e' entrato nel giro", 2, len(avsd))
+    # il 🧊 non esiste in questa famiglia: la finestra e' corta e
+    # cadrebbe prima di CODA_FERMI_GIORNI
+    prova("...e ai moderatori non si scrive mai", 0,
+          sum(1 for chi, _ in avsd if chi == "admin"))
+    avsd.clear()
+    girod()
+    prova("codice diretto: non ribussa nello stesso giorno", [], avsd)
+    # I CONTATORI SONO SUOI, e questa e' la prova che tiene in piedi
+    # tutto il cantiere: se leggesse `solleciti_punto`, l'ordine che
+    # passa alla sorella (il venditore deposita dopo la segnalazione)
+    # arriverebbe al tetto senza aver mai sentito «vai a ritirare».
+    prova("codice diretto: il contatore e' il SUO", (1, 0),
+          tuple(vero.execute("SELECT solleciti_diretti, solleciti_punto "
+                             "FROM ordini WHERE id=20").fetchone()))
+
+    def spostad(id_ordine, giorni):
+        vero.execute("UPDATE ordini SET sollecito_diretto_il=? WHERE id=?",
+                     (ora - giorni * G, id_ordine))
+        vero.commit()
+
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: al secondo squillo solo il compratore",
+          [111], [a[0] for a in avsd])
+    avsd.clear()
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: al TERZO entra anche il venditore",
+          [111, 222], sorted(a[0] for a in avsd))
+    prova("...e a lui si dice che puo' depositare le istruzioni", True,
+          "istruzioni di ritiro" in
+          [t for chi, t in avsd if chi == 222][0])
+    avsd.clear()
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: oltre il tetto, silenzio", [], avsd)
+    prova("...e il contatore si ferma al tetto", 3,
+          vero.execute("SELECT solleciti_diretti FROM ordini WHERE "
+                       "id=20").fetchone()[0])
+    # la staffetta e la leva, come per la sorella
+    vero.execute("UPDATE ordini SET solleciti_diretti=0, "
+                 "sollecito_diretto_il=0, solleciti_conferma=1 "
+                 "WHERE id=20")
+    vero.commit()
+    girod()
+    prova("codice diretto: dove parla gia' la conferma, si tace", [], avsd)
+    ambd["PROMEMORIA_RITIRO_GIORNI"] = 0
+    vero.execute("UPDATE ordini SET solleciti_conferma=0 WHERE id=20")
+    vero.commit()
+    primad = vero.execute("SELECT solleciti_diretti FROM ordini "
+                          "ORDER BY id").fetchall()
+    girod()
+    prova("codice diretto: la leva a 0 spegne, e NON accelera", [], avsd)
+    prova("...e a leva spenta il database non si tocca", primad,
+          vero.execute("SELECT solleciti_diretti FROM ordini "
+                       "ORDER BY id").fetchall())
+    # ...E QUALCUNO LA DEVE CHIAMARE: la RIGA INTERA e non il nome —
+    # un «pass  # await sollecita_codici_diretti()» lascerebbe verde
+    # una sentinella che cerca la parola, con la funzione mai
+    # eseguita. E' la lezione del reaper, e questa mutazione e' l'unica
+    # sopravvissuta al primo giro di tortura di questo cantiere.
+    prova("...ed e' agganciata all'orologio", True,
+          any(r.strip() == "await sollecita_codici_diretti()"
+              for r in pezzo("orologio").splitlines()))
+    # gira DOPO la sorella, come la sorella gira dopo la conferma: le
+    # due popolazioni sono complementari, ma leggono contatori che il
+    # giro precedente puo' aver appena scritto
+    prova("...dopo il promemoria del ritiro al punto", True,
+          _SORGENTE.index("await sollecita_ritiri_al_punto()")
+          < _SORGENTE.index("await sollecita_codici_diretti()"))
     vero.close()
 
 
@@ -23217,14 +23363,22 @@ def prove_sollecito_a_comando():
     esito, _, err = bussa(mondo(), 45)
     prova("lo shipped storico (spedito_il=0) ha la maniglia",
           {"ok": True}, esito)
-    # cantiere 45: col codice dichiarato DIRETTO al compratore non c'e'
-    # nessuna busta da aspettare — il bottone non nasce, e la risposta
-    # e' quella dei fratelli (chi enumera non impara niente)
+    # LA BUSTA DIRETTA E' RIENTRATA (ago 2026), e queste due prove
+    # hanno CAMBIATO LATO col loro perche': certificavano il gate
+    # `busta_diretta_il=0`, cioe' il silenzio che lasciava chi ha
+    # comprato senza nessuna maniglia fino al giorno 10 su una
+    # giacenza di tre. Il bottone adesso c'e' e RIFERISCE un fatto —
+    # «non mi e' arrivato niente» — invece di ricordare un gesto che
+    # il venditore non deve fare.
     esito, db45, err = bussa(mondo(), 47)
-    prova("la busta diretta al compratore resta fuori",
-          (400, "Operazione non permessa"),
-          (err and err.code, err and err.detail))
-    prova("...senza notifiche", [], db45)
+    prova("la busta diretta al compratore entra, col suo mestiere",
+          {"ok": True}, esito)
+    prova("...e al venditore si dice il FATTO, non il rimprovero", True,
+          len(db45) == 1 and "non ha ricevuto il codice" in db45[0][1])
+    # ...e non gli si dice mai che ha sbagliato: il recapito puo'
+    # essere giusto e il messaggio finito nello spam
+    prova("...senza accusarlo di aver sbagliato l'indirizzo", True,
+          "sbagliato" not in db45[0][1])
     esito, _, err = bussa(mondo(), 40, SOLLECITO_MANUALE_BUSTA_ORE=0)
     prova("la leva a 0 spegne la fase busta", 400, err and err.code)
     esito, db4, err = bussa(mondo(), 46)
@@ -23242,19 +23396,39 @@ def prove_sollecito_a_comando():
               (err and err.code, err and err.detail, db5))
     # le sentinelle sulla forma: la WHERE fa entrare la busta, e le
     # scritture restano letterali e SUE
-    prova("la WHERE dice spedito + via punto + busta vuota — e mai la "
-          "busta diretta (cantiere 45)", True,
+    # ROVESCIATA col gate (ago 2026): la WHERE fa entrare la busta
+    # vuota, e adesso ANCHE quella dichiarata diretta — la clausola
+    # `busta_diretta_il=0` non deve tornare di soppiatto, o il
+    # compratore torna muto.
+    prova("la WHERE dice spedito + via punto + busta vuota", True,
           "OR o.stato='shipped' AND o.via_punto=1 " in c
-          and "AND o.busta_il=0 AND o.busta_diretta_il=0)" in c)
+          and "AND o.busta_il=0)" in c)
+    # ...e si guarda il CORPO e non la funzione intera: la docstring
+    # quella clausola la NOMINA apposta, per dire che se n'e' andata —
+    # cercandola in `c` la prova diventerebbe rossa per colpa di una
+    # spiegazione (la trappola gia' a verbale, presa scrivendola).
+    prova("...e la busta diretta non e' piu' esclusa", True,
+          "busta_diretta_il=0" not in corpo)
+    prova("...ma resta distinta, coi suoi testi", True,
+          'diretta = busta and o["busta_diretta_il"] > 0' in corpo)
     prova("l'ancora della busta e' spedito_il", True,
           'o["spedito_il"] + finestra' in corpo)
     prova("le scritture della busta sono letterali", True,
           "sollecito_manuale_busta_il=?" in corpo
           and "solleciti_manuali_busta=solleciti_manuali_busta+1" in corpo)
-    # la traccia del cantiere 45 sta accanto al testo: il giorno che
-    # il codice va diretto al compratore, questo messaggio va zittito
-    prova("la traccia del cantiere 45 e' accanto al testo", True,
-          "CANTIERE 45" in c)
+    # LA TRACCIA E' DIVENTATA IL RAMO (ago 2026): quel commento diceva
+    # «CANTIERE 45 (traccia, non costruito)» ed era stantio da quando
+    # il cantiere 45 e' in main — adesso quel ramo esiste davvero, e
+    # la prova chiede il GESTO invece della parola.
+    # e il TESTO si cerca sulle stringhe RICUCITE: nel sorgente sta
+    # su due righe, ed e' nella piega che un sito si nasconde a un
+    # censimento (la lezione dell'euro e del titolo nudo).
+    cuci = re.sub(r'"\s*\n\s*"', "", corpo)
+    prova("il ramo diretto ha il suo testo, e non quello della busta",
+          True, "if diretta:" in corpo
+          and "non ha ricevuto il codice di ritiro" in cuci)
+    prova("...e la via d'uscita e' dentro quel testo", True,
+          "deposita il nome" in cuci and "si annulla da sola" in cuci)
 
     # --- 11) il giudice del client -------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -23282,10 +23456,14 @@ def prove_sollecito_a_comando():
           and "return 'ok'" in g)
     prova("...e «è presto» resta il NIENTE", True,
           "return '';   // è ancora presto" in g)
+    # i due testi si biforcano col mestiere (ago 2026: sulla busta
+    # diretta il verbo e' «segnalato», che «ricordato» direbbe la cosa
+    # sbagliata), ma lo STATO resta detto in tutti e due i rami
     prova("la pausa lo lascia in pagina, spento e col perché", True,
-          "Già ricordato oggi — riprova domani" in b)
+          "oggi — riprova domani" in b and "'segnalato' : 'ricordato'" in b)
     prova("...e il tetto pure, col numero della leva", True,
-          "Hai già ricordato ${SOLLECITO.max} volte" in b)
+          "${SOLLECITO.max} volte" in b
+          and "'segnalato' : 'ricordato'" in b)
     prova("da spento NON c'e' nessun onclick", 1, b.count("onclick="))
     prova("...ed e' quello dello stato 'ok'", True,
           "st === 'ok'" in b
@@ -23303,8 +23481,19 @@ def prove_sollecito_a_comando():
     prova("la seconda fase del giudice: shipped e' la busta", True,
           "o.state==='shipped'" in g
           and "!o.viaPunto || o.bustaIl" in g)
-    prova("...e la busta diretta lo spegne anche nel client", True,
+    # ROVESCIATA (ago 2026), gemella di quella del server: il giudice
+    # NON deve piu' spegnersi sulla busta diretta — a distinguere sono
+    # le parole, non l'esistenza del bottone.
+    prova("...e la busta diretta NON lo spegne piu'", False,
           "if (o.bustaDirettaIl) return '';" in g)
+    # ...e il verbo si lega alla CONDIZIONE e non alla sola presenza
+    # della stringa: col solo `in b` un `false ?` al posto di
+    # `diretta ?` lasciava la prova verde col bottone tornato muto —
+    # e' l'altra mutazione sopravvissuta al primo giro di tortura.
+    prova("...ma il bottone cambia verbo, che li' non si ricorda niente",
+          True, "diretta ? '📮 Non mi è arrivato il codice'" in b)
+    prova("...e il discriminante e' shipped + busta diretta", True,
+          "const diretta = o.state==='shipped' && o.bustaDirettaIl;" in b)
     prova("...con la finestra a prova di NaN da speditoIl", True,
           "if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso))" in g)
     prova("...e pausa e tetto sui SUOI contatori", True,

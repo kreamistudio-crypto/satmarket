@@ -23595,7 +23595,7 @@ function pannelloBustaRitiro(o){
          il falso — aspetta una cosa che non arrivera' mai — e al suo
          posto si dice da dove arriva il codice davvero. */
       return o.state!=='shipped' ? '' : (o.bustaDirettaIl ? `
-      <div class="trust-note">📦 <span><b>Il codice di ritiro ti arriva direttamente dal corriere</b>, ai recapiti che il venditore ha indicato come destinatario: non passerà dall'ordine. Se non ti arriva, scrivigli o apri una disputa.</span></div>` : `
+      <div class="trust-note">📦 <span><b>Il codice di ritiro ti arriva direttamente dal corriere</b>, ai recapiti che il venditore ha indicato come destinatario: non passerà dall'ordine. Quando il pacco arriva al punto, controlla la posta — <b>anche nello spam</b>. Se non ti arriva niente puoi dirlo al venditore da qui: può mettere lui le istruzioni nell'ordine.</span></div>` : `
       <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>`);
     /* IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed e' cio' che fa
        atterrare il codice dove stava il dito: se il pannello si
@@ -24283,9 +24283,15 @@ function statoSollecito(o){
        subito, come sul server: quella popolazione non ha nessun
        altro squillo. */
     if (!o.viaPunto || o.bustaIl) return '';
-    /* il codice dichiarato DIRETTO al compratore (cantiere 45): non
-       c'e' nessuna busta da aspettare, e il bottone non nasce */
-    if (o.bustaDirettaIl) return '';
+    /* E IL CODICE DICHIARATO DIRETTO (cantiere 45) ADESSO ENTRA (ago
+       2026): la riga che lo teneva fuori diceva «non c'e' nessuna
+       busta da aspettare», ed era vera dal lato del VENDITORE. Dal
+       lato di chi compra il caso scoperto era il rovescio — il codice
+       e' partito verso un recapito e li' non e' arrivato — e con
+       tutte e tre le porte zittite non restava nessuna maniglia fino
+       al giorno 10. Il bottone e' lo stesso, la finestra e i
+       contatori pure (e' la stessa fase); a cambiare sono le parole,
+       che le decide bottoneSollecito. */
     if (SOLLECITO.busta<=0) return '';
     if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso)) return '';
     if (o.sollecitiManualiBusta >= SOLLECITO.max) return 'tetto';
@@ -24405,14 +24411,28 @@ function notaFermo(o){
 function bottoneSollecito(o){
   const st = statoSollecito(o);
   if (!st) return '';
+  /* LA BUSTA DIRETTA NON RICORDA, RIFERISCE (ago 2026): li' il codice
+     e' gia' partito verso un recapito, quindi «ricorda al venditore il
+     codice di ritiro» direbbe la cosa sbagliata — lui quel codice non
+     ce l'ha e non lo aspetta. Il verbo cambia perche' cambia il fatto:
+     l'unica cosa che il venditore non puo' sapere da solo e' che a
+     destinazione non e' arrivato niente. */
+  const diretta = o.state==='shipped' && o.bustaDirettaIl;
+  /* UN SOLO onclick, e non e' un vezzo: la sentinella «da spento NON
+     c'e' nessun onclick» li CONTA, e due — anche se tutti e due nel
+     ramo acceso — la renderebbero cieca. L'etichetta varia, il gesto
+     e' uno. */
   if (st === 'ok')
-    return `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 `
-         + `Ricorda al venditore ${o.state==='shipped'
+    return `<button class="btn ghost" onclick="sollecitaVenditore(this)">`
+         + (diretta ? '📮 Non mi è arrivato il codice'
+             : `🔔 Ricorda al venditore ${o.state==='shipped'
              ? 'il codice di ritiro' : o.consegnaScelta==='digitale'
-             ? 'di mandarti il codice' : 'di spedire'}</button>`;
-  return `<button class="btn ghost" disabled>🔔 ${st === 'tetto'
-    ? `Hai già ricordato ${SOLLECITO.max} volte`
-    : 'Già ricordato oggi — riprova domani'}</button>`;
+             ? 'di mandarti il codice' : 'di spedire'}`) + `</button>`;
+  return `<button class="btn ghost" disabled>${diretta ? '📮' : '🔔'} `
+    + `${st === 'tetto'
+    ? `Hai già ${diretta ? 'segnalato' : 'ricordato'} ${SOLLECITO.max} volte`
+    : `Già ${diretta ? 'segnalato' : 'ricordato'} oggi — riprova domani`
+    }</button>`;
 }
 /* Il gemello di sollecita(), dall'altra parte del tavolo. I due
    contatori dell'automatico non si toccano: sono altre colonne, e

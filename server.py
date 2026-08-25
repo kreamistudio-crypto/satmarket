@@ -4584,6 +4584,26 @@ def init_db():
                     # in cui fra sei mesi si legge la riga sbagliata.
                     "sollecito_punto_il INTEGER DEFAULT 0",
                     "solleciti_punto INTEGER DEFAULT 0",
+                    # ...e il promemoria al COMPRATORE sul binario
+                    # della BUSTA DIRETTA (ago 2026): li' il codice
+                    # gliel'ha mandato il corriere e da noi non passa,
+                    # quindi il messaggio e' un altro — «guarda anche
+                    # nello spam», e la strada per dire che non e' mai
+                    # arrivato.
+                    # COLONNE SUE E NON `solleciti_punto`, e qui la
+                    # regola non e' una precauzione ma il caso vero di
+                    # questo cantiere: le due popolazioni sembrano
+                    # mutuamente esclusive (il deposito della busta
+                    # azzera la dichiarazione) ma un ordine PASSA
+                    # dall'una all'altra — e' il flusso della via
+                    # d'uscita, «non mi e' arrivato» -> il venditore
+                    # deposita. Col contatore condiviso, chi ha speso
+                    # i tre squilli da «diretta» arriverebbe al tetto
+                    # e non sentirebbe MAI il «vai a ritirare», cioe'
+                    # resterebbe muto proprio dopo che il sistema gli
+                    # ha appena risolto il problema.
+                    "sollecito_diretto_il INTEGER DEFAULT 0",
+                    "solleciti_diretti INTEGER DEFAULT 0",
                     # IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026):
                     # NASCONDERE, mai cancellare — la riga resta nel
                     # database, perche' libro mastro, feedback, export
@@ -23605,6 +23625,15 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     'locked' puo' aver consumato i tre squilli), pausa e tetto di
     famiglia. I contatori dell'automatico della busta non si toccano,
     per la regola di sempre.
+    E LA BUSTA DIRETTA E' RIENTRATA (ago 2026): fino a ieri il gate
+    `busta_diretta_il=0` la teneva fuori, perche' li' il venditore non
+    aspetta nessuna busta e sollecitarlo era un rimprovero a vuoto.
+    Restava scoperto il rovescio — il codice partito verso un recapito
+    e mai arrivato — dove chi ha comprato non aveva NESSUNA maniglia e
+    tutte e tre le porte tacevano. Adesso quel ramo entra col suo
+    messaggio: non «deposita il codice» ma «non mi e' arrivato
+    niente», che e' l'unico fatto che il venditore non puo' sapere da
+    solo. Stessa finestra e stessi contatori: e' la stessa fase.
     Qui i sats non si muovono mai, solo parole; la notifica parte DOPO
     il commit."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -23624,18 +23653,43 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     "AND o.consegna_scelta != 'ritiro' "
                     # la seconda fase (cantiere 44): spedito verso un
                     # punto, busta mai depositata — qui si chiede il
-                    # codice di ritiro. E il codice dichiarato DIRETTO
-                    # al compratore (cantiere 45) non ha nessuna busta
-                    # da aspettare: il sollecito rimprovererebbe il
-                    # venditore per niente.
+                    # codice di ritiro.
+                    # E IL CODICE DICHIARATO DIRETTO AL COMPRATORE
+                    # (cantiere 45) ADESSO ENTRA ANCH'ESSO, con un
+                    # mestiere diverso: ago 2026, e questa riga
+                    # ROVESCIA il gate che lo teneva fuori. Allora il
+                    # bottone non aveva niente da dire — il venditore
+                    # non aspetta nessuna busta, e sollecitarlo era un
+                    # rimprovero per niente, cioe' «un bottone che
+                    # porta a un 400 e' peggio di un bottone che non
+                    # c'e'». Ma il caso che restava scoperto e' il
+                    # rovescio: il codice e' andato a un recapito e li'
+                    # non e' arrivato, e chi ha comprato non aveva
+                    # NESSUNA maniglia per dirlo — la busta diretta
+                    # zittiva tutte e tre le porte, e il primo squillo
+                    # cadeva al giorno 10 su una giacenza di tre.
+                    # Il bottone quindi c'e', ma non chiede «deposita
+                    # il codice»: dice «non mi e' arrivato niente», che
+                    # e' l'unico fatto che il venditore non puo'
+                    # sapere da solo — ed e' anche cio' che gli apre la
+                    # via d'uscita (depositare la busta azzera la
+                    # dichiarazione da se').
                     "OR o.stato='shipped' AND o.via_punto=1 "
-                    "AND o.busta_il=0 AND o.busta_diretta_il=0)",
+                    "AND o.busta_il=0)",
                     (ordine_id, user["id"])).fetchone()
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
     # l'unico 'shipped' che la WHERE fa entrare e' quello della busta
     busta = o["stato"] == "shipped"
+    # ...in due gusti: la busta che il venditore deve ancora
+    # depositare, e quella DIRETTA, dove il codice e' gia' partito
+    # verso un recapito e il fatto da riferire e' che non e' arrivato.
+    # Cadenza, finestra e contatori restano gli STESSI: e' la stessa
+    # fase (chi ha comprato bussa sul codice di ritiro) e il venditore
+    # che nel frattempo deposita la busta risolve il problema, quindi
+    # da li' in poi non c'e' piu' niente per cui bussare.
+    diretta = busta and o["busta_diretta_il"] > 0
     if not o["consegna_scelta"]:
         # LA STESSA DOMANDA CHE SI FA `segna_spedito` (ago 2026, dal
         # campo: il bottone non compariva su ordini vecchi e pagati da
@@ -23717,17 +23771,34 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     (adesso, ordine_id))
     con.commit()
     con.close()
+    if diretta:
+        # IL FATTO CHE SOLO CHI COMPRA PUO' SAPERE (ago 2026): il
+        # codice e' partito verso un recapito e li' non e' arrivato.
+        # Il venditore non ha modo di accorgersene da solo — a lui il
+        # corriere non manda niente — quindi questo messaggio non
+        # sollecita un gesto in ritardo: RIFERISCE, e la via d'uscita
+        # e' nella riga dopo. Non si dice mai «hai sbagliato
+        # l'indirizzo»: il recapito puo' essere giusto e il messaggio
+        # essere finito nello spam, o il pacco non essere ancora
+        # arrivato al punto.
+        await notifica(o["venditore_id"],
+                       f"📮 <b>Chi ha comprato «{titolo}» non ha "
+                       "ricevuto il codice di ritiro.</b>\n"
+                       "Hai indicato i suoi recapiti come "
+                       "destinatario, quindi il codice doveva "
+                       "arrivargli dal corriere: non è successo, o non "
+                       "l'ha trovato. Se il codice ce l'hai tu, apri "
+                       "l'ordine nella Mini App e <b>deposita il nome "
+                       "del destinatario e il codice</b> — da lì lo "
+                       "legge lui e la dichiarazione si annulla da "
+                       "sola. La giacenza è corta: senza le istruzioni "
+                       "il pacco torna indietro, con le spese di reso.")
+        return {"ok": True}
     if busta:
         # La prima riga dice un fatto che sappiamo DAVVERO — e' il
         # compratore ad aver premuto — e non promette un arrivo che
         # non possiamo verificare (decisione di Andrea: niente «e'
         # arrivato al punto», Barattolo coi corrieri non parla).
-        # CANTIERE 45 (traccia, non costruito): se il venditore ha
-        # messo l'email del COMPRATORE sull'etichetta, il codice gli
-        # arriva diretto dal corriere e non passa da noi — questo
-        # messaggio direbbe una cosa sbagliata. Quel ramo
-        # (dichiararlo nell'ordine, e zittire busta e promemoria) e'
-        # un cantiere suo.
         await notifica(o["venditore_id"],
                        f"🔔 <b>Chi ha comprato «{titolo}» sta aspettando "
                        "il codice di ritiro.</b>\n"
@@ -32103,7 +32174,13 @@ async def sollecita_buste_ferme():
     niente, e il promemoria lo rimprovererebbe per una busta che non
     arrivera' mai — la WHERE lo esclude, e col promemoria tace anche
     il 🧊 (stessa query). Il testo del sollecito nomina la porta
-    tardiva: e' cosi' che chi ha dimenticato la spunta la scopre."""
+    tardiva: e' cosi' che chi ha dimenticato la spunta la scopre.
+    QUESTA ESCLUSIONE RESTA E RESTA GIUSTA (ago 2026), ma da oggi non
+    lascia l'ordine muto: a guardare quella popolazione c'e'
+    `sollecita_codici_diretti`, che squilla al COMPRATORE — l'unico
+    che possa accorgersi che il codice non e' arrivato — e gli da' la
+    strada per dirlo. Al venditore, qui come li', non si chiede niente
+    finche' non c'e' un fatto da riferirgli."""
     if PROMEMORIA_BUSTA_GIORNI <= 0 or PROMEMORIA_CONFERMA_GIORNI <= 0:
         return
     adesso = int(time.time())
@@ -32245,6 +32322,15 @@ async def sollecita_ritiri_al_punto():
     duplicherebbe, ancorato per giunta alla spedizione e non
     all'arrivo, che non sappiamo: busserebbe «vai a ritirare» su un
     pacco che viaggia ancora.
+    RESTA FUORI DA QUI, ma non e' piu' muta (ago 2026): quella
+    popolazione ce l'ha adesso `sollecita_codici_diretti`, qui sotto,
+    che dice una cosa che il corriere NON dice — «se il codice non ti
+    e' arrivato, guarda anche nello spam, e poi dillo dall'ordine» — e
+    che per l'obiezione qui sopra si tiene un testo vero anche col
+    pacco ancora in transito. Ha colonne SUE: un ordine passa di qui
+    dopo essere passato di la' (il compratore dice che non e'
+    arrivato, il venditore deposita), e col contatore condiviso
+    arriverebbe al tetto prima di sentire il primo «vai a ritirare».
 
     Qui i sats non si muovono mai, solo parole; notifiche DOPO il
     commit, ognuna nel suo try."""
@@ -32311,6 +32397,156 @@ async def sollecita_ritiri_al_punto():
                     f"garanzia finché l'affare non si chiude.")
         except Exception as e:
             print(f"⚠️ Promemoria ritiro saltato (#{r['id']}): {e}")
+
+
+async def sollecita_codici_diretti():
+    """IL CODICE CHE NON PASSA DA QUI (ago 2026): la TERZA sorella
+    della famiglia della busta, e la popolazione che fino a ieri non
+    guardava NESSUNO.
+
+    Con la busta diretta (cantiere 45) il venditore ha messo i
+    recapiti del compratore sull'etichetta, quindi il codice di
+    ritiro glielo manda il corriere e da noi non passa. Da quel
+    momento l'ordine diventava MUTO: sollecita_buste_ferme lo esclude
+    (`busta_diretta_il=0` nella sua WHERE), sollecita_ritiri_al_punto
+    lo salta per costruzione (esige `busta_il>0`) e il bottone a
+    comando aveva lo stesso gate. Il primo squillo arrivava al giorno
+    10, da sollecita_conferme_ferme — mentre la giacenza al punto
+    dura ~3 giorni: quando qualcuno bussava, il pacco era gia'
+    tornato al mittente.
+
+    NON DUPLICA IL CORRIERE, ed e' la ragione per cui questa funzione
+    puo' esistere accanto alla docstring della sorella, che dichiara
+    la busta diretta fuori proprio perche' «il corriere ha i recapiti
+    del COMPRATORE ed e' lui a mandargli codice e promemoria di
+    giacenza». Vero, e resta vero: quel che il corriere NON manda e'
+    «se il codice non ti e' arrivato, ecco cosa fare su Barattolo».
+    Questo messaggio dice quello — piu' la cosa che nessun altro dira'
+    mai a chi aspetta: guarda anche nello spam.
+
+    IL TESTO DEV'ESSERE VERO ANCHE COL PACCO IN VIAGGIO, ed e' l'altra
+    meta' della stessa obiezione: l'ancora e' `spedito_il` e non
+    l'arrivo al punto, che non sappiamo, quindi il primo squillo puo'
+    cadere su un pacco ancora in transito. Per questo non si dice mai
+    «il codice ti e' arrivato» ne' «il pacco ti aspetta» — si dice il
+    fatto NOSTRO e certo (da quanti giorni e' partito), poi cosa fare
+    QUANDO arriva, e la strada se non arriva. E' la stessa disciplina
+    di sollecita_ritiri_al_punto: il tempo non e' nostro.
+
+    COLONNE SUE, E QUI NON E' UNA PRECAUZIONE MA IL CASO VERO DI
+    QUESTO CANTIERE. Le due popolazioni sembrano mutuamente esclusive
+    — il deposito della busta azzera `busta_diretta_il` nello stesso
+    UPDATE — ma un ordine PASSA dall'una all'altra, ed e' precisamente
+    il flusso della via d'uscita: il compratore dice «non mi e'
+    arrivato», il venditore deposita, e da quel momento l'ordine e'
+    della sorella. Con `solleciti_punto` condiviso, chi avesse speso
+    qui i tre squilli arriverebbe al tetto e non sentirebbe MAI il
+    «vai a ritirare» — muto proprio dopo che il sistema gli ha appena
+    risolto il problema.
+
+    `busta_il=0` NELLA WHERE E' UNA CINTURA, non una condizione: il
+    deposito azzera gia' la dichiarazione, quindi oggi e' ridondante.
+    Serve il giorno che qualcuno cambiasse quell'UPDATE — senza,
+    partirebbero due promemoria che si contraddicono.
+
+    LA GUARDIA `spedito_il>0` INVECE SERVE DAVVERO, ed e' la
+    divergenza dalla sorella: li' `busta_il>0` garantisce l'ancora,
+    qui `busta_il` e' zero per definizione e senza guardia il MAX
+    varrebbe 0 — una raffica su ogni 'shipped' storico al primo giro.
+    E' la stessa riga che ha sollecita_buste_ferme, per la stessa
+    ragione.
+
+    NESSUN 🧊, tetto STRETTO: identico alla sorella e per il suo
+    stesso motivo — la finestra e' corta, il 🧊 cadrebbe prima di
+    CODA_FERMI_GIORNI e romperebbe l'invariante «se il 🧊 e' partito,
+    la riga c'e'». Il caso lo raccoglie la coda al giorno 10, dove
+    compare con «🔕 mai sollecitato».
+
+    NIENTE LEVE NUOVE: cadenza e finestra sono PROMEMORIA_RITIRO_GIORNI
+    (2, che fa finestra E passo, come per la sorella) e il tetto e'
+    PROMEMORIA_CONFERMA_MAX — squilli a 2, 4, 6 giorni dalla
+    spedizione. A un giorno il pacco puo' essere ancora in viaggio, a
+    tre la giacenza e' gia' cominciata.
+
+    IL VENDITORE SOLO ALL'ULTIMO, e non e' un rimprovero: finche'
+    nessuno gli dice che il codice non e' arrivato non c'e' NIENTE che
+    possa fare (la decisione di Andrea su chi riceve il promemoria).
+    All'ultimo squillo pero' un fatto c'e' — il pacco sta per
+    tornargli indietro con le spese di reso — ed e' la stessa riga che
+    la sorella ha gia'.
+
+    Qui i sats non si muovono mai, solo parole; notifiche DOPO il
+    commit, ognuna nel suo try."""
+    if PROMEMORIA_RITIRO_GIORNI <= 0:
+        return                       # leva a 0 = popolazione spenta
+    adesso = int(time.time())
+    passo = PROMEMORIA_RITIRO_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+        "o.solleciti_diretti, o.spedito_il, a.titolo FROM ordini o "
+        # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='shipped' AND o.via_punto=1 "
+        # la popolazione COMPLEMENTARE della sorella: qui la busta non
+        # arrivera' mai, perche' il codice e' andato al compratore
+        "AND o.busta_diretta_il>0 "
+        # cintura: oggi il deposito azzera gia' la dichiarazione
+        "AND o.busta_il=0 "
+        # senza, il MAX varrebbe 0 sugli 'shipped' storici
+        "AND o.spedito_il>0 "
+        # STRETTO: senza il 🧊 non c'e' un giro al tetto da fare
+        "AND o.solleciti_diretti < ? "
+        # la staffetta: da qui in poi parla il promemoria della conferma
+        "AND o.solleciti_conferma = 0 "
+        "AND MAX(o.spedito_il + ?, o.sollecito_diretto_il + ?) < ?",
+        (PROMEMORIA_CONFERMA_MAX, passo, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_diretto_il=?, "
+                    "solleciti_diretti=solleciti_diretti+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio.
+        titolo = html.escape((r["titolo"] or "il tuo acquisto")[:60])
+        # i giorni dal delta VERO e mai dalla leva (la regola della
+        # sorella): dopo un server spento il primo squillo dira' «da 9
+        # giorni» invece di 2 — vero, mentre «2, 4, 6» e' un'aspirazione
+        giorni = max(1, (adesso - r["spedito_il"]) // 86400)
+        quanti = f"{giorni} giorni" if giorni > 1 else "1 giorno"
+        try:
+            await notifica(r["compratore_id"],
+                f"📦 <b>«{titolo}» è in viaggio verso il punto di "
+                f"ritiro da {quanti}.</b> Il codice per ritirarlo te lo "
+                f"manda il corriere ai recapiti che il venditore ha "
+                f"indicato come destinatario: quando il pacco arriva, "
+                f"controlla la posta — <b>anche nello spam</b>. Se non "
+                f"ti è arrivato niente, aprilo dalla Mini App e "
+                f"<b>dillo al venditore</b>: può mettere le istruzioni "
+                f"di ritiro dentro l'ordine.")
+            if r["solleciti_diretti"] == PROMEMORIA_CONFERMA_MAX - 1:
+                # SOLO l'ultimo, e non e' un rimprovero: fin qui non
+                # c'era niente che potesse fare. Adesso un fatto c'e'.
+                await notifica(r["venditore_id"],
+                    f"📦 <b>«{titolo}» potrebbe tornarti indietro.</b> "
+                    f"Il pacco è partito da {quanti} verso il punto di "
+                    f"ritiro e l'acquirente non l'ha ancora preso. Hai "
+                    f"indicato i suoi recapiti come destinatario, "
+                    f"quindi il codice è andato a lui: se non gli è "
+                    f"arrivato, puoi mettere tu le istruzioni di "
+                    f"ritiro nell'ordine. Se la giacenza scade il "
+                    f"corriere lo rimanda al mittente.")
+        except Exception as e:
+            print(f"⚠️ Promemoria codice diretto saltato (#{r['id']}): {e}")
 
 
 async def sollecita_punti_obiettati():
@@ -35437,6 +35673,15 @@ async def orologio():
             await sollecita_ritiri_al_punto()
         except Exception as e:
             print(f"⚠️ Promemoria ritiri al punto saltati: {e}")
+        try:
+            # la TERZA della famiglia: il codice e' andato dritto al
+            # compratore e da noi non passa. Anche questa DOPO il
+            # promemoria della conferma, per la stessa staffetta —
+            # e adiacente alle due sorelle, che sono i tre modi in cui
+            # un pacco al punto puo' restare fermo
+            await sollecita_codici_diretti()
+        except Exception as e:
+            print(f"⚠️ Promemoria codici diretti saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:

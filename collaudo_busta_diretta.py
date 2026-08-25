@@ -171,7 +171,7 @@ def semina():
     con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,"
                 "ln_address) VALUES(333,'Estraneo','neg33333',1,'')")
     ids = []
-    for n in range(4):
+    for n in range(6):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
@@ -212,6 +212,15 @@ def giro_buste():
     return list(DETTO), list(ADMIN)
 
 
+def giro_diretti():
+    """La TERZA SORELLA (ago 2026): il promemoria di chi aspetta un
+    codice che non passa da qui."""
+    DETTO.clear()
+    ADMIN.clear()
+    asyncio.run(SRV.sollecita_codici_diretti())
+    return list(DETTO), list(ADMIN)
+
+
 def main():
     G = 86400
     ora = int(time.time())
@@ -219,7 +228,7 @@ def main():
     print("  LA BUSTA DIRETTA — il giro vero")
     print("=" * 60)
     avvio()
-    a1, a2, a3, a4 = semina()
+    a1, a2, a3, a4, a5, a6 = semina()
 
     # ---- 1) la spunta alla spedizione ------------------------------
     print("\n[1] la spunta alla spedizione")
@@ -376,6 +385,105 @@ def main():
           any("busta fuori contratto" in t and str(o_disp) in t
               for t in ghiaccio))
     tocca(o_disp, via_punto=1)
+
+    # ---- 8) il silenzio rotto (tappa A) ----------------------------
+    # Fino a ieri un ordine dichiarato diretto era MUTO: tre gate lo
+    # zittivano, e il primo squillo cadeva al giorno 10 (da
+    # `sollecita_conferme_ferme`) mentre la giacenza al punto dura ~3
+    # giorni — quando qualcuno bussava, il pacco era gia' tornato
+    # indietro. Le sezioni 3 e 4 restano vere e restano giuste: a
+    # tacere e' il sollecito DELLA BUSTA, che chiede al venditore una
+    # cosa che li' non puo' fare. A parlare adesso e' un'altra
+    # funzione, con un altro destinatario.
+    print("\n[8] il silenzio rotto: il promemoria di chi aspetta")
+    o_att = ordine_al_punto(a5)
+    spedisci(o_att, diretta=True)
+    tocca(o_att, spedito_il=ora - 2 * G)
+    detto, ghiaccio = giro_diretti()
+    prova("a 2 giorni squilla il SOLO compratore", [111],
+          [chi for chi, _ in detto])
+    testo = detto[0][1] if detto else ""
+    # LA RIGA CHE IL CORRIERE NON MANDA MAI, ed e' la ragione per cui
+    # questa funzione puo' esistere accanto alle altre due
+    prova("...e gli dice di guardare anche nello spam", True,
+          "spam" in testo)
+    # l'ancora e' la SPEDIZIONE e non l'arrivo, che non sappiamo
+    prova("...senza promettere un arrivo che non possiamo sapere",
+          False, "ti aspetta" in testo or "è arrivato al punto" in testo)
+    prova("...e ai moderatori non si scrive mai", [], ghiaccio)
+    # i contatori sono SUOI: se leggesse quelli della sorella,
+    # l'ordine che passa di la' (il venditore deposita dopo la
+    # segnalazione) arriverebbe al tetto senza aver mai sentito
+    # «vai a ritirare»
+    o = riga(o_att)
+    prova("il contatore e' il SUO", (1, 0, 0),
+          (o["solleciti_diretti"], o["solleciti_punto"],
+           o["solleciti_busta"]))
+    # il non dichiarato resta della sorella, e il depositato di
+    # nessuno dei due
+    o_no = ordine_al_punto(a6)
+    spedisci(o_no)
+    tocca(o_no, spedito_il=ora - 5 * G)
+    detto, _ = giro_diretti()
+    prova("il NON dichiarato non entra in questo giro", [], detto)
+    # LO SHIPPED STORICO con `spedito_il=0`: senza la guardia l'ancora
+    # varrebbe zero e al primo giro partirebbe una raffica su tutta
+    # quella popolazione. E' l'unico caso in cui quella riga morde —
+    # col timbro valorizzato la mutazione che la toglie sopravvive.
+    tocca(o_no, busta_diretta_il=ora - 5 * G, spedito_il=0)
+    detto, _ = giro_diretti()
+    prova("...e lo shipped storico senza data non riceve la raffica",
+          [], detto)
+    tocca(o_no, busta_diretta_il=0, spedito_il=ora - 5 * G)
+    come(222)
+    chiama(SRV.deposita_busta_ritiro, o_att, None,
+           corpo={"nome": "Lia Neri", "codice": "PIN 1122"})
+    tocca(o_att, sollecito_diretto_il=0, solleciti_diretti=0)
+    detto, _ = giro_diretti()
+    prova("...e col codice depositato non squilla piu'", [], detto)
+    # LA CINTURA VUOLE UNO STATO CHE IL DEPOSITO NON PRODUCE, ed e' la
+    # ragione per cui il caso qui sopra non basta: quel gesto AZZERA
+    # la dichiarazione nello stesso UPDATE (l'annulla naturale), quindi
+    # a escludere la riga e' gia' il primo gate e `busta_il=0` non
+    # morde. Si rimette la dichiarazione a mano — lo stato impossibile
+    # per costruzione, che e' precisamente cio' da cui una cintura
+    # difende — o la mutazione che la toglie resta viva (l'ha detto la
+    # tortura del banco, non la rilettura).
+    tocca(o_att, busta_diretta_il=ora - 2 * G)
+    detto, _ = giro_diretti()
+    prova("...e con TUTTI E DUE la cintura chiude lo stesso", [], detto)
+    tocca(o_att, busta_diretta_il=0)
+
+    # LA VIA D'USCITA: il bottone a comando, che fino a ieri il gate
+    # `busta_diretta_il=0` teneva fuori — e li' non c'era niente da
+    # dire, perche' il codice era andato al compratore. Adesso c'e',
+    # ma con un altro mestiere: RIFERISCE un fatto che solo chi compra
+    # puo' sapere, e il testo non accusa mai il venditore di aver
+    # sbagliato l'indirizzo.
+    print("\n[8b] la via d'uscita a comando")
+    o_out = ordine_al_punto(a1)
+    spedisci(o_out, diretta=True)
+    tocca(o_out, spedito_il=ora - 2 * G)
+    DETTO.clear()
+    come(111)
+    r = chiama(SRV.sollecita_venditore, o_out)
+    prova("il compratore puo' segnalare che non e' arrivato niente",
+          True, bool(r.get("ok")))
+    msg = " || ".join(t for chi, t in DETTO if chi == 222)
+    prova("...e al venditore arriva il FATTO", True,
+          "non ha ricevuto il codice di ritiro" in msg)
+    prova("...con la via d'uscita dentro", True,
+          "deposita il nome" in msg)
+    prova("...e senza accusarlo di aver sbagliato l'indirizzo", False,
+          "sbagliato" in msg)
+    # il gesto passa dai contatori della busta e non da quelli
+    # dell'automatico: bussare a mano non sposta il 🧊 di un minuto
+    o = riga(o_out)
+    prova("il gesto usa i contatori della busta", (1, 0),
+          (o["solleciti_manuali_busta"], o["solleciti_diretti"]))
+    come(111)
+    cod, _ = rifiuto(SRV.sollecita_venditore, o_out)
+    prova("...e la pausa di famiglia regge", 400, cod)
 
     print("\n" + "=" * 60)
     print(f"  {PASSATE} verdi, {FALLITE} rosse")
