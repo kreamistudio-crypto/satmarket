@@ -15751,6 +15751,89 @@ def prove_xp():
     prova("il Profilo e il rank dicono LO STESSO NUMERO",
           somma(900), xp_rank.get(900, 0))
     prova("...e non e' zero, o non proverebbe niente", True, somma(900) > 0)
+
+    # --- DA CHE LATO VENGONO GLI XP (ago 2026) ----------------------
+    # Chi legge «76 XP» non sa che sono pochi perche' ha comprato
+    # invece di vendere. IL DATO C'ERA GIA': il ruolo sta DENTRO il
+    # riferimento, quindi i due lati sommano al totale per costruzione
+    # — e quando NON sommano si tace, che e' tutto il cantiere.
+    ruolo_xp, xp_per_ruolo = amb["ruolo_xp"], amb["xp_per_ruolo"]
+    prova("il ruolo si legge dal riferimento (venditore)", "venditore",
+          ruolo_xp("ordine:42:venditore"))
+    prova("...e (compratore)", "compratore",
+          ruolo_xp("ordine:42:compratore"))
+    # IL VOCABOLARIO E' `XP_RUOLO`: quel che non e' un ruolo non lo
+    # diventa. Senza questa guardia una riga muta prenderebbe un lato
+    # a caso, la somma tornerebbe lo stesso e la scomposizione
+    # direbbe il falso — che e' il solo modo in cui puo' sbagliare.
+    prova("un tipo senza ruolo non ne inventa uno", "",
+          ruolo_xp("giorno:2026-08-05"))
+    prova("...e nemmeno un ruolo sconosciuto", "",
+          ruolo_xp("ordine:9:padrino"))
+    prova("il riferimento vuoto non esplode", "", ruolo_xp(""))
+    prova("...e nemmeno None", "", ruolo_xp(None))
+
+    # LA PROVA REGINA: il parser legge quel che il GANCIO scrive. Il
+    # formato vive in `_sblocca_sats` e QUI NON SI RICOPIA — si estrae
+    # da li' e gli si da' in pasto. Una sentinella direbbe che il
+    # parser esiste; questa dice che combacia con l'altra meta', ed e'
+    # l'unica che diventa rossa se un domani il gancio cambia forma.
+    _i = _SORGENTE.index('premia_xp(chi, "ordine",')
+    _rif = re.search(r'f"(ordine:[^"]*)"', _SORGENTE[_i:_i + 400]).group(1)
+    prova("il parser legge il riferimento che il gancio scrive",
+          "venditore",
+          ruolo_xp(_rif.replace("{ordine_id}", "42")
+                   .replace("{ruolo}", "venditore")))
+
+    # LA SCOMPOSIZIONE, dal registro VERO di questo banco: 900 ha
+    # 300+40 dal lato venditore e 180 da compratore, piu' due visite
+    # che il perimetro lascia fuori e che infatti non entrano.
+    _dove_xp, _par_xp = amb["sql_xp_commercio"]()
+    _righe = [(r["riferimento"], r["punti"]) for r in con.execute(
+        "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=900 "
+        f"AND {_dove_xp}", _par_xp)]
+    prova("i due lati, dal registro vero",
+          {"vendite": 340, "acquisti": 180}, xp_per_ruolo(_righe, 520))
+    prova("...e fanno il totale che sta a schermo", 520,
+          sum(xp_per_ruolo(_righe, 520).values()))
+    # IL FAIL-SAFE E' LA SOMMA, ed e' l'unica guardia: se i due lati
+    # non fanno il numero che sta a schermo si tace, e chi legge
+    # ricade sulla frase generica, che e' vera comunque.
+    prova("cache piu' alta del registro: si tace", None,
+          xp_per_ruolo(_righe, 999))
+    prova("...e piu' bassa", None, xp_per_ruolo(_righe, 1))
+    # IL CASO DI DOMANI, ed e' quello per cui la somma basta da sola:
+    # un tipo dentro il perimetro che il ruolo nel riferimento non ce
+    # l'ha non entra in NESSUNO dei due lati, quindi la somma cade da
+    # se'. Senza, quei punti sparirebbero da un lato in silenzio.
+    prova("un tipo futuro senza ruolo fa tacere la scomposizione", None,
+          xp_per_ruolo(_righe + [("gara:7", 60)], 580))
+    # A registro vuoto due zeri, che sono la VERITA': a non scriverli
+    # e' chi rende la riga — lo zero non si scrive mai, ma non e' il
+    # server a doverlo tacere.
+    prova("registro vuoto: due zeri, non None",
+          {"vendite": 0, "acquisti": 0}, xp_per_ruolo([], 0))
+    prova("...ma con la cache non a zero si tace lo stesso", None,
+          xp_per_ruolo([], 7))
+
+    # --- LE SENTINELLE DELLA LETTURA --------------------------------
+    _me = codice(pezzo("mio_profilo"))
+    # Il perimetro vive in un posto solo, come per la classifica: chi
+    # ricopia la condizione a mano resta indietro al primo tipo nuovo.
+    prova("la lettura passa dal perimetro, non da un letterale", True,
+          "sql_xp_commercio(" in _me and "tipo='ordine'" not in _me)
+    # ...e sta dove il database e' ancora aperto: piu' sotto la chiave
+    # uscirebbe sempre None senza che niente protesti.
+    prova("la lettura sta PRIMA che la connessione si chiuda", True,
+          _me.index("xp_per_ruolo(") < _me.index("con.close()"))
+    prova("...e la chiave esce nel payload", True,
+          'profilo["xp_ruoli"] = xp_ruoli' in _me)
+    # LA PROSA NON ESCE DAL SERVER: la riga la scrive il client, che e'
+    # l'unico posto che la mostra. Due prose sulla stessa cosa sono
+    # due prose che un giorno dicono cose diverse.
+    prova("dal server escono i NUMERI e mai la frase", True,
+          "dalle vendite" not in _me
+          and "dalle vendite" not in codice(pezzo("xp_per_ruolo")))
     con.close()
 
     # IL TITOLO CHE DECADE, girato su un mercatino di cartone: chi
@@ -28374,12 +28457,91 @@ def prove_sintassi_client():
     prove_centro_fila(mini, node)
     prove_ordina_ereditato(mini, node)
     prove_pct_libera(node)
+    prove_frase_xp(mini, node)
     prove_corsa_zona(mini, node)
     prove_riempimento(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
 
 
+
+
+def prove_frase_xp(mini, node):
+    """LA RIGA CHE DICE DA CHE LATO, FATTA GIRARE (ago 2026). Chi
+    legge «76 XP» nel Profilo non sa che sono pochi perche' ha
+    comprato invece di vendere: il numero da solo non lo dice, e il
+    dato per dirlo c'era gia' nel registro.
+    Le sentinelle direbbero che il giudice esiste ed e' uno — mai che
+    RISPONDA giusto, e la domanda vera e' proprio quella: con un lato
+    a zero la cifra non si scrive, e senza scomposizione si ricade
+    sulla frase di sempre invece di lasciare la riga muta.
+    E' l'ennesima volta che una prova sulla forma certificherebbe un
+    ramo che nessuno ha esercitato: quella classe va sempre in coppia
+    con una che fa girare il pezzo."""
+    import subprocess as _spx, tempfile as _tfx
+    if not node:
+        salta("la riga degli XP risponde giusto", "node non installato")
+        return
+    # I PEZZI SONO QUELLI VERI, estratti dal client: due costanti di
+    # cartone proverebbero se stesse, e la cosa da guardare e' proprio
+    # che testa e coda restino scritte UNA volta sola.
+    pezzi = (pezzo_js(mini, "const XP_PESO = ", "\n}\n") + "\n}\n")
+    banco = "const fmt = n => n.toLocaleString('it-IT')" \
+            ".replace(/\\./g,'\\u202F');\n" + pezzi + r"""
+const rosse = [];
+function att(nome, cond){ if (!cond) rosse.push(nome); }
+const due   = fraseXp({vendite: 46, acquisti: 30});
+const solaC = fraseXp({vendite: 0,  acquisti: 76});
+const solaV = fraseXp({vendite: 76, acquisti: 0});
+const zero  = fraseXp({vendite: 0,  acquisti: 0});
+const via   = fraseXp(null);
+att('due lati: la scomposizione, con tutti e due i numeri',
+    due.includes('46 dalle vendite') && due.includes('30 dagli acquisti'));
+att('due lati: e la nota sul peso', due.includes('Una vendita pesa'));
+att('solo acquisti: NIENTE scomposizione', !solaC.includes('dalle vendite'));
+att('solo acquisti: il perche\u0027, e il peso',
+    solaC.includes('tutti dagli acquisti') && solaC.includes('Una vendita pesa'));
+att('solo vendite: la frase di sempre', solaV.includes('comprare e vendere'));
+att('solo vendite: SENZA la nota sul peso', !solaV.includes('Una vendita pesa'));
+att('LO ZERO NON SI SCRIVE MAI', ![due, solaC, solaV, zero, via]
+    .some(f => /\b0 d(alle|agli)/.test(f)));
+att('due zeri ricadono sulla frase di sempre', zero === solaV);
+att('chiave assente: la stessa, e mai una riga muta', via === solaV && !!via);
+att('la coda della classifica c\u0027e\u0027 in tutti e tre',
+    [due, solaC, solaV].every(f => f.includes('pesa in classifica')));
+att('la testa si scrive una volta sola', [due, solaC, solaV]
+    .every(f => f.startsWith('Gli XP contano il commercio: ')));
+att('i numeri passano da fmt (spazio stretto, mai il punto)',
+    fraseXp({vendite: 12000, acquisti: 1}).includes('12\u202F000'));
+console.log(JSON.stringify(rosse));
+"""
+    with _tfx.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    r = _spx.run([node, percorso], capture_output=True, text=True,
+                 encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("la riga degli XP gira", "", (r.stderr or "")[:300])
+        return
+    prova("la riga degli XP risponde giusto in tutti i casi",
+          "[]", (r.stdout or "").strip())
+
+    # --- LE SENTINELLE DEL CLIENT -----------------------------------
+    giu = pezzo_js(mini, "function fraseXp(", "\n}\n")
+    # I NUMERI ARRIVANO DAL SERVER: scomporre qui vorrebbe dire una
+    # seconda definizione di «commercio» accanto a XP_COMMERCIO, e le
+    # due divergerebbero al primo tipo nuovo.
+    prova("il giudice non si ricalcola gli XP per conto suo", True,
+          "myXp" not in giu and "vendite_ok" not in giu)
+    prova("...e legge i due lati dal server", True,
+          "r.vendite" in giu and "r.acquisti" in giu)
+    # La riga del cassetto passa dal giudice e non da una prosa a mano
+    prova("il cassetto chiama il giudice", 1,
+          mini.count("${fraseXp(myXpRuoli)}"))
+    prova("...e la vecchia riga fissa non c'e' piu'", False,
+          "commercio: comprare e vendere. \u00c8 lo stesso" in mini)
 
 
 def prove_corsa_zona(mini, node):

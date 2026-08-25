@@ -6607,6 +6607,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   elenco spente col perché, la molla dei distintivi in grigio) e riga
   `.titolo-riga` sotto il nome in Profilo, testata negozio e riquadro
   venditore del dettaglio. Mai in card: la riga meta è già satura.
+  DA CHE LATO VENGONO GLI XP (ago 2026): chi legge «76 XP» nel Profilo
+  non sa che sono pochi perché ha comprato invece di vendere, e il
+  numero da solo non lo dice. IL DATO C'ERA GIÀ e non è servita nessuna
+  colonna: il registro scrive il riferimento come `ordine:{id}:{ruolo}`
+  — il ruolo ci sta dentro perché senza le due parti dello stesso
+  affare si pesterebbero sulla UNIQUE — e `XP_COMMERCIO` è un tipo
+  SOLO, quindi ogni riga porta il suo lato addosso e i due lati sommano
+  al totale PER COSTRUZIONE.
+  NON UNA RIGA NUOVA, LA HINT CHE C'ERA (decisione di Andrea), in TRE
+  casi: chi ha tutti e due i lati legge la scomposizione con le due
+  cifre più la nota sul peso; chi ha SOLO acquisti il perché senza le
+  cifre — «i tuoi vengono tutti dagli acquisti» —, che scriverle
+  sarebbe la stessa cifra due volte; chi ha SOLO vendite la frase di
+  sempre, senza la nota sul peso, che a chi vende non aggiunge niente.
+  LE TRE RIGHE DA NON AMMORBIDIRE. 1) LO ZERO NON SI SCRIVE MAI: «0
+  dalle vendite» è la stessa cifra detta due volte a chi ha comprato, e
+  un rimprovero per niente a chi ha venduto. 2) I NUMERI LI DÀ IL
+  SERVER (`xp_ruoli` in `/api/me`): scomporli nel client vorrebbe dire
+  una seconda definizione di «commercio» accanto a `XP_COMMERCIO`, e le
+  due divergerebbero al primo tipo nuovo. 3) LA SCOMPOSIZIONE ESCE SOLO
+  SE I DUE LATI FANNO IL TOTALE, ed è l'UNICA guardia: se un domani il
+  perimetro si allargasse a un tipo che il ruolo nel riferimento non ce
+  l'ha, quelle righe non entrerebbero in NESSUNO dei due lati e la
+  somma cadrebbe da sé — e lo stesso vale se la cache di `utenti.xp` si
+  sporcasse. **Un numero che non torna si legge come un difetto**,
+  quindi si tace e si ricade sulla frase generica, che è vera comunque.
+  IL RIPIEGO ATTERRA SU UNA FRASE GIÀ GIUSTA, ed è la proprietà che fa
+  risparmiare un ramo: «solo vendite» e «non lo so» dicono la STESSA
+  cosa, quindi il caso in cui si tace è anche quello del venditore, che
+  è il più probabile.
+  I GIUDICI SONO DUE E PURI, accanto al perimetro del registro:
+  `ruolo_xp(riferimento)` — il vocabolario è `XP_RUOLO` e non un elenco
+  nuovo, e un ruolo sconosciuto torna '' invece di prendere un lato a
+  caso, che è il solo modo in cui la scomposizione potrebbe dire il
+  FALSO — e `xp_per_ruolo(righe, totale)`, che decide. La lettura vive
+  in `/api/me` dove il database è ancora aperto (il patto dei titoli e
+  dei punti di ritiro) e passa da `sql_xp_commercio()` come la
+  classifica: il perimetro vive in un posto solo. Costa una riga per
+  affare concluso SUO, sull'indice della UNIQUE che comincia col tg_id
+  — niente a che vedere con la classifica, che guarda tutto il
+  mercatino.
+  IL FORMATO NON SI UNIFICA IN UN POSTO SOLO, ed è dichiarato: a
+  scriverlo sono il gancio di `_sblocca_sats` e le due passate una
+  tantum (`recupera_xp_ordini.py`, `marca_prove.py`), cioè quattro siti
+  di cui due fuori dal server — per una garanzia che il fail-safe della
+  somma dà già. A tenerli in pari c'è la prova che estrae la f-string
+  DAL GANCIO e la dà in pasto al parser: una sentinella direbbe che il
+  parser esiste, mai che combaci con l'altra metà.
+  LA PROSA VIVE NEL CLIENT (`fraseXp`), che è l'unico posto che la
+  mostra, e TESTA E CODA SI SCRIVONO UNA VOLTA SOLA — a cambiare è il
+  mezzo, o sarebbero tre prose da tenere in pari e il primo ritocco ne
+  dimenticherebbe una. La coda «è lo stesso numero che pesa in
+  classifica» resta in TUTTI E TRE i casi (scelta mia, da confermare):
+  quel fatto è vero per chiunque, e farlo sparire nei due casi nuovi
+  sarebbe arbitrario.
   Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
   pubblico i voti escono senza nomi, di proposito — mostrare chi ha
   comprato rivelerebbe gli acquisti altrui —, ma senza un secondo
@@ -23731,6 +23786,30 @@ come oggi. DA GUARDARE al primo giro: la prima offerta di carrello
 vera dentro Telegram (che al venditore arrivi UNA notifica con
 l'elenco, mai N), e il primo accordo pagato con la bolt11 confrontata
 su LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
+
+Da che lato vengono gli XP (ago 2026): nel Profilo «76 XP» non diceva
+che sono pochi perché si è comprato invece di venduto. Il dato c'era
+già nel registro — il ruolo sta DENTRO il riferimento, e il perimetro è
+un tipo solo — quindi zero colonne, zero migrazioni, zero leve: una
+chiave in più in `/api/me` e la hint del cassetto «🎖 Livello e titolo»
+che si sdoppia in tre casi. Le tre righe da non ammorbidire — lo zero
+che non si scrive, i numeri che li dà il server, la scomposizione solo
+se i due lati fanno il totale — stanno in Architettura, «DA CHE LATO
+VENGONO GLI XP», col perché di ognuna.
+Collaudato: 23 prove nuove — fra cui LA PROVA REGINA, che estrae la
+f-string dal GANCIO e la dà in pasto al parser (una sentinella direbbe
+che il parser esiste, mai che combaci con chi scrive), e il banco node
+che fa GIRARE `fraseXp` sui suoi sei casi con undici asserzioni — più
+TREDICI MUTAZIONI, una per riga sorvegliata, tutte uccise al primo
+giro. E il giro DAL
+VIVO col server su una copia usa-e-getta: le quattro popolazioni lette
+A SCHERMO, dal registro fino al DOM (46 e 30 sui due lati, i due casi a
+un lato solo, e la riga muta che fa tacere la scomposizione), con le
+misure a 320/360/375 nei due temi — zero scorrimento laterale, la riga
+a 15px dal bordo del cassetto.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache non legge la
+chiave nuova e vede la riga di sempre.
 
 E il foglio dell'offerta sul carrello si legge nelle due valute (ago
 2026, chiesto da Andrea in due domande: «se tutti gli articoli sono in

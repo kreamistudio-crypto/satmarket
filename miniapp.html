@@ -19143,6 +19143,7 @@ let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecenso
 let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
+let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non tornano
 let myLivello = null;            // il grado DERIVATO dal server
 let myClassifica = false;        // la leva della classifica, dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
@@ -19311,7 +19312,7 @@ function renderLivello(){
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
-    <div class="hint" style="margin-top:6px">Gli XP contano il commercio: comprare e vendere. È lo stesso numero che pesa in classifica.</div>
+    <div class="hint" style="margin-top:6px">${fraseXp(myXpRuoli)}</div>
     <div class="barra-xp"><i style="width:${q}%"></i></div>
     <div class="hint">${manca}</div>
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
@@ -19332,6 +19333,36 @@ function renderLivello(){
    cambia in tutti e due i posti, o la barra mente. prove.py le
    incrocia, come fa per le categorie senza condizione. */
 const SOGLIE_LIV = [0, 50, 200, 800, 3000];
+
+/* Da che lato vengono gli XP, in UNA riga. Chi legge «76 XP» non sa
+   che sono pochi perche' ha comprato invece di vendere, e il numero
+   da solo non lo dice.
+   I NUMERI ARRIVANO DAL SERVER (`xp_ruoli`): qui non si somma e non
+   si divide niente — scomporre nel client vorrebbe dire una seconda
+   definizione di «commercio» accanto a XP_COMMERCIO, e le due
+   divergerebbero al primo tipo nuovo.
+   LO ZERO NON SI SCRIVE MAI: «0 dalle vendite» a chi ha soltanto
+   comprato e' la stessa cifra detta due volte, e a chi ha soltanto
+   venduto un rimprovero per niente.
+   TESTA E CODA SI SCRIVONO UNA VOLTA SOLA e a cambiare e' il mezzo:
+   tre prose intere sarebbero tre posti da tenere in pari, e il primo
+   ritocco ne dimenticherebbe uno.
+   IL RAMO GENERICO E' LA FRASE DI SEMPRE, e serve DUE popolazioni:
+   chi ha solo vendite — dove la nota sul peso non aggiunge niente
+   (decisione di Andrea) — e chi non ha una scomposizione che torni
+   (server di ieri, oppure i due lati che non fanno il totale). Le due
+   coincidono apposta: il ripiego atterra su una frase gia' giusta per
+   chi vende, che e' il caso piu' probabile. */
+const XP_PESO = "Una vendita pesa un po' più di un acquisto dello stesso valore.";
+const XP_CODA = "È lo stesso numero che pesa in classifica.";
+function fraseXp(r){
+  const v = (r && r.vendite) || 0, a = (r && r.acquisti) || 0;
+  let m;
+  if (v && a) m = `${fmt(v)} dalle vendite, ${fmt(a)} dagli acquisti. ` + XP_PESO;
+  else if (a) m = "i tuoi vengono tutti dagli acquisti. " + XP_PESO;
+  else m = "comprare e vendere.";
+  return "Gli XP contano il commercio: " + m + " " + XP_CODA;
+}
 
 async function setTitolo(id){
   haptic();
@@ -29176,6 +29207,7 @@ async function avvia(){
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
+    myXpRuoli = me.xp_ruoli || null;
     myClassifica = !!me.classifica_attiva;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';

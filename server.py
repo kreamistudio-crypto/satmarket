@@ -1742,6 +1742,61 @@ def sql_xp_commercio(colonna: str = "tipo") -> tuple:
     return (f"{colonna} IN ({segni})", list(XP_COMMERCIO))
 
 
+# DA CHE LATO VENGONO GLI XP (ago 2026). Chi legge «76 XP» non sa che
+# sono pochi perche' ha comprato invece di vendere, e il numero da
+# solo non lo dice. IL DATO C'ERA GIA': il registro scrive il
+# riferimento come `ordine:{id}:{ruolo}` — il ruolo ci sta dentro
+# perche' senza le due parti dello stesso affare si pesterebbero sulla
+# UNIQUE — quindi ogni riga porta il suo lato addosso e non serve
+# nessuna colonna nuova.
+def ruolo_xp(riferimento: str) -> str:
+    """Da che lato viene una riga di registro: 'venditore',
+    'compratore', o '' se non si sa.
+    IL VOCABOLARIO E' `XP_RUOLO` E NON UN ELENCO NUOVO: quelli sono i
+    ruoli che pesano, e un secondo catalogo sarebbe il posto da cui un
+    giorno divergono. Un ruolo sconosciuto — o una riga di un tipo che
+    il lato nel riferimento non ce l'ha — torna '', e da li' la somma
+    di `xp_per_ruolo` non torna e si tace.
+    IL FORMATO LO SCRIVE IL GANCIO in `_sblocca_sats` (e le due
+    passate una tantum, `recupera_xp_ordini.py` e `marca_prove.py`):
+    qui si LEGGE soltanto, e non si unifica la f-string in un posto
+    solo apposta — sarebbero quattro siti da toccare, due dei quali
+    fuori dal server, per una garanzia che il fail-safe della somma da'
+    gia'. C'e' la prova che questo parser legga quel che QUEL gancio
+    scrive: una sentinella direbbe che il parser esiste, mai che
+    combaci col formato dall'altra parte."""
+    r = (riferimento or "").rsplit(":", 1)[-1]
+    return r if r in XP_RUOLO else ""
+
+
+def xp_per_ruolo(righe, totale: int):
+    """{'vendite': N, 'acquisti': M} — oppure None, e allora chi legge
+    dice la frase generica. `righe` sono le (riferimento, punti) del
+    registro DENTRO il perimetro, `totale` e' il numero che sta a
+    schermo (la cache `utenti.xp`).
+
+    IL FAIL-SAFE E' LA SOMMA (decisione di Andrea), ed e' l'unica
+    guardia: la scomposizione esce SOLO se i due lati fanno il totale.
+    Se un domani il perimetro si allargasse a un tipo che nel
+    riferimento il ruolo non ce l'ha, quelle righe non entrerebbero in
+    nessuno dei due lati e la somma cadrebbe da se'; e lo stesso vale
+    se la cache di `utenti.xp` si sporcasse. **Un numero che non torna
+    si legge come un difetto**, e la frase generica e' vera comunque.
+    Lo ZERO non e' un caso speciale qui: a registro vuoto escono due
+    zeri, che sono la verita' — a non scriverli e' chi rende la riga.
+    """
+    per = {"vendite": 0, "acquisti": 0}
+    for rif, punti in righe:
+        r = ruolo_xp(rif)
+        if r == "venditore":
+            per["vendite"] += int(punti)
+        elif r == "compratore":
+            per["acquisti"] += int(punti)
+        # una riga che non si sa leggere non entra in NESSUNO dei due
+        # lati: e' cosi' che la somma qui sotto se ne accorge
+    return per if per["vendite"] + per["acquisti"] == int(totale) else None
+
+
 # LAPIDE (ago 2026). Qui viveva il tariffario delle azioni di
 # presenza — visita 1, annuncio 5, feedback 10, incassi 20, identita'
 # 15, distintivo 25 — coi suoi otto ganci e con `oggi_locale()`, che
@@ -24318,6 +24373,18 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     barattolo_cond = ({"token": _bc["token"],
                        "quanti": len(json.loads(_bc["ids"])),
                        "aggiornato": _bc["aggiornato"]} if _bc else None)
+    # Da che lato vengono i suoi XP, per la riga del cassetto. Letto
+    # QUI perche' e' qui che il database e' ancora aperto, come i
+    # titoli e i punti di ritiro qui sopra. Il costo e' quello di una
+    # riga per affare concluso SUO, sull'indice della UNIQUE di
+    # `xp_eventi` che comincia proprio col tg_id: niente a che vedere
+    # con la classifica, che invece guarda tutto il mercatino.
+    _dove_xp, _par_xp = sql_xp_commercio()
+    xp_ruoli = xp_per_ruolo(
+        [(r["riferimento"], r["punti"]) for r in con.execute(
+            "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? "
+            f"AND {_dove_xp}", [user["id"]] + _par_xp)],
+        (u["xp"] or 0) if u else 0) if u else None
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -24544,6 +24611,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["livello"] = livello_utente(
         u["xp"] if u else 0,
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
+    # ...e da che lato vengono quegli XP, che e' la meta' che il numero
+    # da solo non dice. None quando i conti non tornano (vedi
+    # `xp_per_ruolo`): chiave vuota = il cassetto dice la frase di
+    # sempre, che e' vera comunque — un'assenza non e' una bugia. Qui
+    # escono i NUMERI e mai la prosa: la riga la scrive il client, che
+    # e' l'unico posto che la mostra.
+    profilo["xp_ruoli"] = xp_ruoli
     # La porta della classifica: il client non deve mostrare un
     # bottone che porta a una pagina spenta. Esce il FATTO e non le
     # tarature — K, RIF e il peso sono roba del giudice, e un
