@@ -1,0 +1,20 @@
+; Una volta al giorno, alle 04:30: l'ora in cui il mercatino dorme e
+; un backup che legge il database non da' fastidio a nessuno.
+;
+; Qui Persistent=true FUNZIONA (a differenza del timer del deploy, che
+; e' monotono e lo dichiara inerte): questo e' un timer a calendario,
+; e se il VPS era spento alle 04:30 il giro parte al riavvio invece di
+; aspettare il giorno dopo — su un backup, il giro saltato e' proprio
+; quello che manca il giorno del disastro.
+
+[Unit]
+Description=Barattolo — backup giornaliero fuori da Hetzner
+
+[Timer]
+OnCalendar=*-*-* 04:30
+AccuracySec=5min
+Persistent=true
+Unit=barattolo-backup.service
+
+[Install]
+WantedBy=timers.target

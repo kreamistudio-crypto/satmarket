@@ -139,8 +139,11 @@ jobs:
       # il token del bot: meglio un falso allarme da guardare che un
       # segreto vero che passa perche' il formato e' cambiato di un
       # carattere.
+      # E la chiave age dei backup (AGE-SECRET-KEY-1...): la meta'
+      # segreta vive su carta + Bitwarden e non deve mai entrare nel
+      # repo — nel repo sta solo la PUBBLICA, che sa cifrare e basta.
       FORME: >-
-        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
       # E la chiave Nostr in esadecimale nudo, che ha una regola sua
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione
