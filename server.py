@@ -7301,6 +7301,11 @@ async def _anteprima_riepilogo(chat: int):
     # e basta: qui si sta guardando proprio quella, e un post che esce
     # nudo in silenzio manda a cercare il guasto nel posto sbagliato.
     manca = []
+    if nome:
+        # la figura c'e' ma il post non e' partito: quasi sempre e'
+        # Telegram che non e' riuscito a scaricare l'URL
+        manca.append(f"Telegram non ha preso la figura "
+                     f"(<code>{html.escape(nome)}</code>)")
     if not RIEPILOGO_IMMAGINE:
         manca.append("RIEPILOGO_IMMAGINE è spenta")
     if not (ImmaginePillow and ImageDraw and ImageOps):
@@ -37921,6 +37926,12 @@ NOME_FOTO = re.compile(
     # mostra per URL, quindi la sua forma va dichiarata qui o Telegram
     # si vedrebbe rispondere 404 dal nostro stesso server
     r"|pod_\d{4}-\d{2}-\d{2}\.jpg"
+    # e l'ANTEPRIMA del podio (`/anteprima riepilogo`), che ha un nome
+    # SUO per non sovrascrivere la figura del lunedi' vero. Senza
+    # questa riga il file si scrive, Telegram va a prenderlo e si
+    # sente rispondere 404 DAL NOSTRO SERVER: il post ripiega sul
+    # testo e la foto non arriva mai — successo davvero.
+    r"|pod_prova-\d+\.jpg"
     # la figura del negozio nelle raffiche: stesso motivo del podio —
     # il canale la mostra per URL
     r"|neg_\d+_\d+\.jpg)\Z")
