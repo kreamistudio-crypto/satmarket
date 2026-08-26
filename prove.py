@@ -5530,6 +5530,52 @@ def prove_email_corriere():
           primo, riga(1)["email_corriere_il"])
     prova("...e il venditore lo viene a sapere", 1, len(avvisi))
 
+    # ⚠️ CHE L'AVVISO PARTA NON BASTA: se non arriva a CHI SPEDISCE,
+    # o se dice solo «c'e' un'email» senza dire cosa farci, la
+    # scorciatoia esiste e non la usa nessuno — cioe' l'email l'abbiamo
+    # tenuta per niente. Il destinatario e il TESTO sono la meta' che
+    # rende utile tutto il resto, e fino a ieri non li guardava nessuno.
+    avvisi.clear()
+    scrivi(111, 1, "arriva@esempio.it")
+    prova("...e l'avviso va al VENDITORE, non a chi l'ha scritta",
+          222, avvisi[0][0] if avvisi else None)
+    _coda = _amb(111)["_coda_email_corriere"]
+    prova("la coda dice COSA FARCI e non solo che c'e'", True,
+          all(k in _coda(False, True) for k in
+              ("recapito del destinatario", "compri l'etichetta",
+               "arrivargli direttamente", "non devi più depositarlo")))
+    prova("...e non promette che funzioni (dipende dal corriere)",
+          (True, False),
+          ("può arrivargli" in _coda(False, True),
+           "così gli arriva" in _coda(False, True)))
+    prova("...la correzione manda a RILEGGERLA prima dell'etichetta",
+          True, "rileggila nell'ordine prima di" in _coda(True, True))
+    prova("...e chi la toglie riporta il codice al venditore", True,
+          "tornerà a te" in _coda(True, False))
+    prova("...e senza cambio non si dice niente", "", _coda(False, False))
+
+    # IL CARTELLO DENTRO «SPEDISCI», che e' la seconda rete: chi non
+    # legge la notifica (bot muto, nativo Nostr senza chiave) deve
+    # comunque incontrarla al momento di comprare l'etichetta — e
+    # quindi PRIMA del bottone che dichiara la spedizione, non dopo.
+    # ⚠️ La sentinella si ancora alla riga dell'EMAIL e non alla
+    # frase «la leggi nel riquadro qui sotto», che la porta anche la
+    # NOTA: cosi' scritta resterebbe verde col cartello dell'email
+    # tolto (era gia' cosi', ed e' la classe di prova che questo repo
+    # ha gia' smascherato sei volte).
+    _riga_cartello = ("o.emailCorriereIl && !o.emailCorrierePurgataIl) ? "
+                      "`<div class=\"hint\">\U0001F4E7 L'acquirente ha "
+                      "lasciato un'<b>email per il corriere</b>")
+    prova("client: il pannello Spedisci porta il cartello dell'email",
+          1, mini.count(_riga_cartello))
+    prova("client: ...e il cartello viene PRIMA del «Segna come "
+          "spedito», o si legge a etichetta gia' comprata", True,
+          0 < mini.index(_riga_cartello) < mini.index("markShipped()"))
+    prova("client: ...ed e' un CARTELLO e non il dato: l'email non "
+          "compare nel pannello della spedizione", False,
+          "emailLetta[" in pezzo_js(mini, "function shipPanel(")
+          if "function shipPanel(" in mini else False)
+
     scrivi(111, 1, "letta@esempio.it")
     prova("la leggono le due PARTI",
           ("letta@esempio.it", "letta@esempio.it"),

@@ -16197,6 +16197,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   facoltativa e va potuta togliere (il patto della nota). Ma
   `email_corriere_il` NON si azzera togliendola: è il PRIMO, ed è il
   fatto che il moderatore legge in disputa.
+  E IL VENDITORE LO VIENE A SAPERE SUBITO, che e' la meta' senza la
+  quale l'email l'avremmo tenuta per niente: `notifica()` al venditore a
+  ogni cambio, con TRE testi da `_coda_email_corriere` (lasciata,
+  cambiata, tolta) e nessun quarto — il ramo senza cambio e' MUTO,
+  perche' l'UPDATE e' condizionato e riscrivere la stessa email non e'
+  un fatto.
+  IL TESTO DICE COSA FARCI, non solo che c'e': «se la metti come
+  recapito del destinatario quando compri l'etichetta, il codice puo'
+  arrivargli direttamente — e tu non devi piu' depositarlo qui». Senza
+  quella riga la scorciatoia esisterebbe e non la userebbe nessuno. E
+  NON PROMETTE CHE FUNZIONI — «puo' arrivargli» e mai «cosi' gli
+  arriva»: dipende dal corriere e da come compila l'etichetta, e noi
+  non lo verifichiamo.
+  LA SECONDA RETE E' IL CARTELLO DENTRO «SPEDISCI», e sta PRIMA del
+  bottone «Segna come spedito»: chi la notifica non la legge — bot
+  bloccato, nativo Nostr senza chiave, o semplicemente non l'ha vista —
+  la incontra comunque nel momento in cui compra l'etichetta. E' un
+  CARTELLO e non il dato (il patto gia' pagato dal punto di ritiro): il
+  valore vive nel suo riquadro, dove si tocca.
+  IMPERFEZIONE DICHIARATA, e non si chiude: chi compra l'etichetta FUORI
+  da Barattolo *prima* di aprire l'ordine, e ha le notifiche mute, la
+  vede a etichetta gia' comprata. E' la stessa popolazione che non sente
+  nemmeno «hai venduto», e la via d'uscita e' quella di sempre — il
+  compratore che dice «non mi e' arrivato il codice» e il venditore che
+  deposita la busta.
+  LE TRE COSE ERANO SCOPERTE (ago 2026, dalla domanda di Andrea «arriva
+  un messaggio dal bot, o la trova solo aprendo l'ordine?»): le prove
+  dicevano che l'avviso PARTE, mai a CHI va ne' COSA dice, e il
+  cartello non lo guardava nessuno — la sentinella che sembrava
+  coprirlo cercava «la leggi nel riquadro qui sotto», che la porta
+  anche la NOTA, quindi sarebbe restata verde col cartello dell'email
+  tolto. E' la settima volta che questo repo smaschera quella classe di
+  prova. Adesso ci sono le tre sentinelle, torturate: 8 mutazioni, 8
+  uccise.
   IL CONTROLLO DI FORMA VIVE NEL CLIENT, la ricetta di
   `FORME_TRACKING`: a forma storta si CHIEDE e non si impedisce — primo
   tocco avviso, secondo tocco sullo stesso testo si passa. Un'euristica
