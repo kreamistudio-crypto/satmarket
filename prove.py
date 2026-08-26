@@ -26326,7 +26326,7 @@ def prove_podio_sfondo():
     """IL PODIO SUL DISEGNO VERO (ago 2026, chiesto da Andrea).
 
     I tre piu' venduti finiscono nei vetri di
-    `assets/riepilogo-barattoli.png`. Non e' una sostituzione secca:
+    `assets/riepilogo-barattoli.webp`. Non e' una sostituzione secca:
     il podio DISEGNATO resta — serve ancora la fila dei negozi — e fa
     da ripiego, cosi' il lunedi' non salta mai per un asset mancante.
 

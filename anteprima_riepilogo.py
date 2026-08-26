@@ -2,7 +2,8 @@
 """Guarda com'e' fatto il post del lunedi' PRIMA che parta.
 
 I tre piu' venduti della settimana finiscono dentro i tre barattoli di
-`assets/riepilogo-barattoli.png`, e i riquadri dei vetri sono numeri
+`assets/riepilogo-barattoli.webp`, e i riquadri dei vetri sono
+numeri
 che si GUARDANO, non si deducono: questo script compone l'immagine su
 un file e basta — nessuna notifica, nessuna scrittura sul database,
 nessun timbro consumato — cosi' si tara `VETRI_RIEPILOGO` aprendo un
@@ -118,7 +119,8 @@ def main():
     amb = carica()
     if not os.path.exists(amb["SFONDO_RIEPILOGO"]):
         sys.exit(f"manca {amb['SFONDO_RIEPILOGO']}: mettici il disegno "
-                 "dei tre barattoli (il vetro bianco è dove vanno le foto)")
+                 "dei tre barattoli (i vetri trasparenti sono dove "
+                 "vanno le foto)")
     if "--griglia" in args:
         return griglia(amb, fuori)
     foto = [a for a in args if not a.startswith("-")]

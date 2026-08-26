@@ -7187,7 +7187,7 @@ async def comando_anteprima(mittente: dict, testo: str):
     per la cancellazione, e va bene così perché non è nel canale.
 
     LA STRADA È QUELLA VERA (`_caption_canale`, `_altri_del_venditore`,
-    `_immagine_riepilogo`): se l'anteprima si costruisse da sé
+    `_salva_podio`): se l'anteprima si costruisse da sé
     direbbe una cosa e il canale un'altra, che è esattamente il
     difetto che questo comando esiste per far vedere PRIMA. Cambia
     solo il `chat_id` — e le guardie della vetrina qui NON si

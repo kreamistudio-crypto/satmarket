@@ -5008,7 +5008,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   censimento che lo verifica, e guarda il CORPO e non la docstring,
   che quelle colonne le nomina apposta per dire che non si toccano.
   LA STRADA È QUELLA VERA (`_caption_canale`, `_altri_del_venditore`,
-  `_immagine_riepilogo`): un'anteprima che si costruisse il post da sé
+  `_salva_podio`): un'anteprima che si costruisse il post da sé
   direbbe una cosa e il canale un'altra, cioè proprio il difetto che
   il comando esiste per far vedere prima. Cambia solo il `chat_id`, e
   le guardie della vetrina qui NON si applicano — si guarda anche
