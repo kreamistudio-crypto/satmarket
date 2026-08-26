@@ -584,6 +584,14 @@ except ImportError:
 # Il canale del RIEPILOGO del lunedi': vuoto = va dove vanno gli
 # annunci. Come l'altro, e' solo il valore di PARTENZA — si cambia dal
 # bot con «/canale riepilogo @nome».
+# Il canale della COMUNITA' (ago 2026): un canale di TERZI dove i
+# nostri annunci compaiono per farci conoscere. Vuoto = non ci si
+# posta, e nessun ripiego sul nostro — un canale altrui non e' un
+# posto dove finire per distrazione.
+try:
+    from config import TELEGRAM_CANALE_VETRINA
+except ImportError:
+    TELEGRAM_CANALE_VETRINA = ""
 try:
     from config import TELEGRAM_CANALE_RIEPILOGO
 except ImportError:
@@ -1417,6 +1425,7 @@ def db():
 
 _CANALE = None          # None = mai letto; str = il valore che vale
 _CANALE_RIEPILOGO = None   # idem, ma per il post del lunedi'
+_CANALE_VETRINA = None     # e per il canale della comunita'
 
 
 def impostazione(chiave: str, ripiego: str = "") -> str:
@@ -1483,6 +1492,40 @@ def imposta_canale_riepilogo(valore: str) -> str:
     scrivi_impostazione("canale_riepilogo", valore)
     _CANALE_RIEPILOGO = valore
     return valore
+
+def canale_vetrina() -> str:
+    """DOVE ANDIAMO OSPITI (ago 2026, decisione di Andrea): un canale
+    della comunita' — oggi @subito_crypto_vetrina, con 700 membri —
+    dove i nostri annunci nuovi compaiono per farci conoscere.
+
+    NIENTE RIPIEGO, ed e' la differenza col riepilogo: li' il vuoto
+    rimette il post dove vanno gli altri, perche' sono tutti CASA
+    NOSTRA e perdere un post settimanale sarebbe peggio. Qui il
+    canale e' di qualcun ALTRO: vuoto vuol dire «non ci andiamo», e
+    ripiegare sul nostro vorrebbe dire mandare in un posto un
+    messaggio pensato per un altro. Un'assenza non e' una bugia.
+
+    E CHI CI ENTRA E' PIU' STRETTO di chi entra nel nostro (vedi
+    `_posta_promo_singolo`): li' vale l'@username, che e' la maniglia
+    che quel pubblico si aspetta."""
+    global _CANALE_VETRINA
+    if _CANALE_VETRINA is None:
+        _CANALE_VETRINA = impostazione("canale_vetrina",
+                                       TELEGRAM_CANALE_VETRINA)
+    return _CANALE_VETRINA
+
+
+def imposta_canale_vetrina(valore: str) -> str:
+    """Cambia il canale della comunita' e riallinea la cache. Vuoto =
+    non ci si posta piu': qui la stringa vuota E' lo spegnimento (il
+    contrario del riepilogo), perche' non esiste nessun altro posto
+    dove quei messaggi debbano andare."""
+    global _CANALE_VETRINA
+    valore = (valore or "").strip()
+    scrivi_impostazione("canale_vetrina", valore)
+    _CANALE_VETRINA = valore
+    return valore
+
 
 def imposta_canale(valore: str) -> str:
     """Cambia il canale e riallinea la cache. Stringa vuota = spento
@@ -3851,6 +3894,10 @@ def init_db():
                     "nostr_origine_d TEXT DEFAULT ''",
                     "nostr_origine_foto TEXT DEFAULT ''",
                     "post_canale_id INTEGER DEFAULT 0",
+                    # il gemello nel canale della COMUNITA': un id suo
+                    # e non un secondo uso del primo, o il ✅ Venduto
+                    # finirebbe in un canale e il post nell'altro
+                    "post_vetrina_id INTEGER DEFAULT 0",
                     "post_nostr_id TEXT DEFAULT ''",
                     # lat/lon: coordinate del comune riconosciuto nella
                     # zona (0,0 = non riconosciuta). Scritte una volta
@@ -7619,6 +7666,48 @@ async def _anteprima_riepilogo(chat: int):
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
+async def _canale_vetrina_comando(chat: int, arg: str):
+    """Il ramo «/canale vetrina …»: il canale della COMUNITA' dove
+    andiamo ospiti.
+
+    Stessa liturgia dei fratelli — SI PROVA PRIMA DI CREDERCI — ma qui
+    il messaggio di prova serve al doppio: dice cosa arrivera' li'
+    dentro, e soprattutto verifica che il bot sia amministratore di un
+    canale che NON e' nostro. Se non lo e', lo si scopre adesso invece
+    che al primo annuncio, cioe' con un post perso e nessuno che se ne
+    accorge."""
+    if not arg:
+        imposta_canale_vetrina("")
+        await notifica_admin(f"📣 Canale della comunità: spento "
+                             f"(da tg {chat})")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ Fatto: non pubblico più nel canale della "
+                    "comunità.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    r = await bot_api("sendMessage", {
+        "chat_id": arg, "parse_mode": "HTML",
+        "text": "🫙 <b>Barattolo pubblicherà qui i nuovi annunci.</b>\n"
+                "Mercatino in satoshi, con deposito di garanzia."})
+    if not (r and r.get("ok")):
+        motivo = (r or {}).get("description") or "nessuna risposta"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"❌ Non riesco a scrivere in <code>"
+                    f"{html.escape(arg)}</code>.\nTelegram dice: "
+                    f"<i>{html.escape(str(motivo))}</i>\n\n"
+                    "Il bot dev'essere amministratore di quel canale, "
+                    "col permesso di pubblicare (e di modificare i "
+                    "propri messaggi, per il ✅ Venduto).",
+            "parse_mode": "HTML"})
+    imposta_canale_vetrina(arg)
+    await notifica_admin(f"📣 Canale della comunità: {arg} (da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: gli annunci nuovi escono anche in <code>"
+                f"{html.escape(arg)}</code>.\n\n"
+                "<i>Lì entrano solo gli annunci di chi ha un @username "
+                "Telegram: è la maniglia che quel pubblico si aspetta.</i>",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def _canale_riepilogo_comando(chat: int, arg: str):
     """Il ramo «/canale riepilogo …»: dove va il post del lunedi'.
 
@@ -7675,9 +7764,12 @@ async def comando_canale(mittente: dict, testo: str):
     # del post del lunedi'. E' la stessa domanda — dove parla il bot —
     # e un secondo comando col nome quasi uguale e' il genere di cosa
     # che si sbaglia col telefono in mano.
-    if arg.lower().split(maxsplit=1)[:1] == ["riepilogo"]:
-        return await _canale_riepilogo_comando(
-            chat, arg.split(maxsplit=1)[1].strip() if " " in arg else "")
+    prima = arg.lower().split(maxsplit=1)[:1]
+    resto = arg.split(maxsplit=1)[1].strip() if " " in arg else ""
+    if prima == ["riepilogo"]:
+        return await _canale_riepilogo_comando(chat, resto)
+    if prima == ["vetrina"]:
+        return await _canale_vetrina_comando(chat, resto)
     if not arg:
         ora = canale_id()
         stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
@@ -28859,6 +28951,45 @@ async def _drena_promo():
         print(f"⚠️ Post automatici saltati: {e}")
 
 
+def _post_vetrina(a) -> int:
+    """Il message_id del post nel canale della comunita', o 0.
+
+    Il try non e' cerimonia (e' il pattern di `origine_annuncio`): una
+    SELECT che non chiede la colonna nuova — o un database piu'
+    vecchio della migrazione, cioe' lo script lanciato a mano — su una
+    sqlite3.Row alza IndexError, e qui vorrebbe dire far fallire il ✅
+    Venduto anche sul NOSTRO canale, che con questa colonna non
+    c'entra niente."""
+    try:
+        return a["post_vetrina_id"] or 0
+    except (KeyError, IndexError):
+        return 0
+
+
+async def _manda_post_canale(dove: str, caption: str, foto: list) -> int:
+    """Manda UN post in UN canale e torna il suo message_id (0 se non
+    e' partito).
+
+    UNA FABBRICA SOLA PER DUE DESTINAZIONI (ago 2026): il nostro
+    canale e quello della comunita' ricevono lo STESSO messaggio, e
+    scritto in due posti divergerebbe al primo ritocco — il ripiego
+    senza foto, il parse_mode, la caption. Cambia solo il `dove`.
+
+    IL RIPIEGO E' QUELLO DI SEMPRE: con la foto il testo vive nella
+    caption, e se Telegram non la digerisce (URL irraggiungibile,
+    immagine troppo grande) il post esce come testo invece di non
+    uscire."""
+    r = None
+    if foto:
+        r = await bot_api("sendPhoto", {
+            "chat_id": dove, "photo": foto[0],
+            "caption": caption, "parse_mode": "HTML"})
+    if not (r and r.get("ok")):
+        r = await bot_api("sendMessage", {
+            "chat_id": dove, "text": caption, "parse_mode": "HTML"})
+    return r["result"]["message_id"] if r and r.get("ok") else 0
+
+
 async def _posta_promo_singolo(a: dict, giorni: int):
     """Un annuncio, un post per canale. Ogni canale fallisce per conto
     suo; i riferimenti (message_id, event id) si salvano per il ciclo
@@ -28897,25 +29028,31 @@ async def _posta_promo_singolo(a: dict, giorni: int):
                 post_nostr_id = evento["id"]
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
+    post_vetrina_id = 0
+    caption = _caption_canale(a, cambio, altri=altri)
+    foto = _foto_url_nostr(a.get("foto", ""))
     if canale_id():
-        caption = _caption_canale(a, cambio, altri=altri)
-        foto = _foto_url_nostr(a.get("foto", ""))
-        r = None
-        if foto:
-            r = await bot_api("sendPhoto", {
-                "chat_id": canale_id(), "photo": foto[0],
-                "caption": caption, "parse_mode": "HTML"})
-        if not (r and r.get("ok")):
-            r = await bot_api("sendMessage", {
-                "chat_id": canale_id(), "text": caption,
-                "parse_mode": "HTML"})
-        if r and r.get("ok"):
-            post_canale_id = r["result"]["message_id"]
-    if post_nostr_id or post_canale_id:
+        post_canale_id = await _manda_post_canale(canale_id(), caption, foto)
+    # E IL CANALE DELLA COMUNITA' (ago 2026): lo STESSO post, in un
+    # canale che non e' nostro, ma solo per chi ha un @USERNAME.
+    # IL PERCHE' DEL FILTRO (decisione di Andrea): li' il pubblico e'
+    # di gente, non di clienti nostri, e la firma «Annuncio da @tizio»
+    # e' la maniglia che si aspetta — un post senza menzione, in casa
+    # d'altri, e' un volantino. Chi viene da Nostr non ci compare, e i
+    # suoi annunci restano nella vetrina di Barattolo, dove si
+    # comprano esattamente come tutti gli altri.
+    # NON E' UNA POPOLAZIONE DIVERSA MA UN SOTTOINSIEME: nel NOSTRO
+    # canale entrano tutti, come sempre — due canali, due regole, e la
+    # piu' stretta e' quella di casa d'altri.
+    if canale_vetrina() and (a.get("venditore_username") or ""):
+        post_vetrina_id = await _manda_post_canale(
+            canale_vetrina(), caption, foto)
+    if post_nostr_id or post_canale_id or post_vetrina_id:
         con = db()
         con.execute(
-            "UPDATE annunci SET post_nostr_id=?, post_canale_id=? "
-            "WHERE id=?", (post_nostr_id, post_canale_id, a["id"]))
+            "UPDATE annunci SET post_nostr_id=?, post_canale_id=?, "
+            "post_vetrina_id=? WHERE id=?",
+            (post_nostr_id, post_canale_id, post_vetrina_id, a["id"]))
         con.commit()
         con.close()
 
@@ -29609,12 +29746,18 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         # lista di oggi che tre link a scaffali vuoti
         altri = _altri_del_venditore(con, dict(a)) if a else []
         con.close()
-        if not a or not a["post_canale_id"] or not canale_id():
+        if not a:
+            return
+        # DUE DESTINAZIONI, LO STESSO ✅ (ago 2026): ognuna col SUO
+        # message_id, o il segno finirebbe su un post che sta altrove.
+        # Ognuna fallisce per conto suo: se il canale della comunita'
+        # ci ha tolto i permessi, il nostro si aggiorna lo stesso.
+        dove = [(canale_id(), a["post_canale_id"]),
+                (canale_vetrina(), _post_vetrina(a))]
+        if not any(c and m for c, m in dove):
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
                                   venduto=venduto, altri=altri)
-        dati = {"chat_id": canale_id(),
-                "message_id": a["post_canale_id"], "parse_mode": "HTML"}
         # Con la foto il testo vive nella caption, senza nel body — ma
         # il ripiego sendMessage di _posta_promo_singolo rende il tipo
         # ambiguo: si tenta il piu' probabile e poi l'altro.
@@ -29622,10 +29765,15 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         tentativi = (["editMessageCaption", "editMessageText"]
                      if _foto_url_nostr(a["foto"])
                      else ["editMessageText", "editMessageCaption"])
-        for metodo in tentativi:
-            r = await bot_api(metodo, {**dati, campo[metodo]: caption})
-            if r and r.get("ok"):
-                break
+        for canale, msg in dove:
+            if not (canale and msg):
+                continue
+            dati = {"chat_id": canale, "message_id": msg,
+                    "parse_mode": "HTML"}
+            for metodo in tentativi:
+                r = await bot_api(metodo, {**dati, campo[metodo]: caption})
+                if r and r.get("ok"):
+                    break
     except Exception as e:
         print(f"⚠️ Aggiornamento post venduto #{annuncio_id} saltato: {e}")
 
@@ -29637,22 +29785,27 @@ async def promo_rimuovi(annuncio_id: int):
     try:
         con = db()
         a = con.execute(
-            "SELECT post_canale_id, post_nostr_id, foto FROM annunci "
-            "WHERE id=?", (annuncio_id,)).fetchone()
+            "SELECT post_canale_id, post_vetrina_id, post_nostr_id, "
+            "foto FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
         con.close()
-        if not a or not (a["post_canale_id"] or a["post_nostr_id"]):
+        vetrina = _post_vetrina(a) if a else 0
+        if not a or not (a["post_canale_id"] or vetrina
+                         or a["post_nostr_id"]):
             return
-        if a["post_canale_id"] and canale_id():
-            await bot_api("deleteMessage",
-                          {"chat_id": canale_id(),
-                           "message_id": a["post_canale_id"]})
+        # ogni canale col SUO id, e ognuno fallisce per conto suo
+        for canale, msg in ((canale_id(), a["post_canale_id"]),
+                            (canale_vetrina(), vetrina)):
+            if canale and msg:
+                await bot_api("deleteMessage",
+                              {"chat_id": canale, "message_id": msg})
         if a["post_nostr_id"] and _NOSTR:
             await _spedisci_ai_relay(
                 firma_evento(5, [["e", a["post_nostr_id"]], ["k", "1"]],
                              "Annuncio rimosso da Barattolo"))
         con = db()
         con.execute("UPDATE annunci SET post_canale_id=0, "
-                    "post_nostr_id='' WHERE id=?", (annuncio_id,))
+                    "post_vetrina_id=0, post_nostr_id='' WHERE id=?",
+                    (annuncio_id,))
         con.commit()
         con.close()
     except Exception as e:

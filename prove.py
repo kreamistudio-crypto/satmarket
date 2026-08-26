@@ -17673,10 +17673,18 @@ def prove_canale_bot():
           {"canale_id", "_leve_stato"},
           {n for n, c in _corpi.items() if "TELEGRAM_CANALE_ID" in c})
     # ...e ogni funzione che POSTA nel canale passa dal giudice.
-    for f in ("_posta_promo_singolo", "_posta_promo_aggregato",
-              "promo_lampo"):
+    for f in ("_posta_promo_aggregato", "promo_lampo"):
         prova(f"{f} scrive col giudice", True,
               'chat_id": canale_id()' in pezzo(f))
+    # L'ANNUNCIO NUOVO PASSA DALLA FABBRICA (ago 2026, col canale
+    # della comunita'): il `chat_id` non lo scrive piu' lui — lo
+    # riceve `_manda_post_canale`, che e' UNA per le due destinazioni
+    # — ma il giudice dev'esserci lo stesso, ed e' lui a sceglierlo.
+    prova("_posta_promo_singolo scrive col giudice", True,
+          "_manda_post_canale(canale_id()" in pezzo("_posta_promo_singolo"))
+    prova("...e la fabbrica non sceglie il canale da se'", True,
+          "canale_id()" not in pezzo("_manda_post_canale")
+          and "canale_vetrina()" not in pezzo("_manda_post_canale"))
     # IL RIEPILOGO HA CAMBIATO LATO (ago 2026): va nel canale SUO,
     # quindi qui si chiede il contrario — e la prova non sparisce, si
     # rovescia: se una sola delle sue strade tornasse a `canale_id()`
@@ -17697,8 +17705,18 @@ def prove_canale_bot():
            # dentro da solo, ma passando dal SUO giudice)
            "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale"},         # che il canale lo DICE, non ci posta
+          # `_manda_post_canale` non c'e': il canale non lo sceglie,
+          # lo RICEVE — ed e' precisamente quel che la prova qui
+          # sopra le chiede
+          # «parlare» vuol dire chiamare il bot DIRETTAMENTE o
+          # passare dalla fabbrica dei post: senza il secondo ramo
+          # `_posta_promo_singolo` uscirebbe da questo elenco il
+          # giorno che il suo invio e' stato estratto — cioe' la
+          # prova smetterebbe di sorvegliare proprio la bocca
+          # principale, e in silenzio.
           {n for n, c in _corpi.items()
-           if "canale_id()" in c and "bot_api(" in c})
+           if "canale_id()" in c
+           and ("bot_api(" in c or "_manda_post_canale(" in c)})
     # La caption RICOSTRUITA deve avere la firma: senza il JOIN il
     # post riscritto col ✅ perderebbe il venditore che aveva da nuovo.
     prova("promo_venduto rilegge anche il venditore", True,
@@ -17706,9 +17724,17 @@ def prove_canale_bot():
     prova("e cosi' il drenatore", True,
           "venditore_negozio" in pezzo("_drena_promo"))
     # Il timbro PRIMA dell'invio, il patto delle campagne.
+    # COL find() E NON COL index(), ed e' la regola di casa pagata di
+    # nuovo qui: quando l'invio e' passato alla fabbrica
+    # `_manda_post_canale`, «bot_api» e' sparito da questo corpo e la
+    # riga scritta con index() e' ESPLOSA invece di diventare rossa —
+    # portandosi dietro tutte le prove che venivano dopo, in silenzio.
     corpo = pezzo("_posta_promo_singolo")
+    timbro = corpo.find("promo_canale_il")
+    invio = min(i for i in (corpo.find("bot_api"),
+                            corpo.find("_manda_post_canale")) if i >= 0)
     prova("il timbro del turno si scrive PRIMA di postare", True,
-          corpo.index("promo_canale_il") < corpo.index("bot_api"))
+          0 <= timbro < invio)
 
     # --- 6) I COMANDI DI SERVIZIO SONO DEI DUE ADMIN -------------
     amb3 = {}
@@ -17788,12 +17814,113 @@ def prove_canale_bot():
     # nel farlo si rilegge la regola.
     RECINTO = {"canale_telegram",   # dove parla il bot  (`/canale`)
                "canale_riepilogo",  # dove va il lunedi' (`/canale riepilogo`)
+               "canale_vetrina",    # il canale OSPITE   (`/canale vetrina`)
                "ritmo_vetrina"}     # quanto parla       (`/vetrina`)
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
                              _SORGENTE))
     prova("nel recinto delle impostazioni ci sono solo le chiavi note",
           RECINTO, chiavi)
+
+
+def prove_canale_comunita():
+    """IL CANALE DELLA COMUNITA' (ago 2026, decisione di Andrea): i
+    nostri annunci nuovi escono anche in un canale di TERZI — oggi
+    @subito_crypto_vetrina, 700 membri — per farci conoscere.
+
+    DUE CANALI, DUE REGOLE, ed e' tutto il cantiere: nel NOSTRO entra
+    chiunque, come sempre; li' entra solo chi ha un @USERNAME
+    Telegram, perche' quel pubblico e' di gente e la firma «Annuncio
+    da @tizio» e' la maniglia che si aspetta. Chi viene da Nostr non
+    ci compare, e i suoi annunci restano nella vetrina di Barattolo
+    dove si comprano come tutti gli altri."""
+    print("\n[il canale della comunita']")
+    sing = pezzo("_posta_promo_singolo")
+
+    # --- 1) IL FILTRO, che e' la ragione per cui il cantiere esiste
+    prova("il canale ospite ha un giudice suo", True,
+          "def canale_vetrina(" in _SORGENTE)
+    prova("il post ci va solo con l'@username", True,
+          'canale_vetrina() and (a.get("venditore_username")' in sing)
+    # ...e il NOSTRO non ha guadagnato la stessa guardia: li' entrano
+    # tutti, ed e' la meta' della decisione che un riordino
+    # «uniformante» toglierebbe per prima.
+    nostro = sing[sing.index("if canale_id():"):sing.index("canale_vetrina()")]
+    prova("nel nostro canale entrano ancora tutti", False,
+          "venditore_username" in nostro)
+
+    # --- 2) NIENTE RIPIEGO, al contrario del riepilogo: un canale
+    # altrui non e' un posto dove finire per distrazione.
+    giu = pezzo("canale_vetrina")
+    prova("il canale ospite non ripiega sul nostro", False,
+          "canale_id()" in giu)
+    prova("...mentre il riepilogo si', ed e' voluto", True,
+          "canale_id()" in pezzo("canale_riepilogo"))
+
+    # --- 3) IL CICLO DI VITA vale per tutte e due, ognuna col SUO id
+    # NON BASTA CHE IL NOME COMPAIA: la mutazione che toglie il canale
+    # ospite dal GIRO lasciava in piedi sia la lettura della colonna
+    # sia l'azzeramento, e la prova restava verde — l'ha detto la
+    # tortura. Qui si chiede la COPPIA (canale, id) dentro il giro,
+    # che e' il gesto e non la parola.
+    for f in ("promo_venduto", "promo_rimuovi"):
+        c = codice(pezzo(f))
+        prova(f"{f} porta l'ospite nel giro", True,
+              "canale_vetrina()" in c
+              and ("_post_vetrina(a)" in c or "vetrina)" in c))
+        prova(f"...e ognuno col SUO id", True,
+              'canale_vetrina(), a["post_canale_id"]' not in c)
+    prova("la cancellazione azzera anche il suo id", True,
+          "post_vetrina_id=0" in pezzo("promo_rimuovi"))
+
+    # --- 4) LA COLONNA e il suo lettore prudente
+    prova("la colonna nasce a zero", True,
+          '"post_vetrina_id INTEGER DEFAULT 0"' in _SORGENTE)
+    amb = {}
+    exec(pezzo("_post_vetrina"), amb)
+    v = amb["_post_vetrina"]
+    prova("legge l'id quando c'e'", 7, v({"post_vetrina_id": 7}))
+    prova("...e zero quando e' zero", 0, v({"post_vetrina_id": 0}))
+    # IL CASO CHE IL try ESISTE PER PARARE: una SELECT che non chiede
+    # la colonna, o un database piu' vecchio della migrazione. Senza,
+    # il ✅ Venduto fallirebbe anche sul NOSTRO canale, che con questa
+    # colonna non c'entra niente.
+
+    class RigaVecchia(dict):
+        def __getitem__(self, k):
+            if k not in self:
+                raise IndexError(k)      # come fa sqlite3.Row
+            return dict.__getitem__(self, k)
+
+    prova("una riga senza la colonna non fa esplodere niente", 0,
+          v(RigaVecchia(post_canale_id=3)))
+
+    # --- 5) LA FABBRICA e' UNA per le due destinazioni
+    fab = pezzo("_manda_post_canale")
+    prova("la fabbrica riceve il canale, non lo sceglie", True,
+          "dove" in fab.split("\n")[0])
+    prova("...e ha il ripiego senza foto", True,
+          "sendPhoto" in fab and "sendMessage" in fab)
+    prova("i due invii passano tutti e due da lei",
+          2, sing.count("_manda_post_canale("))
+
+    # --- 6) IL COMANDO, gemello dei due fratelli
+    cmd = pezzo("_canale_vetrina_comando")
+    # SI PROVA PRIMA DI CREDERCI, e si guarda il ramo del
+    # SALVATAGGIO: il ramo del vuoto spegne subito e li' un ordine
+    # inverso e' giusto — con la fetta sbagliata questa riga misura
+    # quello e dice il falso (l'ha detto la prova, non la rilettura).
+    salva = cmd[cmd.find('"chat_id": arg'):]
+    prova("si prova prima di crederci", True,
+          0 <= salva.find("bot_api") < salva.find("imposta_canale_vetrina"))
+    prova("...e il rifiuto dice il motivo di Telegram", True,
+          "description" in cmd)
+    prova("il vuoto SPEGNE (e non ripiega)", True,
+          'imposta_canale_vetrina("")' in cmd)
+    prova("il nome del canale esce scappato", True,
+          "html.escape(arg)" in cmd)
+    prova("il dispatch conosce «vetrina»", True,
+          'prima == ["vetrina"]' in pezzo("comando_canale"))
 
 
 def prove_vetrina_negozio():
@@ -35215,6 +35342,7 @@ def main():
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
               prove_script_nel_workflow, prove_deploy,
+              prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,

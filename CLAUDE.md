@@ -5004,6 +5004,72 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   turno per un guasto ha comunque il suo annuncio in vetrina, che è
   dove si compra. L'AGGREGATO non consuma il turno di nessuno: non
   nomina nessuno.
+  ANDIAMO OSPITI IN UN CANALE DELLA COMUNITÀ (ago 2026, decisione di
+  Andrea): gli annunci nuovi escono ANCHE in un canale di TERZI —
+  @subito_crypto_vetrina, 700 membri — per farci conoscere. Giudice
+  `canale_vetrina()` col pattern dei due fratelli (chiave
+  `canale_vetrina` in `impostazioni`, config
+  `TELEGRAM_CANALE_VETRINA` come valore di PARTENZA, e si cambia dal
+  bot con `/canale vetrina @nome`, che è un ramo del comando che c'è
+  già — la stessa domanda, «dove parla il bot»).
+  NIENTE RIPIEGO, ed è la differenza col riepilogo: là il vuoto
+  rimette il post dove vanno gli altri, perché sono tutti CASA NOSTRA
+  e perdere un post settimanale sarebbe peggio. Qui il canale è di
+  qualcun ALTRO: vuoto vuol dire «non ci andiamo», e ripiegare sul
+  nostro vorrebbe dire mandare in un posto un messaggio pensato per
+  un altro. Per la stessa ragione il vuoto È lo spegnimento.
+  CI ENTRA SOLO CHI HA UN @USERNAME, ed è tutto il cantiere: nel
+  NOSTRO canale entra chiunque, come sempre — due canali, due regole,
+  e la più stretta è quella di casa d'altri. IL PERCHÉ (decisione di
+  Andrea): là il pubblico è di gente e non di clienti nostri, e la
+  firma «Annuncio da @tizio» è la maniglia che si aspetta — un post
+  senza menzione, in casa d'altri, è un volantino. Chi viene da Nostr
+  non ci compare, e i suoi annunci restano nella vetrina di Barattolo
+  dove si comprano esattamente come tutti gli altri. C'è la prova nei
+  DUE versi: il filtro c'è là e NON è entrato nel nostro — la metà che
+  un riordino «uniformante» toglierebbe per prima.
+  IL CICLO DI VITA VALE PER TUTTE E DUE, OGNUNA COL SUO ID: colonna
+  `annunci.post_vetrina_id` (additiva, DEFAULT 0) e non un secondo uso
+  del primo, o il ✅ Venduto finirebbe in un canale e il post
+  nell'altro. `promo_venduto` e `promo_rimuovi` girano su una lista di
+  coppie (canale, id) e ognuna fallisce per conto suo: se la comunità
+  ci togliesse i permessi, il nostro canale si aggiorna lo stesso.
+  `_post_vetrina` legge la colonna col `try/except (KeyError,
+  IndexError)` di `origine_annuncio` — una SELECT che non la chiede, o
+  un database più vecchio della migrazione, farebbero fallire il ✅
+  anche sul NOSTRO canale, che con questa colonna non c'entra niente.
+  L'INVIO È UNA FABBRICA SOLA (`_manda_post_canale(dove, caption,
+  foto)`): i due canali ricevono lo STESSO messaggio, e scritto in due
+  posti divergerebbe al primo ritocco — il ripiego senza foto, il
+  parse_mode, la caption. La fabbrica RICEVE il canale e non lo
+  sceglie, e c'è la prova che non nomini nessuno dei due giudici.
+  ⚠️ IL CENSIMENTO «CHI PARLA COL CANALE» HA DOVUTO IMPARARE LA
+  FABBRICA: il suo predicato era «nomina `canale_id()` E chiama
+  `bot_api(`», e col giorno in cui l'invio è stato estratto
+  `_posta_promo_singolo` ne è uscita — cioè la prova avrebbe smesso di
+  sorvegliare la bocca principale, in silenzio. Ora conta anche chi
+  passa da `_manda_post_canale`.
+  ⚠️ E UNA PROVA È ESPLOSA INVECE DI DIVENTARE ROSSA, per l'ennesima
+  volta e sempre per la stessa ragione: «il timbro si scrive PRIMA di
+  postare» era scritta con `corpo.index("bot_api")`, e quella parola
+  è sparita da quel corpo — `ValueError`, e con lei sono cadute tutte
+  le prove che venivano dopo. Riscritta col `find()`, che è la regola
+  di casa.
+  COSA NON CI VA, dichiarato: l'aggregato «📦 N nuovi annunci» (non
+  nomina nessuno: in casa d'altri sarebbe rumore), la raffica per
+  negozio, la lampo e il riepilogo del lunedì. Nel canale della
+  comunità va il POST SINGOLO di un annuncio nuovo, e basta — si
+  spiega in una riga, ed è la cosa che quel pubblico può usare.
+  IL FRENO RESTA UNO: `promo_canale_il` è il turno del VENDITORE, non
+  del canale — un post a settimana, e quel post va in tutti e due i
+  posti quando può. Il budget orario `POST_MAX_ORA` conta i GIRI e non
+  i messaggi: un annuncio può produrne due, ed è dichiarato.
+  IL PREREQUISITO NON DIPENDE DA NOI: il bot dev'essere
+  AMMINISTRATORE di quel canale, col permesso di pubblicare e di
+  modificare i propri messaggi (per il ✅). Il comando lo verifica
+  mandando un messaggio di prova — si prova prima di crederci — e col
+  rifiuto dice il motivo VERO di Telegram, che su un canale altrui è
+  l'unica cosa utile da sapere.
   IL RITMO LO DECIDE IL BOT (ago 2026, chiesto da Andrea insieme al
   canale «Barattolo Vetrina»): il freno qui sopra non è più l'ultima
   parola. `/vetrina tutto | giorno | settimana` sceglie una POSIZIONE

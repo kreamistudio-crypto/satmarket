@@ -713,6 +713,16 @@ TELEGRAM_CANALE_ID = ""
 # «/canale riepilogo @nomecanale». Il bot dev'essere amministratore
 # anche di questo, e puo' essere un canale diverso dall'altro.
 TELEGRAM_CANALE_RIEPILOGO = ""
+# Il canale della COMUNITA' (ago 2026): un canale di TERZI dove i
+# nostri annunci nuovi compaiono per farci conoscere — oggi
+# @subito_crypto_vetrina. Vuoto = non ci si posta, e NIENTE ripiego
+# sul nostro: un canale altrui non e' un posto dove finire per
+# distrazione. Si cambia dal bot con «/canale vetrina @nomecanale»,
+# e il bot dev'essere amministratore di quel canale.
+# LI' DENTRO ENTRANO SOLO gli annunci di chi ha un @username Telegram:
+# e' la maniglia che quel pubblico si aspetta, e un post senza
+# menzione in casa d'altri e' un volantino.
+TELEGRAM_CANALE_VETRINA = ""
 # ATTENZIONE (ago 2026): come per il canale, i tre numeri qui sotto
 # sono il valore di PARTENZA. Il ritmo si sceglie dal bot con
 # «/vetrina tutto | giorno | settimana» e da quel momento comanda la
