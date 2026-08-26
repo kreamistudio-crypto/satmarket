@@ -29,6 +29,11 @@ foglio esiste.
 3. **Decifrare**: la chiave age da Bitwarden (o dal foglietto) in un
    file `chiave.txt`, poi
    `age -d -i chiave.txt barattolo-XXXX.tar.gz.age | tar xz`.
+   ⚠️ La chiave INTERA comincia con `AGE-SECRET-KEY-1…` (74 caratteri):
+   se `age` risponde «unknown identity type», quasi certamente manca il
+   prefisso `AGE-SECRET-KEY-` — si riattacca davanti e riprova. È
+   successo al primo drill (ago 2026): la copia su Bitwarden portava i
+   soli 59 caratteri dal «1» in poi.
 4. **Rimettere i pezzi**: `satmarket.db`, `config.py`, `buste/`,
    `contenuti/` nella cartella dell'app; `sistema/Caddyfile` e le unit
    in `/etc`; `foto/` dal PC (`BarattoloBackup\foto\`).
@@ -51,21 +56,29 @@ foglio esiste.
   chiave è mezzo backup.
 - Le ore fra l'ultimo archivio e il disastro (il backup è giornaliero).
 
-## Il drill (fatto una volta, da rifare dopo ogni cambio di chiavi)
+## Il drill (da rifare dopo ogni cambio di chiavi)
 
 Un backup mai aperto è una speranza, non un backup:
 
 1. scaricare dal canale l'archivio di ieri;
 2. `age -d` con la chiave presa **da Bitwarden** (si prova quella vera);
 3. aprire la sqlite, contare annunci/ordini/utenti, e decifrare UN
-   contenuto digitale con la `CHIAVE_CONTENUTI_DIGITALI` dal foglietto;
+   contenuto digitale con la `CHIAVE_CONTENUTI_DIGITALI` presa dal
+   config RIPRISTINATO (prova che l'archivio è autosufficiente);
 4. confrontare il conteggio file di `BarattoloBackup\foto\` col `du`
    del VPS.
+
+**FATTO il 26 ago 2026, tutto verde**: le due copie (Telegram e pull
+sul PC) identiche allo sha256, integrity_check ok, 300 annunci / 45
+ordini / 292 utenti, un contenuto digitale + una busta + un blob su
+file decifrati con la chiave letta dal config dentro l'archivio.
+L'unico intoppo è a verbale qui sopra: il prefisso age mancante nella
+copia Bitwarden.
 
 ## Nota per chi tocca i testi
 
 La pagina pubblica «Il pagamento protetto» dice che lo storico è
-«salvato ogni giorno». Quando il drill qui sopra è passato, quella
-frase può tornare a dire anche che le copie stanno **fuori dal
-server** — prima no: la pagina non deve promettere un backup che
-nessuno ha mai aperto.
+salvato ogni giorno **con copie cifrate anche fuori dal server** — la
+mezza frase è tornata col drill del 26 ago 2026. Se le chiavi cambiano
+e il drill non viene rifatto, quella frase torna una promessa non
+provata: si rifà il drill, non si lascia la frase sulla fiducia.
