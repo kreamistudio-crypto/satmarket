@@ -16290,6 +16290,48 @@ def prove_classifica():
     prova("...e NON e' una radice", True,
           "'classifica'" not in html[html.index("const RADICI"):
                                      html.index("const RADICI") + 260])
+    # IL CARTELLO DEL RODAGGIO (ago 2026, decisione di Andrea): la
+    # classifica e' accesa mentre la commissione e' ancora sospesa,
+    # quindi i punti oggi si prendono gratis e il giorno che si
+    # accende ripartono da zero. Il testo dice DUE cose, e sono
+    # quelle da non addolcire: che e' in prova, e che i punti
+    # ripartiranno — la seconda e' quella che protegge dal danno
+    # vero, cioe' l'affezione a una posizione che sparira'.
+    # E' anche il tipo di riga che un riordino toglie per prima,
+    # perche' togliendola non si rompe niente.
+    rend = pezzo_js(html, "function renderClassifica(", "\n}\n")
+    corpo = rend[rend.index("box.innerHTML = `"):]
+    prova("il cartello del rodaggio c'e'", True,
+          'class="cl-rodaggio"' in corpo)
+    # In CIMA e non in coda: e' la cornice della pagina — prima si
+    # sa che e' provvisoria, poi si legge come si legge.
+    # find() e non index(): la mutazione che toglie il cartello
+    # deve lasciare una riga ROSSA, non far esplodere il blocco
+    # portandosi dietro le sorelle. E il `0 <=` non e' un vezzo:
+    # find() torna -1 quando non trova, e un -1 e' minore di
+    # qualunque indice — senza, il confronto direbbe di si'
+    # proprio nel caso che deve prendere.
+    _i = corpo.find("cl-rodaggio")
+    _j = corpo.find('"hint">I primi')
+    prova("...e sta prima di come si legge la lista", True,
+          0 <= _i < _j)
+    prova("...e dice che e' in prova", True, "in rodaggio" in corpo)
+    prova("...e che i punti ripartiranno da zero", True,
+          "ripartiranno da zero" in corpo)
+    prova("...e quando: all'accensione delle commissioni", True,
+          "commissioni" in corpo)
+    # Dice e basta: non porta da nessuna parte, quindi non deve
+    # nemmeno sembrare toccabile.
+    prova("...e non finge di essere toccabile", True,
+          0 <= _i < _j and "onclick" not in corpo[_i:_j])
+    # Il vestito e' quello del rodaggio e non una hint grigia: in
+    # questa pagina ce ne sono gia' due di fila, e una terza si
+    # perderebbe proprio dove deve farsi vedere.
+    prova("...e porta la veste del rodaggio, non il grigio", True,
+          ".cl-rodaggio{" in html
+          and "background:var(--sats-soft);border:1.5px solid var(--sats)"
+          in html[html.index(".cl-rodaggio{"):
+                  html.index(".cl-rodaggio{") + 260])
 
 
 def prove_conta_feedback():

@@ -2883,6 +2883,27 @@
   .cl-punti{margin-left:auto;flex:0 0 auto;font-weight:800;
     font-size:14px;font-family:var(--mono);color:var(--ink)}
   .cl-punti + .cl-fr{margin-left:6px}
+  /* IL CARTELLO DEL RODAGGIO (ago 2026, decisione di Andrea): la
+     classifica e' accesa, ma finche' la commissione e' sospesa i
+     punti si prendono gratis — quindi il giorno che si accende gli
+     XP si azzerano e la lista riparte da zero. IL RISCHIO NON E'
+     CHE LA VEDANO: e' che ci si affezioni a una posizione che
+     sparira', e quello si DICE invece di nasconderlo (il patto
+     della commissione sospesa e del rodaggio).
+     LA VESTE E' QUELLA DEL RODAGGIO (--sats-soft col bordo arancio)
+     e non una hint grigia: in questa pagina ce ne sono gia' due di
+     fila, e una terza si perderebbe proprio dove deve farsi
+     vedere. Non riusa la classe della fascia in Esplora, che e'
+     centrata e tutta in 800: tarata per una riga sola, su tre
+     righe di prosa sarebbe un muro. Non e' toccabile — dice e
+     basta, quindi niente cursore e niente :active. */
+  .cl-rodaggio{
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:16px;padding:11px 14px;margin:0 0 14px;
+    font-size:13px;line-height:1.45;font-weight:600;
+    color:var(--sats-text);
+  }
+  .cl-rodaggio b{font-weight:800}
   /* La sfilza dei distintivi accanto al nome del venditore: emoji
      nude in fila con un piccolo respiro (niente cerchietti d'oro:
      nude e sovrapposte si impasterebbero — l'oro resta alle tessere
@@ -9719,7 +9740,17 @@ function renderClassifica(){
   const mia = d.mia ? `
     <div class="section-label" style="margin-top:22px">La tua posizione</div>
     ${rigaClassifica(d.mia, true)}` : '';
+  /* Il cartello sta in CIMA: e' la cornice della pagina, non una
+     nota a pie' di lista — prima si sa che e' provvisoria, poi si
+     legge come si legge. E' HTML letterale perche' non dipende da
+     nessun dato: niente esc() da ricordare. Vive nel ramo PIENO e
+     non sopra i due return: su «ancora nessuno in classifica» non
+     c'e' nessuna posizione a cui affezionarsi. */
   box.innerHTML = `
+    <div class="cl-rodaggio">🚧 <b>La classifica è in rodaggio.</b>
+      Quando accenderemo le commissioni i punti ripartiranno da zero
+      per tutti: oggi accumularli non costa niente, e una classifica
+      che parte da lì misurerebbe il tempo libero più del commercio.</div>
     <div class="hint">I primi ${fmt(voci.length)} su ${fmt(d.totale)} in
       classifica. Conta la media dei feedback, quanto si è commerciato,
       e da quante persone diverse ti hanno votato.
