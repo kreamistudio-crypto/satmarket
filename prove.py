@@ -28562,7 +28562,7 @@ def prove_podio_sfondo():
     """IL PODIO SUL DISEGNO VERO (ago 2026, chiesto da Andrea).
 
     I tre piu' venduti finiscono nei vetri di
-    `assets/riepilogo-barattoli.png`. Non e' una sostituzione secca:
+    `assets/riepilogo-barattoli.webp`. Non e' una sostituzione secca:
     il podio DISEGNATO resta — serve ancora la fila dei negozi — e fa
     da ripiego, cosi' il lunedi' non salta mai per un asset mancante.
 
@@ -28575,7 +28575,7 @@ def prove_podio_sfondo():
     except ImportError:
         salta("il podio sul disegno vero", "Pillow non installata")
         return
-    import io as _io, os as _os, tempfile
+    import io as _io, os as _os, re as _re, tempfile
     amb = {"io": _io, "ImmaginePillow": _Im, "ImageOps": _IOps,
            "ImageDraw": _IDraw, "print": lambda *a, **k: None}
     i = _SORGENTE.index("SFONDO_RIEPILOGO = ")
@@ -28679,6 +28679,47 @@ def prove_podio_sfondo():
                     trasp += alpha[x, y] < 40
             prova(f"...e sta quasi tutto dentro il {i + 1}° barattolo",
                   True, trasp / dentro > 0.80)
+
+    # --- IL NOME DEL FILE PASSA DALLA PORTA ---------------------
+    # Il podio si manda per URL, non a byte: se il nome non rientra in
+    # NOME_FOTO il file si scrive, Telegram va a prenderlo e si sente
+    # rispondere 404 DAL NOSTRO STESSO SERVER — la foto non arriva e
+    # il post ripiega sul testo, senza che nessuno alzi un'eccezione.
+    # E' successo davvero con l'anteprima, che ha un nome suo per non
+    # sovrascrivere la figura del lunedi'.
+    nf = {"re": _re}
+    i = _SORGENTE.index("NOME_FOTO = re.compile(")
+    exec(_SORGENTE[i:_SORGENTE.index("\nTIPI_FOTO", i)], nf)
+    # i nomi si prendono dal CODICE che li scrive, non a memoria: cosi'
+    # il terzo che qualcuno inventera' domani entra nel conto da solo
+    import time as _t
+    sal = codice(pezzo("_salva_podio"))
+    ant = codice(pezzo("_anteprima_riepilogo"))
+    veri = []
+    for corpo, oggi in ((sal, "2026-08-25"), (ant, None)):
+        m = _re.search(r'f"pod_\{oggi\}\.jpg"', corpo)
+        if m:
+            veri.append("pod_2026-08-25.jpg")
+    m = _re.search(r'_salva_podio\(con, top, f"([^"]+)"\)', ant)
+    prova("l'anteprima si da' un nome suo", True, bool(m))
+    if m:
+        veri.append("pod_" + m.group(1).replace(
+            "{int(time.time())}", str(int(_t.time()))) + ".jpg")
+    for n in veri:
+        prova(f"«{n}» passa dalla porta di /foto", True,
+              bool(nf["NOME_FOTO"].match(n)))
+    prova("...e un nome inventato no", False,
+          bool(nf["NOME_FOTO"].match("pod_qualunque.jpg")))
+    # E IL RIFIUTO DI TELEGRAM SI DICE: quando la figura si compone ma
+    # il post non parte (il 404 di sopra e' il caso tipico), senza
+    # questo ramo la nota usciva senza NESSUN motivo — cioe' il
+    # silenzio che quel blocco esiste per togliere, e chi guarda va a
+    # cercare il guasto dalla parte sbagliata. La mutazione che lo
+    # toglie non faceva rossa nessuna riga: l'ha detto la tortura.
+    motivi = ant[ant.index("manca = []"):ant.index("await bot_api",
+                                                   ant.index("manca = []"))]
+    prova("il rifiuto di Telegram entra fra i motivi", True,
+          "if nome:" in motivi and "Telegram" in motivi)
 
     # IL RIPIEGO E' SCRITTO NEL CHIAMANTE, e in quest'ordine: prima il
     # disegno vero, poi quello fatto a matita.
