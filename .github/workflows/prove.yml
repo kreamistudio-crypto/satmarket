@@ -68,9 +68,12 @@ jobs:
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
              anteprima_riepilogo.py
              collaudo_tornate.py collaudo_rilancio.py
+             collaudo_busta_diretta.py
+             collaudo_email_corriere.py
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
-             marca_prove.py recupera_xp_ordini.py
+             marca_prove.py recupera_xp_ordini.py livelli_prova.py
+             collaudo_offerta_carrello.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -136,12 +139,26 @@ jobs:
       # il token del bot: meglio un falso allarme da guardare che un
       # segreto vero che passa perche' il formato e' cambiato di un
       # carattere.
+      # E la chiave age dei backup (AGE-SECRET-KEY-1...): la meta'
+      # segreta vive su carta + Bitwarden e non deve mai entrare nel
+      # repo — nel repo sta solo la PUBBLICA, che sa cifrare e basta.
       FORME: >-
-        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]|\b(ck|cs)_[0-9a-f]{40,}|\bshp(at|ca|pa|ss)_[0-9a-f]{32,}|AGE-SECRET-KEY-1[0-9A-Z]{40,}
       # E la chiave Nostr in esadecimale nudo, che ha una regola sua
       # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
       # per mestiere. Sta qui, accanto a FORME, per la stessa ragione
       # di FORME — la guardano in due, e due copie divergono.
+      # I SEGNAPOSTI: quel che NON e' un segreto pur avendone la
+      # forma. `INCOLLA_QUI` e' il config d'esempio; il secondo e' la
+      # chiave di cartone dei BANCHI, che per costruire un modulo
+      # `config` finto puo' capitare scrivano `NOME = "valore"` — la
+      # forma di un file di configurazione, che questa regola cerca
+      # apposta e non sa distinguere da una chiave vera.
+      # ⚠️ Stanno QUI e non a mano nei due passi, o divergono: e'
+      # gia' successo alle FORME. E si esclude il VALORE e mai il
+      # file: un collaudo che un domani portasse una chiave vera
+      # resterebbe preso.
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5
@@ -185,7 +202,7 @@ jobs:
           # i segnaposto del config d'esempio, che sono l'unica cosa che
           # deve combaciare qui dentro.
           if git ls-files -z | xargs -0 grep -nIE "$FORME" \
-               | grep -v INCOLLA_QUI ; then
+               | grep -vE "$SEGNAPOSTI" ; then
             echo "::error::Sembra esserci una chiave vera in un file"
             exit 1
           fi
@@ -216,7 +233,7 @@ jobs:
       - name: E nemmeno nella cronologia
         run: |
           if git log --all -p --no-color | grep -a '^+' \
-               | grep -aE "$FORME" | grep -av INCOLLA_QUI ; then
+               | grep -aE "$FORME" | grep -avE "$SEGNAPOSTI" ; then
             echo "::error::Un segreto e' passato dalla repo in passato: va RUOTATO"
             exit 1
           fi
@@ -260,11 +277,21 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+      # La STORIA INTERA, e non e' un dettaglio: il checkout di serie e'
+      # SHALLOW (un commit solo), quindi git non puo' dimostrare che
+      # `pronto` sia un antenato di main e RIFIUTA il push anche quando
+      # divergenza non ce n'e'. Il primo giro era passato solo perche'
+      # CREAVA il ref; dal secondo push in poi cadeva sempre, con la
+      # bandierina ferma e la CI rossa a ogni commit di chiunque.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       # --force NO, e non e' pignoleria: `pronto` deve poter solo
       # AVANZARE lungo main. Se un giorno il push venisse rifiutato
       # vuol dire che i due rami hanno divergito — cioe' che qualcuno
       # ha riscritto la storia — ed e' esattamente il momento in cui
-      # un deploy automatico deve fermarsi e farsi guardare.
+      # un deploy automatico deve fermarsi e farsi guardare. Ed e' la
+      # storia intera qui sopra a rendere VERA questa riga: senza, un
+      # rifiuto non distingueva una divergenza da un clone corto.
       - name: Alza la bandierina per il VPS
         run: git push origin HEAD:refs/heads/pronto

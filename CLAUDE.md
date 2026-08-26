@@ -1159,11 +1159,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   compratore ad aver premuto — e MAI «è arrivato al punto», che
   Barattolo non può verificare (c'è la prova che quelle parole non
   compaiano); la riga dopo manda alla mail del corriere, e la coda
-  sui sats è quella di famiglia. CANTIERE 45 (traccia nel commento
-  accanto al testo, NON costruito): se il venditore ha messo l'email
-  del COMPRATORE sull'etichetta, il codice non passa da noi e questo
-  messaggio direbbe una cosa sbagliata — quel ramo (dichiararlo
-  nell'ordine, e zittire busta e promemoria) è un cantiere suo.
+  sui sats è quella di famiglia. IL CANTIERE 45 È STATO COSTRUITO
+  (ago 2026, e questa riga chiude la traccia che stava qui): se il
+  venditore ha messo l'email del COMPRATORE sull'etichetta il codice
+  non passa da noi, e questo messaggio direbbe una cosa sbagliata —
+  quindi la dichiarazione `busta_diretta_il` zittisce ANCHE questa
+  fase, col gate nella WHERE accanto a `busta_il=0` e col gemello in
+  `statoSollecito`, perché il bottone non nasca affatto: un bottone
+  che porta a un 400 è peggio di un bottone che non c'è.
+  DUE GATE E NON UNO, ed è la riga da non «unificare»: il promemoria
+  AUTOMATICO della busta ha la sua funzione e la sua query, questo ne
+  ha un'altra — «stessa query» vale fra gli automatici, mai fra
+  l'automatico e il bottone.
   IL BOTTONE VIVE AL SITO UNICO delle azioni («🔔 Ricorda al venditore
   il codice di ritiro»), non dentro il pannello della busta: l'ordine
   della colonna è dichiarato — prima «libera i sats», poi le strade
@@ -1783,7 +1790,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'eredita' «chi scade prima» parla da sola) e NIENTE cronologia ne'
   ramoVetrina nuovo: i filtri non sono mai stati in chiaveVetrina, e
   il ramo resta alle sole Aste.
-  LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 750x345
+  LE IMMAGINI: `assets/scoprire/lampo.webp` e `sconto.webp`, 816x390
   WebP pieno bordo a bordo, SENZA testo (ago 2026, decisione di
   Andrea che ROVESCIA il testo-nel-disegno della nascita: il titolo
   si muoveva col disegno). IL TITOLO LO SCRIVE L'APP (`.sc-titolo`,
@@ -1808,9 +1815,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/assets/scoprire/{nome}` col calco delle illustrazioni (tupla
   `FILE_SCOPRIRE`, `_file_con_etag`, `public, no-cache`: i file si
   ridisegnano sotto lo stesso nome). I file arrivano da Andrea a
-  2752x1536 e si portano a 750x345 col ritaglio CENTRATO (ImageOps.fit
-  LANCZOS q92 method=6, ~18% dell'altezza via, meta' e meta' —
-  approvato sui primi due); la prova d'esistenza e di misura vive in
+  2752x1536 e si portano a 816x390 col ritaglio CENTRATO (ImageOps.fit
+  LANCZOS q92 method=6, ~14% dell'altezza via, meta' e meta' —
+  approvato sui primi due; era ~18% quando la card era 250x115); la prova d'esistenza e di misura vive in
   prove.py dal commit dei primi file (prima mancava APPOSTA, il
   precedente di tutto.webp), e il ripiego emoji+testo resta per
   quando l'immagine non arriva.
@@ -1864,10 +1871,113 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   unico `scorriSottoHeader`, condiviso con lo scroll dei reparti —
   che arriva PIU' GIU', vedi la voce sua sotto le categorie in home:
   qui cambia solo il punto d'arrivo, la fila stessa.
-  MISURE: la sezione pesa 161px a 320 (misurata; era 157 prima
+  MISURE: la sezione pesa 166px a 320 (misurata; erano 176 finche' e'
+  stata staccata dalle categorie, 161 con le card a 250x115, 157 prima
   dell'aria dell'anello), e nei giorni senza occasioni costa zero. A
   320 una card quasi piena piu' uno spicchio della seconda, il taglio
   al bordo dice che ce n'e' altre.
+  LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+  Andrea: «troppo staccata dalla striscia sopra»). Non si e' toccata
+  nessuna delle due file: si e' stretto quel che stava in mezzo —
+  l'etichetta prende MEZZO respiro (8px invece dei 16 di ogni
+  .section-label, con una regola SUA scoped su #scoprireSez, che le
+  sorelle il respiro intero se lo tengono: qui le due strisce sono
+  PARENTI, la mappa dei reparti e le occasioni, e il respiro di
+  sezione le raccontava come estranee) e il padding di SOPRA della
+  striscia scende da 8 a 6, simmetrico a quello di sotto. Misurato a
+  320/360/375 nei due temi: il vuoto fra le due file passa da 31,9 a
+  23,9px, la sezione da 176 a 166.
+  6 E' IL PAVIMENTO E NON UN GUSTO, ed e' la riga da non ammorbidire:
+  l'anello .attiva sporge 4,5px (outline 2.5 + offset 2) e sotto
+  quella soglia l'overflow della striscia lo RITAGLIA — il difetto
+  gia' pagato in basso, che stringendo ancora si ricompra in alto
+  (misurato dopo: 1,5px d'aria sopra e sotto, l'anello intero). La
+  prova NON ribatte il 4,5: lo DERIVA dall'outline e guarda tutti e
+  due i padding, quindi il giorno che l'anello cresce lo dice la CI —
+  e con lei se n'e' andata quella che inchiodava il padding alla
+  lettera, diventata rossa per un cambio legittimo.
+  L'ETICHETTA RESTA DELLA SUA FILA, il vincolo dell'altro verso: 10px
+  sopra (gli 8 piu' i 2 di coda della .cat-strip) contro 6 sotto,
+  quindi si legge come il titolo di quel che viene dopo. Chi
+  stringesse ancora l'8 la lascerebbe a meta' strada fra le due file,
+  cioe' di nessuno.
+  LO SCROLL DEL TOCCO NON SI SPOSTA DI UN PIXEL, ed e' la cosa da
+  capire prima di ritoccare qui: `scorriSottoHeader` ancora la CIMA
+  della sezione, e i due padding tolti vivono DENTRO di lei — quindi
+  l'arrivo resta 219,4 a 320 (header 164 + pillole 51 + 4), la coda
+  delle categorie resta in vista (55px: l'osservatore interseca e la
+  barra delle pillole resta spenta, verificato) e a salire di 10px e'
+  quel che si VEDE — la fila delle occasioni e, con lei, la griglia.
+  Chi volesse spostare l'ARRIVO deve toccare qualcosa FUORI dalla
+  sezione (il padding-bottom della .cat-strip), non qui dentro.
+  LE CARD SONO CRESCIUTE (ago 2026, decisione di Andrea: «un po' piu'
+  grandi, soprattutto piu' ALTE»): da 250x115 a **272x130**, coi
+  banner rigenerati dagli originali a 816x390. Le due misure sono
+  MISURATE e i numeri stanno qui perche' il prossimo che vorra'
+  crescere non li rifaccia da capo.
+  IL VINCOLO NON E' IL DISEGNO, ed e' il contrario di quel che si
+  teme: crescendo in ALTEZZA non se ne perde, se ne RECUPERA. Gli
+  originali sono 2752x1536 (rapporto 1,792) e il ritaglio ne usava
+  l'82% dell'altezza, adesso l'86% — a 250x115 il fondo della scatola
+  degli sconti era TAGLIATO, e ora si vede intero. Il limite
+  dell'originale e' il rapporto 1,792, sotto il quale si comincerebbe
+  a tagliare in LARGHEZZA: siamo a 2,092, lontani. E il file a 3x non
+  deve superare 2752 di larghezza, cioe' una card larga 917: mai.
+  IL VINCOLO E' LA FILA A 320px, e a decidere e' lo SPICCHIO della
+  seconda card — «il taglio al bordo dice che ce n'e' altre», due
+  righe piu' su, e' una promessa che si mantiene solo se resta
+  abbastanza card da vedere. Lo spicchio a 320 e' 296-W: a 272 sono
+  24px (64 a 360, 79 a 375), sopra i 20 che la .cat-strip accetta per
+  la sua quarta card, e il border-radius di 14 non se li mangia
+  tutti. A 280 scenderebbero a 16, cioe' poco piu' del raggio: una
+  scheggia, non una card. E' li' il capolinea, non nell'originale.
+  IL PREZZO E' MISURATO E DICHIARATO: dopo il tocco su una card la
+  griglia sopra la nav a 320x568 passa da 74 a 59px — e dall'ago 2026
+  risale a 68,8 con l'avvicinamento alle categorie (voce sopra). Lo
+  scroll AL REPARTO invece NON si muove (235px prima e dopo, «N
+  oggetti» a 219,4): quello e' ancorato alla riga «N oggetti», che sta
+  SOTTO questa sezione — ed e' la ragione per cui i 249px dichiarati
+  altrove non c'entrano con questo cantiere.
+  ⚠️ E I DUE NUMERI NON SI CONTANO DALLO STESSO POSTO, che e' la
+  trappola di chi rimisura: 74, 59 e 68,8 partono dalla prima CARD,
+  mentre i 249 (e i 235 qui accanto) partono dal CONTENITORE #grid,
+  che ha 14px di padding sopra. Uno scarto di 14 fra due misure «della
+  griglia» non e' una regressione: e' la convenzione cambiata sotto i
+  piedi.
+  LA FASCIA DEL CONTRASTO MIGLIORA invece di peggiorare (11,8 / 12,0 /
+  14,8 contro 10,7 / 11,9 / 12,9): e' in px CSS mentre il disegno si
+  scala, quindi in proporzione copre meno immagine e resta dov'e'
+  scura. Per la stessa ragione il capolinea del P2P si allontana —
+  vedi la voce sua.
+  E IL CONTO DELL'ONDA MIGLIORA: serve W/H < (scale-1)/sin(θ) = 3,58,
+  e il rapporto scende da 2,17 a 2,09. Crescere in altezza mette il
+  fondo piu' al sicuro, non meno.
+  ⚠️ **E LA PROVA LEGGE LA MISURA DAL CSS**, invece di ribatterla: e'
+  la stessa regola che la fascia dichiarava gia' per se' («la
+  geometria viene dal CSS e non da qui»), portata anche alla misura
+  dei FILE. Erano tre numeri sparsi — 750, 345 e il 115 dentro la
+  fascia — e il giorno della card piu' grande andavano mossi tutti e
+  tre a mano; scritti nella prova, chi ritocca il CSS senza
+  rigenerare i banner non lo sente da NESSUNA parte e object-fit:cover
+  gli ritaglia il disegno in silenzio. Adesso `CARD_W, CARD_H`
+  escono da una regex sul CSS, la fascia larga si deriva
+  dall'altezza (erano `30, 315` in coordinate immagine, che con la
+  misura di ieri e' esattamente quel che la derivazione ridà: e' la
+  STESSA fascia, scritta in modo che non invecchi), e due sentinelle
+  vietano il ritorno a mano.
+  ⚠️ SCRIVERLE E' COSTATO DUE VOLTE LA STESSA TRAPPOLA, ed e' la
+  lezione da tenere: la prova che cerca una stringa LA CONTIENE LEI
+  STESSA, quindi resta rossa per sempre. La cura e' in due pezzi —
+  si guarda la REGIONE della fascia e non tutto il file, e si prende
+  l'ULTIMA occorrenza dell'ancora, perche' la prima e' la riga che la
+  cerca.
+  GLI ORIGINALI NON SONO NEL REPO (stanno nei Download di Andrea) e
+  si RITROVANO cosi', che e' l'unico modo onesto: si rigenera il
+  ritaglio dal candidato e lo si confronta pixel per pixel col file
+  in repo — la differenza media dev'essere ~1,5 su 255, cioe' la sola
+  compressione WebP. Un candidato sbagliato dà 36. Per questo NON
+  esiste uno script committato del ritaglio: non potrebbe girare per
+  nessuno, e sarebbe una promessa che non si mantiene.
   LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
@@ -1967,27 +2077,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scavalca la sua coda in basso a sinistra — a `left:14` un corpo da
   21 NON passerebbe, a `left:18` si. Chi tara questi due numeri li
   muova insieme.
-  I NUMERI, misurati sul file vero e non estrapolati: il disegno
-  regge fino a x=289 sull'immagine — non e' una stima, e' un MURO:
-  alla colonna 290 il contrasto crolla da 12,1 a 2,66 nel giro di due
-  pixel, perche' li' comincia la scia dorata. L'inchiostro VERO di
-  «P2P» finisce a 190 (misurato a schermo, non dedotto: 33px CSS di
-  margine) e la fascia sorvegliata a 282, cioe' **2px CSS**. E' la
-  fascia a decidere, non l'inchiostro — la CI guarda quella — quindi
-  il margine da leggere e' il secondo, ed e' stretto apposta: la
-  stima a un em per carattere e' 1,8 volte la larghezza vera.
-  SPOSTARE COSTA UNO A UNO: ogni px CSS a destra si mangia 3px di
-  fascia, e il filo del disegno non si muove (la banda si accorcia a
-  sinistra e si allunga a destra della stessa misura). Da `left:22`,
-  dove il margine era di 10px CSS, si e' arrivati a 30 in tre passi.
-  ⚠️ **QUESTO E' IL CAPOLINEA**, e va detto perche' la CI da sola non
-  lo direbbe: a 31 resta 1,3px CSS, a 32 tre decimi, e a 33 la prova
-  passa ancora ma SOLO PER UN INCIDENTE — la fascia si campiona a
-  passo 3 e a quel valore la griglia salta esattamente la colonna 290.
-  Dal 34 in giu' e' rossa. Chi vuole spostarlo ancora ridisegni il
-  banner o accorci il campionamento: muovere il numero e basta
-  vorrebbe dire appoggiarsi a un buco della griglia.
-  IL FILE E' `assets/scoprire/p2p.webp`, 750x345 come le sorelle, e
+  I NUMERI, misurati sul file vero e non estrapolati (RIFATTI ad ago
+  2026 con la card a 272x130: il file e' piu' largo, quindi la scia si
+  e' spostata e i numeri di prima non valevano piu'): il disegno regge
+  fino a x=318 sull'immagine da 816 — non e' una stima, e' un MURO:
+  li' comincia la scia dorata e il contrasto crolla nel giro di due
+  pixel. La fascia sorvegliata finisce a 282, cioe' **12px CSS** di
+  margine. E' la fascia a decidere, non l'inchiostro — la CI guarda
+  quella — e la stima a un em per carattere e' 1,8 volte la larghezza
+  vera. SPOSTARE COSTA UNO A UNO: ogni px CSS a destra si mangia 3px
+  di fascia, e il filo del disegno non si muove.
+  ⚠️ **IL CAPOLINEA ADESSO E' `left:42`** (era 33 a 250x115), e va
+  detto perche' la CI da sola non lo direbbe: fino a 42 la prova e'
+  verde, dal 43 e' rossa. IL MARGINE SI E' ALLARGATO DA SOLO col
+  crescere della card — da 3px CSS a 12 — perche' la fascia e' in px
+  CSS mentre la scia si scala col disegno: quel debito si allenta
+  ogni volta che le card crescono, e si STRINGE se un giorno
+  rimpicciolissero. Chi sposta ancora il titolo rimisuri invece di
+  fidarsi di questo numero, che e' il secondo che scriviamo qui.
+  IL FILE E' `assets/scoprire/p2p.webp`, 816x390 come le sorelle, e
   arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
   (ImageOps.fit LANCZOS q92 method=6).
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
@@ -6600,6 +6708,92 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   elenco spente col perché, la molla dei distintivi in grigio) e riga
   `.titolo-riga` sotto il nome in Profilo, testata negozio e riquadro
   venditore del dettaglio. Mai in card: la riga meta è già satura.
+  DA CHE LATO VENGONO GLI XP (ago 2026): chi legge «76 XP» nel Profilo
+  non sa che sono pochi perché ha comprato invece di vendere, e il
+  numero da solo non lo dice. IL DATO C'ERA GIÀ e non è servita nessuna
+  colonna: il registro scrive il riferimento come `ordine:{id}:{ruolo}`
+  — il ruolo ci sta dentro perché senza le due parti dello stesso
+  affare si pesterebbero sulla UNIQUE — e `XP_COMMERCIO` è un tipo
+  SOLO, quindi ogni riga porta il suo lato addosso e i due lati sommano
+  al totale PER COSTRUZIONE.
+  NON UNA RIGA NUOVA, LA HINT CHE C'ERA (decisione di Andrea), in TRE
+  casi: chi ha tutti e due i lati legge la scomposizione con le due
+  cifre più la nota sul peso; chi ha SOLO acquisti il perché senza le
+  cifre — «i tuoi vengono tutti dagli acquisti» —, che scriverle
+  sarebbe la stessa cifra due volte; chi ha SOLO vendite la frase di
+  sempre, senza la nota sul peso, che a chi vende non aggiunge niente.
+  LE TRE RIGHE DA NON AMMORBIDIRE. 1) LO ZERO NON SI SCRIVE MAI: «0
+  dalle vendite» è la stessa cifra detta due volte a chi ha comprato, e
+  un rimprovero per niente a chi ha venduto. 2) I NUMERI LI DÀ IL
+  SERVER (`xp_ruoli` in `/api/me`): scomporli nel client vorrebbe dire
+  una seconda definizione di «commercio» accanto a `XP_COMMERCIO`, e le
+  due divergerebbero al primo tipo nuovo. 3) LA SCOMPOSIZIONE ESCE SOLO
+  SE I DUE LATI FANNO IL TOTALE, ed è l'UNICA guardia: se un domani il
+  perimetro si allargasse a un tipo che il ruolo nel riferimento non ce
+  l'ha, quelle righe non entrerebbero in NESSUNO dei due lati e la
+  somma cadrebbe da sé — e lo stesso vale se la cache di `utenti.xp` si
+  sporcasse. **Un numero che non torna si legge come un difetto**,
+  quindi si tace e si ricade sulla frase generica, che è vera comunque.
+  IL RIPIEGO ATTERRA SU UNA FRASE GIÀ GIUSTA, ed è la proprietà che fa
+  risparmiare un ramo: «solo vendite» e «non lo so» dicono la STESSA
+  cosa, quindi il caso in cui si tace è anche quello del venditore, che
+  è il più probabile.
+  I GIUDICI SONO DUE E PURI, accanto al perimetro del registro:
+  `ruolo_xp(riferimento)` — il vocabolario è `XP_RUOLO` e non un elenco
+  nuovo, e un ruolo sconosciuto torna '' invece di prendere un lato a
+  caso, che è il solo modo in cui la scomposizione potrebbe dire il
+  FALSO — e `xp_per_ruolo(righe, totale)`, che decide. La lettura vive
+  in `/api/me` dove il database è ancora aperto (il patto dei titoli e
+  dei punti di ritiro) e passa da `sql_xp_commercio()` come la
+  classifica: il perimetro vive in un posto solo. Costa una riga per
+  affare concluso SUO, sull'indice della UNIQUE che comincia col tg_id
+  — niente a che vedere con la classifica, che guarda tutto il
+  mercatino.
+  IL FORMATO NON SI UNIFICA IN UN POSTO SOLO, ed è dichiarato: a
+  scriverlo sono il gancio di `_sblocca_sats` e le due passate una
+  tantum (`recupera_xp_ordini.py`, `marca_prove.py`), cioè quattro siti
+  di cui due fuori dal server — per una garanzia che il fail-safe della
+  somma dà già. A tenerli in pari c'è la prova che estrae la f-string
+  DAL GANCIO e la dà in pasto al parser: una sentinella direbbe che il
+  parser esiste, mai che combaci con l'altra metà.
+  LA PROSA VIVE NEL CLIENT (`fraseXp`), che è l'unico posto che la
+  mostra, e TESTA E CODA SI SCRIVONO UNA VOLTA SOLA — a cambiare è il
+  mezzo, o sarebbero tre prose da tenere in pari e il primo ritocco ne
+  dimenticherebbe una. La coda «è lo stesso numero che pesa in
+  classifica» resta in TUTTI E TRE i casi (scelta mia, da confermare):
+  quel fatto è vero per chiunque, e farlo sparire nei due casi nuovi
+  sarebbe arbitrario.
+  E LA RIGA DI SOTTO DICEVA TRE COSE STORTE INSIEME (ago 2026, dal
+  campo): «Al prossimo grado (Bottega avviata) mancano **0 XP e 1
+  affari conclusi**». 1) LO ZERO SI SCRIVEVA — la stessa regola che la
+  riga qui sopra rispetta due centimetri più in su, e il difetto è
+  quello già pagato dal rifiuto del banner, che «nominava il solo
+  affare concluso» e mandava a cercare dalla parte sbagliata: chi ha
+  gli XP e non gli affari si sentiva chiedere una cosa che aveva già.
+  2) NIENTE SINGOLARE, e quella distinzione il server la fa già in
+  `msg_banner_chiuso`. 3) IL VERBO restava plurale davanti a un pezzo
+  solo.
+  IL GIUDICE È UNO, `fraseManca(liv, xp, affari)`, e le tre regole
+  stanno tutte lì: la cifra entra SOLO dentro un `if` (è così che lo
+  zero non può arrivare nella frase — non c'è un ramo che lo tolga
+  dopo), il singolare guarda il numero, e IL VERBO GUARDA QUANTI PEZZI
+  RESTANO E NON I NUMERI: due soggetti uniti da «e» vogliono il
+  plurale anche quando sono «1 XP e 1 affare» — c'è la prova, ed è la
+  riga che una cura frettolosa sbaglia.
+  IL RAMO A MANI VUOTE È UNA CINTURA E NON UN CASO: dai numeri del
+  server non ci si arriva — `livello_utente` tiene il gradino più alto
+  che soddisfa ENTRAMBE le soglie, quindi al prossimo ne manca sempre
+  almeno una — ma una frase rotta è peggio di una riga in più, e il
+  giudice si prova anche lì.
+  ⚠️ E VA DOPO `fraseXp`, NON PRIMA, ed è la lezione del giro:
+  `pezzo_js` ritaglia dalla firma alla prima chiusura a colonna zero,
+  quindi un giudice infilato in mezzo si mangia la fetta del vicino —
+  `fraseXp` restava fuori dal banco node e la prova diceva «is not
+  defined». **L'ordine fra due dichiarazioni di funzione non conta per
+  il browser: conta per chi le ritaglia.** Stessa ragione per cui il
+  banco estrae `esc` VERO dal client invece di darsene uno di cartone:
+  quello proverebbe sé stesso, e la mutazione che lascia il nome del
+  gradino nudo passerebbe liscia (l'ha chiesta la tortura).
   Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
   pubblico i voti escono senza nomi, di proposito — mostrare chi ha
   comprato rivelerebbe gli acquisti altrui —, ma senza un secondo
@@ -8519,7 +8713,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ridondante — a dirlo resta la parentesi della riga.
   Via la riga «se accetta pagheresti…», che
   diceva un totale SENZA la spedizione — cioe' una cosa incompleta —
-  al suo posto la riga «Offri X al pezzo × 3 = Y». Via «Annulla», al
+  al suo posto la riga viva (che nello stesso mese ha cambiato forma
+  due volte: prima il totale davanti, poi il totale in superficie —
+  vedi le due voci qui sotto). Via «Annulla», al
   suo posto la ✕ in alto a destra (`.pacco-x`, il ✕ di casa: un secondo
   nome per la stessa forma sarebbe peggio del nome che invecchia), che
   chiude con `navIndietro()` e mai `closeSheet()`.
@@ -8578,6 +8774,190 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sospetto successivo è la `max-height` che cambia durante
   l'animazione: il foglio è ancorato in basso, quindi accorciandosi
   muove il bordo alto — e si vede solo sul telefono.
+  IL TOTALE IN SUPERFICIE (ago 2026, decisione di Andrea che EMENDA
+  «LA CIFRA RESTA L'UNITARIO» qui sopra — e la emenda per METÀ, che è
+  la riga da leggere due volte): **la superficie parla il totale, la
+  sostanza resta unitaria**. Coi pezzi >1 il campo, le pillole, il
+  minimo detto e il campo legale del rilancio dicono quanto si paga IN
+  TUTTO; la divisione ÷ pezzi avviene UNA volta all'invio, e da lì in
+  giù non cambia niente — colonne, guardie, notifiche, ordine e
+  vetrina restano quelli di ieri. È il pattern del toggle valuta: il
+  campo è una VISTA, il listino è la sostanza. Le tre ragioni per cui
+  l'unitario resta la sostanza non sono state smentite da niente:
+  restano scritte sopra, e valgono ancora.
+  IL PERCHÉ È L'UNITÀ UNICA: sul carrello la cifra è per forza un
+  totale (là non esiste un unitario), e con l'offerta singola che
+  parlava al pezzo la stessa app avrebbe chiesto due unità diverse
+  nella stessa schermata. Il «al pezzo» sotto il campo — la toppa che
+  quel rischio lo dichiarava invece di toglierlo — è morto con la sua
+  regola CSS, e le sentinelle di ieri hanno CAMBIATO LATO col perché.
+  IL FLOOR NON BUCA IL MINIMO, ed è ciò che rende la conversione
+  sicura: `floor(tot/q) ≥ min ⇔ tot ≥ min×q`, quindi il minimo si
+  GIUDICA sull'unitario derivato — la stessa cifra che il server
+  confronta — e si DICE in totale. Sull'euro si divide in CENTESIMI
+  INTERI (`Math.floor(Math.round(tot*100)/q)/100`), o la polvere dei
+  float farebbe uscire un centesimo in più.
+  E LA RIGA VIVA MOSTRA IL RICOMPOSTO, mai il numero digitato: si
+  ripassa dall'unitario e si rimoltiplica, così chi legge non vede mai
+  una cifra che moltiplicando non torna. `suffissoUnita` ha perso il
+  secondo argomento: dice la valuta, e basta.
+
+  L'OFFERTA SUL CARRELLO 🛒 (ago 2026, decisione di Andrea): UNA cifra
+  per tutto il carrello — più articoli dello stesso venditore — e sopra
+  la trattativa di sempre, che sui totali vale identica: il ping-pong è
+  AGNOSTICO (importo, contro, giri e scadenza sono numeri, non prezzi).
+  Il bottone «Fai un'offerta» in fondo alla cassa del set portava a un
+  coming soon; adesso apre il suo foglio.
+  LA TESTATA È UN'OFFERTA CON `annuncio_id=0` — il pattern della
+  testata degli ordini — con le figlie in `offerte_righe` fotografate
+  alla proposta (titolo e unitario per display e notifiche; alla
+  risposta e al pagamento si giudica SEMPRE sul listino CORRENTE, mai
+  su quelle copie). **`quantita=0` in testata**, o `cifraPezzi` nel
+  client moltiplicherebbe una cifra che è già un totale.
+  L'ATTERRAGGIO È UNA VOCE DI TESTATA E MAI UNA SPALMATURA:
+  `ordini.accordo_sats`, col patto di `sconto_sats` parola per parola
+  — **è una colonna TESTIMONE, non un motore**. A comandare è
+  `prezzo_sats`, che nasce già scontato: chi leggesse `accordo_sats`
+  per RIALZARE un'uscita farebbe uscire dall'escrow DI ALTRI ORDINI la
+  differenza, e la cintura di `paga_venditore` non lo vedrebbe (per lei
+  dovuto e bolt11 combacerebbero). C'è la sentinella sulle tre strade
+  d'uscita. Le righe dell'ordine restano LORDE, quindi la divisione a
+  ritroso dell'unitario non si tocca — ed è anche il motivo per cui
+  l'offerta di carrello è solo-SET per costruzione: con una riga sola
+  la cassa devia sul mono, dove l'offerta singola c'è già.
+  AL PAGAMENTO `accordo = max(0, Σlordo_corrente − pattuito)`, ed è la
+  protezione del compratore: una lampo o un listino calato non fanno
+  mai pagare più del corrente — chi paga paga sempre il meglio dei due.
+  GLI SCONTI SI SPENGONO (il carrello del negozio e il codice, che nel
+  body prende un 400 esplicito): il totale pattuito È il prezzo degli
+  articoli, deciso a mano guardando QUESTO carrello, e nessuna promessa
+  generale lo ritocca. LA SPEDIZIONE GRATIS INVECE RESTA e misura il
+  PATTUITO — quel che si paga davvero per la merce — e protezione e
+  commissione seguono, che si calcolano sul netto.
+  LE DECADENZE, che erano la domanda esplicita di Andrea: un pezzo
+  ESAURITO fa decadere l'offerta, pendente o accettata (la composizione
+  non è più onorabile); lo stock sceso SOTTO la quantità no — accettare
+  non riserva, e al pagamento c'è il 400 onesto col nome del pezzo, che
+  se il venditore rifornisce entro la scadenza si paga; il PREZZO
+  cambiato fa decadere le sole pendenti, che l'accordo stretto è
+  assoluto; le FERIE trattengono la partenza del venditore
+  (`_impegni_aperti`); l'annuncio rimosso o in revisione lo prende
+  l'orologio entro dieci minuti.
+  L'ESCLUSIONE È RECIPROCA, nei due versi e col nome del pezzo: due
+  trattative sullo stesso oggetto potrebbero produrre DUE accordi, e al
+  pagamento uno sconto doppio.
+  LA TRAPPOLA DEL CANTIERE ERANO I JOIN: la testata ha `annuncio_id=0`,
+  quindi ogni INNER JOIN su `annunci` la fa sparire IN SILENZIO — e
+  sparire vuol dire un 404 muto dove si risponde, un venditore che
+  chiude le ferie con un accordo vivo, una lista in cui la trattativa
+  più grossa non c'è. Sono diventati LEFT in quattro punti, e il
+  censimento in `prove.py` li ancora alla query DI QUELLA FUNZIONE:
+  le fette di `pezzo()` qui sono larghe (quella di `rispondi_offerta`
+  arriva a 19.000 caratteri e si porta dentro le vicine), quindi
+  cercare «LEFT JOIN annunci» nudo era una sentinella che non poteva
+  fallire — l'ha detto la tortura. `scadenze_offerte` invece NON
+  diventa un LEFT: ha una query SUA, perché la condizione di morte è
+  un'altra («esiste una figlia il cui annuncio non è più attivo») e
+  l'EXISTS negato copre anche l'annuncio CANCELLATO, che un `a.stato`
+  non vedrebbe.
+  ⚠️ `offerte_righe` NON HA UNA COLONNA `id`, ed è la lezione più cara
+  del cantiere: due bug della stessa famiglia in due giorni — la ronda
+  che chiedeva `r.id` (sul database vero esplodeva, e avrebbe mandato
+  il 🧊 quotidiano) e `_accordo_carrello` che faceva `ORDER BY id` (il
+  pagamento sarebbe esploso). **Tutte e due le volte le prove erano
+  verdi**, perché i cartoni davano alla tabella un id che il DDL non
+  ha; a prenderli sono stati il collaudo eseguibile e una segnalazione
+  dalla sessione accanto. Adesso c'è il censimento che estrae le
+  colonne dal DDL VERO invece di elencarle, e le figlie si leggono per
+  `rowid` — che è anche l'ordine della proposta.
+  IL FOGLIO SI LEGGE NELLE DUE VALUTE (ago 2026, chiesto da Andrea, e
+  questa voce ROVESCIA quella di ieri — «il foglio non ha il toggle,
+  deviazione dichiarata dal piano»). IL PERCHÉ DI ALLORA VA TENUTO
+  PERCHÉ ERA VERO: la valuta di un'offerta di carrello è UNA sola
+  ('eur' solo se tutte le righe sono a listino EUR, il principio del
+  `totale_eur` del set) e non cambia col foglio aperto — quindi non
+  esisteva NESSUNA conversione da ancorare. Il perché che lo supera è
+  che «una valuta sola» riguarda la SOSTANZA e non la LETTURA: la
+  cifra che parte resta quella dell'offerta, ma il campo si può
+  leggere e scrivere nell'altra, esattamente come nel gemello singolo.
+  Senza, i due fogli tornavano a divergere — «e allora perché lì posso
+  scrivere in sats e qui no?» — che è il difetto che il giro del
+  totale in superficie era nato per togliere.
+  E LA VALUTA È FORZATA DAL SERVER, non dal client: `fai_offerta_
+  carrello` la DEDUCE dalle righe e nel body non c'è nessun campo
+  valuta — quindi il toggle non poteva e non può cambiare in cosa si
+  manda, e il server non cambia di una riga.
+  LA STRADA SCARTATA, e va tenuta perché è quella che torna in mente:
+  far ESISTERE l'accordo in sats su un carrello tutto-EUR
+  (`offerte.valuta='sats'`). Sposterebbe una garanzia — oggi quel
+  carrello non ha bisogno del cambio per esistere, perché al pagamento
+  il pattuito si converte con `cambio_ordine` e il 503 l'ha già dato
+  `serve_cambio_duro` — mentre con un pattuito FISSO in sats e i lordi
+  che si ricalcolano dal cambio a ogni tick, `max(0, Σlordo −
+  pattuito)` ballerebbe: **la stessa stretta di mano varrebbe uno
+  sconto diverso ogni mattina**. È l'asimmetria già scelta per le
+  soglie del negozio, vista dal rovescio.
+  L'ANCORA È RICALCATA E NON RIFATTA (la condizione di Andrea): i
+  ferri puri del gemello — `offConverti`, `offTestoCampo`,
+  `offCifraTesto`, `suffissoUnita` — si riusano TALI E QUALI, così
+  l'aritmetica della conversione vive in un posto solo per tutti e due
+  i fogli; a restare in proprio è il solo STATO, che vive DENTRO
+  `offCarr` (`cifra`, `cifraValuta`, `campoValuta`), perché due fogli
+  che scrivono nelle stesse variabili sono due fogli che un giorno si
+  pestano. L'unica funzione «nuova» che tocca l'aritmetica è
+  `offCarrCifraIn`, che è UNA riga e passa da `offConverti`.
+  LE TRE REGOLE DEL GEMELLO, ricalcate una per una: l'ancora la
+  scrivono l'ONINPUT (nella valuta del campo, che è la lingua in cui
+  si sta scrivendo) e la PILLOLA (in quella dell'OFFERTA, così il
+  −10% è esattamente −10% al sat qualunque cosa il campo mostri), e
+  il RENDER non la tocca MAI; il campo si riscrive solo quando la
+  valuta cambia DAVVERO (`campoValuta`), o normalizzerebbe sotto le
+  dita quel che si sta ancora scrivendo; e il MINIMO si giudica nella
+  valuta dell'offerta — la stessa cifra che giudicherà il server — e
+  si DICE in quella del campo, per ECCESSO.
+  E L'ALTRA FACCIA SI VEDE MENTRE SI SCRIVE (la seconda domanda di
+  Andrea): in coda alla riga viva la stessa cifra nell'altra valuta,
+  col ≈ SOLO quando è quella convertita — da cui discende che il ≈ non
+  compare mai due volte nella stessa riga, e che **la cifra senza ≈ è
+  sempre quella che parte**. È il pezzo che il gemello singolo NON fa,
+  e lì per una ragione sua: la sua riga ECHEGGIA il campo invece di
+  riconvertire la cifra del listino («50.000 sats» riletti fanno
+  50.008, e un campo che dice 50.000 con sotto un «≈ 50 008» si legge
+  come un guasto). Qui il caso non si presenta, perché la coda dice
+  l'ALTRA faccia dell'ANCORA e non una riconversione.
+  SENZA CAMBIO non si scrive niente: la coda sparisce e il toggle non
+  si offre — la valuta del campo resta quella dell'offerta, che è
+  sempre esatta. È la riga di `valutaOfferta`, ricalcata.
+  IL TOGGLE NON È «DEL FOGLIO»: è quello GLOBALE dell'app (`setValuta`,
+  `data-cur`, la preferenza in localStorage), quindi il cantiere ha
+  aggiunto una SUPERFICIE a un comando che c'era già — le superfici
+  salgono a NOVE e il censimento in `prove.py` viene a chiamare, che è
+  il suo mestiere. Col secondo censimento è arrivato un guadagno non
+  cercato: questo foglio l'unità se la SCRIVEVA A MANO
+  (`'eur' ? '€' : 'sats'`), cioè nella forma che una prova accanto già
+  vietava, e passando al giudice le superfici del suffisso salgono a
+  QUATTRO.
+  LA CASSA IN MODALITÀ ACCORDO: `acqDati.accordoId` **sta nella
+  firma** (`'acc'+id+'|'+firmaSet()`), o la cache servirebbe un conto
+  senza accordo; il cassetto del codice non nasce, il bottone
+  dell'offerta nemmeno (la trattativa è chiusa), il «torna al
+  carrello» sparisce — lì aggiungere sarebbe un invito a rompere
+  l'accordo — e nel conto c'è la riga «🤝 Accordo», gemella di quella
+  dello sconto: a zero non compare.
+  IL COLLAUDO ESEGUIBILE è `collaudo_offerta_carrello.py` (55 verdi):
+  il giro vero proposta→contro→rilancio→accetta→paga sul server VERO
+  con LNbits finto, la bolt11 confrontata AL SAT, gli sconti spenti
+  provati GIRANDO il conto nei DUE mondi (lo stesso carrello sconta
+  senza accordo e non sconta con — la forma non lo saprebbe dire), le
+  decadenze una per una, la fusione senza figlie orfane e la ronda che
+  TACE. Il body porta quantità STORTE apposta: coi numeri giusti le due
+  strade darebbero lo stesso conto e la prova non proverebbe che a
+  comandare sono le figlie — anche questo l'ha chiesto la tortura.
+  RESTA FUORI, dichiarato: la ripresa del pentito del set (non esiste,
+  non si inventa), il ⚡ NWC che resta del solo mono, l'offerta di
+  carrello per gli anonimi e in DEMO, e la contro-proposta per RIGA
+  («ti accetto questi due ma non quello») — chi vuole trattare per
+  pezzo rifiuta e aspetta le offerte singole, e si rivede a rodaggio.
   LESSICO (deciso lug 2026): la scheda per gli utenti si chiama
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
@@ -9219,6 +9599,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che su un'offerta a tempo è precisamente la notizia. Con DUE spunte
   insieme no, e non è una dimenticanza: lì non esiste una scadenza
   sola da guardare, e l'ordine di sempre è l'unica risposta onesta.
+  E LE OCCASIONI SONO TRE, IL CONTEGGIO LE CONTA TUTTE (ago 2026, bug
+  dal campo: «accendo Offerte a tempo, poi Sconti dei negozi, e gli
+  sconti spariscono»). `ordinaEffettivo` era rimasto alle coppie
+  (`filtroLampo && !filtroAsta`), che dello SCONTO non sapevano niente
+  — nato dopo — quindi con «⚡ + 🎁» ereditava 'lampo', e QUELL'ORDINE
+  IMPLICA IL SUO FILTRO COME VINCOLO DURO: l'unione tornava alle sole
+  lampo, in silenzio. LA QUERY ERA ED È GIUSTA — `_where_occasioni` le
+  univa in OR come deve — e le 16 combinazioni provate su di lei non
+  potevano vedere niente, perché il vincolo si aggiunge NELL'ENDPOINT,
+  dopo: una prova su un pezzo giusto non dice niente sul pezzo accanto.
+  Adesso si CONTA (`.filter(Boolean).length !== 1`) invece di
+  confrontare le coppie, e la quarta occasione di domani entra nel
+  conteggio da sola; lo SCONTO conta ma non eredita — una scadenza non
+  ce l'ha, e il keyset pagina su quella colonna. Il difetto valeva
+  identico dalle card «Da scoprire» e dal pannello Filtri, perché le
+  due porte scrivono le stesse variabili: una cura, un posto solo — e
+  `toccaScoperta` non c'entrava (accende la SUA spunta e basta, non
+  spegne la sorella). La prova non è una sentinella: un banco node fa
+  GIRARE il giudice sulle otto combinazioni delle tre spunte, che dire
+  «la riga c'è» non dice mai cosa risponde — e quella di ieri, scritta
+  a coppie, certificava proprio il difetto.
   LA SCELTA ESPLICITA VINCE SEMPRE (`ordinaEffettivo`, giudice unico
   dei tre chiamanti: il parametro al server, il campo-bottone e il
   ramo DEMO): l'eredità vale solo sul DEFAULT.
@@ -12512,9 +12913,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   strada resta comunque: la ← in testata riporta al carrello.
   I DUE SECONDARI vivono nel `.ctrl-fondo` dopo «Paga» e solo sul set
   («Chiedi info» → `ctrlChiediInfo`; «Fai un'offerta» →
-  `view-offertapresto`, che resta il «presto disponibile» non
-  costruito). Sul singolo non ci sono: l'offerta ce l'ha la scheda col
-  suo bottone in barra. Il ⚡ NWC resta del solo mono — regola che
+  `apriOffertaCarrello`, che dall'ago 2026 apre il suo foglio: qui
+  c'era `view-offertapresto`, «il presto disponibile non costruito»,
+  ed è MORTA con la sua vista — le entry vecchie della cronologia
+  degradano su Esplora, il ramo gemello di quello di Sfoglia. Vedi
+  «L'OFFERTA SUL CARRELLO»). Sul singolo non ci sono: l'offerta ce
+  l'ha la scheda col suo bottone in barra. E in modalità ACCORDO non
+  c'è nemmeno quello: la trattativa è già chiusa. Il ⚡ NWC resta del solo mono — regola che
   esisteva nel codice SENZA una sentinella, e dopo la fusione è una
   riga che si può rompere senza accorgersene.
   IL FONDO È APPICCICATO ANCHE PER IL CARRELLO, che se lo prende
@@ -15130,13 +15535,185 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   guadagna «busta fuori contratto» (flag/nome/codice si scrivono nello
   stesso UPDATE e solo sulla via punto); da NON aggiungere, e verrà in
   mente: «shipped via punto senza busta» — è lo stato NORMALE del
-  transito, e sarebbe falso anche su tutto il pregresso. Le ASTE non
-  hanno la busta per costruzione (scegli_consegna_ordine non scrive
-  mai via_punto, dichiarato in _strade_asta). Client:
+  transito, e sarebbe falso anche su tutto il pregresso.
+  ⚠️ E IL BRACCIO DEL CODICE GUARDA LA COLONNA, NON IL CONTENUTO (ago
+  2026, difetto latente trovato e chiuso): dal cantiere del documento
+  il codice SCRITTO è facoltativo — basta il QR — quindi una busta col
+  codice vuoto è NORMALE. Non suona, ma NON per la ragione che si
+  legge nella riga: `_cifra_contenuto` prefissa anche il vuoto
+  ('plain:'), quindi dopo un deposito quella colonna non è MAI ''.
+  Ciò che il braccio prende è la colonna mai SCRITTA insieme al
+  timbro, cioè una guardia caduta — e il giorno che il trasporto
+  smettesse di prefissare comincerebbe a suonare ogni giorno su un
+  caso normale, che è il modo in cui un allarme smette di essere
+  letto. IL FATTO SI INCHIODA NEI DUE POSTI IN CUI VIVE: dove il
+  valore NASCE (una prova sul deposito col solo documento: in colonna
+  il codice vuoto è 'plain:') e dove viene LETTO (una riga sana della
+  ronda, una busta col solo QR su cui TUTTI i controlli devono
+  tacere). Un allarme silenzioso per ACCIDENTE è quello che si scopre
+  rotto il giorno che serve.
+  DA NON AGGIUNGERE, e verrà in mente anche questo: «una busta
+  depositata deve avere il codice O il documento». Lo garantisce già
+  l'endpoint col suo 400, e in SQL non si direbbe onestamente: dentro
+  il cifrato non si guarda.
+  Le ASTE non hanno la busta per costruzione (scegli_consegna_ordine
+  non scrive mai via_punto, dichiarato in _strade_asta). Client:
   `pannelloBustaRitiro(o)` accanto al pannello digitale, cache
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
   senza nemmeno il bottone.
+  LA BUSTA DIRETTA (ago 2026, cantiere 45, dal campo): spedendo a un
+  locker il venditore può mettere i recapiti del COMPRATORE come
+  destinatario — il codice di ritiro glielo manda direttamente il
+  corriere, senza passare da Barattolo. Lì la riga «in attesa del
+  codice» diceva il falso e `sollecita_buste_ferme` rimproverava il
+  venditore per una busta che non sarebbe arrivata mai, fino al 🧊 su
+  un caso che non esiste. La cura è una DICHIARAZIONE del venditore,
+  mai un automatismo: la spunta nel form «📦 Spedisci» (solo via
+  punto — fuori, il flag si ignora: non ha oggetto) e — decisione di
+  Andrea — la PORTA TARDIVA nel pannello della busta
+  (`POST /api/orders/{id}/busta-diretta`): senza, chi dimentica la
+  spunta resterebbe sotto sollecito per sempre e l'unica uscita
+  sarebbe una busta finta. Il sollecito stesso NOMINA la porta
+  («dillo dall'ordine: smettiamo di chiedertelo»), ed è così che i
+  distratti la scoprono.
+  UNA COLONNA SOLA, `ordini.busta_diretta_il` (il pattern di
+  `busta_il`: il quando E il flag), e NESSUN bottone «annulla»: IL
+  DEPOSITO DELLA BUSTA LA AZZERA nello stesso unico UPDATE — la busta
+  supersede la dichiarazione, chi ha dichiarato per sbaglio deposita
+  e basta. Una scrittura sola = «depositata E dichiarata» non esiste
+  nemmeno per un istante, ed è uno dei due bracci nuovi di «busta
+  fuori contratto» nel libro mastro (l'altro è la dichiarazione fuori
+  dalla via punto: la guardia dell'endpoint e il gate di
+  `segna_spedito` la rendono impossibile — se compare, una guardia è
+  caduta). Gemello 16g in query_libro_mastro.sql, che il controllo
+  busta non l'aveva mai avuto.
+  CON LA DICHIARAZIONE: la riga d'attesa del compratore dice da dove
+  arriva il codice davvero — e la notifica di spedizione pure, ed è
+  LEI a correggere la promessa che `_coda_ricevuta` gli ha già fatto
+  al pagamento («ti avviseremo»), scritta quando la dichiarazione non
+  esiste ancora: imperfezione dichiarata. I solleciti tacciono, 🧊
+  compreso (stessa query) — E ANCHE QUELLO A COMANDO, che una query
+  SUA ce l'ha e quindi ha voluto il suo gate (vedi «E LA SECONDA FASE
+  È LA BUSTA»): «stessa query» copre gli automatici, mai il bottone.
+  `sollecita_ritiri_al_punto` resta fuori PER COSTRUZIONE senza una
+  riga (esige `busta_il>0`, e il deposito
+  azzera): il promemoria «vai a ritirare» sui dichiarati TACE,
+  dichiarato — decisione di Andrea: il corriere ha i recapiti del
+  COMPRATORE e gli manda lui codice e giacenza, mentre il nostro
+  squillo sarebbe ancorato alla spedizione e busserebbe su un pacco
+  che viaggia ancora. E il moderatore in disputa legge il fatto CON
+  LA DATA, etichettato di PARTE («è una dichiarazione di parte, non
+  un fatto verificato»): la piattaforma non può verificarla, e «MAI
+  depositate» lì direbbe il falso.
+  L'ENDPOINT: guardia di proprietà DENTRO la WHERE col 400
+  anti-oracolo dei fratelli, UPDATE CONDIZIONATO (il doppio tocco su
+  rete lenta trova rowcount 0: ok senza seconda notifica), nessuna
+  ancora mossa, e con la busta già depositata la porta è chiusa —
+  dichiarare dopo non vuol dire niente. La notifica al compratore è
+  STATICA: la sua aspettativa cambia, gli era stato promesso il
+  codice nell'ordine.
+  E IL COLLAUDO ESEGUIBILE HA PAGATO FUORI DAL SUO PERIMETRO:
+  girando la ronda sul database VERO di init_db ha trovato un
+  controllo di un altro cantiere che esplodeva su una colonna che il
+  DDL non ha — verde sui cartoni di prove.py, che quella colonna ce
+  l'avevano, ed è la classe di bug che i cartoni non possono vedere
+  (curato dal suo cantiere). Il perimetro del check «sul sano» resta
+  STRETTO al controllo della busta, apposta: un controllo altrui
+  rotto non deve tingere di rosso questo collaudo.
+  E CHI ASPETTA NON RESTA PIÙ MUTO (ago 2026, la tappa A del giro
+  sull'email del corriere — l'unica costruita: il campo dei recapiti
+  resta un quadro finché non si guarda il numero degli ordini con
+  `busta_diretta_il > 0`). Un ordine dichiarato diretto era MUTO: tre
+  gate lo zittivano — `sollecita_buste_ferme` lo esclude,
+  `sollecita_ritiri_al_punto` esige `busta_il>0`, e il bottone a
+  comando aveva lo stesso gate — quindi il primo squillo cadeva al
+  giorno 10 (da `sollecita_conferme_ferme`) mentre la giacenza al
+  punto dura ~3 giorni: quando qualcuno bussava, il pacco era già
+  tornato indietro.
+  `sollecita_codici_diretti` È UNA SORELLA E NON UN ALLARGAMENTO, ed è
+  la decisione che regge tutto il resto — il piano diceva di allargare
+  `sollecita_ritiri_al_punto` («la stessa domanda su due binari
+  complementari»), e a smentirlo è stata la lettura del codice: un
+  ordine **PASSA** da una popolazione all'altra, perché è precisamente
+  il flusso della via d'uscita (chi compra dice «non è arrivato», il
+  venditore deposita la busta, e la dichiarazione si azzera nello
+  stesso UPDATE). Coi contatori condivisi il compratore arriverebbe al
+  tetto sulla prima fase e non sentirebbe MAI il «vai a ritirare»
+  della seconda. Colonne SUE (`sollecito_diretto_il`,
+  `solleciti_diretti`) e non `solleciti_punto`, per quella ragione e
+  non per simmetria.
+  IL TESTO DICE LA RIGA CHE IL CORRIERE NON MANDA MAI, ed è ciò che le
+  permette di stare accanto alle altre due senza ripeterle: il codice
+  glielo manda lui, la giacenza pure — quel che NON gli dice nessuno è
+  «se non ti è arrivato, ecco cosa fare su Barattolo». Da lì le due
+  cose che porta: **guarda la posta, anche nello spam** (il caso vero
+  più frequente) e la via d'uscita. E NON PROMETTE UN ARRIVO CHE NON
+  SAPPIAMO: l'ancora è `spedito_il` — quando il pacco arriva al punto
+  non ce lo dice nessuno — quindi mai «ti aspetta», che è la stessa
+  riga da non ammorbidire della sorella. C'è la prova che quelle
+  parole non compaiano.
+  IL RITMO NON HA LEVE NUOVE: `PROMEMORIA_RITIRO_GIORNI` (2) fa già da
+  finestra E da passo — squilli a 2, 4 e 6 giorni dalla spedizione —
+  col tetto `PROMEMORIA_CONFERMA_MAX` (3). A un giorno il pacco può
+  essere ancora in viaggio, a tre la giacenza è già cominciata.
+  NIENTE 🧊, per la ragione già scritta sulla sorella: cadrebbe
+  intorno al giorno 6-8, cioè PRIMA di `CODA_FERMI_GIORNI`, e
+  romperebbe l'invariante «se il 🧊 è partito, la riga c'è». Il caso lo
+  raccoglie la coda dei fermi al giorno 10, dove compare col suo
+  «🔕 mai sollecitato».
+  DESTINATARI: il compratore a ogni squillo (è lui che può agire), il
+  venditore SOLO ALL'ULTIMO — prima non ha niente da fare, e un
+  rimprovero su un'attesa normale è rumore.
+  DUE GUARDIE CHE LA SORELLA NON HA, e sono quelle che si dimenticano.
+  `AND o.spedito_il>0`: là `busta_il>0` garantisce l'ancora, qui sul
+  ramo nuovo `busta_il` è 0 per definizione, e senza guardia il MAX
+  varrebbe 0 su ogni `shipped` storico — una raffica al primo giro.
+  E `AND o.busta_il=0` è una CINTURA: il deposito azzera già la
+  dichiarazione, quindi lo stato «tutti e due pieni» non lo produce
+  nessuno — ed è precisamente ciò da cui una cintura difende.
+  E IL BOTTONE A COMANDO RIENTRA, col gate `busta_diretta_il=0` che
+  diventa un RAMO. Questo ROVESCIA una riga di casa («un bottone che
+  porta a un 400 è peggio di un bottone che non c'è»), e il perché di
+  allora resta vero: là il bottone non aveva niente da dire, perché il
+  codice era andato al compratore. Adesso ha un mestiere DIVERSO —
+  non chiede al venditore di depositare un codice che non ha, gli
+  RIFERISCE il fatto che solo chi compra può sapere: a destinazione
+  non è arrivato niente. Stessi contatori `sollecito_manuale_busta_*`,
+  stessa finestra, stesso tetto — bussare a mano non sposta il 🧊 di
+  un minuto, la regola di sempre.
+  E NON LO ACCUSA MAI DI AVER SBAGLIATO L'INDIRIZZO, ed è la riga da
+  non ammorbidire per simmetria col resto della famiglia: il recapito
+  può essere giusto e il messaggio finito nello spam, o il pacco non
+  essere ancora arrivato al punto. C'è la prova che quella parola non
+  compaia.
+  NEL CLIENT IL VERBO CAMBIA COL FATTO: «📮 Non mi è arrivato il
+  codice» al posto di «🔔 Ricorda al venditore…», e da spento
+  «segnalato» invece di «ricordato». UN SOLO `onclick`, e non è un
+  vezzo: la sentinella «da spento NON c'è nessun onclick» li CONTA, e
+  due — anche se tutti e due nel ramo acceso — la renderebbero cieca
+  (ci si è inciampati alla prima stesura). E il testo che mandava in
+  un vicolo cieco — «se non ti arriva, scrivigli o apri una disputa»,
+  cioè la chat, che è precisamente quel che chi non è contattabile non
+  ha — adesso porta a quel bottone.
+  LA TORTURA HA TROVATO DUE SENTINELLE MIE CHE NON POTEVANO FALLIRE, e
+  sono le due di sempre: la chiamata nell'orologio non la guardava
+  NESSUNO (adesso si chiede la RIGA INTERA e non il nome — la lezione
+  del reaper, alla terza volta), e il verbo del bottone era legato
+  alla sola PRESENZA della stringa, quindi un `false ?` al posto di
+  `diretta ?` la lasciava verde col bottone tornato muto. Dodici
+  mutazioni, dodici uccise solo dopo averle riscritte.
+  E IL BANCO ESEGUIBILE HA PAGATO PER DUE CASI CHE NON POTEVANO
+  FALLIRE PER LA RAGIONE CHE DICEVANO: «col codice depositato la
+  cintura chiude» passava per il PRIMO gate (il deposito azzera la
+  dichiarazione), e la guardia della spedizione non mordeva perché
+  ogni ordine di prova aveva `spedito_il` valorizzato. Adesso il primo
+  rimette la dichiarazione a mano — lo stato impossibile per
+  costruzione — e il secondo ha il suo `shipped` storico a zero.
+  IMPERFEZIONE DICHIARATA: al tetto si tace e l'ordine resta
+  'shipped'. Il compratore che sparisce non lo chiude questo cantiere:
+  serve una via d'uscita del venditore da lì, che tocca il percorso
+  dei soldi ed è un cantiere suo.
   IL DOCUMENTO DI RITIRO (ago 2026, dal campo: al locker il corriere
   manda un PDF o un QR — un PIN si trascrive, un QR NO). È L'ALTRA
   STRADA PER IL CODICE e non un'aggiunta (decisione di Andrea): il
@@ -15552,6 +16129,293 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   disputa continua a mandare le parti in chat per l'indirizzo del
   VENDITORE, che noi non abbiamo — l'asimmetria si vede solo adesso,
   ed è dichiarata, non risolta.
+  L'EMAIL PER IL CORRIERE (ago 2026, tappa B della busta diretta, e la
+  QUARTA volta che lo stesso buco morde): spedendo a un locker il
+  venditore può mettere i recapiti del COMPRATORE come destinatario —
+  la busta diretta, cantiere 45 — e da lì il codice di ritiro glielo
+  manda il corriere, senza passare da noi. La metà che mancava era
+  procurarsi quel recapito senza la chat, cioè precisamente quel che
+  **chi non ha né username Telegram né npub NON HA**: è lo stesso caso
+  vero che ha fatto nascere la busta di consegna, poi l'indirizzo di
+  casa, poi la nota.
+  LA PREMESSA DA CORREGGERE PRIMA DI TUTTO, o si racconta una cosa che
+  non è: «il dato non passa da noi» e «un campo cifrato nell'ordine che
+  sparisce alla chiusura» NON SONO LA STESSA COSA — la seconda lo fa
+  passare da noi. Transita, si scrive su disco, si cifra con una chiave
+  che sta sullo STESSO server, e il nostro codice lo legge per mostrarlo
+  al venditore. La pagina «I tuoi dati» lo dichiara già di sé. Le strade
+  che davvero non lo fanno passare sono due — la CHAT (che esclude i non
+  contattabili) e NIENTE AFFATTO (il venditore mette i propri recapiti e
+  deposita la busta, che resta il ripiego). Questa è la terza: **passa,
+  ma non resta**, ed è esattamente l'indirizzo di casa — «lo
+  trasportiamo, non lo conserviamo».
+  LE CINQUE DECISIONI DI ANDREA, e sono la voce.
+  1) **UN CAMPO SOLO, L'EMAIL. Il numero di telefono non entra in
+  Barattolo per nessuna ragione**: è un vincolo PERMANENTE, e non
+  scade nemmeno se un domani un corriere volesse l'SMS. Al locker
+  serve la mail, il telefono no. Lo sorvegliano due prove che guardano
+  il CODICE (`_senza_prosa`) e non la prosa: la parola vive nella
+  docstring che dichiara il vincolo, nei testi pubblici e nel campo
+  dell'INDIRIZZO, che un telefono lo accetta da sempre.
+  2) FACOLTATIVA, mai una condizione per comprare: chi non la lascia
+  continua come oggi — il codice arriva al venditore, che lo deposita
+  nella busta.
+  3) DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
+  ⚠️ **ROVESCIATA** (ago 2026): diceva «mai alla cassa», e dall'ago
+  2026 il campo c'è anche lì — vedi «L'EMAIL SI LASCIA GIÀ ALLA
+  CASSA», in coda a questa voce. Il perché di allora resta vero ed è
+  diventato la FORMA (dietro un tocco, nessuna guardia su «Paga»); a
+  rovesciarla è un FATTO che allora non era stato considerato — il
+  punto si sceglie PRIMA di pagare e l'email DOPO, quindi un venditore
+  veloce compra l'etichetta prima che l'email esista.
+  4) Su OGNI ordine via punto, senza gate sul venditore — ed è la riga
+  da non ammorbidire: verrebbe naturale offrirla solo a chi dichiara la
+  busta diretta, ma quella dichiarazione arriva DOPO la spedizione,
+  cioè quando questo campo è già chiuso. Un gate così non chiuderebbe
+  mai e chiuderebbe il campo a tutti.
+  5) **IL MODERATORE VEDE CHE C'ERA, MAI QUALE** — il precedente
+  dell'indirizzo, alla lettera: in disputa gli arriva il FATTO con la
+  data e le correzioni, che è quel che gli serve per capire da dove
+  doveva arrivare il codice. Il valore no, da nessuna strada e in
+  nessuno stato.
+  IL MODELLO è la forma dell'indirizzo meno `_atteso` (qui non c'è
+  nessun gate da armare): `email_corriere` cifrata col trasporto dei
+  contenuti digitali, più `_il` (il PRIMO, flag E quando), `_corretta_il`,
+  `_correzioni`, `_purgata_il`. **Il nome dice il mestiere e chiude la
+  porta al telefono per costruzione**: `recapito` inviterebbe ad
+  allargarlo, `email_corriere` no — è il patto di `nome_pezzo`. E NON si
+  riusa la colonna `indirizzo`: la sentinella del libro mastro ha già
+  `indirizzo<>'' AND via_punto=1` come guasto, e il giudice dell'altra è
+  cablato su `scelta=="spedizione" and not via_punto` in tutti e tre i
+  chiamanti.
+  IL GIUDICE TORNA LA TUPLA `(blob, testo)`, il patto di
+  `_indirizzo_da_payload`, e la ragione è la stessa: **Fernet non è
+  deterministico**, quindi due cifrature della stessa email danno
+  stringhe DIVERSE e dai blob non si può dedurre se sia cambiata. Il
+  chiamante confronta il CHIARO — con l'altro confronto ogni
+  salvataggio sembrerebbe un cambio e manderebbe una notifica al
+  venditore per niente. E CIFRA LUI e non i chiamanti (una chiamata
+  sola, c'è la prova): basta che uno se ne dimentichi perché
+  un'email finisca in chiaro.
+  IL VUOTO SI ACCETTA, al contrario dell'indirizzo e per la ragione
+  OPPOSTA: là svuotare rimetterebbe `segna_spedito` in trappola, qui è
+  facoltativa e va potuta togliere (il patto della nota). Ma
+  `email_corriere_il` NON si azzera togliendola: è il PRIMO, ed è il
+  fatto che il moderatore legge in disputa.
+  E IL VENDITORE LO VIENE A SAPERE SUBITO, che e' la meta' senza la
+  quale l'email l'avremmo tenuta per niente: `notifica()` al venditore a
+  ogni cambio, con TRE testi da `_coda_email_corriere` (lasciata,
+  cambiata, tolta) e nessun quarto — il ramo senza cambio e' MUTO,
+  perche' l'UPDATE e' condizionato e riscrivere la stessa email non e'
+  un fatto.
+  IL TESTO DICE COSA FARCI, non solo che c'e': «se la metti come
+  recapito del destinatario quando compri l'etichetta, il codice puo'
+  arrivargli direttamente — e tu non devi piu' depositarlo qui». Senza
+  quella riga la scorciatoia esisterebbe e non la userebbe nessuno. E
+  NON PROMETTE CHE FUNZIONI — «puo' arrivargli» e mai «cosi' gli
+  arriva»: dipende dal corriere e da come compila l'etichetta, e noi
+  non lo verifichiamo.
+  LA SECONDA RETE E' IL CARTELLO DENTRO «SPEDISCI», e sta PRIMA del
+  bottone «Segna come spedito»: chi la notifica non la legge — bot
+  bloccato, nativo Nostr senza chiave, o semplicemente non l'ha vista —
+  la incontra comunque nel momento in cui compra l'etichetta. E' un
+  CARTELLO e non il dato (il patto gia' pagato dal punto di ritiro): il
+  valore vive nel suo riquadro, dove si tocca.
+  IMPERFEZIONE DICHIARATA, e non si chiude: chi compra l'etichetta FUORI
+  da Barattolo *prima* di aprire l'ordine, e ha le notifiche mute, la
+  vede a etichetta gia' comprata. E' la stessa popolazione che non sente
+  nemmeno «hai venduto», e la via d'uscita e' quella di sempre — il
+  compratore che dice «non mi e' arrivato il codice» e il venditore che
+  deposita la busta.
+  LE TRE COSE ERANO SCOPERTE (ago 2026, dalla domanda di Andrea «arriva
+  un messaggio dal bot, o la trova solo aprendo l'ordine?»): le prove
+  dicevano che l'avviso PARTE, mai a CHI va ne' COSA dice, e il
+  cartello non lo guardava nessuno — la sentinella che sembrava
+  coprirlo cercava «la leggi nel riquadro qui sotto», che la porta
+  anche la NOTA, quindi sarebbe restata verde col cartello dell'email
+  tolto. E' la settima volta che questo repo smaschera quella classe di
+  prova. Adesso ci sono le tre sentinelle, torturate: 8 mutazioni, 8
+  uccise.
+  IL CONTROLLO DI FORMA VIVE NEL CLIENT, la ricetta di
+  `FORME_TRACKING`: a forma storta si CHIEDE e non si impedisce — primo
+  tocco avviso, secondo tocco sullo stesso testo si passa. Un'euristica
+  nostra non deve fermare un indirizzo vero, e la forma di un'email
+  valida è molto più larga di quel che si crede. Il SERVER la forma non
+  la giudica affatto (c'è la prova che nel giudice non compaia una
+  chiocciola), e il tetto è un 400 esplicito e MAI un troncamento: una
+  mail tagliata è una mail rotta.
+  SU 'shipped' IL CAMPO SI CHIUDE, come `indica_punto_ritiro`:
+  l'etichetta è già stampata, l'email nuova non ci arriverebbe mai, e
+  lasciarla scrivere sarebbe promettere una cosa che non succede. Al suo
+  posto la riga che lo dice e che porta al bottone «📮 Non mi è arrivato
+  il codice» della tappa A, che da lì in poi è la strada vera.
+  LA SCOPA È DENTRO `pulisci_indirizzi` e non in una gemella: le due
+  velocità e il gate su `AUTO_SBLOCCO_ATTIVO` sono la parte delicata, e
+  due copie divergono al primo ritocco — due UPDATE in più con la stessa
+  forma, e le tre righe da non ammorbidire (la guardia `<>''`,
+  `aggiornato` mai toccato, i soli stati assorbenti) valgono identiche.
+  Il nome resta il suo, il patto dei nomi interni.
+  IL LIBRO MASTRO ha TRE bracci e non quattro, e il quarto che MANCA è
+  quello da ricordare: non si guarda «vuota col timbro», che
+  sull'indirizzo è un guasto e qui è lo stato NORMALE di chi l'ha
+  TOLTA — il campo è facoltativo, il vuoto è un gesto legittimo, e un
+  allarme su un caso normale è peggio di nessun allarme.
+  I TESTI PUBBLICI sono la metà del cantiere, e la riga che ROVESCIA
+  davvero è quella di «Il pagamento protetto» — «la strada che ne chiede
+  di meno è il punto di ritiro: lì un indirizzo tuo non c'è proprio» —
+  che non era sorvegliata da niente. In «I tuoi dati» le cose che
+  chiediamo passano da quattro a CINQUE (è l'unico allarme automatico
+  che scatta quando quella lista cresce, e per questo il numero si
+  scrive a parole invece di essere contato), con la voce che dice anche
+  quel che il telefono non è; più la durata accanto all'indirizzo (è
+  letteralmente la stessa scopa) e la riga in «Cosa vede un
+  moderatore». `META_TESTO_PRIVACY` perde «niente email», che sarebbe
+  diventata una mezza bugia.
+  IL RISCHIO NUOVO SI SCRIVE E NON SI NASCONDE: un'email sbagliata può
+  atterrare su UNA PERSONA VERA, e il codice di ritiro arriverebbe a uno
+  sconosciuto che può andare a ritirare il pacco. Oggi quel codice ce
+  l'ha il venditore. Non si chiude: si attenua col controllo di forma,
+  con la correzione fino alla spedizione, e col promemoria della tappa A
+  che rompe il silenzio.
+  IMPERFEZIONE DICHIARATA: al pagamento `_coda_ricevuta` promette al
+  compratore «ti avviseremo», e chi lascia l'email dopo riceve il codice
+  da un'altra parte — è la stessa asimmetria già dichiarata per la
+  busta diretta, e a correggerla è la notifica di spedizione.
+  TRE DIFETTI LI HA TROVATI IL GIRO DAL VIVO E NON LA RILETTURA, ed è
+  la parte da tenere: le sentinelle dicevano che le righe c'erano, e a
+  schermo due di quelle righe facevano il contrario di quel che
+  promettevano.
+  1) IL CURSORE ALZAVA A OGNI APERTURA DEL CAMPO: `metteFuocoEmail`
+  chiamava `setSelectionRange`, che su un `<input type="email">` NON
+  ESISTE — la specifica lo dà ai soli campi testuali — e l'
+  InvalidStateError si portava via il resto del gesto. Il commento
+  accanto prometteva «il cursore in FONDO, o chi riapre per correggere
+  scriverebbe davanti a quel che ha già scritto», e la riga che doveva
+  mantenerlo era proprio quella che alzava: la promessa era mancata nel
+  caso esatto per cui esisteva. La cura è il GIRO DI VALORE
+  (`c.value = c.value`), che non può alzare su nessun tipo, e la
+  promessa è MISURATA e non supposta — battendo un carattere su un
+  campo appena messo a fuoco: col fuoco nudo atterra all'INIZIO
+  ('Zabc@d.it'), col giro di valore in FONDO. IL TIPO NON SI TOCCA:
+  `type="email"` dà la tastiera giusta e l'autofill, e c'è la
+  sentinella che lo pretende — a cedere è il modo di spostare il
+  caret, mai il campo.
+  2) IL TESTO DELLO 'shipped' DICEVA IL FALSO A METÀ DEGLI ORDINI:
+  «l'email che hai lasciato è già sull'etichetta» dà per scontata la
+  busta DIRETTA, e senza quella dichiarazione l'email non è finita su
+  nessuna etichetta — il codice arriva al venditore come sempre.
+  Adesso si BIFORCA su `bustaDirettaIl`: sul ramo diretto il fatto, su
+  quello normale «il venditore non ha usato la tua email: il codice di
+  ritiro arriva a lui, che te lo passa qui nell'ordine», che è la
+  verità e per giunta rassicura.
+  3) E LA VIA D'USCITA NON SI RIPETE: il testo mandava «al bottone qui
+  sotto», che è la stessa cosa che la nota verde del cantiere 45 dice
+  due righe più giù — la stessa cosa detta due volte a due dita di
+  distanza, il registro già pagato col nome del corriere sotto il
+  riquadro del punto. E per giunta quel bottone nasce solo a
+  `SOLLECITO_MANUALE_BUSTA_ORE` dalla spedizione, quindi per il primo
+  giorno — cioè proprio quando uno si accorge del refuso, appena
+  legge «ho spedito» — mandava a cercare una cosa che non c'era
+  ancora. C'è la prova che quel pannello non nomini né il bottone né
+  la sua etichetta.
+  L'EMAIL SI LASCIA GIÀ ALLA CASSA (ago 2026, e questa voce ROVESCIA la
+  decisione 3 qui sopra): il punto di ritiro si sceglie PRIMA di pagare
+  e l'email si lasciava DOPO — sono la stessa decisione, «come mi arriva
+  il codice», in due momenti diversi, e in mezzo c'era una finestra: **un
+  venditore veloce compra l'etichetta prima che l'email esista**, e da lì
+  in poi non serve più a niente (il gate 'locked' la chiude alla
+  spedizione, giustamente). Il campo si AGGIUNGE in cassa, dentro il
+  cassetto del punto; l'ordine RESTA la seconda porta e il suo endpoint
+  non cambia di una riga.
+  IL PERCHÉ DI ALLORA È DIVENTATO LA FORMA, ed è la parte da tenere:
+  «un campo facoltativo non sta sulla strada dell'acquisto» resta vero,
+  e infatti in cassa vive DIETRO UN TOCCO, senza NESSUNA guardia su
+  «Paga» — una guardia lì lo renderebbe obbligatorio, che è la sola cosa
+  che questo campo non deve diventare (c'è la sentinella, su tutt'e due
+  le strade che pagano).
+  LE TRE DECISIONI DI ANDREA: dentro il cassetto del punto e non in uno
+  suo (così eredita per costruzione lo `stopPropagation` del contenitore
+  e la cascata rete → tipo → punto); senza chiave NON si salva e lo si
+  DICE, ma l'ordine nasce lo stesso; e il venditore lo sa da una riga in
+  coda a «Hai venduto», mai da una seconda notifica.
+  IL GIUDICE IMPARA A DEGRADARE, e il permesso si deve SCRIVERE:
+  `esigi_chiave=False` — l'idioma di `esigi_luogo` — spegne il solo 503
+  e torna `("", testo)`, il blob VUOTO col testo PIENO. È così che il
+  chiamante deduce «c'era un'email e non si è potuta scrivere», e la
+  riga da non ammorbidire è che **in chiaro non si scrive NIENTE
+  nemmeno degradando**: quel che cambia è chi alza, mai cosa finisce in
+  colonna. LA DIFFERENZA FRA LE DUE SUPERFICI è tutta qui — in cassa
+  l'ordine sta NASCENDO e un campo facoltativo non può impedire di
+  comprare, mentre dall'ordine il 503 non toglie niente a nessuno (la
+  merce è già pagata, si riprova più tardi). Il default tiene l'endpoint
+  severo byte per byte.
+  `mail_persa` È LA CONGIUNZIONE (`bool(mail_testo) and not mail`) e
+  serve a DUE cose sole: non toccare la colonna nella ripresa, e dirlo a
+  chi l'ha scritta. Col solo `not mail` direbbe di sì su ogni ordine
+  senza email, cioè un toast su ogni acquisto.
+  NELLA RIPRESA FA LA STRADA DELLA NOTA — fuori dal confronto `stessa` e
+  riscritta nel ramo che esce — e per la STESSA ragione: non tocca il
+  prezzo, quindi correggere un refuso non deve annullare l'ordine e
+  coniare una fattura nuova (il suo blob per giunta non è confrontabile,
+  come quello dell'indirizzo: due ragioni che portano allo stesso posto).
+  IL CONFRONTO È SUL CHIARO, e NIENTE «mail_testo and» — il vuoto è un
+  valore, e «cancello l'email e ripago» fallirebbe in silenzio. E COL
+  DEGRADO NON SI TOCCA NIENTE: scrivere il blob vuoto CANCELLEREBBE
+  un'email già in colonna, cioè il contrario di «non si è potuta
+  salvare».
+  ⚠️ LA CODA AL VENDITORE È GATED SUL TIMBRO E MAI SULLA COLONNA
+  CIFRATA: `_cifra_contenuto` prefissa anche il vuoto (`plain:`), quindi
+  su un ordine che ci è passato quella colonna non è MAI '' e la riga
+  partirebbe anche a email TOLTA. È la lezione già pagata dal braccio del
+  codice della busta nel libro mastro.
+  LA DOPPIA SCRITTURA (cassa E ordine) NON COSTA UNA RIGA, ed è la
+  domanda che Andrea ha fatto per iscritto: l'endpoint confronta il
+  CHIARO, quindi la stessa email è un no-op senza notifica e senza
+  correzione; una diversa è una correzione contata; toglierla la
+  cancella e il timbro RESTA. L'unico effetto è che `email_corriere_il`
+  diventa l'ora dell'ORDINE invece di quella in cui l'ha scritta — al
+  moderatore in disputa è più utile, non meno.
+  IL TOAST HA UN GIUDICE SOLO per i TRE varchi che POSTano a `/orders`
+  (`startBuy`, `startBuySet` e `confermaCompraSubito`): il terzo è
+  proprio quello che nessun collaudo esercita — in locale un wallet non
+  c'è — e sparso a mano l'avviso mancherebbe IN SILENZIO solo a chi paga
+  col wallet collegato. Il testo porta il RIMEDIO (si rimette
+  dall'ordine) e il fatto che intanto regge (il codice arriva al
+  venditore): non si è perso niente, si è persa la scorciatoia.
+  LE PAROLE VIVONO IN TRE GIUDICI (`invitoEmail`, `segnaposEmail`,
+  `spiegaEmail`) accanto a quelli della nota: il campo è UNO e vive in
+  due superfici, e due copie divergono al primo ritocco. La LABEL invece
+  resta diversa apposta — nell'ordine sta sotto il suo `<h4>`, in cassa
+  non c'è nessun titolo e deve dire tutto da sé.
+  ⚠️ IL CONTROLLO DI FORMA NON SI PORTA IN CASSA, ed è una decisione:
+  `formaEmail` CHIEDE, e per chiedere serve un gesto su cui appoggiarsi
+  — «ritocca Salva e lo teniamo così». In cassa l'unico bottone è
+  «Paga», e una domanda lì sarebbe una GUARDIA. Da qui `emailForzata`
+  RESTA DEL SOLO ORDINE — non è una variabile di due superfici, e un
+  «forzato» non può portarsi dietro nessun permesso di qua (c'è la
+  sentinella, che guarda il CODICE del campo e non il commento che lo
+  dichiara). IL PREZZO, dichiarato: chi sbaglia l'email in cassa non se
+  ne accorge lì — lo corregge dall'ordine, dove il controllo c'è e il
+  campo si riapre precompilato, e se il codice non arriva la rete è il
+  bottone «non mi è arrivato il codice» della tappa A.
+  IMPERFEZIONI DICHIARATE. 1) **Chi ha un punto SALVATO non vede
+  l'email a colpo d'occhio**, ed è misurato: `precompilaPunto` riempie
+  punto e tipo al primo conto, quindi le tre guardie di «Paga» non
+  scattano e il cassetto resta chiuso sulla riga compatta. Sono i
+  clienti abituali, cioè i più probabili a volerla.
+  MA È PIÙ MITE DI COSÌ, e lo dice il giro dal vivo (che è anche il
+  motivo per cui una cosa così si guarda invece di dedurla): il
+  «Cambia» della riga compatta è A UN TOCCO, e da lì il cassetto si
+  apre col campo email GIÀ PRESENTE e il punto dentro — le scelte
+  sono fatte, quindi la cascata è soddisfatta e non c'è nient'altro
+  da toccare. Quel che si perde non è la funzione: è il fatto che si
+  VEDA senza cercarla. Se in rodaggio darà fastidio, la leva è
+  l'invito visibile anche sotto la riga compatta. 2) L'email su un
+  ordine mai pagato resta cifrata finché il reaper non cancella la
+  lapide (un'ora), come l'indirizzo. 3) La popolazione di email nel
+  database CRESCE — da oggi entra al pagamento di ogni ordine via
+  punto in cui l'hanno lasciata — e la scopa è la stessa, che
+  cancella alla conferma.
   LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
   dire sull'OGGETTO — la taglia, il numero, la variante. Si scrive
   nella cassa prima di «Paga» e il venditore la legge dentro l'ordine,
@@ -16415,7 +17279,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   solo e un database solo, non ridondato; poi cosa NON si ferma con lui
   — ⚡ i sats (nodo Lightning nostro, seed offline), 🟣 gli annunci su
   Nostr, 📖 il codice, 💾 storico e reputazione col backup giornaliero
-  fuori dal server. E FINISCE LÌ, SULL'ELENCO (ago 2026, decisione di
+  (il «fuori dal server» è CADUTO dalla pagina ad ago 2026 — non era
+  mai stato vero, vedi l'emenda più sotto — e tornerà solo a drill
+  fatto). E FINISCE LÌ, SULL'ELENCO (ago 2026, decisione di
   Andrea): le due righe che chiudevano la sezione — «quello che resta
   fragile è l'infrastruttura, non i fondi… il passo dichiarato è un
   relay Nostr nostro» e la chiusa «oggi il punto di fiducia siamo noi
@@ -16438,9 +17304,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'istanza LNbits del config è OSPITATA (`*.lnbits.com`) ma la funding
   source è un nodo suo con la seed offline — per questo il testo dice
   «il gestionale che lo comanda è ospitato da terzi; il nodo e la seed
-  no», e la scorciatoia «istanza nostra» sarebbe stata falsa; e il
-  backup giornaliero fuori dal server esiste sul VPS, benché nel repo
-  non ci sia niente che lo mostri. IL CATALOGO NON È DI TUTTI ALLO
+  no», e la scorciatoia «istanza nostra» sarebbe stata falsa.
+  ⚠️ EMENDA (ago 2026): la riga che stava qui — «il backup giornaliero
+  fuori dal server esiste sul VPS» — NON ERA MAI STATA VERA, ed è
+  caduta esattamente nel modo che questa voce mette in guardia: era
+  stata ereditata come frase invece di essere verificata come fatto.
+  Il censimento sul VPS ha trovato che backup-barattolo.sh copiava db
+  e config in /root/backup — lo STESSO disco, col config IN CHIARO
+  (dentro: la nsec della piattaforma, CHIAVE_CONTENUTI_DIGITALI, le
+  chiavi LNbits). Contro il guasto che conta — l'account Hetzner
+  perso, che si porta via server, snapshot e Volume INSIEME — valeva
+  zero. LA CURA è l'uscita di sicurezza (deploy/backup-fuori.sh +
+  barattolo-backup.timer + deploy/RIPRISTINO.md, il foglio del
+  panico): ogni giorno alle 04:30 un archivio cifrato con age — db col
+  backup ATOMICO di sqlite, config, buste/, contenuti/, config di
+  sistema — parte verso un canale Telegram privato con un bot
+  DEDICATO (mai quello di Barattolo: mischiare i token lega due
+  mestieri); la metà segreta della chiave age vive su carta +
+  Bitwarden e il server produce backup che lui stesso non sa
+  riaprire; il PC di Andrea tira foto/ e gli archivi via rclone in
+  un'attività pianificata, così i due posti falliscono in modi
+  diversi. I segreti NON rigenerabili (nsec piattaforma, chiave dei
+  contenuti, accesso LNbits) escono su carta + Bitwarden a
+  prescindere: senza la chiave dei contenuti, un backup del db è
+  mezzo backup. La frase della pagina pubblica è stata accorciata a
+  «salvati ogni giorno» e riprende il «fuori dal server» SOLO dopo il
+  drill di ripristino (un backup mai aperto è una speranza, non un
+  backup — il promemoria sta in RIPRISTINO.md). IL CATALOGO NON È DI TUTTI ALLO
   STESSO MODO, ed è la riga che si sbaglia per prima — chi scrive
   guardi `annuncio_su_nostr` e non `evento_annuncio`, o si sbaglia come
   ci si è sbagliati la prima volta: chi ha una chiave PROVATA vede
@@ -19018,7 +19908,40 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `INCOLLA_QUI` restano fuori: così la regola si estende da sola a
   ogni segreto futuro che rispetti quella convenzione. Le forme
   vivono in un posto solo (`env: FORME`), o i due passi
-  divergerebbero. IMPERFEZIONE DICHIARATA nel file: `git log -p` non
+  divergerebbero.
+  E I BANCHI NON SCRIVONO LA FORMA DI UN CONFIG (ago 2026, il job
+  `segreti` rosso su un collaudo nuovo): quella regex cerca
+  `NOME = "valore"` perche' e' la forma di un FILE DI CONFIGURAZIONE, e
+  non puo' distinguere una chiave vera da una di cartone. La regola e'
+  giusta e NON si allenta — a cedere e' il banco: in `prove.py` la
+  stessa chiave vive dentro un DIZIONARIO (due punti, non uguale), ed e'
+  per questo che quel file passa da sempre; un collaudo che costruisce
+  un modulo `config` finto la posa col `setattr`. Non e' un
+  aggiramento, ed e' la riga da capire: chi un domani ci incollasse la
+  chiave VERA lo farebbe nella forma naturale, e lo scanner la
+  prenderebbe. Il precedente e' `prove_script_nel_workflow`, ed e' la
+  seconda volta che un banco nuovo inciampa in una regola della CI:
+  quando ne nasce uno, si lanciano TUTT'E DUE i passi in locale PRIMA
+  di spingere — le variabili si copiano dal workflow, che e' l'unico
+  posto dove vivono.
+  E IL `setattr` NON BASTA UNA VOLTA CHE LA RIGA E' NELLA STORIA: il
+  secondo passo guarda le righe AGGIUNTE di TUTTA la cronologia, e li'
+  quel commit resta per sempre — riscrivere la storia di `main` gia'
+  spinto non e' una cura, e' un danno peggiore. Da qui i SEGNAPOSTI
+  (`env: SEGNAPOSTI`, accanto a `FORME`): quel che non e' un segreto
+  pur avendone la forma. Erano gia' due — `INCOLLA_QUI` scritto a mano
+  in tutti e due i passi, cioe' una divergenza in attesa — e adesso
+  vivono in un posto solo, che e' la stessa regola gia' scritta per le
+  FORME.
+  ⚠️ SI ESCLUDE IL VALORE E MAI IL FILE, ed e' la riga da non
+  ammorbidire: con un'esclusione per NOME DI FILE («i collaudi non si
+  guardano») una chiave vera incollata per sbaglio in un banco
+  passerebbe liscia. Provato a mano, ed e' la prova che rende
+  l'allentamento verificabile invece che sperato: sei righe che devono
+  essere PRESE (la chiave vera nel config, la chiave vera IN UN
+  COLLAUDO, l'admin key, il webhook, la chiave Woo, il token Shopify) e
+  tre che devono passare (i due segnaposto, piu' la riga vecchia nella
+  storia). IMPERFEZIONE DICHIARATA nel file: `git log -p` non
   mostra i diff dei MERGE, quindi un segreto introdotto risolvendo un
   conflitto sfuggirebbe.
   Su Windows serve `PYTHONIOENCODING=utf-8`,
@@ -22883,9 +23806,10 @@ SMETTA di ricevere il promemoria della merce mai partita.
   LA FORMULA vive in un giudice PURO, `_classifica_utenti` — prende
   righe e ritorna la lista ordinata, niente database dentro: è quel che
   la fa girare in CI e la fa riusare allo script della tappa 0.
-    punteggio = F × (1 + PESO · C)
+    punteggio = F × (1 + PESO · C · S)
     F = (persone · media + K · M) / (persone + K)      la FIDUCIA
     C = log10(1 + xp_ordini) / log10(1 + RIF)          il COMMERCIO
+    S = persone / (persone + KD)                       lo SMORZAMENTO
   `F` È UNA MEDIA BAYESIANA e risponde alla frase che ha aperto il
   cantiere: uno con 5,0 su due recensioni non vale uno con 4,8 su
   cinquanta. Una media con pochi voti si tira verso quella del
@@ -22908,6 +23832,60 @@ SMETTA di ricevere il promemoria della merce mai partita.
   varrebbe più di trecento piccoli. Con: da 100 a 1.000 XP il bonus
   passa da +16% a +25%, da 1.000 a 10.000 arriva a +33% — raddoppiare
   il volume non raddoppia niente.
+  LO SMORZAMENTO DELLA FIDUCIA LARGA (ago 2026, `CLASSIFICA_KD`): il
+  bonus del commercio vale quanto è LARGA la fiducia che amplifica —
+  con `KD=2` chi ha un recensore solo se ne prende un terzo, chi ne ha
+  cinque cinque settimi, chi ne ha venti quasi tutto. La fiducia di uno
+  solo è un'opinione, non un curriculum.
+  SI SMORZA IL BONUS E NON LA FIDUCIA, ed è la riga da non ammorbidire:
+  la media resta la media, e chi non commercia non viene punito due
+  volte. Applicato a tutto il punteggio (o alla sola fiducia) chi ha un
+  recensore scenderebbe SOTTO la media del mercatino pur avendola presa
+  identica, che è un'altra cosa da quella che si vuole dire.
+  E `persone` E NON `voti`, per la ragione della bayesiana un gradino
+  più su: quaranta voti da un account solo devono pesare come UNO.
+  NASCE A ZERO, e a zero `persone/(persone + 0)` fa **1 esatto per
+  chiunque**: i punteggi restano IDENTICI BIT PER BIT a quelli di prima
+  dello smorzamento — verificato, il `5.260264460129354` inchiodato in
+  `prove.py` non si muove di un decimale. È voluto e non timidezza: il
+  valore si SCEGLIE guardando i numeri veri (`python
+  classifica_prova.py`, sezione 3, che affianca le tarature), che è il
+  patto con cui fu misurato K. Quindi il deploy non sposta un solo
+  punteggio, la misura passa dal GIUDICE VERO invece che da una
+  simulazione, e la scelta dopo la misura è una riga nel config del VPS
+  — zero codice.
+  E LA MISURA È STATA FATTA: **KD = 2** (ago 2026, decisione di Andrea
+  sui numeri veri del VPS) — chi ha un recensore solo si prende un
+  TERZO del bonus, «che si sente senza azzerare». LE TRE TARATURE
+  DAVANO LO STESSO ORDINE, e questo è il fatto da tenere: con quasi
+  tutte le medie a 5,00 a ordinare è già il commercio, quindi a
+  decidere non è stato l'ordine ma la SEVERITÀ — **11 persone su 16
+  hanno un recensore solo**, e con KD=3 quella severità toccherebbe
+  quasi tutti in un mercatino ancora giovane. È esattamente la domanda
+  per cui esiste la §3b, ed è anche il segnale per rivedere il numero:
+  si ritara quando quel rapporto cambia, non a calendario.
+  ⚠️ E IL VALORE VIVE NEL CONFIG DEL VPS, non nel codice: nel codice il
+  default resta 0. Chi legge `CLASSIFICA_KD = 0` in `server.py` e ne
+  conclude che lo smorzamento è spento sta guardando il posto sbagliato
+  — lo dice il pannello «⚙️ Stato delle leve», che chiede al valore
+  VIVO e non alla costante (la trappola che quella pagina esiste per
+  non far ricadere). Stessa famiglia di `MAX_PREFERITI`: una riga
+  esplicita nel config del VPS vince sempre sul default.
+  ⚠️ IL DEFAULT NON SI SCRIVE NEL COMMENTO che lo spiega:
+  `classifica_prova._leggi_giudice` risolve le leve con una `re.search`
+  sul TESTO di server.py e prende la PRIMA occorrenza, quindi un
+  `CLASSIFICA_KD = 3` dentro una frase gli ruberebbe il numero in
+  silenzio. Si dice «a zero» in prosa, e la cintura è la regex ancorata
+  all'ASSEGNAZIONE (`^[ 	]*NOME\s*=`, con `re.M`): il rischio non è
+  teorico — nel file c'è già un `CLASSIFICA_PESO_XP = 0` dentro un
+  commento, innocuo solo perché sta DOPO la sua assegnazione.
+  ⚠️ E `kd is None` E MAI `kd or CLASSIFICA_KD`: qui lo zero pesa il
+  doppio delle sorelle, perché è proprio il DEFAULT — con l'`or` un
+  `kd=0` passato a mano ricadrebbe sulla costante, e la leva spenta
+  smetterebbe di essere spegnibile dal chiamante. Più il `max(…, 0)`,
+  che non è cosmesi: un KD negativo nel config azzera il denominatore e
+  fa cadere con un 500 una pagina PUBBLICA, che non è avvolta in nessun
+  fail-open.
   E SOLO GLI XP DEGLI ORDINI (`tipo='ordine'`, gli altri sei tipi
   restano fuori): sono gli unici che costano un pagamento Lightning
   vero. Visita giornaliera, pubblicazione, profilo completo e distintivi
@@ -22926,6 +23904,38 @@ SMETTA di ricevere il promemoria della merce mai partita.
   utenti di prova, stava in mezzo), e da lì è nato il `fondo()` che
   semina utenti di sfondo. C'è la prova che tortura il limite su K = 1,
   5, 50, 500.
+  IL PAREGGIO NON LO SCIOGLIE LO SMORZAMENTO, e non poteva: quando la
+  media è uguale a quella del mercatino la fiducia vale ESATTAMENTE M
+  per qualunque `persone` (è il limite qui sopra visto dall'altro lato),
+  e senza XP d'ordine il bonus è zero — quindi lo smorzamento
+  moltiplica uno zero. È il mercatino di oggi, dove hanno tutti 5,00 e
+  parecchi hanno zero XP: lì due righe hanno gli stessi punti BIT PER
+  BIT, ed è il caso che ha aperto il cantiere (Libertoshi con un
+  recensore e Luca con due, a decidere l'id).
+  LA CHIAVE È `persone → affari → id` (decisione di Andrea): prima le
+  PERSONE, che è la stessa cosa che dice lo smorzamento un gradino più
+  su — la regola del cantiere applicata al pareggio, non una regola
+  nuova da spiegare — e senza XP è l'unica che separa.
+  E VA DETTO COSA SI STA SCEGLIENDO col secondo criterio: **LA
+  FREQUENZA BATTE IL VALORE** — due affari da 15 € vanno davanti a uno
+  da 40, che danno gli stessi XP. Non è ovvio, ed è meglio di un id, che
+  non significa niente.
+  LA MEDIA È STATA PROVATA IN QUELLA CHIAVE E TOLTA, ed è una misura e
+  non un gusto: a pari persone due medie diverse danno GIÀ punti diversi
+  (senza XP il punteggio È esattamente la fiducia), quindi in terza
+  posizione sarebbe codice morto — una guardia che promette d'essere
+  esercitata e non lo è mai, la famiglia dell'`except` irraggiungibile
+  di `_npub_venditore`. Il fatto è stato portato ad Andrea invece di
+  implementarlo in silenzio, e la decisione è cambiata di conseguenza.
+  L'ID RESTA IN CODA E NON È UN MERITO: è il determinismo — due righe
+  identiche non devono scambiarsi di posto a ogni richiesta.
+  ⚠️ E LA PROVA DEL PAREGGIO DI IERI ERA UNA TAUTOLOGIA, la sesta della
+  famiglia che questo repo ha già smascherato: chiamava tre volte lo
+  stesso giudice sugli stessi dati e restava VERDE anche togliendo
+  `r["id"]` dalla chiave, perché `sort` è stabile e i dizionari sono
+  ordinati. Al suo posto si cambia l'ORDINE D'ARRIVO DEI VOTI, che è
+  l'unica cosa che l'id deve neutralizzare — e la mutazione che toglie
+  l'id adesso la fa rossa.
   IL FRENO È IL RECENSORE REALE (scelta di Andrea): conta come PERSONA
   solo chi ha a sua volta concluso almeno un affare con QUALCUN ALTRO
   che non sia me. Va più lontano di quanto sembri — il farmer che si
@@ -22939,6 +23949,12 @@ SMETTA di ricevere il promemoria della merce mai partita.
   davvero sarebbe la transitività da un seme fidato — un web-of-trust
   vero, che è un cantiere suo — oppure la COMMISSIONE, che è il freno
   che il roadmap aspettava e che oggi è a 0.
+  ⚠️ IL FRENO ECONOMICO ASPETTA UN EVENTO, NON UN CANTIERE (ago 2026,
+  decisione di Andrea di metterlo a verbale): il giorno che si accende
+  `COMMISSIONE_PERCENTO` questa riga diventa vera DA SOLA — farmare
+  comincia a costare una percentuale su ogni ordine finto, senza che
+  nessuno tocchi la classifica. Chi rilegge fra sei mesi non deve
+  cercare qui un lavoro da fare: deve solo sapere che la leva è quella.
   GLI ALTRI TRE FRENI erano già in casa: i soli XP d'ordine, la
   bayesiana che pesa le persone, e la riga «da N persone» accanto al
   nome, che fa autodenunciare chi farma — la stessa informazione già
@@ -23033,6 +24049,15 @@ SMETTA di ricevere il promemoria della merce mai partita.
   uguale alle sue sorelle. Negli onclick viaggia SOLO il codice negozio
   passato dal filtro-alfabeto, il patto di `renderNegozio`; senza codice
   la riga non è toccabile, meglio ferma che rotta.
+  LA SESTA LEVA è `CLASSIFICA_KD` (0 = spenta), col suo `spento` nel
+  pannello — che scatta proprio sul default, ed è ciò che permette a un
+  moderatore che legge «0» di distinguere «spenta» da «tarata bassa».
+  ⚠️ Chi la aggiunge la metta ANCHE nella tupla del censimento leve di
+  `prove.py` e nello stub di `_amb_classifica`: senza la prima
+  `_ConfigFinto.__missing__` le dà 7 in tutti e due gli stati e la voce
+  esce «accesa» perfino nel censimento spento, senza il secondo l'`exec`
+  del giudice cerca una costante che lì non esiste e TUTTE le prove
+  della classifica esplodono con NameError invece di fallire.
   LEVE: `CLASSIFICA_ATTIVA` nasce SPENTA nel codice, il patto di
   `ASTA_ABILITATA` e `BANNER_NEGOZIO_ATTIVO` — non perché muova denaro,
   ma perché nessuno sa ancora quante righe escono: si accende dal config
@@ -23140,6 +24165,25 @@ tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
 condivisione sulla striscia (la card del barattolo non deve entrarci)
 e il podio dentro Telegram vero.
 
+E la riga di quanto manca al prossimo grado dice tre cose giuste (ago
+2026, dal campo: «mancano 0 XP e 1 affari conclusi» — lo zero scritto,
+nessun singolare, il verbo sempre plurale). Erano TRE difetti nella
+stessa frase, quindi si sistemano insieme: giudice unico `fraseManca`,
+zero server, zero colonne, zero leve. Vedi Architettura, in coda a «DA
+CHE LATO VENGONO GLI XP», per la regola del verbo (guarda quanti pezzi
+restano, non i numeri) e per la lezione dell'ordine fra due funzioni,
+che non conta per il browser e conta per `pezzo_js`.
+Collaudata: 6 prove nuove — il DELTA misurato sull'albero isolato
+(6481 → 6487), che il totale dipende dal ramo su cui si atterra — e
+**TREDICI MUTAZIONI, tredici uccise**, una per riga sorvegliata. Fra
+queste, quella che lascia il nome del gradino NUDO: senza il caso col
+nome cattivo sarebbe sopravvissuta, e l'ha chiesta la tortura. Più il
+giro DAL VIVO col server su un database usa-e-getta, col caso vero di
+Andrea seminato (76 XP e zero affari): «manca 1 affare concluso» letto
+a schermo, più il plurale, i due pezzi insieme e la cima della scala,
+a 320/360/375 nei due temi — zero scorrimento laterale, zero errori JS.
+IN PRODUZIONE basta il deploy: solo client.
+
 Il barattolo si condivide col suo link (ago 2026, il punto 3 del giro
 della card): fotografia e non vista viva, token casuale opt-in e
 revocabile, pagina anonima col noindex, venduti spenti e rimossi mai,
@@ -23196,6 +24240,234 @@ vecchio in cache non vede il bottone e vive come oggi. DA GUARDARE al
 primo giro: il primo promemoria vero della busta dentro Telegram, e
 che al venditore arrivi il testo del codice e non quello della
 spedizione.
+
+L'offerta sul carrello, e il totale in superficie (ago 2026, decisioni
+di Andrea): «Fai un'offerta» in fondo alla cassa del set apriva un
+coming soon, e adesso apre il suo foglio — UNA cifra per tutto il
+carrello, la trattativa di sempre sopra (contro, rilancio, accetta), e
+al pagamento la voce di TESTATA `accordo_sats` che non spalma niente
+sugli unitari. E nello stesso giro l'unità si è unificata IN
+SUPERFICIE: anche sull'offerta del singolo con più pezzi i campi dove
+si digita parlano il TOTALE, mentre la sostanza resta unitaria —
+sennò la stessa app avrebbe chiesto due unità diverse a due dita di
+distanza. Vedi Architettura, «L'OFFERTA SUL CARRELLO» e «IL TOTALE IN
+SUPERFICIE», per l'atterraggio, le decadenze una per una e la trappola
+dei JOIN.
+COLLAUDATO: 6238 prove verdi (il blocco nuovo delle sentinelle
+strutturali) più `collaudo_offerta_carrello.py` — 55 verdi, il server
+VERO su un database usa-e-getta con LNbits finto: il giro completo
+proposta→contro→rilancio→accetta→paga con la bolt11 confrontata AL
+SAT, preventivo == compra, gli sconti spenti provati GIRANDO il conto
+nei due mondi, le decadenze della tabella una per una, la fusione
+senza figlie orfane, la ronda che tace. Più **26 MUTAZIONI, 26
+uccise**, una per riga sorvegliata.
+E LA TORTURA HA FATTO IL SUO MESTIERE, che è la parte da ricordare:
+ha trovato due mutazioni MIRATE MALE (colpivano `fai_offerta` invece
+del gemello carrello: le due funzioni hanno righe identiche, e la
+prima occorrenza nel file è quella singola), una INERTE (`[] or X`
+vale X), e soprattutto **un buco vero del collaudo** — il body
+mandava le quantità GIUSTE, quindi «il client si ignora» non era
+provato da niente; adesso le manda storte apposta. Nel giro delle
+sentinelle ne ha trovate altre quattro che non potevano fallire, per
+la ragione di sempre: la fetta di `pezzo()` era così larga da
+contenere anche le funzioni vicine col loro LEFT JOIN.
+DUE BUG DELLA STESSA FAMIGLIA IN DUE GIORNI, e li ha presi solo il
+codice che GIRA: `offerte_righe` non ha una colonna `id` — la ronda le
+chiedeva `r.id` (segnalato dalla sessione accanto) e la lettura delle
+figlie faceva `ORDER BY id`. Le prove erano verdi tutte e due le
+volte, perché i cartoni davano alla tabella un id che il DDL non ha.
+IN PRODUZIONE: due migrazioni additive (`offerte_righe`,
+`ordini.accordo_sats` a 0), nessuna leva nuova, nessuna rotta di
+pagina — e un client vecchio in cache non conosce le chiavi e vive
+come oggi. DA GUARDARE al primo giro: la prima offerta di carrello
+vera dentro Telegram (che al venditore arrivi UNA notifica con
+l'elenco, mai N), e il primo accordo pagato con la bolt11 confrontata
+su LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
+
+Da che lato vengono gli XP (ago 2026): nel Profilo «76 XP» non diceva
+che sono pochi perché si è comprato invece di venduto. Il dato c'era
+già nel registro — il ruolo sta DENTRO il riferimento, e il perimetro è
+un tipo solo — quindi zero colonne, zero migrazioni, zero leve: una
+chiave in più in `/api/me` e la hint del cassetto «🎖 Livello e titolo»
+che si sdoppia in tre casi. Le tre righe da non ammorbidire — lo zero
+che non si scrive, i numeri che li dà il server, la scomposizione solo
+se i due lati fanno il totale — stanno in Architettura, «DA CHE LATO
+VENGONO GLI XP», col perché di ognuna.
+Collaudato: 23 prove nuove — fra cui LA PROVA REGINA, che estrae la
+f-string dal GANCIO e la dà in pasto al parser (una sentinella direbbe
+che il parser esiste, mai che combaci con chi scrive), e il banco node
+che fa GIRARE `fraseXp` sui suoi sei casi con undici asserzioni — più
+TREDICI MUTAZIONI, una per riga sorvegliata, tutte uccise al primo
+giro. E il giro DAL
+VIVO col server su una copia usa-e-getta: le quattro popolazioni lette
+A SCHERMO, dal registro fino al DOM (46 e 30 sui due lati, i due casi a
+un lato solo, e la riga muta che fa tacere la scomposizione), con le
+misure a 320/360/375 nei due temi — zero scorrimento laterale, la riga
+a 15px dal bordo del cassetto.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache non legge la
+chiave nuova e vede la riga di sempre.
+
+E il foglio dell'offerta sul carrello si legge nelle due valute (ago
+2026, chiesto da Andrea in due domande: «se tutti gli articoli sono in
+euro posso offrire in sats?» e «vorrei vedere la conversione mentre
+scrivo»). La risposta alla prima è che la valuta la forza il SERVER,
+che la deduce dalle righe — quindi si è aperto quel che si poteva
+aprire senza toccare il denaro: il campo si legge e si scrive
+nell'altra valuta, la cifra che parte resta quella dell'offerta. La
+seconda viene quasi in omaggio, ed è lo stesso meccanismo: la coda
+della riga viva dice l'altra faccia col ≈. Vedi Architettura, «IL
+FOGLIO SI LEGGE NELLE DUE VALUTE», per la strada scartata (l'accordo
+che ESISTE in sats su un carrello tutto-EUR, che farebbe ballare lo
+sconto col cambio) e per le tre regole del gemello ricalcate una per
+una. Zero server, zero colonne, zero leve: il cantiere è solo client.
+Collaudato: 6353 prove verdi in modalità severa sull'albero pulito (18
+nuove, più due censimenti che hanno CAMBIATO LATO col perché scritto)
+e **14 MUTAZIONI, 14 uccise** — la sola sopravvissuta al primo giro
+chiedeva DOVE la pillola pianta l'ancora, e il conteggio delle due
+scritture restava verde spostandone una: l'ha detto la tortura, non la
+rilettura. Più il banco node che FA GIRARE l'ancora sul caso che
+smaschera la deriva (66661 sats non tornano a sé passando per gli
+euro, quindi un render che riscrivesse l'ancora perderebbe un sat al
+primo toggle), e il giro DAL VIVO col server vero su un database
+usa-e-getta — **40 verifiche verdi** a 320/360/375 nei due temi: i due
+carrelli (misto e tutto-EUR), i dieci toggle che non spostano l'ancora
+di un sat, il minimo detto nella lingua del campo, e il cambio muto
+che spegne coda e toggle insieme. IN PRODUZIONE basta il deploy.
+
+L'email per il codice del locker (ago 2026, tappa B, dalla richiesta di
+un venditore vero in chat): chi compra può lasciare la sua email
+nell'ordine, così il codice del locker glielo manda direttamente il
+corriere invece del venditore. È la QUARTA volta che lo stesso buco
+morde — chi non ha né username Telegram né npub in chat non ci arriva —
+e la risposta è la terza strada: **passa, ma non resta**. Le cinque
+decisioni di Andrea (una sola email e **mai il telefono, vincolo
+permanente**; facoltativa; dentro l'ordine dopo il pagamento; su ogni
+ordine via punto senza gate sul venditore; il moderatore vede CHE c'era
+e mai QUALE) e la premessa da correggere — «cifrato nell'ordine» non
+vuol dire «non passa da noi» — stanno in Architettura, «L'EMAIL PER IL
+CORRIERE».
+Collaudata: **6580 prove verdi sull'albero ISOLATO** (HEAD più i soli
+hunk di questo cantiere: la copia di lavoro è condivisa con un'altra
+sessione, e la sua baseline era rossa per un cantiere che non è
+questo — è l'unica cosa che risponde a «questo commit, da solo, sta in
+piedi?»), con la famiglia nuova `prove_email_corriere` che fa GIRARE i
+due endpoint su un database di cartone; più
+`collaudo_email_corriere.py`, **39 verdi**, che cammina il giro intero
+col server VERO su un database usa-e-getta — l'email che in colonna
+arriva CIFRATA (`f2:`, con la chiave nel config finto: senza, il caso
+che conta non si potrebbe provare), il venditore che la legge e
+spedisce, il campo che si chiude dopo la spedizione, il moderatore che
+riceve il FATTO e non il valore, l'anti-oracolo verificato sul database
+vero, la scopa nelle due velocità, il caso normale che non cambia di un
+byte e la ronda che tace. Più la TORTURA: **21 mutazioni, 21
+uccise**, una per riga sorvegliata — il telefono che torna nel
+giudice, il tetto che tronca, l'email in chiaro, il confronto sui blob,
+il valore che esce da `/api/orders`, il moderatore che legge, le due
+corsie della scopa, i due rami del libro mastro, il campo che resta
+aperto sullo spedito, la guardia di proprietà fuori dalla WHERE, la
+lettura aperta all'admin. E il GIRO DAL VIVO via CDP a 320/360/375 nei
+due temi e dai TRE ruoli: **65 verifiche verdi e ZERO errori JS** —
+il link chiuso alto una riga, il campo aperto col tipo e l'autofill, la
+riga compatta che NON porta il valore (che in `/api/orders` non c'è) e
+lo precompila al tocco, i due rami dello spedito, il venditore che
+rivela e il moderatore che non ha nemmeno il pannello.
+QUATTRO LEZIONI DI METODO, e sono la parte che serve fra sei mesi.
+1) LA PROSA, per la quarta volta in un giro solo: tre sentinelle sono
+nate rosse per colpa di un COMMENTO — la docstring che dichiara il
+vincolo del telefono, quella della scopa che nomina `'annullato'`
+apposta per dire che non c'è, e un commento del client che nominava il
+velo d'attesa proprio per spiegare perché NON si chiama. Si stringono
+con `_senza_prosa`, o si toglie il nome dal commento.
+2) LA PROVA CHE NON PUÒ FALLIRE: «il valore non c'è nella nota» era
+verde anche con la nota VUOTA — passava per la ragione sbagliata.
+Adesso è in coppia con «la nota esiste».
+3) IL VELO D'ATTESA RESTA ALLE LETTURE: la scrittura dell'email non lo
+prende, perché le due scritture sorelle dell'ordine (`salvaNota`,
+`salvaPuntoRitiro`) non ce l'hanno, e quell'elenco vale finché resta di
+sole letture — è lui ad accorgersi del gesto che un domani muovesse
+sats.
+4) IL GIRO DAL VIVO HA TROVATO QUEL CHE LE MISURE NON DICEVANO, ed è
+la lezione più cara del cantiere: due righe facevano il CONTRARIO di
+quel che il loro commento prometteva, con tutte le sentinelle verdi —
+il cursore che alzava su `type="email"`, e il testo dello spedito che
+dava per scontata la busta diretta. La terza è di registro e si vede
+solo GUARDANDO: la via d'uscita scritta due volte a due dita di
+distanza. Stanno in Architettura, in coda alla voce.
+5) E IL BANCO CREDEVA DI ESSERE UN ALTRO: il login di collaudo vuole
+`id` e non `tg_id`, quindi il POST falliva in silenzio e la sessione
+restava quella di prima — tre righe rosse «del venditore» erano il
+COMPRATORE guardato due volte. Adesso il banco CHIEDE chi è (`myTgId`)
+e si ferma se non è chi crede, che è la stessa rete del marcatore sul
+server.
+6) IL FILTRO DEGLI HUNK SI RIFÀ AL MOMENTO DEL COMMIT: gli hunk
+dell'altra sessione sono cresciuti mentre lavoravo (quattro nuovi in
+`prove.py`), e un censimento di un'ora prima avrebbe portato via metà
+del suo lavoro.
+IN PRODUZIONE basta il deploy: cinque colonne additive che nascono
+vuote, nessuna leva nuova, nessuna migrazione di dati, nessuno stato
+nuovo — e un client rimasto in cache non conosce il campo e si comporta
+come oggi. ⚠️ Sul VPS `CHIAVE_CONTENUTI_DIGITALI` deve esserci, o il
+giudice risponde **503** e l'email non si salva dicendolo: qui il 503
+non blocca l'acquisto (l'ordine esiste già), ma un recapito in chiaro
+non si scrive — a differenza del PIN della busta, che è una
+degradazione accettabile e dichiarata.
+DA GUARDARE al primo giro: la prima email vera lasciata dentro Telegram
+— che il venditore la trovi nel suo riquadro al momento di comprare
+l'etichetta — e, al primo affare confermato, che sparisca con
+l'indirizzo entro dieci minuti (la riga 🏠 nel journal li conta
+insieme).
+
+L'email si lascia già alla cassa (ago 2026, il giro dopo, e ROVESCIA la
+decisione 3 del cantiere qui sopra): il punto di ritiro si sceglie PRIMA
+di pagare e l'email si lasciava DOPO — la stessa decisione in due
+momenti, con in mezzo la finestra in cui **un venditore veloce compra
+l'etichetta prima che l'email esista**. Il campo si AGGIUNGE in cassa,
+dentro il cassetto del punto; l'ordine resta la seconda porta e il suo
+endpoint non cambia di una riga. Le tre decisioni di Andrea (nel
+cassetto del punto e non in uno suo, senza chiave non si salva e lo si
+dice ma l'ordine nasce, il venditore lo sa da una riga in coda a «Hai
+venduto») e le righe da non ammorbidire — il permesso di degradare che
+si deve SCRIVERE, `mail_persa` che è una congiunzione, il gate della
+coda sul TIMBRO e mai sulla colonna cifrata — stanno in Architettura,
+«L'EMAIL SI LASCIA GIÀ ALLA CASSA».
+Collaudata: **+48 prove** in modalità severa (6589 → 6637 contro HEAD
+del giorno, che era verde; è il DELTA il numero difendibile, che la
+cartella è condivisa con altre sessioni) più
+`collaudo_email_corriere.py` a **67 verdi** (era 39: il giro dalla cassa
+end-to-end con la colonna cifrata `f2:`, la riga in coda a «Hai
+venduto», la doppia scrittura nei suoi tre casi, la ripresa che non
+riconia, il degrado che fa nascere l'ordine e la ronda che tace), e
+**20 MUTAZIONI, 20 uccise**, una per riga sorvegliata.
+E IL GIRO DAL VIVO via CDP a 320/360/375 nei due temi, col server
+vero su un database usa-e-getta: **49 verifiche verdi e ZERO errori
+JS** — la cascata rete → tipo → dove → email nell'ordine giusto (il
+campo non c'è finché le scelte mancano), il venditore senza reti che
+lo vede subito, le altre vie che non lo offrono, l'email scritta che
+arriva CIFRATA `f2:` in colonna col suo timbro, il venditore che la
+legge e il moderatore che no, la RIPRESA che non conia un ordine
+nuovo e aggiorna il valore senza muovere il timbro, e la correzione
+dall'ordine che conta 1. È lì che l'imperfezione 1 si è rivelata più
+mite del previsto (vedi la voce).
+⚠️ E IL BANCO HA MENTITO QUATTRO VOLTE, tutte nello stesso modo: id
+sbagliato del campo, cassetto non aperto, punti salvati cancellati da
+un giro precedente, e un annuncio che era un'ASTA. Otto righe rosse
+che non erano del codice — **una verifica che fallisce si guarda
+prima di crederle**, ed è la seconda volta in questo cantiere.
+E DUE SENTINELLE DI ALTRI CANTIERI hanno dovuto imparare qualcosa, che è
+la parte da ricordare: quella del gate del campo elencava cosa c'è SOTTO
+il gate («? campoDove : ''») e tornava rossa per un'aggiunta legittima
+invece che per un gate caduto — adesso si ferma al GATE; e il cartone di
+`prove_ricevuta_compratore` non aveva la colonna del timbro, quindi la
+riga nuova in `_incassa_ordine` non faceva una prova rossa ma ESPLODERE
+la famiglia con un IndexError — la classe di guasto già pagata dalla
+colonna mancante di `offerte_righe`.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache non manda la
+chiave e si comporta come oggi. DA GUARDARE al primo giro: la prima
+email lasciata alla CASSA dentro Telegram — che al venditore arrivi la
+riga in coda a «Hai venduto», e che il compratore la ritrovi
+nell'ordine, col «Cambia» che la riapre precompilata.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

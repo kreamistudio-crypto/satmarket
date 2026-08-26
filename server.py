@@ -1713,29 +1713,116 @@ XP_PER_EURO = 1             # un euro, un punto
 # Il venditore prende piu' del compratore perche' VENDERE E' IL LATO
 # SCARSO: un mercatino muore per mancanza di merce, mai di curiosi.
 XP_RUOLO = {"venditore": 1.0, "compratore": 0.6}
-AZIONI_XP = {
-    "visita": 1,            # presenza, non merito
-    "annuncio": 5,          # UNO al giorno, o si pubblica spazzatura
-    "feedback": 10,         # uno per ordine, come il feedback stesso
-    "incassi": 20,          # Lightning address impostato, una volta sola
-    "identita": 15,         # npub verificata, Telegram collegato
-    "distintivo": 25,
-}
+
+# IL PERIMETRO, E VIVE IN UN POSTO SOLO (ago 2026, decisione di
+# Andrea): gli XP sono il COMMERCIO e nient'altro. Comprare e vendere
+# danno punti; visitare, pubblicare, lasciare un feedback, mettere il
+# Lightning address, verificare la npub e prendere un distintivo no.
+# IL PERCHE' E' IL CANTIERE IN UNA RIGA: il numero che si vede dev'essere
+# il numero che conta. Nel Profilo se ne leggevano 244 e nel rank ne
+# contavano 123, e guardando non c'era modo di capirlo — perche'
+# `utenti.xp` non aveva mai avuto una definizione SCRITTA: era «la
+# somma del registro» in _ricalcola_xp, «la somma di quel che i ganci
+# hanno sommato» in assegna_xp, e una terza scritta a mano nella WHERE
+# della classifica. Tre posti, tre perimetri impliciti, nessun nome.
+# UNA COSTANTE E NON UN `tipo='ordine'` SPARSO, ed e' la meta' che
+# conta: il giorno che qualcuno aggiunge un gancio nuovo, col
+# letterale il numero si gonfia in silenzio, con la costante deve
+# passare DI QUI e prendere una decisione che ha un nome sopra — e non
+# aggiungerlo e' la scelta sicura di serie. In piu' `grep XP_COMMERCIO`
+# da' tutto l'invariante in un colpo.
+XP_COMMERCIO = ("ordine",)
 
 
-def oggi_locale() -> str:
-    """Il giorno di oggi, ora del server ('2026-08-05'). Locale e non
-    UTC: chi apre l'app alle 23 di sera e alle 8 del mattino dopo deve
-    vedere due giorni, non uno — e' l'ora che ha lui sull'orologio."""
-    return time.strftime("%Y-%m-%d", time.localtime())
+def sql_xp_commercio(colonna: str = "tipo") -> tuple:
+    """Il perimetro tradotto in SQL: (frammento, parametri). I lettori
+    lo chiamano invece di riscrivere la condizione a mano, o il giorno
+    che il perimetro si allarga uno dei tre resta indietro."""
+    segni = ",".join("?" for _ in XP_COMMERCIO)
+    return (f"{colonna} IN ({segni})", list(XP_COMMERCIO))
+
+
+# DA CHE LATO VENGONO GLI XP (ago 2026). Chi legge «76 XP» non sa che
+# sono pochi perche' ha comprato invece di vendere, e il numero da
+# solo non lo dice. IL DATO C'ERA GIA': il registro scrive il
+# riferimento come `ordine:{id}:{ruolo}` — il ruolo ci sta dentro
+# perche' senza le due parti dello stesso affare si pesterebbero sulla
+# UNIQUE — quindi ogni riga porta il suo lato addosso e non serve
+# nessuna colonna nuova.
+def ruolo_xp(riferimento: str) -> str:
+    """Da che lato viene una riga di registro: 'venditore',
+    'compratore', o '' se non si sa.
+    IL VOCABOLARIO E' `XP_RUOLO` E NON UN ELENCO NUOVO: quelli sono i
+    ruoli che pesano, e un secondo catalogo sarebbe il posto da cui un
+    giorno divergono. Un ruolo sconosciuto — o una riga di un tipo che
+    il lato nel riferimento non ce l'ha — torna '', e da li' la somma
+    di `xp_per_ruolo` non torna e si tace.
+    IL FORMATO LO SCRIVE IL GANCIO in `_sblocca_sats` (e le due
+    passate una tantum, `recupera_xp_ordini.py` e `marca_prove.py`):
+    qui si LEGGE soltanto, e non si unifica la f-string in un posto
+    solo apposta — sarebbero quattro siti da toccare, due dei quali
+    fuori dal server, per una garanzia che il fail-safe della somma da'
+    gia'. C'e' la prova che questo parser legga quel che QUEL gancio
+    scrive: una sentinella direbbe che il parser esiste, mai che
+    combaci col formato dall'altra parte."""
+    r = (riferimento or "").rsplit(":", 1)[-1]
+    return r if r in XP_RUOLO else ""
+
+
+def xp_per_ruolo(righe, totale: int):
+    """{'vendite': N, 'acquisti': M} — oppure None, e allora chi legge
+    dice la frase generica. `righe` sono le (riferimento, punti) del
+    registro DENTRO il perimetro, `totale` e' il numero che sta a
+    schermo (la cache `utenti.xp`).
+
+    IL FAIL-SAFE E' LA SOMMA (decisione di Andrea), ed e' l'unica
+    guardia: la scomposizione esce SOLO se i due lati fanno il totale.
+    Se un domani il perimetro si allargasse a un tipo che nel
+    riferimento il ruolo non ce l'ha, quelle righe non entrerebbero in
+    nessuno dei due lati e la somma cadrebbe da se'; e lo stesso vale
+    se la cache di `utenti.xp` si sporcasse. **Un numero che non torna
+    si legge come un difetto**, e la frase generica e' vera comunque.
+    Lo ZERO non e' un caso speciale qui: a registro vuoto escono due
+    zeri, che sono la verita' — a non scriverli e' chi rende la riga.
+    """
+    per = {"vendite": 0, "acquisti": 0}
+    for rif, punti in righe:
+        r = ruolo_xp(rif)
+        if r == "venditore":
+            per["vendite"] += int(punti)
+        elif r == "compratore":
+            per["acquisti"] += int(punti)
+        # una riga che non si sa leggere non entra in NESSUNO dei due
+        # lati: e' cosi' che la somma qui sotto se ne accorge
+    return per if per["vendite"] + per["acquisti"] == int(totale) else None
+
+
+# LAPIDE (ago 2026). Qui viveva il tariffario delle azioni di
+# presenza — visita 1, annuncio 5, feedback 10, incassi 20, identita'
+# 15, distintivo 25 — coi suoi otto ganci e con `oggi_locale()`, che
+# serviva a mettere il giorno dentro il riferimento e cosi' a fare da
+# tetto giornaliero. Se n'e' andato col perimetro: quelle azioni non
+# danno piu' punti, quindi il tariffario non ha piu' niente da tariffare.
+# IL PREZZO E' DICHIARATO, ed e' l'unica cosa di questo cantiere che
+# non si disfa: gli XP non si ricalcolano dai dati veri come i
+# distintivi, quindi le righe che da oggi non si scrivono NON
+# ESISTERANNO. Se un domani si volesse riaprire il perimetro — mettiamo
+# ai feedback — il backfill sarebbe impossibile per tutto l'intervallo.
+# E' la stessa asimmetria che il DDL di `xp_eventi` annuncia gia'.
+# Le righe VECCHIE invece restano tutte: il registro e' append-only e
+# non si e' cancellato niente, quindi tornando indietro i numeri si
+# rimettono da soli — e' il motivo per cui questo cantiere lascia stare
+# il registro e tocca solo una cache.
 
 
 def _ricalcola_xp(con, tg_id: int):
     """Rifa' utenti.xp dal registro. Nessun commit: e' del chiamante.
     E' cio' che rende la fusione un caso NON speciale — si migrano le
     righe e si ricalcola, come per rating e feedback."""
+    dove, par = sql_xp_commercio()
     n = con.execute("SELECT COALESCE(SUM(punti),0) AS s FROM xp_eventi "
-                    "WHERE tg_id=?", (tg_id,)).fetchone()["s"]
+                    f"WHERE tg_id=? AND {dove}",
+                    [tg_id] + par).fetchone()["s"]
     con.execute("UPDATE utenti SET xp=? WHERE tg_id=?", (n, tg_id))
     return n
 
@@ -1754,8 +1841,16 @@ def assegna_xp(con, tg_id: int, tipo: str, punti: int,
         (tg_id, tipo, int(punti), riferimento, int(time.time())))
     if not r.rowcount:
         return 0            # gia' pagato: e' il retry, ed e' innocuo
-    con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
-                (int(punti), tg_id))
+    # LA GUARDIA STA ANCHE QUI, e non solo nel ricalcolo: le due sono
+    # due strade verso lo stesso numero — l'incrementale e il
+    # ricalcolo — e con due perimetri diversi la cache dipenderebbe da
+    # QUALE e' girata per ultima (un gancio somma, poi una fusione
+    # chiama _ricalcola_xp e glieli toglie). Un numero che oscilla,
+    # non riproducibile e invisibile: il guasto di oggi, aggravato.
+    # Con la guardia sono la stessa strada PER COSTRUZIONE.
+    if tipo in XP_COMMERCIO:
+        con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
+                    (int(punti), tg_id))
     return int(punti)
 
 
@@ -1798,11 +1893,25 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
 # la stessa idea per cui frequenza e importo valgono entrambi.
 # Derivati, mai in colonna: si ricalcolano da xp e dai contatori, come
 # i distintivi si ricalcolano dai dati veri.
+# LE SOGLIE SONO TARATE SUI NUMERI VERI (ago 2026, misura sul VPS col
+# gemello `livelli_prova.py`) e non a occhio: col perimetro del solo
+# commercio gli XP calano per tutti, e soglie ferme avrebbero fatto
+# SCENDERE di gradino gente che non ha fatto niente. Il tetto di
+# «avviato» era 59, quindi 50 — nessuno scende e chi era entrato dalla
+# porta del banner col livello se la tiene. Le tre alte non le ha
+# ancora raggiunte nessuno, quindi sono scelte libere tenendo il
+# rapporto della scala vecchia diviso tre: in euro venduti fanno
+# ~45, ~190, ~790 e ~3000.
+# ⚠️ Le soglie vanno cambiate NELLO STESSO DEPLOY del riallineamento:
+# deployare il riallineamento con le soglie di ieri farebbe scendere
+# tutti per un giro, e chi guarda vedrebbe un declassamento vero.
+# Le soglie degli AFFARI non si toccano: quelle il perimetro non le ha
+# mai riguardate.
 LIVELLI = [(0, 0, "nuovo", "Nuovo arrivato"),
-           (150, 1, "avviato", "Bottega avviata"),
-           (600, 5, "pratico", "Mercante pratico"),
-           (2500, 15, "esperto", "Mercante esperto"),
-           (9000, 40, "maestro", "Maestro del banco")]
+           (50, 1, "avviato", "Bottega avviata"),
+           (200, 5, "pratico", "Mercante pratico"),
+           (800, 15, "esperto", "Mercante esperto"),
+           (3000, 40, "maestro", "Maestro del banco")]
 
 
 def livello_utente(xp: int, affari: int) -> dict:
@@ -1907,6 +2016,21 @@ try:
     from config import CLASSIFICA_PESO_XP
 except ImportError:
     CLASSIFICA_PESO_XP = 0.25   # quanto puo' contare il commercio, al max
+try:
+    from config import CLASSIFICA_KD
+except ImportError:
+    # LO SMORZAMENTO DELLA FIDUCIA LARGA: il bonus del commercio vale
+    # quanto e' LARGA la fiducia che amplifica — con due persone chi ne
+    # ha una sola si prende un terzo del suo bonus, chi ne ha cinque
+    # cinque settimi, chi ne ha venti quasi tutto. La fiducia di uno
+    # solo e' un'opinione, non un curriculum.
+    # NASCE A ZERO, e a zero `persone/(persone+0)` fa 1 per chiunque:
+    # i punteggi restano IDENTICI bit per bit a quelli di prima dello
+    # smorzamento. E' voluto — il valore si SCEGLIE guardando i numeri
+    # veri (`python classifica_prova.py`, sezione 3, che affianca le
+    # tarature), il patto con cui fu misurato K. Finche' nessuno la
+    # alza dal config, l'unica cosa che cambia e' l'ordine dei pareggi.
+    CLASSIFICA_KD = 0           # persone per il bonus pieno del commercio
 
 
 def _recensore_reale(da: int, chi: int, controparti: dict) -> bool:
@@ -1931,7 +2055,7 @@ def _recensore_reale(da: int, chi: int, controparti: dict) -> bool:
 
 def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
                        affari: dict, k=None, rif=None, peso=None,
-                       solo_reali: bool = True) -> list:
+                       kd=None, solo_reali: bool = True) -> list:
     """IL GIUDICE, ed e' PURO: prende righe e ritorna la lista
     ordinata, senza toccare il database. E' quel che lo rende
     torturabile in CI e riusabile da `classifica_prova.py` — il patto
@@ -1956,6 +2080,14 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
     k = CLASSIFICA_K if k is None else k
     rif = CLASSIFICA_XP_RIF if rif is None else rif
     peso = CLASSIFICA_PESO_XP if peso is None else peso
+    # ZERO E' UN VALORE come per `peso`, e qui pesa il doppio: zero e'
+    # proprio il DEFAULT, quindi con `or` la leva esplicita `kd=0` — la
+    # prova che lo smorzamento si spegne — sarebbe indistinguibile da
+    # «non passato». NEGATIVO invece no: sotto zero il denominatore si
+    # azzera e una pagina PUBBLICA cadrebbe per un meno di troppo nel
+    # config, che qui non e' avvolto in nessun fail-open. Il meno vale
+    # come zero, cioe' come ieri.
+    kd = max(CLASSIFICA_KD if kd is None else kd, 0)
     per = {}
     for chi, da, voto in voti:
         if chi == da:
@@ -1979,6 +2111,13 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
         fiducia = ((persone * media + k * media_globale)
                    / (persone + k))
         commercio = math.log10(1 + xp) / math.log10(1 + rif)
+        # SI SMORZA IL BONUS, NON LA FIDUCIA: la media resta la media, e
+        # chi non commercia non viene punito due volte. Uno con un
+        # recensore solo e mille XP non deve stare davanti a uno con
+        # cinque recensori e gli stessi mille.
+        # `persone` e' almeno 1 per il gate d'ingresso e `kd` almeno 0
+        # per la riga qui sopra: il denominatore non e' mai zero.
+        smorzo = persone / (persone + kd)
         fuori.append({
             "id": chi,
             "media": media,
@@ -1986,12 +2125,38 @@ def _classifica_utenti(voti: list, controparti: dict, xp_ordini: dict,
             "persone": persone,
             "affari": affari.get(chi, 0),
             "xp": xp,
-            "punti": fiducia * (1 + peso * commercio),
+            # F e C escono INTERI perche' `classifica_prova.py` li
+            # mostri senza doverli ricavare dal punteggio: invertire la
+            # formula e' scriverla una seconda volta al contrario, e
+            # quella copia si e' gia' rotta una volta (l'inversione non
+            # sapeva dello smorzamento). In pubblico non escono: `voce()`
+            # elenca i campi a mano.
+            "fiducia": fiducia,
+            "commercio": commercio,
+            "punti": fiducia * (1 + peso * commercio * smorzo),
         })
-    # A pari punteggio comanda l'id, o due righe identiche si
-    # scambierebbero di posto a ogni richiesta (la lezione del pareggio
-    # del podio e del cursore keyset).
-    fuori.sort(key=lambda r: (-r["punti"], r["id"]))
+    # A PARI PUNTEGGIO COMANDA IL MERITO, E L'ID PER ULTIMO.
+    # Lo smorzamento NON scioglie i pareggi, e non poteva: quando la
+    # media e' uguale a quella del mercatino la fiducia vale ESATTAMENTE
+    # M per qualunque `persone`, e senza XP d'ordine il bonus e' zero —
+    # cioe' il mercatino di oggi, dove hanno tutti 5,00. Li' due righe
+    # hanno gli stessi punti bit per bit, e a decidere resta questa
+    # chiave: prima le PERSONE (la fiducia piu' larga vince, ed e' la
+    # stessa cosa che dice lo smorzamento un gradino piu' su), poi gli
+    # AFFARI.
+    # E VA DETTO COSA SI STA SCEGLIENDO (decisione di Andrea): a pari
+    # punteggio LA FREQUENZA BATTE IL VALORE — due affari da 15 € vanno
+    # davanti a uno da 40, che danno gli stessi XP. Non e' ovvio, ed e'
+    # meglio di un id, che non significa niente.
+    # La MEDIA e' stata provata in questa chiave e tolta: a pari persone
+    # due medie diverse danno GIA' punti diversi (senza XP il punteggio
+    # e' esattamente la fiducia), quindi li' sarebbe codice morto — una
+    # guardia che promette d'essere esercitata e non lo e' mai.
+    # L'id resta in coda e NON e' un merito: e' il determinismo — due
+    # righe identiche non devono scambiarsi di posto a ogni richiesta
+    # (la lezione del pareggio del podio e del cursore keyset).
+    fuori.sort(key=lambda r: (-r["punti"], -r["persone"], -r["affari"],
+                              r["id"]))
     return fuori
 
 
@@ -2342,6 +2507,65 @@ def riallinea_quantita_max(con):
     le righe salite sopra il massimo, e nessun giro puo' abbassarlo."""
     con.execute("UPDATE annunci SET quantita_max=quantita "
                 "WHERE quantita>quantita_max")
+
+
+def riallinea_xp_commercio(con):
+    """Rimette `utenti.xp` d'accordo col perimetro: la somma dei soli
+    eventi di COMMERCIO. E' il backfill del cantiere «gli XP sono solo
+    commercio» — prima la cache sommava tutti e sette i tipi, quindi
+    dopo il deploy ogni profilo che aveva punti di presenza e' piu'
+    alto del vero finche' non ci passa di qui.
+    BIDIREZIONALE, e non e' un di piu': la WHERE tocca le righe che non
+    combaciano IN NESSUNO DEI DUE VERSI, quindi ripara anche una cache
+    piu' BASSA — che e' quel che lascerebbe dietro uno script vecchio
+    lanciato dopo il deploy, o un rollback e ritorno.
+    Idempotente: al secondo giro non trova niente, non scrive e tace.
+    PARLA, e le gemelle no: questa toglie punti a persone vere, e un
+    numero che cala in silenzio e' il modo peggiore di presentarsi —
+    la riga nel journal e' quel che permette di dire, guardando, se e
+    quanto e' successo."""
+    dove, par = sql_xp_commercio()
+    r = con.execute(
+        "UPDATE utenti SET xp=COALESCE((SELECT SUM(punti) FROM xp_eventi "
+        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0) "
+        "WHERE xp<>COALESCE((SELECT SUM(punti) FROM xp_eventi "
+        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0)", par + par)
+    if r.rowcount:
+        print(f"🧮 XP riallineati al commercio: {r.rowcount} utenti",
+              flush=True)
+    return r.rowcount
+
+
+def riallinea_titoli_decaduti(con):
+    """Chi indossa un titolo di LIVELLO che non ha piu' torna a
+    «Nessuno». Serve perche' col perimetro nuovo qualcuno puo' scendere
+    di gradino, e un titolo e' un grado: portarne uno che non si ha
+    piu' e' l'unica cosa che questo cantiere puo' far dire di falso a
+    un profilo.
+    I titoli-livello si DERIVANO da TITOLI (`serve[0] == 'livello'`) e
+    non si elencano a mano, o il titolo aggiunto domani resterebbe
+    addosso a chi non lo merita. Il confronto passa da
+    `_gradino_livello` e da `livello_utente`, cioe' dai giudici di
+    sempre: nessuna regola riscritta.
+    Idempotente e silenzioso quando non tocca niente, come le gemelle."""
+    serve = {t["id"]: t["serve"][1] for t in TITOLI
+             if t["serve"][0] == "livello"}
+    if not serve:
+        return 0
+    segni = ",".join("?" for _ in serve)
+    tolti = 0
+    for u in con.execute(
+            f"SELECT tg_id, titolo, xp, vendite_ok, acquisti_ok FROM utenti "
+            f"WHERE titolo IN ({segni})", list(serve)).fetchall():
+        affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+        ora = livello_utente(u["xp"] or 0, affari)["numero"]
+        if _gradino_livello(serve[u["titolo"]]) > ora:
+            con.execute("UPDATE utenti SET titolo='' WHERE tg_id=?",
+                        (u["tg_id"],))
+            tolti += 1
+    if tolti:
+        print(f"🎖 Titoli decaduti tolti: {tolti}", flush=True)
+    return tolti
 
 
 def riallinea_spedizionieri(con):
@@ -3258,18 +3482,27 @@ def init_db():
                     # rating e n_feedback, quindi rimozione admin e
                     # fusione si sistemano da sole.
                     "n_recensori INTEGER DEFAULT 0",
-                    # xp (ago 2026): la SOMMA del registro xp_eventi,
-                    # tenuta qui perche' ogni card e ogni profilo la
-                    # legge e non si fa una SUM per riga. Cache, non
-                    # verita': si rifa' da capo con _ricalcola_xp, che
-                    # e' cio' che rende la fusione un caso non
-                    # speciale (si sommano i registri e si ricalcola).
-                    # xp_ultimo_giorno e' il giorno LOCALE dell'ultima
-                    # visita premiata: serve solo a non rifare la
-                    # scrittura mille volte al giorno — a impedire il
-                    # doppio punto ci pensa comunque la UNIQUE del
-                    # registro, questa e' cortesia verso il database.
+                    # xp (ago 2026): la somma degli eventi di
+                    # COMMERCIO del registro — il perimetro e'
+                    # XP_COMMERCIO e vive in un posto solo. Tenuta qui
+                    # perche' ogni card e ogni profilo la legge e non
+                    # si fa una SUM per riga. Cache, non verita': si
+                    # rifa' da capo con _ricalcola_xp, che e' cio' che
+                    # rende la fusione un caso non speciale (si
+                    # sommano i registri e si ricalcola), e la rimette
+                    # in pari a ogni avvio riallinea_xp_commercio.
+                    # Il registro invece tiene TUTTO, anche i tipi
+                    # fuori perimetro: sono storia, e restano.
                     "xp INTEGER DEFAULT 0",
+                    # xp_ultimo_giorno: LAPIDE (ago 2026). Era il
+                    # giorno locale dell'ultima visita premiata, e da
+                    # quando la visita non da' punti non la scrive piu'
+                    # nessuno. NON SI TOGLIE, ed e' la regola di casa
+                    # (il precedente e' utenti.comune): una colonna non
+                    # si toglie mai, e qui toglierla renderebbe
+                    # VELENOSO un rollback — il server vecchio la
+                    # ri-ALTERerebbe a '' e ricomincerebbe a timbrare
+                    # le visite di tutti da capo.
                     "xp_ultimo_giorno TEXT DEFAULT ''",
                     # coorte (ago 2026): in che ondata e' arrivato.
                     # CONGELATA al primo calcolo — la posizione in una
@@ -4406,6 +4639,26 @@ def init_db():
                     # in cui fra sei mesi si legge la riga sbagliata.
                     "sollecito_punto_il INTEGER DEFAULT 0",
                     "solleciti_punto INTEGER DEFAULT 0",
+                    # ...e il promemoria al COMPRATORE sul binario
+                    # della BUSTA DIRETTA (ago 2026): li' il codice
+                    # gliel'ha mandato il corriere e da noi non passa,
+                    # quindi il messaggio e' un altro — «guarda anche
+                    # nello spam», e la strada per dire che non e' mai
+                    # arrivato.
+                    # COLONNE SUE E NON `solleciti_punto`, e qui la
+                    # regola non e' una precauzione ma il caso vero di
+                    # questo cantiere: le due popolazioni sembrano
+                    # mutuamente esclusive (il deposito della busta
+                    # azzera la dichiarazione) ma un ordine PASSA
+                    # dall'una all'altra — e' il flusso della via
+                    # d'uscita, «non mi e' arrivato» -> il venditore
+                    # deposita. Col contatore condiviso, chi ha speso
+                    # i tre squilli da «diretta» arriverebbe al tetto
+                    # e non sentirebbe MAI il «vai a ritirare», cioe'
+                    # resterebbe muto proprio dopo che il sistema gli
+                    # ha appena risolto il problema.
+                    "sollecito_diretto_il INTEGER DEFAULT 0",
+                    "solleciti_diretti INTEGER DEFAULT 0",
                     # IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026):
                     # NASCONDERE, mai cancellare — la riga resta nel
                     # database, perche' libro mastro, feedback, export
@@ -4455,6 +4708,40 @@ def init_db():
                     # segna_spedito di bloccare di colpo ogni ordine
                     # 'locked' gia' in produzione.
                     "indirizzo_atteso INTEGER DEFAULT 0",
+                    # L'EMAIL PER IL CORRIERE (ago 2026, tappa B): la
+                    # scorciatoia perche' il codice del locker arrivi
+                    # a chi compra DIRETTAMENTE dal corriere, invece
+                    # di passare dalla chat — che e' precisamente
+                    # quello che chi non ha ne' username Telegram ne'
+                    # npub NON HA. E' la terza volta che lo stesso
+                    # buco morde: ha fatto nascere la busta di
+                    # consegna, poi l'indirizzo di casa, adesso questo.
+                    # ⚠️ IL NOME DICE IL MESTIERE E CHIUDE LA PORTA AL
+                    # TELEFONO PER COSTRUZIONE: `recapito` inviterebbe
+                    # ad allargarlo, `email_corriere` no. Vale come
+                    # VINCOLO PERMANENTE (decisione di Andrea): il
+                    # numero di telefono non entra in Barattolo per
+                    # nessuna ragione, nemmeno se un domani un
+                    # corriere volesse l'SMS. Al locker serve la mail.
+                    # (Il telefono che gia' esiste vive DENTRO
+                    # l'indirizzo cifrato, e' facoltativo e sparisce
+                    # con lui: e' un'altra cosa e resta dov'e'.)
+                    # NON SI RIUSA LA COLONNA `indirizzo`, che verrebbe
+                    # in mente: il libro mastro ha gia' «indirizzo su
+                    # una riga via punto» come GUASTO, il giudice e'
+                    # cablato su `not via_punto` in tutti i chiamanti,
+                    # e l'endpoint di correzione rifiuta via_punto
+                    # esplicitamente. Sono due famiglie, e restano due.
+                    "email_corriere TEXT DEFAULT ''",
+                    # la PRIMA (0 = mai): il flag E il quando
+                    "email_corriere_il INTEGER DEFAULT 0",
+                    "email_corriere_corretta_il INTEGER DEFAULT 0",
+                    "email_corriere_correzioni INTEGER DEFAULT 0",
+                    # e QUANDO la scopa l'ha cancellata: la promessa
+                    # «trasporta, non conserva» diventa verificabile
+                    # solo grazie a questa colonna — il libro mastro
+                    # guarda «purgata ma ancora scritta».
+                    "email_corriere_purgata_il INTEGER DEFAULT 0",
                     "nascosto_compratore INTEGER DEFAULT 0",
                     "nascosto_venditore INTEGER DEFAULT 0",
                     # LA PORTA DEL TIMER (ago 2026): QUANDO uno sblocco
@@ -4507,7 +4794,23 @@ def init_db():
                     # MAX di _SQL_FERMI, o la coda dira' «mai
                     # sollecitato» su righe bussate tre volte.
                     "sollecito_appuntamento_il INTEGER DEFAULT 0",
-                    "solleciti_appuntamento INTEGER DEFAULT 0"):
+                    "solleciti_appuntamento INTEGER DEFAULT 0",
+                    # LA BUSTA DIRETTA (ago 2026, cantiere 45): il
+                    # venditore ha dichiarato che il codice di ritiro
+                    # arriva DIRETTAMENTE al compratore — recapiti suoi
+                    # sull'etichetta del corriere — quindi la busta non
+                    # si aspetta: la riga «in attesa del codice» cambia
+                    # testo e sollecita_buste_ferme tace (col suo 🧊).
+                    # Timestamp della dichiarazione, 0 = mai (il
+                    # pattern di busta_il: insieme il flag e il
+                    # quando). Il DEPOSITO della busta la AZZERA nello
+                    # stesso UPDATE: la busta supersede la
+                    # dichiarazione, ed e' anche l'annulla naturale —
+                    # chi ha dichiarato per sbaglio deposita e basta,
+                    # nessun bottone di undo. E' una dichiarazione di
+                    # PARTE non verificabile: in disputa il moderatore
+                    # la legge etichettata cosi', con la sua data.
+                    "busta_diretta_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -4565,6 +4868,11 @@ def init_db():
     # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
     # nome della rete nel cassetto senza che nessuno gliel'abbia tolti.
     riallinea_spedizionieri(con)
+    # PRIMA gli XP e POI i titoli: il secondo giudica sul numero che
+    # il primo ha appena rimesso in pari, e all'incontrario toglierebbe
+    # (o lascerebbe) i gradi guardando la cache di ieri.
+    riallinea_xp_commercio(con)
+    riallinea_titoli_decaduti(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
     # per annuncio a ogni acquisto: e' la prima query calda su ordini
     # (finora la tabella viveva senza indici).
@@ -5033,11 +5341,6 @@ async def login_nostr(req: Request, response: Response):
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
-    # La firma Schnorr ha appena dimostrato il possesso della chiave:
-    # per lui la npub e' verificata dalla nascita, e vale come per chi
-    # su Telegram ci passa dalla nota pubblica. Stesso riferimento, o
-    # un nativo che poi verifica di nuovo verrebbe pagato due volte.
-    await premia_xp(tg_id, "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "nuovo": True}
 
 
@@ -6528,11 +6831,6 @@ async def premia_distintivi(tg_id: int):
         print(f"⚠️ Distintivi saltati per {tg_id}: {e}")
         return
     for did in nuovi:
-        # Un distintivo vale anche XP. Il riferimento e' il badge, che
-        # e' gia' unico per utente: se un giorno i distintivi si
-        # potessero riassegnare, questo non ripagherebbe comunque.
-        await premia_xp(tg_id, "distintivo", AZIONI_XP["distintivo"],
-                        f"badge:{did}")
         dd = next(d for d in DISTINTIVI if d["id"] == did)
         await notifica(tg_id,
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
@@ -6947,10 +7245,6 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # ...e gli XP si risommano dal registro appena migrato: e' il
         # motivo per cui utenti.xp e' una cache e non la verita'.
         _ricalcola_xp(con, id_telegram)
-        # Le due identita' sono adesso una sola, ed e' un traguardo:
-        # vale come la npub verificata, e una volta sola.
-        assegna_xp(con, id_telegram, "identita", AZIONI_XP["identita"],
-                   "telegram")
         # I contatori sommati possono far scattare distintivi nuovi
         # (Specchiato, rodato...): valutazione silenziosa, li vedra'
         # al prossimo giro di Profilo.
@@ -11613,13 +11907,6 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
         accoda_match(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
-    # Pubblicare vale XP UNA volta al giorno, e il tetto non e' scritto
-    # da nessuna parte: e' il riferimento «giorno:...» che, con la
-    # UNIQUE del registro, lascia passare solo il primo annuncio.
-    # Senza, la strada piu' veloce per salire sarebbe pubblicare
-    # spazzatura — e la regola del tariffario dice il contrario.
-    await premia_xp(user["id"], "annuncio", AZIONI_XP["annuncio"],
-                    f"giorno:{oggi_locale()}")
     # Il venditore irraggiungibile lo viene a sapere SUBITO, una volta
     # sola (timbro): la riga del form gliel'ha appena detto, questo e'
     # il richiamo in chat. Solo sul ramo attivo — il testo dice «in
@@ -12331,9 +12618,10 @@ def _dati_classifica(con):
                 "SELECT per_tg_id, da_tg_id, voto FROM feedback "
                 "WHERE ordine_id NOT IN "
                 "(SELECT id FROM ordini WHERE prova=1)")]
+    dove, par = sql_xp_commercio()
     xp = {r["tg_id"]: r["p"] for r in con.execute(
         "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
-        "WHERE tipo='ordine' GROUP BY tg_id")}
+        f"WHERE {dove} GROUP BY tg_id", par)}
     return voti, controparti, xp, affari
 
 
@@ -12366,15 +12654,35 @@ def classifica(x_tg_init_data: str = Header(""),
     gli altri (scelta di Andrea): fuori escono i primi
     CLASSIFICA_TOP e basta.
 
-    COSA NON ESCE MAI, ed e' la parte da non allentare: il `tg_id`
-    (che in vetrina non compare da nessuna parte), gli XP — /api/negozio
-    li toglie apposta dal pubblico, «gli XP sono roba di chi li ha, e un
-    numero altrui non aiuta nessuno a decidere se fidarsi», e USARLI per
-    ordinare non rovescia quella riga mentre PUBBLICARLI si — e il
-    PUNTEGGIO, che sarebbe un numero opaco da spiegare. Si mostrano la
-    posizione e i FATTI su cui poggia: media, da quante persone,
-    quanti affari. Sono anche quel che permette a chi guarda di
-    giudicare da se', che e' il meccanismo su cui la tolleranza agli
+    IL PUNTEGGIO ESCE, ×100 e arrotondato (ago 2026, decisione di
+    Andrea), e ROVESCIA meta' della riga che stava qui — «sarebbe un
+    numero opaco da spiegare». Il perche': senza, l'ordine delle righe
+    non si legge. Con tutte le medie a 5,00 si vedono sette nomi
+    identici in sette posizioni diverse, e chi guarda non ha modo di
+    capire cosa li separa — cioe' la classifica non risponde alla sola
+    domanda per cui esiste. ×100 perche' un numero fra 5,51 e 5,90 si
+    confronta male e si confonde con la media che gli sta accanto.
+
+    LA CONSEGUENZA E' DICHIARATA E ACCETTATA: il punteggio e'
+    INVERTIBILE. Media, persone e affari escono gia' in riga, quindi da
+    qui si ricava quanto uno ha commerciato — e dopo il cantiere del
+    perimetro gli XP sono esattamente questo. Non e' un effetto
+    collaterale: e' una scelta di prodotto presa sapendolo, ed e' per
+    questo che sta scritta anche nella pagina «I tuoi dati», che
+    dichiara cosa e' pubblico. La FORMULA per esteso non si ripete qui:
+    vive in un posto solo, il commentone del giudice.
+
+    COSA NON ESCE ANCORA, ed e' la parte da non allentare: il `tg_id`
+    (che in vetrina non compare da nessuna parte) e gli XP in chiaro —
+    /api/negozio li toglie apposta dal pubblico. Che dal punteggio si
+    possano ricavare non li rende un campo: un numero da cui si deduce
+    e un numero che si legge sono due cose diverse, e la seconda
+    inviterebbe a confrontarlo con quello del Profilo, che e' lo
+    stesso ma detto in un'altra unita'.
+
+    Accanto restano i FATTI su cui il punteggio poggia: media, da
+    quante persone, quanti affari. Sono quel che permette a chi guarda
+    di giudicare da se', che e' il meccanismo su cui la tolleranza agli
     ordini fasulli conta.
 
     I campi si ELENCANO uno per uno invece di togliere quelli di
@@ -12416,6 +12724,9 @@ def classifica(x_tg_init_data: str = Header(""),
                 "avatar": (u["avatar"] if u else "") or "",
                 "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
                 "media": round(r["media"], 2),
+                # ×100 e arrotondato: e' il numero che si legge, e il
+                # solo posto dove il punteggio prende una forma.
+                "punteggio": round(r["punti"] * 100),
                 "voti": r["voti"],
                 "persone": r["persone"],
                 "affari": r["affari"]}
@@ -14639,6 +14950,11 @@ def _leve_stato():
                   CLASSIFICA_PESO_XP,
                   spento="la classifica torna la sola media, e chi "
                          "commercia non guadagna posizioni"),
+            _leva("Persone per il bonus pieno del commercio",
+                  "CLASSIFICA_KD", CLASSIFICA_KD,
+                  spento="il commercio conta pieno anche a chi ha un "
+                         "recensore solo: è la classifica di prima "
+                         "dello smorzamento"),
         ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
@@ -15455,6 +15771,142 @@ def _coda_nota(prima: bool, dopo: bool) -> str:
         return ("📝 <b>L'acquirente ha tolto la sua nota</b>: "
                 "nell'ordine non c'è più niente da leggere.")
     return ""
+
+
+MAX_EMAIL_CORRIERE = 120
+
+
+def _email_corriere_da_payload(d, *, esigi_chiave: bool = True) -> tuple:
+    """L'email che il compratore lascia perche' il codice del locker
+    gli arrivi DIRETTAMENTE dal corriere: (blob CIFRATO, testo).
+
+    TORNA TUTT'E DUE, il patto di _indirizzo_da_payload: il blob va in
+    colonna, il TESTO serve al chiamante per sapere se e' cambiata
+    davvero — e non si puo' dedurre dai blob, perche' Fernet non e'
+    deterministico e due cifrature della stessa email danno stringhe
+    diverse. Un chiamante che normalizzasse per conto suo sarebbe la
+    seconda ricetta dello stesso taglio.
+
+    ⚠️ SOLO L'EMAIL, MAI IL TELEFONO — vincolo permanente (decisione
+    di Andrea): al locker serve la mail e basta, e un numero e' piu'
+    identificante. Non si allarga «tanto e' lo stesso campo»: e' per
+    questo che il nome dice il mestiere.
+
+    IL DATO PASSA DA NOI, E VA DETTO COSI': non e' «non lo facciamo
+    passare» — transita, lo scriviamo su disco e lo cifriamo con una
+    chiave che sta sullo STESSO server, quindi finche' e' li' il
+    server lo puo' leggere. La pagina «I tuoi dati» lo dichiara gia'
+    di se': «al riparo da un database rubato, non da noi». Quel che
+    rende vera la parola e' un'altra cosa — che DURI POCO, cioe' la
+    scopa. Senza quella, «lo trasportiamo, non lo conserviamo»
+    sarebbe una frase e basta.
+
+    CIFRA QUI e non nei chiamanti (il patto di
+    _indirizzo_da_payload): basta che uno se ne dimentichi perche' un
+    recapito finisca in chiaro nel database, e c'e' la sentinella che
+    conta UNA chiamata sola.
+
+    CHIAVE ASSENTE E STRINGA VUOTA SONO LA STESSA COSA, al contrario
+    dell'indirizzo e per la ragione OPPOSTA: li' svuotare rimetterebbe
+    segna_spedito in trappola su un ordine gia' compilato, qui il
+    campo e' FACOLTATIVO e toglierlo e' un gesto legittimo — il patto
+    di _nota_da_payload.
+
+    NESSUN CONTROLLO DI FORMA, ed e' deliberato: l'euristica vive nel
+    CLIENT, dove CHIEDE invece di impedire (la ricetta di
+    FORME_TRACKING, che sta li' e non qui per la stessa ragione). Un
+    server che rifiuta un indirizzo vero per una regola NOSTRA e'
+    peggio di una domanda in piu'.
+
+    IL 400 E NON IL TRONCAMENTO (la regola della busta e della nota):
+    un recapito tagliato a meta' non e' un recapito piu' corto, e' un
+    recapito ROTTO — e chi l'ha scritto non lo saprebbe.
+
+    `esigi_chiave=False` SPEGNE il solo 503 e torna ("", testo) — il
+    blob vuoto col testo PIENO, che e' come il chiamante deduce «c'era
+    un'email e non si e' potuta scrivere». Il permesso si deve
+    SCRIVERE, l'idioma di `esigi_luogo` in guardia_zona_condizione: il
+    default tiene l'endpoint dell'ordine severo byte per byte, e a
+    chiederlo e' la sola CASSA. IL PERCHE' e' la differenza fra le due
+    superfici: qui l'ordine sta NASCENDO, e un campo FACOLTATIVO non
+    puo' impedire di comprare — mentre nell'ordine il 503 non toglie
+    niente a nessuno (si riprova piu' tardi, la merce e' gia' pagata).
+    Nessuno dei due SCRIVE un recapito in chiaro: quella riga non si
+    ammorbidisce in nessuna delle due strade."""
+    testo = " ".join(str(d.get("email_corriere") or "").split())
+    if len(testo) > MAX_EMAIL_CORRIERE:
+        raise HTTPException(400, f"L'email è troppo lunga (massimo "
+                                 f"{MAX_EMAIL_CORRIERE} caratteri)")
+    if not testo:
+        return "", ""
+    if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+        # IL 503 E' QUELLO DELL'INDIRIZZO, con UNA differenza: li'
+        # blocca l'ACQUISTO (l'ordine non nasce), qui l'ordine esiste
+        # gia' e a non salvarsi e' il solo campo facoltativo — quindi
+        # non si perde niente, si dice che la scorciatoia adesso non
+        # c'e'. In collaudo si scrive 'plain:' come tutto il resto.
+        if not MODALITA_COLLAUDO and not esigi_chiave:
+            # LA CASSA DEGRADA e non alza: qui l'ordine sta nascendo, e
+            # un campo facoltativo non puo' impedire di comprare. Il
+            # blob resta VUOTO — un recapito in chiaro non si scrive
+            # nemmeno qui — e il testo pieno dice al chiamante che
+            # c'era qualcosa da salvare: da li' esce l'unica cosa
+            # onesta, dirlo a chi l'ha scritta.
+            return "", testo
+        if not MODALITA_COLLAUDO:
+            raise HTTPException(503, "Questa scorciatoia non è "
+                                     "disponibile in questo momento: "
+                                     "riprova più tardi, oppure lascia "
+                                     "che il codice arrivi al venditore "
+                                     "come al solito")
+    return _cifra_contenuto(testo), testo
+
+
+def _coda_email_corriere(prima: bool, dopo: bool) -> str:
+    """Cosa dire al venditore quando l'email cambia. PURO come
+    _coda_nota: prende due BOOL e non il testo, quindi nell'HTML di
+    una notifica il recapito non ci puo' entrare PER COSTRUZIONE.
+
+    IL TESTO DICE COSA PUO' FARCI, non solo che c'e': senza quella
+    riga il venditore legge un'email e non sa che gli si sta offrendo
+    di metterla sull'etichetta al posto della propria — cioe' la
+    scorciatoia esisterebbe e non la userebbe nessuno.
+
+    E NON PROMETTE CHE FUNZIONA: dipende dal corriere e da come
+    compila l'etichetta, e noi non lo verifichiamo. «Puoi» e non
+    «cosi' gli arriva»."""
+    if dopo and not prima:
+        return ("📧 <b>L'acquirente ha lasciato un'email per il "
+                "corriere</b>: la trovi nell'ordine. Se la metti come "
+                "recapito del destinatario quando compri l'etichetta, "
+                "il codice di ritiro può arrivargli direttamente — e "
+                "tu non devi più depositarlo qui.")
+    if dopo:
+        return ("📧 <b>L'acquirente ha cambiato l'email per il "
+                "corriere</b>: rileggila nell'ordine prima di "
+                "comprare l'etichetta.")
+    if prima:
+        return ("📧 <b>L'acquirente ha tolto l'email per il "
+                "corriere</b>: il codice di ritiro tornerà a te, e lo "
+                "depositi nell'ordine come al solito.")
+    return ""
+
+
+def _email_corriere_letta(blob: str) -> str:
+    """L'email in chiaro, o '' se non si legge.
+
+    IL PARSE E' DIFENSIVO come quello dell'indirizzo, e per lo stesso
+    motivo: _decifra_contenuto e' fail-open per costruzione e su una
+    chiave cambiata restituisce una FRASE invece del testo. Qui la
+    frase non e' JSON da rompere — si vedrebbe stampata al posto
+    dell'indirizzo, che e' peggio: il venditore la copierebbe
+    sull'etichetta. Quindi si guarda che ci sia almeno una chiocciola,
+    che e' l'unica cosa che un'email ha sempre e una frase di scuse
+    non ha mai."""
+    if not blob:
+        return ""
+    testo = _decifra_contenuto(blob)
+    return testo if "@" in testo else ""
 
 
 def _tariffa_dichiarata(a, via: str) -> tuple:
@@ -19169,7 +19621,10 @@ def _accordo_carrello(con, user_id: int, off_id: int, scrivi: bool):
                                      "questa offerta: pagala, oppure "
                                      "annulla quell'ordine e riprova")
     figlie = con.execute(
-        "SELECT * FROM offerte_righe WHERE offerta_id=? ORDER BY id",
+        # rowid e MAI «id»: offerte_righe non ha quella colonna (il
+        # gemello del bug della ronda, preso dal collaudo eseguibile) —
+        # il rowid e' l'ordine d'inserimento, cioe' quello della proposta
+        "SELECT * FROM offerte_righe WHERE offerta_id=? ORDER BY rowid",
         (off_id,)).fetchall()
     if len(figlie) < 2:
         # non dovrebbe esistere: la testata nasce con >=2 figlie nella
@@ -19417,6 +19872,21 @@ async def _compra_set(user: dict, d: dict) -> dict:
     except HTTPException:
         con.close()
         raise
+
+    # L'EMAIL PER IL CORRIERE, col patto del gemello nel mono: solo
+    # sulla via punto (la specularita' dell'indirizzo, che sta sul
+    # `not via_punto`), prima della invoice, e col permesso di
+    # DEGRADARE invece di alzare — qui l'ordine sta nascendo, e un
+    # campo facoltativo non puo' impedire di comprare.
+    mail, mail_testo = "", ""
+    if scelta == "spedizione" and via_punto:
+        try:
+            mail, mail_testo = _email_corriere_da_payload(
+                d, esigi_chiave=False)
+        except HTTPException:
+            con.close()
+            raise
+    mail_persa = bool(mail_testo) and not mail
 
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
@@ -19747,15 +20217,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
-        "tipo_punto,nota_compratore,"
+        "tipo_punto,nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
         "codice_sconto,codice_sconto_id,accordo_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, tipo, nota, ind, adesso if ind else 0,
+         punto, via_punto, rete, tipo, nota,
+         # il timbro guarda il BLOB: col degrado non c'e' niente in
+         # colonna, quindi non c'e' nessun «primo» da datare
+         mail, adesso if mail else 0,
+         ind, adesso if ind else 0,
          ind_atteso,
          sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
@@ -19800,6 +20274,9 @@ async def _compra_set(user: dict, d: dict) -> dict:
             # sconto sono chiavi in piu' e si sommano da sole
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # L'EMAIL NON SALVATA, col gemello del mono: l'ordine e'
+            # nato lo stesso, e chi l'aveva scritta deve saperlo
+            "email_non_salvata": mail_persa,
             # l'accordo sul carrello, accanto allo sconto: il netto
             # qui sopra li ha gia' sottratti tutti e due
             "accordo_sats": accordo_sats_v, "pattuito_sats": pattuito,
@@ -20961,6 +21438,29 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise
 
+    # L'EMAIL PER IL CORRIERE, ALLA CASSA (ago 2026): il punto di
+    # ritiro si sceglie PRIMA di pagare e l'email si lasciava DOPO,
+    # nell'ordine — sono la stessa decisione («come mi arriva il
+    # codice») in due momenti diversi, e in mezzo c'era una finestra:
+    # un venditore veloce compra l'etichetta prima che l'email esista,
+    # e da li' in poi non serve piu' a niente (il gate 'locked' la
+    # chiude alla spedizione, giustamente).
+    # SOLO SULLA VIA PUNTO, ed e' la specularita' dell'indirizzo — che
+    # sta sul `not via_punto`: le due vie chiedono due cose diverse, e
+    # nessuna delle due sta fuori dal suo ramo.
+    mail, mail_testo = "", ""
+    if scelta == "spedizione" and via_punto:
+        try:
+            mail, mail_testo = _email_corriere_da_payload(
+                d, esigi_chiave=False)
+        except HTTPException:
+            con.close()
+            raise
+    # «C'era un'email e non si e' potuta scrivere»: il blob vuoto col
+    # testo pieno. Serve a DUE cose e a nessun'altra — non toccare la
+    # colonna nella ripresa, e dirlo a chi l'ha scritta.
+    mail_persa = bool(mail_testo) and not mail
+
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
     # e' l'anti-doppio-acquisto e va bene cosi'. Se ha gia' un ordine
@@ -21063,6 +21563,30 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "UPDATE ordini SET nota_compratore=? "
                     "WHERE id=? AND stato='creato'", (nota, mio["id"]))
                 con.commit()
+            # L'EMAIL fa la strada della NOTA — fuori dal confronto e
+            # riscritta qui — e per la STESSA ragione: non tocca il
+            # prezzo, quindi correggere un refuso non deve annullare
+            # l'ordine e coniare una fattura nuova. (Il suo blob per
+            # giunta non e' confrontabile, come quello dell'indirizzo:
+            # due ragioni che portano allo stesso posto.)
+            # IL CONFRONTO E' SUL CHIARO, ed e' la riga da non
+            # ammorbidire: sui blob Fernet non e' deterministico, e
+            # ogni tocco su «Paga» sembrerebbe un cambio.
+            # NIENTE «mail_testo and», la trappola della vicina: il
+            # VUOTO E' UN VALORE — «cancello l'email e ripago»
+            # fallirebbe in silenzio.
+            # E COL DEGRADO NON SI TOCCA NIENTE: senza chiave il blob
+            # e' vuoto ma il testo no, e scrivere quel vuoto
+            # CANCELLEREBBE un'email gia' in colonna — cioe' il
+            # contrario di «non si e' potuta salvare».
+            if not mail_persa and mail_testo != _email_corriere_letta(
+                    mio["email_corriere"]):
+                con.execute(
+                    "UPDATE ordini SET email_corriere=?, "
+                    "email_corriere_il=? WHERE id=? AND stato='creato'",
+                    (mail, mio["email_corriere_il"]
+                     or (int(time.time()) if mail else 0), mio["id"]))
+                con.commit()
             con.close()
             # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
             # mono sconta): prezzo_sats nasce gia' scontato, quindi
@@ -21086,6 +21610,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
                     "via_punto": mio["via_punto"] or 0,
+                    # anche sulla ripresa: chi ha appena scritto
+                    # un'email deve sapere che non e' stata salvata,
+                    # e la fattura ripresentata non cambia niente
+                    "email_non_salvata": mail_persa,
                     # la nota FRESCA e non mio["nota_compratore"]: la
                     # riga e' stata letta PRIMA dell'UPDATE qui sopra,
                     # quindi quel campo e' gia' stantio
@@ -21453,16 +21981,19 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
-        "nota_compratore,"
+        "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, rete, tipo,
          nota,
+         # il timbro guarda il BLOB e non il testo: col degrado non c'e'
+         # niente in colonna, quindi non c'e' nessun «primo» da datare
+         mail, int(time.time()) if mail else 0,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats,
@@ -21487,6 +22018,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             # client di ieri, a cui manca solo la riga del risparmio)
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # L'EMAIL NON SALVATA (ago 2026): l'ordine e' nato — un
+            # campo facoltativo non impedisce di comprare — ma chi
+            # l'aveva scritta deve saperlo, o crederebbe che il codice
+            # gli arrivera' dal corriere. Il rimedio e' nell'ordine.
+            "email_non_salvata": mail_persa,
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
             # CHI ha vinto il max. Deve uscire anche di qui e non solo
             # dal preventivo: il paySheet riscrive le sue righe con le
@@ -21825,6 +22361,17 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # dei bool proprio per non poterlo interpolare.
     if o["nota_compratore"]:
         msg += "\n\n" + _coda_nota(False, True)
+    # L'EMAIL PER IL CORRIERE lasciata alla CASSA (ago 2026): fin qui
+    # il venditore la sapeva solo dall'endpoint dell'ordine, che gira
+    # DOPO il pagamento — e chi la lascia prima non gliela diceva
+    # nessuno. Una riga in coda a «Hai venduto», mai una notifica
+    # seconda: e' lo stesso fatto, arrivato un momento prima.
+    # ⚠️ IL GATE E' IL TIMBRO E MAI LA COLONNA CIFRATA: _cifra_contenuto
+    # prefissa anche il vuoto ('plain:'), quindi quella colonna non e'
+    # mai '' su un ordine che ci e' passato — la lezione gia' pagata
+    # dal braccio del codice della busta nel libro mastro.
+    if o["email_corriere_il"]:
+        msg += "\n\n" + _coda_email_corriere(False, True)
     # ...e in fondo la riga operativa di chi ha un negozio collegato:
     # e' l'ULTIMA cosa che legge perche' e' l'unica che gli chiede di
     # uscire da Barattolo. Vuota per tutti gli altri.
@@ -22446,6 +22993,153 @@ async def leggi_indirizzo(ordine_id: int,
             "correzioni": o["indirizzo_correzioni"]}
 
 
+# --------- L'EMAIL PER IL CORRIERE (ago 2026, tappa B) ---------
+# Spedendo a un locker il venditore puo' mettere i recapiti del
+# COMPRATORE come destinatario: da li' il codice di ritiro glielo
+# manda il corriere, e da noi non passa. La META' che mancava era
+# procurarsi quel recapito senza la chat — che e' precisamente cio'
+# che chi non ha ne' username Telegram ne' npub NON HA.
+#
+# LE DECISIONI DI ANDREA, e sono la voce:
+#  - UN CAMPO SOLO, l'EMAIL. Il telefono non entra in Barattolo per
+#    nessuna ragione: vincolo permanente.
+#  - FACOLTATIVA, mai una condizione per comprare. Chi non la lascia
+#    continua come oggi: il codice arriva al venditore, che lo
+#    deposita nella busta.
+#  - DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
+#    ⚠️ QUESTA RIGA E' STATA ROVESCIATA (ago 2026): diceva «mai alla
+#    cassa», e dall'ago 2026 il campo c'e' anche li'. IL PERCHE' DI
+#    ALLORA RESTA VERO ed e' diventato la FORMA — un campo facoltativo
+#    non sta sulla strada dell'acquisto, e infatti in cassa vive dietro
+#    un tocco, dentro il cassetto del punto, senza nessuna guardia su
+#    «Paga». IL FATTO NUOVO che l'ha rovesciata, e allora non era stato
+#    considerato: il punto si sceglie PRIMA di pagare e l'email DOPO,
+#    quindi un venditore veloce compra l'etichetta prima che l'email
+#    esista — e da li' in poi il gate 'locked' la chiude, giustamente.
+#    L'ordine RESTA la seconda porta: chi non la vede prima la mette
+#    dopo, e questo endpoint non cambia di una riga.
+#  - IL MODERATORE VEDE CHE C'ERA, MAI QUALE. In disputa gli serve
+#    sapere se il codice e' stato consegnato, e quello lo legge dalla
+#    dichiarazione del venditore e dalla data: l'indirizzo non lo
+#    aiuta a decidere e gli mette in mano un dato personale che non
+#    gli serve — il precedente dell'indirizzo di casa.
+
+
+@app.post("/api/orders/{ordine_id}/email-corriere")
+async def indica_email_corriere(ordine_id: int, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE lascia (o toglie) l'email per il corriere.
+
+    IL GATE E' 'locked' + via punto, come il fratello del punto di
+    ritiro: dopo la spedizione l'etichetta e' gia' stampata, quindi
+    un'email nuova non ci arriverebbe MAI e lasciarla scrivere
+    sarebbe promettere una cosa che non succede. Il client al suo
+    posto dice cos'e' successo e porta al bottone «non mi e' arrivato
+    il codice», che e' la strada vera da li' in poi.
+
+    IL VUOTO SI ACCETTA (il patto della nota): e' facoltativa, e chi
+    ci ripensa deve poterla togliere. `email_corriere_il` invece NON
+    si azzera togliendola — e' il PRIMO, ed e' il fatto che il
+    moderatore legge in disputa.
+
+    NIENTE GATE SUL VENDITORE, ed e' la riga da non ammorbidire:
+    verrebbe naturale offrirla solo a chi dichiara la busta diretta,
+    ma quella dichiarazione arriva DOPO la spedizione — cioe' quando
+    questo campo e' gia' chiuso. Un gate cosi' non chiuderebbe mai,
+    e chiuderebbe sempre il campo a tutti.
+
+    La notifica al venditore e' STATICA: l'email non entra MAI in un
+    tubo HTML, e lui la legge dall'ordine sotto esc()."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    # il giudice PRIMA di aprire il db: un 400 non lascia mai una
+    # connessione dietro di se' (il patto dei fratelli)
+    mail, testo = _email_corriere_da_payload(d)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["via_punto"]:
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "un punto di ritiro")
+    adesso = int(time.time())
+    prima = bool(o["email_corriere"])
+    dopo = bool(mail)
+    # L'UPDATE E' CONDIZIONATO al cambio VERO, e il confronto NON puo'
+    # essere sui blob: Fernet non e' deterministico (IV casuale a ogni
+    # cifratura), quindi due blob della stessa email sono sempre
+    # DIVERSI e ogni salvataggio sembrerebbe un cambio. Si confronta
+    # il CHIARO — la lezione della ripresa del pentito, dove lo stesso
+    # errore avrebbe coniato una fattura nuova a ogni tocco.
+    if _email_corriere_letta(o["email_corriere"]) == testo:
+        con.close()
+        return {"ok": True, "email_corriere_il": o["email_corriere_il"],
+                "email_corriere_correzioni": o["email_corriere_correzioni"]}
+    correzione = prima and dopo
+    con.execute("UPDATE ordini SET email_corriere=?, email_corriere_il=?, "
+                "email_corriere_corretta_il=?, email_corriere_correzioni=? "
+                "WHERE id=?",
+                (mail, o["email_corriere_il"] or (adesso if dopo else 0),
+                 adesso if correzione else o["email_corriere_corretta_il"],
+                 (o["email_corriere_correzioni"] or 0)
+                 + (1 if correzione else 0), ordine_id))
+    con.commit()
+    con.close()
+    # Il journal dice CHE e' successo, mai COSA: un'email dentro i log
+    # del VPS sarebbe un'email fuori dalla promessa e fuori dalla
+    # scopa (il patto della busta e dell'indirizzo).
+    print(f"📧 Ordine #{ordine_id}: email per il corriere "
+          f"{'tolta' if not dopo else 'corretta' if correzione else 'indicata'}"
+          f" dal compratore")
+    await notifica(o["venditore_id"], _coda_email_corriere(prima, dopo))
+    return {"ok": True,
+            "email_corriere_il": o["email_corriere_il"]
+            or (adesso if dopo else 0),
+            "email_corriere_correzioni":
+                (o["email_corriere_correzioni"] or 0)
+                + (1 if correzione else 0)}
+
+
+@app.get("/api/orders/{ordine_id}/email-corriere")
+async def leggi_email_corriere(ordine_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """L'email si legge SOLO da qui, e solo le due parti.
+
+    IL MODERATORE MAI, da nessuna strada e in nessuno stato — la
+    regola dell'indirizzo di casa: in disputa gli arriva il FATTO
+    («il compratore aveva lasciato un'email per il corriere», con la
+    data) e mai il valore. Autorizzazione PRIMA dell'esistenza col
+    400 opaco: chi enumera gli id non impara niente.
+
+    GET PURO: leggere un recapito non e' una ricevuta e non sposta un
+    sat — nessuna scrittura, nessuno stato toccato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if o["email_corriere_purgata_il"]:
+        # la promessa mantenuta, detta a chi la incontra
+        quando = time.strftime("%d/%m/%Y",
+                               time.localtime(o["email_corriere_purgata_il"]))
+        raise HTTPException(404, f"L'email è stata cancellata il {quando}, "
+                                 f"alla chiusura dell'ordine")
+    mail = _email_corriere_letta(o["email_corriere"])
+    if not mail:
+        raise HTTPException(404, "Nessuna email su questo ordine")
+    return {"email": mail, "indicata_il": o["email_corriere_il"],
+            "corretta_il": o["email_corriere_corretta_il"],
+            "correzioni": o["email_corriere_correzioni"]}
+
+
 # ------------------ LA BUSTA DI CONSEGNA (ago 2026) ------------------
 # Per ritirare un pacco a un punto servono il NOME che il venditore ha
 # messo come destinatario (di fantasia: il corriere esige un nome, noi
@@ -22583,8 +23277,16 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
                                      "adesso: riprova fra poco")
     adesso = int(time.time())
     correzione = o["busta_il"] > 0
+    # IL DEPOSITO AZZERA LA BUSTA DIRETTA, nella stessa unica
+    # scrittura (c'e' la sentinella che le conta): la busta supersede
+    # la dichiarazione «il codice arriva direttamente al compratore»,
+    # ed e' anche il suo annulla naturale — chi aveva dichiarato per
+    # sbaglio deposita e basta. Una scrittura sola = mai lo stato
+    # «depositata E dichiarata» nemmeno per un istante, ed e'
+    # l'invariante che il libro mastro sorveglia.
     con.execute("UPDATE ordini SET busta_nome=?, busta_codice=?, "
                 "busta_file=?, busta_file_tipo=?, busta_file_nome=?, "
+                "busta_diretta_il=0, "
                 "busta_il=?, busta_corretta_il=?, busta_correzioni=? "
                 "WHERE id=?",
                 (_cifra_contenuto(nome), _cifra_contenuto(codice),
@@ -22631,6 +23333,69 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     return {"ok": True, "busta_il": o["busta_il"] or adesso,
             "busta_correzioni": o["busta_correzioni"]
             + (1 if correzione else 0)}
+
+
+@app.post("/api/orders/{ordine_id}/busta-diretta")
+async def dichiara_busta_diretta(ordine_id: int,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """LA PORTA TARDIVA della busta diretta (ago 2026, cantiere 45,
+    decisione di Andrea): chi ha spedito SENZA la spunta nel form
+    resta sotto sollecito per sempre, e l'unica uscita sarebbe una
+    busta finta — da qui dichiara a ordine gia' spedito che il codice
+    di ritiro arriva direttamente al compratore (recapiti suoi
+    sull'etichetta). Il sollecito stesso nomina questa porta.
+
+    Solo su 'shipped': su 'locked' la dichiarazione si da' con la
+    spunta di segna_spedito, e in disputa una dichiarazione fresca e'
+    solo materiale da chat — il moderatore legge quella che c'era.
+    La guardia di proprieta' sta DENTRO la WHERE col 400 dei
+    fratelli: estraneo, ordine inesistente, stato o via sbagliati
+    ricevono la stessa risposta — chi enumera non impara niente.
+    IDEMPOTENTE sul doppio tocco: l'UPDATE e' condizionato a
+    busta_diretta_il=0, e il secondo tocco su rete lenta trova
+    rowcount 0 e risponde ok SENZA seconda notifica (dichiarare due
+    volte la stessa cosa non e' un errore). Non tocca spedito_il,
+    aggiornato ne' lo stato: nessuna ancora si muove.
+    L'ANNULLA NON C'E' APPOSTA: se il codice arriva invece a lui,
+    deposita la busta — e il deposito azzera la dichiarazione da se'.
+    """
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato='shipped' AND via_punto=1",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["busta_il"]:
+        # Le istruzioni sono GIA' nell'ordine: dichiarare che il
+        # codice arriva altrove contraddirebbe la busta depositata.
+        con.close()
+        raise HTTPException(400, "Le istruzioni di ritiro sono già "
+                                 "nell'ordine: il compratore le legge "
+                                 "da lì")
+    adesso = int(time.time())
+    cur = con.execute("UPDATE ordini SET busta_diretta_il=? "
+                      "WHERE id=? AND busta_diretta_il=0",
+                      (adesso, ordine_id))
+    gia = cur.rowcount == 0
+    con.commit()
+    con.close()
+    if gia:
+        return {"ok": True, "busta_diretta_il": o["busta_diretta_il"]}
+    print(f"📦 Ordine #{ordine_id}: il venditore ha dichiarato la "
+          f"busta diretta (il codice di ritiro va al compratore)")
+    # L'aspettativa del compratore cambia — gli era stato promesso
+    # «ti avviseremo quando il codice sara' nell'ordine» — e glielo
+    # si dice. Testo STATICO, la lingua della famiglia busta.
+    await notifica(o["compratore_id"],
+                   "📦 <b>Aggiornamento sul ritiro</b>: il venditore ha "
+                   "indicato i tuoi recapiti come destinatario — il "
+                   "codice di ritiro ti arriva direttamente dal "
+                   "corriere, non dall'ordine. Se non ti arriva, "
+                   "scrivigli o apri una disputa dall'ordine.")
+    return {"ok": True, "busta_diretta_il": adesso}
 
 
 @app.get("/api/orders/{ordine_id}/busta-ritiro")
@@ -22778,6 +23543,12 @@ async def segna_spedito(ordine_id: int, req: Request,
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
+    # LA BUSTA DIRETTA (ago 2026, cantiere 45): il venditore dichiara
+    # che il codice di ritiro arriva DIRETTAMENTE al compratore —
+    # recapiti suoi sull'etichetta — quindi la busta non si aspetta.
+    # Vale solo sulla via punto (fuori non ha oggetto e si ignora);
+    # chiave assente = 0, che su 'locked' e' la verita' di sempre.
+    busta_diretta = bool(d.get("busta_diretta"))
     # 'Ritiro in zona' e' il gemello di 'Consegna a mano' per gli
     # ordini col ritiro scelto dal compratore: niente pacco, niente
     # tracciamento — ma il timer di sblocco d'ufficio parte uguale.
@@ -22870,11 +23641,17 @@ async def segna_spedito(ordine_id: int, req: Request,
     # timbro e motivo sono coerenti). Sulle altre vie i campi sono gia'
     # a zero: scriverli e' innocuo e tiene l'UPDATE uno solo.
     # `punto_obiezioni` NON si azzera: e' la memoria del moderatore.
+    # La dichiarazione della busta diretta viaggia nello stesso unico
+    # UPDATE: fuori dalla via punto si scrive 0, che su una riga
+    # appena uscita da 'locked' e' il valore che aveva gia'.
+    adesso = int(time.time())
+    diretta_ts = adesso if (busta_diretta and o["via_punto"]) else 0
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
                 "punto_obiezione='', punto_obiezione_nota='', "
                 "punto_proposte='', punto_obiettato_il=0, "
+                "busta_diretta_il=?, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
-                (corriere, tracking, int(time.time()), int(time.time()),
+                (corriere, tracking, diretta_ts, adesso, adesso,
                  ordine_id))
     con.commit()
     con.close()
@@ -22899,6 +23676,18 @@ async def segna_spedito(ordine_id: int, req: Request,
             # d'arrivo parte da QUI — una volta sola, mai il doppione
             # «in viaggio» + «ti aspetta».
             await notifica(o["compratore_id"], MSG_BUSTA_PRONTA)
+        elif diretta_ts:
+            # LA BUSTA DIRETTA: qui non si promette «il codice sara'
+            # nell'ordine», che non arrivera' mai — lo manda il
+            # corriere ai recapiti del compratore, e lo si dice.
+            dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
+                         f"<b>{track_e}</b>" if tracking else "")
+            await notifica(o["compratore_id"],
+                f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
+                f"ritiro</b>{dettaglio}! Il venditore ha indicato i "
+                f"tuoi recapiti come destinatario: il codice per "
+                f"ritirarlo te lo manda direttamente il corriere "
+                f"quando il pacco arriva.")
         else:
             # Il caso normale: il pacco parte, il codice arrivera'
             # al venditore quando il pacco e' al punto — e sara' il
@@ -23305,6 +24094,15 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     'locked' puo' aver consumato i tre squilli), pausa e tetto di
     famiglia. I contatori dell'automatico della busta non si toccano,
     per la regola di sempre.
+    E LA BUSTA DIRETTA E' RIENTRATA (ago 2026): fino a ieri il gate
+    `busta_diretta_il=0` la teneva fuori, perche' li' il venditore non
+    aspetta nessuna busta e sollecitarlo era un rimprovero a vuoto.
+    Restava scoperto il rovescio — il codice partito verso un recapito
+    e mai arrivato — dove chi ha comprato non aveva NESSUNA maniglia e
+    tutte e tre le porte tacevano. Adesso quel ramo entra col suo
+    messaggio: non «deposita il codice» ma «non mi e' arrivato
+    niente», che e' l'unico fatto che il venditore non puo' sapere da
+    solo. Stessa finestra e stessi contatori: e' la stessa fase.
     Qui i sats non si muovono mai, solo parole; la notifica parte DOPO
     il commit."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
@@ -23324,7 +24122,27 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     "AND o.consegna_scelta != 'ritiro' "
                     # la seconda fase (cantiere 44): spedito verso un
                     # punto, busta mai depositata — qui si chiede il
-                    # codice di ritiro
+                    # codice di ritiro.
+                    # E IL CODICE DICHIARATO DIRETTO AL COMPRATORE
+                    # (cantiere 45) ADESSO ENTRA ANCH'ESSO, con un
+                    # mestiere diverso: ago 2026, e questa riga
+                    # ROVESCIA il gate che lo teneva fuori. Allora il
+                    # bottone non aveva niente da dire — il venditore
+                    # non aspetta nessuna busta, e sollecitarlo era un
+                    # rimprovero per niente, cioe' «un bottone che
+                    # porta a un 400 e' peggio di un bottone che non
+                    # c'e'». Ma il caso che restava scoperto e' il
+                    # rovescio: il codice e' andato a un recapito e li'
+                    # non e' arrivato, e chi ha comprato non aveva
+                    # NESSUNA maniglia per dirlo — la busta diretta
+                    # zittiva tutte e tre le porte, e il primo squillo
+                    # cadeva al giorno 10 su una giacenza di tre.
+                    # Il bottone quindi c'e', ma non chiede «deposita
+                    # il codice»: dice «non mi e' arrivato niente», che
+                    # e' l'unico fatto che il venditore non puo'
+                    # sapere da solo — ed e' anche cio' che gli apre la
+                    # via d'uscita (depositare la busta azzera la
+                    # dichiarazione da se').
                     "OR o.stato='shipped' AND o.via_punto=1 "
                     "AND o.busta_il=0)",
                     (ordine_id, user["id"])).fetchone()
@@ -23333,6 +24151,14 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Operazione non permessa")
     # l'unico 'shipped' che la WHERE fa entrare e' quello della busta
     busta = o["stato"] == "shipped"
+    # ...in due gusti: la busta che il venditore deve ancora
+    # depositare, e quella DIRETTA, dove il codice e' gia' partito
+    # verso un recapito e il fatto da riferire e' che non e' arrivato.
+    # Cadenza, finestra e contatori restano gli STESSI: e' la stessa
+    # fase (chi ha comprato bussa sul codice di ritiro) e il venditore
+    # che nel frattempo deposita la busta risolve il problema, quindi
+    # da li' in poi non c'e' piu' niente per cui bussare.
+    diretta = busta and o["busta_diretta_il"] > 0
     if not o["consegna_scelta"]:
         # LA STESSA DOMANDA CHE SI FA `segna_spedito` (ago 2026, dal
         # campo: il bottone non compariva su ordini vecchi e pagati da
@@ -23414,17 +24240,34 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     (adesso, ordine_id))
     con.commit()
     con.close()
+    if diretta:
+        # IL FATTO CHE SOLO CHI COMPRA PUO' SAPERE (ago 2026): il
+        # codice e' partito verso un recapito e li' non e' arrivato.
+        # Il venditore non ha modo di accorgersene da solo — a lui il
+        # corriere non manda niente — quindi questo messaggio non
+        # sollecita un gesto in ritardo: RIFERISCE, e la via d'uscita
+        # e' nella riga dopo. Non si dice mai «hai sbagliato
+        # l'indirizzo»: il recapito puo' essere giusto e il messaggio
+        # essere finito nello spam, o il pacco non essere ancora
+        # arrivato al punto.
+        await notifica(o["venditore_id"],
+                       f"📮 <b>Chi ha comprato «{titolo}» non ha "
+                       "ricevuto il codice di ritiro.</b>\n"
+                       "Hai indicato i suoi recapiti come "
+                       "destinatario, quindi il codice doveva "
+                       "arrivargli dal corriere: non è successo, o non "
+                       "l'ha trovato. Se il codice ce l'hai tu, apri "
+                       "l'ordine nella Mini App e <b>deposita il nome "
+                       "del destinatario e il codice</b> — da lì lo "
+                       "legge lui e la dichiarazione si annulla da "
+                       "sola. La giacenza è corta: senza le istruzioni "
+                       "il pacco torna indietro, con le spese di reso.")
+        return {"ok": True}
     if busta:
         # La prima riga dice un fatto che sappiamo DAVVERO — e' il
         # compratore ad aver premuto — e non promette un arrivo che
         # non possiamo verificare (decisione di Andrea: niente «e'
         # arrivato al punto», Barattolo coi corrieri non parla).
-        # CANTIERE 45 (traccia, non costruito): se il venditore ha
-        # messo l'email del COMPRATORE sull'etichetta, il codice gli
-        # arriva diretto dal corriere e non passa da noi — questo
-        # messaggio direbbe una cosa sbagliata. Quel ramo
-        # (dichiararlo nell'ordine, e zittire busta e promemoria) e'
-        # un cantiere suo.
         await notifica(o["venditore_id"],
                        f"🔔 <b>Chi ha comprato «{titolo}» sta aspettando "
                        "il codice di ritiro.</b>\n"
@@ -23902,12 +24745,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         if user["id"] in FONDATORI and not u["titolo"]:
             con.execute("UPDATE utenti SET titolo='t_fondatore' "
                         "WHERE tg_id=?", (user["id"],))
-        giorno = oggi_locale()
-        if (u["xp_ultimo_giorno"] or "") != giorno:
-            assegna_xp(con, user["id"], "visita", AZIONI_XP["visita"],
-                       f"giorno:{giorno}")
-            con.execute("UPDATE utenti SET xp_ultimo_giorno=? WHERE tg_id=?",
-                        (giorno, user["id"]))
+        # (Qui si timbrava la visita del giorno. Il commit RESTA: serve
+        # ad assegna_coorte e al titolo dei fondatori, qui sopra.)
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -23948,6 +24787,18 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     barattolo_cond = ({"token": _bc["token"],
                        "quanti": len(json.loads(_bc["ids"])),
                        "aggiornato": _bc["aggiornato"]} if _bc else None)
+    # Da che lato vengono i suoi XP, per la riga del cassetto. Letto
+    # QUI perche' e' qui che il database e' ancora aperto, come i
+    # titoli e i punti di ritiro qui sopra. Il costo e' quello di una
+    # riga per affare concluso SUO, sull'indice della UNIQUE di
+    # `xp_eventi` che comincia proprio col tg_id: niente a che vedere
+    # con la classifica, che invece guarda tutto il mercatino.
+    _dove_xp, _par_xp = sql_xp_commercio()
+    xp_ruoli = xp_per_ruolo(
+        [(r["riferimento"], r["punti"]) for r in con.execute(
+            "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? "
+            f"AND {_dove_xp}", [user["id"]] + _par_xp)],
+        (u["xp"] or 0) if u else 0) if u else None
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -24174,6 +25025,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["livello"] = livello_utente(
         u["xp"] if u else 0,
         ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
+    # ...e da che lato vengono quegli XP, che e' la meta' che il numero
+    # da solo non dice. None quando i conti non tornano (vedi
+    # `xp_per_ruolo`): chiave vuota = il cassetto dice la frase di
+    # sempre, che e' vera comunque — un'assenza non e' una bugia. Qui
+    # escono i NUMERI e mai la prosa: la riga la scrive il client, che
+    # e' l'unico posto che la mostra.
+    profilo["xp_ruoli"] = xp_ruoli
     # La porta della classifica: il client non deve mostrare un
     # bottone che porta a una pagina spenta. Esce il FATTO e non le
     # tarature — K, RIF e il peso sono roba del giudice, e un
@@ -24340,13 +25198,6 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
-    # Un indirizzo che INCASSA vale XP, una volta sola. Solo se c'e'
-    # davvero: la stessa POST serve anche a cancellarlo, e togliere
-    # non e' un traguardo. Chi lo toglie tiene i punti — il registro
-    # e' append-only, e questo qui e' un fatto successo.
-    if addr:
-        await premia_xp(user["id"], "incassi", AZIONI_XP["incassi"],
-                        "ln_address")
     sbloccati = 0
     for oid in incassi:
         r = await _sblocca_sats(oid)
@@ -26597,7 +27448,6 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
     await premia_distintivi(user["id"])
-    await premia_xp(user["id"], "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "verificata": True}
 
 
@@ -28521,6 +29371,14 @@ def pulisci_indirizzi():
     parola «trasporta»: senza, «non lo conserviamo» sarebbe una frase
     e basta.
 
+    E DALL'AGO 2026 SPAZZA ANCHE L'EMAIL PER IL CORRIERE, che e' la
+    stessa promessa su un altro campo — il nome resta il suo (il patto
+    dei nomi interni: si rinominano i testi, mai le chiavi). QUI
+    DENTRO e non in una gemella: le due velocita' e il gate sulla leva
+    sono la parte delicata, e due copie divergono al primo ritocco;
+    le tre righe da non ammorbidire qui sotto valgono identiche per
+    tutte e due.
+
     DUE VELOCITA', ed e' una decisione di Andrea che viene dritta
     dalla regola di casa — «garantiamo la TRANSAZIONE, non la
     consegna»:
@@ -28583,10 +29441,30 @@ def pulisci_indirizzi():
                 "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
                 "AND stato='released' AND disputata=0",
                 (adesso,)).rowcount
+            # L'EMAIL PER IL CORRIERE VIAGGIA CON LUI (ago 2026), e
+            # sta QUI DENTRO e non in una gemella: le due velocita' e
+            # il gate sulla leva sono la parte delicata, e due copie
+            # divergono al primo ritocco — il patto gia' scritto nella
+            # docstring. Due UPDATE in piu' con la stessa forma, le
+            # stesse tre righe da non ammorbidire (la guardia
+            # `<>''`, `aggiornato` mai toccato, i soli stati
+            # assorbenti).
+            veloce += con.execute(
+                "UPDATE ordini SET email_corriere='', "
+                "email_corriere_purgata_il=? "
+                "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
+                "AND stato='released' AND disputata=0",
+                (adesso,)).rowcount
         # 2) LA FINESTRA: chi si e' chiuso senza quella conferma
         n = con.execute(
             "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
             "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
+            "AND stato IN ('released','refunded') AND aggiornato < ?",
+            (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
+        n += con.execute(
+            "UPDATE ordini SET email_corriere='', "
+            "email_corriere_purgata_il=? "
+            "WHERE email_corriere<>'' AND email_corriere_purgata_il=0 "
             "AND stato IN ('released','refunded') AND aggiornato < ?",
             (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
         con.commit()
@@ -29576,6 +30454,19 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                 stato_busta += (f", poi corrett{'a' if n == 1 else 'e'} "
                                 f"{n} volt{'a' if n == 1 else 'e'} "
                                 f"(ultima il {ultima})")
+        elif o["busta_diretta_il"]:
+            # LA BUSTA DIRETTA: «MAI depositate» qui direbbe il falso
+            # — il venditore ha dichiarato che il codice arriva
+            # direttamente all'acquirente. E' un FATTO con data, ma
+            # e' una dichiarazione di PARTE, e la nota lo etichetta
+            # cosi': il moderatore pesa, non crede sulla parola.
+            quando_d = time.strftime(
+                "%d/%m/%Y %H:%M", time.localtime(o["busta_diretta_il"]))
+            stato_busta = (f"il venditore ha DICHIARATO (il {quando_d}) "
+                           f"che il codice di ritiro arriva direttamente "
+                           f"all'acquirente, recapiti suoi "
+                           f"sull'etichetta — è una dichiarazione di "
+                           f"parte, non un fatto verificato")
         else:
             stato_busta = "istruzioni di ritiro MAI depositate"
         nota_punto = (
@@ -29608,6 +30499,30 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         nota_indirizzo = (
             f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
             f"leggono solo le parti: non è mostrato ai moderatori.")
+    # L'EMAIL PER IL CORRIERE: il FATTO e la data, MAI il valore
+    # (decisione di Andrea). Al moderatore serve sapere se il codice
+    # e' stato consegnato, e quello lo legge dalla dichiarazione del
+    # venditore qui sotto: un recapito non lo aiuta a decidere e gli
+    # mette in mano un dato personale che non gli serve — il
+    # precedente dell'indirizzo, alla lettera.
+    # ⚠️ QUI DENTRO NON SI DECIFRA NIENTE, e la sentinella che lo
+    # verifica legge anche i commenti: il nome della funzione che non
+    # si chiama non va scritto nemmeno qui.
+    nota_email = ""
+    if o["email_corriere_il"]:
+        quando_e = time.strftime("%d/%m/%Y %H:%M",
+                                 time.localtime(o["email_corriere_il"]))
+        stato_em = f"lasciata il {quando_e}"
+        ne = o["email_corriere_correzioni"]
+        if ne:
+            stato_em += (f", poi corretta {ne} "
+                         f"volt{'a' if ne == 1 else 'e'}")
+        if not o["email_corriere"] and not o["email_corriere_purgata_il"]:
+            stato_em += ", e poi TOLTA dall'acquirente"
+        nota_email = (
+            f"\n📧 L'acquirente aveva lasciato un'email per il "
+            f"corriere ({stato_em}). Il valore non è mostrato ai "
+            f"moderatori: serve a sapere SE la scorciatoia c'era.")
     # IL SERVIZIO (ago 2026): la lezione avviene su Meet, fuori — qui
     # dentro non c'e' NIENTE, e la regola dichiarata all'acquisto e'
     # che si giudicano le CONDIZIONI, non il fatto. I due fatti sono
@@ -29682,7 +30597,7 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
                               "decisione." + nota_digitale + nota_punto
-                              + nota_indirizzo + nota_servizio
+                              + nota_indirizzo + nota_email + nota_servizio
                               + avviso_nota)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
@@ -30208,6 +31123,13 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # cancellazione e indirizzo_atteso — che servono al client per
         # sapere quale pannello disegnare senza poter sbirciare.
         r.pop("indirizzo", "")
+        # E l'email per il corriere idem: si legge solo dalla sua
+        # rotta, e solo le due parti (l'admin MAI, nemmeno in
+        # disputa — li' gli arriva il FATTO con la data). Escono i
+        # fatti: il quando, le correzioni, il timbro della
+        # cancellazione. Servono al client per disegnare il cassetto
+        # senza poter sbirciare.
+        r.pop("email_corriere", "")
         # Il collegamento del servizio idem: si legge solo da
         # /accesso, e solo le due parti. `accesso_il` e le correzioni
         # ESCONO — sono il SE e il QUANDO, cioe' il secondo dei due
@@ -31199,11 +32121,6 @@ async def lascia_feedback(ordine_id: int, req: Request,
         raise
     finally:
         con.close()
-    # Lasciare il feedback vale XP a CHI LO LASCIA: e' il gesto che
-    # tiene in piedi la reputazione di tutti, e senza un incentivo lo
-    # fa solo chi e' arrabbiato. Uno per ordine, come il feedback.
-    await premia_xp(user["id"], "feedback", AZIONI_XP["feedback"],
-                    f"ordine:{ordine_id}")
     stelle = "★" * voto
     await notifica(per,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "
@@ -31798,7 +32715,19 @@ async def sollecita_buste_ferme():
     solleciti_busta): un contatore ereditato salterebbe al tetto. Al
     tetto il 🧊 ai moderatori — a quel punto il pacco e' probabilmente
     tornato indietro — poi silenzio, il patto dei solleciti. Qui i
-    sats non si muovono mai, solo parole; notifiche DOPO il commit."""
+    sats non si muovono mai, solo parole; notifiche DOPO il commit.
+    LA BUSTA DIRETTA TACE (ago 2026, cantiere 45): chi ha dichiarato
+    che il codice arriva direttamente al compratore non aspetta
+    niente, e il promemoria lo rimprovererebbe per una busta che non
+    arrivera' mai — la WHERE lo esclude, e col promemoria tace anche
+    il 🧊 (stessa query). Il testo del sollecito nomina la porta
+    tardiva: e' cosi' che chi ha dimenticato la spunta la scopre.
+    QUESTA ESCLUSIONE RESTA E RESTA GIUSTA (ago 2026), ma da oggi non
+    lascia l'ordine muto: a guardare quella popolazione c'e'
+    `sollecita_codici_diretti`, che squilla al COMPRATORE — l'unico
+    che possa accorgersi che il codice non e' arrivato — e gli da' la
+    strada per dirlo. Al venditore, qui come li', non si chiede niente
+    finche' non c'e' un fatto da riferirgli."""
     if PROMEMORIA_BUSTA_GIORNI <= 0 or PROMEMORIA_CONFERMA_GIORNI <= 0:
         return
     adesso = int(time.time())
@@ -31811,6 +32740,9 @@ async def sollecita_buste_ferme():
         # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
         "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.stato='shipped' AND o.via_punto=1 AND o.busta_il=0 "
+        # la busta diretta: il codice va al compratore, qui non c'e'
+        # niente da aspettare — ne' promemoria ne' 🧊
+        "AND o.busta_diretta_il=0 "
         "AND o.spedito_il>0 AND o.solleciti_busta <= ? "
         "AND MAX(o.spedito_il + ?, o.sollecito_busta_il + ?) < ?",
         (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
@@ -31840,7 +32772,10 @@ async def sollecita_buste_ferme():
                     f"apri l'ordine e deposita il nome del "
                     f"destinatario e il codice: senza, il compratore "
                     f"non può ritirare il pacco, e la giacenza scade "
-                    f"in pochi giorni.")
+                    f"in pochi giorni. Se invece il codice arriva "
+                    f"direttamente all'acquirente (hai messo i suoi "
+                    f"recapiti sull'etichetta), dillo dall'ordine: "
+                    f"smettiamo di chiedertelo.")
             else:
                 # Il tetto e' passato: tocca a un umano, poi silenzio.
                 await notifica_admin(
@@ -31923,6 +32858,27 @@ async def sollecita_ritiri_al_punto():
     compratore riceve solo il primo: li' il caso nasce grave e si
     attenua, qui nasce normale e si aggrava.
 
+    LA BUSTA DIRETTA RESTA FUORI APPOSTA (ago 2026, cantiere 45,
+    decisione di Andrea): sugli ordini dichiarati «il codice arriva
+    direttamente al compratore» questo promemoria NON squilla — e ci
+    resta fuori PER COSTRUZIONE, senza una riga: la WHERE esige
+    `busta_il>0`, e il deposito azzera la dichiarazione nello stesso
+    UPDATE, quindi le due popolazioni non si toccano mai. Il perche'
+    e' che li' il corriere ha i recapiti del COMPRATORE ed e' lui a
+    mandargli codice e promemoria di giacenza — il nostro squillo
+    duplicherebbe, ancorato per giunta alla spedizione e non
+    all'arrivo, che non sappiamo: busserebbe «vai a ritirare» su un
+    pacco che viaggia ancora.
+    RESTA FUORI DA QUI, ma non e' piu' muta (ago 2026): quella
+    popolazione ce l'ha adesso `sollecita_codici_diretti`, qui sotto,
+    che dice una cosa che il corriere NON dice — «se il codice non ti
+    e' arrivato, guarda anche nello spam, e poi dillo dall'ordine» — e
+    che per l'obiezione qui sopra si tiene un testo vero anche col
+    pacco ancora in transito. Ha colonne SUE: un ordine passa di qui
+    dopo essere passato di la' (il compratore dice che non e'
+    arrivato, il venditore deposita), e col contatore condiviso
+    arriverebbe al tetto prima di sentire il primo «vai a ritirare».
+
     Qui i sats non si muovono mai, solo parole; notifiche DOPO il
     commit, ognuna nel suo try."""
     if PROMEMORIA_RITIRO_GIORNI <= 0:
@@ -31988,6 +32944,156 @@ async def sollecita_ritiri_al_punto():
                     f"garanzia finché l'affare non si chiude.")
         except Exception as e:
             print(f"⚠️ Promemoria ritiro saltato (#{r['id']}): {e}")
+
+
+async def sollecita_codici_diretti():
+    """IL CODICE CHE NON PASSA DA QUI (ago 2026): la TERZA sorella
+    della famiglia della busta, e la popolazione che fino a ieri non
+    guardava NESSUNO.
+
+    Con la busta diretta (cantiere 45) il venditore ha messo i
+    recapiti del compratore sull'etichetta, quindi il codice di
+    ritiro glielo manda il corriere e da noi non passa. Da quel
+    momento l'ordine diventava MUTO: sollecita_buste_ferme lo esclude
+    (`busta_diretta_il=0` nella sua WHERE), sollecita_ritiri_al_punto
+    lo salta per costruzione (esige `busta_il>0`) e il bottone a
+    comando aveva lo stesso gate. Il primo squillo arrivava al giorno
+    10, da sollecita_conferme_ferme — mentre la giacenza al punto
+    dura ~3 giorni: quando qualcuno bussava, il pacco era gia'
+    tornato al mittente.
+
+    NON DUPLICA IL CORRIERE, ed e' la ragione per cui questa funzione
+    puo' esistere accanto alla docstring della sorella, che dichiara
+    la busta diretta fuori proprio perche' «il corriere ha i recapiti
+    del COMPRATORE ed e' lui a mandargli codice e promemoria di
+    giacenza». Vero, e resta vero: quel che il corriere NON manda e'
+    «se il codice non ti e' arrivato, ecco cosa fare su Barattolo».
+    Questo messaggio dice quello — piu' la cosa che nessun altro dira'
+    mai a chi aspetta: guarda anche nello spam.
+
+    IL TESTO DEV'ESSERE VERO ANCHE COL PACCO IN VIAGGIO, ed e' l'altra
+    meta' della stessa obiezione: l'ancora e' `spedito_il` e non
+    l'arrivo al punto, che non sappiamo, quindi il primo squillo puo'
+    cadere su un pacco ancora in transito. Per questo non si dice mai
+    «il codice ti e' arrivato» ne' «il pacco ti aspetta» — si dice il
+    fatto NOSTRO e certo (da quanti giorni e' partito), poi cosa fare
+    QUANDO arriva, e la strada se non arriva. E' la stessa disciplina
+    di sollecita_ritiri_al_punto: il tempo non e' nostro.
+
+    COLONNE SUE, E QUI NON E' UNA PRECAUZIONE MA IL CASO VERO DI
+    QUESTO CANTIERE. Le due popolazioni sembrano mutuamente esclusive
+    — il deposito della busta azzera `busta_diretta_il` nello stesso
+    UPDATE — ma un ordine PASSA dall'una all'altra, ed e' precisamente
+    il flusso della via d'uscita: il compratore dice «non mi e'
+    arrivato», il venditore deposita, e da quel momento l'ordine e'
+    della sorella. Con `solleciti_punto` condiviso, chi avesse speso
+    qui i tre squilli arriverebbe al tetto e non sentirebbe MAI il
+    «vai a ritirare» — muto proprio dopo che il sistema gli ha appena
+    risolto il problema.
+
+    `busta_il=0` NELLA WHERE E' UNA CINTURA, non una condizione: il
+    deposito azzera gia' la dichiarazione, quindi oggi e' ridondante.
+    Serve il giorno che qualcuno cambiasse quell'UPDATE — senza,
+    partirebbero due promemoria che si contraddicono.
+
+    LA GUARDIA `spedito_il>0` INVECE SERVE DAVVERO, ed e' la
+    divergenza dalla sorella: li' `busta_il>0` garantisce l'ancora,
+    qui `busta_il` e' zero per definizione e senza guardia il MAX
+    varrebbe 0 — una raffica su ogni 'shipped' storico al primo giro.
+    E' la stessa riga che ha sollecita_buste_ferme, per la stessa
+    ragione.
+
+    NESSUN 🧊, tetto STRETTO: identico alla sorella e per il suo
+    stesso motivo — la finestra e' corta, il 🧊 cadrebbe prima di
+    CODA_FERMI_GIORNI e romperebbe l'invariante «se il 🧊 e' partito,
+    la riga c'e'». Il caso lo raccoglie la coda al giorno 10, dove
+    compare con «🔕 mai sollecitato».
+
+    NIENTE LEVE NUOVE: cadenza e finestra sono PROMEMORIA_RITIRO_GIORNI
+    (2, che fa finestra E passo, come per la sorella) e il tetto e'
+    PROMEMORIA_CONFERMA_MAX — squilli a 2, 4, 6 giorni dalla
+    spedizione. A un giorno il pacco puo' essere ancora in viaggio, a
+    tre la giacenza e' gia' cominciata.
+
+    IL VENDITORE SOLO ALL'ULTIMO, e non e' un rimprovero: finche'
+    nessuno gli dice che il codice non e' arrivato non c'e' NIENTE che
+    possa fare (la decisione di Andrea su chi riceve il promemoria).
+    All'ultimo squillo pero' un fatto c'e' — il pacco sta per
+    tornargli indietro con le spese di reso — ed e' la stessa riga che
+    la sorella ha gia'.
+
+    Qui i sats non si muovono mai, solo parole; notifiche DOPO il
+    commit, ognuna nel suo try."""
+    if PROMEMORIA_RITIRO_GIORNI <= 0:
+        return                       # leva a 0 = popolazione spenta
+    adesso = int(time.time())
+    passo = PROMEMORIA_RITIRO_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+        "o.solleciti_diretti, o.spedito_il, a.titolo FROM ordini o "
+        # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='shipped' AND o.via_punto=1 "
+        # la popolazione COMPLEMENTARE della sorella: qui la busta non
+        # arrivera' mai, perche' il codice e' andato al compratore
+        "AND o.busta_diretta_il>0 "
+        # cintura: oggi il deposito azzera gia' la dichiarazione
+        "AND o.busta_il=0 "
+        # senza, il MAX varrebbe 0 sugli 'shipped' storici
+        "AND o.spedito_il>0 "
+        # STRETTO: senza il 🧊 non c'e' un giro al tetto da fare
+        "AND o.solleciti_diretti < ? "
+        # la staffetta: da qui in poi parla il promemoria della conferma
+        "AND o.solleciti_conferma = 0 "
+        "AND MAX(o.spedito_il + ?, o.sollecito_diretto_il + ?) < ?",
+        (PROMEMORIA_CONFERMA_MAX, passo, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_diretto_il=?, "
+                    "solleciti_diretti=solleciti_diretti+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio.
+        titolo = html.escape((r["titolo"] or "il tuo acquisto")[:60])
+        # i giorni dal delta VERO e mai dalla leva (la regola della
+        # sorella): dopo un server spento il primo squillo dira' «da 9
+        # giorni» invece di 2 — vero, mentre «2, 4, 6» e' un'aspirazione
+        giorni = max(1, (adesso - r["spedito_il"]) // 86400)
+        quanti = f"{giorni} giorni" if giorni > 1 else "1 giorno"
+        try:
+            await notifica(r["compratore_id"],
+                f"📦 <b>«{titolo}» è in viaggio verso il punto di "
+                f"ritiro da {quanti}.</b> Il codice per ritirarlo te lo "
+                f"manda il corriere ai recapiti che il venditore ha "
+                f"indicato come destinatario: quando il pacco arriva, "
+                f"controlla la posta — <b>anche nello spam</b>. Se non "
+                f"ti è arrivato niente, aprilo dalla Mini App e "
+                f"<b>dillo al venditore</b>: può mettere le istruzioni "
+                f"di ritiro dentro l'ordine.")
+            if r["solleciti_diretti"] == PROMEMORIA_CONFERMA_MAX - 1:
+                # SOLO l'ultimo, e non e' un rimprovero: fin qui non
+                # c'era niente che potesse fare. Adesso un fatto c'e'.
+                await notifica(r["venditore_id"],
+                    f"📦 <b>«{titolo}» potrebbe tornarti indietro.</b> "
+                    f"Il pacco è partito da {quanti} verso il punto di "
+                    f"ritiro e l'acquirente non l'ha ancora preso. Hai "
+                    f"indicato i suoi recapiti come destinatario, "
+                    f"quindi il codice è andato a lui: se non gli è "
+                    f"arrivato, puoi mettere tu le istruzioni di "
+                    f"ritiro nell'ordine. Se la giacenza scade il "
+                    f"corriere lo rimanda al mittente.")
+        except Exception as e:
+            print(f"⚠️ Promemoria codice diretto saltato (#{r['id']}): {e}")
 
 
 async def sollecita_punti_obiettati():
@@ -35115,6 +36221,15 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Promemoria ritiri al punto saltati: {e}")
         try:
+            # la TERZA della famiglia: il codice e' andato dritto al
+            # compratore e da noi non passa. Anche questa DOPO il
+            # promemoria della conferma, per la stessa staffetta —
+            # e adiacente alle due sorelle, che sono i tre modi in cui
+            # un pacco al punto puo' restare fermo
+            await sollecita_codici_diretti()
+        except Exception as e:
+            print(f"⚠️ Promemoria codici diretti saltati: {e}")
+        try:
             await scadenze_offerte()
         except Exception as e:
             print(f"⚠️ Scadenze offerte saltate: {e}")
@@ -35905,8 +37020,13 @@ CONTROLLI_LIBRO_MASTRO = (
     ("righe d'offerta orfane",
      "figlie di un'offerta che non esiste piu': la fusione le "
      "cancella PRIMA della testata, qualcuno ha rotto l'ordine",
-     "SELECT r.id FROM offerte_righe r WHERE NOT EXISTS "
-     "(SELECT 1 FROM offerte o WHERE o.id=r.offerta_id)"),
+     # l'id mostrato e' l'offerta MANCANTE, che e' quel che si cerca —
+     # e la tabella una colonna `id` non ce l'ha proprio (un `r.id`
+     # qui esplodeva sul database vero: le prove giravano su un
+     # cartone che divergeva dal DDL — trovato da un collaudo del
+     # cantiere accanto, che fa girare la ronda su init_db vero)
+     "SELECT DISTINCT r.offerta_id FROM offerte_righe r WHERE NOT "
+     "EXISTS (SELECT 1 FROM offerte o WHERE o.id=r.offerta_id)"),
     ("offerta mono con righe figlie",
      "un'offerta su UN annuncio con delle figlie di carrello: due "
      "verita' sulla stessa trattativa",
@@ -36002,10 +37122,35 @@ CONTROLLI_LIBRO_MASTRO = (
      "flag, nome e codice si scrivono nello stesso UPDATE e solo "
      "sulla via punto: una riga spaiata e' un deposito a meta' o una "
      "guardia caduta",
+     # ⚠️ IL BRACCIO DEL CODICE GUARDA LA COLONNA, NON IL CONTENUTO
+     # (ago 2026): dal cantiere del documento il codice SCRITTO e'
+     # facoltativo — basta il QR del corriere — quindi una busta col
+     # codice vuoto e' NORMALE, e qui non suona. Non suona pero' per
+     # una ragione che leggendo la riga non si vede: _cifra_contenuto
+     # prefissa anche il vuoto ('plain:'), quindi dopo un deposito
+     # quella colonna non e' MAI ''. Cio' che il braccio prende e' la
+     # colonna mai SCRITTA insieme al timbro, cioe' una guardia
+     # caduta. Il giorno che il trasporto smettesse di prefissare,
+     # questo suonerebbe ogni giorno su un caso normale — il modo in
+     # cui un allarme smette di essere letto: c'e' una riga sana
+     # nella ronda delle prove che tiene quel fatto inchiodato.
+     # DA NON AGGIUNGERE, e verra' in mente: «una busta depositata
+     # deve avere il codice O il documento». Lo garantisce gia'
+     # l'endpoint col suo 400, e in SQL non si puo' dire onestamente:
+     # dentro il cifrato non si guarda.
+     # I due bracci della BUSTA DIRETTA (ago 2026, cantiere 45):
+     # la dichiarazione vive solo sulla via punto (la guardia
+     # dell'endpoint e il gate di segna_spedito la rendono
+     # impossibile altrove — se compare, una guardia e' caduta), e
+     # il deposito la azzera nello STESSO UPDATE, quindi «depositata
+     # E dichiarata» non ha nessuno stato transitorio legittimo:
+     # tutti e due passano la domanda d'ammissione.
      "SELECT id FROM ordini WHERE (busta_il>0) <> (busta_nome<>'') "
      "OR (busta_il>0) <> (busta_codice<>'') "
      "OR (busta_il>0 AND via_punto=0) "
-     "OR (busta_corretta_il>0 AND busta_il=0)"),
+     "OR (busta_corretta_il>0 AND busta_il=0) "
+     "OR (busta_diretta_il>0 AND via_punto=0) "
+     "OR (busta_diretta_il>0 AND busta_il>0)"),
     # L'OBIEZIONE SUL PUNTO (ago 2026), il calco della busta qui sopra
     # e per la stessa ragione: timbro e motivo si scrivono nello STESSO
     # UPDATE e solo sulla via punto, quindi non esiste uno stato
@@ -36047,6 +37192,21 @@ CONTROLLI_LIBRO_MASTRO = (
      "OR (indirizzo='' AND indirizzo_il>0 AND indirizzo_purgato_il=0) "
      "OR (indirizzo<>'' AND via_punto=1) "
      "OR (indirizzo_purgato_il>0 AND indirizzo<>'')"),
+    # L'EMAIL PER IL CORRIERE (ago 2026): il gemello, con TRE bracci
+    # invece di quattro. Manca «piena senza timbro» all'inverso —
+    # cioe' non si guarda `email_corriere='' AND email_corriere_il>0`,
+    # che sull'indirizzo e' un guasto e qui e' lo stato NORMALE di chi
+    # l'ha TOLTA: il campo e' facoltativo, il vuoto e' un gesto
+    # legittimo, e il timbro del PRIMO resta apposta (e' il fatto che
+    # il moderatore legge in disputa). Un allarme su un caso normale
+    # e' peggio di nessun allarme.
+    ("email per il corriere fuori contratto",
+     "l'email si scrive col suo timbro e solo sulla via punto, e "
+     "dopo la purga non deve restare niente",
+     "SELECT id FROM ordini "
+     "WHERE (email_corriere<>'' AND email_corriere_il=0) "
+     "OR (email_corriere<>'' AND via_punto=0) "
+     "OR (email_corriere_purgata_il>0 AND email_corriere<>'')"),
     # Passa la domanda che decide: il gate di nascondi_ordine ammette
     # solo released/refunded, che sono ASSORBENTI — non esiste uno
     # stato transitorio legittimo in cui questa e' falsa.
@@ -36495,7 +37655,8 @@ META_TESTO_SICUREZZA = (
 TITOLO_PRIVACY = "I tuoi dati — Barattolo"
 META_TESTO_PRIVACY = (
     "Cosa sappiamo di te, per quanto tempo e chi lo legge. E cosa non "
-    "raccogliamo: niente email, niente password, nessun tracciamento.")
+    "raccogliamo: niente password, nessun tracciamento, nessuna "
+    "pubblicità.")
 
 META_GENERICI = _meta_anteprima(TITOLO_HOME, META_TESTO_HOME, URL_PUBBLICO)
 

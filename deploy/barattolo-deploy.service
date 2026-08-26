@@ -22,6 +22,26 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/root/satmarket
 Environment=BARATTOLO_DIR=/root/satmarket
+; HOME NON SI EREDITA, ed e' il guasto che questa riga esiste per non
+; ricomprarsi (ago 2026, successo davvero): un servizio systemd nasce
+; con un ambiente quasi vuoto, e su questa macchina HOME non c'era —
+; la regola di systemd lo da' alle unita' utente e a quelle con
+; `User=`, non per forza a un'unita' di sistema che gira come root.
+; Senza, git non trova ne' /root/.gitconfig (dove sta scritto il
+; credential.helper) ne' /root/.git-credentials; il remoto e' HTTPS,
+; quindi il `git fetch` del primo passo fallisce a OGNI giro. E NON
+; SI FERMA CON UN ERRORE: deploy.sh ripiega e se ne va zitto — nel
+; journal resta «git fetch non riuscito (rete? credenziali?)» ogni
+; minuto, e da fuori sembra soltanto che non ci sia niente di nuovo.
+; La cura era una riga a mano sul VPS, e una riga a mano si perde al
+; primo `cp deploy/barattolo-deploy.* /etc/systemd/system/`.
+Environment=HOME=/root
+; IL RESTO DELLA FAMIGLIA E' GIA' STATO GUARDATO, cosi' non lo si
+; rifa': il PATH di serie basta (git, curl, systemctl e python3
+; stanno tutti sotto /usr/bin), e i tre python3 di deploy.sh sono
+; stdlib piu' config.py — nessun pacchetto di terzi, quindi non serve
+; il python di un venv. Chi aggiungesse un `import` di terzi in uno
+; di quegli heredoc si ricompra il guasto da un'altra porta.
 ExecStart=/bin/bash -c 'cp /root/satmarket/deploy.sh /tmp/barattolo-deploy.sh && exec /bin/bash /tmp/barattolo-deploy.sh'
 ; Un deploy che si impianta non deve restare appeso per sempre: il
 ; giro dopo riprova da capo.

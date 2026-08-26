@@ -596,7 +596,7 @@
   .searchbar input{
     flex:1;width:100%;
     border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
-    padding:11px 84px 11px 38px;font:inherit;font-weight:600;outline:none;
+    padding:11px 92px 11px 38px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
@@ -608,6 +608,18 @@
   .cur-seg button{border:0;background:none;padding:4px 10px;font-weight:800;
     font-size:13px;cursor:pointer;color:var(--muted);border-radius:999px}
   .cur-seg button.active{background:var(--ink);color:var(--on-ink)}
+  /* IL TOGGLE DELLA SEARCHBAR E' UN FILO PIU' GRANDE (ago 2026, dal
+     campo: a 13px si leggeva poco e il bersaglio era minuscolo). La
+     misura vive su `#curSeg` e NON sulla regola base, che veste altre
+     otto superfici — dal conto della pagina Paga alla testata del
+     carrello — dove nessuno ha chiesto niente e lo spazio e' un altro.
+     Vince per SPECIFICITA' (l'id) e non per ordine.
+     E CRESCE COL PADDING, cioe' cresce anche l'area toccabile: il
+     bersaglio passa da 28.7x26 a 34x30 (misurati). Sotto i 44px
+     raccomandati resta, e per arrivarci servirebbe un ::after che
+     sborda — che qui il contenitore RITAGLIA (`overflow:hidden`):
+     toglierlo e' un'altra decisione, e tocca tutte e nove. */
+  #curSeg button{font-size:15px;padding:4px 12px}
   /* La variante "in riga" del selettore valuta: stesse due pillole
      compatte, ma dentro il flusso accanto a un campo (form avvisi)
      invece che assoluta dentro la searchbar */
@@ -874,27 +886,76 @@
      .cat-tile (griglia, piastrelle-colonna, velo sotto il nome). */
 
   /* ---------- «Da scoprire» ---------- */
-  /* La fila dei banner sotto le categorie: card rettangolari 250x115
+  /* La fila dei banner sotto le categorie: card rettangolari 272x130
      (decisione di Andrea: larghe, da banner — a 320px una quasi piena
      piu' uno spicchio della seconda, il taglio al bordo dice che ce
-     n'e' altre). Il testo sta DENTRO il disegno (750x345, colori
+     n'e' altre). Il testo sta DENTRO il disegno (816x390, colori
      fissi nei due temi come tutto cio' che vive su una foto):
-     l'etichetta la porta l'aria-label. Niente min-height sulla
-     striscia, e la divergenza da .cat-strip e' voluta: le card
-     spariscono quando non c'e' l'occasione, e uno spazio riservato
-     per una cosa assente sarebbe un buco. */
-  /* Il padding di sotto e' 6 e non i 2 della .cat-strip, e non e'
-     un vezzo: l'anello .attiva (outline 2.5 + offset 2 = 4.5px)
-     sporge sotto il bordo della card, e l'overflow della striscia lo
-     RITAGLIAVA — il bordo basso dell'anello non si vedeva (ago 2026,
-     visto da Andrea). Alle categorie non succede perche' li' sotto
-     il quadrato c'e' l'etichetta. */
+     l'etichetta la porta l'aria-label.
+     LA MISURA E' CRESCIUTA (ago 2026, da 250x115: decisione di Andrea
+     «un po' piu' grandi, soprattutto piu' ALTE»), e i due numeri che
+     la fissano sono MISURATI e non scelti a occhio.
+     IL VINCOLO NON E' IL DISEGNO — crescendo in ALTEZZA non se ne
+     perde, se ne RECUPERA: gli originali sono 2752x1536 (rapporto
+     1,792) e il ritaglio ne usava l'82% dell'altezza, adesso l'86%
+     (a 250x115 il fondo della scatola degli sconti era TAGLIATO, e
+     ora si vede intero). Il limite dell'originale e' il rapporto
+     1,792, sotto il quale si comincerebbe a tagliare in LARGHEZZA:
+     siamo a 2,092, lontani. Chi ricrescera' ancora rifaccia quel
+     conto, e sappia che il file a 3x non deve superare 2752 di
+     larghezza — cioe' una card larga 917, che nessuno vorra' mai.
+     IL VINCOLO E' LA FILA A 320px, e a decidere e' lo SPICCHIO della
+     seconda card: «il taglio al bordo dice che ce n'e' altre», qui
+     sopra, e' una promessa che si mantiene solo se resta abbastanza
+     card da vedere. Lo spicchio a 320 e' 296-W — a 272 sono 24px,
+     sopra i 20 che la .cat-strip accetta per la sua quarta card, e il
+     border-radius di 14 non se li mangia tutti. A 280 scenderebbero a
+     16, cioe' poco piu' del raggio: una scheggia, non una card.
+     IL PREZZO E' MISURATO e sta sotto: dopo il tocco, a 320x568,
+     della prima riga di card sopra la nav se ne vedono 68,8px (erano
+     59 finche' la sezione pesava 176, e 74 con le card a 250x115).
+     ⚠️ QUEL NUMERO SI CONTA DALLA PRIMA CARD e non dal contenitore —
+     il #grid ha 14px di padding sopra — mentre i 249px dello scroll
+     AL REPARTO, qui sotto, si contano dal CONTENITORE: due
+     convenzioni che convivono da sempre, e chi rimisura una delle due
+     senza saperlo trova uno scarto di 14px e crede a una
+     regressione. Lo scroll al reparto infatti NON si muove di un
+     pixel (249 prima e dopo, misurati): e' ancorato alla riga
+     «N oggetti», che sta SOTTO questa sezione — quel che si accorcia
+     qui la fa salire nel documento, non nella finestra.
+     Niente min-height sulla striscia, e la divergenza da .cat-strip
+     e' voluta: le card spariscono quando non c'e' l'occasione, e uno
+     spazio riservato per una cosa assente sarebbe un buco. */
+  /* LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+     Andrea: «troppo staccata dalla striscia sopra»), e i due numeri
+     che la avvicinano sono quel che restava da stringere senza
+     toccare nessuna delle due file:
+     — l'etichetta prende MEZZO respiro invece dei 16px di ogni
+       .section-label (regola SUA, scoped, che le sorelle il respiro
+       intero se lo tengono: qui le due strisce sono parenti — la
+       mappa dei reparti e le occasioni — e il respiro di sezione le
+       raccontava come estranee);
+     — il padding di SOPRA scende da 8 a 6 e diventa simmetrico a
+       quello di sotto.
+     6 E' IL PAVIMENTO E NON UN GUSTO, ed e' la riga da non
+     ammorbidire: l'anello .attiva (outline 2.5 + offset 2 = 4.5px)
+     sporge FUORI dalla card, e sotto i 4,5 l'overflow della striscia
+     lo RITAGLIA — e' il difetto gia' pagato in basso (ago 2026, visto
+     da Andrea: il bordo dell'anello non si vedeva). Alle categorie
+     non succede perche' li' sotto il quadrato c'e' l'etichetta.
+     C'e' la prova, e non ribatte il 4,5: lo DERIVA dall'outline.
+     L'ETICHETTA RESTA DELLA SUA FILA, che e' il vincolo dell'altro
+     verso: sopra di lei ci sono 10px (8 piu' i 2 di coda della
+     .cat-strip) e sotto 6, quindi si legge come il titolo di quel
+     che viene dopo. Chi stringesse ancora l'8 la lascerebbe a meta'
+     strada fra le due file, cioe' di nessuno. */
+  #scoprireSez .section-label{padding-top:8px}
   .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
-    padding:8px var(--pad) 6px}
+    padding:6px var(--pad) 6px}
   .scoprire-strip::-webkit-scrollbar{display:none}
-  .scoprire-card{flex:0 0 auto;position:relative;width:250px;
-    aspect-ratio:250/115;border-radius:14px;overflow:hidden;
+  .scoprire-card{flex:0 0 auto;position:relative;width:272px;
+    aspect-ratio:272/130;border-radius:14px;overflow:hidden;
     background:var(--cat-fondo);cursor:pointer}
   .scoprire-card:active{transform:translateY(1px)}
   /* L'anello e' quello della card categoria accesa: stesso gesto
@@ -919,8 +980,11 @@
      l'origine al centro uno scale>=1 puo' solo ritagliare, mai
      scoprire, quindi il respiro parte da scale(1); e l'onda ruota
      un'immagine GIA' ingrandita del 5% — la rotazione di 0.8° scopre
-     negli angoli ~1.8px (250/2 x sin 0.8°), il 5% ne copre quasi 3
-     sul lato corto. Chi alza i gradi rifa' quel conto. */
+     negli angoli ~1,9px (272/2 x sin 0.8°), il 5% ne copre 3,25 sul
+     lato corto (130). Chi alza i gradi rifa' quel conto, che in
+     forma generale e' W/H < (scale-1)/sin(θ) = 3,58: crescendo in
+     ALTEZZA il margine migliora — col rapporto sceso da 2,17 a 2,09
+     siamo piu' al sicuro di prima, non meno. */
   .scoprire-card[data-id="lampo"] img{
     animation:sc-onda 5s ease-in-out infinite}
   .scoprire-card[data-id="sconto"] img{
@@ -993,8 +1057,11 @@
      numeri: spostare a destra fa DUE lavori, allontana dalla scia che
      sale a destra e scavalca la sua coda in basso a sinistra (a
      left:14 un corpo da 21 non passerebbe, a left:18 si). Il filo del
-     disegno sta a x=289 sull'immagine; qui l'inchiostro vero finisce
-     a 166 e la fascia sorvegliata a 258, cioe' 10px CSS di margine.
+     disegno sta a x=318 sull'immagine (816 di larghezza); qui la
+     fascia sorvegliata finisce a 282, cioe' 12px CSS di margine —
+     ed e' CRESCIUTO da quando la card e' piu' grande: erano 3px a
+     250x115, e quel «capolinea» si e' allontanato da solo, perche'
+     la fascia e' in px CSS mentre la scia si scala col disegno.
      Chi lo sposta ancora o lo ingrandisce lo sente dalla CI — la
      fascia del contrasto legge QUESTA regola, non piu' la sola base:
      senza, avrebbe continuato a guardare dove il titolo stava ieri. */
@@ -1829,10 +1896,9 @@
   /* L'unitario in coda alla riga dell'offerta: piu' piccolo del
      totale, che e' quello che si legge per primo. */
   .off-unitario{font-size:12px;font-weight:600;color:var(--muted)}
-  /* «al pezzo» sotto l'unita' del campo: a CAPO e non in riga, o a
-     320px il suffisso si mangia il campo dove si scrive. */
-  .off-alpezzo{display:block;font-size:11px;font-weight:700;
-    line-height:1.1;white-space:nowrap}
+  /* (la .off-alpezzo — «al pezzo» sotto l'unita' del campo — e' morta
+     col totale in superficie, ago 2026: i campi delle trattative
+     parlano il totale e la toppa non ha piu' niente da toppare) */
   /* Il numero statico dentro un bottone: sul tasto offerta, e su
      «Acquista» quando un accordo ha gia' fissato i pezzi. Non cede
      MAI — a stringersi e' la parola, come nella riga meta della
@@ -2808,6 +2874,36 @@
     font-weight:800;font-size:14px;color:var(--muted)}
   .cl-fr{margin-left:auto;flex:0 0 auto;color:var(--muted);
     font-size:20px;line-height:1}
+  /* Il punteggio: un posto SUO a destra, e non in coda alla riga
+     della reputazione — quella porta gia' stelle, media, conteggio e
+     affari, e a 320px un numero in piu' la manderebbe a capo. Mono
+     come ogni cifra di casa, e `margin-left:auto` per spingerlo a
+     destra: quando la freccia non c'e' (riga non toccabile) il numero
+     resta comunque al suo posto. */
+  .cl-punti{margin-left:auto;flex:0 0 auto;font-weight:800;
+    font-size:14px;font-family:var(--mono);color:var(--ink)}
+  .cl-punti + .cl-fr{margin-left:6px}
+  /* IL CARTELLO DEL RODAGGIO (ago 2026, decisione di Andrea): la
+     classifica e' accesa, ma finche' la commissione e' sospesa i
+     punti si prendono gratis — quindi il giorno che si accende gli
+     XP si azzerano e la lista riparte da zero. IL RISCHIO NON E'
+     CHE LA VEDANO: e' che ci si affezioni a una posizione che
+     sparira', e quello si DICE invece di nasconderlo (il patto
+     della commissione sospesa e del rodaggio).
+     LA VESTE E' QUELLA DEL RODAGGIO (--sats-soft col bordo arancio)
+     e non una hint grigia: in questa pagina ce ne sono gia' due di
+     fila, e una terza si perderebbe proprio dove deve farsi
+     vedere. Non riusa la classe della fascia in Esplora, che e'
+     centrata e tutta in 800: tarata per una riga sola, su tre
+     righe di prosa sarebbe un muro. Non e' toccabile — dice e
+     basta, quindi niente cursore e niente :active. */
+  .cl-rodaggio{
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:16px;padding:11px 14px;margin:0 0 14px;
+    font-size:13px;line-height:1.45;font-weight:600;
+    color:var(--sats-text);
+  }
+  .cl-rodaggio b{font-weight:800}
   /* La sfilza dei distintivi accanto al nome del venditore: emoji
      nude in fila con un piccolo respiro (niente cerchietti d'oro:
      nude e sovrapposte si impasterebbero — l'oro resta alle tessere
@@ -4327,7 +4423,11 @@ document.getElementById('cartello')?.remove();</script>
            costante unica, la stessa che dice il vuoto nel cassetto -->
       <span id="emptyBarattolo" style="display:none"></span>
       <button class="btn orange" id="emptyVendi" onclick="go('vendi')">+ Metti in vendita</button>
-      <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()">🛍 Esplora il mercatino</button>
+      <!-- la LENTE della nav, la stessa icona di Esplora: un cuore solo
+           per le icone, e l'emoji delle borsette cambiava forma da un
+           telefono all'altro. A 20px il tratto si rialza a 1.9, o
+           rimpicciolito si assottiglierebbe (il calco del coming soon) -->
+      <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>Esplora il mercatino</button>
       <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
     </div>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
@@ -4560,25 +4660,11 @@ document.getElementById('cartello')?.remove();</script>
     <div class="ctrl-corpo" id="acqCorpo"></div>
   </div>
 
-  <!-- ============ VISTA: L'OFFERTA SUL PACCO, PRESTO (ago 2026) ====
-       «Fai un'offerta» dalla cassa porta qui: l'offerta sull'intero
-       set e' un cantiere futuro, e una pagina che lo dice e' piu'
-       onesta di un bottone che non c'e'. Lo stile e' quello del
-       coming soon delle aste: markup fisso, nessun dato utente,
-       .empty con la mascotte — chiaro e scuro gratis. Vista interna
-       (non radice): l'indietro riporta alla cassa, e il bottone dice
-       «Torna indietro» invece di nominare il carrello — da qui si
-       torna al conto, non alla composizione. -->
-  <div class="view" id="view-offertapresto">
-    <div class="empty" style="padding-top:34px">
-      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
-      <div class="big">💰</div>
-      <b class="empty-title">L'offerta sul carrello sta arrivando</b>
-      <span>Presto potrai proporre il tuo prezzo per l'intero carrello.<br>
-        Sui singoli oggetti puoi già farlo, dalla loro scheda.</span>
-      <button class="btn orange" onclick="navIndietro()">← Torna indietro</button>
-    </div>
-  </div>
+  <!-- (La vista «offertapresto» — il coming soon dell'offerta sul
+       carrello — e' morta col cantiere che l'ha accesa, ago 2026: il
+       bottone della cassa apre il foglio vero. Le entry gia' scritte
+       nella cronologia di qualcuno degradano su Esplora, il ramo vive
+       in navRendiVista accanto a quello di 'sfoglia'.) -->
 
   <!-- ============ VISTA: IL PAGAMENTO PROTETTO ============ -->
   <!-- La pagina lunga del deposito di garanzia: ci si arriva dal
@@ -4651,7 +4737,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3>L'indirizzo per la spedizione</h3>
       <p>Se scegli la <b>spedizione a casa</b>, l'indirizzo lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato e quando.</p>
       <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b>appena confermi di aver ricevuto l'oggetto viene cancellato</b> — da quel momento l'affare è chiuso e quello che succede fra te e il venditore non ci riguarda più. Se invece l'ordine si chiude <i>senza</i> la tua conferma — un rimborso, una disputa decisa da un moderatore — sparisce entro <b><span data-giorni-ind></span> giorni</b>. Finché l'ordine è aperto resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
-      <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore.</p>
+      <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore. Puoi lasciare <b>la tua email</b>, se vuoi che il codice di ritiro te lo mandi il corriere invece del venditore: è facoltativa, non è mai una condizione per comprare, e sparisce con l'ordine.</p>
 
       <h3>Dove stanno i sats, e per quanto</h3>
       <!-- Testo pesato con attenzione (deciso con Andrea): niente la
@@ -4670,7 +4756,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><span class="em">⚡</span><b>I sats.</b> Il deposito non vive qui dentro: sta su un <b>nodo Lightning nostro</b>, separato dal server, e la sua seed è custodita offline. Il gestionale che lo comanda è ospitato da terzi; il nodo e la seed no.</li>
         <li><span class="em">🟣</span><b>Gli annunci.</b> Vanno su <b>Nostr</b> (NIP-99) ed esistono sui relay indipendentemente da noi. Se hai una <b>chiave Nostr tua</b>, provata, l'annuncio esce sul <b>tuo</b> account — a firmarlo è il tuo browser, la chiave non passa mai di qui — e resta tuo anche se Barattolo non c'è più. Se non ce l'hai lo firma la nostra: resta leggibile in piazza, ma a governarlo siamo noi. La chiave si collega dal Profilo, ed è il motivo per cui abbiamo scelto Nostr dal primo giorno.</li>
         <li><span class="em">📖</span><b>Il codice.</b> È la cosa più facile da rimettere in piedi altrove.</li>
-        <li><span class="em">💾</span><b>Lo storico degli ordini</b> e la reputazione che ci avete costruito. Vivono in un posto solo, ma sono salvati ogni giorno, con copie anche fuori dal server.</li>
+        <li><span class="em">💾</span><b>Lo storico degli ordini</b> e la reputazione che ci avete costruito. Vivono in un posto solo, ma sono salvati ogni giorno.</li>
       </ul>
 
       <!-- Il link della pagina si poteva raggiungere ma non PRENDERE:
@@ -4728,7 +4814,9 @@ document.getElementById('cartello')?.remove();</script>
       <ul class="sicu-lista">
         <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
-        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello.</li>
+        <li>Il tuo <b>Lightning address</b>, se lo imposti per incassare da solo: è un <span class="mono">nome@dominio</span>, come una mail, e ce l'abbiamo <b>in chiaro</b> — è lì che ti mandiamo i sats quando un affare si chiude, quindi dobbiamo poterlo leggere. Non esce da nessuna parte: non lo vede chi compra, non lo vedono i moderatori.</li>
+        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano una cosa sola — quanto hai comprato e venduto.</li>
+        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
       </ul>
@@ -4739,11 +4827,16 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>La revoca</b> è un tocco e il link muore subito: la pagina si rilegge dai nostri dati a ogni apertura, non c'è una copia che sopravviva. Tre limiti onesti, però: chi aveva la pagina già aperta la vede finché non ricarica; l'anteprima del link che Telegram o WhatsApp tengono in cache può durare qualche giorno, ma mostra solo il titolo generico — la lista, in quell'anteprima, non c'è mai entrata; e uno screenshot resta, come per ogni cosa pubblicata. Se un domani ricondividi, il link sarà nuovo: quello vecchio resta morto.</p>
 
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
-      <p>Quattro cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
+      <p>Cinque cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
         <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio. Questo, se vuoi, puoi anche <b>tenertelo nel profilo</b> per non riscriverlo ogni volta: è l'unica delle quattro che si può salvare, e la ragione è che un punto di ritiro è un <i>luogo pubblico</i> — un locker, una tabaccheria — mentre casa tua no. Lo salvi con un tocco quando compri, mai da solo, e lo togli quando vuoi.</li>
         <li><b>Il codice</b> di un buono o di un prodotto digitale, che chi vende consegna qui dentro invece che in chat.</li>
+        <!-- LA QUINTA (ago 2026). E' l'unica che si puo' NON dare senza
+             perdere niente: chi non la lascia riceve il codice dal
+             venditore, come sempre. Va detto qui, o «facoltativa»
+             resterebbe una parola del pannello e non una promessa. -->
+        <li><b>La tua email</b>, se scegli il punto di ritiro e vuoi che il <b>codice del locker</b> te lo mandi direttamente il corriere. È facoltativa: senza, il codice arriva a chi vende, che te lo passa qui dentro. La legge <b>solo chi ti vende</b>, per stampare l'etichetta, e sparisce con l'ordine come l'indirizzo. <b>Il numero di telefono non te lo chiediamo mai</b>, nemmeno qui.</li>
         <!-- LA QUARTA (ago 2026). E' l'unica delle quattro che l'utente
              sceglie di scrivere, ed e' anche l'unica che RESTA: va
              detto qui e non solo fra le durate, perche' e' la voce che
@@ -4778,6 +4871,10 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="priv-durate">Per quanto teniamo le cose</h3>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>: fino alla tua conferma, o <span data-giorni-ind></span> giorni dalla chiusura senza conferma. Qui sopra c'è la storia per intero.</li>
+        <!-- L'email viaggia con la stessa scopa e con le stesse due
+             velocita': e' letteralmente lo stesso giro (pulisci_indirizzi),
+             e per questo la riga sta ACCANTO invece che in fondo. -->
+        <li><b>L'email per il corriere</b>: la stessa cosa, e con la stessa scopa — sparisce insieme all'indirizzo, alle stesse condizioni.</li>
         <li><b>La sessione del browser</b>, se entri dal web: <b><span data-durata="sessione"></span> giorni</b>, poi si rientra. Nel database non c'è il tuo accesso ma solo la sua impronta.</li>
         <li><b>L'accesso da dentro Telegram</b> vale <b><span data-durata="initdata"></span> ore</b>: dopo, riaprendo l'app, se ne fa uno nuovo.</li>
         <li><b>La memoria di quali avvisi ti abbiamo già mandato</b>: <b><span data-durata="avvisi"></span> giorni</b>, così lo stesso annuncio non ti risuona addosso.</li>
@@ -4786,6 +4883,13 @@ document.getElementById('cartello')?.remove();</script>
              l'unica senza scadenza: per questo la strada per toglierla
              sta nella stessa riga, invece che da qualche altra parte. -->
         <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «📍 Punti di ritiro», con una ✕ accanto a ognuno.</li>
+        <!-- Terza voce senza scadenza, e la ragione e' quella delle
+             altre due: ce l'ha messo LUI. ⚠️ Questa riga si e' potuta
+             scrivere solo dall'ago 2026, quando il bottone per
+             toglierlo e' nato: prima il server la stringa vuota la
+             accettava ma dal client non si arrivava, e «finche' non lo
+             togli» sarebbe stata una porta che non si apre. -->
+        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «⚡ Incassi e pagamenti», col suo bottone.</li>
         <!-- Ricade sotto «tutto il resto non ha una scadenza», ma si
              nomina lo stesso: e' testo LIBERO scritto da una persona, e
              chi lo scrive ha diritto di sapere che resta. La strada per
@@ -4814,6 +4918,7 @@ document.getElementById('cartello')?.remove();</script>
            la guardia alle due parti, il contenuto digitale ha il ramo
            admin_disputa. -->
       <p><b>Il tuo indirizzo non lo legge.</b> Quando si apre una disputa un moderatore guarda l'ordine per decidere, e del tuo indirizzo non vede niente nemmeno lì: gli risulta soltanto <i>se</i> l'hai indicato e quando, mai una riga di quello che hai scritto. Lo stesso vale per il nome e il codice di ritiro della busta e per il documento del corriere: quelli li leggono solo chi compra e chi vende.</p>
+      <p><b>La tua email per il corriere non la legge.</b> Vale la stessa regola dell'indirizzo, per la stessa ragione: gli risulta soltanto <i>se</i> l'avevi lasciata e quando, che è quello che gli serve per capire da dove doveva arrivare il codice. Il valore no.</p>
       <p><b>Il contenuto di un buono o di un codice digitale invece sì.</b> Se apri una disputa su un acquisto digitale, il moderatore lo legge. Non c'è modo di decidere quella lite senza guardarlo — è l'oggetto stesso del contendere, e chi la apre di solito dice proprio che quel codice non funziona.</p>
       <!-- LA QUARTA ASIMMETRIA (ago 2026), e per la STESSA ragione della
            precedente: e' l'oggetto del contendere. Va detta qui e non
@@ -4840,8 +4945,8 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Nessun tracciamento.</b> Niente analytics, niente pixel, niente cookie di terzi: nella pagina non c'è nessuno oltre a noi. Da agosto 2026 <b>nemmeno i caratteri</b> — prima li chiedevamo a Google, e a ogni apertura il tuo indirizzo IP arrivava a Google. Adesso stanno qui.</li>
         <li><b>Un cookie solo</b>, e serve a tenerti dentro se entri dal browser: contiene un numero casuale, e nel database c'è soltanto la sua impronta.</li>
         <li><b>Non vendiamo niente a nessuno</b> e non ti profiliamo. Non c'è pubblicità, quindi non c'è nessuno a cui rivenderti.</li>
-        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: è facoltativo e sparisce con l'indirizzo.</li>
-        <li><b>Il tuo wallet non passa da qui.</b> Se lo colleghi, la connessione resta sul tuo dispositivo e non arriva mai ai nostri server.</li>
+        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un'email puoi lasciarla quando compri, o dopo dall'ordine, se vuoi il codice del locker dal corriere; un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: sono facoltativi tutti e due e spariscono con l'ordine. <b>Un campo per il telefono, da solo, in Barattolo non esiste.</b></li>
+        <li><b>La connessione al tuo wallet non passa da qui.</b> Se lo colleghi, resta sul tuo dispositivo e non arriva mai ai nostri server. Il <b>Lightning address</b> è un'altra cosa e ce l'abbiamo, se lo imposti: qui sopra c'è cos'è e per quanto.</li>
       </ul>
       <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
 
@@ -5779,6 +5884,45 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
   </div>
 
+  <!-- ============ SHEET OFFERTA SUL CARRELLO (ago 2026) ============ -->
+  <!-- Il gemello SEMPLIFICATO di #offertaSheet: UNA cifra sul TOTALE
+       del carrello. NIENTE toggle €/₿ e niente ancora, deliberato:
+       la cifra si scrive nella valuta dell'OFFERTA — 'eur' solo se
+       TUTTE le righe sono a listino EUR, altrimenti 'sats' (la regola
+       del server) — che e' UNA e non cambia mai col foglio aperto,
+       quindi non esiste nessuna conversione da ancorare. Le pillole
+       RIEMPIONO il campo (il patto del gemello), il minimo e' sulla
+       SOMMA dei listini, la riga viva dice quel che parte. -->
+  <div class="sheet" id="offertaCarrelloSheet" role="dialog" aria-modal="true"
+       aria-labelledby="offCarrTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="offCarrTitolo">💰 Offri per tutto il carrello</h3>
+      <!-- Il toggle dei suoi fratelli: e' quello GLOBALE dell'app
+           (setValuta, data-cur, la preferenza in localStorage), non un
+           comando di questo foglio — le superfici si accendono
+           insieme. Qui governa la LETTURA e il CAMPO; la cifra che
+           parte resta quella dell'offerta, che e' l'unica valuta in
+           cui l'accordo esiste. -->
+      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <!-- «N articoli · listino Σ»: la scrive il render -->
+    <div id="offCarrTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div class="consegna-scelta" id="offCarrChips" style="margin:0 0 10px"></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="offCarrImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offCarrScritta()">
+      <span id="offCarrSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
+    </div>
+    <div id="offCarrMinimo" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div>
+    <div id="offCarrRiga" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaOffertaCarrello(this)">💰 Offri</button>
+  </div>
+
   <!-- ============ SHEET PUNTATA D'ASTA (ago 2026) ============ -->
   <div class="sheet" id="puntaSheet">
     <div class="grab"></div>
@@ -6534,6 +6678,20 @@ function mapOrder(o){
        /busta-ritiro alle sole parti, MAI all'admin */
     bustaIl:o.busta_il||0, bustaCorrettaIl:o.busta_corretta_il||0,
     bustaCorrezioni:o.busta_correzioni||0,
+    /* la busta DIRETTA (ago 2026, cantiere 45): il venditore ha
+       dichiarato che il codice di ritiro arriva direttamente al
+       compratore — recapiti suoi sull'etichetta. Timestamp, 0 = mai;
+       il deposito della busta la azzera lato server. */
+    bustaDirettaIl:o.busta_diretta_il||0,
+    /* L'EMAIL PER IL CORRIERE (ago 2026, tappa B): il compratore la
+       lascia perche' il codice del locker gli arrivi DIRETTAMENTE dal
+       corriere. Il VALORE non viaggia mai in /api/orders — qui
+       arrivano i soli FATTI (il quando, le correzioni, il timbro
+       della cancellazione), e il testo lo serve /email-corriere alle
+       sole parti, MAI all'admin. */
+    emailCorriereIl:o.email_corriere_il||0,
+    emailCorriereCorrezioni:o.email_corriere_correzioni||0,
+    emailCorrierePurgataIl:o.email_corriere_purgata_il||0,
     /* del documento arriva il solo FLAG: il nome del file e' la
        maniglia sul disco e non esce mai, i byte men che meno */
     bustaDocumento:!!o.busta_documento,
@@ -6756,9 +6914,23 @@ const condFiltrabile = () => !senzaCondizione(activeCat, '');
    un caso che nessuno ha chiesto. */
 function ordinaEffettivo(){
   if (ordinaVista) return ordinaVista;
-  if (filtroLampo && !filtroAsta) return 'lampo';
-  if (filtroAsta && !filtroLampo) return 'asta';
-  return '';
+  /* «UNA SOLA occasione», e le occasioni sono TRE: lo SCONTO conta
+     nel conteggio anche se una scadenza non ce l'ha. Senza di lui,
+     con «⚡ + 🎁» spuntate insieme si ereditava 'lampo' — e
+     quell'ordine sul server implica il suo filtro come VINCOLO DURO,
+     quindi l'unione delle due occasioni tornava alle sole lampo, in
+     silenzio: la vetrina mostrava meno di quel che le spunte
+     promettevano, e la stessa cosa dalle card e dal pannello (bug
+     dal campo, ago 2026 — la query del server era gia' giusta).
+     SI CONTA invece di confrontare le coppie: la quarta occasione di
+     domani ci entra da sola, mentre `&& !filtroX` a due a due va
+     riscritto ogni volta — ed e' precisamente il passo che qui non
+     era stato fatto quando lo sconto e' nato. */
+  if ([filtroLampo, filtroAsta, filtroSconto].filter(Boolean).length !== 1)
+    return '';
+  if (filtroLampo) return 'lampo';
+  if (filtroAsta) return 'asta';
+  return '';   /* lo sconto non ha una scadenza: niente da ereditare */
 }
 /* ...e l'etichetta che il campo-bottone mostra: l'ordine EFFETTIVO e
    non il valore del select, o il campo direbbe «Piu' recenti» mentre
@@ -7159,7 +7331,7 @@ function voceNav(view){
      entry vecchie della cronologia non arrivano qui — le degrada
      navRendiVista prima di rendere qualunque cosa. */
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
-       'acquisto','offertapresto','classifica'].includes(view)) view = 'esplora';
+       'acquisto','classifica'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -7609,6 +7781,10 @@ function navRendiVista(b){
      Ricade sulla home — degradazione, non errore, il patto delle
      entry 'sfoglia|Casa e giardino' qui sopra. */
   if (b.v === 'sfoglia') return go('esplora');
+  /* ...e nemmeno «offertapresto» (ago 2026): il coming soon
+     dell'offerta sul carrello e' morto col foglio vero, ma una entry
+     gia' scritta puo' ancora nominarlo — stessa degradazione. */
+  if (b.v === 'offertapresto') return go('esplora');
   go(b.v);
 }
 
@@ -8964,7 +9140,7 @@ function renderGrid(items){
   if (el('emptyEsplora'))
     el('emptyEsplora').style.display = vistaBarattolo ? '' : 'none';
   if (el('emptyTitolo')) el('emptyTitolo').textContent =
-    vistaBarattolo ? `🫙 ${BARATTOLO_VUOTO}`
+    vistaBarattolo ? BARATTOLO_VUOTO
     : vuotoAste ? '🔨 Nessuna asta in corso' : 'Il barattolo qui è vuoto';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
@@ -9443,9 +9619,13 @@ function tornaDaPrivacy(){ navIndietro(); }
 /* ===================== LA CLASSIFICA (ago 2026) =====================
    I migliori del mercatino, in una pagina raggiungibile dal Profilo.
    Il conto lo fa il SERVER (media pesata sulle persone x commercio):
-   qui non si calcola niente, si disegna — e il punteggio non arriva
-   nemmeno, apposta. Si mostrano la POSIZIONE e i FATTI su cui poggia,
-   che sono anche quel che permette a chi guarda di giudicare da se'.
+   qui non si calcola niente, si disegna — il punteggio arriva gia'
+   fatto, ×100 e arrotondato, e questa riga ROVESCIA quella di prima
+   («il punteggio non arriva nemmeno, apposta»). Il perche' e' che
+   senza di lui l'ordine non si legge: con tutte le medie a 5,00 si
+   vedono sette nomi identici in sette posizioni diverse. Accanto
+   restano i FATTI su cui poggia — media, persone, affari — che sono
+   quel che permette a chi guarda di giudicare da se'.
 
    Il vestito e' quello di casa: `.seller` per la riga (lo stesso
    blocco avatar+nome+reputazione del negozio e del Profilo) e
@@ -9512,6 +9692,7 @@ function rigaClassifica(v, mia){
         <b>${esc(v.nome)}</b>${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
       </div>
+      <div class="cl-punti" title="Punteggio: media dei voti e commercio">${fmt(v.punteggio || 0)}</div>
       ${cod ? '<div class="cl-fr">›</div>' : ''}
     </div>`;
 }
@@ -9539,22 +9720,41 @@ function renderClassifica(){
       ${soglie.map(s => `<button class="tema-pill${classificaFiltro===s?' active':''}" onclick="filtraClassifica(${s})">${s ? '⭐ ' + String(s).replace('.', ',') + '+' : 'Tutti'}</button>`).join('')}
     </div>` : '';
   /* LA RIGA CHE SPIEGA UN'APPARENZA (scelta di Andrea): quando tutte
-     le medie sono uguali, l'ordine lo decide il commercio — e senza
-     dirlo uno legge sette nomi con «5,00» accanto e non capisce
-     perche' e' settimo. La decide il SERVER sui dati veri, quindi
-     sparisce da sola il giorno che arriva il primo voto diverso. */
+     le medie sono uguali, l'ordine lo decidono il commercio e le
+     PERSONE — e senza dirlo uno legge sette nomi con «5,00» accanto e
+     non capisce perche' e' settimo. La decide il SERVER sui dati veri,
+     quindi sparisce da sola il giorno che arriva il primo voto
+     diverso.
+     LE PERSONE SI NOMINANO, ed e' il cantiere dello smorzamento: da
+     quante persone diverse arriva la fiducia pesa sul bonus del
+     commercio, e a pari punteggio decide l'ordine — che e' proprio il
+     caso di questa riga, dove senza XP i punti sono identici bit per
+     bit. Scritta per essere vera anche a leva SPENTA: li' le persone
+     contano comunque, sul pareggio. */
   const spiega = d.medie_piene
     ? '<div class="hint">Per ora hanno tutti la stessa media: a fare '
-      + 'la differenza è quanto si è commerciato.</div>' : '';
+      + 'la differenza sono quanto si è commerciato e da quante '
+      + 'persone diverse si è stati votati.</div>' : '';
   /* La TUA riga esce solo a te e solo se non sei nei primi: chi sta in
      fondo non compare mai in una lista che vedono gli altri. */
   const mia = d.mia ? `
     <div class="section-label" style="margin-top:22px">La tua posizione</div>
     ${rigaClassifica(d.mia, true)}` : '';
+  /* Il cartello sta in CIMA: e' la cornice della pagina, non una
+     nota a pie' di lista — prima si sa che e' provvisoria, poi si
+     legge come si legge. E' HTML letterale perche' non dipende da
+     nessun dato: niente esc() da ricordare. Vive nel ramo PIENO e
+     non sopra i due return: su «ancora nessuno in classifica» non
+     c'e' nessuna posizione a cui affezionarsi. */
   box.innerHTML = `
+    <div class="cl-rodaggio">🚧 <b>La classifica è in rodaggio.</b>
+      Quando accenderemo le commissioni i punti ripartiranno da zero
+      per tutti: oggi accumularli non costa niente, e una classifica
+      che parte da lì misurerebbe il tempo libero più del commercio.</div>
     <div class="hint">I primi ${fmt(voci.length)} su ${fmt(d.totale)} in
-      classifica. Conta la media dei feedback — pesata su quante persone
-      diverse ti hanno votato — e quanto si è commerciato.</div>
+      classifica. Conta la media dei feedback, quanto si è commerciato,
+      e da quante persone diverse ti hanno votato.
+      Il numero a destra è il punteggio che decide l'ordine.</div>
     ${spiega}${pillole}
     ${viste.map(v => rigaClassifica(v, false)).join('')}
     ${viste.length ? '' : '<div class="hint">Nessuno con questa media.</div>'}
@@ -9998,6 +10198,11 @@ function setValuta(v){
      un'altra offerta. A non derivare ci pensa l'ancora: la cifra
      resta quella scritta, e il toggle la RILEGGE convertita. */
   if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
+  /* e il gemello del carrello, con la stessa ragione: li' il toggle
+     cambia la valuta del CAMPO, e a non far derivare la cifra ci
+     pensa la sua ancora */
+  if (el('offertaCarrelloSheet')?.classList.contains('open'))
+    aggiornaFoglioOffCarr();
   /* e gli ORDINI (ago 2026): la lista si ridisegna intera — li' non
      c'e' niente di digitato da perdere e i filtri vivono in variabili
      —, la scheda invece si riscrive IN PLACE, o si porterebbe via il
@@ -10669,13 +10874,14 @@ function contoScomposto(c){
      mai un `1` muto), e il censimento delle chiamate in prove.py
      resta la rete su percentuale e origine. */
   const {art, sped, prot, tot, qta, sconto, suppl, pezziSped,
-         scontoPct, scontoOrigine} = c;
+         scontoPct, scontoOrigine, accordo} = c;
   const pezzi = qta || 1;
   /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
      riga «Articolo × N»: in un carrello l'articolo non ha un numero
      solo, mentre i pezzi spediti sono la loro somma */
   const nSped = pezziSped || pezzi;
-  if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0)) return '';
+  if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0 || accordo > 0))
+    return '';
   const r = (n, t, b, meno) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${meno?'−':''}${fmt(n)} sats</span></div>`;
   return r(art, pezzi > 1 ? `Articolo × ${fmt(pezzi)}` : 'Articolo')
        /* lo sconto del negozio: e' l'ultimo schermo prima che i sats
@@ -10694,6 +10900,9 @@ function contoScomposto(c){
            ? r(sconto, `Sconto${scontoOrigine==='codice' ? ' codice' : ''}${scontoPct
                ? ` <span class="sconto-tag">−${scontoPct}%</span>` : ''}`,
                0, 1) : '')
+       /* l'accordo sul carrello: la riga gemella dello sconto (e a
+          zero non c'e' — il pattuito puo' essere gia' il lordo) */
+       + (accordo>0 ? r(accordo, '🤝 Accordo', 0, 1) : '')
        /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
           l'ha appena mostrata, e una riga che compare e sparisce
           sullo stesso schermo si legge come «il prezzo e' cambiato»
@@ -11791,6 +12000,15 @@ function contoRighe(c){
     + (c.sconto>0
         ? r(`Sconto${c.scontoOrigine==='codice' ? ' codice' : ''}${c.scontoPct ? ` <span class="sconto-tag">−${c.scontoPct}%</span>` : ''}`,
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
+    /* L'ACCORDO SUL CARRELLO (ago 2026), il calco della riga sconto:
+       la differenza fra il lordo corrente e il totale pattuito — puo'
+       essere ZERO anche con un accordo vivo (una lampo o un listino
+       calato sotto il pattuito: chi paga paga sempre il meglio dei
+       due), e a zero la riga non c'e': non si e' sottratto niente. La
+       cifra arriva POSITIVA dal server, il meno lo mette il giudice. */
+    + (c.accordo>0
+        ? r('🤝 Accordo', cifraCtrl(c.accordo, c.circa, c.accordoEur, 1),
+            'sconto') : '')
     /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
        «Commissione Barattolo» questa riga TRONCAVA a 320px —
        l'etichetta ne chiedeva 148 e ne aveva 135, e si leggeva
@@ -11957,6 +12175,7 @@ function apriAcquisto(l){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
              nota:'', notaAperta: notaApertaDefault([l.cat]),
              codice:'', codiceAperto:false,
              errore:''};
@@ -12036,6 +12255,7 @@ function apriAcquistoSet(){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
              nota:'', notaAperta: notaApertaDefault([...setScelte.keys()]
                .map(id => (listings.find(t => t.id === id) || {}).cat)),
              codice:'', codiceAperto:false,
@@ -12132,8 +12352,15 @@ function viaDefault(vive){
 async function caricaPreventivo(){
   const d0 = acqDati; if (!d0) return;
   const body = d0.tipo==='set'
+    /* In modalita' accordo le offerte per riga si azzerano APPOSTA:
+       il server rifiuta la coesistenza (o l'accordo sul carrello o
+       le singole), e l'esclusione reciproca rende quel caso
+       impossibile solo per le offerte VIVE — una scaduta in cache lo
+       riaprirebbe. L'id dell'accordo viaggia in testata. */
     ? {righe: [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-        quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}))}
+        quantita:qta, offerta_id: d0.accordoId ? 0
+          : (offertaAccettataPer(id, true)?.id || 0)})),
+       ...(d0.accordoId ? {offerta_carrello_id: d0.accordoId} : {})}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
   /* IL CODICE SCONTO anche qui, ed e' il varco che conta: senza,
@@ -12158,8 +12385,14 @@ async function caricaPreventivo(){
     acqDati.preventivo = d;
     /* la firma segue il conto: dopo una potatura (rinfrescaSet) la
        composizione e' cambiata, e senza questa riga il rientro dal
-       carrello rifarebbe un fetch che non serve */
-    if (d0.tipo === 'set') acqDati.firma = firmaSet();
+       carrello rifarebbe un fetch che non serve.
+       IL PREFISSO DELL'ACCORDO SI CONSERVA: senza, la cassa normale
+       aperta poi sulla stessa composizione troverebbe la firma
+       uguale e riuserebbe dalla cache un conto CON l'accordo dentro
+       — un prezzo pattuito servito a chi non ha pattuito niente. */
+    if (d0.tipo === 'set')
+      acqDati.firma = (d0.accordoId ? 'acc' + d0.accordoId + '|' : '')
+        + firmaSet();
     /* il default lo dice viaDefault (spedizione prima, vedi sopra) —
        ma una via GIA' SCELTA si conserva se e' ancora viva (12 ago
        2026, con lo stepper): un ± non deve riportare chi aveva
@@ -12768,8 +13001,38 @@ function renderAcquisto(){
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
     ${linkMappePunti(retiMappa)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
+  /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
+     dentro lo STESSO cassetto — cosi' eredita per costruzione lo
+     stopPropagation del contenitore e la cascata rete → tipo → punto,
+     invece di un cassetto suo che sarebbe un secondo tocco per la
+     stessa decisione («come mi arriva il codice»).
+     FACOLTATIVA E SENZA NESSUNA GUARDIA in «Paga»: una guardia la
+     renderebbe obbligatoria, che e' la sola cosa che non deve
+     succedere — c'e' la sentinella.
+     LE PAROLE VENGONO DAI GIUDICI e non da qui: il campo vive in due
+     posti (la cassa e l'ordine) e due copie divergono al primo
+     ritocco. La LABEL invece resta diversa apposta, ed e' dichiarato:
+     nell'ordine sta sotto il suo <h4>, qui non c'e' nessun titolo e
+     deve dire tutto da se'.
+     ⚠️ IL CONTROLLO DI FORMA NON C'E', E NON E' UNA DIMENTICANZA:
+     `formaEmail` CHIEDE — «non sembra un indirizzo, ritocca Salva e lo
+     teniamo cosi'» — e per chiedere serve un gesto su cui appoggiarsi.
+     Qui l'unico bottone e' «Paga», e una domanda li' sarebbe una
+     GUARDIA, cioe' la sola cosa che questo campo non deve diventare.
+     Quindi in cassa si scrive e basta, e chi sbaglia lo corregge
+     dall'ordine, dove il controllo c'e' e il campo si riapre
+     precompilato; se il codice non arriva, la rete e' il bottone
+     «non mi e' arrivato il codice» del cantiere 49.
+     DA QUI DISCENDE CHE `emailForzata` RESTA DEL SOLO ORDINE — non e'
+     una variabile di due superfici, e un «forzato» non puo' portarsi
+     dietro nessun permesso di qua: c'e' la sentinella. */
+  const campoEmail = `<label for="acqEmail">La tua email per il corriere (facoltativa)</label>
+    <input type="email" id="acqEmail" autocomplete="email" inputmode="email"
+      maxlength="120" value="${esc(d.email||'')}" placeholder="${segnaposEmail}"
+      oninput="if(acqDati)acqDati.email=this.value">
+    <div class="acq-nota">${spiegaEmail()}</div>`;
   const campoAperto =
-    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove : ''}`;
+    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove + campoEmail : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
@@ -12935,7 +13198,11 @@ function renderAcquisto(){
      sparire col testo dentro — es. il flag che cambia fra due
      preventivi mentre il campo porta un rifiutato da correggere. */
   const cassettoCodice =
-    (p.codici_esistono !== false || codScritto)
+    /* SOTTO ACCORDO NIENTE CODICE (ago 2026): il totale pattuito E' il
+       prezzo degli articoli, deciso a mano guardando QUESTO carrello —
+       il server risponde 400 a un codice nel body, e un cassetto che
+       porta a un 400 e' peggio di un cassetto che non c'e'. */
+    (!d.accordoId && (p.codici_esistono !== false || codScritto))
     ? `<div class="cassetto-cassa ${d.codiceAperto?'field':''}" id="acqCodiceCampo">
     ${d.codiceAperto ? codCampo : codChiuso}
   </div>`
@@ -13197,6 +13464,10 @@ function renderAcquisto(){
                                articolo, che direbbe 9,99%) */
                             scontoPct: p.sconto_percento||0,
                             scontoOrigine: p.sconto_origine||'',
+                            /* l'accordo sul carrello: la riga gemella
+                               dello sconto, cifre del server */
+                            accordo: p.accordo_sats||0,
+                            accordoEur: p.accordo_eur||0,
                             /* qui la via e' SCELTA, quindi il giudizio
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
@@ -13216,7 +13487,11 @@ function renderAcquisto(){
      La strada resta comunque: la ← in testata riporta al carrello.
      Da qui gli articoli NON si aggiungono — sono troppi e comporre in
      una cassa sarebbe confuso, e lo stepper vive nel carrello. */
-  const tornaCarrello = (d.tipo==='set' && pillole.includes('pill-barra'))
+  /* ...e MAI in modalita' accordo (ago 2026): li' la composizione e'
+     PINNATA — sono le righe pattuite, fotografate — e un invito ad
+     aggiungere sarebbe un invito a rompere l'accordo. */
+  const tornaCarrello = (d.tipo==='set' && !d.accordoId
+                         && pillole.includes('pill-barra'))
     ? `<button type="button" class="btn ghost torna-carrello" onclick="navIndietro()">← Aggiungi altro nel carrello</button>`
     : '';
   /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
@@ -13228,7 +13503,10 @@ function renderAcquisto(){
   const secondari = d.tipo==='set'
     ? `<div class="ctrl-secondari">
          <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
-         <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+         ${/* niente offerta SU un accordo: la trattativa e' gia'
+               chiusa, e il server rifiuterebbe comunque (una viva
+               per coppia) */''}
+         ${d.accordoId ? '' : `<button type="button" class="btn ghost" onclick="apriOffertaCarrello()">Fai un'offerta</button>`}
        </div>` : '';
   /* il «da» della corsa morbida si cattura PRIMA che l'innerHTML
      porti via i nodi — la meccanica intera (clientWidth, il computed
@@ -13394,6 +13672,25 @@ const segnaposNota = (eSet, servizio) =>
   servizio ? 'Es. livello intermedio, vorrei lavorare sulla conversazione'
   : eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
          : 'Es. taglia L, oppure la variante blu';
+/* LE PAROLE DELL'EMAIL PER IL CORRIERE, per la stessa ragione della
+   nota qui sopra e con la stessa forma: dall'ago 2026 il campo vive
+   in DUE posti — la cassa e l'ordine — e due copie degli stessi testi
+   divergono al primo ritocco. Il campo e' UNO, le parole che lo
+   spiegano sono UNE.
+   LA SPIEGAZIONE PORTA HTML (il link alla pagina «I tuoi dati»), ed e'
+   il posto giusto per il dubbio: nasce qui, davanti al campo — il
+   pattern degli hint contestuali. In cassa il tocco non riseleziona la
+   via, perche' il cassetto che la ospita ferma la propagazione. */
+const invitoEmail = () =>
+  '+ Ricevi il codice direttamente dal corriere';
+const segnaposEmail = 'latua@email.it';
+const spiegaEmail = () =>
+  'Il codice del locker te lo manderà il corriere a questo indirizzo, '
+  + 'senza passare da qui. <b>Solo l\'email</b> — il numero di telefono '
+  + 'non lo chiediamo mai. La cancelliamo alla chiusura '
+  + '<span class="fine-frase">dell\'ordine. <button type="button" '
+  + 'class="scopri-link" onclick="apriPrivacy(\'priv-indirizzo\')">'
+  + 'Che fine fa</button></span>';
 /* LA NOTA NASCE APERTA DOVE C'E' UNA VARIANTE DA DIRE (ago 2026,
    decisione di Andrea): taglia, numero, colore — nelle categorie in
    elenco la domanda e' quasi certa e il campo si trova gia' aperto;
@@ -13746,6 +14043,14 @@ function corpoConsegna(){
      server la sua presenza dice «questo client il campo ce l'ha»,
      il patto della chiave dell'indirizzo */
   if (v==='punto') out.tipo_punto = acqDati.tipoPunto || '';
+  /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il gate della via punto,
+     dove il campo vive — e CHIAVE ASSENTE QUANDO E' VUOTA, il patto
+     della nota. Non sta in cima con `extra`, ed e' la riga da non
+     spostare: li' vivono le cose che appartengono all'ORDINE e non
+     alla via, e passerebbe anche sugli annunci storici e sul ritiro,
+     dove il server la rifiuterebbe. */
+  if (v==='punto' && acqDati.email && acqDati.email.trim())
+    out.email_corriere = acqDati.email.trim().slice(0,120);
   /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
      il server la sua PRESENZA e' la dichiarazione «questo ordine
      l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
@@ -13757,6 +14062,25 @@ function corpoConsegna(){
       out.indirizzo[c.k] = (i[c.k]||'').trim().slice(0, c.max));
   }
   return out;
+}
+/* L'EMAIL CHE NON SI E' POTUTA SALVARE (ago 2026): senza la chiave dei
+   contenuti il server fa nascere l'ordine LO STESSO — un campo
+   facoltativo non impedisce di comprare — e ce lo dice con una chiave.
+   Chi l'aveva scritta deve saperlo, o crederebbe che il codice del
+   locker gli arrivera' dal corriere e resterebbe ad aspettarlo.
+   IL TESTO PORTA IL RIMEDIO E IL FATTO CHE INTANTO REGGE: si rimette
+   dall'ordine, e nel frattempo il codice arriva al venditore come
+   sempre — cioe' non si e' perso niente, si e' persa la scorciatoia.
+   UN GIUDICE SOLO PER I TRE VARCHI che POSTano a /orders (startBuy,
+   startBuySet e confermaCompraSubito, la strada del wallet ⚡): il
+   terzo e' proprio quello che nessun collaudo esercita — in locale un
+   wallet non c'e' — e sparso a mano l'avviso mancherebbe IN SILENZIO
+   solo a chi paga col wallet collegato. C'e' il censimento. */
+function avvisaEmailNonSalvata(d){
+  if (!d || !d.email_non_salvata) return;
+  toast('L\'email non si è potuta salvare adesso: la puoi rimettere '
+        + 'dall\'ordine. Intanto il codice di ritiro arriva al '
+        + 'venditore, che te lo passa lì.', 7000);
 }
 /* «Manca la scelta del corriere?»: giudice UNICO delle due strade che
    pagano (il bottone e il ⚡ NWC), o una chiederebbe quel che l'altra
@@ -14509,8 +14833,14 @@ async function startBuySet(){
   pagamentoCorrente = null;
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
+  /* in modalita' accordo le offerte per riga si azzerano e l'id
+     dell'accordo viaggia in testata: il patto di caricaPreventivo —
+     i due body devono dire la stessa cosa, o pagina e invoice
+     divergono */
+  const accId = acqDati?.accordoId || 0;
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-    quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}));
+    quantita:qta, offerta_id: accId ? 0
+      : (offertaAccettataPer(id, true)?.id || 0)}));
   /* le cifre del foglio dal PREVENTIVO della pagina d'acquisto
      (stessi numeri per costruzione), con la stima client di ripiego */
   const p = acqDati?.preventivo;
@@ -14529,6 +14859,7 @@ async function startBuySet(){
   el('payAmount').textContent = circaS + fmt(c.tot);
   el('payScomposto').innerHTML = contoScomposto({art: c.art, sped: c.sped,
     prot: c.prot, tot: c.tot, qta: 1, sconto: c.sconto||0,
+    accordo: (p && p.accordo_sats)||0,
     suppl: (via && via.supplemento_sats)||0,
     pezziSped: (via && via.pezzi)||0,
     scontoPct: (p && p.sconto_percento)||0,
@@ -14539,11 +14870,14 @@ async function startBuySet(){
   aggiornaPayHint();
   el('payInvoice').textContent = 'creazione invoice…';
   mostraQr('');
+  /* sotto accordo il codice sconto non parte: il server lo rifiuta
+     (e il cassetto in cassa non nasce proprio) */
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({righe, ...corpoConsegna(),
-                          ...corpoCodiceSconto()})});
+                          ...(accId ? {offerta_carrello_id: accId}
+                                    : corpoCodiceSconto())})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) {
     toast(d.detail || 'Errore nella creazione dell\'ordine', 6000);
@@ -14561,11 +14895,13 @@ async function startBuySet(){
     art: d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
     sped: d.spedizione_sats||0, prot: d.protezione_sats||0,
     tot: d.prezzo_sats, qta: 1,
-    sconto: d.sconto_sats||0, suppl: d.supplemento_sats||0,
+    sconto: d.sconto_sats||0, accordo: d.accordo_sats||0,
+    suppl: d.supplemento_sats||0,
     pezziSped: d.pezzi||0,
     scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  avvisaEmailNonSalvata(d);
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
@@ -15706,6 +16042,7 @@ async function startBuy(){
       scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  avvisaEmailNonSalvata(d);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
      annuncio e il server ti ha ridato la TUA fattura ancora viva —
      va detto, o i conti («convertito ora») sembrerebbero bugiardi */
@@ -15828,6 +16165,7 @@ async function confermaCompraSubito(btn){
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
+    avvisaEmailNonSalvata(d);
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
     scompOrdine = d.prezzo_sats ? contoScomposto({
       art: d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
@@ -16013,6 +16351,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
@@ -16455,12 +16794,40 @@ function offertaSconto(l, p){
     ? Math.round(l.priceEur*(100-p))/100
     : Math.round(l.price*(100-p)/100);
 }
-/* ...lo stesso sconto, letto nella valuta del campo: serve al
+/* IL TOTALE IN SUPERFICIE (ago 2026, decisione di Andrea): coi pezzi
+   scelti >1 il campo, le pillole, il minimo e la riga parlano il
+   TOTALE — l'unita' si e' unificata con l'offerta sul carrello, che
+   parla totali per natura, e il «al pezzo» accanto al campo era la
+   toppa su un rischio che cosi' si toglie alla radice. LA SOSTANZA
+   RESTA UNITARIA: colonne, guardie e server non cambiano di una riga
+   — la conversione ÷ pezzi avviene UNA volta, all'invio, col FLOOR
+   (mai offrire piu' di quanto scritto: floor(tot/pezzi) >= min ⇔
+   tot >= min×pezzi, quindi il minimo non si buca). E' il pattern del
+   toggle valuta: il campo e' una vista, il listino e' la sostanza. */
+const offPezzi = () => Math.max(1, qtaScelta || 1);
+/* il totale scontato nella valuta del LISTINO: l'unitario di
+   offertaSconto per i pezzi scelti (eur a 2 decimali) */
+function offTotaleSconto(l, p){
+  const u = offertaSconto(l, p), q = offPezzi();
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? Math.round(u*q*100)/100 : u*q;
+}
+/* ...lo stesso totale, letto nella valuta del campo: serve al
    segnaposto e a capire quale pillola e' accesa, che si guardano
    tutt'e due in quello che si VEDE. */
-function offertaScontoIn(l, p, valuta){
+function offTotaleScontoIn(l, p, valuta){
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  return offConverti(offertaSconto(l, p), inEur ? 'eur' : 'sats', valuta);
+  return offConverti(offTotaleSconto(l, p), inEur ? 'eur' : 'sats', valuta);
+}
+/* ...e l'UNITARIO che partira' all'invio, derivato dal totale scritto
+   (valuta del listino). Sull'euro si lavora in CENTESIMI interi, o il
+   floor mangerebbe un centesimo sulla polvere dei float (46,50 / 3
+   puo' leggersi 15,4999…). */
+function offUnitarioDa(l, tot){
+  const q = offPezzi();
+  if (q <= 1) return tot;
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? Math.floor(Math.round(tot*100)/q)/100 : Math.floor(tot/q);
 }
 /* La cifra dell'offerta nella valuta LETTA, con la regola del ≈ di
    cifraCtrl. Ma se la vista chiede una conversione e il cambio non e'
@@ -16522,19 +16889,19 @@ function aggiornaFoglioOfferta(){
     campo.value = offTestoCampo(offCifraIn(vc), vc);
   }
   campo.inputMode = vc==='eur' ? 'decimal' : 'numeric';
-  campo.placeholder = vc==='eur' ? fmtEur(offertaScontoIn(l, 15, vc))
-                                 : fmt(offertaScontoIn(l, 15, vc));
+  campo.placeholder = vc==='eur' ? fmtEur(offTotaleScontoIn(l, 15, vc))
+                                 : fmt(offTotaleScontoIn(l, 15, vc));
   /* Il simbolo accanto e' quello della valuta MOSTRATA: si vede
      sempre in cosa si sta scrivendo — era il secondo mezzo bug, che
      un campo muto lasciava indovinare. Al server la cifra ci arriva
      comunque nella valuta del listino, l'unica in cui l'accordo
      esiste: a convertirla e' inviaOfferta, una volta sola.
-     E DICE «AL PEZZO» MENTRE SI DIGITA (ago 2026): la cifra e'
-     l'unitario, ma chi vuole tre pezzi ragiona sul TOTALE e rischia
-     di scrivere 120 intendendo il totale mentre ne sta offrendo 360.
-     Prima lo si scopriva dalla riga sotto, cioe' DOPO aver scritto.
-     Solo coi pezzi scelti >1: col pezzo singolo sarebbe rumore. */
-  el('offSuffisso').innerHTML = suffissoUnita(vc, qtaScelta);
+     IL «AL PEZZO» E' MORTO COL TOTALE IN SUPERFICIE (ago 2026): coi
+     pezzi >1 il campo parla il TOTALE — che e' cio' su cui chi vuole
+     tre pezzi ragiona comunque — quindi il rischio che quella riga
+     toppava (scrivere 120 intendendo il totale mentre si offriva
+     360) non esiste piu' alla radice. */
+  el('offSuffisso').innerHTML = suffissoUnita(vc);
   offertaDigitata();
 }
 /* L'oninput del campo: pianta l'ANCORA e poi lascia rendere. E' il
@@ -16579,9 +16946,10 @@ function offertaChip(scelta){
     /* L'ancora si pianta nella valuta del LISTINO, cosi' il −10% e'
        esattamente −10% qualunque cosa il campo stia mostrando: la
        cifra che parte e' quella giusta al sat, e a convertirla per
-       gli occhi ci pensa il render. */
+       gli occhi ci pensa il render. Dall'ago 2026 e' il TOTALE
+       scontato (l'unitario × i pezzi scelti): il campo parla totali. */
     const inEur = l.valuta==='eur' && l.priceEur>0;
-    offCifra = offertaSconto(l, Number(scelta));
+    offCifra = offTotaleSconto(l, Number(scelta));
     offCifraValuta = inEur ? 'eur' : 'sats';
     campo.value = offTestoCampo(offCifraIn(offCampoValuta), offCampoValuta);
     offertaDigitata();
@@ -16616,7 +16984,12 @@ function offertaDigitata(){
      nella valuta del CAMPO, che e' l'unica con cui ha senso
      confrontare le pillole, perche' e' il numero che si vede. */
   const vc = offCampoValuta || valutaOfferta(l);
+  /* `v` e' il TOTALE scritto, nella valuta del listino; `u` e'
+     l'unitario che partirebbe all'invio (il floor di offUnitarioDa):
+     e' su di LUI che si giudica il minimo — la stessa cifra che
+     giudichera' il server, mai un'algebra parallela. */
   const v = offCifraIn(inEur ? 'eur' : 'sats');
+  const u = offUnitarioDa(l, v);
   const vv = offCifraIn(vc);
   /* La pillola accesa si DEDUCE dalla cifra: «Personalizzato» quando
      non e' nessuno dei due sconti. Cosi' chi parte da −10% e poi
@@ -16627,22 +17000,28 @@ function offertaDigitata(){
   document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
     const p = b.dataset.p;
     const tol = vc==='eur' ? 0.005 : 0.5;
-    const suo = x => Math.abs(vv - offertaScontoIn(l, x, vc)) < tol;
+    const suo = x => Math.abs(vv - offTotaleScontoIn(l, x, vc)) < tol;
     b.classList.toggle('attiva', vv > 0 && (p === 'libero'
       ? !(suo(10) || suo(20)) : suo(Number(p))));
   });
   /* L'avviso del minimo compare SOLO quando serve — cioe' quando la
-     cifra ci finisce sotto. A leva 0 non esiste nessuna soglia. */
+     cifra ci finisce sotto. A leva 0 non esiste nessuna soglia.
+     Si giudica l'UNITARIO derivato e si DICE il totale: il campo
+     parla totali, e un minimo detto al pezzo si confronterebbe con
+     un numero che non e' quello sotto le dita. */
   const min = offertaMinimo(l);
-  const sotto = offertaMinPercento > 0 && v > 0
-                && (inEur ? v < min.eur : v < min.sats);
+  const sotto = offertaMinPercento > 0 && u > 0
+                && (inEur ? u < min.eur : u < min.sats);
   el('offMinimo').style.display = sotto ? '' : 'none';
-  if (sotto)
+  if (sotto) {
+    const mu = offMinimoIn(l, min, vc), q = offPezzi();
+    const minTot = vc==='eur' ? Math.round(mu*q*100)/100 : mu*q;
     el('offMinimo').innerHTML = `Troppo bassa: il minimo è `
-      + `${offCifraTesto(offMinimoIn(l, min, vc), vc,
+      + `${offCifraTesto(minTot, vc,
                          vc !== (inEur ? 'eur' : 'sats'))} `
       + `(${offertaMinPercento}% `
-      + `del listino${qtaScelta > 1 ? ', al pezzo' : ''})`;
+      + `del listino${q > 1 ? ', in tutto' : ''})`;
+  }
   /* SOTTO IL MINIMO NIENTE TOTALE: calcolare il totale di un'offerta
      che non si puo' inviare e' rumore, e affianca due righe nel
      momento in cui ne serve una sola. Torna da se' appena la cifra
@@ -16656,10 +17035,19 @@ function offertaDigitata(){
      sono. La cifra vera che parte resta quella del listino: la dice
      il paySheet, dove il numero e' definitivo. */
   const conv = vc !== (inEur ? 'eur' : 'sats');
-  const unitaria = offCifraTesto(vv, vc, conv);
-  if (qtaScelta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
+  if (qtaScelta <= 1) {
+    riga.innerHTML = `Offri <b class="mono">${offCifraTesto(vv, vc, conv)}</b>`;
+    return;
+  }
+  /* Coi pezzi >1 la riga dice il RICOMPOSTO — l'unitario del floor
+     per i pezzi — che e' quel che parte davvero: mai un numero che
+     non torna moltiplicando. Se differisce dal digitato di qualche
+     spicciolo, il ricomposto e' quello onesto. */
+  const uCampo = offConverti(u, inEur ? 'eur' : 'sats', vc);
+  const unitaria = offCifraTesto(uCampo, vc, conv);
   const totale = offCifraTesto(
-    vc==='eur' ? Math.round(vv*qtaScelta*100)/100 : vv*qtaScelta, vc, conv);
+    vc==='eur' ? Math.round(uCampo*qtaScelta*100)/100 : uCampo*qtaScelta,
+    vc, conv);
   riga.innerHTML = `Offri <b class="mono">${totale}</b> per ${fmt(qtaScelta)} pezzi`
     + ` <span class="off-unitario">(${unitaria} al pezzo)</span>`;
 }
@@ -16669,10 +17057,18 @@ async function inviaOfferta(btn){
   /* Si manda SEMPRE la valuta del LISTINO: e' l'unica in cui
      l'accordo esiste, e l'unica che il server accetta. Il campo puo'
      parlarne un'altra — la conversione avviene QUI, una volta sola e
-     sull'ancora, mai su quel che il campo mostra adesso. */
+     sull'ancora, mai su quel che il campo mostra adesso.
+     E COI PEZZI >1 IL CAMPO PARLA IL TOTALE (ago 2026): al server
+     parte l'unitario di sempre — la divisione ÷ pezzi qui, UNA volta
+     e col floor (mai offrire piu' di quanto scritto), che e' anche
+     cio' che tiene il minimo: floor(tot/q) >= min ⇔ tot >= min×q. */
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  const cifra = offCifraIn(inEur ? 'eur' : 'sats');
-  if (!(cifra > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const totale = offCifraIn(inEur ? 'eur' : 'sats');
+  if (!(totale > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const cifra = offUnitarioDa(l, totale);
+  if (!(cifra > 0)) {
+    toast(`La cifra è troppo bassa per ${fmt(offPezzi())} pezzi`); return;
+  }
   const importo = inEur ? String(cifra.toFixed(2)).replace('.', ',')
                         : String(cifra);
   const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
@@ -16689,6 +17085,343 @@ async function inviaOfferta(btn){
     .catch(()=>{});
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
+}
+
+/* ---------------- l'offerta sul CARRELLO (ago 2026) ----------------
+   Il gemello dell'offerta singola: UNA cifra sul TOTALE del carrello
+   in composizione.
+   LA VALUTA DELL'OFFERTA E' UNA E NON SI SCEGLIE — 'eur' solo se
+   TUTTE le righe sono a listino EUR, altrimenti 'sats' (la regola del
+   server, che la deduce dalle righe: nel body non c'e' nessun campo
+   valuta) — MA IL CAMPO SI PUO' LEGGERE E SCRIVERE NELL'ALTRA (ago
+   2026, chiesto da Andrea). E' il patto del gemello: il toggle
+   governa la LETTURA, la cifra che parte resta quella dell'offerta, e
+   a convertirla e' l'invio, una volta sola e sull'ancora.
+   QUESTO COMMENTO ROVESCIA IL SUO PREDECESSORE («niente ancora e
+   niente toggle, deliberato»), e il perche' di allora va tenuto
+   perche' era vero: finche' la valuta non si poteva leggere in due
+   modi non esisteva NESSUNA conversione da ancorare. Da quando si
+   puo', l'ancora e' esattamente cio' che impedisce alla cifra di
+   derivare — si tiene la cifra COM'E' STATA SCRITTA insieme alla
+   valuta in cui lo e' stata, e il toggle non la riscrive MAI: la
+   RILEGGE. Cosi' andare e tornare cento volte costa sempre UNA
+   conversione sull'originale, invece di una catena in cui ognuna
+   parte dal risultato della precedente.
+   I FERRI SONO QUELLI DEL SINGOLO, non una seconda stesura:
+   offConverti, offTestoCampo, offCifraTesto e suffissoUnita sono puri
+   e si riusano tal quali — l'aritmetica della conversione vive in un
+   posto solo per tutti e due i fogli. A restare in proprio e' il solo
+   STATO, che vive DENTRO offCarr: due fogli che scrivono nelle stesse
+   variabili sono due fogli che un giorno si pestano. */
+let offCarr = null;   /* {valuta, listinoSats, listinoEur, n, pezzi,
+                          cifra, cifraValuta, campoValuta} — le ultime
+                          tre sono l'ANCORA e la valuta mostrata, i
+                          gemelli di offCifra/offCifraValuta/
+                          offCampoValuta del singolo */
+function apriOffertaCarrello(){
+  haptic();
+  if (VETRINA) {
+    invitoTelegram('Per fare un\'offerta serve l\'app vera dentro Telegram: '
+      + 'è lì che il venditore ti risponde.');
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const righe = [...setScelte].map(([id, q]) =>
+    ({l: listings.find(t=>t.id===id), q})).filter(r=>r.l);
+  if (righe.length < 2)
+    { toast('L\'offerta sul carrello vuole almeno due oggetti diversi'); return; }
+  /* in ferie non si tratta, la regola di apriOfferta — e il carrello
+     e' di UN venditore, quindi basta guardarne una */
+  const pausa = righe.find(r=>inFerie(r.l));
+  if (pausa) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(pausa.l.ferie)}`, 5000);
+    return;
+  }
+  /* La valuta e la SOMMA DEI LISTINI, le regole del server: nel misto
+     le righe EUR si convertono col cambio vivo (satsAnnuncio, che
+     senza cambio ripiega sull'equivalente di pubblicazione) — qui e'
+     una cifra per gli occhi, il giudice resta il server. */
+  const tuttoEur = righe.every(r=>r.l.valuta==='eur' && r.l.priceEur>0);
+  let lstS = 0, lstE = 0;
+  for (const {l, q} of righe){
+    lstS += satsAnnuncio(l) * q;
+    if (tuttoEur) lstE = Math.round((lstE + l.priceEur*q)*100)/100;
+  }
+  offCarr = {valuta: tuttoEur ? 'eur' : 'sats',
+             listinoSats: lstS, listinoEur: lstE,
+             n: righe.length, pezzi: pezziSet(),
+             /* l'ANCORA nasce vuota: `campoValuta` a '' fa scrivere
+                il campo al primo render, qualunque sia il toggle */
+             cifra: 0, cifraValuta: '', campoValuta: ''};
+  el('offCarrTestata').innerHTML = `
+    <span style="font-size:28px">🛒</span>
+    <div style="min-width:0;flex:1">
+      <b style="display:block">${fmt(offCarr.n)} articoli${offCarr.pezzi>offCarr.n ? ` · ${fmt(offCarr.pezzi)} pezzi` : ''}</b>
+      <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${cifraOff(offCarr.valuta, lstS, lstE)}</span>
+    </div>`;
+  /* le pillole RIEMPIONO il campo, il patto del gemello */
+  el('offCarrChips').innerHTML =
+    [10,20].map(p => `<button class="consegna-pill" data-p="${p}" onclick="offCarrChip('${p}')">−${p}%</button>`).join('')
+    + `<button class="consegna-pill" data-p="libero" onclick="offCarrChip('libero')">Personalizzato</button>`;
+  el('offCarrImporto').value = '';
+  aggiornaFoglioOffCarr();
+  el('sheetBg').classList.add('open');
+  el('offertaCarrelloSheet').classList.add('open');
+}
+/* la somma dei listini meno p%: EUR a 2 decimali, sats interi */
+function offCarrSconto(p){
+  return offCarr.valuta==='eur'
+    ? Math.round(offCarr.listinoEur*(100-p))/100
+    : Math.round(offCarr.listinoSats*(100-p)/100);
+}
+/* La valuta del CAMPO: quella che si guarda, se il cambio e' vivo —
+   senza cambio resta quella dell'offerta, che e' sempre esatta (mai
+   una conversione fatta col valore di riserva: qui il numero conta
+   davvero). Il ricalco di valutaOfferta, dove il posto del listino lo
+   prende il carrello. */
+function valutaOffCarr(){
+  if (!offCarr) return 'sats';
+  if (!cambioVivo) return offCarr.valuta;
+  return valutaVista==='eur' ? 'eur' : 'sats';
+}
+/* La cifra scritta, letta in una valuta qualsiasi. Sempre dall'ANCORA
+   — e' questo, e non il numero che si vede, il punto fermo — e sempre
+   da offConverti, che e' il ferro del gemello: l'aritmetica della
+   conversione non si riscrive. */
+function offCarrCifraIn(valuta){
+  if (!offCarr) return 0;
+  return offConverti(offCarr.cifra, offCarr.cifraValuta || valuta, valuta);
+}
+/* La somma dei listini meno p%, nella valuta chiesta (il ricalco di
+   offTotaleScontoIn). */
+function offCarrScontoIn(p, valuta){
+  return offConverti(offCarrSconto(p), offCarr.valuta, valuta);
+}
+/* L'oninput del campo: pianta l'ANCORA e poi lascia rendere. E' il
+   SOLO posto che la scrive — se la scrivesse anche il render, un
+   toggle riscriverebbe l'originale con la propria conversione e la
+   cifra deriverebbe a ogni tocco: e' esattamente il difetto che
+   l'ancora esiste per non avere. */
+function offCarrScritta(){
+  if (!offCarr) return;
+  const vc = offCarr.campoValuta || valutaOffCarr();
+  const grezzo = String(el('offCarrImporto').value||'').trim();
+  offCarr.cifra = vc==='eur' ? (parseFloat(grezzo.replace(',','.'))||0)
+                             : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+  offCarr.cifraValuta = vc;
+  offCarrDigitata();
+}
+/* IL CAMPO SEGUE IL TOGGLE, e si riscrive SOLO quando la valuta cambia
+   davvero (`campoValuta`): se lo riscrivessimo a ogni render
+   normalizzeremmo sotto le dita una cifra che si sta ancora
+   scrivendo. E il valore viene dall'ANCORA, mai da quello che c'e'
+   scritto adesso. */
+function aggiornaFoglioOffCarr(){
+  if (!offCarr) return;
+  const vc = valutaOffCarr();
+  const campo = el('offCarrImporto');
+  if (vc !== offCarr.campoValuta) {
+    offCarr.campoValuta = vc;
+    campo.value = offTestoCampo(offCarrCifraIn(vc), vc);
+  }
+  campo.inputMode = vc==='eur' ? 'decimal' : 'numeric';
+  campo.placeholder = vc==='eur' ? fmtEur(offCarrScontoIn(15, vc))
+                                 : fmt(offCarrScontoIn(15, vc));
+  /* il simbolo accanto e' quello della valuta MOSTRATA: si vede
+     sempre in cosa si sta scrivendo */
+  el('offCarrSuffisso').innerHTML = suffissoUnita(vc);
+  offCarrDigitata();
+}
+/* il minimo sulla SOMMA dei listini, le formule del server (sui sats
+   per ECCESSO: il client non deve dire «va bene» a una cifra che di
+   la' viene rifiutata) */
+function offCarrMinimo(){
+  return offCarr.valuta==='eur'
+    ? Math.round(offCarr.listinoEur*offertaMinPercento)/100
+    : Math.floor((offCarr.listinoSats*offertaMinPercento+99)/100);
+}
+/* Il minimo nella valuta del CAMPO, per ECCESSO come il gemello: il
+   minimo va detto nella lingua in cui si sta scrivendo, o si
+   confronta con un numero che non e' quello sotto le dita — e
+   arrotondato all'ingiu' direbbe «va bene» a una cifra che di la'
+   viene rifiutata. */
+function offCarrMinimoIn(valuta){
+  const m = offCarrMinimo();
+  if (valuta === offCarr.valuta) return m;
+  return valuta==='eur' ? Math.ceil(m*eurPerSat*100)/100
+                        : Math.ceil(m/eurPerSat);
+}
+function offCarrChip(scelta){
+  haptic();
+  if (!offCarr) return;
+  const campo = el('offCarrImporto');
+  if (scelta !== 'libero') {
+    /* L'ancora si pianta nella valuta dell'OFFERTA, cosi' il −10% e'
+       esattamente −10% qualunque cosa il campo stia mostrando: la
+       cifra che parte e' giusta al sat, e a convertirla per gli occhi
+       ci pensa il render. */
+    offCarr.cifra = offCarrSconto(Number(scelta));
+    offCarr.cifraValuta = offCarr.valuta;
+    campo.value = offTestoCampo(offCarrCifraIn(offCarr.campoValuta),
+                                offCarr.campoValuta);
+    offCarrDigitata();
+    return;   /* il campo RESTA li', pronto a essere ritoccato */
+  }
+  campo.focus({preventScroll:true});
+  try { campo.select(); } catch(e) {}
+  offCarrDigitata();
+}
+function offCarrDigitata(){
+  if (!offCarr) return;
+  /* DUE letture che servono a due cose diverse, il patto del gemello:
+     `v` e' la cifra nella valuta dell'OFFERTA — quella su cui
+     giudicano il minimo e il server — e `vv` quella nella valuta del
+     CAMPO, che e' l'unica con cui ha senso confrontare le pillole,
+     perche' e' il numero che si vede. */
+  const vc = offCarr.campoValuta || valutaOffCarr();
+  const conv = vc !== offCarr.valuta;
+  const v = offCarrCifraIn(offCarr.valuta);
+  const vv = offCarrCifraIn(vc);
+  /* la pillola accesa si DEDUCE dalla cifra, nella valuta MOSTRATA e
+     con la tolleranza di quella valuta: nei sats un'unita' (una
+     conversione non torna mai al sat esatto), negli euro il centesimo */
+  document.querySelectorAll('#offCarrChips .consegna-pill').forEach(b => {
+    const p = b.dataset.p;
+    const tol = vc==='eur' ? 0.005 : 0.5;
+    const suo = x => Math.abs(vv - offCarrScontoIn(x, vc)) < tol;
+    b.classList.toggle('attiva', vv > 0 && (p === 'libero'
+      ? !(suo(10) || suo(20)) : suo(Number(p))));
+  });
+  /* Il minimo si GIUDICA nella valuta dell'offerta — la stessa cifra
+     che giudichera' il server, mai un'algebra parallela — e si DICE
+     in quella del campo. */
+  const min = offCarrMinimo();
+  const sotto = offertaMinPercento > 0 && v > 0 && v < min;
+  el('offCarrMinimo').style.display = sotto ? '' : 'none';
+  if (sotto)
+    el('offCarrMinimo').innerHTML = `Troppo bassa: il minimo è `
+      + `${offCifraTesto(offCarrMinimoIn(vc), vc, conv)} `
+      + `(${offertaMinPercento}% della somma dei listini)`;
+  /* sotto il minimo niente riga, il patto del gemello */
+  const riga = el('offCarrRiga');
+  if (v<=0 || sotto) { riga.textContent = ''; return; }
+  /* La riga ECHEGGIA il campo, e il ≈ sta sulla faccia CONVERTITA e
+     mai su quella dell'offerta, che e' la cifra che parte davvero. */
+  let testo = `Offri <b class="mono">${offCifraTesto(vv, vc, conv)}</b>`
+    + ` in tutto per ${fmt(offCarr.n)} articoli`;
+  /* E L'ALTRA FACCIA SI VEDE MENTRE SI SCRIVE (ago 2026, chiesta da
+     Andrea): la coda dice la stessa cifra nell'altra valuta, col ≈
+     quando e' quella convertita — quindi il ≈ non compare MAI due
+     volte nella stessa riga, e la cifra senza ≈ e' sempre quella che
+     parte. Senza cambio la coda non si scrive affatto: mai una
+     conversione col valore di riserva. */
+  if (cambioVivo) {
+    const alt = vc==='eur' ? 'sats' : 'eur';
+    const va = offCarrCifraIn(alt);
+    if (va > 0)
+      testo += ` <span class="off-unitario">· `
+        + `${offCifraTesto(va, alt, alt !== offCarr.valuta)}</span>`;
+  }
+  riga.innerHTML = testo;
+}
+async function inviaOffertaCarrello(btn){
+  haptic();
+  if (!offCarr) return;
+  /* Si manda SEMPRE la valuta dell'OFFERTA: e' l'unica in cui
+     l'accordo esiste, e l'unica che il server accetta — nel body non
+     c'e' nessun campo valuta, la deduce lui dalle righe. Il campo puo'
+     parlarne un'altra: la conversione avviene QUI, una volta sola e
+     sull'ancora, mai su quel che il campo mostra adesso. */
+  const v = offCarrCifraIn(offCarr.valuta);
+  if (!(v > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const importo = offCarr.valuta==='eur'
+    ? String(v.toFixed(2)).replace('.', ',') : String(v);
+  /* le righe della composizione: quantita' e basta — le fotografie
+     (unitari, titoli) le fa il server, che e' l'unico a saperle vere */
+  const righe = [...setScelte].map(([id, qta]) =>
+    ({annuncio_id:id, quantita:qta}));
+  const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
+  try {
+    const r = await fetch(`${API_BASE}/offerte/carrello`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({righe, importo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
+    closeSheet();
+    toast('💰 Offerta inviata! Ti avvisiamo appena il venditore risponde', 5000);
+    loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+      .catch(()=>{});
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+/* Il titolo sintetico di una testata carrello: primo pezzo +N (il
+   pattern di _titolo_ordine, gemello di _titolo_offerta_carrello sul
+   server). I titoli sono FOTOGRAFATI alla proposta: un annuncio
+   sparito non ammutolisce la trattativa. */
+function titoloCarrello(o){
+  const r = o.righe||[];
+  if (!r.length) return 'Offerta sul carrello';
+  const base = r[0].titolo || '?';
+  return r.length>1 ? `${base} +${r.length-1}` : base;
+}
+/* ...e la somma dei listini FOTOGRAFATI, per la riga «listino» della
+   lista: alla risposta il server giudica sul corrente, questa e' la
+   fotografia che il compratore ha visto proponendo */
+function listinoCarrello(o){
+  let s = 0, e = 0;
+  for (const f of (o.righe||[])){
+    s += (f.unitario_sats||0) * (f.quantita||1);
+    e = Math.round((e + (f.unitario_eur||0) * (f.quantita||1))*100)/100;
+  }
+  return {sats:s, eur:e};
+}
+/* «Paga ora» sull'accordo di carrello: MAI pagaOfferta, che aprirebbe
+   il dettaglio dell'annuncio 0. Si ricostruisce la composizione dalle
+   figlie fotografate — le quantita' dell'accordo COMANDANO, e il
+   server le riscrive comunque dalle sue — e si apre la cassa in
+   modalita' accordo: composizione pinnata, il conto lo fa il server
+   con offerta_carrello_id. */
+async function pagaOffertaCarrello(id){
+  haptic();
+  const o = offerteMie.find(x=>x.id===id);
+  const righe = (o && o.righe) || [];
+  if (!righe.length) { toast('Offerta non trovata'); return; }
+  /* le card servono alla cassa (striscia, ferie, nota): chi manca dal
+     catalogo si va a prendere, il pattern di pagaOfferta */
+  for (const f of righe){
+    if (!listings.find(x=>x.id===f.annuncio_id)) {
+      try {
+        const r = await fetch(`${API_BASE}/listings/${f.annuncio_id}`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (r.ok) inCatalogo([mapListing(await r.json())]);
+      } catch(e) {}
+    }
+  }
+  setScelte = new Map(righe.map(f=>[f.annuncio_id,
+                                    Math.max(1, f.quantita||1)]));
+  const primo = listings.find(x=>x.id===righe[0].annuncio_id);
+  if (primo) {
+    currentListing = primo;
+    paccoDati = {sellerId: primo.sellerId, origineId: primo.id};
+  }
+  acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
+             accordoId:o.id,
+             /* la firma INCLUDE l'accordo, o la cassa normale aperta
+                poi sulla stessa composizione riuserebbe dalla cache
+                un conto col pattuito dentro (e viceversa) */
+             firma:'acc'+o.id+'|'+firmaSet(),
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             tipoPunto:'', puntoToccato:false, precompilato:false,
+             indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
+             nota:'', notaAperta: notaApertaDefault(righe.map(f =>
+               (listings.find(t=>t.id===f.annuncio_id)||{}).cat)),
+             codice:'', codiceAperto:false,
+             errore:''};
+  go('acquisto');
+  renderAcquisto();
+  caricaPreventivo();
 }
 
 /* ---------------- offerta lampo: il foglio del venditore ----------------
@@ -16984,34 +17717,38 @@ function rilanciRimasti(o){
   const tetto = (offerteDati && offerteDati.max_rilanci) || 0;
   return Math.max(0, tetto - (o.giri || 0));
 }
-/* L'UNITA' DEL CAMPO, e il «al pezzo» quando serve (ago 2026, dal
-   campo: «nel campo del rilancio non si capisce che la cifra e' per
-   PEZZO — su un'offerta da tre pezzi uno scrive il totale e
-   sbaglia»). In tutta l'app la cifra di una trattativa e'
-   UNITARIA: il minimo, il listino e i due estremi del rilancio si
-   confrontano al pezzo, e il totale lo dice `cifraPezzi` con le due
-   facce. Ma chi vuole tre pezzi ragiona sul TOTALE, e un campo muto
-   lo lascia sbagliare — poi lo scopre dalla riga sotto, cioe' DOPO
-   aver scritto.
-   IL FOGLIO DELL'OFFERTA LO DICEVA GIA' e i due box inline no:
-   quindi non e' una parola nuova, e' la LINGUA DI CASA portata
-   dove mancava. Un giudice solo per tutte e tre le superfici —
+/* L'UNITA' DEL CAMPO (ago 2026, ROVESCIATA col totale in
+   superficie). La storia va tenuta intera: il «al pezzo» accanto ai
+   campi nacque dal caso vero «su un'offerta da tre pezzi uno scrive
+   il totale e sbaglia» — era la TOPPA sul rischio. Dall'ago 2026 i
+   campi delle trattative parlano il TOTALE (l'unita' si e' unificata
+   con l'offerta sul carrello, che parla totali per natura), quindi
+   quel rischio non esiste piu' alla radice e la toppa muore con lui:
+   il suffisso e' la sola valuta. La SOSTANZA resta unitaria — la
+   divisione ÷ pezzi la fanno inviaOfferta e rispondiOfferta, una
+   volta e col floor.
+   Resta un giudice solo per tutte e tre le superfici —
    l'offerta iniziale, la controproposta del venditore e il
    rilancio del compratore — perche' tre rese della stessa cosa
    divergono al primo ritocco, e qui a divergere sarebbe il
-   significato di una cifra di denaro.
-   SOLO CON PIU' DI UN PEZZO: sul pezzo singolo «al pezzo» e'
-   rumore, e ruberebbe larghezza al campo dove si scrive. */
-function suffissoUnita(valuta, quantita){
-  return (valuta === 'eur' ? '€' : 'sats')
-    + ((quantita || 0) > 1
-        ? '<span class="off-alpezzo">al pezzo</span>' : '');
+   significato di una cifra di denaro. */
+function suffissoUnita(valuta){
+  return valuta === 'eur' ? '€' : 'sats';
 }
 /* Il campo legale, detto a chi scrive: e' l'unica cosa che il
-   compratore non puo' dedurre da solo guardando la riga. */
+   compratore non puo' dedurre da solo guardando la riga. Coi pezzi
+   >1 i due estremi si dicono in TOTALE (unitario legale × pezzi):
+   col floor dell'invio, un totale dentro questo intervallo da'
+   sempre un unitario dentro il suo. La testata carrello (quantita=0)
+   parla gia' totali da se'. */
 function campoRilancio(o){
-  const su = o.valuta === 'eur' ? o.importo_eur + 0.01 : o.importo_sats + 1;
-  const giu = o.valuta === 'eur' ? o.contro_eur - 0.01 : o.contro_sats - 1;
+  let su = o.valuta === 'eur' ? o.importo_eur + 0.01 : o.importo_sats + 1;
+  let giu = o.valuta === 'eur' ? o.contro_eur - 0.01 : o.contro_sats - 1;
+  const q = o.annuncio_id ? (o.quantita||0) : 0;
+  if (q > 1) {
+    su = o.valuta==='eur' ? Math.round(su*q*100)/100 : su*q;
+    giu = o.valuta==='eur' ? Math.round(giu*q*100)/100 : giu*q;
+  }
   return `Tra ${cifraOff(o.valuta, su, su)} e ${cifraOff(o.valuta, giu, giu)}`;
 }
 function renderOfferte(){
@@ -17029,11 +17766,16 @@ function renderOfferte(){
   let daAgire = 0;
   el('offerteList').innerHTML = vive.map(o => {
     const compro = o.compratore_id===myTgId;
+    /* la testata carrello (annuncio_id=0): titolo sintetico dalle
+       figlie fotografate, icona 🛒, e le cifre — che sono TOTALI —
+       escono giuste da sole perche' quantita=0 in testata fa tacere
+       il «× pezzi» di cifraPezzi */
+    const carr = !o.annuncio_id;
     const ore = Math.max(1, Math.ceil((o.scadenza - Date.now()/1000)/3600));
     let thumb = '';
     try { const nomi = o.foto ? JSON.parse(o.foto) : [];
           if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
-    const ic = thumb
+    const ic = carr ? '🛒' : thumb
       ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
       : '💰';
     let stato = '', azioni = '';
@@ -17058,7 +17800,7 @@ function renderOfferte(){
            meccanismo e' quello di sempre — l'annuncio non si e' mai
            bloccato — ma ora va ridetto dove il numero si vede. */
         azioni = `
-          ${(o.quantita||0) > 1 ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: l'annuncio resta in vetrina e vince chi paga per primo.</div>` : ''}
+          ${((o.quantita||0) > 1 || carr) ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: ${carr?'gli annunci restano':'l\'annuncio resta'} in vetrina e vince chi paga per primo.</div>` : ''}
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn primary" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
             <button class="btn allarme" style="flex:1 1 50%;margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
@@ -17072,7 +17814,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
             </div>
           </div>`;
@@ -17126,7 +17868,7 @@ function renderOfferte(){
             <div style="display:flex;gap:8px;align-items:center">
               <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
                      style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
-              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta, o.quantita)}</span>
+              <span style="font-weight:800;color:var(--muted);flex:none;text-align:center">${suffissoUnita(o.valuta)}</span>
               <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'rilancia')">Invia</button>
             </div>
             <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${campoRilancio(o)} · rilancio ${(o.giri||0)+1} di ${(offerteDati&&offerteDati.max_rilanci)||0}</div>
@@ -17143,18 +17885,27 @@ function renderOfferte(){
            nudi si impilerebbero a tutta larghezza. */
         azioni = `
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn orange" style="flex:1;margin:0" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>
+            ${/* MAI pagaOfferta sulla testata carrello: aprirebbe il
+                  dettaglio dell'annuncio 0 — il suo «Paga ora»
+                  ricostruisce la composizione e apre la cassa in
+                  modalita' accordo */''}
+            <button class="btn orange" style="flex:1;margin:0" onclick="${carr ? `pagaOffertaCarrello(${o.id})` : `pagaOfferta(${o.annuncio_id})`}">⚡ Paga ora</button>
             <button class="btn allarme" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
           </div>`;
       } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
     }
+    /* la riga carrello: titolo sintetico, listino = somma delle
+       fotografie (le figlie), e l'ELENCO delle righe — il venditore
+       giudica su quello, e i titoli fotografati passano da esc() */
+    const lc = carr ? listinoCarrello(o) : null;
     return `<div class="order" id="off_${o.id}" style="cursor:default">
       <div class="row">
         <div class="order-left">
           <span class="order-ic">${ic}</span>
           <div class="order-main">
-            <b>${esc(o.titolo)}</b>
-            <div class="sub">${compro?'Stai comprando':'Stai vendendo'} · listino ${cifraOff(o.valuta,o.listino_sats,o.listino_eur)}</div>
+            <b>${carr ? '🛒 ' + esc(titoloCarrello(o)) : esc(o.titolo)}</b>
+            <div class="sub">${compro?'Stai comprando':'Stai vendendo'} · listino ${carr ? cifraOff(o.valuta, lc.sats, lc.eur) : cifraOff(o.valuta,o.listino_sats,o.listino_eur)}${carr ? ` · ${fmt((o.righe||[]).length)} articoli` : ''}</div>
+            ${carr ? `<div class="sub">${(o.righe||[]).map(f=>esc(f.titolo||'?')+((f.quantita||1)>1?` ×${f.quantita}`:'')).join(' · ')}</div>` : ''}
             <div class="sub">${stato}</div>
           </div>
         </div>
@@ -17180,13 +17931,36 @@ function rispondiOfferta(id, azione){
       return;
     }
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
+    /* IL TOTALE IN SUPERFICIE (ago 2026): coi pezzi >1 anche questi
+       campi parlano il TOTALE, e al server parte l'unitario di
+       sempre — la divisione ÷ pezzi qui, UNA volta e col floor
+       (l'invariante di inviaOfferta: mai piu' di quanto scritto, e
+       sull'euro si lavora in centesimi interi contro la polvere dei
+       float). La testata carrello (quantita=0) parla totali anche
+       sul server e non si tocca. */
+    const qq = o.annuncio_id ? (o.quantita||0) : 0;
+    if (qq > 1) {
+      const tot = o.valuta==='eur'
+        ? (parseFloat(importo.replace(',','.'))||0)
+        : (parseInt(importo,10)||0);
+      const u = o.valuta==='eur'
+        ? Math.floor(Math.round(tot*100)/qq)/100 : Math.floor(tot/qq);
+      if (!(u > 0)) {
+        toast(`La cifra è troppo bassa per ${fmt(qq)} pezzi`); return;
+      }
+      importo = o.valuta==='eur'
+        ? String(u.toFixed(2)).replace('.', ',') : String(u);
+    }
   }
   /* I testi sono NUDI: qui le cifre si scrivono a mano, che cifraOff
-     e i suoi gemelli portano dentro dell'HTML. */
-  const a = accordoDi(o), q = o.quantita||0;
+     e i suoi gemelli portano dentro dell'HTML. Sulla testata carrello
+     (quantita=0) la cifra E' gia' il totale: moltiplicarla per q
+     direbbe zero. */
+  const a = accordoDi(o), q = o.quantita||0, carr = !o.annuncio_id;
+  const qTot = carr ? 1 : q;
   const totale = o.valuta==='eur'
-    ? fmtEur(Math.round(a.eur*q*100)/100)+' €'
-    : fmt(a.sats*q)+' sats';
+    ? fmtEur(Math.round(a.eur*qTot*100)/100)+' €'
+    : fmt(a.sats*qTot)+' sats';
   if (azione==='accetta') {
     /* La prima riga non cambia MAI, ed e' quella che conta: da quando
        l'accordo porta un numero il venditore si sente piu' impegnato
@@ -17198,7 +17972,11 @@ function rispondiOfferta(id, azione){
       titolo: mio ? 'Accetti l\'offerta?' : 'Accetti la controproposta?',
       testata: testataOfferta(o),
       corpo: mio
-        ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in '
+        ? (carr ? 'Accettare non riserva niente: gli annunci restano in '
+            + 'vetrina e vince chi paga per primo. L\'accordo vale per '
+            + `l'intero carrello (${fmt((o.righe||[]).length)} articoli): `
+            + `se paga, incassi ${totale}.`
+          : 'Accettare non riserva l\'oggetto: l\'annuncio resta in '
           + 'vetrina e vince chi paga per primo.'
           + (q > 1
               ? ` L'accordo è per ${fmt(q)} pezzi al prezzo offerto: se `
@@ -17206,7 +17984,7 @@ function rispondiOfferta(id, azione){
               : q === 1
               ? ' L\'accordo è per un pezzo solo.'
               : ' Se l\'annuncio ha più pezzi, la cifra vale come prezzo '
-                + 'AL PEZZO per la quantità che sceglierà.')
+                + 'AL PEZZO per la quantità che sceglierà.'))
         : 'Avrai un tempo limitato per pagare.',
       etichetta: '✓ Accetta',
       poi: () => inviaRisposta(id, azione, importo)});
@@ -17272,6 +18050,11 @@ function chiediConferma(c){
    manca. Sta qui perche' la vogliono tutti i chiamanti che parlano di
    un'offerta, e ricopiarla sarebbe il secondo posto da tenere in pari. */
 function testataOfferta(o){
+  /* la testata carrello non ha ne' foto ne' titolo suo: il 🛒 e il
+     sintetico dalle figlie (o.titolo sarebbe null → 'null' a schermo) */
+  if (!o.annuncio_id)
+    return `<span style="font-size:28px">🛒</span>`
+      + `<b style="font-size:14px">${esc(titoloCarrello(o))}</b>`;
   let thumb = '';
   try { const nomi = o.foto ? JSON.parse(o.foto) : [];
         if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
@@ -18030,12 +18813,21 @@ function openOrder(id){
           ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
+          ${/* LA BUSTA DIRETTA (ago 2026, cantiere 45): la spunta sta
+                sotto la riga del codice, che gia' dice a chi arriva —
+                spuntandola la busta non si aspetta, la riga d'attesa
+                del compratore cambia testo e i promemoria tacciono.
+                Chi dimentica ha la porta tardiva nel pannello della
+                busta, che il sollecito stesso nomina. */''}
+          ${o.viaPunto ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
+            <input type="checkbox" id="shipBustaDiretta" style="margin-top:2px"> <span>Ho messo i recapiti dell'acquirente come destinatario: il codice di ritiro arriva direttamente a lui</span></label>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
           ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
                 riquadro qui sotto, e ripeterla qui sarebbe il dato
                 accanto al posto in cui si tocca — il peccato che il
                 punto ha gia' commesso e per cui e' stato corretto.
                 Stessa forma della riga dell'indirizzo, due sopra. */''}
+          ${(o.viaPunto && o.emailCorriereIl && !o.emailCorrierePurgataIl) ? `<div class="hint">📧 L'acquirente ha lasciato un'<b>email per il corriere</b>: la leggi nel riquadro qui sotto, e mettendola come destinatario il codice di ritiro arriva direttamente a lui.</div>` : ''}
           ${o.notaCompratore ? `<div class="hint">📝 L'acquirente ha lasciato una <b>nota</b>: la leggi nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
@@ -18055,6 +18847,7 @@ function openOrder(id){
       ${pannelloContenutoDigitale(o)}
       ${pannelloNota(o)}
       ${pannelloIndirizzoCasa(o)}
+      ${pannelloEmailCorriere(o)}
       ${pannelloBustaRitiro(o)}
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
@@ -18416,7 +19209,8 @@ function renderLnAddress(){
         ⚡ Incassi automatici su <span class="mono">${esc(myLnAddress)}</span></div>
       <div style="margin-top:4px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         Ogni vendita conclusa arriva da sola qui.</div>
-      <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>`;
+      <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>
+      <button class="btn danger-ghost" onclick="rimuoviLnAddress()">🗑 Rimuovi l'indirizzo</button>`;
     return;
   }
   box.innerHTML = `
@@ -18431,6 +19225,7 @@ function renderLnAddress(){
 async function salvaLnAddressProfilo(btn){
   haptic();
   const addr = el('lnAddrProfilo').value.trim().toLowerCase();
+  if (!addr && myLnAddress) return rimuoviLnAddress();
   if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
     toast('Formato non valido: dev\'essere tipo nome@wallet.com'); return;
   }
@@ -18448,6 +19243,42 @@ async function salvaLnAddressProfilo(btn){
   toast(d.incassi_sbloccati > 0
     ? '⚡ Attivato! E gli incassi in attesa sono partiti da soli 🔓'
     : '⚡ Incassi automatici attivati!');
+}
+
+/* L'indirizzo si TOGLIE, ed e' il calco di `rimuoviNpub`: la stessa
+   POST con la stringa vuota, che il server accetta da sempre — la
+   porta c'era, dal client non si apriva (le due funzioni che salvano
+   hanno la guardia del formato, e il campo svuotato prendeva «formato
+   non valido»). Senza questo bottone la pagina «I tuoi dati» non
+   potrebbe dire «finche' non lo togli», che e' la formula con cui
+   quella pagina nomina ogni dato senza scadenza.
+   LA CONFERMA DICE LA CONSEGUENZA e non il gesto: togliere l'indirizzo
+   non cancella un contatto, RIPORTA GLI INCASSI A MANO — e gli ordini
+   gia' confermati restano fermi finche' non si incolla una invoice.
+   Chi non lo sapesse lo scoprirebbe alla prima vendita. */
+async function rimuoviLnAddress(){
+  haptic();
+  if (!myLnAddress) return;
+  chiediConferma({
+    titolo: 'Rimuovere il tuo Lightning address?',
+    corpo: 'Gli incassi tornano a mano: a ogni vendita dovrai incollare '
+         + 'tu una invoice per farti pagare, e gli ordini gia\' '
+         + 'confermati restano in attesa finche\' non lo fai.'
+         + '\n\nPuoi rimetterlo quando vuoi.',
+    etichetta: '🗑 Rimuovi',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/me/ln-address`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify({ln_address: ''})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 7000); return; }
+      myLnAddress = d.ln_address || '';
+      lnAddrModifica = false;
+      renderLnAddress();
+      renderChecklist();
+      toast('Indirizzo rimosso: gli incassi tornano a mano');
+    }});
 }
 
 /* ---- badge Nostr del profilo: npub auto-dichiarata + verifica con
@@ -18501,6 +19332,7 @@ let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecenso
 let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
+let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non tornano
 let myLivello = null;            // il grado DERIVATO dal server
 let myClassifica = false;        // la leva della classifica, dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
@@ -18652,13 +19484,7 @@ function renderLivello(){
     ? Math.max(0, Math.min(100, Math.round(
         (myXp - daQui) / (myLivello.xp_prossimo - daQui) * 100)))
     : 100;
-  const manca = myLivello.xp_prossimo
-    ? `Al prossimo grado (<b>${esc(myLivello.nome_prossimo)}</b>) mancano
-       ${fmt(Math.max(0, myLivello.xp_prossimo - myXp))} XP` +
-      (myLivello.affari_prossimo > myAffari
-        ? ` e ${fmt(myLivello.affari_prossimo - myAffari)} affari conclusi`
-        : '')
-    : 'Sei in cima alla scala. 🫙';
+  const manca = fraseManca(myLivello, myXp, myAffari);
   /* SOLO gli sbloccati (ago 2026, decisione di Andrea): mostrare
      quelli chiusi era una molla finche' tutti erano raggiungibili,
      ma «Fondatore» non lo potra' ottenere piu' nessuno — e una
@@ -18669,6 +19495,7 @@ function renderLivello(){
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
+    <div class="hint" style="margin-top:6px">${fraseXp(myXpRuoli)}</div>
     <div class="barra-xp"><i style="width:${q}%"></i></div>
     <div class="hint">${manca}</div>
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
@@ -18688,7 +19515,69 @@ function renderLivello(){
    Sono le stesse di LIVELLI in server.py — chi ne cambia una la
    cambia in tutti e due i posti, o la barra mente. prove.py le
    incrocia, come fa per le categorie senza condizione. */
-const SOGLIE_LIV = [0, 150, 600, 2500, 9000];
+const SOGLIE_LIV = [0, 50, 200, 800, 3000];
+
+/* Da che lato vengono gli XP, in UNA riga. Chi legge «76 XP» non sa
+   che sono pochi perche' ha comprato invece di vendere, e il numero
+   da solo non lo dice.
+   I NUMERI ARRIVANO DAL SERVER (`xp_ruoli`): qui non si somma e non
+   si divide niente — scomporre nel client vorrebbe dire una seconda
+   definizione di «commercio» accanto a XP_COMMERCIO, e le due
+   divergerebbero al primo tipo nuovo.
+   LO ZERO NON SI SCRIVE MAI: «0 dalle vendite» a chi ha soltanto
+   comprato e' la stessa cifra detta due volte, e a chi ha soltanto
+   venduto un rimprovero per niente.
+   TESTA E CODA SI SCRIVONO UNA VOLTA SOLA e a cambiare e' il mezzo:
+   tre prose intere sarebbero tre posti da tenere in pari, e il primo
+   ritocco ne dimenticherebbe uno.
+   IL RAMO GENERICO E' LA FRASE DI SEMPRE, e serve DUE popolazioni:
+   chi ha solo vendite — dove la nota sul peso non aggiunge niente
+   (decisione di Andrea) — e chi non ha una scomposizione che torni
+   (server di ieri, oppure i due lati che non fanno il totale). Le due
+   coincidono apposta: il ripiego atterra su una frase gia' giusta per
+   chi vende, che e' il caso piu' probabile. */
+const XP_PESO = "Una vendita pesa un po' più di un acquisto dello stesso valore.";
+const XP_CODA = "È lo stesso numero che pesa in classifica.";
+function fraseXp(r){
+  const v = (r && r.vendite) || 0, a = (r && r.acquisti) || 0;
+  let m;
+  if (v && a) m = `${fmt(v)} dalle vendite, ${fmt(a)} dagli acquisti. ` + XP_PESO;
+  else if (a) m = "i tuoi vengono tutti dagli acquisti. " + XP_PESO;
+  else m = "comprare e vendere.";
+  return "Gli XP contano il commercio: " + m + " " + XP_CODA;
+}
+
+/* Quanto manca al prossimo grado. TRE cose che la riga di prima
+   sbagliava tutte insieme, e tutte nella stessa frase (ago 2026, dal
+   campo: «Al prossimo grado (Bottega avviata) mancano 0 XP e 1 affari
+   conclusi»).
+   1) LO ZERO NON SI SCRIVE — la stessa regola della riga qui sotto:
+   chi ha gli XP e non gli affari si sentiva chiedere una cosa che
+   aveva gia', ed e' alla lettera il difetto che il rifiuto del banner
+   ha gia' pagato una volta («il messaggio nominava il solo affare
+   concluso... e andava a cercare dalla parte sbagliata»).
+   2) IL SINGOLARE: «1 affari conclusi». La stessa distinzione il
+   server la fa gia' in `msg_banner_chiuso`; qui mancava.
+   3) IL VERBO, che segue quel che resta: «manca 1 affare concluso»,
+   «mancano 120 XP», e il PLURALE davanti a due pezzi qualunque siano
+   i numeri — due soggetti uniti da «e» vogliono il verbo plurale.
+   IL RAMO A MANI VUOTE E' UNA CINTURA E NON UN CASO: dai numeri del
+   server non ci si arriva — `livello_utente` tiene il gradino piu'
+   alto che soddisfa ENTRAMBE le soglie, quindi al prossimo ne manca
+   sempre almeno una — ma una frase rotta e' peggio di una riga in
+   piu', e il giudice si prova anche li'. */
+function fraseManca(liv, xp, affari){
+  if (!liv || !liv.xp_prossimo) return "Sei in cima alla scala. 🫙";
+  const dx = Math.max(0, liv.xp_prossimo - xp);
+  const da = Math.max(0, (liv.affari_prossimo || 0) - affari);
+  const pezzi = [];
+  if (dx) pezzi.push(`${fmt(dx)} XP`);
+  if (da) pezzi.push(`${fmt(da)} affar` + (da === 1 ? "e concluso" : "i conclusi"));
+  const grado = `Al prossimo grado (<b>${esc(liv.nome_prossimo)}</b>) `;
+  if (!pezzi.length) return grado + "ci sei.";
+  const solo_uno = pezzi.length === 1 && (dx === 1 || da === 1);
+  return grado + (solo_uno ? "manca " : "mancano ") + pezzi.join(" e ");
+}
 
 async function setTitolo(id){
   haptic();
@@ -21982,13 +22871,25 @@ async function markShipped(){
   }
   /* la forma del codice: avvisa, non blocca (vedi FORME_TRACKING) */
   if (!trackingDaControllare(corriere, tracking, 'shipAvviso')) return;
-  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
+  /* la busta diretta: la spunta esiste solo sulla via punto — il
+     `?.checked` fa false dove il nodo non c'e', e il server fuori
+     dalla via punto la ignora comunque */
+  const bustaDiretta = !!el('shipBustaDiretta')?.checked;
+  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; if (bustaDiretta) currentOrder.bustaDirettaIl = Math.floor(Date.now()/1000); toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({corriere, tracking})});
+    body: JSON.stringify({corriere, tracking, busta_diretta: bustaDiretta})});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking;
+  /* anche sulla riga di orders, non solo su currentOrder: la lista
+     puo' essersi ricaricata e currentOrder essere un detached */
+  if (bustaDiretta && currentOrder.viaPunto) {
+    const ts = Math.floor(Date.now()/1000);
+    currentOrder.bustaDirettaIl = ts;
+    const riga = orders.find(x => x.id === currentOrder.id);
+    if (riga) riga.bustaDirettaIl = ts;
+  }
   toast('📦 Segnato come spedito'); openOrder(currentOrder.id);
 }
 
@@ -22981,9 +23882,13 @@ function pannelloBustaRitiro(o){
   if (o.role==='buyer'){
     if (!o.bustaIl)
       /* lo stato d'attesa visibile (decisione di Andrea, al posto del
-         gate): il venditore ha spedito, il codice arriva all'arrivo */
-      return o.state==='shipped' ? `
-      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>` : '';
+         gate): il venditore ha spedito, il codice arriva all'arrivo.
+         Con la BUSTA DIRETTA (cantiere 45) la riga di sempre direbbe
+         il falso — aspetta una cosa che non arrivera' mai — e al suo
+         posto si dice da dove arriva il codice davvero. */
+      return o.state!=='shipped' ? '' : (o.bustaDirettaIl ? `
+      <div class="trust-note">📦 <span><b>Il codice di ritiro ti arriva direttamente dal corriere</b>, ai recapiti che il venditore ha indicato come destinatario: non passerà dall'ordine. Quando il pacco arriva al punto, controlla la posta — <b>anche nello spam</b>. Se non ti arriva niente puoi dirlo al venditore da qui: può mettere lui le istruzioni nell'ordine.</span></div>` : `
+      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>`);
     /* IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed e' cio' che fa
        atterrare il codice dove stava il dito: se il pannello si
        riscrivesse per intero — il nome sopra, il codice sotto, come
@@ -23006,9 +23911,17 @@ function pannelloBustaRitiro(o){
      'dispute' — un PIN sbagliato lo corregge solo lui, il moderatore
      non puo' (non legge la busta) */
   if (o.role==='seller' && ['locked','shipped','dispute'].includes(o.state)){
+    /* la BUSTA DIRETTA dichiarata: la testa lo dice, il form resta —
+       il deposito E' l'annulla (lato server azzera la dichiarazione),
+       quindi chi si e' sbagliato deposita e basta */
+    const quandoDiretta = o.bustaDirettaIl
+      ? new Date(o.bustaDirettaIl*1000).toLocaleString('it-IT',
+          {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
     const testa = o.bustaIl
       ? `✓ Depositate il ${quando}${corr}. Se hai sbagliato qualcosa (il PIN, il nome), correggile da qui: l'acquirente riceve un avviso. Nemmeno i moderatori possono leggerle o correggerle per te.`
-      : (o.state==='locked'
+      : (o.bustaDirettaIl
+        ? `✓ Hai indicato che il codice di ritiro arriva direttamente all'acquirente (il ${quandoDiretta}). Se invece arriva a te, depositalo qui: la dichiarazione si annulla da sola.`
+        : o.state==='locked'
         ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando ti arriva.'
         : 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
     return `
@@ -23022,6 +23935,14 @@ function pannelloBustaRitiro(o){
         ${campoDocumentoBusta(o, b)}
         ${o.bustaIl && !b ? `<button class="btn ghost" style="margin-top:8px" onclick="mostraBusta(this)">👁 Rileggi ciò che hai depositato</button>` : ''}
         <button class="btn orange" style="margin-top:10px" onclick="depositaBusta(this)">📦 ${o.bustaIl?'Aggiorna le istruzioni':'Deposita le istruzioni'}</button>
+        ${/* LA PORTA TARDIVA (cantiere 45): chi ha spedito senza la
+              spunta resta sotto sollecito, e l'unica uscita sarebbe
+              una busta finta — da qui dichiara che il codice va
+              direttamente all'acquirente. Solo su 'shipped' (il
+              server rifiuta altrove) e solo finche' non c'e' ne'
+              busta ne' dichiarazione. */''}
+        ${(o.state==='shipped' && !o.bustaIl && !o.bustaDirettaIl) ? `
+        <div class="hint" style="margin-top:8px">Hai messo i recapiti dell'acquirente come destinatario? <button type="button" class="scopri-link" onclick="dichiaraBustaDiretta()">Il codice arriva direttamente a lui</button></div>` : ''}
       </div>`;
   }
   /* venditore fuori dagli stati di scrittura: rilettura e basta.
@@ -23039,6 +23960,251 @@ function pannelloBustaRitiro(o){
       ${b ? bloccoDocumentoBusta(o, b) : ''}
     </div>`;
   return '';
+}
+
+
+/* ---- L'EMAIL PER IL CORRIERE (ago 2026, tappa B) ----
+   Il compratore la lascia perche' il codice del locker gli arrivi
+   DIRETTAMENTE dal corriere, senza passare dalla chat — che e'
+   precisamente cio' che chi non ha ne' username Telegram ne' npub NON
+   HA. E' FACOLTATIVA e non e' mai una condizione per comprare: chi non
+   la lascia continua come oggi, il codice arriva al venditore che lo
+   deposita nella busta.
+
+   IL CAMPO STA DIETRO UN LINK, la ricetta della nota del compratore:
+   l'ordine e' una pagina che si LEGGE, e un campo sempre aperto su una
+   cosa che quasi nessuno scrive e' spazio morto — e una tastiera che
+   si alza da sola su un pannello che non l'ha chiesta.
+   TRE STATI come il cassetto del punto: link / campo aperto / riga
+   compatta col «Cambia», che riapre PRECOMPILATO — mai ricominciare da
+   capo.
+
+   LO STATO VIVE IN `emailAperta` E MAI NEL DOM (il patto di
+   `acqDati.puntoAperto`): il pannello si ridisegna a ogni salvataggio,
+   e uno stato solo-DOM si richiuderebbe sotto le dita.
+
+   ⚠️ IL VALORE NON ARRIVA MAI DA /api/orders: si legge solo dalla sua
+   rotta, e per il compratore ci si passa alla PRIMA apertura del
+   cassetto — che e' anche l'unico momento in cui gli serve. */
+let emailLetta = {};      // ordineId -> l'email in chiaro
+let emailAperta = 0;      // l'ordine col cassetto aperto (0 = nessuno)
+let emailInCorso = false; // la bandierina del doppio tocco
+
+function pannelloEmailCorriere(o){
+  if (!o || !o.viaPunto) return '';
+  /* IL COMPRATORE, e solo su 'locked': dopo la spedizione l'etichetta
+     e' gia' stampata, quindi un'email nuova non ci arriverebbe MAI —
+     il server la rifiuta e qui non si offre. Al suo posto la riga che
+     dice cos'e' successo e porta al bottone «non mi e' arrivato il
+     codice», che da li' in poi e' la strada vera. */
+  if (o.role==='buyer'){
+    if (o.state==='locked'){
+      const aperta = emailAperta === o.id;
+      const scritta = emailLetta[o.id] || '';
+      const campo = `
+        <div class="hint">${spiegaEmail()}</div>
+        <div class="ind-campi">
+          <label for="emailCorriereInp">La tua email</label>
+          <input type="email" id="emailCorriereInp" autocomplete="email"
+            inputmode="email" maxlength="120" placeholder="${segnaposEmail}"
+            value="${esc(scritta)}">
+        </div>
+        <div class="hint avviso-tracking" id="emailAvviso" style="display:none"></div>
+        <button class="btn orange" onclick="salvaEmailCorriere()">${o.emailCorriereIl ? "Aggiorna l'email" : "Salva l'email"}</button>
+        ${o.emailCorriereIl ? `<button class="btn ghost" onclick="togliEmailCorriere()">🗑 Togli l'email</button>` : ''}`;
+      const chiusa = o.emailCorriereIl
+        ? `<button type="button" class="via-riga punto-riga" aria-expanded="false"
+            onclick="apriEmailCorriere(this)"><span class="punto-testo">📧 ${esc(scritta || 'Email per il corriere')}</span><span class="punto-cambia">Cambia</span></button>`
+        : `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
+            onclick="apriEmailCorriere(this)">${invitoEmail()}</button>`;
+      return `<div class="payout" id="emailPannello">
+        <h4>📧 La tua email per il corriere</h4>
+        ${aperta ? campo : chiusa}
+      </div>`;
+    }
+    /* SPEDITO: il campo si chiude, e si dice PERCHE'. Il testo si
+       BIFORCA sulla busta diretta, e non e' una rifinitura: senza
+       quella dichiarazione l'email NON e' finita su nessuna
+       etichetta — il codice arriva al venditore come sempre —
+       quindi «il codice non ti arrivera'» sarebbe FALSO, e
+       manderebbe a cercare un guasto che non c'e'. Sul ramo
+       diretto invece la via d'uscita si TACE: ce l'ha gia' la nota
+       verde due righe piu' sotto (quella del cantiere della busta
+       diretta), e ripeterla sarebbe la stessa cosa detta due volte
+       a due dita di distanza — il difetto trovato dal giro DAL
+       VIVO, che una misura non poteva vedere. */
+    if (o.state==='shipped' && o.emailCorriereIl && !o.emailCorrierePurgataIl)
+      return `<div class="payout" id="emailPannello">
+        <h4>📧 La tua email per il corriere</h4>
+        <div class="hint">${o.bustaDirettaIl
+          ? "Il pacco è partito e l'email che hai lasciato è già sull'etichetta: da qui non si cambia più."
+          : "Il pacco è partito, e il venditore non ha usato la tua email: il <b>codice di ritiro</b> arriva a lui, che te lo passa qui nell'ordine."}</div>
+      </div>`;
+    return '';
+  }
+  /* IL VENDITORE la legge quando gli serve: al momento di comprare
+     l'etichetta. Il valore passa dalla sua rotta e non da /api/orders,
+     quindi c'e' il bottone che lo rivela — il calco della busta. */
+  if (o.role==='seller' && ['locked','shipped'].includes(o.state)){
+    if (!o.emailCorriereIl || o.emailCorrierePurgataIl) return '';
+    const mail = emailLetta[o.id] || '';
+    return `<div class="payout" id="emailPannello">
+      <h4>📧 Email dell'acquirente per il corriere</h4>
+      <div class="hint">L'acquirente ha lasciato un'email perché il <b>codice di ritiro</b> gli arrivi direttamente dal corriere. Se la metti come destinatario sull'etichetta, il codice non passa da qui — e nel pannello della spedizione spunta «il codice arriva direttamente a lui».</div>
+      ${mail
+        ? `<div class="hint" style="margin-top:8px"><b class="mono" style="user-select:all">${esc(mail)}</b></div>`
+        : `<button class="btn ghost" style="margin-top:10px" onclick="mostraEmailCorriere(this)">👁 Mostra l'email</button>`}
+    </div>`;
+  }
+  /* IL MODERATORE MAI, da nessuna strada: in disputa gli arriva il
+     FATTO con la data (la nota del server), e il valore no. */
+  return '';
+}
+
+/* Il ridisegno e' del SOLO pannello e MAI `openOrder`, la lezione del
+   codice di ritiro: riaprire riporta la pagina in cima e butta via
+   quel che si sta scrivendo. Il fatto vive tutto dentro il riquadro,
+   quindi vale la meta' semplice della regola. */
+function ridisegnaEmail(){
+  const p = el('emailPannello');
+  if (!p) return;
+  const html = pannelloEmailCorriere(currentOrder);
+  if (html) p.outerHTML = html;
+}
+
+function apriEmailCorriere(btn){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  emailAperta = o.id;
+  /* col valore gia' scritto si va a prenderlo PRIMA di disegnare, o il
+     campo si aprirebbe vuoto su un'email che c'e' — cioe' inviterebbe
+     a riscriverla da capo */
+  if (o.emailCorriereIl && !emailLetta[o.id]){
+    (async () => {
+      const ripristina = attesaRitardata(btn, "Apro l'email…");
+      await caricaEmailCorriere();
+      ripristina();
+      ridisegnaEmail();
+      metteFuocoEmail();
+    })();
+    return;
+  }
+  ridisegnaEmail();
+  metteFuocoEmail();
+}
+
+/* il fuoco vive SOLO qui e mai in un render: e' il gesto che chiede la
+   tastiera, non il disegno (la regola del cassetto della nota).
+   ⚠️ E IL CURSORE SI PORTA IN FONDO COL GIRO DI VALORE, mai con
+   `setSelectionRange`: su un <input type="email"> quel metodo NON
+   ESISTE — la specifica lo da' ai soli campi testuali — e alza un
+   InvalidStateError che si porta via il resto del gesto. Il difetto
+   l'ha trovato il giro DAL VIVO e non la rilettura: le sentinelle
+   dicevano che la riga c'era, e a schermo ogni apertura del campo
+   alzava. La promessa e' MISURATA e non supposta: col fuoco nudo il
+   carattere battuto atterra all'INIZIO ('Zabc@d.it'), col giro di
+   valore in FONDO — cioe' senza questa riga, chi riapre per
+   correggere scriverebbe davanti a quel che ha gia' scritto. */
+function metteFuocoEmail(){
+  const c = el('emailCorriereInp');
+  if (!c) return;
+  c.focus({preventScroll:true});
+  c.value = c.value;
+}
+
+async function caricaEmailCorriere(){
+  const o = currentOrder; if (!o) return '';
+  try {
+    const r = await fetch(`${API_BASE}/orders/${o.id}/email-corriere`, {
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return ''; }
+    emailLetta[o.id] = d.email || '';
+    return emailLetta[o.id];
+  } catch(e){ toast('Non ci sono riuscito, riprova', 6000); return ''; }
+}
+
+async function mostraEmailCorriere(btn){
+  haptic();
+  if (emailInCorso) return;
+  emailInCorso = true;
+  const ripristina = attesaRitardata(btn, "Apro l'email…");
+  const mail = await caricaEmailCorriere();
+  ripristina();
+  emailInCorso = false;
+  if (!mail) return;
+  ridisegnaEmail();
+}
+
+/* IL CONTROLLO DI FORMA CHIEDE, NON IMPEDISCE — la ricetta di
+   FORME_TRACKING: un'euristica nostra non deve fermare un indirizzo
+   vero (i domini nuovi nascono di continuo, e la forma di un'email
+   valida e' molto piu' larga di quel che si crede). Primo tocco =
+   avviso, secondo tocco sullo STESSO testo = si passa. */
+let emailForzata = '';
+function formaEmail(t){
+  return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(t);
+}
+
+async function salvaEmailCorriere(){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  const mail = (el('emailCorriereInp')?.value || '').trim();
+  const avviso = el('emailAvviso');
+  if (mail && !formaEmail(mail) && emailForzata !== mail){
+    emailForzata = mail;
+    if (avviso){
+      avviso.textContent = 'Non sembra un indirizzo email. Se è giusto '
+        + 'ritocca «Salva» e lo teniamo così.';
+      avviso.style.display = '';
+    }
+    return;
+  }
+  if (avviso) avviso.style.display = 'none';
+  await mandaEmailCorriere(mail);
+}
+
+async function togliEmailCorriere(){
+  haptic();
+  emailForzata = '';
+  await mandaEmailCorriere('');
+}
+
+async function mandaEmailCorriere(mail){
+  const o = currentOrder; if (!o) return;
+  /* NIENTE VELO D'ATTESA, ed e' la riga da non «uniformare» col
+     fratello che legge: quel velo ha in CI un censimento che NOMINA i
+     suoi chiamanti e sono tutte LETTURE — e' quell'invariante ad
+     accorgersi del gesto che un domani muovesse sats. Le due scritture
+     sorelle dell'ordine (salvaNota, salvaPuntoRitiro) non ne hanno
+     una, e questa e' della loro famiglia.
+     ⚠️ Il nome di quel velo non si scrive nemmeno qui: la sentinella
+     che verifica questa riga cerca proprio quella parola nel corpo, e
+     nominarla in un commento la fa rossa per colpa di una
+     spiegazione.
+     La bandierina invece resta: senza, due tocchi su rete lenta
+     manderebbero due volte lo stesso salvataggio. */
+  if (emailInCorso) return;
+  emailInCorso = true;
+  const r = await fetch(`${API_BASE}/orders/${o.id}/email-corriere`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({email_corriere: mail})});
+  const d = await r.json().catch(()=>({}));
+  emailInCorso = false;
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  emailLetta[o.id] = mail;
+  /* si scrive sulla riga di `orders` e non sul solo currentOrder, che
+     puo' essere DETACHED se la lista si e' ricaricata (la lezione dei
+     solleciti) */
+  const viva = orders.find(x => x.id === o.id);
+  o.emailCorriereIl = d.email_corriere_il || 0;
+  o.emailCorriereCorrezioni = d.email_corriere_correzioni || 0;
+  if (viva){ viva.emailCorriereIl = o.emailCorriereIl;
+    viva.emailCorriereCorrezioni = o.emailCorriereCorrezioni; }
+  emailAperta = 0;
+  ridisegnaEmail();
+  toast(mail ? '📧 Email salvata' : '🗑 Email tolta');
 }
 
 /* ---- LA FORMA DI QUEL CHE IL VENDITORE HA CONSEGNATO (ago 2026) ----
@@ -23571,9 +24737,50 @@ async function depositaBusta(btn){
     delete bustaDocVisto[currentOrder.id];
   }
   bustaDoc = null;
+  /* il deposito azzera la busta diretta (lo fa il server nello
+     stesso UPDATE): il client rispecchia, o la testa del pannello
+     direbbe ancora «arriva direttamente a lui» */
+  currentOrder.bustaDirettaIl = 0;
+  {const riga = orders.find(x => x.id === currentOrder.id);
+   if (riga) riga.bustaDirettaIl = 0;}
   openOrder(currentOrder.id);
   toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
                    : '📦 Istruzioni depositate');
+    }});
+}
+
+/* LA PORTA TARDIVA DELLA BUSTA DIRETTA (ago 2026, cantiere 45): chi
+   ha spedito senza la spunta dichiara da qui che il codice di ritiro
+   arriva direttamente all'acquirente. Conferma col foglio di casa —
+   la dichiarazione silenzia i promemoria e avvisa l'acquirente, va
+   detto PRIMA del tocco — poi il ridisegno e' IN PLACE
+   (ridisegnaBusta, mai openOrder: il fatto vive dentro il pannello,
+   e riaprire butterebbe un'eventuale bozza negli altri campi). */
+function dichiaraBustaDiretta(){
+  const o = currentOrder; if (!o) return;
+  chiediConferma({
+    titolo: 'Il codice va direttamente a lui?',
+    corpo: 'Confermi di aver messo i recapiti dell\'acquirente come '
+      + 'destinatario: il codice di ritiro glielo manda il corriere, '
+      + 'non passa dall\'ordine. Smettiamo di chiedertelo e avvisiamo '
+      + 'l\'acquirente.\n\nSe invece il codice arriva a te, potrai '
+      + 'sempre depositarlo qui: la dichiarazione si annulla da sola.',
+    etichetta: '📮 È così, dillo',
+    poi: async () => {
+      if (DEMO) { o.bustaDirettaIl = Math.floor(Date.now()/1000);
+                  ridisegnaBusta(); toast('📮 Segnato'); return; }
+      const r = await fetch(`${API_BASE}/orders/${o.id}/busta-diretta`, {
+        method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+      const ts = d.busta_diretta_il || Math.floor(Date.now()/1000);
+      o.bustaDirettaIl = ts;
+      /* anche sulla riga di orders: currentOrder puo' essere un
+         oggetto detached se la lista si e' ricaricata */
+      const riga = orders.find(x => x.id === o.id);
+      if (riga) riga.bustaDirettaIl = ts;
+      ridisegnaBusta();
+      toast('📮 Segnato: l\'acquirente è stato avvisato');
     }});
 }
 
@@ -23613,6 +24820,15 @@ function statoSollecito(o){
        subito, come sul server: quella popolazione non ha nessun
        altro squillo. */
     if (!o.viaPunto || o.bustaIl) return '';
+    /* E IL CODICE DICHIARATO DIRETTO (cantiere 45) ADESSO ENTRA (ago
+       2026): la riga che lo teneva fuori diceva «non c'e' nessuna
+       busta da aspettare», ed era vera dal lato del VENDITORE. Dal
+       lato di chi compra il caso scoperto era il rovescio — il codice
+       e' partito verso un recapito e li' non e' arrivato — e con
+       tutte e tre le porte zittite non restava nessuna maniglia fino
+       al giorno 10. Il bottone e' lo stesso, la finestra e i
+       contatori pure (e' la stessa fase); a cambiare sono le parole,
+       che le decide bottoneSollecito. */
     if (SOLLECITO.busta<=0) return '';
     if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso)) return '';
     if (o.sollecitiManualiBusta >= SOLLECITO.max) return 'tetto';
@@ -23732,14 +24948,28 @@ function notaFermo(o){
 function bottoneSollecito(o){
   const st = statoSollecito(o);
   if (!st) return '';
+  /* LA BUSTA DIRETTA NON RICORDA, RIFERISCE (ago 2026): li' il codice
+     e' gia' partito verso un recapito, quindi «ricorda al venditore il
+     codice di ritiro» direbbe la cosa sbagliata — lui quel codice non
+     ce l'ha e non lo aspetta. Il verbo cambia perche' cambia il fatto:
+     l'unica cosa che il venditore non puo' sapere da solo e' che a
+     destinazione non e' arrivato niente. */
+  const diretta = o.state==='shipped' && o.bustaDirettaIl;
+  /* UN SOLO onclick, e non e' un vezzo: la sentinella «da spento NON
+     c'e' nessun onclick» li CONTA, e due — anche se tutti e due nel
+     ramo acceso — la renderebbero cieca. L'etichetta varia, il gesto
+     e' uno. */
   if (st === 'ok')
-    return `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 `
-         + `Ricorda al venditore ${o.state==='shipped'
+    return `<button class="btn ghost" onclick="sollecitaVenditore(this)">`
+         + (diretta ? '📮 Non mi è arrivato il codice'
+             : `🔔 Ricorda al venditore ${o.state==='shipped'
              ? 'il codice di ritiro' : o.consegnaScelta==='digitale'
-             ? 'di mandarti il codice' : 'di spedire'}</button>`;
-  return `<button class="btn ghost" disabled>🔔 ${st === 'tetto'
-    ? `Hai già ricordato ${SOLLECITO.max} volte`
-    : 'Già ricordato oggi — riprova domani'}</button>`;
+             ? 'di mandarti il codice' : 'di spedire'}`) + `</button>`;
+  return `<button class="btn ghost" disabled>${diretta ? '📮' : '🔔'} `
+    + `${st === 'tetto'
+    ? `Hai già ${diretta ? 'segnalato' : 'ricordato'} ${SOLLECITO.max} volte`
+    : `Già ${diretta ? 'segnalato' : 'ricordato'} oggi — riprova domani`
+    }</button>`;
 }
 /* Il gemello di sollecita(), dall'altra parte del tavolo. I due
    contatori dell'automatico non si toccano: sono altre colonne, e
@@ -28437,6 +29667,7 @@ async function avvia(){
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
+    myXpRuoli = me.xp_ruoli || null;
     myClassifica = !!me.classifica_attiva;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';

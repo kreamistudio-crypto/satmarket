@@ -1,0 +1,34 @@
+; L'uscita di sicurezza di Barattolo: una volta al giorno, un archivio
+; cifrato (db + config + buste + contenuti + config di sistema) parte
+; verso il canale Telegram dei backup. Lo chiama il timer gemello.
+; Il perche' e il come stanno in deploy/backup-fuori.sh e in
+; deploy/RIPRISTINO.md.
+;
+; SI COPIA LO SCRIPT PRIMA DI ESEGUIRLO, come il deploy e per la
+; stessa ragione: il deploy automatico fa `git reset` e puo'
+; riscrivere questo script mentre gira — bash legge il file mentre lo
+; esegue, e la riga dopo sarebbe di un altro script.
+;
+; Installazione (una volta sola, da root):
+;     apt install age sqlite3
+;     cp deploy/barattolo-backup.* /etc/systemd/system/
+;     systemctl daemon-reload
+;     systemctl enable --now barattolo-backup.timer
+; piu' /etc/barattolo-backup.env (chmod 600): vedi backup-fuori.sh.
+
+[Unit]
+Description=Barattolo — il backup giornaliero che esce da Hetzner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/satmarket
+Environment=BARATTOLO_DIR=/root/satmarket
+; La lezione del deploy: un servizio di sistema nasce senza HOME, e
+; qui `crontab -l` (che finisce nell'archivio) ne ha bisogno.
+Environment=HOME=/root
+ExecStart=/bin/bash -c 'cp /root/satmarket/deploy/backup-fuori.sh /tmp/barattolo-backup.sh && exec /bin/bash /tmp/barattolo-backup.sh'
+; Un archivio da ~5 MB su una rete viva parte in secondi; dieci minuti
+; coprono anche la giornata storta senza restare appesi per sempre.
+TimeoutStartSec=600

@@ -877,6 +877,8 @@ CAMBIO_RINFRESCO_S = 60
 # concluso e almeno un voto da un «recensore reale» — uno che a sua
 # volta ha commerciato con qualcun altro: chi si fabbrica venti
 # identita' e se le fa votare non entra affatto.
+# Il bonus del commercio si smorza con quante persone ti hanno
+# votato: la fiducia di uno solo non amplifica come quella di venti.
 # NASCE SPENTA, e non perche' muova denaro: perche' nessuno sa quante
 # righe escono finche' non si guarda. Il conto lo da'
 # `python classifica_prova.py`, che legge e basta.
@@ -900,6 +902,21 @@ CLASSIFICA_XP_RIF = 1000        # gli XP-ordine che valgono il bonus
 CLASSIFICA_PESO_XP = 0.25       # quanto puo' contare il commercio, al
                                 # massimo: +25% sulla fiducia. 0 = la
                                 # classifica torna la sola media.
+CLASSIFICA_KD = 0               # quante persone servono perche' il bonus
+                                # del commercio conti PIENO: con due, chi
+                                # ha un recensore solo si prende un terzo
+                                # del suo bonus, chi ne ha 5 cinque
+                                # settimi, chi ne ha 20 quasi tutto —
+                                # la fiducia di uno solo e' un'opinione,
+                                # non un curriculum. Alzalo e il commercio
+                                # parla solo a chi ha molta gente dietro.
+                                # 0 = il bonus pieno per chiunque, cioe'
+                                # la classifica di prima dello
+                                # smorzamento; mai negativo (un meno vale
+                                # come zero). Il valore si SCEGLIE
+                                # guardando i numeri veri: la sezione 3
+                                # di `classifica_prova.py` affianca le
+                                # tarature sulla classifica vera.
 
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.

@@ -108,7 +108,9 @@ SELECT o.id, o.stato FROM offerte o
    AND NOT EXISTS (SELECT 1 FROM offerte_righe r WHERE r.offerta_id = o.id);
 
 SELECT '8e) RIGHE D''OFFERTA ORFANE (deve essere vuoto)' AS controllo;
-SELECT r.id, r.offerta_id, r.titolo FROM offerte_righe r
+-- niente r.id: la tabella non ha quella colonna (il rowid c'e', ma
+-- l'offerta mancante e' il dato che si cerca)
+SELECT r.offerta_id, r.annuncio_id, r.titolo FROM offerte_righe r
  WHERE NOT EXISTS (SELECT 1 FROM offerte o WHERE o.id = r.offerta_id);
 
 SELECT '8f) OFFERTE MONO CON RIGHE FIGLIE (deve essere vuoto)' AS controllo;
@@ -279,6 +281,27 @@ SELECT id, stato, via_punto, punto_obiettato_il, punto_obiezioni,
  WHERE (punto_obiettato_il > 0) <> (punto_obiezione <> '')
     OR (punto_obiettato_il > 0 AND via_punto = 0)
     OR (punto_obiezioni = 0 AND punto_obiettato_il > 0);
+
+SELECT '16g) BUSTA FUORI CONTRATTO (vuoto)' AS controllo;
+-- la busta di consegna: flag, nome e codice si scrivono nello stesso
+-- UPDATE e solo sulla via punto. Gli ultimi due bracci sono la BUSTA
+-- DIRETTA (ago 2026, cantiere 45): la dichiarazione «il codice arriva
+-- direttamente al compratore» vive solo sulla via punto, e il deposito
+-- della busta la azzera nello STESSO UPDATE — «depositata E dichiarata»
+-- non ha nessuno stato transitorio legittimo.
+-- Il braccio del codice guarda la COLONNA e non il contenuto: dal
+-- cantiere del documento una busta col solo QR non ha un codice
+-- scritto, ed e' normale — non suona perche' _cifra_contenuto
+-- prefissa anche il vuoto, quindi dopo un deposito la colonna non
+-- e' mai ''. Quel che prende e' la colonna mai scritta col timbro.
+SELECT id, stato, via_punto, busta_il, busta_diretta_il
+  FROM ordini
+ WHERE (busta_il > 0) <> (busta_nome <> '')
+    OR (busta_il > 0) <> (busta_codice <> '')
+    OR (busta_il > 0 AND via_punto = 0)
+    OR (busta_corretta_il > 0 AND busta_il = 0)
+    OR (busta_diretta_il > 0 AND via_punto = 0)
+    OR (busta_diretta_il > 0 AND busta_il > 0);
 
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non

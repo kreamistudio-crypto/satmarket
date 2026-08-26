@@ -2,9 +2,18 @@
 ; due sha, cioe' niente. Il minuto e' il ritardo massimo fra «la CI e'
 ; diventata verde» e «e' online».
 ;
-; Persistent=true: se il VPS e' stato spento (o riavviato) il giro si
-; recupera all'accensione invece di aspettare il minuto successivo —
-; cosi' una macchina che torna su si allinea da sola.
+; A RECUPERARE DOPO UNO SPEGNIMENTO E' OnBootSec, non Persistent: se
+; il VPS e' stato giu' (o riavviato) il primo giro cade due minuti
+; dopo l'accensione, invece di aspettare il minuto successivo a
+; un'attivita' che non c'e' mai stata — cosi' una macchina che torna
+; su si allinea da sola.
+;
+; PERSISTENT=TRUE QUI E' INERTE, ed e' scritto perche' il commento di
+; prima attribuiva a lui quel recupero: `Persistent=` ha effetto SOLO
+; sui timer con `OnCalendar=` (lo dice systemd.timer), e questo e'
+; monotono. La riga resta perche' non fa danno e sarebbe quel che
+; serve il giorno che questo timer diventasse a calendario; il
+; comportamento promesso, pero', lo da' la riga di sopra e non lei.
 
 [Unit]
 Description=Barattolo — controlla ogni minuto se c'e' un aggiornamento pronto

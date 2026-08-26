@@ -3229,6 +3229,37 @@ def prove_busta_ritiro():
     prova("il libro mastro sorveglia la busta fuori contratto", True,
           "busta fuori contratto" in _SORGENTE)
 
+    # --- LA BUSTA DIRETTA (ago 2026, cantiere 45): le forme ----------
+    # Il venditore dichiara che il codice di ritiro arriva
+    # direttamente al compratore. Le sentinelle guardano il CODICE
+    # (codice(): via i commenti — la prosa che racconta la clausola
+    # la renderebbe verde anche a clausola tolta), e la RIGA INTERA
+    # dove la lezione del reaper lo esige.
+    prova("il promemoria esclude la busta diretta (riga intera)", True,
+          '"AND o.busta_diretta_il=0 "' in codice(sb))
+    prova("il deposito azzera la dichiarazione, stessa scrittura",
+          True, '"busta_diretta_il=0, "' in codice(dep))
+    prova("la spedizione la timbra solo sulla via punto", True,
+          'busta_diretta and o["via_punto"]' in codice(sped)
+          and "busta_diretta_il=?" in codice(sped))
+    dich = pezzo("dichiara_busta_diretta").split('"""')[-1]
+    prova("la porta tardiva: guardia nella WHERE col 400 dei fratelli",
+          True, "AND stato='shipped' AND via_punto=1" in dich
+          and "Operazione non permessa" in dich)
+    prova("...con la busta depositata la porta e' chiusa", True,
+          'if o["busta_il"]:' in codice(dich))
+    prova("...idempotente: la scrittura e' condizionata", True,
+          "WHERE id=? AND busta_diretta_il=0" in codice(dich))
+    prova("...e non muove nessuna ancora", [],
+          [x for x in ("spedito_il", "aggiornato", "stato='shipped',")
+           if x in codice(dich)])
+    prova("la disputa racconta anche la dichiarazione, etichettata",
+          True, "busta_diretta_il" in ad
+          and "dichiarazione di" in ad)
+    prova("il mastro sorveglia i due bracci della busta diretta", True,
+          "OR (busta_diretta_il>0 AND via_punto=0) " in _SORGENTE
+          and "OR (busta_diretta_il>0 AND busta_il>0)" in _SORGENTE)
+
     # --- LA SORELLA SPECULARE: il compratore che non va a ritirare ---
     # Stessa famiglia, popolazione COMPLEMENTARE. Le righe qui sotto
     # sono tutte cadute almeno una volta sotto tortura: si rompono da
@@ -3348,6 +3379,33 @@ def prove_busta_ritiro():
     prova("client: aprire la busta non chiede conferme", False,
           "confirm" in pezzo_js(mini, "async function mostraBusta"))
 
+    # --- LA BUSTA DIRETTA, lato client (ago 2026, cantiere 45) ------
+    prova("la spunta della spedizione viaggia col body", True,
+          "shipBustaDiretta" in mini
+          and "busta_diretta: bustaDiretta" in mini)
+    prova("...e bustaDirettaIl sta in mapOrder", True,
+          "bustaDirettaIl:o.busta_diretta_il" in mini)
+    _bd = pezzo_js(mini, "function dichiaraBustaDiretta(){")
+    prova("la porta tardiva chiede col foglio di casa", True,
+          "chiediConferma({" in _bd)
+    prova("...e ridisegna IN PLACE, mai openOrder (il fatto vive "
+          "dentro il pannello)", True,
+          "ridisegnaBusta()" in _bd and "openOrder" not in _bd)
+    prova("...aggiornando anche la riga di orders, non solo il "
+          "detached", True, "orders.find(" in _bd)
+    # la riga d'attesa del compratore ha il ramo dichiarato: senza,
+    # direbbe «ti avviseremo» di un codice che non arrivera' mai
+    _pann = pezzo_js(mini, "function pannelloBustaRitiro(o){")
+    prova("la riga d'attesa ha il ramo della busta diretta", True,
+          "direttamente dal corriere" in _pann
+          and "In attesa del codice di ritiro." in _pann
+          and "o.bustaDirettaIl ?" in _pann)
+    # e il deposito rispecchia l'azzeramento del server, o la testa
+    # del pannello direbbe ancora «arriva direttamente a lui»
+    prova("il deposito azzera la dichiarazione anche nel client", True,
+          "currentOrder.bustaDirettaIl = 0;"
+          in pezzo_js(mini, "async function depositaBusta"))
+
     # --- IL CODICE DENTRO IL BOTTONE (ago 2026, dal campo) ---------
     # Tre cose in un cantiere solo: la pagina non salta piu', il
     # codice nasce DOVE STAVA IL DITO, e toccandolo si copia.
@@ -3450,11 +3508,26 @@ def prove_busta_ritiro():
     # aprirla e rileggerla per correggerla sono GET puri, come il
     # collegamento del servizio. La sola lettura che NON sta qui e' la
     # rivelazione del codice digitale, dove leggere E' la ricevuta.
-    prova("l'attesa ritardata la chiamano solo le sette LETTURE",
+    prova("l'attesa ritardata la chiamano solo le nove LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
            "apriDocBusta", "mostraAccesso",
-           "apriFotoContenuto", "apriCorrezioneContenuto"},
+           "apriFotoContenuto", "apriCorrezioneContenuto",
+           # l'email per il corriere (ago 2026): due LETTURE, e la sua
+           # SCRITTURA (mandaEmailCorriere) sta apposta fuori — le due
+           # scritture sorelle dell'ordine, salvaNota e
+           # salvaPuntoRitiro, un velo non ce l'hanno affatto, e questo
+           # elenco vale finche' resta di sole letture
+           "apriEmailCorriere", "mostraEmailCorriere"},
           _chi_chiama("attesaRitardata(btn,"))
+    # ⚠️ con find() e non index(): una prova che ESPLODE invece di
+    # farsi rossa si porta dietro tutte le sorelle dopo di lei — la
+    # lezione gia' pagata tre volte
+    _i = mini.find("async function mandaEmailCorriere(")
+    _f = mini.find(chr(10) + "async function", _i + 10)
+    _corpo_manda = mini[_i:_f] if _i >= 0 and _f > _i else ""
+    prova("...e la SCRITTURA dell'email ne resta fuori",
+          (True, False),
+          (bool(_corpo_manda), "attesaRitardata" in _corpo_manda))
     # IL GEMELLO: chi non passa un testo si prende «Invio sats in
     # corso…», quindi il default puo' restare SOLO a chi i sats li
     # muove davvero — e' cosi' che quella frase e' finita sopra il
@@ -3618,10 +3691,13 @@ def prove_busta_ritiro():
         busta_correzioni INT DEFAULT 0,
         busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
         busta_file_nome TEXT DEFAULT '',
+        busta_diretta_il INT DEFAULT 0,
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
         sollecito_punto_il INT DEFAULT 0, solleciti_punto INT DEFAULT 0,
+        sollecito_diretto_il INT DEFAULT 0,
+        solleciti_diretti INT DEFAULT 0,
         sollecito_appuntamento_il INT DEFAULT 0,
         solleciti_appuntamento INT DEFAULT 0,
         appuntamento_il INT DEFAULT 0,
@@ -3770,6 +3846,80 @@ def prove_busta_ritiro():
           vero.execute("SELECT stato FROM ordini "
                        "WHERE id=3").fetchone()["stato"])
     avvisi.clear()
+
+    # --- LA BUSTA DIRETTA (ago 2026, cantiere 45) --------------------
+    # Il venditore dichiara che il codice di ritiro arriva
+    # direttamente al compratore: la spunta alla spedizione, la porta
+    # tardiva, e il deposito che azzera. Tutto GIRATO, mai guardato.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, punto_ritiro) "
+                 "VALUES(4, 111, 222, 'locked', 1, 'Locker InPost')")
+    # id 5: spedizione a casa — la spunta li' non ha oggetto
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato) VALUES(5, 111, 222, 'locked')")
+    vero.commit()
+    amb = _amb(222)
+    exec("async " + pezzo("segna_spedito"), amb)
+    corri(amb, "segna_spedito", 4,
+          _Req({"corriere": "InPost", "tracking": "1234567890",
+                "busta_diretta": True}))
+    o4 = vero.execute("SELECT * FROM ordini WHERE id=4").fetchone()
+    prova("la spunta alla spedizione timbra la dichiarazione", True,
+          o4["busta_diretta_il"] > 0 and o4["stato"] == "shipped")
+    prova("...e la notifica dice il corriere, mai «ti avviseremo»",
+          True, len(avvisi) == 1
+          and "direttamente il corriere" in avvisi[0][1]
+          and "Ti avviseremo" not in avvisi[0][1])
+    avvisi.clear()
+    corri(amb, "segna_spedito", 5,
+          _Req({"corriere": "BRT", "tracking": "1234567890",
+                "busta_diretta": True}))
+    prova("fuori dalla via punto la spunta non scrive niente", 0,
+          vero.execute("SELECT busta_diretta_il FROM ordini "
+                       "WHERE id=5").fetchone()[0])
+    avvisi.clear()
+    # LA PORTA TARDIVA: id 6, spedito senza la spunta (il distratto)
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, punto_ritiro, spedito_il, "
+                 "aggiornato) "
+                 "VALUES(6, 111, 222, 'shipped', 1, 'Punto Poste', "
+                 "1000, 1000)")
+    vero.commit()
+
+    def dichiara(chi, oid):
+        a2 = _amb(chi)
+        exec("async " + pezzo("dichiara_busta_diretta"), a2)
+        return corri(a2, "dichiara_busta_diretta", oid)
+
+    prova("il compratore non dichiara", "400 Operazione non permessa",
+          dichiara(111, 6))
+    prova("l'estraneo e l'ordine inesistente rispondono uguale",
+          dichiara(999, 6), dichiara(222, 777))
+    prova("fuori dalla via punto niente porta",
+          "400 Operazione non permessa", dichiara(222, 5))
+    prova("con la busta gia' depositata la porta e' chiusa", True,
+          str(dichiara(222, 1)).startswith("400 Le istruzioni"))
+    r6 = dichiara(222, 6)
+    prova("la dichiarazione tardiva timbra", True,
+          isinstance(r6, dict) and r6["busta_diretta_il"] > 0)
+    prova("...e avvisa il compratore col testo statico", True,
+          len(avvisi) == 1 and avvisi[0][0] == 111
+          and "direttamente dal corriere" in avvisi[0][1])
+    o6 = vero.execute("SELECT * FROM ordini WHERE id=6").fetchone()
+    prova("...senza muovere le ancore ne' lo stato",
+          (1000, 1000, "shipped"),
+          (o6["spedito_il"], o6["aggiornato"], o6["stato"]))
+    avvisi.clear()
+    r6b = dichiara(222, 6)
+    prova("il doppio tocco: ok idempotente e NESSUNA seconda notifica",
+          True, isinstance(r6b, dict) and avvisi == [])
+    # il deposito e' l'annulla naturale: azzera la dichiarazione
+    deposita(222, 6, busta)
+    o6 = vero.execute("SELECT * FROM ordini WHERE id=6").fetchone()
+    prova("il deposito azzera la dichiarazione (l'annulla naturale)",
+          True, o6["busta_il"] > 0 and o6["busta_diretta_il"] == 0)
+    avvisi.clear()
+
     # la lettura: le parti si', l'estraneo e l'inesistente uguali,
     # e il database non cambia di un byte
     dump = [tuple(r) for r in vero.execute(
@@ -3856,6 +4006,18 @@ def prove_busta_ritiro():
           and not _os.path.exists(_os.path.join(buste_dir, vecchio)))
     prova("...e il tipo lo segue", "application/pdf",
           o1["busta_file_tipo"])
+    # IL CODICE VUOTO NON E' UNA COLONNA VUOTA, ed e' il fatto da cui
+    # dipende in silenzio il libro mastro: il suo braccio
+    # «(busta_il>0) <> (busta_codice<>'')» controlla che le COLONNE si
+    # scrivano insieme al timbro, e su una busta col solo QR tace
+    # soltanto perche' il trasporto di casa prefissa anche il vuoto.
+    # Se un domani `_cifra_contenuto("")` tornasse '', quel braccio
+    # comincerebbe a suonare ogni giorno su un caso NORMALE — cioe' il
+    # modo in cui un allarme smette di essere letto. Qui si inchioda
+    # il fatto dove il valore NASCE; di la' una riga sana della ronda
+    # lo inchioda dove viene letto.
+    prova("il codice vuoto in colonna non e' vuoto: e' il trasporto",
+          True, o1["busta_codice"] == "plain:")
     resta = o1["busta_file"]
     deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1"})
     prova("chiave assente = si CONSERVA (il patto dello stock)", resta,
@@ -3948,6 +4110,14 @@ def prove_busta_ritiro():
                  "stato, via_punto, spedito_il) "
                  "VALUES(9, 111, 222, 'shipped', 1, ?)",
                  (int(_t.time()) - 4 * 86400,))
+    # id 15: il caso AFFILATO della busta diretta — spedito da 5
+    # giorni, busta assente, MA dichiarato: senza la clausola nella
+    # WHERE squillerebbe insieme al 9, e la prova qui sotto direbbe
+    # [222, 222]. Copre anche il 🧊, che vive nella stessa query.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(15, 111, 222, 'shipped', 1, ?, ?)",
+                 (int(_t.time()) - 5 * 86400, int(_t.time()) - 5 * 86400))
     vero.commit()
     amb = {"db": Con, "notifica": _notifica,
            "notifica_admin": _notifica_admin_spia(avvisi),
@@ -4092,6 +4262,150 @@ def prove_busta_ritiro():
     prova("...e a leva spenta il database non si tocca", prima,
           vero.execute("SELECT solleciti_punto FROM ordini "
                        "ORDER BY id").fetchall())
+
+    # --- LA TERZA SORELLA: IL CODICE CHE NON PASSA DA QUI ------------
+    # La busta DIRETTA (cantiere 45) zittiva tutte e tre le porte, e
+    # l'ordine restava muto fino al giorno 10 su una giacenza di tre.
+    # Anche qui non si guarda com'e' scritta la funzione: la si fa
+    # girare e si guarda CHI riceve cosa, in che giorno.
+    avsd = []
+    vero.execute("DELETE FROM ordini")
+    # id 20: dichiarato, spedito 2 giorni (e un'ora) fa. L'ora in piu'
+    # per la stessa ragione della sorella: il confronto e' STRETTO.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(20, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 2 * G - 3600, ora - 2 * G))
+    # id 21: la busta C'E' — e' della SORELLA, non di questa. Senza il
+    # gate `busta_diretta_il>0` riceverebbe due promemoria che si
+    # contraddicono.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il) "
+                 "VALUES(21, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 9 * G, ora - 8 * G))
+    # id 22: LA CINTURA. Dichiarato E con la busta depositata — oggi
+    # impossibile (il deposito azzera la dichiarazione), e per questo
+    # e' il caso che una sentinella sul testo non saprebbe distinguere:
+    # se un domani quell'UPDATE cambia, senza `busta_il=0` partirebbero
+    # due squilli sullo stesso ordine.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il, "
+                 "busta_diretta_il) "
+                 "VALUES(22, 111, 222, 'shipped', 1, ?, ?, ?)",
+                 (ora - 9 * G, ora - 8 * G, ora - 8 * G))
+    # id 23: LO 'shipped' STORICO col campo a zero. Senza la guardia
+    # `spedito_il>0` il MAX varrebbe 0 e questo squillerebbe al primo
+    # giro — la raffica che la sorella non rischia perche' `busta_il>0`
+    # le garantisce l'ancora.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il) "
+                 "VALUES(23, 111, 222, 'shipped', 1, 0, ?)",
+                 (ora - 30 * G,))
+    # id 24: un SET (annuncio_id=0), la lezione del LEFT JOIN
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_diretta_il, "
+                 "annuncio_id) VALUES(24, 111, 222, 'shipped', 1, ?, ?, 0)",
+                 (ora - 3 * G, ora - 3 * G))
+    vero.commit()
+    async def _notifica_d(tg, testo):
+        avsd.append((tg, testo))
+
+    ambd = {"db": Con, "notifica": _notifica_d,
+            "notifica_admin": _notifica_admin_spia(avsd),
+            "_titolo_ordine": lambda righe: "un set",
+            "html": __import__("html"), "time": _t,
+            "PROMEMORIA_RITIRO_GIORNI": 2, "PROMEMORIA_CONFERMA_MAX": 3}
+    exec("async " + pezzo("sollecita_codici_diretti"), ambd)
+
+    def girod():
+        asyncio.new_event_loop().run_until_complete(
+            ambd["sollecita_codici_diretti"]())
+
+    girod()
+    prova("codice diretto: a 2 giorni squilla il SOLO compratore",
+          [111, 111], [a[0] for a in avsd])
+    dettod = " || ".join(t for _, t in avsd)
+    # LA RIGA CHE IL CORRIERE NON DICE MAI, ed e' la ragione per cui
+    # questa funzione puo' esistere accanto alla sorella
+    prova("...e gli dice di guardare anche nello spam", True,
+          "spam" in dettod)
+    prova("...e il SET c'e', col titolo dalle righe", True,
+          "un set" in dettod)
+    # IL TESTO DEV'ESSERE VERO ANCHE COL PACCO IN VIAGGIO: l'ancora e'
+    # la spedizione e non l'arrivo, che non sappiamo
+    prova("...e non promette un arrivo che non possiamo sapere", True,
+          "ti aspetta" not in dettod and "è arrivato al punto" not in dettod)
+    prova("...e nessun altro ordine e' entrato nel giro", 2, len(avsd))
+    # il 🧊 non esiste in questa famiglia: la finestra e' corta e
+    # cadrebbe prima di CODA_FERMI_GIORNI
+    prova("...e ai moderatori non si scrive mai", 0,
+          sum(1 for chi, _ in avsd if chi == "admin"))
+    avsd.clear()
+    girod()
+    prova("codice diretto: non ribussa nello stesso giorno", [], avsd)
+    # I CONTATORI SONO SUOI, e questa e' la prova che tiene in piedi
+    # tutto il cantiere: se leggesse `solleciti_punto`, l'ordine che
+    # passa alla sorella (il venditore deposita dopo la segnalazione)
+    # arriverebbe al tetto senza aver mai sentito «vai a ritirare».
+    prova("codice diretto: il contatore e' il SUO", (1, 0),
+          tuple(vero.execute("SELECT solleciti_diretti, solleciti_punto "
+                             "FROM ordini WHERE id=20").fetchone()))
+
+    def spostad(id_ordine, giorni):
+        vero.execute("UPDATE ordini SET sollecito_diretto_il=? WHERE id=?",
+                     (ora - giorni * G, id_ordine))
+        vero.commit()
+
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: al secondo squillo solo il compratore",
+          [111], [a[0] for a in avsd])
+    avsd.clear()
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: al TERZO entra anche il venditore",
+          [111, 222], sorted(a[0] for a in avsd))
+    prova("...e a lui si dice che puo' depositare le istruzioni", True,
+          "istruzioni di ritiro" in
+          [t for chi, t in avsd if chi == 222][0])
+    avsd.clear()
+    spostad(20, 3)
+    girod()
+    prova("codice diretto: oltre il tetto, silenzio", [], avsd)
+    prova("...e il contatore si ferma al tetto", 3,
+          vero.execute("SELECT solleciti_diretti FROM ordini WHERE "
+                       "id=20").fetchone()[0])
+    # la staffetta e la leva, come per la sorella
+    vero.execute("UPDATE ordini SET solleciti_diretti=0, "
+                 "sollecito_diretto_il=0, solleciti_conferma=1 "
+                 "WHERE id=20")
+    vero.commit()
+    girod()
+    prova("codice diretto: dove parla gia' la conferma, si tace", [], avsd)
+    ambd["PROMEMORIA_RITIRO_GIORNI"] = 0
+    vero.execute("UPDATE ordini SET solleciti_conferma=0 WHERE id=20")
+    vero.commit()
+    primad = vero.execute("SELECT solleciti_diretti FROM ordini "
+                          "ORDER BY id").fetchall()
+    girod()
+    prova("codice diretto: la leva a 0 spegne, e NON accelera", [], avsd)
+    prova("...e a leva spenta il database non si tocca", primad,
+          vero.execute("SELECT solleciti_diretti FROM ordini "
+                       "ORDER BY id").fetchall())
+    # ...E QUALCUNO LA DEVE CHIAMARE: la RIGA INTERA e non il nome —
+    # un «pass  # await sollecita_codici_diretti()» lascerebbe verde
+    # una sentinella che cerca la parola, con la funzione mai
+    # eseguita. E' la lezione del reaper, e questa mutazione e' l'unica
+    # sopravvissuta al primo giro di tortura di questo cantiere.
+    prova("...ed e' agganciata all'orologio", True,
+          any(r.strip() == "await sollecita_codici_diretti()"
+              for r in pezzo("orologio").splitlines()))
+    # gira DOPO la sorella, come la sorella gira dopo la conferma: le
+    # due popolazioni sono complementari, ma leggono contatori che il
+    # giro precedente puo' aver appena scritto
+    prova("...dopo il promemoria del ritiro al punto", True,
+          _SORGENTE.index("await sollecita_ritiri_al_punto()")
+          < _SORGENTE.index("await sollecita_codici_diretti()"))
     vero.close()
 
 
@@ -4880,6 +5194,716 @@ def prove_indirizzo_casa():
     vero.close()
 
 
+def prove_email_corriere():
+    """L'EMAIL PER IL CORRIERE (ago 2026, tappa B).
+
+    Spedendo a un locker il venditore puo' mettere i recapiti del
+    COMPRATORE come destinatario — la busta diretta, cantiere 45 — e da
+    li' il codice glielo manda il corriere. La META' che mancava era
+    procurarsi quel recapito senza la chat, cioe' proprio cio' che chi
+    non ha ne' username Telegram ne' npub NON HA: e' la terza volta che
+    lo stesso buco morde (la busta, l'indirizzo, adesso questo).
+
+    LE DECISIONI DI ANDREA, e sono la voce:
+      - UN CAMPO SOLO, l'EMAIL. Il telefono non entra in Barattolo per
+        nessuna ragione: e' un vincolo permanente, e la prova che lo
+        sorveglia guarda il CODICE e non la prosa.
+      - FACOLTATIVA, mai una condizione per comprare.
+      - DENTRO L'ORDINE, DOPO IL PAGAMENTO.
+      - IL MODERATORE VEDE CHE C'ERA, MAI QUALE.
+
+    Le sentinelle dicono che i pezzi ci sono; a dire che RISPONDONO
+    giusto e' il banco in fondo, che fa girare i due endpoint VERI su
+    un database vero."""
+    import sqlite3, asyncio
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    giu = pezzo("_email_corriere_da_payload")
+    post = pezzo("indica_email_corriere")
+    get = pezzo("leggi_email_corriere")
+
+    # --- IL VINCOLO PERMANENTE: il telefono non entra --------------
+    # ⚠️ si guarda il CODICE e non il file: la parola «telefono» vive
+    # nella prosa (la docstring che dichiara il vincolo, i testi
+    # pubblici, il campo dell'INDIRIZZO che un telefono lo accetta da
+    # sempre), quindi una ricerca larga sarebbe rossa per colpa di una
+    # spiegazione.
+    prova("il giudice non conosce nessun telefono", False,
+          "telefono" in _senza_prosa(codice(giu)).lower())
+    prova("...ne' l'endpoint che scrive", False,
+          "telefono" in _senza_prosa(codice(post)).lower())
+    # il DDL si taglia da solo: e' l'unico posto dove quei nomi stanno
+    # dentro una dichiarazione di colonna
+    _ddl = src[src.index('"email_corriere TEXT'):
+               src.index('"email_corriere_purgata_il') + 200]
+    prova("il DDL ha le cinque colonne", 5,
+          _ddl.count('"email_corriere'))
+
+    # --- IL GIUDICE ------------------------------------------------
+    prova("cifra LUI e non i chiamanti", (1, 0),
+          (giu.count("_cifra_contenuto(testo)"),
+           codice(post).count("_cifra_contenuto")))
+    prova("il vuoto si ACCETTA (e' facoltativa)", True,
+          'return "", ""' in giu)
+    prova("torna la TUPLA: dai blob non si deduce niente, Fernet non "
+          "e' deterministico", True, "-> tuple" in giu)
+    prova("il tetto e' un 400 e mai un troncamento", True,
+          "HTTPException(400" in giu and "[:MAX_EMAIL" not in giu)
+    prova("...e la leva ha il suo nome", True,
+          "MAX_EMAIL_CORRIERE = 120" in src)
+    # IL CONTROLLO DI FORMA VIVE NEL CLIENT, la ricetta di
+    # FORME_TRACKING: un'euristica nostra non deve fermare un
+    # indirizzo vero, quindi CHIEDE e non impedisce
+    prova("il server la forma non la giudica", False,
+          "@" in codice(giu))
+    prova("...e il client la chiede senza impedire", True,
+          "function formaEmail(" in mini and "emailForzata" in mini)
+
+    # --- LA SUPERFICIE: il valore non esce da nessun'altra parte ----
+    prova("non esce da /api/orders", True,
+          'r.pop("email_corriere", "")' in src)
+    prova("...ma i FATTI si', o il client non saprebbe disegnare",
+          True, "emailCorriereIl:o.email_corriere_il" in mini)
+    prova("il moderatore non la legge MAI: la guardia e' alle due "
+          "parti", True,
+          "(compratore_id=? OR venditore_id=?)" in get)
+    prova("...e l'autorizzazione viene PRIMA dell'esistenza", True,
+          get.index("if not o:") < get.index("email_corriere_purgata_il"))
+    # ⚠️ QUI il nome della funzione che NON si chiama non si scrive
+    # nemmeno in un commento: questa prova legge il pezzo intero.
+    prova("in disputa esce il FATTO e non il valore", False,
+          "_email_corriere_letta" in pezzo("apri_disputa"))
+    prova("...e il fatto c'e', con la sua data", True,
+          "aveva lasciato un'email per il corriere" in src)
+
+    # --- IL GATE: 'locked' e via punto, e il perche' del venditore --
+    prova("solo il compratore, solo su locked", True,
+          "compratore_id=? \"\n                    \"AND stato='locked'"
+          in post or ("compratore_id=?" in post
+                      and "stato='locked'" in post))
+    prova("solo sulla via punto", True, 'if not o["via_punto"]' in post)
+    prova("il 400 e' quello opaco dei fratelli", True,
+          '400, "Operazione non permessa"' in post)
+    # NIENTE GATE SUL VENDITORE, ed e' la riga da non ammorbidire:
+    # verrebbe naturale offrire il campo solo a chi dichiara la busta
+    # diretta, ma quella dichiarazione arriva DOPO la spedizione —
+    # cioe' quando questo campo e' gia' chiuso.
+    prova("nessun gate sulla dichiarazione del venditore", False,
+          "busta_diretta_il" in codice(post))
+
+    # --- LA SCOPA: dentro pulisci_indirizzi, non in una gemella -----
+    scopa = _senza_prosa(pezzo("pulisci_indirizzi"))
+    prova("la scopa e' UNA: le due velocita' non si copiano", 2,
+          scopa.count("email_corriere_purgata_il=?"))
+    prova("...con la guardia che rende verificabile la promessa", 2,
+          scopa.count("email_corriere<>'' AND email_corriere_purgata_il=0"))
+    prova("...e NON tocca `aggiornato`", False,
+          "aggiornato=?" in scopa)
+    prova("...e solo gli stati assorbenti", False,
+          "'annullato'" in scopa)
+    prova("il libro mastro ha il suo controllo", True,
+          "email per il corriere fuori contratto" in src)
+
+    # --- IL CLIENT -------------------------------------------------
+    prova("client: il campo sta dietro un link discreto", True,
+          "+ Ricevi il codice direttamente dal corriere" in mini)
+    prova("client: il ridisegno e' del solo pannello, MAI openOrder",
+          False, "openOrder" in pezzo_js(mini, "function ridisegnaEmail("))
+    prova("client: lo stato vive in una variabile, non nel DOM", True,
+          "let emailAperta = 0;" in mini)
+    prova("client: il campo e' un <input type=email> con l'autofill",
+          True, 'type="email" id="emailCorriereInp" autocomplete="email"'
+          in mini)
+    prova("client: e prende il vestito dei campi dell'indirizzo, che "
+          "dentro .payout un input nudo esce col bordo del browser",
+          True, '<div class="ind-campi">' in mini)
+    # il fuoco vive SOLO nel gesto e mai in un render, o la tastiera si
+    # alzerebbe da sola aprendo l'ordine
+    prova("client: il fuoco sta nel gesto, non nel disegno", 1,
+          mini.count("function metteFuocoEmail("))
+    # ⚠️ IL DIFETTO CHE SOLO IL GIRO DAL VIVO HA VISTO: su un
+    # <input type="email"> `setSelectionRange` NON ESISTE (la specifica
+    # lo da' ai soli campi testuali) e alza un InvalidStateError che si
+    # porta via il resto del gesto — a schermo ogni apertura del campo
+    # alzava, e le sentinelle di ieri erano tutte verdi. Il cursore in
+    # fondo si tiene col giro di valore, che non puo' alzare su nessun
+    # tipo; e la promessa e' MISURATA: col fuoco nudo il carattere
+    # battuto atterra all'inizio.
+    _fuoco = pezzo_js(mini, "function metteFuocoEmail(")
+    prova("client: il cursore in fondo NON passa da setSelectionRange, "
+          "che su type=email alza", False, "setSelectionRange" in _fuoco)
+    prova("client: ...e ci va col giro di valore", True,
+          "c.value = c.value" in _fuoco)
+    prova("client: su 'shipped' il campo si chiude e si dice perche'",
+          True, "l'email che hai lasciato è già sull'etichetta" in mini)
+    # ⚠️ IL TESTO SI BIFORCA SULLA BUSTA DIRETTA, e sono DUE difetti
+    # trovati dal giro DAL VIVO che nessuna misura poteva vedere.
+    #   1) senza quella dichiarazione l'email non e' finita su nessuna
+    #      etichetta — il codice arriva al venditore come sempre —
+    #      quindi il ramo unico diceva il FALSO a meta' degli ordini;
+    #   2) sul ramo diretto la via d'uscita NON si ripete: ce l'ha gia'
+    #      la nota verde due righe piu' sotto, e ripeterla sarebbe la
+    #      stessa cosa detta due volte a due dita di distanza. Per la
+    #      stessa ragione qui non si nomina il bottone della maniglia,
+    #      che per giunta nasce solo a SOLLECITO_MANUALE_BUSTA_ORE
+    #      dalla spedizione.
+    _sped = pezzo_js(mini, "function pannelloEmailCorriere(")
+    prova("client: ...e il testo dello 'shipped' si biforca sulla busta "
+          "diretta", True, "${o.bustaDirettaIl" in _sped)
+    prova("client: ...senza busta diretta dice che l'email non e' stata "
+          "usata", True, "non ha usato la tua email" in _sped)
+    prova("client: ...e non ripete la via d'uscita della nota verde",
+          (False, False),
+          ("col bottone qui sotto" in _sped,
+           "Non mi è arrivato il codice" in _sped))
+    prova("client: il venditore la legge dalla sua rotta", True,
+          "mostraEmailCorriere(this)" in mini)
+    prova("client: il moderatore non ha nessun bottone", True,
+          "role==='seller'" in pezzo_js(mini, "function pannelloEmailCorriere(")
+          and "role==='admin'" not in
+          pezzo_js(mini, "function pannelloEmailCorriere("))
+
+    # --- I TESTI PUBBLICI: oggi nessuna riga era sorvegliata --------
+    prova("la pagina «Il pagamento protetto» dichiara l'email", True,
+          "se vuoi che il codice di ritiro te lo mandi il corriere"
+          in mini)
+    prova("«I tuoi dati» dice che il telefono non lo chiediamo mai",
+          True, "Il numero di telefono non te lo chiediamo mai" in mini)
+    prova("...e che un campo per il telefono non esiste", True,
+          "Un campo per il telefono, da solo, in Barattolo non esiste."
+          in mini)
+    prova("...e dichiara la durata, accanto all'indirizzo", True,
+          "sparisce insieme all'indirizzo" in mini)
+    prova("...e che il moderatore non la legge", True,
+          "La tua email per il corriere non la legge." in mini)
+    prova("i meta della privacy non promettono piu' «niente email»",
+          False, "niente email" in src)
+
+    # ================================================================
+    # IL FUNZIONALE: i due endpoint VERI su un database vero
+    # ================================================================
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
+        stato TEXT, via_punto INT DEFAULT 0, aggiornato INT DEFAULT 0,
+        email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+        email_corriere_corretta_il INT DEFAULT 0,
+        email_corriere_correzioni INT DEFAULT 0,
+        email_corriere_purgata_il INT DEFAULT 0,
+        indirizzo TEXT DEFAULT '', indirizzo_purgato_il INT DEFAULT 0,
+        disputata INT DEFAULT 0);
+      -- 1: via punto, pagato: il caso normale
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto)
+        VALUES(1, 111, 222, 'locked', 1);
+      -- 2: la spedizione a casa, che di email non ne vuole
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato)
+        VALUES(2, 111, 222, 'locked');
+      -- 3: gia' spedito: l'etichetta e' stampata, il campo si chiude
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
+        email_corriere, email_corriere_il)
+        VALUES(3, 111, 222, 'shipped', 1, 'plain:gia@qui.it', 500);
+      -- 4: chiuso e PURGATO: la promessa mantenuta
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
+        email_corriere_il, email_corriere_purgata_il)
+        VALUES(4, 111, 222, 'released', 1, 500, 900);
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    avvisi = []
+
+    async def _notifica(tg, testo):
+        avvisi.append((tg, testo))
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    class _T:
+        @staticmethod
+        def time():
+            return 9_000_000_000
+
+        @staticmethod
+        def strftime(f, t):
+            return "01/01/2000"
+
+        @staticmethod
+        def localtime(t=None):
+            return None
+
+    def _amb(chi):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "time": _T, "print": lambda *a, **k: None,
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MODALITA_COLLAUDO": True,
+               "MAX_EMAIL_CORRIERE": 120}
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        exec(pezzo("_email_corriere_letta"), amb)
+        exec(pezzo("_coda_email_corriere"), amb)
+        return amb
+
+    def corri(amb, nome, *args):
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb[nome](*args))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def scrivi(chi, oid, mail):
+        amb = _amb(chi)
+        exec("async " + pezzo("indica_email_corriere"), amb)
+        return corri(amb, "indica_email_corriere", oid,
+                     _Req({"email_corriere": mail}))
+
+    def leggi(chi, oid):
+        amb = _amb(chi)
+        exec("async " + pezzo("leggi_email_corriere"), amb)
+        return corri(amb, "leggi_email_corriere", oid)
+
+    def riga(i):
+        return vero.execute("SELECT * FROM ordini WHERE id=?",
+                            (i,)).fetchone()
+
+    prova("il venditore non la scrive", "400 Operazione non permessa",
+          scrivi(222, 1, "x@y.it"))
+    prova("l'estraneo nemmeno, e con la STESSA risposta",
+          "400 Operazione non permessa", scrivi(999, 1, "x@y.it"))
+    prova("l'ordine che non esiste: la stessa risposta ancora",
+          "400 Operazione non permessa", scrivi(111, 77, "x@y.it"))
+    prova("niente email sulla spedizione a casa", True,
+          str(scrivi(111, 2, "x@y.it")).startswith("400 Questo ordine"))
+    prova("dopo la spedizione il campo e' chiuso",
+          "400 Operazione non permessa", scrivi(111, 3, "altra@y.it"))
+
+    avvisi.clear()
+    r = scrivi(111, 1, "  Mario@Esempio.IT  ")
+    prova("il compratore la scrive", True, isinstance(r, dict))
+    prova("...e in colonna arriva CIFRATA col prefisso", True,
+          riga(1)["email_corriere"].startswith("plain:"))
+    prova("...con gli spazi ai bordi tolti", "Mario@Esempio.IT",
+          riga(1)["email_corriere"].split(":", 1)[1])
+    prova("...e il venditore riceve un avviso STATICO, mai il valore",
+          (1, False),
+          (len(avvisi), "Mario@Esempio.IT" in (avvisi[0][1] if avvisi else "")))
+    prova("...e il timbro del PRIMO c'e'", True, riga(1)["email_corriere_il"] > 0)
+
+    avvisi.clear()
+    scrivi(111, 1, "Mario@Esempio.IT")
+    prova("riscriverla identica non e' un cambio: niente avviso",
+          (0, 0), (len(avvisi), riga(1)["email_corriere_correzioni"]))
+
+    primo = riga(1)["email_corriere_il"]
+    scrivi(111, 1, "nuova@esempio.it")
+    prova("la correzione si conta", 1, riga(1)["email_corriere_correzioni"])
+    prova("...e il timbro del PRIMO non si muove", primo,
+          riga(1)["email_corriere_il"])
+
+    avvisi.clear()
+    scrivi(111, 1, "")
+    prova("togliersi si puo': il vuoto si accetta", "",
+          riga(1)["email_corriere"])
+    prova("...e il timbro del primo RESTA (e' il fatto della disputa)",
+          primo, riga(1)["email_corriere_il"])
+    prova("...e il venditore lo viene a sapere", 1, len(avvisi))
+
+    # ⚠️ CHE L'AVVISO PARTA NON BASTA: se non arriva a CHI SPEDISCE,
+    # o se dice solo «c'e' un'email» senza dire cosa farci, la
+    # scorciatoia esiste e non la usa nessuno — cioe' l'email l'abbiamo
+    # tenuta per niente. Il destinatario e il TESTO sono la meta' che
+    # rende utile tutto il resto, e fino a ieri non li guardava nessuno.
+    avvisi.clear()
+    scrivi(111, 1, "arriva@esempio.it")
+    prova("...e l'avviso va al VENDITORE, non a chi l'ha scritta",
+          222, avvisi[0][0] if avvisi else None)
+    _coda = _amb(111)["_coda_email_corriere"]
+    prova("la coda dice COSA FARCI e non solo che c'e'", True,
+          all(k in _coda(False, True) for k in
+              ("recapito del destinatario", "compri l'etichetta",
+               "arrivargli direttamente", "non devi più depositarlo")))
+    prova("...e non promette che funzioni (dipende dal corriere)",
+          (True, False),
+          ("può arrivargli" in _coda(False, True),
+           "così gli arriva" in _coda(False, True)))
+    prova("...la correzione manda a RILEGGERLA prima dell'etichetta",
+          True, "rileggila nell'ordine prima di" in _coda(True, True))
+    prova("...e chi la toglie riporta il codice al venditore", True,
+          "tornerà a te" in _coda(True, False))
+    prova("...e senza cambio non si dice niente", "", _coda(False, False))
+
+    # IL CARTELLO DENTRO «SPEDISCI», che e' la seconda rete: chi non
+    # legge la notifica (bot muto, nativo Nostr senza chiave) deve
+    # comunque incontrarla al momento di comprare l'etichetta — e
+    # quindi PRIMA del bottone che dichiara la spedizione, non dopo.
+    # ⚠️ La sentinella si ancora alla riga dell'EMAIL e non alla
+    # frase «la leggi nel riquadro qui sotto», che la porta anche la
+    # NOTA: cosi' scritta resterebbe verde col cartello dell'email
+    # tolto (era gia' cosi', ed e' la classe di prova che questo repo
+    # ha gia' smascherato sei volte).
+    _riga_cartello = ("o.emailCorriereIl && !o.emailCorrierePurgataIl) ? "
+                      "`<div class=\"hint\">\U0001F4E7 L'acquirente ha "
+                      "lasciato un'<b>email per il corriere</b>")
+    prova("client: il pannello Spedisci porta il cartello dell'email",
+          1, mini.count(_riga_cartello))
+    prova("client: ...e il cartello viene PRIMA del «Segna come "
+          "spedito», o si legge a etichetta gia' comprata", True,
+          0 < mini.index(_riga_cartello) < mini.index("markShipped()"))
+    prova("client: ...ed e' un CARTELLO e non il dato: l'email non "
+          "compare nel pannello della spedizione", False,
+          "emailLetta[" in pezzo_js(mini, "function shipPanel(")
+          if "function shipPanel(" in mini else False)
+
+    scrivi(111, 1, "letta@esempio.it")
+    prova("la leggono le due PARTI",
+          ("letta@esempio.it", "letta@esempio.it"),
+          (leggi(111, 1).get("email"), leggi(222, 1).get("email")))
+    prova("l'estraneo no, con la risposta dei fratelli",
+          "400 Operazione non permessa", leggi(999, 1))
+    dump = [tuple(x) for x in vero.execute("SELECT * FROM ordini")]
+    leggi(111, 1); leggi(222, 1)
+    prova("...e la lettura non scrive NIENTE", dump,
+          [tuple(x) for x in vero.execute("SELECT * FROM ordini")])
+    prova("il purgato lo dice a chi lo cerca", True,
+          str(leggi(111, 4)).startswith("404 L'email è stata cancellata"))
+    prova("un'email troppo lunga si rifiuta, non si tronca", True,
+          str(scrivi(111, 1, "a" * 130 + "@x.it")).startswith("400 "))
+
+    # ---- LA CIFRATURA VERA: non deterministica -------------------
+    # ⚠️ IL CASO CHE IL CARTONE NON POTEVA VEDERE, e l'ha trovato la
+    # tortura: senza chiave `_cifra_contenuto` scrive 'plain:', cioe'
+    # e' DETERMINISTICO — quindi confrontare i BLOB funzionerebbe, e
+    # la mutazione che rimette quel confronto restava verde. In
+    # produzione Fernet mette un IV casuale e la stessa email da' due
+    # stringhe diverse: ogni salvataggio sembrerebbe un cambio e
+    # manderebbe una notifica al venditore per niente. Qui la chiave
+    # c'e' e la Fernet e' di cartone, ma NON DETERMINISTICA come
+    # quella vera: e' l'unico modo di provare il caso invece di
+    # guardarlo.
+    class _FernetFinta:
+        n = 0
+
+        def __init__(self, chiave):
+            pass
+
+        def encrypt(self, b):
+            _FernetFinta.n += 1
+            return (str(_FernetFinta.n).encode() + b"|" + b)
+
+        def decrypt(self, b):
+            return b.split(b"|", 1)[1]
+
+    def _amb_cifrato(chi):
+        amb = _amb(chi)
+        amb["CHIAVE_CONTENUTI_DIGITALI"] = "x"
+        amb["Fernet"] = _FernetFinta
+        amb["_chiave_fernet"] = lambda v=None: b"k"
+        amb["base64"] = __import__("base64")
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        exec(pezzo("_email_corriere_letta"), amb)
+        exec("async " + pezzo("indica_email_corriere"), amb)
+        return amb
+
+    vero.execute("UPDATE ordini SET email_corriere='', email_corriere_il=0,"
+                 " email_corriere_correzioni=0 WHERE id=1")
+    vero.commit()
+    a1 = _amb_cifrato(111)
+    corri(a1, "indica_email_corriere", 1, _Req({"email_corriere": "x@y.it"}))
+    b1 = riga(1)["email_corriere"]
+    avvisi.clear()
+    a2 = _amb_cifrato(111)
+    corri(a2, "indica_email_corriere", 1, _Req({"email_corriere": "x@y.it"}))
+    b2 = riga(1)["email_corriere"]
+    prova("cifrata sul serio, due blob della stessa email DIFFERISCONO",
+          True, b1.startswith("f2:") and b1 != _FernetFinta.n * "x"
+          and b1 != ("f2:" + "x@y.it"))
+    prova("...eppure riscriverla identica non e' un cambio",
+          (b1, 0, 0),
+          (b2, len(avvisi), riga(1)["email_corriere_correzioni"]))
+
+    # ---- LA SCOPA: si fa GIRARE, non si conta ---------------------
+    # ⚠️ l'altro buco della tortura: la sentinella conta le stringhe, e
+    # una stringa dentro un `or` che non si esegue la lascia verde.
+    vero.executescript("""
+      UPDATE ordini SET email_corriere='plain:a@a.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='released', disputata=0, aggiornato=8999913600 WHERE id=1;
+      UPDATE ordini SET email_corriere='plain:b@b.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='refunded', aggiornato=500 WHERE id=2;
+      UPDATE ordini SET email_corriere='plain:c@c.it',
+        email_corriere_il=500, email_corriere_purgata_il=0,
+        stato='locked', aggiornato=500 WHERE id=3;
+    """)
+    vero.commit()
+    detto_s = []
+    amb_s = {"db": Con, "time": _T, "print": lambda *a: detto_s.append(
+                 " ".join(str(x) for x in a)),
+             "GIORNI_INDIRIZZO": 10, "AUTO_SBLOCCO_ATTIVO": False}
+    exec(pezzo("pulisci_indirizzi"), amb_s)
+    prima_agg = riga(2)["aggiornato"]
+    amb_s["pulisci_indirizzi"]()
+    prova("la CORSIA VELOCE spazza l'email alla conferma",
+          ("", True), (riga(1)["email_corriere"],
+                       riga(1)["email_corriere_purgata_il"] > 0))
+    prova("la CORSIA LENTA la spazza a finestra scaduta",
+          ("", True), (riga(2)["email_corriere"],
+                       riga(2)["email_corriere_purgata_il"] > 0))
+    prova("...e l'ordine VIVO non si tocca", "plain:c@c.it",
+          riga(3)["email_corriere"])
+    prova("...e `aggiornato` non si muove mai", prima_agg,
+          riga(2)["aggiornato"])
+    prova("...e la scopa non e' saltata in silenzio", False,
+          any("saltata" in r for r in detto_s))
+
+    # ================================================================
+    # L'EMAIL SI LASCIA GIA' ALLA CASSA (ago 2026)
+    # ================================================================
+    # Il punto di ritiro si sceglie PRIMA di pagare e l'email si
+    # lasciava DOPO: sono la stessa decisione in due momenti, e in
+    # mezzo c'era una finestra — un venditore veloce compra
+    # l'etichetta prima che l'email esista, e da li' il gate 'locked'
+    # la chiude. Il campo si AGGIUNGE in cassa e l'ordine resta la
+    # seconda porta: l'endpoint non cambia di una riga.
+    compra_ = pezzo("compra")
+    set_ = pezzo("_compra_set")
+    inc = pezzo("_incassa_ordine")
+
+    # --- IL GIUDICE DEGRADA, e si fa GIRARE ------------------------
+    # ⚠️ una sentinella direbbe che il parametro c'e', mai che
+    # RISPONDA giusto: il caso e' proprio quello che nessun ambiente
+    # di casa esercita — senza chiave e FUORI collaudo.
+    def _amb_senza_chiave():
+        amb = {"HTTPException": _H, "MAX_EMAIL_CORRIERE": 120,
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MODALITA_COLLAUDO": False,
+               "_cifra_contenuto": lambda t: "MAI:" + t}
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        return amb["_email_corriere_da_payload"]
+
+    _g = _amb_senza_chiave()
+
+    # ⚠️ NON si usa `_alza`: la _H di questo banco non popola `args`,
+    # quindi `str(e)` e' '' — indistinguibile dal «non ha alzato», che
+    # e' precisamente la prova che passerebbe in silenzio.
+    def esito(chiama):
+        try:
+            return chiama()
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    prova("il permesso si deve SCRIVERE: il default alza ancora il 503",
+          True, str(esito(lambda: _g({"email_corriere": "x@y.it"})))
+          .startswith("503 "))
+    prova("...e la CASSA degrada invece di alzare", ("", "x@y.it"),
+          _g({"email_corriere": "x@y.it"}, esigi_chiave=False))
+    # LA RIGA CHE NON SI AMMORBIDISCE IN NESSUNA DELLE DUE STRADE: il
+    # blob resta VUOTO — un recapito in chiaro non si scrive nemmeno
+    # degradando — e il testo pieno e' il SEGNALE, non il dato salvato
+    prova("...col blob VUOTO: in chiaro non si scrive nemmeno qui",
+          "", _g({"email_corriere": "x@y.it"}, esigi_chiave=False)[0])
+    prova("...e il vuoto resta vuoto da tutt'e due le parti", ("", ""),
+          _g({"email_corriere": "  "}, esigi_chiave=False))
+    # il tetto non si allenta col permesso: un recapito tagliato e'
+    # rotto, e chi l'ha scritto non lo saprebbe
+    prova("...e il 400 del tetto vale anche degradando", True,
+          str(esito(lambda: _g({"email_corriere": "a" * 130 + "@x.it"},
+                               esigi_chiave=False))).startswith("400 "))
+    prova("il permesso e' keyword-only, o un chiamante distratto lo "
+          "darebbe per posizione", True,
+          "def _email_corriere_da_payload(d, *, esigi_chiave" in src)
+
+    # --- LA CASSA: dove si legge, e con che permesso ----------------
+    for nome, fetta in (("compra", compra_), ("_compra_set", set_)):
+        c = _senza_prosa(codice(fetta))
+        prova(f"{nome}: l'email si legge col permesso di degradare",
+              1, c.count("esigi_chiave=False"))
+        # SOLO SULLA VIA PUNTO, ed e' la specularita' dell'indirizzo,
+        # che sta sul `not via_punto`: due vie, due cose diverse
+        prova(f"{nome}: ...e SOLO sulla via punto", 1,
+              c.count('if scelta == "spedizione" and via_punto:'))
+        prova(f"{nome}: ...PRIMA della invoice, o un 400 lascerebbe "
+              "una fattura senza un ordine su cui posarsi", True,
+              c.index("esigi_chiave=False")
+              < c.index("crea_invoice_escrow"))
+        prova(f"{nome}: ...e col con.close() sulla via del rifiuto",
+              True, "_email_corriere_da_payload(" in c
+              and "con.close()" in c)
+        # «C'ERA UN'EMAIL E NON SI E' POTUTA SCRIVERE»: la congiunzione
+        # e non uno dei due — col solo `not mail` direbbe di si' su
+        # ogni ordine senza email, cioe' un toast su ogni acquisto
+        prova(f"{nome}: `mail_persa` e' la CONGIUNZIONE", 1,
+              c.count("mail_persa = bool(mail_testo) and not mail"))
+        # IL TIMBRO GUARDA IL BLOB E NON IL TESTO: col degrado in
+        # colonna non c'e' niente, quindi non c'e' nessun «primo» da
+        # datare — e un timbro senza email farebbe suonare il libro
+        # mastro e parlare la coda di _incassa_ordine
+        # ⚠️ UN'ANCORA SOLA: il set scrive «tipo_punto,nota_compratore,
+        # email_corriere,...», che CONTIENE quella del mono — sommare
+        # due count che si sovrappongono conta due volte la stessa riga
+        prova(f"{nome}: l'INSERT nomina le due colonne", 1,
+              c.count("nota_compratore,email_corriere,email_corriere_il,"))
+        prova(f"{nome}: ...e il timbro guarda il BLOB, mai il testo",
+              (True, False),
+              ("if mail else 0" in c, "if mail_testo else 0" in c))
+
+    # --- LA RIPRESA DEL PENTITO ------------------------------------
+    rip = _senza_prosa(codice(compra_))
+    # FUORI DAL CONFRONTO, come la nota e per la stessa ragione: non
+    # tocca il prezzo, quindi correggere un refuso non deve annullare
+    # l'ordine e coniare una fattura nuova. (E il blob per giunta non
+    # e' confrontabile.)
+    _stessa = rip[rip.index("stessa = ("):rip.index("viva = mio[")]
+    prova("la ripresa: l'email sta FUORI dal confronto `stessa`",
+          (False, False),
+          ("email" in _stessa, "mail" in _stessa))
+    prova("...ma si RISCRIVE, o chi corregge un refuso rivedrebbe la "
+          "sua fattura con l'email di prima", True,
+          "UPDATE ordini SET email_corriere=?, " in rip)
+    # IL CONFRONTO E' SUL CHIARO: sui blob Fernet non e'
+    # deterministico e ogni tocco su «Paga» sembrerebbe un cambio
+    prova("...e il confronto e' sul CHIARO", True,
+          "mail_testo != _email_corriere_letta(" in rip)
+    # NIENTE «mail_testo and», la trappola della vicina: il VUOTO E'
+    # UN VALORE, e «cancello l'email e ripago» fallirebbe in silenzio
+    prova("...senza «mail_testo and», che il vuoto e' un valore",
+          False, "if mail_testo and" in rip)
+    # E COL DEGRADO NON SI TOCCA NIENTE: scrivere il blob vuoto
+    # CANCELLEREBBE un'email gia' in colonna, cioe' il contrario di
+    # «non si e' potuta salvare»
+    prova("...e col degrado la colonna non si tocca", True,
+          "if not mail_persa and mail_testo !=" in rip)
+
+    # --- LA CODA AL VENDITORE: il gate e' il TIMBRO -----------------
+    # ⚠️ MAI la colonna cifrata: _cifra_contenuto prefissa anche il
+    # vuoto ('plain:'), quindi su un ordine che ci e' passato quella
+    # colonna non e' MAI '' — e la riga partirebbe anche a email
+    # tolta. E' la lezione gia' pagata dal braccio del codice della
+    # busta nel libro mastro.
+    _inc = _senza_prosa(codice(inc))
+    prova("«Hai venduto» porta la riga dell'email", 1,
+          _inc.count('_coda_email_corriere(False, True)'))
+    prova("...col gate sul TIMBRO e mai sulla colonna cifrata",
+          (True, False),
+          ('if o["email_corriere_il"]:' in _inc,
+           'if o["email_corriere"]:' in _inc))
+    prova("...e la riga e' STATICA: il valore in un tubo HTML non ci "
+          "entra per costruzione", False,
+          "_email_corriere_letta" in _inc)
+    # NIENTE SECONDA NOTIFICA: e' lo stesso fatto, arrivato un momento
+    # prima — e un messaggio in piu' e' la famiglia che fa bloccare il
+    # bot, col quale si perdono le notifiche degli ordini
+    prova("...e non nasce una notifica in piu'", 1,
+          _inc.count("_coda_email_corriere"))
+
+    # --- IL ROVESCIAMENTO DICHIARATO -------------------------------
+    prova("il «mai alla cassa» e' rovesciato COL PERCHE' DI ALLORA",
+          True, "QUESTA RIGA E' STATA ROVESCIATA" in src
+          and "IL PERCHE' DI\n#    ALLORA RESTA VERO" in src)
+
+    # --- IL CLIENT: lo stato, il payload, le parole -----------------
+    prova("client: i TRE literal di acqDati hanno il campo", 3,
+          mini.count("email:''"))
+    # ⚠️ il terzo e' quello del set sotto ACCORDO, ed e' quello che si
+    # dimentica: la lezione della chiave doppia in acqDati
+    _corpo = pezzo_js(mini, "function corpoConsegna(", "\n}")
+    prova("client: il payload sta SOTTO il gate della via punto", True,
+          "if (v==='punto' && acqDati.email" in _corpo)
+    prova("...e la chiave e' ASSENTE quando e' vuota (il patto della "
+          "nota)", False, "out.email_corriere = acqDati.email ||" in _corpo)
+    # NON IN CIMA CON `extra`: li' vivono le cose che appartengono
+    # all'ORDINE e non alla via, e passerebbe anche sugli storici
+    prova("...e non viaggia dentro `extra`", True,
+          _corpo.index("const extra") < _corpo.index("out.email_corriere"))
+    # NESSUNA GUARDIA: e' facoltativa, e una guardia la renderebbe
+    # obbligatoria — la sola cosa che questo campo non deve diventare
+    for f in ("function ctaAcquisto(", "function compraSubito("):
+        prova(f"client: nessuna guardia sull'email in {f[9:-1]}",
+              False, "email" in pezzo_js(mini, f, "\n}\n"))
+    # LE PAROLE IN UN POSTO SOLO: il campo vive in due superfici, e
+    # due copie divergono al primo ritocco
+    prova("client: le parole del campo sono in tre giudici", (1, 1, 1),
+          (mini.count("const invitoEmail ="),
+           mini.count("const segnaposEmail ="),
+           mini.count("const spiegaEmail =")))
+    prova("...e i letterali non sono rimasti in nessuna delle due",
+          (1, 1),
+          (mini.count("+ Ricevi il codice direttamente dal corriere"),
+           mini.count("latua@email.it")))
+    # gli USI e non le occorrenze: la definizione porta il nome nudo,
+    # quindi si contano la chiamata e l'interpolazione
+    prova("...e le usano tutt'e due le superfici", (2, 2),
+          (mini.count("spiegaEmail()"), mini.count("${segnaposEmail}")))
+    # IL CAMPO STA DENTRO IL CASSETTO DEL PUNTO: cosi' eredita per
+    # costruzione lo stopPropagation del contenitore e la cascata
+    # rete → tipo → punto, invece di un cassetto suo
+    prova("client: il campo vive dentro il cassetto del punto", True,
+          "? campoDove + campoEmail : ''" in mini)
+    # ⚠️ `emailForzata` RESTA DEL SOLO ORDINE: in cassa non c'e' un
+    # gesto su cui appoggiare una domanda («ritocca Salva») — l'unico
+    # bottone e' «Paga», e li' una domanda sarebbe una guardia. La
+    # sentinella guarda il CODICE del campo e non il commento che lo
+    # dichiara.
+    _campo = mini[mini.index("const campoEmail ="):
+                  mini.index("const campoAperto =")]
+    prova("client: in cassa non c'e' nessun permesso forzato",
+          (False, False),
+          ("emailForzata" in _campo, "formaEmail" in _campo))
+    # IL TOAST: un giudice per i TRE varchi che POSTano a /orders. Il
+    # terzo (il wallet ⚡) e' quello che nessun collaudo esercita — in
+    # locale un wallet non c'e' — e sparso a mano l'avviso mancherebbe
+    # IN SILENZIO solo a chi paga col wallet collegato.
+    # le CHIAMATE e non le occorrenze: la firma della definizione e'
+    # `avvisaEmailNonSalvata(d){`, il punto e virgola la esclude
+    prova("client: l'avviso e' UN giudice con TRE chiamanti", (1, 3),
+          (mini.count("function avvisaEmailNonSalvata("),
+           mini.count("avvisaEmailNonSalvata(d);")))
+    for f in ("async function startBuy(", "async function startBuySet(",
+              "async function confermaCompraSubito("):
+        prova(f"client: ...e {f[15:-1]} lo chiama", True,
+              "avvisaEmailNonSalvata(d)" in pezzo_js(mini, f, "\n}\n"))
+    # IL TESTO PORTA IL RIMEDIO: senza, chi l'ha scritta resterebbe ad
+    # aspettare un codice che al corriere non e' mai arrivato
+    _t = pezzo_js(mini, "function avvisaEmailNonSalvata(", "\n}")
+    prova("client: ...e l'avviso dice il rimedio e cosa regge intanto",
+          (True, True),
+          ("rimettere" in _t, "arriva al" in _t))
+    # I DUE SERVER RISPONDONO LA CHIAVE, o il toast non parte mai
+    prova("la chiave esce dai DUE percorsi e dalla ripresa", 3,
+          src.count('"email_non_salvata": mail_persa'))
+
+    # --- IL TESTO PUBBLICO che diventava impreciso -----------------
+    prova("«I tuoi dati» non dice piu' che si lascia solo nell'ordine",
+          (False, True),
+          ("Un'email puoi lasciarla nell'ordine" in mini,
+           "Un'email puoi lasciarla quando compri" in mini))
+    vero.close()
+
+
 def prove_nota_compratore():
     """LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
     dire sull'OGGETTO — la taglia, il numero, la variante.
@@ -5043,11 +6067,13 @@ def prove_nota_compratore():
     prova("client: ...ed e' montato nello scheletro, dopo le vie", True,
           "${vie}${note}${cassettoNota}" in mini)
     # ROVESCIATA (ago 2026, la nota per categoria): il default non e'
-    # piu' un false secco — lo decide notaApertaDefault, e i DUE
+    # piu' un false secco — lo decide notaApertaDefault, e i
     # costruttori devono passare dallo STESSO giudice, o mono e set
-    # aprirebbero il campo con due regole diverse.
-    prova("client: le due chiavi nascono nei DUE costruttori, dal giudice",
-          2, mini.count("notaAperta: notaApertaDefault("))
+    # aprirebbero il campo con due regole diverse. Il TERZO e' la
+    # cassa in modalita' accordo (pagaOffertaCarrello, ago 2026):
+    # anche li' un capo d'abbigliamento apre la nota da se'.
+    prova("client: le chiavi nascono nei TRE costruttori, dal giudice",
+          3, mini.count("notaAperta: notaApertaDefault("))
     prova("client: ...e il vecchio default secco non esiste piu'", 0,
           mini.count("notaAperta:false"))
     # IL DEFAULT APERTO NON ALZA LA TASTIERA: il focus sul campo nota
@@ -5095,8 +6121,13 @@ def prove_nota_compratore():
           and "Nota per il venditore (facoltativa)" in mini)
     prova("client: il campo dice di non scriverci il recapito", True,
           "non il tuo recapito" in mini)
-    prova("la pagina «I tuoi dati» dichiara la quarta cosa", True,
-          "Quattro cose non ce le dai" in mini)
+    # ⚠️ CAMBIATA LATO (ago 2026): erano quattro, sono CINQUE — con
+    # l'email per il corriere. E' l'unico allarme automatico che
+    # scatta quando quella lista cresce, e per questo il numero si
+    # scrive a parole nel testo invece di essere contato: chi aggiunge
+    # una voce senza dirlo trova la CI rossa.
+    prova("la pagina «I tuoi dati» dichiara la quinta cosa", True,
+          "Cinque cose non ce le dai" in mini)
     prova("...e che la nota il moderatore la legge", True,
           "E la nota che hai scritto a chi vende, sì." in mini)
 
@@ -7381,10 +8412,18 @@ def prove_barattolo_filtra():
           mini.count("const BARATTOLO_INVITO = "))
     prova("il cassetto le dice tutte e due", True,
           "${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}" in mini)
+    # IL TITOLO NON RIPETE IL BARATTOLO (ago 2026, dal campo): in quel
+    # blocco il barattolo si vede gia' tre volte — la mascotte sopra
+    # (o il `.big`, che e' il suo ripiego: `.empty-mascotte + .big`),
+    # l'emoji dentro l'invito subito sotto, e la pillola accesa in
+    # cima alla fila. Il titolo era il quarto. La prova ha CAMBIATO
+    # LATO: prima chiedeva il prefisso, adesso lo vieta.
     prova("...e la vetrina mette la constatazione nel TITOLO e "
           "l'invito nel corpo", True,
-          "`🫙 ${BARATTOLO_VUOTO}`" in rg
+          "vistaBarattolo ? BARATTOLO_VUOTO" in rg
           and "textContent = BARATTOLO_INVITO;" in rg)
+    prova("...senza ripetere il barattolo dell'invito qui sotto", False,
+          "${BARATTOLO_VUOTO}`" in rg)
     prova("...senza che nessuno se le riscriva a mano", 0,
           mini.count("Il tuo barattolo è vuoto:"))
 
@@ -7400,6 +8439,18 @@ def prove_barattolo_filtra():
           'id="emptyEsplora"' in mini and 'onclick="alternaBarattolo()"'
           in mini[mini.index('id="emptyEsplora"'):
                   mini.index('id="emptyEsplora"') + 200])
+    # E PORTA LA LENTE DELLA NAV, non un'emoji sua (ago 2026, dal
+    # campo): un cuore solo per le icone — le borsette cambiavano
+    # forma da un telefono all'altro, ed e' la stessa cura gia' fatta
+    # al coming soon delle aste. La fetta e' quella del BOTTONE e non
+    # tutto il file: il glifo vecchio vive ancora, legittimo, come
+    # ripiego della card «Tutto» e dentro il banner della vetrina.
+    _btn_esplora = mini[mini.index('id="emptyEsplora"'):]
+    _btn_esplora = _btn_esplora[:_btn_esplora.index("</button>")]
+    prova("...con la LENTE della nav e non l'emoji delle borsette",
+          True,
+          'class="nav-ico"' in _btn_esplora
+          and "🛍" not in _btn_esplora)
 
     # --- 7) LO STATO E' DI SESSIONE, E FUORI DALLA CRONOLOGIA ---
     # In localStorage vivono valuta, tema, corpo del testo, hint,
@@ -12547,8 +13598,11 @@ def prove_punti_salvati():
           fetta("function renderAcquisto(){").count("precompilaPunto("))
     # ...e la contro-prova che la fetta VEDE davvero: senza, uno zero
     # qui sopra sembrerebbe una promozione invece che una cecita'.
+    # il tetto e' salito con la modalita' accordo (ago 2026, ~45,5k):
+    # resta una cintura contro una fetta che ingoia il file, non una
+    # misura fine
     prova("(e la fetta del render e' quella giusta)", True,
-          0 < len(fetta("function renderAcquisto(){")) < 45000
+          0 < len(fetta("function renderAcquisto(){")) < 55000
           and "cassettoPunto" in fetta("function renderAcquisto(){"))
     prova("precompilaPunto ha UN chiamante solo", 1,
           mini.count("precompilaPunto(")
@@ -12730,6 +13784,144 @@ def prove_punti_salvati():
           True, "finché non li togli" in priv
           and "Punti di ritiro" in priv)
 
+    # Il Lightning address e' il dato piu' longevo del profilo —
+    # nome@dominio, in CHIARO, senza scadenza — e fino all'ago 2026 la
+    # pagina non lo nominava affatto, mentre una riga di «Cosa non
+    # facciamo» prometteva il contrario: «il tuo wallet non passa da
+    # qui», vera per NWC (che vive in localStorage) e FALSA per
+    # l'indirizzo, che e' quel che un venditore chiama il suo wallet.
+    # ⚠️ Le due prove qui sotto si ancorano alla VOCE e non alla
+    # pagina: «Lightning address» ci vive in tre punti e «in chiaro»
+    # in quattro, quindi cercarli nella pagina intera le rendeva
+    # verdi anche con la voce mutilata — la tortura le ha trovate
+    # tutte e due sopravvissute.
+    _voce = priv[priv.index("Il tuo <b>Lightning address</b>"):]
+    _voce = _voce[:_voce.index("</li>")]
+    prova("l'elenco di cosa nasce nomina il Lightning address", True,
+          "Lightning address" in _voce)
+    prova("...e dice la parte scomoda: ce l'abbiamo in chiaro", True,
+          "in chiaro" in _voce)
+    prova("...e perche' ci serve leggerlo, non solo che ce l'abbiamo",
+          True, "ti mandiamo i sats" in _voce)
+    prova("...e per quanto, con la strada per toglierlo", True,
+          "finché non lo togli" in priv
+          and "Incassi e pagamenti" in priv)
+    # La riga che diceva il falso non deve tornare: la promessa e' sulla
+    # CONNESSIONE (NWC), mai sul wallet nudo.
+    prova("la promessa sul wallet parla della connessione", True,
+          "connessione al tuo wallet non passa" in priv)
+    prova("...e non promette piu' che «il wallet non passa da qui»",
+          False, "<b>Il tuo wallet non passa" in priv)
+
+    # E LA PORTA CHE QUELLA PAGINA PROMETTE ESISTE DAVVERO: e' la meta'
+    # che una sentinella sui testi non direbbe. Il server la stringa
+    # vuota l'ha sempre accettata, dal client non si arrivava — le due
+    # funzioni che salvano hanno la guardia del formato, quindi il campo
+    # svuotato prendeva «formato non valido»: un vicolo cieco.
+    prova("il bottone per togliere l'indirizzo c'e'", True,
+          'onclick="rimuoviLnAddress()"' in mini)
+    prova("...e manda la stringa vuota, il calco di rimuoviNpub", True,
+          "JSON.stringify({ln_address: ''})"
+          in pezzo_js(mini, "async function rimuoviLnAddress"))
+    _sln = pezzo_js(mini, "async function salvaLnAddressProfilo")
+    prova("...e il campo svuotato delega alla rimozione", True,
+          "if (!addr && myLnAddress) return rimuoviLnAddress();" in _sln)
+    # L'ORDINE E' LA SOSTANZA: sotto la guardia del formato la delega
+    # non scatterebbe mai, e la riga della pagina tornerebbe falsa.
+    prova("...e la delega viene PRIMA della guardia del formato", True,
+          _sln.index("return rimuoviLnAddress()")
+          < _sln.index("Formato non valido"))
+
+    # E SI FA GIRARE. Il caso che solo l'esecuzione prende e' il campo
+    # svuotato da chi un indirizzo NON ce l'ha: li' la delega non deve
+    # scattare — una conferma «rimuovo?» su un niente e' un vicolo
+    # cieco travestito da cortesia — e la guardia del formato deve
+    # dire la sua come ha sempre fatto.
+    import json as _js4, os as _os4, shutil as _sh4
+    import subprocess as _sp4, tempfile as _tf4
+    _node4 = _sh4.which("node")
+    if not _node4:
+        salta("il gesto della rimozione risponde giusto", "node non installato")
+    else:
+        _prog4 = ("""
+let myLnAddress = '', lnAddrModifica = false, CAMPO = '';
+const API_BASE = '/api';
+const reg = [];
+function haptic(){}
+function toast(t){ reg.push({toast: t}); }
+function authHdr(){ return ''; }
+function renderLnAddress(){ reg.push({render: 1}); }
+function renderChecklist(){ reg.push({checklist: 1}); }
+function bottoneInAttesa(){ reg.push({velo: 1}); return () => {}; }
+function el(){ return {value: CAMPO}; }
+function chiediConferma(o){
+  reg.push({conferma: o.titolo, corpo: o.corpo}); return o.poi();
+}
+async function fetch(u, o){
+  reg.push({post: u, body: o.body});
+  return {ok: true, json: async () => ({ln_address: \'\'})};
+}
+""" + pezzo_js(mini, "async function rimuoviLnAddress")
+              + pezzo_js(mini, "async function salvaLnAddressProfilo") + """
+(async () => {
+  const out = {};
+  // `chiediConferma` non si attende (ne' qui ne' in rimuoviNpub: e'
+  // una regia, non una promessa), quindi la coda del gesto arriva
+  // DOPO il return — un await sulla funzione non aspetta niente e il
+  // banco leggerebbe i microtask che gli capita di aver smaltito. Ci
+  // vuole un macrotask, ed e' la stessa lezione del banco degli
+  // osservatori: si aspetta prima di leggere, e prima di azzerare, o
+  // la coda di un giro inquina quello dopo.
+  const respiro = () => new Promise(r => setTimeout(r, 5));
+  const giro = async (nome, indirizzo, campo, f) => {
+    await respiro();
+    myLnAddress = indirizzo; CAMPO = campo; reg.length = 0;
+    await f();
+    await respiro();
+    out[nome] = {passi: reg.map(r => Object.keys(r)[0]).join(","),
+                 body: (reg.find(r => r.post) || {}).body || "",
+                 corpo: (reg.find(r => r.conferma) || {}).corpo || "",
+                 toast: (reg.filter(r => r.toast).pop() || {}).toast || ""};
+  };
+  await giro("cintura", "", "", () => rimuoviLnAddress());
+  await giro("rimuove", "a@b.com", "", () => rimuoviLnAddress());
+  await giro("delega", "a@b.com", "", () => salvaLnAddressProfilo({}));
+  await giro("vuotoSenza", "", "", () => salvaLnAddressProfilo({}));
+  console.log(JSON.stringify(out));
+})();
+""")
+        _f4 = _tf4.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f4.write(_prog4)
+        _f4.close()
+        _r4 = _sp4.run([_node4, _f4.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        _os4.unlink(_f4.name)
+        _e4 = (_js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
+               else {"errore": _r4.stderr[:300]})
+        prova("senza indirizzo il gesto non chiede e non manda niente",
+              "", _e4.get("cintura", {}).get("passi", "ERRORE"))
+        prova("...col suo indirizzo chiede, manda, ridisegna e lo dice",
+              "conferma,post,render,checklist,toast",
+              _e4.get("rimuove", {}).get("passi", "ERRORE"))
+        prova("...e quel che manda e' la stringa VUOTA",
+              '{"ln_address":""}',
+              _e4.get("rimuove", {}).get("body", "ERRORE"))
+        prova("...e la conferma dice la conseguenza, non il gesto",
+              True, "a mano" in _e4.get("rimuove", {}).get("corpo", ""))
+        # La delega passa dalla rimozione INTERA: stessi passi, e in
+        # testa non c'e' il velo — il return precede `bottoneInAttesa`.
+        prova("il campo svuotato delega, e non alza il velo per conto suo",
+              "conferma,post,render,checklist,toast",
+              _e4.get("delega", {}).get("passi", "ERRORE"))
+        # ⚠️ Il caso che tiene onesta la delega: chi un indirizzo non
+        # ce l'ha non deve vedersi chiedere se toglierlo.
+        prova("...ma senza un indirizzo da togliere non chiede niente",
+              "toast", _e4.get("vuotoSenza", {}).get("passi", "ERRORE"))
+        prova("...e gli dice quel che gli ha sempre detto", True,
+              "Formato non valido"
+              in _e4.get("vuotoSenza", {}).get("toast", ""))
+
 
 # ====================================================================
 def prove_pagina_acquisto():
@@ -12876,8 +14068,10 @@ def prove_pagina_acquisto():
           "📍 Indica il punto di ritiro" in mini3)
     prova("...e anche la riga compatta ha perso il 📍", False,
           '>📍 <span class="punto-testo">' in mini3)
-    prova("...lo stato del cassetto nasce in acqDati (due costruttori)",
-          2, mini3.count("punto:'', puntoAperto:false"))
+    # il terzo costruttore e' la cassa in modalita' accordo
+    # (pagaOffertaCarrello, ago 2026)
+    prova("...lo stato del cassetto nasce in acqDati (tre costruttori)",
+          3, mini3.count("punto:'', puntoAperto:false"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
           True, 'value="${esc(d.punto)}"' in mini3)
     # dal cantiere delle reti la riga compatta porta anche il nome del
@@ -12928,9 +14122,15 @@ def prove_pagina_acquisto():
     prova("sesto giro: il gate delle scelte esiste", True,
           "const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo"
           in mini3)
+    # ⚠️ L'ANCORA SI FERMA AL GATE e non elenca cosa c'e' dentro: dal
+    # cantiere dell'email alla cassa (ago 2026) sotto quel gate ci
+    # sono DUE campi — il dove e l'email, che eredita cosi' la stessa
+    # cascata — e scritta col solo `campoDove` la sentinella tornava
+    # rossa per un'aggiunta legittima invece che per un gate caduto.
+    # Quel che deve restare vero e' il GATE, non l'elenco.
     prova("...e il campo si disegna solo a scelte fatte (o senza reti)",
           True,
-          "(!reti.length || scelteFatte) ? campoDove : ''" in mini3)
+          "(!reti.length || scelteFatte) ? campoDove" in mini3)
     prova("...il segnaposto non ripete il tipo: li' va solo il dove",
           False, "Locker — Via Roma" in mini3)
     prova("...e la riga «scegli prima il corriere» e' morta con lui: "
@@ -13476,16 +14676,38 @@ def prove_pagina_acquisto():
           _testa.count("cur-seg"))
     prova("...la fabbrica del toggle e' una sola", 1,
           mini3.count("function toggleValuta("))
-    #    e il censimento delle SUPERFICI del toggle: otto in tutto il
+    #    e il censimento delle SUPERFICI del toggle: NOVE in tutto il
     #    client (searchbar, carrello, i due dell'offerta, il dettaglio,
     #    LA CASSA — che e' l'unica a passare da una fabbrica invece che
-    #    dal markup — l'ordine e il pannello). Chi ne aggiunge una lo
-    #    sente da qui, invece di scoprirlo da un toggle che non si
-    #    accende: e' aggiornaCurToggle a doverli conoscere tutti.
-    prova("...e le superfici del toggle sono otto", 8,
+    #    dal markup — l'ordine, il pannello, e dall'ago 2026 il foglio
+    #    dell'offerta sul CARRELLO). Chi ne aggiunge una lo sente da
+    #    qui, invece di scoprirlo da un toggle che non si accende: e'
+    #    aggiornaCurToggle a doverli conoscere tutti — ed e' anche il
+    #    motivo per cui quel foglio non ha inventato nessun comando
+    #    suo, ha aggiunto una superficie a quello che c'era gia'.
+    prova("...e le superfici del toggle sono nove", 9,
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
+    # LA MISURA PIU' GRANDE E' SOLO DELLA SEARCHBAR (ago 2026, dal
+    # campo: li' dentro il campo Cerca, a 13px, si leggeva poco e il
+    # bersaglio era minuscolo). Vive su `#curSeg` e vince per
+    # SPECIFICITA' e non per ordine; la regola BASE non si tocca,
+    # perche' veste le altre otto superfici — fra cui il conto della
+    # pagina Paga, che questo progetto dichiara la piu' stretta di
+    # tutte. Allargarla per tutti non si vedrebbe qui: si vedrebbe di
+    # la', in un'etichetta mozzata.
+    prova("il toggle piu' grande e' scopato alla searchbar", True,
+          "#curSeg button{font-size:15px;padding:4px 12px}" in mini3)
+    prova("...e la regola base resta la misura di sempre", True,
+          "padding:4px 10px;font-weight:800" in mini3
+          and "font-size:13px;cursor:pointer" in mini3)
+    # E IL CAMPO RISERVA LO SPAZIO PER IL TOGGLE CRESCIUTO: le pillole
+    # stanno DENTRO il campo, in posizione assoluta, quindi a tenere
+    # il testo digitato lontano da loro c'e' solo questo padding —
+    # senza, si scriverebbe sotto l'euro.
+    prova("...e il campo Cerca gli lascia il posto", True,
+          "padding:11px 92px 11px 38px" in mini3)
     prova("...e la chiamano i due rami del render", 2,
           pezzo_js(mini3, "function renderAcquisto(){",
                    "\n}").count("${toggleValuta()}"))
@@ -13506,16 +14728,26 @@ def prove_pagina_acquisto():
     _rac = pezzo_js(mini3, "function renderAcquisto(){", "\n}")
     prova("i secondari sono del solo carrello", True,
           "const secondari = d.tipo==='set'" in _rac)
-    prova("...e ci sono tutti e due", True,
+    #    CAMBIO DI LATO (ago 2026, l'offerta sul carrello): il bottone
+    #    non porta piu' al coming soon — apre il foglio VERO — e sotto
+    #    accordo non nasce affatto (la trattativa e' gia' chiusa, e il
+    #    server rifiuterebbe: una viva per coppia).
+    prova("...e ci sono tutti e due (l'offerta apre il foglio vero)", True,
           'onclick="ctrlChiediInfo()"' in _rac
-          and "onclick=\"go('offertapresto')\"" in _rac)
+          and 'onclick="apriOffertaCarrello()"' in _rac
+          and "go('offertapresto')" not in _rac)
+    prova("...ma niente offerta SU un accordo", True,
+          "d.accordoId ? '' : `<button" in _rac)
     #    IL BOTTONE CHE RIPORTA AL CARRELLO: solo sul carrello, e solo
     #    con un invito APERTO — sotto un «✅ Sconto −10%» sarebbe un
     #    invito a fare una cosa che non serve (decisione di Andrea).
-    prova("il «torna al carrello» e' del solo carrello, e solo con un"
-          " invito aperto", True,
-          "const tornaCarrello = (d.tipo==='set'"
-          " && pillole.includes('pill-barra'))" in _rac)
+    #    ...e MAI in modalita' accordo (ago 2026): li' la composizione
+    #    e' pinnata — sono le righe pattuite — e un invito ad
+    #    aggiungere sarebbe un invito a rompere l'accordo.
+    prova("il «torna al carrello» e' del solo carrello, con un invito"
+          " aperto e mai sotto accordo", True,
+          "const tornaCarrello = (d.tipo==='set' && !d.accordoId" in _rac
+          and "&& pillole.includes('pill-barra'))" in _rac)
     prova("...e sul singolo non nasce mai", 1,
           _rac.count("tornaCarrello = "))
     #    IL ⚡ RESTA DEL SOLO SINGOLO: il set paga dal paySheet (il suo
@@ -13815,8 +15047,14 @@ def prove_libro_mastro():
           busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
           busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
           busta_correzioni INT DEFAULT 0,
+          busta_file TEXT DEFAULT '',
+          busta_diretta_il INT DEFAULT 0,
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
+          email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+          email_corriere_corretta_il INT DEFAULT 0,
+          email_corriere_correzioni INT DEFAULT 0,
+          email_corriere_purgata_il INT DEFAULT 0,
           nascosto_compratore INT DEFAULT 0,
           nascosto_venditore INT DEFAULT 0,
           codice_sconto TEXT DEFAULT '', codice_sconto_id INT DEFAULT 0,
@@ -13841,7 +15079,11 @@ def prove_libro_mastro():
           DEFAULT 1, importo_sats INT
           DEFAULT 0, importo_eur REAL DEFAULT 0, contro_sats INT
           DEFAULT 0, contro_eur REAL DEFAULT 0, giri INT DEFAULT 0);
-        CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+        -- SENZA una colonna id, come il DDL VERO: il cartone che
+        -- gliene dava una teneva verde un «SELECT r.id» che sul
+        -- database vero esplodeva (trovato da un collaudo che gira la
+        -- ronda su init_db vero, non da queste prove — la lezione)
+        CREATE TABLE offerte_righe(
           offerta_id INT, annuncio_id INT, quantita INT DEFAULT 1,
           unitario_sats INT DEFAULT 0, unitario_eur REAL DEFAULT 0,
           titolo TEXT DEFAULT '');
@@ -13924,6 +15166,26 @@ def prove_libro_mastro():
           busta_nome,busta_codice,busta_il)
           VALUES(4, 9, 1000, 'shipped', 1,
                  'plain:Mario Rossi', 'plain:PIN 4321', 123);
+        -- UNA BUSTA DIRETTA SANA (ago 2026, cantiere 45): via punto,
+        -- spedito, dichiarato e SENZA busta — che non arrivera' mai,
+        -- ed e' esattamente il caso: nessuno deve fiatare
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
+          busta_diretta_il)
+          VALUES(10, 9, 1000, 'shipped', 1, 456);
+        -- UNA BUSTA COL SOLO DOCUMENTO (ago 2026): dal cantiere
+        -- del documento il codice SCRITTO e' facoltativo — basta
+        -- il QR del corriere — quindi questa riga e' NORMALE e la
+        -- ronda deve tacerci sopra. Tace per una ragione che non
+        -- si vede leggendo la query: `_cifra_contenuto('')` torna
+        -- il trasporto di casa ('plain:'), MAI la stringa vuota,
+        -- e senza quel fatto il braccio del codice suonerebbe ogni
+        -- giorno su un caso normale — cioe' il modo in cui un
+        -- allarme smette di essere letto. E' quel fatto che questa
+        -- riga tiene inchiodato.
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
+          busta_nome,busta_codice,busta_file,busta_il)
+          VALUES(12, 9, 1000, 'shipped', 1,
+                 'plain:Mario Rossi', 'plain:', 'b11_a1b2.jpg', 123);
         -- UN CODICE SANO e un ordine scontato da lui: il codice e'
         -- del venditore 222, l'ordine 7 e' del venditore 222, l'id e
         -- il nome ci sono tutti e due, e lo sconto e' scattato.
@@ -14051,9 +15313,12 @@ def prove_libro_mastro():
         # la forma di offerte/offerte_righe, i tre modi
         ("DELETE FROM offerte_righe WHERE offerta_id=3",
          "offerta di carrello senza righe", "3"),
-        ("INSERT INTO offerte_righe(id,offerta_id,annuncio_id) "
-         "VALUES(88, 4242, 9)",
-         "righe d'offerta orfane", "88"),
+        # l'id che il controllo mostra e' l'offerta MANCANTE (4242),
+        # che e' quel che un moderatore cercherebbe: la tabella una
+        # colonna id non ce l'ha proprio
+        ("INSERT INTO offerte_righe(offerta_id,annuncio_id) "
+         "VALUES(4242, 9)",
+         "righe d'offerta orfane", "4242"),
         ("INSERT INTO offerte_righe(offerta_id,annuncio_id) VALUES(1, 9)",
          "offerta mono con righe figlie", "1"),
         ("UPDATE puntate SET offerto_sats=101 WHERE id=1",
@@ -14130,6 +15395,14 @@ def prove_libro_mastro():
         ("UPDATE ordini SET busta_il=0, busta_nome='', busta_codice='', "
          "busta_corretta_il=99 WHERE id=4",
          "busta fuori contratto", "4"),
+        # ...e i due bracci della busta DIRETTA (cantiere 45): la
+        # dichiarazione fuori dalla via punto e' una guardia caduta,
+        # e «depositata E dichiarata» non esiste mai legittimamente —
+        # il deposito azzera la dichiarazione nella stessa scrittura
+        ("UPDATE ordini SET via_punto=0 WHERE id=10",
+         "busta fuori contratto", "10"),
+        ("UPDATE ordini SET busta_diretta_il=77 WHERE id=4",
+         "busta fuori contratto", "4"),
         # il nascondere e' ammesso solo sugli stati assorbenti: un
         # flag su un ordine vivo e' una guardia caduta — e un ordine
         # che una parte non vede piu'
@@ -14164,6 +15437,24 @@ def prove_libro_mastro():
         ("UPDATE ordini SET indirizzo='via Roma 1', indirizzo_il=99, "
          "indirizzo_purgato_il=100 WHERE id=4",
          "indirizzo fuori contratto", "4"),
+        # L'EMAIL PER IL CORRIERE (ago 2026): tre bracci, e il caso
+        # che NON c'e' e' quello da ricordare — l'email TOLTA (vuota
+        # col timbro del primo) e' lo stato normale di chi ci ha
+        # ripensato, non un guasto.
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=0 "
+         "WHERE id=4",
+         "email per il corriere fuori contratto", "4"),
+        # ⚠️ il ramo del via_punto si pianta sull'ordine 2, che una
+        # busta non ce l'ha: sul 4 spegnere via_punto farebbe suonare
+        # ANCHE il controllo della busta, e un caso che puo' fallire
+        # per due ragioni non ne sorveglia nessuna (la lezione di
+        # _pare_recapito).
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=1 "
+         "WHERE id=2",
+         "email per il corriere fuori contratto", "2"),
+        ("UPDATE ordini SET email_corriere='x', email_corriere_il=1, "
+         "email_corriere_purgata_il=100 WHERE id=4",
+         "email per il corriere fuori contratto", "4"),
         # LO SBLOCCO DEL BANNER, e sono i quattro modi in cui il primo
         # incasso nostro puo' rompersi SENZA che niente alzi la voce:
         # nessuna eccezione, nessuna riga di journal, nessuna prova
@@ -14653,7 +15944,7 @@ def _amb_classifica():
     """Il giudice della classifica, estratto dal sorgente."""
     amb = {"math": __import__("math"),
            "CLASSIFICA_XP_RIF": 1000, "CLASSIFICA_PESO_XP": 0.25,
-           "CLASSIFICA_K": 5}
+           "CLASSIFICA_K": 5, "CLASSIFICA_KD": 0}
     for f in ("_recensore_reale", "_classifica_utenti", "_medie_tutte_piene"):
         exec(pezzo(f), amb)
     return amb
@@ -14779,6 +16070,22 @@ def prove_classifica():
     # mutazione che nessuna prova sull'ordine vedeva.
     prova("...che NON e' quello con la media globale sporca",
           False, abs(uno["punti"] - 5.818284028035579) < 1e-9)
+    # LO SMORZAMENTO, COL SUO NUMERO. Lo stesso caso e' anche il
+    # discriminante di chi smorzasse coi VOTI invece che con le
+    # PERSONE: qui sono 3 voti da 1 persona, quindi il fattore e' 1/3 e
+    # non 1/4, e il numero cambia.
+    #   smorzo = persone/(persone+KD) = 1/(1+2) = 1/3
+    #   punti  = F * (1 + 0,25 * C * 1/3) = 4,55897704226534
+    due = next(r for r in cl(voti, contro, {1: 999}, {1: 3, 2: 1, 3: 10},
+                             kd=2) if r["id"] == 1)
+    prova("...e con lo smorzamento e' quello calcolato a mano", True,
+          abs(due["punti"] - 4.55897704226534) < 1e-12)
+    # F e C escono INTERI dal giudice, e il punteggio ci si ricompone:
+    # e' cio' che permette a `classifica_prova.py` di non riscrivere la
+    # formula al contrario per mostrarli.
+    prova("...e il punteggio si ricompone da fiducia e commercio", True,
+          abs(due["fiducia"] * (1 + 0.25 * due["commercio"] * (1 / 3))
+              - due["punti"]) < 1e-12)
 
     # --- il gate d'ingresso ----------------------------------------
     voti = [(1, 100, 5), (2, 100, 5)]
@@ -14807,13 +16114,78 @@ def prove_classifica():
     prova("a peso zero il commercio non sposta niente",
           [1, 2], [r["id"] for r in fuori])
 
-    # --- il pareggio e' deterministico ------------------------------
-    # Due righe identiche non devono scambiarsi di posto a ogni
-    # richiesta: la lezione del pareggio del podio e del cursore.
-    voti = [(1, 100, 5), (2, 101, 5)]
-    ids = [[r["id"] for r in cl(voti, {100: {9}, 101: {9}}, {},
-                                {1: 1, 2: 1})] for _ in range(3)]
-    prova("a pari punteggio l'ordine non balla", [[1, 2]] * 3, ids)
+    # --- LO SMORZAMENTO DELLA FIDUCIA LARGA -------------------------
+    # A pari media e pari commercio comanda da QUANTE persone arriva la
+    # fiducia: il bonus passa da persone/(persone+KD). Qui lo si chiede
+    # esplicito, che il default vivo e' ZERO.
+    voti = [(1, 100, 5), (2, 101, 5), (2, 102, 5)]
+    contro = {100: {9}, 101: {9}, 102: {9}}
+    arg = ({1: 999, 2: 999}, {1: 5, 2: 5})
+    fuori = cl(voti, contro, *arg, kd=2)
+    prova("a pari media e pari commercio comanda chi ha piu' persone",
+          [2, 1], [r["id"] for r in fuori])
+    # ...e a separarli e' il PUNTEGGIO, non il tie-break: senza questa,
+    # una mutazione che toglie lo smorzamento resterebbe verde grazie
+    # alla chiave del sort, che guarda le persone lo stesso.
+    prova("...e a separarli e' il punteggio, non il tie-break", True,
+          fuori[0]["punti"] > fuori[1]["punti"])
+    # LA LEVA A ZERO E' IL MONDO DI IERI, bit per bit: e' la promessa
+    # scritta nel config, ed e' anche il motivo per cui il deploy non
+    # sposta un punteggio.
+    ieri = cl(voti, contro, *arg, kd=0)
+    prova("a KD=0 il commercio non si smorza (il mondo di ieri)",
+          True, ieri[0]["punti"] == ieri[1]["punti"])
+    # ...e ZERO passato a mano dev'essere ZERO anche quando la costante
+    # dice altro: e' la prova che uccide il ritorno di `kd or ...`,
+    # invisibile finche' il default e' zero pure lui.
+    amb2 = _amb_classifica()
+    amb2["CLASSIFICA_KD"] = 3
+    exec(pezzo("_classifica_utenti"), amb2)
+    due = amb2["_classifica_utenti"](voti, contro, *arg, kd=0)
+    prova("...e KD=0 vale zero anche se la leva dice altro", True,
+          due[0]["punti"] == due[1]["punti"])
+    # Un KD negativo nel config non deve far CADERE una pagina PUBBLICA.
+    def _kd(v):
+        try:
+            return cl(voti, contro, *arg, kd=v)[0]["punti"]
+        except ZeroDivisionError:
+            return "cade"
+    prova("un KD negativo vale come zero", _kd(0), _kd(-5))
+
+    # --- IL PAREGGIO: DI MERITO, POI DETERMINISTICO -----------------
+    # Con la media uguale a quella del mercatino la fiducia vale
+    # ESATTAMENTE M per qualunque `persone`, e senza XP il bonus e'
+    # zero: i punti sono identici BIT PER BIT. E' il mercatino di oggi,
+    # dove hanno tutti 5,00 — ed e' il motivo per cui lo smorzamento da
+    # solo non basta e serve il tie-break.
+    voti = [(1, 100, 5), (1, 100, 5), (1, 100, 5),
+            (2, 101, 5), (2, 102, 5)]
+    contro = {100: {9}, 101: {9}, 102: {9}}
+    fuori = cl(voti, contro, {}, {1: 3, 2: 2})
+    prova("a XP zero il pareggio e' vero: gli stessi punti, non «quasi»",
+          True, fuori[0]["punti"] == fuori[1]["punti"])
+    prova("...e a pari punteggio comanda chi ha piu' PERSONE",
+          [2, 1], [r["id"] for r in fuori])
+    prova("...anche se l'altro ha piu' VOTI (3 da uno contro 2 da due)",
+          (3, 1), next((r["voti"], r["persone"])
+                       for r in fuori if r["id"] == 1))
+    # A pari persone comanda chi ha concluso piu' affari, e va detto
+    # cosa si sceglie: LA FREQUENZA BATTE IL VALORE — due affari da 15 €
+    # passano davanti a uno da 40, che danno gli stessi XP.
+    fuori = cl([(1, 100, 5), (2, 101, 5)], contro, {1: 50, 2: 50},
+               {1: 1, 2: 2})
+    prova("a pari persone comanda chi ha piu' affari",
+          [2, 1], [r["id"] for r in fuori])
+    # ...e in fondo l'id. LA PROVA NON CHIAMA TRE VOLTE LO STESSO
+    # GIUDICE: con la sort stabile e i dizionari ordinati sarebbe una
+    # tautologia — restava verde anche togliendo l'id dalla chiave, ed
+    # e' cosi' che era scritta. Cambia l'ORDINE D'ARRIVO dei voti, che
+    # e' l'unica cosa che l'id deve neutralizzare.
+    a_ = [(1, 100, 5), (2, 101, 5)]
+    ids = [[r["id"] for r in cl(v, contro, {}, {1: 1, 2: 1})]
+           for v in (a_, a_[::-1])]
+    prova("a pari tutto l'ordine non dipende da come arrivano i voti",
+          [[1, 2], [1, 2]], ids)
 
     # --- la riga che spiega un'apparenza ----------------------------
     prova("con tutte le medie uguali la riga si accende", True,
@@ -14839,8 +16211,12 @@ def prove_classifica():
     prova("il giudice e' PURO: non tocca il database", True,
           "execute(" not in giu and "db()" not in giu)
     letture = codice(pezzo("_dati_classifica"))
-    prova("in classifica entrano i SOLI XP degli ordini", True,
-          "WHERE tipo='ordine'" in letture)
+    # Dall'ago 2026 il perimetro e' UNO e vive in `XP_COMMERCIO`: qui
+    # si guarda che questo lettore ci passi, invece di ricopiarsi la
+    # condizione — o il giorno che il perimetro cambia, uno dei tre
+    # resta indietro in silenzio.
+    prova("in classifica entrano i SOLI XP del commercio", True,
+          "sql_xp_commercio(" in letture and "tipo='ordine'" not in letture)
     prova("...e gli affari si contano dagli ordini released", True,
           "stato='released'" in letture)
     # LEGGE E BASTA, come controlla_libro_mastro: nessuna scrittura in
@@ -14864,6 +16240,23 @@ def prove_classifica():
     for campo in ('"id":', '"xp":', '"punti":'):
         prova(f"dalla voce pubblica non esce {campo}", True,
               campo not in voce)
+    # I DUE NUMERI DELLA LEVA NUOVA DEVONO DIRE LA STESSA COSA: il
+    # default nel codice e la riga del config d'esempio.
+    # Non e' un vezzo: `classifica_prova.py` prende il default DAL
+    # CODICE quando il config non ce l'ha, e un disallineamento gli
+    # farebbe stampare una classifica che il server non calcola.
+    # Il numero non si scrive qui: se Andrea ritara, questa si aggiorna
+    # da sola e resta rossa solo se i due file divergono.
+    def _dichiarato(nome, testo):
+        m = re.search(rf"^[ \t]*{nome}\s*=\s*([0-9.]+)", testo, re.M)
+        return m and m.group(1)
+    _cfg = open(os.path.join(QUI, "config_esempio.py"),
+                encoding="utf-8").read()
+    prova("il default di CLASSIFICA_KD si trova davvero", True,
+          _dichiarato("CLASSIFICA_KD", _SORGENTE) is not None)
+    prova("...e il config d'esempio dichiara lo stesso numero",
+          _dichiarato("CLASSIFICA_KD", _SORGENTE),
+          _dichiarato("CLASSIFICA_KD", _cfg))
     prova("...e la posizione personale esce solo a chi non e' nei primi",
           True, 'io_["posizione"] > CLASSIFICA_TOP' in end)
     # La riga che spiega guarda la FETTA VISIBILE e non tutta la
@@ -14887,11 +16280,58 @@ def prove_classifica():
     # Profilo e' morto: le sue prove stanno in prove_barattolo_in_striscia)
     prova("la porta si accende solo a leva accesa", True,
           "myClassifica && !DEMO && !VETRINA" in html)
+    # «offertapresto» e' uscita dall'elenco con la sua vista (ago 2026,
+    # l'offerta sul carrello): le entry vecchie degradano in
+    # navRendiVista, come quelle di 'sfoglia'
     prova("la vista e' interna (l'indietro riporta a Esplora)", True,
-          "'acquisto','offertapresto','classifica'" in html)
+          "'acquisto','classifica'" in html)
+    prova("...e il coming soon dell'offerta degrada su Esplora", True,
+          "if (b.v === 'offertapresto') return go('esplora');" in html)
     prova("...e NON e' una radice", True,
           "'classifica'" not in html[html.index("const RADICI"):
                                      html.index("const RADICI") + 260])
+    # IL CARTELLO DEL RODAGGIO (ago 2026, decisione di Andrea): la
+    # classifica e' accesa mentre la commissione e' ancora sospesa,
+    # quindi i punti oggi si prendono gratis e il giorno che si
+    # accende ripartono da zero. Il testo dice DUE cose, e sono
+    # quelle da non addolcire: che e' in prova, e che i punti
+    # ripartiranno — la seconda e' quella che protegge dal danno
+    # vero, cioe' l'affezione a una posizione che sparira'.
+    # E' anche il tipo di riga che un riordino toglie per prima,
+    # perche' togliendola non si rompe niente.
+    rend = pezzo_js(html, "function renderClassifica(", "\n}\n")
+    corpo = rend[rend.index("box.innerHTML = `"):]
+    prova("il cartello del rodaggio c'e'", True,
+          'class="cl-rodaggio"' in corpo)
+    # In CIMA e non in coda: e' la cornice della pagina — prima si
+    # sa che e' provvisoria, poi si legge come si legge.
+    # find() e non index(): la mutazione che toglie il cartello
+    # deve lasciare una riga ROSSA, non far esplodere il blocco
+    # portandosi dietro le sorelle. E il `0 <=` non e' un vezzo:
+    # find() torna -1 quando non trova, e un -1 e' minore di
+    # qualunque indice — senza, il confronto direbbe di si'
+    # proprio nel caso che deve prendere.
+    _i = corpo.find("cl-rodaggio")
+    _j = corpo.find('"hint">I primi')
+    prova("...e sta prima di come si legge la lista", True,
+          0 <= _i < _j)
+    prova("...e dice che e' in prova", True, "in rodaggio" in corpo)
+    prova("...e che i punti ripartiranno da zero", True,
+          "ripartiranno da zero" in corpo)
+    prova("...e quando: all'accensione delle commissioni", True,
+          "commissioni" in corpo)
+    # Dice e basta: non porta da nessuna parte, quindi non deve
+    # nemmeno sembrare toccabile.
+    prova("...e non finge di essere toccabile", True,
+          0 <= _i < _j and "onclick" not in corpo[_i:_j])
+    # Il vestito e' quello del rodaggio e non una hint grigia: in
+    # questa pagina ce ne sono gia' due di fila, e una terza si
+    # perderebbe proprio dove deve farsi vedere.
+    prova("...e porta la veste del rodaggio, non il grigio", True,
+          ".cl-rodaggio{" in html
+          and "background:var(--sats-soft);border:1.5px solid var(--sats)"
+          in html[html.index(".cl-rodaggio{"):
+                  html.index(".cl-rodaggio{") + 260])
 
 
 def prove_conta_feedback():
@@ -14974,8 +16414,13 @@ def prove_xp():
 
     amb = {"time": time}
     i = _SORGENTE.index("FISSO_XP_ORDINE = ")
-    exec(_SORGENTE[i:_SORGENTE.index("AZIONI_XP = {", i)], amb)
-    for f in ("oggi_locale", "_ricalcola_xp", "assegna_xp", "xp_ordine"):
+    # La fine della fetta e' la prima funzione che si exec-a a parte:
+    # cosi' dentro ci finiscono il tariffario, XP_COMMERCIO e il
+    # giudice del perimetro, e il marcatore non e' una riga che un
+    # riordino puo' togliere. (Era `AZIONI_XP = {`, morto con la
+    # lapide del tariffario.)
+    exec(_SORGENTE[i:_SORGENTE.index("def _ricalcola_xp", i)], amb)
+    for f in ("_ricalcola_xp", "assegna_xp", "xp_ordine"):
         exec(pezzo(f), amb)
     xp_ordine, assegna_xp = amb["xp_ordine"], amb["assegna_xp"]
 
@@ -15022,14 +16467,27 @@ def prove_xp():
           assegna_xp(con, 900, "ordine", 180, "ordine:1:compratore"))
     prova("punti a zero non scrivono", 0,
           assegna_xp(con, 900, "visita", 0, "x"))
-    # La visita: il tetto giornaliero non e' scritto da nessuna parte,
-    # lo fa il riferimento col giorno dentro
-    prova("la visita di oggi", 1,
+    # IL PERIMETRO (ago 2026): un tipo fuori da XP_COMMERCIO lascia la
+    # sua riga nel registro — e' storia, e la UNIQUE fa il suo mestiere
+    # come sempre — ma NON muove la cache. Le due cose si guardano
+    # separate apposta: e' la distinzione fra il registro e la somma.
+    prova("il perimetro e' il solo commercio", ("ordine",),
+          amb["XP_COMMERCIO"])
+    prima = somma(901)
+    prova("un tipo fuori perimetro scrive la sua riga", 1,
           assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
-    prova("la stessa visita non ripaga", 0,
+    prova("...ma NON muove la cache", prima, somma(901))
+    prova("...e la riga c'e' lo stesso", 1,
+          con.execute("SELECT COUNT(*) c FROM xp_eventi WHERE tg_id=901 "
+                      "AND tipo='visita'").fetchone()["c"])
+    prova("...quindi la UNIQUE fa il suo mestiere anche fuori", 0,
           assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
-    prova("quella di domani si'", 1,
-          assegna_xp(con, 901, "visita", 1, "giorno:2026-08-06"))
+    # LE DUE STRADE DICONO LO STESSO NUMERO, ed e' il motivo per cui la
+    # guardia sta anche in assegna_xp: con due perimetri diversi la
+    # cache dipenderebbe da quale e' girata per ultima.
+    assegna_xp(con, 901, "ordine", 40, "ordine:9:venditore")
+    prova("scrittura e ricalcolo dicono lo stesso numero",
+          somma(901), amb["_ricalcola_xp"](con, 901))
 
     # Il ricalcolo e' la rete: la cache si puo' sporcare, il registro no
     con.execute("UPDATE utenti SET xp=99999 WHERE tg_id=900")
@@ -15042,9 +16500,252 @@ def prove_xp():
     assegna_xp(con, 900, "visita", 1, "giorno:2026-08-06")
     con.execute("UPDATE OR IGNORE xp_eventi SET tg_id=900 WHERE tg_id=901")
     con.execute("DELETE FROM xp_eventi WHERE tg_id=901")
-    prova("fondendo, il giorno doppio conta una volta", 482,
+    prova("fondendo, il giorno doppio resta UNA riga", 1,
+          con.execute("SELECT COUNT(*) c FROM xp_eventi WHERE tg_id=900 "
+                      "AND tipo='visita' AND riferimento='giorno:2026-08-06'"
+                      ).fetchone()["c"])
+    prova("...e nella somma entra il solo commercio", 520,
           amb["_ricalcola_xp"](con, 900))
+
+    # IL RIALLINEAMENTO D'AVVIO, girato per davvero: e' il backfill del
+    # cantiere, e la cosa che deve fare e' BIDIREZIONALE.
+    exec(pezzo("riallinea_xp_commercio"), amb)
+    riallinea = amb["riallinea_xp_commercio"]
+    con.execute("UPDATE utenti SET xp=99999 WHERE tg_id=900")
+    con.execute("INSERT INTO utenti(tg_id, xp) VALUES(902, 7)")
+    # TRE e non due: la terza e' 901, che la fusione qui sopra ha
+    # svuotato del registro senza toccargli la cache — nel server quella
+    # riga muore, qui resta, ed e' il caso che il riallineamento deve
+    # saper ripulire comunque.
+    prova("il riallineamento tocca le righe storte", 3, riallinea(con))
+    prova("...e le rimette sul commercio", 520, somma(900))
+    prova("...anche quando la cache era piu' BASSA (rollback)", 0,
+          somma(902))
+    # ⚠️ IL CASO CHE DISCRIMINA IL VERSO: 902 ha zero eventi, quindi
+    # anche un confronto SBAGLIATO (`xp >` invece di `xp <>`) lo
+    # toccherebbe lo stesso — quel caso non prova il bidirezionale.
+    # Qui la cache e' piu' bassa del vero E il registro non e' vuoto:
+    # con `>` questa riga resterebbe storta per sempre, ed e' quel che
+    # lascia dietro uno script vecchio lanciato dopo il deploy.
+    con.execute("INSERT INTO utenti(tg_id, xp) VALUES(903, 1)")
+    assegna_xp(con, 903, "ordine", 70, "ordine:70:venditore")
+    con.execute("UPDATE utenti SET xp=1 WHERE tg_id=903")
+    prova("...e la rimette in su, non solo in giu'", 1, riallinea(con))
+    prova("...col numero del registro", 70, somma(903))
+    prova("il secondo giro non trova niente", 0, riallinea(con))
+
+    # LA PROVA CHE E' IL CANTIERE, e vale piu' di tutte le sentinelle
+    # messe insieme: il numero che si legge nel PROFILO e quello che
+    # pesa nel RANK devono essere LO STESSO NUMERO. Erano 244 contro
+    # 123, e guardando non c'era modo di capirlo. Qui si girano tutte
+    # e due le strade vere — la cache riallineata e la lettura della
+    # classifica — e si confrontano.
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+      compratore_id INTEGER, stato TEXT, prova INTEGER DEFAULT 0);
+    CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,
+      per_tg_id INTEGER, voto INTEGER);
+    """)
+    exec(pezzo("_dati_classifica"), amb)
+    _, _, xp_rank, _ = amb["_dati_classifica"](con)
+    prova("il Profilo e il rank dicono LO STESSO NUMERO",
+          somma(900), xp_rank.get(900, 0))
+    prova("...e non e' zero, o non proverebbe niente", True, somma(900) > 0)
+
+    # --- DA CHE LATO VENGONO GLI XP (ago 2026) ----------------------
+    # Chi legge «76 XP» non sa che sono pochi perche' ha comprato
+    # invece di vendere. IL DATO C'ERA GIA': il ruolo sta DENTRO il
+    # riferimento, quindi i due lati sommano al totale per costruzione
+    # — e quando NON sommano si tace, che e' tutto il cantiere.
+    ruolo_xp, xp_per_ruolo = amb["ruolo_xp"], amb["xp_per_ruolo"]
+    prova("il ruolo si legge dal riferimento (venditore)", "venditore",
+          ruolo_xp("ordine:42:venditore"))
+    prova("...e (compratore)", "compratore",
+          ruolo_xp("ordine:42:compratore"))
+    # IL VOCABOLARIO E' `XP_RUOLO`: quel che non e' un ruolo non lo
+    # diventa. Senza questa guardia una riga muta prenderebbe un lato
+    # a caso, la somma tornerebbe lo stesso e la scomposizione
+    # direbbe il falso — che e' il solo modo in cui puo' sbagliare.
+    prova("un tipo senza ruolo non ne inventa uno", "",
+          ruolo_xp("giorno:2026-08-05"))
+    prova("...e nemmeno un ruolo sconosciuto", "",
+          ruolo_xp("ordine:9:padrino"))
+    prova("il riferimento vuoto non esplode", "", ruolo_xp(""))
+    prova("...e nemmeno None", "", ruolo_xp(None))
+
+    # LA PROVA REGINA: il parser legge quel che il GANCIO scrive. Il
+    # formato vive in `_sblocca_sats` e QUI NON SI RICOPIA — si estrae
+    # da li' e gli si da' in pasto. Una sentinella direbbe che il
+    # parser esiste; questa dice che combacia con l'altra meta', ed e'
+    # l'unica che diventa rossa se un domani il gancio cambia forma.
+    _i = _SORGENTE.index('premia_xp(chi, "ordine",')
+    _rif = re.search(r'f"(ordine:[^"]*)"', _SORGENTE[_i:_i + 400]).group(1)
+    prova("il parser legge il riferimento che il gancio scrive",
+          "venditore",
+          ruolo_xp(_rif.replace("{ordine_id}", "42")
+                   .replace("{ruolo}", "venditore")))
+
+    # LA SCOMPOSIZIONE, dal registro VERO di questo banco: 900 ha
+    # 300+40 dal lato venditore e 180 da compratore, piu' due visite
+    # che il perimetro lascia fuori e che infatti non entrano.
+    _dove_xp, _par_xp = amb["sql_xp_commercio"]()
+    _righe = [(r["riferimento"], r["punti"]) for r in con.execute(
+        "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=900 "
+        f"AND {_dove_xp}", _par_xp)]
+    prova("i due lati, dal registro vero",
+          {"vendite": 340, "acquisti": 180}, xp_per_ruolo(_righe, 520))
+    prova("...e fanno il totale che sta a schermo", 520,
+          sum(xp_per_ruolo(_righe, 520).values()))
+    # IL FAIL-SAFE E' LA SOMMA, ed e' l'unica guardia: se i due lati
+    # non fanno il numero che sta a schermo si tace, e chi legge
+    # ricade sulla frase generica, che e' vera comunque.
+    prova("cache piu' alta del registro: si tace", None,
+          xp_per_ruolo(_righe, 999))
+    prova("...e piu' bassa", None, xp_per_ruolo(_righe, 1))
+    # IL CASO DI DOMANI, ed e' quello per cui la somma basta da sola:
+    # un tipo dentro il perimetro che il ruolo nel riferimento non ce
+    # l'ha non entra in NESSUNO dei due lati, quindi la somma cade da
+    # se'. Senza, quei punti sparirebbero da un lato in silenzio.
+    prova("un tipo futuro senza ruolo fa tacere la scomposizione", None,
+          xp_per_ruolo(_righe + [("gara:7", 60)], 580))
+    # A registro vuoto due zeri, che sono la VERITA': a non scriverli
+    # e' chi rende la riga — lo zero non si scrive mai, ma non e' il
+    # server a doverlo tacere.
+    prova("registro vuoto: due zeri, non None",
+          {"vendite": 0, "acquisti": 0}, xp_per_ruolo([], 0))
+    prova("...ma con la cache non a zero si tace lo stesso", None,
+          xp_per_ruolo([], 7))
+
+    # --- LE SENTINELLE DELLA LETTURA --------------------------------
+    _me = codice(pezzo("mio_profilo"))
+    # Il perimetro vive in un posto solo, come per la classifica: chi
+    # ricopia la condizione a mano resta indietro al primo tipo nuovo.
+    prova("la lettura passa dal perimetro, non da un letterale", True,
+          "sql_xp_commercio(" in _me and "tipo='ordine'" not in _me)
+    # ...e sta dove il database e' ancora aperto: piu' sotto la chiave
+    # uscirebbe sempre None senza che niente protesti.
+    prova("la lettura sta PRIMA che la connessione si chiuda", True,
+          _me.index("xp_per_ruolo(") < _me.index("con.close()"))
+    prova("...e la chiave esce nel payload", True,
+          'profilo["xp_ruoli"] = xp_ruoli' in _me)
+    # LA PROSA NON ESCE DAL SERVER: la riga la scrive il client, che e'
+    # l'unico posto che la mostra. Due prose sulla stessa cosa sono
+    # due prose che un giorno dicono cose diverse.
+    prova("dal server escono i NUMERI e mai la frase", True,
+          "dalle vendite" not in _me
+          and "dalle vendite" not in codice(pezzo("xp_per_ruolo")))
     con.close()
+
+    # IL TITOLO CHE DECADE, girato su un mercatino di cartone: chi
+    # scende di gradino non porta piu' un grado che non ha. E' la sola
+    # cosa che questo cantiere poteva far dire di FALSO a un profilo.
+    db2 = os.path.join(tempfile.mkdtemp(), "tit.db")
+    con2 = sqlite3.connect(db2)
+    con2.row_factory = sqlite3.Row
+    con2.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, titolo TEXT DEFAULT '',
+      xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0,
+      acquisti_ok INTEGER DEFAULT 0);
+    INSERT INTO utenti(tg_id, titolo, xp, vendite_ok) VALUES
+      (10, 't_pratico', 30, 1),      -- sceso: il titolo non lo ha piu'
+      (11, 't_pratico', 900, 20),    -- lo ha eccome: non si tocca
+      (12, 't_nostrano', 0, 0),      -- non e' un titolo di LIVELLO
+      (13, '', 0, 0);                -- niente titolo, niente da fare
+    """)
+    for blocco in ("COORTI = [", "LIVELLI = [", "TITOLI = ("):
+        j = _SORGENTE.index(blocco)
+        exec(_SORGENTE[j:_SORGENTE.index("\n\n\n", j)], amb)
+    for f in ("livello_utente", "_gradino_livello",
+              "riallinea_titoli_decaduti"):
+        exec(pezzo(f), amb)
+    prova("il titolo decaduto se ne va", 1,
+          amb["riallinea_titoli_decaduti"](con2))
+
+    def tit(t):
+        return con2.execute("SELECT titolo FROM utenti WHERE tg_id=?",
+                            (t,)).fetchone()["titolo"]
+
+    prova("...a chi non ha piu' il grado", "", tit(10))
+    prova("...e non a chi ce l'ha", "t_pratico", tit(11))
+    prova("i titoli che non sono di livello non si toccano",
+          "t_nostrano", tit(12))
+    prova("il secondo giro non tocca niente", 0,
+          amb["riallinea_titoli_decaduti"](con2))
+    con2.close()
+
+    # --- LE SENTINELLE DEL PERIMETRO --------------------------------
+    # Il perimetro e' un INVARIANTE, e la sua forza sta nell'essere
+    # dichiarato UNA volta: e' quel che fa si' che il gancio scritto
+    # fra sei mesi debba passare da qui invece di gonfiare il numero
+    # in silenzio.
+    src = codice(_SORGENTE)
+    prova("il perimetro si dichiara UNA volta sola", 1,
+          src.count("XP_COMMERCIO = ("))
+    for f in ("_ricalcola_xp", "_dati_classifica", "riallinea_xp_commercio"):
+        prova(f"{f} passa dal giudice del perimetro", True,
+              "sql_xp_commercio(" in codice(pezzo(f)))
+    prova("...e assegna_xp guarda la costante", True,
+          "in XP_COMMERCIO" in codice(pezzo("assegna_xp")))
+    # Nessuno riscrive la condizione a mano: e' il modo in cui i tre
+    # lettori tornerebbero a dire tre cose diverse.
+    prova("nessun tipo='ordine' scritto a mano", 0,
+          src.count("tipo='ordine'") + src.count('tipo="ordine"'))
+
+    # `utenti.xp` si scrive dai TRE posti dichiarati e da nessun altro.
+    prova("la cache degli XP ha tre scrittori", 3,
+          src.count("UPDATE utenti SET xp="))
+
+    # UN SOLO GANCIO, ed e' quello degli ordini: gli altri otto sono
+    # andati via col perimetro. La def non conta (ha un nome diverso).
+    # `await premia_xp(` e non `premia_xp(` secco: il secondo conta
+    # anche la definizione, e la sentinella direbbe due per sempre.
+    prova("resta un gancio solo, ed e' l'ordine", 1,
+          src.count("await premia_xp("))
+    prova("...e premia il commercio", True,
+          'premia_xp(chi, "ordine"' in src)
+    # Il tariffario e il giorno locale sono morti: se tornano, torna
+    # anche il perimetro largo.
+    prova("il tariffario non esiste piu'", 0, src.count("AZIONI_XP"))
+    prova("...ne' il giorno della visita", 0, src.count("oggi_locale"))
+    # ...MA LA COLONNA RESTA: toglierla renderebbe velenoso un
+    # rollback (il server vecchio la ri-ALTERerebbe e ricomincerebbe a
+    # timbrare le visite di tutti).
+    prova("la colonna della visita resta", True,
+          "xp_ultimo_giorno TEXT DEFAULT ''" in _SORGENTE)
+
+    # IL RIALLINEAMENTO SI CHIAMA ALL'AVVIO, e si guarda la RIGA e non
+    # il nome: nel file il nome compare comunque (la def, la docstring
+    # della gemella), quindi cercarlo non potrebbe fallire — e' la
+    # lezione del reaper, pagata piu' di una volta.
+    avvio = codice(pezzo("init_db"))
+    prova("il riallineamento si chiama all'avvio", True,
+          "riallinea_xp_commercio(con)" in avvio)
+    prova("...e con lui i titoli decaduti", True,
+          "riallinea_titoli_decaduti(con)" in avvio)
+    # PRIMA gli XP e POI i titoli: al contrario il secondo giudicherebbe
+    # sulla cache di ieri.
+    prova("...e in quest'ordine", True,
+          avvio.index("riallinea_xp_commercio(con)")
+          < avvio.index("riallinea_titoli_decaduti(con)"))
+
+    # IL PUNTEGGIO ESCE: a dirlo c'era il solo collaudo_classifica.py,
+    # che in CI non gira — quindi togliendo la riga nessuno fiatava.
+    voce = codice(pezzo("classifica"))
+    prova("il punteggio esce, ×100 e arrotondato", True,
+          'round(r["punti"] * 100)' in voce)
+    prova("...e gli XP in chiaro no", True,
+          '"xp": r' not in voce and '"id": r' not in voce)
+
+    # I DUE SCRIPT A MANO: rifacevano la cache SENZA filtro, quindi
+    # dopo il cantiere ri-gonfiavano in silenzio gli utenti toccati e
+    # il riavvio dopo li sgonfiava — un numero che oscilla ATTRAVERSO
+    # UN REBOOT e' il guasto piu' difficile da farsi credere.
+    for nome in ("marca_prove.py", "recupera_xp_ordini.py"):
+        with open(nome, encoding="utf-8") as fh:
+            t = fh.read()
+        prova(f"{nome} non ri-gonfia la cache", True,
+              "UPDATE utenti SET xp=" not in t
+              or "tipo IN ('ordine')" in t)
 
 
 # ====================================================================
@@ -15082,8 +16783,11 @@ def prove_coorti_titoli():
           livello(4010, 1)["nome"])
     prova("...con quindici affari e' esperto", "Mercante esperto",
           livello(4010, 15)["nome"])
+    # Venti affari da POCO: la cifra e' scesa con le soglie (ago 2026),
+    # il caso e' lo stesso — gli XP sotto la soglia del gradino dopo
+    # non si comprano col numero di affari.
     prova("venti affari da poco non bastano", "Bottega avviata",
-          livello(200, 20)["nome"])
+          livello(60, 20)["nome"])
     prova("in cima non c'e' un prossimo", "",
           livello(99999, 99)["nome_prossimo"])
 
@@ -15638,7 +17342,8 @@ def _censimento(acceso):
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
-                 "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP"):
+                 "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
+                 "CLASSIFICA_KD"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -16919,6 +18624,16 @@ def prove_leve():
     # resterebbero verdi per caso (70 > 7 in tutti e due i modi).
     prova("...e il valore passa dal giudice", True,
           "_prezzo_banner(" in codice(pezzo("_leve_stato")))
+    # LO SMORZAMENTO DELLA CLASSIFICA: nasce a zero, e a zero un
+    # moderatore che legge «0» deve capire che quella e' la classifica
+    # di prima dello smorzamento e non una leva tarata bassa.
+    prova("lo smorzamento c'e' nel pannello", True,
+          "CLASSIFICA_KD" in voci_on)
+    prova("...e a zero dice che il commercio torna pieno per tutti",
+          True, "recensore solo" in voci_off.get("CLASSIFICA_KD",
+                                                 {}).get("nota", ""))
+    prova("...e acceso non dice niente", False,
+          "nota" in voci_on.get("CLASSIFICA_KD", {}))
 
     # --- 2) LA FORMA ---------------------------------------------
     prova("ogni gruppo ha delle voci", True,
@@ -17594,6 +19309,14 @@ def prove_ricevuta_compratore():
               stato TEXT, quantita INT, consegna_scelta TEXT,
               via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
               nota_compratore TEXT DEFAULT '',
+              -- il TIMBRO dell'email per il corriere (ago 2026): da
+              -- quando la si lascia gia' alla cassa, _incassa_ordine
+              -- ci mette la riga in coda a «Hai venduto» e legge
+              -- questa colonna. Il cartone che non ce l'ha non fa una
+              -- prova rossa: fa ESPLODERE la famiglia con un
+              -- IndexError, che e' la classe di guasto gia' pagata
+              -- dalla colonna mancante di offerte_righe.
+              email_corriere_il INT DEFAULT 0,
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
               sconto_sats INT DEFAULT 0,
               indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
@@ -17607,7 +19330,9 @@ def prove_ricevuta_compratore():
             CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
               compratore_id INT, ordine_id INT, stato TEXT,
               aggiornato INT DEFAULT 0);
-            CREATE TABLE offerte_righe(id INTEGER PRIMARY KEY,
+            -- senza colonna id, come il DDL vero (la lezione del
+            -- cartone che divergeva: vedi prove_libro_mastro)
+            CREATE TABLE offerte_righe(
               offerta_id INT, annuncio_id INT, quantita INT,
               unitario_sats INT, unitario_eur REAL, titolo TEXT);
             CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY
@@ -20392,21 +22117,38 @@ def prove_offerta_quantita():
     # fisso e' l'altro modo in cui nasce uno scatto (lezione picker)
     prova("il fuoco sul campo non trascina niente", True,
           "campo.focus({preventScroll:true})" in mini)
-    # IL CAMPO DICE «AL PEZZO» mentre si digita, e solo coi pezzi >1:
-    # chi ne vuole tre ragiona sul TOTALE e rischia di scrivere 120
-    # intendendo il totale mentre ne sta offrendo 360
-    # Dall'ago 2026 la riga vive nel GIUDICE UNICO, che serve tutte
-    # e tre le superfici (il foglio, la controproposta del venditore
-    # e il rilancio del compratore): l'affermazione e' la stessa,
-    # cambia il posto in cui si guarda.
-    suf = pezzo_js(mini, "function suffissoUnita(valuta, quantita){",
+    # IL «AL PEZZO» E' MORTO COL TOTALE IN SUPERFICIE (ago 2026,
+    # ROVESCIATE — erano le sentinelle della toppa): i campi delle
+    # trattative parlano il TOTALE, quindi il rischio che quella riga
+    # toppava (scrivere 120 intendendo il totale mentre si offrivano
+    # 360) non esiste piu' alla radice. Il suffisso e' la sola valuta,
+    # il giudice unico resta, e la divisione ÷ pezzi avviene
+    # all'invio, UNA volta e col floor — l'unica algebra che tiene il
+    # minimo senza una seconda regola: floor(tot/q) >= min ⇔
+    # tot >= min×q.
+    suf = pezzo_js(mini, "function suffissoUnita(valuta){",
                    "\n}") + "\n}"
-    prova("il campo dice «al pezzo» mentre si scrive", True,
-          '<span class="off-alpezzo">al pezzo</span>' in suf)
-    prova("...ma solo con piu' di un pezzo", True,
-          "(quantita || 0) > 1" in suf)
-    prova("...e col pezzo singolo tace", True,
+    prova("il suffisso non dice piu' «al pezzo»", False,
+          "off-alpezzo" in suf)
+    prova("...e la sua regola CSS e' morta con lui", False,
           ".off-alpezzo{display:block" in mini)
+    prova("le pillole riempiono col TOTALE scontato", True,
+          "offCifra = offTotaleSconto(l, Number(scelta));" in mini)
+    prova("l'invio divide UNA volta, col floor (e in centesimi interi"
+          " sull'euro)", True,
+          "const cifra = offUnitarioDa(l, totale);" in mini
+          and "? Math.floor(Math.round(tot*100)/q)/100 : Math.floor(tot/q);"
+          in mini)
+    prova("...anche contro e rilancio dividono all'invio", True,
+          "Math.floor(Math.round(tot*100)/qq)/100 : Math.floor(tot/qq);"
+          in mini)
+    prova("...e il minimo si giudica sull'UNITARIO derivato, come fara'"
+          " il server", True,
+          "(inEur ? u < min.eur : u < min.sats);" in mini)
+    prova("...ma si DICE in totale", True,
+          "del listino${q > 1 ? ', in tutto' : ''})" in mini)
+    prova("il campo legale del rilancio parla totali coi pezzi", True,
+          "su = o.valuta==='eur' ? Math.round(su*q*100)/100 : su*q;" in mini)
     # SOTTO IL MINIMO NIENTE TOTALE: due righe dove ne serve una
     prova("sotto il minimo la riga del totale sparisce", True,
           "if (v<=0 || sotto) { riga.textContent = ''; return; }" in mini)
@@ -20481,7 +22223,7 @@ def prove_offerta_quantita():
           "const vc = valutaOfferta(l);" in fogjs
           and "return valutaVista==='eur' ? 'eur' : 'sats';" in mini)
     prova("...portando il simbolo della valuta MOSTRATA", True,
-          "el('offSuffisso').innerHTML = suffissoUnita(vc,"
+          "el('offSuffisso').innerHTML = suffissoUnita(vc);"
           in fogjs)
     # L'ANCORA E' QUELLO CHE IMPEDISCE ALLA CIFRA DI DERIVARE: si
     # tiene la cifra com'e' stata scritta e la valuta in cui lo e'
@@ -20521,10 +22263,12 @@ def prove_offerta_quantita():
     # LE PILLOLE si confrontano nella valuta MOSTRATA — e' il numero
     # che si vede — ma piantano l'ancora in quella del LISTINO, cosi'
     # il −10% che parte e' esattamente −10% al sat
+    # ...e dall'ago 2026 il confronto e' sul TOTALE scontato: il campo
+    # parla totali, e la pillola si accende su quel che si vede
     prova("le pillole si confrontano in quel che si vede", True,
-          "Math.abs(vv - offertaScontoIn(l, x, vc)) < tol" in odig)
+          "Math.abs(vv - offTotaleScontoIn(l, x, vc)) < tol" in odig)
     prova("...e piantano l'ancora nella valuta del listino", True,
-          "offCifra = offertaSconto(l, Number(scelta));" in fog2
+          "offCifra = offTotaleSconto(l, Number(scelta));" in fog2
           and "offCifraValuta = inEur ? 'eur' : 'sats';" in fog2)
     # IL MINIMO: si CONFRONTA nella valuta del listino, che e' quella
     # su cui giudica il server, e si DICE in quella del campo,
@@ -20532,8 +22276,11 @@ def prove_offerta_quantita():
     # legge dev'essere ammesso, mai rifiutato per un centesimo.
     prova("il minimo si confronta come il server", True,
           "const v = offCifraIn(inEur ? 'eur' : 'sats');" in odig)
+    # (in TOTALE, dall'ago 2026: minTot = l'unitario del giudice per i
+    # pezzi scelti, detto nella lingua del campo)
     prova("...e si dice nella valuta del campo", True,
-          "offCifraTesto(offMinimoIn(l, min, vc), vc," in odig)
+          "const mu = offMinimoIn(l, min, vc), q = offPezzi();" in odig
+          and "offCifraTesto(minTot, vc," in odig)
     prova("...arrotondato per eccesso, o rifiuterebbe cio' che mostra",
           True, "Math.ceil(min.sats*eurPerSat*100)/100" in mini
           and "Math.ceil(min.eur/eurPerSat)" in mini)
@@ -20544,9 +22291,129 @@ def prove_offerta_quantita():
     i_inv = mini.index("async function inviaOfferta(")
     inv = mini[i_inv:mini.index("function apriLampo(", i_inv)]
     prova("l'invio converte verso il listino", True,
-          "const cifra = offCifraIn(inEur ? 'eur' : 'sats');" in inv)
+          "const totale = offCifraIn(inEur ? 'eur' : 'sats');" in inv)
     prova("...e non legge piu' il campo", False,
           "el('offImporto').value" in inv)
+
+
+# ====================================================================
+def prove_offerta_carrello():
+    """L'OFFERTA SUL CARRELLO, la FORMA (ago 2026).
+
+    Il giro vero — proposta, contro, rilancio, accetta, pagamento con
+    la bolt11 al sat, e le decadenze una per una — lo cammina
+    `collaudo_offerta_carrello.py`, che ha bisogno di un database.
+    Qui restano le righe che un riordino toglierebbe senza rompere
+    niente di visibile.
+
+    LA PRIMA E' LA LEZIONE DEL CANTIERE, e viene da DUE bug della
+    stessa famiglia in due giorni: `offerte_righe` non ha una colonna
+    `id`. La ronda ci ha chiesto `r.id` (e sul database vero
+    esplodeva, mandando il 🧊 quotidiano), `_accordo_carrello` ci ha
+    fatto `ORDER BY id` (e il pagamento sarebbe esploso). Tutte e due
+    le volte le prove erano verdi, perche' i cartoni davano alla
+    tabella un id che il DDL non ha. Questo censimento e' il tappo:
+    chiunque chieda quella colonna lo sente dalla CI."""
+    print("\n[l'offerta sul carrello: la forma]")
+    src = _SORGENTE
+    # --- 1. LA COLONNA CHE NON C'E'. Si estraggono le colonne dal DDL
+    #        VERO invece di elencarle: il giorno che la tabella ne
+    #        guadagna una, il censimento la impara da solo.
+    i = src.index("CREATE TABLE IF NOT EXISTS offerte_righe(")
+    # il taglio si ancora alla PARENTESI IN COLONNA e non a un «);»
+    # nudo: il commento del DDL nomina `ordine_righe)`, e una fine
+    # ingenua cade li' dentro lasciando fuori tutte le colonne.
+    # (`\n` e non `\r\n`: _SORGENTE si legge in modalita' TESTO, che
+    # traduce i fine-riga — server.py sul disco e' CRLF.)
+    ddl = src[i:src.index("\n    );", i)]
+    colonne = re.findall(r"^\s{8}(\w+) ", ddl, re.M)
+    prova("il DDL di offerte_righe si legge, e non ha «id»",
+          (True, False),
+          ("annuncio_id" in colonne, "id" in colonne))
+    # ...e nessuna query gliela chiede. Si guarda il CODICE (le
+    # docstring nominano `id` per dire che NON c'e': una prova che
+    # legge la prosa diventerebbe rossa per colpa di una spiegazione).
+    nudo = codice(src)
+    for quale, forma in (
+            ("l'ORDER BY della lettura",
+             "offerte_righe WHERE offerta_id=? ORDER BY id"),
+            ("il r.id della ronda", "SELECT r.id FROM offerte_righe"),
+            ("un SELECT id secco", "SELECT id FROM offerte_righe"),
+            ("un ordinamento nudo", "offerte_righe ORDER BY id")):
+        prova(f"nessuno chiede quella colonna: {quale}", 0,
+              nudo.count(forma))
+    # l'ordine delle figlie e' il ROWID, cioe' quello della proposta
+    prova("le figlie si leggono per rowid", True,
+          "FROM offerte_righe WHERE offerta_id=? ORDER BY rowid" in nudo)
+    # e la ronda cerca l'offerta MANCANTE, non la riga: e' quella il
+    # dato che serve a chi legge il 🧊
+    prova("la ronda pesca l'offerta orfana per offerta_id", True,
+          "SELECT DISTINCT r.offerta_id FROM offerte_righe r" in nudo)
+
+    # --- 2. IL CENSIMENTO DEI JOIN: la testata ha annuncio_id=0,
+    #        quindi ogni INNER JOIN su annunci la fa sparire in
+    #        silenzio — ed e' la trappola principale del cantiere.
+    # OGNI ANCORA E' LA QUERY DI QUELLA FUNZIONE, mai la parola «LEFT
+    # JOIN annunci» nuda: le fette di pezzo() qui sono larghe (quella
+    # di rispondi_offerta arriva a 19.000 caratteri e si porta dentro
+    # le vicine), quindi la parola generica la troverebbe COMUNQUE
+    # anche col JOIN mutato — una sentinella che non puo' fallire.
+    # L'ha detto la tortura, non la rilettura.
+    for fn, query in (
+            ("mie_offerte",
+             '"LEFT JOIN annunci a ON a.id = o.annuncio_id "\n'
+             '        "LEFT JOIN utenti uc'),
+            ("rispondi_offerta",
+             '"FROM offerte o LEFT JOIN annunci a ON a.id = o.annuncio_id "'),
+            ("ritira_offerta",
+             '"SELECT o.*, a.titolo FROM offerte o "'),
+            ("_impegni_aperti",
+             '"LEFT JOIN annunci a ON a.id = o.annuncio_id "\n'
+             '            "WHERE o.venditore_id=? AND o.stato=\'accettata\' "')):
+        prova(f"{fn}: il JOIN su annunci e' LEFT", 1, src.count(query))
+    # ritira_offerta: la sua query si riconosce dal SELECT, e il LEFT
+    # e' la riga dopo — si guardano insieme o l'ancora non dice niente
+    i_rit = src.index("async def ritira_offerta(")
+    prova("...e in ritira_offerta il LEFT segue quel SELECT", True,
+          "LEFT JOIN annunci a ON a.id = o.annuncio_id" in
+          src[i_rit:i_rit + 2600])      # la docstring e' lunga 2.143
+    # scadenze_offerte NON diventa un LEFT: ha una query SUA per i
+    # carrelli, perche' la condizione di morte e' un'altra («esiste
+    # una figlia il cui annuncio non e' piu' attivo») e l'EXISTS
+    # negato copre anche l'annuncio CANCELLATO, che un a.stato non
+    # vedrebbe. La query di sempre resta byte-identica.
+    prova("scadenze_offerte tiene la sua query di sempre", 1,
+          src.count('"FROM offerte o JOIN annunci a ON a.id = '
+                    'o.annuncio_id "'))
+    prova("...e una SECONDA per i carrelli, con l'EXISTS negato", 1,
+          src.count('"SELECT o.*, EXISTS(SELECT 1 FROM offerte_righe '
+                    'r WHERE "'))
+
+    # --- 3. L'ESCLUSIONE RECIPROCA, nei DUE versi. Una sola meta'
+    #        lascerebbe due trattative sullo stesso pezzo — e al
+    #        pagamento due accordi sulla stessa merce.
+    prova("verso singolo→carrello: fai_offerta guarda le figlie", True,
+          "JOIN offerte_righe r ON r.offerta_id=o.id"
+          in codice(pezzo("fai_offerta", "\n\n\n@app")))
+    prova("verso carrello→singolo: il gemello guarda le offerte",
+          True, "o.annuncio_id IN ({seg})"
+          in codice(pezzo("fai_offerta_carrello", "\n\n\n@app")))
+
+    # --- 4. La colonna TESTIMONE, il patto di sconto_sats: a comandare
+    #        e' `prezzo_sats`, che nasce gia' scontato. Chi leggesse
+    #        `accordo_sats` per RIALZARE un'uscita farebbe uscire
+    #        dall'escrow di ALTRI ordini la differenza, e la cintura di
+    #        paga_venditore non lo vedrebbe (per lei i conti
+    #        tornerebbero).
+    for fn in ("_sblocca_sats", "_rimborsa_compratore",
+               "deposita_invoice"):
+        prova(f"{fn}: cieco ad accordo_sats", False,
+              "accordo_sats" in codice(pezzo(fn)))
+    # ...e la sottrazione vive in UN posto solo, dove vive quella
+    # dello sconto: due sottrazioni sono un accordo applicato due volte
+    prova("la sottrazione dell'accordo sta nel conto, e li' soltanto",
+          True, "netto = max(0, articolo - max(0, sconto) - "
+                "max(0, accordo))" in codice(pezzo("_conto_ordine")))
 
 
 # ====================================================================
@@ -21147,16 +23014,201 @@ def prove_rilancio_offerta():
     prova("i bottoni delle offerte non vanno a capo da soli", 0,
           solo.count("flex-wrap:wrap"))
     # LE TRE SUPERFICI DEL SUFFISSO passano dal giudice unico, e
-    # nessuna scrive l'unita' a mano: sono le tre volte in cui una
-    # cifra UNITARIA si digita in un campo, e se una tacesse chi
-    # compra scriverebbe il totale credendo di offrire quello.
+    # nessuna scrive l'unita' a mano. Dall'ago 2026 il giudice dice la
+    # SOLA valuta (i campi parlano il totale, il «al pezzo» e' morto
+    # con la toppa): resta unico perche' tre rese della stessa cosa
+    # divergono al primo ritocco.
     prova("i due box inline chiedono l'unita' al giudice", 2,
-          rend.count("suffissoUnita(o.valuta, o.quantita)"))
+          rend.count("suffissoUnita(o.valuta)"))
     prova("...e nessuno se la scrive a mano", 0,
           solo.count("'eur'?'€':'sats'")
           + solo.count("'eur' ? '€' : 'sats'"))
-    prova("le superfici che chiedono una cifra unitaria sono TRE", 3,
+    #    QUATTRO dall'ago 2026: il foglio dell'offerta sul CARRELLO
+    #    l'unita' se la SCRIVEVA A MANO ('eur' ? '€' : 'sats'), che e'
+    #    esattamente la forma che la prova qui sopra vieta — col
+    #    toggle e' passato al giudice, quindi il conto sale ed e' un
+    #    guadagno, non un allentamento.
+    prova("le superfici che chiedono una cifra unitaria sono QUATTRO", 4,
           mini.count("suffissoUnita(") - 1)
+
+    # --- 3bis) IL TOGGLE DEL FOGLIO CARRELLO E' UN RICALCO -------
+    # (ago 2026, chiesto da Andrea: «rifai l'ancora ricalcandola dal
+    # singolo, non reinventandola»). Quel che queste righe sorvegliano
+    # non e' che il toggle esista — quello si vede — ma che i FERRI
+    # siano quelli del gemello: l'aritmetica della conversione deve
+    # vivere in UN posto solo per tutti e due i fogli, o il giorno che
+    # si corregge un arrotondamento se ne corregge meta'.
+    _oc = pezzo_js(mini, "function offCarrDigitata(){", "\n}")
+    _oi = pezzo_js(mini, "function inviaOffertaCarrello(btn){", "\n}")
+    _oa = pezzo_js(mini, "function aggiornaFoglioOffCarr(){", "\n}")
+    _os = pezzo_js(mini, "function offCarrScritta(){", "\n}")
+    prova("il carrello converte col ferro del singolo, mai con l'aritmetica",
+          True,
+          "offConverti(" in pezzo_js(mini, "function offCarrCifraIn(",
+                                     "\n}")
+          and "offConverti(" in pezzo_js(mini, "function offCarrScontoIn(",
+                                         "\n}"))
+    # e NON se la riscrive: eurPerSat compare solo dove il gemello ce
+    # l'ha davvero (il minimo per eccesso, che offConverti non copre
+    # perche' li' l'arrotondamento va nell'altro verso)
+    prova("...e non moltiplica per il cambio per conto suo", 0,
+          _oc.count("eurPerSat") + _oi.count("eurPerSat")
+          + _oa.count("eurPerSat") + _os.count("eurPerSat"))
+    # L'ANCORA: la scrive SOLO l'oninput (e la pillola, che pianta la
+    # cifra esatta nella valuta dell'offerta). Se la scrivesse anche il
+    # render, un toggle riscriverebbe l'originale con la propria
+    # conversione e la cifra deriverebbe a ogni tocco — e' il difetto
+    # che l'ancora esiste per non avere, e nel gemello ha la sua
+    # sentinella identica.
+    prova("l'ancora del carrello la scrivono in due: l'input e la pillola",
+          2, mini.count("offCarr.cifraValuta ="))
+    prova("...e il render NON la tocca", 0,
+          _oc.count("offCarr.cifra =") + _oa.count("offCarr.cifra ="))
+    # DOVE la piantano non lo dice il conteggio qui sopra — l'ha detto
+    # la tortura, che con «due scritture» restava verde spostandone
+    # una. La pillola la pianta nella valuta dell'OFFERTA, cosi' il
+    # −10% e' esattamente −10% al sat qualunque cosa il campo stia
+    # mostrando; l'input in quella del CAMPO, che e' la lingua in cui
+    # si sta scrivendo. Scambiarle vuol dire un −10% convertito e
+    # riconvertito, cioe' non piu' −10%.
+    _ochip = pezzo_js(mini, "function offCarrChip(scelta){", "\n}")
+    prova("la pillola pianta l'ancora nella valuta dell'offerta", True,
+          "offCarr.cifraValuta = offCarr.valuta;" in _ochip)
+    prova("...e l'input in quella del campo", True,
+          "offCarr.cifraValuta = vc;" in _os)
+    # Il campo si riscrive SOLO al cambio di valuta, o normalizzerebbe
+    # sotto le dita quel che si sta ancora scrivendo.
+    prova("il campo si riscrive solo quando la valuta cambia davvero",
+          True, "if (vc !== offCarr.campoValuta) {" in _oa)
+    # ALL'INVIO parte SEMPRE la valuta dell'offerta: e' l'unica in cui
+    # l'accordo esiste, e nel body non c'e' nessun campo valuta — la
+    # deduce il server dalle righe. La mutazione che manda la cifra
+    # del CAMPO fa rossa questa riga.
+    prova("all'invio si manda la cifra nella valuta dell'offerta", True,
+          "offCarrCifraIn(offCarr.valuta)" in _oi)
+    prova("...e mai quella del campo", 0,
+          _oi.count("campoValuta"))
+    # IL MINIMO si GIUDICA nella valuta dell'offerta — la stessa cifra
+    # che giudichera' il server — e si DICE in quella del campo.
+    prova("il minimo si giudica sulla valuta dell'offerta", True,
+          "const v = offCarrCifraIn(offCarr.valuta);" in _oc
+          and "v < min" in _oc)
+    prova("...e si dice in quella del campo, per eccesso", True,
+          "offCarrMinimoIn(vc)" in _oc
+          and "Math.ceil" in pezzo_js(mini, "function offCarrMinimoIn(",
+                                      "\n}"))
+    # LE PILLOLE si confrontano nella valuta MOSTRATA (e' il numero che
+    # si vede) con la tolleranza di quella valuta.
+    prova("le pillole si confrontano nella valuta mostrata", True,
+          "offCarrScontoIn(x, vc)" in _oc
+          and "vc==='eur' ? 0.005 : 0.5" in _oc)
+    # IL ≈ STA SULLA FACCIA CONVERTITA E MAI SU QUELLA DELL'OFFERTA:
+    # e' la cifra che parte davvero, e un ≈ li' sopra direbbe che non
+    # e' ferma. Da qui discende anche che il ≈ non compare mai due
+    # volte nella stessa riga.
+    prova("il ≈ della riga viva sta sulla faccia convertita", True,
+          "offCifraTesto(vv, vc, conv)" in _oc
+          and "const conv = vc !== offCarr.valuta;" in _oc)
+    prova("...e la coda dice l'ALTRA faccia col suo", True,
+          "alt !== offCarr.valuta" in _oc)
+    # SENZA CAMBIO la coda non si scrive affatto: mai una conversione
+    # col valore di riserva (la regola di casa, e la stessa per cui
+    # senza cambio il toggle non si offre e la valuta resta la nativa).
+    prova("...ma solo col cambio vivo", True,
+          "if (cambioVivo) {" in _oc)
+    prova("senza cambio la valuta del campo resta quella dell'offerta",
+          True,
+          "if (!cambioVivo) return offCarr.valuta;"
+          in pezzo_js(mini, "function valutaOffCarr(){", "\n}"))
+    # E IL FOGLIO SEGUE IL TOGGLE: senza questa riga il campo direbbe
+    # una valuta e il simbolo accanto un'altra, che e' il mezzo bug
+    # gia' pagato dal gemello.
+    prova("setValuta ridisegna anche il foglio del carrello", True,
+          "aggiornaFoglioOffCarr();"
+          in pezzo_js(mini, "function setValuta(v){", "\n}"))
+    # LO STATO RESTA SUO: due fogli che scrivono nelle stesse variabili
+    # sono due fogli che un giorno si pestano.
+    prova("il carrello non tocca l'ancora del singolo", 0,
+          _oc.count("offCifra") + _oi.count("offCifra")
+          + _oa.count("offCifra") + _os.count("offCifra")
+          - _oc.count("offCifraTesto") - _oa.count("offCifraTesto"))
+
+    # --- 3ter) E L'ANCORA SI FA GIRARE ---------------------------
+    # Le sentinelle qui sopra dicono che l'ancora c'e'; che NON FACCIA
+    # DERIVARE la cifra lo dice solo l'esecuzione. Il caso che
+    # smaschera la deriva e' scelto apposta: 66661 sats non tornano a
+    # se' passando per gli euro (66661 -> 33,33 € -> 66660), quindi un
+    # render che riscrivesse l'ancora perderebbe un sat al primo
+    # toggle e un altro al terzo. Con l'ancora, dieci giri costano
+    # sempre la conversione del primo.
+    import json as _js2
+    import shutil as _sh2
+    import subprocess as _sp2
+    import tempfile as _tf2
+    _node2 = _sh2.which("node")
+    if not _node2:
+        salta("l'ancora del carrello non fa derivare la cifra",
+              "node non installato")
+    else:
+        _ferri = "".join(
+            pezzo_js(mini, f"function {nome}", "\n}") + "\n}\n"
+            for nome in ("offConverti(v, da, a){", "valutaOffCarr(){",
+                         "offCarrCifraIn(valuta){", "offCarrSconto(p){",
+                         "offCarrScontoIn(p, valuta){",
+                         "offCarrMinimo(){", "offCarrMinimoIn(valuta){"))
+        # Il mondo di cartone: un cambio TONDO (1 BTC = 50.000 €, cioe'
+        # 1 sat = 0,0005 €) cosi' gli attesi si scrivono a mano invece
+        # di derivarli dalla stessa formula — un atteso calcolato col
+        # codice che si sta provando non prova niente.
+        _prog = ("let offCarr = null, cambioVivo = true, valutaVista = 'eur';\n"
+                 "const eurPerSat = 0.0005, offertaMinPercento = 50;\n"
+                 + _ferri + """
+const out = {};
+// 1) la NON-DERIVA: ancora in sats, dieci letture alternate
+offCarr = {valuta:'sats', listinoSats:100000, listinoEur:0,
+           cifra:66661, cifraValuta:'sats', campoValuta:'sats'};
+const giro = [];
+for (let i = 0; i < 10; i++)
+  giro.push(offCarrCifraIn(i % 2 ? 'eur' : 'sats'));
+out.deriva = [...new Set(giro.filter((_, i) => i % 2 === 0))];
+out.derivaEur = [...new Set(giro.filter((_, i) => i % 2 === 1))];
+// 2) le due facce di un'ancora piantata in euro
+offCarr = {valuta:'eur', listinoSats:0, listinoEur:50,
+           cifra:50, cifraValuta:'eur', campoValuta:'eur'};
+out.eurInEur = offCarrCifraIn('eur');
+out.eurInSats = offCarrCifraIn('sats');
+// 3) la valuta del campo: col cambio muto resta quella dell'offerta
+out.vistaVivo = valutaOffCarr();
+cambioVivo = false;
+out.vistaMuto = valutaOffCarr();
+cambioVivo = true;
+// 4) la pillola nella valuta mostrata
+out.sconto10 = offCarrScontoIn(10, 'eur');
+out.sconto10Sats = offCarrScontoIn(10, 'sats');
+// 5) il minimo per ECCESSO: 50001 sats sono 25,0005 €, e dirlo
+//    25,00 sarebbe dire «va bene» a una cifra che di la' e' sotto
+offCarr = {valuta:'sats', listinoSats:100001, listinoEur:0,
+           cifra:0, cifraValuta:'', campoValuta:''};
+out.minNativo = offCarrMinimo();
+out.minInEur = offCarrMinimoIn('eur');
+console.log(JSON.stringify(out));
+""")
+        _f2 = _tf2.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f2.write(_prog)
+        _f2.close()
+        _r2 = _sp2.run([_node2, _f2.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        os.unlink(_f2.name)
+        _got = (_js2.loads(_r2.stdout.strip()) if _r2.returncode == 0
+                else {"errore": _r2.stderr[:200]})
+        prova("l'ancora del carrello non fa derivare la cifra",
+              {"deriva": [66661], "derivaEur": [33.33],
+               "eurInEur": 50, "eurInSats": 100000,
+               "vistaVivo": "eur", "vistaMuto": "eur",
+               "sconto10": 45, "sconto10Sats": 90000,
+               "minNativo": 50001, "minInEur": 25.01},
+              _got)
 
     # --- 4) E I DUE GIUDICI SI FANNO GIRARE ---------------------
     # Le sentinelle dicono che esistono, mai che rispondano uguale al
@@ -21737,8 +23789,12 @@ def prove_fogli_di_casa():
     # QUARANTUNO (ago 2026): la revoca del barattolo condiviso — un
     # link che muore per chiunque ce l'abbia si chiede prima, e il
     # corpo dice il costo vero (ricondividendo il link sara' NUOVO).
-    prova("i gesti che passano dalla domanda unica sono quarantuno",
-          41, solo_codice(mini).count("chiediConferma({"))
+    # QUARANTADUE (ago 2026, cantiere 45): la porta tardiva della
+    # busta diretta — dichiarare che il codice va al compratore
+    # silenzia i promemoria e avvisa l'acquirente, e va detto PRIMA
+    # del tocco.
+    prova("i gesti che passano dalla domanda unica sono quarantatre",
+          43, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -21905,6 +23961,8 @@ def prove_sollecito_a_comando():
             "busta_il INT DEFAULT 0, "
             "sollecito_manuale_busta_il INT DEFAULT 0, "
             "solleciti_manuali_busta INT DEFAULT 0, "
+            # cantiere 45: il codice dichiarato DIRETTO al compratore
+            "busta_diretta_il INT DEFAULT 0, "
             # ...e i contatori dell'AUTOMATICO della busta, che il
             # bottone non deve toccare
             "sollecito_busta_il INT DEFAULT 0, "
@@ -22014,6 +24072,15 @@ def prove_sollecito_a_comando():
              (46, 111, 222, 8, "shipped", "spedizione", ORA - 60 * g2,
               ORA - g2, ORA - 25 * g2, 1, 0, 0, 0, 0, 0, 0),
             ])
+        # cantiere 45: il venditore ha dichiarato il codice DIRETTO al
+        # compratore — nessuna busta da aspettare, il bottone non nasce
+        vero.execute(
+            "INSERT INTO ordini(id, compratore_id, venditore_id, "
+            "annuncio_id, stato, consegna_scelta, creato, aggiornato, "
+            "spedito_il, via_punto, busta_diretta_il) "
+            "VALUES(47, 111, 222, 7, 'shipped', 'spedizione', ?, ?, "
+            "?, 1, ?)",
+            (ORA - 60 * g2, ORA - g2, ORA - 25 * g2, ORA - 20 * g2))
         vero.commit()
         return vero
 
@@ -22325,6 +24392,22 @@ def prove_sollecito_a_comando():
     esito, _, err = bussa(mondo(), 45)
     prova("lo shipped storico (spedito_il=0) ha la maniglia",
           {"ok": True}, esito)
+    # LA BUSTA DIRETTA E' RIENTRATA (ago 2026), e queste due prove
+    # hanno CAMBIATO LATO col loro perche': certificavano il gate
+    # `busta_diretta_il=0`, cioe' il silenzio che lasciava chi ha
+    # comprato senza nessuna maniglia fino al giorno 10 su una
+    # giacenza di tre. Il bottone adesso c'e' e RIFERISCE un fatto —
+    # «non mi e' arrivato niente» — invece di ricordare un gesto che
+    # il venditore non deve fare.
+    esito, db45, err = bussa(mondo(), 47)
+    prova("la busta diretta al compratore entra, col suo mestiere",
+          {"ok": True}, esito)
+    prova("...e al venditore si dice il FATTO, non il rimprovero", True,
+          len(db45) == 1 and "non ha ricevuto il codice" in db45[0][1])
+    # ...e non gli si dice mai che ha sbagliato: il recapito puo'
+    # essere giusto e il messaggio finito nello spam
+    prova("...senza accusarlo di aver sbagliato l'indirizzo", True,
+          "sbagliato" not in db45[0][1])
     esito, _, err = bussa(mondo(), 40, SOLLECITO_MANUALE_BUSTA_ORE=0)
     prova("la leva a 0 spegne la fase busta", 400, err and err.code)
     esito, db4, err = bussa(mondo(), 46)
@@ -22342,18 +24425,39 @@ def prove_sollecito_a_comando():
               (err and err.code, err and err.detail, db5))
     # le sentinelle sulla forma: la WHERE fa entrare la busta, e le
     # scritture restano letterali e SUE
+    # ROVESCIATA col gate (ago 2026): la WHERE fa entrare la busta
+    # vuota, e adesso ANCHE quella dichiarata diretta — la clausola
+    # `busta_diretta_il=0` non deve tornare di soppiatto, o il
+    # compratore torna muto.
     prova("la WHERE dice spedito + via punto + busta vuota", True,
           "OR o.stato='shipped' AND o.via_punto=1 " in c
           and "AND o.busta_il=0)" in c)
+    # ...e si guarda il CORPO e non la funzione intera: la docstring
+    # quella clausola la NOMINA apposta, per dire che se n'e' andata —
+    # cercandola in `c` la prova diventerebbe rossa per colpa di una
+    # spiegazione (la trappola gia' a verbale, presa scrivendola).
+    prova("...e la busta diretta non e' piu' esclusa", True,
+          "busta_diretta_il=0" not in corpo)
+    prova("...ma resta distinta, coi suoi testi", True,
+          'diretta = busta and o["busta_diretta_il"] > 0' in corpo)
     prova("l'ancora della busta e' spedito_il", True,
           'o["spedito_il"] + finestra' in corpo)
     prova("le scritture della busta sono letterali", True,
           "sollecito_manuale_busta_il=?" in corpo
           and "solleciti_manuali_busta=solleciti_manuali_busta+1" in corpo)
-    # la traccia del cantiere 45 sta accanto al testo: il giorno che
-    # il codice va diretto al compratore, questo messaggio va zittito
-    prova("la traccia del cantiere 45 e' accanto al testo", True,
-          "CANTIERE 45" in c)
+    # LA TRACCIA E' DIVENTATA IL RAMO (ago 2026): quel commento diceva
+    # «CANTIERE 45 (traccia, non costruito)» ed era stantio da quando
+    # il cantiere 45 e' in main — adesso quel ramo esiste davvero, e
+    # la prova chiede il GESTO invece della parola.
+    # e il TESTO si cerca sulle stringhe RICUCITE: nel sorgente sta
+    # su due righe, ed e' nella piega che un sito si nasconde a un
+    # censimento (la lezione dell'euro e del titolo nudo).
+    cuci = re.sub(r'"\s*\n\s*"', "", corpo)
+    prova("il ramo diretto ha il suo testo, e non quello della busta",
+          True, "if diretta:" in corpo
+          and "non ha ricevuto il codice di ritiro" in cuci)
+    prova("...e la via d'uscita e' dentro quel testo", True,
+          "deposita il nome" in cuci and "si annulla da sola" in cuci)
 
     # --- 11) il giudice del client -------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -22381,10 +24485,14 @@ def prove_sollecito_a_comando():
           and "return 'ok'" in g)
     prova("...e «è presto» resta il NIENTE", True,
           "return '';   // è ancora presto" in g)
+    # i due testi si biforcano col mestiere (ago 2026: sulla busta
+    # diretta il verbo e' «segnalato», che «ricordato» direbbe la cosa
+    # sbagliata), ma lo STATO resta detto in tutti e due i rami
     prova("la pausa lo lascia in pagina, spento e col perché", True,
-          "Già ricordato oggi — riprova domani" in b)
+          "oggi — riprova domani" in b and "'segnalato' : 'ricordato'" in b)
     prova("...e il tetto pure, col numero della leva", True,
-          "Hai già ricordato ${SOLLECITO.max} volte" in b)
+          "${SOLLECITO.max} volte" in b
+          and "'segnalato' : 'ricordato'" in b)
     prova("da spento NON c'e' nessun onclick", 1, b.count("onclick="))
     prova("...ed e' quello dello stato 'ok'", True,
           "st === 'ok'" in b
@@ -22402,6 +24510,19 @@ def prove_sollecito_a_comando():
     prova("la seconda fase del giudice: shipped e' la busta", True,
           "o.state==='shipped'" in g
           and "!o.viaPunto || o.bustaIl" in g)
+    # ROVESCIATA (ago 2026), gemella di quella del server: il giudice
+    # NON deve piu' spegnersi sulla busta diretta — a distinguere sono
+    # le parole, non l'esistenza del bottone.
+    prova("...e la busta diretta NON lo spegne piu'", False,
+          "if (o.bustaDirettaIl) return '';" in g)
+    # ...e il verbo si lega alla CONDIZIONE e non alla sola presenza
+    # della stringa: col solo `in b` un `false ?` al posto di
+    # `diretta ?` lasciava la prova verde col bottone tornato muto —
+    # e' l'altra mutazione sopravvissuta al primo giro di tortura.
+    prova("...ma il bottone cambia verbo, che li' non si ricorda niente",
+          True, "diretta ? '📮 Non mi è arrivato il codice'" in b)
+    prova("...e il discriminante e' shipped + busta diretta", True,
+          "const diretta = o.state==='shipped' && o.bustaDirettaIl;" in b)
     prova("...con la finestra a prova di NaN da speditoIl", True,
           "if (!((o.speditoIl||0) + SOLLECITO.busta*3600 <= adesso))" in g)
     prova("...e pausa e tetto sui SUOI contatori", True,
@@ -24669,10 +26790,22 @@ def prove_verde_e_filtri():
           "if (ordinaVista) return ordinaVista;" in _oe)
     # UNA SOLA occasione eredita: con due spunte non esiste una
     # scadenza sola da guardare, e l'ordine di sempre e' l'unica
-    # risposta onesta
-    prova("eredita solo con UNA occasione spuntata", (True, True),
-          ("if (filtroLampo && !filtroAsta) return 'lampo';" in _oe,
-           "if (filtroAsta && !filtroLampo) return 'asta';" in _oe))
+    # risposta onesta.
+    # LA PROVA HA CAMBIATO LATO (ago 2026, bug dal campo): chiedeva
+    # le due righe a coppie (`filtroLampo && !filtroAsta`), che dello
+    # SCONTO non sapevano niente — quindi certificava proprio il
+    # difetto, ereditando 'lampo' con «offerte a tempo» e «sconti dei
+    # negozi» spuntate insieme. Adesso si CONTA: le occasioni sono
+    # tre, e la quarta di domani entra nel conteggio da sola.
+    prova("eredita solo con UNA occasione spuntata", (True, False),
+          ("[filtroLampo, filtroAsta, filtroSconto].filter(Boolean)"
+           ".length !== 1" in _oe,
+           "!filtroAsta" in _oe or "!filtroLampo" in _oe))
+    # ...e lo SCONTO non eredita niente: una scadenza non ce l'ha, e
+    # inventargliene una vorrebbe dire un ordinamento che il server
+    # non ha (il vincolo duro pagina sulla colonna della scadenza).
+    prova("...e le due sole eredita' sono lampo e asta", 2,
+          _oe.count("return '") - _oe.count("return '';"))
     # IL CAMPO NON MENTE: mostra l'ordine EFFETTIVO e non il valore del
     # select — che con un'occasione spuntata direbbe «Piu' recenti» su
     # una vetrina in scadenza (la regola del pannello Filtri, dove la
@@ -24840,9 +26973,10 @@ def prove_prezzo_accordo():
     _lo = pezzo_js(mini, "async function loadOfferte(){", "\n}")
     prova("la prossima scadenza si rifa' a ogni lettura", True,
           "ricalcolaProssimoAccordo();" in _lo)
-    # il predicato vive in un posto solo: loadOfferte ha CINQUE
-    # chiamanti (avvio, ingresso negli Ordini, invio, risposta, ritiro)
-    prova("il rinfresco ha un posto solo e cinque chiamanti", (1, 5),
+    # il predicato vive in un posto solo: loadOfferte ha SEI
+    # chiamanti (avvio, ingresso negli Ordini, invio, risposta,
+    # ritiro, e dall'ago 2026 l'invio dell'offerta sul CARRELLO)
+    prova("il rinfresco ha un posto solo e sei chiamanti", (1, 6),
           (mini.count("function rinfrescaAccordi("),
            mini.count("rinfrescaAccordi();")))
     # ...E SI ACCENDE ANCHE QUANDO L'ACCORDO SPARISCE. E' un difetto
@@ -25523,13 +27657,31 @@ def prove_scoprire():
     BANNER = {"lampo.webp": "Offerte a tempo",
               "sconto.webp": "Sconti dei negozi",
               "p2p.webp": "P2P"}
+    # LA MISURA DELLA CARD SI LEGGE DAL CSS, e non si ribatte qui: e'
+    # la stessa regola che la fascia del contrasto dichiara gia' per
+    # se' («la geometria viene dal CSS e non da qui»), portata anche
+    # alla misura dei file. Erano tre numeri sparsi — 750, 345 e il
+    # 115 dentro la fascia — e il giorno che la card e' cresciuta
+    # andavano mossi tutti e tre a mano; scritti qui, chi ritocca il
+    # CSS senza rigenerare i banner non lo sente da nessuna parte,
+    # e object-fit:cover gli ritaglia il disegno in silenzio.
+    _mis = re.search(r"\.scoprire-card\{[^}]*?width:(\d+)px[^}]*?"
+                     r"aspect-ratio:(\d+)/(\d+)", mini, re.S)
+    prova("la card dichiara la sua misura nel CSS", True, bool(_mis))
+    CARD_W, CARD_H = int(_mis.group(1)), int(_mis.group(3))
+    # ...e la larghezza dell'aspect-ratio E' la width, o i file
+    # sarebbero tagliati su un rapporto che la card non ha
+    prova("...e il rapporto combacia con la larghezza",
+          CARD_W, int(_mis.group(2)))
     for _f in BANNER:
         prova(f"il banner {_f} esiste", True,
               os.path.exists(os.path.join("assets", "scoprire", _f)))
-    # ...e sono ESATTAMENTE 750x345, il triplo della card 250x115: un
+    # ...e sono ESATTAMENTE 816x390, il triplo della card 272x130: un
     # ratio diverso verrebbe ritagliato da object-fit:cover in
     # silenzio, e il disegno di Andrea perderebbe i bordi senza che
-    # nessuno lo veda.
+    # nessuno lo veda. I tre numeri (CARD_W, CARD_H e il triplo) sono
+    # LA STESSA misura del CSS: chi cresce le card li muove insieme,
+    # o la prova diventa rossa il giro dopo.
     # i titoli dell'elenco sono quelli VERI del catalogo, o la
     # fascia del contrasto (qui sotto, derivata dal titolo)
     # misurerebbe la lunghezza di un titolo inventato
@@ -25537,7 +27689,7 @@ def prove_scoprire():
           all(f"testo: '{_t}'" in mini for _t in BANNER.values()))
     try:
         from PIL import Image as _Im
-        prova("...e misurano 750x345", [(750, 345)] * len(BANNER),
+        prova("...e misurano 816x390", [(CARD_W * 3, CARD_H * 3)] * len(BANNER),
               [_Im.open(os.path.join("assets", "scoprire", _f)).size
                for _f in BANNER])
     except ImportError:
@@ -25689,6 +27841,37 @@ def prove_scoprire():
     prova("l'anello e' quello della card categoria", True,
           ".scoprire-card.attiva{outline:2.5px solid var(--sats);"
           in mini)
+    # LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
+    # Andrea): mezzo respiro sopra l'etichetta invece dei 16px di ogni
+    # .section-label. La regola dev'essere SCOPED, ed e' meta' della
+    # prova: il respiro intero e' di TUTTE le altre sezioni, e
+    # stringerlo sul selettore nudo cambierebbe il ritmo di mezza app
+    # senza che nessuno se ne accorga.
+    _eti = re.search(r"#scoprireSez \.section-label\{padding-top:(\d+)px\}",
+                     mini)
+    prova("l'etichetta di «Da scoprire» ha un respiro suo, scoped",
+          True, bool(_eti))
+    _base = re.search(r"\.section-label\{\s*display:flex[^}]*?"
+                      r"padding:(\d+)px", mini, re.S)
+    prova("...e le sorelle tengono quello intero", True,
+          bool(_base) and int(_base.group(1)) == 16)
+    prova("...che e' il doppio del suo", int(_base.group(1)),
+          int(_eti.group(1)) * 2)
+    # I DUE PADDING DELLA STRISCIA NON SCENDONO SOTTO L'ANELLO, e il
+    # 4,5 NON si ribatte qui: si DERIVA dall'outline della card accesa
+    # (spessore + offset), che e' l'unico posto dove quel numero e'
+    # scritto. Sotto quella soglia l'overflow della striscia ritaglia
+    # il bordo dell'anello — il difetto gia' pagato in basso, che il
+    # giro dell'avvicinamento ha rischiato di ricomprarsi in alto.
+    _an = re.search(r"\.scoprire-card\.attiva\{outline:([\d.]+)px solid "
+                    r"var\(--sats\);\s*outline-offset:([\d.]+)px\}", mini)
+    prova("l'anello dichiara il suo ingombro nel CSS", True, bool(_an))
+    _sporge = float(_an.group(1)) + float(_an.group(2))
+    _pad = re.search(r"\.scoprire-strip\{[^}]*?padding:(\d+)px "
+                     r"var\(--pad\) (\d+)px\}", mini, re.S)
+    prova("la striscia dichiara i suoi due padding", True, bool(_pad))
+    prova("...e nessuno dei due ritaglia l'anello", True,
+          min(int(_pad.group(1)), int(_pad.group(2))) >= _sporge)
     # IL GESTO: il ritocco spegne, e si scrive quel che scriverebbe
     # il pannello (stato + checkbox + bottone Filtri + campo-bottone)
     _ts = pezzo_js(mini, "function toccaScoperta(id){", "\n}")
@@ -25918,11 +28101,14 @@ def prove_scoprire():
     prova("il fondo non si scopre: mai sotto scale(1), mai translate",
           (False, False, True),
           ("scale(0" in _kf, "translate" in _kf, "scale(1.05)" in _kf))
-    # e l'anello della card accesa ha l'ARIA per il bordo di sotto:
-    # outline 2.5 + offset 2 = 4.5px, e col padding a 2 l'overflow
-    # della striscia lo ritagliava (visto da Andrea)
-    prova("l'anello ha l'aria per il bordo di sotto", True,
-          "padding:8px var(--pad) 6px}" in mini)
+    # L'ARIA PER L'ANELLO la guarda la prova DERIVATA piu' su («nessuno
+    # dei due ritaglia l'anello»): questa ribatteva il padding alla
+    # lettera — «padding:8px var(--pad) 6px}» — ed e' diventata rossa
+    # il giorno che la sezione si e' avvicinata alle categorie (ago
+    # 2026), cioe' per un cambio LEGITTIMO. Una prova che inchioda i
+    # numeri invece della REGOLA fa questo: si mette di traverso a chi
+    # ritocca e non dice niente a chi sbaglia davvero (col letterale,
+    # un padding-top a 4 con quello di sotto a 6 sarebbe passato).
 
     # ---- 6. IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE
     # SI MUOVE (ago 2026, decisione di Andrea che ROVESCIA il
@@ -25961,6 +28147,23 @@ def prove_scoprire():
           (True, True),
           ("_ov = _blocco('.scoprire-card[data-id=" in _io,
            '_num(_ov, "left:", _num(_base, "left:"))' in _io))
+    # ...e la fascia LARGA si deriva dall'ALTEZZA invece di portare due
+    # numeri in coordinate immagine (erano 30 e 315 su 345). Scritti a
+    # mano resterebbero a guardare dove il titolo stava alla misura di
+    # IERI, e il giorno della card piu' grande non se ne accorgerebbe
+    # nessuno: una fascia piu' STRETTA del vero passa sempre, ed e' il
+    # modo silenzioso in cui questa prova smetterebbe di provare
+    # qualcosa. Stessa ragione della riga qui sopra, sull'altro asse.
+    # ⚠️ DUE trappole in una riga, e le ho prese tutte e due scrivendo
+    # questa prova. 1) Si guarda la REGIONE della fascia e non tutto
+    # il file, o la prova trova la stringa dentro SE STESSA e resta
+    # rossa per sempre. 2) E si prende l'ULTIMA occorrenza dell'ancora,
+    # perche' la PRIMA e' la riga qui sotto — quella che la cerca.
+    _fascia = _io[_io.rindex("_QUIETE = 3, CARD_H"):]
+    prova("...e la fascia larga si deriva dall'altezza della card",
+          (True, False),
+          ("(_ALTA - _QUIETE) * _F" in _fascia,
+           "_y1 = 30, 315" in _fascia))
     # tre: l'aria-label della card, la riserva e il titolo — un
     # quarto posto sarebbe un doppione da guardare
     prova("...e il testo e' quello del catalogo, tre volte", 3,
@@ -25984,9 +28187,12 @@ def prove_scoprire():
     # fascia piu' larga. Oltre la scatola il titolo va a capo, e li'
     # si torna alla fascia conservativa di sempre (tutta l'altezza),
     # perche' quante righe diventino non lo sappiamo.
-    # Misurati: 11.4 (lampo) e 12.0 (sconto) sulla fascia piena,
-    # 14.4 (p2p) sulla sua riga — un ridisegno che scalda la fascia
-    # di una card si sente da qui.
+    # Misurati a 272x130: 11,8 (lampo) e 12,0 (sconto) sulla fascia
+    # piena, 14,8 (p2p) sulla sua riga — un ridisegno che scalda la
+    # fascia di una card si sente da qui. Crescendo la card i tre
+    # sono MIGLIORATI (erano 10,7 / 11,9 / 12,9 a 250x115): la fascia
+    # e' in px CSS mentre il disegno si scala, quindi in proporzione
+    # copre meno immagine e resta piu' a sinistra, dove e' scura.
     try:
         from PIL import Image as _Im
 
@@ -26024,7 +28230,15 @@ def prove_scoprire():
 
         _base = _blocco(".sc-titolo{")
         _largo, _passo = _num(_base, "width:"), _num(_base, "line-height:")
-        _F, _ALTA, _M = 3, 115, 12      # 750/250; la card; il margine dell'onda
+        # _F e' il triplo dei file, _ALTA la card, _M il margine
+        # dell'onda. _QUIETE sono i 10px CSS di margine sopra e sotto
+        # della fascia larga: erano scritti a mano in coordinate
+        # IMMAGINE (30 e 315 su 345), cioe' due numeri che il giorno
+        # della card piu' grande sarebbero rimasti a guardare dove il
+        # titolo stava ieri. Derivati, la fascia e' la STESSA e non
+        # invecchia piu': non e' un allentamento, e' la stessa regola
+        # scritta in modo che segua il CSS come gia' fa tutto il resto.
+        _F, _ALTA, _M, _QUIETE = 3, CARD_H, 12, 10
         for _f, _testo in BANNER.items():
             _ov = _blocco('.scoprire-card[data-id="%s"] .sc-titolo{'
                           % _f.rsplit(".", 1)[0])
@@ -26040,7 +28254,7 @@ def prove_scoprire():
                 _y1 = round((_ALTA + _h) / 2 * _F) + _M
                 _x1 = round((_sx + _w) * _F) + _M
             else:                       # va a capo: la fascia di sempre
-                _y0, _y1 = 30, 315
+                _y0, _y1 = _QUIETE * _F, (_ALTA - _QUIETE) * _F
                 _x1 = round((_sx + _largo) * _F) + _M
             _lmax = max(_lum(_im.getpixel((x, y)))
                         for y in range(_y0, _y1, 3)
@@ -26320,6 +28534,28 @@ def prove_deploy():
           "OnUnitActiveSec=1min" in timer)
     prova("...e recupera il giro dopo uno spegnimento", True,
           "Persistent=true" in timer)
+
+    # L'AMBIENTE DEL SERVIZIO, che e' la riga che si perde per prima
+    # (ago 2026, guasto vero): un servizio systemd non eredita HOME,
+    # quindi git non trova ne' /root/.gitconfig ne'
+    # /root/.git-credentials, e il `git fetch` sul remoto HTTPS
+    # fallisce a ogni giro — IN SILENZIO, perche' deploy.sh ripiega e
+    # se ne va: il mercatino resta indietro per ore e da fuori sembra
+    # soltanto che non ci sia niente di nuovo.
+    # SI GUARDA IL CORPO E NON LA PROSA: qui i commenti cominciano
+    # per `;` e quel guasto lo raccontano per esteso, quindi una
+    # sentinella sul testo intero resterebbe verde a riga tolta — la
+    # stessa trappola gia' pagata da `sh` in cima a questa funzione.
+    corpo = "\n".join(r for r in unita.split("\n")
+                      if not r.lstrip().startswith(";"))
+    prova("il servizio si dichiara HOME", True,
+          "Environment=HOME=/root" in corpo)
+    # e la dichiara DOVE conta: in [Unit] quella chiave systemd non
+    # la applica (al piu' una riga di warning al caricamento, che non
+    # guarda nessuno), cioe' il guasto tornerebbe identico con la
+    # riga ancora li' da leggere.
+    prova("...nel blocco [Service]", True,
+          "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
 
 
 def prove_podio_sfondo():
@@ -27056,6 +29292,57 @@ console.log(JSON.stringify(rosse));
           "[]", (r.stdout or "").strip())
 
 
+def prove_ordina_ereditato(mini, node):
+    """L'ORDINE EREDITATO, FATTO GIRARE (ago 2026, bug dal campo:
+    «accendo Offerte a tempo e poi Sconti dei negozi, e gli sconti
+    spariscono»). Le sentinelle dicevano che il giudice esiste ed e'
+    uno, e passavano tutte: a mentire era la RISPOSTA, che con due
+    occasioni spuntate tornava 'lampo' — un ordinamento che sul server
+    implica il suo filtro come VINCOLO DURO in AND, quindi l'unione
+    (lampo OR sconto) tornava alle sole lampo.
+    LA QUERY DI `_where_occasioni` ERA ED E' GIUSTA, ed e' la parte da
+    ricordare: le 16 combinazioni provate su di lei non potevano
+    vedere niente, perche' il vincolo dell'ordinamento si aggiunge
+    nell'endpoint, DOPO — una prova su un pezzo giusto non dice niente
+    sul pezzo accanto.
+    Da qui il banco: le otto combinazioni delle tre spunte con
+    l'atteso scritto a mano, piu' la scelta esplicita che vince
+    sempre."""
+    import subprocess as _sp, tempfile as _tf
+    fn = pezzo_js(mini, "function ordinaEffettivo(){", "\n}") + "\n}"
+    banco = fn + r"""
+const attesi = {'000': '', '100': 'lampo', '010': 'asta', '001': '',
+                '101': '', '011': '', '110': '', '111': ''};
+let filtroLampo, filtroAsta, filtroSconto, ordinaVista;
+const rosse = [];
+for (const k of Object.keys(attesi)) {
+  const [l, a, s] = k.split('').map(Number);
+  filtroLampo = !!l; filtroAsta = !!a; filtroSconto = !!s; ordinaVista = '';
+  const avuto = ordinaEffettivo();
+  if (avuto !== attesi[k])
+    rosse.push('lampo=' + l + ' asta=' + a + ' sconto=' + s +
+               ": atteso '" + attesi[k] + "', avuto '" + avuto + "'");
+}
+/* LA SCELTA ESPLICITA VINCE SEMPRE, spunte o non spunte */
+filtroLampo = true; filtroAsta = false; filtroSconto = true;
+ordinaVista = 'prezzo_su';
+if (ordinaEffettivo() !== 'prezzo_su')
+  rosse.push('la scelta esplicita non vince sulle spunte');
+console.log(JSON.stringify(rosse));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco); percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il giudice dell'ordine gira", "", (r.stderr or "")[:200])
+        return
+    prova("l'ordine ereditato risponde giusto su tutte le combinazioni",
+          "[]", (r.stdout or "").strip())
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -27097,13 +29384,157 @@ def prove_sintassi_client():
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
     prove_centro_fila(mini, node)
+    prove_ordina_ereditato(mini, node)
     prove_pct_libera(node)
+    prove_frase_xp(mini, node)
     prove_corsa_zona(mini, node)
     prove_riempimento(mini, node)
     prove_commenti_css(mini)
     prove_chiavi_doppie(mini)
 
 
+
+
+def prove_frase_xp(mini, node):
+    """LA RIGA CHE DICE DA CHE LATO, FATTA GIRARE (ago 2026). Chi
+    legge «76 XP» nel Profilo non sa che sono pochi perche' ha
+    comprato invece di vendere: il numero da solo non lo dice, e il
+    dato per dirlo c'era gia' nel registro.
+    Le sentinelle direbbero che il giudice esiste ed e' uno — mai che
+    RISPONDA giusto, e la domanda vera e' proprio quella: con un lato
+    a zero la cifra non si scrive, e senza scomposizione si ricade
+    sulla frase di sempre invece di lasciare la riga muta.
+    E' l'ennesima volta che una prova sulla forma certificherebbe un
+    ramo che nessuno ha esercitato: quella classe va sempre in coppia
+    con una che fa girare il pezzo."""
+    import subprocess as _spx, tempfile as _tfx
+    if not node:
+        salta("la riga degli XP risponde giusto", "node non installato")
+        return
+    # I PEZZI SONO QUELLI VERI, estratti dal client: due costanti di
+    # cartone proverebbero se stesse, e la cosa da guardare e' proprio
+    # che testa e coda restino scritte UNA volta sola.
+    # `esc` e' quello VERO e non uno di cartone: il giudice ci passa
+    # il nome del gradino, e un finto proverebbe se stesso.
+    pezzi = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+             + pezzo_js(mini, "const XP_PESO = ", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function fraseManca(", "\n}\n") + "\n}\n")
+    banco = "const fmt = n => n.toLocaleString('it-IT')" \
+            ".replace(/\\./g,'\\u202F');\n" + pezzi + r"""
+const rosse = [];
+function att(nome, cond){ if (!cond) rosse.push(nome); }
+const due   = fraseXp({vendite: 46, acquisti: 30});
+const solaC = fraseXp({vendite: 0,  acquisti: 76});
+const solaV = fraseXp({vendite: 76, acquisti: 0});
+const zero  = fraseXp({vendite: 0,  acquisti: 0});
+const via   = fraseXp(null);
+att('due lati: la scomposizione, con tutti e due i numeri',
+    due.includes('46 dalle vendite') && due.includes('30 dagli acquisti'));
+att('due lati: e la nota sul peso', due.includes('Una vendita pesa'));
+att('solo acquisti: NIENTE scomposizione', !solaC.includes('dalle vendite'));
+att('solo acquisti: il perche\u0027, e il peso',
+    solaC.includes('tutti dagli acquisti') && solaC.includes('Una vendita pesa'));
+att('solo vendite: la frase di sempre', solaV.includes('comprare e vendere'));
+att('solo vendite: SENZA la nota sul peso', !solaV.includes('Una vendita pesa'));
+att('LO ZERO NON SI SCRIVE MAI', ![due, solaC, solaV, zero, via]
+    .some(f => /\b0 d(alle|agli)/.test(f)));
+att('due zeri ricadono sulla frase di sempre', zero === solaV);
+att('chiave assente: la stessa, e mai una riga muta', via === solaV && !!via);
+att('la coda della classifica c\u0027e\u0027 in tutti e tre',
+    [due, solaC, solaV].every(f => f.includes('pesa in classifica')));
+att('la testa si scrive una volta sola', [due, solaC, solaV]
+    .every(f => f.startsWith('Gli XP contano il commercio: ')));
+att('i numeri passano da fmt (spazio stretto, mai il punto)',
+    fraseXp({vendite: 12000, acquisti: 1}).includes('12\u202F000'));
+/* QUANTO MANCA AL PROSSIMO GRADO: tre difetti nella stessa frase
+   («mancano 0 XP e 1 affari conclusi»), e ognuno ha il suo caso. */
+const rosseM = [];
+function attM(nome, cond){ if (!cond) rosseM.push(nome); }
+const G = (xpP, afP) => ({xp_prossimo: xpP, affari_prossimo: afP,
+                          nome_prossimo: 'Bottega avviata'});
+const soloAf = fraseManca(G(50, 1), 76, 0);    // il caso dal campo
+const soloXp = fraseManca(G(200, 5), 80, 9);
+const unXp   = fraseManca(G(200, 5), 199, 9);
+const tuttiE = fraseManca(G(200, 5), 80, 2);
+const unoEuno = fraseManca(G(200, 5), 199, 4);
+const cima   = fraseManca({xp_prossimo: 0}, 9999, 99);
+const vuoto  = fraseManca(G(50, 1), 76, 3);    // la cintura
+/* Il nome del gradino viene dal CATALOGO e non da una persona, quindi
+   `esc` li' e' una cintura — ma senza un caso che la esercita nessuna
+   prova diventerebbe rossa togliendola (l'ha detto la tortura). */
+const cattivo = fraseManca({xp_prossimo: 200, affari_prossimo: 5,
+                            nome_prossimo: '<img src=x>'}, 80, 2);
+attM("LO ZERO NON SI SCRIVE: niente <<0 XP>>", !soloAf.includes('XP'));
+attM("...e niente <<0 affari>> dall'altro lato", !soloXp.includes('affar'));
+attM("IL SINGOLARE: 1 affare concluso, mai <<1 affari>>",
+     soloAf.includes('1 affare concluso') && !soloAf.includes('affari'));
+attM("...e il plurale da 2 in su", tuttiE.includes('3 affari conclusi'));
+attM("IL VERBO segue quel che resta: manca, con uno solo",
+     soloAf.includes(') manca 1 affare') && !soloAf.includes('mancano'));
+attM("...manca anche con 1 XP", unXp.includes(') manca 1 XP'));
+attM("...mancano con piu' d'uno", soloXp.includes(') mancano 120 XP'));
+attM("...e mancano con DUE pezzi, qualunque siano i numeri",
+     unoEuno.includes(') mancano 1 XP e 1 affare concluso'));
+attM("i due pezzi si uniscono con <<e>>",
+     tuttiE.includes('120 XP e 3 affari conclusi'));
+attM("in cima alla scala non si chiede niente",
+     cima.includes('cima alla scala') && !cima.includes('manca'));
+attM("la cintura non lascia una frase rotta",
+     vuoto.includes('ci sei.') && !vuoto.includes('manca'));
+attM("il grado si nomina sempre", [soloAf, soloXp, tuttiE, vuoto]
+     .every(f => f.includes('<b>Bottega avviata</b>')));
+attM("...e il suo nome passa da esc", cattivo.includes('&lt;img src=x&gt;'));
+console.log(JSON.stringify([rosse, rosseM]));
+"""
+    with _tfx.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    r = _spx.run([node, percorso], capture_output=True, text=True,
+                 encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("la riga degli XP gira", "", (r.stderr or "")[:300])
+        return
+    import json as _jsx
+    try:
+        _xp, _mc = _jsx.loads(r.stdout or "[]")
+    except Exception:
+        prova("le righe del cassetto girano", "", (r.stdout or "")[:300])
+        return
+    prova("la riga degli XP risponde giusto in tutti i casi", [], _xp)
+    prova("...e quella di quanto manca al prossimo grado", [], _mc)
+
+    # --- LE SENTINELLE DEL CLIENT -----------------------------------
+    giu = pezzo_js(mini, "function fraseXp(", "\n}\n")
+    # I NUMERI ARRIVANO DAL SERVER: scomporre qui vorrebbe dire una
+    # seconda definizione di «commercio» accanto a XP_COMMERCIO, e le
+    # due divergerebbero al primo tipo nuovo.
+    prova("il giudice non si ricalcola gli XP per conto suo", True,
+          "myXp" not in giu and "vendite_ok" not in giu)
+    prova("...e legge i due lati dal server", True,
+          "r.vendite" in giu and "r.acquisti" in giu)
+    # La riga del cassetto passa dal giudice e non da una prosa a mano
+    prova("il cassetto chiama il giudice", 1,
+          mini.count("${fraseXp(myXpRuoli)}"))
+    prova("...e la vecchia riga fissa non c'e' piu'", False,
+          "commercio: comprare e vendere. \u00c8 lo stesso" in mini)
+    # --- E LA RIGA DI QUANTO MANCA (ago 2026, dal campo) -------------
+    # «mancano 0 XP e 1 affari conclusi»: tre difetti in una frase.
+    gm = pezzo_js(mini, "function fraseManca(", "\n}\n")
+    prova("il cassetto passa dal giudice di quanto manca", 1,
+          mini.count("fraseManca(myLivello, myXp, myAffari)"))
+    # LO ZERO NON SI SCRIVE: la cifra entra solo DENTRO un `if`, mai
+    # concatenata comunque — era il difetto che si stava riparando.
+    prova("...e lo zero non arriva mai nella frase", True,
+          "if (dx) pezzi.push" in gm and "if (da) pezzi.push" in gm)
+    prova("...il singolare c'e', e il plurale pure", True,
+          "e concluso" in gm and "i conclusi" in gm)
+    prova("...e il verbo ha tutt'e due le forme", True,
+          '"manca "' in gm and '"mancano "' in gm)
+    # La frase fissa di prima non deve tornare da nessuna parte
+    prova("la frase fissa di prima non c'e' piu'", False,
+          "Math.max(0, myLivello.xp_prossimo" in mini)
 
 
 def prove_corsa_zona(mini, node):
@@ -28841,9 +31272,13 @@ def prove_servizi():
             via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
             busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
             busta_correzioni INT DEFAULT 0, busta_file TEXT DEFAULT '',
+            busta_diretta_il INT DEFAULT 0,
             indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
             indirizzo_corretto_il INT DEFAULT 0,
             indirizzo_correzioni INT DEFAULT 0,
+            email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
+            email_corriere_correzioni INT DEFAULT 0,
+            email_corriere_purgata_il INT DEFAULT 0,
             nota_compratore TEXT DEFAULT '',
             appuntamento_il INT DEFAULT 0,
             appuntamento_confermato_il INT DEFAULT 0,
@@ -28924,6 +31359,18 @@ def prove_servizi():
     prova("...e quante ne ha perse", True, "1 a favore di chi ha" in n4)
     prova("il contenuto del collegamento non c'e' MAI", True,
           "meet." not in n and "http" not in n)
+    # LA BUSTA DIRETTA in disputa (ago 2026, cantiere 45): sul
+    # dichiarato «MAI depositate» direbbe il falso — la nota dice la
+    # dichiarazione con la data, etichettata di PARTE: il moderatore
+    # pesa, non crede sulla parola
+    n5 = _disputa(consegna_scelta="spedizione", via_punto=1,
+                  punto_ritiro="Locker InPost",
+                  busta_diretta_il=ora - 3600)
+    prova("la disputa sul dichiarato dice la dichiarazione, di parte",
+          True, "ha DICHIARATO" in n5
+          and "dichiarazione di parte" in n5)
+    prova("...e non piu' il falso «MAI depositate»", False,
+          "MAI depositate" in n5)
 
     # --- il form Vendi
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -32721,6 +35168,7 @@ def main():
               prove_busta_ritiro, prove_contenuto_digitale_forma,
               prove_foto_contenuto,
               prove_indirizzo_casa,
+              prove_email_corriere,
               prove_nota_compratore,
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,
@@ -32751,6 +35199,7 @@ def main():
               prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
+              prove_offerta_carrello,
               prove_ritiro_offerta, prove_link_offerte,
               prove_deep_link_offerta, prove_rilancio_offerta,
               prove_fogli_di_casa,
