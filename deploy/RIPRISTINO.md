@@ -32,8 +32,11 @@ foglio esiste.
    ⚠️ La chiave INTERA comincia con `AGE-SECRET-KEY-1…` (74 caratteri):
    se `age` risponde «unknown identity type», quasi certamente manca il
    prefisso `AGE-SECRET-KEY-` — si riattacca davanti e riprova. È
-   successo al primo drill (ago 2026): la copia su Bitwarden portava i
-   soli 59 caratteri dal «1» in poi.
+   successo al primo drill (ago 2026): copiando da Bitwarden erano
+   arrivati i soli 59 caratteri dal «1» in poi — la copia salvata era
+   intera, a mozzarla era stato il copia-incolla. Alle due di notte si
+   sbaglia uguale: controllare la LUNGHEZZA prima di incolpare la
+   chiave.
 4. **Rimettere i pezzi**: `satmarket.db`, `config.py`, `buste/`,
    `contenuti/` nella cartella dell'app; `sistema/Caddyfile` e le unit
    in `/etc`; `foto/` dal PC (`BarattoloBackup\foto\`).
