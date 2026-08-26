@@ -15771,7 +15771,7 @@ def _coda_nota(prima: bool, dopo: bool) -> str:
 MAX_EMAIL_CORRIERE = 120
 
 
-def _email_corriere_da_payload(d) -> tuple:
+def _email_corriere_da_payload(d, *, esigi_chiave: bool = True) -> tuple:
     """L'email che il compratore lascia perche' il codice del locker
     gli arrivi DIRETTAMENTE dal corriere: (blob CIFRATO, testo).
 
@@ -15815,7 +15815,19 @@ def _email_corriere_da_payload(d) -> tuple:
 
     IL 400 E NON IL TRONCAMENTO (la regola della busta e della nota):
     un recapito tagliato a meta' non e' un recapito piu' corto, e' un
-    recapito ROTTO — e chi l'ha scritto non lo saprebbe."""
+    recapito ROTTO — e chi l'ha scritto non lo saprebbe.
+
+    `esigi_chiave=False` SPEGNE il solo 503 e torna ("", testo) — il
+    blob vuoto col testo PIENO, che e' come il chiamante deduce «c'era
+    un'email e non si e' potuta scrivere». Il permesso si deve
+    SCRIVERE, l'idioma di `esigi_luogo` in guardia_zona_condizione: il
+    default tiene l'endpoint dell'ordine severo byte per byte, e a
+    chiederlo e' la sola CASSA. IL PERCHE' e' la differenza fra le due
+    superfici: qui l'ordine sta NASCENDO, e un campo FACOLTATIVO non
+    puo' impedire di comprare — mentre nell'ordine il 503 non toglie
+    niente a nessuno (si riprova piu' tardi, la merce e' gia' pagata).
+    Nessuno dei due SCRIVE un recapito in chiaro: quella riga non si
+    ammorbidisce in nessuna delle due strade."""
     testo = " ".join(str(d.get("email_corriere") or "").split())
     if len(testo) > MAX_EMAIL_CORRIERE:
         raise HTTPException(400, f"L'email è troppo lunga (massimo "
@@ -15828,6 +15840,14 @@ def _email_corriere_da_payload(d) -> tuple:
         # gia' e a non salvarsi e' il solo campo facoltativo — quindi
         # non si perde niente, si dice che la scorciatoia adesso non
         # c'e'. In collaudo si scrive 'plain:' come tutto il resto.
+        if not MODALITA_COLLAUDO and not esigi_chiave:
+            # LA CASSA DEGRADA e non alza: qui l'ordine sta nascendo, e
+            # un campo facoltativo non puo' impedire di comprare. Il
+            # blob resta VUOTO — un recapito in chiaro non si scrive
+            # nemmeno qui — e il testo pieno dice al chiamante che
+            # c'era qualcosa da salvare: da li' esce l'unica cosa
+            # onesta, dirlo a chi l'ha scritta.
+            return "", testo
         if not MODALITA_COLLAUDO:
             raise HTTPException(503, "Questa scorciatoia non è "
                                      "disponibile in questo momento: "
@@ -19848,6 +19868,21 @@ async def _compra_set(user: dict, d: dict) -> dict:
         con.close()
         raise
 
+    # L'EMAIL PER IL CORRIERE, col patto del gemello nel mono: solo
+    # sulla via punto (la specularita' dell'indirizzo, che sta sul
+    # `not via_punto`), prima della invoice, e col permesso di
+    # DEGRADARE invece di alzare — qui l'ordine sta nascendo, e un
+    # campo facoltativo non puo' impedire di comprare.
+    mail, mail_testo = "", ""
+    if scelta == "spedizione" and via_punto:
+        try:
+            mail, mail_testo = _email_corriere_da_payload(
+                d, esigi_chiave=False)
+        except HTTPException:
+            con.close()
+            raise
+    mail_persa = bool(mail_testo) and not mail
+
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
     for aid, qta in richieste.items():
@@ -20177,15 +20212,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
-        "tipo_punto,nota_compratore,"
+        "tipo_punto,nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
         "codice_sconto,codice_sconto_id,accordo_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, tipo, nota, ind, adesso if ind else 0,
+         punto, via_punto, rete, tipo, nota,
+         # il timbro guarda il BLOB: col degrado non c'e' niente in
+         # colonna, quindi non c'e' nessun «primo» da datare
+         mail, adesso if mail else 0,
+         ind, adesso if ind else 0,
          ind_atteso,
          sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
@@ -20230,6 +20269,9 @@ async def _compra_set(user: dict, d: dict) -> dict:
             # sconto sono chiavi in piu' e si sommano da sole
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # L'EMAIL NON SALVATA, col gemello del mono: l'ordine e'
+            # nato lo stesso, e chi l'aveva scritta deve saperlo
+            "email_non_salvata": mail_persa,
             # l'accordo sul carrello, accanto allo sconto: il netto
             # qui sopra li ha gia' sottratti tutti e due
             "accordo_sats": accordo_sats_v, "pattuito_sats": pattuito,
@@ -21391,6 +21433,29 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise
 
+    # L'EMAIL PER IL CORRIERE, ALLA CASSA (ago 2026): il punto di
+    # ritiro si sceglie PRIMA di pagare e l'email si lasciava DOPO,
+    # nell'ordine — sono la stessa decisione («come mi arriva il
+    # codice») in due momenti diversi, e in mezzo c'era una finestra:
+    # un venditore veloce compra l'etichetta prima che l'email esista,
+    # e da li' in poi non serve piu' a niente (il gate 'locked' la
+    # chiude alla spedizione, giustamente).
+    # SOLO SULLA VIA PUNTO, ed e' la specularita' dell'indirizzo — che
+    # sta sul `not via_punto`: le due vie chiedono due cose diverse, e
+    # nessuna delle due sta fuori dal suo ramo.
+    mail, mail_testo = "", ""
+    if scelta == "spedizione" and via_punto:
+        try:
+            mail, mail_testo = _email_corriere_da_payload(
+                d, esigi_chiave=False)
+        except HTTPException:
+            con.close()
+            raise
+    # «C'era un'email e non si e' potuta scrivere»: il blob vuoto col
+    # testo pieno. Serve a DUE cose e a nessun'altra — non toccare la
+    # colonna nella ripresa, e dirlo a chi l'ha scritta.
+    mail_persa = bool(mail_testo) and not mail
+
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
     # e' l'anti-doppio-acquisto e va bene cosi'. Se ha gia' un ordine
@@ -21493,6 +21558,30 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "UPDATE ordini SET nota_compratore=? "
                     "WHERE id=? AND stato='creato'", (nota, mio["id"]))
                 con.commit()
+            # L'EMAIL fa la strada della NOTA — fuori dal confronto e
+            # riscritta qui — e per la STESSA ragione: non tocca il
+            # prezzo, quindi correggere un refuso non deve annullare
+            # l'ordine e coniare una fattura nuova. (Il suo blob per
+            # giunta non e' confrontabile, come quello dell'indirizzo:
+            # due ragioni che portano allo stesso posto.)
+            # IL CONFRONTO E' SUL CHIARO, ed e' la riga da non
+            # ammorbidire: sui blob Fernet non e' deterministico, e
+            # ogni tocco su «Paga» sembrerebbe un cambio.
+            # NIENTE «mail_testo and», la trappola della vicina: il
+            # VUOTO E' UN VALORE — «cancello l'email e ripago»
+            # fallirebbe in silenzio.
+            # E COL DEGRADO NON SI TOCCA NIENTE: senza chiave il blob
+            # e' vuoto ma il testo no, e scrivere quel vuoto
+            # CANCELLEREBBE un'email gia' in colonna — cioe' il
+            # contrario di «non si e' potuta salvare».
+            if not mail_persa and mail_testo != _email_corriere_letta(
+                    mio["email_corriere"]):
+                con.execute(
+                    "UPDATE ordini SET email_corriere=?, "
+                    "email_corriere_il=? WHERE id=? AND stato='creato'",
+                    (mail, mio["email_corriere_il"]
+                     or (int(time.time()) if mail else 0), mio["id"]))
+                con.commit()
             con.close()
             # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
             # mono sconta): prezzo_sats nasce gia' scontato, quindi
@@ -21516,6 +21605,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
                     "via_punto": mio["via_punto"] or 0,
+                    # anche sulla ripresa: chi ha appena scritto
+                    # un'email deve sapere che non e' stata salvata,
+                    # e la fattura ripresentata non cambia niente
+                    "email_non_salvata": mail_persa,
                     # la nota FRESCA e non mio["nota_compratore"]: la
                     # riga e' stata letta PRIMA dell'UPDATE qui sopra,
                     # quindi quel campo e' gia' stantio
@@ -21883,16 +21976,19 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
-        "nota_compratore,"
+        "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, rete, tipo,
          nota,
+         # il timbro guarda il BLOB e non il testo: col degrado non c'e'
+         # niente in colonna, quindi non c'e' nessun «primo» da datare
+         mail, int(time.time()) if mail else 0,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats,
@@ -21917,6 +22013,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             # client di ieri, a cui manca solo la riga del risparmio)
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
+            # L'EMAIL NON SALVATA (ago 2026): l'ordine e' nato — un
+            # campo facoltativo non impedisce di comprare — ma chi
+            # l'aveva scritta deve saperlo, o crederebbe che il codice
+            # gli arrivera' dal corriere. Il rimedio e' nell'ordine.
+            "email_non_salvata": mail_persa,
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
             # CHI ha vinto il max. Deve uscire anche di qui e non solo
             # dal preventivo: il paySheet riscrive le sue righe con le
@@ -22255,6 +22356,17 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # dei bool proprio per non poterlo interpolare.
     if o["nota_compratore"]:
         msg += "\n\n" + _coda_nota(False, True)
+    # L'EMAIL PER IL CORRIERE lasciata alla CASSA (ago 2026): fin qui
+    # il venditore la sapeva solo dall'endpoint dell'ordine, che gira
+    # DOPO il pagamento — e chi la lascia prima non gliela diceva
+    # nessuno. Una riga in coda a «Hai venduto», mai una notifica
+    # seconda: e' lo stesso fatto, arrivato un momento prima.
+    # ⚠️ IL GATE E' IL TIMBRO E MAI LA COLONNA CIFRATA: _cifra_contenuto
+    # prefissa anche il vuoto ('plain:'), quindi quella colonna non e'
+    # mai '' su un ordine che ci e' passato — la lezione gia' pagata
+    # dal braccio del codice della busta nel libro mastro.
+    if o["email_corriere_il"]:
+        msg += "\n\n" + _coda_email_corriere(False, True)
     # ...e in fondo la riga operativa di chi ha un negozio collegato:
     # e' l'ULTIMA cosa che legge perche' e' l'unica che gli chiede di
     # uscire da Barattolo. Vuota per tutti gli altri.
@@ -22890,8 +23002,17 @@ async def leggi_indirizzo(ordine_id: int,
 #    continua come oggi: il codice arriva al venditore, che lo
 #    deposita nella busta.
 #  - DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
-#    Mai alla cassa: un campo facoltativo non sta sulla strada
-#    dell'acquisto.
+#    ⚠️ QUESTA RIGA E' STATA ROVESCIATA (ago 2026): diceva «mai alla
+#    cassa», e dall'ago 2026 il campo c'e' anche li'. IL PERCHE' DI
+#    ALLORA RESTA VERO ed e' diventato la FORMA — un campo facoltativo
+#    non sta sulla strada dell'acquisto, e infatti in cassa vive dietro
+#    un tocco, dentro il cassetto del punto, senza nessuna guardia su
+#    «Paga». IL FATTO NUOVO che l'ha rovesciata, e allora non era stato
+#    considerato: il punto si sceglie PRIMA di pagare e l'email DOPO,
+#    quindi un venditore veloce compra l'etichetta prima che l'email
+#    esista — e da li' in poi il gate 'locked' la chiude, giustamente.
+#    L'ordine RESTA la seconda porta: chi non la vede prima la mette
+#    dopo, e questo endpoint non cambia di una riga.
 #  - IL MODERATORE VEDE CHE C'ERA, MAI QUALE. In disputa gli serve
 #    sapere se il codice e' stato consegnato, e quello lo legge dalla
 #    dichiarazione del venditore e dalla data: l'indirizzo non lo

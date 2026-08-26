@@ -5679,6 +5679,228 @@ def prove_email_corriere():
           riga(2)["aggiornato"])
     prova("...e la scopa non e' saltata in silenzio", False,
           any("saltata" in r for r in detto_s))
+
+    # ================================================================
+    # L'EMAIL SI LASCIA GIA' ALLA CASSA (ago 2026)
+    # ================================================================
+    # Il punto di ritiro si sceglie PRIMA di pagare e l'email si
+    # lasciava DOPO: sono la stessa decisione in due momenti, e in
+    # mezzo c'era una finestra — un venditore veloce compra
+    # l'etichetta prima che l'email esista, e da li' il gate 'locked'
+    # la chiude. Il campo si AGGIUNGE in cassa e l'ordine resta la
+    # seconda porta: l'endpoint non cambia di una riga.
+    compra_ = pezzo("compra")
+    set_ = pezzo("_compra_set")
+    inc = pezzo("_incassa_ordine")
+
+    # --- IL GIUDICE DEGRADA, e si fa GIRARE ------------------------
+    # ⚠️ una sentinella direbbe che il parametro c'e', mai che
+    # RISPONDA giusto: il caso e' proprio quello che nessun ambiente
+    # di casa esercita — senza chiave e FUORI collaudo.
+    def _amb_senza_chiave():
+        amb = {"HTTPException": _H, "MAX_EMAIL_CORRIERE": 120,
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MODALITA_COLLAUDO": False,
+               "_cifra_contenuto": lambda t: "MAI:" + t}
+        exec(pezzo("_email_corriere_da_payload"), amb)
+        return amb["_email_corriere_da_payload"]
+
+    _g = _amb_senza_chiave()
+
+    # ⚠️ NON si usa `_alza`: la _H di questo banco non popola `args`,
+    # quindi `str(e)` e' '' — indistinguibile dal «non ha alzato», che
+    # e' precisamente la prova che passerebbe in silenzio.
+    def esito(chiama):
+        try:
+            return chiama()
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    prova("il permesso si deve SCRIVERE: il default alza ancora il 503",
+          True, str(esito(lambda: _g({"email_corriere": "x@y.it"})))
+          .startswith("503 "))
+    prova("...e la CASSA degrada invece di alzare", ("", "x@y.it"),
+          _g({"email_corriere": "x@y.it"}, esigi_chiave=False))
+    # LA RIGA CHE NON SI AMMORBIDISCE IN NESSUNA DELLE DUE STRADE: il
+    # blob resta VUOTO — un recapito in chiaro non si scrive nemmeno
+    # degradando — e il testo pieno e' il SEGNALE, non il dato salvato
+    prova("...col blob VUOTO: in chiaro non si scrive nemmeno qui",
+          "", _g({"email_corriere": "x@y.it"}, esigi_chiave=False)[0])
+    prova("...e il vuoto resta vuoto da tutt'e due le parti", ("", ""),
+          _g({"email_corriere": "  "}, esigi_chiave=False))
+    # il tetto non si allenta col permesso: un recapito tagliato e'
+    # rotto, e chi l'ha scritto non lo saprebbe
+    prova("...e il 400 del tetto vale anche degradando", True,
+          str(esito(lambda: _g({"email_corriere": "a" * 130 + "@x.it"},
+                               esigi_chiave=False))).startswith("400 "))
+    prova("il permesso e' keyword-only, o un chiamante distratto lo "
+          "darebbe per posizione", True,
+          "def _email_corriere_da_payload(d, *, esigi_chiave" in src)
+
+    # --- LA CASSA: dove si legge, e con che permesso ----------------
+    for nome, fetta in (("compra", compra_), ("_compra_set", set_)):
+        c = _senza_prosa(codice(fetta))
+        prova(f"{nome}: l'email si legge col permesso di degradare",
+              1, c.count("esigi_chiave=False"))
+        # SOLO SULLA VIA PUNTO, ed e' la specularita' dell'indirizzo,
+        # che sta sul `not via_punto`: due vie, due cose diverse
+        prova(f"{nome}: ...e SOLO sulla via punto", 1,
+              c.count('if scelta == "spedizione" and via_punto:'))
+        prova(f"{nome}: ...PRIMA della invoice, o un 400 lascerebbe "
+              "una fattura senza un ordine su cui posarsi", True,
+              c.index("esigi_chiave=False")
+              < c.index("crea_invoice_escrow"))
+        prova(f"{nome}: ...e col con.close() sulla via del rifiuto",
+              True, "_email_corriere_da_payload(" in c
+              and "con.close()" in c)
+        # «C'ERA UN'EMAIL E NON SI E' POTUTA SCRIVERE»: la congiunzione
+        # e non uno dei due — col solo `not mail` direbbe di si' su
+        # ogni ordine senza email, cioe' un toast su ogni acquisto
+        prova(f"{nome}: `mail_persa` e' la CONGIUNZIONE", 1,
+              c.count("mail_persa = bool(mail_testo) and not mail"))
+        # IL TIMBRO GUARDA IL BLOB E NON IL TESTO: col degrado in
+        # colonna non c'e' niente, quindi non c'e' nessun «primo» da
+        # datare — e un timbro senza email farebbe suonare il libro
+        # mastro e parlare la coda di _incassa_ordine
+        # ⚠️ UN'ANCORA SOLA: il set scrive «tipo_punto,nota_compratore,
+        # email_corriere,...», che CONTIENE quella del mono — sommare
+        # due count che si sovrappongono conta due volte la stessa riga
+        prova(f"{nome}: l'INSERT nomina le due colonne", 1,
+              c.count("nota_compratore,email_corriere,email_corriere_il,"))
+        prova(f"{nome}: ...e il timbro guarda il BLOB, mai il testo",
+              (True, False),
+              ("if mail else 0" in c, "if mail_testo else 0" in c))
+
+    # --- LA RIPRESA DEL PENTITO ------------------------------------
+    rip = _senza_prosa(codice(compra_))
+    # FUORI DAL CONFRONTO, come la nota e per la stessa ragione: non
+    # tocca il prezzo, quindi correggere un refuso non deve annullare
+    # l'ordine e coniare una fattura nuova. (E il blob per giunta non
+    # e' confrontabile.)
+    _stessa = rip[rip.index("stessa = ("):rip.index("viva = mio[")]
+    prova("la ripresa: l'email sta FUORI dal confronto `stessa`",
+          (False, False),
+          ("email" in _stessa, "mail" in _stessa))
+    prova("...ma si RISCRIVE, o chi corregge un refuso rivedrebbe la "
+          "sua fattura con l'email di prima", True,
+          "UPDATE ordini SET email_corriere=?, " in rip)
+    # IL CONFRONTO E' SUL CHIARO: sui blob Fernet non e'
+    # deterministico e ogni tocco su «Paga» sembrerebbe un cambio
+    prova("...e il confronto e' sul CHIARO", True,
+          "mail_testo != _email_corriere_letta(" in rip)
+    # NIENTE «mail_testo and», la trappola della vicina: il VUOTO E'
+    # UN VALORE, e «cancello l'email e ripago» fallirebbe in silenzio
+    prova("...senza «mail_testo and», che il vuoto e' un valore",
+          False, "if mail_testo and" in rip)
+    # E COL DEGRADO NON SI TOCCA NIENTE: scrivere il blob vuoto
+    # CANCELLEREBBE un'email gia' in colonna, cioe' il contrario di
+    # «non si e' potuta salvare»
+    prova("...e col degrado la colonna non si tocca", True,
+          "if not mail_persa and mail_testo !=" in rip)
+
+    # --- LA CODA AL VENDITORE: il gate e' il TIMBRO -----------------
+    # ⚠️ MAI la colonna cifrata: _cifra_contenuto prefissa anche il
+    # vuoto ('plain:'), quindi su un ordine che ci e' passato quella
+    # colonna non e' MAI '' — e la riga partirebbe anche a email
+    # tolta. E' la lezione gia' pagata dal braccio del codice della
+    # busta nel libro mastro.
+    _inc = _senza_prosa(codice(inc))
+    prova("«Hai venduto» porta la riga dell'email", 1,
+          _inc.count('_coda_email_corriere(False, True)'))
+    prova("...col gate sul TIMBRO e mai sulla colonna cifrata",
+          (True, False),
+          ('if o["email_corriere_il"]:' in _inc,
+           'if o["email_corriere"]:' in _inc))
+    prova("...e la riga e' STATICA: il valore in un tubo HTML non ci "
+          "entra per costruzione", False,
+          "_email_corriere_letta" in _inc)
+    # NIENTE SECONDA NOTIFICA: e' lo stesso fatto, arrivato un momento
+    # prima — e un messaggio in piu' e' la famiglia che fa bloccare il
+    # bot, col quale si perdono le notifiche degli ordini
+    prova("...e non nasce una notifica in piu'", 1,
+          _inc.count("_coda_email_corriere"))
+
+    # --- IL ROVESCIAMENTO DICHIARATO -------------------------------
+    prova("il «mai alla cassa» e' rovesciato COL PERCHE' DI ALLORA",
+          True, "QUESTA RIGA E' STATA ROVESCIATA" in src
+          and "IL PERCHE' DI\n#    ALLORA RESTA VERO" in src)
+
+    # --- IL CLIENT: lo stato, il payload, le parole -----------------
+    prova("client: i TRE literal di acqDati hanno il campo", 3,
+          mini.count("email:''"))
+    # ⚠️ il terzo e' quello del set sotto ACCORDO, ed e' quello che si
+    # dimentica: la lezione della chiave doppia in acqDati
+    _corpo = pezzo_js(mini, "function corpoConsegna(", "\n}")
+    prova("client: il payload sta SOTTO il gate della via punto", True,
+          "if (v==='punto' && acqDati.email" in _corpo)
+    prova("...e la chiave e' ASSENTE quando e' vuota (il patto della "
+          "nota)", False, "out.email_corriere = acqDati.email ||" in _corpo)
+    # NON IN CIMA CON `extra`: li' vivono le cose che appartengono
+    # all'ORDINE e non alla via, e passerebbe anche sugli storici
+    prova("...e non viaggia dentro `extra`", True,
+          _corpo.index("const extra") < _corpo.index("out.email_corriere"))
+    # NESSUNA GUARDIA: e' facoltativa, e una guardia la renderebbe
+    # obbligatoria — la sola cosa che questo campo non deve diventare
+    for f in ("function ctaAcquisto(", "function compraSubito("):
+        prova(f"client: nessuna guardia sull'email in {f[9:-1]}",
+              False, "email" in pezzo_js(mini, f, "\n}\n"))
+    # LE PAROLE IN UN POSTO SOLO: il campo vive in due superfici, e
+    # due copie divergono al primo ritocco
+    prova("client: le parole del campo sono in tre giudici", (1, 1, 1),
+          (mini.count("const invitoEmail ="),
+           mini.count("const segnaposEmail ="),
+           mini.count("const spiegaEmail =")))
+    prova("...e i letterali non sono rimasti in nessuna delle due",
+          (1, 1),
+          (mini.count("+ Ricevi il codice direttamente dal corriere"),
+           mini.count("latua@email.it")))
+    # gli USI e non le occorrenze: la definizione porta il nome nudo,
+    # quindi si contano la chiamata e l'interpolazione
+    prova("...e le usano tutt'e due le superfici", (2, 2),
+          (mini.count("spiegaEmail()"), mini.count("${segnaposEmail}")))
+    # IL CAMPO STA DENTRO IL CASSETTO DEL PUNTO: cosi' eredita per
+    # costruzione lo stopPropagation del contenitore e la cascata
+    # rete → tipo → punto, invece di un cassetto suo
+    prova("client: il campo vive dentro il cassetto del punto", True,
+          "? campoDove + campoEmail : ''" in mini)
+    # ⚠️ `emailForzata` RESTA DEL SOLO ORDINE: in cassa non c'e' un
+    # gesto su cui appoggiare una domanda («ritocca Salva») — l'unico
+    # bottone e' «Paga», e li' una domanda sarebbe una guardia. La
+    # sentinella guarda il CODICE del campo e non il commento che lo
+    # dichiara.
+    _campo = mini[mini.index("const campoEmail ="):
+                  mini.index("const campoAperto =")]
+    prova("client: in cassa non c'e' nessun permesso forzato",
+          (False, False),
+          ("emailForzata" in _campo, "formaEmail" in _campo))
+    # IL TOAST: un giudice per i TRE varchi che POSTano a /orders. Il
+    # terzo (il wallet ⚡) e' quello che nessun collaudo esercita — in
+    # locale un wallet non c'e' — e sparso a mano l'avviso mancherebbe
+    # IN SILENZIO solo a chi paga col wallet collegato.
+    # le CHIAMATE e non le occorrenze: la firma della definizione e'
+    # `avvisaEmailNonSalvata(d){`, il punto e virgola la esclude
+    prova("client: l'avviso e' UN giudice con TRE chiamanti", (1, 3),
+          (mini.count("function avvisaEmailNonSalvata("),
+           mini.count("avvisaEmailNonSalvata(d);")))
+    for f in ("async function startBuy(", "async function startBuySet(",
+              "async function confermaCompraSubito("):
+        prova(f"client: ...e {f[15:-1]} lo chiama", True,
+              "avvisaEmailNonSalvata(d)" in pezzo_js(mini, f, "\n}\n"))
+    # IL TESTO PORTA IL RIMEDIO: senza, chi l'ha scritta resterebbe ad
+    # aspettare un codice che al corriere non e' mai arrivato
+    _t = pezzo_js(mini, "function avvisaEmailNonSalvata(", "\n}")
+    prova("client: ...e l'avviso dice il rimedio e cosa regge intanto",
+          (True, True),
+          ("rimettere" in _t, "arriva al" in _t))
+    # I DUE SERVER RISPONDONO LA CHIAVE, o il toast non parte mai
+    prova("la chiave esce dai DUE percorsi e dalla ripresa", 3,
+          src.count('"email_non_salvata": mail_persa'))
+
+    # --- IL TESTO PUBBLICO che diventava impreciso -----------------
+    prova("«I tuoi dati» non dice piu' che si lascia solo nell'ordine",
+          (False, True),
+          ("Un'email puoi lasciarla nell'ordine" in mini,
+           "Un'email puoi lasciarla quando compri" in mini))
     vero.close()
 
 
@@ -13900,9 +14122,15 @@ def prove_pagina_acquisto():
     prova("sesto giro: il gate delle scelte esiste", True,
           "const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo"
           in mini3)
+    # ⚠️ L'ANCORA SI FERMA AL GATE e non elenca cosa c'e' dentro: dal
+    # cantiere dell'email alla cassa (ago 2026) sotto quel gate ci
+    # sono DUE campi — il dove e l'email, che eredita cosi' la stessa
+    # cascata — e scritta col solo `campoDove` la sentinella tornava
+    # rossa per un'aggiunta legittima invece che per un gate caduto.
+    # Quel che deve restare vero e' il GATE, non l'elenco.
     prova("...e il campo si disegna solo a scelte fatte (o senza reti)",
           True,
-          "(!reti.length || scelteFatte) ? campoDove : ''" in mini3)
+          "(!reti.length || scelteFatte) ? campoDove" in mini3)
     prova("...il segnaposto non ripete il tipo: li' va solo il dove",
           False, "Locker — Via Roma" in mini3)
     prova("...e la riga «scegli prima il corriere» e' morta con lui: "
@@ -19039,6 +19267,14 @@ def prove_ricevuta_compratore():
               stato TEXT, quantita INT, consegna_scelta TEXT,
               via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
               nota_compratore TEXT DEFAULT '',
+              -- il TIMBRO dell'email per il corriere (ago 2026): da
+              -- quando la si lascia gia' alla cassa, _incassa_ordine
+              -- ci mette la riga in coda a «Hai venduto» e legge
+              -- questa colonna. Il cartone che non ce l'ha non fa una
+              -- prova rossa: fa ESPLODERE la famiglia con un
+              -- IndexError, che e' la classe di guasto gia' pagata
+              -- dalla colonna mancante di offerte_righe.
+              email_corriere_il INT DEFAULT 0,
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
               sconto_sats INT DEFAULT 0,
               indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,

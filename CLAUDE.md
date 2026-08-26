@@ -16161,8 +16161,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   continua come oggi — il codice arriva al venditore, che lo deposita
   nella busta.
   3) DENTRO L'ORDINE, DOPO IL PAGAMENTO, accanto al campo del punto.
-  Mai alla cassa: un campo facoltativo non sta sulla strada
-  dell'acquisto.
+  ⚠️ **ROVESCIATA** (ago 2026): diceva «mai alla cassa», e dall'ago
+  2026 il campo c'è anche lì — vedi «L'EMAIL SI LASCIA GIÀ ALLA
+  CASSA», in coda a questa voce. Il perché di allora resta vero ed è
+  diventato la FORMA (dietro un tocco, nessuna guardia su «Paga»); a
+  rovesciarla è un FATTO che allora non era stato considerato — il
+  punto si sceglie PRIMA di pagare e l'email DOPO, quindi un venditore
+  veloce compra l'etichetta prima che l'email esista.
   4) Su OGNI ordine via punto, senza gate sul venditore — ed è la riga
   da non ammorbidire: verrebbe naturale offrirla solo a chi dichiara la
   busta diretta, ma quella dichiarazione arriva DOPO la spedizione,
@@ -16313,6 +16318,104 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   legge «ho spedito» — mandava a cercare una cosa che non c'era
   ancora. C'è la prova che quel pannello non nomini né il bottone né
   la sua etichetta.
+  L'EMAIL SI LASCIA GIÀ ALLA CASSA (ago 2026, e questa voce ROVESCIA la
+  decisione 3 qui sopra): il punto di ritiro si sceglie PRIMA di pagare
+  e l'email si lasciava DOPO — sono la stessa decisione, «come mi arriva
+  il codice», in due momenti diversi, e in mezzo c'era una finestra: **un
+  venditore veloce compra l'etichetta prima che l'email esista**, e da lì
+  in poi non serve più a niente (il gate 'locked' la chiude alla
+  spedizione, giustamente). Il campo si AGGIUNGE in cassa, dentro il
+  cassetto del punto; l'ordine RESTA la seconda porta e il suo endpoint
+  non cambia di una riga.
+  IL PERCHÉ DI ALLORA È DIVENTATO LA FORMA, ed è la parte da tenere:
+  «un campo facoltativo non sta sulla strada dell'acquisto» resta vero,
+  e infatti in cassa vive DIETRO UN TOCCO, senza NESSUNA guardia su
+  «Paga» — una guardia lì lo renderebbe obbligatorio, che è la sola cosa
+  che questo campo non deve diventare (c'è la sentinella, su tutt'e due
+  le strade che pagano).
+  LE TRE DECISIONI DI ANDREA: dentro il cassetto del punto e non in uno
+  suo (così eredita per costruzione lo `stopPropagation` del contenitore
+  e la cascata rete → tipo → punto); senza chiave NON si salva e lo si
+  DICE, ma l'ordine nasce lo stesso; e il venditore lo sa da una riga in
+  coda a «Hai venduto», mai da una seconda notifica.
+  IL GIUDICE IMPARA A DEGRADARE, e il permesso si deve SCRIVERE:
+  `esigi_chiave=False` — l'idioma di `esigi_luogo` — spegne il solo 503
+  e torna `("", testo)`, il blob VUOTO col testo PIENO. È così che il
+  chiamante deduce «c'era un'email e non si è potuta scrivere», e la
+  riga da non ammorbidire è che **in chiaro non si scrive NIENTE
+  nemmeno degradando**: quel che cambia è chi alza, mai cosa finisce in
+  colonna. LA DIFFERENZA FRA LE DUE SUPERFICI è tutta qui — in cassa
+  l'ordine sta NASCENDO e un campo facoltativo non può impedire di
+  comprare, mentre dall'ordine il 503 non toglie niente a nessuno (la
+  merce è già pagata, si riprova più tardi). Il default tiene l'endpoint
+  severo byte per byte.
+  `mail_persa` È LA CONGIUNZIONE (`bool(mail_testo) and not mail`) e
+  serve a DUE cose sole: non toccare la colonna nella ripresa, e dirlo a
+  chi l'ha scritta. Col solo `not mail` direbbe di sì su ogni ordine
+  senza email, cioè un toast su ogni acquisto.
+  NELLA RIPRESA FA LA STRADA DELLA NOTA — fuori dal confronto `stessa` e
+  riscritta nel ramo che esce — e per la STESSA ragione: non tocca il
+  prezzo, quindi correggere un refuso non deve annullare l'ordine e
+  coniare una fattura nuova (il suo blob per giunta non è confrontabile,
+  come quello dell'indirizzo: due ragioni che portano allo stesso posto).
+  IL CONFRONTO È SUL CHIARO, e NIENTE «mail_testo and» — il vuoto è un
+  valore, e «cancello l'email e ripago» fallirebbe in silenzio. E COL
+  DEGRADO NON SI TOCCA NIENTE: scrivere il blob vuoto CANCELLEREBBE
+  un'email già in colonna, cioè il contrario di «non si è potuta
+  salvare».
+  ⚠️ LA CODA AL VENDITORE È GATED SUL TIMBRO E MAI SULLA COLONNA
+  CIFRATA: `_cifra_contenuto` prefissa anche il vuoto (`plain:`), quindi
+  su un ordine che ci è passato quella colonna non è MAI '' e la riga
+  partirebbe anche a email TOLTA. È la lezione già pagata dal braccio del
+  codice della busta nel libro mastro.
+  LA DOPPIA SCRITTURA (cassa E ordine) NON COSTA UNA RIGA, ed è la
+  domanda che Andrea ha fatto per iscritto: l'endpoint confronta il
+  CHIARO, quindi la stessa email è un no-op senza notifica e senza
+  correzione; una diversa è una correzione contata; toglierla la
+  cancella e il timbro RESTA. L'unico effetto è che `email_corriere_il`
+  diventa l'ora dell'ORDINE invece di quella in cui l'ha scritta — al
+  moderatore in disputa è più utile, non meno.
+  IL TOAST HA UN GIUDICE SOLO per i TRE varchi che POSTano a `/orders`
+  (`startBuy`, `startBuySet` e `confermaCompraSubito`): il terzo è
+  proprio quello che nessun collaudo esercita — in locale un wallet non
+  c'è — e sparso a mano l'avviso mancherebbe IN SILENZIO solo a chi paga
+  col wallet collegato. Il testo porta il RIMEDIO (si rimette
+  dall'ordine) e il fatto che intanto regge (il codice arriva al
+  venditore): non si è perso niente, si è persa la scorciatoia.
+  LE PAROLE VIVONO IN TRE GIUDICI (`invitoEmail`, `segnaposEmail`,
+  `spiegaEmail`) accanto a quelli della nota: il campo è UNO e vive in
+  due superfici, e due copie divergono al primo ritocco. La LABEL invece
+  resta diversa apposta — nell'ordine sta sotto il suo `<h4>`, in cassa
+  non c'è nessun titolo e deve dire tutto da sé.
+  ⚠️ IL CONTROLLO DI FORMA NON SI PORTA IN CASSA, ed è una decisione:
+  `formaEmail` CHIEDE, e per chiedere serve un gesto su cui appoggiarsi
+  — «ritocca Salva e lo teniamo così». In cassa l'unico bottone è
+  «Paga», e una domanda lì sarebbe una GUARDIA. Da qui `emailForzata`
+  RESTA DEL SOLO ORDINE — non è una variabile di due superfici, e un
+  «forzato» non può portarsi dietro nessun permesso di qua (c'è la
+  sentinella, che guarda il CODICE del campo e non il commento che lo
+  dichiara). IL PREZZO, dichiarato: chi sbaglia l'email in cassa non se
+  ne accorge lì — lo corregge dall'ordine, dove il controllo c'è e il
+  campo si riapre precompilato, e se il codice non arriva la rete è il
+  bottone «non mi è arrivato il codice» della tappa A.
+  IMPERFEZIONI DICHIARATE. 1) **Chi ha un punto SALVATO non vede
+  l'email a colpo d'occhio**, ed è misurato: `precompilaPunto` riempie
+  punto e tipo al primo conto, quindi le tre guardie di «Paga» non
+  scattano e il cassetto resta chiuso sulla riga compatta. Sono i
+  clienti abituali, cioè i più probabili a volerla.
+  MA È PIÙ MITE DI COSÌ, e lo dice il giro dal vivo (che è anche il
+  motivo per cui una cosa così si guarda invece di dedurla): il
+  «Cambia» della riga compatta è A UN TOCCO, e da lì il cassetto si
+  apre col campo email GIÀ PRESENTE e il punto dentro — le scelte
+  sono fatte, quindi la cascata è soddisfatta e non c'è nient'altro
+  da toccare. Quel che si perde non è la funzione: è il fatto che si
+  VEDA senza cercarla. Se in rodaggio darà fastidio, la leva è
+  l'invito visibile anche sotto la riga compatta. 2) L'email su un
+  ordine mai pagato resta cifrata finché il reaper non cancella la
+  lapide (un'ora), come l'indirizzo. 3) La popolazione di email nel
+  database CRESCE — da oggi entra al pagamento di ogni ordine via
+  punto in cui l'hanno lasciata — e la scopa è la stessa, che
+  cancella alla conferma.
   LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
   dire sull'OGGETTO — la taglia, il numero, la variante. Si scrive
   nella cassa prima di «Paga» e il venditore la legge dentro l'ordine,
@@ -24288,6 +24391,57 @@ DA GUARDARE al primo giro: la prima email vera lasciata dentro Telegram
 l'etichetta — e, al primo affare confermato, che sparisca con
 l'indirizzo entro dieci minuti (la riga 🏠 nel journal li conta
 insieme).
+
+L'email si lascia già alla cassa (ago 2026, il giro dopo, e ROVESCIA la
+decisione 3 del cantiere qui sopra): il punto di ritiro si sceglie PRIMA
+di pagare e l'email si lasciava DOPO — la stessa decisione in due
+momenti, con in mezzo la finestra in cui **un venditore veloce compra
+l'etichetta prima che l'email esista**. Il campo si AGGIUNGE in cassa,
+dentro il cassetto del punto; l'ordine resta la seconda porta e il suo
+endpoint non cambia di una riga. Le tre decisioni di Andrea (nel
+cassetto del punto e non in uno suo, senza chiave non si salva e lo si
+dice ma l'ordine nasce, il venditore lo sa da una riga in coda a «Hai
+venduto») e le righe da non ammorbidire — il permesso di degradare che
+si deve SCRIVERE, `mail_persa` che è una congiunzione, il gate della
+coda sul TIMBRO e mai sulla colonna cifrata — stanno in Architettura,
+«L'EMAIL SI LASCIA GIÀ ALLA CASSA».
+Collaudata: **+48 prove** in modalità severa (6589 → 6637 contro HEAD
+del giorno, che era verde; è il DELTA il numero difendibile, che la
+cartella è condivisa con altre sessioni) più
+`collaudo_email_corriere.py` a **67 verdi** (era 39: il giro dalla cassa
+end-to-end con la colonna cifrata `f2:`, la riga in coda a «Hai
+venduto», la doppia scrittura nei suoi tre casi, la ripresa che non
+riconia, il degrado che fa nascere l'ordine e la ronda che tace), e
+**20 MUTAZIONI, 20 uccise**, una per riga sorvegliata.
+E IL GIRO DAL VIVO via CDP a 320/360/375 nei due temi, col server
+vero su un database usa-e-getta: **49 verifiche verdi e ZERO errori
+JS** — la cascata rete → tipo → dove → email nell'ordine giusto (il
+campo non c'è finché le scelte mancano), il venditore senza reti che
+lo vede subito, le altre vie che non lo offrono, l'email scritta che
+arriva CIFRATA `f2:` in colonna col suo timbro, il venditore che la
+legge e il moderatore che no, la RIPRESA che non conia un ordine
+nuovo e aggiorna il valore senza muovere il timbro, e la correzione
+dall'ordine che conta 1. È lì che l'imperfezione 1 si è rivelata più
+mite del previsto (vedi la voce).
+⚠️ E IL BANCO HA MENTITO QUATTRO VOLTE, tutte nello stesso modo: id
+sbagliato del campo, cassetto non aperto, punti salvati cancellati da
+un giro precedente, e un annuncio che era un'ASTA. Otto righe rosse
+che non erano del codice — **una verifica che fallisce si guarda
+prima di crederle**, ed è la seconda volta in questo cantiere.
+E DUE SENTINELLE DI ALTRI CANTIERI hanno dovuto imparare qualcosa, che è
+la parte da ricordare: quella del gate del campo elencava cosa c'è SOTTO
+il gate («? campoDove : ''») e tornava rossa per un'aggiunta legittima
+invece che per un gate caduto — adesso si ferma al GATE; e il cartone di
+`prove_ricevuta_compratore` non aveva la colonna del timbro, quindi la
+riga nuova in `_incassa_ordine` non faceva una prova rossa ma ESPLODERE
+la famiglia con un IndexError — la classe di guasto già pagata dalla
+colonna mancante di `offerte_righe`.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache non manda la
+chiave e si comporta come oggi. DA GUARDARE al primo giro: la prima
+email lasciata alla CASSA dentro Telegram — che al venditore arrivi la
+riga in coda a «Hai venduto», e che il compratore la ritrovi
+nell'ordine, col «Cambia» che la riapre precompilata.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

@@ -4924,7 +4924,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Nessun tracciamento.</b> Niente analytics, niente pixel, niente cookie di terzi: nella pagina non c'è nessuno oltre a noi. Da agosto 2026 <b>nemmeno i caratteri</b> — prima li chiedevamo a Google, e a ogni apertura il tuo indirizzo IP arrivava a Google. Adesso stanno qui.</li>
         <li><b>Un cookie solo</b>, e serve a tenerti dentro se entri dal browser: contiene un numero casuale, e nel database c'è soltanto la sua impronta.</li>
         <li><b>Non vendiamo niente a nessuno</b> e non ti profiliamo. Non c'è pubblicità, quindi non c'è nessuno a cui rivenderti.</li>
-        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un'email puoi lasciarla nell'ordine, se vuoi il codice del locker dal corriere; un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: sono facoltativi tutti e due e spariscono con l'ordine. <b>Un campo per il telefono, da solo, in Barattolo non esiste.</b></li>
+        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un'email puoi lasciarla quando compri, o dopo dall'ordine, se vuoi il codice del locker dal corriere; un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: sono facoltativi tutti e due e spariscono con l'ordine. <b>Un campo per il telefono, da solo, in Barattolo non esiste.</b></li>
         <li><b>La connessione al tuo wallet non passa da qui.</b> Se lo colleghi, resta sul tuo dispositivo e non arriva mai ai nostri server. Il <b>Lightning address</b> è un'altra cosa e ce l'abbiamo, se lo imposti: qui sopra c'è cos'è e per quanto.</li>
       </ul>
       <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
@@ -12144,6 +12144,7 @@ function apriAcquisto(l){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
              nota:'', notaAperta: notaApertaDefault([l.cat]),
              codice:'', codiceAperto:false,
              errore:''};
@@ -12223,6 +12224,7 @@ function apriAcquistoSet(){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
              nota:'', notaAperta: notaApertaDefault([...setScelte.keys()]
                .map(id => (listings.find(t => t.id === id) || {}).cat)),
              codice:'', codiceAperto:false,
@@ -12968,8 +12970,38 @@ function renderAcquisto(){
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
     ${linkMappePunti(retiMappa)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
+  /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
+     dentro lo STESSO cassetto — cosi' eredita per costruzione lo
+     stopPropagation del contenitore e la cascata rete → tipo → punto,
+     invece di un cassetto suo che sarebbe un secondo tocco per la
+     stessa decisione («come mi arriva il codice»).
+     FACOLTATIVA E SENZA NESSUNA GUARDIA in «Paga»: una guardia la
+     renderebbe obbligatoria, che e' la sola cosa che non deve
+     succedere — c'e' la sentinella.
+     LE PAROLE VENGONO DAI GIUDICI e non da qui: il campo vive in due
+     posti (la cassa e l'ordine) e due copie divergono al primo
+     ritocco. La LABEL invece resta diversa apposta, ed e' dichiarato:
+     nell'ordine sta sotto il suo <h4>, qui non c'e' nessun titolo e
+     deve dire tutto da se'.
+     ⚠️ IL CONTROLLO DI FORMA NON C'E', E NON E' UNA DIMENTICANZA:
+     `formaEmail` CHIEDE — «non sembra un indirizzo, ritocca Salva e lo
+     teniamo cosi'» — e per chiedere serve un gesto su cui appoggiarsi.
+     Qui l'unico bottone e' «Paga», e una domanda li' sarebbe una
+     GUARDIA, cioe' la sola cosa che questo campo non deve diventare.
+     Quindi in cassa si scrive e basta, e chi sbaglia lo corregge
+     dall'ordine, dove il controllo c'e' e il campo si riapre
+     precompilato; se il codice non arriva, la rete e' il bottone
+     «non mi e' arrivato il codice» del cantiere 49.
+     DA QUI DISCENDE CHE `emailForzata` RESTA DEL SOLO ORDINE — non e'
+     una variabile di due superfici, e un «forzato» non puo' portarsi
+     dietro nessun permesso di qua: c'e' la sentinella. */
+  const campoEmail = `<label for="acqEmail">La tua email per il corriere (facoltativa)</label>
+    <input type="email" id="acqEmail" autocomplete="email" inputmode="email"
+      maxlength="120" value="${esc(d.email||'')}" placeholder="${segnaposEmail}"
+      oninput="if(acqDati)acqDati.email=this.value">
+    <div class="acq-nota">${spiegaEmail()}</div>`;
   const campoAperto =
-    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove : ''}`;
+    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove + campoEmail : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
@@ -13609,6 +13641,25 @@ const segnaposNota = (eSet, servizio) =>
   servizio ? 'Es. livello intermedio, vorrei lavorare sulla conversazione'
   : eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
          : 'Es. taglia L, oppure la variante blu';
+/* LE PAROLE DELL'EMAIL PER IL CORRIERE, per la stessa ragione della
+   nota qui sopra e con la stessa forma: dall'ago 2026 il campo vive
+   in DUE posti — la cassa e l'ordine — e due copie degli stessi testi
+   divergono al primo ritocco. Il campo e' UNO, le parole che lo
+   spiegano sono UNE.
+   LA SPIEGAZIONE PORTA HTML (il link alla pagina «I tuoi dati»), ed e'
+   il posto giusto per il dubbio: nasce qui, davanti al campo — il
+   pattern degli hint contestuali. In cassa il tocco non riseleziona la
+   via, perche' il cassetto che la ospita ferma la propagazione. */
+const invitoEmail = () =>
+  '+ Ricevi il codice direttamente dal corriere';
+const segnaposEmail = 'latua@email.it';
+const spiegaEmail = () =>
+  'Il codice del locker te lo manderà il corriere a questo indirizzo, '
+  + 'senza passare da qui. <b>Solo l\'email</b> — il numero di telefono '
+  + 'non lo chiediamo mai. La cancelliamo alla chiusura '
+  + '<span class="fine-frase">dell\'ordine. <button type="button" '
+  + 'class="scopri-link" onclick="apriPrivacy(\'priv-indirizzo\')">'
+  + 'Che fine fa</button></span>';
 /* LA NOTA NASCE APERTA DOVE C'E' UNA VARIANTE DA DIRE (ago 2026,
    decisione di Andrea): taglia, numero, colore — nelle categorie in
    elenco la domanda e' quasi certa e il campo si trova gia' aperto;
@@ -13961,6 +14012,14 @@ function corpoConsegna(){
      server la sua presenza dice «questo client il campo ce l'ha»,
      il patto della chiave dell'indirizzo */
   if (v==='punto') out.tipo_punto = acqDati.tipoPunto || '';
+  /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il gate della via punto,
+     dove il campo vive — e CHIAVE ASSENTE QUANDO E' VUOTA, il patto
+     della nota. Non sta in cima con `extra`, ed e' la riga da non
+     spostare: li' vivono le cose che appartengono all'ORDINE e non
+     alla via, e passerebbe anche sugli annunci storici e sul ritiro,
+     dove il server la rifiuterebbe. */
+  if (v==='punto' && acqDati.email && acqDati.email.trim())
+    out.email_corriere = acqDati.email.trim().slice(0,120);
   /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
      il server la sua PRESENZA e' la dichiarazione «questo ordine
      l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
@@ -13972,6 +14031,25 @@ function corpoConsegna(){
       out.indirizzo[c.k] = (i[c.k]||'').trim().slice(0, c.max));
   }
   return out;
+}
+/* L'EMAIL CHE NON SI E' POTUTA SALVARE (ago 2026): senza la chiave dei
+   contenuti il server fa nascere l'ordine LO STESSO — un campo
+   facoltativo non impedisce di comprare — e ce lo dice con una chiave.
+   Chi l'aveva scritta deve saperlo, o crederebbe che il codice del
+   locker gli arrivera' dal corriere e resterebbe ad aspettarlo.
+   IL TESTO PORTA IL RIMEDIO E IL FATTO CHE INTANTO REGGE: si rimette
+   dall'ordine, e nel frattempo il codice arriva al venditore come
+   sempre — cioe' non si e' perso niente, si e' persa la scorciatoia.
+   UN GIUDICE SOLO PER I TRE VARCHI che POSTano a /orders (startBuy,
+   startBuySet e confermaCompraSubito, la strada del wallet ⚡): il
+   terzo e' proprio quello che nessun collaudo esercita — in locale un
+   wallet non c'e' — e sparso a mano l'avviso mancherebbe IN SILENZIO
+   solo a chi paga col wallet collegato. C'e' il censimento. */
+function avvisaEmailNonSalvata(d){
+  if (!d || !d.email_non_salvata) return;
+  toast('L\'email non si è potuta salvare adesso: la puoi rimettere '
+        + 'dall\'ordine. Intanto il codice di ritiro arriva al '
+        + 'venditore, che te lo passa lì.', 7000);
 }
 /* «Manca la scelta del corriere?»: giudice UNICO delle due strade che
    pagano (il bottone e il ⚡ NWC), o una chiederebbe quel che l'altra
@@ -14792,6 +14870,7 @@ async function startBuySet(){
     scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  avvisaEmailNonSalvata(d);
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
@@ -15932,6 +16011,7 @@ async function startBuy(){
       scontoPct: d.sconto_percento||0, scontoOrigine: d.sconto_origine||''});
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
+  avvisaEmailNonSalvata(d);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
      annuncio e il server ti ha ridato la TUA fattura ancora viva —
      va detto, o i conti («convertito ora») sembrerebbero bugiardi */
@@ -16054,6 +16134,7 @@ async function confermaCompraSubito(btn){
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
+    avvisaEmailNonSalvata(d);
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
     scompOrdine = d.prezzo_sats ? contoScomposto({
       art: d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
@@ -17302,6 +17383,7 @@ async function pagaOffertaCarrello(id){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             email:'',
              nota:'', notaAperta: notaApertaDefault(righe.map(f =>
                (listings.find(t=>t.id===f.annuncio_id)||{}).cat)),
              codice:'', codiceAperto:false,
@@ -23889,11 +23971,11 @@ function pannelloEmailCorriere(o){
       const aperta = emailAperta === o.id;
       const scritta = emailLetta[o.id] || '';
       const campo = `
-        <div class="hint">Il codice del locker te lo manderà il corriere a questo indirizzo, senza passare da qui. <b>Solo l'email</b> — il numero di telefono non lo chiediamo mai. La cancelliamo alla chiusura <span class="fine-frase">dell'ordine. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-indirizzo')">Che fine fa</button></span></div>
+        <div class="hint">${spiegaEmail()}</div>
         <div class="ind-campi">
           <label for="emailCorriereInp">La tua email</label>
           <input type="email" id="emailCorriereInp" autocomplete="email"
-            inputmode="email" maxlength="120" placeholder="latua@email.it"
+            inputmode="email" maxlength="120" placeholder="${segnaposEmail}"
             value="${esc(scritta)}">
         </div>
         <div class="hint avviso-tracking" id="emailAvviso" style="display:none"></div>
@@ -23903,7 +23985,7 @@ function pannelloEmailCorriere(o){
         ? `<button type="button" class="via-riga punto-riga" aria-expanded="false"
             onclick="apriEmailCorriere(this)"><span class="punto-testo">📧 ${esc(scritta || 'Email per il corriere')}</span><span class="punto-cambia">Cambia</span></button>`
         : `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
-            onclick="apriEmailCorriere(this)">+ Ricevi il codice direttamente dal corriere</button>`;
+            onclick="apriEmailCorriere(this)">${invitoEmail()}</button>`;
       return `<div class="payout" id="emailPannello">
         <h4>📧 La tua email per il corriere</h4>
         ${aperta ? campo : chiusa}

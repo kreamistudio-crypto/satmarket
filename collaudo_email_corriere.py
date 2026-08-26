@@ -179,7 +179,7 @@ def semina():
     con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,"
                 "ln_address) VALUES(333,'Estraneo','neg33333',1,'')")
     ids = []
-    for n in range(6):
+    for n in range(12):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
@@ -192,15 +192,22 @@ def semina():
     return ids
 
 
-def ordine_al_punto(annuncio_id, punto="Locker InPost Via Verdi 3"):
+def ordine_al_punto(annuncio_id, punto="Locker InPost Via Verdi 3",
+                    mail=None, restituisci=False):
+    """L'ordine via punto. `mail` la lascia GIA' ALLA CASSA (ago 2026):
+    e' l'altra porta dello stesso campo, e senza il parametro il giro
+    resta quello di ieri byte per byte. Con `restituisci` torna anche
+    la risposta, per chi deve guardarci dentro (email_non_salvata)."""
     come(111)
-    c = chiama(SRV.compra, None, corpo={
-        "annuncio_id": annuncio_id, "consegna": "spedizione",
-        "spedizione_via": "punto", "punto_ritiro": punto,
-        "tipo_punto": "locker"})
+    corpo = {"annuncio_id": annuncio_id, "consegna": "spedizione",
+             "spedizione_via": "punto", "punto_ritiro": punto,
+             "tipo_punto": "locker"}
+    if mail is not None:
+        corpo["email_corriere"] = mail
+    c = chiama(SRV.compra, None, corpo=corpo)
     oid = c["ordine_id"]
     tocca(oid, stato="locked")
-    return oid
+    return (oid, c) if restituisci else oid
 
 
 def ordine_a_casa(annuncio_id):
@@ -400,7 +407,163 @@ def main():
           (cod, "cancellata" in msg))
 
     # ============================================================
-    print("\n[9] LA RONDA DEL LIBRO MASTRO")
+    print("\n[9] L'EMAIL SI LASCIA GIA' ALLA CASSA")
+    # ============================================================
+    # Il punto si sceglie PRIMA di pagare e l'email si lasciava DOPO:
+    # in mezzo c'era la finestra in cui un venditore veloce compra
+    # l'etichetta prima che l'email esista. Adesso il campo c'e' anche
+    # in cassa, e l'ordine resta la seconda porta.
+    o_cassa = ordine_al_punto(ann[6], mail="  Cassa@Esempio.IT  ")
+    r_cassa = riga(o_cassa)
+    prova("l'ordine nasce con l'email in colonna", True,
+          bool(r_cassa["email_corriere"]))
+    prova("...e NON in chiaro", False,
+          "Cassa@Esempio.IT" in r_cassa["email_corriere"])
+    prova("...perche' e' cifrata col trasporto dei contenuti", True,
+          r_cassa["email_corriere"].startswith("f2:"))
+    prova("...col timbro del PRIMO", True, r_cassa["email_corriere_il"] > 0)
+    prova("...e gli spazi ai bordi li ha tolti il giudice",
+          "Cassa@Esempio.IT",
+          leggi_email(o_cassa, 111).get("email"))
+    prova("...e il venditore la legge subito dalla sua rotta",
+          "Cassa@Esempio.IT", leggi_email(o_cassa, 222).get("email"))
+    prova("...senza nessuna correzione contata", 0,
+          r_cassa["email_corriere_correzioni"])
+
+    # --- LA RIGA IN CODA A «HAI VENDUTO» -------------------------
+    # Fin qui il venditore la sapeva solo dall'endpoint dell'ordine,
+    # che gira DOPO il pagamento: chi la lascia PRIMA non gliela
+    # diceva nessuno. Il gate e' il TIMBRO e mai la colonna cifrata.
+    come(111)
+    c_inc = chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[7], "consegna": "spedizione",
+        "spedizione_via": "punto", "punto_ritiro": "Locker Via Po 1",
+        "tipo_punto": "locker", "email_corriere": "incasso@esempio.it"})
+    DETTO.clear()
+    asyncio.run(SRV._incassa_ordine(c_inc["ordine_id"]))
+    msg_v = " || ".join(t for chi, t in DETTO if chi == 222)
+    prova("«Hai venduto» porta la riga dell'email", True,
+          "email per il corriere" in msg_v)
+    prova("...e la riga dice cosa farci", True,
+          "compri l'etichetta" in msg_v)
+    prova("...ma il VALORE non c'e' mai", False,
+          "incasso@esempio.it" in msg_v)
+    prova("...e non e' partita una notifica in piu'", 1,
+          sum(1 for chi, t in DETTO
+              if chi == 222 and "email per il corriere" in t))
+    # e chi NON la lascia non se la sente nominare
+    come(111)
+    c_no = chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[8], "consegna": "spedizione",
+        "spedizione_via": "punto", "punto_ritiro": "Locker Via Po 2",
+        "tipo_punto": "locker"})
+    DETTO.clear()
+    asyncio.run(SRV._incassa_ordine(c_no["ordine_id"]))
+    prova("...e chi non la lascia non se la sente nominare", False,
+          any("email per il corriere" in t
+              for chi, t in DETTO if chi == 222))
+
+    # --- LA DOPPIA SCRITTURA: cassa E ordine ---------------------
+    # Il caso che Andrea ha chiesto per iscritto, e sono TRE.
+    DETTO.clear()
+    scrivi_email(o_cassa, "Cassa@Esempio.IT")
+    prova("la STESSA email dall'ordine non e' un cambio: zero avvisi",
+          (0, 0),
+          (sum(1 for chi, _ in DETTO if chi == 222),
+           riga(o_cassa)["email_corriere_correzioni"]))
+    primo_cassa = riga(o_cassa)["email_corriere_il"]
+    DETTO.clear()
+    scrivi_email(o_cassa, "corretta@esempio.it")
+    prova("...una DIVERSA e' una correzione, e si conta", 1,
+          riga(o_cassa)["email_corriere_correzioni"])
+    prova("...col venditore avvisato", True,
+          any(chi == 222 for chi, _ in DETTO))
+    prova("...e il timbro del PRIMO resta quello della cassa",
+          primo_cassa, riga(o_cassa)["email_corriere_il"])
+    DETTO.clear()
+    scrivi_email(o_cassa, "")
+    prova("...e TOGLIERLA si puo': la colonna si svuota", "",
+          riga(o_cassa)["email_corriere"])
+    prova("...ma il timbro resta (e' il fatto della disputa)",
+          primo_cassa, riga(o_cassa)["email_corriere_il"])
+
+    # --- LA RIPRESA DEL PENTITO ----------------------------------
+    # L'email NON tocca il prezzo: correggere un refuso non deve
+    # annullare l'ordine e coniare una fattura nuova.
+    come(111)
+    p1 = chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[9], "consegna": "spedizione",
+        "spedizione_via": "punto", "punto_ritiro": "Locker Via Dante 9",
+        "tipo_punto": "locker", "email_corriere": "prima@esempio.it"})
+    p2 = chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[9], "consegna": "spedizione",
+        "spedizione_via": "punto", "punto_ritiro": "Locker Via Dante 9",
+        "tipo_punto": "locker", "email_corriere": "seconda@esempio.it"})
+    prova("la ripresa NON conia una fattura nuova",
+          (p1["ordine_id"], True),
+          (p2["ordine_id"], bool(p2.get("ripresa"))))
+    prova("...e l'email si aggiorna sulla stessa fattura",
+          "seconda@esempio.it",
+          leggi_email(p1["ordine_id"], 111).get("email"))
+    # e il VUOTO cancella: il patto della nota, dove copiando la
+    # guardia dell'indirizzo «cancello e ripago» fallirebbe in silenzio
+    chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[9], "consegna": "spedizione",
+        "spedizione_via": "punto", "punto_ritiro": "Locker Via Dante 9",
+        "tipo_punto": "locker", "email_corriere": ""})
+    prova("...e il vuoto CANCELLA, che il vuoto e' un valore", "",
+          riga(p1["ordine_id"])["email_corriere"])
+
+    # --- IL GATE DELLA VIA ---------------------------------------
+    o_casa2 = ordine_a_casa(ann[10])
+    prova("sulla via CASA l'email non entra in colonna", ("", 0),
+          (riga(o_casa2)["email_corriere"],
+           riga(o_casa2)["email_corriere_il"]))
+    # gli annunci seminati spediscono e basta: per provare il ritiro
+    # si allarga QUELLO, invece di far dire al giudice della consegna
+    # una cosa che non e' vera
+    _c = SRV.db()
+    _c.execute("UPDATE annunci SET consegna='entrambe' WHERE id=?",
+               (ann[11],))
+    _c.commit()
+    _c.close()
+    come(111)
+    c_rit = chiama(SRV.compra, None, corpo={
+        "annuncio_id": ann[11], "consegna": "ritiro",
+        "email_corriere": "ritiro@esempio.it"})
+    prova("...e sul RITIRO nemmeno", ("", 0),
+          (riga(c_rit["ordine_id"])["email_corriere"],
+           riga(c_rit["ordine_id"])["email_corriere_il"]))
+
+    # --- IL DEGRADO: senza chiave l'ordine NASCE lo stesso --------
+    # E' la decisione che governa il cantiere: in cassa l'ordine sta
+    # nascendo, e un campo FACOLTATIVO non puo' impedire di comprare —
+    # mentre nell'ordine il 503 non toglie niente a nessuno.
+    kv, mc, fn = (SRV.CHIAVE_CONTENUTI_DIGITALI, SRV.MODALITA_COLLAUDO,
+                  SRV.Fernet)
+    SRV.CHIAVE_CONTENUTI_DIGITALI, SRV.MODALITA_COLLAUDO = "", False
+    SRV.Fernet = None
+    o_deg, r_deg = ordine_al_punto(ann[6], mail="persa@esempio.it",
+                                   restituisci=True)
+    prova("senza chiave l'ordine NASCE lo stesso", True, o_deg > 0)
+    prova("...e lo dice, o chi l'ha scritta resterebbe ad aspettare",
+          True, bool(r_deg.get("email_non_salvata")))
+    prova("...ma in chiaro non si scrive NIENTE", ("", 0),
+          (riga(o_deg)["email_corriere"], riga(o_deg)["email_corriere_il"]))
+    # e l'endpoint dell'ordine resta SEVERO: li' il 503 non toglie
+    # niente, la merce e' gia' pagata e si riprova piu' tardi
+    cod_deg, _ = rifiuto(SRV.indica_email_corriere, o_deg, None,
+                         corpo={"email_corriere": "x@y.it"})
+    prova("...mentre dall'ordine il 503 resta", 503, cod_deg)
+    SRV.CHIAVE_CONTENUTI_DIGITALI, SRV.MODALITA_COLLAUDO = kv, mc
+    SRV.Fernet = fn
+    # chi non la lascia non prende nessun avviso, nemmeno degradando
+    o_pulito, r_pulito = ordine_al_punto(ann[7], restituisci=True)
+    prova("chi non la lascia non riceve nessun avviso", False,
+          bool(r_pulito.get("email_non_salvata")))
+
+    # ============================================================
+    print("\n[10] LA RONDA DEL LIBRO MASTRO")
     # ============================================================
     ADMIN.clear()
     asyncio.run(SRV.controlla_libro_mastro())
