@@ -17393,10 +17393,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   diversi. I segreti NON rigenerabili (nsec piattaforma, chiave dei
   contenuti, accesso LNbits) escono su carta + Bitwarden a
   prescindere: senza la chiave dei contenuti, un backup del db è
-  mezzo backup. La frase della pagina pubblica è stata accorciata a
-  «salvati ogni giorno» e riprende il «fuori dal server» SOLO dopo il
-  drill di ripristino (un backup mai aperto è una speranza, non un
-  backup — il promemoria sta in RIPRISTINO.md). IL CATALOGO NON È DI TUTTI ALLO
+  mezzo backup. IL DRILL È FATTO (26 ago 2026, tutto verde: le due
+  copie identiche allo sha256, la sqlite che si apre e conta, un
+  contenuto digitale decifrato con la chiave letta dal config DENTRO
+  l'archivio — la prova che è autosufficiente) e la frase della pagina
+  pubblica è tornata intera: «salvati ogni giorno, con copie cifrate
+  anche fuori dal server». Se le chiavi cambiano il drill si RIFÀ, o
+  quella frase torna una promessa non provata (la liturgia e l'intoppo
+  del prefisso age stanno in RIPRISTINO.md). IL CATALOGO NON È DI TUTTI ALLO
   STESSO MODO, ed è la riga che si sbaglia per prima — chi scrive
   guardi `annuncio_su_nostr` e non `evento_annuncio`, o si sbaglia come
   ci si è sbagliati la prima volta: chi ha una chiave PROVATA vede
