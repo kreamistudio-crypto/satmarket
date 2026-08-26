@@ -17279,7 +17279,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   solo e un database solo, non ridondato; poi cosa NON si ferma con lui
   — ⚡ i sats (nodo Lightning nostro, seed offline), 🟣 gli annunci su
   Nostr, 📖 il codice, 💾 storico e reputazione col backup giornaliero
-  fuori dal server. E FINISCE LÌ, SULL'ELENCO (ago 2026, decisione di
+  (il «fuori dal server» è CADUTO dalla pagina ad ago 2026 — non era
+  mai stato vero, vedi l'emenda più sotto — e tornerà solo a drill
+  fatto). E FINISCE LÌ, SULL'ELENCO (ago 2026, decisione di
   Andrea): le due righe che chiudevano la sezione — «quello che resta
   fragile è l'infrastruttura, non i fondi… il passo dichiarato è un
   relay Nostr nostro» e la chiusa «oggi il punto di fiducia siamo noi
@@ -17302,9 +17304,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'istanza LNbits del config è OSPITATA (`*.lnbits.com`) ma la funding
   source è un nodo suo con la seed offline — per questo il testo dice
   «il gestionale che lo comanda è ospitato da terzi; il nodo e la seed
-  no», e la scorciatoia «istanza nostra» sarebbe stata falsa; e il
-  backup giornaliero fuori dal server esiste sul VPS, benché nel repo
-  non ci sia niente che lo mostri. IL CATALOGO NON È DI TUTTI ALLO
+  no», e la scorciatoia «istanza nostra» sarebbe stata falsa.
+  ⚠️ EMENDA (ago 2026): la riga che stava qui — «il backup giornaliero
+  fuori dal server esiste sul VPS» — NON ERA MAI STATA VERA, ed è
+  caduta esattamente nel modo che questa voce mette in guardia: era
+  stata ereditata come frase invece di essere verificata come fatto.
+  Il censimento sul VPS ha trovato che backup-barattolo.sh copiava db
+  e config in /root/backup — lo STESSO disco, col config IN CHIARO
+  (dentro: la nsec della piattaforma, CHIAVE_CONTENUTI_DIGITALI, le
+  chiavi LNbits). Contro il guasto che conta — l'account Hetzner
+  perso, che si porta via server, snapshot e Volume INSIEME — valeva
+  zero. LA CURA è l'uscita di sicurezza (deploy/backup-fuori.sh +
+  barattolo-backup.timer + deploy/RIPRISTINO.md, il foglio del
+  panico): ogni giorno alle 04:30 un archivio cifrato con age — db col
+  backup ATOMICO di sqlite, config, buste/, contenuti/, config di
+  sistema — parte verso un canale Telegram privato con un bot
+  DEDICATO (mai quello di Barattolo: mischiare i token lega due
+  mestieri); la metà segreta della chiave age vive su carta +
+  Bitwarden e il server produce backup che lui stesso non sa
+  riaprire; il PC di Andrea tira foto/ e gli archivi via rclone in
+  un'attività pianificata, così i due posti falliscono in modi
+  diversi. I segreti NON rigenerabili (nsec piattaforma, chiave dei
+  contenuti, accesso LNbits) escono su carta + Bitwarden a
+  prescindere: senza la chiave dei contenuti, un backup del db è
+  mezzo backup. La frase della pagina pubblica è stata accorciata a
+  «salvati ogni giorno» e riprende il «fuori dal server» SOLO dopo il
+  drill di ripristino (un backup mai aperto è una speranza, non un
+  backup — il promemoria sta in RIPRISTINO.md). IL CATALOGO NON È DI TUTTI ALLO
   STESSO MODO, ed è la riga che si sbaglia per prima — chi scrive
   guardi `annuncio_su_nostr` e non `evento_annuncio`, o si sbaglia come
   ci si è sbagliati la prima volta: chi ha una chiave PROVATA vede
