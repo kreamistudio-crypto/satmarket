@@ -20034,13 +20034,17 @@ function renderIdentita(){
   const attivaFoto = myAvatarScelta || (tgFotoOk ? 'telegram' : 'nostr');
   const pillFoto = (val, nome) =>
     `<button onclick="setFotoScelta('${val}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${attivaFoto===val?'var(--sats)':'var(--line)'};background:${attivaFoto===val?'var(--sats)':'transparent'};color:${attivaFoto===val?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${nome}</button>`;
+  /* Lo stato e le pillole portano un id perche' il velo di
+     `attesaFoto` possa parlare DENTRO la riga che sta cambiando —
+     e non su tutta l'app, per un gesto che non muove un sat. */
   const statoFoto = attivaFoto === 'nessuna'
     ? 'Nessuna: accanto al tuo nome compare la tua iniziale.'
     : `Viene dal tuo profilo <b style="color:var(--ink)">${attivaFoto==='telegram'?'✈️ Telegram':'🟣 Nostr'}</b>`
       + (myAvatarScelta ? '' : ' (automatico)')
       + ` e compare accanto al tuo nome in vetrina e nel negozio.`;
-  const fotoRiga = riga('📷', 'La tua foto', statoFoto)
-    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
+  const fotoRiga = riga('📷', 'La tua foto',
+                        `<span id="fotoStato">${statoFoto}</span>`)
+    + `<div id="fotoPillole" style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
         ${tgFotoOk ? pillFoto('telegram','✈️ Telegram') : ''}
         ${nostrFotoOk ? pillFoto('nostr','🟣 Nostr') : ''}
         ${pillFoto('nessuna','Nessuna')}</div>`;
@@ -20057,12 +20061,53 @@ function renderIdentita(){
   renderRicerche();
 }
 
+/* IL VELO DI QUESTO GESTO, e non uno dei due di casa: la scelta
+   SCRIVE una colonna, quindi `attesaRitardata` non e' casa sua (il
+   censimento in CI la vuole di sole LETTURE); e `bottoneInAttesa`
+   alzerebbe il velo su tutta l'app per un gesto che non muove un
+   sat. Qui il tempo lo prende il SOCIAL — dall'ago 2026 il server
+   aspetta di riavere il francobollo prima di rispondere — quindi il
+   segnale vive nella riga che sta cambiando: le pillole si spengono
+   e il testo dice cosa sta succedendo.
+   LA SOGLIA E' QUELLA DEL VELO DELLO STEPPER (RITARDO_ATTESA), e non
+   e' pigrizia: due soglie direbbero due attese diverse per la stessa
+   idea. Su «Nessuna» il server non aspetta niente, quindi la
+   risposta arriva sotto soglia e il velo non compare mai: spegnere
+   resta istantaneo, riaccendere lo dice. */
+function attesaFoto(scelta){
+  let acceso = false;
+  const t = setTimeout(()=>{
+    acceso = true;
+    const s = el('fotoStato'), p = el('fotoPillole');
+    if (s) s.textContent = scelta==='nessuna' ? 'Spengo la foto…'
+      : scelta==='nostr' ? '⏳ Prendo la foto dal tuo profilo Nostr…'
+      : scelta==='telegram' ? '⏳ Prendo la foto dal tuo profilo Telegram…'
+      : '⏳ Prendo la foto…';
+    if (p) { p.style.opacity = '.45'; p.style.pointerEvents = 'none'; }
+  }, RITARDO_ATTESA);
+  /* Il ripristino visivo NON sta qui: e' il renderIdentita() del
+     `finally`, che rimette la riga com'e' DAVVERO su ogni strada —
+     riuscita, rifiuto e rete caduta. Qui basta annullare il timer,
+     o un velo comparirebbe DOPO la risposta. */
+  return ()=>clearTimeout(t);
+}
+
+/* La bandierina del doppio tocco: da quando il si' si aspetta, la
+   finestra e' larga quanto il social. Non `bottoneInAttesa` per la
+   ragione scritta sopra, e niente `disabled` sulle pillole:
+   sbiadirebbero, cioe' sarebbe un secondo velo al posto di quello
+   che il velo gia' dice. */
+let fotoInCorso = false;
+
 /* Il selettore della foto: il server valida la sorgente (esiste
-   davvero?) e, se non e' «nessuna», rifa' subito il francobollo dal
-   social scelto */
+   davvero?) e, se non e' «nessuna», rifa' il francobollo dal social
+   scelto e ASPETTA di averlo prima di rispondere. */
 async function setFotoScelta(scelta){
   haptic();
   if (DEMO) { toast('In demo non ci sono foto vere 🙂'); return; }
+  if (fotoInCorso) return;
+  fotoInCorso = true;
+  const fine = attesaFoto(scelta);
   try {
     const r = await fetch(`${API_BASE}/me/avatar-scelta`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
@@ -20070,11 +20115,23 @@ async function setFotoScelta(scelta){
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     myAvatarScelta = d.scelta;
-    renderIdentita();
+    /* IL NOME DEL FRANCOBOLLO ARRIVA COL SI', e va usato: da quando
+       «Nessuna» spegne la foto anche per lui, riaccendendo il client
+       non ha piu' nessun nome in mano — e quello di prima non
+       servirebbe comunque, che il rinfresco ha appena cancellato il
+       file vecchio (i nomi sono versionati). Chiave assente = server
+       di ieri: si tiene quel che c'e' invece di svuotare. */
+    if ('avatar' in d) myAvatar = d.avatar || '';
+    /* E SI RIDISEGNA ANCHE FUORI DAL CASSETTO: i lettori di myAvatar
+       sono la testata del Profilo e il tappo in testata, e senza
+       questi due la faccia resterebbe li' fino al prossimo /api/me —
+       cioe' il difetto che questo giro esiste per togliere. */
+    renderProfilo(); renderAvatar();
     toast(scelta==='nessuna' ? '👤 Solo l\'iniziale, ovunque'
         : scelta==='nostr'   ? '📷 Foto dal profilo Nostr'
         : '📷 Foto dal profilo Telegram');
   } catch(e) { toast('Rete assente: riprova'); }
+  finally { fine(); renderIdentita(); fotoInCorso = false; }
 }
 
 /* ---- Avvisi: dove ricevere le notifiche sugli affari. Le scelte si

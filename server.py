@@ -24504,6 +24504,30 @@ GIORNI_AVATAR = 7                    # rinfresco opportunistico
 _AVATAR_IN_CORSO: set[int] = set()   # anti-valanga: un fetch per utente
 
 
+def avatar_da_mostrare(avatar: str, scelta: str) -> str:
+    """La foto che si puo' far vedere, dato quel che l'utente ha
+    scelto. Con 'nessuna' NON esce a NESSUNO — nemmeno a lui (ago
+    2026, decisione di Andrea che ROVESCIA la regola della nascita:
+    tappo e testata del Profilo mostravano sempre la propria faccia,
+    perche' quella e' la vista PRIVATA e '' valeva per il pubblico).
+
+    IL PERCHE' DEL ROVESCIAMENTO: chi la spegne non la vuole, e
+    vederla lo stesso sul proprio profilo e' incoerente — ma
+    soprattutto e' quello che faceva sembrare il bottone ROTTO (caso
+    vero dal campo): la scelta si salvava, il pubblico cambiava
+    davvero, e a due dita dal selettore la faccia era ancora li'.
+    Il toast diceva gia' «ovunque»; adesso e' vero.
+
+    IL DATO NON SI PERDE, ed e' cio' che rende la scelta gratuita:
+    la colonna e il file in dispensa non si toccano (il CASE nasconde
+    in uscita, il patto di `condizione_da_mostrare`), quindi
+    riaccendendo la foto torna. E' un giudice PURO e non l'ennesima
+    copia del CASE: quello vive in SQL nelle sei SELECT del pubblico,
+    questo serve i due posti che l'avatar lo maneggiano in Python —
+    /api/me e la risposta del selettore — e si tortura in CI."""
+    return "" if scelta == "nessuna" else (avatar or "")
+
+
 # L'INSEGNA DEL NEGOZIO: il gemello dell'avatar, con due sole
 # differenze e tutte e due dichiarate.
 # 1) Il RITAGLIO e' 3:1 e non quadrato — un'insegna e' larga e bassa, e
@@ -24893,6 +24917,15 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         (u["xp"] or 0) if u else 0) if u else None
     con.close()
     profilo = dict(u) if u else {}
+    # LA FOTO SPENTA NON ESCE NEMMENO A LUI (ago 2026): questa era
+    # l'unica rotta che mandava l'avatar GREZZO — «e' il tuo profilo,
+    # devi vedere cosa hai» — ed e' precisamente cio' che faceva
+    # sembrare rotto il bottone «Nessuna». Il giudice e' lo stesso
+    # della risposta del selettore, cosi' le due strade non possono
+    # dire due cose diverse sulla stessa faccia.
+    if u:
+        profilo["avatar"] = avatar_da_mostrare(
+            u["avatar"], u["avatar_scelta"])
     profilo["admin"] = e_admin(user["id"])
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
@@ -26954,11 +26987,33 @@ async def scegli_avatar(req: Request,
                 (scelta, user["id"]))
     con.commit()
     con.close()
-    # La sorgente e' cambiata: il francobollo in dispensa puo' venire
-    # dall'altro social, si rifa' subito (con 'nessuna' non si scarica)
+    # LA SORGENTE E' CAMBIATA, E QUI SI ASPETTA (ago 2026, decisione
+    # di Andrea): era un `create_task` — la risposta non aspettava — e
+    # andava bene finche' la propria faccia si vedeva comunque. Da
+    # quando «Nessuna» la spegne anche per lui, riaccendendo il client
+    # non ha PIU' NESSUN nome in mano: senza l'attesa resterebbe
+    # l'iniziale fino al prossimo /api/me, cioe' lo stesso «il bottone
+    # non fa niente» rovesciato — e per giunta il rinfresco cancella il
+    # file vecchio (i nomi sono versionati), quindi non basterebbe
+    # rimettere quello di prima.
+    # IL PREZZO E' DICHIARATO: il bottone ci mette quanto ci mette il
+    # social (due chiamate a Telegram, quattro relay per Nostr). Vale
+    # per un gesto raro, e a dirlo c'e' il velo del cassetto.
+    # Con 'nessuna' non si aspetta NIENTE: li' non c'e' niente da
+    # scaricare, e spegnere resta istantaneo.
     if scelta != "nessuna":
-        asyncio.create_task(aggiorna_profilo_social(user["id"]))
-    return {"ok": True, "scelta": scelta}
+        await aggiorna_profilo_social(user["id"])
+    # Il nome del francobollo torna col si': e' quello che permette al
+    # client di rimettere la faccia SUBITO, senza ricaricare. Si
+    # rilegge DOPO il rinfresco, o si direbbe il nome di ieri — e passa
+    # dal giudice, che con 'nessuna' risponde ''.
+    con = db()
+    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    con.close()
+    return {"ok": True, "scelta": scelta,
+            "avatar": avatar_da_mostrare(r["avatar"] if r else "",
+                                         scelta)}
 
 
 # --- Avvisi di ricerca: «dimmi quando esce quello che cerco» ---------

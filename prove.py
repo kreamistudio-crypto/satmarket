@@ -7542,6 +7542,220 @@ def prove_foto_vuota():
                          "<= FOTO_PIATTA_SD" in giudice))
 
 
+def prove_foto_spenta():
+    """«NESSUNA» VUOL DIRE OVUNQUE, ANCHE A LUI (ago 2026, dal campo:
+    «scelgo Nessuna e il bottone sembra non fare niente»).
+
+    La diagnosi diceva che il gesto RIUSCIVA: la scelta si salvava, e in
+    vetrina e nel negozio la foto spariva davvero. Restava dov'era nella
+    vista PRIVATA — tappo e testata del Profilo — perche' /api/me
+    mandava l'avatar GREZZO, ed era una regola scritta: «e' il tuo
+    profilo, devi vedere cosa hai». Solo che il toast diceva «ovunque» e
+    a due dita dal selettore la faccia era ancora li'.
+
+    DECISIONE DI ANDREA: la regola si ROVESCIA — chi la spegne non la
+    vuole. Il dato non si perde (colonna e file restano: il giudice
+    nasconde in USCITA, il patto di `condizione_da_mostrare`), quindi
+    riaccendendo la foto torna.
+
+    E LA META' CHE NON ERA NEL PIANO: rovesciando, riaccendere
+    diventava lo stesso difetto al contrario — il client non ha piu'
+    nessun nome in mano, e quello di prima non servirebbe comunque
+    perche' il rinfresco cancella il file vecchio. Da qui il si' che
+    ASPETTA il social e torna col nome nuovo. Il prezzo (un bottone che
+    ci mette quanto ci mette Telegram o Nostr) e' dichiarato e vale per
+    un gesto raro."""
+    import sqlite3, asyncio
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    giu = pezzo("avatar_da_mostrare")
+    end = pezzo("scegli_avatar")
+    print("\n[«Nessuna» vale ovunque, anche per lui]")
+
+    # --- IL GIUDICE, girato e non guardato -------------------------
+    amb = {}
+    exec(giu, amb)
+    g = amb["avatar_da_mostrare"]
+    prova("con 'nessuna' la foto non esce", "", g("av_ab12cd34_9.jpg",
+                                                  "nessuna"))
+    prova("...con l'automatico esce", "av_ab12cd34_9.jpg",
+          g("av_ab12cd34_9.jpg", ""))
+    prova("...con Telegram pure", "av_ab12cd34_9.jpg",
+          g("av_ab12cd34_9.jpg", "telegram"))
+    prova("...e con Nostr", "av_ab12cd34_9.jpg",
+          g("av_ab12cd34_9.jpg", "nostr"))
+    prova("chi non ha foto non ne guadagna una", "", g("", "telegram"))
+    prova("il None non diventa mai 'None'", "", g(None, ""))
+
+    # --- /api/me: era l'unica rotta che la mandava grezza ----------
+    _me = pezzo("mio_profilo")
+    prova("/api/me passa dal giudice", True,
+          "avatar_da_mostrare(" in codice(_me))
+    # ⚠️ la riga vale solo se sta DOPO il dict(u), o riscriverebbe una
+    # chiave che il dict rimette grezza subito dopo
+    prova("...e DOPO il dict(u), o il grezzo la ricoprirebbe", True,
+          _me.index("profilo = dict(u)") < _me.index("avatar_da_mostrare("))
+    # il CASE del pubblico non si tocca: sei SELECT che dicono gia' la
+    # stessa cosa in SQL
+    prova("il CASE del pubblico resta dov'era", True,
+          src.count("avatar_scelta='nessuna' THEN ''") >= 5)
+
+    # --- IL SI' CHE ASPETTA ----------------------------------------
+    _end = codice(end)
+    prova("il rinfresco si ASPETTA", True,
+          "await aggiorna_profilo_social(" in _end)
+    prova("...e non e' piu' un create_task che nessuno attende", False,
+          "create_task(aggiorna_profilo_social" in _end)
+    prova("con 'nessuna' non si aspetta niente (spegnere e' istantaneo)",
+          True, 'if scelta != "nessuna":' in _end)
+    prova("la risposta porta il nome del francobollo", True,
+          '"avatar": avatar_da_mostrare(' in _end)
+    # LA RIGA CHE VALE IL CANTIERE: rileggere PRIMA direbbe il nome di
+    # ieri, cioe' un file che il rinfresco ha appena cancellato
+    prova("...riletto DOPO il rinfresco", True,
+          _end.index("await aggiorna_profilo_social(")
+          < _end.index("SELECT avatar FROM utenti"))
+
+    # --- IL CLIENT --------------------------------------------------
+    _set = pezzo_js(mini, "async function setFotoScelta(scelta){")
+    prova("il client rimette la faccia col nome che torna", True,
+          "if ('avatar' in d) myAvatar = d.avatar || '';" in _set)
+    # chiave assente = server di ieri: si tiene quel che c'e'
+    prova("...e un server vecchio non gli svuota la faccia", True,
+          "'avatar' in d" in _set)
+    prova("ridisegna anche la testata e il tappo, non solo il cassetto",
+          (True, True),
+          ("renderProfilo()" in _set, "renderAvatar()" in _set))
+    prova("...e la riga del cassetto su OGNI strada (anche il rifiuto)",
+          True, "finally { fine(); renderIdentita();" in _set)
+    prova("la bandierina para il doppio tocco", True,
+          "if (fotoInCorso) return;" in _set)
+
+    # IL VELO E' SUO, e le due esclusioni sono la regola: la ritardata
+    # e' delle sole LETTURE (c'e' il censimento), e bottoneInAttesa
+    # alzerebbe il velo su tutta l'app per un gesto che non muove sats
+    prova("il velo e' quello suo", True, "attesaFoto(scelta)" in _set)
+    prova("...e non uno dei due di casa", (False, False),
+          ("attesaRitardata" in _set, "bottoneInAttesa" in _set))
+    _velo = pezzo_js(mini, "function attesaFoto(scelta){")
+    prova("il velo arma un timer e non tocca subito il DOM", True,
+          "setTimeout(" in _velo
+          and _velo.index("setTimeout(") < _velo.index("fotoStato"))
+    prova("...con la soglia dello stepper, non una sua", True,
+          "}, RITARDO_ATTESA);" in _velo)
+    prova("...e il ripristino ANNULLA il timer (mai un velo dopo il si')",
+          True, "clearTimeout(t)" in _velo)
+    prova("le pillole si spengono mentre si aspetta", True,
+          "pointerEvents = 'none'" in _velo)
+    # i due ganci: senza, il velo non avrebbe dove posarsi
+    prova("la riga della foto ha i suoi due ganci", (True, True),
+          ('id="fotoStato"' in mini, 'id="fotoPillole"' in mini))
+
+    # ================================================================
+    # IL FUNZIONALE: l'endpoint VERO su un database vero
+    # ================================================================
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE utenti(
+        tg_id INT PRIMARY KEY, negozio TEXT DEFAULT '',
+        avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
+        npub TEXT DEFAULT '', npub_verificata INT DEFAULT 0,
+        npub_accesso TEXT DEFAULT '');
+      INSERT INTO utenti(tg_id,negozio,avatar,npub,npub_verificata)
+        VALUES(111,'ab12cd34','av_ab12cd34_100.jpg','npub1zz',1);
+      -- chi una npub non l'ha: la gamba Nostr non gli si offre
+      INSERT INTO utenti(tg_id,negozio) VALUES(222,'cd34ab12');
+      -- il nativo Nostr: una chat Telegram non ce l'ha
+      INSERT INTO utenti(tg_id,negozio,npub_accesso)
+        VALUES(-5,'ef56ab78','npub1qq');
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    social = []
+
+    async def _rinfresca(tg_id):
+        """Il download vero: scrive un nome NUOVO, come _scrivi_avatar
+        (i nomi sono versionati). Se la risposta lo leggesse PRIMA,
+        direbbe ancora quello di ieri — ed e' cio' che questa finta
+        rende visibile."""
+        social.append(tg_id)
+        vero.execute("UPDATE utenti SET avatar=? WHERE tg_id=?",
+                     ("av_ab12cd34_200.jpg", tg_id))
+        vero.commit()
+
+    def scegli(scelta, chi=111):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi,
+               "aggiorna_profilo_social": _rinfresca}
+        exec(giu, amb)
+        exec("async " + end, amb)
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb["scegli_avatar"](_Req({"scelta": scelta})))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def riga():
+        return vero.execute("SELECT avatar, avatar_scelta FROM utenti "
+                            "WHERE tg_id=111").fetchone()
+
+    social.clear()
+    r = scegli("nessuna")
+    prova("spegnere: la risposta non porta nessuna foto",
+          {"ok": True, "scelta": "nessuna", "avatar": ""}, r)
+    prova("...e non si e' chiesto niente al social", [], social)
+    prova("...ma il file resta in dispensa: riaccendendo torna",
+          "av_ab12cd34_100.jpg", riga()["avatar"])
+
+    social.clear()
+    r = scegli("telegram")
+    prova("riaccendere: si va a chiedere al social", [111], social)
+    # LA PROVA REGINA: e' il nome NUOVO, non quello di ieri
+    prova("...e la risposta porta la foto NUOVA",
+          {"ok": True, "scelta": "telegram",
+           "avatar": "av_ab12cd34_200.jpg"}, r)
+    prova("...che e' anche quella in colonna", "av_ab12cd34_200.jpg",
+          riga()["avatar"])
+
+    # LE GUARDIE DI SEMPRE NON SI SONO ALLENTATE — e i due casi
+    # vogliono utenti VERI: col tg_id di uno che nel cartone non
+    # c'e', l'endpoint risponde 404 «Profilo non trovato» e la
+    # prova passerebbe per la ragione sbagliata.
+    prova("chi non ha una npub non puo' sceglierla", True,
+          str(scegli("nostr", chi=222)).startswith("400 Prima"))
+    prova("...e il nativo Nostr non ha una chat Telegram", True,
+          str(scegli("telegram", chi=-5)).startswith("400 Questo"))
+    prova("...e la scelta sconosciuta si rifiuta ancora", True,
+          str(scegli("faccina")).startswith("400 Scelta"))
+    # e nessuno dei tre rifiuti ha toccato il social
+    prova("un rifiuto non va a chiedere niente a nessuno", [],
+          social[1:])
+
+
 def prove_avatar():
     """I francobolli degli avatar non vogliono una miniatura (ago 2026).
     _salva_avatar li scrive gia' a 128px e miniatura_jpeg non ingrandisce
@@ -35290,6 +35504,7 @@ def main():
               prove_annullo, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
+              prove_foto_spenta,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,

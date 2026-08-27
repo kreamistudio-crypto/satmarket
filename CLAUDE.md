@@ -4698,13 +4698,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   selettore pieno è dei doppi cittadini), attiva = sorgente EFFETTIVA
   con «(automatico)» quando la scelta è vuota — l'automatico si
   mostra come Telegram anche quando la catena è ripiegata su Nostr,
-  semplificazione dichiarata. «Nessuna» = iniziale ovunque per il
-  pubblico, reversibile: `venditore_avatar` in
-  CAMPI_VETRINA/CAMPI_MIEI/search e `avatar` nel profilo di
-  /api/negozio escono col CASE su 'nessuna' (il nome file non lascia
-  il server, il file resta in dispensa) — mentre tappo e testata del
-  Profilo mostrano sempre la PROPRIA foto (vista privata, `avatar`
-  da /api/me). Frontend: `avatarImg()` (filtro-alfabeto sul nome file)
+  semplificazione dichiarata. «Nessuna» = iniziale OVUNQUE, reversibile:
+  `venditore_avatar` in CAMPI_VETRINA/CAMPI_MIEI/search e `avatar` nel
+  profilo di /api/negozio escono col CASE su 'nessuna' (il nome file
+  non lascia il server, il file resta in dispensa).
+  E DALL'AGO 2026 VALE ANCHE PER LUI (decisione di Andrea, dal campo:
+  «scelgo Nessuna e il bottone sembra non fare niente»), e questa riga
+  ROVESCIA quella di ieri — «tappo e testata del Profilo mostrano
+  sempre la PROPRIA foto (vista privata, `avatar` da /api/me)».
+  IL PERCHÉ DI ALLORA era «è il tuo profilo, devi vedere cosa hai»:
+  ragionevole, e in pratica l'unico effetto era che il gesto sembrava
+  ROTTO — la scelta si salvava, il pubblico cambiava davvero, il toast
+  diceva «ovunque», e a due dita dal selettore la faccia era ancora lì.
+  IL PERCHÉ CHE LO SUPERA sta in una riga: chi la spegne non la vuole.
+  Il giudice è `avatar_da_mostrare(avatar, scelta)`, PURO e con DUE
+  chiamanti — /api/me, che era l'unica rotta a mandarlo grezzo, e la
+  risposta del selettore — e NON è l'ennesima copia del CASE: quello
+  vive in SQL nelle sei SELECT del pubblico, questo serve i due posti
+  che l'avatar lo maneggiano in Python. Il dato non si perde MAI
+  (colonna e file intatti: si nasconde in USCITA, il patto di
+  `condizione_da_mostrare`), quindi riaccendendo la foto torna.
+  E IL SÌ ASPETTA IL SOCIAL, che è la metà che il piano non aveva:
+  rovesciando e basta, RIACCENDERE diventava lo stesso difetto al
+  contrario — il client non ha più nessun nome in mano, e quello di
+  prima non servirebbe comunque perché `_scrivi_avatar` ha appena
+  cancellato il file vecchio (i nomi sono versionati). Quindi
+  `scegli_avatar` fa `await aggiorna_profilo_social` invece del
+  `create_task` di ieri, rilegge la colonna DOPO — o direbbe il nome di
+  ieri, ed è la riga sorvegliata — e torna col nome nuovo, che il
+  client usa per rimettere la faccia SUBITO. Con 'nessuna' non aspetta
+  niente: lì non c'è niente da scaricare, e spegnere resta istantaneo.
+  IL PREZZO È DICHIARATO (decisione di Andrea): il bottone ci mette
+  quanto ci mette il social — due chiamate a Telegram, quattro relay
+  per Nostr — e vale per un gesto raro. La strada scartata era
+  rispondere col nome CORRENTE senza aspettare: istantanea, ma lascia
+  in piedi metà del caso «ho cambiato foto sul social mentre era
+  spenta», che è precisamente quello sollevato.
+  IL VELO È SUO (`attesaFoto`) e le due esclusioni sono la regola:
+  `attesaRitardata` è delle sole LETTURE — c'è il censimento in CI che
+  le nomina, e qui si SCRIVE una colonna — e `bottoneInAttesa`
+  alzerebbe il velo su tutta l'app per un gesto che non muove un sat.
+  Il segnale vive nella riga che sta cambiando: le pillole si spengono
+  e il testo dice cosa sta succedendo, con la soglia `RITARDO_ATTESA`
+  dello stepper (due soglie direbbero due attese diverse per la stessa
+  idea). Su 'nessuna' la risposta arriva sotto soglia e il velo non
+  compare mai. Il ripristino visivo NON sta nel velo: è il
+  `renderIdentita()` del `finally`, che rimette la riga com'è davvero
+  su ogni strada — riuscita, rifiuto e rete caduta.
+  ⚠️ E `setFotoScelta` RIDISEGNA ANCHE FUORI DAL CASSETTO: i lettori di
+  `myAvatar` sono DUE — la testata del Profilo e il tappo — e senza
+  `renderProfilo()` e `renderAvatar()` la faccia resterebbe lì fino al
+  prossimo /api/me, cioè il difetto che il cantiere esiste per
+  togliere. NIENTE MINIATURA nel cassetto (decisione di Andrea): la
+  scelta è fra Telegram, Nostr e nessuna, quindi si sa già cosa si
+  riaccende — bastano le pillole. E l'impostazione NASCE ACCESA
+  (`avatar_scelta` ha DEFAULT ''): è spegnerla che vale ovunque, mai il
+  contrario. Frontend: `avatarImg()` (filtro-alfabeto sul nome file)
   posa l'<img> sopra l'iniziale nei cerchi `.avatar` di dettaglio,
   negozio e Profilo (onerror la toglie: mai un'immagine rotta);
   `renderAvatar()` mette la faccia nel tappo (`.con-foto` spegne
