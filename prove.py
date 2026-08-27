@@ -15145,25 +15145,47 @@ def prove_pagina_acquisto():
           mini.count("https://www.poste.it/cerca-mappe-app/?vieni-in-poste"))
     prova("dentro Telegram si apre con tg.openLink", True,
           "tg.openLink(m.url)" in mini)
-    prova("il giudice dei link e' UNO (linkMappePunti)", 1,
-          mini.count("function linkMappePunti"))
-    # i CHIAMANTI, contati togliendo la definizione: col cantiere
-    # delle reti uno dei due e' finito dentro un ternario e non ha
-    # piu' il `${` davanti — cercare quello contava una superficie
-    # sola e la prova diceva il falso proprio mentre le due c'erano
-    prova("...e lo chiamano le due superfici del punto", 2,
-          mini.count("linkMappePunti(")
-          - mini.count("function linkMappePunti("))
-    # DAL CANTIERE DELLE RETI il giudice prende una LISTA, e la regola
-    # «una rete senza mappa non aggiunge niente» vive nel filtro:
-    # 'Altro' non sta in RETE_MAPPA, quindi cade da se'. La sentinella
-    # ha cambiato FORMA, non lato — resta l'affermazione che un link
-    # fuorviante e' peggio di nessun link.
-    prova("il giudice delle mappe prende una LISTA di reti", True,
-          "function linkMappePunti(reti)" in mini)
+    # IL GIUDICE E' UNO, LE RESE SONO DUE (ago 2026): la frase sale
+    # sopra le due opzioni del tipo e i bottoni restano sotto il
+    # campo, quindi non stanno piu' nello stesso posto della pagina —
+    # e due letture indipendenti delle reti sono due letture che un
+    # giorno diranno reti diverse.
+    _rm = pezzo_js(mini, "function retiMappe(reti){", "\n}")
+    _fr = pezzo_js(mini, "function fraseReti(reti){", "\n}")
+    _mp = pezzo_js(mini, "function mappePunti(reti){", "\n}")
+    _lk = pezzo_js(mini, "function linkMappePunti(reti){", "\n}")
+    prova("il giudice delle reti e' UNO (retiMappe)", 1,
+          mini.count("function retiMappe"))
+    prova("...e le due rese passano da lui, mai da RETE_MAPPA a mano",
+          True, "retiMappe(reti);" in _fr and "retiMappe(reti);" in _mp)
+    # ...e nessun altro legge quella tabella per conto suo: il
+    # censimento e' quel che impedisce alla terza superficie di
+    # domani di rifarsi il filtro in casa e divergere in silenzio
+    prova("...ed e' l'UNICO posto che legge RETE_MAPPA", 0,
+          mini.count("RETE_MAPPA[r]") - _rm.count("RETE_MAPPA[r]"))
+    # LA SENTINELLA DEL FILTRO ha cambiato FORMA, non lato: la regola
+    # «una rete senza mappa non aggiunge niente» vive ora dentro il
+    # giudice, e 'Altro' cade da se' perche' non sta in RETE_MAPPA.
+    prova("il giudice prende una LISTA di reti", True,
+          "function retiMappe(reti)" in mini)
     prova("con 'Altro' nessun link: la mappa sbagliata e' peggio di "
           "nessuna", True,
-          ".map(r => RETE_MAPPA[r]).filter(Boolean)" in mini)
+          "dichiarate.filter(r => RETE_MAPPA[r])" in _rm)
+    # ...e la stessa lista serve la FRASE, o direbbe una rete che
+    # sotto non ha nessun bottone
+    prova("...e la frase nomina le stesse reti dei bottoni", True,
+          "conMappa.map(r => `<b>${esc(r)}</b>`)" in _fr)
+    prova("il giudice dei link resta UNO (linkMappePunti)", 1,
+          mini.count("function linkMappePunti"))
+    # E ADESSO NE HA UN CHIAMANTE SOLO — l'ORDINE, dove frase e
+    # bottoni sono adiacenti e restano com'erano. La prova ha
+    # cambiato lato col perche' scritto: nella cassa le due rese si
+    # chiamano SEPARATE, ed e' tutto il cantiere.
+    prova("...e lo chiama il solo campo dentro l'ordine", 1,
+          mini.count("linkMappePunti(")
+          - mini.count("function linkMappePunti("))
+    prova("...e mette insieme le due rese, senza rifarsi il testo",
+          True, "fraseReti(reti)" in _lk and "mappePunti(reti)" in _lk)
     prova("...e 'Altro' non ha una mappa nel catalogo", False,
           "'Altro':" in mini.split("const RETE_MAPPA")[1][:200])
     prova("nessuna rete dichiarata = tutte le mappe (il «non lo so» "
@@ -15180,6 +15202,119 @@ def prove_pagina_acquisto():
           "linkMappePunti(o.retePunto ? [o.retePunto] : [])" in mini)
     prova("la nota consiglia il locker automatico", True,
           "NOTA_LOCKER" in mini and "locker automatico" in mini)
+
+    # ---- LA FRASE SOPRA LE DUE OPZIONI (ago 2026) -------------------
+    # Chi sceglie il tipo deve gia' sapere con chi spedisce il
+    # venditore: prima la frase viveva DENTRO il campo, cioe' si
+    # leggeva DOPO aver scelto — si sceglieva al buio e il vincolo
+    # arrivava dopo. La posizione qui e' CONTENUTO e non forma.
+    prova("la frase sta sotto la domanda e prima delle due opzioni",
+          True,
+          "<label>Che tipo di punto?</label>\n       ${fraseCorriere"
+          in mini
+          and mini.index("${fraseCorriere")
+          < mini.index("${TIPI_PUNTO.map(tipoPill)"))
+    prova("...e la compone il giudice, non la cassa", 1,
+          mini.count("const fraseCorriere = fraseReti(reti);"))
+    prova("...e i bottoni restano sotto il campo", True,
+          "${mappePunti(reti)}" in mini)
+    # ...e seguono le reti DICHIARATE come la frase (decisione di
+    # Andrea): il filtro sulla rete SCELTA e' morto col cantiere, e
+    # se tornasse la frase direbbe due reti e i bottoni una sola.
+    prova("...e non filtrano piu' sulla rete scelta", False,
+          "retiMappa" in mini)
+    # I DUE TESTI DI IERI NON TORNANO. Il primo prometteva che
+    # andasse bene una rete qualunque — e non lo sappiamo; il secondo
+    # ripeteva locker e punto dopo che erano stati scelti.
+    # ⚠️ Le due formule non si citano nei commenti del client: queste
+    # sentinelle leggono anche quelli.
+    prova("senza reti non si promette piu' che vada bene una rete "
+          "qualunque", False, "qualsiasi rete" in mini)
+    prova("...e la coda che ripeteva locker e punto e' morta", False,
+          "assicurati di indicare" in mini)
+    # E I DUE GIUDICI SI FANNO GIRARE, che una sentinella dice che
+    # esistono e mai cosa rispondono — la lezione ormai ottava. Il
+    # caso che solo l'esecuzione prende e' la rete SENZA MAPPA in
+    # mezzo alle vive ('Altro'): la forma del filtro c'e' comunque,
+    # ma solo girando si vede che la frase non la nomina.
+    import json as _js6, shutil as _sh6, subprocess as _sp6, tempfile as _tf6
+    _node6 = _sh6.which("node")
+    _F6 = "Il venditore spedisce con "
+    _B6 = lambda s: "<b>" + s + "</b>"
+    _GEN6 = ("Il venditore non ha dichiarato con che corriere spedisce: "
+             "InPost e Punto Poste sono le reti più diffuse.")
+    #      (reti dichiarate,          frase attesa,   quanti bottoni)
+    _casi6 = [
+        (["InPost"],                _F6 + _B6("InPost") + ".",         1),
+        (["Poste Italiane"],        _F6 + _B6("Poste Italiane") + ".", 1),
+        (["InPost", "Poste Italiane"],
+         _F6 + _B6("InPost") + " e " + _B6("Poste Italiane") + ".",    2),
+        # nessuna dichiarata: il «non lo so» detto onestamente, e le
+        # due mappe pari — mai la promessa che una valga l'altra
+        ([],                        _GEN6,                             2),
+        # la sola rete senza mappa: niente frase e niente bottoni,
+        # comportamento di ieri — non c'e' niente da promettere
+        (["Altro"],                 "",                                0),
+        # ...e in mezzo a una viva non si nomina: sotto non avrebbe
+        # nessun bottone, e la frase direbbe una rete che i bottoni
+        # non conoscono
+        (["Poste Italiane", "Altro"],
+         _F6 + _B6("Poste Italiane") + ".",                            1),
+        # la stringa nuda, che e' come la chiama il campo dell'ordine
+        # quando la rete c'e': la normalizzazione vive nel giudice
+        ("InPost",                  _F6 + _B6("InPost") + ".",         1),
+    ]
+    if not _node6:
+        salta("i due giudici delle reti rispondono giusto",
+              "node non installato")
+    else:
+        try:
+            _esc6 = mini[mini.index("const esc = s =>"):
+                         mini.index("const el = id =>")]
+            _cost6 = mini[mini.index("const MAPPE_PUNTI = {"):
+                          mini.index("\nfunction apriMappaPunti")]
+            _rmap6 = mini[mini.index("const RETE_MAPPA = {"):]
+            _rmap6 = _rmap6[:_rmap6.index("\n")]
+            _prog6 = (
+                _esc6 + _cost6 + "\n" + _rmap6 + "\n"
+                + pezzo_js(mini, "function retiMappe(reti){", "\n}") + "}\n"
+                + pezzo_js(mini, "function fraseReti(reti){", "\n}") + "}\n"
+                + pezzo_js(mini, "function mappePunti(reti){", "\n}") + "}\n"
+                + "const casi = " + _js6.dumps([c[0] for c in _casi6])
+                + ";\nconsole.log(JSON.stringify(casi.map(r => {\n"
+                "  const f = fraseReti(r), m = mappePunti(r);\n"
+                "  return [f, (m.match(/<button/g) || []).length,\n"
+                "          (f.match(/<b>/g) || []).length];\n"
+                "})));")
+            _f6 = _tf6.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                          encoding="utf-8")
+            _f6.write(_prog6)
+            _f6.close()
+            _r6 = _sp6.run([_node6, _f6.name], capture_output=True,
+                           text=True, timeout=60, encoding="utf-8")
+            os.unlink(_f6.name)
+            _out6 = (_js6.loads(_r6.stdout.strip()) if _r6.returncode == 0
+                     else f"ERRORE: {_r6.stderr[:200]}")
+        except ValueError as _e6:
+            _out6 = f"ANCORA PERSA: {_e6}"
+        prova("i due giudici delle reti rispondono giusto sui sette casi",
+              [[f, b] for _r6b, f, b in _casi6],
+              [[o[0], o[1]] for o in _out6]
+              if isinstance(_out6, list) else _out6)
+        # L'INVARIANTE DEL PUNTO 1, e non e' una sentinella sulla
+        # forma: e' il CONTO, girato — quante reti la frase NOMINA e
+        # quanti bottoni compaiono sotto devono combaciare, o le due
+        # rese dicono reti diverse a due dita di distanza. L'unico
+        # caso escluso e' quello senza reti dichiarate, dove la frase
+        # non ne nomina nessuna e le mappe sono due pari: li' il «non
+        # lo so» E' il messaggio. Scritto come regola e non come
+        # lista, cosi' il caso che qualcuno aggiungera' domani ci
+        # entra da solo.
+        prova("...e frase e bottoni non dicono mai reti diverse",
+              [True] * len(_casi6),
+              [(o[2] == o[1]) if r else True
+               for (r, _f6b, _b6b), o in zip(_casi6, _out6)]
+              if isinstance(_out6, list) else _out6)
 
     # ---- LA MISURA DEL TESTO (ago 2026) ----
     # Il cuore e' UNO: `zoom` sulla radice. La trappola che questa

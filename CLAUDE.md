@@ -14966,6 +14966,64 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si citano nei commenti del client: quelle sentinelle leggono anche
   i commenti — è il modo in cui una prova diventa vacua, o rossa per
   colpa della prosa (la lezione già pagata con `_decifra_contenuto`).
+  E DALL'OTTAVO GIRO LA FRASE STA SOPRA LE DUE OPZIONI (ago 2026,
+  decisione di Andrea): «Il venditore spedisce con InPost» si legge
+  sotto la domanda «Che tipo di punto?» e PRIMA delle due pillole,
+  invece che dentro il campo — cioè DOPO la scelta. Il perché in una
+  riga: chi sceglie deve già sapere con chi spedisce il venditore,
+  sennò sceglie al buio e legge il vincolo dopo.
+  IL GIUDICE È UNO E LE RESE SONO DUE, ed è la parte da non
+  ammorbidire: da questo giro la frase e i bottoni non stanno più
+  nello stesso posto della pagina, e due letture indipendenti delle
+  reti sono due letture che un giorno diranno reti diverse — il patto
+  di `luogoTesto`/`luogoRiga`/`luogoPunto`. `retiMappe` è l'UNICO
+  posto che legge `RETE_MAPPA` (c'è il censimento), `fraseReti` e
+  `mappePunti` ne leggono l'uscita, e `linkMappePunti` le rimette
+  INSIEME per il campo dentro l'ORDINE, dove sono adiacenti e non
+  cambia niente. La frase esce NUDA e la veste chi la mostra: una
+  `.acq-nota` nella cassa, una `.hint` nell'ordine.
+  LA FRASE DICE IL FATTO, IL VINCOLO LO DICE LA LABEL: la coda che
+  ripeteva locker e punto è caduta, perché arrivava DOPO che locker e
+  punto erano appena stati scelti — mentre «dev'essere un punto di
+  QUELLA rete» sta già nella label del campo («nome o indirizzo del
+  punto InPost»), a un centimetro da dove si scrive. Il grassetto sui
+  nomi è la lingua che il cassetto ha già (`rigaPuntoAltrove`).
+  ⚠️ SENZA RETI DICHIARATE il testo NON PROMETTE PIÙ che vada bene
+  una rete qualunque (era il caso da guardare, punto 2 di Andrea):
+  non lo sappiamo, sappiamo solo che il venditore non l'ha detto —
+  quindi si dice quello, più le due reti più diffuse, che è l'aiuto
+  pratico. Il rimedio — la scelta alla cieca e la correzione
+  dall'ordine — lo dice già la riga onesta fra le note, e ripeterlo
+  dentro il cassetto sarebbe la stessa cosa due volte. Le due formule
+  di ieri sono vietate da una prova e per questo non si citano nei
+  commenti: quelle sentinelle leggono anche i commenti.
+  I BOTTONI SEGUONO LE RETI DICHIARATE come la frase (decisione di
+  Andrea): uno solo se il venditore ne ha dichiarata una, tutti e due
+  se le ha dichiarate entrambe. ⚠️ ROVESCIA il «una rete, una mappa»
+  del cantiere delle reti, dove con due dichiarate la mappa seguiva
+  quella SCELTA. IL PERCHÉ DI ALLORA RESTA VERO e va tenuto, che è
+  quello che torna in mente: dopo aver scelto InPost, la mappa Poste
+  porta a un punto della rete sbagliata — cioè il difetto che il
+  cassetto esiste per prevenire. A tenerlo a bada c'è la label del
+  campo, che nomina la rete SCELTA due righe più giù; se in rodaggio
+  si vedrà un punto della rete sbagliata proprio da un venditore con
+  DUE reti, la leva è una riga (`mappePunti` torna a ricevere la
+  rete scelta) e la frase resta com'è.
+  LA CRESCITA È MISURATA, ed è il punto 3: a 320px il cassetto cresce
+  di **+27px** con una rete e **+17px** con due, ma SOLO finché il
+  tipo non è scelto — a cassetto PIENO si ACCORCIA (−45px con una
+  rete, −31 senza nessuna), perché il testo ha perso la coda e la
+  `.acq-nota` è più compatta della `.hint`. Con la sola 'Altro' non
+  cambia un pixel: lì non esce né frase né bottoni, comportamento di
+  ieri. Zero sbordo alle tre larghezze nei due temi.
+  E LA PROVA CHE CONTA FA GIRARE I DUE GIUDICI (le sentinelle dicono
+  che esistono e mai cosa rispondono — la lezione ormai ottava), coi
+  sette casi e con l'INVARIANTE del giudice unico: quante reti la
+  frase NOMINA e quanti bottoni compaiono sotto devono combaciare,
+  scritto come regola e non come lista, così il caso di domani ci
+  entra da solo. L'unico escluso è quello senza reti, dove la frase
+  non ne nomina nessuna e le mappe sono due pari: lì il «non lo so» È
+  il messaggio.
   I PUNTI SALVATI, E LA RIGA CHE SPIEGA UN VUOTO (ago 2026). Chi
   compra si tiene il suo locker — tabella `punti_ritiro`, uno per
   rete, si salva col tocco su «📍 Ricorda questo punto» sotto il

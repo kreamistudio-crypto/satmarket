@@ -12947,9 +12947,6 @@ function renderAcquisto(){
     ? `<label>Con quale corriere?</label>
        <div class="fila-reti">${reti.map(retePill).join('')}</div>`
     : '';
-  /* la mappa segue la rete SCELTA quando c'e' una scelta da fare: e'
-     tutto il punto della fila qui sopra — una rete, una mappa */
-  const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
   /* LA SECONDA DOMANDA: locker automatico o punto col banco (ago
      2026, la meta' che mancava). Un locker e una tabaccheria non
      sono la stessa consegna — chi vende compra un'ETICHETTA DIVERSA,
@@ -12972,7 +12969,21 @@ function renderAcquisto(){
     `<button type="button" class="pill${d.tipoPunto===t.id?' pill-trust':''}"
        data-tipo="${t.id}" onclick="setTipoPuntoAcquisto(this.dataset.tipo)"
        style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`;
+  /* LA FRASE STA SOPRA LE DUE OPZIONI (ago 2026, decisione di
+     Andrea): chi sceglie deve gia' sapere con chi spedisce il
+     venditore — sennò sceglie al buio e legge il vincolo dopo, che
+     e' esattamente quel che succedeva quando la frase viveva dentro
+     il campo, cioe' DOPO la scelta del tipo. Il testo lo compone
+     `fraseReti`, il giudice unico che serve anche i bottoni qui
+     sotto: due letture delle reti nella stessa pagina sono due
+     letture che un giorno diranno reti diverse.
+     La veste e' la `.acq-nota` del cassetto (la stessa di
+     `rigaPuntoAltrove` e della riga dell'email), col respiro
+     riscritto a mano: appartiene alla scelta che segue, quindi sta
+     piu' vicina alle pillole che alla domanda. */
+  const fraseCorriere = fraseReti(reti);
   const scelteTipo = `<label>Che tipo di punto?</label>
+       ${fraseCorriere ? `<div class="acq-nota" style="margin:4px 0 8px">${fraseCorriere}</div>` : ''}
        <div class="fila-reti">${TIPI_PUNTO.map(tipoPill).join('')}</div>`;
   /* IL CAMPO ARRIVA DOPO LE SCELTE (ago 2026, decisione di Andrea):
      prima il corriere, poi locker o banco, e SOLO ALLORA si scrive
@@ -12982,8 +12993,9 @@ function renderAcquisto(){
      un campo aperto prima invita a scrivere un indirizzo che poi va
      ripensato. Con questa regola la vecchia riga «Scegli prima il
      corriere: la mappa e' diversa per ognuno» non serve piu' — quel
-     caso adesso non ha un campo da spiegare — e quando il campo
-     compare la mappa della rete scelta e' li' sotto.
+     caso adesso non ha un campo da spiegare — e chi spedisce il
+     venditore si legge SOPRA le due opzioni, prima di sceglierle
+     (`fraseCorriere`, il giro dopo).
      SENZA NESSUN CORRIERE DICHIARATO il campo resta disponibile
      SUBITO, com'era (decisione di Andrea): li' non c'e' nessuna
      cascata da rispettare, la mappa non si sa quale sia (si mostrano
@@ -12999,7 +13011,7 @@ function renderAcquisto(){
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
-    ${linkMappePunti(retiMappa)}
+    ${mappePunti(reti)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
      dentro lo STESSO cassetto — cosi' eredita per costruzione lo
@@ -23246,41 +23258,82 @@ async function inviaObiezione(btn){
   } catch(e) { toast('Errore di rete'); }
   finally { fine(); }
 }
-function linkMappePunti(reti){
+/* IL GIUDICE DELLE RETI E' UNO, LE RESE SONO DUE (ago 2026,
+   decisione di Andrea: la frase sale SOPRA le due opzioni del tipo,
+   i bottoni restano sotto il campo). Da quel giorno le due cose non
+   stanno piu' nello stesso posto della pagina — e due letture
+   indipendenti delle reti sono due letture che un giorno diranno
+   reti diverse: e' il patto di luogoTesto/luogoRiga/luogoPunto, un
+   giudice e due rese.
+   LE TRE REGOLE DI SEMPRE VIVONO QUI e in nessun altro posto: con le
+   reti dichiarate si tengono SOLO quelle che una mappa ce l'hanno
+   davvero (una rete senza mappa — oggi 'Altro' — non aggiunge
+   niente, che un link fuorviante e' peggio di nessun link); senza
+   reti dichiarate tutte e due, pari, che e' il «non lo so» detto
+   onestamente; e con la sola 'Altro' non esce NIENTE, ne' frase ne'
+   bottoni — comportamento di ieri, niente da promettere. */
+function retiMappe(reti){
   const dichiarate = Array.isArray(reti) ? reti : (reti ? [reti] : []);
-  /* niente reti = non si sa, quindi tutte; con le reti si tengono
-     solo quelle che una mappa ce l'hanno davvero */
-  const mappe = dichiarate.length
-    ? dichiarate.map(r => RETE_MAPPA[r]).filter(Boolean)
-    : ['inpost', 'poste'];
-  if (!mappe.length) return '';
-  /* IL MESSAGGIO DICE LA RETE (ago 2026, chiesto da Andrea): chi
-     sceglie un punto deve sapere di che rete dev'essere, PRIMA di
-     sbagliare. Parla delle reti che ha davanti — nella cassa con due
-     dichiarate il campo appare a rete gia' SCELTA, quindi qui ne
-     arriva una e il messaggio nomina quella (piu' preciso del
-     generico); il ramo a due resta per chi passa le reti non
-     filtrate. Con la sola 'Altro' non si arriva qui (nessuna mappa,
-     return sopra): comportamento di ieri, niente da promettere. */
   const conMappa = dichiarate.filter(r => RETE_MAPPA[r]);
-  const msg = !dichiarate.length
-    ? 'Il venditore non ha ancora dichiarato il corriere: puoi '
-      + 'indicare un punto di qualsiasi rete — InPost e Punto Poste '
-      + 'sono le più diffuse.'
-    : conMappa.length >= 2
-      ? `Il venditore spedisce con ${esc(conMappa.join(' e '))}: `
-        + 'indica un locker o un punto di una di queste reti.'
-      : conMappa[0] === 'InPost'
-        ? 'Il venditore spedisce con InPost: assicurati di indicare '
-          + 'un locker o un punto InPost.'
-        : 'Il venditore spedisce con Poste Italiane: assicurati di '
-          + 'indicare un Punto Poste.';
+  return {dichiarate, conMappa,
+          mappe: dichiarate.length ? conMappa.map(r => RETE_MAPPA[r])
+                                   : ['inpost', 'poste']};
+}
+
+/* LA FRASE DICE IL FATTO, e il VINCOLO lo dice la label del campo
+   («nome o indirizzo del punto InPost»), che nomina gia' la rete a
+   un centimetro da dove si scrive: la vecchia coda ripeteva locker e
+   punto DOPO che locker e punto erano appena stati scelti, cioe' la
+   stessa cosa detta due volte a due dita di distanza.
+   ⚠️ SENZA RETI NON SI PROMETTE PIU' CHE VADA BENE UNA RETE
+   QUALUNQUE: non lo sappiamo — sappiamo solo che il venditore non
+   l'ha detto — e il rimedio (la scelta alla cieca, la correzione
+   dall'ordine) lo dice gia' la riga onesta fra le note. Le due
+   formule di ieri sono vietate da una prova, e per questo qui non si
+   citano: quella sentinella legge anche i commenti.
+   IL TESTO ESCE NUDO e lo veste chi lo mostra: nella cassa e' una
+   `.acq-nota` sopra le pillole del tipo, nell'ordine una `.hint`
+   accanto ai bottoni. Il grassetto sui nomi e' la lingua che il
+   cassetto ha gia' (`rigaPuntoAltrove`, due righe piu' giu').
+   L'elenco e' un `join(' e ')` e basta perche' RETE_MAPPA ha DUE
+   chiavi: il giorno che ne avesse tre, «A e B e C» sara' brutto ma
+   non falso. */
+function fraseReti(reti){
+  const {dichiarate, conMappa, mappe} = retiMappe(reti);
+  if (!mappe.length) return '';
+  if (!dichiarate.length)
+    return 'Il venditore non ha dichiarato con che corriere spedisce: '
+         + 'InPost e Punto Poste sono le reti più diffuse.';
+  return 'Il venditore spedisce con '
+       + conMappa.map(r => `<b>${esc(r)}</b>`).join(' e ') + '.';
+}
+
+/* I BOTTONI SONO LO STRUMENTO, e seguono le reti DICHIARATE come la
+   frase (decisione di Andrea): uno solo se il venditore ne ha
+   dichiarata una, tutti e due se le ha dichiarate entrambe.
+   ⚠️ ROVESCIA il «una rete, una mappa» di ieri, dove con due reti
+   dichiarate la mappa seguiva quella SCELTA nella fila qui sopra. Il
+   perche' di allora resta vero e va tenuto, che e' quello che torna
+   in mente: dopo aver scelto InPost, la mappa Poste porta a un punto
+   della rete sbagliata. A tenerlo a bada c'e' la label del campo,
+   che nomina la rete SCELTA due righe piu' giu'. */
+function mappePunti(reti){
+  const {mappe} = retiMappe(reti);
+  if (!mappe.length) return '';
   const link = mappe.map(r =>
     `<button type="button" class="btn mini" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
   ).join(' ');
-  return `<div class="hint" style="margin-top:6px">${msg}</div>`
-       + `<div class="mappe-punti">${link}</div>`
+  return `<div class="mappe-punti">${link}</div>`
        + `<div class="hint" style="margin-top:6px">${NOTA_LOCKER}</div>`;
+}
+
+/* Le due rese INSIEME, per il campo dentro l'ORDINE: li' la frase e
+   i bottoni sono adiacenti e restano dov'erano. Nella cassa invece
+   si chiamano separate — e' tutto il cantiere. */
+function linkMappePunti(reti){
+  const f = fraseReti(reti);
+  return (f ? `<div class="hint" style="margin-top:6px">${f}</div>` : '')
+       + mappePunti(reti);
 }
 
 /* Il punto di ritiro dal campo dell'ordine (dal quarto giro la rete
