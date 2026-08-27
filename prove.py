@@ -15217,12 +15217,27 @@ def prove_pagina_acquisto():
     prova("...e la compone il giudice, non la cassa", 1,
           mini.count("const fraseCorriere = fraseReti(reti);"))
     prova("...e i bottoni restano sotto il campo", True,
-          "${mappePunti(reti)}" in mini)
-    # ...e seguono le reti DICHIARATE come la frase (decisione di
-    # Andrea): il filtro sulla rete SCELTA e' morto col cantiere, e
-    # se tornasse la frase direbbe due reti e i bottoni una sola.
-    prova("...e non filtrano piu' sulla rete scelta", False,
-          "retiMappa" in mini)
+          "${mappePunti(retiMappa)}" in mini)
+    # ...E SEGUONO LA RETE SCELTA, non le dichiarate come la frase
+    # (ago 2026, decisione di Andrea dal campo: un pacco fermo per un
+    # punto sbagliato). Dopo aver scelto InPost un bottone verso
+    # Poste porta alla rete sbagliata, cioe' al difetto che il
+    # cassetto esiste per prevenire.
+    # ⚠️ QUESTA SENTINELLA HA CAMBIATO LATO DUE VOLTE, e va detto
+    # perche' non se ne cambi una terza per simmetria: nacque cosi'
+    # («una rete, una mappa»), per un giorno ha chiesto il contrario
+    # — le dichiarate, come la frase — e a rovesciare quel giorno e'
+    # stato un FATTO dal campo, non un ripensamento. La prima e la
+    # terza dicono la stessa cosa: e' il giro di mezzo l'eccezione.
+    prova("...e seguono la rete SCELTA, che la frase e' un'altra "
+          "domanda", True,
+          "const retiMappa = sceglieRete ? (d.rete ? [d.rete] : [])"
+          " : reti;" in mini)
+    # E IL GIUDICE RESTA UNO anche adesso che gli argomenti sono due:
+    # a divergere non sono le LETTURE di RETE_MAPPA (quella e' una
+    # sola, c'e' il censimento qui sotto) ma cosa gli si passa.
+    prova("...e la cassa non si rifa' il filtro a mano", False,
+          "RETE_MAPPA[" in mini.split("function retiMappe")[0])
     # I DUE TESTI DI IERI NON TORNANO. Il primo prometteva che
     # andasse bene una rete qualunque — e non lo sappiamo; il secondo
     # ripeteva locker e punto dopo che erano stati scelti.
@@ -15301,15 +15316,23 @@ def prove_pagina_acquisto():
               [[f, b] for _r6b, f, b in _casi6],
               [[o[0], o[1]] for o in _out6]
               if isinstance(_out6, list) else _out6)
-        # L'INVARIANTE DEL PUNTO 1, e non e' una sentinella sulla
-        # forma: e' il CONTO, girato — quante reti la frase NOMINA e
-        # quanti bottoni compaiono sotto devono combaciare, o le due
-        # rese dicono reti diverse a due dita di distanza. L'unico
-        # caso escluso e' quello senza reti dichiarate, dove la frase
-        # non ne nomina nessuna e le mappe sono due pari: li' il «non
-        # lo so» E' il messaggio. Scritto come regola e non come
-        # lista, cosi' il caso che qualcuno aggiungera' domani ci
-        # entra da solo.
+        # L'INVARIANTE DEL GIUDICE UNICO, e non e' una sentinella
+        # sulla forma: e' il CONTO, girato — a PARITA' DI ARGOMENTO,
+        # quante reti la frase NOMINA e quanti bottoni compaiono
+        # devono combaciare. L'unico caso escluso e' quello senza
+        # reti dichiarate, dove la frase non ne nomina nessuna e le
+        # mappe sono due pari: li' il «non lo so» E' il messaggio.
+        # Scritto come regola e non come lista, cosi' il caso che
+        # qualcuno aggiungera' domani ci entra da solo.
+        # ⚠️ DELL'ARGOMENTO E NON DELLA PAGINA, ed e' la riga da
+        # leggere prima di allargarlo: nella CASSA i due argomenti
+        # sono diversi apposta (la frase le reti dichiarate, i
+        # bottoni quella scelta), quindi li' con due reti la frase ne
+        # nomina due e il bottone e' uno — e' voluto, non una
+        # divergenza. Cio' che questa prova garantisce e' che a non
+        # divergere sia il GIUDICE: nessuno rilegge RETE_MAPPA per
+        # conto suo. Nel campo dentro l'ORDINE l'argomento e' uno
+        # solo, e li' la coppia combacia sempre.
         prova("...e frase e bottoni non dicono mai reti diverse",
               [True] * len(_casi6),
               [(o[2] == o[1]) if r else True

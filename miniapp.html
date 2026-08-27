@@ -12973,10 +12973,14 @@ function renderAcquisto(){
      Andrea): chi sceglie deve gia' sapere con chi spedisce il
      venditore — sennò sceglie al buio e legge il vincolo dopo, che
      e' esattamente quel che succedeva quando la frase viveva dentro
-     il campo, cioe' DOPO la scelta del tipo. Il testo lo compone
-     `fraseReti`, il giudice unico che serve anche i bottoni qui
-     sotto: due letture delle reti nella stessa pagina sono due
-     letture che un giorno diranno reti diverse.
+     il campo, cioe' DOPO la scelta del tipo.
+     LA FRASE DICE LE RETI DICHIARATE, I BOTTONI QUELLA SCELTA, e le
+     due cose rispondono a domande diverse: qui si dice con chi
+     spedisce il venditore PRIMA che tu scelga, li' sotto si porta
+     alla mappa di dove stai per cercare. Il giudice resta UNO
+     (`retiMappe`, l'unico che legge RETE_MAPPA): a cambiare e' cosa
+     gli si passa, non chi legge — due LETTURE della stessa tabella
+     sarebbero due letture che un giorno divergono, due argomenti no.
      La veste e' la `.acq-nota` del cassetto (la stessa di
      `rigaPuntoAltrove` e della riga dell'email), col respiro
      riscritto a mano: appartiene alla scelta che segue, quindi sta
@@ -13006,12 +13010,25 @@ function renderAcquisto(){
      PER QUESTO LE GUARDIE RESTANO IN QUEST'ORDINE (rete → tipo →
      punto): quando scatta la terza il campo esiste per costruzione,
      e nessun toast manda a un campo che non c'e'. */
+  /* LA MAPPA SEGUE LA RETE SCELTA (ago 2026, decisione di Andrea
+     dal campo: un pacco fermo per un punto sbagliato). Dopo aver
+     scelto InPost, un bottone verso Poste porta a un punto della
+     rete sbagliata — cioe' il difetto che questo cassetto esiste
+     per prevenire, offerto da noi con un tocco.
+     ⚠️ E' un RITORNO e non un'oscillazione: la regola nacque cosi'
+     («una rete, una mappa»), per un giorno i bottoni hanno seguito
+     le DICHIARATE come la frase, e a rovesciare quel giorno e'
+     stato un FATTO — non un ripensamento. Chi lo rigirasse una
+     terza volta porti un fatto nuovo, non una simmetria.
+     Senza scelta (una rete sola, o nessuna) valgono le dichiarate,
+     che e' anche quel che la frase dice. */
+  const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
   const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipoPunto;
   const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
-    ${mappePunti(reti)}
+    ${mappePunti(retiMappa)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
      dentro lo STESSO cassetto — cosi' eredita per costruzione lo

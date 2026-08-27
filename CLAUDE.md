@@ -14997,18 +14997,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dentro il cassetto sarebbe la stessa cosa due volte. Le due formule
   di ieri sono vietate da una prova e per questo non si citano nei
   commenti: quelle sentinelle leggono anche i commenti.
-  I BOTTONI SEGUONO LE RETI DICHIARATE come la frase (decisione di
-  Andrea): uno solo se il venditore ne ha dichiarata una, tutti e due
-  se le ha dichiarate entrambe. ⚠️ ROVESCIA il «una rete, una mappa»
-  del cantiere delle reti, dove con due dichiarate la mappa seguiva
-  quella SCELTA. IL PERCHÉ DI ALLORA RESTA VERO e va tenuto, che è
-  quello che torna in mente: dopo aver scelto InPost, la mappa Poste
-  porta a un punto della rete sbagliata — cioè il difetto che il
-  cassetto esiste per prevenire. A tenerlo a bada c'è la label del
-  campo, che nomina la rete SCELTA due righe più giù; se in rodaggio
-  si vedrà un punto della rete sbagliata proprio da un venditore con
-  DUE reti, la leva è una riga (`mappePunti` torna a ricevere la
-  rete scelta) e la frase resta com'è.
+  I BOTTONI SEGUONO LA RETE SCELTA, LA FRASE LE DICHIARATE (ago 2026,
+  decisione di Andrea DAL CAMPO: quella settimana un pacco si è
+  fermato per un punto sbagliato). Sono due domande diverse e per
+  questo hanno due risposte: la frase dice con chi spedisce il
+  venditore PRIMA che tu scelga, il bottone porta alla mappa di dove
+  stai per cercare ADESSO — e dopo aver scelto InPost, un bottone
+  verso Poste è un invito allo sbaglio offerto da noi con un tocco.
+  ⚠️ QUESTA RIGA HA CAMBIATO LATO DUE VOLTE IN DUE GIORNI, e va
+  detto perché non se ne cambi una terza per simmetria: nacque così
+  col cantiere delle reti («una rete, una mappa»), per UN GIORNO i
+  bottoni hanno seguito le DICHIARATE come la frase, e a rovesciare
+  quel giorno è stato un FATTO e non un ripensamento. La prima e la
+  terza stesura dicono la stessa cosa: è il giro di mezzo l'eccezione.
+  NON È IL CASO DELL'«ATTESO CHE CAMBIA DUE VOLTE», ed è la
+  distinzione da tenere: là un valore si riscriveva per inseguire il
+  modello, qui si è tornati al punto di partenza portando una prova
+  dal mondo. Chi lo rigirasse una quarta volta porti un fatto nuovo,
+  non un'idea di coerenza.
+  IL GIUDICE RESTA UNO anche adesso che gli argomenti sono due, ed è
+  la riga che rende sicuro il rovesciamento: a divergere non sono le
+  LETTURE di `RETE_MAPPA` — quella è una sola, `retiMappe`, col
+  censimento — ma cosa gli si passa. Due letture della stessa tabella
+  un giorno dicono reti diverse, due argomenti no. Nel campo dentro
+  l'ORDINE l'argomento resta uno e la coppia combacia sempre.
+  E LA PROVA DELL'INVARIANTE È DELL'ARGOMENTO E NON DELLA PAGINA:
+  «quante reti la frase nomina, tanti bottoni» vale a PARITÀ DI
+  ARGOMENTO — nella cassa con due reti la frase ne nomina due e il
+  bottone è uno, ed è voluto. Il commento che prometteva la coppia
+  sulla PAGINA è stato corretto insieme al codice: un commento che
+  promette più di quel che la prova garantisce è la stessa famiglia
+  del «perché» dell'allarme che diceva il falso.
   LA CRESCITA È MISURATA, ed è il punto 3: a 320px il cassetto cresce
   di **+27px** con una rete e **+17px** con due, ma SOLO finché il
   tipo non è scelto — a cassetto PIENO si ACCORCIA (−45px con una
@@ -15016,6 +15035,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.acq-nota` è più compatta della `.hint`. Con la sola 'Altro' non
   cambia un pixel: lì non esce né frase né bottoni, comportamento di
   ieri. Zero sbordo alle tre larghezze nei due temi.
+  E COL BOTTONE UNICO IL CASO A DUE RETI SI ACCORCIA DI 45px: a 320
+  il blocco delle mappe passa da 82 a 37 — il secondo bottone non ci
+  sta in riga e se ne prende una intera. Quindi il rovesciamento dei
+  bottoni non costa spazio, ne restituisce: quel cassetto è il più
+  alto che la pagina abbia (620px pieno a 320), e i 45 tolti sono la
+  cosa migliore che gli sia capitata.
   E LA PROVA CHE CONTA FA GIRARE I DUE GIUDICI (le sentinelle dicono
   che esistono e mai cosa rispondono — la lezione ormai ottava), coi
   sette casi e con l'INVARIANTE del giudice unico: quante reti la
