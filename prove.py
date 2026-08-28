@@ -29802,7 +29802,13 @@ def prove_scoprire():
     # lungo si perdeva in un angolo. SOLO il suo: le sorelle quella
     # scatola la riempiono davvero, e allargarle le manderebbe a capo
     # — quindi l'override e' UNO, e la base non si tocca.
-    prova("il titolo del P2P ha la sua regola, e solo lui", (True, 1),
+    # LE REGOLE SONO DUE dall'ago 2026 — la mobile e la sua gemella
+    # desktop, scalata col fattore della card — e il conteggio dice
+    # DUE apposta: «e solo lui» non si e' allentato, e infatti la
+    # riga qui sotto continua a chiedere che nessun'altra card
+    # sposti il suo titolo. Chi ne aggiungesse una TERZA (una terza
+    # misura? un ripensamento sul mobile?) viene a leggere qui.
+    prova("il titolo del P2P ha la sua regola, e solo lui", (True, 2),
           ('.scoprire-card[data-id="p2p"] .sc-titolo{'
            'left:30px;font-size:20px}' in mini,
            mini.count('data-id="p2p"] .sc-titolo{')))
@@ -29831,11 +29837,23 @@ def prove_scoprire():
     # il file, o la prova trova la stringa dentro SE STESSA e resta
     # rossa per sempre. 2) E si prende l'ULTIMA occorrenza dell'ancora,
     # perche' la PRIMA e' la riga qui sotto — quella che la cerca.
-    _fascia = _io[_io.rindex("_QUIETE = 3, CARD_H"):]
+    # ⚠️ L'ANCORA VIVE SOLO NEL CODICE, e non e' pignoleria: prima
+    # era la riga `_QUIETE = 3, CARD_H`, e quando il cantiere del web
+    # l'ha cambiata `rindex` ha trovato la sola occorrenza rimasta —
+    # quella dentro QUESTA prova — cosi' il frammento e' diventato la
+    # prova stessa, che la stringa vietata la contiene per forza. Verde
+    # per la ragione sbagliata, poi rossa per la ragione sbagliata.
+    _fascia = _io[_io.rindex("for _dove, _cw, _ch, _pb, _po in _MISURE:"):]
     prova("...e la fascia larga si deriva dall'altezza della card",
           (True, False),
-          ("(_ALTA - _QUIETE) * _F" in _fascia,
+          ("(_ch - _QUIETE) * _F" in _fascia,
            "_y1 = 30, 315" in _fascia))
+    # ...e il fattore fra il file e la card si LEGGE dal file, invece
+    # di essere il 3 fisso di quando la card era una sola: e' quel che
+    # rende la prova capace di girare su tutte e due le misure
+    prova("...e il fattore file/card non e' piu' un numero fisso",
+          (True, False),
+          ("_F = _im.size[0] / _cw" in _fascia, "_F = 3" in _fascia))
     # tre: l'aria-label della card, la riserva e il titolo — un
     # quarto posto sarebbe un doppione da guardare
     prova("...e il testo e' quello del catalogo, tre volte", 3,
@@ -29900,8 +29918,12 @@ def prove_scoprire():
             _p = _b[_b.index(chiave) + len(chiave):]
             return float(re.match(r"[\d.]+", _p).group())
 
-        _base = _blocco(".sc-titolo{")
-        _largo, _passo = _num(_base, "width:"), _num(_base, "line-height:")
+        # la base MOBILE si ancora all'indentazione, o il find
+        # prenderebbe la variante desktop, che contiene la stessa
+        # sottostringa (oggi sta dopo nel foglio, ma «dopo» non e'
+        # una garanzia: e' l'ordine di scrittura di qualcun altro)
+        _base = _blocco("\n  .sc-titolo{")
+        _passo = _num(_base, "line-height:")
         # _F e' il triplo dei file, _ALTA la card, _M il margine
         # dell'onda. _QUIETE sono i 10px CSS di margine sopra e sotto
         # della fascia larga: erano scritti a mano in coordinate
@@ -29910,29 +29932,71 @@ def prove_scoprire():
         # titolo stava ieri. Derivati, la fascia e' la STESSA e non
         # invecchia piu': non e' un allentamento, e' la stessa regola
         # scritta in modo che segua il CSS come gia' fa tutto il resto.
-        _F, _ALTA, _M, _QUIETE = 3, CARD_H, 12, 10
-        for _f, _testo in BANNER.items():
-            _ov = _blocco('.scoprire-card[data-id="%s"] .sc-titolo{'
-                          % _f.rsplit(".", 1)[0])
-            _sx = _num(_ov, "left:", _num(_base, "left:"))
-            _corpo = _num(_ov, "font-size:", _num(_base, "font-size:"))
-            _im = _Im.open(os.path.join(
-                "assets", "scoprire", _f)).convert("RGB")
-            # un em per carattere: stima per ECCESSO, mai per difetto
-            _w = len(_testo) * _corpo
-            if _w <= _largo:            # ci sta in riga: fascia stretta
-                _h = _corpo * _passo
-                _y0 = round((_ALTA - _h) / 2 * _F) - _M
-                _y1 = round((_ALTA + _h) / 2 * _F) + _M
-                _x1 = round((_sx + _w) * _F) + _M
-            else:                       # va a capo: la fascia di sempre
-                _y0, _y1 = _QUIETE * _F, (_ALTA - _QUIETE) * _F
-                _x1 = round((_sx + _largo) * _F) + _M
-            _lmax = max(_lum(_im.getpixel((x, y)))
-                        for y in range(_y0, _y1, 3)
-                        for x in range(round(_sx * _F), _x1, 3))
-            prova(f"la fascia del titolo regge la crema ({_f})", True,
-                  (_lc + .05) / (_lmax + .05) >= 4.5)
+        _M, _QUIETE = 12, 10
+        # ...E SI GIRA PER OGNI MISURA DELLA CARD (ago 2026, col
+        # cantiere della crescita sul web): la card non e' piu' una
+        # sola — da 768px in su, fuori da Telegram, e' 400x191 col
+        # titolo scalato dello stesso fattore. Con `_F` inchiodato a 3
+        # questa prova avrebbe continuato a misurare la fascia della
+        # card MOBILE e sarebbe stata CIECA sulla variante web, cioe'
+        # proprio su quella dove il titolo si e' mosso.
+        # `_F` e' il rapporto fra il file e la card, LETTO dal file
+        # (non piu' il 3 fisso): a 272 vale 3, a 400 vale 2,04.
+        # ⚠️ E SE IL TITOLO SCALA COL SUO FATTORE il contrasto e' lo
+        # STESSO per costruzione, non «simile»: la fascia in
+        # coordinate immagine e' identica, perche' `left x k x
+        # (816 / (272 k))` si semplifica. Misurati sui file veri:
+        # 12,34 / 12,57 / 15,40, IDENTICI sulle due misure (e la fascia
+        # in coordinate immagine combacia: x[42..342] di qua e di la').
+        # Chi cresce il titolo PIU' della card lo sposta verso la scia
+        # dorata, e lo sente qui.
+        _webW = re.search(r"html\.fuori-telegram \.scoprire-card\{"
+                          r"width:(\d+)px\}", mini)
+        prova("la card del web dichiara la sua misura nel CSS",
+              True, bool(_webW))
+        _MISURE = [("mobile", CARD_W, CARD_H, "", "")]
+        if _webW:
+            _wW = int(_webW.group(1))
+            # l'aspect-ratio non cambia: l'altezza si DERIVA, o sarebbe
+            # un terzo numero da tenere in pari a mano
+            _MISURE.append(("web", _wW, _wW * CARD_H / CARD_W,
+                            "html.fuori-telegram ", "html.fuori-telegram "))
+        for _dove, _cw, _ch, _pb, _po in _MISURE:
+            # la base della sua misura, col ripiego su quella mobile:
+            # una variante che non ridichiara una proprieta' eredita
+            _bb = _blocco(_pb + ".sc-titolo{") if _pb else _base
+            _sxB = _num(_bb, "left:", _num(_base, "left:"))
+            _cpB = _num(_bb, "font-size:", _num(_base, "font-size:"))
+            _largo = _num(_bb, "width:", _num(_base, "width:"))
+            for _f, _testo in BANNER.items():
+                _ov = _blocco(_po + '.scoprire-card[data-id="%s"]'
+                              ' .sc-titolo{' % _f.rsplit(".", 1)[0])
+                _sx = _num(_ov, "left:", _sxB)
+                _corpo = _num(_ov, "font-size:", _cpB)
+                _im = _Im.open(os.path.join(
+                    "assets", "scoprire", _f)).convert("RGB")
+                _F = _im.size[0] / _cw
+                # un em per carattere: stima per ECCESSO, mai per difetto
+                _w = len(_testo) * _corpo
+                if _w <= _largo:        # ci sta in riga: fascia stretta
+                    _h = _corpo * _passo
+                    _y0 = round((_ch - _h) / 2 * _F) - _M
+                    _y1 = round((_ch + _h) / 2 * _F) + _M
+                    _x1 = round((_sx + _w) * _F) + _M
+                else:                   # va a capo: la fascia di sempre
+                    _y0, _y1 = _QUIETE * _F, (_ch - _QUIETE) * _F
+                    _x1 = round((_sx + _largo) * _F) + _M
+                # la fascia puo' sporgere dal file quando il margine
+                # dell'onda cade sul bordo: si tiene dentro, o il
+                # getpixel alza invece di dire il contrasto
+                _y0 = max(0, int(_y0)); _y1 = min(_im.size[1], int(_y1))
+                _x1 = min(_im.size[0], int(_x1))
+                _lmax = max(_lum(_im.getpixel((x, y)))
+                            for y in range(_y0, _y1, 3)
+                            for x in range(round(_sx * _F), _x1, 3))
+                prova(f"la fascia del titolo regge la crema"
+                      f" ({_f}, {_dove})", True,
+                      (_lc + .05) / (_lmax + .05) >= 4.5)
     except ImportError:
         salta("contrasto del titolo: serve Pillow")
     # lo spegnimento deve VINCERE per specificita': col selettore nudo
@@ -30222,6 +30286,185 @@ def prove_deploy():
     # riga ancora li' da leggere.
     prova("...nel blocco [Service]", True,
           "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
+
+
+def prove_strisce_web():
+    """LE DUE STRISCE PIU' GRANDI SUL WEB (ago 2026): fuori da Telegram
+    e da 768px in su, le card di «Da scoprire» passano da 272x130 a
+    400x191 e quelle delle categorie da 84 a 120 — col titolo dei
+    banner e il nome delle categorie che crescono con loro.
+
+    Le due cose che qui possono rompersi in silenzio, e sono opposte:
+    che la crescita ARRIVI dentro la Mini App (dove il patto e' che non
+    cambi nulla, nemmeno di un byte) e che NON arrivi sul web, se un
+    domani qualcuno legasse la decisione al giudice sbagliato. Piu' la
+    terza, che non fallisce affatto: le immagini che si scalano SU e si
+    ammorbidiscono senza che nessuno lo veda."""
+    print("\n[le due strisce, piu' grandi sul web]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL GIUDICE. Sta nell'anti-flash in testa al file e non in
+    # avvia(): e' una MISURA, e una misura decisa dopo il primo paint si
+    # vedrebbe scattare — la stessa ragione del tema e della scala del
+    # testo, che vivono nello stesso blocco.
+    _testa = mini[:mini.index("</head>")]
+    prova("il giudice vive nella testa, prima del primo paint", True,
+          "classList.add('fuori-telegram')" in _testa)
+    # ...e guarda initData. E' LA RIGA CHE DECIDE TUTTO IL CANTIERE:
+    # `WEB` nasce falso e diventa vero solo col cookie di sessione,
+    # quindi con quello mezzo web (l'anonimo dai motori, la DEMO, il
+    # collaudo) resterebbe piccolo — e non fallirebbe niente.
+    _blocco_giudice = _testa[_testa.index("DA CHE PORTA SI GUARDA"):]
+    _blocco_giudice = _blocco_giudice[:_blocco_giudice.index("/* e la misura")]
+    prova("...e il giudice e' initData", True,
+          "tw && tw.initData" in _blocco_giudice)
+    # ...e si guarda il CODICE e non la prosa: il commento accanto
+    # nomina «WEB» APPOSTA, per dire che non si usa — una prova che
+    # legge anche i commenti diventa rossa per colpa di una
+    # spiegazione (presa mentre la si scriveva, per l'ennesima volta).
+    # ⚠️ il frammento comincia DENTRO il commento (l'ancora e' una sua
+    # riga), quindi il `/*` di apertura non c'e' e un re.sub sui
+    # commenti lascerebbe passare tutta la prosa: si taglia al primo
+    # `*/`, cioe' si tiene il solo codice.
+    _solo_codice = _blocco_giudice[_blocco_giudice.index("*/") + 2:]
+    prova("...e NON e' WEB, che significa un'altra cosa",
+          False, "WEB" in _solo_codice)
+    # la classe si mette quando initData MANCA, non quando c'e'
+    prova("...e la classe si mette fuori da Telegram", True,
+          "if (!(tw && tw.initData))" in _blocco_giudice)
+
+    # ---- 2. LA CRESCITA E' TUTTA DENTRO UN BLOCCO SOLO, gated due
+    # volte: la classe (non siamo nella Mini App) e i 768px (c'e'
+    # spazio). Da soli non basterebbero ne' l'uno ne' l'altro — dentro
+    # Telegram Desktop la WebView puo' essere larga, e sul telefono in
+    # browser una card da 400 non ci starebbe.
+    _i = mini.index("LE DUE STRISCE, PIU' GRANDI SUL WEB")
+    _web = mini[_i:mini.index("DESKTOP LARGO", _i)]
+    prova("la crescita vive in un blocco solo, a 768px", True,
+          "@media (min-width:768px){" in _web)
+    # ogni regola porta il prefisso: nessuna scappa fuori dal giudice.
+    # Si CONTANO le regole del blocco invece di elencarle, cosi' la
+    # settima di domani entra nel conto da sola.
+    _regole = [r for r in re.findall(r"^\s{4}([^\s/][^{]*)\{", _web, re.M)]
+    prova("...e ogni sua regola passa dal giudice", True,
+          bool(_regole) and all(r.startswith("html.fuori-telegram")
+                                for r in _regole))
+    # e il giudice non compare da nessun'altra parte del foglio: una
+    # regola sparsa altrove sfuggirebbe al gate dei 768px
+    _css = mini[:mini.index("</style>")]
+    prova("...e fuori di li' il giudice non veste niente",
+          _web.count("html.fuori-telegram"),
+          _css.count("html.fuori-telegram"))
+
+    # ---- 3. DENTRO LA MINI APP NON CAMBIA NULLA, ed e' la meta' che
+    # conta: le regole BASE restano quelle di ieri, alla lettera. Se un
+    # domani qualcuno «uniformasse» le misure toccando la base invece
+    # della variante, sul telefono cambierebbe la resa di tutti — e
+    # nessuna delle prove di sopra se ne accorgerebbe.
+    for _r in ('.scoprire-card{flex:0 0 auto;position:relative;width:272px',
+               'aspect-ratio:272/130',
+               '.cat-cella{flex:0 0 auto;width:84px',
+               'min-height:115px',
+               '.sc-titolo{position:absolute;left:14px;top:0;bottom:0;'
+               'width:96px',
+               'font-size:17px',
+               '.scoprire-card[data-id="p2p"] .sc-titolo{'
+               'left:30px;font-size:20px}',
+               'font-size:11px'):
+        prova("la Mini App non cambia: %s" % _r[:44], True, _r in mini)
+
+    # ---- 4. IL TITOLO CRESCE COL SUO DISEGNO, e col FATTORE della
+    # card: e' quel che tiene identica la fascia del contrasto (la
+    # prova sta in prove_scoprire, e da questo cantiere gira su tutte e
+    # due le misure). Cresciuto di piu', il titolo scivolerebbe verso
+    # la scia dorata dei fondi.
+    def _num(testo, sel, chiave):
+        _b = testo[testo.index(sel) + len(sel):]
+        _b = _b[:_b.index("}")]
+        if chiave not in _b:
+            return None
+        return float(re.match(r"[\d.]+",
+                              _b[_b.index(chiave) + len(chiave):]).group())
+
+    _kW = (_num(_web, "html.fuori-telegram .scoprire-card{", "width:")
+           / _num(mini, "\n  .scoprire-card{", "width:"))
+    prova("la card del web cresce di 400/272", True, abs(_kW - 400 / 272) < .01)
+    _coppie = [
+        ("left", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
+        ("width", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
+        ("font-size", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
+        ("left", 'html.fuori-telegram .scoprire-card[data-id="p2p"]'
+                 ' .sc-titolo{', '\n  .scoprire-card[data-id="p2p"]'
+                 ' .sc-titolo{'),
+        ("font-size", 'html.fuori-telegram .scoprire-card[data-id="p2p"]'
+                      ' .sc-titolo{', '\n  .scoprire-card[data-id="p2p"]'
+                      ' .sc-titolo{'),
+    ]
+    for _ch, _selW, _selM in _coppie:
+        _w, _m = _num(_web, _selW, _ch + ":"), _num(mini, _selM, _ch + ":")
+        # tolleranza 3%: i valori sono arrotondati a numeri leggibili
+        prova("il titolo cresce col fattore della card (%s%s)"
+              % (_ch, " p2p" if "p2p" in _selW else ""), True,
+              _w is not None and abs(_w / _m - _kW) < .03 * _kW)
+
+    # ---- 5. IL VETRO DEL BARATTOLO e' l'unica card il cui contenuto
+    # non e' un'immagine con object-fit: e' un SVG che il JS chiede a
+    # misura FISSA, quindi da solo resterebbe a 56 dentro un quadrato
+    # da 120. Lo scala il CSS — e la regola vive SOLO nel blocco del
+    # web: applicata anche a mobile darebbe 56,28 invece di 56.
+    prova("il vetro del barattolo scala col quadrato", True,
+          "html.fuori-telegram .cella-barattolo .cat-quad svg{"
+          "width:67%;height:67%}" in _web)
+    prova("...e il JS non ha una seconda misura da tenere in pari", 1,
+          mini.count("jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)"))
+
+    # ---- 6. LO SPAZIO RISERVATO CRESCE CON LA CARD, o torna il salto
+    # che quella riga esiste per non avere (la fila non si disegna
+    # finche' i conteggi non sono veri). Il numero si DERIVA con la
+    # stessa formula del 115 di la' — quadrato + margine + due righe
+    # di nome — invece di ribatterlo: cosi' chi cresce ancora le card
+    # e si dimentica la riserva lo sente da qui.
+    _lato = _num(_web, "html.fuori-telegram .cat-cella{", "width:")
+    _eti = _num(_web, "html.fuori-telegram .cat-eti{", "font-size:")
+    _mt = _num(mini, ".cat-eti{display:-webkit-box;", "margin-top:")
+    _lh = _num(mini, ".cat-eti{display:-webkit-box;", "line-height:")
+    _atteso = _lato + _mt + _eti * _lh * 2
+    prova("lo spazio riservato cresce con la card", True,
+          abs(_num(_web, "html.fuori-telegram .cat-strip{", "min-height:")
+              - _atteso) <= 1)
+
+    # ---- 7. LE IMMAGINI REGGONO LA MISURA NUOVA, misurate sui file
+    # veri e non sulle intenzioni (il patto del pareggio
+    # dell'inchiostro). IL VINCOLO E' 2x: sul desktop i display sono 1x
+    # e 2x, e i banner sono il TRIPLO della card mobile — quindi a 400
+    # chiedono 800 device px sui 816 che hanno. Il 3x non si guarda
+    # apposta: e' il telefono, dove questa crescita non arriva; e se un
+    # domani ci arrivasse, quel cantiere questi conti li rifa'.
+    # (Oggi le illustrazioni delle categorie reggerebbero anche a 3x,
+    # la peggiore a x0,95 — margine, non garanzia.)
+    try:
+        from PIL import Image as _Im
+        _fw, _fh = _Im.open(os.path.join("assets", "scoprire",
+                                         "lampo.webp")).size
+        _cw = _num(_web, "html.fuori-telegram .scoprire-card{", "width:")
+        _ch = _cw * 130 / 272
+        prova("i banner reggono la card del web a 2x", True,
+              max(_cw * 2 / _fw, _ch * 2 / _fh) <= 1)
+        # le categorie: object-fit CONTAIN dentro il riquadro della
+        # figura, che non e' quadrato (left/right 6%, top/bottom 11%)
+        _rw, _rh = _lato * .88, _lato * .78
+        _peggio, _chi = 0, ""
+        for _f in os.listdir(os.path.join("assets", "categorie")):
+            if not _f.endswith(".webp") or _f.endswith("-mini.webp"):
+                continue
+            _w, _h = _Im.open(os.path.join("assets", "categorie", _f)).size
+            _k = min(_rw / _w, _rh / _h) * 2
+            if _k > _peggio:
+                _peggio, _chi = _k, _f
+        prova("le illustrazioni reggono la card del web a 2x (%s)" % _chi,
+              True, _peggio <= 1)
+    except ImportError:
+        salta("le immagini alla misura del web: serve Pillow")
 
 
 def prove_podio_sfondo():
@@ -37417,6 +37660,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri, prove_prezzo_accordo,
               prove_scoprire,
+        prove_strisce_web,
               prove_scoprire_p2p,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,

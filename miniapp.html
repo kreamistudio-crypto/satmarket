@@ -4175,6 +4175,79 @@
     .nav-logo .lockup{display:none}
   }
 
+  /* ====== LE DUE STRISCE, PIU' GRANDI SUL WEB (ago 2026) ======
+     Decisione di Andrea: dal browser le card di «Da scoprire» e delle
+     categorie si vedevano troppo piccole. Non era un'impressione, ed
+     e' MISURATO: sul desktop la gerarchia si era ROVESCIATA — la card
+     banner e' larga 272 come una card ANNUNCIO della griglia (270 a
+     1280, 295 a 960), mentre su mobile e' 1,64 volte la sua. E la
+     striscia non scorreva affatto: due card su 1128px utili, il resto
+     vuoto — quindi il vincolo che fissa i 272 («a 320px la seconda
+     card deve sbucare dal bordo, o non si sa che ce n'e' altre») qui
+     NON HA OGGETTO: non c'e' nessuno spicchio da mostrare.
+     SOLO DESKTOP, e la doppia guardia e' voluta: `fuori-telegram` dice
+     che non siamo nella Mini App (il giudice sta nell'anti-flash in
+     testa al file, col perche' per esteso), i 768px che c'e' spazio.
+     Da soli non basterebbero ne' l'uno ne' l'altro — dentro Telegram
+     Desktop la WebView puo' essere larga, e sul telefono in browser
+     una card da 400 non ci starebbe.
+     LE MISURE, e ognuna col suo tetto MISURATO:
+     — banner 400x191 (+47%). E' il massimo che i file reggono su uno
+       schermo 2x SENZA rigenerarli: sono 816x390, quindi il tetto
+       esatto e' 408 (a 1x sarebbe 816, a 3x 272 — cioe' la misura di
+       oggi, ed e' il motivo per cui il file e' il triplo). A 1160
+       lascia 312px della terza card, a 960 ne lascia 112.
+     — categorie 120px (+43%). Qui il limite non e' la fila (28 celle,
+       scorrono comunque) ma la risoluzione delle illustrazioni, che
+       sono piccole: la piu' stretta e' 240x386. Misurate tutte e 30 a
+       vari lati, 120 e' l'ultimo dove NESSUNA scala su nemmeno a 3x
+       (a 132 due comincerebbero, del 4%).
+     Chi cresce ancora rifaccia quei due conti, e sappia che i banner
+     si rigenerano solo dagli originali 2752x1536, che non stanno nel
+     repo (sono nei Download di Andrea). */
+  @media (min-width:768px){
+    html.fuori-telegram .scoprire-card{width:400px}
+    /* IL TITOLO CRESCE COL SUO DISEGNO, ed e' la meta' che rende
+       questo cantiere piu' di un ritocco di larghezza: a 17px dentro
+       una card da 400 si vedeva sperduto (guardato a schermo).
+       Il fattore e' quello della card (400/272 = 1,47) applicato a
+       tutte e tre le misure — left, larghezza della scatola, corpo —
+       e questo NON allenta di un decimale la prova del contrasto:
+       la fascia sorvegliata sta in coordinate IMMAGINE, e
+       `left x k x (816 / (272 k))` si semplifica. Misurati sui file
+       veri: 11,88 / 12,10 / 14,83, gli STESSI di oggi. Chi lo cresce
+       di piu' della card sposta il titolo verso la scia dorata e lo
+       sente dalla CI. */
+    html.fuori-telegram .sc-titolo{left:20.6px;width:141px;font-size:25px}
+    /* il P2P tiene la sua deroga anche qui (titolo corto, piu' a
+       destra e piu' grande), scalata dello stesso fattore. Serve un
+       selettore SUO: la base desktop ha una classe in meno
+       dell'override mobile e da sola perderebbe per specificita'. */
+    html.fuori-telegram .scoprire-card[data-id="p2p"] .sc-titolo{
+      left:44px;font-size:29px}
+    html.fuori-telegram .cat-cella{width:120px}
+    /* col quadrato piu' grande il nome sale di un gradino: 11px sotto
+       una card da 120 si legge come una didascalia dimenticata. 13 e'
+       la misura che .altri-tit usa gia' per lo stesso mestiere. */
+    html.fuori-telegram .cat-eti{font-size:13px}
+    /* e lo SPAZIO RISERVATO cresce con loro, o torna il salto che
+       quella riga esiste per non avere (la fila non si disegna finche'
+       i conteggi non sono veri). Stessa formula del 115 di la':
+       quadrato + margine dell'etichetta + due righe di nome
+       (120 + 5 + 13x1,2x2). */
+    html.fuori-telegram .cat-strip{min-height:156px}
+    /* IL VETRO DEL BARATTOLO E' L'UNICA CARD il cui contenuto non e'
+       un'immagine con object-fit: e' un SVG che il JS chiede a misura
+       FISSA (jarSVG(..., 56, 1.15)), quindi da solo resterebbe a 56
+       dentro un quadrato da 120. Lo scala il CSS invece del JS — 56/84
+       e' il 67% del quadrato, e il CSS batte l'attributo width dell'
+       SVG: verificato dal vivo, non dedotto (misurato 80,4px su una
+       card da 120). La regola vive SOLO qui: applicata anche a mobile
+       darebbe 56,28 invece di 56, e «nemmeno di un byte» vuol dire
+       nemmeno quello. */
+    html.fuori-telegram .cella-barattolo .cat-quad svg{width:67%;height:67%}
+  }
+
   /* ==================== DESKTOP LARGO (≥1024px) ==================== */
   @media (min-width:1024px){
     #app{max-width:1160px}
@@ -4207,6 +4280,23 @@
     (tw && tw.initData) ? tw.colorScheme==='dark'
     : matchMedia('(prefers-color-scheme: dark)').matches));
   if (scuro) document.documentElement.dataset.tema = 'scuro';
+  /* DA CHE PORTA SI GUARDA (ago 2026): fuori da Telegram, e da 768px in
+     su, le card di «Da scoprire» e delle categorie crescono — dentro la
+     Mini App non cambia NULLA, nemmeno di un byte (il vincolo di ferro
+     del cantiere PWA, qui applicato a delle misure).
+     IL GIUDICE E' `initData` E MAI `WEB`: quello nasce falso e diventa
+     vero solo se /api/me risponde col cookie di sessione, quindi
+     sarebbe falso per l'anonimo che arriva da un motore, in DEMO e in
+     collaudo — mezzo web resterebbe piccolo. `initData` invece e' il
+     segnale gia' usato dal service worker e dal tema qui sopra:
+     l'oggetto `tg` esiste anche nel browser, initData no.
+     STA QUI E NON IN avvia(): e' una MISURA, e una misura decisa dopo
+     il primo paint si vedrebbe scattare — la stessa ragione del tema e
+     della scala del testo, due righe piu' giu'.
+     Il nome dice DOVE si sta e non prende in prestito «web», che in
+     questo file significa gia' un'altra cosa (il login col cookie). */
+  if (!(tw && tw.initData))
+    document.documentElement.classList.add('fuori-telegram');
   /* e la misura del testo, per la stessa ragione: se la scala
      arrivasse dopo il primo paint, l'app comparirebbe piccola e poi
      scatterebbe. La logica completa vive in applicaFont(). */
