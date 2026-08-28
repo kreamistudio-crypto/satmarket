@@ -29460,15 +29460,17 @@ def prove_scoprire():
     prova("...e nasce nascosta: la accendono i flag", True,
           '<div id="scoprireSez" style="display:none">' in mini)
     # il censimento ESATTO dei chiamanti: renderChips (il giro di
-    # sempre), toccaScoperta (l'anello prima della rete), i due rami
-    # DEMO del pannello Filtri (dove renderChips non passa) e —
-    # dall'ago 2026 — toggleInteresse: la card «P2P» legge
-    # `interessiMiei`, e dopo il voto nessun altro giro ripasserebbe
-    # di qui (chi torna in Esplora col gesto indietro non rifa' le
-    # pillole), quindi resterebbe a schermo un invito gia' accolto.
-    prova("renderScoprire ha i suoi cinque chiamanti", 5,
+    # sempre), toccaScoperta (l'anello prima della rete) e i due rami
+    # DEMO del pannello Filtri (dove renderChips non passa).
+    # IL QUINTO E' MORTO COL SUO CASO (ago 2026): era il voto, e c'era
+    # perche' la card «P2P» spariva a chi votava — da quando resta, il
+    # suo `vivo` quella lista non la legge piu' e la firma non
+    # cambierebbe comunque. La prova ha CAMBIATO LATO e chiede che il
+    # voto NON sia un chiamante: e' l'affermazione forte, e rimetterlo
+    # sarebbe un giro che non puo' cambiare niente.
+    prova("renderScoprire ha i suoi quattro chiamanti", 4,
           mini.count("renderScoprire();"))
-    prova("...e il quinto e' il voto sulla funzione in arrivo", True,
+    prova("...e il voto non e' piu' uno di loro", False,
           "renderScoprire();" in pezzo_js(
               mini, "async function toggleInteresse(f){", "\n}"))
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}")
@@ -29592,31 +29594,25 @@ def prove_scoprire():
           < _cat.find("{id: 'sconto',"))
     prova("...e il suo tocco porta al «coming soon»", True,
           "tocca: () => vaiP2P()" in _cat)
-    # SPARISCE A CHI HA GIA' VOTATO: e' tutto il suo mestiere, ed e'
-    # anche cio' che restituisce alla sezione la possibilita' di
-    # sparire (una card fissa gliel'avrebbe tolta per sempre — quel
-    # display:none e' la proprieta' piu' forte del blocco).
-    prova("sparisce a chi ha gia' votato", True,
-          "vivo: () => interessiNoti && !interessiMiei.includes('p2p')"
-          in _cat)
-    # ...MA SOLO QUANDO SI SA: senza il flag la card comparirebbe e
-    # sparirebbe ~300ms dopo a chi il voto l'ha gia' dato (la lezione
-    # del seme della demo nelle pillole). Il flag si alza dove la
-    # risposta diventa nota: /api/me, la vetrina anonima e i due rami
-    # DEMO — quattro posti, censiti.
-    prova("il flag nasce falso e si alza dove si sa", (True, 4),
-          ("let interessiNoti = false;" in mini,
-           mini.count("interessiNoti = true;")))
-    # nel ramo autenticato sta ACCANTO alla lista e PRIMA del
-    # loadListings che disegna la sezione: piu' in la' sarebbe il
-    # lampo di ieri, solo spostato
-    _av = pezzo_js(mini, "async function avvia(){", "\n}")
-    _i = _av.find("interessiMiei = me.interessi_miei || [];")
-    prova("...e nel ramo autenticato arriva con la lista", True,
-          0 <= _i and "interessiNoti = true;" in _av[_i:_i + 120])
-    prova("...prima del giro che disegna la sezione", True,
-          0 <= _av.find("interessiNoti = true;")
-          < _av.find("await loadListings()"))
+    # RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO (ago 2026, decisione
+    # di Andrea che ROVESCIA la sparizione della nascita: la sezione
+    # P2P si tiene in vista). La prova CAMBIA LATO col perche'
+    # scritto — quella di ieri certificava il comportamento che il
+    # cantiere toglie. Il titolo dice il NOME e mai «Avvisami», quindi
+    # a chi ha gia' votato non ripete nessun invito, e la pagina dove
+    # porta ha il conteggio, che dopo il voto e' la cosa interessante.
+    prova("resta anche a chi ha gia' votato", True,
+          "vivo: () => true," in _cat)
+    # ...E IL FLAG DEL «LO SO GIA'» NON C'E' PIU': esisteva per il solo
+    # lampo di questa card (senza, comparendo e sparendo ~300ms dopo a
+    # chi aveva gia' votato), e da quando la card non dipende dal voto
+    # era uno stato scritto in quattro posti e letto da NESSUNO — con
+    # un commento che avrebbe raccontato una card che non esiste piu'.
+    # ZERO OCCORRENZE e non «zero letture»: e' l'affermazione forte, e
+    # per questo il suo nome non si scrive nemmeno nella lapide del
+    # catalogo (il precedente dello spaziatore della nav).
+    prova("il flag del «lo so gia'» non e' rimasto da nessuna parte",
+          0, mini.count("interessiNoti"))
     # L'ARIA-PRESSED E' DELL'INTERRUTTORE: su una card che naviga
     # direbbe «false» per sempre su una cosa che non si accende. Il
     # role="button" invece resta per tutt'e due (porta altrove come
@@ -29950,15 +29946,15 @@ def prove_scoprire():
 def prove_scoprire_p2p(mini=None, node=None):
     """LA CARD CHE NAVIGA, FATTA GIRARE (ago 2026): «P2P»
     e' la prima della fila, porta al «coming soon» invece di accendere
-    un filtro, e sparisce a chi ha gia' votato.
+    un filtro, e RESTA anche a chi ha gia' votato.
 
     Le sentinelle di prove_scoprire dicono che il dispatch C'E' e che
     sta in testa; nessuna puo' dire che la card GIUSTA compaia, che il
-    tocco che naviga non sfiori un filtro, e — la cosa che vale piu' di
-    tutte — che la sezione possa ancora SPARIRE, cioe' la proprieta'
-    che una card fissa le avrebbe tolto per sempre. Qui il catalogo,
-    renderScoprire e toccaScoperta si fanno girare per davvero con un
-    DOM di cartone."""
+    tocco che naviga non sfiori un filtro, e — la cosa che vale piu'
+    di tutte da quando la card e' fissa — che il voto non la tolga
+    piu' di mezzo: `interessiMiei` si muove apposta, e la fila deve
+    restare la stessa. Qui il catalogo, renderScoprire e toccaScoperta
+    si fanno girare per davvero con un DOM di cartone."""
     import shutil as _sh, subprocess as _sp, tempfile as _tf
     print("\n[«Da scoprire»: la card che naviga, girata]")
     if mini is None:
@@ -30028,7 +30024,7 @@ function lampoAttiva(){ return false; }
 function scontoQui(){ return false; }
 let DEMO = false, vistaBarattolo = false, listings = [];
 let filtroLampo = false, filtroSconto = false;
-let occasioniServer = null, interessiNoti = false, interessiMiei = [];
+let occasioniServer = null, interessiMiei = [];
 """
 
 _BANCO_SCOPRIRE = """
@@ -30044,13 +30040,7 @@ const rifai = () => { scoprireFirma = ''; renderScoprire(); };
 
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
-dice("finche non si sa, la card del P2P non c e",
-     ['lampo','sconto'], idCard());
-
-interessiNoti = true;
-rifai();
-dice("appena si sa, il P2P e il primo della fila",
-     ['p2p','lampo','sconto'], idCard());
+dice("il P2P e il primo della fila", ['p2p','lampo','sconto'], idCard());
 const suo = nodi['scoprireStrip'].innerHTML
   .split('data-id="p2p"')[1].split('>')[0];
 dice("...e non porta l aria-pressed dell interruttore", false,
@@ -30069,28 +30059,28 @@ dice('...con lo scroll e la richiesta di sempre',
      ['haptic','picker:ordinaSel','scroll','loadListings'], scritte);
 filtroLampo = false;
 
+// IL CASO DEL CANTIERE (ago 2026): il voto si muove e la fila non
+// deve muoversi. E' l'unica cosa che una sentinella sulla forma non
+// puo' dire — il catalogo quella lista non la nomina piu', e a
+// dimostrare che non la legge e' proprio questo giro.
 interessiMiei = ['p2p'];
 rifai();
-dice("a chi ha gia votato la card sparisce", ['lampo','sconto'],
+dice("a chi ha gia votato la card RESTA", ['p2p','lampo','sconto'],
      idCard());
 
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
-dice('...e senza occasioni la sezione sparisce ancora INTERA',
-     'none', nodi['scoprireSez'].style.display);
+dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
+// IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
+// sparire — il display:none era la proprieta' piu' forte del blocco,
+// e questa riga e' il posto dove il suo prezzo si vede.
+dice('...e la sezione non sparisce piu', '',
+     nodi['scoprireSez'].style.display);
 
-interessiMiei = [];
-rifai();
-dice('chi non ha votato la vede anche senza occasioni', ['p2p'],
-     idCard());
-
-occasioniServer = {lampo: 1, sconto: 1};
 vistaBarattolo = true;
 rifai();
 dice('col barattolo resta la sola card che naviga', ['p2p'], idCard());
-interessiMiei = ['p2p'];
-rifai();
-dice('...e col P2P gia votato la sezione sparisce intera', 'none',
+dice('...anche col voto gia dato', '',
      nodi['scoprireSez'].style.display);
 """
 

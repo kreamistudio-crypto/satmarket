@@ -6902,16 +6902,6 @@ let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
    · il MIO like arriva da /api/me ed e' un fatto suo. */
 let interessiServer = null;   // {p2p: 12, aste: 34}
 let interessiMiei = [];       // ['p2p'] — quali ho gia' votato io
-/* ...e se la risposta la SAPPIAMO. Prima di /api/me `interessiMiei` e'
-   vuoto tanto per chi non ha votato quanto per chi non gliel'abbiamo
-   ancora chiesto, e le due cose non si distinguono: la card «P2P in
-   arrivo» di «Da scoprire» (che sparisce a chi ha gia' votato) senza
-   questo flag comparirebbe e sparirebbe ~300ms dopo a chi il voto
-   l'ha gia' dato — la lezione del seme della demo nelle pillole.
-   Finche' non si sa, la card non c'e': un'assenza non e' una bugia.
-   In DEMO e in vetrina anonima nessuno ha votato PER COSTRUZIONE, e
-   il flag si alza li' senza aspettare niente. */
-let interessiNoti = false;
 let datiVivi = false;   // al primo carico vero il seme demo si butta
 
 /* Un server vecchio risponde con l'array nudo: lo si legge come
@@ -8768,28 +8758,47 @@ const SCOPRIRE = [
      navigheranno anche loro — il dispatch di toccaScoperta e' la
      preparazione che questa lista aspettava comunque, non un caso
      particolare aperto per lei.
-     SPARISCE A CHI HA GIA' VOTATO (`vivo`): fa crescere le iscrizioni
-     e si toglie di mezzo quando l'ha fatto, invece di ripetere un
-     invito gia' accolto — il patto degli hint contestuali, «sparisce
-     da solo quando smette di essere vero». Ed e' anche cio' che
-     RESTITUISCE alla sezione la possibilita' di sparire: una card
-     fissa gliel'avrebbe tolta per sempre, e quel `display:none` e' la
-     proprieta' piu' forte di questo blocco (nei giorni senza
-     occasioni costa zero). `interessiNoti` e' la meta' che si
-     dimentica: vedi la sua dichiarazione.
+     RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO (ago 2026, decisione di
+     Andrea che ROVESCIA la sparizione della nascita). IL PERCHE' DI
+     ALLORA VA TENUTO perche' era buono: la card si toglieva di mezzo
+     quando aveva fatto il suo — il patto degli hint contestuali — ed
+     era anche cio' che restituiva alla sezione la possibilita' di
+     sparire. IL PERCHE' CHE LO SUPERA e' che questa non e' una card
+     che CHIEDE: il suo titolo dice il NOME della sezione e mai
+     «Avvisami», quindi a chi ha gia' votato non ripete nessun invito
+     — e la pagina dove porta ha il CONTEGGIO, che a chi aspetta
+     interessa proprio dopo il voto. L'invito vive DENTRO, dove il
+     bottone diventa «✓ Ti avviseremo» da solo.
+     A CHI HA VOTATO NON MOSTRA NIENTE DI DIVERSO, e non e' una
+     rinuncia: il titolo e' l'unico posto dove questa card parla, e li'
+     non entra un carattere di piu' — la fascia del contrasto finisce
+     a 282 sui 318 dove comincia la scia dorata, quindi il capolinea
+     sono i TRE caratteri di «P2P». Il quarto porta la fascia a 342 e
+     la CI diventa rossa; «✓ Ti avviseremo» va a capo in una scatola
+     da 96px e arriva a 390. E l'aria-label resta il NOME per la
+     ragione per cui lo e' a schermo: il nome di un comando che cambia
+     con uno stato invisibile agli altri non e' piu' un nome.
      IN TESTA e non in coda (decisione di Andrea, col costo accettato
      e MISURATO): a 320px si vede una card quasi piena piu' uno
      spicchio, quindi chi non scorre non vede piu' le offerte a tempo.
-     La spinta dura poco proprio perche' la card si toglie da sola.
-     PREZZO DICHIARATO, e va ricordato quando si leggeranno i numeri:
-     dando la card al P2P e non alle Aste, il duello fra i due like
-     non vale piu' — il P2P vince perche' e' piu' esposto, non perche'
-     lo aspetta piu' gente. Si guarda la CRESCITA ASSOLUTA del P2P.
+     Quel costo era temporaneo finche' la card si toglieva da sola; da
+     quando resta e' PERMANENTE, ed e' stato accettato sapendolo.
+     E LA SEZIONE NON PUO' PIU' SPARIRE, che e' il secondo prezzo:
+     `display:none` era la proprieta' piu' forte di questo blocco —
+     nei giorni senza occasioni costava zero, adesso costa i suoi
+     166px. Con lei se n'e' andato il flag del «lo so gia'», che
+     esisteva per il solo lampo di questa card: il suo nome non si
+     scrive nemmeno qui, che a contarne zero c'e' una prova.
+     SUI NUMERI, e va ricordato quando si leggeranno: dando la card al
+     P2P e non alle Aste, il duello fra i due like non vale piu' — il
+     P2P vince perche' e' piu' esposto, non perche' lo aspetta piu'
+     gente, e da oggi quel vantaggio non scade nemmeno col voto. Si
+     guarda la CRESCITA ASSOLUTA del P2P.
      NIENTE anello e niente interruttore: `accesa` risponde sempre no
      — la card non si accende, si tocca e si va — e il template le
      toglie anche l'aria-pressed. */
   {id: 'p2p', file: 'p2p.webp', emoji: '₿', testo: 'P2P',
-   vivo: () => interessiNoti && !interessiMiei.includes('p2p'),
+   vivo: () => true,
    accesa: () => false,
    tocca: () => vaiP2P()},
   {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
@@ -9388,11 +9397,11 @@ async function toggleInteresse(f){
       ? interessiMiei.concat(interessiMiei.includes(f) ? [] : [f])
       : interessiMiei.filter(x => x !== f);
     renderInteresse();
-    /* ...e la card «P2P» in home se ne va (o torna, se il
-       voto si toglie): il suo `vivo` legge proprio questa lista, e
-       da qui nessun altro giro ripassa da renderChips — chi torna in
-       Esplora col gesto indietro non rifa' le pillole. */
-    renderScoprire();
+    /* E LA CARD «P2P» IN HOME NON SI TOCCA (ago 2026): da quando
+       resta anche a chi ha votato, il suo `vivo` questa lista non la
+       legge piu' — e la firma di renderScoprire non cambierebbe
+       comunque. Il giro di qui e' morto con la sparizione, e non e'
+       una dimenticanza: c'e' il censimento dei chiamanti. */
     toast(d.interessa ? 'Segnato 🔔' : 'Tolto');
   } catch(e) { toast('Rete assente: riprova'); }
   finally { interesseInCorso = false; }
@@ -30224,10 +30233,6 @@ async function apriBarattoloDaUrl(){
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
 async function avviaVetrina(){
-  /* In vetrina il voto non si puo' dare senza entrare: la risposta la
-     sappiamo prima di chiedere niente a nessuno, e va alzata PRIMA
-     del loadListings qui sotto, che la sezione la disegna gia' lui. */
-  interessiNoti = true;
   try {
     await loadListings(true);  // anonimo: nessun header, prima pagina
     VETRINA = true; DEMO = false; orders = [];
@@ -30268,7 +30273,6 @@ async function avviaVetrina(){
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
     renderPodioTesta();        // ...la classifica no: niente server che la calcoli
-    interessiNoti = true;      // in demo non vota nessuno: si sa e basta
     /* le pillole e le due strisce si ridisegnano ADESSO che DEMO e'
        vera: il giro di renderChips in testa ad avvia() e' partito con
        DEMO ancora false, quindi la striscia delle categorie (e con
@@ -30306,7 +30310,7 @@ async function avvia(){
   preparaCategoriaDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; interessiNoti = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders(); return;
+    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders(); return;
   }
   /* Il banner del rodaggio parte SUBITO, in parallelo col primo /me:
      quando le card saranno pronte la risposta e' gia' arrivata, e la
@@ -30428,7 +30432,6 @@ async function avvia(){
        giusto se la pagina e' gia' aperta (i due canali arrivano
        separati, e questo puo' atterrare per ultimo) */
     interessiMiei = me.interessi_miei || [];
-    interessiNoti = true;   // ...e da adesso l'assenza vuol dire «non ha votato»
     renderInteresse();
     /* lo stato del barattolo condiviso (null = mai condiviso o
        revocato): serve al foglio e al bottone nel cassetto */
