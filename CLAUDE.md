@@ -372,7 +372,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   RIMESSO a DUBBIO (vedi la voce sua, sopra): col prossimo giro il
   conto deve tornare **19/19** — ED È TORNATO: il 23 ago 2026 Andrea
   l'ha rilanciato sul VPS coi sei casi dei servizi in coda, **25/25**,
-  nessuno caduto. CHI LO RILANCIA SCRIVA QUI IL NOME di
+  nessuno caduto — e il 28 ago 2026, coi cinque dei piani condivisi,
+  **30/30 al primo giro**. CHI LO RILANCIA SCRIVA QUI IL NOME di
   quel che cade: un «18/19» senza nome è un numero su cui fra sei mesi
   nessuno può agire, ed è esattamente il rumore in cui una regressione
   vera si perde. Vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL
@@ -25539,14 +25540,17 @@ domani.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — il prompt vale per i giudizi nuovi e gli
 annunci gia' in coda restano dove sono.
-⚠️ DA FARE PRIMA DI FIDARSI, ed e' il pezzo che in locale non si puo'
-fare perche' vuole la chiave: `python collaudo_impersonazione.py` sul
-VPS. L'atteso e' **30/30** (era 25/25). Se cade la GEMELLA del DAZN la
-cura ha imparato l'esempio invece della regola; se cade il Netflix la
-parola «condiviso» e' diventata un lasciapassare; se cadono il Disney+
-rubato o la carta clonata il muro si e' allentato. **Scrivi qui il
-conto COL NOME di quel che cade**, che un «29/30» senza nome e' un
-numero su cui fra sei mesi nessuno puo' agire.
+IL COLLAUDO COL MODELLO VERO È **30/30 AL PRIMO GIRO** (28 ago 2026,
+Andrea sul VPS, era 25/25): i cinque casi nuovi passano tutti, e
+nessuno dei vecchi è caduto. È la cosa che dice se il modello ha
+capito, e in locale non si può fare — vuole la chiave.
+⚠️ VA RILANCIATO A OGNI RITOCCO DEL PROMPT, e questa è la lettura
+delle cadute per il prossimo giro: se cade la GEMELLA del DAZN la cura
+ha imparato l'esempio invece della regola; se cade il Netflix la parola
+«condiviso» è diventata un lasciapassare; se cadono il Disney+ rubato o
+la carta clonata il muro si è allentato. Il conto si scrive COL NOME di
+quel che cade, che un «29/30» senza nome è un numero su cui fra sei
+mesi nessuno può agire.
 DA GUARDARE al primo giro: il primo annuncio vero di piano condiviso, e
 il registro `moderazione_log` — se i «credenziali» cominciano a
 comparire fra i dubbi invece che fra i rifiuti, il declassamento
