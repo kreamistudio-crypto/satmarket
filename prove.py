@@ -35686,6 +35686,226 @@ def prove_tornate():
           False, "vetrinaCursore.split" in mini or "cursore.split" in mini)
 
 
+def _amb_portachiavi():
+    """Il portachiavi VERO su un database di cartone, piu' un Response
+    che registra i cookie invece di spedirli.
+
+    Gira invece di essere guardato, ed e' il punto: le sentinelle
+    dicono che la dedup e il tetto ci sono, mai che rispondano giusto —
+    e qui la domanda e' proprio COSA esce dalla lista quando un tg_id
+    compare due volte."""
+    import sqlite3 as _s
+    import hashlib as _h
+    import time as _t
+
+    class Resp:
+        def __init__(self):
+            self.cookie = {}
+            self.tolti = []
+
+        def set_cookie(self, nome, valore, **kw):
+            self.cookie[nome] = valore
+
+        def delete_cookie(self, nome, **kw):
+            self.tolti.append(nome)
+            self.cookie.pop(nome, None)
+
+    class Con(_s.Connection):
+        """I pezzi veri chiudono la connessione quando hanno finito, e
+        qui la stessa deve sopravvivere a tutta la prova: `close` e' di
+        sola lettura su sqlite3.Connection, quindi si zittisce da una
+        sottoclasse invece che riassegnandola."""
+        def close(self):
+            pass
+
+    con = _s.connect(":memory:", factory=Con)
+    con.row_factory = _s.Row
+    con.executescript("""
+        CREATE TABLE sessioni(token_hash TEXT PRIMARY KEY, tg_id INTEGER,
+                              creato INTEGER, scade INTEGER);
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,
+                            username TEXT, negozio TEXT, avatar TEXT,
+                            avatar_scelta TEXT DEFAULT '');
+    """)
+    amb = {"hashlib": _h, "time": _t, "db": lambda: con,
+           "MODALITA_COLLAUDO": True,
+           "GIORNI_SESSIONE_WEB": 30, "MAX_ACCOUNT_BROWSER": 3,
+           "COOKIE_PORTACHIAVI": "barattolo_portachiavi",
+           "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets")}
+    for n in ("crea_sessione", "imposta_cookie_sessione",
+              "imposta_cookie_portachiavi", "_portachiavi_token",
+              "portachiavi_conti", "apri_sessione"):
+        exec(pezzo(n), amb)
+    return amb, con, Resp
+
+
+def prove_portachiavi():
+    """PIU' ACCOUNT SULLO STESSO BROWSER (ago 2026): il portachiavi
+    accanto al cookie di sessione, che resta quello di sempre."""
+    print("\n[piu' account sullo stesso browser]")
+    amb, con, Resp = _amb_portachiavi()
+    for i, (tg, nome) in enumerate([(11, "Alan"), (22, "To The Mooon"),
+                                    (33, "Terzo"), (44, "Quarto")]):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')",
+                    (tg, nome, nome.lower().replace(" ", ""), f"neg{i}", ""))
+    con.commit()
+
+    # --- la porta unica: apre, attiva e appende, tutto insieme ---
+    r1 = Resp()
+    t1 = amb["apri_sessione"](r1, 11, "")
+    prova("il primo login attiva il suo account", t1,
+          r1.cookie["barattolo_sessione"])
+    prova("...e lo mette nel portachiavi", t1,
+          r1.cookie["barattolo_portachiavi"])
+
+    r2 = Resp()
+    t2 = amb["apri_sessione"](r2, 22, r1.cookie["barattolo_portachiavi"])
+    prova("il secondo login NON butta fuori il primo", [t1, t2],
+          r2.cookie["barattolo_portachiavi"].split("."))
+    prova("...e l'attivo e' quello appena entrato", t2,
+          r2.cookie["barattolo_sessione"])
+
+    pc = r2.cookie["barattolo_portachiavi"]
+    conti = amb["portachiavi_conti"](pc)
+    prova("la lista dice i due account, in ordine di ingresso",
+          [11, 22], [c["tg_id"] for c in conti])
+    prova("...col nome di ognuno", ["Alan", "To The Mooon"],
+          [c["nome"] for c in conti])
+
+    # --- rientrare sullo stesso account non lo raddoppia ---
+    r3 = Resp()
+    t1b = amb["apri_sessione"](r3, 11, pc)
+    prova("chi rientra su un account gia' aperto non lo raddoppia",
+          [22, 11], [c["tg_id"] for c in
+                     amb["portachiavi_conti"](r3.cookie["barattolo_portachiavi"])])
+    prova("...e vale la sessione FRESCA, non quella vecchia", True,
+          t1b in r3.cookie["barattolo_portachiavi"]
+          and t1 not in r3.cookie["barattolo_portachiavi"])
+
+    # --- il tetto cede il piu' vecchio, mai chi e' appena entrato ---
+    r4 = Resp()
+    amb["apri_sessione"](r4, 33, r3.cookie["barattolo_portachiavi"])
+    r5 = Resp()
+    t44 = amb["apri_sessione"](r5, 44, r4.cookie["barattolo_portachiavi"])
+    fin = amb["portachiavi_conti"](r5.cookie["barattolo_portachiavi"])
+    prova("al tetto (3) cede il PIU' VECCHIO", [11, 33, 44],
+          [c["tg_id"] for c in fin])
+    prova("...e chi e' appena entrato c'e' sempre", t44,
+          r5.cookie["barattolo_sessione"])
+
+    # --- una sessione scaduta sparisce da sola: la fonte e' il DB ---
+    con.execute("UPDATE sessioni SET scade=1 WHERE tg_id=33")
+    con.commit()
+    prova("la sessione scaduta sparisce dalla lista", [11, 44],
+          [c["tg_id"] for c in
+           amb["portachiavi_conti"](r5.cookie["barattolo_portachiavi"])])
+
+    # --- LA FUSIONE (UPDATE sessioni SET tg_id) puo' lasciare due
+    #     token sullo stesso account: in lista dev'essere UNA voce ---
+    con.execute("UPDATE sessioni SET tg_id=11 WHERE tg_id=44")
+    con.commit()
+    dopo = amb["portachiavi_conti"](r5.cookie["barattolo_portachiavi"])
+    prova("dopo una fusione l'account non compare due volte", [11],
+          [c["tg_id"] for c in dopo])
+
+    # --- il cookie storto non fa danni: si ignora, mai un 400 ---
+    prova("un token inventato non trova niente", [],
+          amb["portachiavi_conti"]("nonesisto"))
+    prova("...e un cookie vuoto nemmeno", [], amb["portachiavi_conti"](""))
+    prova("il portachiavi vuoto si CANCELLA (mai un cookie morto)",
+          True, "barattolo_portachiavi" in
+          (lambda r: (amb["imposta_cookie_portachiavi"](r, []), r.tolti)[1])(Resp()))
+
+    # --- gli scudi: gli stessi del fratello, ne' piu' ne' meno ---
+    c = codice(pezzo("imposta_cookie_portachiavi"))
+    for scudo in ("httponly=True", "samesite=\"lax\"",
+                  "secure=not MODALITA_COLLAUDO"):
+        prova(f"il portachiavi ha lo scudo {scudo}", True, scudo in c)
+
+    # --- IL TOKEN NON ESCE MAI: e' la riga da non ammorbidire ---
+    s = codice(pezzo("sessioni_aperte"))
+    prova("da /api/sessioni il token non esce", True,
+          'k != "token"' in s)
+    prova("...e lo switch si chiede col tg_id, non col token", True,
+          '"tg_id"' in codice(pezzo("sessione_attiva")))
+
+    # --- LO SWITCH E' UNA LETTURA: non tocca il database ---
+    sw = codice(pezzo("sessione_attiva"))
+    for gesto in ("INSERT", "UPDATE", "DELETE", "crea_sessione"):
+        prova(f"lo switch non fa {gesto}", False, gesto in sw)
+
+    # --- l'anti-oracolo: una frase sola per tutti i no ---
+    prova("il no dello switch e' UNA frase sola", 2,
+          sw.count("MSG_ACCOUNT_ASSENTE"))
+
+    # --- il logout esce da UNO, non da tutti ---
+    lg = codice(pezzo("logout"))
+    prova("il logout toglie il solo token attivo", True,
+          'c["token"] != barattolo_sessione' in lg)
+    prova("...e passa a chi resta", True, "imposta_cookie_sessione" in lg)
+    prova("...e senza nessuno cancella come sempre", True,
+          'response.delete_cookie("barattolo_sessione"' in lg)
+
+    # --- LA PORTA E' UNA: nessun login apre una sessione per conto suo.
+    #     Censimento e non elenco: la quinta porta di domani ci entra
+    #     da sola invece di dimenticarsi il portachiavi. ---
+    fuori = [f for f in _SORGENTE.split("\ndef ")[1:]
+             if "crea_sessione(" in codice(f)
+             and not f.startswith("crea_sessione(")
+             and not f.startswith("apri_sessione(")]
+    prova("apri_sessione e' la PORTA UNICA di ogni login", [], fuori)
+
+    # --- e nel client il token non arriva mai ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # Stretta sulla FETTA del selettore e non su tutto il file: un
+    # `.token` esiste eccome altrove (il barattolo condiviso ne ha uno
+    # suo, che e' un'altra cosa), e una sentinella larga sarebbe rossa
+    # per colpa di un cantiere che non c'entra.
+    sel = _fetta(mini, "async function caricaAccount", 2600)
+    prova("nel selettore non arriva mai un token di sessione", False,
+          "token" in sel)
+    prova("il selettore non esiste dentro Telegram", True,
+          "function accountVivi(){ return WEB && !DEMO && !VETRINA; }" in mini)
+    prova("...e lo switch ricarica invece di ridisegnare a mano", True,
+          "location.reload();" in _fetta(mini, "async function cambiaAccount"))
+
+    # --- IL GESTO DEL TAPPO (ago 2026): primo tocco il Profilo,
+    #     secondo il menu degli account. ---
+    tap = _fetta(mini, "function toccaTappo()", 500)
+    prova("il tappo passa dal gesto e non piu' da go('profilo')", 2,
+          mini.count('class="avatar-btn" onclick="toccaTappo()"'))
+    prova("...e nessuna istanza e' rimasta indietro", 0,
+          mini.count("""class="avatar-btn" onclick="go('profilo')\""""))
+    prova("il secondo tocco vuole di essere GIA' nel Profilo", True,
+          "qui === 'profilo'" in tap)
+    prova("...e vale solo dove gli account esistono", True,
+          "accountVivi()" in tap)
+    prova("...ma chi e' altrove va al Profilo, come sempre", True,
+          "go('profilo');" in tap)
+    # La lista vive in UN posto solo: in pagina non deve tornare, o
+    # sarebbero due elenchi della stessa cosa e il gesto non avrebbe
+    # piu' niente da dire.
+    prova("l'elenco NON torna in pagina", False, "profiloAccount" in mini)
+    prova("...e a disegnarlo e' una funzione sola", 1,
+          mini.count("function renderAccountSheet()"))
+    # L'accenno: una volta sola, e solo a chi ha gia' due account —
+    # prima non c'e' niente da scegliere e sarebbe rumore.
+    acc = _fetta(mini, "function accennaAccount()", 700)
+    prova("l'accenno parla solo con due account", True,
+          "accountAperti.length < 2" in acc)
+    prova("...e si consuma col timbro degli hint", True,
+          "hintDismesso('duetocchi')" in acc and "h.duetocchi" in acc)
+
+
+def _fetta(testo, ancora, quanti=1400):
+    """Una finestra di sorgente dopo un'ancora. `find` e mai `index`:
+    la lezione di casa — un'ancora sparita deve far diventare ROSSA la
+    prova, non farla ESPLODERE portandosi dietro le sorelle."""
+    i = testo.find(ancora)
+    return "" if i < 0 else testo[i:i + quanti]
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -35919,7 +36139,8 @@ def main():
               prove_asta, prove_proxy_asta,
               prove_annullo, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
+              prove_initdata, prove_portachiavi,
+              prove_foto, prove_foto_scarti, prove_avatar,
               prove_foto_spenta,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,

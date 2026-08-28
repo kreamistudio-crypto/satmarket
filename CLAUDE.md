@@ -6147,6 +6147,132 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   committato a versione bloccata e servito da `GET /vendor/nostr.js`
   (file singolo, MAI CDN: nessun terzo deve poter cambiare la pagina
   dove si può incollare una nsec).
+  PIÙ ACCOUNT SULLO STESSO BROWSER (ago 2026, chiesto da Andrea: «il
+  mio account e quello del negozio, entrambi loggati, senza fare
+  logout e login ogni volta»): il tappo del Profilo apre il menu delle
+  identità aperte, e con un tocco si passa dall'una all'altra.
+  LA REGOLA CHE TIENE PICCOLO IL CANTIERE: `barattolo_sessione` resta
+  ESATTAMENTE quello di sempre — il token ATTIVO — e accanto nasce il
+  PORTACHIAVI (`barattolo_portachiavi`), i token delle sessioni aperte
+  su questo browser. Così `verifica_utente`, `utente_se_autenticato` e
+  i ~50 endpoint che le chiamano NON CAMBIANO DI UNA RIGA: lo switch
+  riscrive il cookie attivo, e da lì in giù è il mondo di ieri byte
+  per byte. La strada scartata è far scegliere l'account a OGNI
+  richiesta: toccherebbe il percorso dell'autenticazione di tutta
+  l'app, cioè il pezzo più delicato che abbiamo, per ottenere la
+  stessa cosa.
+  SOLO SU WEB E PWA, ed è una decisione di Andrea e non una
+  dimenticanza: dentro Telegram l'identità la IMPONE il client —
+  `authHdr()` manda l'initData firmato e `verifica_utente` dice che
+  «il fallback scatta SOLO a header vuoto: un initData presente ma
+  invalido resta 401» — quindi uno switch nella Mini App vorrebbe dire
+  far vincere una sessione scelta su una firma di Telegram, cioè
+  rovesciare quella regola. Il giudice client è `accountVivi()`
+  (`WEB && !DEMO && !VETRINA`): in demo e in vetrina non c'è nessuna
+  sessione, e un selettore vuoto sarebbe un cassetto su un muro.
+  IL PORTACHIAVI NON È UNA CREDENZIALE NUOVA, ed è la ragione per cui
+  non si firma e non si cifra: contiene TOKEN VERI, gli stessi che
+  aprono le sessioni. Chi lo ruba ha rubato dei token di sessione, non
+  di più; chi lo falsifica scrive token che nel database non trovano
+  niente (il patto del cursore storto: si ignora, mai un 400). Per
+  questo ha le STESSE difese del fratello — HttpOnly, Secure,
+  SameSite=Lax — e non ne servono altre. Il separatore è il PUNTO
+  perché i token sono `token_urlsafe`, cioè `[A-Za-z0-9_-]`: non ci
+  può finire dentro per costruzione.
+  IL TOKEN NON ESCE MAI da `/api/sessioni`, ed è la riga da non
+  ammorbidire: uscirebbe da un cookie HttpOnly per finire in mano al
+  JavaScript, cioè si butterebbe via l'unica difesa che quel cookie
+  ha. A dire «passa a questo» basta il `tg_id`, che di suo non apre
+  niente — e la prova che conta lo guarda sulla RISPOSTA vera e non
+  sul sorgente.
+  LO SWITCH È UNA LETTURA (`POST /api/sessioni/attiva`): non apre
+  sessioni, non scrive sul database, non muove un sat, non tocca un
+  ordine e non avvisa nessuno — si passa liberamente anche con un
+  affare aperto (decisione di Andrea), e le notifiche del bot
+  continuano ad arrivare all'account giusto, che è quel che tiene
+  tutto in piedi. L'ANTI-ORACOLO è una frase sola
+  (`MSG_ACCOUNT_ASSENTE`): «non è nel tuo portachiavi», «non esiste» e
+  «è di un altro» si raccontano identici NEL CODICE e nelle parole —
+  un 404 contro un 400 direbbe «questo esiste» a messaggio uguale.
+  `apri_sessione` È LA PORTA UNICA di ogni login (widget Telegram, le
+  due strade del login Nostr, il collegamento): apre la sessione, la
+  rende attiva e la appende al portachiavi. Le tre cose stanno insieme
+  apposta — erano due righe ripetute in quattro punti, e il quinto
+  ingresso di domani si sarebbe scordato il portachiavi. C'è il
+  CENSIMENTO che lo verifica: nessuna funzione fuori di lì chiama
+  `crea_sessione`.
+  CHI RIENTRA SU UN ACCOUNT GIÀ APERTO non lo raddoppia (la voce
+  vecchia lascia il posto alla sessione fresca), e al TETTO
+  (`MAX_ACCOUNT_BROWSER`, 5) cede il più VECCHIO e mai chi è appena
+  entrato: chi ha appena messo la password si aspetta di trovarsi lì
+  dentro.
+  LA FUSIONE NON HA VOLUTO UNA RIGA, e va detto perché sembra un buco:
+  `esegui_fusione` fa `UPDATE sessioni SET tg_id`, quindi il
+  portachiavi può ritrovarsi due token che puntano alla stessa
+  persona — e in lista sarebbe la stessa voce due volte. A chiuderlo è
+  la dedup per `tg_id` che `portachiavi_conti` fa in LETTURA: la fonte
+  è il database, il cookie è solo un mazzo di chiavi. Per la stessa
+  ragione le sessioni scadute spariscono da sole.
+  IL LOGOUT ESCE DA UNO, non da tutti: toglie l'attivo e passa a chi
+  resta; senza nessuno è il logout di sempre, byte per byte. Chi vuole
+  uscire da tutti tocca «Esci» una volta per account, ed è voluto — un
+  bottone che chiude in un colpo anche l'account su cui non si sta è
+  il modo di buttare fuori qualcuno per sbaglio. E il bottone DICE
+  cosa fa: «🚪 Esci da questo account» quando gli account sono più
+  d'uno, o si temerebbe di perderli tutti.
+  LO SWITCH RICARICA e non ridisegna: cambiare identità cambia
+  vetrina, ordini, preferiti, offerte, barattolo e permessi insieme, e
+  rimettere in pari a mano una dozzina di viste sarebbe l'elenco che
+  fra sei mesi ne dimentica una. È la strada che il login web fa già.
+  L'ANELLO ARANCIONE sull'account attivo è quello di sempre — il tappo
+  del Profilo, la voce di nav, la card del reparto: un registro solo
+  per una cosa sola — ed è un `outline` con offset, quindi sta FUORI e
+  non sposta le righe vicine. Negli onclick viaggia SOLO il tg_id
+  numerico, il patto del filtro-alfabeto.
+  IL GESTO È IL DOPPIO TOCCO SUL TAPPO (ago 2026, decisione di Andrea):
+  il primo porta al Profilo come ha sempre fatto, il SECONDO — quando
+  ci si è già — apre `#accountSheet` col menu delle identità e la
+  porta per aggiungerne una. È il gesto di Gmail, quello che chi ha
+  due account ha già nelle dita.
+  LA LISTA VIVE NEL FOGLIO E NON IN PAGINA, ed è il rovesciamento del
+  primo giro (dove stava sotto la testata del Profilo): un elenco in
+  pagina E uno nel foglio sarebbero due posti per la stessa cosa, e il
+  secondo tocco non avrebbe più niente da dire — `renderAccountSheet`
+  è l'unico posto che le disegna, e c'è la prova che `profiloAccount`
+  non torni nel client.
+  IL SECONDO TOCCO ESISTE SOLO DOVE HA SENSO: la guardia è
+  `accountVivi()`, la stessa del resto del cantiere, quindi dentro
+  Telegram, in demo e in vetrina il tappo fa esattamente quel che ha
+  sempre fatto — e chi non è nel Profilo ci va, sempre: è l'unico
+  gesto che il tappo abbia mai avuto e non deve cambiare sotto le
+  dita. «Dove sono» si chiede al DOM (`.view.active`) come fanno già
+  `ptrVista` e `navRendiVista`: una variabile che segue la vista
+  sarebbe un secondo posto da tenere in pari.
+  L'ACCENNO È UN TOAST, UNA VOLTA SOLA — «💡 Tocca di nuovo la tua foto
+  per cambiare account» — ed è la lezione del tocco lungo sulle card
+  delle categorie: un gesto nascosto che nessuno scopre è un gesto che
+  non esiste, e il toast è l'unica forma a zero pixel di layout. Si
+  consuma col timbro degli hint (`duetocchi`), per dispositivo e per
+  sempre. PARLA SOLO A CHI HA GIÀ DUE ACCOUNT: con uno solo porterebbe
+  a un menu che non ha ancora niente da scegliere, e un suggerimento
+  che arriva prima di servire è rumore.
+  LE PORTE DEL LOGIN stanno in fondo al foglio sotto la loro etichetta
+  («Aggiungi un account»): senza, il widget di Telegram comparirebbe
+  nudo sotto la lista e nessuno saprebbe che serve ad AGGIUNGERE e non
+  a rientrare. Sono le stesse due del login web (widget Telegram,
+  Nostr) e la differenza è che il portachiavi NON si azzera; al TETTO
+  non si montano affatto e la riga dice perché — un bottone che porta
+  a un muro è peggio di un bottone che non c'è.
+  IL FOGLIO SI APRE SUBITO E POI RILEGGE (`apriAccountSheet`): disegna
+  coi dati che ha e richiama `caricaAccount`, perché una sessione può
+  essere scaduta da un'altra parte — mai un'attesa davanti a un elenco
+  vuoto, il patto del rientro istantaneo della cassa.
+  IL BANCO HA MENTITO UNA VOLTA, ed è la lezione del giro: i cookie
+  HttpOnly nel file di curl portano il prefisso `#HttpOnly_`, e lo
+  script che li rimetteva nel browser saltava quelle righe come
+  commenti — quindi il giro «dal vivo» stava entrando con l'identità
+  finta del collaudo e diceva `WEB: false` per la ragione sbagliata.
+  Una verifica che fallisce si guarda prima di crederle.
   Doppia cittadinanza (lug 2026): le due direzioni del collegamento.
   Telegram→Nostr: `POST /api/me/npub/abilita-accesso` promuove il
   badge VERIFICATO a `npub_accesso` (indice unico = giudice: 409 se
@@ -24795,6 +24921,55 @@ chiave e si comporta come oggi. DA GUARDARE al primo giro: la prima
 email lasciata alla CASSA dentro Telegram — che al venditore arrivi la
 riga in coda a «Hai venduto», e che il compratore la ritrovi
 nell'ordine, col «Cambia» che la riapre precompilata.
+
+Più account sullo stesso browser (ago 2026, chiesto da Andrea: «il mio
+account e quello del negozio entrambi loggati, senza fare logout e
+login ogni volta»). Il cookie di sessione resta quello di sempre — il
+token ATTIVO — e accanto nasce il PORTACHIAVI: così `verifica_utente` e
+i ~50 endpoint che la chiamano non cambiano di una riga, e lo switch è
+solo il cookie attivo che si riscrive. Le tre decisioni di Andrea: solo
+web e PWA (dentro Telegram l'identità la impone il client, e lo switch
+vorrebbe dire rovesciare una regola di sicurezza scritta), si passa
+LIBERAMENTE anche con un affare aperto, e il logout esce da UN account
+alla volta. IL GESTO È IL DOPPIO TOCCO SUL TAPPO (decisione di Andrea,
+il giro dopo): il primo porta al Profilo come sempre, il secondo apre
+il menu — quello di Gmail — e la lista è TRASLOCATA dalla pagina al
+foglio, che due elenchi della stessa cosa sono il difetto che il gesto
+esiste per togliere. Vedi Architettura, «PIÙ ACCOUNT SULLO STESSO
+BROWSER», per il token che non esce mai da `/api/sessioni`, per
+l'anti-oracolo, per la fusione — che non ha voluto una riga perché la
+dedup vive in lettura — e per l'accenno one-shot, senza il quale un
+gesto nascosto non lo scopre nessuno.
+Provato: **+41 prove** in `prove.py` (6472 → 6513 contro `origin/main`
+del giorno, che ha le stesse 6 fallite preesistenti — `websocket` non
+installato qui; è il DELTA il numero difendibile) con i ferri VERI
+girati su un database di cartone, e **13 MUTAZIONI, 13 uccise**, una
+per riga sorvegliata: dedup tolta, tetto rovesciato, scadenza non
+guardata, token che esce, switch che apre una sessione, anti-oracolo
+che distingue, logout che chiude tutti, HttpOnly perso, login che si
+riapre la sessione da solo, selettore in DEMO, switch che non ricarica.
+Più `collaudo_account.py` (32 verdi), che è il pezzo che le sentinelle
+non possono dare: un browser vero che tiene i cookie, e la domanda su
+cui il cantiere si regge — **dopo lo switch `/api/me` cambia persona
+davvero?** — con l'anti-oracolo provato sul database vero, dove
+l'account estraneo ESISTE. Torturato a sua volta: 5 mutazioni, 5
+uccise, e la quinta ha fatto irrobustire la prova dell'anti-oracolo
+(confrontava le parole e non il codice di stato). E il giro DAL VIVO
+col server vero su un database usa-e-getta a 320/360/375 nei due temi,
+zero sbordo e zero errori JS: il primo tocco che porta al Profilo, il
+secondo che apre il menu, il tocco sull'altra riga che porta da 222 a
+111 col nome che cambia e tutti e due ancora aperti, l'accenno che
+compare una volta sola, il caso a UN account solo, e — la prova che il
+gesto non è cambiato per nessun altro — `accountVivi()` falsa, dove i
+due tocchi fanno esattamente quel che facevano ieri.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuno stato nuovo, e la leva ha il default nel codice — un browser
+con un account solo fa login e logout esattamente come oggi, e chi è
+dentro Telegram non vede niente di diverso. DA GUARDARE al primo giro:
+il widget di Telegram dentro il menu, che qui non si può esercitare
+(vuole il dominio registrato su BotFather: in locale disegna un
+riquadro «Bot domain invalid») — e che dopo lo switch gli ORDINI
+mostrino quelli dell'altro account.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
