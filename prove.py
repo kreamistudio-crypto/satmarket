@@ -37232,7 +37232,7 @@ Nodo.prototype.querySelectorAll = function(sel){
 const NODI = {};
 function mkGruppo(idg, cassetti){
   const g = new Nodo('grp', idg);
-  g.appendChild(new Nodo('section-label grp-h'));
+  g.appendChild(new Nodo('grp-h'));
   const b = g.appendChild(new Nodo('grp-b'));
   for (const idc of cassetti) NODI[idc] = b.appendChild(new Nodo('acc', idc));
   NODI[idg] = g;
@@ -37391,16 +37391,69 @@ def prove_profilo_sezioni():
     # apre sulla mappa intera, non su un cassetto gia' spalancato.
     prova("nessuna sezione nasce aperta", 0, vista.count('class="grp open"'))
 
-    # --- 2) LA FORMA RESTA DISTINTA. Un `.acc` dentro un `.acc-b` non
+    # --- 2) LA FORMA RESTA DISTINTA, ed e' una TERZA e non una delle
+    # due che c'erano (ago 2026): un `.acc` dentro un `.acc-b` non
     # esiste da nessuna parte nel client, e due livelli con la stessa
     # veste sarebbero la trappola del doppio significato gia' pagata
     # con «lampo», «attesa» e «nota».
-    prova("la sezione e' un'etichetta e non un secondo cassetto", True,
-          'class="section-label grp-h"' in vista
-          and 'class="grp acc"' not in vista)
+    # ⚠️ LE DUE ASSERZIONI QUI SOTTO HANNO CAMBIATO LATO: chiedevano
+    # che la sezione fosse un `.section-label` con la freccia in coda
+    # ai puntini — cioe' certificavano proprio il difetto arrivato dal
+    # campo, «i titoli non sembrano toccabili». La sezione non e' piu'
+    # un'etichetta, e tenersi quella classe vorrebbe dire
+    # sovrascriverne ogni proprieta'.
+    prova("la sezione non e' un'etichetta di servizio", True,
+          'class="grp-h"' in vista
+          and 'class="section-label grp-h"' not in vista)
+    prova("e nemmeno un secondo cassetto", True,
+          'class="grp acc"' not in vista)
     css = mini[:mini.index("</style>")]
-    prova("la freccia della sezione atterra DOPO i puntini", True,
-          ".grp-h .fr{order:2" in css)
+    # ⚠️ SI GUARDA DENTRO LA REGIONE DELLA REGOLA e mai tutto il CSS,
+    # ed e' la tortura ad averlo chiesto: `border:1.5px solid
+    # var(--field-line)` vive in DIECI punti del foglio e
+    # `border-radius:50%;background:var(--card)` in due, quindi le
+    # prime stesure passavano PER LA RAGIONE SBAGLIATA — certificavano
+    # che quelle stringhe esistono da qualche parte, non che siano
+    # nella regola della sezione. Due mutazioni sopravvivevano.
+    titolo = css[css.index("  .grp-h{"):css.index("  .grp-h .fr{")]
+    fr = css[css.index("  .grp-h .fr{"):css.index("  .grp.open .grp-h .fr")]
+    # LA MISURA: il livello SOPRA dev'essere piu' grande di quello
+    # sotto. Il cassetto sta a 15px, e prima del cantiere la sezione
+    # stava a 11 — cioe' il contrario.
+    prova("la sezione e' piu' GRANDE del cassetto (17 contro 15)", True,
+          "font-size:17px" in titolo and "font-size:15px" in css[
+              css.index("  .acc-h{"):css.index("  .acc-h .em")])
+    # IL COLORE: un comando non e' una nota di servizio.
+    prova("e parla l'inchiostro, non il grigio", True,
+          "color:var(--ink)" in titolo and "var(--muted)" not in titolo)
+    # IL MAIUSCOLETTO CADE, e non e' cosmesi: e' il registro delle
+    # etichette di SERVIZIO in tutto il client, e finche' la sezione lo
+    # portava si leggeva come una nota invece che come un comando.
+    prova("e il maiuscoletto delle etichette non torna", True,
+          "text-transform" not in titolo and "letter-spacing" not in titolo)
+    # LA SEZIONE NON PRENDE LA CARTA, che e' la differenza piu' forte
+    # fra i due livelli — e la fascia velata a tutta larghezza fu
+    # scartata a schermo perche' indistinguibile dalla checklist.
+    prova("e non prende la carta del cassetto", True,
+          "background:none" in titolo and "var(--card)" not in titolo)
+    # ⚠️ E `font:inherit` VIENE PRIMA dei longhand, o la scorciatoia
+    # azzera corpo e peso e il titolo torna a 15px EREDITATI — la
+    # stringa `font-size:17px` resterebbe li' a dire il falso. E' la
+    # lezione gia' pagata da .demo-cta, ed e' l'ordine che un riordino
+    # sposta senza vederlo: la tortura ci e' passata attraverso finche'
+    # questa riga non e' esistita.
+    prova("...e font:inherit sta PRIMA del corpo, o lo azzera", True,
+          -1 < titolo.find("font:inherit") < titolo.find("font-size:17px"))
+    # IL SEGNO DEL TOCCO: la freccia in un cerchietto di carta col
+    # contorno, che il cassetto ce l'ha NUDA. Misurato a schermo: senza
+    # il bordo il cerchietto non stacca dal crema della pagina.
+    prova("la freccia della sezione sta in un cerchietto", True,
+          "border-radius:50%" in fr and "background:var(--card)" in fr)
+    prova("...col contorno, o non stacca dal crema", True,
+          "border:1.5px solid var(--field-line)" in fr)
+    prova("mentre quella del cassetto resta nuda", True,
+          "border-radius" not in css[css.index("  .acc-h .fr{"):
+                                     css.index("  .acc.open .acc-h .fr")])
     prova("il corpo della sezione si apre con la classe", True,
           ".grp-b{display:none}" in css
           and ".grp.open .grp-b{display:block}" in css)

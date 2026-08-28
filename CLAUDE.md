@@ -19210,23 +19210,74 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   si nasconde». In più il giudice «questo utente vende» NON ESISTE:
   `myListings` arriva da una fetch separata DOPO il render, e
   `/api/me` non ha un campo equivalente.
-  LA FORMA È LA RIGA DA NON AMMORBIDIRE: la sezione è un
-  `.section-label` reso TOCCABILE — il pattern di `.trust-line`, una
-  riga statica diventata `<button>` — e MAI un secondo cassetto. Un
-  `.acc` dentro un `.acc-b` **non esiste da nessuna parte nel
-  client**: sarebbe territorio nuovo, col `margin-top:10px` che si
-  somma al padding del genitore, e soprattutto due livelli con la
-  stessa veste sono la trappola del doppio significato già pagata con
-  «lampo», «attesa» e «nota» — chi guarda non saprebbe se sta aprendo
-  una sezione o un cassetto. Due dettagli che vengono dal codice e non
-  dall'intuito: `padding:26px 0 0` e non i `16px var(--pad)` di serie
-  (dentro `.form`, che ha già il suo padding laterale, il rientro si
-  sommerebbe — è quel che fa il pannello admin), e `order:2` sulla
-  freccia, perché il `::after` della linea puntinata è `order:1` e la
-  freccia deve atterrare DOPO i puntini, nel posto che il CSS riserva
-  già al `.conta`. Freccia della sezione a fondo riga sui puntini,
-  freccia del cassetto dentro la card: due forme distinte a colpo
-  d'occhio (guardate a schermo nei due temi).
+  LA SEZIONE È UNA TERZA FORMA (ago 2026, rifatta dal campo: «i
+  titoli sono troppo piccoli e non sembrano toccabili»). Nasceva come
+  `.section-label` reso TOCCABILE — il pattern di `.trust-line` — e IL
+  DIFETTO ERA MISURATO, non un'impressione: **11px GRIGI MAIUSCOLETTI
+  contro i 15px in inchiostro del cassetto**, cioè il livello SOPRA si
+  leggeva più piccolo di quello sotto, e le due frecce erano IDENTICHE
+  (12px, nude, tutte e due a fine riga a x=331). A schermo le sezioni
+  si leggevano come «IL TUO PROFILO», che è un titolo statico che non
+  si tocca — e due dita sopra c'erano tre bottoni veri con la loro
+  carta e l'ombra piena.
+  NON DIVENTA UN CASSETTO, e quella ragione resta INTERA: un `.acc`
+  dentro un `.acc-b` **non esiste da nessuna parte nel client**, e due
+  livelli con la stessa veste sono la trappola del doppio significato
+  già pagata con «lampo», «attesa» e «nota». Quindi TRE DIFFERENZE
+  INSIEME, e nessuna delle tre basta da sola: 1) **LA CARTA** — il
+  cassetto è una card bianca col bordo e il raggio 16, la sezione sta
+  sul crema della pagina: è la differenza più forte; 2) **LA MISURA**
+  — 17px contro 15, che il livello sopra dev'essere più grande; 3)
+  **IL SEGNO DEL TOCCO** — la freccia in un CERCHIETTO di carta col
+  contorno (28px), mentre il cassetto ce l'ha NUDA. Più il rientro,
+  che viene gratis: il testo del cassetto parte molto più a destra.
+  E CADE IL MAIUSCOLETTO, che non è cosmesi: quello è il registro
+  delle etichette di SERVIZIO in tutto il client — finché la sezione
+  lo portava si leggeva come una nota e non come un comando. Per la
+  stessa ragione cade `.section-label` dal MARKUP: la sezione non è
+  più un'etichetta, e tenersi la classe vorrebbe dire sovrascriverne
+  ogni proprietà.
+  IL TEST CHE DECIDE È LA SEZIONE APERTA, ed è l'unico che dica se i
+  due livelli si confondono: chiusi si vedono uno accanto all'altro,
+  aperti si vedono UNO DENTRO L'ALTRO. Guardato a 320/360/375 nei due
+  temi, e nel caso più severo — due sezioni aperte e dentro una un
+  cassetto aperto col suo contenuto, cioè TRE livelli insieme.
+  LE TRE FORME PROVATE E SCARTATE, guardate a schermo e non dedotte,
+  che è la parte che serve fra sei mesi: 1) **il cerchietto ATTACCATO
+  al testo** invece che a fine riga — i cerchietti finiscono a x
+  diverse, la colonna si perde e la lista si sfilaccia; 2) **la fascia
+  velata a tutta larghezza** (`--chip-bg`, il registro di
+  `.trust-line`) — indistinguibile dalla CHECKLIST che sta due dita
+  sopra, stessa larghezza e stesso raggio: sette fasce di fila e tre
+  significati diversi, cioè il difetto del cantiere spostato di un
+  livello, e per giunta +140px; 3) **la linea piena SOTTO** il titolo
+  — a sezione APERTA taglia fra il titolo e i suoi cassetti e si legge
+  «finisco qui» invece di «questi sono miei»; il dubbio c'era già
+  sulla carta e il giro dal vivo l'ha confermato peggiore del
+  previsto.
+  IL COSTO È MISURATO: il Profilo passa da **1023 a 1113px** a 375
+  (+90, +8,8%) e ogni titolo da 42 a 60px. ⚠️ E IL CAPOLINEA DEL
+  TESTO È «Impostazioni di negozio» A 320: 218px di testo con **42px
+  d'aria** prima del cerchietto, cioè ~2 caratteri — chi allunga
+  un'etichetta di sezione rimisuri lì, che è la larghezza dove la riga
+  si gioca.
+  Due dettagli che vengono dal codice e non dall'intuito:
+  `padding:24px 0 8px` e non i `16px var(--pad)` di serie (dentro
+  `.form`, che ha già il suo padding laterale, il rientro si
+  sommerebbe — è quel che fa il pannello admin), con l'aria SOTTO che
+  serve perché il primo cassetto ha solo i suoi 10px di margine; e
+  **`font:inherit` PRIMA dei longhand**, o la scorciatoia azzera corpo
+  e peso e il titolo torna a 15px EREDITATI lasciando `font-size:17px`
+  lì a dire il falso — la lezione già pagata da `.demo-cta`, e la
+  tortura ci è passata attraverso finché la prova sull'ORDINE non è
+  esistita.
+  ⚠️ E LE PROVE DELLA FORMA GUARDANO DENTRO LA REGIONE DELLA REGOLA e
+  mai tutto il foglio, ed è la tortura ad averlo chiesto: `border:1.5px
+  solid var(--field-line)` vive in DIECI punti del CSS e
+  `border-radius:50%;background:var(--card)` in due, quindi le prime
+  stesure passavano PER LA RAGIONE SBAGLIATA — certificavano che
+  quelle stringhe esistono da qualche parte, non che siano nella
+  regola della sezione. Due mutazioni sopravvivevano.
   `toggleGrp` NON HA MEMORIA, ed è il gemello di `toggleAcc`: lo stato
   È la classe sul nodo, e sopravvive perché il markup del Profilo non
   si ridisegna MAI (i render scrivono dentro i propri `…Blocco`).
@@ -26063,10 +26114,13 @@ i diciannove cassetti in fila diventano CINQUE sezioni richiudibili —
 catalogo, negozio, quando compri, privacy, account — tutte chiuse
 entrando; e il ventesimo cassetto porta l'indirizzo `.onion`, che il
 servizio nascosto aveva da mesi senza che nessuno potesse saperlo. Il
-Profilo passa da ~1660 a **1115px** misurati a 375px. Vedi
+Profilo passa da ~1660 a **1113px** misurati a 375px (il 1115 della
+prima stesura era misurato con un cassetto in meno visibile: il numero
+assoluto dipende dalle leve di quell'utente, e a valere è la
+differenza misurata prima e dopo nella stessa sessione). Vedi
 Architettura, «IL PROFILO A SEZIONI, E L'INDIRIZZO TOR», per la forma
-della sezione (un'etichetta toccabile e MAI un secondo cassetto: un
-`.acc` dentro un `.acc-b` non esiste da nessuna parte nel client), per
+della sezione — una TERZA forma, né etichetta né cassetto, rifatta dal
+campo il giorno dopo perché i titoli non sembravano toccabili — per
 la riga che il cantiere paga — `apriCassettoProfilo` che apre anche la
 sezione, o il cassetto si aprirebbe invisibile — e per le due
 decisioni che si leggono male da sole: «Incassi e pagamenti» sta in
@@ -26076,12 +26130,15 @@ IL LAMPO DICHIARATO NEL PIANO NON ESISTE, misurato e non supposto: 124
 campioni con la vista a schermo, e in tutti la sezione vuota era già
 spenta — il Profilo non è la vista d'ingresso, quindi quando ci si
 arriva i render sono già girati.
-Collaudato: 33 prove nuove (7036 verdi in modalità severa, col
-censimento che nessun cassetto resti fuori da una sezione e il banco
-node che fa GIRARE i quattro pezzi su un DOM di cartone) e **15
-MUTAZIONI, 15 uccise**, una per riga sorvegliata; più il giro DAL VIVO
-col server vero su un database usa-e-getta a 320/360/375 nei due temi —
-38 verifiche verdi, zero errori JS: l'atterraggio sul cassetto
+Collaudato: 33 prove nuove (**7044 verdi** in modalità severa
+sull'albero ISOLATO dopo il giro della forma — è quello il numero
+difendibile: la cartella è condivisa, e il totale sul disco dipende
+da chi altro ci sta lavorando; col censimento che nessun cassetto resti fuori da
+una sezione e il banco node che fa GIRARE i quattro pezzi su un DOM di
+cartone) e **15 + 8 MUTAZIONI, tutte uccise**, una per riga
+sorvegliata; più il giro DAL VIVO col server vero su un database
+usa-e-getta a 320/360/375 nei due temi — 38 verifiche verdi sul primo
+giro e 108 sul secondo, zero errori JS: l'atterraggio sul cassetto
 profondo, il cassetto Tor nelle due facce, il caso SENZA indirizzo, la
 DEMO dove una sezione sparisce, e la regressione del ritorno da un
 annuncio (y=700 → y=700).

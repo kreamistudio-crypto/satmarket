@@ -1700,31 +1700,62 @@
      titoli senza nessun appiglio. Ora stanno in cinque sezioni
      richiudibili, chiuse di serie.
 
-     IL GRUPPO E' UN'ETICHETTA, NON UN SECONDO CASSETTO, ed e' la riga
-     da non ammorbidire: il cassetto ha gia' la sua freccia dentro una
-     card, e un gruppo con la stessa veste darebbe due livelli con la
-     stessa forma — chi guarda non saprebbe se sta aprendo un gruppo o
-     un cassetto (la trappola del doppio significato gia' pagata con
-     «lampo», «attesa» e «nota»). E un .acc dentro un .acc-b non esiste
-     da nessuna parte nel client: sarebbe territorio nuovo, col
-     margin-top:10px che si somma al padding del genitore. Quindi il
-     gruppo e' un .section-label reso TOCCABILE — il pattern di
-     .trust-line, una riga statica diventata bottone con la sua freccia
-     — e porta ENTRAMBE le classi: la prima da' l'aspetto, la seconda i
-     correttivi da bottone. Cosi' le altre etichette statiche del
-     client non si toccano.
+     LA SEZIONE E' UNA TERZA FORMA (ago 2026, dal campo: «i titoli
+     sono troppo piccoli e non sembrano toccabili»). Nasceva come
+     .section-label reso toccabile, e la misura diceva il difetto: 11px
+     GRIGI MAIUSCOLETTI contro i 15px in inchiostro del cassetto —
+     cioe' il livello SOPRA si leggeva piu' piccolo di quello sotto — e
+     le due frecce erano IDENTICHE, 12px nude tutte e due a fine riga.
+     A schermo le sezioni si leggevano come «IL TUO PROFILO», che e' un
+     titolo statico che non si tocca.
 
-     `padding:26px 0 0` e non i `16px var(--pad)` di serie: qui siamo
+     NON DIVENTA UN CASSETTO, e quella ragione resta intera: due
+     livelli con la stessa veste sono la trappola del doppio
+     significato gia' pagata con «lampo», «attesa» e «nota», e un .acc
+     dentro un .acc-b non esiste da nessuna parte nel client. Quindi
+     TRE differenze insieme, guardate a schermo con una sezione APERTA
+     — che e' l'unico caso in cui i due livelli si vedono uno sopra
+     l'altro: 1) LA CARTA — il cassetto e' una card bianca col bordo,
+     la sezione sta sul crema della pagina, ed e' la differenza piu'
+     forte; 2) LA MISURA — 17px contro 15, che il livello sopra dev'
+     essere piu' grande; 3) IL SEGNO DEL TOCCO — la freccia in un
+     CERCHIETTO di carta col contorno, mentre il cassetto ce l'ha NUDA.
+     Piu' il rientro: il testo del cassetto parte molto piu' a destra.
+
+     E CADE IL MAIUSCOLETTO, che non e' cosmesi: quello e' il registro
+     delle etichette di SERVIZIO in tutto il client, e finche' la
+     sezione lo portava si leggeva come una nota e non come un comando.
+     Per la stessa ragione cade il .section-label dal markup: la
+     sezione non e' piu' un'etichetta, e tenersi la classe vorrebbe
+     dire sovrascriverne ogni proprieta'.
+
+     LE TRE FORME PROVATE E SCARTATE, guardate a schermo prima di
+     decidere: 1) IL CERCHIETTO ATTACCATO AL TESTO invece che a fine
+     riga — i cerchietti finiscono a x diverse, la colonna si perde e
+     la lista si sfilaccia; 2) LA FASCIA VELATA a tutta larghezza —
+     indistinguibile dalla CHECKLIST che sta due dita sopra (stessa
+     larghezza, stesso raggio, fondo simile): sette fasce di fila e tre
+     significati diversi, cioe' il difetto del cantiere spostato di un
+     livello; 3) LA LINEA PIENA SOTTO il titolo — a sezione APERTA
+     taglia fra il titolo e i suoi cassetti, e si legge «finisco qui»
+     invece di «questi sono miei» (il dubbio c'era gia' sulla carta, e
+     il giro dal vivo l'ha confermato peggiore del previsto).
+
+     `padding:24px 0 8px` e non i `16px var(--pad)` di serie: qui siamo
      dentro .form, che il rientro laterale ce l'ha gia' e si
      sommerebbe — e' quel che fa il pannello dei moderatori due righe
-     piu' su. La freccia va in `order:2` perche' il ::after della linea
-     puntinata e' order:1: atterra DOPO i puntini, nel posto che il CSS
-     riserva gia' al .conta. Freccia del gruppo a fondo riga sui
-     puntini, freccia del cassetto dentro la card: due forme che non si
-     confondono. */
-  .grp-h{padding:26px 0 0;border:0;background:none;font-family:inherit;
-    width:100%;cursor:pointer;text-align:left}
-  .grp-h .fr{order:2;color:var(--muted);font-size:12px;
+     piu' su. L'aria SOTTO e' nuova e serve: il primo cassetto ha solo
+     i suoi 10px di margine, e senza il titolo gli toccherebbe.
+     `font:inherit` va PRIMA dei longhand, o la scorciatoia azzera
+     corpo e peso — la lezione gia' pagata da .demo-cta. */
+  .grp-h{display:flex;align-items:center;gap:9px;
+    padding:24px 0 8px;border:0;background:none;font:inherit;
+    width:100%;cursor:pointer;text-align:left;
+    font-size:17px;font-weight:800;color:var(--ink)}
+  .grp-h .fr{margin-left:auto;flex:none;width:28px;height:28px;
+    border-radius:50%;background:var(--card);
+    border:1.5px solid var(--field-line);color:var(--ink);font-size:11px;
+    display:flex;align-items:center;justify-content:center;
     transition:transform .18s ease}
   .grp.open .grp-h .fr{transform:rotate(180deg)}
   .grp-b{display:none}
@@ -5501,7 +5532,7 @@ document.getElementById('cartello')?.remove();</script>
            «questo utente vende» non esiste: myListings arriva DOPO il
            render, e /api/me non ha un campo che lo dica. ============ -->
       <div class="grp" id="grpCatalogo">
-        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpCatalogo')"
+        <button type="button" class="grp-h" onclick="toggleGrp('grpCatalogo')"
                 aria-expanded="false">📋 Il tuo catalogo<span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
@@ -5561,7 +5592,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
 
       <div class="grp" id="grpNegozio">
-        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpNegozio')"
+        <button type="button" class="grp-h" onclick="toggleGrp('grpNegozio')"
                 aria-expanded="false">🏪 Impostazioni di negozio<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
@@ -5634,7 +5665,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
 
       <div class="grp" id="grpCompri">
-        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpCompri')"
+        <button type="button" class="grp-h" onclick="toggleGrp('grpCompri')"
                 aria-expanded="false">🫙 Quando compri<span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- I preferiti, primo cassetto: cio' che hai messo da parte
@@ -5653,7 +5684,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
 
       <div class="grp" id="grpPrivacy">
-        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpPrivacy')"
+        <button type="button" class="grp-h" onclick="toggleGrp('grpPrivacy')"
                 aria-expanded="false">🔐 Privacy<span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accIdentita">
@@ -5729,7 +5760,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
 
       <div class="grp" id="grpAccount">
-        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpAccount')"
+        <button type="button" class="grp-h" onclick="toggleGrp('grpAccount')"
                 aria-expanded="false">⚙️ Il tuo account<span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAvvisi">
