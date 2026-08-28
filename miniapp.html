@@ -3764,6 +3764,16 @@
     font:inherit;font-weight:800;font-size:13px;line-height:1.35;
     color:var(--sats-text);
   }
+  /* LA RIGA DI CHI ARRIVA DA TOR: la forma della sorella qui sopra,
+     coi token NEUTRI. Niente arancio (e' del rodaggio e dell'acquisto),
+     niente verde (e' il deposito di garanzia) e niente viola (e'
+     Nostr): un colore che significa gia' una cosa non se ne prende
+     un'altra, e questa riga non e' ne' un'occasione ne' una promessa
+     — e' una constatazione. Carta e inchiostro, come una mappa. */
+  .fascia-onion{
+    background:var(--chip-bg);border-color:var(--muted);
+    color:var(--ink);font-weight:700;
+  }
   button.fascia-test{cursor:pointer}
   button.fascia-test:active{transform:translateY(1px)}
   .fascia-test .ft-cta{text-decoration:underline;text-underline-offset:2px}
@@ -4262,6 +4272,9 @@ document.getElementById('cartello')?.remove();</script>
     <!-- La porta fissa al canale durante il rodaggio: la riempie
          renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
     <div id="fasciaTest" style="display:none"></div>
+    <!-- La riga di chi arriva dal servizio nascosto: la riempie
+         renderFasciaOnion(), e fuori da Tor non nasce mai. -->
+    <div id="fasciaOnion" style="display:none"></div>
     <!-- Banner «installa Barattolo» (PWA): riempito da
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
@@ -4947,6 +4960,11 @@ document.getElementById('cartello')?.remove();</script>
         <li><span class="em">🤖</span><b>L'intelligenza artificiale</b> che controlla gli annunci: le arriva il testo dell'annuncio — titolo e descrizione — e <b>mai chi l'ha scritto</b>. Quello che scrivi nella <b>barra di ricerca</b> non le arriva mai: la ricerca è un indice di casa, e la tua domanda non esce da qui.</li>
         <li><span class="em">💱</span><b>Il cambio euro/bitcoin</b>, che chiediamo noi una volta al minuto e non il tuo browser: così nessun terzo sa che stai guardando un prezzo.</li>
       </ul>
+
+      <h3 id="priv-tor">Se ti colleghi da Tor</h3>
+      <p>Barattolo si raggiunge anche da un indirizzo <b>.onion</b>, cioè da dentro la rete Tor. Quello che cambia è <b>da dove risulta che ti colleghi</b>: il nostro server non vede il tuo indirizzo IP e non lo scrive da nessuna parte, chi ti fornisce la connessione non sa che stai su Barattolo, e fra il tuo browser e noi non c'è nessun altro. Le foto, le pagine e tutto il resto restano dentro il tunnel.</p>
+      <p>Di là la pagina <b>non porta lo script di Telegram</b>: fuori non protegge nessuno — sei già su barattolo.store — ma da Tor sarebbe la contraddizione più grossa, perché sarebbe la prima richiesta a uscire col tuo indirizzo vero. Per la stessa ragione lì non c'è il bottone «Entra con Telegram» (funziona solo sul dominio normale) e si entra <b>con una chiave Nostr</b>.</p>
+      <p>Fin dove arriva, detto per intero: <b>Tor nasconde da dove ti colleghi, non quello che scrivi.</b> L'indirizzo di consegna, il punto di ritiro e l'email per il corriere li legge chi ti spedisce — <b>è così su Tor e fuori</b>, e non è una cosa che si perde scegliendo Tor: quella parte non è mai stata una questione di rete. Restano fuori dal tunnel anche i <b>relay Nostr</b> quando entri, il tuo <b>wallet Lightning</b> quando paga (parla per conto suo con la rete), e i <b>collegamenti che portano altrove</b> — la chat di Telegram, il profilo Nostr, il sito del corriere: sono link a case d'altri, e li apri tu quando li tocchi.</p>
 
       <h3 id="priv-no">Cosa non facciamo</h3>
       <ul class="sicu-lista">
@@ -6212,6 +6230,32 @@ let DEMO = !API_BASE;
 let VETRINA = false;   // browser in produzione: annunci veri, sola lettura
 let WEB = false;       // browser col login web: cookie di sessione, app completa
 
+/* DA CHE PORTA SI E' ENTRATI (ago 2026, il servizio nascosto Tor).
+   Il client lo sa da solo: `.onion` e' un TLD RISERVATO (RFC 7686),
+   nessun dominio vero puo' finire cosi', quindi non serve chiederlo
+   al server — e una domanda in meno e' una cosa in meno che puo'
+   divergere. */
+function suOnion(){
+  return location.hostname.endsWith('.onion');
+}
+/* IL DOMINIO DA CUI SI CONDIVIDE. Da Tor un link `.onion` mandato a
+   qualcuno e' un link che quasi nessuno puo' aprire — e per giunta
+   dice «io uso Tor», mentre l'indirizzo normale non dice niente.
+   Quindi da li' si condivide il CLEARNET, che il server manda nella
+   busta di prima pagina.
+
+   FUORI DA ONION RESTA `location.origin`, ed e' la riga da non
+   «semplificare» usando il dominio di casa sempre: in DEMO e in
+   collaudo si sta su localhost, e condividere link di produzione da
+   un banco di prova sarebbe peggio del difetto che questa funzione
+   cura. Il ripiego copre anche il server di ieri, che quella chiave
+   non la manda. */
+let dominioPubblico = '';
+function baseCondivisione(){
+  return (suOnion() && dominioPubblico) ? dominioPubblico : location.origin;
+}
+
+
 if (tg) { tg.ready(); tg.expand(); }
 
 /* ---- COLLAUDO: due identità finte per provare dal browser ---- */
@@ -7131,6 +7175,10 @@ async function loadListings(anonimo){
   /* il cambio del SERVER, prima che la griglia si disegni (vedi
      impostaCambio): fonte unica, zero chiamate in piu' */
   if (j.cambio_eur !== undefined) impostaCambio(j.cambio_eur);
+  /* il dominio di casa, che serve solo a chi arriva dall'onion: la
+     riga la legge baseCondivisione, e senza (server di ieri) resta
+     location.origin, cioe' il comportamento di sempre */
+  if (j.dominio_pubblico) dominioPubblico = j.dominio_pubblico;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -10112,7 +10160,7 @@ async function rimuoviFeedback(fid){
 function condividiNegozio(){
   const v = negozioCorrente;
   if (!v) return;
-  const link = `${location.origin}/negozio/${encodeURIComponent(v.username || v.negozio)}`;
+  const link = `${baseCondivisione()}/negozio/${encodeURIComponent(v.username || v.negozio)}`;
   copiaLink(link, '📋 Link del negozio copiato');
 }
 
@@ -11538,6 +11586,11 @@ async function caricaBannerTest(){
    `modaleTest` in coda la ridisegna identica (stesso innerHTML:
    nessun movimento) e tiene il suo mestiere, il cartello del giorno. */
 async function fasciaPrima(){
+  /* la riga di Tor non aspetta niente — l'hostname si sa dal primo
+     fotogramma — quindi sta PRIMA del giro di rete del rodaggio: se
+     nascesse dopo le card sarebbe un salto, la lezione della fascia
+     sorella qui sotto */
+  renderFasciaOnion();
   await caricaBannerTest();
   renderFasciaTest();
 }
@@ -11583,6 +11636,50 @@ function renderFasciaTest(){
          <span>🚧 Barattolo è in fase di test</span>
          <span class="ft-cta">💬 Dicci la tua ›</span></button>`
     : `<div class="fascia-test"><span>🚧 Barattolo è in fase di test</span></div>`;
+}
+/* DOVE LA PROTEZIONE FINISCE, e si dice dove nasce il dubbio: nel
+   cassetto in cui si sta per scrivere un recapito. UN TESTO E DUE
+   CASE — il punto di ritiro e l'indirizzo di casa — perche' e' la
+   stessa frase per lo stesso dubbio, e due copie divergono al primo
+   ritocco.
+
+   IL REGISTRO E' LA MAPPA, e la meta' che conta e' la seconda: «e'
+   cosi' su Tor e fuori» dice che NON si e' perso niente scegliendo
+   Tor — quella parte non e' mai stata una questione di rete. Chi
+   arriva da li' teme di aver scelto male, e un avvertimento glielo
+   confermerebbe; questa frase gli dice che ha scelto una cosa che
+   copre un altro pezzo.
+
+   NIENTE AMBRA E NIENTE ROSSO: non c'e' un problema e non c'e' un
+   ritardo, c'e' un confine — e il rosso in pagina Paga e' del recinto
+   che dice tutt'altro. La veste e' la `.acq-nota` delle sorelle. */
+function notaOnionRecapito(){
+  return suOnion()
+    ? `<div class="acq-nota">🧅 <b>Tor nasconde da dove ti colleghi</b>,
+         non quello che scrivi qui: questo lo legge chi ti spedisce —
+         è così su Tor e fuori.</div>`
+    : '';
+}
+/* CHI ARRIVA DA TOR SE LO SENTE DIRE, e nel verso POSITIVO: dice
+   cosa E' protetto, non cosa non lo e'. Il registro e' quello di una
+   MAPPA e non di un avvertimento — chi arriva da li' teme di aver
+   scelto male, e un ⚠️ in cima glielo confermerebbe.
+
+   NON UN CARTELLO CHE CHIEDE QUALCOSA: nessun bottone, nessun
+   dismiss. E' uno stato di dove si sta, e sparisce da solo quando
+   smette di essere vero (il patto degli hint contestuali).
+
+   Dove la protezione FINISCE lo dicono altri due posti, e nessuno dei
+   tre e' un banner all'ingresso: la frase nel cassetto del recapito,
+   dove nasce il dubbio, e la voce in «I tuoi dati», dove vivono gia'
+   le altre tre affermazioni scomode. */
+function renderFasciaOnion(){
+  const f = el('fasciaOnion'); if (!f) return;
+  if (!suOnion()) { f.style.display = 'none'; f.innerHTML = ''; return; }
+  f.style.display = '';
+  f.innerHTML = `<div class="fascia-test fascia-onion">
+       <span>🧅 Sei su Tor: quello che guardi resta fra te e Barattolo</span>
+     </div>`;
 }
 /* Dentro Telegram il link al canale passa dal client (che sa aprire
    gli inviti t.me/+…); nel browser e' una scheda nuova. */
@@ -13077,7 +13174,8 @@ function renderAcquisto(){
       placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
     ${mappePunti(retiMappa)}
-    <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
+    <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>
+    ${notaOnionRecapito()}`;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il campo del punto,
      dentro lo STESSO cassetto — cosi' eredita per costruzione lo
      stopPropagation del contenitore e la cascata rete → tipo → punto,
@@ -13155,6 +13253,7 @@ function renderAcquisto(){
          un'ALTRA pagina: due destinazioni non possono avere le stesse
          parole. -->
     <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo appena confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-indirizzo')">Che fine fa</button></span></div>
+    ${notaOnionRecapito()}
   </form>`;
   const indScritto = indirizzoCompleto(iVal);
   const indChiuso = indScritto
@@ -19901,7 +20000,7 @@ function condividiAnnuncio(){
     + (chi ? `\nAnnuncio di ${chi}` : '')
     + `\nPagamento in satoshi`;
   return condividiLink(
-    `${location.origin}/annuncio/${l.id}${s ? '-' + s : ''}`,
+    `${baseCondivisione()}/annuncio/${l.id}${s ? '-' + s : ''}`,
     testo, l.title);
 }
 
@@ -19911,7 +20010,7 @@ function condividiAnnuncio(){
    nostre viste non sa niente. Senza ancora: chi lo riceve la legge
    dall'inizio. */
 function condividiSicurezza(){
-  return condividiLink(`${location.origin}/sicurezza`,
+  return condividiLink(`${baseCondivisione()}/sicurezza`,
     'Come funziona il pagamento protetto su Barattolo 🫙⚡',
     'Il pagamento protetto');
 }
@@ -19921,7 +20020,7 @@ function condividiSicurezza(){
    chi ha chiesto «ma che dati si prendono?», che dei nomi delle nostre
    pagine non sa niente. */
 function condividiPrivacy(){
-  return condividiLink(`${location.origin}/privacy`,
+  return condividiLink(`${baseCondivisione()}/privacy`,
     'Che dati raccoglie Barattolo, e per quanto 🫙',
     'I tuoi dati');
 }
@@ -19965,7 +20064,7 @@ function condividiPrivacy(){
    dove serve di piu'. */
 function condividiCategoria(c){
   if (DEMO || c === 'Tutto' || !CATS.includes(c)) return;
-  return condividiLink(`${location.origin}/categoria/${slugCat(c)}`,
+  return condividiLink(`${baseCondivisione()}/categoria/${slugCat(c)}`,
     `${c} in vendita su Barattolo 🫙`, c);
 }
 
@@ -19996,7 +20095,7 @@ function apriMioNegozio(){
 let widgetUrl = '';
 function apriWidget(tipo, id){
   haptic();
-  const base = location.origin;
+  const base = baseCondivisione();
   if (tipo === 'annuncio') {
     widgetUrl = `${base}/widget/annuncio/${id}`;
     el('widgetChe').textContent = 'questo annuncio';
@@ -20034,7 +20133,7 @@ function apriAnteprimaWidget(){
 }
 
 function condividiMioNegozio(){
-  const link = `${location.origin}/negozio/${encodeURIComponent(myUsername || myNegozio)}`;
+  const link = `${baseCondivisione()}/negozio/${encodeURIComponent(myUsername || myNegozio)}`;
   copiaLink(link, '📋 Link del tuo negozio copiato');
 }
 
@@ -26159,7 +26258,7 @@ function apriJarShare(){
    patto di linkCanaleTest): il token e' esadecimale per costruzione,
    ma la regola non fa eccezioni che poi diventano abitudini. */
 const jarShareLinkUrl = () => myBarattoloCond
-  ? `${location.origin}/barattolo/${myBarattoloCond.token}` : '';
+  ? `${baseCondivisione()}/barattolo/${myBarattoloCond.token}` : '';
 function condividiJarLink(){
   const l = jarShareLinkUrl(); if (!l) return;
   condividiLink(l, 'Le cose che ho messo da parte su Barattolo 🫙');
@@ -29880,7 +29979,14 @@ async function avviaVetrina(){
     renderAvatar();            // in vetrina anonima il tappo non compare
     renderPodioTesta();        // ...e il podio nemmeno: la cintura di apriClassifica
     mostraBanner(BANNER_VETRINA);
-    bottoneLoginTelegram();
+    /* SU ONION IL LOGIN TELEGRAM NON SI OFFRE, e non e' prudenza:
+       il Login Widget funziona SOLO sul dominio registrato con
+       /setdomain, che e' uno per bot — quindi di la' porterebbe a un
+       muro, ed e' la regola di casa (un bottone che porta a un muro e'
+       peggio di un bottone che non c'e'). In piu' il widget si tira
+       dietro uno script da telegram.org, cioe' la fuga che su quella
+       strada si e' appena chiusa. Resta Nostr, che di la' funziona. */
+    if (!suOnion()) bottoneLoginTelegram();
     bottoneLoginNostr();
     /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
        risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */

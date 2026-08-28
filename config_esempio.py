@@ -864,6 +864,30 @@ MAX_ACCOUNT_BROWSER = 5
 # sola strada che questa leva puo' chiudere.
 PROTEGGI_IFRAME = False
 
+# --- L'altra porta: il servizio nascosto Tor (ago 2026) --------------
+# L'indirizzo `.onion` da cui Barattolo si raggiunge anche da Tor, SENZA
+# schema e senza porta: e' un HOST e si confronta con l'header Host.
+# Lo scrive Tor in /var/lib/tor/barattolo/hostname quando crea il
+# servizio nascosto; il blocco che lo serve vive nel Caddyfile.
+# VUOTO = la funzione non esiste, ed e' il patto delle leve che nascono
+# spente: senza questa riga il server non ha modo di sapere che l'onion
+# esiste, e ogni pagina esce esattamente com'e' sempre stata.
+#
+# CAMBIA UNA COSA SOLA, e solo alle richieste che arrivano da li': la
+# pagina non porta lo script di telegram.org. Fuori da Tor quello
+# script non protegge nessuno (si e' gia' su barattolo.store), ma su
+# onion e' la contraddizione piu' grossa che ci sia — uno arriva dal
+# tunnel e la prima richiesta del browser esce verso Telegram col suo
+# IP vero.
+#
+# ⚠️ LA CHIAVE E' L'INDIRIZZO: un onion v3 non e' registrato da
+# nessuna parte, l'indirizzo si DERIVA dalla chiave in
+# /var/lib/tor/barattolo/. Persa quella, e' perso per sempre e va
+# annunciato di nuovo. Sta nell'archivio cifrato di
+# `deploy/backup-fuori.sh` insieme al torrc, ed e' li' che si guarda
+# prima di migrare la macchina.
+ONION_HOST = ""
+
 # Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
 # L'ultimo cambio letto vive nel database e torna in cache a ogni
 # riavvio (prima la cache nasceva vuota, e un deploy dentro

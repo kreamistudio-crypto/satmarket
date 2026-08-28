@@ -17914,6 +17914,165 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   codice, documento) non si cancella MAI, mentre l'indirizzo ha la sua
   scopa — la pagina lo dice, ma darle una scopa è un'altra decisione
   con la sua domanda (il codice serve ancora dopo la chiusura?).
+  BARATTOLO SU TOR (ago 2026): il mercatino si raggiunge anche da un
+  indirizzo `.onion`, cioè da dentro la rete Tor. Il quadro l'ha
+  chiesto Andrea prima di costruire, e il punto 5 era quello che
+  decideva: «se metà delle cose porta comunque fuori, l'onion promette
+  una riservatezza che non mantiene — e quello è peggio di non
+  averlo». La risposta è che il client È GIÀ TUTTO RELATIVO (API,
+  foto, vendor, assets, manifest, service worker seguono l'host da
+  soli), quindi quel che restava era UNA riga — e quella si chiude.
+  LA FUGA ERA LA RIGA 7, e va detta per esteso perché è la ragione del
+  cantiere: `<script src="https://telegram.org/js/telegram-web-app.js">`
+  esce a OGNI apertura, quindi uno arrivava dal tunnel e la PRIMA
+  richiesta del suo browser andava a Telegram col suo IP vero. Fuori
+  da Tor quello script non protegge nessuno (si è già su
+  barattolo.store, e Telegram vede comunque una visita al sito): si
+  toglie SOLO di là, che è anche l'unico modo di non perdere la Mini
+  App.
+  LA QUARTA FESSURA è il meccanismo che c'era già: `_pagina_con_meta`
+  lavora sui BYTE con `_spezza_pagina`/`_monta_pagina` e tre fessure,
+  e questa è la quarta — `SEGNO_TG`, che spezza **p2** e non p1
+  (lo script sta DOPO `</title>`). NON È IN SEQUENZA con le altre e
+  per questo vive fuori da `_fessure_base`: quelle tre si passano gli
+  offset di mano in mano — se salta la prima saltano tutte, e per
+  questo si spengono da valle — mentre questa lavora su p2 GIÀ
+  ritagliato e non sposta niente per nessuno. Fail-open come le
+  sorelle: se un domani quella riga cambia forma la fessura si
+  spegne, lo script RESTA, e su onion si perde la cura e non la
+  pagina.
+  IL SEGNO NON PORTA IL FINE-RIGA, ed è la riga da non «completare»:
+  sul disco di Windows quel file è CRLF e sul VPS è LF (lo decide
+  `.gitattributes` con `text=auto`), quindi un segno che se lo
+  portasse dentro funzionerebbe di qua e non di là.
+  E IL DICT NASCE COMPLETO, coi campi della quarta fessura che
+  `_fessure_base` non scrive mai: un dict a cui manca una chiave
+  quando il ramo d'errore non l'ha scritta non fa un montaggio storto
+  — fa esplodere il chiamante con un KeyError, ed è successo davvero
+  appena la quarta è nata. È la famiglia della colonna mancante di
+  `offerte_righe`.
+  COME IL SERVER SA DI ESSERE SU ONION: `su_onion()` confronta
+  l'header **Host** con `ONION_HOST`, ed è il fatto che il codice già
+  considera affidabile — `guardia_csrf` lo dice alla lettera («dietro
+  Caddy lo schema balla, l'Host inoltrato è affidabile»). SCARTATO un
+  header aggiunto da Caddy: dipenderebbe da una riga di configurazione
+  che qualcuno può togliere, e andrebbe CANCELLATO sul blocco clearnet
+  o chiunque potrebbe fingersi onion da fuori mettendoselo da sé.
+  IL CONTEXTVAR E NON UN ARGOMENTO alle rotte: le rotte-pagina sono
+  UNDICI e passano tutte da `_pagina_con_meta`, quindi la dodicesima
+  di domani eredita la cura per costruzione invece di doversene
+  ricordare. Un middleware segna l'Host in `_HOST_RICHIESTA` e il
+  giudice lo legge — provato che il valore arrivi anche dentro le
+  rotte SINCRONE, che girano nel threadpool. FAIL-CLOSED DUE VOLTE:
+  senza `ONION_HOST` e con un contextvar mai scritto (le prove che
+  chiamano le pagine direttamente, uno script a mano) la risposta è
+  NO, cioè la pagina esce esattamente com'è sempre stata. La PORTA non
+  fa parte dell'identità dell'host, e Tor può inoltrare su una porta
+  qualunque.
+  NEL CLIENT I GIUDICI SONO DUE, e il primo non chiede niente al
+  server: `.onion` è un TLD RISERVATO (RFC 7686), nessun dominio vero
+  può finire così, quindi `suOnion()` guarda `location.hostname` e
+  basta — una domanda in meno è una cosa in meno che può divergere.
+  IL SECONDO È `baseCondivisione()`: da Tor un link `.onion` mandato a
+  qualcuno è un link che quasi nessuno può aprire — è un difetto
+  FUNZIONALE prima che di privacy — e per giunta dice «io uso Tor»,
+  mentre l'indirizzo normale non dice niente. Quindi di là si
+  condivide il CLEARNET, che il server manda in `dominio_pubblico`
+  nella busta di prima pagina (accanto a `cambio_eur`, e per la stessa
+  ragione: quella risposta il client la chiede già).
+  FUORI DA ONION RESTA `location.origin`, ed è la riga da non
+  «semplificare» usando il dominio di casa sempre: in DEMO e in
+  collaudo si sta su localhost, e condividere link di produzione da un
+  banco di prova sarebbe peggio del difetto che il giudice cura. Il
+  ripiego copre anche il server di ieri.
+  GLI OTTO SITI che compongono un link per qualcun altro passano di
+  lì — le due condivisioni del negozio, l'annuncio, `/sicurezza`,
+  `/privacy`, il reparto, il barattolo condiviso e il codice del
+  WIDGET da incollare sul sito di un estraneo, che è il caso più netto
+  (un iframe `.onion` là dentro non si apre a nessuno).
+  ⚠️ E IL ROVESCIO È LA METÀ CHE CONTA: TRE `location.origin` NON si
+  toccano. Il tag `relay` del login Nostr lo confronta il server con
+  l'Host (NIP-42), e cambiarlo romperebbe il login proprio sull'unica
+  porta che di là funziona; i due URL di export e del modello CSV
+  devono puntare al server da cui si sta scaricando. A tenerlo fermo
+  c'è un CENSIMENTO e non un elenco — nel CODICE del client
+  `location.origin` resta in quattro posti, il ripiego del giudice più
+  quei tre — e lo scanner guarda DUE forme di commento, che questo è
+  un file HTML e la prosa vive tanto in `/* */` quanto in `<!-- -->`.
+  IL LOGIN TELEGRAM NON SI OFFRE SU ONION, e non è prudenza: il Login
+  Widget funziona SOLO sul dominio registrato con `/setdomain`, che è
+  uno per bot — quindi di là porterebbe a un muro (la regola di casa:
+  un bottone che porta a un muro è peggio di un bottone che non c'è).
+  In più si tira dietro un secondo script da telegram.org, cioè la
+  fuga appena chiusa che rientrerebbe da un'altra porta. Resta NOSTR,
+  che di là funziona — provato dal vivo da Tor Browser prima di
+  scrivere una riga di codice.
+  I TRE TESTI DEL CONFINE, e il registro è la metà del lavoro. Andrea:
+  «deve sapere fin dove arriva la protezione, senza che sembri un
+  avvertimento spaventoso». La differenza in due righe:
+  ❌ «⚠️ Attenzione: su Tor i tuoi dati possono uscire!»
+  ✅ «Tor nasconde da dove ti colleghi. L'indirizzo che scrivi qui
+  serve a chi ti spedisce, e lo legge lui: **è così su Tor e fuori.**»
+  È LA SECONDA METÀ A TOGLIERE LA PAURA — «è così su Tor e fuori» —
+  perché non è che su Tor si perde qualcosa: quella parte non è mai
+  stata una questione di rete. Chi arriva da Tor teme di aver scelto
+  male, e un ⚠️ in cima glielo confermerebbe.
+  I posti sono TRE, ognuno col suo mestiere. 1) ALL'INGRESSO, il verso
+  POSITIVO — «🧅 Sei su Tor: quello che guardi resta fra te e
+  Barattolo» — una riga nella famiglia della fascia 🚧 del rodaggio,
+  disegnata da `fasciaPrima` PRIMA del suo giro di rete (l'hostname si
+  sa dal primo fotogramma; più in là sarebbe un salto). NON CHIEDE
+  NIENTE: nessun bottone e nessun «Non ora» — è uno stato di dove si
+  sta, e sparisce da solo quando smette di essere vero. LA VESTE È
+  NEUTRA (`--chip-bg` e inchiostro): niente arancio (è il rodaggio e
+  l'acquisto), niente verde (è il deposito di garanzia) e niente viola
+  (è Nostr) — un colore che significa già una cosa non se ne prende
+  un'altra, e questa riga non è né un'occasione né una promessa.
+  2) DOVE LA PROTEZIONE FINISCE, dove nasce il dubbio: la frase nel
+  cassetto in cui si sta per scrivere un recapito. UN TESTO E DUE CASE
+  (`notaOnionRecapito`, il punto di ritiro e l'indirizzo di casa),
+  perché è la stessa frase per lo stesso dubbio e due copie divergono
+  al primo ritocco. Ambra mai, rosso mai: non c'è un problema e non
+  c'è un ritardo, c'è un confine. 3) LA QUARTA VOCE in «I tuoi dati»
+  (`priv-tor`), dove vivono già le tre affermazioni scomode — ed è
+  MARKUP FISSO come tutta la pagina, quindi la leggono tutti: è
+  documentazione, ed è vera anche per chi legge dal clearnet. NON
+  PUBBLICA L'INDIRIZZO: quello si annuncia quando lo si vuole
+  annunciare, e chi ci arriva da Tor lo conosce già.
+  COSA MANTIENE DAVVERO, che era il punto 5: il nostro server non vede
+  l'IP e quell'IP non finisce nei log, l'ISP non sa che si è su
+  Barattolo, niente DNS né TLS che leghino la visita, e foto, API e
+  asset restano dentro il tunnel. COSA RESTA FUORI, e si dice invece
+  di tacerlo: i RELAY NOSTR al login, il WALLET Lightning (parla con
+  la rete per conto suo), i PONTI e le MAPPE al tocco, e — la cosa che
+  Andrea ha isolato — IL RECAPITO, che il venditore legge comunque.
+  I PAGAMENTI FUNZIONANO, e la ragione va tenuta perché è
+  controintuitiva: **LNbits ha ZERO occorrenze nel client**. Il
+  browser chiede al NOSTRO server, il server chiede a LNbits — quel
+  traffico esce dal server, non da chi compra — il QR è
+  `lightning:<bolt11>` (schema locale) e il poll è casa nostra. A
+  ostacolare l'acquisto su onion non è il pagamento: è l'IDENTITÀ, e
+  l'unica porta è Nostr.
+  LE TRE VERIFICHE CHE VENGONO PRIMA le ha fatte Andrea sul VPS con
+  Tor Browser, e la prima era BLOCCANTE: il cookie di sessione passa
+  (quindi `secure=` non si tocca), i relay rispondono da Tor, il
+  service worker si registra. Se la prima fosse caduta il cantiere
+  avrebbe cambiato forma.
+  ⚠️ LA CHIAVE È L'INDIRIZZO: un onion v3 non è registrato da nessuna
+  parte, l'indirizzo è `base32(chiave_pubblica ‖ checksum ‖ versione)`
+  — chi ha la chiave È quell'indirizzo. Copiare `/var/lib/tor/…/`
+  basta a migrare, e i PERMESSI sono parte della chiave (cartella
+  `0700` e proprietaria l'utente di Tor: coi permessi larghi Tor non
+  parte, non degrada). Sta nell'archivio cifrato di
+  `deploy/backup-fuori.sh` col `torrc`, e il percorso si LEGGE da lì
+  invece di ribatterlo — una fonte sola. Quella copia NON tace se
+  fallisce, al contrario dei `|| true` dei vicini: è la sola cosa
+  dell'onion che non si può rifare.
+  RESTA FUORI, dichiarato: il Caddyfile col blocco onion vive solo sul
+  VPS (torna col backup, ma non ha storia in git), e i relay Nostr
+  possono rifiutare gli exit node — succede a qualcuno, e la strada
+  è cambiare relay.
+
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
@@ -24970,6 +25129,43 @@ il widget di Telegram dentro il menu, che qui non si può esercitare
 (vuole il dominio registrato su BotFather: in locale disegna un
 riquadro «Bot domain invalid») — e che dopo lo switch gli ORDINI
 mostrino quelli dell'altro account.
+
+Barattolo si raggiunge anche su Tor (ago 2026): un indirizzo `.onion`
+accanto al dominio di sempre, con l'app COMPLETA e non la sola vetrina
+(decisione di Andrea con Alan: chi arriva da Tor sa cosa fa e userà
+Nostr). Il quadro è arrivato prima del codice, e il punto che decideva
+era il quinto — «se metà delle cose porta comunque fuori, l'onion
+promette una riservatezza che non mantiene». Il censimento ha detto che
+il client è già tutto relativo e che a uscire restava UNA riga: lo
+script di telegram.org, che su Tor era la prima richiesta a partire col
+tuo IP vero. Si toglie SOLO di là, con una quarta fessura fail-open nel
+meccanismo che c'era già. Vedi Architettura, «BARATTOLO SU TOR», per il
+giudice che legge l'Host (e per l'header di Caddy scartato), per i TRE
+`location.origin` che NON si toccano — in testa il tag `relay` del
+login Nostr, che romperebbe il login proprio sull'unica porta che di là
+funziona — e per il registro dei tre testi, che è una mappa e non un
+avvertimento.
+Collaudato: 6852 prove verdi in modalità severa (le nuove: la famiglia
+`prove_onion`, la quarta fessura in `prove_anteprime`, e il banco node
+che fa GIRARE `condividiAnnuncio` dai due mondi) e **27 MUTAZIONI, 27
+uccise**, una per riga sorvegliata — e sono state loro a trovare i due
+buchi veri: la sentinella del middleware che restava verde davanti a un
+`pass  # _HOST_RICHIESTA.set(...)` (`codice()` toglie le righe che
+COMINCIANO per «#», non un commento in coda: vale la cura del reaper,
+si chiede la RIGA INTERA) e il fatto che nessuno guardasse se
+`renderFasciaOnion()` fosse CHIAMATA. Più IL GIRO DAL VIVO col server
+VERO su una copia usa-e-getta, **12/12**: dall'onion nessuno
+`<script src>` punta più a telegram.org, dal clearnet c'è ancora, la
+differenza fra le due pagine è ESATTAMENTE la lunghezza del segno, un
+altro `.onion` non apre la porta e la porta appresso non la chiude.
+IN PRODUZIONE il deploy non cambia NIENTE: `ONION_HOST` nasce vuota nel
+codice, e senza quella riga nel config del VPS ogni pagina esce
+esattamente com'è sempre stata. Si accende scrivendo l'indirizzo (senza
+schema e senza porta) e riavviando. DA GUARDARE al primo giro, ed è il
+pezzo che da qui non si può fare: il giro completo in Tor Browser —
+vetrina, scheda, login Nostr, un acquisto fino alla fattura — col
+pannello di rete aperto, dove **non deve partire nessuna richiesta a
+telegram.org**.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

@@ -17751,7 +17751,7 @@ def _censimento(acceso):
                  "MODERAZIONE_REVISIONE", "AVVISI_ISCRITTI",
                  "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
                  "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
-                 "PROTEGGI_IFRAME",
+                 "PROTEGGI_IFRAME", "ONION_HOST",
                  "COMMISSIONE_PERCENTO",
                  "PROTEZIONE_PERCENTO", "TETTO_SATS_ANNUNCIO",
                  "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
@@ -20506,6 +20506,13 @@ def _amb_seo():
            "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
            else "",
            "cambio_noto_ora": lambda *a: 0.0}
+    # LA LEVETTA DELL'ONION, mutabile: `_pagina_con_meta` chiede a
+    # `su_onion()` se togliere lo script di Telegram, e qui non c'e'
+    # nessuna richiesta da cui leggere l'Host. Una lista di un
+    # elemento e non un bool, cosi' la prova la gira da fuori
+    # (`amb["_FINTO_ONION"][0] = True`) senza rimontare l'ambiente.
+    amb["_FINTO_ONION"] = [False]
+    amb["su_onion"] = lambda: amb["_FINTO_ONION"][0]
     for riga in ("IMMAGINE_BRAND = (", "SEGNO_META = ", "SEGNO_TITOLO = ",
                  "SEGNO_CORPO = ", "MAX_SLUG = ", "_ID_PERCORSO = ",
                  "META_NOINDEX = ", "TETTO_CARTELLO = ",
@@ -20520,7 +20527,8 @@ def _amb_seo():
                    "CONDIZIONI = {", "CONDIZIONI_LD = {",
                    "_PAGINA_CACHE = {", "_SEO_HOME_CACHE = {",
                    "_SITEMAP_CACHE = {", "ROBOTS_TXT = (",
-                   "TITOLO_HOME = ", "TITOLO_SICUREZZA = "):
+                   "TITOLO_HOME = ", "TITOLO_SICUREZZA = ",
+                   "SEGNO_TG = ("):
         i = _SORGENTE.index(blocco)
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for f in ("normalizza", "slug_categoria", "senza_condizione",
@@ -20534,7 +20542,8 @@ def _amb_seo():
               "_link_categorie", "_seo_niente", "_prezzo_ld",
               "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
               "_seo_negozio", "_seo_categoria", "_seo_home",
-              "_seo_o_generici", "_spezza_pagina", "_monta_pagina",
+              "_seo_o_generici", "_fessure_base", "_fessura_tg",
+              "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
     i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
@@ -20572,6 +20581,238 @@ def _vetrina_finta(con):
                 "negozio TEXT, rating REAL, n_feedback INT, "
                 "ferie_fino INT DEFAULT 0)")
     return con
+
+
+def prove_onion():
+    """BARATTOLO SU TOR (ago 2026). Chi arriva dal servizio nascosto lo
+    fa per non far sapere da dove si collega, e finche' la pagina
+    portava lo <script> di telegram.org la prima richiesta del browser
+    usciva col suo IP vero — la contraddizione piu' grossa che ci
+    fosse. La quarta fessura la toglie, e le sue prove vivono in
+    `prove_anteprime`, dove stanno le tre sorelle.
+
+    QUI DENTRO C'E' IL RESTO, e la meta' che conta e' il ROVESCIO: i
+    tre `location.origin` che NON si toccano. Il tag `relay` del login
+    Nostr lo confronta il server con l'Host (NIP-42) e cambiarlo
+    romperebbe il login proprio sull'unica porta che di la' funziona;
+    i due URL di export e del modello CSV devono puntare al server da
+    cui si sta scaricando. Un censimento, non un elenco: la
+    condivisione di domani passa dal giudice, e questi tre no."""
+    print("\n[Barattolo su Tor]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) i due giudici del client ------------------------------
+    # `.onion` e' un TLD RISERVATO (RFC 7686): nessun dominio vero puo'
+    # finire cosi', quindi il client lo sa da solo e non c'e' una
+    # seconda domanda da tenere in pari col server.
+    prova("il client sa da solo di essere su onion", True,
+          "location.hostname.endsWith('.onion')" in mini)
+    prova("...e i giudici sono UNO ciascuno",
+          (1, 1),
+          (mini.count("function suOnion("),
+           mini.count("function baseCondivisione(")))
+    # FUORI DA ONION RESTA `location.origin`: usare il dominio di casa
+    # SEMPRE farebbe condividere link di produzione da un banco di
+    # prova, che e' peggio del difetto che il giudice cura.
+    prova("...e fuori da onion si condivide da dove si sta guardando",
+          True,
+          "(suOnion() && dominioPubblico) ? dominioPubblico"
+          " : location.origin" in mini)
+
+    # --- 2) gli otto siti che compongono un link per QUALCUN ALTRO --
+    for pezzo_link in ("/negozio/${encodeURIComponent(v.username",
+                       "/annuncio/${l.id}",
+                       "/sicurezza`",
+                       "/privacy`",
+                       "/categoria/${slugCat(c)}",
+                       "/negozio/${encodeURIComponent(myUsername",
+                       "/barattolo/${myBarattoloCond.token}"):
+        prova(f"...«{pezzo_link[:26]}» passa dal giudice", True,
+              ("baseCondivisione()}" + pezzo_link) in mini)
+    # il codice del widget da incollare sul sito di un estraneo: un
+    # iframe .onion la' dentro non si apre a nessuno
+    prova("...e il widget da incorporare pure", True,
+          "const base = baseCondivisione();" in mini)
+
+    # --- 3) IL ROVESCIO: i tre che non si toccano ------------------
+    prova("il tag relay del login Nostr resta location.origin", True,
+          "['relay', location.origin]" in mini)
+    prova("...e i due URL di export/modello anche", 2,
+          mini.count("${location.origin}${API_BASE}"))
+    # E IL CENSIMENTO: nel CODICE del client `location.origin` resta
+    # in QUATTRO posti — il ripiego del giudice piu' i tre qui sopra —
+    # e da nessun'altra parte. Cosi' la condivisione nuova di domani
+    # non puo' nascere col dominio sbagliato senza che questa riga lo
+    # dica.
+    #
+    # ⚠️ SI GUARDA IL CODICE E NON LA PROSA, ed e' la trappola gia'
+    # pagata altrove: nel client i commenti sono a BLOCCO e le righe di
+    # mezzo non cominciano per «*», quindi un filtro riga-per-riga
+    # pesca le spiegazioni che raccontano il giudice — cinque, qui. Chi
+    # scrive non deve riformulare la frase: e' la sentinella a dover
+    # guardare dove serve.
+    # DUE FORME DI COMMENTO e non una: questo e' un file HTML, e la
+    # prosa vive tanto in «/* */» (nel JS) quanto in «<!-- -->» (nel
+    # markup). Guardandone una sola passava per codice il commento del
+    # bottone «Condividi questa pagina», che `location.origin` lo
+    # nomina apposta per dire perche' in DEMO sparisce.
+    _chiuso, _vive = None, []
+    for _r in mini.split("\n"):
+        _pulita, _i = "", 0
+        while _i < len(_r):
+            if _chiuso:
+                _j = _r.find(_chiuso, _i)
+                if _j < 0:
+                    break
+                _i, _chiuso = _j + len(_chiuso), None
+            else:
+                _apre = [(_r.find(a, _i), a, c)
+                         for a, c in (("/*", "*/"), ("<!--", "-->"))
+                         if _r.find(a, _i) >= 0]
+                if not _apre:
+                    _pulita += _r[_i:]
+                    break
+                _j, _a, _chiuso = min(_apre)
+                _pulita += _r[_i:_j]
+                _i = _j + len(_a)
+        if "location.origin" in _pulita.split("//")[0]:
+            _vive.append(_r.strip())
+    prova("...e nel codice non ne restano altri in giro", 4, len(_vive))
+
+    # --- 4) il login Telegram non si offre su onion ----------------
+    # Il Login Widget funziona SOLO sul dominio registrato con
+    # /setdomain, che e' uno per bot: di la' porterebbe a un muro. Ed
+    # e' anche uno script in piu' verso telegram.org, cioe' la fuga
+    # appena chiusa che rientrerebbe da un'altra porta.
+    prova("su onion il login Telegram non si disegna", True,
+          "if (!suOnion()) bottoneLoginTelegram();" in mini)
+    prova("...e quello Nostr resta, che di la' funziona", True,
+          "if (!suOnion()) bottoneLoginTelegram();\n    bottoneLoginNostr();"
+          in mini)
+
+    # --- 5) il server: la leva e il giudice ------------------------
+    # FAIL-CLOSED due volte, ed e' la riga da non ammorbidire: senza
+    # ONION_HOST configurato la funzione non esiste, e senza un Host
+    # arrivato (le prove che chiamano le pagine direttamente, uno
+    # script a mano) la risposta e' NO — cioe' la pagina esce
+    # esattamente com'e' sempre stata.
+    g = pezzo("su_onion")
+    prova("senza ONION_HOST il giudice dice sempre no", True,
+          "if not ONION_HOST:" in g and "return False" in g)
+    prova("...e senza un Host arrivato pure", True,
+          'return bool(arrivato) and arrivato ==' in g)
+    # La PORTA non fa parte dell'identita' dell'host, e Tor puo'
+    # inoltrare su una porta qualunque.
+    prova("...e la porta non conta", True, 'split(":")[0]' in g)
+    # L'HOST E' AFFIDABILE DIETRO CADDY, ed e' il fatto che il codice
+    # gia' considera vero altrove (`guardia_csrf` lo dice alla
+    # lettera). Un header aggiunto da Caddy dipenderebbe da una riga
+    # di configurazione che qualcuno puo' togliere, e andrebbe
+    # CANCELLATO sul blocco clearnet o chiunque potrebbe fingersi
+    # onion da fuori.
+    prova("il giudice legge l'Host e non un header inventato", True,
+          "_HOST_RICHIESTA" in g and "X-" not in g)
+    # ⚠️ SI CHIEDE LA RIGA INTERA e non la parola-spia: `codice()`
+    # toglie le righe che COMINCIANO per «#», non un commento in
+    # coda, quindi un «pass  # _HOST_RICHIESTA.set(...)» lasciava la
+    # sentinella verde col middleware muto. E' la lezione del reaper,
+    # e l'ha detta la tortura — non la rilettura.
+    mw = [r.strip() for r in pezzo("segna_host").splitlines()]
+    prova("...che un middleware segna su ogni richiesta", True,
+          '_HOST_RICHIESTA.set(request.headers.get("host", ""))' in mw)
+    # IL CONTEXTVAR e non un argomento passato a mano alle rotte: le
+    # rotte-pagina sono undici, e la dodicesima di domani eredita la
+    # cura per costruzione invece di doversene ricordare.
+    prova("il contextvar nasce vuoto (fail-closed)", True,
+          '_HOST_RICHIESTA = contextvars.ContextVar("host_richiesta",'
+          ' default="")' in _SORGENTE)
+
+    # --- 6) il dominio di casa viaggia nella busta di prima pagina --
+    prova("il server manda il dominio di casa alla prima pagina", True,
+          'risposta["dominio_pubblico"] = URL_PUBBLICO' in _SORGENTE)
+    prova("...e il client lo legge di li'", True,
+          "if (j.dominio_pubblico) dominioPubblico = j.dominio_pubblico;"
+          in mini)
+
+
+    # --- 7) I TRE TESTI DEL CONFINE -------------------------------
+    # Andrea: «deve sapere fin dove arriva la protezione, senza che
+    # sembri un avvertimento spaventoso». Il registro e' quello di una
+    # MAPPA: chi arriva da Tor teme di aver scelto male, e un ⚠️ in
+    # cima glielo confermerebbe.
+    #
+    # 7a) ALL'INGRESSO, IL VERSO POSITIVO: dice cosa E' protetto.
+    fo = pezzo_js(mini, "function renderFasciaOnion(", "\n}\n")
+    prova("la riga d'ingresso c'e' solo su Tor", True,
+          "if (!suOnion())" in fo)
+    prova("...e dice cosa E' protetto, non cosa non lo e'", True,
+          "quello che guardi resta fra te e Barattolo" in fo)
+    # NON CHIEDE NIENTE: non e' un cartello con un bottone e non ha un
+    # «Non ora» — e' uno stato di dove si sta, e sparisce da solo
+    # quando smette di essere vero (il patto degli hint contestuali).
+    # ⚠️ E QUALCUNO DEVE DISEGNARLA: la funzione puo' esserci
+    # perfetta e non chiamarla nessuno — e' la lezione del reaper, e
+    # qui il costo sarebbe che chi arriva da Tor non legge niente. Si
+    # chiede la RIGA INTERA e dentro il suo chiamante, che il nome da
+    # solo vive anche in un commento.
+    fp = pezzo_js(mini, "async function fasciaPrima(", "\n}\n")
+    prova("...e a disegnarla c'e' fasciaPrima, prima del giro di rete",
+          True,
+          "  renderFasciaOnion();" in fp
+          and fp.index("renderFasciaOnion();")
+          < fp.index("await caricaBannerTest();"))
+    prova("...e non chiede niente: nessun bottone, nessun dismiss",
+          (False, False),
+          ("onclick" in fo, "hint" in fo.lower()))
+    # NIENTE ARANCIO, VERDE O VIOLA: sono gia' il rodaggio/l'acquisto,
+    # il deposito di garanzia e Nostr. Un colore che significa una
+    # cosa non se ne prende un'altra.
+    _css = mini[mini.index(".fascia-onion{"):]
+    _css = _css[:_css.index("}")]
+    prova("...e la veste e' neutra, che i colori di casa parlano gia'",
+          (True, False, False),
+          ("var(--chip-bg)" in _css,
+           "sats" in _css, "trust" in _css or "nostr" in _css))
+
+    # 7b) DOVE LA PROTEZIONE FINISCE, dove nasce il dubbio: nel
+    # cassetto in cui si sta per scrivere un recapito. UN TESTO E DUE
+    # CASE — il punto di ritiro e l'indirizzo di casa.
+    prova("il giudice del recapito e' UNO", 1,
+          mini.count("function notaOnionRecapito("))
+    prova("...e lo chiamano i due cassetti del recapito", 2,
+          mini.count("${notaOnionRecapito()}"))
+    nr = pezzo_js(mini, "function notaOnionRecapito(", "\n}\n")
+    # LA SECONDA META' E' QUELLA CHE TOGLIE LA PAURA: non e' che su Tor
+    # si perde qualcosa, e' che quella parte non e' mai stata una
+    # questione di rete.
+    prova("...e la frase dice «e' cosi' su Tor e fuori»", True,
+          "è così su Tor e fuori" in nr)
+    prova("...nel verso positivo, col fatto protetto in grassetto",
+          True, "<b>Tor nasconde da dove ti colleghi</b>" in nr)
+    # NIENTE AMBRA E NIENTE ROSSO: non c'e' un problema e non c'e' un
+    # ritardo, c'e' un confine.
+    prova("...e non e' un allarme", (False, False, False),
+          ("⚠️" in nr, "warn" in nr, "danger" in nr))
+
+    # 7c) LA QUARTA VOCE in «I tuoi dati», dove vivono gia' le altre
+    # affermazioni scomode. E' MARKUP FISSO come tutta la pagina,
+    # quindi la leggono tutti — anche dal clearnet: e' documentazione,
+    # ed e' vera per chiunque.
+    _i = mini.index('<h3 id="priv-tor">')
+    voce = mini[_i:mini.index('<h3 id="priv-no">', _i)]
+    prova("«I tuoi dati» ha la sua voce su Tor", True,
+          "Se ti colleghi da Tor" in voce)
+    prova("...che dice il confine per intero", True,
+          "Tor nasconde da dove ti colleghi, non quello che scrivi"
+          in voce)
+    # E DICE ANCHE COSA RESTA FUORI DAL TUNNEL, che e' la meta' che una
+    # pagina sulla privacy non puo' tacere.
+    for _c in ("relay Nostr", "wallet Lightning", "portano altrove"):
+        prova(f"...e nomina «{_c}»", True, _c in voce)
+    # NON PUBBLICA L'INDIRIZZO: quello si annuncia quando lo si vuole
+    # annunciare, e chi ci arriva da Tor lo conosce gia'.
+    prova("...e non pubblica l'indirizzo .onion", False,
+          ".onion</b>" in voce and "ckmc" in voce)
 
 
 def prove_anteprime():
@@ -20987,6 +21228,68 @@ def prove_anteprime():
           b"<title>x</title>" in muta)
     prova("...e senza i meta appesi in un posto a caso", False,
           b"SEGNAPOSTO" in muta)
+
+    # --- 8quater) LA QUARTA FESSURA: lo script di Telegram su .onion -
+    # Chi arriva dal servizio nascosto lo fa per non far sapere da dove
+    # si collega, e la prima richiesta della pagina usciva verso
+    # telegram.org col suo IP vero — la contraddizione piu' grossa che
+    # ci fosse. La riga si toglie SOLO li': fuori da Tor non protegge
+    # nessuno (si e' gia' su barattolo.store) e toglierla costerebbe la
+    # Mini App.
+    amb["_PAGINA_CACHE"].update(timbro=False)
+    amb["_FINTO_ONION"][0] = True
+    try:
+        onion = amb["_pagina_con_meta"]("<!--SEGNAPOSTO-->\n")
+    finally:
+        amb["_FINTO_ONION"][0] = False
+        amb["_PAGINA_CACHE"].update(timbro=False)
+    prova("su onion lo script di Telegram non esce", False,
+          amb["SEGNO_TG"] in onion)
+    prova("...ne' l'indirizzo da cui lo si scaricava",
+          False, b"telegram-web-app.js" in onion)
+    # E IL RESTO E' INTATTO: la differenza fra le due pagine e'
+    # ESATTAMENTE la lunghezza del segno, cioe' non e' saltato altro
+    # per strada. E' l'invariante byte-per-byte delle sorelle, letto
+    # sulla differenza invece che sull'uguaglianza.
+    prova("...e via lui non manca nient'altro", len(amb["SEGNO_TG"]),
+          len(pagina) - len(onion))
+    _i = pagina.index(amb["SEGNO_TG"])
+    prova("...il resto della pagina combacia", pagina,
+          onion[:_i] + amb["SEGNO_TG"] + onion[_i:])
+    # IL WIDGET DI LOGIN E' UN'ALTRA COSA e resta: lo carica il client
+    # a runtime (telegram-widget.js), non questa riga. Su onion non
+    # funzionerebbe comunque — il Login Widget vive solo sul dominio
+    # registrato con /setdomain — e a non disegnarlo e' il client.
+    prova("...e il widget di login non lo tocca questa fessura", True,
+          b"telegram-widget.js" in pagina
+          and b"telegram-widget.js" in onion)
+
+    # --- 8quinquies) la fessura rotta NON spegne la pagina ----------
+    # Fail-open come le tre sorelle, e qui vale doppio: e' un
+    # ornamento della privacy, e un ornamento non deve poter mandare
+    # giu' il mercatino. Se un domani quella riga cambia forma, lo
+    # script RESTA — cioe' su onion si perde la cura, non la pagina.
+    finto = (b'<meta charset="UTF-8">' + b"\n"
+             + b"<title>x</title>" + b"\n"
+             + b'<script src="https://telegram.org/js/ALTRO.js"></script>'
+             + b"\n" + b'<div id="cartello"></div>' + b"\n")
+    rotta = amb["_spezza_pagina"](finto)
+    prova("segno cambiato: la quarta fessura si spegne", False,
+          rotta["ha_tg"])
+    # IL DICT NASCE COMPLETO, coi campi della quarta fessura che
+    # `_fessure_base` non scrive mai: un dict a cui manca una chiave
+    # quando il ramo d'errore non l'ha scritta non fa un montaggio
+    # storto — fa esplodere il chiamante con un KeyError, ed e'
+    # successo davvero appena la quarta e' nata.
+    prova("...e il dict porta i suoi campi anche da spenta",
+          (True, True),
+          ("p2b" in amb["_fessure_base"](b"niente"),
+           "ha_tg" in amb["_fessure_base"](b"niente")))
+    prova("...e le tre sorelle restano in piedi", (True, True, True),
+          (rotta["ha_meta"], rotta["ha_titolo"], rotta["ha_corpo"]))
+    prova("...e la pagina esce comunque intera, anche chiedendola "
+          "senza lo script", finto,
+          amb["_monta_pagina"](rotta, "", "x", "", senza_tg=True))
 
     # --- 9) nessuna rotta condivisibile torna a servire il file nudo -
     # E' la riga che sparisce in un riordino senza rompere niente di
@@ -29618,8 +29921,12 @@ def prove_condivisione_venditore():
     # senza, la sentinella NON POTEVA FALLIRE su un'AGGIUNTA in coda
     # (`...?da=${chi}`) — cioe' proprio sul caso che nomina. L'ha
     # detto la tortura, non la rilettura.
+    # Dal cantiere Tor la base non e' piu' `location.origin` ma
+    # `baseCondivisione()`, che da onion torna il dominio di casa: un
+    # link .onion in una chat non lo apre quasi nessuno. L'indirizzo
+    # PARLANTE non cambia — cambia da dove si compone.
     prova("il link resta l'indirizzo parlante di sempre", True,
-          "`${location.origin}/annuncio/${l.id}${s ? '-' + s : ''}`,"
+          "`${baseCondivisione()}/annuncio/${l.id}${s ? '-' + s : ''}`,"
           in ca)
     # E il testo composto e' quello che si CONSEGNA: senza questa
     # riga `testo` poteva essere calcolato e poi buttato via, con
@@ -29684,8 +29991,18 @@ def prove_condivisione_venditore():
             [_u + "-poster", _t.format("")],
             [_u, _t.format("Annuncio di @rosina\n")],
         ]
+        # Le due funzioni del cantiere Tor montate VERE (mai
+        # ricopiate: due copie del giudice sono due risposte diverse
+        # sullo stesso link) e `location` con l'hostname, che
+        # `suOnion` guarda. `dominioPubblico` lo scrive la busta di
+        # prima pagina: qui si semina a mano.
+        _onion = pezzo_js(mini, "function suOnion(", "\n}\n")
+        _base_c = pezzo_js(mini, "function baseCondivisione(", "\n}\n")
         _prog = (
-            "const location = {origin: 'https://barattolo.store'};\n"
+            "const location = {origin: 'https://barattolo.store',"
+            " hostname: 'barattolo.store'};\n"
+            "let dominioPubblico = 'https://barattolo.store';\n"
+            + _onion + "\n}\n" + _base_c + "\n}\n"
             "const fmt = n => String(n);\n"
             "const fmtEur = n => String(n);\n"
             "let visto = null, currentListing = null;\n"
@@ -29695,7 +30012,23 @@ def prove_condivisione_venditore():
             + "const esiti = " + _jsC.dumps(_casi)
             + ".map(c => { currentListing = c;"
               " condividiAnnuncio(); return visto; });\n"
-            "console.log(JSON.stringify(esiti));\n")
+            # E LO STESSO CASO DA ONION: il link dev'essere il
+            # CLEARNET. Un `.onion` incollato in una chat quasi
+            # nessuno lo apre — ed e' un difetto funzionale prima che
+            # di privacy — e per giunta dice «io uso Tor», mentre
+            # l'indirizzo normale non dice niente.
+            "location.hostname = 'ckmc76bxrwjnja5n4qryeayzj5kqkiix"
+            "npmi6ode3e6vdpw4gutlrbyd.onion';\n"
+            "currentListing = " + _jsC.dumps(_casi[0]) + ";\n"
+            "condividiAnnuncio();\n"
+            "const daOnion = visto;\n"
+            # ...e senza il dominio di casa (server di ieri) si
+            # ripiega su quello da cui si sta guardando: un'assenza,
+            # mai un link inventato.
+            "dominioPubblico = '';\n"
+            "location.origin = 'http://xyz.onion';\n"
+            "condividiAnnuncio();\n"
+            "console.log(JSON.stringify([esiti, daOnion, visto]));\n")
         _f = _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
                                      encoding="utf-8")
         _f.write(_prog)
@@ -29703,10 +30036,20 @@ def prove_condivisione_venditore():
         _r = _spC.run([_node, _f.name], capture_output=True, text=True,
                       timeout=60, encoding="utf-8")
         os.unlink(_f.name)
+        _tutto = (_jsC.loads(_r.stdout) if _r.returncode == 0
+                  and _r.stdout.strip().startswith("[") else None)
+        if _tutto:
+            prova("da onion si condivide il link di CASA", _atteso[0],
+                  _tutto[1])
+            prova("...e senza il dominio di casa non se ne inventa uno",
+                  "http://xyz.onion/annuncio/7-poster", _tutto[2][0])
+        else:
+            prova("da onion si condivide il link di CASA", "esiti",
+                  "il banco non ha risposto: " + (_r.stderr or "")[:200])
         prova("condividiAnnuncio risponde giusto sui sei casi",
               _atteso,
-              _jsC.loads(_r.stdout.strip()) if _r.returncode == 0
-              else "ERRORE: " + _r.stderr[:200])
+              _tutto[0] if _tutto
+              else "ERRORE: " + (_r.stderr or "")[:200])
 
 
 def prove_altri_scorrimento():
@@ -36174,6 +36517,7 @@ def main():
               prove_punti_salvati,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
+              prove_onion,
               prove_impersonazione, prove_avviso_spedizione,
               prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,

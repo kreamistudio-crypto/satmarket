@@ -31,6 +31,7 @@ AVVIO:      uvicorn server:app --host 0.0.0.0 --port 8080
 import asyncio
 import base64
 import csv
+import contextvars
 import difflib
 import hashlib
 import hmac
@@ -750,6 +751,18 @@ try:
 except ImportError:
     PROTEGGI_IFRAME = False
 
+# L'INDIRIZZO .onion (ago 2026). Vuoto = la funzione non esiste, ed e'
+# il default nel CODICE: chi non ha un servizio nascosto non deve
+# accorgersi che questo blocco c'e'.
+#
+# Serve a UNA domanda sola — «questa richiesta e' arrivata dal
+# tunnel?» — e la risposta cambia una cosa sola: se la pagina porta
+# lo script di Telegram. Il perche' sta su `su_onion`.
+try:
+    from config import ONION_HOST
+except ImportError:
+    ONION_HOST = ""
+
 # QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
 # a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
 # muta — un compratore si e' trovato la pagina d'acquisto bloccata da
@@ -1390,6 +1403,56 @@ async def no_iframe(request, call_next):
             "frame-ancestors 'self' https://web.telegram.org "
             "https://*.telegram.org")
     return r
+
+
+# ------------------ DA CHE PORTA E' ENTRATA ------------------------
+# (ago 2026) Barattolo si raggiunge da due strade — barattolo.store e
+# il servizio nascosto Tor — e c'e' UNA cosa che deve saperlo: la
+# pagina, che sul tunnel non deve portare lo script di Telegram.
+#
+# L'host viaggia in un contextvar invece che negli argomenti delle
+# rotte, e la ragione e' il collo di bottiglia: le rotte-pagina sono
+# NOVE e nessuna ha la Request in firma. Passargliela vorrebbe dire
+# diciotto ritocchi e, soprattutto, che la decima rotta di domani deve
+# RICORDARSENE — e chi se ne dimentica riapre la fuga su quella pagina
+# sola, in silenzio. Cosi' invece la si eredita per costruzione.
+#
+# Che il contextvar arrivi fin dentro una rotta SINCRONA non e' dato
+# per scontato: le nove sono `def` e non `async def`, quindi FastAPI
+# le esegue in un threadpool. E' stato provato, non dedotto.
+_HOST_RICHIESTA = contextvars.ContextVar("host_richiesta", default="")
+
+
+@app.middleware("http")
+async def segna_host(request, call_next):
+    """Il primo middleware registrato e' l'ultimo a girare, quindi
+    questo si mette in coda: quando la rotta legge, l'host c'e'."""
+    _HOST_RICHIESTA.set(request.headers.get("host", ""))
+    return await call_next(request)
+
+
+def su_onion() -> bool:
+    """La richiesta corrente e' arrivata dal servizio nascosto?
+
+    Si guarda l'HOST, che dietro Caddy e' affidabile — lo dice gia'
+    `guardia_csrf`, che sullo schema invece non conta. Scartato un
+    header messo da Caddy sul blocco onion: dipenderebbe da una riga
+    di configurazione che qualcuno puo' togliere, e andrebbe
+    CANCELLATO sul blocco clearnet, o chiunque potrebbe fingersi
+    onion da fuori mettendoselo da se'.
+
+    FAIL-CLOSED verso il mondo di ieri, due volte: senza ONION_HOST
+    configurato, e con un contextvar mai scritto (le prove che
+    chiamano le funzioni della pagina direttamente, uno script a
+    mano), la risposta e' NO — cioe' la pagina esce esattamente com'e'
+    sempre stata. Per accendere qualcosa serve che tutt'e due i lati
+    dicano di si'."""
+    if not ONION_HOST:
+        return False
+    # La porta non fa parte dell'identita' dell'host, e Tor puo'
+    # inoltrare su una porta qualunque.
+    arrivato = _HOST_RICHIESTA.get("").split(":")[0].strip().lower()
+    return bool(arrivato) and arrivato == ONION_HOST.strip().lower()
 
 
 # ------------------------- DATABASE --------------------------------
@@ -12084,6 +12147,16 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # sfoglia il mercatino non deve aspettare nessuno. 0 = non
         # disponibile, e il client sa gia' cosa farne (omette il «≈»).
         risposta["cambio_eur"] = cambio_noto_ora()
+        # IL DOMINIO DI CASA, che il client da solo non puo' sapere
+        # (ago 2026, col servizio nascosto Tor): serve a comporre i
+        # link da CONDIVIDERE quando si arriva dall'onion — un
+        # indirizzo .onion incollato in una chat non lo apre quasi
+        # nessuno, ed e' un difetto funzionale prima che di privacy.
+        # Viaggia SEMPRE e non solo di la': cosi' il client ha un
+        # giudice solo («ce l'ho? usalo dove serve») invece di un ramo
+        # condizionato, e chi sta sul clearnet semplicemente non lo
+        # guarda. Gratis, che questa risposta il client la chiede gia'.
+        risposta["dominio_pubblico"] = URL_PUBBLICO
     con.close()
     return risposta
 
@@ -14849,6 +14922,12 @@ def _leve_stato():
                          "sito: è com'è sempre stato, e accenderla è una "
                          "stretta — ma prima va provata la Mini App da "
                          "Telegram Web, che gira in un iframe"),
+            _leva("Servizio nascosto Tor", "ONION_HOST",
+                  bool(ONION_HOST),
+                  acceso="alle richieste che arrivano dall'indirizzo "
+                         ".onion la pagina esce SENZA lo script di "
+                         "telegram.org — una strada in più, e su quella "
+                         "il login è solo Nostr"),
             _leva("Negozi collegati (Shopify e WooCommerce)",
                   "CONNETTORI_NEGOZIO_APERTI",
                   bool(CONNETTORI_NEGOZIO_APERTI),
@@ -38183,16 +38262,30 @@ SEGNO_META = b'<meta charset="UTF-8">'
 # mescolata.
 SEGNO_TITOLO = (b'<title>', b'</title>')
 SEGNO_CORPO = (b'<div id="cartello">', b'</div>')
+# La QUARTA fessura (ago 2026, il servizio nascosto Tor). Non e' una
+# coppia come le due qui sopra: e' una riga INTERA che si toglie o si
+# lascia — l'unica cosa della pagina che cambia fra le due strade.
+#
+# IL SEGNO NON PORTA IL FINE-RIGA, ed e' la riga da non «completare»:
+# sul disco di Windows questo file e' CRLF e sul VPS e' LF (lo decide
+# `.gitattributes` con text=auto), quindi un segno che se lo portasse
+# dentro funzionerebbe di qua e non di la'. Il fine-riga resta al suo
+# posto e diventa una riga vuota: invisibile a chi legge la pagina.
+SEGNO_TG = (b'<script src="https://telegram.org/js/'
+            b'telegram-web-app.js"></script>')
+
 # timbro False (e non None) e' il «mai letto»: nessuna coppia
 # (mtime, size) puo' esserci uguale, nemmeno quella di uno stat fallito
 _PAGINA_CACHE = {"timbro": False, "p0": b"", "p1": b"", "titolo": b"",
-                 "p2": b"", "p3": b"", "ha_meta": False,
-                 "ha_titolo": False, "ha_corpo": False}
+                 "p2": b"", "p2b": b"", "p3": b"", "ha_meta": False,
+                 "ha_titolo": False, "ha_corpo": False, "ha_tg": False}
 
 
-def _spezza_pagina(grezzo: bytes) -> dict:
-    """miniapp.html tagliato nelle sue tre fessure. PURA: byte dentro,
-    segmenti fuori — cosi' si prova senza toccare il disco.
+def _fessure_base(grezzo: bytes) -> dict:
+    """Le tre fessure IN SEQUENZA: meta, titolo, cartello. PURA: byte
+    dentro, segmenti fuori — cosi' si prova senza toccare il disco.
+
+    Si chiama da `_spezza_pagina`, che ci aggiunge la quarta.
 
     La pagina montata e':
         p0 [meta] p1 titolo p2 [corpo] p3
@@ -38203,8 +38296,14 @@ def _spezza_pagina(grezzo: bytes) -> dict:
     scombinata. Una fessura spenta fonde i suoi segmenti vicini e
     lascia il suo flag a False — la pagina esce lo stesso, che e' la
     regola di tutto questo blocco."""
-    p = {"p0": grezzo, "p1": b"", "titolo": b"", "p2": b"", "p3": b"",
-         "ha_meta": False, "ha_titolo": False, "ha_corpo": False}
+    # IL DICT NASCE COMPLETO, coi campi della QUARTA fessura che qui
+    # dentro non si scrivono mai (li riempie `_fessura_tg`): un dict a
+    # cui manca una chiave quando il ramo d'errore non l'ha scritta
+    # non fa un montaggio storto — fa esplodere il chiamante con un
+    # KeyError, ed e' successo davvero appena la quarta e' nata.
+    p = {"p0": grezzo, "p1": b"", "titolo": b"", "p2": b"", "p2b": b"",
+         "p3": b"", "ha_meta": False, "ha_titolo": False,
+         "ha_corpo": False, "ha_tg": False}
 
     i_meta = grezzo.find(SEGNO_META)
     if i_meta < 0:
@@ -38241,12 +38340,59 @@ def _spezza_pagina(grezzo: bytes) -> dict:
     return p
 
 
-def _monta_pagina(p: dict, meta: str, titolo: str, corpo: str) -> bytes:
+def _fessura_tg(p: dict) -> dict:
+    """La quarta fessura: spezza p2 attorno allo script di Telegram.
+    PURA, e MUTA il dict che riceve (lo restituisce per comodita').
+
+    NON E' IN SEQUENZA con le altre tre, ed e' la ragione per cui vive
+    fuori da `_fessure_base`: quelle tre si passano gli offset di mano
+    in mano — se salta la prima saltano tutte, e per questo si spengono
+    da valle — mentre questa lavora su p2 GIA' RITAGLIATO e non sposta
+    niente per nessuno. Puo' mancare senza far male a nessun vicino.
+
+    Lo script vive in p2 e non in p1: sta dopo `</title>`, in mezzo
+    all'head. p2 e' grosso (tutto il CSS in linea), e per questo si
+    spezza UNA volta qui invece di fare un `replace` a ogni richiesta.
+
+    L'avviso tace se il titolo non e' stato trovato: li' p2 non e' mai
+    stato calcolato, e un secondo ⚠️ manderebbe a cercare il guasto
+    dalla parte sbagliata — il primo l'ha gia' detto."""
+    i = p["p2"].find(SEGNO_TG)
+    if i < 0:
+        if p["ha_titolo"]:
+            print("⚠️ Fessura Telegram spenta: lo <script> di "
+                  "telegram-web-app non e' quello che ci si aspetta in "
+                  "miniapp.html — su .onion la pagina lo portera' lo "
+                  "stesso", flush=True)
+        return p
+    p.update(p2=p["p2"][:i], p2b=p["p2"][i + len(SEGNO_TG):], ha_tg=True)
+    return p
+
+
+def _spezza_pagina(grezzo: bytes) -> dict:
+    """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
+
+    Il nome non cambia da quando le fessure erano tre: la sentinella
+    delle rotte pubbliche in prove.py cerca `_pagina_con_meta(`, e
+    questa e' la sua fornitrice — tenere i nomi vale una regressione
+    risparmiata. Chi la chiama ottiene sempre tutte e quattro, cosi'
+    non c'e' un secondo posto che debba ricordarsi di comporle."""
+    return _fessura_tg(_fessure_base(grezzo))
+
+
+def _monta_pagina(p: dict, meta: str, titolo: str, corpo: str,
+                  senza_tg: bool = False) -> bytes:
     """I segmenti piu' cio' che ci va in mezzo. PURA.
 
     `b"".join` e non `+=`, e non e' estetica: con `+=` su bytes si
     pagano quattro copie da 900 KB per richiesta invece di una. E' la
-    sola voce di costo CPU che questo cantiere puo' introdurre."""
+    sola voce di costo CPU che questo cantiere puo' introdurre.
+
+    `senza_tg` ha il DEFAULT che tiene il mondo di ieri byte per byte,
+    ed e' cio' che fa ricadere ogni chiamante distratto — e le prove
+    scritte prima che la quarta fessura esistesse — sul comportamento
+    di sempre. Vale anche a fessura spenta: senza `ha_tg` non c'e'
+    niente da togliere, e lo script resta dov'e'."""
     fette = [p["p0"]]
     if p["ha_meta"] and meta:
         fette.append(b"\n" + meta.rstrip("\n").encode("utf-8"))
@@ -38254,6 +38400,12 @@ def _monta_pagina(p: dict, meta: str, titolo: str, corpo: str) -> bytes:
     fette.append(titolo.encode("utf-8") if (p["ha_titolo"] and titolo)
                  else p["titolo"])
     fette.append(p["p2"])
+    if p["ha_tg"]:
+        # Togliere lo script vuol dire NON rimetterlo: il fine-riga che
+        # lo seguiva resta al suo posto, e diventa una riga vuota.
+        if not senza_tg:
+            fette.append(SEGNO_TG)
+        fette.append(p["p2b"])
     if p["ha_corpo"] and corpo:
         fette.append(corpo.encode("utf-8"))
     fette.append(p["p3"])
@@ -38278,7 +38430,13 @@ def _pagina_con_meta(meta: str, titolo: str = "",
     IL NOME NON CAMBIA anche adesso che gli argomenti sono tre, ed e'
     voluto: la sentinella delle rotte pubbliche in prove.py cerca
     proprio «_pagina_con_meta(» dentro il corpo di ognuna, e tenere il
-    nome vale una regressione risparmiata."""
+    nome vale una regressione risparmiata.
+
+    E LA QUARTA FESSURA SI DECIDE QUI, non nelle rotte: `su_onion()`
+    legge un contextvar, quindi le NOVE rotte-pagina non hanno un
+    argomento in piu' da passare e la decima di domani eredita la cura
+    per costruzione. E' lo stesso pregio del cartello — chi aggiunge
+    una pagina non deve sapere che questo blocco esiste."""
     try:
         s = os.stat("miniapp.html")
         timbro = (s.st_mtime, s.st_size)
@@ -38291,7 +38449,8 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.
         _PAGINA_CACHE.update(_spezza_pagina(grezzo), timbro=timbro)
-    return HTMLResponse(_monta_pagina(_PAGINA_CACHE, meta, titolo, corpo),
+    return HTMLResponse(_monta_pagina(_PAGINA_CACHE, meta, titolo, corpo,
+                                      senza_tg=su_onion()),
                         headers=HEADER_NO_CACHE)
 
 
