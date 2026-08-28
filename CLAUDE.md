@@ -18262,6 +18262,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   375: il testo sta su una riga a tutte e tre) e la `line-height` da
   sola (con l'1.5 il bottone torna alto come il fratello, ma il 🟣
   resta senza aria SOPRA: e' il font, non l'interlinea).
+  E IL FONT NON BASTAVA (ago 2026, secondo giro dal campo): col font
+  giusto il 🟣 restava «tondo da una parte e tagliato dritto
+  dall'altra». QUELLA DESCRIZIONE E' LA DIAGNOSI, ed e' il pezzo da
+  tenere: un clip che rispetta il `border-radius` taglia CURVO, quindi
+  a mordere e' il CONTENT BOX, che gli angoli tondi non ce li ha — in
+  WebKit un <button> ritaglia il proprio contenuto. E il fatto stesso
+  che tagli lo conferma dall'altro lato: il glifo distava 6px dal
+  bordo della pillola, quindi un clip al padding box non l'avrebbe
+  nemmeno sfiorato.
+  L'INCHIOSTRO NON E' LA SCATOLA, ed e' la misura che spiega perche'
+  su Chrome non si vede niente: `measureText` da' l'ink vero
+  (`actualBoundingBox*`), e col ripiego di Windows il 🟣 a 13px sta a
+  12px sopra la baseline dentro una scatola che ne dichiara 13 — ci
+  sta. Le emoji di Apple la sfondano, e con ZERO aria sopra il taglio
+  cade dritto.
+  LA CURA HA DUE GAMBE perche' da qui non si puo' provare quale morda,
+  e vanno tenute tutte e due: `overflow:visible` toglie il ritaglio
+  dove WebKit onora l'override, e L'ARIA lo rende innocuo dove non lo
+  onora. L'aria si sposta dal PADDING — che sta fuori dal clip — al
+  LINE BOX, che ci sta dentro: `line-height:2` con 3px invece di 6
+  lascia l'altezza dov'era (32 contro 31,5, misurato) e da' al glifo
+  4px sopra invece di zero. ⚠️ I tre valori si muovono INSIEME: da
+  soli si annullano, e chi ne ritocca uno li rimisuri tutti.
+  E LA RIGA DELL'OVERFLOW ERA STATA TOLTA APPOSTA il giro prima, con
+  la ragione giusta — «una guardia che nessuno esercita e' peggio di
+  niente» — e il campo l'ha esercitata il giorno dopo. Non e' un
+  ripensamento: e' la regola che vale finche' non c'e' il caso, e il
+  caso adesso c'e'.
   IL CTA DEL BANNER NON CAMBIA PORTA: SPARISCE (ago 2026, il giorno
   dopo, dal campo — e questa riga EMENDA quella del giro prima, che
   diceva «cambia porta»). Su onion `mostraBanner` non disegna nessun
