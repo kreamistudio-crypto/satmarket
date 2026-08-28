@@ -4990,6 +4990,44 @@ elif not pillow_heif:
 
 GIORNI_SESSIONE_WEB = 30   # quanto dura il login dal browser
 
+# --- PIU' ACCOUNT SULLO STESSO BROWSER (ago 2026) -------------------
+# Chi ha due identita' (la sua e quella del negozio) le tiene aperte
+# INSIEME e passa dall'una all'altra senza rifare il login.
+#
+# LA REGOLA CHE TIENE PICCOLO IL CANTIERE: `barattolo_sessione` resta
+# ESATTAMENTE quello di sempre — il token ATTIVO — e accanto vive il
+# PORTACHIAVI, cioe' i token delle sessioni aperte su questo browser.
+# Cosi' verifica_utente, utente_se_autenticato e i ~50 endpoint che le
+# chiamano non cambiano di una riga: lo switch riscrive il cookie
+# attivo, e da li' in giu' e' il mondo di ieri byte per byte. Chi
+# volesse invece far scegliere l'account a ogni richiesta toccherebbe
+# il percorso dell'autenticazione di TUTTA l'app, che e' il pezzo piu'
+# delicato che abbiamo.
+#
+# IL PORTACHIAVI NON E' UNA CREDENZIALE NUOVA, ed e' la ragione per cui
+# non si firma e non si cifra: contiene TOKEN VERI, gli stessi che
+# aprono le sessioni. Chi lo ruba ha rubato dei token di sessione — non
+# di piu' — e chi lo falsifica scrive token che nel database non
+# trovano niente. Per questo ha le STESSE difese del fratello
+# (HttpOnly, Secure, SameSite=Lax): non ne servono altre, e non
+# concede NIENTE che il token da solo non conceda gia'.
+#
+# DENTRO TELEGRAM NON ESISTE, ed e' una decisione (Andrea, ago 2026):
+# li' l'identita' la impone il client — `authHdr()` manda l'initData e
+# verifica_utente dice che «il fallback scatta SOLO a header vuoto» —
+# quindi uno switch nella Mini App vorrebbe dire far vincere una
+# sessione scelta su una firma di Telegram, cioe' rovesciare quella
+# regola. Sul web e nella PWA l'identita' e' gia' il nostro cookie, e
+# li' il portachiavi e' naturale.
+COOKIE_PORTACHIAVI = "barattolo_portachiavi"
+# I token sono token_urlsafe, cioe' [A-Za-z0-9_-]: il punto non ci puo'
+# finire dentro per costruzione, quindi separa senza ambiguita'.
+SEP_PORTACHIAVI = "."
+try:
+    from config import MAX_ACCOUNT_BROWSER
+except ImportError:
+    MAX_ACCOUNT_BROWSER = 5    # quanti account insieme sullo stesso browser
+
 
 def upsert_utente(user: dict):
     """Il benvenuto standard: crea l'utente al primo ingresso (con data
@@ -5031,6 +5069,92 @@ def imposta_cookie_sessione(response: Response, token: str):
         max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
         secure=not MODALITA_COLLAUDO,   # in locale siamo su http
         samesite="lax", path="/")
+
+
+def imposta_cookie_portachiavi(response: Response, token_list: list):
+    """Il portachiavi: gli stessi identici scudi del cookie di sessione
+    (vedi il commento sopra: non e' una credenziale nuova). Vuoto = si
+    cancella, o resterebbe un cookie che non apre piu' niente."""
+    if not token_list:
+        response.delete_cookie(COOKIE_PORTACHIAVI, path="/")
+        return
+    response.set_cookie(
+        COOKIE_PORTACHIAVI, SEP_PORTACHIAVI.join(token_list),
+        max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
+        secure=not MODALITA_COLLAUDO,
+        samesite="lax", path="/")
+
+
+def _portachiavi_token(raw: str) -> list:
+    """I token del cookie, senza doppioni e nell'ordine in cui sono
+    stati aggiunti. Non valida niente: a dire se un token vale qualcosa
+    e' il database, e un token inventato semplicemente non trova nessuna
+    sessione (il patto del cursore storto: mai un 400, si ignora)."""
+    fuori, visti = [], set()
+    for t in (raw or "").split(SEP_PORTACHIAVI):
+        t = t.strip()
+        if t and t not in visti:
+            visti.add(t)
+            fuori.append(t)
+    return fuori[:MAX_ACCOUNT_BROWSER]
+
+
+def portachiavi_conti(raw: str) -> list:
+    """Gli account VIVI del portachiavi: una riga per ognuno, con il suo
+    token e quel che serve a disegnarlo. Le sessioni scadute o revocate
+    spariscono da sole — la fonte e' il database, il cookie e' solo un
+    mazzo di chiavi — e un tg_id compare UNA volta sola: la fusione dei
+    due account (UPDATE sessioni SET tg_id) puo' lasciare due token che
+    puntano alla stessa persona, e in lista sarebbe la stessa voce due
+    volte. A parita' vince il token piu' RECENTE, che e' quello che il
+    login appena fatto ha messo in fondo."""
+    token = _portachiavi_token(raw)
+    if not token:
+        return []
+    per_hash = {hashlib.sha256(t.encode()).hexdigest(): t for t in token}
+    con = db()
+    righe = con.execute(
+        "SELECT s.token_hash, s.tg_id, u.nome, u.username, u.negozio, "
+        "       u.avatar, u.avatar_scelta "
+        "FROM sessioni s JOIN utenti u ON u.tg_id = s.tg_id "
+        f"WHERE s.token_hash IN ({','.join('?' * len(per_hash))}) "
+        "  AND s.scade > ?",
+        (*per_hash.keys(), int(time.time()))).fetchall()
+    con.close()
+    per_tg = {}
+    for r in righe:
+        # L'ordine del cookie e' quello di aggiunta: l'ultimo arrivato
+        # sovrascrive, cosi' un secondo login sullo stesso account
+        # tiene la sessione fresca invece di quella vecchia.
+        per_tg[r["tg_id"]] = {
+            "tg_id": r["tg_id"],
+            "token": per_hash[r["token_hash"]],
+            "nome": r["nome"] or "",
+            "username": r["username"] or "",
+            "negozio": r["negozio"] or "",
+            # La faccia segue la scelta dell'utente come in vetrina:
+            # chi ha detto «nessuna» resta l'iniziale anche qui.
+            "avatar": "" if r["avatar_scelta"] == "nessuna" else (r["avatar"] or ""),
+        }
+    ordine = {t: i for i, t in enumerate(token)}
+    return sorted(per_tg.values(), key=lambda v: ordine[v["token"]])
+
+
+def apri_sessione(response: Response, tg_id: int, portachiavi: str = "") -> str:
+    """La PORTA UNICA di ogni login: apre la sessione, la rende attiva e
+    la appende al portachiavi di questo browser. Le tre cose stanno
+    insieme apposta — erano due righe ripetute in quattro punti, e il
+    quinto ingresso di domani si sarebbe scordato il portachiavi.
+    Chi rientra su un account che c'e' gia' non lo raddoppia: la voce
+    vecchia lascia il posto alla sessione nuova."""
+    token = crea_sessione(tg_id)
+    resto = [c["token"] for c in portachiavi_conti(portachiavi)
+             if c["tg_id"] != tg_id]
+    # Al tetto cede il piu' VECCHIO, mai quello appena aperto: chi ha
+    # appena messo la password si aspetta di trovarsi li' dentro.
+    imposta_cookie_sessione(response, token)
+    imposta_cookie_portachiavi(response, (resto + [token])[-MAX_ACCOUNT_BROWSER:])
+    return token
 
 
 def utente_da_sessione(token: str) -> dict | None:
@@ -5080,6 +5204,12 @@ def verifica_login_widget(dati: dict) -> dict:
 # verita' («riaprimi») invece di degradare in silenzio a vetrina
 # anonima, dove ogni tocco offrirebbe di entrare a chi e' gia' dentro.
 MSG_INITDATA_SCADUTO = "Sessione scaduta: chiudi e riapri Barattolo"
+
+# Lo switch fra account nega con UNA frase sola: «non c'e' nel tuo
+# portachiavi», «non esiste» e «e' di un altro» si raccontano identici,
+# o l'endpoint diventerebbe un modo per sapere quali tg_id esistono.
+MSG_ACCOUNT_ASSENTE = ("Questo account non è aperto su questo "
+                       "dispositivo: rifai l'accesso")
 
 
 def verifica_utente(init_data: str, sessione: str = "") -> dict:
@@ -5174,7 +5304,8 @@ async def leggi_json(req: Request) -> dict:
 # ------------------- API: LOGIN WEB DAL BROWSER ---------------------
 
 @app.post("/api/login/telegram")
-async def login_telegram(req: Request, response: Response):
+async def login_telegram(req: Request, response: Response,
+                         barattolo_portachiavi: str = Cookie("")):
     """Riceve i dati firmati dal Login Widget, li verifica e apre la
     sessione: da qui in poi il browser e' riconosciuto dal cookie.
     In collaudo accetta anche un'identita' finta ({"collaudo": true}),
@@ -5188,16 +5319,71 @@ async def login_telegram(req: Request, response: Response):
     else:
         user = verifica_login_widget(d)
     upsert_utente(user)
-    token = crea_sessione(int(user["id"]))
-    imposta_cookie_sessione(response, token)
+    apri_sessione(response, int(user["id"]), barattolo_portachiavi)
     return {"ok": True}
 
 
+@app.get("/api/sessioni")
+def sessioni_aperte(barattolo_sessione: str = Cookie(""),
+                    barattolo_portachiavi: str = Cookie("")):
+    """Gli account aperti su questo browser, per il selettore del
+    Profilo. LEGGE E BASTA: nessuno switch, nessuna scrittura.
+    IL TOKEN NON ESCE MAI, ed e' la riga da non ammorbidire: uscirebbe
+    da un cookie HttpOnly per finire in mano al JavaScript, cioe' si
+    butterebbe via l'unica difesa che quel cookie ha. A dire «passa a
+    questo» basta il tg_id, che di suo non apre niente."""
+    conti = portachiavi_conti(barattolo_portachiavi)
+    attivo = None
+    if barattolo_sessione:
+        for c in conti:
+            if c["token"] == barattolo_sessione:
+                attivo = c["tg_id"]
+    return {"attivo": attivo,
+            "massimo": MAX_ACCOUNT_BROWSER,
+            "conti": [{k: v for k, v in c.items() if k != "token"}
+                      for c in conti]}
+
+
+@app.post("/api/sessioni/attiva")
+async def sessione_attiva(req: Request, response: Response,
+                          barattolo_portachiavi: str = Cookie("")):
+    """Lo switch: riscrive il cookie attivo con un token che era GIA'
+    nel portachiavi di questo browser. Non apre nessuna sessione nuova
+    — quindi non e' una porta d'ingresso e non ha niente da verificare
+    oltre al possesso del portachiavi, che e' il possesso dei token.
+    E' una LETTURA sul mondo: non muove un sat, non tocca un ordine,
+    non manda una notifica (decisione di Andrea: si passa liberamente
+    anche con un affare aperto — le notifiche del bot continuano ad
+    arrivare all'account giusto, che e' quel che tiene tutto in piedi).
+    L'ANTI-ORACOLO E' UN MESSAGGIO SOLO: un tg_id che non e' nel
+    portachiavi risponde identico a uno che non esiste, cosi' chi
+    enumera non impara niente — la regola dei fratelli."""
+    d = await leggi_json(req)
+    try:
+        chiesto = int(d.get("tg_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, MSG_ACCOUNT_ASSENTE)
+    for c in portachiavi_conti(barattolo_portachiavi):
+        if c["tg_id"] == chiesto:
+            imposta_cookie_sessione(response, c["token"])
+            return {"ok": True, "attivo": chiesto}
+    raise HTTPException(400, MSG_ACCOUNT_ASSENTE)
+
+
 @app.post("/api/logout")
-def logout(response: Response, barattolo_sessione: str = Cookie("")):
+def logout(response: Response, barattolo_sessione: str = Cookie(""),
+           barattolo_portachiavi: str = Cookie("")):
     """Chiude SOLO la sessione di questo browser (altri dispositivi
     restano collegati). Funziona anche con un cookie ormai scaduto:
-    pulisce e saluta."""
+    pulisce e saluta.
+    COL PORTACHIAVI esce UN account alla volta, non tutti: si toglie
+    quello attivo e si passa a chi resta — se non resta nessuno, e' il
+    logout di sempre, byte per byte. Chi vuole uscire da tutti tocca
+    «Esci» una volta per account, ed e' voluto: un bottone che chiude
+    in un colpo anche l'account su cui non si sta e' il modo di
+    buttare fuori qualcuno per sbaglio."""
+    resto = [c for c in portachiavi_conti(barattolo_portachiavi)
+             if c["token"] != barattolo_sessione]
     if barattolo_sessione:
         con = db()
         con.execute(
@@ -5205,8 +5391,12 @@ def logout(response: Response, barattolo_sessione: str = Cookie("")):
             (hashlib.sha256(barattolo_sessione.encode()).hexdigest(),))
         con.commit()
         con.close()
+    imposta_cookie_portachiavi(response, [c["token"] for c in resto])
+    if resto:
+        imposta_cookie_sessione(response, resto[-1]["token"])
+        return {"ok": True, "attivo": resto[-1]["tg_id"]}
     response.delete_cookie("barattolo_sessione", path="/")
-    return {"ok": True}
+    return {"ok": True, "attivo": None}
 
 
 # --- Login Nostr: le fondamenta della verifica -----------------------
@@ -5343,7 +5533,8 @@ def login_nostr_sfida():
 
 
 @app.post("/api/login/nostr")
-async def login_nostr(req: Request, response: Response):
+async def login_nostr(req: Request, response: Response,
+                      barattolo_portachiavi: str = Cookie("")):
     """Secondo passo: arriva l'evento firmato. Tre strade, in ordine:
     1) npub_accesso conosciuta -> si entra nel suo account;
     2) npub gia' VERIFICATA (badge 🟣) su UN account Telegram non
@@ -5365,7 +5556,7 @@ async def login_nostr(req: Request, response: Response):
                     (npub,)).fetchone()
     if r:
         con.close()
-        imposta_cookie_sessione(response, crea_sessione(r["tg_id"]))
+        apri_sessione(response, r["tg_id"], barattolo_portachiavi)
         return {"ok": True}
     righe = con.execute(
         "SELECT tg_id, nome, username FROM utenti "
@@ -5384,7 +5575,7 @@ async def login_nostr(req: Request, response: Response):
                             "username": righe[0]["username"],
                             "biglietto": biglietto}}
     tg_id = crea_utente_nostr(pubkey, npub)
-    imposta_cookie_sessione(response, crea_sessione(tg_id))
+    apri_sessione(response, tg_id, barattolo_portachiavi)
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
@@ -5392,7 +5583,8 @@ async def login_nostr(req: Request, response: Response):
 
 
 @app.post("/api/login/nostr/collega")
-async def login_nostr_collega(req: Request, response: Response):
+async def login_nostr_collega(req: Request, response: Response,
+                              barattolo_portachiavi: str = Cookie("")):
     """L'utente ha accettato: la sua chiave Nostr diventa la chiave
     d'accesso dell'account Telegram esistente, e si entra li'.
     Se invece rifiuta, il client chiude il foglio e basta: il
@@ -5413,7 +5605,7 @@ async def login_nostr_collega(req: Request, response: Response):
         con.close()
         raise HTTPException(401, "Riprova il login")
     con.close()
-    imposta_cookie_sessione(response, crea_sessione(tg_id))
+    apri_sessione(response, tg_id, barattolo_portachiavi)
     await premia_distintivi(tg_id)   # doppia cittadinanza appena nata
     return {"ok": True, "collegato": True}
 

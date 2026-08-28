@@ -2866,6 +2866,14 @@
   .seller .who{flex:1;min-width:0}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
+  /* «Sei qui» sull'account attivo del selettore: lo stesso anello
+     arancione del tappo del Profilo, della voce di nav e della card
+     del reparto — un registro solo per una cosa sola. E' un OUTLINE
+     con offset e non un bordo: sta FUORI dal riquadro, quindi non
+     ruba un pixel al contenuto e non sposta le righe vicine (la
+     lezione della striscia delle categorie). L'aria attorno c'e'
+     gia': il .seller ha 14px di margine sopra e sotto. */
+  .seller.attivo{outline:2.5px solid var(--sats);outline-offset:2px}
   /* LA CLASSIFICA: la riga e' un `.seller` con due pezzi in piu' —
      la posizione a sinistra e la freccia a destra, come il
      riquadro venditore del dettaglio. Nessun colore nuovo: le
@@ -4212,7 +4220,7 @@ document.getElementById('cartello')?.remove();</script>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
         <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
-        <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
+        <button class="avatar-btn" onclick="toccaTappo()" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
            tastiera mobile), cioe' col submit del form -->
@@ -5272,6 +5280,11 @@ document.getElementById('cartello')?.remove();</script>
     <div class="form">
       <div class="section-label" style="padding-top:22px">Il tuo profilo</div>
       <div id="profiloTestata"></div>
+      <!-- (Gli account aperti NON stanno qui: vivono nel foglio che si
+           apre col SECONDO tocco sul tappo — vedi toccaTappo(). Un
+           elenco in pagina e uno nel foglio sarebbero due posti per la
+           stessa cosa, che e' il difetto che il gesto esiste per
+           togliere.) -->
       <div id="profiloChecklist"></div>
 
       <!-- I preferiti, primo cassetto: cio' che hai messo da parte
@@ -5653,7 +5666,7 @@ document.getElementById('cartello')?.remove();</script>
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
-    <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
+    <button class="avatar-btn" onclick="toccaTappo()" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
   <!-- ============ SHEET PAGAMENTO ============ -->
@@ -6083,6 +6096,24 @@ document.getElementById('cartello')?.remove();</script>
   <!-- (Il foglio #setSheet «Riempi il barattolo» non esiste piu' —
        ago 2026 — e nemmeno la pagina del riepilogo che l'aveva
        sostituito: il carrello si paga nella cassa, view-acquisto.) -->
+
+  <!-- ============ SHEET AGGIUNGI UN ACCOUNT ============ -->
+  <!-- Le stesse due porte del login web (widget Telegram e Nostr): la
+       differenza e' che qui il portachiavi NON si azzera, quindi
+       l'account di adesso resta aperto accanto a quello nuovo. Il
+       widget lo monta apriAccountSheet() al volo: lo script di
+       Telegram va appeso dove si vede, e questo foglio esiste solo
+       da loggati. -->
+  <div class="sheet" id="accountSheet">
+    <div class="grab"></div>
+    <h3 id="accountTitolo">👥 I tuoi account</h3>
+    <div id="accountSub" style="font-size:13px;color:var(--muted);font-weight:600"></div>
+    <!-- Le righe degli account e le porte del login: le scrive
+         renderAccountSheet(), che e' l'unico posto che le disegna. -->
+    <div id="accountLista"></div>
+    <div id="accountPorte" style="margin-top:14px"></div>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
 
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
@@ -7488,7 +7519,11 @@ function go(view){
   if (view==='profilo') { renderProfilo(); loadMyListings().then(()=>{ renderMyListings(); ripristinaMieiPos(); }).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
        essere stato venduto nel frattempo, e il cassetto deve dirlo */
-    caricaPreferiti().then(renderPreferiti); }
+    caricaPreferiti().then(renderPreferiti);
+    /* gli account aperti si rileggono come il barattolo (una sessione
+       puo' essere scaduta da un'altra parte) e da li' si decide se
+       accennare al secondo tocco: la lista deve essere gia' vera */
+    caricaAccount().then(accennaAccount); }
   window.scrollTo(0, posizioneDaRendere(view));
 }
 
@@ -16404,6 +16439,7 @@ function closeSheet(){
   el('riscuotiSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
   el('corrieriSheet').classList.remove('open');
+  el('accountSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
      scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui),
@@ -19419,7 +19455,14 @@ function renderProfilo(){
     ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
     ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}
     ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
-  if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
+  /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
+     passa a chi resta, e chiamarlo «Esci» secco farebbe temere di
+     perderli tutti in un colpo. */
+  if (el('profiloEsci')) {
+    el('profiloEsci').style.display = WEB ? '' : 'none';
+    el('profiloEsci').textContent = accountAperti.length > 1
+      ? '🚪 Esci da questo account' : '🚪 Esci';
+  }
   /* «Tutorial» c'e' dove il tour puo' partire davvero: hintAttivi()
      e' la stessa guardia che tourBenvenuto interroga per prima. */
   if (el('profiloTutorial')) el('profiloTutorial').style.display =
@@ -28569,6 +28612,198 @@ async function esciWeb(){
   location.reload();
 }
 
+/* ---------------- PIU' ACCOUNT SULLO STESSO BROWSER ----------------
+   Due identita' (la mia e quella del negozio) aperte INSIEME, e si
+   passa dall'una all'altra dal Profilo senza rifare il login.
+
+   SOLO SU WEB E PWA, ed e' una decisione (Andrea, ago 2026) e non una
+   dimenticanza: dentro Telegram l'identita' la impone il client —
+   authHdr() manda l'initData firmato — quindi li' non c'e' niente da
+   scegliere, e farlo vorrebbe dire far vincere una sessione scelta su
+   una firma di Telegram. In DEMO e in vetrina anonima non esiste
+   affatto: la' non c'e' nessuna sessione, e un selettore vuoto
+   sarebbe un cassetto su un muro.
+
+   IL TOKEN NON ARRIVA MAI QUI: il server manda i soli tg_id, e lo
+   switch si chiede con quello. I token restano nel cookie HttpOnly,
+   dove il JavaScript non li vede — che e' l'unica difesa che quel
+   cookie ha. */
+let accountAperti = [], accountAttivo = null, accountMax = 0;
+
+function accountVivi(){ return WEB && !DEMO && !VETRINA; }
+
+async function caricaAccount(){
+  if (!accountVivi()) { accountAperti = []; return; }
+  try {
+    const r = await fetch(`${API_BASE}/sessioni`);
+    if (!r.ok) throw new Error('niente sessioni');
+    const d = await r.json();
+    accountAperti = d.conti || [];
+    accountAttivo = d.attivo != null ? d.attivo : null;
+    accountMax = d.massimo || 0;
+  } catch (e) {
+    /* Un server di ieri non ha questa rotta: si resta col solo account
+       di adesso, che e' un'ASSENZA e mai una bugia. */
+    accountAperti = [];
+  }
+}
+
+/* IL MENU DEGLI ACCOUNT (ago 2026, decisione di Andrea): il primo
+   tocco sul tappo porta al Profilo, il SECONDO apre questo foglio —
+   le identita' aperte, e la porta per aggiungerne una. E' il gesto di
+   Gmail, quello che chi ha due account ha gia' nelle dita.
+   VIVE NEL FOGLIO E NON IN PAGINA: un elenco qui e uno nel Profilo
+   sarebbero due posti per la stessa cosa, e il secondo tocco non
+   avrebbe piu' niente da dire. */
+function renderAccountSheet(){
+  const box = el('accountLista');
+  if (!box) return;
+  const pieno = accountAperti.length >= accountMax;
+  el('accountSub').textContent = accountAperti.length > 1
+    ? 'Tocca un account per passare a quello. Restano aperti tutti: '
+      + 'nessun affare in corso viene toccato.'
+    : 'Puoi tenere aperte più identità insieme — la tua e quella del '
+      + 'negozio — e passare dall\'una all\'altra senza rifare l\'accesso.';
+  box.innerHTML =
+    accountAperti.map(c => {
+        const attivo = c.tg_id === accountAttivo;
+        const nome = c.nome || c.username || 'Account';
+        /* Negli onclick viaggia SOLO il tg_id numerico: il patto del
+           filtro-alfabeto, come «Scrivi a un utente». Nome e username
+           sono testo altrui e passano da esc(). */
+        return `<div class="seller${attivo?' attivo':''}"`
+          + (attivo ? '' : ` role="button" tabindex="0"`
+              + ` onclick="cambiaAccount(${c.tg_id})"`
+              + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
+              + `{event.preventDefault();cambiaAccount(${c.tg_id})}"`)
+          + ` style="margin-top:8px${attivo?'':';cursor:pointer'}">`
+          + `<div class="avatar">${avatarImg(c.avatar)}${esc([...nome][0]||'?')}</div>`
+          + `<div class="who"><b>${esc(nome)}</b>`
+          + `<div class="rep">${c.username?'@'+esc(c.username)+' · ':''}`
+          + `${attivo?'sei qui':'tocca per passare a questo account'}</div></div>`
+          + `</div>`;
+      }).join('')
+    + (pieno
+        ? `<div class="hint" style="margin-top:10px">Sono aperti ${accountMax} account:`
+          + ` per aggiungerne un altro esci da uno di questi.</div>` : '');
+  /* Le porte del login si montano solo se c'e' posto: un bottone che
+     porta a un muro e' peggio di un bottone che non c'e'. */
+  montaPorteAccount(!pieno);
+}
+
+/* Lo switch. E' una LETTURA sul mondo: non muove un sat, non tocca un
+   ordine, non avvisa nessuno — si passa liberamente anche con un
+   affare aperto (decisione di Andrea), e le notifiche del bot
+   continuano ad arrivare all'account giusto.
+   Si RICARICA e non si ridisegna: cambiare identita' cambia vetrina,
+   ordini, preferiti, offerte, barattolo e permessi insieme, e
+   rimettere in pari a mano una dozzina di viste sarebbe l'elenco che
+   fra sei mesi ne dimentica una. Il reload e' la strada che il login
+   web fa gia'. */
+let accountInCorso = false;
+async function cambiaAccount(tgId){
+  if (accountInCorso || tgId === accountAttivo) return;
+  accountInCorso = true;
+  try {
+    const r = await fetch(`${API_BASE}/sessioni/attiva`, {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tg_id: tgId})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.detail || 'switch rifiutato');
+    location.reload();
+  } catch (e) {
+    accountInCorso = false;
+    toast(e.message || 'Non è riuscito, riprova', 5000);
+  }
+}
+
+/* IL GESTO DEL TAPPO: il primo tocco porta al Profilo, il secondo —
+   quando ci si e' gia' — apre il menu degli account.
+   IL SECONDO TOCCO ESISTE SOLO DOVE HA SENSO: dentro Telegram, in
+   demo e in vetrina il tappo fa quel che ha sempre fatto, perche' li'
+   di account da scegliere non ce n'e' (vedi accountVivi). Chi non e'
+   nel Profilo ci va, sempre: e' l'unico gesto che il tappo ha mai
+   avuto, e non deve cambiare sotto le dita. */
+/* L'ACCENNO, UNA VOLTA SOLA: il secondo tocco sul tappo non lo scopre
+   nessuno da solo — e' la lezione del tocco lungo sulle card delle
+   categorie, e la risposta e' la stessa: un TOAST, che e' l'unica
+   forma a zero pixel di layout (se ne va da solo e non sposta
+   niente). Si consuma col timbro degli hint, per dispositivo e per
+   sempre.
+   PARLA SOLO A CHI HA GIA' DUE ACCOUNT: con uno solo il gesto
+   porterebbe a un menu che non ha ancora niente da scegliere, e un
+   suggerimento che arriva prima di servire e' rumore. */
+function accennaAccount(){
+  renderAccountSheet();
+  if (!accountVivi() || accountAperti.length < 2) return;
+  if (hintDismesso('duetocchi')) return;
+  const h = hintLetti(); h.duetocchi = Date.now();
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  setTimeout(()=>toast('💡 Tocca di nuovo la tua foto per cambiare account', 4200), 900);
+}
+
+function toccaTappo(){
+  /* «Dove sono» si chiede al DOM come fa gia' il resto del client
+     (ptrVista, navRendiVista): una seconda variabile che segue la
+     vista sarebbe un secondo posto da tenere in pari. */
+  const qui = (document.querySelector('.view.active')?.id || '').replace('view-','');
+  if (qui === 'profilo' && accountVivi()) { apriAccountSheet(); return; }
+  go('profilo');
+}
+
+/* Le due porte del login web, dentro il foglio invece che nel banner
+   della vetrina: qui si e' gia' dentro, e il portachiavi non si
+   azzera — l'account di adesso resta aperto accanto a quello nuovo.
+   `dai` falsa = c'e' posto per nessuno: si svuota e basta. */
+function montaPorteAccount(dai){
+  const porte = el('accountPorte');
+  porte.innerHTML = '';
+  if (!dai) return;
+  /* L'etichetta dice cosa sono le porte qui sotto: senza, il widget di
+     Telegram comparirebbe nudo sotto la lista e nessuno saprebbe che
+     serve ad AGGIUNGERE, non a rientrare. */
+  const eti = document.createElement('div');
+  eti.className = 'section-label';
+  eti.style.paddingTop = '6px';
+  eti.textContent = 'Aggiungi un account';
+  porte.appendChild(eti);
+  if (collaudo) {
+    /* In locale il widget vero non compare (vuole il dominio
+       registrato su BotFather): resta la porta del collaudo. */
+    const b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = '🍪 Entra come l\'identità di collaudo';
+    b.onclick = provaLoginWeb;
+    porte.appendChild(b);
+  } else {
+    const posto = document.createElement('div');
+    const s = document.createElement('script');
+    s.src = 'https://telegram.org/js/telegram-widget.js?22';
+    s.setAttribute('data-telegram-login', 'ilbarattolobot');
+    s.setAttribute('data-size', 'medium');
+    s.setAttribute('data-request-access', 'write');
+    s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    posto.appendChild(s);
+    porte.appendChild(posto);
+  }
+  const n = document.createElement('button');
+  n.className = 'btn ghost';
+  n.textContent = '🟣 …o entra con Nostr';
+  n.onclick = () => { navIndietro(); apriNostrSheet(); };
+  porte.appendChild(n);
+}
+
+/* Il menu si apre coi dati che si hanno e li RILEGGE: una sessione
+   puo' essere scaduta da un'altra parte, e la lista deve dirlo — ma
+   il foglio si vede subito, mai un'attesa davanti a un elenco vuoto
+   (il patto del rientro istantaneo della cassa). */
+function apriAccountSheet(){
+  renderAccountSheet();
+  el('sheetBg').classList.add('open');
+  el('accountSheet').classList.add('open');
+  caricaAccount().then(renderAccountSheet);
+}
+
 /* ---------- PWA: banner «installa Barattolo» ---------- */
 /* Solo web MOBILE fuori da Telegram, mai se l'app e' gia' installata,
    mai in DEMO (invitare a installare una demo sarebbe una bugia). Il
@@ -29893,6 +30128,9 @@ async function avvia(){
        rilegge (fail-open: senza risposta resta vuoto) */
     preferiti = new Set(); myPreferiti = [];
     await caricaPreferiti();
+    /* gli account aperti su questo browser: fire-and-forget, il
+       selettore vive nel Profilo e nessuno lo aspetta qui */
+    caricaAccount();
     /* le offerte seguono l'identita' come i preferiti: si rileggono
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];

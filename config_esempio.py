@@ -830,6 +830,17 @@ AVVISI_ORDINI_ADMIN = True
 # freno d'emergenza, non una scelta.
 ORE_INITDATA = 24
 
+# PIU' ACCOUNT SULLO STESSO BROWSER (ago 2026): quante identita' si
+# tengono aperte insieme e si scambiano dal Profilo senza rifare il
+# login — il caso vero e' «il mio account e quello del negozio».
+# Vale SOLO su web e PWA: dentro Telegram l'identita' la impone il
+# client (l'initData firmato), e li' non c'e' niente da scegliere.
+# Ogni account in piu' e' un token nel cookie del portachiavi (~43
+# caratteri): il tetto non protegge dal peso, tiene corta una lista
+# che si legge con un dito. Al limite cede il piu' VECCHIO, mai
+# l'account su cui si e' appena entrati.
+MAX_ACCOUNT_BROWSER = 5
+
 # LA RICERCA NON HA PIU' UNA QUOTA (ago 2026): `TETTO_RICERCHE_AI_ORA`
 # frenava le chiamate ad Anthropic della ricerca, e la ricerca non
 # chiama piu' nessuno — e' un indice full-text dentro SQLite. Una riga
