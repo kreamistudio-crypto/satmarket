@@ -6206,6 +6206,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`MAX_ACCOUNT_BROWSER`, 5) cede il più VECCHIO e mai chi è appena
   entrato: chi ha appena messo la password si aspetta di trovarsi lì
   dentro.
+  LA SESSIONE DI IERI SI ADOTTA (ago 2026, caso dal campo: «non riesco
+  a switchare nonostante il commit sia in prod»), ed è il pezzo che al
+  cantiere mancava: **chi era già loggato PRIMA del deploy ha il
+  cookie della sessione e NESSUN mazzo** — il portachiavi nasce al
+  login, e il suo login è di ieri. Quindi il menu gli si apriva senza
+  nemmeno il SUO account, cioè senza niente fra cui passare; e al
+  primo «aggiungi un account» quella sessione spariva dal mazzo, che
+  `apri_sessione` appendeva a un portachiavi vuoto.
+  IL GIUDICE È `portachiavi_adottato(portachiavi, sessione)`: se la
+  sessione attiva non è nel mazzo, ce la mette IN TESTA — è la più
+  vecchia, e la testa è il posto di chi cede per primo al tetto. Lo
+  chiamano `apri_sessione` (che guadagna il quarto argomento) e
+  `sessioni_aperte`, che RISCRIVE il cookie solo quando il mazzo è
+  davvero cambiato: la migrazione avviene al primo sguardo, senza uno
+  script e senza toccare il database.
+  E NON VALIDA NIENTE PER CONTO SUO, la regola del fratello: passa la
+  sessione a `portachiavi_conti`, dove a decidere è il DATABASE — una
+  sessione inventata o scaduta non entra nel mazzo, e non serve un
+  ramo apposta.
+  ⚠️ LE PORTE DEL LOGIN SONO QUATTRO E `login_nostr` NE HA DUE, ed è
+  la trappola che la tortura ha trovato: la sentinella che cercava la
+  PAROLA `barattolo_sessione` nel corpo restava verde togliendola a
+  UNO dei due rami, perché la parola la porta comunque l'altro. Adesso
+  si CONTANO le chiamate (`apri_sessione(` contro `barattolo_sessione)`
+  — mai un regex `[^)]*`, che su `int(user["id"])` si ferma alla
+  parentesi di dentro).
   LA FUSIONE NON HA VOLUTO UNA RIGA, e va detto perché sembra un buco:
   `esegui_fusione` fa `UPDATE sessioni SET tg_id`, quindi il
   portachiavi può ritrovarsi due token che puntano alla stessa
