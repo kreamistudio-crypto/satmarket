@@ -66,6 +66,32 @@ cp /etc/systemd/system/barattolo*.service \
    /etc/systemd/system/barattolo*.timer "$TMP/sistema/" 2>/dev/null || true
 crontab -l > "$TMP/sistema/crontab-root.txt" 2>/dev/null || true
 
+# 2b) La chiave del servizio nascosto Tor. NON e' un dato di servizio
+#     come i vicini: l'indirizzo .onion e' DERIVATO da lei — e' la
+#     base32 della sua chiave pubblica — quindi la chiave E'
+#     l'indirizzo. Persa, non si rigenera: non c'e' un registro da
+#     aggiornare ne' un DNS da rimettere, e ogni link .onion che
+#     qualcuno si e' salvato muore. E il caso non e' solo il disastro:
+#     una MIGRAZIONE su un'altra macchina la vuole tale e quale, ed e'
+#     una cosa che si fa quando tutto va bene.
+#
+#     Il percorso si LEGGE dal torrc invece di ribatterlo qui: una
+#     fonte sola, e se un domani la cartella cambia nome il backup la
+#     segue da solo. `cp -a` porta dentro anche i permessi 0700, senza
+#     i quali Tor si rifiuta di partire; il proprietario va rimesso al
+#     ripristino, e la liturgia sta in deploy/RIPRISTINO.md.
+cp /etc/tor/torrc "$TMP/sistema/" 2>/dev/null || true
+DIR_ONION=$(awk '$1=="HiddenServiceDir"{print $2; exit}'             /etc/tor/torrc 2>/dev/null || true)
+if [ -n "${DIR_ONION:-}" ] && [ -d "$DIR_ONION" ]; then
+    # QUESTA copia non tace se fallisce, al contrario dei `|| true`
+    # qui sopra: quelli proteggono file che si riscrivono a mano, qui
+    # sotto c'e' la sola cosa dell'onion che non si puo' rifare. Si
+    # urla e si TIRA DRITTO — un archivio senza la chiave vale molto
+    # piu' di nessun archivio, e il db resta la ragione per cui questo
+    # script esiste.
+    cp -a "$DIR_ONION" "$TMP/sistema/tor-hidden-service" ||       echo "ATTENZIONE: chiave .onion NON copiata da $DIR_ONION - l'archivio e' monco proprio dove conta di piu' (l'indirizzo non si rigenera)" >&2
+fi
+
 # 3) Tar + age. La pubblica cifra, e nessuno su questa macchina sa
 #    decifrare: e' il punto di tutto lo script.
 ARCHIVIO="$DIR_OUT/barattolo-$STAMP.tar.gz.age"
