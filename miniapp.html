@@ -1732,7 +1732,7 @@
      — che e' l'unico caso in cui i due livelli si vedono uno sopra
      l'altro: 1) LA CARTA — il cassetto e' una card bianca col bordo,
      la sezione sta sul crema della pagina, ed e' la differenza piu'
-     forte; 2) LA MISURA — 17px contro 15, che il livello sopra dev'
+     forte; 2) LA MISURA — 18px contro 15, che il livello sopra dev'
      essere piu' grande; 3) IL SEGNO DEL TOCCO — la freccia in un
      CERCHIETTO di carta col contorno, mentre il cassetto ce l'ha NUDA.
      Piu' il rientro: il testo del cassetto parte molto piu' a destra.
@@ -1762,14 +1762,32 @@
      piu' su. L'aria SOTTO e' nuova e serve: il primo cassetto ha solo
      i suoi 10px di margine, e senza il titolo gli toccherebbe.
      `font:inherit` va PRIMA dei longhand, o la scorciatoia azzera
-     corpo e peso — la lezione gia' pagata da .demo-cta. */
+     corpo e peso — la lezione gia' pagata da .demo-cta.
+
+     ⚠️ IL TETTO E' 19px E IL TITOLO STA A 18, ed e' MISURATO sulla
+     pagina vera e non stimato: a 320px «🏪 Impostazioni di negozio»
+     e' il piu' lungo, e a 20px VA A CAPO (il bottone passa da 60 a
+     90). L'aria che resta prima del cerchietto e' 42px a 17, 30 a
+     18, 17 a 19: sul tetto ci starebbe UN carattere, quindi non ci
+     si piazza sopra — la prossima etichetta un filo piu' lunga lo
+     romperebbe. Chi cresce ancora il corpo, o allunga un titolo,
+     RIMISURI li': e' la larghezza dove la riga si gioca.
+
+     E CRESCERE IL TITOLO NON COSTA UN PIXEL D'ALTEZZA, che e' la
+     cosa che leggendo non si vede: la riga la detta il CERCHIETTO
+     da 28px (align-items:center), e la line box del testo ci sta
+     sotto fino a 19px — il bottone resta 60px a 17, 18 e 19. Per
+     la stessa ragione il cerchietto NON si ingrandisce insieme al
+     titolo: costerebbe due volte, in altezza e nell'aria del testo,
+     mentre a farsi leggere basta il GLIFO dentro — a 11px riempiva
+     il 38% del cerchietto, a 16 ne riempie il 56%. */
   .grp-h{display:flex;align-items:center;gap:9px;
     padding:24px 0 8px;border:0;background:none;font:inherit;
     width:100%;cursor:pointer;text-align:left;
-    font-size:17px;font-weight:800;color:var(--ink)}
+    font-size:18px;font-weight:800;color:var(--ink)}
   .grp-h .fr{margin-left:auto;flex:none;width:28px;height:28px;
     border-radius:50%;background:var(--card);
-    border:1.5px solid var(--field-line);color:var(--ink);font-size:11px;
+    border:1.5px solid var(--field-line);color:var(--ink);font-size:16px;
     display:flex;align-items:center;justify-content:center;
     transition:transform .18s ease}
   .grp.open .grp-h .fr{transform:rotate(180deg)}

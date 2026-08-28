@@ -19316,7 +19316,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   INSIEME, e nessuna delle tre basta da sola: 1) **LA CARTA** — il
   cassetto è una card bianca col bordo e il raggio 16, la sezione sta
   sul crema della pagina: è la differenza più forte; 2) **LA MISURA**
-  — 17px contro 15, che il livello sopra dev'essere più grande; 3)
+  — 18px contro 15, che il livello sopra dev'essere più grande; 3)
   **IL SEGNO DEL TOCCO** — la freccia in un CERCHIETTO di carta col
   contorno (28px), mentre il cassetto ce l'ha NUDA. Più il rientro,
   che viene gratis: il testo del cassetto parte molto più a destra.
@@ -19345,18 +19345,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sulla carta e il giro dal vivo l'ha confermato peggiore del
   previsto.
   IL COSTO È MISURATO: il Profilo passa da **1023 a 1113px** a 375
-  (+90, +8,8%) e ogni titolo da 42 a 60px. ⚠️ E IL CAPOLINEA DEL
-  TESTO È «Impostazioni di negozio» A 320: 218px di testo con **42px
-  d'aria** prima del cerchietto, cioè ~2 caratteri — chi allunga
-  un'etichetta di sezione rimisuri lì, che è la larghezza dove la riga
-  si gioca.
+  (+90, +8,8%) e ogni titolo da 42 a 60px.
+  ⚠️ IL TETTO DEL CORPO È 19px E IL TITOLO STA A 18 (ago 2026,
+  secondo giro dal campo: «17 non basta»), ed è MISURATO sulla pagina
+  vera e non stimato: a 320px il più lungo è «🏪 Impostazioni di
+  negozio», e a **20px VA A CAPO** — il bottone passa da 60 a 90.
+  L'aria che gli resta prima del cerchietto è 42px a 17, **29,6 a 18**
+  e 16,8 a 19: sul tetto ci starebbe UN carattere, quindi non ci si
+  piazza sopra — la prossima etichetta un filo più lunga lo
+  romperebbe. Chi cresce ancora il corpo, o allunga un titolo,
+  RIMISURI lì: è la larghezza dove la riga si gioca.
+  E CRESCERE IL TITOLO NON COSTA UN PIXEL D'ALTEZZA, che è la cosa che
+  leggendo non si vede e che ha reso il ritocco gratis: la riga la
+  detta il CERCHIETTO da 28px (`align-items:center`) e la line box del
+  testo ci sta sotto fino a 19px, quindi il bottone resta **60px a 17,
+  18 e 19** e il Profilo non si muove di un pixel (1113 a 375, 1161 a
+  320, prima e dopo).
+  LA FRECCIA CRESCE DENTRO IL CERCHIETTO, CHE NON SI TOCCA: a 11px il
+  glifo ne riempiva il **38%** e non si leggeva; a 16 ne riempie il
+  **56%**. Ingrandire il CERCHIETTO costerebbe DUE volte — l'altezza
+  di ogni riga, perché è lui a dettarla, e l'aria del testo, che è la
+  risorsa scarsa — mentre a farsi vedere basta il glifo, che non costa
+  niente a nessuno dei due. E il segno ne esce RINFORZATO: contro la
+  freccia nuda da 12px del cassetto l'inchiostro passa da 9,4 a 14px.
   Due dettagli che vengono dal codice e non dall'intuito:
   `padding:24px 0 8px` e non i `16px var(--pad)` di serie (dentro
   `.form`, che ha già il suo padding laterale, il rientro si
   sommerebbe — è quel che fa il pannello admin), con l'aria SOTTO che
   serve perché il primo cassetto ha solo i suoi 10px di margine; e
   **`font:inherit` PRIMA dei longhand**, o la scorciatoia azzera corpo
-  e peso e il titolo torna a 15px EREDITATI lasciando `font-size:17px`
+  e peso e il titolo torna a 15px EREDITATI lasciando `font-size:18px`
   lì a dire il falso — la lezione già pagata da `.demo-cta`, e la
   tortura ci è passata attraverso finché la prova sull'ORDINE non è
   esistita.
@@ -26255,18 +26273,25 @@ IL LAMPO DICHIARATO NEL PIANO NON ESISTE, misurato e non supposto: 124
 campioni con la vista a schermo, e in tutti la sezione vuota era già
 spenta — il Profilo non è la vista d'ingresso, quindi quando ci si
 arriva i render sono già girati.
-Collaudato: 33 prove nuove (**7044 verdi** in modalità severa
-sull'albero ISOLATO dopo il giro della forma — è quello il numero
-difendibile: la cartella è condivisa, e il totale sul disco dipende
-da chi altro ci sta lavorando; col censimento che nessun cassetto resti fuori da
-una sezione e il banco node che fa GIRARE i quattro pezzi su un DOM di
-cartone) e **15 + 8 MUTAZIONI, tutte uccise**, una per riga
-sorvegliata; più il giro DAL VIVO col server vero su un database
-usa-e-getta a 320/360/375 nei due temi — 38 verifiche verdi sul primo
-giro e 108 sul secondo, zero errori JS: l'atterraggio sul cassetto
-profondo, il cassetto Tor nelle due facce, il caso SENZA indirizzo, la
-DEMO dove una sezione sparisce, e la regressione del ritorno da un
-annuncio (y=700 → y=700).
+Collaudato: 39 prove nuove (**7067 verdi** in modalità severa, col
+censimento che nessun cassetto resti fuori da una sezione e il banco
+node che fa GIRARE i quattro pezzi su un DOM di cartone) e **15 + 8 +
+12 MUTAZIONI, tutte uccise**, una per riga sorvegliata — fra cui la
+sola che dice se la cintura del tetto serve a qualcosa: chi cresce il
+corpo E AGGIORNA I LETTERALI delle prove, che è quel che si fa
+naturalmente (l'ho fatto io passando da 17 a 18) — lì le prove
+letterali seguono il codice e a fermare resta solo il tetto. Più il
+giro DAL VIVO col server vero su un database usa-e-getta a
+320/360/375 nei due temi — 38 + 108 verifiche verdi e poi le tre
+differenze rimisurate una per una, zero errori JS: l'atterraggio sul
+cassetto profondo, il cassetto Tor nelle due facce, il caso SENZA
+indirizzo, la DEMO dove una sezione sparisce, e la regressione del
+ritorno da un annuncio (y=700 → y=700).
+⚠️ E UNA SONDA HA MENTITO, la lezione del giro: la differenza della
+CARTA misurava «trasparente» per TUTTI E DUE i livelli — perché la
+carta è del contenitore `.acc` e io guardavo il suo header `.acc-h`,
+che di fondo non ne ha. Il codice era giusto e la misura no: una
+verifica che dice quel che non ti aspetti si guarda prima di crederle.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna rotta, nessuna leva nuova — e se `ONION_HOST` sul VPS è vuoto
 il cassetto semplicemente non compare. DA GUARDARE dal VPS, ed è il

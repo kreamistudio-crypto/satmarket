@@ -37555,8 +37555,8 @@ def prove_profilo_sezioni():
     # LA MISURA: il livello SOPRA dev'essere piu' grande di quello
     # sotto. Il cassetto sta a 15px, e prima del cantiere la sezione
     # stava a 11 — cioe' il contrario.
-    prova("la sezione e' piu' GRANDE del cassetto (17 contro 15)", True,
-          "font-size:17px" in titolo and "font-size:15px" in css[
+    prova("la sezione e' piu' GRANDE del cassetto (18 contro 15)", True,
+          "font-size:18px" in titolo and "font-size:15px" in css[
               css.index("  .acc-h{"):css.index("  .acc-h .em")])
     # IL COLORE: un comando non e' una nota di servizio.
     prova("e parla l'inchiostro, non il grigio", True,
@@ -37573,12 +37573,12 @@ def prove_profilo_sezioni():
           "background:none" in titolo and "var(--card)" not in titolo)
     # ⚠️ E `font:inherit` VIENE PRIMA dei longhand, o la scorciatoia
     # azzera corpo e peso e il titolo torna a 15px EREDITATI — la
-    # stringa `font-size:17px` resterebbe li' a dire il falso. E' la
+    # stringa `font-size:18px` resterebbe li' a dire il falso. E' la
     # lezione gia' pagata da .demo-cta, ed e' l'ordine che un riordino
     # sposta senza vederlo: la tortura ci e' passata attraverso finche'
     # questa riga non e' esistita.
     prova("...e font:inherit sta PRIMA del corpo, o lo azzera", True,
-          -1 < titolo.find("font:inherit") < titolo.find("font-size:17px"))
+          -1 < titolo.find("font:inherit") < titolo.find("font-size:18px"))
     # IL SEGNO DEL TOCCO: la freccia in un cerchietto di carta col
     # contorno, che il cassetto ce l'ha NUDA. Misurato a schermo: senza
     # il bordo il cerchietto non stacca dal crema della pagina.
@@ -37586,6 +37586,25 @@ def prove_profilo_sezioni():
           "border-radius:50%" in fr and "background:var(--card)" in fr)
     prova("...col contorno, o non stacca dal crema", True,
           "border:1.5px solid var(--field-line)" in fr)
+    # ⚠️ IL TETTO E' 19px, MISURATO sulla pagina vera: a 20 il titolo
+    # piu' lungo («Impostazioni di negozio») va a capo a 320px e il
+    # bottone passa da 60 a 90. Qui non si misura il testo — ci vuole
+    # un browser — si inchioda il NUMERO, che e' l'unica cosa che la
+    # CI puo' dire: chi cresce il corpo oltre il tetto lo sente subito
+    # invece di scoprirlo da uno screenshot.
+    _c = int(re.search(r"font-size:(\d+)px", titolo).group(1))
+    prova("il corpo del titolo resta sotto il tetto misurato (19)", True,
+          15 < _c <= 19)
+    # IL GLIFO DENTRO IL CERCHIETTO: a 11px ne riempiva il 38% e non si
+    # leggeva (segnalato dal campo). Non cresce il CERCHIETTO — quello
+    # costerebbe due volte, in altezza della riga e nell'aria del testo
+    # — ma il glifo, che e' quel che si guarda.
+    prova("e il glifo dentro il cerchietto si vede (16, non 11)", True,
+          "font-size:16px" in fr)
+    # E IL CERCHIETTO RESTA 28: e' lui a dettare l'altezza della riga
+    # (align-items:center), quindi crescerlo alzerebbe ogni titolo.
+    prova("...mentre il cerchietto resta 28, o la riga cresce", True,
+          "width:28px;height:28px" in fr)
     prova("mentre quella del cassetto resta nuda", True,
           "border-radius" not in css[css.index("  .acc-h .fr{"):
                                      css.index("  .acc.open .acc-h .fr")])
