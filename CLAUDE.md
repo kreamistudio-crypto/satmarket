@@ -25349,6 +25349,17 @@ banner subito dopo `mostraBanner`, quando la seconda mano non ci aveva
 ancora scritto.
 IN PRODUZIONE basta il deploy: solo client, e sul clearnet non cambia
 un byte.
+VERIFICATO DAL VIVO (ago 2026, Andrea su Tor Browser): «un bottone
+solo, 🟣 Entra con Nostr». La doppia porta e' chiusa in produzione e il
+testo senza il «…o» e' quello che si legge — non e' piu' da guardare.
+⚠️ E CONFERMA IL LATO CLIENT, NON TUTTO IL CANTIERE, ed e' la
+distinzione da non perdere: `suOnion()` nel client giudica
+`location.hostname` e NON passa da `ONION_HOST`, quindi quel bottone si
+comporta bene anche con la leva del server vuota. La FESSURA che toglie
+lo script di Telegram dipende invece da `ONION_HOST` nel config del
+VPS, e resta da guardare col pannello di rete aperto: **nessuna
+richiesta a telegram.org**. Chi legge «verificato su Tor» non concluda
+che sia confermata anche quella.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
