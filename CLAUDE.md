@@ -448,6 +448,84 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   fosse un rifiuto secco, cioè certificava il comportamento che ha
   fermato il venditore (il precedente è la sentinella del reaper sui
   'creato', e quella degli avatar).
+  E IL RIFIUTO DICE QUALE DIVIETO È SCATTATO (ago 2026, decisione di
+  Andrea): la lista dei nove non dice a chi legge quale delle nove
+  cose l'abbia fermato, e chi è stato bloccato per sbaglio non ha modo
+  di capirlo. Il divieto lo sappiamo SEMPRE — dal filtro parole è la
+  CATEGORIA del suo catalogo, dall'AI la famiglia che
+  `divieto_bloccante` ricava dal motivo — quindi si dice.
+  CON PAROLE NOSTRE E MAI QUELLE DEL MODELLO, ed è la riga da non
+  ammorbidire: il motivo lo scrive lui con parole sue e può essere
+  storto o confabulato («il titolo e la descrizione mancano» mentre il
+  titolo c'era), quindi resta ai moderatori nel registro. Al venditore
+  va l'ETICHETTA, che è un dato di casa.
+  LE QUATTRO FAMIGLIE DIVENTANO LA FONTE e le due liste si DERIVANO
+  (`DIVIETI_BLOCCANTI`): da due elenchi piatti si sa SE bloccare ma
+  non QUALE, ed è il patto di REGIONI/SIGLE_REGIONE — una fonte sola e
+  le derivate sotto. C'è la prova che le liste siano identiche a
+  quelle di ieri, prefissi NELL'ORDINE compreso: la derivazione non
+  deve poter perdere una parola per strada. `_vietato_bloccante` resta
+  ma diventa il ROVESCIO del giudice pieno (`bool(divieto_bloccante)`)
+  e non una seconda lettura della stessa lista, che due letture prima
+  o poi dicono due cose diverse sullo stesso motivo. A pari motivo che
+  ne nomina due vince la PRIMA del catalogo: deterministico, e non
+  cambia il blocco — cambia la parola che si legge.
+  E DICE LA STRADA, che è la metà che mancava davvero: il rifiuto era
+  l'unico esito della moderazione a non indicarne nessuna — la
+  revisione dice quanto aspettare, i servizi cosa riscrivere, e il no
+  secco era un muro da sei secondi. Adesso porta «riscrivilo più
+  chiaro e ripubblica» e, se il canale c'è, dove protestare.
+  LA FRASE AMMETTE CHE L'ERRORE PUÒ ESSERE NOSTRO, e non è cortesia:
+  un venditore onesto bloccato per una parola oggi non sa di poter
+  protestare, quindi non protesta, quindi NON LO SCOPRIAMO — l'unica
+  ragione per cui il caso «Sat's Oil» è arrivato fino a noi è che
+  quella persona ha scritto di sua iniziativa. È la valvola che rende
+  visibili i falsi positivi, e per questo vale più di un bottone che
+  sblocca.
+  IL MODELLO È `MSG_RIFIUTO_SERVIZI`, che la strada la dice già — e
+  per questo è l'unico ramo che NON prende il «riscrivi»: la stessa
+  cosa due volte a due righe di distanza è il registro che questo
+  progetto toglie (la lezione della coda «nel conto»). C'è la prova
+  che quel ramo tenga la sua coda diversa, o il primo riordino la
+  uniforma per simmetria.
+  IL CONTATTO SI PROMETTE SOLO SE C'È (`BANNER_TEST_LINK`, col calco
+  del messaggio dei moderatori — `startswith("http")`, così il
+  segnaposto del config non diventa un recapito): un «scrivici» dove
+  non c'è nessun canale è una porta su un muro.
+  IMPERFEZIONE DICHIARATA: nel toast il link NON è toccabile
+  (`toast` scrive col `textContent`, ed è giusto così — quel testo
+  arriva dal server). Chi vuole scrivere passa dalla fascia 🚧 in
+  fondo a Esplora, che porta allo stesso canale con un tocco; il
+  giorno che desse fastidio, la leva è rendere il rifiuto un foglio e
+  non un toast, non un innerHTML.
+  LA COMPOSIZIONE VIVE IN `messaggio_rifiuto` E IN NESSUN ALTRO
+  POSTO: i siti che rifiutano sono SEI (tre funzioni per due strati) e
+  una coda appesa da loro sarebbe sei posti da tenere in pari, col
+  settimo di domani che se ne dimentica. C'è il censimento che conta
+  zero rifiuti con la costante nuda e tre che passano la categoria.
+  E IL TESTO STA A SCHERMO QUANTO SERVE A LEGGERLO
+  (`tempoLettura`, client): il messaggio è passato da ~200 a ~400
+  caratteri e sei secondi non bastavano — un messaggio che non si
+  legge è un messaggio che non c'è. I 40 ms per carattere NON sono
+  inventati: sono il ritmo che il progetto aveva già scelto a mano
+  guardando lo schermo (il toast della prestazione in revisione, 304
+  caratteri in 12 secondi), e c'è la prova che li rilegge da lì invece
+  di ribatterli. Pavimento 6 secondi — gli errori corti non si
+  allungano di un millisecondo — e tetto 14, perché oltre un toast
+  smette di essere un avviso e diventa un ostacolo.
+  QUEL CHE NON SI È FATTO, e la ragione (decisione di Andrea): NIENTE
+  VALVOLA per sbloccare un annuncio fermato dalle quattro famiglie. Il
+  blocco secco alza PRIMA di toccare il database — non c'è una riga,
+  un id, uno stato, e nemmeno la descrizione (il registro tiene il
+  titolo a 120 caratteri e il motivo a 200) — quindi non è che manchi
+  il bottone: manca l'OGGETTO, e le valvole di feedback e categorie
+  non sono ricalcabili perché là una riga c'è. Far nascere in
+  revisione anche i «vietato» costerebbe poco codice e rovescerebbe
+  una decisione: in revisione l'annuncio è invisibile ma SCRITTO nel
+  nostro database, e per armi o droghe «invisibile ma salvato» e «mai
+  esistito» non sono la stessa cosa. La leva che resta è quella già
+  dichiarata — «la lista si accorcia, non si allunga» — e adesso i
+  falsi positivi si vengono a sapere, che era il pezzo mancante.
   Terza via della moderazione (lug 2026, decisione di Andrea: basta
   blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
   verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
@@ -24675,6 +24753,53 @@ Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
+
+Il rifiuto dice quale divieto è scattato, e cosa fare (ago 2026,
+decisione di Andrea da un caso vero: un annuncio bloccato dall'AI e
+nessuna strada per protestare). Il messaggio adesso porta le tre cose
+che gli mancavano — QUALE dei nove divieti l'ha fermato, che si può
+riscrivere e ripubblicare, e dove scrivere se l'errore è nostro — col
+modello di `MSG_RIFIUTO_SERVIZI`, che la strada la diceva già. Le
+quattro famiglie diventano la FONTE (`DIVIETI_BLOCCANTI`) e le due
+liste si derivano da lei, così la domanda «quale?» ha una risposta
+invece di essere un `any()` su un elenco piatto. Vedi Architettura,
+«E IL RIFIUTO DICE QUALE DIVIETO È SCATTATO», per le parole NOSTRE e
+mai quelle del modello, per il ramo dei servizi che NON prende il
+«riscrivi» (la strada la dice già), e soprattutto per QUEL CHE NON SI
+È FATTO: nessuna valvola per sbloccare i «vietato», perché lì non
+manca il bottone — manca l'oggetto, e far nascere in revisione anche
+armi e droghe vorrebbe dire tenerle SCRITTE nel database.
+LA DIAGNOSI VALE PIÙ DELLA CURA, ed è la parte da ricordare: non
+esiste un solo «blocco dell'AI». Se il motivo nomina una delle quattro
+famiglie il rifiuto è secco e non lascia NIENTE — la riga non nasce,
+l'`HTTPException` alza prima del `db()` — mentre tutto il resto era
+già in coda dal cantiere «l'AI segnala, non decide». A distinguerli
+nel registro è `esito`: 'vietato' è il secco, 'dubbio' è la coda.
+Collaudato: 6760 prove verdi (le nuove: la derivazione identica a
+ieri coi prefissi nell'ordine, il giudice girato sui suoi dieci casi,
+il censimento dei sei siti, e le tre cose guardate una per una sul
+testo che il venditore legge) più DIECI prove che hanno CAMBIATO LATO
+col perché scritto — certificavano il messaggio SENZA la strada, cioè
+il muro — e **15 MUTAZIONI, 15 uccise**, una per riga sorvegliata.
+LA TORTURA HA TROVATO IL BUCO CHE LA RILETTURA NON VEDEVA: il ramo del
+FILTRO PAROLE — quello che serve i tre quarti dei rifiuti, perché
+viene prima dell'AI — non aveva NESSUNA prova sul testo che compone,
+e la sua coda si poteva togliere senza far diventare rossa una riga.
+Tutte le prove passavano dal ramo dell'AI. Adesso ha le sue due.
+E IL BANCO HA MENTITO DUE VOLTE, tutte e due lezioni già a verbale:
+la tortura girata sui file VERI ha lasciato una mutazione su
+`server.py` quando il timeout ha ucciso il processo prima del
+`finally` (si tortura su una COPIA nello scratchpad, sempre), e nella
+copia lo script di tortura messo nella radice faceva scattare
+`prove_script_nel_workflow` — «1 rossa a codice intatto», cioè un
+banco che non si può credere.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache riceve
+comunque il testo nuovo (viene dal server), solo col tempo di lettura
+di ieri. DA GUARDARE al primo giro: il primo rifiuto vero dentro
+Telegram — che dica la famiglia giusta e che il canale sia quello del
+config — e il registro, per vedere se i falsi positivi cominciano ad
+arrivare adesso che si possono segnalare.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
