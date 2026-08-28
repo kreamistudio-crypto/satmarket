@@ -1403,6 +1403,36 @@ def prove_ricategorizza():
     prova("...con la coppia consulenza/hardware wallet", True,
           "Una consulenza su bitcoin e' «Lezioni e corsi»" in ric.PROMPT
           and "un hardware wallet e' «Bitcoin»" in ric.PROMPT)
+    # IL QUARTO GIRO (ago 2026, dal campo: un abbonamento Spotify in
+    # «Informatica»). Il buco non era una regola sbagliata ma una
+    # regola ASSENTE: «Buoni ed esperienze» era nell'elenco delle
+    # categorie ammesse e nessuna riga ci portava. Questa prova e'
+    # anche il censimento che lo impedisce di nuovo — se un domani
+    # una categoria nuova restasse senza una riga sua, e' qui che si
+    # viene a leggere perche'.
+    prova("i crediti hanno la loro regola (il quarto giro)", True,
+          "Un CREDITO da spendere presso un altro e' «Buoni ed "
+          "esperienze»" in ric.PROMPT)
+    # La coppia che insegna il confine, come le due magliette: un
+    # riordino la toglierebbe per prima sembrando una ripetizione.
+    prova("...con la coppia abbonamento/corso", True,
+          "Un abbonamento Spotify di 3 mesi e' «Buoni ed esperienze»"
+          in ric.PROMPT
+          and "un corso di chitarra di 3 mesi e' «Lezioni e corsi»"
+          in ric.PROMPT)
+    # LA CONTRO-REGOLA E' LA META' CHE CONTA, ed e' la gemella di
+    # quella di Bitcoin («MA il tema dev'essere L'OGGETTO»): senza,
+    # «credito» assorbe tutto cio' che arriva come codice — licenze e
+    # videogiochi compresi — e il reparto smette di dire qualcosa.
+    # Le due punte si guardano separate: nominate insieme in un `and`
+    # unico, la mutazione che ne toglie una sola resterebbe verde.
+    prova("...e il credito dev'essere il PRODOTTO", True,
+          "MA il credito dev'essere il PRODOTTO" in ric.PROMPT)
+    prova("...con la punta della licenza", True,
+          "una licenza Office e' «Informatica»" in ric.PROMPT)
+    prova("...e quella del videogioco", True,
+          "la chiave di un videogioco e' «Console e videogiochi»"
+          in ric.PROMPT)
 
 
 # ====================================================================
@@ -1420,8 +1450,8 @@ def prove_collaudo_ricategorizza():
     import ricategorizza as ric
     cat = ric.catalogo()
 
-    prova("i quattordici casi ci sono (piano + secondo e terzo giro)",
-          True, len(cr.CASI) >= 14)
+    prova("i diciannove casi ci sono (piano + dal secondo al quarto giro)",
+          True, len(cr.CASI) >= 19)
     prova("ogni «ora sta in» e' una categoria vera del catalogo", [],
           [t for t, _, ora, _, _ in cr.CASI if ora not in cat])
     prova("ogni atteso e' una categoria vera del catalogo", [],
@@ -1457,6 +1487,31 @@ def prove_collaudo_ricategorizza():
           any(t.startswith("Consulenza sui wallet")
               and ora == "Bitcoin" and att == "Lezioni e corsi"
               for t, _, ora, att, _ in cr.CASI))
+    # Il quarto giro, ancorato al caso di campo per NOME come i due
+    # sopra: la gemella del Game Pass terrebbe verde un any() generico
+    # su «Buoni ed esperienze» anche con l'atteso dello Spotify
+    # riscritto.
+    prova("l'abbonamento Spotify esce da Informatica (quarto giro)",
+          True, any(t.startswith("Abbonamento Spotify")
+                    and ora == "Informatica"
+                    and att == "Buoni ed esperienze"
+                    for t, _, ora, att, _ in cr.CASI))
+    # LE DUE PUNTE AFFILATE della contro-regola: stanno in «Buoni ed
+    # esperienze» e devono USCIRNE, ognuna verso la sua categoria.
+    # Senza, «credito» diventerebbe «tutto quello che arriva come
+    # codice» — la stessa funzione che la maglietta qualunque ha per
+    # il reparto tematico.
+    prova("...e la licenza software ne esce verso Informatica", True,
+          any(ora == "Buoni ed esperienze" and att == "Informatica"
+              for _, _, ora, att, _ in cr.CASI))
+    prova("...e la chiave del gioco verso Console e videogiochi", True,
+          any(ora == "Buoni ed esperienze"
+              and att == "Console e videogiochi"
+              for _, _, ora, att, _ in cr.CASI))
+    prova("...mentre il buono vero ci RESTA", True,
+          any(ora == "Buoni ed esperienze"
+              and att == "Buoni ed esperienze"
+              for _, _, ora, att, _ in cr.CASI))
     # Il collaudo usa i pezzi VERI: un prompt in due copie e' un
     # prompt che diverge, e una copia di chiedi() pure.
     src = open("collaudo_ricategorizza.py", encoding="utf-8").read()

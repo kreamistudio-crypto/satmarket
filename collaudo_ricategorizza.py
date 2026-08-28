@@ -137,6 +137,45 @@ CASI = [
      "la gemella su un ALTRO tema: se cade solo questa, la cura ha "
      "imparato «bitcoin» invece della regola delle prestazioni"),
 
+    # --- il quarto giro (ago 2026, dal campo): un abbonamento
+    #     Spotify in «Informatica». Il prompt non nominava «Buoni ed
+    #     esperienze» da nessuna parte — la categoria era ammessa e
+    #     nessuna regola ci portava — quindi un codice da riscattare
+    #     finiva dove capitava. Il criterio e' COSA SI COMPRA: un
+    #     credito da spendere altrove.
+    ("Abbonamento Spotify Premium 3 mesi",
+     "Codice da riscattare sul sito, valido per nuovi account.",
+     "Informatica", "Buoni ed esperienze",
+     "il caso vero del quarto giro: e' un credito da riscattare "
+     "altrove — sta in «Informatica» e deve USCIRNE"),
+    ("Game Pass Ultimate, 1 mese",
+     "Codice digitale, lo mando dopo il pagamento.",
+     "Console e videogiochi", "Buoni ed esperienze",
+     "la gemella con altre parole e da un'altra categoria: se cade "
+     "solo questa, la cura ha imparato «Spotify» invece della regola "
+     "del credito"),
+    # LE DUE PUNTE DELLA CONTRO-REGOLA («MA il credito dev'essere il
+    # PRODOTTO»), affilate come la maglietta qualunque: stanno in
+    # «Buoni ed esperienze» e devono USCIRNE. Ce ne vogliono DUE
+    # perche' la contro-regola nomina due casi: con una sola, la
+    # mutazione che ne toglie meta' non fa rossa nessuna riga.
+    ("Licenza Office 2021 Professional Plus",
+     "Chiave di attivazione permanente per un PC, fattura inclusa.",
+     "Buoni ed esperienze", "Informatica",
+     "AFFILATO: si compra il prodotto software, non un credito da "
+     "spendere. Senza questo caso «credito» diventerebbe «tutto "
+     "quello che arriva come codice»"),
+    ("Elden Ring, chiave Steam",
+     "Codice riscattabile su Steam, regione Europa.",
+     "Buoni ed esperienze", "Console e videogiochi",
+     "la seconda punta: il gioco e' il prodotto, e il codice e' solo "
+     "come arriva — sorveglia l'altra meta' della contro-regola"),
+    ("Buono regalo Zalando da 50 €",
+     "Tessera fisica mai usata, la spedisco o mando il codice.",
+     "Buoni ed esperienze", "Buoni ed esperienze",
+     "regressione della cura: il buono vero ci RESTA, e il fatto che "
+     "sia una tessera da spedire non lo sposta"),
+
     # --- le regressioni: il file guarda tutto il prompt, non solo
     #     la cura -----------------------------------------------------
     ("Portatile Dell i5",

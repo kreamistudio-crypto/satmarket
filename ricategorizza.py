@@ -152,6 +152,30 @@ PROMPT = (
     "su commissione — la categoria e' «Lezioni e corsi» o «Lavoro e "
     "servizi», qualunque sia l'argomento. Una consulenza su bitcoin "
     "e' «Lezioni e corsi», un hardware wallet e' «Bitcoin».\n"
+    # IL QUARTO GIRO (ago 2026, dal campo: un abbonamento Spotify in
+    # «Informatica»). Il prompt non nominava «Buoni ed esperienze» in
+    # NESSUNA riga: la categoria era nell'elenco ammesso e nessuna
+    # regola ci portava, quindi un codice da riscattare non aveva una
+    # casa e finiva dove capitava — «Informatica» perche' suona
+    # digitale, o «Lavoro e servizi» perche' la parola «servizio»
+    # tirava. Il criterio e' COSA SI COMPRA, non com'e' fatto: un
+    # credito da spendere altrove, non un oggetto e non il lavoro di
+    # chi vende. La contro-regola («MA il credito dev'essere il
+    # PRODOTTO») e' la gemella di quella di Bitcoin: senza, il
+    # reparto assorbirebbe tutto il digitale, licenze e videogiochi
+    # compresi.
+    "- Un CREDITO da spendere presso un altro e' «Buoni ed "
+    "esperienze»: gift card, buoni acquisto, voucher, abbonamenti a "
+    "piattaforme. A decidere e' cosa si compra — un credito da "
+    "riscattare altrove, non un oggetto e non una prestazione di chi "
+    "vende: non e' «Informatica», che vuole un computer o una "
+    "periferica, e non e' «Lavoro e servizi», dove sta il lavoro che "
+    "fa CHI VENDE. Un abbonamento Spotify di 3 mesi e' «Buoni ed "
+    "esperienze», un corso di chitarra di 3 mesi e' «Lezioni e "
+    "corsi». MA il credito dev'essere il PRODOTTO: quando si compra "
+    "la cosa e non un credito vale la sua categoria, anche se arriva "
+    "come codice — una licenza Office e' «Informatica», la chiave di "
+    "un videogioco e' «Console e videogiochi».\n"
     "- «Informatica» e' per computer, portatili, componenti e "
     "periferiche; «Telefonia» per telefoni e accessori; «Elettronica» "
     "resta per il resto.\n"
