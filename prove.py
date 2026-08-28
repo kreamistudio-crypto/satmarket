@@ -20989,6 +20989,23 @@ def prove_onion():
         for _nome, _atteso, _avuto in _banco:
             prova(_nome, _atteso, _avuto)
 
+    # E IL VESTITO DEL BOTTONE, che e' l'altra meta' del difetto dal
+    # campo (ago 2026, «il pallino viola sembra fuori posto»): la
+    # classe `.demo-cta` la vestono un <a> e due <button>, e un
+    # <button> NON EREDITA il font — misurato a schermo, il fratello
+    # usciva in Nunito e i due bottoni in ARIAL, con la riga alta 30px
+    # invece di 31,5. `font:inherit` e' la stessa riga che `.btn`
+    # porta per tutti i bottoni di casa, e chiude in un colpo famiglia,
+    # line-height e il resto che un <button> si perde.
+    _cta = mini[mini.find("  .demo-cta{"):]
+    _cta = _cta[:_cta.find("}")]
+    prova("il bottone del banner eredita il font di casa", True,
+          "font:inherit" in _cta)
+    # e VIENE PRIMA dei due longhand, o la scorciatoia `font` li
+    # azzererebbe: e' l'ordine che un riordino sposta senza vederlo
+    prova("...prima del peso e del corpo, o li azzererebbe", True,
+          -1 < _cta.find("font:inherit") < _cta.find("font-weight:800"))
+
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
     # ha il tg_id POSITIVO e senza questa riga prenderebbe il ramo che

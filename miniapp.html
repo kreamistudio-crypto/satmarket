@@ -4012,10 +4012,21 @@
   .demo-x{position:absolute;top:6px;right:8px;border:0;background:none;
     color:#fff;font-size:14px;font-weight:800;cursor:pointer;
     padding:6px;line-height:1;opacity:.85}
+  /* IL `font:inherit` NON E' UN ORNAMENTO, ed e' la stessa riga che
+     `.btn` porta per tutti i bottoni di casa: questa classe la vestono
+     un <a> (il link al bot) e due <button> (Nostr, Esci), e un
+     <button> NON EREDITA il font — ne' la famiglia ne' la
+     line-height. Misurato: il fratello <a> usciva in Nunito e i due
+     bottoni in ARIAL, con la riga alta 30px invece di 31,5. Era
+     l'unico testo dell'app scritto in un font che non e' di casa, e
+     sul telefono (dove quel ripiego e' un altro font ancora) il 🟣 si
+     leggeva fuori posto — difetto dal campo, ago 2026. Va PRIMA dei
+     due longhand, che la scorciatoia `font` li azzererebbe. */
   .demo-cta{
     display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
     text-decoration:none;border-radius:999px;padding:6px 15px;
-    font-weight:800;font-size:13px;box-shadow:0 2px 0 var(--sats-deep);
+    font:inherit;font-weight:800;font-size:13px;
+    box-shadow:0 2px 0 var(--sats-deep);
   }
 
   /* ==================== DESKTOP (≥768px) ====================
