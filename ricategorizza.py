@@ -164,18 +164,41 @@ PROMPT = (
     # PRODOTTO») e' la gemella di quella di Bitcoin: senza, il
     # reparto assorbirebbe tutto il digitale, licenze e videogiochi
     # compresi.
+    # E IL PRIMO GIRO VERO HA PAGATO SUBITO (ago 2026): 18/19 DUE
+    # VOLTE, a cadere sempre e solo il GAME PASS — «Console e
+    # videogiochi» invece di «Buoni ed esperienze». Non era il
+    # modello a disobbedire: e' la stessa forma della SACCA. La
+    # regola diceva «abbonamenti a piattaforme» ma il suo unico
+    # ESEMPIO era Spotify, cioe' musica, mentre la contro-regola
+    # aveva un esempio esplicito di videogiochi — quindi su quel
+    # terreno l'unico appiglio diceva «Console e videogiochi», e
+    # Game Pass cade esattamente sulla linea di frattura fra la
+    # regola e la sua contro-regola (e' un abbonamento a una
+    # piattaforma DI VIDEOGIOCHI). Due cure mirate: la regola dice
+    # che vale su QUALUNQUE argomento, e la contro-regola stringe
+    # dal generico al singolo («la chiave di UN videogioco») con la
+    # distinzione fra la COSA e l'ACCESSO. NESSUN marchio nuovo nel
+    # prompt, ed e' la riga da non ammorbidire: scrivendoci «Game
+    # Pass» il caso del collaudo diventerebbe una tautologia — la
+    # lezione della birra, dove il modello impara il nome invece
+    # della regola. A dirlo c'e' la gemella PS Plus, che il prompt
+    # non nomina.
     "- Un CREDITO da spendere presso un altro e' «Buoni ed "
     "esperienze»: gift card, buoni acquisto, voucher, abbonamenti a "
-    "piattaforme. A decidere e' cosa si compra — un credito da "
-    "riscattare altrove, non un oggetto e non una prestazione di chi "
-    "vende: non e' «Informatica», che vuole un computer o una "
-    "periferica, e non e' «Lavoro e servizi», dove sta il lavoro che "
-    "fa CHI VENDE. Un abbonamento Spotify di 3 mesi e' «Buoni ed "
-    "esperienze», un corso di chitarra di 3 mesi e' «Lezioni e "
-    "corsi». MA il credito dev'essere il PRODOTTO: quando si compra "
-    "la cosa e non un credito vale la sua categoria, anche se arriva "
-    "come codice — una licenza Office e' «Informatica», la chiave di "
-    "un videogioco e' «Console e videogiochi».\n"
+    "piattaforme — QUALUNQUE sia l'argomento: musica, video, "
+    "videogiochi, software. A decidere e' cosa si compra — un "
+    "credito da riscattare altrove, non un oggetto e non una "
+    "prestazione di chi vende: non e' «Informatica», che vuole un "
+    "computer o una periferica, e non e' «Lavoro e servizi», dove "
+    "sta il lavoro che fa CHI VENDE. Un abbonamento Spotify di 3 "
+    "mesi e' «Buoni ed esperienze», un corso di chitarra di 3 mesi "
+    "e' «Lezioni e corsi». MA il credito dev'essere il PRODOTTO: "
+    "quando si compra la cosa e non un credito vale la sua "
+    "categoria, anche se arriva come codice — una licenza Office e' "
+    "«Informatica», la chiave di UN videogioco e' «Console e "
+    "videogiochi». La differenza e' fra la COSA e l'ACCESSO, mai "
+    "fra i reparti: la chiave di un gioco e' quel gioco, un "
+    "abbonamento che apre un CATALOGO resta un credito.\n"
     "- «Informatica» e' per computer, portatili, componenti e "
     "periferiche; «Telefonia» per telefoni e accessori; «Elettronica» "
     "resta per il resto.\n"

@@ -1431,8 +1431,31 @@ def prove_ricategorizza():
     prova("...con la punta della licenza", True,
           "una licenza Office e' «Informatica»" in ric.PROMPT)
     prova("...e quella del videogioco", True,
-          "la chiave di un videogioco e' «Console e videogiochi»"
+          "la chiave di UN videogioco e' «Console e videogiochi»"
           in ric.PROMPT)
+    # IL PRIMO GIRO VERO (ago 2026): 18/19 due volte, a cadere sempre
+    # e solo il Game Pass. La regola diceva «abbonamenti a
+    # piattaforme» col solo esempio Spotify — musica — mentre la
+    # contro-regola aveva un esempio esplicito di videogiochi: sul
+    # terreno dei giochi l'unico appiglio diceva «Console e
+    # videogiochi». E' la forma della SACCA, e la cura e' mirata
+    # come quella: la regola vale su qualunque argomento, la
+    # contro-regola stringe sul gioco SINGOLO.
+    prova("gli abbonamenti valgono su ogni argomento (il quinto giro)",
+          True, "QUALUNQUE sia l'argomento: musica, video, "
+                "videogiochi, software" in ric.PROMPT)
+    prova("...e la differenza e' fra la COSA e l'ACCESSO", True,
+          "La differenza e' fra la COSA e l'ACCESSO" in ric.PROMPT
+          and "un abbonamento che apre un CATALOGO resta un credito"
+          in ric.PROMPT)
+    # LA RIGA DA NON AMMORBIDIRE: nel prompt non entra nessun marchio
+    # dei due casi di collaudo, o quei casi diventano tautologie —
+    # il modello imparerebbe il nome invece della regola (la lezione
+    # della birra, gia' pagata dal secondo giro).
+    prova("il prompt non nomina i marchi dei casi (mai tautologie)",
+          [], [m for m in ("Game Pass", "PlayStation", "PS Plus",
+                           "Netflix", "Elden Ring", "Zalando", "Steam")
+               if m in ric.PROMPT])
 
 
 # ====================================================================
@@ -1450,8 +1473,8 @@ def prove_collaudo_ricategorizza():
     import ricategorizza as ric
     cat = ric.catalogo()
 
-    prova("i diciannove casi ci sono (piano + dal secondo al quarto giro)",
-          True, len(cr.CASI) >= 19)
+    prova("i venti casi ci sono (piano + dal secondo al quinto giro)",
+          True, len(cr.CASI) >= 20)
     prova("ogni «ora sta in» e' una categoria vera del catalogo", [],
           [t for t, _, ora, _, _ in cr.CASI if ora not in cat])
     prova("ogni atteso e' una categoria vera del catalogo", [],
@@ -1512,6 +1535,28 @@ def prove_collaudo_ricategorizza():
           any(ora == "Buoni ed esperienze"
               and att == "Buoni ed esperienze"
               for _, _, ora, att, _ in cr.CASI))
+    # IL QUINTO GIRO: il Game Pass e' caduto due volte, quindi
+    # diventa regressione permanente — e vuole la sua gemella,
+    # perche' la cura ha dovuto toccare proprio il terreno dei
+    # videogiochi. Ancorate per NOME come il Sat's Oil: con un any()
+    # generico su «Buoni ed esperienze» una terrebbe verde l'altra.
+    prova("il Game Pass esce da Console e videogiochi (quinto giro)",
+          True, any(t.startswith("Game Pass")
+                    and ora == "Console e videogiochi"
+                    and att == "Buoni ed esperienze"
+                    for t, _, ora, att, _ in cr.CASI))
+    prova("...e la sua gemella che il prompt non nomina", True,
+          any(t.startswith("PlayStation Plus")
+              and ora == "Console e videogiochi"
+              and att == "Buoni ed esperienze"
+              for t, _, ora, att, _ in cr.CASI))
+    # E la punta che NON si deve allargare: il gioco singolo resta
+    # un prodotto. Se cadesse anche lei, la cura avrebbe fatto
+    # collassare la contro-regola.
+    prova("...mentre la chiave di UN gioco resta un prodotto", True,
+          any(t.startswith("Elden Ring")
+              and att == "Console e videogiochi"
+              for t, _, _, att, _ in cr.CASI))
     # Il collaudo usa i pezzi VERI: un prompt in due copie e' un
     # prompt che diverge, e una copia di chiedi() pure.
     src = open("collaudo_ricategorizza.py", encoding="utf-8").read()

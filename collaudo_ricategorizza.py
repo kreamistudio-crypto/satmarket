@@ -151,9 +151,21 @@ CASI = [
     ("Game Pass Ultimate, 1 mese",
      "Codice digitale, lo mando dopo il pagamento.",
      "Console e videogiochi", "Buoni ed esperienze",
-     "la gemella con altre parole e da un'altra categoria: se cade "
-     "solo questa, la cura ha imparato «Spotify» invece della regola "
-     "del credito"),
+     "REGRESSIONE PERMANENTE — la gemella da un'ALTRA categoria, ed e' "
+     "CADUTA DUE VOLTE al primo giro vero (18/19, «Console e "
+     "videogiochi»): la regola diceva «abbonamenti a piattaforme» ma "
+     "il suo unico esempio era Spotify, cioe' musica, mentre la "
+     "contro-regola ne aveva uno esplicito di videogiochi — e questo "
+     "caso sta sulla linea di frattura fra le due. Da qui il "
+     "«QUALUNQUE sia l'argomento» e la chiave di UN videogioco"),
+    ("PlayStation Plus Extra, 12 mesi",
+     "Codice per il rinnovo, catalogo giochi incluso.",
+     "Console e videogiochi", "Buoni ed esperienze",
+     "LA GEMELLA DELLA GEMELLA, e serve perche' la cura ha dovuto "
+     "toccare il terreno dei videogiochi: il prompt NON nomina ne' "
+     "Game Pass ne' PS Plus, quindi se cadesse solo questa vorrebbe "
+     "dire che il modello ha imparato il nome del caso invece della "
+     "distinzione fra la COSA e l'ACCESSO — la lezione della birra"),
     # LE DUE PUNTE DELLA CONTRO-REGOLA («MA il credito dev'essere il
     # PRODOTTO»), affilate come la maglietta qualunque: stanno in
     # «Buoni ed esperienze» e devono USCIRNE. Ce ne vogliono DUE
