@@ -18449,34 +18449,98 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   375: il testo sta su una riga a tutte e tre) e la `line-height` da
   sola (con l'1.5 il bottone torna alto come il fratello, ma il 🟣
   resta senza aria SOPRA: e' il font, non l'interlinea).
-  E IL FONT NON BASTAVA (ago 2026, secondo giro dal campo): col font
-  giusto il 🟣 restava «tondo da una parte e tagliato dritto
-  dall'altra». QUELLA DESCRIZIONE E' LA DIAGNOSI, ed e' il pezzo da
-  tenere: un clip che rispetta il `border-radius` taglia CURVO, quindi
-  a mordere e' il CONTENT BOX, che gli angoli tondi non ce li ha — in
-  WebKit un <button> ritaglia il proprio contenuto. E il fatto stesso
-  che tagli lo conferma dall'altro lato: il glifo distava 6px dal
-  bordo della pillola, quindi un clip al padding box non l'avrebbe
-  nemmeno sfiorato.
-  L'INCHIOSTRO NON E' LA SCATOLA, ed e' la misura che spiega perche'
-  su Chrome non si vede niente: `measureText` da' l'ink vero
-  (`actualBoundingBox*`), e col ripiego di Windows il 🟣 a 13px sta a
-  12px sopra la baseline dentro una scatola che ne dichiara 13 — ci
-  sta. Le emoji di Apple la sfondano, e con ZERO aria sopra il taglio
-  cade dritto.
-  LA CURA HA DUE GAMBE perche' da qui non si puo' provare quale morda,
-  e vanno tenute tutte e due: `overflow:visible` toglie il ritaglio
-  dove WebKit onora l'override, e L'ARIA lo rende innocuo dove non lo
-  onora. L'aria si sposta dal PADDING — che sta fuori dal clip — al
-  LINE BOX, che ci sta dentro: `line-height:2` con 3px invece di 6
-  lascia l'altezza dov'era (32 contro 31,5, misurato) e da' al glifo
-  4px sopra invece di zero. ⚠️ I tre valori si muovono INSIEME: da
-  soli si annullano, e chi ne ritocca uno li rimisuri tutti.
-  E LA RIGA DELL'OVERFLOW ERA STATA TOLTA APPOSTA il giro prima, con
-  la ragione giusta — «una guardia che nessuno esercita e' peggio di
-  niente» — e il campo l'ha esercitata il giorno dopo. Non e' un
-  ripensamento: e' la regola che vale finche' non c'e' il caso, e il
-  caso adesso c'e'.
+  E IL FONT NON BASTAVA: TAGLIA GECKO (ago 2026, cinque banchi e tre
+  giri dal campo). Col font giusto il 🟣 restava tagliato, e la
+  risposta l'ha data la MISURA piu' semplice: **la stessa pagina, sullo
+  STESSO telefono, si vede pulita con Chrome e tagliata con Tor
+  Browser**. Quindi non e' il sistema, non e' il glifo, non e' il font:
+  e' Gecko contro Blink.
+  QUEL CHE RESTA IGNOTO SI DICHIARA, ed e' la meta' onesta: cosa
+  esattamente ritagli dentro quella pillola non lo sappiamo, e la cura
+  non dipende dal saperlo — sopravvive UNA cosa sola, e quella si usa.
+  LA DIAGNOSI E' PER ESCLUSIONE, e vale piu' della cura perche' e' il
+  metodo: dieci righe a grandezza VERA (nessuna lente), lo stesso
+  bottone con una cosa cambiata alla volta, aperte da Andrea su Tor
+  Browser. Il glifo FUORI da un bottone e' pulito e dentro no → non e'
+  il glifo; a 13px fuori e' pulito → non e' la misura; con
+  `line-height:normal` taglia → non e' l'interlinea; dentro un `<div
+  role="button">` taglia uguale → non e' l'elemento `<button>`; col
+  font di sistema taglia dentro e non fuori → non e' il font. Dentro la
+  pillola sopravvive solo il **disegno**.
+  LA CURA E' UN CERCHIO SVG, e le tre leve del giro prima sono state
+  TOLTE: `overflow:visible`, `line-height:2` e il `padding:3px` non
+  curavano niente — erano mirate al content box, che era la diagnosi
+  sbagliata — e restare li' a promettere una cosa che non fanno e' il
+  difetto che questo progetto toglie per regola. C'e' la prova che non
+  tornino, e quelle di ieri hanno CAMBIATO LATO col perche' scritto.
+  `font:inherit` invece RESTA: quella cura era vera e misurata (un
+  <button> non eredita il font, e usciva in Arial), ed e' un'altra
+  cosa.
+  IL GIUDICE E' UNO, `etichettaNostr`, con `ICO_NOSTR` accanto: i siti
+  che scrivono quell'etichetta sono TRE — il banner della vetrina, il
+  foglio invito, il menu account — e tre copie a mano vorrebbero dire
+  che la prossima cura ne cura due. I tre passano da `innerHTML` e non
+  piu' da `textContent`, e c'e' il censimento che li conta.
+  IL PALLINO E' VIOLA PER TOKEN E MAI `currentColor`, ed e' la
+  differenza con `ICO_LOCKER` che sta due righe piu' su: quella e'
+  un'icona di SERVIZIO e si accende col testo, questa e' un MARCHIO —
+  con `currentColor` diventerebbe marrone sulla pillola e crema sul
+  ghost, cioe' smetterebbe di essere il pallino di Nostr. Segue il tema
+  (#8B5CF6 di giorno, #A78BFA di sera): si abbassa la luce, non si
+  cambia il segno.
+  E LA MISURA E' IN `em`, MAI UN PX FISSO: i tre bottoni hanno tre
+  corpi diversi — 13px la pillola del banner, 15.5 i due `.btn` — e un
+  px darebbe il disegno grande sul piccolo e piccolo sul grande.
+  MISURATO dal vivo: 14,9px nel banner e 17,8 nel foglio, cioe' 1.15em
+  in tutti e due. C'e' la prova, ed e' nata dalla tortura: quella riga
+  non la guardava nessuno.
+  IL PERIMETRO E' STRETTO APPOSTA (decisione di Andrea): si curano le
+  TRE PORTE — quelle che chi arriva da Tor deve toccare, perche' su
+  onion Nostr e' l'unica — e restano col glifo i tre bottoni di dentro
+  («salva la npub», i due ponti, il collaudo), che si incontrano solo
+  dopo aver gia' scelto. C'e' il CENSIMENTO che li conta: se il numero
+  sale, qualcuno ha aggiunto una porta col glifo copiato a mano.
+  E IL PROBLEMA E' PIU' LARGO DI QUESTO PALLINO, misurato e non
+  stimato: dentro un `<button>` il client ha **357 occorrenze di emoji
+  su 85 glifi diversi**, e su Gecko sono tagliate tutte. Si NOTA solo
+  questa perche' e' un cerchio PIENO che riempie la cella — un 🔔 o un
+  ⚡ perdono un pixel di contorno e nessuno se ne accorge. Curarle
+  tutte vorrebbe dire 85 disegni: il giorno che un altro glifo si
+  facesse notare, la strada e' questa.
+  «E ALLORA NON SI CURA SOLO SU TOR?» (domanda di Andrea, e la risposta
+  e' NO): **il difetto non e' di Tor, e' di Gecko** — Tor Browser e'
+  Gecko, ma lo e' anche FIREFOX, che apre barattolo.store dal dominio
+  normale. Un ramo su `suOnion()` lascerebbe il pallino tagliato a ogni
+  utente Firefox del clearnet, cioe' al pubblico che non abbiamo
+  misurato, e vorrebbe dire due rese dello stesso bottone da tenere in
+  pari per sempre. La cura piena costa zero: su Blink il disegno si
+  vede identico al glifo.
+  IL BANCO HA MENTITO TRE VOLTE SU CINQUE, ed e' la lezione del giro.
+  1) LA LENTE FABBRICAVA IL DIFETTO: `overflow:hidden; height:120px`
+  con dentro un `transform:scale(6)` tagliava OGNI caso in fondo — e
+  per giunta `scale` ridisegna il testo alla misura finale, quindi una
+  lente non puo' MAI mostrare un difetto di rendering a 13px. I bottoni
+  a grandezza vera nello stesso banco erano tutti puliti, e a dirlo e'
+  stato Andrea guardandoli. 2) IL BANCO SENZA IL FONT non riproduceva
+  niente: mancava Nunito, che il banco non poteva chiedere a Google
+  (CSP) e che si e' dovuto incorporare come data URI. 3) E un banco
+  aperto dal PC non dice niente su un difetto che vive su un motore
+  che il PC non ha. Chi rifa' un banco per un difetto di RESA: niente
+  lenti, il font vero dentro, e aperto sul dispositivo che lo mostra.
+  PROVATO: 15 mutazioni, 15 uccise, una per riga sorvegliata — e sono
+  state loro a trovare i tre buchi delle mie sentinelle, fra cui l'ennesima
+  che non poteva fallire (`n.innerHTML` e' SOTTOSTRINGA di
+  `btn.innerHTML`, quindi la terza porta teneva verde la seconda) e un
+  cartone che «imparava» innerHTML senza che servisse, perche' un
+  literal JS crea la proprieta' da se' all'assegnazione — una guardia
+  che nessuno esercita. Piu' il giro dal vivo a 320/360/375 nei due
+  temi, 32 verdi: il disegno dentro il bottone in tutti i casi, il
+  viola CHIESTO alla pagina invece che ricordato, e i due corpi che
+  danno due misure.
+  ⚠️ MA IL GIRO DAL VIVO GUARDA BLINK, e va detto: qui Gecko non c'e',
+  quindi quel giro dice che la cura non ROMPE niente dove il glifo gia'
+  funzionava — che il taglio sia sparito lo puo' dire solo il telefono
+  di Andrea con Tor Browser.
   IL CTA DEL BANNER NON CAMBIA PORTA: SPARISCE (ago 2026, il giorno
   dopo, dal campo — e questa riga EMENDA quella del giro prima, che
   diceva «cambia porta»). Su onion `mostraBanner` non disegna nessun

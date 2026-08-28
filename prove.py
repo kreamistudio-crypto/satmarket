@@ -21005,21 +21005,68 @@ def prove_onion():
     # azzererebbe: e' l'ordine che un riordino sposta senza vederlo
     prova("...prima del peso e del corpo, o li azzererebbe", True,
           -1 < _cta.find("font:inherit") < _cta.find("font-weight:800"))
-    # E IL FONT NON BASTAVA (ago 2026, secondo giro dal campo): il 🟣
-    # restava «tondo da una parte e tagliato dritto dall'altra», cioe'
-    # RITAGLIATO — e un clip che rispetta il border-radius taglia
-    # CURVO, quindi a mordere e' il content box. Due gambe, perche' da
-    # qui non si puo' provare quale morda: l'overflow toglie il
-    # ritaglio dove WebKit onora l'override, l'aria lo rende innocuo
-    # dove non lo onora. ⚠️ I due valori dell'aria si muovono INSIEME:
-    # il padding sta FUORI dal clip e il line box ci sta DENTRO, quindi
-    # da soli si annullano — misurato, 4px sopra invece di zero a
-    # parita' di altezza.
-    prova("il ritaglio del <button> non morde", True,
+    # LE DUE SENTINELLE DEL RITAGLIO HANNO CAMBIATO LATO (ago 2026,
+    # terzo giro dal campo), e il perche' vale piu' della riga.
+    # Chiedevano `overflow:visible`, `line-height:2` e `padding:3px`
+    # perche' la diagnosi di allora diceva «il content box del
+    # <button> morde». Il campo l'ha smentita due volte: taglia anche
+    # un <div> col vestito della pillola (quindi non e' il <button>),
+    # e la STESSA pagina sullo stesso telefono e' pulita in Chrome e
+    # tagliata in Tor Browser (quindi e' GECKO, non il sistema ne' il
+    # glifo). Quelle tre righe non curavano niente, e una riga che
+    # promette una cura che non fa e' peggio di una riga che manca.
+    # Adesso si chiede il CONTRARIO: che non tornino.
+    prova("l'overflow che non curava niente non torna", False,
           "overflow:visible" in _cta)
-    prova("...e l'aria del glifo sta nel line box, non nel padding",
-          (True, True),
+    prova("...e nemmeno l'aria mirata al lato sbagliato",
+          (False, False),
           ("line-height:2" in _cta, "padding:3px 15px" in _cta))
+
+    # IL PALLINO E' UN DISEGNO (ago 2026): dentro quella pillola un
+    # glifo lo taglia Gecko, e l'unica cosa che sopravvive e' un
+    # <circle>. Il giudice e' UNO perche' i siti che scrivono
+    # quell'etichetta sono TRE — il banner, il foglio invito, il menu
+    # account — e tre copie a mano vorrebbero dire che la prossima
+    # cura ne cura due.
+    prova("il pallino della porta e' disegnato, non scritto", True,
+          'const ICO_NOSTR' in mini and '<circle cx="8" cy="8" r="7"/>' in mini)
+    prova("...ed e' viola per token, mai col colore del testo",
+          (True, False),
+          ("fill:var(--nostr)" in mini,
+           "ico-nostr" in mini.split(".ico-nostr{")[1].split("}")[0]
+           and "currentColor" in mini.split(".ico-nostr{")[1].split("}")[0]))
+    _vestito = mini.split(".ico-nostr{")[1].split("}")[0]
+    prova("...e la misura segue il corpo del testo, mai un px fisso",
+          (True, False), ("em" in _vestito, "px" in _vestito))
+    # I TRE SITI PASSANO DAL GIUDICE, e nessuno di loro scrive piu' il
+    # glifo a mano: e' la riga che un cantiere futuro rompe per primo,
+    # aggiungendo la quarta porta con la stringa copiata.
+    _porte = ("nos.innerHTML = etichettaNostr(",
+              " n.innerHTML = etichettaNostr(",
+              "btn.innerHTML = etichettaNostr(")
+    prova("i tre siti della porta chiamano il giudice",
+          (True, True, True),
+          tuple(p in mini for p in _porte))
+    prova("...e le chiamate al giudice sono TRE", 3,
+          mini.count("etichettaNostr("))
+    # E IL CENSIMENTO DEI BOTTONI CHE IL GLIFO CE L'HANNO ANCORA:
+    # sono TRE, e sono quelli che chi arriva da Tor non incontra —
+    # «salva la npub», i due ponti verso il profilo Nostr e il
+    # bottone di collaudo, che si vedono solo da dentro e dopo aver
+    # gia' scelto. Il perimetro e' stretto APPOSTA (decisione di
+    # Andrea): il difetto e' confinato a Gecko, e allargare il diff su
+    # bottoni che quel pubblico non tocca non lo merita. Se il numero
+    # sale, qualcuno ha aggiunto una porta col glifo copiato a mano e
+    # deve venire a leggere questa voce.
+    import re as _re
+    _btn_glifo = len(_re.findall(
+        r"<button\b[^>]*>[^<]*\U0001F7E3", mini))
+    prova("i bottoni rimasti col glifo sono i tre di dentro", 3, _btn_glifo)
+    # il TITOLO del foglio Nostr invece il glifo lo tiene, ed e'
+    # giusto: e' un <h3>, non una pillola — fuori da quel vestito il
+    # campo ha misurato che non taglia niente
+    prova("...e il titolo del foglio non si tocca", True,
+          "'🟣 Entra con Nostr'" in mini)
 
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
@@ -21100,7 +21147,7 @@ const document = {createElement: () => ({style:{}, onclick: null,
 let ONION = false;
 function suOnion(){ return ONION; }
 function apriNostrSheet(){}
-""" + testi + "\n" + mb + "\n" + bn + """
+""" + testi + "\n" + _giudice_nostr(mini) + "\n" + mb + "\n" + bn + """
 function componi(onion){
   ONION = onion;
   mostraBanner(onion ? BANNER_VETRINA_ONION : BANNER_VETRINA);
@@ -21113,7 +21160,11 @@ function componi(onion){
   const h = banner.innerHTML;
   const porte = (h.match(/apriNostrSheet/g) || []).length
     + figli.filter(f => f.onclick === apriNostrSheet).length;
-  const tutto = h + figli.map(f => f.textContent).join('|');
+  // dal cantiere del pallino la porta si scrive con innerHTML: senza
+  // leggerlo, `tutto` non conterrebbe piu' il testo del bottone appeso
+  // e il «…o» si potrebbe togliere senza che niente diventi rosso
+  const tutto = h + figli.map(f => f.textContent + (f.innerHTML || ''))
+                        .join('|');
   return {tutto, porte, bot: h.includes('t.me/ilbarattolobot'),
           oppure: tutto.includes('\u2026o entra con Nostr')};
 }
@@ -21147,6 +21198,28 @@ console.log(JSON.stringify([componi(false), componi(true)]));
     ]
 
 
+def _pallino_disegnato(html, testo):
+    """Il bottone porta il DISEGNO e quel testo, non il glifo.
+
+    Si guarda cosa c'e' DENTRO invece di ribattere l'SVG: cosi' la
+    prova regge se il disegno cambia forma, e cade se torna un
+    glifo — che e' l'unica cosa che deve farla cadere."""
+    return ('class="ico-nostr"' in html and "<circle" in html
+            and testo in html and "\U0001F7E3" not in html)
+
+
+def _giudice_nostr(mini):
+    """Il giudice dell'etichetta, RITAGLIATO dal client.
+
+    Ribatterlo qui vorrebbe dire provare una copia: la mutazione che
+    cambia il disegno vero resterebbe verde. E' la lezione di `esc`,
+    che per la stessa ragione si estrae invece di darsene uno di
+    cartone."""
+    i = mini.index("const ICO_NOSTR = ")
+    j = mini.index("const etichettaNostr", i)
+    return mini[i:mini.index(";", j) + 1]
+
+
 def _banco_invito(mini):
     """Fa GIRARE `invitoTelegram` nei due mondi su un DOM di cartone.
 
@@ -21166,25 +21239,26 @@ def _banco_invito(mini):
 const nodi = {};
 function el(id){
   if (!nodi[id]) nodi[id] = {textContent:'', className:'', style:{},
+                             innerHTML:'',
                              classList:{add(){}, remove(){}}};
   return nodi[id];
 }
 let ONION = false;
 function suOnion(){ return ONION; }
-""" + cat + "\n" + fn + """
+""" + cat + "\n" + _giudice_nostr(mini) + "\n" + fn + """
 const fuori = [];
 ONION = false;
 invitoTelegram('Per comprare in sicurezza serve l\\'app vera dentro Telegram: '
   + 'è lì che i tuoi sats restano al sicuro fino alla consegna.', 'compra');
 fuori.push([nodi.invitoTit.textContent, nodi.invitoTesto.textContent,
             nodi.invitoTg.style.display, nodi.invitoNostr.className,
-            nodi.invitoNostr.textContent]);
+            nodi.invitoNostr.innerHTML]);
 ONION = true;
 invitoTelegram('Per comprare in sicurezza serve l\\'app vera dentro Telegram: '
   + 'è lì che i tuoi sats restano al sicuro fino alla consegna.', 'compra');
 fuori.push([nodi.invitoTit.textContent, nodi.invitoTesto.textContent,
             nodi.invitoTg.style.display, nodi.invitoNostr.className,
-            nodi.invitoNostr.textContent]);
+            nodi.invitoNostr.innerHTML]);
 invitoTelegram('roba che nomina Telegram', 'chiave-che-non-esiste');
 fuori.push(nodi.invitoTesto.textContent);
 invitoTelegram('roba che nomina Telegram');
@@ -21212,9 +21286,11 @@ console.log(JSON.stringify(fuori));
          ["🫙 Ti aspettiamo su Telegram",
           "Per comprare in sicurezza serve l'app vera dentro Telegram: "
           "è lì che i tuoi sats restano al sicuro fino alla consegna.",
-          "block", "btn ghost", "🟣 …o entra con Nostr"],
-         fu),
+          "block", "btn ghost", True],
+         fu[:4] + [_pallino_disegnato(fu[4], "…o entra con Nostr")]),
         # SU ONION SI GIRA: titolo, testo, porte.
+        ("...e la porta Nostr porta il pallino disegnato", True,
+         _pallino_disegnato(on[4], "Entra con Nostr")),
         ("...e su onion il titolo parla della chiave",
          "🧅 Entra con la tua chiave", on[0]),
         ("...il testo tiene il senso e non nomina Telegram",
@@ -21223,7 +21299,8 @@ console.log(JSON.stringify(fuori));
           "Telegram" in on[1])),
         ("...il bottone del bot sparisce", "none", on[2]),
         ("...e Nostr diventa il pieno",
-         ["btn orange", "🟣 Entra con Nostr"], [on[3], on[4]]),
+         ["btn orange", True],
+         [on[3], _pallino_disegnato(on[4], "Entra con Nostr")]),
         # IL RIPIEGO NON RIMETTE MAI IL TESTO DEL CHIAMANTE.
         ("una chiave sconosciuta cade sul generico", (True, False),
          ("con la tua chiave Nostr" in senza, "Telegram" in senza)),

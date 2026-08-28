@@ -2419,6 +2419,27 @@
      accende col testo della via nei due temi; la misura e' quella di
      un'emoji nella stessa riga, l'allineamento e' alla riga di base */
   .ico-locker{width:17px;height:17px;vertical-align:-3.5px}
+  /* IL PALLINO DI NOSTR E' UN DISEGNO E NON UN GLIFO (ago 2026, dal
+     campo, e la diagnosi e' costata cinque banchi): dentro la pillola
+     bianca del bottone GECKO taglia il glifo, Blink no — stesso
+     telefono, Chrome pulito e Tor Browser tagliato. Cosa esattamente
+     tagli dentro quella pillola non lo sappiamo, ed e' dichiarato:
+     sono cadute TUTTE le leve provate sul telefono — piu' padding
+     sotto, piu' interlinea, `line-height:normal`, il glifo piu'
+     piccolo, il glifo alzato, il vestito inline-flex dei .btn, il
+     font di sistema, e perfino un <div role="button"> al posto del
+     <button>, che e' cio' che ha fatto cadere anche la diagnosi «e'
+     il <button>». L'unica cosa che li' dentro sopravvive e' un
+     DISEGNO — e un disegno non ha una baseline, non sta in un line
+     box e non dipende dal font del telefono: non e' una cura PER
+     Firefox, toglie il difetto di mezzo in tutti e due i motori.
+     Il viola e' `--nostr` e non currentColor: il locker si accende
+     col testo perche' e' un'icona di servizio, questo e' il segno di
+     Nostr e su una pillola bruna diventerebbe bruno.
+     La misura e' in em perche' i tre bottoni della porta hanno tre
+     corpi diversi (13px la pillola del banner, 15.5px i .btn). */
+  .ico-nostr{width:1.15em;height:1.15em;vertical-align:-.18em;
+             fill:var(--nostr);flex:none}
   /* la stessa parola nella riga «Spedizione» del conto: li' sta dentro
      lo `.mono` della colonna delle cifre, e senza questa riga
      erediterebbe il monospazio — cioe' verrebbe scritta come un
@@ -4140,9 +4161,9 @@
      annullano. */
   .demo-cta{
     display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
-    text-decoration:none;border-radius:999px;padding:3px 15px;
-    font:inherit;font-weight:800;font-size:13px;line-height:2;
-    box-shadow:0 2px 0 var(--sats-deep);overflow:visible;
+    text-decoration:none;border-radius:999px;padding:6px 15px;
+    font:inherit;font-weight:800;font-size:13px;line-height:1.5;
+    box-shadow:0 2px 0 var(--sats-deep);
   }
 
   /* ==================== DESKTOP (≥768px) ====================
@@ -6503,7 +6524,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- La seconda porta: chi arriva da un DM Nostr entra con la sua
          chiave e ritrova l'annuncio autenticato (l'URL non cambia).
          SU ONION E' LA PRIMA E L'UNICA — vedi invitoTelegram(). -->
-    <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()">🟣 …o entra con Nostr</button>
+    <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()"><svg class="ico-nostr" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg> …o entra con Nostr</button>
     <button class="btn ghost" onclick="navIndietro()">Continua a guardare</button>
   </div>
 
@@ -17085,6 +17106,19 @@ const INVITO_ONION_GENERICO =
    porta» e diventa l'unica, col vestito che glielo dice.
    `chiave` e' FACOLTATIVA e serve solo di la': fuori da onion il
    testo che arriva e' quello di sempre, byte per byte. */
+/* L'etichetta della porta Nostr, in un posto solo: la scrivono TRE
+   siti — il banner della vetrina, il foglio invito e il menu account —
+   e il pallino ci arriva come DISEGNO (il perche' sta sul CSS di
+   .ico-nostr). Tre copie a mano vorrebbero dire che la prossima cura
+   ne cura due.
+   LO SPAZIO DAVANTI AL TESTO SERVE ALLA PILLOLA, che e' inline-block;
+   nei .btn, che sono flex, quello stesso spazio viene collassato via
+   e a distanziare resta il loro `gap`. Una riga sola per due vestiti,
+   invece di un margine da tenere in pari con un gap. */
+const ICO_NOSTR = '<svg class="ico-nostr" viewBox="0 0 16 16" '
+  + 'aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg>';
+const etichettaNostr = testo => ICO_NOSTR + ' ' + testo;
+
 function invitoTelegram(testo, chiave){
   const onion = suOnion();
   el('invitoTit').textContent = onion
@@ -17099,7 +17133,8 @@ function invitoTelegram(testo, chiave){
      bottone sparito lo vestirebbe da ripiego proprio dove e' l'unica
      strada — ed e' il registro, non un vezzo. */
   nos.className = onion ? 'btn orange' : 'btn ghost';
-  nos.textContent = onion ? '🟣 Entra con Nostr' : '🟣 …o entra con Nostr';
+  nos.innerHTML = etichettaNostr(onion ? 'Entra con Nostr'
+                                        : '…o entra con Nostr');
   el('sheetBg').classList.add('open');
   el('invitoSheet').classList.add('open');
 }
@@ -29553,7 +29588,7 @@ function montaPorteAccount(dai){
   }
   const n = document.createElement('button');
   n.className = 'btn ghost';
-  n.textContent = '🟣 …o entra con Nostr';
+  n.innerHTML = etichettaNostr('…o entra con Nostr');
   n.onclick = () => { navIndietro(); apriNostrSheet(); };
   porte.appendChild(n);
 }
@@ -30112,9 +30147,8 @@ function bottoneLoginNostr(){
      e' l'unica porta, mentre sul clearnet e' la SECONDA — dopo il
      widget Telegram, che infatti `avviaVetrina` mette solo di qua. E'
      la stessa riga del foglio invito: cade il mezzo, resta la porta. */
-  btn.textContent = suOnion()
-    ? '🟣 Entra con Nostr'
-    : '🟣 …o entra con Nostr';
+  btn.innerHTML = etichettaNostr(suOnion() ? 'Entra con Nostr'
+                                            : '…o entra con Nostr');
   btn.onclick = apriNostrSheet;
   el('demoBanner').appendChild(btn);
 }
