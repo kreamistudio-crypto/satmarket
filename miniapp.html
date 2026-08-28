@@ -29169,6 +29169,15 @@ function firmatarioEstensione(){
   };
 }
 
+/* QUANTO SI ASPETTA UNA WEBSOCKET DEL BUNKER, e i 15 secondi non
+   sono un numero a caso: su Tor una connessione onesta può prendersi
+   parecchi secondi, e far cadere un relay che funziona è peggio che
+   aspettare. Il prezzo — con più relay in fila l'attesa si somma —
+   lo paga la sala d'attesa, che dice QUALE si sta provando: così
+   anche tre relay lenti si leggono, invece di sembrare un'app
+   piantata. */
+const BUNKER_CONNETTI_MS = 15000;
+
 /* 2) Bunker NIP-46: le firme le fa un signer remoto. Il protocollo è
    una chat cifrata su un relay: noi (chiave locale del CLIENT, mai
    quella dell'utente) mandiamo richieste kind-24133 cifrate NIP-44,
@@ -29191,13 +29200,53 @@ async function firmatarioBunker(uri, skHex){
   const skLocale = skHex ? NT.utils.hexToBytes(skHex) : NT.generateSecretKey();
   const pubLocale = NT.getPublicKey(skLocale);
   const chiave = NT.nip44.getConversationKey(skLocale, bunkerPub);
-  let relay = null;
+  let relay = null, scelto = '';
+  const rifiuti = [];
   for (const r of relays) {
-    try { relay = await NT.Relay.connect(r); console.log(`🟪 [bunker] relay connesso: ${r}`); break; }
-    catch(e){ console.log(`🟪 [bunker] relay non raggiungibile: ${r} (${e.message||e})`); }
+    bunkerDice(`Chiamo ${r}…`);
+    /* IL TIMEOUT SI OTTIENE SOLO COSTRUENDO IL RELAY A MANO, ed è la
+       riga da non «semplificare» tornando alla factory statica: quella
+       passa le opzioni al COSTRUTTORE e poi chiama `relay.connect()`
+       SENZA argomenti, quindi il suo `opts?.timeout` è per sempre
+       undefined. E senza timeout, se la socket resta appesa in
+       CONNECTING — un exit node che scarta i pacchetti, un relay morto
+       — quella promise NON SI RISOLVE MAI: era il buco, «Chiamo il
+       bunker…» e poi silenzio, senza un errore da nessuna parte. La
+       stessa cura sta già in `pubblicaEventoSuRelay`, col suo «un
+       relay morto non deve tenere in ostaggio la modifica». */
+    try {
+      relay = new NT.Relay(r);
+      await relay.connect({timeout: BUNKER_CONNETTI_MS});
+      scelto = r;
+      console.log(`🟪 [bunker] relay connesso: ${r}`);
+      break;
+    }
+    catch(e){
+      /* sul timeout la libreria rigetta con una STRINGA e sul resto
+         con un Error: `e?.message || String(e)` li prende tutti e due */
+      relay = null;
+      const motivo = e?.message || String(e);
+      rifiuti.push(`${r} → ${motivo}`);
+      console.log(`🟪 [bunker] relay non raggiungibile: ${r} (${motivo})`);
+    }
   }
-  if (!relay) throw new Error('nessun relay del bunker raggiungibile');
+  /* QUALE relay e COSA ha risposto, mai «nessun relay raggiungibile» e
+     basta: senza quei due dati chi legge non può decidere di cambiare
+     bunker, che è l'unica cosa che può fare da solo. */
+  if (!relay) throw new Error('nessun relay raggiungibile — ' + rifiuti.join(' · '));
   const attese = {};   // id richiesta -> {ok, no} della Promise in corso
+  /* Fa cadere le attese in corso con lo stesso motivo. Serve quando la
+     strada si chiude sotto i piedi: da lì in poi la risposta non può
+     PIÙ arrivare, e stare i due minuti del timeout umano vuol dire
+     aspettare una cosa che non può succedere. */
+  function saltano(motivo){
+    for (const id of Object.keys(attese)) {
+      const at = attese[id];
+      delete attese[id];
+      console.log(`🟪 [bunker] attesa ${id} caduta: ${motivo}`);
+      at.no(new Error(motivo));
+    }
+  }
   relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
     let msg;
     try { msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave)); }
@@ -29215,6 +29264,19 @@ async function firmatarioBunker(uri, skHex){
     console.log(`🟪 [bunker] ← risposta per id ${msg.id}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
     delete attese[msg.id];
     if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
+  },
+  /* IL RELAY PUÒ CHIUDERCI L'ASCOLTO — un CLOSED (auth-required,
+     restricted, rate-limited…) o la websocket che muore: la libreria
+     chiama questa in tutti e due i casi. Senza, la risposta del bunker
+     non poteva più arrivare e non lo sapeva nessuno.
+     L'USCITA A MANI VUOTE È LA CHIUSURA NOSTRA di fine giro — anche
+     `chiudi()` passa di qui — e lì non c'è niente da far cadere e
+     niente da dire. */
+  onclose(motivo){
+    if (!Object.keys(attese).length) return;
+    const testo = `${scelto} ha chiuso l'ascolto: ${motivo || 'connessione caduta'}`;
+    console.log(`🟪 [bunker] ${testo}`);
+    saltano(testo);
   }});
   function chiama(metodo, params, timeoutMs){
     return new Promise((ok, no)=>{
@@ -29225,13 +29287,33 @@ async function firmatarioBunker(uri, skHex){
         content: NT.nip44.encrypt(JSON.stringify({id, method:metodo, params}), chiave)},
         skLocale);
       console.log(`🟪 [bunker] → ${metodo} (id ${id})`);
-      relay.publish(ev).catch(e=>console.log(`🟪 [bunker] publish fallito: ${e.message||e}`));
+      relay.publish(ev).catch(e=>{
+        const motivo = e?.message || String(e);
+        /* DUE COSE DIVERSE, e confonderle costa una connessione buttata
+           via. «publish timed out» vuol dire che l'evento È PARTITO e
+           manca solo l'OK del relay, che su Tor può tardare più dei
+           4,4s che la libreria si dà — lì si ASPETTA, o si butta una
+           chiamata ancora viva. Un rifiuto vero (OK:false — blocked,
+           auth-required, restricted…) dice invece che la richiesta non
+           è entrata: la risposta non può arrivare, e si cade subito
+           dicendo CHI l'ha rifiutata e con che parole. */
+        if (/timed out/i.test(motivo)) {
+          console.log(`🟪 [bunker] ${scelto} tarda l'OK (${motivo}): resto in ascolto`);
+          return;
+        }
+        console.log(`🟪 [bunker] ${scelto} ha rifiutato ${metodo}: ${motivo}`);
+        if (attese[id]) { delete attese[id];
+          no(new Error(`${scelto} ha rifiutato la richiesta: ${motivo}`)); }
+      });
       /* La firma aspetta un ESSERE UMANO che approva su un altro
          dispositivo: 2 minuti. Le chiamate di servizio restano a 30s. */
       const ms = timeoutMs || 30000;
       setTimeout(()=>{ if (attese[id]) { delete attese[id];
         console.log(`🟪 [bunker] ⏱ ${metodo} senza risposta dopo ${ms/1000}s`);
-        no(new Error('il bunker non risponde')); } }, ms);
+        /* IL NOME DEL RELAY ANCHE QUI: «il bunker non risponde» non
+           dice se a tacere è il bunker o la strada per arrivarci, e
+           sono due guasti con due rimedi diversi. */
+        no(new Error(`nessuna risposta dal bunker in ${ms/1000}s (via ${scelto})`)); } }, ms);
     });
   }
   /* Il terzo parametro della connect sono i PERMESSI richiesti: senza,
@@ -29284,6 +29366,20 @@ function scordaBunker(){
   try { localStorage.removeItem(BUNKER_CHIAVE); } catch(e){}
 }
 
+/* LA SALA D'ATTESA DEL BUNKER. Il toast dura due secondi e se ne
+   va; il rituale del bunker può durare minuti — una connessione su
+   Tor, un umano che approva su un altro telefono — quindi lo stato
+   vive nel FOGLIO, dove `apriAutorizzazioneBunker` scrive già il suo
+   «resto in ascolto».
+   SI SCRIVE COL textContent, e non è pigrizia: qui dentro finiscono
+   la URI incollata dall'utente e LA RISPOSTA DI UN RELAY, cioè testo
+   di terzi. Con innerHTML sarebbe un esc() da ricordarsi per sempre,
+   e prima o poi qualcuno se lo dimentica. */
+function bunkerDice(testo){
+  const s = el('nostrSheetSub');
+  if (s) s.textContent = testo;
+}
+
 /* auth_url del bunker: MAI window.open automatico — fuori dal gesto
    utente i browser lo bloccano (Brave su Android anche in silenzio,
    senza ritornare null) e il flusso muore muto. Il link si mostra
@@ -29291,8 +29387,19 @@ function scordaBunker(){
    che nessun browser blocca. E con l'app del bunker (nsec.app…)
    spesso basta aprirla: la richiesta e' gia' in coda anche li'. */
 function apriAutorizzazioneBunker(url){
-  if (!/^https?:\/\//i.test(url || '')) {   // mai href javascript: & co.
-    console.log('🟪 [bunker] auth_url non http, la ignoro');
+  if (!/^https?:\/\//i.test(url || '')) {
+    /* LA GUARDIA RESTA (mai un link `javascript:` & co.) MA SI DICE, ed
+       è il quinto silenzio di questa strada: i firmatari che vivono
+       sul telefono — Amber e i suoi — rispondono con uno schema loro
+       (`nostrsigner:`, `intent:`), che http non è. Finché quel ramo
+       era un `console.log` e basta, chi guardava vedeva «chiamo il
+       bunker» e poi niente, mentre il permesso era stato chiesto
+       davvero. Il link NON si rende toccabile — la guardia esiste
+       apposta — e si dice invece dove la richiesta sta aspettando. */
+    console.log(`🟪 [bunker] auth_url con uno schema che non apro: ${url}`);
+    bunkerDice("Il tuo firmatario chiede un'autorizzazione che da qui "
+             + "non posso aprire: aprilo sul telefono, la richiesta ti "
+             + "aspetta lì. Resto in ascolto.");
     return;
   }
   console.log('🟪 [bunker] mostro il bottone di autorizzazione');
@@ -29367,12 +29474,23 @@ async function loginNostrBunker(){
   let f = null;
   try {
     toast('🔗 Chiamo il bunker…');
+    bunkerDice('Sto chiamando il bunker…');
     f = await firmatarioBunker(el('bunkerUri').value);
     /* connessione riuscita: la sessione si conserva sul dispositivo,
        le prossime firme non rifaranno il rituale */
     ricordaBunker(f.sessione);
+    bunkerDice('Bunker collegato: entro…');
     await consegnaFirmatario(f);
-  } catch(e){ toast(`Bunker: ${e.message || 'non risponde'}`, 6000); }
+  } catch(e){
+    const motivo = e?.message || 'non risponde';
+    /* IL MOTIVO STA NEL FOGLIO E NON SOLO NEL TOAST: dice quale relay
+       e cosa ha risposto, ed è l'unica cosa con cui si può decidere
+       di cambiare bunker. Un toast che se ne va quella decisione non
+       la fa prendere a nessuno — e questi messaggi sono lunghi, quindi
+       il toast prende il tempo di lettura di casa. */
+    bunkerDice(`Non ha funzionato — ${motivo}`);
+    toast(`Bunker: ${motivo}`, tempoLettura(motivo));
+  }
   finally { if (f) f.chiudi(); }   // la websocket si chiude comunque
 }
 async function loginNostrNsec(){

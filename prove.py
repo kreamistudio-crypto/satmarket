@@ -37145,6 +37145,206 @@ def prove_tutorial():
     prova("...e si dice perche'", 1, d["detto"])
 
 
+def prove_bunker_muto():
+    """Il bunker che non poteva fallire (ago 2026, dal campo: da Tor
+    «Chiamo il bunker…» e poi silenzio per sempre).
+
+    La causa non era nostra — il circuito Tor non arrivava al relay,
+    verificato dal campo: lo stesso bunker dal dominio normale entra —
+    ma il SILENZIO sì: `Relay.connect` non aveva timeout, e il rifiuto
+    di un relay finiva in una riga di console. Su clearnet un relay
+    morto avrebbe fatto la stessa cosa."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fb = pezzo_js(mini, "async function firmatarioBunker(uri, skHex){")
+
+    # --- il timeout che non c'era ---
+    prova("il bunker non usa piu' la factory statica (butta via le "
+          "opzioni: passa opts al costruttore e poi chiama connect() "
+          "senza argomenti, quindi il timeout non arriva mai)",
+          (False, True),
+          ("NT.Relay.connect(" in fb, "new NT.Relay(" in fb))
+    prova("...e il timeout si passa alla connect, dalla LEVA e non "
+          "da un numero ribattuto qui",
+          True, "await relay.connect({timeout: BUNKER_CONNETTI_MS})" in fb)
+    _ms = re.search(r"const BUNKER_CONNETTI_MS = (\d+);", mini)
+    prova("la leva esiste e concede a Tor il suo tempo (una "
+          "connessione onesta di la' ci mette parecchi secondi)",
+          True, bool(_ms) and int(_ms.group(1)) >= 10000)
+
+    # --- QUALE relay e COSA ha risposto: la parte che conta ---
+    prova("il ciclo raccoglie i motivi relay per relay",
+          True, "rifiuti.push(" in fb)
+    prova("...e l'errore finale li NOMINA: senza, chi legge non puo' "
+          "decidere di cambiare bunker",
+          True, "rifiuti.join(" in fb)
+    prova("il timeout umano dice da quale relay non e' arrivato niente",
+          True, "(via ${scelto})" in fb)
+
+    # --- le attese che cadono invece di aspettare due minuti ---
+    prova("la sottoscrizione ha il suo onclose (CLOSED del relay, o "
+          "websocket caduta: la risposta non puo' piu' arrivare)",
+          True, "onclose(motivo){" in fb)
+    prova("...e da li' le attese cadono col motivo",
+          True, "saltano(testo);" in fb)
+    prova("la chiusura NOSTRA di fine giro non dice niente: a mani "
+          "vuote si esce prima", True,
+          "if (!Object.keys(attese).length) return;" in fb)
+
+    # --- il publish rifiutato non e' piu' una riga di console ---
+    prova("il publish distingue il RIFIUTO dall'OK che tarda: buttare "
+          "una chiamata ancora viva costa una connessione",
+          True, "/timed out/i.test(motivo)" in fb)
+    prova("...e sul rifiuto vero fa cadere l'attesa dicendo chi e' "
+          "stato", True,
+          "no(new Error(`${scelto} ha rifiutato la richiesta: ${motivo}`))"
+          in fb)
+
+    # --- il motivo si legge, e non e' HTML ---
+    bd = pezzo_js(mini, "function bunkerDice(testo){", "\n}")
+    prova("bunkerDice scrive col textContent: li' dentro finisce la "
+          "risposta di un RELAY, cioe' testo di terzi",
+          (True, False), ("textContent" in bd, "innerHTML" in bd))
+    lb = pezzo_js(mini, "async function loginNostrBunker(){", "\n}")
+    prova("il motivo resta nel foglio e non solo nel toast, che se ne "
+          "va", True, "bunkerDice(`Non ha funzionato" in lb)
+
+    # E SI FA GIRARE, che le sentinelle qui sopra dicono che le righe
+    # ci sono, mai che il giro risponda giusto — e qui la domanda e'
+    # proprio COSA arriva in mano a chi legge.
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("firmatarioBunker dice quale relay e cosa ha risposto",
+              "node non installato")
+        return
+    _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
+              + "\n" + bd + "\n}\n"
+              + "function apriAutorizzazioneBunker(){}\n"
+              + "async function caricaNostrTools(){}\n"
+              + fb + "\n")   # col taglio di serie la graffa c'e' gia'
+    # il cartone: una libreria che si comporta come quella vera nei
+    # punti che contano — la connect che rigetta con una STRINGA (il
+    # timeout) o con un Error (il resto), il publish che rigetta come
+    # fa il bundle su OK:false, la sottoscrizione che tiene i suoi
+    # callback in modo che il banco possa chiuderla da fuori
+    _prog = _pezzi + r"""
+/* firmatarioBunker RACCONTA (le righe 🟪 sono meta' della diagnosi dal
+   campo): qui pero' finirebbero nello stesso stdout del risultato e lo
+   sporcherebbero. Si zittisce e si scrive il JSON dalla porta di
+   servizio. */
+const vero = console.log;
+console.log = () => {};
+const el = () => null;
+let sub = null;
+function NTfinto(comeConnette, comePubblica){
+  return {
+    utils: {hexToBytes: h => h, bytesToHex: b => String(b)},
+    generateSecretKey: () => 'sk',
+    getPublicKey: () => 'pub',
+    finalizeEvent: (ev) => ev,
+    nip44: {getConversationKey: () => 'k',
+            encrypt: (s) => s, decrypt: (s) => s},
+    Relay: class {
+      constructor(url){ this.url = url; }
+      connect(opts){ return comeConnette(this.url, opts); }
+      subscribe(f, params){ sub = params; return {close(){}}; }
+      publish(ev){ return comePubblica(this.url); }
+      close(){}
+    },
+  };
+}
+const URI = 'bunker://' + 'a'.repeat(64)
+  + '?relay=wss://uno.example&relay=wss://due.example';
+const esiti = {};
+/* IL CANE DA GUARDIA C'E' SEMPRE, ed e' la riga che rende questo banco
+   capace di FALLIRE: il difetto sotto esame e' proprio un'attesa che
+   non finisce mai, quindi senza di lui una mutazione che la rimette lo
+   fa PIANTARE — e un banco piantato esplode invece di diventare rosso,
+   cioe' passa per «mutazione sopravvissuta». Preso sul fatto: le prime
+   tre mutazioni della tortura si erano promosse cosi'. */
+async function caso(nome, comeConnette, comePubblica, ms){
+  globalThis.window = {NostrTools: NTfinto(comeConnette, comePubblica)};
+  const p = firmatarioBunker(URI).then(() => 'NON HA FALLITO',
+                                       e => e.message);
+  esiti[nome] = await Promise.race([p, new Promise(ok =>
+    setTimeout(() => ok('ANCORA IN ATTESA'), ms || 2000))]);
+}
+(async () => {
+  // (a) nessun relay risponde: uno va in timeout come fa la libreria
+  //     (rigetta una STRINGA), l'altro con un Error
+  await caso('nessuno',
+    (url) => url.includes('uno')
+      ? Promise.reject('connection timed out')
+      : Promise.reject(new Error('dns')),
+    () => new Promise(() => {}));
+  // (b) connesso, e il relay ci chiude l'ascolto mentre aspettiamo
+  await caso('chiuso',
+    () => Promise.resolve(),
+    () => { setTimeout(() => sub.onclose('auth-required: registrati'), 0);
+            return new Promise(() => {}); });
+  // (c) connesso, e il relay RIFIUTA la richiesta
+  await caso('rifiutato',
+    () => Promise.resolve(),
+    () => Promise.reject(new Error('blocked: no tor exits')));
+  // (d) l'OK tarda: l'evento E' partito, si aspetta
+  await caso('tarda',
+    () => Promise.resolve(),
+    () => Promise.reject(new Error('publish timed out')), 300);
+  vero(JSON.stringify(esiti));
+  process.exit(0);   // i timeout umani da 120s terrebbero vivo node
+})();
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("firmatarioBunker gira sul cartone", "0",
+              f"{_r.returncode}: {_r.stderr[:300]}")
+        return
+    d = _js.loads(_r.stdout.strip())
+    prova("nessun relay risponde: l'errore nomina TUTTI E DUE i relay "
+          "e i due motivi (la stringa del timeout e l'Error)",
+          [True] * 4,
+          [t in d["nessuno"] for t in ("wss://uno.example",
+                                       "wss://due.example",
+                                       "connection timed out", "dns")])
+    prova("il relay chiude l'ascolto: si cade SUBITO col suo motivo, "
+          "invece di stare i due minuti del timeout umano",
+          [True, True],
+          ["auth-required: registrati" in d["chiuso"],
+           "wss://uno.example" in d["chiuso"]])
+    prova("il relay rifiuta la richiesta: si cade dicendo chi e' stato "
+          "e con che parole",
+          [True, True],
+          ["blocked: no tor exits" in d["rifiutato"],
+           "wss://uno.example" in d["rifiutato"]])
+    prova("...ma «publish timed out» NON fa cadere niente: l'evento e' "
+          "partito e manca solo l'OK, che su Tor puo' tardare",
+          "ANCORA IN ATTESA", d["tarda"])
+
+    # --- il quinto silenzio: l'auth_url che non si apre ---
+    # I firmatari che vivono sul telefono (Amber e i suoi) rispondono
+    # con uno schema loro, che http non e': la guardia contro un href
+    # `javascript:` RESTA — e non si allenta — ma il ramo taceva, e da
+    # fuori si vedeva «chiamo il bunker» mentre il permesso era stato
+    # chiesto davvero.
+    _au = pezzo_js(mini, "function apriAutorizzazioneBunker(url){")
+    _ramo = _au[:_au.find("return;")]
+    prova("l'auth_url che non si apre lo DICE, invece di tacere", True,
+          "bunkerDice(" in _ramo)
+    prova("...e la guardia dello schema resta", True,
+          "/^https?:" in _ramo)
+    # ⚠️ e la parola vietata non si scrive nemmeno nel commento che
+    # spiega la guardia: questa prova legge anche la prosa, e ci si e'
+    # gia' inciampati scrivendola
+    prova("...ma non la si rende MAI toccabile", (False, False),
+          ("href" in _ramo, "openLink" in _ramo))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -37235,6 +37435,7 @@ def main():
               prove_tornate,
               prove_ordini_prova,
               prove_tutorial,
+              prove_bunker_muto,
               prove_config_esempio):
         try:
             f()
