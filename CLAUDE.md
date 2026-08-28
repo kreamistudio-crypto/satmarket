@@ -19896,6 +19896,46 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   argomento — un corso di cucina non è «Alimenti e bevande» — ed è il
   gemello lato macchina dell'ortogonalità già decisa per i due
   reparti («la categoria dice COSA compri, la strada COME arriva»).
+  E IL QUARTO GIRO È UNA REGOLA CHE MANCAVA, non una che sbagliava
+  (ago 2026, dal campo: un abbonamento Spotify in «Informatica»). Il
+  prompt non nominava «Buoni ed esperienze» in NESSUNA riga: la
+  categoria stava nell'elenco delle ammesse e nessuna regola ci
+  portava — quindi un codice da riscattare non aveva una casa e
+  finiva dove capitava, «Informatica» perché suona digitale o
+  «Lavoro e servizi» perché la parola «servizio» tira. È la stessa
+  famiglia dei tre giri precedenti vista dal rovescio: là una
+  premessa PARZIALE orientava male, qui l'assenza di premessa non
+  orientava affatto.
+  IL CRITERIO È COSA SI COMPRA E NON COM'È FATTO (decisione di
+  Andrea): un CREDITO da spendere presso un altro — gift card,
+  buono, voucher, abbonamento a una piattaforma — è «Buoni ed
+  esperienze», e la regola nomina i due vicini che se lo
+  prenderebbero: non «Informatica», che vuole un computer o una
+  periferica, e non «Lavoro e servizi», dove sta il lavoro che fa
+  CHI VENDE. La coppia che insegna il confine è abbonamento Spotify
+  di 3 mesi contro corso di chitarra di 3 mesi — stessa durata,
+  stessa parola «mesi», due reparti — perché il rischio vero qui è
+  la regola delle PRESTAZIONI, che senza questa riga assorbirebbe
+  ogni abbonamento.
+  LA CONTRO-REGOLA È LA METÀ CHE CONTA, ed è la gemella esatta di
+  quella di Bitcoin («MA il tema dev'essere L'OGGETTO»): **MA il
+  credito dev'essere il PRODOTTO** — quando si compra la cosa e non
+  un credito vale la sua categoria, anche se arriva come codice, e
+  la riga lo dice con DUE punte (una licenza Office è «Informatica»,
+  la chiave di un videogioco è «Console e videogiochi»). Senza,
+  «credito» diventerebbe «tutto quello che arriva come codice» e il
+  reparto smetterebbe di dire qualcosa — l'errore già pagato dalla
+  prima stesura della regola tematica.
+  DUE PUNTE E NON UNA, e vale per le prove come per il prompt: la
+  contro-regola nomina due casi, quindi il collaudo ne ha DUE
+  affilati (Office e la chiave Steam, tutti e due «stanno in Buoni e
+  devono USCIRNE», la funzione che la maglietta qualunque ha per il
+  reparto tematico) e le sentinelle li guardano SEPARATI — nominati
+  insieme in un `and` unico, la mutazione che ne toglie una sola
+  resterebbe verde. Più il buono Zalando come regressione della
+  cura, che è anche il caso che dice che una tessera FISICA non
+  esce dal reparto: la strada non decide la categoria, il patto dei
+  Buoni.
   E IL PRIMO GIRO VERO DEL COLLAUDO HA PAGATO SUBITO (ago 2026):
   atteso 14/14, uscito **13/14 DUE VOLTE** — a cadere la SACCA,
   «Sacca in cotone col logo Bitcoin» spostata in Abbigliamento. Il
@@ -19922,7 +19962,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   VPS il 23 ago 2026: **14/14**, la sacca compresa.
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
-  da rilanciare a OGNI ritocco. Quattordici casi con l'atteso accanto:
+  da rilanciare a OGNI ritocco. Diciannove casi con l'atteso accanto:
   i cinque di Andrea (sacca, poster, le DUE magliette — quella
   qualunque STA in Bitcoin e deve USCIRNE, il caso affilato apposta
   che impedisce a «tematico» di assorbire troppo — e il NerdMiner che
@@ -19933,7 +19973,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   consulenza sui wallet che ESCE da Bitcoin verso «Lezioni e corsi»,
   e il corso di cucina gemello su un ALTRO tema — se cade solo lui,
   la cura ha imparato «bitcoin» invece della regola delle
-  prestazioni) più quattro regressioni (portatile→Informatica,
+  prestazioni), i CINQUE del quarto (l'abbonamento Spotify che ESCE
+  da Informatica, il Game Pass gemello che arriva da un'ALTRA
+  categoria — se cade solo lui, la cura ha imparato «Spotify» invece
+  della regola del credito —, le due punte affilate di Office e
+  della chiave Steam che escono da Buoni, e il buono Zalando che ci
+  resta) più quattro regressioni (portatile→Informatica,
   Jade→Bitcoin, l'alimentatore che sorveglia la clausola tenuta, e il
   NON SO che sopravvive). A differenza del
   fratello si IMPORTA — ricategorizza.py chiede il config dentro
@@ -19952,11 +19997,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che un giro saltato non si scambi per un giro riuscito. Torturato
   con sei mutazioni, ognuna rossa da sola.
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
-  (`python collaudo_ricategorizza.py`), atteso 14/14 — e 14/14 è
-  uscito il 23 ago 2026: chi lo rilancia
+  (`python collaudo_ricategorizza.py`), che il 23 ago 2026 dava
+  **14/14** sui casi di allora; col quarto giro l'atteso è **19/19**
+  ed è DA RILANCIARE. Chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
-  maglietta qualunque, l'alimentatore, l'olio o la consulenza la
-  regola assorbe troppo e va stretta, se cadono i tematici non ha
+  maglietta qualunque, l'alimentatore, l'olio, la consulenza, la
+  licenza Office o la chiave Steam la regola assorbe troppo e va
+  stretta, se cadono i tematici, lo Spotify o il Game Pass non ha
   insegnato abbastanza.
   L'atteso segue il PROMPT, mai il modello. Dopo il giro,
   `ricategorizza.py --rifai` sul VPS è una SCELTA di Andrea, non un
