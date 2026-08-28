@@ -13899,6 +13899,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   relay, `auth_url` in popup), nsec incollata che firma SOLO in pagina
   (chiave nella closure, azzerata dopo la firma: mai inviata, mai
   salvata, UI che la sconsiglia). Il bundle si carica pigro da
+  IL BUNKER NON PUO' PIU' RESTARE MUTO (ago 2026, caso dal campo: da
+  onion «Chiamo il bunker…» e poi silenzio PER SEMPRE). La causa non
+  era nostra — il circuito Tor non arrivava al relay, e lo stesso
+  bunker dal dominio normale entra — ma il SILENZIO si', ed era in
+  QUATTRO punti. Il primo spiega il «per sempre» alla lettera:
+  `Relay.connect` non aveva timeout, e non bastava passarglielo —
+  `NT.Relay.connect(url, opts)` e' una FACTORY STATICA che le opzioni
+  le da' al COSTRUTTORE e poi chiama `relay.connect()` SENZA
+  argomenti, quindi il suo `opts?.timeout` resta undefined per
+  sempre. Il relay si costruisce a mano (`new NT.Relay(r)` +
+  `relay.connect({timeout: BUNKER_CONNETTI_MS})`), ed e' la riga da
+  non «semplificare» tornando alla factory. Gli altri tre: la
+  sottoscrizione chiusa dal relay (un CLOSED per auth-required o
+  rate-limit) non faceva cadere le attese, il `publish` rifiutato
+  finiva in una riga di console, e il timeout umano non diceva da
+  QUALE relay. IL PEZZO CHE CONTA DI PIU' (decisione di Andrea) e'
+  proprio quello: si dice QUALE relay e COSA ha risposto — senza,
+  chi legge non puo' cambiare bunker.
+  IL POSTO DOVE SI DICE E' IL FOGLIO, non il toast (`bunkerDice`, che
+  scrive nel sottotitolo di `#nostrSheet`): il toast dura due secondi
+  e il rito del bunker puo' durare minuti. Col `textContent` e MAI
+  l'innerHTML — li' dentro finiscono il motivo di un relay e l'URI
+  incollata, cioe' testo di terzi.
+  `BUNKER_CONNETTI_MS` e' 15 secondi e non tre: su Tor una connessione
+  ci mette legittimamente qualche secondo, e la sala d'attesa dice
+  intanto quale relay si sta chiamando. Il ramo «publish timed out»
+  NON fa cadere la chiamata, ed e' la riga da non uniformare: l'evento
+  e' partito e manca solo l'OK, che su Tor tarda — buttarla li'
+  vorrebbe dire perdere una richiesta viva.
+  E IL QUINTO SILENZIO E' L'`auth_url` CHE NON SI APRE: i firmatari
+  che vivono sul telefono (Amber e i suoi) rispondono con uno schema
+  loro (`nostrsigner:`, `intent:`), e `apriAutorizzazioneBunker` li
+  ingoiava con un solo `console.log` — da fuori si vedeva «chiamo il
+  bunker» mentre il permesso era stato chiesto DAVVERO. La guardia
+  contro un link `javascript:` RESTA e non si allenta: quel che
+  cambia e' che adesso lo DICE, e manda dove la richiesta aspetta.
+  ⚠️ La parola vietata non si scrive nemmeno nel commento che spiega
+  la guardia: la prova legge anche la prosa, e ci si e' inciampati
+  scrivendola.
+  «NO PERMISSION» VIENE DAL BUNKER, MAI DAL RELAY, ed e' la riga che
+  chiude la domanda del campo: quella stringa non esiste ne' nel
+  nostro codice ne' in nostr-tools, e l'unica strada per cui arriva a
+  schermo e' `msg.error` di un evento kind-24133 DECIFRATO con
+  `getConversationKey(skLocale, bunkerPub)`. NIP-44 e' cifratura
+  autenticata: se si apre, l'ha scritta chi ha la chiave del bunker —
+  un relay non la puo' fabbricare, e Barattolo non sta leggendo male.
+  IL PERCHE' SU ONION E NON SUL DOMINIO NORMALE sta nell'identita' del
+  client: e' la CHIAVE LOCALE, che vive in `localStorage`
+  (`barattolo_bunker`) — e il localStorage e' PER ORIGINE. Da onion
+  quella chiave non c'e', quindi `firmatarioBunker` ne genera una
+  NUOVA a ogni tentativo e per il firmatario e' un'app mai vista: se
+  la policy salvata dice no, risponde «no permission» senza notificare
+  niente, perche' la decisione e' gia' presa. Il rimedio non e' nel
+  codice: si riautorizza l'app dal firmatario, e da quel dominio la
+  sessione si conserva come sull'altro.
   `/vendor/nostr.js` solo per bunker/nsec. `barraWeb` con avviso
   onesto per chi entra da Nostr (che indica «Collega Telegram» nel
   Profilo); foglio `#collegaSheet` per la proposta di collegamento.
@@ -18182,6 +18237,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   gesto cadeva sul generico, perdendo IN SILENZIO il testo scritto
   apposta per lui. Il censimento estrae le chiavi PASSATE e le confronta
   con quelle del catalogo.
+  IL BOTTONE DEL BANNER PORTA `font:inherit` (ago 2026, difetto dal
+  campo: «sul telefono il pallino viola sembra fuori posto»). La
+  classe `.demo-cta` la vestono un <a> (il link al bot) e due <button>
+  (Nostr, Esci), e UN <button> NON EREDITA IL FONT — ne' la famiglia
+  ne' la line-height: il foglio dell'utente gliene da' uno suo.
+  MISURATO a schermo, non dedotto: il fratello <a> usciva in Nunito e
+  i due bottoni in ARIAL, con la riga alta 30px invece di 31,5 e il 🟣
+  senza un pixel d'aria nella scatola. Era l'unico testo dell'app
+  scritto in un font che non e' di casa, e sul telefono — dove quel
+  ripiego e' un font ancora diverso, con altre metriche per l'emoji —
+  si legge come un pallino fuori posto.
+  LA CURA E' LA RIGA CHE `.btn` PORTA GIA' per tutti i bottoni di
+  casa: `font:inherit` chiude in un colpo famiglia, corpo, peso, stile
+  E line-height, cioe' tutto quel che un <button> si perde. Va PRIMA
+  dei due longhand (`font-weight:800;font-size:13px`), o la
+  scorciatoia `font` li azzererebbe — c'e' la prova sull'ORDINE, ed e'
+  la riga che un riordino sposta senza vederla. Misurato dopo: il
+  bottone e' identico al fratello <a> alle tre larghezze (Nunito, 800,
+  13px, 19.5px, h 31,5) e i fratelli non si muovono di un pixel,
+  perche' quel valore lo ereditavano gia' dal banner.
+  DUE IPOTESI GUARDATE E SCARTATE, che e' la parte che risparmia il
+  prossimo giro: l'a-capo dentro la pillola (misurato a 320, 360 e
+  375: il testo sta su una riga a tutte e tre) e la `line-height` da
+  sola (con l'1.5 il bottone torna alto come il fratello, ma il 🟣
+  resta senza aria SOPRA: e' il font, non l'interlinea).
   IL CTA DEL BANNER NON CAMBIA PORTA: SPARISCE (ago 2026, il giorno
   dopo, dal campo — e questa riga EMENDA quella del giro prima, che
   diceva «cambia porta»). Su onion `mostraBanner` non disegna nessun
