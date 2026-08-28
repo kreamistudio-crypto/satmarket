@@ -7317,6 +7317,19 @@ const titoloRiga = nome =>
 const nomeTitolo = id => (myTitoli.find(t=>t.id===id)||{}).nome || '';
 function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), ms||2200); }
+/* Quanto sta a schermo un messaggio che si LEGGE invece di sbirciarsi.
+   I 40 ms per carattere non sono inventati: sono il ritmo che il
+   progetto ha gia' scelto a mano guardando lo schermo (il toast della
+   prestazione in revisione, 304 caratteri in 12 secondi). Il
+   PAVIMENTO e' i 6 secondi di sempre, quindi i messaggi corti non si
+   allungano di un millisecondo; il TETTO e' 14, perche' oltre un
+   toast smette di essere un avviso e diventa un ostacolo in mezzo
+   allo schermo. Serve ai rifiuti della moderazione, che da ago 2026
+   dicono anche quale divieto e' scattato e cosa fare: in sei secondi
+   quel testo non si legge, e un messaggio che non si legge e' un
+   messaggio che non c'e'. */
+function tempoLettura(testo){
+  return Math.min(14000, Math.max(6000, (testo || '').length * 40)); }
 function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 
 /* ---------------- navigazione ---------------- */
@@ -28092,7 +28105,8 @@ async function publish(){
       toast('Le foto sono troppo pesanti tutte insieme: togline una e riprova', 7000);
       return;
     }
-    if (!r.ok) { toast(d.detail||'Errore nella pubblicazione', 6000); return; }
+    if (!r.ok) { const e = d.detail||'Errore nella pubblicazione';
+                 toast(e, tempoLettura(e)); return; }
     nuovoId = d.id;
     inRevisione = !!d.revisione; attesaOre = d.attesa_ore || 24;
     avvisoFotoTesto = avvisoFoto(d, sellFoto.length);
@@ -28200,7 +28214,8 @@ async function salvaModifica(t, p){
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify(body)});
     const d = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(d.detail||'Errore nella modifica', 6000); return; }
+    if (!r.ok) { const e = d.detail||'Errore nella modifica';
+                 toast(e, tempoLettura(e)); return; }
     avvisoFotoTesto = avvisoFoto(d, (body.foto || []).length);
     if (d.revisione) {
       /* la modifica ha insospettito l'AI: l'annuncio esce dalla
@@ -28378,7 +28393,8 @@ async function salvaModificaFirmata(t, p){
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify(body)});
   const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Errore nella modifica', 7000); return; }
+  if (!r.ok) { const e = d.detail||'Errore nella modifica';
+               toast(e, tempoLettura(e)); return; }
   /* Come si firma? Senza rituale, quando si puo': prima la sessione
      bunker conservata sul dispositivo, poi l'estensione. Il foglio
      compare solo se non c'e' una strada automatica o se e' morta. */

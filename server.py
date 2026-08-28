@@ -8619,6 +8619,34 @@ MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
                "sessuali, refurtiva, contraffazioni, documenti, dati "
                "personali, farmaci e animali protetti.")
 
+# IL RIFIUTO DICE QUALE DIVIETO E' SCATTATO (ago 2026, decisione di
+# Andrea): la lista dei nove non dice a chi legge quale delle nove
+# cose l'abbia fermato, e chi è stato bloccato per sbaglio non ha modo
+# di capirlo. Il divieto lo sappiamo sempre — dal filtro parole è la
+# CATEGORIA del catalogo, dall'AI la famiglia che divieto_bloccante
+# ricava dal motivo — quindi si dice, e con parole NOSTRE: il motivo
+# del modello resta ai moderatori, che il testo generato non va
+# mostrato a chi lo subisce.
+MSG_RIFIUTO_DIVIETO = ("Questo annuncio sembra rientrare tra le cose "
+                       "che su Barattolo non si vendono: {divieto}.")
+
+# E DICE ANCHE LA STRADA, che è la metà che mancava: il rifiuto era
+# l'unico esito della moderazione a non indicarne nessuna — la
+# revisione dice quanto aspettare, i servizi dicono cosa riscrivere,
+# e il no secco era un muro. Il modello è MSG_RIFIUTO_SERVIZI, che la
+# strada la dice già e per questo non prende questa coda.
+# LA FRASE AMMETTE CHE L'ERRORE PUÒ ESSERE NOSTRO, e non è cortesia:
+# un venditore onesto bloccato per una parola oggi non sa di poter
+# protestare, quindi non protesta, quindi non lo scopriamo — l'unica
+# ragione per cui il caso «Sat's Oil» è arrivato fino a noi è che
+# quella persona ha scritto di sua iniziativa.
+MSG_RIFIUTO_RISCRIVI = (" Se il tuo annuncio parlava d'altro, "
+                        "riscrivilo più chiaro e ripubblica: a volte "
+                        "basta una parola di troppo per farci "
+                        "sbagliare.")
+MSG_RIFIUTO_SCRIVICI = (" Se invece pensi che l'errore sia nostro, "
+                        "scrivici: ")
+
 # Chi prova a vendere una prestazione non merita la lista dei divieti
 # gravi: il no e' di prodotto, non di condotta.
 # IL TESTO E' CAMBIATO COL CANTIERE DEI SERVIZI (ago 2026), e non era
@@ -8739,24 +8767,57 @@ def promette_recupero_wallet(titolo: str, descrizione: str = "") -> bool:
 
 
 
-def messaggio_rifiuto(motivo: str) -> str:
-    """Il messaggio giusto per il no dell'AI: a chi si e' spacciato
-    per noi il confine, ai servizi il garbo, a tutto il resto la lista
-    dei divieti. 'servizi sessuali' NON e' un servizio da garbo: resta
-    col messaggio di sempre.
+def messaggio_rifiuto(motivo: str = "", divieto: str = "") -> str:
+    """Il messaggio giusto per un no: a chi si e' spacciato per noi il
+    confine, ai servizi il garbo, a tutto il resto QUALE divieto e'
+    scattato — piu' la strada per rimediare, che e' comune a tutti e
+    tre. 'servizi sessuali' NON e' un servizio da garbo: resta col
+    messaggio severo.
+
+    Due chiamanti e due strade: il filtro PAROLE passa il `divieto`
+    (la categoria del suo catalogo), l'AI passa il `motivo` e la
+    famiglia si ricava. Chi non passa niente ha la lista dei nove.
 
     L'IMPERSONAZIONE SI GUARDA PER PRIMA, e non e' l'ordine che
     capita: il motivo scritto dall'AI puo' benissimo dire «finto
     servizio clienti di Barattolo», e quella parola cadrebbe nel ramo
     dei servizi — cioe' risponderebbe «i servizi non sono ancora
     supportati» a chi ha appena provato a spacciarsi per noi."""
+    # La coda si compone qui e in nessun altro posto: i siti che
+    # rifiutano sono SEI (tre funzioni per due strati), e una coda
+    # appesa da loro sarebbe sei posti da tenere in pari — col
+    # settimo di domani che se ne dimentica. Il contatto si scrive
+    # solo se il canale c'è davvero (il patto di casa: mai promettere
+    # una porta che non si apre), col calco del messaggio dei
+    # moderatori — startswith("http"), non un valore qualunque.
+    def coda(riscrivi: bool = True) -> str:
+        c = MSG_RIFIUTO_RISCRIVI if riscrivi else ""
+        if (BANNER_TEST_LINK or "").startswith("http"):
+            c += MSG_RIFIUTO_SCRIVICI + BANNER_TEST_LINK
+        return c
+
+    # IL DIVIETO PASSATO VINCE, e non è un caso particolare: è il
+    # filtro parole, che la sua categoria ce l'ha già in mano e più
+    # precisa della nostra (nove voci contro quattro). Chi la passa
+    # non ha nemmeno un motivo da leggere.
+    if divieto:
+        return MSG_RIFIUTO_DIVIETO.format(divieto=divieto) + coda()
     m = (motivo or "").lower()
     if any(p in m for p in PAROLE_IMPERSONAZIONE):
-        return MSG_RIFIUTO_IMPERSONAZIONE
+        return MSG_RIFIUTO_IMPERSONAZIONE + coda()
     if (("servizio" in m or "servizi" in m or "prestazion" in m)
             and "sessual" not in m):
-        return MSG_RIFIUTO_SERVIZI
-    return MSG_RIFIUTO
+        # I servizi la strada la dicono già («Riscrivi… e ripubblica!»):
+        # la stessa cosa due volte a due righe di distanza è il
+        # registro che questo progetto toglie, non aggiunge.
+        return MSG_RIFIUTO_SERVIZI + coda(riscrivi=False)
+    # Dall'AI il divieto si ricava dal motivo. Il RIPIEGO è la lista
+    # dei nove di sempre: succede sul DUBBIO della modifica firmata,
+    # che passa di qui pur non avendo nessuna famiglia dietro.
+    famiglia = divieto_bloccante(motivo)
+    testa = (MSG_RIFIUTO_DIVIETO.format(divieto=famiglia)
+             if famiglia else MSG_RIFIUTO)
+    return testa + coda()
 
 
 def controlla_vietato(titolo: str, descrizione: str) -> str | None:
@@ -8808,35 +8869,74 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
 # scatta. Si accetta: quando il modello e' abbastanza sicuro da dire
 # quella parola secca, il no e' la risposta giusta, e chi non e'
 # d'accordo protesta. La lista si accorcia, non si allunga.
-PAROLE_BLOCCANTI = frozenset((
+# LE QUATTRO FAMIGLIE SONO LA FONTE, le due liste si DERIVANO (ago
+# 2026, col cantiere del messaggio): erano due elenchi piatti, e da
+# lì si sa SE bloccare ma non QUALE divieto è scattato — che è
+# esattamente la cosa che al venditore serve sapere. Raggruppate per
+# famiglia la domanda ha una risposta, e le liste restano quelle di
+# prima per costruzione invece che per attenzione: è il patto di
+# REGIONI/SIGLE_REGIONE, una fonte sola e le derivate sotto.
+# L'ETICHETTA E' QUELLA CHE IL VENDITORE LEGGE, quindi si scrive per
+# lui e non per noi: entra in «rientra tra le cose che su Barattolo
+# non si vendono: …», e va bene al singolare come al plurale.
+DIVIETI_BLOCCANTI = {
     # ESATTE, e la ragione e' che sono corte: «arma» sta dentro
     # «armadio», «droga» dentro «drogato» va bene ma «armi» dentro
-    # «armistizio» no — a parole intere non succede.
-    "arma", "armi", "droga", "droghe", "minore", "minori",
-    "escort", "prostituta", "prostitute",
-))
-PREFISSI_BLOCCANTI = (
-    # LUNGHE e senza omonimi: qui il prefisso e' sicuro e prende le
+    # «armistizio» no — a parole intere non succede. I PREFISSI sono
+    # LUNGHI e senza omonimi: li' il prefisso e' sicuro e prende le
     # declinazioni («sessuali», «sfruttamento», «clonate»...)
-    "munizion", "esplosiv", "stupefacent", "cocain", "eroin",
-    "hashish", "marijuana", "anfetamin", "sessual", "prostituzion",
-    "pedoporn", "sfruttament", "clonat", "credenzial",
-)
+    "armi": {"parole": ("arma", "armi"),
+             "prefissi": ("munizion", "esplosiv")},
+    "droghe": {"parole": ("droga", "droghe"),
+               "prefissi": ("stupefacent", "cocain", "eroin",
+                            "hashish", "marijuana", "anfetamin")},
+    "sesso a pagamento e sfruttamento": {
+        "parole": ("minore", "minori", "escort",
+                   "prostituta", "prostitute"),
+        "prefissi": ("sessual", "prostituzion", "pedoporn",
+                     "sfruttament")},
+    "documenti falsi e credenziali": {
+        "parole": (),
+        "prefissi": ("clonat", "credenzial")},
+}
+PAROLE_BLOCCANTI = frozenset(
+    p for v in DIVIETI_BLOCCANTI.values() for p in v["parole"])
+PREFISSI_BLOCCANTI = tuple(
+    p for v in DIVIETI_BLOCCANTI.values() for p in v["prefissi"])
+
+
+def divieto_bloccante(motivo: str) -> str:
+    """QUALE divieto ferma davvero, guardando il MOTIVO che il modello
+    ha scritto con parole sue: l'etichetta della famiglia, o '' se non
+    se ne riconosce nessuna. A PAROLE INTERE come il filtro di casa
+    (con gli spazi ai lati, 'armadio' non contiene 'arma').
+
+    L'ORDINE E' QUELLO DEL CATALOGO e va detto, che un motivo può
+    nominarne due («droga e armi»): vince la prima famiglia scritta in
+    DIVIETI_BLOCCANTI. Deterministico, e la scelta non cambia il
+    blocco — cambia solo la parola che il venditore legge.
+
+    Fail-SAFE verso la coda: un motivo che non si riconosce non
+    blocca — sbagliare qui vuol dire far guardare una riga a un umano,
+    mentre sbagliare nell'altro verso vuol dire fermare un venditore
+    onesto senza che nessuno lo sappia."""
+    testo = f" {normalizza(motivo)} "
+    parole = testo.split()
+    for etichetta, voci in DIVIETI_BLOCCANTI.items():
+        if any(f" {p} " in testo for p in voci["parole"]):
+            return etichetta
+        if any(any(w.startswith(p) for p in voci["prefissi"])
+               for w in parole):
+            return etichetta
+    return ""
 
 
 def _vietato_bloccante(motivo: str) -> bool:
-    """Il VIETATO dell'AI ferma davvero, o va in coda? Guarda il MOTIVO
-    che il modello ha scritto con parole sue, a PAROLE INTERE come il
-    filtro di casa (con gli spazi ai lati, 'armadio' non contiene
-    'arma'). Fail-SAFE verso la coda: un motivo che non si riconosce
-    non blocca — sbagliare qui vuol dire far guardare una riga a un
-    umano, mentre sbagliare nell'altro verso vuol dire fermare un
-    venditore onesto senza che nessuno lo sappia."""
-    testo = f" {normalizza(motivo)} "
-    if any(f" {p} " in testo for p in PAROLE_BLOCCANTI):
-        return True
-    return any(any(w.startswith(p) for p in PREFISSI_BLOCCANTI)
-               for w in testo.split())
+    """Il VIETATO dell'AI ferma davvero, o va in coda? E' il rovescio
+    del giudice qui sopra, e resta una funzione sua perché è questa la
+    domanda che _leggi_verdetto fa: due letture della stessa lista
+    direbbero, prima o poi, due cose diverse sullo stesso motivo."""
+    return bool(divieto_bloccante(motivo))
 
 
 def registra_moderazione(strato: str, esito: str, motivo: str,
@@ -11844,7 +11944,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
             f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
 
     # --- Strato 2: parere dell'AI. Il vietato netto blocca come
     # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
@@ -13151,7 +13251,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
@@ -13418,7 +13518,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
             f"🚫 <b>Modifica firmata bloccata dal filtro</b> ({cat_vietata})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(divieto=cat_vietata))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto:
         esito, motivo = verdetto

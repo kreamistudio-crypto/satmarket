@@ -19424,8 +19424,8 @@ def prove_impersonazione():
     # da sola (la lezione di reale() e di _fmt_sats).
     import unicodedata as _u
     amb = {"MODERAZIONE_REVISIONE": True, "re": re, "unicodedata": _u}
-    for ancora in ("def normalizza(", "PAROLE_BLOCCANTI = ",
-                   "PREFISSI_BLOCCANTI = ", "def _vietato_bloccante("):
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "def divieto_bloccante(", "def _vietato_bloccante("):
         i = _SORGENTE.index(ancora)
         exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
     exec(pezzo("_leggi_verdetto"), amb)
@@ -19452,16 +19452,45 @@ def prove_impersonazione():
     # droghe, che non c'entra niente. Adesso ha il suo messaggio, e
     # deve dire anche DOV'E' IL CONFINE: qui e' sottile e non ovvio —
     # nominare il mercatino va benissimo, parlare a nome suo no.
-    amb2 = {}
-    for costante in ("MSG_RIFIUTO = (", "MSG_RIFIUTO_SERVIZI = (",
+    # CHI ESTRAE UNA FUNZIONE NE EREDITA LE DIPENDENZE, per la
+    # seconda volta in questa prova: da quando il rifiuto dice QUALE
+    # divieto e' scattato, messaggio_rifiuto chiama il giudice delle
+    # famiglie — e il canale, che decide se la coda porta un
+    # contatto. Il link finto e' un http VERO apposta: col
+    # segnaposto la coda tacerebbe, e meta' di queste righe non
+    # proverebbero piu' niente.
+    amb2 = {"re": re, "unicodedata": _u,
+            "BANNER_TEST_LINK": "https://t.me/prova"}
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "def divieto_bloccante("):
+        i = _SORGENTE.index(ancora)
+        exec(_SORGENTE[i:_SORGENTE.index(chr(10) * 3, i)], amb2)
+    for costante in ("MSG_RIFIUTO = (", "MSG_RIFIUTO_DIVIETO = (",
+                     "MSG_RIFIUTO_RISCRIVI = (",
+                     "MSG_RIFIUTO_SCRIVICI = (",
+                     "MSG_RIFIUTO_SERVIZI = (",
                      "MSG_RIFIUTO_IMPERSONAZIONE = (",
                      "PAROLE_IMPERSONAZIONE = ("):
         j = _SORGENTE.index(costante)
         exec(_SORGENTE[j:_SORGENTE.index("\n\n", j)], amb2)
     exec(pezzo("messaggio_rifiuto"), amb2)
     rifiuto = amb2["messaggio_rifiuto"]
+    # QUESTE PROVE HANNO CAMBIATO LATO (ago 2026): chiedevano che
+    # il messaggio fosse SOLO la costante, cioe' certificavano il
+    # muro — un no che non dice a chi legge ne' cosa riscrivere ne'
+    # a chi protestare. Restano UGUAGLIANZE ESATTE, che e'
+    # l'affermazione piu' forte: cosi' provano in un colpo il
+    # messaggio giusto E che la strada e' appesa a tutti.
+    coda = (amb2["MSG_RIFIUTO_RISCRIVI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
+            + "https://t.me/prova")
+    # ...e i servizi il riscrivi NON lo prendono: la loro frase la
+    # dice gia' («Riscrivi… e ripubblica!»), e la stessa cosa due
+    # volte a due righe di distanza e' il registro che questo
+    # progetto toglie. E' l'unico ramo con una coda diversa: se un
+    # domani gliela si uniforma per simmetria, questa riga lo dice.
+    coda_serv = amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova"
     prova("chi si e' spacciato per noi ha il messaggio suo",
-          amb2["MSG_RIFIUTO_IMPERSONAZIONE"],
+          amb2["MSG_RIFIUTO_IMPERSONAZIONE"] + coda,
           rifiuto("impersonazione della piattaforma"))
     prova("...che dice il confine, non l'elenco delle armi", True,
           "nominare il mercatino va benissimo" in
@@ -19478,22 +19507,75 @@ def prove_impersonazione():
                      "si spaccia per un moderatore",
                      "phishing mascherato da annuncio"):
         prova(f"...anche detto «{variante}»",
-              amb2["MSG_RIFIUTO_IMPERSONAZIONE"], rifiuto(variante))
+              amb2["MSG_RIFIUTO_IMPERSONAZIONE"] + coda,
+              rifiuto(variante))
     # LA RIGA CHE DECIDE L'ORDINE dei due rami, e senza questa prova
     # sarebbe invisibile: il motivo puo' nominare un servizio proprio
     # perche' quello e' cio' per cui ci si finge. Col ramo dei servizi
     # davanti, a chi ha provato a spacciarsi per noi risponderemmo
     # «i servizi non sono ancora supportati».
     prova("«finto servizio clienti» e' impersonazione, non un servizio",
-          amb2["MSG_RIFIUTO_IMPERSONAZIONE"],
+          amb2["MSG_RIFIUTO_IMPERSONAZIONE"] + coda,
           rifiuto("finto servizio clienti di Barattolo"))
     # e le due strade di sempre non si sono mosse
     prova("i servizi veri tengono il loro garbo",
-          amb2["MSG_RIFIUTO_SERVIZI"], rifiuto("servizio su commissione"))
-    prova("...i servizi sessuali il messaggio severo",
-          amb2["MSG_RIFIUTO"], rifiuto("servizi sessuali mascherati"))
-    prova("...e le armi la lista di sempre",
-          amb2["MSG_RIFIUTO"], rifiuto("arma da fuoco"))
+          amb2["MSG_RIFIUTO_SERVIZI"] + coda_serv,
+          rifiuto("servizio su commissione"))
+    # E LE DUE CHE PRIMA PRENDEVANO LA LISTA DEI NOVE adesso
+    # dicono QUALE divieto e' scattato — che e' tutto il cantiere:
+    # chi legge non doveva indovinare quale delle nove cose lo
+    # avesse fermato. Il divieto lo scriviamo NOI (l'etichetta del
+    # catalogo), mai il motivo che il modello ha scritto con parole
+    # sue: quello resta ai moderatori.
+    def col_divieto(d):
+        return amb2["MSG_RIFIUTO_DIVIETO"].format(divieto=d) + coda
+    prova("...i servizi sessuali dicono la loro famiglia",
+          col_divieto("sesso a pagamento e sfruttamento"),
+          rifiuto("servizi sessuali mascherati"))
+    prova("...e un'arma dice «armi», non l'elenco dei nove",
+          col_divieto("armi"), rifiuto("arma da fuoco"))
+    # IL RIPIEGO resta la lista: ci cade il DUBBIO della modifica
+    # firmata, che passa da qui pur non avendo nessuna famiglia
+    # dietro. Senza questa riga, il giorno che il ripiego sparisse
+    # quel messaggio diventerebbe una frase monca.
+    prova("...e senza famiglia resta la lista dei nove",
+          amb2["MSG_RIFIUTO"] + coda, rifiuto("caso ambiguo"))
+    # IL RAMO DEL FILTRO PAROLE HA IL SUO TESTO, e senza questa
+    # riga non lo guardava nessuno: le prove qui sotto passano
+    # tutte dal ramo dell'AI, e la coda del ramo `divieto=` si
+    # poteva togliere senza far diventare rossa una sola prova.
+    # L'ha detto la tortura, non la rilettura — ed e' il ramo che
+    # serve i tre quarti dei rifiuti, che il filtro parole viene
+    # PRIMA dell'AI e blocca per primo.
+    prova("il filtro parole compone col suo divieto e la strada",
+          col_divieto("farmaci"), rifiuto(divieto="farmaci"))
+    # ...e la categoria del catalogo vince sul motivo, che su
+    # quella strada non c'e' nemmeno da leggere.
+    prova("...e la categoria passata batte il motivo",
+          col_divieto("animali protetti"),
+          rifiuto("arma da fuoco", divieto="animali protetti"))
+    # LE TRE COSE CHE IL RIFIUTO DEVE DIRE, guardate una per una
+    # sul testo che il venditore legge davvero.
+    detto = rifiuto("arma da fuoco")
+    prova("il rifiuto dice QUALE divieto", True, "armi" in detto)
+    prova("...che si puo' riscrivere e ripubblicare", True,
+          "ripubblica" in detto)
+    prova("...e a chi scrivere se l'errore e' nostro", True,
+          "https://t.me/prova" in detto)
+    # E IL CANALE SI PROMETTE SOLO SE C'E': un contatto scritto
+    # dove non c'e' nessun canale e' una porta su un muro.
+    amb3 = dict(amb2, BANNER_TEST_LINK="")
+    exec(pezzo("messaggio_rifiuto"), amb3)
+    muto = amb3["messaggio_rifiuto"]("arma da fuoco")
+    prova("senza canale non si promette nessun contatto", True,
+          "scrivici" not in muto and "armi" in muto
+          and "ripubblica" in muto)
+    # ...e nemmeno un segnaposto vale per un canale: e' la stessa
+    # riga del messaggio dei moderatori (startswith("http")).
+    amb4 = dict(amb2, BANNER_TEST_LINK="INCOLLA_QUI_IL_LINK")
+    exec(pezzo("messaggio_rifiuto"), amb4)
+    prova("...nemmeno col segnaposto nel config", True,
+          "scrivici" not in amb4["messaggio_rifiuto"]("arma da fuoco"))
 
 
 # ====================================================================
@@ -22971,14 +23053,22 @@ def prove_sat_non_e_barattolo():
     # 4. il buco della lista: il messaggio giusto a chi si e' visto
     #    dire «confondere». Si prova sulla funzione VERA, coi motivi
     #    scritti come li scrive l'AI.
-    amb2 = {}
+    import unicodedata as _u2
+    amb2 = {"re": re, "unicodedata": _u2,
+            "BANNER_TEST_LINK": "https://t.me/prova"}
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "def divieto_bloccante("):
+        i = src.index(ancora)
+        exec(src[i:src.index(chr(10) * 3, i)], amb2)
     for n in ("MSG_RIFIUTO", "MSG_RIFIUTO_SERVIZI",
               "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE"):
         j = src.index(f"{n} = ")
         exec(src[j:src.index("\n\n\n", j)], amb2)
     exec(pezzo("messaggio_rifiuto"), amb2)
     msg = amb2["messaggio_rifiuto"]
-    imperson = amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
+    imperson = (amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
+                + amb2["MSG_RIFIUTO_RISCRIVI"]
+                + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova")
     prova("«confondere»: il messaggio dell'impersonazione, non le armi",
           imperson,
           msg('il nome appare progettato per confondere con Barattolo'))
@@ -22988,9 +23078,16 @@ def prove_sat_non_e_barattolo():
                    "phishing: chiede le credenziali"):
         prova(f"...e resta vero per «{motivo[:28]}»", imperson,
               msg(motivo))
-    prova("un servizio resta un servizio", amb2["MSG_RIFIUTO_SERVIZI"],
+    prova("un servizio resta un servizio",
+          amb2["MSG_RIFIUTO_SERVIZI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
+          + "https://t.me/prova",
           msg("servizio di riparazione su commissione"))
-    prova("e le armi la lista di sempre", amb2["MSG_RIFIUTO"],
+    # HA CAMBIATO LATO (ago 2026): chiedeva la lista dei nove, e
+    # adesso il rifiuto dice QUALE divieto e' scattato.
+    prova("e un'arma dice «armi»",
+          amb2["MSG_RIFIUTO_DIVIETO"].format(divieto="armi")
+          + amb2["MSG_RIFIUTO_RISCRIVI"]
+          + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova",
           msg("arma da fuoco funzionante"))
 
     # 5. il collaudo col MODELLO tiene il caso come REGRESSIONE
@@ -23042,8 +23139,8 @@ def prove_ai_segnala():
     src = _SORGENTE
     import unicodedata as _u
     amb = {"re": re, "unicodedata": _u}
-    for ancora in ("def normalizza(", "PAROLE_BLOCCANTI = ",
-                   "PREFISSI_BLOCCANTI = ", "def _vietato_bloccante("):
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "def divieto_bloccante(", "def _vietato_bloccante("):
         i = src.index(ancora)
         exec(src[i:src.index("\n\n\n", i)], amb)
     blocca = amb["_vietato_bloccante"]
@@ -23080,6 +23177,112 @@ def prove_ai_segnala():
 
     # --- il declassamento sta nel GIUDICE, e la leva resta sovrana --
     lv = pezzo("_leggi_verdetto")
+    # --- LE DUE LISTE SI DERIVANO DALLA FONTE (ago 2026) --------
+    # Erano due elenchi piatti, e da li' si sapeva SE bloccare ma
+    # non QUALE divieto — che e' la cosa che al venditore serve.
+    # Raggruppate per famiglia, le liste restano quelle di prima
+    # PER COSTRUZIONE: questa riga e' l'unica cosa che lo dice, e
+    # diventa rossa il giorno che una parola si perde in mezzo.
+    prova("le parole bloccanti sono ancora le nove di sempre",
+          {"arma", "armi", "droga", "droghe", "minore", "minori",
+           "escort", "prostituta", "prostitute"},
+          set(amb["PAROLE_BLOCCANTI"]))
+    prova("...e i quattordici prefissi, NELL'ORDINE di prima",
+          ("munizion", "esplosiv", "stupefacent", "cocain", "eroin",
+           "hashish", "marijuana", "anfetamin", "sessual",
+           "prostituzion", "pedoporn", "sfruttament", "clonat",
+           "credenzial"),
+          tuple(amb["PREFISSI_BLOCCANTI"]))
+    # ...e nessuna famiglia resta senza parole E senza prefissi:
+    # una voce vuota non blocca niente e non lo direbbe nessuno.
+    prova("nessuna famiglia e' vuota", True,
+          all(v["parole"] or v["prefissi"]
+              for v in amb["DIVIETI_BLOCCANTI"].values()))
+    # --- E IL GIUDICE DICE QUALE, con l'etichetta che il
+    # venditore legge. Le sentinelle dicono che esiste: solo
+    # girandolo si vede che risponde la famiglia giusta.
+    quale = amb["divieto_bloccante"]
+    for motivo, atteso in (
+            ("arma da fuoco funzionante", "armi"),
+            ("vendita di munizioni", "armi"),
+            ("vende cocaina", "droghe"),
+            ("sostanze stupefacenti", "droghe"),
+            ("servizi sessuali a pagamento",
+             "sesso a pagamento e sfruttamento"),
+            ("sfruttamento di minori",
+             "sesso a pagamento e sfruttamento"),
+            ("carte clonate", "documenti falsi e credenziali"),
+            ("chiede le credenziali dell'account",
+             "documenti falsi e credenziali"),
+            ("impersonazione della piattaforma", ""),
+            ("un armadio in noce", ""),
+    ):
+        prova(f"«{motivo[:30]}» -> {atteso or 'in coda'}",
+              atteso, quale(motivo))
+    # IL BOOLEANO E' IL ROVESCIO DEL GIUDICE e non una seconda
+    # lettura della stessa lista: due letture, prima o poi, dicono
+    # due cose diverse sullo stesso motivo.
+    prova("_vietato_bloccante e' il rovescio di divieto_bloccante",
+          True,
+          "return bool(divieto_bloccante(motivo))"
+          in pezzo("_vietato_bloccante"))
+    # --- I SEI SITI CHE RIFIUTANO, censiti e non elencati -------
+    # Sono tre funzioni per due strati (pubblica, modifica,
+    # modifica firmata) e nessuno di loro compone piu' il
+    # messaggio: lo chiede a messaggio_rifiuto, che e' il posto
+    # dove la coda vive. Il settimo di domani lo eredita solo se
+    # passa di li' — e se non lo fa, questa riga lo dice.
+    corpo = _SORGENTE
+    prova("nessuno rifiuta piu' con la costante nuda", 0,
+          corpo.count("HTTPException(400, MSG_RIFIUTO)"))
+    prova("...i sei passano tutti dal compositore", 6,
+          corpo.count("HTTPException(400, messaggio_rifiuto("))
+    # IL FILTRO PAROLE PASSA LA SUA CATEGORIA, che e' piu' precisa
+    # della famiglia (nove voci contro quattro): se un domani
+    # tornasse a non passarla, quei tre rifiuti direbbero la lista
+    # dei nove a chi la categoria ce l'aveva gia' in mano.
+    prova("...e i tre del filtro parole dicono QUALE categoria", 3,
+          corpo.count("messaggio_rifiuto(divieto="))
+
+    # --- E IL MESSAGGIO DEVE STARE A SCHERMO QUANTO SERVE -------
+    # Il testo e' cresciuto (dice il divieto, la riscrittura e il
+    # contatto): in sei secondi non si legge, e un messaggio che
+    # non si legge e' un messaggio che non c'e'. Il PAVIMENTO
+    # resta i sei secondi di sempre, quindi gli errori corti non
+    # si allungano di un millisecondo.
+    _mini2 = open("miniapp.html", encoding="utf-8").read()
+    prova("i tre rifiuti del client passano da tempoLettura", 3,
+          _mini2.count("toast(e, tempoLettura(e))"))
+    prova("...e nessuno tiene piu' il tempo fisso", 0,
+          _mini2.count("Errore nella pubblicazione', 6000)")
+          + _mini2.count("Errore nella modifica', 6000)")
+          + _mini2.count("Errore nella modifica', 7000)"))
+    # I 40 ms per carattere non sono inventati: sono il ritmo che
+    # il progetto ha gia' scelto a mano guardando lo schermo (il
+    # toast della prestazione, 304 caratteri in 12 secondi). Se
+    # quel toast cambia durata, questa riga viene a chiedere se il
+    # ritmo e' ancora quello.
+    _serv = re.findall(r"serv \? (\d+) : \d+", _mini2)
+    prova("il ritmo e' ancora quello del toast della prestazione",
+          True, _serv and abs(int(_serv[0]) / 304 - 40) < 6)
+    # E IL GIUDICE SI FA GIRARE: una sentinella dice che esiste,
+    # mai che risponda giusto — e qui la risposta e' un numero.
+    import subprocess as _sp2, json as _js2
+    _tl = pezzo_js(_mini2, "function tempoLettura(testo){")
+    try:
+        _r2 = _sp2.run(["node", "-e", _tl + ";console.log("
+                       "JSON.stringify([tempoLettura('x'.repeat(28)),"
+                       "tempoLettura('x'.repeat(293)),"
+                       "tempoLettura('x'.repeat(414)),"
+                       "tempoLettura(''), tempoLettura(null)]))"],
+                       capture_output=True, text=True, timeout=30)
+        prova("il tempo segue la lunghezza, col pavimento e il tetto",
+              [6000, 11720, 14000, 6000, 6000],
+              _js2.loads(_r2.stdout.strip()))
+    except FileNotFoundError:
+        salta("il tempo di lettura (node non c'e')")
+
+
     prova("il vietato passa da _vietato_bloccante", True,
           "if _vietato_bloccante(motivo):" in lv)
     prova("...e chi non lo e' diventa un dubbio", True,
