@@ -25288,11 +25288,12 @@ altro `.onion` non apre la porta e la porta appresso non la chiude.
 IN PRODUZIONE il deploy non cambia NIENTE: `ONION_HOST` nasce vuota nel
 codice, e senza quella riga nel config del VPS ogni pagina esce
 esattamente com'è sempre stata. Si accende scrivendo l'indirizzo (senza
-schema e senza porta) e riavviando. DA GUARDARE al primo giro, ed è il
-pezzo che da qui non si può fare: il giro completo in Tor Browser —
-vetrina, scheda, login Nostr, un acquisto fino alla fattura — col
-pannello di rete aperto, dove **non deve partire nessuna richiesta a
-telegram.org**.
+schema e senza porta) e riavviando.
+VERIFICATO DAL VIVO (ago 2026, Andrea in Tor Browser col pannello di
+rete aperto): filtrando «telegram» **non compare nessuna richiesta**, e
+`ONION_HOST` è nel config del VPS. Era il pezzo che da qui non si
+poteva fare, ed è il solo che dica se la fessura scatta davvero: non è
+più da guardare.
 
 Le quattro porte verso Telegram che su onion non si aprono (ago 2026,
 dal campo: Andrea ha toccato «Apri @ilbarattolobot» da Tor Browser e
@@ -25352,14 +25353,12 @@ un byte.
 VERIFICATO DAL VIVO (ago 2026, Andrea su Tor Browser): «un bottone
 solo, 🟣 Entra con Nostr». La doppia porta e' chiusa in produzione e il
 testo senza il «…o» e' quello che si legge — non e' piu' da guardare.
-⚠️ E CONFERMA IL LATO CLIENT, NON TUTTO IL CANTIERE, ed e' la
-distinzione da non perdere: `suOnion()` nel client giudica
-`location.hostname` e NON passa da `ONION_HOST`, quindi quel bottone si
-comporta bene anche con la leva del server vuota. La FESSURA che toglie
-lo script di Telegram dipende invece da `ONION_HOST` nel config del
-VPS, e resta da guardare col pannello di rete aperto: **nessuna
-richiesta a telegram.org**. Chi legge «verificato su Tor» non concluda
-che sia confermata anche quella.
+E CON LUI IL CANTIERE TOR E' CHIUSO: `ONION_HOST` e' nel config del
+VPS e il pannello di rete non mostra nessuna richiesta a telegram.org,
+cioe' anche la FESSURA del server e' verificata (le due cose andavano
+guardate separate: `suOnion()` nel client giudica `location.hostname` e
+non passa da quella leva, quindi il bottone giusto da solo non avrebbe
+detto niente sullo script).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
