@@ -405,8 +405,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   qualcuno deve guardarla: IL COSTO È LA CODA, NON IL RISCHIO.
   L'ELENCO, dichiarato e non dedotto — QUATTRO famiglie: 1) armi,
   munizioni ed esplosivi; 2) droghe e stupefacenti; 3) sesso a
-  pagamento e sfruttamento, minori compresi; 4) documenti falsi,
-  credenziali, carte clonate, account rubati.
+  pagamento e sfruttamento, minori compresi; 4) carte clonate.
+  ⚠️ LA QUARTA SI È ACCORCIATA (ago 2026, col cantiere dei piani
+  condivisi): diceva «documenti falsi, credenziali, carte clonate,
+  account rubati» e prometteva più di quanto bloccasse — i DOCUMENTI
+  FALSI da qui non hanno mai bloccato secco (nessuno dei due
+  prefissi li prende: li ferma lo STRATO 1, che ha la sua categoria
+  ed è più preciso), e `credenzial` è uscito apposta. Resta
+  `clonat`, e l'etichetta che il venditore legge dice quello.
   COSA NON C'È E PERCHÉ, che è la metà da leggere: refurtiva,
   contraffazione, farmaci con obbligo di ricetta e animali protetti
   sono illegali quanto gli altri, ma hanno tutti una LETTURA INNOCENTE
@@ -526,6 +532,103 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   esistito» non sono la stessa cosa. La leva che resta è quella già
   dichiarata — «la lista si accorcia, non si allunga» — e adesso i
   falsi positivi si vengono a sapere, che era il pezzo mancante.
+  UN POSTO SUL MIO PIANO NON È UN ACCOUNT RUBATO (ago 2026, dal campo:
+  il divieto «dati personali o account» prendeva anche i posti sui piani
+  famiglia — Spotify, DAZN, Netflix — che sono un mercato vero, e
+  Together Price fa solo quello).
+  LA DIAGNOSI ROVESCIA LA DOMANDA, ed è la cosa da sapere prima di
+  toccare una riga: l'esito di ieri non era «bloccato», era ALEATORIO.
+  `DIVIETI_BLOCCANTI` aveva `credenzial` ma NON la parola «account»,
+  quindi lo STESSO annuncio finiva in coda («vendita di account
+  condivisi») o veniva rifiutato secco («vendita di credenziali»)
+  secondo la parola che il modello sceglieva — e in tutti e due i casi
+  il venditore non pubblicava. Da lì discende la forma della cura: la
+  voce nel prompt DA SOLA NON BASTA, perché se il modello scrive
+  «credenziali» non lo salva.
+  IL PERIMETRO È IL POSTO, MAI L'ACCOUNT (decisione di Andrea): è
+  lecito il posto su un abbonamento condiviso che il venditore PAGA e
+  di cui resta TITOLARE; la cessione di un account intero resta fuori.
+  L'esito è OK — pubblica subito, come un buono regalo — perché lì non
+  c'è niente di ambiguo da far guardare a un umano.
+  LE TRE CONTRO-REGOLE sono la metà che un riordino toglie per prima,
+  perché sembrano un ripensamento. 1) IL TEST NON È LA PAROLA, È IL
+  GESTO: «piano condiviso» o «famiglia» scritti in un annuncio non
+  bastano — dev'esserci un TITOLARE CHE RESTA e un POSTO CHE SI
+  AGGIUNGE. Senza, «condiviso» diventa la parola magica, cioè l'errore
+  del «barattolo» vaso di vetro rovesciato: là un divieto sulla parola,
+  qui un permesso sulla parola. 2) L'ACCESSO INTERO NON È UN POSTO,
+  qualunque parola usi l'annuncio (email e password, «te lo intesto»,
+  «cambia tu la password») → DUBBIO, perché da fuori non si distingue
+  da un account preso a qualcun altro: è la seconda metà della regola
+  sovrana dell'impersonazione («…e non si chiede NIENTE») applicata
+  qui. 3) QUEL CHE È DI ALTRI RESTA VIETATO SENZA SFUMATURE — account
+  rubati o hackerati, credenziali di terzi, profili comprati da terze
+  parti: la regola apre una porta, non toglie un muro.
+  E LA COPPIA È DELLO STESSO SERVIZIO, che è ciò che la rende capace
+  di insegnare (il calco della bici/cuffie e della lezione/bot): «Posto
+  su piano Spotify Family» col titolare che resta → OK, «Account
+  Spotify Premium, ti passo email e password» → DUBBIO. Due annunci
+  che nominano la stessa cosa e finiscono in due esiti opposti.
+  `credenzial` ESCE DAI PREFISSI BLOCCANTI e scende in coda — è la
+  regola già scritta in casa, «la lista si accorcia, non si allunga» —
+  e resta `clonat`. CONSEGUENZA DICHIARATA: una carta clonata che il
+  modello descrive come «vendita di credenziali» finisce in revisione
+  invece che rifiutata. Si accetta, ed è l'argomento del declassamento
+  di agosto: in revisione l'annuncio NON È PUBBLICO, quindi il costo è
+  la coda e non il rischio — e in cambio la cura funziona anche quando
+  il modello sceglie la parola sbagliata.
+  ⚠️ L'ETICHETTA È LA PARTE SOTTILE, e non è cosmesi: è la stringa che
+  il venditore LEGGE nel rifiuto. Con solo `clonat` dentro, un'etichetta
+  «documenti falsi e credenziali» nominerebbe due famiglie che la voce
+  non blocca più — cioè il difetto esatto che il cantiere del messaggio
+  è nato per togliere, dire a chi è stato fermato una famiglia che non
+  è quella che l'ha fermato. Diventa `"carte clonate"`.
+  IL FILTRO PAROLE (strato 1) NON SI TOCCA: `PAROLE_VIETATE` matcha
+  frasi INTERE ad alta precisione («account rubato», «credenziali
+  rubate», «carta clonata») e un «Posto su piano Spotify Family» non ne
+  contiene nessuna — passava già ieri. Verificato voce per voce, e la
+  prova lo GIRA invece di guardarlo. ⚠️ Da lì una cosa che sembra un
+  buco e non lo è: «Carta prepagata clonata» passa lo strato 1 (le due
+  parole non sono adiacenti) e a fermarla è il declassamento — è la
+  divisione del lavoro fra gli strati, e la prova la dichiara invece di
+  turarla.
+  E `stima_coda_moderazione.py` ERA ROTTA DA AGOSTO, trovata di
+  striscio da questo cantiere: il suo `exec` montava
+  `PAROLE_BLOCCANTI`/`PREFISSI_BLOCCANTI` senza `DIVIETI_BLOCCANTI` né
+  `divieto_bloccante`, quindi lo strumento che MISURA quanto cresce la
+  coda — cioè il numero su cui poggia la decisione del declassamento —
+  moriva di NameError. Adesso c'è una prova che lo fa GIRARE, e non una
+  sentinella sulla forma: quel guasto la forma non lo mostrava.
+  ⚠️ E UN PATCH PUÒ APPLICARSI PULITO ED ESSERE INCOMPLETO — ripagata
+  qui: la prima cura aggiungeva alla catena solo `DIVIETI_BLOCCANTI`, e
+  `_vietato_bloccante` CHIAMA `divieto_bloccante`, che restava fuori.
+  Non si era visto perché lo script moriva un passo prima. È la prova
+  che gira ad averlo preso.
+  QUEL CHE QUESTO CANTIERE APRE E NON CHIUDE, ed è la voce in «Dove il
+  deposito non può proteggerti»: UN POSTO PUÒ SPARIRE DOPO — il
+  venditore lo toglie, o il fornitore chiude il piano perché la
+  condivisione fuori dal nucleo viola i suoi termini. È PEGGIO del
+  codice riscattato, che è il caso irriducibile già dichiarato: là la
+  domanda è «l'ho usato o no», qui il bene FUNZIONAVA e poi ha smesso,
+  e Barattolo non può verificare né l'una né l'altra cosa. La finestra
+  è quella del digitale, quindi il consiglio è provarlo SUBITO. Aprire
+  un mercato senza dire dove il deposito non arriva è precisamente la
+  cosa che questo progetto non fa.
+  FUORI DAL PERIMETRO, dichiarato: nessuna categoria nuova (un posto
+  sta in «Buoni ed esperienze», dove la regola del credito manda già
+  gli abbonamenti dal quarto giro del prompt di ricategorizza), nessuna
+  leva, e nessun campo «titolare del piano» da dichiarare nel form —
+  che sarebbe una domanda a cui chiunque può rispondere quel che vuole.
+  LA TORTURA HA TROVATO UN BUCO CHE NON ERA DI QUESTO CANTIERE, ed è la
+  parte da tenere: togliere una `prove_*` dalla TUPLA di `main()` era
+  l'UNICA mutazione sopravvissuta — la funzione sparisce dal giro e non
+  diventa rossa NIENTE, cala solo il conto, che nessuno confronta. Da
+  lì il CENSIMENTO delle prove orfane dentro `prove_script_nel_workflow`
+  (definite meno quelle nel main, meno quelle chiamate da una sorella),
+  che copre anche il cantiere di domani. ⚠️ E la sua prima stesura
+  cercava `"def main()"` trovando LA PROPRIA RIGA — la trappola già
+  scritta in questo file, presa mentre la si scriveva: l'ancora è la
+  definizione a colonna zero, che nella riga che la cerca non compare.
   Terza via della moderazione (lug 2026, decisione di Andrea: basta
   blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
   verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
@@ -25399,6 +25502,55 @@ cioe' anche la FESSURA del server e' verificata (le due cose andavano
 guardate separate: `suOnion()` nel client giudica `location.hostname` e
 non passa da quella leva, quindi il bottone giusto da solo non avrebbe
 detto niente sullo script).
+
+Un posto sul mio piano non e' un account rubato (ago 2026, dal campo:
+il divieto «dati personali o account» prendeva anche i posti sui piani
+famiglia — Spotify, DAZN, Netflix — che sono un mercato vero, e
+Together Price fa solo quello). LA DIAGNOSI ROVESCIA LA DOMANDA, ed e'
+la cosa da leggere per prima: l'esito di ieri non era «bloccato», era
+ALEATORIO — `credenzial` stava fra le parole del declassamento e
+«account» no, quindi lo stesso annuncio finiva in coda o veniva
+rifiutato secco secondo la parola che il modello sceglieva. Da li' la
+cura in due pezzi, che la voce nel prompt da sola non basta. Le tre
+decisioni di Andrea (il perimetro e' il POSTO sul piano di cui il
+venditore resta titolare, l'esito e' OK, `credenzial` scende in coda) e
+le tre contro-regole stanno in Architettura, «UN POSTO SUL MIO PIANO
+NON E' UN ACCOUNT RUBATO» — con l'ETICHETTA, che e' la parte sottile:
+e' la stringa che il venditore legge, e con solo `clonat` dentro
+prometteva due famiglie che la voce non blocca piu'.
+Piu' la voce in «Dove il deposito non puo' proteggerti»: un posto puo'
+sparire dopo, ed e' PEGGIO del codice riscattato perche' il bene
+funzionava e poi ha smesso.
+E `stima_coda_moderazione.py` ERA ROTTA DA AGOSTO, trovata di striscio:
+lo strumento che misura quanto cresce la coda — il numero su cui poggia
+la decisione del declassamento — moriva di NameError. Adesso c'e' una
+prova che lo fa GIRARE, ed e' quella che ha preso anche la seconda
+meta' della cura (`_vietato_bloccante` chiama `divieto_bloccante`, che
+la prima stesura lasciava fuori: un patch puo' applicarsi pulito ed
+essere incompleto).
+Collaudato: **6951 prove verdi** (una famiglia nuova che GIRA i giudici
+e il filtro parole invece di guardarli, piu' quattro asserzioni che
+hanno CAMBIATO LATO col perche' scritto) e **16 MUTAZIONI, 16 uccise**,
+una per riga sorvegliata. La sola sopravvissuta al primo giro non era
+di questo cantiere — togliere una `prove_*` dalla tupla di `main()`,
+che fa sparire una prova dal giro senza far diventare rossa NIENTE — e
+da li' il censimento delle prove orfane, che copre anche il cantiere di
+domani.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — il prompt vale per i giudizi nuovi e gli
+annunci gia' in coda restano dove sono.
+⚠️ DA FARE PRIMA DI FIDARSI, ed e' il pezzo che in locale non si puo'
+fare perche' vuole la chiave: `python collaudo_impersonazione.py` sul
+VPS. L'atteso e' **30/30** (era 25/25). Se cade la GEMELLA del DAZN la
+cura ha imparato l'esempio invece della regola; se cade il Netflix la
+parola «condiviso» e' diventata un lasciapassare; se cadono il Disney+
+rubato o la carta clonata il muro si e' allentato. **Scrivi qui il
+conto COL NOME di quel che cade**, che un «29/30» senza nome e' un
+numero su cui fra sei mesi nessuno puo' agire.
+DA GUARDARE al primo giro: il primo annuncio vero di piano condiviso, e
+il registro `moderazione_log` — se i «credenziali» cominciano a
+comparire fra i dubbi invece che fra i rifiuti, il declassamento
+accorciato sta funzionando.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
