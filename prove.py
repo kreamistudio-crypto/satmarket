@@ -29352,12 +29352,19 @@ def prove_scoprire():
     for _f in BANNER:
         prova(f"il banner {_f} esiste", True,
               os.path.exists(os.path.join("assets", "scoprire", _f)))
-    # ...e sono ESATTAMENTE 816x390, il triplo della card 272x130: un
-    # ratio diverso verrebbe ritagliato da object-fit:cover in
-    # silenzio, e il disegno di Andrea perderebbe i bordi senza che
-    # nessuno lo veda. I tre numeri (CARD_W, CARD_H e il triplo) sono
-    # LA STESSA misura del CSS: chi cresce le card li muove insieme,
-    # o la prova diventa rossa il giro dopo.
+    # ...e sono abbastanza grandi PER IL CRITERIO e non per un numero
+    # (ago 2026, chiesto da Andrea): «>= 3x del mobile e >= 2x del web»
+    # non invecchia, «816x390» si — quella misura e' stata vera fino al
+    # giorno in cui la card del web e' cresciuta, e a dirlo non sarebbe
+    # stato nessuno: un file piu' piccolo del dovuto non fallisce, si
+    # scala su e si ammorbidisce, che e' proprio il guasto invisibile
+    # che questa prova esiste per prendere.
+    # LE DUE DENSITA' NON SONO LA STESSA: il 3x e' il telefono, il 2x
+    # il desktop (li' i display sono 1x e 2x) — quindi il file deve
+    # reggere il PEGGIORE dei due, che oggi e' il web e ieri era il
+    # mobile. E il RAPPORTO resta un'uguaglianza: un file di rapporto
+    # diverso lo ritaglia object-fit:cover in silenzio, e il disegno di
+    # Andrea perde i bordi senza che nessuno lo veda.
     # i titoli dell'elenco sono quelli VERI del catalogo, o la
     # fascia del contrasto (qui sotto, derivata dal titolo)
     # misurerebbe la lunghezza di un titolo inventato
@@ -29365,9 +29372,29 @@ def prove_scoprire():
           all(f"testo: '{_t}'" in mini for _t in BANNER.values()))
     try:
         from PIL import Image as _Im
-        prova("...e misurano 816x390", [(CARD_W * 3, CARD_H * 3)] * len(BANNER),
-              [_Im.open(os.path.join("assets", "scoprire", _f)).size
-               for _f in BANNER])
+        _webW = re.search(r"html\.fuori-telegram \.scoprire-card\{"
+                          r"width:(\d+)px\}", mini)
+        _minW = max(CARD_W * 3, int(_webW.group(1)) * 2 if _webW else 0)
+        for _f in BANNER:
+            _w, _h = _Im.open(os.path.join("assets", "scoprire", _f)).size
+            prova("...e %s regge 3x sul mobile e 2x sul web" % _f,
+                  (True, True),
+                  (_w >= _minW,
+                   abs(_w / _h - CARD_W / CARD_H) < .01))
+        # ...e il minimo si DERIVA dalle due misure, mai da un numero
+        # scritto qui: con `max(816, ...)` la prova PASSEREBBE LO STESSO
+        # finche' i file sono grandi abbastanza — e mentirebbe in
+        # silenzio il giorno che la card del web cresce, che e' l'unico
+        # giorno in cui serve. L'ancora e' l'ASSEGNAZIONE a colonna (la
+        # cintura di CLASSIFICA_KD): la riga che la cerca non e'
+        # un'assegnazione a _minW, quindi non si trova da sola.
+        _mio = open("prove.py", encoding="utf-8").read()
+        _asseg = re.search(r"^[ \t]*_minW\s*=.*$", _mio, re.M)
+        prova("il minimo dei banner si deriva dalle due misure",
+              (True, True, True),
+              (bool(_asseg),
+               "CARD_W" in (_asseg.group(0) if _asseg else ""),
+               "_webW" in (_asseg.group(0) if _asseg else "")))
     except ImportError:
         salta("misura dei banner: serve Pillow")
 
@@ -30084,6 +30111,10 @@ function renderGrid(){ scritte.push('renderGrid'); }
 function loadListings(){ scritte.push('loadListings');
   return Promise.resolve(); }
 function vaiP2P(){ scritte.push('vaiP2P'); }
+/* MUTO apposta: questo banco prova il DISPATCH del tocco, e la
+   sequenza delle scritte e' quel che confronta — le frecce
+   hanno la loro prova, qui sarebbero rumore in mezzo ai gesti. */
+function aggiornaFrecce(){}
 function lampoAttiva(){ return false; }
 function scontoQui(){ return false; }
 let DEMO = false, vistaBarattolo = false, listings = [];
@@ -30291,8 +30322,9 @@ def prove_deploy():
 def prove_strisce_web():
     """LE DUE STRISCE PIU' GRANDI SUL WEB (ago 2026): fuori da Telegram
     e da 768px in su, le card di «Da scoprire» passano da 272x130 a
-    400x191 e quelle delle categorie da 84 a 120 — col titolo dei
-    banner e il nome delle categorie che crescono con loro.
+    520x248 e quelle delle categorie da 84 a 160 — col titolo dei
+    banner e il nome delle categorie che crescono con loro, e con le
+    frecce e la rotellina che rendono la fila scorrevole col mouse.
 
     Le due cose che qui possono rompersi in silenzio, e sono opposte:
     che la crescita ARRIVI dentro la Mini App (dove il patto e' che non
@@ -30337,7 +30369,7 @@ def prove_strisce_web():
     # volte: la classe (non siamo nella Mini App) e i 768px (c'e'
     # spazio). Da soli non basterebbero ne' l'uno ne' l'altro — dentro
     # Telegram Desktop la WebView puo' essere larga, e sul telefono in
-    # browser una card da 400 non ci starebbe.
+    # browser una card da 520 non ci starebbe.
     _i = mini.index("LE DUE STRISCE, PIU' GRANDI SUL WEB")
     _web = mini[_i:mini.index("DESKTOP LARGO", _i)]
     prova("la crescita vive in un blocco solo, a 768px", True,
@@ -30388,7 +30420,7 @@ def prove_strisce_web():
 
     _kW = (_num(_web, "html.fuori-telegram .scoprire-card{", "width:")
            / _num(mini, "\n  .scoprire-card{", "width:"))
-    prova("la card del web cresce di 400/272", True, abs(_kW - 400 / 272) < .01)
+    prova("la card del web cresce di 520/272", True, abs(_kW - 520 / 272) < .01)
     _coppie = [
         ("left", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
         ("width", "html.fuori-telegram .sc-titolo{", "\n  .sc-titolo{"),
@@ -30410,7 +30442,7 @@ def prove_strisce_web():
     # ---- 5. IL VETRO DEL BARATTOLO e' l'unica card il cui contenuto
     # non e' un'immagine con object-fit: e' un SVG che il JS chiede a
     # misura FISSA, quindi da solo resterebbe a 56 dentro un quadrato
-    # da 120. Lo scala il CSS — e la regola vive SOLO nel blocco del
+    # da 160. Lo scala il CSS — e la regola vive SOLO nel blocco del
     # web: applicata anche a mobile darebbe 56,28 invece di 56.
     prova("il vetro del barattolo scala col quadrato", True,
           "html.fuori-telegram .cella-barattolo .cat-quad svg{"
@@ -30436,12 +30468,14 @@ def prove_strisce_web():
     # ---- 7. LE IMMAGINI REGGONO LA MISURA NUOVA, misurate sui file
     # veri e non sulle intenzioni (il patto del pareggio
     # dell'inchiostro). IL VINCOLO E' 2x: sul desktop i display sono 1x
-    # e 2x, e i banner sono il TRIPLO della card mobile — quindi a 400
-    # chiedono 800 device px sui 816 che hanno. Il 3x non si guarda
-    # apposta: e' il telefono, dove questa crescita non arriva; e se un
-    # domani ci arrivasse, quel cantiere questi conti li rifa'.
-    # (Oggi le illustrazioni delle categorie reggerebbero anche a 3x,
-    # la peggiore a x0,95 — margine, non garanzia.)
+    # e 2x. E I DUE TETTI SONO DI NATURA DIVERSA, che e' la cosa da
+    # sapere prima di crescere ancora: i BANNER si rigenerano dagli
+    # originali 2752x1536 (a 520 sono 1040x498, cioe' esattamente 2x —
+    # il file INSEGUE la card e non la limita, fino a ~1376px), le
+    # ILLUSTRAZIONI no: sono nate come sono, e la piu' piccola
+    # (335x240) mette il tetto a ~190px. A 160 sta a x0,84.
+    # Il 3x non si guarda apposta: e' il telefono, dove questa
+    # crescita non arriva.
     try:
         from PIL import Image as _Im
         _fw, _fh = _Im.open(os.path.join("assets", "scoprire",
@@ -30465,6 +30499,107 @@ def prove_strisce_web():
               True, _peggio <= 1)
     except ImportError:
         salta("le immagini alla misura del web: serve Pillow")
+
+    # ---- 8. LE DUE STRISCE SI SCORRONO COL MOUSE (ago 2026, dal
+    # campo). Le fila hanno la barra NASCOSTA da sempre, e sul mouse
+    # quello toglie insieme l'appiglio e il segnale che ci sia altro:
+    # le FRECCE sono l'appiglio, la ROTELLINA il gesto istintivo.
+    # Il difetto qui non fallisce mai: una freccia che non scorre, o
+    # una rotellina che pianta la pagina, non alzano niente — si vedono
+    # solo col mouse in mano, e solo sul web.
+    for _id in ("catStrip", "scoprireStrip"):
+        # la striscia sta DENTRO il wrapper, o le frecce non avrebbero
+        # niente rispetto a cui posizionarsi (`position:relative` e'
+        # suo) e finirebbero ancorate alla pagina
+        _i_w = (mini.index('<div class="strip-wrap">')
+                if _id == "catStrip"
+                else mini.rindex('<div class="strip-wrap">'))
+        _w = mini[_i_w:]
+        _w = _w[:_w.index("</div>")]
+        prova("la striscia %s vive nel wrapper delle frecce" % _id, True,
+              ('id="%s"' % _id) in _w)
+        prova("...e le sue due frecce chiamano lei", (True, True),
+              ("scorriFila('%s',-1)" % _id in mini,
+               "scorriFila('%s',1)" % _id in mini))
+    # LE FRECCE NASCONO SPENTE, ed e' la riga che si dimentica: il
+    # markup e' fisso, quindi esistono anche su una fila corta — a
+    # tenerle via e' `.off`, che il render poi toglie se c'e' davvero
+    # da scorrere. Nate accese, la prima cosa che si vedrebbe
+    # all'apertura sono due frecce inerti.
+    prova("le quattro frecce nascono spente", 4,
+          mini.count('class="strip-frec sx off"')
+          + mini.count('class="strip-frec dx off"'))
+    # ...e sul telefono non esistono affatto: `display:none` nella base
+    # e `flex` nel solo blocco del web — il patto «dentro la Mini App
+    # non cambia un pixel» vale anche per quel che si AGGIUNGE.
+    prova("...e sul telefono non esistono", True,
+          ".strip-frec{display:none}" in mini)
+    prova("...e le accende il solo blocco del web", True,
+          "html.fuori-telegram .strip-frec{" in _web)
+    # IL GUSCIO PORTA IL `position:relative`, ed e' la riga che il
+    # commento qui sopra prometteva senza che nessuno la guardasse: le
+    # frecce sono ASSOLUTE, quindi senza di lui risalirebbero al primo
+    # antenato posizionato — la trappola gia' pagata dalla
+    # `.card{position:relative}` col cantiere «farsi trovare», dove
+    # tutti i barattolini si accatastavano in alto a destra.
+    prova("...e il guscio e' il loro riferimento", True,
+          ".strip-wrap{position:relative}" in mini)
+    # E LA FRECCIA E' UN DISEGNO E NON UN'ENTITA' TIPOGRAFICA: il
+    # carattere di casa rende il chevron come un trattino sottile —
+    # visto a schermo, non leggendo il foglio — e un riordino che lo
+    # «semplifica» rimetterebbe un trattino al posto di una freccia.
+    _bott = [_r for _r in mini.split(chr(10))
+             if "onclick" in _r and "scorriFila(" in _r]
+    prova("...e la freccia e' un disegno, mai un carattere", (4, 4),
+          (len(_bott), sum(1 for _r in _bott if "<svg" in _r)))
+    # LA ROTELLINA SI ARMA SOLO FUORI DA TELEGRAM, e col giudice GIA'
+    # deciso: `FUORI_TG` LEGGE la classe che l'anti-flash ha messo, mai
+    # una seconda domanda a initData — due letture della stessa cosa un
+    # giorno direbbero due cose diverse, e la misura delle strisce e il
+    # comportamento della rotellina si separerebbero senza che nulla
+    # fallisca.
+    prova("il giudice del JS legge la classe, non rifa' la domanda",
+          (True, True),
+          ("const FUORI_TG = document.documentElement.classList"
+           ".contains('fuori-telegram');" in mini,
+           "FUORI_TG" in pezzo_js(mini, "function armaFila")))
+    _arma = pezzo_js(mini, "function armaFila")
+    # ...e il listener NON e' passivo, o il preventDefault non si
+    # potrebbe chiamare affatto e la cura sarebbe muta
+    prova("...e il wheel non e' passivo", True,
+          "{passive: false}" in _arma)
+    # A FINE CORSA SI LASCIA PASSARE ALLA PAGINA: se dopo il clamp la
+    # posizione non cambia, niente preventDefault. Senza, arrivati in
+    # fondo alla fila la rotellina si pianterebbe li' sopra e la pagina
+    # non scenderebbe piu' — il difetto peggiore dei due, perche'
+    # colpisce anche chi la fila non la sta guardando.
+    prova("...e a fine corsa la pagina scorre lo stesso", True,
+          "if (n === s.scrollLeft) return;" in _arma
+          and _arma.index("if (n === s.scrollLeft) return;")
+          < _arma.index("e.preventDefault()"))
+    # ...e un gesto GIA' orizzontale (trackpad, shift+rotellina) non si
+    # tocca: quello il browser lo fa gia' bene
+    prova("...e il gesto orizzontale resta del browser", True,
+          "Math.abs(e.deltaY) <= Math.abs(e.deltaX)" in _arma)
+    # LE FRECCE SEGUONO IL CONTENUTO: cambiando le celle cambia quanto
+    # c'e' da scorrere, e senza questa riga resterebbero come le ha
+    # lasciate il render di prima — accese su una fila che non scorre
+    # piu', o spente su una che e' appena cresciuta.
+    for _f, _id in (("renderStriscia", "catStrip"),
+                    ("renderScoprire", "scoprireStrip")):
+        prova("%s riallinea le sue frecce" % _f, True,
+              "aggiornaFrecce('%s')" % _id in pezzo_js(mini, "function " + _f))
+    # e si armano nei DUE avvii: chi arriva dal browser passa dal
+    # secondo, ed e' proprio lui il destinatario del gesto (la
+    # trappola gia' pagata da apriCategoriaDaUrl)
+    prova("le strisce si armano nei due avvii", (2, 2),
+          (mini.count("armaFila('catStrip')"),
+           mini.count("armaFila('scoprireStrip')")))
+    # LA SCIVOLATA E' MORBIDA, SECCA CON REDUCED-MOTION, e passa dal
+    # giudice di casa di quella preferenza invece di rifarne uno.
+    prova("la freccia rispetta chi non vuole animazioni", True,
+          "tourRidotto() ? 'auto' : 'smooth'" in pezzo_js(
+              mini, "function scorriFila"))
 
 
 def prove_podio_sfondo():

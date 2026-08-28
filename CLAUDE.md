@@ -2162,8 +2162,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessuno, e sarebbe una promessa che non si mantiene.
   LE DUE STRISCE SONO PIU' GRANDI SUL WEB (ago 2026, decisione di
   Andrea): fuori da Telegram e da 768px in su le card di «Da scoprire»
-  passano da 272x130 a **400x191** e le celle delle categorie da 84 a
-  **120**, col titolo dei banner e il nome dei reparti che crescono con
+  passano da 272x130 a **520x248** e le celle delle categorie da 84 a
+  **160**, col titolo dei banner e il nome dei reparti che crescono con
   loro. IL VINCOLO E' DI FERRO: dentro la Mini App non cambia NULLA,
   nemmeno di un byte — le regole BASE non si toccano, la crescita e'
   una variante.
@@ -2193,25 +2193,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in browser una card da 400 non ci starebbe. Solo la larghezza: dentro
   Telegram Desktop la WebView puo' essere larga, e il patto cadrebbe.
   Misurato al filo: a **767 le misure di ieri, a 768 quelle nuove**.
-  LA MISURA VERA LA DANNO I FILE, non il gusto: i banner sono 816x390,
-  quindi a 1x reggono fino a 816 e **a 2x fino a 408** — che sul
-  desktop e' il vincolo, perche' li' i display sono 1x e 2x (il 3x e'
-  il telefono, dove questa crescita non arriva). 400 e' l'ultimo numero
-  tondo sotto quel tetto. Le illustrazioni delle categorie invece sono
-  CONTAIN e la piu' piccola e' 240x386: **120px di lato e' l'ultima
-  misura in cui nessuna si scala su nemmeno a 3x** (la peggiore resta a
-  x0,95). Sono i due numeri da rifare, e con questo metodo, se un
-  giorno le si vuole ancora piu' grandi.
+  LA MISURA VERA LA DANNO I FILE, e i due tetti sono di NATURA DIVERSA
+  — e' la riga da leggere prima di crescere ancora. I BANNER sono
+  nostri e si RIGENERANO dagli originali (2752x1536 nei Download di
+  Andrea), quindi il loro tetto non e' un muro ma un lavoro: si e'
+  passati da 816x390 a **1040x498** e la card da 400 a **520**. LE
+  ILLUSTRAZIONI DELLE CATEGORIE no: sono disegni CONTAIN che
+  l'originale non ce l'hanno piu' in casa, e la piu' piccola e'
+  335x240 — sopra i **~190px** di lato si scalerebbe SU, cioe' si
+  ammorbidirebbe. 160 e' comodo sotto quel muro.
+  IL NUMERO CHE DECIDE E' IL DPR, e sono due mondi: **3x e' il
+  telefono, 2x il desktop**, quindi un banner regge una card larga
+  metà del file — 1040 → 520 — mentre a mobile ne regge un terzo,
+  272x3 = 816. Il file deve stare sopra TUTTI E DUE i minimi, ed e'
+  esattamente quel che la prova chiede.
+  ⚠️ LA PROVA DEL FILE SI SCRIVE COL CRITERIO E MAI COL NUMERO
+  (decisione di Andrea): «≥ 3x del mobile e ≥ 2x del web» non
+  invecchia, `816x390` si — e la mutazione che la riporta al letterale
+  (`max(816, ...)`) **PASSEREBBE LO STESSO** finche' i file sono
+  grandi abbastanza, per poi mentire in silenzio il giorno che la card
+  cresce, che e' l'unico giorno in cui quella prova serve. A
+  sorvegliarlo e' una sentinella sull'ASSEGNAZIONE a colonna (la
+  cintura di CLASSIFICA_KD), che per questo non si trova da sola.
+  L'ALTEZZA DEL FILE SI ARROTONDA PER ECCESSO: 1040 x 130/272 fa
+  497,06, e con 497 il file starebbe un pelo SOTTO il 2x della card —
+  498. Si e' alzato il file, non abbassata la prova.
   IL TITOLO CRESCE COL FATTORE DELLA CARD, e non e' un ritocco
   estetico: e' quel che tiene IDENTICO il contrasto. Se card e titolo
   scalano dello stesso `k`, la fascia sorvegliata in coordinate
-  IMMAGINE non si muove — `left x k x (816 / (272 k))` si semplifica —
-  e infatti i contrasti misurati sono gli STESSI sulle due misure
-  (**12,34 / 12,57 / 15,40**, con la fascia a x[42..342] di qua e di
-  la'). Chi crescesse il titolo PIU' della card lo spingerebbe verso la
-  scia dorata dei fondi, e lo sente dalla CI: la prova della fascia
-  gira su TUTTE E DUE le misure, e `_F` non e' piu' il 3 fisso ma il
-  rapporto file/card LETTO dal file (3 a 272, 2,04 a 400) — inchiodato
+  IMMAGINE non si muove — `left x k x (fileW / (272 k))` si semplifica
+  — e infatti i contrasti misurati sono gli STESSI sulle due misure
+  (**11,88 / 11,92 / 14,83**, con la fascia a x[54..433] e x[115..356]
+  di qua e di la'). Chi crescesse il titolo PIU' della card lo
+  spingerebbe verso la scia dorata dei fondi, e lo sente dalla CI: la
+  prova della fascia gira su TUTTE E DUE le misure, e `_F` non e' piu'
+  il 3 fisso ma il rapporto file/card LETTO dal file — inchiodato
   a 3 avrebbe continuato a misurare la card mobile, cioe' sarebbe stata
   cieca proprio dove il titolo si e' mosso.
   IL VETRO DEL BARATTOLO E' L'UNICO CONTENUTO CHE NON E' UN'IMMAGINE:
@@ -2224,8 +2240,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   LO SPAZIO RISERVATO CRESCE CON LA CARD, o torna il salto che quella
   riga esiste per non avere (la fila non si disegna finche' i conteggi
   non sono veri). E si DERIVA con la stessa formula del 115 — quadrato
-  + margine + due righe di nome — invece di ribatterlo: 120 + 5 +
-  13x1,2x2 = **156**, e chi cresce ancora le card e si dimentica la
+  + margine + due righe di nome — invece di ribatterlo: 160 + 5 +
+  15x1,2x2 = **201**, e chi cresce ancora le card e si dimentica la
   riserva lo sente dalla CI.
   QUEL CHE NON CAMBIA, ed e' la meta' che le prove sorvegliano: le otto
   misure base del mobile stanno li' alla lettera (una prova le cerca
@@ -2234,11 +2250,84 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   entra da sola) e quel selettore non veste NIENTE fuori di li' — una
   regola sparsa altrove sfuggirebbe al gate dei 768px. Verificato dal
   vivo: **a 1280 dentro la Mini App le misure sono quelle del telefono,
-  identiche** (272x130, cella 84, nome 11px, riserva 115).
+  identiche** (272x130, cella 84, nome 11px, riserva 115) — e la
+  rotellina non arma niente.
   E LA SEZIONE PUO' ANCORA SPARIRE: qui si cambiano solo delle misure —
   il `display:none` dei giorni senza occasioni, il ritocco che spegne
   il filtro e la card che se ne va a chi ha votato restano quelli di
   sempre.
+  E SU DESKTOP LE DUE STRISCE SI SCORRONO (ago 2026, dal campo: «col
+  dito sul telefono funziona, col mouse no»). Crescere le card ha
+  reso VISIBILE un difetto che c'era da sempre e non si notava: le
+  file scorrono di lato, la barra di scorrimento e' nascosta apposta,
+  e col mouse non c'era NESSUN appiglio — le card fuori schermo erano
+  irraggiungibili. La crescita e lo scorrimento sono lo stesso
+  cantiere in due tempi: chi ingrandisce una fila che scorre si
+  ricompra questo difetto.
+  DUE STRADE E NON UNA (decisione di Andrea): «le frecce sono
+  l'appiglio che si VEDE, la rotellina il gesto ISTINTIVO». Una sola
+  non basta — le frecce senza rotellina fanno cliccare chi girerebbe
+  la rotella, la rotellina senza frecce resta un gesto che non scopre
+  nessuno (la lezione del tocco lungo sulle card).
+  LA ROTELLINA NON LA GIRA IL BROWSER, ed e' la cosa da sapere prima
+  di scrivere una riga: **Blink NON dirotta la rotella verticale su
+  una fila che scorre in orizzontale** — misurato, anche con
+  `overflow-y:hidden`, che e' la ricetta che gira su internet e qui
+  non fa niente. Serve JS.
+  TRE RIGHE DEL LISTENER DA NON AMMORBIDIRE. 1) NON E' PASSIVO
+  (`{passive:false}`), o `preventDefault` non si potrebbe chiamare
+  affatto e la cura sarebbe muta. 2) I GESTI GIA' ORIZZONTALI SI
+  LASCIANO AL BROWSER (`|deltaY| <= |deltaX|` esce subito): sul
+  trackpad e col shift+rotella il browser scorre gia' bene, e
+  prendere quei gesti vorrebbe dire raddoppiare lo spostamento. 3) A
+  FINE CORSA NIENTE `preventDefault`: se dopo il clamp la posizione
+  non cambia, il gesto passa alla PAGINA — senza, arrivati in fondo
+  alla fila la rotellina si pianterebbe li' sopra e la pagina non
+  scenderebbe piu', che e' il difetto peggiore dei due perche' lo
+  incontra anche chi non voleva scorrere la fila.
+  IL GIUDICE E' `FUORI_TG`, CHE **LEGGE LA CLASSE** che l'anti-flash
+  ha gia' messo, mai una seconda domanda a `initData`: due letture
+  della stessa cosa un giorno dicono due cose diverse, e la MISURA
+  delle strisce e il COMPORTAMENTO della rotellina si separerebbero
+  senza che niente fallisca. Dentro Telegram `armaFila` esce subito e
+  non appende nessun listener — verificato dal vivo a 1280.
+  LE FRECCE VIVONO SOLO NEL BLOCCO DEL WEB (`display:none` nella base,
+  `flex` sotto `html.fuori-telegram`): il patto «dentro la Mini App
+  non cambia un pixel» vale anche per quel che si AGGIUNGE. Nascono
+  SPENTE (`.off`) e le accende `aggiornaFrecce`, che ogni render
+  richiama — una freccia accesa su una fila che non scorre e' un
+  bottone che non fa niente.
+  ⚠️ IL GUSCIO PORTA IL `position:relative`, ed e' la riga che un
+  riordino toglie per prima perche' sembra vuota: le frecce sono
+  ASSOLUTE, quindi senza di lui risalirebbero al primo antenato
+  POSIZIONATO — la trappola gia' pagata dalla `.card{position:
+  relative}` col cantiere «farsi trovare», dove tutti i barattolini si
+  accatastavano in alto a destra. Il commento lo diceva e nessuna
+  prova lo guardava: l'ha trovato la TORTURA.
+  E LA FRECCIA E' UN DISEGNO, MAI UN CARATTERE: `&rsaquo;` nel font di
+  casa si rende come un TRATTINO SOTTILE — visto a schermo, non
+  leggendo il foglio — quindi e' un `<svg>` col chevron, nella
+  grammatica delle icone di casa (viewBox 0 0 24 24, `currentColor`,
+  capi tondi). C'e' la prova che i quattro bottoni portino un disegno.
+  IL CERCHIETTO E' DI CARTA, la lingua di cio' che fluttua SULLA foto
+  (`share-btn`, `back-float`): crema fissa e inchiostro scuro nei due
+  temi, perche' sta sopra i banner e sopra i quadrati bruni delle
+  categorie e in nessuno dei due casi puo' seguire il tema. Sta al
+  centro VERTICALE della sua fila — sui quadrati per le categorie,
+  cioe' sopra il disegno e non sull'etichetta sotto.
+  UN TOCCO SCORRE L'80% DELLA FINESTRA e non «una card»: una card
+  intera lascerebbe il taglio al bordo sempre nello stesso punto, e
+  l'80% e' la convenzione che tiene un pezzo di contesto fra una
+  schermata e l'altra. `smooth`, spento da reduced-motion col
+  `tourRidotto()` di casa.
+  MISURATO DAL VIVO a 1280: la rotellina porta la fila da 0 a 200 con
+  la PAGINA FERMA, all'indietro torna a 0, e a fine corsa la fila
+  resta e la pagina scende. Le frecce: all'apertura sinistra spenta e
+  destra accesa, un tocco scorre 928px (=1160x0,8) e accende la
+  sinistra, in fondo la destra si spegne. Sulla fila dei banner con
+  DUE card (che su 1160px non scorre) le frecce restano spente e la
+  rotellina cade giustamente sulla pagina; con TRE — il caso vero in
+  produzione — la fila scorre 448 e le frecce fanno il loro mestiere.
   LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
@@ -26053,9 +26142,45 @@ la classe compariva lo stesso e il caso Mini App usciva «rotto» mentre
 era rotto il banco. Si blocca quella richiesta.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — solo client, e sul telefono (in Telegram
-o in browser) non cambia un pixel. DA GUARDARE dal computer di Andrea:
-il sito vero a schermo intero, che è la larghezza per cui il cantiere
-esiste.
+o in browser) non cambia un pixel.
+
+E su desktop le due strisce si scorrono (ago 2026, il giorno dopo, dal
+campo: «col dito sul telefono funziona, col mouse no»). Crescere le card
+aveva reso VISIBILE un difetto che c'era da sempre: le file scorrono di
+lato, la barra è nascosta apposta, e col mouse non c'era nessun
+appiglio — le card fuori schermo erano irraggiungibili. Due strade e non
+una (decisione di Andrea): le frecce che si vedono e la rotellina che è
+il gesto istintivo. Nello stesso giro le card sono cresciute ancora —
+**520×248** i banner (rigenerati dagli originali a 1040×498: il loro
+tetto non è un muro ma un lavoro) e **160** le celle delle categorie,
+dove il muro invece c'è ed è ~190 perché l'illustrazione più piccola è
+335×240 — e la prova dei file si scrive col CRITERIO invece che col
+numero, che «≥ 3x del mobile e ≥ 2x del web» non invecchia mentre
+816×390 sì. Vedi Architettura, «E SU DESKTOP LE DUE STRISCE SI
+SCORRONO», per le tre righe del listener da non ammorbidire e per il
+fatto che decide tutto: **Blink non dirotta la rotella verticale su una
+fila orizzontale**, nemmeno con `overflow-y:hidden`.
+Collaudato: **+20 prove** in modalità severa sull'albero ISOLATO (7044 →
+7064; la cartella è condivisa con un'altra sessione, quindi è il DELTA
+il numero difendibile) e **19 MUTAZIONI, 19 uccise**, una per riga
+sorvegliata. Tre erano sopravvissute al primo giro, e sono tutte e tre
+buchi delle mie sentinelle e non del codice: il `position:relative` del
+guscio, che il commento prometteva e nessuno guardava; il chevron che
+tornava a un'entità tipografica; e la prova del file riportata al
+numero, che **passa lo stesso** finché i file sono grandi abbastanza —
+la classe di guasto che questo repo ha già visto sei volte, la prova
+onesta e insufficiente insieme.
+E il giro DAL VIVO col server dell'albero isolato: il filo esatto
+767/768, la Mini App a 1280 che tiene le misure del telefono e non arma
+la rotellina, la rotellina che scorre la fila con la pagina ferma e la
+lascia passare a fine corsa, e le frecce che si accendono e si spengono
+ai due estremi — provate su una fila che SCORRE DAVVERO, che il primo
+giro le aveva guardate sui due banner che su 1160px non scorrono e il
+click non provava niente.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
+rotta — solo client e tre file. DA GUARDARE dal computer di Andrea: le
+due file scorse col mouse e con le frecce, che è il gesto per cui il
+cantiere esiste.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

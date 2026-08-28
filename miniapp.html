@@ -803,6 +803,21 @@
   .cat-strip{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
     scrollbar-width:none;padding:8px var(--pad) 2px;min-height:115px}
   .cat-strip::-webkit-scrollbar{display:none}
+  /* LE FRECCE DELLE DUE STRISCE (ago 2026, dal campo: «su desktop non
+     si riesce a scorrere le due strisce — col dito sul telefono
+     funziona, col mouse no»). Le fila hanno la barra di scorrimento
+     NASCOSTA da sempre (`scrollbar-width:none`), che sul telefono e'
+     giusto — li' si trascina col dito e una barra sarebbe rumore — e
+     sul mouse toglie insieme l'appiglio e il SEGNALE che ci sia
+     altro. Le frecce sono l'appiglio che si vede; la rotellina (in
+     JS) e' il gesto istintivo di chi non le cerca.
+     NASCONO SPENTE E NON ESISTONO SUL TELEFONO: il markup e' fisso,
+     quindi le due `<button>` ci sono comunque — a farle comparire e'
+     il solo blocco web, e sul mobile non cambia un pixel. E si
+     spengono anche AI BORDI, e a fila corta tutte e due: una freccia
+     che non porta da nessuna parte e' peggio di nessuna freccia. */
+  .strip-frec{display:none}
+  .strip-wrap{position:relative}
   /* 84px + 8 di gap: a 320px (288 utili) si vedono tre card intere e
      20px della quarta — il TAGLIO al bordo e' il segnale che ce n'e'
      altre, come gia' fanno le pillole. Chi allarga la card cambia quel
@@ -4258,51 +4273,60 @@
      Da soli non basterebbero ne' l'uno ne' l'altro — dentro Telegram
      Desktop la WebView puo' essere larga, e sul telefono in browser
      una card da 400 non ci starebbe.
-     LE MISURE, e ognuna col suo tetto MISURATO:
-     — banner 400x191 (+47%). E' il massimo che i file reggono su uno
-       schermo 2x SENZA rigenerarli: sono 816x390, quindi il tetto
-       esatto e' 408 (a 1x sarebbe 816, a 3x 272 — cioe' la misura di
-       oggi, ed e' il motivo per cui il file e' il triplo). A 1160
-       lascia 312px della terza card, a 960 ne lascia 112.
-     — categorie 120px (+43%). Qui il limite non e' la fila (28 celle,
-       scorrono comunque) ma la risoluzione delle illustrazioni, che
-       sono piccole: la piu' stretta e' 240x386. Misurate tutte e 30 a
-       vari lati, 120 e' l'ultimo dove NESSUNA scala su nemmeno a 3x
-       (a 132 due comincerebbero, del 4%).
-     Chi cresce ancora rifaccia quei due conti, e sappia che i banner
-     si rigenerano solo dagli originali 2752x1536, che non stanno nel
-     repo (sono nei Download di Andrea). */
+     LE MISURE (ago 2026, secondo giro: erano 400 e 120, e ad Andrea
+     restavano piccole). Ognuna col suo tetto MISURATO, e i due tetti
+     sono di NATURA diversa:
+     — banner 520x248 (+91% sul mobile). Il file non e' piu' il
+       vincolo: si rigenera dagli originali 2752x1536, che a rapporto
+       2,09 reggono un ritaglio 2752x1315, cioe' una card fino a
+       1376px a 2x. A decidere e' la FILA — a 1160 la terza card
+       lascia 104px, che si vedono; a 560 ne lascerebbe 24, cioe' una
+       scheggia. I file sono quindi 1040x497 (+45% di peso: 204 KB in
+       tutto invece di 141).
+     — categorie 160px (+90%). Qui il file NON si puo' rigenerare —
+       le illustrazioni sono nate cosi' — e il tetto e' la loro
+       risoluzione: il quadrato ne mostra 88%x78%, quindi la piu'
+       piccola (bellezza-e-benessere, 335x240) comincia a scalare su
+       oltre 190px a 2x. A 160 sta a x0,84, cioe' ancora sotto.
+     ⚠️ E CRESCERE PEGGIORA LO SCORRIMENTO, che sul web col mouse non
+     c'era: tre card da 520 fanno 1584 su 1160 utili. Per questo il
+     cantiere porta anche le frecce e la rotellina — le misure da sole
+     avrebbero nascosto meta' della fila senza un modo di arrivarci. */
   @media (min-width:768px){
-    html.fuori-telegram .scoprire-card{width:400px}
+    html.fuori-telegram .scoprire-card{width:520px}
     /* IL TITOLO CRESCE COL SUO DISEGNO, ed e' la meta' che rende
        questo cantiere piu' di un ritocco di larghezza: a 17px dentro
        una card da 400 si vedeva sperduto (guardato a schermo).
-       Il fattore e' quello della card (400/272 = 1,47) applicato a
+       Il fattore e' quello della card (520/272 = 1,91) applicato a
        tutte e tre le misure — left, larghezza della scatola, corpo —
        e questo NON allenta di un decimale la prova del contrasto:
        la fascia sorvegliata sta in coordinate IMMAGINE, e
-       `left x k x (816 / (272 k))` si semplifica. Misurati sui file
-       veri: 11,88 / 12,10 / 14,83, gli STESSI di oggi. Chi lo cresce
-       di piu' della card sposta il titolo verso la scia dorata e lo
-       sente dalla CI. */
-    html.fuori-telegram .sc-titolo{left:20.6px;width:141px;font-size:25px}
+       `left x k x (fileW / (272 k))` si semplifica — vale anche coi
+       file rigenerati, perche' cresce pure il numeratore. Misurati
+       sui file veri: 12,34 / 12,57 / 15,40, gli STESSI del mobile.
+       Chi lo cresce di piu' della card sposta il titolo verso la scia
+       dorata e lo sente dalla CI. */
+    html.fuori-telegram .sc-titolo{left:26.8px;width:183.5px;font-size:32.5px}
     /* il P2P tiene la sua deroga anche qui (titolo corto, piu' a
        destra e piu' grande), scalata dello stesso fattore. Serve un
        selettore SUO: la base desktop ha una classe in meno
        dell'override mobile e da sola perderebbe per specificita'. */
     html.fuori-telegram .scoprire-card[data-id="p2p"] .sc-titolo{
-      left:44px;font-size:29px}
-    html.fuori-telegram .cat-cella{width:120px}
+      left:57.4px;font-size:38.2px}
+    html.fuori-telegram .cat-cella{width:160px}
     /* col quadrato piu' grande il nome sale di un gradino: 11px sotto
-       una card da 120 si legge come una didascalia dimenticata. 13 e'
-       la misura che .altri-tit usa gia' per lo stesso mestiere. */
-    html.fuori-telegram .cat-eti{font-size:13px}
+       una card da 160 si legge come una didascalia dimenticata. 15 e'
+       il corpo del testo di casa (`body`), cioe' la misura che una
+       riga di prosa ha ovunque nell'app — e NON il fattore della
+       cella, che darebbe 21 e trasformerebbe il nome nel
+       protagonista della card al posto del disegno. */
+    html.fuori-telegram .cat-eti{font-size:15px}
     /* e lo SPAZIO RISERVATO cresce con loro, o torna il salto che
        quella riga esiste per non avere (la fila non si disegna finche'
        i conteggi non sono veri). Stessa formula del 115 di la':
        quadrato + margine dell'etichetta + due righe di nome
-       (120 + 5 + 13x1,2x2). */
-    html.fuori-telegram .cat-strip{min-height:156px}
+       (160 + 5 + 15x1,2x2). */
+    html.fuori-telegram .cat-strip{min-height:201px}
     /* IL VETRO DEL BARATTOLO E' L'UNICA CARD il cui contenuto non e'
        un'immagine con object-fit: e' un SVG che il JS chiede a misura
        FISSA (jarSVG(..., 56, 1.15)), quindi da solo resterebbe a 56
@@ -4313,6 +4337,38 @@
        darebbe 56,28 invece di 56, e «nemmeno di un byte» vuol dire
        nemmeno quello. */
     html.fuori-telegram .cella-barattolo .cat-quad svg{width:67%;height:67%}
+    /* LE FRECCE, e le tre righe che le rendono innocue. 1) Sono di
+       CARTA coi colori FISSI nei due temi, la ricetta di `.share-btn`:
+       stanno SOPRA le card, che hanno un fondo bruno fisso, e un
+       cerchietto che segue il tema sparirebbe di sera. 2) Stanno
+       DENTRO il padding della fila (`left/right:2px` contro i 16 del
+       `--pad`), quindi coprono il bordo e non il soggetto della prima
+       card. 3) Il centro verticale lo da' `top:0;bottom:0;margin:auto`
+       sul wrapper, che avvolge la SOLA striscia: cresciute le card,
+       le frecce restano al centro senza un numero da rincorrere. */
+    html.fuori-telegram .strip-frec{
+      display:flex;align-items:center;justify-content:center;
+      position:absolute;top:0;bottom:0;margin:auto;z-index:2;
+      width:38px;height:38px;border-radius:50%;border:0;padding:0;
+      background:rgba(255,248,234,.94);color:#23282C;cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,.25);
+      font:700 22px/1 var(--f-titolo)}
+    /* IL SEGNO E' UN CHEVRON DISEGNATO e non il carattere «>»: provato
+       a schermo, il `&#8250;` in Baloo esce come un trattino sottile —
+       si vede il cerchietto e non si capisce dove porta. E' la
+       grammatica delle icone di casa (tratto a currentColor, capi
+       tondi), la stessa della nav. */
+    html.fuori-telegram .strip-frec svg{width:19px;height:19px;
+      fill:none;stroke:currentColor;stroke-width:2.4;
+      stroke-linecap:round;stroke-linejoin:round}
+    html.fuori-telegram .strip-frec:active{transform:scale(.94)}
+    html.fuori-telegram .strip-frec.sx{left:2px}
+    html.fuori-telegram .strip-frec.dx{right:2px}
+    /* spenta = NON C'E': il `display` batte il `flex` di sopra perche'
+       la regola sta piu' in basso a pari specificita'. Mai `disabled`
+       ne' un velo — una freccia sbiadita su una fila gia' in fondo si
+       legge come un guasto, e chi la tocca non ottiene niente. */
+    html.fuori-telegram .strip-frec.off{display:none}
   }
 
   /* ==================== DESKTOP LARGO (≥1024px) ==================== */
@@ -4486,7 +4542,13 @@ document.getElementById('cartello')?.remove();</script>
          acceso la sezione sparisce: lo stato lo dicono le pillole. -->
     <div id="catSez">
       <div class="section-label">Esplora per categorie</div>
-      <div class="cat-strip" id="catStrip"></div>
+      <div class="strip-wrap">
+        <div class="cat-strip" id="catStrip"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('catStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('catStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
     </div>
     <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
          filtri dell'occasione — oggi due fisse (offerte a tempo,
@@ -4501,7 +4563,13 @@ document.getElementById('cartello')?.remove();</script>
          fascia test). -->
     <div id="scoprireSez" style="display:none">
       <div class="section-label">Da scoprire</div>
-      <div class="scoprire-strip" id="scoprireStrip"></div>
+      <div class="strip-wrap">
+        <div class="scoprire-strip" id="scoprireStrip"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('scoprireStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
     </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. Sono un'altra cosa dalla ricerca per parole, e si
@@ -6504,6 +6572,13 @@ const tg = window.Telegram?.WebApp;
 let DEMO = !API_BASE;
 let VETRINA = false;   // browser in produzione: annunci veri, sola lettura
 let WEB = false;       // browser col login web: cookie di sessione, app completa
+/* FUORI DALLA MINI APP: si LEGGE la classe che l'anti-flash in testa
+   al file ha gia' messo, invece di richiedere `tg.initData`. Il
+   giudice resta UNO — due letture della stessa cosa un giorno
+   direbbero due cose diverse, e la misura delle strisce e il
+   comportamento della rotellina si separerebbero senza che nulla
+   fallisca. */
+const FUORI_TG = document.documentElement.classList.contains('fuori-telegram');
 
 /* DA CHE PORTA SI E' ENTRATI (ago 2026, il servizio nascosto Tor).
    Il client lo sa da solo: `.onion` e' un TLD RISERVATO (RFC 7686),
@@ -8998,6 +9073,9 @@ function renderStriscia(){
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
       <span class="cat-eti">${esc(c)}</span>
     </a>`).join('');
+  /* le frecce seguono il contenuto: cambiando le celle cambia quanto
+     c'e' da scorrere, e a fila corta si spengono da sole */
+  aggiornaFrecce('catStrip');
 }
 
 /* «DA SCOPRIRE» (ago 2026): la fila dei banner sotto le categorie.
@@ -9124,7 +9202,74 @@ function renderScoprire(){
       ><span class="sc-titolo" aria-hidden="true">${v.testo}</span>
     </div>`;
   }).join('');
+  aggiornaFrecce('scoprireStrip');
 }
+
+/* LE DUE STRISCE SI SCORRONO COL MOUSE (ago 2026, dal campo: «col dito
+   sul telefono funziona, col mouse no»). Due gesti, e sono
+   complementari apposta: le FRECCE sono l'appiglio che si VEDE — la
+   barra di scorrimento e' nascosta da sempre, quindi senza di loro
+   non c'e' niente che dica che la fila continua — e la ROTELLINA e'
+   il gesto di chi non le cerca.
+   SOLO FUORI DALLA MINI APP, come le misure: dentro Telegram non
+   cambia un byte, e il giudice e' lo stesso (FUORI_TG legge la classe
+   che l'anti-flash ha messo, mai una seconda domanda a initData). */
+function scorriFila(id, verso){
+  const s = el(id);
+  if (!s) return;
+  /* UNO SCHERMO MENO UN PEZZO, non una card: la card e' larga 520 sui
+     banner e 160 sulle categorie, quindi «una card» vorrebbe dire due
+     gesti diversi; l'80% della finestra lascia in vista quel che si
+     stava guardando, che e' come si scorre una fila. */
+  s.scrollBy({left: verso * s.clientWidth * .8,
+              behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+
+/* Le frecce spente NON CI SONO (`.off` le toglie): a fila corta si
+   spengono tutte e due e la striscia torna quella di sempre — un
+   appiglio che non porta da nessuna parte e' peggio di nessun
+   appiglio. La tolleranza di 1px non e' cosmesi: `scrollLeft` e'
+   frazionario sugli schermi a densita' alta, e senza quella l'ultima
+   freccia resterebbe accesa in fondo alla fila. */
+function aggiornaFrecce(id){
+  const s = el(id);
+  if (!s || !s.parentNode) return;
+  const sx = s.parentNode.querySelector('.strip-frec.sx');
+  const dx = s.parentNode.querySelector('.strip-frec.dx');
+  if (!sx || !dx) return;
+  const max = s.scrollWidth - s.clientWidth;
+  sx.classList.toggle('off', max <= 1 || s.scrollLeft <= 1);
+  dx.classList.toggle('off', max <= 1 || s.scrollLeft >= max - 1);
+}
+
+/* LA ROTELLINA GIRA IN ORIZZONTALE, e il perche' e' MISURATO e non
+   supposto: Blink NON dirotta la rotellina verticale su una fila che
+   scorre di lato — nemmeno con `overflow-y:hidden`, provato — quindi
+   oggi quel gesto scorre la PAGINA sopra una striscia ferma, e chi lo
+   fa conclude che la fila e' tutta li'.
+   LE TRE RIGHE DA NON AMMORBIDIRE. 1) Se il gesto e' GIA' orizzontale
+   (trackpad, shift+rotellina) non si tocca niente: quello il browser
+   lo fa gia' bene, e prevenirlo lo renderebbe piu' lento.
+   2) A FINE CORSA SI LASCIA PASSARE — se dopo il clamp la posizione
+   non cambia, niente `preventDefault` e la pagina scorre: senza,
+   arrivati in fondo alla fila la rotellina si pianterebbe li' sopra e
+   la pagina non scenderebbe piu'. 3) NON e' passivo, o il
+   `preventDefault` non si potrebbe chiamare affatto. */
+function armaFila(id){
+  const s = el(id);
+  if (!s || !FUORI_TG) return;
+  s.addEventListener('scroll', () => aggiornaFrecce(id));
+  s.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const max = s.scrollWidth - s.clientWidth;
+    const n = Math.max(0, Math.min(max, s.scrollLeft + e.deltaY));
+    if (n === s.scrollLeft) return;
+    e.preventDefault();
+    s.scrollLeft = n;
+  }, {passive: false});
+  aggiornaFrecce(id);
+}
+
 /* LO SCROLL DELL'ACCENSIONE E' UNO SOLO per le due strisce («Da
    scoprire» e le card categoria): porta `sez` sotto l'header, e a
    cambiare e' solo il PUNTO D'ARRIVO — la fila stessa per le
@@ -30618,6 +30763,13 @@ async function avviaVetrina(){
     bottoneLoginNostr();
     /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
        risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */
+    /* le due strisce imparano rotellina e frecce (fuori da Telegram e
+       basta: dentro, armaFila esce subito). Sta nei DUE avvii perche'
+       chi arriva dal browser passa dal secondo, ed e' proprio lui il
+       destinatario del gesto — e SOPRA la coppia fascia+griglia, che
+       una prova vuole adiacenti (la fascia si disegna prima delle
+       card, o le card scendono di 56px quando arriva). */
+    armaFila('catStrip'); armaFila('scoprireStrip');
     await fasciaPrima();
     renderGrid();
     apriNegozioDaUrl();
@@ -30853,6 +31005,13 @@ async function avvia(){
        caricaPreferiti chiama aggiornaJarCards); l'unico dato che puo'
        cambiare una card intera e' un ACCORDO accettato su un annuncio
        in vetrina — raro, per-compratore — e li' si ridisegna, sotto. */
+    /* le due strisce imparano rotellina e frecce (fuori da Telegram e
+       basta: dentro, armaFila esce subito). Sta nei DUE avvii perche'
+       chi arriva dal browser passa dal secondo, ed e' proprio lui il
+       destinatario del gesto — e SOPRA la coppia fascia+griglia, che
+       una prova vuole adiacenti (la fascia si disegna prima delle
+       card, o le card scendono di 56px quando arriva). */
+    armaFila('catStrip'); armaFila('scoprireStrip');
     await fasciaPrima();
     renderGrid();
     await loadOrders();
