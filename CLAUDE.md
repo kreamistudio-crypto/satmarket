@@ -20348,6 +20348,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   cura, che è anche il caso che dice che una tessera FISICA non
   esce dal reparto: la strada non decide la categoria, il patto dei
   Buoni.
+  E IL SUO PRIMO GIRO VERO HA PAGATO SUBITO, come per la sacca (ago
+  2026): atteso 19/19, uscito **18/19 DUE VOLTE** — a cadere sempre e
+  solo il GAME PASS, «Console e videogiochi» invece di «Buoni ed
+  esperienze», col rilancio a prompt FERMO che ha dato la caduta
+  identica (la liturgia del caso «Assistenza Barattolo»: stabile,
+  quindi si cura).
+  LA DIAGNOSI È LA STESSA FORMA DELLA SACCA, e la dà il collaudo: lo
+  Spotify restava giusto e il Game Pass no, perché la regola diceva
+  «abbonamenti a piattaforme» ma il suo unico ESEMPIO era Spotify —
+  cioè MUSICA — mentre la contro-regola ne aveva uno esplicito di
+  VIDEOGIOCHI. Sul terreno dei giochi l'unico appiglio del modello
+  diceva «Console e videogiochi», e Game Pass cade esattamente sulla
+  linea di frattura fra la regola e la sua contro-regola: è un
+  abbonamento a una piattaforma DI VIDEOGIOCHI. È la lezione di
+  sempre vista una volta di più — gli esempi insegnano il confine
+  più della regola astratta, anche quando insegnano un confine più
+  stretto di quello voluto.
+  LA CURA È MIRATA E IN DUE PEZZI, e non allarga la regola: gli
+  abbonamenti valgono «QUALUNQUE sia l'argomento: musica, video,
+  videogiochi, software» (l'esempio non è più l'unico appiglio), e
+  la contro-regola stringe dal generico al SINGOLO — «la chiave di
+  UN videogioco» — con la riga che dice dov'è il confine vero: **la
+  differenza è fra la COSA e l'ACCESSO, mai fra i reparti**. La
+  chiave di un gioco è quel gioco, un abbonamento che apre un
+  CATALOGO resta un credito. A presidiare che non collassi c'è la
+  punta di Elden Ring, che deve continuare a NON muoversi.
+  ⚠️ E NEL PROMPT NON ENTRA NESSUN MARCHIO DEI CASI DI COLLAUDO, ed
+  è la riga da non ammorbidire: scrivere «Game Pass» lì dentro
+  sarebbe il modo SBAGLIATO di far tornare il conto — il caso
+  diventerebbe una tautologia e il modello imparerebbe il nome
+  invece della regola (la lezione della birra, già pagata dal
+  secondo giro). C'è la sentinella che lo vieta per sette marchi, e
+  la tortura la esercita mutando il prompt proprio così. A dire se
+  la cura ha insegnato la REGOLA c'è la gemella della gemella —
+  «PlayStation Plus Extra», che il prompt non nomina: se cadesse
+  solo lei, il modello avrebbe imparato Game Pass.
   E IL PRIMO GIRO VERO DEL COLLAUDO HA PAGATO SUBITO (ago 2026):
   atteso 14/14, uscito **13/14 DUE VOLTE** — a cadere la SACCA,
   «Sacca in cotone col logo Bitcoin» spostata in Abbigliamento. Il
@@ -20374,7 +20410,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   VPS il 23 ago 2026: **14/14**, la sacca compresa.
   E IL PROMPT HA IL SUO COLLAUDO, `collaudo_ricategorizza.py` — il
   gemello di collaudo_impersonazione.py che a questo prompt mancava,
-  da rilanciare a OGNI ritocco. Diciannove casi con l'atteso accanto:
+  da rilanciare a OGNI ritocco. Venti casi con l'atteso accanto:
   i cinque di Andrea (sacca, poster, le DUE magliette — quella
   qualunque STA in Bitcoin e deve USCIRNE, il caso affilato apposta
   che impedisce a «tematico» di assorbire troppo — e il NerdMiner che
@@ -20385,11 +20421,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   consulenza sui wallet che ESCE da Bitcoin verso «Lezioni e corsi»,
   e il corso di cucina gemello su un ALTRO tema — se cade solo lui,
   la cura ha imparato «bitcoin» invece della regola delle
-  prestazioni), i CINQUE del quarto (l'abbonamento Spotify che ESCE
-  da Informatica, il Game Pass gemello che arriva da un'ALTRA
-  categoria — se cade solo lui, la cura ha imparato «Spotify» invece
-  della regola del credito —, le due punte affilate di Office e
-  della chiave Steam che escono da Buoni, e il buono Zalando che ci
+  prestazioni), i SEI del quarto e del quinto (l'abbonamento Spotify
+  che ESCE da Informatica, il Game Pass gemello che arriva da
+  un'ALTRA categoria — CADUTO due volte al primo giro, ora
+  regressione permanente — con la SUA gemella «PlayStation Plus»,
+  che il prompt non nomina apposta: se cadesse solo lei, il modello
+  avrebbe imparato il nome invece della distinzione fra la COSA e
+  l'ACCESSO; le due punte affilate di Office e della chiave Steam
+  che escono da Buoni, e il buono Zalando che ci
   resta) più quattro regressioni (portatile→Informatica,
   Jade→Bitcoin, l'alimentatore che sorveglia la clausola tenuta, e il
   NON SO che sopravvive). A differenza del
@@ -20410,13 +20449,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   con sei mutazioni, ognuna rossa da sola.
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
   (`python collaudo_ricategorizza.py`), che il 23 ago 2026 dava
-  **14/14** sui casi di allora; col quarto giro l'atteso è **19/19**
+  **14/14** sui casi di allora e **18/19 due volte** al primo giro
+  del quarto (cadeva il Game Pass); col quinto l'atteso è **20/20**
   ed è DA RILANCIARE. Chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
   maglietta qualunque, l'alimentatore, l'olio, la consulenza, la
   licenza Office o la chiave Steam la regola assorbe troppo e va
-  stretta, se cadono i tematici, lo Spotify o il Game Pass non ha
-  insegnato abbastanza.
+  stretta, se cadono i tematici, lo Spotify, il Game Pass o la sua
+  gemella non ha insegnato abbastanza.
   L'atteso segue il PROMPT, mai il modello. Dopo il giro,
   `ricategorizza.py --rifai` sul VPS è una SCELTA di Andrea, non un
   deploy: rifà le domande anche sui già decisi.
