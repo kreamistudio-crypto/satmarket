@@ -20596,6 +20596,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la cura ha insegnato la REGOLA c'è la gemella della gemella —
   «PlayStation Plus Extra», che il prompt non nomina: se cadesse
   solo lei, il modello avrebbe imparato Game Pass.
+  E LA CURA HA RETTO AL PRIMO GIRO: **20/20** (28 ago 2026,
+  Andrea sul VPS), col Game Pass tornato al suo posto E LA
+  GEMELLA PASSATA — che è la risposta alla domanda per cui
+  esisteva, ed è più forte del conto pieno: il prompt «PlayStation
+  Plus» non lo nomina, quindi il modello ci è arrivato dalla
+  distinzione fra la COSA e l'ACCESSO e non dal nome del caso che
+  gli era caduto. Il conto separato dei falsi positivi resta a
+  ZERO: nessuna delle punte affilate (Office, la chiave Steam,
+  Elden Ring) si è mossa, quindi la regola non ha assorbito niente
+  che non fosse suo.
   E IL PRIMO GIRO VERO DEL COLLAUDO HA PAGATO SUBITO (ago 2026):
   atteso 14/14, uscito **13/14 DUE VOLTE** — a cadere la SACCA,
   «Sacca in cotone col logo Bitcoin» spostata in Abbigliamento. Il
@@ -20662,8 +20672,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ⚠️ IL GIRO VERO È DI ANDREA SUL VPS
   (`python collaudo_ricategorizza.py`), che il 23 ago 2026 dava
   **14/14** sui casi di allora e **18/19 due volte** al primo giro
-  del quarto (cadeva il Game Pass); col quinto l'atteso è **20/20**
-  ed è DA RILANCIARE. Chi lo rilancia
+  del quarto (cadeva il Game Pass); col quinto **20/20 AL PRIMO
+  GIRO** (28 ago 2026), la gemella PlayStation Plus compresa — ed
+  è LEI a dire che la cura ha insegnato la REGOLA e non il nome:
+  il prompt non la nomina, quindi se fosse caduta solo lei
+  avremmo saputo che il modello aveva imparato «Game Pass».
+  Chi lo rilancia
   scriva QUI il conto COL NOME di quel che cade — se cadono la
   maglietta qualunque, l'alimentatore, l'olio, la consulenza, la
   licenza Office o la chiave Steam la regola assorbe troppo e va
