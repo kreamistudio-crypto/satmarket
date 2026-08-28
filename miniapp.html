@@ -1694,6 +1694,42 @@
      di serie: qui i cassetti stanno in fila con dei section-label. */
   #adminStats .acc{margin-top:22px}
 
+  /* ---------- LE SEZIONI DEL PROFILO (ago 2026) ----------
+     I cassetti erano diciannove in fila piatta: chi entrava per
+     cambiare una cosa scorreva tre schermate leggendo diciannove
+     titoli senza nessun appiglio. Ora stanno in cinque sezioni
+     richiudibili, chiuse di serie.
+
+     IL GRUPPO E' UN'ETICHETTA, NON UN SECONDO CASSETTO, ed e' la riga
+     da non ammorbidire: il cassetto ha gia' la sua freccia dentro una
+     card, e un gruppo con la stessa veste darebbe due livelli con la
+     stessa forma — chi guarda non saprebbe se sta aprendo un gruppo o
+     un cassetto (la trappola del doppio significato gia' pagata con
+     «lampo», «attesa» e «nota»). E un .acc dentro un .acc-b non esiste
+     da nessuna parte nel client: sarebbe territorio nuovo, col
+     margin-top:10px che si somma al padding del genitore. Quindi il
+     gruppo e' un .section-label reso TOCCABILE — il pattern di
+     .trust-line, una riga statica diventata bottone con la sua freccia
+     — e porta ENTRAMBE le classi: la prima da' l'aspetto, la seconda i
+     correttivi da bottone. Cosi' le altre etichette statiche del
+     client non si toccano.
+
+     `padding:26px 0 0` e non i `16px var(--pad)` di serie: qui siamo
+     dentro .form, che il rientro laterale ce l'ha gia' e si
+     sommerebbe — e' quel che fa il pannello dei moderatori due righe
+     piu' su. La freccia va in `order:2` perche' il ::after della linea
+     puntinata e' order:1: atterra DOPO i puntini, nel posto che il CSS
+     riserva gia' al .conta. Freccia del gruppo a fondo riga sui
+     puntini, freccia del cassetto dentro la card: due forme che non si
+     confondono. */
+  .grp-h{padding:26px 0 0;border:0;background:none;font-family:inherit;
+    width:100%;cursor:pointer;text-align:left}
+  .grp-h .fr{order:2;color:var(--muted);font-size:12px;
+    transition:transform .18s ease}
+  .grp.open .grp-h .fr{transform:rotate(180deg)}
+  .grp-b{display:none}
+  .grp.open .grp-b{display:block}
+
   /* ---------- ⚙️ stato delle leve (ago 2026) ----------
      Settanta righe fitte: il nome a sinistra con sotto la chiave da
      andare a cambiare sul VPS, il valore a destra incolonnato. */
@@ -5090,6 +5126,26 @@ document.getElementById('cartello')?.remove();</script>
       <p>Di là la pagina <b>non porta lo script di Telegram</b>: fuori non protegge nessuno — sei già su barattolo.store — ma da Tor sarebbe la contraddizione più grossa, perché sarebbe la prima richiesta a uscire col tuo indirizzo vero. Per la stessa ragione lì non c'è il bottone «Entra con Telegram» (funziona solo sul dominio normale) e si entra <b>con una chiave Nostr</b>.</p>
       <p>Fin dove arriva, detto per intero: <b>Tor nasconde da dove ti colleghi, non quello che scrivi.</b> L'indirizzo di consegna, il punto di ritiro e l'email per il corriere li legge chi ti spedisce — <b>è così su Tor e fuori</b>, e non è una cosa che si perde scegliendo Tor: quella parte non è mai stata una questione di rete. Restano fuori dal tunnel anche i <b>relay Nostr</b> quando entri, il tuo <b>wallet Lightning</b> quando paga (parla per conto suo con la rete), e i <b>collegamenti che portano altrove</b> — la chat di Telegram, il profilo Nostr, il sito del corriere: sono link a case d'altri, e li apri tu quando li tocchi.</p>
 
+      <!-- L'INDIRIZZO, che fin qui non usciva da nessuna parte: la
+           sezione raccontava il .onion senza poter dire QUALE, cioe'
+           lo stesso difetto gia' pagato coi reparti — «ci si atterra
+           bene, ma da dentro l'app quel link non si poteva prendere».
+           Nasce SPENTO e lo accende `scriviOnion` quando l'indirizzo
+           arriva (il pattern di #fasciaOnion): «ecco l'indirizzo:»
+           seguito dal nulla e' peggio del silenzio.
+           E' un SEGNAPOSTO e non un render, perche' questa pagina e'
+           markup FISSO — renderPrivacy() non esiste piu', e' una
+           decisione presa — e i dati del server ci entrano col
+           textContent, il pattern di scriviDurate().
+           ⚠️ QUI SI RIPETE UN DATO E NON UNA SPIEGAZIONE, ed e' la
+           differenza col registro doppio che altrove si toglie:
+           questa pagina la vede anche l'ANONIMO in vetrina, dove il
+           Profilo e' bloccato — e chi vuole passare a Tor e' proprio
+           chi non si e' ancora fidato abbastanza da entrare. La
+           spiegazione resta in un posto solo, e la fonte del dato e'
+           una variabile sola. -->
+      <p id="privOnionBlocco" style="display:none">L'indirizzo è <b class="mono" id="privOnionVal" style="user-select:all;word-break:break-all"></b> — per aprirlo serve il Tor Browser.</p>
+
       <h3 id="priv-no">Cosa non facciamo</h3>
       <ul class="sicu-lista">
         <li><b>Nessun tracciamento.</b> Niente analytics, niente pixel, niente cookie di terzi: nella pagina non c'è nessuno oltre a noi. Da agosto 2026 <b>nemmeno i caratteri</b> — prima li chiedevamo a Google, e a ogni apertura il tuo indirizzo IP arrivava a Google. Adesso stanno qui.</li>
@@ -5428,15 +5484,26 @@ document.getElementById('cartello')?.remove();</script>
            stessa cosa, che e' il difetto che il gesto esiste per
            togliere.) -->
       <div id="profiloChecklist"></div>
-
-      <!-- I preferiti, primo cassetto: cio' che hai messo da parte
-           col barattolino. In demo e vetrina non esiste (il patto
-           del wallet). -->
-      <div class="acc" id="accPreferiti">
-        <button class="acc-h" onclick="toggleAcc('accPreferiti')"><span class="em" id="preferitiJar">🫙</span>Nel tuo barattolo <span class="conta" id="preferitiConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="preferitiBlocco"></div></div>
-      </div>
-
+      <!-- ============ LE CINQUE SEZIONI (ago 2026) ============
+           I cassetti erano una lista piatta di diciannove voci in ordine
+           di sedimentazione storica: impostazioni di negozio, dati
+           personali e preferenze mescolate, e tre schermate da scorrere
+           per cambiare una cosa. Ora stanno in cinque sezioni chiuse di
+           serie — la mappa intera in una schermata.
+           I CASSETTI NON SI TOCCANO: si spostano interi, con l'indentazione
+           di prima. Rientrarli avrebbe riscritto ogni loro riga per zero
+           guadagno, e questo file ha le sentinelle ancorate al markup.
+           NIENTE SI NASCONDE A CHI NON VENDE (decisione di Andrea): il
+           titolo del gruppo fa gia' saltare il blocco con un colpo
+           d'occhio, mentre nascondere chiuderebbe la porta a chi sta per
+           cominciare — l'opposto di quel che si e' deciso per il banner,
+           «la porta chiusa si dice, non si nasconde». E il giudice
+           «questo utente vende» non esiste: myListings arriva DOPO il
+           render, e /api/me non ha un campo che lo dica. ============ -->
+      <div class="grp" id="grpCatalogo">
+        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpCatalogo')"
+                aria-expanded="false">📋 Il tuo catalogo<span class="fr">▾</span></button>
+        <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
         <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
@@ -5467,7 +5534,6 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
 
-
       <!-- IL NEGOZIO COLLEGATO (ago 2026, tappa 5): chi ha gia' un
            e-commerce collega il catalogo e i suoi prodotti compaiono
            qui, invece di ripubblicarli a mano.
@@ -5491,7 +5557,105 @@ document.getElementById('cartello')?.remove();</script>
         <button class="acc-h" onclick="toggleAcc('accDoppioni')"><span class="em">🔁</span>Doppioni su Nostr <span class="conta" id="doppioniConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="doppioniBlocco"></div></div>
       </div>
+        </div>
+      </div>
 
+      <div class="grp" id="grpNegozio">
+        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpNegozio')"
+                aria-expanded="false">🏪 Impostazioni di negozio<span class="fr">▾</span></button>
+        <div class="grp-b">
+      <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
+           «chi spedisce dichiara»): con quali reti di punti di ritiro
+           spedisci. La via punto si offre COMUNQUE (secondo giro) —
+           dichiararli serve a far scegliere a chi compra un punto
+           della rete giusta, invece di accordarsi in chat. Le voci
+           arrivano da /api/me (mai hardcodate); in DEMO il cassetto
+           sparisce, il patto del wallet. -->
+      <div class="acc" id="accSpedizioniere">
+        <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci <span class="conta" id="spedizioniereConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
+      </div>
+
+      <!-- La spedizione gratis sopra soglia (ago 2026): la seconda
+           promessa di negozio, sorella dello sconto qui sopra e
+           indipendente da lui — le due guardano lo stesso numero
+           senza vedersi — e dall'ago 2026 con lo stesso perimetro:
+           il mono sconta. Le soglie proposte arrivano da /api/me.
+           In DEMO il cassetto sparisce, il patto del wallet. -->
+      <div class="acc" id="accSpedGratis">
+        <button class="acc-h" onclick="toggleAcc('accSpedGratis')"><span class="em">🚚</span>Spedizione gratis <span class="conta" id="spedGratisConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="spedGratisBlocco"></div></div>
+      </div>
+
+      <!-- Lo sconto sugli articoli (ago 2026): UNA regola per tutto il
+           negozio — a pezzi conta QUANTI, a valore conta QUANTO, ed e'
+           il criterio a dire dove vale — che cade sui soli
+           ARTICOLI e mai sulla spedizione. Le soglie e le percentuali
+           possibili arrivano da /api/me, mai hardcodate qui (il patto
+           della lampo). Sta accanto allo spedizioniere perche' sono
+           due politiche di negozio sempre accese; le ferie, che sono
+           l'interruzione, chiudono il gruppo.
+           In DEMO il cassetto sparisce, il patto del wallet. -->
+      <div class="acc" id="accScontoPacco">
+        <button class="acc-h" onclick="toggleAcc('accScontoPacco')"><span class="em">🎁</span>Sconto sugli articoli <span class="conta" id="scontoPaccoConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="scontoPaccoBlocco"></div></div>
+      </div>
+
+      <!-- I CODICI SCONTO (ago 2026): il venditore ne crea uno e lo
+           da' a chi vuole. E' una LISTA con un tetto, non una regola
+           sola — quindi il modello e' «Avvisi di ricerca» e non i due
+           cassetti delle promesse qui sopra. Sta FRA la spedizione
+           gratis e le ferie: le tre promesse commerciali restano
+           adiacenti, e le ferie — che sono l'interruzione — continuano
+           a chiudere il gruppo. -->
+      <div class="acc" id="accCodici">
+        <button class="acc-h" onclick="toggleAcc('accCodici')"><span class="em">🎟</span>Codici sconto <span class="conta" id="codiciConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="codiciBlocco"></div></div>
+      </div>
+
+      <!-- Il banner del negozio (ago 2026): l'insegna sopra il
+           catalogo, una foto e un link al proprio sito. Ogni banner —
+           e ogni sua modifica — passa da un moderatore: qui dentro
+           si carica e si vede a che punto sta. -->
+      <div class="acc" id="accBanner">
+        <button class="acc-h" onclick="toggleAcc('accBanner')"><span class="em">🖼</span>Banner del negozio <span class="conta" id="bannerConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="bannerBlocco"></div></div>
+      </div>
+
+      <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
+           data di rientro. Gli annunci RESTANO in vetrina — si
+           guardano, non si comprano — e al rientro tornano
+           comprabili da soli. In DEMO sparisce, il patto del wallet. -->
+      <div class="acc" id="accFerie">
+        <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="ferieBlocco"></div></div>
+      </div>
+        </div>
+      </div>
+
+      <div class="grp" id="grpCompri">
+        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpCompri')"
+                aria-expanded="false">🫙 Quando compri<span class="fr">▾</span></button>
+        <div class="grp-b">
+      <!-- I preferiti, primo cassetto: cio' che hai messo da parte
+           col barattolino. In demo e vetrina non esiste (il patto
+           del wallet). -->
+      <div class="acc" id="accPreferiti">
+        <button class="acc-h" onclick="toggleAcc('accPreferiti')"><span class="em" id="preferitiJar">🫙</span>Nel tuo barattolo <span class="conta" id="preferitiConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="preferitiBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accRicerche" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accRicerche')"><span class="em">🔎</span>Avvisi di ricerca <span class="conta" id="ricercheConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="ricercheBlocco"></div></div>
+      </div>
+        </div>
+      </div>
+
+      <div class="grp" id="grpPrivacy">
+        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpPrivacy')"
+                aria-expanded="false">🔐 Privacy<span class="fr">▾</span></button>
+        <div class="grp-b">
       <div class="acc" id="accIdentita">
         <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
         <div class="acc-b">
@@ -5504,6 +5668,41 @@ document.getElementById('cartello')?.remove();</script>
                dicono confirm e toast al momento giusto. -->
           <div id="npubVerifica"></div>
         </div>
+      </div>
+
+      <!-- 🧅 IL SITO TOR. Il servizio nascosto ESISTE da prima di questo
+           cassetto — la sua chiave sta nel backup giornaliero — e non lo
+           sapeva nessuno: ONION_HOST non usciva mai verso il client,
+           quindi chi leggeva «Se ti colleghi da Tor» in «I tuoi dati»
+           scopriva che il .onion c'e' e non aveva modo di sapere QUALE.
+           E' lo stesso difetto gia' pagato coi reparti: ci si atterrava
+           bene, ma da dentro l'app quel link non si poteva PRENDERE.
+           QUI NON SI SPIEGA NIENTE, si porta il dato: la spiegazione
+           vive in «I tuoi dati» in tre paragrafi, e riscriverla qui
+           sarebbe la stessa prosa in due posti. Il cassetto porta
+           l'indirizzo, la copia e la porta verso quella sezione — il
+           pattern del recinto escrow, una riga e «Scopri di piu'».
+           Nasce SPENTO come i due sotto: senza indirizzo configurato
+           non deve lampeggiare prima di sparire. -->
+      <div class="acc" id="accTor" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accTor')"><span class="em">🧅</span>Sito Tor<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="torBlocco"></div></div>
+      </div>
+
+      <!-- I punti di ritiro che si tiene CHI COMPRA (ago 2026): il
+           gemello dall'altra parte del banco — sopra c'e' con quali
+           corrieri SPEDISCI, qui dove vuoi RICEVERE.
+           IL CASSETTO ELENCA E TOGLIE, e basta: non c'e' un form per
+           aggiungerne uno, ed e' deliberato. Dal Profilo non si sa
+           quali reti servano, e offrire tutte e tre inviterebbe a
+           salvare punti per corrieri che nessuno usa; il gesto sta al
+           checkout, dove la rete la dice il venditore e la mappa e' li'
+           sotto. Correggere un refuso si fa allo stesso posto: il punto
+           arriva precompilato, «Cambia» lo riapre, «Aggiorna» lo
+           sostituisce. -->
+      <div class="acc" id="accPuntiRitiro">
+        <button class="acc-h" onclick="toggleAcc('accPuntiRitiro')"><span class="em">📍</span>Punti di ritiro <span class="conta" id="puntiRitiroConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="puntiRitiroBlocco"></div></div>
       </div>
 
       <div class="acc" id="walletBlocco">
@@ -5526,98 +5725,16 @@ document.getElementById('cartello')?.remove();</script>
             Il CSV dei tuoi affari conclusi, comodo per la contabilità.</div>
         </div>
       </div>
+        </div>
+      </div>
 
+      <div class="grp" id="grpAccount">
+        <button type="button" class="section-label grp-h" onclick="toggleGrp('grpAccount')"
+                aria-expanded="false">⚙️ Il tuo account<span class="fr">▾</span></button>
+        <div class="grp-b">
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
         <div class="acc-b"><div id="avvisiBlocco"></div></div>
-      </div>
-
-      <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
-           «chi spedisce dichiara»): con quali reti di punti di ritiro
-           spedisci. La via punto si offre COMUNQUE (secondo giro) —
-           dichiararli serve a far scegliere a chi compra un punto
-           della rete giusta, invece di accordarsi in chat. Le voci
-           arrivano da /api/me (mai hardcodate); in DEMO il cassetto
-           sparisce, il patto del wallet. -->
-      <div class="acc" id="accSpedizioniere">
-        <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci <span class="conta" id="spedizioniereConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
-      </div>
-
-      <!-- I punti di ritiro che si tiene CHI COMPRA (ago 2026): il
-           gemello dall'altra parte del banco — sopra c'e' con quali
-           corrieri SPEDISCI, qui dove vuoi RICEVERE.
-           IL CASSETTO ELENCA E TOGLIE, e basta: non c'e' un form per
-           aggiungerne uno, ed e' deliberato. Dal Profilo non si sa
-           quali reti servano, e offrire tutte e tre inviterebbe a
-           salvare punti per corrieri che nessuno usa; il gesto sta al
-           checkout, dove la rete la dice il venditore e la mappa e' li'
-           sotto. Correggere un refuso si fa allo stesso posto: il punto
-           arriva precompilato, «Cambia» lo riapre, «Aggiorna» lo
-           sostituisce. -->
-      <div class="acc" id="accPuntiRitiro">
-        <button class="acc-h" onclick="toggleAcc('accPuntiRitiro')"><span class="em">📍</span>Punti di ritiro <span class="conta" id="puntiRitiroConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="puntiRitiroBlocco"></div></div>
-      </div>
-
-      <!-- Lo sconto sugli articoli (ago 2026): UNA regola per tutto il
-           negozio — a pezzi conta QUANTI, a valore conta QUANTO, ed e'
-           il criterio a dire dove vale — che cade sui soli
-           ARTICOLI e mai sulla spedizione. Le soglie e le percentuali
-           possibili arrivano da /api/me, mai hardcodate qui (il patto
-           della lampo). Sta accanto allo spedizioniere perche' sono
-           due politiche di negozio sempre accese; le ferie, che sono
-           l'interruzione, chiudono il gruppo.
-           In DEMO il cassetto sparisce, il patto del wallet. -->
-      <div class="acc" id="accScontoPacco">
-        <button class="acc-h" onclick="toggleAcc('accScontoPacco')"><span class="em">🎁</span>Sconto sugli articoli <span class="conta" id="scontoPaccoConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="scontoPaccoBlocco"></div></div>
-      </div>
-
-      <!-- La spedizione gratis sopra soglia (ago 2026): la seconda
-           promessa di negozio, sorella dello sconto qui sopra e
-           indipendente da lui — le due guardano lo stesso numero
-           senza vedersi — e dall'ago 2026 con lo stesso perimetro:
-           il mono sconta. Le soglie proposte arrivano da /api/me.
-           In DEMO il cassetto sparisce, il patto del wallet. -->
-      <div class="acc" id="accSpedGratis">
-        <button class="acc-h" onclick="toggleAcc('accSpedGratis')"><span class="em">🚚</span>Spedizione gratis <span class="conta" id="spedGratisConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="spedGratisBlocco"></div></div>
-      </div>
-
-      <!-- I CODICI SCONTO (ago 2026): il venditore ne crea uno e lo
-           da' a chi vuole. E' una LISTA con un tetto, non una regola
-           sola — quindi il modello e' «Avvisi di ricerca» e non i due
-           cassetti delle promesse qui sopra. Sta FRA la spedizione
-           gratis e le ferie: le tre promesse commerciali restano
-           adiacenti, e le ferie — che sono l'interruzione — continuano
-           a chiudere il gruppo. -->
-      <div class="acc" id="accCodici">
-        <button class="acc-h" onclick="toggleAcc('accCodici')"><span class="em">🎟</span>Codici sconto <span class="conta" id="codiciConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="codiciBlocco"></div></div>
-      </div>
-
-      <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
-           data di rientro. Gli annunci RESTANO in vetrina — si
-           guardano, non si comprano — e al rientro tornano
-           comprabili da soli. In DEMO sparisce, il patto del wallet. -->
-      <div class="acc" id="accFerie">
-        <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="ferieBlocco"></div></div>
-      </div>
-
-      <!-- Il banner del negozio (ago 2026): l'insegna sopra il
-           catalogo, una foto e un link al proprio sito. Ogni banner —
-           e ogni sua modifica — passa da un moderatore: qui dentro
-           si carica e si vede a che punto sta. -->
-      <div class="acc" id="accBanner">
-        <button class="acc-h" onclick="toggleAcc('accBanner')"><span class="em">🖼</span>Banner del negozio <span class="conta" id="bannerConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="bannerBlocco"></div></div>
-      </div>
-
-      <div class="acc" id="accRicerche" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accRicerche')"><span class="em">🔎</span>Avvisi di ricerca <span class="conta" id="ricercheConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="ricercheBlocco"></div></div>
       </div>
 
       <div class="acc" id="accAspetto">
@@ -5647,6 +5764,8 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accDistintivi">
         <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      </div>
+        </div>
       </div>
 
       <div id="adminStats"></div>
@@ -6362,6 +6481,27 @@ let WEB = false;       // browser col login web: cookie di sessione, app complet
    divergere. */
 function suOnion(){
   return location.hostname.endsWith('.onion');
+}
+
+/* L'INDIRIZZO .onion, dal server e MAI scritto a mano qui: un
+   indirizzo hardcodato e' un indirizzo che un giorno dice il falso su
+   un'altra installazione. Lo riempie la busta di prima pagina, quindi
+   ce l'ha anche l'anonimo in vetrina. */
+let onionHost = '';
+function impostaOnion(v){
+  onionHost = (v || '').trim();
+  scriviOnion();
+  renderTor();
+}
+/* Il segnaposto della pagina «I tuoi dati»: quella pagina e' markup
+   FISSO (renderPrivacy() non esiste piu', e' una decisione presa), e i
+   dati che vengono dal server ci entrano da un segnaposto — il pattern
+   di scriviDurate(). Il blocco nasce spento: dire «ecco l'indirizzo:»
+   seguito dal nulla e' peggio del silenzio. */
+function scriviOnion(){
+  const b = el('privOnionBlocco'); if (!b) return;
+  b.style.display = onionHost ? '' : 'none';
+  const s = el('privOnionVal'); if (s) s.textContent = onionHost;
 }
 /* IL DOMINIO DA CUI SI CONDIVIDE. Da Tor un link `.onion` mandato a
    qualcuno e' un link che quasi nessuno puo' aprire — e per giunta
@@ -7294,6 +7434,12 @@ async function loadListings(anonimo){
      riga la legge baseCondivisione, e senza (server di ieri) resta
      location.origin, cioe' il comportamento di sempre */
   if (j.dominio_pubblico) dominioPubblico = j.dominio_pubblico;
+  /* L'indirizzo del servizio nascosto, per chi lo vuole COPIARE: il
+     giudice suOnion() dice se ci siamo dentro, questo dice QUAL E'.
+     Senza (server di ieri, o ONION_HOST vuoto) il cassetto e il
+     blocco della pagina dei dati non nascono affatto: un'assenza,
+     mai un indirizzo inventato. */
+  if (j.onion_host !== undefined) impostaOnion(j.onion_host);
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -11516,6 +11662,14 @@ function apriCassettoProfilo(idAcc){
   closeSheet();               // se un foglio era aperto, si chiude
   go('profilo');
   const c = el(idAcc);
+  /* IL CASSETTO VIVE DENTRO UNA SEZIONE RICHIUDIBILE, e da sola non
+     basta aprirlo: resterebbe INVISIBILE e lo scrollIntoView qui sotto
+     atterrerebbe nel vuoto — un difetto che non alza niente e non si
+     vede finche' non lo si prova. Il gruppo si apre PRIMA e in
+     sincrono, o lo scroll misura una pagina che non ha ancora
+     quell'altezza. Con closest lo eredita anche il cassetto che
+     qualcuno aggiungera' fra sei mesi, senza un elenco da ricordare. */
+  c?.closest('.grp')?.classList.add('open');
   if (c && !c.classList.contains('open')) c.classList.add('open');
   setTimeout(()=>c?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
 }
@@ -11815,6 +11969,48 @@ function renderFasciaOnion(){
   f.innerHTML = `<div class="fascia-test fascia-onion">
        <span>🧅 Sei su Tor: quello che guardi resta fra te e Barattolo</span>
      </div>`;
+}
+
+/* IL CASSETTO «🧅 Sito Tor» (ago 2026). NON RISPIEGA NIENTE, ed e' la
+   riga da non ammorbidire: cos'e' Tor, cosa cambia e fin DOVE arriva
+   stanno gia' scritti — tre paragrafi in «I tuoi dati», sezione
+   `priv-tor` — e riscriverli qui sarebbe la stessa cosa detta in due
+   posti, cioe' due posti che un giorno diranno cose diverse. Qui c'e'
+   il DATO che mancava (l'indirizzo) e la strada per il resto: la
+   ricetta del recinto escrow — una riga e «Scopri di piu' ›».
+
+   LE DUE FACCE, il pattern gia' in casa di `notaOnionRecapito` e
+   `INVITO_ONION`: da fuori l'indirizzo e' una PORTA («si raggiunge
+   anche da li'»), da dentro e' quello che si sta gia' usando — e
+   ripeterglielo come una novita' sarebbe strano. Ma il cassetto
+   RESTA su onion, e non e' simmetria per gusto: e' l'unico posto da
+   cui prendere quell'indirizzo per mandarlo a qualcuno, e chi ci e'
+   arrivato non ce l'ha in mano piu' di chiunque altro.
+
+   SENZA INDIRIZZO IL CASSETTO NON NASCE, fail-closed come il giudice
+   del server: un cassetto che si apre su un vuoto e' peggio di un
+   cassetto che non c'e' — e a spegnere la sezione, se resta senza
+   figli, ci pensa gia' aggiornaGruppiProfilo. */
+function renderTor(){
+  const box = el('torBlocco'); if (!box) return;
+  const c = el('accTor');
+  if (c) c.style.display = onionHost ? '' : 'none';
+  if (!onionHost) { box.innerHTML = ''; return; }
+  const riga = suOnion()
+    ? `Sei su Tor: <b>questo è l'indirizzo che stai usando</b>. Copialo
+       per mandarlo a qualcuno che usa il Tor Browser.`
+    : `Barattolo si raggiunge anche <b>da dentro la rete Tor</b>, a
+       questo indirizzo. Per aprirlo serve il Tor Browser.`;
+  box.innerHTML = `
+    <div class="hint">${riga}</div>
+    <div class="hint mono" style="user-select:all;word-break:break-all;margin-top:8px">${esc(onionHost)}</div>
+    <button class="btn ghost" onclick="copiaOnion()">📋 Copia l'indirizzo</button>
+    <div class="hint" style="margin-top:10px"><button type="button" class="scopri-link" onclick="apriPrivacy('priv-tor')">Scopri di più ›</button></div>`;
+}
+/* La copia passa dal giudice unico: se la clipboard non c'e' mette
+   l'indirizzo nel toast invece di tacere. */
+function copiaOnion(){
+  if (onionHost) copiaLink(onionHost, 'Indirizzo copiato');
 }
 /* Dentro Telegram il link al canale passa dal client (che sa aprire
    gli inviti t.me/+…); nel browser e' una scheda nuova. */
@@ -19717,6 +19913,40 @@ function toggleAcc(id){
   el(id)?.classList.toggle('open');
 }
 
+/* ---- le sezioni del Profilo: gemelle dei cassetti un piano piu' su.
+   NIENTE MEMORIA, ed e' la stessa asimmetria che c'e' gia' fra
+   toggleAcc e toggleAccAdm: lo stato E' la classe sul nodo, e
+   sopravvive perche' il markup del Profilo non si ridisegna mai — i
+   render scrivono dentro i propri «...Blocco». Il Set serve di la',
+   dove il pannello si rifa' con innerHTML. Fra una sessione e l'altra
+   non si ricorda niente: si riparte da chiuso, che e' il default
+   dichiarato. ---- */
+function toggleGrp(id){
+  haptic();
+  const g = el(id); if (!g) return;
+  const aperto = g.classList.toggle('open');
+  g.querySelector('.grp-h')?.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+}
+
+/* ---- UN TITOLO CHE SI APRE SUL VUOTO E' PEGGIO DI UN TITOLO CHE NON
+   C'E': la sezione vive finche' almeno un suo cassetto e' visibile.
+   NON E' UN CASO TEORICO — in DEMO spariscono tutti e sei i cassetti
+   di «Impostazioni di negozio» e tutti e due di «Quando compri», e
+   fuori dalla DEMO succede a chi ha le leve del negozio spente.
+   Si LEGGE il DOM dopo che i render hanno deciso: la condizione di
+   ognuno vive nella sua funzione, e ricopiarla qui sarebbe un secondo
+   elenco da tenere in pari — quello che un domani direbbe il
+   contrario. Idempotente e a costo di venti letture: la chiamano
+   tutt'e due le catene (renderProfilo e renderIdentita), e se una gira
+   prima dell'altra la seconda corregge. ---- */
+function aggiornaGruppiProfilo(){
+  document.querySelectorAll('#view-profilo .grp').forEach(g => {
+    const vivo = [...g.querySelectorAll('.acc')]
+      .some(a => a.style.display !== 'none');
+    g.style.display = vivo ? '' : 'none';
+  });
+}
+
 /* ---- la testata della scheda Profilo: chi sei, come vai, il link
    del tuo negozio da condividere. Stesso biglietto da visita della
    vista negozio, ma per te stesso. ---- */
@@ -19768,6 +19998,10 @@ function renderProfilo(){
   renderDoppioni();
   renderPreferiti();
   renderChecklist();
+  renderTor();
+  /* Le sezioni per ultime: la loro visibilita' si LEGGE da quella
+     dei cassetti, che le righe qui sopra hanno appena deciso. */
+  aggiornaGruppiProfilo();
 }
 
 /* ---- «Completa il profilo (N di M)»: il promemoria consultabile.
@@ -20448,6 +20682,15 @@ function renderIdentita(){
   renderFerie();
   renderBanner();
   renderRicerche();
+  /* L'ALTRA CATENA che decide la visibilita' dei cassetti: questa
+     non e' nella lista del reload dati, quindi le sezioni si
+     riaggiornano da tutt'e due o su un percorso resterebbero
+     ferme. La funzione e' idempotente: chi gira per secondo
+     corregge. ⚠️ L'ordine delle chiamate qui sopra NON si tocca —
+     `renderConnettori(); renderAvvisi();` sono adiacenti sotto
+     sentinella, e l'ordine di render non c'entra con quello del
+     markup. */
+  aggiornaGruppiProfilo();
 }
 
 /* IL VELO DI QUESTO GESTO, e non uno dei due di casa: la scelta

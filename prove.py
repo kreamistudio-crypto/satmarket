@@ -37175,6 +37175,300 @@ def _fetta(testo, ancora, quanti=1400):
     return "" if i < 0 else testo[i:i + quanti]
 
 
+def _banco_profilo(mini):
+    """Fa GIRARE apriCassettoProfilo, aggiornaGruppiProfilo, toggleGrp e
+    renderTor su un DOM di cartone: una sentinella dice che la riga
+    c'e', mai che il cassetto diventi VISIBILE o che esca la frase
+    giusta — ed e' precisamente la domanda di questo cantiere."""
+    import json, subprocess, tempfile
+    pezzi = []
+    for nome in ("function apriCassettoProfilo(idAcc){",
+                 "function aggiornaGruppiProfilo(){",
+                 "function toggleGrp(id){",
+                 "function renderTor(){"):
+        # pezzo_js si ferma PRIMA del terminatore: la graffa finale
+        # va rimessa, o il banco non compila.
+        pezzi.append(pezzo_js(mini, nome, "\n}\n") + "\n}")
+    js = """
+// --- DOM di cartone: due sezioni, tre cassetti ---
+let SCROLL = 0;
+function Nodo(cls, id){
+  this.className = cls || ''; this.id = id || '';
+  this.style = {display:''}; this.figli = []; this.padre = null;
+  this.innerHTML = ''; this.attr = {};
+  const s = new Set((cls||'').split(' ').filter(Boolean));
+  this.classList = {
+    add: (c)=>s.add(c), remove: (c)=>s.delete(c),
+    contains: (c)=>s.has(c),
+    toggle: (c)=>{ const v = !s.has(c); v ? s.add(c) : s.delete(c); return v; }
+  };
+}
+Nodo.prototype.appendChild = function(n){ n.padre = this; this.figli.push(n); return n; };
+Nodo.prototype.setAttribute = function(k,v){ this.attr[k] = v; };
+Nodo.prototype.scrollIntoView = function(){ SCROLL++; };
+Nodo.prototype.closest = function(sel){
+  const c = sel.replace('.','');
+  let n = this;
+  while (n) { if (n.classList.contains(c)) return n; n = n.padre; }
+  return null;
+};
+Nodo.prototype.querySelector = function(sel){
+  const c = sel.replace('.','');
+  for (const f of this.figli) {
+    if (f.classList.contains(c)) return f;
+    const g = f.querySelector(sel); if (g) return g;
+  }
+  return null;
+};
+Nodo.prototype.querySelectorAll = function(sel){
+  const c = sel.replace('.','');
+  let out = [];
+  for (const f of this.figli) {
+    if (f.classList.contains(c)) out.push(f);
+    out = out.concat(f.querySelectorAll(sel));
+  }
+  return out;
+};
+const NODI = {};
+function mkGruppo(idg, cassetti){
+  const g = new Nodo('grp', idg);
+  g.appendChild(new Nodo('section-label grp-h'));
+  const b = g.appendChild(new Nodo('grp-b'));
+  for (const idc of cassetti) NODI[idc] = b.appendChild(new Nodo('acc', idc));
+  NODI[idg] = g;
+  return g;
+}
+const VISTA = new Nodo('view', 'view-profilo');
+VISTA.appendChild(mkGruppo('g1', ['c1','c2']));
+VISTA.appendChild(mkGruppo('g2', ['c3']));
+NODI['torBlocco'] = new Nodo('', 'torBlocco');
+NODI['accTor'] = new Nodo('acc', 'accTor');
+const document = {
+  querySelectorAll: (sel)=> sel.startsWith('#view-profilo')
+    ? VISTA.querySelectorAll(sel.split(' ').pop()) : []
+};
+function el(id){ return NODI[id] || null; }
+function haptic(){}
+function closeSheet(){}
+function go(){}
+function esc(s){ return String(s); }
+let ONION = false;
+function suOnion(){ return ONION; }
+let onionHost = '';
+""" + "\n".join(pezzi) + """
+
+const out = {};
+// 1) apriCassettoProfilo apre ANCHE la sezione, e lo scroll parte
+apriCassettoProfilo('c2');
+out.cassetto = NODI['c2'].classList.contains('open');
+out.gruppo = NODI['g1'].classList.contains('open');
+out.scroll = SCROLL;
+// 2) toggleGrp apre il suo e non tocca gli altri
+NODI['g1'].classList.remove('open');
+toggleGrp('g2');
+out.g2 = NODI['g2'].classList.contains('open');
+out.g1 = NODI['g1'].classList.contains('open');
+out.aria = NODI['g2'].querySelector('.grp-h').attr['aria-expanded'];
+// 3) la sezione vuota sparisce, e la regia e' idempotente
+NODI['c1'].style.display = 'none';
+NODI['c2'].style.display = 'none';
+aggiornaGruppiProfilo();
+out.vuotoSpento = NODI['g1'].style.display;
+out.pienoAcceso = NODI['g2'].style.display;
+aggiornaGruppiProfilo();
+out.dueGiri = NODI['g1'].style.display;
+NODI['c1'].style.display = '';
+aggiornaGruppiProfilo();
+out.torna = NODI['g1'].style.display;
+// 4) renderTor: senza indirizzo il cassetto non nasce
+onionHost = '';
+renderTor();
+out.senza = [NODI['accTor'].style.display, NODI['torBlocco'].innerHTML];
+onionHost = 'abc123.onion';
+ONION = false;
+renderTor();
+out.fuori = [NODI['accTor'].style.display, NODI['torBlocco'].innerHTML];
+ONION = true;
+renderTor();
+out.dentro = NODI['torBlocco'].innerHTML;
+// lo scroll parte da un setTimeout(80): si aspetta, o si
+// misurerebbe zero e la prova direbbe il falso.
+setTimeout(()=>{ out.scroll = SCROLL;
+  console.log(JSON.stringify(out)); }, 250);
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        os.unlink(p)
+        return None
+    os.unlink(p)
+    if r.returncode != 0:
+        return [("il banco del Profilo gira", "", r.stderr[-400:])]
+    o = json.loads(r.stdout)
+    return [
+        # LA PROVA CHE VALE DI PIU' del cantiere: dentro una sezione
+        # CHIUSA il cassetto si aprirebbe INVISIBILE e lo scroll
+        # atterrerebbe nel vuoto — un difetto che non alza niente e
+        # non si vede finche' non lo si prova.
+        ("apriCassettoProfilo apre il cassetto E la sua sezione",
+         [True, True], [o["cassetto"], o["gruppo"]]),
+        ("e lo scroll parte lo stesso", 1, o["scroll"]),
+        ("toggleGrp apre il suo e non tocca gli altri",
+         [True, False], [o["g2"], o["g1"]]),
+        ("e lo dice a voce", "true", o["aria"]),
+        # Un titolo che si apre sul vuoto e' peggio di un titolo che
+        # non c'e': in DEMO succede a due sezioni su cinque.
+        ("la sezione senza cassetti vivi sparisce", "none", o["vuotoSpento"]),
+        ("quella con un cassetto vivo resta", "", o["pienoAcceso"]),
+        ("e due giri di fila dicono lo stesso", "none", o["dueGiri"]),
+        ("torna accesa se un cassetto riappare", "", o["torna"]),
+        # Fail-closed come il giudice del server: «ecco l'indirizzo:»
+        # seguito dal nulla e' peggio del silenzio.
+        ("senza indirizzo il cassetto Tor non nasce",
+         ["none", ""], o["senza"]),
+        ("con l'indirizzo nasce e lo porta dentro",
+         [True, True],
+         [o["fuori"][0] == "", "abc123.onion" in o["fuori"][1]]),
+        # LE DUE FACCE: una sentinella direbbe che i due rami ci sono,
+        # mai QUALE frase esce.
+        ("da fuori l'indirizzo e' una porta", True,
+         "da dentro la rete Tor" in o["fuori"][1]
+         and "stai usando" not in o["fuori"][1]),
+        ("da dentro dice quello che stai gia' usando", True,
+         "stai usando" in o["dentro"]
+         and "da dentro la rete Tor" not in o["dentro"]),
+        ("e l'indirizzo c'e' in tutti e due i casi", True,
+         "abc123.onion" in o["dentro"]),
+    ]
+
+
+def prove_profilo_sezioni():
+    """IL PROFILO A SEZIONI e il cassetto «🧅 Sito Tor» (ago 2026).
+
+    Diciannove cassetti in fila erano ~1660px, tre schermate e mezzo di
+    titoli senza un appiglio. Adesso stanno in CINQUE sezioni
+    richiudibili, tutte chiuse entrando; e il ventesimo cassetto porta
+    l'indirizzo .onion, che il servizio nascosto aveva da mesi senza
+    che nessuno potesse saperlo."""
+    print("\n🔐 Il Profilo a sezioni, e l'indirizzo Tor")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+    i0 = mini.index('id="view-profilo"')
+    i1 = mini.index('id="adminStats"', i0)
+    vista = mini[i0:i1]
+
+    # --- 1) IL CENSIMENTO, la prova che vale di piu': nessun cassetto
+    # resta fuori da una sezione, cosi' quello di domani lo sente
+    # dalla CI invece di restare orfano in fondo alla pagina.
+    # Si conta a STACK sugli attributi dei div e non coi </div>: il
+    # markup dei cassetti ne e' pieno, e un conteggio secco direbbe il
+    # falso (ci si e' inciampati scrivendo questa prova).
+    pila, orfani, ids = [], [], []
+    for m in re.finditer(r'<div\b([^>]*)>|</div>', vista):
+        if m.group(0) == "</div>":
+            if pila:
+                pila.pop()
+            continue
+        at = m.group(1)
+        c = re.search(r'class="([^"]*)"', at)
+        i = re.search(r'id="([^"]*)"', at)
+        cls, idv = (c.group(1) if c else ""), (i.group(1) if i else "")
+        if "acc" in cls.split() and idv:
+            ids.append(idv)
+            if not any("grp-b" in x.split() for x in pila):
+                orfani.append(idv)
+        pila.append(cls)
+    prova("nessun cassetto del Profilo resta fuori da una sezione",
+          [], orfani)
+    prova("e ognuno compare una volta sola", len(ids), len(set(ids)))
+    prova("le sezioni sono cinque", 5, vista.count('<div class="grp"'))
+    # LE SEZIONI NASCONO CHIUSE (decisione di Andrea): il Profilo si
+    # apre sulla mappa intera, non su un cassetto gia' spalancato.
+    prova("nessuna sezione nasce aperta", 0, vista.count('class="grp open"'))
+
+    # --- 2) LA FORMA RESTA DISTINTA. Un `.acc` dentro un `.acc-b` non
+    # esiste da nessuna parte nel client, e due livelli con la stessa
+    # veste sarebbero la trappola del doppio significato gia' pagata
+    # con «lampo», «attesa» e «nota».
+    prova("la sezione e' un'etichetta e non un secondo cassetto", True,
+          'class="section-label grp-h"' in vista
+          and 'class="grp acc"' not in vista)
+    css = mini[:mini.index("</style>")]
+    prova("la freccia della sezione atterra DOPO i puntini", True,
+          ".grp-h .fr{order:2" in css)
+    prova("il corpo della sezione si apre con la classe", True,
+          ".grp-b{display:none}" in css
+          and ".grp.open .grp-b{display:block}" in css)
+
+    # --- 3) LA REGIA E' CHIAMATA DA TUTT'E DUE LE CATENE che decidono
+    # la visibilita' dei cassetti — la seconda non e' nella lista del
+    # reload dati. Si guarda la RIGA INTERA e non il nome: la lezione
+    # del reaper, dove un «pass # …» lasciava verde una sentinella.
+    rp = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    ri = pezzo_js(mini, "function renderIdentita(){", "\n}\n")
+    prova("renderProfilo riaggiorna le sezioni", True,
+          "\n  aggiornaGruppiProfilo();" in rp)
+    prova("e renderIdentita pure (l'altra catena)", True,
+          "\n  aggiornaGruppiProfilo();" in ri)
+    # ⚠️ L'ORDINE DELLE CHIAMATE NON SI RIORDINA per rispecchiare le
+    # sezioni: e' indipendente dall'ordine del markup, e quella coppia
+    # e' sotto sentinella altrove.
+    prova("l'ordine sorvegliato di renderIdentita e' intatto", True,
+          "renderConnettori();\n  renderAvvisi();" in ri)
+    ac = pezzo_js(mini, "function apriCassettoProfilo(idAcc){", "\n}\n")
+    prova("apriCassettoProfilo apre la sezione col closest", True,
+          "closest('.grp')" in ac)
+
+    # --- 4) L'INDIRIZZO NON E' SCRITTO A MANO. Un .onion hardcodato e'
+    # un indirizzo che un giorno dice il falso su un'altra
+    # installazione: la fonte e' il server, e nel client c'e' una
+    # variabile sola.
+    codice = mini[mini.index("<script>"):]
+    a_mano = [m.group(0) for m in
+              re.finditer(r"['\"][a-z2-7]{8,}\.onion['\"]", codice)]
+    prova("nessun indirizzo .onion scritto a mano nel client", [], a_mano)
+    prova("la fonte e' una variabile sola", 1, codice.count("let onionHost"))
+    prova("che arriva dalla busta di prima pagina", True,
+          "if (j.onion_host !== undefined) impostaOnion(j.onion_host);"
+          in codice)
+    prova("e il server ce la mette", True,
+          'risposta["onion_host"] = ONION_HOST' in srv)
+
+    # --- 5) L'INDIRIZZO STA IN DUE POSTI, e il secondo nasce SPENTO:
+    # la pagina «I tuoi dati» la vede anche l'ANONIMO in vetrina, dove
+    # il Profilo e' bloccato — e chi vuole passare a Tor e' proprio chi
+    # non si e' ancora fidato abbastanza da entrare. A ripetersi e' un
+    # DATO, non una spiegazione: quella resta in un posto solo.
+    i_p = mini.index('id="view-privacy"')
+    priv = mini[i_p:mini.index('id="view-', i_p + 10)]
+    prova("l'indirizzo compare anche in «I tuoi dati»", True,
+          'id="privOnionBlocco"' in priv and 'id="privOnionVal"' in priv)
+    prova("e quel blocco nasce spento", True,
+          'id="privOnionBlocco" style="display:none"' in priv)
+    prova("il cassetto Tor sta dentro la sezione Privacy", True,
+          'id="accTor"' in vista)
+    # La spiegazione NON si ripete: il cassetto rimanda alla sezione
+    # che ce l'ha gia' — la ricetta del recinto escrow.
+    rt = pezzo_js(mini, "function renderTor(){", "\n}\n")
+    prova("il cassetto rimanda alla spiegazione invece di rifarla", True,
+          "apriPrivacy('priv-tor')" in rt)
+    prova("e la copia passa dal giudice unico", True,
+          "copiaLink(onionHost"
+          in pezzo_js(mini, "function copiaOnion(){", "\n}\n"))
+
+    esiti = _banco_profilo(mini)
+    if esiti is None:
+        salta("il banco del Profilo", "node non c'e'")
+    else:
+        for nome, atteso, avuto in esiti:
+            prova(nome, atteso, avuto)
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -37685,6 +37979,7 @@ def main():
               prove_ordini_prova,
               prove_tutorial,
               prove_bunker_muto,
+              prove_profilo_sezioni,
               prove_config_esempio):
         try:
             f()

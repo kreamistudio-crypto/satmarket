@@ -19179,6 +19179,163 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tornato SOLO il form di pubblicazione, e dopo pubblica/modifica si
   apre il dettaglio dell'annuncio appena salvato (l'id arriva da
   `{ok,id}`, ripiego su Esplora se non è in lista).
+  IL PROFILO A SEZIONI, E L'INDIRIZZO TOR (ago 2026, decisione di
+  Andrea): i cassetti erano DICIANNOVE in fila, in ordine di
+  sedimentazione storica — impostazioni di negozio, dati personali e
+  preferenze mescolate — e chi entrava per cambiare una cosa scorreva
+  ~1660px leggendo diciannove titoli senza nessun appiglio. Adesso
+  stanno in CINQUE sezioni richiudibili, tutte chiuse entrando, e il
+  ventesimo cassetto porta l'indirizzo `.onion` — che il servizio
+  nascosto aveva da mesi senza che nessuno potesse saperlo.
+  MISURATO: il Profilo passa da ~1660 a **1115px** a 375px con 16
+  cassetti visibili su 20 — tutte e cinque le etichette in una
+  schermata e mezzo invece di tre e mezzo.
+  LE CINQUE SEZIONI: 📋 Il tuo catalogo (annunci, import, negozio
+  collegato, doppioni) · 🏪 Impostazioni di negozio (spedizioniere,
+  spedizione gratis, sconto, codici, banner, ferie) · 🫙 Quando compri
+  (barattolo, avvisi di ricerca) · 🔐 Privacy (identità, **Sito Tor**,
+  punti di ritiro, incassi e pagamenti) · ⚙️ Il tuo account (avvisi,
+  aspetto, livello, distintivi).
+  «INCASSI E PAGAMENTI» STA IN PRIVACY, e la ragione non è di gusto:
+  la pagina «I tuoi dati» nomina esattamente DUE cassetti come strada
+  per togliere un dato — «Punti di ritiro» e «Incassi e pagamenti» —
+  con due prove in CI che lo sorvegliano, e il Lightning address è il
+  dato più longevo del profilo, in chiaro e senza scadenza. ⚠️ DA
+  GUARDARE A RODAGGIO: se un venditore lo cerca sotto «negozio» e non
+  lo trova, si rivede — è lo spostamento di un blocco.
+  E NIENTE SI NASCONDE A CHI NON VENDE (decisione di Andrea): il
+  titolo della sezione fa già saltare il blocco con un colpo d'occhio,
+  e nascondere chiuderebbe la porta a chi sta per cominciare — la
+  decisione opposta a quella del banner, «la porta chiusa si dice, non
+  si nasconde». In più il giudice «questo utente vende» NON ESISTE:
+  `myListings` arriva da una fetch separata DOPO il render, e
+  `/api/me` non ha un campo equivalente.
+  LA FORMA È LA RIGA DA NON AMMORBIDIRE: la sezione è un
+  `.section-label` reso TOCCABILE — il pattern di `.trust-line`, una
+  riga statica diventata `<button>` — e MAI un secondo cassetto. Un
+  `.acc` dentro un `.acc-b` **non esiste da nessuna parte nel
+  client**: sarebbe territorio nuovo, col `margin-top:10px` che si
+  somma al padding del genitore, e soprattutto due livelli con la
+  stessa veste sono la trappola del doppio significato già pagata con
+  «lampo», «attesa» e «nota» — chi guarda non saprebbe se sta aprendo
+  una sezione o un cassetto. Due dettagli che vengono dal codice e non
+  dall'intuito: `padding:26px 0 0` e non i `16px var(--pad)` di serie
+  (dentro `.form`, che ha già il suo padding laterale, il rientro si
+  sommerebbe — è quel che fa il pannello admin), e `order:2` sulla
+  freccia, perché il `::after` della linea puntinata è `order:1` e la
+  freccia deve atterrare DOPO i puntini, nel posto che il CSS riserva
+  già al `.conta`. Freccia della sezione a fondo riga sui puntini,
+  freccia del cassetto dentro la card: due forme distinte a colpo
+  d'occhio (guardate a schermo nei due temi).
+  `toggleGrp` NON HA MEMORIA, ed è il gemello di `toggleAcc`: lo stato
+  È la classe sul nodo, e sopravvive perché il markup del Profilo non
+  si ridisegna MAI (i render scrivono dentro i propri `…Blocco`).
+  Verificato dal vivo: si entra in un annuncio da «I tuoi annunci» e
+  si torna — sezione e cassetto ancora aperti, e `ripristinaMieiPos`
+  riporta a y=700 esatto.
+  `apriCassettoProfilo` APRE ANCHE LA SEZIONE, ed è la riga che il
+  cantiere paga: dentro una sezione chiusa il cassetto si aprirebbe
+  INVISIBILE e lo `scrollIntoView` atterrerebbe nel vuoto — un difetto
+  che non alza niente e non si vede finché non lo si prova. Otto
+  chiamanti, tutti dentro le sezioni. Si usa `closest('.grp')` e non
+  un elenco di appartenenze: il cassetto di domani lo eredita.
+  `aggiornaGruppiProfilo` SPEGNE LA SEZIONE RIMASTA SENZA CASSETTI, e
+  NON è un caso teorico — in DEMO succede per davvero (misurato:
+  `grpNegozio` sparisce). Legge il DOM DOPO che i render hanno deciso,
+  invece di ricopiare qui le venti condizioni di visibilità, che
+  sarebbe un secondo elenco da tenere in pari. È chiamata da TUTT'E
+  DUE le catene — `renderProfilo` e `renderIdentita` — e la seconda non
+  è nella lista del reload dati: è idempotente, quindi chi gira per
+  secondo corregge.
+  ⚠️ L'ORDINE DELLE CHIAMATE DI RENDER NON SI RIORDINA per
+  rispecchiare le sezioni: è indipendente dall'ordine del markup, e
+  `renderConnettori(); renderAvvisi();` sono adiacenti sotto
+  sentinella — toccarlo rompe quella prova senza guadagnare niente.
+  IL LAMPO DICHIARATO NEL PIANO NON ESISTE, ed è misurato e non
+  supposto: le sezioni nascono VISIBILI nel markup, quindi il dubbio
+  era che in DEMO due titoli comparissero e sparissero. Campionato ogni
+  40 ms dall'avvio: **124 campioni con la vista Profilo a schermo, e in
+  tutti la sezione vuota era GIÀ spenta**. La ragione è strutturale e
+  non fortuna — il Profilo non è la vista d'ingresso e nessuna rotta ci
+  atterra sopra, quindi quando ci si arriva i render sono già girati.
+  Chi un domani facesse atterrare qualcuno dritto sul Profilo
+  rimisuri.
+
+  IL CASSETTO «🧅 SITO TOR» (ago 2026, stesso giro). Il servizio
+  nascosto ESISTEVA già — `ONION_HOST` col suo giudice fail-closed,
+  `suOnion()`, la fascia «🧅 Sei su Tor», l'invito girato,
+  `dominioPubblico` per condividere link clearnet da dentro Tor — e la
+  SPIEGAZIONE pure, tre paragrafi in «I tuoi dati», sezione `priv-tor`,
+  compresa la parte migliore («Tor nasconde da dove ti colleghi, non
+  quello che scrivi»). MANCAVA UNA COSA SOLA: L'INDIRIZZO. `ONION_HOST`
+  non usciva mai verso il client, quindi chi leggeva quella sezione
+  scopriva che il `.onion` esiste e non aveva modo di sapere quale — lo
+  stesso difetto già pagato coi reparti, «ci si atterra bene, ma da
+  dentro l'app quel link non si poteva prendere».
+  QUINDI IL CASSETTO NON RISPIEGA NIENTE: porta il DATO e rimanda alla
+  sezione — la ricetta del recinto escrow, una riga e «Scopri di più
+  ›». Riscrivere qui cos'è Tor sarebbe la stessa cosa detta in due
+  posti, cioè due posti che un giorno diranno cose diverse.
+  IL VIAGGIO: `risposta["onion_host"] = ONION_HOST` nella busta di
+  PRIMA PAGINA di `/api/listings`, accanto a `giorni_indirizzo` e per
+  la stessa ragione già scritta — serve anche all'ANONIMO in vetrina,
+  che `/api/me` non ce l'ha, e chi vuole passare a Tor è precisamente
+  chi non è ancora entrato. NON è un segreto: un indirizzo pubblico è
+  fatto per essere conosciuto, il segreto è la chiave, che resta sul
+  VPS. Nel client `let onionHost = ''` e **nessun letterale `.onion`
+  scritto a mano** (c'è la prova): un indirizzo hardcodato è un
+  indirizzo che un giorno dice il falso su un'altra installazione.
+  LE DUE FACCE, il pattern già in casa di `notaOnionRecapito` e
+  `INVITO_ONION`: da CLEARNET l'indirizzo è una PORTA («Barattolo si
+  raggiunge anche da dentro la rete Tor»), da DENTRO è quello che si
+  sta già usando — e ripeterglielo come una novità sarebbe strano. Ma
+  IL CASSETTO RESTA su onion, e non è simmetria per gusto: è l'unico
+  posto da cui prendere quell'indirizzo per mandarlo a qualcuno, e chi
+  ci è arrivato non ce l'ha in mano più di chiunque altro.
+  SENZA INDIRIZZO IL CASSETTO NON NASCE, fail-closed come il giudice
+  del server — e a spegnere la sezione, se restasse senza figli, ci
+  pensa già `aggiornaGruppiProfilo`. Vale anche in DEMO, dove la busta
+  non arriva. La copia passa da `copiaLink`, il giudice unico che se la
+  clipboard non c'è mette l'indirizzo nel toast invece di tacere.
+  E L'INDIRIZZO STA ANCHE IN «I TUOI DATI», in coda alla sezione che
+  già lo racconta: un segnaposto col `textContent` (la pagina è markup
+  FISSO — `renderPrivacy()` non esiste più, è una decisione presa — e i
+  dati del server ci entrano col pattern di `scriviDurate`), che nasce
+  `display:none` e si accende quando l'indirizzo arriva: «ecco
+  l'indirizzo:» seguito dal nulla è peggio del silenzio.
+  ⚠️ QUI SI RIPETE UN DATO E NON UNA SPIEGAZIONE, ed è la differenza
+  col registro doppio che altrove si toglie: quella pagina la vede
+  anche l'ANONIMO in vetrina, dove il Profilo è bloccato. La
+  spiegazione resta in un posto solo, e la fonte del dato è una
+  variabile sola.
+  Provato: 33 prove nuove (7036 verdi in modalità severa) — il
+  censimento che nessun `.acc` del Profilo resti fuori da una sezione,
+  contato a STACK sugli attributi dei div e non coi `</div>`, che il
+  markup dei cassetti ne è pieno e un conteggio secco direbbe il falso
+  (ci si è inciampati scrivendo la prova) — più un BANCO node che fa
+  GIRARE `apriCassettoProfilo`, `aggiornaGruppiProfilo`, `toggleGrp` e
+  `renderTor` su un DOM di cartone: una sentinella dice che la riga
+  c'è, mai che il cassetto diventi VISIBILE o che esca la frase giusta.
+  E **15 MUTAZIONI, 15 uccise**, una per riga sorvegliata (closest
+  tolto, la regia tolta da ognuna delle due catene, la guardia del
+  vuoto rovesciata, un cassetto lasciato fuori, una sezione che nasce
+  aperta, la sezione trasformata in cassetto, la freccia che perde il
+  posto, l'indirizzo hardcodato, il server che non lo manda, la guardia
+  del cassetto Tor tolta, i due testi scambiati, il blocco privacy che
+  nasce acceso, la copia fuori dal giudice unico, l'ordine sorvegliato
+  rotto). Più il giro DAL VIVO col server vero su un database
+  usa-e-getta, a 320/360/375 nei due temi: 38 verifiche verdi, zero
+  errori JS, zero scorrimento laterale — le cinque sezioni chiuse,
+  l'atterraggio sul cassetto profondo, il cassetto Tor nelle due facce,
+  il caso SENZA indirizzo (Privacy resta coi suoi), la DEMO, e la
+  regressione del ritorno da un annuncio.
+  IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+  nessuna rotta, nessuna leva nuova — `ONION_HOST` esiste già nel
+  config del VPS, e **se è vuoto il cassetto semplicemente non compare**
+  e tutto il resto vale identico. ⚠️ DA GUARDARE dal VPS, ed è il pezzo
+  che da qui non si può fare: l'indirizzo vero sul dominio `.onion` col
+  Tor Browser — che la fascia 🧅 e il cassetto dicano la stessa cosa, e
+  che l'indirizzo copiato sia quello giusto.
   PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore;
   percorso ormai completo: Fase 2 = icona adattiva, Fase 3 =
   «Distribuzione dell'APK», più sotto): `manifest.json` (id/
@@ -25900,6 +26057,39 @@ di ieri. DA GUARDARE al primo giro: il primo rifiuto vero dentro
 Telegram — che dica la famiglia giusta e che il canale sia quello del
 config — e il registro, per vedere se i falsi positivi cominciano ad
 arrivare adesso che si possono segnalare.
+
+Il Profilo a sezioni, e l'indirizzo Tor (ago 2026, decisione di Andrea):
+i diciannove cassetti in fila diventano CINQUE sezioni richiudibili —
+catalogo, negozio, quando compri, privacy, account — tutte chiuse
+entrando; e il ventesimo cassetto porta l'indirizzo `.onion`, che il
+servizio nascosto aveva da mesi senza che nessuno potesse saperlo. Il
+Profilo passa da ~1660 a **1115px** misurati a 375px. Vedi
+Architettura, «IL PROFILO A SEZIONI, E L'INDIRIZZO TOR», per la forma
+della sezione (un'etichetta toccabile e MAI un secondo cassetto: un
+`.acc` dentro un `.acc-b` non esiste da nessuna parte nel client), per
+la riga che il cantiere paga — `apriCassettoProfilo` che apre anche la
+sezione, o il cassetto si aprirebbe invisibile — e per le due
+decisioni che si leggono male da sole: «Incassi e pagamenti» sta in
+PRIVACY perché è il dato più longevo del profilo, e niente si nasconde
+a chi non vende.
+IL LAMPO DICHIARATO NEL PIANO NON ESISTE, misurato e non supposto: 124
+campioni con la vista a schermo, e in tutti la sezione vuota era già
+spenta — il Profilo non è la vista d'ingresso, quindi quando ci si
+arriva i render sono già girati.
+Collaudato: 33 prove nuove (7036 verdi in modalità severa, col
+censimento che nessun cassetto resti fuori da una sezione e il banco
+node che fa GIRARE i quattro pezzi su un DOM di cartone) e **15
+MUTAZIONI, 15 uccise**, una per riga sorvegliata; più il giro DAL VIVO
+col server vero su un database usa-e-getta a 320/360/375 nei due temi —
+38 verifiche verdi, zero errori JS: l'atterraggio sul cassetto
+profondo, il cassetto Tor nelle due facce, il caso SENZA indirizzo, la
+DEMO dove una sezione sparisce, e la regressione del ritorno da un
+annuncio (y=700 → y=700).
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna rotta, nessuna leva nuova — e se `ONION_HOST` sul VPS è vuoto
+il cassetto semplicemente non compare. DA GUARDARE dal VPS, ed è il
+pezzo che da qui non si può fare: l'indirizzo vero sul dominio `.onion`
+col Tor Browser, che la fascia 🧅 e il cassetto dicano la stessa cosa.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):

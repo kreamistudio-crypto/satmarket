@@ -12196,6 +12196,19 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # personale. Se l'operatore mette 90 e la pagina dicesse 30,
         # avremmo scritto il falso.
         risposta["giorni_indirizzo"] = GIORNI_INDIRIZZO
+        # L'INDIRIZZO DEL SERVIZIO NASCOSTO. Esiste da prima di questa
+        # riga — la sua chiave sta nel backup giornaliero — e non lo
+        # sapeva NESSUNO: ONION_HOST non usciva mai di qui, quindi la
+        # pagina «I tuoi dati» raccontava il .onion senza poter dire
+        # quale. Viaggia nella busta di PRIMA PAGINA e non in /api/me
+        # per la ragione che decide tutto il cantiere: serve anche
+        # all'ANONIMO in vetrina, che /api/me non ce l'ha — e chi
+        # vuole passare a Tor e' precisamente chi non e' ancora
+        # entrato. Non e' un segreto: un indirizzo pubblico e' fatto
+        # per essere conosciuto (il segreto e' la chiave, che resta
+        # sul VPS). Vuoto = il cassetto e il blocco non nascono, e
+        # tutto il resto vale identico.
+        risposta["onion_host"] = ONION_HOST
         # LE DURATE DELLA PAGINA «I tuoi dati» (ago 2026), stessa
         # ragione della riga qui sopra e non di TEMPI: quei numeri
         # decidono se un bottone ha senso, questi SONO la promessa
