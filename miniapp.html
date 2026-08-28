@@ -4021,12 +4021,28 @@
      l'unico testo dell'app scritto in un font che non e' di casa, e
      sul telefono (dove quel ripiego e' un altro font ancora) il 🟣 si
      leggeva fuori posto — difetto dal campo, ago 2026. Va PRIMA dei
-     due longhand, che la scorciatoia `font` li azzererebbe. */
+     due longhand, che la scorciatoia `font` li azzererebbe.
+     E IL FONT NON BASTAVA: dal campo il 🟣 restava «tondo da una parte
+     e tagliato dritto dall'altra», cioe' RITAGLIATO — e un clip che
+     rispetta il border-radius taglia CURVO, quindi a mordere e' il
+     content box, che gli angoli tondi non ce li ha. In WebKit un
+     <button> ritaglia il proprio contenuto, e l'inchiostro di un
+     emoji sfonda la scatola che il font dichiara (misurato col canvas:
+     con Segoe sta dentro — 12 contro 13 sopra la baseline — e per
+     questo su Chrome non si vede niente; le emoji di Apple no).
+     La cura ha DUE gambe perche' non si puo' provare da qui quale
+     morda: `overflow:visible` toglie il ritaglio se WebKit onora
+     l'override, e l'ARIA lo rende innocuo se non lo onora. L'aria si
+     sposta dal padding — che sta FUORI dal clip — al line box, che ci
+     sta DENTRO: `line-height:2` con 3px invece di 6 lascia l'altezza
+     dov'era (32 contro 31,5) e da' al glifo 4px sopra invece di ZERO.
+     ⚠️ Chi ritocca questi tre valori li rimisuri insieme: da soli si
+     annullano. */
   .demo-cta{
     display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
-    text-decoration:none;border-radius:999px;padding:6px 15px;
-    font:inherit;font-weight:800;font-size:13px;
-    box-shadow:0 2px 0 var(--sats-deep);
+    text-decoration:none;border-radius:999px;padding:3px 15px;
+    font:inherit;font-weight:800;font-size:13px;line-height:2;
+    box-shadow:0 2px 0 var(--sats-deep);overflow:visible;
   }
 
   /* ==================== DESKTOP (≥768px) ====================

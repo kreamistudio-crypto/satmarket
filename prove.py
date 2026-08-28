@@ -21005,6 +21005,21 @@ def prove_onion():
     # azzererebbe: e' l'ordine che un riordino sposta senza vederlo
     prova("...prima del peso e del corpo, o li azzererebbe", True,
           -1 < _cta.find("font:inherit") < _cta.find("font-weight:800"))
+    # E IL FONT NON BASTAVA (ago 2026, secondo giro dal campo): il 🟣
+    # restava «tondo da una parte e tagliato dritto dall'altra», cioe'
+    # RITAGLIATO — e un clip che rispetta il border-radius taglia
+    # CURVO, quindi a mordere e' il content box. Due gambe, perche' da
+    # qui non si puo' provare quale morda: l'overflow toglie il
+    # ritaglio dove WebKit onora l'override, l'aria lo rende innocuo
+    # dove non lo onora. ⚠️ I due valori dell'aria si muovono INSIEME:
+    # il padding sta FUORI dal clip e il line box ci sta DENTRO, quindi
+    # da soli si annullano — misurato, 4px sopra invece di zero a
+    # parita' di altezza.
+    prova("il ritaglio del <button> non morde", True,
+          "overflow:visible" in _cta)
+    prova("...e l'aria del glifo sta nel line box, non nel padding",
+          (True, True),
+          ("line-height:2" in _cta, "padding:3px 15px" in _cta))
 
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
