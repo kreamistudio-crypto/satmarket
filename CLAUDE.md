@@ -2160,6 +2160,85 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   compressione WebP. Un candidato sbagliato dà 36. Per questo NON
   esiste uno script committato del ritaglio: non potrebbe girare per
   nessuno, e sarebbe una promessa che non si mantiene.
+  LE DUE STRISCE SONO PIU' GRANDI SUL WEB (ago 2026, decisione di
+  Andrea): fuori da Telegram e da 768px in su le card di «Da scoprire»
+  passano da 272x130 a **400x191** e le celle delle categorie da 84 a
+  **120**, col titolo dei banner e il nome dei reparti che crescono con
+  loro. IL VINCOLO E' DI FERRO: dentro la Mini App non cambia NULLA,
+  nemmeno di un byte — le regole BASE non si toccano, la crescita e'
+  una variante.
+  IL DIFETTO ERA MISURATO e non un'impressione: su desktop la card di
+  un banner era larga QUANTO una card di annuncio (272 contro 270 a
+  1280, 295 a 960) mentre sul telefono e' 1,64 volte; e la fila non
+  scorreva affatto (`scrollWidth == clientWidth`), cioe' restavano
+  ~600px di vuoto accanto a due card piccole.
+  IL GIUDICE E' `initData` E MAI `WEB`, ed e' la riga che decide tutto
+  il cantiere: `WEB` nasce falso e diventa vero solo se `/api/me`
+  risponde col cookie di sessione — quindi sarebbe falso per l'anonimo
+  che arriva da un motore, in DEMO e in collaudo, e **mezzo web
+  resterebbe piccolo senza che niente fallisca**. `initData` invece e'
+  vuoto in ogni browser e pieno solo dentro la WebView vera.
+  STA NELL'ANTI-FLASH IN TESTA AL FILE e non in `avvia()`: e' una
+  MISURA, e una misura decisa dopo il primo paint si vedrebbe scattare
+  — la stessa ragione per cui li' vivono il tema e la scala del testo.
+  Il nome della classe (`fuori-telegram`) dice DOVE si sta e non prende
+  in prestito «web», che in questo file significa gia' un'altra cosa.
+  ⚠️ E LO STUB DA SOLO NON BASTA A SIMULARLA: lo script di telegram.org
+  sta in testa al file e RIMPIAZZA `window.Telegram` — chi la prova in
+  headless deve bloccare quella richiesta, o il banco dira' «il
+  cantiere e' rotto» mentre e' rotto lui (successo, e per un giro
+  intero il caso Mini App e' uscito verde dalla parte sbagliata).
+  IL GATE E' DOPPIO e nessuno dei due basta: la CLASSE (non siamo nella
+  Mini App) e i **768px** (c'e' spazio). Solo la classe: sul telefono
+  in browser una card da 400 non ci starebbe. Solo la larghezza: dentro
+  Telegram Desktop la WebView puo' essere larga, e il patto cadrebbe.
+  Misurato al filo: a **767 le misure di ieri, a 768 quelle nuove**.
+  LA MISURA VERA LA DANNO I FILE, non il gusto: i banner sono 816x390,
+  quindi a 1x reggono fino a 816 e **a 2x fino a 408** — che sul
+  desktop e' il vincolo, perche' li' i display sono 1x e 2x (il 3x e'
+  il telefono, dove questa crescita non arriva). 400 e' l'ultimo numero
+  tondo sotto quel tetto. Le illustrazioni delle categorie invece sono
+  CONTAIN e la piu' piccola e' 240x386: **120px di lato e' l'ultima
+  misura in cui nessuna si scala su nemmeno a 3x** (la peggiore resta a
+  x0,95). Sono i due numeri da rifare, e con questo metodo, se un
+  giorno le si vuole ancora piu' grandi.
+  IL TITOLO CRESCE COL FATTORE DELLA CARD, e non e' un ritocco
+  estetico: e' quel che tiene IDENTICO il contrasto. Se card e titolo
+  scalano dello stesso `k`, la fascia sorvegliata in coordinate
+  IMMAGINE non si muove — `left x k x (816 / (272 k))` si semplifica —
+  e infatti i contrasti misurati sono gli STESSI sulle due misure
+  (**12,34 / 12,57 / 15,40**, con la fascia a x[42..342] di qua e di
+  la'). Chi crescesse il titolo PIU' della card lo spingerebbe verso la
+  scia dorata dei fondi, e lo sente dalla CI: la prova della fascia
+  gira su TUTTE E DUE le misure, e `_F` non e' piu' il 3 fisso ma il
+  rapporto file/card LETTO dal file (3 a 272, 2,04 a 400) — inchiodato
+  a 3 avrebbe continuato a misurare la card mobile, cioe' sarebbe stata
+  cieca proprio dove il titolo si e' mosso.
+  IL VETRO DEL BARATTOLO E' L'UNICO CONTENUTO CHE NON E' UN'IMMAGINE:
+  `jarSVG` lo chiede a misura FISSA (56), quindi da solo resterebbe a
+  56 dentro un quadrato da 120. Lo scala il CSS (`width:67%`), e la
+  regola vive SOLO nel blocco del web — applicata anche a mobile
+  darebbe 56,28 invece di 56, cioe' cambierebbe la Mini App di un
+  quarto di pixel per niente. Il JS non guadagna una seconda misura da
+  tenere in pari: c'e' la prova che ne conti UNA.
+  LO SPAZIO RISERVATO CRESCE CON LA CARD, o torna il salto che quella
+  riga esiste per non avere (la fila non si disegna finche' i conteggi
+  non sono veri). E si DERIVA con la stessa formula del 115 — quadrato
+  + margine + due righe di nome — invece di ribatterlo: 120 + 5 +
+  13x1,2x2 = **156**, e chi cresce ancora le card e si dimentica la
+  riserva lo sente dalla CI.
+  QUEL CHE NON CAMBIA, ed e' la meta' che le prove sorvegliano: le otto
+  misure base del mobile stanno li' alla lettera (una prova le cerca
+  una per una), ogni regola del blocco nuovo comincia per
+  `html.fuori-telegram` (contate, non elencate: la settima di domani
+  entra da sola) e quel selettore non veste NIENTE fuori di li' — una
+  regola sparsa altrove sfuggirebbe al gate dei 768px. Verificato dal
+  vivo: **a 1280 dentro la Mini App le misure sono quelle del telefono,
+  identiche** (272x130, cella 84, nome 11px, riserva 115).
+  E LA SEZIONE PUO' ANCORA SPARIRE: qui si cambiano solo delle misure —
+  il `display:none` dei giorni senza occasioni, il ritocco che spegne
+  il filtro e la card che se ne va a chi ha votato restano quelli di
+  sempre.
   LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
@@ -25732,6 +25811,43 @@ nessuna leva, nessuna rotta — solo client. DA GUARDARE al primo giro:
 che la sezione «Da scoprire» sia in vista anche nei giorni senza
 occasioni, e la crescita ASSOLUTA dei like sul P2P, che da oggi non
 si ferma piu' col voto.
+
+Le due strisce sono più grandi sul web (ago 2026, dal campo: «sul sito
+le card di Da scoprire e le icone delle categorie sono troppo
+piccole»). Da 768px in su e FUORI da Telegram le card dei banner
+passano a 400×191 e le celle delle categorie a 120, col titolo che
+cresce dello stesso fattore; dentro la Mini App non cambia un byte. Il
+difetto era misurato — su desktop una card di banner era larga quanto
+una card di annuncio, e la fila non scorreva affatto lasciando ~600px
+di vuoto — e le due misure vengono dai FILE e non dal gusto (i banner
+816×390 reggono 408 a 2x, le illustrazioni 120 senza scalarsi su
+nemmeno a 3x). Vedi Architettura, «LE DUE STRISCE SONO PIÙ GRANDI SUL
+WEB», per il giudice `initData` e mai `WEB` (che sarebbe falso per
+l'anonimo, in DEMO e in collaudo: mezzo web resterebbe piccolo senza
+che niente fallisca), per il gate DOPPIO e per il contrasto, che resta
+identico PER COSTRUZIONE quando titolo e card scalano insieme.
+Collaudato: **+28 prove** in modalità severa sull'albero ISOLATO — HEAD
+più i soli hunk di questo cantiere, che la cartella è condivisa con
+un'altra sessione che lavora proprio su «Da scoprire» — con la baseline
+di HEAD a 6975/0 e il cantiere a **7003/0**. La prova del contrasto ora
+gira su TUTTE E DUE le misure (12,34 / 12,57 / 15,40, identici) e il
+fattore file/card si legge dal file invece di essere il 3 fisso, che
+l'avrebbe resa cieca proprio sulla variante nuova.
+E IL GIRO DAL VIVO NEI DUE POSTI, col codice VERO servito dal server e
+non con CSS iniettato: 767 e 768 (il filo esatto: prima le misure di
+ieri, dopo quelle nuove), 960, 1280 chiaro e scuro, 375 — e la Mini App
+simulata mettendo `initData` PRIMA del documento, dove **a 1280 le
+misure sono quelle del telefono, identiche**. Zero scorrimento
+laterale, zero errori JS.
+⚠️ E IL BANCO HA MENTITO UN GIRO INTERO: lo stub di Telegram da solo non
+basta — lo script di telegram.org rimpiazza `window.Telegram`, quindi
+la classe compariva lo stesso e il caso Mini App usciva «rotto» mentre
+era rotto il banco. Si blocca quella richiesta.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client, e sul telefono (in Telegram
+o in browser) non cambia un pixel. DA GUARDARE dal computer di Andrea:
+il sito vero a schermo intero, che è la larghezza per cui il cantiere
+esiste.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
