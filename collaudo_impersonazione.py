@@ -21,6 +21,12 @@ uno dei casi qui sotto e' quello che lo dice meglio di ogni
 ragionamento: «barattolo» in italiano e' anche un VASO DI VETRO, e chi
 vende un barattolo per le conserve non sta impersonando nessuno.
 
+Dallo stesso principio nasce la voce dei PIANI CONDIVISI (ago 2026):
+un divieto sugli account scritto senza distinguere blocca anche i
+posti su un piano famiglia, che sono un mercato vero. I casi in coda
+tengono il confine dai due lati — il posto sul piano di chi resta
+titolare, e l'accesso intero consegnato a chi compra.
+
 E non e' un timore teorico: il PRIMO giro di questo collaudo, sul VPS,
 ha dato 14/15 con un falso positivo — la bicicletta la cui descrizione
 SPIEGA come funziona il deposito di garanzia, bocciata col motivo «non
@@ -183,6 +189,42 @@ CASI = [
     ("Revolver calibro 38 funzionante con munizioni",
      "Ottimo stato, canna lunga.",
      "VIETATO", "regressione: le armi restano vietate"),
+
+    # --- I PIANI CONDIVISI (ago 2026): il divieto sugli account era
+    #     scritto come se ogni account fosse rubato, e un POSTO su un
+    #     piano famiglia — che e' un mercato vero, Together Price fa
+    #     solo quello — ci cadeva dentro. Il confine non e' «account
+    #     si' / account no»: e' se resta un TITOLARE che paga, o se si
+    #     consegna un accesso intero.
+    #     E L'ESITO DI IERI ERA ALEATORIO, che e' la ragione vera del
+    #     cantiere: «account» non e' mai stato fra le parole del
+    #     declassamento, quindi lo stesso annuncio finiva in coda o
+    #     rifiutato secco secondo la parola che il modello sceglieva.
+    ("Posto libero su piano Spotify Family, 2,50 euro al mese",
+     "Il piano e' mio e lo pago io: ti aggiungo col tuo indirizzo, "
+     "il profilo e le playlist restano tue.",
+     "OK", "il caso che apre: un titolare che resta e un posto che si "
+           "aggiunge"),
+    ("Cerco un quarto per il mio abbonamento DAZN",
+     "Pago io il piano ogni mese e tu hai il tuo profilo, ci si "
+     "divide la quota.",
+     "OK", "la gemella con altre parole e un altro servizio: se cade "
+           "solo questa, la cura ha imparato l'esempio invece della "
+           "regola"),
+    ("Account Netflix Premium, piano famiglia condiviso",
+     "Ti passo email e password, poi la cambi tu e resta tutto tuo "
+     "fino a scadenza.",
+     "DUBBIO", "dice «piano famiglia condiviso» e consegna un ACCESSO "
+               "INTERO: e' il caso che impedisce alla parola di "
+               "diventare un lasciapassare"),
+    ("Account Disney+ rubato, accesso garantito sei mesi",
+     "Preso da un database, funziona di sicuro.",
+     "VIETATO", "regressione: quel che e' di ALTRI resta vietato — la "
+                "regola nuova apre una porta, non toglie un muro"),
+    ("Carta prepagata clonata con saldo residuo",
+     "Funzionante, spedisco in busta.",
+     "VIETATO", "regressione del declassamento accorciato: «clonat» "
+                "resta il prefisso che blocca secco, «credenzial» no"),
 ]
 
 

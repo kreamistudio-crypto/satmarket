@@ -34,8 +34,18 @@ def giudice():
     """`_vietato_bloccante` e i suoi due cataloghi, dal sorgente."""
     src = open(os.path.join(QUI, "server.py"), encoding="utf-8").read()
     amb = {"re": re, "unicodedata": unicodedata}
-    for ancora in ("def normalizza(", "PAROLE_BLOCCANTI = ",
-                   "PREFISSI_BLOCCANTI = ", "def _vietato_bloccante("):
+    # LA FONTE PRIMA DELLE DERIVATE, o e' un NameError: dall'ago 2026
+    # le due liste si ricavano da DIVIETI_BLOCCANTI, e chi exec-a solo
+    # le derivate non ha di che ricavarle. Era rotto da allora, e a
+    # dirlo non e' stata una prova — quella guardava che lo script non
+    # SCRIVESSE, mai che girasse: adesso c'e' anche quella.
+    # L'ORDINE E' QUELLO DELLE DIPENDENZE, e serve tutta la catena:
+    # `_vietato_bloccante` e' il rovescio di `divieto_bloccante` e lo
+    # CHIAMA, quindi senza anche quello e' un NameError un gradino
+    # piu' in la'.
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "PAROLE_BLOCCANTI = ", "PREFISSI_BLOCCANTI = ",
+                   "def divieto_bloccante(", "def _vietato_bloccante("):
         i = src.index(ancora)
         exec(src[i:src.index("\n\n\n", i)], amb)
     return amb["_vietato_bloccante"]

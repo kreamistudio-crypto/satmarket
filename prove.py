@@ -23894,13 +23894,22 @@ def prove_ai_segnala():
                    "cocaina", "servizi sessuali mascherati",
                    "sfruttamento della prostituzione",
                    "materiale pedopornografico", "coinvolge minori",
-                   "carte clonate", "credenziali di accesso rubate"):
+                   "carte clonate", "carta clonata"):
         prova(f"blocca: «{motivo[:34]}»", True, blocca(motivo))
 
     # --- e quelle che NON fermano: hanno tutte una lettura innocente
     # che il modello puo' aver frainteso, e un no le fermerebbe da
     # gente onesta senza che nessuno lo sappia ----------------------
+    # HA CAMBIATO LATO (ago 2026, cantiere dei piani condivisi):
+    # «credenziali di accesso rubate» stava fra i bloccanti, e la riga
+    # certificava un esito che era ALEATORIO — «account» non e' mai
+    # stato fra le parole, quindi lo stesso annuncio finiva in coda o
+    # rifiutato secco secondo la parola che il modello sceglieva. Ora
+    # quel motivo va sempre in revisione, e un posto su un piano
+    # famiglia non si vede piu' negare da una parola.
     for motivo in ("il nome appare progettato per confondere con Barattolo",
+                   "credenziali di accesso rubate",
+                   "vendita di credenziali di un piano condiviso",
                    "finto servizio clienti di Barattolo",
                    "impersonazione della piattaforma",
                    "possibile refurtiva",
@@ -23930,11 +23939,13 @@ def prove_ai_segnala():
           {"arma", "armi", "droga", "droghe", "minore", "minori",
            "escort", "prostituta", "prostitute"},
           set(amb["PAROLE_BLOCCANTI"]))
-    prova("...e i quattordici prefissi, NELL'ORDINE di prima",
+    # TREDICI E NON QUATTORDICI (ago 2026): «credenzial» e' sceso in
+    # coda. La lista si accorcia, non si allunga — ed e' l'unica riga
+    # che dice quando una parola se ne va o si aggiunge di nascosto.
+    prova("...e i tredici prefissi, NELL'ORDINE di prima",
           ("munizion", "esplosiv", "stupefacent", "cocain", "eroin",
            "hashish", "marijuana", "anfetamin", "sessual",
-           "prostituzion", "pedoporn", "sfruttament", "clonat",
-           "credenzial"),
+           "prostituzion", "pedoporn", "sfruttament", "clonat"),
           tuple(amb["PREFISSI_BLOCCANTI"]))
     # ...e nessuna famiglia resta senza parole E senza prefissi:
     # una voce vuota non blocca niente e non lo direbbe nessuno.
@@ -23954,9 +23965,13 @@ def prove_ai_segnala():
              "sesso a pagamento e sfruttamento"),
             ("sfruttamento di minori",
              "sesso a pagamento e sfruttamento"),
-            ("carte clonate", "documenti falsi e credenziali"),
-            ("chiede le credenziali dell'account",
-             "documenti falsi e credenziali"),
+            # L'ETICHETTA DICE QUEL CHE LA VOCE BLOCCA DAVVERO, e da
+            # ago 2026 e' solo «carte clonate». La seconda riga ha
+            # CAMBIATO LATO: chiedere le credenziali va in coda, che
+            # e' anche cio' che apre la porta ai piani condivisi.
+            ("carte clonate", "carte clonate"),
+            ("carta clonata", "carte clonate"),
+            ("chiede le credenziali dell'account", ""),
             ("impersonazione della piattaforma", ""),
             ("un armadio in noce", ""),
     ):
@@ -24056,6 +24071,190 @@ def prove_ai_segnala():
     for parola in ("INSERT", "UPDATE", "DELETE", "commit"):
         prova(f"lo strumento della stima non {parola.lower()}", False,
               parola in corpo)
+    # ...E GIRA, che e' un'altra domanda (ago 2026): dall'ago 2026 le
+    # due liste si DERIVANO da DIVIETI_BLOCCANTI, e questo script
+    # exec-ava le sole derivate — NameError, cioe' rotto da mesi. Le
+    # righe qui sopra restavano verdi: guardavano che non SCRIVESSE,
+    # mai che funzionasse. E' lo strumento con cui si misura quanto
+    # costa la coda, cioe' il numero su cui si decide.
+    import importlib.util as _iu
+    _s = _iu.spec_from_file_location("_stima", "stima_coda_moderazione.py")
+    _m = _iu.module_from_spec(_s)
+    _s.loader.exec_module(_m)
+    _g = _m.giudice()
+    prova("lo strumento della stima si costruisce il giudice", True,
+          _g("arma da fuoco") and not _g("credenziali di accesso"))
+
+
+# ====================================================================
+def prove_piani_condivisi():
+    """I POSTI SUI PIANI CONDIVISI NON SONO CREDENZIALI RUBATE (ago
+    2026, decisione di Andrea dal campo). Il divieto «dati personali o
+    account» era scritto come se ogni account fosse rubato, e un POSTO
+    su un piano famiglia — Spotify, DAZN, Netflix: un mercato vero,
+    Together Price fa solo quello — ci cadeva dentro.
+
+    LA DIAGNOSI ROVESCIA LA DOMANDA, ed e' la ragione del cantiere:
+    l'esito non era «bloccato», era ALEATORIO. «account» non e' mai
+    stato fra le parole del declassamento, quindi lo stesso annuncio
+    finiva in coda («vendita di account condivisi») o rifiutato secco
+    («vendita di credenziali») secondo la parola che il modello
+    sceglieva. Un esito che non si puo' prevedere e' peggio di un
+    divieto netto: non lo si sa nemmeno spiegare a chi lo subisce.
+
+    Qui si difende la FORMA — la voce, le TRE contro-regole, la coppia
+    — piu' i due giudici GIRATI sui casi veri. Che il modello abbia
+    capito lo dice solo collaudo_impersonazione.py, che vuole la
+    chiave."""
+    print("\n[i piani condivisi non sono credenziali rubate]")
+    src = _SORGENTE
+    i = src.index("PROMPT_MODERAZIONE = (")
+    amb = {}
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    p = amb["PROMPT_MODERAZIONE"]
+
+    # --- 1) la voce c'e', ed e' un PERMESSO e non un divieto -------
+    prova("il prompt dichiara lecito il posto sul piano condiviso",
+          True, "E' LECITO il POSTO su un abbonamento CONDIVISO" in p)
+    prova("...e dice che chi vende resta TITOLARE e paga", True,
+          "paga e di cui resta TITOLARE" in p)
+    # l'elenco in cima diceva «account» secco: adesso dice di CHI
+    prova("...e l'elenco dei vietati nomina gli account ALTRUI", True,
+          "account ALTRUI o credenziali di terzi" in p)
+
+    # --- 2) LE TRE CONTRO-REGOLE, che sono la meta' delicata -------
+    # Un permesso senza di loro non e' una regola, e' un lasciapassare:
+    # basterebbe scrivere «piano famiglia» in cima a un annuncio che
+    # vende l'accesso di qualcun altro. Sono la riga che un riordino
+    # toglie per prima, perche' sembrano un ripensamento.
+    prova("(a) il test e' il GESTO e non la parola", True,
+          "IL TEST NON E' LA PAROLA MA IL GESTO" in p
+          and "un TITOLARE che resta e un POSTO che si aggiunge" in p)
+    prova("(b) l'accesso INTERO non e' un posto condiviso", True,
+          "ACCESSO INTERO" in p
+          and "non e' un posto condiviso qualunque parola usi" in p)
+    prova("(c) quel che e' di ALTRI resta vietato senza sfumature",
+          True, "resta VIETATO senza sfumature" in p
+          and "account rubati o hackerati" in p)
+
+    # --- 3) LA COPPIA CHE INSEGNA IL CONFINE -----------------------
+    # Due annunci dello STESSO servizio con due esiti opposti: e' il
+    # pattern della bici/cuffie e della lezione/bot, che qui ha gia'
+    # dimostrato di insegnare piu' della regola astratta.
+    prova("la coppia dei piani condivisi e' nel prompt", True,
+          "LA COPPIA CHE INSEGNA IL CONFINE DEI PIANI CONDIVISI" in p)
+    prova("...col posto sul proprio piano in OK", True,
+          "il profilo resta tuo' -> OK" in p)
+    prova("...e l'accesso consegnato in DUBBIO", True,
+          "poi la cambi tu' -> DUBBIO" in p)
+    # Il conto si fa DENTRO la coppia e non sul prompt intero: la
+    # voce nomina Spotify anche come esempio, e un conto largo
+    # direbbe tre — cioe' misurerebbe un'altra cosa.
+    coppia = p[p.index("LA COPPIA CHE INSEGNA IL CONFINE DEI PIANI"):
+               p.index("'Assistenza Barattolo - supporto")]
+    prova("...e sono lo STESSO servizio, o non insegnano un confine",
+          2, coppia.count("Spotify"))
+    prova("l'esempio corto e' in fila con gli altri", True,
+          "'Posto su piano DAZN, pago io l'abbonamento' -> OK" in p)
+
+    # --- 4) IL DECLASSAMENTO, girato e non guardato ----------------
+    # La regola nel prompt DA SOLA non basta: se il modello scrive
+    # «credenziali» su un piano condiviso, il giudice lo fermerebbe
+    # comunque. E' per questo che «credenzial» e' uscito dai prefissi.
+    import unicodedata as _u
+    amb2 = {"re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "DIVIETI_BLOCCANTI = ",
+                   "def divieto_bloccante(", "def _vietato_bloccante("):
+        j = src.index(ancora)
+        exec(src[j:src.index("\n\n\n", j)], amb2)
+    quale = amb2["divieto_bloccante"]
+    for motivo in ("vendita di credenziali di un piano condiviso",
+                   "condivisione di credenziali di accesso",
+                   "vendita di account in abbonamento condiviso"):
+        prova(f"in coda: «{motivo[:38]}»", "", quale(motivo))
+    # ...e il muro non si e' mosso di un centimetro
+    for motivo, atteso in (("carta clonata", "carte clonate"),
+                           ("arma da fuoco", "armi"),
+                           ("vende cocaina", "droghe")):
+        prova(f"resta bloccante: «{motivo[:30]}»", atteso, quale(motivo))
+
+    # --- 5) IL FILTRO PAROLE non e' mai stato il problema ----------
+    # Lo strato 1 e' ad ALTA PRECISIONE («account rubato», «credenziali
+    # rubate») e un annuncio di piano condiviso non lo tocca. Si GIRA,
+    # perche' una sentinella direbbe che la lista esiste e mai che
+    # lasci passare l'annuncio che deve passare.
+    amb3 = {"re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
+                   "def controlla_vietato("):
+        j = src.index(ancora)
+        exec(src[j:src.index("\n\n\n", j)], amb3)
+    filtro = amb3["controlla_vietato"]
+    prova("il filtro parole lascia passare il posto sul piano", None,
+          filtro("Posto su piano Spotify Family",
+                 "Il piano e' mio e lo pago io, ti aggiungo."))
+    prova("...e quello sul DAZN", None,
+          filtro("Cerco un quarto per il mio abbonamento DAZN",
+                 "Pago io ogni mese, tu hai il tuo profilo."))
+    # ...mentre quel che e' di altri lo ferma PRIMA dell'AI
+    prova("...ma ferma l'account rubato", "refurtiva",
+          filtro("Account Disney+ rubato", "Preso da un database."))
+    prova("...e la carta clonata detta per intero",
+          "dati personali e account",
+          filtro("Vendo carta clonata", "Con saldo residuo."))
+    # ...MA IL FILTRO CERCA FRASI INTERE, e in «carta PREPAGATA
+    # clonata» le due parole non sono adiacenti: li' lo strato 1 non
+    # vede niente ed e' il DECLASSAMENTO a fermare, sul motivo che
+    # l'AI scrive. E' la divisione del lavoro fra i due strati, e
+    # vale la pena che una riga la dica: e' anche il caso del
+    # collaudo, che sarebbe passato per la ragione sbagliata.
+    prova("...mentre «carta prepagata clonata» passa lo strato 1",
+          None, filtro("Carta prepagata clonata", "Con saldo."))
+    prova("...ed e' il giudice a fermarla", "carte clonate",
+          quale("vende una carta prepagata clonata"))
+
+    # --- 6) IL PATTO SI DICHIARA PRIMA, o non e' un patto -----------
+    # Un posto su un piano condiviso puo' SPARIRE dopo la consegna: il
+    # venditore lo toglie, o il fornitore chiude il piano. Le finestre
+    # del digitale sono quelle che sono, e aprire un mercato senza
+    # dire dove il deposito non arriva e' precisamente quel che questo
+    # progetto non fa. La voce vive nella lista dei limiti, e non
+    # altrove: e' li' che chi si fida va a leggere.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.index('id="sicu-limiti"')
+    lista = mini[i0:mini.index("</ul>", i0)]
+    prova("«Il pagamento protetto» dice che il posto puo' sparire",
+          True, "Un posto su un abbonamento condiviso può sparire "
+                "dopo" in lista)
+    prova("...e dice che il piano resta di chi l'ha venduto", True,
+          "Il piano resta di chi te l'ha venduto" in lista)
+    # ...e che e' PEGGIO del codice, che e' il confronto che serve a
+    # chi legge: li' la domanda e' «l'ho riscattato», qui il bene
+    # funzionava e poi ha smesso — e noi non vediamo ne' l'una ne'
+    # l'altra cosa.
+    prova("...e in che cosa e' peggio di un codice", True,
+          "funzionava</i> e poi ha smesso" in lista)
+    # LA FINESTRA NON SI SCRIVE A MANO: e' una leva, e il segnaposto
+    # la legge da TEMPI — il patto di scriviTempi.
+    prova("...con la finestra dal segnaposto, mai un numero a mano",
+          True, 'data-tempo="confermaDig"' in
+          lista[lista.index("Un posto su un abbonamento"):])
+
+    # --- 7) i casi nel collaudo col MODELLO ------------------------
+    # Sono loro a dire se il modello ha capito, e vanno rilanciati a
+    # ogni ritocco del prompt. IN CODA e mai in mezzo: le sentinelle
+    # cercano l'esito in una finestra dopo il nome del caso.
+    col = open("collaudo_impersonazione.py", encoding="utf-8").read()
+    for nome, atteso in (
+            ("Posto libero su piano Spotify", "OK"),
+            ("Cerco un quarto per il mio abbonamento DAZN", "OK"),
+            ("Account Netflix Premium", "DUBBIO"),
+            ("Account Disney+ rubato", "VIETATO"),
+            ("Carta prepagata clonata", "VIETATO"),
+    ):
+        prova(f"«{nome[:34]}» e' nel collaudo", 1, col.count(nome))
+        k = col.index(nome)
+        prova(f"...ed e' atteso {atteso}", True,
+              f'"{atteso}"' in col[k:k + 420])
 
 
 def prove_link_offerte():
@@ -30202,6 +30401,35 @@ def prove_script_nel_workflow():
     prova("il repo ha degli script da compilare", True, len(nostri) > 10)
     fuori = [f for f in nostri if f not in riga]
     prova("...e sono TUTTI nel compileall del workflow", [], fuori)
+
+    # --- E OGNI FUNZIONE DI PROVE GIRA DAVVERO (ago 2026) ----------
+    # La gemella del compileall, e nasce dalla tortura del cantiere
+    # dei piani condivisi: togliere una `prove_*` dalla tupla di
+    # main() era l'UNICA mutazione sopravvissuta — la funzione sparisce
+    # dal giro e non diventa rossa NIENTE, cala solo il conto, che
+    # nessuno confronta a mente. E' la lezione di «una prova saltata si
+    # conta», un piano piu' su: li' spariva un'asserzione, qui una
+    # famiglia intera.
+    # LE DUE STRADE SONO LEGITTIME, e per questo si guardano tutt'e
+    # due: registrata nella tupla del main, oppure CHIAMATA da una
+    # sorella (undici lo sono oggi, e girano). Orfana e' un'altra
+    # cosa: definita, mai eseguita, verde per sempre.
+    src = open("prove.py", encoding="utf-8").read()
+    definite = set(re.findall(r"^def (prove_\w+)\(", src, re.M))
+    # ⚠️ L'ANCORA E' LA DEFINIZIONE A COLONNA ZERO, e non il nome
+    # nudo: questa riga stessa contiene «def main()» dentro una
+    # stringa, quindi un index() largo trovava SE' STESSO e la
+    # fetta usciva vuota — tutte le prove «orfane», la trappola
+    # gia' scritta in CLAUDE.md presa mentre la si scriveva.
+    i = src.index(chr(10) + "def main():")
+    dentro = src[i:src.index(chr(10) + "    return", i)]
+    dentro_main = set(re.findall(r"(prove_\w+)", dentro))
+    # «chiamata da una sorella» = compare seguita da una tonda
+    # almeno DUE volte, che una e' la sua definizione.
+    orfane = sorted(
+        f for f in definite - dentro_main
+        if len(re.findall(re.escape(f) + r"\(", src)) < 2)
+    prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
 def prove_annotazioni_negli_ambienti():
@@ -36961,6 +37189,7 @@ def main():
               prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
+              prove_piani_condivisi,
               prove_obiezione_punto,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,

@@ -9152,7 +9152,13 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
 #   1. armi, munizioni ed esplosivi
 #   2. droghe e stupefacenti
 #   3. sesso a pagamento e sfruttamento, minori compresi
-#   4. documenti falsi, credenziali, carte clonate, account rubati
+#   4. carte clonate
+# «CREDENZIALI» E' SCESO IN CODA (ago 2026, cantiere dei piani
+# condivisi), e la quarta famiglia si e' ristretta al suo nome vero.
+# Il motivo e' che l'esito era ALEATORIO: «account» non e' mai stato
+# fra le parole, quindi lo stesso annuncio finiva in coda o rifiutato
+# secco secondo la parola che il modello sceglieva. Adesso quel motivo
+# va sempre in revisione — un esito che si puo' prevedere e spiegare.
 # COSA NON C'E' E PERCHE', che e' la meta' da leggere: refurtiva,
 # contraffazione, farmaci con obbligo di ricetta e animali protetti
 # sono illegali quanto gli altri, ma hanno tutti una LETTURA INNOCENTE
@@ -9194,9 +9200,21 @@ DIVIETI_BLOCCANTI = {
                    "prostituta", "prostitute"),
         "prefissi": ("sessual", "prostituzion", "pedoporn",
                      "sfruttament")},
-    "documenti falsi e credenziali": {
+    # L'ETICHETTA DICE QUEL CHE LA VOCE BLOCCA DAVVERO, e da ago 2026
+    # e' solo «carte clonate». «credenzial» e' uscito col cantiere dei
+    # piani condivisi: un posto su un Family non e' una credenziale
+    # rubata, ma il modello quella parola la scrive lo stesso — e col
+    # prefisso qui dentro la regola nuova del prompt non lo
+    # salverebbe. I DOCUMENTI FALSI non sono mai stati qui: «documento
+    # falso» non matcha nessuno dei due prefissi, quindi da questo
+    # strato non hanno mai bloccato secco — li prende lo strato 1, che
+    # ha la sua categoria ed e' piu' preciso (nove voci contro
+    # quattro). Tenere il nome vecchio vorrebbe dire dire al venditore
+    # una famiglia che non e' quella che l'ha fermato, cioe' il
+    # difetto che questo messaggio e' nato per togliere.
+    "carte clonate": {
         "parole": (),
-        "prefissi": ("clonat", "credenzial")},
+        "prefissi": ("clonat",)},
 }
 PAROLE_BLOCCANTI = frozenset(
     p for v in DIVIETI_BLOCCANTI.values() for p in v["parole"])
@@ -9798,7 +9816,8 @@ PROMPT_MODERAZIONE = (
     "l'annuncio e' lecito. E' VIETATO vendere: armi da fuoco VERE e "
     "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
     "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
-    "falsi; dati personali o account; farmaci con obbligo di ricetta; "
+    "falsi; dati personali, account ALTRUI o credenziali di terzi; "
+    "farmaci con obbligo di ricetta; "
     "animali protetti. Riserva VIETATO a questi casi netti. LE "
     "PRESTAZIONI si vendono, ma solo se sono DEFINITE: cio' che si "
     "compra dev'essere stabilito PRIMA — quanto dura, che cosa "
@@ -9831,6 +9850,21 @@ PROMPT_MODERAZIONE = (
     "Zalando...), codici sconto, licenze software, chiavi di "
     "attivazione, abbonamenti prepagati — la loro rivendita e' "
     "permessa (restano vietati carte clonate e account rubati). "
+    "E' LECITO il POSTO su un abbonamento CONDIVISO che il venditore "
+    "paga e di cui resta TITOLARE: i piani famiglia di musica, video, "
+    "sport o cloud ('cerco un quarto per il mio Spotify Family', "
+    "'posto libero sul mio DAZN, pago io il piano') sono un mercato "
+    "normale, e chi li vende non consegna l'account di nessuno — "
+    "aggiunge una persona al SUO piano e continua a pagarlo. IL TEST "
+    "NON E' LA PAROLA MA IL GESTO: 'piano condiviso' o 'famiglia' "
+    "scritti in un annuncio non bastano — dev'esserci un TITOLARE che "
+    "resta e un POSTO che si aggiunge. Se invece si consegna un "
+    "ACCESSO INTERO (email e password, 'te lo intesto', 'cambia tu la "
+    "password') non e' un posto condiviso qualunque parola usi "
+    "l'annuncio -> DUBBIO, perche' da fuori non si distingue da un "
+    "account preso a qualcun altro. E resta VIETATO senza sfumature "
+    "cio' che e' di ALTRI: account rubati o hackerati, credenziali di "
+    "terzi, profili comprati da terze parti. "
     "Un buono o un codice vale come PRODOTTO anche quando cio' che si "
     "riscatta e' cibo o una consumazione presso un esercizio (un buono "
     "per una piadina, una pizza, un caffe'): il bene venduto e' il "
@@ -9892,6 +9926,7 @@ PROMPT_MODERAZIONE = (
     "secco. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
     "softair a molla' -> OK. 'Buono regalo Zalando 50 euro' -> OK. "
     "'Piadina digitale: buono con codice da riscattare' -> OK. "
+    "'Posto su piano DAZN, pago io l'abbonamento' -> OK. "
     "'Pacchetto soggiorno 2 notti in B&B, colazione inclusa' -> OK: "
     "e' un pernottamento definito, non una prestazione su misura. "
     "'Adesivi e gadget di Barattolo, lotto da 10' -> OK: cita il "
@@ -9918,6 +9953,14 @@ PROMPT_MODERAZIONE = (
     "serve' -> DUBBIO: non e' il software a essere vietato, e' che "
     "non si sa DOVE FINISCE — e in una lite nessuno potrebbe dire se "
     "sia stato consegnato. "
+    "LA COPPIA CHE INSEGNA IL CONFINE DEI PIANI CONDIVISI, e sono "
+    "due annunci dello STESSO servizio. 'Posto su piano Spotify "
+    "Family, 2,50 euro al mese', descrizione 'Il piano e' mio e lo "
+    "pago io, ti aggiungo col tuo indirizzo e il profilo resta tuo' "
+    "-> OK: c'e' un titolare che resta e un posto che si aggiunge. "
+    "'Account Spotify Premium attivo fino a giugno', descrizione 'Ti "
+    "passo email e password, poi la cambi tu' -> DUBBIO: si consegna "
+    "un accesso intero, e da fuori non si vede di chi sia. "
     "'Assistenza Barattolo - supporto agli utenti' -> DUBBIO: si "
     "intesta un ruolo che non ha. "
     "'Barattolo: verifica il tuo pagamento in sospeso' -> VIETATO: "
