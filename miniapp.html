@@ -6136,13 +6136,14 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
     <div class="grab"></div>
-    <h3>🫙 Ti aspettiamo su Telegram</h3>
+    <h3 id="invitoTit">🫙 Ti aspettiamo su Telegram</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600" id="invitoTesto"></div>
-    <a class="btn orange" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
+    <a class="btn orange" id="invitoTg" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
        href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">Apri @ilbarattolobot</a>
     <!-- La seconda porta: chi arriva da un DM Nostr entra con la sua
-         chiave e ritrova l'annuncio autenticato (l'URL non cambia) -->
-    <button class="btn ghost" onclick="closeSheet();apriNostrSheet()">🟣 …o entra con Nostr</button>
+         chiave e ritrova l'annuncio autenticato (l'URL non cambia).
+         SU ONION E' LA PRIMA E L'UNICA — vedi invitoTelegram(). -->
+    <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()">🟣 …o entra con Nostr</button>
     <button class="btn ghost" onclick="navIndietro()">Continua a guardare</button>
   </div>
 
@@ -7499,7 +7500,8 @@ function go(view){
       ? 'Qui in vetrina si guarda soltanto: per mettere in vendita i tuoi oggetti apri Barattolo dentro Telegram.'
       : view==='affari'
       ? 'I tuoi ordini vivono su Telegram: apri Barattolo per seguirli.'
-      : 'Il tuo profilo vive su Telegram: apri Barattolo per gestire annunci, incassi e identità.');
+      : 'Il tuo profilo vive su Telegram: apri Barattolo per gestire annunci, incassi e identità.',
+      view);
     return;
   }
   /* Si segna dove si era in vetrina PRIMA di spegnerla: un istante
@@ -9332,7 +9334,7 @@ async function toggleInteresse(f){
      stessa persona vale due voti — e la porta e' quella di sempre. */
   if (VETRINA) {
     invitoTelegram("Per dire che aspetti questa novità serve l'app vera "
-      + "dentro Telegram: così ti avvisiamo appena arriva.");
+      + "dentro Telegram: così ti avvisiamo appena arriva.", 'interesse');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -12298,7 +12300,8 @@ function apriAcquisto(l){
   haptic();
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
-      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.',
+      'compra');
     return;
   }
   /* Il negozio in ferie: la pagina d'acquisto non nasce nemmeno — il
@@ -14330,7 +14333,7 @@ function apriPacco(){
   if (!l) return;
   if (VETRINA) {
     invitoTelegram('Per riempire il carrello serve l\'app vera dentro Telegram: '
-      + 'è lì che i tuoi sats restano al sicuro fino alla consegna.');
+      + 'è lì che i tuoi sats restano al sicuro fino alla consegna.', 'carrello');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -15856,7 +15859,7 @@ function apriPunta(modo){
   const l = currentListing; if (!l) return;
   if (VETRINA) {
     invitoTelegram('Per puntare serve l\'app vera dentro Telegram: è lì '
-      + 'che i tuoi sats restano al sicuro fino alla fine dell\'asta.');
+      + 'che i tuoi sats restano al sicuro fino alla fine dell\'asta.', 'punta');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto 🔨'); return; }
@@ -16145,7 +16148,8 @@ async function startBuy(){
                                 di un giro precedente */
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
-      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.',
+      'compra');
     return;
   }
   /* Le cifre del foglio vengono dal PREVENTIVO della pagina
@@ -16269,7 +16273,8 @@ function compraSubito(){
   /* cinture: il bottone non compare in vetrina/demo, ma non si sa mai */
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
-      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.',
+      'compra');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -16511,9 +16516,67 @@ async function annullaPagamento(){
     }});
 }
 
-/* Il foglio-invito della vetrina: spiega e accompagna verso il bot */
-function invitoTelegram(testo){
-  el('invitoTesto').textContent = testo;
+/* SU ONION LA PORTA E' UN'ALTRA, e questo catalogo e' la ragione
+   per cui il foglio si puo' girare senza perdere niente: i dieci
+   testi dei chiamanti nominano tutti il MEZZO («l'app vera dentro
+   Telegram»), che di la' e' falso — il bot non si apre e il Login
+   Widget non c'e' — ma la RAGIONE per cui vale la pena entrare non
+   dipende da come ci sei arrivato: «i tuoi sats restano al sicuro
+   fino alla consegna» e' vero su Tor e fuori.
+   Una voce per GESTO e non un generico solo: il foglio si apre dopo
+   un tocco, e chi legge deve ritrovarci la cosa che stava facendo.
+   IL RIPIEGO E' IL GENERICO E MAI IL TESTO DEL CHIAMANTE, ed e' la
+   riga da non ammorbidire: un invito nuovo che si dimentica la
+   chiave rimetterebbe «Telegram» davanti a chi su Telegram non ci
+   puo' andare — meglio una frase piu' povera che una falsa. */
+const INVITO_ONION = {
+  compra:  'Per comprare in sicurezza serve un account: i tuoi sats '
+         + 'restano al sicuro fino alla consegna.',
+  carrello:'Per riempire il carrello serve un account: i tuoi sats '
+         + 'restano al sicuro fino alla consegna.',
+  punta:   'Per puntare serve un account: i tuoi sats restano al '
+         + 'sicuro fino alla fine dell\'asta.',
+  offerta: 'Per fare un\'offerta serve un account: è così che il '
+         + 'venditore ti risponde.',
+  interesse:'Per dire che aspetti questa novità serve un account: '
+         + 'così ti avvisiamo appena arriva.',
+  vendi:   'Qui in vetrina si guarda soltanto: per mettere in vendita '
+         + 'i tuoi oggetti serve un account.',
+  affari:  'I tuoi ordini ti aspettano: entra e li trovi nella scheda '
+         + 'Ordini.',
+  profilo: 'Il tuo profilo ti aspetta: entra e trovi annunci, incassi '
+         + 'e identità.',
+  trattativa:'La tua trattativa ti aspetta dentro Barattolo: entra e '
+         + 'la trovi nella scheda Ordini.'
+};
+const INVITO_ONION_GENERICO =
+  'Per comprare, offrire o vendere serve un account: da qui si entra '
+  + 'con la tua chiave Nostr.';
+
+/* Il foglio-invito della vetrina: spiega e accompagna verso la porta.
+   SU ONION SI GIRA — titolo, testo e porte — perche' di la' il bot
+   non si apre (Tor Browser ferma il salto verso l'app esterna) e il
+   Login Widget non funzionerebbe comunque, che vive sul solo dominio
+   di /setdomain. Un foglio che nomina una strada senza offrirla e'
+   peggio del bottone rotto: qui Nostr smette di essere «la seconda
+   porta» e diventa l'unica, col vestito che glielo dice.
+   `chiave` e' FACOLTATIVA e serve solo di la': fuori da onion il
+   testo che arriva e' quello di sempre, byte per byte. */
+function invitoTelegram(testo, chiave){
+  const onion = suOnion();
+  el('invitoTit').textContent = onion
+    ? '🧅 Entra con la tua chiave' : '🫙 Ti aspettiamo su Telegram';
+  el('invitoTesto').textContent = onion
+    ? (INVITO_ONION[chiave] || INVITO_ONION_GENERICO) : testo;
+  /* La porta di Telegram non si nasconde soltanto: su onion non
+     deve esistere per il dito ne' per la tastiera. */
+  el('invitoTg').style.display = onion ? 'none' : 'block';
+  const nos = el('invitoNostr');
+  /* IL PIENO SEGUE LA PORTA VERA: lasciare Nostr in ghost sotto un
+     bottone sparito lo vestirebbe da ripiego proprio dove e' l'unica
+     strada — ed e' il registro, non un vezzo. */
+  nos.className = onion ? 'btn orange' : 'btn ghost';
+  nos.textContent = onion ? '🟣 Entra con Nostr' : '🟣 …o entra con Nostr';
   el('sheetBg').classList.add('open');
   el('invitoSheet').classList.add('open');
 }
@@ -16946,7 +17009,7 @@ function apriOfferta(){
   haptic();
   if (VETRINA) {
     invitoTelegram('Per fare un\'offerta serve l\'app vera dentro Telegram: '
-      + 'è lì che il venditore ti risponde.');
+      + 'è lì che il venditore ti risponde.', 'offerta');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -17299,7 +17362,7 @@ function apriOffertaCarrello(){
   haptic();
   if (VETRINA) {
     invitoTelegram('Per fare un\'offerta serve l\'app vera dentro Telegram: '
-      + 'è lì che il venditore ti risponde.');
+      + 'è lì che il venditore ti risponde.', 'offerta');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -20168,7 +20231,16 @@ function renderIdentita(){
   /* — riga Telegram — */
   let tgRiga;
   if (myTgId != null && myTgId < 0) {
-    tgRiga = riga('✈️','Telegram','Non collegato: collegalo per ricevere gli avvisi sui tuoi affari direttamente in chat.',
+    /* SU ONION IL BOTTONE NON NASCE, ed e' la regola di
+       `bottoneRifornisci`: un bottone che porta a un muro e' peggio
+       di un bottone che non c'e'. Qui il muro costa anche un giro —
+       `collegaTelegram` fa emettere al server il codice monouso PRIMA
+       di aprire il link, quindi il tocco brucerebbe un lasciapassare
+       e il link non si aprirebbe lo stesso. E lo si DICE, o al posto
+       del bottone resterebbe un'assenza che sembra un guasto. */
+    tgRiga = suOnion()
+      ? riga('✈️','Telegram','Non collegato. Da Tor il collegamento non si può fare: il codice viaggia dentro un link di Telegram, che qui non si apre. Si fa da barattolo.store, con la stessa chiave Nostr.')
+      : riga('✈️','Telegram','Non collegato: collegalo per ricevere gli avvisi sui tuoi affari direttamente in chat.',
       `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaTelegram()">✈️ Collega Telegram</button>`);
   } else {
     tgRiga = riga('✈️','Telegram',
@@ -28659,14 +28731,27 @@ async function firmaEConsegna(d, id, f, auto){
 function mostraBanner(testo){
   const b = el('demoBanner');
   b.className = 'demo-banner demo-vera';
+  /* SU ONION IL CTA CAMBIA PORTA, e la decisione vive QUI e non nei
+     chiamanti: sono quattro (vetrina, demo, demo di riserva, sessione
+     scaduta) e il quinto di domani eredita la cura invece di
+     ricordarsene. Gli altri tre di la' non ci arrivano — la demo gira
+     da file:// e l'initData scaduto vuole un initData — ma la guardia
+     resta dove la domanda si fa una volta sola. */
   b.innerHTML =
     `<div>${testo}</div>`
-    + `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
-    + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`;
+    + (suOnion()
+       ? `<button class="demo-cta" onclick="apriNostrSheet()"`
+         + ` style="border:none;cursor:pointer">🟣 Entra con Nostr →</button>`
+       : `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
+         + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`);
   b.style.display = 'block';
 }
 const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
 const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram per comprare e vendere anche da qui';
+/* La stessa riga per chi arriva da Tor: cambia la PORTA, non l'invito
+   — di la' Telegram non e' una strada, e nominarla sarebbe mandare
+   qualcuno contro un muro. */
+const BANNER_VETRINA_ONION = '🛍️ Stai guardando la vetrina — entra con la tua chiave Nostr per comprare e vendere anche da qui';
 /* L'initData di Telegram dura 24 ore (ago 2026) e NON si rinfresca
    finché la Mini App resta aperta: solo riaprirla ne conia uno nuovo.
    Senza questa riga chi scade si ritroverebbe nella vetrina anonima
@@ -28687,7 +28772,18 @@ function barraWeb(nome){
   if (hintDismesso('barraweb')) { b.style.display = 'none'; return; }
   b.className = 'demo-banner demo-vera';
   b.style.display = 'block';
-  const avvisi = myTgId < 0
+  /* TRE RAMI E NON DUE, e il terzo e' onion: di la' il link al bot
+     non si apre, e nemmeno l'invito a collegarlo tiene — porta a
+     `collegaTelegram`, che si rompe allo stesso modo. Quindi si dice
+     la cosa vera e si indica l'unica strada che di la' funziona: gli
+     Ordini, che sono qui dentro. Il ramo di onion viene PRIMA perche'
+     ci cade anche il DOPPIO CITTADINO: chi entra con una npub che e'
+     la chiave d'accesso di un account Telegram ha il tg_id POSITIVO,
+     quindi senza questa riga prenderebbe il ramo che nomina il bot. */
+  const avvisi = suOnion()
+    ? `da qui gli avvisi in chat non si possono attivare: ricontrolla`
+      + ` i tuoi Ordini di tanto in tanto`
+    : myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
       + ` dalla scheda Profilo (sezione «🆔 Identità»), oppure ricontrolla`
       + ` i tuoi Ordini di tanto in tanto`
@@ -29886,7 +29982,8 @@ function apriOffertaDaUrl(){
      sopravvive e questo giro si rifa' da autenticati: chi riceve
      il DM su Nostr non resta fuori. */
   if (DEMO || VETRINA) {
-    invitoTelegram('La tua trattativa ti aspetta dentro Barattolo: entra e la trovi nella scheda Ordini.');
+    invitoTelegram('La tua trattativa ti aspetta dentro Barattolo: entra e la trovi nella scheda Ordini.',
+      'trattativa');
     return;
   }
   offertaDaSvelare = Number(OFFERTA_URL[1]);
@@ -29978,7 +30075,7 @@ async function avviaVetrina(){
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
     renderPodioTesta();        // ...e il podio nemmeno: la cintura di apriClassifica
-    mostraBanner(BANNER_VETRINA);
+    mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);
     /* SU ONION IL LOGIN TELEGRAM NON SI OFFRE, e non e' prudenza:
        il Login Widget funziona SOLO sul dominio registrato con
        /setdomain, che e' uno per bot — quindi di la' porterebbe a un

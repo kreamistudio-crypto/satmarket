@@ -18007,6 +18007,72 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fuga appena chiusa che rientrerebbe da un'altra porta. Resta NOSTR,
   che di là funziona — provato dal vivo da Tor Browser prima di
   scrivere una riga di codice.
+  E LE QUATTRO PORTE VERSO TELEGRAM (ago 2026, il giro dopo, dal campo:
+  Andrea ha toccato «Apri @ilbarattolobot» da Tor Browser e la richiesta
+  si è fermata con un errore). Non era una fuga silenziosa — parte solo
+  se lo tocchi — ma la stessa famiglia del login Telegram: una strada
+  che di là non ha senso offrire, e **per giunta rotta**: quel link
+  redirige verso `tg://`, cioè un protocol handler esterno, e Tor
+  Browser li ferma apposta — un'app fuori dal browser non passa dal
+  tunnel. (La causa è un sospetto e non un fatto verificato: per
+  saperlo servirebbe il pannello di Tor Browser. Non cambia la cura.)
+  ERANO QUATTRO E NON UNA, e il censimento è la parte che vale — le
+  prime due le vede chi non è ancora dentro, le altre due chi c'è già:
+  1) IL FOGLIO INVITO (`#invitoSheet`), il bottone ARANCIO e l'unico
+  pieno, aperto da DIECI chiamanti (compra, offerta, carrello, puntata,
+  «lo aspetto», Vendi, Ordini, Profilo, trattativa); 2) il CTA del
+  BANNER della vetrina; 3) il link inline di `barraWeb`; 4)
+  `collegaTelegram`, che Andrea non aveva visto ed è il peggiore —
+  quando il link fallisce **il codice monouso è già stato emesso dal
+  server**, quindi il tocco brucia un giro e non apre niente.
+  TOGLIERE IL BOTTONE NON BASTAVA, ed è la decisione di Andrea che ha
+  dato forma al cantiere: il foglio si intitola «Ti aspettiamo su
+  Telegram» e i dieci testi dicono «serve l'app vera dentro Telegram» —
+  tolto il bottone resterebbe un foglio che NOMINA una strada senza
+  offrirla, con «🟣 …o entra con Nostr» in GHOST, cioè l'unica porta che
+  di là funziona vestita da ripiego. «Un foglio che nomina una strada
+  senza offrirla è peggio del bottone rotto». Quindi SU ONION IL FOGLIO
+  SI GIRA — titolo, testo e porte — e Nostr prende il pieno: il vestito
+  segue la porta vera, ed è il registro e non un vezzo.
+  I DIECI TESTI TENGONO IL SENSO (richiesta di Andrea: «prova a tenerne
+  almeno il senso — "i tuoi sats restano al sicuro fino alla consegna"
+  è vero a prescindere dal mezzo»). Catalogo `INVITO_ONION`, UNA VOCE
+  PER GESTO e non un generico solo: il foglio si apre dopo un tocco, e
+  chi legge deve ritrovarci la cosa che stava facendo. Cade il MEZZO,
+  resta la RAGIONE. I chiamanti passano una `chiave` — dieci edit da
+  una parola — e FUORI DA ONION IL SECONDO ARGOMENTO NON FA NIENTE:
+  il testo che arriva è quello di sempre, byte per byte.
+  IL RIPIEGO È IL GENERICO E MAI IL TESTO DEL CHIAMANTE, ed è la riga
+  da non ammorbidire: un invito nuovo che si dimentica la chiave
+  rimetterebbe «Telegram» davanti a chi su Telegram non ci può andare —
+  meglio una frase più povera che una falsa.
+  ⚠️ E LA CHIAVE DEV'ESSERE UNA DI QUELLE DICHIARATE, non solo
+  presente: l'ha trovato la TORTURA, non la rilettura — un refuso
+  («carrelli» per «carrello») passava il censimento e su onion quel
+  gesto cadeva sul generico, perdendo IN SILENZIO il testo scritto
+  apposta per lui. Il censimento estrae le chiavi PASSATE e le confronta
+  con quelle del catalogo.
+  LE ALTRE TRE, ognuna con la sua riga: il CTA del BANNER cambia porta
+  DENTRO `mostraBanner` e non nei suoi quattro chiamanti (il quinto di
+  domani eredita la cura); `barraWeb` guadagna un TERZO ramo che viene
+  PRIMA di quello dei nativi Nostr, perché su onion ci cade anche il
+  DOPPIO CITTADINO — chi entra con una npub che è la chiave d'accesso di
+  un account Telegram ha il `tg_id` POSITIVO, e senza quella riga
+  prenderebbe il ramo che nomina il bot — e quel ramo NON invita a
+  collegare Telegram, che porterebbe alla quarta porta, rotta uguale;
+  e «✈️ Collega Telegram» non nasce (la regola di `bottoneRifornisci`)
+  ma LO SI DICE, o al posto del bottone resterebbe un'assenza che sembra
+  un guasto — con la strada che funziona, cioè barattolo.store con la
+  stessa chiave.
+  LA PROVA CHE VALE FA GIRARE IL FOGLIO, su un DOM di cartone e poi in
+  quello VERO col giudice forzato (`suOnion` è una funzione globale,
+  quindi si riassegna: un hostname `.onion` in locale non si può avere).
+  E IL BANCO HA MENTITO PASSANDO, che è il modo peggiore: un apostrofo
+  scappato male rendeva la chiamata un errore di sintassi, il foglio non
+  veniva scritto MAI, e il primo controllo usciva verde leggendo il
+  MARKUP FISSO — che dice esattamente quelle cose. Da lì la stringa si
+  costruisce con `json.dumps` e ogni `js()` che alza FERMA il banco
+  invece di far finta.
   I TRE TESTI DEL CONFINE, e il registro è la metà del lavoro. Andrea:
   «deve sapere fin dove arriva la protezione, senza che sembri un
   avvertimento spaventoso». La differenza in due righe:
@@ -25166,6 +25232,37 @@ pezzo che da qui non si può fare: il giro completo in Tor Browser —
 vetrina, scheda, login Nostr, un acquisto fino alla fattura — col
 pannello di rete aperto, dove **non deve partire nessuna richiesta a
 telegram.org**.
+
+Le quattro porte verso Telegram che su onion non si aprono (ago 2026,
+dal campo: Andrea ha toccato «Apri @ilbarattolobot» da Tor Browser e
+la richiesta si è fermata con un errore — non una fuga silenziosa, ma
+un bottone ROTTO). Erano QUATTRO e non una, e il censimento è la parte
+che vale: il foglio invito col suo bottone arancio (dieci chiamanti),
+il CTA del banner della vetrina, il link inline di `barraWeb` e
+`collegaTelegram` — che Andrea non aveva visto ed è il peggiore, perché
+quando il link fallisce il codice monouso è già stato emesso. Vedi
+Architettura, «E LE QUATTRO PORTE VERSO TELEGRAM», per la decisione che
+ha dato forma al cantiere (togliere il bottone non bastava: il foglio
+si gira, e Nostr prende il pieno) e per il catalogo che tiene il SENSO
+dei dieci testi senza nominare il mezzo.
+Collaudato: **6886 prove verdi** (34 nuove, di cui una ESEGUIBILE che
+fa GIRARE `invitoTelegram` sui suoi casi) e **16 MUTAZIONI, 16
+uccise** — e una di quelle ha trovato un buco vero: la chiave che il
+censimento accettava senza controllare che fosse DICHIARATA, cioè un
+refuso che su onion perdeva il testo del gesto in silenzio. Più il giro
+DAL VIVO nel DOM vero col server acceso su un database usa-e-getta
+(**16/16, zero errori JS**): le quattro porte nei due mondi, il doppio
+cittadino col `tg_id` positivo, e la regressione del clearnet, che non
+cambia di un byte. Più gli screenshot a 320/375 nei due temi.
+⚠️ E IL BANCO HA MENTITO PASSANDO, che è il modo peggiore: un apostrofo
+scappato male rendeva la chiamata un errore di sintassi e il primo
+controllo usciva verde leggendo il markup fisso. Una verifica che passa
+per la ragione sbagliata è peggio di una rossa.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client, e senza `ONION_HOST` nel
+config del VPS non cambia niente per nessuno. DA GUARDARE al primo
+giro in Tor Browser: il foglio girato al primo tocco su «Acquista», e
+che «Collega Telegram» non compaia nel cassetto Identità.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

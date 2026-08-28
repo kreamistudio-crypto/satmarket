@@ -20814,6 +20814,235 @@ def prove_onion():
     prova("...e non pubblica l'indirizzo .onion", False,
           ".onion</b>" in voce and "ckmc" in voce)
 
+    # --- 8) LE QUATTRO PORTE VERSO TELEGRAM -----------------------
+    # Il login Widget se n'era gia' andato (§4), ma restavano quattro
+    # strade che portano al bot — e su onion NON SONO SOLO INUTILI:
+    # Tor Browser ferma il salto verso l'app esterna, quindi sono
+    # bottoni ROTTI. Ognuna si spegne dove sta, e nessuna cambia di un
+    # byte fuori da onion.
+
+    # 8a) IL FOGLIO INVITO — la porta che vede chi non e' ancora
+    # dentro, e l'unica col bottone PIENO. Togliere il bottone non
+    # basta: il titolo nomina Telegram e i dieci testi dei chiamanti
+    # pure, quindi resterebbe un foglio che nomina una strada senza
+    # offrirla, con l'unica porta buona vestita da ripiego. Si GIRA.
+    inv = pezzo_js(mini, "function invitoTelegram(", "\n}\n")
+    prova("su onion il foglio invito si gira", True, "suOnion()" in inv)
+    prova("...il bottone del bot non si disegna", True,
+          "el('invitoTg').style.display = onion ? 'none' : 'block';" in inv)
+    # IL PIENO SEGUE LA PORTA VERA: lasciare Nostr in ghost sotto un
+    # bottone sparito lo vestirebbe da ripiego dove e' l'unica strada.
+    prova("...e Nostr diventa il pieno", True,
+          "nos.className = onion ? 'btn orange' : 'btn ghost';" in inv)
+    prova("...col titolo che parla di lui", True,
+          "Entra con la tua chiave" in inv)
+    # ⚠️ IL RIPIEGO E' IL GENERICO E MAI IL TESTO DEL CHIAMANTE: un
+    # invito nuovo che si dimentica la chiave rimetterebbe «Telegram»
+    # davanti a chi su Telegram non ci puo' andare.
+    prova("...e la chiave mancante ricade sul generico, mai sul testo",
+          True,
+          "(INVITO_ONION[chiave] || INVITO_ONION_GENERICO) : testo"
+          in inv)
+
+    # I DIECI CHIAMANTI passano la loro chiave, ed e' un CENSIMENTO e
+    # non un elenco: l'invito nuovo di domani entra nel conto da solo.
+    # UNA CHIAMATA COMINCIA SEMPRE CON UN ARGOMENTO: cosi' restano
+    # fuori da soli la definizione (che comincia col nome del
+    # parametro) e il commento del markup, che la funzione la nomina
+    # apposta per rimandarci — «vedi invitoTelegram()».
+    _ch = [c for c in mini.split("invitoTelegram(")[1:]
+           if c[:1] in ("'", '"', "v")]                 # ', ", view
+    _senza = [c[:40] for c in _ch
+              if ", '" not in c.split(");")[0]
+              and ",\n" not in c.split(");")[0]
+              and ", view)" not in c.split(");")[0]]
+    prova("...e ogni chiamante porta la sua chiave", [], _senza)
+    prova("...e i chiamanti sono i dieci di sempre", 10, len(_ch))
+    # ⚠️ E LA CHIAVE DEV'ESSERE UNA DI QUELLE DICHIARATE, o un refuso
+    # («carrelli» per «carrello») passa il censimento e su onion quel
+    # gesto cade sul generico — perdendo IN SILENZIO il testo scritto
+    # apposta per lui. L'ha trovato la tortura: chiedere che la chiave
+    # ci sia non e' chiedere che voglia dire qualcosa.
+    _passate = set()
+    for _c in _ch:
+        # L'ULTIMO ARGOMENTO, che in cinque chiamanti va a capo: si
+        # taglia sull'ultima virgola invece che cercare una forma
+        # scritta a mano.
+        _ult = _c.split(");")[0].rsplit(",", 1)[-1].strip()
+        if _ult == "view":
+            # go() passa la vista, che vale 'vendi'|'affari'|'profilo'
+            _passate |= {"vendi", "affari", "profilo"}
+        elif _ult.startswith("'"):
+            _passate.add(_ult.strip("'"))
+    # E IL CATALOGO LE COPRE TUTTE: una chiave passata e non
+    # dichiarata cadrebbe sul generico in silenzio.
+    _cat = mini[mini.index("const INVITO_ONION = {"):]
+    _cat = _cat[:_cat.index("\n};")]
+    # ⚠️ SI RICUCE PRIMA DI CERCARE: nel catalogo le frasi sono
+    # spezzate a meta' («i tuoi sats ' + 'restano al sicuro»), ed e'
+    # nella piega che una ricerca a mano non le trova — la lezione
+    # gia' pagata dal censimento dell'euro.
+    _cucito = _re_cuci(_cat)
+    prova("...e la chiave che passa e' una di quelle dichiarate",
+          set(), {_k for _k in _passate if _k + ":" not in _cat})
+    for _k in ("compra", "carrello", "punta", "offerta", "interesse",
+               "vendi", "affari", "profilo", "trattativa"):
+        prova(f"...«{_k}» sta nel catalogo", True, _k + ":" in _cat)
+    # LA RAGIONE NON SI BUTTA, ed e' la richiesta di Andrea: «i tuoi
+    # sats restano al sicuro fino alla consegna» e' vero a
+    # prescindere dal mezzo, e nel catalogo resta — quello che cade e'
+    # il MEZZO, che di la' e' falso.
+    prova("...e i testi tengono il senso senza nominare Telegram",
+          (True, False),
+          ("i tuoi sats restano al sicuro fino alla consegna" in _cucito,
+           "Telegram" in _cucito))
+
+    # 8b) IL BANNER DELLA VETRINA — la stessa porta in testa alla
+    # pagina. La decisione vive DENTRO mostraBanner e non nei suoi
+    # quattro chiamanti: il quinto di domani la eredita.
+    mb = pezzo_js(mini, "function mostraBanner(", "\n}\n")
+    prova("il CTA del banner cambia porta su onion", True,
+          "suOnion()" in mb and "apriNostrSheet()" in mb)
+    prova("...e fuori resta quello di sempre", True,
+          'href="https://t.me/ilbarattolobot"' in mb)
+    prova("...col testo che non nomina piu' una strada chiusa", True,
+          "mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);"
+          in mini)
+
+    # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
+    # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
+    # ha il tg_id POSITIVO e senza questa riga prenderebbe il ramo che
+    # nomina il bot.
+    bw = pezzo_js(mini, "function barraWeb(", "\n}\n")
+    prova("barraWeb ha il suo ramo per onion", True,
+          "const avvisi = suOnion()" in bw)
+    prova("...e viene PRIMA di quello dei nativi Nostr", True,
+          bw.index("suOnion()") < bw.index("myTgId < 0"))
+    # E NON INVITA A COLLEGARE TELEGRAM: quell'invito porta a
+    # `collegaTelegram`, che di la' si rompe allo stesso modo.
+    _ramo = bw[bw.index("const avvisi = suOnion()"):bw.index("myTgId < 0")]
+    prova("...e non manda a una porta che non si apre", False,
+          "collega" in _ramo.lower())
+
+    # 8d) «Collega Telegram» — il bottone che BRUCIA UN CODICE: il
+    # server emette il lasciapassare PRIMA di aprire il link, quindi
+    # il tocco consuma un giro e il link non si apre lo stesso.
+    ri = pezzo_js(mini, "function renderIdentita(", "\n}\n")
+    prova("su onion il bottone «Collega Telegram» non nasce", True,
+          "tgRiga = suOnion()" in ri)
+    # E LO SI DICE, o al posto del bottone resta un'assenza che sembra
+    # un guasto (la regola gia' scritta per la riga dei punti salvati).
+    prova("...e la riga dice perche', invece di tacere", True,
+          "Da Tor il collegamento non si può fare" in ri)
+    prova("...e indica la strada che funziona", True,
+          "barattolo.store" in ri)
+
+    # 8e) LA PROVA CHE VALE: il foglio GIRATO PER DAVVERO su un DOM di
+    # cartone. Le sentinelle dicono che le righe ci sono, mai che il
+    # foglio risponda giusto — e qui la domanda e' proprio cosa legge
+    # chi apre quel foglio da Tor.
+    _banco = _banco_invito(mini)
+    if _banco is None:
+        salta("il foglio girato: node non c'e'")
+    else:
+        for _nome, _atteso, _avuto in _banco:
+            prova(_nome, _atteso, _avuto)
+
+
+def _re_cuci(testo):
+    """Ricuce le stringhe JS spezzate: «'a ' + 'b'» -> «'a b'».
+
+    Serve a cercare una FRASE dentro il sorgente: nella piega di una
+    concatenazione una ricerca a mano non la trova, ed e' cosi' che
+    due siti si erano nascosti al censimento dell'euro."""
+    import re as _re
+    return _re.sub(r"'\s*\+\s*'", "", testo)
+
+
+def _banco_invito(mini):
+    """Fa GIRARE `invitoTelegram` nei due mondi su un DOM di cartone.
+
+    Il pezzo vero, non una copia: si ritaglia dal client insieme al
+    catalogo e ai due giudici. Torna None se node non c'e'."""
+    import json as _json
+    import subprocess
+    import tempfile
+    cat = mini[mini.index("const INVITO_ONION = {"):]
+    _fine = "+ 'con la tua chiave Nostr.';"
+    cat = cat[:cat.index(_fine) + len(_fine)]
+    # `pezzo_js` torna il CORPO, senza la graffa che lo chiude: senza
+    # rimetterla node dice «Unexpected end of input» — che e' anche
+    # il modo in cui un ritaglio a occhio si fa vedere.
+    fn = pezzo_js(mini, "function invitoTelegram(", "\n}\n") + "\n}"
+    js = """
+const nodi = {};
+function el(id){
+  if (!nodi[id]) nodi[id] = {textContent:'', className:'', style:{},
+                             classList:{add(){}, remove(){}}};
+  return nodi[id];
+}
+let ONION = false;
+function suOnion(){ return ONION; }
+""" + cat + "\n" + fn + """
+const fuori = [];
+ONION = false;
+invitoTelegram('Per comprare in sicurezza serve l\\'app vera dentro Telegram: '
+  + 'è lì che i tuoi sats restano al sicuro fino alla consegna.', 'compra');
+fuori.push([nodi.invitoTit.textContent, nodi.invitoTesto.textContent,
+            nodi.invitoTg.style.display, nodi.invitoNostr.className,
+            nodi.invitoNostr.textContent]);
+ONION = true;
+invitoTelegram('Per comprare in sicurezza serve l\\'app vera dentro Telegram: '
+  + 'è lì che i tuoi sats restano al sicuro fino alla consegna.', 'compra');
+fuori.push([nodi.invitoTit.textContent, nodi.invitoTesto.textContent,
+            nodi.invitoTg.style.display, nodi.invitoNostr.className,
+            nodi.invitoNostr.textContent]);
+invitoTelegram('roba che nomina Telegram', 'chiave-che-non-esiste');
+fuori.push(nodi.invitoTesto.textContent);
+invitoTelegram('roba che nomina Telegram');
+fuori.push(nodi.invitoTesto.textContent);
+console.log(JSON.stringify(fuori));
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        os.unlink(p)
+        return None
+    os.unlink(p)
+    if r.returncode != 0:
+        return [("il banco del foglio gira", "", r.stderr[-300:])]
+    fu, on, senza, nudo = _json.loads(r.stdout)
+    return [
+        # FUORI DA ONION NON CAMBIA UN BYTE: il testo e' quello del
+        # chiamante, il bottone del bot c'e', Nostr resta in ghost.
+        ("fuori da onion il foglio e' quello di sempre",
+         ["🫙 Ti aspettiamo su Telegram",
+          "Per comprare in sicurezza serve l'app vera dentro Telegram: "
+          "è lì che i tuoi sats restano al sicuro fino alla consegna.",
+          "block", "btn ghost", "🟣 …o entra con Nostr"],
+         fu),
+        # SU ONION SI GIRA: titolo, testo, porte.
+        ("...e su onion il titolo parla della chiave",
+         "🧅 Entra con la tua chiave", on[0]),
+        ("...il testo tiene il senso e non nomina Telegram",
+         (True, False),
+         ("i tuoi sats restano al sicuro fino alla consegna" in on[1],
+          "Telegram" in on[1])),
+        ("...il bottone del bot sparisce", "none", on[2]),
+        ("...e Nostr diventa il pieno",
+         ["btn orange", "🟣 Entra con Nostr"], [on[3], on[4]]),
+        # IL RIPIEGO NON RIMETTE MAI IL TESTO DEL CHIAMANTE.
+        ("una chiave sconosciuta cade sul generico", (True, False),
+         ("con la tua chiave Nostr" in senza, "Telegram" in senza)),
+        ("...e una chiave che manca del tutto pure", (True, False),
+         ("con la tua chiave Nostr" in nudo, "Telegram" in nudo)),
+    ]
+
 
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
