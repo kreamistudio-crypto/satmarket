@@ -5203,15 +5203,44 @@ def portachiavi_conti(raw: str) -> list:
     return sorted(per_tg.values(), key=lambda v: ordine[v["token"]])
 
 
-def apri_sessione(response: Response, tg_id: int, portachiavi: str = "") -> str:
+def portachiavi_adottato(portachiavi: str, sessione: str) -> list:
+    """I conti del portachiavi, PIU' la sessione attiva se non c'e'
+    dentro. E' LA MIGRAZIONE, e non poteva stare all'avvio come le
+    altre: il portachiavi vive nel BROWSER e non nel database, quindi
+    l'unico momento in cui si puo' riempire e' quando quel browser
+    torna a bussare.
+
+    IL CASO E' CHIUNQUE FOSSE GIA' DENTRO (ago 2026, dal campo): chi si
+    e' loggato PRIMA del deploy ha `barattolo_sessione` e nessun
+    portachiavi — nessuno dei suoi login e' mai passato da
+    `apri_sessione`. Senza adozione il menu si apriva senza nemmeno il
+    SUO account, cioe' senza niente fra cui passare; e al primo
+    «aggiungi» la sessione di prima sarebbe sparita dal mazzo, che e'
+    il modo peggiore di sbagliare — si perde l'account su cui si era.
+    LA SESSIONE ATTIVA VA IN TESTA: e' la piu' vecchia delle due, e
+    l'ordine del portachiavi e' quello di ingresso."""
+    conti = portachiavi_conti(portachiavi)
+    if not sessione or any(c["token"] == sessione for c in conti):
+        return conti
+    # A dire se quella sessione vale qualcosa e' `portachiavi_conti`,
+    # come per ogni altro token: una morta o inventata non trova niente
+    # e non entra nel mazzo.
+    return portachiavi_conti(sessione) + conti
+
+
+def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
+                  sessione: str = "") -> str:
     """La PORTA UNICA di ogni login: apre la sessione, la rende attiva e
     la appende al portachiavi di questo browser. Le tre cose stanno
     insieme apposta — erano due righe ripetute in quattro punti, e il
     quinto ingresso di domani si sarebbe scordato il portachiavi.
     Chi rientra su un account che c'e' gia' non lo raddoppia: la voce
-    vecchia lascia il posto alla sessione nuova."""
+    vecchia lascia il posto alla sessione nuova.
+    `sessione` e' il cookie attivo di ADESSO, e serve a chi era gia'
+    dentro da prima che il portachiavi esistesse: senza, il suo
+    account sparirebbe dal mazzo proprio mentre ne aggiunge un altro."""
     token = crea_sessione(tg_id)
-    resto = [c["token"] for c in portachiavi_conti(portachiavi)
+    resto = [c["token"] for c in portachiavi_adottato(portachiavi, sessione)
              if c["tg_id"] != tg_id]
     # Al tetto cede il piu' VECCHIO, mai quello appena aperto: chi ha
     # appena messo la password si aspetta di trovarsi li' dentro.
@@ -5368,7 +5397,8 @@ async def leggi_json(req: Request) -> dict:
 
 @app.post("/api/login/telegram")
 async def login_telegram(req: Request, response: Response,
-                         barattolo_portachiavi: str = Cookie("")):
+                         barattolo_portachiavi: str = Cookie(""),
+                         barattolo_sessione: str = Cookie("")):
     """Riceve i dati firmati dal Login Widget, li verifica e apre la
     sessione: da qui in poi il browser e' riconosciuto dal cookie.
     In collaudo accetta anche un'identita' finta ({"collaudo": true}),
@@ -5382,20 +5412,31 @@ async def login_telegram(req: Request, response: Response,
     else:
         user = verifica_login_widget(d)
     upsert_utente(user)
-    apri_sessione(response, int(user["id"]), barattolo_portachiavi)
+    apri_sessione(response, int(user["id"]), barattolo_portachiavi,
+                  barattolo_sessione)
     return {"ok": True}
 
 
 @app.get("/api/sessioni")
-def sessioni_aperte(barattolo_sessione: str = Cookie(""),
+def sessioni_aperte(response: Response,
+                    barattolo_sessione: str = Cookie(""),
                     barattolo_portachiavi: str = Cookie("")):
-    """Gli account aperti su questo browser, per il selettore del
-    Profilo. LEGGE E BASTA: nessuno switch, nessuna scrittura.
+    """Gli account aperti su questo browser, per il menu del tappo.
+    NON MUOVE NIENTE NEL DATABASE: l'unica cosa che scrive e' il cookie
+    del portachiavi, e solo per ADOTTARE la sessione con cui si sta
+    bussando — la migrazione di chi era gia' dentro (vedi
+    portachiavi_adottato), che va fatta qui perche' questo e' l'unico
+    momento in cui quel browser si fa vedere.
     IL TOKEN NON ESCE MAI, ed e' la riga da non ammorbidire: uscirebbe
     da un cookie HttpOnly per finire in mano al JavaScript, cioe' si
     butterebbe via l'unica difesa che quel cookie ha. A dire «passa a
     questo» basta il tg_id, che di suo non apre niente."""
-    conti = portachiavi_conti(barattolo_portachiavi)
+    conti = portachiavi_adottato(barattolo_portachiavi, barattolo_sessione)
+    # Si riscrive il cookie solo se e' cambiato qualcosa: l'adozione, o
+    # le sessioni morte che `portachiavi_conti` ha appena tolto.
+    vivi = [c["token"] for c in conti]
+    if vivi != _portachiavi_token(barattolo_portachiavi):
+        imposta_cookie_portachiavi(response, vivi)
     attivo = None
     if barattolo_sessione:
         for c in conti:
@@ -5597,7 +5638,8 @@ def login_nostr_sfida():
 
 @app.post("/api/login/nostr")
 async def login_nostr(req: Request, response: Response,
-                      barattolo_portachiavi: str = Cookie("")):
+                      barattolo_portachiavi: str = Cookie(""),
+                      barattolo_sessione: str = Cookie("")):
     """Secondo passo: arriva l'evento firmato. Tre strade, in ordine:
     1) npub_accesso conosciuta -> si entra nel suo account;
     2) npub gia' VERIFICATA (badge 🟣) su UN account Telegram non
@@ -5619,7 +5661,8 @@ async def login_nostr(req: Request, response: Response,
                     (npub,)).fetchone()
     if r:
         con.close()
-        apri_sessione(response, r["tg_id"], barattolo_portachiavi)
+        apri_sessione(response, r["tg_id"], barattolo_portachiavi,
+                      barattolo_sessione)
         return {"ok": True}
     righe = con.execute(
         "SELECT tg_id, nome, username FROM utenti "
@@ -5638,7 +5681,7 @@ async def login_nostr(req: Request, response: Response,
                             "username": righe[0]["username"],
                             "biglietto": biglietto}}
     tg_id = crea_utente_nostr(pubkey, npub)
-    apri_sessione(response, tg_id, barattolo_portachiavi)
+    apri_sessione(response, tg_id, barattolo_portachiavi, barattolo_sessione)
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
@@ -5647,7 +5690,8 @@ async def login_nostr(req: Request, response: Response,
 
 @app.post("/api/login/nostr/collega")
 async def login_nostr_collega(req: Request, response: Response,
-                              barattolo_portachiavi: str = Cookie("")):
+                              barattolo_portachiavi: str = Cookie(""),
+                              barattolo_sessione: str = Cookie("")):
     """L'utente ha accettato: la sua chiave Nostr diventa la chiave
     d'accesso dell'account Telegram esistente, e si entra li'.
     Se invece rifiuta, il client chiude il foglio e basta: il
@@ -5668,7 +5712,7 @@ async def login_nostr_collega(req: Request, response: Response,
         con.close()
         raise HTTPException(401, "Riprova il login")
     con.close()
-    apri_sessione(response, tg_id, barattolo_portachiavi)
+    apri_sessione(response, tg_id, barattolo_portachiavi, barattolo_sessione)
     await premia_distintivi(tg_id)   # doppia cittadinanza appena nata
     return {"ok": True, "collegato": True}
 
