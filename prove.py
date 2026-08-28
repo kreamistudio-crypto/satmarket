@@ -20686,9 +20686,23 @@ def prove_onion():
     # appena chiusa che rientrerebbe da un'altra porta.
     prova("su onion il login Telegram non si disegna", True,
           "if (!suOnion()) bottoneLoginTelegram();" in mini)
+    # E IL «...o» NON SI DICE SU ONION, che li' quella e' l'UNICA
+    # porta: il puntino di sospensione nomina un'alternativa, e sul
+    # clearnet e' vero (viene dopo il widget Telegram) mentre di la'
+    # no. E' la riga del foglio invito, sullo stesso registro.
+    _bn = pezzo_js(mini, "function bottoneLoginNostr(", "\n}\n")
+    prova("il testo della porta segue il mondo", True,
+          "suOnion()" in _bn and "\u2026o entra con Nostr" in _bn)
+
+    # ATTENZIONE: qui NON si guarda che le due righe siano ADIACENTI —
+    # era l'ancora di ieri, e si e' rotta al primo commento in mezzo.
+    # Peggio: guardare che due mani stiano vicine non dice NIENTE su
+    # cosa producono INSIEME, ed e' precisamente la cecita' che ha
+    # lasciato passare i due bottoni Nostr affiancati. Il fatto da
+    # sorvegliare e' che quella porta NON sia gated.
     prova("...e quello Nostr resta, che di la' funziona", True,
-          "if (!suOnion()) bottoneLoginTelegram();\n    bottoneLoginNostr();"
-          in mini)
+          "bottoneLoginNostr();" in mini
+          and "suOnion()) bottoneLoginNostr" not in mini)
 
     # --- 5) il server: la leva e il giudice ------------------------
     # FAIL-CLOSED due volte, ed e' la riga da non ammorbidire: senza
@@ -20901,13 +20915,34 @@ def prove_onion():
     # pagina. La decisione vive DENTRO mostraBanner e non nei suoi
     # quattro chiamanti: il quinto di domani la eredita.
     mb = pezzo_js(mini, "function mostraBanner(", "\n}\n")
-    prova("il CTA del banner cambia porta su onion", True,
-          "suOnion()" in mb and "apriNostrSheet()" in mb)
-    prova("...e fuori resta quello di sempre", True,
+    # ⚠️ QUESTA PROVA HA CAMBIATO LATO, e il perche' e' la lezione del
+    # giro: ieri chiedeva che il CTA CAMBIASSE PORTA su onion, cioe'
+    # certificava il difetto. Quel banner lo scrivono in DUE —
+    # `mostraBanner` mette il CTA e `bottoneLoginNostr` APPENDE la
+    # porta del login — e dando la porta Nostr anche al primo
+    # diventavano due bottoni uguali affiancati, tutti e due pieni.
+    # Il CTA su onion non cambia porta: SPARISCE, perche' il suo
+    # mestiere e' portare alla Mini App dentro Telegram.
+    prova("su onion il CTA del banner non si disegna proprio", True,
+          "+ (suOnion() ? ''" in mb)
+    prova("...e non mette una seconda porta Nostr", False,
+          "apriNostrSheet()" in mb)
+    prova("...mentre fuori resta quello di sempre", True,
           'href="https://t.me/ilbarattolobot"' in mb)
     prova("...col testo che non nomina piu' una strada chiusa", True,
           "mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);"
           in mini)
+
+    # E LA PROVA CHE MANCAVA: il banner guardato COME SI COMPONE,
+    # cioe' dopo TUTTE le mani che ci scrivono. Guardarne una alla
+    # volta era il buco — `mostraBanner` da sola era giusta,
+    # `bottoneLoginNostr` pure, e insieme facevano due porte uguali.
+    _banco = _banco_banner(mini)
+    if _banco is None:
+        salta("il banner composto: node non c'e'")
+    else:
+        for _nome, _atteso, _avuto in _banco:
+            prova(_nome, _atteso, _avuto)
 
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
@@ -20957,6 +20992,82 @@ def _re_cuci(testo):
     due siti si erano nascosti al censimento dell'euro."""
     import re as _re
     return _re.sub(r"'\s*\+\s*'", "", testo)
+
+
+def _banco_banner(mini):
+    """Compone il banner della vetrina come lo compone `avviaVetrina`.
+
+    Due mani, nell'ordine vero: `mostraBanner` che scrive l'innerHTML
+    e `bottoneLoginNostr` che appende la porta. Si contano le PORTE
+    NOSTR — che devono essere UNA, di la' come di qua."""
+    import json as _json
+    import subprocess
+    import tempfile
+    mb = pezzo_js(mini, "function mostraBanner(", "\n}\n") + "\n}"
+    bn = pezzo_js(mini, "function bottoneLoginNostr(", "\n}\n") + "\n}"
+    testi = mini[mini.index("const BANNER_VETRINA ="):]
+    testi = testi[:testi.index("BANNER_VETRINA_ONION = ") + 200]
+    testi = testi[:testi.rindex("';") + 2]
+    js = """
+const figli = [];
+const banner = {
+  className: '', style: {},
+  set innerHTML(v){ this._h = v; figli.length = 0; },
+  get innerHTML(){ return this._h || ''; },
+  appendChild(n){ figli.push(n); },
+};
+function el(id){ return banner; }
+const document = {createElement: () => ({style:{}, onclick: null,
+  set textContent(v){ this._t = v; },
+  get textContent(){ return this._t || ''; }})};
+let ONION = false;
+function suOnion(){ return ONION; }
+function apriNostrSheet(){}
+""" + testi + "\n" + mb + "\n" + bn + """
+function componi(onion){
+  ONION = onion;
+  mostraBanner(onion ? BANNER_VETRINA_ONION : BANNER_VETRINA);
+  bottoneLoginNostr();
+  // SI CONTANO LE PORTE, NON LE PAROLE: un secondo bottone verso
+  // Nostr con un testo diverso e' lo stesso difetto, e col conteggio
+  // sul testo passava liscio (l'ha detto la tortura, non la
+  // rilettura). Il fatto e' chi PORTA a `apriNostrSheet`; come lo si
+  // chiama e' un'altra cosa.
+  const h = banner.innerHTML;
+  const porte = (h.match(/apriNostrSheet/g) || []).length
+    + figli.filter(f => f.onclick === apriNostrSheet).length;
+  const tutto = h + figli.map(f => f.textContent).join('|');
+  return {tutto, porte, bot: h.includes('t.me/ilbarattolobot'),
+          oppure: tutto.includes('\u2026o entra con Nostr')};
+}
+console.log(JSON.stringify([componi(false), componi(true)]));
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        os.unlink(p)
+        return None
+    os.unlink(p)
+    if r.returncode != 0:
+        return [("il banco del banner gira", "", r.stderr[-300:])]
+    fu, on = _json.loads(r.stdout)
+    return [
+        # LA PORTA E' UNA, di la' come di qua: e' la riga per cui
+        # questo banco esiste.
+        ("nel banner composto la porta Nostr e' UNA", [1, 1],
+         [fu["porte"], on["porte"]]),
+        ("...e fuori da onion il bot c'e' ancora", True, fu["bot"]),
+        ("...mentre su onion non ci porta piu' niente", False, on["bot"]),
+        # E IL «...o» segue il mondo: la sentinella dice che il ramo
+        # c'e', solo il banco dice cosa risponde.
+        ("il «...o» resta fuori da onion", True, fu["oppure"]),
+        ("...e su onion non si dice", False, on["oppure"]),
+    ]
 
 
 def _banco_invito(mini):

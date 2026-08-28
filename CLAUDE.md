@@ -18078,9 +18078,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   gesto cadeva sul generico, perdendo IN SILENZIO il testo scritto
   apposta per lui. Il censimento estrae le chiavi PASSATE e le confronta
   con quelle del catalogo.
-  LE ALTRE TRE, ognuna con la sua riga: il CTA del BANNER cambia porta
-  DENTRO `mostraBanner` e non nei suoi quattro chiamanti (il quinto di
-  domani eredita la cura); `barraWeb` guadagna un TERZO ramo che viene
+  IL CTA DEL BANNER NON CAMBIA PORTA: SPARISCE (ago 2026, il giorno
+  dopo, dal campo — e questa riga EMENDA quella del giro prima, che
+  diceva «cambia porta»). Su onion `mostraBanner` non disegna nessun
+  CTA, e il perche' e' che quel banner lo scrivono in DUE: lui mette il
+  CTA e `bottoneLoginNostr()` **appende** la porta del login web. Sul
+  clearnet i due hanno mestieri DIVERSI — il primo porta alla Mini App
+  DENTRO Telegram, il secondo apre una sessione qui — e su onion il
+  primo mestiere non esiste piu'. Dandogli la porta Nostr sono
+  diventati DUE BOTTONI UGUALI AFFIANCATI, tutti e due pieni: il
+  difetto che Andrea ha visto il giorno dopo. La decisione resta DENTRO
+  `mostraBanner` e non nei suoi quattro chiamanti, cosi' il quinto di
+  domani la eredita — quel che cambia e' cosa decide.
+  E IL «...o» SEGUE IL MONDO: sul clearnet quel bottone e' il SECONDO,
+  dopo il widget Telegram, e «…o entra con Nostr» dice il vero; su onion
+  e' l'UNICO, e il puntino di sospensione nomina un'alternativa che non
+  c'e' — la stessa famiglia del foglio che nominava Telegram senza
+  offrirlo. Di la' diventa «🟣 Entra con Nostr», come nel foglio.
+  ⚠️ DUE MANI SCRIVONO IN QUEL BANNER, ed e' la riga da non
+  dimenticare: chi ne tocca una guardi l'altra. C'e' il commento su
+  tutte e due.
+  LA PROVA CHE MANCAVA GUARDA IL BANNER COME SI COMPONE, cioe' dopo
+  TUTTE le mani, e CONTA le porte. Guardarne una alla volta era
+  precisamente il buco — `mostraBanner` da sola era giusta,
+  `bottoneLoginNostr` pure, e insieme facevano due porte uguali; il
+  banco del giro prima leggeva l'innerHTML SUBITO dopo `mostraBanner` e
+  la somma non la vedeva mai.
+  ⚠️ E IL BANCO NUOVO CONTAVA LE PAROLE INVECE DELLE PORTE, che l'ha
+  detto la TORTURA e non la rilettura: con un secondo bottone verso
+  `apriNostrSheet` ma con un altro TESTO il conteggio restava UNO —
+  cioe' la prova nata apposta per questo difetto non lo prendeva. Si
+  conta chi PORTA a Nostr (l'onclick nell'innerHTML e il gestore dei
+  figli appesi); come lo si chiama e' un'altra cosa.
+  ⚠️ E LA SENTINELLA DELLE DUE RIGHE ERA ANCORATA ALL'ADIACENZA, che e'
+  la stessa cecita': chiedeva che `bottoneLoginTelegram` e
+  `bottoneLoginNostr` fossero attaccate, si e' rotta al primo commento
+  in mezzo, e soprattutto non diceva NIENTE su cosa producono insieme.
+  Adesso guarda il FATTO — che quella porta non sia gated.
+  LE ALTRE DUE, ognuna con la sua riga: `barraWeb` guadagna un TERZO ramo che viene
   PRIMA di quello dei nativi Nostr, perché su onion ci cade anche il
   DOPPIO CITTADINO — chi entra con una npub che è la chiave d'accesso di
   un account Telegram ha il `tg_id` POSITIVO, e senza quella riga
@@ -25289,6 +25324,31 @@ nessuna leva, nessuna rotta — solo client, e senza `ONION_HOST` nel
 config del VPS non cambia niente per nessuno. DA GUARDARE al primo
 giro in Tor Browser: il foglio girato al primo tocco su «Acquista», e
 che «Collega Telegram» non compaia nel cassetto Identità.
+
+E su onion la porta Nostr era DOPPIA (ago 2026, il giorno dopo, dal
+campo: «due bottoni Nostr affiancati, tutti e due pieni»). Il difetto
+era mio e nasceva dal non aver guardato CHI ALTRO scrive in quel
+banner: il giro prima aveva dato la porta Nostr al CTA di
+`mostraBanner`, e `bottoneLoginNostr()` la sua la **appende** allo
+stesso nodo. La cura non e' cambiargli porta un'altra volta — su onion
+il CTA non si disegna proprio, perche' il suo mestiere e' portare alla
+Mini App dentro Telegram. Piu' il «…o» del bottone, che di la' nomina
+un'alternativa che non c'e'. Vedi Architettura, «IL CTA DEL BANNER NON
+CAMBIA PORTA: SPARISCE».
+Collaudato: 6903 verdi e **6 MUTAZIONI, 6 uccise** — e la tortura ha
+trovato che **il banco nuovo contava le PAROLE invece delle PORTE**:
+con un secondo bottone verso Nostr dal testo diverso il conteggio
+restava UNO, cioe' la prova nata apposta per questo difetto non lo
+prendeva. Piu' il giro DAL VIVO nel DOM vero (**6/6, zero errori JS**):
+su onion UNA porta sola, e il clearnet invariato al pixel — stessi
+testi, stesse quote, stesse larghezze.
+⚠️ LA LEZIONE E' LA STESSA DI DUE GIORNI FA, da un'altra porta: una
+prova che guarda **un pezzo alla volta** puo' essere onesta su ognuno e
+cieca su quel che fanno INSIEME. Il banco del giro prima leggeva il
+banner subito dopo `mostraBanner`, quando la seconda mano non ci aveva
+ancora scritto.
+IN PRODUZIONE basta il deploy: solo client, e sul clearnet non cambia
+un byte.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

@@ -28731,17 +28731,17 @@ async function firmaEConsegna(d, id, f, auto){
 function mostraBanner(testo){
   const b = el('demoBanner');
   b.className = 'demo-banner demo-vera';
-  /* SU ONION IL CTA CAMBIA PORTA, e la decisione vive QUI e non nei
-     chiamanti: sono quattro (vetrina, demo, demo di riserva, sessione
-     scaduta) e il quinto di domani eredita la cura invece di
-     ricordarsene. Gli altri tre di la' non ci arrivano — la demo gira
-     da file:// e l'initData scaduto vuole un initData — ma la guardia
-     resta dove la domanda si fa una volta sola. */
+  /* SU ONION IL CTA NON SI DISEGNA — e la riga da capire e' che NON
+     cambia porta: SPARISCE. Il suo mestiere e' portare alla Mini App
+     DENTRO Telegram, che di la' non esiste; la porta del login web in
+     questo stesso banner ce l'ha gia' `bottoneLoginNostr()`, che la
+     appende dopo. Dandogli la porta Nostr diventavano DUE bottoni
+     uguali affiancati, tutti e due pieni (difetto vero, visto dal
+     campo il giorno dopo). La decisione vive QUI e non nei quattro
+     chiamanti, cosi' il quinto di domani la eredita. */
   b.innerHTML =
     `<div>${testo}</div>`
-    + (suOnion()
-       ? `<button class="demo-cta" onclick="apriNostrSheet()"`
-         + ` style="border:none;cursor:pointer">🟣 Entra con Nostr →</button>`
+    + (suOnion() ? ''
        : `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
          + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`);
   b.style.display = 'block';
@@ -29420,7 +29420,13 @@ function bottoneLoginNostr(){
   const btn = document.createElement('button');
   btn.className = 'demo-cta';
   btn.style.cssText = 'border:none;cursor:pointer;margin-top:8px';
-  btn.textContent = '🟣 …o entra con Nostr';
+  /* IL «...o» NOMINA UN'ALTERNATIVA, e su onion non c'e': li' questa
+     e' l'unica porta, mentre sul clearnet e' la SECONDA — dopo il
+     widget Telegram, che infatti `avviaVetrina` mette solo di qua. E'
+     la stessa riga del foglio invito: cade il mezzo, resta la porta. */
+  btn.textContent = suOnion()
+    ? '🟣 Entra con Nostr'
+    : '🟣 …o entra con Nostr';
   btn.onclick = apriNostrSheet;
   el('demoBanner').appendChild(btn);
 }
@@ -30084,6 +30090,10 @@ async function avviaVetrina(){
        dietro uno script da telegram.org, cioe' la fuga che su quella
        strada si e' appena chiusa. Resta Nostr, che di la' funziona. */
     if (!suOnion()) bottoneLoginTelegram();
+    /* LA PORTA NOSTR LA METTE LUI, ed e' l'unica: `mostraBanner` su
+       onion il suo CTA non lo disegna proprio, perche' porterebbe
+       alla Mini App. Due mani che scrivono nello stesso banner: chi
+       ne tocca una guardi l'altra. */
     bottoneLoginNostr();
     /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
        risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */
