@@ -28,7 +28,12 @@ Le domande a cui risponde:
   · il LOGOUT esce da UNO: chiude l'attivo, passa a chi resta, e solo
     all'ultimo saluta come ha sempre fatto;
   · IL MONDO DI IERI e' intatto: un browser con un account solo fa il
-    login e il logout esattamente come prima.
+    login e il logout esattamente come prima;
+  · LA SESSIONE DI IERI si adotta — chi era gia' dentro prima del
+    deploy ha il cookie della sessione e nessun mazzo, e il menu gli si
+    apriva VUOTO: qui il caso si riproduce invece di descriverlo;
+  · LA PORTA NOSTR mette la sua riga nel mazzo senza buttare fuori chi
+    c'era: e' quella da cui si entra col secondo account.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -37,9 +42,12 @@ chiave, nessuna rete, nessun LNbits.
 USO:  python collaudo_account.py
 """
 
+import hashlib
+import json
 import os
 import sys
 import tempfile
+import time
 import types
 
 QUI = os.path.dirname(os.path.abspath(__file__))
@@ -205,6 +213,95 @@ def main():
           [x["tg_id"] for x in conti])
     prova("...mentre chi e' appena entrato c'e'", 703,
           c3.get("/api/me").json()["tg_id"])
+
+    # ------------------------------------------------------------------
+    # LA SESSIONE DI IERI (ago 2026, il caso dal campo: «non riesco a
+    # switchare nonostante il commit sia in prod»). Chi era gia' dentro
+    # PRIMA del deploy ha il cookie della sessione e nessun mazzo: il
+    # menu gli si apriva senza nemmeno il SUO account, cioe' senza
+    # niente fra cui passare. Qui la sessione si crea A MANO come faceva
+    # il codice di ieri, quindi il caso si RIPRODUCE invece di essere
+    # descritto: se un domani l'adozione cade, questa riga lo MOSTRA.
+    # ------------------------------------------------------------------
+    print("\n[la sessione di ieri, adottata]")
+    server.upsert_utente({"id": 811, "first_name": "Chi C'era",
+                          "username": "prima"})
+    c4 = TestClient(server.app)
+    c4.cookies.set("barattolo_sessione", server.crea_sessione(811))
+    d4 = c4.get("/api/sessioni").json()
+    prova("chi era dentro da ieri si vede nel menu", [811],
+          [x["tg_id"] for x in d4["conti"]])
+    prova("...ed e' segnato come attivo", 811, d4["attivo"])
+    c4.post("/api/login/telegram",
+            json={"collaudo": True, "id": 812, "first_name": "L'Altro"})
+    prova("...e aggiungendo un account resta con DUE", [811, 812],
+          [x["tg_id"] for x in c4.get("/api/sessioni").json()["conti"]])
+    c4.post("/api/sessioni/attiva", json={"tg_id": 811})
+    prova("...con quello di ieri ancora raggiungibile", 811,
+          c4.get("/api/me").json()["tg_id"])
+
+    # ------------------------------------------------------------------
+    # LA PORTA NOSTR, che il collaudo non copriva: e' quella da cui si
+    # entra col secondo account, e passa da apri_sessione come le
+    # sorelle — quindi deve mettere la sua riga nel mazzo senza buttare
+    # fuori chi c'era. La firma e' VERA (Schnorr), o non si proverebbe
+    # la porta ma un ramo di collaudo.
+    # ------------------------------------------------------------------
+    print("\n[la porta Nostr]")
+    try:
+        from coincurve import PrivateKey
+    except ImportError:
+        print("  · coincurve non c'e': la porta Nostr si SALTA")
+    else:
+        c5 = TestClient(server.app)
+        c5.post("/api/login/telegram",
+                json={"collaudo": True, "id": 821, "first_name": "Telegram"})
+        sk = PrivateKey()
+        pub = sk.public_key_xonly.format().hex()
+        sfida = c5.get("/api/login/nostr/sfida").json()["sfida"]
+        ev = {"pubkey": pub, "created_at": int(time.time()), "kind": 22242,
+              "tags": [["relay", "http://testserver"], ["challenge", sfida]],
+              "content": ""}
+        ser = json.dumps([0, pub, ev["created_at"], 22242, ev["tags"], ""],
+                         separators=(",", ":"), ensure_ascii=False)
+        ev["id"] = hashlib.sha256(ser.encode()).hexdigest()
+        ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+        prova("si entra con la chiave Nostr", 200,
+              c5.post("/api/login/nostr", json={"evento": ev}).status_code)
+        conti5 = c5.get("/api/sessioni").json()["conti"]
+        prova("...e nel mazzo ci sono TUTTI E DUE", 2, len(conti5))
+        prova("...col Telegram che c'era prima ancora al suo posto", True,
+              821 in [x["tg_id"] for x in conti5])
+        nativo = [x["tg_id"] for x in conti5 if x["tg_id"] != 821]
+        prova("...e il nativo Nostr ha il tg_id NEGATIVO", True,
+              bool(nativo) and nativo[0] < 0)
+        c5.post("/api/sessioni/attiva", json={"tg_id": 821})
+        prova("si torna sul Telegram con un tocco", 821,
+              c5.get("/api/me").json()["tg_id"])
+
+        # E il RIENTRO con la STESSA chiave, che e' un ramo DIVERSO
+        # (npub_accesso: l'account c'e' gia'). Senza questo caso la
+        # mutazione che gli toglie la sessione sopravvive, perche' la
+        # parola la porta comunque il ramo del nativo nuovo.
+        c6 = TestClient(server.app)
+        c6.post("/api/login/telegram",
+                json={"collaudo": True, "id": 831, "first_name": "Prima"})
+        sfida2 = c6.get("/api/login/nostr/sfida").json()["sfida"]
+        ev2 = {"pubkey": pub, "created_at": int(time.time()), "kind": 22242,
+               "tags": [["relay", "http://testserver"], ["challenge", sfida2]],
+               "content": ""}
+        ser2 = json.dumps([0, pub, ev2["created_at"], 22242, ev2["tags"], ""],
+                          separators=(",", ":"), ensure_ascii=False)
+        ev2["id"] = hashlib.sha256(ser2.encode()).hexdigest()
+        ev2["sig"] = sk.sign_schnorr(bytes.fromhex(ev2["id"])).hex()
+        r6 = c6.post("/api/login/nostr", json={"evento": ev2})
+        prova("si RIENTRA con una chiave gia' collegata", 200,
+              r6.status_code)
+        prova("...e anche di li' il mazzo resta di DUE", 2,
+              len(c6.get("/api/sessioni").json()["conti"]))
+        c6.post("/api/sessioni/attiva", json={"tg_id": 831})
+        prova("...col Telegram di prima ancora raggiungibile", 831,
+              c6.get("/api/me").json()["tg_id"])
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

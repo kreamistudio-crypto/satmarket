@@ -36306,7 +36306,7 @@ def _amb_portachiavi():
            "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets")}
     for n in ("crea_sessione", "imposta_cookie_sessione",
               "imposta_cookie_portachiavi", "_portachiavi_token",
-              "portachiavi_conti", "apri_sessione"):
+              "portachiavi_conti", "portachiavi_adottato", "apri_sessione"):
         exec(pezzo(n), amb)
     return amb, con, Resp
 
@@ -36365,6 +36365,54 @@ def prove_portachiavi():
           [c["tg_id"] for c in fin])
     prova("...e chi e' appena entrato c'e' sempre", t44,
           r5.cookie["barattolo_sessione"])
+
+    # --- L'ADOZIONE (ago 2026, dal campo): chi era gia' loggato PRIMA
+    #     del deploy ha la sessione e nessun portachiavi. Senza, il
+    #     menu si apriva senza nemmeno il SUO account — cioe' senza
+    #     niente fra cui passare — e al primo «aggiungi» quella
+    #     sessione spariva dal mazzo. ---
+    ieri = amb["crea_sessione"](11)          # com'era prima: solo la sessione
+    prova("la sessione di ieri viene ADOTTATA", [11],
+          [c["tg_id"] for c in amb["portachiavi_adottato"]("", ieri)])
+    rAltro = Resp()
+    amb["apri_sessione"](rAltro, 22, "")      # un mazzo che ha gia' 22
+    prova("...e va in TESTA, che e' la piu' vecchia", [11, 22],
+          [c["tg_id"] for c in amb["portachiavi_adottato"](
+              rAltro.cookie["barattolo_portachiavi"], ieri)])
+    prova("una sessione gia' nel mazzo non si raddoppia", 1,
+          len(amb["portachiavi_adottato"](ieri, ieri)))
+    prova("una sessione inventata non entra nel mazzo", [],
+          amb["portachiavi_adottato"]("", "nonesisto"))
+    # E il caso VERO per intero: chi era dentro da ieri aggiunge un
+    # account e deve restare con DUE, non con quello nuovo soltanto.
+    rA = Resp()
+    amb["apri_sessione"](rA, 22, "", ieri)
+    prova("chi era dentro da ieri, aggiungendo, resta con DUE", [11, 22],
+          [c["tg_id"] for c in
+           amb["portachiavi_conti"](rA.cookie["barattolo_portachiavi"])])
+
+    # ...e la porta che il menu apre deve ADOTTARE, non solo leggere:
+    # e' la riga che in produzione apriva il menu VUOTO, e senza
+    # questa sentinella la mutazione che la rimette come ieri non fa
+    # diventare rossa nessuna prova (l'ha detto la tortura).
+    apre = codice(pezzo("sessioni_aperte"))
+    prova("il menu ADOTTA la sessione di ieri", True,
+          "portachiavi_adottato(" in apre)
+    prova("...e non torna a leggere il solo mazzo", False,
+          "portachiavi_conti(barattolo_portachiavi)" in apre)
+    # Le porte del login devono passarle la sessione, o chi entra da
+    # una di loro perde il PROPRIO account dal mazzo. Si CONTANO le
+    # chiamate invece di cercare la parola: `login_nostr` ha DUE rami
+    # (chi rientra con una chiave collegata e il nativo nuovo), e con
+    # la sola parola quella che la dimentica resta invisibile, perche'
+    # la parola la porta comunque l'altra (l'ha detto la tortura).
+    for porta, quante in (("login_telegram", 1), ("login_nostr", 2),
+                          ("login_nostr_collega", 1)):
+        corpo = codice(pezzo(porta))
+        prova(f"{porta}: {quante} apri_sessione, tutte con la sessione",
+              (quante, quante),
+              (corpo.count("apri_sessione("),
+               corpo.count("barattolo_sessione)")))
 
     # --- una sessione scaduta sparisce da sola: la fonte e' il DB ---
     con.execute("UPDATE sessioni SET scade=1 WHERE tg_id=33")
