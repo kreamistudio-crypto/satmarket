@@ -2177,34 +2177,53 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invece resta a tutte (porta altrove come il tasto della barra, e non
   e' un link: l'URL non si tocca). L'haptic lo da' la strada che si
   prende — `vaiP2P` ha il suo, e batterlo due volte si sente.
-  SPARISCE A CHI HA GIA' VOTATO, ed e' la meta' che regge tutto: fa il
-  suo mestiere e si toglie di mezzo quando l'ha fatto, invece di
+  RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO (ago 2026, decisione di
+  Andrea che ROVESCIA la sparizione della nascita: «la sezione P2P va
+  tenuta in vista»). IL PERCHE' DI ALLORA VA TENUTO perche' era buono:
+  la card faceva il suo mestiere e si toglieva di mezzo, invece di
   ripetere un invito gia' accolto (il patto degli hint contestuali,
-  «sparisce da solo quando smette di essere vero»). Ed e' cio' che
-  RESTITUISCE alla sezione la possibilita' di sparire: una card FISSA
-  gliel'avrebbe tolta per sempre, e quel `display:none` e' la
-  proprieta' piu' forte del blocco — nei giorni senza occasioni costa
-  zero. C'e' la prova che gira: votato e senza occasioni, la sezione
-  e' ancora spenta.
-  ...MA SOLO QUANDO SI SA (`interessiNoti`), ed e' la riga che
-  leggendo non si vede: prima di /api/me `interessiMiei` e' vuoto
-  tanto per chi non ha votato quanto per chi non gliel'abbiamo ancora
-  chiesto, e senza quel flag la card comparirebbe e sparirebbe ~300 ms
-  dopo a chi il voto l'ha gia' dato — la lezione del seme della demo
-  nelle pillole, sulla stessa striscia. Il flag si alza nei QUATTRO
-  punti in cui la risposta diventa nota (/api/me, la vetrina anonima e
-  i due rami DEMO, dove nessuno ha votato PER COSTRUZIONE), e nel ramo
-  autenticato sta ACCANTO alla lista e PRIMA del `loadListings` che
-  disegna la sezione: piu' in la' sarebbe lo stesso lampo, spostato.
-  E DOPO IL VOTO LA CARD SE NE VA DA SOLA: `renderScoprire` in coda a
-  `toggleInteresse` — i chiamanti salgono a CINQUE — perche' da li' in
-  poi nessun altro giro ripassa da `renderChips` (chi torna in Esplora
-  col gesto indietro non rifa' le pillole), e resterebbe a schermo un
-  invito gia' accolto.
+  «sparisce da solo quando smette di essere vero»), ed era anche cio'
+  che RESTITUIVA alla sezione la possibilita' di sparire.
+  IL PERCHE' CHE LO SUPERA E' CHE QUESTA CARD NON CHIEDE NIENTE, ed e'
+  la riga che risponde alla domanda «e allora cosa mostra a chi ha gia'
+  votato?»: il suo titolo dice il NOME della sezione — «P2P» — e mai
+  «Avvisami», quindi a chi ha votato non ripete nessun invito. La
+  parola che invita vive DENTRO la pagina, dove il bottone diventa
+  «✓ Ti avviseremo» da solo, e la pagina ha il CONTEGGIO, che dopo il
+  voto e' proprio la cosa che chi aspetta torna a guardare.
+  A CHI HA VOTATO NON SI MOSTRA NIENTE DI DIVERSO, e non e' una
+  rinuncia: e' MISURATO. Il titolo e' l'unico posto dove questa card
+  parla, e li' non entra un carattere di piu' — la fascia del
+  contrasto finisce a 282 sui 318 dove comincia la scia dorata, quindi
+  il capolinea sono i TRE caratteri di «P2P»: il quarto porta la
+  fascia a 342 e la CI diventa rossa, e «✓ Ti avviseremo» va a capo in
+  una scatola da 96px e arriva a 390. E l'ARIA-LABEL resta il NOME per
+  la ragione per cui lo e' a schermo: il nome di un comando che cambia
+  con uno stato invisibile a tutti gli altri non e' piu' un nome.
+  IL PREZZO E' DICHIARATO, e sono due. La sezione «Da scoprire» NON
+  PUO' PIU' SPARIRE: quel `display:none` era la proprieta' piu' forte
+  del blocco — nei giorni senza occasioni costava zero, adesso costa i
+  suoi 166px — e la prova che lo diceva ha CAMBIATO LATO. E la spinta
+  al P2P, che era temporanea perche' la card si toglieva da sola,
+  adesso e' PERMANENTE.
+  E `interessiNoti` NON ESISTE PIU': esisteva per il solo lampo di
+  questa card (senza, comparendo e sparendo ~300 ms dopo a chi aveva
+  gia' votato), e da quando la card non dipende dal voto era uno stato
+  scritto in quattro posti e letto da NESSUNO, con un commento che
+  avrebbe raccontato una card che non c'e' piu'. Il suo nome non si
+  scrive nemmeno nella lapide del catalogo — c'e' la prova che ne
+  conta ZERO, ed e' il precedente dello spaziatore della nav.
+  E IL VOTO NON RIDISEGNA PIU' LA FILA: `renderScoprire` in coda a
+  `toggleInteresse` era il QUINTO chiamante e serviva perche' la card
+  spariva; adesso il suo `vivo` quella lista non la legge, e la firma
+  non cambierebbe comunque. I chiamanti tornano QUATTRO, e la prova
+  chiede che il voto NON sia uno di loro — che e' l'affermazione piu'
+  forte delle due.
   IN TESTA E NON IN CODA (decisione di Andrea, col costo ACCETTATO e
   misurato): a 320px si vede una card quasi piena piu' uno spicchio,
   quindi chi non scorre non vede piu' le offerte a tempo. La spinta
-  dura poco proprio perche' la card si toglie da sola.
+  era un costo temporaneo finche' la card si toglieva da sola; da
+  quando resta e' permanente, ed e' stato accettato sapendolo.
   IL PREZZO SULLA MISURA E' DICHIARATO, e va ricordato il giorno che
   si leggeranno i numeri (decisione di Andrea): dando la card al P2P e
   non alle Aste, il DUELLO fra i due like non vale piu' — il P2P vince
@@ -25677,6 +25696,42 @@ DA GUARDARE al primo giro: il primo annuncio vero di piano condiviso, e
 il registro `moderazione_log` — se i «credenziali» cominciano a
 comparire fra i dubbi invece che fra i rifiuti, il declassamento
 accorciato sta funzionando.
+
+La card P2P resta in vista (ago 2026, decisione di Andrea): «Da
+scoprire» non toglie piu' la card a chi ha gia' premuto «Avvisami».
+LA DOMANDA CHE ANDREA HA FATTO — «cosa mostra a chi ha gia' votato?
+non puo' dire ancora Avvisami» — HA UNA RISPOSTA CHE ROVESCIA LA
+PREMESSA, ed e' la parte da tenere: la card «Avvisami» non l'ha mai
+detto. Mostra il disegno e il titolo «P2P», cioe' il NOME della
+sezione, e l'aria-label dice lo stesso; l'invito vive DENTRO la
+pagina, dove il bottone diventa «✓ Ti avviseremo» da solo. Quindi a
+chi ha votato non si mostra niente di diverso, e non c'era nessun
+invito da correggere.
+E LA PROPOSTA «✓ Ti avviseremo» SUL TITOLO NON ENTRA, ed e' MISURATO
+e non un'opinione: la fascia del contrasto finisce a 282 sui 318 dove
+comincia la scia dorata, quindi il capolinea sono i TRE caratteri di
+«P2P» — il quarto porta la fascia a 342 e la CI diventa rossa, quella
+frase va a capo in una scatola da 96px e arriva a 390. Vedi
+Architettura, «RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO», per i due
+prezzi dichiarati (la sezione che non puo' piu' sparire e la spinta al
+P2P che diventa permanente) e per `interessiNoti`, che se n'e' andato
+col lampo che era nato a curare.
+Collaudata: **6972 prove verdi sull'albero ISOLATO** (HEAD piu' i soli
+hunk di questo cantiere: la copia di lavoro e' condivisa con altre due
+sessioni — e' il DELTA il numero difendibile, −3 sulle 6975 di HEAD,
+che il cantiere TOGLIE uno stato e i suoi casi), con la sentinella
+della sparizione e i due casi del banco che CAMBIANO LATO col perche'
+scritto, e **5 MUTAZIONI, 5 uccise** — la sparizione rimessa, il voto
+che torna a ridisegnare la fila, il flag che rinasce, la card che
+sparisce col barattolo, il tocco che smette di navigare. La prova che
+conta e' quella che GIRA: `interessiMiei` si muove sul catalogo VERO e
+la fila deve restare la stessa — una sentinella sulla forma non puo'
+dirlo, perche' il catalogo quella lista non la nomina piu'.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client. DA GUARDARE al primo giro:
+che la sezione «Da scoprire» sia in vista anche nei giorni senza
+occasioni, e la crescita ASSOLUTA dei like sul P2P, che da oggi non
+si ferma piu' col voto.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
