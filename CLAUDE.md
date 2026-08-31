@@ -11338,6 +11338,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   **5**, lo stesso numero della lampo e per la stessa ragione
   (decisione di Andrea): «uno sconto dell'1% è un rumore, non
   un'offerta» — solo che qui non dura sei ore, sta in vetrina.
+  ⚠️ IL PAVIMENTO DEI CODICI È SCESO A **1** (ago 2026), e la coppia
+  non è più pari: quel «sta in vetrina» era l'argomento, e su un
+  codice è FALSO — un buono mirato non lo legge nessuno che non
+  l'abbia ricevuto. Vedi «LA PERCENTUALE È LIBERA»: il consiglio di
+  tenerli pari, qui sotto, è stato SPESO.
   ⚠️ IL PAVIMENTO NON TOCCA LO SPEGNIMENTO, ed e' la riga da non
   ammorbidire: `percento <= 0` e' un ramo suo che arriva PRIMA e non ha
   guardie (il patto del rientro dalle ferie). Scritto come un
@@ -12339,9 +12344,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il tetto, e sposta il FONDO della cascata lampo+sconto che una prova
   dichiara ad alta voce), più una terza: codice e sconto carrello sono
   LO STESSO MESTIERE, e due sconti sulla stessa cosa vogliono due righe
-  che chi legge deve sommare da sé. 2) Un codice fa **solo una
-  percentuale sugli articoli** — mai la spedizione, mai una cifra
-  fissa. 3) I limiti sono DUE, scadenza e tetto totale di usi;
+  che chi legge deve sommare da sé. 2) Un codice sconta **solo gli
+  articoli** — mai la spedizione — e alla nascita solo in percentuale
+  (⚠️ ROVESCIATA dall'ago 2026: la cifra fissa c'è, vedi «LA
+  PERCENTUALE È LIBERA, E LA CIFRA FISSA È UN TIPO»). 3) I limiti sono
+  DUE, scadenza e tetto totale di usi;
   **niente «una volta per persona»**, e l'imperfezione va dichiarata:
   chi ha il codice può consumarne il tetto da solo.
   È «VINCE IL MAGGIORE» A TENERE PICCOLO IL CANTIERE, ed è la cosa da
@@ -12488,10 +12495,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `CODICI_SCONTO_DURATE_GIORNI`) vanno a mano nel censimento di
   `prove.py`: chi le dimentica non vede una prova rossa, vede **la
   suite che ESPLODE** (`TypeError: 'int' object is not iterable` —
-  verificato togliendo la riga). E `CODICI_SCONTO_MAX_PERCENTO` va
-  tenuto PARI a `SCONTO_PACCO_MAX_PERCENTO`: con «vince il maggiore»
-  il tetto della cascata è il max dei due, e alzare solo questo sposta
-  il FONDO dichiarato.
+  verificato togliendo la riga). ⚠️ E `CODICI_SCONTO_MAX_PERCENTO`
+  NON è più pari a `SCONTO_PACCO_MAX_PERCENTO` (ago 2026: 100 contro
+  30) — la riga che stava qui diceva di tenerli pari «perché con
+  "vince il maggiore" il tetto della cascata è il max dei due», ed è
+  vera a metà: il max SI SPOSTA, ma il FONDO dichiarato è del
+  CARRELLO, cioè della promessa pubblica, e non si muove di un
+  centesimo. Vedi «LA PERCENTUALE È LIBERA» per il perché per esteso.
   Provato con 52 prove nuove in `prove.py` (3989 verdi) e 44 in
   `collaudo_conto.py` (99 verdi): la PROVA REGINA col codice su mono e
   set, «vince il maggiore» nei tre casi col pari merito che non brucia
@@ -12506,6 +12516,120 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   arriva solo il NOME, mai una cifra»: la vecchia restava verde PER
   FORTUNA, perché `d.get("codice_sconto"` non contiene
   `d.get("sconto`, e una prova che passa per caso non prova niente.
+  LA PERCENTUALE È LIBERA, E LA CIFRA FISSA È UN TIPO (ago 2026,
+  decisione di Andrea: «devo poter decidere arbitrariamente quando
+  scontare, anche 100% se voglio, oppure ancora meglio a valore»). Due
+  cose in un giro, e la prima è una LEVA: `CODICI_SCONTO_MAX_PERCENTO`
+  passa da 30 a **100** e `CODICI_SCONTO_MIN_PERCENTO` da 5 a **1**.
+  LE DUE LEVE SI SLEGANO DALLO SCONTO CARRELLO, ed è la riga da capire
+  prima di rimetterle pari «per coerenza»: quella è una promessa
+  PUBBLICA scritta in vetrina — dove un 1% è rumore e un 100% sarebbe
+  un negozio che si regala — questo è un SEGRETO che il venditore dà a
+  chi vuole, dove «−100% al primo cliente» e «−1% simbolico» sono
+  gesti legittimi che nessun estraneo legge. È la stessa distinzione
+  che governa metà della voce sopra, applicata ai numeri.
+  IL FONDO DELLA CASCATA NON SI MUOVE, ed è il conto che rende
+  gratuito l'allargamento: fra codice e regola vince il MAGGIORE, e un
+  `max()` non è una somma — quindi il 21% del listino (lampo 70% +
+  carrello 30%) resta esattamente dov'era. A cambiare è solo quanto
+  può togliere il ramo che vince da solo, ed è precisamente la cosa
+  che si voleva. C'è la prova che le due coppie di leve siano DIVERSE:
+  rimetterle pari fa rossa una riga, invece di passare in silenzio.
+  IL TIPO È UNA COLONNA E NON UN VALORE IN PIÙ, col patto di
+  `sconto_pacco_criterio`: `codici_sconto.tipo` ('percento' | 'valore')
+  più `valore_sats`, `valore_eur` e `valore_valuta` — quattro colonne
+  additive, e **il DEFAULT È la migrazione**: `tipo` nasce 'percento',
+  quindi ogni codice di ieri resta identico byte per byte senza uno
+  script. `_tipo_codice` è il giudice, e la sua regola è quella di
+  casa: la colonna VUOTA vale 'percento' (è letteralmente il mondo di
+  ieri), un tipo SCRITTO e fuori catalogo SPEGNE — fail-closed come
+  `importo_invoice`, che una riga scritta a mano o il rollback da un
+  tipo futuro non devono poter far scontare a caso.
+  LA VALUTA LA SCEGLIE IL VENDITORE, il patto delle soglie a valore, e
+  le due colonne si CONSERVANO a vicenda col COALESCE: chi prova in
+  euro e torna ai sats ritrova la sua cifra.
+  L'ATTERRAGGIO NON CAMBIA, ed è ciò che ha tenuto piccolo il
+  cantiere: lo sconto finisce in `ordini.sconto_sats`, la colonna di
+  sempre — «vince il maggiore» vuol dire che una somma non esiste,
+  quindi UNA colonna basta — e la divisione a ritroso dell'unitario
+  (`_righe_ordine`, la ripresa, la riga del client) non cambia di un
+  carattere, `prove_divisione_a_ritroso` compresa.
+  LA PERCENTUALE IN RICEVUTA È ZERO SU UNA CIFRA FISSA, E NON SI
+  DEDUCE: dedurla da sconto/articolo direbbe 19,99% — la regola già
+  scritta per `sconto_percento`, che è la fotografia della REGOLA e
+  non della cifra. Da lì la conseguenza che il libro mastro ha dovuto
+  imparare, ed è la terza volta in quel catalogo: **«sconto e
+  percentuale scordati» era un bicondizionale**, e col codice a valore
+  «sconto senza percentuale» è diventato lo stato NORMALE — tenendolo
+  secco avrebbe suonato su ogni buono da 10 € speso, cioè l'allarme
+  che suona sul normale. Adesso vale in un verso solo, e a distinguere
+  è `codice_sconto_id`, che dice già che a scontare è stato un CODICE:
+  nessuna colonna nuova. Più il braccio nuovo «un tipo che nessuno sa
+  leggere», che è il gemello di quello del criterio.
+  SI LIMA AL CARRELLO E MAI GRATIS: «−50 €» su un carrello da 20 €
+  toglie il carrello meno un sat, e non si RIFIUTA — chi ha ricevuto
+  quel buono l'ha ricevuto per spendere meno, e un codice che dice di
+  no perché è TROPPO generoso è il genere di no che nessuno sa
+  spiegare. Il `- 1` è lo stesso della lampo e della gemella a
+  percentuale: una invoice da zero non si emette, e il fondo è un sat
+  per costruzione invece che per una guardia da ricordare — quindi
+  anche il 100% lascia un sat di articoli, e lo dice il collaudo.
+  ⚠️ `_sconto_valore` STA NEL BLOCCO PURO e confronta la valuta
+  LETTERALMENTE, esattamente come `_sconto_pacco`: `_valuta_soglia`
+  guarda le LEVE e vive fuori di lì, quindi chiamarla porterebbe il
+  config dentro l'aritmetica e le prove in CI girerebbero un'altra
+  cosa. La sua docstring la NOMINA apposta per dire che non la chiama,
+  quindi la sentinella passa da `_senza_prosa` — la trappola della
+  prosa, per l'ennesima volta.
+  A CAMBIO MUTO UN CODICE IN EURO NON SCATTA, e vale ZERO: la regola
+  già scritta per la soglia a valore, che qui pesa di più perché non
+  si sta MISURANDO una soglia ma SOTTRAENDO dei sats veri. Uno in
+  SATS scatta anche con CoinGecko giù — il guadagno dichiarato di
+  quella valuta.
+  IL BUG CHE HA TROVATO IL COLLAUDO, e non la rilettura, è la parte
+  che vale più della funzione: il cambio si prendeva solo quando lo
+  chiedeva una promessa del NEGOZIO (`_sconto_vuole_cambio`, o la
+  spedizione gratis in euro), **e un codice non è una promessa del
+  negozio** — quindi ogni buono in EURO scontava ZERO, in silenzio.
+  Falliva su UNA STRADA SOLA (i codici in sats funzionavano), che è il
+  modo più silenzioso di fallire, e nessuna delle 7000 sentinelle
+  poteva vederlo: il conto era coerente con sé stesso. Da lì
+  `_codice_vuole_cambio` — puro, che risponde «sì» solo su
+  valore+euro — cablato in tutti e quattro i percorsi del conto, col
+  CENSIMENTO che ne conta quattro: il quinto di domani deve venire a
+  leggere questa riga, o il suo preventivo direbbe una cifra e la
+  fattura un'altra.
+  ⚠️ E IL RICONTROLLO PRIMA DELL'INSERT confronta una TUPLA: da quando
+  `_codice_sconto` torna `(sats, percento)`, il vecchio `[0] <= 0`
+  sarebbe un TypeError DENTRO il blocco che sta per scrivere
+  l'ordine — si scrive `not …[0]`, e c'è la mutazione che lo dice.
+  NEL CLIENT LA CIFRA HA UN GIUDICE SOLO (`cifraCodice`): «−10%» e
+  «−10 €» si scrivono con lo stesso numero, e a distinguerli è solo il
+  TIPO — quindi le sentinelle dicono che esiste ed è uno, e a dire che
+  risponde giusto è il banco node che lo fa GIRARE. Il campo libero
+  della cifra è `campoValLibero` e **non riusa** `campoPctLibera`: è
+  lo stesso divieto che quella coppia ha già verso
+  `campoSogliaLibera` — un numero non passa dal percorso di un'altra
+  scala — col verso rovesciato, e c'è la prova.
+  ⚠️ E LE PILLOLE PASSANO DAL `data-v`: da quando quei campi portano
+  anche STRINGHE ('percento', 'sats'), interpolarle nude nell'onclick
+  le renderebbe IDENTIFICATORI — un ReferenceError al primo tocco.
+  LE DUE LEVE-LISTA NUOVE (`CODICI_SCONTO_VALORI_EUR`,
+  `CODICI_SCONTO_VALORI_SATS`) vanno a mano nel censimento di
+  `prove.py` come le sorelle, o la suite ESPLODE invece di diventare
+  rossa. I due TETTI del valore (`CODICI_SCONTO_MAX_VALORE_EUR`,
+  `_SATS`) si applicano ognuno NELLA SUA UNITÀ: limare una cifra col
+  numero di un'altra scala sarebbe peggio che non limarla.
+  PROVATO CON 21 MUTAZIONI, 21 uccise — e il primo giro ne lasciava
+  vive DIECI, che è la parte da ricordare: NOVE erano buchi veri delle
+  mie sentinelle (la leva letta dall'AMBIENTE della prova invece che
+  dal sorgente, quindi un tetto rimesso a 30 restava verde; il
+  valore-zero provato nel solo ramo euro; `_codice_vuole_cambio` che
+  non guardava nessuno; l'ordine SANO che spende un codice a valore,
+  che mancava al libro mastro — la riga in `codici_sconto` da sola non
+  bastava; le due della whitelist dell'endpoint; il banco che fa
+  girare la cifra) e UNA era una mutazione INERTE (`None or 0` dà lo
+  stesso 0 del ramo che toglie).
 
   LE PROMESSE DIVENTANO BADGE (ago 2026, decisione di Andrea): le due
   righe di prosa grigia passano a PILLOLE su tre superfici — scheda
@@ -26361,6 +26485,43 @@ nessuna rotta, nessuna leva nuova — e se `ONION_HOST` sul VPS è vuoto
 il cassetto semplicemente non compare. DA GUARDARE dal VPS, ed è il
 pezzo che da qui non si può fare: l'indirizzo vero sul dominio `.onion`
 col Tor Browser, che la fascia 🧅 e il cassetto dicano la stessa cosa.
+
+I buoni sconto scontano quanto vuoi, e anche a cifra fissa (ago 2026,
+decisione di Andrea: «devo poter decidere arbitrariamente quando
+scontare, anche 100% se voglio, oppure ancora meglio a valore»). Due
+cose in un giro: il tetto della percentuale passa da 30 a **100** e il
+pavimento da 5 a **1** — le due leve si slegano da quelle dello sconto
+carrello, che è una promessa PUBBLICA mentre un codice è un segreto
+mirato — e nasce il secondo TIPO di codice, la cifra fissa: «−10 €» o
+«−5.000 sats». Vedi Architettura, «LA PERCENTUALE È LIBERA, E LA CIFRA
+FISSA È UN TIPO», per il FONDO della cascata che non si muove (fra
+codice e regola vince il maggiore, e un `max()` non è una somma), per
+il DEFAULT che È la migrazione, e per la percentuale in ricevuta che
+su una cifra fissa è ZERO e non si deduce — con la conseguenza che il
+libro mastro ha dovuto imparare.
+IL BUG CHE HA TROVATO IL COLLAUDO E NON LA RILETTURA, ed è la parte
+che vale più della funzione: il cambio si prendeva solo quando lo
+chiedeva una promessa del NEGOZIO, e un codice non è una promessa del
+negozio — quindi **ogni buono in EURO scontava ZERO**, in silenzio e
+su una strada sola (in sats funzionava). Nessuna sentinella poteva
+vederlo: il conto era coerente con sé stesso.
+Collaudato: **7023 prove verdi** (le nuove: i due giudici girati sui
+loro casi, il banco node della cifra, l'ordine SANO del libro mastro
+che spende un codice a valore) più `collaudo_conto.py` a **136 verdi**
+(era 99: la PROVA REGINA — preventivo == compra al sat con la bolt11
+confrontata — sui due tipi, il 100% che lascia un sat, il buono più
+grande del carrello, la divisione a ritroso esatta, e la ronda che
+tace) e **21 MUTAZIONI, 21 uccise**. Il primo giro ne lasciava vive
+DIECI: nove buchi veri delle mie sentinelle e una mutazione inerte —
+l'elenco sta nella voce, perché è il genere di cecità che ritorna.
+IN PRODUZIONE basta il deploy: quattro colonne additive che nascono
+coi loro default (nessun codice esistente cambia), nessuna migrazione
+di dati, nessuna rotta nuova, e le leve hanno il default nel codice.
+⚠️ Se il config del VPS ha righe esplicite `CODICI_SCONTO_MAX_PERCENTO`
+o `CODICI_SCONTO_MIN_PERCENTO`, vincono sul default e il tetto nuovo
+non entra in vigore: si guarda PRIMA del deploy, come per
+`MAX_PREFERITI`. DA GUARDARE al primo giro: il primo buono a cifra
+fissa speso dentro Telegram, con la bolt11 confrontata su LNbits.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
