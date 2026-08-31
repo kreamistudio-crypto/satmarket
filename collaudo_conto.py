@@ -174,15 +174,24 @@ def semina(criterio, soglia, valore_eur, pct, prezzo=30_000, quantita=9,
 
 
 def semina_codice(codice="SATOSHI10", pct=20, giorni=0, usi_max=0,
-                  attivo=1, di_chi=222):
-    """Un codice sconto in tabella. Torna il suo id."""
+                  attivo=1, di_chi=222, tipo="percento", val_sats=0,
+                  val_eur=0, valuta="eur"):
+    """Un codice sconto in tabella. Torna il suo id.
+
+    Dall'ago 2026 semina anche il tipo a CIFRA FISSA: i default lo
+    lasciano 'percento', quindi ogni chiamata di ieri semina lo stesso
+    codice di ieri — e' la regressione a costo zero, e se il tipo nuovo
+    avesse spostato di un sat il mondo di prima le prove della sezione
+    [6] diventerebbero rosse tutte insieme."""
     con = SRV.db()
     con.execute("DELETE FROM codici_sconto")
     scad = (int(time.time()) + giorni * 86400) if giorni else 0
     cur = con.execute(
         "INSERT INTO codici_sconto(venditore_id,codice,percento,scadenza,"
-        "usi_max,attivo,creato) VALUES(?,?,?,?,?,?,?)",
-        (di_chi, codice, pct, scad, usi_max, attivo, int(time.time())))
+        "usi_max,attivo,creato,tipo,valore_sats,valore_eur,valore_valuta) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        (di_chi, codice, pct, scad, usi_max, attivo, int(time.time()),
+         tipo, val_sats, val_eur, valuta))
     con.commit()
     cid = cur.lastrowid
     con.close()
@@ -504,6 +513,129 @@ def prove_codice_sconto():
 
 
 
+def prove_codice_valore():
+    """IL CODICE A CIFRA FISSA (ago 2026): «−10 €» invece di «−10%».
+
+    `prove.py` gira i giudici e dice che l'aritmetica e' giusta; quel
+    che non puo' fare e' far nascere un ORDINE — e le due cose che
+    contano si vedono solo qui: che la bolt11 chieda esattamente quel
+    che la pagina ha promesso, e che un codice a valore consumi un uso
+    come il fratello a percentuale.
+    LE QUATTRO DOMANDE le fa `confronta`, che di tipi non sa niente:
+    e' precisamente il motivo per cui il tipo nuovo si innesta qui
+    senza un ambiente suo."""
+    print("\n[7] IL CODICE A CIFRA FISSA")
+
+    # ---- 1. IL GIRO VERO, in euro. MILLE SATS = UN EURO, quindi
+    # «−10 €» su un carrello da 30.000 sats deve togliere 10.000.
+    a, _ = semina("pezzi", 99, 0, 0, prezzo=30_000)   # regola irraggiungibile
+    cid = semina_codice("REGALO10", 0, tipo="valore", val_eur=10,
+                        valuta="eur")
+    p = confronta("codice −10 €", {"annuncio_id": a, "quantita": 1,
+                                   "codice_sconto": "REGALO10"})
+    prova("...toglie 10.000 sats (mille sats = un euro)", 10_000,
+          p["sconto_sats"])
+    # LA PERCENTUALE E' ZERO, e non «dedotta»: quel codice una
+    # percentuale non ce l'ha, e inventargliela direbbe 33,33%.
+    prova("...e la percentuale in ricevuta e' ZERO, non dedotta", 0,
+          p["sconto_percento"])
+    prova("...ma lo sconto e' dichiarato applicato", "applicato",
+          p["codice_sconto"]["stato"])
+    prova("...e l'origine dice che ha vinto il codice", "codice",
+          p["sconto_origine"])
+    prova("...e ha consumato il suo uso", 1, usi_di(cid))
+
+    # ---- 2. IN SATS, senza mai guardare il cambio ------------------
+    a2, _ = semina("pezzi", 99, 0, 0, prezzo=30_000)
+    semina_codice("SATFISSI", 0, tipo="valore", val_sats=7_000,
+                  valuta="sats")
+    p2 = confronta("codice −7.000 sats", {"annuncio_id": a2, "quantita": 1,
+                                          "codice_sconto": "SATFISSI"})
+    prova("...toglie esattamente 7.000 sats", 7_000, p2["sconto_sats"])
+
+    # ---- 3. VINCE IL MAGGIORE, coi due tipi a confronto -----------
+    # ⚠️ LA SOGLIA A PEZZI E' 2 E LA QUANTITA' PURE, o la regola non
+    # scatterebbe affatto (_sconto_pacco ha `minimo = 2` a criterio
+    # pezzi) e il confronto proverebbe il codice contro il NULLA — cioe'
+    # passerebbe per la ragione sbagliata. L'ha detto il collaudo al
+    # primo giro, non la rilettura.
+    # Articolo 2 x 30.000 = 60.000; la regola -10% ne toglie 6.000.
+    a3, _ = semina("pezzi", 2, 0, 10, prezzo=30_000)
+    semina_codice("GROSSO", 0, tipo="valore", val_eur=10, valuta="eur")
+    p3 = confronta("il valore batte la regola", {"annuncio_id": a3,
+                                                 "quantita": 2,
+                                                 "codice_sconto": "GROSSO"})
+    prova("...vince il codice (10.000 contro 6.000)", 10_000,
+          p3["sconto_sats"])
+    # ...e al contrario: un codice da 1 € perde contro il -10%
+    a4, _ = semina("pezzi", 2, 0, 10, prezzo=30_000)
+    cid4 = semina_codice("PICCOLO", 0, tipo="valore", val_eur=1,
+                         valuta="eur")
+    p4 = confronta("...e perde quando toglie di meno",
+                   {"annuncio_id": a4, "quantita": 2,
+                    "codice_sconto": "PICCOLO"})
+    prova("...vince la regola del negozio (6.000)", 6_000,
+          p4["sconto_sats"])
+    prova("...e la ricevuta dice la percentuale DEL VINCITORE", 10,
+          p4["sconto_percento"])
+    # LA REGOLA DERIVATA, e si prova in una riga: un uso non si brucia
+    # per dare quel che era gia' dato.
+    prova("...e l'uso NON si e' bruciato", 0, usi_di(cid4))
+
+    # ---- 4. SI LIMA AL CARRELLO, MAI GRATIS -----------------------
+    # un buono da 50 € su un carrello da 20.000 sats (= 20 €)
+    a5, _ = semina("pezzi", 99, 0, 0, prezzo=20_000)
+    semina_codice("ENORME", 0, tipo="valore", val_eur=50, valuta="eur")
+    p5 = confronta("un buono piu' grande del carrello",
+                   {"annuncio_id": a5, "quantita": 1,
+                    "codice_sconto": "ENORME"})
+    prova("...si lima al carrello meno un sat", 19_999, p5["sconto_sats"])
+    art = next(s for s in p5["strade"] if s["via"] == "ritiro")
+    prova("...e chi compra paga comunque qualcosa", True,
+          art["totale_sats"] >= 1)
+
+    # ---- 5. IL 100%, che e' il tetto nuovo e non vuol dire gratis --
+    a6, _ = semina("pezzi", 99, 0, 0, prezzo=30_000)
+    semina_codice("TUTTO", 100)
+    p6 = confronta("un codice al 100%", {"annuncio_id": a6, "quantita": 1,
+                                         "codice_sconto": "TUTTO"})
+    prova("...lascia UN SAT di articoli", 29_999, p6["sconto_sats"])
+    prova("...e la ricevuta dice 100%", 100, p6["sconto_percento"])
+
+    # ---- 6. I RIFIUTI, che restano quelli di sempre ---------------
+    a7, _ = semina("pezzi", 99, 0, 0, prezzo=30_000)
+    semina_codice("MORTO", 0, tipo="valore", val_eur=10, valuta="eur",
+                  attivo=0)
+    p7 = chiama(SRV.preventivo_ordine, {"annuncio_id": a7, "quantita": 1,
+                                        "codice_sconto": "MORTO"})
+    prova("un codice a valore in pausa e' rifiutato", "rifiutato",
+          p7["codice_sconto"]["stato"])
+    prova("...e il conto resta PIENO", 0, p7["sconto_sats"])
+    # LA CIFRA A ZERO: il codice esiste, ma non sconta niente — ed e'
+    # esattamente lo stato che il libro mastro chiama «non puo'
+    # scattare». Alla cassa deve rispondere come un codice che non c'e'.
+    semina_codice("VUOTO", 0, tipo="valore", val_eur=0, valuta="eur")
+    p8 = chiama(SRV.preventivo_ordine, {"annuncio_id": a7, "quantita": 1,
+                                        "codice_sconto": "VUOTO"})
+    prova("un codice a valore con la cifra a zero e' rifiutato",
+          "rifiutato", p8["codice_sconto"]["stato"])
+
+    # ---- 7. LA DIVISIONE A RITROSO regge anche col valore ---------
+    a9, _ = semina("pezzi", 99, 0, 0, prezzo=10_000)
+    semina_codice("TRE", 0, tipo="valore", val_eur=6, valuta="eur")
+    c9 = chiama(SRV.compra, {"annuncio_id": a9, "quantita": 3,
+                             "consegna": "ritiro", "codice_sconto": "TRE"})
+    con = SRV.db()
+    o9 = con.execute("SELECT * FROM ordini WHERE id=?",
+                     (c9["ordine_id"],)).fetchone()
+    con.close()
+    lordo9 = (o9["prezzo_sats"] - o9["spedizione_sats"]
+              - o9["protezione_sats"] + o9["sconto_sats"])
+    prova("la divisione a ritroso resta ESATTA col codice a valore",
+          0, lordo9 % 3)
+    prova("...e l'unitario e' quello di sempre", 10_000, lordo9 // 3)
+
+
 def prove_ronda():
     """La ronda del libro mastro LEGGE E BASTA, e su un database sano
     deve TACERE: un allarme che suona sul normale e' peggio di nessun
@@ -522,6 +654,7 @@ def main():
     prove_invito()
     prove_regressione()
     prove_codice_sconto()
+    prove_codice_valore()
     prove_ronda()
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

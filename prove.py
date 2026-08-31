@@ -12870,9 +12870,19 @@ def prove_sped_gratis():
     # devono restare pari o il fondo dichiarato si sposta; due
     # pavimenti diversi non compongono niente. Qui si chiede solo che
     # nessuno li scriva a mano nel codice.
-    for leva in ("SCONTO_PACCO_MIN_PERCENTO", "CODICI_SCONTO_MIN_PERCENTO"):
-        prova("%s nasce a 5 nel codice" % leva, True,
-              "    %s = 5" % leva in src)
+    # ⚠️ I DUE PAVIMENTI NON SONO PIU' PARI (ago 2026, decisione di
+    # Andrea: «devo poter decidere arbitrariamente quando scontare»).
+    # La riga qui sopra lo dichiarava gia' LECITO — «un pavimento non
+    # compone niente, dice solo se una promessa si puo' accendere» — e
+    # quel permesso e' stato usato: 5 resta per la promessa in VETRINA
+    # (dove uno sconto irrisorio e' un cartello che fa piu' danno che
+    # niente), 1 per il SEGRETO mirato, dove quanto valga il regalo lo
+    # sa solo chi lo fa. La prova segue i due numeri invece di
+    # chiederli uguali.
+    for leva, quanto in (("SCONTO_PACCO_MIN_PERCENTO", 5),
+                         ("CODICI_SCONTO_MIN_PERCENTO", 1)):
+        prova("%s nasce a %d nel codice" % (leva, quanto), True,
+              "    %s = %d" % (leva, quanto) in src)
         # ...e il pannello «⚙️ Stato delle leve» la conosce: e' la
         # pagina che esiste perche' nessuno debba ricordare a memoria
         # con che numeri gira il server, e una leva che non compare li'
@@ -15538,7 +15548,9 @@ def prove_libro_mastro():
           titolo TEXT DEFAULT '');
         CREATE TABLE codici_sconto(id INTEGER PRIMARY KEY, venditore_id INT,
           codice TEXT, percento INT, scadenza INT DEFAULT 0,
-          usi_max INT DEFAULT 0, attivo INT DEFAULT 1, creato INT DEFAULT 0);
+          usi_max INT DEFAULT 0, attivo INT DEFAULT 1, creato INT DEFAULT 0,
+          tipo TEXT DEFAULT 'percento', valore_sats INT DEFAULT 0,
+          valore_eur INT DEFAULT 0, valore_valuta TEXT DEFAULT 'eur');
         CREATE TABLE puntate(id INTEGER PRIMARY KEY, annuncio_id INT,
           tg_id INT, offerto_sats INT, versato_sats INT, proxy INT
           DEFAULT 0, stato TEXT);
@@ -15666,12 +15678,33 @@ def prove_libro_mastro():
         -- lo stato LEGITTIMO che il biconditionale farebbe suonare.
         INSERT INTO codici_sconto(id,venditore_id,codice,percento,attivo)
           VALUES(1, 222, 'SATOSHI10', 10, 1);
+        -- UN CODICE A VALORE SANO (ago 2026), e non e' un contorno: e'
+        -- l'unica riga che dimostra che i due bracci nuovi TACCIONO
+        -- sul normale. Senza, «codice che non puo' scattare» resterebbe
+        -- verde anche tornando a guardare `percento<=0` da solo — che
+        -- su un codice a cifra fissa e' zero per costruzione, cioe' il
+        -- falso allarme che quel cantiere esiste per non avere.
+        INSERT INTO codici_sconto(id,venditore_id,codice,percento,attivo,
+          tipo,valore_eur,valore_valuta)
+          VALUES(2, 222, 'REGALO10', 0, 1, 'valore', 10, 'eur');
         INSERT INTO ordini(id,annuncio_id,venditore_id,prezzo_sats,
           sconto_sats,sconto_percento,quantita,codice_sconto,codice_sconto_id)
           VALUES(7, 9, 222, 9000, 1000, 10, 1, 'SATOSHI10', 1);
         INSERT INTO ordini(id,annuncio_id,venditore_id,prezzo_sats,
           sconto_sats,sconto_percento,quantita,codice_sconto)
           VALUES(8, 9, 222, 8000, 2000, 20, 1, 'SATOSHI10');
+        -- ...E UN ORDINE CHE QUEL CODICE LO SPENDE DAVVERO (ago 2026):
+        -- sconto 10.000 e percentuale ZERO, che su una cifra fissa e'
+        -- lo stato normale — una percentuale quel codice non ce l'ha.
+        -- ⚠️ La riga in `codici_sconto` da sola NON bastava: senza un
+        -- ORDINE cosi', «sconto e percentuale scordati» resta verde
+        -- anche tornando al bicondizionale secco di ieri, che avrebbe
+        -- fatto suonare la ronda su ogni buono da 10 € speso. L'ha
+        -- detto la tortura, non la rilettura.
+        INSERT INTO ordini(id,annuncio_id,venditore_id,prezzo_sats,
+          sconto_sats,sconto_percento,quantita,codice_sconto,
+          codice_sconto_id)
+          VALUES(9, 9, 222, 20000, 10000, 0, 1, 'REGALO10', 2);
         -- UN NASCOSTO SANO: released, il compratore l'ha messo via —
         -- e' il caso LEGITTIMO, e non deve suonare
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,
@@ -15894,6 +15927,23 @@ def prove_libro_mastro():
         # un volantino in giro che non sconta mai, in silenzio
         ("UPDATE codici_sconto SET percento=0 WHERE id=1",
          "codice sconto che non puo' scattare", "1"),
+        # ...e il GEMELLO A VALORE (ago 2026): un codice a cifra fissa
+        # con la cifra a zero e' lo stesso volantino muto. Il caso si
+        # scrive col tipo E la valuta, o passerebbe per la ragione
+        # sbagliata — sul tipo 'valore' `percento` e' zero per
+        # costruzione, ed e' proprio lo stato normale che il braccio
+        # vecchio avrebbe fatto suonare.
+        ("UPDATE codici_sconto SET tipo='valore', valore_valuta='eur', "
+         "valore_eur=0 WHERE id=1",
+         "codice sconto che non puo' scattare", "1"),
+        # il tipo fuori catalogo: il giudice lo spegne in silenzio, e
+        # chi ha quel codice in mano non lo sapra' mai
+        ("UPDATE codici_sconto SET tipo='regalo' WHERE id=1",
+         "codice sconto con un tipo che nessuno sa leggere", "1"),
+        # ...e la valuta fuori catalogo, sull'altro braccio
+        ("UPDATE codici_sconto SET tipo='valore', valore_sats=500, "
+         "valore_valuta='btc' WHERE id=1",
+         "codice sconto con un tipo che nessuno sa leggere", "1"),
         # l'indirizzo di casa, nei suoi quattro modi. L'ULTIMO E'
         # QUELLO CHE CONTA: se la scopa ha timbrato la cancellazione
         # ma il testo e' ancora li', la promessa scritta nella pagina
@@ -16048,6 +16098,333 @@ def prove_divisione_a_ritroso():
     prova("copia 3 (client): +scontoSats nella divisione", True,
           nudo("(o.listing.price-(o.spedSats||0)-(o.protSats||0)"
                "+(o.scontoSats||0))/o.qta") in nudo(mini_vivo))
+
+
+# ====================================================================
+def prove_codice_a_valore():
+    """IL CODICE SCONTO A CIFRA FISSA (ago 2026): «−10 €» invece di
+    «−10%», e la percentuale che sale fino a 100. Le due meta' del
+    cantiere si provano qui GIRANDO i giudici — una sentinella direbbe
+    che i pezzi esistono, mai che rispondano giusto, ed e' precisamente
+    la classe di prova che questo repo ha smascherato sette volte."""
+    print("\n[il codice sconto a cifra fissa]")
+    src = open("server.py", encoding="utf-8").read()
+
+    # ---- L'AMBIENTE. Le leve stanno qui perche' _codice_vale le
+    # guarda: e' il giudice del DIRITTO e vive fuori dal blocco puro.
+    amb = {"CODICI_SCONTO_ATTIVI": True,
+           "CODICI_SCONTO_MAX_PERCENTO": 100,
+           "CODICI_SCONTO_MAX_VALORE_EUR": 10_000,
+           "CODICI_SCONTO_MAX_VALORE_SATS": 100_000_000,
+           "VALUTE_SOGLIA": ("eur", "sats")}
+    for f in ("_sped_in_sats", "_sconto_percento", "_sconto_valore",
+              "_valuta_soglia", "_tipo_codice", "_codice_vale",
+              "_sconto_codice", "_eur_interi", "_sconto_pacco",
+              "_sconto_regole", "_sconto_vincente",
+              "_codice_vuole_cambio"):
+        exec(pezzo(f), amb)
+    # MILLE SATS = UN EURO, come nelle prove del carrello: ogni cifra
+    # si legge a mente in tutt'e due le unita'.
+    CAMBIO = 100_000.0
+    val = amb["_sconto_valore"]
+    tipo, vale = amb["_tipo_codice"], amb["_codice_vale"]
+    scod, vinc = amb["_sconto_codice"], amb["_sconto_vincente"]
+
+    # ---- 1. IL TIPO, normalizzato ---------------------------------
+    prova("il vuoto vale 'percento': e' il mondo di ieri", "percento",
+          tipo(""))
+    prova("...e anche il None (colonna mai scritta)", "percento",
+          tipo(None))
+    prova("'valore' passa", "valore", tipo("valore"))
+    prova("maiuscole e spazi si normalizzano", "valore", tipo("  VALORE "))
+    # FAIL-CLOSED: una riga scritta a mano non deve poter scontare a
+    # caso, e il rollback da un tipo futuro nemmeno.
+    prova("un tipo fuori catalogo SPEGNE, non ripiega", "", tipo("regalo"))
+
+    # ---- 2. L'ARITMETICA DELLA CIFRA FISSA ------------------------
+    prova("−10 € su 100.000 sats toglie 10.000", 10_000,
+          val(100_000, 0, 10, "eur", CAMBIO))
+    prova("−5.000 sats toglie 5.000, senza guardare il cambio", 5_000,
+          val(100_000, 5_000, 0, "sats", 0.0))
+    # A CAMBIO MUTO la promessa in euro non scatta: e' la regola gia'
+    # scritta per la soglia a valore, e qui pesa di piu' perche' non si
+    # sta MISURANDO ma SOTTRAENDO dei sats veri.
+    prova("in euro a cambio muto NON scatta", 0,
+          val(100_000, 0, 10, "eur", 0.0))
+    prova("...mentre in sats scatta lo stesso (il guadagno dichiarato)",
+          5_000, val(100_000, 5_000, 0, "sats", 0.0))
+    # SI LIMA ALL'ARTICOLO, MAI GRATIS: il fondo e' un sat, per
+    # costruzione e non per una guardia da ricordare.
+    prova("uno sconto piu' grande del carrello si LIMA", 19_999,
+          val(20_000, 0, 50, "eur", CAMBIO))
+    prova("...e non arriva MAI a zero: resta un sat", True,
+          all(x - val(x, 0, 10_000, "eur", CAMBIO) >= 1
+              for x in (2, 3, 100, 5_000, 999_999)))
+    prova("articolo da 1 sat: non si sconta niente", 0,
+          val(1, 0, 10, "eur", CAMBIO))
+    prova("cifra a zero: nessuno sconto", 0, val(100_000, 0, 0, "eur", CAMBIO))
+    prova("cifra negativa (colonna storta): nessuno sconto", 0,
+          val(100_000, -500, 0, "sats", 0.0))
+    prova("valuta fuori catalogo: si tace", 0,
+          val(100_000, 5_000, 10, "btc", CAMBIO))
+
+    # ---- 3. IL GIUDICE DEL DIRITTO, che ora torna la REGOLA -------
+    # firma: (tipo, pct, val_sats, val_eur, valuta, scadenza, usi_max,
+    #         attivo, di_chi, venditore_id, adesso, usi)
+    def v(tp="percento", pct=10, vs=0, ve=0, vv="eur", scad=0, umax=0,
+          att=1, di=222, ven=222, ora=1000, usi=0):
+        return vale(tp, pct, vs, ve, vv, scad, umax, att, di, ven, ora, usi)
+
+    prova("un codice a percentuale torna la sua regola",
+          ("percento", 10, 0, 0, ""), v())
+    prova("un codice a valore in euro torna la sua",
+          ("valore", 0, 0, 10, "eur"), v("valore", 0, 0, 10, "eur"))
+    prova("...e in sats la sua", ("valore", 0, 5_000, 0, "sats"),
+          v("valore", 0, 5_000, 0, "sats"))
+    # LA TUPLA VUOTA E' «non vale», e la sua VERITA' e' la domanda che
+    # i chiamanti fanno: nessuno deve ricordarsi i casi.
+    prova("in pausa non vale", (), v(att=0))
+    prova("di un altro negozio non vale", (), v(di=333))
+    prova("scaduto non vale", (), v(scad=999))
+    prova("al filo esatto vale ancora (l'idioma di offerte.scadenza)",
+          ("percento", 10, 0, 0, ""), v(scad=1000))
+    prova("tetto degli usi esaurito: non vale", (), v(umax=3, usi=3))
+    prova("percentuale a zero: non vale", (), v(pct=0))
+    prova("valore a zero: non vale", (), v("valore", 0, 0, 0, "eur"))
+    # ...E LO STESSO IN SATS, che e' un RAMO DIVERSO e non una
+    # ripetizione: l'ha detto la tortura, che ha visto sopravvivere la
+    # mutazione che toglieva la guardia dal solo ramo dei sats.
+    prova("...e nemmeno a zero in sats", (), v("valore", 0, 0, 0, "sats"))
+    prova("tipo fuori catalogo: non vale", (), v("regalo"))
+    prova("valuta fuori catalogo su un valore: non vale", (),
+          v("valore", 0, 5_000, 0, "btc"))
+    # I DUE TAPPI, ognuno NELLA SUA UNITA': limare una cifra col
+    # numero di un'altra scala sarebbe peggio di non limarla.
+    prova("il tappo della percentuale e' la sua leva",
+          ("percento", 100, 0, 0, ""), v(pct=150))
+    prova("il tappo del valore in euro e' il suo",
+          ("valore", 0, 0, 10_000, "eur"), v("valore", 0, 0, 99_999, "eur"))
+    prova("...e quello in sats il suo, mai quello degli euro",
+          ("valore", 0, 100_000_000, 0, "sats"),
+          v("valore", 0, 999_999_999, 0, "sats"))
+    # A LEVA SPENTA non vale piu' niente, su nessun tipo.
+    amb["CODICI_SCONTO_ATTIVI"] = False
+    prova("a leva spenta la percentuale non vale", (), v())
+    prova("...e nemmeno il valore", (), v("valore", 0, 0, 10, "eur"))
+    amb["CODICI_SCONTO_ATTIVI"] = True
+
+    # ---- 4. IL DISPATCHER: la cifra e la sua percentuale ----------
+    prova("dal codice a percentuale escono sats E percentuale",
+          (10_000, 10), scod(100_000, ("percento", 10, 0, 0, ""), CAMBIO))
+    # LA PERCENTUALE E' ZERO SUL VALORE, e non «dedotta»: dedurla da
+    # sconto/articolo direbbe 19,99% — la regola gia' scritta per
+    # ordini.sconto_percento.
+    prova("dal codice a valore escono i sats e ZERO percentuale",
+          (10_000, 0), scod(100_000, ("valore", 0, 0, 10, "eur"), CAMBIO))
+    prova("nessun codice: zero e zero", (0, 0), scod(100_000, (), CAMBIO))
+    prova("regola storta: zero e zero", (0, 0),
+          scod(100_000, ("regalo", 9, 0, 0, ""), CAMBIO))
+
+    # ---- 5. VINCE IL MAGGIORE, e il confronto e' fra SATS ---------
+    # regole: [(criterio, soglia, percento, valuta)]
+    R10 = [("pezzi", 3, 10, "eur")]        # -10% da 3 pezzi
+    prova("il codice a valore batte la regola quando toglie di piu'",
+          (20_000, 0, "codice"),
+          vinc(100_000, 100, 3, R10, ("valore", 0, 0, 20, "eur"), CAMBIO))
+    prova("...e perde quando toglie di meno", (10_000, 10, ""),
+          vinc(100_000, 100, 3, R10, ("valore", 0, 0, 5, "eur"), CAMBIO))
+    # A PARI MERITO VINCE LA REGOLA (il `>` e' stretto), e la regola
+    # derivata e' che UN USO NON SI BRUCIA per dare quel che era gia'
+    # dato: si consuma solo quando `chi == 'codice'`.
+    prova("a pari merito vince la REGOLA, e l'uso non si brucia",
+          (10_000, 10, ""),
+          vinc(100_000, 100, 3, R10, ("valore", 0, 0, 10, "eur"), CAMBIO))
+    prova("senza regole del negozio vince il codice da solo",
+          (7_000, 0, "codice"),
+          vinc(100_000, 100, 1, [], ("valore", 0, 7_000, 0, "sats"), 0.0))
+    prova("nessun codice e nessuna regola: nessuno sconto",
+          (0, 0, ""), vinc(100_000, 100, 1, [], (), CAMBIO))
+    # IL 100% E' IL TETTO NUOVO, e non vuol dire gratis.
+    prova("un codice al 100% lascia UN SAT di articolo",
+          (99_999, 100, "codice"),
+          vinc(100_000, 100, 1, [], ("percento", 100, 0, 0, ""), CAMBIO))
+
+    # ---- 6. LA FORMA che un riordino farebbe sparire --------------
+    prova("il giudice del tipo e' UNO", 1, src.count("def _tipo_codice("))
+    prova("l'aritmetica della cifra fissa e' UNA", 1,
+          src.count("def _sconto_valore("))
+    prova("il dispatcher e' UNO", 1, src.count("def _sconto_codice("))
+    # I QUATTRO PERCORSI passano la REGOLA e il cambio: con la sola
+    # percentuale un codice a valore non scontererebbe MAI, in silenzio.
+    prova("i quattro percorsi passano la regola, non la percentuale", 4,
+          src.count("regole_sc, cod_reg,"))
+    # ⚠️ IL RICONTROLLO PRIMA DELLA INVOICE guarda la VERITA' della
+    # tupla e non un `<= 0`: quel confronto su una tupla non e' falso,
+    # SOLLEVA — e solleverebbe dentro il blocco che sta per scrivere
+    # l'ordine.
+    prova("il ricontrollo del tetto non confronta piu' una tupla con 0",
+          (2, 0),
+          (src.count("not _codice_sconto(con,"),
+           src.count('int(time.time()))[0] <= 0:')))
+    # _sconto_valore NON guarda le leve: se lo facesse, il blocco puro
+    # si porterebbe dentro il config e le prove in CI girerebbero
+    # un'altra cosa.
+    # ⚠️ SI GUARDA IL CODICE E NON LA PROSA, per l'ennesima volta: la
+    # docstring di _sconto_valore NOMINA `_valuta_soglia` apposta, per
+    # dire che non la chiama — e una sentinella che cerca quella parola
+    # diventerebbe rossa per colpa di una spiegazione.
+    _sv = codice(_senza_prosa(pezzo("_sconto_valore")))
+    prova("l'aritmetica resta pura: la valuta arriva normalizzata", True,
+          "_valuta_soglia" not in _sv and 'valuta == "sats"' in _sv)
+    # IL LIBRO MASTRO guarda il TIPO, o suonerebbe su OGNI codice a
+    # cifra fissa — che ha `percento` a zero per costruzione.
+    prova("il libro mastro non guarda piu' la sola percentuale", False,
+          "WHERE attivo=1 AND percento<=0" in src)
+    prova("...e ha il braccio del tipo fuori catalogo", True,
+          "codice sconto con un tipo che nessuno sa leggere" in src)
+    # ---- 6b. LE DUE LEVE, LETTE DAL SORGENTE ---------------------
+    # ⚠️ NON DALL'AMBIENTE: `amb` porta i numeri che ci mette questa
+    # prova, quindi un tetto rimesso a 30 nel file resterebbe verde.
+    # Il tetto e' 100 e il pavimento 1 perche' una decisione lo dice —
+    # «devo poter decidere arbitrariamente quando scontare, anche
+    # 100%» — e sono l'unica cosa che rende vera quella frase.
+    def _leva(nome):
+        m = re.search(rf"^    {nome} = (\d+)", src, re.M)
+        return int(m.group(1)) if m else None
+    prova("il tetto di un codice e' il 100%", 100,
+          _leva("CODICI_SCONTO_MAX_PERCENTO"))
+    prova("...e il pavimento e' l'1%", 1,
+          _leva("CODICI_SCONTO_MIN_PERCENTO"))
+    # E NON SEGUONO PIU' LO SCONTO CARRELLO, che e' una promessa
+    # PUBBLICA del negozio mentre questo e' un segreto mirato: le due
+    # leve si sono slegate apposta, e legarle di nuovo rimetterebbe il
+    # tetto di la' addosso a questo.
+    prova("...e sono slegate da quelle dello sconto carrello", (True, True),
+          (_leva("CODICI_SCONTO_MAX_PERCENTO")
+           != _leva("SCONTO_PACCO_MAX_PERCENTO"),
+           _leva("CODICI_SCONTO_MIN_PERCENTO")
+           != _leva("SCONTO_PACCO_MIN_PERCENTO")))
+
+    # ---- 6c. IL CAMBIO SI CHIEDE ANCHE PER IL CODICE -------------
+    # IL BUG CHE HA TROVATO IL COLLAUDO, e non la rilettura: il cambio
+    # si prendeva solo quando lo chiedeva una promessa del NEGOZIO, e
+    # un codice non e' una promessa del negozio — quindi ogni buono in
+    # EURO scontava ZERO. Falliva su una strada sola (i codici in sats
+    # funzionavano), che e' il modo piu' silenzioso di fallire.
+    vuole = amb["_codice_vuole_cambio"]
+    prova("un codice in EURO chiede il cambio", True,
+          vuole(("valore", 0, 0, 10, "eur")))
+    prova("...uno in SATS no (non ha niente da convertire)", False,
+          vuole(("valore", 0, 5_000, 0, "sats")))
+    prova("...una percentuale nemmeno", False,
+          vuole(("percento", 10, 0, 0, "")))
+    prova("...e nessun codice nemmeno", False, vuole(()))
+    # IL CENSIMENTO DEI QUATTRO PERCORSI: compra mono, compra set e i
+    # due preventivi. Sono QUATTRO e devono restare quattro — il
+    # quinto di domani deve venire a leggere questa riga, o il suo
+    # conto direbbe una cifra e la fattura un'altra.
+    prova("tutti e quattro i percorsi del conto lo chiedono", 4,
+          src.count("or _codice_vuole_cambio(cod_reg)"))
+
+    # ---- 6d. L'ENDPOINT: tipo e valuta sono WHITELIST ------------
+    # Quei due valori arrivano dal CLIENT e finiscono in DUE COLONNE
+    # che il conto poi legge: senza il recinto, una riga con un tipo
+    # inventato la scrive chiunque — e il giorno che un tipo VERO si
+    # chiamasse cosi', quelle righe comincerebbero a scontare. E' il
+    # patto di TIMBRI_SUGGERIMENTO e di `rete_da_payload`, e i due
+    # giudici esistono gia': quel che si sorveglia e' che l'endpoint
+    # LI CHIAMI invece di fidarsi.
+    _sal = codice(_senza_prosa(pezzo("salva_codice_sconto")))
+    prova("il tipo passa dal giudice e mai dal payload nudo",
+          (True, False),
+          ('tipo = _tipo_codice(d.get("tipo"))' in _sal,
+           'tipo = str(d.get("tipo")' in _sal))
+    prova("...e un tipo che il giudice spegne si rifiuta", True,
+          "if not tipo:" in _sal)
+    # LA VALUTA SI CHIEDE SOLO A UN CODICE A VALORE — su una
+    # percentuale non vuol dire niente — ma li' e' OBBLIGATORIA: senza,
+    # la colonna nascerebbe col DEFAULT 'eur' su un codice che il
+    # venditore voleva in sats, cioe' una cifra nell'unita' sbagliata.
+    prova("la valuta di un codice a valore si valida", True,
+          'if tipo == "valore" and not valuta:' in _sal)
+    prova("...e su una percentuale non si chiede", True,
+          'if tipo == "valore" else ""' in _sal)
+
+    # ---- 7. IL CLIENT: la cifra si dice in un posto solo ----------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client ha UN giudice della cifra", 1,
+          mini.count("function cifraCodice("))
+    # ⚠️ IL VALORE DELLA PILLOLA PASSA DAL `data-v`: dall'ago 2026 questi
+    # campi portano anche STRINGHE, e interpolate nude diventerebbero
+    # identificatori — un ReferenceError al primo tocco.
+    prova("le pillole del cassetto passano dal dataset", (True, False),
+          ("codicePill('${campo}', this.dataset.v)" in mini,
+           "codicePill('${campo}',${v})" in mini))
+    # la riga della cassa non dice piu' «−0%» sul codice che ha appena
+    # scontato: la percentuale si scrive SOLO se c'e'
+    prova("la riga della cassa non promette una percentuale che non c'e'",
+          (True, False),
+          ("(p.sconto_percento||0) > 0" in mini,
+           "— <b>−${p.sconto_percento||0}%</b>" in mini))
+    # ...e la CIFRA non si rifa' li': la dice il conto, dove c'e' gia'
+    # e nella valuta della vista (il patto «la pillola e' il cartello»)
+    _cod_riga = mini[mini.index("const codDetto ="):]
+    _cod_riga = _cod_riga[:_cod_riga.index("const codChiuso")]
+    prova("...e non ricalcola la cifra accanto al cartello", True,
+          "fmt(" not in _cod_riga and "cifraCtrl" not in _cod_riga)
+    # ⚠️ IL CAMPO LIBERO DEL VALORE NON RIUSA QUELLO DELLA PERCENTUALE,
+    # ed e' lo stesso divieto che `campoPctLibera` ha gia' verso
+    # `campoSogliaLibera`: quella commuta l'UNITA' secondo la valuta, e
+    # innestarci una percentuale farebbe passare un numero dentro un
+    # percorso che cambia scala — il posto piu' facile in cui un numero
+    # diventa un'altra cosa. Qui il verso e' l'opposto e il divieto e'
+    # lo stesso: una CIFRA non passa dal campo di una PERCENTUALE.
+    _cvl = mini[mini.index("function campoValLibero("):]
+    _cvl = _cvl[:_cvl.index("\nfunction ", 1)]
+    prova("il campo del valore non passa da quello della percentuale",
+          (False, False),
+          ("campoPctLibera" in _cvl, "pctLibera" in _cvl))
+
+    # ---- 8. LA CIFRA SI DICE GIUSTA, e lo dice GIRANDOLA ----------
+    # Le sentinelle qui sopra dicono che il giudice esiste ed e' UNO,
+    # mai che risponda giusto: «−10%» e «−10 €» si scrivono con lo
+    # stesso numero, e a distinguerli e' solo il TIPO. Il banco lo fa
+    # girare — la lezione ormai nona di questo repo.
+    import json as _json
+    import subprocess as _sp
+    # `fmt` e' una const-arrow e non una function: si prende la sua
+    # riga, che e' l'unica dipendenza del giudice.
+    _fmt = mini[mini.index("const fmt = n =>"):]
+    _fmt = _fmt[:_fmt.index("\n") + 1]
+    _banco = (_fmt + pezzo_js(mini, "function cifraCodice(")
+              + "\nconsole.log(JSON.stringify(["
+              "cifraCodice('percento', 10, 0, 0, ''),"
+              "cifraCodice('percento', 100, 0, 0, ''),"
+              "cifraCodice('valore', 0, 0, 10, 'eur'),"
+              "cifraCodice('valore', 0, 5000, 0, 'sats'),"
+              "cifraCodice('', 10, 0, 0, '')]));")
+    try:
+        _r = _json.loads(_sp.run(["node", "-e", _banco], text=True,
+                                 capture_output=True,
+                                 timeout=30).stdout.strip())
+    except (FileNotFoundError, ValueError):
+        _r = None
+    if _r is None:
+        salta("la cifra del codice si legge giusta (manca node)")
+    else:
+        prova("la percentuale si dice in percentuale", "\u2212" + "10%",
+              _r[0])
+        prova("...anche al tetto nuovo", "\u2212" + "100%", _r[1])
+        # LA CIFRA FISSA DICE UNA CIFRA, e nella valuta dichiarata: qui
+        # un «\u2212" + "10%» sarebbe il difetto piu' silenzioso del
+        # cantiere — la stessa cifra, l'unita' sbagliata.
+        prova("la cifra in euro si dice in euro", True,
+              "\u20ac" in _r[2] and "%" not in _r[2])
+        prova("...e quella in sats in sats", True,
+              "sats" in _r[3] and "%" not in _r[3])
+        # il tipo vuoto e' il mondo di ieri: percentuale
+        prova("un tipo non dichiarato resta una percentuale",
+              "\u2212" + "10%", _r[4])
 
 
 # ====================================================================
@@ -17781,6 +18158,7 @@ def _censimento(acceso):
                  "SCONTO_PACCO_CRITERI", "VALUTE_SOGLIA",
                  "SPED_GRATIS_SOGLIE_EUR", "SPED_GRATIS_SOGLIE_SATS",
                  "CODICI_SCONTO_PERCENTI", "CODICI_SCONTO_DURATE_GIORNI",
+                 "CODICI_SCONTO_VALORI_EUR", "CODICI_SCONTO_VALORI_SATS",
                  "BANNER_LINK_VIETATI"):
         amb[nome] = [1, 2, 3]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
@@ -27825,13 +28203,20 @@ def prove_promesse_raggiungibili():
     # COPRE la promessa — e quello non e' una previsione sulla
     # composizione, e' un fatto di adesso. Senza, il client inviterebbe
     # verso uno sconto che aggiungendo pezzi non arriverebbe mai.
-    # LA GUARDIA E' LA META' CHE CONTA (`cod_pct and ... not _sc_vive`):
+    # LA GUARDIA E' LA META' CHE CONTA (`cod_reg and ... not _sc_vive`):
     # senza il primo termine la chiave uscirebbe False su OGNI set senza
     # promesse, e il set tornerebbe ad affermare quel che ha sempre
     # taciuto.
+    # ⚠️ IL PRIMO TERMINE E' LA REGOLA E NON PIU' LA PERCENTUALE (ago
+    # 2026, col codice a valore): li' `cod_pct` e' ZERO per costruzione
+    # — quel codice una percentuale non ce l'ha — e col termine vecchio
+    # la chiave non sarebbe uscita MAI su un codice a cifra fissa, cioe'
+    # il client avrebbe invitato verso uno sconto gia' coperto. La
+    # tupla VUOTA e' «nessun codice», e la sua verita' e' esattamente
+    # la domanda che quella riga vuole fare.
     prova("...ma lo sconto la afferma se un codice copre", True,
           '"sconto_raggiungibile": False' in _pset
-          and "if cod_pct and regole_sc and not _sc_vive" in _pset)
+          and "if cod_reg and regole_sc and not _sc_vive" in _pset)
 
     # ---- 2. IL CLIENT LE LEGGE FAIL-OPEN. `!== false` e non `&&`:
     # chiave assente = invito come oggi (il set, la DEMO, i server di
@@ -38211,6 +38596,7 @@ def main():
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
+              prove_codice_a_valore,
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,

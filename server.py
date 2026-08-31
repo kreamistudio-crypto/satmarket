@@ -422,20 +422,33 @@ try:
 except ImportError:
     CODICI_SCONTO_ATTIVI = True
 
-# IL TETTO DELLA PERCENTUALE, e questa e' la parte che conta: e' LO
-# STESSO NUMERO di SCONTO_PACCO_MAX_PERCENTO, non per simmetria ma
-# perche' con «vince il maggiore» il tetto della cascata e' il max()
-# dei due — tenerli pari lascia il FONDO dichiarato ad alta voce da
-# una prova (lampo 70% + sconto 30% = il 21% del listino) esattamente
-# dov'e'. Alzare QUESTO da solo lo sposta, e a dirlo sara' soltanto
-# quella prova che diventa rossa.
-# Leva SUA e non un riuso di quella dello sconto carrello: un giorno
-# si potrebbe voler concedere di piu' a un codice mirato che a una
-# regola pubblica, ed e' una decisione che va potuta prendere.
+# IL TETTO DELLA PERCENTUALE, e questa leva ha appena SMESSO di essere
+# pari a SCONTO_PACCO_MAX_PERCENTO (ago 2026, decisione di Andrea:
+# «devo poter decidere arbitrariamente quando scontare, anche 100% se
+# voglio»). Il commento di ieri diceva «tenerli pari», e va tenuto
+# perche' meta' di quel ragionamento e' ancora vero: col «vince il
+# maggiore» il tetto della cascata E' il max() dei due. Ma quel max()
+# non e' una SOMMA — le due promesse non si sommano MAI, e' la prima
+# riga di _sconto_vincente — quindi il FONDO dichiarato dalla prova
+# (lampo 70% + carrello 30% = il 21% del listino) parla del CARRELLO e
+# non si muove di un sat: quella prova gira su _sconto_pacco, che
+# questa leva non la guarda nemmeno.
+# LA RAGIONE PER CUI SI PUO' SGANCIARE sta nel DDL della tabella, ed e'
+# la stessa che governa meta' di quel cantiere: lo sconto carrello e'
+# una promessa PUBBLICA, scritta in vetrina e uguale per tutti, mentre
+# un codice e' un SEGRETO che il venditore da' a chi vuole. Un tetto
+# stretto su una promessa pubblica protegge il venditore da se' stesso
+# in vetrina; su un segreto mirato — il cliente affezionato, il buono
+# di scuse per un ordine andato storto — non protegge nessuno, e
+# impediva l'unico gesto per cui quel segreto esiste.
+# CENTO E NON DI PIU': oltre non c'e' niente da togliere. E il 100 non
+# vuol dire gratis — `_sconto_percento` ha il suo max(1), la cintura
+# della lampo — quindi l'articolo resta a 1 sat: una invoice da zero
+# non si emette, e chi compra paga comunque spedizione e protezione.
 try:
     from config import CODICI_SCONTO_MAX_PERCENTO
 except ImportError:
-    CODICI_SCONTO_MAX_PERCENTO = 30
+    CODICI_SCONTO_MAX_PERCENTO = 100
 
 # IL PAVIMENTO, gemello di SCONTO_PACCO_MIN_PERCENTO e nato con lui
 # (ago 2026, decisione di Andrea: i due si aprono INSIEME col campo
@@ -450,10 +463,23 @@ except ImportError:
 # LO ZERO qui NON e' uno spegnimento — un codice si mette in pausa col
 # suo bottone — quindi questa cintura prende il posto del `< 1` di
 # prima invece di aggiungersi a un ramo che non c'e'.
+# SCENDE A 1 (ago 2026, stessa decisione del tetto): «uno sconto
+# dell'1% e' rumore, non un'offerta» era vero per una promessa in
+# VETRINA, dove il cartello lo leggono tutti e uno sconto irrisorio
+# fa piu' danno che niente. Su un codice mirato quel ragionamento non
+# regge: chi lo riceve non sta leggendo un cartello, sta spendendo un
+# regalo che gli e' stato dato — e quanto valga lo decide chi lo da'.
+# La riga resta una CINTURA e non sparisce: a zero il codice non
+# scontera' mai niente, ed e' il caso che il libro mastro chiama
+# «codice che non puo' scattare».
+# ⚠️ E NON E' PIU' PARI AL GEMELLO, il che era gia' dichiarato lecito
+# due leve piu' su («se un giorno si volesse un codice mirato piu'
+# timido di una regola pubblica, si abbassa questo»): qui e' successo
+# al contrario, ed e' la stessa liberta' usata nell'altro verso.
 try:
     from config import CODICI_SCONTO_MIN_PERCENTO
 except ImportError:
-    CODICI_SCONTO_MIN_PERCENTO = 5
+    CODICI_SCONTO_MIN_PERCENTO = 1
 
 # Le pillole del venditore, il patto di LAMPO_SCONTI: il client non
 # hardcoda mai una cifra, le riceve da /api/me.
@@ -461,6 +487,51 @@ try:
     from config import CODICI_SCONTO_PERCENTI
 except ImportError:
     CODICI_SCONTO_PERCENTI = (5, 10, 15, 20)
+
+# ==== LO SCONTO A VALORE (ago 2026) ================================
+# «−10 €» invece di «−10%», e la decisione di Andrea che l'ha chiesto
+# e' la stessa del tetto: chi da' un codice deve poter dire quanto
+# toglie, non solo in che proporzione. ROVESCIA la decisione 2 del
+# cantiere dei codici («un codice fa solo una percentuale, mai una
+# cifra fissa»), e il perche' di allora resta scritto nel DDL perche'
+# meta' e' ancora vera: una percentuale non ha unita', e per questo la
+# tabella non aveva nessuna colonna `valuta`. La cifra fissa ce l'ha,
+# quindi le colonne arrivano ADESSO e col loro significato — non si
+# riusa niente e non si allarga il senso di `percento`.
+# IL CASO CHE LO CHIEDE e' quello che una percentuale non sa dire: il
+# buono di scuse da 10 € per un ordine andato storto, il regalo di
+# Natale, il rimborso concordato a voce. Con la sola percentuale quel
+# gesto si fa a occhio — «quanto fa il 18% del suo carrello?» — e la
+# risposta cambia col carrello, cioe' non e' quel che si era promesso.
+# LE PILLOLE, il patto di LAMPO_SCONTI: il client non hardcoda mai una
+# cifra, le riceve da /api/me. Due liste e non una, per la stessa
+# ragione delle due soglie dello sconto carrello — un euro e un sat
+# non si scrivono nella stessa scala, e una lista sola convertita al
+# cambio darebbe pillole che ballano ogni mattina.
+try:
+    from config import CODICI_SCONTO_VALORI_EUR
+except ImportError:
+    CODICI_SCONTO_VALORI_EUR = (5, 10, 20, 50)
+
+try:
+    from config import CODICI_SCONTO_VALORI_SATS
+except ImportError:
+    CODICI_SCONTO_VALORI_SATS = (5_000, 10_000, 25_000, 50_000)
+
+# LE DUE CINTURE, larghe apposta: la regola di MAX_QUANTITA_ANNUNCIO —
+# quanto vale il suo carrello lo sa il venditore, non noi — e il tetto
+# VERO e' un altro, cioe' l'articolo stesso: uno sconto piu' grande del
+# carrello si LIMA (vedi _sconto_valore), non lo si rifiuta. Queste due
+# fermano il numero incollato per sbaglio, non il venditore generoso.
+try:
+    from config import CODICI_SCONTO_MAX_VALORE_EUR
+except ImportError:
+    CODICI_SCONTO_MAX_VALORE_EUR = 10_000
+
+try:
+    from config import CODICI_SCONTO_MAX_VALORE_SATS
+except ImportError:
+    CODICI_SCONTO_MAX_VALORE_SATS = 100_000_000
 
 # Le durate offerte, IN GIORNI. Lo ZERO sta NEL CATALOGO e vuol dire
 # «senza scadenza»: detto qui invece che come caso speciale dentro il
@@ -2902,6 +2973,41 @@ def init_db():
         -- _regola_sconto dentro una tabella nuova e riaprirebbe la
         -- domanda «si somma o vince il maggiore?», gia' chiusa.
         percento INTEGER NOT NULL DEFAULT 0,
+        -- CHE COSA TOGLIE (ago 2026): 'percento' come sempre, oppure
+        -- 'valore' — «−10 €», una cifra fissa sugli articoli. Il
+        -- DEFAULT 'percento' E' LA MIGRAZIONE, ed e' tutto il costo
+        -- del cantiere: SQLite riempie le righe di ieri e ogni codice
+        -- gia' in giro continua a significare quello che significa
+        -- adesso, byte per byte (il precedente e'
+        -- sconto_pacco_criterio, e prima ancora "valuta TEXT DEFAULT
+        -- 'sats'" degli annunci).
+        -- ⚠️ IL COMMENTO QUI SOPRA DICEVA «l'unica leva del codice» e
+        -- «NESSUNA colonna valuta: una percentuale non ha unita'». La
+        -- prima meta' e' invecchiata; LA SECONDA NO, ed e' la ragione
+        -- per cui le colonne arrivano solo adesso: una valuta senza
+        -- una cifra da misurare non significava niente, e aggiungerla
+        -- «per simmetria» sarebbe stato il difetto che quel commento
+        -- metteva in guardia. Adesso c'e' una cifra, quindi c'e'.
+        tipo TEXT NOT NULL DEFAULT 'percento',
+        -- LA CIFRA FISSA, in due colonne — una per unita' — col patto
+        -- delle soglie a valore dello sconto carrello, ricalcato: le
+        -- due NON si tengono in pari, ognuna e' l'ultima cifra che il
+        -- venditore ha scritto in quell'unita', e il toggle CONSERVA
+        -- invece di convertire. Chi prova gli euro e torna ai sats
+        -- ritrova il suo numero, non una conversione che non ha mai
+        -- scelto (e che al cambio di oggi sarebbe pure diversa da
+        -- quella di ieri).
+        valore_sats INTEGER NOT NULL DEFAULT 0,
+        -- In EURO INTERI e non centesimi ne' REAL, la ragione della
+        -- soglia gemella: un buono e' «−10 €» e non «−9,99 €», che e'
+        -- un trucco da listino — e il filo resta esatto senza
+        -- inventare una convenzione nuova.
+        valore_eur INTEGER NOT NULL DEFAULT 0,
+        -- QUALE DELLE DUE vale. Il DEFAULT 'eur' non ha nessun effetto
+        -- sulle righe di ieri (sono tutte 'percento', e li' questa
+        -- colonna non la legge nessuno): e' il valore di partenza per
+        -- chi apre il cassetto oggi.
+        valore_valuta TEXT NOT NULL DEFAULT 'eur',
         -- 0 = mai. Gate in LETTURA come lampo, asta e ferie: il codice
         -- scade da solo, nessun orologio che lo spenga. L'idioma e'
         -- quello LETTERALE di offerte.scadenza (`0 < x < adesso`), o
@@ -4316,6 +4422,27 @@ def init_db():
         con.execute("ALTER TABLE offerte ADD COLUMN giri INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # LO SCONTO A VALORE DEI CODICI (ago 2026): la PRIMA migrazione su
+    # `codici_sconto`, che era nata completa. Additive e coi DEFAULT
+    # che SONO la migrazione — nessuno script da lanciare, nessun
+    # backfill: le righe di ieri restano 'percento' e continuano a
+    # scontare identiche, e le tre colonne nuove li' dentro non le
+    # legge nessuno (il tipo le gatea per costruzione).
+    # ⚠️ IL DEFAULT DELL'ALTER NON E' QUELLO DEL DDL, e va detto perche'
+    # e' la trappola classica: SQLite scrive il default della CREATE
+    # TABLE solo sui database NUOVI, quindi la stessa cifra va ripetuta
+    # qui o i codici gia' esistenti nascerebbero col tipo VUOTO — che
+    # `_tipo_codice` fa ricadere su 'percento' (fail-open verso il
+    # mondo di ieri), ma su un'assenza e non su un fatto scritto.
+    for tab_col in ("codici_sconto ADD COLUMN tipo TEXT DEFAULT 'percento'",
+                    "codici_sconto ADD COLUMN valore_sats INTEGER DEFAULT 0",
+                    "codici_sconto ADD COLUMN valore_eur INTEGER DEFAULT 0",
+                    "codici_sconto ADD COLUMN valore_valuta TEXT "
+                    "DEFAULT 'eur'"):
+        try:
+            con.execute(f"ALTER TABLE {tab_col}")
+        except sqlite3.OperationalError:
+            pass
     # Migrazioni per spedizione, consegna e resi
     for colonna in ("corriere TEXT DEFAULT ''", "tracking TEXT DEFAULT ''",
                     "corriere_reso TEXT DEFAULT ''",
@@ -15283,11 +15410,27 @@ def _leve_stato():
                        "cascata"),
             _leva("Sconto massimo (%)", "CODICI_SCONTO_MAX_PERCENTO",
                   CODICI_SCONTO_MAX_PERCENTO,
-                  acceso="tenerlo pari a quello dello sconto articoli: "
-                       "con «vince il maggiore» il tetto della cascata "
-                       "e' il max dei due"),
+                  acceso="NON e' piu' pari a quello dello sconto "
+                       "articoli (ago 2026): un codice e' un segreto "
+                       "mirato, non un cartello in vetrina. Il fondo "
+                       "della cascata non si muove — «vince il "
+                       "maggiore» non e' una somma"),
             _leva("Sconti proposti (%)", "CODICI_SCONTO_PERCENTI",
                   _elenco(CODICI_SCONTO_PERCENTI)),
+            _leva("Sconti proposti a valore (€)",
+                  "CODICI_SCONTO_VALORI_EUR",
+                  _elenco(CODICI_SCONTO_VALORI_EUR)),
+            _leva("Sconti proposti a valore (sats)",
+                  "CODICI_SCONTO_VALORI_SATS",
+                  _elenco(CODICI_SCONTO_VALORI_SATS)),
+            _leva("Sconto massimo a valore (€)",
+                  "CODICI_SCONTO_MAX_VALORE_EUR",
+                  CODICI_SCONTO_MAX_VALORE_EUR,
+                  acceso="il tetto VERO e' l'articolo: uno sconto piu' "
+                       "grande del carrello si lima, non si rifiuta"),
+            _leva("Sconto massimo a valore (sats)",
+                  "CODICI_SCONTO_MAX_VALORE_SATS",
+                  CODICI_SCONTO_MAX_VALORE_SATS),
             _leva("Durate proposte (giorni)", "CODICI_SCONTO_DURATE_GIORNI",
                   _elenco(CODICI_SCONTO_DURATE_GIORNI),
                   acceso="lo 0 in elenco vuol dire «senza scadenza»"),
@@ -16674,6 +16817,58 @@ def _sconto_percento(articolo: int, percento: int) -> int:
     return articolo - max(1, articolo * (100 - min(percento, 100)) // 100)
 
 
+def _sconto_valore(articolo: int, valore_sats: int, valore_eur: int,
+                   valuta: str, cambio: float) -> int:
+    """LA SOTTRAZIONE di uno sconto a CIFRA FISSA sugli articoli.
+
+    La gemella di _sconto_percento per il secondo tipo di codice (ago
+    2026): la' si toglie una proporzione, qui una cifra — «−10 €» — e
+    le due non si somigliano abbastanza da stare nella stessa funzione,
+    perche' questa deve sapere di UNITA' e quella no.
+    LA VALUTA LA SCEGLIE IL VENDITORE, e qui cambia solo QUALE dei due
+    numeri si guarda. La conversione la fa `_sped_in_sats`, e il riuso
+    e' deliberato benche' il nome parli di spedizione: euro → sats e'
+    UNA aritmetica sola, e una seconda copia divergerebbe al primo
+    ritocco (il patto di _sconto_percento, che i codici riusano
+    identica). Il nome invecchiato si dichiara invece di ricopiarlo.
+    A CAMBIO MUTO LA PROMESSA NON SCATTA e vale ZERO, mai un ripiego:
+    e' la regola gia' scritta per la soglia a valore («meglio un match
+    perso che uno sbagliato»), e qui pesa di piu' perche' non si sta
+    MISURANDO una soglia ma SOTTRAENDO dei sats veri. Un codice in
+    SATS invece scatta anche con CoinGecko giu': non ha niente da
+    convertire, ed e' il guadagno dichiarato di quella valuta.
+    SI LIMA ALL'ARTICOLO E NON SI RIFIUTA, ed e' la riga da non
+    ammorbidire: «−50 €» su un carrello da 20 € toglie il carrello, non
+    fallisce. Chi ha ricevuto quel buono l'ha ricevuto per spendere
+    meno, e un codice che si rifiuta perche' e' TROPPO generoso e' il
+    genere di no che nessuno sa spiegare a chi lo legge.
+    MAI GRATIS: il `- 1` e' lo stesso max(1) della gemella e della
+    lampo. Una invoice da zero non si emette, e chi compra paga
+    comunque spedizione e protezione — quindi il fondo e' un sat, e lo
+    e' per costruzione invece che per una guardia da ricordare.
+    LA DECISIONE NON ABITA QUI, come nella gemella: se lo sconto SPETTA
+    lo dice _codice_vale. Qui si sa solo sottrarre.
+    ⚠️ LA VALUTA ARRIVA GIA' NORMALIZZATA e si confronta LETTERALMENTE,
+    esattamente come fa _sconto_pacco: `_valuta_soglia` guarda le LEVE
+    e vive fuori dal blocco puro, quindi chiamarla di qui porterebbe
+    una leva dentro l'aritmetica — e con lei il config dentro le prove
+    in CI, che girano queste funzioni senza."""
+    if articolo <= 1:
+        return 0
+    if valuta == "sats":
+        quanto = max(0, int(valore_sats or 0))
+    elif valuta == "eur":
+        # `_sped_in_sats(0, eur, cambio)` = la conversione euro → sats
+        # di casa, che a cambio muto torna None: la stessa forma di
+        # _eur_interi, e il None qui vale «non scatta».
+        quanto = _sped_in_sats(0, float(valore_eur or 0), cambio)
+        if not quanto:
+            return 0
+    else:
+        return 0        # valuta che nessun ramo sa convertire: si tace
+    return min(quanto, articolo - 1) if quanto > 0 else 0
+
+
 def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
                   soglia: int, percento: int, valuta: str) -> int:
     """LO SCONTO CARRELLO in sats (ago 2026): la regola del negozio —
@@ -16790,6 +16985,28 @@ def _sconto_vuole_cambio(regole) -> bool:
     return any(c == "valore" and v == "eur" for c, _s, _p, v in regole)
 
 
+def _codice_vuole_cambio(regola) -> bool:
+    """Se il codice speso e' una CIFRA FISSA IN EURO, e quindi il conto
+    ha bisogno di una conversione per sapere quanto toglie (ago 2026).
+
+    La gemella di _sconto_vuole_cambio, e nasce con lei per la stessa
+    ragione: la domanda si fa nei QUATTRO percorsi del conto, e scritta
+    a mano quattro volte sarebbe il posto in cui un giorno una resta
+    indietro — con meta' degli ordini scontati e meta' no, in silenzio.
+    ⚠️ SENZA DI LEI IL CODICE IN EURO NON SCONTA NIENTE, ed e' il
+    difetto che il collaudo ha trovato appena il tipo nuovo e' nato:
+    `cambio_misura` si prendeva SOLO quando una promessa del NEGOZIO lo
+    chiedeva, e un codice non e' una promessa del negozio. In sats
+    invece scattava benissimo — cioe' il guasto viveva su una strada
+    sola, che e' il modo in cui passa inosservato.
+    IL BISOGNO RESTA MORBIDO come quello della sorella: nessuno alza un
+    503 per questo. Un codice che non si sa convertire non scatta, il
+    preventivo lo dice, e l'ordine parte a prezzo pieno — far fallire
+    un acquisto perche' non si riesce a regalare uno sconto sarebbe
+    curare un male causandone uno peggiore."""
+    return bool(regola) and regola[0] == "valore" and regola[4] == "eur"
+
+
 # La forma di un codice sconto. Sono NUMERI DI STRUTTURA e non leve:
 # il minimo tiene fuori i codici che si indovinano a caso, il massimo
 # e' quanto sta comodo in un campo e si detta a voce.
@@ -16819,9 +17036,30 @@ def _codice_normalizza(codice) -> str:
     return pulito[:CODICE_SCONTO_MAX_LEN]
 
 
-def _codice_vale(percento, scadenza, usi_max, attivo, di_chi: int,
-                 venditore_id: int, adesso: int, usi: int) -> int:
-    """La percentuale di un codice sconto, o 0 se non vale.
+def _tipo_codice(tipo) -> str:
+    """Il tipo di uno sconto codice, normalizzato: 'percento' o
+    'valore', mai altro.
+    IL VUOTO VALE 'percento', ed e' la retrocompatibilita' a costo
+    zero: e' letteralmente il mondo di ieri, quando la percentuale era
+    l'unica cosa che un codice sapeva fare — e la colonna nasce con
+    quel DEFAULT proprio per questo (il patto di _valuta_soglia).
+    Un tipo SCRITTO ma fuori catalogo invece SPEGNE il codice (il ''
+    in uscita), che e' fail-closed: una riga scritta a mano, o il
+    rollback da un tipo futuro, non devono poter far scontare a caso.
+    NIENTE LEVA-CATALOGO qui, al contrario di VALUTE_SOGLIA: quelle
+    sono unita' di misura e una si puo' voler spegnere, questi sono i
+    due mestieri che il codice del conto sa fare — toglierne uno dal
+    catalogo non spegnerebbe niente, lascerebbe delle righe che
+    nessun ramo sa piu' leggere."""
+    t = (str(tipo).strip().lower() if tipo else "percento")
+    return t if t in ("percento", "valore") else ""
+
+
+def _codice_vale(tipo, percento, valore_sats, valore_eur, valuta,
+                 scadenza, usi_max, attivo, di_chi: int,
+                 venditore_id: int, adesso: int, usi: int) -> tuple:
+    """LA REGOLA di un codice sconto — `(tipo, percento, valore_sats,
+    valore_eur, valuta)` — oppure la tupla VUOTA se non vale.
 
     Il ruolo di _regola_sconto per la terza promessa: PRENDE I CAMPI E
     NON LA RIGA (il patto di in_ferie), cosi' lo stesso giudice serve
@@ -16830,36 +17068,90 @@ def _codice_vale(percento, scadenza, usi_max, attivo, di_chi: int,
     due, il venditore leggerebbe «valido» su un codice che alla cassa
     non scatta, ed e' esattamente il tipo di divergenza che nessuno
     scopre finche' non protesta un compratore.
-    FAIL-CLOSED SU OGNI STRADA, e ognuna da' LO STESSO ZERO: leva
-    spenta, codice in pausa, percentuale a zero, scaduto, tetto
-    esaurito, di un altro negozio. Nessun chiamante deve ricordarsi i
-    casi, e il motivo del rifiuto NON esce di qui — vedi
-    l'anti-oracolo: c'e' un messaggio solo.
-    IL TAPPO min(percento, MAX) e' la CINTURA contro una colonna
-    scritta a mano o il rollback da una leva piu' generosa; il VARCO
-    e' il 400 dell'endpoint, che invece la cifra la dice (la lezione
-    di quantita_da_payload: si lima dove il dato e' gia' in casa, si
-    rifiuta dove lo si sta accettando).
+    ⚠️ TORNAVA UN INT, LA PERCENTUALE (ago 2026: adesso una tupla).
+    Il cambio di forma non e' cosmesi ed e' la sola strada onesta: con
+    due tipi di sconto «quanto vale» non e' piu' UN numero — un
+    `−10 €` e un `−10%` non stanno nella stessa scala — e tenere l'int
+    avrebbe voluto dire o convertire QUI (portando il cambio dentro il
+    giudice del diritto, che di sats non deve sapere niente) o un
+    secondo giudice accanto, che e' precisamente quel che il paragrafo
+    qui sopra vieta. La VERITA' della tupla e' «vale»: chi chiama
+    scrive `if regola:` e non deve ricordarsi nessun caso.
+    FAIL-CLOSED SU OGNI STRADA, e ognuna da' LO STESSO VUOTO: leva
+    spenta, codice in pausa, sconto a zero, tipo o valuta fuori
+    catalogo, scaduto, tetto esaurito, di un altro negozio. Il motivo
+    del rifiuto NON esce di qui — vedi l'anti-oracolo: c'e' un
+    messaggio solo.
+    I DUE TAPPI sono la CINTURA contro una colonna scritta a mano o il
+    rollback da una leva piu' generosa; il VARCO e' il 400
+    dell'endpoint, che invece la cifra la dice (la lezione di
+    quantita_da_payload: si lima dove il dato e' gia' in casa, si
+    rifiuta dove lo si sta accettando). Il tappo del VALORE si applica
+    NELL'UNITA' DICHIARATA — euro col tetto in euro, sats col suo — o
+    limerebbe una cifra con un numero di un'altra scala.
     LA SCADENZA usa l'idioma LETTERALE di offerte.scadenza
     (`0 < scadenza < adesso`): lo zero e' «mai», e al filo esatto il
     codice vale ancora — come _asta_viva e in_ferie.
     GLI USI arrivano gia' contati dal chiamante (_usi_codice): qui non
     si legge niente, o questa funzione smetterebbe di essere pura."""
     if not CODICI_SCONTO_ATTIVI or not attivo:
-        return 0
-    if not percento or percento <= 0:
-        return 0
+        return ()
     if di_chi != venditore_id:
-        return 0
+        return ()
     if 0 < (scadenza or 0) < adesso:
-        return 0
+        return ()
     if (usi_max or 0) > 0 and usi >= usi_max:
-        return 0
-    return min(percento, CODICI_SCONTO_MAX_PERCENTO)
+        return ()
+    t = _tipo_codice(tipo)
+    if t == "percento":
+        pct = int(percento or 0)
+        if pct <= 0:
+            return ()
+        return ("percento", min(pct, CODICI_SCONTO_MAX_PERCENTO), 0, 0, "")
+    if t == "valore":
+        v = _valuta_soglia(valuta)
+        if v == "sats":
+            quanto = min(int(valore_sats or 0), CODICI_SCONTO_MAX_VALORE_SATS)
+            return ("valore", 0, quanto, 0, "sats") if quanto > 0 else ()
+        if v == "eur":
+            quanto = min(int(valore_eur or 0), CODICI_SCONTO_MAX_VALORE_EUR)
+            return ("valore", 0, 0, quanto, "eur") if quanto > 0 else ()
+    return ()
+
+
+def _sconto_codice(articolo: int, regola, cambio: float) -> tuple:
+    """Quanto toglie UN CODICE, in sats, e con che percentuale:
+    `(sconto_sats, percento)`.
+
+    IL DISPATCHER dei due tipi (ago 2026), e vive a parte invece che
+    dentro _sconto_vincente per una ragione sola: cosi' il confronto
+    «vince il maggiore» resta una riga che guarda DUE SATS, senza
+    sapere niente di tipi e di unita'. Prima quel confronto chiamava
+    _sconto_percento direttamente — con due tipi avrebbe dovuto
+    biforcarsi, e la biforcazione sarebbe finita dentro la funzione
+    che decide chi vince, cioe' nel posto peggiore.
+    LA PERCENTUALE CHE ESCE E' LA FOTOGRAFIA DELLA REGOLA, ed e' zero
+    sul tipo 'valore' — non «dedotta da sconto/articolo», che direbbe
+    19,99% (la regola gia' scritta per ordini.sconto_percento). Lo
+    zero non e' un buco: e' il fatto che quello sconto una percentuale
+    NON CE L'HA, e ogni superficie che mostra il tag `−N%` ha gia' la
+    sua guardia `if percento` — quindi la riga dice la CIFRA e basta,
+    che e' esattamente cio' che quel codice prometteva.
+    `regola` e' la tupla di _codice_vale, e la tupla VUOTA e' «nessun
+    codice»: nessun chiamante deve ricordarsi un caso."""
+    if not regola:
+        return 0, 0
+    tipo, pct, val_sats, val_eur, valuta = regola
+    if tipo == "percento":
+        return _sconto_percento(articolo, pct), pct
+    if tipo == "valore":
+        return _sconto_valore(articolo, val_sats, val_eur, valuta,
+                              cambio), 0
+    return 0, 0
 
 
 def _sconto_vincente(articolo: int, articolo_eur, pezzi: int, regole,
-                     codice_percento: int) -> tuple:
+                     codice_regola, cambio: float = 0.0) -> tuple:
     """VINCE IL MAGGIORE fra il codice sconto e la regola del negozio.
 
     Torna `(sconto_sats, percento, chi)`, dove `chi` e' 'codice' quando
@@ -16894,11 +17186,23 @@ def _sconto_vincente(articolo: int, articolo_eur, pezzi: int, regole,
     ricevuta deve dire 20% — dedurla da sconto/articolo direbbe
     19,99%. Zero quando non ha scontato nessuno, cosi' il
     `pct if sconto else 0` dei chiamanti resta una cintura e non un
-    motore."""
+    motore.
+    ...E ZERO ANCHE QUANDO VINCE UN CODICE A VALORE (ago 2026), che e'
+    la stessa regola e non un'eccezione: quello sconto una percentuale
+    non ce l'ha, e inventargliela sarebbe precisamente il 19,99% che la
+    riga qui sopra vieta. La ricevuta dice la CIFRA, e ogni superficie
+    che mostra il tag `−N%` ha gia' la sua guardia sullo zero.
+    IL CONFRONTO E' SEMPRE FRA DUE SATS, ed e' quel che permette al
+    tipo nuovo di innestarsi senza toccare questa riga: a tradurre la
+    regola del codice in sats ci pensa _sconto_codice, e qui non si sa
+    ne' che tipo fosse ne' in che valuta era scritto. Il `cambio`
+    passa di qui SOLO per arrivare a lui — un codice in euro va
+    convertito, uno in sats no — ed e' l'unico argomento di questa
+    funzione che non serve a decidere chi vince."""
     da_regola = _sconto_regole(articolo, articolo_eur, pezzi, regole)
-    da_codice = _sconto_percento(articolo, codice_percento)
+    da_codice, cod_pct = _sconto_codice(articolo, codice_regola, cambio)
     if da_codice > da_regola:
-        return da_codice, codice_percento, "codice"
+        return da_codice, cod_pct, "codice"
     return da_regola, (regole[0][2] if regole and da_regola else 0), ""
 
 
@@ -20091,7 +20395,11 @@ def _usi_codice(con, codice_id: int) -> int:
 
 def _codice_sconto(con, venditore_id: int, codice: str,
                    adesso: int) -> tuple:
-    """(percento, id) del codice speso su QUESTO negozio, o (0, 0).
+    """(regola, id) del codice speso su QUESTO negozio, o ((), 0).
+
+    `regola` e' la tupla di _codice_vale — il tipo e la sua cifra — e
+    non piu' la sola percentuale (ago 2026, col codice a valore): la
+    forma la decide il giudice, qui si legge la riga e si passa oltre.
 
     UN SOLO ESITO IN USCITA, e nessun motivo: non esiste, e' spento,
     e' scaduto, il tetto e' pieno, e' di un altro venditore — tutto
@@ -20106,18 +20414,20 @@ def _codice_sconto(con, venditore_id: int, codice: str,
     scrive invece di fingere che non ci sia — a chiuderlo per davvero
     c'e' il freno, che e' anche la ragione per cui esiste."""
     if not CODICI_SCONTO_ATTIVI or not codice:
-        return 0, 0
+        return (), 0
     r = con.execute("SELECT id, venditore_id, percento, scadenza, usi_max, "
-                    "attivo FROM codici_sconto "
+                    "attivo, tipo, valore_sats, valore_eur, valore_valuta "
+                    "FROM codici_sconto "
                     "WHERE venditore_id=? AND codice=?",
                     (venditore_id, codice)).fetchone()
     if not r:
-        return 0, 0
+        return (), 0
     usi = _usi_codice(con, r["id"]) if r["usi_max"] else 0
-    pct = _codice_vale(r["percento"], r["scadenza"], r["usi_max"],
-                       r["attivo"], r["venditore_id"], venditore_id,
-                       adesso, usi)
-    return (pct, r["id"]) if pct else (0, 0)
+    reg = _codice_vale(r["tipo"], r["percento"], r["valore_sats"],
+                       r["valore_eur"], r["valore_valuta"], r["scadenza"],
+                       r["usi_max"], r["attivo"], r["venditore_id"],
+                       venditore_id, adesso, usi)
+    return (reg, r["id"]) if reg else ((), 0)
 
 
 def _codici_vivi(con, venditore_id: int, adesso: int) -> bool:
@@ -20139,12 +20449,14 @@ def _codici_vivi(con, venditore_id: int, adesso: int) -> bool:
         return False
     for r in con.execute(
             "SELECT id, venditore_id, percento, scadenza, usi_max, "
-            "attivo FROM codici_sconto WHERE venditore_id=?",
+            "attivo, tipo, valore_sats, valore_eur, valore_valuta "
+            "FROM codici_sconto WHERE venditore_id=?",
             (venditore_id,)).fetchall():
         usi = _usi_codice(con, r["id"]) if r["usi_max"] else 0
-        if _codice_vale(r["percento"], r["scadenza"], r["usi_max"],
-                        r["attivo"], r["venditore_id"], venditore_id,
-                        adesso, usi):
+        if _codice_vale(r["tipo"], r["percento"], r["valore_sats"],
+                        r["valore_eur"], r["valore_valuta"], r["scadenza"],
+                        r["usi_max"], r["attivo"], r["venditore_id"],
+                        venditore_id, adesso, usi):
             return True
     return False
 
@@ -20577,11 +20889,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
         raise HTTPException(400, "Il totale è già pattuito: il codice "
                                  "sconto non si applica a un'offerta "
                                  "accettata")
-    cod_pct, cod_id = 0, 0
+    cod_reg, cod_id = (), 0
     if cod_nome:
-        cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
+        cod_reg, cod_id = _codice_sconto(con, venditore_id, cod_nome,
                                          int(time.time()))
-        if not cod_pct:
+        if not cod_reg:
             con.close()
             _codice_tentativo_speso(user["id"])
             raise HTTPException(400, MSG_CODICE_NO)
@@ -20625,6 +20937,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     cambio_misura = 0.0
     if (serve_cambio_duro
             or _sconto_vuole_cambio(regole_sc)
+            or _codice_vuole_cambio(cod_reg)
             or (sog_gratis > 0 and val_sg == "eur")):
         cambio_misura = await cambio_btc_eur()
         if serve_cambio_duro:
@@ -20718,7 +21031,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # mai la somma: la percentuale del vincitore esce di qui, e `pct`
     # non si assegna piu' al momento della lettura delle regole.
     sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
-                                           regole_sc, cod_pct)
+                                           regole_sc, cod_reg, cambio_misura)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
     # l'ordine fra queste due righe non conta — nessuna delle due
@@ -20757,8 +21070,13 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # non della riga. Vale parola per parola il commento del mono, il
     # 409 COL MOTIVO compreso — l'unica deroga all'anti-oracolo, e il
     # perche' e' scritto la'.
-    if cod_id and _codice_sconto(con, venditore_id, cod_nome,
-                                 int(time.time()))[0] <= 0:
+    # ⚠️ `not …[0]` e NON `… <= 0`: dall'ago 2026 quel posto porta la
+    # REGOLA (una tupla) e non piu' la percentuale, e un confronto
+    # numerico con una tupla non e' falso — SOLLEVA. La tupla vuota e'
+    # «non vale piu'», ed e' la stessa verita' che leggono i quattro
+    # percorsi del conto.
+    if cod_id and not _codice_sconto(con, venditore_id, cod_nome,
+                                     int(time.time()))[0]:
         con.close()
         raise HTTPException(409, "Il codice sconto è appena finito: "
                                  "togli il codice e riprova")
@@ -21147,12 +21465,20 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # il freno morde: si GUARDA prima (a quota finita non si interroga
     # nemmeno il database) e si SPENDE solo se il tentativo e' fallito.
     cod_nome = _codice_normalizza(d.get("codice_sconto"))
-    cod_pct, cod_id = 0, 0
+    cod_reg, cod_id = (), 0
     if cod_nome and _codice_quota_libera(user["id"]):
-        cod_pct, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
+        cod_reg, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
                                          int(time.time()))
-        if not cod_pct:
+        if not cod_reg:
             _codice_tentativo_speso(user["id"])
+    # LA PERCENTUALE DEL CODICE, e ZERO quando il codice e' a VALORE:
+    # serve ai confronti dell'invito qui sotto, mai al conto — quello
+    # passa dalla regola intera. Su un codice a valore lo zero fa
+    # restare VIVE tutte le gambe della promessa, ed e' il verso
+    # giusto: uno sconto fisso non cresce col carrello, quindi «il
+    # codice copre gia'» non si puo' affermare (la regola dell'invito
+    # non raggiungibile, dall'altro lato).
+    cod_pct = cod_reg[1] if cod_reg else 0
     # il cassetto della cassa compare solo se c'e' qualcosa da
     # scriverci: il solo si'/no, mai un dato del codice
     codici_vivi = _codici_vivi(con, a["venditore_id"], int(time.time()))
@@ -21174,6 +21500,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             or a["spedizione_punto_eur"] > 0
             or a["spedizione_extra_eur"] > 0
             or _sconto_vuole_cambio(regole_sc)
+            or _codice_vuole_cambio(cod_reg)
             or (sog_gratis > 0 and val_sg == "eur")):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
@@ -21218,7 +21545,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # lui. La cintura di _strade_preventivo (`sconto == 0 or
     # sconto_eur > 0`) regge e ne esce rafforzata.
     sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
-                                           regole_sc, cod_pct)
+                                           regole_sc, cod_reg, cambio)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
@@ -21379,9 +21706,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # «SATOSHI10» e capisce cosa abbiamo capito.
             "codice_sconto": ({"codice": cod_nome,
                                "stato": ("applicato" if chi_sc
-                                         else ("coperto" if cod_pct
+                                         else ("coperto" if cod_reg
                                                else "rifiutato")),
-                               "motivo": ("" if cod_pct else MSG_CODICE_NO)}
+                               "motivo": ("" if cod_reg else MSG_CODICE_NO)}
                               if cod_nome else None),
             # CHI ha vinto il max: il client spegne la pillola verde
             # della promessa del negozio quando ha vinto il codice —
@@ -21617,12 +21944,20 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # il cassetto non si offre: il totale e' gia' pattuito
     cod_nome = ("" if accordo_carrello
                 else _codice_normalizza(d.get("codice_sconto")))
-    cod_pct, cod_id = 0, 0
+    cod_reg, cod_id = (), 0
     if cod_nome and _codice_quota_libera(user["id"]):
-        cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
+        cod_reg, cod_id = _codice_sconto(con, venditore_id, cod_nome,
                                          int(time.time()))
-        if not cod_pct:
+        if not cod_reg:
             _codice_tentativo_speso(user["id"])
+    # LA PERCENTUALE DEL CODICE, e ZERO quando il codice e' a VALORE:
+    # serve ai confronti dell'invito qui sotto, mai al conto — quello
+    # passa dalla regola intera. Su un codice a valore lo zero fa
+    # restare VIVE tutte le gambe della promessa, ed e' il verso
+    # giusto: uno sconto fisso non cresce col carrello, quindi «il
+    # codice copre gia'» non si puo' affermare (la regola dell'invito
+    # non raggiungibile, dall'altro lato).
+    cod_pct = cod_reg[1] if cod_reg else 0
     # il gemello del mono: il solo si'/no che gata il cassetto
     codici_vivi = _codici_vivi(con, venditore_id, int(time.time()))
     if accordo_carrello:
@@ -21642,6 +21977,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # un prezzo ma decidendo se regalare qualcosa. Quelle in SATS non
     # lo chiedono affatto: la loro misura e' l'articolo stesso.
     if (listino_eur or _sconto_vuole_cambio(regole_sc)
+            or _codice_vuole_cambio(cod_reg)
             or (sog_gratis > 0 and val_sg == "eur")
             or any(a["spedizione_eur"] > 0
                    or a["spedizione_punto_eur"] > 0
@@ -21709,7 +22045,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # esce di qui e la porta con se' anche l'euro nativo, due righe
     # piu' giu'.
     sconto, pct, chi_sc = _sconto_vincente(misura_art, misura_eur, pezzi,
-                                           regole_sc, cod_pct)
+                                           regole_sc, cod_reg, cambio)
     # LA GAMBA PIU' VICINA, e qui fra TUTTE: nel set la raggiungibilita'
     # non si afferma (la composizione puo' sempre crescere di un altro
     # articolo del negozio), quindi non c'e' niente da filtrare prima.
@@ -21783,9 +22119,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # «SATOSHI10» e capisce cosa abbiamo capito.
             "codice_sconto": ({"codice": cod_nome,
                                "stato": ("applicato" if chi_sc
-                                         else ("coperto" if cod_pct
+                                         else ("coperto" if cod_reg
                                                else "rifiutato")),
-                               "motivo": ("" if cod_pct else MSG_CODICE_NO)}
+                               "motivo": ("" if cod_reg else MSG_CODICE_NO)}
                               if cod_nome else None),
             # CHI ha vinto il max: il client spegne la pillola verde
             # della promessa del negozio quando ha vinto il codice —
@@ -21802,7 +22138,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # composizione, e senza questa riga il client inviterebbe
             # verso uno sconto che non arrivera' mai.
             **({"sconto_raggiungibile": False}
-               if cod_pct and regole_sc and not _sc_vive else {}),
+               if cod_reg and regole_sc and not _sc_vive else {}),
             "sconto_criterio": _crit_sc,
             "sconto_valuta": _val_sc,
             "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,
@@ -22349,11 +22685,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # 400 butterebbe indietro tutta la pagina per un refuso.
     # Il gettone del freno si consuma SOLO qui, cioe' solo quando il
     # tentativo e' fallito davvero.
-    cod_pct, cod_id = 0, 0
+    cod_reg, cod_id = (), 0
     if cod_nome:
-        cod_pct, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
+        cod_reg, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
                                          adesso)
-        if not cod_pct:
+        if not cod_reg:
             con.close()
             _codice_tentativo_speso(user["id"])
             raise HTTPException(400, MSG_CODICE_NO)
@@ -22396,7 +22732,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # spedizione sarebbe curare un male causandone uno peggiore.
     cambio_misura = cambio_ordine
     if cambio_misura <= 0 and ((sog_gratis > 0 and val_sg == "eur")
-                               or _sconto_vuole_cambio(regole_sc)):
+                               or _sconto_vuole_cambio(regole_sc)
+                               or _codice_vuole_cambio(cod_reg)):
         cambio_misura = await cambio_btc_eur()
     # Il conto lavora sull'UNITARIO (offerte e lampo parlano il prezzo
     # del singolo pezzo, come il listino) e moltiplica alla fine:
@@ -22456,7 +22793,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # del vincitore esce di qui — `pct` non si assegna piu' al momento
     # della lettura delle regole — e finisce in ordini.sconto_percento.
     sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
-                                           regole_sc, cod_pct)
+                                           regole_sc, cod_reg, cambio_misura)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # intera, supplemento compreso: e' quello che il venditore
@@ -22517,8 +22854,13 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # codice» e' un ciclo infinito. La fattura appena nata muore da
     # sola in 15 minuti, come nel 409 dello stock: non e' stato pagato
     # niente.
-    if cod_id and _codice_sconto(con, a["venditore_id"], cod_nome,
-                                 int(time.time()))[0] <= 0:
+    # ⚠️ `not …[0]` e NON `… <= 0`: dall'ago 2026 quel posto porta la
+    # REGOLA (una tupla) e non piu' la percentuale, e un confronto
+    # numerico con una tupla non e' falso — SOLLEVA. La tupla vuota e'
+    # «non vale piu'», ed e' la stessa verita' che leggono i quattro
+    # percorsi del conto.
+    if cod_id and not _codice_sconto(con, a["venditore_id"], cod_nome,
+                                     int(time.time()))[0]:
         con.close()
         raise HTTPException(409, "Il codice sconto è appena finito: "
                                  "togli il codice e riprova")
@@ -25578,6 +25920,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "durate": list(CODICI_SCONTO_DURATE_GIORNI),
         "min_percento": CODICI_SCONTO_MIN_PERCENTO,
         "max_percento": CODICI_SCONTO_MAX_PERCENTO,
+        # LE PILLOLE E I TETTI DELLA CIFRA FISSA (ago 2026), uno per
+        # unita': il client non hardcoda mai una cifra, e con due
+        # scale un tetto solo non direbbe niente in nessuna delle due.
+        "valori_eur": list(CODICI_SCONTO_VALORI_EUR),
+        "valori_sats": list(CODICI_SCONTO_VALORI_SATS),
+        "max_valore_eur": CODICI_SCONTO_MAX_VALORE_EUR,
+        "max_valore_sats": CODICI_SCONTO_MAX_VALORE_SATS,
+        "valute": list(VALUTE_SOGLIA),
         "max_usi": CODICI_SCONTO_MAX_USI}
     # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
     # grezzo: `suggerimenti_annunci` esce dal SELECT * ed e' 0 anche
@@ -27716,7 +28066,19 @@ def _codice_pubblico(r, usi: int, adesso: int) -> dict:
     return {"id": r["id"], "codice": r["codice"], "percento": r["percento"],
             "scadenza": r["scadenza"], "usi_max": r["usi_max"],
             "attivo": r["attivo"], "creato": r["creato"], "usi": usi,
-            "vale": bool(_codice_vale(r["percento"], r["scadenza"],
+            # IL TIPO E LA SUA CIFRA (ago 2026): escono NORMALIZZATI dal
+            # giudice — mai le colonne grezze — o la riga del cassetto
+            # direbbe «−0%» su un codice a valore, cioe' la stessa cosa
+            # che la lista esiste per non far indovinare al venditore.
+            # Le due colonne dell'altra unita' escono comunque: sono la
+            # cifra che ha scritto lui, e il toggle del cassetto le
+            # CONSERVA — il patto delle due soglie a valore.
+            "tipo": _tipo_codice(r["tipo"]) or "percento",
+            "valore_sats": r["valore_sats"], "valore_eur": r["valore_eur"],
+            "valore_valuta": _valuta_soglia(r["valore_valuta"]) or "eur",
+            "vale": bool(_codice_vale(r["tipo"], r["percento"],
+                                      r["valore_sats"], r["valore_eur"],
+                                      r["valore_valuta"], r["scadenza"],
                                       r["usi_max"], r["attivo"],
                                       r["venditore_id"], r["venditore_id"],
                                       adesso, usi))}
@@ -27752,6 +28114,13 @@ async def lista_codici_sconto(x_tg_init_data: str = Header(""),
             "durate": list(CODICI_SCONTO_DURATE_GIORNI),
             "min_percento": CODICI_SCONTO_MIN_PERCENTO,
             "max_percento": CODICI_SCONTO_MAX_PERCENTO,
+            # la gemella della busta di /api/me: le due si tengono in
+            # pari o il cassetto direbbe due cose secondo la strada
+            "valori_eur": list(CODICI_SCONTO_VALORI_EUR),
+            "valori_sats": list(CODICI_SCONTO_VALORI_SATS),
+            "max_valore_eur": CODICI_SCONTO_MAX_VALORE_EUR,
+            "max_valore_sats": CODICI_SCONTO_MAX_VALORE_SATS,
+            "valute": list(VALUTE_SOGLIA),
             "max_usi": CODICI_SCONTO_MAX_USI}
 
 
@@ -27781,18 +28150,47 @@ async def salva_codice_sconto(req: Request,
                                  f"punteggiatura non contano.")
     try:
         percento = int(d.get("percento") or 0)
+        valore = int(d.get("valore") or 0)
         usi_max = int(d.get("usi_max") or 0)
         giorni = int(d.get("giorni") or 0)
     except (TypeError, ValueError):
         raise HTTPException(400, "Numeri del codice non leggibili")
-    # IL PAVIMENTO AL POSTO DEL `< 1` (ago 2026, col campo libero): un
-    # codice all'1% non e' un'offerta, e' rumore — la stessa ragione
-    # della gemella, e qui lo zero non era comunque uno spegnimento.
-    if not (CODICI_SCONTO_MIN_PERCENTO <= percento
-            <= CODICI_SCONTO_MAX_PERCENTO):
-        raise HTTPException(400, f"Lo sconto di un codice va dal "
-                                 f"{CODICI_SCONTO_MIN_PERCENTO}% al "
-                                 f"{CODICI_SCONTO_MAX_PERCENTO}%.")
+    # IL TIPO (ago 2026). Assente = 'percento', ed e' il client di ieri
+    # che non sa che esiste: mandava `percento` e basta, e continua a
+    # creare codici a percentuale come sempre — la retrocompatibilita'
+    # a costo zero, lo stesso DEFAULT della colonna.
+    tipo = _tipo_codice(d.get("tipo"))
+    if not tipo:
+        raise HTTPException(400, "Tipo di sconto non previsto")
+    valuta = _valuta_soglia(d.get("valuta")) if tipo == "valore" else ""
+    if tipo == "valore" and not valuta:
+        raise HTTPException(400, "Valuta non prevista per un codice sconto")
+    if tipo == "percento":
+        # IL PAVIMENTO AL POSTO DEL `< 1` (ago 2026, col campo libero).
+        # SCESO A 1 col tetto salito a 100 (decisione di Andrea: «devo
+        # poter decidere arbitrariamente quando scontare»): la riga
+        # resta una cintura — a zero il codice non scontera' mai
+        # niente — ma non giudica piu' se il regalo sia abbastanza
+        # generoso, che e' una cosa che sa solo chi lo fa.
+        if not (CODICI_SCONTO_MIN_PERCENTO <= percento
+                <= CODICI_SCONTO_MAX_PERCENTO):
+            raise HTTPException(400, f"Lo sconto di un codice va dal "
+                                     f"{CODICI_SCONTO_MIN_PERCENTO}% al "
+                                     f"{CODICI_SCONTO_MAX_PERCENTO}%.")
+    else:
+        # LA CIFRA FISSA, col tetto NELLA SUA UNITA': un euro e un sat
+        # non si misurano con lo stesso numero, e un tetto solo
+        # lascerebbe passare in una scala quel che rifiuta nell'altra.
+        # IL PAVIMENTO E' 1 e non una leva: sotto c'e' solo lo zero,
+        # che qui vuol dire «nessuno sconto» — cioe' il codice che il
+        # libro mastro chiama «non puo' scattare».
+        tetto = (CODICI_SCONTO_MAX_VALORE_SATS if valuta == "sats"
+                 else CODICI_SCONTO_MAX_VALORE_EUR)
+        if not (1 <= valore <= tetto):
+            raise HTTPException(400, f"Lo sconto di un codice a cifra fissa "
+                                     f"va da 1 a "
+                                     f"{_fmt_sats(tetto)}"
+                                     f"{' sats' if valuta == 'sats' else ' €'}.")
     if usi_max < 0 or usi_max > CODICI_SCONTO_MAX_USI:
         raise HTTPException(400, f"Gli usi di un codice arrivano a "
                                  f"{_fmt_sats(CODICI_SCONTO_MAX_USI)}: "
@@ -27814,12 +28212,27 @@ async def salva_codice_sconto(req: Request,
         # e nella direzione che costa. Si conserva col COALESCE.
         sc = None if d.get("giorni") is None else scadenza
         um = None if d.get("usi_max") is None else usi_max
+        # LE DUE COLONNE DELLA CIFRA SI CONSERVANO A VICENDA, il patto
+        # delle due soglie a valore: si scrive SOLO quella dell'unita'
+        # dichiarata, e l'altra resta l'ultima cifra che il venditore
+        # ha battuto in quell'unita' — cosi' chi prova gli euro e torna
+        # ai sats ritrova il suo numero e non una conversione che non
+        # ha scelto. Sul tipo 'percento' non si tocca nessuna delle
+        # due: passare a percentuale e tornare indietro non deve
+        # cancellare la cifra.
+        vs = valore if (tipo == "valore" and valuta == "sats") else None
+        ve = valore if (tipo == "valore" and valuta == "eur") else None
+        vv = valuta if tipo == "valore" else None
         try:
             n = con.execute("UPDATE codici_sconto SET codice=?, percento=?, "
+                            "tipo=?, "
+                            "valore_sats=COALESCE(?, valore_sats), "
+                            "valore_eur=COALESCE(?, valore_eur), "
+                            "valore_valuta=COALESCE(?, valore_valuta), "
                             "scadenza=COALESCE(?, scadenza), "
                             "usi_max=COALESCE(?, usi_max) "
                             "WHERE id=? AND venditore_id=?",
-                            (codice, percento, sc, um, cid,
+                            (codice, percento, tipo, vs, ve, vv, sc, um, cid,
                              user["id"])).rowcount
         except sqlite3.IntegrityError:
             con.close()
@@ -27842,9 +28255,15 @@ async def salva_codice_sconto(req: Request,
         # xp_eventi, dove il vincolo E' il giudice.
         try:
             con.execute("INSERT INTO codici_sconto(venditore_id, codice, "
-                        "percento, scadenza, usi_max, attivo, creato) "
-                        "VALUES(?,?,?,?,?,1,?)",
-                        (user["id"], codice, percento, scadenza, usi_max,
+                        "percento, tipo, valore_sats, valore_eur, "
+                        "valore_valuta, scadenza, usi_max, attivo, creato) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,1,?)",
+                        (user["id"], codice, percento, tipo,
+                         valore if (tipo == "valore"
+                                    and valuta == "sats") else 0,
+                         valore if (tipo == "valore"
+                                    and valuta == "eur") else 0,
+                         valuta or "eur", scadenza, usi_max,
                          int(time.time())))
         except sqlite3.IntegrityError:
             con.close()
@@ -37588,8 +38007,21 @@ CONTROLLI_LIBRO_MASTRO = (
      "- protezione_sats <= 0))"),
     ("sconto e percentuale scordati",
      "la ricevuta dichiara uno sconto che non c'e', o tace su uno che c'e'",
-     "SELECT id FROM ordini "
-     "WHERE (sconto_percento>0) <> (sconto_sats>0)"),
+     # ⚠️ IL BICONDIZIONALE VALE SOLO IN UN VERSO (ago 2026, col codice
+     # a cifra fissa): «percentuale senza sconto» resta un guasto —
+     # nessuna regola la scrive senza aver scontato — ma «sconto senza
+     # percentuale» e' diventato lo stato NORMALE di ogni ordine
+     # scontato da un codice a valore, che una percentuale NON CE
+     # L'HA. Tenere il `<>` avrebbe fatto suonare la ronda su ogni
+     # buono da 10 € speso: l'allarme che suona sul normale, per la
+     # terza volta in questo catalogo.
+     # A DISTINGUERLI non serve una colonna nuova: `codice_sconto_id`
+     # dice gia' che a scontare e' stato un CODICE, ed e' l'unica
+     # strada da cui puo' uscire uno sconto senza percentuale.
+     "SELECT id FROM ordini WHERE "
+     "  (sconto_percento>0 AND sconto_sats<=0)"
+     "  OR (sconto_sats>0 AND sconto_percento<=0 "
+     "      AND COALESCE(codice_sconto_id,0)=0)"),
     # La promessa del venditore, non l'ordine: qui non si perdono sats,
     # si perde una vendita — e in silenzio, che e' il modo in cui questi
     # guasti campano per mesi. Copre in una riga i due modi di
@@ -37926,9 +38358,35 @@ CONTROLLI_LIBRO_MASTRO = (
     # e mai le leve — un allarme agganciato a una leva suona al primo
     # ritocco della leva.
     ("codice sconto che non puo' scattare",
-     "un codice acceso con una percentuale che non sconta niente: chi "
-     "l'ha ricevuto lo scrivera' alla cassa e non succedera' nulla",
-     "SELECT id FROM codici_sconto WHERE attivo=1 AND percento<=0"),
+     "un codice acceso che non sconta niente: chi l'ha ricevuto lo "
+     "scrivera' alla cassa e non succedera' nulla",
+     # ⚠️ IL CONTROLLO GUARDA IL TIPO (ago 2026, col codice a valore),
+     # o suonerebbe su OGNI codice a cifra fissa — che ha `percento`
+     # a zero per costruzione, ed e' il suo stato NORMALE. Un allarme
+     # che suona sul normale e' il modo in cui si impara a ignorarlo.
+     # Il tipo VUOTO vale 'percento' come nel giudice: sono le righe
+     # nate prima della migrazione, e li' la percentuale e' l'unica
+     # cosa da guardare. Un tipo fuori catalogo NON entra qui: quello
+     # non e' «uno sconto a zero», e' una riga che nessun ramo sa
+     # leggere — la prende il controllo accanto.
+     "SELECT id FROM codici_sconto WHERE attivo=1 AND ("
+     "  (COALESCE(tipo,'') IN ('','percento') AND percento<=0)"
+     "  OR (tipo='valore' AND valore_valuta='sats' AND valore_sats<=0)"
+     "  OR (tipo='valore' AND valore_valuta='eur' AND valore_eur<=0))"),
+    # IL GEMELLO STRUTTURALE, e nasce col tipo: una riga il cui tipo o
+    # la cui valuta non stanno in catalogo e' un codice ACCESO che il
+    # giudice spegne in silenzio — chi l'ha in mano non capira' mai
+    # perche'. Passa la domanda che decide («esiste uno stato
+    # transitorio legittimo?»): no, i due cataloghi sono chiusi e
+    # l'endpoint rifiuta tutto il resto, quindi se compare e' una
+    # scrittura a mano o un rollback da un tipo futuro.
+    ("codice sconto con un tipo che nessuno sa leggere",
+     "un codice acceso con un tipo o una valuta fuori catalogo: il "
+     "giudice lo spegne, e chi l'ha ricevuto non lo sapra' mai",
+     "SELECT id FROM codici_sconto WHERE attivo=1 AND ("
+     "  COALESCE(tipo,'') NOT IN ('','percento','valore')"
+     "  OR (tipo='valore' AND COALESCE(valore_valuta,'') "
+     "      NOT IN ('eur','sats')))"),
     # QUALI NON NASCONO, e la domanda che decide («esiste uno stato
     # TRANSITORIO LEGITTIMO in cui e' falsa?»):
     # - «usi <= usi_max»: NO, e va scritto perche' e' il primo che

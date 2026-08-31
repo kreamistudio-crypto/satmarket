@@ -401,17 +401,27 @@ SPED_GRATIS_MIN_SATS = 1        # idem, in sats
 CODICI_SCONTO_ATTIVI = True     # False = i codici non valgono piu' alla
                                 # cassa e il cassetto risponde 400, ma
                                 # le righe restano e tornano vive
-CODICI_SCONTO_MAX_PERCENTO = 30  # TIENILO PARI a SCONTO_PACCO_MAX_
-                                # PERCENTO: con «vince il maggiore» il
-                                # tetto della cascata e' il max dei due,
-                                # e alzare solo questo sposta il fondo
-CODICI_SCONTO_MIN_PERCENTO = 5   # il gemello del pavimento dello
-                                # sconto articoli. Tenerlo pari e' un
-                                # CONSIGLIO e non una regola come per i
-                                # tetti: un pavimento non compone la
-                                # cascata, dice solo se una promessa si
-                                # puo' accendere
+CODICI_SCONTO_MAX_PERCENTO = 100  # NON e' piu' pari al gemello dello
+                                # sconto articoli (ago 2026): quello e'
+                                # una promessa in vetrina, questo un
+                                # segreto dato a chi si vuole. Il fondo
+                                # della cascata non si sposta — «vince
+                                # il maggiore» non e' una somma — e il
+                                # 100 non vuol dire gratis: resta 1 sat
+CODICI_SCONTO_MIN_PERCENTO = 1   # quanto valga il regalo lo decide chi
+                                # lo fa. Resta una cintura: a 0 il
+                                # codice non scontera' mai niente
 CODICI_SCONTO_PERCENTI = (5, 10, 15, 20)     # le pillole del venditore
+
+# LO SCONTO A CIFRA FISSA (ago 2026): «−10 €» invece di «−10%». La
+# valuta la sceglie il venditore, e le due liste sono due perche' un
+# euro e un sat non si scrivono nella stessa scala.
+CODICI_SCONTO_VALORI_EUR = (5, 10, 20, 50)   # le pillole in euro
+CODICI_SCONTO_VALORI_SATS = (5_000, 10_000, 25_000, 50_000)
+CODICI_SCONTO_MAX_VALORE_EUR = 10_000   # cinture larghe: il tetto VERO
+CODICI_SCONTO_MAX_VALORE_SATS = 100_000_000   # e' l'articolo stesso —
+                                # uno sconto piu' grande del carrello si
+                                # LIMA, non si rifiuta
 CODICI_SCONTO_DURATE_GIORNI = (7, 30, 90, 0)  # lo 0 = senza scadenza
 CODICI_SCONTO_MAX_PER_VENDITORE = 20   # quanti codici puo' avere
 CODICI_SCONTO_MAX_USI = 100_000        # cintura contro il numero

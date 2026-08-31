@@ -13881,8 +13881,19 @@ function renderAcquisto(){
      cui «vince il maggiore» si spiega a chi paga: un codice COPERTO e'
      VALIDO — ha solo perso contro una promessa piu' generosa — e
      dirgli «non vale» lo manderebbe a cercarne un altro che non c'e' */
+  /* ⚠️ LA PERCENTUALE SI DICE SOLO SE C'E' (ago 2026, col codice a
+     cifra fissa): li' `sconto_percento` e' ZERO per costruzione — quel
+     codice una percentuale NON CE L'HA — e il testo di ieri avrebbe
+     scritto «−0%» proprio sul codice che aveva appena scontato.
+     E la CIFRA non si rifa' qui: la dice la riga «Sconto codice» del
+     conto, due dita piu' giu', dove c'e' gia' e nella valuta della
+     vista. E' il patto di casa — la pillola e' il cartello, il conto
+     e' il fatto — e per la percentuale vale il rovescio: quella e' la
+     REGOLA e non una cifra, quindi non invecchia col carrello e si
+     dice qui. */
   const codDetto = codStato === 'applicato'
-    ? `🎟 ${esc(codRisp.codice)} — <b>−${p.sconto_percento||0}%</b>`
+    ? `🎟 ${esc(codRisp.codice)} — <b>${(p.sconto_percento||0) > 0
+        ? `−${p.sconto_percento}%` : 'sconto applicato'}</b>`
     : `🎟 ${esc(codRisp ? codRisp.codice : codScritto)} — lo sconto del negozio è più alto`;
   const codChiuso = (codScritto && codStato && codStato !== 'rifiutato')
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
@@ -21698,6 +21709,79 @@ async function setScontoPacco(spegni){
    CAMPO LIBERO (vedi sogliaLibera), e con due modi di dire lo stesso
    numero un salvataggio per tocco lascerebbe il campo indietro. */
 
+/* LA CIFRA FISSA SCRITTA A MANO, il gemello di campoPctLibera per il
+   tipo 'valore' (ago 2026).
+   ⚠️ NON si riusa quella coppia, e il divieto e' lo stesso che lei ha
+   gia' scritto per se': `campoPctLibera` non ha un `campo` variabile
+   perche' «di unita' ce n'e' una e non cambia mai» — qui ce ne sono
+   DUE e commutano col toggle, cioe' il posto piu' facile in cui un
+   numero diventa un'altra cosa. Due funzioni, due unita', nessuna
+   scorciatoia.
+   COME LA GEMELLA: le pillole RIEMPIONO il campo invece di
+   sostituirlo, il campo si ACCENDE quando porta una cifra che nessuna
+   pillola dice, e in ROSSO quando e' fuori intervallo — accenderlo in
+   arancio direbbe «scelto» su un numero che il server rifiuta. E NON
+   RIDISEGNA IL CASSETTO: un re-render toglierebbe il fuoco a ogni
+   tasto. */
+function valFuori(v){
+  const L = codiciLeve || {}, b = bozzaCod();
+  const max = (b.valuta === 'sats' ? L.max_valore_sats : L.max_valore_eur)
+              || 0;
+  return v > 0 && max > 0 && v > max ? {max} : null;
+}
+
+function campoValLibero(valore, voci){
+  const b = bozzaCod();
+  const suo = valore > 0 && !(voci || []).includes(valore);
+  const fuori = valFuori(valore);
+  const unita = b.valuta === 'sats' ? 'sats' : '€';
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--muted)">
+      <span>oppure</span>
+      <input id="val-codici" type="number" inputmode="numeric"
+        min="1" step="1" value="${valore > 0 ? valore : ''}"
+        oninput="valLibero(this.value)"
+        aria-label="Sconto a cifra fissa"
+        style="font:inherit;width:96px;padding:6px 8px;border:1px solid ${
+          fuori ? 'var(--danger)' : suo ? 'var(--sats)' : 'var(--line)'
+        };border-radius:8px;background:transparent;color:var(--ink);font-weight:${suo&&!fuori?800:400}">
+      <span>${unita}</span></div>
+    <div id="val-avviso-codici" style="font-size:12.5px;font-weight:700;color:var(--danger);margin-top:6px">${
+      fuori ? `Al massimo ${fmt(fuori.max)} ${unita}` : ''}</div>`;
+}
+
+function valLibero(v){
+  const b = bozzaCod();
+  /* interi: un buono e' «−10 €» e non «−9,99 €», e le colonne del
+     server sono INTEGER (euro interi, il patto delle soglie).
+     Cifra illeggibile o vuota = 0, cioe' «manca»: NON si lima al
+     massimo qui, che sarebbe un clamp muto — a dire la cifra ci sono
+     la riga qui sotto e il 400 del server. */
+  const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
+  const q = n > 0 ? n : 0;
+  if (b.valuta === 'sats') b.valSats = q; else b.valEur = q;
+  /* le pillole tornano a dire la verita', come nella gemella */
+  const voci = (b.valuta === 'sats' ? codiciLeve.valori_sats
+                                    : codiciLeve.valori_eur) || [];
+  document.querySelectorAll('#codiciBlocco [data-campo="val"]').forEach(p => {
+    const on = Number(p.dataset.v) === q;
+    p.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+    p.style.background = on ? 'var(--sats)' : 'transparent';
+    p.style.color = on ? '#fff' : 'var(--muted)';
+  });
+  const suo = q > 0 && !voci.includes(q);
+  const fuori = valFuori(q);
+  const campo = el('val-codici');
+  if (campo){
+    campo.style.borderColor = fuori ? 'var(--danger)'
+                            : suo ? 'var(--sats)' : 'var(--line)';
+    campo.style.fontWeight = (suo && !fuori) ? 800 : 400;
+  }
+  const av = el('val-avviso-codici');
+  if (av) av.textContent = fuori
+    ? `Al massimo ${fmt(fuori.max)} ${b.valuta === 'sats' ? 'sats' : '€'}`
+    : '';
+}
+
 /* --- I CODICI SCONTO DEL VENDITORE (ago 2026) --------------------
    IL MODELLO E' renderRicerche e NON renderSpedGratis: li' c'e' UNA
    regola con UN bottone che salva e uno che spegne, qui una LISTA con
@@ -21717,10 +21801,34 @@ let bozzaCodice = null;
 
 function bozzaCod(){
   if (!bozzaCodice)
-    bozzaCodice = {pct: (codiciLeve && codiciLeve.sconti || [10])[0],
+    bozzaCodice = {tipo: 'percento',
+                   pct: (codiciLeve && codiciLeve.sconti || [10])[0],
+                   /* la cifra fissa vive in DUE campi, uno per unita',
+                      e il toggle CONSERVA invece di convertire: il
+                      patto delle due soglie a valore del negozio —
+                      chi prova gli euro e torna ai sats ritrova il
+                      suo numero, non una conversione che non ha mai
+                      scelto (e che al cambio di oggi sarebbe pure
+                      diversa da quella di ieri) */
+                   valEur: (codiciLeve && codiciLeve.valori_eur || [10])[0],
+                   valSats: (codiciLeve && codiciLeve.valori_sats
+                             || [10000])[0],
+                   valuta: 'eur',
                    giorni: (codiciLeve && codiciLeve.durate || [0])[0],
                    usi: 0};
   return bozzaCodice;
+}
+
+/* LA CIFRA DI UN CODICE, in un posto solo (ago 2026): «−10%» oppure
+   «−10 €». La fanno in due — la riga della lista e l'anteprima del
+   form — e due copie direbbero due cose sullo stesso codice, che e'
+   esattamente cio' che il cassetto esiste per non far indovinare al
+   venditore. Prende i CAMPI e non la riga, cosi' serve tanto un
+   codice salvato quanto una bozza che si sta ancora scrivendo. */
+function cifraCodice(tipo, pct, valSats, valEur, valuta){
+  if (tipo !== 'valore') return `−${pct||0}%`;
+  return valuta === 'sats' ? `−${fmt(valSats||0)} sats`
+                           : `−${fmt(valEur||0)} €`;
 }
 
 async function renderCodici(){
@@ -21744,8 +21852,21 @@ async function renderCodici(){
   const tetto = codiciLeve.max || 20;
   el('codiciConta').textContent = `(${myCodici.length} di ${tetto})`;
   const b = bozzaCod();
-  const pill = (v, testo, campo) =>
-    `<button data-campo="${campo}" data-v="${v}" onclick="codicePill('${campo}',${v})" style="font:inherit;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  /* QUAL E' LA SCELTA VIVA per questo campo: 'val' non ha un campo
+     suo nella bozza — la cifra vive in valSats/valEur, una per unita'
+     — quindi la domanda si fa qui, in un posto solo, e le pillole e
+     il campo libero non possono accendersi su due numeri diversi. */
+  const scelto = campo => campo === 'val'
+    ? (b.valuta === 'sats' ? b.valSats : b.valEur) : b[campo];
+  /* ⚠️ IL VALORE PASSA DAL `data-v` E NON DENTRO L'ONCLICK: dall'ago
+     2026 questi campi portano anche STRINGHE ('percento', 'eur'), e
+     interpolate nude diventerebbero IDENTIFICATORI — `codicePill(
+     'tipo',percento)`, cioe' un ReferenceError al primo tocco. E'
+     la lezione di «Valle d'Aosta» sul picker, con una causa nuova. */
+  const pill = (v, testo, campo) => {
+    const on = scelto(campo) === v;
+    return `<button data-campo="${campo}" data-v="${v}" onclick="codicePill('${campo}', this.dataset.v)" style="font:inherit;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  };
   const durata = g => g ? `${g} giorni` : 'senza scadenza';
   const azCod = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
   const riga = c => {
@@ -21764,7 +21885,7 @@ async function renderCodici(){
        nessuna prova poteva prenderlo. */
     return `<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px dashed var(--line)">
       <div style="flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.4;color:${c.attivo && !morto ? 'var(--ink)' : 'var(--muted)'}">
-        ${c.attivo ? '' : '⏸ '}<b class="mono">${esc(c.codice)}</b> · −${c.percento}%
+        ${c.attivo ? '' : '⏸ '}<b class="mono">${esc(c.codice)}</b> · ${cifraCodice(c.tipo, c.percento, c.valore_sats, c.valore_eur, c.valore_valuta)}
         · ${c.usi_max ? `${fmt(c.usi)}/${fmt(c.usi_max)} usi` : `${fmt(c.usi)} usi`}
         · ${c.scadenza ? 'scade il ' + new Date(c.scadenza*1000).toLocaleDateString('it-IT') : 'senza scadenza'}
         ${morto ? `<span style="color:var(--danger);font-weight:800"> · ${perche}</span>` : ''}
@@ -21788,10 +21909,46 @@ async function renderCodici(){
     <div class="field"><input id="codCodice" maxlength="24"
       placeholder="Es. SATOSHI10" autocomplete="off"
       style="text-transform:uppercase" value="${esc(b.codice||'')}"></div>
-    <div class="section-label" style="margin-top:10px">Quanto sconto</div>
+    <div class="section-label" style="margin-top:10px">Che sconto fa</div>
+    ${/* IL TIPO (ago 2026): una percentuale o una cifra fissa. Due
+          pillole e non un toggle nel campo, per la ragione del
+          criterio dello sconto carrello — sono due MESTIERI diversi,
+          non due unita' della stessa cosa, e il blocco sotto cambia
+          per intero. */''}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${(codiciLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
-    ${campoPctLibera('codici', b.pct, codiciLeve.sconti||[])}
+      ${pill('percento', 'In percentuale', 'tipo')}
+      ${pill('valore', 'A cifra fissa', 'tipo')}</div>
+    ${b.tipo === 'valore' ? `
+      ${/* LA VALUTA la sceglie il venditore, e il toggle CONSERVA:
+            passare a sats e tornare agli euro ritrova la cifra di
+            prima — il patto delle due soglie a valore. */''}
+      <div class="section-label" style="margin-top:12px">In che valuta</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${pill('eur', '€ euro', 'valuta')}
+        ${pill('sats', '₿ sats', 'valuta')}</div>
+      <div class="section-label" style="margin-top:12px">Quanto toglie</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${((b.valuta === 'sats' ? codiciLeve.valori_sats
+                                : codiciLeve.valori_eur) || [])
+            .map(v => pill(v, b.valuta === 'sats' ? `−${fmt(v)}` : `−${v} €`,
+                           'val')).join('')}</div>
+      ${campoValLibero(b.valuta === 'sats' ? b.valSats : b.valEur,
+                       (b.valuta === 'sats' ? codiciLeve.valori_sats
+                                            : codiciLeve.valori_eur) || [])}
+      ${/* LA RIGA CHE DICE COSA SUCCEDE AL LIMITE, e non e' un
+            contorno: uno sconto piu' grande del carrello e' il caso
+            NORMALE di un buono generoso, e senza questa riga il
+            venditore lo scoprirebbe da una vendita. */''}
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:8px">
+        Se il carrello vale meno, si toglie quel che c'è: chi compra
+        paga <b style="color:var(--ink)">1 sat</b> di articoli, più
+        spedizione e protezione.</div>
+    ` : `
+      <div class="section-label" style="margin-top:12px">Quanto sconto</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${(codiciLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
+      ${campoPctLibera('codici', b.pct, codiciLeve.sconti||[])}
+    `}
     <div class="section-label" style="margin-top:12px">Per quanto vale</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(codiciLeve.durate||[]).map(g => pill(g, durata(g), 'giorni')).join('')}</div>
@@ -21817,7 +21974,20 @@ function codicePill(campo, v){
      cancellerebbe il codice appena digitato */
   b.codice = el('codCodice')?.value || b.codice || '';
   b.usi = parseInt(el('codUsi')?.value || '0', 10) || 0;
-  b[campo] = v;
+  /* dal `data-v` arriva sempre una STRINGA: i tre campi numerici la
+     riconvertono, i due di catalogo ('tipo', 'valuta') la tengono
+     com'e'. Senza questa riga `b.pct` diventerebbe '10' e il
+     confronto d'accensione — che e' un `===` — spegnerebbe la pillola
+     appena toccata. */
+  if (campo === 'val'){
+    /* la cifra non ha un campo suo: va in quello della sua unita' */
+    if (b.valuta === 'sats') b.valSats = Number(v) || 0;
+    else b.valEur = Number(v) || 0;
+  } else if (campo === 'pct' || campo === 'giorni'){
+    b[campo] = Number(v) || 0;
+  } else {
+    b[campo] = String(v);
+  }
   renderCodici();
 }
 
@@ -21826,7 +21996,19 @@ function modificaCodice(id){
   if (!c) return;
   haptic();
   codiceInModifica = id;
+  /* LA BOZZA NASCE COMPLETA, e le due cifre arrivano ENTRAMBE dal
+     server: cosi' il toggle della valuta conserva anche in modifica —
+     chi apre un codice in euro, guarda i sats e torna indietro
+     ritrova la sua cifra. I ripieghi sulle pillole servono al codice
+     nato PRIMA della migrazione, che quelle colonne le ha a zero. */
   bozzaCodice = {codice: c.codice, pct: c.percento, usi: c.usi_max,
+                 tipo: c.tipo || 'percento',
+                 valuta: c.valore_valuta || 'eur',
+                 valEur: c.valore_eur
+                         || (codiciLeve && codiciLeve.valori_eur || [10])[0],
+                 valSats: c.valore_sats
+                          || (codiciLeve && codiciLeve.valori_sats
+                              || [10000])[0],
                  giorni: 0};
   renderCodici();
 }
@@ -21841,9 +22023,17 @@ function annullaModificaCodice(){
 async function salvaCodice(btn){
   haptic();
   const b = bozzaCod();
+  /* SI MANDA SOLO LA CIFRA DEL TIPO SCELTO, e la valuta con lei: le
+     due colonne dell'altra unita' le CONSERVA il server col suo
+     COALESCE — mandarle tutte e due vorrebbe dire riscrivere a ogni
+     salvataggio una cifra che il venditore non sta guardando. */
   const corpo = {codice: el('codCodice')?.value || '',
-                 percento: b.pct, giorni: b.giorni,
+                 tipo: b.tipo, percento: b.pct, giorni: b.giorni,
                  usi_max: parseInt(el('codUsi')?.value || '0', 10) || 0};
+  if (b.tipo === 'valore'){
+    corpo.valuta = b.valuta;
+    corpo.valore = b.valuta === 'sats' ? b.valSats : b.valEur;
+  }
   if (codiceInModifica) corpo.id = codiceInModifica;
   const dove = el('codiciErrore');
   if (dove) dove.innerHTML = '';
