@@ -3210,6 +3210,45 @@
     font-family:'Baloo 2',system-ui,sans-serif;font-size:22px;
     line-height:1.15;font-weight:800;color:var(--ink)}
   .rac-logo + .rac-nome{display:none}
+  /* IL RAZZO CHE DECOLLA, all'apertura del racconto (ago 2026,
+     chiesto da Andrea: «e' anche il simbolo del progetto»). Un
+     ornamento, e per questo tutte e tre le righe che lo governano
+     sono vincoli e non gusti.
+     1. NON SPINGE NIENTE: `absolute` sta fuori dal flusso, quindi
+        costa ZERO pixel di layout — e `pointer-events:none` perche'
+        un disegno che passa sopra non deve mangiare un tocco.
+     2. NON COPRE IL TESTO, e non per promessa ma per COSTRUZIONE:
+        vola nella fascia del LOGO (alta 72px), dove a destra c'e' un
+        vuoto misurato di 171px a 320 e 531 a 1280 — la pastiglia sta
+        a sinistra, il logo sta a sinistra, e il testo comincia solo
+        SOTTO. ⚠️ Un volo piu' lungo, che attraversi la testa, e'
+        stato scartato per questo: li' occhiello, titolo e intro sono
+        blocchi a TUTTA larghezza (colonna libera: zero), e l'unico
+        modo di passarci sarebbe tarare la traiettoria sull'inchiostro
+        di QUESTO testo — una misura che invecchia col prossimo
+        sponsor.
+     3. CHI HA LE ANIMAZIONI RIDOTTE NON LO VEDE MAI: nasce a
+        `opacity:0` e reduced-motion toglie l'animazione, quindi
+        resta invisibile invece di restare PIANTATO a mezz'aria —
+        che e' quel che succederebbe fermandolo con
+        `animation-play-state` (la lezione dell'impulso dello scatto).
+     `both` tiene l'ultimo fotogramma, che e' di nuovo trasparente:
+     nessun residuo da ripulire, per costruzione.
+     `left` E NON `right`: ancorato al bordo destro, a 1280 il razzo
+     partirebbe a mezzo metro dal logo e si leggerebbe come scollegato
+     da tutto. Cosi' invece decolla sempre da accanto al marchio.
+     I 150px sono il fondo del vuoto: il logo finisce a 117, e la
+     RISERVA — il nome scritto, quando la figura non arriva — ne
+     chiede ~145, quindi il razzo comincia dopo tutti e due. */
+  .rac-razzo{position:absolute;left:150px;top:0;width:30px;height:30px;
+    opacity:0;pointer-events:none;color:var(--ink)}
+  .rac-razzo.va{animation:racRazzo 1s cubic-bezier(.32,0,.5,1) both}
+  @keyframes racRazzo{
+    0%{transform:translateY(76px) scale(.85);opacity:0}
+    20%{transform:translateY(58px) scale(.9);opacity:1}
+    72%{opacity:1}
+    100%{transform:translateY(-6px) scale(1);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.rac-razzo.va{animation:none}}
   .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
     letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
@@ -9357,6 +9396,25 @@ function renderStriscia(){
    non compare (`vivo` lo guarda) e il racconto nemmeno. E'
    fail-closed apposta — meglio nessuna card che una card che porta
    al negozio sbagliato. */
+/* Il razzo del racconto. DISEGNO e non immagine, e non e' una
+   preferenza: un SVG in linea costa zero file, zero giri di rete —
+   e uno proprio mentre il cassetto si apre e' il peggior momento per
+   chiederne uno — e zero voci nella whitelist della rotta. Col
+   `currentColor` segue il tema da solo, come le icone della nav.
+   Grammatica di casa (tagliaSVG, ICO_LOCKER, ICO_NOSTR): viewBox
+   ritagliato sull'inchiostro, tratto 1.5, capi tondi, e l'inchiostro
+   TUTTO dentro [2,22] col tratto compreso — chi lo ridisegna tenga
+   quel recinto, o il viewBox glielo taglia. */
+const ICO_RAZZO = '<svg viewBox="2 2 20 20" aria-hidden="true">'
+  + '<g fill="none" stroke="currentColor" stroke-width="1.5"'
+  + ' stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M12 2.8c2.4 3 3.4 6.8 3.4 10.4h-6.8C8.6 9.6 9.6 5.8 12 2.8z"/>'
+  + '<circle cx="12" cy="8.4" r="1.7"/>'
+  + '<path d="M8.6 10.2 5.6 15.4l3-1.2"/>'
+  + '<path d="M15.4 10.2 18.4 15.4l-3-1.2"/>'
+  + '<path d="M12 14.6C13.7 16.9 13.3 19.3 12 20.9'
+  + ' 10.7 19.3 10.3 16.9 12 14.6z"/></g></svg>';
+
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
@@ -9366,6 +9424,13 @@ const RACCONTI = {
        qui non la «corregga». */
     titolo: 'To The Mooon!',
     occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
+    /* IL RAZZO E' DI QUESTO PROGETTO, non del racconto (decisione
+       di Andrea): sta nel CATALOGO e non nel renderer, o il secondo
+       sponsor se lo ritroverebbe addosso senza che sia il suo
+       simbolo. E' la stessa ragione per cui il blocco «Come funziona
+       questo spazio» sta invece nel RENDERER: quello e' nostro e non
+       puo' dipendere da chi paga, questo e' loro. */
+    razzo: true,
     sottotitolo: 'Capire Bitcoin, giocando.',
     intro: "Ogni viaggio inizia con una scelta. L'obiettivo e' arrivare " +
            "sulla Luna: prendi decisioni, affronti imprevisti e gestisci " +
@@ -10754,10 +10819,18 @@ let negozioPag = {chi:null, cursore:null, caricando:false};
    il racconto sotto le dita di chi sta leggendo. Mai localStorage:
    e' lo stato di una pagina, non una preferenza. */
 let raccontoAperto = false;
+/* Il razzo parte UNA volta per apertura del negozio, e il «una volta»
+   sta nella BANDIERINA e mai nell'animazione: coi keyframes da soli
+   basterebbe un ridisegno qualunque a farlo ripartire — la lezione di
+   `bustaSvelata`. Si azzera entrando nel negozio e non alla
+   pubblicazione: chi esce e rientra e' un'apertura nuova, e negarglielo
+   vorrebbe dire una volta per SESSIONE, che e' un'altra cosa. */
+let razzoFatto = false;
 
 async function apriNegozio(chi, aperto){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
+  razzoFatto = false;
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(
@@ -10938,9 +11011,17 @@ function raccontoNegozio(v){
      esattamente cio' che il prompt della moderazione vieta agli
      altri («il testo che SI RIVOLGE A CHI LEGGE come farebbe la
      piattaforma»). Quella regola non puo' valere solo per gli altri. */
+  /* Il razzo parte solo se il racconto NASCE aperto — cioe' a chi e'
+     arrivato dalla card. Chi apre il cassetto a mano lo fa partire da
+     `toggleRacconto`, che e' l'altro momento in cui «il racconto si
+     apre»: qui l'elemento non si disegna affatto, o volerebbe sotto
+     un cassetto chiuso. */
+  const razzoVa = !!r.razzo && raccontoAperto && !razzoFatto;
+  if (razzoVa) razzoFatto = true;
   return `
     <div class="racconto">
       <div class="rac-testa">
+        ${razzoVa ? `<span class="rac-razzo va">${ICO_RAZZO}</span>` : ''}
         <span class="rac-pill">📣 Sponsor</span>
         <img class="rac-logo" src="${foto('cop')}"
              alt="${esc(r.titolo)}" decoding="async"
@@ -10986,6 +11067,18 @@ function toggleRacconto(btn){
   if (c) c.classList.toggle('aperto', raccontoAperto);
   btn.setAttribute('aria-expanded', raccontoAperto ? 'true' : 'false');
   btn.textContent = raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›';
+  /* L'altro momento in cui «il racconto si apre». Il disegno qui non
+     c'e' ancora (il render non l'ha messo: il cassetto era chiuso), e
+     si aggiunge invece di riaccendere una classe — cosi' non serve
+     nessun reflow per far ripartire un'animazione, che e' il modo in
+     cui questa riga di solito si sbaglia. */
+  const testa = document.querySelector('.rac-testa');
+  if (raccontoAperto && !razzoFatto && testa
+      && (RACCONTI[sponsorVivo] || {}).razzo){
+    razzoFatto = true;
+    testa.insertAdjacentHTML('afterbegin',
+      `<span class="rac-razzo va">${ICO_RAZZO}</span>`);
+  }
 }
 
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
