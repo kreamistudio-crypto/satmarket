@@ -32201,14 +32201,39 @@ def prove_sponsor():
           "tourRidotto()" in _rz.split("return")[0])
     prova("...e passa dallo stesso giudice del racconto", True,
           "raccontoDi(v)" in _rz)
-    # IL RITAGLIO E' LA GARANZIA DEL «non copre»: il razzo esce verso
-    # l'alto, e senza guscio passerebbe sopra la prosa. `inset:0` lo
-    # tiene nei bordi della card per costruzione, non per taratura.
+    # IL RITAGLIO SERVE AL TENTATIVO: li' il razzo sale di 9px e
+    # ricade, e senza guscio quel sussulto uscirebbe dalla card.
+    # `inset:0` lo tiene nei suoi bordi per costruzione, non per
+    # taratura.
     _g = " ".join(mini[mini.index("  .razzo-g{"):].split())
     _g = _g[:_g.index("}")]
     prova("il guscio del razzo RITAGLIA", (True, True, True),
           ("overflow:hidden" in _g, "inset:0" in _g,
            "position:absolute" in _g))
+    # ⚠️ ...E SI APRE ALLA PARTENZA, o il razzo non esce MAI (ago
+    # 2026, dal campo: «parte ma scompare subito dentro la card»).
+    # Il guscio e' alto quanto la card — 66px misurati — quindi
+    # ritagliava il volo dopo una quarantina di pixel e il resto lo
+    # faceva invisibile. La prova qui sopra era VERA e restava verde
+    # col difetto vivo: e' la classe di sentinella onesta e
+    # insufficiente insieme, per la settima volta.
+    _ga = " ".join(mini[mini.index("  .razzo-g.aperto{"):].split())
+    prova("...e si apre alla partenza", True,
+          _ga[:_ga.index("}")].endswith("overflow:visible"))
+    # ⚠️ E `pointer-events:none` RESTA APERTO O CHIUSO: e' la seconda
+    # condizione di Andrea («non copre»), e vale sui TOCCHI — il
+    # ritaglio non c'entra, e infatti il razzo in volo passa sopra la
+    # prosa apposta.
+    prova("...e non ruba tocchi in nessuno dei due stati", True,
+          "pointer-events:none" in _g)
+    # QUANTO SALE NON E' UN NUMERO NEL FOGLIO: la distanza la sa solo
+    # il momento della partenza, che dipende da DOVE sta la card in
+    # quell'istante. Col numero fisso il razzo restava a meta'
+    # schermo — 431px dalla cima di un viewport alto 760, misurati.
+    _kf = mini[mini.index("  @keyframes rz-parte{"):]
+    _kf = " ".join(_kf[:_kf.index("\n  }")].split())
+    prova("il volo del razzo lo scrive chi parte", (True, False),
+          ("var(--rz-volo" in _kf, "translateY(-120px)" in _kf))
     # ⚠️ E IL `position:relative` STA SULLA CLASSE SUA e non su
     # `.seller`, che la porta anche il riquadro venditore del
     # dettaglio: un antenato posizionato in piu' fa risalire li' ogni
@@ -32290,6 +32315,19 @@ def prove_sponsor():
     _ten = _ar[_ar.index("stato = 1;"):]
     prova("il cielo si accende quando il razzo PARTE", (True, False),
           ("razzoCielo" in _pt, "razzoCielo" in _ten))
+    # E IL GUSCIO SI APRE NELLO STESSO RAMO, mai nel tentativo: li' il
+    # ritaglio e' l'unica cosa che tiene il sussulto dentro la card.
+    prova("...e con lui si apre il guscio, mai nel tentativo",
+          (True, False), ("'aperto'" in _pt, "'aperto'" in _ten))
+    # ⚠️ E LA MISURA VIENE PRIMA DI TOGLIERE `prova`: quella classe
+    # tiene il razzo a `translateY(0)` alla fine del suo `both`,
+    # quindi il rect e' quello di RIPOSO — leggendolo dopo si
+    # prenderebbe un fotogramma a meta' del ricadere, e il volo
+    # uscirebbe corto di quel tanto.
+    prova("il volo si misura sul razzo fermo", (True, True),
+          ("--rz-volo" in _pt,
+           _pt.index("getBoundingClientRect")
+           < _pt.index("remove('prova')")))
     # IL LOGO STA AL CENTRO (chiesto da Andrea): `left:50%` col mezzo
     # passo indietro lo tiene in mezzo a ogni larghezza, senza un
     # numero da tarare.
@@ -32313,6 +32351,42 @@ def prove_sponsor():
     prova("...e l'indirizzo lo fa la fabbrica del racconto", (True, False),
           ("foto('logo')" in _rz, "/assets/racconti/${sponsorVivo}-logo"
            in _rz))
+    # ⚠️ E IL FILE DEVE REGGERE IL TETTO CSS, col criterio LETTO da li'
+    # e mai col numero: e' la lezione dei banner («scritta col
+    # letterale la prova passerebbe lo stesso finche' i file sono
+    # grandi abbastanza, e mentirebbe il giorno che la misura
+    # cresce»). Qui il peggiore e' il telefono a dpr 3 — sul web
+    # questo logo non cresce, che il cielo e' della card del
+    # venditore e non della striscia.
+    # L'ORIGINALE PIU' GRANDE NON CE L'ABBIAMO in repo (sta nei file
+    # di Andrea), quindi vale la ricetta delle celle delle categorie:
+    # il tetto si SCEGLIE guardando il file, e la prova lo inchioda.
+    _tetto = re.search(r"\.rz-logo\{[^}]*width:min\(\d+%,(\d+)px\)", mini)
+    prova("il tetto del logo si legge dal foglio", True, bool(_tetto))
+    try:
+        from PIL import Image as _Im
+        _lw, _lh = _Im.open(
+            os.path.join("assets", "racconti",
+                         "to-the-moon-logo.webp")).size
+        prova("...e il file del logo lo regge a dpr 3", True,
+              _lw >= int(_tetto.group(1)) * 3 if _tetto else False)
+        # e ha l'ALPHA: il logo sta sopra il fumo, e su un fondo
+        # opaco si vedrebbe il suo rettangolo — il precedente delle
+        # 27 illustrazioni delle categorie.
+        prova("...e il logo e' trasparente",
+              True,
+              _Im.open(os.path.join("assets", "racconti",
+                                    "to-the-moon-logo.webp")).mode
+              in ("RGBA", "LA", "PA"))
+    except ImportError:
+        salta("misura del logo: serve Pillow")
+    # ...e il criterio non torna un numero: l'ancora e' l'ASSEGNAZIONE
+    # a colonna, che nella riga che la cerca non compare.
+    _mio = open("prove.py", encoding="utf-8").read()
+    _at = re.search(r"^[ \t]*_tetto\s*=.*$", _mio, re.M)
+    prova("il tetto del logo non e' un numero scritto qui",
+          (True, True),
+          (bool(_at), "mini" in (_at.group(0) if _at else "")))
 
 
 def prove_racconto_girato():

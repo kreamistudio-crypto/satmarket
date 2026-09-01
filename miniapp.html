@@ -3084,6 +3084,19 @@
   .seller.con-razzo{position:relative;padding-right:52px}
   .razzo-g{position:absolute;inset:0;overflow:hidden;
     border-radius:inherit;pointer-events:none}
+  /* ⚠️ E SI APRE ALLA PARTENZA, o il razzo non esce MAI: il guscio e'
+     alto quanto la card (66px misurati) e il ritaglio se lo mangiava
+     dopo una quarantina di pixel — il resto del volo lo faceva
+     invisibile, ed e' il difetto arrivato dal campo («parte ma
+     scompare subito dentro la card»).
+     IL RITAGLIO SERVE AL SOLO TENTATIVO, ed e' la distinzione da non
+     perdere: li' il razzo sale di 9px e ricade, quindi il guscio non
+     ha niente da tagliare e sta chiuso per prudenza; alla PARTENZA
+     invece il suo mestiere e' proprio lasciarlo andare.
+     `pointer-events:none` RESTA, ed e' quel che tiene in piedi la
+     seconda condizione di Andrea: aperto o chiuso, questo disegno non
+     ruba un tocco a nessuno. */
+  .razzo-g.aperto{overflow:visible}
   .razzo{position:absolute;right:15px;bottom:5px;width:22px;height:37px}
   /* I COLORI SONO SUOI E NON PRESI IN PRESTITO: nel progetto l'arancio
      e' l'acquisto, il verde la fiducia, il rosso la lampo, il petrolio
@@ -3101,11 +3114,18 @@
      su questa pagina il progetto ha gia' rimesso indietro uno squillo
      a scatti («MAI riproporre un movimento a scatti qui»). */
   .razzo.prova{animation:rz-prova 1.2s cubic-bezier(.34,.7,.5,1) .3s both}
-  /* LA PARTENZA: si abbassa un attimo — la spinta — e se ne va. I
-     120px sono abbondanti apposta: la card e' alta una sessantina e
-     al razzo ne bastano una quarantina per uscire, ma il ritaglio
-     rende gratuito esagerare, e cosi' il numero non va ritarato il
-     giorno che la card cresce. */
+  /* LA PARTENZA: si abbassa un attimo — la spinta — e se ne va.
+     ⚠️ QUANTO SALE NON E' UN NUMERO NEL FOGLIO, ed e' l'altra meta'
+     della cura: i 120px di ieri erano tarati sul ritaglio («al razzo
+     ne bastano una quarantina per uscire»), e col guscio aperto
+     lascerebbero il razzo fermo a meta' schermo — misurato: si
+     piantava a 431px dalla cima di un viewport alto 760.
+     La distanza la sa solo il momento della partenza, perche'
+     dipende da DOVE sta la card in quell'istante: `armaRazzo` la
+     misura e la scrive in `--rz-volo`. Il fallback nel `var()` non e'
+     cosmesi — e' il comportamento di ieri se un domani qualcuno
+     smettesse di scriverla, cioe' un razzo che si vede poco invece di
+     un razzo che non si muove. */
   .razzo.parte{animation:rz-parte 1.15s cubic-bezier(.5,0,.75,.35) forwards}
   .razzo.parte .rz-fiamma{animation:rz-fuoco .14s ease-in-out 8 both}
   @keyframes rz-prova{
@@ -3117,7 +3137,7 @@
   @keyframes rz-parte{
     0%{transform:translateY(0)}
     14%{transform:translateY(4px)}
-    100%{transform:translateY(-120px)}
+    100%{transform:translateY(calc(-1 * var(--rz-volo, 120px)))}
   }
   /* La fiamma tremola, e qui lo scatto e' il mestiere: dura quanto la
      partenza e finisce — un `infinite` resterebbe a girare per sempre
@@ -3164,7 +3184,12 @@
      costruzione — e resta in mezzo a ogni larghezza senza un numero da
      tarare. Il tetto a 300px e' perche' su desktop la vista arriva a
      520 e un logo largo 400 si leggerebbe come un cartellone. */
-  .rz-logo{position:absolute;left:50%;bottom:64px;width:min(76%,300px);
+  /* ⚠️ IL TETTO E' 280 E NON UN NUMERO TONDO: e' la misura del FILE
+     divisa per 3 (l'inchiostro e' largo 843), cioe' il piu' grande che
+     non si scala mai SU nemmeno su un telefono largo a dpr 3 — la
+     ricetta delle celle delle categorie, dove l'originale piu' grande
+     non ce l'abbiamo. C'e' la prova, e legge il tetto DA QUI. */
+  .rz-logo{position:absolute;left:50%;bottom:64px;width:min(76%,280px);
     transform:translate(-50%,44px);opacity:0}
   .rz-cielo.acceso .rz-logo{
     animation:rz-logo 2.9s cubic-bezier(.16,.8,.3,1) .62s both}
@@ -11348,8 +11373,26 @@ function armaRazzo(){
     const n = window.scrollY;
     if (stato === 1 && n < y - 4) {
       stato = 2;
+      /* QUANTO DEVE SALIRE PER USCIRE DALLO SCHERMO, chiesto adesso e
+         non scritto nel foglio: e' la distanza fra la punta del razzo
+         e la cima del viewport, piu' un margine perche' la fiamma non
+         resti a filo. Sotto un minimo si tiene il minimo — su una
+         card che per qualche ragione fosse gia' in cima, un volo di
+         pochi pixel si leggerebbe come un sussulto e non come una
+         partenza.
+         ⚠️ SI MISURA PRIMA DI TOGLIERE `prova`: quella classe tiene il
+         razzo a `translateY(0)` alla fine del suo `both`, quindi il
+         rect e' quello di riposo; leggendolo dopo si prenderebbe un
+         fotogramma a meta' del ricadere. */
+      const b = g.getBoundingClientRect().bottom;
+      g.style.setProperty('--rz-volo', Math.max(160, Math.ceil(b + 40))
+                          + 'px');
       g.classList.remove('prova');
       g.classList.add('parte');
+      /* IL GUSCIO SI APRE INSIEME AL VOLO e non un istante prima: fra
+         il tentativo e la partenza il ritaglio e' l'unica cosa che
+         tiene il disegno dentro i bordi della card. */
+      g.parentElement?.classList.add('aperto');
       el('razzoCielo')?.classList.add('acceso');
       if (razzoStop) { razzoStop(); razzoStop = null; }
     }

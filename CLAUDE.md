@@ -2886,6 +2886,49 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che non fallisce e si accumula.
   UNA VOLTA SOLA PER APERTURA (`stato` a tre valori): un razzo che
   riparte a ogni su-e-giu' e' un tic, non un ornamento.
+  ⚠️ E IL RAZZO ESCE DAVVERO (ago 2026, dal campo: «parte ma scompare
+  subito dentro la card del venditore»). MISURATO prima di toccare, ed
+  erano DUE difetti sommati — nessuno dei due si vedeva leggendo il
+  foglio. 1) IL GUSCIO SE LO MANGIAVA: `.razzo-g` e' alto quanto la
+  card (**66px**) e ritaglia, quindi dopo una quarantina di pixel il
+  razzo spariva e il resto del volo lo faceva invisibile. 2) ANCHE
+  SENZA RITAGLIO NON BASTAVANO: i 120px erano tarati sul ritaglio («al
+  razzo ne bastano una quarantina per uscire») e lo lasciavano a
+  **431px dalla cima di un viewport alto 760**, cioe' a meta' schermo.
+  IL GUSCIO SI APRE ALLA PARTENZA (`.razzo-g.aperto{overflow:visible}`)
+  E IL RITAGLIO RESTA AL SOLO TENTATIVO, ed e' la distinzione da non
+  perdere: li' il razzo sale di 9px e ricade, quindi il guscio non ha
+  niente da tagliare e sta chiuso per prudenza; alla PARTENZA il suo
+  mestiere e' proprio lasciarlo andare. `pointer-events:none` RESTA
+  aperto o chiuso, ed e' quel che tiene in piedi la seconda condizione
+  di Andrea: questo disegno non ruba un tocco a nessuno.
+  QUANTO SALE NON E' UN NUMERO NEL FOGLIO, ed e' l'altra meta': la
+  distanza la sa solo il momento della partenza, perche' dipende da
+  DOVE sta la card in quell'istante — `armaRazzo` legge
+  `getBoundingClientRect().bottom` e scrive `--rz-volo`, che il
+  keyframe spende in un `calc()`. Il fallback nel `var()` non e'
+  cosmesi: e' il comportamento di ieri se un domani qualcuno smettesse
+  di scriverla, cioe' un razzo che si vede poco invece di un razzo che
+  non si muove. Il pavimento (160px) copre la card che fosse gia' in
+  cima, dove un volo di pochi pixel si leggerebbe come un sussulto.
+  ⚠️ SI MISURA PRIMA DI TOGLIERE `prova`: quella classe tiene il razzo
+  a `translateY(0)` alla fine del suo `both`, quindi il rect e' quello
+  di riposo — leggendolo dopo si prenderebbe un fotogramma a meta' del
+  ricadere.
+  I NUMERI DEL DOPO, misurati a 375: volo **628px**, il razzo va da
+  top=553 a **top=-77** e ci resta, guscio `visible`. Uguale a 320 e a
+  360, nei due temi.
+  ⚠️ E LA SONDA HA MENTITO DUE VOLTE, tutte e due della famiglia gia' a
+  verbale — il codice era giusto e a sbagliare era la misura. Diceva
+  «volo non scritto, guscio non aperto» perche' leggeva un piano piu'
+  su (nel codice `g` E' IL RAZZO, quindi la variabile sta su di lui e
+  la classe sul suo genitore), e il conto la smascherava da solo:
+  553 - 630 = -77. Poi `elementsFromPoint` diceva che davanti al razzo
+  c'era il testo del racconto — ma quella funzione RISPETTA
+  `pointer-events`, e razzo e cielo li hanno spenti: per lei non
+  esistono. Quando la domanda e' «si VEDE?», a rispondere sono i pixel:
+  il ritaglio a 4x sul rect vero mostra il razzo sopra la prosa, in
+  mezzo al volo.
   E IL CIELO: IL LOGO CHE SALE COL FUMO (ago 2026, seconda stesura —
   la prima era un VELO A TUTTO SCHERMO e va tenuta perche' e' quella
   che torna in mente). Quando il razzo esce, sopra la card del
@@ -2927,8 +2970,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL LOGO STA AL CENTRO (chiesto da Andrea): `left:50%` col mezzo passo
   indietro, che lo tiene in mezzo a ogni larghezza senza un numero da
   tarare — misurato, scarto dal centro **0** a 320, 360 e 375. Largo
-  `min(76%,300px)`, quindi il file vuole **~900px** di larghezza (3x)
-  in WebP TRASPARENTE; il suo URL passa dalla `foto()` del racconto e
+  `min(76%,280px)`, e il **280 non e' un numero tondo**: e' la misura
+  del FILE diviso 3 — l'inchiostro del logo di Andrea e' largo **843**
+  — cioe' il piu' grande che non si scala mai SU nemmeno su un telefono
+  a dpr 3. E' la ricetta delle celle delle categorie, dove l'originale
+  piu' grande non ce l'abbiamo in repo: la misura si SCEGLIE guardando
+  il file. C'e' la prova, e legge il tetto DAL FOGLIO invece di
+  ribatterlo — col letterale passerebbe lo stesso finche' il file e'
+  grande abbastanza, e mentirebbe il giorno che il tetto cresce, che e'
+  l'unico giorno in cui serve.
+  IL FILE E' **843x521 RGBA**, ritagliato dall'originale col bbox a
+  soglia **8/255** sull'alpha (la stessa delle illustrazioni) piu' 2px
+  di margine, WebP `q92 method=6`. ⚠️ ERA GIA' TRASPARENTE: il fondo
+  bianco che si vede aprendolo e' del visualizzatore, non del file —
+  la prova lo inchioda, che un logo su fondo opaco mostrerebbe il suo
+  rettangolo sopra il fumo. Il suo URL passa dalla `foto()` del racconto e
   non si scrive a mano, o sarebbe il secondo posto che un giorno
   diverge dal primo. E ha il ripiego di ogni immagine del progetto:
   se il file non e' ancora arrivato resta il fumo — degradazione e non
@@ -28012,11 +28068,18 @@ voleva guardare.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — il server guadagna solo `logo` nella
 whitelist di forma delle immagini del racconto.
-⚠️ DA FARE: **il file del logo non c'è ancora**. Serve
-`assets/racconti/to-the-moon-logo.webp`, largo **~900px** e in WebP
-**trasparente** (quello mandato da Andrea è su fondo bianco e ha molto
-margine: va scontornato e ritagliato). Finché non arriva, `onerror` lo
-toglie e resta il fumo — degradazione e non regressione.
+E IL LOGO È ARRIVATO, col razzo che finalmente esce (ago 2026, il
+giro dopo): `assets/racconti/to-the-moon-logo.webp`, 843×521 RGBA
+ritagliato dal file di Andrea — **era già trasparente**, il bianco che
+si vede aprendolo è del visualizzatore — col tetto CSS sceso a 280 per
+non scalarlo mai su. E la cura del difetto dal campo, che erano DUE
+sommati (il guscio che ritagliava e i 120px tarati su quel ritaglio):
+vedi «E IL RAZZO ESCE DAVVERO» in Architettura, anche per le due volte
+in cui la sonda ha mentito. Verificato dal vivo: **51 verdi, zero
+rossi** a 320/360/375 nei due temi — volo 628px, il razzo da top=553 a
+**−77** e ci resta — più il ramo delle animazioni ridotte, dove non
+nasce né razzo né cielo (con l'autocontrollo che chiede alla pagina se
+quel ramo è davvero acceso).
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
