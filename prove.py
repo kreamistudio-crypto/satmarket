@@ -8585,10 +8585,21 @@ def prove_savers_proprietario():
     # LA REGRESSIONE DEL CANTIERE: il commento CSS scritto con «\\*»
     # invece di «/*» non apre niente, e il parser si mangia la regola
     # che segue — qui si e' portato via .nota-punto, che esisteva da
-    # prima. Il selettore le veste tutte e due.
+    # prima. Il selettore le veste tutte.
+    # ⚠️ SI LEGGE LA REGOLA E NON LA FORMATTAZIONE (ago 2026): la
+    # prima stesura cercava la sottostringa «…nota-savers{» ed e'
+    # diventata rossa il giorno che il selettore ha guadagnato una
+    # classe ed e' andato a capo — cioe' per un motivo che non era il
+    # suo. Quel che deve garantire e' che le tre superfici neutre
+    # siano vestite dalla STESSA regola, e quello si chiede alla
+    # regola: dal selettore alla graffa.
     i = src.index(".trust-note.nota-punto")
-    prova("la superficie neutra veste il punto E il conteggio", True,
-          ".trust-note.nota-punto,.trust-note.nota-savers{" in src[i - 40:i + 90])
+    _reg = src[i:src.index("{", i)]
+    prova("la superficie neutra veste il punto E il conteggio",
+          (True, True, True),
+          (".trust-note.nota-punto" in _reg,
+           ".trust-note.nota-savers" in _reg,
+           ".trust-note.nota-promessa" in _reg))
 
 
 def prove_barattolo_in_striscia():
@@ -19755,6 +19766,12 @@ def prove_relay_leva():
     import sys
     import types
 
+    # ⚠️ Il taglio arriva fino a `CHARSET_BECH32`, quindi si porta
+    # dentro anche `RELAYS_NIP46` — la stanza del login QR, che vive
+    # li' accanto. E' innocuo (e' un literal, e nessuna prova qui
+    # guarda quella chiave) e la marca resta questa apposta: una
+    # ancorata al loro commento si romperebbe al primo riordino di un
+    # cantiere che con la leva non c'entra niente.
     SERVER = _blocco(_SORGENTE, "RELAY_DI_SERIE = [",
                      "\nCHARSET_BECH32")
     _IMP = open("importa_nostr.py", encoding="utf-8").read()
@@ -19852,11 +19869,21 @@ def prove_relay_leva():
 
     # --- 6) UNA SOLA LISTA DI SERIE, in ognuno dei due file ------
     # Il difetto che il cantiere toglie e' proprio questo: elenchi
-    # ripetuti che divergono. Quattro occorrenze nel server (la
-    # lista) e cinque nell'import (la lista piu' il relay del
-    # venditore): di piu' vuol dire che una copia e' tornata.
-    prova("in server.py i wss:// sono solo quelli di serie", 4,
-          _SORGENTE.count("wss://"))
+    # ripetuti che divergono, e una copia che torna non fallisce da
+    # sola: si sfilaccia.
+    # ⚠️ NEL SERVER NON SI CONTANO I `wss://` NUDI, e non e' un
+    # ammorbidimento: esiste un'ALTRA lista con un mestiere suo —
+    # `RELAYS_NIP46`, la stanza del login QR, dove la scelta e' «chi
+    # non butta via i kind 24133» e non «dove la gente scrive» —
+    # quindi damus e nos.lol hanno un secondo posto legittimo. A
+    # rispondere alla domanda vera («qualcuno ha ri-scritto a mano la
+    # lista di serie?») restano i due che vivono SOLO li': se
+    # ricompaiono, una copia e' tornata. Il giorno che uno dei due
+    # finisse in una lista nuova per un motivo suo, questa riga
+    # diventa rossa e chi la guarda legge questo commento e decide —
+    # che e' quel che una sentinella deve fare.
+    for _r in ("wss://relay.primal.net", "wss://nostr.mom"):
+        prova(f"{_r} sta in un posto solo", 1, _SORGENTE.count(_r))
     prova("in importa_nostr.py sono la lista piu' il venditore", 5,
           _IMP.count("wss://"))
 
@@ -28538,7 +28565,11 @@ def prove_promesse_badge():
           _ao.index("sgOk ? `<span") < _ao.index("scOk.length ? `<span"))
     prova("nel carrello la scatola della spedizione sta sopra", True,
           mini.index('id="paccoSpedGratis"') < mini.index('id="paccoSconto"'))
-    prova("e la testata del negozio dice lo stesso ordine", True,
+    # ⚠️ NON E' PIU' LA TESTATA (ago 2026): le due promesse sono
+    # scese sotto «In vetrina in questo negozio». L'ordine invece non
+    # si e' mosso, ed e' il punto — a cambiare e' dove si leggono,
+    # mai in quale ordine.
+    prova("e il negozio dice lo stesso ordine", True,
           "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}" in mini)
     # le SOSPESE restano prosa e ognuna guarda la SUA valuta:
     # promesse_sospese e' un flag combinato, e senza il filtro una
@@ -31641,31 +31672,74 @@ def prove_sponsor():
     # rinominano i testi, mai le chiavi.
     prova("...e la parola e' quella della categoria futura",
           "Consigliato", _par.group(1).strip() if _par else "")
-    # ⚠️ LA RIGA IN CHIARO STA IN FONDO AL CASSETTO, e questa prova ha
-    # CAMBIATO LATO (ago 2026, decisione di Andrea): chiedeva che
-    # stesse SOPRA, «che sotto la legge solo chi apre». Il perche' di
-    # allora era buono e a superarlo e' stato un fatto — in cima il
-    # suo posto l'ha preso l'HERO, l'immagine col nome del progetto
-    # dentro. Quel che regge la dichiarazione a cassetto CHIUSO e' la
-    # PASTIGLIA, che sta sempre in vista e porta la stessa parola
-    # della card: la riga aggiunge il PERCHE', e chi ha letto la
-    # storia ci arriva comunque.
-    prova("la riga in chiaro chiude il racconto", True,
-          _rn.index('class="rac-avviso"') > _rn.index('class="rac-corpo'))
-    # LA RIGA IN CHIARO, e la SECONDA frase conta piu' della prima:
-    # senza, «in vetrina su Barattolo» si legge come un endorsement
-    # nostro — che e' esattamente cio' che il PROMPT_MODERAZIONE
-    # vieta agli altri. Quella regola non puo' valere solo per loro.
-    # ...A SPAZI COLLASSATI, o la sentinella diventa rossa per colpa
-    # di un a capo del markup: la frase e' lunga e va a capo dove il
-    # rientro la porta. E' la lezione della sonda che non
+    # ⚠️ LA RIGA IN CHIARO NON C'E' PIU', e queste TRE prove hanno
+    # CAMBIATO LATO in due giri (ago 2026, decisioni di Andrea): la
+    # prima chiedeva che la riga stesse in fondo al cassetto, le altre
+    # due che si fosse accorciata alla META' che GARANTISCE. Adesso se
+    # ne va anche quella, e a dichiarare resta la sola PASTIGLIA.
+    # IL COSTO E' STATO RIPORTATO PRIMA e accettato: «Consigliato» e'
+    # una parola NOSTRA, quindi da sola si legge come un giudizio
+    # nostro sul venditore — cioe' cio' che il PROMPT_MODERAZIONE
+    # vieta agli altri («il testo che SI RIVOLGE A CHI LEGGE come
+    # farebbe la piattaforma»), e quella regola era nata per valere
+    # anche per noi.
+    # ...A SPAZI COLLASSATI, o la sentinella diventerebbe rossa per
+    # colpa di un a capo del markup: e' la lezione della sonda che non
     # normalizzava, gia' pagata col giro dal vivo della riga dello
     # sconto nel form.
+    # ⚠️ DUE PERIMETRI E NON UNO, e la tortura ha chiesto il primo:
+    # guardando il solo renderer la prova restava verde con la frase
+    # rimessa nel CATALOGO del racconto — se quel testo torna, puo'
+    # tornare da un'altra porta. Le due frasi che nel client non
+    # esistono affatto (misurato: zero occorrenze) si vietano in
+    # tutto il foglio; «ha pagato» no, che due righe legittime la
+    # portano — il wallet che non paga e la ricevuta del compratore —
+    # e allargarla la renderebbe rossa per colpa di un'altra
+    # funzione.
     _rnp = " ".join(_rn.split())
-    prova("...e la riga dice che e' uno spazio pubblicitario", True,
-          "Spazio pubblicitario" in _rnp and "ha pagato" in _rnp)
-    prova("...e che le tutele non cambiano", True,
-          "tutele sull'acquisto sono le stesse" in _rnp)
+    prova("del banner in fondo non resta niente", (0, False, False, False),
+          (mini.count("rac-avviso"),
+           "Spazio pubblicitario" in mini,
+           "tutele sull'acquisto" in mini,
+           "ha pagato" in _rnp))
+
+    # ---- 3a-bis. LA RIGA DELLE DUE AZIONI -----------------------
+    # «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di Andrea): e'
+    # l'unico bottone pieno della pagina, e la sua meta' e' il motivo
+    # per cui il racconto vive DENTRO il negozio invece che in una
+    # pagina a parte — sotto c'e' roba da comprare. Sta accanto al
+    # link che apre la storia e NON dentro il cassetto: chi arriva col
+    # racconto chiuso deve poterci arrivare senza aprire niente.
+    prova("il bottone Acquista sta nella testa", True,
+          0 <= _rn.find('class="btn orange rac-acquista"')
+          < _rn.find('class="rac-corpo'))
+    # ...E NON COMPRA NIENTE, scorre: c'e' la prova che nel suo
+    # onclick non compaia nessuno dei varchi che POSTano a /orders —
+    # un bottone arancione che dice «Acquista» e apre una fattura da
+    # una pagina che non ha scelto un articolo sarebbe il difetto piu'
+    # caro possibile.
+    _acq = pezzo_js(mini, "function acquistaDalRacconto(){")
+    prova("...e non apre nessun acquisto", False,
+          any(x in _acq for x in ("startBuy", "compraDaBarra",
+                                  "apriAcquisto", "/api/orders")))
+    # L'ANCORA E' L'ETICHETTA DELLA VETRINA e non la griglia, che
+    # vuota non ha un box su cui atterrare — e dev'esserci davvero nel
+    # markup, o lo scroll cade nel nulla in silenzio.
+    prova("...e l'ancora esiste nel markup", True,
+          'id="negozioVetrinaTit"' in mini)
+    prova("...e il bottone ci punta", True, "negozioVetrinaTit" in _acq)
+    # ...E LO SCROLL E' QUELLO DI CASA, spento da reduced-motion come
+    # ogni altro dell'app.
+    prova("...e rispetta reduced-motion", True, "tourRidotto()" in _acq)
+    # ⚠️ L'OCCHIELLO NON C'E' PIU' (ago 2026, decisione di Andrea):
+    # «Gioco da tavolo · fatto e stampato in Italia» diceva in
+    # anticipo quel che la prima riga della storia dice meglio. Esce
+    # anche dal CATALOGO e dal foglio: un campo che non legge nessuno
+    # fa credere a chi passa che da qualche parte si veda, e una
+    # classe orfana nel CSS fa lo stesso (il precedente di `rac-logo`).
+    prova("dell'occhiello non resta niente", (0, 0, 0),
+          (mini.count("rac-occhiello"), _cat.count("occhiello"),
+           _rn.count("occhiello")))
 
     # ---- 3b. LA FOTO VERTICALE NON SI PRENDE UNO SCHERMO ---------
     # Il tabellone di To The Moon e' in piedi, e a colonna piena una
@@ -31694,13 +31768,19 @@ def prove_sponsor():
     prova("...e la verticale resta centrata", True,
           "margin:16px auto 0" in _dic)
 
-    # ---- 3c. L'HERO IN CIMA -------------------------------------
-    # ⚠️ HA PRESO IL POSTO DEL LOGO (ago 2026, decisione di Andrea), e
-    # il buco che il logo colmava NON si riapre: il nome del progetto
-    # non compare in nessun testo del racconto — l'h3 della testa
-    # porta il SOTTOTITOLO — quindi chi apre il negozio da un annuncio,
-    # col cassetto CHIUSO, deve leggerlo qui. Sta dentro l'immagine,
-    # che e' anche il motivo per cui questa vive FUORI dal cassetto.
+    # ---- 3c. L'HERO, DENTRO IL CASSETTO -------------------------
+    # ⚠️ HA PRESO IL POSTO DEL LOGO (ago 2026, decisione di Andrea) e
+    # il giorno dopo E' SCESO NEL CASSETTO, decisione che ROVESCIA la
+    # riga di ieri: chiudendo la storia si chiude TUTTO il racconto,
+    # immagine compresa — fuori restava un'immagine grande senza piu'
+    # niente attorno, e «Chiudi la storia» non chiudeva la cosa piu'
+    # grande che si vedeva.
+    # ⚠️ IL PREZZO E' DICHIARATO, ed e' il buco che il logo colmava
+    # riaperto sapendolo: il nome del progetto vive SOLO dentro questa
+    # immagine — l'h3 della testa porta il SOTTOTITOLO — quindi chi
+    # apre il negozio da un annuncio, col cassetto CHIUSO, non lo
+    # legge da nessuna parte. La leva, se a rodaggio dara' fastidio, e'
+    # il nome nell'h3: non l'hero fuori.
     _rh = mini[mini.index("  .rac-hero{"):]
     _rh = [" ".join(x.split())
            for x in _rh[:_rh.index("}")].split("{", 1)[1].split(";")]
@@ -31712,15 +31792,24 @@ def prove_sponsor():
     # file, e per questo va consegnato 21:9.
     prova("...e l'altezza segue il file, non il CSS", True,
           "height:auto" in _rh)
-    prova("l'hero sta fuori dal cassetto", True,
-          _rn.index('class="rac-hero"') < _rn.index('class="rac-corpo'))
-    # ...E NON E' PIGRO, al contrario delle foto del cassetto: sta
-    # sopra la piega e si vede appena il negozio si apre — un lazy li'
-    # ritarderebbe la prima cosa che identifica lo spazio venduto.
-    _tsa = _rn[_rn.index('class="rac-pill"'):
-               _rn.index('class="rac-corpo')]
-    prova("...e non aspetta (niente lazy sopra la piega)", True,
-          'class="rac-hero"' in _tsa and "loading=" not in _tsa)
+    prova("l'hero sta DENTRO il cassetto", True,
+          _rn.index('class="rac-hero"') > _rn.index('class="rac-corpo'))
+    # ...ED E' LA PRIMA COSA DEL CASSETTO e non l'ultima: chi tocca la
+    # card lo trova aperto, quindi l'hero apre la storia invece di
+    # chiuderla — e a cassetto chiuso non costa un pixel a nessuno.
+    prova("...e apre la storia, prima dei blocchi", True,
+          _rn.index('class="rac-hero"') < _rn.index("${blocchi}"))
+    # ...E NON E' PIGRO, al contrario delle foto sotto: per chi arriva
+    # dalla card il cassetto nasce APERTO, quindi questa e' la prima
+    # cosa che si vede — un lazy ritarderebbe proprio l'immagine che
+    # identifica lo spazio venduto.
+    # ⚠️ L'ANCORA E' IL TAG e non piu' la fetta fino al cassetto: da
+    # quando l'hero ci sta DENTRO, quella fetta non lo conterrebbe
+    # affatto e la riga passerebbe per la ragione sbagliata.
+    _tsa = _rn[_rn.index('class="rac-hero"'):]
+    _tsa = _tsa[:_tsa.index(">")]
+    prova("...e non aspetta (niente lazy)", True,
+          "loading=" not in _tsa)
     # IL FILE PASSA DALLA FORMA DEL SERVER: `-cop` e' gia' nella
     # whitelist (`(?:cop|[1-9])`) — era lo slot della copertina, che
     # il logo occupava e adesso lascia all'hero, quindi la regex non
@@ -31791,6 +31880,116 @@ def prove_sponsor():
            ("foto", "1"), ("elenco", ""), ("foto", "3")],
           _blo)
 
+    # ---- 3f. LA TRUST-LINE E' USCITA DAL NEGOZIO ----------------
+    # ⚠️ (ago 2026, decisione di Andrea): «Ogni acquisto e' protetto
+    # dal deposito di garanzia» lo dice gia' la SCHEDA dell'annuncio
+    # prima di comprare, e qui era la terza volta nella stessa
+    # schermata. Le porte verso «Il pagamento protetto» restano DUE —
+    # la riga di Esplora e il bottone in fondo al Profilo — e nessuna
+    # delle due era questa.
+    # con find() e non index(): se il markup si sposta questa prova
+    # dev'essere ROSSA, non esplodere portandosi dietro le sorelle
+    _i = mini.find('<div class="view" id="view-negozio"')
+    _j = mini.find('<div class="view" id=', _i + 10)
+    _vn = mini[_i:_j] if 0 <= _i < _j else ""
+    prova("il negozio non ha piu' la riga del deposito", (True, False),
+          (bool(_vn), 'class="trust-line"' in _vn))
+    # ...E QUELLA DI ESPLORA RESTA, ed e' la meta' che conta: il tour
+    # la cerca per classe dentro `#view-esplora` (`TAPPE_TOUR`), e una
+    # tappa senza bersaglio non entra nel giro — il contatore «N di M»
+    # scenderebbe senza che niente fallisca.
+    prova("...ma quella di Esplora c'e' ancora", 1,
+          mini.count('class="trust-line"'))
+    prova("...ed e' quella che il tour cerca", True,
+          "#view-esplora .trust-line" in mini)
+
+    # ---- 3g. LE DUE PROMESSE, SOTTO LA VETRINA ------------------
+    # (ago 2026, decisione di Andrea) Erano in TESTATA, sopra il nome
+    # del venditore, su fondo verde e con la frase lunga. Adesso
+    # stanno sotto «In vetrina in questo negozio» — un dito sopra la
+    # merce a cui si applicano — corte e su superficie NEUTRA.
+    # ⚠️ SI E' SPOSTATA LA COPPIA e non la sola 🚚, che Andrea aveva
+    # nominato: le due promesse sono lo stesso mestiere, e l'ordine
+    # (🚚 prima della 🎁) e' una regola dichiarata con la sua prova.
+    # Spostandone una sola si sarebbe rovesciato leggendo la pagina
+    # dall'alto, e le due gemelle avrebbero avuto due vesti nella
+    # stessa schermata.
+    prova("il contenitore sta fra il titolo e la griglia", True,
+          0 <= _vn.find('id="negozioVetrinaTit"')
+          < _vn.find('id="negozioPromesse"')
+          < _vn.find('id="negozioGrid"'))
+    # SI RISCRIVE SEMPRE, anche a mani vuote: `renderNegozio` gira a
+    # ogni apertura, e senza l'assegnazione incondizionata la promessa
+    # del negozio di prima resterebbe a schermo su un negozio che non
+    # ne ha — un difetto che non fallisce e si vede solo passando da
+    # un negozio all'altro.
+    _neg = pezzo_js(mini, "function renderNegozio(v, annunci, feedback=[], esauriti=[]){")
+    # ⚠️ SI CHIEDE CHE LA RIGA COMINCI CON L'ASSEGNAZIONE, e la
+    # prima stesura chiedeva solo che ESISTESSE — restava verde con
+    # un `if (_p) el(...).innerHTML = _p;`, cioe' certificava la
+    # presenza e mai l'incondizionata, che e' tutta la garanzia.
+    # L'ha detto la tortura, non la rilettura. Non l'indentazione (la
+    # mutazione stava a due spazi come il corpo) e non la
+    # formattazione: un a capo dopo il «=» e' legittimo.
+    prova("...e renderNegozio lo riscrive sempre", True,
+          any(r.strip().startswith("el('negozioPromesse').innerHTML")
+              for r in _neg.splitlines()))
+    prova("...con la 🚚 prima della 🎁", True,
+          "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}" in _neg)
+    # LA VESTE E' NEUTRA e non verde: il verde e' il registro della
+    # FIDUCIA (il deposito di garanzia), e una promessa commerciale
+    # non e' quello. Si riusa il meccanismo di .nota-punto — la stessa
+    # scatola con una classe che ne cambia la superficie — invece di
+    # ribattere i due token.
+    prova("le due righe non sono piu' verdi", (2, True),
+          (_neg.count('class="trust-note nota-promessa"'),
+           ".trust-note.nota-promessa{background:var(--chip-bg)" in mini
+           or "  .trust-note.nota-promessa{background:var(--chip-bg)" in mini))
+    # ...E SONO CORTE: via il prefisso, che ripeteva a ogni riga una
+    # cosa che il titolo sopra dice gia'.
+    prova("...e non ripetono «questo negozio»", (False, False),
+          ("Questo negozio offre la" in _neg,
+           "Questo negozio fa" in _neg))
+    # ⚠️ LA MAIUSCOLA LA METTE IL CSS, ed e' quel che permette di
+    # riusare `frasePromessaSpedGratis` TALE E QUALE: quel giudice e'
+    # unico per quattro superfici e comincia minuscolo perche' altrove
+    # si incastra in una frase piu' lunga. Col JS servirebbe una copia
+    # della frase — due copie divergono al primo ritocco — o un taglio
+    # della stringa che il giorno che comincia con un tag scriverebbe
+    # la maiuscola dentro il markup.
+    prova("la maiuscola e' del foglio e non del giudice", (True, False),
+          (".trust-note.nota-promessa span::first-letter"
+           "{text-transform:uppercase}" in mini,
+           "toUpperCase" in _neg))
+    # e il giudice unico non si e' toccato: comincia minuscolo, e a
+    # dirlo e' la prova che lo GIRA (le altre tre superfici lo
+    # incastrano in una frase, e una maiuscola li' si vedrebbe)
+    _fsg = pezzo_js(mini, "function frasePromessaSpedGratis(r){")
+    prova("...e il giudice comincia ancora minuscolo", True,
+          "`spedizione <b>gratis</b> da " in _fsg)
+
+    # ---- 3h. IL CORPO DEL RACCONTO ------------------------------
+    # (ago 2026, decisione di Andrea: «e' troppo piccolo») La prosa
+    # sale a 15/1.6, che e' `.sicu p` — il corpo delle due pagine di
+    # testo lungo del progetto — e i secondari a 14, un gradino sotto
+    # come lo erano prima. Il numero non e' inventato: 13.5 era piu'
+    # piccolo perfino della descrizione di un annuncio (14.5), su un
+    # testo che si legge molto piu' a lungo.
+    prova("la prosa del racconto e' al corpo di casa", True,
+          ".rac-p{margin:0;font-size:15px;line-height:1.6" in mini)
+    prova("...lo stesso di «Il pagamento protetto»", True,
+          ".sicu p{font-size:15px;line-height:1.6" in mini)
+    # il censimento, o il gradino nuovo lo prende una regola sola e
+    # le altre restano indietro senza che nessuno se ne accorga
+    _rac = [r for r in mini.split("\n") if r.startswith("  .rac-")]
+    prova("...e nel racconto non resta un 13.5", 0,
+          sum(1 for r in _rac if "13.5px" in r))
+    # ⚠️ IL MAIUSCOLETTO RESTA A 11: e' il registro delle etichette di
+    # sezione in tutta l'app (.section-label, .desc-tit), e crescerlo
+    # qui aprirebbe un'eccezione da spiegare ogni volta.
+    prova("...ma il maiuscoletto non cresce", True,
+          ".rac-h{margin:18px 0 6px;font-size:11px" in mini)
+
     # ---- 4. LA DICHIARAZIONE E' NOSTRA --------------------------
     # ⚠️ IL BLOCCO «Come funziona questo spazio» NON C'E' PIU' (ago
     # 2026, decisione di Andrea): tre tappe in fondo al racconto per
@@ -31799,10 +31998,16 @@ def prove_sponsor():
     # RENDERER E NON NEL CATALOGO — e a portarla ora e' la riga in
     # chiaro: se stesse nel catalogo, il progetto di domani potrebbe
     # nascere senza.
+    # ⚠️ L'ANCORA SI E' SPOSTATA DUE VOLTE, e la seconda e' questa (ago
+    # 2026): era «Spazio pubblicitario», poi la frase delle tutele, e
+    # adesso che la riga in chiaro non c'e' piu' e' LA PASTIGLIA — la
+    # sola cosa rimasta a dichiarare, e sta nel renderer. La prova non
+    # e' morta col taglio: dice ancora quel che deve dire, cioe' che a
+    # dichiarare non e' il catalogo dello sponsor.
     prova("la dichiarazione la scrive il renderer", True,
-          "Spazio pubblicitario" in _rnp)
+          'class="rac-pill"' in _rn)
     prova("...e non sta nel catalogo di chi compra", False,
-          "Spazio pubblicitario" in _cat or "tutele" in _cat)
+          "Consigliato" in _cat or "Spazio pubblicitario" in _cat)
     prova("...e il blocco delle tre tappe se n'e' andato", False,
           "Come funziona questo spazio" in mini)
     # ...E NON DICE NESSUNA CIFRA sulla commissione (ago 2026,
@@ -31998,10 +32203,13 @@ dice('su un altro negozio non esce', '', raccontoNegozio(altro));
 const r = raccontoNegozio(mio);
 dice('sul suo negozio esce', true, r.length > 200);
 
-// 4. LA DICHIARAZIONE C'E', tutte e due le meta'.
+// 4. LA DICHIARAZIONE C'E', ed e' la PASTIGLIA e basta. ⚠️ La riga
+// in chiaro se n'e' andata (ago 2026, decisione di Andrea) e la
+// seconda prova ha CAMBIATO LATO per la seconda volta: prima
+// chiedeva la frase intera, poi la sola meta' che garantiva, adesso
+// che non ci sia piu' niente.
 dice('...con la pastiglia', true, r.includes('class="rac-pill"'));
-dice('...e con la riga che dice che e pubblicita', true,
-     r.replace(/\\s+/g, ' ').includes('Spazio pubblicitario'));
+dice("...e senza la riga in fondo", false, r.includes('rac-avviso'));
 
 // 5. IL CASSETTO nasce chiuso da un annuncio e aperto dalla card.
 dice('il cassetto nasce chiuso', false, r.includes('rac-corpo aperto'));
@@ -39825,6 +40033,12 @@ def prove_bunker_muto():
               "node non installato")
         return
     _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
+              # i permessi vivono in una costante condivisa con la
+              # strada del QR: senza portarsela dietro il banco esplode
+              # con un ReferenceError sulla connect, cioe' dice il
+              # motivo sbagliato per tutti e tre i casi
+              + "\n" + re.search(r"const NIP46_PERMESSI = '[^']*';",
+                                 mini).group(0)
               + "\n" + bd + "\n}\n"
               + "function apriAutorizzazioneBunker(){}\n"
               + "async function caricaNostrTools(){}\n"
@@ -39952,6 +40166,300 @@ async function caso(nome, comeConnette, comePubblica, ms){
           ("href" in _ramo, "openLink" in _ramo))
 
 
+def prove_login_qr():
+    """Il login col telefono (ago 2026): il QR `nostrconnect://` e la
+    guida per chi un profilo Nostr non ce l'ha ancora.
+
+    La URI `bunker://` la scrive il firmatario e si INCOLLA: da un
+    computer con nsec.app aperto e' comoda, da un telefono con Amber
+    non esiste proprio — non c'e' niente da copiare. Qui la direzione
+    si rovescia: la URI la scriviamo noi, la mostriamo come codice, e
+    il firmatario ci chiama."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    print("\n[il login col telefono]")
+
+    # --- la stanza dell'appuntamento arriva dal server ---
+    # E' una COSTANTE e non una leva: il gemello e' RELAYS_VERIFICA,
+    # che sta nel codice da sempre — quindi il censimento del config
+    # d'esempio non la deve pretendere, e infatti non la vede.
+    prova("il server ha la sua lista di relay per il NIP-46, "
+          "separata da quella delle note pubbliche",
+          (True, True),
+          ("RELAYS_NIP46 = [" in src,
+           src.index("RELAYS_NIP46 = [") != src.index("RELAYS_VERIFICA = [")))
+    prova("...e viaggia nella busta di PRIMA pagina, dove la trova "
+          "anche chi non e' ancora entrato",
+          True, 'risposta["relay_nip46"] = RELAYS_NIP46' in src)
+    prova("...e il client la legge da li', senza una lista sua",
+          (True, False),
+          ("if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;"
+           in mini,
+           "wss://" in pezzo_js(
+               mini, "async function firmatarioNostrConnect(){")))
+
+    fnc = pezzo_js(mini, "async function firmatarioNostrConnect(){")
+
+    # --- LA riga: il QR porta il relay a cui siamo connessi ---
+    # Elencandoli tutti, il telefono puo' rispondere sul secondo
+    # mentre noi ascoltiamo il primo — e quel difetto non fallisce da
+    # nessuna parte: sul telefono si legge «collegato», qui si aspetta
+    # per sempre.
+    prova("nella URI del QR va il relay SCELTO, mai la lista",
+          (True, False),
+          ("'&relay=' not in fnc" != "", "relays.join" in fnc))
+    prova("...cioe' proprio quello a cui la connessione e' riuscita",
+          True, "+ '?relay=' + encodeURIComponent(scelto)" in fnc)
+
+    # --- il segreto e' la porta ---
+    # Verso la nostra chiave effimera puo' cifrare CHIUNQUE veda il
+    # codice: senza il confronto basterebbe un «ack» di passaggio per
+    # legarci al firmatario sbagliato.
+    prova("si accetta solo chi rimanda il SEGRETO, mai un ack "
+          "qualunque", True, "if (msg.result !== segreto)" in fnc)
+    prova("...e la chiave di conversazione si deriva da CHI HA "
+          "SCRITTO, che il mittente qui non si conosce in anticipo",
+          True, "getConversationKey(skLocale, ev.pubkey)" in fnc)
+
+    # --- il motore NIP-46 resta UNO ---
+    prova("finito il rito si passa il testimone al bunker di sempre, "
+          "invece di riscrivere il protocollo",
+          True, "return await firmatarioBunker(" in fnc)
+    # IL SECRET NON SI RIPETE: e' servito una volta, e certi firmatari
+    # lo trattano come usa-e-getta — ripresentarlo vorrebbe dire
+    # rischiare un rifiuto DOPO che l'utente ha gia' approvato.
+    _bk = fnc[fnc.index("return await firmatarioBunker("):]
+    prova("...e nella sua URI il secret non si ripete", False,
+          "secret" in _bk)
+    prova("...con la chiave client appena usata, o il firmatario non "
+          "ci riconoscerebbe", True, "bytesToHex(skLocale)" in _bk)
+    # I PERMESSI IN UN POSTO SOLO: le due strade ne chiedono due, e
+    # scritti a mano una delle due un giorno ne chiede uno diverso da
+    # quello che poi usa.
+    # si CONTANO le occorrenze (meno la dichiarazione) invece di
+    # indovinare come sono scritte le due chiamate: la prima stesura
+    # cercava «NIP46_PERMESSI,» e «NIP46_PERMESSI)» e la riga del
+    # bunker finisce con una quadra — passava per meta'.
+    prova("i permessi vivono in una costante, chiamata dalle DUE "
+          "strade", (True, 2),
+          ("const NIP46_PERMESSI = " in mini,
+           mini.count("NIP46_PERMESSI") - 1))
+
+    # --- il disegno del QR e' una fabbrica sola ---
+    # I codici da disegnare sono due (la invoice e questa URI) e la
+    # geometria e' la stessa: due copie divergono al primo ritocco, e
+    # un QR ritoccato male non fallisce — si scansiona e porta altrove.
+    prova("il canvas del QR si disegna in un posto solo",
+          1, mini.count("qr.getModuleCount()"))
+    prova("...e ci passano tutti e due i codici, ognuno col suo modo",
+          (True, True),
+          ("disegnaQr(box, ('lightning:' + invoice.trim()).toUpperCase(), "
+           "'Alphanumeric')" in mini,
+           "disegnaQr(el('nostrQr'), uri, 'Byte')" in mini))
+
+    # --- senza relay il bottone non nasce ---
+    _ap = pezzo_js(mini, "function apriNostrSheet(scopo){", "\n}")
+    prova("senza la lista dal server il bottone non compare: un QR "
+          "che punta a un relay inventato si scansiona e non porta da "
+          "nessuna parte", True,
+          "q.style.display = relayNip46.length ? '' : 'none'" in _ap)
+    prova("...e il foglio nasce pulito, che un codice del giro di "
+          "prima e' un appuntamento su una chiave che non ascolta "
+          "piu'", (True, True),
+          ("nostrQrGiro++" in _ap, "nascondiQrConnessione()" in _ap))
+    _lq = pezzo_js(mini, "async function loginNostrQr(){", "\n}")
+    prova("...e l'attesa che atterra su un giro morto non entra al "
+          "posto di quella nuova", 2, _lq.count("giro !== nostrQrGiro"))
+
+    # --- la guida, e la porta che ci arriva ---
+    prova("il foglio della guida esiste e sta DOPO quello del login: "
+          "navPila ordina per posizione, quindi da li' l'indietro "
+          "riporta all'accesso invece di uscire",
+          True,
+          0 < mini.index('id="nostrSheet"') < mini.index('id="nostrGuidaSheet"'))
+    prova("...ed e' registrato in closeSheet come i suoi fratelli",
+          True,
+          "el('nostrGuidaSheet').classList.remove('open');" in mini)
+    _ag = pezzo_js(mini, "function apriGuidaNostr(){", "\n}")
+    prova("...e si apre SOPRA il login, che resta aperto sotto: "
+          "leggere come si fa una chiave non deve costare il ritorno "
+          "da capo", False, "remove('open')" in _ag)
+    # I DUE LINK SONO NOSTRI (scritti qui, non da un utente), quindi
+    # niente foglio di conferma — quello esiste per il banner del
+    # negozio, dove l'indirizzo lo sceglie chi vende. Che siano
+    # strumenti di terzi lo dice la guida, nella sua ultima riga.
+    _al = pezzo_js(mini, "function apriLinkGuida(quale){", "\n}")
+    prova("i link della guida passano dalla scala di casa (dentro "
+          "Telegram il suo browser, fuori una scheda con noopener)",
+          (True, True),
+          ("tg.openLink(url)" in _al, "'noopener'" in _al))
+    prova("...e non si interpolano in un onclick: viaggia la CHIAVE",
+          (True, False),
+          ("apriLinkGuida('amber')" in mini, "https://nstart.me'\")" in mini))
+    _guida = mini[mini.index('id="nostrGuidaSheet"'):]
+    _guida = _guida[:_guida.index("<!-- ============ SHEET COLLEGAMENTO")]
+    prova("la guida dice che quegli strumenti non sono nostri",
+          True, "non sono di Barattolo" in _guida)
+    prova("...e che la chiave privata non la vediamo mai",
+          True, "non la vede mai" in _guida)
+    prova("...e nomina tutte e due le strade, col loro passo finale",
+          (True, True, True),
+          ("Amber" in _guida, "nstart.me" in _guida,
+           "Col telefono" in _guida))
+    # LA CITAZIONE SI LEGA AL BOTTONE VERO, e non e' pignoleria: la
+    # riga qui sopra cerca «Col telefono» DENTRO LA GUIDA, quindi
+    # resterebbe verde anche rinominando il bottone — la guida
+    # manderebbe a cercare un'etichetta che non c'e' piu'. E' successo
+    # davvero il giorno che il bottone e' passato da «Col telefono
+    # (Amber, nsec.app...)» a «Col telefono (Amber)»: nessuna prova se
+    # n'e' accorta. Qui l'etichetta si ESTRAE dal markup e si chiede
+    # che la guida ne citi l'inizio.
+    _et = re.search(r'id="nostrQrBtn"[^>]*>([^<]+)<', mini).group(1)
+    _et = _et.replace('\U0001f4f1', '').strip()          # via l'emoji
+    _et = _et.split('(')[0].strip()                       # e la parentesi
+    prova("...citando l'etichetta VERA del bottone",
+          True, bool(_et) and _et in _guida)
+
+    # ==================================================================
+    # E SI FA GIRARE. Le sentinelle qui sopra dicono che le righe ci
+    # sono, mai che il giro risponda giusto — e qui le due domande che
+    # contano sono proprio COSA finisce nel codice a schermo e CHI
+    # viene accettato come firmatario.
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il giro del login col telefono", "node non installato")
+        return
+    _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
+              + "\n"
+              + re.search(r"const NIP46_PERMESSI = '[^']*';", mini).group(0)
+              + "\n"
+              + re.search(r"const NOSTRCONNECT_ATTESA_MS = \d+;",
+                          mini).group(0)
+              + "\n" + fnc + "\n")
+    _prog = _pezzi + r"""
+/* il pezzo RACCONTA (le righe 🟪 sono meta' della diagnosi dal campo):
+   qui finirebbero nello stesso stdout del risultato e lo
+   sporcherebbero. Si zittisce e si scrive dalla porta di servizio. */
+const vero = console.log;
+console.log = () => {};
+let sub = null, qrMostrato = null, alBunker = null;
+async function caricaNostrTools(){}
+function bunkerDice(){}
+async function mostraQrConnessione(uri){ qrMostrato = uri; }
+function baseCondivisione(){ return 'https://barattolo.store'; }
+async function firmatarioBunker(uri, sk){
+  alBunker = {uri, sk};
+  return {pubkey: async () => 'REMOTO', firma: async (e) => e,
+          chiudi(){}, sessione: {uri, sk}};
+}
+let relayNip46 = [];
+function NTfinto(comeConnette){
+  let quante = 0;
+  return {
+    utils: {hexToBytes: h => h, bytesToHex: b => String(b)},
+    /* due chiavi diverse: la prima e' quella del client, la seconda
+       diventa il segreto — cosi' il banco puo' distinguerle */
+    generateSecretKey: () => (quante++ ? 'ilsegreto' : 'skclient'),
+    getPublicKey: () => 'PUBCLIENT',
+    finalizeEvent: (ev) => ev,
+    nip44: {getConversationKey: (sk, pub) => 'k:' + pub,
+            encrypt: (s) => s,
+            /* nel cartone il contenuto viaggia gia' in chiaro */
+            decrypt: (s) => s},
+    Relay: class {
+      constructor(url){ this.url = url; }
+      connect(opts){ return comeConnette(this.url, opts); }
+      subscribe(f, params){ sub = params; return {close(){}}; }
+      publish(){ return Promise.resolve(); }
+      close(){}
+    },
+  };
+}
+const esiti = {};
+function avvia(comeConnette){
+  globalThis.window = {NostrTools: NTfinto(comeConnette)};
+  qrMostrato = null; alBunker = null; sub = null;
+  return firmatarioNostrConnect().then(() => 'FATTO', e => e.message);
+}
+/* il cane da guardia c'e' SEMPRE: qui il difetto sotto esame e'
+   un'attesa che puo' non finire mai, e senza di lui una mutazione che
+   la rimette fa PIANTARE il banco — che esplode invece di diventare
+   rosso, cioe' passa per «mutazione sopravvissuta». */
+const conTetto = (p, ms) => Promise.race([p,
+  new Promise(ok => setTimeout(() => ok('ANCORA IN ATTESA'), ms || 250))]);
+(async () => {
+  // (a) tre relay, i primi due rifiutano: nel QR deve finire il terzo
+  relayNip46 = ['wss://uno.example', 'wss://due.example', 'wss://tre.example'];
+  let p = avvia(url => url.includes('tre') ? Promise.resolve()
+                                           : Promise.reject(new Error('giu')));
+  esiti.attesa = await conTetto(p);
+  esiti.qr = qrMostrato;
+  // (b) un messaggio col segreto SBAGLIATO non apre niente
+  sub.onevent({pubkey: 'IMPOSTORE',
+               content: JSON.stringify({id: '1', result: 'ack'})});
+  esiti.impostore = await conTetto(p);
+  esiti.dopoImpostore = alBunker;
+  // (c) col segreto giusto si passa al bunker di sempre
+  sub.onevent({pubkey: 'REMOTO',
+               content: JSON.stringify({id: '2', result: 'ilsegreto'})});
+  esiti.buono = await conTetto(p, 400);
+  esiti.bunker = alBunker;
+  // (d) senza relay non si mostra nessun codice
+  relayNip46 = [];
+  esiti.senzaRelay = await conTetto(avvia(() => Promise.resolve()));
+  esiti.qrSenzaRelay = qrMostrato;
+  vero(JSON.stringify(esiti));
+  process.exit(0);   // il timeout dell'attesa umana terrebbe vivo node
+})();
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("il login col telefono gira sul cartone", "0",
+              f"{_r.returncode}: {_r.stderr[:300]}")
+        return
+    d = _js.loads(_r.stdout.strip())
+    # la URI e' percent-encoded (il relay ci sta dentro come valore di
+    # un parametro): si DECODIFICA invece di cercare la forma nuda,
+    # che non c'e' — la prima stesura falliva per questo, non perche'
+    # il relay fosse sbagliato.
+    from urllib.parse import unquote as _unq
+    _qr = _unq(d["qr"] or "")
+    prova("il codice a schermo porta UN relay solo, e proprio quello "
+          "che ha risposto", (True, 1, True),
+          ("wss://tre.example" in _qr,
+           _qr.count("relay="),
+           "wss://uno.example" not in _qr))
+    prova("...e si presenta con la chiave del client, il segreto e i "
+          "permessi", [True] * 3,
+          [t in _qr for t in ("nostrconnect://PUBCLIENT",
+                              "secret=ilsegreto", "perms=")])
+    prova("finche' nessuno risponde si resta in ascolto, senza "
+          "inventarsi un firmatario",
+          ("ANCORA IN ATTESA", None), (d["attesa"], d["dopoImpostore"]))
+    prova("un messaggio col segreto sbagliato NON apre: verso la "
+          "nostra chiave effimera puo' cifrare chiunque veda il codice",
+          ("ANCORA IN ATTESA", None), (d["impostore"], d["dopoImpostore"]))
+    prova("col segreto giusto si passa al bunker, con la chiave del "
+          "MITTENTE e la sk del client", ["FATTO", True, "skclient"],
+          [d["buono"], (d["bunker"] or {}).get("uri", "")
+           .startswith("bunker://REMOTO"), (d["bunker"] or {}).get("sk")])
+    prova("...e senza il secret, che e' gia' servito una volta",
+          False, "secret" in (d["bunker"] or {}).get("uri", ""))
+    prova("senza relay non si disegna nessun codice", (True, None),
+          ("appuntamento non disponibile" in d["senzaRelay"],
+           d["qrSenzaRelay"]))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -40048,6 +40556,7 @@ def main():
               prove_ordini_prova,
               prove_tutorial,
               prove_bunker_muto,
+              prove_login_qr,
               prove_profilo_sezioni,
               prove_config_esempio):
         try:

@@ -12665,6 +12665,16 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # condizionato, e chi sta sul clearnet semplicemente non lo
         # guarda. Gratis, che questa risposta il client la chiede gia'.
         risposta["dominio_pubblico"] = URL_PUBBLICO
+        # LA STANZA DEL LOGIN COL QR (ago 2026): senza questa riga il
+        # bottone «Col telefono» non nasce affatto, ed e' voluto — un
+        # QR che punta a un relay inventato dal client sarebbe un
+        # codice che si scansiona e non porta da nessuna parte, cioe'
+        # il difetto peggiore di questa strada (il telefono dice
+        # «fatto» e qui non arriva niente). Viaggia di qui e non da
+        # /api/me per la ragione delle sue vicine: il foglio del
+        # login lo apre soprattutto chi NON e' ancora entrato, e
+        # /api/me in vetrina non esiste.
+        risposta["relay_nip46"] = RELAYS_NIP46
     con.close()
     return risposta
 
@@ -28690,6 +28700,35 @@ except ImportError:
 if not RELAYS_VERIFICA:
     print("[nostr] RELAY_NOSTR vuota nel config: valgono i relay di serie")
     RELAYS_VERIFICA = list(RELAY_DI_SERIE)
+
+# I RELAY DEL NIP-46, cioe' la stanza dove il telefono di chi entra
+# e questa pagina si danno appuntamento (ago 2026, col login QR).
+# Sono una lista SEPARATA da RELAYS_VERIFICA e non la stessa: li' si
+# cercano note pubbliche (kind 1) e la scelta e' «dove la gente
+# scrive», qui passa una conversazione cifrata fra due chiavi
+# effimere e la scelta e' «chi non chiede l'autenticazione e non
+# butta via gli eventi kind 24133». Il primo e' quello dedicato:
+# nsec.app lo tiene su per questo mestiere ed e' quello che i
+# firmatari (Amber in testa) trovano gia' configurato.
+# ORDINE = PRECEDENZA, e il primo posto si paga: il client prova dal
+# primo e si ferma al primo che risponde, ma un relay MUTO si porta
+# via i 15 secondi del timeout PRIMA che il codice compaia — e chi
+# guarda vede una sala d'attesa e basta. Quindi in testa va quello che
+# risponde, non quello piu' specializzato.
+# MISURATO e non supposto (ago 2026, dal banco): `relay.nsec.app` —
+# che sarebbe IL relay dedicato al NIP-46 — da qui non risponde
+# nemmeno a una GET, mentre damus e nos.lol rispondono in un decimo di
+# secondo. Resta in lista, in coda: se un domani torna su fa il suo
+# mestiere, e intanto non fa aspettare nessuno. Chi ritocca l'ordine
+# lo RIMISURI (una GET a ognuno) invece di andare a memoria.
+# E nella URI del QR ci finisce SOLO il relay scelto — vedi il
+# commento di firmatarioNostrConnect: e' la riga che impedisce alla
+# stanza di essere due.
+RELAYS_NIP46 = [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.nsec.app",
+]
 CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 

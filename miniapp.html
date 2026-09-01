@@ -3183,27 +3183,57 @@
      ⚠️ PRENDE LO SLOT `-cop`, che il logo lascia libero — e' lo slot
      della COPERTINA, quindi la regex del server (`FORMA_RACCONTO`)
      non si tocca di un carattere.
-     STA FUORI DAL CASSETTO, ed e' la riga che rende sostenibile la
-     morte del logo: chi arriva al negozio da un annuncio ha il
-     racconto CHIUSO, e senza questa immagine il nome «To The Mooon!»
-     non lo leggerebbe da nessuna parte — l'h3 qui sotto porta il
-     SOTTOTITOLO. E' lo stesso buco di ieri, colmato meglio.
+     STA DENTRO IL CASSETTO (ago 2026, decisione di Andrea che
+     ROVESCIA il giro di ieri): chiudendo la storia si chiude TUTTO il
+     racconto, immagine compresa — fuori restava un'immagine grande
+     senza piu' niente attorno, e «Chiudi la storia» non chiudeva la
+     cosa piu' grande che si vedeva.
+     ⚠️ IL PREZZO E' DICHIARATO, ed e' il buco che il logo colmava,
+     riaperto sapendolo: il nome «To The Mooon!» vive SOLO dentro
+     questa immagine — l'h3 della testa porta il SOTTOTITOLO — quindi
+     chi apre il negozio da un annuncio, col cassetto CHIUSO, non lo
+     legge da nessuna parte. Se a rodaggio dara' fastidio, la leva e'
+     il nome nell'h3, non l'hero fuori.
      IL RAPPORTO E' NEL FILE e non nel CSS: l'altezza segue la
      larghezza della colonna, quindi il costo in pixel dipende dal
      rapporto dell'immagine — che per questo va CONSEGNATA 21:9,
      come dice il commento del catalogo. */
-  .rac-hero{display:block;width:100%;height:auto;margin:14px 0 0;
+  .rac-hero{display:block;width:100%;height:auto;margin:0;
     border-radius:var(--radius)}
-  .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
-    letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
     font-size:20px;line-height:1.2;font-weight:800;color:var(--ink)}
-  .rac-intro{margin:6px 0 8px;font-size:13.5px;line-height:1.45;
+  /* I DUE CORPI DEL RACCONTO (ago 2026, decisione di Andrea: «e'
+     troppo piccolo»). La prosa sta a **15/1.6**, che e' `.sicu p` —
+     il corpo delle due pagine di testo lungo del progetto — e i
+     secondari (le spiegazioni sotto i grassetti, l'elenco) a 14, un
+     gradino sotto come lo erano prima. Il rapporto fra i due non
+     cambia: cambia il punto di partenza, che era 13.5 — piu' piccolo
+     perfino della descrizione di un annuncio (14.5) su un testo che
+     si legge molto piu' a lungo.
+     ⚠️ IL MAIUSCOLETTO `.rac-h` RESTA A 11, e non e' una
+     dimenticanza: quello e' il registro delle etichette di sezione in
+     tutta l'app (`.section-label`, `.desc-tit`), e crescerlo qui
+     aprirebbe un'eccezione che poi si spiega ogni volta. */
+  .rac-intro{margin:6px 0 8px;font-size:15px;line-height:1.55;
     color:var(--ink-soft)}
   /* Il link che apre e' un BOTTONE vestito da link (.scopri-link, la
      ricetta del recinto escrow): un cassetto si apre con un comando,
      e un <a> senza href non lo e'. */
   .rac-apri{background:none;border:0;padding:0;cursor:pointer}
+  /* LA RIGA DELLE DUE AZIONI (ago 2026, decisione di Andrea): il link
+     che apre la storia e il CTA che porta alla MERCE. Il link sta a
+     SINISTRA, dove comincia la lettura e dove l'ha sempre trovato chi
+     e' venuto per la storia; l'arancio a destra, dove il pollice lo
+     cerca — e a destra non ruba la prima lettura al link.
+     `wrap` perche' a 320px col testo lungo («Leggi la storia >» piu'
+     «Acquista») la riga e' al filo: a cedere e' l'a-capo, mai lo
+     sbordo. */
+  .rac-azioni{display:flex;flex-wrap:wrap;gap:10px;
+    align-items:center;justify-content:space-between;margin-top:2px}
+  /* ⚠️ `width:auto` perche' `.btn` nasce a tutta larghezza: senza,
+     l'arancio si prenderebbe la riga e il link scenderebbe sotto. */
+  .rac-acquista{width:auto;padding:9px 18px;font-size:14px;
+    margin:0}
   /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
      da indovinare — `display:none` e basta. Qui dentro non c'e'
      niente che debba transizionare: la storia si legge, non si
@@ -3212,7 +3242,7 @@
   .rac-corpo.aperto{display:block;margin-top:14px}
   .rac-h{margin:18px 0 6px;font-size:11px;font-weight:800;
     letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-  .rac-p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+  .rac-p{margin:0;font-size:15px;line-height:1.6;color:var(--ink)}
   .rac-punti{display:flex;flex-direction:column;gap:10px;margin-top:12px}
   /* CONTORNATI (ago 2026, decisione di Andrea): il riquadro li
      stacca dalla prosa sopra e sotto — sono tre FATTI del gioco,
@@ -3223,8 +3253,8 @@
     border:1.5px solid var(--field-line);border-radius:var(--radius);
     padding:10px 12px}
   .rac-e{font-size:19px;line-height:1.1;flex:0 0 auto}
-  .rac-punto b{display:block;font-size:13.5px;color:var(--ink)}
-  .rac-punto span{display:block;font-size:13px;line-height:1.45;
+  .rac-punto b{display:block;font-size:15px;color:var(--ink)}
+  .rac-punto span{display:block;font-size:14px;line-height:1.5;
     color:var(--ink-soft)}
   /* Le tappe: una colonna con la barretta a sinistra, che e' quel che
      le fa leggere come una sequenza invece che come un elenco. */
@@ -3247,10 +3277,10 @@
   .rac-tappa:nth-child(2)::before{background:var(--ink-soft)}
   .rac-tappa:nth-child(3)::before{background:var(--muted)}
   .rac-tappa:nth-child(4)::before{background:var(--sats)}
-  .rac-tappa b{display:block;font-size:13.5px;color:var(--ink)}
-  .rac-tappa span{display:block;font-size:13px;line-height:1.45;
+  .rac-tappa b{display:block;font-size:15px;color:var(--ink)}
+  .rac-tappa span{display:block;font-size:14px;line-height:1.5;
     color:var(--ink-soft)}
-  .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:13px;
+  .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:14px;
     line-height:1.6;color:var(--ink-soft)}
   /* IL VINCOLO E' L'ALTEZZA E NON LA LARGHEZZA, o una foto
      VERTICALE si prende piu' di una schermata. Il tabellone di To
@@ -3270,22 +3300,18 @@
      stira piu': meglio cosi', e le nostre sono 1360. */
   .rac-foto{display:block;width:auto;max-width:100%;max-height:560px;
     margin:16px auto 0;border-radius:var(--radius)}
-  /* LA RIGA CHE DICHIARA. Superficie NEUTRA (--chip-bg) come
-     .nota-punto e .nota-savers: non e' un avviso e non e' una
-     promessa, e' un fatto. La seconda frase conta piu' della
-     prima — senza, «in vetrina su Barattolo» si legge come un
-     endorsement nostro, che e' esattamente cio' che il prompt
-     della moderazione vieta agli altri.
-     ⚠️ DALL'AGO 2026 STA IN FONDO AL CASSETTO, e la riga di ieri
-     («fuori, che dentro la legge solo chi apre») e' stata
-     ROVESCIATA: in cima il suo posto l'ha preso l'hero. Quel che
-     regge la dichiarazione a cassetto CHIUSO e' la PASTIGLIA,
-     che sta sempre in vista e porta la stessa parola della card
-     — la riga aggiunge il PERCHE', e chi ha letto la storia
-     arriva qui comunque. */
-  .rac-avviso{display:flex;gap:8px;background:var(--chip-bg);
-    border-radius:var(--radius);padding:10px 12px;margin:22px 0 0;
-    font-size:12.5px;line-height:1.45;color:var(--ink)}
+  /* ⚠️ QUI C'ERA LA RIGA CHE DICHIARAVA, in fondo al cassetto, e
+     dall'ago 2026 non c'e' piu' (decisione di Andrea). La classe se
+     n'e' andata col markup: una regola orfana nel foglio fa credere
+     a chi legge che qualcosa la usi ancora — il precedente del logo e
+     dell'occhiello, e c'e' il censimento che ne conta ZERO in tutti e
+     tre i posti.
+     ⚠️ IL NOME DI QUELLE DUE CLASSI NON SI SCRIVE QUI, ed e' la
+     trappola in cui si e' inciampati scrivendo proprio questa riga: i
+     censimenti che ne pretendono ZERO leggono il foglio INTERO,
+     commenti compresi, e citarne una li fa tornare rossi.
+     Il perche' e il costo stanno in `raccontoNegozio`, dove il taglio
+     si vede. */
 
   .trust-note{
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
@@ -3305,7 +3331,23 @@
      il verde dell'escrow — ma un fatto sul suo annuncio. Un selettore
      solo per due nomi: due regole gemelle sarebbero due valori da
      tenere in pari. */
-  .trust-note.nota-punto,.trust-note.nota-savers{background:var(--chip-bg);color:var(--ink)}
+  .trust-note.nota-punto,.trust-note.nota-savers,
+  .trust-note.nota-promessa{background:var(--chip-bg);color:var(--ink)}
+  /* LE DUE PROMESSE DEL NEGOZIO, sotto «In vetrina in questo
+     negozio» (ago 2026, decisione di Andrea). NEUTRE e non verdi: il
+     verde e' il registro della FIDUCIA — il deposito di garanzia — e
+     una promessa commerciale non e' quello; e a filo della griglia
+     due riquadri verdi sopra la merce si leggevano come un cartello
+     invece che come un fatto del negozio.
+     ⚠️ LA MAIUSCOLA LA METTE IL CSS e non il JS, che e' quel che
+     permette di riusare `frasePromessaSpedGratis` TALE E QUALE: quel
+     giudice e' unico per quattro superfici e comincia minuscolo
+     perche' altrove si incastra in «Questo negozio offre la …». Col
+     JS servirebbe una copia della frase, o un taglio della stringa
+     che il giorno che comincia con un tag scriverebbe la maiuscola
+     dentro il markup. Sullo span funziona perche' i figli di un flex
+     sono di livello blocco. */
+  .trust-note.nota-promessa span::first-letter{text-transform:uppercase}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -4982,8 +5024,21 @@ document.getElementById('cartello')?.remove();</script>
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
     <div id="negozioFeedback"></div>
-    <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
-    <div class="section-label">In vetrina in questo negozio</div>
+    <!-- La trust-line del deposito e' USCITA di qui (ago 2026,
+         decisione di Andrea): lo dice gia' la scheda dell'annuncio
+         prima di comprare, e qui era la terza volta nella stessa
+         schermata. Le porte verso «Il pagamento protetto» scendono a
+         DUE — la riga di Esplora (che e' anche la tappa del tour) e il
+         bottone in fondo al Profilo — e nessuna delle due era questa. -->
+    <div class="section-label" id="negozioVetrinaTit">In vetrina in questo negozio</div>
+    <!-- LE DUE PROMESSE DEL NEGOZIO stanno QUI dall'ago 2026
+         (decisione di Andrea): erano in testata, sopra il nome del
+         venditore, e le dice meglio dove servono — un dito sopra la
+         merce a cui si applicano. Il contenitore e' vuoto per i
+         negozi che non promettono niente, quindi non costa un pixel;
+         a riempirlo e' `renderNegozio`, cioe' l'unico posto che
+         conosce il venditore. -->
+    <div id="negozioPromesse"></div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
     <!-- ============ ESAURITI (ago 2026) ============
@@ -6749,7 +6804,25 @@ document.getElementById('cartello')?.remove();</script>
       Dimostri di possedere la tua chiave firmando una sfida.
       La chiave privata <b>non viene mai inviata</b> a nessuno.
     </div>
-    <button class="btn primary" style="margin-top:14px" onclick="loginNostrEstensione()">🧩 Con l'estensione (consigliato)</button>
+    <!-- IL TELEFONO PER PRIMO, e non e' un'opinione: qui dentro si
+         entra quasi sempre da un telefono (Mini App, PWA), dove
+         un'estensione del browser non esiste proprio — «consigliato»
+         su quella riga consigliava una strada che meta' del pubblico
+         non puo' imboccare. La parola e' caduta da tutti e due: a
+         dire qual e' la propria e' il dispositivo che si ha in mano.
+         Il bottone si spegne senza i relay (vedi apriNostrSheet). -->
+    <button class="btn primary" id="nostrQrBtn" style="margin-top:14px" onclick="loginNostrQr()">📱 Col telefono (Amber)</button>
+    <!-- I TESTI SI VESTONO IN LINEA come i loro vicini di foglio, e
+         non con `.hint`: quella classe non ha una regola BASE — vive
+         solo dentro `.payout` e `.campo-file` — quindi qui dentro non
+         vestirebbe niente e la riga uscirebbe col corpo del titolo. -->
+    <div id="nostrQrBox" style="display:none">
+      <div class="qr" id="nostrQr"></div>
+      <div class="invoice" id="nostrQrUri" style="user-select:all;margin-top:10px"></div>
+      <button class="btn mini" style="margin-top:6px" onclick="copiaUriConnessione()">📋 Copia il link</button>
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link e incollalo nell'app.</div>
+    </div>
+    <button class="btn primary" style="margin-top:10px" onclick="loginNostrEstensione()">🧩 Con l'estensione del browser</button>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔗 Con un bunker remoto (NIP-46)</summary>
       <div class="field" style="margin-top:8px">
@@ -6769,7 +6842,64 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <button class="btn primary" onclick="loginNostrNsec()">Entra</button>
     </details>
+    <!-- LA PORTA PER CHI UN PROFILO NON CE L'HA ANCORA: tre bottoni
+         che chiedono una chiave sono un muro per chi non sa nemmeno
+         cos'e'. Il link e' discreto (la lingua di «+ Aggiungi una
+         nota») perche' non e' un'azione di questo foglio: e' la
+         strada per tornarci fra cinque minuti. -->
+    <div style="font-size:13px;color:var(--muted);font-weight:600;margin-top:12px">
+      Non hai ancora un profilo Nostr?
+      <button class="scopri-link" onclick="apriGuidaNostr()">Creane uno</button>
+    </div>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET GUIDA «CREA UN PROFILO NOSTR» ============
+       STA DOPO IL FOGLIO DEL LOGIN nel markup, e non e' un dettaglio:
+       navPila ordina gli strati per posizione nel documento, quindi
+       da qui il gesto indietro chiude PRIMA la guida e riporta al
+       login — che resta aperto sotto, come fa il picker. -->
+  <div class="sheet" id="nostrGuidaSheet">
+    <div class="grab"></div>
+    <h3>🌱 Crea il tuo profilo Nostr</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      Su Nostr non c'è un account con email e password: c'è una
+      <b>chiave</b>. La parte pubblica è il tuo nome (la npub), quella
+      privata è la firma — e resta tua, non la vede mai nessuno.
+      <b>Barattolo non la vede mai</b>: quando serve una firma la fa il
+      tuo telefono o il tuo browser, e qui arriva già firmata.
+    </div>
+
+    <div style="font-weight:800;font-size:14px;margin-top:16px">📱 Dal telefono (Android)</div>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      <b>Amber</b> custodisce la chiave sul telefono e firma per te: è
+      la strada più comoda se entri da qui, perché poi ti basta
+      inquadrare il codice.
+      <br>1. Installa Amber.
+      <br>2. Aprilo e scegli di <b>creare una chiave nuova</b>.
+      <br>3. Torna qui, tocca <b>«Col telefono»</b> e inquadra il codice.
+    </div>
+    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('amber')">📥 Scarica Amber</button>
+
+    <div style="font-weight:800;font-size:14px;margin-top:16px">💻 Dal browser</div>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.6">
+      <b>nstart.me</b> ti prende per mano e crea la chiave passo passo,
+      mettendola al sicuro.
+      <br>1. Apri nstart.me e segui i passi.
+      <br>2. <b>Conserva la chiave privata</b> dove la ritrovi: se la
+      perdi non la rifà nessuno, nemmeno noi.
+      <br>3. Torna qui: se hai installato un'estensione (Alby, nos2x)
+      entri con <b>«Con l'estensione»</b>, altrimenti col <b>bunker</b>
+      che nstart ti propone.
+    </div>
+    <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('nstart')">🌐 Apri nstart.me</button>
+
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:14px">
+      Amber e nstart.me non sono di Barattolo: sono strumenti liberi
+      del mondo Nostr, e la chiave che creano è tua e funziona con
+      qualsiasi app, non solo qui.
+    </div>
+    <button class="btn primary" style="margin-top:14px" onclick="navIndietro()">Ho capito, torno all'accesso</button>
   </div>
 
   <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
@@ -6868,6 +6998,15 @@ let dominioPubblico = '';
 function baseCondivisione(){
   return (suOnion() && dominioPubblico) ? dominioPubblico : location.origin;
 }
+
+/* LA STANZA DELL'APPUNTAMENTO col firmatario (il login col telefono):
+   la lista arriva dal server nella busta di prima pagina, che il
+   client chiede gia' — zero giri di rete in piu'. Vuota vuol dire
+   «da qui non si puo'», e il bottone non nasce affatto: un QR che
+   punta a un relay inventato si scansiona e non porta da nessuna
+   parte, che e' peggio di un bottone che manca. Cosi' resta vuota
+   anche in DEMO da file://, dove un server non c'e'. */
+let relayNip46 = [];
 
 
 if (tg) { tg.ready(); tg.expand(); }
@@ -7795,6 +7934,10 @@ async function loadListings(anonimo){
      blocco della pagina dei dati non nascono affatto: un'assenza,
      mai un indirizzo inventato. */
   if (j.onion_host !== undefined) impostaOnion(j.onion_host);
+  /* i relay dove darsi appuntamento col firmatario: senza (server di
+     ieri, o lista vuota) il bottone «Col telefono» non compare e le
+     altre porte restano quelle di sempre */
+  if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -9379,7 +9522,6 @@ const RACCONTI = {
        visibile dello spazio che abbiamo venduto. Chi passa di
        qui non la «corregga». */
     titolo: 'To The Mooon!',
-    occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
     sottotitolo: 'Capire Bitcoin, giocando.',
     intro: "Ogni viaggio inizia con una scelta. L'obiettivo e' arrivare " +
            "sulla Luna: prendi decisioni, affronti imprevisti e gestisci " +
@@ -10901,15 +11043,27 @@ function apriLinkBanner(){
    esauriti: si eredita tutto, e questa e' la ragione per cui la card
    porta qui invece che a una pagina a parte.
    NIENTE COPERTINA (ago 2026, decisione di Andrea, che ROVESCIA il
-   primo disegno): in testa vanno pastiglia, titolo, occhiello e il
-   link che apre — l'immagine grande si e' appena vista a tutto
+   primo disegno): in testa vanno pastiglia, titolo, intro e la RIGA
+   DELLE DUE AZIONI — l'immagine grande si e' appena vista a tutto
    schermo nella card, e ripeterla a un tocco di distanza non aggiunge
-   niente. Le foto del progetto vivono DENTRO il cassetto. Il conto
-   che ha deciso: copertina + titolo facevano ~213px sopra la merce,
-   cosi' ne fanno ~98 — ed e' quel che permette di TENERE ANCHE IL
-   BANNER del venditore, che nel primo disegno spariva. Due immagini
-   3:1 in fila facevano 396px sopra il nome del venditore, cioe' la
-   prima card fuori da qualunque schermo.
+   niente. TUTTE le immagini del progetto, hero compreso, vivono
+   DENTRO il cassetto. Il conto che ha deciso: copertina + titolo
+   facevano ~213px sopra la merce, cosi' ne fanno ~98 — ed e' quel che
+   permette di TENERE ANCHE IL BANNER del venditore, che nel primo
+   disegno spariva. Due immagini 3:1 in fila facevano 396px sopra il
+   nome del venditore, cioe' la prima card fuori da qualunque schermo.
+   ⚠️ E L'OCCHIELLO NON C'E' PIU' (ago 2026, decisione di Andrea):
+   «Gioco da tavolo · fatto e stampato in Italia» stava fra la
+   pastiglia e il titolo, e diceva in anticipo quel che la prima riga
+   della storia dice meglio. Si parte dal sottotitolo. Il campo e'
+   uscito anche dal catalogo, che un campo che non legge nessuno fa
+   credere a chi passa che da qualche parte si veda.
+   IL BOTTONE «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di
+   Andrea): sta nella riga della testa accanto al link che apre la
+   storia, ed e' l'unico pieno di questa pagina — la sua meta' e' il
+   motivo per cui il racconto vive DENTRO il negozio invece che in una
+   pagina a parte, cioe' che sotto c'e' roba da comprare. Non compra
+   niente: scorre.
    E IL BANNER RESTA DOV'E', per tutti: chi arriva da un annuncio non
    apre il racconto e non deve perdere l'insegna che quel venditore
    si e' guadagnata. Sono due cose diverse e adesso non si fanno piu'
@@ -10953,34 +11107,48 @@ function raccontoNegozio(v){
                    decoding="async" onerror="this.remove()">`;
     return '';
   }).join('');
-  /* La riga della trasparenza sta FUORI dal cassetto, e non e' una
-     scelta di gusto: dentro, chi non apre non la leggerebbe mai — e
-     sarebbe come dichiararlo a chi lo sa gia'. La seconda frase e'
-     quella che conta piu' della prima: senza, «in vetrina su
-     Barattolo» si legge come un endorsement nostro, che e'
-     esattamente cio' che il prompt della moderazione vieta agli
-     altri («il testo che SI RIVOLGE A CHI LEGGE come farebbe la
-     piattaforma»). Quella regola non puo' valere solo per gli altri. */
+  /* LA RIGA IN CHIARO NON C'E' PIU' (ago 2026, decisione di Andrea
+     presa sapendo il costo, che le era stato riportato per iscritto).
+     Era gia' scesa a UNA frase — quella che GARANTIVA, e che questo
+     file dichiarava «conta piu' della prima» — e adesso se ne va
+     anche lei: della dichiarazione resta la sola PASTIGLIA.
+     ⚠️ QUEL CHE RESTA SCOPERTO, e va detto invece di far finta:
+     nessuna superficie dice piu' ne' che quello spazio si compra ne'
+     che comprarci dentro vale quanto comprare altrove. «Consigliato»
+     e' una parola NOSTRA, quindi da sola si legge come un giudizio
+     nostro sul venditore — che e' esattamente cio' che il
+     PROMPT_MODERAZIONE vieta agli altri («il testo che SI RIVOLGE A
+     CHI LEGGE come farebbe la piattaforma»), e quella regola era
+     nata per valere anche per noi.
+     LA LEVA, il giorno che si vorra' richiudere, E' UNA RIGA nel
+     renderer — mai nel catalogo, o il progetto di domani potrebbe
+     nascere senza. E' la ragione per cui la prova della
+     dichiarazione non e' morta col taglio: si e' riancorata alla
+     pastiglia, che nel renderer sta.
+     ⚠️ LE PAROLE DELLE DUE RIGHE DI IERI NON SI SCRIVONO QUI, e non
+     e' pignoleria: le prove che le vietano leggono il pezzo JS
+     COMMENTI COMPRESI, quindi una spiegazione che le cita le fa
+     tornare rosse. E' la trappola della prosa, pagata TRE volte in
+     questa stessa funzione. */
   return `
     <div class="racconto">
       <div class="rac-testa">
         <span class="rac-pill">📣 Consigliato</span>
-        <div class="rac-occhiello">${esc(r.occhiello || '')}</div>
         <h3 class="rac-titolo">${esc(r.sottotitolo || r.titolo)}</h3>
         <p class="rac-intro">${esc(r.intro || '')}</p>
-        <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
-                aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
-          raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+        <div class="rac-azioni">
+          <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
+                  aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
+            raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+          <button class="btn orange rac-acquista"
+                  onclick="acquistaDalRacconto()">Acquista</button>
+        </div>
       </div>
-      <img class="rac-hero" src="${foto('cop')}"
-           alt="${esc(r.titolo)}" decoding="async"
-           onerror="this.remove()">
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
+        <img class="rac-hero" src="${foto('cop')}"
+             alt="${esc(r.titolo)}" decoding="async"
+             onerror="this.remove()">
         ${blocchi}
-        <div class="rac-avviso">📣 <span><b>Spazio
-          pubblicitario</b> — questo negozio ha pagato per comparire in
-          «Da scoprire». Le tutele sull'acquisto sono le stesse di ogni
-          altro negozio.</span></div>
       </div>
     </div>`;
 }
@@ -10995,6 +11163,18 @@ function toggleRacconto(btn){
   if (c) c.classList.toggle('aperto', raccontoAperto);
   btn.setAttribute('aria-expanded', raccontoAperto ? 'true' : 'false');
   btn.textContent = raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›';
+}
+
+/* «Acquista» dal racconto NON compra: porta alla merce, che in questa
+   pagina sta sotto — ed e' la ragione per cui il racconto vive dentro
+   il negozio invece che in una pagina a parte. Lo scroll e' quello di
+   casa (il calco di svelaOfferta), spento da reduced-motion; l'ancora
+   e' l'etichetta della vetrina e non la griglia, che vuota non ha un
+   box su cui atterrare. */
+function acquistaDalRacconto(){
+  const t = el('negozioVetrinaTit');
+  if (t) t.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth',
+                           block: 'start'});
 }
 
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
@@ -11031,8 +11211,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
                             w.sconto_pacco_valore, w.sconto_pacco_valore_eur,
                             w.sconto_pacco_valuta, w.sconto_pacco_percento);
     return rs.length
-      ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
-           negozio fa ${frasePromessaSconto(rs)}.</span></div>` : '';
+      ? `<div class="trust-note nota-promessa" style="margin-top:12px">🎁
+           <span>Sconto ${frasePromessaSconto(rs)}</span></div>` : '';
   };
   /* E la seconda promessa: le due sono INDIPENDENTI — guardano lo
      stesso numero senza vedersi — quindi un negozio puo' averle tutte
@@ -11046,8 +11226,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     const r = regolaSpedGratis(w.sped_gratis_soglia, w.sped_gratis_eur,
                                w.sped_gratis_valuta);
     return r
-      ? `<div class="trust-note" style="margin-top:12px">🚚 <span>Questo
-           negozio offre la ${frasePromessaSpedGratis(r)}.</span></div>`
+      ? `<div class="trust-note nota-promessa" style="margin-top:12px">🚚
+           <span>${frasePromessaSpedGratis(r)}</span></div>`
       : '';
   };
   const chi = (v.nome||'').split(' ')[0];
@@ -11066,8 +11246,17 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       </div>
     </div>
     ${ponti}
-    ${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+  /* LE DUE PROMESSE SCENDONO SOTTO «In vetrina in questo negozio»
+     (ago 2026, decisione di Andrea), e l'ordine di montaggio non
+     cambia: 🚚 PRIMA della 🎁, come in Paga, in «Altri oggetti» e nel
+     carrello — l'occhio impara UNA fila, e una superficie che la
+     rovescia gliene fa trovare un'altra. C'e' la prova.
+     SI RISCRIVE SEMPRE, anche a mani vuote: `renderNegozio` gira a
+     ogni apertura, e senza l'assegnazione la promessa del negozio di
+     prima resterebbe a schermo su un negozio che non ne ha. */
+  el('negozioPromesse').innerHTML =
+    `${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}`;
   /* Gli ultimi feedback ricevuti: stelle, commento, ruolo, data — e
      CHI li ha scritti, con nome e faccia (ago 2026). Un voto senza un
      volto non si puo' pesare: e' la stessa ragione del «da N persone».
@@ -17501,20 +17690,42 @@ async function mostraQr(invoice){
     box.classList.remove('pronto'); box.innerHTML = ''; return;
   }
   if (giro !== qrGiro) return;
-  const testo = ('lightning:' + invoice.trim()).toUpperCase();
+  disegnaQr(box, ('lightning:' + invoice.trim()).toUpperCase(), 'Alphanumeric');
+}
+
+/* IL DISEGNO DEL QR VIVE IN UN POSTO SOLO (ago 2026, col login col
+   telefono): i codici da disegnare sono diventati DUE — la invoice
+   Lightning e la URI `nostrconnect://` dell'accesso — e la geometria
+   (zona quieta, scala, moduli scuri su bianco FISSO nei due temi) e'
+   la stessa identica per tutti e due. Scritta in due posti
+   divergerebbe al primo ritocco, e un QR ritoccato male non fallisce
+   da solo: si scansiona lo stesso e porta altrove.
+   IL MODO E' L'UNICA COSA CHE CAMBIA, e si passa invece di
+   indovinarlo: 'Alphanumeric' accetta A-Z, 0-9 e pochi segni — la
+   bolt11 in maiuscolo ci sta e ne esce un codice piu' rado, piu'
+   facile da inquadrare — mentre una URI con le minuscole, le barre e
+   la chiocciola non ci entra e va per forza in 'Byte'.
+   Torna `true` se il codice c'e' davvero: chi mostra un'attesa deve
+   poter dire «non sono riuscito a disegnarlo» invece di lasciare un
+   riquadro vuoto che sembra un caricamento infinito. */
+async function disegnaQr(box, testo, modo){
+  if (!box) return false;
+  try { await caricaQrcode(); } catch(e) {
+    box.classList.remove('pronto'); box.innerHTML = ''; return false;
+  }
   let qr;
   try {
     qr = qrcode(0, 'M');            /* versione automatica, correzione M */
-    qr.addData(testo, 'Alphanumeric');
+    qr.addData(testo, modo || 'Byte');
     qr.make();
   } catch(e) {
     /* fuori misura o carattere imprevisto: meglio nessun QR che un QR
-       sbagliato — resta la invoice da copiare */
-    box.classList.remove('pronto'); box.innerHTML = ''; return;
+       sbagliato — resta il testo da copiare */
+    box.classList.remove('pronto'); box.innerHTML = ''; return false;
   }
   /* moduli scuri su bianco con 4 moduli di zona quieta DENTRO il
-     canvas; la scala punta a ~500px veri, poi il CSS lo posa a 230
-     (pixelated: i bordi restano netti) */
+     canvas; la scala punta a ~500px veri, poi il CSS lo posa alla sua
+     misura (pixelated: i bordi restano netti) */
   const moduli = qr.getModuleCount(), quieto = 4;
   const scala = Math.max(2, Math.round(500 / (moduli + quieto * 2)));
   const lato = (moduli + quieto * 2) * scala;
@@ -17529,6 +17740,7 @@ async function mostraQr(invoice){
         g.fillRect((quieto + col) * scala, (quieto + r) * scala, scala, scala);
   box.innerHTML = ''; box.appendChild(c);
   box.classList.add('pronto');
+  return true;
 }
 
 /* L'«Annulla» del foglio pagamento ANNULLA DAVVERO (ago 2026): prima
@@ -17680,6 +17892,7 @@ function closeSheet(){
   el('paySheet').classList.remove('open');
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
+  el('nostrGuidaSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
@@ -30594,6 +30807,14 @@ function firmatarioEstensione(){
    piantata. */
 const BUNKER_CONNETTI_MS = 15000;
 
+/* I PERMESSI CHE CHIEDIAMO AL FIRMATARIO, in un posto solo: le firme
+   che questa app sa chiedere sono DUE — la sfida del login (22242) e
+   l'annuncio NIP-99 della modifica firmata (30402) — e non ne esistono
+   altre. Le strade che li chiedono sono due (la URI incollata e il QR)
+   e scriverli due volte vuol dire che un giorno una delle due chiede
+   un permesso in piu' o in meno di quello che poi usa. */
+const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402';
+
 /* 2) Bunker NIP-46: le firme le fa un signer remoto. Il protocollo è
    una chat cifrata su un relay: noi (chiave locale del CLIENT, mai
    quella dell'utente) mandiamo richieste kind-24133 cifrate NIP-44,
@@ -30740,7 +30961,7 @@ async function firmatarioBunker(uri, skHex){
      l'app del bunker e approvare, in 30s non ci si sta. */
   try {
     await chiama('connect', [bunkerPub, par.get('secret') || '',
-                             'sign_event:22242,sign_event:30402'], 120000);
+                             NIP46_PERMESSI], 120000);
   } catch(e){
     if (!/already connected/i.test(e.message || '')) {
       try { relay.close(); } catch(_){}   // niente websocket orfane
@@ -30759,6 +30980,151 @@ async function firmatarioBunker(uri, skHex){
     /* per ricordaBunker: uri + chiave client = la sessione riusabile */
     sessione: {uri: uri.trim(), sk: NT.utils.bytesToHex(skLocale)},
   };
+}
+
+/* 2b) IL BUNKER AL CONTRARIO: `nostrconnect://` (ago 2026, il login
+   col telefono). La URI `bunker://` la scrive il FIRMATARIO e si
+   incolla qui: ottima da un computer con nsec.app aperto in un'altra
+   scheda, impossibile da un telefono — chi ha Amber non ha nessuna
+   stringa da copiare, ce l'ha l'app. Qui la direzione si rovescia:
+   la URI la scriviamo NOI, la mostriamo come QR, e il firmatario ci
+   chiama. Il protocollo e' lo stesso (NIP-46), cambia solo chi bussa.
+
+   IL RELAY DELLA URI E' QUELLO A CUI SIAMO GIA' CONNESSI, ed e' LA
+   riga da non ammorbidire: ci si connette PRIMA e si scrive nel QR
+   solo il relay SCELTO. Elencandoli tutti e tre, il telefono potrebbe
+   rispondere sul secondo mentre noi ascoltiamo il primo — e quel
+   difetto non fallisce da nessuna parte: sul telefono si legge
+   «collegato», qui si aspetta per sempre.
+
+   IL SEGRETO E' LA PORTA, e si accetta SOLO lui: verso la nostra
+   chiave effimera puo' cifrare CHIUNQUE veda il QR, quindi senza
+   quel confronto basterebbe un «ack» di passaggio per legarci al
+   firmatario sbagliato. E' quel che NIP-46 chiede, ed e' anche
+   l'unica cosa che rende sicuro mostrare un codice su uno schermo.
+
+   E QUANDO IL FIRMATARIO SI E' FATTO VIVO, il resto e' il bunker di
+   sempre: si compone la sua `bunker://` e si chiama `firmatarioBunker`
+   con la chiave client appena usata. Cosi' il motore NIP-46 resta UNO
+   — e soprattutto la sessione che si conserva ha la FORMA di sempre,
+   quindi la coda delle firme, la modifica firmata e `bunkerSalvato()`
+   funzionano senza sapere che questa strada esiste.
+   IL SECRET NON SI RIPETE nella seconda connect: e' servito una volta,
+   alla presentazione, e certi firmatari lo trattano come usa-e-getta —
+   ripresentarlo vorrebbe dire rischiare un rifiuto DOPO che l'utente
+   ha gia' approvato, che e' il momento peggiore in cui fallire. */
+const NOSTRCONNECT_ATTESA_MS = 180000;   /* 3 minuti: dall'altra parte
+   c'e' un umano che prende il telefono, apre l'app, inquadra e
+   approva. Coi 30s delle chiamate di servizio non ci si sta. */
+let nostrQrGiro = 0;
+
+async function firmatarioNostrConnect(){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const relays = (relayNip46 || []).slice();
+  /* Senza la lista dal server non si inventa niente: un QR che punta a
+     un relay scelto a caso e' un codice che si scansiona e non porta
+     da nessuna parte. Il bottone non nasce nemmeno (vedi
+     apriNostrSheet), e questa e' la cintura per le altre strade. */
+  if (!relays.length) throw new Error('appuntamento non disponibile');
+  const skLocale = NT.generateSecretKey();
+  const pubLocale = NT.getPublicKey(skLocale);
+  const segreto = NT.utils.bytesToHex(NT.generateSecretKey()).slice(0, 32);
+  let relay = null, scelto = '';
+  const rifiuti = [];
+  for (const r of relays) {
+    bunkerDice(`Preparo l'appuntamento su ${r}…`);
+    try {
+      /* il relay a mano col suo timeout, per la ragione scritta in
+         firmatarioBunker: la factory statica il timeout non lo passa */
+      relay = new NT.Relay(r);
+      await relay.connect({timeout: BUNKER_CONNETTI_MS});
+      scelto = r;
+      console.log(`🟪 [qr] relay connesso: ${r}`);
+      break;
+    } catch(e){
+      relay = null;
+      const motivo = e?.message || String(e);
+      rifiuti.push(`${r} → ${motivo}`);
+      console.log(`🟪 [qr] relay non raggiungibile: ${r} (${motivo})`);
+    }
+  }
+  if (!relay) throw new Error('nessun relay raggiungibile — ' + rifiuti.join(' · '));
+  const uri = 'nostrconnect://' + pubLocale
+    + '?relay=' + encodeURIComponent(scelto)
+    + '&secret=' + segreto
+    + '&perms=' + encodeURIComponent(NIP46_PERMESSI)
+    + '&name=' + encodeURIComponent('Barattolo')
+    /* l'indirizzo che il firmatario mostra a chi approva: da Tor
+       quello di casa e non il .onion, che li' non direbbe niente a
+       nessuno — e' lo stesso giudice dei link da condividere */
+    + '&url=' + encodeURIComponent(baseCondivisione());
+  console.log(`🟪 [qr] appuntamento su ${scelto} (client ${pubLocale.slice(0,8)}…)`);
+  await mostraQrConnessione(uri);
+  let remoto;
+  try {
+    remoto = await new Promise((ok, no)=>{
+      const t = setTimeout(()=> no(new Error(
+        `nessuna risposta in ${NOSTRCONNECT_ATTESA_MS/60000} minuti`)),
+        NOSTRCONNECT_ATTESA_MS);
+      relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
+        let msg;
+        /* la chiave di conversazione si deriva da CHI HA SCRITTO: qui
+           il mittente non lo conosciamo in anticipo — e' proprio quel
+           che stiamo aspettando di scoprire */
+        try {
+          const chiave = NT.nip44.getConversationKey(skLocale, ev.pubkey);
+          msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave));
+        } catch(e){ return; }          // non era per noi (o cifrario vecchio)
+        if (msg.result !== segreto) {
+          console.log(`🟪 [qr] ← messaggio senza il segreto giusto: ignorato`);
+          return;
+        }
+        console.log(`🟪 [qr] ← eccolo: ${ev.pubkey.slice(0,8)}…`);
+        clearTimeout(t);
+        ok(ev.pubkey);
+      },
+      /* il relay puo' chiuderci l'ascolto (auth-required, rate-limit,
+         websocket caduta): senza questo ramo la risposta non potrebbe
+         piu' arrivare e si starebbero i tre minuti per niente */
+      onclose(motivo){
+        clearTimeout(t);
+        no(new Error(`${scelto} ha chiuso l'ascolto: ${motivo || 'connessione caduta'}`));
+      }});
+    });
+  } finally { try { relay.close(); } catch(e){} }
+  bunkerDice('Firmatario collegato: preparo la firma…');
+  return await firmatarioBunker(
+    'bunker://' + remoto + '?relay=' + encodeURIComponent(scelto),
+    NT.utils.bytesToHex(skLocale));
+}
+
+/* Il codice a schermo, e la stringa sotto per chi ha il firmatario su
+   QUESTO telefono: li' il QR non si puo' inquadrare da soli, e
+   copiare-e-incollare e' l'unica strada che funziona sempre — un
+   `nostrconnect://` toccabile lo aprirebbe solo se l'app ha registrato
+   quello schema, e promettere una porta che non si apre e' peggio che
+   non prometterla. */
+async function mostraQrConnessione(uri){
+  const box = el('nostrQrBox');
+  if (!box) return;
+  el('nostrQrUri').textContent = uri;
+  box.style.display = '';
+  const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
+  bunkerDice(fatto
+    ? "Inquadra il codice col tuo firmatario (Amber, nsec.app…) e "
+    + "approva: resto in ascolto."
+    : "Il codice non si e' potuto disegnare: copia il link qui sotto e "
+    + "incollalo nel tuo firmatario. Resto in ascolto.");
+}
+function nascondiQrConnessione(){
+  const box = el('nostrQrBox');
+  if (box) box.style.display = 'none';
+  const q = el('nostrQr');
+  if (q) { q.classList.remove('pronto'); q.innerHTML = ''; }
+}
+function copiaUriConnessione(){
+  copiaLink(el('nostrQrUri').textContent, 'Link copiato: incollalo nel firmatario');
 }
 
 /* La sessione bunker si CONSERVA sul dispositivo (pattern del wallet
@@ -30886,6 +31252,38 @@ async function loginNostrEstensione(){
   try { await consegnaFirmatario(firmatarioEstensione()); }
   catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
 }
+/* Il login col telefono: si mostra il codice e si aspetta che il
+   firmatario chiami. Il GIRO serve perche' l'attesa dura minuti e nel
+   frattempo il foglio si puo' chiudere e riaprire: una risposta
+   arrivata dopo non deve entrare al posto di quella nuova — e' la
+   lezione di vetrinaGiro, su una websocket invece che su una fetch.
+   La sessione si conserva come quella del bunker (stessa forma: le
+   firme di domani non rifanno il rito). */
+async function loginNostrQr(){
+  const giro = ++nostrQrGiro;
+  let f = null;
+  try {
+    bunkerDice('Preparo il codice…');
+    f = await firmatarioNostrConnect();
+    /* il foglio e' stato chiuso e riaperto mentre aspettavamo: questa
+       connessione parla di un giro che non c'e' piu' */
+    if (giro !== nostrQrGiro) return;
+    ricordaBunker(f.sessione);
+    nascondiQrConnessione();
+    bunkerDice('Collegato: entro…');
+    await consegnaFirmatario(f);
+  } catch(e){
+    const motivo = e?.message || 'non risponde';
+    if (giro !== nostrQrGiro) return;   // il fallimento e' di un giro morto
+    nascondiQrConnessione();
+    /* IL MOTIVO NEL FOGLIO e non solo nel toast, la regola del bunker:
+       dice quale relay e cosa ha risposto, ed e' l'unica cosa con cui
+       si puo' decidere di riprovare o cambiare strada. */
+    bunkerDice(`Non ha funzionato — ${motivo}`);
+    toast(`Accesso col telefono: ${motivo}`, tempoLettura(motivo));
+  }
+  finally { if (f) f.chiudi(); }        // la websocket si chiude comunque
+}
 async function loginNostrBunker(){
   let f = null;
   try {
@@ -30962,9 +31360,48 @@ function apriNostrSheet(scopo){
       + 'si ricorda e le prossime firme partono al volo.'
     : 'Dimostri di possedere la tua chiave firmando una sfida. '
       + 'La chiave privata <b>non viene mai inviata</b> a nessuno.';
+  /* IL FOGLIO NASCE PULITO: un codice rimasto dal giro di prima e' un
+     appuntamento su una chiave effimera che non ascolta piu' nessuno,
+     cioe' un QR che si scansiona e non porta da nessuna parte. E il
+     giro avanza qui: l'attesa vecchia, se arriva, si accorge di
+     parlare di un foglio che non c'e' piu'. */
+  nostrQrGiro++;
+  nascondiQrConnessione();
+  /* SENZA RELAY IL BOTTONE NON NASCE (server di ieri, DEMO da
+     file://): la regola di casa — un bottone che porta a un muro e'
+     peggio di un bottone che non c'e'. */
+  const q = el('nostrQrBtn');
+  if (q) q.style.display = relayNip46.length ? '' : 'none';
   el('sheetBg').classList.add('open');
   el('nostrSheet').classList.add('open');
 }
+/* La guida per chi un profilo non ce l'ha. Si apre SOPRA il foglio del
+   login e non al suo posto (il pattern del picker e di chiediConferma):
+   il login resta sotto, il gesto indietro chiude prima la guida e ci
+   si ritrova dove si era — leggere come si fa una chiave non deve
+   costare il ritorno da capo. */
+function apriGuidaNostr(){
+  el('sheetBg').classList.add('open');
+  el('nostrGuidaSheet').classList.add('open');
+}
+
+/* I DUE LINK DELLA GUIDA sono NOSTRI (scritti qui, non da un utente),
+   quindi niente foglio di conferma: quello esiste per il banner del
+   negozio, dove l'indirizzo lo sceglie chi vende e la card puo'
+   ingannare. Che siano strumenti di terzi lo dice la guida stessa,
+   nella sua ultima riga. La scala e' quella di casa: dentro Telegram
+   il browser del client, fuori una scheda nuova con noopener. */
+const LINK_GUIDA = {
+  amber:  'https://github.com/greenart7c3/Amber',
+  nstart: 'https://nstart.me',
+};
+function apriLinkGuida(quale){
+  const url = LINK_GUIDA[quale];
+  if (!url) return;
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener');
+}
+
 /* Il bottone gemello del widget Telegram, nel banner della vetrina.
    A differenza del widget non ha bisogno di domini registrati:
    funziona anche in locale. */
