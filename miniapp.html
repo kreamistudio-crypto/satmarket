@@ -3157,6 +3157,39 @@
   .rac-pill{display:inline-block;background:var(--chip-bg);
     color:var(--ink);border-radius:999px;padding:4px 10px;
     font-size:11px;font-weight:800;letter-spacing:.02em}
+  /* IL LOGO DELLO SPONSOR, in cima: e' l'unica cosa che dice il NOME
+     del progetto — l'h3 qui sotto porta il SOTTOTITOLO, e chi arriva
+     al negozio da un annuncio (cassetto CHIUSO) il nome altrimenti
+     non lo leggerebbe da nessuna parte: sta dentro l'immagine della
+     card, che li' non c'e'.
+     ⚠️ ROVESCIA la riga in testa a questo blocco («qui dentro NON ci
+     va nessuna immagine»), e il perche' di allora va tenuto perche'
+     resta vero per tutto il resto: quella regola nacque contro una
+     COPERTINA a rapporto 3:1, che a 360 costava ~213px. Un marchio
+     alto 72 ne costa 82 col margine, ed e' un'altra cosa.
+     L'ALTEZZA E' FISSA E LA LARGHEZZA CEDE, come per .rac-foto e per
+     la stessa ragione rovesciata: cosi' il costo in pixel non dipende
+     dal rapporto del logo che arrivera' domani, e lo spazio e'
+     riservato PRIMA che l'immagine atterri — niente salto.
+     I DUE TEMI LI REGGE IL DISEGNO, e non e' fortuna: misurato sui
+     pixel veri, il giallo #FBDA0B fa 1,39 sulla carta chiara — da
+     solo sparirebbe — ma il contorno #0D0C14 fa 19,45; al buio i
+     ruoli si scambiano (giallo 10,94, contorno 1,28). Due inchiostri,
+     e ognuno lavora dove l'altro sparisce: e' per questo che questo
+     logo non ha bisogno di un fondo suo, e per cui il prossimo va
+     RIMISURATO invece che dato per buono. */
+  .rac-logo{display:block;height:72px;width:auto;margin:10px 0 0}
+  /* LA RISERVA, la ricetta delle card di «Da scoprire»: se il file
+     non arriva, l'onerror toglie l'img e il nome resta SCRITTO — che
+     qui e' l'unico posto dove il nome vive. Il selettore guarda
+     l'ESISTENZA dell'immagine e non il suo onload, cosi' durante il
+     caricamento la riserva sta spenta e si accende solo dove la
+     figura non arrivera' mai: la lezione dell'emoji che aspetta la
+     figura, dove il lampo si vedeva a ogni apertura. */
+  .rac-nome{display:block;margin:10px 0 0;
+    font-family:'Baloo 2',system-ui,sans-serif;font-size:22px;
+    line-height:1.15;font-weight:800;color:var(--ink)}
+  .rac-logo + .rac-nome{display:none}
   .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
     letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
@@ -10849,7 +10882,10 @@ function apriLinkBanner(){
 function raccontoNegozio(v){
   const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
   if (!r || !r.negozio || r.negozio !== v.negozio) return '';
-  const foto = n => `/assets/racconti/${sponsorVivo}-${n}.webp`;
+  /* `q` e non `n`: la forma della whitelist del server ammette
+     `{slug}-cop` accanto a `{slug}-1..9`, e la copertina passa di
+     qui come le altre invece di costruirsi un secondo URL. */
+  const foto = q => `/assets/racconti/${sponsorVivo}-${q}.webp`;
   const blocchi = (r.blocchi || []).map(x => {
     if (x.t === 'testo')
       return `<h4 class="rac-h">${esc(x.h)}</h4>
@@ -10886,6 +10922,10 @@ function raccontoNegozio(v){
     <div class="racconto">
       <div class="rac-testa">
         <span class="rac-pill">📣 Sponsor</span>
+        <img class="rac-logo" src="${foto('cop')}"
+             alt="${esc(r.titolo)}" decoding="async"
+             onerror="this.remove()">
+        <span class="rac-nome">${esc(r.titolo)}</span>
         <div class="rac-occhiello">${esc(r.occhiello || '')}</div>
         <h3 class="rac-titolo">${esc(r.sottotitolo || r.titolo)}</h3>
         <p class="rac-intro">${esc(r.intro || '')}</p>

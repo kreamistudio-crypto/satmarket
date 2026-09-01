@@ -2537,6 +2537,57 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invece di quattro (~44), e l'avviso su una riga sola in meno (~23).
   LA PASTIGLIA E LA SECONDA FRASE DELL'AVVISO NON SI TOCCANO: sono il
   punto 1, e i pixel che costano si pagano.
+  IL LOGO IN CIMA, E LA SUA RISERVA (ago 2026, chiesto da Andrea):
+  sopra l'occhiello, dentro `.rac-testa`, il logo del progetto — e non
+  e' un ornamento, COLMA UN BUCO. Il nome «To The Mooon!» non compare
+  in NESSUN testo del racconto: `.rac-titolo` mostra il sottotitolo
+  («Capire Bitcoin, giocando.») e il nome vive solo DENTRO l'immagine
+  della card, che ha `titoloDentro`. Quindi chi arriva al negozio da un
+  annuncio — cassetto chiuso — non lo leggerebbe da nessuna parte.
+  «DENTRO LA COPERTINA» NON SI PUO', ed e' la risposta alla domanda:
+  una copertina non c'e' piu' — e' stata sostituita dalla testa
+  testuale proprio per risparmiare i ~213px che costava (vedi «NIENTE
+  COPERTINA», sopra).
+  COSTA 82px ESATTI (72 di altezza + 10 di margine), identici a
+  320/360/375/1280 — e il fatto che siano identici e' la conseguenza
+  della forma: **l'altezza e' FISSA e a cedere e' la larghezza**, che
+  e' la ragione ROVESCIATA di `.rac-foto`, dove la larghezza e' data
+  dal contenitore e il tetto sta sull'altezza. Qui il tetto sta
+  sull'altezza perche' e' quella che si PAGA in pixel: cosi' il costo e'
+  determinato e lo spazio e' riservato prima che l'immagine atterri —
+  zero salto. MISURATO spegnendo il solo logo via CSS e rimisurando
+  (la riserva NON si accende, perche' il suo selettore guarda
+  l'ESISTENZA dell'img, che resta): a 360 la testa passa da 188 a 270 e
+  la prima card da 845 a 927.
+  IL PNG SI CONVERTE, e non per gusto: `FORMA_RACCONTO` accetta solo
+  `.webp` e la rotta cabla `image/webp`, quindi un PNG li' dentro da'
+  404. Lo slot `-cop` era GIA' nella whitelist dalla copertina mai
+  nata, quindi il logo ci entra senza toccare la regex — e passa dalla
+  fabbrica degli URL come le foto, invece di costruirsene uno suo.
+  Il file era **72% aria** (839x517 di inchiostro dentro 1024x1536):
+  ritagliato sull'alpha con la soglia >8 di `ritaglia_categorie.py`,
+  600x370 RGBA, **1,9 MB -> 72 KB**.
+  REGGE I DUE TEMI PERCHE' HA DUE INCHIOSTRI, e il perche' e' misurato:
+  il giallo #FBDA0B fa 1,39 sulla carta chiara — da solo sparirebbe —
+  ma il contorno #0D0C14 fa 19,45; al buio si scambiano (10,94 e 1,28).
+  Un logo a tinta unita su trasparente non reggerebbe, questo si': a
+  garantirlo e' il contorno, non il colore. Da rimisurare se un domani
+  arriva un logo diverso.
+  LA RISERVA E' IL NOME SCRITTO (`.rac-nome`), e il selettore che la
+  spegne guarda l'ESISTENZA dell'img (`img + .rac-nome`) e MAI il
+  `data-ok` dell'onload: col secondo il nome lampeggerebbe a ogni
+  apertura, che e' la lezione gia' pagata dalle emoji delle categorie.
+  Cosi' resta spenta per tutto il caricamento e si accende solo dove la
+  figura non arrivera' mai — provato rompendo l'URL, non con un
+  `remove()` a mano. E per quello **logo e riserva devono essere
+  adiacenti nel markup**: c'e' la prova, e guarda cosa sta FRA la
+  chiusura dell'img e l'apertura dello span (un solo `<`).
+  NIENTE `loading="lazy"` sul logo, al contrario delle foto: sta sopra
+  la piega e in un cassetto che puo' nascere aperto — pigro,
+  arriverebbe dopo che si e' gia' letto quel che c'e' sotto.
+  E IL TETTO `max-height:560px` NON MORDE su nessuna delle tre foto
+  vere: sono tutte orizzontali (a 1280 escono 648x432). La leva del
+  «tabellone in piedi» protegge dal futuro, non da queste.
   LE FOTO POSSONO ESSERE VERTICALI, e il vincolo e' l'ALTEZZA e non la
   larghezza (ago 2026, dal campo: «il tabellone e' verticale, e
   forzarlo in orizzontale vuol dire tagliarlo o lasciare due bande

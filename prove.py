@@ -31452,6 +31452,54 @@ def prove_sponsor():
     prova("...e la verticale resta centrata", True,
           "margin:16px auto 0" in _dic)
 
+    # ---- 3c. IL LOGO IN CIMA, E LA SUA RISERVA -------------------
+    # E' L'UNICO POSTO DOVE IL NOME DEL PROGETTO VIVE: l'h3 della
+    # testa porta il SOTTOTITOLO (`sottotitolo || titolo`), quindi
+    # chi apre il negozio da un annuncio — cassetto CHIUSO — senza il
+    # logo non leggerebbe «To The Mooon!» da nessuna parte. Per
+    # questo la riserva non e' un ornamento: e' il nome che resta.
+    _rl = mini[mini.index("  .rac-logo{"):]
+    _rl = [" ".join(x.split())
+           for x in _rl[:_rl.index("}")].split("{", 1)[1].split(";")]
+    prova("il logo dello sponsor ha un'altezza fissa", True,
+          any(x.startswith("height:") and x != "height:auto"
+              for x in _rl))
+    # ...E LA LARGHEZZA CEDE, per la ragione ROVESCIATA di .rac-foto:
+    # li' il tetto e' sull'altezza perche' la larghezza e' data, qui
+    # l'altezza e' data perche' e' quella che si paga in pixel — e
+    # cosi' il costo non dipende dal rapporto del logo di domani.
+    prova("...e la larghezza cede al rapporto del logo", True,
+          "width:auto" in _rl)
+    # LA RISERVA SI ACCENDE SOLO DOVE LA FIGURA NON ARRIVERA' MAI: il
+    # selettore guarda l'ESISTENZA dell'img (fratello adiacente) e non
+    # un `data-ok` scritto dall'onload — se guardasse quello, il nome
+    # lampeggerebbe a ogni apertura prima che il file atterri. E'
+    # l'errore gia' pagato dalle emoji delle categorie.
+    prova("la riserva del nome si spegne quando il logo c'e'", True,
+          ".rac-logo + .rac-nome{display:none}" in mini)
+    # ...e i due sono FRATELLI ADIACENTI nel markup, o quel selettore
+    # non matcha e la riserva resta accesa SOTTO il logo: due nomi
+    # uno sull'altro, che e' il difetto che non fallisce da solo.
+    _tsa = _rn[_rn.index('class="rac-pill"'):]
+    _tsa = _tsa[:_tsa.index("rac-occhiello")]
+    _fra = _tsa[_tsa.index('class="rac-logo"'):
+                _tsa.index('class="rac-nome"')]
+    prova("...e nel markup sono adiacenti", True,
+          _fra.count(">") >= 1 and _fra[_fra.index(">"):].count("<") == 1)
+    # IL LOGO NON E' PIGRO, al contrario delle foto del cassetto: sta
+    # sopra la piega e si vede appena il negozio si apre — un lazy li'
+    # ritarderebbe la prima cosa che identifica lo spazio venduto.
+    prova("...e il logo non aspetta (niente lazy sopra la piega)", True,
+          'class="rac-logo"' in _rn
+          and "loading=" not in _tsa)
+    # IL FILE PASSA DALLA FORMA DEL SERVER: `-cop` e' gia' nella
+    # whitelist (`(?:cop|[1-9])`), quindi la copertina non ha voluto
+    # una riga di regex — e il client la chiede dalla STESSA funzione
+    # delle foto, invece di costruirsi un secondo URL che un domani
+    # divergerebbe.
+    prova("...e la copertina passa dalla fabbrica degli URL", True,
+          "foto('cop')" in _rn)
+
     # ---- 4. IL BLOCCO «COME FUNZIONA» E' NOSTRO ------------------
     # Sta nel RENDERER e non nel catalogo, e non e' un dettaglio di
     # posizione: la dichiarazione di pubblicita' non puo' dipendere
