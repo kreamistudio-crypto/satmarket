@@ -27717,8 +27717,16 @@ nella voce «IL RACCONTO SI LEGGE»), e la riga che conta è che per chi
 arriva al negozio da un annuncio — dove il cassetto nasce chiuso — la
 merce **non scende: sale di 4px**, perché il racconto cresciuto si
 riprende quel che il banner e la testata hanno lasciato.
-Collaudato: **DELTA +9 prove** sull'albero ISOLATO (7348 → 7357; le 4
-rosse sono di un'altra sessione e stanno anche sulla baseline) e **16
+Collaudato: **DELTA +9 prove**, e a dirlo è la CI: **7352 → 7361,
+zero fallite**. ⚠️ IL CONTO CHE VALE È QUELLO DELLA CI e non quello
+del portatile, ed è questo giro ad averlo insegnato: in locale la
+suite dava **4 rosse su tutt'e due gli alberi** — baseline compresa,
+quindi il delta era giusto lo stesso — e a caldo le avevo attribuite
+a un'altra sessione. Non erano di nessuna sessione: sono della
+MACCHINA (Python 3.14 qui, più vecchio in CI, e l'encoding di
+Windows), e sulla baseline la CI le dà verdi. Un numero assoluto
+misurato sul portatile non si scrive qui: si scrive il delta, e il
+totale lo dice il log della CI. Più **16
 MUTAZIONI, 16 uccise**, una per riga sorvegliata. Tre erano
 sopravvissute al primo giro: due MIRATE MALE (un'ancora storta, e un
 contenitore aggiunto con un NOME DIVERSO invece di spostare quello
