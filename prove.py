@@ -21647,14 +21647,26 @@ def prove_onion():
     # di 0,2 — a occhio non si vede. Quel che rende un viola «pieno»
     # invece che pastello, a parita' di tinta, e' la LUCE: da L66% a
     # L58%, cioe' #8B5CF6 -> #7C3AED.
-    # ⚠️ E DI SERA NON SI SCURISCE, che e' la regola di casa: sul
-    # bruno un viola piu' scuro sparisce (misurato: 3,68 contro 5,39
-    # sul fondo del bottone ponte). Li' si alza la saturazione
-    # tenendo la luce — si abbassa la luce, non si cambia il segno.
-    # QUEL CHE SI SORVEGLIA NON E' IL GUSTO MA IL CONTRASTO: il
-    # pallino e' un DISEGNO, quindi la soglia e' 3:1 (WCAG per gli
-    # elementi grafici) e non 4,5 — e la superficie peggiore e' il
-    # fondo velato del bottone ponte, dove il viola sta sul viola.
+    # ⚠️ E DI SERA E' LO STESSO VIOLA DEL GIORNO (1 set 2026,
+    # decisione di Andrea), che ROVESCIA la regola di casa «si abbassa
+    # la luce, non si cambia il segno». IL PERCHE' DI ALLORA VA TENUTO
+    # perche' e' MISURATO e resta vero: sul bruno un viola scuro rende
+    # meno — sul fondo velato del ponte 2,58 contro i 4,87 del chiaro
+    # — e la soglia dei DISEGNI e' 3:1 (WCAG per gli elementi grafici,
+    # non il 4,5 del testo). Quindi di sera la soglia NON si raggiunge.
+    # ANDREA LO SA E LO ACCETTA: «mi piace di piu' cosi'». Non e' una
+    # dimenticanza, ed e' l'unica ragione per cui questo blocco tiene
+    # due soglie diverse invece di allentarne una sola — la regola
+    # resta scritta dov'e' vera, e la deroga si NOMINA.
+    # ⚠️ E IL NUMERO DI IERI ERA SBAGLIATO: qui c'era scritto
+    # «3,68 contro 5,39», e il 3,68 non e' il contrasto di nessuna
+    # coppia viva (il 5,39 si': era il #A78BFA della sera PRIMA del
+    # cantiere). Il conto vero, col metodo stesso della prova, e'
+    # 2,58 — cioe' il margine e' PEGGIORE di quel che quella riga
+    # dichiarava. Un numero misurato male e' peggio di nessun numero.
+    # LA SUPERFICIE PEGGIORE NON E' UNA SOLA: il fondo del ponte e'
+    # quello che la prova guarda (li' il viola sta sul viola), ma il
+    # fondo dei chip scende a 2,30 e quello della pagina sta a 3,02.
     def _lum(h):
         def _c(v):
             v /= 255.0
@@ -21674,14 +21686,26 @@ def prove_onion():
     _nc, _ns = _chiaro[:7], _scuro[:7]
     _softc = "#" + _chiaro.split("--nostr-soft:#")[1][:6]
     _softs = "#" + _scuro.split("--nostr-soft:#")[1][:6]
-    prova("il pallino stacca dal fondo del ponte nei due temi",
-          (True, True),
-          (_contr(_nc, _softc) >= 3.0, _contr(_ns, _softs) >= 3.0))
-    # ...E IL CHIARO E' PIU' SCURO DELLO SCURO, che e' la regola detta
-    # come invariante: se un domani i due si scambiassero, di sera il
-    # pallino sarebbe piu' cupo del fondo su cui vive.
-    prova("...e di sera e' piu' chiaro, mai piu' cupo",
-          True, _lum(_ns) > _lum(_nc))
+    prova("il pallino stacca dal fondo del ponte, di giorno pieno",
+          True, _contr(_nc, _softc) >= 3.0)
+    # ...E LA DEROGA DELLA SERA SI SORVEGLIA LO STESSO. Il 2,5 non e'
+    # una soglia nuova travestita da regola: e' il PAVIMENTO sotto il
+    # valore misurato oggi (2,58), e serve a una cosa sola — se un
+    # domani qualcuno tocca --nostr-soft della sera e il contrasto
+    # peggiora ancora, la CI lo dice invece di lasciarlo scivolare.
+    # Una deroga accettata e' un numero fermo, non una porta aperta.
+    prova("...e di sera resta la deroga misurata, senza peggiorare",
+          True, _contr(_ns, _softs) >= 2.5)
+    # ...E I DUE TEMI PORTANO LO STESSO VIOLA, che e' la decisione
+    # detta come invariante. La riga di ieri chiedeva il CONTRARIO —
+    # «di sera e' piu' chiaro, mai piu' cupo» — ed e' stata rovesciata
+    # da Andrea SAPENDO il numero: chi la rilegge deve trovarci una
+    # scelta, non un valore scivolato per caso. E' anche la riga che
+    # rende la scelta REVERSIBILE senza ambiguita': il giorno che si
+    # volesse tornare a due viola, questa diventa rossa e chiede di
+    # rileggere il perche' prima di cambiarla.
+    prova("...e i due temi portano lo stesso viola, per scelta",
+          True, _nc == _ns)
     # ...E DI GIORNO E' PIENO, NON PASTELLO. Il valore esatto e' un
     # GUSTO — «te lo dico guardandolo, non misurandolo» — e un gusto
     # non si inchioda con una prova; quel che si sorveglia e' la

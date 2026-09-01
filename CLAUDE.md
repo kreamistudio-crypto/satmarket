@@ -18913,17 +18913,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   contrasto di 0,2 — a occhio non si vede. QUEL CHE RENDE UN VIOLA
   «PIENO» INVECE CHE PASTELLO, A PARITA' DI TINTA, E' LA LUCE: da
   L66% a L58%, cioe' #8B5CF6 -> #7C3AED.
-  ⚠️ E DI SERA NON SI SCURISCE, che e' la regola di casa applicata
-  qui: sul bruno un viola piu' scuro SPARISCE (misurato: 3,68 contro
-  5,39 sul fondo velato del bottone ponte, che e' la superficie
-  peggiore — li' il viola sta sul viola). Di la' si alza la
-  saturazione tenendo la luce, #A78BFA -> #A97BFF.
-  E A SORVEGLIARE NON E' IL GUSTO MA IL CONTRASTO: il pallino e' un
-  DISEGNO, quindi la soglia e' 3:1 (WCAG per gli elementi grafici) e
-  non 4,5. Le due prove sono il contrasto sul fondo del ponte nei due
-  temi, piu' l'INVARIANTE che il viola della sera resti il piu'
-  chiaro dei due — se un domani si scambiassero, di notte il pallino
-  sarebbe piu' cupo del fondo su cui vive.
+  ⚠️ E DI SERA E' LO STESSO VIOLA DEL GIORNO (1 set 2026,
+  decisione di Andrea che ROVESCIA la regola di casa «si abbassa la
+  luce, non si cambia il segno»): `#7C3AED` nei due temi.
+  IL PERCHE' DI ALLORA VA TENUTO PERCHE' E' MISURATO E RESTA VERO: sul
+  bruno un viola scuro rende MENO — sul fondo velato del bottone ponte
+  fa **2,58** contro i **4,87** del chiaro che c'era — e la soglia dei
+  DISEGNI e' 3:1 (WCAG per gli elementi grafici, non il 4,5 del
+  testo). Quindi di sera la soglia NON si raggiunge, ed e' una DEROGA
+  DICHIARATA e non una dimenticanza: Andrea l'ha scelto sapendo il
+  numero — «mi piace di piu' cosi'» — dopo che gli era stato riportato
+  per iscritto.
+  ⚠️ IL NUMERO DI IERI ERA SBAGLIATO, e la correzione vale piu'
+  della scelta: qui c'era scritto «3,68 contro 5,39», e il 3,68 non e'
+  il contrasto di NESSUNA coppia viva — il 5,39 si', ma era il
+  `#A78BFA` della sera PRIMA del cantiere, cioe' un valore che non
+  esiste piu'. Il conto vero, rifatto col metodo STESSO della prova,
+  e' 2,58: il margine e' PEGGIORE di quel che quella riga dichiarava,
+  e Andrea aveva accettato la deroga citando il numero sbagliato. Un
+  numero misurato male e' peggio di nessun numero, e chi rimisura
+  usi il metodo della prova invece di fidarsi della riga.
+  E LA SUPERFICIE PEGGIORE NON E' UNA SOLA: la prova guarda il fondo
+  del ponte (li' il viola sta sul viola), ma i chip scendono a 2,30 e
+  il fondo pagina sta a 3,02 — appena sopra. Chi tocca uno di quei
+  fondi rimisuri tutt'e tre.
+  LE TRE PROVE, e la forma e' la parte che conta: la soglia PIENA
+  resta dov'e' vera (il giorno, 3:1); la sera ha il PAVIMENTO a 2,5,
+  che non e' una soglia nuova travestita da regola ma un numero fermo
+  sotto il valore di oggi — se un domani `--nostr-soft` della sera
+  cambia e il contrasto peggiora ancora, la CI lo dice invece di
+  lasciarlo scivolare; e l'INVARIANTE dice che i due temi portano lo
+  STESSO viola. Quest'ultima ha CAMBIATO LATO: chiedeva il contrario
+  («di sera e' piu' chiaro, mai piu' cupo»), e adesso e' anche cio'
+  che rende la scelta REVERSIBILE senza ambiguita' — il giorno che si
+  volesse tornare a due viola, diventa rossa e chiede di rileggere
+  questa voce prima di toccarla.
+  UNA DEROGA ACCETTATA E' UN NUMERO FERMO, NON UNA PORTA APERTA: e'
+  la ragione per cui non si e' allentata la soglia unica a 2,5 — cosi'
+  l'avrebbe persa anche il giorno, dove e' rispettata con margine.
   E LA MISURA E' IN `em`, MAI UN PX FISSO: i tre bottoni hanno tre
   corpi diversi — 13px la pillola del banner, 15.5 i due `.btn` — e un
   px darebbe il disegno grande sul piccolo e piccolo sul grande.
