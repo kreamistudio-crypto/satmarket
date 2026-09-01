@@ -18638,10 +18638,52 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   MISURATO dal vivo: 14,9px nel banner e 17,8 nel foglio, cioe' 1.15em
   in tutti e due. C'e' la prova, ed e' nata dalla tortura: quella riga
   non la guardava nessuno.
+  E I DUE VIOLA ERANO DUE (ago 2026, dal campo: «il pallino disegnato
+  e' piu' spento del 🟣 accanto ai venditori — si vede che sono due
+  viola diversi»). Il badge del venditore era il GLIFO, quindi nella
+  stessa pagina convivevano il NOSTRO token e il viola del font di
+  SISTEMA.
+  IL NUMERO, CAMPIONATO E NON RICORDATO (Segoe UI Emoji su Blink):
+  glifo #8061BE contro token #8B5CF6 — la TINTA combacia, 260 gradi
+  contro 258, e a divergere sono la SATURAZIONE (42% contro 90%) e
+  la luce (56% contro 66%); ΔE76 **33** di giorno e **17** di sera.
+  ⚠️ E LA DIREZIONE ROVESCIA L'ASPETTAZIONE: li' il disegno e' piu'
+  ACCESO del glifo, non piu' spento — Andrea lo vede al contrario
+  perche' il font del suo telefono e' un altro.
+  DA CUI LA RIGA CHE DECIDE LA CURA: **il glifo non ha UN colore**.
+  E' Segoe su Windows, Noto su Android, quello di Apple su iOS —
+  quindi un bersaglio non esiste, e «avvicinare» il token vorrebbe
+  dire tararlo su un font e sbagliare sugli altri due. NON SI
+  AVVICINA, SI UNIFICA: il badge passa allo STESSO disegno delle
+  porte, e il viola torna uno per COSTRUZIONE su ogni telefono. In
+  piu' si chiude il taglio di Gecko anche li', che quel badge sta in
+  una riga di testo come il titolo del foglio.
+  I SITI SONO QUATTRO e passano da un giudice SUO, `badgeNostr`, che
+  RIUSA `ICO_NOSTR` invece di ricopiarsi il disegno: la testata del
+  negozio, il riquadro venditore del dettaglio, e i due stati del
+  PROPRIO badge nel Profilo (dove lo spento resta un `opacity:.45`
+  sullo span, non un secondo disegno). Il `title` resta sullo SPAN,
+  che l'SVG e' `aria-hidden` e li' dentro non direbbe niente a chi
+  legge con la voce; e i tre titoli sono letterali di casa — mai una
+  virgoletta dentro, che finiscono in un attributo.
+  ⚠️ NESSUNA TDZ: `ICO_NOSTR` e' a colonna zero e i quattro badge
+  vivono dentro `renderNegozio`, `openDetail` e `renderProfilo`,
+  cioe' funzioni chiamate dopo il parse — verificato, che e' la
+  trappola che ha gia' ucciso lo script una volta.
+  RESTA FUORI, dichiarato: il 🟣 dell'IMPORTATO (due siti), che dice
+  un'altra cosa — «arriva da Nostr», non «venditore verificato» — ed
+  e' un'altra famiglia; li' il `color:var(--nostr)` e' INERTE, che
+  un'emoji a colori ignora `color` (il suo viola sta nel font), ed e'
+  anche la ragione per cui i due divergevano. E i glifi in prosa,
+  toast e hint, che accanto al disegno non compaiono mai.
+  ⚠️ E `.nostr-dot` NON LA VESTE NESSUNO: una regola CSS morta,
+  vista e non toccata — e' l'unico altro lettore di `var(--nostr)`
+  insieme a `.ico-nostr`.
   IL PERIMETRO E' STRETTO APPOSTA (decisione di Andrea): si curano le
   QUATTRO PORTE — quelle che chi arriva da Tor deve toccare, perche'
   su onion Nostr e' l'unica, e il titolo del foglio e' il passo
-  SUBITO DOPO le altre tre — e restano col glifo i tre bottoni di dentro
+  SUBITO DOPO le altre tre — piu' i QUATTRO BADGE accanto al nome,
+  che sono quelli che il disegno lo affiancano nella stessa pagina — e restano col glifo i tre bottoni di dentro
   («salva la npub», i due ponti, il collaudo), che si incontrano solo
   dopo aver gia' scelto. C'e' il CENSIMENTO che li conta: se il numero
   sale, qualcuno ha aggiunto una porta col glifo copiato a mano.
@@ -18709,7 +18751,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   variante «piu' opaca» era identica a quella base e non provava
   niente. L'ho vista guardandola, e la fascia si e' dovuta
   rimisurare con l'opacita' dentro il CSS della variante.
-  PROVATO: 22 mutazioni, 22 uccise, una per riga sorvegliata — e sono
+  PROVATO: 28 mutazioni, 28 uccise, una per riga sorvegliata
+  ⚠️ E IL BANCO HA MENTITO DUE VOLTE ANCORA, tutte e due gia' a
+  verbale: la porta del server la teneva un uvicorn di un giro
+  prima — per un giro intero ho interrogato un database VUOTO
+  credendo a un bug della vetrina, e il rimedio e' il MARCATORE
+  (l'annuncio seminato: se non c'e', il banco si ferma) — e una
+  riga rossa era l'arrotondamento BANCARIO di Python, che su
+  17,25 da' 17,2 mentre il browser rende 17,3: la misura era
+  giusta e sbagliava la sonda. Piu' la prova del badge nel
+  Profilo, che passava per la ragione sbagliata — su una vista in
+  `display:none` il rect e' 0, quindi «l'SVG c'e'» non diceva che
+  si vedesse: adesso il Profilo si APRE davvero. — e sono
   state loro a trovare i tre buchi delle mie sentinelle, fra cui l'ennesima
   che non poteva fallire (`n.innerHTML` e' SOTTOSTRINGA di
   `btn.innerHTML`, quindi la terza porta teneva verde la seconda) e un

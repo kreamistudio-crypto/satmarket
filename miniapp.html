@@ -10532,7 +10532,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
      senza ✓: il non-verificato qui non compare proprio) */
   const badge = v.npub_verificata
-    ? ' <span title="Venditore verificato su Nostr">🟣</span>' : '';
+    ? badgeNostr('Venditore verificato su Nostr') : '';
   /* La bacheca completa dei distintivi (tutte le iconcine, a capo se
      serve, mai il «+N»: e' la vetrina del venditore) — un tocco apre
      il foglietto che li racconta uno a uno. */
@@ -15819,7 +15819,7 @@ function openDetail(id){
         <div class="who"><b>${esc(l.seller)}</b>${
           /* il 🟣 in fila coi badge, come nella testata del negozio:
              solo l'icona — la verifica si racconta di la' */
-          l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}${
+          l.sellerNpubOk?badgeNostr('Venditore verificato su Nostr'):''}${
           /* la sfilza compatta (prime 4 + «+N»): il resto si scopre
              nel negozio, dove porta gia' tutta la card. Niente tocco
              qui dentro: il bersaglio resta uno solo. */
@@ -17149,6 +17149,26 @@ const ICO_NOSTR = '<svg class="ico-nostr" viewBox="0 0 16 16" '
   + 'aria-hidden="true"><circle cx="8" cy="8" r="7"/>'
   + '<circle class="lux" cx="5.5" cy="5.3" r="2.3"/></svg>';
 const etichettaNostr = testo => ICO_NOSTR + ' ' + testo;
+/* IL BADGE ACCANTO AL NOME e' LO STESSO disegno delle porte, ed e'
+   la ragione per cui esiste (ago 2026, dal campo: «si vede che
+   sono due viola diversi»). Finche' era il glifo del font, nella
+   stessa pagina convivevano il NOSTRO viola e quello del font di
+   SISTEMA — misurati su Segoe UI Emoji: la tinta combacia (260
+   contro 258 gradi) e a divergere sono la SATURAZIONE (+48%) e la
+   luce (+10%), ΔE76 33 di giorno e 17 di sera.
+   NON SI AVVICINA, SI UNIFICA, ed e' la riga da non ammorbidire:
+   il glifo non ha UN colore — e' Segoe su Windows, Noto su
+   Android, quello di Apple su iOS — quindi tarare il token su uno
+   vorrebbe dire sbagliare sugli altri due. Col disegno il viola
+   torna uno per COSTRUZIONE, su ogni telefono. In piu' si chiude
+   il taglio di Gecko anche qui, che il badge sta in una riga di
+   testo come il titolo del foglio.
+   Il `title` resta sullo SPAN (l'SVG e' aria-hidden), e i tre
+   titoli sono letterali di casa: mai una virgoletta dentro. */
+const badgeNostr = (titolo, spento) =>
+  ' <span title="' + titolo + '"'
+  + (spento ? ' style="opacity:.45"' : '') + '>'
+  + ICO_NOSTR + '</span>';
 
 function invitoTelegram(testo, chiave){
   const onion = suOnion();
@@ -20220,8 +20240,9 @@ function renderProfilo(){
      spento (e con l'invito) se ancora da verificare — in pubblico
      quello spento non esiste proprio */
   const badge = myNpub
-    ? (myNpubVerified?' <span title="Npub verificata">🟣</span>'
-                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità" style="opacity:.45">🟣</span>')
+    ? (myNpubVerified
+        ? badgeNostr('Npub verificata')
+        : badgeNostr('Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità', true))
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */

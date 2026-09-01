@@ -21501,6 +21501,47 @@ def prove_onion():
           (False, False, False),
           ("radialGradient" in _tutto, "<defs" in _tutto,
            "id=" in _tutto))
+    # IL BADGE ACCANTO AL NOME passa dallo STESSO disegno (ago 2026,
+    # dal campo: «il pallino disegnato e' piu' spento del 🟣 accanto
+    # ai venditori — si vede che sono due viola diversi»). Erano il
+    # glifo del font, quindi nella stessa pagina convivevano il NOSTRO
+    # viola e quello del font di SISTEMA. Misurato su Segoe UI Emoji:
+    # la TINTA combacia (260 contro 258 gradi) e a divergere sono la
+    # saturazione (+48%) e la luce (+10%) — ΔE76 33 di giorno, 17 di
+    # sera — e la direzione ROVESCIA l'aspettativa, che li' il disegno
+    # e' piu' acceso del glifo.
+    # NON SI AVVICINA, SI UNIFICA, ed e' la riga da non ammorbidire:
+    # il glifo non ha UN colore (Segoe su Windows, Noto su Android,
+    # quello di Apple su iOS), quindi tarare il token su uno vuol dire
+    # sbagliare sugli altri due. Col disegno il viola torna uno per
+    # COSTRUZIONE, e si chiude il taglio di Gecko anche qui.
+    _badge = ("? badgeNostr('Venditore verificato su Nostr') : '';",
+              "l.sellerNpubOk?badgeNostr('Venditore verificato su "
+              "Nostr')",
+              "? badgeNostr('Npub verificata')",
+              ": badgeNostr('Npub da verificare:")
+    prova("i quattro badge accanto al nome chiamano il giudice",
+          (True, True, True, True), tuple(p in mini for p in _badge))
+    prova("...e le chiamate al giudice del badge sono QUATTRO", 4,
+          mini.count("badgeNostr("))
+    # ⚠️ e nessuno dei quattro scrive piu' il glifo a mano: e' la riga
+    # che il prossimo cantiere rompe per primo, aggiungendo il quinto
+    # badge con la stringa copiata.
+    prova("...e nessuno di loro scrive piu' il glifo a mano", 0,
+          len(_re.findall(
+              r'<span title="(?:Venditore verificato su Nostr'
+              r'|Npub verificata|Npub da verificare)[^"]*"[^>]*>'
+              r"\U0001F7E3", mini)))
+    # IL BADGE RIUSA IL DISEGNO DELLE PORTE e non se ne ricopia uno:
+    # con due copie della stringa il prossimo ritocco ne curerebbe una
+    # sola, ed e' esattamente la divergenza che il cantiere chiude.
+    _bg = mini.split("const badgeNostr = ")[1].split("';")[0]
+    prova("il badge riusa ICO_NOSTR invece di ricopiare il disegno",
+          (True, False), ("ICO_NOSTR" in _bg, "<circle" in _bg))
+    # il `title` resta sullo SPAN: l'SVG e' aria-hidden, quindi dentro
+    # non direbbe niente a chi legge con la voce.
+    prova("...col title sullo span e lo spento che resta uno stile",
+          (True, True), ('title="' in _bg, "opacity:.45" in _bg))
 
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che
