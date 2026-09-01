@@ -39629,6 +39629,12 @@ def prove_bunker_muto():
               "node non installato")
         return
     _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
+              # i permessi vivono in una costante condivisa con la
+              # strada del QR: senza portarsela dietro il banco esplode
+              # con un ReferenceError sulla connect, cioe' dice il
+              # motivo sbagliato per tutti e tre i casi
+              + "\n" + re.search(r"const NIP46_PERMESSI = '[^']*';",
+                                 mini).group(0)
               + "\n" + bd + "\n}\n"
               + "function apriAutorizzazioneBunker(){}\n"
               + "async function caricaNostrTools(){}\n"
@@ -39756,6 +39762,300 @@ async function caso(nome, comeConnette, comePubblica, ms){
           ("href" in _ramo, "openLink" in _ramo))
 
 
+def prove_login_qr():
+    """Il login col telefono (ago 2026): il QR `nostrconnect://` e la
+    guida per chi un profilo Nostr non ce l'ha ancora.
+
+    La URI `bunker://` la scrive il firmatario e si INCOLLA: da un
+    computer con nsec.app aperto e' comoda, da un telefono con Amber
+    non esiste proprio — non c'e' niente da copiare. Qui la direzione
+    si rovescia: la URI la scriviamo noi, la mostriamo come codice, e
+    il firmatario ci chiama."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    print("\n[il login col telefono]")
+
+    # --- la stanza dell'appuntamento arriva dal server ---
+    # E' una COSTANTE e non una leva: il gemello e' RELAYS_VERIFICA,
+    # che sta nel codice da sempre — quindi il censimento del config
+    # d'esempio non la deve pretendere, e infatti non la vede.
+    prova("il server ha la sua lista di relay per il NIP-46, "
+          "separata da quella delle note pubbliche",
+          (True, True),
+          ("RELAYS_NIP46 = [" in src,
+           src.index("RELAYS_NIP46 = [") != src.index("RELAYS_VERIFICA = [")))
+    prova("...e viaggia nella busta di PRIMA pagina, dove la trova "
+          "anche chi non e' ancora entrato",
+          True, 'risposta["relay_nip46"] = RELAYS_NIP46' in src)
+    prova("...e il client la legge da li', senza una lista sua",
+          (True, False),
+          ("if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;"
+           in mini,
+           "wss://" in pezzo_js(
+               mini, "async function firmatarioNostrConnect(){")))
+
+    fnc = pezzo_js(mini, "async function firmatarioNostrConnect(){")
+
+    # --- LA riga: il QR porta il relay a cui siamo connessi ---
+    # Elencandoli tutti, il telefono puo' rispondere sul secondo
+    # mentre noi ascoltiamo il primo — e quel difetto non fallisce da
+    # nessuna parte: sul telefono si legge «collegato», qui si aspetta
+    # per sempre.
+    prova("nella URI del QR va il relay SCELTO, mai la lista",
+          (True, False),
+          ("'&relay=' not in fnc" != "", "relays.join" in fnc))
+    prova("...cioe' proprio quello a cui la connessione e' riuscita",
+          True, "+ '?relay=' + encodeURIComponent(scelto)" in fnc)
+
+    # --- il segreto e' la porta ---
+    # Verso la nostra chiave effimera puo' cifrare CHIUNQUE veda il
+    # codice: senza il confronto basterebbe un «ack» di passaggio per
+    # legarci al firmatario sbagliato.
+    prova("si accetta solo chi rimanda il SEGRETO, mai un ack "
+          "qualunque", True, "if (msg.result !== segreto)" in fnc)
+    prova("...e la chiave di conversazione si deriva da CHI HA "
+          "SCRITTO, che il mittente qui non si conosce in anticipo",
+          True, "getConversationKey(skLocale, ev.pubkey)" in fnc)
+
+    # --- il motore NIP-46 resta UNO ---
+    prova("finito il rito si passa il testimone al bunker di sempre, "
+          "invece di riscrivere il protocollo",
+          True, "return await firmatarioBunker(" in fnc)
+    # IL SECRET NON SI RIPETE: e' servito una volta, e certi firmatari
+    # lo trattano come usa-e-getta — ripresentarlo vorrebbe dire
+    # rischiare un rifiuto DOPO che l'utente ha gia' approvato.
+    _bk = fnc[fnc.index("return await firmatarioBunker("):]
+    prova("...e nella sua URI il secret non si ripete", False,
+          "secret" in _bk)
+    prova("...con la chiave client appena usata, o il firmatario non "
+          "ci riconoscerebbe", True, "bytesToHex(skLocale)" in _bk)
+    # I PERMESSI IN UN POSTO SOLO: le due strade ne chiedono due, e
+    # scritti a mano una delle due un giorno ne chiede uno diverso da
+    # quello che poi usa.
+    # si CONTANO le occorrenze (meno la dichiarazione) invece di
+    # indovinare come sono scritte le due chiamate: la prima stesura
+    # cercava «NIP46_PERMESSI,» e «NIP46_PERMESSI)» e la riga del
+    # bunker finisce con una quadra — passava per meta'.
+    prova("i permessi vivono in una costante, chiamata dalle DUE "
+          "strade", (True, 2),
+          ("const NIP46_PERMESSI = " in mini,
+           mini.count("NIP46_PERMESSI") - 1))
+
+    # --- il disegno del QR e' una fabbrica sola ---
+    # I codici da disegnare sono due (la invoice e questa URI) e la
+    # geometria e' la stessa: due copie divergono al primo ritocco, e
+    # un QR ritoccato male non fallisce — si scansiona e porta altrove.
+    prova("il canvas del QR si disegna in un posto solo",
+          1, mini.count("qr.getModuleCount()"))
+    prova("...e ci passano tutti e due i codici, ognuno col suo modo",
+          (True, True),
+          ("disegnaQr(box, ('lightning:' + invoice.trim()).toUpperCase(), "
+           "'Alphanumeric')" in mini,
+           "disegnaQr(el('nostrQr'), uri, 'Byte')" in mini))
+
+    # --- senza relay il bottone non nasce ---
+    _ap = pezzo_js(mini, "function apriNostrSheet(scopo){", "\n}")
+    prova("senza la lista dal server il bottone non compare: un QR "
+          "che punta a un relay inventato si scansiona e non porta da "
+          "nessuna parte", True,
+          "q.style.display = relayNip46.length ? '' : 'none'" in _ap)
+    prova("...e il foglio nasce pulito, che un codice del giro di "
+          "prima e' un appuntamento su una chiave che non ascolta "
+          "piu'", (True, True),
+          ("nostrQrGiro++" in _ap, "nascondiQrConnessione()" in _ap))
+    _lq = pezzo_js(mini, "async function loginNostrQr(){", "\n}")
+    prova("...e l'attesa che atterra su un giro morto non entra al "
+          "posto di quella nuova", 2, _lq.count("giro !== nostrQrGiro"))
+
+    # --- la guida, e la porta che ci arriva ---
+    prova("il foglio della guida esiste e sta DOPO quello del login: "
+          "navPila ordina per posizione, quindi da li' l'indietro "
+          "riporta all'accesso invece di uscire",
+          True,
+          0 < mini.index('id="nostrSheet"') < mini.index('id="nostrGuidaSheet"'))
+    prova("...ed e' registrato in closeSheet come i suoi fratelli",
+          True,
+          "el('nostrGuidaSheet').classList.remove('open');" in mini)
+    _ag = pezzo_js(mini, "function apriGuidaNostr(){", "\n}")
+    prova("...e si apre SOPRA il login, che resta aperto sotto: "
+          "leggere come si fa una chiave non deve costare il ritorno "
+          "da capo", False, "remove('open')" in _ag)
+    # I DUE LINK SONO NOSTRI (scritti qui, non da un utente), quindi
+    # niente foglio di conferma — quello esiste per il banner del
+    # negozio, dove l'indirizzo lo sceglie chi vende. Che siano
+    # strumenti di terzi lo dice la guida, nella sua ultima riga.
+    _al = pezzo_js(mini, "function apriLinkGuida(quale){", "\n}")
+    prova("i link della guida passano dalla scala di casa (dentro "
+          "Telegram il suo browser, fuori una scheda con noopener)",
+          (True, True),
+          ("tg.openLink(url)" in _al, "'noopener'" in _al))
+    prova("...e non si interpolano in un onclick: viaggia la CHIAVE",
+          (True, False),
+          ("apriLinkGuida('amber')" in mini, "https://nstart.me'\")" in mini))
+    _guida = mini[mini.index('id="nostrGuidaSheet"'):]
+    _guida = _guida[:_guida.index("<!-- ============ SHEET COLLEGAMENTO")]
+    prova("la guida dice che quegli strumenti non sono nostri",
+          True, "non sono di Barattolo" in _guida)
+    prova("...e che la chiave privata non la vediamo mai",
+          True, "non la vede mai" in _guida)
+    prova("...e nomina tutte e due le strade, col loro passo finale",
+          (True, True, True),
+          ("Amber" in _guida, "nstart.me" in _guida,
+           "Col telefono" in _guida))
+    # LA CITAZIONE SI LEGA AL BOTTONE VERO, e non e' pignoleria: la
+    # riga qui sopra cerca «Col telefono» DENTRO LA GUIDA, quindi
+    # resterebbe verde anche rinominando il bottone — la guida
+    # manderebbe a cercare un'etichetta che non c'e' piu'. E' successo
+    # davvero il giorno che il bottone e' passato da «Col telefono
+    # (Amber, nsec.app...)» a «Col telefono (Amber)»: nessuna prova se
+    # n'e' accorta. Qui l'etichetta si ESTRAE dal markup e si chiede
+    # che la guida ne citi l'inizio.
+    _et = re.search(r'id="nostrQrBtn"[^>]*>([^<]+)<', mini).group(1)
+    _et = _et.replace('\U0001f4f1', '').strip()          # via l'emoji
+    _et = _et.split('(')[0].strip()                       # e la parentesi
+    prova("...citando l'etichetta VERA del bottone",
+          True, bool(_et) and _et in _guida)
+
+    # ==================================================================
+    # E SI FA GIRARE. Le sentinelle qui sopra dicono che le righe ci
+    # sono, mai che il giro risponda giusto — e qui le due domande che
+    # contano sono proprio COSA finisce nel codice a schermo e CHI
+    # viene accettato come firmatario.
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il giro del login col telefono", "node non installato")
+        return
+    _pezzi = (re.search(r"const BUNKER_CONNETTI_MS = \d+;", mini).group(0)
+              + "\n"
+              + re.search(r"const NIP46_PERMESSI = '[^']*';", mini).group(0)
+              + "\n"
+              + re.search(r"const NOSTRCONNECT_ATTESA_MS = \d+;",
+                          mini).group(0)
+              + "\n" + fnc + "\n")
+    _prog = _pezzi + r"""
+/* il pezzo RACCONTA (le righe 🟪 sono meta' della diagnosi dal campo):
+   qui finirebbero nello stesso stdout del risultato e lo
+   sporcherebbero. Si zittisce e si scrive dalla porta di servizio. */
+const vero = console.log;
+console.log = () => {};
+let sub = null, qrMostrato = null, alBunker = null;
+async function caricaNostrTools(){}
+function bunkerDice(){}
+async function mostraQrConnessione(uri){ qrMostrato = uri; }
+function baseCondivisione(){ return 'https://barattolo.store'; }
+async function firmatarioBunker(uri, sk){
+  alBunker = {uri, sk};
+  return {pubkey: async () => 'REMOTO', firma: async (e) => e,
+          chiudi(){}, sessione: {uri, sk}};
+}
+let relayNip46 = [];
+function NTfinto(comeConnette){
+  let quante = 0;
+  return {
+    utils: {hexToBytes: h => h, bytesToHex: b => String(b)},
+    /* due chiavi diverse: la prima e' quella del client, la seconda
+       diventa il segreto — cosi' il banco puo' distinguerle */
+    generateSecretKey: () => (quante++ ? 'ilsegreto' : 'skclient'),
+    getPublicKey: () => 'PUBCLIENT',
+    finalizeEvent: (ev) => ev,
+    nip44: {getConversationKey: (sk, pub) => 'k:' + pub,
+            encrypt: (s) => s,
+            /* nel cartone il contenuto viaggia gia' in chiaro */
+            decrypt: (s) => s},
+    Relay: class {
+      constructor(url){ this.url = url; }
+      connect(opts){ return comeConnette(this.url, opts); }
+      subscribe(f, params){ sub = params; return {close(){}}; }
+      publish(){ return Promise.resolve(); }
+      close(){}
+    },
+  };
+}
+const esiti = {};
+function avvia(comeConnette){
+  globalThis.window = {NostrTools: NTfinto(comeConnette)};
+  qrMostrato = null; alBunker = null; sub = null;
+  return firmatarioNostrConnect().then(() => 'FATTO', e => e.message);
+}
+/* il cane da guardia c'e' SEMPRE: qui il difetto sotto esame e'
+   un'attesa che puo' non finire mai, e senza di lui una mutazione che
+   la rimette fa PIANTARE il banco — che esplode invece di diventare
+   rosso, cioe' passa per «mutazione sopravvissuta». */
+const conTetto = (p, ms) => Promise.race([p,
+  new Promise(ok => setTimeout(() => ok('ANCORA IN ATTESA'), ms || 250))]);
+(async () => {
+  // (a) tre relay, i primi due rifiutano: nel QR deve finire il terzo
+  relayNip46 = ['wss://uno.example', 'wss://due.example', 'wss://tre.example'];
+  let p = avvia(url => url.includes('tre') ? Promise.resolve()
+                                           : Promise.reject(new Error('giu')));
+  esiti.attesa = await conTetto(p);
+  esiti.qr = qrMostrato;
+  // (b) un messaggio col segreto SBAGLIATO non apre niente
+  sub.onevent({pubkey: 'IMPOSTORE',
+               content: JSON.stringify({id: '1', result: 'ack'})});
+  esiti.impostore = await conTetto(p);
+  esiti.dopoImpostore = alBunker;
+  // (c) col segreto giusto si passa al bunker di sempre
+  sub.onevent({pubkey: 'REMOTO',
+               content: JSON.stringify({id: '2', result: 'ilsegreto'})});
+  esiti.buono = await conTetto(p, 400);
+  esiti.bunker = alBunker;
+  // (d) senza relay non si mostra nessun codice
+  relayNip46 = [];
+  esiti.senzaRelay = await conTetto(avvia(() => Promise.resolve()));
+  esiti.qrSenzaRelay = qrMostrato;
+  vero(JSON.stringify(esiti));
+  process.exit(0);   // il timeout dell'attesa umana terrebbe vivo node
+})();
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("il login col telefono gira sul cartone", "0",
+              f"{_r.returncode}: {_r.stderr[:300]}")
+        return
+    d = _js.loads(_r.stdout.strip())
+    # la URI e' percent-encoded (il relay ci sta dentro come valore di
+    # un parametro): si DECODIFICA invece di cercare la forma nuda,
+    # che non c'e' — la prima stesura falliva per questo, non perche'
+    # il relay fosse sbagliato.
+    from urllib.parse import unquote as _unq
+    _qr = _unq(d["qr"] or "")
+    prova("il codice a schermo porta UN relay solo, e proprio quello "
+          "che ha risposto", (True, 1, True),
+          ("wss://tre.example" in _qr,
+           _qr.count("relay="),
+           "wss://uno.example" not in _qr))
+    prova("...e si presenta con la chiave del client, il segreto e i "
+          "permessi", [True] * 3,
+          [t in _qr for t in ("nostrconnect://PUBCLIENT",
+                              "secret=ilsegreto", "perms=")])
+    prova("finche' nessuno risponde si resta in ascolto, senza "
+          "inventarsi un firmatario",
+          ("ANCORA IN ATTESA", None), (d["attesa"], d["dopoImpostore"]))
+    prova("un messaggio col segreto sbagliato NON apre: verso la "
+          "nostra chiave effimera puo' cifrare chiunque veda il codice",
+          ("ANCORA IN ATTESA", None), (d["impostore"], d["dopoImpostore"]))
+    prova("col segreto giusto si passa al bunker, con la chiave del "
+          "MITTENTE e la sk del client", ["FATTO", True, "skclient"],
+          [d["buono"], (d["bunker"] or {}).get("uri", "")
+           .startswith("bunker://REMOTO"), (d["bunker"] or {}).get("sk")])
+    prova("...e senza il secret, che e' gia' servito una volta",
+          False, "secret" in (d["bunker"] or {}).get("uri", ""))
+    prova("senza relay non si disegna nessun codice", (True, None),
+          ("appuntamento non disponibile" in d["senzaRelay"],
+           d["qrSenzaRelay"]))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -39852,6 +40152,7 @@ def main():
               prove_ordini_prova,
               prove_tutorial,
               prove_bunker_muto,
+              prove_login_qr,
               prove_profilo_sezioni,
               prove_config_esempio):
         try:
