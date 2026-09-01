@@ -18378,6 +18378,12 @@ def _censimento(acceso):
     # causa in piu'. Stringhe vere e non [1,2,3], che qui il pannello
     # ci fa una differenza fra due liste.
     amb["RELAYS_VERIFICA"] = ["wss://uno.example", "wss://due.example"]
+    # I RELAY DEL COORDINATOR P2P sono una lista che a leve spente e'
+    # VUOTA (non c'e' una lista di serie, apposta): [1,2,3] fisso come
+    # le altre lascerebbe la riga «accesa» anche nel censimento spento,
+    # e la nota «senza i relay non si accende» non uscirebbe mai.
+    amb["MOSTRO_RELAY"] = [1, 2, 3] if acceso else []
+    amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
     amb["ADMIN_IDS"] = [111111111, 222222222]
@@ -18410,7 +18416,7 @@ def _censimento(acceso):
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
                  "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
-                 "CLASSIFICA_KD"):
+                 "CLASSIFICA_KD", "P2P_ATTIVO", "MOSTRO_NPUB"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -18462,8 +18468,11 @@ def _censimento(acceso):
     # e chi la legge va a cercare dalla parte sbagliata. E' la
     # stessa trappola che il docstring di `_ConfigFinto` avverte
     # per le leve-LISTA, con una causa nuova.
+    # `_p2p_leve` per la stessa ragione di `_prezzo_banner`: il
+    # pannello lo CHIAMA, e da `__missing__` uscirebbe un 7 che non
+    # si chiama — la prova esploderebbe invece di diventare rossa.
     for f in ("webhook_attivo", "_leva", "_elenco",
-              "_prezzo_banner", "_leve_stato"):
+              "_prezzo_banner", "_p2p_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -34694,6 +34703,174 @@ process.stdout.write(JSON.stringify(out));
     prova("bundle: hkdf.expand da' la lunghezza chiesta", 76, o["hkdfLen"])
 
 
+def prove_p2p_server():
+    """LO SCAMBIO P2P, LATO SERVER (set 2026, tappa 1): tre leve, un
+    giudice e due buste.
+
+    Il server qui non tocca un sat: dice al client dov'e' il
+    coordinator Mostro (npub e relay) e se la funzione e' accesa. Le
+    chiavi con cui si scambia nascono nel BROWSER — regola ferrea 2, e
+    decisione di Andrea: mai la piattaforma come firmataria degli
+    scambi altrui — quindi la cosa da sorvegliare non e' cosa il
+    server FA ma cosa NON fa: nessuna chiave privata, nessun LNbits,
+    nessun pagamento in questo blocco.
+    `attivo` e' il FATTO — leva accesa E coordinator raggiungibile per
+    configurazione — e mai la sola costante: una leva accesa con la
+    npub storta direbbe al client di parlare con nessuno. Fail-closed
+    come `importo_invoice`."""
+    print("\n[lo scambio P2P, lato server]")
+
+    src = _SORGENTE
+    # L'ancora e' la frase INTERA: «LO SCAMBIO P2P (set 2026)» apre anche
+    # il commento della busta di prima pagina, molto piu' in alto.
+    i = src.index("# LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT")
+    blocco = src[i:src.index("\ndef _bech32_polymod(", i)]
+    cod = codice(blocco)
+
+    # --- 1) LE LEVE NASCONO SPENTE, E SI LEGGONO DAL CONFIG ---------
+    prova("P2P_ATTIVO nasce False nel codice", True,
+          "except ImportError:\n    P2P_ATTIVO = False" in cod)
+    prova("...e si legge dal config col pattern di casa", True,
+          "from config import P2P_ATTIVO" in cod)
+    prova("MOSTRO_NPUB nasce vuota", True,
+          "except ImportError:\n    MOSTRO_NPUB = \"\"" in cod)
+    prova("MOSTRO_RELAY nasce vuota, senza una lista di serie", True,
+          "except ImportError:\n    MOSTRO_RELAY = []" in cod
+          and "RELAY_DI_SERIE" not in cod)
+    prova("...e le stringhe vuote si scartano come per RELAY_NOSTR",
+          True, "if str(r).strip()" in cod)
+
+    # --- 2) IL GIUDICE DELLA NPUB E' FAIL-CLOSED --------------------
+    amb = {"__builtins__": __builtins__,
+           "CHARSET_BECH32": re.search(r'CHARSET_BECH32 = "([a-z0-9]+)"',
+                                       src).group(1)}
+    exec(pezzo("npub_to_hex"), amb)
+    exec(pezzo("_mostro_hex"), amb)
+    # Un'esplosione non e' una rossa (la lezione del find()): se il giudice
+    # ALZA su una npub storta la prova lo dice invece di morire.
+    def mh(x):
+        try:
+            return amb["_mostro_hex"](x)
+        except Exception as e:
+            return f"ALZA {type(e).__name__}"
+    npub = "npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0"
+    hexv = mh(npub)
+    prova("una npub buona diventa 64 esadecimali", True,
+          len(hexv) == 64 and all(c in "0123456789abcdef" for c in hexv))
+    prova("...ed e' la stessa che da' npub_to_hex", amb["npub_to_hex"](npub),
+          hexv)
+    prova("una npub storta vale '' e non alza", "", mh("npub1xyz"))
+    prova("un esadecimale nudo NON passa: la leva vuole la npub", "",
+          mh("ab" * 32))
+    prova("il vuoto vale vuoto", "", mh(""))
+    prova("un carattere fuori alfabeto vale ''", "", mh(npub[:-1] + "b"))
+
+    # --- 3) `_p2p_leve` GIRA nei quattro casi -------------------------
+    def leve(attivo, hexv, relay):
+        a = {"__builtins__": __builtins__, "P2P_ATTIVO": attivo,
+             "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay}
+        exec(pezzo("_p2p_leve"), a)
+        return a["_p2p_leve"]()
+    relay = ["wss://relay.mostro.network", "wss://nos.lol"]
+    piena = leve(True, hexv, relay)
+    prova("accesa e configurata: attivo, con npub hex e relay", True,
+          piena["attivo"] and piena["mostro"] == hexv
+          and piena["relay"] == relay)
+    prova("...e la lista dei relay e' una COPIA", False,
+          piena["relay"] is relay)
+    prova("spenta: attivo False anche se configurata", False,
+          leve(False, hexv, relay)["attivo"])
+    prova("accesa ma npub storta: attivo False (fail-closed)", False,
+          leve(True, "", relay)["attivo"])
+    prova("accesa ma senza relay: attivo False (fail-closed)", False,
+          leve(True, hexv, [])["attivo"])
+    prova("le chiavi sono tre e sono sempre quelle",
+          ["attivo", "mostro", "relay"], sorted(piena.keys()))
+    # Il journal dice il perche' quando la leva e' accesa ma non morde:
+    # una riga sul VPS e nessuna spiegazione sarebbe un guasto muto.
+    prova("accesa e storta lo dice all'avvio", True,
+          "if P2P_ATTIVO and not (MOSTRO_HEX and MOSTRO_RELAY):" in cod
+          and "print(" in cod)
+
+    # --- 4) LE DUE BUSTE, DALLO STESSO GIUDICE -----------------------
+    # Il patto di asta_leve: chi e' in vetrina /api/me non ce l'ha, e il
+    # libro ordini si legge anche da anonimi — quindi la busta di prima
+    # pagina; chi e' dentro la trova anche in /api/me. Una funzione
+    # sola, o le due un giorno direbbero due cose diverse.
+    prova("la busta di prima pagina porta p2p dal giudice", True,
+          'risposta["p2p"] = _p2p_leve()' in src)
+    prova("/api/me porta p2p_leve dallo stesso giudice", True,
+          'profilo["p2p_leve"] = _p2p_leve()' in src)
+    prova("...e il giudice e' UNO: nessuna seconda copia del dict", 1,
+          src.count('"mostro": MOSTRO_HEX'))
+
+    # --- 5) IL BLOCCO NON TOCCA UN SAT NE' UNA CHIAVE ---------------
+    # E' l'affermazione che regge il punto 5 del quadro: qui dentro non
+    # esiste una chiave privata da custodire. Si guarda il CODICE del
+    # blocco e non la prosa, che «nsec» lo nomina apposta per dire che
+    # non c'e'.
+    for spia in ("nsec", "LNBITS", "paga_venditore", "crea_invoice",
+                 "PrivateKey", "_NOSTR"):
+        # A maiuscole indifferenti: MOSTRO_NSEC e' una nsec quanto nsec.
+        prova(f"il blocco P2P non nomina `{spia}`", False,
+              spia.lower() in cod.lower())
+
+    # --- 6) IL PANNELLO DELLE LEVE CHIEDE AL GIUDICE ----------------
+    # La trappola che quella pagina esiste per non far ricadere: la
+    # riga «Scambio P2P» deve dire il FATTO (leva e coordinator
+    # insieme) e non la costante — una leva accesa con la npub storta
+    # si leggerebbe «accesa» mentre il client non parla con nessuno.
+    ls = codice(pezzo("_leve_stato"))
+    # Si guarda la RIGA della leva e non la parola: `_p2p_leve()["attivo"]`
+    # vive anche nell'allarme accanto, e da sola non poteva fallire —
+    # l'ha detto la tortura (il pannello tornato alla costante restava
+    # verde).
+    prova("il pannello chiede `_p2p_leve()` e non la costante", True,
+          '_leva("Scambio P2P", "P2P_ATTIVO", _p2p_leve()["attivo"],' in ls)
+    prova("...e la costante nuda non e' il valore di nessuna riga", 0,
+          ls.count('"P2P_ATTIVO", bool(P2P_ATTIVO)')
+          + ls.count('"P2P_ATTIVO", P2P_ATTIVO,'))
+    gruppi_on, voci_on, _ = _censimento(True)
+    gruppi_off, voci_off, _ = _censimento(False)
+    prova("il gruppo dello scambio P2P esiste", True,
+          any(g["gruppo"].startswith("🔁") and len(g["voci"]) >= 3
+              for g in gruppi_on))
+    prova("...e sta fra le porte aperte e gli avvisi di servizio",
+          True, [g["gruppo"] for g in gruppi_on].index(
+              next(g["gruppo"] for g in gruppi_on
+                   if g["gruppo"].startswith("🔁")))
+          < [g["gruppo"] for g in gruppi_on].index(
+              next(g["gruppo"] for g in gruppi_on
+                   if g["gruppo"].startswith("🔔"))))
+    prova("la leva accesa dice cosa comporta", True,
+          "campanello" in voci_on["P2P_ATTIVO"].get("nota", "")
+          and voci_on["P2P_ATTIVO"]["valore"] is True)
+    prova("...e spenta dice che la pagina resta il coming soon", True,
+          "in arrivo" in voci_off["P2P_ATTIVO"].get("nota", "")
+          and voci_off["P2P_ATTIVO"]["valore"] is False)
+    prova("la npub del coordinator e' nel pannello", True,
+          "MOSTRO_NPUB" in voci_on)
+    prova("...e i relay del coordinator pure, come elenco", True,
+          voci_on.get("MOSTRO_RELAY", {}).get("valore") == "1 · 2 · 3")
+    prova("i relay vuoti dicono che lo scambio non si accende", True,
+          "non si accende" in voci_off.get("MOSTRO_RELAY",
+                                          {}).get("nota", ""))
+
+    # --- 7) LE TRE LEVE STANNO DOVE SI COPIA -------------------------
+    # `prove_config_esempio` lo verifica gia' per censimento, ma una
+    # riga col NOME dice a chi la vede rossa quale delle tre manca.
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    for nome in ("P2P_ATTIVO", "MOSTRO_NPUB", "MOSTRO_RELAY"):
+        prova(f"{nome} e' nel file da cui si copia", True,
+              f"\n{nome} = " in cfg)
+    prova("...e li' nasce SPENTA", True, "\nP2P_ATTIVO = False" in cfg)
+    prova("...con la npub del coordinator di Andrea", True,
+          "\nMOSTRO_NPUB = \"npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0\""
+          in cfg)
+    prova("...e il relay del coordinator per primo", True,
+          "MOSTRO_RELAY = [\n    \"wss://relay.mostro.network\"," in cfg)
+
+
 def prove_nwc_cifratura():
     """La cifratura NWC si DICHIARA (ago 2026, dal campo: «Primal non
     si collega»). NIP-47 dice che il client mette un tag `encryption`
@@ -40800,6 +40977,7 @@ def main():
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,
               prove_bundle_nostr,
+              prove_p2p_server,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,

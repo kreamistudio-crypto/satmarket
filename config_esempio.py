@@ -515,6 +515,30 @@ ASTA_MAX_ATTIVE_VENDITORE = 3  # aste vive per venditore (prudenza)
 # blocca le sole puntate proxy nuove, mai il motore dei proxy vivi.
 ASTA_PROXY_ATTIVO = False    # rilancio automatico (False = spento)
 
+# --- Scambio P2P: Barattolo come client di Mostro ---------------------
+# Il tab «P2P» smette di essere un coming soon e apre il libro ordini
+# del coordinator Mostro — un servizio INDIPENDENTE, su una macchina di
+# Andrea, che custodisce in una hold invoice i sats di chi scambia
+# euro<->bitcoin con un altro utente. Barattolo qui non tocca un sat:
+# fa da bacheca (mostra il libro) e da campanello (avvisa chi ha uno
+# scambio aperto). Le chiavi con cui si scambia nascono nel BROWSER di
+# chi scambia, mai sul server.
+# NASCE SPENTA, il patto di ASTA_ABILITATA: si accende qui con un gesto
+# dopo il giro dal vivo sul coordinator, mai per effetto di un deploy.
+# Spenta, il tab resta il coming soon e nessun relay viene toccato.
+P2P_ATTIVO = False
+# La npub del coordinator: e' PUBBLICA (firma il libro ordini che tutti
+# leggono). Storta = lo scambio resta spento, e il journal lo dice.
+MOSTRO_NPUB = "npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0"
+# I relay su cui il coordinator PUBBLICA: il client legge il libro e
+# manda le richieste da qui, e il suo relay dedicato va per primo. Non
+# c'e' una lista di serie nel codice, apposta — vuota = spento.
+MOSTRO_RELAY = [
+    "wss://relay.mostro.network",
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+]
+
 DB = "satmarket.db"
 
 # --- I relay Nostr ----------------------------------------------------

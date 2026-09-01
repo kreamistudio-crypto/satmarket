@@ -12675,6 +12675,11 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # login lo apre soprattutto chi NON e' ancora entrato, e
         # /api/me in vetrina non esiste.
         risposta["relay_nip46"] = RELAYS_NIP46
+        # LO SCAMBIO P2P (set 2026): dove sta il coordinator e se la
+        # funzione e' accesa. Sta QUI e non solo in /api/me perche' il
+        # libro ordini si legge anche da anonimi in vetrina, dove
+        # /api/me non esiste — il patto di `asta_abilitata`.
+        risposta["p2p"] = _p2p_leve()
     con.close()
     return risposta
 
@@ -16007,6 +16012,27 @@ def _leve_stato():
                   spento="il commercio conta pieno anche a chi ha un "
                          "recensore solo: è la classifica di prima "
                          "dello smorzamento"),
+        ]},
+        {"gruppo": "🔁 Scambio P2P (Mostro)", "voci": [
+            # LA RIGA DICE IL FATTO E NON LA COSTANTE — la trappola che
+            # questo pannello esiste per non far ricadere: una leva
+            # accesa con la npub storta si leggerebbe «accesa» mentre
+            # il client non parla con nessuno. Si chiede al giudice.
+            _leva("Scambio P2P", "P2P_ATTIVO", _p2p_leve()["attivo"],
+                  acceso="il tab P2P apre il libro ordini del "
+                         "coordinator; il server non tocca sats — fa da "
+                         "bacheca e da campanello, le chiavi vivono nel "
+                         "browser",
+                  spento="il tab P2P resta il coming soon «in arrivo»",
+                  allarme=bool(P2P_ATTIVO) and not _p2p_leve()["attivo"]),
+            _leva("Coordinator (npub)", "MOSTRO_NPUB", MOSTRO_NPUB,
+                  spento="senza la npub del coordinator lo scambio non "
+                         "si accende, anche con P2P_ATTIVO a True"),
+            _leva("Relay del coordinator", "MOSTRO_RELAY",
+                  _elenco(MOSTRO_RELAY),
+                  spento="senza i relay lo scambio non si accende: qui "
+                         "non c'e' una lista di serie, e non deve "
+                         "esserci"),
         ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
@@ -26304,6 +26330,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["servizio_leve"] = {
         "attivi": bool(SERVIZI_ATTIVI),
         "max_giorni": SERVIZIO_MAX_GIORNI}
+    # E lo scambio P2P, dallo STESSO giudice della busta di prima
+    # pagina: due letture della stessa cosa un giorno dicono due cose
+    # diverse, e il client ha gia' il calco di `asteAccese` per
+    # metterle insieme.
+    profilo["p2p_leve"] = _p2p_leve()
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
@@ -28749,6 +28780,80 @@ def npub_to_hex(npub: str) -> str:
     if len(hexkey) != 64:
         raise ValueError("npub non valida: lunghezza sbagliata")
     return hexkey
+
+
+# LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT del coordinator
+# Mostro — un servizio indipendente, su una macchina di Andrea, che
+# custodisce i sats degli scambi euro<->bitcoin fra utenti in una hold
+# invoice. Il server qui fa DUE mestieri soli, e nessuno dei due tocca
+# un sat: dice al client dov'e' il coordinator (nella busta di prima
+# pagina e in /api/me) e, dalla tappa 7, fa da campanello. Le chiavi
+# con cui si scambia nascono e vivono nel BROWSER — regola ferrea 2, e
+# decisione di Andrea: mai la piattaforma come firmataria degli scambi
+# altrui, che una compromissione del server agirebbe dentro ogni
+# trattativa. Quindi in questo blocco NON esiste una nsec, e c'e' la
+# sentinella che lo pretende.
+# NASCE SPENTA come ASTA_ABILITATA e per la stessa ragione: apre una
+# porta verso un servizio esterno che muove denaro vero, e il salto si
+# fa con un gesto nel config del VPS dopo il giro dal vivo sul
+# coordinator — mai per effetto di un deploy.
+try:
+    from config import P2P_ATTIVO
+except ImportError:
+    P2P_ATTIVO = False
+# La npub del coordinator e' PUBBLICA (e' l'autore del libro ordini
+# che tutti leggono) e i relay sono quelli su cui il coordinator
+# scrive: si leggono dal config col pattern di RELAY_NOSTR. Qui pero'
+# la lista vuota vale «spento» e NON ripiega su una lista di serie —
+# un relay di serie non sarebbe quello dove il coordinator di Andrea
+# pubblica, e un client che ascolta il posto sbagliato non vede
+# arrivare niente senza che nessun errore lo dica.
+try:
+    from config import MOSTRO_NPUB
+except ImportError:
+    MOSTRO_NPUB = ""
+try:
+    from config import MOSTRO_RELAY
+    MOSTRO_RELAY = [str(r) for r in MOSTRO_RELAY if str(r).strip()]
+except ImportError:
+    MOSTRO_RELAY = []
+
+
+def _mostro_hex(npub: str) -> str:
+    """La chiave esadecimale del coordinator, calcolata UNA volta
+    all'avvio. Una npub storta — o un esadecimale nudo incollato al
+    posto suo — vale '', cioe' leva spenta: FAIL-CLOSED come
+    `importo_invoice`, nel dubbio il client non deve ricevere una
+    chiave a meta' e mettersi a parlare con nessuno."""
+    if not npub.startswith("npub1"):
+        return ""
+    try:
+        return npub_to_hex(npub)
+    except ValueError:
+        return ""
+
+
+MOSTRO_HEX = _mostro_hex(MOSTRO_NPUB)
+if P2P_ATTIVO and not (MOSTRO_HEX and MOSTRO_RELAY):
+    # La leva e' accesa ma non morde: lo si DICE, o sul VPS resterebbe
+    # una riga nel config che sembra fare qualcosa e non fa niente.
+    print("[p2p] P2P_ATTIVO ma MOSTRO_NPUB o MOSTRO_RELAY storti o "
+          "vuoti: lo scambio resta SPENTO")
+
+
+def _p2p_leve() -> dict:
+    """Quel che il client deve sapere per parlare col coordinator, in
+    un posto solo per le DUE fonti — la busta di prima pagina di
+    /api/listings e /api/me: il patto di `asta_leve`, chi e' in
+    vetrina /api/me non ce l'ha e il libro ordini si legge anche da
+    anonimi. `attivo` e' il FATTO — leva accesa E coordinator
+    raggiungibile per configurazione — e mai la sola costante: una
+    leva accesa con la npub storta direbbe al client di parlare con
+    nessuno. Npub e relay sono pubblici e viaggiano sempre; e' il
+    client a non usarli finche' `attivo` e' falso."""
+    return {"attivo": bool(P2P_ATTIVO and MOSTRO_HEX and MOSTRO_RELAY),
+            "mostro": MOSTRO_HEX,
+            "relay": list(MOSTRO_RELAY)}
 
 
 def _bech32_polymod(valori: list) -> int:
