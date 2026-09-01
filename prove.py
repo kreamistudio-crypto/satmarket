@@ -31425,6 +31425,33 @@ def prove_sponsor():
     prova("...e che le tutele non cambiano", True,
           "tutele sull'acquisto sono le stesse" in _rnp)
 
+    # ---- 3b. LA FOTO VERTICALE NON SI PRENDE UNO SCHERMO ---------
+    # Il tabellone di To The Moon e' in piedi, e a colonna piena una
+    # 3:4 diventa alta 864px su desktop contro i 429 di una
+    # orizzontale (misurato). Il tetto e' l'unica cosa che glielo
+    # impedisce, e sta SOPRA i 429: mordere anche le orizzontali
+    # vorrebbe dire rimpicciolire foto che vanno bene cosi'.
+    _rf = mini[mini.index("  .rac-foto{"):]
+    _rf = _rf[:_rf.index("}")]
+    prova("la foto del racconto ha un tetto in altezza", True,
+          "max-height:560px" in _rf)
+    # ...E LA LARGHEZZA E' AUTO, che e' la meta' che si dimentica: col
+    # `width:100%` il tetto sull'altezza DEFORMA — la larghezza resta
+    # piena mentre l'altezza si accorcia — e il difetto si vede solo
+    # il giorno in cui arriva una verticale, cioe' mai in collaudo.
+    # ...A DICHIARAZIONI e non a sottostringhe: `max-width:100%`
+    # CONTIENE `width:100%`, quindi la prima stesura era rossa da
+    # sola — e nell'altro verso sarebbe stata muta, che e' peggio.
+    _dic = [" ".join(x.split())
+            for x in _rf.split("{", 1)[1].split(";")]
+    prova("...e la larghezza cede, o il tetto deformerebbe", True,
+          "width:auto" in _dic and "width:100%" not in _dic
+          and "max-width:100%" in _dic)
+    # ...e si CENTRA: una verticale piu' stretta della colonna
+    # incollata a sinistra si legge come un'immagine caduta li'.
+    prova("...e la verticale resta centrata", True,
+          "margin:16px auto 0" in _dic)
+
     # ---- 4. IL BLOCCO «COME FUNZIONA» E' NOSTRO ------------------
     # Sta nel RENDERER e non nel catalogo, e non e' un dettaglio di
     # posizione: la dichiarazione di pubblicita' non puo' dipendere

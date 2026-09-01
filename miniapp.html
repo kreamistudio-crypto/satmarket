@@ -3192,8 +3192,24 @@
     color:var(--ink-soft)}
   .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:13px;
     line-height:1.6;color:var(--ink-soft)}
-  .rac-foto{display:block;width:100%;margin:16px 0 0;
-    border-radius:var(--radius)}
+  /* IL VINCOLO E' L'ALTEZZA E NON LA LARGHEZZA, o una foto
+     VERTICALE si prende piu' di una schermata. Il tabellone di To
+     The Moon e' in piedi, e a colonna piena diventerebbe alta 864px
+     su desktop (972 se lo scatto e' 2:3) contro i 429 di una
+     orizzontale — misurato, non stimato. Col tetto la verticale si
+     RIMPICCIOLISCE e si centra: resta intera, e attorno c'e' la
+     pagina invece delle bande dentro un riquadro.
+     I 560 sono scelti perche' stanno SOPRA i 429 di una orizzontale
+     a 1280: mordono le sole verticali su schermo largo e non toccano
+     niente a 360, dove una verticale e' alta 437 e si guarda bene.
+     ⚠️ `width:auto` non e' un dettaglio: col `width:100%` di prima il
+     tetto sull'altezza DEFORMEREBBE l'immagine — la larghezza
+     resterebbe piena mentre l'altezza si accorcia — ed e' un difetto
+     che si vede solo il giorno che arriva una verticale. Il prezzo
+     dichiarato e' che una foto piu' STRETTA della colonna non si
+     stira piu': meglio cosi', e le nostre sono 1360. */
+  .rac-foto{display:block;width:auto;max-width:100%;max-height:560px;
+    margin:16px auto 0;border-radius:var(--radius)}
   /* LA RIGA CHE DICHIARA, e sta FUORI dal cassetto: dentro la
      leggerebbe solo chi apre, cioe' chi lo sa gia'. Superficie
      NEUTRA (--chip-bg) come .nota-punto e .nota-savers: non e' un
@@ -9291,6 +9307,10 @@ function renderStriscia(){
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
+    /* ⚠️ TRE «O» APPOSTA (confermato da Andrea): e' il nome
+       stilizzato del gioco, non un refuso — ed e' la parola piu'
+       visibile dello spazio che abbiamo venduto. Chi passa di
+       qui non la «corregga». */
     titolo: 'To The Mooon!',
     occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
     sottotitolo: 'Capire Bitcoin, giocando.',

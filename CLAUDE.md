@@ -2537,6 +2537,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invece di quattro (~44), e l'avviso su una riga sola in meno (~23).
   LA PASTIGLIA E LA SECONDA FRASE DELL'AVVISO NON SI TOCCANO: sono il
   punto 1, e i pixel che costano si pagano.
+  LE FOTO POSSONO ESSERE VERTICALI, e il vincolo e' l'ALTEZZA e non la
+  larghezza (ago 2026, dal campo: «il tabellone e' verticale, e
+  forzarlo in orizzontale vuol dire tagliarlo o lasciare due bande
+  vuote»). Che fossero tutte orizzontali non era una decisione: era
+  venuto cosi' dai segnaposto del banco — `.rac-foto` non ha mai avuto
+  ne' un'altezza fissa ne' un `aspect-ratio`, quindi ACCETTARLE NON
+  COSTA UNA RIGA. Quel che costa e' quanto crescono, ed e' misurato:
+  la colonna del racconto e' 328px a 360 e **648 a 1280**, quindi una
+  3:4 e' alta 437 sul telefono e **864 su desktop** (972 se lo scatto
+  e' 2:3) contro i 429 di una orizzontale — **il costo e' sul
+  DESKTOP**, che e' il contrario di quel che si teme.
+  IL TETTO E' `max-height:560px` e sta SOPRA i 429 di una orizzontale
+  a 1280: morde le sole verticali su schermo largo (560 invece di 864,
+  col racconto che passa da 3319 a 3015) e a 360 non morde MAI —
+  li' una verticale resta intera a colonna piena, e si guarda bene.
+  Mordere anche le orizzontali vorrebbe dire rimpicciolire foto che
+  vanno gia' bene.
+  ⚠️ `width:auto` E' LA META' CHE SI DIMENTICA: col `width:100%` di
+  prima il tetto sull'altezza DEFORMA — la larghezza resta piena
+  mentre l'altezza si accorcia — e il difetto si vede solo il giorno
+  che arriva una verticale, cioe' mai in collaudo. C'e' la prova, e la
+  mutazione che rimette il `100%` la fa rossa; verificato dal vivo che
+  il tabellone esca **420x560** su desktop e **328x437** a 360, cioe'
+  il rapporto 0,75 esatto in tutti e due — rimpicciolita, non
+  schiacciata. La sentinella guarda le DICHIARAZIONI e non le
+  sottostringhe: `max-width:100%` CONTIENE `width:100%`, e la prima
+  stesura era rossa da sola (nell'altro verso sarebbe stata muta, che
+  e' peggio). Prezzo dichiarato: una foto piu' STRETTA della colonna
+  non si stira piu' — meglio cosi', e le nostre sono 1360.
+  E LA CRESCITA NON LA PAGA CHI VIENE PER LA MERCE: quei numeri sono
+  col racconto APERTO, cioe' solo per chi tocca la card. Chi arriva da
+  un annuncio ha il cassetto chiuso e la prima card a 863, invariata.
+  ⚠️ IL TITOLO E' «To The Mooon!» CON TRE «O» (confermato da Andrea):
+  e' il nome stilizzato del gioco e non un refuso, ed e' la parola piu'
+  visibile dello spazio venduto. C'e' il commento accanto al catalogo,
+  che chi passa non la «corregga».
   E IL BANNER RESTA DOV'E', PER TUTTI: sono due cose diverse che nel
   primo disegno si facevano concorrenza — un'insegna che porta FUORI
   da Barattolo, e un titolo che porta alla merce sotto. Chi arriva da
