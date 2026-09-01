@@ -3063,6 +3063,129 @@
      il testo gia' sistemato dappertutto). E' lo stesso rimedio del
      comune nella riga meta della card, per lo stesso identico motivo. */
   .seller .who{flex:1;min-width:0}
+  /* IL RAZZO DELLO SPAZIO IN VETRINA (ago 2026, chiesto da Andrea:
+     «parte dalla card del venditore, quella in fondo alla pagina — e'
+     li' che sta fermo prima di partire»).
+     ⚠️ IL `position:relative` NON VA SU `.seller`, e non e' pignoleria:
+     quella classe la porta anche il riquadro venditore del dettaglio,
+     e un antenato posizionato in piu' fa risalire li' ogni figlio
+     assoluto che qualcuno ci mettera' domani — la trappola gia' pagata
+     dalla `.card{position:relative}`, dove i barattolini si
+     accatastavano tutti in alto a destra. Se lo prende la classe SUA,
+     che nasce col razzo e muore con lui.
+     IL GUSCIO E' QUEL CHE GARANTISCE «NON COPRE»: il razzo esce verso
+     l'alto, e senza ritaglio passerebbe sopra la prosa che sta sopra
+     la card. `inset:0` piu' `overflow:hidden` lo tengono dentro i
+     bordi della card per costruzione — non per taratura — e
+     `border-radius:inherit` glielo tiene tondo agli angoli.
+     E NON SPINGE NIENTE: e' assoluto, quindi fuori dal flusso e fuori
+     dal flex del `.seller`; l'unica cosa che occupa spazio e' il
+     padding che gli si fa attorno, perche' non copra il nome. */
+  .seller.con-razzo{position:relative;padding-right:52px}
+  .razzo-g{position:absolute;inset:0;overflow:hidden;
+    border-radius:inherit;pointer-events:none}
+  .razzo{position:absolute;right:15px;bottom:5px;width:22px;height:37px}
+  /* I COLORI SONO SUOI E NON PRESI IN PRESTITO: nel progetto l'arancio
+     e' l'acquisto, il verde la fiducia, il rosso la lampo, il petrolio
+     l'asta, il viola Nostr — un ornamento di un progetto ospite non
+     puo' prendere un colore che significa gia' qualcos'altro. Sono
+     FISSI nei due temi come tutto cio' che sta sopra una superficie
+     sua, e ricalcano il razzo che il progetto ha gia' nel suo
+     banner. */
+  .rz-corpo{fill:#FFF8EA}
+  .rz-naso,.rz-ala{fill:#C4392B}
+  .rz-oblo{fill:#2C6E8F}
+  .rz-fiamma{fill:#F7931A;opacity:0}
+  /* IL TENTATIVO: sale, non ce la fa, ricade. UNA volta sola per
+     apertura — un sussulto che si ripete ogni tot secondi e' un tic, e
+     su questa pagina il progetto ha gia' rimesso indietro uno squillo
+     a scatti («MAI riproporre un movimento a scatti qui»). */
+  .razzo.prova{animation:rz-prova 1.2s cubic-bezier(.34,.7,.5,1) .3s both}
+  /* LA PARTENZA: si abbassa un attimo — la spinta — e se ne va. I
+     120px sono abbondanti apposta: la card e' alta una sessantina e
+     al razzo ne bastano una quarantina per uscire, ma il ritaglio
+     rende gratuito esagerare, e cosi' il numero non va ritarato il
+     giorno che la card cresce. */
+  .razzo.parte{animation:rz-parte 1.15s cubic-bezier(.5,0,.75,.35) forwards}
+  .razzo.parte .rz-fiamma{animation:rz-fuoco .14s ease-in-out 8 both}
+  @keyframes rz-prova{
+    0%{transform:translateY(0)}
+    38%{transform:translateY(-9px)}
+    58%{transform:translateY(-5px)}
+    100%{transform:translateY(0)}
+  }
+  @keyframes rz-parte{
+    0%{transform:translateY(0)}
+    14%{transform:translateY(4px)}
+    100%{transform:translateY(-120px)}
+  }
+  /* La fiamma tremola, e qui lo scatto e' il mestiere: dura quanto la
+     partenza e finisce — un `infinite` resterebbe a girare per sempre
+     su un disegno gia' uscito dal ritaglio, cioe' invisibile. */
+  @keyframes rz-fuoco{
+    0%,100%{opacity:.95;transform:scaleY(1)}
+    50%{opacity:.6;transform:scaleY(.7)}
+  }
+  /* IL CIELO: la scia di fumo e il logo che ci sale dentro quando il
+     razzo esce (ago 2026, chiesto da Andrea).
+     ⚠️ E' ASSOLUTO E NON RISERVA SPAZIO, ed e' la riga che tiene la
+     promessa «non spinge»: ancorato al fondo della card si estende
+     verso l'ALTO per la sua altezza, quindi vive fuori dal flusso e
+     la merce sotto non si muove di un pixel. La pagina del negozio e'
+     gia' lunga — 226px nel caso minimo, ~618 nel tipico prima della
+     prima card — e un riquadro riservato per un ornamento sarebbe
+     stato il conto piu' caro di questo cantiere.
+     `pointer-events:none` e' l'altra meta': passa SOPRA la coda del
+     racconto per due secondi e non ruba un tocco a nessuno. */
+  .rz-cielo{position:absolute;left:0;right:0;bottom:0;height:190px;
+    overflow:hidden;pointer-events:none;opacity:0}
+  .rz-cielo.acceso{animation:rz-cielo 2.9s ease-out .5s both}
+  /* IL FUMO E' CSS E NON PARTICELLE (decisione di Andrea): tre forme
+     sfocate che si dilatano girano sul compositor e non costano
+     niente, mentre «lo schermo si riempie» con un rAF vuol dire
+     cinquanta oggetti grandi su un telefono lento. Il colore e' un
+     grigio caldo FISSO nei due temi, come tutto quel che sta sopra una
+     superficie sua: si vede sul crema del giorno e sul bruno della
+     sera, mentre un bianco puro sparirebbe di giorno. */
+  .rz-nube{position:absolute;bottom:-10px;border-radius:50%;opacity:0;
+    background:radial-gradient(circle at 50% 55%,
+      rgba(186,176,160,.62) 0%,rgba(186,176,160,.34) 52%,
+      rgba(186,176,160,0) 72%)}
+  .rz-cielo.acceso .rz-nube{animation:rz-nube 2.9s ease-out both}
+  .rz-nube.a{left:50%;width:150px;height:150px;margin-left:-75px;
+    animation-delay:.5s}
+  .rz-nube.b{left:50%;width:118px;height:118px;margin-left:-118px;
+    animation-delay:.66s}
+  .rz-nube.c{left:50%;width:126px;height:126px;margin-left:-8px;
+    animation-delay:.78s}
+  /* IL LOGO STA AL CENTRO DELLA PAGINA (chiesto da Andrea): il cielo e'
+     largo quanto la card, che e' larga quanto la vista, quindi
+     `left:50%` col mezzo passo indietro lo mette in mezzo per
+     costruzione — e resta in mezzo a ogni larghezza senza un numero da
+     tarare. Il tetto a 300px e' perche' su desktop la vista arriva a
+     520 e un logo largo 400 si leggerebbe come un cartellone. */
+  .rz-logo{position:absolute;left:50%;bottom:64px;width:min(76%,300px);
+    transform:translate(-50%,44px);opacity:0}
+  .rz-cielo.acceso .rz-logo{
+    animation:rz-logo 2.9s cubic-bezier(.16,.8,.3,1) .62s both}
+  @keyframes rz-cielo{
+    0%{opacity:1} 74%{opacity:1} 100%{opacity:0}
+  }
+  /* La nube parte piccola e densa da dove il razzo se n'e' andato, si
+     gonfia e si dirada: e' il fumo che si apre, non una macchia che
+     cresce — per questo l'opacita' arriva presto al massimo e poi cala
+     per tutto il resto. */
+  @keyframes rz-nube{
+    0%{opacity:0;transform:scale(.25) translateY(18px)}
+    18%{opacity:1}
+    100%{opacity:0;transform:scale(1.35) translateY(-26px)}
+  }
+  @keyframes rz-logo{
+    0%{opacity:0;transform:translate(-50%,44px) scale(.86)}
+    22%{opacity:1;transform:translate(-50%,0) scale(1)}
+    72%{opacity:1;transform:translate(-50%,0) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-10px) scale(1)}
+  }
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
   /* «Sei qui» sull'account attivo del selettore: lo stesso anello
@@ -3299,7 +3422,58 @@
      dichiarato e' che una foto piu' STRETTA della colonna non si
      stira piu': meglio cosi', e le nostre sono 1360. */
   .rac-foto{display:block;width:auto;max-width:100%;max-height:560px;
-    margin:16px auto 0;border-radius:var(--radius)}
+    margin:0 auto;border-radius:var(--radius)}
+  /* LE IMMAGINI DEL RACCONTO RESPIRANO (ago 2026, chiesto da Andrea:
+     «come le card in home, quel movimento lento che gia' c'e'»).
+     ⚠️ IL GUSCIO NON E' UN INVOLUCRO DI COMODO, e' quel che rende il
+     movimento ammissibile: in home a muoversi e' l'immagine DENTRO la
+     card, che ha gia' il suo overflow:hidden — qui una .rac-foto e'
+     un elemento in flusso, e uno zoom senza ritaglio non spinge
+     niente (un transform non tocca il layout) ma ESCE dai suoi bordi
+     e coprirebbe la prosa sopra e sotto. Il guscio e' alto quanto la
+     foto, quindi la ritaglia esattamente come fa la card di la'.
+     IL MARGINE E IL RAGGIO TRASLOCANO SUL GUSCIO: e' lui che ritaglia,
+     quindi e' lui a dover essere tondo — l'immagine tiene il suo per
+     sicurezza, che se un domani il guscio sparisse in un riordino la
+     foto resterebbe tonda invece di diventare un rettangolo. Sulla
+     .rac-foto resta `margin:0 auto`, che e' il CENTRAGGIO della
+     verticale piu' stretta della colonna: quella riga ha la sua prova
+     e non se n'e' andata, si e' spostata di un livello.
+     PIU' LENTO E PIU' TENUE DELLE SORELLE (1.03 su 9s contro 1.055 su
+     6), e la ragione e' aritmetica: **il movimento si misura in
+     PIXEL, non in percentuale** — di la' il disegno e' alto 130px e
+     il 5,5% ne fa 7, qui una foto ne e' alta 437 e lo stesso 5,5% ne
+     farebbe 24, che su una foto di prodotto si legge come un
+     traballamento. Il 3% ne fa 13, sei e mezzo per lato.
+     SFALSATE A COPPIE, o respirerebbero tutte all'unisono e la
+     pagina intera pulserebbe: la classe la mette il renderer col suo
+     contatore, che `:nth-of-type` qui conterebbe anche i blocchi di
+     testo. */
+  .rac-g{display:block;overflow:hidden;border-radius:var(--radius);
+    margin:16px auto 0;line-height:0}
+  /* l'hero apre il cassetto e non vuole stacco: il suo margine e'
+     quello che aveva, cioe' nessuno */
+  .rac-g.hero{margin:0}
+  /* l'onerror toglie l'immagine e il guscio resta vuoto: senza questa
+     riga resterebbero i suoi 16px di stacco a separare due paragrafi
+     per niente. ⚠️ `:empty` non perdona lo spazio bianco — nel
+     renderer fra il guscio e l'immagine non c'e' NIENTE, ed e' il
+     motivo per cui quel markup e' scritto attaccato. */
+  .rac-g:empty{display:none}
+  .rac-g > img{animation:rac-respiro 9s ease-in-out infinite}
+  .rac-g.sfalsa > img{animation-delay:-4.5s}
+  @keyframes rac-respiro{
+    0%,100%{transform:scale(1)}
+    50%{transform:scale(1.03)}
+  }
+  /* Lo spegnimento pareggia la specificita' e vince per ORDINE, che
+     e' la lezione gia' pagata dalle card di home: col selettore nudo
+     `.rac-g img` perderebbe contro `.rac-g > img` e i disegni si
+     muoverebbero anche in reduced-motion — con la sentinella verde,
+     perche' la regola c'e' e semplicemente non vince mai. */
+  @media (prefers-reduced-motion:reduce){
+    .rac-g > img,.rac-g.sfalsa > img{animation:none}
+  }
   /* ⚠️ QUI C'ERA LA RIGA CHE DICHIARAVA, in fondo al cassetto, e
      dall'ago 2026 non c'e' piu' (decisione di Andrea). La classe se
      n'e' andata col markup: una regola orfana nel foglio fa credere
@@ -9522,6 +9696,12 @@ const RACCONTI = {
        visibile dello spazio che abbiamo venduto. Chi passa di
        qui non la «corregga». */
     titolo: 'To The Mooon!',
+    /* IL RAZZO LO DICHIARA IL CATALOGO, come l'immagine e i testi:
+       e' un ornamento DEL PROGETTO — il secondo spazio venduto
+       potrebbe non avercelo, o averne un altro — al contrario della
+       riga che dichiara la pubblicita', che sta nel RENDERER apposta
+       perche' non possa dipendere da chi paga. */
+    razzo: true,
     sottotitolo: 'Capire Bitcoin, giocando.',
     intro: "Ogni viaggio inizia con una scelta. L'obiettivo e' arrivare " +
            "sulla Luna: prendi decisioni, affronti imprevisti e gestisci " +
@@ -11076,13 +11256,132 @@ function apriLinkBanner(){
    «resta l'1% di sempre» diventerebbe falso il giorno che si
    accende, cioe' proprio dentro il blocco che promette di non avere
    commissioni nascoste. */
-function raccontoNegozio(v){
+/* IL GIUDICE DEL RACCONTO, e ce n'e' UNO: lo chiedono il renderer e
+   il razzo, e due letture della stessa condizione un giorno direbbero
+   due cose diverse sullo stesso negozio — il razzo di un racconto che
+   non c'e', o un racconto senza il suo razzo. */
+function raccontoDi(v){
   const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
-  if (!r || !r.negozio || r.negozio !== v.negozio) return '';
+  return (r && r.negozio && v && r.negozio === v.negozio) ? r : null;
+}
+
+/* IL RAZZO, fermo nell'angolo della card del venditore finche' non
+   parte. Il disegno e' nostro: nell'immagine dello spazio il razzo
+   sta DENTRO la grafica e non esiste come asset a se'.
+   ⚠️ CON LE ANIMAZIONI RIDOTTE NON NASCE AFFATTO, e non e' una
+   scorciatoia: un razzo fermo per sempre in un angolo e' un disegno
+   senza mestiere, e la terza condizione posta da Andrea e' che chi le
+   ha ridotte «non veda niente». Spegnerlo dal CSS lo lascerebbe li'.
+   PREZZO DICHIARATO: chi cambia quella preferenza a pagina aperta non
+   vede il razzo comparire — il negozio non si ridisegna da solo. */
+function razzoSponsor(v){
+  const r = raccontoDi(v);
+  if (!r || !r.razzo || tourRidotto()) return '';
+  const foto = q => `/assets/racconti/${sponsorVivo}-${q}.webp`;
+  return `<span class="razzo-g" aria-hidden="true">` +
+    `<svg class="razzo" id="razzoSponsor" viewBox="0 0 20 34">` +
+    `<path class="rz-fiamma" d="M10 26.5c2.4 2.6 3.3 4.6 2.5 6.1` +
+    `-.6 1.1-4.4 1.1-5 0-.8-1.5.1-3.5 2.5-6.1z"/>` +
+    `<path class="rz-ala" d="M6.6 18.4C4.1 20.5 2.7 22.9 2.5 25.6` +
+    `c0 .5.4.8.8.6l3.3-1.8zm6.8 0c2.5 2.1 3.9 4.5 4.1 7.2 0 .5-.4.8` +
+    `-.8.6l-3.3-1.8z"/>` +
+    `<path class="rz-corpo" d="M10 1.6c3 3 4.6 7 4.6 12.1 0 4.2-.9` +
+    ` 7.9-2.8 11H8.2c-1.9-3.1-2.8-6.8-2.8-11 0-5.1 1.6-9.1 4.6-12.1z"/>` +
+    `<path class="rz-naso" d="M10 1.6c1.8 1.8 3.1 4 3.9 6.5H6.1` +
+    `c.8-2.5 2.1-4.7 3.9-6.5z"/>` +
+    `<circle class="rz-oblo" cx="10" cy="12.4" r="2.3"/>` +
+    `</svg></span>` +
+    /* IL CIELO nasce SPENTO e si accende con una classe: il nodo
+       dev'essere gia' li' quando il razzo esce — costruirlo in
+       quell'istante vorrebbe dire chiedere al browser un layout nel
+       fotogramma in cui deve solo far partire un'animazione.
+       ⚠️ IL LOGO HA IL SUO `onerror`, come ogni immagine di questo
+       progetto: se il file non e' ancora arrivato resta il fumo, che
+       e' una degradazione e non una regressione — il precedente e' la
+       card «Tutto» che ha aspettato la sua illustrazione mostrando
+       l'emoji di ripiego. */
+    `<span class="rz-cielo" id="razzoCielo" aria-hidden="true">` +
+    `<span class="rz-nube a"></span><span class="rz-nube b"></span>` +
+    `<span class="rz-nube c"></span>` +
+    `<img class="rz-logo" src="${foto('logo')}" alt="" ` +
+    `decoding="async" onerror="this.remove()"></span>`;
+}
+
+/* L'ARMAMENTO DEL RAZZO — e sono DUE FATTI, non «seguire lo
+   scorrimento», che era la domanda di Andrea sul costo.
+   1) «LA CARD E' IN VISTA» lo dice un IntersectionObserver, che il
+      browser calcola fuori dal thread principale e che quest'app usa
+      gia' in quattro posti (le sentinelle dello scroll infinito, la
+      striscia delle categorie in home).
+   2) «L'UTENTE HA CAMBIATO DIREZIONE» e' un listener passivo che
+      confronta due numeri, e sta appeso SOLO fra il tentativo e la
+      partenza — pochi secondi, su una pagina sola. Il precedente
+      permanente e' `posizionaTour`, che di listener sullo scroll ne
+      tiene uno per TUTTA la sessione.
+   ⚠️ IL DISARMO NON E' UNA CORTESIA: `#negozioHeader` si riscrive a
+   ogni apertura, quindi senza quella riga dieci negozi aperti
+   lascerebbero dieci listener appesi su nodi che non esistono piu'.
+   E' la regola di `vetrinaGiro`: quel che nasce da un render deve
+   morire col render dopo. */
+let razzoStop = null;
+function armaRazzo(){
+  if (razzoStop) { razzoStop(); razzoStop = null; }
+  const g = el('razzoSponsor');
+  /* `razzoSponsor` non ha disegnato niente: animazioni ridotte, o
+     nessun racconto vivo su questo negozio. Non c'e' da armare. */
+  if (!g) return;
+  const card = g.closest('.seller');
+  if (!card) return;
+  let stato = 0;               /* 0 fermo · 1 ci ha provato · 2 via */
+  let y = window.scrollY;
+  /* SI GUARDA IL VERSO E NON LA POSIZIONE: `n < y` vuol dire che si
+     sta tornando su. I 4px di soglia sono lo slop del dito — senza,
+     un rimbalzo dello scorrimento inerziale farebbe partire il razzo
+     mentre si sta ancora scendendo.
+     IMPERFEZIONE DICHIARATA: chi inverte MENTRE il tentativo e'
+     ancora in corso vede il razzo tornare a zero per un fotogramma —
+     la partenza comincia da li'. Dura quanto un fotogramma e
+     assomiglia alla spinta con cui l'animazione comincia comunque;
+     curarlo vorrebbe dire aspettare la fine del tentativo, cioe' un
+     timer in piu' per un caso che si vede appena. */
+  const su = () => {
+    const n = window.scrollY;
+    if (stato === 1 && n < y - 4) {
+      stato = 2;
+      g.classList.remove('prova');
+      g.classList.add('parte');
+      el('razzoCielo')?.classList.add('acceso');
+      if (razzoStop) { razzoStop(); razzoStop = null; }
+    }
+    y = n;
+  };
+  /* Al 60%: la card dev'essere in vista per DAVVERO, o il razzo
+     proverebbe a partire mentre si vede solo il suo bordo. */
+  const oss = new IntersectionObserver(e => {
+    if (!e[0].isIntersecting || stato) return;
+    stato = 1;
+    g.classList.add('prova');
+    y = window.scrollY;
+    window.addEventListener('scroll', su, {passive: true});
+  }, {threshold: .6});
+  oss.observe(card);
+  razzoStop = () => {
+    window.removeEventListener('scroll', su);
+    oss.disconnect();
+  };
+}
+
+function raccontoNegozio(v){
+  const r = raccontoDi(v);
+  if (!r) return '';
   /* `q` e non `n`: la forma della whitelist del server ammette
      `{slug}-cop` accanto a `{slug}-1..9`, e la copertina passa di
      qui come le altre invece di costruirsi un secondo URL. */
   const foto = q => `/assets/racconti/${sponsorVivo}-${q}.webp`;
+  /* il contatore delle sole FOTO: serve a sfalsare i respiri, e
+     `:nth-of-type` non basterebbe perche' conterebbe anche i blocchi
+     di testo che stanno in mezzo. */
+  let nf = 0;
   const blocchi = (r.blocchi || []).map(x => {
     if (x.t === 'testo')
       return `<h4 class="rac-h">${esc(x.h)}</h4>
@@ -11102,9 +11401,14 @@ function raccontoNegozio(v){
               <ul class="rac-elenco">${x.voci.map(t =>
                 `<li>${esc(t)}</li>`).join('')}</ul>`;
     if (x.t === 'foto')
-      return `<img class="rac-foto" src="${foto(x.n)}"
-                   alt="${esc(x.alt || '')}" loading="lazy"
-                   decoding="async" onerror="this.remove()">`;
+      /* ⚠️ NIENTE SPAZI DENTRO IL GUSCIO: il ritaglio si nasconde da
+         solo con `:empty` quando l'onerror toglie la foto, e `:empty`
+         non scatta se dentro c'e' anche solo un a capo. Per questo il
+         markup si concatena invece di andare a capo nel template. */
+      return `<span class="rac-g${++nf % 2 ? '' : ' sfalsa'}">` +
+             `<img class="rac-foto" src="${foto(x.n)}" ` +
+             `alt="${esc(x.alt || '')}" loading="lazy" ` +
+             `decoding="async" onerror="this.remove()"></span>`;
     return '';
   }).join('');
   /* LA RIGA IN CHIARO NON C'E' PIU' (ago 2026, decisione di Andrea
@@ -11144,10 +11448,10 @@ function raccontoNegozio(v){
                   onclick="acquistaDalRacconto()">Acquista</button>
         </div>
       </div>
-      <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
-        <img class="rac-hero" src="${foto('cop')}"
+      <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}"><span
+        class="rac-g hero"><img class="rac-hero" src="${foto('cop')}"
              alt="${esc(r.titolo)}" decoding="async"
-             onerror="this.remove()">
+             onerror="this.remove()"></span>
         ${blocchi}
       </div>
     </div>`;
@@ -11235,18 +11539,22 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     (v.username||'').replace(/[^A-Za-z0-9_]/g,''),
     (v.npub_verificata && v.npub ? v.npub : '').replace(/[^a-z0-9]/g,''),
     chi ? `a ${esc(chi)}` : 'al venditore');
+  const razzo = razzoSponsor(v);
   el('negozioHeader').innerHTML = `
     ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
-    <div class="seller" style="margin-top:14px">
+    <div class="seller${razzo ? ' con-razzo' : ''}" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
-      </div>
+      </div>${razzo}
     </div>
     ${ponti}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+  /* Il razzo si arma DOPO che il markup e' a schermo: prima il nodo
+     che l'osservatore deve guardare non esiste ancora. */
+  armaRazzo();
   /* LE DUE PROMESSE SCENDONO SOTTO «In vetrina in questo negozio»
      (ago 2026, decisione di Andrea), e l'ordine di montaggio non
      cambia: 🚚 PRIMA della 🎁, come in Paga, in «Altri oggetti» e nel

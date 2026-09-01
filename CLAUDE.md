@@ -2835,6 +2835,124 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e' il nome stilizzato del gioco e non un refuso, ed e' la parola piu'
   visibile dello spazio venduto. C'e' il commento accanto al catalogo,
   che chi passa non la «corregga».
+  LE IMMAGINI RESPIRANO (ago 2026, chiesto da Andrea: «come le card in
+  home — quel movimento lento che gia' c'e'»): le foto del racconto
+  fanno lo zoom lentissimo della card degli sconti (`sc-respiro`,
+  1→1.055 su 6s), qui 1→1.03 su **9s** perche' sono grandi e a colonna
+  piena — la stessa ampiezza si vedrebbe come un difetto.
+  IL FONDO NON SI SCOPRE MAI ED E' ARITMETICA, non fortuna: `scale>=1`
+  con l'origine al centro puo' solo RITAGLIARE. E a ritagliare c'e' un
+  GUSCIO (`.rac-g`, `overflow:hidden` col raggio della foto), perche'
+  senza di lui l'immagine ingrandita esce dal suo posto e sale sopra il
+  testo del blocco accanto — misurato: 10px per lato al picco, e col
+  guscio quei 10px si tagliano e il riquadro resta fermo AL PIXEL.
+  NON SPINGE NIENTE, ed e' la prima delle tre condizioni: `transform`
+  gira sul compositor e non tocca il layout — verificato che a
+  respiro fermo e a respiro al picco la card sotto sta allo stesso
+  posto.
+  LE FOTO SI SFALSANO A COPPIE (`.sfalsa` con `animation-delay:-4.5s`,
+  cioe' mezzo giro): tre immagini che pulsano all'unisono si leggono
+  come un battito dell'app, sfalsate come tre cose che respirano. Il
+  contatore vive nel `map` (`++nf % 2`) e non nell'indice del blocco,
+  o le foto si sfalserebbero rispetto ai TESTI in mezzo invece che fra
+  loro.
+  ⚠️ `.rac-g:empty{display:none}` E IL RIPIEGO: `onerror` toglie
+  l'`img` e lascerebbe un guscio vuoto col suo margine — quindi il
+  guscio si nasconde da solo, e per farlo NON DEVE CONTENERE SPAZI (un
+  a capo dentro il tag lo rende non-vuoto: c'e' la prova, ed e' il
+  motivo per cui quel template e' scritto tutto attaccato).
+  IL RAZZO PARTE DALLA CARD DEL VENDITORE (ago 2026, decisione di
+  Andrea: «prova a uscire verso l'alto ma non ce la fa; poi quando
+  l'utente torna a scorrere verso l'alto, il razzo esce» — e «parte
+  dalla card del venditore, quella in fondo alla pagina: e' li' che sta
+  fermo prima di partire»). Un SVG di 22x37 in basso a destra dentro
+  la `.seller`, disegnato coi colori di casa (crema `#FFF8EA` il corpo,
+  il rosso della lampo il naso e le ali, il petrolio dell'asta
+  l'oblo', l'arancio ₿ la fiamma).
+  I DUE FATTI SONO DIVERSI, ed e' tutto il cantiere: il TENTATIVO e' la
+  card che entra in vista (un IntersectionObserver), la PARTENZA e' il
+  VERSO dello scorrimento — si torna su. Il secondo non e' una
+  posizione ma una direzione, quindi si misura confrontando due
+  `scrollY` (`n < y - 4`, coi 4px di tolleranza contro il tremolio del
+  dito) e non con una soglia: una soglia direbbe «sei arrivato qui», e
+  qui la cosa da sapere e' «stai tornando indietro».
+  IL LISTENER VIVE SOLO FRA I DUE FATTI: si appende quando il razzo ci
+  ha provato e si stacca quando e' partito — mai un ascoltatore di
+  scroll permanente su una pagina che si scorre tutta, ed e' la stessa
+  economia del touchmove non-passivo della tirata di aggiornamento.
+  E IL DISARMO E' LA PRIMA ISTRUZIONE DI `armaRazzo`: quella funzione
+  gira a ogni apertura di negozio, e senza `razzoStop()` in testa un
+  osservatore vecchio resterebbe appeso a un nodo morto — il difetto
+  che non fallisce e si accumula.
+  UNA VOLTA SOLA PER APERTURA (`stato` a tre valori): un razzo che
+  riparte a ogni su-e-giu' e' un tic, non un ornamento.
+  E IL CIELO: IL LOGO CHE SALE COL FUMO (ago 2026, seconda stesura —
+  la prima era un VELO A TUTTO SCHERMO e va tenuta perche' e' quella
+  che torna in mente). Quando il razzo esce, sopra la card del
+  venditore sale una nuvola di fumo e col fumo il LOGO del progetto,
+  centrato; dopo ~3 secondi svanisce tutto da solo.
+  IL VELO E' STATO SCARTATO, e le DUE ragioni sono di Andrea: un
+  pannello che copre la merce di uno spazio **PAGATO**, e che parte da
+  uno SCROLL invece che da un tocco, e' la cosa piu' aggressiva che
+  Barattolo farebbe verso chi guarda; e le pagine `/negozio/{codice}`
+  sono INDICIZZATE (sitemap, canonical, cartello SEO), quindi sarebbe
+  alla lettera l'«intrusive interstitial» che Google penalizza su
+  mobile — su un cantiere nato per farsi trovare, quella seconda
+  **decide da sola**.
+  LE TRE CONDIZIONI DI ANDREA sono la specifica, e ognuna ha la sua
+  riga. 1) NON SPINGE: il cielo e' `position:absolute` ancorato al
+  `bottom:0` della card e alto 190px — fuori dal flusso, quindi si
+  estende verso l'ALTO senza riservare un pixel (misurato: card,
+  `.seller` e `scrollHeight` identici col cielo spento e acceso). Un
+  riquadro riservato sarebbe stato il conto piu' caro del cantiere su
+  una pagina che questo file dichiara «gia' lunga». 2) NON COPRE:
+  `pointer-events:none` piu' `overflow:hidden`, e tutto svanisce da
+  se' — l'opacita' e' 1,00 fino a 2550ms e **0,00 a 3400**. 3) LE
+  ANIMAZIONI RIDOTTE non vedono niente, e non per una regola in piu':
+  il cielo nasce DENTRO `razzoSponsor`, che con `tourRidotto()` non
+  disegna nulla — quindi non c'e' markup da spegnere.
+  SI ACCENDE ALLA PARTENZA E MAI AL TENTATIVO: il fumo e' la scia di un
+  razzo che se n'e' andato, e sul sussulto racconterebbe una partenza
+  che non c'e' stata.
+  ⚠️ E I DUE RAMI SI PRENDONO PER NOME, mai col «prima nel testo»:
+  nel sorgente il ramo della PARTENZA sta SOPRA l'osservatore, quindi
+  la fetta «prima di `stato = 2`» non contiene il tentativo e
+  un'accensione infilata li' cadeva dove la prova non guardava. L'ha
+  detta la tortura, non la rilettura.
+  IL FUMO E' CSS E NON PARTICELLE (decisione di Andrea): tre forme
+  sfocate con un gradiente radiale, sul compositor, invece di
+  cinquanta oggetti su un `requestAnimationFrame` — che su un telefono
+  lento e' un costo vero. C'e' la prova che nel razzo non nasca nessun
+  ciclo a mano.
+  IL LOGO STA AL CENTRO (chiesto da Andrea): `left:50%` col mezzo passo
+  indietro, che lo tiene in mezzo a ogni larghezza senza un numero da
+  tarare — misurato, scarto dal centro **0** a 320, 360 e 375. Largo
+  `min(76%,300px)`, quindi il file vuole **~900px** di larghezza (3x)
+  in WebP TRASPARENTE; il suo URL passa dalla `foto()` del racconto e
+  non si scrive a mano, o sarebbe il secondo posto che un giorno
+  diverge dal primo. E ha il ripiego di ogni immagine del progetto:
+  se il file non e' ancora arrivato resta il fumo — degradazione e non
+  regressione, il precedente della card «Tutto».
+  LA FORMA DEL FILE E' UNA WHITELIST e non un elenco: `FORMA_RACCONTO`
+  guadagna `logo` accanto a `cop` e alle cifre, quindi il server non
+  si tocca di piu'.
+  ⚠️ E IL BANCO HA MENTITO QUATTRO VOLTE in questo cantiere, tutte
+  della stessa famiglia — la sonda e non il codice. 1) «quel che cresce
+  resta dentro il guscio» misurava il rect dell'`img`, che cresce PER
+  COSTRUZIONE: `getBoundingClientRect` da' la geometria e non il
+  RITAGLIO, quindi si misura il GUSCIO. 2) Stessa cosa per il fumo, che
+  fa `scale(1.35)` apposta. 3) «tutto svanisce» campionava a 2800ms
+  mentre l'animazione ha `delay .5s` e dura 3400. 4) La peggiore:
+  `Cdp.tema()` rimette `prefers-reduced-motion: no-preference`, quindi
+  chiamandolo DOPO aver impostato `reduce` si cancellava il ramo che si
+  voleva guardare — adesso tema e moto si impostano INSIEME, e c'e'
+  un'asserzione di autocontrollo che chiede alla pagina se quel ramo e'
+  davvero acceso.
+  ⚠️ E IL `clip` DELLO SCREENSHOT E' IN COORDINATE DOCUMENTO: su una
+  pagina scrollata alla card del venditore un clip a y=0 fotografa la
+  cima del racconto, cioe' crema vuoto (il primo giro l'ha fatto). Si
+  legge il rect vero del cielo, si somma `scrollY`, e si aggiunge
+  `captureBeyondViewport`.
   E IL BANNER RESTA, E STA IN CIMA A TUTTO (ago 2026, decisione di
   Andrea): prima del racconto e prima del nome del venditore — e'
   l'insegna della bottega, e un'insegna sta sulla porta, mentre il
@@ -27855,6 +27973,50 @@ col perché scritto: chiedeva la dichiarazione DUE volte, cioè
 certificava proprio la riga che Andrea ha tolto.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — solo client.
+
+Il racconto prende vita: le foto respirano, il razzo parte, il logo
+sale col fumo (ago 2026, chiesto da Andrea in tre tempi). Le immagini
+del racconto fanno lo zoom lentissimo che le card in home hanno già,
+sfalsate a coppie e dentro un guscio che le ritaglia; il razzo in
+fondo alla card del venditore **ci prova** quando quella card entra in
+vista e **parte** quando si torna a scorrere verso l'alto; e quando
+esce, sopra la card sale una nuvola di fumo col LOGO del progetto,
+centrato, che svanisce da solo in tre secondi. Vedi Architettura, «LE
+IMMAGINI RESPIRANO», «IL RAZZO PARTE DALLA CARD DEL VENDITORE» e «E IL
+CIELO», per le tre condizioni di Andrea — non spinge, non copre, chi
+ha le animazioni ridotte non vede niente — e per il VELO A TUTTO
+SCHERMO scartato coi suoi due perché, che è la parte che torna in
+mente: su uno spazio **pagato** un pannello che copre la merce
+partendo da uno scroll è la cosa più aggressiva che l'app farebbe, e
+su una pagina INDICIZZATA è alla lettera l'«intrusive interstitial»
+che Google penalizza — «quella seconda la decide da sola, visto che
+quelle pagine esistono per farsi trovare».
+Collaudato: **DELTA +24 prove** sull'albero ISOLATO (7376 → 7400; la
+cartella è condivisa con altre sessioni, e le 4 rosse sono le
+preesistenti della MACCHINA su tutti e due gli alberi — il conto che
+vale è quello della CI) e **27 + 13 MUTAZIONI, tutte uccise**, una per
+riga sorvegliata. Più il giro DAL VIVO col server vero su un database
+usa-e-getta a 320/360/375 nei due temi: **112 verdi, zero rossi**,
+zero errori JS e zero scorrimento laterale — la scala del respiro
+misurata a 1.000/1.015/1.030 col guscio fermo AL PIXEL, il razzo che
+ci prova entrando e parte tornando su, il cielo che non sposta la
+merce di un pixel, il logo centrato con scarto **0** a tutte e tre le
+larghezze, e l'opacità che a 3400ms è **0,00**.
+⚠️ IL BANCO HA MENTITO QUATTRO VOLTE, sempre nella sonda e mai nel
+codice — l'elenco sta nella voce, perché è la famiglia di errori che
+ritorna: due misure fatte sul figlio invece che sul guscio (il rect dà
+la geometria, non il ritaglio), un campionamento prima della fine
+dell'animazione, e — la peggiore — `Cdp.tema()` che rimetteva
+`prefers-reduced-motion: no-preference` cancellando il ramo che si
+voleva guardare.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — il server guadagna solo `logo` nella
+whitelist di forma delle immagini del racconto.
+⚠️ DA FARE: **il file del logo non c'è ancora**. Serve
+`assets/racconti/to-the-moon-logo.webp`, largo **~900px** e in WebP
+**trasparente** (quello mandato da Andrea è su fondo bianco e ha molto
+margine: va scontornato e ritagliato). Finché non arriva, `onerror` lo
+toglie e resta il fumo — degradazione e non regressione.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
