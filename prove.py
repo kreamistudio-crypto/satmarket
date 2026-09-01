@@ -31429,21 +31429,33 @@ def prove_sponsor():
           'class="rac-pill"' in _rn)
     # E DICE LA STESSA PAROLA DELLA CARD (difetto trovato DAL VIVO, non
     # leggendo: la pagina diceva «Progetto in vetrina» — piu' caldo e
-    # piu' debole, e soprattutto un'ALTRA parola). Chi tocca «Sponsor»
-    # deve ritrovare «Sponsor», o la dichiarazione non si riconosce
-    # come la stessa cosa.
+    # piu' debole, e soprattutto un'ALTRA parola). Chi tocca la
+    # pastiglia deve ritrovare la stessa parola, o la dichiarazione
+    # non si riconosce come la stessa cosa.
     _sc = pezzo_js(mini, "function renderScoprire(){")
     _par = re.search(r'class="sc-sponsor"[^>]*>([^<]+)<', _sc)
     prova("...e dice la stessa parola della card", True,
           bool(_par) and _par.group(1).strip() in _rn)
-    # ...E LA RIGA IN CHIARO STA SOPRA IL CASSETTO, che e' l'altra
-    # meta' trovata dal vivo: sotto, chi arriva dalla card — cioe' chi
-    # ha il cassetto APERTO, cioe' proprio chi viene dalla pubblicita'
-    # — la troverebbe in fondo a tutto il racconto. Sopra si legge
-    # sempre, aperto o chiuso, e non costa un pixel in piu'.
-    prova("...e la riga in chiaro si legge sempre, sopra il cassetto",
-          True, _rn.index('class="rac-avviso"')
-          < _rn.index('class="rac-corpo'))
+    # ...E LA PAROLA E' «Consigliato» (ago 2026, decisione di Andrea):
+    # e' il lessico della CATEGORIA futura, quella dove finiranno i
+    # progetti che segnaliamo noi. La prova qui sopra tiene i due
+    # posti d'accordo fra loro, questa inchioda QUALE parola — senza,
+    # il lessico si potrebbe rovesciare in un giro senza che nessuno
+    # se ne accorga. La CHIAVE resta `sponsor` dappertutto: si
+    # rinominano i testi, mai le chiavi.
+    prova("...e la parola e' quella della categoria futura",
+          "Consigliato", _par.group(1).strip() if _par else "")
+    # ⚠️ LA RIGA IN CHIARO STA IN FONDO AL CASSETTO, e questa prova ha
+    # CAMBIATO LATO (ago 2026, decisione di Andrea): chiedeva che
+    # stesse SOPRA, «che sotto la legge solo chi apre». Il perche' di
+    # allora era buono e a superarlo e' stato un fatto — in cima il
+    # suo posto l'ha preso l'HERO, l'immagine col nome del progetto
+    # dentro. Quel che regge la dichiarazione a cassetto CHIUSO e' la
+    # PASTIGLIA, che sta sempre in vista e porta la stessa parola
+    # della card: la riga aggiunge il PERCHE', e chi ha letto la
+    # storia ci arriva comunque.
+    prova("la riga in chiaro chiude il racconto", True,
+          _rn.index('class="rac-avviso"') > _rn.index('class="rac-corpo'))
     # LA RIGA IN CHIARO, e la SECONDA frase conta piu' della prima:
     # senza, «in vetrina su Barattolo» si legge come un endorsement
     # nostro — che e' esattamente cio' che il PROMPT_MODERAZIONE
@@ -31486,66 +31498,120 @@ def prove_sponsor():
     prova("...e la verticale resta centrata", True,
           "margin:16px auto 0" in _dic)
 
-    # ---- 3c. IL LOGO IN CIMA, E LA SUA RISERVA -------------------
-    # E' L'UNICO POSTO DOVE IL NOME DEL PROGETTO VIVE: l'h3 della
-    # testa porta il SOTTOTITOLO (`sottotitolo || titolo`), quindi
-    # chi apre il negozio da un annuncio — cassetto CHIUSO — senza il
-    # logo non leggerebbe «To The Mooon!» da nessuna parte. Per
-    # questo la riserva non e' un ornamento: e' il nome che resta.
-    _rl = mini[mini.index("  .rac-logo{"):]
-    _rl = [" ".join(x.split())
-           for x in _rl[:_rl.index("}")].split("{", 1)[1].split(";")]
-    prova("il logo dello sponsor ha un'altezza fissa", True,
-          any(x.startswith("height:") and x != "height:auto"
-              for x in _rl))
-    # ...E LA LARGHEZZA CEDE, per la ragione ROVESCIATA di .rac-foto:
-    # li' il tetto e' sull'altezza perche' la larghezza e' data, qui
-    # l'altezza e' data perche' e' quella che si paga in pixel — e
-    # cosi' il costo non dipende dal rapporto del logo di domani.
-    prova("...e la larghezza cede al rapporto del logo", True,
-          "width:auto" in _rl)
-    # LA RISERVA SI ACCENDE SOLO DOVE LA FIGURA NON ARRIVERA' MAI: il
-    # selettore guarda l'ESISTENZA dell'img (fratello adiacente) e non
-    # un `data-ok` scritto dall'onload — se guardasse quello, il nome
-    # lampeggerebbe a ogni apertura prima che il file atterri. E'
-    # l'errore gia' pagato dalle emoji delle categorie.
-    prova("la riserva del nome si spegne quando il logo c'e'", True,
-          ".rac-logo + .rac-nome{display:none}" in mini)
-    # ...e i due sono FRATELLI ADIACENTI nel markup, o quel selettore
-    # non matcha e la riserva resta accesa SOTTO il logo: due nomi
-    # uno sull'altro, che e' il difetto che non fallisce da solo.
-    _tsa = _rn[_rn.index('class="rac-pill"'):]
-    _tsa = _tsa[:_tsa.index("rac-occhiello")]
-    _fra = _tsa[_tsa.index('class="rac-logo"'):
-                _tsa.index('class="rac-nome"')]
-    prova("...e nel markup sono adiacenti", True,
-          _fra.count(">") >= 1 and _fra[_fra.index(">"):].count("<") == 1)
-    # IL LOGO NON E' PIGRO, al contrario delle foto del cassetto: sta
+    # ---- 3c. L'HERO IN CIMA -------------------------------------
+    # ⚠️ HA PRESO IL POSTO DEL LOGO (ago 2026, decisione di Andrea), e
+    # il buco che il logo colmava NON si riapre: il nome del progetto
+    # non compare in nessun testo del racconto — l'h3 della testa
+    # porta il SOTTOTITOLO — quindi chi apre il negozio da un annuncio,
+    # col cassetto CHIUSO, deve leggerlo qui. Sta dentro l'immagine,
+    # che e' anche il motivo per cui questa vive FUORI dal cassetto.
+    _rh = mini[mini.index("  .rac-hero{"):]
+    _rh = [" ".join(x.split())
+           for x in _rh[:_rh.index("}")].split("{", 1)[1].split(";")]
+    prova("l'hero prende tutta la colonna", True, "width:100%" in _rh)
+    # ...E IL RAPPORTO VIENE DAL FILE, che e' il ROVESCIO del logo:
+    # li' l'altezza era fissa perche' era quella che si pagava in
+    # pixel, qui l'immagine E' il contenuto e un'altezza cablata la
+    # ritaglierebbe o la stirerebbe. Il costo dipende dal rapporto del
+    # file, e per questo va consegnato 21:9.
+    prova("...e l'altezza segue il file, non il CSS", True,
+          "height:auto" in _rh)
+    prova("l'hero sta fuori dal cassetto", True,
+          _rn.index('class="rac-hero"') < _rn.index('class="rac-corpo'))
+    # ...E NON E' PIGRO, al contrario delle foto del cassetto: sta
     # sopra la piega e si vede appena il negozio si apre — un lazy li'
     # ritarderebbe la prima cosa che identifica lo spazio venduto.
-    prova("...e il logo non aspetta (niente lazy sopra la piega)", True,
-          'class="rac-logo"' in _rn
-          and "loading=" not in _tsa)
+    _tsa = _rn[_rn.index('class="rac-pill"'):
+               _rn.index('class="rac-corpo')]
+    prova("...e non aspetta (niente lazy sopra la piega)", True,
+          'class="rac-hero"' in _tsa and "loading=" not in _tsa)
     # IL FILE PASSA DALLA FORMA DEL SERVER: `-cop` e' gia' nella
-    # whitelist (`(?:cop|[1-9])`), quindi la copertina non ha voluto
-    # una riga di regex — e il client la chiede dalla STESSA funzione
-    # delle foto, invece di costruirsi un secondo URL che un domani
-    # divergerebbe.
-    prova("...e la copertina passa dalla fabbrica degli URL", True,
+    # whitelist (`(?:cop|[1-9])`) — era lo slot della copertina, che
+    # il logo occupava e adesso lascia all'hero, quindi la regex non
+    # si tocca di un carattere. E il client la chiede dalla STESSA
+    # funzione delle foto, invece di costruirsi un secondo URL che un
+    # domani divergerebbe.
+    prova("...e passa dalla fabbrica degli URL", True,
           "foto('cop')" in _rn)
+    # ...E DEL LOGO NON RESTA NIENTE: una classe orfana nel foglio
+    # farebbe credere a chi legge che qualcosa la usi ancora, e la
+    # riserva del nome senza il suo `img` fratello resterebbe accesa
+    # per sempre — due nomi uno sull'altro.
+    prova("del logo non resta niente", (0, 0, 0),
+          (mini.count("rac-logo"), mini.count("rac-nome"),
+           _rn.count("rac-logo")))
 
-    # ---- 4. IL BLOCCO «COME FUNZIONA» E' NOSTRO ------------------
-    # Sta nel RENDERER e non nel catalogo, e non e' un dettaglio di
-    # posizione: la dichiarazione di pubblicita' non puo' dipendere
-    # da chi la paga — se stesse nel catalogo, il progetto di domani
-    # potrebbe nascere senza.
-    prova("«come funziona» lo scrive il renderer", True,
-          "Come funziona questo spazio" in _rn)
+    # ---- 3d. I TRE PUNTI E LE QUATTRO TAPPE ---------------------
+    # I PUNTI SI CONTORNANO (ago 2026, decisione di Andrea): il
+    # riquadro li stacca dalla prosa sopra e sotto — sono tre FATTI
+    # del gioco, non un altro paragrafo.
+    _rp = mini[mini.index("  .rac-punto{"):]
+    _rp = " ".join(_rp[:_rp.index("}")].split())
+    # ⚠️ SI CHIEDE IL COLORE E NON LA PAROLA: `border:1.5px solid
+    # transparent` porta «border:» e non contorna niente — la riga
+    # resterebbe verde col difetto piu' silenzioso che ci sia, la
+    # regola nel foglio e niente a schermo. L'ha detto la tortura.
+    prova("i tre punti sono contornati", True,
+          "border:1.5px solid var(--field-line)" in _rp
+          and "border-radius:" in _rp and "padding:" in _rp)
+    # ...E LA SUPERFICIE E' NEUTRA, che e' la meta' da non ammorbidire:
+    # nel racconto non c'e' niente da promettere, e in tutta l'app il
+    # verde vuol dire fiducia e l'arancio acquisto. Un fondo colorato
+    # qui direbbe una cosa che questi tre punti non dicono.
+    prova("...e non prendono nessun colore parlante", (0, 0, 0, 0),
+          (_rp.count("--trust"), _rp.count("--sats"),
+           _rp.count("--lampo"), _rp.count("--sconto")))
+    # LE TAPPE PRENDONO IL PALLINO (ago 2026, decisione di Andrea): la
+    # barretta a sinistra dice che e' una sequenza, il pallino dice
+    # DOVE si e' arrivati lungo quella.
+    _rt = mini[mini.index("  .rac-tappa::before{"):]
+    _rt = " ".join(_rt[:_rt.index("}")].split())
+    prova("le tappe hanno il pallino sulla linea", True,
+          "border-radius:50%" in _rt and "position:absolute" in _rt)
+    # ...COL FONDO DELLA CARTA ATTORNO, o la barretta gli passerebbe
+    # dietro e il pallino si leggerebbe come una perla infilata.
+    prova("...e la barretta non gli passa dietro", True,
+          "box-shadow:0 0 0 3px var(--card)" in _rt)
+    # ...E IL COLORE NON E' PARLANTE: sono quattro momenti di una
+    # storia e non quattro stati con un significato — quindi la scala
+    # dell'inchiostro, che schiarisce come il tempo che passa. Il
+    # contenitore vuole `position:relative`, o l'assoluto risalirebbe
+    # al primo antenato posizionato: e' la trappola gia' pagata dalla
+    # `.card{position:relative}` e dal guscio delle frecce.
+    prova("...e il pallino e' ancorato alla sua tappa", True,
+          "  .rac-tappa{position:relative}" in mini)
+
+    # ---- 3e. L'ORDINE DEI BLOCCHI ------------------------------
+    # (ago 2026, la lista di Andrea) La storia si legge in un ordine
+    # deciso: cos'e' → la scatola → il libro → i tre fatti → chi
+    # l'ha fatto → com'e' nato → le carte → com'e' fatto → il
+    # tabellone. Le foto non nascono ne' muoiono: si SCAMBIANO di
+    # posto, e una prova sull'ordine e' l'unica cosa che impedisce a
+    # un riordino di rimescolarle senza che nessuno lo veda.
+    _blo = re.findall(r"\{t: '(\w+)'(?:, n: (\d))?", _cat)
+    prova("i blocchi del racconto stanno nell'ordine deciso",
+          [("testo", ""), ("foto", "2"), ("testo", ""),
+           ("punti", ""), ("foto", "4"), ("tappe", ""),
+           ("foto", "1"), ("elenco", ""), ("foto", "3")],
+          _blo)
+
+    # ---- 4. LA DICHIARAZIONE E' NOSTRA --------------------------
+    # ⚠️ IL BLOCCO «Come funziona questo spazio» NON C'E' PIU' (ago
+    # 2026, decisione di Andrea): tre tappe in fondo al racconto per
+    # dire cose che il resto dell'app dice gia'. Quel che difendeva
+    # pero' resta vero e resta necessario — LA DICHIARAZIONE STA NEL
+    # RENDERER E NON NEL CATALOGO — e a portarla ora e' la riga in
+    # chiaro: se stesse nel catalogo, il progetto di domani potrebbe
+    # nascere senza.
+    prova("la dichiarazione la scrive il renderer", True,
+          "Spazio pubblicitario" in _rnp)
     prova("...e non sta nel catalogo di chi compra", False,
-          "Come funziona questo spazio" in _cat)
+          "Spazio pubblicitario" in _cat or "tutele" in _cat)
+    prova("...e il blocco delle tre tappe se n'e' andato", False,
+          "Come funziona questo spazio" in mini)
     # ...E NON DICE NESSUNA CIFRA sulla commissione (ago 2026,
     # segnalato da Andrea): oggi e' a ZERO, quindi un «resta l'1% di
-    # sempre» sarebbe falso — e falso proprio dentro il blocco che
+    # sempre» sarebbe falso — e falso proprio dentro il racconto che
     # promette di non avere commissioni nascoste.
     prova("...e non promette nessuna percentuale", [],
           re.findall(r"\d+\s*%", _rn))
@@ -31625,6 +31691,12 @@ def prove_sponsor():
     # diverse: un'insegna che porta FUORI, e un titolo che porta
     # alla merce sotto.
     _rnz = pezzo_js(mini, "function renderNegozio(v, annunci")
+    # ⚠️ E STA IN CIMA A TUTTO (ago 2026, decisione di Andrea): prima
+    # del racconto e prima del nome del venditore. E' l'insegna della
+    # bottega, e un'insegna sta sulla porta — mentre il racconto e'
+    # quel che si legge una volta entrati.
+    prova("il banner sta in cima, prima del racconto", True,
+          _rnz.index("bannerNegozio") < _rnz.index("raccontoNegozio"))
     prova("il banner non guarda il racconto", False,
           "raccontoAperto" in _rnz.split("bannerNegozio")[0][-400:]
           or "sponsorVivo" in _rnz.split("bannerNegozio")[0][-400:])

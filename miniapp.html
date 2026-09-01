@@ -3177,39 +3177,23 @@
   .rac-pill{display:inline-block;background:var(--chip-bg);
     color:var(--ink);border-radius:999px;padding:4px 10px;
     font-size:11px;font-weight:800;letter-spacing:.02em}
-  /* IL LOGO DELLO SPONSOR, in cima: e' l'unica cosa che dice il NOME
-     del progetto — l'h3 qui sotto porta il SOTTOTITOLO, e chi arriva
-     al negozio da un annuncio (cassetto CHIUSO) il nome altrimenti
-     non lo leggerebbe da nessuna parte: sta dentro l'immagine della
-     card, che li' non c'e'.
-     ⚠️ ROVESCIA la riga in testa a questo blocco («qui dentro NON ci
-     va nessuna immagine»), e il perche' di allora va tenuto perche'
-     resta vero per tutto il resto: quella regola nacque contro una
-     COPERTINA a rapporto 3:1, che a 360 costava ~213px. Un marchio
-     alto 72 ne costa 82 col margine, ed e' un'altra cosa.
-     L'ALTEZZA E' FISSA E LA LARGHEZZA CEDE, come per .rac-foto e per
-     la stessa ragione rovesciata: cosi' il costo in pixel non dipende
-     dal rapporto del logo che arrivera' domani, e lo spazio e'
-     riservato PRIMA che l'immagine atterri — niente salto.
-     I DUE TEMI LI REGGE IL DISEGNO, e non e' fortuna: misurato sui
-     pixel veri, il giallo #FBDA0B fa 1,39 sulla carta chiara — da
-     solo sparirebbe — ma il contorno #0D0C14 fa 19,45; al buio i
-     ruoli si scambiano (giallo 10,94, contorno 1,28). Due inchiostri,
-     e ognuno lavora dove l'altro sparisce: e' per questo che questo
-     logo non ha bisogno di un fondo suo, e per cui il prossimo va
-     RIMISURATO invece che dato per buono. */
-  .rac-logo{display:block;height:72px;width:auto;margin:10px 0 0}
-  /* LA RISERVA, la ricetta delle card di «Da scoprire»: se il file
-     non arriva, l'onerror toglie l'img e il nome resta SCRITTO — che
-     qui e' l'unico posto dove il nome vive. Il selettore guarda
-     l'ESISTENZA dell'immagine e non il suo onload, cosi' durante il
-     caricamento la riserva sta spenta e si accende solo dove la
-     figura non arrivera' mai: la lezione dell'emoji che aspetta la
-     figura, dove il lampo si vedeva a ogni apertura. */
-  .rac-nome{display:block;margin:10px 0 0;
-    font-family:'Baloo 2',system-ui,sans-serif;font-size:22px;
-    line-height:1.15;font-weight:800;color:var(--ink)}
-  .rac-logo + .rac-nome{display:none}
+  /* L'HERO DEL RACCONTO (ago 2026, decisione di Andrea che ROVESCIA
+     il logo di ieri): un'immagine 21:9 col NOME del progetto dentro,
+     al posto della riga che dichiarava lo spazio.
+     ⚠️ PRENDE LO SLOT `-cop`, che il logo lascia libero — e' lo slot
+     della COPERTINA, quindi la regex del server (`FORMA_RACCONTO`)
+     non si tocca di un carattere.
+     STA FUORI DAL CASSETTO, ed e' la riga che rende sostenibile la
+     morte del logo: chi arriva al negozio da un annuncio ha il
+     racconto CHIUSO, e senza questa immagine il nome «To The Mooon!»
+     non lo leggerebbe da nessuna parte — l'h3 qui sotto porta il
+     SOTTOTITOLO. E' lo stesso buco di ieri, colmato meglio.
+     IL RAPPORTO E' NEL FILE e non nel CSS: l'altezza segue la
+     larghezza della colonna, quindi il costo in pixel dipende dal
+     rapporto dell'immagine — che per questo va CONSEGNATA 21:9,
+     come dice il commento del catalogo. */
+  .rac-hero{display:block;width:100%;height:auto;margin:14px 0 0;
+    border-radius:var(--radius)}
   .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
     letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
@@ -3229,8 +3213,15 @@
   .rac-h{margin:18px 0 6px;font-size:11px;font-weight:800;
     letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
   .rac-p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
-  .rac-punti{display:flex;flex-direction:column;gap:12px;margin-top:12px}
-  .rac-punto{display:flex;gap:10px;align-items:flex-start}
+  .rac-punti{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+  /* CONTORNATI (ago 2026, decisione di Andrea): il riquadro li
+     stacca dalla prosa sopra e sotto — sono tre FATTI del gioco,
+     non un altro paragrafo. Superficie NEUTRA e nessun colore:
+     qui non c'e' niente da promettere, e verde e arancio
+     significano gia' un'altra cosa in tutta l'app. */
+  .rac-punto{display:flex;gap:10px;align-items:flex-start;
+    border:1.5px solid var(--field-line);border-radius:var(--radius);
+    padding:10px 12px}
   .rac-e{font-size:19px;line-height:1.1;flex:0 0 auto}
   .rac-punto b{display:block;font-size:13.5px;color:var(--ink)}
   .rac-punto span{display:block;font-size:13px;line-height:1.45;
@@ -3240,6 +3231,22 @@
   .rac-tappe{display:flex;flex-direction:column;gap:14px;
     margin:12px 0 0;padding-left:14px;
     border-left:2px solid var(--field-line)}
+  /* IL PALLINO SULLA BARRETTA (ago 2026, decisione di Andrea):
+     la barretta dice che e' una sequenza, il pallino dice dove
+     si e' arrivati. Sta SULLA linea (left:-21px = meta' del
+     pallino piu' il padding), col fondo della carta attorno o
+     la barretta gli passerebbe dietro.
+     ⚠️ IL COLORE NON E' PARLANTE: sono quattro momenti di una
+     storia e non quattro stati, quindi niente verde/arancio —
+     si prende la scala dell'inchiostro, che schiarisce come il
+     tempo che passa. */
+  .rac-tappa{position:relative}
+  .rac-tappa::before{content:'';position:absolute;left:-21px;
+    top:3px;width:11px;height:11px;border-radius:50%;
+    background:var(--ink);box-shadow:0 0 0 3px var(--card)}
+  .rac-tappa:nth-child(2)::before{background:var(--ink-soft)}
+  .rac-tappa:nth-child(3)::before{background:var(--muted)}
+  .rac-tappa:nth-child(4)::before{background:var(--sats)}
   .rac-tappa b{display:block;font-size:13.5px;color:var(--ink)}
   .rac-tappa span{display:block;font-size:13px;line-height:1.45;
     color:var(--ink-soft)}
@@ -3263,14 +3270,21 @@
      stira piu': meglio cosi', e le nostre sono 1360. */
   .rac-foto{display:block;width:auto;max-width:100%;max-height:560px;
     margin:16px auto 0;border-radius:var(--radius)}
-  /* LA RIGA CHE DICHIARA, e sta FUORI dal cassetto: dentro la
-     leggerebbe solo chi apre, cioe' chi lo sa gia'. Superficie
-     NEUTRA (--chip-bg) come .nota-punto e .nota-savers: non e' un
-     avviso e non e' una promessa, e' un fatto. La seconda frase
-     conta piu' della prima — senza, «in vetrina su Barattolo» si
-     legge come un endorsement nostro. */
+  /* LA RIGA CHE DICHIARA. Superficie NEUTRA (--chip-bg) come
+     .nota-punto e .nota-savers: non e' un avviso e non e' una
+     promessa, e' un fatto. La seconda frase conta piu' della
+     prima — senza, «in vetrina su Barattolo» si legge come un
+     endorsement nostro, che e' esattamente cio' che il prompt
+     della moderazione vieta agli altri.
+     ⚠️ DALL'AGO 2026 STA IN FONDO AL CASSETTO, e la riga di ieri
+     («fuori, che dentro la legge solo chi apre») e' stata
+     ROVESCIATA: in cima il suo posto l'ha preso l'hero. Quel che
+     regge la dichiarazione a cassetto CHIUSO e' la PASTIGLIA,
+     che sta sempre in vista e porta la stessa parola della card
+     — la riga aggiunge il PERCHE', e chi ha letto la storia
+     arriva qui comunque. */
   .rac-avviso{display:flex;gap:8px;background:var(--chip-bg);
-    border-radius:var(--radius);padding:10px 12px;margin:14px 0 0;
+    border-radius:var(--radius);padding:10px 12px;margin:22px 0 0;
     font-size:12.5px;line-height:1.45;color:var(--ink)}
 
   .trust-note{
@@ -9373,22 +9387,22 @@ const RACCONTI = {
            "strada.",
     blocchi: [
       {t: 'testo', h: "COS'E'",
-       p: "Durante la partita scopri, quasi senza accorgertene, alcuni " +
-          "dei principi che stanno sotto Bitcoin: la proof of work, gli " +
-          "imprevisti di chi lascia i fondi su un exchange, il senso di " +
-          "scriversi una seed. Non serve nessuna conoscenza tecnica: le " +
-          "regole si imparano in cinque minuti, e i termini che " +
-          "sembrano da iniziati diventano familiari nel giro di una " +
-          "partita."},
+       p: "Un gioco da tavolo che ti porta sulla Luna. E ti spiega " +
+          "Bitcoin per la strada. Durante la partita scopri, quasi " +
+          "senza accorgertene, alcuni dei principi che stanno alla " +
+          "base di Bitcoin: la proof of work, gli imprevisti di chi " +
+          "lascia i fondi su un exchange, il senso di scriversi una " +
+          "seed. Non e' necessario avere conoscenze tecniche o aver " +
+          "mai usato Bitcoin: le regole si imparano in cinque minuti."},
+      {t: 'foto', n: 2, alt: 'La scatola del gioco'},
       {t: 'testo', h: "E IL LIBRO",
-       p: "Nella scatola c'e' anche un libro: una strada piu' lineare " +
-          "per approfondire quello che al tavolo si e' solo intuito. " +
-          "Il gioco fa venire la curiosita', il libro le da' da " +
-          "mangiare."},
+       p: "Nella scatola c'e' anche un libro. Il gioco fa venire le " +
+          "domande; il libro e' dove si fermano abbastanza da poterci " +
+          "pensare."},
       {t: 'punti', voci: [
-        {e: '🎯', h: 'Lo spinner decide, tu scegli',
+        {e: '🎲', h: 'Lo spinner decide, tu scegli',
          p: "21 caselle numerate piu' 4 caselle Bonus: avanzi di 1, 2 o " +
-            "3, e ogni casella ti mette davanti a una decisione."},
+            "3 e ogni casella ti mette davanti a una decisione."},
         {e: '⛏️', h: 'Quattro tappe di Proof of Work',
          p: "Earth, Orbit, Moon Path, Moon Landing: un mazzo per ogni " +
             "pezzo di viaggio, sempre piu' tosto."},
@@ -9397,7 +9411,9 @@ const RACCONTI = {
             "peschi. I 12 segnalini Backup Seed ti salvano — se te li " +
             "sei presi."},
       ]},
-      {t: 'foto', n: 1, alt: 'Le carte Proof of Work del gioco'},
+      {t: 'foto', n: 4,
+       alt: 'I tre autori in tuta da astronauta sulla Luna, ' +
+            'davanti a un razzo col simbolo di Bitcoin'},
       {t: 'tappe', h: "COM'E' NATO", voci: [
         {h: "L'incontro",
          p: "Tre pazzi, per puro caso: la stessa idea in testa — portare " +
@@ -9415,7 +9431,7 @@ const RACCONTI = {
          p: "In vendita qui, in sats. Un gioco che parla di bitcoin, " +
             "pagato in bitcoin: ci sembrava il minimo."},
       ]},
-      {t: 'foto', n: 2, alt: 'La scatola del gioco'},
+      {t: 'foto', n: 1, alt: 'Le carte Proof of Work del gioco'},
       {t: 'elenco', h: "COM'E' FATTO", voci: [
         'Tabellone a colori — 21 caselle numerate + 4 Bonus',
         'Spinner quadrato',
@@ -9491,9 +9507,16 @@ const SCOPRIRE = [
      titolo lo direbbe due volte. Da qui la fascia del contrasto non
      la si misura — la prova quel caso lo DICHIARA, invece di
      saltarlo in silenzio.
-     LA PASTIGLIA «Sponsor» E' L'ALTRA META' DELLA REGOLA, e non si
-     toglie: e' pubblicita', si dice sulla card E si ridice sulla
-     pagina — nessuno dei due basta da solo.
+     LA PASTIGLIA «Consigliato» E' L'ALTRA META' DELLA REGOLA, e
+     non si toglie: e' pubblicita', si dice sulla card E si ridice
+     sulla pagina — nessuno dei due basta da solo.
+     ⚠️ LA PAROLA E' «Consigliato» E NON «Sponsor» (ago 2026,
+     decisione di Andrea): e' il lessico della CATEGORIA futura, dove
+     finiranno i progetti e i negozi che segnaliamo noi — sceglierla
+     adesso costa niente, cambiarla dopo vorrebbe dire cambiarla sotto
+     gli occhi di chi l'ha gia' imparata. La CHIAVE resta `sponsor`
+     dappertutto (classe, id, colonne, comando del bot): si rinominano
+     i testi, mai le chiavi.
      `file` E `testo` SONO FUNZIONI come i tre giudici, e non valori:
      questa voce non sa a chi appartiene finche' la busta non arriva,
      e una costante letta all'avvio direbbe sempre lo spazio di ieri. */
@@ -9571,7 +9594,7 @@ function renderScoprire(){
        E NON ENTRA NELLA FASCIA del contrasto: e' carta opaca sopra
        il disegno, non testo sul disegno. */
     const pastiglia = v.sponsor
-      ? `<span class="sc-sponsor" aria-hidden="true">Sponsor</span>` : '';
+      ? `<span class="sc-sponsor" aria-hidden="true">Consigliato</span>` : '';
     /* IL TITOLO LO SCRIVE L'APP, TRANNE DOVE STA GIA' DENTRO IL
        DISEGNO: sovrapporre il nostro a una grafica che porta il suo
        lo direbbe due volte. La RISERVA invece resta sempre — e' il
@@ -10941,11 +10964,7 @@ function raccontoNegozio(v){
   return `
     <div class="racconto">
       <div class="rac-testa">
-        <span class="rac-pill">📣 Sponsor</span>
-        <img class="rac-logo" src="${foto('cop')}"
-             alt="${esc(r.titolo)}" decoding="async"
-             onerror="this.remove()">
-        <span class="rac-nome">${esc(r.titolo)}</span>
+        <span class="rac-pill">📣 Consigliato</span>
         <div class="rac-occhiello">${esc(r.occhiello || '')}</div>
         <h3 class="rac-titolo">${esc(r.sottotitolo || r.titolo)}</h3>
         <p class="rac-intro">${esc(r.intro || '')}</p>
@@ -10953,25 +10972,15 @@ function raccontoNegozio(v){
                 aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
           raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
       </div>
-      <div class="rac-avviso">📣 <span><b>Spazio pubblicitario</b> —
-        questo negozio ha pagato per comparire in «Da scoprire». Le
-        tutele sull'acquisto sono le stesse di ogni altro
-        negozio.</span></div>
+      <img class="rac-hero" src="${foto('cop')}"
+           alt="${esc(r.titolo)}" decoding="async"
+           onerror="this.remove()">
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
         ${blocchi}
-        <h4 class="rac-h">Come funziona questo spazio</h4>
-        <div class="rac-tappe">
-          <div class="rac-tappa"><b>Si paga in sats</b>
-            <span>Il progetto ha comprato la sua settimana in vetrina.
-              Quanto costa resta fra noi e loro: stesso prezzo per
-              tutti, nessuna asta.</span></div>
-          <div class="rac-tappa"><b>La storia la scrive il progetto</b>
-            <span>Noi mettiamo l'impaginazione, e diciamo di no a
-              quello che col mercatino non c'entra.</span></div>
-          <div class="rac-tappa"><b>Zero commissioni nascoste</b>
-            <span>Sulla vendita valgono le condizioni di sempre:
-              nessun extra perché sponsorizzato.</span></div>
-        </div>
+        <div class="rac-avviso">📣 <span><b>Spazio
+          pubblicitario</b> — questo negozio ha pagato per comparire in
+          «Da scoprire». Le tutele sull'acquisto sono le stesse di ogni
+          altro negozio.</span></div>
       </div>
     </div>`;
 }
@@ -11047,6 +11056,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     (v.npub_verificata && v.npub ? v.npub : '').replace(/[^a-z0-9]/g,''),
     chi ? `a ${esc(chi)}` : 'al venditore');
   el('negozioHeader').innerHTML = `
+    ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
@@ -11055,7 +11065,6 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
         <div class="rep">${rep}</div>
       </div>
     </div>
-    ${bannerNegozio(v)}
     ${ponti}
     ${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;

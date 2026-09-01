@@ -2485,10 +2485,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   avrebbe rimesso lo scatto d'avvio — ~900 KB piu' sei giri di rete —
   che due cantieri recenti hanno appena tolto.
   E' PUBBLICITA', E SI DICE DUE VOLTE (il punto da non ammorbidire):
-  la pastiglia «Sponsor» sulla CARD — in alto a destra, l'angolo
+  la pastiglia «Consigliato» sulla CARD — in alto a destra, l'angolo
   libero, di CARTA crema fissa nei due temi come tutto cio' che sta
   sopra una foto — e sulla PAGINA la stessa pastiglia piu' UNA RIGA IN
-  CHIARO. Nessuna delle due basta da sola. LA SECONDA FRASE DI QUELLA
+  CHIARO. Nessuna delle due basta da sola.
+  ⚠️ LA PAROLA E' «Consigliato» E NON «Sponsor» (ago 2026, decisione
+  di Andrea): e' il lessico della CATEGORIA futura — quella dove
+  finiranno tutti i progetti e i negozi che segnaliamo noi — e
+  sceglierla adesso costa niente, mentre cambiarla dopo vorrebbe dire
+  cambiarla sotto gli occhi di chi l'ha gia' imparata. LA CHIAVE
+  RESTA `sponsor` DAPPERTUTTO (la classe `.sc-sponsor`, il `data-id`,
+  le colonne di `impostazioni`, `SLUG_SPONSOR`, il comando del bot,
+  `sponsor_aperture`): si rinominano i testi, mai le chiavi — il
+  patto gia' scritto per `pacco`, `.lampo-was` e `sconto_pacco_*`.
+  C'e' la prova che INCHIODA la parola: quella che tiene card e
+  pagina d'accordo fra loro non basta — con due posti allineati il
+  lessico si potrebbe rovesciare in un giro senza che nessuno lo
+  veda. LA SECONDA FRASE DI QUELLA
   RIGA CONTA PIU' DELLA PRIMA — «le tutele sull'acquisto sono le
   stesse di ogni altro negozio» — perche' senza, «in vetrina su
   Barattolo» si legge come un ENDORSEMENT nostro: che e' esattamente
@@ -2535,56 +2548,107 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che da solo pesa piu' del doppio dei ~40 previsti. LE TRE LEVE, se
   a rodaggio non reggesse: l'occhiello via (~18), l'intro a due righe
   invece di quattro (~44), e l'avviso su una riga sola in meno (~23).
+  ⚠️ E QUEL NUMERO E' GIA' INVECCHIATO (ago 2026): col giro dell'HERO
+  la prima card a 360 sta a **639px col racconto chiuso** — **−224**
+  rispetto agli 863 di ieri — perche' se ne sono andati il logo (82) e
+  la riga in chiaro dalla cima, che e' scesa in fondo al cassetto e
+  li' non pesa piu' finche' resta chiuso. L'hero da solo COSTA (141px
+  a 360, piu' del logo che sostituisce): a scendere e' la somma.
+  DELLE TRE LEVE NE RESTANO DUE — l'occhiello e l'intro — che la
+  terza e' stata SPESA: l'avviso non e' piu' in cima, e a cassetto
+  chiuso non c'e' piu' niente da stringere li'.
+  I 863 RESTANO SCRITTI E NON SI CANCELLANO: sono il numero che ha
+  fatto scartare la copertina, e chi un domani volesse rimettere
+  un'immagine grande in cima deve partire da li' e non da 639.
   LA PASTIGLIA E LA SECONDA FRASE DELL'AVVISO NON SI TOCCANO: sono il
   punto 1, e i pixel che costano si pagano.
-  IL LOGO IN CIMA, E LA SUA RISERVA (ago 2026, chiesto da Andrea):
-  sopra l'occhiello, dentro `.rac-testa`, il logo del progetto — e non
-  e' un ornamento, COLMA UN BUCO. Il nome «To The Mooon!» non compare
-  in NESSUN testo del racconto: `.rac-titolo` mostra il sottotitolo
-  («Capire Bitcoin, giocando.») e il nome vive solo DENTRO l'immagine
-  della card, che ha `titoloDentro`. Quindi chi arriva al negozio da un
-  annuncio — cassetto chiuso — non lo leggerebbe da nessuna parte.
-  «DENTRO LA COPERTINA» NON SI PUO', ed e' la risposta alla domanda:
-  una copertina non c'e' piu' — e' stata sostituita dalla testa
-  testuale proprio per risparmiare i ~213px che costava (vedi «NIENTE
-  COPERTINA», sopra).
-  COSTA 82px ESATTI (72 di altezza + 10 di margine), identici a
-  320/360/375/1280 — e il fatto che siano identici e' la conseguenza
-  della forma: **l'altezza e' FISSA e a cedere e' la larghezza**, che
-  e' la ragione ROVESCIATA di `.rac-foto`, dove la larghezza e' data
-  dal contenitore e il tetto sta sull'altezza. Qui il tetto sta
-  sull'altezza perche' e' quella che si PAGA in pixel: cosi' il costo e'
-  determinato e lo spazio e' riservato prima che l'immagine atterri —
-  zero salto. MISURATO spegnendo il solo logo via CSS e rimisurando
-  (la riserva NON si accende, perche' il suo selettore guarda
-  l'ESISTENZA dell'img, che resta): a 360 la testa passa da 188 a 270 e
-  la prima card da 845 a 927.
-  IL PNG SI CONVERTE, e non per gusto: `FORMA_RACCONTO` accetta solo
-  `.webp` e la rotta cabla `image/webp`, quindi un PNG li' dentro da'
-  404. Lo slot `-cop` era GIA' nella whitelist dalla copertina mai
-  nata, quindi il logo ci entra senza toccare la regex — e passa dalla
-  fabbrica degli URL come le foto, invece di costruirsene uno suo.
-  Il file era **72% aria** (839x517 di inchiostro dentro 1024x1536):
-  ritagliato sull'alpha con la soglia >8 di `ritaglia_categorie.py`,
-  600x370 RGBA, **1,9 MB -> 72 KB**.
-  REGGE I DUE TEMI PERCHE' HA DUE INCHIOSTRI, e il perche' e' misurato:
-  il giallo #FBDA0B fa 1,39 sulla carta chiara — da solo sparirebbe —
-  ma il contorno #0D0C14 fa 19,45; al buio si scambiano (10,94 e 1,28).
-  Un logo a tinta unita su trasparente non reggerebbe, questo si': a
-  garantirlo e' il contorno, non il colore. Da rimisurare se un domani
-  arriva un logo diverso.
-  LA RISERVA E' IL NOME SCRITTO (`.rac-nome`), e il selettore che la
-  spegne guarda l'ESISTENZA dell'img (`img + .rac-nome`) e MAI il
-  `data-ok` dell'onload: col secondo il nome lampeggerebbe a ogni
-  apertura, che e' la lezione gia' pagata dalle emoji delle categorie.
-  Cosi' resta spenta per tutto il caricamento e si accende solo dove la
-  figura non arrivera' mai — provato rompendo l'URL, non con un
-  `remove()` a mano. E per quello **logo e riserva devono essere
-  adiacenti nel markup**: c'e' la prova, e guarda cosa sta FRA la
-  chiusura dell'img e l'apertura dello span (un solo `<`).
-  NIENTE `loading="lazy"` sul logo, al contrario delle foto: sta sopra
-  la piega e in un cassetto che puo' nascere aperto — pigro,
-  arriverebbe dopo che si e' gia' letto quel che c'e' sotto.
+  ⚠️ E LA RIGA IN CHIARO E' TRASLOCATA IN FONDO AL CASSETTO (ago
+  2026, decisione di Andrea): stava SOPRA, e la prova che lo esigeva
+  ha CAMBIATO LATO. IL PERCHE' DI ALLORA ERA BUONO e va tenuto —
+  «sotto la legge solo chi apre, cioe' chi lo sa gia'» — e a
+  superarlo e' stato un FATTO: in cima il suo posto l'ha preso
+  l'HERO, che quella riga non poteva convivere con un'immagine grande
+  senza spingere la merce dove nessuno arriva.
+  QUEL CHE REGGE LA DICHIARAZIONE A CASSETTO CHIUSO E' LA PASTIGLIA,
+  ed e' la riga da non ammorbidire: sta sempre in vista, porta la
+  STESSA parola della card, e a un tocco di distanza da dove uno ha
+  toccato — la riga aggiunge il PERCHE', e chi ha letto la storia ci
+  arriva comunque. PREZZO DICHIARATO: chi apre il negozio da un
+  annuncio e non tocca «Leggi la storia» la riga non la vede; se a
+  rodaggio dara' fastidio, la leva e' rimetterla sopra in una riga.
+  L'HERO IN CIMA (ago 2026, decisione di Andrea che ROVESCIA il logo
+  del giro prima): un'immagine 21:9 col NOME del progetto dentro, fra
+  il link che apre e il cassetto — e prende il posto della riga che
+  dichiarava lo spazio, che e' traslocata in fondo (voce sopra).
+  IL BUCO CHE IL LOGO COLMAVA NON SI RIAPRE, ed e' la ragione per cui
+  la sostituzione regge: il nome «To The Mooon!» non compare in NESSUN
+  testo del racconto — `.rac-titolo` mostra il SOTTOTITOLO («Capire
+  Bitcoin, giocando.») — quindi chi arriva al negozio da un annuncio,
+  col cassetto CHIUSO, senza quell'immagine non lo leggerebbe da
+  nessuna parte. E' lo stesso buco di ieri, colmato meglio: il logo lo
+  diceva in 82px, l'hero lo dice raccontando anche di cosa si tratta.
+  PER QUESTO STA FUORI DAL CASSETTO. Dentro, la meta' delle persone
+  non lo vedrebbe mai — e sarebbe proprio la meta' che al negozio ci
+  arriva per la merce.
+  IL RAPPORTO E' NEL FILE E NON NEL CSS (`width:100%; height:auto`),
+  che e' il ROVESCIO esatto del logo: li' l'altezza era FISSA perche'
+  era quella che si pagava in pixel, qui l'immagine E' il contenuto e
+  un'altezza cablata la ritaglierebbe o la stirerebbe. Il costo
+  dipende quindi dal rapporto del file, e per questo va CONSEGNATO
+  21:9 — c'e' il commento accanto al catalogo.
+  PRENDE LO SLOT `-cop`, che il logo lascia libero: era lo slot della
+  COPERTINA mai nata, sta gia' nella whitelist `FORMA_RACCONTO`
+  (`(?:cop|[1-9])`), quindi il server non si tocca di un carattere e
+  il client la chiede dalla STESSA `foto()` delle altre invece di
+  costruirsi un secondo URL che un domani divergerebbe.
+  NIENTE `loading="lazy"`, al contrario delle foto del cassetto: sta
+  sopra la piega e si vede appena il negozio si apre — pigro,
+  ritarderebbe la prima cosa che identifica lo spazio venduto.
+  DEL LOGO NON RESTA NIENTE (`.rac-logo`, `.rac-nome` e il selettore
+  della riserva), e c'e' il censimento che lo conta: una classe orfana
+  nel foglio fa credere a chi legge che qualcosa la usi ancora, e la
+  riserva senza il suo `img` fratello resterebbe accesa per sempre —
+  due nomi uno sull'altro.
+  COSTA PIU' DEL LOGO CHE SOSTITUISCE — **141px a 360** contro 82 — e
+  il conto della testata sta dov'e' la sua storia, nella voce «NIENTE
+  COPERTINA» qui sopra: a scendere e' la SOMMA, non questa riga.
+  I TRE PUNTI SONO CONTORNATI e le QUATTRO TAPPE hanno il PALLINO
+  (ago 2026, decisione di Andrea). Il contorno stacca i punti dalla
+  prosa che sta sopra e sotto — sono tre FATTI del gioco, non un altro
+  paragrafo — e la superficie e' NEUTRA: nel racconto non c'e' niente
+  da promettere, e in tutta l'app il verde vuol dire fiducia e
+  l'arancio acquisto. Il pallino invece sta SULLA barretta
+  (`left:-21px` = meta' del pallino piu' il padding) col fondo della
+  carta attorno, o la linea gli passerebbe dietro e si leggerebbe come
+  una perla infilata: la barretta dice che e' una SEQUENZA, il pallino
+  dice DOVE si e' arrivati lungo quella.
+  ⚠️ IL COLORE DEI PALLINI NON E' PARLANTE, ed e' la riga da non
+  ammorbidire: sono quattro momenti di una storia e non quattro STATI
+  con un significato, quindi niente verde/arancio di casa — si prende
+  la scala dell'inchiostro, che schiarisce come il tempo che passa
+  (`--ink` -> `--ink-soft` -> `--muted`), e l'ultimo prende `--sats`
+  perche' «Oggi» e' il presente, non uno stato di successo.
+  Il contenitore vuole `position:relative`, o l'assoluto risalirebbe
+  al primo antenato posizionato — la trappola gia' pagata dalla
+  `.card{position:relative}` e dal guscio delle frecce.
+  L'ORDINE DEI BLOCCHI E' DECISO E SORVEGLIATO (ago 2026, la lista di
+  Andrea): cos'e' -> la scatola -> il libro -> i tre fatti -> chi
+  l'ha fatto -> com'e' nato -> le carte -> com'e' fatto -> il
+  tabellone -> la riga che dichiara. LE FOTO NON NASCONO NE' MUOIONO:
+  si SCAMBIANO di posto — la 1 (le carte) scende sotto «Com'e' nato»,
+  la 2 (la scatola) sale sopra «E il libro» — piu' la 4, il team, che
+  e' nuova. C'e' la prova sull'ORDINE, ed e' l'unica cosa che
+  impedisce a un riordino di rimescolarli senza che nessuno lo veda.
+  ⚠️ IL BLOCCO «COME FUNZIONA QUESTO SPAZIO» NON C'E' PIU' (ago 2026,
+  decisione di Andrea): tre tappe in fondo per dire cose che il resto
+  dell'app dice gia'. QUEL CHE DIFENDEVA PERO' RESTA — la
+  dichiarazione la scrive il RENDERER e mai il catalogo, o il progetto
+  di domani potrebbe nascere senza — e a portarla adesso e' la riga in
+  chiaro: la prova non e' stata tolta, ha cambiato OGGETTO.
+  E IL RACCONTO NON DICE NESSUNA PERCENTUALE, che era gia' vero e
+  resta: la commissione oggi e' a ZERO, quindi un «resta l'1% di
+  sempre» sarebbe falso — e falso proprio dentro il racconto che
+  promette di non avere commissioni nascoste.
   E IL TETTO `max-height:560px` NON MORDE su nessuna delle tre foto
   vere: sono tutte orizzontali (a 1280 escono 648x432). La leva del
   «tabellone in piedi» protegge dal futuro, non da queste.
@@ -2624,8 +2688,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e' il nome stilizzato del gioco e non un refuso, ed e' la parola piu'
   visibile dello spazio venduto. C'e' il commento accanto al catalogo,
   che chi passa non la «corregga».
-  E IL BANNER RESTA DOV'E', PER TUTTI: sono due cose diverse che nel
-  primo disegno si facevano concorrenza — un'insegna che porta FUORI
+  E IL BANNER RESTA, E STA IN CIMA A TUTTO (ago 2026, decisione di
+  Andrea): prima del racconto e prima del nome del venditore — e'
+  l'insegna della bottega, e un'insegna sta sulla porta, mentre il
+  racconto e' quel che si legge una volta entrati. Sono due cose
+  diverse che nel primo disegno si facevano concorrenza — un'insegna che porta FUORI
   da Barattolo, e un titolo che porta alla merce sotto. Chi arriva da
   un annuncio non apre il racconto e non deve perdere l'insegna che
   quel venditore si e' guadagnata. C'e' la prova che `bannerNegozio`
