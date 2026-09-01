@@ -21640,6 +21640,40 @@ def prove_onion():
     # che e' di un altro cantiere e non si tocca per un ornamento.
     prova("...e il disegno si allinea al centro, non alla baseline",
           True, "vertical-align:middle" in _vestito)
+    # MA NEL TITOLO DI UN FOGLIO IL VICINO E' TESTO (1 set 2026, dal
+    # campo: «il pallino non e' allineato con la scritta Entra con
+    # Nostr»). Li' quella regola sbaglia dalla parte OPPOSTA: allinea
+    # il centro del disegno alla x-height, mentre il centro ottico di
+    # una riga con le maiuscole sta piu' in alto (baseline + cap/2).
+    # MISURATO sull'INCHIOSTRO e non sulla line box — che comprende
+    # ascendenti e discendenti che «Entra con Nostr» non usa, e a
+    # separarlo e' il COLORE, che nel ponte invece non separa niente
+    # perche' li' il testo e' viola quanto il pallino: +0,69px con la
+    # base, -0,31 con -.28em. Su un disegno alto 18,1 contro una
+    # cap-height di 11,5 quel quasi-pixel si vede — il pallino scende
+    # sotto la riga, e sotto la riga l'occhio ci guarda.
+    # IL NUMERO NON E' INSEGUITO AL CENTESIMO: da -.25em a -.30em il
+    # rendering e' IDENTICO (il browser arrotonda al pixel del
+    # dispositivo), quindi -.28em e' il centro di una finestra larga
+    # e la prova inchioda LA FINESTRA e non il valore — che e' anche
+    # la risposta all'obiezione del giro prima, «un numero che
+    # nessuno puo' spiegare».
+    # PERCHE' NON SI CAMBIA LA BASE, ed e' la riga da non
+    # ammorbidire: accanto al nome il bersaglio sono le MEDAGLIE,
+    # spinte giu' di 2px apposta dalla sfilza, e li' la base e' la
+    # cura del giro prima — portando -.28em dappertutto quel pallino
+    # risalirebbe di 0,81px e tornerebbe il difetto di allora. Due
+    # vicini diversi, due valori; e nei BOTTONI non conta nessuno dei
+    # due, che il contenitore e' flex (misurato: il disegno non si
+    # muove di un centesimo su sette valori, mentre nei due contesti
+    # inline si muove di 2,9 e 2,4 px).
+    _tit = mini.split(".sheet h3 .ico-nostr{")[1].split("}")[0]
+    _tem = float(_tit.split("vertical-align:-")[1].split("em")[0])
+    prova("...e nel titolo di un foglio, dove il vicino e' TESTO, si"
+          " alza di un filo — dentro la finestra misurata",
+          True, .25 <= _tem <= .30)
+    prova("...ma solo li': la base resta quella dei vicini-emoji",
+          True, ".sheet h3 .ico-nostr{" in mini)
     # IL VIOLA E' PIU' CARICO (ago 2026, dal campo: «e' troppo spento
     # rispetto al glifo che c'era prima»). La richiesta era alzare la
     # SATURAZIONE, e la misura dice che li' non c'era niente da

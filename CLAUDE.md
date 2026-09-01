@@ -19072,6 +19072,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della sfilza, che e' di un altro cantiere e non si tocca per un
   ornamento. Chi lo volesse azzerare deve toccare quel `-2px`, non
   questo valore.
+  MA NEL TITOLO DI UN FOGLIO IL VICINO E' TESTO (1 set 2026, dal
+  campo: «il pallino non e' allineato con la scritta Entra con
+  Nostr»), e li' quella stessa regola sbaglia DALLA PARTE OPPOSTA:
+  `middle` allinea il centro del disegno alla x-height, mentre il
+  centro ottico di una riga con le maiuscole sta piu' in alto
+  (baseline + cap/2) — quindi accanto alle emoji, che sono spinte
+  giu' di 2px, il pallino resta un filo SOPRA, e accanto al solo
+  testo finisce un filo SOTTO. Override scoped: `.sheet h3
+  .ico-nostr{vertical-align:-.28em}`, che prende tutti e due i
+  titoli col disegno (il foglio Nostr e «Ti conosciamo gia'!»).
+  IL NUMERO NON E' INSEGUITO AL CENTESIMO, ed e' la risposta
+  all'obiezione qui sopra («un numero che nessuno puo' spiegare»):
+  da **-.25em a -.30em il rendering e' IDENTICO** — il browser
+  arrotonda al pixel del dispositivo — quindi -.28em e' il CENTRO di
+  una finestra larga sei centesimi, e la prova inchioda la FINESTRA
+  e non il valore. Chi lo sposta fuori lo sente dalla CI.
+  MISURATO SULL'INCHIOSTRO e non sulla line box, che comprende
+  ascendenti e discendenti che «Entra con Nostr» non usa: **+0,69px
+  con la base, -0,31 con l'override**, su un disegno alto 18,1
+  contro una cap-height di 11,5 — ed e' li' che si vede, perche' il
+  pallino scendeva sotto la RIGA, che e' la linea che l'occhio
+  segue. Col glifo di ieri stava a -0,87, cioe' dall'altra parte: lo
+  spostamento percepito e' di **1,75px**, e per questo si nota anche
+  se in valore assoluto i due scarti si somigliano.
+  ⚠️ IL CASO DI RIFERIMENTO E' «Entra con Nostr» APPOSTA: non ha
+  discendenti, quindi il centro dell'inchiostro del testo e' ben
+  definito fra la cima delle maiuscole e la baseline. Sull'altro
+  titolo — «Ti conosciamo gia'!», con la «g» e l'accento — la stessa
+  misura da' -0,75px e NON e' confrontabile: li' si verifica che
+  l'override si applichi, non quanto valga.
+  PERCHE' NON SI CAMBIA LA BASE, ed e' la riga da non ammorbidire:
+  portando -.28em dappertutto il pallino accanto al nome
+  **risalirebbe di 0,81px** e tornerebbe il difetto di ieri. Due
+  vicini diversi, due valori — e a dire quali posti sono in gioco e'
+  una misura e non un'impressione: il disegno si muove di **2,9px**
+  nel titolo e **2,4** accanto al nome, e di **0,00** nel ponte, che
+  e' flex. Nei bottoni questa riga non conta, quindi l'override non
+  li puo' toccare.
+  ⚠️ E IL COLORE NON SEPARA L'INCHIOSTRO OVUNQUE: nel ponte il testo
+  e' viola quanto il pallino (la ricetta del ghost veste testo,
+  bordo e ombra dello stesso colore), quindi a dire dove sta il
+  disegno sono i suoi rect e non la tinta. Chi rimisura parta da li'.
   ⚠️ E LA MISURA DELL'ALTEZZA (1.15em) NON SI TOCCA per allineare:
   quella pareggia il disegno col GLIFO che sostituisce, ed e' l'altra
   garanzia — rimpicciolirlo per far tornare i centri romperebbe la

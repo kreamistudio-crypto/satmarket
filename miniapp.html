@@ -2498,6 +2498,26 @@
      e' in coordinate del viewBox, quindi scala col disegno e
      resta proporzionale a ogni misura. */
   .ico-nostr .lux{fill:#fff;opacity:.55;filter:blur(1.2px)}
+  /* MA NEL TITOLO DI UN FOGLIO IL VICINO E' TESTO (1 set 2026, dal
+     campo: «il pallino non e' allineato con la scritta Entra con
+     Nostr»). Li' `middle` sbaglia dalla parte OPPOSTA: allinea il
+     centro del disegno alla x-height, mentre il centro ottico di una
+     riga con le maiuscole sta piu' in alto (baseline + cap/2) — e su
+     un disegno alto 18,1 contro una cap-height di 11,5 quel
+     quasi-pixel si vede: il pallino scende sotto la riga.
+     MISURATO sull'INCHIOSTRO e non sulla line box, che comprende
+     ascendenti e discendenti che «Entra con Nostr» non usa: +0,69px
+     con la regola di sopra, -0,31 con questa. E il numero non e'
+     inseguito al centesimo — da -.25em a -.30em il rendering e'
+     IDENTICO, quindi -.28em e' il centro di una finestra larga.
+     PERCHE' NON SI CAMBIA LA BASE: accanto al nome il bersaglio sono
+     le MEDAGLIE, spinte giu' di 2px apposta dalla sfilza, e quella e'
+     la cura del giro prima — portando questo valore dappertutto il
+     pallino li' risalirebbe di 0,81px e tornerebbe il difetto di
+     allora. Due vicini diversi, due valori; e nei BOTTONI non conta
+     nessuno dei due, che il contenitore e' flex (misurato: 0,00 px
+     su sette valori). */
+  .sheet h3 .ico-nostr{vertical-align:-.28em}
   /* la stessa parola nella riga «Spedizione» del conto: li' sta dentro
      lo `.mono` della colonna delle cifre, e senza questa riga
      erediterebbe il monospazio — cioe' verrebbe scritta come un
