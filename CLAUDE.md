@@ -18591,6 +18591,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   role="button">` taglia uguale → non e' l'elemento `<button>`; col
   font di sistema taglia dentro e non fuori → non e' il font. Dentro la
   pillola sopravvive solo il **disegno**.
+  ⚠️ MA IL «DENTRO UN BOTTONE» ERA LA LETTURA PIU' STRETTA, e il
+  campo l'ha smentita il giorno dopo: il TITOLO del foglio Nostr
+  — un `<h3>`, non una pillola — e' tagliato uguale. I due banchi
+  si contraddicevano gia' su quel caso (il quarto diceva che il
+  titolo fuori da un bottone e' pulito, il quinto no) e avevo
+  tenuto la piu' stretta: **il taglio e' di Gecko e basta, non
+  ha bisogno di una pillola**. La prova che diceva il contrario
+  ha CAMBIATO LATO. La lezione e' quella di sempre — quando due
+  banchi non concordano su un caso, quel caso non e' deciso: si
+  dichiara come tale invece di scegliere la lettura comoda.
   LA CURA E' UN CERCHIO SVG, e le tre leve del giro prima sono state
   TOLTE: `overflow:visible`, `line-height:2` e il `padding:3px` non
   curavano niente — erano mirate al content box, che era la diagnosi
@@ -18601,10 +18611,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   <button> non eredita il font, e usciva in Arial), ed e' un'altra
   cosa.
   IL GIUDICE E' UNO, `etichettaNostr`, con `ICO_NOSTR` accanto: i siti
-  che scrivono quell'etichetta sono TRE — il banner della vetrina, il
-  foglio invito, il menu account — e tre copie a mano vorrebbero dire
-  che la prossima cura ne cura due. I tre passano da `innerHTML` e non
-  piu' da `textContent`, e c'e' il censimento che li conta.
+  che scrivono quell'etichetta sono QUATTRO — il banner della
+  vetrina, il foglio invito, il menu account e il TITOLO del foglio
+  Nostr — e quattro copie a mano vorrebbero dire che la prossima
+  cura ne cura tre. Tutti passano da `innerHTML` e non piu' da
+  `textContent`, e c'e' il censimento che li conta.
+  E IL MARKUP NON RIPETE IL DISEGNO dove il JS lo riscrive SEMPRE:
+  `invitoTelegram` e `apriNostrSheet` sono le uniche porte dei loro
+  fogli, quindi li' il markup porta il solo TESTO — e se un domani
+  una strada nuova saltasse il giudice, quel che resta e' un testo
+  senza pallino, cioe' un'assenza e mai un glifo tagliato. Le copie
+  della stringa restano DUE — il giudice, e il markup del foglio del
+  collegamento, che non riscrive nessuno — e la prova le CONFRONTA
+  invece di contarle: nel JS la stringa e' spezzata in letterali, e
+  un conteggio direbbe «due» anche su due disegni diversi.
   IL PALLINO E' VIOLA PER TOKEN E MAI `currentColor`, ed e' la
   differenza con `ICO_LOCKER` che sta due righe piu' su: quella e'
   un'icona di SERVIZIO e si accende col testo, questa e' un MARCHIO —
@@ -18619,14 +18639,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   in tutti e due. C'e' la prova, ed e' nata dalla tortura: quella riga
   non la guardava nessuno.
   IL PERIMETRO E' STRETTO APPOSTA (decisione di Andrea): si curano le
-  TRE PORTE — quelle che chi arriva da Tor deve toccare, perche' su
-  onion Nostr e' l'unica — e restano col glifo i tre bottoni di dentro
+  QUATTRO PORTE — quelle che chi arriva da Tor deve toccare, perche'
+  su onion Nostr e' l'unica, e il titolo del foglio e' il passo
+  SUBITO DOPO le altre tre — e restano col glifo i tre bottoni di dentro
   («salva la npub», i due ponti, il collaudo), che si incontrano solo
   dopo aver gia' scelto. C'e' il CENSIMENTO che li conta: se il numero
   sale, qualcuno ha aggiunto una porta col glifo copiato a mano.
   E IL PROBLEMA E' PIU' LARGO DI QUESTO PALLINO, misurato e non
   stimato: dentro un `<button>` il client ha **357 occorrenze di emoji
-  su 85 glifi diversi**, e su Gecko sono tagliate tutte. Si NOTA solo
+  su 85 glifi diversi**, e su Gecko sono tagliate tutte — e da
+  quando il titolo del foglio ha smentito il «dentro un bottone»,
+  quel 357 e' il PAVIMENTO e non il totale: le emoji del client
+  sono molte di piu' fuori dai bottoni. Si NOTA solo
   questa perche' e' un cerchio PIENO che riempie la cella — un 🔔 o un
   ⚡ perdono un pixel di contorno e nessuno se ne accorge. Curarle
   tutte vorrebbe dire 85 disegni: il giorno che un altro glifo si
@@ -18651,7 +18675,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   aperto dal PC non dice niente su un difetto che vive su un motore
   che il PC non ha. Chi rifa' un banco per un difetto di RESA: niente
   lenti, il font vero dentro, e aperto sul dispositivo che lo mostra.
-  PROVATO: 15 mutazioni, 15 uccise, una per riga sorvegliata — e sono
+  E IL CERCHIO PIATTO PIACEVA MENO DEL GLIFO (ago 2026, dal campo:
+  «quello aveva un riflesso e sembrava in rilievo»). Il disegno
+  guadagna un secondo cerchio bianco velato e SFUMATO in alto a
+  sinistra.
+  UNA FORMA E NON UN GRADIENTE, ed e' la risposta alla domanda che
+  Andrea ha fatto per iscritto («se e' un gradiente, proviamolo»):
+  un `<radialGradient>` vuole un `<defs>` con un **id**, e questo
+  disegno compare piu' volte nella stessa pagina — id duplicati,
+  cioe' markup non valido (e' la ragione per cui `jarSVG` si genera
+  un id per istanza). La strada di casa costa meno ed era gia'
+  scritta: il riflesso del barattolo e' fatto con una FORMA.
+  IL BLUR E' QUEL CHE LO RENDE SICURO sul motore che da qui non si
+  puo' provare: se Gecko non applicasse `filter:blur()` resta il
+  cerchio NETTO, cioe' il disegno di prima — **degradazione, mai una
+  regressione**. E il px del blur e' in coordinate del viewBox,
+  quindi scala col disegno: misurato, il riflesso resta
+  proporzionale sia sul titolo (20,7px) sia sul banner (14,9).
+  I DUE NUMERI SONO MISURATI e non scelti: sei varianti rese alla
+  misura VERA e guardate ingrandite a pixel veri nei due temi —
+  sotto .30 non si vede, sopra .70 sbianca (di sera il viola e' piu'
+  chiaro e il bianco spicca meno), e il cerchio NETTO mostrava il
+  suo bordo e si leggeva come una macchia incollata. Chi li ritocca
+  RIMISURI: c'e' la prova che tiene l'opacita' dentro la fascia.
+  LE DUE STRADE SCARTATE, guardate a schermo e non dedotte: la
+  PENNELLATA alla `jarSVG` (a questa misura si legge come un graffio
+  — e' la stessa cosa gia' scritta per i barattoli del podio sopra
+  una foto) e i DUE CERCHI concentrici, che fanno banding: due bordi
+  netti invece di uno.
+  ⚠️ E UNA VARIANTE DEL BANCO NON POTEVA DIFFERIRE, che e' la
+  trappola del giro: l'`opacity` messa come ATTRIBUTO di
+  presentazione perde contro `.lux{opacity:…}` del CSS, quindi la
+  variante «piu' opaca» era identica a quella base e non provava
+  niente. L'ho vista guardandola, e la fascia si e' dovuta
+  rimisurare con l'opacita' dentro il CSS della variante.
+  PROVATO: 22 mutazioni, 22 uccise, una per riga sorvegliata — e sono
   state loro a trovare i tre buchi delle mie sentinelle, fra cui l'ennesima
   che non poteva fallire (`n.innerHTML` e' SOTTOSTRINGA di
   `btn.innerHTML`, quindi la terza porta teneva verde la seconda) e un

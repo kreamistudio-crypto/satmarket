@@ -21421,11 +21421,12 @@ def prove_onion():
     # aggiungendo la quarta porta con la stringa copiata.
     _porte = ("nos.innerHTML = etichettaNostr(",
               " n.innerHTML = etichettaNostr(",
-              "btn.innerHTML = etichettaNostr(")
-    prova("i tre siti della porta chiamano il giudice",
-          (True, True, True),
+              "btn.innerHTML = etichettaNostr(",
+              "el('nostrSheetTitolo').innerHTML = etichettaNostr(")
+    prova("i quattro siti della porta chiamano il giudice",
+          (True, True, True, True),
           tuple(p in mini for p in _porte))
-    prova("...e le chiamate al giudice sono TRE", 3,
+    prova("...e le chiamate al giudice sono QUATTRO", 4,
           mini.count("etichettaNostr("))
     # E IL CENSIMENTO DEI BOTTONI CHE IL GLIFO CE L'HANNO ANCORA:
     # sono TRE, e sono quelli che chi arriva da Tor non incontra —
@@ -21440,11 +21441,66 @@ def prove_onion():
     _btn_glifo = len(_re.findall(
         r"<button\b[^>]*>[^<]*\U0001F7E3", mini))
     prova("i bottoni rimasti col glifo sono i tre di dentro", 3, _btn_glifo)
-    # il TITOLO del foglio Nostr invece il glifo lo tiene, ed e'
-    # giusto: e' un <h3>, non una pillola — fuori da quel vestito il
-    # campo ha misurato che non taglia niente
-    prova("...e il titolo del foglio non si tocca", True,
-          "'🟣 Entra con Nostr'" in mini)
+    # ⚠️ IL TITOLO DEL FOGLIO HA CAMBIATO LATO (ago 2026, dal campo):
+    # questa prova chiedeva che il glifo RESTASSE, «e' un <h3> e non
+    # una pillola, fuori da quel vestito non taglia». Falso: il campo
+    # l'ha visto tagliato uguale, e i due banchi si contraddicevano
+    # gia' su quel caso — uno diceva che il titolo fuori da un bottone
+    # e' pulito, l'altro no, e avevo tenuto la lettura piu' stretta.
+    # Il taglio e' di Gecko e basta: non ha bisogno di una pillola.
+    prova("il titolo del foglio Nostr non porta piu' il glifo",
+          (False, False),
+          ("'🟣 Entra con Nostr'" in mini,
+           '<h3 id="nostrSheetTitolo">🟣' in mini))
+    # E LE DUE COPIE DEL DISEGNO DICONO LA STESSA COSA. Sono due
+    # apposta: il giudice, e il markup del foglio del collegamento,
+    # che non riscrive nessuno. Dove il JS riscrive SEMPRE (l'invito,
+    # il titolo del foglio) il markup porta il solo testo, cosi' una
+    # strada nuova che saltasse il giudice lascerebbe un'assenza e mai
+    # un glifo tagliato. Si CONFRONTANO invece di contarle: la copia
+    # nel JS e' spezzata in letterali, e un conteggio direbbe «due»
+    # anche su due disegni diversi.
+    _ico = _giudice_nostr(mini).split("const etichettaNostr")[0]
+    _js = "".join(_re.findall(r"'([^']*)'", _ico))
+    _mk = mini.split(" Ti conosciamo")[0].split("<h3>")[-1]
+    prova("il disegno del markup e quello del giudice combaciano",
+          True, _js == _mk and "<circle" in _js)
+    prova("...e le porte riscritte dal JS portano il solo testo",
+          (True, True),
+          ('id="invitoNostr" onclick="closeSheet();apriNostrSheet()">'
+           '…o entra con Nostr</button>' in mini,
+           '<h3 id="nostrSheetTitolo">Entra con Nostr</h3>' in mini))
+    # IL RIFLESSO: senza, il cerchio e' piatto mentre l'emoji che
+    # sostituisce sembrava in rilievo. E' BIANCO VELATO e non un
+    # secondo token — e' luce sul viola, quindi vale nei due temi —
+    # ed e' una FORMA e non un gradiente: un <radialGradient> vuole
+    # un id in un <defs>, e questo disegno compare piu' volte per
+    # pagina, cioe' id duplicati e markup non valido.
+    prova("il pallino ha il suo riflesso, velato e non un token",
+          (True, True),
+          ('class="lux"' in _js, "fill:#fff;opacity:." in mini))
+    # ...E SI SFUMA: il cerchio netto si vedeva col suo bordo e sembrava
+    # una macchia incollata invece che luce (guardato ingrandito a
+    # pixel veri, non dedotto). Il blur e' anche quel che rende sicura
+    # la cura sul motore che da qui non si prova: se Gecko non lo
+    # applicasse resta il cerchio netto, cioe' il disegno di prima.
+    _lux = mini.split(".ico-nostr .lux{")[1].split("}")[0]
+    prova("...e la luce e' sfumata", True, "blur(" in _lux)
+    # i due numeri sono MISURATI su sei varianti: sotto .30 non si
+    # vede, sopra .70 sbianca — soprattutto di sera, dove il viola e'
+    # piu' chiaro. Chi li ritocca RIMISURI invece di sceglierli.
+    _op = float(_lux.split("opacity:")[1].split(";")[0].split("}")[0])
+    prova("...con l'opacita' dentro la fascia misurata",
+          True, 0.30 < _op < 0.70)
+    # ⚠️ si guarda il DISEGNO e non il file: `jarSVG` ha
+    # legittimamente il suo <defs> col clipPath (ed e' il precedente
+    # che il commento cita), e la prima occorrenza di «<defs» nel
+    # client e' il commento stesso — la trappola della prosa.
+    _tutto = _js + _mk
+    prova("...ed e' una forma, mai un gradiente con un id",
+          (False, False, False),
+          ("radialGradient" in _tutto, "<defs" in _tutto,
+           "id=" in _tutto))
 
     # 8c) barraWeb — chi e' GIA' dentro. TRE RAMI e non due, e
     # l'ordine conta: su onion ci cade anche il DOPPIO CITTADINO, che

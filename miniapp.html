@@ -2440,6 +2440,25 @@
      corpi diversi (13px la pillola del banner, 15.5px i .btn). */
   .ico-nostr{width:1.15em;height:1.15em;vertical-align:-.18em;
              fill:var(--nostr);flex:none}
+  /* il riflesso in alto a sinistra: senza, il cerchio e' piatto
+     mentre l'emoji che sostituisce sembrava in rilievo.
+     Bianco velato e non un secondo token: e' LUCE sul viola,
+     quindi vale nei due temi senza una taratura sua — e i due
+     numeri sono MISURATI su sei varianti rese alla misura vera
+     e guardate ingrandite: sotto .30 non si vede, sopra .70
+     sbianca (di sera il viola e' piu' chiaro e il bianco
+     spicca meno).
+     UNA FORMA E NON UN GRADIENTE: un <radialGradient> vuole un
+     id in un <defs>, e questo disegno compare piu' volte nella
+     stessa pagina — id duplicati, cioe' markup non valido (e'
+     la ragione per cui `jarSVG` si genera un id per istanza).
+     IL BLUR SFUMA E BASTA, ed e' quel che lo rende sicuro sul
+     motore che da qui non si puo' provare: se Gecko non lo
+     applicasse resta il cerchio NETTO, cioe' il disegno di
+     prima — degradazione, mai una regressione. Il px del blur
+     e' in coordinate del viewBox, quindi scala col disegno e
+     resta proporzionale a ogni misura. */
+  .ico-nostr .lux{fill:#fff;opacity:.55;filter:blur(1.2px)}
   /* la stessa parola nella riga «Spedizione» del conto: li' sta dentro
      lo `.mono` della colonna delle cifre, e senza questa riga
      erediterebbe il monospazio — cioe' verrebbe scritta come un
@@ -6524,7 +6543,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- La seconda porta: chi arriva da un DM Nostr entra con la sua
          chiave e ritrova l'annuncio autenticato (l'URL non cambia).
          SU ONION E' LA PRIMA E L'UNICA — vedi invitoTelegram(). -->
-    <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()"><svg class="ico-nostr" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg> …o entra con Nostr</button>
+    <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()">…o entra con Nostr</button>
     <button class="btn ghost" onclick="navIndietro()">Continua a guardare</button>
   </div>
 
@@ -6540,7 +6559,7 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ SHEET LOGIN NOSTR ============ -->
   <div class="sheet" id="nostrSheet">
     <div class="grab"></div>
-    <h3 id="nostrSheetTitolo">🟣 Entra con Nostr</h3>
+    <h3 id="nostrSheetTitolo">Entra con Nostr</h3>
     <div id="nostrSheetSub" style="font-size:13px;color:var(--muted);font-weight:600">
       Dimostri di possedere la tua chiave firmando una sfida.
       La chiave privata <b>non viene mai inviata</b> a nessuno.
@@ -6571,7 +6590,7 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
   <div class="sheet" id="collegaSheet">
     <div class="grab"></div>
-    <h3>🟣 Ti conosciamo già!</h3>
+    <h3><svg class="ico-nostr" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><circle class="lux" cx="5.5" cy="5.3" r="2.3"/></svg> Ti conosciamo già!</h3>
     <div id="collegaTesto" style="font-size:13px;color:var(--muted);font-weight:600"></div>
     <button class="btn primary" style="margin-top:14px" onclick="accettaCollega()">Usa l'account esistente</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
@@ -17127,7 +17146,8 @@ const INVITO_ONION_GENERICO =
    e a distanziare resta il loro `gap`. Una riga sola per due vestiti,
    invece di un margine da tenere in pari con un gap. */
 const ICO_NOSTR = '<svg class="ico-nostr" viewBox="0 0 16 16" '
-  + 'aria-hidden="true"><circle cx="8" cy="8" r="7"/></svg>';
+  + 'aria-hidden="true"><circle cx="8" cy="8" r="7"/>'
+  + '<circle class="lux" cx="5.5" cy="5.3" r="2.3"/></svg>';
 const etichettaNostr = testo => ICO_NOSTR + ' ' + testo;
 
 function invitoTelegram(testo, chiave){
@@ -30314,8 +30334,8 @@ function apriNostrSheet(scopo){
      del foglio racconta lo scopo giusto. */
   scopoFirmatario = (typeof scopo === 'function') ? scopo : null;
   const firma = !!scopoFirmatario;
-  el('nostrSheetTitolo').textContent =
-    firma ? '🟣 Firma con la tua chiave Nostr' : '🟣 Entra con Nostr';
+  el('nostrSheetTitolo').innerHTML = etichettaNostr(
+    firma ? 'Firma con la tua chiave Nostr' : 'Entra con Nostr');
   el('nostrSheetSub').innerHTML = firma
     ? 'Questa modifica aggiorna anche l\'annuncio su Nostr: serve la '
       + 'firma della tua chiave. La chiave privata <b>non viene mai '
