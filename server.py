@@ -40703,7 +40703,7 @@ def asset_og(nome: str, if_none_match: str = Header("")):
 # slug del catalogo — `{slug}-cop.webp` per la copertina e
 # `{slug}-1..9.webp` per le altre — quindi lo sponsor di domani porta
 # i suoi file e non tocca questa riga.
-FORMA_RACCONTO = re.compile(r"^([a-z0-9-]{2,40})-(?:cop|logo|[1-9])\.webp$")
+FORMA_RACCONTO = re.compile(r"^([a-z0-9-]{2,40})-(?:cop|[1-9])\.webp$")
 
 
 @app.get("/assets/racconti/{nome}")

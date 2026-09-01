@@ -32110,9 +32110,15 @@ def prove_sponsor():
     prova("la forma e' dichiarata", True, bool(_f))
     if _f:
         _re = re.compile(_f.group(1))
+        # ⚠️ `-logo` HA CAMBIATO LATO (ago 2026): esisteva per il razzo,
+        # che se n'e' andato — e con lui il file. Una forma ammessa che
+        # non serve a nessuno e' una cartella servita per un nome in
+        # piu', quindi adesso NON deve passare. Il giorno che un
+        # racconto avra' un logo, questa riga torna indietro insieme
+        # alla sua ragione.
         for _n, _ok in ((slug_vero + "-1.webp", True),
                         (slug_vero + "-cop.webp", True),
-                        (slug_vero + "-logo.webp", True),
+                        (slug_vero + "-logo.webp", False),
                         (slug_vero + "-LOGO.webp", False),
                         (slug_vero + "-0.webp", False),
                         (slug_vero + ".webp", False),
@@ -32172,11 +32178,11 @@ def prove_sponsor():
     _an = pezzo_js(mini, "async function apriNegozio(chi, aperto){")
     prova("apriNegozio scrive l'apertura che riceve", True,
           "raccontoAperto = !!aperto;" in _an)
-    # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): lo chiedono in
-    # due — il renderer e il razzo — e due letture della stessa
-    # condizione un giorno direbbero due cose diverse sullo stesso
-    # negozio. Le prove si sono spostate con lui, e non hanno cambiato
-    # lato: la ragione e' quella di sempre.
+    # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): il renderer non
+    # lo rifa' per conto suo, o due letture della stessa condizione un
+    # giorno direbbero due cose diverse sullo stesso negozio. Nacque
+    # perche' i chiamanti erano DUE — c'era anche il razzo, tolto ad
+    # ago 2026 — e resta perche' la ragione vale col primo che torna.
     _rd = pezzo_js(mini, "function raccontoDi(v){")
     prova("il racconto esce solo sul negozio del progetto", True,
           "r.negozio === v.negozio" in _rd)
@@ -32184,209 +32190,6 @@ def prove_sponsor():
           "r.negozio &&" in _rd)
     prova("...e il renderer passa dal giudice, non lo rifa'", (True, False),
           ("raccontoDi(v)" in _rn, "RACCONTI[sponsorVivo]" in _rn))
-
-    # ---- 10. IL RAZZO ------------------------------------------
-    # «Parte dalla card del venditore, quella in fondo alla pagina»
-    # (ago 2026, chiesto da Andrea). Le tre condizioni poste sono che
-    # non copra, non spinga, e che chi ha le animazioni ridotte non
-    # veda niente: le prime due le garantisce il RITAGLIO, la terza il
-    # fatto che il razzo non nasca affatto.
-    _rz = pezzo_js(mini, "function razzoSponsor(v){")
-    prova("il razzo lo dichiara il CATALOGO, non il renderer",
-          (True, True),
-          ("razzo: true," in mini, "r.razzo" in _rz))
-    # Spegnerlo dal CSS lo lascerebbe li' fermo per sempre, che e' un
-    # disegno senza mestiere: con reduced-motion non si disegna.
-    prova("...e con le animazioni ridotte non nasce affatto", True,
-          "tourRidotto()" in _rz.split("return")[0])
-    prova("...e passa dallo stesso giudice del racconto", True,
-          "raccontoDi(v)" in _rz)
-    # IL RITAGLIO SERVE AL TENTATIVO: li' il razzo sale di 9px e
-    # ricade, e senza guscio quel sussulto uscirebbe dalla card.
-    # `inset:0` lo tiene nei suoi bordi per costruzione, non per
-    # taratura.
-    _g = " ".join(mini[mini.index("  .razzo-g{"):].split())
-    _g = _g[:_g.index("}")]
-    prova("il guscio del razzo RITAGLIA", (True, True, True),
-          ("overflow:hidden" in _g, "inset:0" in _g,
-           "position:absolute" in _g))
-    # ⚠️ ...E SI APRE ALLA PARTENZA, o il razzo non esce MAI (ago
-    # 2026, dal campo: «parte ma scompare subito dentro la card»).
-    # Il guscio e' alto quanto la card — 66px misurati — quindi
-    # ritagliava il volo dopo una quarantina di pixel e il resto lo
-    # faceva invisibile. La prova qui sopra era VERA e restava verde
-    # col difetto vivo: e' la classe di sentinella onesta e
-    # insufficiente insieme, per la settima volta.
-    _ga = " ".join(mini[mini.index("  .razzo-g.aperto{"):].split())
-    prova("...e si apre alla partenza", True,
-          _ga[:_ga.index("}")].endswith("overflow:visible"))
-    # ⚠️ E `pointer-events:none` RESTA APERTO O CHIUSO: e' la seconda
-    # condizione di Andrea («non copre»), e vale sui TOCCHI — il
-    # ritaglio non c'entra, e infatti il razzo in volo passa sopra la
-    # prosa apposta.
-    prova("...e non ruba tocchi in nessuno dei due stati", True,
-          "pointer-events:none" in _g)
-    # QUANTO SALE NON E' UN NUMERO NEL FOGLIO: la distanza la sa solo
-    # il momento della partenza, che dipende da DOVE sta la card in
-    # quell'istante. Col numero fisso il razzo restava a meta'
-    # schermo — 431px dalla cima di un viewport alto 760, misurati.
-    _kf = mini[mini.index("  @keyframes rz-parte{"):]
-    _kf = " ".join(_kf[:_kf.index("\n  }")].split())
-    prova("il volo del razzo lo scrive chi parte", (True, False),
-          ("var(--rz-volo" in _kf, "translateY(-120px)" in _kf))
-    # ⚠️ E IL `position:relative` STA SULLA CLASSE SUA e non su
-    # `.seller`, che la porta anche il riquadro venditore del
-    # dettaglio: un antenato posizionato in piu' fa risalire li' ogni
-    # figlio assoluto di domani — la trappola gia' pagata dalla
-    # `.card{position:relative}`, coi barattolini accatastati in alto
-    # a destra.
-    _sl = " ".join(mini[mini.index("  .seller{"):].split())
-    prova("...e il relative non tocca la .seller nuda", (True, False),
-          ("position:relative" in " ".join(
-              mini[mini.index("  .seller.con-razzo{"):].split()
-          )[:60], "position:relative" in _sl[:_sl.index("}")]))
-    # Il razzo e' l'ULTIMO FIGLIO del .seller: il guscio si ancora a
-    # lui, e appeso fuori risalirebbe al primo antenato posizionato
-    # lungo la strada.
-    prova("il razzo sta DENTRO la card del venditore", True,
-          "</div>${razzo}\n    </div>" in _rnz)
-    # I DUE FATTI, e nessuno dei due e' «seguire lo scorrimento»: la
-    # card in vista la dice un osservatore, il verso un listener
-    # passivo — che sta appeso SOLO fra il tentativo e la partenza.
-    _ar = pezzo_js(mini, "function armaRazzo(){")
-    prova("il razzo guarda due fatti, e il secondo e' passivo",
-          (True, True),
-          ("new IntersectionObserver" in _ar,
-           "'scroll', su, {passive: true}" in _ar))
-    # ⚠️ IL DISARMO NON E' UNA CORTESIA: `#negozioHeader` si riscrive a
-    # ogni apertura, e senza queste righe dieci negozi aperti
-    # lascerebbero dieci listener su nodi che non esistono piu'. E'
-    # la regola di `vetrinaGiro`.
-    # ⚠️ LA PRIMA RIGA DEL CORPO, e non «prima dell'osservatore»:
-    # quella stringa compare DUE volte — il disarmo del giro
-    # precedente e quello che il razzo fa di se' quando parte — e
-    # l'altra sta comunque sopra l'osservatore, quindi togliendo la
-    # riga in cima la prova restava verde. L'ha detta la tortura.
-    prova("...e quel che nasce dal render muore col render dopo",
-          (True, True, True),
-          ("removeEventListener('scroll', su)" in _ar,
-           "oss.disconnect()" in _ar,
-           _ar.split("{", 1)[1].lstrip().startswith(
-               "if (razzoStop) { razzoStop(); razzoStop = null; }")))
-    # Si guarda il VERSO e non la posizione, con lo slop del dito:
-    # senza, un rimbalzo dello scorrimento inerziale farebbe partire
-    # il razzo mentre si sta ancora scendendo.
-    prova("...e a farlo partire e' il verso, non la posizione", True,
-          "n < y - 4" in _ar)
-
-    # ---- 10b. IL CIELO: il logo che sale col fumo ---------------
-    # ⚠️ IL VELO A TUTTO SCHERMO E' STATO SCARTATO (ago 2026), e le
-    # due ragioni vanno tenute perche' sono quelle che tornano in
-    # mente: un pannello che copre la merce di uno spazio PAGATO e
-    # che parte da uno SCROLL e' la cosa piu' aggressiva che l'app
-    # farebbe verso chi guarda; e le pagine `/negozio/{codice}` sono
-    # INDICIZZATE, quindi sarebbe alla lettera l'«intrusive
-    # interstitial» che Google penalizza su mobile — su un cantiere
-    # nato per farsi trovare, quella seconda decide da sola.
-    _ci = " ".join(mini[mini.index("  .rz-cielo{"):].split())
-    _ci = _ci[:_ci.index("}")]
-    # NON RISERVA SPAZIO, ed e' la riga che tiene la promessa «non
-    # spinge»: assoluto e ancorato al fondo della card, si estende
-    # verso l'alto fuori dal flusso. Un riquadro riservato sarebbe
-    # stato il conto piu' caro del cantiere su una pagina che questo
-    # file dichiara «gia' lunga».
-    prova("il cielo non riserva spazio e non ruba tocchi",
-          (True, True, True),
-          ("position:absolute" in _ci, "bottom:0" in _ci,
-           "pointer-events:none" in _ci))
-    # ...e ritaglia: senza, il fumo uscirebbe dai suoi 190px e si
-    # vedrebbe salire sopra tutto il racconto.
-    prova("...e ritaglia quel che ci sale dentro", True,
-          "overflow:hidden" in _ci)
-    # SI ACCENDE ALLA PARTENZA E NON AL TENTATIVO: il fumo e' la scia
-    # di un razzo che se n'e' andato, e sul sussulto racconterebbe
-    # una partenza che non c'e' stata.
-    # ⚠️ I DUE RAMI SI PRENDONO PER NOME e mai col «prima nel testo»:
-    # nel sorgente `su` — dove il razzo PARTE — sta sopra
-    # l'osservatore, dove il razzo ci PROVA, quindi il «prima» e' la
-    # partenza e un'accensione infilata nel tentativo cadeva dove la
-    # prova non guardava. L'ha detta la tortura.
-    _pt = _ar[_ar.index("stato = 2;"):_ar.index("stato = 1;")]
-    _ten = _ar[_ar.index("stato = 1;"):]
-    prova("il cielo si accende quando il razzo PARTE", (True, False),
-          ("razzoCielo" in _pt, "razzoCielo" in _ten))
-    # E IL GUSCIO SI APRE NELLO STESSO RAMO, mai nel tentativo: li' il
-    # ritaglio e' l'unica cosa che tiene il sussulto dentro la card.
-    prova("...e con lui si apre il guscio, mai nel tentativo",
-          (True, False), ("'aperto'" in _pt, "'aperto'" in _ten))
-    # ⚠️ E LA MISURA VIENE PRIMA DI TOGLIERE `prova`: quella classe
-    # tiene il razzo a `translateY(0)` alla fine del suo `both`,
-    # quindi il rect e' quello di RIPOSO — leggendolo dopo si
-    # prenderebbe un fotogramma a meta' del ricadere, e il volo
-    # uscirebbe corto di quel tanto.
-    prova("il volo si misura sul razzo fermo", (True, True),
-          ("--rz-volo" in _pt,
-           _pt.index("getBoundingClientRect")
-           < _pt.index("remove('prova')")))
-    # IL LOGO STA AL CENTRO (chiesto da Andrea): `left:50%` col mezzo
-    # passo indietro lo tiene in mezzo a ogni larghezza, senza un
-    # numero da tarare.
-    _lg = " ".join(mini[mini.index("  .rz-logo{"):].split())
-    _lg = _lg[:_lg.index("}")]
-    prova("il logo e' centrato per costruzione", (True, True),
-          ("left:50%" in _lg, "translate(-50%" in _lg))
-    # ⚠️ IL FUMO E' CSS E NON PARTICELLE (decisione di Andrea): tre
-    # forme sfocate sul compositor invece di cinquanta oggetti su un
-    # rAF, che su un telefono lento e' un costo vero. La prova guarda
-    # che nel razzo non nasca nessun ciclo di animazione a mano.
-    prova("il fumo non passa da nessun rAF", (False, False),
-          ("requestAnimationFrame" in _rz, "requestAnimationFrame" in _ar))
-    # Il logo ha il suo ripiego, come ogni immagine del progetto: se
-    # il file non e' ancora arrivato resta il fumo — degradazione e
-    # non regressione, il precedente della card «Tutto».
-    prova("...e se il logo non arriva resta il fumo", True,
-          'onerror="this.remove()"' in _rz)
-    # E l'URL viene dalla STESSA `foto` del racconto: ricopiarlo a
-    # mano sarebbe il secondo posto che un giorno diverge dal primo.
-    prova("...e l'indirizzo lo fa la fabbrica del racconto", (True, False),
-          ("foto('logo')" in _rz, "/assets/racconti/${sponsorVivo}-logo"
-           in _rz))
-    # ⚠️ E IL FILE DEVE REGGERE IL TETTO CSS, col criterio LETTO da li'
-    # e mai col numero: e' la lezione dei banner («scritta col
-    # letterale la prova passerebbe lo stesso finche' i file sono
-    # grandi abbastanza, e mentirebbe il giorno che la misura
-    # cresce»). Qui il peggiore e' il telefono a dpr 3 — sul web
-    # questo logo non cresce, che il cielo e' della card del
-    # venditore e non della striscia.
-    # L'ORIGINALE PIU' GRANDE NON CE L'ABBIAMO in repo (sta nei file
-    # di Andrea), quindi vale la ricetta delle celle delle categorie:
-    # il tetto si SCEGLIE guardando il file, e la prova lo inchioda.
-    _tetto = re.search(r"\.rz-logo\{[^}]*width:min\(\d+%,(\d+)px\)", mini)
-    prova("il tetto del logo si legge dal foglio", True, bool(_tetto))
-    try:
-        from PIL import Image as _Im
-        _lw, _lh = _Im.open(
-            os.path.join("assets", "racconti",
-                         "to-the-moon-logo.webp")).size
-        prova("...e il file del logo lo regge a dpr 3", True,
-              _lw >= int(_tetto.group(1)) * 3 if _tetto else False)
-        # e ha l'ALPHA: il logo sta sopra il fumo, e su un fondo
-        # opaco si vedrebbe il suo rettangolo — il precedente delle
-        # 27 illustrazioni delle categorie.
-        prova("...e il logo e' trasparente",
-              True,
-              _Im.open(os.path.join("assets", "racconti",
-                                    "to-the-moon-logo.webp")).mode
-              in ("RGBA", "LA", "PA"))
-    except ImportError:
-        salta("misura del logo: serve Pillow")
-    # ...e il criterio non torna un numero: l'ancora e' l'ASSEGNAZIONE
-    # a colonna, che nella riga che la cerca non compare.
-    _mio = open("prove.py", encoding="utf-8").read()
-    _at = re.search(r"^[ \t]*_tetto\s*=.*$", _mio, re.M)
-    prova("il tetto del logo non e' un numero scritto qui",
-          (True, True),
-          (bool(_at), "mini" in (_at.group(0) if _at else "")))
 
 
 def prove_racconto_girato():
