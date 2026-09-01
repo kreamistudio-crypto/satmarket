@@ -1081,6 +1081,23 @@
      fascia del contrasto legge QUESTA regola, non piu' la sola base:
      senza, avrebbe continuato a guardare dove il titolo stava ieri. */
   .scoprire-card[data-id="p2p"] .sc-titolo{left:30px;font-size:20px}
+  /* LA PASTIGLIA CHE DICE «e' pubblicita'» (ago 2026): sta in alto a
+     DESTRA, l'angolo libero — il titolo delle sorelle vive a
+     sinistra. DI CARTA, crema fissa su inchiostro: la lingua di
+     tutto cio' che sta sopra una foto (.tag-price, .share-btn,
+     .back-float), uguale nei due temi perche' un'etichetta di carta
+     non cambia colore di notte. Non prende nessuno dei colori
+     parlanti — arancio e' l'acquisto, verde la fiducia, rosso la
+     lampo, petrolio l'asta, viola Nostr — perche' non e'
+     un'occasione ne' una promessa: e' una dichiarazione.
+     L'OMBRA C'E' come sui badge lampo e asta: deve staccare da
+     qualunque disegno ci finisca sotto. E si vede SEMPRE, anche
+     senza l'immagine (niente `img ~`, al contrario del titolo): la
+     dichiarazione non puo' dipendere da un file che arriva. */
+  .sc-sponsor{position:absolute;top:8px;right:8px;
+    background:#FFF8EA;color:#23282C;border-radius:999px;
+    padding:3px 9px;font-size:10.5px;font-weight:800;
+    letter-spacing:.02em;box-shadow:0 1px 3px rgba(0,0,0,.28)}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
@@ -3123,6 +3140,69 @@
      della conferma — chi tocca sa dove va prima e durante. */
   .ban-dominio{display:flex;align-items:center;gap:5px;
     margin:0 0 14px;font-size:11.5px;font-weight:700;color:var(--muted)}
+
+  /* ---------- lo spazio raccontato ---------- */
+  /* Sta in cima al negozio, sopra il nome del venditore. Il costo in
+     pixel e' il vincolo di tutto il blocco: la testata del negozio e'
+     gia' lunga (226px nel caso minimo, ~618 nel tipico prima della
+     prima card) e qui dentro NON ci va nessuna immagine — le foto
+     del progetto vivono nel cassetto, che a schermo non pesa finche'
+     resta chiuso. */
+  .racconto{margin:14px 0 0}
+  .rac-testa{position:relative}
+  /* La pastiglia e' la stessa parola della card, e chi ha toccato la
+     ritrova identica: cambiano solo i colori, perche' qui sta sulla
+     CARTA e non sopra una foto — quindi segue il tema come ogni
+     altra etichetta di servizio (il patto di .nota-punto). */
+  .rac-pill{display:inline-block;background:var(--chip-bg);
+    color:var(--ink);border-radius:999px;padding:4px 10px;
+    font-size:11px;font-weight:800;letter-spacing:.02em}
+  .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
+    font-size:20px;line-height:1.2;font-weight:800;color:var(--ink)}
+  .rac-intro{margin:6px 0 8px;font-size:13.5px;line-height:1.45;
+    color:var(--ink-soft)}
+  /* Il link che apre e' un BOTTONE vestito da link (.scopri-link, la
+     ricetta del recinto escrow): un cassetto si apre con un comando,
+     e un <a> senza href non lo e'. */
+  .rac-apri{background:none;border:0;padding:0;cursor:pointer}
+  /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
+     da indovinare — `display:none` e basta. Qui dentro non c'e'
+     niente che debba transizionare: la storia si legge, non si
+     guarda comparire. */
+  .rac-corpo{display:none}
+  .rac-corpo.aperto{display:block;margin-top:14px}
+  .rac-h{margin:18px 0 6px;font-size:11px;font-weight:800;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .rac-p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+  .rac-punti{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+  .rac-punto{display:flex;gap:10px;align-items:flex-start}
+  .rac-e{font-size:19px;line-height:1.1;flex:0 0 auto}
+  .rac-punto b{display:block;font-size:13.5px;color:var(--ink)}
+  .rac-punto span{display:block;font-size:13px;line-height:1.45;
+    color:var(--ink-soft)}
+  /* Le tappe: una colonna con la barretta a sinistra, che e' quel che
+     le fa leggere come una sequenza invece che come un elenco. */
+  .rac-tappe{display:flex;flex-direction:column;gap:14px;
+    margin:12px 0 0;padding-left:14px;
+    border-left:2px solid var(--field-line)}
+  .rac-tappa b{display:block;font-size:13.5px;color:var(--ink)}
+  .rac-tappa span{display:block;font-size:13px;line-height:1.45;
+    color:var(--ink-soft)}
+  .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:13px;
+    line-height:1.6;color:var(--ink-soft)}
+  .rac-foto{display:block;width:100%;margin:16px 0 0;
+    border-radius:var(--radius)}
+  /* LA RIGA CHE DICHIARA, e sta FUORI dal cassetto: dentro la
+     leggerebbe solo chi apre, cioe' chi lo sa gia'. Superficie
+     NEUTRA (--chip-bg) come .nota-punto e .nota-savers: non e' un
+     avviso e non e' una promessa, e' un fatto. La seconda frase
+     conta piu' della prima — senza, «in vetrina su Barattolo» si
+     legge come un endorsement nostro. */
+  .rac-avviso{display:flex;gap:8px;background:var(--chip-bg);
+    border-radius:var(--radius);padding:10px 12px;margin:14px 0 0;
+    font-size:12.5px;line-height:1.45;color:var(--ink)}
 
   .trust-note{
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
@@ -7304,6 +7384,12 @@ let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
    `sconto_pacco_*`): si rinominano i testi, mai le chiavi. */
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
+/* Lo SLUG dello spazio in vetrina, dalla busta di prima pagina —
+   '' = nessuno. E' il gate in LETTURA: alla scadenza il server
+   smette di mandarlo e la card sparisce da sola, senza che nessuna
+   scopa passi (il patto di ferie e lampo). Chiave assente = server
+   di ieri = niente spazio, che un'assenza non e' una bugia. */
+let sponsorVivo = '';
 let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
                              // scoprire»: null = server vecchio o busta
                              // mai arrivata, e la sezione non si disegna
@@ -7630,6 +7716,7 @@ async function loadListings(anonimo){
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
   if (j.occasioni) occasioniServer = j.occasioni;
+  sponsorVivo = j.sponsor || '';
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
      tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
@@ -9175,14 +9262,111 @@ function renderStriscia(){
    state. Il testo vive DENTRO il disegno (decisione di Andrea):
    l'app porta l'aria-label, e il ripiego emoji+testo compare solo
    dove il banner non arriva. */
+/* LO SPAZIO RACCONTATO (ago 2026): il catalogo dei progetti che
+   comprano una settimana in vetrina. La card in «Da scoprire» porta
+   al NEGOZIO del venditore — non a una pagina a parte — e in cima al
+   negozio compare questo racconto, sopra la merce di sempre.
+   VIVE QUI E NON NEL DATABASE, ed e' la riga che tiene piccolo tutto
+   il cantiere: il racconto NON e' un campo di prosa di un utente —
+   in Barattolo un venditore non ha nessun posto dove scrivere prosa
+   lunga su di se', e questo cantiere non lo inventa. E' un catalogo
+   come SCOPRIRE, TAPPE_TOUR o PICKER: roba nostra, committata,
+   niente moderazione a runtime, niente innerHTML da una fetch,
+   niente colonna da difendere. Ogni progetto nuovo costa un deploy,
+   che con «uno alla volta» e il prezzo fuori dal software e' la
+   stessa scaletta di assets/scoprire/.
+   SONO DATI E NON MARKUP, deliberato: il secondo progetto scrive
+   testi e non HTML, e cosi' il giorno che questa lista arrivasse dal
+   server (il commento di SCOPRIRE lo dichiara possibile) non ci
+   sarebbe da riscrivere niente — i testi passano da esc() come
+   quelli di chiunque altro.
+   E IL BLOCCO «COME FUNZIONA QUESTO SPAZIO» NON STA QUI: e' NOSTRO,
+   uguale per tutti, e lo scrive il renderer. La dichiarazione di
+   pubblicita' non puo' dipendere dal catalogo di chi la paga — se
+   stesse qui, il progetto di domani potrebbe nascere senza.
+   IL CODICE NEGOZIO E' IL LEGAME, e senza non nasce niente: la card
+   non compare (`vivo` lo guarda) e il racconto nemmeno. E'
+   fail-closed apposta — meglio nessuna card che una card che porta
+   al negozio sbagliato. */
+const RACCONTI = {
+  'to-the-moon': {
+    negozio: '',        /* DA RIEMPIRE col codice negozio del venditore */
+    titolo: 'To The Mooon!',
+    occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
+    sottotitolo: 'Capire Bitcoin, giocando.',
+    intro: "Ogni viaggio inizia con una scelta. L'obiettivo e' arrivare " +
+           "sulla Luna: prendi decisioni, affronti imprevisti e gestisci " +
+           "i tuoi BTC. Non serve saperne di Bitcoin — lo impari per " +
+           "strada.",
+    blocchi: [
+      {t: 'testo', h: "COS'E'",
+       p: "Durante la partita scopri, quasi senza accorgertene, alcuni " +
+          "dei principi che stanno sotto Bitcoin: la proof of work, gli " +
+          "imprevisti di chi lascia i fondi su un exchange, il senso di " +
+          "scriversi una seed. Non serve nessuna conoscenza tecnica: le " +
+          "regole si imparano in cinque minuti, e i termini che " +
+          "sembrano da iniziati diventano familiari nel giro di una " +
+          "partita."},
+      {t: 'testo', h: "E IL LIBRO",
+       p: "Nella scatola c'e' anche un libro: una strada piu' lineare " +
+          "per approfondire quello che al tavolo si e' solo intuito. " +
+          "Il gioco fa venire la curiosita', il libro le da' da " +
+          "mangiare."},
+      {t: 'punti', voci: [
+        {e: '🎯', h: 'Lo spinner decide, tu scegli',
+         p: "21 caselle numerate piu' 4 caselle Bonus: avanzi di 1, 2 o " +
+            "3, e ogni casella ti mette davanti a una decisione."},
+        {e: '⛏️', h: 'Quattro tappe di Proof of Work',
+         p: "Earth, Orbit, Moon Path, Moon Landing: un mazzo per ogni " +
+            "pezzo di viaggio, sempre piu' tosto."},
+        {e: '🔑', h: 'Custodial o self-custodial?',
+         p: "La carta Wallet che scegli cambia gli imprevisti che " +
+            "peschi. I 12 segnalini Backup Seed ti salvano — se te li " +
+            "sei presi."},
+      ]},
+      {t: 'foto', n: 1, alt: 'Le carte Proof of Work del gioco'},
+      {t: 'tappe', h: "COM'E' NATO", voci: [
+        {h: "L'incontro",
+         p: "Tre pazzi, per puro caso: la stessa idea in testa — portare " +
+            "Bitcoin a chi ancora non lo conosce, senza convincere " +
+            "nessuno e senza prediche."},
+        {h: "L'idea",
+         p: "La tana del bianconiglio, in scatola. Quello che di solito " +
+            "richiede mesi di video e libri, qui succede intorno a un " +
+            "tavolo."},
+        {h: 'La scatola',
+         p: "Uno alla meccanica di gioco, uno alla grafica, uno alla " +
+            "realizzazione fisica e alla stampa. Nessuno l'aveva mai " +
+            "fatto prima."},
+        {h: 'Oggi',
+         p: "In vendita qui, in sats. Un gioco che parla di bitcoin, " +
+            "pagato in bitcoin: ci sembrava il minimo."},
+      ]},
+      {t: 'foto', n: 2, alt: 'La scatola del gioco'},
+      {t: 'elenco', h: "COM'E' FATTO", voci: [
+        'Tabellone a colori — 21 caselle numerate + 4 Bonus',
+        'Spinner quadrato',
+        'Mazzi Proof of Work — Earth, Orbit, Moon Path, Moon Landing',
+        'Mazzi Imprevisto — custodial e self-custodial',
+        'Carte Wallet — 2 self-custodial, 2 custodial',
+        'Segnalino Epoche e 12 segnalini Backup Seed',
+        'Pedine Razzo colorate e dadi a 6 facce',
+        '300 monete bitcoin — tagli da 16, 8, 4, 2 e 1',
+        'Il libro, per approfondire dopo la partita',
+      ]},
+      {t: 'foto', n: 3, alt: 'Il tabellone del gioco'},
+    ],
+  },
+};
+
 const SCOPRIRE = [
   /* LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): non accende un
      filtro — porta al «coming soon» del P2P, dove si vota «🔔
      Avvisami». E' il SECONDO TIPO DI TOCCO della fila, e NON e' una
-     deroga: le sponsorizzate porteranno a un ANNUNCIO, cioe'
-     navigheranno anche loro — il dispatch di toccaScoperta e' la
-     preparazione che questa lista aspettava comunque, non un caso
-     particolare aperto per lei.
+     deroga: lo spazio in vetrina porta al NEGOZIO del suo
+     venditore, cioe' naviga anche lui — il dispatch di toccaScoperta
+     e' la preparazione che questa lista aspettava comunque, non un
+     caso particolare aperto per lei.
      RESTA SEMPRE, ANCHE A CHI HA GIA' VOTATO (ago 2026, decisione di
      Andrea che ROVESCIA la sparizione della nascita). IL PERCHE' DI
      ALLORA VA TENUTO perche' era buono: la card si toglieva di mezzo
@@ -9222,6 +9406,31 @@ const SCOPRIRE = [
      NIENTE anello e niente interruttore: `accesa` risponde sempre no
      — la card non si accende, si tocca e si va — e il template le
      toglie anche l'aria-pressed. */
+  /* LO SPAZIO IN VETRINA, in testa a tutto (ago 2026): la posizione
+     che a 320px si vede senza scorrere e' quella che si vende, ed e'
+     anche il posto del P2P — che scala di uno finche' lo spazio e'
+     vivo. Alla scadenza la card sparisce da sola e il P2P torna
+     primo, senza che nessuna scopa passi: il `vivo` guarda lo slug
+     della busta, che il server smette di mandare.
+     IL TITOLO STA DENTRO L'IMMAGINE (decisione di Andrea), ed e'
+     l'unica card che non porta la scritta dell'app: il progetto
+     manda la sua grafica col nome dentro, e sovrapporgli il nostro
+     titolo lo direbbe due volte. Da qui la fascia del contrasto non
+     la si misura — la prova quel caso lo DICHIARA, invece di
+     saltarlo in silenzio.
+     LA PASTIGLIA «Sponsor» E' L'ALTRA META' DELLA REGOLA, e non si
+     toglie: e' pubblicita', si dice sulla card E si ridice sulla
+     pagina — nessuno dei due basta da solo.
+     `file` E `testo` SONO FUNZIONI come i tre giudici, e non valori:
+     questa voce non sa a chi appartiene finche' la busta non arriva,
+     e una costante letta all'avvio direbbe sempre lo spazio di ieri. */
+  {id: 'sponsor', emoji: '📣', titoloDentro: true, sponsor: true,
+   file: () => sponsorVivo + '.webp',
+   testo: () => (RACCONTI[sponsorVivo] || {}).titolo || '',
+   vivo: () => !!(sponsorVivo && RACCONTI[sponsorVivo]
+                  && RACCONTI[sponsorVivo].negozio),
+   accesa: () => false,
+   tocca: () => apriNegozio(RACCONTI[sponsorVivo].negozio, true)},
   {id: 'p2p', file: 'p2p.webp', emoji: '₿', testo: 'P2P',
    vivo: () => true,
    accesa: () => false,
@@ -9271,15 +9480,41 @@ function renderScoprire(){
        (l'URL non si tocca: il patto del motore di navigazione). */
     const premuto = v.tocca ? ''
       : ` aria-pressed="${v.accesa() ? 'true' : 'false'}"`;
+    /* `file` e `testo` possono essere FUNZIONI (lo spazio in vetrina
+       non sa a chi appartiene finche' la busta non arriva) o valori,
+       come sono le tre card fisse. Si risolvono qui, in un posto
+       solo: due letture sparse direbbero due nomi diversi sulla
+       stessa card. */
+    const file = typeof v.file === 'function' ? v.file() : v.file;
+    const testo = typeof v.testo === 'function' ? v.testo() : v.testo;
+    /* LA PASTIGLIA CHE DICE «e' pubblicita'», e sta SEMPRE dove il
+       titolo non c'e' — angolo in alto a destra, che il titolo delle
+       sorelle vive a sinistra. Di CARTA: crema fissa su inchiostro,
+       la lingua di tutto cio' che sta SOPRA una foto (.tag-price,
+       .share-btn, .back-float), uguale nei due temi perche'
+       un'etichetta di carta non cambia colore di notte. Non prende
+       nessuno dei colori parlanti — arancio e' l'acquisto, verde la
+       fiducia, rosso la lampo, petrolio l'asta, viola Nostr.
+       E NON ENTRA NELLA FASCIA del contrasto: e' carta opaca sopra
+       il disegno, non testo sul disegno. */
+    const pastiglia = v.sponsor
+      ? `<span class="sc-sponsor" aria-hidden="true">Sponsor</span>` : '';
+    /* IL TITOLO LO SCRIVE L'APP, TRANNE DOVE STA GIA' DENTRO IL
+       DISEGNO: sovrapporre il nostro a una grafica che porta il suo
+       lo direbbe due volte. La RISERVA invece resta sempre — e' il
+       ripiego di quando l'immagine non arriva, e li' un nome ci
+       vuole. */
+    const titolo = v.titoloDentro ? ''
+      : `<span class="sc-titolo" aria-hidden="true">${testo}</span>`;
     return `
     <div class="scoprire-card${v.accesa() ? ' attiva' : ''}" role="button"
-         tabindex="0" data-id="${v.id}" aria-label="${v.testo}"${premuto}
+         tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
          onclick="toccaScoperta(this.dataset.id)"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
-      <img src="/assets/scoprire/${v.file}" alt="" loading="lazy"
+      <img src="/assets/scoprire/${file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
-      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${v.testo}</span
-      ><span class="sc-titolo" aria-hidden="true">${v.testo}</span>
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${testo}</span
+      >${titolo}${pastiglia}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
@@ -10433,8 +10668,23 @@ function apriNegozioDaAnnuncio(){
    deve farli scaricare tutti a chi passa solo a guardare */
 let negozioPag = {chi:null, cursore:null, caricando:false};
 
-async function apriNegozio(chi){
+/* IL CASSETTO DEL RACCONTO NASCE APERTO A CHI E' VENUTO PER LEGGERE
+   (ago 2026), ed e' la riga che rende sostenibile tutto il resto: chi
+   tocca la card in «Da scoprire» ha toccato proprio per la storia, e
+   trovarla chiusa sarebbe il contrario del servizio; chi arriva al
+   negozio dalla scheda di un annuncio sta cercando la merce, e la
+   trova dov'e' sempre stata. E' il pattern di notaApertaDefault — il
+   campo nota che nasce aperto nelle categorie con varianti.
+   LA MEMORIA E' UNA VARIABILE E NON IL DOM, alla toggleAccAdm e non
+   alla toggleAcc nuda: #negozioHeader si riscrive con innerHTML —
+   oggi una volta per apertura, ma un ridisegno futuro richiuderebbe
+   il racconto sotto le dita di chi sta leggendo. Mai localStorage:
+   e' lo stato di una pagina, non una preferenza. */
+let raccontoAperto = false;
+
+async function apriNegozio(chi, aperto){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
+  raccontoAperto = !!aperto;
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(
@@ -10549,6 +10799,114 @@ function apriLinkBanner(){
     }});
 }
 
+/* IL RACCONTO IN CIMA AL NEGOZIO (ago 2026): il progetto che ha
+   comprato lo spazio si presenta sopra la sua merce. Sotto, il
+   negozio e' quello di sempre — catalogo, feedback, promesse, ponti,
+   esauriti: si eredita tutto, e questa e' la ragione per cui la card
+   porta qui invece che a una pagina a parte.
+   NIENTE COPERTINA (ago 2026, decisione di Andrea, che ROVESCIA il
+   primo disegno): in testa vanno pastiglia, titolo, occhiello e il
+   link che apre — l'immagine grande si e' appena vista a tutto
+   schermo nella card, e ripeterla a un tocco di distanza non aggiunge
+   niente. Le foto del progetto vivono DENTRO il cassetto. Il conto
+   che ha deciso: copertina + titolo facevano ~213px sopra la merce,
+   cosi' ne fanno ~98 — ed e' quel che permette di TENERE ANCHE IL
+   BANNER del venditore, che nel primo disegno spariva. Due immagini
+   3:1 in fila facevano 396px sopra il nome del venditore, cioe' la
+   prima card fuori da qualunque schermo.
+   E IL BANNER RESTA DOV'E', per tutti: chi arriva da un annuncio non
+   apre il racconto e non deve perdere l'insegna che quel venditore
+   si e' guadagnata. Sono due cose diverse e adesso non si fanno piu'
+   concorrenza — un'insegna che porta fuori, e un titolo che porta
+   alla merce sotto.
+   IL BLOCCO «COME FUNZIONA QUESTO SPAZIO» E' NOSTRO E STA QUI, non
+   nel catalogo: la dichiarazione di pubblicita' non puo' dipendere
+   da chi la paga, o il progetto di domani potrebbe nascere senza. E
+   NON DICE NESSUNA CIFRA sulla commissione — oggi e' a zero, e un
+   «resta l'1% di sempre» diventerebbe falso il giorno che si
+   accende, cioe' proprio dentro il blocco che promette di non avere
+   commissioni nascoste. */
+function raccontoNegozio(v){
+  const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
+  if (!r || !r.negozio || r.negozio !== v.negozio) return '';
+  const foto = n => `/assets/racconti/${sponsorVivo}-${n}.webp`;
+  const blocchi = (r.blocchi || []).map(x => {
+    if (x.t === 'testo')
+      return `<h4 class="rac-h">${esc(x.h)}</h4>
+              <p class="rac-p">${esc(x.p)}</p>`;
+    if (x.t === 'punti')
+      return `<div class="rac-punti">${x.voci.map(p => `
+        <div class="rac-punto"><span class="rac-e">${p.e}</span>
+          <div><b>${esc(p.h)}</b><span>${esc(p.p)}</span></div>
+        </div>`).join('')}</div>`;
+    if (x.t === 'tappe')
+      return `<h4 class="rac-h">${esc(x.h)}</h4>
+              <div class="rac-tappe">${x.voci.map(p => `
+        <div class="rac-tappa"><b>${esc(p.h)}</b>
+          <span>${esc(p.p)}</span></div>`).join('')}</div>`;
+    if (x.t === 'elenco')
+      return `<h4 class="rac-h">${esc(x.h)}</h4>
+              <ul class="rac-elenco">${x.voci.map(t =>
+                `<li>${esc(t)}</li>`).join('')}</ul>`;
+    if (x.t === 'foto')
+      return `<img class="rac-foto" src="${foto(x.n)}"
+                   alt="${esc(x.alt || '')}" loading="lazy"
+                   decoding="async" onerror="this.remove()">`;
+    return '';
+  }).join('');
+  /* La riga della trasparenza sta FUORI dal cassetto, e non e' una
+     scelta di gusto: dentro, chi non apre non la leggerebbe mai — e
+     sarebbe come dichiararlo a chi lo sa gia'. La seconda frase e'
+     quella che conta piu' della prima: senza, «in vetrina su
+     Barattolo» si legge come un endorsement nostro, che e'
+     esattamente cio' che il prompt della moderazione vieta agli
+     altri («il testo che SI RIVOLGE A CHI LEGGE come farebbe la
+     piattaforma»). Quella regola non puo' valere solo per gli altri. */
+  return `
+    <div class="racconto">
+      <div class="rac-testa">
+        <span class="rac-pill">📣 Sponsor</span>
+        <div class="rac-occhiello">${esc(r.occhiello || '')}</div>
+        <h3 class="rac-titolo">${esc(r.sottotitolo || r.titolo)}</h3>
+        <p class="rac-intro">${esc(r.intro || '')}</p>
+        <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
+                aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
+          raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+      </div>
+      <div class="rac-avviso">📣 <b>Spazio pubblicitario</b> — questo
+        negozio ha pagato per comparire in «Da scoprire». Le tutele
+        sull'acquisto sono le stesse di ogni altro negozio.</div>
+      <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
+        ${blocchi}
+        <h4 class="rac-h">Come funziona questo spazio</h4>
+        <div class="rac-tappe">
+          <div class="rac-tappa"><b>Si paga in sats</b>
+            <span>Il progetto ha comprato la sua settimana in vetrina.
+              Quanto costa resta fra noi e loro: stesso prezzo per
+              tutti, nessuna asta.</span></div>
+          <div class="rac-tappa"><b>La storia la scrive il progetto</b>
+            <span>Noi mettiamo l'impaginazione, e diciamo di no a
+              quello che col mercatino non c'entra.</span></div>
+          <div class="rac-tappa"><b>Zero commissioni nascoste</b>
+            <span>Sulla vendita valgono le condizioni di sempre:
+              nessun extra perché sponsorizzato.</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Il cassetto si apre e si chiude IN PLACE: il corpo e' gia' nel DOM
+   e cambia una classe, mai un innerHTML — cosi' non si ridisegna
+   l'header e non si perde niente di quel che sta sotto (la regola
+   del ridisegno gia' scritta per la busta di ritiro). */
+function toggleRacconto(btn){
+  raccontoAperto = !raccontoAperto;
+  const c = document.querySelector('.rac-corpo');
+  if (c) c.classList.toggle('aperto', raccontoAperto);
+  btn.setAttribute('aria-expanded', raccontoAperto ? 'true' : 'false');
+  btn.textContent = raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›';
+}
+
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   negozioCorrente = v;
   /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
@@ -10608,6 +10966,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     (v.npub_verificata && v.npub ? v.npub : '').replace(/[^a-z0-9]/g,''),
     chi ? `a ${esc(chi)}` : 'al venditore');
   el('negozioHeader').innerHTML = `
+    ${raccontoNegozio(v)}
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>

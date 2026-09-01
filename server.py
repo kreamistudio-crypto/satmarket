@@ -1673,6 +1673,90 @@ def imposta_canale(valore: str) -> str:
     return valore
 
 
+# ============ LO SPAZIO SPONSORIZZATO (ago 2026) ============
+# Un venditore paga per comparire in «Da scoprire», e la card porta al
+# SUO NEGOZIO — vestito col racconto in testa e la merce sotto
+# (decisione di Andrea, che ha ROVESCIATO la pagina a se' del primo
+# giro: il negozio ha gia' anteprima, catalogo paginato, feedback e
+# ponti, e una pagina a parte sarebbe stata l'unica di Barattolo dove
+# non si compra niente).
+#
+# QUI NON PASSA NESSUN TESTO, ed e' la riga che tiene piccolo tutto il
+# resto: il racconto vive nel CLIENT come `SCOPRIRE`, `TAPPE_TOUR` e
+# `PICKER` — markup nostro, committato — quindi niente colonna di
+# prosa, niente moderazione a runtime, niente sanificazione. Il server
+# dice solo QUALE racconto e' vivo e FINO A QUANDO. Il prezzo, voluto:
+# ogni sponsor nuovo e' un deploy, che con «uno alla volta» e' la
+# stessa scaletta di `assets/scoprire/`.
+#
+# SLUG_SPONSOR e' il vocabolario, gemello di `FILE_SCOPRIRE`: lo slug
+# arriva dal bot e finisce in una riga che il client poi cerca nel suo
+# catalogo, quindi un nome inventato non deve poterci entrare. A
+# tenerlo in pari col client c'e' `prove.py` — il patto di
+# EMOJI_CATEGORIA/EMOJI_CAT.
+SLUG_SPONSOR = ("to-the-moon",)
+
+_SPONSOR = None     # None = mai letto; (slug, fino) = quel che vale
+
+
+def _sponsor_righe() -> tuple:
+    """Le due righe di `impostazioni`, con la cache. Si tengono INSIEME
+    perche' si scrivono insieme e nessuna delle due vuol dire niente da
+    sola: uno slug senza scadenza sarebbe per sempre, una scadenza
+    senza slug non sponsorizza nessuno."""
+    global _SPONSOR
+    if _SPONSOR is None:
+        try:
+            fino = int(impostazione("sponsor_fino", "0") or 0)
+        except ValueError:
+            fino = 0        # scritta a mano e storta: vale «scaduto»
+        _SPONSOR = (impostazione("sponsor_slug", ""), fino)
+    return _SPONSOR
+
+
+def sponsor_vivo(adesso: int | None = None) -> str:
+    """LO SLUG VIVO, o '' — ed e' un GATE IN LETTURA e non un
+    interruttore che qualcuno spegne: il pattern di `in_ferie` e delle
+    lampo, «la lettura gatea su scadenza, l'orologio fa solo pulizia».
+    Alla scadenza la card sparisce dalla home, il racconto sparisce dal
+    negozio e il banner del venditore torna — SENZA che giri niente, e
+    quindi anche a server fermo per una settimana.
+
+    LA CACHE TIENE I DUE VALORI, MAI IL VERDETTO: la scadenza si
+    confronta a ogni chiamata, o il giudizio resterebbe quello del
+    primo avvio. Al filo esatto e' ancora vivo, come `_asta_viva` e
+    `in_ferie`.
+
+    Fail-closed su uno slug fuori catalogo: una riga scritta a mano e
+    storta non deve poter mandare il client a cercare un racconto che
+    non ha — meglio nessuno sponsor che una card che porta al vuoto."""
+    slug, fino = _sponsor_righe()
+    if not slug or slug not in SLUG_SPONSOR:
+        return ""
+    return slug if fino > (adesso if adesso is not None else int(time.time())) else ""
+
+
+def sponsor_fino() -> int:
+    """Quando scade quello vivo (0 = non c'e'). Serve al promemoria e
+    al comando del bot, mai al client: a lui basta lo slug."""
+    return _sponsor_righe()[1] if sponsor_vivo() else 0
+
+
+def imposta_sponsor(slug: str, fino: int) -> str:
+    """Accende (o spegne, con slug vuoto) lo spazio e riallinea la
+    cache. Il vuoto E' lo spegnimento, come in `imposta_canale_vetrina`
+    e per la stessa ragione: non esiste nessun altro posto dove quello
+    spazio debba andare."""
+    global _SPONSOR
+    slug = (slug or "").strip().lower()
+    if slug not in SLUG_SPONSOR:
+        slug, fino = "", 0
+    scrivi_impostazione("sponsor_slug", slug)
+    scrivi_impostazione("sponsor_fino", str(int(fino)))
+    _SPONSOR = (slug, int(fino))
+    return slug
+
+
 def nuovo_codice_negozio(con) -> str:
     """Codice pubblico del negozio: 8 caratteri casuali, assegnati una
     volta e stabili per sempre. Non deriva dal tg_id, quindi si puo'
@@ -3400,6 +3484,22 @@ def init_db():
         -- apposta perche' accenderle costi un gesto dal VPS.
         chiave TEXT PRIMARY KEY,
         valore TEXT DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS sponsor_aperture(
+        -- QUANTE volte lo spazio sponsorizzato viene aperto, MAI CHI
+        -- (ago 2026, decisione di Andrea): la regola gia' scritta per
+        -- i salvataggi nel barattolo e per i like delle funzioni in
+        -- arrivo — il numero e' nostro, i nomi non si contano affatto.
+        -- Qui non c'e' un `tg_id` PER COSTRUZIONE e non per
+        -- attenzione: non essendoci la colonna, nessuna query futura
+        -- potra' scriverlo per distrazione.
+        -- UN GIORNO PER RIGA e non un totale piatto: cosi' si vede
+        -- l'ANDAMENTO, che e' la sola cosa per cui il conteggio esiste
+        -- — «la card funziona?» non si risponde con un numero solo.
+        slug TEXT NOT NULL,
+        giorno TEXT NOT NULL,            -- 'AAAA-MM-GG' locale
+        quante INTEGER DEFAULT 0,
+        PRIMARY KEY (slug, giorno)
     );
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
@@ -8259,6 +8359,120 @@ SPIEGA_RITMO = {
 }
 
 
+MAX_GIORNI_SPONSOR = 365
+
+
+def _data_sponsor(ts: int) -> str:
+    """La scadenza dello spazio come si legge su un calendario.
+
+    NON si riusa `_quando_scade`, ed e' una decisione e non una
+    dimenticanza: quello dice «alle 18:30 del 31/10» — relativo,
+    senza anno — ed e' giusto per le finestre CORTE per cui e' nato
+    (la lampo, il preavviso di tre giorni). Qui la scadenza puo'
+    stare a un anno di distanza, e chi la legge la confronta col
+    calendario: serve la data piena, nell'idioma di casa delle note
+    ai moderatori.
+
+    Il PREAVVISO invece resta con la formula relativa: li' manca poco
+    per definizione, e «fra tre giorni» si legge meglio di una data."""
+    return time.strftime("%d/%m/%Y alle %H:%M", time.localtime(ts))
+
+def aperture_sponsor(slug: str, giorni: int = 30) -> int:
+    """Quante volte lo spazio e' stato aperto negli ultimi N giorni.
+    LEGGE E BASTA, e non sa CHI: nella tabella un `tg_id` non c'e' per
+    costruzione — vedi il DDL. Fail-open: un contatore che non si sa
+    leggere non deve rompere il comando che lo mostra."""
+    try:
+        con = db()
+        n = con.execute(
+            "SELECT COALESCE(SUM(quante), 0) AS n FROM sponsor_aperture "
+            "WHERE slug=? AND giorno >= date('now', 'localtime', ?)",
+            (slug, f"-{int(giorni)} days")).fetchone()["n"]
+        con.close()
+        return int(n)
+    except Exception:
+        return 0
+
+
+async def comando_sponsor(mittente: dict, testo: str):
+    """`/sponsor` — lo spazio raccontato in vetrina. Solo admin.
+
+    E' il terzo della famiglia di `/canale` e `/vetrina`: uno slug e
+    una data non accendono niente che muova denaro, e sbagliarli si
+    vede subito in home — per questo vivono in `impostazioni` e si
+    cambiano da qui invece che dal config del VPS.
+
+    LO SLUG SI VALIDA CONTRO IL CATALOGO, e non e' pignoleria: quel
+    nome finisce in una colonna e il client ci cerca dentro il suo
+    racconto — uno inventato spegnerebbe lo spazio in silenzio invece
+    di dire di no. Il patto di `TIMBRI_SUGGERIMENTO`.
+
+    NON SI PROVA NIENTE PRIMA DI CREDERCI, al contrario di `/canale`:
+    li' si scrive in una chat di qualcun altro e l'unico modo di
+    sapere se il bot ci arriva e' provare, qui il racconto e' markup
+    NOSTRO gia' committato — se lo slug e' in catalogo, c'e'."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    pezzi = testo.split()
+    arg = pezzi[1].strip().lower() if len(pezzi) > 1 else ""
+    if not arg:
+        vivo = sponsor_vivo()
+        if vivo:
+            resta = max(0, (sponsor_fino() - int(time.time())) // 86400)
+            # LA DATA COMANDA E I GIORNI SONO L'INCISO (decisione di
+            # Andrea): questa riga si confronta col calendario, e un
+            # «ancora 47 giorni» costringe a fare il conto a mano.
+            stato = (f"In vetrina: <b>{vivo}</b>, fino al "
+                     f"<b>{_data_sponsor(sponsor_fino())}</b> "
+                     f"(fra {resta} giorni).\n"
+                     f"Aperture negli ultimi 30 giorni: "
+                     f"<b>{aperture_sponsor(vivo)}</b>.")
+        else:
+            stato = "Nessuno spazio in vetrina adesso."
+        voci = "\n".join(f"<code>/sponsor {s} 30</code>"
+                          for s in SLUG_SPONSOR)
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"📣 <b>Spazio in vetrina</b>\n{stato}\n\n{voci}\n"
+                    "<code>/sponsor spento</code> — lo toglie subito.\n\n"
+                    "Alla scadenza sparisce da solo: la card, il "
+                    "racconto in cima al negozio, e il banner del "
+                    "venditore torna se ce l'aveva.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if arg in ("spento", "no", "off"):
+        imposta_sponsor("", 0)
+        await notifica_admin(f"📣 Spazio in vetrina tolto (da tg {chat})")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ Tolto. In home la card non c'e' piu', e il "
+                    "negozio torna quello di sempre.",
+            "reply_markup": tastiera_bot()})
+    if arg not in SLUG_SPONSOR:
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"Non conosco «{html.escape(arg)}». Quelli che ci sono: "
+                    + ", ".join(SLUG_SPONSOR) + ".",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    try:
+        giorni = int(pezzi[2]) if len(pezzi) > 2 else 7
+    except ValueError:
+        giorni = 0
+    if not 1 <= giorni <= MAX_GIORNI_SPONSOR:
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"I giorni vanno da 1 a {MAX_GIORNI_SPONSOR}. "
+                    f"Esempio: <code>/sponsor {arg} 30</code>",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    fino = int(time.time()) + giorni * 86400
+    imposta_sponsor(arg, fino)
+    await notifica_admin(f"📣 Spazio in vetrina: {arg} per {giorni} "
+                         f"giorni (da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ <b>{arg}</b> e' in vetrina per <b>{giorni}</b> "
+                f"giorni, fino al <b>{_data_sponsor(fino)}</b>.\n"
+                "La card e' in testa a «Da scoprire» e il racconto in "
+                "cima al suo negozio. Il banner del venditore resta "
+                "nascosto finche' dura.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def comando_vetrina(mittente: dict, testo: str):
     """`/vetrina` — quanto parla il canale. Solo admin.
 
@@ -8415,6 +8629,8 @@ async def gestisci_update(update: dict):
         return await comando_anteprima(mittente, testo)
     if testo.startswith("/canale"):
         return await comando_canale(mittente, testo)
+    if testo.startswith("/sponsor"):
+        return await comando_sponsor(mittente, testo)
     if testo.startswith("/vetrina"):
         return await comando_vetrina(mittente, testo)
     if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
@@ -12357,6 +12573,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                 "SELECT 1 FROM annunci a WHERE a.stato='attivo'"
                 + _w + " LIMIT 1", _wp).fetchone() else 0
         risposta["occasioni"] = occ
+        # LO SPAZIO SPONSORIZZATO (ago 2026): lo SLUG di chi e' vivo,
+        # o '' — e viaggia qui accanto alle occasioni per la stessa
+        # ragione, che questa risposta il client la chiede gia' e una
+        # card in home non merita un giro di rete suo. Il testo del
+        # racconto NON passa da qui: sta nel catalogo del client, e da
+        # questa parte non ne esiste una riga. La chiave assente (un
+        # server di ieri) = nessuno sponsor, cioe' un'assenza e mai una
+        # bugia.
+        risposta["sponsor"] = sponsor_vivo(_ora)
         # I pionieri viaggiano insieme (niente giro di rete in piu');
         # a interruttore spento la chiave non c'e' e il frontend non
         # disegna la riga.
@@ -13142,7 +13367,7 @@ def barattolo_pubblico(token: str):
 
 
 @app.get("/api/negozio/{chi}")
-def negozio(chi: str, limit: int = 0, cursore: str = "",
+def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
             x_tg_init_data: str = Header(""),
             barattolo_sessione: str = Cookie("")):
     """La pagina-negozio di un venditore: profilo pubblico + i suoi
@@ -13182,6 +13407,34 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     if not v:
         con.close()
         raise HTTPException(404, "Negozio non trovato")
+    # LE APERTURE DELLO SPAZIO IN VETRINA (ago 2026): quante volte si
+    # arriva qui DALLA CARD di «Da scoprire», mai CHI. La tabella non
+    # ha un `tg_id` per costruzione, e questa riga non lo legge
+    # nemmeno: `user` sta due righe piu' su e qui dentro non entra.
+    # SI CONTA SOLO COL PARAMETRO ESPLICITO E CON LO SPAZIO VIVO — il
+    # gate in LETTURA di ferie e lampo: alla scadenza il contatore si
+    # ferma da solo, senza che nessuna scopa passi.
+    # E' UNA SCRITTURA SU UNA GET, e il precedente e' /api/me coi
+    # distintivi: idempotente per giorno, una riga sola che non cresce.
+    # IMPERFEZIONE DICHIARATA: `da` lo scrive il client, quindi chi lo
+    # manda a mano gonfia il numero. E' un TERMOMETRO e non un dato su
+    # cui si decide del denaro (il precedente e' il like sulle funzioni
+    # in arrivo), e stringerlo vorrebbe dire tenere qui anche il codice
+    # negozio dello sponsor — una terza chiave da mantenere in pari per
+    # una difesa che dal negozio giusto non reggerebbe comunque.
+    # Fail-open: un contatore non deve poter rompere una pagina.
+    if da == "sponsor":
+        _sp = sponsor_vivo()
+        if _sp:
+            try:
+                con.execute(
+                    "INSERT INTO sponsor_aperture(slug, giorno, quante) "
+                    "VALUES(?,?,1) ON CONFLICT(slug, giorno) DO UPDATE "
+                    "SET quante=quante+1",
+                    (_sp, time.strftime("%Y-%m-%d")))
+                con.commit()
+            except Exception as e:
+                print(f"[!] Aperture sponsor: {e}")
     # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
     dove = "a.venditore_id=? AND a.stato='attivo'"
@@ -37088,6 +37341,47 @@ def scadenze_ferie():
     con.close()
 
 
+ORE_PREAVVISO_SPONSOR = 72
+TIMBRO_SPONSOR = "sponsor_scadenza"
+
+
+async def avvisa_scadenza_sponsor():
+    """«Fra tre giorni lo spazio in vetrina scade»: UNA notifica ai
+    moderatori, cosi' la scadenza non arriva di sorpresa e c'e' il
+    tempo di rinnovare o di avvisare chi l'ha comprato.
+
+    IL TIMBRO PORTA LA SCADENZA e non il solo nome, ed e' la riga da
+    non semplificare: col nome nudo un rinnovo — che sposta `fino` e
+    tiene lo stesso slug — non risuonerebbe mai piu'. Cosi' invece
+    ogni scadenza nuova ha il suo timbro, e quella vecchia resta
+    scritta senza dar fastidio a nessuno.
+
+    Timbro PRIMA dell'invio, il patto delle campagne: un errore di
+    rete puo' perdere un avviso di cortesia, mai raddoppiarlo. E si
+    tace se lo spazio non c'e': una coda ferma non suona."""
+    if ORE_PREAVVISO_SPONSOR <= 0:
+        return
+    slug = sponsor_vivo()
+    if not slug:
+        return                      # niente in vetrina: niente da dire
+    fino = sponsor_fino()
+    if fino > int(time.time()) + ORE_PREAVVISO_SPONSOR * 3600:
+        return                      # troppo presto
+    marchio = f"{slug}:{fino}"
+    if timbro_letto(TIMBRO_SPONSOR) == marchio:
+        return                      # gia' detto per QUESTA scadenza
+    timbro_scrivi(TIMBRO_SPONSOR, marchio)
+    aperte = aperture_sponsor(slug)
+    print(f"[i] Spazio in vetrina «{slug}» in scadenza {_quando_scade(fino)}")
+    await notifica_admin(
+        f"📣 <b>Lo spazio in vetrina scade {_quando_scade(fino)}.</b>\n"
+        f"In vetrina: <b>{slug}</b> — aperto {aperte} volte negli "
+        f"ultimi 30 giorni.\n\n"
+        f"Alla scadenza sparisce da solo: la card in «Da scoprire», il "
+        f"racconto in cima al negozio, e il banner del venditore torna "
+        f"se ce l'aveva. Per rinnovare: <code>/sponsor {slug} 30</code>")
+
+
 async def avvisa_rientro_ferie():
     """«Domani riapri»: il promemoria del giorno prima, cosi' il
     rientro automatico non coglie nessuno impreparato — e chi vuole
@@ -37408,6 +37702,7 @@ async def orologio():
             print(f"⚠️ Scadenze lampo saltate: {e}")
         try:
             await avvisa_rientro_ferie()   # prima: legge le ferie ancora vive
+            await avvisa_scadenza_sponsor()
             scadenze_ferie()               # poi la scopa azzera le passate
         except Exception as e:
             print(f"⚠️ Giro delle ferie saltato: {e}")
@@ -40274,7 +40569,8 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 # FILE_FONT); i nomi sono gli ID delle card (per le due occasioni,
 # anche le chiavi dei filtri che accendono), e restano quelli per
 # sempre.
-FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp")
+FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
+                 "to-the-moon.webp")
 
 
 # Le anteprime dei reparti (ago 2026): l'og:image di
@@ -40309,6 +40605,38 @@ def asset_og(nome: str, if_none_match: str = Header("")):
     # il file si puo' ridisegnare (basta rifare l'illustrazione e
     # rilanciare og_categorie.py).
     return _file_con_etag(percorso, "image/jpeg", "public, no-cache",
+                          if_none_match)
+
+
+# LE IMMAGINI DEI RACCONTI (ago 2026): le foto dello spazio in
+# vetrina, che vivono in cima al negozio dello sponsor. Cartella SUA e
+# MAI `assets/scoprire/`, per la ragione gia' scritta li' accanto:
+# `ritaglia_categorie.py` fa il glob di quella cartella, e un'immagine
+# a pieno bordo le inquinerebbe la mediana del pareggio. Vale anche
+# per la banda larga — qui i file sono grandi e sono parecchi.
+#
+# LA WHITELIST E' UNA FORMA E NON UN ELENCO, ed e' la differenza con
+# le tre sorelle di `FILE_SCOPRIRE`: quelle sono tre e si contano, i
+# racconti crescono di tre-quattro file per ogni sponsor nuovo e un
+# elenco a mano sarebbe l'ennesima lista da tenere in pari (la
+# lezione del titolo nudo nelle notifiche). La forma la derivano gli
+# slug del catalogo — `{slug}-cop.webp` per la copertina e
+# `{slug}-1..9.webp` per le altre — quindi lo sponsor di domani porta
+# i suoi file e non tocca questa riga.
+FORMA_RACCONTO = re.compile(r"^([a-z0-9-]{2,40})-(?:cop|[1-9])\.webp$")
+
+
+@app.get("/assets/racconti/{nome}")
+def asset_racconto(nome: str, if_none_match: str = Header("")):
+    m = FORMA_RACCONTO.match(nome)
+    if not m or m.group(1) not in SLUG_SPONSOR:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "racconti", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    # Revalidazione come le sorelle: i file si ridisegnano sotto lo
+    # stesso nome, e un racconto si corregge senza rinominare niente.
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
                           if_none_match)
 
 

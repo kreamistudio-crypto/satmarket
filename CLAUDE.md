@@ -2332,10 +2332,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a
   quella pagina ci si arriva solo da un tab, cioe' per curiosita'.
-  E' IL SECONDO TIPO DI TOCCO della fila, e NON e' una deroga: le
-  SPONSORIZZATE porteranno a un annuncio, cioe' navigheranno anche
-  loro — il dispatch e' la preparazione che questa lista aspettava
-  comunque, non un caso particolare aperto per una card. Una voce che
+  E' IL SECONDO TIPO DI TOCCO della fila, e NON e' una deroga: lo
+  SPAZIO IN VETRINA porta al NEGOZIO del suo venditore, cioe' naviga
+  anche lui — il dispatch e' la preparazione che questa lista
+  aspettava comunque, non un caso particolare aperto per una card.
+  (⚠️ La riga diceva «porteranno a un ANNUNCIO»: era la previsione di
+  quando la card sponsorizzata non esisteva ancora, ed e' cambiata in
+  corsa — vedi «LO SPAZIO IN VETRINA» per il perche'.) Una voce che
   dichiara un `tocca` se ne va da `toccaScoperta` PRIMA di sfiorare i
   filtri (niente stato, checkbox, scroll, richiesta), e il dispatch
   sta in TESTA apposta: sotto c'e' la grammatica dell'interruttore, e
@@ -2467,6 +2470,177 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL FILE E' `assets/scoprire/p2p.webp`, 816x390 come le sorelle, e
   arriva da Andrea a 2752x1536 col ritaglio CENTRATO di sempre
   (ImageOps.fit LANCZOS q92 method=6).
+  LO SPAZIO IN VETRINA 📣 (ago 2026): un progetto compra una
+  settimana in «Da scoprire», e la sua card porta al NEGOZIO del
+  venditore — non a una pagina a parte — dove in cima compare il
+  RACCONTO, sopra la merce di sempre. Il primo e' «To The Moon», il
+  gioco da tavolo di Alan.
+  IL CANTIERE E' CAMBIATO IN CORSA, ed e' la decisione che porta via
+  tutto il resto (Andrea): nacque come «una pagina a parte», e il
+  negozio l'ha vinta perche' esiste gia' con la sua anteprima social,
+  il catalogo paginato, i feedback, le promesse, i ponti di contatto,
+  gli esauriti e lo scroll infinito. Una pagina a parte avrebbe
+  dovuto ricomprarsi tutto, sarebbe stata L'UNICA PAGINA DI BARATTOLO
+  DOVE NON SI COMPRA NIENTE, e per aprirla fuori dalla Mini App
+  avrebbe rimesso lo scatto d'avvio — ~900 KB piu' sei giri di rete —
+  che due cantieri recenti hanno appena tolto.
+  E' PUBBLICITA', E SI DICE DUE VOLTE (il punto da non ammorbidire):
+  la pastiglia «Sponsor» sulla CARD — in alto a destra, l'angolo
+  libero, di CARTA crema fissa nei due temi come tutto cio' che sta
+  sopra una foto — e sulla PAGINA la stessa pastiglia piu' UNA RIGA IN
+  CHIARO. Nessuna delle due basta da sola. LA SECONDA FRASE DI QUELLA
+  RIGA CONTA PIU' DELLA PRIMA — «le tutele sull'acquisto sono le
+  stesse di ogni altro negozio» — perche' senza, «in vetrina su
+  Barattolo» si legge come un ENDORSEMENT nostro: che e' esattamente
+  cio' che il `PROMPT_MODERAZIONE` vieta agli altri («il testo che SI
+  RIVOLGE A CHI LEGGE come farebbe la piattaforma»), e quella regola
+  non puo' valere solo per loro. Si tortura.
+  IL RACCONTO E' UN CATALOGO NEL CLIENT (`RACCONTI`), non un campo di
+  prosa di un utente: in Barattolo un venditore non ha nessun posto
+  dove scrivere prosa lunga su di se' — verificato, nessuna colonna
+  `bio`/`presentazione` esiste — e questo cantiere NON la inventa. E'
+  roba nostra, committata, come `SCOPRIRE`, `TAPPE_TOUR` o `PICKER`:
+  niente moderazione a runtime, niente `innerHTML` da una fetch,
+  niente colonna di prosa da difendere. SONO DATI E NON MARKUP,
+  deliberato: il secondo progetto scrive TESTI e non HTML, e i testi
+  passano da `esc()` come quelli di chiunque altro — cosi' il giorno
+  che la lista arrivasse dal server non ci sarebbe da riscrivere
+  niente. Ogni progetto nuovo costa un deploy, che con «uno alla
+  volta» e il prezzo fuori dal software e' la stessa scaletta di
+  `assets/scoprire/`.
+  IL BLOCCO «COME FUNZIONA QUESTO SPAZIO» E' NOSTRO E VIVE NEL
+  RENDERER, mai nel catalogo: la dichiarazione di pubblicita' non puo'
+  dipendere da chi la paga — se stesse la', il progetto di domani
+  potrebbe nascere senza. E NON DICE NESSUNA CIFRA sulla commissione
+  (segnalato da Andrea): oggi e' a ZERO, e un «resta l'1% di sempre»
+  diventerebbe falso il giorno che si accende — cioe' proprio dentro
+  il blocco che promette di non avere commissioni nascoste. C'e' la
+  prova che nel racconto non compaia nessuna percentuale.
+  NIENTE COPERTINA, e questa riga ROVESCIA il primo disegno
+  (decisione di Andrea, che chiedeva di tenere ANCHE il banner del
+  venditore): in testa vanno pastiglia, occhiello, titolo, intro e il
+  link che apre — l'immagine grande si e' appena vista a tutto schermo
+  nella card, e ripeterla a un tocco di distanza non aggiunge niente.
+  IL CONTO CHE HA DECISO: due immagini 3:1 in fila facevano 396px
+  sopra il nome del venditore, cioe' la prima card fuori da qualunque
+  schermo — la testata e' gia' 226px nel caso minimo e ~618 nel
+  tipico. Le foto del progetto vivono DENTRO il cassetto, dove a
+  schermo non pesano finche' resta chiuso.
+  ⚠️ MA IL COSTO VERO E' PIU' DEL TRIPLO DI QUANTO STIMATO, ed e' il
+  numero da tenere perche' il piano diceva «~98px» e la MISURA dice
+  altro. A 360px, prima card: **554 senza racconto, 863 col racconto
+  CHIUSO, 2301 con quello aperto** — quindi il cassetto chiuso costa
+  **+309px**, non cento. Dentro: `.rac-testa` 188 (pastiglia,
+  occhiello, titolo, intro, il link che apre) e `.rac-avviso` 93,
+  che da solo pesa piu' del doppio dei ~40 previsti. LE TRE LEVE, se
+  a rodaggio non reggesse: l'occhiello via (~18), l'intro a due righe
+  invece di quattro (~44), e l'avviso su una riga sola in meno (~23).
+  LA PASTIGLIA E LA SECONDA FRASE DELL'AVVISO NON SI TOCCANO: sono il
+  punto 1, e i pixel che costano si pagano.
+  E IL BANNER RESTA DOV'E', PER TUTTI: sono due cose diverse che nel
+  primo disegno si facevano concorrenza — un'insegna che porta FUORI
+  da Barattolo, e un titolo che porta alla merce sotto. Chi arriva da
+  un annuncio non apre il racconto e non deve perdere l'insegna che
+  quel venditore si e' guadagnata. C'e' la prova che `bannerNegozio`
+  non guardi lo spazio in vetrina.
+  IL CASSETTO NASCE APERTO A CHI E' VENUTO PER LEGGERE, ed e' la riga
+  che rende sostenibile tutto il resto: chi tocca la card ha toccato
+  proprio per la storia, e trovarla chiusa sarebbe il contrario del
+  servizio; chi arriva al negozio dalla scheda di un annuncio sta
+  cercando la merce, e la trova dov'e' sempre stata. E' il pattern di
+  `notaApertaDefault`. La memoria e' una VARIABILE e non il DOM (alla
+  `toggleAccAdm`): `#negozioHeader` si riscrive con innerHTML, e un
+  ridisegno futuro richiuderebbe il racconto sotto le dita di chi
+  legge. Mai localStorage: e' lo stato di una pagina, non una
+  preferenza.
+  IL GATE E' IN LETTURA e NESSUNA SCOPA SPEGNE NIENTE — il patto di
+  `ferie_fino` e di `lampo_scadenza`: alla scadenza il server smette
+  di mandare lo slug nella busta di prima pagina, e la card sparisce
+  da sola, il racconto pure, il banner torna se c'era. Nessuna lapide
+  e nessun 404: chi ha il link `/negozio/{codice}` continua a vedere
+  il negozio, senza racconto. C'e' il censimento che a scrivere sia il
+  solo comando del bot — un orologio che spegnesse sarebbe uno stato
+  in piu' da tenere in pari con la lettura.
+  LO STATO VIVE IN `impostazioni` (`sponsor_slug`, `sponsor_fino`), e
+  il suo recinto li ammette: uno slug e una data non accendono niente
+  e sbagliarli si vede subito — la famiglia dell'id del canale. Si
+  cambia DAL BOT: `/sponsor to-the-moon 30`, `/sponsor` per sapere chi
+  c'e', `/sponsor spento`. ⚠️ NON SI PROVA NIENTE PRIMA DI CREDERCI,
+  al contrario di `/canale`: li' si manda un messaggio di collaudo
+  perche' il permesso su un canale altrui non dipende da noi, qui lo
+  slug si valida contro `SLUG_SPONSOR` — che e' roba di casa — e non
+  c'e' nessun terzo a cui chiedere.
+  FAIL-CLOSED IN TRE PUNTI, e sono tutti e tre girati in CI: uno slug
+  fuori catalogo non accende niente, una data storta vale «scaduto»
+  (mai «per sempre»), e SENZA IL CODICE NEGOZIO nel catalogo la card
+  non nasce e il racconto nemmeno — meglio nessuna card che una che
+  porta al negozio sbagliato. Quel codice si riempie A MANO quando lo
+  spazio si vende, ed e' anche il legame slug→negozio: il client
+  conosce lo slug (dalla busta) e il codice (dal catalogo), quindi il
+  match lo fa da solo e `/api/negozio` non guadagna una riga.
+  IL TITOLO STA DENTRO L'IMMAGINE (decisione di Andrea): la card
+  sponsor e' l'unica che non porta la scritta dell'app — il progetto
+  manda la sua grafica col nome dentro, e sovrapporgli il nostro lo
+  direbbe due volte. Da qui la fascia del contrasto non la si misura,
+  e la prova quel caso lo DICHIARA invece di saltarlo in silenzio:
+  `BANNER` dev'essere ESATTAMENTE l'insieme delle card SENZA
+  `titoloDentro`, quindi togliendo quel flag la CI viene a chiedere la
+  sua misura. La RISERVA invece resta sempre — e' il ripiego di quando
+  l'immagine non arriva, e li' un nome ci vuole.
+  `file` E `testo` SONO FUNZIONI e non valori, e il renderer li
+  risolve in un posto solo: questa voce non sa a chi appartiene finche'
+  la busta non arriva, e una costante letta all'avvio direbbe sempre
+  lo spazio di ieri. Un `${v.testo}` rimasto in giro scriverebbe
+  «() => ...» dentro un aria-label, e a dirlo non sarebbe nessuno: si
+  legge solo con lo screen reader acceso.
+  LE APERTURE SI CONTANO, MAI CHI (decisione di Andrea, la regola del
+  conteggio dei savers): tabella `sponsor_aperture(slug, giorno,
+  quante)` con UPSERT — un giorno per riga, cosi' si vede l'andamento
+  invece di un totale piatto — e NIENTE `tg_id`, per costruzione e non
+  per attenzione: non essendoci la colonna, nessuna query futura potra'
+  scriverlo per distrazione. ⚠️ E' UN TERMOMETRO E NON UNA MISURA: a
+  dire «vengo dallo spazio» e' il CLIENT (`?da=sponsor`), quindi il
+  numero si gonfia da chiunque sappia scrivere un URL. Va bene per la
+  domanda che deve rispondere — «e' servito?» — e non per una fattura.
+  ⚠️ La prova che lo verifica guarda il DDL SENZA LA PROSA: il
+  commento nomina `tg_id` apposta, per dire che non c'e'.
+  LA ROTTA DEGLI ASSET E' UNA WHITELIST DI FORMA e non un elenco
+  (`FORMA_RACCONTO` + `SLUG_SPONSOR`): le foto di un racconto sono tre
+  oggi e cinque domani, e un elenco a mano sarebbe l'ennesima lista da
+  tenere in pari — col guasto che non fallisce, si vede solo come
+  un'immagine che non arriva. La forma da sola pero' non basta: lo
+  slug dev'essere uno di quelli VENDUTI, o la rotta servirebbe la
+  cartella a chiunque sappia indovinare un nome.
+  IL PROMEMORIA DELLA SCADENZA e' il calco di `avvisa_rientro_ferie`:
+  tre giorni prima UNA notifica ai moderatori, col timbro in `timbri`
+  scritto PRIMA dell'invio (il patto delle campagne). ⚠️ IL TIMBRO
+  PORTA LA SCADENZA (`slug:fino`) e non il solo nome, ed e' la riga da
+  non semplificare: col nome nudo un RINNOVO — che sposta `fino` e
+  tiene lo stesso slug — non risuonerebbe MAI piu'.
+  QUEL CHE NON SI TOCCA, e perche': `_seo_negozio` non cambia di una
+  riga — l'anteprima resta `IMMAGINE_BRAND`, e le sei prove di «DOVE
+  NON ENTRA» restano verdi E restano vere, che «un'anteprima col
+  NOSTRO nome e la pubblicita' di un altro sito e' l'impersonazione
+  con la nostra faccia sopra»; nessuna rotta nuova (il racconto vive
+  dentro il negozio, che ha gia' indirizzo, anteprima e voce in
+  sitemap); nessuna colonna di prosa su `utenti`; e `renderScoprire`
+  non cambia forma — mangia una lista, e questa e' una voce in piu'.
+  ⚠️ «UNO ALLA VOLTA» E' LA TAPPA, NON LA FORMA (nota di Andrea):
+  l'idea e' che piu' avanti nasca una categoria «Consigliati» dove
+  finiscono tutti i progetti e i negozi che segnaliamo noi. La strada
+  e' gia' aperta e non e' costata niente — `SLUG_SPONSOR` e' una
+  TUPLA, `RACCONTI` un DIZIONARIO, e il renderer mangia una lista —
+  quindi a cambiare sara' la sola IMPOSTAZIONE, che oggi tiene uno
+  slug solo. NON si costruisce adesso.
+  RESTA FUORI, dichiarato: il pagamento self-service (`motivo=
+  'sponsor'` in `pagamenti` e' gia' generico, si costruisce col
+  secondo cliente), la rotazione di piu' spazi insieme, l'anteprima
+  social dedicata, il racconto SCRITTO dal venditore (qui l'HTML e'
+  nostro, e aprirlo vorrebbe dire il primo campo di prosa lunga
+  pubblica del progetto, con la sua moderazione), e qualunque metrica
+  oltre le aperture — niente clic sui link, niente tempo di lettura,
+  niente chi.
+
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
   le stesse 27 figure della pagina Sfoglia, nello stesso ordine (per
