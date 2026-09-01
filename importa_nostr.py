@@ -61,13 +61,52 @@ DB = "satmarket.db"
 FOTO_DIR = "foto"                    # stessa cartella degli annunci normali
 MAX_FOTO_BYTES = 3_000_000           # oltre ~3 MB la foto resta un URL
 
-RELAYS = [
+# I RELAY SONO UNA LEVA (ago 2026), e qui sono DUE liste per un
+# motivo: `RELAY_NOSTR` sono quelli dove Barattolo scrive e legge —
+# gli stessi del server, cosi' un relay aggiunto la' vale anche qui
+# per costruzione — e `RELAY_NOSTR_IMPORT` quelli che si interrogano
+# in PIU', i relay personali dei venditori, dove i loro annunci
+# vivono e i grossi non arrivano. La' si pubblica, qui si legge e
+# basta: tenerli separati e' quel che permette di aggiungere il relay
+# di un venditore senza mandargli anche i nostri eventi.
+# Il config e' il VALORE DI PARTENZA: senza quelle righe valgono i
+# cinque di sempre, cioe' il mondo di ieri.
+# ⚠️ IL CONFIG SI LEGGE DENTRO UN try, come NPUB_VENDITORE qui sopra:
+# questo modulo dev'essere lanciabile a mano su un Barattolo piu'
+# VECCHIO, dove quelle righe non ci sono (la lezione di
+# ricategorizza.py, che chiudeva la CI in faccia a chi lo importava).
+# ⚠️ IL NOME E' LO STESSO DEL SERVER (`RELAY_DI_SERIE`) apposta: e'
+# la stessa lista con lo stesso mestiere, e chi la cerca in un file
+# la trova nell'altro. Sta in una costante e non ripetuta due volte
+# — nel default e nel fail-safe — perche' due copie divergono al
+# primo ritocco, che e' il difetto che questo cantiere toglie.
+RELAY_DI_SERIE = [
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://relay.primal.net",
     "wss://nostr.mom",
-    "wss://21milionidinostr.duckdns.org",   # il relay del nostro venditore
 ]
+try:
+    from config import RELAY_NOSTR
+except ImportError:
+    RELAY_NOSTR = list(RELAY_DI_SERIE)
+try:
+    from config import RELAY_NOSTR_IMPORT
+except ImportError:
+    RELAY_NOSTR_IMPORT = [
+        "wss://21milionidinostr.duckdns.org",   # il relay di un venditore
+    ]
+
+# I doppioni si tolgono, e non e' cosmesi: interrogare due volte lo
+# stesso relay raddoppia i suoi eventi nel giro e — sull'altra strada,
+# quella della pubblicazione — falserebbe il conto degli OK, che e' il
+# giudice di «l'evento e' arrivato da qualche parte». L'ordine e'
+# quello scritto: prima i nostri, poi gli extra.
+RELAYS = list(dict.fromkeys(
+    [str(r) for r in list(RELAY_NOSTR) + list(RELAY_NOSTR_IMPORT)
+     if str(r).strip()]))
+if not RELAYS:                    # il fail-safe del server, qui uguale
+    RELAYS = list(RELAY_DI_SERIE)
 
 # Quanti eventi chiedere a ogni relay, SEPARATAMENTE per gli annunci e
 # per le cancellazioni (vedi interroga: un tetto solo per tutti e due

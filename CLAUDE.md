@@ -5557,6 +5557,64 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'iniziale, onerror ripiega sul tappo di sempre e poi
   sull'iniziale). Ordini e card della griglia SENZA avatar (deciso);
   in DEMO iniziali e basta.
+  I RELAY SONO UNA LEVA (ago 2026): dove Barattolo scrive e legge su
+  Nostr si cambia dal config del VPS, non con un commit. Erano CINQUE
+  elenchi scritti a mano — `RELAYS_VERIFICA` nel server, `RELAYS`
+  nell'import, e tre negli script — e già divergevano fra loro, il
+  che è anche il modo in cui questo genere di debito si fa notare:
+  non fallisce, si sfilaccia.
+  DUE LEVE E NON UNA, ed è la riga da capire prima di unirle:
+  `RELAY_NOSTR` sono quelli dove si SCRIVE e si legge (gli stessi per
+  il server e per l'import, così un relay aggiunto vale per tutti e
+  due i mestieri per costruzione), `RELAY_NOSTR_IMPORT` quelli che
+  l'import interroga in PIÙ — i relay personali dei venditori, dove i
+  loro annunci vivono e i grossi non arrivano. Là si pubblica, qui si
+  legge e basta: tenerle separate è quel che permette di aggiungere
+  il relay di un venditore senza mandargli anche i nostri eventi. Con
+  una lista sola quel relay riceverebbe le nostre note promo.
+  SI AGGIUNGE, NON SI SOSTITUISCE, e vale PER COSTRUZIONE e non per
+  prudenza: `_spedisci_ai_relay` manda a TUTTI i relay in parallelo e
+  conta gli OK, quindi un relay in più non toglie niente agli altri —
+  e dove serve almeno un OK (il ritiro NIP-09 con `esigi_ok=True`) lo
+  rende più robusto, non meno. È la ragione per cui il giorno del
+  relay nostro basterà metterlo in coda alla lista.
+  IL FAIL-SAFE È LA RIGA CHE CONTA, ed è l'unico modo in cui questo
+  cantiere può fallire in SILENZIO: una lista VUOTA nel config non
+  spegnerebbe Nostr con un messaggio — farebbe uscire ogni
+  pubblicazione con «0 relay» senza che niente lo dica, e il ritiro
+  NIP-09 smetterebbe di funzionare. Quindi vuota = valgono i quattro
+  di serie, E LO SI STAMPA. Chi vuole spegnere Nostr ha già la sua
+  leva, ed è la nsec della piattaforma. Stessa ragione per cui le
+  stringhe vuote si scartano: una riga rimasta a metà nel config non
+  deve diventare un indirizzo a cui connettersi a ogni evento.
+  ⚠️ IL NOME `RELAYS_VERIFICA` NON SI RINOMINA: è letto in una dozzina
+  di punti e importato da `ripubblica_tag_client.py`, che così eredita
+  la leva senza una riga sua — il patto dei nomi interni (`pacco`,
+  `.lampo-was`, `sconto_pacco_*`): si cambiano i testi, mai le chiavi.
+  Per la stessa ragione `_relays_import()` non cambia forma: è già il
+  collo di bottiglia che serve il browser.
+  E LA LISTA DI SERIE STA IN UNA COSTANTE, `RELAY_DI_SERIE`, con lo
+  STESSO NOME nei due file: prima viveva in due copie dentro
+  `importa_nostr.py` (il default della leva e il fail-safe), e due
+  copie divergono al primo ritocco — cioè il difetto che il cantiere
+  esiste per togliere, ricomprato dentro la cura. C'è la prova che
+  conta i `wss://` dei due file: quattro nel server, cinque
+  nell'import (la lista più il relay del venditore).
+  IL PANNELLO «⚙️ Stato delle leve» CHIEDE IL VALORE VIVO e mai la
+  costante — il patto del canale e del ritmo — e gli EXTRA
+  dell'import li DERIVA (`_relays_import()` meno `RELAYS_VERIFICA`)
+  invece di rileggersi la leva: due letture della stessa cosa un
+  giorno dicono due cose diverse. Senza extra la riga è vuota e si
+  prende la sua nota, che è il caso per cui quella nota esiste.
+  IL CONFIG SI LEGGE DENTRO UN `try` anche in `importa_nostr.py`: quel
+  modulo dev'essere lanciabile a mano su un Barattolo più VECCHIO,
+  dove quelle righe non ci sono — la lezione di `ricategorizza.py`,
+  che chiudeva la CI in faccia a chi lo importava.
+  RESTANO FUORI, dichiarati: `censimento_nostr.py` (sei relay, fra cui
+  nostr.band e snort.social — è RICERCA DI MERCATO, «quanti annunci
+  ci sono davvero su Nostr», e la lista è larga apposta) e
+  `presenta_release.py`, una tantum lanciata dal PC di Andrea con la
+  chiave release fredda. Nessuno dei due è il canale di Barattolo.
   Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
   (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
   server firma un evento NIP-99 (kind 30402, tag `d` stabile
@@ -27118,6 +27176,51 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
 rotta — solo client e tre file. DA GUARDARE dal computer di Andrea: le
 due file scorse col mouse e con le frecce, che è il gesto per cui il
 cantiere esiste.
+
+I relay Nostr diventano una leva (ago 2026, primo passo del cantiere
+del relay nostro): dove Barattolo scrive e legge su Nostr si cambia
+dal config del VPS invece che con un commit. Erano CINQUE elenchi
+scritti a mano che già divergevano fra loro, e la leva ripaga tre
+cose vere — puntare a un relay NOSTRO il giorno che ci sarà, togliere
+di mezzo in un riavvio un relay che si comporta male, e il debito già
+scritto in questo file sui relay che rifiutano gli exit node di Tor,
+dove «cambiare relay» era finora un deploy. Vedi Architettura, «I
+RELAY SONO UNA LEVA», per le DUE leve e il perché non si uniscono,
+e per il FAIL-SAFE, che è l'unico modo in cui il cantiere può fallire
+in silenzio.
+IL RELAY IN SÉ NON È QUESTO CANTIERE: il quadro completo — dove vive,
+quale programma, chi ci scrive — sta nel piano, e le due decisioni
+prese sono **4a** (lettura aperta a tutti, scrittura riservata alla
+piattaforma e ai venditori con la chiave dimostrata) e la leva
+subito. **Resta aperta** la scelta di dove vive, in attesa che LNVPS
+risponda su dominio proprio e NIP-11 personalizzabile: senza quelle
+due cose il relay gestito esce dal tavolo e resta una macchina
+piccola nostra. La macchina del NODO è sconsigliata, e le due ragioni
+stanno nel piano — un record DNS che punta all'IP dei canali, e una
+porta aperta a chiunque su una macchina dove un guasto costa sats.
+Collaudato: **+18 prove** sull'albero ISOLATO (HEAD più i soli hunk di
+questo cantiere: la cartella è condivisa con altre due sessioni, e
+7306 → 7324 è il DELTA difendibile; le 4 rosse sono preesistenti a
+HEAD e sono il mojibake del meno tipografico su una console cp1252,
+non del cantiere) e **12 MUTAZIONI, 12 uccise**, una per riga
+sorvegliata — la leva che non comanda, il fail-safe che non scatta,
+quello che scatta e TACE, le stringhe vuote, il pannello che torna
+alla costante, gli extra che saltano il giudice, il doppione che
+resta, l'ordine rovesciato, il relay del venditore sparito dal
+default, la leva tolta dal file da cui si copia, lo script che si
+riscrive la lista invece di ereditarla.
+LA PROVA HA TROVATO UN DIFETTO, ed era nella PROVA e non nel codice:
+il taglio del blocco si chiudeva sull'ultima assegnazione, che nel
+server compare DUE volte — nell'`except` e nel fail-safe — quindi
+tagliava alla prima e si portava via proprio il fail-safe, cioè la
+riga per cui la prova esiste. Diceva «il fail-safe non scatta» mentre
+a non scattare era il taglio. Da lì `_blocco` chiude su una marca
+ESCLUSA, che è la prima cosa DOPO il blocco.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna rotta — e **senza le due righe nel config del VPS non cambia
+NIENTE**, che è la regressione provata per prima (i quattro di ieri
+nel server e i cinque nell'import, nello stesso ordine). Le due righe
+si aggiungono al config solo quando ci sarà un relay da aggiungere.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

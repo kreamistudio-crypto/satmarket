@@ -517,6 +517,38 @@ ASTA_PROXY_ATTIVO = False    # rilancio automatico (False = spento)
 
 DB = "satmarket.db"
 
+# --- I relay Nostr ----------------------------------------------------
+# Dove Barattolo scrive e legge su Nostr. Erano cinque elenchi scritti
+# a mano nel codice, e gia' divergevano fra loro: da qui si cambiano
+# senza un deploy, che e' la regola di casa per tutto cio' che il VPS
+# decide (l'id del canale, ONION_HOST, le leve dei connettori).
+#
+# Serve per tre cose vere: puntare a un relay NOSTRO il giorno che ci
+# sara'; togliere di mezzo in un riavvio un relay che si comporta male
+# invece di aspettare un commit; e i relay che rifiutano gli exit node
+# di Tor, dove la strada e' sempre stata «cambiare relay» — cioe',
+# finora, un deploy.
+#
+# ⚠️ SI AGGIUNGE, NON SI SOSTITUISCE: gli eventi vanno a TUTTI i relay
+# della lista in parallelo e si contano gli OK, quindi un relay in piu'
+# non toglie niente agli altri. Lasciarne almeno un paio di quelli
+# grossi e' cio' che tiene gli annunci raggiungibili da chi ha i SUOI
+# relay e non i nostri.
+RELAY_NOSTR = [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+    "wss://nostr.mom",
+]
+# I relay che l'IMPORT interroga in piu' — quelli personali dei
+# venditori, dove i loro annunci vivono e i grossi non arrivano. Sono
+# una lista a parte e non quattro voci in fondo a quella sopra perche'
+# hanno un mestiere diverso: qui NON si pubblica, si va a leggere. Un
+# doppione fra le due liste si toglie da solo.
+RELAY_NOSTR_IMPORT = [
+    "wss://21milionidinostr.duckdns.org",   # il relay di un nostro venditore
+]
+
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------
 NPUB_VENDITORE = "INCOLLA_QUI_LA_NPUB_DEL_VENDITORE"  # npub1… oppure hex
 VENDITORE_ID = 222   # a chi intestare gli annunci importati:

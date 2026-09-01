@@ -18358,6 +18358,15 @@ def _censimento(acceso):
                  "CODICI_SCONTO_VALORI_EUR", "CODICI_SCONTO_VALORI_SATS",
                  "BANNER_LINK_VIETATI"):
         amb[nome] = [1, 2, 3]
+    # I RELAY SONO UNA LISTA ANCHE LORO, ma il nome nel pannello e'
+    # `RELAYS_VERIFICA` mentre la chiave del config si chiama
+    # `RELAY_NOSTR` — quindi cercarlo nella tupla qui sopra non lo
+    # farebbe trovare a nessuno, e senza questa riga `__missing__` lo
+    # risolve a 7: la prova non diventa rossa, ESPLODE su
+    # `str(v) for v in 7`. E' la trappola delle leve-LISTA con una
+    # causa in piu'. Stringhe vere e non [1,2,3], che qui il pannello
+    # ci fa una differenza fra due liste.
+    amb["RELAYS_VERIFICA"] = ["wss://uno.example", "wss://due.example"]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
     amb["ADMIN_IDS"] = [111111111, 222222222]
@@ -18415,6 +18424,18 @@ def _censimento(acceso):
     amb["ritmo_vetrina"] = ((lambda: (1, 2, 3)) if acceso
                             else (lambda: (0, 0, 0)))
     amb["nome_ritmo"] = (lambda: "giorno") if acceso else (lambda: "")
+    # I relay dell'IMPORT si chiedono al GIUDICE come il canale e il
+    # ritmo: il pannello ne deriva gli EXTRA sottraendo quelli del
+    # server, quindi lo stub e' anche quel che rende la prova capace
+    # di dire «la riga e' vuota quando non c'e' nessun extra». A leve
+    # spente il giudice torna i soli relay del server, la differenza
+    # e' vuota e la riga si prende la sua nota — che e' esattamente
+    # il caso per cui quella nota esiste.
+    amb["_relays_import"] = ((lambda: ["wss://uno.example",
+                                       "wss://due.example",
+                                       "wss://tre.example"]) if acceso
+                             else (lambda: ["wss://uno.example",
+                                            "wss://due.example"]))
     amb["SPIEGA_RITMO"] = {"giorno": "uno al giorno per venditore"}
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
@@ -19693,6 +19714,181 @@ def prove_vetrina_canale():
           "html.escape(t[" in rs)
     prova("il riepilogo non finisce su Nostr", False,
           "_spedisci_ai_relay" in rs or "firma_evento" in rs)
+
+
+def _blocco(src, inizio, dopo):
+    """Taglia il codice fra `inizio` e la prima cosa che viene DOPO.
+
+    ⚠️ LA MARCA DI FINE E' QUELLA ESCLUSA, e non la riga finale del
+    blocco: la prima stesura chiudeva sull'ultima assegnazione, che
+    nel blocco del server compare DUE volte — nell'`except` e nel
+    fail-safe — quindi tagliava alla prima e si portava via proprio
+    il fail-safe, cioe' la riga per cui questa prova esiste. La prova
+    diventava rossa dicendo «il fail-safe non scatta» mentre a non
+    scattare era il taglio. Una marca che segue il blocco non ha quel
+    problema, e se sparisce lo dice.
+
+    ⚠️ E si cerca con `find` e non con `.index()`: una marca sparita
+    deve fare una prova ROSSA che dice cosa manca, non ESPLODERE
+    portandosi via le sorelle dopo di lei."""
+    i = src.find(inizio)
+    assert i >= 0, f"marca d'inizio sparita: {inizio!r}"
+    j = src.find(dopo, i)
+    assert j >= 0, f"marca di fine sparita: {dopo!r}"
+    return src[i:j]
+
+
+def prove_relay_leva():
+    """I RELAY SONO UNA LEVA (ago 2026).
+
+    Erano cinque elenchi scritti a mano che gia' divergevano fra loro,
+    quindi puntare a un relay NOSTRO — il giorno che ci sara' — era un
+    commit invece di una riga nel config del VPS.
+
+    Le due prove che decidono sono la REGRESSIONE (senza config valgono
+    i relay di ieri, byte per byte) e il FAIL-SAFE sulla lista vuota,
+    che e' l'unico modo in cui questo cantiere puo' fallire in
+    SILENZIO: una lista vuota non spegnerebbe Nostr con un messaggio,
+    farebbe uscire ogni pubblicazione con «0 relay» senza che niente
+    lo dica."""
+    print("\n[i relay sono una leva]")
+    import sys
+    import types
+
+    SERVER = _blocco(_SORGENTE, "RELAY_DI_SERIE = [",
+                     "\nCHARSET_BECH32")
+    _IMP = open("importa_nostr.py", encoding="utf-8").read()
+    IMPORT = _blocco(_IMP, "RELAY_DI_SERIE = [",
+                     "\n# Quanti eventi chiedere")
+
+    def deriva(blocco, **leve):
+        """Fa girare un blocco di derivazione con un `config` finto.
+
+        Il config si INIETTA in sys.modules e non si scrive su disco:
+        quel file non e' nostro, e una prova che lo tocca e' una prova
+        che rompe il computer di chi la lancia.
+
+        ⚠️ `sys.modules["config"] = None` NON e' una svista — e' il
+        modo documentato di far alzare ImportError a un import, ed e'
+        l'unica cosa che rende provabile il caso «senza config» anche
+        in LOCALE, dove config.py c'e' davvero. Senza, questa prova
+        direbbe il vero in CI e il falso sul portatile: la classe di
+        bug che in questo progetto e' gia' costata una CI rossa per
+        nove ore."""
+        vecchio = sys.modules.get("config", "(assente)")
+        if leve:
+            finto = types.ModuleType("config")
+            for k, v in leve.items():
+                setattr(finto, k, v)
+            sys.modules["config"] = finto
+        else:
+            sys.modules["config"] = None     # -> ImportError
+        detto = []
+        amb = {"__builtins__": __builtins__,
+               "print": lambda *a, **k: detto.append(" ".join(map(str, a)))}
+        try:
+            exec(blocco, amb)
+        finally:
+            if vecchio == "(assente)":
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+        return amb, detto
+
+    QUATTRO = ["wss://relay.damus.io", "wss://nos.lol",
+               "wss://relay.primal.net", "wss://nostr.mom"]
+    VENDITORE = "wss://21milionidinostr.duckdns.org"
+
+    # --- 1) LA REGRESSIONE, che viene prima di tutto -------------
+    # Senza le righe nel config valgono i relay di ieri, nello stesso
+    # ordine: e' la sola cosa che permette di deployare la leva senza
+    # toccare il config del VPS.
+    amb, _ = deriva(SERVER)
+    prova("senza config il server ha i quattro di ieri",
+          QUATTRO, amb["RELAYS_VERIFICA"])
+    amb, _ = deriva(IMPORT)
+    prova("senza config l'import ha i cinque di ieri",
+          QUATTRO + [VENDITORE], amb["RELAYS"])
+
+    # --- 2) LA LEVA COMANDA --------------------------------------
+    amb, _ = deriva(SERVER, RELAY_NOSTR=["wss://relay.barattolo.store"])
+    prova("la leva comanda sul server",
+          ["wss://relay.barattolo.store"], amb["RELAYS_VERIFICA"])
+    amb, _ = deriva(IMPORT, RELAY_NOSTR=["wss://a"],
+                    RELAY_NOSTR_IMPORT=["wss://b"])
+    prova("la leva comanda sull'import", ["wss://a", "wss://b"],
+          amb["RELAYS"])
+
+    # --- 3) IL FAIL-SAFE, e il fatto che LO DICA -----------------
+    # Il verso in cui questo cantiere puo' fallire male e' uno solo:
+    # una lista vuota nel config che fa uscire ogni evento con «0
+    # relay» in silenzio. Il ritiro NIP-09 esige almeno un OK, quindi
+    # smetterebbe di funzionare senza che niente lo dica.
+    amb, detto = deriva(SERVER, RELAY_NOSTR=[])
+    prova("lista vuota: il server torna ai relay di serie",
+          QUATTRO, amb["RELAYS_VERIFICA"])
+    prova("...e lo dice invece di tacere", True,
+          any("RELAY_NOSTR" in r for r in detto))
+    amb, _ = deriva(IMPORT, RELAY_NOSTR=[], RELAY_NOSTR_IMPORT=[])
+    prova("lista vuota: l'import torna ai relay di serie",
+          QUATTRO, amb["RELAYS"])
+
+    # --- 4) LE STRINGHE VUOTE NON DIVENTANO RELAY ----------------
+    # Una riga rimasta a meta' nel config del VPS non deve diventare
+    # un indirizzo: `_spedisci_ai_relay` ci proverebbe a connettersi
+    # e conterebbe un fallimento in piu' a ogni evento.
+    amb, _ = deriva(SERVER, RELAY_NOSTR=["wss://vero", "", "   "])
+    prova("le stringhe vuote si scartano", ["wss://vero"],
+          amb["RELAYS_VERIFICA"])
+
+    # --- 5) IL DOPPIONE SI TOGLIE, E L'ORDINE RESTA --------------
+    # Interrogare due volte lo stesso relay raddoppia i suoi eventi
+    # nel giro; e sull'altra strada — la pubblicazione — falserebbe
+    # il conto degli OK, che e' il giudice di «l'evento e' arrivato».
+    amb, _ = deriva(IMPORT, RELAY_NOSTR=["wss://a", "wss://b"],
+                    RELAY_NOSTR_IMPORT=["wss://b", "wss://c"])
+    prova("il doppione si toglie e l'ordine e' quello scritto",
+          ["wss://a", "wss://b", "wss://c"], amb["RELAYS"])
+
+    # --- 6) UNA SOLA LISTA DI SERIE, in ognuno dei due file ------
+    # Il difetto che il cantiere toglie e' proprio questo: elenchi
+    # ripetuti che divergono. Quattro occorrenze nel server (la
+    # lista) e cinque nell'import (la lista piu' il relay del
+    # venditore): di piu' vuol dire che una copia e' tornata.
+    prova("in server.py i wss:// sono solo quelli di serie", 4,
+          _SORGENTE.count("wss://"))
+    prova("in importa_nostr.py sono la lista piu' il venditore", 5,
+          _IMP.count("wss://"))
+
+    # --- 7) IL NOME NON SI RINOMINA ------------------------------
+    # `RELAYS_VERIFICA` e' letto in una dozzina di punti e importato
+    # da `ripubblica_tag_client.py`, che cosi' eredita la leva senza
+    # una riga sua — il patto dei nomi interni.
+    prova("RELAYS_VERIFICA resta il nome di casa", True,
+          _SORGENTE.count("RELAYS_VERIFICA") > 8)
+    rip = open("ripubblica_tag_client.py", encoding="utf-8").read()
+    prova("lo script della ripubblicazione eredita la leva", True,
+          "server.RELAYS_VERIFICA" in rip and "wss://relay." not in rip)
+
+    # --- 8) IL PANNELLO CHIEDE IL VALORE VIVO --------------------
+    # E' la trappola che quella pagina esiste per non far ricadere:
+    # leggere la costante del config direbbe lo stato di IERI, non
+    # quello con cui il server sta girando.
+    ls = codice(pezzo("_leve_stato"))
+    prova("il pannello legge RELAYS_VERIFICA e non il config", True,
+          "_elenco(RELAYS_VERIFICA)" in ls)
+    prova("...e gli extra li deriva dal giudice", True,
+          "_relays_import()" in ls)
+    prova("...senza rileggersi la leva per conto suo", False,
+          "from config import RELAY_NOSTR" in ls)
+
+    # --- 9) LE DUE LEVE STANNO DOVE SI COPIA ---------------------
+    # `prove_config_esempio` lo verifica gia' per censimento, ma una
+    # riga col NOME dice a chi la vede rossa quale delle due manca.
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    for nome in ("RELAY_NOSTR", "RELAY_NOSTR_IMPORT"):
+        prova(f"{nome} e' nel file da cui si copia", True,
+              f"\n{nome} = [" in cfg)
 
 
 def prove_leve():
@@ -39802,7 +39998,7 @@ def main():
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_podio_riepilogo, prove_vetrina_negozio,
-              prove_vetrina_canale,
+              prove_vetrina_canale, prove_relay_leva,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_salvati,

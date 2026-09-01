@@ -15852,6 +15852,22 @@ def _leve_stato():
                          "sposta_a_mano.py"),
         ]},
         {"gruppo": "🟣 Nostr e canali", "voci": [
+            # I RELAY VENGONO PRIMI, che e' dove si pubblica prima di
+            # cosa si pubblica — e si chiedono al VALORE VIVO e non
+            # alla costante del config, il patto del canale e del
+            # ritmo: leggere il config direbbe lo stato di ieri, ed e'
+            # la trappola che questo pannello esiste per non far
+            # ricadere.
+            _leva("Relay Nostr", "RELAY_NOSTR", _elenco(RELAYS_VERIFICA)),
+            # Gli EXTRA dell'import si derivano dalla lista vera meno
+            # quella sopra, invece di rileggere la leva: due letture
+            # della stessa cosa un giorno dicono due cose diverse.
+            _leva("Relay in più per l'import", "RELAY_NOSTR_IMPORT",
+                  _elenco([r for r in _relays_import()
+                           if r not in RELAYS_VERIFICA]),
+                  spento="l'import interroga solo i relay qui sopra: i "
+                         "venditori che pubblicano sul proprio relay "
+                         "personale non si vedono"),
             _leva("Import aperto da Nostr", "IMPORT_NOSTR_APERTO",
                   bool(IMPORT_NOSTR_APERTO),
                   acceso="il server apre account per venditori che non ci "
@@ -28643,12 +28659,37 @@ async def elimina_codice_sconto(codice_id: int,
 # (oggi importabile, ma i gemelli restano: il server non deve dipendere
 # da uno script che vive di vita propria).
 
-RELAYS_VERIFICA = [
+# I RELAY SONO UNA LEVA (ago 2026): erano cinque elenchi scritti a
+# mano che gia' divergevano fra loro, quindi puntare a un relay nuovo
+# — il NOSTRO, il giorno che ci sara' — era un commit invece di una
+# riga nel config del VPS. E' la regola di casa per tutto cio' che il
+# VPS decide: `canale_id()`, `ONION_HOST`, le sei dei connettori.
+# Il config e' il VALORE DI PARTENZA e non la verita': senza quella
+# riga valgono i quattro di sempre, cioe' il mondo di ieri byte per
+# byte.
+# ⚠️ IL NOME NON SI RINOMINA: `RELAYS_VERIFICA` e' letto in una dozzina di
+# punti e importato da `ripubblica_tag_client.py`, che cosi' eredita
+# la leva senza una riga — il patto dei nomi interni.
+RELAY_DI_SERIE = [
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://relay.primal.net",
     "wss://nostr.mom",
 ]
+try:
+    from config import RELAY_NOSTR
+    RELAYS_VERIFICA = [str(r) for r in RELAY_NOSTR if str(r).strip()]
+except ImportError:
+    RELAYS_VERIFICA = list(RELAY_DI_SERIE)
+# FAIL-SAFE VERSO IL MONDO DI IERI, e non e' pignoleria: una lista
+# vuota nel config non spegnerebbe Nostr con un messaggio — farebbe
+# uscire ogni pubblicazione con «0 relay» in SILENZIO, e il ritiro
+# NIP-09 (che esige almeno un OK) smetterebbe di funzionare senza che
+# niente lo dica. Chi vuole spegnere Nostr ha la sua leva, ed e' la
+# nsec della piattaforma.
+if not RELAYS_VERIFICA:
+    print("[nostr] RELAY_NOSTR vuota nel config: valgono i relay di serie")
+    RELAYS_VERIFICA = list(RELAY_DI_SERIE)
 CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
 
