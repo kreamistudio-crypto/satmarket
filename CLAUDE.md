@@ -4701,6 +4701,106 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   modificando» + bottone che diventa «Salva le modifiche»), bottone
   ✏️ nel dettaglio e badge nei tuoi annunci; le foto attuali si
   tengono o si sostituiscono tutte, mai a pezzi.
+  DUPLICARE UN ANNUNCIO (ago 2026, chiesto da Andrea): chi ha venti
+  cose simili ne pubblica una e ricalca le altre — «📄 Duplica questo
+  annuncio» nella scheda del PROPRIO annuncio riempie il form di Vendi
+  con TUTTO (categoria, condizione, consegna, le tre tariffe, taglia,
+  zona, descrizione, quantità) e da lì ne nasce uno NUOVO.
+  NON È UNA MODIFICA, ed è la sola cosa che si può capire male:
+  `editandoId` resta null, `publish()` prende la strada di sempre —
+  moderazione compresa, che è un annuncio nuovo — il bottone resta
+  «⚡ Pubblica annuncio», e a dirlo sono la testata («Duplica
+  annuncio»), il sottotitolo e il banner ambra, che nomina l'annuncio
+  di partenza e dice che **resta com'è**.
+  TITOLO, PREZZO E FOTO ARRIVANO PIENI E NON SVUOTATI (decisione di
+  Andrea: «la chiave è titolo, prezzo e foto»), ed è il contrario di
+  quel che verrebbe naturale: sono le tre cose che quasi sempre
+  cambiano, e averle già lì vuol dire CORREGGERLE invece che
+  riscriverle — su venti prodotti simili il titolo cambia di una
+  parola e il prezzo di poche cifre. Svuotarle costringerebbe a
+  ribattere da zero proprio i campi per cui si duplica.
+  ZERO ROTTE NUOVE: il duplicato è `pubblica()` con UNA chiave in più
+  nel payload, `copia_foto_da` — quindi guardie, scudo anti-doppione,
+  moderazione a tre strati, Nostr, promo e match si ereditano per
+  costruzione invece di essere ricopiati.
+  LE FOTO LE COPIA IL SERVER, DAI FILE (`copia_foto`), e la ragione è
+  il patto della filiera a UNA SOLA COMPRESSIONE: nel client di quelle
+  foto ci sono gli URL, e rileggerli per ripassarli dal canvas sarebbe
+  una seconda generazione (~2dB a giro). Si copiano i BYTE del pieno
+  così come sono e la gemella `_min` si rifà dal pieno come ha sempre
+  fatto, che è l'unica seconda generazione ammessa. Verificato dal
+  vivo col confronto binario: il pieno del duplicato è IDENTICO a
+  quello dell'originale.
+  SOLO SE NON SE NE SCELGONO DI NUOVE, ed è la stessa regola della
+  modifica: scegliere una foto sostituisce il set per intero — con le
+  due strade insieme non si saprebbe quale vince. Il client manda
+  `copia_foto_da` solo a `sellFoto` vuoto, e il server lo guarda a sua
+  volta (`if not (d.get("foto") or [])`): due guardie perché quella
+  del client dice l'intenzione e quella del server è la regola.
+  LA GUARDIA È DI PROPRIETÀ E STA NELLA WHERE (`foto_da_copiare`): si
+  copiano le proprie foto e mai quelle di un altro. Sono pubbliche e
+  chiunque potrebbe riscaricarle a mano, ma qui si SCRIVONO dei file
+  sul nostro disco, e ogni scrittura vuole il suo recinto. Un id
+  storto o inesistente non è un errore — non si copia niente, e
+  l'annuncio nasce lo stesso senza foto: il patto del cursore storto.
+  E LA WHITELIST DELLE FORME (`NOME_FOTO`) VALE ANCHE QUI: quei nomi
+  arrivano dal nostro database, ma una lettura di file non si apre mai
+  su un nome che non si è guardato — ed è anche ciò che tiene fuori
+  per costruzione le foto degli IMPORTATI, che sono URL su un host
+  altrui e non matchano (lo scarto lo dice: «foto ospitata altrove»).
+  NESSUNA FOTO SPARISCE IN SILENZIO, la regola di `salva_foto` fino in
+  fondo: `copia_foto` ritorna la stessa coppia (nomi, MOTIVI) e i
+  motivi finiscono in `foto_scarti`, cioè in coda al toast di
+  conferma.
+  SOLO SU CIÒ CHE È NATO QUI: duplicare un importato darebbe un nativo
+  gemello del suo evento Nostr, cioè **proprio il doppione che la
+  deduplica esiste per togliere** — ed è la stessa guardia (`l.nostr`)
+  che tiene già fuori il rifornimento, un rigo più giù nella stessa
+  colonna.
+  IL BOTTONE VIVE SOLO NELLA SCHEDA e non nella riga di «📋 I tuoi
+  annunci», ed è una misura già scritta per il rifornimento: a 320px
+  `.mio-azioni` concede 196px e la coppia Modifica+Elimina se li
+  prende tutti — un terzo badge va a capo e fa crescere OGNI riga
+  della lista, per un gesto che si fa da fermi.
+  LA PRECOMPILAZIONE VIVE IN UN POSTO SOLO (`riempiFormDa`), estratta
+  da `editListing` quando i chiamanti sono diventati due: sono ~40
+  righe di campi, e due copie divergerebbero al primo campo nuovo —
+  chi lo aggiungesse a una sola delle due si ritroverebbe un duplicato
+  che perde un dato per strada, IN SILENZIO. Dentro ci sono i soli
+  CAMPI: le variabili di modalità (`editandoId`, `duplicaDaId`,
+  `editandoNostr`, `consegnaFirmata`) le scrive il chiamante PRIMA,
+  perché `aggiornaFormVendi` e `renderFotoPreview` le leggono. C'è il
+  censimento in `prove.py` che conta DUE chiamanti e UNA sola riga che
+  scrive la categoria.
+  LE DUE MODALITÀ NON CONVIVONO: chi accende l'una spegne l'altra
+  (`duplicaAnnuncio` azzera `editandoId`/`editandoNostr`/
+  `consegnaFirmata`), o il form direbbe due cose insieme e `publish()`
+  prenderebbe la strada del salvataggio su un annuncio che non c'è.
+  IL DUPLICATO SI SPEGNE DOPO LA PUBBLICAZIONE, ed è la riga che
+  leggendo non si vede: senza, rientrando in Vendi si ritroverebbe il
+  banner «stai duplicando» sopra un form vuoto — e la pubblicazione
+  successiva erediterebbe delle foto che nessuno ha più chiesto.
+  `annullaModifica` tiene il suo nome pur spegnendo anche il duplicato
+  (il patto dei nomi interni: si rinominano i testi, mai le chiavi).
+  E LE DUE USCITE PARLANO LA LINGUA DEL LAVORO A METÀ: «Annulla il
+  duplicato» / «Chiudi il duplicato», e la conferma dice «non nasce
+  nessun annuncio» invece di «l'annuncio resta com'è adesso» — qui non
+  c'è ancora niente che possa restare com'era.
+  IN DEMO le foto ereditate si mostrano lo stesso (`photos` prende
+  `fotoAttuali` quando non se ne scelgono di nuove): là non c'è nessun
+  server che le copi, e pubblicarne zero direbbe il falso su quel che
+  si sta per pubblicare.
+  E NON NASCE AFFATTO SU UN'ASTA NÉ SU UN ESAURITO, e non è una
+  guardia scritta: il bottone vive nel ramo NORMALE della colonna del
+  proprietario, e quegli altri due hanno il loro blocco — l'asta il
+  suo, l'esaurito il «🔄 Rifornisci», che per «ne ho finito uno»
+  è la strada giusta invece di far nascere un gemello.
+  IMPERFEZIONI DICHIARATE: il duplicato NON eredita la sottocategoria
+  (la ricalcola il giudice silenzioso dai testi nuovi, che è quel che
+  fa già per ogni annuncio) né la lampo, gli sconti o lo stato — sono
+  fatti dell'annuncio di partenza e non della merce; e le foto si
+  copiano davvero sul disco, quindi due annunci gemelli pesano il
+  doppio (il patto della filiera vale più dello spazio).
   Modifica FIRMATA degli importati (lug 2026): il doppio cittadino con
   `npub_accesso` ≡ `contatto_nostr` modifica anche gli annunci
   importati — Barattolo fa da client Nostr, la nsec resta nel browser
@@ -26633,6 +26733,55 @@ o `CODICI_SCONTO_MIN_PERCENTO`, vincono sul default e il tetto nuovo
 non entra in vigore: si guarda PRIMA del deploy, come per
 `MAX_PREFERITI`. DA GUARDARE al primo giro: il primo buono a cifra
 fissa speso dentro Telegram, con la bolt11 confrontata su LNbits.
+
+Duplicare un annuncio (ago 2026, chiesto da Andrea: «crea un duplicato
+dove posso modificare alcune info — però la chiave è titolo, prezzo e
+foto»): «📄 Duplica questo annuncio» nella scheda del proprio annuncio
+riempie il form di Vendi con tutto e ne fa nascere uno NUOVO. Titolo,
+prezzo e foto arrivano PIENI e non svuotati, ed è la decisione che
+governa il resto: sono le tre cose che quasi sempre cambiano, e averle
+lì vuol dire correggerle invece che riscriverle — chi ha venti prodotti
+simili cambia una parola nel titolo e poche cifre nel prezzo. Vedi
+Architettura, «DUPLICARE UN ANNUNCIO», per il fatto che NON è una
+modifica (il pezzo che si può capire male, e a dirlo sono testata,
+banner e il bottone che resta «Pubblica»), per le foto copiate dal
+SERVER coi byte del pieno — il patto della filiera a una sola
+compressione — e per gli importati esclusi, che duplicati darebbero
+proprio il doppione che la deduplica esiste per togliere.
+ZERO ROTTE NUOVE: è `pubblica()` con una chiave in più nel payload,
+quindi guardie, scudo anti-doppione, moderazione, Nostr, promo e match
+si ereditano per costruzione.
+Collaudato: **+38 prove** in modalità severa (7023 → 7061 contro HEAD
+del giorno; è il DELTA il numero difendibile, che la cartella è
+condivisa con un'altra sessione) più `collaudo_duplicato.py` — 18
+verdi, la rotta VERA su un database e una cartella foto usa-e-getta:
+il duplicato che nasce, l'originale che non si muove di un byte, i
+byte del pieno confrontati, le foto nuove che vincono sull'eredità, la
+guardia di proprietà, e il mondo di ieri intatto. Più **15 MUTAZIONI,
+15 uccise**, una per riga sorvegliata.
+DUE ERANO SOPRAVVISSUTE AL PRIMO GIRO, e sono buchi delle mie
+sentinelle e non del codice — la classe di cecità che questo repo ha
+già smascherato sette volte: una guardava se una riga ESISTE
+(«editandoId = null» c'era ancora, e una seconda assegnazione due
+righe più giù passava liscia rimettendo il duplicato in modalità
+modifica: adesso si contano TUTTE le scritture di quella variabile nel
+corpo), e il ramo del file sparito dal disco scartava in SILENZIO
+senza che nessuna prova lo dicesse, contro la regola di casa «nessuna
+foto sparisce in silenzio».
+E il giro DAL VIVO col server locale su un database usa-e-getta a
+320/360/375: il bottone presente sul nativo e assente sull'importato,
+il form ereditato coi suoi campi, la pubblicazione che fa nascere
+l'annuncio con le foto copiate — `cmp` dice byte IDENTICI — l'originale
+intatto, il duplicato che si spegne dopo, e l'uscita con la sua
+domanda. È lì che si è visto quel che il foglio non diceva: la nota
+«restano com'erano» parlava di foto che nel duplicato non sono ancora
+di nessuno, e la riga sotto le miniature lo diceva già meglio.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e un client rimasto in cache non manda
+la chiave nuova e pubblica come oggi. DA GUARDARE al primo giro: il
+primo duplicato vero dentro Telegram, e che le foto ereditate si
+vedano in vetrina (sono file nuovi con nomi nuovi: se una card resta
+col segnaposto, il posto da guardare è `copia_foto`).
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
