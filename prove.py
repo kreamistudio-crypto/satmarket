@@ -21613,6 +21613,86 @@ def prove_onion():
     _vestito = mini.split(".ico-nostr{")[1].split("}")[0]
     prova("...e la misura segue il corpo del testo, mai un px fisso",
           (True, False), ("em" in _vestito, "px" in _vestito))
+    # E STA IN LINEA COI VICINI VERI (ago 2026, dal campo: «il pallino
+    # sta piu' IN ALTO delle emoji che gli stanno accanto»). Il primo
+    # giro l'aveva tarato contro il glifo ISOLATO in un banco — il
+    # test sbagliato: -.24em azzerava li' e nel layout vero lasciava
+    # 2,28px, cioe' proprio lo scarto che si vedeva.
+    # LA CAUSA E' STRUTTURALE E NON E' L'EM: accanto al nome i vicini
+    # sono le medaglie della sfilza, che ha un `vertical-align:-2px`
+    # SUO — le emoji sono spinte giu' apposta — e sono alte 14,5px
+    # contro i 17,25 del disegno. Con l'allineamento a BASELINE due
+    # scatole di altezze diverse non possono avere i centri in linea:
+    # e' la natura di quell'allineamento, non una taratura mancata.
+    # NESSUN EM CI ARRIVA, misurato su sette valori: a -.28em restano
+    # 1,69px e lo zero cade a -.39em, un numero che nessuno puo'
+    # spiegare e che invecchia al primo ritocco del vicino.
+    # QUINDI SI CAMBIA REGIME, e il valore e' CANONICO invece che
+    # tarato: `middle` dice «il centro del disegno al centro del
+    # testo», che e' esattamente quel che si vuole per un disegno in
+    # mezzo alle parole. MISURATO: lo scarto passa da 2,28 a 0,87px
+    # — sotto il pixel — la riga NON cresce (39,14 prima e dopo, la
+    # card 68) e nei BOTTONI non cambia niente, che li' il
+    # contenitore e' flex e il vertical-align non conta affatto.
+    # IL RESIDUO DI 0,87px E' DICHIARATO: e' il `-2px` della sfilza,
+    # che e' di un altro cantiere e non si tocca per un ornamento.
+    prova("...e il disegno si allinea al centro, non alla baseline",
+          True, "vertical-align:middle" in _vestito)
+    # IL VIOLA E' PIU' CARICO (ago 2026, dal campo: «e' troppo spento
+    # rispetto al glifo che c'era prima»). La richiesta era alzare la
+    # SATURAZIONE, e la misura dice che li' non c'era niente da
+    # prendere: era gia' al 90%, e portarla a 100 sposta il contrasto
+    # di 0,2 — a occhio non si vede. Quel che rende un viola «pieno»
+    # invece che pastello, a parita' di tinta, e' la LUCE: da L66% a
+    # L58%, cioe' #8B5CF6 -> #7C3AED.
+    # ⚠️ E DI SERA NON SI SCURISCE, che e' la regola di casa: sul
+    # bruno un viola piu' scuro sparisce (misurato: 3,68 contro 5,39
+    # sul fondo del bottone ponte). Li' si alza la saturazione
+    # tenendo la luce — si abbassa la luce, non si cambia il segno.
+    # QUEL CHE SI SORVEGLIA NON E' IL GUSTO MA IL CONTRASTO: il
+    # pallino e' un DISEGNO, quindi la soglia e' 3:1 (WCAG per gli
+    # elementi grafici) e non 4,5 — e la superficie peggiore e' il
+    # fondo velato del bottone ponte, dove il viola sta sul viola.
+    def _lum(h):
+        def _c(v):
+            v /= 255.0
+            return v / 12.92 if v <= .03928 else ((v + .055) / 1.055) ** 2.4
+        r, g, b = (int(h[i:i + 2], 16) for i in (1, 3, 5))
+        return .2126 * _c(r) + .7152 * _c(g) + .0722 * _c(b)
+
+    def _contr(a, b):
+        la, lb = _lum(a), _lum(b)
+        return (max(la, lb) + .05) / (min(la, lb) + .05)
+
+    def _tok(blocco, nome):
+        return blocco.split(nome + ":")[1].split(";")[0].strip()
+
+    _chiaro = mini.split("--nostr:")[1]
+    _scuro = mini.split("--nostr:")[2]
+    _nc, _ns = _chiaro[:7], _scuro[:7]
+    _softc = "#" + _chiaro.split("--nostr-soft:#")[1][:6]
+    _softs = "#" + _scuro.split("--nostr-soft:#")[1][:6]
+    prova("il pallino stacca dal fondo del ponte nei due temi",
+          (True, True),
+          (_contr(_nc, _softc) >= 3.0, _contr(_ns, _softs) >= 3.0))
+    # ...E IL CHIARO E' PIU' SCURO DELLO SCURO, che e' la regola detta
+    # come invariante: se un domani i due si scambiassero, di sera il
+    # pallino sarebbe piu' cupo del fondo su cui vive.
+    prova("...e di sera e' piu' chiaro, mai piu' cupo",
+          True, _lum(_ns) > _lum(_nc))
+    # ...E DI GIORNO E' PIENO, NON PASTELLO. Il valore esatto e' un
+    # GUSTO — «te lo dico guardandolo, non misurandolo» — e un gusto
+    # non si inchioda con una prova; quel che si sorveglia e' la
+    # DECISIONE, cioe' che la leva sia la LUCE: un viola con L oltre
+    # il 62% torna pastello, ed e' esattamente quel che dal telefono
+    # si legge «spento». L'ha chiesta la TORTURA: senza, rimettere il
+    # #8B5CF6 di ieri non faceva rossa nessuna riga.
+    def _luceHsl(h):
+        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
+        return (max(r, g, b) + min(r, g, b)) / 2
+
+    prova("il viola di giorno e' pieno, non pastello",
+          True, _luceHsl(_nc) <= .62)
     # I TRE SITI PASSANO DAL GIUDICE, e nessuno di loro scrive piu' il
     # glifo a mano: e' la riga che un cantiere futuro rompe per primo,
     # aggiungendo la quarta porta con la stringa copiata.
@@ -21623,21 +21703,76 @@ def prove_onion():
     prova("i quattro siti della porta chiamano il giudice",
           (True, True, True, True),
           tuple(p in mini for p in _porte))
-    prova("...e le chiamate al giudice sono QUATTRO", 4,
+    # I QUATTRO SITI NUOVI (ago 2026): il giudice dell'etichetta
+    # serve ormai anche i tre BOTTONI e le due PILLOLE del censimento
+    # qui sotto — il ponte «Scrivi su Nostr», il bottone di collaudo,
+    # e le pillole della foto e del canale.
+    _porte2 = ("${etichettaNostr(`Scrivi ${chi} su Nostr`)}",
+               "${etichettaNostr('nostr')}",
+               "pillFoto('nostr', etichettaNostr('Nostr'))",
+               "pill('nostr', etichettaNostr('DM Nostr'))")
+    prova("...e i quattro siti nuovi passano dallo stesso giudice",
+          (True, True, True, True),
+          tuple(p in mini for p in _porte2))
+    prova("...e le chiamate al giudice sono OTTO", 8,
           mini.count("etichettaNostr("))
-    # E IL CENSIMENTO DEI BOTTONI CHE IL GLIFO CE L'HANNO ANCORA:
-    # sono TRE, e sono quelli che chi arriva da Tor non incontra —
-    # «salva la npub», i due ponti verso il profilo Nostr e il
-    # bottone di collaudo, che si vedono solo da dentro e dopo aver
-    # gia' scelto. Il perimetro e' stretto APPOSTA (decisione di
-    # Andrea): il difetto e' confinato a Gecko, e allargare il diff su
-    # bottoni che quel pubblico non tocca non lo merita. Se il numero
-    # sale, qualcuno ha aggiunto una porta col glifo copiato a mano e
-    # deve venire a leggere questa voce.
+    # ⚠️ IL CENSIMENTO HA CAMBIATO LATO (ago 2026, dal campo, e la
+    # decisione con lui): qui si chiedeva che i bottoni col glifo
+    # fossero TRE — «il perimetro e' stretto apposta, il difetto e'
+    # confinato a Gecko e allargare il diff su bottoni che quel
+    # pubblico non tocca non lo merita». Andrea l'ha rovesciata
+    # trovandone uno tagliato («Scrivi al venditore su Nostr»), e la
+    # richiesta e' quella giusta: **un censimento, non una cura a uno
+    # a uno man mano che si trovano**.
+    # SI CONTA PER FORMA E NON PER ELENCO, che e' tutta la differenza:
+    # un elenco a memoria invecchia e RIMPICCIOLISCE (la lezione del
+    # titolo nudo nelle notifiche, quindici siti e non quattro),
+    # mentre un predicato prende da solo il sito che qualcuno
+    # scrivera' fra sei mesi. Le tre forme sono quelle del perimetro
+    # dichiarato: dentro un BOTTONE, dentro una PILLOLA (che un
+    # bottone lo e'), e dentro uno SPAN che tenta di colorarlo col
+    # nostro token — quest'ultima e' anche la piu' precisa, perche'
+    # dice il difetto: un'emoji a colori IGNORA `color`, quindi quel
+    # viola non e' mai stato il nostro.
     import re as _re
-    _btn_glifo = len(_re.findall(
-        r"<button\b[^>]*>[^<]*\U0001F7E3", mini))
-    prova("i bottoni rimasti col glifo sono i tre di dentro", 3, _btn_glifo)
+
+    def _censisci(t):
+        """Quante volte il glifo sta dentro le tre forme del perimetro."""
+        r = t.splitlines()
+        return (len(_re.findall(r"<button\b[^>]*>[^<]*\U0001F7E3", t)),
+                len([x for x in r if "\U0001F7E3" in x
+                     and ("pill(" in x or "pillFoto(" in x)]),
+                len([x for x in r if "\U0001F7E3" in x
+                     and "color:var(--nostr)" in x]))
+
+    prova("nessun bottone, pillola o span porta piu' il glifo",
+          (0, 0, 0), _censisci(mini))
+    # ...E IL CENSIMENTO DIMOSTRA DI VEDERE, o uno «zero» non e' una
+    # promozione ma una cecita': con un contatore azzerato a mano la
+    # riga qui sopra resta verde per sempre. E' la lezione gia' pagata
+    # dal censimento dei titoli nudi, e l'ha chiesta la TORTURA — due
+    # mutazioni sui predicati sopravvivevano.
+    _cartone = ("<button class=\"x\">\U0001F7E3 apri</button>\n"
+                "${pill('nostr','\U0001F7E3 DM')}\n"
+                "<span style=\"color:var(--nostr)\">\U0001F7E3</span>")
+    prova("...e il censimento vede davvero le tre forme",
+          (1, 1, 1), _censisci(_cartone))
+    # RESTA IL GLIFO DOVE SI SCRIVE COL `textContent`, ed e' la riga
+    # da non ammorbidire: l'etichetta della conferma
+    # (`el('confOk').textContent`) e il bottone «Firma e salva» del
+    # form Vendi passano di li', e quello e' una GUARDIA — si baratta
+    # un ornamento, non una guardia. E resta in PROSA (toast, hint,
+    # trust-note, le righe delle pagine pubbliche) e in `riga()` del
+    # cassetto Identita', dove il pallino e' il pittogramma di una
+    # riga IN COLONNA con l'aereo di Telegram: vestirne uno solo col
+    # disegno lo farebbe divergere dalla sorella, e la strada per
+    # curarli sarebbe convertire la COPPIA — che vuole anche un
+    # disegno per Telegram, cioe' un'altra decisione.
+    prova("...e l'etichetta della conferma resta col glifo, che li' "
+          "il textContent e' la guardia",
+          (True, True),
+          ("el('confOk').textContent" in mini,
+           "etichetta: '\U0001F7E3 Ritira'" in mini))
     # ⚠️ IL TITOLO DEL FOGLIO HA CAMBIATO LATO (ago 2026, dal campo):
     # questa prova chiedeva che il glifo RESTASSE, «e' un <h3> e non
     # una pillola, fuori da quel vestito non taglia». Falso: il campo
@@ -21662,6 +21797,17 @@ def prove_onion():
     _mk = mini.split(" Ti conosciamo")[0].split("<h3>")[-1]
     prova("il disegno del markup e quello del giudice combaciano",
           True, _js == _mk and "<circle" in _js)
+    # ...E VALE PER OGNI COPIA, non solo per quella. Le copie
+    # letterali sono TRE — il giudice, il foglio del collegamento e
+    # il bottone «Salva la npub», che nessuno riscrive — e si
+    # confrontano col giudice UNA PER UNA: contarle direbbe «tre»
+    # anche su tre disegni diversi.
+    _tutte = _re.findall(
+        r'<svg class="ico-nostr" viewBox[^\n]*?</svg>', mini)
+    _letterali = [c for c in _tutte if "' " not in c and "+ '" not in c]
+    prova("ogni copia letterale del disegno combacia col giudice",
+          (2, True), (len(_letterali),
+                      all(c == _js for c in _letterali)))
     prova("...e le porte riscritte dal JS portano il solo testo",
           (True, True),
           ('id="invitoNostr" onclick="closeSheet();apriNostrSheet()">'
@@ -21719,7 +21865,21 @@ def prove_onion():
               ": badgeNostr('Npub da verificare:")
     prova("i quattro badge accanto al nome chiamano il giudice",
           (True, True, True, True), tuple(p in mini for p in _badge))
-    prova("...e le chiamate al giudice del badge sono QUATTRO", 4,
+    # E CON LORO L'IMPORTATO (ago 2026, col censimento): il suo
+    # \U0001F7E3 era dichiarato FUORI — «dice un'altra cosa, arriva da
+    # Nostr e non venditore verificato» — e resta vero, ma quella era
+    # una distinzione di SIGNIFICATO mentre il perimetro nuovo e' di
+    # FORMA: sta accanto a un titolo, e il taglio di Gecko lo colpisce
+    # uguale. In piu' i due erano gia' indistinguibili, che il glifo
+    # e' lo stesso: convertirli non cambia cosa si vede, cura il
+    # taglio e rende VERO il loro `color`, che su un'emoji a colori
+    # non ha mai fatto niente.
+    _badge2 = ("badgeNostr('Importato dal tuo client Nostr: il testo lo"
+               " comandano i relay')",
+               "${a.importato ? badgeNostr('Importato da Nostr') : ''}")
+    prova("...e i due dell'importato pure", (True, True),
+          tuple(p in mini for p in _badge2))
+    prova("...e le chiamate al giudice del badge sono SEI", 6,
           mini.count("badgeNostr("))
     # ⚠️ e nessuno dei quattro scrive piu' il glifo a mano: e' la riga
     # che il prossimo cantiere rompe per primo, aggiungendo il quinto

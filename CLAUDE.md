@@ -18730,14 +18730,70 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   un'icona di SERVIZIO e si accende col testo, questa e' un MARCHIO —
   con `currentColor` diventerebbe marrone sulla pillola e crema sul
   ghost, cioe' smetterebbe di essere il pallino di Nostr. Segue il tema
-  (#8B5CF6 di giorno, #A78BFA di sera): si abbassa la luce, non si
+  (#7C3AED di giorno, #A97BFF di sera): si abbassa la luce, non si
   cambia il segno.
+  E IL VIOLA E' PIU' CARICO DI QUELLO DI IERI (ago 2026, dal campo:
+  «e' troppo spento rispetto al glifo che c'era prima»). LA RICHIESTA
+  ERA ALZARE LA SATURAZIONE, e la misura dice che li' non c'era
+  niente da prendere: era gia' al **90%**, e portarla a 100 sposta il
+  contrasto di 0,2 — a occhio non si vede. QUEL CHE RENDE UN VIOLA
+  «PIENO» INVECE CHE PASTELLO, A PARITA' DI TINTA, E' LA LUCE: da
+  L66% a L58%, cioe' #8B5CF6 -> #7C3AED.
+  ⚠️ E DI SERA NON SI SCURISCE, che e' la regola di casa applicata
+  qui: sul bruno un viola piu' scuro SPARISCE (misurato: 3,68 contro
+  5,39 sul fondo velato del bottone ponte, che e' la superficie
+  peggiore — li' il viola sta sul viola). Di la' si alza la
+  saturazione tenendo la luce, #A78BFA -> #A97BFF.
+  E A SORVEGLIARE NON E' IL GUSTO MA IL CONTRASTO: il pallino e' un
+  DISEGNO, quindi la soglia e' 3:1 (WCAG per gli elementi grafici) e
+  non 4,5. Le due prove sono il contrasto sul fondo del ponte nei due
+  temi, piu' l'INVARIANTE che il viola della sera resti il piu'
+  chiaro dei due — se un domani si scambiassero, di notte il pallino
+  sarebbe piu' cupo del fondo su cui vive.
   E LA MISURA E' IN `em`, MAI UN PX FISSO: i tre bottoni hanno tre
   corpi diversi — 13px la pillola del banner, 15.5 i due `.btn` — e un
   px darebbe il disegno grande sul piccolo e piccolo sul grande.
   MISURATO dal vivo: 14,9px nel banner e 17,8 nel foglio, cioe' 1.15em
   in tutti e due. C'e' la prova, ed e' nata dalla tortura: quella riga
   non la guardava nessuno.
+  E LA RIGA DI BASE E' `middle`, NON UN `em` TARATO (ago 2026, dal
+  campo: «il pallino accanto al nome sta piu' IN ALTO delle emoji che
+  gli stanno accanto»). Il primo giro l'aveva tarato contro il glifo
+  ISOLATO in un banco — il test sbagliato: -.24em azzerava li' e nel
+  layout vero lasciava **2,28px**, cioe' esattamente lo scarto che si
+  vedeva.
+  LA CAUSA E' STRUTTURALE E NON E' L'EM, ed e' la parte da capire
+  prima di ritoccare qualunque numero: accanto al nome i vicini sono
+  le medaglie della sfilza, che ha un `vertical-align:-2px` SUO — le
+  emoji sono spinte giu' apposta — e sono alte 14,5px contro i 17,25
+  del disegno. Con l'allineamento a BASELINE due scatole di altezze
+  diverse non possono avere i centri in linea: e' la natura di
+  quell'allineamento, non una taratura mancata.
+  NESSUN EM CI ARRIVA, misurato su sette valori: a -.28em restano
+  1,69px e lo zero cade a **-.39em**, un numero che nessuno puo'
+  spiegare e che invecchia al primo ritocco del vicino.
+  QUINDI SI CAMBIA REGIME, e il valore e' CANONICO invece che tarato:
+  `middle` dice «il centro del disegno al centro del testo», che e'
+  esattamente quel che si vuole per un disegno in mezzo alle parole.
+  MISURATO: lo scarto passa da 2,28 a **0,87px** — sotto il pixel —
+  la riga NON cresce (39,14px prima e dopo, la card 68) e nei BOTTONI
+  non cambia niente, che li' il contenitore e' flex e il
+  `vertical-align` non conta affatto (scarto dal centro: 0 prima e
+  dopo).
+  IL RESIDUO DI 0,87px E' DICHIARATO E NON INSEGUITO: e' il `-2px`
+  della sfilza, che e' di un altro cantiere e non si tocca per un
+  ornamento. Chi lo volesse azzerare deve toccare quel `-2px`, non
+  questo valore.
+  ⚠️ E LA MISURA DELL'ALTEZZA (1.15em) NON SI TOCCA per allineare:
+  quella pareggia il disegno col GLIFO che sostituisce, ed e' l'altra
+  garanzia — rimpicciolirlo per far tornare i centri romperebbe la
+  prima per aggiustare la seconda.
+  ⚠️ E `vertical-align:middle` NON E' UN'ANCORA: nel foglio compare
+  DUE volte, e la prima e' `.jar-ico`, il barattolino. La tortura del
+  giro l'ha pagata — due mutazioni «uccidevano» il barattolino e
+  lasciavano il pallino intatto, quindi sopravvivevano dicendo il
+  falso su tutt'e due. Chi tortura questa riga si ancori al selettore
+  intero: la tortura va mirata quanto le sentinelle.
   E I DUE VIOLA ERANO DUE (ago 2026, dal campo: «il pallino disegnato
   e' piu' spento del 🟣 accanto ai venditori — si vede che sono due
   viola diversi»). Il badge del venditore era il GLIFO, quindi nella
@@ -18779,14 +18835,46 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ⚠️ E `.nostr-dot` NON LA VESTE NESSUNO: una regola CSS morta,
   vista e non toccata — e' l'unico altro lettore di `var(--nostr)`
   insieme a `.ico-nostr`.
-  IL PERIMETRO E' STRETTO APPOSTA (decisione di Andrea): si curano le
-  QUATTRO PORTE — quelle che chi arriva da Tor deve toccare, perche'
-  su onion Nostr e' l'unica, e il titolo del foglio e' il passo
-  SUBITO DOPO le altre tre — piu' i QUATTRO BADGE accanto al nome,
-  che sono quelli che il disegno lo affiancano nella stessa pagina — e restano col glifo i tre bottoni di dentro
-  («salva la npub», i due ponti, il collaudo), che si incontrano solo
-  dopo aver gia' scelto. C'e' il CENSIMENTO che li conta: se il numero
-  sale, qualcuno ha aggiunto una porta col glifo copiato a mano.
+  IL PERIMETRO STRETTO NON C'E' PIU' (ago 2026, decisione di Andrea
+  che ROVESCIA quella del giro prima: «fai un censimento vero di
+  TUTTI i posti dove quel pallino sta dentro un bottone o accanto a
+  un nome, invece di curarli a uno a uno man mano che li trovo»).
+  IL PERCHE' DI ALLORA VA TENUTO perche' era una decisione e non una
+  dimenticanza: si curavano le QUATTRO PORTE — quelle che chi arriva
+  da Tor deve toccare — piu' i QUATTRO BADGE accanto al nome, e i tre
+  bottoni «di dentro» restavano col glifo perche' si incontrano solo
+  dopo aver gia' scelto.
+  IL PERCHE' CHE LO SUPERA E' UN FATTO: il ponte «Scrivi su Nostr»
+  era uno di quei tre, ed e' arrivato dal campo tagliato — cioe' la
+  distinzione «di fuori / di dentro» non reggeva, perche' chi entra
+  con la sua chiave i bottoni di dentro li usa eccome. E curarli uno
+  alla volta man mano che si notano e' precisamente il modo in cui
+  una cura si trascina per mesi.
+  IL CENSIMENTO E' PER FORMA E NON PER ELENCO, ed e' la lezione gia'
+  pagata dal titolo nudo nelle notifiche: una lista a memoria
+  invecchia e RIMPICCIOLISCE, un predicato prende il sito di domani
+  da solo. Le tre forme sono quelle che Andrea ha nominato — il
+  glifo dentro un `<button>`, dentro una `pill(`/`pillFoto(`, e
+  dentro uno `<span style="color:var(--nostr)">` — e il conto e'
+  `(0, 0, 0)`.
+  IL CONTO DEL GIRO: **51 glifi nel client, 7 dentro il perimetro,
+  0 rimasti**. I sette: il ponte «Scrivi su Nostr», il bottone
+  «Salva la npub nel profilo», il bottone del collaudo, le due
+  pillole (la foto del profilo e il canale degli avvisi) e i due
+  span dell'IMPORTATO — che il giro prima dichiarava «un'altra
+  famiglia» e sono invece la terza forma del censimento.
+  ⚠️ E IL CENSIMENTO DEVE DIMOSTRARE DI VEDERE, o uno «zero» non e'
+  una promozione ma una CECITA': con un contatore azzerato a mano la
+  riga resta verde per sempre. L'ha chiesta la TORTURA — due
+  mutazioni sui predicati sopravvivevano — e adesso lo stesso
+  predicato gira su un CARTONE che contiene tutte e tre le forme e
+  deve rispondere `(1, 1, 1)`.
+  RESTA IL GLIFO DOVE IL `textContent` E' LA GUARDIA, ed e' l'unica
+  eccezione: l'etichetta della conferma (`el('confOk').textContent`)
+  e i testi che ci finiscono dentro — li' un disegno uscirebbe a
+  lettere, e quel `textContent` e' la riga che impedisce a un titolo
+  d'annuncio di diventare HTML. Piu' i glifi in PROSA (toast, hint,
+  messaggi), che non stanno ne' in un bottone ne' accanto a un nome.
   E IL PROBLEMA E' PIU' LARGO DI QUESTO PALLINO, misurato e non
   stimato: dentro un `<button>` il client ha **357 occorrenze di emoji
   su 85 glifi diversi**, e su Gecko sono tagliate tutte — e da
