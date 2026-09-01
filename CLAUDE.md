@@ -6866,6 +6866,103 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   committato a versione bloccata e servito da `GET /vendor/nostr.js`
   (file singolo, MAI CDN: nessun terzo deve poter cambiare la pagina
   dove si può incollare una nsec).
+  IL LOGIN COL TELEFONO (ago 2026, chiesto da Andrea): si entra
+  inquadrando un QR con Amber — o con qualunque firmatario NIP-46 —
+  invece di incollare a mano una URI `bunker://`. È IL BUNKER
+  ROVESCIATO, ed è la riga che spiega tutto il resto: là la URI la
+  scrive il FIRMATARIO e la incolla l'utente, qui la scriviamo NOI
+  (`nostrconnect://`), la mostriamo come codice, e a richiamare è il
+  telefono.
+  IL SEGRETO È LA PORTA, e non si ammorbidisce: verso la nostra chiave
+  effimera può cifrare CHIUNQUE veda il codice — quindi si accetta
+  solo la risposta il cui `result` è il `secret` che abbiamo scritto
+  nella URI, MAI un «ack» generico. Un messaggio col segreto sbagliato
+  si IGNORA e si resta in ascolto: chiudere l'attesa al primo
+  estraneo sarebbe un modo di far fallire il login di qualcun altro.
+  UN RELAY SOLO NELLA URI, ed è il difetto silenzioso che questa riga
+  impedisce: ci si connette PRIMA e nel codice si scrive solo il relay
+  che ha risposto — con la lista intera il telefono potrebbe
+  rispondere sul relay B mentre noi ascoltiamo sull'A, e da fuori si
+  vede «il telefono dice fatto e qui non arriva niente». La stanza
+  dev'essere UNA.
+  E SI DELEGA AL BUNKER, che è ciò che ha tenuto piccolo il cantiere:
+  scoperta la chiave del firmatario si compone una `bunker://` e si
+  chiama `firmatarioBunker(uri, skHex)` — quindi il motore NIP-46
+  resta UNO (nessuna seconda copia da tenere in pari) e la SESSIONE
+  CONSERVATA mantiene la forma storica (`localStorage
+  ['barattolo_bunker']` = `{uri, sk}`), col che la coda delle firme e
+  la modifica firmata continuano a funzionare senza sapere che questa
+  strada esiste. Nella seconda URI il `secret` NON si ripete: è già
+  servito una volta, e ripeterlo si fa rifiutare dopo l'approvazione.
+  I PERMESSI VIVONO IN UNA COSTANTE (`NIP46_PERMESSI`), che le due
+  strade chiedono le stesse cose e due elenchi divergerebbero al primo
+  permesso nuovo; c'è la prova che i siti siano due.
+  IL RELAY LO DICE IL SERVER (`RELAYS_NIP46` in `server.py`, nella
+  busta di PRIMA PAGINA accanto a `dominio_pubblico`): senza quella
+  riga il bottone non nasce affatto — un QR che punta a un relay
+  inventato dal client è un codice che si scansiona e non porta da
+  nessuna parte. Viaggia di lì e non da `/api/me` per la ragione delle
+  vicine: quel foglio lo apre soprattutto chi NON è ancora entrato, e
+  in vetrina `/api/me` non esiste. Quindi in DEMO, da `file://` e su
+  un server di ieri il bottone semplicemente non c'è, e
+  `firmatarioNostrConnect` alza da sé come cintura.
+  ⚠️ L'ORDINE DELLA LISTA È PRECEDENZA, E IL PRIMO POSTO SI PAGA: il
+  client prova dal primo e si ferma al primo che risponde, ma un relay
+  MUTO si porta via i 15 secondi del timeout PRIMA che il codice
+  compaia — e chi guarda vede una sala d'attesa e basta. MISURATO e
+  non supposto: `relay.nsec.app`, che sarebbe IL relay dedicato al
+  NIP-46, da qui non risponde nemmeno a una GET (12 s), mentre damus e
+  nos.lol rispondono in ~0,14 s; con nsec.app in testa il QR
+  compariva dopo quindici secondi, con damus in testa dopo uno. Resta
+  in lista, in coda. Chi ritocca l'ordine lo RIMISURI (una GET a
+  ognuno) invece di andare a memoria.
+  IL DISEGNO DEL CODICE HA UNA FABBRICA SOLA (`disegnaQr(box, testo,
+  modo)`, estratta da `mostraQr`): il QR della invoice resta
+  alfanumerico MAIUSCOLO (la modalità dei wallet) e questo passa in
+  `Byte`, perché una `nostrconnect://` ha minuscole e caratteri che
+  quella modalità non ammette. Scuro-su-bianco FISSO nei due temi e
+  zona quieta doppia, il patto del paySheet: un codice si legge col
+  contrasto, non col tema.
+  LA URI SI VEDE TRONCATA E SI COPIA INTERA: sotto il codice sta la
+  stringa vestita da `.invoice` — tre righe, il testo completo per la
+  copia — ed è la stessa lezione già pagata dalla invoice («col QR in
+  pagina la stringa intera era solo centimetri di gibberish»). A
+  chiederla è il caso vero di chi ha il firmatario SULLO STESSO
+  telefono, dove il codice non si può inquadrare da soli: lì la
+  strada è «📋 Copia il link» e incollare nell'app.
+  ⚠️ E L'ETICHETTA DEL BOTTONE È MISURATA: «📱 Col telefono (Amber,
+  nsec.app…)» andava a capo a 320px e faceva un bottone alto 130px —
+  ora è «📱 Col telefono (Amber)», una riga a tutte e tre le
+  larghezze. La guida CITA quell'etichetta, quindi la prova la ESTRAE
+  dal markup invece di ribatterla: rinominare il bottone senza toccare
+  la guida fa rossa una riga (è successo davvero in questo cantiere, e
+  nessuna prova se n'era accorta).
+  IL GIRO SI ANNULLA COL FOGLIO (`nostrQrGiro`, il patto di
+  `vetrinaGiro`): l'attesa dura fino a tre minuti, quindi chi chiude e
+  riapre non deve ritrovarsi un firmatario arrivato in ritardo — c'è
+  la prova che il controllo ci sia nei DUE punti, prima di ricordare
+  la sessione e prima di ricaricare.
+  LA GUIDA «CREA IL TUO PROFILO» (stessa richiesta) è un foglio SUO
+  (`#nostrGuidaSheet`) che si apre SOPRA il login e non lo chiude: il
+  gesto indietro chiude prima la guida e si torna dove si stava — è
+  `navPila`, che ordina per posizione nel DOM, quindi quel foglio va
+  DOPO `#nostrSheet` nel markup e prima di `#collegaSheet`. C'è la
+  prova sull'ordine e su `closeSheet`.
+  DICE DUE STRADE E NON UNA: 📱 Amber per chi entra dal telefono
+  («installa, crea una chiave nuova, torna qui e inquadra»), 💻
+  nstart.me per chi sta al browser — e ognuna finisce col PASSO
+  FINALE, cioè con quale bottone si entra dopo. Una guida che spiega
+  come creare una chiave e non dice come tornare indietro è una guida
+  che manda in un vicolo cieco.
+  E DICHIARA DUE COSE CHE NESSUN ALTRO POSTO DICE: che quegli
+  strumenti NON SONO NOSTRI (si manda gente su un sito e un'app di
+  terzi: dirlo è la stessa onestà del canale del rodaggio) e che la
+  chiave privata **Barattolo non la vede mai** — che è la regola
+  ferrea 2 detta a chi la sta creando, cioè nell'unico momento in cui
+  serve saperlo. C'è la prova su tutte e tre le affermazioni.
+  I DUE LINK ESTERNI passano dalla scala di casa (`tg.openLink` dentro
+  Telegram, `window.open` con `noopener` fuori) e vivono in un
+  catalogo, mai dentro un `onclick`: il patto di `linkCanaleTest`.
   PIÙ ACCOUNT SULLO STESSO BROWSER (ago 2026, chiesto da Andrea: «il
   mio account e quello del negozio, entrambi loggati, senza fare
   logout e login ogni volta»): il tappo del Profilo apre il menu delle
@@ -27302,6 +27399,48 @@ la chiave nuova e pubblica come oggi. DA GUARDARE al primo giro: il
 primo duplicato vero dentro Telegram, e che le foto ereditate si
 vedano in vetrina (sono file nuovi con nomi nuovi: se una card resta
 col segnaposto, il posto da guardare è `copia_foto`).
+
+Si entra col telefono inquadrando un codice, e la chiave si crea da
+qui (ago 2026, chiesto da Andrea in un messaggio solo): «📱 Col
+telefono (Amber)» nel foglio del login mostra un QR `nostrconnect://`
+— il bunker ROVESCIATO, dove la URI la scriviamo noi e a richiamare è
+il firmatario — e accanto c'è la guida «Crea il tuo profilo», che
+spiega le due strade (Amber dal telefono, nstart.me dal browser) e
+soprattutto COME TORNARE INDIETRO a entrare. Vedi Architettura, «IL
+LOGIN COL TELEFONO», per il segreto che è la porta (verso la nostra
+chiave effimera può cifrare chiunque veda il codice), per il relay
+UNICO nella URI — la riga che impedisce il fallimento silenzioso «il
+telefono dice fatto e qui non arriva niente» — e per la delega a
+`firmatarioBunker`, che tiene UNO il motore NIP-46 e lascia intatta la
+forma della sessione conservata, quindi coda delle firme e modifica
+firmata non sanno nemmeno che questa strada esiste.
+Collaudato: **+32 prove** in modalità severa (7072 → 7104 contro HEAD
+del giorno; è il DELTA il numero difendibile, che la cartella è
+condivisa con altre sessioni e le 5 rosse sono le preesistenti —
+`websocket` non installato qui) e **19 MUTAZIONI, 19 uccise**, una per
+riga sorvegliata. La prova che conta è il BANCO NODE, che fa GIRARE
+`firmatarioNostrConnect` su un NostrTools di cartone: tre relay di cui
+solo il terzo risponde (e nel QR finisce solo quello), il messaggio
+col segreto sbagliato che NON apre, quello giusto che delega al bunker
+con la chiave del mittente e senza il secret, e la lista vuota che non
+disegna niente — cose che una sentinella sulla forma non può dire.
+E IL GIRO DAL VIVO ha trovato quel che le prove non vedevano, per la
+solita ragione: due difetti di RESA e un fatto del mondo. Il bottone
+andava a capo (130px di altezza) e la URI stampava cinque righe di
+gibberish — curati con la misura e col vestito che il progetto ha già
+(`.invoice`, tre righe e testo intero per la copia) — e
+soprattutto **`relay.nsec.app` non risponde nemmeno a una GET**, cioè
+il relay dedicato al NIP-46 faceva aspettare quindici secondi prima
+che il codice comparisse. Riordinata la lista (damus in testa), il QR
+compare in ~1 s: il fatto è misurato e scritto accanto alla costante.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — il bottone compare da sé appena
+`relay_nip46` arriva al client, e chi resta su un client in cache non
+lo vede e continua a entrare come oggi.
+DA GUARDARE al primo giro, ed è il pezzo che da qui non si può fare:
+**una scansione vera con Amber su un telefono** — che l'approvazione
+faccia comparire l'utente qui, e che la sessione conservata regga al
+riavvio (una firma chiesta il giorno dopo non deve rimandare al QR).
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
