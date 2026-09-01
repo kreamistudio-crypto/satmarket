@@ -30871,13 +30871,18 @@ async function provaLoginWeb(){
 
 /* La libreria nostr-tools (bech32, secp256k1, cifratura NIP-44) si
    carica dal NOSTRO server (/vendor/nostr.js: mai da una CDN) e solo
-   quando serve: per l'estensione NIP-07 non serve affatto. */
+   quando serve: per l'estensione NIP-07 non serve affatto.
+   Il `?v=` porta il suffisso `-mostro` da set 2026: e' lo stesso
+   nostr-tools 2.23.12 con quattro export in piu' (schnorr, sha256,
+   hmac, hkdf) che il file conteneva gia' -- il suffisso serve a
+   svegliare la cache di un giorno della rotta, e a dire a chi legge
+   che il bundle non e' quello di serie. */
 let nostrToolsPromessa = null;
 function caricaNostrTools(){
   if (window.NostrTools) return Promise.resolve();
   if (!nostrToolsPromessa) nostrToolsPromessa = new Promise((ok, no)=>{
     const s = document.createElement('script');
-    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12`;
+    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro`;
     s.onload = ok;
     s.onerror = ()=>{ nostrToolsPromessa = null; no(new Error('libreria non raggiungibile')); };
     document.head.appendChild(s);

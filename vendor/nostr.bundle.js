@@ -60,6 +60,17 @@ var NostrTools = (() => {
     serializeEvent: () => serializeEvent,
     sortEvents: () => sortEvents,
     utils: () => utils_exports,
+    // Barattolo (set 2026): quattro export in piu' rispetto al bundle di
+    // serie di nostr-tools 2.23.12 -- funzioni che il file conteneva GIA',
+    // solo non esportate. Servono al client Mostro: `schnorr.sign` firma
+    // un HASH nudo (l'identity proof del trasporto v2 non e' un evento, e
+    // finalizeEvent non puo' farla), `hmac`/`sha256` derivano le trade
+    // key, `hkdf` le chiavi della chat fra pari. Chi aggiorna nostr-tools
+    // rimette queste righe: prove.py le pretende (prove_bundle_nostr).
+    hkdf: () => ({ extract, expand }),
+    hmac: () => hmac,
+    schnorr: () => schnorr,
+    sha256: () => sha256,
     validateEvent: () => validateEvent,
     verifiedSymbol: () => verifiedSymbol,
     verifyEvent: () => verifyEvent

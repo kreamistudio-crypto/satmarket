@@ -40498,7 +40498,15 @@ def vendor_nostr():
     qualcuno puo' incollare una nsec. File singolo committato a
     versione bloccata, rotta esplicita: mai StaticFiles su una
     directory (regola ferrea 3). Si puo' tenere in cache: cambia solo
-    quando aggiorniamo il file apposta (e col ?v= nel src si sveglia)."""
+    quando aggiorniamo il file apposta (e col ?v= nel src si sveglia).
+    Dal set 2026 il file NON e' il bundle di serie: e' nostr-tools
+    2.23.12 con quattro export in piu' (`schnorr`, `sha256`, `hmac`,
+    `hkdf`) aggiunti A MANO nel blocco degli export -- funzioni che il
+    bundle conteneva gia' e non esponeva. Le vuole il client Mostro
+    (l'identity proof e' una firma su un hash nudo, che finalizeEvent
+    non sa fare). Un diff di dieci righe su un file da 250 KB, mai una
+    ricostruzione: chi aggiorna la libreria rimette quelle righe, e
+    prove_bundle_nostr le pretende."""
     return FileResponse("vendor/nostr.bundle.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})

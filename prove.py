@@ -34547,8 +34547,11 @@ def prove_font():
               f"'/vendor/font/{n}.woff2'," in swjs)
     prova("font: i latin-ext NON gonfiano l'addAll atomico", True,
           "latin-ext.woff2'," not in swjs)
+    # >= 5 e non == 5: VERSIONE sale ogni volta che un file in PRECACHE
+    # cambia (il bundle Nostr l'ha portata a 6), e una sentinella
+    # inchiodata al numero diventerebbe rossa per un cambio legittimo.
     prova("font: la VERSIONE del SW e' salita", True,
-          "barattolo-v5" in swjs)
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 5)
     prova("font: il ramo cache-first di Google e' codice morto tolto",
           True, "fontDallaDispensa" not in swjs and "CACHE_FONT" not in swjs)
 
@@ -34575,6 +34578,120 @@ def prove_font():
           sum(1 for b in re.findall(r"@font-face\{[^}]*\}", mini)
               if re.search(r"font-weight:\d+ \d+", b)))
     prova("font: otto pesi per due sottoinsiemi", 16, len(blocchi))
+
+
+def prove_bundle_nostr():
+    """Il bundle nostr-tools ha quattro export in piu' (set 2026, tappa 0
+    del cantiere P2P). Il client Mostro deve firmare un HASH NUDO —
+    l'identity proof del trasporto v2 e' `schnorr.sign(sha256("mostro-
+    transport-v2-identity:<trade pub>:<json>"))`, non un evento — e
+    `finalizeEvent` firma sempre l'id di un evento: con quel solo export
+    il client girerebbe in full-privacy mode, cioe' SENZA la reputazione
+    che si accumula, che e' l'opposto di cio' per cui il mazzo esiste.
+    Il bundle di serie di nostr-tools 2.23.12 contiene gia' schnorr,
+    sha256, hmac e hkdf ma non li esporta: si sono aggiunte quattro
+    righe al blocco degli export invece di ricostruire il file.
+
+    Le sentinelle guardano la FORMA (le righe nel blocco, il `?v=` che
+    sveglia la cache, il SW che e' salito); il banco node fa GIRARE il
+    bundle vero e chiede la sola cosa che conta: che una firma su un
+    hash nudo si verifichi, e che la derivazione delle trade key con
+    HMAC sia deterministica e dia scalari validi. Piu' la TRAPPOLA
+    documentata: `getConversationKey(sk, pub(i))` e' deterministica ma
+    PUBBLICA (ECDH e' simmetrico e `i` lo sa chiunque) — la prova la
+    dimostra, cosi' chi fra sei mesi la trovasse "piu' comoda" la vede
+    fallire nel banco invece di scoprirla in piazza."""
+    print("\n[bundle nostr: schnorr, sha256, hmac, hkdf esportati]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import os as _os
+    bundle = open("vendor/nostr.bundle.js", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    swjs = open("sw.js", encoding="utf-8").read()
+
+    # 1) la forma: le quattro righe stanno nel blocco degli export
+    i = bundle.find("__export(nostr_tools_exports, {")
+    blocco = bundle[i:bundle.find("});", i)]
+    for nome, riga in (("schnorr", "schnorr: () => schnorr,"),
+                       ("sha256", "sha256: () => sha256,"),
+                       ("hmac", "hmac: () => hmac,"),
+                       ("hkdf", "hkdf: () => ({ extract, expand }),")):
+        # == 1 e non `in`: una chiave doppia in un object literal e' JS lecito
+        # (l'ultima vince, la lezione di acqDati) e uno script di patch girato
+        # due volte l'ha prodotta davvero -- la prova deve vederlo.
+        prova(f"bundle: `{nome}` e' nel blocco degli export, UNA volta", 1,
+              blocco.count(riga))
+    prova("bundle: il loader sveglia la cache col suffisso -mostro", True,
+          "/vendor/nostr.js?v=2.23.12-mostro`" in mini)
+    prova("bundle: nel client il vecchio ?v= nudo non c'e' piu'", True,
+          "nostr.js?v=2.23.12`" not in mini)
+    prova("bundle: e' in PRECACHE, quindi la VERSIONE del SW e' salita a 6+", True,
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 6)
+    prova("bundle: la rotta dichiara che non e' il bundle di serie", True,
+          "prove_bundle_nostr" in _SORGENTE and "quattro export in piu'" in _SORGENTE)
+
+    # 2) il banco: il bundle VERO fatto girare in node
+    node = _sh.which("node")
+    if not node:
+        salta("bundle: la firma su un hash nudo si verifica", "node non installato")
+        return
+    banco = """
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const {bytesToHex, hexToBytes} = NT.utils;
+const enc = s => new TextEncoder().encode(s);
+const out = {};
+out.exp = ['schnorr','sha256','hmac','hkdf','finalizeEvent','nip44','nip13','nip19','Relay','generateSecretKey','getPublicKey']
+  .filter(k => NT[k] !== undefined);
+out.hkdf = typeof NT.hkdf.extract === 'function' && typeof NT.hkdf.expand === 'function';
+// la firma su un hash NUDO: l'identity proof di Mostro
+const sk = NT.generateSecretKey();
+const pub = NT.getPublicKey(sk);
+const h = NT.sha256(enc('mostro-transport-v2-identity:' + pub + ':{"order":{}}'));
+const sig = NT.schnorr.sign(h, sk);
+out.firmaOk = NT.schnorr.verify(sig, h, hexToBytes(pub));
+out.firmaAltro = NT.schnorr.verify(sig, NT.sha256(enc('altro')), hexToBytes(pub));
+out.hashLen = h.length; out.sigLen = sig.length;
+// le trade key: HMAC deterministico, indici diversi, scalari validi
+const der = i => NT.hmac(NT.sha256, sk, enc('barattolo/mostro/scambio/' + i));
+out.det = bytesToHex(der(1)) === bytesToHex(der(1));
+out.diversi = bytesToHex(der(1)) !== bytesToHex(der(2)) && bytesToHex(der(1)) !== bytesToHex(sk);
+out.scalareValido = /^[0-9a-f]{64}$/.test(NT.getPublicKey(der(7)));
+// la TRAPPOLA: getConversationKey(sk, pub(i)) la calcola chiunque da pub(sk)
+const gck = NT.nip44.getConversationKey || NT.nip44.v2.utils.getConversationKey;
+const iBytes = new Uint8Array(32); iBytes[31] = 3;
+const conv = gck(sk, NT.getPublicKey(iBytes));
+const convPubblica = gck(iBytes, pub);
+out.trappola = bytesToHex(conv) === bytesToHex(convPubblica);
+// hkdf: extract/expand danno bytes della lunghezza chiesta
+const prk = NT.hkdf.extract(NT.sha256, der(1), enc('sale'));
+out.hkdfLen = NT.hkdf.expand(NT.sha256, prk, enc('info'), 76).length;
+process.stdout.write(JSON.stringify(out));
+"""
+    with _tf.TemporaryDirectory() as d:
+        p = _os.path.join(d, "banco.js")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(banco)
+        r = _sp.run([node, p, _os.path.abspath("vendor/nostr.bundle.js")],
+                    capture_output=True, encoding="utf-8", timeout=60)
+    if r.returncode != 0:
+        prova("bundle: il banco node gira", "", (r.stderr or "")[-400:])
+        return
+    o = _json.loads(r.stdout)
+    prova("bundle: gli export nuovi e quelli di ieri ci sono tutti", 11, len(o["exp"]))
+    prova("bundle: hkdf espone extract ed expand", True, o["hkdf"])
+    prova("bundle: la firma su un hash nudo si verifica", True, o["firmaOk"])
+    prova("bundle: e su un altro hash NON si verifica", False, o["firmaAltro"])
+    prova("bundle: sha256 da 32 byte, firma da 64", (32, 64), (o["hashLen"], o["sigLen"]))
+    prova("bundle: la trade key via HMAC e' deterministica", True, o["det"])
+    prova("bundle: indici diversi danno chiavi diverse, e mai la sk", True, o["diversi"])
+    prova("bundle: la trade key e' uno scalare valido", True, o["scalareValido"])
+    prova("bundle: getConversationKey(sk, pub(i)) sarebbe PUBBLICA (la trappola)",
+          True, o["trappola"])
+    prova("bundle: hkdf.expand da' la lunghezza chiesta", 76, o["hkdfLen"])
 
 
 def prove_nwc_cifratura():
@@ -40682,6 +40799,7 @@ def main():
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,
+              prove_bundle_nostr,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
