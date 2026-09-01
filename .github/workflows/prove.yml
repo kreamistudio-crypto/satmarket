@@ -70,6 +70,7 @@ jobs:
              collaudo_tornate.py collaudo_rilancio.py
              collaudo_busta_diretta.py
              collaudo_email_corriere.py collaudo_account.py
+             collaudo_duplicato.py
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
              marca_prove.py recupera_xp_ordini.py livelli_prova.py

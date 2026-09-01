@@ -8793,6 +8793,62 @@ def salva_foto(annuncio_id: int, foto_lista: list,
     return nomi, scarti
 
 
+def foto_da_copiare(venditore_id: int, da_id) -> list:
+    """I nomi delle foto dell'annuncio da cui si DUPLICA ('' se non
+    c'e' niente da copiare). LA GUARDIA E' DI PROPRIETA' E STA NELLA
+    WHERE: si copiano le proprie foto e mai quelle di un altro — sono
+    pubbliche e chiunque potrebbe riscaricarle a mano, ma qui si
+    SCRIVONO dei file sul nostro disco, e ogni scrittura vuole il suo
+    recinto. Un id storto non e' un errore: non si copia niente."""
+    try:
+        da_id = int(da_id)
+    except (TypeError, ValueError):
+        return []
+    con = db()
+    r = con.execute("SELECT foto FROM annunci WHERE id=? AND venditore_id=?",
+                    (da_id, venditore_id)).fetchone()
+    con.close()
+    try:
+        return json.loads(r["foto"]) if r and r["foto"] else []
+    except Exception:
+        return []
+
+
+def copia_foto(annuncio_id: int, nomi_sorgente: list) -> tuple[list, list]:
+    """Le foto del DUPLICATO: chi ricalca un annuncio suo non le
+    ricarica. Si copiano i BYTE del pieno COSI' COME SONO — mai una
+    seconda compressione: e' il patto della filiera (un JPEG riletto e
+    ripassato dal canvas perde ~2dB a giro), e la gemella _min si rifa'
+    dal pieno come ha sempre fatto, che e' l'unica seconda generazione
+    ammessa.
+
+    Ritorna la coppia di `salva_foto` — nomi e MOTIVI degli scarti —
+    perche' vale la stessa regola: nessuna foto sparisce in silenzio."""
+    nomi, scarti = [], []
+    for i, sorgente in enumerate((nomi_sorgente or [])[:5]):
+        # SOLO I NOSTRI FILE, e la whitelist e' quella di sempre: le
+        # foto di un annuncio importato da Nostr sono URL su un host
+        # altrui, non matchano, e con loro non si copia niente. Vale
+        # anche da cintura — quei nomi arrivano dal nostro database,
+        # ma una lettura di file non si apre mai su un nome che non
+        # si e' guardato.
+        if not isinstance(sorgente, str) or not NOME_FOTO.match(sorgente):
+            scarti.append("foto ospitata altrove: ricaricala a mano")
+            continue
+        try:
+            with open(os.path.join(FOTO_DIR, sorgente), "rb") as f:
+                raw = f.read()
+        except OSError:
+            scarti.append("foto dell'annuncio di partenza non trovata")
+            continue
+        nome = _salva_una_foto(annuncio_id, i, raw)
+        if nome:
+            nomi.append(nome)
+        else:
+            scarti.append("non riesco a leggere questa foto")
+    return nomi, scarti
+
+
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
     """Una miniatura di una ricetta vecchia (lato piu' corto del
     catalogo attuale) va rifatta: si leggono solo le intestazioni
@@ -12548,6 +12604,17 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # Il commit e' gia' fatto: niente lock del database nel frattempo.
     nomi, scarti_foto = await asyncio.to_thread(salva_foto, annuncio_id,
                                                 d.get("foto"))
+    # IL DUPLICATO EREDITA LE FOTO (ago 2026): chi ricalca un proprio
+    # annuncio non le ricarica — si copiano i file di quello di
+    # partenza. Solo se non ne ha scelte di NUOVE: sceglierne una
+    # sostituisce il set per intero, che e' la stessa regola della
+    # modifica, e con le due strade insieme non si saprebbe quale
+    # vince. Guardia di proprieta' dentro foto_da_copiare.
+    if not (d.get("foto") or []):
+        sorgenti = foto_da_copiare(user["id"], d.get("copia_foto_da"))
+        if sorgenti:
+            nomi, scarti_foto = await asyncio.to_thread(
+                copia_foto, annuncio_id, sorgenti)
     if nomi:
         con = db()
         con.execute("UPDATE annunci SET foto=? WHERE id=?",

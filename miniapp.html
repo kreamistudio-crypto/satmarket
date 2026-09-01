@@ -15845,6 +15845,21 @@ function openDetail(id){
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <!-- LA PORTA DEL DUPLICATO (ago 2026), e sta SUBITO DOPO
+                la modifica perche' sono i due gesti che partono da
+                questo annuncio: uno lo cambia, l'altro ne fa nascere
+                un altro uguale. L'ordine della colonna resta quello
+                dichiarato — occasione → ritocco → stock → uscita.
+                SOLO QUI, e non nella riga di «I tuoi annunci»: vale
+                la misura gia' scritta per il rifornimento — a 320px
+                .mio-azioni concede 196px e la coppia
+                Modifica+Elimina se li prende tutti, quindi un terzo
+                badge va a capo e fa crescere OGNI riga della lista.
+                E solo su cio' che e' NATO QUI: duplicare un importato
+                darebbe un nativo gemello del suo evento Nostr, cioe'
+                il doppione che la deduplica esiste per togliere. E'
+                la stessa guardia del rifornimento, un rigo piu' giu'. -->
+           ${l.nostr ? '' : `<button class="btn ghost" onclick="duplicaAnnuncio(${l.id})">📄 Duplica questo annuncio</button>`}
            <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
                 e' obbligatoria: le tre strade che aprivano il foglio
                 erano tutte gatate sull'esaurito, quindi senza questa
@@ -28060,6 +28075,13 @@ async function rimuoviModerazione(id){
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
+/* IL DUPLICATO (ago 2026): il form si riempie come in modifica, ma
+   l'annuncio che nasce e' NUOVO — quindi `editandoId` resta null e
+   publish() prende la strada di sempre. Le due modalita' non possono
+   convivere: chi accende l'una spegne l'altra, e il banner lo dice.
+   `duplicaDaId` serve anche DOPO il riempimento: e' l'annuncio da cui
+   il server copia le foto quando non se ne scelgono di nuove. */
+let duplicaDaId = null, duplicaTitolo = '';
 let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
 /* «su QUESTA modifica firmata la consegna si dichiara» (ago 2026).
    Non basta `editandoNostr`, e il caso che lo chiede sono i due
@@ -28602,19 +28624,16 @@ const qtaForm = () => Math.max(1, parseInt(el('sellQta').value, 10) || 1);
 
 /* Porta un annuncio nel form di Vendi per ritoccarlo: stessi campi,
    stessa moderazione, submit sull'endpoint di modifica. */
-function editListing(id){
-  const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
-  if (!l) { toast('Annuncio non trovato'); return; }
-  haptic();
-  editandoId = id; editandoTitolo = l.title;
-  /* Un annuncio importato da Nostr si puo' modificare solo FIRMANDO
-     con la propria chiave (doppio cittadino): il form lo dice e il
-     salvataggio prende la strada firmata. Senza chiave d'accesso il
-     server risponde col suo messaggio di sempre. */
-  editandoNostr = !DEMO && !!l.nostr && !!myNpubAccesso;
-  /* il digitale resta fuori dalla strada firmata: v. consegnaFirmata */
-  consegnaFirmata = editandoNostr && (l.consegna||'') !== 'digitale'
-                    && !l.ancheDigitale;
+/* LA PRECOMPILAZIONE DEL FORM VIVE IN UN POSTO SOLO, e la ragione e'
+   che i chiamanti sono DUE: la modifica di un annuncio e il DUPLICATO
+   (ago 2026). Sono ~40 righe di campi, e due copie divergerebbero al
+   primo campo nuovo — chi lo aggiunge a una sola delle due si
+   ritroverebbe un duplicato che perde un dato per strada, in silenzio.
+   Qui dentro ci sono i soli CAMPI: le variabili di modalita'
+   (editandoId, duplicaDaId, editandoNostr, consegnaFirmata) le scrive
+   il chiamante PRIMA di chiamare, perche' aggiornaFormVendi e
+   renderFotoPreview le leggono. */
+function riempiFormDa(l){
   el('sellTitle').value = l.title;
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
@@ -28656,6 +28675,22 @@ function editListing(id){
   aggiornaSpedCampo();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
+}
+
+function editListing(id){
+  const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  haptic();
+  editandoId = id; editandoTitolo = l.title;
+  /* Un annuncio importato da Nostr si puo' modificare solo FIRMANDO
+     con la propria chiave (doppio cittadino): il form lo dice e il
+     salvataggio prende la strada firmata. Senza chiave d'accesso il
+     server risponde col suo messaggio di sempre. */
+  editandoNostr = !DEMO && !!l.nostr && !!myNpubAccesso;
+  /* il digitale resta fuori dalla strada firmata: v. consegnaFirmata */
+  consegnaFirmata = editandoNostr && (l.consegna||'') !== 'digitale'
+                    && !l.ancheDigitale;
+  riempiFormDa(l);
   /* Entrare in modifica e' una DISCESA, non un cambio di tab: Vendi e'
      una radice e senza la bandierina l'entry SOSTITUIREBBE quella di
      partenza — lo swipe indietro atterrava in Esplora invece che su
@@ -28663,6 +28698,33 @@ function editListing(id){
      eccezione della discesa in un reparto, alzata subito prima del
      go() che la consuma. */
   navSpingi = true;
+  go('vendi'); window.scrollTo(0, 0);
+}
+
+/* DUPLICARE UN ANNUNCIO (ago 2026, chiesto da Andrea): chi ha
+   venti cose simili ne pubblica una e ricalca le altre, invece di
+   ricompilare ogni volta categoria, condizione, consegna, tariffe,
+   zona e descrizione. Il form si riempie tutto — TITOLO, PREZZO e
+   FOTO compresi: sono le tre cose che quasi sempre cambiano, e
+   averle gia' li' vuol dire correggerle invece che riscriverle.
+   NON E' UNA MODIFICA, ed e' la sola cosa che si puo' capire male:
+   l'annuncio di partenza non si tocca e da qui ne nasce uno nuovo.
+   Lo dicono la testata, il banner e il bottone, che resta «Pubblica».
+   SOLO SU CIO' CHE E' NATO QUI: duplicare un importato darebbe un
+   nativo gemello del suo evento, cioe' proprio il doppione che la
+   deduplica dei doppioni Nostr esiste per togliere — ed e' la stessa
+   guardia (`l.nostr`) che gia' tiene fuori il rifornimento. */
+function duplicaAnnuncio(id){
+  const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  haptic();
+  /* le due modalita' si escludono: un duplicato non e' una modifica,
+     e se si arriva qui da un form in modifica quella si abbandona */
+  editandoId = null; editandoTitolo = '';
+  editandoNostr = false; consegnaFirmata = false;
+  duplicaDaId = id; duplicaTitolo = l.title;
+  riempiFormDa(l);
+  navSpingi = true;   // e' una discesa come la modifica, v. editListing
   go('vendi'); window.scrollTo(0, 0);
 }
 
@@ -28682,18 +28744,28 @@ function editListing(id){
    lui vivrebbe dentro Telegram e non altrove — meta' garanzia, che e'
    la trappola gia' dichiarata per la ✕ del carrello. */
 function annullaModificaChiedendo(){
-  if (!editandoId) { navIndietro(); return; }
+  if (!editandoId && !duplicaDaId) { navIndietro(); return; }
+  /* la stessa domanda per i due lavori a metà, con le parole di
+     ognuno: nel duplicato non c'e' nessun annuncio che «resta
+     com'era» — non e' ancora nato niente */
   chiediConferma({
-    titolo: 'Annullare la modifica?',
-    corpo: 'Le modifiche che non hai salvato si perdono. '
-         + 'L\'annuncio resta com\'è adesso in vetrina.',
-    etichetta: 'Annulla la modifica',
+    titolo: editandoId ? 'Annullare la modifica?' : 'Annullare il duplicato?',
+    corpo: editandoId
+      ? 'Le modifiche che non hai salvato si perdono. '
+        + 'L\'annuncio resta com\'è adesso in vetrina.'
+      : 'Quello che hai compilato si perde e non nasce nessun annuncio. '
+        + 'L\'annuncio di partenza resta com\'è.',
+    etichetta: editandoId ? 'Annulla la modifica' : 'Annulla il duplicato',
     poi: () => { annullaModifica(); uscitaDopoAnnullo = true; navIndietro(); }
   });
 }
 
+/* Svuota il form e spegne TUTTE E DUE le modalita': il nome resta
+   quello di sempre — il patto dei nomi interni, si rinominano i testi
+   e mai le chiavi — ma da ago 2026 chiude anche il duplicato. */
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
+  duplicaDaId = null; duplicaTitolo = '';
   editandoNostr = false;
   consegnaFirmata = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
@@ -28766,11 +28838,45 @@ function aggiornaFormVendi(){
       + 'protetti. Gli annunci vengono moderati.';
     if (el('sellSottotitolo')) el('sellSottotitolo').textContent =
       '3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.';
+    /* IL DUPLICATO VIVE NELL'ELSE, e non e' una sistemazione di
+       comodo: qui si PUBBLICA, quindi il bottone resta «⚡ Pubblica
+       annuncio» — che e' la cosa piu' importante da dire a chi
+       potrebbe credere di star modificando l'originale. Il banner
+       dice da cosa si sta ricalcando, la testata cosa si sta
+       facendo. */
+    if (duplicaDaId){
+      b.style.display = 'block';
+      b.innerHTML = `📄 Stai duplicando «${esc(duplicaTitolo)}»: `
+        + `l'annuncio di partenza <b>resta com'è</b> e da qui ne nasce `
+        + `uno nuovo. Rivedi <b>titolo, prezzo e foto</b>.`;
+      if (el('sellTitolo')) el('sellTitolo').textContent = 'Duplica annuncio';
+      if (el('sellSottotitolo')) el('sellSottotitolo').textContent =
+        'È già compilato come l\'originale: cambia quello che serve e pubblica. Ripassa dalla moderazione come un annuncio nuovo.';
+      /* le foto ereditate si sostituiscono in blocco come in modifica,
+         e l'etichetta lo dice solo se ce n'e' qualcuna da sostituire.
+         LA NOTA DELLA MODIFICA RESTA SPENTA, ed e' una cosa vista a
+         schermo: «restano com'erano» parla di foto che qui non sono
+         ancora di nessuno, e la riga sotto le miniature dice gia' la
+         stessa cosa con le parole giuste — due frasi per un fatto
+         solo, e quella meno precisa sopra. */
+      if (fotoAttuali.length && el('sellFotoEtichetta'))
+        el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
+    }
   }
   /* le due uscite della modifica compaiono e spariscono insieme:
      sono lo stesso gesto in due posti */
-  if (el('sellAnnulla')) el('sellAnnulla').style.display = editandoId ? '' : 'none';
-  if (el('sellChiudi')) el('sellChiudi').style.display = editandoId ? '' : 'none';
+  const aMeta = !!(editandoId || duplicaDaId);
+  if (el('sellAnnulla')) {
+    el('sellAnnulla').style.display = aMeta ? '' : 'none';
+    el('sellAnnulla').textContent = editandoId
+      ? 'Annulla la modifica' : 'Annulla il duplicato';
+  }
+  if (el('sellChiudi')) {
+    el('sellChiudi').style.display = aMeta ? '' : 'none';
+    const chiudi = editandoId ? 'Chiudi la modifica' : 'Chiudi il duplicato';
+    el('sellChiudi').title = chiudi;
+    el('sellChiudi').setAttribute('aria-label', chiudi);
+  }
   /* Le foto degli importati vivono sui relay: qui non si cambiano
      (v1, invariato). */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
@@ -28990,14 +29096,19 @@ async function fotoLasciate(ev){
 }
 
 function renderFotoPreview(){
-  if (editandoId && !sellFoto.length && fotoAttuali.length){
+  if ((editandoId || duplicaDaId) && !sellFoto.length && fotoAttuali.length){
     /* In modifica: si vedono le foto attuali; appena se ne scelgono
        di nuove, il set si sostituisce per intero. Per gli importati
-       da Nostr invece le foto non si toccano proprio (v1). */
+       da Nostr invece le foto non si toccano proprio (v1).
+       Nel DUPLICATO sono le foto dell'annuncio di partenza: qui non
+       sono ancora di nessuno — le copiera' il server alla
+       pubblicazione, dai file, senza ricomprimerle. */
     el('photoPreview').innerHTML = fotoAttuali.map(f=>`
       <div class="th"><img src="${esc(f)}" alt=""></div>`).join('')
       + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${editandoNostr
         ? 'Le foto degli annunci importati si cambiano dal tuo client Nostr'
+        : duplicaDaId
+        ? 'Sono le foto dell\'annuncio di partenza: le eredita anche questo, oppure scegline di nuove per sostituirle tutte'
         : 'Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte'}</div>`;
     return;
   }
@@ -29136,7 +29247,11 @@ async function publish(){
       condizione:el('sellCond').value, quantita:qtaForm(),
       zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
       seller:'Tu', rating:5, sales:0,
-      desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
+      /* nel duplicato senza foto nuove valgono quelle ereditate: in
+         DEMO non c'e' nessun server che le copi, e mostrarne zero
+         direbbe il falso su quel che si sta per pubblicare */
+      desc:el('sellDesc').value||'—',
+      photos:(sellFoto.length ? sellFoto : fotoAttuali).slice()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
       method:'POST',
@@ -29146,6 +29261,13 @@ async function publish(){
         quantita:qtaForm(),
         ...(asta ? {asta} : {}),
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
+        /* LE FOTO DEL DUPLICATO LE COPIA IL SERVER, dai file: qui in
+           mano ci sono URL, e rileggerli per ripassarli dal canvas
+           sarebbe una seconda compressione — il patto della filiera.
+           Si manda solo se non se ne sono scelte di nuove: sceglierne
+           una sostituisce il set per intero, come in modifica. */
+        ...(duplicaDaId && !sellFoto.length
+            ? {copia_foto_da: duplicaDaId} : {}),
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
     /* 413: il corpo intero e' stato rifiutato prima di arrivare al
@@ -29194,7 +29316,12 @@ async function publish(){
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
-  sellFoto = []; renderFotoPreview();
+  /* il duplicato si spegne qui: senza, rientrando in Vendi si
+     ritroverebbe il banner «stai duplicando» sopra un form vuoto —
+     e la prossima pubblicazione erediterebbe delle foto che nessuno
+     ha piu' chiesto */
+  duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
+  sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */

@@ -7856,6 +7856,192 @@ def prove_foto_spenta():
           social[1:])
 
 
+def prove_duplica_annuncio():
+    """IL DUPLICATO (ago 2026, chiesto da Andrea): si ricalca un
+    proprio annuncio invece di ricompilare tutto, e i tre campi che
+    quasi sempre cambiano — titolo, prezzo, foto — arrivano gia'
+    pieni. Le foto le copia il SERVER dai file: qui si gira il pezzo
+    vero su una cartella usa-e-getta, perche' la cosa che conta —
+    che i byte del pieno siano IDENTICI, cioe' nessuna seconda
+    compressione — una sentinella sulla forma non la puo' dire."""
+    print("\n[il duplicato]")
+    import io
+    import json
+    import re
+    import sqlite3
+    import tempfile
+
+    try:
+        from PIL import Image, ImageOps, ImageStat
+    except ImportError:
+        salta("la copia delle foto, girata per davvero",
+              "Pillow non e' installata")
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            amb = {"os": os, "io": io, "re": re, "json": json,
+                   "ImmaginePillow": Image, "ImageOps": ImageOps,
+                   "ImageStat": ImageStat, "FOTO_DIR": tmp}
+            i = _SORGENTE.index("MINIATURA_LATO = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            # la whitelist delle FORME: senza, copia_foto aprirebbe
+            # qualunque nome le si passi (chi estrae una funzione ne
+            # eredita le dipendenze)
+            i = _SORGENTE.index("NOME_FOTO = re.compile(")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            for f in ("miniatura_jpeg", "_salva_una_foto", "copia_foto",
+                      "foto_da_copiare"):
+                exec(pezzo(f), amb)
+
+            # l'annuncio di partenza: due foto vere sul disco
+            out = io.BytesIO()
+            foto_finta().save(out, "JPEG")
+            pieno = out.getvalue()
+            for n in ("a5_0.jpg", "a5_1.jpg"):
+                with open(os.path.join(tmp, n), "wb") as f:
+                    f.write(pieno)
+
+            nomi, scarti = amb["copia_foto"](9, ["a5_0.jpg", "a5_1.jpg"])
+            prova("le due foto si copiano", (["a9_0.jpg", "a9_1.jpg"], []),
+                  (nomi, scarti))
+            # LA PROVA REGINA: i byte del pieno sono gli STESSI. Una
+            # seconda compressione non fallisce e non alza — sgrana la
+            # foto, e se ne accorge solo chi la guarda sei mesi dopo.
+            with open(os.path.join(tmp, "a9_0.jpg"), "rb") as f:
+                prova("...e i byte del pieno sono IDENTICI", pieno, f.read())
+            prova("...con la gemella _min rifatta dal pieno", True,
+                  os.path.exists(os.path.join(tmp, "a9_0_min.jpg")))
+
+            # gli URL degli importati non si copiano, E LO DICONO
+            nomi, scarti = amb["copia_foto"](11, ["https://host.tld/x.jpg"])
+            prova("una foto ospitata altrove non si copia", [], nomi)
+            prova("...e il motivo si dice", 1, len(scarti))
+            # e un nome storto non apre nessun file
+            nomi, scarti = amb["copia_foto"](12, ["../config.py"])
+            prova("un nome fuori forma non apre niente", ([], 1),
+                  (nomi, len(scarti)))
+            # IL FILE CHE NON C'E' PIU' HA IL SUO MOTIVO, ed e' un
+            # ramo suo: il nome e' della forma giusta — quindi la
+            # whitelist lo lascia passare — e a fallire e' la lettura.
+            # L'ha chiesto la tortura: senza questo caso, un ramo che
+            # scarta in SILENZIO non faceva rossa nessuna riga, e la
+            # regola di casa e' che nessuna foto sparisca senza dirlo.
+            nomi, scarti = amb["copia_foto"](14, ["a77_0.jpg"])
+            prova("la foto sparita dal disco non si copia", [], nomi)
+            prova("...e il motivo lo dice", 1, len(scarti))
+            prova("niente da copiare, niente scarti", ([], []),
+                  amb["copia_foto"](13, []))
+
+            # LA GUARDIA E' DI PROPRIETA' e sta nella WHERE
+            vero = sqlite3.connect(":memory:")
+            vero.row_factory = sqlite3.Row
+            vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                         "venditore_id INT, foto TEXT)")
+            vero.execute("INSERT INTO annunci VALUES(5,111,?)",
+                         (json.dumps(["a5_0.jpg"]),))
+            vero.commit()
+
+            class Con:
+                def execute(self, *a): return vero.execute(*a)
+                def close(self): pass
+
+            amb["db"] = lambda: Con()
+            prova("le proprie foto si copiano", ["a5_0.jpg"],
+                  amb["foto_da_copiare"](111, 5))
+            prova("quelle di un altro no", [],
+                  amb["foto_da_copiare"](222, 5))
+            for storto in (None, "", "5; DROP", 999):
+                prova(f"id storto ({storto!r}): non si copia niente", [],
+                      amb["foto_da_copiare"](111, storto))
+
+    # --- SENTINELLE, server -------------------------------------------
+    pub = pezzo("pubblica")
+    # SI COPIA SOLO SENZA FOTO NUOVE: sceglierne una sostituisce il set
+    # per intero (la regola della modifica), e con le due strade insieme
+    # non si saprebbe quale vince.
+    prova("sentinella: si copia solo se non ne ha scelte di nuove", True,
+          'if not (d.get("foto") or []):' in pub
+          and pub.index('salva_foto, annuncio_id')
+              < pub.index("copia_foto, annuncio_id"))
+    prova("sentinella: la guardia di proprieta' e' nella WHERE", True,
+          "WHERE id=? AND venditore_id=?" in pezzo("foto_da_copiare"))
+    cop = codice(pezzo("copia_foto"))
+    prova("sentinella: la copia guarda la whitelist delle forme", True,
+          "NOME_FOTO.match(sorgente)" in cop)
+    # NIENTE SECONDA COMPRESSIONE: qui i byte si copiano e basta —
+    # e' il patto della filiera, e un converti_in_jpeg lasciato
+    # entrare non farebbe fallire niente, sgranerebbe le foto.
+    for vietato in ("converti_in_jpeg", "miniatura_jpeg", "ImmaginePillow"):
+        prova(f"sentinella: la copia non chiama {vietato}", False,
+              vietato in cop)
+
+    # --- SENTINELLE, client -------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    dup = pezzo_js(mini, "function duplicaAnnuncio(id){", "\n}")
+    # LA COSA DA NON SBAGLIARE: il duplicato NON e' una modifica —
+    # con editandoId acceso publish() devierebbe su salvaModifica e
+    # l'annuncio nuovo non nascerebbe, si riscriverebbe l'originale.
+    # E SI GUARDA L'EFFETTO, non che una riga esista: l'ha chiesto la
+    # tortura — con «editandoId = null» ancora al suo posto, una
+    # seconda assegnazione due righe piu' giu' passava liscia e il
+    # duplicato tornava a essere una modifica. Si contano TUTTE le
+    # scritture di quella variabile nel corpo, e devono essere a null.
+    scritture = re.findall(r"editandoId\s*=\s*([^;,\n]+)", dup)
+    prova("client: il duplicato non entra in modalita' modifica",
+          ["null"], [s.strip() for s in scritture])
+    prova("client: ...e non prende la strada firmata", True,
+          "editandoNostr = false" in dup)
+    prova("client: si ricorda da dove copiare le foto", True,
+          "duplicaDaId = id" in dup)
+    # LA PRECOMPILAZIONE E' UNA SOLA, ed e' un censimento e non un
+    # elenco: chi ricopia i campi dentro duplicaAnnuncio si ritrova
+    # due riempimenti che divergono al primo campo nuovo.
+    prova("client: i campi si riempiono in un posto solo", 1,
+          mini.count("el('sellCat').value = l.cat;"))
+    prova("client: e i chiamanti sono due", 2,
+          mini.count("riempiFormDa(l);"))
+    pub = pezzo_js(mini, "async function publish(){", "\n}")
+    prova("client: copia_foto_da parte solo senza foto nuove", True,
+          "duplicaDaId && !sellFoto.length" in pub
+          and "{copia_foto_da: duplicaDaId}" in pub)
+    # PUBBLICATO, IL DUPLICATO SI SPEGNE: senza, rientrando in Vendi
+    # resterebbe il banner sopra un form vuoto e la pubblicazione dopo
+    # erediterebbe delle foto che nessuno ha chiesto.
+    prova("client: pubblicato, il duplicato si spegne", True,
+          "duplicaDaId = null" in pub and "aggiornaFormVendi();" in pub)
+    prova("client: e l'annullo lo spegne insieme alla modifica", True,
+          "duplicaDaId = null" in pezzo_js(mini, "function annullaModifica()"))
+    # IL BOTTONE RESTA «Pubblica»: e' la cosa piu' importante che si
+    # dice a chi potrebbe credere di star modificando l'originale.
+    vendi = pezzo_js(mini, "function aggiornaFormVendi()")
+    i_dup = vendi.index("if (duplicaDaId){")
+    prova("client: il duplicato parla nel ramo che PUBBLICA", True,
+          vendi.index("btn.textContent = '⚡ Pubblica annuncio';") < i_dup)
+    prova("client: e non tocca il bottone", False,
+          "btn.textContent" in vendi[i_dup:])
+    # LA NOTA DELLA MODIFICA RESTA SPENTA: «restano com'erano» parla
+    # di foto che nel duplicato non sono ancora di nessuno, e la riga
+    # sotto le miniature lo dice gia' meglio (visto a schermo).
+    prova("client: e non riaccende la nota della modifica", False,
+          "sellFotoNota" in vendi[i_dup:])
+    # le due uscite valgono per tutti e due i lavori a meta'
+    prova("client: la ✕ e l'annulla compaiono anche sul duplicato", True,
+          "const aMeta = !!(editandoId || duplicaDaId);" in vendi)
+    prova("client: e la domanda si fa anche li'", True,
+          "if (!editandoId && !duplicaDaId)" in
+          pezzo_js(mini, "function annullaModificaChiedendo()"))
+    # LE FOTO EREDITATE SI VEDONO, o si pubblicherebbe alla cieca
+    prova("client: le foto di partenza si vedono nel duplicato", True,
+          "if ((editandoId || duplicaDaId) && !sellFoto.length" in
+          pezzo_js(mini, "function renderFotoPreview(){", "\n}"))
+    # E SOLO SU CIO' CHE E' NATO QUI: duplicare un importato darebbe
+    # un nativo gemello del suo evento, cioe' il doppione che la
+    # deduplica dei doppioni Nostr esiste per togliere.
+    prova("client: il bottone non nasce sugli importati", True,
+          "${l.nostr ? '' : `<button class=\"btn ghost\" "
+          "onclick=\"duplicaAnnuncio(${l.id})\">" in mini)
+
+
+
 def prove_avatar():
     """I francobolli degli avatar non vogliono una miniatura (ago 2026).
     _salva_avatar li scrive gia' a 128px e miniatura_jpeg non ingrandisce
@@ -11831,11 +12017,22 @@ def prove_valuta_soglia():
     # infilata DOPO il go() lasciava la sentinella verde (l'ha detto la
     # tortura). Quello che deve valere e' che quando il ricalcolo parte
     # NESSUNA scrittura del prezzo sia ancora in arrivo.
-    _ed = pezzo_js(mini, "function editListing(id){", "\n}")
-    prova("la modifica precompila il prezzo PRIMA di aprire il form",
+    # DALL'AGO 2026 la precompilazione vive in riempiFormDa (i
+    # chiamanti sono due: la modifica e il duplicato), quindi la
+    # catena da guardare e' in DUE pezzi — e l'affermazione non si
+    # allenta: si chiede in piu' che il riempimento non si porti
+    # dentro il go(), o «prima» smetterebbe di voler dire qualcosa.
+    _ri = pezzo_js(mini, "function riempiFormDa(l){", "\n}")
+    prova("il form si riempie il prezzo per ultimo, mai dopo il go'",
           True,
-          0 < _ed.rfind("el('sellPrice').value")
-            < _ed.find("go('vendi')"))
+          0 < _ri.rfind("el('sellPrice').value")
+          and "go('vendi')" not in _ri)
+    for _chi in ("function editListing(id){",
+                 "function duplicaAnnuncio(id){"):
+        _ed = pezzo_js(mini, _chi, "\n}")
+        prova(f"{_chi[9:-4]}: riempie PRIMA di aprire il form", True,
+              0 < _ed.rfind("riempiFormDa(l);")
+                < _ed.find("go('vendi')"))
     prova("...e entrando in Vendi la riga si rifa'", True,
           "aggiornaHintPolitiche();"
           in pezzo_js(mini, "if (view==='vendi') {", "\n  }"))
@@ -38669,7 +38866,8 @@ def main():
               prove_annullo, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
-              prove_foto, prove_foto_scarti, prove_avatar,
+              prove_foto, prove_foto_scarti,
+              prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
