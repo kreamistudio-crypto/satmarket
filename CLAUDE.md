@@ -19743,6 +19743,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «finisco qui» invece di «questi sono miei»; il dubbio c'era già
   sulla carta e il giro dal vivo l'ha confermato peggiore del
   previsto.
+  E LA QUARTA È IL CONTORNO, chiesta DUE VOLTE a giorni di distanza
+  — quindi è quella che tornerà in mente per prima, e va letta
+  prima di riprovarci: dare al titolo un riquadro come quello dei
+  cassetti. SUL TITOLO fallisce in tutte le sue forme (bordo
+  marcato col fondo vuoto, bordo inchiostro, velo, riquadro
+  sporgente col margine negativo): la sezione diventa un FRATELLO
+  dei cassetti invece del loro contenitore, e il padding laterale
+  che il bordo si porta dietro mangia i 29,6px d'aria del titolo
+  lungo — che va a capo in tutte e quattro.
+  SUL GRUPPO INTERO INVECE FUNZIONA, ed è la metà da tenere: il
+  riquadro abbraccia anche i cassetti, quindi dice «contengo»
+  invece di «sono uno di voi», e di giorno la gerarchia si legge
+  MEGLIO di adesso. La carta resta una differenza vera anche così
+  — al titolo non si dà la carta, al gruppo si dà il contorno col
+  fondo trasparente: pieno (cassetto) contro vuoto (gruppo).
+  MA DI SERA SI ASSOTTIGLIA, ed è il numero che ha deciso: la carta
+  del cassetto stacca dal fondo notturno appena **1,13**, quindi di
+  notte i cassetti sembrano vuoti anche loro e la distinzione passa
+  da «testo nudo contro riquadro» — categoriale, si vede subito — a
+  «bordo da 2 contro bordo da 1», che si vede solo confrontando. Il
+  contorno del gruppo resta comunque il più visibile della pagina
+  (stacca 1,69 contro l'1,13 del cassetto): non collassa, si legge
+  peggio — ed è la ragione per cui la decisione non era ovvia.
+  I TRE COSTI, misurati e non stimati: il Profilo CHIUSO da **1113
+  a 1213** a 375 (+9%); il **tetto del corpo che scende da 19 a
+  18**, cioè la riserva di un carattere misurata il giorno prima
+  sparisce e la prossima etichetta un filo più lunga va a capo; e i
+  **cassetti più stretti di 16px** a 320. Il secondo si toglierebbe
+  accorciando l'etichetta più lunga («Il tuo negozio» sta anche
+  nella famiglia di «Il tuo catalogo» e «Il tuo account»: a 20px
+  restano 82px d'aria) — ma è una decisione di CONTENUTO, che cambia
+  cosa promette quel titolo, non di layout.
+  DECISIONE DI ANDREA: si lascia com'è. Chi la ripropone porti il
+  pezzo che manca — un fondo di cassetto che si veda anche di notte
+  — o si porti dietro la perdita di sera sapendola.
   IL COSTO È MISURATO: il Profilo passa da **1023 a 1113px** a 375
   (+90, +8,8%) e ogni titolo da 42 a 60px.
   ⚠️ IL TETTO DEL CORPO È 19px E IL TITOLO STA A 18 (ago 2026,
