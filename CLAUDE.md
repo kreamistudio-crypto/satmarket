@@ -2531,14 +2531,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   prova che nel racconto non compaia nessuna percentuale.
   NIENTE COPERTINA, e questa riga ROVESCIA il primo disegno
   (decisione di Andrea, che chiedeva di tenere ANCHE il banner del
-  venditore): in testa vanno pastiglia, occhiello, titolo, intro e il
-  link che apre — l'immagine grande si e' appena vista a tutto schermo
+  venditore): in testa vanno pastiglia, titolo, intro e la RIGA DELLE
+  DUE AZIONI — l'immagine grande si e' appena vista a tutto schermo
   nella card, e ripeterla a un tocco di distanza non aggiunge niente.
   IL CONTO CHE HA DECISO: due immagini 3:1 in fila facevano 396px
   sopra il nome del venditore, cioe' la prima card fuori da qualunque
   schermo — la testata e' gia' 226px nel caso minimo e ~618 nel
-  tipico. Le foto del progetto vivono DENTRO il cassetto, dove a
-  schermo non pesano finche' resta chiuso.
+  tipico. TUTTE le immagini del progetto, hero compreso, vivono DENTRO
+  il cassetto, dove a schermo non pesano finche' resta chiuso.
+  ⚠️ E L'OCCHIELLO NON C'E' PIU' (ago 2026, decisione di Andrea):
+  «Gioco da tavolo · fatto e stampato in Italia» stava fra la
+  pastiglia e il titolo e diceva in ANTICIPO quel che la prima riga
+  della storia dice meglio. Si parte dal sottotitolo. Il campo e'
+  uscito anche dal CATALOGO e la classe dal foglio: un campo che non
+  legge nessuno fa credere a chi passa che da qualche parte si veda —
+  il precedente di `.rac-logo`, e c'e' il censimento che ne conta
+  ZERO in tutti e tre i posti.
   ⚠️ MA IL COSTO VERO E' PIU' DEL TRIPLO DI QUANTO STIMATO, ed e' il
   numero da tenere perche' il piano diceva «~98px» e la MISURA dice
   altro. A 360px, prima card: **554 senza racconto, 863 col racconto
@@ -2560,8 +2568,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   I 863 RESTANO SCRITTI E NON SI CANCELLANO: sono il numero che ha
   fatto scartare la copertina, e chi un domani volesse rimettere
   un'immagine grande in cima deve partire da li' e non da 639.
+  ⚠️ MA I NUMERI ASSOLUTI NON SI CONFRONTANO FRA GIRI DIVERSI, ed e'
+  la lezione del giro di agosto: il banco semina un catalogo suo
+  (annunci, banner, feedback), quindi «639» e «748» possono dire la
+  stessa cosa su due mondi diversi. A valere e' il DELTA misurato
+  PRIMA E DOPO nella STESSA sessione — e col giro delle sette
+  modifiche (occhiello via, hero nel cassetto, riga accorciata) il
+  cassetto chiuso scende di **149px misurati**, da 897 a 748: la
+  testa cresce di 34 (il bottone) e il racconto cala di 120 (l'hero
+  che se ne va di la'). Chi rimisura lanci il banco sui due alberi
+  invece di credere a un numero scritto qui.
   LA PASTIGLIA E LA SECONDA FRASE DELL'AVVISO NON SI TOCCANO: sono il
   punto 1, e i pixel che costano si pagano.
+  ⚠️ E LA RIGA SI E' ACCORCIATA A UNA FRASE (ago 2026, decisione di
+  Andrea: «non e' il momento di spiegare quella funzione»): se n'e'
+  andata la META' CHE RACCONTA — «spazio pubblicitario, questo negozio
+  ha pagato per comparire» — e resta quella che GARANTISCE, cioe'
+  quella che questo file dichiarava «conta piu' della prima». Il
+  blocco scende da tre righe a una (`.rac-avviso` da 93px a 56).
+  IL PERCHE' REGGE: la seconda frase e' l'unica che impedisce di
+  leggere «Consigliato» come un endorsement NOSTRO — che e' cio' che
+  il `PROMPT_MODERAZIONE` vieta agli altri, e quella regola non puo'
+  valere solo per loro. La prima invece RACCONTAVA la funzione, ed e'
+  esattamente quel che la decisione toglie.
+  ⚠️ QUEL CHE RESTA SCOPERTO, e va detto invece di far finta: nessuna
+  superficie dice piu' che quello spazio SI COMPRA. La pastiglia dice
+  «Consigliato», che e' una parola NOSTRA e suggerisce il contrario —
+  la scelta e' stata portata ad Andrea col suo costo, non applicata in
+  silenzio. La leva, il giorno che si vorra' chiudere, e' UNA parola
+  dentro questa riga: non la sezione di ieri.
+  ⚠️ E LE PAROLE DI IERI NON SI SCRIVONO NEL COMMENTO che spiega il
+  taglio: la prova che le vieta legge il pezzo JS COMMENTI COMPRESI, e
+  una spiegazione la farebbe tornare rossa. E' la trappola della
+  prosa, pagata due volte nello stesso giro.
   ⚠️ E LA RIGA IN CHIARO E' TRASLOCATA IN FONDO AL CASSETTO (ago
   2026, decisione di Andrea): stava SOPRA, e la prova che lo esigeva
   ha CAMBIATO LATO. IL PERCHE' DI ALLORA ERA BUONO e va tenuto —
@@ -2587,9 +2626,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   col cassetto CHIUSO, senza quell'immagine non lo leggerebbe da
   nessuna parte. E' lo stesso buco di ieri, colmato meglio: il logo lo
   diceva in 82px, l'hero lo dice raccontando anche di cosa si tratta.
-  PER QUESTO STA FUORI DAL CASSETTO. Dentro, la meta' delle persone
-  non lo vedrebbe mai — e sarebbe proprio la meta' che al negozio ci
-  arriva per la merce.
+  ⚠️ MA DAL GIORNO DOPO STA DENTRO IL CASSETTO (ago 2026, decisione
+  di Andrea che ROVESCIA la riga di ieri — «chiudendo la storia deve
+  chiudersi anche l'immagine»): fuori restava l'oggetto piu' grande
+  della pagina senza piu' niente attorno, e «Chiudi la storia» non
+  chiudeva la cosa che si vedeva di piu'. Il PERCHE' DI ALLORA va
+  tenuto perche' era vero — dentro, chi arriva da un annuncio non lo
+  vede — e a superarlo e' il registro: un cassetto che si chiama
+  «Chiudi la storia» e lascia fuori meta' della storia dice il falso
+  sul proprio nome.
+  IL PREZZO E' IL BUCO DEL LOGO RIAPERTO, dichiarato: il nome «To The
+  Mooon!» vive SOLO dentro quell'immagine — `.rac-titolo` porta il
+  sottotitolo — quindi a cassetto chiuso non si legge da nessuna
+  parte. LA LEVA, se a rodaggio dara' fastidio, E' IL NOME NELL'H3 e
+  non l'hero fuori: la riga si legge comunque, e non si ricompra
+  un'immagine grande sopra la merce.
+  E APRE LA STORIA invece di chiuderla (prima dei blocchi, non
+  dopo): chi tocca la card lo trova aperto, quindi e' la prima cosa
+  che vede — ed e' anche il motivo per cui NON e' pigro. C'e' la
+  prova su tutt'e due le cose.
   IL RAPPORTO E' NEL FILE E NON NEL CSS (`width:100%; height:auto`),
   che e' il ROVESCIO esatto del logo: li' l'altezza era FISSA perche'
   era quella che si pagava in pixel, qui l'immagine E' il contenuto e
@@ -2612,6 +2667,47 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   COSTA PIU' DEL LOGO CHE SOSTITUISCE — **141px a 360** contro 82 — e
   il conto della testata sta dov'e' la sua storia, nella voce «NIENTE
   COPERTINA» qui sopra: a scendere e' la SOMMA, non questa riga.
+  «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di Andrea): il
+  bottone arancio di casa accanto al link che apre la storia, e
+  toccandolo si scorre alla vetrina del negozio. E' l'UNICO pieno di
+  questa pagina, ed e' anche la meta' che spiega perche' il racconto
+  vive DENTRO il negozio invece che in una pagina a parte: sotto c'e'
+  roba da comprare, e senza un modo di arrivarci quella scelta non si
+  vedeva da nessuna parte.
+  NON COMPRA NIENTE, SCORRE, ed e' la riga da non ammorbidire: c'e' la
+  prova che nel suo `onclick` non compaia nessuno dei varchi che
+  POSTano a `/orders` (`startBuy`, `compraDaBarra`, `apriAcquisto`).
+  Un bottone arancione che dice «Acquista» e conia una fattura da una
+  pagina dove nessuno ha scelto un articolo sarebbe il difetto piu'
+  caro che questo cantiere possa produrre.
+  L'ANCORA E' L'ETICHETTA «In vetrina in questo negozio» e non la
+  griglia: quella vuota non ha un box su cui atterrare, e lo scroll
+  cadrebbe nel nulla in silenzio. Deve esistere davvero nel markup —
+  c'e' la prova — e lo scroll e' quello di casa, spento da
+  `prefers-reduced-motion` con `tourRidotto()` come ogni altro.
+  STA NELLA TESTA E NON NEL CASSETTO (c'e' la prova sull'ordine): chi
+  arriva al negozio da un annuncio ha il racconto CHIUSO, e deve
+  poter scendere alla merce senza aprire una storia che non gli
+  interessa.
+  ⚠️ `width:auto` SUL BOTTONE, o non ci sta accanto al link: `.btn`
+  nasce a tutta larghezza, quindi l'arancio si prenderebbe la riga
+  intera e il «Leggi la storia» scenderebbe sotto. E' la stessa
+  lezione gia' pagata dai bottoni della barra d'acquisto.
+  LA RIGA DEL DEPOSITO E' USCITA DAL NEGOZIO (ago 2026, decisione di
+  Andrea): «🔒 Ogni acquisto e' protetto dal deposito di garanzia»
+  compariva in cima alla vetrina del negozio, e lo dice gia' la SCHEDA
+  dell'annuncio dentro il recinto verde, un tocco prima di comprare —
+  qui era la terza volta nella stessa schermata, su una pagina che
+  questo file dichiara «gia' lunga».
+  LE DUE PORTE VERSO «Il pagamento protetto» RESTANO, e nessuna delle
+  due era questa: la riga in Esplora e il bottone in fondo al Profilo.
+  ⚠️ QUELLA DI ESPLORA NON SI TOCCA MAI, ed e' la meta' che conta: il
+  TOUR di benvenuto la cerca per classe dentro `#view-esplora`
+  (`TAPPE_TOUR`), e una tappa senza bersaglio non entra nel giro — il
+  contatore «N di M» scenderebbe senza che niente fallisca. C'e' la
+  prova che di `.trust-line` ne resti UNA in tutto il client, e che
+  sia quella che il tour cerca.
+
   I TRE PUNTI SONO CONTORNATI e le QUATTRO TAPPE hanno il PALLINO
   (ago 2026, decisione di Andrea). Il contorno stacca i punti dalla
   prosa che sta sopra e sotto — sono tre FATTI del gioco, non un altro
@@ -27441,6 +27537,64 @@ DA GUARDARE al primo giro, ed è il pezzo che da qui non si può fare:
 **una scansione vera con Amber su un telefono** — che l'approvazione
 faccia comparire l'utente qui, e che la sessione conservata regga al
 riavvio (una firma chiesta il giorno dopo non deve rimandare al QR).
+
+La pagina del Consigliato, cinque ritocchi su sette (ago 2026, dal
+campo). Via l'occhiello (diceva in anticipo quel che la prima riga
+della storia dice meglio), il bottone **Acquista** accanto a «Leggi la
+storia» — che non compra: scorre alla merce, ed è la metà che spiega
+perché il racconto vive dentro il negozio — l'**hero dentro il
+cassetto** (chiudendo la storia si chiude tutto: fuori restava
+l'oggetto più grande della pagina senza niente attorno), e la riga in
+fondo accorciata a una frase. Vedi Architettura, «NIENTE COPERTINA» e
+le voci sotto, per il prezzo dichiarato dell'hero (il nome del
+progetto vive solo lì dentro, quindi a cassetto chiuso non si legge —
+la leva è il nome nell'h3, non l'hero fuori) e per quel che resta
+scoperto sulla riga.
+IL PUNTO 4 NON SI È ESEGUITO ALLA LETTERA, ed è stato riportato ad
+Andrea invece di applicarlo in silenzio: la sezione se n'è andata per
+metà. Quel che RACCONTA la funzione è sparito, quel che GARANTISCE
+resta — «le tutele sull'acquisto sono le stesse di ogni altro
+negozio» — perché è l'unica frase che impedisca di leggere
+«Consigliato» come un endorsement nostro, cioè ciò che il
+`PROMPT_MODERAZIONE` vieta agli altri. Il costo è dichiarato: da oggi
+nessuna superficie dice più che quello spazio si compra.
+I PUNTI 6 E 7 NON SI SONO TOCCATI, ed è la risposta alla domanda di
+Andrea: quella riga è del **NEGOZIO** e non del racconto —
+`spedGratisNegozioRiga` si disegna per qualunque venditore con la
+spedizione gratis accesa. Toccarla cambierebbe la pagina di tutti, e
+in tre modi diversi secondo cosa si tocca: il TESTO si divide fra
+l'involucro locale e `frasePromessaSpedGratis`, che è giudice unico di
+due superfici in prosa più l'etichetta di «Altri oggetti»; la
+POSIZIONE rovescerebbe l'ordine 🚚-prima-di-🎁, che ha la sua prova su
+quattro superfici; e il simbolo € viene da `cifraSoglia`, usato
+ovunque. È una decisione di prodotto, non un ritocco.
+Collaudato: **DELTA +10 prove** sull'albero ISOLATO — la cartella è
+condivisa con altre due sessioni, quindi è il DELTA il numero
+difendibile — e **15 MUTAZIONI, 15 uccise**, una per riga
+sorvegliata — due erano sopravvissute al primo giro ed erano MIRATE
+MALE, non buchi del codice: `tourRidotto()` vive in sei posti, e la
+mutazione dell'hero aggiungeva spazi invece di spostarlo. Più il giro
+DAL VIVO col server vero su un database usa-e-getta a 320/360/375 nei
+due temi (**113 verdi, zero errori JS, zero scorrimento laterale**):
+l'hero che si vede a cassetto aperto e sparisce a chiuso, «Acquista»
+che scorre davvero (l'etichetta atterra a 1px dalla cima) e che resta
+visibile a cassetto chiuso.
+⚠️ E LE QUATTRO ROSSE DEL BANCO NON SONO UN DIFETTO, ed è la
+trappola che ha fatto concludere male per un'ora: sono **mojibake** —
+`âˆ'` al posto di `−` — di un banco node lanciato senza
+`encoding="utf-8"` (le altre tre chiamate a node del file ce l'hanno).
+Falliscono su Windows e passano in CI, che infatti è VERDE sullo
+stesso albero. È la lezione già a verbale in memoria, e il modo di
+smascherarla è quello: **se la CI è verde su un commit che in locale
+è rosso, il difetto è del banco** — si guarda il valore avuto, non il
+nome della prova.
+E IL NUMERO SI MISURA PRIMA E DOPO, ed è la lezione del giro: il 748
+di oggi sembrava una crescita contro il 639 scritto in CLAUDE.md, e
+non lo era — quel numero veniva da un altro banco con un altro
+catalogo. Rimisurato sullo stesso seme: **897 → 748, cioè −149px** a
+cassetto chiuso.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):

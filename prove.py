@@ -31447,29 +31447,70 @@ def prove_sponsor():
           "Consigliato", _par.group(1).strip() if _par else "")
     # ⚠️ LA RIGA IN CHIARO STA IN FONDO AL CASSETTO, e questa prova ha
     # CAMBIATO LATO (ago 2026, decisione di Andrea): chiedeva che
-    # stesse SOPRA, «che sotto la legge solo chi apre». Il perche' di
-    # allora era buono e a superarlo e' stato un fatto — in cima il
-    # suo posto l'ha preso l'HERO, l'immagine col nome del progetto
-    # dentro. Quel che regge la dichiarazione a cassetto CHIUSO e' la
-    # PASTIGLIA, che sta sempre in vista e porta la stessa parola
-    # della card: la riga aggiunge il PERCHE', e chi ha letto la
-    # storia ci arriva comunque.
+    # stesse SOPRA, «che sotto la legge solo chi apre». Quel che regge
+    # la dichiarazione a cassetto CHIUSO e' la PASTIGLIA, che sta
+    # sempre in vista e porta la stessa parola della card: la riga
+    # aggiunge il PERCHE', e chi ha letto la storia ci arriva
+    # comunque.
     prova("la riga in chiaro chiude il racconto", True,
           _rn.index('class="rac-avviso"') > _rn.index('class="rac-corpo'))
-    # LA RIGA IN CHIARO, e la SECONDA frase conta piu' della prima:
-    # senza, «in vetrina su Barattolo» si legge come un endorsement
-    # nostro — che e' esattamente cio' che il PROMPT_MODERAZIONE
-    # vieta agli altri. Quella regola non puo' valere solo per loro.
+    # ⚠️ LA RIGA SI E' ACCORCIATA A UNA FRASE, e queste due prove
+    # hanno CAMBIATO LATO (ago 2026, decisione di Andrea: «non e' il
+    # momento di spiegare quella funzione»): se n'e' andata la META'
+    # che RACCONTA e resta quella che GARANTISCE. La seconda contava
+    # gia' «piu' della prima» ed e' l'unica rimasta — senza,
+    # «Consigliato» si legge come un endorsement NOSTRO, che e'
+    # esattamente cio' che il PROMPT_MODERAZIONE vieta agli altri («il
+    # testo che SI RIVOLGE A CHI LEGGE come farebbe la piattaforma»),
+    # e quella regola non puo' valere solo per loro.
     # ...A SPAZI COLLASSATI, o la sentinella diventa rossa per colpa
     # di un a capo del markup: la frase e' lunga e va a capo dove il
     # rientro la porta. E' la lezione della sonda che non
     # normalizzava, gia' pagata col giro dal vivo della riga dello
     # sconto nel form.
     _rnp = " ".join(_rn.split())
-    prova("...e la riga dice che e' uno spazio pubblicitario", True,
-          "Spazio pubblicitario" in _rnp and "ha pagato" in _rnp)
-    prova("...e che le tutele non cambiano", True,
+    prova("la riga non racconta piu' la funzione", False,
+          "Spazio pubblicitario" in _rnp or "ha pagato" in _rnp)
+    prova("...e resta quella che GARANTISCE", True,
           "tutele sull'acquisto sono le stesse" in _rnp)
+
+    # ---- 3a-bis. LA RIGA DELLE DUE AZIONI -----------------------
+    # «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di Andrea): e'
+    # l'unico bottone pieno della pagina, e la sua meta' e' il motivo
+    # per cui il racconto vive DENTRO il negozio invece che in una
+    # pagina a parte — sotto c'e' roba da comprare. Sta accanto al
+    # link che apre la storia e NON dentro il cassetto: chi arriva col
+    # racconto chiuso deve poterci arrivare senza aprire niente.
+    prova("il bottone Acquista sta nella testa", True,
+          0 <= _rn.find('class="btn orange rac-acquista"')
+          < _rn.find('class="rac-corpo'))
+    # ...E NON COMPRA NIENTE, scorre: c'e' la prova che nel suo
+    # onclick non compaia nessuno dei varchi che POSTano a /orders —
+    # un bottone arancione che dice «Acquista» e apre una fattura da
+    # una pagina che non ha scelto un articolo sarebbe il difetto piu'
+    # caro possibile.
+    _acq = pezzo_js(mini, "function acquistaDalRacconto(){")
+    prova("...e non apre nessun acquisto", False,
+          any(x in _acq for x in ("startBuy", "compraDaBarra",
+                                  "apriAcquisto", "/api/orders")))
+    # L'ANCORA E' L'ETICHETTA DELLA VETRINA e non la griglia, che
+    # vuota non ha un box su cui atterrare — e dev'esserci davvero nel
+    # markup, o lo scroll cade nel nulla in silenzio.
+    prova("...e l'ancora esiste nel markup", True,
+          'id="negozioVetrinaTit"' in mini)
+    prova("...e il bottone ci punta", True, "negozioVetrinaTit" in _acq)
+    # ...E LO SCROLL E' QUELLO DI CASA, spento da reduced-motion come
+    # ogni altro dell'app.
+    prova("...e rispetta reduced-motion", True, "tourRidotto()" in _acq)
+    # ⚠️ L'OCCHIELLO NON C'E' PIU' (ago 2026, decisione di Andrea):
+    # «Gioco da tavolo · fatto e stampato in Italia» diceva in
+    # anticipo quel che la prima riga della storia dice meglio. Esce
+    # anche dal CATALOGO e dal foglio: un campo che non legge nessuno
+    # fa credere a chi passa che da qualche parte si veda, e una
+    # classe orfana nel CSS fa lo stesso (il precedente di `rac-logo`).
+    prova("dell'occhiello non resta niente", (0, 0, 0),
+          (mini.count("rac-occhiello"), _cat.count("occhiello"),
+           _rn.count("occhiello")))
 
     # ---- 3b. LA FOTO VERTICALE NON SI PRENDE UNO SCHERMO ---------
     # Il tabellone di To The Moon e' in piedi, e a colonna piena una
@@ -31498,13 +31539,19 @@ def prove_sponsor():
     prova("...e la verticale resta centrata", True,
           "margin:16px auto 0" in _dic)
 
-    # ---- 3c. L'HERO IN CIMA -------------------------------------
-    # ⚠️ HA PRESO IL POSTO DEL LOGO (ago 2026, decisione di Andrea), e
-    # il buco che il logo colmava NON si riapre: il nome del progetto
-    # non compare in nessun testo del racconto — l'h3 della testa
-    # porta il SOTTOTITOLO — quindi chi apre il negozio da un annuncio,
-    # col cassetto CHIUSO, deve leggerlo qui. Sta dentro l'immagine,
-    # che e' anche il motivo per cui questa vive FUORI dal cassetto.
+    # ---- 3c. L'HERO, DENTRO IL CASSETTO -------------------------
+    # ⚠️ HA PRESO IL POSTO DEL LOGO (ago 2026, decisione di Andrea) e
+    # il giorno dopo E' SCESO NEL CASSETTO, decisione che ROVESCIA la
+    # riga di ieri: chiudendo la storia si chiude TUTTO il racconto,
+    # immagine compresa — fuori restava un'immagine grande senza piu'
+    # niente attorno, e «Chiudi la storia» non chiudeva la cosa piu'
+    # grande che si vedeva.
+    # ⚠️ IL PREZZO E' DICHIARATO, ed e' il buco che il logo colmava
+    # riaperto sapendolo: il nome del progetto vive SOLO dentro questa
+    # immagine — l'h3 della testa porta il SOTTOTITOLO — quindi chi
+    # apre il negozio da un annuncio, col cassetto CHIUSO, non lo
+    # legge da nessuna parte. La leva, se a rodaggio dara' fastidio, e'
+    # il nome nell'h3: non l'hero fuori.
     _rh = mini[mini.index("  .rac-hero{"):]
     _rh = [" ".join(x.split())
            for x in _rh[:_rh.index("}")].split("{", 1)[1].split(";")]
@@ -31516,15 +31563,24 @@ def prove_sponsor():
     # file, e per questo va consegnato 21:9.
     prova("...e l'altezza segue il file, non il CSS", True,
           "height:auto" in _rh)
-    prova("l'hero sta fuori dal cassetto", True,
-          _rn.index('class="rac-hero"') < _rn.index('class="rac-corpo'))
-    # ...E NON E' PIGRO, al contrario delle foto del cassetto: sta
-    # sopra la piega e si vede appena il negozio si apre — un lazy li'
-    # ritarderebbe la prima cosa che identifica lo spazio venduto.
-    _tsa = _rn[_rn.index('class="rac-pill"'):
-               _rn.index('class="rac-corpo')]
-    prova("...e non aspetta (niente lazy sopra la piega)", True,
-          'class="rac-hero"' in _tsa and "loading=" not in _tsa)
+    prova("l'hero sta DENTRO il cassetto", True,
+          _rn.index('class="rac-hero"') > _rn.index('class="rac-corpo'))
+    # ...ED E' LA PRIMA COSA DEL CASSETTO e non l'ultima: chi tocca la
+    # card lo trova aperto, quindi l'hero apre la storia invece di
+    # chiuderla — e a cassetto chiuso non costa un pixel a nessuno.
+    prova("...e apre la storia, prima dei blocchi", True,
+          _rn.index('class="rac-hero"') < _rn.index("${blocchi}"))
+    # ...E NON E' PIGRO, al contrario delle foto sotto: per chi arriva
+    # dalla card il cassetto nasce APERTO, quindi questa e' la prima
+    # cosa che si vede — un lazy ritarderebbe proprio l'immagine che
+    # identifica lo spazio venduto.
+    # ⚠️ L'ANCORA E' IL TAG e non piu' la fetta fino al cassetto: da
+    # quando l'hero ci sta DENTRO, quella fetta non lo conterrebbe
+    # affatto e la riga passerebbe per la ragione sbagliata.
+    _tsa = _rn[_rn.index('class="rac-hero"'):]
+    _tsa = _tsa[:_tsa.index(">")]
+    prova("...e non aspetta (niente lazy)", True,
+          "loading=" not in _tsa)
     # IL FILE PASSA DALLA FORMA DEL SERVER: `-cop` e' gia' nella
     # whitelist (`(?:cop|[1-9])`) — era lo slot della copertina, che
     # il logo occupava e adesso lascia all'hero, quindi la regex non
@@ -31595,6 +31651,29 @@ def prove_sponsor():
            ("foto", "1"), ("elenco", ""), ("foto", "3")],
           _blo)
 
+    # ---- 3f. LA TRUST-LINE E' USCITA DAL NEGOZIO ----------------
+    # ⚠️ (ago 2026, decisione di Andrea): «Ogni acquisto e' protetto
+    # dal deposito di garanzia» lo dice gia' la SCHEDA dell'annuncio
+    # prima di comprare, e qui era la terza volta nella stessa
+    # schermata. Le porte verso «Il pagamento protetto» restano DUE —
+    # la riga di Esplora e il bottone in fondo al Profilo — e nessuna
+    # delle due era questa.
+    # con find() e non index(): se il markup si sposta questa prova
+    # dev'essere ROSSA, non esplodere portandosi dietro le sorelle
+    _i = mini.find('<div class="view" id="view-negozio"')
+    _j = mini.find('<div class="view" id=', _i + 10)
+    _vn = mini[_i:_j] if 0 <= _i < _j else ""
+    prova("il negozio non ha piu' la riga del deposito", (True, False),
+          (bool(_vn), 'class="trust-line"' in _vn))
+    # ...E QUELLA DI ESPLORA RESTA, ed e' la meta' che conta: il tour
+    # la cerca per classe dentro `#view-esplora` (`TAPPE_TOUR`), e una
+    # tappa senza bersaglio non entra nel giro — il contatore «N di M»
+    # scenderebbe senza che niente fallisca.
+    prova("...ma quella di Esplora c'e' ancora", 1,
+          mini.count('class="trust-line"'))
+    prova("...ed e' quella che il tour cerca", True,
+          "#view-esplora .trust-line" in mini)
+
     # ---- 4. LA DICHIARAZIONE E' NOSTRA --------------------------
     # ⚠️ IL BLOCCO «Come funziona questo spazio» NON C'E' PIU' (ago
     # 2026, decisione di Andrea): tre tappe in fondo al racconto per
@@ -31603,8 +31682,12 @@ def prove_sponsor():
     # RENDERER E NON NEL CATALOGO — e a portarla ora e' la riga in
     # chiaro: se stesse nel catalogo, il progetto di domani potrebbe
     # nascere senza.
+    # ⚠️ L'ANCORA E' LA FRASE DELLE TUTELE: da quando la riga si e'
+    # accorciata, «Spazio pubblicitario» non compare piu' da nessuna
+    # parte — cercarla qui renderebbe questa prova rossa per colpa di
+    # una decisione di prodotto invece che di un renderer svuotato.
     prova("la dichiarazione la scrive il renderer", True,
-          "Spazio pubblicitario" in _rnp)
+          "tutele sull'acquisto" in _rnp)
     prova("...e non sta nel catalogo di chi compra", False,
           "Spazio pubblicitario" in _cat or "tutele" in _cat)
     prova("...e il blocco delle tre tappe se n'e' andato", False,
@@ -31802,10 +31885,14 @@ dice('su un altro negozio non esce', '', raccontoNegozio(altro));
 const r = raccontoNegozio(mio);
 dice('sul suo negozio esce', true, r.length > 200);
 
-// 4. LA DICHIARAZIONE C'E', tutte e due le meta'.
+// 4. LA DICHIARAZIONE C'E'. ⚠️ La riga si e' ACCORCIATA a una frase
+// (ago 2026, decisione di Andrea) e la seconda prova ha CAMBIATO
+// LATO: quel che resta e' la GARANZIA, che gia' contava «piu' della
+// prima» — e a dire che lo spazio e' segnalato da noi resta la
+// pastiglia, che porta la stessa parola della card.
 dice('...con la pastiglia', true, r.includes('class="rac-pill"'));
-dice('...e con la riga che dice che e pubblicita', true,
-     r.replace(/\\s+/g, ' ').includes('Spazio pubblicitario'));
+dice('...e con la riga delle tutele', true,
+     r.replace(/\\s+/g, ' ').includes('tutele sull\\'acquisto sono le stesse'));
 
 // 5. IL CASSETTO nasce chiuso da un annuncio e aperto dalla card.
 dice('il cassetto nasce chiuso', false, r.includes('rac-corpo aperto'));

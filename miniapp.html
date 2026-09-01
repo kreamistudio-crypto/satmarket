@@ -3183,19 +3183,23 @@
      ⚠️ PRENDE LO SLOT `-cop`, che il logo lascia libero — e' lo slot
      della COPERTINA, quindi la regex del server (`FORMA_RACCONTO`)
      non si tocca di un carattere.
-     STA FUORI DAL CASSETTO, ed e' la riga che rende sostenibile la
-     morte del logo: chi arriva al negozio da un annuncio ha il
-     racconto CHIUSO, e senza questa immagine il nome «To The Mooon!»
-     non lo leggerebbe da nessuna parte — l'h3 qui sotto porta il
-     SOTTOTITOLO. E' lo stesso buco di ieri, colmato meglio.
+     STA DENTRO IL CASSETTO (ago 2026, decisione di Andrea che
+     ROVESCIA il giro di ieri): chiudendo la storia si chiude TUTTO il
+     racconto, immagine compresa — fuori restava un'immagine grande
+     senza piu' niente attorno, e «Chiudi la storia» non chiudeva la
+     cosa piu' grande che si vedeva.
+     ⚠️ IL PREZZO E' DICHIARATO, ed e' il buco che il logo colmava,
+     riaperto sapendolo: il nome «To The Mooon!» vive SOLO dentro
+     questa immagine — l'h3 della testa porta il SOTTOTITOLO — quindi
+     chi apre il negozio da un annuncio, col cassetto CHIUSO, non lo
+     legge da nessuna parte. Se a rodaggio dara' fastidio, la leva e'
+     il nome nell'h3, non l'hero fuori.
      IL RAPPORTO E' NEL FILE e non nel CSS: l'altezza segue la
      larghezza della colonna, quindi il costo in pixel dipende dal
      rapporto dell'immagine — che per questo va CONSEGNATA 21:9,
      come dice il commento del catalogo. */
-  .rac-hero{display:block;width:100%;height:auto;margin:14px 0 0;
+  .rac-hero{display:block;width:100%;height:auto;margin:0;
     border-radius:var(--radius)}
-  .rac-occhiello{margin:8px 0 2px;font-size:11px;font-weight:800;
-    letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
     font-size:20px;line-height:1.2;font-weight:800;color:var(--ink)}
   .rac-intro{margin:6px 0 8px;font-size:13.5px;line-height:1.45;
@@ -3204,6 +3208,20 @@
      ricetta del recinto escrow): un cassetto si apre con un comando,
      e un <a> senza href non lo e'. */
   .rac-apri{background:none;border:0;padding:0;cursor:pointer}
+  /* LA RIGA DELLE DUE AZIONI (ago 2026, decisione di Andrea): il link
+     che apre la storia e il CTA che porta alla MERCE. Il link sta a
+     SINISTRA, dove comincia la lettura e dove l'ha sempre trovato chi
+     e' venuto per la storia; l'arancio a destra, dove il pollice lo
+     cerca — e a destra non ruba la prima lettura al link.
+     `wrap` perche' a 320px col testo lungo («Leggi la storia >» piu'
+     «Acquista») la riga e' al filo: a cedere e' l'a-capo, mai lo
+     sbordo. */
+  .rac-azioni{display:flex;flex-wrap:wrap;gap:10px;
+    align-items:center;justify-content:space-between;margin-top:2px}
+  /* ⚠️ `width:auto` perche' `.btn` nasce a tutta larghezza: senza,
+     l'arancio si prenderebbe la riga e il link scenderebbe sotto. */
+  .rac-acquista{width:auto;padding:9px 18px;font-size:14px;
+    margin:0}
   /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
      da indovinare — `display:none` e basta. Qui dentro non c'e'
      niente che debba transizionare: la storia si legge, non si
@@ -4982,8 +5000,13 @@ document.getElementById('cartello')?.remove();</script>
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
     <div id="negozioFeedback"></div>
-    <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
-    <div class="section-label">In vetrina in questo negozio</div>
+    <!-- La trust-line del deposito e' USCITA di qui (ago 2026,
+         decisione di Andrea): lo dice gia' la scheda dell'annuncio
+         prima di comprare, e qui era la terza volta nella stessa
+         schermata. Le porte verso «Il pagamento protetto» scendono a
+         DUE — la riga di Esplora (che e' anche la tappa del tour) e il
+         bottone in fondo al Profilo — e nessuna delle due era questa. -->
+    <div class="section-label" id="negozioVetrinaTit">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
     <!-- ============ ESAURITI (ago 2026) ============
@@ -9467,7 +9490,6 @@ const RACCONTI = {
        visibile dello spazio che abbiamo venduto. Chi passa di
        qui non la «corregga». */
     titolo: 'To The Mooon!',
-    occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
     sottotitolo: 'Capire Bitcoin, giocando.',
     intro: "Ogni viaggio inizia con una scelta. L'obiettivo e' arrivare " +
            "sulla Luna: prendi decisioni, affronti imprevisti e gestisci " +
@@ -10989,15 +11011,27 @@ function apriLinkBanner(){
    esauriti: si eredita tutto, e questa e' la ragione per cui la card
    porta qui invece che a una pagina a parte.
    NIENTE COPERTINA (ago 2026, decisione di Andrea, che ROVESCIA il
-   primo disegno): in testa vanno pastiglia, titolo, occhiello e il
-   link che apre — l'immagine grande si e' appena vista a tutto
+   primo disegno): in testa vanno pastiglia, titolo, intro e la RIGA
+   DELLE DUE AZIONI — l'immagine grande si e' appena vista a tutto
    schermo nella card, e ripeterla a un tocco di distanza non aggiunge
-   niente. Le foto del progetto vivono DENTRO il cassetto. Il conto
-   che ha deciso: copertina + titolo facevano ~213px sopra la merce,
-   cosi' ne fanno ~98 — ed e' quel che permette di TENERE ANCHE IL
-   BANNER del venditore, che nel primo disegno spariva. Due immagini
-   3:1 in fila facevano 396px sopra il nome del venditore, cioe' la
-   prima card fuori da qualunque schermo.
+   niente. TUTTE le immagini del progetto, hero compreso, vivono
+   DENTRO il cassetto. Il conto che ha deciso: copertina + titolo
+   facevano ~213px sopra la merce, cosi' ne fanno ~98 — ed e' quel che
+   permette di TENERE ANCHE IL BANNER del venditore, che nel primo
+   disegno spariva. Due immagini 3:1 in fila facevano 396px sopra il
+   nome del venditore, cioe' la prima card fuori da qualunque schermo.
+   ⚠️ E L'OCCHIELLO NON C'E' PIU' (ago 2026, decisione di Andrea):
+   «Gioco da tavolo · fatto e stampato in Italia» stava fra la
+   pastiglia e il titolo, e diceva in anticipo quel che la prima riga
+   della storia dice meglio. Si parte dal sottotitolo. Il campo e'
+   uscito anche dal catalogo, che un campo che non legge nessuno fa
+   credere a chi passa che da qualche parte si veda.
+   IL BOTTONE «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di
+   Andrea): sta nella riga della testa accanto al link che apre la
+   storia, ed e' l'unico pieno di questa pagina — la sua meta' e' il
+   motivo per cui il racconto vive DENTRO il negozio invece che in una
+   pagina a parte, cioe' che sotto c'e' roba da comprare. Non compra
+   niente: scorre.
    E IL BANNER RESTA DOV'E', per tutti: chi arriva da un annuncio non
    apre il racconto e non deve perdere l'insegna che quel venditore
    si e' guadagnata. Sono due cose diverse e adesso non si fanno piu'
@@ -11041,34 +11075,45 @@ function raccontoNegozio(v){
                    decoding="async" onerror="this.remove()">`;
     return '';
   }).join('');
-  /* La riga della trasparenza sta FUORI dal cassetto, e non e' una
-     scelta di gusto: dentro, chi non apre non la leggerebbe mai — e
-     sarebbe come dichiararlo a chi lo sa gia'. La seconda frase e'
-     quella che conta piu' della prima: senza, «in vetrina su
-     Barattolo» si legge come un endorsement nostro, che e'
-     esattamente cio' che il prompt della moderazione vieta agli
-     altri («il testo che SI RIVOLGE A CHI LEGGE come farebbe la
-     piattaforma»). Quella regola non puo' valere solo per gli altri. */
+  /* LA RIGA IN CHIARO SI E' ACCORCIATA A UNA FRASE (ago 2026,
+     decisione di Andrea: «non e' il momento di spiegare quella
+     funzione»). Se n'e' andata la META' che RACCONTA come funziona lo
+     spazio, e resta quella che GARANTISCE — che e' anche quella che
+     questo file dichiarava «conta piu' della prima»: senza,
+     «Consigliato» si legge come un endorsement NOSTRO, cioe'
+     esattamente cio' che il PROMPT_MODERAZIONE vieta agli altri («il
+     testo che SI RIVOLGE A CHI LEGGE come farebbe la piattaforma»), e
+     quella regola non puo' valere solo per loro.
+     ⚠️ QUEL CHE RESTA SCOPERTO, dichiarato: nessuna superficie dice
+     piu' che quello spazio si compra — la pastiglia dice
+     «Consigliato», che e' una parola nostra e suggerisce il
+     contrario. La leva, il giorno che si vorra' chiudere, e' UNA
+     parola dentro questa riga, non la sezione di ieri.
+     ⚠️ E LE PAROLE DELLA RIGA DI IERI NON SI SCRIVONO QUI: la prova
+     che le vieta legge il pezzo JS COMMENTI COMPRESI, e una
+     spiegazione le farebbe tornare rosse. E' la trappola della prosa,
+     gia' pagata in questo file da `_decifra_contenuto`. */
   return `
     <div class="racconto">
       <div class="rac-testa">
         <span class="rac-pill">📣 Consigliato</span>
-        <div class="rac-occhiello">${esc(r.occhiello || '')}</div>
         <h3 class="rac-titolo">${esc(r.sottotitolo || r.titolo)}</h3>
         <p class="rac-intro">${esc(r.intro || '')}</p>
-        <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
-                aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
-          raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+        <div class="rac-azioni">
+          <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
+                  aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
+            raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+          <button class="btn orange rac-acquista"
+                  onclick="acquistaDalRacconto()">Acquista</button>
+        </div>
       </div>
-      <img class="rac-hero" src="${foto('cop')}"
-           alt="${esc(r.titolo)}" decoding="async"
-           onerror="this.remove()">
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
+        <img class="rac-hero" src="${foto('cop')}"
+             alt="${esc(r.titolo)}" decoding="async"
+             onerror="this.remove()">
         ${blocchi}
-        <div class="rac-avviso">📣 <span><b>Spazio
-          pubblicitario</b> — questo negozio ha pagato per comparire in
-          «Da scoprire». Le tutele sull'acquisto sono le stesse di ogni
-          altro negozio.</span></div>
+        <div class="rac-avviso">📣 <span>Le tutele sull'acquisto sono
+          le stesse di ogni altro negozio.</span></div>
       </div>
     </div>`;
 }
@@ -11083,6 +11128,18 @@ function toggleRacconto(btn){
   if (c) c.classList.toggle('aperto', raccontoAperto);
   btn.setAttribute('aria-expanded', raccontoAperto ? 'true' : 'false');
   btn.textContent = raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›';
+}
+
+/* «Acquista» dal racconto NON compra: porta alla merce, che in questa
+   pagina sta sotto — ed e' la ragione per cui il racconto vive dentro
+   il negozio invece che in una pagina a parte. Lo scroll e' quello di
+   casa (il calco di svelaOfferta), spento da reduced-motion; l'ancora
+   e' l'etichetta della vetrina e non la griglia, che vuota non ha un
+   box su cui atterrare. */
+function acquistaDalRacconto(){
+  const t = el('negozioVetrinaTit');
+  if (t) t.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth',
+                           block: 'start'});
 }
 
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
