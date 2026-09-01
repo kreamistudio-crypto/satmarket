@@ -8585,10 +8585,21 @@ def prove_savers_proprietario():
     # LA REGRESSIONE DEL CANTIERE: il commento CSS scritto con «\\*»
     # invece di «/*» non apre niente, e il parser si mangia la regola
     # che segue — qui si e' portato via .nota-punto, che esisteva da
-    # prima. Il selettore le veste tutte e due.
+    # prima. Il selettore le veste tutte.
+    # ⚠️ SI LEGGE LA REGOLA E NON LA FORMATTAZIONE (ago 2026): la
+    # prima stesura cercava la sottostringa «…nota-savers{» ed e'
+    # diventata rossa il giorno che il selettore ha guadagnato una
+    # classe ed e' andato a capo — cioe' per un motivo che non era il
+    # suo. Quel che deve garantire e' che le tre superfici neutre
+    # siano vestite dalla STESSA regola, e quello si chiede alla
+    # regola: dal selettore alla graffa.
     i = src.index(".trust-note.nota-punto")
-    prova("la superficie neutra veste il punto E il conteggio", True,
-          ".trust-note.nota-punto,.trust-note.nota-savers{" in src[i - 40:i + 90])
+    _reg = src[i:src.index("{", i)]
+    prova("la superficie neutra veste il punto E il conteggio",
+          (True, True, True),
+          (".trust-note.nota-punto" in _reg,
+           ".trust-note.nota-savers" in _reg,
+           ".trust-note.nota-promessa" in _reg))
 
 
 def prove_barattolo_in_striscia():
@@ -28342,7 +28353,11 @@ def prove_promesse_badge():
           _ao.index("sgOk ? `<span") < _ao.index("scOk.length ? `<span"))
     prova("nel carrello la scatola della spedizione sta sopra", True,
           mini.index('id="paccoSpedGratis"') < mini.index('id="paccoSconto"'))
-    prova("e la testata del negozio dice lo stesso ordine", True,
+    # ⚠️ NON E' PIU' LA TESTATA (ago 2026): le due promesse sono
+    # scese sotto «In vetrina in questo negozio». L'ordine invece non
+    # si e' mosso, ed e' il punto — a cambiare e' dove si leggono,
+    # mai in quale ordine.
+    prova("e il negozio dice lo stesso ordine", True,
           "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}" in mini)
     # le SOSPESE restano prosa e ognuna guarda la SUA valuta:
     # promesse_sospese e' un flag combinato, e senza il filtro una
@@ -31445,34 +31460,36 @@ def prove_sponsor():
     # rinominano i testi, mai le chiavi.
     prova("...e la parola e' quella della categoria futura",
           "Consigliato", _par.group(1).strip() if _par else "")
-    # ⚠️ LA RIGA IN CHIARO STA IN FONDO AL CASSETTO, e questa prova ha
-    # CAMBIATO LATO (ago 2026, decisione di Andrea): chiedeva che
-    # stesse SOPRA, «che sotto la legge solo chi apre». Quel che regge
-    # la dichiarazione a cassetto CHIUSO e' la PASTIGLIA, che sta
-    # sempre in vista e porta la stessa parola della card: la riga
-    # aggiunge il PERCHE', e chi ha letto la storia ci arriva
-    # comunque.
-    prova("la riga in chiaro chiude il racconto", True,
-          _rn.index('class="rac-avviso"') > _rn.index('class="rac-corpo'))
-    # ⚠️ LA RIGA SI E' ACCORCIATA A UNA FRASE, e queste due prove
-    # hanno CAMBIATO LATO (ago 2026, decisione di Andrea: «non e' il
-    # momento di spiegare quella funzione»): se n'e' andata la META'
-    # che RACCONTA e resta quella che GARANTISCE. La seconda contava
-    # gia' «piu' della prima» ed e' l'unica rimasta — senza,
-    # «Consigliato» si legge come un endorsement NOSTRO, che e'
-    # esattamente cio' che il PROMPT_MODERAZIONE vieta agli altri («il
-    # testo che SI RIVOLGE A CHI LEGGE come farebbe la piattaforma»),
-    # e quella regola non puo' valere solo per loro.
-    # ...A SPAZI COLLASSATI, o la sentinella diventa rossa per colpa
-    # di un a capo del markup: la frase e' lunga e va a capo dove il
-    # rientro la porta. E' la lezione della sonda che non
+    # ⚠️ LA RIGA IN CHIARO NON C'E' PIU', e queste TRE prove hanno
+    # CAMBIATO LATO in due giri (ago 2026, decisioni di Andrea): la
+    # prima chiedeva che la riga stesse in fondo al cassetto, le altre
+    # due che si fosse accorciata alla META' che GARANTISCE. Adesso se
+    # ne va anche quella, e a dichiarare resta la sola PASTIGLIA.
+    # IL COSTO E' STATO RIPORTATO PRIMA e accettato: «Consigliato» e'
+    # una parola NOSTRA, quindi da sola si legge come un giudizio
+    # nostro sul venditore — cioe' cio' che il PROMPT_MODERAZIONE
+    # vieta agli altri («il testo che SI RIVOLGE A CHI LEGGE come
+    # farebbe la piattaforma»), e quella regola era nata per valere
+    # anche per noi.
+    # ...A SPAZI COLLASSATI, o la sentinella diventerebbe rossa per
+    # colpa di un a capo del markup: e' la lezione della sonda che non
     # normalizzava, gia' pagata col giro dal vivo della riga dello
     # sconto nel form.
+    # ⚠️ DUE PERIMETRI E NON UNO, e la tortura ha chiesto il primo:
+    # guardando il solo renderer la prova restava verde con la frase
+    # rimessa nel CATALOGO del racconto — se quel testo torna, puo'
+    # tornare da un'altra porta. Le due frasi che nel client non
+    # esistono affatto (misurato: zero occorrenze) si vietano in
+    # tutto il foglio; «ha pagato» no, che due righe legittime la
+    # portano — il wallet che non paga e la ricevuta del compratore —
+    # e allargarla la renderebbe rossa per colpa di un'altra
+    # funzione.
     _rnp = " ".join(_rn.split())
-    prova("la riga non racconta piu' la funzione", False,
-          "Spazio pubblicitario" in _rnp or "ha pagato" in _rnp)
-    prova("...e resta quella che GARANTISCE", True,
-          "tutele sull'acquisto sono le stesse" in _rnp)
+    prova("del banner in fondo non resta niente", (0, False, False, False),
+          (mini.count("rac-avviso"),
+           "Spazio pubblicitario" in mini,
+           "tutele sull'acquisto" in mini,
+           "ha pagato" in _rnp))
 
     # ---- 3a-bis. LA RIGA DELLE DUE AZIONI -----------------------
     # «ACQUISTA» PORTA ALLA MERCE (ago 2026, decisione di Andrea): e'
@@ -31674,6 +31691,93 @@ def prove_sponsor():
     prova("...ed e' quella che il tour cerca", True,
           "#view-esplora .trust-line" in mini)
 
+    # ---- 3g. LE DUE PROMESSE, SOTTO LA VETRINA ------------------
+    # (ago 2026, decisione di Andrea) Erano in TESTATA, sopra il nome
+    # del venditore, su fondo verde e con la frase lunga. Adesso
+    # stanno sotto «In vetrina in questo negozio» — un dito sopra la
+    # merce a cui si applicano — corte e su superficie NEUTRA.
+    # ⚠️ SI E' SPOSTATA LA COPPIA e non la sola 🚚, che Andrea aveva
+    # nominato: le due promesse sono lo stesso mestiere, e l'ordine
+    # (🚚 prima della 🎁) e' una regola dichiarata con la sua prova.
+    # Spostandone una sola si sarebbe rovesciato leggendo la pagina
+    # dall'alto, e le due gemelle avrebbero avuto due vesti nella
+    # stessa schermata.
+    prova("il contenitore sta fra il titolo e la griglia", True,
+          0 <= _vn.find('id="negozioVetrinaTit"')
+          < _vn.find('id="negozioPromesse"')
+          < _vn.find('id="negozioGrid"'))
+    # SI RISCRIVE SEMPRE, anche a mani vuote: `renderNegozio` gira a
+    # ogni apertura, e senza l'assegnazione incondizionata la promessa
+    # del negozio di prima resterebbe a schermo su un negozio che non
+    # ne ha — un difetto che non fallisce e si vede solo passando da
+    # un negozio all'altro.
+    _neg = pezzo_js(mini, "function renderNegozio(v, annunci, feedback=[], esauriti=[]){")
+    # ⚠️ SI CHIEDE CHE LA RIGA COMINCI CON L'ASSEGNAZIONE, e la
+    # prima stesura chiedeva solo che ESISTESSE — restava verde con
+    # un `if (_p) el(...).innerHTML = _p;`, cioe' certificava la
+    # presenza e mai l'incondizionata, che e' tutta la garanzia.
+    # L'ha detto la tortura, non la rilettura. Non l'indentazione (la
+    # mutazione stava a due spazi come il corpo) e non la
+    # formattazione: un a capo dopo il «=» e' legittimo.
+    prova("...e renderNegozio lo riscrive sempre", True,
+          any(r.strip().startswith("el('negozioPromesse').innerHTML")
+              for r in _neg.splitlines()))
+    prova("...con la 🚚 prima della 🎁", True,
+          "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}" in _neg)
+    # LA VESTE E' NEUTRA e non verde: il verde e' il registro della
+    # FIDUCIA (il deposito di garanzia), e una promessa commerciale
+    # non e' quello. Si riusa il meccanismo di .nota-punto — la stessa
+    # scatola con una classe che ne cambia la superficie — invece di
+    # ribattere i due token.
+    prova("le due righe non sono piu' verdi", (2, True),
+          (_neg.count('class="trust-note nota-promessa"'),
+           ".trust-note.nota-promessa{background:var(--chip-bg)" in mini
+           or "  .trust-note.nota-promessa{background:var(--chip-bg)" in mini))
+    # ...E SONO CORTE: via il prefisso, che ripeteva a ogni riga una
+    # cosa che il titolo sopra dice gia'.
+    prova("...e non ripetono «questo negozio»", (False, False),
+          ("Questo negozio offre la" in _neg,
+           "Questo negozio fa" in _neg))
+    # ⚠️ LA MAIUSCOLA LA METTE IL CSS, ed e' quel che permette di
+    # riusare `frasePromessaSpedGratis` TALE E QUALE: quel giudice e'
+    # unico per quattro superfici e comincia minuscolo perche' altrove
+    # si incastra in una frase piu' lunga. Col JS servirebbe una copia
+    # della frase — due copie divergono al primo ritocco — o un taglio
+    # della stringa che il giorno che comincia con un tag scriverebbe
+    # la maiuscola dentro il markup.
+    prova("la maiuscola e' del foglio e non del giudice", (True, False),
+          (".trust-note.nota-promessa span::first-letter"
+           "{text-transform:uppercase}" in mini,
+           "toUpperCase" in _neg))
+    # e il giudice unico non si e' toccato: comincia minuscolo, e a
+    # dirlo e' la prova che lo GIRA (le altre tre superfici lo
+    # incastrano in una frase, e una maiuscola li' si vedrebbe)
+    _fsg = pezzo_js(mini, "function frasePromessaSpedGratis(r){")
+    prova("...e il giudice comincia ancora minuscolo", True,
+          "`spedizione <b>gratis</b> da " in _fsg)
+
+    # ---- 3h. IL CORPO DEL RACCONTO ------------------------------
+    # (ago 2026, decisione di Andrea: «e' troppo piccolo») La prosa
+    # sale a 15/1.6, che e' `.sicu p` — il corpo delle due pagine di
+    # testo lungo del progetto — e i secondari a 14, un gradino sotto
+    # come lo erano prima. Il numero non e' inventato: 13.5 era piu'
+    # piccolo perfino della descrizione di un annuncio (14.5), su un
+    # testo che si legge molto piu' a lungo.
+    prova("la prosa del racconto e' al corpo di casa", True,
+          ".rac-p{margin:0;font-size:15px;line-height:1.6" in mini)
+    prova("...lo stesso di «Il pagamento protetto»", True,
+          ".sicu p{font-size:15px;line-height:1.6" in mini)
+    # il censimento, o il gradino nuovo lo prende una regola sola e
+    # le altre restano indietro senza che nessuno se ne accorga
+    _rac = [r for r in mini.split("\n") if r.startswith("  .rac-")]
+    prova("...e nel racconto non resta un 13.5", 0,
+          sum(1 for r in _rac if "13.5px" in r))
+    # ⚠️ IL MAIUSCOLETTO RESTA A 11: e' il registro delle etichette di
+    # sezione in tutta l'app (.section-label, .desc-tit), e crescerlo
+    # qui aprirebbe un'eccezione da spiegare ogni volta.
+    prova("...ma il maiuscoletto non cresce", True,
+          ".rac-h{margin:18px 0 6px;font-size:11px" in mini)
+
     # ---- 4. LA DICHIARAZIONE E' NOSTRA --------------------------
     # ⚠️ IL BLOCCO «Come funziona questo spazio» NON C'E' PIU' (ago
     # 2026, decisione di Andrea): tre tappe in fondo al racconto per
@@ -31682,14 +31786,16 @@ def prove_sponsor():
     # RENDERER E NON NEL CATALOGO — e a portarla ora e' la riga in
     # chiaro: se stesse nel catalogo, il progetto di domani potrebbe
     # nascere senza.
-    # ⚠️ L'ANCORA E' LA FRASE DELLE TUTELE: da quando la riga si e'
-    # accorciata, «Spazio pubblicitario» non compare piu' da nessuna
-    # parte — cercarla qui renderebbe questa prova rossa per colpa di
-    # una decisione di prodotto invece che di un renderer svuotato.
+    # ⚠️ L'ANCORA SI E' SPOSTATA DUE VOLTE, e la seconda e' questa (ago
+    # 2026): era «Spazio pubblicitario», poi la frase delle tutele, e
+    # adesso che la riga in chiaro non c'e' piu' e' LA PASTIGLIA — la
+    # sola cosa rimasta a dichiarare, e sta nel renderer. La prova non
+    # e' morta col taglio: dice ancora quel che deve dire, cioe' che a
+    # dichiarare non e' il catalogo dello sponsor.
     prova("la dichiarazione la scrive il renderer", True,
-          "tutele sull'acquisto" in _rnp)
+          'class="rac-pill"' in _rn)
     prova("...e non sta nel catalogo di chi compra", False,
-          "Spazio pubblicitario" in _cat or "tutele" in _cat)
+          "Consigliato" in _cat or "Spazio pubblicitario" in _cat)
     prova("...e il blocco delle tre tappe se n'e' andato", False,
           "Come funziona questo spazio" in mini)
     # ...E NON DICE NESSUNA CIFRA sulla commissione (ago 2026,
@@ -31885,14 +31991,13 @@ dice('su un altro negozio non esce', '', raccontoNegozio(altro));
 const r = raccontoNegozio(mio);
 dice('sul suo negozio esce', true, r.length > 200);
 
-// 4. LA DICHIARAZIONE C'E'. ⚠️ La riga si e' ACCORCIATA a una frase
-// (ago 2026, decisione di Andrea) e la seconda prova ha CAMBIATO
-// LATO: quel che resta e' la GARANZIA, che gia' contava «piu' della
-// prima» — e a dire che lo spazio e' segnalato da noi resta la
-// pastiglia, che porta la stessa parola della card.
+// 4. LA DICHIARAZIONE C'E', ed e' la PASTIGLIA e basta. ⚠️ La riga
+// in chiaro se n'e' andata (ago 2026, decisione di Andrea) e la
+// seconda prova ha CAMBIATO LATO per la seconda volta: prima
+// chiedeva la frase intera, poi la sola meta' che garantiva, adesso
+// che non ci sia piu' niente.
 dice('...con la pastiglia', true, r.includes('class="rac-pill"'));
-dice('...e con la riga delle tutele', true,
-     r.replace(/\\s+/g, ' ').includes('tutele sull\\'acquisto sono le stesse'));
+dice("...e senza la riga in fondo", false, r.includes('rac-avviso'));
 
 // 5. IL CASSETTO nasce chiuso da un annuncio e aperto dalla card.
 dice('il cassetto nasce chiuso', false, r.includes('rac-corpo aperto'));

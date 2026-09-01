@@ -3202,7 +3202,19 @@
     border-radius:var(--radius)}
   .rac-titolo{margin:0;font-family:'Baloo 2',system-ui,sans-serif;
     font-size:20px;line-height:1.2;font-weight:800;color:var(--ink)}
-  .rac-intro{margin:6px 0 8px;font-size:13.5px;line-height:1.45;
+  /* I DUE CORPI DEL RACCONTO (ago 2026, decisione di Andrea: «e'
+     troppo piccolo»). La prosa sta a **15/1.6**, che e' `.sicu p` —
+     il corpo delle due pagine di testo lungo del progetto — e i
+     secondari (le spiegazioni sotto i grassetti, l'elenco) a 14, un
+     gradino sotto come lo erano prima. Il rapporto fra i due non
+     cambia: cambia il punto di partenza, che era 13.5 — piu' piccolo
+     perfino della descrizione di un annuncio (14.5) su un testo che
+     si legge molto piu' a lungo.
+     ⚠️ IL MAIUSCOLETTO `.rac-h` RESTA A 11, e non e' una
+     dimenticanza: quello e' il registro delle etichette di sezione in
+     tutta l'app (`.section-label`, `.desc-tit`), e crescerlo qui
+     aprirebbe un'eccezione che poi si spiega ogni volta. */
+  .rac-intro{margin:6px 0 8px;font-size:15px;line-height:1.55;
     color:var(--ink-soft)}
   /* Il link che apre e' un BOTTONE vestito da link (.scopri-link, la
      ricetta del recinto escrow): un cassetto si apre con un comando,
@@ -3230,7 +3242,7 @@
   .rac-corpo.aperto{display:block;margin-top:14px}
   .rac-h{margin:18px 0 6px;font-size:11px;font-weight:800;
     letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-  .rac-p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink)}
+  .rac-p{margin:0;font-size:15px;line-height:1.6;color:var(--ink)}
   .rac-punti{display:flex;flex-direction:column;gap:10px;margin-top:12px}
   /* CONTORNATI (ago 2026, decisione di Andrea): il riquadro li
      stacca dalla prosa sopra e sotto — sono tre FATTI del gioco,
@@ -3241,8 +3253,8 @@
     border:1.5px solid var(--field-line);border-radius:var(--radius);
     padding:10px 12px}
   .rac-e{font-size:19px;line-height:1.1;flex:0 0 auto}
-  .rac-punto b{display:block;font-size:13.5px;color:var(--ink)}
-  .rac-punto span{display:block;font-size:13px;line-height:1.45;
+  .rac-punto b{display:block;font-size:15px;color:var(--ink)}
+  .rac-punto span{display:block;font-size:14px;line-height:1.5;
     color:var(--ink-soft)}
   /* Le tappe: una colonna con la barretta a sinistra, che e' quel che
      le fa leggere come una sequenza invece che come un elenco. */
@@ -3265,10 +3277,10 @@
   .rac-tappa:nth-child(2)::before{background:var(--ink-soft)}
   .rac-tappa:nth-child(3)::before{background:var(--muted)}
   .rac-tappa:nth-child(4)::before{background:var(--sats)}
-  .rac-tappa b{display:block;font-size:13.5px;color:var(--ink)}
-  .rac-tappa span{display:block;font-size:13px;line-height:1.45;
+  .rac-tappa b{display:block;font-size:15px;color:var(--ink)}
+  .rac-tappa span{display:block;font-size:14px;line-height:1.5;
     color:var(--ink-soft)}
-  .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:13px;
+  .rac-elenco{margin:10px 0 0;padding-left:18px;font-size:14px;
     line-height:1.6;color:var(--ink-soft)}
   /* IL VINCOLO E' L'ALTEZZA E NON LA LARGHEZZA, o una foto
      VERTICALE si prende piu' di una schermata. Il tabellone di To
@@ -3288,22 +3300,18 @@
      stira piu': meglio cosi', e le nostre sono 1360. */
   .rac-foto{display:block;width:auto;max-width:100%;max-height:560px;
     margin:16px auto 0;border-radius:var(--radius)}
-  /* LA RIGA CHE DICHIARA. Superficie NEUTRA (--chip-bg) come
-     .nota-punto e .nota-savers: non e' un avviso e non e' una
-     promessa, e' un fatto. La seconda frase conta piu' della
-     prima — senza, «in vetrina su Barattolo» si legge come un
-     endorsement nostro, che e' esattamente cio' che il prompt
-     della moderazione vieta agli altri.
-     ⚠️ DALL'AGO 2026 STA IN FONDO AL CASSETTO, e la riga di ieri
-     («fuori, che dentro la legge solo chi apre») e' stata
-     ROVESCIATA: in cima il suo posto l'ha preso l'hero. Quel che
-     regge la dichiarazione a cassetto CHIUSO e' la PASTIGLIA,
-     che sta sempre in vista e porta la stessa parola della card
-     — la riga aggiunge il PERCHE', e chi ha letto la storia
-     arriva qui comunque. */
-  .rac-avviso{display:flex;gap:8px;background:var(--chip-bg);
-    border-radius:var(--radius);padding:10px 12px;margin:22px 0 0;
-    font-size:12.5px;line-height:1.45;color:var(--ink)}
+  /* ⚠️ QUI C'ERA LA RIGA CHE DICHIARAVA, in fondo al cassetto, e
+     dall'ago 2026 non c'e' piu' (decisione di Andrea). La classe se
+     n'e' andata col markup: una regola orfana nel foglio fa credere
+     a chi legge che qualcosa la usi ancora — il precedente del logo e
+     dell'occhiello, e c'e' il censimento che ne conta ZERO in tutti e
+     tre i posti.
+     ⚠️ IL NOME DI QUELLE DUE CLASSI NON SI SCRIVE QUI, ed e' la
+     trappola in cui si e' inciampati scrivendo proprio questa riga: i
+     censimenti che ne pretendono ZERO leggono il foglio INTERO,
+     commenti compresi, e citarne una li fa tornare rossi.
+     Il perche' e il costo stanno in `raccontoNegozio`, dove il taglio
+     si vede. */
 
   .trust-note{
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
@@ -3323,7 +3331,23 @@
      il verde dell'escrow — ma un fatto sul suo annuncio. Un selettore
      solo per due nomi: due regole gemelle sarebbero due valori da
      tenere in pari. */
-  .trust-note.nota-punto,.trust-note.nota-savers{background:var(--chip-bg);color:var(--ink)}
+  .trust-note.nota-punto,.trust-note.nota-savers,
+  .trust-note.nota-promessa{background:var(--chip-bg);color:var(--ink)}
+  /* LE DUE PROMESSE DEL NEGOZIO, sotto «In vetrina in questo
+     negozio» (ago 2026, decisione di Andrea). NEUTRE e non verdi: il
+     verde e' il registro della FIDUCIA — il deposito di garanzia — e
+     una promessa commerciale non e' quello; e a filo della griglia
+     due riquadri verdi sopra la merce si leggevano come un cartello
+     invece che come un fatto del negozio.
+     ⚠️ LA MAIUSCOLA LA METTE IL CSS e non il JS, che e' quel che
+     permette di riusare `frasePromessaSpedGratis` TALE E QUALE: quel
+     giudice e' unico per quattro superfici e comincia minuscolo
+     perche' altrove si incastra in «Questo negozio offre la …». Col
+     JS servirebbe una copia della frase, o un taglio della stringa
+     che il giorno che comincia con un tag scriverebbe la maiuscola
+     dentro il markup. Sullo span funziona perche' i figli di un flex
+     sono di livello blocco. */
+  .trust-note.nota-promessa span::first-letter{text-transform:uppercase}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -5007,6 +5031,14 @@ document.getElementById('cartello')?.remove();</script>
          DUE — la riga di Esplora (che e' anche la tappa del tour) e il
          bottone in fondo al Profilo — e nessuna delle due era questa. -->
     <div class="section-label" id="negozioVetrinaTit">In vetrina in questo negozio</div>
+    <!-- LE DUE PROMESSE DEL NEGOZIO stanno QUI dall'ago 2026
+         (decisione di Andrea): erano in testata, sopra il nome del
+         venditore, e le dice meglio dove servono — un dito sopra la
+         merce a cui si applicano. Il contenitore e' vuoto per i
+         negozi che non promettono niente, quindi non costa un pixel;
+         a riempirlo e' `renderNegozio`, cioe' l'unico posto che
+         conosce il venditore. -->
+    <div id="negozioPromesse"></div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
     <!-- ============ ESAURITI (ago 2026) ============
@@ -11075,24 +11107,29 @@ function raccontoNegozio(v){
                    decoding="async" onerror="this.remove()">`;
     return '';
   }).join('');
-  /* LA RIGA IN CHIARO SI E' ACCORCIATA A UNA FRASE (ago 2026,
-     decisione di Andrea: «non e' il momento di spiegare quella
-     funzione»). Se n'e' andata la META' che RACCONTA come funziona lo
-     spazio, e resta quella che GARANTISCE — che e' anche quella che
-     questo file dichiarava «conta piu' della prima»: senza,
-     «Consigliato» si legge come un endorsement NOSTRO, cioe'
-     esattamente cio' che il PROMPT_MODERAZIONE vieta agli altri («il
-     testo che SI RIVOLGE A CHI LEGGE come farebbe la piattaforma»), e
-     quella regola non puo' valere solo per loro.
-     ⚠️ QUEL CHE RESTA SCOPERTO, dichiarato: nessuna superficie dice
-     piu' che quello spazio si compra — la pastiglia dice
-     «Consigliato», che e' una parola nostra e suggerisce il
-     contrario. La leva, il giorno che si vorra' chiudere, e' UNA
-     parola dentro questa riga, non la sezione di ieri.
-     ⚠️ E LE PAROLE DELLA RIGA DI IERI NON SI SCRIVONO QUI: la prova
-     che le vieta legge il pezzo JS COMMENTI COMPRESI, e una
-     spiegazione le farebbe tornare rosse. E' la trappola della prosa,
-     gia' pagata in questo file da `_decifra_contenuto`. */
+  /* LA RIGA IN CHIARO NON C'E' PIU' (ago 2026, decisione di Andrea
+     presa sapendo il costo, che le era stato riportato per iscritto).
+     Era gia' scesa a UNA frase — quella che GARANTIVA, e che questo
+     file dichiarava «conta piu' della prima» — e adesso se ne va
+     anche lei: della dichiarazione resta la sola PASTIGLIA.
+     ⚠️ QUEL CHE RESTA SCOPERTO, e va detto invece di far finta:
+     nessuna superficie dice piu' ne' che quello spazio si compra ne'
+     che comprarci dentro vale quanto comprare altrove. «Consigliato»
+     e' una parola NOSTRA, quindi da sola si legge come un giudizio
+     nostro sul venditore — che e' esattamente cio' che il
+     PROMPT_MODERAZIONE vieta agli altri («il testo che SI RIVOLGE A
+     CHI LEGGE come farebbe la piattaforma»), e quella regola era
+     nata per valere anche per noi.
+     LA LEVA, il giorno che si vorra' richiudere, E' UNA RIGA nel
+     renderer — mai nel catalogo, o il progetto di domani potrebbe
+     nascere senza. E' la ragione per cui la prova della
+     dichiarazione non e' morta col taglio: si e' riancorata alla
+     pastiglia, che nel renderer sta.
+     ⚠️ LE PAROLE DELLE DUE RIGHE DI IERI NON SI SCRIVONO QUI, e non
+     e' pignoleria: le prove che le vietano leggono il pezzo JS
+     COMMENTI COMPRESI, quindi una spiegazione che le cita le fa
+     tornare rosse. E' la trappola della prosa, pagata TRE volte in
+     questa stessa funzione. */
   return `
     <div class="racconto">
       <div class="rac-testa">
@@ -11112,8 +11149,6 @@ function raccontoNegozio(v){
              alt="${esc(r.titolo)}" decoding="async"
              onerror="this.remove()">
         ${blocchi}
-        <div class="rac-avviso">📣 <span>Le tutele sull'acquisto sono
-          le stesse di ogni altro negozio.</span></div>
       </div>
     </div>`;
 }
@@ -11176,8 +11211,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
                             w.sconto_pacco_valore, w.sconto_pacco_valore_eur,
                             w.sconto_pacco_valuta, w.sconto_pacco_percento);
     return rs.length
-      ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
-           negozio fa ${frasePromessaSconto(rs)}.</span></div>` : '';
+      ? `<div class="trust-note nota-promessa" style="margin-top:12px">🎁
+           <span>Sconto ${frasePromessaSconto(rs)}</span></div>` : '';
   };
   /* E la seconda promessa: le due sono INDIPENDENTI — guardano lo
      stesso numero senza vedersi — quindi un negozio puo' averle tutte
@@ -11191,8 +11226,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     const r = regolaSpedGratis(w.sped_gratis_soglia, w.sped_gratis_eur,
                                w.sped_gratis_valuta);
     return r
-      ? `<div class="trust-note" style="margin-top:12px">🚚 <span>Questo
-           negozio offre la ${frasePromessaSpedGratis(r)}.</span></div>`
+      ? `<div class="trust-note nota-promessa" style="margin-top:12px">🚚
+           <span>${frasePromessaSpedGratis(r)}</span></div>`
       : '';
   };
   const chi = (v.nome||'').split(' ')[0];
@@ -11211,8 +11246,17 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       </div>
     </div>
     ${ponti}
-    ${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+  /* LE DUE PROMESSE SCENDONO SOTTO «In vetrina in questo negozio»
+     (ago 2026, decisione di Andrea), e l'ordine di montaggio non
+     cambia: 🚚 PRIMA della 🎁, come in Paga, in «Altri oggetti» e nel
+     carrello — l'occhio impara UNA fila, e una superficie che la
+     rovescia gliene fa trovare un'altra. C'e' la prova.
+     SI RISCRIVE SEMPRE, anche a mani vuote: `renderNegozio` gira a
+     ogni apertura, e senza l'assegnazione la promessa del negozio di
+     prima resterebbe a schermo su un negozio che non ne ha. */
+  el('negozioPromesse').innerHTML =
+    `${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}`;
   /* Gli ultimi feedback ricevuti: stelle, commento, ruolo, data — e
      CHI li ha scritti, con nome e faccia (ago 2026). Un voto senza un
      volto non si puo' pesare: e' la stessa ragione del «da N persone».

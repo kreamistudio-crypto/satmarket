@@ -2591,12 +2591,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il `PROMPT_MODERAZIONE` vieta agli altri, e quella regola non puo'
   valere solo per loro. La prima invece RACCONTAVA la funzione, ed e'
   esattamente quel che la decisione toglie.
-  ⚠️ QUEL CHE RESTA SCOPERTO, e va detto invece di far finta: nessuna
-  superficie dice piu' che quello spazio SI COMPRA. La pastiglia dice
-  «Consigliato», che e' una parola NOSTRA e suggerisce il contrario —
-  la scelta e' stata portata ad Andrea col suo costo, non applicata in
-  silenzio. La leva, il giorno che si vorra' chiudere, e' UNA parola
-  dentro questa riga: non la sezione di ieri.
+  ⚠️ ...E POI NON C'E' PIU' AFFATTO (ago 2026, il giorno dopo,
+  decisione di Andrea presa sapendo il costo, che gli era stato
+  riportato per iscritto PRIMA): se ne va anche la frase che
+  GARANTIVA, e a dichiarare resta la sola PASTIGLIA.
+  IL PERCHE' DI IERI ERA IL PIU' FORTE DI TUTTO IL CANTIERE e va
+  tenuto, perche' non e' stato smentito — e' stato SPESO: quella
+  frase e' l'unica che impedisce di leggere «Consigliato» come un
+  endorsement NOSTRO, cioe' cio' che il `PROMPT_MODERAZIONE` vieta
+  agli altri («il testo che SI RIVOLGE A CHI LEGGE come farebbe la
+  piattaforma»), e quella regola era nata per valere anche per noi.
+  ⚠️ QUEL CHE RESTA SCOPERTO, e va detto invece di far finta: adesso
+  nessuna superficie dice piu' NE' che quello spazio si compra NE'
+  che comprarci dentro vale quanto comprare altrove. «Consigliato» e'
+  una parola NOSTRA, quindi da sola si legge come un giudizio nostro
+  sul venditore. LA LEVA, il giorno che si vorra' richiudere, E' UNA
+  RIGA nel renderer — mai nel catalogo, o il progetto di domani
+  potrebbe nascere senza — ed e' la ragione per cui la prova della
+  dichiarazione non e' morta col taglio: si e' riancorata alla
+  PASTIGLIA, che nel renderer sta.
+  ⚠️ E LA PROVA CHE VIETA QUELLE PAROLE HA DUE PERIMETRI, che la
+  tortura ha chiesto: le due frasi che nel client non esistono
+  AFFATTO si vietano in tutto il foglio — guardando il solo renderer
+  restava verde con la frase rimessa nel CATALOGO del racconto, cioe'
+  da un'altra porta — mentre «ha pagato» resta sul renderer, che due
+  righe legittime la portano (il wallet che non paga e la ricevuta
+  del compratore).
   ⚠️ E LE PAROLE DI IERI NON SI SCRIVONO NEL COMMENTO che spiega il
   taglio: la prova che le vieta legge il pezzo JS COMMENTI COMPRESI, e
   una spiegazione la farebbe tornare rossa. E' la trappola della
@@ -2745,6 +2765,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   resta: la commissione oggi e' a ZERO, quindi un «resta l'1% di
   sempre» sarebbe falso — e falso proprio dentro il racconto che
   promette di non avere commissioni nascoste.
+  IL RACCONTO SI LEGGE (ago 2026, decisione di Andrea: «il testo è
+  troppo piccolo»): la prosa del racconto passa a **15px/1.6**, che
+  non è un numero scelto a occhio — è `.sicu p`, il corpo delle DUE
+  pagine di testo lungo del progetto («Il pagamento protetto» e «I
+  tuoi dati»), e questo è il terzo posto dove si legge una storia. A
+  13.5 era più piccolo perfino della descrizione di un annuncio
+  (14.5), cioè il testo più lungo dell'app era il più fitto.
+  CRESCONO INSIEME O SI SFALSANO: intro 13.5/1.45 → 15/1.55, `.rac-p`
+  → 15/1.6, i grassetti dei punti e delle tappe → 15, le loro code →
+  14/1.5, l'elenco → 14. IL MAIUSCOLETTO RESTA A 11, ed è la riga da
+  non «uniformare»: `.rac-h` è un'ETICHETTA di sezione e non prosa —
+  cresciuto si legge come un titolo e ruba il peso alla frase che
+  introduce (c'è la prova che lo tiene fermo, e la mutazione che lo
+  porta a 15 la fa rossa).
+  IL COSTO È MISURATO NEI QUATTRO STATI, e il totale non basta: il
+  giro TOGLIE due pezzi (il banner in fondo, le promesse dalla
+  testata) e ne fa crescere uno, quindi a valere è il SALDO — dove
+  comincia la MERCE, che è il numero che il cantiere ha sempre
+  guardato. Prima → dopo, a 360px:
+  · cassetto CHIUSO, venditore che non promette: 748 → 762 (**+14**)
+  · cassetto CHIUSO, venditore che promette:     825 → 821 (**−4**)
+  · cassetto APERTO, venditore che non promette: 2919 → 3018 (+99)
+  · cassetto APERTO, venditore che promette:     2997 → 3076 (+79)
+  LA RIGA CHE CONTA È LA SECONDA: per chi arriva al negozio da un
+  annuncio — il caso comune, dove il cassetto nasce chiuso — la merce
+  non scende di un pixel, **SALE di quattro**. Il racconto cresce di
+  98px, e li si riprende altrove: 56 dal banner tolto e 18 dalle
+  promesse, che sotto la vetrina costano 59px invece dei 77 che
+  costavano in testata (una riga invece di due, e la frase corta).
+  I 79 li paga chi ha toccato la card apposta per leggere, ed è il
+  posto giusto in cui pagarli.
   E IL TETTO `max-height:560px` NON MORDE su nessuna delle tre foto
   vere: sono tutte orizzontali (a 1280 escono 648x432). La leva del
   «tabellone in piedi» protegge dal futuro, non da queste.
@@ -12151,6 +12202,48 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   barrato (vedi la voce della barra del carrello) e la coda direbbe
   di cercare altrove una cosa già in vista; la sentinella ora conta
   che di code non ne resti NESSUNA.
+  LE DUE PROMESSE DEL NEGOZIO SCENDONO SOTTO LA VETRINA (ago 2026,
+  decisione di Andrea, e vale PER TUTTI i venditori e non solo per lo
+  spazio in vetrina): «Questo negozio offre la spedizione gratis da
+  10 € di articoli» stava in TESTATA, sopra il nome del venditore, e
+  adesso sta sotto «In vetrina in questo negozio» — corta
+  («Spedizione gratis da 10 € di articoli») e su fondo NEUTRO.
+  ⚠️ SI È SPOSTATA LA COPPIA E NON LA SOLA 🚚, che è quella che Andrea
+  aveva nominato, ed è la riga da capire prima di ritoccare qui: le
+  due promesse sono lo stesso mestiere, e l'ordine (🚚 prima della 🎁)
+  è una regola dichiarata con la sua prova su quattro superfici.
+  Spostandone una sola l'ordine si ROVESCEREBBE leggendo la pagina
+  dall'alto — la 🎁 sopra il titolo e la 🚚 sotto — e per giunta le due
+  gemelle avrebbero avuto DUE VESTI nella stessa schermata. La scelta
+  è stata dichiarata ad Andrea con la sua leva: per tornare a
+  spostarne una sola bastano il markup di un secondo contenitore e la
+  prova dell'ordine, ma allora l'ordine va ridiscusso.
+  IL FONDO È NEUTRO E NON VERDE (`--chip-bg`, accanto a `.nota-punto`
+  e `.nota-savers` nella STESSA regola): il verde è il registro della
+  FIDUCIA — il deposito di garanzia — e una promessa commerciale non
+  è quello; e a filo della griglia due riquadri verdi sopra la merce
+  si leggevano come un cartello invece che come un fatto del negozio.
+  ⚠️ LA MAIUSCOLA LA METTE IL CSS (`span::first-letter`) e non il JS,
+  ed è quel che permette di riusare `frasePromessaSpedGratis` TALE E
+  QUALE: quel giudice è unico per quattro superfici e comincia
+  minuscolo perché altrove si incastra in una frase più lunga. Col JS
+  servirebbe una copia della frase — due copie divergono al primo
+  ritocco — o un taglio della stringa che il giorno che comincia con
+  un tag scriverebbe la maiuscola dentro il markup. Sullo span
+  funziona perché i figli di un flex sono di livello blocco.
+  E LA CIFRA LA FA `cifraSoglia`, il giudice unico: la riga dice
+  «10 €» o «10.000 sats» secondo la valuta che il venditore ha
+  scelto, e «euro» non si scrive mai a mano.
+  IL CONTENITORE È VUOTO per i negozi che non promettono niente,
+  quindi non costa un pixel; a riempirlo è `renderNegozio`, cioè
+  l'unico posto che conosce il venditore. ⚠️ SI RISCRIVE SEMPRE,
+  anche a mani vuote: quella funzione gira a ogni apertura, e senza
+  l'assegnazione INCONDIZIONATA la promessa del negozio di prima
+  resterebbe a schermo su un negozio che non ne ha — un difetto che
+  non fallisce e si vede solo passando da un negozio all'altro. La
+  prova lo chiede guardando che la riga COMINCI con l'assegnazione:
+  la prima stesura chiedeva solo che ESISTESSE e restava verde con un
+  `if` davanti, e a dirlo è stata la tortura.
   E DALL'AGO 2026 IL CARRELLO PARLA LA LINGUA DELLA CASSA anche nelle
   due righe che erano rimaste indietro (decisione di Andrea col
   cantiere della cassa): la spedizione SCATTATA portava il 🚚 dove la
@@ -12914,9 +13007,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.mono` della colonna delle cifre verrebbe scritta come un numero.
   Giudice unico `regolaSpedGratis` e frase unica
   `frasePromessaSpedGratis`, per la ragione delle gemelle dello sconto.
-  TRE righe pubbliche — testata negozio, «Altri oggetti», e (la novità)
-  la SCHEDA DELL'ANNUNCIO, che lo sconto non ha perché nel mono non
-  esiste e questa sì. La riga della scheda DICE LA REGOLA, MAI UN
+  TRE righe pubbliche — la pagina del negozio, «Altri oggetti», e (la
+  novità) la SCHEDA DELL'ANNUNCIO, che lo sconto non ha perché nel mono
+  non esiste e questa sì.
+  ⚠️ SUL NEGOZIO NON È PIÙ LA TESTATA (ago 2026, decisione di Andrea):
+  le due promesse sono scese SOTTO «In vetrina in questo negozio», un
+  dito sopra la merce a cui si applicano — vedi «LE DUE PROMESSE DEL
+  NEGOZIO SCENDONO SOTTO LA VETRINA», qui sotto. La riga della scheda DICE LA REGOLA, MAI UN
   VERDETTO SU QUELL'OGGETTO, ed è il punto dove è più facile scivolare:
   verrebbe da scrivere «questo è già sopra soglia» leggendo il prezzo
   accanto, ma quel prezzo non è il numero che il server confronta — una
@@ -13367,9 +13464,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   L'ORDINE DELLA FILA È UNO SOLO (12 ago 2026, decisione di Andrea):
   🚚 PRIMA della 🎁, ovunque le due promesse compaiano insieme —
   pagina Paga (dove la fila sta anche SOPRA la riga della consegna),
-  «Altri oggetti», carrello e testata del negozio, che era il quarto
+  «Altri oggetti», carrello e pagina del negozio, che era il quarto
   posto e l'ha trovato il censimento: l'occhio impara UNA fila, e una
-  superficie che la rovescia gliene fa trovare un'altra. In
+  superficie che la rovescia gliene fa trovare un'altra. (⚠️ Sul
+  negozio dall'ago 2026 non e' piu' la TESTATA: le due promesse sono
+  scese sotto «In vetrina in questo negozio» — vedi la voce sua. A
+  cambiare e' DOVE si leggono, mai in quale ordine, e c'e' la prova.) In
   `renderAcquisto` i BLOCCHI sorgente restano sconto-poi-spedizione
   (le prove li affettano coi marcatori dei commenti): l'ordine reso
   lo decide la sola composizione `pillaSg + pillaSc`, e cinque
@@ -27593,6 +27693,42 @@ di oggi sembrava una crescita contro il 639 scritto in CLAUDE.md, e
 non lo era — quel numero veniva da un altro banco con un altro
 catalogo. Rimisurato sullo stesso seme: **897 → 748, cioè −149px** a
 cassetto chiuso.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client.
+
+E il giorno dopo, tre ritocchi che si leggono insieme (ago 2026, dal
+campo): via il banner delle tutele in fondo al racconto, le due
+promesse del negozio SOTTO «In vetrina in questo negozio» — corte e
+su fondo neutro, **per tutti i venditori** — e la prosa del racconto
+a 15px/1.6, che è `.sicu p`, il corpo delle due pagine di testo lungo
+del progetto.
+DUE COSE DA DIRE AD ANDREA, e sono le decisioni che il giro ha preso
+per lui invece di applicarle in silenzio. 1) SI È SPOSTATA LA COPPIA
+e non la sola 🚚 che aveva nominato: le due promesse sono lo stesso
+mestiere e il loro ordine è una regola con la sua prova su quattro
+superfici — spostandone una sola l'ordine si rovescerebbe leggendo
+dall'alto, e le due gemelle avrebbero due vesti nella stessa
+schermata. 2) LA CIFRA LA FA `cifraSoglia`, quindi la riga dice
+«10 €» e non «10 euro»: quel giudice è unico, e scrivere la parola a
+mano vorrebbe dire mentire al venditore che la soglia l'ha messa in
+sats.
+IL COSTO È MISURATO NEI QUATTRO STATI (i numeri per esteso stanno
+nella voce «IL RACCONTO SI LEGGE»), e la riga che conta è che per chi
+arriva al negozio da un annuncio — dove il cassetto nasce chiuso — la
+merce **non scende: sale di 4px**, perché il racconto cresciuto si
+riprende quel che il banner e la testata hanno lasciato.
+Collaudato: **DELTA +9 prove** sull'albero ISOLATO (7348 → 7357; le 4
+rosse sono di un'altra sessione e stanno anche sulla baseline) e **16
+MUTAZIONI, 16 uccise**, una per riga sorvegliata. Tre erano
+sopravvissute al primo giro: due MIRATE MALE (un'ancora storta, e un
+contenitore aggiunto con un NOME DIVERSO invece di spostare quello
+vero) e una che ha trovato un buco VERO — la prova chiedeva che la
+riga del montaggio ESISTESSE e restava verde con un `if` davanti,
+cioè non garantiva l'INCONDIZIONATA. Più il giro DAL VIVO col server
+vero su un database usa-e-getta a 320/360/375 nei due temi (**113
+verdi, zero errori JS**), dove una prova del banco ha CAMBIATO LATO
+col perché scritto: chiedeva la dichiarazione DUE volte, cioè
+certificava proprio la riga che Andrea ha tolto.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — solo client.
 
