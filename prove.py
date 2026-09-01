@@ -31672,6 +31672,32 @@ def prove_sponsor():
     # rinominano i testi, mai le chiavi.
     prova("...e la parola e' quella della categoria futura",
           "Consigliato", _par.group(1).strip() if _par else "")
+    # ...E STA NELL'ANGOLO IN BASSO A DESTRA (ago 2026, decisione di
+    # Andrea guardando la card a schermo): in alto copriva la coda di
+    # «TO THE MOOON!», che su questa card e' scritto DENTRO il
+    # disegno — la card sponsor porta `titoloDentro`, quindi il
+    # titolo dell'app non si disegna affatto e l'angolo in basso e'
+    # libero per costruzione.
+    # ⚠️ NON E' UN NUMERO RIBATTUTO MA UN LATO: si chiede che ancori
+    # in BASSO e che non porti piu' un `top`, che con tutti e due
+    # verrebbe stirata per l'altezza della card. La misura degli 8px
+    # e' la stessa dei badge lampo e asta, e resta libera di cambiare.
+    _pill = mini[mini.index("  .sc-sponsor{"):]
+    _pill = " ".join(_pill[:_pill.index("}")].split())
+    prova("...e vive nell'angolo in basso a destra", (True, True, False),
+          ("bottom:8px" in _pill, "right:8px" in _pill, "top:" in _pill))
+    # ...E L'OMBRA C'E', ed e' LEI a farla staccare — non il contrasto
+    # col fondo, che qui non si puo' promettere: sotto c'e' il disegno
+    # dello sponsor, e ci puo' finire QUALUNQUE colore. MISURATO dal
+    # vivo sul disegno vero, col pixel peggiore: il contrasto fra la
+    # carta e il fondo accanto vale 1,00 — e vale 1,00 anche con la
+    # pastiglia IN ALTO, cioe' non e' un difetto di questa posizione
+    # ma la condizione normale di un'etichetta appoggiata su una foto.
+    # A far LEGGERE la parola e' il contrasto INTERNO (14,08 fra la
+    # carta e l'inchiostro, tutti e due letterali qui sopra); a far
+    # vedere il BORDO e' questa riga, come sui badge lampo e asta.
+    prova("...e l'ombra la stacca da qualunque disegno", True,
+          "box-shadow:0 1px 3px rgba(0,0,0,.28)" in _pill)
     # ⚠️ LA RIGA IN CHIARO NON C'E' PIU', e queste TRE prove hanno
     # CAMBIATO LATO in due giri (ago 2026, decisioni di Andrea): la
     # prima chiedeva che la riga stesse in fondo al cassetto, le altre
@@ -31800,12 +31826,48 @@ def prove_sponsor():
     # nei due posti che lo scrivono.
     _foto = _rn[_rn.index('class="rac-g${'):]
     _foto = _foto[:_foto.index("</span>") + 7]
-    _hero = _rn[_rn.index('class="rac-g hero">'):]
+    _hero = _rn[_rn.index('class="rac-g rac-cima">'):]
     _hero = _hero[:_hero.index("</span>") + 7]
     prova("dentro il guscio non entra spazio bianco", (True, True, True),
           ('">` +' in _foto,
-           'class="rac-g hero"><img' in _hero,
+           'class="rac-g rac-cima"><img' in _hero,
            _foto.count("></span>") + _hero.count("></span>") == 2))
+    # ...E NESSUNA CLASSE NUDA SUL GUSCIO (ago 2026, dal campo: l'hero
+    # 21:9 usciva QUADRATA su desktop). Il modificatore si chiamava
+    # `hero`, e `.hero` in quel foglio e' gia' la hero di Esplora: da
+    # 768px in su si prendeva `display:flex` e `width:220px;
+    # height:220px` di un'altra parte dell'app. Il nostro selettore
+    # composto non difende da niente — a colpire il nodo e' la regola
+    # NUDA di un altro, e vince per specificita'.
+    # LA PROVA E' UN CENSIMENTO e non un elenco: guarda OGNI classe che
+    # finisce sul guscio e chiede che sia prefissata, cosi' il
+    # modificatore che qualcuno aggiungera' fra sei mesi ci entra da
+    # solo. Legge le due forme che il markup usa — la classe nuda dopo
+    # `rac-g` e i letterali dentro il template — e non un elenco di
+    # nomi, che invecchierebbe al primo modificatore nuovo.
+    _mod = []
+    for _x in re.findall(r'class="rac-g([^"]*)"', _rn):
+        for _p in (re.findall(r"'([^']*)'", _x) or [_x]):
+            _mod += _p.split()
+    prova("...e nessuna classe NUDA sul guscio", [],
+          [w for w in _mod if not w.startswith("rac-")])
+    # ...E IL FOGLIO E IL MARKUP SI RINOMINANO INSIEME (buco
+    # PREESISTENTE, trovato dalla tortura del giro in cui il
+    # modificatore si e' dovuto rinominare). Un selettore rimasto sul
+    # nome vecchio non fallisce: SMETTE DI VESTIRE, e si vede e basta
+    # — l'hero si ricomprerebbe i 16px di margine che il cassetto non
+    # vuole, e le foto respirerebbero all'unisono, cioe' come un
+    # battito dell'app invece che come tre cose che respirano.
+    # LE DUE DIREZIONI SERVONO TUTT'E DUE: la prima prende il
+    # modificatore che il foglio non veste, la seconda la regola
+    # rimasta orfana — e da sola nemmeno la seconda basterebbe,
+    # perche' un nome puo' vivere in DUE regole (qui il respiro e il
+    # suo reduced-motion) e mutarne una lascia l'altra a coprirla.
+    _sel = re.findall(r"\.rac-g\.([a-zA-Z0-9_-]+)", mini)
+    prova("...e il foglio veste ogni modificatore del markup", [],
+          [w for w in _mod if not [s for s in _sel if s == w]])
+    prova("...e non gli resta addosso nessuna regola orfana", [],
+          [s for s in dict.fromkeys(_sel) if s not in _mod])
     # Il respiro vive sull'IMMAGINE dentro il guscio e non sul guscio:
     # a muoversi dev'essere cio' che viene ritagliato, o il ritaglio
     # si muoverebbe con lei e non taglierebbe niente.
@@ -31821,7 +31883,7 @@ def prove_sponsor():
     _acc = " ".join(mini.split()).index(".rac-g > img{animation:rac-respiro")
     prova("...e reduced-motion lo spegne, dopo la regola che accende",
           (True, True),
-          (".rac-g.sfalsa > img,".replace(",", "") in
+          (".rac-g.rac-sfalsa > img,".replace(",", "") in
            " ".join(mini.split())[_sp:_sp + 200], _sp > _acc))
 
     # ---- 3c. L'HERO, DENTRO IL CASSETTO -------------------------

@@ -1093,8 +1093,16 @@
      L'OMBRA C'E' come sui badge lampo e asta: deve staccare da
      qualunque disegno ci finisca sotto. E si vede SEMPRE, anche
      senza l'immagine (niente `img ~`, al contrario del titolo): la
-     dichiarazione non puo' dipendere da un file che arriva. */
-  .sc-sponsor{position:absolute;top:8px;right:8px;
+     dichiarazione non puo' dipendere da un file che arriva.
+     IN BASSO A DESTRA (ago 2026, decisione di Andrea): in alto
+     copriva la coda di «TO THE MOOON!», che su questa card e'
+     scritto DENTRO il disegno. Sotto non ha niente da coprire — il
+     titolo dell'app qui non esiste (`titoloDentro`), quindi la
+     «fascia col titolo» che si teme e' del disegno e sta in ALTO —
+     e il fondo li' e' scuro, quindi la carta stacca meglio di prima
+     (misurato a schermo, non dedotto). Resta l'angolo che il titolo
+     non usa: la regola non cambia, cambia quale angolo e' libero. */
+  .sc-sponsor{position:absolute;bottom:8px;right:8px;
     background:#FFF8EA;color:#23282C;border-radius:999px;
     padding:3px 9px;font-size:10.5px;font-weight:800;
     letter-spacing:.02em;box-shadow:0 1px 3px rgba(0,0,0,.28)}
@@ -3329,8 +3337,22 @@
   .rac-g{display:block;overflow:hidden;border-radius:var(--radius);
     margin:16px auto 0;line-height:0}
   /* l'hero apre il cassetto e non vuole stacco: il suo margine e'
-     quello che aveva, cioe' nessuno */
-  .rac-g.hero{margin:0}
+     quello che aveva, cioe' nessuno.
+     ⚠️ LA CLASSE E' PREFISSATA, e non e' pignoleria: si chiamava
+     `hero` NUDA, e `.hero` in questo foglio e' gia' LA HERO DI
+     ESPLORA — quella col barattolo scontornato, che da 768px in su
+     diventa `display:flex` e da' alla sua immagine
+     `width:220px;height:220px`. Da desktop il guscio del racconto se
+     le prendeva addosso e l'hero 21:9 usciva QUADRATA, stirata e
+     spinta a destra dal `margin-left:auto` di quella regola — visto
+     a schermo e non leggendo, perche' sul telefono non si vede: li'
+     quelle due regole non si applicano affatto.
+     E' LA TRAPPOLA DEL DOPPIO SIGNIFICATO gia' pagata con «lampo»,
+     «attesa» e «nota», stavolta su una classe CSS: un modificatore
+     del racconto va PREFISSATO, o vince chi si e' chiamato cosi' per
+     primo — e il nostro selettore composto non ci difende, perche' a
+     colpire il nodo e' la regola NUDA di un altro. */
+  .rac-g.rac-cima{margin:0}
   /* l'onerror toglie l'immagine e il guscio resta vuoto: senza questa
      riga resterebbero i suoi 16px di stacco a separare due paragrafi
      per niente. ⚠️ `:empty` non perdona lo spazio bianco — nel
@@ -3338,7 +3360,7 @@
      motivo per cui quel markup e' scritto attaccato. */
   .rac-g:empty{display:none}
   .rac-g > img{animation:rac-respiro 9s ease-in-out infinite}
-  .rac-g.sfalsa > img{animation-delay:-4.5s}
+  .rac-g.rac-sfalsa > img{animation-delay:-4.5s}
   @keyframes rac-respiro{
     0%,100%{transform:scale(1)}
     50%{transform:scale(1.03)}
@@ -3349,7 +3371,7 @@
      muoverebbero anche in reduced-motion — con la sentinella verde,
      perche' la regola c'e' e semplicemente non vince mai. */
   @media (prefers-reduced-motion:reduce){
-    .rac-g > img,.rac-g.sfalsa > img{animation:none}
+    .rac-g > img,.rac-g.rac-sfalsa > img{animation:none}
   }
   /* ⚠️ QUI C'ERA LA RIGA CHE DICHIARAVA, in fondo al cassetto, e
      dall'ago 2026 non c'e' piu' (decisione di Andrea). La classe se
@@ -9777,8 +9799,9 @@ function renderScoprire(){
     const file = typeof v.file === 'function' ? v.file() : v.file;
     const testo = typeof v.testo === 'function' ? v.testo() : v.testo;
     /* LA PASTIGLIA CHE DICE «e' pubblicita'», e sta SEMPRE dove il
-       titolo non c'e' — angolo in alto a destra, che il titolo delle
-       sorelle vive a sinistra. Di CARTA: crema fissa su inchiostro,
+       titolo non c'e' — angolo in BASSO a destra: il titolo delle
+       sorelle vive a sinistra, e quello di questa card sta dentro il
+       disegno, in alto, dove la pastiglia lo copriva. Di CARTA: crema fissa su inchiostro,
        la lingua di tutto cio' che sta SOPRA una foto (.tag-price,
        .share-btn, .back-float), uguale nei due temi perche'
        un'etichetta di carta non cambia colore di notte. Non prende
@@ -11173,7 +11196,7 @@ function raccontoNegozio(v){
          solo con `:empty` quando l'onerror toglie la foto, e `:empty`
          non scatta se dentro c'e' anche solo un a capo. Per questo il
          markup si concatena invece di andare a capo nel template. */
-      return `<span class="rac-g${++nf % 2 ? '' : ' sfalsa'}">` +
+      return `<span class="rac-g${++nf % 2 ? '' : ' rac-sfalsa'}">` +
              `<img class="rac-foto" src="${foto(x.n)}" ` +
              `alt="${esc(x.alt || '')}" loading="lazy" ` +
              `decoding="async" onerror="this.remove()"></span>`;
@@ -11217,7 +11240,7 @@ function raccontoNegozio(v){
         </div>
       </div>
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}"><span
-        class="rac-g hero"><img class="rac-hero" src="${foto('cop')}"
+        class="rac-g rac-cima"><img class="rac-hero" src="${foto('cop')}"
              alt="${esc(r.titolo)}" decoding="async"
              onerror="this.remove()"></span>
         ${blocchi}

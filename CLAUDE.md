@@ -2485,10 +2485,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   avrebbe rimesso lo scatto d'avvio — ~900 KB piu' sei giri di rete —
   che due cantieri recenti hanno appena tolto.
   E' PUBBLICITA', E SI DICE DUE VOLTE (il punto da non ammorbidire):
-  la pastiglia «Consigliato» sulla CARD — in alto a destra, l'angolo
-  libero, di CARTA crema fissa nei due temi come tutto cio' che sta
-  sopra una foto — e sulla PAGINA la stessa pastiglia piu' UNA RIGA IN
-  CHIARO. Nessuna delle due basta da sola.
+  la pastiglia «Consigliato» sulla CARD — in BASSO a destra (vedi la
+  voce sua qui sotto: nacque in alto), di CARTA crema fissa nei due
+  temi come tutto cio' che sta sopra una foto — e sulla PAGINA la
+  stessa pastiglia piu' UNA RIGA IN CHIARO. Nessuna delle due basta
+  da sola.
   ⚠️ LA PAROLA E' «Consigliato» E NON «Sponsor» (ago 2026, decisione
   di Andrea): e' il lessico della CATEGORIA futura — quella dove
   finiranno tutti i progetti e i negozi che segnaliamo noi — e
@@ -2501,7 +2502,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   C'e' la prova che INCHIODA la parola: quella che tiene card e
   pagina d'accordo fra loro non basta — con due posti allineati il
   lessico si potrebbe rovesciare in un giro senza che nessuno lo
-  veda. LA SECONDA FRASE DI QUELLA
+  veda.
+  ⚠️ E STA IN BASSO A DESTRA (ago 2026, decisione di Andrea guardando
+  la card a schermo; nacque in alto, dove «l'angolo libero» era il
+  ragionamento giusto sulla premessa sbagliata). IL PERCHE' E' che il
+  titolo di questa card e' scritto DENTRO il disegno — «TO THE
+  MOOON!», in alto — e la pastiglia gliene copriva la coda. Sotto non
+  ha niente da coprire: la card sponsor porta `titoloDentro`, quindi
+  `.sc-titolo` non si disegna AFFATTO, e comunque quella classe vive
+  a SINISTRA (`left:14px;top:0;bottom:0;width:96px`). LA REGOLA NON
+  CAMBIA — «sta sempre dove il titolo non c'e'» — cambia quale angolo
+  e' libero, ed e' per questo che si e' guardata la card invece di
+  ragionare sui lati.
+  ⚠️ E LA «FASCIA SCURA COL TITOLO SCRITTO DALL'APP» IN BASSO NON
+  ESISTE, ed e' la premessa da correggere prima di ritoccare qui: su
+  QUESTA card l'app non scrive niente. Quel che si vede in basso e' il
+  disegno dello sponsor.
+  IL CONTRASTO COL DISEGNO NON SI PROMETTE, E NON E' UNA RINUNCIA: e'
+  MISURATO col pixel peggiore, e vale **1,00 sotto la pastiglia in
+  basso E 1,00 con la pastiglia in alto** — il confronto e' stato
+  fatto prima e dopo, un processo per albero. Non e' un difetto dello
+  spostamento: e' la condizione normale di un'etichetta appoggiata su
+  una foto che manda lo SPONSOR, dove sotto ci puo' finire qualunque
+  colore. A far vedere il BORDO e' l'OMBRA — che il codice dichiara
+  gia' («deve staccare da qualunque disegno ci finisca sotto») e che
+  da oggi ha la sua sentinella, perche' toglierla non fa fallire
+  niente di visibile: la pastiglia si confonde e basta. A far LEGGERE
+  la parola e' il contrasto INTERNO, 14,08 fra la carta e
+  l'inchiostro, che sono due valori fissi nel CSS — misurato dai
+  pixel veri sul disegno vero: 17,49.
+  UNA PROVA CHE NON PUO' PASSARE NON PROVA NIENTE, ed e' la ragione
+  per cui il banco dal vivo NON misura piu' il contrasto col fondo:
+  certificava un fallimento che esisteva identico prima del cantiere.
+  Misura quel che si puo' promettere — che la parola si legga. LA SECONDA FRASE DI QUELLA
   RIGA CONTA PIU' DELLA PRIMA — «le tutele sull'acquisto sono le
   stesse di ogni altro negozio» — perche' senza, «in vetrina su
   Barattolo» si legge come un ENDORSEMENT nostro: che e' esattamente
@@ -2671,6 +2704,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un'altezza cablata la ritaglierebbe o la stirerebbe. Il costo
   dipende quindi dal rapporto del file, e per questo va CONSEGNATO
   21:9 — c'e' il commento accanto al catalogo.
+  ⚠️ LA CLASSE DEL GUSCIO E' PREFISSATA, e non e' pignoleria (ago
+  2026, difetto dal campo: «sul sito l'immagine 21:9 esce quadrata e
+  tagliata, sul telefono va bene»). Si chiamava `hero` NUDA, e
+  `.hero` in questo foglio e' gia' LA HERO DI ESPLORA — quella col
+  barattolo scontornato — che da 768px in su diventa `display:flex` e
+  da' alla sua immagine `width:220px;height:220px`. Da desktop il
+  guscio del racconto se le prendeva addosso: l'hero 21:9 usciva
+  QUADRATA, stirata e spinta a destra dal `margin-left:auto` di
+  quella regola. MISURATO prima e dopo, a 768/1024/1280: rapporto
+  **1,00 prima e 2,33 dopo**, largo 220 contro i 648 della colonna.
+  E IL NOSTRO SELETTORE COMPOSTO NON CI DIFENDEVA, ed e' la riga da
+  capire: `.rac-g.hero{margin:0}` c'era ed era giusto — a colpire il
+  nodo era la regola NUDA di un ALTRO (`.hero img`, 0-1-1, che batte
+  per specificita'). Un modificatore va PREFISSATO, o vince chi si e'
+  chiamato cosi' per primo.
+  SUL TELEFONO NON SI VEDEVA, e per questo si guarda a schermo LARGO:
+  sotto i 768px quelle due regole non si applicano affatto.
+  E' LA TRAPPOLA DEL DOPPIO SIGNIFICATO gia' pagata con «lampo»,
+  «attesa» e «nota», stavolta su una classe CSS — e la parente e'
+  `.card{position:relative}`: una regola di qualcun altro che decide
+  la geometria di un nodo che non e' suo.
+  LA PROVA E' UN CENSIMENTO E NON UN ELENCO: si guarda OGNI classe che
+  finisce sul guscio e si chiede che sia prefissata, cosi' il
+  modificatore che qualcuno aggiungera' domani ci entra da solo — con
+  `sfalsa` rinominata insieme, che era la stessa trappola in attesa.
+  E LA TORTURA HA TROVATO UN BUCO PREESISTENTE: markup e foglio si
+  possono rinominare a meta' senza che niente fallisca — l'hero si
+  ricompra i 16px di margine, le foto respirano all'unisono — quindi
+  il censimento guarda le DUE direzioni (il modificatore che il
+  foglio non veste, e la regola rimasta orfana). Da sola nemmeno la
+  seconda basta: un nome puo' vivere in DUE regole (il respiro e il
+  suo reduced-motion) e mutarne una lascia l'altra a coprirla.
   PRENDE LO SLOT `-cop`, che il logo lascia libero: era lo slot della
   COPERTINA mai nata, sta gia' nella whitelist `FORMA_RACCONTO`
   (`(?:cop|[1-9])`), quindi il server non si tocca di un carattere e
