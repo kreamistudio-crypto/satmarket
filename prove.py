@@ -31160,17 +31160,29 @@ dice('senza spazio venduto la fila e quella di sempre',
 
 // FAIL-CLOSED: lo slug c'e', il codice negozio no — e la card NON
 // nasce. Meglio nessuna card che una che porta al negozio
-// sbagliato. Il catalogo qui e' quello VERO, col codice vuoto in
-// attesa di essere riempito a mano: e' il catalogo a dirlo, non un
-// finto costruito per l'occasione.
+// sbagliato.
+// IL CODICE SI SVUOTA APPOSTA, e la riga di prima diceva il
+// contrario: si appoggiava al campo VUOTO del catalogo vero, «in
+// attesa di essere riempito a mano». Quel vuoto e' durato finche' lo
+// spazio non si e' venduto — dal primo codice scritto la prova
+// diventava rossa, cioe' proprio nel giorno in cui la funzione
+// comincia a servire. Una prova non deve dipendere da uno stato del
+// catalogo che il cantiere esiste per cambiare: si costruisce il
+// caso che si vuole sorvegliare.
 sponsorVivo = 'to-the-moon';
+const codiceVero = RACCONTI['to-the-moon'].negozio;
+RACCONTI['to-the-moon'].negozio = '';
 rifai();
 dice('...e con lo slug ma senza codice negozio nemmeno',
      ['p2p','lampo','sconto'], idCard());
 
 // ...e col codice la card e' la PRIMA: la posizione che a 320px si
-// vede senza scorrere e' quella che si vende.
-RACCONTI['to-the-moon'].negozio = 'ab12cd34';
+// vede senza scorrere e' quella che si vende. Si rimette QUELLO DEL
+// CATALOGO e non uno finto: cosi' il giro esercita la
+// configurazione vera, e il ripiego copre il giorno in cui lo spazio
+// tornasse senza venditore.
+const codiceCard = codiceVero || 'ab12cd34';
+RACCONTI['to-the-moon'].negozio = codiceCard;
 rifai();
 dice('col codice e la prima della fila',
      ['sponsor','p2p','lampo','sconto'], idCard());
@@ -31193,8 +31205,14 @@ dice('...ma con la riserva, che senza immagine e l unico nome', true,
 
 scritte = [];
 toccaScoperta('sponsor');
+// L'ATTESO NON SI SCRIVE COL LETTERALE, ed e' la stessa lezione di
+// venti righe piu' su: col codice finto inchiodato qui la prova
+// diventava rossa il giorno in cui il catalogo prende il suo codice
+// vero. L'atteso viene dal CATALOGO e l'osservato dalla CHIAMATA:
+// restano due strade diverse, e la prova continua a dire quel che
+// deve — il tocco porta al negozio DI QUESTO sponsor, aperto.
 dice('il suo tocco porta al negozio, col racconto aperto',
-     ['negozio:ab12cd34:aperto'], scritte);
+     ['negozio:' + codiceCard + ':aperto'], scritte);
 dice('...e nemmeno lui sfiora un filtro', [false, false],
      [filtroLampo, filtroSconto]);
 

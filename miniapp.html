@@ -9290,7 +9290,7 @@ function renderStriscia(){
    al negozio sbagliato. */
 const RACCONTI = {
   'to-the-moon': {
-    negozio: '',        /* DA RIEMPIRE col codice negozio del venditore */
+    negozio: '1b9a53e6',   /* il codice negozio del venditore */
     titolo: 'To The Mooon!',
     occhiello: 'Gioco da tavolo · fatto e stampato in Italia',
     sottotitolo: 'Capire Bitcoin, giocando.',
@@ -10873,9 +10873,10 @@ function raccontoNegozio(v){
                 aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
           raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
       </div>
-      <div class="rac-avviso">📣 <b>Spazio pubblicitario</b> — questo
-        negozio ha pagato per comparire in «Da scoprire». Le tutele
-        sull'acquisto sono le stesse di ogni altro negozio.</div>
+      <div class="rac-avviso">📣 <span><b>Spazio pubblicitario</b> —
+        questo negozio ha pagato per comparire in «Da scoprire». Le
+        tutele sull'acquisto sono le stesse di ogni altro
+        negozio.</span></div>
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">
         ${blocchi}
         <h4 class="rac-h">Come funziona questo spazio</h4>
