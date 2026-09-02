@@ -26673,8 +26673,10 @@ def prove_fogli_di_casa():
     # scambio): dimenticare il profilo e sostituirlo importandone un
     # altro — tutt'e due possono far perdere una reputazione che non
     # torna, e il corpo lo dice.
-    prova("i gesti che passano dalla domanda unica sono quarantacinque",
-          45, solo_codice(mini).count("chiediConferma({"))
+    # col motore dello scambio (set 2026) sono tre in piu': prendere
+    # un ordine, dire «ho inviato gli euro», liberare i sats
+    prova("i gesti che passano dalla domanda unica sono quarantotto",
+          48, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -32071,10 +32073,18 @@ def prove_sponsor():
     # non e' quello. Si riusa il meccanismo di .nota-punto — la stessa
     # scatola con una classe che ne cambia la superficie — invece di
     # ribattere i due token.
+    # ⚠️ SI LEGGE IL SELETTORE E NON IL LETTERALE (set 2026): la prima
+    # stesura cercava `.nota-promessa{background:…`, cioe' dava per
+    # scontato che quel nome fosse l'ULTIMO della lista — e il giorno
+    # che il selettore neutro ne ha preso un quarto (`.nota-scambio`,
+    # la riga di stato dello scambio P2P) e' diventata rossa per un
+    # cambio LEGITTIMO, mentre il fatto che sorveglia era intatto. E'
+    # la lezione gia' pagata dal padding della sezione del Profilo:
+    # una sentinella si ancora al FATTO, non alla forma di ieri.
+    _reg = [r for r in mini.split("}") if "{background:var(--chip-bg)" in r]
     prova("le due righe non sono piu' verdi", (2, True),
           (_neg.count('class="trust-note nota-promessa"'),
-           ".trust-note.nota-promessa{background:var(--chip-bg)" in mini
-           or "  .trust-note.nota-promessa{background:var(--chip-bg)" in mini))
+           any(".trust-note.nota-promessa" in r.split("{")[0] for r in _reg)))
     # ...E SONO CORTE: via il prefisso, che ripeteva a ogni riga una
     # cosa che il titolo sopra dice gia'.
     prova("...e non ripetono «questo negozio»", (False, False),
@@ -35319,6 +35329,855 @@ const corpo = f => JSON.parse(f.opt.body);
     }
     for k, nome in attesi.items():
         prova(nome, True, out.get(k))
+
+
+def prove_p2p_motore():
+    """IL MOTORE DELLO SCAMBIO (set 2026, tappa 4): il kind 14 che parla
+    col coordinator, e la sola cosa che possa fallire in silenzio.
+    Un messaggio scartato non alza NIENTE: se manca il nonce, se il
+    tag `expiration` non c'e', se la firma copre un JSON diverso da
+    quello che il coordinatore ri-serializza, l'evento sparisce e a
+    schermo resta un'attesa. Quindi qui non basta una sentinella che
+    dica «la riga c'e'»: il banco fa GIRARE il motore vero col bundle
+    VERO contro un coordinatore di cartone che CONTROLLA — kind, tag,
+    proof-of-work, firma della trade key e prova d'identita' — e che
+    risponde come risponde Mostro, sollecitato e non.
+    Le due righe che questo banco esiste per difendere: il nonce si
+    mina PRIMA della firma (invertendole l'id non torna e l'evento
+    viene buttato via senza un errore), e il segreto del profilo non
+    esce mai dal browser."""
+    print("\n[il motore dello scambio]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    i_mot = mini.index("IL MOTORE DELLO SCAMBIO")
+    i_cod = mini.index("const MOSTRO_ORDINI_CHIAVE")
+    i_fine = mini.index("/* ============ fine del motore dello scambio")
+    def solo_codice(js):
+        """Via i commenti, o una sentinella pesca la PROSA che racconta
+        il cantiere invece del programma — e qui e' successo subito, due
+        volte: il conteggio delle `fetch(` trovava la docstring che le
+        NOMINA per dire che non ce ne sono, e la parola «relay» veniva
+        da un commento in coda a una riga di codice. Il `://` resta
+        fuori, o si taglierebbe un indirizzo.
+        E si affetta dal CODICE e non dal titolo del blocco, che sta
+        DENTRO un commento: partendo di li' l'apertura resta fuori e da
+        quel punto in poi non si chiude piu' niente."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return re.sub(r"(?<![:'\"])//.*$", "", js, flags=re.M)
+
+    cod = solo_codice(mini[i_cod:i_fine])
+
+    # --- 1) DOVE STA, e perche' non puo' stare altrove ---------------
+    # i due censimenti di ieri affettano il sorgente per marcatori e
+    # contano `fetch(`, `body:` e `chiediConferma({`: il motore dentro
+    # uno dei due li farebbe rossi per la ragione sbagliata
+    prova("il motore sta FUORI dal blocco del mazzo", True,
+          i_mot > mini.index("/* ---- export CSV degli affari conclusi"))
+    prova("...e fuori dal blocco del libro", True,
+          i_mot > mini.index("IL MAZZO DEL PROFILO DI SCAMBIO"))
+    prova("...e ha il suo marcatore di chiusura", True, i_fine > i_cod)
+
+    # --- 2) IL SEGRETO NON ESCE, il denaro non passa di qui ----------
+    prova("il motore non chiama il server: zero fetch", 0, cod.count("fetch("))
+    prova("...e nessun corpo di richiesta", 0, cod.count("body:"))
+    prova("il foglio della hold non e' un terzo vestiPaySheet", True,
+          "vestiPaySheet" not in cod and "mostraQr(" not in cod)
+    prova("...e disegna il QR da se'", True, "disegnaQr(el('p2pHoldQr')" in cod)
+
+    # --- 3) LA RIGA DA NON INVERTIRE --------------------------------
+    ch = pezzo_js(mini, "async function mostroChiama(skTrade, msg, opz){", "\n}\n")
+    prova("il nonce si mina PRIMA della firma", True,
+          0 < ch.index("minePow(ev, bits)") < ch.index("finalizeEvent(ev"))
+    prova("...e il kind 14 porta expiration", True,
+          "['expiration', String(adesso + P2P_SCADENZA_MSG)]" in ch)
+    prova("...e la busta si cifra verso il coordinatore", True,
+          "nip44.encrypt(bustaMostro(skTrade, o.mazzoSk, msg), conv)" in ch)
+    prova("il timeout non nomina il relay a chi legge", False,
+          "relay" in ch[ch.index("no(new Error("):ch.index("}, o.timeoutMs")].lower())
+    prova("un publish andato in timeout resta in ascolto", True,
+          "if (!/timed out/i.test(testo)) {" in ch)
+
+    # --- 4) IL REGISTRO: il sigillo dell'escrow non si presta --------
+    # `vault` e' il recinto tratteggiato del deposito di garanzia di
+    # Barattolo: qui i sats li tiene un altro, e dirlo con la stessa
+    # forma sarebbe la bugia piu' facile del cantiere
+    vista = mini[mini.index("<!-- ============ VISTA: LO SCAMBIO (set 2026)"):]
+    vista = vista[:vista.index("============", 40)]
+    prova("la vista dello scambio non veste il recinto dell'escrow", True,
+          'class="vault"' not in vista and "vault" not in cod)
+    prova("...e i passi vivono in un contenitore suo", True,
+          '<div class="p2p-passi"><div class="steps">' in cod)
+    prova("lo stato si dice sulla superficie neutra", True,
+          '"trust-note nota-scambio"' in cod)
+
+    # --- 5) LE PAROLE, per chi entra con Telegram --------------------
+    testi = re.findall(r"'([^'\\\n]{12,})'", cod) + re.findall(r'"([^"\\\n]{12,})"', cod)
+    sporche = [t for t in testi
+               if re.search(r"\b(nostr|nsec|relay|chiave privata)\b", t, re.I)]
+    prova("a schermo nessuna parola di protocollo", [], sporche)
+    prova("il coordinatore si presenta col suo nome e per quel che e'", True,
+          "(Mostro, un servizio indipendente)" in cod)
+
+    # --- 6) I FOGLI, e la navigazione --------------------------------
+    cs = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    for f in ("p2pHoldSheet", "p2pIncassoSheet"):
+        prova("il foglio %s si chiude con gli altri" % f, True,
+              "el('%s').classList.remove('open')" % f in cs)
+    prova("la vista dello scambio accende la voce P2P", True,
+          "else if (view === 'p2pordine') view = 'p2p';" in mini)
+    prova("...e si ridisegna entrandoci", True,
+          "if (view==='p2pordine') renderOrdineP2P();" in mini)
+    prova("...e la cronologia ricostruisce solo cio' che e' ancora qui",
+          True, "return ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2p');" in mini)
+
+    # --- 7) L'ID DI UNO SCONOSCIUTO NON ENTRA IN UN ONCLICK ----------
+    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    prova("l'id del libro viaggia nel dataset", True,
+          'onclick="prendiOrdineP2P(this.dataset.id)"' in riga)
+    apri = pezzo_js(mini, "function apriOrdineP2P(id){", "\n}\n")
+    prova("...e i gesti della vista leggono l'ordine aperto", True,
+          "p2pOrdineAperto = id;" in apri)
+    # I QUATTRO BOTTONI DELLO SCAMBIO NON PORTANO UN ID, ed e' la
+    # riga che il primo giro ha corretto: due lo interpolavano e le
+    # funzioni lo IGNORAVANO — un id di uno sconosciuto dentro una
+    # stringa JS per niente. Adesso leggono tutti l'ordine aperto.
+    vis = solo_codice(mini[mini.index("function renderOrdineP2P()"):
+                           mini.index("function copiaHoldP2P()")])
+    prova("nessun id nelle stringhe degli onclick della vista", [],
+          re.findall(r"onclick=\\?.[a-zA-Z0-9]+\((?!\)|this)", vis))
+
+    # --- 8) LA VIA DI RISERVA non passa dal parser del libro ---------
+    sp = pezzo_js(mini, "async function statoPubblicoOrdini(ids){", "\n}\n")
+    prova("lo stato pubblico non passa da ordineDaEvento", False,
+          "ordineDaEvento" in sp)
+    prova("...e legge i due tag che decidono", True,
+          "tagValore(ev, 's')" in sp and "tagValore(ev, 'd')" in sp)
+    prova("...e non rianima uno scambio gia' finito", True,
+          "P2P_FINALI.indexOf(o.stato) >= 0) continue;" in sp)
+
+    # --- 9) IL BANCO: il motore vero contro un coordinatore vero -----
+    node = _sh.which("node")
+    if not node:
+        salta("il motore parla col coordinatore di cartone", "node non c'e'")
+        return
+    js_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
+                    mini.index("/* ---- export CSV degli affari conclusi")]
+    js_motore = mini[i_cod:i_fine]
+    banco = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT0 = NostrTools;
+const {bytesToHex, hexToBytes, utf8Encoder} = NT0.utils;
+
+/* ---- IL COORDINATORE DI CARTONE ----
+   Non fa finta di rispondere: CONTROLLA quel che gli arriva come lo
+   controlla Mostro — kind, destinatario, scadenza, proof-of-work,
+   firma della chiave dello scambio e prova d'identita' — e quel che
+   non torna lo BUTTA, in silenzio, come farebbe lui. */
+const MOSTRO_SK = NT0.generateSecretKey();
+const MOSTRO_PUB = NT0.getPublicKey(MOSTRO_SK);
+let ricevuti = [], subs = [], chiuse = 0, rispondi = null;
+
+function esamina(ev){
+  const r = {ok: false, perche: '', kind: ev.kind, pow: NT0.nip13.getPow(ev.id)};
+  const p = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
+  const exp = (ev.tags || []).filter(t => t[0] === 'expiration').map(t => t[1])[0];
+  r.versoDiMe = p === MOSTRO_PUB;
+  r.scadenza = Number(exp || 0);
+  r.firmaEvento = NT0.verifyEvent(ev);
+  r.tradePub = ev.pubkey;
+  if (ev.kind !== 14) { r.perche = 'kind'; return r; }
+  if (!r.versoDiMe) { r.perche = 'destinatario'; return r; }
+  if (!(r.scadenza > Math.floor(Date.now() / 1000))) { r.perche = 'scaduto'; return r; }
+  if (!r.firmaEvento) { r.perche = 'firma evento'; return r; }
+  const conv = NT0.nip44.getConversationKey(MOSTRO_SK, ev.pubkey);
+  let arr;
+  try { arr = JSON.parse(NT0.nip44.decrypt(ev.content, conv)); }
+  catch(e) { r.perche = 'non si decifra'; return r; }
+  if (!Array.isArray(arr) || arr.length !== 3) { r.perche = 'non e\' una terna'; return r; }
+  /* IL CONFRONTO LETTERALE: la firma copre il JSON del messaggio, e
+     chi verifica lo ri-serializza dalla propria struttura. Se l'ordine
+     dei campi non e' quello di serde le due stringhe non combaciano e
+     l'evento cade — senza un errore da nessuna parte. */
+  const msgJson = JSON.stringify(arr[0]);
+  r.msgJson = msgJson;
+  r.dentro = arr[0].order || arr[0]['cant-do'] || arr[0].dispute || arr[0].rate;
+  const h = NT0.sha256(utf8Encoder.encode(msgJson));
+  r.firmaTrade = !!arr[1] && NT0.schnorr.verify(hexToBytes(arr[1]), h, hexToBytes(ev.pubkey));
+  r.anonimo = arr[1] === null && arr[2] === null;
+  if (arr[2]) {
+    const ip = NT0.sha256(utf8Encoder.encode(
+      'mostro-transport-v2-identity:' + ev.pubkey + ':' + msgJson));
+    r.provaIdentita = NT0.schnorr.verify(hexToBytes(arr[2][1]), ip, hexToBytes(arr[2][0]));
+    r.identitaPub = arr[2][0];
+  }
+  r.ok = true;
+  return r;
+}
+function manda(msg, versoPub){
+  const conv = NT0.nip44.getConversationKey(MOSTRO_SK, versoPub);
+  const ev = NT0.finalizeEvent({
+    kind: 14, created_at: Math.floor(Date.now() / 1000),
+    tags: [['p', versoPub]],
+    content: NT0.nip44.encrypt(JSON.stringify([msg, null, null]), conv)
+  }, MOSTRO_SK);
+  for (const s of subs) {
+    const f = s.filtri[0] || {};
+    if (f['#p'] && f['#p'].indexOf(versoPub) >= 0) setTimeout(() => s.h.onevent(ev), 0);
+  }
+}
+function ordine(azione, rid, id, payload){
+  const m = {version: 2, request_id: rid === undefined ? null : rid, trade_index: null};
+  if (id) m.id = id;
+  m.action = azione;
+  m.payload = payload === undefined ? null : payload;
+  return azione === 'cant-do' ? {'cant-do': m} : {order: m};
+}
+class FintoRelay {
+  constructor(url){ this.url = url; this.connected = false; }
+  async connect(){
+    if (/rotto/.test(this.url)) throw new Error('non risponde');
+    this.connected = true;
+  }
+  subscribe(filtri, h){
+    const s = {filtri: filtri, h: h, close(){ chiuse++; }};
+    subs.push(s);
+    return s;
+  }
+  async publish(ev){
+    const r = esamina(ev);
+    ricevuti.push(r);
+    if (!r.ok) return 'scartato';
+    if (rispondi) for (const m of (rispondi(r) || [])) manda(m, r.tradePub);
+    return 'ok';
+  }
+}
+const NT = Object.assign({}, NT0, {Relay: FintoRelay});
+const window = {NostrTools: NT};
+
+/* ---- l'app di cartone attorno al motore ---- */
+let store = new Map();
+const localStorage = {getItem: k => store.has(k) ? store.get(k) : null,
+  setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k)};
+let cloud = new Map();
+const cloudVero = {
+  getItem: (k, cb) => cb(null, cloud.get(k) || ''),
+  setItem: (k, v, cb) => { cloud.set(k, v); cb(null, true); },
+  removeItem: (k, cb) => { cloud.delete(k); cb(null, true); }};
+let tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
+let DEMO = false, VETRINA = false, myTgId = 111, myLnAddress = 'io@wallet.com';
+const API_BASE = '/api';
+function authHdr(){ return 'collaudo:111:x'; }
+let fetches = [];
+async function fetch(url, opt){ fetches.push({url: url, opt: opt}); return {ok: true}; }
+let toasts = []; function toast(m){ toasts.push(String(m)); }
+function haptic(){}
+let nodi = {}, aperti = [], chiusi = [];
+function el(id){
+  if (!nodi[id]) nodi[id] = {id: id, value: '', innerHTML: '', textContent: '',
+    style: {}, focus(){},
+    classList: {add(c){ aperti.push(id); }, remove(c){ chiusi.push(id); }}};
+  return nodi[id];
+}
+function esc(s){ return String(s); }
+function fmt(n){ return String(n); }
+function fmtEur(n){ return String(n); }
+function altroFoglioAperto(){ return false; }
+let conferme = [];
+function chiediConferma(o){ conferme.push(o); if (o.poi) o.poi(); }
+let inviti = []; function invitoTelegram(t, k){ inviti.push(k); }
+const INVITO_ONION = {p2p: 'x'};
+async function caricaNostrTools(){}
+let copiato = '';
+const navigator = {clipboard: {writeText: async t => { copiato = t; }}};
+function copiaLink(t, m){ copiato = t; toast(m); }
+let viste = []; function go(v){ viste.push(v); }
+const document = {querySelector: s => ({id: 'view-p2pordine'})};
+let qr = []; async function disegnaQr(box, testo, modo){ qr.push(testo); }
+function bottoneInAttesa(b, t){ return () => {}; }
+let renderP2Pn = 0; function renderP2P(){ renderP2Pn++; }
+/* i pezzi della tappa 2: qui non si provano, si prestano */
+let P2P_LIBRO_MS = 8000;
+let p2pInfo = null;
+let p2pLibro = null;
+function p2pCoord(){ return {mostro: MOSTRO_PUB, relay: ['wss://finto']}; }
+async function caricaLibroP2P(){}
+function tagValore(ev, n){
+  const t = (ev.tags || []).filter(x => x[0] === n)[0];
+  return t ? t[1] : '';
+}
+""" + js_mazzo + js_motore + r"""
+/* ---- il banco ---- */
+const out = {};
+const pausa = ms => new Promise(r => setTimeout(r, ms || 30));
+function reset(){
+  store = new Map(); cloud = new Map(); fetches = []; toasts = []; nodi = {};
+  aperti = []; chiusi = []; conferme = []; inviti = []; viste = []; qr = [];
+  copiato = ''; renderP2Pn = 0; ricevuti = []; subs = []; chiuse = 0;
+  rispondi = null; DEMO = false; VETRINA = false; myTgId = 111;
+  p2pRelayVivo = null; p2pConnessa = null; p2pSub = null; p2pSubChiavi = '';
+  p2pAttese = {}; p2pVisti = []; p2pOrdineAperto = ''; p2pHoldOrdine = '';
+  p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
+  P2P_ATTESA_MS = 30000;
+  p2pInfo = {fee: 0.01, pow: 8, powPrimo: 10, maxSats: 100000, minSats: 100,
+             valute: ['EUR'], versione: '2', quando: 0,
+             scadenzaSec: 86400, holdFinestra: 300, fattFinestra: 900};
+  p2pLibro = {ordini: [
+    {id: 'ord-vendo', lato: 'sell', euro: 50, sats: 100000, metodi: ['SEPA'], premium: 0},
+    {id: 'ord-compro', lato: 'buy', euro: 20, sats: 40000, metodi: ['Satispay'], premium: 0}
+  ]};
+}
+(async () => {
+  /* ---- 1) IL GIRO DI CHI COMPRA, dal libro al concluso ---------- */
+  reset();
+  rispondi = r => {
+    const d = r.dentro;
+    if (d.action === 'take-sell')
+      return [ordine('add-invoice', d.request_id, d.id,
+                     {order: {id: d.id, amount: 99000, fiat_amount: 50}})];
+    return [];
+  };
+  await prendiOrdineP2P('ord-vendo');
+  await pausa(120);
+  const r1 = ricevuti[0] || {};
+  out.chiestoUnaVolta = ricevuti.length === 1;
+  out.kind14 = r1.kind === 14;
+  out.versoMostro = r1.versoDiMe === true;
+  out.scade = r1.scadenza > Math.floor(Date.now() / 1000);
+  out.powFatto = r1.pow >= 10;                 /* primo contatto: powPrimo */
+  out.firmaEvento = r1.firmaEvento === true;
+  out.firmaTrade = r1.firmaTrade === true;
+  out.provaIdentita = r1.provaIdentita === true;
+  out.azioneGiusta = r1.dentro && r1.dentro.action === 'take-sell';
+  out.indiceMandato = r1.dentro && r1.dentro.trade_index === 1;
+  out.versione2 = r1.dentro && r1.dentro.version === 2;
+  /* la trade key e' USA-E-GETTA: non e' l'identita' del profilo */
+  out.tradeNonIdentita = r1.tradePub !== r1.identitaPub;
+  const mz1 = mazzoMostro();
+  out.identitaEilMazzo = r1.identitaPub === mz1.pub;
+  out.skMaiInRete = JSON.stringify(fetches).indexOf(mz1.sk) < 0;
+  out.pubRegistrata = JSON.stringify(fetches).indexOf(r1.tradePub) >= 0;
+  let o = ordiniP2P()['ord-vendo'];
+  out.dopoPresa = o.stato;
+  out.satsNetti = o.satsNetti;
+  /* i non sollecitati muovono la macchina uguale */
+  const tp = o.pubTrade;
+  manda(ordine('waiting-seller-to-pay', null, 'ord-vendo'), tp); await pausa();
+  out.aspettaVenditore = ordiniP2P()['ord-vendo'].stato;
+  manda(ordine('hold-invoice-payment-accepted', null, 'ord-vendo'), tp); await pausa();
+  out.attivo = ordiniP2P()['ord-vendo'].stato;
+  /* lo stesso evento due volte non muove niente due volte */
+  const primaDei = renderP2Pn;
+  const evDoppio = subs.length ? null : null;
+  manda(ordine('fiat-sent-ok', null, 'ord-vendo'), tp); await pausa();
+  out.euroInviati = ordiniP2P()['ord-vendo'].stato;
+  manda(ordine('released', null, 'ord-vendo'), tp); await pausa();
+  out.rilasciato = ordiniP2P()['ord-vendo'].stato;
+  manda(ordine('purchase-completed', null, 'ord-vendo'), tp); await pausa();
+  out.concluso = ordiniP2P()['ord-vendo'].stato;
+  out.dettoConcluso = toasts.some(t => t.indexOf('concluso') >= 0);
+  await pausa(1000);
+  out.backupOfferto = aperti.indexOf('p2pProfiloSheet') >= 0;
+  out.paroleDiCasa = !['nostr', 'nsec', 'relay']
+    .some(w => (nodi.p2pOrdineCorpo.innerHTML || '').toLowerCase().includes(w));
+
+  /* ---- 2) LA DEDUP: il relay puo' ripetere --------------------- */
+  reset();
+  rispondi = r => [];
+  scriviOrdineP2P({id: 'x1', lato: 'compro', indice: 0, pubTrade: '', stato: 'attivo',
+                   euro: 10, sats: 20000, satsNetti: 0, metodi: [], creato: 1});
+  {
+    const mz = await assicuraMazzo();
+    const tk = chiaveScambio(mz.sk, 0);
+    const oo = ordiniP2P()['x1']; oo.pubTrade = tk.pub; scriviOrdineP2P(oo);
+    await mostroRiascolta();
+    const conv = NT0.nip44.getConversationKey(MOSTRO_SK, tk.pub);
+    const ev = NT0.finalizeEvent({
+      kind: 14, created_at: Math.floor(Date.now() / 1000), tags: [['p', tk.pub]],
+      content: NT0.nip44.encrypt(
+        JSON.stringify([ordine('fiat-sent-ok', null, 'x1'), null, null]), conv)
+    }, MOSTRO_SK);
+    await mostroArriva(ev);
+    const dopoUno = ordiniP2P()['x1'].stato;
+    const q1 = ordiniP2P()['x1'].aggiornato;
+    ordiniP2P();
+    await mostroArriva(ev);           /* lo stesso, di nuovo */
+    out.dedup = dopoUno === 'euro_inviati' && p2pVisti.length === 1;
+    /* un messaggio per una chiave che non e' nostra si lascia stare */
+    const altra = chiaveScambio(mz.sk, 77);
+    const ev2 = NT0.finalizeEvent({
+      kind: 14, created_at: Math.floor(Date.now() / 1000), tags: [['p', altra.pub]],
+      content: NT0.nip44.encrypt(
+        JSON.stringify([ordine('canceled', null, 'x1'), null, null]),
+        NT0.nip44.getConversationKey(MOSTRO_SK, altra.pub))
+    }, MOSTRO_SK);
+    await mostroArriva(ev2);
+    out.nonMio = ordiniP2P()['x1'].stato === 'euro_inviati';
+  }
+
+  /* ---- 3) IL GIRO DI CHI VENDE, e il foglio che si chiude ------ */
+  reset();
+  const BOLT = 'lnbc400u1pfintaxxxx';
+  rispondi = r => {
+    const d = r.dentro;
+    if (d.action === 'take-buy')
+      return [ordine('pay-invoice', d.request_id, d.id,
+                     {payment_request: [{id: d.id, amount: 40000, fiat_amount: 20}, BOLT, null]})];
+    return [];
+  };
+  await prendiOrdineP2P('ord-compro');
+  await pausa(120);
+  let ov = ordiniP2P()['ord-compro'];
+  out.venditoreAspetta = ov.stato;
+  out.holdArrivata = !!(ov.hold && ov.hold.bolt11 === BOLT);
+  out.holdConImporto = ov.hold && ov.hold.sats === 40000;
+  await apriHoldP2P();
+  out.qrDellaHold = qr.length === 1 && qr[0] === ('lightning:' + BOLT).toUpperCase();
+  out.holdApertoConVelo = aperti.indexOf('p2pHoldSheet') >= 0
+                       && aperti.indexOf('sheetBg') >= 0;
+  out.invoiceColTextContent = nodi.p2pHoldInvoice.textContent === BOLT
+                           && (nodi.p2pHoldCorpo.innerHTML || '').indexOf(BOLT) < 0;
+  manda(ordine('hold-invoice-payment-accepted', null, 'ord-compro'), ov.pubTrade);
+  await pausa();
+  out.holdChiusoDaSolo = chiusi.indexOf('p2pHoldSheet') >= 0;
+  out.dopoHold = ordiniP2P()['ord-compro'].stato;
+  /* e il gesto che libera i sats parte solo dopo gli euro */
+  manda(ordine('fiat-sent-ok', null, 'ord-compro'), ov.pubTrade); await pausa();
+  rilasciaP2P();
+  await pausa(60);
+  out.rilascioChiesto = ricevuti.length === 2
+                     && ricevuti[1].dentro.action === 'release';
+  out.rilascioSenzaIndice = ricevuti[1].dentro.trade_index === null;
+  out.rilascioConId = ricevuti[1].dentro.id === 'ord-compro';
+  out.rilascioChiede = conferme.length === 2;
+
+  /* ---- 4) DOVE RICEVERE I SATS: l'indirizzo si manda com'e' ---- */
+  reset();
+  rispondi = r => {
+    const d = r.dentro;
+    if (d.action === 'take-sell')
+      return [ordine('add-invoice', d.request_id, d.id,
+                     {order: {id: d.id, amount: 99000}})];
+    if (d.action === 'add-invoice')
+      return [ordine('waiting-seller-to-pay', d.request_id, d.id)];
+    return [];
+  };
+  await prendiOrdineP2P('ord-vendo');
+  await pausa(120);
+  apriIncassoP2P();
+  el('p2pIncassoInp').value = 'io@wallet.com';
+  await inviaIncassoP2P();
+  await pausa(60);
+  out.indirizzoComEe = ricevuti.length === 2
+    && ricevuti[1].dentro.action === 'add-invoice'
+    && ricevuti[1].dentro.payload.payment_request[1] === 'io@wallet.com';
+  out.nessunaFetchAllIndirizzo = fetches.every(f => String(f.url).indexOf('/api/') === 0);
+  out.incassoChiuso = chiusi.indexOf('p2pIncassoSheet') >= 0;
+  out.dopoLIndirizzo = ordiniP2P()['ord-vendo'].stato;
+  /* una fattura dell'importo sbagliato non parte */
+  reset();
+  rispondi = r => [];
+  scriviOrdineP2P({id: 'x2', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'attesa_mia_fattura', euro: 10, sats: 20000,
+                   satsNetti: 99000, metodi: [], creato: 1});
+  p2pOrdineAperto = 'x2';
+  await assicuraMazzo();
+  apriIncassoP2P();
+  el('p2pIncassoInp').value = 'lnbc1u1pxxx';       /* 100 sats, non 99000 */
+  await inviaIncassoP2P();
+  out.importoStortoFermato = ricevuti.length === 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('99000') >= 0;
+  el('p2pIncassoInp').value = 'non e un indirizzo';
+  await inviaIncassoP2P();
+  out.testoStortoFermato = ricevuti.length === 0;
+
+  /* ---- 5) IL «NO» DEL COORDINATORE, in italiano ---------------- */
+  reset();
+  rispondi = r => [ordine('cant-do', r.dentro.request_id, r.dentro.id,
+                          {cant_do: 'invalid-trade-index'})];
+  await prendiOrdineP2P('ord-vendo');
+  await pausa(150);
+  const no = ordiniP2P()['ord-vendo'];
+  out.rifiutato = no.stato;
+  out.motivoInItaliano = String(no.errore).indexOf('non è allineato') >= 0;
+  out.cantDoScritto = String(no.cantDo).indexOf('non è allineato') >= 0;
+
+  /* ---- 6) IL SILENZIO, e come si dice ------------------------- */
+  reset();
+  rispondi = r => [];
+  P2P_ATTESA_MS = 150;
+  await prendiOrdineP2P('ord-vendo');
+  await pausa(400);
+  const mu = ordiniP2P()['ord-vendo'];
+  out.senzaRisposta = mu.stato;
+  out.diceISecondi = String(mu.errore).indexOf('non ha risposto') >= 0;
+  out.offreRiprova = (nodi.p2pOrdineCorpo.innerHTML || '').indexOf('Riprova') >= 0;
+
+  /* ---- 7) SENZA FIRMA GREZZA non si mente: anonimo ------------ */
+  reset();
+  rispondi = r => [];
+  P2P_ATTESA_MS = 150;
+  const schnorrVero = NT.schnorr;
+  delete NT.schnorr;
+  await prendiOrdineP2P('ord-vendo');
+  await pausa(400);
+  const ra = ricevuti[0] || {};
+  out.anonimo = ra.anonimo === true;
+  out.senzaIndice = ra.dentro && ra.dentro.trade_index === null;
+  out.indiceNonBruciato = (mazzoMostro().indice || 0) === 0;
+  NT.schnorr = schnorrVero;
+
+  /* ---- 8) IL COORDINATORE GIU' non e' un martello ------------- */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://rotto']});
+  let esploso = '';
+  try { await mostroConnetti(); } catch(e) { esploso = String(e.message || e); }
+  out.giuLoDice = esploso.indexOf('non risponde') >= 0;
+  out.giuNonNominaIlRelay = esploso.toLowerCase().indexOf('wss://') < 0;
+
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
+"""
+    d = _tf.mkdtemp()
+    p = os.path.join(d, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    try:
+        r = _sp.run([node, p, os.path.abspath(os.path.join("vendor", "nostr.bundle.js"))],
+                    capture_output=True, encoding="utf-8", timeout=180)
+        prova("il banco node del motore gira", "", r.stderr[-600:])
+        out = _json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+    attesi = {
+        "chiestoUnaVolta": "prendere un ordine manda UNA richiesta",
+        "kind14": "...ed e' un kind 14",
+        "versoMostro": "...indirizzato al coordinatore",
+        "scade": "...con la sua scadenza",
+        "powFatto": "...col nonce del primo contatto gia' minato",
+        "firmaEvento": "...e l'id che torna dopo il nonce",
+        "firmaTrade": "la firma copre il messaggio esattamente com'e' scritto",
+        "provaIdentita": "...e la prova d'identita' lega la chiave al profilo",
+        "azioneGiusta": "dal libro «vendo» si compra",
+        "indiceMandato": "...con l'indice dello scambio",
+        "versione2": "...e la versione 2 del protocollo",
+        "tradeNonIdentita": "la chiave dello scambio non e' quella del profilo",
+        "identitaEilMazzo": "...e la prova viene dal profilo",
+        "skMaiInRete": "il segreto del profilo non esce mai",
+        "pubRegistrata": "...e al server va la sola meta' pubblica",
+        "dopoPresa": ("il coordinatore chiede dove ricevere", "attesa_mia_fattura"),
+        "satsNetti": ("...e dice quanti sats arrivano netti", 99000),
+        "aspettaVenditore": ("«sta pagando» si legge", "attesa_hold_venditore"),
+        "attivo": ("i sats bloccati fanno partire lo scambio", "attivo"),
+        "euroInviati": ("gli euro inviati si registrano", "euro_inviati"),
+        "rilasciato": ("il rilascio pure", "rilasciato"),
+        "concluso": ("e lo scambio si chiude", "concluso"),
+        "dettoConcluso": "...dicendolo",
+        "backupOfferto": "il codice si chiede quando vale: al primo scambio concluso",
+        "paroleDiCasa": "a schermo nessuna parola di protocollo",
+        "dedup": "lo stesso messaggio due volte muove lo scambio una volta",
+        "nonMio": "...e un messaggio che non e' nostro non lo tocca",
+        "venditoreAspetta": ("chi vende deve bloccare i sats", "attesa_mia_hold"),
+        "holdArrivata": "...e la richiesta di pagamento arriva",
+        "holdConImporto": "...col suo importo",
+        "qrDellaHold": "il QR e' quello della richiesta, in maiuscolo",
+        "holdApertoConVelo": "...e il foglio si apre col velo",
+        "invoiceColTextContent": "la fattura si scrive col testo, mai nel markup",
+        "holdChiusoDaSolo": "il foglio si chiude quando i sats sono bloccati",
+        "dopoHold": ("...e lo scambio e' attivo", "attivo"),
+        "rilascioChiesto": "chi vende libera i sats",
+        "rilascioSenzaIndice": "...senza rimandare l'indice",
+        "rilascioConId": "...e con l'id dello scambio",
+        "rilascioChiede": "...dopo aver chiesto conferma",
+        "indirizzoComEe": "l'indirizzo Lightning si manda com'e'",
+        "nessunaFetchAllIndirizzo": "...senza chiedere niente a un wallet di terzi",
+        "incassoChiuso": "...e il foglio si chiude",
+        "dopoLIndirizzo": ("...e si aspetta chi vende", "attesa_hold_venditore"),
+        "importoStortoFermato": "una fattura dell'importo sbagliato non parte",
+        "testoStortoFermato": "...e nemmeno un testo che non e' ne' l'uno ne' l'altra",
+        "rifiutato": ("un «no» del coordinatore si legge", "rifiutato"),
+        "motivoInItaliano": "...e il motivo e' in italiano",
+        "cantDoScritto": "...e resta scritto nello scambio",
+        "senzaRisposta": ("il silenzio non e' un rifiuto", "senza_risposta"),
+        "diceISecondi": "...lo dice",
+        "offreRiprova": "...e offre di riprovare",
+        "anonimo": "senza firma grezza si scambia in anonimo",
+        "senzaIndice": "...senza indice",
+        "indiceNonBruciato": "...e senza bruciarne uno",
+        "giuLoDice": "un coordinatore giu' si dice",
+        "giuNonNominaIlRelay": "...senza nominare il relay",
+    }
+    for k, nome in attesi.items():
+        if isinstance(nome, tuple):
+            prova(nome[0], nome[1], out.get(k))
+        else:
+            prova(nome, True, out.get(k))
+
+
+def prove_p2p_stati():
+    """LA MACCHINA A STATI DELLO SCAMBIO (set 2026, tappa 4).
+
+    Uno scambio P2P non ha un posto sul nostro server: il coordinatore
+    manda dei messaggi, e a dire «a che punto siamo» e' una TABELLA che
+    vive nel browser. Da lei discende l'unica cosa che chi guarda deve
+    capire — di chi e' il turno — quindi le due funzioni che decidono
+    (`avanzaOrdineP2P` e `azioniDisponibili`) sono PURE apposta: si
+    provano senza un browser, senza un relay e senza un coordinatore.
+
+    LE DUE COSE DA NON AMMORBIDIRE. Uno stato FINALE non si riapre: il
+    relay ripete gli eventi, e un «buyer-took-order» ripescato non deve
+    riportare a «attivo» uno scambio concluso. E si offre UN gesto solo
+    per volta: due bottoni pieni nella stessa pagina sono due strade
+    dove ce n'e' una — chi compra dice dove ricevere e poi che ha
+    mandato gli euro, chi vende blocca e poi libera.
+
+    Le sentinelle dicono che le righe ci sono; il banco node fa GIRARE
+    le due sequenze intere, che e' l'unica cosa capace di dire se al
+    passo giusto compare il bottone giusto."""
+    print("\n[la macchina a stati dello scambio]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def blocco_const(nome):
+        i = mini.index("const " + nome + " = {")
+        return mini[i:mini.index("\n};", i) + 3]
+
+    # ATTENZIONE: il `fine` esplicito, e la graffa rimessa a mano. Il
+    # default di pezzo_js si ferma alla prima RIGA VUOTA, e qui fra una
+    # funzione e la successiva quasi mai ce n'e' una: con quello si
+    # porterebbe dentro le vicine, e il banco proverebbe un'altra cosa
+    # senza dirlo.
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    i_fin = mini.index("const P2P_FINALI = [")
+    riga_finali = mini[i_fin:mini.index("\n", i_fin)]
+    avanza = fn("function avanzaOrdineP2P(ordine, azione, payload){")
+    azioni = fn("function azioniDisponibili(o){")
+    tab = blocco_const("AVANZA_P2P")
+    stati = blocco_const("STATI_P2P")
+    prog = blocco_const("P2P_PROGRESSO")
+    motivi = blocco_const("MOTIVI_CANTDO")
+
+    # --- 1) LE DUE FUNZIONI CHE DECIDONO SONO PURE -------------------
+    # niente browser dentro: se un giorno una di loro leggesse
+    # localStorage o disegnasse qualcosa, smetterebbe di essere
+    # provabile qui — ed e' l'unica cosa che ci dice se lo scambio
+    # racconta la verita'
+    for spia in ("localStorage", "el(", "document", "fetch(", "await ",
+                 "toast(", "renderOrdineP2P"):
+        prova(f"`avanzaOrdineP2P` non tocca `{spia}`", False, spia in avanza)
+        prova(f"`azioniDisponibili` non tocca `{spia}`", False, spia in azioni)
+    prova("avanzaOrdineP2P copia l'ordine invece di mutarlo", True,
+          "const o = Object.assign({}, ordine);" in avanza)
+    prova("...e uno stato finale non si riapre", True,
+          "const finito = P2P_FINALI.indexOf(o.stato) >= 0;" in avanza
+          and "if (nuovo && !finito) {" in avanza)
+    prova("gli stati finali sono i tre da cui non si torna",
+          "const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];",
+          riga_finali)
+    prova("un «no» del coordinatore non muove lo stato", True,
+          "if (azione === 'cant-do') { o.cantDo = motivoCantDo(p); return o; }" in avanza)
+
+    # --- 2) IL CENSIMENTO DELLA TABELLA ------------------------------
+    # ogni stato che la tabella sa produrre deve avere delle parole da
+    # mostrare e un posto nella timeline: uno stato senza testo sarebbe
+    # una pagina muta proprio nel momento in cui uno guarda
+    prodotti = sorted(set(re.findall(r"'([a-z_]+)'(?:,|\n)", tab.split("{", 1)[1])))
+    nomi_stati = sorted(set(re.findall(r"^  (\w+): \{", stati, re.M)))
+    nomi_prog = sorted(set(re.findall(r"(\w+): \d", prog)))
+    prova("ogni stato della tabella ha le sue parole", [],
+          [s for s in prodotti if s not in nomi_stati])
+    prova("...e un posto nei quattro passi", [],
+          [s for s in prodotti if s not in nomi_prog])
+    prova("...e nessuno stato con le parole resta senza posto", [],
+          [s for s in nomi_stati if s not in nomi_prog])
+    prova("i tre finali sono fra gli stati che si sanno raccontare", True,
+          all(s in nomi_stati for s in ("concluso", "annullato", "rifiutato")))
+    prova("i motivi del «no» sono tutti in italiano", False,
+          any(w in motivi.lower() for w in ("invalid ", "not allowed", "pending order")))
+
+    # --- 3) IL BANCO NODE: le sequenze girano ------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("le due sequenze dello scambio", "node non c'e'")
+        return
+    banco = "\n".join([
+        riga_finali, tab, stati, prog, motivi,
+        fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"),
+        fn("function statoTestoP2P(o){"),
+        avanza, azioni]) + r"""
+const out = {};
+/* uno scambio si «cammina»: si parte da com'e' nato e gli si danno i
+   messaggi nell'ordine in cui il coordinatore li manda, guardando a
+   ogni passo lo stato e il bottone che compare */
+function cammina(inizio, passi){
+  let o = inizio, tappe = [];
+  for (const [azione, payload] of passi) {
+    o = avanzaOrdineP2P(o, azione, payload || null);
+    tappe.push([o.stato, azioniDisponibili(o)]);
+  }
+  return {ord: o, tappe};
+}
+const compro = {id: 'a', lato: 'compro', stato: 'prendo', euro: 50, sats: 80000,
+                satsNetti: 0, metodi: [], cantDo: '', errore: ''};
+const vendo = {id: 'b', lato: 'vendo', stato: 'prendo', euro: 50, sats: 80000,
+               satsNetti: 0, metodi: [], cantDo: '', errore: ''};
+
+// 1) il giro di chi COMPRA, per intero
+const gc = cammina(compro, [
+  ['add-invoice', {order: {amount: 79200, fiat_amount: 50, payment_method: 'Revolut, Satispay'}}],
+  ['waiting-seller-to-pay', null],
+  ['buyer-took-order', {peer: {pubkey: 'cc'.repeat(32)}}],
+  ['fiat-sent-ok', null],
+  ['released', null],
+  ['purchase-completed', null]
+]);
+out.giroCompro = gc.tappe;
+out.comproNetti = gc.ord.satsNetti;
+out.comproMetodi = gc.ord.metodi;
+out.comproPeer = gc.ord.peer;
+
+// 2) il giro di chi VENDE, con la richiesta di pagamento da bloccare
+const gv = cammina(vendo, [
+  ['pay-invoice', {payment_request: [null, 'lnbc800u1qqqq', 80000]}],
+  ['hold-invoice-payment-accepted', null],
+  ['fiat-sent-ok', null],
+  ['hold-invoice-payment-settled', null]
+]);
+out.giroVendo = gv.tappe;
+out.holdLetta = gv.ord.hold && gv.ord.hold.bolt11 === 'lnbc800u1qqqq' && gv.ord.hold.sats;
+
+// 3) un messaggio vecchio non riapre uno scambio finito
+out.finitoResta = avanzaOrdineP2P(gc.ord, 'buyer-took-order', null).stato;
+out.annullatoResta = avanzaOrdineP2P(
+  avanzaOrdineP2P(compro, 'canceled', null), 'add-invoice', null).stato;
+
+// 4) il «no» del coordinatore: dice perche' e lascia lo scambio dov'era
+const attivo = avanzaOrdineP2P(avanzaOrdineP2P(compro, 'add-invoice', null),
+                               'buyer-took-order', null);
+const no = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'invalid-trade-index'});
+out.noStato = no.stato;
+out.noMotivo = no.cantDo;
+out.noIgnoto = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'roba-nuova'}).cantDo;
+out.noVuoto = avanzaOrdineP2P(attivo, 'cant-do', {}).cantDo;
+/* e il messaggio dopo lo cancella: un avviso vecchio non resta a
+   schermo su uno scambio che nel frattempo si e' mosso */
+out.noSiPulisce = avanzaOrdineP2P(no, 'fiat-sent-ok', null).cantDo;
+
+// 5) un'azione che non conosciamo non muove niente
+const ign = avanzaOrdineP2P(attivo, 'roba-che-non-esiste', null);
+out.ignotoFermo = ign.stato === attivo.stato && ign.aggiornato === attivo.aggiornato;
+// ...ma il voto si accende senza muovere lo stato
+const vot = avanzaOrdineP2P(attivo, 'rate', null);
+out.rate = vot.votabile === true && vot.stato === attivo.stato;
+
+// 6) i due bottoni non compaiono mai insieme, e mai a chi non tocca
+out.mai2 = ['prendo','attesa_mia_fattura','attesa_hold_venditore',
+  'attesa_fattura_compratore','attesa_mia_hold','attivo','euro_inviati',
+  'rilasciato','concluso','annullato','in_disputa','annullo_chiesto',
+  'annullo_proposto','senza_risposta','rifiutato','pagamento_ritentato']
+  .map(s => [azioniDisponibili({lato:'compro', stato:s}),
+             azioniDisponibili({lato:'vendo', stato:s})])
+  .every(([a, b]) => !(a && b));
+out.senzaOrdine = azioniDisponibili(null) === '' && azioniDisponibili({}) === '';
+
+// 7) i metodi di pagamento nelle due forme in cui arrivano
+out.metodiArray = avanzaOrdineP2P(compro, 'add-invoice',
+  {order: {payment_method: ['Revolut', 'Bonifico']}}).metodi;
+out.metodiVuoti = avanzaOrdineP2P(
+  Object.assign({}, compro, {metodi: ['x']}), 'add-invoice',
+  {order: {payment_method: '  '}}).metodi;
+
+// 8) l'importo della richiesta di pagamento
+out.bolt = [importoBolt11('lnbc1500n1qqq'), importoBolt11('lnbc10u1qqq'),
+            importoBolt11('lnbc1m1qqq'), importoBolt11('lnbc1qwerty'),
+            importoBolt11('LNBC2500U1QQQ'), importoBolt11('lnbcrt100n1q'),
+            importoBolt11('lnbc5p1qqq'), importoBolt11('ciao'),
+            importoBolt11('tizio@wallet.com'), importoBolt11('')];
+
+// 9) le parole cambiano col lato di chi guarda
+out.attivoCompro = statoTestoP2P({lato: 'compro', stato: 'attivo'}).d;
+out.attivoVendo = statoTestoP2P({lato: 'vendo', stato: 'attivo'}).d;
+out.euroCompro = statoTestoP2P({lato: 'compro', stato: 'euro_inviati'}).d;
+out.euroVendo = statoTestoP2P({lato: 'vendo', stato: 'euro_inviati'}).d;
+out.titoloUguale = statoTestoP2P({lato: 'compro', stato: 'attivo'}).t
+                === statoTestoP2P({lato: 'vendo', stato: 'attivo'}).t;
+out.statoIgnoto = statoTestoP2P({lato: 'compro', stato: 'boh'});
+process.stdout.write(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=60)
+        if r.returncode != 0:
+            prova("il banco node della macchina a stati gira", "", r.stderr[-700:])
+            return
+        out = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+    prova("chi COMPRA: dove ricevere, poi «ho inviato gli euro», e basta",
+          [["attesa_mia_fattura", "fattura"],
+           ["attesa_hold_venditore", ""],
+           ["attivo", "euro-inviati"],
+           ["euro_inviati", ""],
+           ["rilasciato", ""],
+           ["concluso", ""]], out["giroCompro"])
+    prova("...e i sats NETTI arrivano dal coordinatore", 79200, out["comproNetti"])
+    prova("...coi metodi letti dalla stringa a virgole",
+          ["Revolut", "Satispay"], out["comproMetodi"])
+    prova("...e la trade key dell'altra persona si tiene", "cc" * 32,
+          out["comproPeer"])
+    prova("chi VENDE: blocca i sats, poi li libera, e basta",
+          [["attesa_mia_hold", "hold"],
+           ["attivo", ""],
+           ["euro_inviati", "rilascia"],
+           ["concluso", ""]], out["giroVendo"])
+    prova("la richiesta da bloccare si legge, importo compreso", 80000,
+          out["holdLetta"])
+    prova("un messaggio vecchio non riapre uno scambio concluso",
+          "concluso", out["finitoResta"])
+    prova("...ne' uno annullato", "annullato", out["annullatoResta"])
+    prova("un «no» lascia lo scambio dov'era", "attivo", out["noStato"])
+    prova("...e lo dice in italiano",
+          "Il coordinatore ha detto di no: il profilo di scambio non è "
+          "allineato: prova a riaprire l'app", out["noMotivo"])
+    prova("...un motivo che non conosciamo si dice com'e', mai si perde",
+          "Il coordinatore ha detto di no: roba-nuova", out["noIgnoto"])
+    prova("...e senza motivo si dice almeno che ha rifiutato",
+          "Il coordinatore ha rifiutato la richiesta", out["noVuoto"])
+    prova("il messaggio dopo cancella l'avviso vecchio", "", out["noSiPulisce"])
+    prova("un'azione sconosciuta non muove niente", True, out["ignotoFermo"])
+    prova("il voto si accende senza muovere lo stato", True, out["rate"])
+    prova("i due bottoni non compaiono MAI insieme", True, out["mai2"])
+    prova("senza ordine non c'e' nessun gesto", True, out["senzaOrdine"])
+    prova("i metodi arrivano anche come lista", ["Revolut", "Bonifico"],
+          out["metodiArray"])
+    prova("...e una lista vuota non cancella quelli che c'erano", ["x"],
+          out["metodiVuoti"])
+    prova("l'importo della bolt11, nelle sue forme",
+          [150, 1000, 100000, 0, 250000, 10, None, None, None, None],
+          out["bolt"])
+    prova("a sats in custodia si dice a ognuno cosa tocca a lui", True,
+          "manda gli euro" in out["attivoCompro"]
+          and "Aspetta che chi compra" in out["attivoVendo"])
+    prova("...e a euro inviati pure", True,
+          "appena chi vende li vede" in out["euroCompro"]
+          and "Controlla di averli ricevuti" in out["euroVendo"])
+    prova("il titolo del passo invece e' lo stesso per tutti e due", True,
+          out["titoloUguale"])
+    prova("uno stato che non conosciamo non lascia la pagina muta",
+          {"t": "Scambio in corso", "d": ""}, out["statoIgnoto"])
 
 
 def prove_p2p_server():
@@ -41598,6 +42457,8 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
     prove_p2p_chiavi,
+    prove_p2p_motore,
+    prove_p2p_stati,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
