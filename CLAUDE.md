@@ -906,15 +906,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   effetto di un deploy).
   COSA SI DISARMA: i due rami fisici di `controlla_scadenze` — 72h da
   `consegnato` (delivered) e GIORNI_AUTO_SBLOCCO giorni da
-  `spedito_il` (shipped), ritiro in zona compreso, che passa dallo
-  stesso ramo. Il caso che ha aperto il cantiere è il secondo:
-  l'ancora è la parola del venditore, che la piattaforma NON verifica
-  (niente tracking API) — un pacco mai partito e dieci giorni di
-  silenzio incassavano. Il primo si disarma per la regola cardinale e
-  non per l'asimmetria: `consegnato` lo scrive SOLO il compratore
+  `spedito_il` (shipped). Il caso che ha aperto il cantiere è il
+  secondo: l'ancora è la parola del venditore, che la piattaforma NON
+  verifica (niente tracking API) — un pacco mai partito e dieci giorni
+  di silenzio incassavano. Il primo si disarma per la regola cardinale
+  e non per l'asimmetria: `consegnato` lo scrive SOLO il compratore
   (regola ferrea 5), quindi lì l'ancora è sua — ma UN SILENZIO NON È
   UN CONSENSO, e chi tace può aver trovato il problema proprio
   aprendo il pacco.
+  E IL RITIRO IN ZONA NE È USCITO PER SEMPRE (ago 2026, e questa riga
+  ROVESCIA il «ritiro in zona compreso» che stava qui): non è più
+  disarmato con gli altri due — è ESCLUSO dai due rami, quindi il
+  giorno del rientro non torna dentro con loro. IL PERCHÉ È CHE PER
+  LUI QUEL GIORNO NON ARRIVA MAI: il piano di rientro qui sotto dice
+  «solo col tracking verificato via API corrieri», cioè quando «ho
+  spedito» smetterà di essere una dichiarazione di parte — e **nessun
+  corriere può confermare una consegna in zona**. Senza quella riga il
+  ritiro resterebbe l'UNICO ramo a sbloccarsi sulla parola nuda del
+  venditore proprio nel momento in cui gli altri smettono di farlo.
+  ED È IL RAMO CHE NE HA PIÙ BISOGNO, non uno che se ne poteva
+  passare: il ritiro PASSA da `segna_spedito` — è l'unico modo che il
+  venditore ha di dichiarare la consegna a mano — quindi arriva a
+  'shipped' con `spedito_il` timbrato e ZERO tracciamento, che il
+  corriere-sentinella 'Ritiro in zona' glielo esenta apposta e
+  `correggi_tracking` lo rifiuta per sempre.
+  LA CINTURA STA IN `controlla_scadenze` E NON IN `segna_spedito`, ed
+  è la differenza col SERVIZIO: quello lì si rifiuta, il ritiro ci
+  DEVE passare — chi lo bloccasse là per «uniformare al servizio»
+  toglierebbe al venditore l'unico modo di dichiarare la consegna.
+  C'è la prova nei due versi.
+  IL PREZZO È DICHIARATO: a leva riaccesa un ritiro non si chiude più
+  da solo, e `sollecita_conferme_ferme` è il SOSTITUTO dello sblocco
+  (gira solo a leva SPENTA), quindi da lì non bussa nessuno. A
+  raccoglierlo resta la coda «⏸ Ordini fermi», che la leva non la
+  guarda e lo mostra al decimo giorno: è il caso da moderatore di
+  sempre, ed è il prezzo di non avere una prova. A leva SPENTA — cioè
+  oggi — non cambia NIENTE: quei due rami non girano affatto, e il
+  ritiro continua a ricevere i promemoria e il suo 🧊 (c'è la prova che
+  `sollecita_conferme_ferme` NON lo escluda, ed è quel che rende la
+  cintura gratuita).
   COSA RESTA ARMATO, e perché la regola tiene lo stesso: 1) LE
   FINESTRE DEL DIGITALE (ORE_CONFERMA_DIGITALE 24h dalla rivelazione,
   ORE_SILENZIO_DIGITALE 48h dalla consegna mai rivelata) — la prima è
@@ -1046,6 +1076,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `segna_consegnato`, che dall'ago 2026 non esiste piu' — vedi «IL
   PASSO INTERMEDIO NON C'È PIÙ»). È lo stesso patto della commissione
   sospesa.
+  ⚠️ E DA QUELLA LISTA È USCITA LA NOTIFICA DEL RITIRO (ago 2026, con
+  la cintura qui sopra): `sollecita_ritiri_fermi` NON va più rimessa —
+  il ritiro è escluso dai due rami PER SEMPRE, quindi il giorno del
+  rientro quella promessa resterebbe falsa. Chi rimette i testi a
+  memoria la rimetterebbe per prima, ed è il modo in cui il rientro
+  scriverebbe una bugia: là il venditore leggerebbe che i sats si
+  sbloccano da soli su una strada dove non si sbloccano. I posti che
+  restano sono gli altri.
   IL TRACCIAMENTO SI CORREGGE, MA NON DAL VENDITORE (ago 2026, caso
   vero dal campo): un venditore compra la spedizione da un
   intermediario (Packlink, Sendcloud) e inserisce il codice
