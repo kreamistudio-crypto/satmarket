@@ -694,6 +694,133 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   motivi frequenti + ultime 20 righe, sezione «🛡 Registro
   moderazione» nel Profilo admin — è con QUESTI dati che il prompt si
   corregge A MANO: la macchina raccoglie, l'umano decide.
+  LA BOZZA: SI SCRIVE OGGI, SI PUBBLICA QUANDO SI VUOLE (set 2026,
+  chiesto da Andrea): «📝 Salva senza pubblicare» nel form Vendi fa
+  nascere l'annuncio in `stato='bozza'` — un archivio personale dentro
+  il negozio, che lo vede solo chi l'ha scritto. Le quattro decisioni
+  di Andrea: la moderazione gira alla PUBBLICAZIONE e non al
+  salvataggio, un annuncio gia' in vetrina si puo' RIMETTERE in bozza,
+  le bozze stanno dentro «📋 I tuoi annunci» col badge e non in un
+  cassetto a parte, e NIENTE TETTO al loro numero.
+  IL FILTRAGGIO INCLUSIVO E' QUEL CHE HA RESO PICCOLO IL CANTIERE, ed
+  e' la prima cosa da capire: le ~60 query della vetrina chiedono
+  `stato='attivo'` — cioe' elencano quel che si vede invece di
+  escludere quel che non si vede — quindi uno stato NUOVO e' invisibile
+  PER COSTRUZIONE a vetrina, ricerca, SEO, anteprime social, widget,
+  sitemap e conteggi. Il censimento ha trovato UN SOLO filtro a
+  esclusione (`_dati_distintivi`, che dice `NOT IN`): quello e' l'unico
+  posto che ha dovuto imparare la parola, o si sarebbero guadagnati
+  distintivi scrivendo bozze. CHI AGGIUNGE UNO STATO faccia lo stesso
+  censimento: i `NOT IN` sono i soli punti dove il nuovo entra da solo.
+  IL VARCO DELLA MODERAZIONE E' UNO, `modera_per_la_vetrina(titolo,
+  descrizione, user, annuncio_id)` — i tre strati (parole, AI,
+  revisione) estratti in un giudice solo — e lo chiamano DUE gateway:
+  `pubblica()` quando NON e' una bozza, e `pubblica_bozza()`. La
+  modifica ne resta FUORI DELIBERATAMENTE quando l'annuncio e' una
+  bozza: giudicare un testo che nessuno vede ancora vorrebbe dire
+  pagare l'AI a ogni salvataggio e — peggio — mandare in coda ai
+  moderatori un annuncio che il suo autore non ha ancora deciso di
+  pubblicare. Il testo lo si giudica quando va in vetrina, che e'
+  l'unico momento in cui quel giudizio serve a qualcuno.
+  IL TESTO GIUDICATO E' QUELLO IN COLONNA e mai uno mandato dal
+  client, ed e' la riga da non ammorbidire: `pubblica_bozza` legge
+  `a["titolo"], a["descrizione"]` DAL DATABASE — con un payload si
+  potrebbe far giudicare una cosa e pubblicarne un'altra. C'e' la
+  prova, e chiede anche che `d.get("descrizione"` non compaia in quel
+  corpo.
+  «bozza» NON E' UN QUINTO STATO CHE COMPLICA LA MACCHINA: e' uno
+  stato di PARTENZA, e da li' si esce in un posto solo. Le tre
+  transizioni sono `bozza → attivo|revisione` (la pubblicazione),
+  `attivo|venduto → bozza` (il ritiro) e `bozza → rimosso` (il
+  cestino); da `revisione` non ci si torna, che li' la palla e' di un
+  moderatore. Il patto e' lo stesso della lampo e delle ferie: il gate
+  vive in LETTURA, quindi non c'e' nessun orologio da far girare.
+  IL RITIRO E' LA DECISIONE PIU' DELICATA, e le sue guardie sono
+  quelle di casa: mai con sats in cassaforte (`_ordini_vivi_annuncio`
+  sui quattro stati vivi), mai con un'asta che ha puntate salde, mai
+  su un IMPORTATO — il testo di quello lo riscrive il sync a ogni
+  giro, e una bozza fatta con quello sparirebbe entro l'ora e in
+  silenzio. Il ritiro NON passa dalla moderazione: togliere dalla
+  vetrina non e' un atto da giudicare, e chi ripubblichera' ripassera'
+  dal varco.
+  E IL RITIRO CHIUDE UN BUCO DELL'INVARIANTE, che il piano non aveva
+  previsto: `venduto <=> quantita=0` valeva finche' da 'venduto' si
+  usciva solo ricaricando lo stock — col ritiro un esaurito puo'
+  diventare bozza e tornare in vetrina con zero pezzi. Da qui la riga
+  in `pubblica_bozza`: `if nuovo == "attivo" and not a["quantita"]:
+  nuovo = "venduto"` — si pubblica lo scaffale vuoto, che e' esatto:
+  quell'annuncio ha un link vivo e un «🔄 Rifornisci» che lo aspetta.
+  I GANCI PARTONO DAL VARCO UNICO, e in `pubblica()` c'e' un `return`
+  ANTICIPATO prima di TUTTI e tre (Nostr, promo del canale, avvisi di
+  ricerca): quei ganci raccontano al mondo un annuncio, e su una
+  bozza non c'e' ancora niente da raccontare. E' anche il posto dove
+  il quarto gancio di domani verra' aggiunto — se restassero sparsi,
+  quello si dimenticherebbe la bozza.
+  LO SCUDO ANTI-DOPPIONE HA IMPARATO LA BOZZA (`stato IN
+  ('attivo','revisione','bozza')`), e non e' una rifinitura: senza,
+  chi salva due volte lo stesso testo entro la finestra si ritrova due
+  bozze gemelle — ed e' proprio il gesto ripetuto che la bozza invita
+  a fare. L'ha trovato il collaudo eseguibile e non la lettura: due
+  `crea()` di fila tornavano lo stesso id, e da li' e' nata la prova.
+  L'UPDATE E' CONDIZIONATO SULLO STATO DI PARTENZA in tutte e due le
+  rotte (il doppio tocco su rete lenta trova il fatto compiuto e
+  nessun gancio riparte), e la guardia di proprieta' sta DENTRO la
+  WHERE col 400 dei fratelli: chi enumera non impara niente — «non e'
+  tuo», «non e' una bozza» e «non esiste» rispondono identici.
+  ⚠️ E LA SENTINELLA DEL CAS GUARDA LA CONDIZIONE E NON IL `rowcount`:
+  la prima stesura chiedeva `"rowcount == 1" in corpo`, e togliendo
+  `AND stato='bozza'` dalla WHERE quella riga restava li' — la prova
+  restava VERDE certificando un CAS che non c'era piu'. L'ha detto la
+  TORTURA, ed e' l'ottava volta che questo repo smaschera la stessa
+  classe di cecita': una sentinella onesta e insufficiente insieme.
+  NEL CLIENT `publish(comeBozza)` PRENDE UN ARGOMENTO, e la scelta e'
+  stata pesata: le FIRME che sono ancore di `pezzo_js` non si toccano
+  (la regola di casa), e infatti il cambio ha fatto ESPLODERE due
+  prove che si ancoravano a `"async function publish(){"` portandosi
+  dietro 48 sorelle. La cura non e' stata tornare indietro ma
+  ANCORARSI a `"async function publish("`, che sopravvive a qualunque
+  argomento futuro; una variabile di modulo avrebbe lasciato uno stato
+  residuo, che su un gesto che PUBBLICA e' peggio.
+  ⚠️ `restaBozza` E' IL PEZZO CHE SOLO IL GIRO DAL VIVO HA TROVATO:
+  modificando una bozza il client mandava `bozza:false` — non e' una
+  pubblicazione — e il server rispondeva giustamente `bozza:true`,
+  ma la coda leggeva la variabile LOCALE e cadeva nel ramo normale:
+  «⚡ Annuncio pubblicato!» e `openDetail` su una cosa che in vetrina
+  non c'e'. Adesso `restaBozza = restaBozza || !!d.bozza` — **la
+  verita' e' della RISPOSTA, non della richiesta** — e ci sono tre
+  sentinelle piu' un caso nel collaudo. Nessuna delle 7200 prove
+  poteva vederlo: il server era giusto, il client era giusto, e a
+  divergere erano le due meta' di una domanda sola.
+  `editandoBozza` governa i testi del form (titolo, sottotitolo,
+  banner, bottone, la riga della moderazione che dice «quando la
+  pubblicherai»), ha UN solo scrittore in `editListing` e si spegne
+  nelle due uscite: senza, chi modifica una bozza e poi pubblica un
+  annuncio nuovo si ritroverebbe il form che dice «bozza» su una
+  pubblicazione vera.
+  IL COSTO IN PIXEL E' MISURATO, ed e' il caso gia' pagato dal
+  rifornimento: `.mio-azioni` e' flex-wrap e a 320px concede 196px,
+  quindi i due badge della bozza (📝 Bozza + ⚡ Pubblica = 167px)
+  stanno sulla prima riga e Modifica+Elimina (181) sulla seconda — la
+  riga passa da 160 a **194px**, +34, e SOLO sulle bozze. Le sorelle
+  non crescono di un pixel, che e' la differenza col terzo badge
+  scartato allora. Zero sbordo a 320/360/375.
+  IL BADGE «⚡ Pubblica» VESTE LA COPPIA `--sats-soft`/`--sats-text`
+  col bordo ₿, la ricetta della fascia del rodaggio, e il contrasto e'
+  **4,3 di giorno e 7,5 di sera** — misurato a schermo, non dedotto.
+  Il 4,3 e' sotto AA di poco, ED E' ESATTAMENTE DOVE STA IL VICINO:
+  «🗑 Elimina», che in quella riga c'e' da sempre, rende **4,4**. Non
+  si e' introdotta una coppia peggiore delle sorelle, e `--sats-deep`
+  sarebbe PEGGIORE (2,73). Chi alzera' il contrasto di quei badge li
+  alzi tutti e due insieme.
+  IL BOTTONE «📝 Rimetti in bozza» vive nella colonna del proprietario
+  della SCHEDA e non nella riga di «I tuoi annunci», la misura gia'
+  scritta per il duplicato: a 320px quella riga e' satura. Sta sopra
+  il rosso — occasione → ritocco → stock → uscita — e non nasce sugli
+  importati.
+  RESTA FUORI, dichiarato: nessun tetto al numero di bozze (decisione
+  di Andrea), nessuna scadenza, nessun promemoria — una bozza dimenticata
+  non fa male a nessuno e non occupa una vetrina — e nessuna bozza per
+  gli ANNUNCI IMPORTATI, che vivono sui relay e non qui.
   Scudo anti-doppione (lug 2026, nato da un bug vero: 5 annunci
   identici da un solo utente): `pubblica()` risponde in modo
   IDEMPOTENTE — stesso venditore + stesso titolo + stesso
@@ -28140,6 +28267,41 @@ qualunque ornamento futuro di quella pagina. Sta in Architettura,
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva — il server torna alla whitelist di forma di prima
 (`cop` e le cifre, senza `logo`) e il file esce dal repo.
+
+Le bozze: si scrive oggi, si pubblica quando si vuole (set 2026,
+chiesto da Andrea): «📝 Salva senza pubblicare» nel form Vendi, le
+bozze dentro «I tuoi annunci» col loro badge, e un annuncio in vetrina
+che si puo' RIMETTERE nel cassetto. Le quattro decisioni sue — la
+moderazione alla PUBBLICAZIONE e non al salvataggio, il ritiro
+reversibile, niente cassetto a parte, nessun tetto — stanno in
+Architettura, «LA BOZZA», insieme alla ragione per cui il cantiere e'
+stato piccolo: il filtraggio INCLUSIVO della vetrina rende invisibile
+uno stato nuovo per costruzione, e a doverlo imparare era UN solo
+filtro a esclusione.
+Collaudata: **+57 prove** in `prove.py` (7203 → 7260 in modalita'
+severa; e' il DELTA il numero difendibile, che la cartella e'
+condivisa con altre sessioni e le 5 rosse sono le preesistenti —
+`websocket` non installato qui) piu' `collaudo_bozza.py`, **60 verdi**:
+il server VERO su un database usa-e-getta con undici famiglie — la
+bozza che non esce da NESSUNA vetrina, lo scudo, la modifica che non
+pubblica, il testo giudicato in colonna, lo scaffale vuoto, il ritiro
+coi suoi rifiuti, l'anti-oracolo sul database vero, il mondo di ieri
+intatto e la ronda che tace. E **21 MUTAZIONI** una per riga
+sorvegliata.
+DUE COSE LE HA TROVATE SOLO IL GIRO DAL VIVO, ed e' la parte che serve
+fra sei mesi: `restaBozza` (modificare una bozza diceva «pubblicato!»
+e apriva una scheda che in vetrina non c'e' — server giusto, client
+giusto, e a divergere erano le due meta' di una domanda sola) e la
+sentinella del CAS che guardava il `rowcount` invece della condizione,
+cioe' certificava un lucchetto che si poteva togliere. Piu' le misure
+a 320/360/375 nei due temi: la riga della bozza cresce di 34px e SOLO
+lei, zero sbordo, zero errori JS.
+IN PRODUZIONE basta il deploy: nessuna colonna (`stato` e' TEXT e
+cambia solo il commento dello schema), nessuna migrazione, nessuna
+leva, nessuno stato da riparare — e un client rimasto in cache non
+manda la chiave `bozza` e pubblica come oggi. DA GUARDARE al primo
+giro: la prima bozza vera dentro Telegram, e che pubblicandola parta
+il post nel canale (i ganci partono da li', non dal salvataggio).
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
