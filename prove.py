@@ -26675,8 +26675,8 @@ def prove_fogli_di_casa():
     # torna, e il corpo lo dice.
     # col motore dello scambio (set 2026) sono tre in piu': prendere
     # un ordine, dire «ho inviato gli euro», liberare i sats
-    prova("i gesti che passano dalla domanda unica sono quarantotto",
-          48, solo_codice(mini).count("chiediConferma({"))
+    prova("i gesti che passano dalla domanda unica sono cinquanta",
+          50, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -35961,6 +35961,17 @@ def prove_p2p_stati():
     riga_finali = mini[i_fin:mini.index("\n", i_fin)]
     avanza = fn("function avanzaOrdineP2P(ordine, azione, payload){")
     azioni = fn("function azioniDisponibili(o){")
+    # le due funzioni della tappa 5 stanno su UNA riga: `fn` si ferma
+    # alla graffa a colonna zero e qui non c'e'
+    def riga(firma):
+        i = mini.index(firma)
+        return mini[i:mini.index("\n", i)]
+    secondarie = fn("function azioniSecondarieP2P(o){")
+    i_sub = mini.index("const P2P_ANNULLA_SUBITO = [")
+    liste = mini[i_sub:mini.index("];", mini.index(
+        "const P2P_ANNULLA_INSIEME = [")) + 2]
+    provv = (riga("function nomeProvvisorioP2P(indice){") + "\n"
+             + riga("function provvisorioP2P(id){"))
     tab = blocco_const("AVANZA_P2P")
     stati = blocco_const("STATI_P2P")
     prog = blocco_const("P2P_PROGRESSO")
@@ -36010,7 +36021,7 @@ def prove_p2p_stati():
         salta("le due sequenze dello scambio", "node non c'e'")
         return
     banco = "\n".join([
-        riga_finali, tab, stati, prog, motivi,
+        riga_finali, tab, stati, prog, motivi, liste, secondarie, provv,
         fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"),
         fn("function statoTestoP2P(o){"),
@@ -36112,6 +36123,57 @@ out.euroVendo = statoTestoP2P({lato: 'vendo', stato: 'euro_inviati'}).d;
 out.titoloUguale = statoTestoP2P({lato: 'compro', stato: 'attivo'}).t
                 === statoTestoP2P({lato: 'vendo', stato: 'attivo'}).t;
 out.statoIgnoto = statoTestoP2P({lato: 'compro', stato: 'boh'});
+
+/* ---- tappa 5: chi PUBBLICA un ordine ---- */
+// 10) il giro di chi pubblica e poi aspetta che qualcuno risponda
+const pubblico = {id: 'nuovo:7', lato: 'vendo', stato: 'pubblico', euro: 50,
+                  sats: 0, satsNetti: 0, metodi: ['SEPA'], cantDo: '', errore: ''};
+const gp = cammina(pubblico, [
+  ['new-order', {order: {id: 'vero-1', payment_method: 'SEPA'}}],
+  ['pay-invoice', {payment_request: [null, 'lnbc800u1qqqq', 80000]}],
+  ['hold-invoice-payment-accepted', null],
+  ['fiat-sent-ok', null],
+  ['hold-invoice-payment-settled', null]
+]);
+out.giroPubblico = gp.tappe;
+/* un ordine appena pubblicato non chiede NIENTE a chi l'ha messo: il
+   turno e' di chi lo prendera', e il bottone pieno non c'e' */
+out.pubblicatoSenzaPieno = azioniDisponibili({lato: 'vendo', stato: 'pubblicato'}) === ''
+  && azioniDisponibili({lato: 'compro', stato: 'pubblicato'}) === '';
+
+// 11) i gesti secondari: mai il passo successivo, sempre sotto
+out.secRitira = azioniSecondarieP2P({stato: 'pubblicato'});
+out.secAnnulla = azioniSecondarieP2P({stato: 'attivo'});
+out.secProposto = azioniSecondarieP2P({stato: 'annullo_proposto'});
+out.secConcluso = azioniSecondarieP2P({stato: 'concluso'});
+out.secVota = azioniSecondarieP2P({stato: 'concluso', votabile: true});
+out.secVotato = azioniSecondarieP2P({stato: 'concluso', votabile: true, votato: true});
+out.secSenza = azioniSecondarieP2P(null);
+/* IL RITIRO E L'ANNULLO NON COMPAIONO MAI INSIEME: sono la stessa
+   azione per il coordinatore e due gesti diversi per chi guarda —
+   offrirli tutti e due direbbe che sono due cose */
+out.maiDueAnnulli = ['pubblico','pubblicato','prendo','attesa_mia_fattura',
+  'attesa_hold_venditore','attesa_fattura_compratore','attesa_mia_hold',
+  'attivo','euro_inviati','rilasciato','concluso','annullato','in_disputa',
+  'annullo_chiesto','annullo_proposto','senza_risposta','rifiutato',
+  'pagamento_ritentato']
+  .map(st => azioniSecondarieP2P({stato: st}))
+  .every(a => !(a.indexOf('ritira') >= 0 && a.indexOf('annulla') >= 0));
+/* e da uno stato FINALE non si chiede di annullare: non c'e' piu'
+   niente da fermare, e il bottone porterebbe a un «no» */
+out.finaliSenzaAnnullo = ['concluso','annullato','rifiutato']
+  .map(st => azioniSecondarieP2P({stato: st}))
+  .every(a => a.indexOf('ritira') < 0 && a.indexOf('annulla') < 0);
+
+// 12) il voto: si accende quando il coordinatore lo chiede, e si
+//     spegne quando e' partito — mai due volte sulla stessa persona
+const vr = avanzaOrdineP2P({lato: 'compro', stato: 'concluso', votabile: true},
+                           'rate-received', null);
+out.rateRicevuto = [vr.votato === true, vr.stato];
+
+// 13) il nome provvisorio: si riconosce, e un id vero non lo e' mai
+out.provv = [nomeProvvisorioP2P(7), provvisorioP2P(nomeProvvisorioP2P(7)),
+             provvisorioP2P('abc123'), provvisorioP2P(''), provvisorioP2P(null)];
 process.stdout.write(JSON.stringify(out));
 """
     d = _tf.mkdtemp()
@@ -36178,6 +36240,151 @@ process.stdout.write(JSON.stringify(out));
           out["titoloUguale"])
     prova("uno stato che non conosciamo non lascia la pagina muta",
           {"t": "Scambio in corso", "d": ""}, out["statoIgnoto"])
+
+    # --- 4) TAPPA 5: chi pubblica, chi ritira, chi vota --------------
+    prova("chi PUBBLICA aspetta, poi blocca i sats come chiunque venda",
+          [["pubblicato", ""],
+           ["attesa_mia_hold", "hold"],
+           ["attivo", ""],
+           ["euro_inviati", "rilascia"],
+           ["concluso", ""]], out["giroPubblico"])
+    prova("un ordine appena pubblicato non chiede niente a chi l'ha messo",
+          True, out["pubblicatoSenzaPieno"])
+    prova("da 'pubblicato' si RITIRA e basta", ["ritira"], out["secRitira"])
+    prova("...da uno scambio in corso si CHIEDE di annullare",
+          ["annulla"], out["secAnnulla"])
+    # e NON si offre anche di richiederlo: chi ha davanti una proposta
+    # di annullo ha una cosa sola da fare, dire di si'
+    prova("...e se l'ha chiesto l'altro si accetta, e basta",
+          ["accetta-annullo"], out["secProposto"])
+    prova("a scambio concluso non c'e' nessun gesto", [], out["secConcluso"])
+    prova("...finche' il coordinatore non chiede il voto",
+          ["vota"], out["secVota"])
+    prova("...e il voto sparisce quando e' partito", [], out["secVotato"])
+    prova("senza scambio non c'e' nessun gesto secondario", [],
+          out["secSenza"])
+    prova("il ritiro e l'annullo non compaiono MAI insieme", True,
+          out["maiDueAnnulli"])
+    # e la PREMESSA su cui quella riga poggia: le due liste non si
+    # sovrappongono. E' la prova che la tortura ha chiesto — con le
+    # liste disgiunte la mutazione dell'`else` e' inerte, quindi
+    # l'esito da solo non basta a sorvegliare quel ramo.
+    _sub = set(re.findall(r"'([a-z_]+)'",
+                          liste.split("P2P_ANNULLA_INSIEME")[0]))
+    _ins = set(re.findall(r"'([a-z_]+)'",
+                          liste.split("P2P_ANNULLA_INSIEME")[1]))
+    prova("le due liste dell'annullo sono disgiunte", set(), _sub & _ins)
+    prova("...e nessuna delle due e' vuota", (True, True),
+          (len(_sub) > 0, len(_ins) > 0))
+    prova("...e da uno stato finale non si annulla piu' niente", True,
+          out["finaliSenzaAnnullo"])
+    prova("il voto mandato si spegne senza muovere lo scambio",
+          [True, "concluso"], out["rateRicevuto"])
+    prova("il nome provvisorio si riconosce, e un id vero non lo e' mai",
+          ["nuovo:7", True, False, False, False], out["provv"])
+
+
+def prove_p2p_pubblica():
+    """PUBBLICARE UN ORDINE (set 2026, tappa 5).
+
+    Chi crea non prende: PUBBLICA, e poi aspetta. Da qui nasce l'unica
+    cosa che questa tappa aggiunge al motore — un ordine che vive
+    PRIMA di avere un nome, perche' il nome glielo da' il coordinatore
+    quando risponde.
+
+    LA RIGA DA NON AMMORBIDIRE E' IL RINOME, e sta nel funnel e non in
+    chi crea: la risposta puo' arrivare quando nessuno la sta
+    aspettando (app riaperta, relay che ripete), e da li' in poi lo
+    scambio deve avere il nome col quale il coordinatore lo chiamera'
+    per sempre. Scritta dentro `inviaNuovoOrdineP2P` funzionerebbe nel
+    caso felice e lascerebbe due scambi — uno col nome vero e uno col
+    provvisorio — in tutti gli altri.
+
+    E l'importo va in euro con `amount: 0`: i sats li fa il prezzo di
+    mercato quando qualcuno prende, che e' anche perche' il libro dice
+    «al prezzo di mercato» invece di una cifra che invecchierebbe."""
+    print("\n[pubblicare un ordine]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    applica = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){",
+                       "\n}\n")
+    rinomina = pezzo_js(mini, "function rinominaOrdineP2P(o, nuovoId){",
+                        "\n}\n")
+
+    # --- 1) IL RINOME STA NEL FUNNEL ---------------------------------
+    prova("il rinome vive dove passano TUTTE le risposte", True,
+          "if (provvisorioP2P(nuovo.id) && dentro.id) "
+          "rinominaOrdineP2P(nuovo, dentro.id);" in applica)
+    prova("...e chi crea l'ordine non se lo scrive per conto suo", False,
+          "rinominaOrdineP2P(" in invia)
+    prova("il nome vecchio si cancella dalla mappa", True,
+          "delete m[vecchio];" in rinomina)
+    # senza, restano due scambi: quello col nome vero e un fantasma che
+    # non ricevera' mai piu' un messaggio
+    prova("...e i tre riferimenti aperti seguono il nome nuovo", True,
+          all(("if (p2p%s === vecchio) p2p%s = o.id;" % (n, n)) in rinomina
+              for n in ("OrdineAperto", "HoldOrdine", "IncassoOrdine")))
+
+    # --- 2) IL PAYLOAD DI `new-order` --------------------------------
+    prova("l'ordine nasce in euro, coi sats al prezzo di mercato", True,
+          "amount: 0," in invia and "fiat_amount: euro," in invia)
+    prova("...e in EUR, che e' l'unica valuta del coordinatore", True,
+          "fiat_code: 'EUR'," in invia)
+    prova("il lato lo dice la scheda in cui si sta", True,
+          "kind: lato === 'compro' ? 'buy' : 'sell'," in invia)
+    prova("l'ordine nasce 'pending': lo prende chi vuole", True,
+          "status: 'pending'," in invia)
+    prova("il metodo di pagamento e' quello scritto, non un codice",
+          True, "payment_method: metodo," in invia)
+
+    # --- 3) LE DUE COSE CHE NON DEVONO SUCCEDERE ---------------------
+    # l'indice si manda solo dove il coordinatore lo valida, e senza
+    # la firma su bytes grezzi non si manda affatto
+    prova("l'indice si manda solo se il profilo sa firmare", True,
+          "indice: reput ? indice : null," in invia)
+    prova("...e il profilo di scambio non esce mai da qui", False,
+          "fetch(" in invia)
+
+    # --- 4) I GESTI CHE NON SI POSSONO FARE --------------------------
+    annullo = pezzo_js(mini, "async function inviaAnnulloP2P(){", "\n}\n")
+    prova("un ordine senza nome non si puo' annullare", True,
+          "if (provvisorioP2P(id)) {" in annullo)
+    # il coordinatore lo chiama per id: finche' non risponde, non c'e'
+    # niente da nominargli — e un 400 sarebbe un vicolo cieco muto
+    prova("...e lo si dice invece di lasciare il bottone muto", True,
+          "toast('Aspetta: il coordinatore non ha ancora risposto');" in annullo)
+
+    # --- 5) IL VELO SI SPEGNE ----------------------------------------
+    # `bottoneInAttesa` RITORNA il ripristino: chiamarla una seconda
+    # volta lo rialza, e l'app resta sotto l'overlay per sempre
+    voto = pezzo_js(mini, "async function votaP2P(n){", "\n}\n")
+    for nome, corpo in (("l'annullo", annullo), ("il voto", voto)):
+        prova("%s alza il velo e lo rimette giu'" % nome, True,
+              "const rip = bottoneInAttesa(" in corpo and "\n  rip();" in corpo)
+        prova("...e mai col booleano, che lo riaccenderebbe" , False,
+              "bottoneInAttesa(true" in corpo or "bottoneInAttesa(false" in corpo)
+
+    # --- 6) I DUE FOGLI NUOVI SI CHIUDONO COI FRATELLI ---------------
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    for f in ("p2pNuovoSheet", "p2pVotoSheet"):
+        prova("#%s si chiude col censimento di casa" % f, True,
+              "el('%s').classList.remove('open');" % f in chiudi)
+
+    # --- 7) IL VOTO NON SI CONFONDE COLLE STELLE DI BARATTOLO --------
+    # sono due reputazioni diverse e vivono in due posti diversi: chi
+    # legge deve saperlo, o crederebbe di star votando il negozio
+    rvoto = pezzo_js(mini, "function renderVotoP2P(){", "\n}\n")
+    prova("il foglio del voto dice di CHI e' la reputazione", True,
+          "profilo di scambio" in rvoto and "negozio su Barattolo" in rvoto)
+
+    # --- 8) LE PAROLE DEL PROFILO DI SCAMBIO ------------------------
+    # chi entra da Telegram non deve leggere «Nostr», «chiave»,
+    # «relay»: e' «il tuo profilo di scambio», e il coordinatore ha un
+    # nome proprio
+    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    for parola in ("Nostr", "nsec", "npub", "relay"):
+        prova("il foglio del nuovo ordine non nomina «%s»" % parola,
+              False, parola.lower() in nuovo.lower())
 
 
 def prove_p2p_server():
@@ -42459,6 +42666,7 @@ def main():
     prove_p2p_chiavi,
     prove_p2p_motore,
     prove_p2p_stati,
+    prove_p2p_pubblica,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
