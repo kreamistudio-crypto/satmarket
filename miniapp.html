@@ -1706,6 +1706,20 @@
      una bugia di registro, la stessa ragione per cui la riga di stato
      e' `.nota-scambio` e non il verde della fiducia. */
   .p2p-passi{margin:14px 0 4px}
+  /* i messaggi: la lingua e' quella delle chat che tutti hanno nel
+     telefono -- i miei a destra sull'arancio di casa, i suoi a
+     sinistra sulla carta. Il riquadro scorre da se': la pagina
+     sotto non si deve muovere mentre si scrive. */
+  .p2p-chat{max-height:46vh;overflow-y:auto;overscroll-behavior:contain;
+    display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .p2p-msg{max-width:82%;align-self:flex-start;background:var(--chip-bg);
+    color:var(--ink);border-radius:14px;padding:8px 11px;font-size:14px;
+    line-height:1.4;overflow-wrap:anywhere}
+  .p2p-msg.mio{align-self:flex-end;background:var(--sats-soft);color:var(--sats-text)}
+  .p2p-msg small{display:block;margin-top:3px;font-size:11px;opacity:.7}
+  #p2pChatCorpo textarea{width:100%;font:inherit;font-size:14px;padding:10px 12px;
+    border:1.5px solid var(--field-line);border-radius:12px;background:var(--card);
+    color:var(--ink);resize:none}
 
   /* ---------- hero di Esplora: esiste solo da desktop in su ---------- */
   .hero{display:none}
@@ -6578,6 +6592,12 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pIncassoTit">💸 Dove ricevere i sats</h3>
     <div id="p2pIncassoCorpo"></div>
+  </div>
+
+  <div class="sheet" id="p2pChatSheet" role="dialog" aria-modal="true" aria-labelledby="p2pChatTit">
+    <div class="grab"></div>
+    <h3 id="p2pChatTit">💬 Messaggi</h3>
+    <div id="p2pChatCorpo"></div>
   </div>
   <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
        aria-labelledby="paccoSvuotaTit">
@@ -18139,6 +18159,7 @@ function closeSheet(){
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
+  el('p2pChatSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
@@ -31016,16 +31037,18 @@ async function provaLoginWeb(){
    carica dal NOSTRO server (/vendor/nostr.js: mai da una CDN) e solo
    quando serve: per l'estensione NIP-07 non serve affatto.
    Il `?v=` porta il suffisso `-mostro` da set 2026: e' lo stesso
-   nostr-tools 2.23.12 con quattro export in piu' (schnorr, sha256,
-   hmac, hkdf) che il file conteneva gia' -- il suffisso serve a
-   svegliare la cache di un giorno della rotta, e a dire a chi legge
-   che il bundle non e' quello di serie. */
+   nostr-tools 2.23.12 con cinque export in piu' (schnorr, sha256,
+   hmac, hkdf, secp256k1) che il file conteneva gia' -- il suffisso
+   serve a svegliare la cache di un giorno della rotta, e a dire a
+   chi legge che il bundle non e' quello di serie. Il numero in coda
+   sale a ogni export aggiunto: chi ne mette un sesto lo alzi, o i
+   browser di chi ha gia' aperto l'app terranno il file di ieri. */
 let nostrToolsPromessa = null;
 function caricaNostrTools(){
   if (window.NostrTools) return Promise.resolve();
   if (!nostrToolsPromessa) nostrToolsPromessa = new Promise((ok, no)=>{
     const s = document.createElement('script');
-    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro`;
+    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro2`;
     s.onload = ok;
     s.onerror = ()=>{ nostrToolsPromessa = null; no(new Error('libreria non raggiungibile')); };
     document.head.appendChild(s);
@@ -32737,7 +32760,7 @@ function ultimoVistoP2P(){
 async function mostroRiascolta(){
   const mappa = ordiniAscoltoP2P();
   const pubs = Object.keys(mappa).sort();
-  const firma = pubs.join(',');
+  const firma = pubs.join(',') + '|' + Object.keys(autoriChatP2P()).sort().join(',');
   if (!pubs.length) {
     try { if (p2pSub) p2pSub.close(); } catch(e){}
     p2pSub = null; p2pSubChiavi = '';
@@ -32747,7 +32770,19 @@ async function mostroRiascolta(){
   const relay = await mostroConnetti();
   try { if (p2pSub) p2pSub.close(); } catch(e){}
   p2pSubChiavi = firma;
-  p2pSub = relay.subscribe([{kinds: [14], '#p': pubs, since: ultimoVistoP2P() - 600}], {
+  /* DUE filtri e non uno. Il primo prende le risposte del
+     coordinatore (che scrive ALLA nostra chiave); il secondo i
+     messaggi dell'altra persona, e guarda l'AUTORE invece del
+     destinatario: quel tag viaggia in chiaro, quindi con un filtro
+     sul destinatario chiunque potrebbe riempire la conversazione di
+     roba da scaricare e provare a decifrare. La busta la sanno
+     firmare solo le due parti: cosi' il relay butta via il resto
+     prima che arrivi qui. */
+  const chat = Object.keys(autoriChatP2P()).sort();
+  const filtri = [{kinds: [14], '#p': pubs, since: ultimoVistoP2P() - 600}];
+  if (chat.length) filtri.push({kinds: [14], authors: chat,
+                                since: ultimoVistoP2P() - 600});
+  p2pSub = relay.subscribe(filtri, {
     onevent(ev){ mostroArriva(ev).catch(e => console.log('🔁 [p2p] messaggio illeggibile: ' + (e && e.message || e))); },
     onclose(){ if (p2pSubChiavi === firma) { p2pSub = null; p2pSubChiavi = ''; } }
   });
@@ -32759,6 +32794,13 @@ async function mostroArriva(ev){
   if (p2pVisti.indexOf(ev.id) >= 0) return;   // il relay puo' ripetere
   p2pVisti.push(ev.id);
   if (p2pVisti.length > 300) p2pVisti.splice(0, p2pVisti.length - 300);
+  /* A DECIDERE E' L'AUTORE, mai il tag `p`: quel tag lo puo'
+     scrivere chiunque, la firma no. Prima i messaggi dell'altra
+     persona, poi quelli del coordinatore, e tutto il resto si
+     lascia stare. */
+  const scambio = autoriChatP2P()[ev.pubkey];
+  if (scambio) { chatArriva(scambio, ev); return; }
+  if (ev.pubkey !== mostroHexP2P()) return;    // non e' il coordinatore
   const pub = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
   const ord = ordiniAscoltoP2P()[pub];
   if (!ord) return;                            // non e' roba nostra
@@ -32914,6 +32956,13 @@ function avanzaOrdineP2P(ordine, azione, payload){
     if (Array.isArray(pm)) o.metodi = pm.map(String).filter(Boolean);
     else if (typeof pm === 'string' && pm.trim())
       o.metodi = pm.split(',').map(s => s.trim()).filter(Boolean);
+    /* LA CONTROPARTE si raccoglie da QUI e non dal solo messaggio
+       che la nomina: l'ordine porta le due chiavi dello scambio e
+       una delle due e' la nostra -- si tiene l'altra. Chi aspettasse
+       il messaggio dedicato accenderebbe i messaggi a meta' strada,
+       e in un momento diverso per chi compra e per chi vende. */
+    for (const k of [ord.buyer_trade_pubkey, ord.seller_trade_pubkey])
+      if (k && String(k) !== o.pubTrade) o.peer = String(k);
   }
   /* la richiesta di pagamento del venditore: arriva come terna
      [ordine, fattura, importo] — sempre tre elementi, anche vuoti */
@@ -32956,6 +33005,10 @@ function azioniDisponibili(o){
 const P2P_ANNULLA_SUBITO = ['pubblicato'];
 const P2P_ANNULLA_INSIEME = ['attesa_mia_fattura', 'attesa_hold_venditore',
   'attesa_fattura_compratore', 'attesa_mia_hold', 'attivo', 'pagamento_ritentato'];
+/* gli stati in cui una disputa vuol dire qualcosa: i sats sono gia'
+   in custodia e c'e' una controparte dall'altra parte. Prima non
+   c'e' niente da contendere, dopo la cosa e' decisa. */
+const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
 /* PURA: i gesti che stanno SOTTO il bottone pieno. Mai il passo
    successivo — quello e' uno solo ed e' azioniDisponibili. */
 function azioniSecondarieP2P(o){
@@ -32965,6 +33018,7 @@ function azioniSecondarieP2P(o){
   else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0) fuori.push('annulla');
   if (o.stato === 'annullo_proposto') fuori.push('accetta-annullo');
   if (o.votabile && !o.votato) fuori.push('vota');
+  if (P2P_DISPUTABILI.indexOf(o.stato) >= 0) fuori.push('disputa');
   return fuori;
 }
 /* i quattro passi che si vedono, e a che punto sta ognuno stato */
@@ -33179,7 +33233,11 @@ const SECONDARI_P2P = {
   ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Ritira l\'ordine</button>',
   annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Chiedi di annullare</button>',
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
-  vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>'
+  vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>',
+  /* l'uscita, e sta in fondo come nell'ordine di Barattolo: prima
+     il passo da fare, poi il modo di parlarsi, e per ultima la
+     strada per quando parlarsi non e' bastato */
+  disputa: '<button class="btn allarme" onclick="apriDisputaP2P()">⚠️ C’è un problema</button>'
 };
 
 /* ---- la pagina di uno scambio ---- */
@@ -33189,6 +33247,21 @@ function apriOrdineP2P(id){
   p2pOrdineAperto = id;
   renderOrdineP2P();
   go('p2pordine');
+  /* Il bottone dei messaggi vuole il bundle, che si carica pigro:
+     chi arriva qui dalla lista o dal gesto indietro non e' passato da
+     nessun take, quindi puo' non esserci ancora -- e senza, il
+     bottone non nasce e non lo ridisegna nessuno (visto dal vivo).
+     Si riallinea quando arriva, il patto dei barattolini; e solo se
+     la pagina e' ancora QUESTA, che scrivere sopra un altro scambio
+     sarebbe peggio del bottone che manca. */
+  if (!window.NostrTools) caricaNostrTools().then(() => {
+    if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine')
+      renderOrdineP2P();
+  }).catch(() => {});
+}
+function vistaAttivaP2P(){
+  const v = document.querySelector('.view.active');
+  return v ? v.id : '';
 }
 function renderOrdineP2P(){
   const box = el('p2pOrdineCorpo');
@@ -33234,6 +33307,15 @@ function renderOrdineP2P(){
     (bottoni[azione] || '') +
     (o.stato === 'senza_risposta'
       ? '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprova</button>' : '') +
+    /* i messaggi stanno FRA il passo da fare e le uscite: e' il modo
+       di mettersi d'accordo, e quasi sempre e' quel che serve prima
+       di annullare o di aprire una disputa. Compare solo quando si sa
+       con chi si sta scambiando: prima non c'e' nessuno a cui
+       scrivere, e un bottone che porta a un muro e' peggio di un
+       bottone che non c'e'. */
+    (chiaviChatOrdine(o)
+      ? '<button class="btn ghost" onclick="apriChatP2P()">💬 Messaggi'
+        + (o.chatNuovi ? ' <b>(' + fmt(o.chatNuovi) + ')</b>' : '') + '</button>' : '') +
     secondarie.map(a => SECONDARI_P2P[a] || '').join('') +
     '<div class="hint">I sats li custodisce il coordinatore (Mostro, un servizio indipendente): Barattolo non li tiene e non li vede. Gli euro viaggiano fra voi due, fuori da qui.</div>';
 }
@@ -33587,6 +33669,279 @@ async function votaP2P(n){
     toast('Grazie ⭐');
   } catch(e) {
     toast('Il voto non è partito: ' + String(e && e.message || e));
+  }
+  rip();
+  if (p2pOrdineAperto === id) renderOrdineP2P();
+}
+
+/* ---- LA CHAT FRA PARI (set 2026, tappa 6) ----
+   Il coordinatore non ci entra: le due chiavi della conversazione si
+   derivano da un ECDH fra le due chiavi dello scambio, e il messaggio
+   viaggia cifrato fra le due persone. Barattolo non lo vede — non lo
+   riceve nemmeno, il server di questo non sa niente.
+
+   LE DUE CHIAVI SONO DUE APPOSTA, ed e' la riga da non semplificare:
+   `conv` cifra e da' il nome alla conversazione (il tag `p`), `firma`
+   firma la busta esterna. Chi ha solo `conv` LEGGE e non puo' scrivere,
+   ed e' quello che permette, un domani, di far leggere la chat a chi
+   risolve una disputa senza dargli la possibilita' di parlarci dentro.
+
+   LA SOTTOSCRIZIONE GUARDA L'AUTORE E MAI IL TAG `p`: quel tag viaggia
+   in chiaro, e con un filtro `#p` chiunque lo legga potrebbe riempire
+   la conversazione di roba che il telefono deve prima scaricare e poi
+   provare a decifrare. Firmando la busta con `firma` — che hanno solo
+   le due parti — a scrivere puo' essere solo chi c'e' dentro, e il
+   relay butta via il resto prima che arrivi qui. */
+const CHAT_INFO_CONV = 'mostro:chat:conv:v1';
+const CHAT_INFO_FIRMA = 'mostro:chat:sign:v1';
+const CHAT_TOLLERANZA = 60;      // lo scarto d'orologio che si accetta
+const CHAT_MAX_BYTE = 65536;     // una busta piu' grande non si apre
+const CHAT_MAX_TESTO = 1000;     // quanto si puo' scrivere in un colpo
+const CHAT_MAX_MSG = 200;        // quanti se ne tengono per scambio
+const CHAT_RAFFICA = 60;         // quanti se ne accettano al minuto
+let p2pChatOrdine = '';
+let p2pChiaviChat = {};          // sk+peer -> {conv, firma}: l'ECDH costa
+let p2pChatSecchio = {};         // pub(firma) -> {quanti, da}
+
+/* Le due chiavi, con la ricetta del coordinatore alla lettera: ECDH
+   x-only (le pubkey nostr non portano la parita': si assume pari, come
+   fanno NIP-04 e NIP-44), poi HKDF-SHA256 SENZA SALE e un blocco solo.
+   Se per un caso su miliardi il risultato non fosse un numero valido
+   per la curva, si riprova con un byte in coda all'ETICHETTA — non al
+   materiale: e' l'etichetta a cambiare, e il conto riparte da li'. */
+function chiaviPeer(skHex, peerPub){
+  const chiave = skHex + ':' + peerPub;
+  if (p2pChiaviChat[chiave]) return p2pChiaviChat[chiave];
+  const NT = window.NostrTools;
+  if (!NT || !NT.secp256k1 || !NT.hkdf || !NT.sha256)
+    throw new Error('I messaggi non sono disponibili');
+  const punto = NT.secp256k1.getSharedSecret(
+    NT.utils.hexToBytes(skHex), NT.utils.hexToBytes('02' + peerPub));
+  const condiviso = punto.subarray(1, 33);
+  const prk = NT.hkdf.extract(NT.sha256, condiviso);
+  const enc = new TextEncoder();
+  const deriva = (info) => {
+    for (let c = 0; c <= 255; c++) {
+      const et = c === 0 ? enc.encode(info)
+                         : Uint8Array.from([...enc.encode(info), c]);
+      const okm = NT.hkdf.expand(NT.sha256, prk, et, 32);
+      try { return {sk: okm, pub: NT.getPublicKey(okm)}; } catch(e) { }
+    }
+    throw new Error('I messaggi non sono disponibili');
+  };
+  const coppia = {conv: deriva(CHAT_INFO_CONV), firma: deriva(CHAT_INFO_FIRMA)};
+  p2pChiaviChat[chiave] = coppia;
+  return coppia;
+}
+/* le chiavi di UNO scambio, quando la controparte si conosce */
+function chiaviChatOrdine(o){
+  if (!o || !o.peer) return null;
+  const mz = mazzoMostro();
+  if (!mz) return null;
+  try {
+    return chiaviPeer(chiaveScambio(mz.sk, o.indice).sk, o.peer);
+  } catch(e) { return null; }
+}
+/* gli autori da ascoltare: uno per scambio vivo che ha una controparte */
+function autoriChatP2P(){
+  const m = {};
+  const mappa = ordiniAscoltoP2P();
+  for (const pub in mappa) {
+    const k = chiaviChatOrdine(mappa[pub]);
+    if (k) m[k.firma.pub] = mappa[pub];
+  }
+  return m;
+}
+/* da quando riprendere i messaggi di uno scambio. Il segnalibro non
+   supera MAI l'orologio di qui: la busta la firma anche l'altra
+   persona, e una data buttata nel futuro zittirebbe la conversazione
+   fino a quel giorno — un guasto che sopravvive a ogni riapertura. */
+function chatDaQuando(o){
+  const adesso = Math.floor(Date.now() / 1000);
+  const v = Math.min(Number(o.chatVisto) || 0, adesso);
+  return Math.max(0, (v || (o.creato || adesso)) - 600);
+}
+
+/* ---- quel che si scrive ---- */
+async function chatInvia(o, testo){
+  const NT = window.NostrTools;
+  const mz = mazzoMostro();
+  if (!mz) throw new Error('Il profilo di scambio non si trova');
+  const k = chiaviChatOrdine(o);
+  if (!k) throw new Error('Non si sa ancora con chi stai scambiando');
+  const tk = chiaveScambio(mz.sk, o.indice);
+  const quando = Math.floor(Date.now() / 1000);
+  /* dentro: il messaggio vero, firmato dalla chiave DELLO SCAMBIO —
+     e' l'unica cosa che dice chi l'ha scritto, perche' la busta la
+     sanno firmare tutte e due le parti */
+  const dentro = NT.finalizeEvent({
+    kind: 1, created_at: quando, tags: [], content: testo
+  }, NT.utils.hexToBytes(tk.sk));
+  const conv = NT.nip44.getConversationKey(k.conv.sk, k.conv.pub);
+  /* fuori: la busta. Un solo tag `p`, e la data UGUALE a quella di
+     dentro: e' cosi' che si riconosce una busta rimessa in giro con
+     un messaggio vecchio. */
+  const fuori = NT.finalizeEvent({
+    kind: 14, created_at: quando,
+    tags: [['p', k.conv.pub]],
+    content: NT.nip44.encrypt(JSON.stringify(dentro), conv)
+  }, k.firma.sk);
+  const relay = await mostroConnetti();
+  await relay.publish(fuori);
+  const agg = ordiniP2P()[o.id] || o;
+  chatAggiungi(agg, {id: dentro.id, mio: true, testo: testo, t: quando});
+  return agg;
+}
+/* i messaggi vivono accanto allo scambio: l'id di ognuno E' anche il
+   ricordo che serve a non riprendere due volte lo stesso — chi
+   ripubblica una busta vecchia ci sbatte contro. */
+function chatAggiungi(o, msg){
+  const lista = (o.chat || []).slice();
+  if (lista.some(m => m.id === msg.id)) return o;
+  lista.push(msg);
+  lista.sort((a, b) => (a.t || 0) - (b.t || 0));
+  o.chat = lista.slice(-CHAT_MAX_MSG);
+  if (!msg.mio) o.chatNuovi = (o.chatNuovi || 0) + 1;
+  scriviOrdineP2P(o);
+  if (p2pChatOrdine === o.id) renderChatP2P();
+  if (p2pOrdineAperto === o.id) renderOrdineP2P();
+  return o;
+}
+
+/* ---- quel che arriva ----
+   I controlli stanno in quest'ordine apposta: prima quelli che non
+   costano niente, e solo alla fine si decifra e si verificano le
+   firme. Chi volesse tempestare la conversazione paga il lavoro suo,
+   non il nostro. */
+function chatArriva(o, ev){
+  const NT = window.NostrTools;
+  const k = chiaviChatOrdine(o);
+  if (!k) return;
+  const adesso = Math.floor(Date.now() / 1000);
+  /* PRIMA DI TUTTO L'AUTORE, ed e' la riga che rende vere le due
+     chiavi: chi ha solo quella di lettura puo' aprire le buste e
+     NON scriverne. Senza, quella garanzia vivrebbe soltanto nel
+     filtro del relay -- cioe' fuori di qui, in mano a un terzo. */
+  if (ev.pubkey !== k.firma.pub) return;
+  const pTag = (ev.tags || []).filter(t => t[0] === 'p');
+  if (pTag.length !== 1 || pTag[0][1] !== k.conv.pub) return;
+  if ((ev.created_at || 0) > adesso + CHAT_TOLLERANZA) return;
+  if ((ev.content || '').length > CHAT_MAX_BYTE) return;
+  /* la raffica si ferma PRIMA di decifrare: e' li' che costa */
+  const secchio = p2pChatSecchio[k.firma.pub] || {quanti: 0, da: adesso};
+  if (adesso - secchio.da >= 60) { secchio.quanti = 0; secchio.da = adesso; }
+  if (++secchio.quanti > CHAT_RAFFICA) { p2pChatSecchio[k.firma.pub] = secchio; return; }
+  p2pChatSecchio[k.firma.pub] = secchio;
+  if (!NT.verifyEvent(ev)) return;
+  const conv = NT.nip44.getConversationKey(k.conv.sk, k.conv.pub);
+  let dentro;
+  try { dentro = JSON.parse(NT.nip44.decrypt(ev.content, conv)); }
+  catch(e) { return; }
+  if (!dentro || dentro.kind !== 1) return;
+  if (!NT.verifyEvent(dentro)) return;      // CHI ha scritto: solo questa lo dice
+  const mz = mazzoMostro();
+  if (!mz) return;
+  const mia = chiaveScambio(mz.sk, o.indice).pub;
+  if (dentro.pubkey !== o.peer && dentro.pubkey !== mia) return;
+  if (Math.abs((dentro.created_at || 0) - (ev.created_at || 0)) > CHAT_TOLLERANZA) return;
+  const agg = ordiniP2P()[o.id] || o;
+  agg.chatVisto = Math.min(Math.max(Number(agg.chatVisto) || 0, ev.created_at || 0), adesso);
+  chatAggiungi(agg, {id: dentro.id, mio: dentro.pubkey === mia,
+                     testo: String(dentro.content || '').slice(0, CHAT_MAX_TESTO),
+                     t: dentro.created_at || adesso});
+}
+
+/* ---- il foglio ---- */
+function apriChatP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o) return;
+  if (!chiaviChatOrdine(o)) { toast('Non si sa ancora con chi stai scambiando'); return; }
+  haptic();
+  p2pChatOrdine = id;
+  if (o.chatNuovi) { o.chatNuovi = 0; scriviOrdineP2P(o); renderOrdineP2P(); }
+  renderChatP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pChatSheet').classList.add('open');
+  const c = el('p2pChatInp');
+  if (c) setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60);
+}
+function oraChatP2P(t){
+  try {
+    return new Date((t || 0) * 1000)
+      .toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+  } catch(e) { return ''; }
+}
+function renderChatP2P(){
+  const box = el('p2pChatCorpo');
+  const o = ordiniP2P()[p2pChatOrdine];
+  if (!box || !o) return;
+  const msg = o.chat || [];
+  const scritto = el('p2pChatInp') ? el('p2pChatInp').value : '';
+  box.innerHTML =
+    '<div class="p2p-chat" id="p2pChatLista">' +
+      (msg.length
+        ? msg.map(m => '<div class="p2p-msg' + (m.mio ? ' mio' : '') + '">' +
+            esc(m.testo) + '<small>' + esc(oraChatP2P(m.t)) + '</small></div>').join('')
+        : '<div class="hint" style="margin:0">Ancora nessun messaggio. Qui vi mettete d\'accordo su come mandare gli euro.</div>') +
+    '</div>' +
+    '<textarea id="p2pChatInp" rows="2" maxlength="' + CHAT_MAX_TESTO + '" ' +
+      'placeholder="Scrivi qui…"></textarea>' +
+    '<button class="btn orange" onclick="inviaChatP2P(this)">Invia</button>' +
+    '<div class="hint">I messaggi viaggiano cifrati fra te e l\'altra persona: né Barattolo né il coordinatore li leggono. Non scrivere qui password o codici di accesso.</div>';
+  const inp = el('p2pChatInp');
+  if (inp && scritto) inp.value = scritto;
+  const lista = el('p2pChatLista');
+  if (lista) lista.scrollTop = lista.scrollHeight;
+}
+async function inviaChatP2P(btn){
+  const o = ordiniP2P()[p2pChatOrdine];
+  const inp = el('p2pChatInp');
+  if (!o || !inp) return;
+  const testo = String(inp.value || '').trim().slice(0, CHAT_MAX_TESTO);
+  if (!testo) { toast('Scrivi qualcosa prima di inviare'); return; }
+  const rip = bottoneInAttesa(btn, 'Mando il messaggio…');
+  try {
+    await chatInvia(o, testo);
+    inp.value = '';
+    renderChatP2P();
+  } catch(e) {
+    toast('Non è partito: ' + String(e && e.message || e));
+  }
+  rip();
+}
+
+/* ---- la disputa ----
+   L'ultima uscita, e per questo il testo dice cosa succede DOPO: da li'
+   in poi i sats non li muove piu' nessuno dei due, e a decidere e' chi
+   risolve le dispute presso il coordinatore. Barattolo non c'entra e
+   non puo' farci niente: si dice, invece di lasciarlo credere. */
+function apriDisputaP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o) return;
+  haptic();
+  chiediConferma({
+    titolo: 'Aprire una disputa?',
+    corpo: 'Un moderatore del coordinatore guarderà il caso e deciderà chi riceve i sats.\n\n'
+      + 'Da quel momento lo scambio si ferma: né tu né l\'altra persona potete più muovere i sats. '
+      + 'Barattolo non decide e non può intervenire.\n\n'
+      + 'Prima di aprirla, prova a scrivere all\'altra persona: quasi sempre è un ritardo.',
+    etichetta: 'Sì, apri la disputa',
+    poi: () => { inviaDisputaP2P(); }
+  });
+}
+async function inviaDisputaP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o) return;
+  const rip = bottoneInAttesa(null, 'Apro la disputa…');
+  try {
+    await chiamataOrdineP2P(o, 'dispute');
+  } catch(e) {
+    const agg = ordiniP2P()[id] || o;
+    agg.errore = String(e && e.message || e);
+    scriviOrdineP2P(agg);
+    toast('Non è riuscita: ' + String(e && e.message || e));
   }
   rip();
   if (p2pOrdineAperto === id) renderOrdineP2P();

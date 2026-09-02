@@ -70,6 +70,7 @@ var NostrTools = (() => {
     hkdf: () => ({ extract, expand }),
     hmac: () => hmac,
     schnorr: () => schnorr,
+    secp256k1: () => secp256k1,
     sha256: () => sha256,
     validateEvent: () => validateEvent,
     verifiedSymbol: () => verifiedSymbol,

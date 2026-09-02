@@ -26675,8 +26675,12 @@ def prove_fogli_di_casa():
     # torna, e il corpo lo dice.
     # col motore dello scambio (set 2026) sono tre in piu': prendere
     # un ordine, dire «ho inviato gli euro», liberare i sats
-    prova("i gesti che passano dalla domanda unica sono cinquanta",
-          50, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTUNO con la disputa P2P (set 2026), ed e' il terzo dei
+    # cinquantuno che parla di sats gia' in custodia: il corpo dice
+    # la cosa che non si disfa — da li' non si annulla piu', e a
+    # decidere e' il coordinatore, non Barattolo.
+    prova("i gesti che passano dalla domanda unica sono cinquantuno",
+          51, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -34603,8 +34607,8 @@ def prove_font():
 
 
 def prove_bundle_nostr():
-    """Il bundle nostr-tools ha quattro export in piu' (set 2026, tappa 0
-    del cantiere P2P). Il client Mostro deve firmare un HASH NUDO —
+    """Il bundle nostr-tools ha cinque export in piu' (set 2026, tappe 0
+    e 6 del cantiere P2P). Il client Mostro deve firmare un HASH NUDO —
     l'identity proof del trasporto v2 e' `schnorr.sign(sha256("mostro-
     transport-v2-identity:<trade pub>:<json>"))`, non un evento — e
     `finalizeEvent` firma sempre l'id di un evento: con quel solo export
@@ -34612,18 +34616,25 @@ def prove_bundle_nostr():
     che si accumula, che e' l'opposto di cio' per cui il mazzo esiste.
     Il bundle di serie di nostr-tools 2.23.12 contiene gia' schnorr,
     sha256, hmac e hkdf ma non li esporta: si sono aggiunte quattro
-    righe al blocco degli export invece di ricostruire il file.
+    righe al blocco degli export invece di ricostruire il file. Il
+    QUINTO, `secp256k1`, e' arrivato con la chat fra pari: quelle due
+    chiavi si derivano da un ECDH GREZZO, e la coordinata X non si
+    puo' avere da nip44, che `getConversationKey` la restituisce
+    gia' passata dall'extract, cioe' irreversibile.
 
     Le sentinelle guardano la FORMA (le righe nel blocco, il `?v=` che
     sveglia la cache, il SW che e' salito); il banco node fa GIRARE il
     bundle vero e chiede la sola cosa che conta: che una firma su un
-    hash nudo si verifichi, e che la derivazione delle trade key con
-    HMAC sia deterministica e dia scalari validi. Piu' la TRAPPOLA
+    hash nudo si verifichi, che l'ECDH grezzo dia la STESSA X che
+    NIP-44 usa come IKM (la verifica del nove del quinto export: se
+    combacia, la chat fra pari parte dalla cosa giusta), e che la
+    derivazione delle trade key con HMAC sia deterministica e dia
+    scalari validi. Piu' la TRAPPOLA
     documentata: `getConversationKey(sk, pub(i))` e' deterministica ma
     PUBBLICA (ECDH e' simmetrico e `i` lo sa chiunque) — la prova la
     dimostra, cosi' chi fra sei mesi la trovasse "piu' comoda" la vede
     fallire nel banco invece di scoprirla in piazza."""
-    print("\n[bundle nostr: schnorr, sha256, hmac, hkdf esportati]")
+    print("\n[bundle nostr: schnorr, sha256, hmac, hkdf, secp256k1]")
     import json as _json
     import shutil as _sh
     import subprocess as _sp
@@ -34639,20 +34650,28 @@ def prove_bundle_nostr():
     for nome, riga in (("schnorr", "schnorr: () => schnorr,"),
                        ("sha256", "sha256: () => sha256,"),
                        ("hmac", "hmac: () => hmac,"),
-                       ("hkdf", "hkdf: () => ({ extract, expand }),")):
+                       ("hkdf", "hkdf: () => ({ extract, expand }),"),
+                       ("secp256k1", "secp256k1: () => secp256k1,")):
         # == 1 e non `in`: una chiave doppia in un object literal e' JS lecito
         # (l'ultima vince, la lezione di acqDati) e uno script di patch girato
         # due volte l'ha prodotta davvero -- la prova deve vederlo.
         prova(f"bundle: `{nome}` e' nel blocco degli export, UNA volta", 1,
               blocco.count(riga))
-    prova("bundle: il loader sveglia la cache col suffisso -mostro", True,
-          "/vendor/nostr.js?v=2.23.12-mostro`" in mini)
-    prova("bundle: nel client il vecchio ?v= nudo non c'e' piu'", True,
-          "nostr.js?v=2.23.12`" not in mini)
-    prova("bundle: e' in PRECACHE, quindi la VERSIONE del SW e' salita a 6+", True,
-          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 6)
+    prova("bundle: il loader sveglia la cache col suffisso -mostro2", True,
+          "/vendor/nostr.js?v=2.23.12-mostro2`" in mini)
+    # il suffisso di ieri non deve sopravvivere: chi aggiunge un export
+    # e lascia il vecchio ?v= regala il bundle di ieri a chi ha gia'
+    # aperto l'app, e il guasto si vede solo su quei browser.
+    # L'ancora e' l'URL INTERO e non il solo suffisso: `-mostro` da solo
+    # vive anche nella prosa del commento che lo spiega, e la prova
+    # sarebbe rossa per colpa di una spiegazione.
+    prova("bundle: il ?v= di ieri (nudo o -mostro) non c'e' piu'", True,
+          "nostr.js?v=2.23.12`" not in mini
+          and "nostr.js?v=2.23.12-mostro`" not in mini)
+    prova("bundle: e' in PRECACHE, quindi la VERSIONE del SW e' salita a 7+", True,
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 7)
     prova("bundle: la rotta dichiara che non e' il bundle di serie", True,
-          "prove_bundle_nostr" in _SORGENTE and "quattro export in piu'" in _SORGENTE)
+          "prove_bundle_nostr" in _SORGENTE and "cinque export in piu'" in _SORGENTE)
 
     # 2) il banco: il bundle VERO fatto girare in node
     node = _sh.which("node")
@@ -34666,7 +34685,8 @@ const NT = NostrTools;
 const {bytesToHex, hexToBytes} = NT.utils;
 const enc = s => new TextEncoder().encode(s);
 const out = {};
-out.exp = ['schnorr','sha256','hmac','hkdf','finalizeEvent','nip44','nip13','nip19','Relay','generateSecretKey','getPublicKey']
+const gck0 = NT.nip44.getConversationKey || NT.nip44.v2.utils.getConversationKey;
+out.exp = ['schnorr','sha256','hmac','hkdf','secp256k1','finalizeEvent','nip44','nip13','nip19','Relay','generateSecretKey','getPublicKey']
   .filter(k => NT[k] !== undefined);
 out.hkdf = typeof NT.hkdf.extract === 'function' && typeof NT.hkdf.expand === 'function';
 // la firma su un hash NUDO: l'identity proof di Mostro
@@ -34688,6 +34708,18 @@ const iBytes = new Uint8Array(32); iBytes[31] = 3;
 const conv = gck(sk, NT.getPublicKey(iBytes));
 const convPubblica = gck(iBytes, pub);
 out.trappola = bytesToHex(conv) === bytesToHex(convPubblica);
+// l'ECDH grezzo: la X dev'essere la STESSA che NIP-44 usa come IKM.
+// E' la verifica del nove del quinto export: la chat fra pari deriva
+// K_conv/K_sign da li', e se la X fosse un'altra cosa le due parti
+// calcolerebbero chiavi diverse senza che niente fallisca.
+const alice = NT.generateSecretKey(), bob = NT.generateSecretKey();
+const Alice = NT.getPublicKey(alice), Bob = NT.getPublicKey(bob);
+const soloX = (sk, pub) =>
+  NT.secp256k1.getSharedSecret(sk, hexToBytes('02' + pub)).subarray(1, 33);
+const xa = soloX(alice, Bob), xb = soloX(bob, Alice);
+out.ecdhSimmetrico = bytesToHex(xa) === bytesToHex(xb);
+out.ecdhEQuellaDiNip44 = bytesToHex(NT.hkdf.extract(NT.sha256, xa, enc('nip44-v2')))
+  === bytesToHex(gck0(alice, Bob));
 // hkdf: extract/expand danno bytes della lunghezza chiesta
 const prk = NT.hkdf.extract(NT.sha256, der(1), enc('sale'));
 out.hkdfLen = NT.hkdf.expand(NT.sha256, prk, enc('info'), 76).length;
@@ -34703,7 +34735,10 @@ process.stdout.write(JSON.stringify(out));
         prova("bundle: il banco node gira", "", (r.stderr or "")[-400:])
         return
     o = _json.loads(r.stdout)
-    prova("bundle: gli export nuovi e quelli di ieri ci sono tutti", 11, len(o["exp"]))
+    prova("bundle: gli export nuovi e quelli di ieri ci sono tutti", 12, len(o["exp"]))
+    prova("bundle: l'ECDH grezzo e' simmetrico", True, o["ecdhSimmetrico"])
+    prova("bundle: ...ed e' la STESSA X che NIP-44 usa come IKM", True,
+          o["ecdhEQuellaDiNip44"])
     prova("bundle: hkdf espone extract ed expand", True, o["hkdf"])
     prova("bundle: la firma su un hash nudo si verifica", True, o["firmaOk"])
     prova("bundle: e su un altro hash NON si verifica", False, o["firmaAltro"])
@@ -35967,9 +36002,11 @@ def prove_p2p_stati():
         i = mini.index(firma)
         return mini[i:mini.index("\n", i)]
     secondarie = fn("function azioniSecondarieP2P(o){")
-    i_sub = mini.index("const P2P_ANNULLA_SUBITO = [")
-    liste = mini[i_sub:mini.index("];", mini.index(
-        "const P2P_ANNULLA_INSIEME = [")) + 2]
+    # le liste di stati si CENSISCONO e non si elencano: una nuova
+    # (P2P_DISPUTABILI e' la terza) entra nel banco da sola, invece
+    # di farlo cadere con un ReferenceError il giorno che nasce
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];",
+                                 mini, re.M))
     provv = (riga("function nomeProvvisorioP2P(indice){") + "\n"
              + riga("function provvisorioP2P(id){"))
     tab = blocco_const("AVANZA_P2P")
@@ -36021,7 +36058,7 @@ def prove_p2p_stati():
         salta("le due sequenze dello scambio", "node non c'e'")
         return
     banco = "\n".join([
-        riga_finali, tab, stati, prog, motivi, liste, secondarie, provv,
+        tab, stati, prog, motivi, liste, secondarie, provv,
         fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"),
         fn("function statoTestoP2P(o){"),
@@ -36251,8 +36288,13 @@ process.stdout.write(JSON.stringify(out));
     prova("un ordine appena pubblicato non chiede niente a chi l'ha messo",
           True, out["pubblicatoSenzaPieno"])
     prova("da 'pubblicato' si RITIRA e basta", ["ritira"], out["secRitira"])
-    prova("...da uno scambio in corso si CHIEDE di annullare",
-          ["annulla"], out["secAnnulla"])
+    # ...E POI, IN FONDO, L'USCITA (set 2026): a scambio in corso i
+    # sats sono gia' in custodia, quindi la disputa vuol dire
+    # qualcosa -- e sta DOPO l'annullo, che e' la strada che
+    # quasi sempre basta.
+    prova("...da uno scambio in corso si chiede di annullare, e in "
+          "fondo c'e' l'uscita",
+          ["annulla", "disputa"], out["secAnnulla"])
     # e NON si offre anche di richiederlo: chi ha davanti una proposta
     # di annullo ha una cosa sola da fare, dire di si'
     prova("...e se l'ha chiesto l'altro si accetta, e basta",
@@ -36282,6 +36324,480 @@ process.stdout.write(JSON.stringify(out));
           [True, "concluso"], out["rateRicevuto"])
     prova("il nome provvisorio si riconosce, e un id vero non lo e' mai",
           ["nuovo:7", True, False, False, False], out["provv"])
+
+
+BANCO_CHAT = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const {bytesToHex, hexToBytes} = NT.utils;
+const out = {};
+
+/* --- il mondo attorno al blocco: stub, mai la cosa vera --- */
+let DEMO = false, VETRINA = false;
+let toasts = []; function toast(m){ toasts.push(m); }
+function haptic(){}
+function esc(s){ return String(s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(n){ return String(n); }
+let nodi = {};
+function el(id){
+  if (!nodi[id]) nodi[id] = {value: '', innerHTML: '', scrollTop: 0, scrollHeight: 0,
+    focus(){}, classList: {add(){}, remove(){}}};
+  return nodi[id];
+}
+function altroFoglioAperto(){ return false; }
+function bottoneInAttesa(){ return () => {}; }
+function chiediConferma(){}
+function renderOrdineP2P(){}
+let p2pOrdineAperto = '';
+/* i due lati: ognuno ha il suo profilo e il suo magazzino di scambi */
+let LATO = 'a';
+const mondo = {a: {mazzo: null, ordini: {}}, b: {mazzo: null, ordini: {}}};
+function mazzoMostro(){ return mondo[LATO].mazzo; }
+function ordiniP2P(){ return mondo[LATO].ordini; }
+function scriviOrdineP2P(o){ mondo[LATO].ordini[o.id] = o; return o; }
+function ordiniAscoltoP2P(){
+  const m = {};
+  for (const id in ordiniP2P()) { const o = ordiniP2P()[id]; if (o.pubTrade) m[o.pubTrade] = o; }
+  return m;
+}
+let pubblicati = [];
+async function mostroConnetti(){ return {publish: async ev => { pubblicati.push(ev); }}; }
+const hexBytes = hexToBytes;
+
+__PEZZI__
+(async () => {
+
+/* ===== 1) LA PROVA REGINA: il test vector di mostro-core =====
+   Se queste tre righe combaciano, le due chiavi si derivano ESATTAMENTE
+   come le deriva il coordinatore — cioe' la chat parla la stessa lingua
+   di Mostro mobile e non resta Barattolo↔Barattolo. */
+/* LE CHIAVI SONO SPEZZATE A META' APPOSTA, e non si "ripuliscono":
+   sono i test vector PUBBLICATI di mostro-core — di cartone, non
+   nostre — ma sono 64 esadecimali, e lo scanner dei segreti della CI
+   non puo' distinguerle da una chiave vera. FA BENE a non poterlo:
+   quella regola e' l'unica che sta fra un `nsec` incollato per
+   sbaglio e il repo pubblico, e allentarla per un banco vorrebbe
+   dire spegnerla per tutti. Cede il banco, mai la regola. */
+const TV = {
+  aSk: '548f68890c49fa42f104c60352395e60' + 'ff030b0b407e955f1eed1400d6c0347a',
+  aPub: '000053c3b4773182e7c4c1b72b272d34' + 'be01bf4414a6a25c998977c516a46a01',
+  bSk: 'f258e73f07386d37133718b6127f873d' + 'd7c391b8f43b331ff8254034a13d2943',
+  bPub: '000009ae5cff9f6ba9b05159ec5ed58c' + '187f5882ea77c81ed5dd19163272a5d7',
+  conv: 'bceb1cd2a8e98ee9729122a1693edcc3' + '9c3ace04582ff96a26705c5e4078a6f2',
+  sign: '1dba04571059183f76b148119cfa6f80' + '04dad30cb4e810180a6df17386a7f0b4'
+};
+out.tvSkTornano = NT.getPublicKey(hexBytes(TV.aSk)) === TV.aPub
+               && NT.getPublicKey(hexBytes(TV.bSk)) === TV.bPub;
+const kA = chiaviPeer(TV.aSk, TV.bPub), kB = chiaviPeer(TV.bSk, TV.aPub);
+out.tvConv = kA.conv.pub;
+out.tvSign = kA.firma.pub;
+out.tvSimmetrico = kA.conv.pub === kB.conv.pub && kA.firma.pub === kB.firma.pub;
+out.tvDueChiaviDiverse = kA.conv.pub !== kA.firma.pub;
+
+/* DAL RELAY UN EVENTO ARRIVA COME DATI, mai come l'oggetto che
+   `finalizeEvent` ha appena costruito: quello si porta dietro il
+   timbro «gia’ verificato» di nostr-tools, e una firma rotta a
+   mano dopo passerebbe senza che nessuno la guardi -- cioe’ il
+   banco direbbe che la guardia non c’e’ mentre a non
+   funzionare e’ lui. */
+function dalRelay(ev){ return JSON.parse(JSON.stringify(ev)); }
+
+/* ===== 2) il giro chiuso: Alice scrive, Bob legge ===== */
+function apparecchia(){
+  mondo.a = {mazzo: {sk: 'a1'.repeat(32), pub: ''}, ordini: {}};
+  mondo.b = {mazzo: {sk: 'b2'.repeat(32), pub: ''}, ordini: {}};
+  const ta = chiaveScambio(mondo.a.mazzo.sk, 1);
+  const tb = chiaveScambio(mondo.b.mazzo.sk, 1);
+  mondo.a.mazzo.pub = ta.pub; mondo.b.mazzo.pub = tb.pub;
+  mondo.a.ordini['X'] = {id: 'X', indice: 1, pubTrade: ta.pub, peer: tb.pub,
+                         stato: 'attivo', creato: 1000, chat: []};
+  mondo.b.ordini['X'] = {id: 'X', indice: 1, pubTrade: tb.pub, peer: ta.pub,
+                         stato: 'attivo', creato: 1000, chat: []};
+  p2pChiaviChat = {}; p2pChatSecchio = {}; pubblicati = [];
+  return {ta, tb};
+}
+const {ta, tb} = apparecchia();
+
+LATO = 'a';
+await chatInvia(mondo.a.ordini['X'], 'Ciao, ti mando gli euro con Satispay');
+const busta = dalRelay(pubblicati[0]);
+out.buste = pubblicati.length;
+out.fuoriKind = busta.kind;
+out.fuoriAutore = busta.pubkey === chiaviPeer(ta.sk, tb.pub).firma.pub;
+out.fuoriUnSoloP = busta.tags.length === 1 && busta.tags[0][0] === 'p';
+out.fuoriPEQuellaConv = busta.tags[0][1] === chiaviPeer(ta.sk, tb.pub).conv.pub;
+out.fuoriFirmata = NT.verifyEvent(busta);
+/* dentro: il messaggio vero, firmato dalla chiave DELLO SCAMBIO */
+const cA = chiaviPeer(ta.sk, tb.pub);
+const dentro = JSON.parse(NT.nip44.decrypt(busta.content,
+  NT.nip44.getConversationKey(cA.conv.sk, cA.conv.pub)));
+out.dentroKind = dentro.kind;
+out.dentroAutore = dentro.pubkey === ta.pub;
+out.dentroFirmato = NT.verifyEvent(dentro);
+out.dentroSenzaTag = Array.isArray(dentro.tags) && dentro.tags.length === 0;
+out.dateUguali = dentro.created_at === busta.created_at;
+out.mioSubito = (mondo.a.ordini['X'].chat || []).length === 1
+             && mondo.a.ordini['X'].chat[0].mio === true;
+
+/* Bob lo riceve */
+LATO = 'b';
+chatArriva(mondo.b.ordini['X'], busta);
+const suoi = mondo.b.ordini['X'].chat || [];
+out.bobHaRicevuto = suoi.length === 1 && suoi[0].testo.indexOf('Satispay') > 0;
+out.bobNonMio = suoi[0].mio === false;
+out.bobHaContato = mondo.b.ordini['X'].chatNuovi === 1;
+out.bobHaSegnato = mondo.b.ordini['X'].chatVisto === busta.created_at;
+/* la stessa busta due volte non raddoppia niente: e' la protezione
+   dal replay, e l'id di DENTRO e' quello che la fa */
+chatArriva(mondo.b.ordini['X'], busta);
+out.replayNonRaddoppia = (mondo.b.ordini['X'].chat || []).length === 1;
+
+/* ===== 3) quel che si rifiuta ===== */
+const adesso = Math.floor(Date.now() / 1000);
+function bustaFatta(opz){
+  const o = opz || {};
+  const c = chiaviPeer(ta.sk, tb.pub);
+  const quando = o.quandoFuori || adesso;
+  const dentro = NT.finalizeEvent({
+    kind: o.kindDentro === undefined ? 1 : o.kindDentro,
+    created_at: o.quandoDentro || quando, tags: [], content: o.testo || 'prova'
+  }, hexBytes(o.skDentro || ta.sk));
+  const conv = NT.nip44.getConversationKey(c.conv.sk, c.conv.pub);
+  const tags = o.tags || [['p', c.conv.pub]];
+  return dalRelay(NT.finalizeEvent({kind: 14, created_at: quando, tags: tags,
+    content: NT.nip44.encrypt(JSON.stringify(dentro), conv)},
+    o.skFuori ? hexBytes(o.skFuori) : c.firma.sk));
+}
+function quanti(){ return (mondo.b.ordini['X'].chat || []).length; }
+function rifiuta(nome, busta){
+  const prima = quanti();
+  try { chatArriva(mondo.b.ordini['X'], busta); } catch(e) { }
+  out[nome] = quanti() === prima;
+}
+LATO = 'b';
+rifiuta('noDueTagP', bustaFatta({tags: [['p', chiaviPeer(ta.sk, tb.pub).conv.pub],
+                                        ['p', ta.pub]]}));
+rifiuta('noTagPStorto', bustaFatta({tags: [['p', ta.pub]]}));
+rifiuta('noSenzaTagP', bustaFatta({tags: []}));
+rifiuta('noNelFuturo', bustaFatta({quandoFuori: adesso + 600}));
+rifiuta('noDateDisallineate', bustaFatta({quandoDentro: adesso - 600}));
+rifiuta('noDentroKindSbagliato', bustaFatta({kindDentro: 4}));
+rifiuta('noDentroDaUnEstraneo', bustaFatta({
+  skDentro: bytesToHex(NT.generateSecretKey())}));
+/* la busta firmata da un estraneo: qui non ci arriverebbe nemmeno,
+   perche' la sub filtra per autore — ma la guardia c'e' lo stesso */
+rifiuta('noFuoriDaUnEstraneo', bustaFatta({
+  skFuori: bytesToHex(NT.generateSecretKey())}));
+/* firma rotta a mano: il contenuto e' quello giusto, la firma no */
+const rotta = bustaFatta({});
+rotta.sig = rotta.sig.slice(0, -2) + (rotta.sig.slice(-2) === 'aa' ? 'bb' : 'aa');
+rifiuta('noFirmaRotta', rotta);
+/* e una busta sana passa ancora: se cadesse anche questa, i rifiuti
+   qui sopra non direbbero niente */
+const sana = bustaFatta({testo: 'ancora io'});
+const primaSana = quanti();
+chatArriva(mondo.b.ordini['X'], sana);
+out.sanaPassa = quanti() === primaSana + 1;
+
+/* la raffica: oltre il tetto si smette di guardare */
+apparecchia();
+LATO = 'b';
+let entrati = 0;
+for (let i = 0; i < 80; i++) {
+  const prima = quanti();
+  chatArriva(mondo.b.ordini['X'], bustaFatta({testo: 'msg' + i}));
+  if (quanti() > prima) entrati++;
+}
+out.raffica = entrati;
+
+/* il segnalibro non supera MAI l'orologio di qui, o un peer che scrive
+   una data nel futuro zittirebbe la conversazione fino a quel giorno */
+apparecchia();
+mondo.b.ordini['X'].chatVisto = adesso + 999999;
+LATO = 'b';
+out.cursoreClampato = chatDaQuando(mondo.b.ordini['X']) <= adesso;
+
+/* ===== 4) gli autori da ascoltare ===== */
+apparecchia();
+LATO = 'a';
+const aut = autoriChatP2P();
+out.autoreEQuelloDellaFirma = Object.keys(aut).length === 1
+  && Object.keys(aut)[0] === chiaviPeer(ta.sk, tb.pub).firma.pub;
+out.autoreRimandaAlloScambio = aut[Object.keys(aut)[0]].id === 'X';
+/* senza controparte non si ascolta nessuno: la chat non esiste ancora */
+delete mondo.a.ordini['X'].peer;
+p2pChiaviChat = {};
+out.senzaPeerNessunAutore = Object.keys(autoriChatP2P()).length === 0;
+out.senzaPeerNienteChiavi = chiaviChatOrdine(mondo.a.ordini['X']) === null;
+
+console.log(JSON.stringify(out));
+})().catch(e => { console.log('BANCO ROTTO: ' + (e && e.stack || e)); process.exit(1); });
+"""
+
+
+def prove_p2p_chat():
+    """LA CHAT FRA PARI E LA DISPUTA (set 2026, tappa 6).
+
+    Il coordinatore non entra nella conversazione: le due chiavi si
+    derivano da un ECDH fra le chiavi dello scambio, e il messaggio
+    viaggia cifrato fra le due persone. Barattolo non lo vede e non lo
+    riceve nemmeno.
+
+    LE DUE CHIAVI SONO DUE APPOSTA: `conv` cifra e da' il nome alla
+    conversazione, `firma` firma la busta. Chi ha solo la prima LEGGE e
+    non puo' scrivere -- ed e' la proprieta' che un domani permettera'
+    di far leggere una chat a chi risolve una disputa senza dargli la
+    voce. A renderla vera e' una riga sola, la guardia sull'AUTORE in
+    testa a `chatArriva`: senza, quella garanzia vivrebbe soltanto nel
+    filtro del relay, cioe' fuori di qui.
+
+    LA PROVA REGINA E' IL TEST VECTOR di mostro-core: se le due pubkey
+    derivate combaciano con quelle pubblicate, la chat parla la stessa
+    lingua di Mostro mobile invece di restare Barattolo↔Barattolo. Le
+    sentinelle dicono che le righe ci sono; il banco fa GIRARE il
+    blocco col bundle VERO, e i rifiuti li prova uno per uno -- con
+    una busta SANA in mezzo, o un `chatArriva` che rifiuta tutto li
+    farebbe passare tutti."""
+    print("\n[la chat fra pari]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    blocco = mini[mini.index("/* ---- LA CHAT FRA PARI"):
+                  mini.index("/* ---- la riga di uno scambio nella lista ---- */")]
+    cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
+
+    # --- 1) LE ETICHETTE DELL'HKDF sono quelle del coordinatore ------
+    # Non sono una scelta nostra: cambiarle di un carattere fa derivare
+    # a Barattolo due chiavi che Mostro mobile non calcolera' mai.
+    prova("le due etichette sono quelle di mostro-core", True,
+          "'mostro:chat:conv:v1'" in cod and "'mostro:chat:sign:v1'" in cod)
+    prova("l'ECDH tiene la sola X, col prefisso pari", True,
+          "getSharedSecret(" in cod and ".subarray(1, 33)" in cod
+          and "hexToBytes('02' + peerPub)" in cod)
+    prova("l'extract non ha sale (e' cosi' che lo fa il coordinatore)",
+          True, "hkdf.extract(NT.sha256, condiviso)" in cod)
+    prova("...e sul fallimento il contatore va in coda all'ETICHETTA",
+          True, "enc.encode(info), c" in cod)
+
+    # --- 2) IL WIRE FORMAT -------------------------------------------
+    inv = pezzo_js(mini, "async function chatInvia(", "\n}\n")
+    prova("il messaggio dentro e' un kind 1 senza tag", True,
+          "kind: 1, created_at: quando, tags: [], content: testo" in inv)
+    prova("...ed e' firmato dalla chiave DELLO SCAMBIO", True,
+          "}, NT.utils.hexToBytes(tk.sk));" in inv)
+    prova("la busta e' un kind 14 firmato dalla chiave della firma", True,
+          "kind: 14, created_at: quando," in inv and "}, k.firma.sk);" in inv)
+    prova("...con UN tag `p`, quello della chiave della conversazione",
+          True, "tags: [['p', k.conv.pub]]" in inv)
+    prova("...e si cifra verso se stessi con la chiave di conversazione",
+          True, "getConversationKey(k.conv.sk, k.conv.pub)" in inv)
+    # LE DUE DATE SONO LA STESSA, e non si contano le occorrenze:
+    # quella variabile la porta anche il messaggio che si mette in
+    # pagina, e il conto salirebbe senza che sia cambiato niente.
+    prova("le due date vengono dalla stessa variabile", 2,
+          inv.count("created_at: quando"))
+    prova("...e l'orologio si legge una volta sola", 1,
+          inv.count("Date.now()"))
+
+    # --- 3) LA VALIDAZIONE, e l'ordine in cui si fa ------------------
+    arr = pezzo_js(mini, "function chatArriva(", "\n}\n")
+    prova("l'AUTORE si guarda per primo, prima di ogni altra cosa", True,
+          0 <= arr.find("ev.pubkey !== k.firma.pub") < arr.find("pTag"))
+    prova("...e prima di decifrare e di verificare le firme", True,
+          0 <= arr.find("ev.pubkey !== k.firma.pub")
+          < arr.find("verifyEvent"))
+    prova("il tag `p` dev'essere UNO e quello giusto", True,
+          "pTag.length !== 1 || pTag[0][1] !== k.conv.pub" in arr)
+    prova("una busta buttata nel futuro non si guarda", True,
+          "> adesso + CHAT_TOLLERANZA" in arr)
+    prova("una busta troppo grande nemmeno", True,
+          "> CHAT_MAX_BYTE" in arr)
+    prova("la raffica si ferma PRIMA di decifrare", True,
+          0 <= arr.find("CHAT_RAFFICA") < arr.find("nip44.decrypt"))
+    prova("si verifica la firma della busta E quella di dentro", 2,
+          arr.count("verifyEvent"))
+    prova("...e la seconda dice CHI ha scritto: e' quella che non si salta",
+          True, "if (!NT.verifyEvent(dentro)) return;" in arr)
+    prova("chi ha scritto dev'essere una delle due parti", True,
+          "dentro.pubkey !== o.peer && dentro.pubkey !== mia" in arr)
+    prova("il kind di dentro dev'essere 1", True, "dentro.kind !== 1" in arr)
+    prova("le due date devono combaciare", True,
+          "Math.abs((dentro.created_at || 0) - (ev.created_at || 0))" in arr)
+    prova("il segnalibro non supera MAI l'orologio di qui", True,
+          "Math.min(Math.max(Number(agg.chatVisto)" in arr
+          and "adesso)" in pezzo_js(mini, "function chatDaQuando(", "\n}\n"))
+
+    # --- 4) LA SOTTOSCRIZIONE guarda l'autore, non il destinatario ---
+    ria = pezzo_js(mini, "async function mostroRiascolta(", "\n}\n")
+    prova("il filtro della chat e' per AUTORE e mai per tag `p`", True,
+          "{kinds: [14], authors: chat," in ria)
+    prova("...e non si apre quando non c'e' nessuno con cui parlare",
+          True, "if (chat.length) filtri.push(" in ria)
+    prova("la firma della sub cambia anche quando cambia la sola chat",
+          True, "+ '|' + Object.keys(autoriChatP2P())" in ria)
+    mar = pezzo_js(mini, "async function mostroArriva(", "\n}\n")
+    prova("a decidere e' l'autore: prima la chat, poi il coordinatore",
+          True, 0 <= mar.find("autoriChatP2P()[ev.pubkey]")
+          < mar.find("ev.pubkey !== mostroHexP2P()")
+          < mar.find("ordiniAscoltoP2P()[pub]"))
+
+    # --- 5) LA CONTROPARTE arriva da ogni messaggio che la porta -----
+    av = pezzo_js(mini, "function avanzaOrdineP2P(", "\n}\n")
+    prova("le due chiavi dell'ordine si guardano, e si tiene l'altra",
+          True, "ord.buyer_trade_pubkey, ord.seller_trade_pubkey" in av
+          and "String(k) !== o.pubTrade" in av)
+    prova("...e il messaggio che la nomina resta la seconda fonte", True,
+          "p.peer && p.peer.pubkey" in av)
+
+    # --- 6) I TESTI: chi entra da Telegram non legge di protocollo ---
+    for fn in ("function apriChatP2P(", "function renderChatP2P(",
+               "async function inviaChatP2P(", "function apriDisputaP2P("):
+        testo = pezzo_js(mini, fn, "\n}\n").replace("window.NostrTools", "").lower()
+        prova(f"`{fn.split('function ')[1][:-1]}` non dice Nostr/nsec/relay/chiave",
+              False, any(w in testo for w in ("nostr", "nsec", "relay", "chiave")))
+    rc = pezzo_js(mini, "function renderChatP2P(", "\n}\n")
+    prova("il messaggio di un altro passa da esc()", True,
+          "esc(m.testo)" in rc)
+    prova("...e il foglio dice che nessuno dei due li legge", True,
+          "né Barattolo né il coordinatore li leggono" in rc)
+    prova("il foglio della chat si chiude col velo", True,
+          "el('p2pChatSheet').classList.remove('open');"
+          in pezzo_js(mini, "function closeSheet(", "\n}\n"))
+
+    # --- 6b) IL BUNDLE ARRIVA DOPO ------------------------------------
+    #   Il bottone dei messaggi vuole nostr-tools, che si carica pigro:
+    #   chi apre uno scambio dalla lista o dal gesto indietro non e'
+    #   passato da nessun take, quindi puo' non esserci ancora -- e
+    #   senza, il bottone non nasce e non lo ridisegna NESSUNO. Trovato
+    #   dal vivo (senza la cura resta assente per sempre, e non alza
+    #   niente), quindi qui si guarda che le due righe restino.
+    apri = pezzo_js(mini, "function apriOrdineP2P(", "\n}\n")
+    prova("chi apre uno scambio senza la libreria la chiede", True,
+          "if (!window.NostrTools) caricaNostrTools()" in apri)
+    dopo = apri.split("caricaNostrTools()")
+    prova("...e ridisegna quando arriva", True,
+          len(dopo) > 1 and "renderOrdineP2P();" in dopo[1])
+    prova("...ma solo se la pagina e' ancora quella", True,
+          "p2pOrdineAperto === id" in apri
+          and "vistaAttivaP2P() === 'view-p2pordine'" in apri)
+    prova("...e una libreria che non arriva non alza", True,
+          ".catch(() => {})" in apri)
+
+    # --- 7) LA DISPUTA ------------------------------------------------
+    dis = pezzo_js(mini, "async function inviaDisputaP2P(", "\n}\n")
+    prova("la disputa e' l'azione `dispute` e non porta un payload", True,
+          "chiamataOrdineP2P(o, 'dispute')" in dis)
+    prova("...e non muove lo stato a mano: lo fa la risposta", False,
+          "stato" in dis)
+    ap = pezzo_js(mini, "function apriDisputaP2P(", "\n}\n")
+    prova("si chiede prima, e si dice cosa succede DOPO", True,
+          "chiediConferma({" in ap and "non decide e non può intervenire" in ap)
+    prova("...e si consiglia di scrivere prima all'altra persona", True,
+          "prova a scrivere all" in ap)
+    prova("il bottone della disputa e' l'uscita rossa di casa", True,
+          'disputa: \'<button class="btn allarme"' in mini)
+    sec = pezzo_js(mini, "function azioniSecondarieP2P(", "\n}\n")
+    prova("la disputa e' l'ULTIMA della colonna", True,
+          0 <= sec.rfind("fuori.push('vota')")
+          < sec.rfind("fuori.push('disputa')"))
+    prova("...e si apre solo dove i sats sono gia' in custodia", True,
+          "const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];"
+          in mini)
+    ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
+    prova("i messaggi stanno FRA il passo da fare e le uscite", True,
+          0 <= ren.find("bottoni[azione]") < ren.find("apriChatP2P()")
+          < ren.find("SECONDARI_P2P[a]"))
+    prova("...e il bottone non nasce quando non si sa con chi parlare",
+          True, "(chiaviChatOrdine(o)" in ren)
+
+    # --- 8) IL BANCO: il blocco gira col bundle VERO ------------------
+    node = _sh.which("node")
+    if not node:
+        salta("la chat gira col bundle vero", "node non c'e'")
+        return
+    # `pezzo_js` si ferma PRIMA del terminatore: la graffa di
+    # chiusura si rimette a mano, o la funzione dopo finisce dentro
+    # il corpo di questa e node si ferma in fondo al file
+    pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
+             + blocco)
+    banco = BANCO_CHAT.replace("__PEZZI__", pezzi)
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "chat.js")
+        # dentro un `with`: senza, su Windows node puo' aprirlo
+        # prima che il buffer sia sul disco, e l'errore che si
+        # legge e' un «Unexpected end of input» che sembra un
+        # difetto del blocco
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f, "vendor/nostr.bundle.js"], capture_output=True,
+                    text=True, encoding="utf-8", timeout=120)
+    if r.returncode:
+        prova("la chat gira col bundle vero", "", (r.stdout or "") + (r.stderr or ""))
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+
+    # LA PROVA REGINA: le due pubkey del test vector di mostro-core
+    prova("test vector: le chiavi di prova sono quelle pubblicate", True,
+          o["tvSkTornano"])
+    # SPEZZATE COME NEL BANCO, e per la stessa ragione: la
+    # concatenazione di due letterali adiacenti e' la stessa stringa
+    # per Python e non 64 esadecimali di fila per lo scanner.
+    prova("test vector: pub(K_conv) e' quella di mostro-core",
+          "bceb1cd2a8e98ee9729122a1693edcc3"
+          "9c3ace04582ff96a26705c5e4078a6f2",
+          o["tvConv"])
+    prova("test vector: pub(K_sign) e' quella di mostro-core",
+          "1dba04571059183f76b148119cfa6f80"
+          "04dad30cb4e810180a6df17386a7f0b4",
+          o["tvSign"])
+    prova("le due parti derivano le STESSE chiavi", True, o["tvSimmetrico"])
+    prova("...e le due chiavi sono diverse fra loro", True,
+          o["tvDueChiaviDiverse"])
+
+    prova("scrivere manda UNA busta sola", 1, o["buste"])
+    prova("la busta e' un kind 14", 14, o["fuoriKind"])
+    prova("...firmata dalla chiave della firma", True, o["fuoriAutore"])
+    prova("...con un solo tag `p`, quello della conversazione",
+          [True, True], [o["fuoriUnSoloP"], o["fuoriPEQuellaConv"]])
+    prova("...e la firma della busta si verifica", True, o["fuoriFirmata"])
+    prova("dentro c'e' un kind 1 firmato da chi scrive, senza tag",
+          [1, True, True, True],
+          [o["dentroKind"], o["dentroAutore"], o["dentroFirmato"],
+           o["dentroSenzaTag"]])
+    prova("le due date combaciano", True, o["dateUguali"])
+    prova("chi scrive si vede il proprio messaggio subito", True, o["mioSubito"])
+    prova("l'altra persona lo riceve e lo legge", True, o["bobHaRicevuto"])
+    prova("...come suo, e col contatore dei nuovi", [True, True],
+          [o["bobNonMio"], o["bobHaContato"]])
+    prova("...e il segnalibro avanza", True, o["bobHaSegnato"])
+    prova("la stessa busta due volte non raddoppia niente", True,
+          o["replayNonRaddoppia"])
+
+    for nome, cosa in (("noFuoriDaUnEstraneo", "una busta firmata da un estraneo"),
+                       ("noDentroDaUnEstraneo", "un messaggio scritto da un terzo"),
+                       ("noDueTagP", "due tag `p`"),
+                       ("noTagPStorto", "un tag `p` che non e' la conversazione"),
+                       ("noSenzaTagP", "una busta senza tag `p`"),
+                       ("noNelFuturo", "una busta datata nel futuro"),
+                       ("noDateDisallineate", "due date che non combaciano"),
+                       ("noDentroKindSbagliato", "un kind diverso da 1"),
+                       ("noFirmaRotta", "una firma rotta")):
+        prova("si rifiuta: " + cosa, True, o[nome])
+    prova("...e una busta sana passa ancora", True, o["sanaPassa"])
+    prova("la raffica si ferma al tetto del minuto", 60, o["raffica"])
+    prova("il segnalibro non va mai oltre l'orologio di qui", True,
+          o["cursoreClampato"])
+    prova("l'autore da ascoltare e' quello della firma", True,
+          o["autoreEQuelloDellaFirma"])
+    prova("...e rimanda allo scambio giusto", True, o["autoreRimandaAlloScambio"])
+    prova("senza controparte non si ascolta nessuno", [True, True],
+          [o["senzaPeerNessunAutore"], o["senzaPeerNienteChiavi"]])
 
 
 def prove_p2p_pubblica():
@@ -42666,6 +43182,7 @@ def main():
     prove_p2p_chiavi,
     prove_p2p_motore,
     prove_p2p_stati,
+    prove_p2p_chat,
     prove_p2p_pubblica,
               prove_pagina_dati,
               prove_font,
