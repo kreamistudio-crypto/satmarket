@@ -28970,6 +28970,276 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     return {"ok": True, "tolte": tolte}
 
 
+# ---------- IL CAMPANELLO DELLO SCAMBIO P2P (set 2026, tappa 7) ------
+# Uno scambio dura ore: il taker ha 900 secondi per la sua mossa,
+# l'ordine 24. Fra una mossa e l'altra la Mini App e' CHIUSA — e le
+# risposte del coordinatore arrivano lo stesso, sui relay, dove nessuno
+# le guarda. Senza un campanello, chi vende scopre che il compratore ha
+# preso l'ordine quando riapre l'app, e magari e' tardi.
+#
+# UN GIRO D'OROLOGIO DA UN MINUTO, NON UNA WEBSOCKET LUNGA, ed e' la
+# scelta che governa il resto: una connessione persistente ai relay
+# vorrebbe riconnessioni, backoff e un task che puo' morire in
+# silenzio — cioe' un campanello che smette di suonare senza dirlo a
+# nessuno. Un giro sincrono in `to_thread` (il calco di
+# `chiedi_relay_dm`) non ha niente da tenere vivo: se un battito va
+# male, il prossimo arriva fra sessanta secondi. La latenza e' <= 60 s,
+# che su una finestra di 900 e' niente.
+#
+# IL SERVER NON DECIFRA NIENTE, E NON PER ATTENZIONE: la funzione che
+# legge dai relay tiene di ogni evento tre cose — a chi e' indirizzato,
+# quando, e l'id per non ricontarlo — e il `content` non lo tocca
+# nessuno. Non ne avrebbe nemmeno il modo (la meta' privata del mazzo
+# vive nel browser: regola ferrea 2), ed e' anche il motivo per cui il
+# campanello non puo' dire COSA e' successo. Dice «guarda», e chi apre
+# lo scopre dal suo scambio.
+TIMBRO_P2P_VISTO = "p2p_ultimo_visto"   # il segnalibro, sopravvive al riavvio
+P2P_GIRO_S = 60          # ogni quanto si guarda: la latenza del campanello
+P2P_NUDGE_S = 600        # il gate: al piu' uno squillo ogni dieci minuti
+P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
+P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
+_P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
+
+MSG_NUDGE_P2P = (
+    "🔄 <b>C'è una novità nel tuo scambio.</b>\n\n"
+    "Apri Barattolo e vai su <b>P2P → I miei scambi</b>: "
+    "potrebbe toccare a te.\n\n"
+    "<i>Cosa sia successo lo sa solo il tuo telefono: i messaggi dello "
+    "scambio sono cifrati e Barattolo non li legge.</i>")
+
+
+def eventi_p2p_da_relay(relay: str, pubkeys: list, since: int, mostro: str):
+    """Chiede a UN relay se il coordinatore ha scritto a queste pubkey.
+    E' SINCRONA: va in asyncio.to_thread (il calco di
+    `chiedi_relay_dm`).
+
+    Torna una lista di `(pubkey, created_at, id)` — e MAI il contenuto:
+    quelle tre cose bastano a sapere A CHI suonare e a non suonare due
+    volte per lo stesso evento. Il `content` non si legge, non si passa
+    e non esce da qui; c'e' la sentinella.
+
+    IL FILTRO PORTA `authors`, ed e' una stretta e non un dettaglio:
+    senza, un estraneo qualunque potrebbe far suonare il campanello a
+    chiunque scrivendo un kind 14 a una trade key — quelle pubkey le
+    vede chiunque legga i relay. Col filtro suona solo il coordinatore.
+
+    E LA CHAT FRA LE DUE PARTI NON SUONA, ed e' una decisione e non una
+    conseguenza (Andrea, set 2026): il campanello copre le risposte del
+    COORDINATORE, che sono i momenti in cui tocca a te fare qualcosa —
+    la richiesta accettata, la fattura da pagare, il bonifico
+    confermato. Un messaggio della controparte no: quello si legge
+    aprendo lo scambio.
+    IL PERCHE' E' IL COSTO, ed e' un dato NUOVO e non uno in piu' dello
+    stesso tipo: le chiavi della conversazione escono da un ECDH fra le
+    due chiavi di scambio (tappa 6) e nel mazzo non ci sono, quindi per
+    farle suonare bisognerebbe REGISTRARLE qui — e oggi il server sa
+    «questa pubkey e' di Tizio», mentre con quella saprebbe «Tizio e
+    Caio si stanno parlando», cioe' metterebbe in relazione due utenti
+    nostri. Una correlazione sul nostro server per un guadagno piccolo.
+    LE DUE GUARDIE SONO INDIPENDENTI, e questo e' quel che rende la
+    decisione difficile da rovesciare per distrazione: la chiave della
+    chat non e' nel mazzo E il filtro porta `authors`. Per far suonare
+    un messaggio della controparte servirebbero DUE cambi, non uno.
+
+    None = «non ho potuto chiedere» (relay muto o irraggiungibile), che
+    e' un'altra cosa da `[]` = «non c'e' niente di nuovo»: la
+    distinzione di `cerca_ids`, e serve al chiamante per passare al
+    relay dopo invece di credere al silenzio."""
+    if not create_connection:
+        return None
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "p2p", {
+            "kinds": [14], "authors": [mostro], "#p": list(pubkeys),
+            "since": int(since), "limit": 500}]))
+        inizio = time.time()
+        fuori = []
+        while time.time() - inizio < 8:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "p2p":
+                ev = msg[2]
+                quando = int(ev.get("created_at") or 0)
+                ident = str(ev.get("id") or "")
+                for t in ev.get("tags", []):
+                    if len(t) > 1 and t[0] == "p":
+                        fuori.append((t[1], quando, ident))
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+        return fuori
+    except Exception:
+        return None               # relay muto: si prova il prossimo
+
+
+def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
+    """A chi suonare, e se e' il momento. Torna il tg_id da avvisare, o
+    0. Puro sulla connessione (il patto di `_registra_chiavi_p2p`),
+    cosi' si gira su sqlite in memoria invece di guardarlo soltanto.
+
+    IL GATE E' DELLA PERSONA E NON DELLA PUBKEY, ed e' la riga da non
+    ammorbidire: un mazzo ha una trade key per SCAMBIO, quindi due
+    risposte nello stesso giro sono due pubkey diverse dello stesso
+    utente — col gate per pubkey riceverebbe due campanelli per la
+    stessa frase («guarda i tuoi scambi»), che non dice nemmeno quale.
+    E' il rovescio della pausa dei solleciti, che invece e' dell'ORDINE
+    apposta: la' il messaggio nomina l'ordine, qui no.
+
+    Una pubkey che non e' di nessuno non fa suonare niente: puo'
+    arrivare da un tag `p` di un evento indirizzato anche a un
+    terzo."""
+    r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
+                    (pubkey,)).fetchone()
+    if not r:
+        return 0
+    tg_id = r["tg_id"]
+    q = con.execute("SELECT MAX(ultimo_nudge) FROM chiavi_p2p WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if adesso - int(q[0] or 0) < P2P_NUDGE_S:
+        return 0
+    con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
+                (adesso, tg_id))
+    return tg_id
+
+
+async def _giro_p2p():
+    """Un battito del campanello: si guarda chi ha scritto, si suona a
+    chi tocca, si sposta il segnalibro."""
+    if not _p2p_leve()["attivo"] or not create_connection:
+        return
+    con = db()
+    pubkeys = [r["pubkey"] for r in
+               con.execute("SELECT pubkey FROM chiavi_p2p").fetchall()]
+    con.close()
+    if not pubkeys:
+        return                    # nessuno ha ancora un profilo di scambio
+    adesso = int(time.time())
+    try:
+        since = int(timbro_letto(TIMBRO_P2P_VISTO) or 0)
+    except ValueError:
+        since = 0                 # timbro storto: vale «mai guardato»
+    if since <= 0:
+        # Primo avvio (o database nuovo): si guarda indietro dieci
+        # minuti e non la storia intera — al primo giro suonerebbe a
+        # tutti per scambi vecchi di settimane.
+        since = adesso - P2P_PRIMO_SGUARDO
+    leve = _p2p_leve()
+    trovati = []
+    for i in range(0, len(pubkeys), P2P_BLOCCO):
+        blocco = pubkeys[i:i + P2P_BLOCCO]
+        eventi = None
+        for relay in leve["relay"]:
+            eventi = await asyncio.to_thread(
+                eventi_p2p_da_relay, relay, blocco, since, leve["mostro"])
+            if eventi is not None:
+                break             # il primo che risponde basta
+        if eventi:
+            trovati.extend(eventi)
+    if not trovati:
+        return
+    # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
+    # dalla chat: il `created_at` lo scrive chi manda, e uno sballato
+    # nel futuro porterebbe il `since` avanti di ore — i messaggi veri
+    # di dopo non si vedrebbero MAI piu'. E non torna indietro, o si
+    # rileggerebbe in eterno la stessa fetta.
+    visto = max([q for _, q, _ in trovati] + [since])
+    timbro_scrivi(TIMBRO_P2P_VISTO, str(min(visto, adesso)))
+    # `since` in Nostr e' inclusivo, quindi l'ultimo evento torna a
+    # ogni giro: senza gli id gia' contati il campanello suonerebbe
+    # ogni dieci minuti per sempre sullo stesso messaggio. Il set vive
+    # nel processo; al riavvio, al piu', uno squillo di troppo.
+    nuovi = [p for p, _, i in trovati if i and i not in _P2P_VISTI]
+    for _, _, i in trovati:
+        _P2P_VISTI.add(i)
+    if len(_P2P_VISTI) > 5000:
+        _P2P_VISTI.clear()
+    if not nuovi:
+        return
+    con = db()
+    da_avvisare = []
+    for pub in nuovi:
+        tg_id = _nudge_p2p(con, pub, adesso)
+        if tg_id:
+            da_avvisare.append(tg_id)
+    con.commit()
+    con.close()
+    for tg_id in da_avvisare:
+        try:
+            await notifica(tg_id, MSG_NUDGE_P2P)
+        except Exception as e:
+            print(f"⚠️ Campanello P2P saltato per {tg_id}: {e}")
+        await asyncio.sleep(0.2)
+    if da_avvisare:
+        print(f"🔔 Campanello P2P: avvisati {len(da_avvisare)} "
+              f"{da_avvisare}")
+
+
+async def orologio_p2p():
+    """Il giro del campanello, uno al minuto. Fail-open come le
+    sorelle: un battito che va male e' una riga in console, e il
+    prossimo arriva lo stesso — un giro che muore in silenzio sarebbe
+    peggio di nessun campanello."""
+    while True:
+        try:
+            await _giro_p2p()
+        except Exception as e:
+            print(f"⚠️ Campanello P2P: battito saltato ({e})")
+        await asyncio.sleep(P2P_GIRO_S)
+
+
+TIMBRO_CAMPAGNA_P2P = "campagna_p2p_acceso"
+
+
+async def avvisa_interessi_p2p():
+    """Chi aveva premuto «🔔 Avvisami» sulla pagina P2P lo viene a
+    sapere. E' IL DEBITO SCRITTO SULLA TABELLA `interessi` (il like su
+    quelle pagine non e' solo un termometro: il testo PROMETTE
+    l'avviso, e la promessa si legge prima del tocco), e si paga qui.
+
+    Una-tantum GLOBALE col timbro in `timbri`, il calco di
+    `avvisa_sconto_su_mono`: e' un evento del deploy, non una
+    condizione che ricorre. Il timbro si scrive PRIMA degli invii — un
+    errore di rete puo' perdere un avviso di cortesia, mai
+    raddoppiarlo — ma DOPO la guardia della leva, o accendendo il P2P
+    la campagna non partirebbe piu'.
+
+    Le righe di `interessi` NON si cancellano: «quanti lo aspettavano»
+    resta una domanda con una risposta (la decisione di Andrea sulla
+    tabella). E il testo non nomina mai Nostr, chiavi o relay: chi
+    entra con Telegram legge «il coordinatore, un servizio
+    indipendente», che e' quel che gli serve sapere."""
+    if not _p2p_leve()["attivo"]:
+        return                    # la funzione non c'e': non si promette
+    if timbro_letto(TIMBRO_CAMPAGNA_P2P):
+        return
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id FROM interessi WHERE funzione='p2p'").fetchall()
+    con.close()
+    timbro_scrivi(TIMBRO_CAMPAGNA_P2P, "fatto")
+    mandati = []
+    for r in righe:
+        try:
+            await notifica(r["tg_id"], (
+                "🔄 <b>Lo scambio in euro è arrivato.</b>\n\n"
+                "Avevi chiesto di essere avvisato: da oggi puoi comprare "
+                "e vendere sats in euro direttamente con un'altra "
+                "persona, dall'app.\n\n"
+                "I sats restano bloccati finché il bonifico non arriva — "
+                "a tenerli è il coordinatore (Mostro, un servizio "
+                "indipendente): Barattolo non tiene né vede i tuoi "
+                "sats.\n\n"
+                "Lo trovi nella barra in basso, alla voce <b>P2P</b>."))
+            mandati.append(r["tg_id"])
+        except Exception as e:
+            print(f"⚠️ Avviso P2P saltato per {r['tg_id']}: {e}")
+        await asyncio.sleep(0.2)
+    # la riga nel journal SEMPRE quando la campagna gira: e' il modo di
+    # sapere a chi e' arrivata (il patto dei timbri)
+    print(f"🔄 Campagna «lo scambio P2P è arrivato»: avvisati "
+          f"{len(mandati)} {mandati}")
+
+
 def _bech32_polymod(valori: list) -> int:
     """Il cuore del checksum bech32 (BIP-173): un registro a scorrimento
     che 'mastica' i valori a 5 bit. Serve solo a hex_to_npub."""
@@ -38076,6 +38346,13 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Campagna sconto-su-mono saltata: {e}")
         try:
+            # una-tantum GLOBALE (timbro in `timbri`): il debito scritto
+            # sulla tabella `interessi` — chi ha premuto «Avvisami»
+            # sulla pagina P2P se lo sente dire il giorno che si accende
+            await avvisa_interessi_p2p()
+        except Exception as e:
+            print(f"⚠️ Campagna P2P saltata: {e}")
+        try:
             # la ronda degli invarianti: legge e avvisa, non corregge
             # mai niente — e a libro mastro sano non dice nulla
             await controlla_libro_mastro()
@@ -39189,6 +39466,14 @@ async def controlla_libro_mastro():
 @app.on_event("startup")
 async def avvia_orologio():
     asyncio.create_task(orologio())
+    # Il campanello dello scambio P2P ha un giro SUO da un minuto (la
+    # finestra del taker e' 900 secondi: dieci minuti li' dentro
+    # sarebbero un ottavo del tempo che ha per rispondere). Si avvia
+    # SOLO a leva accesa: le leve si leggono dal config all'import e
+    # non cambiano a runtime, quindi un task che gira a vuoto per
+    # sempre non aiuterebbe nessuno.
+    if _p2p_leve()["attivo"]:
+        asyncio.create_task(orologio_p2p())
     # Le foto nate prima delle miniature ne ricevono una, in un
     # thread: l'avvio non aspetta nessuno (oggi i file sono pochi)
     asyncio.create_task(asyncio.to_thread(genera_miniature_mancanti))

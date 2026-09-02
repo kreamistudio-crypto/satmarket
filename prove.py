@@ -35098,8 +35098,14 @@ def prove_p2p_chiavi():
           sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl, re.M)))
     post = src[src.index('@app.post("/api/p2p/chiavi")'):
                src.index('@app.delete("/api/p2p/chiavi")')]
-    dele = src[src.index('@app.delete("/api/p2p/chiavi")'):
-               src.index("\ndef _bech32_polymod(")]
+    # LA FETTA SI CHIUDE ALLA FINE DELLA FUNZIONE e non a un punto di
+    # riferimento lontano: ancorata a `_bech32_polymod` si e' portata
+    # dentro il campanello (tappa 7), che `_p2p_leve` la nomina
+    # eccome — e la sentinella «non guarda la leva» sarebbe diventata
+    # rossa per colpa del vicino. E' la fetta larga di `pezzo()`, alla
+    # seconda volta.
+    _d = src.index('@app.delete("/api/p2p/chiavi")')
+    dele = src[_d:src.index("\n\n\n", _d)]
     prova("registrare vuole l'identita'", True, "verifica_utente(" in post)
     prova("...e risponde 409 a leva spenta, chiedendo al giudice", True,
           'if not _p2p_leve()["attivo"]:' in post and "HTTPException(409" in post)
@@ -37069,6 +37075,216 @@ def prove_p2p_server():
           in cfg)
     prova("...e il relay del coordinator per primo", True,
           "MOSTRO_RELAY = [\n    \"wss://relay.mostro.network\"," in cfg)
+
+
+def prove_p2p_campanello():
+    """IL CAMPANELLO DELLO SCAMBIO (set 2026, tappa 7): il coordinator
+    risponde mentre l'app e' chiusa, e chi aspetta lo viene a sapere.
+    Un giro al minuto chiede ai relay se il coordinator ha scritto alle
+    pubkey del mazzo, e a chi tocca arriva UNA notifica che dice solo
+    «guarda i tuoi scambi».
+
+    Le cose da sorvegliare sono quattro, e nessuna fallisce da sola:
+    che il server non legga MAI il contenuto (il campanello sa CHI
+    guardare e nient'altro), che il filtro porti `authors` — senza, un
+    estraneo fa suonare il campanello a chiunque, perche' quelle pubkey
+    le legge chi vuole sui relay —, che il gate sia della PERSONA e non
+    della pubkey, e che il segnalibro non scavalchi l'orologio.
+    Le sentinelle dicono che le righe ci sono; il banco sqlite fa
+    GIRARE il gate, e quello della campagna la fa girare intera con la
+    notifica di cartone: una sentinella direbbe che il timbro c'e', mai
+    che al momento del primo invio il turno fosse gia' bruciato."""
+    print("\n[il campanello dello scambio]")
+    import sqlite3
+    import asyncio as _aio
+    src = _SORGENTE
+    i = src.index('TIMBRO_P2P_VISTO = "p2p_ultimo_visto"')
+    blocco = src[i:src.index("\ndef _bech32_polymod(", i)]
+    relay = pezzo("eventi_p2p_da_relay")
+    nudge = pezzo("_nudge_p2p")
+    giro = pezzo("_giro_p2p")
+    campagna = pezzo("avvisa_interessi_p2p", fine="\n\n\ndef ")
+
+    # --- 1) IL SERVER NON LEGGE IL CONTENUTO ------------------------
+    # La docstring di `eventi_p2p_da_relay` NOMINA `content` apposta,
+    # per dire che non lo tocca: si guarda il CODICE, o la sentinella
+    # sarebbe rossa per colpa di una spiegazione (la trappola della
+    # prosa, gia' pagata da `_decifra_contenuto`).
+    codice_nudo = codice("\n".join(_senza_prosa(f)
+                                   for f in (relay, nudge, giro)))
+    for spia in ("content", "nip44", "nip04", "decifra", "cifra",
+                 "getConversationKey", "nsec", "privata"):
+        prova(f"il campanello non nomina `{spia}`", False,
+              spia in codice_nudo)
+    prova("...e dal relay tornano tre cose sole: pubkey, quando, id",
+          True, "fuori.append((t[1], quando, ident))" in relay)
+    # LA CHAT NON SUONA, E LE DUE GUARDIE SONO INDIPENDENTI (decisione
+    # di Andrea, set 2026): il filtro porta `authors` — la prova qui
+    # sotto — e la chiave della conversazione NON entra nel mazzo. La
+    # seconda si sorveglia da qui, ed e' un censimento e non un elenco:
+    # si guardano tutte le chiamate del client e si chiede che
+    # l'argomento non nomini la chat, cosi' il chiamante di domani ci
+    # entra da solo. Registrarla vorrebbe dire scrivere sul nostro
+    # server «Tizio e Caio si parlano», che e' un dato NUOVO.
+    import re as _re
+    _mini = open("miniapp.html", encoding="utf-8").read()
+    _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
+    prova("i chiamanti di registraChiaviP2P sono cinque", 5, len(_reg))
+    for _arg in _reg:
+        prova(f"...e `{_arg}` non e' una chiave della chat", True,
+              not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
+
+    # --- 2) IL FILTRO: solo il coordinator fa suonare ---------------
+    prova("il filtro porta `authors` col coordinator", True,
+          '"authors": [mostro]' in relay)
+    prova("...e il chiamante gli passa la chiave del giudice, mai una sua",
+          True, 'eventi_p2p_da_relay, relay, blocco, since, leve["mostro"]'
+          in giro and "leve = _p2p_leve()" in giro)
+    prova("...e chiede i soli kind 14", True, '"kinds": [14]' in relay)
+    prova("il relay muto e' None e non una lista vuota", True,
+          codice(relay).count("return None") == 2 and "return fuori" in relay)
+    prova("...e il chiamante passa al prossimo solo su None", True,
+          "if eventi is not None:" in giro)
+    prova("le pubkey si chiedono a blocchi (i relay hanno tetti)", True,
+          "for i in range(0, len(pubkeys), P2P_BLOCCO):" in giro)
+
+    # --- 3) IL SEGNALIBRO -------------------------------------------
+    prova("il segnalibro sta nella tabella timbri", True,
+          "timbro_letto(TIMBRO_P2P_VISTO)" in giro
+          and "timbro_scrivi(TIMBRO_P2P_VISTO" in giro)
+    prova("...e non scavalca l'orologio", True, "min(visto, adesso)" in giro)
+    prova("...e non torna indietro (il max col since di partenza)", True,
+          "max([q for _, q, _ in trovati] + [since])" in giro)
+    prova("un timbro storto vale «mai guardato»", True,
+          "except ValueError:" in giro and "since = 0" in giro)
+    prova("al primo sguardo si guarda indietro poco, non la storia intera",
+          True, "since = adesso - P2P_PRIMO_SGUARDO" in giro
+          and "P2P_PRIMO_SGUARDO = 600" in blocco)
+    prova("gli id gia' contati impediscono il campanello a ripetizione",
+          True, "i not in _P2P_VISTI" in giro and "_P2P_VISTI.add(i)" in giro)
+    prova("...e il set ha un tetto, o cresce per sempre", True,
+          "if len(_P2P_VISTI) > 5000:" in giro)
+
+    # --- 4) IL GIRO NON PARTE DOVE NON DEVE -------------------------
+    prova("il giro esce a leva spenta e senza websocket", True,
+          'if not _p2p_leve()["attivo"] or not create_connection:' in giro)
+    prova("...e se nessuno ha un profilo di scambio", True,
+          "if not pubkeys:" in giro)
+    prova("l'orologio e' fail-open: un battito storto non lo ferma", True,
+          "Campanello P2P: battito saltato" in blocco
+          and "while True:" in pezzo("orologio_p2p"))
+    # LA RIGA INTERA e non il nome, la lezione del reaper: col solo
+    # nome un `pass  # asyncio.create_task(orologio_p2p())` la
+    # lascerebbe verde con l'orologio mai avviato.
+    prova("l'orologio si avvia, e solo a leva accesa", True,
+          'if _p2p_leve()["attivo"]:\n'
+          "        asyncio.create_task(orologio_p2p())\n" in src)
+    prova("il campanello lascia la riga nel journal", True,
+          "Campanello P2P: avvisati" in giro)
+
+    # --- 5) LE PAROLE: chi entra da Telegram non legge protocollo ---
+    msg = src[src.index("MSG_NUDGE_P2P = ("):
+              src.index("def eventi_p2p_da_relay")]
+    for spia in ("nostr", "relay", "chiave", "pubkey", "npub"):
+        prova(f"il messaggio del campanello non dice «{spia}»", False,
+              spia in msg.lower())
+    prova("...e dice che il contenuto non lo leggiamo", True,
+          "Barattolo non li legge" in msg)
+    for spia in ("nostr", "relay", "chiave", "npub"):
+        prova(f"la campagna non dice «{spia}»", False,
+              spia in _senza_prosa(campagna).lower())
+
+    # --- 6) LA CAMPAGNA: il debito del like -------------------------
+    prova("la campagna gira nell'orologio", True,
+          "\n            await avvisa_interessi_p2p()\n" in src)
+    prova("il timbro sta nella tabella timbri", True,
+          "timbro_letto(TIMBRO_CAMPAGNA_P2P)" in campagna
+          and "timbro_scrivi(TIMBRO_CAMPAGNA_P2P" in campagna)
+    prova("...e si scrive PRIMA degli invii (il patto delle campagne)",
+          True, campagna.index("timbro_scrivi(")
+          < campagna.index("await notifica("))
+    # DOPO la guardia della leva, o accendendo il P2P la campagna
+    # avrebbe gia' bruciato il suo turno e non partirebbe mai.
+    prova("...e DOPO la guardia della leva", True,
+          campagna.index('_p2p_leve()["attivo"]')
+          < campagna.index("timbro_scrivi("))
+    prova("la campagna bussa a chi ha votato il P2P e non le aste", True,
+          "FROM interessi WHERE funzione='p2p'" in campagna)
+    prova("...e lascia la riga nel journal coi destinatari", True,
+          "Campagna «lo scambio P2P" in campagna and "{mandati}" in campagna)
+
+    # --- 7) IL BANCO SQLITE: il gate gira ---------------------------
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i)
+                 + len("ON chiavi_p2p(tg_id);")]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    amb = {"P2P_NUDGE_S": 600}
+    exec(_senza_prosa(nudge), amb)
+    gate = amb["_nudge_p2p"]
+    A, B, C = "a" * 64, "b" * 64, "c" * 64
+    for pub, chi in ((A, 111), (B, 111), (C, 222)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) "
+                    "VALUES(?,?,0)", (pub, chi))
+    prova("una pubkey che non e' di nessuno non fa suonare niente",
+          0, gate(con, "f" * 64, 1000))
+    prova("la prima risposta suona", 111, gate(con, A, 1000))
+    # IL GATE E' DELLA PERSONA: A e B sono due trade key dello STESSO
+    # utente, e col gate per pubkey riceverebbe due volte la stessa
+    # frase — che non dice nemmeno a quale scambio si riferisce.
+    prova("...e l'altra trade key dello stesso utente TACE", 0,
+          gate(con, B, 1001))
+    prova("...mentre un altro utente suona lo stesso", 222,
+          gate(con, C, 1002))
+    prova("un istante prima della pausa ancora niente", 0,
+          gate(con, A, 1000 + 599))
+    prova("...e alla pausa passata si torna a suonare", 111,
+          gate(con, B, 1000 + 600))
+    con.close()
+
+    # --- 8) IL BANCO DELLA CAMPAGNA: gira intera --------------------
+    # Il «timbro prima degli invii» si vede solo GIRANDOLA: la
+    # sentinella dice dove sta la riga, mai che al momento della prima
+    # notifica il turno fosse gia' bruciato.
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("CREATE TABLE interessi(tg_id INTEGER, funzione TEXT);")
+    for chi in (111, 222):
+        con.execute("INSERT INTO interessi VALUES(?, 'p2p')", (chi,))
+    con.execute("INSERT INTO interessi VALUES(333, 'aste')")
+    TIMBRO = "campagna_p2p_acceso"
+    timbri, mandati, gia_timbrato = {}, [], []
+
+    async def _finta_notifica(tg_id, testo):
+        gia_timbrato.append(TIMBRO in timbri)
+        mandati.append(tg_id)
+
+    async def _dormi(_s):
+        return None
+
+    def _giro_campagna(attivo=True):
+        amb = {"_p2p_leve": lambda: {"attivo": attivo},
+               "timbro_letto": lambda n: timbri.get(n),
+               "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+               "db": lambda: con, "notifica": _finta_notifica,
+               "asyncio": type("A", (), {"sleep": staticmethod(_dormi)}),
+               "print": lambda *a, **k: None,
+               "TIMBRO_CAMPAGNA_P2P": TIMBRO}
+        exec("async " + campagna, amb)   # `pezzo` taglia l'async
+        _aio.run(amb["avvisa_interessi_p2p"]())
+
+    _giro_campagna(attivo=False)
+    prova("a leva spenta non si promette niente e non si brucia il turno",
+          ([], {}), (mandati, timbri))
+    _giro_campagna()
+    prova("a leva accesa arriva a chi ha votato il P2P", [111, 222], mandati)
+    prova("...e non a chi aspettava le aste", False, 333 in mandati)
+    prova("...e il turno era gia' timbrato al primo invio", [True, True],
+          gia_timbrato)
+    _giro_campagna()
+    prova("il secondo giro non raddoppia niente", [111, 222], mandati)
+    con.close()
 
 
 def prove_nwc_cifratura():
@@ -43180,6 +43396,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
     prove_p2p_chiavi,
+    prove_p2p_campanello,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,
