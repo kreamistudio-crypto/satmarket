@@ -5252,6 +5252,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <div class="hint" id="p2pInfoRiga" style="display:none"></div>
       <div id="p2pCorpo"></div>
+      <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
     </div>
   </div>
 
@@ -5628,6 +5629,9 @@ document.getElementById('cartello')?.remove();</script>
         <li><span class="em">🤖</span><b>L'intelligenza artificiale</b> che controlla gli annunci: le arriva il testo dell'annuncio — titolo e descrizione — e <b>mai chi l'ha scritto</b>. Quello che scrivi nella <b>barra di ricerca</b> non le arriva mai: la ricerca è un indice di casa, e la tua domanda non esce da qui.</li>
         <li><span class="em">💱</span><b>Il cambio euro/bitcoin</b>, che chiediamo noi una volta al minuto e non il tuo browser: così nessun terzo sa che stai guardando un prezzo.</li>
       </ul>
+
+      <h3 id="priv-p2p">Il profilo di scambio P2P</h3>
+      <p>Per scambiare sats in euro con altre persone Barattolo ti fa da tramite verso un <b>coordinatore</b> (Mostro, un servizio indipendente), e per riconoscerti lì nasce nel tuo browser un <b>profilo di scambio</b>: un codice segreto che <b>il nostro server non riceve mai</b> — ne conosce solo la parte pubblica, per poterti avvisare quando c'è una novità in uno scambio. Se entri da Telegram il profilo viene salvato anche nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Dal profilo di scambio lo vedi, lo copi su un altro dispositivo o lo dimentichi; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
 
       <h3 id="priv-tor">Se ti colleghi da Tor</h3>
       <p>Barattolo si raggiunge anche da un indirizzo <b>.onion</b>, cioè da dentro la rete Tor. Quello che cambia è <b>da dove risulta che ti colleghi</b>: il nostro server non vede il tuo indirizzo IP e non lo scrive da nessuna parte, chi ti fornisce la connessione non sa che stai su Barattolo, e fra il tuo browser e noi non c'è nessun altro. Le foto, le pagine e tutto il resto restano dentro il tunnel.</p>
@@ -6508,6 +6512,20 @@ document.getElementById('cartello')?.remove();</script>
        due bottoni sono il punto: rettangolari come «Acquista» (il
        token --radius-btn, un cuore solo), quello che distrugge sopra
        e il ripensamento sotto. -->
+
+  <!-- IL PROFILO DI SCAMBIO (set 2026, tappa 3): il mazzo Mostro visto
+       da chi non deve sapere cos'e' una chiave. Nessuna parola di
+       protocollo qui dentro — «Nostr», «nsec», «relay» non compaiono:
+       c'e' la sentinella. Il codice segreto va in un <input
+       type="password" autocomplete="new-password"> dentro un <form>
+       col suo username fisso: cosi' il gestore password del browser si
+       OFFRE di salvarlo, e l'export diventa il gesto che quei browser
+       fanno gia'. Il valore ci entra col `.value`, mai interpolato. -->
+  <div class="sheet" id="p2pProfiloSheet" role="dialog" aria-modal="true" aria-labelledby="p2pProfiloTit">
+    <div class="grab"></div>
+    <h3 id="p2pProfiloTit">👤 Il tuo profilo di scambio</h3>
+    <div id="p2pProfiloCorpo"></div>
+  </div>
   <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
        aria-labelledby="paccoSvuotaTit">
     <div class="grab"></div>
@@ -17969,7 +17987,10 @@ const INVITO_ONION = {
   profilo: 'Il tuo profilo ti aspetta: entra e trovi annunci, incassi '
          + 'e identità.',
   trattativa:'La tua trattativa ti aspetta dentro Barattolo: entra e '
-         + 'la trovi nella scheda Ordini.'
+         + 'la trovi nella scheda Ordini.',
+  p2p: 'Per scambiare sats in euro con altre persone serve un account: il tuo '
+     + 'profilo di scambio nasce qui dentro, e i sats li custodisce il '
+     + 'coordinatore fino alla fine dello scambio.'
 };
 const INVITO_ONION_GENERICO =
   'Per comprare, offrire o vendere serve un account: da qui si entra '
@@ -18051,6 +18072,7 @@ function closeSheet(){
   el('offertaCarrelloSheet').classList.remove('open');
   el('confermaSheet').classList.remove('open');
   el('jarShareSheet').classList.remove('open');
+  el('p2pProfiloSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
@@ -32052,6 +32074,14 @@ function infoRigaP2P(){
 }
 
 function renderP2P(){
+  /* Il mazzo che c'e' gia' si rimanda al server una volta per sessione:
+     l'INSERT OR IGNORE e' idempotente, e cosi' un profilo importato
+     o tornato dal cloud finisce nella lista da guardare. */
+  const mz = mazzoMostro();
+  if (mz && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
+    p2pRegistrato = true;
+    registraChiaviP2P([mz.pub]);
+  }
   const box = el('p2pCorpo');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('active', p2pLato === 'compro');
@@ -32084,6 +32114,304 @@ function ricaricaP2P(){
   p2pErrore = '';
   p2pLibro = null;
   renderP2P();
+}
+
+
+/* ============ IL MAZZO DEL PROFILO DI SCAMBIO (set 2026, tappa 3) ============
+   Le chiavi con cui si parla col coordinator NASCONO NEL BROWSER, per
+   tutti — anche per chi entra con Telegram (decisione di Andrea, e la
+   regola ferrea 2 vista dall'altro lato: mai la piattaforma come
+   firmataria degli scambi altrui). Il server conosce SOLO la meta'
+   pubblica, che gli si manda via `registraChiaviP2P`: c'e' la sentinella
+   che nei corpi delle fetch di questo blocco viaggino solo `pubkeys`.
+   LE PAROLE: chi entra con Telegram non legge mai «Nostr» ne' «chiave»
+   ne' «relay» — e' «il tuo profilo di scambio» e «il codice segreto del
+   profilo». Il codice e' la nsec del mazzo (bech32), cosi' lo stesso
+   codice entra in mostro-cli o Mostro mobile con la stessa identita'.
+   TRE GAMBE per non perderlo, e nessuna si chiede alla nascita:
+   1) dentro Telegram il mazzo si salva nel CloudStorage alla creazione,
+      in silenzio — client → cloud di Telegram, mai il nostro server —
+      e localStorage diventa la cache: sopravvive alla cache svuotata e
+      viaggia fra telefono e desktop dello stesso account. Non e' E2E
+      (Telegram puo' leggerlo) ed e' detto in «I tuoi dati»;
+   2) il backup cifrato per se' sui relay di chi ha una chiave Nostr
+      provata (tappa 9);
+   3) il codice, nel foglio del profilo, chiesto nei momenti in cui vale.
+   `indice` e' il contatore delle trade key (una per scambio, mai
+   riusata); `chiaveScambio` le deriva con HMAC-SHA256 dal solo segreto,
+   cosi' c'e' UNA cosa da esportare. ⚠️ Non si deriva con
+   `nip44.getConversationKey(sk, pub(i))`: ECDH(sk, i·G) = i·Pub, che lo
+   calcola chiunque conosca la pubkey d'identita' — trade key pubbliche. */
+const MOSTRO_CHIAVE = 'barattolo_mostro';
+const CLOUD_MAZZO = 'mostro_mazzo';
+const MAZZO_INFO = 'barattolo/mostro/scambio/';
+const FORMA_HEX64 = /^[0-9a-f]{64}$/;
+let p2pRegistrato = false;
+let p2pCodiceVisibile = false;
+let p2pCodiceMostrato = '';
+let mazzoInCorso = null;
+function mazzoMostro(){
+  try {
+    const d = JSON.parse(localStorage.getItem(MOSTRO_CHIAVE)) || null;
+    return (d && FORMA_HEX64.test(d.sk || '') && FORMA_HEX64.test(d.pub || '')) ? d : null;
+  } catch(e){ return null; }
+}
+function ricordaMazzo(m){
+  try { localStorage.setItem(MOSTRO_CHIAVE, mazzoSerializza(m)); } catch(e){}
+}
+function scordaMazzoLocale(){
+  try { localStorage.removeItem(MOSTRO_CHIAVE); } catch(e){}
+}
+function mazzoSerializza(m){
+  return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
+                         creato: m.creato|0, backupFatto: !!m.backupFatto});
+}
+/* IL CLOUD DI TELEGRAM, solo dentro Telegram VERO e col client che ce
+   l'ha (Bot API 6.9): nel browser lo stub di telegram.org esiste comunque
+   e mentirebbe — il patto di esportaDati. Fail-open in ogni verso: un
+   cloud che non risponde vale «niente», mai un'eccezione. */
+function cloudTelegram(){
+  return (tg?.initData && tg.isVersionAtLeast?.('6.9') && tg.CloudStorage) ? tg.CloudStorage : null;
+}
+function cloudLeggi(chiave){
+  return new Promise(ok => {
+    const c = cloudTelegram();
+    if (!c) return ok(null);
+    try { c.getItem(chiave, (err, v) => ok(err ? null : (v || null))); }
+    catch(e){ ok(null); }
+  });
+}
+function cloudScrivi(chiave, valore){
+  return new Promise(ok => {
+    const c = cloudTelegram();
+    if (!c) return ok(false);
+    try { c.setItem(chiave, valore, (err, fatto) => ok(!err && !!fatto)); }
+    catch(e){ ok(false); }
+  });
+}
+function cloudCancella(chiave){
+  return new Promise(ok => {
+    const c = cloudTelegram();
+    if (!c) return ok(false);
+    try { c.removeItem(chiave, (err, fatto) => ok(!err && !!fatto)); }
+    catch(e){ ok(false); }
+  });
+}
+/* Il testo di un codice, in tutte le forme che si incontrano: la nsec
+   bech32 (mostro-cli, Mostro mobile, il foglio di casa), 64 esadecimali
+   nudi, o il JSON con cui il mazzo sta nel cloud. Storto = null, mai
+   un'eccezione: chi incolla un codice sbagliato deve leggere un toast. */
+function mazzoDaTesto(testo){
+  const NT = window.NostrTools;
+  if (!NT) return null;
+  const t = String(testo || '').trim();
+  if (!t) return null;
+  let sk = '', d = null;
+  if (t[0] === '{') {
+    try { d = JSON.parse(t); } catch(e){ return null; }
+    sk = String((d && d.sk) || '').toLowerCase();
+  } else if (/^nsec1/i.test(t)) {
+    try {
+      const r = NT.nip19.decode(t.toLowerCase());
+      if (r.type !== 'nsec') return null;
+      sk = NT.utils.bytesToHex(r.data);
+    } catch(e){ return null; }
+  } else sk = t.toLowerCase();
+  if (!FORMA_HEX64.test(sk)) return null;
+  let pub;
+  try { pub = NT.getPublicKey(NT.utils.hexToBytes(sk)); } catch(e){ return null; }
+  return {sk, pub, indice: d ? (d.indice|0) : 0,
+          creato: (d && d.creato) ? (d.creato|0) : Math.floor(Date.now()/1000),
+          backupFatto: d ? !!d.backupFatto : true};
+}
+/* La trade key numero `indice`: HMAC-SHA256 col segreto come chiave e
+   un'etichetta di casa come messaggio — deterministica, quindi lo stesso
+   codice rida' le stesse chiavi su un altro dispositivo. `getPublicKey`
+   fa da giudice dello scalare: se per un indice non e' valido (una
+   possibilita' su 2^128, ma il ramo esiste) si prova col suffisso. */
+function chiaveScambio(sk, indice){
+  const NT = window.NostrTools;
+  const enc = new TextEncoder();
+  const skB = NT.utils.hexToBytes(sk);
+  for (let giro = 0; giro < 8; giro++) {
+    const msg = MAZZO_INFO + indice + (giro ? '/' + giro : '');
+    const cand = NT.hmac(NT.sha256, skB, enc.encode(msg));
+    try {
+      const pub = NT.getPublicKey(cand);
+      return {sk: NT.utils.bytesToHex(cand), pub, indice};
+    } catch(e) {}
+  }
+  throw new Error('chiave di scambio non derivabile');
+}
+/* Al server vanno SOLO le pubkey: e' l'unica fetch di questo blocco che
+   scrive, e il suo corpo e' `{pubkeys}` e nient'altro. Fail-open: una
+   registrazione persa si rifa' al prossimo ingresso nella pagina. */
+async function registraChiaviP2P(pubkeys){
+  if (DEMO || VETRINA || !myTgId) return false;
+  const lista = (pubkeys || []).filter(p => FORMA_HEX64.test(p));
+  if (!lista.length) return false;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/chiavi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({pubkeys: lista})});
+    return r.ok;
+  } catch(e){ return false; }
+}
+async function dimenticaChiaviP2P(){
+  if (DEMO || VETRINA || !myTgId) return false;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/chiavi`, {method: 'DELETE',
+      headers: {'X-Tg-Init-Data': authHdr()}});
+    return r.ok;
+  } catch(e){ return false; }
+}
+/* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
+   il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
+   Telegram — la cache svuotata non deve fabbricare un profilo nuovo a
+   chi ne ha gia' uno — e solo a mani vuote si genera. Una promessa sola
+   per volta: due gesti insieme non devono fare due mazzi. */
+function assicuraMazzo(){
+  const m = mazzoMostro();
+  if (m) return Promise.resolve(m);
+  if (!mazzoInCorso) mazzoInCorso = (async () => {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const nuvola = mazzoDaTesto(await cloudLeggi(CLOUD_MAZZO));
+    let nuovo = nuvola;
+    if (!nuovo) {
+      const sk = NT.utils.bytesToHex(NT.generateSecretKey());
+      nuovo = {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), indice: 0,
+               creato: Math.floor(Date.now()/1000), backupFatto: false};
+    }
+    ricordaMazzo(nuovo);
+    if (!nuvola) await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo));
+    await registraChiaviP2P([nuovo.pub]);
+    return nuovo;
+  })().finally(() => { mazzoInCorso = null; });
+  return mazzoInCorso;
+}
+function esportaMazzo(){
+  const m = mazzoMostro();
+  const NT = window.NostrTools;
+  if (!m || !NT) return '';
+  return NT.nip19.nsecEncode(NT.utils.hexToBytes(m.sk));
+}
+/* ---- il foglio del profilo ---- */
+async function apriProfiloP2P(){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto: il profilo di scambio nasce nell\'app vera 🔁'); return; }
+  if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
+  p2pCodiceVisibile = false;
+  p2pCodiceMostrato = '';
+  renderProfiloP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pProfiloSheet').classList.add('open');
+}
+function renderProfiloP2P(){
+  const box = el('p2pProfiloCorpo');
+  if (!box) return;
+  const m = mazzoMostro();
+  const dove = cloudTelegram()
+    ? 'È al sicuro nel tuo Telegram: lo ritrovi anche su un altro dispositivo con lo stesso account. Chi ha il tuo account Telegram ce l\'ha anche lui — è già così per tutto Barattolo.'
+    : 'Vale su questo dispositivo: su un altro incolla il codice segreto.';
+  const importa = `<div class="field" style="margin-top:14px"><label>Hai già un profilo su un altro dispositivo?</label>
+      <input type="text" id="p2pImportaInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il suo codice segreto"></div>
+    <button class="btn ghost" onclick="importaMazzoDalFoglio()">📥 Importa questo profilo</button>`;
+  if (!m) {
+    box.innerHTML = `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${importa}`;
+    return;
+  }
+  const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
+  const debito = m.backupFatto
+    ? '✓ Hai salvato il codice segreto.'
+    : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
+  box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${dove}</div>
+    <div class="hint">${debito}</div>
+    <form id="p2pCodiceForm" onsubmit="codiceP2PSalvato(); return false;" style="display:${p2pCodiceVisibile ? '' : 'none'}">
+      <input type="text" name="username" value="barattolo-profilo-di-scambio" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">
+      <div class="field"><label>Il codice segreto del profilo</label>
+        <div class="campo-pre"><input type="password" id="p2pCodice" name="password" autocomplete="new-password" readonly spellcheck="false" style="font-family:var(--mono)">
+          <button type="button" class="btn mini" onclick="svelaCodiceP2P()" aria-label="Mostra o nascondi il codice">👁</button></div></div>
+      <button type="button" class="btn ghost" onclick="copiaCodiceP2P()">📋 Copia il codice segreto</button>
+      <button type="submit" class="btn orange" style="margin-top:10px">✓ L'ho salvato</button>
+    </form>
+    <button class="btn ghost" onclick="mostraCodiceP2P()" style="display:${p2pCodiceVisibile ? 'none' : ''}">🔑 Mostra il codice segreto</button>
+    ${importa}
+    <button class="btn allarme" onclick="scordaMazzo()">🗑 Dimentica il profilo su questo dispositivo</button>`;
+  /* il codice entra col .value: mai dentro un template */
+  if (p2pCodiceVisibile) el('p2pCodice').value = p2pCodiceMostrato;
+}
+async function mostraCodiceP2P(){
+  await caricaNostrTools();
+  const codice = esportaMazzo();
+  if (!codice) { toast('Non c\'è ancora un profilo da mostrare'); return; }
+  p2pCodiceMostrato = codice;
+  p2pCodiceVisibile = true;
+  renderProfiloP2P();
+}
+function svelaCodiceP2P(){
+  const c = el('p2pCodice');
+  if (c) c.type = c.type === 'password' ? 'text' : 'password';
+}
+async function copiaCodiceP2P(){
+  if (!p2pCodiceMostrato) return;
+  try {
+    await navigator.clipboard.writeText(p2pCodiceMostrato);
+    toast('Codice copiato: incollalo nel tuo gestore di password 🔐');
+  } catch(e) {
+    toast('Non riesco a copiare: mostra il codice e copialo a mano');
+  }
+}
+async function codiceP2PSalvato(){
+  const m = mazzoMostro();
+  if (!m) return;
+  m.backupFatto = true;
+  ricordaMazzo(m);
+  await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(m));
+  p2pCodiceVisibile = false;
+  p2pCodiceMostrato = '';
+  renderProfiloP2P();
+  toast('Bene: il profilo ha la sua copia ✓');
+}
+async function importaMazzoDalFoglio(){
+  const inp = el('p2pImportaInp');
+  const testo = inp ? inp.value : '';
+  if (!testo.trim()) { toast('Incolla prima il codice segreto'); return; }
+  await caricaNostrTools();
+  const d = mazzoDaTesto(testo);
+  if (!d) { toast('Questo codice non ha la forma giusta: controlla di averlo copiato intero'); return; }
+  const m = mazzoMostro();
+  if (m && m.sk === d.sk) { toast('È già il profilo di questo dispositivo'); return; }
+  if (m) {
+    chiediConferma({titolo: 'Sostituire il profilo?',
+      corpo: 'Il profilo di scambio che c\'è su questo dispositivo lascia il posto a quello che stai importando.\n\nSe non hai salvato il suo codice segreto, la sua reputazione non si recupera più.',
+      etichetta: 'Sostituisci', poi: () => applicaImportMazzo(d)});
+    return;
+  }
+  applicaImportMazzo(d);
+}
+async function applicaImportMazzo(d){
+  ricordaMazzo(d);
+  await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(d));
+  await registraChiaviP2P([d.pub]);
+  p2pCodiceVisibile = false;
+  renderProfiloP2P();
+  toast('Profilo di scambio importato ✓');
+}
+function scordaMazzo(){
+  chiediConferma({titolo: 'Dimenticare il profilo?',
+    corpo: 'Il profilo di scambio sparisce da questo dispositivo e dal tuo Telegram.\n\nSe non hai salvato il codice segreto, la reputazione riparte da zero. Gli scambi aperti restano legati a questo profilo: finiscili prima.',
+    etichetta: 'Dimentica', poi: dimenticaMazzoOra});
+}
+async function dimenticaMazzoOra(){
+  scordaMazzoLocale();
+  await cloudCancella(CLOUD_MAZZO);
+  await dimenticaChiaviP2P();
+  p2pRegistrato = false;
+  p2pCodiceVisibile = false;
+  p2pCodiceMostrato = '';
+  renderProfiloP2P();
+  toast('Profilo di scambio dimenticato');
 }
 
 /* ---- export CSV degli affari conclusi (contabilità) ---- */

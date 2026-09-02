@@ -3214,6 +3214,26 @@ def init_db():
     -- idx_preferiti_annuncio, un piano piu' su).
     CREATE INDEX IF NOT EXISTS idx_interessi_funzione
       ON interessi(funzione);
+    CREATE TABLE IF NOT EXISTS chiavi_p2p(
+        -- LE CHIAVI PUBBLICHE DELLO SCAMBIO P2P (set 2026, tappa 3): il
+        -- server sa SOLO chi guardare sui relay — le pubkey del mazzo
+        -- Mostro di ogni utente (l'identita' e ogni trade key man mano
+        -- che nasce) — per il campanello della tappa 7. La meta'
+        -- PRIVATA non entra MAI (regola ferrea 2, decisione di Andrea:
+        -- mai la piattaforma come firmataria degli scambi altrui):
+        -- nasce e vive nel browser, e questa tabella non ha nemmeno una
+        -- colonna dove potrebbe finire. Una riga per pubkey: la PK e'
+        -- l'idempotenza, il client le rimanda a ogni avvio e a ogni
+        -- chiave nuova con un INSERT OR IGNORE. `ultimo_nudge` e' il
+        -- gate del campanello (10 min), `creato` dice da quando si
+        -- guarda. «Dimentica il profilo» (DELETE) toglie le righe di
+        -- quell'utente: senza pubkey non c'e' niente da guardare.
+        pubkey TEXT PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        creato INTEGER,
+        ultimo_nudge INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
     CREATE TABLE IF NOT EXISTS punti_ritiro(
         -- I punti di ritiro che CHI COMPRA si tiene (ago 2026): il
         -- locker sotto casa non cambia, e riscriverlo a ogni acquisto
@@ -7601,6 +7621,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE interessi SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM interessi WHERE tg_id=?", (id_nostr,))
+        # Le pubkey dello scambio P2P seguono l'utente. Qui la PK e' la
+        # pubkey e non contiene il tg_id, quindi le due meta' non possono
+        # collidere (una chiave e' di UN mazzo, nato in UN browser):
+        # l'UPDATE secco basta, come per i connettori — un OR IGNORE +
+        # DELETE sarebbe una cintura che nessuno esercita.
+        con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -28854,6 +28881,93 @@ def _p2p_leve() -> dict:
     return {"attivo": bool(P2P_ATTIVO and MOSTRO_HEX and MOSTRO_RELAY),
             "mostro": MOSTRO_HEX,
             "relay": list(MOSTRO_RELAY)}
+
+
+# LE CHIAVI PUBBLICHE DELLO SCAMBIO (tappa 3): il client registra le
+# pubkey del suo mazzo Mostro — l'identita' e ogni trade key man mano
+# che nasce — perche' il campanello (tappa 7) sappia CHI guardare sui
+# relay. Qui entra SOLO la meta' pubblica, per costruzione: il corpo
+# accetta una lista di esadecimali da 64 e nient'altro, e il giudice
+# `_registra_chiavi_p2p` e' puro (connessione, utente, lista) cosi' si
+# gira in CI su sqlite in memoria. Il tetto e' una costante nuda e non
+# una leva: e' un guardrail contro un client impazzito, non una taratura.
+MAX_CHIAVI_P2P = 500      # per utente: l'identita' + una trade key per scambio
+FORMA_PUBKEY_P2P = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
+    """Scrive le pubkey di UN utente. Idempotente per costruzione (la PK
+    e' la pubkey e l'INSERT e' OR IGNORE): il client le rimanda a ogni
+    avvio e non nasce mai un doppione. Alza ValueError — mai un 400
+    diretto — sulla forma storta e sul tetto, cosi' chi lo chiama decide
+    il codice HTTP e la prova non ha bisogno di FastAPI.
+    UNA PUBKEY GIA' DI UN ALTRO NON SI RUBA: l'OR IGNORE la lascia a chi
+    l'ha registrata per primo (due mazzi non condividono mai una chiave,
+    che nasce casuale: se succede e' lo stesso codice importato su due
+    account, e la riga di prima resta quella vera)."""
+    if not isinstance(pubkeys, list) or not pubkeys:
+        raise ValueError("Nessuna chiave da registrare")
+    pulite = []
+    for p in pubkeys:
+        p = str(p).strip().lower()
+        if not FORMA_PUBKEY_P2P.fullmatch(p):
+            raise ValueError("Chiave in una forma sconosciuta")
+        if p not in pulite:
+            pulite.append(p)
+    gia = {r[0] for r in con.execute(
+        "SELECT pubkey FROM chiavi_p2p WHERE tg_id=?", (tg_id,))}
+    nuove = [p for p in pulite if p not in gia]
+    if len(gia) + len(nuove) > MAX_CHIAVI_P2P:
+        raise ValueError("Troppe chiavi registrate per questo profilo")
+    scritte = 0
+    for p in nuove:
+        scritte += con.execute(
+            "INSERT OR IGNORE INTO chiavi_p2p(pubkey, tg_id, creato) "
+            "VALUES(?,?,?)", (p, tg_id, adesso)).rowcount
+    con.commit()
+    return {"registrate": scritte, "totale": len(gia) + scritte}
+
+
+@app.post("/api/p2p/chiavi")
+async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Il client dice al server quali pubkey guardare. 409 a leva
+    spenta: a funzione spenta nessuno dovrebbe avere un mazzo, e una
+    registrazione che passa lo stesso sarebbe una tabella che cresce
+    per una cosa che non esiste. Il giudice e' `_registra_chiavi_p2p`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_leve()["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        esito = _registra_chiavi_p2p(con, user["id"],
+                                     (d or {}).get("pubkeys"),
+                                     int(time.time()))
+    except ValueError as e:
+        con.close()
+        raise HTTPException(400, str(e))
+    con.close()
+    return {"ok": True, **esito}
+
+
+@app.delete("/api/p2p/chiavi")
+def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """«Dimentica il profilo»: via TUTTE le pubkey di quell'utente.
+    NESSUN gate sulla leva, ed e' deliberato: togliere il proprio nome
+    da una lista non dipende da un interruttore (il patto di
+    `ritira_puntata` — uscire non dipende da una leva)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    tolte = con.execute("DELETE FROM chiavi_p2p WHERE tg_id=?",
+                        (user["id"],)).rowcount
+    con.commit()
+    con.close()
+    return {"ok": True, "tolte": tolte}
 
 
 def _bech32_polymod(valori: list) -> int:

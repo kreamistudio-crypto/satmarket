@@ -26669,8 +26669,12 @@ def prove_fogli_di_casa():
     # busta diretta — dichiarare che il codice va al compratore
     # silenzia i promemoria e avvisa l'acquirente, e va detto PRIMA
     # del tocco.
-    prova("i gesti che passano dalla domanda unica sono quarantatre",
-          43, solo_codice(mini).count("chiediConferma({"))
+    # QUARANTAQUATTRO E QUARANTACINQUE (set 2026, il profilo di
+    # scambio): dimenticare il profilo e sostituirlo importandone un
+    # altro — tutt'e due possono far perdere una reputazione che non
+    # torna, e il corpo lo dice.
+    prova("i gesti che passano dalla domanda unica sono quarantacinque",
+          45, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -34729,7 +34733,11 @@ def prove_p2p_libro():
 
     # --- 1) LA LEVA DA DUE FONTI, il calco di asteAccese ---------------
     i = mini.index("LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO")
-    blocco = mini[i:mini.index("/* ---- export CSV degli affari conclusi", i)]
+    # Il blocco della LETTURA finisce dove comincia il mazzo (tappa 3):
+    # e' li' che il segreto nasce, e l'affermazione «qui non si firma,
+    # non si cifra, non si pubblica» resta vera sul solo libro. Il
+    # mazzo ha le sue sentinelle in prove_p2p_chiavi.
+    blocco = mini[i:mini.index("IL MAZZO DEL PROFILO DI SCAMBIO", i)]
     # il codice senza i commenti a blocco: la prosa nomina apposta le
     # cose che non ci sono (la lezione di _senza_prosa)
     cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
@@ -34914,6 +34922,403 @@ console.log(JSON.stringify(out));
     prova("la scadenza a grana grossa",
           ["", "scaduto", "scade fra 2 min", "scade fra 2 h", "scade fra 3 g"],
           out["scade"])
+
+
+def prove_p2p_chiavi():
+    """IL MAZZO DEL PROFILO DI SCAMBIO (set 2026, tappa 3): le chiavi con
+    cui si parla col coordinator nascono nel BROWSER, per tutti — anche
+    per chi entra con Telegram — e il server conosce SOLO la meta'
+    pubblica (regola ferrea 2, decisione di Andrea: mai la piattaforma
+    come firmataria degli scambi altrui).
+    Le cose da sorvegliare sono tre: che il segreto non esca MAI dal
+    browser (i corpi delle fetch di questo blocco portano solo
+    `pubkeys`, la tabella non ha una colonna dove potrebbe finire), che
+    il cloud di Telegram si legga PRIMA di fabbricare un mazzo nuovo (la
+    cache svuotata non deve rifare un profilo a chi ne ha gia' uno) e
+    che chi entra da Telegram non legga mai una parola di protocollo.
+    Le sentinelle dicono che le righe ci sono; il banco node fa GIRARE
+    il blocco col bundle VERO e un cloud di cartone, e il banco sqlite
+    fa girare il giudice del server."""
+    print("\n[il mazzo del profilo di scambio]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL BLOCCO DEL MAZZO, e cosa non deve contenere -----------
+    # dal `/*` che apre il blocco, o il commento di testa — che nomina
+    # apposta cio' che non si fa — resterebbe fuori dallo strip
+    i = mini.rindex("/*", 0, mini.index("IL MAZZO DEL PROFILO DI SCAMBIO"))
+    blocco = mini[i:mini.index("/* ---- export CSV degli affari conclusi", i)]
+    cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
+    corpi = re.findall(r"body: ([^\n]*)", cod)
+    prova("le fetch del blocco che portano un corpo sono UNA", 1, len(corpi))
+    prova("...e quel corpo e' `{pubkeys}` e nient'altro", True,
+          all(c.startswith("JSON.stringify({pubkeys:") for c in corpi))
+    prova("...senza un `sk` dentro", False,
+          any("sk" in c for c in corpi))
+    prova("le fetch del blocco sono due: registra e dimentica", 2,
+          cod.count("fetch("))
+    prova("la trade key si deriva con HMAC e mai con getConversationKey",
+          True, "NT.hmac(NT.sha256, skB" in cod
+          and "getConversationKey" not in cod)
+    prova("...e getPublicKey fa da giudice dello scalare", True,
+          "const pub = NT.getPublicKey(cand);" in cod)
+    prova("mazzoMostro rifiuta un mazzo senza sk O senza pub esadecimali",
+          True, "FORMA_HEX64.test(d.sk || '') && FORMA_HEX64.test(d.pub || '')"
+          in cod)
+    prova("il cloud di Telegram si chiama solo con initData vero e 6.9",
+          True, "tg?.initData && tg.isVersionAtLeast?.('6.9') && tg.CloudStorage"
+          in cod)
+    am = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
+    prova("assicuraMazzo legge il cloud PRIMA di generare", True,
+          0 < am.find("cloudLeggi(CLOUD_MAZZO)") < am.find("generateSecretKey"))
+    prova("...e scrive il cloud solo quando il mazzo e' nuovo", True,
+          "if (!nuvola) await cloudScrivi(CLOUD_MAZZO" in am)
+    prova("...e registra la pubkey appena nato", True,
+          "await registraChiaviP2P([nuovo.pub]);" in am)
+    prova("il codice entra nel campo col .value, mai in un template", True,
+          "el('p2pCodice').value = p2pCodiceMostrato" in cod
+          and "${p2pCodiceMostrato" not in cod)
+    prova("mostraCodiceP2P aspetta il bundle prima di esportare", True,
+          "await caricaNostrTools();" in pezzo_js(mini, "async function mostraCodiceP2P(", "\n}\n"))
+    rp = pezzo_js(mini, "function renderProfiloP2P(", "\n}\n")
+    prova("il codice sta in un password con autocomplete new-password", True,
+          'type="password" id="p2pCodice" name="password" autocomplete="new-password"' in rp)
+    prova("...dentro un form con lo username fisso del profilo", True,
+          'name="username" value="barattolo-profilo-di-scambio" autocomplete="username"' in rp
+          and '<form id="p2pCodiceForm"' in rp)
+    prova("la riga del debito sparisce con backupFatto", True,
+          "m.backupFatto\n    ? '✓ Hai salvato il codice segreto.'" in rp)
+    # LE PAROLE: chi entra da Telegram non legge «Nostr», «nsec», «relay»
+    # ne' «chiave» nei testi del profilo. Si guardano le funzioni che
+    # PARLANO, tolti i due nomi di codice che quella parola la portano
+    # per mestiere (il bundle e il suo loader).
+    for fn in ("async function apriProfiloP2P(", "function renderProfiloP2P(",
+               "function scordaMazzo(", "async function importaMazzoDalFoglio(",
+               "async function codiceP2PSalvato(", "async function copiaCodiceP2P(",
+               "async function dimenticaMazzoOra("):
+        testo = pezzo_js(mini, fn, "\n}\n").replace("caricaNostrTools", "") \
+            .replace("window.NostrTools", "").lower()
+        prova(f"`{fn.split('function ')[1][:-1]}` non dice Nostr/nsec/relay/chiave",
+              False, any(w in testo for w in ("nostr", "nsec", "relay", "chiave")))
+    sh_i = mini.index('<div class="sheet" id="p2pProfiloSheet"')
+    sheet = mini[sh_i:mini.index("</div>\n", mini.index('id="p2pProfiloCorpo"'))]
+    prova("il markup del foglio non dice Nostr/nsec/relay/chiave", False,
+          any(w in sheet.lower() for w in ("nostr", "nsec", "relay", "chiave")))
+    prova("il foglio e' un dialog", True,
+          'role="dialog" aria-modal="true"' in sheet)
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}")
+    prova("il foglio si registra in closeSheet", True,
+          "el('p2pProfiloSheet').classList.remove('open')" in chiudi)
+    prova("...e sta PRIMA della conferma nel DOM (navPila ordina per posizione)",
+          True, sh_i < mini.index('<div class="sheet" id="paccoSvuotaSheet"')
+          < mini.index('id="confermaSheet"'))
+    prova("la vista P2P ha la porta del profilo", True,
+          'onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio' in mini)
+    prova("in vetrina apre l'invito con la SUA chiave", True,
+          "invitoTelegram(INVITO_ONION.p2p, 'p2p')" in cod)
+    cat = mini[mini.index("const INVITO_ONION = {"):]
+    cat = cat[:cat.index("\n};")]
+    prova("...che sta nel catalogo dell'onion", True, "\n  p2p: '" in cat)
+    prova("in DEMO si guarda soltanto", True,
+          "if (DEMO) { toast('Nel demo si guarda soltanto" in cod)
+    prova("«dimentica» e «sostituisci» passano dalla domanda unica", 2,
+          cod.count("chiediConferma({"))
+    prova("dimenticare toglie locale, cloud E la lista del server", True,
+          all(s in pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
+              for s in ("scordaMazzoLocale();", "await cloudCancella(CLOUD_MAZZO);",
+                        "await dimenticaChiaviP2P();")))
+    rp2 = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("il mazzo che c'e' gia' si rimanda al server dalla pagina", True,
+          "registraChiaviP2P([mz.pub]);" in rp2 and "!p2pRegistrato" in rp2)
+    priv = mini[mini.index('id="view-privacy"'):mini.index("privShare")]
+    prova("«I tuoi dati» dice del cloud di Telegram e del server che non riceve",
+          True, '<h3 id="priv-p2p">' in priv
+          and "il nostro server non riceve mai" in priv
+          and "chi ha il tuo account Telegram ce l'ha anche lui" in priv)
+
+    # --- 2) IL SERVER: la tabella senza un posto per il segreto ------
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i) + len("ON chiavi_p2p(tg_id);")]
+    ddl = "\n".join(r for r in schema.split("\n") if not r.strip().startswith("--"))
+    for spia in ("sk", "nsec", "secret", "segreto", "priv"):
+        prova(f"il DDL di chiavi_p2p non ha un posto per `{spia}`", False,
+              spia in ddl.lower())
+    prova("le colonne sono quattro e sono quelle",
+          ["creato", "pubkey", "tg_id", "ultimo_nudge"],
+          sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl, re.M)))
+    post = src[src.index('@app.post("/api/p2p/chiavi")'):
+               src.index('@app.delete("/api/p2p/chiavi")')]
+    dele = src[src.index('@app.delete("/api/p2p/chiavi")'):
+               src.index("\ndef _bech32_polymod(")]
+    prova("registrare vuole l'identita'", True, "verifica_utente(" in post)
+    prova("...e risponde 409 a leva spenta, chiedendo al giudice", True,
+          'if not _p2p_leve()["attivo"]:' in post and "HTTPException(409" in post)
+    prova("...e il conto lo fa il giudice puro", True,
+          "_registra_chiavi_p2p(con, user[\"id\"]," in post)
+    prova("dimenticare vuole l'identita' e NON guarda la leva", True,
+          "verifica_utente(" in dele and "_p2p_leve" not in dele)
+    giudice = pezzo("_registra_chiavi_p2p")
+    prova("il giudice scrive con INSERT OR IGNORE", True,
+          "INSERT OR IGNORE INTO chiavi_p2p" in giudice)
+    prova("...e valida con fullmatch sui 64 esadecimali", True,
+          "FORMA_PUBKEY_P2P.fullmatch(p)" in giudice
+          and 'FORMA_PUBKEY_P2P = re.compile(r"^[0-9a-f]{64}$")' in src)
+    prova("la fusione porta le chiavi con l'utente", True,
+          "UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?" in pezzo("esegui_fusione"))
+
+    # --- 3) IL BANCO SQLITE: il giudice gira -------------------------
+    con = sqlite3.connect(":memory:")
+    con.executescript(schema)
+    forma = re.search(r'FORMA_PUBKEY_P2P = re\.compile\(r"([^"]+)"\)', src).group(1)
+    amb = {"MAX_CHIAVI_P2P": 3, "FORMA_PUBKEY_P2P": re.compile(forma)}
+    exec(giudice, amb)
+    reg = amb["_registra_chiavi_p2p"]
+    A, B = "a" * 64, "b" * 64
+
+    def tenta(*a):
+        try:
+            return reg(*a)
+        except ValueError as e:
+            return "NO " + str(e)
+    prova("la prima pubkey si registra", {"registrate": 1, "totale": 1},
+          tenta(con, 111, [A], 1000))
+    prova("...la stessa di nuovo non raddoppia", {"registrate": 0, "totale": 1},
+          tenta(con, 111, [A], 1001))
+    prova("le maiuscole si accettano abbassandole",
+          {"registrate": 1, "totale": 2}, tenta(con, 111, [B.upper()], 1002))
+    prova("...e in colonna e' minuscola", B, con.execute(
+        "SELECT pubkey FROM chiavi_p2p WHERE tg_id=111 AND pubkey=?", (B,)).fetchone()[0])
+    prova("una forma storta e' un NO e non scrive", True,
+          str(tenta(con, 111, ["zz" * 32], 1003)).startswith("NO")
+          and con.execute("SELECT COUNT(*) FROM chiavi_p2p").fetchone()[0] == 2)
+    prova("una lista vuota e' un NO", True,
+          str(tenta(con, 111, [], 1003)).startswith("NO")
+          and str(tenta(con, 111, None, 1003)).startswith("NO"))
+    prova("oltre il tetto e' un NO, e non scrive nemmeno la prima", True,
+          str(tenta(con, 111, ["c" * 64, "d" * 64], 1004)).startswith("NO")
+          and con.execute("SELECT COUNT(*) FROM chiavi_p2p WHERE tg_id=111").fetchone()[0] == 2)
+    prova("una pubkey gia' di un altro non si ruba", {"registrate": 0, "totale": 0},
+          tenta(con, 222, [A], 1005))
+    prova("...e resta a chi l'aveva", 111, con.execute(
+        "SELECT tg_id FROM chiavi_p2p WHERE pubkey=?", (A,)).fetchone()[0])
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)",
+                ("e" * 64, -7, 1))
+    con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?", (111, -7))
+    prova("la fusione sposta le chiavi del nativo sul Telegram", 3, con.execute(
+        "SELECT COUNT(*) FROM chiavi_p2p WHERE tg_id=111").fetchone()[0])
+    con.close()
+
+    # --- 4) IL BANCO NODE: il blocco gira col bundle VERO ------------
+    node = _sh.which("node")
+    if not node:
+        salta("il mazzo gira nel browser di cartone", "node non c'e'")
+        return
+    js_blocco = mini[mini.index("const MOSTRO_CHIAVE = "):
+                     mini.index("/* ---- export CSV degli affari conclusi")]
+    banco = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const {bytesToHex, hexToBytes} = NT.utils;
+let store = new Map();
+const localStorage = {getItem: k => store.has(k) ? store.get(k) : null,
+  setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k)};
+let cloud = new Map(), cloudLog = [];
+const cloudVero = {
+  getItem: (k, cb) => { cloudLog.push('get'); cb(null, cloud.get(k) || ''); },
+  setItem: (k, v, cb) => { cloudLog.push('set'); cloud.set(k, v); cb(null, true); },
+  removeItem: (k, cb) => { cloudLog.push('rm'); cloud.delete(k); cb(null, true); }};
+let tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+function authHdr(){ return 'collaudo:111:x'; }
+let fetches = [];
+async function fetch(url, opt){ fetches.push({url, opt}); return {ok: true}; }
+let toasts = []; function toast(m){ toasts.push(m); }
+function haptic(){}
+let nodi = {}, aperti = [];
+function el(id){
+  if (!nodi[id]) nodi[id] = {value: '', innerHTML: '', type: 'password',
+    classList: {add(c){ aperti.push(id); }, remove(){}}};
+  return nodi[id];
+}
+function esc(s){ return String(s); }
+let conferme = []; function chiediConferma(o){ conferme.push(o); if (o.poi) o.poi(); }
+let inviti = []; function invitoTelegram(t, k){ inviti.push(k); }
+const INVITO_ONION = {p2p: 'x'};
+async function caricaNostrTools(){}
+let copiato = '';
+const navigator = {clipboard: {writeText: async t => { copiato = t; }}};
+""" + js_blocco + r"""
+function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches = [];
+  toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
+  p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
+  myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero}; }
+const corpo = f => JSON.parse(f.opt.body);
+(async () => {
+  const out = {};
+  // 1) le trade key
+  const sk = bytesToHex(NT.generateSecretKey());
+  const k1 = chiaveScambio(sk, 1), k1b = chiaveScambio(sk, 1), k2 = chiaveScambio(sk, 2);
+  out.det = k1.sk === k1b.sk && k1.pub === k1b.pub;
+  out.diversi = k1.sk !== k2.sk && k1.sk !== sk;
+  out.pubValida = /^[0-9a-f]{64}$/.test(k1.pub) && NT.getPublicKey(hexToBytes(k1.sk)) === k1.pub;
+  // 2) il codice nelle sue forme
+  const nsec = NT.nip19.nsecEncode(hexToBytes(sk));
+  out.daNsec = mazzoDaTesto(nsec).sk === sk;
+  out.daHexMaiuscolo = mazzoDaTesto(sk.toUpperCase()).sk === sk;
+  const daJson = mazzoDaTesto(JSON.stringify({sk, indice: 3, creato: 5, backupFatto: true}));
+  out.daJson = daJson.sk === sk && daJson.indice === 3 && daJson.creato === 5 && daJson.backupFatto === true;
+  out.storti = [mazzoDaTesto('nsec1zzzz'), mazzoDaTesto(''), mazzoDaTesto('zz'.repeat(32)),
+                mazzoDaTesto('{"x":1}'), mazzoDaTesto('{rotto')].every(v => v === null);
+  // 3) assicuraMazzo: nasce, va nel cloud, la pubkey al server
+  reset();
+  const m = await assicuraMazzo();
+  out.nato = /^[0-9a-f]{64}$/.test(m.sk) && m.pub === NT.getPublicKey(hexToBytes(m.sk)) && m.backupFatto === false;
+  out.inLocale = mazzoMostro() && mazzoMostro().sk === m.sk;
+  out.cloudPrimaLettoPoiScritto = cloudLog.join(',') === 'get,set';
+  out.cloudPortaIlMazzo = JSON.parse(cloud.get('mostro_mazzo')).sk === m.sk;
+  out.fetchUna = fetches.length === 1 && fetches[0].opt.method === 'POST';
+  out.corpoSoloPub = JSON.stringify(corpo(fetches[0])) === JSON.stringify({pubkeys: [m.pub]});
+  out.skMaiInRete = !JSON.stringify(fetches).includes(m.sk);
+  // 4) dal cloud non si fabbrica un mazzo nuovo
+  reset();
+  cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 2, creato: 9, backupFatto: true}));
+  const mc = await assicuraMazzo();
+  out.tornatoDalCloud = mc.sk === sk && mc.indice === 2 && mc.backupFatto === true;
+  out.cloudNonRiscritto = cloudLog.join(',') === 'get';
+  out.registratoLoStesso = fetches.length === 1 && corpo(fetches[0]).pubkeys[0] === mc.pub;
+  // 5) col mazzo gia' in locale non si tocca niente
+  reset(); ricordaMazzo(m);
+  const ml = await assicuraMazzo();
+  out.localeVince = ml.sk === m.sk && cloudLog.length === 0 && fetches.length === 0;
+  // 6) fuori da Telegram niente cloud, ma il mazzo nasce
+  reset(); tg = undefined;
+  const mf = await assicuraMazzo();
+  out.senzaTelegram = /^[0-9a-f]{64}$/.test(mf.sk) && cloudLog.length === 0 && fetches.length === 1;
+  reset(); tg = {initData: '', isVersionAtLeast: v => true, CloudStorage: cloudVero};
+  await assicuraMazzo();
+  out.stubNonInganna = cloudLog.length === 0;
+  // 7) in vetrina il segreto nasce ma il server non si chiama
+  reset(); VETRINA = true;
+  await assicuraMazzo();
+  out.vetrinaNonChiama = fetches.length === 0;
+  // 8) due gesti insieme = un mazzo solo
+  reset();
+  const [d1, d2] = await Promise.all([assicuraMazzo(), assicuraMazzo()]);
+  out.unoSolo = d1.sk === d2.sk && fetches.length === 1;
+  // 9) mazzoMostro non crede a un dato storto
+  reset(); store.set('barattolo_mostro', 'xx');
+  out.corrotto = mazzoMostro() === null;
+  store.set('barattolo_mostro', JSON.stringify({sk: 'zz', pub: 'zz'}));
+  out.storto = mazzoMostro() === null;
+  // 10) esporta e rileggi
+  reset(); ricordaMazzo(m);
+  const cod = esportaMazzo();
+  out.esporta = cod.startsWith('nsec1') && mazzoDaTesto(cod).sk === m.sk;
+  // 11) il foglio: mostra, copia, «l'ho salvato»
+  await apriProfiloP2P();
+  out.foglioAperto = aperti.includes('p2pProfiloSheet') && aperti.includes('sheetBg');
+  const primaTesto = nodi.p2pProfiloCorpo.innerHTML;
+  out.debitoDetto = primaTesto.includes('la reputazione riparte da zero');
+  await mostraCodiceP2P();
+  out.codiceNelCampo = nodi.p2pCodice.value === cod && !nodi.p2pProfiloCorpo.innerHTML.includes(cod);
+  await copiaCodiceP2P();
+  out.copiato = copiato === cod;
+  await codiceP2PSalvato();
+  out.salvato = mazzoMostro().backupFatto === true && JSON.parse(cloud.get('mostro_mazzo')).backupFatto === true
+    && nodi.p2pProfiloCorpo.innerHTML.includes('Hai salvato');
+  // 12) importa: lo stesso non fa niente, un altro chiede e sostituisce
+  nodi.p2pImportaInp = {value: cod};
+  await importaMazzoDalFoglio();
+  out.stessoNonImporta = conferme.length === 0 && toasts.some(t => t.includes('già'));
+  const sk2 = bytesToHex(NT.generateSecretKey());
+  nodi.p2pImportaInp.value = NT.nip19.nsecEncode(hexToBytes(sk2));
+  fetches = [];
+  await importaMazzoDalFoglio();
+  out.sostituisceChiedendo = conferme.length === 1 && mazzoMostro().sk === sk2
+    && corpo(fetches[0]).pubkeys[0] === NT.getPublicKey(hexToBytes(sk2));
+  nodi.p2pImportaInp.value = 'nsec1rotto';
+  toasts = [];
+  await importaMazzoDalFoglio();
+  out.stortoDetto = mazzoMostro().sk === sk2 && toasts.some(t => t.includes('forma giusta'));
+  // 13) dimentica: via da locale, cloud e server
+  fetches = []; conferme = [];
+  scordaMazzo();
+  await new Promise(r => setTimeout(r, 20));
+  out.dimenticato = conferme.length === 1 && mazzoMostro() === null && !cloud.has('mostro_mazzo')
+    && fetches.length === 1 && fetches[0].opt.method === 'DELETE';
+  // 14) in DEMO e in vetrina il foglio non si apre
+  reset(); DEMO = true;
+  await apriProfiloP2P();
+  out.demoTace = aperti.length === 0 && toasts.length === 1;
+  reset(); VETRINA = true;
+  await apriProfiloP2P();
+  out.vetrinaInvita = aperti.length === 0 && inviti[0] === 'p2p';
+  // 15) le parole a schermo
+  reset(); ricordaMazzo(m); await apriProfiloP2P();
+  const t = nodi.p2pProfiloCorpo.innerHTML.toLowerCase();
+  out.paroleDiCasa = !['nostr', 'nsec', 'relay', 'chiave'].some(w => t.includes(w));
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
+"""
+    d = _tf.mkdtemp()
+    p = os.path.join(d, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    try:
+        r = _sp.run([node, p, os.path.abspath(os.path.join("vendor", "nostr.bundle.js"))],
+                    capture_output=True, encoding="utf-8", timeout=90)
+        prova("il banco node del mazzo gira", "", r.stderr[-600:])
+        out = _json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    attesi = {
+        "det": "la trade key e' deterministica",
+        "diversi": "indici diversi danno chiavi diverse, e mai il segreto stesso",
+        "pubValida": "la pubkey derivata e' quella della sua sk",
+        "daNsec": "il codice si legge in bech32",
+        "daHexMaiuscolo": "...e in esadecimale, anche maiuscolo",
+        "daJson": "...e nel JSON del cloud coi suoi campi",
+        "storti": "un codice storto vale null e non alza",
+        "nato": "il mazzo nasce con sk, pub e backupFatto=false",
+        "inLocale": "...e finisce in localStorage",
+        "cloudPrimaLettoPoiScritto": "il cloud si legge PRIMA e si scrive DOPO",
+        "cloudPortaIlMazzo": "...e nel cloud c'e' il mazzo",
+        "fetchUna": "al server parte UNA POST",
+        "corpoSoloPub": "...col solo {pubkeys: [pub]}",
+        "skMaiInRete": "...e il segreto non e' in nessuna fetch",
+        "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
+        "cloudNonRiscritto": "...senza riscrivere il cloud",
+        "registratoLoStesso": "...e la pubkey si registra lo stesso",
+        "localeVince": "col mazzo gia' in locale ne' cloud ne' rete",
+        "senzaTelegram": "fuori da Telegram niente cloud, ma il mazzo nasce e si registra",
+        "stubNonInganna": "lo stub di Telegram senza initData non apre il cloud",
+        "vetrinaNonChiama": "in vetrina il server non si chiama",
+        "unoSolo": "due gesti insieme fanno un mazzo solo",
+        "corrotto": "un localStorage corrotto vale null",
+        "storto": "...e un mazzo con sk storta pure",
+        "esporta": "esporta e rileggi ridanno lo stesso segreto",
+        "foglioAperto": "il foglio si apre col velo",
+        "debitoDetto": "...e dice che senza codice la reputazione riparte da zero",
+        "codiceNelCampo": "«mostra» mette il codice nel campo e MAI nel markup",
+        "copiato": "«copia» copia quel codice",
+        "salvato": "«l'ho salvato» timbra il backup in locale e nel cloud",
+        "stessoNonImporta": "importare lo stesso codice non fa niente e lo dice",
+        "sostituisceChiedendo": "importarne un altro chiede, sostituisce e registra",
+        "stortoDetto": "un codice storto non tocca il mazzo e lo dice",
+        "dimenticato": "«dimentica» chiede, e poi via da locale, cloud e server",
+        "demoTace": "in DEMO il foglio non si apre e un toast lo dice",
+        "vetrinaInvita": "in vetrina si apre l'invito con la chiave p2p",
+        "paroleDiCasa": "a schermo nessuna parola di protocollo",
+    }
+    for k, nome in attesi.items():
+        prova(nome, True, out.get(k))
 
 
 def prove_p2p_server():
@@ -41192,6 +41597,7 @@ def main():
               prove_bundle_nostr,
               prove_p2p_server,
         prove_p2p_libro,
+    prove_p2p_chiavi,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
