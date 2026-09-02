@@ -527,6 +527,18 @@ ASTA_PROXY_ATTIVO = False    # rilancio automatico (False = spento)
 # dopo il giro dal vivo sul coordinator, mai per effetto di un deploy.
 # Spenta, il tab resta il coming soon e nessun relay viene toccato.
 P2P_ATTIVO = False
+# LA FASE CHIUSA, prima di aprire a tutti: i tg_id che vedono il P2P
+# mentre gli altri leggono il coming soon di sempre. IL VUOTO E'
+# L'APERTURA — lasciata cosi' (o non dichiarata affatto) il P2P vale
+# per chiunque appena P2P_ATTIVO si accende, e il giorno dell'apertura
+# si cancella la riga. Finche' c'e' qualcuno qui dentro, la campagna
+# una-tantum a chi ha premuto «Avvisami» NON parte: e' l'annuncio
+# dell'apertura, e si manda una volta sola.
+# ⚠️ Una riga storta (una stringa, o qualcosa che non e' un numero)
+# vale «chiusa a tutti» e lo dice all'avvio: qui sbagliare verso
+# l'apertura vorrebbe dire uno scambio di denaro vero aperto al
+# mercatino intero senza averlo deciso.
+P2P_PROVA_IDS = []
 # La npub del coordinator: e' PUBBLICA (firma il libro ordini che tutti
 # leggono). Storta = lo scambio resta spento, e il journal lo dice.
 MOSTRO_NPUB = "npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0"

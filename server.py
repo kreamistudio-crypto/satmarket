@@ -12706,7 +12706,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # funzione e' accesa. Sta QUI e non solo in /api/me perche' il
         # libro ordini si legge anche da anonimi in vetrina, dove
         # /api/me non esiste — il patto di `asta_abilitata`.
-        risposta["p2p"] = _p2p_leve()
+        risposta["p2p"] = _p2p_per(user["id"] if user else 0)
     con.close()
     return risposta
 
@@ -16055,6 +16055,13 @@ def _leve_stato():
             _leva("Coordinator (npub)", "MOSTRO_NPUB", MOSTRO_NPUB,
                   spento="senza la npub del coordinator lo scambio non "
                          "si accende, anche con P2P_ATTIVO a True"),
+            _leva("Fase di prova P2P", "P2P_PROVA_IDS",
+                  _elenco(sorted(P2P_PROVA_IDS)),
+                  acceso="il P2P lo vedono solo questi id, e finché "
+                         "c'è qualcuno qui la campagna «lo aspetto» "
+                         "non parte",
+                  spento="aperto a tutti: appena P2P_ATTIVO si accende "
+                         "lo scambio vale per chiunque"),
             _leva("Relay del coordinator", "MOSTRO_RELAY",
                   _elenco(MOSTRO_RELAY),
                   spento="senza i relay lo scambio non si accende: qui "
@@ -26361,7 +26368,7 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
     # metterle insieme.
-    profilo["p2p_leve"] = _p2p_leve()
+    profilo["p2p_leve"] = _p2p_per(user["id"])
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
@@ -28844,6 +28851,40 @@ try:
     MOSTRO_RELAY = [str(r) for r in MOSTRO_RELAY if str(r).strip()]
 except ImportError:
     MOSTRO_RELAY = []
+# LA FASE CHIUSA (set 2026, decisione di Andrea): prima di aprire il
+# P2P a tutti lo usano solo Andrea e Alan, su scambi veri e piccoli.
+# La lista dei tg_id ammessi E' la leva, e IL VUOTO E' L'APERTURA —
+# non un terzo stato da ricordare: `P2P_ATTIVO` dice se la funzione
+# esiste, questa dice a CHI, e a lista vuota vale per chiunque. Il
+# giorno dell'apertura si cancella una riga dal config.
+# NON SI RIUSA `ADMIN_IDS`, ed e' la riga da non ammorbidire: quello
+# significa «moderatore» e governa gia' le notifiche di servizio, la
+# coda della revisione, il pannello delle leve e le code admin —
+# quindi far provare il P2P a un terzo vorrebbe dire dargli anche
+# quelle, e un moderatore che di scambi non vuole sapere niente se lo
+# ritroverebbe acceso. Sono due domande diverse e hanno due leve.
+# UNA LEVA STORTA CHIUDE E NON APRE, ed e' il fail-closed di
+# `_mostro_hex` applicato a un caso in cui il verso non e' ovvio: qui
+# la lista VUOTA vuol dire «tutti», quindi un `set()` sul refuso
+# aprirebbe uno scambio di denaro vero al mercatino intero senza che
+# nessuno l'abbia deciso. Il ripiego e' `{0}` — un id che non esiste,
+# cioe' la fase chiusa accesa con nessun ammesso — e lo si DICE, che
+# altrimenti Andrea vedrebbe il P2P sparito senza sapere perche'.
+# NON DICHIARATA e' un'altra cosa da SCRITTA MALE: chi non ha la riga
+# nel config e' il mondo di ieri, byte per byte, e apre a tutti.
+try:
+    from config import P2P_PROVA_IDS
+    if isinstance(P2P_PROVA_IDS, (str, bytes)):
+        # `"123"` iterata darebbe {1, 2, 3} senza alzare niente: e'
+        # l'unico modo in cui questa leva puo' sbagliare in silenzio.
+        raise TypeError("una stringa non e' una lista di id")
+    P2P_PROVA_IDS = {int(i) for i in P2P_PROVA_IDS}
+except ImportError:
+    P2P_PROVA_IDS = set()          # non dichiarata: aperto a tutti
+except (TypeError, ValueError):
+    P2P_PROVA_IDS = {0}            # storta: chiusa a tutti, e si dice
+    print("[p2p] P2P_PROVA_IDS non e' una lista di numeri: la fase di "
+          "prova resta CHIUSA (0 e' un id che non esiste)")
 
 
 def _mostro_hex(npub: str) -> str:
@@ -28881,6 +28922,38 @@ def _p2p_leve() -> dict:
     return {"attivo": bool(P2P_ATTIVO and MOSTRO_HEX and MOSTRO_RELAY),
             "mostro": MOSTRO_HEX,
             "relay": list(MOSTRO_RELAY)}
+
+
+def _p2p_per(tg_id) -> dict:
+    """Le stesse leve, ma per UNA persona: nella fase chiusa `attivo`
+    e' vero solo per chi e' nella lista.
+    E' UN GIUDICE DELLA VISTA E NON DEL FATTO, ed e' la distinzione da
+    tenere: `_p2p_leve` dice se la funzione esiste sul SERVER — e
+    quello guardano l'orologio, il campanello e il pannello delle
+    leve — mentre questo dice se esiste PER TE, e lo guardano le due
+    buste che vanno al client piu' la registrazione delle chiavi.
+    Scambiarli non rompe niente di visibile: fa vedere il P2P a tutti
+    durante la fase chiusa, oppure spegne il campanello a chi lo sta
+    usando davvero.
+    NPUB E RELAY VIAGGIANO LO STESSO, il patto di `_p2p_leve`: sono
+    pubblici, e a non usarli e' il client finche' `attivo` e' falso.
+    L'ANONIMO NON E' NESSUNO: chi legge il libro ordini senza essere
+    entrato arriva qui con 0, che nella lista non c'e' mai — in fase
+    chiusa il tab resta il coming soon di sempre.
+    A LISTA VUOTA TORNA IL DIZIONARIO DI SEMPRE, e non e' un dettaglio:
+    il giorno dell'apertura questa funzione diventa trasparente e non
+    c'e' niente da togliere."""
+    leve = _p2p_leve()
+    # ⚠️ `leve["attivo"] and` E' UNA SCORCIATOIA E NON UNA GUARDIA, e va
+    # detto perche' la tortura ci torna sopra: a funzione spenta
+    # `attivo` e' gia' falso, quindi togliendolo il risultato non
+    # cambia di un carattere — l'ha verificato il giro delle mutazioni
+    # su tutti e cinque i casi, ed e' INERTE e non sopravvissuta. Resta
+    # perche' si legge come si pensa («se la funzione non c'e', non
+    # c'e' niente da filtrare») e perche' evita una copia del dict.
+    if leve["attivo"] and P2P_PROVA_IDS and tg_id not in P2P_PROVA_IDS:
+        return {**leve, "attivo": False}
+    return leve
 
 
 # LE CHIAVI PUBBLICHE DELLO SCAMBIO (tappa 3): il client registra le
@@ -28936,7 +29009,12 @@ async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
     registrazione che passa lo stesso sarebbe una tabella che cresce
     per una cosa che non esiste. Il giudice e' `_registra_chiavi_p2p`."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not _p2p_leve()["attivo"]:
+    # IL GATE E' PER PERSONA e non il FATTO del server: una regola che
+    # vale solo nel client e' mezza regola (la lezione del barattolo),
+    # e in fase chiusa chi non e' della partita non deve poter
+    # registrare un mazzo dall'API — sarebbe una tabella che cresce, e
+    # un campanello che suona, per una cosa che per lui non c'e'.
+    if not _p2p_per(user["id"])["attivo"]:
         raise HTTPException(409, "Lo scambio P2P non e' attivo")
     try:
         d = await req.json()
@@ -29208,8 +29286,15 @@ async def avvisa_interessi_p2p():
     tabella). E il testo non nomina mai Nostr, chiavi o relay: chi
     entra con Telegram legge «il coordinatore, un servizio
     indipendente», che e' quel che gli serve sapere."""
-    if not _p2p_leve()["attivo"]:
-        return                    # la funzione non c'e': non si promette
+    # LA TERZA DOMANDA, ed e' quella che rende sostenibile la fase
+    # chiusa: la campagna e' l'ANNUNCIO dell'apertura, e la lista
+    # vuota E' l'apertura. Partendo con la fase chiusa accesa direbbe
+    # «il P2P c'e'» a chi poi non lo vedrebbe, e siccome il timbro e'
+    # UNA-TANTUM brucerebbe il turno — il giorno vero l'avviso non
+    # partirebbe piu', e per rimandarlo bisognerebbe mettere le mani
+    # nella tabella `timbri`.
+    if not _p2p_leve()["attivo"] or P2P_PROVA_IDS:
+        return                    # non c'e', o c'e' per due: si tace
     if timbro_letto(TIMBRO_CAMPAGNA_P2P):
         return
     con = db()

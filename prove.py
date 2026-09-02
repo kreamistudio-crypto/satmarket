@@ -18383,6 +18383,12 @@ def _censimento(acceso):
     # le altre lascerebbe la riga «accesa» anche nel censimento spento,
     # e la nota «senza i relay non si accende» non uscirebbe mai.
     amb["MOSTRO_RELAY"] = [1, 2, 3] if acceso else []
+    # LA FASE CHIUSA e' una lista anche lei, e come i relay il VUOTO ha
+    # un significato — «aperto a tutti» — quindi si esercitano tutti e
+    # due i rami del pannello invece di inchiodarla a [1,2,3]: a leve
+    # spente la riga deve dire l'apertura, e senza questa distinzione
+    # quel ramo non lo guarderebbe nessuno.
+    amb["P2P_PROVA_IDS"] = {1, 2, 3} if acceso else set()
     amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
@@ -35107,8 +35113,13 @@ def prove_p2p_chiavi():
     _d = src.index('@app.delete("/api/p2p/chiavi")')
     dele = src[_d:src.index("\n\n\n", _d)]
     prova("registrare vuole l'identita'", True, "verifica_utente(" in post)
+    # CAMBIATA LATO con la tappa 7b: il gate qui e' della PERSONA e non
+    # il FATTO del server — in fase chiusa chi non e' della partita non
+    # deve poter registrare un mazzo dall'API, o la fase chiusa sarebbe
+    # solo un nascondere nel client (la lezione del barattolo).
     prova("...e risponde 409 a leva spenta, chiedendo al giudice", True,
-          'if not _p2p_leve()["attivo"]:' in post and "HTTPException(409" in post)
+          'if not _p2p_per(user["id"])["attivo"]:' in post
+          and "HTTPException(409" in post)
     prova("...e il conto lo fa il giudice puro", True,
           "_registra_chiavi_p2p(con, user[\"id\"]," in post)
     prova("dimenticare vuole l'identita' e NON guarda la leva", True,
@@ -37003,12 +37014,95 @@ def prove_p2p_server():
     # libro ordini si legge anche da anonimi — quindi la busta di prima
     # pagina; chi e' dentro la trova anche in /api/me. Una funzione
     # sola, o le due un giorno direbbero due cose diverse.
-    prova("la busta di prima pagina porta p2p dal giudice", True,
-          'risposta["p2p"] = _p2p_leve()' in src)
+    # LE DUE BUSTE PASSANO DA `_p2p_per` E NON PIU' DA `_p2p_leve`
+    # (tappa 7b): queste due prove hanno CAMBIATO LATO col perche'
+    # scritto — certificavano il FATTO del server dove adesso serve la
+    # vista della PERSONA, cioe' avrebbero tenuto in piedi il P2P
+    # visibile a tutti durante la fase chiusa.
+    prova("la busta di prima pagina porta p2p dal giudice PER PERSONA",
+          True, 'risposta["p2p"] = _p2p_per(user["id"] if user else 0)'
+          in src)
     prova("/api/me porta p2p_leve dallo stesso giudice", True,
-          'profilo["p2p_leve"] = _p2p_leve()' in src)
+          'profilo["p2p_leve"] = _p2p_per(user["id"])' in src)
     prova("...e il giudice e' UNO: nessuna seconda copia del dict", 1,
           src.count('"mostro": MOSTRO_HEX'))
+
+    # --- 4b) LA FASE CHIUSA (tappa 7b) ------------------------------
+    # `P2P_ATTIVO` dice se la funzione esiste, `P2P_PROVA_IDS` a CHI, e
+    # il vuoto E' l'apertura. Il giudice si fa GIRARE e non si guarda
+    # soltanto: una sentinella direbbe che la riga c'e', mai che un
+    # anonimo resti fuori o che npub e relay continuino a viaggiare.
+    per = pezzo("_p2p_per")
+
+    def _per(tg_id, ids, attivo=True):
+        amb = {"_p2p_leve": lambda: {"attivo": attivo, "mostro": "ab",
+                                     "relay": ["wss://uno"]},
+               "P2P_PROVA_IDS": ids}
+        exec(per, amb)
+        return amb["_p2p_per"](tg_id)
+
+    prova("a lista vuota il giudice e' trasparente", True,
+          _per(111, set())["attivo"])
+    prova("...e nella lista si passa", True, _per(111, {111, 222})["attivo"])
+    prova("...e fuori dalla lista no", False, _per(999, {111, 222})["attivo"])
+    prova("...e l'anonimo (0) non e' nessuno", False,
+          _per(0, {111, 222})["attivo"])
+    # NPUB E RELAY VIAGGIANO LO STESSO, il patto di `_p2p_leve`: sono
+    # pubblici, e a non usarli e' il client. Chi li togliesse qui
+    # romperebbe la busta per meta' mercatino senza far fallire niente.
+    prova("...ma npub e relay viaggiano lo stesso", ("ab", ["wss://uno"]),
+          (_per(999, {111})["mostro"], _per(999, {111})["relay"]))
+    # LA LISTA NON PUO' ACCENDERE QUEL CHE NON C'E': a funzione spenta
+    # nemmeno chi e' dentro la vede — sarebbe un client che parla con
+    # un coordinator che non abbiamo configurato.
+    prova("a funzione spenta la lista non accende niente", False,
+          _per(111, {111}, attivo=False)["attivo"])
+    # IL FATTO RESTA IL FATTO: orologio, campanello e pannello guardano
+    # `_p2p_leve` — chi ci mettesse `_p2p_per` spegnerebbe il
+    # campanello a chi lo sta usando, e senza un tg_id da passare.
+    for chi, atteso in (("_giro_p2p", True), ("avvia_orologio", True)):
+        prova("%s guarda il FATTO e non la persona" % chi, atteso,
+              '_p2p_leve()["attivo"]' in pezzo(chi))
+    prova("...e il pannello delle leve pure", True,
+          '_p2p_leve()["attivo"]' in codice(pezzo("_leve_stato")))
+    prova("...e nessuno dei tre passa da _p2p_per", 0,
+          sum("_p2p_per" in pezzo(f)
+              for f in ("_giro_p2p", "avvia_orologio", "_leve_stato")))
+    # E LA REGISTRAZIONE DELLE CHIAVI E' PER PERSONA: una regola che
+    # vale solo nel client e' mezza regola (la lezione del barattolo).
+    prova("registrare un mazzo passa dal giudice della persona", True,
+          '_p2p_per(user["id"])["attivo"]' in src)
+
+    # LA LEVA: non dichiarata e' un'altra cosa da scritta MALE. Il
+    # blocco si gira per davvero, che il fail-closed qui va nel verso
+    # meno ovvio — la lista VUOTA vuol dire «tutti», quindi un refuso
+    # non deve poter aprire.
+    i_l = src.index("try:\n    from config import P2P_PROVA_IDS")
+    blocco = src[i_l:src.index("\n\n\ndef _mostro_hex", i_l)]
+
+    def _leva_con(valore):
+        amb = {"print": lambda *a, **k: None}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_PROVA_IDS = valore
+        import sys as _s
+        vecchio = _s.modules.get("config")
+        _s.modules["config"] = finto
+        try:
+            exec(blocco, amb)
+        finally:
+            if vecchio is None:
+                _s.modules.pop("config", None)
+            else:
+                _s.modules["config"] = vecchio
+        return amb["P2P_PROVA_IDS"]
+
+    prova("la leva legge la lista", {111, 222}, _leva_con([111, 222]))
+    prova("...non dichiarata: aperto a tutti (il mondo di ieri)",
+          set(), _leva_con(None))
+    prova("...una stringa non e' una lista di id: chiude, non apre",
+          {0}, _leva_con("123"))
+    prova("...e nemmeno una lista di parole", {0}, _leva_con(["pippo"]))
 
     # --- 5) IL BLOCCO NON TOCCA UN SAT NE' UNA CHIAVE ---------------
     # E' l'affermazione che regge il punto 5 del quadro: qui dentro non
@@ -37061,6 +37155,21 @@ def prove_p2p_server():
     prova("i relay vuoti dicono che lo scambio non si accende", True,
           "non si accende" in voci_off.get("MOSTRO_RELAY",
                                           {}).get("nota", ""))
+    # LA FASE CHIUSA NEL PANNELLO (tappa 7b), e questa riga l'ha chiesta
+    # la TORTURA: rinominando la chiave della voce non diventava rossa
+    # NIENTE — il pannello e' l'unico posto da cui un moderatore sa che
+    # il P2P non lo vedono tutti, e una voce che sparisce in silenzio
+    # lascerebbe a chiedersi perche' meta' mercatino non lo trova.
+    prova("la fase chiusa e' nel pannello, come elenco", "1 · 2 · 3",
+          voci_on.get("P2P_PROVA_IDS", {}).get("valore"))
+    prova("...e dice che la campagna non parte", True,
+          "campagna" in voci_on.get("P2P_PROVA_IDS", {}).get("nota", ""))
+    # IL VUOTO E' L'APERTURA, e il pannello lo DICE invece di lasciare
+    # una riga vuota: e' lo stato in cui la leva non morde, e senza la
+    # nota si leggerebbe come «non configurata».
+    prova("...e a lista vuota dice l'apertura", True,
+          "aperto a tutti" in voci_off.get("P2P_PROVA_IDS",
+                                           {}).get("nota", ""))
 
     # --- 7) LE TRE LEVE STANNO DOVE SI COPIA -------------------------
     # `prove_config_esempio` lo verifica gia' per censimento, ma una
@@ -37263,8 +37372,9 @@ def prove_p2p_campanello():
     async def _dormi(_s):
         return None
 
-    def _giro_campagna(attivo=True):
+    def _giro_campagna(attivo=True, prova_ids=set()):
         amb = {"_p2p_leve": lambda: {"attivo": attivo},
+               "P2P_PROVA_IDS": prova_ids,
                "timbro_letto": lambda n: timbri.get(n),
                "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
                "db": lambda: con, "notifica": _finta_notifica,
@@ -37284,6 +37394,25 @@ def prove_p2p_campanello():
           gia_timbrato)
     _giro_campagna()
     prova("il secondo giro non raddoppia niente", [111, 222], mandati)
+    con.close()
+
+    # --- 9) LA FASE CHIUSA NON BRUCIA IL TURNO (tappa 7b) -----------
+    # E' il difetto per cui la 7b esiste: la campagna e' l'ANNUNCIO
+    # dell'apertura e il timbro e' UNA-TANTUM, quindi accendendo il P2P
+    # per due persone partirebbe verso TUTTI quelli che hanno votato —
+    # e il giorno vero non partirebbe piu'. Si gira, che una sentinella
+    # direbbe dove sta la riga e mai che il turno fosse ancora intero.
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("CREATE TABLE interessi(tg_id INTEGER, funzione TEXT);")
+    for chi in (111, 222):
+        con.execute("INSERT INTO interessi VALUES(?, 'p2p')", (chi,))
+    timbri, mandati, gia_timbrato = {}, [], []
+    _giro_campagna(prova_ids={111})
+    prova("in fase chiusa la campagna tace", ([], {}), (mandati, timbri))
+    _giro_campagna()
+    prova("...e all'apertura il turno e' ancora intero", [111, 222],
+          mandati)
     con.close()
 
 
