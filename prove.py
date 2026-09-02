@@ -33218,6 +33218,93 @@ def prove_podio_sfondo():
           "disegna_figura(_foto_podio(con, tre), FILA_MISURE)" in _SORGENTE)
 
 
+def prove_censimento_kind():
+    """OGNI KIND NOSTR DEL SORGENTE E' NOMINATO IN CLAUDE.md (set 2026).
+
+    La sezione «Nostr: i kind e i NIP che tocchiamo» e' la mappa di
+    cosa mandiamo in piazza e cosa leggiamo: chi firma, chi legge, e
+    la riga che non si ammorbidisce. Ma un censimento a memoria
+    invecchia e RIMPICCIOLISCE — e' la lezione gia' pagata dal titolo
+    nudo nelle notifiche, dove l'elenco dichiarato diceva «quattro
+    solleciti» su quindici siti veri.
+
+    Quindi a contare non e' la memoria: si estraggono i kind dai tre
+    file che parlano coi relay e si chiede che ognuno sia nominato
+    nella sezione. Il kind nuovo di domani lo dice la CI il giorno
+    stesso.
+
+    IL CENSIMENTO DEVE DIMOSTRARE DI VEDERE, o uno «zero mancanti»
+    non e' una promozione ma una CECITA': l'estrattore gira anche su
+    un sorgente di cartone che contiene tutte e quattro le forme in
+    cui un kind compare, e deve trovarle."""
+    print("\n[i kind Nostr, e la mappa in CLAUDE.md]")
+
+    def kind_nel_testo(s):
+        """Le quattro forme in cui un kind compare nel sorgente."""
+        n = set()
+        for m in re.finditer(r'kinds?["\']?\s*[:=]\s*\[?([0-9,\s]+)\]?', s):
+            n.update(int(k) for k in re.findall(r"\d+", m.group(1)))
+        for m in re.finditer(r"firma_evento\((\d+)", s):
+            n.add(int(m.group(1)))
+        for m in re.finditer(r"evento_non_firmato\([^,]+,\s*(\d+)", s):
+            n.add(int(m.group(1)))
+        for m in re.finditer(r"\.hex\(\),\s*(\d+),\s*\[\[", s):
+            n.add(int(m.group(1)))
+        return n
+
+    # --- prima: l'estrattore VEDE? (le quattro forme, su un cartone)
+    cartone = ('"kinds": [30402, 30018]\n'
+               'return firma_evento(5, tags, "")\n'
+               'rumor = evento_non_firmato(pubkey, 14, [["p", d]], t, a)\n'
+               'effimera.public_key.format()[1:].hex(), 1059, [["p", d]],\n'
+               "relay.subscribe([{kinds:[24133], '#p':[pub]}]")
+    prova("l'estrattore vede tutte e quattro le forme",
+          {30402, 30018, 5, 14, 1059, 24133}, kind_nel_testo(cartone))
+
+    # --- poi: il censimento vero
+    tutti = set()
+    for f in ("server.py", "miniapp.html", "importa_nostr.py"):
+        tutti |= kind_nel_testo(open(f, encoding="utf-8").read())
+    prova("i kind del sorgente sono quelli che sappiamo",
+          {0, 1, 5, 13, 14, 1059, 10050, 13194, 22242, 23194, 23195,
+           24133, 30017, 30018, 30402, 38383, 38385}, tutti)
+
+    doc = open("CLAUDE.md", encoding="utf-8").read()
+    i = doc.find("## Nostr: i kind e i NIP")
+    prova("la sezione esiste", True, i > 0)
+    # E SE NON C'E', LE RIGHE QUI SOTTO DIVENTANO ROSSE invece di far
+    # ESPLODERE la famiglia portandosi dietro le sorelle: e' la
+    # lezione del find(), che questo file ha gia' pagato tre volte.
+    # Una fetta vuota fa cadere tutte le asserzioni della sezione —
+    # che e' quel che si vuole — mentre un'eccezione le fa sparire
+    # dal conto, e un'asserzione che non gira e' un'asserzione che
+    # non c'e'.
+    fine = doc.find("\n## Produzione", i) if i > 0 else -1
+    sez = doc[i:fine] if fine > 0 else ""
+    numeri = {int(x) for x in re.findall(r"\b(\d{1,5})\b", sez)}
+    mancano = sorted(k for k in tutti if k not in numeri)
+    prova("...e nomina OGNI kind del sorgente", [], mancano)
+
+    # I NIP nominati nel codice devono comparire nella mappa: e' la
+    # stessa domanda dall'altro lato, e prende il caso in cui un kind
+    # si nomina senza dire di che NIP e'.
+    nip = set()
+    for f in ("server.py", "miniapp.html", "importa_nostr.py"):
+        nip |= set(re.findall(r"NIP-([0-9A-Za-z]+)",
+                              open(f, encoding="utf-8").read()))
+    fuori = sorted(n for n in nip if ("NIP-" + n) not in sez)
+    prova("...e ogni NIP che il codice nomina", [], fuori)
+
+    # LE TRE RIGHE CHE NON SI AMMORBIDISCONO, e sono le affermazioni
+    # su cui poggia la fiducia: chi le toglie deve venire a leggere.
+    prova("dice che la piattaforma e' il RIPIEGO", True,
+          "IL RIPIEGO, NON LA REGOLA" in sez)
+    prova("dice che la chiave privata altrui non si tocca", True,
+          "MAI LA CHIAVE PRIVATA DI UN ALTRO" in sez)
+    prova("...e cosa NON mandiamo in piazza", True,
+          "QUEL CHE NON MANDIAMO IN PIAZZA" in sez)
+
+
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
@@ -43876,7 +43963,8 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
-                    prove_script_nel_workflow, prove_deploy,
+              prove_censimento_kind,
+              prove_script_nel_workflow, prove_deploy,
               prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,

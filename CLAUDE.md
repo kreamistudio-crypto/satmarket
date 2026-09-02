@@ -22959,6 +22959,118 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   funzione quella forma la NOMINA apposta per dire perché non si fa —
   la prova nasceva rossa per colpa di una spiegazione. Si conta sul
   codice, coi commenti tolti.
+## Nostr: i kind e i NIP che tocchiamo
+
+Il censimento di cosa Barattolo SCRIVE e LEGGE sui relay. Vale come
+mappa: le regole di ognuno vivono nelle voci loro in Architettura, qui
+c'e' il quadro — chi firma, chi legge, e la riga che non si ammorbidisce.
+CHI AGGIUNGE UN KIND LO AGGIUNGE QUI, o fra sei mesi nessuno sa piu'
+rispondere a «cosa mandiamo in piazza?» senza leggere tremila righe.
+
+### Quello che scriviamo
+
+| kind | NIP | cos'e' | chi firma |
+|---|---|---|---|
+| **30402** | NIP-99 | l'ANNUNCIO (classified listing) | la piattaforma, **o il venditore** — vedi IL BIVIO |
+| **1** | NIP-01 | la nota promozionale: un annuncio nuovo, uno sconto lampo | sempre la piattaforma |
+| **5** | NIP-09 | la cancellazione: ritiro di un annuncio o di una nota | chi ha firmato l'evento che si ritira |
+| **14 / 13 / 1059** | NIP-17 | il DM di notifica: rumor non firmato -> sigillo -> pacco regalo | sigillo la piattaforma, pacco una chiave usa-e-getta |
+| **14** (Mostro) | — | il messaggio al coordinatore: nuovo ordine, dispute, rating — un transport-v2 suo, MAI il rumor NIP-17 | il browser, con la trade key EFFIMERA dell'ordine |
+| **22242** | NIP-42 | la sfida del LOGIN | il BROWSER dell'utente, mai noi |
+| **24133** | NIP-46 | la richiesta al bunker (firma remota) | il browser, con una chiave di sessione sua |
+| **23194** | NIP-47 | la richiesta al wallet (NWC) | il browser, col secret che vive solo li' |
+| **31990** | NIP-89 | l'handler che ci fa riconoscere dalle classifiche | la piattaforma, una tantum da script |
+| **30509** | NIP-C1 | la prova che lega il certificato Android alla chiave di release | la chiave FREDDA delle release, mai quella della piattaforma |
+| **32267 / 30063 / 3063** | NIP-82 | app, release e asset su Zapstore | la chiave di release, via `zsp` (fuori dal repo) |
+
+### Quello che leggiamo
+
+| kind | NIP | a che serve |
+|---|---|---|
+| **30402** | NIP-99 | l'import: gli annunci dei venditori |
+| **30018 / 30017** | NIP-15 | l'import: prodotti e valuta dei negozi (Shopstr, Plebeian) |
+| **5** | NIP-09 | le cancellazioni dei venditori: diventano LAPIDI, e valgono per sempre |
+| **0** | NIP-01 | il profilo: avatar e nome di chi entra con Nostr |
+| **1** | NIP-01 | la verifica della npub: la nota col codice che l'utente pubblica |
+| **10050** | NIP-17 | dove il destinatario vuole ricevere i DM (cache 1h) |
+| **24133** | NIP-46 | la risposta del bunker |
+| **23195 / 13194** | NIP-47 | la risposta del wallet e il suo biglietto da visita |
+| **38383** | Mostro | il libro ordini: un evento per scambio, replaceable, pubblicato dal coordinatore — mai da noi |
+| **38385** | Mostro | le impostazioni del coordinatore: commissione, tetto, difficolta' del PoW |
+| **14** (Mostro) | — | le risposte del coordinatore sullo stesso canale (transport-v2) |
+
+### Le regole che governano tutto
+
+**LA PIATTAFORMA E' IL RIPIEGO, NON LA REGOLA**: se il venditore ha
+una chiave di cui ha DIMOSTRATO il possesso, il 30402 esce sul SUO
+account e a firmare e' il suo browser (`firme_nostr`); la nostra
+chiave firma solo per chi quella chiave non ce l'ha. `annunci.nostr_
+autore` dice chi ha firmato — e' il campo da guardare PRIMA di
+affermare qualunque cosa su chi controlla un evento. La nota kind-1
+invece resta sempre nostra: e' Barattolo che RACCONTA, il gemello del
+post nel canale Telegram.
+
+**MAI LA CHIAVE PRIVATA DI UN ALTRO** (regola ferrea 2): il 22242, il
+24133 e il 23194 li firma il BROWSER. Di segreti altrui sul server non
+ne vive nessuno — la nsec incollata firma in pagina e si azzera dopo
+una firma, la sessione bunker e il secret NWC stanno in `localStorage`
+del dispositivo. Le tre strade del firmatario, in ordine: l'estensione
+**NIP-07** (`window.nostr`: firma lei, noi non vediamo niente), il
+bunker **NIP-46** (che puo' sempre negare o revocare), e la nsec
+incollata, che resta il rito di ultima porta.
+
+**LE DUE CIFRATURE NON SI CONFONDONO**: NIP-44 per i DM (NIP-17) e per
+il bunker; il NWC parla nip04 O nip44 secondo il wallet, e la
+richiesta lo DICHIARA col tag `encryption` — senza, la specifica dice
+nip04, e un contenuto nip44 dentro un evento che si dichiara nip04
+non lo decifra nessuno e il wallet TACE.
+
+**L'ID E LA FIRMA SONO DI CASA**: `evento_non_firmato` fa la
+serializzazione canonica NIP-01 (sha256), `firma_evento` la Schnorr
+BIP-340 con coincurve. Il rumor NIP-17 resta non firmato APPOSTA — e'
+quello che rende il DM ripudiabile. In lettura l'id si RICALCOLA
+sempre: mai fidarsi di quello ricevuto.
+
+**LE CHIAVI SI SCRIVONO IN BECH32 E SI CONFRONTANO IN HEX**:
+`npub_to_hex` e `hex_to_npub` sono le due gemelle di casa (checksum
+vero), e ogni confronto fra chiavi passa di li' — nel client fa lo
+stesso `nip19` di nostr-tools. Una npub e la sua hex sono la stessa
+chiave, e chi le confronta come stringhe sbaglia.
+
+**IL TAG `client` DICE CHI HA COMPOSTO, NON CHI FIRMA** (NIP-89): sta
+su OGNI 30402 che componiamo noi, chiunque lo firmi. Fuori restano i
+kind 5, le note promo e i DM — su un canale cifrato un tag
+identificante e' un metadato regalato.
+
+**I RELAY SONO TRE ELENCHI E NON UNO**: `RELAYS` (import),
+`RELAYS_VERIFICA` (verifica npub, kind-0, DM) e `RELAYS_NIP46` (il
+bunker, dove l'ORDINE e' precedenza e il primo posto si paga in
+secondi d'attesa). Il relay personale del venditore si aggiunge alla
+pubblicazione firmata.
+
+**IL COORDINATORE MOSTRO PARLA UN DIALETTO SUO**: il 38383 e il 38385
+sono replaceable event che pubblica LUI — un servizio indipendente
+che custodisce i sats dello scambio in una hold invoice, mai
+Barattolo — e li leggiamo e basta, mai li scriviamo. Il kind 14
+verso il coordinatore NON e' il rumor NIP-17: e' un evento VERO,
+firmato e pubblicato, cifrato NIP-44 (col ripiego NIP-04 se serve)
+verso la pubkey del coordinatore, con scadenza NIP-40 e talvolta un
+nonce NIP-13 sotto la soglia che il 38385 dichiara. A firmarlo e' la
+TRADE KEY effimera dell'ordine, mai la chiave con cui l'utente e'
+entrato — la regola ferrea 2 vale anche qui. `MOSTRO_RELAY` e' un
+QUARTO elenco di relay, suo e non uno dei tre sopra: lo dice il
+config, mai una lista cablata in una funzione.
+
+**QUEL CHE NON MANDIAMO IN PIAZZA**, ed e' la meta' da non allargare
+per distrazione: ordini, vendite, offerte, aste, punti di ritiro,
+indirizzi, codici digitali, il contenuto delle buste. Su Nostr esce
+l'ANNUNCIO e il suo stato (`active`/`sold`), mai una transazione. E
+niente esce di quel che non e' in vetrina: la BOZZA e l'annuncio in
+REVISIONE un evento non ce l'hanno MAI avuto — la bozza per
+costruzione, che i ganci partono dal varco unico della pubblicazione —
+mentre il RIMOSSO ce l'aveva e la NIP-09 se lo riprende, che e' un'altra
+cosa e vale la pena saperla: quel che e' stato in piazza si ritira, non
+si cancella dal passato.
 
 ## Produzione
 
