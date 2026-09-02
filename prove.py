@@ -2232,6 +2232,30 @@ def prove_disarmo():
     # 8: la prova storica non deve ingiallire
     prova("auto-sblocco: mai dai 'locked' senza dichiarazioni", False,
           "stato='locked'" in scad)
+    # 8b: LA CINTURA DEL RITIRO A MANO (ago 2026). Il servizio ce
+    # l'aveva da sempre, il ritiro no — ed e' il ramo che ne ha piu'
+    # bisogno: PASSA da segna_spedito (e' il modo in cui il
+    # venditore dichiara la consegna), quindi arriva a 'shipped'
+    # con `spedito_il` timbrato e ZERO tracciamento. Il piano di
+    # rientro dell'auto-sblocco aspetta il tracking verificato via
+    # API corrieri, e per una consegna in zona quel giorno non
+    # arriva MAI: senza queste due righe il ritiro sarebbe l'unico
+    # ramo a sbloccarsi sulla parola nuda del venditore proprio
+    # quando gli altri smettono di farlo.
+    prova("ritiro: i due rami fisici lo escludono", 2,
+          scad.count("consegna_scelta NOT IN "
+                     "('digitale','servizio','ritiro')"))
+    # ...e la differenza col servizio, che e' la ragione per cui la
+    # cintura sta QUI e non in segna_spedito: il ritiro ci DEVE
+    # passare. Chi lo bloccasse la' per «uniformare al servizio»
+    # toglierebbe al venditore l'unico modo di dichiarare la
+    # consegna a mano.
+    sped = pezzo("segna_spedito")
+    prova("ritiro: segna_spedito lo lascia passare (esente tracking)",
+          True, '("Consegna a mano", "Ritiro in zona")' in sped)
+    prova("...e ha il suo ramo, che non e' un rifiuto", True,
+          'if corriere == "Ritiro in zona":' in sped
+          and 'o["consegna_scelta"] == "ritiro"' not in sped)
 
     prom = corpo("sollecita_conferme_ferme")
     # 9-12: il sostituto non muove sats, e' agganciato, e non dimentica i set
@@ -2246,6 +2270,13 @@ def prove_disarmo():
           "LEFT JOIN annunci" in prom)
     prova("promemoria: il digitale non lo riguarda", True,
           "consegna_scelta != 'digitale'" in prom)
+    # ...e il RITIRO si': e' quel che rende gratuita la cintura qui
+    # sopra. A leva spenta un ritiro 'shipped' non resta muto —
+    # riceve i promemoria e, al tetto, il ghiaccio ai moderatori.
+    # Chi escludesse anche lui lascerebbe quella popolazione senza
+    # nessuno che bussa.
+    prova("...e il ritiro invece SI'", False,
+          "'ritiro'" in prom)
     # 13-14: l'unico ponte timer->fondi, e i gemelli che restano muti
     prova("sblocco automatico: un solo chiamante in tutto il file", True,
           _SORGENTE.count("automatico=True") == 1)
@@ -38806,8 +38837,12 @@ def prove_servizi():
     # dell'auto-sblocco, che il giorno del rientro lo chiuderebbero
     # sulla PAROLA DEL VENDITORE.
     sc = cuci(pezzo("controlla_scadenze"))
+    # (il letterale porta anche 'ritiro' dall'ago 2026: il ritiro a
+    # mano ha avuto la stessa cintura, e per la stessa ragione —
+    # vedi prove_disarmo)
     prova("...e i due rami fisici lo escludono comunque", 2,
-          sc.count("consegna_scelta NOT IN ('digitale','servizio')"))
+          sc.count("consegna_scelta NOT IN "
+                   "('digitale','servizio','ritiro')"))
 
     # --- il sollecito: il gemello dei ritiri
     ss = cuci(pezzo("sollecita_servizi_fermi"))

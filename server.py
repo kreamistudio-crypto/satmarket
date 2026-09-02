@@ -34271,12 +34271,36 @@ async def controlla_scadenze():
             # e' la riga che protegge la regola cardinale se un
             # domani qualcuno facesse passare un servizio da
             # segna_spedito
-            "AND consegna_scelta NOT IN ('digitale','servizio')",
+            "AND consegna_scelta NOT IN ('digitale','servizio','ritiro')",
             (adesso - ORE_CONFERMA * 3600,))]
         scaduti_silenzio = [r["id"] for r in con.execute(
             "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
             "AND spedito_il < ? "
-            "AND consegna_scelta NOT IN ('digitale','servizio')",
+            # E IL RITIRO A MANO NON ENTRA PIU' (ago 2026): e' la
+            # cintura che al servizio era stata data e a lui no.
+            # Il ritiro PASSA da segna_spedito — e' il modo in cui
+            # il venditore dichiara la consegna — quindi arriva qui
+            # con `spedito_il` timbrato e ZERO tracciamento:
+            # segna_spedito glielo esenta apposta (il
+            # corriere-sentinella 'Ritiro in zona') e
+            # correggi_tracking lo rifiuta per sempre.
+            # IL PIANO DI RIENTRO dell'auto-sblocco dice «solo col
+            # tracking verificato via API corrieri», cioe' quando
+            # «ho spedito» smettera' di essere una dichiarazione di
+            # parte — e PER IL RITIRO A MANO QUEL GIORNO NON ARRIVA
+            # MAI, che nessun corriere puo' confermare una consegna
+            # in zona. Senza questa riga il ritiro resterebbe
+            # l'unico ramo a sbloccarsi sulla PAROLA NUDA del
+            # venditore proprio il giorno in cui gli altri smettono
+            # di farlo.
+            # IL PREZZO E' DICHIARATO: a leva riaccesa un ritiro non
+            # si chiude piu' da solo, e sollecita_conferme_ferme e'
+            # il SOSTITUTO dello sblocco (gira solo a leva spenta),
+            # quindi da li' non bussa nessuno. A raccoglierlo resta
+            # la coda «⏸ Ordini fermi», che non guarda la leva e lo
+            # mostra al decimo giorno: e' il caso da moderatore di
+            # sempre, ed e' il prezzo di non avere una prova.
+            "AND consegna_scelta NOT IN ('digitale','servizio','ritiro')",
             (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
     # Il digitale ha le SUE finestre, corte: un codice si prova
     # subito, non viaggia in furgone. consegnato = la rivelazione
