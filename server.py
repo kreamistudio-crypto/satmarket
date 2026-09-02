@@ -1858,9 +1858,16 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
                         "AND ((venditore_id=? AND stato='refunded') OR "
                         "(compratore_id=? AND stato='released'))",
                         tg_id, tg_id),
-        # niente 'revisione': un annuncio mai approvato non apre bottega
+        # niente 'revisione' e niente 'bozza': un annuncio mai approvato
+        # — o mai uscito dal cassetto — non apre bottega. ⚠️ E' l'UNICO
+        # filtro per ESCLUSIONE su questa colonna in tutto il file, e
+        # per questo e' il solo posto che uno stato nuovo raggiunge
+        # per conto suo: senza questa riga i distintivi si
+        # guadagnerebbero salvando bozze che nessuno vedra' mai.
+        # Chi aggiunge un altro stato guardi QUI per primo.
         annunci=q("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
-                  "AND stato NOT IN ('rimosso','revisione')", tg_id),
+                  "AND stato NOT IN ('rimosso','revisione','bozza')",
+                  tg_id),
         fb_ricevuti=fb["n"], fb_media=fb["media"] or 0,
         fb_lasciati=q("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
                       tg_id),
@@ -2868,7 +2875,18 @@ def init_db():
         foto TEXT DEFAULT '',              -- lista JSON: nomi file o URL
         contatto_nostr TEXT DEFAULT '',    -- npub del venditore (annunci importati)
         nostr_event_id TEXT DEFAULT '',    -- evento NIP-99 firmato dalla piattaforma
-        stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso
+        stato TEXT DEFAULT 'attivo',
+        -- bozza | attivo | revisione | venduto | rimosso
+        -- LA BOZZA (ago 2026) e' l'annuncio SCRITTO E MAI PUBBLICATO:
+        -- il venditore lo prepara con calma e lo manda in vetrina
+        -- quando vuole. Non e' uno stato «quasi attivo» — e' fuori da
+        -- ogni vetrina PER COSTRUZIONE, perche' i ~60 filtri di
+        -- questo file chiedono stato='attivo' per INCLUSIONE: e'
+        -- quello che ha reso il cantiere piccolo, ed e' anche la riga
+        -- da non ammorbidire (chi un domani scrivesse un filtro per
+        -- ESCLUSIONE — stato!='rimosso' — farebbe comparire in
+        -- vetrina la roba che nessuno ha ancora deciso di mostrare).
+        -- Il precedente e' 'revisione', che vive cosi' da luglio.
         creato INTEGER
     );
     CREATE TABLE IF NOT EXISTS ordini(
@@ -12717,11 +12735,64 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
 # nuovo. Chi ha davvero due oggetti identici aspetta mezzo minuto.
 FINESTRA_ANTIDOPPIONE = 30
 
+
+async def modera_per_la_vetrina(titolo: str, descrizione: str, user: dict,
+                                annuncio_id: int = 0):
+    """I due strati che decidono se un testo puo' andare in vetrina —
+    il filtro parole (gratis, istantaneo) e il parere dell'AI — con
+    l'esito di sempre: il VIETATO alza e non si pubblica niente, il
+    DUBBIO non blocca (lug 2026) e ritorna in_revisione.
+
+    UN POSTO SOLO PER I DUE VARCHI CHE PUBBLICANO (ago 2026): la
+    pubblicazione diretta e la bozza che esce allo scoperto fanno la
+    STESSA domanda sullo stesso oggetto, e due copie divergerebbero al
+    primo ritocco — con la piu' vecchia che continuerebbe a far
+    passare cio' che l'altra ferma. C'e' il censimento dei chiamanti.
+
+    `modifica_annuncio` resta fuori APPOSTA, e non e' una
+    dimenticanza: i suoi messaggi nominano la modifica («Modifica
+    bloccata dal filtro») e il suo registro porta gia' l'id — darle
+    questo giudice vorrebbe dire un parametro dei testi per un
+    chiamante solo. Le copie restano DUE com'erano, non tre.
+
+    `annuncio_id` serve al solo registro: alla nascita l'annuncio non
+    esiste ancora (0), mentre una bozza che si pubblica una riga ce
+    l'ha gia' — e li' quel numero e' la maniglia con cui un moderatore
+    la ritrova."""
+    categoria = controlla_vietato(titolo, descrizione)
+    if categoria:
+        registra_moderazione("parole", "vietato", categoria,
+                             titolo, annuncio_id, user["id"])
+        await notifica_admin(
+            f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
+            f"«{titolo[:80]}» — {user['first_name']} (id {user['id']})")
+        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
+
+    verdetto = await moderazione_ai(titolo, descrizione)
+    if verdetto and verdetto[0] == "vietato":
+        registra_moderazione("ai", "vietato", verdetto[1],
+                             titolo, annuncio_id, user["id"])
+        await notifica_admin(
+            f"🚫 <b>Annuncio bloccato dall'AI</b> ({verdetto[1]})\n"
+            f"«{titolo[:80]}» — {user['first_name']} (id {user['id']})")
+        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
+    in_revisione = bool(verdetto and verdetto[0] == "dubbio")
+    return in_revisione, (verdetto[1] if in_revisione else "")
+
+
 @app.post("/api/listings")
 async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
+    # «Salva senza pubblicare»: l'annuncio nasce in BOZZA. E' un verbo
+    # del payload e non una rotta a parte, perche' tutto il resto —
+    # guardie, prezzo, consegna, zona, foto — e' identico: cambia solo
+    # che alla fine non esce di casa. Le guardie NON si allentano
+    # apposta: una bozza che nasce storta sarebbe una sorpresa il
+    # giorno che si pubblica, cioe' il difetto rimandato invece che
+    # tolto.
+    bozza = bool(d.get("bozza"))
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     # Qui e non piu' in basso: consegna_da_payload puo' attendere il
     # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
@@ -12751,29 +12822,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         punto_sats, punto_eur, punto_dich = 0, 0.0, 0
         quantita = 1
 
-    # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
-    if categoria:
-        registra_moderazione("parole", "vietato", categoria,
-                             d["titolo"], venditore_id=user["id"])
-        await notifica_admin(
-            f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
-
-    # --- Strato 2: parere dell'AI. Il vietato netto blocca come
-    # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
-    # in stato 'revisione' e decide un moderatore umano. ---
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
-    if verdetto and verdetto[0] == "vietato":
-        registra_moderazione("ai", "vietato", verdetto[1],
-                             d["titolo"], venditore_id=user["id"])
-        await notifica_admin(
-            f"🚫 <b>Annuncio bloccato dall'AI</b> ({verdetto[1]})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
-    in_revisione = bool(verdetto and verdetto[0] == "dubbio")
-    motivo_dubbio = verdetto[1] if in_revisione else ""
+    # LA BOZZA NON SI MODERA (ago 2026, decisione di Andrea): la
+    # moderazione difende la VETRINA, e in vetrina una bozza non c'e'
+    # — resta invisibile esattamente come un annuncio rifiutato, e il
+    # costo e' la coda e non il rischio (il patto gia' scritto per la
+    # revisione). Il giudizio arriva quando l'annuncio esce allo
+    # scoperto, sul testo che va DAVVERO online: cosi' l'AI si paga
+    # una volta sola, e chi salva e poi ritocca non si fa giudicare un
+    # testo che nessuno vedra' mai.
+    in_revisione, motivo_dubbio = False, ""
+    if not bozza:
+        in_revisione, motivo_dubbio = await modera_per_la_vetrina(
+            d["titolo"], d.get("descrizione", ""), user)
 
     con = db()
     # --- Scudo anti-doppione: se lo stesso venditore ha gia' un
@@ -12784,13 +12844,15 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # server mono-processo il blocco resta atomico. ---
     gemello = con.execute(
         "SELECT id, stato FROM annunci WHERE venditore_id=? AND titolo=? "
-        "AND prezzo_sats=? AND stato IN ('attivo','revisione') "
+        "AND prezzo_sats=? AND stato IN ('attivo','revisione','bozza') "
         "AND creato>=? ORDER BY id DESC LIMIT 1",
         (user["id"], d["titolo"], prezzo_sats,
          int(time.time()) - FINESTRA_ANTIDOPPIONE)).fetchone()
     if gemello:
         con.close()
         risposta = {"ok": True, "id": gemello["id"]}
+        if gemello["stato"] == "bozza":
+            risposta["bozza"] = True
         if gemello["stato"] == "revisione":
             # il retry di un submit finito in revisione deve dire la
             # stessa verita' del primo giro
@@ -12852,7 +12914,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
          # il massimo nasce uguale alla quantita': da qui in poi puo'
          # solo salire, e non scende mai coi pezzi venduti
          condizione, quantita, quantita,
-         "revisione" if in_revisione else "attivo",
+         "bozza" if bozza else ("revisione" if in_revisione else "attivo"),
          adesso,
          # la base d'asta E' il prezzo del listino (un campo solo da
          # tenere vero); il cronometro parte adesso — e se l'annuncio
@@ -12892,6 +12954,16 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # avvisa. Un annuncio che nasce con meno foto di quelle scelte non
     # e' una cosa da scoprire da soli aprendo la scheda.
     conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
+    if bozza:
+        # La bozza esce di qui e basta: niente moderatori, niente
+        # Nostr, niente canale, niente avvisi di ricerca, niente
+        # distintivi. Non e' un elenco da ricordare — e' lo STESSO
+        # elenco che la revisione trattiene, e per la stessa ragione:
+        # quei ganci raccontano al mondo un annuncio, e qui non c'e'
+        # ancora niente da raccontare. Partiranno tutti insieme dal
+        # varco unico (pubblica_bozza), che e' anche il posto dove il
+        # giorno che nascera' un quarto gancio verra' aggiunto.
+        return {"ok": True, "id": annuncio_id, "bozza": True, **conto_foto}
     if in_revisione:
         # La terza via: l'annuncio esiste ma non e' online — niente
         # Nostr, niente promo, niente avvisi di ricerca, niente
@@ -13022,8 +13094,14 @@ def miei_annunci(limit: int = 0, cursore: str = "",
     # E dal cantiere stock anche i venduti/esauriti: la ricarica parte
     # da qui, e la riga «Venduto» col bottone «Rimetti in vendita» e'
     # il relist onesto anche per chi vendeva un pezzo solo.
+    # E le BOZZE (ago 2026): questa lista e' il libro mastro del
+    # venditore, e una bozza che non compare qui non compare da
+    # NESSUNA parte — sarebbe roba scritta e perduta. E' anche l'unico
+    # posto da cui si pubblica, ed e' per questo che non nasce un
+    # secondo elenco: un cassetto a parte sarebbe un secondo posto da
+    # ricordarsi di aprire (decisione di Andrea).
     dove = ("a.venditore_id=? AND a.stato IN "
-            "('attivo','revisione','venduto')")
+            "('attivo','revisione','venduto','bozza')")
     con = db()
     if limit:
         righe, prossimo = pagina_annunci(
@@ -13802,8 +13880,11 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con = db()
     # anche 'revisione': il venditore puo' sempre ritirare cio' che
     # aspetta una decisione (mai stato online: nessun ordine possibile)
+    # ...e anche 'bozza', per la stessa ragione portata fino in fondo:
+    # se una bozza si puo' scrivere, si deve poter buttare — e senza
+    # questa riga l'unico modo di liberarsene sarebbe pubblicarla.
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato IN ('attivo','revisione')",
+                    "AND stato IN ('attivo','revisione','bozza')",
                     (annuncio_id, user["id"])).fetchone()
     if not a:
         con.close()
@@ -14005,12 +14086,221 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
             "esaurito": esaurito_ora}
 
 
+# ---------------- Il ciclo di vita della bozza -----------------------
+# La bozza e' l'annuncio scritto e mai pubblicato. Da qui esce allo
+# scoperto (pubblica_bozza) e qui puo' tornare (ritira_in_bozza): due
+# rotte sole, perche' il resto del suo mestiere lo fanno gia' le
+# funzioni di sempre — si scrive da pubblica() col verbo `bozza`, si
+# ritocca dalla modifica, si butta dalla rimozione.
+
+@app.post("/api/listings/{annuncio_id}/pubblica")
+async def pubblica_bozza(annuncio_id: int,
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """La bozza esce allo scoperto: e' QUI che si paga la moderazione,
+    sul testo che va davvero online, e qui partono in un colpo solo i
+    ganci che la nascita aveva trattenuto.
+
+    E' il calco del ramo «pubblica» di decidi_revisione — stessa
+    transizione, stessi ganci, stesso UPDATE condizionato — e non un
+    secondo motore: la differenza e' CHI decide (li' un moderatore su
+    un annuncio in attesa, qui il proprietario su roba sua) e che qui
+    la moderazione deve ancora girare.
+
+    IL VIETATO NON DISTRUGGE NIENTE, ed e' la riga da non
+    ammorbidire: l'annuncio RESTA bozza col suo testo dentro. Una
+    pubblicazione diretta che viene rifiutata non lascia una riga
+    perche' non l'ha mai avuta; qui la riga c'e' ed e' il lavoro di
+    chi l'ha scritta — buttarla vorrebbe dire punire un errore di
+    parole con la perdita del lavoro. Chi e' stato fermato riscrive e
+    ripubblica dalla stessa bozza, che e' esattamente la strada che il
+    messaggio di rifiuto gli indica."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='bozza'",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        # Stessa risposta per «non e' tua», «non esiste» e «non e' piu'
+        # una bozza»: chi enumera non impara niente (il patto dei
+        # fratelli con la guardia dentro la WHERE).
+        raise HTTPException(400, "Operazione non permessa")
+    # Le due guardie che alla nascita erano gia' passate ma che nel
+    # frattempo possono essere cambiate: una bozza puo' aspettare
+    # settimane, e in mezzo il venditore puo' essere partito per le
+    # ferie o aver perso i requisiti del codice online.
+    adesso = int(time.time())
+    if a["asta_base_sats"] > 0:
+        guardia_ferie_venditore(con, user["id"], "aprirai un'asta")
+        vive = con.execute(
+            "SELECT COUNT(*) AS n FROM annunci WHERE venditore_id=? "
+            "AND stato IN ('attivo','revisione') AND asta_base_sats>0 "
+            "AND asta_scadenza>?", (user["id"], adesso)).fetchone()["n"]
+        if vive >= ASTA_MAX_ATTIVE_VENDITORE:
+            con.close()
+            raise HTTPException(400, f"Hai già {ASTA_MAX_ATTIVE_VENDITORE} "
+                                     f"aste in corso: chiudine una prima "
+                                     f"di aprire questa")
+    con.close()
+    guardia_venditore_digitale(user["id"], a["consegna"],
+                               a["anche_digitale"])
+
+    # --- La moderazione, adesso: il testo si legge dal DATABASE e mai
+    # da un payload. E' l'annuncio COM'E' — quello che sta per andare
+    # in vetrina — e non quello che un client dice che sia: fra la
+    # scrittura della bozza e questo gesto puo' esserci passata una
+    # modifica, e a giudicare dev'essere l'ultima parola scritta. ---
+    in_revisione, motivo_dubbio = await modera_per_la_vetrina(
+        a["titolo"], a["descrizione"] or "", user, annuncio_id)
+
+    con = db()
+    # L'INVARIANTE VALE ANCHE QUI: venduto <=> quantita=0. Una bozza a
+    # zero pezzi nasce ESAURITA e non «attiva», o sarebbe un annuncio
+    # comprabile all'occhio che alla cassa dice di no — il difetto che
+    # i connettori hanno gia' pagato quando un prodotto arrivava dal
+    # negozio gia' finito. Il caso non e' di scuola: si arriva qui
+    # ritirando nel cassetto un esaurito e ripubblicandolo, ed e'
+    # esattamente cio' che il ritiro rende possibile.
+    nuovo = "revisione" if in_revisione else "attivo"
+    if nuovo == "attivo" and not a["quantita"]:
+        nuovo = "venduto"
+    cur = con.execute(
+        "UPDATE annunci SET stato=? WHERE id=? AND stato='bozza'",
+        (nuovo, annuncio_id))
+    fatto = cur.rowcount == 1
+    if fatto and a["asta_base_sats"] > 0 and a["asta_scadenza"] > 0:
+        # Il cronometro dell'asta riparte da ADESSO, per la durata
+        # scelta: la stessa riga di decidi_revisione, e per la stessa
+        # ragione — una bozza tenuta in cassetto due settimane si
+        # mangerebbe altrimenti l'intera asta da tre giorni.
+        durata = a["asta_scadenza"] - a["asta_creato"]
+        con.execute("UPDATE annunci SET asta_creato=?, asta_scadenza=? "
+                    "WHERE id=?", (adesso, adesso + durata, annuncio_id))
+    con.commit()
+    con.close()
+    if not fatto:
+        # Il doppio tocco su rete lenta: la seconda POST trova il
+        # fatto compiuto e non rifa' partire nessun gancio.
+        raise HTTPException(409, "Questo annuncio è già stato pubblicato")
+
+    if in_revisione:
+        registra_moderazione("ai", "dubbio", motivo_dubbio, a["titolo"],
+                             annuncio_id, user["id"])
+        await avvisa_revisione(annuncio_id, motivo_dubbio)
+        return {"ok": True, "id": annuncio_id, "revisione": True,
+                "attesa_ore": REVISIONE_ATTESA_ORE}
+    # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina
+    marca_asta = " · 🔨 all'asta" if a["asta_base_sats"] else ""
+    if nuovo == "venduto":
+        marca_asta += " · scaffale vuoto (zero pezzi)"
+    await notifica_admin(
+        f"🆕 <b>Nuovo annuncio #{annuncio_id}</b> (da bozza)\n"
+        f"«{a['titolo'][:80]}» — "
+        f"{testo_prezzo(a['valuta'], a['prezzo_sats'], a['prezzo_eur'])}"
+        f"{marca_asta}\n"
+        f"Venditore: {user['first_name']} (id {user['id']})")
+    if not a["asta_base_sats"] and nuovo == "attivo":
+        # I tre canali NON parlano di uno scaffale vuoto, ed e' la
+        # seconda meta' dell'invariante qui sopra: annunciare in
+        # piazza e nel canale una cosa che non si puo' comprare
+        # sarebbe una promessa che la scheda smentisce al primo tocco.
+        # Con la stessa regola di decidi_revisione: una
+        # bozza RITIRATA dalla vetrina un evento Nostr ce l'ha gia', e
+        # il suo tag `d` e' stabile — quindi si AGGIORNA invece di
+        # nascere due volte; e il post di canale non si rifa' se c'e'
+        # gia'. Le aste restano fuori da tutti e tre, come sempre.
+        asyncio.create_task(annuncio_su_nostr(
+            annuncio_id, "active",
+            solo_aggiornamento=bool(a["nostr_event_id"])))
+        if not a["post_canale_id"]:
+            accoda_promo(annuncio_id)
+        accoda_match(annuncio_id)
+    await premia_distintivi(user["id"])
+    await avvisa_contatto_mancante(user["id"])
+    risposta = {"ok": True, "id": annuncio_id}
+    if a["asta_base_sats"] and a["asta_scadenza"]:
+        risposta["asta_scadenza"] = adesso + (a["asta_scadenza"]
+                                              - a["asta_creato"])
+    return risposta
+
+
+@app.post("/api/listings/{annuncio_id}/ritira-in-bozza")
+async def ritira_in_bozza(annuncio_id: int,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """L'annuncio torna nel cassetto: esce dalla vetrina e dalle due
+    piazze, e il venditore lo rimette a posto con calma.
+
+    E' il calco del ramo «riapri» di decidi_revisione — le stesse
+    guardie, gli stessi due ritiri, lo stesso UPDATE condizionato —
+    perche' e' la stessa transizione: da pubblico a non pubblico.
+
+    NON E' LA PAUSA, ed e' la distinzione da tenere quando si scrivono
+    i testi: la pausa («per ora e' finito», scorte a zero) dice che
+    l'oggetto ESISTE e tornera' — l'annuncio resta in vetrina spento,
+    il link mandato a un amico non muore, lo scaffale vuoto racconta
+    la bottega. Il ritiro in bozza dice il contrario: quell'annuncio
+    non deve piu' farsi vedere da nessuno finche' non lo decide chi
+    l'ha scritto. Chi ha solo finito i pezzi usa la pausa; chi ha
+    scritto il prezzo sbagliato usa questo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','venduto')",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    # Il testo di un importato lo riscrive il sync a ogni giro: una
+    # bozza fatta con quello sparirebbe entro l'ora, e in silenzio.
+    if origine_annuncio(a):
+        con.close()
+        raise HTTPException(400, msg_modifica_altrove(a))
+    # Con sats in cassaforte prima si chiude l'ordine, poi si discute
+    # dell'annuncio: la guardia della rimozione e del ripensamento di
+    # moderazione, parola per parola.
+    if _ordini_vivi_annuncio(con, annuncio_id,
+                             ("locked", "shipped", "confirmed", "dispute")):
+        con.close()
+        raise HTTPException(400, "C'è un affare in corso su questo "
+                                 "annuncio: chiudi prima l'ordine, poi "
+                                 "potrai rimetterlo nel cassetto")
+    # E un'asta con puntate salde e' VINCOLANTE: chi ha versato sta
+    # gareggiando, e i suoi sats tornano solo dall'annullo d'asta.
+    if a["asta_base_sats"] > 0 and _puntate_attive_salde(con, annuncio_id):
+        con.close()
+        raise HTTPException(400, "L'asta ha puntate salde: va prima "
+                                 "annullata dai moderatori, poi potrai "
+                                 "rimetterla nel cassetto")
+    cur = con.execute(
+        "UPDATE annunci SET stato='bozza' WHERE id=? "
+        "AND stato IN ('attivo','venduto')", (annuncio_id,))
+    ritirato = cur.rowcount == 1
+    # Gli ordini mai pagati decadono: l'annuncio esce di scena.
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                "(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
+                (int(time.time()), annuncio_id, annuncio_id))
+    con.commit()
+    con.close()
+    if not ritirato:
+        raise HTTPException(409, "Qualcosa è cambiato: ricarica e riprova")
+    # Fuori dalla vetrina vuol dire fuori da OGNI vetrina, non solo
+    # dalla nostra. I due ganci sono innocui su chi in piazza non c'e'
+    # mai andato: agiscono solo se le colonne sono valorizzate.
+    asyncio.create_task(ritira_da_nostr(annuncio_id))
+    asyncio.create_task(promo_rimuovi(annuncio_id))
+    return {"ok": True, "id": annuncio_id, "bozza": True}
+
+
 @app.post("/api/listings/{annuncio_id}/modifica")
 async def modifica_annuncio(annuncio_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
                             barattolo_sessione: str = Cookie("")):
-    """Il venditore ritocca un suo annuncio attivo. Regole:
-    - solo il proprietario, solo su annunci attivi
+    """Il venditore ritocca un suo annuncio attivo — o una sua BOZZA,
+    che di essere ritoccata vive. Regole:
+    - solo il proprietario, su annunci attivi e su bozze
     - mai con ordini in corso: chi ha pagato (o sta pagando) deve
       trovare l'annuncio cosi' com'era, non uno diverso sotto i piedi
     - la modifica ripassa da TUTTI gli strati di moderazione, come
@@ -14026,7 +14316,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+                    "AND stato IN ('attivo','bozza')",
+                    (annuncio_id, user["id"])).fetchone()
     if not a:
         # il messaggio giusto per chi prova a ritoccare un annuncio
         # in attesa: la modifica riparte dopo la decisione
@@ -14044,10 +14335,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     if origine_annuncio(a):
         con.close()
         raise HTTPException(400, msg_modifica_altrove(a))
-    if a["asta_base_sats"] > 0:
+    # LA BOZZA E' L'ANNUNCIO CHE SI PUO' ANCORA CAMBIARE, e da qui in
+    # giu' e' la domanda che governa tre guardie: l'asta che non si
+    # tocca, la moderazione, e i ganci in coda. Tutte e tre parlano
+    # della VETRINA — e una bozza in vetrina non c'e'.
+    e_bozza = a["stato"] == "bozza"
+    if a["asta_base_sats"] > 0 and not e_bozza:
         # Un'asta non si modifica MAI (regola del cantiere: base,
         # durata e testo si bloccano alla prima puntata; e senza
         # puntate ritirarla e ripubblicarla costa un minuto).
+        # La bozza d'asta invece si ritocca eccome: nessuno ci ha
+        # ancora puntato niente, e il cronometro non e' partito.
         con.close()
         raise HTTPException(400, "Un'asta non si modifica: senza puntate "
                                  "puoi ritirarla e ripubblicarla, con le "
@@ -14096,31 +14394,39 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                                  "(chi compra deve trovare l'annuncio così "
                                  "com'era quando ha deciso di pagare)")
 
-    # --- Stessa moderazione di una pubblicazione nuova ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
-    if categoria:
-        registra_moderazione("parole", "vietato", categoria, d["titolo"],
-                             annuncio_id, user["id"])
-        await notifica_admin(
-            f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
-    if verdetto and verdetto[0] == "vietato":
-        registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
-                             annuncio_id, user["id"])
-        await notifica_admin(
-            f"🚫 <b>Modifica bloccata dall'AI</b> ({verdetto[1]})\n"
-            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
-    # Il DUBBIO sulla modifica: le modifiche si applicano ma l'annuncio
-    # esce dalla vetrina finche' un moderatore non decide. Le offerte
-    # pendenti decadono via scadenze_offerte (il non-attivo e' «non
-    # piu' disponibile»): caso raro, dichiarato.
-    in_revisione = bool(verdetto and verdetto[0] == "dubbio")
-    motivo_dubbio = verdetto[1] if in_revisione else ""
+    # LA MODIFICA DI UNA BOZZA NON SI MODERA (ago 2026): il giudizio
+    # e' della pubblicazione, non della scrittura — e su una bozza
+    # arriverebbe due volte, la seconda sullo stesso identico testo.
+    # Il posto dove si paga e' pubblica_bozza, che legge il titolo
+    # dal DATABASE apposta: l'ultima parola scritta e' quella che va
+    # in vetrina, e a giudicare dev'essere lei.
+    in_revisione, motivo_dubbio = False, ""
+    if not e_bozza:
+        # --- Stessa moderazione di una pubblicazione nuova ---
+        categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+        if categoria:
+            registra_moderazione("parole", "vietato", categoria, d["titolo"],
+                                 annuncio_id, user["id"])
+            await notifica_admin(
+                f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
+                f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+                f"{user['first_name']} (id {user['id']})")
+            raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
+        verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+        if verdetto and verdetto[0] == "vietato":
+            registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
+                                 annuncio_id, user["id"])
+            await notifica_admin(
+                f"🚫 <b>Modifica bloccata dall'AI</b> ({verdetto[1]})\n"
+                f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+                f"{user['first_name']} (id {user['id']})")
+            raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
+        # Il DUBBIO sulla modifica: le modifiche si applicano ma l'annuncio
+        # esce dalla vetrina finche' un moderatore non decide. Le offerte
+        # pendenti decadono via scadenze_offerte (il non-attivo e' «non
+        # piu' disponibile»): caso raro, dichiarato.
+        in_revisione = bool(verdetto and verdetto[0] == "dubbio")
+        motivo_dubbio = verdetto[1] if in_revisione else ""
 
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
@@ -14165,7 +14471,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          punto_sats, punto_eur, punto_dich,
          extra_sats, extra_eur, taglia, anche_dig,
          condizione, quantita, quantita,
-         "revisione" if in_revisione else "attivo",
+         # LA RIGA CHE UN RIORDINO SBAGLIA PER PRIMA: senza `e_bozza`
+         # qui, ritoccare una bozza la PUBBLICHEREBBE in silenzio —
+         # nessun errore, nessuna notifica, l'annuncio in vetrina
+         # senza che nessuno l'abbia chiesto e senza essere passato
+         # dalla moderazione (che due righe piu' su si e' saltata
+         # apposta). C'e' la prova.
+         "bozza" if e_bozza else
+         ("revisione" if in_revisione else "attivo"),
          int(time.time()),
          servizio_dove_da_payload(d, consegna),
          durata_da_payload(d, consegna), annuncio_id))
@@ -14265,6 +14578,12 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # pannello — che filtra per STATO, non per come ci si e' arrivati.
     # Il fatto in se' resta scritto: `annunci.modificato` porta la data
     # e la scheda la mostra. A sparire e' solo lo squillo.
+    if e_bozza:
+        # In piazza non c'e' andata mai: niente da aggiornare, e
+        # `solo_aggiornamento=True` su un annuncio senza evento non
+        # farebbe niente comunque — ma la riga dice la regola invece
+        # di appoggiarsi a un caso fortunato.
+        return {"ok": True, "id": annuncio_id, "bozza": True, **conto_foto}
     # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
     # stabile fa si' che sostituisca il precedente da solo
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",

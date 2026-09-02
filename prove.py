@@ -7999,7 +7999,7 @@ def prove_duplica_annuncio():
           mini.count("el('sellCat').value = l.cat;"))
     prova("client: e i chiamanti sono due", 2,
           mini.count("riempiFormDa(l);"))
-    pub = pezzo_js(mini, "async function publish(){", "\n}")
+    pub = pezzo_js(mini, "async function publish(", "\n}")
     prova("client: copia_foto_da parte solo senza foto nuove", True,
           "duplicaDaId && !sellFoto.length" in pub
           and "{copia_foto_da: duplicaDaId}" in pub)
@@ -9684,6 +9684,205 @@ def prove_stock_raccontato():
     prova("il countdown della lampo tace su un esaurito", True,
           "${!esa && !ferie && !asta && gp.motivo==='lampo'?" in mini)
 
+
+def prove_bozza():
+    """LE BOZZE (ago 2026, chiesto da Andrea): si scrive un annuncio e
+    lo si pubblica quando si vuole — e uno gia' in vetrina si puo'
+    rimettere in bozza. Lo stato nuovo e' fuori da ogni vetrina PER
+    COSTRUZIONE, perche' i filtri di questo progetto chiedono
+    stato='attivo' per INCLUSIONE: la garanzia non e' una riga da
+    ricordare, e' la forma di sessanta WHERE. L'unico filtro per
+    ESCLUSIONE e' quello dei distintivi, ed e' il primo posto da
+    guardare il giorno che nasce un altro stato."""
+    print("\n[le bozze]")
+    import re
+
+    def solo_codice(js):
+        """Via i commenti: in questo file la prosa nomina apposta le
+        cose che il codice NON fa, e una sentinella che cerca quella
+        parola diventerebbe rossa per colpa di una spiegazione."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                          if not r.strip().startswith("//"))
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    pub = pezzo("pubblica")
+    mod = pezzo("modifica_annuncio")
+    pb = pezzo("pubblica_bozza")
+    rit = pezzo("ritira_in_bozza")
+    mv = pezzo("modera_per_la_vetrina")
+
+    # --- il giudice unico dei due varchi che pubblicano
+    prova("i due strati che decidono la vetrina hanno un giudice solo",
+          True, "controlla_vietato(" in mv and "moderazione_ai(" in mv)
+    # I CHIAMANTI SONO DUE E NON TRE: `modifica_annuncio` resta fuori
+    # apposta — li' la moderazione vive dentro il suo `if not e_bozza`
+    # e con la sua strada firmata, e tirarla dentro sarebbe un
+    # cantiere sul percorso della moderazione, non su questo.
+    prova("...e lo chiamano i DUE varchi che pubblicano", 2,
+          codice(_SORGENTE).count("await modera_per_la_vetrina("))
+    for nome, corpo in (("pubblica", pub), ("pubblica_bozza", pb)):
+        prova(f"...fra cui {nome}", True,
+              "await modera_per_la_vetrina(" in codice(corpo))
+    # e il ritiro NON ci passa: tornare sui propri passi non e' un
+    # atto da giudicare, e la moderazione l'ha gia' fatta la
+    # pubblicazione da cui si sta tornando indietro.
+    prova("il ritiro in bozza non passa dalla moderazione", True,
+          "modera_per_la_vetrina" not in rit
+          and "controlla_vietato" not in rit)
+
+    # --- pubblica(): la bozza salta la moderazione e i ganci
+    prova("pubblica() legge il verbo dal payload", True,
+          'bozza = bool(d.get("bozza"))' in codice(pub))
+    prova("...e sulla bozza NON modera", True,
+          "if not bozza:" in codice(pub))
+    # LA RIGA CHE VALE IL CANTIERE: senza il `return` la bozza
+    # uscirebbe su Nostr, nel canale e negli avvisi di ricerca — cioe'
+    # in vetrina dappertutto tranne che nella nostra.
+    corpo_pub = codice(pub)
+    i_ret = corpo_pub.find('return {"ok": True, "id": annuncio_id, "bozza": True')
+    prova("...e la bozza esce PRIMA dei ganci", True, i_ret > 0)
+    for gancio in ("annuncio_su_nostr", "accoda_promo", "accoda_match",
+                   "notifica_admin"):
+        prova(f"   ...il gancio {gancio} resta trattenuto", True,
+              corpo_pub.find(gancio, i_ret) > i_ret if i_ret > 0 else False)
+    prova("lo scudo anti-doppione conosce la bozza", True,
+          "stato IN ('attivo','revisione','bozza')" in pub)
+
+    # --- LA RIGA CHE UN RIORDINO SBAGLIA PER PRIMA
+    # Senza `e_bozza` nell'UPDATE dello stato, RITOCCARE una bozza la
+    # PUBBLICHEREBBE: e' il difetto che l'assert di questo cantiere ha
+    # trovato prima che nascesse — l'ancora del vecchio INSERT
+    # matchava due volte, e la seconda era proprio qui.
+    prova("modificare una bozza NON la pubblica", True,
+          '"bozza" if e_bozza else' in mod)
+    prova("...e la modifica di una bozza non passa dalla moderazione",
+          True, "if not e_bozza:" in codice(mod))
+    prova("...e non tocca l'evento Nostr (in piazza non c'e')", True,
+          codice(mod).find("if e_bozza:") <
+          codice(mod).find("annuncio_su_nostr"))
+    prova("la modifica accetta la bozza accanto all'attivo", True,
+          "stato IN ('attivo','bozza')" in mod)
+
+    # --- l'unico filtro per ESCLUSIONE del progetto
+    dist = pezzo("_dati_distintivi")
+    prova("i distintivi non li fa guadagnare una bozza", True,
+          "stato NOT IN ('rimosso','revisione','bozza')" in dist)
+
+    # --- la bozza si vede dove deve
+    prova("«I tuoi annunci» la mostra",
+          True, "'bozza')" in pezzo("miei_annunci"))
+    prova("...e si puo' buttare", True,
+          "IN ('attivo','revisione','bozza')" in pezzo("rimuovi_annuncio"))
+
+    # --- le due rotte nuove: le guardie di casa
+    for nome, corpo in (("pubblica_bozza", pb), ("ritira_in_bozza", rit)):
+        prova(f"{nome}: la proprieta' sta DENTRO la WHERE", True,
+              "venditore_id=?" in corpo)
+        # l'UPDATE condizionato: il doppio tocco su rete lenta trova
+        # il fatto compiuto e non rifa' partire nessun gancio.
+        # SI GUARDA LA CONDIZIONE E NON IL `rowcount`, ed e' la
+        # differenza che la tortura ha chiesto: togliendo lo stato
+        # dalla WHERE il rowcount resta li' e la prova restava verde,
+        # cioe' certificava un CAS che non c'era piu'.
+        prova(f"...e l'UPDATE e' condizionato sullo stato", True,
+              "rowcount == 1" in corpo)
+        prova(f"...guardando lo stato di PARTENZA nella sua WHERE", True,
+              (("WHERE id=? AND stato='bozza'" in corpo)
+               if nome == "pubblica_bozza" else
+               ("WHERE id=? \"\n        \"AND stato IN ('attivo','venduto')"
+                in corpo)))
+    # e il 400 che NON distingue «non e' tuo» da «non esiste»
+    prova("chi enumera non impara niente", 2,
+          sum(1 for c in (pb, rit) if "400" in c))
+
+    # LA ROTTA LEGGE DAL DATABASE E NON DA UN PAYLOAD, ed e' la riga
+    # che rende vera la promessa «la moderazione gira sul testo che
+    # va in vetrina»: col testo mandato dal client si potrebbe far
+    # giudicare una cosa e pubblicarne un'altra.
+    # IL TESTO GIUDICATO E' QUELLO IN COLONNA, e non uno mandato dal
+    # client: con un payload si potrebbe far giudicare una cosa e
+    # pubblicarne un'altra. L'ancora e' il primo argomento, che nel
+    # sorgente va a capo — a valere e' da DOVE si legge.
+    prova("il testo giudicato e' quello in colonna", True,
+          'a["titolo"], a["descrizione"] or "", user, annuncio_id)' in pb
+          and 'd.get("descrizione"' not in pb)
+
+    # l'invariante di casa, alla nascita come altrove
+    prova("una bozza a zero pezzi nasce ESAURITA", True,
+          'if nuovo == "attivo" and not a["quantita"]:' in codice(pb))
+    prova("...e i tre canali tacciono su uno scaffale vuoto", True,
+          'if not a["asta_base_sats"] and nuovo == "attivo":' in codice(pb))
+    # il cronometro dell'asta riparte: la stessa regola di
+    # decidi_revisione — la coda non mangia la durata, e un cassetto
+    # men che meno
+    prova("l'asta di una bozza riparte da adesso", True,
+          "asta_creato=?, asta_scadenza=?" in pb)
+
+    # --- il ritiro: cosa NON si puo' ritirare
+    prova("un importato non si ritira in bozza", True,
+          "origine_annuncio(" in codice(rit))
+    prova("...ne' un annuncio con dei sats in cassaforte", True,
+          "_ordini_vivi_annuncio(" in codice(rit))
+    prova("...ne' un'asta con delle puntate salde", True,
+          "_puntate_attive_salde(" in codice(rit))
+    # e quel che c'era in piazza si ritira davvero
+    prova("ritirando si spegne anche la piazza", True,
+          "ritira_da_nostr(" in codice(rit) and "promo_rimuovi(" in codice(rit))
+
+    # --- il client
+    prova("il bottone «salva senza pubblicare» c'e'", True,
+          'id="sellBozza" onclick="publish(true)"' in mini)
+    pubj = pezzo_js(mini, "async function publish(", "\n}")
+    prova("...e publish() manda il verbo", True,
+          "...(bozza ? {bozza: true} : {})," in pubj)
+    # IN DEMO LA BOZZA NON ENTRA IN `listings`: li' `vetrina` e
+    # `listings` sono lo STESSO array, quindi una bozza aggiunta di la'
+    # comparirebbe fra la merce — il difetto che questo stato esiste
+    # per non avere.
+    prova("...e in DEMO non finisce nella vetrina finta", True,
+          "if (bozza) myListings.unshift(riga); else listings.unshift(riga);"
+          in pubj)
+    # LA VERITA' LA DICE IL SERVER, e la riga l'ha chiesta il giro dal
+    # vivo: modificando una bozza il verbo non parte — il primario e'
+    # `publish()` senza argomenti — quindi senza rileggere il flag
+    # dalla risposta si finirebbe nel ramo normale, «⚡ Annuncio
+    # pubblicato!» su una cosa che in vetrina non c'e'.
+    prova("...e la risposta del server si rilegge", True,
+          "restaBozza = restaBozza || !!d.bozza;" in pubj)
+    prova("...e a decidere la coda e' LEI, non il bottone", True,
+          "if (restaBozza) {" in pubj and "if (bozza) {" not in pubj)
+    prova("...e non apre il dettaglio (in vetrina non c'e')", True,
+          pubj.find("if (restaBozza) {") < pubj.find("if (inRevisione) {"))
+
+    riga = pezzo_js(mini, "const rigaMioAnnuncio = ", "\n\n")
+    prova("la riga porta il badge e il bottone che pubblica", True,
+          "📝 Bozza" in riga and "pubblicaBozza(${l.id})" in riga)
+    prova("...e la bozza si modifica", True,
+          "${(rev||esa)?'':`<span class=\"badge az-btn\" onclick=\"editListing("
+          in riga)
+    prova("...ma il suo dettaglio non si apre", True,
+          "apre = !rev && !boz" in riga)
+
+    # LE DUE PORTE PASSANO DALLA DOMANDA DI CASA: sono gesti che
+    # cambiano quel che il mercatino vede, e il ritiro spegne un link
+    # che qualcuno puo' avere in mano.
+    for f in ("pubblicaBozza", "ritiraInBozza"):
+        prova(f"{f} chiede prima di agire", True,
+              "chiediConferma({" in pezzo_js(mini, f"async function {f}(", "\n}"))
+
+    # il ritiro vive nella SCHEDA e non nella riga: la misura gia'
+    # pagata da duplicato e rifornimento (.mio-azioni a 320px)
+    prova("il ritiro sta nella scheda, non nella riga", True,
+          "ritiraInBozza(${l.id}, true)" in mini
+          and "ritiraInBozza" not in riga)
+
+    # la variabile di modalita' si spegne su OGNI uscita, o il form
+    # direbbe «bozza» sul prossimo annuncio
+    prova("editandoBozza si spegne in tutte le uscite", 3,
+          solo_codice(mini).count("editandoBozza = false"))
+    prova("...e l'accende solo editListing", 1,
+          solo_codice(mini).count("editandoBozza = l.stato === 'bozza'"))
 
 def prove_pausa():
     """«PER ORA E' FINITO» (ago 2026): il venditore che esaurisce le
@@ -13358,7 +13557,7 @@ def prove_reti_corriere():
     # apertura dell'app. Si guarda il corpo di publish, non il file.
     prova("...e publish riarma il flag a pubblicazione riuscita", True,
           "corrieriChiesto = false;" in
-          pezzo_js(mini, "async function publish(){", "\n}"))
+          pezzo_js(mini, "async function publish(", "\n}"))
     prova("...e chi ha gia' dichiarato non lo vede mai", True,
           "!mieRetiSped.length" in serve)
     prova("...ne' chi non spedisce: ritiro e codice online fuori "
@@ -13379,7 +13578,7 @@ def prove_reti_corriere():
           "el('corrieriSheet').classList.remove('open')" in
           pezzo_js(mini, "function closeSheet(){", "\n}"))
     # l'aggancio in publish: DOPO le validazioni e PRIMA dell'overlay
-    pub = pezzo_js(mini, "async function publish(){", "\n}")
+    pub = pezzo_js(mini, "async function publish(", "\n}")
     prova("l'invito sta PRIMA dello scudo anti-doppione", True,
           pub.index("serveInvitoCorrieri()")
           < pub.index("bottoneInAttesa("))
@@ -26685,8 +26884,12 @@ def prove_fogli_di_casa():
     # cinquantuno che parla di sats gia' in custodia: il corpo dice
     # la cosa che non si disfa — da li' non si annulla piu', e a
     # decidere e' il coordinatore, non Barattolo.
-    prova("i gesti che passano dalla domanda unica sono cinquantuno",
-          51, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTADUE E CINQUANTATRE (set 2026, le bozze): pubblicare
+    # una bozza — il gesto che la manda in vetrina, su Nostr e nel
+    # canale — e rimetterne in bozza una pubblicata, che il link lo
+    # spegne.
+    prova("i gesti che passano dalla domanda unica sono cinquantatre",
+          53, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -43614,7 +43817,7 @@ def main():
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti,
-              prove_duplica_annuncio, prove_avatar,
+              prove_duplica_annuncio, prove_bozza, prove_avatar,
               prove_foto_spenta,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
@@ -43673,7 +43876,7 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
-              prove_script_nel_workflow, prove_deploy,
+                    prove_script_nel_workflow, prove_deploy,
               prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,

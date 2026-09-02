@@ -5948,6 +5948,15 @@ document.getElementById('cartello')?.remove();</script>
            mettersi in vetrina: il pattern degli hint contestuali. -->
       <div id="sellContattoHint" style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--sats-text);font-weight:700;line-height:1.45">🔕 Nessuno può scriverti: aggiungi uno <b>username</b> su Telegram (Impostazioni&nbsp;→&nbsp;Nome utente) per farti contattare da chi compra — o collega una npub nel Profilo.</div>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
+      <!-- SALVA SENZA PUBBLICARE (ago 2026): l'annuncio si scrive
+           adesso e si manda in vetrina quando si vuole. Sta SOTTO il
+           pieno e in ghost, che e' il registro dei secondari di casa:
+           l'unico pieno di questa pagina resta «Pubblica», o due
+           bottoni dello stesso peso trasformerebbero il gesto normale
+           in un bivio. Nasce visibile e lo spegne aggiornaFormVendi
+           dove non ha senso (la modifica di un annuncio gia' in
+           vetrina). -->
+      <button class="btn ghost" id="sellBozza" onclick="publish(true)">📝 Salva senza pubblicare</button>
       <!-- L'annulla della modifica sta SOTTO il salva (ago 2026, dal
            campo: era solo un link nel banner in cima, cioe' dalla
            parte opposta del gesto che chiude). Bottone VERO col
@@ -16790,6 +16799,19 @@ function openDetail(id){
                 guardia di bottoneRifornisci). -->
            ${l.nostr ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
            <button class="btn ghost" onclick="apriWidget('annuncio',${l.id})">&lt;/&gt; Widget per il web</button>
+           <!-- IL RITORNO IN BOZZA (ago 2026), e vive SOLO qui: e' il
+                gesto che toglie l'annuncio dalla vetrina senza
+                buttarlo, e sta subito sopra l'uscita rossa perche' e'
+                il gradino prima — chi arriva in fondo alla colonna
+                pensando «lo tolgo» trova prima la via che si disfa.
+                NON e' la pausa dell'esaurito: quella lascia il link
+                vivo e lo scaffale in piedi, questa fa sparire tutto.
+                Nella riga di «I tuoi annunci» non ci va, ed e' la
+                misura gia' pagata da duplicato e rifornimento.
+                E non sugli IMPORTATI: la loro vetrina sono i relay, e
+                il server risponde 400 (la stessa guardia dei due
+                bottoni qui sopra). -->
+           ${l.nostr ? '' : `<button class="btn ghost" onclick="ritiraInBozza(${l.id}, true)">📝 Rimetti in bozza</button>`}
            <!-- L'uscita della colonna, e ora un bottone vero: il
                 testuale sottolineato spariva fra due ghost — proprio
                 il gesto che non si torna indietro. Il testo dice solo
@@ -27353,7 +27375,20 @@ async function caricaAltriMiei(){
    raggiungerebbe nessuno. Il ramo revisione resta parola per parola
    quello di ieri. */
 const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
-  esa = l.stato==='venduto', spento = rev || esa, apre = !rev; return `
+  esa = l.stato==='venduto',
+  /* LA BOZZA NON E' SPENTA, ed e' una distinzione e non una svista:
+     in questa lista il grigio dice «non ci puoi fare niente» — la
+     revisione aspetta un moderatore, l'esaurito aspetta un
+     rifornimento — mentre su una bozza si puo' fare TUTTO, ed e'
+     l'unica riga che sta aspettando proprio te. A dire cos'e' basta
+     il badge. */
+  boz = l.stato==='bozza',
+  /* e il dettaglio non si apre, come per la revisione: la scheda e'
+     la vetrina di un annuncio, e questo in vetrina non c'e'. Tutto
+     quel che serve — pubblica, modifica, butta — sta in questa riga
+     (e il server risponderebbe comunque 404: /api/listings/{id}
+     serve i soli attivi e venduti). */
+  spento = rev || esa, apre = !rev && !boz; return `
     <div class="order">
       <div class="row mio-riga">
         <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${l.photos&&l.photos[0]
@@ -27374,7 +27409,8 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
            lui: il posto dove il pollice arriva senza coprire quello
            che sta leggendo */''}
       <div class="mio-azioni">
-        ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
+        ${boz?`<span class="badge" style="background:var(--chip-bg);color:var(--ink)" title="Scritto e non ancora pubblicato: lo vedi solo tu">📝 Bozza</span><span class="badge az-btn" onclick="pubblicaBozza(${l.id})" style="cursor:pointer;background:var(--sats-soft);color:var(--sats-text);border:1.5px solid var(--sats)" title="Mandalo in vetrina adesso">⚡ Pubblica</span>`
+          :rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
           /* LA RIGA CHE RESTA, e vale piu' del toast: chi torna qui il
              giorno dopo a chiedersi perche' e' fermo trova la regola e
              la strada, non un cartello muto. Solo sulle prestazioni:
@@ -27384,7 +27420,8 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
              davvero. «Esaurito» e' la parola PUBBLICA, per chi
              guarda da fuori uno scaffale vuoto. */
           :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge az-btn" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
-          :`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
+          :''}
+        ${(rev||esa)?'':`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
         ${esa?'':`<span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
       </div>
       ${/* fuori da .mio-azioni e su una riga sua: quella e' flex-wrap
@@ -28998,6 +29035,79 @@ async function deleteListing(id, dalDettaglio){
     }});
 }
 
+/* ---------------- la bozza esce allo scoperto ----------------
+   I due gesti che spostano un annuncio dentro e fuori dalla vetrina
+   senza cancellarlo. Vivono qui accanto a deleteListing perche' sono
+   la stessa famiglia — cosa ne faccio di questa riga — e per la stessa
+   ragione passano dal foglio di casa e non da un tocco secco: sono
+   gesti che cambiano cosa vede il mercatino.
+   ATTENZIONE alla differenza che si legge male: PUBBLICA fa passare
+   il testo dalla moderazione (puo' rispondere no, o mandare in
+   revisione), RITIRA no — quello e' un passo indietro, e chi torna
+   sui suoi passi non si fa giudicare. */
+async function pubblicaBozza(id){
+  haptic();
+  chiediConferma({
+    titolo: 'Pubblichi questo annuncio?',
+    corpo: 'Va in vetrina, su Nostr e nel canale, e da qui in avanti '
+         + 'chiunque puo\' comprarlo. Prima passa dalla moderazione: '
+         + 'se qualcosa non torna te lo diciamo.',
+    etichetta: '⚡ Pubblica',
+    poi: async () => {
+      if (DEMO) {
+        const l = myListings.find(x=>x.id===id);
+        if (l) { l.stato = 'attivo'; listings.unshift(l); vetrina = listings; }
+      } else {
+        const r = await fetch(`${API_BASE}/listings/${id}/pubblica`,
+          {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(d.detail||'Operazione non riuscita', tempoLettura(d.detail)); return; }
+        await loadListings();
+        if (d.revisione) {
+          await loadMyListings(); renderMyListings(); renderGrid();
+          /* LE STESSE PAROLE del ramo revisione di publish(): e' la
+             stessa cosa detta due volte, e dirla in due modi
+             sarebbe la strada per cui una delle due invecchia. */
+          toast('⏳ Annuncio inviato: un moderatore lo controllerà'
+                + (d.attesa_ore ? ` (di solito entro ${d.attesa_ore} ore)` : '')
+                + '. Lo trovi tra i tuoi annunci.', 6000);
+          return;
+        }
+      }
+      await loadMyListings();
+      renderMyListings(); renderGrid();
+      toast('⚡ Annuncio pubblicato!');
+    }});
+}
+
+/* Il ritorno indietro: dalla vetrina alla bozza, senza perdere la
+   riga. NON e' la pausa dell'esaurito — quella lascia l'annuncio
+   visibile e col link vivo, questa lo toglie di mezzo — e il testo lo
+   dice, o si sceglierebbe il gesto sbagliato. */
+async function ritiraInBozza(id, dalDettaglio){
+  haptic();
+  chiediConferma({
+    titolo: 'Lo rimetti in bozza?',
+    corpo: 'Sparisce dalla vetrina, da Nostr e dal canale, e il suo '
+         + 'link smette di funzionare. Resta tuo: lo modifichi con '
+         + 'calma e lo ripubblichi quando vuoi.',
+    etichetta: '📝 Rimetti in bozza',
+    poi: async () => {
+      if (DEMO) { toast('In demo non si può'); return; }
+      const r = await fetch(`${API_BASE}/listings/${id}/ritira-in-bozza`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail||'Operazione non riuscita', tempoLettura(d.detail)); return; }
+      await loadListings();
+      await loadMyListings();
+      renderMyListings(); renderGrid();
+      toast('📝 Rimesso in bozza: lo trovi tra i tuoi annunci');
+      /* la scheda da cui si veniva adesso non esiste piu' in vetrina:
+         si va dove la riga vive, la strada di deleteListing */
+      if (dalDettaglio) go('profilo');
+    }});
+}
+
 /* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
 async function rimuoviModerazione(id){
   haptic();
@@ -29026,6 +29136,11 @@ let editandoId = null, editandoTitolo = '', fotoAttuali = [];
    il server copia le foto quando non se ne scelgono di nuove. */
 let duplicaDaId = null, duplicaTitolo = '';
 let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
+/* Si sta ritoccando una BOZZA? Cambia quel che il form PROMETTE — in
+   vetrina non ci va e dalla moderazione non passa — non quel che
+   manda: il payload e' quello di sempre, ed e' il SERVER a tenerla
+   bozza (`modifica_annuncio` non pubblica mai per conto suo). */
+let editandoBozza = false;
 /* «su QUESTA modifica firmata la consegna si dichiara» (ago 2026).
    Non basta `editandoNostr`, e il caso che lo chiede sono i due
    importati DIGITALI corretti a mano: li' la casella «codice online»
@@ -29630,6 +29745,7 @@ function editListing(id){
      salvataggio prende la strada firmata. Senza chiave d'accesso il
      server risponde col suo messaggio di sempre. */
   editandoNostr = !DEMO && !!l.nostr && !!myNpubAccesso;
+  editandoBozza = l.stato === 'bozza';
   /* il digitale resta fuori dalla strada firmata: v. consegnaFirmata */
   consegnaFirmata = editandoNostr && (l.consegna||'') !== 'digitale'
                     && !l.ancheDigitale;
@@ -29664,7 +29780,7 @@ function duplicaAnnuncio(id){
   /* le due modalita' si escludono: un duplicato non e' una modifica,
      e se si arriva qui da un form in modifica quella si abbandona */
   editandoId = null; editandoTitolo = '';
-  editandoNostr = false; consegnaFirmata = false;
+  editandoNostr = false; consegnaFirmata = false; editandoBozza = false;
   duplicaDaId = id; duplicaTitolo = l.title;
   riempiFormDa(l);
   navSpingi = true;   // e' una discesa come la modifica, v. editListing
@@ -29709,7 +29825,7 @@ function annullaModificaChiedendo(){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   duplicaDaId = null; duplicaTitolo = '';
-  editandoNostr = false;
+  editandoNostr = false; editandoBozza = false;
   consegnaFirmata = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
@@ -29742,12 +29858,17 @@ function aggiornaFormVendi(){
        succede quando salva. Le due strade sono vere entrambe e si
        dicono in una riga: la modifica e' subito in vetrina, ma
        ripassa dalla moderazione come un annuncio nuovo. */
-    if (el('sellTitolo')) el('sellTitolo').textContent = 'Modifica annuncio';
+    if (el('sellTitolo')) el('sellTitolo').textContent =
+      editandoBozza ? 'Modifica la bozza' : 'Modifica annuncio';
     if (el('sellFotoEtichetta'))
       el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
     if (el('sellFotoNota')) el('sellFotoNota').style.display = '';
-    if (el('sellDivieto')) el('sellDivieto').textContent =
-      'Anche le modifiche vengono moderate: vale la stessa lista di cose '
+    if (el('sellDivieto')) el('sellDivieto').textContent = editandoBozza
+      ? 'Quando la pubblicherai passerà dalla moderazione: vale la stessa '
+      + 'lista di cose che non si possono vendere — armi, droghe, servizi '
+      + 'sessuali, refurtiva, contraffazioni, documenti, dati personali, '
+      + 'farmaci, animali protetti.'
+      : 'Anche le modifiche vengono moderate: vale la stessa lista di cose '
       + 'che non si possono vendere — armi, droghe, servizi sessuali, '
       + 'refurtiva, contraffazioni, documenti, dati personali, farmaci, '
       + 'animali protetti.';
@@ -29759,6 +29880,12 @@ function aggiornaFormVendi(){
       ? 'Le modifiche vanno anche sui relay Nostr, firmate con la tua chiave'
         + (consegnaFirmata ? ' — la consegna compresa' : '')
         + '. Ripassano dalla moderazione come un annuncio nuovo.'
+      : editandoBozza
+      /* le due promesse della modifica sono TUTT'E DUE FALSE su una
+         bozza — in vetrina non c'e', e dalla moderazione non passa
+         finche' non la pubblichi — quindi qui si dice l'altra cosa
+         vera: dove si tocca il bottone che la manda in piazza. */
+      ? 'Salvi e resta una bozza: la vedi solo tu. La pubblichi dai tuoi annunci, quando vuoi.'
       : 'Salvi e l\'annuncio è aggiornato in vetrina. Ripassa dalla moderazione come uno nuovo: se qualcosa non convince resta in attesa di un moderatore.';
     /* l'annulla non vive piu' qui: e' il bottone in fondo, sotto il
        salva — il banner dice soltanto cosa si sta facendo */
@@ -29766,8 +29893,11 @@ function aggiornaFormVendi(){
       ? `🟣 Stai modificando «${esc(editandoTitolo)}», importato da Nostr: `
         + `al salvataggio la modifica si <b>firma con la tua chiave</b> e `
         + `aggiorna anche i relay.`
+      : editandoBozza
+      ? `📝 Stai modificando la bozza «${esc(editandoTitolo)}»`
       : `✏️ Stai modificando «${esc(editandoTitolo)}»`;
-    btn.textContent = editandoNostr ? '🟣 Firma e salva' : '✏️ Salva le modifiche';
+    btn.textContent = editandoNostr ? '🟣 Firma e salva'
+      : editandoBozza ? '📝 Salva la bozza' : '✏️ Salva le modifiche';
   } else {
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
@@ -29806,6 +29936,11 @@ function aggiornaFormVendi(){
         el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
     }
   }
+  /* «Salva senza pubblicare» vive dove si PUBBLICA — annuncio nuovo o
+     duplicato — e sparisce in modifica: li' il bottone primario e' gia'
+     un salvataggio, e su una bozza dice pure le stesse parole. Due
+     bottoni per lo stesso gesto sono un bivio senza risposta giusta. */
+  if (el('sellBozza')) el('sellBozza').style.display = editandoId ? 'none' : '';
   /* le due uscite della modifica compaiono e spariscono insieme:
      sono lo stesso gesto in due posti */
   const aMeta = !!(editandoId || duplicaDaId);
@@ -30091,7 +30226,12 @@ function avvisoFoto(d, chieste){
     ? 'è entrata' : 'sono entrate'}${motivi ? ': ' + motivi : ''}`;
 }
 
-async function publish(){
+async function publish(comeBozza){
+  /* `comeBozza` arriva SOLO dal bottone «Salva senza pubblicare»: le
+     validazioni qui sotto NON si allentano — una bozza che nasce
+     storta sarebbe una sorpresa il giorno che si pubblica, cioe' il
+     difetto rimandato invece che tolto (la stessa riga del server). */
+  const bozza = !!comeBozza;
   const t = el('sellTitle').value.trim();
   const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
@@ -30164,16 +30304,35 @@ async function publish(){
      l'overlay blocca tutto finche' il server non risponde — un fetch
      lento (foto in base64 + moderazione AI) col dito che ritocca
      diventava N annunci identici. */
-  const ripristina = bottoneInAttesa(el('sellSubmit'), 'Pubblico l\'annuncio…');
+  const ripristina = bozza
+    ? bottoneInAttesa(el('sellBozza'), 'Salvo la bozza…')
+    : bottoneInAttesa(el('sellSubmit'), 'Pubblico l\'annuncio…');
   try {
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId, inRevisione = false, attesaOre = 24, avvisoFotoTesto = '';
+  /* Il verbo lo dice il bottone, ma la VERITA' la dice il server:
+     modificando una bozza il flag non parte — il primario e'
+     `publish()` senza argomenti — e senza rileggerlo dalla risposta
+     si cadrebbe nel ramo normale, cioe' «⚡ Annuncio pubblicato!» e il
+     dettaglio che prova ad aprirsi su una cosa che in vetrina non
+     c'e'. Trovato dal vivo, non leggendo. */
+  let restaBozza = bozza;
   const cns = consegnaPayload();
   const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
     nuovoId = Date.now();
-    listings.unshift({id:nuovoId, emoji:'📦', title:t,
+    /* IN DEMO LA BOZZA NON ENTRA IN `listings`, ed e' la riga che
+       tiene in piedi la vetrina finta: li' `vetrina = listings` sono
+       lo STESSO array, quindi una bozza aggiunta di la' comparirebbe
+       fra la merce — cioe' il difetto che questo stato esiste per non
+       avere. Va nei soli «tuoi annunci», dove si vede col suo badge.
+       Imperfezione dichiarata: al prossimo loadMyListings la demo
+       la ricalcola da `listings` e la bozza sparisce. In DEMO non c'e'
+       nessun server che la conservi, ed e' la stessa onesta' del
+       cassetto wallet — meglio una simulazione che si dimentica di
+       una che mente sulla vetrina. */
+    const riga = {id:nuovoId, emoji:'📦', title:t,
       price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
       valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
       cat:el('sellCat').value,
@@ -30194,7 +30353,9 @@ async function publish(){
          DEMO non c'e' nessun server che le copi, e mostrarne zero
          direbbe il falso su quel che si sta per pubblicare */
       desc:el('sellDesc').value||'—',
-      photos:(sellFoto.length ? sellFoto : fotoAttuali).slice()});
+      stato: bozza ? 'bozza' : 'attivo',
+      photos:(sellFoto.length ? sellFoto : fotoAttuali).slice()};
+    if (bozza) myListings.unshift(riga); else listings.unshift(riga);
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
       method:'POST',
@@ -30211,6 +30372,7 @@ async function publish(){
            una sostituisce il set per intero, come in modifica. */
         ...(duplicaDaId && !sellFoto.length
             ? {copia_foto_da: duplicaDaId} : {}),
+        ...(bozza ? {bozza: true} : {}),
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
     /* 413: il corpo intero e' stato rifiutato prima di arrivare al
@@ -30224,13 +30386,17 @@ async function publish(){
                  toast(e, tempoLettura(e)); return; }
     nuovoId = d.id;
     inRevisione = !!d.revisione; attesaOre = d.attesa_ore || 24;
+    restaBozza = restaBozza || !!d.bozza;
     avvisoFotoTesto = avvisoFoto(d, sellFoto.length);
     await loadListings();
     svuotaFirmeNostr().catch(()=>{});   // l'annuncio appena nato
     /* Un suggerimento al massimo, sul momento giusto: prima gli
        incassi (senza ln address restano appesi), poi il badge 🟣.
        In revisione niente hint: il dettaglio non si aprirà. */
-    if (hintAttivi() && !inRevisione) {
+    /* niente hint su una bozza: parlano di incassi e di piazza
+       Nostr, cioe' di un annuncio che e' in vetrina — qui non ci
+       sara' finche' non lo decide chi l'ha scritto */
+    if (hintAttivi() && !inRevisione && !restaBozza) {
       if (!myLnAddress && !hintDismesso('lnaddr'))
         hintPubblicazione = {id:'lnaddr', annuncio:nuovoId};
       else if (myNpub && !myNpubVerified && !hintDismesso('npubverifica'))
@@ -30265,6 +30431,18 @@ async function publish(){
      ha piu' chiesto */
   duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
+  if (restaBozza) {
+    /* La bozza non si apre in vetrina — in vetrina non c'e'. Si va
+       dove vive: il cassetto dei tuoi annunci, che e' anche l'unico
+       posto da cui si pubblica. Stessa strada della revisione, e per
+       la stessa ragione. */
+    if (!DEMO) await loadMyListings();
+    renderMyListings();
+    toast('📝 Bozza salvata: la trovi tra i tuoi annunci, e la pubblichi quando vuoi.'
+          + avvisoFotoTesto, 6000);
+    apriCassettoProfilo('accAnnunci');
+    return;
+  }
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
