@@ -22878,6 +22878,85 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (entrambe hanno wheel, niente compilazioni). Se mancano, i JPEG
   vivono come sempre e solo le HEIC non convertibili si saltano.
 
+## Il nodo Mostro (un'ALTRA macchina)
+
+⚠️ Non è il VPS di Barattolo. È il coordinator Mostro P2P su LNVPS
+(Dublino), Debian 13, tutto in container — bitcoind pruned, LND, tor,
+mostrod — con un canale da 400.000 sat verso ACINQ. IPv4 pubblico
+`185.18.221.96`. Sta qui perché la tappa 8 del cantiere client P2P
+(il primo ordine vero, due identità e mille sats) si chiude LÌ.
+
+**L'AUDIT DI SICUREZZA È GIÀ STATO FATTO — 2 settembre 2026.** Non
+riproporre le sue sei domande come «da fare»: superficie esposta,
+ampiezza del macaroon di mostrod, cosa può chi entra nella macchina,
+buchi nel proxy trasparente Tor, la nsec in chiaro in `settings.toml`,
+e cosa può fare un attaccante che arriva dai relay. Tutti e sei chiusi,
+in modalità **guarda-e-riferisci** (i comandi li scrivo io, li esegue
+Andrea — vedi la regola del VPS fuori dal perimetro).
+
+**IL DOCUMENTO STA NEL CANALE TELEGRAM DEL NODO**, quello degli avvisi
+della ronda, col nome `auditnodomostro202609`. Si chiede quello invece
+di riscriverlo a memoria: contiene le decisioni **coi loro perché**, che
+è la parte che non si ricostruisce.
+⚠️ Da quando quel canale è anche un archivio vale la regola: **i canali
+Telegram non sono cifrati end-to-end**, quindi lì dentro vanno documenti
+SENZA segreti — mai `settings.toml`, mai la nsec, mai un macaroon. Per i
+segreti la strada è l'archivio cifrato con age.
+
+I DUE DIFETTI VERI che ha trovato, perché sono la lezione: 1) in mostrod
+0.18.5 lo **spam gate girava PRIMA della verifica della firma** —
+chiunque dai relay poteva bruciare il budget di un utente vero
+dichiarandone la trade key, cioè censura per identità a costo zero;
+chiuso salendo a **0.18.6** (rollback taggato `mostro:v0.18.5`). 2) Una
+**fuga di traffico fuori da Tor**: `ip_forward=1` con la tabella filter
+tutta ACCEPT, quindi UDP≠53 (QUIC/HTTP-3 sulla 443) e ICMP uscivano in
+chiaro; chiusa con `iptables -A FORWARD -s 172.28.1.5 -j DROP` **dentro
+il compose, riga 48** — a mano sparirebbe al primo `up -d` e il buco si
+riaprirebbe in silenzio — provata con `--force-recreate`. Nessuno dei
+due era un errore di configurazione nostro: il primo era nel codice, il
+secondo era il residuo che le tre regole di redirect non coprivano.
+
+**LA RONDA DICE CINQUE COSE E LA QUINTA VALIDA LE ALTRE:** finestra
+blocchi/disco/ram, canale e HTLC, backup (allarme oltre 48h o sotto
+1 MB), superficie (baseline di 23 righe che NOMINA cosa è comparso o
+sparito, e `--impara` è un gesto), più il **marcatore `--- fine ronda`**.
+Se il messaggio non finisce con quella riga, un `exit 0` di metà script
+si è mangiato un pezzo — è successo DUE volte, e avvisarne a parole non
+era bastato: quel difetto non fallisce, semplicemente non gira, e da
+fuori un giro monco si legge come uno completo.
+
+**IL BACKUP** è `backup-nodo.sh` + `nodo-backup.timer` (03:30,
+`Persistent=true`): cifra con la sola chiave **pubblica** age — il
+server produce copie che lui stesso non sa riaprire — e il PC le tira
+giù in **pull** via SSH, così non c'è nessuna credenziale di uscita
+sulla macchina. Drill completo fatto. **NON contiene `channel.db`, ed è
+voluto**: ripristinare uno stato vecchio di un canale e trasmettere un
+commitment obsoleto è il modo classico di perdere i fondi — per i canali
+esiste solo l'SCB, che li CHIUDE. Lo script non si fida di `--exclude`:
+guarda DENTRO l'archivio e si ferma se lo trova.
+
+`pow_first_contact` resta **SPENTO**, e non per prudenza generica: non
+c'è spam in corso (zero utenti), il modo in cui fallisce è silenzioso in
+tre direzioni — nessun errore al client, nessun messaggio all'utente,
+nessuna riga nei nostri log, perché l'evento scartato non raggiunge mai
+un handler — e la guida di migrazione per i client è «Phase 3, pending».
+Si riapre quando il termometro degli eventi salta di un ordine di
+grandezza SENZA che siano arrivati utenti.
+
+`uris` di LND porta **solo l'onion, nessun IP**: verificato, ed era la
+cosa che non si sarebbe potuta disfare.
+
+**LE SEI COSE APERTE**, dichiarate e non dimenticate: `/config`
+scrivibile da mostrod (prima serve sapere dove vive il db); macaroon
+senza IP lock (oggi il file non esce dalla macchina); LLMNR sulla 5355
+(superficie che non paga affitto); **nessun ordine mai creato sul
+coordinator** — che non è una manutenzione rimandata ma il fatto che
+quella macchina non ha mai fatto il suo mestiere nemmeno una volta; il
+pull non è sorvegliato (il server sa che l'archivio esiste, non che il
+PC l'abbia preso); e la riconciliazione LND↔Mostro, rimandata al primo
+trade vero perché un controllo su un caso che non si produce ancora non
+prova niente.
+
 ## Regole ferree
 
 1. MAI committare `config.py`, `*.db`, `foto/`, chiavi, token, npub private.
