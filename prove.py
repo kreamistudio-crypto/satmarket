@@ -24089,11 +24089,10 @@ def prove_seo():
     _vp = pezzo_js(testo_mini, "function vaiP2P(){", "\n}")
     prova("vaiP2P porta al coming soon", True,
           "go('p2ppresto')" in _vp)
-    # nessun giudice e nessuna leva APPOSTA: il giorno che lo scambio
-    # nascera' qui entrera' il calco di asteAccese(), e questa prova
-    # cambiera' lato col suo perche'
-    prova("...senza giudici ne' rami: la risposta e' una sola", False,
-          "if (" in _vp)
+    # ROVESCIATA (set 2026, tappa 2 del P2P): il giudice c'e' — e' il
+    # calco di asteAccese, ed e' prove_p2p_libro a guardarlo per intero
+    prova("...e chiede a p2pAcceso PRIMA di aprirlo", True,
+          "if (!p2pAcceso())" in _vp)
     prova("...e la cella della barra lo chiama", True,
           '<button id="nav-p2p" onclick="vaiP2P()"' in testo_mini)
     prova("niente pull-to-refresh: non c'e' nulla da rileggere", True,
@@ -34703,6 +34702,220 @@ process.stdout.write(JSON.stringify(out));
     prova("bundle: hkdf.expand da' la lunghezza chiesta", 76, o["hkdfLen"])
 
 
+def prove_p2p_libro():
+    """LO SCAMBIO P2P, LATO CLIENT (set 2026, tappa 2): la leva a due
+    fonti, il tab che passa dal giudice, la vista col libro ordini del
+    coordinator Mostro in sola lettura — anche per gli anonimi — e le
+    impostazioni dal kind 38385.
+
+    Le sentinelle guardano la FORMA: le due fonti, il tab che chiede
+    al giudice prima di aprire il coming soon, la radice, il
+    pull-to-refresh, la vista fissa senza «Nostr» a chi legge, e —
+    l'affermazione che regge la tappa — che nel blocco non si firmi,
+    non si cifri e non si pubblichi NIENTE. Il banco node fa GIRARE il
+    parser sui casi che contano: il range e lo scaduto ESCLUSI, lo
+    stato TENUTO (il libro filtra, il parser no), il prezzo di mercato
+    stimato solo col cambio vivo, il metodo di pagamento — testo di
+    sconosciuti — scappato dove si rende, e la commissione LETTA e non
+    cablata. Una sentinella direbbe che il parser esiste, mai che
+    risponda giusto."""
+    print("\n[lo scambio P2P: il libro ordini nel client]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA LEVA DA DUE FONTI, il calco di asteAccese ---------------
+    i = mini.index("LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO")
+    blocco = mini[i:mini.index("/* ---- export CSV degli affari conclusi", i)]
+    # il codice senza i commenti a blocco: la prosa nomina apposta le
+    # cose che non ci sono (la lezione di _senza_prosa)
+    cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
+    prova("p2pAcceso legge /api/me e poi la busta", True,
+          "const p2pAcceso = () => p2pLeve ? !!p2pLeve.attivo" in cod
+          and "p2pLevaPubblica === null ? false : !!p2pLevaPubblica.attivo" in cod)
+    prova("/api/me scrive p2pLeve accanto ad astaLeve", True,
+          "p2pLeve = me.p2p_leve || null;" in mini)
+    prova("la busta di prima pagina scrive p2pLevaPubblica", True,
+          "p2pLevaPubblica = j.p2p;" in mini)
+    prova("...solo se e' un oggetto: un server di ieri non scrive niente",
+          True, "if (j.p2p && typeof j.p2p === 'object')" in mini)
+
+    # --- 2) IL TAB PASSA DAL GIUDICE ---------------------------------
+    _vp = pezzo_js(mini, "function vaiP2P(){", "\n}")
+    prova("vaiP2P chiede al giudice e a leva spenta resta al coming soon",
+          True, "if (!p2pAcceso()) { go('p2ppresto'); return; }" in _vp)
+    prova("...e a leva accesa apre la pagina vera", True,
+          "go('p2p');" in _vp)
+
+    # --- 3) RADICE, PULL-TO-REFRESH, go() ----------------------------
+    i_r = mini.index("const RADICI = new Set(")
+    radici = mini[i_r:mini.index("]);", i_r)]
+    prova("'p2p' e' una radice", True, "'p2p'" in radici)
+    prova("...e il coming soon resta una radice", True,
+          "'p2ppresto'" in radici)
+    ptr = mini[mini.index("VISTE_PTR = "):mini.index("VISTE_PTR = ") + 120]
+    prova("il libro si rilegge tirando giu'", True, "'p2p'" in ptr)
+    av = pezzo_js(mini, "async function aggiornaVista(){")
+    prova("...e aggiornaVista chiede una lettura NUOVA", True,
+          "if (v === 'p2p')" in av and "caricaLibroP2P(true)" in av)
+    _go = pezzo_js(mini, "function go(view){")
+    prova("go() ridisegna il libro entrando nella vista", True,
+          "if (view==='p2p') renderP2P();" in _go)
+    prova("...e vaiP2P NON lo ridisegna (ci si torna dalla cronologia)",
+          False, "renderP2P" in _vp)
+
+    # --- 4) LA VISTA E' MARKUP FISSO, E NON DICE «NOSTR» -------------
+    j = mini.index('id="view-p2p"')
+    fetta = mini[j:mini.index("============", j)]
+    prova("view-p2p e' markup fisso, senza interpolazioni", False,
+          "${" in fetta)
+    senza_commenti = re.sub(r"<!--.*?-->", "", fetta, flags=re.S)
+    prova("...e a chi legge non dice mai «Nostr»", False,
+          "Nostr" in senza_commenti)
+    prova("...ma dice CHI custodisce i sats e che noi non li vediamo",
+          True, "coordinatore" in senza_commenti
+          and "non li tiene e non li vede" in senza_commenti)
+    prova("le due pillole del lato sono le tema-pill di casa", 2,
+          senza_commenti.count("tema-pill"))
+    prova("view-p2p sta DOPO il coming soon e PRIMA del pacco", True,
+          mini.index('id="view-p2ppresto"') < j
+          < mini.index("VISTA: LA PAGINA DEL PACCO"))
+
+    # --- 5) IN TAPPA 2 NON SI FIRMA, NON SI CIFRA, NON SI PUBBLICA ---
+    for spia in ("finalizeEvent", "publish(", "generateSecretKey", "nsec",
+                 "nip44", "localStorage", "fetch("):
+        prova(f"il blocco della tappa 2 non nomina `{spia}`", False,
+              spia in cod)
+    prova("la REQ filtra la sola valuta e i soli pending", True,
+          "'#f': [P2P_VALUTA], '#s': ['pending']" in cod)
+    prova("...e chiede anche le impostazioni (38385)", True,
+          "{kinds: [38385], authors: [c.mostro]}" in cod)
+    prova("il relay si costruisce a mano, col timeout (la lezione del bunker)",
+          True, "new NT.Relay(url)" in cod
+          and "relay.connect({timeout: P2P_LIBRO_MS})" in cod)
+    prova("la risposta di un giro vecchio si butta", True,
+          "if (giro !== p2pGiro) return;" in cod)
+    prova("il metodo di pagamento passa da esc() dove si rende", True,
+          "esc(o.metodi.join(', '))" in cod)
+
+    # --- 6) COMMISSIONE E TETTO SI LEGGONO, MAI CABLATI ---------------
+    prova("commissione e tetto si LEGGONO dal 38385", True,
+          "fee: num('fee')," in cod and "num('max_order_amount')" in cod)
+    prova("...e nessuna cifra del coordinator e' scritta qui", False,
+          any(s in cod for s in ("100000", "100_000", "0.01", "0.02", "1%", "2%")))
+    prova("...e la riga delle impostazioni tace su quel che non sa", True,
+          "if (i && i.fee > 0)" in cod and "if (i && i.maxSats > 0)" in cod)
+
+    # --- 7) IL BANCO NODE: il parser GIRA ------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il parser del libro ordini", "node non c'e'")
+        return
+    k = mini.index("const esc = s =>")
+    esc_js = mini[k:mini.index(";\n", k) + 1]
+    pezzi = [esc_js] + [pezzo_js(mini, f) for f in (
+        "function tagValore(ev, nome){",
+        "function ordineDaEvento(ev, adesso){",
+        "function infoDaEvento(ev){",
+        "function scadeTestoP2P(scade){",
+        "function satsMercatoP2P(o){",
+        "function rigaOrdineP2P(o){",
+        "function infoRigaP2P(){")]
+    banco = "\n".join(pezzi) + r"""
+const fmt = n => String(n);
+const fmtEur = e => e.toFixed(2).replace('.', ',');
+let cambioVivo = true, eurPerSat = 0.0005, p2pInfo = null;
+const ora = 2000000000;
+const ev = (kind, tags, created) => ({kind, tags, created_at: created || 1});
+const out = {};
+out.fisso = ordineDaEvento(ev(38383, [['d','ord-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','80000'],['fa','50'],['pm','Revolut','Satispay'],['premium','0'],['expires_at', String(ora+3600)]]), ora);
+out.mercato = ordineDaEvento(ev(38383, [['d','ord-2'],['k','buy'],['f','eur'],['s','pending'],['amt','0'],['fa','50'],['pm','Bonifico'],['premium','2'],['expires_at', String(ora+90000)]]), ora);
+out.mercatoSats = satsMercatoP2P(out.mercato);
+out.range = ordineDaEvento(ev(38383, [['d','ord-3'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['pm','x']]), ora);
+out.scaduto = ordineDaEvento(ev(38383, [['d','ord-4'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora-1)]]), ora);
+out.senzaD = ordineDaEvento(ev(38383, [['k','sell'],['f','EUR'],['fa','5']]), ora);
+out.latoStorto = ordineDaEvento(ev(38383, [['d','x'],['k','swap'],['fa','5']]), ora);
+out.kindStorto = ordineDaEvento(ev(38385, [['d','ord-1'],['k','sell'],['fa','5']]), ora);
+out.stato = ordineDaEvento(ev(38383, [['d','ord-5'],['k','sell'],['f','EUR'],['s','in-progress'],['amt','10'],['fa','5']]), ora);
+out.info = infoDaEvento(ev(38385, [['d','mostro-pk'],['fee','0.01'],['pow','0'],['max_order_amount','100000'],['min_order_amount','100'],['fiat_currencies_accepted','EUR, usd'],['mostro_version','0.18.2']], 5));
+out.infoStorta = infoDaEvento(ev(38383, [['fee','0.5']]));
+out.rigaVeleno = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ord-6"'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['pm','<script>alert(1)</script>'],['expires_at', String(ora+7200)]]), ora));
+out.rigaMercato = rigaOrdineP2P(out.mercato);
+cambioVivo = false;
+out.rigaMercatoMuto = rigaOrdineP2P(out.mercato);
+p2pInfo = out.info; out.infoRiga = infoRigaP2P();
+p2pInfo = null; out.infoRigaVuota = infoRigaP2P();
+const adesso = Math.floor(Date.now()/1000);
+out.scade = [scadeTestoP2P(0), scadeTestoP2P(adesso - 5), scadeTestoP2P(adesso + 120),
+             scadeTestoP2P(adesso + 7200), scadeTestoP2P(adesso + 3*86400)];
+console.log(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = _os.path.join(d, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8",
+                    timeout=60)
+        if r.returncode != 0:
+            prova("il banco node del libro gira", "", r.stderr[-600:])
+            return
+        out = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    f = out["fisso"]
+    prova("un ordine a sats fissi si legge intero", True,
+          f is not None and f["id"] == "ord-1" and f["lato"] == "sell"
+          and f["euro"] == 50 and f["sats"] == 80000 and f["fiat"] == "EUR"
+          and f["stato"] == "pending" and f["premium"] == 0
+          and f["scade"] == 2000000000 + 3600)
+    prova("...coi metodi di pagamento come tag a piu' valori",
+          ["Revolut", "Satispay"], f["metodi"])
+    m = out["mercato"]
+    prova("amt=0 e' il prezzo di mercato: sats 0 e premio letto", True,
+          m is not None and m["sats"] == 0 and m["premium"] == 2
+          and m["lato"] == "buy")
+    prova("...la valuta si normalizza in maiuscolo", "EUR", m["fiat"])
+    prova("...e i sats si STIMANO col cambio e il premio", 98039,
+          out["mercatoSats"])
+    prova("il range (due importi) e' ESCLUSO", None, out["range"])
+    prova("lo scaduto e' escluso", None, out["scaduto"])
+    prova("senza id non e' un ordine", None, out["senzaD"])
+    prova("un lato sconosciuto non e' un ordine", None, out["latoStorto"])
+    prova("un kind diverso non e' un ordine", None, out["kindStorto"])
+    prova("lo stato si TIENE (a filtrare e' il libro, non il parser)",
+          "in-progress", out["stato"]["stato"])
+    inf = out["info"]
+    prova("le impostazioni si leggono: fee, tetti, valute, versione", True,
+          inf["fee"] == 0.01 and inf["maxSats"] == 100000
+          and inf["minSats"] == 100 and inf["valute"] == ["EUR", "USD"]
+          and inf["versione"] == "0.18.2" and inf["quando"] == 5)
+    prova("...e il pow del primo contatto ricade su pow", 0, inf["powPrimo"])
+    prova("un 38383 non e' un'impostazione", None, out["infoStorta"])
+    rv = out["rigaVeleno"]
+    prova("il metodo avvelenato esce scappato", True,
+          "&lt;script&gt;" in rv and "<script>" not in rv)
+    prova("...e l'id con la virgoletta non spezza l'attributo", True,
+          'data-id="ord-6&quot;"' in rv)
+    prova("a prezzo di mercato la riga porta il ≈ e il premio", True,
+          "≈ 98039 sats" in out["rigaMercato"]
+          and "+2% sul mercato" in out["rigaMercato"])
+    prova("...e a cambio muto non inventa nessun numero", True,
+          "al prezzo di mercato" in out["rigaMercatoMuto"]
+          and "≈" not in out["rigaMercatoMuto"])
+    prova("la riga delle impostazioni dice commissione e tetto LETTI", True,
+          "commissione 1%" in out["infoRiga"]
+          and "fino a 100000 sats" in out["infoRiga"]
+          and "0.18.2" in out["infoRiga"])
+    prova("...e senza 38385 dice solo chi e' il coordinatore",
+          "Coordinatore Mostro", out["infoRigaVuota"])
+    prova("la scadenza a grana grossa",
+          ["", "scaduto", "scade fra 2 min", "scade fra 2 h", "scade fra 3 g"],
+          out["scade"])
+
+
 def prove_p2p_server():
     """LO SCAMBIO P2P, LATO SERVER (set 2026, tappa 1): tre leve, un
     giudice e due buste.
@@ -40978,6 +41191,7 @@ def main():
               prove_nwc_cifratura,
               prove_bundle_nostr,
               prove_p2p_server,
+        prove_p2p_libro,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
