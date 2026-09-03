@@ -13793,7 +13793,8 @@ function apriAcquisto(l){
      parse non lo prende (chiavi doppie sono JS lecito): c'e' la prova. */
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id, true)?.id || 0,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             preventivo:null, via:'', punto:'', puntoBarattolo:'',
+             puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              email:'',
@@ -13873,7 +13874,8 @@ function apriAcquistoSet(){
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             preventivo:null, via:'', punto:'', puntoBarattolo:'',
+             puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              email:'',
@@ -14644,7 +14646,15 @@ function renderAcquisto(){
      Senza scelta (una rete sola, o nessuna) valgono le dichiarate,
      che e' anche quel che la frase dice. */
   const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
-  const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipoPunto;
+  /* I PUNTI DI CASA (ago 2026): sulla rete nostra il «dove» non e' un
+     campo di testo ma un ELENCO — sono punti che proponiamo noi,
+     quindi li conosciamo, e farli riscrivere a mano sarebbe chiedere
+     a chi compra un dato che abbiamo gia'. E IL TIPO NON SI CHIEDE:
+     dietro un punto nostro c'e' sempre una persona, lo dice il
+     catalogo del server (TIPO_PUNTO_BARATTOLO) e chiederlo sarebbe
+     una domanda senza risposte sbagliate. */
+  const casa = puntiDiCasa(d, reti);
+  const scelteFatte = (!sceglieRete || !!d.rete) && (!!casa || !!d.tipoPunto);
   const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
@@ -14682,14 +14692,45 @@ function renderAcquisto(){
       maxlength="120" value="${esc(d.email||'')}" placeholder="${segnaposEmail}"
       oninput="if(acqDati)acqDati.email=this.value">
     <div class="acq-nota">${spiegaEmail()}</div>`;
-  const campoAperto =
-    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove + campoEmail : ''}`;
+  /* L'ELENCO DEI PUNTI DI CASA, al posto del campo libero. Le pillole
+     sono quelle delle vie sorelle (`.pill` + `.pill-trust` da accesa,
+     il vestito che il cassetto ha gia'), e ognuna dice nome, via e
+     comune: chi sceglie deve riconoscere il posto, non l'id.
+     GLI ORARI STANNO SOTTO LA PILLOLA ACCESA e non dentro ognuna: e'
+     l'unica cosa che serve DOPO aver scelto — quando si va a ritirare
+     — e in ogni pillola sarebbe una colonna di testo su cui l'occhio
+     non trova piu' il nome.
+     A ZERO PUNTI si dice perche', e non si finge un campo libero: la
+     rete e' dichiarata dal venditore ma i punti sono spenti, e
+     scrivere un indirizzo a mano vorrebbe dire mandare il pacco a un
+     banco che non aspetta niente. Il server rifiuta comunque (il suo
+     giudice valida contro i punti VIVI): qui si dice prima. */
+  const scelto = puntoDiCasaScelto(d);
+  const puntoPill = (pt) =>
+    `<button type="button" class="pill${d.puntoBarattolo===pt.id?' pill-trust':''}"
+       data-punto="${esc(pt.id)}" onclick="setPuntoDiCasa(this.dataset.punto)"
+       style="cursor:pointer">🏠 ${esc(pt.nome)} — ${esc(pt.indirizzo)}, ${esc(pt.comune)}</button>`;
+  const elencoCasa = casa && casa.length
+    ? `<label>A quale punto Barattolo?</label>
+       <div class="fila-reti">${casa.map(puntoPill).join('')}</div>
+       ${scelto && scelto.orari ? `<div class="acq-nota">Orari: ${esc(scelto.orari)}</div>` : ''}
+       ${campoEmail}`
+    : `<div class="acq-nota">Questo venditore consegna ai punti di Barattolo, ma in questo momento non ce n'è nessuno attivo: scegli un'altra via.</div>`;
+  const campoAperto = casa
+    ? `${scelteRete}${elencoCasa}`
+    : `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove + campoEmail : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
-  const campoChiuso = puntoScritto
+  /* LA RIGA COMPATTA parla anche per la rete di casa, dove `d.punto`
+     e' vuoto per costruzione — il testo lo compone il server — e
+     senza questa riga il cassetto si richiuderebbe sul bottone nudo
+     dopo aver scelto, cioe' non direbbe cosa si e' scelto. */
+  const rigaCasa = scelto
+    ? `Punto Barattolo — ${scelto.nome}, ${scelto.comune}` : '';
+  const campoChiuso = (rigaCasa || puntoScritto)
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()"><span class="punto-testo">${(d.tipoPunto||d.rete)?esc(nomePunto(d.tipoPunto, d.rete))+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo">${rigaCasa ? esc(rigaCasa) : ((d.tipoPunto||d.rete)?esc(nomePunto(d.tipoPunto, d.rete))+' — ':'')+esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
@@ -15202,7 +15243,10 @@ function setViaAcquisto(v){
      cassetto si richiude, cosi' tornandoci si trova la riga (o il
      bottone), mai un campo spalancato */
   if (v !== 'punto') acqDati.puntoAperto = false;
-  else if (!acqDati.punto.trim()) acqDati.puntoAperto = true;
+  /* «manca il dove» vale per tutte e due le forme: il testo libero
+     delle reti di terzi e l'id del punto di casa */
+  else if (!acqDati.punto.trim() && !acqDati.puntoBarattolo)
+    acqDati.puntoAperto = true;
   /* il gemello sulla via casa, stessa regola */
   if (v !== 'casa') acqDati.indirizzoAperto = false;
   else if (!indirizzoCompleto(acqDati.indirizzo))
@@ -15600,9 +15644,39 @@ function setReteAcquisto(r){
      cancellarlo sarebbe sbagliato oltre che sgarbato. Il verso giusto
      e' che chi ha scritto comanda. */
   if (!acqDati.puntoToccato) applicaPuntoSalvato(puntoSalvatoPer(r));
+  /* IL PUNTO DI CASA SE NE VA COL SUO CORRIERE, sempre — anche
+     toccato a mano, al contrario del testo libero qui sopra. Non e'
+     un'asimmetria: quello e' testo di chi compra e in Italia la
+     stessa tabaccheria e' spesso punto di due reti, questo e' un id
+     del NOSTRO catalogo che sotto un'altra rete non vuol dire
+     niente. Lasciarlo li' manderebbe al server un punto che il suo
+     giudice rifiuta (`punto_barattolo_da_payload` esce a mani vuote
+     fuori dalla rete di casa), cioe' un ordine sulla via punto senza
+     dove. */
+  if (r !== RETE_BARATTOLO) acqDati.puntoBarattolo = '';
   renderAcquisto();
-  if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
+  /* il fuoco vale per il campo di testo: sulla rete di casa non c'e'
+     niente da scrivere, e la tastiera sarebbe un fastidio */
+  if (r !== RETE_BARATTOLO && !acqDati.punto.trim())
+    el('acqPunto')?.focus({preventScroll:true});
 }
+/* IL PUNTO DI CASA SCELTO (ago 2026). Non tocca `punto`, ed e' la
+   riga da non ammorbidire: quel campo e' il testo LIBERO delle reti
+   di terzi, e il testo del punto nostro lo compone il server dal
+   catalogo — scriverlo qui vorrebbe dire due verita' sullo stesso
+   ordine, e la nostra invecchierebbe il giorno che il punto cambia
+   indirizzo.
+   NIENTE FUOCO da mettere: qui non si scrive niente, si sceglie —
+   ed e' anche il motivo per cui il cassetto puo' richiudersi da
+   solo, che la scelta e' finita col tocco. */
+function setPuntoDiCasa(pid){
+  if (!acqDati) return;
+  haptic();
+  acqDati.puntoBarattolo = pid;
+  acqDati.puntoToccato = true;
+  renderAcquisto();
+}
+
 /* Locker automatico o punto col banco: al venditore serve per
    comprare l'etichetta giusta. Il fuoco va al campo solo se il punto
    e' ancora vuoto — su una correzione la tastiera sarebbe un
@@ -15706,6 +15780,13 @@ function corpoConsegna(){
      server la sua presenza dice «questo client il campo ce l'ha»,
      il patto della chiave dell'indirizzo */
   if (v==='punto') out.tipo_punto = acqDati.tipoPunto || '';
+  /* IL PUNTO DI CASA: l'id e basta — il TESTO lo compone il server dal
+     catalogo, che e' la ragione per cui questa chiave esiste accanto a
+     `punto_ritiro` invece di riempirlo. Chiave assente quando non c'e'
+     (il patto della nota): un client di ieri non la manda, e per il
+     server e' il mondo di prima. */
+  if (v==='punto' && acqDati.puntoBarattolo)
+    out.punto_barattolo = acqDati.puntoBarattolo;
   /* L'EMAIL PER IL CORRIERE (ago 2026): sotto il gate della via punto,
      dove il campo vive — e CHIAVE ASSENTE QUANDO E' VUOTA, il patto
      della nota. Non sta in cima con `extra`, ed e' la riga da non
@@ -15757,7 +15838,26 @@ function reteMancante(d){
    SEMPRE sulla via punto — il tipo non dipende dalle reti e non si
    deduce da niente. Uno solo per le due strade che pagano. */
 function tipoPuntoMancante(d){
+  /* SULLA RETE DI CASA IL TIPO NON MANCA MAI, perche' non si chiede:
+     lo dice il catalogo del server, e un toast che chiede una cosa
+     che non c'e' a schermo manderebbe a cercare una scelta che non
+     esiste. La domanda si fa al giudice unico, mai rileggendo la
+     rete a mano. */
+  if (puntiDiCasa(d, d?.preventivo?.reti || [])) return false;
   return d?.via === 'punto' && !d.tipoPunto;
+}
+
+/* «Manca il punto?» — il gemello del `!d.punto.trim()` per la rete di
+   casa, dove il dove non si scrive ma si sceglie. GIUDICE SUO e non
+   un `||` dentro la guardia: i posti che pagano sono DUE
+   (`ctaAcquisto` e la strada del wallet ⚡), e il secondo e' proprio
+   quello che nessun collaudo esercita — in locale un wallet non c'e'.
+   A ZERO PUNTI ACCESI risponde `true` e la guardia ferma: e' il caso
+   in cui la rete e' dichiarata ma non c'e' niente da scegliere, e il
+   cassetto lo dice a parole. */
+function puntoDiCasaMancante(d){
+  const casa = puntiDiCasa(d, d?.preventivo?.reti || []);
+  return d?.via === 'punto' && !!casa && !d.puntoBarattolo;
 }
 
 function ctaAcquisto(){
@@ -15776,13 +15876,22 @@ function ctaAcquisto(){
     toast('Dicci se è un locker automatico o un punto col banco');
     return;
   }
+  /* e il gemello della rete di casa, dove il dove si sceglie
+     dall'elenco: sta QUI e non insieme al testo libero perche'
+     l'ordine delle guardie e' rete → tipo → dove, e quando scatta
+     questa il cassetto ha gia' l'elenco a schermo */
+  if (puntoDiCasaMancante(d)){
+    apriPuntoAcquisto();
+    toast('Scegli a quale punto Barattolo vuoi ricevere il pacco');
+    return;
+  }
   /* il punto e' obbligatorio SEMPRE sulla via punto (quarto giro):
      il server lo esige solo con la rete dichiarata — tolleranza per
      il client di ieri, che senza rete non ha il campo — quindi la
      regola del prodotto vive qui. Dal quinto giro il campo puo'
      essere chiuso dietro il bottone: si APRE prima del fuoco, mai il
      fuoco su un campo nascosto */
-  if (d.via==='punto' && !d.punto.trim()){
+  if (d.via==='punto' && !d.punto.trim() && !d.puntoBarattolo){
     apriPuntoAcquisto();
     toast('Indica il punto di ritiro: al venditore serve per spedire');
     return;
@@ -17795,7 +17904,13 @@ function compraSubito(){
     toast('Dicci se è un locker automatico o un punto col banco');
     return;
   }
-  if (acqDati.via==='punto' && !acqDati.punto.trim()){
+  if (puntoDiCasaMancante(acqDati)){
+    apriPuntoAcquisto();
+    toast('Scegli a quale punto Barattolo vuoi ricevere il pacco');
+    return;
+  }
+  if (acqDati.via==='punto' && !acqDati.punto.trim()
+      && !acqDati.puntoBarattolo){
     /* la gemella della guardia di ctaAcquisto: il campo puo' essere
        chiuso dietro il bottone — si APRE prima del fuoco */
     apriPuntoAcquisto();
@@ -19218,7 +19333,8 @@ async function pagaOffertaCarrello(id){
                 poi sulla stessa composizione riuserebbe dalla cache
                 un conto col pattuito dentro (e viceversa) */
              firma:'acc'+o.id+'|'+firmaSet(),
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             preventivo:null, via:'', punto:'', puntoBarattolo:'',
+             puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              email:'',
@@ -25079,6 +25195,41 @@ function apriMappaPunti(rete){
    arrivato un '' hardcodato e si vedevano sempre tutte e due le
    mappe anche a rete dichiarata. */
 const RETE_MAPPA = {'InPost': 'inpost', 'Poste Italiane': 'poste'};
+
+/* LA RETE DI CASA (ago 2026): il gemello di RETE_BARATTOLO del
+   server. Non sta in RETE_MAPPA APPOSTA, ed e' quel che la fa
+   comportare bene senza una riga di codice: `retiMappe` filtra su
+   quella tabella, quindi per la rete nostra non escono ne' frase ne'
+   bottoni — la stessa strada di 'Altro', e per la stessa ragione (un
+   link alla mappa di un terzo qui manderebbe nel posto sbagliato).
+   Il suo elenco lo disegna il cassetto, dal preventivo. */
+const RETE_BARATTOLO = 'Barattolo';
+
+/* «Si sta scegliendo un punto di CASA?» — e in quel caso, quali.
+   Torna una LISTA (anche vuota) sulla rete nostra e `null` altrove:
+   e' un giudice solo perche' la domanda la fanno in tre — il campo
+   che disegna l'elenco al posto del testo libero, il tipo che non si
+   chiede, e le guardie di «Paga» — e tre copie divergerebbero al
+   primo ritocco.
+   LA LISTA VUOTA NON E' `null`: vuol dire «rete di casa, ma nessun
+   punto acceso», che e' un caso da dire a voce e non da confondere
+   con «qui la rete nostra non c'entra». Il server la manda vuota
+   quando i punti sono spenti, e in DEMO non la manda affatto. */
+function puntiDiCasa(d, reti){
+  if (!Array.isArray(reti) || !reti.includes(RETE_BARATTOLO)) return null;
+  if (reti.length >= 2 && d?.rete !== RETE_BARATTOLO) return null;
+  return d?.preventivo?.punti_barattolo || [];
+}
+
+/* Il punto scelto, dal catalogo che arriva col preventivo: serve alla
+   riga compatta e al testo che si legge. Il TESTO non si compone qui
+   e non si manda al server — lo scrive lui dal catalogo, che e' la
+   riga per cui `punto_barattolo` esiste: un ordine deve continuare a
+   dire dove sta il pacco anche se il punto cambia indirizzo. */
+function puntoDiCasaScelto(d){
+  return (d?.preventivo?.punti_barattolo || [])
+    .find(p => p.id === d?.puntoBarattolo) || null;
+}
 
 /* CHE TIPO DI PUNTO (ago 2026): gemello del catalogo TIPI_PUNTO del
    server — gli id sono per sempre, le etichette si ritoccano, e

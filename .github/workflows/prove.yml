@@ -74,7 +74,7 @@ jobs:
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
              marca_prove.py recupera_xp_ordini.py livelli_prova.py
-             collaudo_offerta_carrello.py
+             collaudo_offerta_carrello.py collaudo_punti_barattolo.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.

@@ -13254,15 +13254,40 @@ def prove_reti_corriere():
             self.status_code, self.detail = codice, detail
             super().__init__(detail)
     amb = {"HTTPException": _HTTP}
-    i = src.index('SPEDIZIONIERI = ("')
-    exec(src[i:src.index("\n", i)], amb)
+    for ancora in ('SPEDIZIONIERI = ("', 'RETE_BARATTOLO = "'):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n", i)], amb)
     for nome in ("_reti_serializza", "reti_venditore", "rete_da_payload"):
         exec(pezzo(nome), amb)
     reti_venditore = amb["reti_venditore"]
     _reti_serializza = amb["_reti_serializza"]
     rete_da_payload = amb["rete_da_payload"]
     prova("il catalogo di prova e' quello VERO del server",
-          ("InPost", "Poste Italiane", "Altro"), amb["SPEDIZIONIERI"])
+          ("Barattolo", "InPost", "Poste Italiane", "Altro"),
+          amb["SPEDIZIONIERI"])
+    # LA RETE DI CASA E' IN TESTA, e non e' un vezzo: l'ordine della
+    # tupla governa la serializzazione, quindi e' quel che decide come
+    # si scrivono le colonne — e la testa e' il posto della rete
+    # nostra. (Che l'ordine sia deterministico lo dicono le prove di
+    # `_reti_serializza` qui sotto: le righe di ieri non si rompono.)
+    prova("...con la rete di casa in TESTA", "Barattolo",
+          amb["SPEDIZIONIERI"][0])
+
+    # --- IL GATE DELLA RETE DI CASA (ago 2026) ----------------------
+    # La regressione viene PRIMA: senza il terzo argomento il giudice
+    # risponde esattamente come ieri, byte per byte. E' la riga che
+    # rende gratuito il cantiere per tutte le reti di terzi.
+    prova("senza il gate, la rete di casa NON esce (fail-closed)",
+          ["InPost"], reti_venditore("|Barattolo|InPost|", ""))
+    prova("...nemmeno quando e' l'unica dichiarata", [],
+          reti_venditore("|Barattolo|", ""))
+    prova("...e nemmeno dal ripiego sulla colonna singolare", [],
+          reti_venditore("", "Barattolo"))
+    prova("col gate acceso esce, in testa al catalogo",
+          ["Barattolo", "InPost"],
+          reti_venditore("|InPost|Barattolo|", "", True))
+    prova("il gate non inventa una rete che non e' dichiarata",
+          ["InPost"], reti_venditore("|InPost|", "", True))
 
     # --- il giudice puro delle reti ---------------------------------
     prova("le reti si leggono dai pipe", ["InPost", "Poste Italiane"],
@@ -13481,11 +13506,23 @@ def prove_reti_corriere():
           [p.split(":")[0].strip() for p in firma.split(",")])
 
     # il tipo si scrive in colonna nei due rami d'acquisto
+    # ⚠️ L'ANCORA E' ACCORCIATA dal cantiere dei punti di casa: la riga
+    # e' diventata un ternario spezzato su due righe, e cercarla intera
+    # non troverebbe piu' niente. Quel che la prova continua a
+    # garantire e' che il GIUDICE si chiami nei due rami; che il suo
+    # risultato finisca in `tipo` lo dice la riga qui sotto.
+    rami = [codice(pezzo(f)) for f in ("compra", "_compra_set")]
     prova("il tipo si legge dal payload nei due rami d'acquisto",
           [1, 1],
-          [codice(pezzo(f)).count(
-              'tipo = tipo_punto_da_payload(d.get("tipo_punto"))')
-           for f in ("compra", "_compra_set")])
+          [c.count('tipo_punto_da_payload(d.get("tipo_punto"))')
+           for c in rami])
+    # E SULLA RETE DI CASA IL TIPO NON SI CHIEDE, che dietro un punto
+    # nostro c'e' sempre una persona: e' il catalogo a dirlo, e il
+    # giudice non viene nemmeno interrogato. La prova sta accanto alla
+    # sorella perche' le due insieme dicono la regola intera — si
+    # chiede a chi ha una rete di terzi, mai a chi ha la nostra.
+    prova("...ma sulla rete di casa lo dice il catalogo, nei due rami",
+          [1, 1], [c.count("TIPO_PUNTO_BARATTOLO if pid") for c in rami])
     prova("...e finisce in colonna nei due INSERT", 2,
           codice(src).count("tipo_punto,"))
     # la correzione dentro l'ordine, che e' la rete di sicurezza degli
@@ -13950,8 +13987,9 @@ def prove_punti_salvati():
             super().__init__(detail)
 
     amb = {"HTTPException": _HTTP}
-    i = src.index('SPEDIZIONIERI = ("')
-    exec(src[i:src.index("\n", i)], amb)
+    for ancora in ('SPEDIZIONIERI = ("', 'RETE_BARATTOLO = "'):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n", i)], amb)
     i = src.index("TIPI_PUNTO = ((")
     exec(src[i:src.index("\n\n", i)], amb)
     for nome in ("_testo_punto", "_punti_resi", "punti_per_venditore",
@@ -14634,28 +14672,72 @@ def prove_pagina_acquisto():
     # il terzo costruttore e' la cassa in modalita' accordo
     # (pagaOffertaCarrello, ago 2026)
     prova("...lo stato del cassetto nasce in acqDati (tre costruttori)",
-          3, mini3.count("punto:'', puntoAperto:false"))
+          3, mini3.count("puntoAperto:false, rete:''"))
+    # ⚠️ E DAL CANTIERE DEI PUNTI DI CASA IL DOVE E' DUE CAMPI: il
+    # testo libero delle reti di terzi e l'id del punto nostro. Nascono
+    # INSIEME nei tre costruttori, o `corpoConsegna` leggerebbe un
+    # `undefined` — e la chiave e' NUOVA e non collide con `punto`, che
+    # e' la lezione della chiave doppia (`tipo`), dove in un literal
+    # l'ultima vince in silenzio.
+    prova("...e il punto di casa accanto al testo libero, nei tre",
+          3, mini3.count("punto:'', puntoBarattolo:''"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
           True, 'value="${esc(d.punto)}"' in mini3)
     # dal cantiere delle reti la riga compatta porta anche il nome del
     # punto (tipo + rete, dal giudice unico): il punto resta SCAPPATO
     # e il Cambia al suo posto — cambia il prefisso, non la regola
+    # ⚠️ L'ANCORA DEL TESTO HA PERSO IL `${`: dal cantiere dei punti di
+    # casa la riga e' un ternario, e il testo libero e' l'ALTRO ramo —
+    # sulla rete nostra `d.punto` e' vuoto per costruzione e a dire
+    # dove va il pacco e' il catalogo. Quel che la prova continua a
+    # garantire e' che il punto SCRITTO resti scappato col suo Cambia.
     prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
           True,
           "esc(nomePunto(d.tipoPunto, d.rete))+' — '" in mini3
-          and '${esc(puntoScritto)}</span>' in mini3)
+          and "esc(puntoScritto)}</span>" in mini3)
+    # e la riga della rete di casa passa dalla stessa porta: quel testo
+    # lo compone il server dal catalogo, ma resta testo di un terzo
+    prova("...e anche la riga del punto di casa passa da esc()",
+          True, "rigaCasa ? esc(rigaCasa)" in mini3)
     prova("...e il nome del punto passa anch'esso da esc()",
           True, "esc(nomePunto(d.tipoPunto, d.rete))" in mini3)
     prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
           True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
-    # SEI ora: ogni strada che paga fa TRE domande in fila — il
-    # corriere, che tipo di punto, e dove — e tutte e sei aprono il
-    # cassetto invece di mettere il fuoco su un campo fuori pagina
-    prova("le guardie del cassetto lo APRONO (x6: due strade, "
-          "tre domande)", 6, mini3.count("apriPuntoAcquisto();"))
+    # OTTO dal cantiere dei punti di casa, ed e' la riga da leggere due
+    # volte: le DOMANDE sono quattro — il corriere, che tipo di punto,
+    # QUALE punto nostro, e dove — ma **mai tutte e quattro sullo
+    # stesso acquisto**. Sulla rete di casa il tipo non si chiede (lo
+    # dice il catalogo) e il dove nemmeno (si sceglie dall'elenco);
+    # sulle reti di terzi il punto nostro non c'entra. In fila ne
+    # scattano sempre e solo tre, e a garantirlo sono i due giudici
+    # (`tipoPuntoMancante`, `puntoDiCasaMancante`), che si escludono a
+    # vicenda. Quel che questa prova conta sono i SITI, e tutti e otto
+    # APRONO il cassetto invece di mettere il fuoco su un campo fuori
+    # pagina — che e' la regola, e non cambia con la quarta domanda.
+    prova("le guardie del cassetto lo APRONO (x8: due strade, "
+          "quattro domande)", 8, mini3.count("apriPuntoAcquisto();"))
+    prova("...e la quarta e' identica nelle due strade", 2,
+          mini3.count("Scegli a quale punto Barattolo vuoi ricevere "
+                      "il pacco"))
     prova("...col toast identico nelle due copie", 2,
           mini3.count("Indica il punto di ritiro: al venditore serve "
                       "per spedire"))
+    # ⚠️ E LE DUE GUARDIE DEL TESTO LIBERO ESENTANO LA RETE DI CASA,
+    # che e' la riga che nessuna prova guardava: li' `punto` e' vuoto
+    # PER COSTRUZIONE — il testo lo compone il SERVER dal catalogo —
+    # quindi senza quell'esenzione chi ha appena scelto un punto nostro
+    # si sentirebbe chiedere di indicarlo, col toast che dice il falso
+    # proprio a chi ha gia' risposto. L'ha detto la tortura, non la
+    # rilettura. E si guarda DENTRO ogni funzione e mai nel file
+    # intero: una condizione giusta in una delle due terrebbe verde
+    # l'altra, che e' precisamente il modo in cui questa coppia si
+    # sfilaccia (il precedente e' il toast, che infatti si conta x2).
+    for _fn, _rif in (("ctaAcquisto(){", "d."),
+                      ("compraSubito(){", "acqDati.")):
+        _g = pezzo_js(mini3, "function " + _fn, "\n}")
+        _g = _g[:_g.index("Indica il punto di ritiro")]
+        prova("...e in %s la guardia esenta la rete di casa" % _fn[:-3],
+              True, (_rif + "puntoBarattolo") in _g)
     prova("...e nessuna mette piu' il fuoco su un campo nascosto",
           False, "el('acqPunto')?.focus(); return;" in mini3)
     _cta = pezzo_js(mini3, "function ctaAcquisto(){", "\n}")
@@ -14682,9 +14764,15 @@ def prove_pagina_acquisto():
     #    punto, sorvegliato qui sopra) a garantire che quando scatta
     #    la terza il campo ci sia davvero: nessun toast manda mai a un
     #    campo che non esiste.
+    # ⚠️ IL GATE HA IMPARATO LA RETE DI CASA (ago 2026) e la prova ha
+    # CAMBIATO LATO: la seconda meta' non e' piu' «hai detto che tipo
+    # di punto» ma «hai detto il tipo OPPURE sei sulla rete nostra,
+    # dove il tipo lo dice il catalogo». La cascata non si allenta —
+    # resta rete → (tipo | punto nostro) → dove — cambia quale delle
+    # due la soddisfa.
     prova("sesto giro: il gate delle scelte esiste", True,
-          "const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo"
-          in mini3)
+          "const scelteFatte = (!sceglieRete || !!d.rete) "
+          "&& (!!casa || !!d.tipoPunto)" in mini3)
     # ⚠️ L'ANCORA SI FERMA AL GATE e non elenca cosa c'e' dentro: dal
     # cantiere dell'email alla cassa (ago 2026) sotto quel gate ci
     # sono DUE campi — il dove e l'email, che eredita cosi' la stessa
@@ -14716,6 +14804,13 @@ def prove_pagina_acquisto():
         (["InPost"],          {"rete": "",       "tipoPunto": "banco"},  True),
         ([],                  {"rete": "",       "tipoPunto": ""},       True),
         ([],                  {"rete": "",       "tipoPunto": "locker"}, True),
+        # e il nono, dal cantiere dei punti di casa: sulla rete nostra
+        # il gate si soddisfa SENZA il tipo. Quel valore li' non
+        # governa il campo libero — il ternario prende l'altro ramo —
+        # ma e' la spia che riporta rossa la mutazione che rimette
+        # `scelteFatte` al solo `!!d.tipoPunto`.
+        (["Barattolo"],       {"rete": "",       "tipoPunto": "",
+                               "preventivo": {"punti_barattolo": []}},   True),
     ]
     if not _node4:
         salta("il gate del campo risponde giusto", "node non installato")
@@ -14723,11 +14818,20 @@ def prove_pagina_acquisto():
         try:
             _sr4 = mini3[mini3.index("const sceglieRete ="):]
             _sr4 = _sr4[:_sr4.index("\n")]
+            # dal cantiere dei punti di casa il gate legge `casa`, che
+            # e' il giudice unico: si porta nel banco lui e non una
+            # copia della sua regola, o si proverebbe una regola che
+            # nel client non gira
+            _sc4 = mini3[mini3.index("  const casa = puntiDiCasa("):]
+            _sc4 = _sc4[:_sc4.index("\n")]
             _sf4 = mini3[mini3.index("const scelteFatte ="):]
             _sf4 = _sf4[:_sf4.index("\n")]
             _cond4 = mini3[mini3.index("${(!reti.length") + 2:
                            mini3.index(" ? campoDove")]
-            _prog4 = ("function campoCe(reti, d){" + _sr4 + _sf4
+            _prog4 = ("const RETE_BARATTOLO = 'Barattolo';\n"
+                      + pezzo_js(mini3, "function puntiDiCasa(", "\n}")
+                      + "\n}\n"
+                      + "function campoCe(reti, d){" + _sr4 + _sc4 + _sf4
                       + " return !!" + _cond4 + ";}\n"
                       "const casi = "
                       + _js4.dumps([[r, d] for r, d, _a in _casi4])
@@ -18942,7 +19046,8 @@ def prove_canale_bot():
                "canale_vetrina",    # il canale OSPITE   (`/canale vetrina`)
                "ritmo_vetrina",     # quanto parla       (`/vetrina`)
                "sponsor_slug",      # chi e' in vetrina  (`/sponsor`)
-               "sponsor_fino"}      # ...e fino a quando (`/sponsor`)
+               "sponsor_fino",      # ...e fino a quando (`/sponsor`)
+               "punti_barattolo"}   # i punti di casa    (`/punti`)
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
                              _SORGENTE))
@@ -43910,6 +44015,330 @@ const conTetto = (p, ms) => Promise.race([p,
            d["qrSenzaRelay"]))
 
 
+def prove_punti_barattolo():
+    """LA RETE DI PUNTI DI CASA (ago 2026).
+
+    Un ristoratore si offre come punto di ritiro: nessun documento,
+    basta il nome sul pacco. E' la prima volta che un punto non e' un
+    contratto di un terzo ma **un'entita' che proponiamo noi**, e da
+    li' nasce tutto il resto.
+
+    Le quattro righe che questa famiglia difende, e sono quelle che un
+    riordino toglierebbe per prime:
+    · il GATE E' IN LETTURA — nessuna scopa spegne niente, il patto di
+      `sponsor_vivo` e di `in_ferie`: spegnere un punto lo toglie
+      dall'elenco all'istante e non tocca gli ordini gia' nati;
+    · FAIL-CLOSED sul catalogo, in tutti e tre i posti (l'id scritto a
+      mano sul VPS, il punto spento al momento dell'acquisto, il
+      codice negozio che non risolve): meglio nessun punto che uno che
+      porta al vuoto;
+    · il TESTO lo compone il SERVER e mai il client, o il giorno che
+      il punto cambia indirizzo un ordine vecchio direbbe il falso;
+    · il TIPO non si chiede sulla rete di casa — dietro un punto
+      nostro c'e' sempre una persona, ed e' il catalogo a dirlo."""
+    print("\n[i punti di Barattolo]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- il catalogo vero -------------------------------------------
+    # Oggi e' VUOTO ed e' giusto (si entra su invito, uno alla volta):
+    # quel che si prova qui e' la FORMA, cosi' il giorno che Andrea ci
+    # mette il ristoratore la CI dice subito se manca un campo.
+    amb0 = {}
+    for ancora in ("PUNTI_BARATTOLO = (", "ID_PUNTI_BARATTOLO = tuple("):
+        i = src.index(ancora)
+        j = src.index("\n\n", i)
+        exec(src[i:j], amb0)
+    cat = amb0["PUNTI_BARATTOLO"]
+    prova("gli id del catalogo si DERIVANO, mai un secondo elenco",
+          tuple(p["id"] for p in cat), amb0["ID_PUNTI_BARATTOLO"])
+    prova("...e sono unici", len(cat), len({p["id"] for p in cat}))
+    campi = ("id", "nome", "indirizzo", "comune", "negozio")
+    prova("...e ogni voce porta i cinque campi che servono",
+          [], [p["id"] for p in cat
+               if any(not p.get(c) for c in campi)])
+    # ⚠️ IL COMUNE si scrive come la zona di un annuncio — «Milano
+    # (MI)» — o il motore geografico non lo riconosce: e' la stessa
+    # chiave di `_chiave_comune`, e il giorno che i punti si
+    # filtreranno per distanza e' quel formato a farli combaciare.
+    prova("...e il comune porta la sigla, come una zona",
+          [], [p["id"] for p in cat
+               if not re.search(r"\([A-Z]{2}\)$", p.get("comune", ""))])
+
+    # ---- i giudici, GIRATI su un catalogo di cartone -----------------
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+            super().__init__(detail)
+
+    FINTI = (
+        {"id": "da-mario", "nome": "Da Mario", "indirizzo": "Via Roma 1",
+         "comune": "Milano (MI)", "orari": "lun-sab 9-19",
+         "negozio": "aa11bb22"},
+        {"id": "bar-luna", "nome": "Bar Luna", "indirizzo": "Via Po 9",
+         "comune": "Torino (TO)", "negozio": "cc33dd44"},
+    )
+    riga = [""]
+    amb = {
+        "HTTPException": _HTTP,
+        "PUNTI_BARATTOLO": FINTI,
+        "ID_PUNTI_BARATTOLO": tuple(p["id"] for p in FINTI),
+        "RETE_BARATTOLO": "Barattolo",
+        "_PUNTI": None,
+        "impostazione": lambda k, d="": riga[0],
+        "scrivi_impostazione": lambda k, v: riga.__setitem__(0, v),
+    }
+    for nome in ("_punti_accesi", "punti_barattolo_vivi",
+                 "rete_barattolo_viva", "punto_barattolo",
+                 "testo_punto_barattolo", "imposta_punti",
+                 "punto_barattolo_da_payload"):
+        exec(pezzo(nome), amb)
+
+    def azzera(valore):
+        riga[0] = valore
+        amb["_PUNTI"] = None
+
+    azzera("")
+    prova("a punti spenti la rete non e' viva", False,
+          amb["rete_barattolo_viva"]())
+    prova("...e l'elenco e' vuoto", [], amb["punti_barattolo_vivi"]())
+
+    # FAIL-CLOSED: un id scritto a mano sul VPS non accende niente
+    azzera("|boh|da-mario|")
+    prova("un id fuori catalogo non accende niente",
+          ("da-mario",), amb["_punti_accesi"]())
+    prova("...e la rete e' viva per quello che resta", True,
+          amb["rete_barattolo_viva"]())
+
+    azzera("|bar-luna|da-mario|")
+    prova("l'elenco esce NELL'ORDINE del catalogo, non della riga",
+          ["da-mario", "bar-luna"],
+          [p["id"] for p in amb["punti_barattolo_vivi"]()])
+
+    # il testo lo compone il server
+    prova("il testo del punto lo compone il server",
+          "Da Mario - Via Roma 1 - Milano (MI)",
+          amb["testo_punto_barattolo"](FINTI[0]))
+    prova("...e un campo che manca non lascia un trattino orfano",
+          "Bar Luna - Via Po 9 - Torino (TO)",
+          amb["testo_punto_barattolo"](FINTI[1]))
+
+    # LO SPENTO SI LEGGE ANCORA, ed e' la riga da non ammorbidire: un
+    # ordine gia' nato verso un punto che abbiamo tolto deve
+    # continuare a dire dove sta il pacco.
+    azzera("|da-mario|")
+    prova("un punto spento si legge ancora per id",
+          "Bar Luna", amb["punto_barattolo"]("bar-luna").get("nome"))
+    prova("...ma non compare nell'elenco di chi compra",
+          ["da-mario"],
+          [p["id"] for p in amb["punti_barattolo_vivi"]()])
+    prova("...e un id che il catalogo non ha torna a mani vuote",
+          {}, amb["punto_barattolo"]("mai-esistito"))
+
+    # imposta_punti: filtra, ordina, deduplica
+    prova("accendere filtra e ordina come il catalogo",
+          ("da-mario", "bar-luna"),
+          amb["imposta_punti"](["bar-luna", "boh", "da-mario"]))
+    prova("...e scrive la riga coi pipe ai bordi",
+          "|da-mario|bar-luna|", riga[0])
+    prova("...e la lista vuota spegne tutto", (), amb["imposta_punti"]([]))
+    prova("...lasciando la riga vuota e non due pipe", "", riga[0])
+
+    # il giudice del payload
+    azzera("|da-mario|")
+    g = amb["punto_barattolo_da_payload"]
+    prova("fuori dalla rete di casa il punto non ha oggetto",
+          ("", ""), g("da-mario", "InPost"))
+    prova("...anche a mani vuote", ("", ""), g("", "Poste Italiane"))
+    prova("sulla rete di casa l'id vivo torna col suo testo",
+          ("da-mario", "Da Mario - Via Roma 1 - Milano (MI)"),
+          g(" da-mario ", "Barattolo"))
+    for grezzo, quando in (("", "senza scelta"),
+                           ("bar-luna", "su un punto spento"),
+                           ("mai-esistito", "su un id inventato")):
+        try:
+            g(grezzo, "Barattolo")
+            esito = "PASSATO"
+        except _HTTP as e:
+            esito = e.status_code
+        prova("...e %s si rifiuta col 400" % quando, 400, esito)
+
+    # ---- le sentinelle del server ------------------------------------
+    # IL GATE STA FUORI DAL GIUDICE, o il giudice smetterebbe di essere
+    # provabile senza un database: `reti_venditore` riceve un BOOL, e
+    # a leggerlo e' il chiamante.
+    _rv = pezzo("reti_venditore")
+    prova("il gate della rete e' un argomento, mai una lettura dentro",
+          False, "_punti_accesi()" in _rv or "impostazione(" in _rv)
+    prova("...e senza il permesso la rete di casa non esce",
+          True, "barattolo or s != RETE_BARATTOLO" in codice(_rv))
+    # I QUATTRO che OFFRONO una rete a chi compra la gateano; il quinto
+    # (/api/me) no, ed e' la riga da non uniformare: li' non si offre
+    # niente, si dice al venditore cosa ha dichiarato lui — e senza,
+    # spegnendo l'ultimo punto, dal suo cassetto sparirebbe una spunta
+    # che aveva messo.
+    for f in ("compra", "preventivo_ordine", "_preventivo_set",
+              "_compra_set"):
+        prova("...e %s lo chiede al gate" % f, 1,
+              codice(pezzo(f)).count("rete_barattolo_viva()"))
+    prova("...mentre il cassetto del venditore le mostra tutte",
+          1, codice(pezzo("scegli_spedizioniere")).count(
+              'reti_venditore(serializzate, "", True)'))
+    # ⚠️ E LA META' CHE IL COMMENTO PROMETTE E NESSUNO GUARDAVA: che il
+    # quinto NON lo chieda. Senza questa riga, uniformare /api/me al
+    # gate degli altri quattro non farebbe rossa nessuna prova — e il
+    # danno si vedrebbe solo il giorno che l'ultimo punto si spegne, in
+    # un cassetto che perde una spunta che il venditore aveva messo.
+    prova("...e /api/me NON lo chiede, ed e' la riga da non uniformare",
+          0, codice(pezzo("mio_profilo")).count("rete_barattolo_viva()"))
+
+    # NESSUNA SCOPA: il gate e' in lettura, e un orologio che spegnesse
+    # sarebbe un secondo stato da tenere in pari con la lettura.
+    prova("a scrivere gli accesi e' il solo comando del bot",
+          1, src.count('scrivi_impostazione("punti_barattolo"'))
+    prova("...e l'orologio non li tocca mai",
+          False, "imposta_punti(" in codice(pezzo("orologio")))
+
+    # la colonna e i due INSERT
+    prova("la colonna nasce additiva, vuota", True,
+          '"punto_barattolo TEXT DEFAULT \'\'"' in src
+          or "punto_barattolo TEXT DEFAULT ''" in src)
+    # ⚠️ L'ANCORA E' LA COLONNA e non la coppia di colonne: i due
+    # INSERT elencano i campi in ordine diverso (`compra` la mette dopo
+    # `tipo_punto`, `_compra_set` in testa alla sua riga), e una
+    # sentinella scritta sulla vicina sarebbe cieca su uno dei due.
+    for f in ("compra", "_compra_set"):
+        prova("...e %s la nomina nel suo INSERT" % f, 1,
+              codice(pezzo(f)).count("punto_barattolo,"))
+
+    # il comando del bot, fail-closed sul titolare
+    # ⚠️ `_senza_prosa` E NON `codice()`: la docstring il tg_id lo
+    # NOMINA apposta — «il tg_id del titolare» — quindi una sentinella
+    # che cerchi quella parola diventa rossa per colpa di una
+    # spiegazione. E' la trappola gia' pagata da `_decifra_contenuto`.
+    _tp = _senza_prosa(codice(pezzo("titolare_punto")))
+    prova("il titolare si risolve dal codice negozio, mai da un tg_id",
+          True, "FROM utenti WHERE negozio=?" in _tp)
+    # il tg_id e' l'USCITA, mai l'ingresso: e' quel che tiene NESSUN
+    # tg_id dentro il repo, che e' il patto di `SLUG_SPONSOR`
+    prova("...e a entrare e' il solo codice negozio",
+          True, "(codice,)" in _tp)
+    _cp = codice(pezzo("comando_punti"))
+    prova("...e un codice che non risolve non accende il punto",
+          True, "titolare_punto(" in _cp)
+
+    # ---- il client: i giudici GIRATI --------------------------------
+    # Le sentinelle dicono che i tre giudici esistono e sono uno; a
+    # dire che RISPONDONO GIUSTO e' solo il codice che gira — la
+    # lezione ormai ottava.
+    prova("nel client la rete di casa e' una costante, mai un letterale",
+          1, mini.count("const RETE_BARATTOLO = 'Barattolo';"))
+    # ⚠️ E NON STA IN RETE_MAPPA, ed e' quel che la fa comportare bene
+    # senza una riga: `retiMappe` filtra su quella tabella, quindi per
+    # la rete nostra non escono ne' frase ne' bottoni — la stessa
+    # strada di 'Altro', e per la stessa ragione (un link alla mappa di
+    # un terzo qui manderebbe nel posto sbagliato).
+    _rm = mini[mini.index("const RETE_MAPPA ="):]
+    prova("...e non entra in RETE_MAPPA: niente frase, niente mappe",
+          False, "Barattolo" in _rm[:_rm.index("\n")])
+    prova("il giudice dei punti di casa e' UNO",
+          1, mini.count("function puntiDiCasa("))
+
+    import json, shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("i giudici del client rispondono giusto",
+              "node non installato")
+    else:
+        pezzi = "\n".join(
+            pezzo_js(mini, "function %s(" % n, "\n}") + "\n}"
+            for n in ("puntiDiCasa", "puntoDiCasaScelto",
+                      "tipoPuntoMancante", "puntoDiCasaMancante"))
+        P = [{"id": "da-mario", "nome": "Da Mario",
+              "indirizzo": "Via Roma 1", "comune": "Milano (MI)"}]
+        def d(**o):
+            base = {"via": "punto", "punto": "", "puntoBarattolo": "",
+                    "tipoPunto": "", "rete": "",
+                    "preventivo": {"reti": [], "punti_barattolo": []}}
+            base.update(o)
+            return base
+        def pre(reti, punti=None):
+            return {"reti": reti, "punti_barattolo": punti or []}
+        casi = [
+            # (funzione, dato, reti, atteso)
+            ("puntiDiCasa", d(preventivo=pre(["InPost"], P)),
+             ["InPost"], None),
+            ("puntiDiCasa", d(preventivo=pre(["Barattolo"], P)),
+             ["Barattolo"], P),
+            ("puntiDiCasa", d(rete="InPost",
+                              preventivo=pre(["Barattolo", "InPost"], P)),
+             ["Barattolo", "InPost"], None),
+            ("puntiDiCasa", d(rete="Barattolo",
+                              preventivo=pre(["Barattolo", "InPost"], P)),
+             ["Barattolo", "InPost"], P),
+            ("puntiDiCasa", d(preventivo=pre(["Barattolo", "InPost"], P)),
+             ["Barattolo", "InPost"], None),
+            # LA LISTA VUOTA NON E' `null`: vuol dire «rete di casa, ma
+            # nessun punto acceso», che e' un caso da dire a voce e non
+            # da confondere con «qui la rete nostra non c'entra»
+            ("puntiDiCasa", d(preventivo=pre(["Barattolo"], [])),
+             ["Barattolo"], []),
+            ("tipoPuntoMancante", d(preventivo=pre(["Barattolo"], P)),
+             None, False),
+            ("tipoPuntoMancante", d(preventivo=pre(["InPost"], [])),
+             None, True),
+            ("puntoDiCasaMancante", d(preventivo=pre(["Barattolo"], P)),
+             None, True),
+            ("puntoDiCasaMancante",
+             d(puntoBarattolo="da-mario", preventivo=pre(["Barattolo"], P)),
+             None, False),
+            ("puntoDiCasaMancante", d(preventivo=pre(["InPost"], [])),
+             None, False),
+            ("puntoDiCasaMancante", d(preventivo=pre(["Barattolo"], [])),
+             None, True),
+            ("puntoDiCasaMancante",
+             d(via="casa", preventivo=pre(["Barattolo"], P)), None, False),
+        ]
+        prog = ("const RETE_BARATTOLO = 'Barattolo';\n" + pezzi
+                + "\nconst casi = " + json.dumps(
+                    [[f, dd, r] for f, dd, r, _a in casi])
+                + ";console.log(JSON.stringify(casi.map(([f,dd,r]) =>"
+                  " f === 'puntiDiCasa' ? puntiDiCasa(dd, r)"
+                  " : (f === 'tipoPuntoMancante' ? tipoPuntoMancante(dd)"
+                  " : puntoDiCasaMancante(dd)))));")
+        f = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                       encoding="utf-8")
+        f.write(prog)
+        f.close()
+        r = subprocess.run([node, f.name], capture_output=True, text=True,
+                           timeout=60, encoding="utf-8")
+        os.unlink(f.name)
+        esiti = (json.loads(r.stdout.strip()) if r.returncode == 0
+                 else "ERRORE: %s" % r.stderr[:150])
+        prova("i giudici del client rispondono giusto sui tredici casi",
+              [a for _f, _d, _r, a in casi], esiti)
+
+    # il punto scelto: dal catalogo del preventivo, mai ricomposto
+    _pdc = pezzo_js(mini, "function puntoDiCasaScelto(", "\n}")
+    prova("il punto scelto si ritrova dal catalogo del preventivo",
+          True, "preventivo?.punti_barattolo" in _pdc)
+    prova("...e il client non compone mai il testo del punto",
+          False, "indirizzo}, ${" in mini)
+    # l'id e basta nel payload: il TESTO lo scrive il server
+    _cc = pezzo_js(mini, "function corpoConsegna(", "\n}")
+    prova("nel payload viaggia l'id e basta", 1,
+          _cc.count("out.punto_barattolo = acqDati.puntoBarattolo"))
+    prova("...e la chiave e' assente quando non c'e' (il patto della "
+          "nota)", True, "v==='punto' && acqDati.puntoBarattolo" in _cc)
+    # LO SWAP DI RETE: un punto di casa non vale su InPost
+    _sr = pezzo_js(mini, "function setReteAcquisto(", "\n}")
+    prova("cambiando rete il punto di casa se ne va col suo corriere",
+          True, "if (r !== RETE_BARATTOLO) acqDati.puntoBarattolo = '';"
+          in _sr)
+    prova("...e sulla rete di casa non si mette il fuoco: non c'e' "
+          "niente da scrivere", True,
+          "r !== RETE_BARATTOLO && !acqDati.punto.trim()" in _sr)
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -43959,6 +44388,7 @@ def main():
               prove_vetrina_canale, prove_relay_leva,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
+              prove_punti_barattolo,
               prove_punti_salvati,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,

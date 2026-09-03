@@ -4775,6 +4775,20 @@ def init_db():
                     # dedurlo dal testo del punto: «tabaccheria» in un
                     # indirizzo non e' una prova.
                     "tipo_punto TEXT DEFAULT ''",
+                    # QUALE punto della rete di CASA (ago 2026): l'id
+                    # di PUNTI_BARATTOLO, '' su ogni altra rete e su
+                    # tutto il pregresso. Non e' un doppione di
+                    # `punto_ritiro`, che e' il TESTO — quello resta
+                    # com'era il giorno dell'ordine e serve a chi
+                    # spedisce; questo e' il legame col catalogo, e
+                    # serve a tre cose che dal testo non si possono
+                    # fare: sapere CHI deve prendere in carico il
+                    # pacco, dirlo al moderatore in disputa, e il
+                    # libro mastro.
+                    # L'id e' per SEMPRE anche quando il punto esce
+                    # dal catalogo: `punto_barattolo()` risponde anche
+                    # sugli spenti apposta.
+                    "punto_barattolo TEXT DEFAULT ''",
 
                     # L'OBIEZIONE DEL VENDITORE SUL PUNTO (ago 2026):
                     # il punto lo scrive chi compra, ed e' testo libero
@@ -8500,6 +8514,128 @@ async def comando_sponsor(mittente: dict, testo: str):
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
+def titolare_punto(codice: str) -> int:
+    """Il tg_id del titolare di un punto, 0 se quel codice negozio non
+    risolve. E' la domanda che il comando fa PRIMA di accendere."""
+    if not codice:
+        return 0
+    try:
+        con = db()
+        r = con.execute("SELECT tg_id FROM utenti WHERE negozio=? LIMIT 1",
+                        (codice,)).fetchone()
+        con.close()
+        return int(r["tg_id"]) if r else 0
+    except Exception:
+        return 0
+
+
+async def comando_punti(mittente: dict, testo: str):
+    """`/punti` — i punti di ritiro di Barattolo. Solo admin.
+
+    Il quarto della famiglia di `/canale`, `/vetrina` e `/sponsor`: un
+    elenco di id non accende niente che muova denaro, e sbagliarlo si
+    vede subito nella cassa — per questo vive in `impostazioni` e si
+    cambia da qui invece che dal config del VPS.
+
+    SI PROVA PRIMA DI CREDERCI, e QUI SI', al contrario di `/sponsor`:
+    il catalogo lega il punto al suo titolare col CODICE NEGOZIO, e
+    quel codice sta in un letterale committato a mano — un refuso non
+    si vede da nessuna parte finche' non arriva il primo pacco, e
+    allora la presa in carico non la puo' fare nessuno. Il controllo
+    sta nel COMANDO e non nel gate, che deve restare puro e non puo'
+    interrogare `utenti` a ogni preventivo.
+
+    L'INGRESSO E' SU INVITO, UNO ALLA VOLTA (decisione di Andrea):
+    niente rotta di candidatura e niente coda di moderazione — ogni
+    punto nuovo e' una riga nel catalogo, cioe' un deploy, e questo
+    comando accende quel che il catalogo gia' contiene."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    pezzi = testo.split()
+    arg = pezzi[1].strip().lower() if len(pezzi) > 1 else ""
+    accesi = list(_punti_accesi())
+
+    if not arg:
+        if accesi:
+            righe = ["· <b>{}</b> — {}".format(
+                        html.escape(pid),
+                        html.escape(testo_punto_barattolo(
+                            punto_barattolo(pid))))
+                     for pid in accesi]
+            stato = "Accesi adesso:\n" + "\n".join(righe)
+        else:
+            stato = ("Nessun punto acceso: la rete «Barattolo» non "
+                     "compare fra le vie di consegna.")
+        spenti = [p["id"] for p in PUNTI_BARATTOLO if p["id"] not in accesi]
+        voci = ("\n".join("<code>/punti {}</code>".format(i)
+                          for i in spenti)
+                if spenti else "(nel catalogo non ce n'e' altri)")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "🏠 <b>Punti di ritiro di Barattolo</b>\n"
+                    + stato + "\n\n" + voci + "\n"
+                    "<code>/punti spento &lt;id&gt;</code> — ne toglie uno.\n"
+                    "<code>/punti spento</code> — li toglie tutti.\n\n"
+                    "Spegnere non tocca gli ordini gia' nati: il loro "
+                    "punto e' scritto nell'ordine e il pacco arriva "
+                    "dov'era previsto. A sparire e' la voce per chi "
+                    "compra da adesso.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+    if arg in ("spento", "no", "off"):
+        via = pezzi[2].strip().lower() if len(pezzi) > 2 else ""
+        if via:
+            if via not in ID_PUNTI_BARATTOLO:
+                return await bot_api("sendMessage", {"chat_id": chat,
+                    "text": "Non conosco «{}».".format(html.escape(via)),
+                    "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+            tenuti = imposta_punti([i for i in accesi if i != via])
+            detto = "«{}» tolto".format(via)
+        else:
+            tenuti = imposta_punti([])
+            detto = "tutti i punti tolti"
+        await notifica_admin("🏠 Punti di ritiro: {} (da tg {})"
+                             .format(detto, chat))
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ {}. Accesi adesso: <b>{}</b>."
+                    .format(detto.capitalize(), len(tenuti)),
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+    if arg not in ID_PUNTI_BARATTOLO:
+        elenco = ", ".join(ID_PUNTI_BARATTOLO) or "(il catalogo e' vuoto)"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "Non conosco «{}». Quelli che ci sono: {}."
+                    .format(html.escape(arg), elenco),
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+    p = punto_barattolo(arg)
+    tg = titolare_punto(p.get("negozio", ""))
+    if not tg:
+        # FAIL-CLOSED, ed e' la ragione per cui questo comando prova
+        # prima di credere: senza un titolare la presa in carico non la
+        # puo' fare nessuno, e il pacco arriverebbe a un banco che su
+        # Barattolo non ha modo di dire «l'ho ricevuto».
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "⚠️ Il codice negozio di «{}» (<code>{}</code>) non "
+                    "risolve a nessun utente. Il punto NON e' stato "
+                    "acceso: controlla il codice nel catalogo."
+                    .format(html.escape(arg),
+                            html.escape(p.get("negozio", ""))),
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    tenuti = imposta_punti(accesi + [arg])
+    await notifica_admin("🏠 Punto di ritiro acceso: {} (da tg {})"
+                         .format(arg, chat))
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": "✅ <b>{}</b> e' acceso — {}.\nTitolare: tg <code>{}</code>."
+                "\n\nAccesi adesso: <b>{}</b>. Da ora chi compra da un "
+                "venditore che ha dichiarato la rete «Barattolo» lo "
+                "trova nell'elenco."
+                .format(html.escape(arg),
+                        html.escape(testo_punto_barattolo(p)),
+                        tg, len(tenuti)),
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def comando_vetrina(mittente: dict, testo: str):
     """`/vetrina` — quanto parla il canale. Solo admin.
 
@@ -8660,6 +8796,8 @@ async def gestisci_update(update: dict):
         return await comando_sponsor(mittente, testo)
     if testo.startswith("/vetrina"):
         return await comando_vetrina(mittente, testo)
+    if testo.startswith("/punti"):
+        return await comando_punti(mittente, testo)
     if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": TESTO_SFOGLIA, "parse_mode": "HTML",
@@ -11457,7 +11595,155 @@ TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 # giorno che si trova la sua MAPPA — una voce senza mappa e' lo stato
 # «Altro», cioe' nessun link, e un link fuorviante e' peggio di
 # nessun link.
-SPEDIZIONIERI = ("InPost", "Poste Italiane", "Altro")
+SPEDIZIONIERI = ("Barattolo", "InPost", "Poste Italiane", "Altro")
+
+
+# ------------------- I PUNTI DI RITIRO DI BARATTOLO -----------------
+# La rete di punti NOSTRA: un negozio di quartiere che si e' offerto
+# di tenere i pacchi per chi compra qui. E' la prima volta che un
+# punto di ritiro e' un'entita' che PROPONIAMO NOI invece di un
+# indirizzo che chi compra scrive a mano, e da li' viene tutto il
+# resto del cantiere: dietro InPost e Poste c'e' un'azienda con un
+# contratto, dietro un punto nostro c'e' una persona che con noi non
+# ha firmato niente.
+#
+# IL CATALOGO VIVE NEL CODICE, committato, e lega il punto al suo
+# titolare col CODICE NEGOZIO: e' pubblico e stabile per costruzione
+# (`nuovo_codice_negozio`), quindi NESSUN tg_id entra nel repo. E' il
+# patto di RACCONTI/SLUG_SPONSOR, dove «il codice negozio si riempie
+# a mano quando lo spazio si vende».
+#
+# NASCE VUOTO, ed e' la decisione di Andrea: «su invito, uno alla
+# volta» - niente rotta di candidatura, niente coda di moderazione, e
+# ogni punto nuovo e' un deploy. Con zero punti accesi la rete non si
+# offre affatto (il gate `barattolo` di `reti_venditore`), quindi il
+# giorno del deploy non cambia NIENTE per nessuno.
+#
+# IL COMUNE SI SCRIVE COME LA ZONA DI UN ANNUNCIO - «Milano (MI)» - o
+# il motore geografico non lo riconosce: e' la stessa chiave di
+# `_chiave_comune`, e il giorno che i punti si filtreranno per
+# distanza e' quel formato a farli combaciare. L'`id` e' per SEMPRE
+# (finisce in `ordini.punto_barattolo`), il resto si ritocca: il
+# patto di TIPI_PUNTO.
+PUNTI_BARATTOLO = (
+    # {"id": "da-mario", "nome": "Da Mario",
+    #  "indirizzo": "Via Roma 1", "comune": "Milano (MI)",
+    #  "orari": "lun-sab 9-19", "negozio": "<codice negozio>"},
+)
+ID_PUNTI_BARATTOLO = tuple(p["id"] for p in PUNTI_BARATTOLO)
+
+# Il nome della rete dentro SPEDIZIONIERI. E' una COSTANTE e non un
+# letterale sparso: la stessa stringa finisce in `ordini.rete_punto`
+# degli ordini gia' nati, quindi rinominarla vorrebbe dire migrarli -
+# il patto dei nomi interni, si cambiano i testi e mai le chiavi.
+RETE_BARATTOLO = "Barattolo"
+
+# Un punto nostro e' SEMPRE un banco, e il tipo non si chiede: dietro
+# c'e' una persona — e' alla lettera la definizione di questa rete — e
+# un locker nostro non esiste, che armadietti non ne abbiamo. Cosi' il
+# venditore legge la stessa parola di sempre quando compra l'etichetta
+# e a chi compra si risparmia una domanda con una risposta sola. Il
+# giorno che un locker nostro ci fosse, e' un campo del catalogo.
+TIPO_PUNTO_BARATTOLO = "banco"
+
+_PUNTI = None       # None = mai letto; tuple = gli id accesi
+
+
+def _punti_accesi() -> tuple:
+    """Gli id accesi, dalla riga di `impostazioni`, con la cache.
+
+    Coi pipe ai bordi come `avvisi_ricerca.categorie`, e FILTRATI
+    contro il catalogo: un id scritto a mano sul VPS - o rimasto da un
+    punto che il catalogo non ha piu' - non deve poter accendere
+    niente. Fail-closed come `sponsor_vivo`: meglio nessun punto che
+    uno che porta al vuoto."""
+    global _PUNTI
+    if _PUNTI is None:
+        grezzo = impostazione("punti_barattolo", "").split("|")
+        _PUNTI = tuple(i for i in ID_PUNTI_BARATTOLO if i in grezzo)
+    return _PUNTI
+
+
+def punti_barattolo_vivi() -> list:
+    """I punti accesi, nell'ordine del catalogo.
+
+    E' un GATE IN LETTURA e non un interruttore che qualcuno spegne -
+    il pattern di `sponsor_vivo` e di `in_ferie`: spegnere un punto lo
+    toglie dall'elenco all'istante, senza che giri nessuna scopa e
+    senza toccare gli ordini gia' nati, che il loro punto ce l'hanno
+    scritto in colonna."""
+    accesi = _punti_accesi()
+    return [dict(p) for p in PUNTI_BARATTOLO if p["id"] in accesi]
+
+
+def rete_barattolo_viva() -> bool:
+    """C'e' almeno un punto acceso? E' il gate che si passa a
+    `reti_venditore`, e vive qui invece che dentro il giudice per
+    tenerlo PURO: li' dentro una lettura di `impostazioni` renderebbe
+    il giudice non piu' provabile senza un database."""
+    return bool(_punti_accesi())
+
+
+def punto_barattolo(pid: str) -> dict:
+    """Un punto per id, ANCHE se spento: {} se il catalogo non ce l'ha.
+
+    Lo spento si restituisce apposta - gli ordini gia' nati verso un
+    punto che nel frattempo abbiamo tolto devono continuare a dire
+    dove sta il pacco. A gatearsi e' l'elenco di CHI COMPRA, mai la
+    lettura di un ordine che esiste gia'."""
+    for p in PUNTI_BARATTOLO:
+        if p["id"] == pid:
+            return dict(p)
+    return {}
+
+
+def testo_punto_barattolo(p: dict) -> str:
+    """Il punto come finisce in `ordini.punto_ritiro`: lo compone il
+    SERVER e mai il client, cosi' il testo in colonna e' sempre nostro
+    - e resta quello anche il giorno che il punto cambia indirizzo o
+    esce dal catalogo, che e' precisamente quel che serve a chi ha in
+    mano un ordine vecchio."""
+    return " - ".join(x for x in (p.get("nome"), p.get("indirizzo"),
+                                  p.get("comune")) if x)
+
+
+def imposta_punti(ids) -> tuple:
+    """Accende (o spegne, con la lista vuota) i punti e riallinea la
+    cache. Il calco di `imposta_sponsor`: filtrato e NELL'ORDINE del
+    catalogo, cosi' deduplica e ordine stabile vengono gratis."""
+    global _PUNTI
+    tenuti = tuple(i for i in ID_PUNTI_BARATTOLO if i in ids)
+    scrivi_impostazione("punti_barattolo",
+                        ("|" + "|".join(tenuti) + "|") if tenuti else "")
+    _PUNTI = tenuti
+    return tenuti
+
+
+def punto_barattolo_da_payload(grezzo: str, rete: str) -> tuple:
+    """Quale punto NOSTRO ha scelto chi compra: `(id, testo)`.
+
+    Fuori dalla rete di casa non ha oggetto e torna `('', '')` - il
+    testo lo scrive il compratore come sempre. Sulla rete di casa
+    invece l'id e' OBBLIGATORIO e il testo lo componiamo noi: e' la
+    differenza che il cantiere compra - su InPost il punto e' testo
+    libero che nessuno verifica, qui e' una voce di un catalogo che
+    proponiamo noi.
+
+    Si valida contro i punti VIVI e non contro il catalogo, ed e' la
+    riga da non ammorbidire: un punto spento e' un negozio che ha
+    smesso, e far nascere un ordine verso di lui vorrebbe dire mandare
+    un pacco a un indirizzo dove nessuno lo aspetta."""
+    if rete != RETE_BARATTOLO:
+        return "", ""
+    scelto = (grezzo or "").strip()
+    vivi = {p["id"]: p for p in punti_barattolo_vivi()}
+    if not scelto:
+        raise HTTPException(400, "Scegli a quale punto Barattolo vuoi "
+                                 "ricevere il pacco")
+    if scelto not in vivi:
+        raise HTTPException(400, "Questo punto Barattolo non è più "
+                                 "attivo: scegline un altro")
+    return scelto, testo_punto_barattolo(vivi[scelto])
 
 
 # CHE TIPO DI PUNTO (ago 2026, la seconda meta' del cantiere dei
@@ -11532,7 +11818,8 @@ def _reti_serializza(scelte) -> str:
     return ("|" + "|".join(tenute) + "|") if tenute else ""
 
 
-def reti_venditore(spedizionieri: str, spedizioniere: str = "") -> list:
+def reti_venditore(spedizionieri: str, spedizioniere: str = "",
+                   barattolo: bool = False) -> list:
     """Le reti dichiarate da un venditore, come lista.
 
     Giudice PURO: prende i CAMPI e non la riga (il patto di `in_ferie`),
@@ -11543,11 +11830,23 @@ def reti_venditore(spedizionieri: str, spedizioniere: str = "") -> list:
     vivere il dato di ieri il giorno del deploy, prima che il backfill
     sia girato — e copre anche uno script lanciato a mano su un
     database piu' vecchio. Le voci fuori catalogo si buttano, che una
-    rete che non sappiamo mappare non e' una rete."""
+    rete che non sappiamo mappare non e' una rete.
+
+    `barattolo` E' IL GATE DELLA RETE DI CASA e nasce SPENTO, ed e'
+    la riga da non ammorbidire: a punti tutti spenti quella voce esce
+    dall'elenco — una rete senza punti e' un vicolo cieco, e chi
+    l'avesse dichiarata quando i punti c'erano non deve poter
+    ricevere ordini che nessuno puo' consegnare.
+
+    ARGOMENTO E NON UNA CHIAMATA AL GATE, o il giudice smetterebbe di
+    essere puro; e FAIL-CLOSED, perche' il default e' il mondo di
+    ieri — dove quella rete non esisteva affatto — e chi vuole
+    offrirla lo SCRIVE: l'idioma di `esigi_luogo` e `zero_ammesso`."""
     grezze = [s for s in (spedizionieri or "").split("|") if s]
     if not grezze and spedizioniere:
         grezze = [spedizioniere]
-    return [s for s in SPEDIZIONIERI if s in grezze]
+    return [s for s in SPEDIZIONIERI if s in grezze
+            and (barattolo or s != RETE_BARATTOLO)]
 
 
 def rete_da_payload(grezza: str, reti: list) -> str:
@@ -21112,21 +21411,38 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # della invoice, il patto del ricontrollo non si tocca.
         sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
                          "WHERE tg_id=?", (venditore_id,)).fetchone()
-        reti = reti_venditore(sp["spedizionieri"],
-                              sp["spedizioniere"]) if sp else []
-        if reti and not punto:
-            con.close()
-            raise HTTPException(400, "Indica il punto di ritiro (nome o "
-                                     "indirizzo del punto)")
+        reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
+                              rete_barattolo_viva()) if sp else []
+        # L'ORDINE E' INVERTITO rispetto a ieri, e non e' un riordino:
+        # sulla rete di CASA il testo del punto lo compone il SERVER,
+        # quindi il campo del client e' vuoto per costruzione e la
+        # guardia «indica il punto» scatterebbe prima che si sappia
+        # quale rete sia. Si risolve prima la rete e poi si decide —
+        # che e' anche la cascata che il client fa gia' (rete -> tipo
+        # -> dove), quindi il 400 che arriva per primo diventa quello
+        # utile invece di quello che capita.
         try:
             rete = rete_da_payload(d.get("rete_punto"), reti)
-            tipo = tipo_punto_da_payload(d.get("tipo_punto"))
+            pid, testo = punto_barattolo_da_payload(
+                d.get("punto_barattolo"), rete)
+            tipo = (TIPO_PUNTO_BARATTOLO if pid
+                    else tipo_punto_da_payload(d.get("tipo_punto")))
         except HTTPException:
             con.close()
             raise
+        if pid:
+            # il testo lo scrive il SERVER dal catalogo, mai il client:
+            # e' quel che rende `punto_ritiro` sempre nostro su questa
+            # rete, e quel che lo tiene valido il giorno che il punto
+            # cambia indirizzo o esce dal catalogo.
+            punto = testo
+        elif reti and not punto:
+            con.close()
+            raise HTTPException(400, "Indica il punto di ritiro (nome o "
+                                     "indirizzo del punto)")
     else:
         punto = ""
-        rete = tipo = ""
+        rete = tipo = pid = ""
     via_punto = 1 if via == "punto" else 0
 
     # L'INDIRIZZO DI CASA sta QUI, accanto alla via e PRIMA della
@@ -21504,15 +21820,16 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
-        "tipo_punto,nota_compratore,email_corriere,email_corriere_il,"
+        "tipo_punto,punto_barattolo,"
+        "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
         "codice_sconto,codice_sconto_id,accordo_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, tipo, nota,
+         punto, via_punto, rete, tipo, pid, nota,
          # il timbro guarda il BLOB: col degrado non c'e' niente in
          # colonna, quindi non c'e' nessun «primo» da datare
          mail, adesso if mail else 0,
@@ -21602,6 +21919,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
             "rete_punto": rete, "tipo_punto": tipo,
+            "punto_barattolo": pid,
             "nota_compratore": nota,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
@@ -21839,8 +22157,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
-    reti = reti_venditore(sp["spedizionieri"],
-                          sp["spedizioniere"]) if sp else []
+    reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
+                          rete_barattolo_viva()) if sp else []
     # la stringa resta per il client rimasto in cache, che di reti ne
     # legge una sola: gli si da' la prima, che e' un'omissione e non
     # una bugia (la regola d'oro di _sconto_pubblico)
@@ -22081,6 +22399,13 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
+            # I PUNTI DI CASA: escono solo se quel venditore la rete la
+            # dichiara (`reti` e' gia' gatata), o si offrirebbe un
+            # elenco su una strada che quell'ordine non puo' prendere.
+            # Lista vuota = il client non disegna niente e resta il
+            # campo libero di sempre: un'assenza, mai una bugia.
+            "punti_barattolo": (punti_barattolo_vivi()
+                                if RETE_BARATTOLO in reti else []),
             # ogni chiave porta il numero SOLO nella sua unita': la
             # `sped_gratis_soglia` e' in SATS e i client di prima del
             # passaggio all'euro la leggono cosi' — su un negozio in
@@ -22318,8 +22643,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
-    reti = reti_venditore(sp["spedizionieri"],
-                          sp["spedizioniere"]) if sp else []
+    reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
+                          rete_barattolo_viva()) if sp else []
     spedizioniere = reti[0] if reti else ""
     # il gemello del ramo mono: stesso giudice, stessa SELECT sola
     punti_salvati = punti_per_venditore(
@@ -22562,6 +22887,13 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
+            # I PUNTI DI CASA: escono solo se quel venditore la rete la
+            # dichiara (`reti` e' gia' gatata), o si offrirebbe un
+            # elenco su una strada che quell'ordine non puo' prendere.
+            # Lista vuota = il client non disegna niente e resta il
+            # campo libero di sempre: un'assenza, mai una bugia.
+            "punti_barattolo": (punti_barattolo_vivi()
+                                if RETE_BARATTOLO in reti else []),
             # la seconda promessa del negozio, che guarda lo STESSO
             # lordo della prima: le due sono indipendenti
             # per costruzione, e nessuna delle due misura l'altra
@@ -22687,21 +23019,38 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # (Lettura prima della invoice: il patto del ricontrollo.)
         sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
                          "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
-        reti = reti_venditore(sp["spedizionieri"],
-                              sp["spedizioniere"]) if sp else []
-        if reti and not punto:
-            con.close()
-            raise HTTPException(400, "Indica il punto di ritiro (nome o "
-                                     "indirizzo del punto)")
+        reti = reti_venditore(sp["spedizionieri"], sp["spedizioniere"],
+                              rete_barattolo_viva()) if sp else []
+        # L'ORDINE E' INVERTITO rispetto a ieri, e non e' un riordino:
+        # sulla rete di CASA il testo del punto lo compone il SERVER,
+        # quindi il campo del client e' vuoto per costruzione e la
+        # guardia «indica il punto» scatterebbe prima che si sappia
+        # quale rete sia. Si risolve prima la rete e poi si decide —
+        # che e' anche la cascata che il client fa gia' (rete -> tipo
+        # -> dove), quindi il 400 che arriva per primo diventa quello
+        # utile invece di quello che capita.
         try:
             rete = rete_da_payload(d.get("rete_punto"), reti)
-            tipo = tipo_punto_da_payload(d.get("tipo_punto"))
+            pid, testo = punto_barattolo_da_payload(
+                d.get("punto_barattolo"), rete)
+            tipo = (TIPO_PUNTO_BARATTOLO if pid
+                    else tipo_punto_da_payload(d.get("tipo_punto")))
         except HTTPException:
             con.close()
             raise
+        if pid:
+            # il testo lo scrive il SERVER dal catalogo, mai il client:
+            # e' quel che rende `punto_ritiro` sempre nostro su questa
+            # rete, e quel che lo tiene valido il giorno che il punto
+            # cambia indirizzo o esce dal catalogo.
+            punto = testo
+        elif reti and not punto:
+            con.close()
+            raise HTTPException(400, "Indica il punto di ritiro (nome o "
+                                     "indirizzo del punto)")
     else:
         punto = ""
-        rete = tipo = ""
+        rete = tipo = pid = ""
     via_punto = 1 if via == "punto" else 0
 
     # IL CODICE SCONTO, normalizzato QUI e non piu' in la': e' una pura
@@ -23292,15 +23641,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
-        "nota_compratore,email_corriere,email_corriere_il,"
+        "punto_barattolo,nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, punto, via_punto, rete, tipo,
+         cambio_ordine, scelta, punto, via_punto, rete, tipo, pid,
          nota,
          # il timbro guarda il BLOB e non il testo: col degrado non c'e'
          # niente in colonna, quindi non c'e' nessun «primo» da datare
@@ -23364,6 +23713,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
             "rete_punto": rete, "tipo_punto": tipo,
+            "punto_barattolo": pid,
             "nota_compratore": nota,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
@@ -26196,8 +26546,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # si sostituisce col catalogo, che e' il valore che quella chiave
     # ha sempre avuto. Il dato dell'utente e' `spedizionieri_miei`.)
     profilo["spedizionieri"] = list(SPEDIZIONIERI)
+    # `barattolo=True` e NON il gate, ed e' la riga che si sbaglia:
+    # qui non si OFFRE una rete a chi compra — si dice al venditore
+    # cosa ha dichiarato lui, e il cassetto rimanda indietro le sue
+    # spunte. Nascondendola a punti spenti, al primo salvataggio se la
+    # cancellerebbe da solo, in silenzio. Il gate vive sull'ACQUISTO.
     profilo["spedizionieri_miei"] = reti_venditore(
-        u["spedizionieri"], u["spedizioniere"])
+        u["spedizionieri"], u["spedizioniere"], True)
     # I punti di ritiro che si e' tenuto CHI COMPRA (ago 2026). Qui
     # escono TUTTI — anche quelli su una rete che nessun venditore
     # dichiara piu' — perche' questo e' il cassetto in cui si tolgono, e
@@ -26721,7 +27076,11 @@ async def scegli_spedizioniere(req: Request,
                             + ", ".join(SPEDIZIONIERI)
                             + " o niente (non dichiarato)")
     serializzate = _reti_serializza(scelte)
-    reti = reti_venditore(serializzate)
+    # `True` per la ragione del gemello in /api/me: qui si sceglie la
+    # prima rete per la colonna singolare, cioe' il dato di
+    # compatibilita' di CHI VENDE — gatarla lascerebbe vuota quella
+    # colonna a chi ha dichiarato solo la rete di casa.
+    reti = reti_venditore(serializzate, "", True)
     con = db()
     con.execute("UPDATE utenti SET spedizionieri=?, spedizioniere=? "
                 "WHERE tg_id=?",
