@@ -22767,6 +22767,72 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Su Windows serve `PYTHONIOENCODING=utf-8`,
   o la console cp1252 esplode sulle spunte.
 
+- IL JSON CHE SI FIRMA È QUELLO DI SERDE (set 2026, dal campo: il
+  coordinatore Mostro rifiutava OGNI new-order con «trade signature does
+  not verify against event author», e a schermo restava un'attesa).
+  LA RIGA CHE SPIEGA TUTTO IL RESTO: chi verifica la firma **non guarda
+  la stringa che gli arriva** — la RI-SERIALIZZA dalla propria struttura
+  Rust (`message.as_json()`) e confronta quella. Quindi l'ordine dei
+  campi e i `null` espliciti non sono uno stile: sono ciò che fa
+  combaciare le due stringhe. Noi omettevamo `min_amount`, `max_amount`
+  ed `expires_at`, che serde scrive a null perché non hanno
+  `skip_serializing_if`: **230 caratteri firmati contro 284
+  ri-serializzati**, misurati.
+  IL DIFETTO NON ALZA NIENTE, ed è la ragione per cui vale una voce: un
+  campo fuori posto non dà un errore che si veda — fa cadere la firma, e
+  il coordinatore tace. È la stessa famiglia del titolo nudo nelle
+  notifiche, su un tubo che non è nostro.
+  LA REGOLA VALE A OGNI LIVELLO, ed è la metà che era sfuggita: il
+  commento sopra `messaggioMostro` la dichiarava dal primo giorno, ma
+  era applicata al solo MESSAGGIO — l'ordine dentro il PAYLOAD no. Una
+  regola scritta e applicata a metà è peggio di una non scritta: la si
+  rilegge e si conclude che è già rispettata.
+  I CAMPI ENTRANO NELL'ORDINE DI UNA TABELLA (`CAMPI_MOSTRO`) e mai in
+  quello in cui li ha scritti il chiamante: `JSON.stringify` rispetta
+  l'inserimento, quindi è l'inserimento a dover essere quello di serde.
+  La tabella è la trascrizione di `MessageKind` (message.rs) e
+  `SmallOrder` (order.rs) di mostro-core 0.14.6, col flag «si omette
+  quando è vuoto»; a canonizzare è `canonicoMostro`, e l'ORDINE è
+  l'unico payload fatto di campi — gli altri sono scalari e tuple, che
+  serde rende già come li scriviamo.
+  IL PRESIDIO STA NELLE PROVE, e non è una tautologia della tabella:
+  `prove_p2p_canonico` porta la SECONDA copia di quelle struct
+  nell'ordine di dichiarazione, e le due devono combaciare — il giorno
+  che di là aggiungono o spostano un campo diventa rossa lei invece di
+  far cadere la firma in silenzio. Si riverifica su
+  `https://docs.rs/mostro-core/<versione>/src/mostro_core/order.rs.html`.
+  Accanto, un banco node che INCHIODA la stringa che ne esce: una
+  sentinella direbbe che la tabella c'è, mai che il JSON combaci.
+  DUE RIGHE CHE IL DIFETTO POTEVA RIMETTERE IN PIEDI. 1) `bustaMostro`
+  serializza UNA volta sola e spedisce **la stringa che ha firmato**,
+  alla lettera (`'[' + msgJson + ','`): con un secondo
+  `JSON.stringify(msg)` le due potrebbero divergere senza che niente
+  fallisca — si firmerebbero byte che non partono. 2) L'ID DI UN ORDINE
+  È UN UUID E NIENT'ALTRO (`idMostroVero`): il nome provvisorio con cui
+  nasce da noi (`nuovo:N`) è roba NOSTRA, e di là `id` è un
+  `Option<Uuid>` — una stringa che UUID non è non fa cadere il campo, fa
+  cadere l'INTERO messaggio, che il coordinatore scarta con un «Error
+  serializing message». Fail-closed: nel dubbio si omette, e chi aveva
+  bisogno dell'id lo sente da una porta che si chiude A VOCE
+  (`chiamataOrdineP2P` alza invece di spedire un messaggio che verrebbe
+  scartato in silenzio).
+  IL GATE È RUMOROSO APPOSTA, e va detto: se un domani Mostro cambiasse
+  il formato del tag `d`, i gesti sugli ordini si fermerebbero con un
+  errore invece di degradare. È il verso giusto — un messaggio scartato
+  in silenzio è precisamente il difetto da cui viene questo cantiere.
+  ⚠️ IL BANCO DEL MOTORE USAVA ID FINTI (`ord-compro`), cioè un caso di
+  prova IRREALISTICO: nel mondo vero l'id è il tag `d` del 38383, che
+  Mostro scrive come UUID. Il gate l'ha smascherato facendo esplodere
+  56 prove — ed è la lezione di `_pare_recapito`, ripagata: un caso di
+  prova va scelto in modo che possa fallire solo per la ragione che si
+  vuole sorvegliare, e uno irrealistico non sorveglia niente.
+  ⚠️ E LA MIA SENTINELLA CONTAVA LA PROSA, per l'ennesima volta:
+  «`bustaMostro` serializza una volta sola» contava
+  `JSON.stringify(msg)` sul testo grezzo, e il commento dentro la
+  funzione quella forma la NOMINA apposta per dire perché non si fa —
+  la prova nasceva rossa per colpa di una spiegazione. Si conta sul
+  codice, coi commenti tolti.
+
 ## Produzione
 
 - VPS Hetzner Helsinki `46.62.162.103`, Ubuntu 26.04, servizio systemd
@@ -28083,3 +28149,42 @@ segnati da Andrea — non sono ancora decisi, sono da riprendere):
 - «I MIEI ANNUNCI» resa più fruibile;
 - i PRIVILEGI DEI PIONIERI (la coorte esiste già, non dà ancora niente);
 - il LOCKER DI RISERVA: un secondo punto se il primo non va.
+Il coordinatore Mostro rifiutava ogni ordine, e la firma era il perché
+(set 2026, dal campo — il difetto che ha fermato la tappa 8 prima ancora
+che cominciasse). Il client parlava correttamente NIP-44 e il messaggio
+arrivava: a non tornare era la FIRMA, perché mostrod la verifica sul
+JSON che ri-serializza lui, e noi omettevamo tre campi che serde scrive
+a null. Vedi Architettura, «IL JSON CHE SI FIRMA È QUELLO DI SERDE», per
+la regola, per il presidio che la difende dal giorno che mostro-core
+aggiunge un campo, e per le due righe che il difetto poteva rimettere in
+piedi.
+⚠️ E LA DIAGNOSI DELL'ALTRO ERRORE ERA SBAGLIATA, ed è la parte da
+ricordare: l'«Error serializing message» delle 10:00 l'avevo attribuito
+al nome provvisorio `nuovo:N` che usciva come `id`. Tre verifiche
+l'hanno smontata — il ramo che lo produrrebbe è già bloccato a monte,
+tutte e nove le azioni esistono nell'enum, e i campi sospetti sono
+guardati prima. Poi la MISURA l'ha chiusa: col padding NIP-44 un
+`content` da 688 caratteri vuol dire plaintext ≤446 byte, e le sole due
+firme ne occupano ~330 — dentro ci sta un messaggio SENZA `id` e senza
+payload, quindi `nuovo:N` non è mai uscito. Il gate dell'id è entrato
+come CINTURA e non come cura. **La causa di quell'errore resta ignota**,
+e curare la firma è anche ciò che la rende diagnosticabile: da adesso un
+messaggio malformato tira una risposta `cant-do` invece del silenzio.
+⚠️ E VA DETTO CHE NEMMENO L'ALTRO CLIENT è riuscito a creare un ordine
+(zero eventi 38383 dal nostro coordinator), quindi dopo questa cura può
+affiorare un terzo strato.
+Provato: DELTA **+17 prove** sul ramo isolato (7933 → 7950; le 4 rosse
+sono preesistenti e IDENTICHE sulla baseline — il mojibake del meno
+tipografico su console Windows, che in CI è verde) e **9 MUTAZIONI, 9
+uccise**, una per riga sorvegliata: la tabella riordinata, un campo che
+smette di scriversi a null, un campo sparito dalla tabella, le due
+canonizzazioni tolte una per una, il giudice dell'id che accetta tutto,
+il provvisorio che torna a uscire, la seconda serializzazione, il gate
+che se ne va. Una era MIRATA MALE al primo giro — l'ancora attraversava
+un a-capo su un file CRLF, la trappola già a verbale.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client.
+DA GUARDARE alla tappa 8, ed è il pezzo che da qui non si può fare: il
+primo new-order vero verso il coordinator — nel journal del nodo non
+deve comparire nessun «trade signature does not verify», e l'ordine deve
+uscire come 38383 col suo `d`.
