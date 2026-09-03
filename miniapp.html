@@ -32634,20 +32634,70 @@ function mostroHexP2P(){
 }
 
 /* ---- il messaggio, nell'ordine in cui il coordinatore lo rilegge ----
-   La firma copre il JSON del messaggio, e chi lo verifica lo
-   ri-serializza dalla sua struttura: l'ordine dei campi non e' un
-   vezzo, e' quello che fa combaciare le due stringhe. `id` si OMETTE
-   quando non c'e' (non si scrive null), `trade_index` e `request_id`
-   invece ci sono sempre. */
+   La firma copre il JSON del messaggio, e chi la verifica NON guarda
+   la stringa che gli arriva: la RI-SERIALIZZA dalla sua struttura
+   (`message.as_json()`) e confronta quella. Quindi l'ordine dei campi
+   e i `null` espliciti non sono uno stile: sono cio' che fa combaciare
+   le due stringhe — e un campo fuori posto NON da' un errore che si
+   veda, fa cadere la firma e il coordinatore tace.
+   LA REGOLA VALE A OGNI LIVELLO, ed e' la meta' che ci era sfuggita:
+   il messaggio era canonico e l'ordine dentro il payload no.
+   La tabella e' la trascrizione delle struct di mostro-core 0.14.6
+   (`MessageKind` in message.rs, `SmallOrder` in order.rs); il secondo
+   valore e' il `skip_serializing_if = "Option::is_none"` di serde,
+   cioe' «si omette quando e' vuoto» — tutti gli altri si scrivono
+   SEMPRE, anche a null.
+   CHI TOCCA QUESTA TABELLA CAMBIA LA FIRMA: c'e' la prova che inchioda
+   la stringa che ne esce, e il giorno che di la' aggiungono un campo
+   diventa rossa lei invece di far tacere il coordinatore. */
+const CAMPI_MOSTRO = {
+  messaggio: [['version', 0], ['request_id', 0], ['trade_index', 0],
+              ['id', 1], ['action', 0], ['payload', 0]],
+  ordine:    [['id', 1], ['kind', 0], ['status', 0], ['amount', 0],
+              ['fiat_code', 0], ['min_amount', 0], ['max_amount', 0],
+              ['fiat_amount', 0], ['payment_method', 0], ['premium', 0],
+              ['buyer_trade_pubkey', 1], ['seller_trade_pubkey', 1],
+              ['buyer_invoice', 1], ['created_at', 0], ['expires_at', 0]]
+};
+/* i campi entrano nell'ordine della TABELLA e mai in quello in cui il
+   chiamante li ha scritti: JSON.stringify rispetta l'inserimento,
+   quindi e' l'inserimento a dover essere quello di serde */
+function canonicoMostro(campi, o){
+  const out = {};
+  for (const [nome, saltaSeVuoto] of campi) {
+    const v = o[nome];
+    if (saltaSeVuoto && (v === undefined || v === null)) continue;
+    out[nome] = (v === undefined) ? null : v;
+  }
+  return out;
+}
+/* l'id di un ordine e' un UUID e nient'altro: il nome provvisorio con
+   cui nasce da noi (`nuovo:N`) e' roba NOSTRA e non deve poter uscire
+   — di la' e' un `Option<Uuid>`, e una stringa che UUID non e' non fa
+   cadere il campo: fa cadere l'INTERO messaggio, che il coordinatore
+   scarta con un «Error serializing message». Fail-closed: nel dubbio
+   si omette, e chi aveva bisogno dell'id lo sente da una porta che si
+   chiude a voce (vedi `chiamataOrdineP2P`) invece che da un silenzio. */
+function idMostroVero(id){
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    .test(String(id || ''));
+}
 function messaggioMostro(azione, opz){
   const o = opz || {};
-  const m = {};
-  m.version = 2;
-  m.request_id = (o.requestId === undefined) ? null : o.requestId;
-  m.trade_index = (o.indice === undefined || o.indice === null) ? null : o.indice;
-  if (o.id) m.id = o.id;
-  m.action = azione;
-  m.payload = (o.payload === undefined) ? null : o.payload;
+  const payload = (o.payload === undefined) ? null : o.payload;
+  /* l'ordine e' l'unico payload fatto di CAMPI: gli altri sono scalari
+     o tuple, che serde rende gia' come li scriviamo */
+  const p = (payload && payload.order)
+    ? {order: canonicoMostro(CAMPI_MOSTRO.ordine, payload.order)}
+    : payload;
+  const m = canonicoMostro(CAMPI_MOSTRO.messaggio, {
+    version: 2,
+    request_id: o.requestId,
+    trade_index: o.indice,
+    id: idMostroVero(o.id) ? String(o.id) : null,
+    action: azione,
+    payload: p
+  });
   const busta = {};
   busta[o.busta || 'order'] = m;
   return busta;
@@ -32695,7 +32745,11 @@ function bustaMostro(skTrade, skIdentita, msg){
   const pubTrade = NT.getPublicKey(NT.utils.hexToBytes(skTrade));
   const firma = firmaMostro(skTrade, msgJson);
   const prova = firma ? provaIdentitaMostro(skIdentita, pubTrade, msgJson) : null;
-  return JSON.stringify([msg, firma, prova]);
+  /* LA STRINGA FIRMATA E' DENTRO QUELLA SPEDITA, alla lettera: con un
+     secondo JSON.stringify(msg) le due potrebbero divergere senza che
+     niente fallisca — si firmerebbero dei byte che non partono */
+  return '[' + msgJson + ',' + JSON.stringify(firma || null) + ',' +
+         JSON.stringify(prova || null) + ']';
 }
 
 /* ---- la connessione viva ----
@@ -33212,6 +33266,11 @@ async function riprovaPresaP2P(){
 async function chiamataOrdineP2P(o, azione, payload){
   const mz = mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
+  /* ogni gesto di qui parla di un ordine PRECISO: senza l'id il
+     coordinatore non saprebbe di quale, quindi si dice invece di
+     spedire un messaggio che verrebbe scartato in silenzio */
+  if (!idMostroVero(o.id))
+    throw new Error('Il coordinatore non ha ancora registrato questo ordine: aspetta la sua risposta');
   const NT = window.NostrTools;
   const reput = !!(NT && NT.schnorr) && o.indice > 0;
   const conIndice = (azione === 'take-sell' || azione === 'take-buy' || azione === 'new-order');

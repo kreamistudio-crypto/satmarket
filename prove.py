@@ -35679,8 +35679,8 @@ function reset(){
              valute: ['EUR'], versione: '2', quando: 0,
              scadenzaSec: 86400, holdFinestra: 300, fattFinestra: 900};
   p2pLibro = {ordini: [
-    {id: 'ord-vendo', lato: 'sell', euro: 50, sats: 100000, metodi: ['SEPA'], premium: 0},
-    {id: 'ord-compro', lato: 'buy', euro: 20, sats: 40000, metodi: ['Satispay'], premium: 0}
+    {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002', lato: 'sell', euro: 50, sats: 100000, metodi: ['SEPA'], premium: 0},
+    {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', lato: 'buy', euro: 20, sats: 40000, metodi: ['Satispay'], premium: 0}
   ]};
 }
 (async () => {
@@ -35693,7 +35693,7 @@ function reset(){
                      {order: {id: d.id, amount: 99000, fiat_amount: 50}})];
     return [];
   };
-  await prendiOrdineP2P('ord-vendo');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await pausa(120);
   const r1 = ricevuti[0] || {};
   out.chiestoUnaVolta = ricevuti.length === 1;
@@ -35713,24 +35713,24 @@ function reset(){
   out.identitaEilMazzo = r1.identitaPub === mz1.pub;
   out.skMaiInRete = JSON.stringify(fetches).indexOf(mz1.sk) < 0;
   out.pubRegistrata = JSON.stringify(fetches).indexOf(r1.tradePub) >= 0;
-  let o = ordiniP2P()['ord-vendo'];
+  let o = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.dopoPresa = o.stato;
   out.satsNetti = o.satsNetti;
   /* i non sollecitati muovono la macchina uguale */
   const tp = o.pubTrade;
-  manda(ordine('waiting-seller-to-pay', null, 'ord-vendo'), tp); await pausa();
-  out.aspettaVenditore = ordiniP2P()['ord-vendo'].stato;
-  manda(ordine('hold-invoice-payment-accepted', null, 'ord-vendo'), tp); await pausa();
-  out.attivo = ordiniP2P()['ord-vendo'].stato;
+  manda(ordine('waiting-seller-to-pay', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
+  out.aspettaVenditore = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
+  manda(ordine('hold-invoice-payment-accepted', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
+  out.attivo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
   /* lo stesso evento due volte non muove niente due volte */
   const primaDei = renderP2Pn;
   const evDoppio = subs.length ? null : null;
-  manda(ordine('fiat-sent-ok', null, 'ord-vendo'), tp); await pausa();
-  out.euroInviati = ordiniP2P()['ord-vendo'].stato;
-  manda(ordine('released', null, 'ord-vendo'), tp); await pausa();
-  out.rilasciato = ordiniP2P()['ord-vendo'].stato;
-  manda(ordine('purchase-completed', null, 'ord-vendo'), tp); await pausa();
-  out.concluso = ordiniP2P()['ord-vendo'].stato;
+  manda(ordine('fiat-sent-ok', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
+  out.euroInviati = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
+  manda(ordine('released', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
+  out.rilasciato = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
+  manda(ordine('purchase-completed', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
+  out.concluso = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
   out.dettoConcluso = toasts.some(t => t.indexOf('concluso') >= 0);
   await pausa(1000);
   out.backupOfferto = aperti.indexOf('p2pProfiloSheet') >= 0;
@@ -35781,9 +35781,9 @@ function reset(){
                      {payment_request: [{id: d.id, amount: 40000, fiat_amount: 20}, BOLT, null]})];
     return [];
   };
-  await prendiOrdineP2P('ord-compro');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001');
   await pausa(120);
-  let ov = ordiniP2P()['ord-compro'];
+  let ov = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'];
   out.venditoreAspetta = ov.stato;
   out.holdArrivata = !!(ov.hold && ov.hold.bolt11 === BOLT);
   out.holdConImporto = ov.hold && ov.hold.sats === 40000;
@@ -35793,18 +35793,18 @@ function reset(){
                        && aperti.indexOf('sheetBg') >= 0;
   out.invoiceColTextContent = nodi.p2pHoldInvoice.textContent === BOLT
                            && (nodi.p2pHoldCorpo.innerHTML || '').indexOf(BOLT) < 0;
-  manda(ordine('hold-invoice-payment-accepted', null, 'ord-compro'), ov.pubTrade);
+  manda(ordine('hold-invoice-payment-accepted', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'), ov.pubTrade);
   await pausa();
   out.holdChiusoDaSolo = chiusi.indexOf('p2pHoldSheet') >= 0;
-  out.dopoHold = ordiniP2P()['ord-compro'].stato;
+  out.dopoHold = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'].stato;
   /* e il gesto che libera i sats parte solo dopo gli euro */
-  manda(ordine('fiat-sent-ok', null, 'ord-compro'), ov.pubTrade); await pausa();
+  manda(ordine('fiat-sent-ok', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'), ov.pubTrade); await pausa();
   rilasciaP2P();
   await pausa(60);
   out.rilascioChiesto = ricevuti.length === 2
                      && ricevuti[1].dentro.action === 'release';
   out.rilascioSenzaIndice = ricevuti[1].dentro.trade_index === null;
-  out.rilascioConId = ricevuti[1].dentro.id === 'ord-compro';
+  out.rilascioConId = ricevuti[1].dentro.id === '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001';
   out.rilascioChiede = conferme.length === 2;
 
   /* ---- 4) DOVE RICEVERE I SATS: l'indirizzo si manda com'e' ---- */
@@ -35818,7 +35818,7 @@ function reset(){
       return [ordine('waiting-seller-to-pay', d.request_id, d.id)];
     return [];
   };
-  await prendiOrdineP2P('ord-vendo');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await pausa(120);
   apriIncassoP2P();
   el('p2pIncassoInp').value = 'io@wallet.com';
@@ -35829,7 +35829,7 @@ function reset(){
     && ricevuti[1].dentro.payload.payment_request[1] === 'io@wallet.com';
   out.nessunaFetchAllIndirizzo = fetches.every(f => String(f.url).indexOf('/api/') === 0);
   out.incassoChiuso = chiusi.indexOf('p2pIncassoSheet') >= 0;
-  out.dopoLIndirizzo = ordiniP2P()['ord-vendo'].stato;
+  out.dopoLIndirizzo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
   /* una fattura dell'importo sbagliato non parte */
   reset();
   rispondi = r => [];
@@ -35851,9 +35851,9 @@ function reset(){
   reset();
   rispondi = r => [ordine('cant-do', r.dentro.request_id, r.dentro.id,
                           {cant_do: 'invalid-trade-index'})];
-  await prendiOrdineP2P('ord-vendo');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await pausa(150);
-  const no = ordiniP2P()['ord-vendo'];
+  const no = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.rifiutato = no.stato;
   out.motivoInItaliano = String(no.errore).indexOf('non è allineato') >= 0;
   out.cantDoScritto = String(no.cantDo).indexOf('non è allineato') >= 0;
@@ -35862,9 +35862,9 @@ function reset(){
   reset();
   rispondi = r => [];
   P2P_ATTESA_MS = 150;
-  await prendiOrdineP2P('ord-vendo');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await pausa(400);
-  const mu = ordiniP2P()['ord-vendo'];
+  const mu = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.senzaRisposta = mu.stato;
   out.diceISecondi = String(mu.errore).indexOf('non ha risposto') >= 0;
   out.offreRiprova = (nodi.p2pOrdineCorpo.innerHTML || '').indexOf('Riprova') >= 0;
@@ -35875,7 +35875,7 @@ function reset(){
   P2P_ATTESA_MS = 150;
   const schnorrVero = NT.schnorr;
   delete NT.schnorr;
-  await prendiOrdineP2P('ord-vendo');
+  await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await pausa(400);
   const ra = ricevuti[0] || {};
   out.anonimo = ra.anonimo === true;
@@ -36918,6 +36918,163 @@ def prove_p2p_pubblica():
     for parola in ("Nostr", "nsec", "npub", "relay"):
         prova("il foglio del nuovo ordine non nomina «%s»" % parola,
               False, parola.lower() in nuovo.lower())
+
+
+def prove_p2p_canonico():
+    """IL JSON CHE SI FIRMA E' QUELLO DI SERDE (set 2026, dal campo: il
+    coordinatore rifiutava ogni new-order con «trade signature does not
+    verify against event author»).
+
+    Chi verifica la firma NON guarda la stringa che gli arriva: la
+    RI-SERIALIZZA dalla sua struttura Rust (`message.as_json()`) e
+    confronta quella. Quindi la nostra deve uscire byte per byte come
+    la sua — stesso ordine dei campi, e i `null` espliciti dove serde
+    non fa `skip_serializing_if`. Noi omettevamo `min_amount`,
+    `max_amount` ed `expires_at`: 230 caratteri contro 284, e la firma
+    non poteva tornare. Il difetto non alza niente e non si legge da
+    nessuna parte — il coordinatore tace e basta.
+
+    LA REGOLA VALE A OGNI LIVELLO, ed e' la meta' che era sfuggita: il
+    commento sopra `messaggioMostro` la dichiarava dal primo giorno, ma
+    era applicata al solo MESSAGGIO — l'ordine dentro il payload no.
+
+    IL PRESIDIO: l'elenco atteso qui sotto e' la trascrizione delle
+    struct di mostro-core 0.14.6 — `MessageKind` in message.rs,
+    `SmallOrder` in order.rs — nell'ORDINE DI DICHIARAZIONE, che e'
+    quello in cui serde le scrive. Non e' una tautologia della tabella
+    del client: sono due copie che devono combaciare, e il giorno che
+    di la' aggiungono o spostano un campo diventa rossa questa invece
+    di far cadere la firma in silenzio. Si riverifica su
+    https://docs.rs/mostro-core/<versione>/src/mostro_core/order.rs.html
+    (il secondo valore e' il `skip_serializing_if = "Option::is_none"`,
+    cioe' «si omette quando e' vuoto»)."""
+    print("\n[il JSON canonico di Mostro]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- il presidio: la tabella contro le struct vere ---
+    ATTESI = {
+        "messaggio": [("version", "0"), ("request_id", "0"),
+                      ("trade_index", "0"), ("id", "1"), ("action", "0"),
+                      ("payload", "0")],
+        "ordine": [("id", "1"), ("kind", "0"), ("status", "0"),
+                   ("amount", "0"), ("fiat_code", "0"), ("min_amount", "0"),
+                   ("max_amount", "0"), ("fiat_amount", "0"),
+                   ("payment_method", "0"), ("premium", "0"),
+                   ("buyer_trade_pubkey", "1"), ("seller_trade_pubkey", "1"),
+                   ("buyer_invoice", "1"), ("created_at", "0"),
+                   ("expires_at", "0")],
+    }
+    i = mini.index("const CAMPI_MOSTRO = {")
+    tab = mini[i:mini.index("\n};", i)]
+    for nome, campi in ATTESI.items():
+        fetta = tab[tab.index(nome + ":"):]
+        fetta = fetta[:fetta.index("]]") + 2]
+        letti = re.findall(r"\['([a-z_]+)', ([01])\]", fetta)
+        prova("CAMPI_MOSTRO.%s ha i campi di mostro-core, NELL'ORDINE" % nome,
+              campi, letti)
+
+    # --- il banco: la stringa che ne esce, inchiodata ---
+    import json as _jsc
+    import subprocess as _spc
+    import tempfile as _tfc
+    tabjs = mini[i:mini.index("\n};", i) + 3]
+    js = (tabjs + "\n"
+          + pezzo_js(mini, "function canonicoMostro(", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function idMostroVero(", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function messaggioMostro(", "\n}\n") + "\n}\n" + """
+const u = '0199a1f2-3b4c-7d8e-9f01-234567890abc';
+/* il payload si scrive NELL'ORDINE DEL CHIAMANTE, che non e' quello di
+   serde: e' cosi' che il banco prova la canonizzazione invece di
+   provare come sono stati scritti i campi qui dentro */
+const nuovo = messaggioMostro('new-order', {requestId: 1, indice: 1, payload: {order: {
+  kind: 'buy', status: 'pending', amount: 0, fiat_code: 'EUR',
+  fiat_amount: 25, payment_method: 'Satispay', premium: 0, created_at: 0}}});
+console.log(JSON.stringify({
+  nuovo: JSON.stringify(nuovo),
+  conId: JSON.stringify(messaggioMostro('fiat-sent', {requestId: 7, id: u})),
+  provvisorio: JSON.stringify(messaggioMostro('cancel', {requestId: 2, id: 'nuovo:1'})),
+  fattura: JSON.stringify(messaggioMostro('add-invoice', {requestId: 3, id: u,
+    payload: {payment_request: [null, 'lnbc1', null]}})),
+  voto: JSON.stringify(messaggioMostro('rate-user', {requestId: 4, id: u,
+    payload: {rating_user: 5}})),
+  id: [u, u.toUpperCase(), 'nuovo:1', '', null, u.replace(/-/g, '')].map(idMostroVero)
+}));
+""")
+    with _tfc.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as fh:
+        fh.write(js)
+        p = fh.name
+    try:
+        r = _spc.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _spc.TimeoutExpired):
+        os.unlink(p)
+        salta("il banco del JSON canonico", "node non c'e'")
+        r = None
+    else:
+        os.unlink(p)
+    if r is not None and r.returncode != 0:
+        prova("il banco del JSON canonico gira", "", r.stderr[-300:])
+    elif r is not None:
+        v = _jsc.loads(r.stdout)
+        uu = "0199a1f2-3b4c-7d8e-9f01-234567890abc"
+        # LA STRINGA INCHIODATA: e' quel che mostrod ri-serializza dalla
+        # sua struct. Se qualcuno riordina i campi «per pulizia» questa
+        # diventa rossa e viene a leggere il perche', invece di far
+        # tacere il coordinatore.
+        prova("il new-order esce come lo scrive serde",
+              '{"order":{"version":2,"request_id":1,"trade_index":1,'
+              '"action":"new-order","payload":{"order":{"kind":"buy",'
+              '"status":"pending","amount":0,"fiat_code":"EUR",'
+              '"min_amount":null,"max_amount":null,"fiat_amount":25,'
+              '"payment_method":"Satispay","premium":0,"created_at":0,'
+              '"expires_at":null}}}}', v["nuovo"])
+        # i tre campi che mancavano, nominati uno per uno: e' il difetto
+        for campo in ("min_amount", "max_amount", "expires_at"):
+            prova("il payload scrive «%s» anche a null" % campo,
+                  True, ('"%s":null' % campo) in v["nuovo"])
+        prova("un gesto su un ordine preso porta l'id",
+              '{"order":{"version":2,"request_id":7,"trade_index":null,'
+              '"id":"%s","action":"fiat-sent","payload":null}}' % uu,
+              v["conId"])
+        # il nome provvisorio e' roba NOSTRA e non deve uscire: di la'
+        # `id` e' un Option<Uuid>, e una stringa che UUID non e' non fa
+        # cadere il campo — fa cadere l'INTERO messaggio
+        prova("il nome provvisorio non esce nel messaggio", False,
+              "nuovo:1" in v["provvisorio"] or '"id"' in v["provvisorio"])
+        # i payload che non sono ordini passano com'e': sono tuple e
+        # scalari, che serde rende gia' come li scriviamo noi
+        prova("la fattura passa come tupla", True,
+              '"payment_request":[null,"lnbc1",null]' in v["fattura"])
+        prova("il voto passa come scalare", True, '"rating_user":5' in v["voto"])
+        prova("il giudice dell'id riconosce solo gli UUID",
+              [True, True, False, False, False, False], v["id"])
+
+    # --- le righe che il difetto puo' rimettere in piedi ---
+    busta = pezzo_js(mini, "function bustaMostro(", "\n}\n")
+    # SI FIRMA QUEL CHE SI SPEDISCE, alla lettera: con un secondo
+    # JSON.stringify(msg) le due stringhe potrebbero divergere senza che
+    # niente fallisca — si firmerebbero byte che non partono.
+    # ⚠️ SI CONTA SUL CODICE E NON SULLA PROSA: il commento che sta
+    # DENTRO la funzione nomina quella forma apposta, per dire perche'
+    # non si fa — contando il testo grezzo la prova nasce rossa per
+    # colpa di una spiegazione. E' la trappola gia' pagata a decine.
+    bcod = re.sub(r"/\*[\s\S]*?\*/", "", busta)
+    prova("bustaMostro serializza il messaggio UNA volta sola",
+          1, bcod.count("JSON.stringify(msg)"))
+    prova("bustaMostro spedisce la stringa che ha firmato", True,
+          "'[' + msgJson + ','" in busta)
+    fab = pezzo_js(mini, "function messaggioMostro(", "\n}\n")
+    prova("la fabbrica canonizza il messaggio", True,
+          "canonicoMostro(CAMPI_MOSTRO.messaggio" in fab)
+    prova("la fabbrica canonizza l'ordine dentro il payload", True,
+          "canonicoMostro(CAMPI_MOSTRO.ordine" in fab)
+    prova("l'id passa dal giudice", True, "idMostroVero(o.id)" in fab)
+    # un gesto su un ordine senza id il coordinatore non lo capisce: si
+    # dice a voce invece di spedirlo e farlo scartare in silenzio
+    ch = pezzo_js(mini, "async function chiamataOrdineP2P(", "\n}\n")
+    prova("chiamataOrdineP2P si ferma senza un id vero", True,
+          "if (!idMostroVero(o.id))" in ch and "throw new Error" in ch)
 
 
 def prove_p2p_server():
@@ -43530,6 +43687,7 @@ def main():
     prove_p2p_stati,
     prove_p2p_chat,
     prove_p2p_pubblica,
+    prove_p2p_canonico,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
