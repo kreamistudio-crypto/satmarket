@@ -17586,12 +17586,17 @@ def prove_conta_feedback():
     html = open("miniapp.html", encoding="utf-8").read()
     prova("il client ha un giudice unico", True,
           "function contaFeedback(" in html)
-    # TRE posti la mostrano — negozio, Profilo e la CLASSIFICA (ago
-    # 2026) — e devono passare tutti da li', o diventano tre rese
-    # diverse della stessa cosa. Il conto e' un CENSIMENTO: il
-    # quarto di domani fa rossa questa riga e viene a leggere il
-    # perche' invece di ricopiarsi la regola della soglia.
-    prova("i tre posti lo usano tutti e tre", 3,
+    # QUATTRO posti la mostrano — negozio, Profilo, la CLASSIFICA (ago
+    # 2026) e la card del LIBRO P2P — e devono passare tutti da li', o
+    # diventano quattro rese diverse della stessa cosa. Il conto e' un
+    # CENSIMENTO, e ha fatto il suo mestiere: il quarto e' arrivato, ha
+    # trovato la riga rossa ed e' venuto a leggere il perche' invece di
+    # ricopiarsi la regola della soglia.
+    # ⚠️ IL QUARTO CHIAMA CON UN ARGOMENTO SOLO, ed e' una decisione e
+    # non una dimenticanza: il tag `rating` del coordinator porta i
+    # VOTI e non le persone distinte, quindi la seconda cifra non
+    # nasce — dire «7 da 7 persone» sarebbe un'affermazione inventata.
+    prova("i quattro posti lo usano tutti e quattro", 4,
           html.count("contaFeedback(") - 1)   # -1 = la definizione
 
     # La regola della soglia, rifatta qui: la seconda cifra parla SOLO
@@ -35026,17 +35031,117 @@ def prove_p2p_libro():
     prova("...ma dice CHI custodisce i sats e che noi non li vediamo",
           True, "coordinatore" in senza_commenti
           and "non li tiene e non li vede" in senza_commenti)
-    prova("le due pillole del lato sono le tema-pill di casa", 2,
-          senza_commenti.count("tema-pill"))
+    # HA CAMBIATO LATO (ago 2026, cantiere della forma del libro): erano
+    # `tema-pill`, cioe' la pillola dell'ASPETTO — piccola, e accesa e'
+    # ARANCIO PIENO, mentre dieci righe piu' giu' c'e' gia' il `btn
+    # orange` del «Pubblica»: due pieni arancio nella stessa schermata.
+    # `consegna-scelta` e' il commutatore di casa (`flex:1`, quindi le
+    # due meta' si spartiscono la riga) ed e' lo STESSO gesto delle
+    # pillole del ruolo negli Ordini: filtrare una lista per ruolo.
+    prova("il lato si sceglie col commutatore di casa, non con le tema-pill",
+          True, senza_commenti.count("consegna-pill") == 2
+          and "consegna-scelta" in senza_commenti
+          and "tema-pill" not in senza_commenti)
     prova("view-p2p sta DOPO il coming soon e PRIMA del pacco", True,
           mini.index('id="view-p2ppresto"') < j
           < mini.index("VISTA: LA PAGINA DEL PACCO"))
+
+    # --- 4b) LA FORMA DELLA CARD (ago 2026) -------------------------
+    # Le due righe da non ammorbidire, e nessuna delle due fallisce da
+    # sola: si vedono solo misurando la pagina vera.
+    css = mini[mini.index(".p2p-ord{"):mini.index(".p2p-rep{") + 400]
+    prova("la testa va a capo: senza, il prezzo si stringe e spezza",
+          True, "flex-wrap:wrap" in css.split(".p2p-euro")[0])
+    # E NON `nowrap` sull'euro: il prezzo e' l'ultima cosa che deve
+    # cedere, ma inchiodarlo impedirebbe alla riga di sfaldarsi bene —
+    # a cedere e' la stima in sats, che va a capo sotto.
+    prova("...e a cedere e' la stima, non il prezzo", False,
+          "white-space:nowrap" in css[css.index(".p2p-euro"):
+                                      css.index(".p2p-sats")])
+    # HA CAMBIATO LATO (ago 2026, il riordino a blocchi): i metodi erano
+    # un figlio FLEX con `flex:1 1 100%; min-width:0`, e quel min-width
+    # era la riga che impediva alla scatola di ALLARGARE LA PAGINA — un
+    # figlio flex non scende sotto il proprio contenuto (la lezione del
+    # comune in card, pagata due volte). Adesso i metodi hanno una
+    # scatola loro e sono un BLOCCO: largo quanto il contenitore per
+    # costruzione, quindi `overflow:hidden` morde da solo e il difetto
+    # non si puo' nemmeno presentare. La garanzia non si allenta —
+    # DIVENTA STRUTTURALE — e quel che resta da sorvegliare e' che i
+    # puntini ci siano davvero e che la riga non vada a capo.
+    paga = css[css.index(".p2p-paga{"):css.index("}", css.index(".p2p-paga{"))]
+    prova("i metodi cedono coi puntini e non allargano la pagina",
+          True, "overflow:hidden" in paga and "text-overflow:ellipsis" in paga
+          and "white-space:nowrap" in paga)
+    # ...e il flex non deve tornare di soppiatto: dentro un flex quella
+    # regola torna a essere insufficiente, e il difetto rientra muto.
+    prova("...e i metodi NON sono tornati un figlio flex", False,
+          "flex:" in paga)
+    # HA CAMBIATO LATO ANCHE QUESTA: la striscia era staccata da un filo
+    # (`border-top`), e adesso a staccarla e' il RIQUADRO — la carta di
+    # `--chip-bg` sotto, che e' quel che il riferimento fa e quel che
+    # `.acq-art .qta-mini` fa gia' in casa. Un filo DENTRO un riquadro
+    # sarebbe una seconda linea che non separa piu' niente.
+    box = css[css.index(".p2p-box{"):css.index("}", css.index(".p2p-box{"))]
+    prova("le due scatole sono la carta di casa, non una tinta nuova",
+          True, "var(--chip-bg)" in box and "border-radius" in box)
+    rep = css[css.index(".p2p-rep{"):css.index("}", css.index(".p2p-rep{"))]
+    prova("...e la striscia la stacca il riquadro, non piu' un filo",
+          False, "border-top" in rep)
+    # LE DUE CIFRE AI DUE BORDI, che e' la forma del riferimento: il
+    # voto a sinistra e da quanto e' li' a destra.
+    prova("...e le due cifre della striscia stanno ai due bordi", True,
+          "justify-content:space-between" in rep)
+    # LA STIMA SCENDE SOTTO IL PREZZO nella SOLA card del libro: la
+    # classe resta quella — stessa cifra, stesso mestiere — e a cambiare
+    # e' il vestito in questa casa (il pattern di `.acq-art .qta-mini`).
+    # Il selettore DISCENDENTE e' quel che tiene ferme le altre due case
+    # di `.p2p-testa`: lo scambio e l'ordine preso non si muovono.
+    # ⚠️ E GUARDA COSA DICE, non se la riga c'e': la prima stesura
+    # chiedeva il solo selettore e restava VERDE con `display:inline`
+    # dentro — cioe' con la stima tornata in fila col prezzo, che e'
+    # esattamente il difetto che il cantiere ha misurato a 320px.
+    # L'ha detto la tortura, non la rilettura.
+    j_st = css.index(".p2p-ord > .p2p-sats{")
+    st = css[j_st:css.index("}", j_st)]
+    prova("la stima scende sotto il prezzo, e solo nella card del libro",
+          True, "display:block" in st)
+    # ...e li' PUO' andare a capo: la base e' `nowrap` perche' in fila
+    # una cifra spezzata e' illeggibile, ma su una riga tutta sua il
+    # nowrap allargherebbe la pagina con una cifra assurda di un terzo.
+    prova("...e sulla riga sua puo' andare a capo", True,
+          "white-space:normal" in st)
 
     # --- 5) IN TAPPA 2 NON SI FIRMA, NON SI CIFRA, NON SI PUBBLICA ---
     for spia in ("finalizeEvent", "publish(", "generateSecretKey", "nsec",
                  "nip44", "localStorage", "fetch("):
         prova(f"il blocco della tappa 2 non nomina `{spia}`", False,
               spia in cod)
+    _rp = pezzo_js(mini, "function renderP2P(){")
+    # IL CONTEGGIO al posto della riga di servizio: e' la forma di casa
+    # (`riga-conta` di renderGrid) e dice una cosa vera che prima non si
+    # sapeva — quante ce ne sono — e per giunta che il libro e' vivo.
+    prova("il libro dice QUANTE offerte ci sono, nella forma di casa",
+          True, 'class="section-label riga-conta"' in _rp
+          and '<span class="conta">${vivi.length}</span>' in _rp)
+    prova("...col singolare quando ne resta una",
+          True, "vivi.length === 1 ? 'a' : 'e'" in _rp)
+    # e dice il LATO di chi sta dall'ALTRA parte: la pillola accesa dice
+    # il mio, questa dice quello dell'offerta.
+    prova("...e dice di chi sono le offerte", True,
+          "p2pLato === 'compro' ? 'vende' : 'compra'" in _rp)
+    prova("il commutatore accende la pillola di casa", True,
+          "classList.toggle('attiva', p2pLato === 'compro')" in _rp
+          and "classList.toggle('attiva', p2pLato === 'vendo')" in _rp)
+    # GLI ESCLUSI: il conteggio si legge dal LATO che si sta guardando,
+    # o si direbbe «3 a intervallo» a chi ne ha davanti uno solo.
+    prova("gli ordini a intervallo si dicono, e per lato", True,
+          "(p2pLibro.intervalli || []).filter(l => l === k).length" in _rp
+          and "a intervallo" in _rp)
+    prova("...e a zero non si scrive niente", True,
+          "fuori ? " in _rp)
+    prova("gli intervalli si contano per `d`, come gli ordini", True,
+          "fuori.set(String(tagValore(ev, 'd')), lato)"
+          in pezzo_js(mini, "function caricaLibroP2P(forza){"))
     prova("la REQ filtra la sola valuta e i soli pending", True,
           "'#f': [P2P_VALUTA], '#s': ['pending']" in cod)
     prova("...e chiede anche le impostazioni (38385)", True,
@@ -35064,9 +35169,17 @@ def prove_p2p_libro():
         return
     k = mini.index("const esc = s =>")
     esc_js = mini[k:mini.index(";\n", k) + 1]
-    pezzi = [esc_js] + [pezzo_js(mini, f) for f in (
+    # la valuta si LEGGE dal client e non si ribatte qui: e' la stessa
+    # su cui `intervalloP2P` decide, e due copie direbbero due cose
+    j_val = mini.index("const P2P_VALUTA = ")
+    val_js = mini[j_val:mini.index(";", j_val) + 1]
+    pezzi = [esc_js, val_js] + [pezzo_js(mini, f) for f in (
+        "function contaFeedback(n, persone){",
         "function tagValore(ev, nome){",
+        "function repDaTag(s){",
         "function ordineDaEvento(ev, adesso){",
+        "function intervalloP2P(ev, adesso){",
+        "function repTestoP2P(rep){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
         "function satsMercatoP2P(o){",
@@ -35092,8 +35205,38 @@ out.info = infoDaEvento(ev(38385, [['d','mostro-pk'],['fee','0.01'],['pow','0'],
 out.infoStorta = infoDaEvento(ev(38383, [['fee','0.5']]));
 out.rigaVeleno = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ord-6"'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['pm','<script>alert(1)</script>'],['expires_at', String(ora+7200)]]), ora));
 out.rigaMercato = rigaOrdineP2P(out.mercato);
+/* SENZA premio: e' l'unico caso in cui il ramo del ripiego della meta
+   si valuta davvero — con `premium` pieno il ternario non ci arriva. */
+out.mercatoZero = ordineDaEvento(ev(38383, [['d','ord-2z'],['k','buy'],['f','eur'],['s','pending'],['amt','0'],['fa','50'],['pm','Bonifico'],['expires_at', String(ora+90000)]]), ora);
+out.rigaMercatoZeroVivo = rigaOrdineP2P(out.mercatoZero);
+/* LA REPUTAZIONE: il tag `rating` lo scrive il NOSTRO coordinator, ma
+   passa da relay di terzi — quindi si prova anche storto e assente. */
+const conRep = t => ordineDaEvento(ev(38383, [['d','rep-'+t.length],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['rating', t]]), ora);
+out.repPiena  = conRep('{"total_reviews": 7, "total_rating": 4.6, "days": 23}');
+out.repZero   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 1}');
+out.repOggi   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 0.4}');
+out.repFuori  = conRep('{"total_reviews": 3, "total_rating": 999, "days": -5}');
+out.repStorta = conRep('{non sono json');
+out.testoPieno  = repTestoP2P(out.repPiena.rep);
+out.testoZero   = repTestoP2P(out.repZero.rep);
+out.testoOggi   = repTestoP2P(out.repOggi.rep);
+out.testoFuori  = repTestoP2P(out.repFuori.rep);
+out.testoNiente = repTestoP2P(null);
+out.rigaRep      = rigaOrdineP2P(out.repPiena);
+out.rigaSenzaRep = rigaOrdineP2P(out.fisso);
+/* GLI ESCLUSI: il giudice degli intervalli dice il LATO, e solo su
+   quelli che davvero non si prendono da qui. */
+const range = (extra) => ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']].concat(extra || []));
+out.intervallo         = intervalloP2P(range(), ora);
+out.intervalloComp     = intervalloP2P(ev(38383, [['d','r'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']]), ora);
+out.intervalloVecchio  = intervalloP2P(range([['expires_at', String(ora-1)]]), ora);
+out.intervalloAltraVal = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','USD'],['s','pending'],['amt','0'],['fa','50','100']]), ora);
+out.intervalloPreso    = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','in-progress'],['amt','0'],['fa','50','100']]), ora);
+out.intervalloSingolo  = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50']]), ora);
+out.intervalloKind     = intervalloP2P(ev(38385, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['fa','50','100']]), ora);
 cambioVivo = false;
 out.rigaMercatoMuto = rigaOrdineP2P(out.mercato);
+out.rigaMercatoZeroMuto = rigaOrdineP2P(out.mercatoZero);
 p2pInfo = out.info; out.infoRiga = infoRigaP2P();
 p2pInfo = null; out.infoRigaVuota = infoRigaP2P();
 const adesso = Math.floor(Date.now()/1000);
@@ -35150,9 +35293,93 @@ console.log(JSON.stringify(out));
     prova("a prezzo di mercato la riga porta il ≈ e il premio", True,
           "≈ 98039 sats" in out["rigaMercato"]
           and "+2% sul mercato" in out["rigaMercato"])
+    # HA CAMBIATO LATO (ago 2026): il ripiego era «al prezzo di mercato»,
+    # venti caratteri in mono dentro una testa larga 258px a 320 — e la
+    # testa e' un flex, quindi il prezzo si stringeva e andava a capo
+    # (misurato, 2 card su 7). Quel che la prova garantisce non cambia:
+    # a cambio muto non esce nessun numero inventato.
     prova("...e a cambio muto non inventa nessun numero", True,
-          "al prezzo di mercato" in out["rigaMercatoMuto"]
+          "al mercato" in out["rigaMercatoMuto"]
           and "≈" not in out["rigaMercatoMuto"])
+    # E IL CASO CHE MORDE E' QUELLO SENZA PREMIO, che l'ha detto la
+    # tortura: con `premium` pieno la meta dice «+2% sul mercato» e il
+    # ripiego non si valuta affatto, quindi l'asserzione sul solo
+    # `rigaMercatoMuto` passava per la ragione sbagliata.
+    prova("...e la testa lo dice gia', quindi la meta non lo ripete",
+          False, "prezzo di mercato" in out["rigaMercatoMuto"]
+          or "prezzo di mercato" in out["rigaMercatoZeroMuto"])
+    # il ROVESCIO, o la riga di sopra sarebbe vera anche se quel ramo
+    # non scrivesse mai niente: col cambio vivo la meta lo dice.
+    prova("...mentre col cambio vivo la meta dice che e' quello di mercato",
+          True, "prezzo di mercato" in out["rigaMercatoZeroVivo"])
+
+    # --- 8) CHI C'E' DALL'ALTRA PARTE ------------------------------
+    # Il tag `rating` lo scrive il NOSTRO coordinator (mostrod lo mette
+    # sul 38383 dal profilo dell'utente) ed e' l'unico numero della
+    # pagina che non sia auto-dichiarato. Fino a ieri si scaricava e si
+    # buttava: `ordineDaEvento` non lo leggeva affatto.
+    r = out["repPiena"]["rep"]
+    prova("il tag rating si legge: voti, media, giorni", True,
+          r is not None and r["voti"] == 7 and r["media"] == 4.6
+          and r["giorni"] == 23)
+    prova("...e con la media fuori scala si CLAMPA a 5", 5,
+          out["repFuori"]["rep"]["media"])
+    prova("...e i giorni negativi valgono zero", 0,
+          out["repFuori"]["rep"]["giorni"])
+    # UN `rating` STORTO NON DEVE FAR SPARIRE L'ORDINE DAL LIBRO: e'
+    # una stringa che passa da relay di terzi, e il JSON.parse sta
+    # dentro un try apposta — l'ordine resta, la striscia non si scrive.
+    prova("un rating malformato non toglie l'ordine dal libro", True,
+          out["repStorta"] is not None and out["repStorta"]["rep"] is None)
+    prova("...e senza il tag la reputazione e' semplicemente assente",
+          None, out["fisso"]["rep"])
+    prova("con voti la striscia porta stelle, media e conteggio", True,
+          '<span class="stars">★★★★★</span> 4,6 (7)' in out["testoPieno"]
+          and "da 23 giorni" in out["testoPieno"])
+    # LE STELLE COMPAIONO COL PRIMO VOTO — la regola che il mercatino ha
+    # gia' per i venditori: «0 ★» a chi e' appena arrivato fa solo danno.
+    # HANNO CAMBIATO LATO (ago 2026, il riordino a blocchi): la striscia
+    # era una frase sola col « · », e adesso sono DUE pezzi che la
+    # scatola spinge ai due bordi — quindi il separatore lo fa lo
+    # spazio, e un puntino si vedrebbe in mezzo al vuoto. Quel che le
+    # due prove garantiscono NON cambia di una virgola: a zero voti non
+    # esce nessuna stella, e si dice l'unica cosa che sappiamo di lui.
+    prova("a zero voti niente stelle: si dice da quanto e' li'",
+          "<span>🆕 Senza voti</span><span>da 1 giorno</span>",
+          out["testoZero"])
+    prova("...e sotto il giorno si dice «da oggi»",
+          "<span>🆕 Senza voti</span><span>da oggi</span>", out["testoOggi"])
+    # LA SOSTANZA, detta a parte dal markup: se un domani la striscia
+    # cambia forma un'altra volta, questa riga resta e continua a
+    # chiedere la cosa per cui le due sopra esistono.
+    prova("...e in nessuno dei due casi compare una stella", 0,
+          out["testoZero"].count("★") + out["testoOggi"].count("★"))
+    # E CON I VOTI le due cifre stanno in due pezzi come le altre.
+    prova("...e con i voti il voto e l'eta' sono due pezzi", True,
+          out["testoPieno"].startswith("<span>")
+          and "</span><span>da 23 giorni</span>" in out["testoPieno"])
+    prova("...e la media fuori scala non stampa 999 stelle", True,
+          out["testoFuori"].count("★") == 5)
+    prova("senza il tag la striscia non si scrive proprio",
+          "", out["testoNiente"])
+    prova("...e la card infatti non la porta", False,
+          "p2p-rep" in out["rigaSenzaRep"])
+    prova("...mentre con la reputazione la card la porta IN CODA", True,
+          "p2p-rep" in out["rigaRep"]
+          and out["rigaRep"].index("p2p-euro") < out["rigaRep"].index("p2p-rep"))
+
+    # --- 9) GLI ESCLUSI SI DICONO ----------------------------------
+    # Il parser lascia fuori gli ordini a intervallo (due importi = due
+    # validazioni, e la seconda non c'e'), e fin qui sparivano in
+    # silenzio. Il giudice dice il LATO, cosi' il conteggio e' quello
+    # della pagina che si sta guardando e non di tutte e due.
+    prova("un ordine a intervallo si riconosce, col suo lato",
+          ["sell", "buy"], [out["intervallo"], out["intervalloComp"]])
+    prova("...ma NON si conta quel che non si mostrerebbe comunque",
+          ["", "", "", "", ""],
+          [out["intervalloVecchio"], out["intervalloAltraVal"],
+           out["intervalloPreso"], out["intervalloSingolo"],
+           out["intervalloKind"]])
     prova("la riga delle impostazioni dice commissione e tetto LETTI", True,
           "commissione 1%" in out["infoRiga"]
           and "fino a 100000 sats" in out["infoRiga"]

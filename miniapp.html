@@ -1681,15 +1681,74 @@
      carta e bordo di casa, l'euro in Baloo come un prezzo, i sats in
      mono come ogni cifra Lightning. Niente arancio pieno: in tappa 2
      non c'e' ancora nessun gesto, si guarda e basta. */
-  .p2p-lati{display:flex;gap:6px;margin:12px 0}
+  /* IL COMMUTATORE DEL LATO E' QUELLO DELLA CONSEGNA (.consegna-scelta):
+     due meta' che si spartiscono la riga (flex:1), e l'acceso e' il
+     VELATO arancio. Non le tema-pill, che sono strette e il cui acceso
+     e' arancio PIENO: dieci righe piu' giu' c'e' gia' il `btn orange`
+     del «Pubblica», e due pieni nella stessa schermata si fanno
+     concorrenza — contro quel che il commento qui sopra dice per
+     questa pagina. Il margine e' di qui perche' quello della consegna
+     nasce dentro un form, dove sopra c'e' gia' un campo. */
+  #view-p2p .consegna-scelta{margin:12px 0 10px}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 14px;margin-top:10px}
-  .p2p-testa{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
+     e il testo dell'euro va a capo DENTRO la sua scatola staccando il
+     simbolo dalla cifra — misurato a 320px col ripiego lungo, 2 card
+     su 7. Col wrap i due pezzi scendono INTERI. */
+  .p2p-testa{display:flex;justify-content:space-between;align-items:baseline;
+    flex-wrap:wrap;gap:2px 10px}
+  /* niente `nowrap` qui, ed e' deliberato: l'importo arriva da un
+     evento di sconosciuti, e una cifra assurda con nowrap allargherebbe
+     la PAGINA. A capo dentro la sua scatola e' brutto; la pagina che
+     scorre di lato e' un difetto. */
   .p2p-euro{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;color:var(--ink)}
   .p2p-sats{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;
     color:var(--sats-text);white-space:nowrap}
   .p2p-meta{margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600;
     display:flex;flex-wrap:wrap;gap:4px 12px}
+  /* IL TEMPO IN ALTO A DESTRA: e' il posto dove il riferimento mette
+     l'ETA' dell'offerta, e da noi il tempo che fa decidere e' un altro
+     — quanto ne RESTA, non quanto e' vecchia. Stesso posto, il tempo
+     nostro: la scadenza loro non ce l'hanno. */
+  .p2p-quando{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+  /* LA STIMA SCENDE SOTTO IL PREZZO nella sola card del libro: era
+     l'unica riga del riferimento che avevamo in fila invece che
+     incolonnata. La CLASSE resta quella — stessa cifra, stesso
+     mestiere — e a cambiare e' il vestito in QUESTA casa, il pattern
+     di `.acq-art .qta-mini`: le altre due case di `.p2p-testa` (lo
+     scambio e l'ordine preso) non si toccano di un pixel. */
+  .p2p-ord > .p2p-sats{display:block;margin-top:3px;font-size:13px;
+    white-space:normal}
+  /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
+     chi c'e' dall'altra parte non sono righe di prosa in mezzo al
+     resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
+     una tinta nuova: e' la carta di casa per quel che sta DENTRO una
+     card (il patto di `.acq-art .qta-mini`), e segue il tema. */
+  .p2p-box{margin-top:8px;background:var(--chip-bg);border-radius:10px;
+    padding:8px 10px;font-size:12.5px;color:var(--muted);font-weight:600}
+  /* La lista dei metodi e' testo di sconosciuti e puo' essere lunga
+     quanto vuole: cede coi puntini, e a cedere e' SEMPRE lei — premio e
+     scadenza sono le due cose che fanno decidere.
+     ⚠️ NIENTE `min-width:0` QUI, e non e' una dimenticanza: quella riga
+     serve a un figlio FLEX, che senza non scende sotto il proprio
+     contenuto e ALLARGA LA PAGINA (la lezione del comune in card,
+     pagata due volte). Da quando i metodi hanno una scatola loro sono
+     un BLOCCO, e un blocco e' largo quanto il suo contenitore per
+     costruzione: `overflow:hidden` morde da solo e la pagina non si
+     puo' allargare. Chi rimettesse questa riga in un flex si ricompra
+     il difetto, e allora quella riga torna obbligatoria. */
+  .p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* CHI C'E' DALL'ALTRA PARTE, nella sua scatola: il filo che la
+     staccava non serve piu' — a staccarla e' il riquadro, come nel
+     riferimento. Ultima e non prima: in un libro si scorre per PREZZO,
+     e la persona davanti al numero metterebbe uno sconosciuto prima
+     della cifra.
+     Le due cifre a destra come nel riferimento, e `wrap` perche' con
+     «Senza voti» + «da 1 giorno» a 320 la riga puo' non bastare: a
+     capo e' meglio che allargare la pagina. */
+  .p2p-rep{display:flex;flex-wrap:wrap;justify-content:space-between;
+    gap:2px 10px;font-size:12px}
   #view-p2p .btn{margin-top:14px}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
   /* le stelle sono l UNICO gesto del foglio: grandi, in fila, e col
@@ -5277,9 +5336,9 @@ document.getElementById('cartello')?.remove();</script>
     <div class="sicu">
       <div class="section-label">🔁 Scambio P2P</div>
       <div class="hint">Compri e vendi bitcoin con altre persone, in euro. Il coordinatore (Mostro, un servizio indipendente) custodisce i sats durante lo scambio: Barattolo non li tiene e non li vede.</div>
-      <div class="p2p-lati" role="tablist">
-        <button class="tema-pill active" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compro sats</button>
-        <button class="tema-pill" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendo sats</button>
+      <div class="consegna-scelta" role="tablist">
+        <button class="consegna-pill attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compro sats</button>
+        <button class="consegna-pill" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendo sats</button>
       </div>
       <div class="hint" id="p2pInfoRiga" style="display:none"></div>
       <div id="p2pCorpo"></div>
@@ -32333,6 +32392,36 @@ function tagValori(ev, nome){
   return t ? t.slice(1) : [];
 }
 
+/* CHI C'E' DALL'ALTRA PARTE. Il tag `rating` lo scrive il COORDINATOR
+   (mostrod, che e' nostro) e non chi pubblica l'ordine: e' l'unico
+   numero di questa pagina a non essere auto-dichiarato. Arriva come
+   JSON dentro una stringa —
+     ["rating", "{\"total_reviews\": 7, \"total_rating\": 4.6, \"days\": 23}"]
+   — e quella stringa e' di sconosciuti, quindi il `try` non e'
+   cortesia: un `rating` storto non deve poter far SPARIRE l'ordine dal
+   libro. Torna null e la striscia non si scrive; l'ordine resta.
+   LA MEDIA SI CLAMPA A 5, ed e' la riga da non togliere: senza, un
+   `total_rating: 999` finisce dritto dentro '★'.repeat() e stampa
+   novecentonovantanove stelle — la famiglia del filtro-alfabeto, un
+   numero di un terzo che arriva in una repeat(). I tre valori escono
+   interi e non negativi, cosi' la stringa che ne nasce e' NOSTRA e non
+   porta niente di sconosciuto a schermo. */
+function repDaTag(s){
+  if (!s) return null;
+  let d;
+  try { d = JSON.parse(s); } catch(e) { return null; }
+  if (!d || typeof d !== 'object') return null;
+  const num = (v, tetto) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(tetto, Math.max(0, n)) : 0;
+  };
+  return {
+    voti: Math.floor(num(d.total_reviews, 1e6)),
+    media: num(d.total_rating, 5),
+    giorni: Math.floor(num(d.days, 1e5))
+  };
+}
+
 /* IL PARSER E' PURO: prende un evento e torna un ordine o null. Torna
    null — cioe' ESCLUDE — su tre cose che si riconoscono e non si
    nascondono per sbaglio: il range (due importi = due validazioni,
@@ -32361,8 +32450,32 @@ function ordineDaEvento(ev, adesso){
     premium: Number(tagValore(ev, 'premium')) || 0,
     metodi: tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean),
     scade,
-    creato: Number(ev.created_at) || 0
+    creato: Number(ev.created_at) || 0,
+    rep: repDaTag(tagValore(ev, 'rating'))
   };
+}
+
+/* IL PARSER ESCLUDE GLI ORDINI A INTERVALLO, e fin qui sparivano in
+   silenzio: chi guardava vedeva sette offerte dove il coordinator ne
+   ha nove. Questo giudice riconosce QUEL caso e non gli altri due —
+   uno scaduto o un kind sbagliato non sono «a intervallo», e dirlo
+   sarebbe peggio del silenzio. La condizione e' la stessa del parser
+   scritta una volta sola (due importi buoni o piu'): `fa` VUOTO non e'
+   un intervallo, e' un ordine rotto, e non si conta. Si guardano anche
+   stato, valuta e scadenza, o si direbbe «due a intervallo» di ordini
+   che nel libro non sarebbero comunque entrati. Torna il LATO, che e'
+   insieme il giudizio e il dato che serve a chi conta. */
+function intervalloP2P(ev, adesso){
+  if (!ev || ev.kind !== 38383) return '';
+  const lato = tagValore(ev, 'k');
+  if (lato !== 'sell' && lato !== 'buy') return '';
+  const fa = tagValori(ev, 'fa').map(Number).filter(n => Number.isFinite(n) && n > 0);
+  if (fa.length < 2) return '';
+  if (String(tagValore(ev, 's') || '') !== 'pending') return '';
+  if (String(tagValore(ev, 'f') || '').toUpperCase() !== P2P_VALUTA) return '';
+  const scade = Number(tagValore(ev, 'expires_at')) || Number(tagValore(ev, 'expiration')) || 0;
+  if (scade && scade <= (adesso || Math.floor(Date.now() / 1000))) return '';
+  return lato;
 }
 
 /* Le impostazioni del coordinator: `fee` e' una FRAZIONE (0.01 = 1%),
@@ -32449,6 +32562,9 @@ function caricaLibroP2P(forza){
       const {eventi} = await leggiLibroMostro();
       if (giro !== p2pGiro) return;
       const perId = new Map();
+      /* gli intervalli si contano per `d` come gli ordini, o due relay
+         che mandano lo stesso evento lo conterebbero due volte */
+      const fuori = new Map();
       for (const ev of eventi) {
         if (ev.kind === 38385) {
           const i = infoDaEvento(ev);
@@ -32456,7 +32572,11 @@ function caricaLibroP2P(forza){
           continue;
         }
         const o = ordineDaEvento(ev);
-        if (!o) continue;
+        if (!o) {
+          const lato = intervalloP2P(ev);
+          if (lato) fuori.set(String(tagValore(ev, 'd')), lato);
+          continue;
+        }
         const g = perId.get(o.id);
         if (!g || o.creato > g.creato) perId.set(o.id, o);
       }
@@ -32464,6 +32584,7 @@ function caricaLibroP2P(forza){
         ordini: [...perId.values()]
           .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA)
           .sort((a, b) => b.creato - a.creato),
+        intervalli: [...fuori.values()],
         quando: Date.now()
       };
       p2pErrore = '';
@@ -32499,6 +32620,32 @@ function scadeTestoP2P(scade){
   return 'scade fra ' + Math.round(s / 86400) + ' g';
 }
 
+/* La striscia di chi c'e' dall'altra parte. E' un giudizio PURO come la
+   scadenza: numeri in, stringa out. Le stelle compaiono col PRIMO voto
+   — la regola che il mercatino ha gia' per i venditori, «0 ★» a chi e'
+   appena arrivato fa solo danno — e chi non ne ha ancora si presenta
+   con l'unica cosa che sappiamo di lui: da quanto e' sul coordinator.
+   L'HTML che ne esce e' nostro: i tre numeri li ha gia' tosati
+   repDaTag, e `contaFeedback` si chiama con UN argomento solo perche'
+   il tag non porta le persone distinte — dire «7 da 7 persone» sarebbe
+   un'affermazione inventata. */
+function repTestoP2P(rep){
+  if (!rep) return '';
+  const eta = rep.giorni >= 1
+    ? 'da ' + rep.giorni + (rep.giorni === 1 ? ' giorno' : ' giorni')
+    : 'da oggi';
+  /* DUE PEZZI e non una frase: nel riferimento il voto sta a sinistra
+     e da quanto e' li' a destra, e la scatola li spinge ai due bordi.
+     Il separatore lo fa lo SPAZIO fra i due, non un puntino — un « · »
+     dentro un `space-between` si vedrebbe in mezzo al vuoto. */
+  if (!(rep.voti > 0) || !(rep.media > 0))
+    return '<span>🆕 Senza voti</span><span>' + eta + '</span>';
+  const media = rep.media.toLocaleString('it-IT',
+    {minimumFractionDigits: 1, maximumFractionDigits: 1});
+  return `<span><span class="stars">${'★'.repeat(Math.round(rep.media))}</span> `
+    + media + contaFeedback(rep.voti) + '</span><span>' + eta + '</span>';
+}
+
 /* A prezzo di mercato (amt=0) i sats si STIMANO col cambio di casa e il
    premio dell'ordine: e' una stima e porta il ≈ — la cifra vera la
    decide il coordinator al momento dello scambio. Senza cambio vivo
@@ -32508,24 +32655,36 @@ function satsMercatoP2P(o){
   return Math.round(o.euro / (eurPerSat * (1 + o.premium / 100)));
 }
 
+/* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
+   c'e' dall'altra parte. La cifra PRIMA e la persona ULTIMA — in un
+   libro si scorre per prezzo, e la reputazione in cima metterebbe uno
+   sconosciuto davanti al numero. */
 function rigaOrdineP2P(o){
+  const stima = satsMercatoP2P(o);
+  /* «al mercato» e non «al prezzo di mercato»: sono venti caratteri in
+     mono dentro una testa larga 258px a 320, e con la riga lunga il
+     prezzo andava a capo — misurato, 2 card su 7. */
   const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
-             : satsMercatoP2P(o) ? '≈ ' + fmt(satsMercatoP2P(o)) + ' sats'
-             : 'al prezzo di mercato';
+             : stima ? '≈ ' + fmt(stima) + ' sats'
+             : 'al mercato';
+  /* col cambio muto la testa dice GIA' che il prezzo e' quello di
+     mercato: ripeterlo nella meta sarebbe la stessa cosa due volte */
   const premio = o.sats > 0 ? ''
                : o.premium ? (o.premium > 0 ? '+' : '−') + Math.abs(o.premium) + '% sul mercato'
-               : 'prezzo di mercato';
-  const meta = [];
-  if (o.metodi.length) meta.push('💳 ' + esc(o.metodi.join(', ')));
-  if (premio) meta.push(esc(premio));
+               : stima ? 'prezzo di mercato' : '';
   const sc = scadeTestoP2P(o.scade);
-  if (sc) meta.push('⏳ ' + esc(sc));
+  const paga = o.metodi.length
+    ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
+      + esc(o.metodi.join(', ')) + '</div>' : '';
+  const rep = repTestoP2P(o.rep);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    <div class="p2p-testa"><span class="p2p-euro">${esc(fmtEur(o.euro))} €</span><span class="p2p-sats">${sats}</span></div>
-    <div class="p2p-meta">${meta.map(m => '<span>' + m + '</span>').join('')}</div>
+    <div class="p2p-testa"><span class="p2p-euro">${esc(fmtEur(o.euro))} €</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
+    <span class="p2p-sats">${sats}${premio ? ' · ' + esc(premio) : ''}</span>
+    ${paga}
+    ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
   </div>`;
 }
 
@@ -32572,8 +32731,8 @@ function renderP2P(){
   }
   const box = el('p2pCorpo');
   if (!box) return;
-  el('p2pLatoCompro')?.classList.toggle('active', p2pLato === 'compro');
-  el('p2pLatoVendo')?.classList.toggle('active', p2pLato === 'vendo');
+  el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
+  el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   const info = el('p2pInfoRiga');
   if (info) { info.innerHTML = infoRigaP2P(); info.style.display = p2pInfo ? '' : 'none'; }
   if (p2pLibro === null) {
@@ -32586,10 +32745,22 @@ function renderP2P(){
   }
   const k = P2P_LATO_K[p2pLato];
   const vivi = p2pLibro.ordini.filter(o => o.lato === k);
-  const testa = p2pLato === 'compro'
-    ? 'Chi <b>vende</b> sats in euro, adesso'
-    : 'Chi <b>compra</b> sats in euro, adesso';
-  box.innerHTML = scambiP2P() + `<div class="hint">${testa}${p2pErrore ? ' · ' + esc(p2pErrore) : ''}</div>`
+  const fuori = (p2pLibro.intervalli || []).filter(l => l === k).length;
+  /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
+     prima non si sapeva — quante ce ne sono — e per giunta dice che il
+     libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
+     dice anche il LATO: la pillola accesa qui sopra dice il mio
+     («Compro sats»), questa dice quello di chi sta dall'altra parte. */
+  const testa = `<div class="section-label riga-conta"><span class="conta">${vivi.length}</span> `
+    + `offert${vivi.length === 1 ? 'a' : 'e'} di chi `
+    + (p2pLato === 'compro' ? 'vende' : 'compra') + ' sats</div>'
+    /* GLI ESCLUSI SI DICONO: il parser lascia fuori gli ordini a
+       intervallo, e fin qui sparivano in silenzio. Costa una riga e
+       toglie l'unica bugia della pagina. */
+    + (fuori ? `<div class="hint">${fuori} offert${fuori === 1 ? 'a' : 'e'} a intervallo `
+        + `non si prend${fuori === 1 ? 'e' : 'ono'} ancora da qui.</div>` : '')
+    + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}</div>` : '');
+  box.innerHTML = scambiP2P() + testa
     + (vivi.length ? vivi.map(rigaOrdineP2P).join('')
        : `<div class="empty"><span class="big">🔁</span><span class="empty-title">Nessun ordine aperto</span>${
            p2pLato === 'compro'
