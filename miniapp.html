@@ -32309,6 +32309,52 @@ function mazzoSerializza(m){
   return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
                          creato: m.creato|0, backupFatto: !!m.backupFatto});
 }
+/* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
+   desktop avevano due mazzi diversi, e un ordine pubblicato dall'uno
+   non si vedeva nell'altro). Il difetto era in DUE pezzi, e nessuno dei
+   due era la guardia di versione: il cloud si scriveva SOLO alla
+   nascita del mazzo — quindi un mazzo gia' in `localStorage` non ci
+   finiva MAI e non esisteva nessuna migrazione — e la scrittura e'
+   fail-open MUTA, quindi un fallimento non lasciava traccia e nessuno
+   riprovava. La gamba 1 prometteva «viaggia fra telefono e desktop» e
+   quella promessa non era garantita da niente.
+   TRE CASI, e il terzo e' quello che si sbaglia per primo:
+     cloud vuoto + locale c'e' -> si CARICA (la migrazione che mancava)
+     cloud c'e' + locale manca -> si scarica (lo fa assicuraMazzo)
+     tutti e due, DIVERSI      -> NON SI TOCCA NIENTE, e si dice.
+   Sul terzo non si sovrascrive MAI in silenzio: sono due identita' con
+   due storie, e sceglierne una al posto di chi guarda ne distrugge una
+   — la regola delle lapidi applicata alle chiavi.
+   FAIL-CLOSED sul caso che costa di piu': un testo che C'E' e non si
+   legge NON e' un cloud vuoto. Trattarlo come vuoto lo sovrascriverebbe
+   col mazzo locale, cioe' distruggerebbe una chiave che non sappiamo
+   leggere ma che qualcuno potrebbe ancora recuperare. Per questo il
+   testo si legge GREZZO e `NostrTools` si carica solo quando c'e'
+   qualcosa da interpretare: senza il bundle `mazzoDaTesto` torna null,
+   e un null preso per «vuoto» sarebbe esattamente quel disastro. */
+let mazzoNuvola = '';      /* '' | spento | copia | muto | illeggibile | diverso */
+let mazzoNuvolaAltro = null;   /* il mazzo del cloud, quando e' DIVERSO */
+let sincroInCorso = null;
+function sincronizzaMazzo(){
+  if (sincroInCorso) return sincroInCorso;
+  sincroInCorso = (async () => {
+    const m = mazzoMostro();
+    if (!m) return (mazzoNuvola = '');
+    if (!cloudTelegram()) return (mazzoNuvola = 'spento');
+    const grezzo = await cloudLeggi(CLOUD_MAZZO);
+    if (grezzo) {
+      await caricaNostrTools();
+      const su = mazzoDaTesto(grezzo);
+      if (!su) return (mazzoNuvola = 'illeggibile');
+      if (su.sk !== m.sk) { mazzoNuvolaAltro = su; return (mazzoNuvola = 'diverso'); }
+      mazzoNuvolaAltro = null;
+      return (mazzoNuvola = 'copia');
+    }
+    mazzoNuvolaAltro = null;
+    return (mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(m)) ? 'copia' : 'muto');
+  })().finally(() => { sincroInCorso = null; });
+  return sincroInCorso;
+}
 /* IL CLOUD DI TELEGRAM, solo dentro Telegram VERO e col client che ce
    l'ha (Bot API 6.9): nel browser lo stub di telegram.org esiste comunque
    e mentirebbe — il patto di esportaDati. Fail-open in ogni verso: un
@@ -32415,11 +32461,15 @@ async function dimenticaChiaviP2P(){
    per volta: due gesti insieme non devono fare due mazzi. */
 function assicuraMazzo(){
   const m = mazzoMostro();
-  if (m) return Promise.resolve(m);
+  /* il mazzo c'e': il gesto parte SUBITO e la riconciliazione col cloud
+     va per conto suo — e' la migrazione per chi il foglio non lo apre
+     mai, e non deve far aspettare nessuno */
+  if (m) { sincronizzaMazzo(); return Promise.resolve(m); }
   if (!mazzoInCorso) mazzoInCorso = (async () => {
     await caricaNostrTools();
     const NT = window.NostrTools;
-    const nuvola = mazzoDaTesto(await cloudLeggi(CLOUD_MAZZO));
+    const grezzo = await cloudLeggi(CLOUD_MAZZO);
+    const nuvola = mazzoDaTesto(grezzo);
     let nuovo = nuvola;
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
@@ -32427,7 +32477,11 @@ function assicuraMazzo(){
                creato: Math.floor(Date.now()/1000), backupFatto: false};
     }
     ricordaMazzo(nuovo);
-    if (!nuvola) await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo));
+    /* si scrive solo se il cloud era vuoto DAVVERO: un testo illeggibile
+       non e' un posto libero, e sovrascriverlo butterebbe via una chiave
+       che qualcuno potrebbe ancora recuperare */
+    if (!grezzo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo)) ? 'copia' : 'muto';
+    else if (nuvola) mazzoNuvola = 'copia';
     await registraChiaviP2P([nuovo.pub]);
     return nuovo;
   })().finally(() => { mazzoInCorso = null; });
@@ -32449,14 +32503,28 @@ async function apriProfiloP2P(){
   renderProfiloP2P();
   el('sheetBg').classList.add('open');
   el('p2pProfiloSheet').classList.add('open');
+  /* si apre SUBITO e poi rilegge: il patto del rientro istantaneo della
+     cassa — mai un'attesa davanti a un foglio già disegnabile */
+  sincronizzaMazzo().then(renderProfiloP2P);
 }
 function renderProfiloP2P(){
   const box = el('p2pProfiloCorpo');
   if (!box) return;
   const m = mazzoMostro();
-  const dove = cloudTelegram()
-    ? 'È al sicuro nel tuo Telegram: lo ritrovi anche su un altro dispositivo con lo stesso account. Chi ha il tuo account Telegram ce l\'ha anche lui — è già così per tutto Barattolo.'
-    : 'Vale su questo dispositivo: su un altro incolla il codice segreto.';
+  /* LA RIGA DICE IL FATTO E NON IL POSSIBILE (set 2026): prima guardava
+     `cloudTelegram()`, cioe' « l'API esiste », e da li' prometteva
+     « lo ritrovi su un altro dispositivo » senza aver mai controllato
+     che la copia ci fosse davvero — ed e' esattamente la promessa che
+     si e' rotta in mano. Adesso la risposta viene da `sincronizzaMazzo`,
+     che il cloud l'ha guardato. Finche' non risponde si dice la piu'
+     prudente delle due: un'attesa non e' una garanzia. */
+  const dove = {
+    copia: `Ne esiste una copia nel tuo Telegram ✓ Lo ritrovi su un altro dispositivo con lo stesso account. Chi ha il tuo account Telegram ce l'ha anche lui — è già così per tutto Barattolo.`,
+    spento: `Questo Telegram non sa tenerne una copia: il profilo vale su questo dispositivo, e su un altro si incolla il codice segreto.`,
+    muto: `Non siamo riusciti a metterne una copia nel tuo Telegram: per ora vale <b>solo su questo dispositivo</b>.`,
+    illeggibile: `Nel tuo Telegram c'è una copia che non riusciamo a leggere, e non l'abbiamo toccata: il profilo vale su questo dispositivo.`,
+    diverso: `Nel tuo Telegram c'è un profilo <b>diverso</b> da questo.`
+  }[mazzoNuvola] || `Vale su questo dispositivo: su un altro incolla il codice segreto.`;
   const importa = `<div class="field" style="margin-top:14px"><label>Hai già un profilo su un altro dispositivo?</label>
       <input type="text" id="p2pImportaInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il suo codice segreto"></div>
     <button class="btn ghost" onclick="importaMazzoDalFoglio()">📥 Importa questo profilo</button>`;
@@ -32468,7 +32536,21 @@ function renderProfiloP2P(){
   const debito = m.backupFatto
     ? '✓ Hai salvato il codice segreto.'
     : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
+  /* IL CONFLITTO NON SI RISOLVE DA SOLO: due mazzi diversi sono due
+     identita' con due storie, e a sceglierne una e' chi guarda. Si
+     dicono le due DATE, che e' l'unica cosa che il client sa davvero
+     — la reputazione vive sul coordinatore e da qui non si vede. */
+  const scelta = mazzoNuvola === 'diverso' && mazzoNuvolaAltro
+    ? `<div class="trust-note"><span>⚠️</span><span>
+        Non ne abbiamo toccato nessuno dei due. Quello di <b>questo dispositivo</b> è del
+        ${esc(dataMazzo(m))}, quello salvato nel Telegram del <b>${esc(dataMazzo(mazzoNuvolaAltro))}</b>.
+        Gli scambi e le recensioni restano attaccati a quello con cui li hai fatti.
+        <button class="btn ghost" onclick="usaMazzoDellaNuvola()">📥 Usa quello salvato nel Telegram</button>
+        <button class="btn ghost" onclick="tieniMazzoDiQui()">⬆️ Tieni questo e sostituisci la copia</button>
+       </span></div>`
+    : '';
   box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${dove}</div>
+    ${scelta}
     <div class="hint">${debito}</div>
     <form id="p2pCodiceForm" onsubmit="codiceP2PSalvato(); return false;" style="display:${p2pCodiceVisibile ? '' : 'none'}">
       <input type="text" name="username" value="barattolo-profilo-di-scambio" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">
@@ -32533,9 +32615,44 @@ async function importaMazzoDalFoglio(){
   }
   applicaImportMazzo(d);
 }
+function dataMazzo(m){
+  return new Date(((m && m.creato) || 0) * 1000)
+    .toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
+}
+/* Le due uscite del conflitto. Nessuna e' automatica e tutte e due
+   CHIEDONO, perche' tutte e due lasciano indietro qualcosa: la prima
+   l'identita' di questo dispositivo (che resta qui finche' non la si
+   dimentica), la seconda la COPIA dell'altra — che sul suo
+   dispositivo resta, ma smette di avere un posto dove ritrovarsi. */
+function usaMazzoDellaNuvola(){
+  const d = mazzoNuvolaAltro;
+  if (!d) { toast(`Non c'è nessun profilo salvato da usare`); return; }
+  chiediConferma({titolo: 'Usare il profilo salvato?',
+    corpo: `Il profilo di scambio di questo dispositivo lascia il posto a quello salvato nel tuo Telegram.
+
+Se non hai salvato il suo codice segreto, la sua reputazione non si recupera più.`,
+    etichetta: 'Usa quello salvato', poi: () => applicaImportMazzo(d)});
+}
+function tieniMazzoDiQui(){
+  const m = mazzoMostro();
+  if (!m) return;
+  chiediConferma({titolo: 'Sostituire la copia?',
+    corpo: `Nel tuo Telegram resta il profilo di questo dispositivo, al posto di quello salvato prima.
+
+L'altro non si cancella: resta sul dispositivo dov'è, ma senza copia.`,
+    etichetta: 'Sostituisci la copia', poi: async () => {
+      const fatto = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(m));
+      mazzoNuvola = fatto ? 'copia' : 'muto';
+      mazzoNuvolaAltro = null;
+      renderProfiloP2P();
+      toast(fatto ? `Copia sostituita ✓`
+                  : `Non siamo riusciti a scrivere nel tuo Telegram`);
+    }});
+}
 async function applicaImportMazzo(d){
   ricordaMazzo(d);
-  await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(d));
+  mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(d)) ? 'copia' : 'muto';
+  mazzoNuvolaAltro = null;
   await registraChiaviP2P([d.pub]);
   p2pCodiceVisibile = false;
   renderProfiloP2P();

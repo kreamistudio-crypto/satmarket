@@ -26685,8 +26685,11 @@ def prove_fogli_di_casa():
     # cinquantuno che parla di sats gia' in custodia: il corpo dice
     # la cosa che non si disfa — da li' non si annulla piu', e a
     # decidere e' il coordinatore, non Barattolo.
-    prova("i gesti che passano dalla domanda unica sono cinquantuno",
-          51, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTATRE' con le due uscite del conflitto fra mazzi (set
+    # 2026): scegliere un mazzo lascia indietro un'identita', e nessuna
+    # delle due si fa in silenzio.
+    prova("i gesti che passano dalla domanda unica sono cinquantatre",
+          53, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -35027,8 +35030,13 @@ def prove_p2p_chiavi():
     am = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
     prova("assicuraMazzo legge il cloud PRIMA di generare", True,
           0 < am.find("cloudLeggi(CLOUD_MAZZO)") < am.find("generateSecretKey"))
-    prova("...e scrive il cloud solo quando il mazzo e' nuovo", True,
-          "if (!nuvola) await cloudScrivi(CLOUD_MAZZO" in am)
+    # HA CAMBIATO LATO col cantiere della riconciliazione (set 2026), e
+    # la nuova e' PIU' STRETTA: si guardava `nuvola` — il mazzo LETTO —
+    # ma un testo che c'e' e non si legge da' `nuvola` a null pur non
+    # essendo un posto libero, e sovrascriverlo butterebbe via una
+    # chiave. Si guarda il testo GREZZO: si scrive solo sul vuoto vero.
+    prova("...e scrive il cloud solo se era vuoto DAVVERO", True,
+          "if (!grezzo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO" in am)
     prova("...e registra la pubkey appena nato", True,
           "await registraChiaviP2P([nuovo.pub]);" in am)
     prova("il codice entra nel campo col .value, mai in un template", True,
@@ -35077,7 +35085,10 @@ def prove_p2p_chiavi():
     prova("...che sta nel catalogo dell'onion", True, "\n  p2p: '" in cat)
     prova("in DEMO si guarda soltanto", True,
           "if (DEMO) { toast('Nel demo si guarda soltanto" in cod)
-    prova("«dimentica» e «sostituisci» passano dalla domanda unica", 2,
+    # QUATTRO dal cantiere della riconciliazione: alle due di sempre si
+    # aggiungono le due uscite del conflitto fra il mazzo di qui e quello
+    # salvato nel Telegram.
+    prova("i quattro gesti del mazzo passano dalla domanda unica", 4,
           cod.count("chiediConferma({"))
     prova("dimenticare toglie locale, cloud E la lista del server", True,
           all(s in pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
@@ -35256,10 +35267,16 @@ const corpo = f => JSON.parse(f.opt.body);
   out.tornatoDalCloud = mc.sk === sk && mc.indice === 2 && mc.backupFatto === true;
   out.cloudNonRiscritto = cloudLog.join(',') === 'get';
   out.registratoLoStesso = fetches.length === 1 && corpo(fetches[0]).pubkeys[0] === mc.pub;
-  // 5) col mazzo gia' in locale non si tocca niente
+  // 5) col mazzo gia' in locale il gesto parte subito, e la copia nel
+  //    cloud si rifa' per conto suo: e' LA MIGRAZIONE, il difetto che ha
+  //    aperto il cantiere — un mazzo nato prima del cloud non ci finiva
+  //    MAI, e telefono e desktop restavano due identita' diverse.
   reset(); ricordaMazzo(m);
   const ml = await assicuraMazzo();
-  out.localeVince = ml.sk === m.sk && cloudLog.length === 0 && fetches.length === 0;
+  out.localeNienteRete = ml.sk === m.sk && fetches.length === 0;
+  await new Promise(r => setTimeout(r, 0));
+  out.localeMigra = cloudLog.join(',') === 'get,set'
+    && (cloud.get('mostro_mazzo') || '').includes(m.sk);
   // 6) fuori da Telegram niente cloud, ma il mazzo nasce
   reset(); tg = undefined;
   const mf = await assicuraMazzo();
@@ -35358,7 +35375,8 @@ const corpo = f => JSON.parse(f.opt.body);
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
-        "localeVince": "col mazzo gia' in locale ne' cloud ne' rete",
+        "localeNienteRete": "col mazzo gia' in locale il gesto non chiama la rete",
+        "localeMigra": "...e la copia nel cloud si rifa' da sola (la migrazione)",
         "senzaTelegram": "fuori da Telegram niente cloud, ma il mazzo nasce e si registra",
         "stubNonInganna": "lo stub di Telegram senza initData non apre il cloud",
         "vetrinaNonChiama": "in vetrina il server non si chiama",
@@ -37075,6 +37093,157 @@ console.log(JSON.stringify({
     ch = pezzo_js(mini, "async function chiamataOrdineP2P(", "\n}\n")
     prova("chiamataOrdineP2P si ferma senza un id vero", True,
           "if (!idMostroVero(o.id))" in ch and "throw new Error" in ch)
+
+
+def prove_p2p_nuvola():
+    """LA RICONCILIAZIONE DEL MAZZO COL CLOUD (set 2026, dal campo:
+    telefono e desktop avevano due mazzi diversi, e un ordine pubblicato
+    dall'uno non si vedeva nell'altro).
+
+    I DUE DIFETTI, e nessuno dei due era la guardia di versione: il cloud
+    si scriveva SOLO alla nascita del mazzo — quindi un mazzo gia' in
+    localStorage non ci finiva MAI, e non esisteva nessuna migrazione — e
+    `cloudScrivi` e' fail-open MUTA, quindi un fallimento non lasciava
+    traccia e nessuno riprovava. La gamba 1 prometteva «viaggia fra
+    telefono e desktop» e quella promessa non era garantita da niente.
+
+    LA RIGA CHE COSTA DI PIU' e' il FAIL-CLOSED: un testo che C'E' e non
+    si legge NON e' un cloud vuoto. Trattarlo come vuoto lo
+    sovrascriverebbe col mazzo locale, cioe' distruggerebbe una chiave.
+    Per questo il testo si legge GREZZO e il bundle si carica solo quando
+    c'e' qualcosa da interpretare: senza bundle `mazzoDaTesto` torna
+    null, e un null preso per «vuoto» sarebbe esattamente quel disastro.
+
+    E IL CONFLITTO NON SI RISOLVE DA SOLO: due mazzi diversi sono due
+    identita' con due storie, e sovrascriverne una la distrugge — la
+    regola delle lapidi applicata alle chiavi."""
+    print("\n[il mazzo e il cloud di Telegram]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    sin = pezzo_js(mini, "function sincronizzaMazzo(", "\n}\n") + "\n}"
+    # IL FAIL-CLOSED, e si guarda DENTRO il ramo del testo che c'e' e non
+    # «dopo l'indice»: piu' sotto la scrittura della migrazione c'e'
+    # eccome, solo che da qui e' irraggiungibile — una sentinella che la
+    # trovasse direbbe il falso su una riga giusta.
+    ramo = sin[sin.index("if (grezzo) {"):]
+    ramo = ramo[:ramo.index("\n    }")]
+    prova("nel ramo del cloud che C'E' non si scrive mai",
+          -1, ramo.find("cloudScrivi"))
+    prova("...e il testo illeggibile esce senza toccare niente", True,
+          "if (!su) return (mazzoNuvola = 'illeggibile');" in ramo)
+    prova("...e due mazzi diversi nemmeno", True,
+          "if (su.sk !== m.sk) { mazzoNuvolaAltro = su;" in ramo)
+    prova("il testo si legge GREZZO prima di interpretarlo", True,
+          sin.index("cloudLeggi") < sin.index("caricaNostrTools"))
+    # il bundle si carica solo dentro quel ramo: senza, `mazzoDaTesto`
+    # tornerebbe null su un cloud PIENO e il null si leggerebbe «vuoto»
+    prova("il bundle si carica solo quando c'e' qualcosa da leggere",
+          True, "caricaNostrTools" in ramo
+          and sin.index("if (grezzo) {") < sin.index("caricaNostrTools"))
+    prova("una promessa sola per volta", True, "if (sincroInCorso)" in sin)
+
+    # i due agganci: senza il primo la migrazione non gira per chi il
+    # foglio non lo apre mai, senza il secondo la riga di stato mente
+    ass = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
+    prova("il ramo veloce riconcilia (la migrazione)", True,
+          "if (m) { sincronizzaMazzo(); return Promise.resolve(m); }" in ass)
+    prova("...e non fa aspettare nessuno (niente await)", -1,
+          ass[:ass.index("sincronizzaMazzo()")].find("await sincronizzaMazzo"))
+    prova("alla nascita si scrive solo se il cloud era vuoto DAVVERO",
+          True, "if (!grezzo) mazzoNuvola = await cloudScrivi" in ass)
+    apri = pezzo_js(mini, "async function apriProfiloP2P(", "\n}\n")
+    prova("il foglio si apre subito e poi rilegge", True,
+          "sincronizzaMazzo().then(renderProfiloP2P)" in apri)
+
+    # la riga di stato dice il FATTO: guardare cloudTelegram() era
+    # guardare «l'API esiste», ed e' la promessa che si e' rotta in mano
+    ren = pezzo_js(mini, "function renderProfiloP2P(", "\n}\n")
+    prova("la riga di stato legge la risposta, non l'API", True,
+          "}[mazzoNuvola]" in ren)
+    prova("...e non torna a guardare cloudTelegram()", -1,
+          ren.find("const dove = cloudTelegram()"))
+    for stato in ("copia", "spento", "muto", "illeggibile", "diverso"):
+        prova("la riga di stato dice il caso «%s»" % stato,
+              True, ("\n    %s:" % stato) in ren or ("    %s:" % stato) in ren)
+
+    # le due uscite del conflitto CHIEDONO: tutte e due lasciano
+    # indietro un'identita', e nessuna delle due si fa in silenzio
+    for fn in ("usaMazzoDellaNuvola", "tieniMazzoDiQui"):
+        c = pezzo_js(mini, "function %s(" % fn, "\n}\n")
+        prova("%s chiede prima di agire" % fn, True, "chiediConferma({" in c)
+
+    # --- il banco: le sentinelle dicono che le righe ci sono, mai che
+    #     la funzione risponda giusto sui cinque casi ---
+    import json as _jsn
+    import subprocess as _spn
+    import tempfile as _tfn
+    js = ("globalThis.window = {};\n"
+          "let LOCALE = null, NUVOLA = null, SCRITTO = null, SCRIVIBILE = true;\n"
+          "let LEGGIBILE = true, CLOUD = true;\n"
+          "const CLOUD_MAZZO = 'mostro_mazzo';\n"
+          "let mazzoNuvola = '', mazzoNuvolaAltro = null, sincroInCorso = null;\n"
+          "function mazzoMostro(){ return LOCALE; }\n"
+          "function cloudTelegram(){ return CLOUD ? {} : null; }\n"
+          "function cloudLeggi(){ return Promise.resolve(NUVOLA); }\n"
+          "function cloudScrivi(k, v){ if (SCRIVIBILE) SCRITTO = v;\n"
+          "  return Promise.resolve(SCRIVIBILE); }\n"
+          "function caricaNostrTools(){ return Promise.resolve(); }\n"
+          "function mazzoDaTesto(t){ return LEGGIBILE && t ? JSON.parse(t) : null; }\n"
+          "function mazzoSerializza(m){ return JSON.stringify(m); }\n"
+          + sin + "\n"
+          "const A = {sk:'aa', pub:'AA'}, B = {sk:'bb', pub:'BB'};\n"
+          "(async () => {\n"
+          "  const out = {};\n"
+          "  const giro = async (nome, pre) => { SCRITTO = null;\n"
+          "    LOCALE = null; NUVOLA = null; SCRIVIBILE = true;\n"
+          "    LEGGIBILE = true; CLOUD = true; mazzoNuvolaAltro = null;\n"
+          "    pre(); out[nome] = [await sincronizzaMazzo(), SCRITTO,\n"
+          "                        mazzoNuvolaAltro && mazzoNuvolaAltro.sk]; };\n"
+          "  await giro('senza mazzo', () => {});\n"
+          "  await giro('cloud spento', () => { LOCALE = A; CLOUD = false; });\n"
+          "  await giro('migrazione', () => { LOCALE = A; });\n"
+          "  await giro('gia in pari', () => { LOCALE = A;\n"
+          "    NUVOLA = JSON.stringify(A); });\n"
+          "  await giro('scrittura muta', () => { LOCALE = A; SCRIVIBILE = false; });\n"
+          "  await giro('illeggibile', () => { LOCALE = A; NUVOLA = 'xx';\n"
+          "    LEGGIBILE = false; });\n"
+          "  await giro('diverso', () => { LOCALE = A;\n"
+          "    NUVOLA = JSON.stringify(B); });\n"
+          "  console.log(JSON.stringify(out));\n"
+          "})();\n")
+    with _tfn.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as fh:
+        fh.write(js)
+        p = fh.name
+    try:
+        r = _spn.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _spn.TimeoutExpired):
+        os.unlink(p)
+        salta("la riconciliazione risponde giusto", "node non c'e'")
+    else:
+        os.unlink(p)
+        if r.returncode != 0:
+            prova("il banco della riconciliazione gira", "",
+                  "\n".join((r.stderr or "").strip().splitlines()[:6]))
+        else:
+            g = _jsn.loads(r.stdout)
+            prova("senza mazzo non si tocca niente",
+                  ["", None, None], g["senza mazzo"])
+            prova("cloud spento: si dice, e non si scrive",
+                  ["spento", None, None], g["cloud spento"])
+            # LA MIGRAZIONE: e' il difetto che ha aperto il cantiere
+            prova("il mazzo locale sale nel cloud vuoto",
+                  ["copia", '{"sk":"aa","pub":"AA"}', None], g["migrazione"])
+            prova("gia in pari: non si riscrive",
+                  ["copia", None, None], g["gia in pari"])
+            prova("una scrittura fallita si SA (non resta muta)",
+                  "muto", g["scrittura muta"][0])
+            # il fail-closed che costa di piu': mai sovrascrivere
+            prova("cloud illeggibile: si dice, e NON si sovrascrive",
+                  ["illeggibile", None, None], g["illeggibile"])
+            prova("due mazzi diversi: non si tocca niente, e si tiene l'altro",
+                  ["diverso", None, "bb"], g["diverso"])
 
 
 def prove_p2p_bundle():
@@ -43798,6 +43967,7 @@ def main():
     prove_p2p_pubblica,
     prove_p2p_canonico,
     prove_p2p_bundle,
+    prove_p2p_nuvola,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
