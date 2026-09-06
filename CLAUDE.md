@@ -23032,8 +23032,11 @@ nodo): è in BLOCCHI, 144 ≈ 24h — il numero che hanno detto — e 3
 giorni fanno 432. Il margine `escrow_deadline_margin_blocks` (24)
 resta com'è, quindi la finestra UTILE è sempre ~4 ore più corta
 dell'orizzonte: mostrod molla la presa PRIMA che LND sia costretto a
-chiudere il canale per salvare l'HTLC. A set 2026 il nodo è ancora al
-default. 2) I 15 minuti che avevamo visto NON sono la finestra del
+chiudere il canale per salvare l'HTLC. GIRATA A 432 il 6 set 2026, a
+scambi fermi: riavvio pulito («Settings correctly loaded», transport
+nip44). ⚠️ Il container si chiama «mostro», NON mostrod — mostrod è
+il demone che ci gira dentro, e un `docker restart mostrod` fallisce
+cercando un container che non esiste. 2) I 15 minuti che avevamo visto NON sono la finestra del
 deposito: sono `expiration_seconds` (900) in `[mostro]`, il tempo per
 ACCETTARE l'ordine — erano due cose diverse. 3) Nessun vincolo di
 protocollo sul rilascio: «you need trustworthy moderators». La
