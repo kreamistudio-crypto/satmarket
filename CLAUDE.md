@@ -23336,6 +23336,114 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   potrebbe finire. Le gambe sono e restano tre — il cloud di
   Telegram, il backup cifrato per sé sui relay (tappa 9), il codice
   nel foglio del profilo — e nessuna delle tre passa da noi.
+  IL LIBRO E' UNA VETRINA, NON UNA PAGINA DI TESTO (ago 2026, chiesto
+  da Andrea sullo screenshot dell'app di Mostro: «mi piace come
+  struttura la pagina, e la voglio cosi' — ma in stile Barattolo, non
+  copiata»). E' un cantiere di FORMA: il motore non si tocca, e le
+  funzioni che leggono i relay, prendono in carico e fanno lo scambio
+  restano identiche byte per byte.
+  LE DIFFERENZE VERE ERANO TRE e non dieci, ed è il conto che ha
+  ridotto il cantiere: la CARD al posto della riga, il CONTEGGIO, e la
+  REPUTAZIONE. Il resto della loro pagina o è colore, o è roba che non
+  ci serve — vedi «COSA NON SI È PRESO».
+  LA CARD È A BLOCCHI E NON A RIGHE, ed è la richiesta letterale di
+  Andrea a metà cantiere («con questa struttura»): prezzo grande e
+  scadenza ai due bordi della testa, la stima in sats sulla RIGA SUA,
+  i metodi in una scatola, chi c'è dall'altra parte in un'altra.
+  LA CIFRA PRIMA, LA PERSONA ULTIMA, ed è la sola cosa in cui NON si
+  segue il riferimento: in un libro si scorre per prezzo, e la
+  reputazione in cima — come fa Mostro — metterebbe uno sconosciuto
+  davanti al numero. C'è la prova sull'ordine.
+  LE DUE SCATOLE VESTONO `--chip-bg`, la carta di casa di ciò che sta
+  DENTRO una card: seguono il tema senza una tinta nuova da spiegare, e
+  a staccare la striscia non è più un filo (`border-top`) ma il
+  riquadro — un riquadro dice «questo è un blocco» meglio di una riga.
+  ⚠️ IL VESTITO DELLA STIMA È UN SELETTORE DISCENDENTE
+  (`.p2p-ord > .p2p-sats`), e non è pignoleria: `.p2p-sats` vive in
+  altre DUE case — `renderOrdineP2P` e `rigaScambioP2P` — e un
+  `display:block` sulla classe nuda le manderebbe a capo tutte. È il
+  patto di casa «stessa classe, stesso mestiere, vestito diverso in
+  casa diversa» (`.acq-art .qta-mini`, `.av-foto`), e a dire che tiene
+  è la MISURA prima e dopo: le altre due case identiche al pixel.
+  LA REPUTAZIONE NON SI COSTRUISCE, ARRIVA GIÀ: il tag `rating` sul
+  38383 lo scrive il NOSTRO coordinator (`order_to_tags` in
+  `src/util.rs`) e porta `total_reviews`, `total_rating`, `days` —
+  cioè esattamente i tre numeri della card di Mostro. `ordineDaEvento`
+  li scaricava e li buttava. **È l'unico numero della pagina che non
+  sia auto-dichiarato**, ed è la cosa più di casa che ci sia: le
+  stelle e il «(N)» sono la lingua che il mercatino parla da mesi.
+  TRE RIGHE DA NON AMMORBIDIRE, e nessuna delle tre fallisce da sola.
+  1) IL `JSON.parse` STA DENTRO UN `try`: è una stringa che passa da
+  relay di terzi, e un `rating` storto non deve far SPARIRE l'ordine
+  dal libro — torna `null` e la striscia non si scrive. 2) LA MEDIA SI
+  CLAMPA A 5: senza, un `total_rating: 999` dentro `repeat()` stampa
+  999 stelle e sfonda la pagina — è la famiglia del filtro-alfabeto, un
+  numero di un terzo che finisce dritto in una ripetizione. 3) A ZERO
+  VOTI NIENTE STELLE (decisione di Andrea): si dice «🆕 Senza voti» e
+  da quanto è lì — la regola che il mercatino ha già per i venditori,
+  dove «0 ★» a chi è appena arrivato fa solo danno.
+  `contaFeedback` SI CHIAMA CON UN ARGOMENTO SOLO, e non è una
+  dimenticanza: il tag porta i VOTI e non le persone distinte, quindi
+  la seconda cifra non nasce — dire «7 da 7 persone» sarebbe
+  un'affermazione inventata. Il censimento dei suoi chiamanti sale a
+  QUATTRO e ha fatto il suo mestiere: la riga è diventata rossa e ha
+  portato qui invece di far ricopiare la regola della soglia.
+  LA STRISCIA È DUE SPAN E NON UNA FRASE: nel riferimento il voto sta
+  a sinistra e l'età a destra, e a spingerli ai due bordi è il
+  `space-between` della scatola. Il separatore lo fa lo SPAZIO, non un
+  puntino — un « · » dentro un `space-between` si vedrebbe in mezzo al
+  vuoto.
+  IL CONTEGGIO nella forma di casa (`riga-conta` di `renderGrid`) dice
+  una cosa vera che prima non si sapeva — quante ce ne sono — e per
+  giunta che il libro è vivo; e dice il LATO di chi sta dall'ALTRA
+  parte, che la pillola accesa dice già il mio.
+  E LA RIGA DEGLI ESCLUSI toglie l'unica bugia silenziosa della
+  pagina: gli ordini a INTERVALLO (due importi, e la seconda
+  validazione non c'è) sparivano senza che nessuno lo sapesse. Si
+  contano PER LATO — «3 a intervallo» a chi ne ha davanti uno solo
+  sarebbe falso — e si deduplicano per `d` come gli ordini.
+  IL COMMUTATORE PASSA ALLE `consegna-pill` e lascia le `tema-pill`:
+  quelle accese sono ARANCIO PIENO, e dieci righe più giù c'è già il
+  `btn orange` del «Pubblica» — due pieni arancio nella stessa
+  schermata. `consegna-scelta` è `flex:1`, quindi le due metà si
+  spartiscono la riga, ed è lo STESSO gesto delle pillole del ruolo
+  negli Ordini: filtrare una lista per ruolo.
+  I DUE DIFETTI TROVATI LÌ, tutti e due MISURATI e non dedotti: la
+  testa era un flex SENZA `flex-wrap`, quindi col ripiego a cambio muto
+  («al prezzo di mercato», venti caratteri in mono) il prezzo si
+  stringeva e andava a capo — 2 card su 7 a 320px — e il ripiego si è
+  accorciato ad «al mercato»; e i metodi ALLARGAVANO LA PAGINA.
+  ⚠️ E `min-width:0` NON C'È PIÙ, ed è la riga che un riordino
+  rimetterebbe «per sicurezza»: serviva quando i metodi erano un figlio
+  FLEX, che senza non scende sotto il proprio contenuto (la lezione del
+  comune in card, pagata due volte). Da quando hanno una scatola loro
+  sono un BLOCCO, e un blocco è largo quanto il suo contenitore per
+  costruzione: `overflow:hidden` morde da solo. **La garanzia non si è
+  allentata, è diventata STRUTTURALE** — e chi li rimettesse in un flex
+  si ricompra il difetto, e allora quella riga torna obbligatoria.
+  IL PREZZO È DICHIARATO E MISURATO: la card è più ALTA della riga —
+  436px contro ~360 a 320 — perché i blocchi costano. Si paga
+  sapendolo: a 320 si vedono due offerte invece di tre, e in cambio
+  ognuna si legge senza rileggerla.
+  COSA NON SI È PRESO DAL RIFERIMENTO, e il perché vale più della
+  lista: il TONDO ＋ FLOTTANTE (in casa il ＋ è una cella di nav
+  rialzata, e i tondi veri vivono `absolute` sopra una foto — uno
+  libero qui coprirebbe l'ultima card); il FILTRO (con una valuta sola
+  e poche decine di offerte sarebbe un bottone che porta a un pannello
+  vuoto, e il conteggio dice già «quante ce ne sono»); le VOCI DI NAV
+  Libro / Miei scambi / Chat (la barra ha cinque celle e il P2P ne è
+  UNA); e l'ETÀ DELL'ORDINE, che loro mostrano perché non mostrano la
+  SCADENZA — le due dicono cose diverse, e per decidere serve la
+  seconda.
+  E LA DISCLOSURE NON SI TOCCA: le tre righe che dicono che i sats li
+  custodisce Mostro e che «Barattolo non li tiene e non li vede» non si
+  accorciano e non diventano verdi — il verde in casa vuol dire
+  deposito di garanzia NOSTRO, e qui i sats li tiene un terzo.
+  ⚠️ E UNA SENTINELLA GUARDAVA SE LA RIGA ESISTE INVECE DI COSA DICE,
+  per l'ennesima volta: chiedeva il solo selettore della stima e
+  restava VERDE con `display:inline` dentro — cioè col difetto che il
+  cantiere ha appena misurato a 320px. L'ha detto la tortura, non la
+  rilettura.
 
 ## Produzione
 
@@ -28829,6 +28937,50 @@ verso il punto dentro Telegram — che il venditore veda il nome DEL
 PUNTO da scrivere sull'etichetta, che il titolare trovi il pacco nella
 sua coda, e che il codice arrivi a chi compra solo DOPO la presa in
 carico.
+
+Il libro P2P diventa una vetrina (ago 2026, chiesto da Andrea sullo
+screenshot dell'app di Mostro: «mi piace come struttura la pagina, e la
+voglio così — ma in stile Barattolo, non copiata»). Cantiere di FORMA:
+il motore non si tocca. Le differenze vere erano TRE — la card al posto
+della riga, il conteggio, e la reputazione, che ci arriva già dal tag
+`rating` del NOSTRO coordinator e che scaricavamo e buttavamo via.
+LA CARD È A BLOCCHI e non a righe (la richiesta letterale di Andrea a
+metà cantiere, «con questa struttura»): prezzo e scadenza ai due bordi,
+la stima in sats sulla riga sua, i metodi in una scatola, chi c'è
+dall'altra parte in un'altra. La cifra prima, la persona ultima — ed è
+la sola cosa in cui NON si segue il riferimento. Più il conteggio nella
+forma di casa, la riga degli esclusi (gli ordini a intervallo sparivano
+in silenzio) e il commutatore che passa alle `consegna-pill`. Vedi
+Architettura, «IL LIBRO È UNA VETRINA, NON UNA PAGINA DI TESTO», per le
+tre righe da non ammorbidire della reputazione, per il selettore
+DISCENDENTE che tiene ferme le altre due case di `.p2p-sats`, e per
+`min-width:0` che non c'è più — la garanzia non si è allentata, è
+diventata strutturale.
+I DUE DIFETTI TROVATI LÌ erano preesistenti e MISURATI: la testa senza
+`flex-wrap` spezzava il prezzo su 2 card su 7 a 320px col ripiego a
+cambio muto, e i metodi allargavano la pagina.
+Provato: **+34 prove** sul ramo (7990 → 8024 in modalità severa; le 4
+rosse sono le preesistenti — il mojibake della console cp1252, e la CI è
+l'autorità sui totali) con quattro che hanno CAMBIATO LATO col perché
+scritto, e **25 MUTAZIONI, 25 uccise**, una per riga sorvegliata. La
+tortura ha trovato una sentinella che guardava se la riga ESISTE invece
+di cosa DICE: restava verde con la stima tornata in fila col prezzo,
+cioè col difetto appena misurato. Più il giro a schermo a 320/360/375
+nei due temi, prima e dopo, coi casi che contano — cambio muto, cinque
+metodi di pagamento, reputazione a zero voti, libro vuoto, e un
+`total_rating` fuori scala: testa su una riga sempre, zero scorrimento
+laterale, i puntini che mordono solo a 320, e le altre due case di
+`.p2p-testa` identiche al pixel.
+IL PREZZO È DICHIARATO: la card è più alta della riga (436px contro
+~360 a 320), quindi a 320 si vedono due offerte invece di tre. È il
+costo dei blocchi, e si paga sapendolo.
+IN PRODUZIONE non cambia niente: è solo client — nessuna colonna,
+nessuna migrazione, nessuna leva, nessuna rotta — e il P2P resta dietro
+`P2P_ATTIVO`. DA GUARDARE al primo giro vero: un libro con offerte VERE
+sul telefono, dove la reputazione arriva dal coordinator e non dal
+banco — e in particolare un'offerta senza il tag `rating`, che è il caso
+che il collaudo copre e che in produzione decide se la card si legge
+lo stesso.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
