@@ -16991,6 +16991,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   moderazione, qualunque incentivo in sats, e il **locker di riserva**
   (un secondo punto se il primo non va), che è nell'elenco delle cose
   da riprendere.
+  LA MAPPA HA LA SUA CONDIZIONE, e va scritta perché il cantiere si fa
+  quando quella si avvera e non prima (decisione di Andrea): **si fa
+  quando i punti saranno SPARSI**, e quel che deve comprare è che si
+  sappia **PRIMA di arrivare in cassa** se in zona ce n'è uno.
+  OGGI L'ELENCO IN CASSA BASTA, ed è il caso a un punto solo: chi
+  sceglie la rete di casa vede le pillole dei punti vivi — nome, via e
+  comune — sceglie con un tocco, e sotto legge gli orari; a zero punti
+  accesi non si finge un campo libero e si dice «scegli un'altra via»,
+  che è la cosa giusta perché il server rifiuterebbe comunque (il suo
+  giudice valida contro i punti VIVI).
+  IL LIMITE VERO NON È LA MAPPA, È IL MOMENTO: i punti si vedono solo
+  DOPO aver scelto l'articolo, quindi chi sfoglia non sa se in zona ce
+  n'è uno — con Milano solo non si nota, con dieci sparsi diventa la
+  ragione per cui la via non si sceglie. La geografia per farlo è già
+  in casa e non costa un cantiere suo (`carica_comuni`, `distanza_km`,
+  `RAGGI_AMMESSI`): quel che manca è dove METTERE la risposta prima
+  della cassa, e quella è una decisione di prodotto.
+  NIENTE ORDINE PER VICINANZA finché i punti sono pochi, per la stessa
+  ragione per cui non c'è la mappa: ordinare un elenco di uno non vuol
+  dire niente, e chiedere la posizione per farlo sarebbe un dato in più
+  raccolto per un servizio che non si rende.
   IL PUNTO SI CONCORDA (ago 2026, caso vero: il venditore spedisce con
   InPost e chi compra indica un punto Poste, o un locker che non
   esiste). Il punto è testo LIBERO che nessuno verifica — `segna_
