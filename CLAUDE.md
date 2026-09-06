@@ -17012,6 +17012,60 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ragione per cui non c'è la mappa: ordinare un elenco di uno non vuol
   dire niente, e chiedere la posizione per farlo sarebbe un dato in più
   raccolto per un servizio che non si rende.
+  IL MODULO DI CANDIDATURA NON SI FA, E LA SOGLIA È SCRITTA (ago 2026,
+  quadro chiesto da Andrea PRIMA di costruire): chi vuole offrire il suo
+  locale scrive sul canale del rodaggio e lo aggiungiamo a mano, e la
+  domanda era se sostituire quel giro con una pagina e un form.
+  LA SOGLIA NON SI CONTA IN MINUTI RISPARMIATI: **il modulo conviene
+  quando le candidature che arrivano superano i punti che riusciamo ad
+  ACCENDERE** — è lì che nasce il lavoro vero (leggere, scegliere, dire
+  di no, non perderne nessuna), e uno smistatore senza coda da smistare
+  è solo codice da mantenere. Con un punto per deploy quella soglia sta
+  intorno alle 10 candidature aperte insieme, o 3-4 al mese in modo
+  continuativo.
+  E IL NUMERO DA SOLO NON DECIDE, ed è la parte da tenere: ad ago 2026 il
+  rapporto era **candidature 5+, punti accesi ZERO**. Per la formula la
+  soglia è superata di slancio, ma letto bene quel rapporto dice un'altra
+  cosa — **il collo di bottiglia è a VALLE**: non stiamo perdendo
+  candidature, non le stiamo evadendo. Un modulo le farebbe arrivare
+  ordinate e resterebbero ferme uguale. Tocca UN passo su cinque (chiedere
+  i campi nel formato giusto) e non quello caro, che è commit + deploy.
+  IL COSTO È MISURATO sul calco esatto: il banner del negozio è lo stesso
+  mestiere riga per riga — un utente chiede dal Profilo, va in revisione,
+  un moderatore decide — ed è costato ~2000 righe; una candidatura ne
+  vuole ~900-1100 col rapporto prove/produzione di casa, 2-3 a 1.
+  IL CATALOGO NEL CODICE È LA REVISIONE UMANA PER COSTRUZIONE, ed è la
+  riga che un riordino toglierebbe per prima credendola una comodità:
+  `PUNTI_BARATTOLO` vive committato, quindi **nessuno può finire
+  nell'elenco pubblico senza che una persona scriva una riga e faccia un
+  deploy**. La decisione «su invito, uno alla volta» ne dice metà; questa
+  è l'altra. Il giorno che il catalogo passasse nel database quella
+  garanzia va RICOSTRUITA a mano, ed è il costo vero di quella strada —
+  non le 300 righe. L'accoppiamento invece è misurato e contenuto: otto
+  punti nel server, nove nelle prove.
+  LE TRE STRADE, coi costi e col segnale che le distingue. **A)** il
+  MODULO (~1000 righe): le candidature arrivano ordinate e non si
+  perdono, e restano ferme lo stesso. **B)** il CATALOGO NEL DATABASE
+  (~300-400 più ~700 di prove ingiallite): accendere costa un tocco
+  invece di un deploy, ma va ricostruita la revisione umana. **C)** tutte
+  e due. IL SEGNALE non è una data ma **cosa si rompe per primo dopo che
+  i punti sono accesi**: se il fastidio diventa il DEPLOY → B; se diventa
+  la LETTURA (una sfuggita nello scroll, una settimana per rispondere) →
+  A; se non si rompe niente, il messaggio-modello del canale basta.
+  E LA FORMA È GIÀ DECISA, se un domani si farà, così non si ridiscute:
+  un CASSETTO DEL PROFILO e mai una pagina pubblica — dalla sessione il
+  codice negozio arriva gratis e il recapito c'è già, quindi non si apre
+  nessuna colonna personale nuova, mentre da pagina pubblica servirebbe
+  un'email, cioè un dato personale in più con la sua scopa e la sua voce
+  in «I tuoi dati». Tabella nuova + coda SENZA tastiera, il calco delle
+  categorie: qui non c'è niente da decidere col telefono in mano.
+  ⚠️ E L'INDIRIZZO DI UN PUNTO FINISCE NELLA STORIA DEI COMMIT, che non
+  è scritto né qui né in «I tuoi dati»: per un ristorante va bene, ma per
+  un artigiano, una ditta individuale o un B&B **l'indirizzo
+  dell'attività è l'indirizzo di casa** — e su GitHub, nella storia, non
+  si cancella. Va detto al candidato PRIMA, e il messaggio-modello fissato
+  sul canale lo dice; è anche l'argomento più forte a favore della strada
+  B, dove un punto che si ritira sparisce davvero.
   IL PUNTO SI CONCORDA (ago 2026, caso vero: il venditore spedisce con
   InPost e chi compra indica un punto Poste, o un locker che non
   esiste). Il punto è testo LIBERO che nessuno verifica — `segna_
