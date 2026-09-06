@@ -585,6 +585,19 @@ RELAY_NOSTR_IMPORT = [
     "wss://21milionidinostr.duckdns.org",   # il relay di un nostro venditore
 ]
 
+# --- Il relay di Barattolo (chi ci puo' scrivere) --------------------
+# Il segreto con cui il NOSTRO relay ci chiede, ogni dieci minuti, la
+# lista delle chiavi ammesse a scrivere: la piattaforma e i venditori
+# che hanno DIMOSTRATO il possesso della loro (npub_accesso, o il
+# badge npub ma verificato). E' un blocco a parte da RELAY_NOSTR
+# apposta: quelli sono i relay ALTRUI dove pubblichiamo, questa e' la
+# porta da cui il relay nostro viene a chiedere chi far entrare.
+#
+# Vuoto o segnaposto = la rotta /api/relay/chiavi NON ESISTE (404).
+# Il relay non ne muore: tiene la lista che ha gia' scaricato, e
+# senza averne mai scaricata una accetta la sola piattaforma.
+RELAY_CHIAVI_TOKEN = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------
 NPUB_VENDITORE = "INCOLLA_QUI_LA_NPUB_DEL_VENDITORE"  # npub1… oppure hex
 VENDITORE_ID = 222   # a chi intestare gli annunci importati:

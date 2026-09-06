@@ -162,6 +162,17 @@ try:
 except ImportError:
     TELEGRAM_WEBHOOK_SEGRETO = ""
 
+# Il segreto con cui il RELAY di Barattolo ci chiede la lista di chi
+# ci puo' scrivere. Segnaposto o vuoto = la rotta non esiste (404):
+# una whitelist e' l'elenco di chi commercia qui, e "aggregare e'
+# diverso da esporre" — la stessa distinzione di _pare_recapito sulla
+# sitemap. Il relay non ne ha bisogno per vivere: senza, tiene la
+# lista che ha gia' scaricato.
+try:
+    from config import RELAY_CHIAVI_TOKEN
+except ImportError:
+    RELAY_CHIAVI_TOKEN = ""
+
 # La leva del tetto per annuncio: nata col cantiere doppia valuta ma
 # SPENTA di serie (0 = nessun limite). Si accende dal config in un
 # minuto, se un giorno servisse. Per gli annunci in EUR varrebbe
@@ -7524,6 +7535,15 @@ def webhook_attivo() -> bool:
                 and not TELEGRAM_WEBHOOK_SEGRETO.startswith("INCOLLA"))
 
 
+def relay_chiavi_attivo() -> bool:
+    """Gemello di webhook_attivo: la rotta della whitelist esiste solo
+    se il segreto c'e' davvero. Il segnaposto non conta — senza
+    questa riga un config appena copiato aprirebbe la lista a chiunque
+    indovini la parola scritta nel file d'esempio."""
+    return bool(RELAY_CHIAVI_TOKEN
+                and not RELAY_CHIAVI_TOKEN.startswith("INCOLLA"))
+
+
 _finto_msg_id = 0   # contatore dei message_id simulati in collaudo
 
 
@@ -12577,6 +12597,64 @@ def salute():
     return {"ok": True}
 
 
+@app.get("/api/relay/chiavi")
+def relay_chiavi(request: Request):
+    """Chi puo' scrivere sul relay di Barattolo: una chiave hex per
+    riga, in chiaro. La chiede il relay ogni dieci minuti e la scrive
+    nel file che il suo plugin rilegge.
+
+    LA REGOLA E' QUELLA DI SEMPRE e non se ne inventa una seconda:
+    SQL_CHIAVE_PROVATA, cioe' il gemello SQL di chiave_nostr_provata
+    — npub_accesso, o il badge npub ma solo VERIFICATO. Mai una npub
+    nuda, che e' una dichiarazione e non una prova: qui vorrebbe dire
+    dare il diritto di scrivere sul nostro relay a chiunque si
+    intesti la chiave di un altro.
+
+    LA CHIAVE DELLA PIATTAFORMA VA IN TESTA, e non e' un di piu': il
+    plugin ce l'ha anche cablata, ma quella e' una COPIA scritta a
+    mano il giorno del montaggio, mentre questa e' la chiave con cui
+    il server sta firmando ADESSO. Il giorno che la nsec cambia, la
+    lista resta giusta da se'.
+
+    IL TOKEN E' UNA PORTA E NON UN'AUTENTICAZIONE: 404 quando la leva
+    e' spenta — come il campanello del webhook, e per la stessa
+    ragione: una rotta che non deve esistere non dice nemmeno di
+    esistere — e 403 col segreto sbagliato, confrontato con
+    compare_digest. Non e' un segreto grosso (aggregare non e'
+    esporre: sono chiavi pubbliche, e chiunque puo' leggerle una per
+    una dalla vetrina), ma l'ELENCO e' un'altra cosa dalle voci: dice
+    in un colpo solo chi commercia qui.
+
+    no-store perche' e' una whitelist e non un contenuto: una copia
+    in un proxy resterebbe indietro proprio sul venditore appena
+    arrivato, che e' l'unico caso in cui questa rotta serve."""
+    if not relay_chiavi_attivo():
+        raise HTTPException(404, "Non trovato")
+    atteso = "Bearer " + RELAY_CHIAVI_TOKEN
+    if not hmac.compare_digest(request.headers.get("authorization", ""),
+                               atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+    con = db()
+    righe_db = con.execute(
+        "SELECT COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
+        f"FROM utenti WHERE {SQL_CHIAVE_PROVATA}").fetchall()
+    con.close()
+    # La nostra per prima, poi le loro. dict.fromkeys tiene l'ordine e
+    # toglie i doppioni: la stessa chiave puo' stare in due righe
+    # (npub_accesso di una e badge dell'altra), e al relay una lista
+    # con dei doppioni non fa danno ma non dice la verita' su quanti
+    # sono.
+    chiavi = [_NOSTR[1].lower()] if _NOSTR else []
+    for r in righe_db:
+        try:
+            chiavi.append(npub_to_hex(r["chiave"]).lower())
+        except Exception:
+            continue        # una npub storta in colonna non ferma le altre
+    corpo = "".join(k + "\n" for k in dict.fromkeys(chiavi))
+    return Response(corpo, media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/banner-test")
 def banner_test():
     """Il cartello «Barattolo e' in fase di test» che la Mini App mostra
@@ -15893,6 +15971,12 @@ def _leve_stato():
                   spento="il bot manda e basta: niente /start, niente "
                          "tastiere ✅/❌ sulla revisione, niente fusione "
                          "Nostr→Telegram"),
+            _leva("Whitelist del relay", "RELAY_CHIAVI_TOKEN",
+                  relay_chiavi_attivo(),
+                  spento="il relay di Barattolo non può più aggiornare "
+                         "la lista di chi ci scrive: resta ferma "
+                         "all'ultima scaricata, e un venditore nuovo "
+                         "non ci pubblica"),
             _leva("Moderatori", "ADMIN_IDS", len(ADMIN_IDS),
                   allarme=not ADMIN_IDS,
                   spento="nessuno riceve gli avvisi e nessuno può "
@@ -30850,6 +30934,19 @@ def chiave_nostr_provata(u) -> str:
     return ""
 
 
+# Il gemello SQL di chiave_nostr_provata: la stessa regola detta in una
+# WHERE, per quando le chiavi si vogliono TUTTE invece che una alla
+# volta. Vive qui accanto al suo giudice apposta — due letture della
+# stessa regola un giorno dicono due cose diverse su CHI e' padrone di
+# una chiave, ed e' il pattern di SQL_ORIGINE_ESTERNA e di
+# sql_xp_commercio(). I chiamanti sono DUE e hanno mestieri diversi:
+# l'import (chi andare a leggere sui relay) e la whitelist del relay
+# nostro (chi ci puo' scrivere). Tenere due WHERE sarebbe il posto in
+# cui un tetto messo per l'uno mutila l'altra in silenzio.
+SQL_CHIAVE_PROVATA = ("npub_accesso != '' "
+                      "OR (npub != '' AND npub_verificata=1)")
+
+
 def accoda_firma(con, annuncio_id: int, tg_id: int, azione: str):
     """Mette (o sostituisce) l'azione in sospeso su quell'annuncio.
     L'ultima vince: venduto e poi rimborsato fa 'active', e all'utente
@@ -37236,7 +37333,7 @@ def venditori_nostr_attivi() -> list:
     righe = con.execute(
         "SELECT tg_id, COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
         "FROM utenti "
-        "WHERE npub_accesso != '' OR (npub != '' AND npub_verificata=1)"
+        f"WHERE {SQL_CHIAVE_PROVATA}"
     ).fetchall()
     con.close()
     # La nostra chiave non si importa MAI, nemmeno se in utenti esiste

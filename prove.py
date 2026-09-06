@@ -18531,6 +18531,7 @@ _SEGRETI_FINTI = {
     "TELEGRAM_WEBHOOK_SEGRETO": "SEGRETO-webhook",
     "TELEGRAM_CANALE_ID": "SEGRETO-canale",
     "CHIAVE_CONTENUTI_DIGITALI": "SEGRETO-contenuti",
+    "RELAY_CHIAVI_TOKEN": "SEGRETO-token-del-relay",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -18649,6 +18650,7 @@ def _censimento(acceso):
         amb["TELEGRAM_WEBHOOK_SEGRETO"] = ""
         amb["TELEGRAM_CANALE_ID"] = ""
         amb["CHIAVE_CONTENUTI_DIGITALI"] = ""
+        amb["RELAY_CHIAVI_TOKEN"] = ""
         amb["ADMIN_IDS"] = []
     # ⚠️ `_prezzo_banner` va exec'ato PRIMA di `_leve_stato`, che lo
     # chiama: senza, `__missing__` lo risolve a 7 e la prova non
@@ -18659,7 +18661,7 @@ def _censimento(acceso):
     # `_p2p_leve` per la stessa ragione di `_prezzo_banner`: il
     # pannello lo CHIAMA, e da `__missing__` uscirebbe un 7 che non
     # si chiama — la prova esploderebbe invece di diventare rossa.
-    for f in ("webhook_attivo", "_leva", "_elenco",
+    for f in ("webhook_attivo", "relay_chiavi_attivo", "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_leve_stato"):
         exec(pezzo(f), amb)
     gruppi = amb["_leve_stato"]()
@@ -45303,6 +45305,179 @@ def prove_punti_pubblici():
     prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
           False, bool(_crit["punto_ritiro"](_tutto)))
 
+def prove_relay_chiavi():
+    """La whitelist che il relay di Barattolo viene a chiedere.
+
+    LA REGOLA E' UNA E VIVE IN UN POSTO SOLO — `SQL_CHIAVE_PROVATA`,
+    la forma SQL di `chiave_nostr_provata`, scritta accanto al suo
+    giudice. Due letture della stessa riga un giorno direbbero due
+    cose diverse su CHI POSSIEDE UNA CHIAVE, e qui quella differenza
+    non e' un dettaglio: e' chi puo' scrivere sul nostro relay.
+
+    Le sentinelle dicono che i pezzi ci sono; a dire che la rotta
+    RISPONDE giusto e' il banco in fondo, che la fa girare VERA su un
+    database di cartone, col giro chiuso della bech32 — cosi' le
+    chiavi che escono sono esattamente quelle che entrano, e non una
+    stringa che si somiglia."""
+    print("\n--- La whitelist del relay ---")
+
+    import sqlite3, hmac
+
+    # ================================================================
+    # LA FORMA
+    # ================================================================
+    prova("la regola SQL vive in un posto solo",
+          1, _SORGENTE.count("SQL_CHIAVE_PROVATA = ("))
+
+    vend = _senza_prosa(codice(pezzo("venditori_nostr_attivi")))
+    prova("l'import legge la regola dal giudice e non a mano",
+          True, "SQL_CHIAVE_PROVATA" in vend
+                and "npub_verificata" not in vend)
+
+    rotta = _senza_prosa(codice(pezzo("relay_chiavi")))
+    prova("la rotta legge la STESSA regola",
+          True, "SQL_CHIAVE_PROVATA" in rotta
+                and "npub_verificata" not in rotta)
+
+    # Il 404 PRIMA del confronto del segreto: al contrario, una
+    # richiesta senza token su una leva spenta si prenderebbe un 403 —
+    # cioe' la rotta annuncerebbe di esistere proprio nel momento in
+    # cui deve non esistere.
+    # find() e non index(): togliendo una delle due righe la prova
+    # deve diventare ROSSA, non ESPLODERE portandosi dietro le
+    # sorelle che vengono dopo. E il -1 non passa: lo dice lo zero.
+    i404, iseg = rotta.find("404"), rotta.find("compare_digest")
+    prova("la leva si guarda PRIMA del segreto",
+          True, 0 <= i404 < iseg)
+    prova("il segreto si confronta a tempo costante",
+          True, "hmac.compare_digest" in rotta)
+
+    # La chiave della piattaforma si legge VIVA: la copia scritta a
+    # mano nel plugin del relay e' una fotografia, questa e' la chiave
+    # con cui il server firma ADESSO.
+    prova("la piattaforma si legge da _NOSTR e non da una copia",
+          True, "_NOSTR" in rotta)
+    prova("la lista non si cacha da nessuna parte",
+          True, "no-store" in rotta)
+
+    giu = _senza_prosa(codice(pezzo("relay_chiavi_attivo")))
+    prova("il segnaposto non accende la rotta",
+          True, "INCOLLA" in giu)
+
+    # ================================================================
+    # IL BANCO: la rotta VERA su un database di cartone
+    # ================================================================
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    class _Resp:
+        def __init__(self, corpo, media_type="", headers=None):
+            self.corpo = corpo
+            self.media_type = media_type
+            self.headers = headers or {}
+
+    class _Req:
+        def __init__(self, h):
+            self.headers = h
+
+    def _costante(nome, fine="\n"):
+        i = _SORGENTE.index("\n" + nome + " = ") + 1
+        return _SORGENTE[i:_SORGENTE.index(fine, i)]
+
+    # Le cinque chiavi del banco. La PIATTAFORMA in MAIUSCOLO apposta:
+    # deve uscire minuscola come tutte le altre, o il plugin del relay
+    # confronterebbe due stringhe che sono la stessa chiave.
+    P = "ee" * 32
+    A = "aa" * 32          # npub_accesso
+    B = "bb" * 32          # badge VERIFICATO
+    C = "cc" * 32          # badge NON verificato: resta fuori
+    D = "dd" * 32          # la stessa chiave in due righe diverse
+
+    amb0 = {}
+    exec(_costante("CHARSET_BECH32"), amb0)
+    exec(pezzo("_bech32_polymod"), amb0)
+    exec(pezzo("hex_to_npub"), amb0)
+    npub = amb0["hex_to_npub"]
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE utenti(
+        tg_id INTEGER PRIMARY KEY, npub TEXT DEFAULT '',
+        npub_verificata INT DEFAULT 0, npub_accesso TEXT DEFAULT '');
+    """)
+    vero.executemany(
+        "INSERT INTO utenti(tg_id,npub,npub_verificata,npub_accesso) "
+        "VALUES(?,?,?,?)", [
+            (1, "", 0, npub(A)),          # entra: chiave d'accesso
+            (2, npub(B), 1, ""),          # entra: badge verificato
+            (3, npub(C), 0, ""),          # FUORI: badge non verificato
+            (4, "", 0, npub(D)),          # il doppione, prima meta'
+            (5, npub(D), 1, ""),          # il doppione, seconda meta'
+            (6, "", 0, "npub1storta"),    # illeggibile: si salta e basta
+        ])
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def close(self):
+            pass
+
+    def chiama(token, header, nostr=("finta", P.upper())):
+        amb = {"HTTPException": _H, "Response": _Resp, "Request": object,
+               "hmac": hmac, "db": lambda: Con(), "_NOSTR": nostr,
+               "RELAY_CHIAVI_TOKEN": token}
+        exec(_costante("CHARSET_BECH32"), amb)
+        exec(_costante("SQL_CHIAVE_PROVATA", "\n\n"), amb)
+        exec(pezzo("npub_to_hex"), amb)
+        exec(pezzo("relay_chiavi_attivo"), amb)
+        exec(pezzo("relay_chiavi"), amb)
+        try:
+            return amb["relay_chiavi"](_Req({"authorization": header}))
+        except _H as e:
+            return e
+
+    # --- la leva spenta: la rotta NON ESISTE ------------------------
+    for token, come in (("", "vuoto"),
+                        ("INCOLLA_QUI_UN_SEGRETO_CASUALE", "segnaposto")):
+        r = chiama(token, "Bearer qualunque")
+        prova(f"a token {come} la rotta non esiste (404)",
+              404, getattr(r, "code", None))
+
+    # --- il segreto sbagliato --------------------------------------
+    for header, come in (("", "senza header"),
+                         ("Bearer altro", "segreto sbagliato"),
+                         ("segreto-vero", "senza Bearer")):
+        r = chiama("segreto-vero", header)
+        prova(f"{come}: 403", 403, getattr(r, "code", None))
+
+    # --- la lista vera ---------------------------------------------
+    r = chiama("segreto-vero", "Bearer segreto-vero")
+    righe = r.corpo.split("\n")
+    prova("il corpo finisce con l'a-capo", "", righe[-1])
+    chiavi = righe[:-1]
+
+    prova("la piattaforma esce per prima e minuscola", P, chiavi[0])
+    prova("la lista e' quella attesa, senza doppioni",
+          [P, A, B, D], chiavi)
+    prova("il badge NON verificato resta fuori", False, C in chiavi)
+    prova("la npub illeggibile non ferma le altre", 4, len(chiavi))
+    prova("una chiave per riga, niente spazi",
+          True, all(len(k) == 64 and k == k.strip() for k in chiavi))
+    prova("il testo non si cacha", "no-store",
+          r.headers.get("Cache-Control"))
+
+    # --- senza nsec la lista c'e' lo stesso ------------------------
+    # Il relay non e' un pezzo della firma: se la chiave della
+    # piattaforma non e' configurata, i venditori ci scrivono uguale.
+    r = chiama("segreto-vero", "Bearer segreto-vero", nostr=None)
+    prova("senza nsec restano i soli venditori",
+          [A, B, D], r.corpo.split("\n")[:-1])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -45387,6 +45562,7 @@ def main():
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,
               prove_bundle_nostr,
+              prove_relay_chiavi,
               prove_p2p_server,
         prove_p2p_libro,
     prove_p2p_chiavi,
