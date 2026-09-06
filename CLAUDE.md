@@ -22812,7 +22812,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nasce da noi (`nuovo:N`) è roba NOSTRA, e di là `id` è un
   `Option<Uuid>` — una stringa che UUID non è non fa cadere il campo, fa
   cadere l'INTERO messaggio, che il coordinatore scarta con un «Error
-  serializing message». Fail-closed: nel dubbio si omette, e chi aveva
+  serializing message».
+  ⚠️ E UN UUID MAIUSCOLO PASSEREBBE IL GATE E FAREBBE CADERE LA FIRMA,
+  latente e dichiarato: `idMostroVero` valida la FORMA e ritorna la
+  stringa com'è, mentre Rust ri-serializza un `Uuid` sempre in
+  minuscolo — quindi un id arrivato in maiuscolo (nessuno lo scrive
+  così oggi, ma il tag `d` non è roba nostra) darebbe due stringhe
+  diverse e la solita firma che non torna, in silenzio. La cura è una
+  minuscola in quel giudice, il giorno che si tocca.
+  Fail-closed: nel dubbio si omette, e chi aveva
   bisogno dell'id lo sente da una porta che si chiude A VOCE
   (`chiamataOrdineP2P` alza invece di spedire un messaggio che verrebbe
   scartato in silenzio).
@@ -22833,6 +22841,82 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la prova nasceva rossa per colpa di una spiegazione. Si conta sul
   codice, coi commenti tolti.
 
+- UN BUNDLE VECCHIO NON FALLISCE DOVE LO CARICHI (set 2026, dal campo:
+  col client NUOVO confermato in pagina, «pubblica» non faceva NIENTE —
+  nessun ordine a schermo, nessuna riga nel journal del nodo, e in
+  console un solo avviso di Telegram che non c'entrava).
+  LA DIAGNOSI L'HA DATA UNA DOMANDA AL DATABASE DEL CLIENT e non la
+  lettura del codice: `Object.values(ordiniP2P()).map(o => [o.id,
+  o.stato, o.errore])` ha risposto `[["","senza_risposta","NT.hmac is
+  not a function"]]` — cioè l'errore VERO era stato scritto, con la sua
+  causa dentro, in una riga che nessuna vista poteva mostrare.
+  LA CAUSA È UN'ASIMMETRIA DEL SERVICE WORKER, ed è la riga che vale
+  oltre questo cantiere: `miniapp.html` è una NAVIGAZIONE e `sw.js` la
+  serve network-first — sempre fresca — mentre `/vendor/nostr.js` sta
+  in `IN_DISPENSA` e va CACHE-FIRST (`caches.match(url.pathname) ||
+  fetch(r)`): alla rete non si chiede MAI. Quindi un client NUOVO può
+  girare con un bundle VECCHIO, che è la classe di guasto peggiore —
+  due metà che non si parlano, ognuna giusta per conto suo.
+  LA DISPENSA SI RIFÀ QUANDO IL SERVICE WORKER NUOVO SI ATTIVA, e lui
+  ASPETTA (niente `skipWaiting`: scelta dichiarata, e giusta) — nel
+  frattempo il vecchio continua a servire la sua. E il `?v=` che
+  `caricaNostrTools` appende NON lo scavalca, perché `sw.js` guarda
+  `url.pathname`: la query non la vede nemmeno.
+  ⚠️ LA REGOLA DELLA VERSIONE ERA STATA RISPETTATA, e va detto o si
+  cerca il colpevole dove non è: il commit che ha aggiunto gli export
+  al bundle ha alzato anche `VERSIONE` (v5→v6, e poi v6→v7). Il difetto
+  non è una dimenticanza — è che l'ATTESA del service worker nuovo può
+  durare giorni, e in quei giorni le due metà divergono. Chi cambia un
+  file in dispensa alzi la versione E sappia che il salto non è
+  immediato per chi ha già l'app aperta.
+  E DENTRO TELEGRAM NON SUCCEDEVA, ed è quel che ha reso il caso
+  confondente: là il service worker non si registra affatto (la guardia
+  `!tg?.initData`), quindi non c'è nessuna dispensa e tutto arriva
+  dalla rete. Dall'app il messaggio PARTIVA e si fermava sull'attesa
+  del coordinatore, dal browser non partiva proprio: due comportamenti
+  diversi per una causa sola.
+  LA PRIMA CURA È UNA GUARDIA AL CARICAMENTO (`esigiBundleNostr`): se
+  uno dei pezzi che il client chiama non c'è, si alza SUBITO con un
+  messaggio che dice la STRADA — «ricarica l'app; se non basta, svuota
+  la cache» — invece di fallire mille righe dopo dentro una derivazione
+  di chiavi, con un errore che la causa non la nomina.
+  STA IN TUTTI E DUE I RAMI, ed è la riga che si dimentica: senza
+  quella del ramo corto (`if (window.NostrTools)`) un primo caricamento
+  andato male resterebbe muto per tutte le volte dopo. E un bundle
+  incompleto non resta in cache come promessa — `nostrToolsPromessa` si
+  azzera come nel ramo dell'errore di rete, così chi svuota la cache e
+  riprova non deve ricaricare la pagina. Fail-closed: sbagliare qui
+  costa un ricaricamento, sbagliare nell'altro verso costa una firma
+  che non torna e un coordinatore che tace.
+  L'ELENCO È UN CENSIMENTO E NON UNA LISTA A MEMORIA: `prove.py` rifà
+  il grep dei `NT.<nome>` sul client e pretende che ognuno stia in
+  `PEZZI_NOSTR` — il pezzo che qualcuno chiamerà fra sei mesi entra nel
+  conto da solo — e il ROVESCIO tiene l'elenco onesto, che un pezzo
+  preteso e mai chiamato è una guardia che nessuno esercita. Accanto,
+  un banco node che carica il bundle COMMITTATO e chiede ogni pezzo
+  dichiarato: una sentinella direbbe che l'elenco c'è, mai che il file
+  lo soddisfi.
+  LA SECONDA CURA È IL CATCH CHE PARLA, e chiude la metà del difetto
+  che non era il bundle: `renderOrdineP2P` ridisegna l'ordine APERTO,
+  quindi un guasto PRIMA di `apriOrdineP2P` lasciava schermo e console
+  muti — il gesto sembrava non fare niente. Ora una bandierina dice se
+  l'ordine è COMPARSO A SCHERMO, e se non è comparso il motivo vero
+  esce in un toast. La bandierina e non un controllo sullo stato:
+  «l'ordine esiste» e «l'ordine si vede» sono due cose diverse, e qui
+  serve la seconda.
+  E UN ORDINE SENZA NOME NON SI SCRIVE PIÙ: la riga con l'id vuoto che
+  la domanda al database ha tirato fuori è precisamente quella —
+  spazzatura che nessuna vista può mostrare, perché `chiaveScambio`
+  gira PRIMA che l'ordine prenda il suo nome provvisorio. Scriverla
+  costa una riga fantasma nel mazzo; non scriverla non costa niente,
+  perché a raccontare il guasto c'è il toast.
+  ⚠️ E IL MESSAGGIO DELLA GUARDIA HA UN PUNTO E VIRGOLA DENTRO, che
+  sembra un dettaglio e ha reso VACUA la prima stesura della prova: il
+  taglio si fermava al primo `;` — quello di «Ricarica l'app**;** se
+  non basta» — e la sentinella non vedeva mai la metà che dice «svuota
+  la cache», cioè la strada vera. Si taglia sul `;` a FINE RIGA. È la
+  trappola della prosa, su un asse nuovo.
+
 ## Produzione
 
 - VPS Hetzner Helsinki `46.62.162.103`, Ubuntu 26.04, servizio systemd
@@ -22846,6 +22930,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   moderatori arriva una notifica sola coi gruppi. Non cambia niente in
   vetrina finché un moderatore non approva. Per spegnerla, `False` nel
   config del VPS e riavvio.
+- Le tre leve del P2P (`P2P_ATTIVO`, `MOSTRO_NPUB`, `MOSTRO_RELAY`) si
+  AGGIUNGONO al config del VPS, non si «verificano» (set 2026, dal
+  campo: la ricetta d'accensione diceva di controllare che npub e relay
+  fossero quelli veri, e **non c'erano affatto**). Il config del VPS è
+  un file suo e non eredita niente da `config_esempio.py`: una leva
+  nuova lì dentro non compare mai da sola, e senza quelle due il server
+  parte lo stesso e stampa la riga «P2P_ATTIVO ma MOSTRO_NPUB o
+  MOSTRO_RELAY storti o assenti» — che è il primo posto da guardare se
+  il P2P sembra acceso e non parla con nessuno. Vale per ogni leva
+  aggiunta da un cantiere: il file d'esempio dice quale sia il valore
+  giusto, non che quella riga esista di là.
 - L'import aperto da Nostr si accende SOLO scrivendo
   `IMPORT_NOSTR_APERTO = True` nel config del VPS e riavviando: nel
   codice il default è False apposta (vedi Architettura). Prima di
@@ -22981,6 +23076,18 @@ il compose, riga 48** — a mano sparirebbe al primo `up -d` e il buco si
 riaprirebbe in silenzio — provata con `--force-recreate`. Nessuno dei
 due era un errore di configurazione nostro: il primo era nel codice, il
 secondo era il residuo che le tre regole di redirect non coprivano.
+
+**LA 0.18.7 (4 set 2026) NON C'ENTRA COL NOSTRO GIRO**, e va scritto
+perche' la domanda torna: il changelog e' pagamenti, timelock, dev-fee,
+annullamenti e contatori di drain — **niente sulla verifica della
+firma, niente sul trasporto, e mostro-core resta 0.14.6**, cioe' la
+ricetta che il nostro client ricalca non si e' mossa. L'aggiornamento
+resta una cosa a parte e non un pezzo di diagnosi.
+⚠️ UNA SOLA VOCE MERITA UNO SGUARDO IL GIORNO CHE SI SALE: `c6efb2d`
+(#952) rinomina il campo con cui l'evento `info` annuncia la finestra
+della hold invoice (`invoice_expiration_window`). Il client lo legge
+(`mostroInfoP2P`), quindi si guarda quel nome PRIMA di aggiornare, o la
+finestra torna a essere quella di riserva senza che niente fallisca.
 
 **LA RONDA DICE CINQUE COSE E LA QUINTA VALIDA LE ALTRE:** finestra
 blocchi/disco/ram, canale e HTLC, backup (allarme oltre 48h o sotto
@@ -28297,3 +28404,43 @@ DA GUARDARE alla tappa 8, ed è il pezzo che da qui non si può fare: il
 primo new-order vero verso il coordinator — nel journal del nodo non
 deve comparire nessun «trade signature does not verify», e l'ordine deve
 uscire come 38383 col suo `d`.
+
+E POI IL COORDINATORE HA RISPOSTO, ma la firma non era l'ultimo strato
+(set 2026, il giorno dopo): col client nuovo confermato in pagina il
+tocco su «pubblica» non faceva NIENTE — nessun ordine, nessuna riga nel
+journal del nodo, console muta. La causa era un BUNDLE VECCHIO servito
+dal service worker: `/vendor/nostr.js` sta in dispensa e va
+cache-first, `miniapp.html` è una navigazione e va sempre in rete —
+quindi le due metà erano di due giorni diversi, e `NT.hmac` non
+esisteva. Vedi Architettura, «UN BUNDLE VECCHIO NON FALLISCE DOVE LO
+CARICHI», per l'asimmetria per esteso, per il fatto che dentro Telegram
+il difetto non si presentava affatto (là il service worker non si
+registra) e per le due cure — la guardia che alza al caricamento
+dicendo la strada, e il catch che parla quando l'ordine non è mai
+comparso a schermo.
+⚠️ E LA DIAGNOSI L'HA DATA UNA DOMANDA AL DATABASE DEL CLIENT, non la
+lettura del codice: l'errore vero era già scritto, con la sua causa
+dentro, in una riga che nessuna vista poteva mostrare — id vuoto,
+perché `chiaveScambio` gira prima che l'ordine prenda il suo nome. È la
+lezione del giro, e vale oltre il P2P: quando un gesto «non fa niente»,
+la prima cosa da chiedere è se qualcuno abbia già scritto il perché
+dove nessuno lo guarda.
+FATTO (6 set 2026, Andrea sul coordinator vero): dopo unregister del
+service worker e clear site data, l'ordine è passato — `new-order`
+accettato, 25 EUR Satispay — e anche il RITIRO ha risposto. Quindi
+pubblicazione e cancellazione sono provate sulla macchina vera; resta
+lo scambio completo con due identità.
+Provato: DELTA **+13 prove** (7950 → 7963 sul ramo isolato; le 4 rosse
+sono le preesistenti — il mojibake su console Windows, verde in CI, e
+la CI su questo commit è verde) e **9 MUTAZIONI, 9 uccise**, una per
+riga sorvegliata: la guardia tolta da ognuno dei due rami, la guardia
+che torna un booleano invece di alzare, il bundle incompleto che resta
+in cache come promessa, un pezzo che esce dall'elenco, il messaggio che
+perde la strada, la bandierina che non si alza, il catch che torna
+muto, l'ordine senza nome che torna a scriversi.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client. ⚠️ E chi ha l'app aperta da
+prima **non prende la cura al primo giro**, che è esattamente il
+difetto che cura: `sw.js` non è cambiato, quindi la dispensa resta
+quella finché il service worker in attesa non si attiva. Da lì in poi
+un bundle disallineato lo dice invece di far sparire un gesto.
