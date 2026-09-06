@@ -6106,6 +6106,19 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="connettoriBlocco"></div></div>
       </div>
 
+      <!-- I PACCHI AL TUO PUNTO (ago 2026, la rete di casa): compare
+           SOLO a chi tiene un punto di Barattolo, cioe' oggi a
+           nessuno e domani a uno — per tutti gli altri il cassetto
+           non esiste, il patto di «Doppioni su Nostr».
+           STA QUI e non fra le impostazioni di negozio: quelle sono
+           LEVE che si girano una volta, questa e' una lista di
+           LAVORO — i pacchi da segnare — cioe' la stessa famiglia
+           degli annunci, dell'import e del negozio collegato. -->
+      <div class="acc" id="accPunto" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accPunto')"><span class="em">🏪</span>Pacchi al tuo punto <span class="conta" id="puntoConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="puntoBlocco"></div></div>
+      </div>
+
       <!-- Doppioni su Nostr: compare SOLO se /api/me trova coppie
            sospette (doppio cittadino con lo stesso oggetto due volte
            sui relay). Per tutti gli altri il cassetto non esiste. -->
@@ -7675,6 +7688,13 @@ function mapOrder(o){
        STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
        ed e' lo stato che apre il campo nell'ordine */
     puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
+    /* LA RETE DI CASA (ago 2026): l'id del punto nostro, e il timbro
+       di quando il punto ha segnato di aver ricevuto il pacco. Sono
+       due FATTI e non due contenuti — il codice di ritiro continua a
+       leggersi solo da /busta-ritiro — e servono al client per sapere
+       chi scrive la busta: su questa strada la conia il SERVER, e i
+       testi di sempre direbbero il falso su chi ha fatto cosa. */
+    puntoBarattolo:o.punto_barattolo||'', puntoPresoIl:o.punto_preso_il||0,
     appuntamentoIl:o.appuntamento_il||0,
     appuntamentoConfermatoIl:o.appuntamento_confermato_il||0,
     appuntamentoProposte:o.appuntamento_proposte||0,
@@ -22037,6 +22057,7 @@ function renderIdentita(){
   renderFerie();
   renderBanner();
   renderRicerche();
+  renderPuntoPacchi();
   /* L'ALTRA CATENA che decide la visibilita' dei cassetti: questa
      non e' nella lista del reload dati, quindi le sezioni si
      riaggiornano da tutt'e due o su un percorso resterebbero
@@ -23218,6 +23239,110 @@ function eliminaCodice(id){
    tetto dei collegamenti, le piattaforme, le strade di consegna e la
    pausa fra due «Aggiorna ora» sono leve, e il client non hardcoda
    mai una leva (il patto di max_barattolo). */
+/* I PACCHI AL MIO PUNTO (ago 2026). La cache si azzera dopo ogni
+   presa in carico: quel gesto cambia la riga sul server (timbro e
+   codice), e ridisegnare dalla copia in memoria mostrerebbe lo stato
+   di un istante prima — cioe' il bottone ancora li' su un pacco gia'
+   segnato, che e' il modo piu' facile di far premere due volte. */
+let myPacchiPunto = null;
+
+async function renderPuntoPacchi(){
+  const box = el('puntoBlocco');
+  if (!box) return;
+  const sez = el('accPunto');
+  /* la guardia e' quella di casa: in DEMO e in vetrina il punto non
+     esiste, e un cassetto vuoto sarebbe una porta su un muro */
+  if (DEMO || VETRINA || !myTgId){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (!myPacchiPunto){
+    try {
+      const r = await fetch(`${API_BASE}/punto/pacchi`,
+                            {headers:{'X-Tg-Init-Data':authHdr()}});
+      myPacchiPunto = await r.json();
+    } catch(e) { myPacchiPunto = {punti:[], pacchi:[]}; }
+  }
+  const d = myPacchiPunto || {};
+  const punti = d.punti || [], pacchi = d.pacchi || [];
+  /* CHI NON TIENE UN PUNTO NON VEDE NIENTE, e la domanda gliela fa il
+     SERVER: la lista dei punti torna vuota, e non c'e' nessun giudice
+     da tenere in pari qui — il catalogo vive di la'. */
+  if (!punti.length){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const daFare = pacchi.filter(x => !x.punto_preso_il).length;
+  el('puntoConta').textContent = daFare ? `(${daFare} da segnare)` : '';
+  const nomi = punti.map(x => esc(x.nome)).join(' · ');
+  /* IL TESTO DICE IL PATTO, ed e' la meta' che conta: cosa vedi (il
+     numero e il tracciamento), cosa NON sai (cosa c'e' nel pacco e
+     chi lo manda), e soprattutto cosa succede quando segni — perche'
+     da quel momento, se qualcosa va storto, per Barattolo chi ha
+     spedito ha consegnato. E' la stessa regola che chi compra legge
+     in «Il pagamento protetto» prima di scegliere il punto. */
+  const testa = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      I pacchi in arrivo a <b>${nomi}</b>. Di ognuno vedi il numero
+      dell'ordine e il tracciamento del corriere — <b>non cosa c'è
+      dentro né chi lo manda</b>.<br>Quando il pacco è sul tuo banco
+      tocca <b>«L'ho ricevuto»</b>: da lì scriviamo noi il codice di
+      ritiro, chi ha comprato lo riceve e viene a prenderlo dicendoti
+      quel codice. <b>Segna solo quello che hai davvero in mano</b>:
+      quel momento resta scritto, ed è la prova che il venditore ha
+      consegnato.</div>`;
+  if (!pacchi.length)
+    return void (box.innerHTML = testa + `
+      <div class="hint" style="margin-top:12px">Nessun pacco in arrivo
+      in questo momento.</div>`);
+  const righe = pacchi.map(x => {
+    const gg = x.spedito_il
+      ? Math.floor((Date.now()/1000 - x.spedito_il) / 86400) : NaN;
+    const da = !(gg >= 1) ? 'spedito oggi'
+      : gg === 1 ? 'spedito 1 giorno fa' : `spedito ${gg} giorni fa`;
+    const trk = x.tracking
+      ? `<div class="hint" style="margin-top:2px">${esc(x.corriere||'Corriere')} · <b class="mono" style="user-select:all">${esc(x.tracking)}</b></div>` : '';
+    const dove = punti.length > 1
+      ? `<div class="hint" style="margin-top:2px">🏪 ${esc(x.punto_nome)}</div>` : '';
+    /* IL CODICE SI VEDE SOLO DOPO, ed e' il gesto del banco: chi
+       ritira lo dice e tu lo confronti. Prima non esiste proprio —
+       lo conia il server in quell'istante. */
+    const fatto = x.punto_preso_il
+      ? `<div class="hint" style="margin-top:6px">✓ Segnato ricevuto. Chi viene a ritirare deve dirti questo codice: <b class="mono" style="user-select:all;font-size:16px">${esc(x.codice||'')}</b></div>`
+      : `<button class="btn orange" style="margin-top:8px;width:auto" onclick="segnaPaccoRicevuto(this, ${x.id})">📥 L'ho ricevuto</button>`;
+    return `<div style="border-top:1px solid var(--line);padding:10px 0">
+      <div style="font-weight:800">Ordine #${x.id} <span style="font-weight:600;color:var(--muted);font-size:12.5px">— ${da}</span></div>
+      ${dove}${trk}${fatto}</div>`;
+  }).join('');
+  box.innerHTML = testa + `<div style="margin-top:8px">${righe}</div>`;
+}
+
+async function segnaPaccoRicevuto(btn, id){
+  /* la domanda si fa PRIMA, e il testo dice il fatto irreversibile:
+     da qui il codice parte a chi compra, e quel momento resta
+     scritto. E' il registro di casa per i gesti che non tornano
+     indietro (il confirm di «libera i sats»). */
+  chiediConferma({
+    titolo: 'Hai il pacco in mano?',
+    corpo: `Stiamo per scrivere che il pacco dell'ordine #${id} è arrivato al tuo punto.\n\nChi ha comprato riceverà il codice di ritiro e verrà a prenderlo. Segna solo quello che hai davvero sul banco: questo momento resta scritto.`,
+    etichetta: '📥 Sì, ce l\'ho io',
+    poi: async () => {
+      const fine = bottoneInAttesa(btn, '📥 Segno il pacco…');
+      try {
+        const r = await fetch(`${API_BASE}/orders/${id}/punto/preso`,
+          {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+        const d = await r.json();
+        if (!r.ok) { toast(d.detail || 'Non è stato possibile'); return; }
+        myPacchiPunto = null;
+        toast('📥 Segnato: il codice è partito');
+        await renderPuntoPacchi();
+      } catch(e) { toast('Connessione assente'); }
+      finally { fine(); }
+    }
+  });
+}
+
 let myConnettori = null;      /* cache, azzerata dopo ogni mutazione */
 let connettoriLeve = null;    /* le leve vengono dal server, mai qui */
 let connInModifica = 0;
@@ -26187,7 +26312,7 @@ function pannelloBustaRitiro(o){
          posto si dice da dove arriva il codice davvero. */
       return o.state!=='shipped' ? '' : (o.bustaDirettaIl ? `
       <div class="trust-note">📦 <span><b>Il codice di ritiro ti arriva direttamente dal corriere</b>, ai recapiti che il venditore ha indicato come destinatario: non passerà dall'ordine. Quando il pacco arriva al punto, controlla la posta — <b>anche nello spam</b>. Se non ti arriva niente puoi dirlo al venditore da qui: può mettere lui le istruzioni nell'ordine.</span></div>` : `
-      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>`);
+      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> ${o.puntoBarattolo ? 'Su un punto di Barattolo il codice <b>lo scriviamo noi</b>: compare qui appena il punto segna di aver ricevuto il pacco, e ti avviseremo.' : 'Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.'}</span></div>`);
     /* IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed e' cio' che fa
        atterrare il codice dove stava il dito: se il pannello si
        riscrivesse per intero — il nome sopra, il codice sotto, come
@@ -26201,7 +26326,7 @@ function pannelloBustaRitiro(o){
         <div class="hint">Depositate il ${quando}${corr}: il nome del destinatario e il codice per ritirare il pacco al punto. <b>Leggerle non conferma nulla</b> — i sats restano nel deposito di garanzia finché non confermi tu il ritiro. ⏳ Sono qui <b>${daQuando}</b>: la data esatta di scadenza è nell'avviso del corriere, dopo il pacco torna al venditore.</div>
         ${b ? piattoCodice(b, svelato)
             : `<button class="btn orange" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra ${o.bustaDocumento?'le istruzioni':'il codice di ritiro'}</button>`}
-        ${b ? `<div class="hint" style="margin-top:10px">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo): <b class="mono" style="user-select:all">${esc(b.nome)}</b></div>
+        ${b ? `<div class="hint" style="margin-top:10px">${o.puntoBarattolo ? 'Nome sul pacco (è quello del punto: sull\'etichetta c\'è il suo, non il tuo)' : 'Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo)'}: <b class="mono" style="user-select:all">${esc(b.nome)}</b></div>
         ${bloccoDocumentoBusta(o, b)}` : ''}
       </div>`;
   }
@@ -26209,7 +26334,20 @@ function pannelloBustaRitiro(o){
      immediato), il caso normale su 'shipped', la correzione fino a
      'dispute' — un PIN sbagliato lo corregge solo lui, il moderatore
      non puo' (non legge la busta) */
-  if (o.role==='seller' && ['locked','shipped','dispute'].includes(o.state)){
+  /* SULLA RETE DI CASA IL VENDITORE NON SCRIVE (ago 2026): il codice
+     lo conia il server alla presa in carico, e il deposito risponde
+     400 — un form che porta a un 400 e' peggio di un form che non
+     c'e'. Il gate lo fa cadere nel ramo di RILETTURA qui sotto, che
+     e' esattamente quel che gli tocca: la busta la legge, non la
+     scrive. Finche' il punto non ha preso in carico non c'e' ancora
+     niente da leggere, e la riga dice PERCHE' invece di lasciare il
+     vuoto — quel che il piano chiama «lo stato d'attesa visibile»,
+     dal lato di chi ha spedito. */
+  if (o.role==='seller' && o.puntoBarattolo && !o.bustaIl)
+    return o.state==='shipped' ? `
+      <div class="trust-note">📦 <span><b>Il codice di ritiro lo scriviamo noi.</b> Su un punto di Barattolo non devi depositare niente: appena il punto segna di aver ricevuto il pacco, il codice compare nell'ordine dell'acquirente e tu ricevi l'avviso — è anche la prova che il pacco è arrivato.</span></div>` : '';
+  if (o.role==='seller' && !o.puntoBarattolo
+      && ['locked','shipped','dispute'].includes(o.state)){
     /* la BUSTA DIRETTA dichiarata: la testa lo dice, il form resta —
        il deposito E' l'annulla (lato server azzera la dichiarazione),
        quindi chi si e' sbagliato deposita e basta */

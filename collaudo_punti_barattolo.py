@@ -31,6 +31,25 @@ Le domande a cui risponde, e sono quelle su cui il commit si regge:
   · IL MONDO DI IERI E' INTATTO: un ordine verso una rete di terzi si
     comporta come prima, byte per byte, e il campo libero resta.
 
+E dal secondo tempo (la PRESA IN CARICO, che e' l'unico fatto che
+questa rete compra):
+
+  · IL TITOLARE SEGNA e da li' il codice ESISTE: lo conia il server,
+    lo vedono chi compra e il punto, mai il venditore — che dal
+    deposito in poi non ha piu' niente da fare;
+  · NON TOCCA `spedito_il` ne' `aggiornato` ne' lo stato: prendere in
+    carico non e' consegnare, ed e' la trappola dell'ancora mobile
+    gia' pagata quattro volte;
+  · IL SECONDO TOCCO E' UN NO-OP e non manda una seconda notifica;
+  · L'ANTI-ORACOLO sul database VERO: estraneo, titolare di un ALTRO
+    punto, il venditore in persona e un ordine inesistente rispondono
+    IDENTICO — ed e' il caso che smaschera una guardia scritta su
+    «sei un titolare?» invece che «e' TUO?»;
+  · LA LISTA DEL TITOLARE non porta ne' chi compra ne' cosa c'e'
+    dentro, e il codice esce SOLO dopo la presa in carico;
+  · LA NOTA AL MODERATORE dice il fatto con la data e la regola di
+    default che la strada B compra — mai il codice, mai il nome.
+
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. LNbits non
 viene mai chiamato — le invoice si contano, non si chiedono — quindi
@@ -44,12 +63,15 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 import types
 
 QUI = os.path.dirname(os.path.abspath(__file__))
 PASSATE = FALLITE = 0
 SRV = None
 INVOICES = []
+DETTI = []          # (destinatario, testo) di ogni notifica
+ADMIN = []          # i testi arrivati dalla ronda del libro mastro
 CAMBIO = 100_000.0
 UTENTE = {"id": 111, "nome": "Compra", "username": "compra", "admin": False}
 
@@ -64,6 +86,24 @@ FINTI = (
     {"id": "bar-luna", "nome": "Bar Luna", "indirizzo": "Via Po 9",
      "comune": "Torino (TO)", "negozio": "neg33333"},
 )
+
+
+def sezione(fn, *a):
+    """⚠️ UNA SEZIONE CHE ESPLODE NON DEVE PORTARSI VIA IL CONTO, e
+    l'ha detto la tortura: una mutazione faceva alzare una rotta due
+    sezioni piu' avanti, il collaudo si fermava li' e la riga finale
+    non si stampava — quindi il banco della tortura leggeva «nessuna
+    fallita» e contava la mutazione come SOPRAVVISSUTA, mentre delle
+    righe rosse c'erano gia' state. Un'eccezione e' un fallimento, e
+    si dice cosi': si scrive, si conta, e le sezioni dopo girano."""
+    global FALLITE
+    try:
+        return fn(*a)
+    except Exception as e:
+        FALLITE += 1
+        print(f"  \u2717 la sezione «{fn.__name__}» e' ESPLOSA")
+        print(f"      {type(e).__name__}: {e}")
+        return None
 
 
 def prova(nome, atteso, avuto):
@@ -141,11 +181,42 @@ def avvio():
     async def mai_pagata(_hash):
         return False
 
+    # LE NOTIFICHE NON SI BUTTANO PIU', SI REGISTRANO: dal secondo
+    # tempo il loro contenuto e' una delle cose da provare — che il
+    # codice di ritiro non ci entri MAI, che il secondo tocco non ne
+    # mandi una seconda, e che la nota al moderatore dica il fatto
+    # senza il contenuto. La nota della disputa arriva ai moderatori
+    # da `notifica(admin, ...)` e non da `notifica_admin`, che invece
+    # la ronda del libro mastro usa: due registri, due mestieri.
+    async def detta(chi, testo, *a, **k):
+        DETTI.append((chi, testo))
+
+    async def alla_ronda(testo, *a, **k):
+        ADMIN.append(testo)
+
+    # L'USCITA DEI SATS: il giro si chiude con la conferma di chi ha
+    # ritirato, e senza questi due `_sblocca_sats` andrebbe a chiedere
+    # a LNbits. Qui non si prova il payout — quello ha il suo collaudo
+    # — si prova che l'ordine ci arrivi.
+    async def ln_finta(_addr, sats):
+        return f"lnbc{sats}collaudo"
+
+    async def paga_finta(_bolt11, _atteso):
+        return server.PAGATO
+
     server.crea_invoice_escrow = invoice_finta
     server.invoice_pagata = mai_pagata
     server.cambio_btc_eur = cambio_finto
-    server.notifica = zitta
-    server.polso_ordini_admin = lambda *a, **k: None
+    server.notifica = detta
+    server.notifica_admin = alla_ronda
+    server.invoice_da_ln_address = ln_finta
+    server.paga_venditore = paga_finta
+    server.premia_distintivi = zitta
+    server.premia_xp = zitta
+    # ⚠️ E' ATTESO: il primo tempo non arrivava mai alla chiusura di un
+    # ordine, quindi un `lambda` bastava; da qui il giro si chiude e
+    # `_sblocca_sats` lo attende — un None non si puo' attendere.
+    server.polso_ordini_admin = zitta
     server.verifica_utente = lambda *a, **k: UTENTE
 
     # IL CATALOGO DI CARTONE si innesta DOPO l'import, ed e' l'unica
@@ -215,6 +286,105 @@ def riga_ordine(oid):
     r = con.execute("SELECT * FROM ordini WHERE id=?", (oid,)).fetchone()
     con.close()
     return r
+
+
+# --- gli attrezzi del secondo tempo (la presa in carico) -------
+# Il primo tempo gira tutto con UNA identita' perche' li' bastava; da
+# qui in poi sono QUATTRO, e a distinguerle e' l'unica cosa che rende
+# provabile l'anti-oracolo.
+def come(tg_id, admin=False):
+    SRV.verifica_utente = lambda *a, **k: {
+        "id": tg_id, "nome": f"U{tg_id}", "username": f"u{tg_id}",
+        "admin": admin}
+
+
+def esegui(fn, *args, corpo=None):
+    """Come `chiama`, ma per le rotte che prendono l'ordine: il corpo
+    e' FACOLTATIVO, che meta' di quelle del giro non lo leggono."""
+    if corpo is not None:
+        async def leggi(_req):
+            return corpo
+        SRV.leggi_json = leggi
+    return asyncio.run(fn(*args))
+
+
+def rifiuta(fn, *args, corpo=None):
+    """Torna `(codice, messaggio)` invece di far esplodere il collaudo:
+    e' la forma che permette di CONFRONTARE due rifiuti fra loro, cioe'
+    precisamente quel che l'anti-oracolo chiede."""
+    try:
+        esegui(fn, *args, corpo=corpo)
+        return 0, ""
+    except Exception as e:
+        return getattr(e, "status_code", None), str(getattr(e, "detail", e))
+
+
+def semina_b():
+    """Le quattro identita' del secondo tempo. IL TITOLARE E' 333 e NON
+    il venditore: `da-mario` sta a `neg22222`, quindi il venditore e'
+    titolare di un ALTRO punto — ed e' il caso che serve, perche' una
+    guardia scritta su «sei un titolare?» lo lascerebbe passare."""
+    con = SRV.db()
+    for t in ("ordine_righe", "ordini", "annunci"):
+        con.execute(f"DELETE FROM {t}")
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,"
+                "ln_address,spedizionieri,spedizioniere) VALUES"
+                "(222,'Vende','neg22222',1,'vende@wallet.tld',"
+                "'|Barattolo|InPost|','Barattolo')")
+    for tg, neg, nome in ((111, "neg11111", "Compra"),
+                          (333, "neg33333", "Luna"),
+                          (777, "neg77777", "Estraneo")):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
+                    "registrato) VALUES(?,?,?,1)", (tg, nome, neg))
+    ids = []
+    for n in range(8):
+        cur = con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+            "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
+            "spedizione_sats) VALUES(222,?,'desc',30000,'Altro',"
+            "'Torino (TO)','attivo',1,'spedizione',5,'sats','buono',1000)",
+            (f"Cosa {n}",))
+        ids.append(cur.lastrowid)
+    con.commit()
+    con.close()
+    accendi("da-mario", "bar-luna")
+    return ids
+
+
+def tocca(oid, **campi):
+    con = SRV.db()
+    con.execute("UPDATE ordini SET " + ", ".join(f"{k}=?" for k in campi)
+                + " WHERE id=?", tuple(campi.values()) + (oid,))
+    con.commit()
+    con.close()
+
+
+def al_punto(aid, pid="bar-luna"):
+    """L'ordine verso un punto NOSTRO. `punto_ritiro` non si passa
+    apposta: sulla rete di casa quel campo lo scrive il server."""
+    come(111)
+    r = compra(aid, rete_punto="Barattolo", punto_barattolo=pid)
+    tocca(r["ordine_id"], stato="locked")
+    return r["ordine_id"]
+
+
+def a_inpost(aid):
+    come(111)
+    r = compra(aid, rete_punto="InPost",
+               punto_ritiro="Locker InPost Via Verdi 3", tipo_punto="locker")
+    tocca(r["ordine_id"], stato="locked")
+    return r["ordine_id"]
+
+
+def spedisci(oid, chi=222):
+    come(chi)
+    return esegui(SRV.segna_spedito, oid, None,
+                  corpo={"corriere": "BRT", "tracking": "1234567890"})
+
+
+def prendi(oid, chi=333):
+    come(chi)
+    return esegui(SRV.punto_preso_in_carico, oid)
 
 
 # ---------------------------------------------------------------
@@ -404,6 +574,312 @@ def prove_spento_si_legge():
           "Da Mario", SRV.punto_barattolo("da-mario").get("nome"))
 
 
+def prove_presa_in_carico():
+    print("\n\u2500\u2500 LA PRESA IN CARICO: il fatto che la rete compra \u2500\u2500")
+    ann = semina_b()
+    oid = al_punto(ann[0])
+    spedisci(oid)
+    r = riga_ordine(oid)
+    prova("prima della presa la busta e' vuota", "", r["busta_codice"])
+    prova("...e il timbro pure", 0, r["punto_preso_il"])
+
+    prima = riga_ordine(oid)
+    DETTI.clear()
+    esito = prendi(oid)
+    dopo = riga_ordine(oid)
+    prova("la rotta risponde ok", True, bool(esito.get("ok")))
+    prova("il momento resta scritto", True, dopo["punto_preso_il"] > 0)
+    prova("...col codice negozio del punto, per il libro mastro",
+          "neg33333", dopo["punto_preso_da"])
+    # LE TRE ANCORE CHE NON SI TOCCANO
+    prova("NON tocca `spedito_il` (l'ancora dei promemoria)",
+          prima["spedito_il"], dopo["spedito_il"])
+    prova("...ne' `aggiornato`", prima["aggiornato"], dopo["aggiornato"])
+    prova("...ne' lo stato: prendere in carico non e' consegnare",
+          "shipped", dopo["stato"])
+
+    prova("la busta si e' scritta da sola", True, bool(dopo["busta_codice"]))
+    prova("...col `busta_il` nello stesso istante", True,
+          dopo["busta_il"] == dopo["punto_preso_il"])
+    prova("...e in colonna il codice non e' in chiaro", True,
+          ":" in dopo["busta_codice"])
+    codice = SRV._decifra_contenuto(dopo["busta_codice"])
+    prova("il codice e' di sei caratteri", 6, len(codice))
+    prova("...senza 0, 1, I e O", True, not (set(codice) & set("01IO")))
+    prova("il nome sulla busta e' quello DEL PUNTO — il ribaltamento",
+          "Bar Luna", SRV._decifra_contenuto(dopo["busta_nome"]))
+
+    chi = [c for c, _ in DETTI]
+    prova("avvisa chi compra", True, 111 in chi)
+    prova("...e chi vende", True, 222 in chi)
+    testi = " || ".join(t for _, t in DETTI)
+    prova("IL CODICE NON ENTRA IN NESSUNA NOTIFICA", False, codice in testi)
+    prova("...e a chi compra si dice dove trovarlo", True,
+          "codice di ritiro" in testi)
+
+    print("\n\u2500\u2500 ...e il codice esce solo dopo, e solo a chi deve \u2500\u2500")
+    come(333)
+    d = esegui(SRV.pacchi_del_punto)
+    prova("ora il titolare vede il codice", codice, d["pacchi"][0]["codice"])
+    come(111)
+    b = esegui(SRV.leggi_busta_ritiro, oid)
+    prova("e chi compra lo legge dalla busta", codice, b["codice"])
+    prova("...col nome del punto", "Bar Luna", b["nome"])
+    come(999, admin=True)
+    cod, _ = rifiuta(SRV.leggi_busta_ritiro, oid)
+    prova("il moderatore NON legge la busta, nemmeno adesso", 400, cod)
+
+    print("\n\u2500\u2500 ...e il secondo tocco e' un no-op \u2500\u2500")
+    DETTI.clear()
+    prima = riga_ordine(oid)
+    esito = prendi(oid)
+    dopo = riga_ordine(oid)
+    prova("risponde ok lo stesso", True, bool(esito.get("ok")))
+    prova("...ma il timbro non si muove", prima["punto_preso_il"],
+          dopo["punto_preso_il"])
+    prova("...il codice non si riconia", prima["busta_codice"],
+          dopo["busta_codice"])
+    prova("...e non parte nessuna seconda notifica", [], DETTI)
+    return ann
+
+
+def prove_lista_del_punto(ann):
+    print("\n\u2500\u2500 LA LISTA DEL TITOLARE: un codice e basta \u2500\u2500")
+    oid = al_punto(ann[1])
+    spedisci(oid)
+    come(333)
+    d = esegui(SRV.pacchi_del_punto)
+    prova("il titolare vede il suo punto", ["bar-luna"],
+          [x["id"] for x in d["punti"]])
+    p0 = [x for x in d["pacchi"] if x["id"] == oid][0]
+    prova("vede il tracciamento del corriere", "1234567890", p0["tracking"])
+    prova("...e il nome del suo punto", "Bar Luna", p0["punto_nome"])
+    prova("MA NON il codice, che non esiste ancora", "", p0["codice"])
+    # ⚠️ E LA PROVA VERA E' QUESTA, che l'ha detto la tortura: sopra la
+    # colonna e' VUOTA, quindi il gate non ha niente da nascondere e la
+    # riga passerebbe anche togliendolo. Qui la busta si scrive a mano
+    # SENZA la presa in carico — lo stato che il gate esiste per
+    # coprire — e il codice deve restare dentro lo stesso.
+    tocca(oid, busta_codice=SRV._cifra_contenuto("ZZZ999"))
+    come(333)
+    dz = esegui(SRV.pacchi_del_punto)
+    pz = [x for x in dz["pacchi"] if x["id"] == oid][0]
+    prova("...e nemmeno se la busta c'e' ma il punto non ha segnato",
+          "", pz["codice"])
+    prova("...e la colonna non esce nuda per un'altra strada", False,
+          "busta_codice" in pz)
+    tocca(oid, busta_codice="")
+    prova("...ne' chi compra", False, "compratore_id" in p0)
+    prova("...ne' cosa c'e' dentro", False,
+          any(k in p0 for k in ("titolo", "annuncio_id", "prezzo_sats")))
+    come(222)                       # titolare di un ALTRO punto
+    d2 = esegui(SRV.pacchi_del_punto)
+    prova("il titolare dell'altro punto non vede questo pacco", [],
+          [x for x in d2["pacchi"] if x["id"] == oid])
+    come(777)
+    d3 = esegui(SRV.pacchi_del_punto)
+    prova("e chi non tiene un punto non vede niente", ([], []),
+          (d3["punti"], d3["pacchi"]))
+    # ⚠️ IL GATE IN LETTURA VALE ANCHE QUI, e senza questa prova non lo
+    # esercitava nessuno: togliere una voce dal catalogo e' l'unica
+    # sanzione che abbiamo, e col catalogo INTERO al posto dei vivi il
+    # titolare di un punto spento continuerebbe a vedere la sua coda —
+    # cioe' la pagina pubblica prometterebbe una cosa che non succede.
+    accendi("da-mario")                         # bar-luna si spegne
+    come(333)
+    d4 = esegui(SRV.pacchi_del_punto)
+    prova("il titolare di un punto SPENTO non vede piu' niente",
+          ([], []), (d4["punti"], d4["pacchi"]))
+    accendi("da-mario", "bar-luna")
+    return oid
+
+
+def prove_anti_oracolo(ann, aperto):
+    print("\n\u2500\u2500 L'ANTI-ORACOLO, sul database VERO \u2500\u2500")
+    come(777)
+    a = rifiuta(SRV.punto_preso_in_carico, aperto)
+    come(222)          # il venditore, che e' titolare di un ALTRO punto
+    b = rifiuta(SRV.punto_preso_in_carico, aperto)
+    come(111)          # chi ha comprato
+    c = rifiuta(SRV.punto_preso_in_carico, aperto)
+    come(333)
+    d = rifiuta(SRV.punto_preso_in_carico, 999999)
+    prova("l'estraneo si sente dire 400", 400, a[0])
+    prova("...e il titolare di un altro punto risponde IDENTICO", a, b)
+    prova("...e chi ha comprato pure", a, c)
+    prova("...e l'ordine inesistente pure", a, d)
+    prova("...con UN messaggio solo, che non racconta niente",
+          "Operazione non permessa", a[1])
+
+    print("\n\u2500\u2500 ...e gli stati che non sono suoi \u2500\u2500")
+    o3 = al_punto(ann[2])                       # ancora 'locked'
+    come(333)
+    prova("un ordine non ancora spedito risponde uguale", a,
+          rifiuta(SRV.punto_preso_in_carico, o3))
+    o4 = a_inpost(ann[3])
+    spedisci(o4)
+    come(333)
+    prova("...e un ordine su una rete di terzi pure", a,
+          rifiuta(SRV.punto_preso_in_carico, o4))
+    # IL PUNTO SPENTO NON PRENDE PIU' IN CARICO NIENTE: e' la sola
+    # sanzione che abbiamo, e la pagina pubblica la promette.
+    o5 = al_punto(ann[4])
+    spedisci(o5)
+    accendi("da-mario")                         # bar-luna si spegne
+    come(333)
+    prova("e un punto TOLTO dalla rete non lavora piu'", a,
+          rifiuta(SRV.punto_preso_in_carico, o5))
+    accendi("da-mario", "bar-luna")
+    return o4, o5
+
+
+def prove_gate_busta(o5):
+    print("\n\u2500\u2500 SULLA RETE DI CASA IL VENDITORE NON DEPOSITA \u2500\u2500")
+    come(222)
+    cod, msg = rifiuta(SRV.deposita_busta_ritiro, o5, None,
+                       corpo={"nome": "Mario Rossi", "codice": "ABC123"})
+    prova("il deposito si rifiuta", 400, cod)
+    prova("...e il rifiuto dice chi scrive il codice", True,
+          "codice" in msg.lower())
+    cod, msg = rifiuta(SRV.dichiara_busta_diretta, o5)
+    prova("e nemmeno la busta diretta si dichiara", 400, cod)
+    prova("...col suo perche'", True, len(msg) > 20)
+    r = riga_ordine(o5)
+    prova("...e la busta e' rimasta intatta", ("", 0),
+          (r["busta_codice"], r["busta_il"]))
+
+
+def prove_promemoria(nostro, terzi):
+    print("\n\u2500\u2500 I PROMEMORIA: la rete di casa e' un'altra popolazione \u2500\u2500")
+    ora = int(time.time())
+    tocca(nostro, spedito_il=ora - 9 * 86400)
+    tocca(terzi, spedito_il=ora - 9 * 86400)
+    DETTI.clear()
+    asyncio.run(SRV.sollecita_buste_ferme())
+    # ⚠️ SI GUARDA IL CONTATORE E NON IL TESTO: il promemoria al
+    # venditore porta il TITOLO e non il numero dell'ordine (l'id lo
+    # scrive solo il 🧊 al tetto), quindi cercarlo nel testo sarebbe
+    # una prova che non puo' fallire. `solleciti_busta` invece dice
+    # che la RIGA e' entrata nella query, che e' la domanda vera.
+    prova("il promemoria della busta SALTA la rete di casa",
+          0, riga_ordine(nostro)["solleciti_busta"])
+    prova("...e continua a bussare sulle reti di terzi",
+          1, riga_ordine(terzi)["solleciti_busta"])
+    prova("...bussando a chi vende", [222], [c for c, _ in DETTI])
+    # LA MANIGLIA DI CHI COMPRA CAMBIA BERSAGLIO: su questa strada il
+    # codice non lo scrive il venditore, quindi bussare a lui sarebbe
+    # mandare qualcuno a chiedere una cosa a chi non ce l'ha.
+    DETTI.clear()
+    come(111)
+    esegui(SRV.sollecita_venditore, nostro)
+    prova("la maniglia di chi compra bussa al PUNTO, non al venditore",
+          [333], [c for c, _ in DETTI])
+
+
+def prove_nota_moderatore(ann, terzi):
+    print("\n\u2500\u2500 LA NOTA AL MODERATORE \u2500\u2500")
+    oid = al_punto(ann[5])
+    spedisci(oid)
+    prendi(oid)
+    codice = SRV._decifra_contenuto(riga_ordine(oid)["busta_codice"])
+    DETTI.clear()
+    come(111)
+    esegui(SRV.apri_disputa, oid)
+    nota = " || ".join(t for c, t in DETTI if c == 999)
+    prova("la nota arriva ai moderatori", True, "Disputa aperta" in nota)
+    prova("...e dice che il punto e' NOSTRO", True, "Bar Luna" in nota)
+    prova("...e che il punto ha segnato di aver ricevuto il pacco",
+          True, "segnato di aver RICEVUTO il pacco il" in nota)
+    prova("...col codice negozio, che e' la maniglia del libro mastro",
+          True, "neg33333" in nota)
+    prova("...e la regola di default che la strada B compra", True,
+          "chi ha spedito ha consegnato" in nota)
+    prova("MA NON il codice di ritiro", False, codice in nota)
+    # IL RAMO DI IERI, sulle reti di terzi, non si e' mosso
+    DETTI.clear()
+    come(111)
+    esegui(SRV.apri_disputa, terzi)
+    nota4 = " || ".join(t for c, t in DETTI if c == 999)
+    prova("sulla rete di terzi la nota resta quella di sempre", False,
+          "Bar Luna" in nota4)
+    prova("...col ramo del locker, intatto", True,
+          "LOCKER/PUNTO DI RITIRO" in nota4)
+    # ⚠️ E LI' IL PUNTO SCRITTO DAL COMPRATORE NON C'E', ed e' giusto:
+    # quella nota dice il FATTO (depositata sì/no, quando) e mai il
+    # contenuto della busta — l'indirizzo del locker e' roba delle
+    # parti. La prova guarda che resti fuori.
+    prova("...e senza il punto che il compratore ha scritto", False,
+          "Via Verdi" in nota4)
+
+
+def prove_giro_chiuso(ann):
+    print("\n\u2500\u2500 IL GIRO SI CHIUDE, E LA REGRESSIONE \u2500\u2500")
+    oid = al_punto(ann[6])
+    spedisci(oid)
+    prendi(oid)
+    come(111)
+    esegui(SRV.conferma_ricezione, oid)
+    r = riga_ordine(oid)
+    prova("chi ritira conferma e l'ordine si chiude", "released", r["stato"])
+    prova("...e la presa in carico resta scritta", True,
+          r["punto_preso_il"] > 0)
+
+    # LA REGRESSIONE: su InPost il giro e' quello di ieri, byte per byte
+    o7 = a_inpost(ann[7])
+    spedisci(o7)
+    r7 = riga_ordine(o7)
+    prova("su InPost il punto e' il testo del COMPRATORE",
+          "Locker InPost Via Verdi 3", r7["punto_ritiro"])
+    prova("...l'id del catalogo e' vuoto", "", r7["punto_barattolo"])
+    prova("...e la presa in carico non esiste", 0, r7["punto_preso_il"])
+    come(222)
+    esegui(SRV.deposita_busta_ritiro, o7, None,
+           corpo={"nome": "Mario Rossi", "codice": "XY99"})
+    prova("il venditore deposita la busta come sempre", True,
+          bool(riga_ordine(o7)["busta_codice"]))
+    come(111)
+    b7 = esegui(SRV.leggi_busta_ritiro, o7)
+    prova("...e chi compra la legge", "XY99", b7["codice"])
+    prova("...col nome che ha scritto lui", "Mario Rossi", b7["nome"])
+    return oid, o7
+
+
+def prove_libro_mastro(sano, terzi):
+    print("\n\u2500\u2500 LA RONDA DEL LIBRO MASTRO \u2500\u2500")
+
+    def ronda():
+        ADMIN.clear()
+        SRV.timbro_scrivi(SRV.TIMBRO_LIBRO_MASTRO, "")
+        asyncio.run(SRV.controlla_libro_mastro())
+        return " || ".join(ADMIN)
+
+    fuori = ronda()
+    prova("sul sano TACE sulla presa in carico", False,
+          "presa in carico" in fuori)
+    prova("...e sul punto di casa", False, "punto di casa" in fuori)
+    # IL TIMBRO SENZA IL CODICE NEGOZIO: una guardia caduta
+    tocca(sano, punto_preso_da="")
+    fuori = ronda()
+    prova("la presa in carico a meta' si vede", True,
+          "presa in carico fuori contratto" in fuori)
+    prova("...col suo id", True, str(sano) in fuori)
+    tocca(sano, punto_preso_da="neg33333")
+    # UN PUNTO DI CASA SU UNA STRADA CHE NON E' LA SUA
+    # ⚠️ SERVONO TUTT'E DUE I CAMPI: il controllo guarda «l'id del
+    # catalogo c'e' MA la via punto no», quindi mettere l'id su un
+    # ordine che la via punto ce l'ha costruisce una riga SANA — e la
+    # ronda tacerebbe giustamente, mentre la prova crederebbe di aver
+    # trovato un buco nel controllo.
+    tocca(terzi, punto_barattolo="bar-luna", via_punto=0)
+    fuori = ronda()
+    prova("il punto di casa fuori dalla via punto si vede", True,
+          "punto di casa fuori contratto" in fuori)
+    prova("...col suo id", True, str(terzi) in fuori)
+    tocca(terzi, punto_barattolo="", via_punto=1)
+    prova("...e rimesso a posto la ronda tace di nuovo", False,
+          "punto di casa fuori contratto" in ronda())
+
+
 def main():
     print("=" * 58)
     print("  IL COLLAUDO DEI PUNTI DI BARATTOLO")
@@ -417,6 +893,15 @@ def main():
     prove_regressione()
     prove_titolare()
     prove_spento_si_legge()
+    # --- il secondo tempo: la presa in carico ---
+    ann = sezione(prove_presa_in_carico)
+    aperto = sezione(prove_lista_del_punto, ann)
+    terzi, o5 = sezione(prove_anti_oracolo, ann, aperto) or (0, 0)
+    sezione(prove_gate_busta, o5)
+    sezione(prove_promemoria, o5, terzi)
+    sezione(prove_nota_moderatore, ann, terzi)
+    sano, o7 = sezione(prove_giro_chiuso, ann) or (0, 0)
+    sezione(prove_libro_mastro, sano, o7)
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
     print("=" * 58)

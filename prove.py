@@ -3823,6 +3823,7 @@ def prove_busta_ritiro():
         busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
         busta_file_nome TEXT DEFAULT '',
         busta_diretta_il INT DEFAULT 0,
+        punto_barattolo TEXT DEFAULT '', punto_preso_il INT DEFAULT 0, punto_preso_da TEXT DEFAULT '',
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
@@ -15874,6 +15875,7 @@ def prove_libro_mastro():
           busta_correzioni INT DEFAULT 0,
           busta_file TEXT DEFAULT '',
           busta_diretta_il INT DEFAULT 0,
+          punto_barattolo TEXT DEFAULT '', punto_preso_il INT DEFAULT 0, punto_preso_da TEXT DEFAULT '',
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
           email_corriere TEXT DEFAULT '', email_corriere_il INT DEFAULT 0,
@@ -16343,6 +16345,24 @@ def prove_libro_mastro():
         ("UPDATE ordini SET punto_obiettato_il=900, punto_obiezione='' "
          "WHERE id=1",
          "obiezione sul punto fuori contratto", "1"),
+        # LA RETE DI PUNTI DI CASA (ago 2026). Il primo caso rompe il
+        # braccio del PAIO: il timbro c'e' e il codice negozio no,
+        # cioe' meta' UPDATE — e su questa strada quel codice e'
+        # l'unica cosa che dice CHI ha preso in carico il pacco, che e'
+        # precisamente il fatto che il moderatore legge in disputa.
+        # (Il punto e' pieno apposta, o scatterebbe anche il secondo
+        # braccio dello stesso controllo e il caso non direbbe piu'
+        # quale dei due ha suonato.)
+        ("UPDATE ordini SET punto_barattolo='da-mario', "
+         "punto_preso_il=900, punto_preso_da='' WHERE id=4",
+         "presa in carico fuori contratto", "4"),
+        # Il secondo e' l'id del punto scritto sulla strada sbagliata:
+        # lo fissa compra() insieme alla via e nessuna rotta lo
+        # riscrive dopo, quindi una riga cosi' vorrebbe dire che il
+        # titolare vedrebbe nella sua lista un pacco che per le due
+        # parti non passa da nessun punto.
+        ("UPDATE ordini SET punto_barattolo='da-mario' WHERE id=1",
+         "punto di casa fuori contratto", "1"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -26824,8 +26844,14 @@ def prove_fogli_di_casa():
     # CINQUANTATRE' con le due uscite del conflitto fra mazzi (set
     # 2026): scegliere un mazzo lascia indietro un'identita', e nessuna
     # delle due si fa in silenzio.
-    prova("i gesti che passano dalla domanda unica sono cinquantatre",
-          53, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTAQUATTRO (ago 2026, la rete di punti di casa): la presa
+    # in carico del titolare — da quel tocco il codice di ritiro parte
+    # a chi compra e il momento resta scritto, cioe' e' la prova che
+    # sposta il peso in disputa. Un gesto che non torna indietro si
+    # chiede prima, e il corpo dice il fatto e non il gesto («segna
+    # solo quello che hai davvero sul banco»).
+    prova("i gesti che passano dalla domanda unica sono cinquantaquattro",
+          54, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -26994,6 +27020,8 @@ def prove_sollecito_a_comando():
             "solleciti_manuali_busta INT DEFAULT 0, "
             # cantiere 45: il codice dichiarato DIRETTO al compratore
             "busta_diretta_il INT DEFAULT 0, "
+            "punto_barattolo TEXT DEFAULT '', "
+            "punto_preso_il INT DEFAULT 0, "
             # ...e i contatori dell'AUTOMATICO della busta, che il
             # bottone non deve toccare
             "sollecito_busta_il INT DEFAULT 0, "
@@ -39007,6 +39035,7 @@ def prove_servizi():
             busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
             busta_correzioni INT DEFAULT 0, busta_file TEXT DEFAULT '',
             busta_diretta_il INT DEFAULT 0,
+            punto_barattolo TEXT DEFAULT '', punto_preso_il INT DEFAULT 0, punto_preso_da TEXT DEFAULT '',
             indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
             indirizzo_corretto_il INT DEFAULT 0,
             indirizzo_correzioni INT DEFAULT 0,
@@ -44339,6 +44368,288 @@ def prove_punti_barattolo():
           "niente da scrivere", True,
           "r !== RETE_BARATTOLO && !acqDati.punto.trim()" in _sr)
 
+def prove_presa_in_carico():
+    """LA PRESA IN CARICO (ago 2026, la strada B del cantiere).
+
+    E' l'unico fatto che la rete di casa compra, e questa famiglia
+    difende le righe senza le quali non lo comprerebbe:
+    · il CODICE SI CONIA UNA VOLTA SOLA — l'UPDATE e' condizionato, e
+      riconiarlo al secondo tocco e' il difetto peggiore di tutto il
+      cantiere: chi ha comprato sta gia' andando al banco con quello
+      di prima, e al banco non aprirebbe piu' niente;
+    · il PUNTO SPENTO NON LAVORA — e' l'unica sanzione che abbiamo, e
+      la pagina pubblica la promette;
+    · non si toccano `spedito_il`, `aggiornato` e lo STATO: prendere
+      in carico non e' consegnare, e le prime due sono le ancore dei
+      promemoria (la trappola gia' pagata quattro volte);
+    · il VENDITORE NON SCRIVE PIU' LA BUSTA su questa strada — e i due
+      gate sono OBBLIGATORI, non rifiniture: senza, un deposito
+      riscriverebbe un codice che chi compra ha gia' in mano."""
+    print("\n[la presa in carico]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rotta = pezzo("punto_preso_in_carico")
+    # ⚠️ LA PROSA ESCE, e non e' pignoleria: la docstring di quella
+    # rotta NOMINA `punti_barattolo_vivi()`, `spedito_il`, `aggiornato`
+    # e lo stato — cioe' meta' di quel che le prove qui sotto cercano —
+    # quindi col solo `codice()` passavano guardando una spiegazione.
+    # L'ha detto la tortura: la mutazione che apre il gate al catalogo
+    # intero restava verde.
+    corpo = _senza_prosa(codice(rotta))
+
+    # ---- il codice di ritiro: si fa girare, non si guarda -----------
+    amb = {"secrets": __import__("secrets")}
+    i = src.index("ALFABETO_RITIRO = ")
+    exec(src[i:src.index("\n", i)], amb)
+    exec(pezzo("conia_codice_ritiro"), amb)
+    codici = {amb["conia_codice_ritiro"]() for _ in range(300)}
+    prova("il codice di ritiro e' di sei caratteri",
+          {6}, {len(c) for c in codici})
+    # L'ALFABETO E' LA RIGA CHE CONTA, e non e' pignoleria: quel
+    # codice si legge ad alta voce a un banco, e «zero o o?» e'
+    # l'unico modo in cui questo pezzo puo' fallire.
+    prova("...e non contiene mai 0, 1, I o O",
+          set(), set("01IO") & set("".join(codici)))
+    prova("...e non si ripete (300 giri, 300 codici)", 300, len(codici))
+    prova("il codice viene da `secrets` e mai da `random`",
+          (True, False),
+          ("secrets.choice(ALFABETO_RITIRO)" in src,
+           "random.choice(ALFABETO_RITIRO)" in src))
+
+    # ---- la rotta ----------------------------------------------------
+    # IL PUNTO SPENTO NON PRENDE PIU' IN CARICO NIENTE: si guardano i
+    # VIVI e non il catalogo intero, che `punto_barattolo()` la voce
+    # spenta la restituisce lo stesso.
+    prova("la rotta guarda i punti VIVI e non il catalogo",
+          (True, False),
+          ("punti_barattolo_vivi()" in corpo,
+           "punto_barattolo(o[" in corpo))
+    prova("...e il titolare si risolve dal codice negozio",
+          True, 'titolare_punto(pt.get("negozio", "")) != user["id"]'
+          in corpo)
+    # L'ANTI-ORACOLO: cinque strade di rifiuto, un messaggio solo —
+    # ordine inesistente, di un altro punto, rete di terzi, stato
+    # sbagliato e punto spento si raccontano identici, o si
+    # imparerebbe quali ordini passano da un punto.
+    prova("le strade di rifiuto rispondono con UN messaggio solo",
+          1, corpo.count('raise HTTPException(400'))
+    prova("...ed e' quello dei fratelli, senza motivo",
+          True, 'raise HTTPException(400, "Operazione non permessa")'
+          in corpo)
+    prova("...e la SELECT e' una sola, con le tre condizioni dentro",
+          (1, True, True, True),
+          (corpo.count("SELECT * FROM ordini WHERE id=?"),
+           "via_punto=1" in corpo, "stato='shipped'" in corpo,
+           "punto_barattolo<>''" in corpo))
+    # L'UPDATE CONDIZIONATO e' l'idempotenza, e senza il codice si
+    # riconia al secondo tocco.
+    prova("l'UPDATE e' condizionato a `punto_preso_il=0`",
+          True, "WHERE id=? AND punto_preso_il=0" in corpo)
+    # ⚠️ NON BASTA CHE L'`if` CI SIA: quel ramo deve USCIRE, e il
+    # `return` si puo' togliere senza toccare la condizione — allora il
+    # secondo tocco prosegue e manda una SECONDA notifica a chi ha
+    # comprato, che e' precisamente il difetto che l'idempotenza esiste
+    # per togliere. Si guarda la fetta dal ramo alla prima notifica.
+    _i = corpo.index("if cur.rowcount == 0:")
+    _uscita = corpo[_i:corpo.index("await notifica(", _i)]
+    prova("...e il rowcount 0 esce senza riconiare e senza avvisare",
+          (True, True),
+          ("if cur.rowcount == 0:" in corpo, "return {" in _uscita))
+    # LE TRE COSE CHE NON SI TOCCANO. Il conteggio guarda l'UPDATE e
+    # non il corpo intero: `spedito_il` e `stato` compaiono nella
+    # SELECT, ed e' giusto.
+    # ⚠️ la fine si cerca DOPO l'inizio, o si prende la docstring —
+    # che quella condizione la NOMINA, e lo slice uscirebbe VUOTO:
+    # le tre prove qui sotto passerebbero senza guardare niente
+    _i = corpo.index("UPDATE ordini SET")
+    _upd = corpo[_i:corpo.index("punto_preso_il=0", _i)]
+    prova("la presa in carico non tocca `spedito_il`",
+          False, "spedito_il" in _upd)
+    prova("...ne' `aggiornato`", False, "aggiornato" in _upd)
+    prova("...ne' lo stato: prendere in carico non e' consegnare",
+          False, "stato=" in _upd)
+    # LA BUSTA SI SCRIVE QUI, cifrata come sempre: il nome e' quello
+    # del PUNTO (che sta sull'etichetta) e il codice serve a chi
+    # ritira, non al corriere per consegnare.
+    prova("la busta la scrive il server, cifrata",
+          (True, True),
+          ('_cifra_contenuto(pt.get("nome", ""))' in corpo,
+           "_cifra_contenuto(codice)" in corpo))
+    prova("...col `busta_il` che si timbra nello stesso UPDATE",
+          True, "busta_il=?" in _upd)
+    # LE DUE NOTIFICHE, e il codice che non entra in nessuna delle
+    # due: si legge dall'ordine, dove vive cifrato.
+    prova("avvisa entrambe le parti", 2, corpo.count("await notifica("))
+    prova("...e il codice non entra in nessuna notifica",
+          False, "{codice}" in rotta)
+    prova("...mentre il titolo passa da html.escape (il tubo HTML)",
+          True, "html.escape(_titolo_ordine(" in corpo)
+
+    # ---- la lista dei pacchi del titolare ---------------------------
+    lista = codice(pezzo("pacchi_del_punto"))
+    # IL CODICE ESCE SOLO DOPO, ed e' il gesto del banco: chi ritira
+    # lo dice e il titolare lo confronta.
+    prova("al titolare il codice esce solo dopo la presa in carico",
+          True, 'if r["punto_preso_il"] else ""' in lista)
+    # ⚠️ E IL `pop` STA FUORI DAL RAMO: dentro l'espressione
+    # condizionale girerebbe SOLO quando la presa in carico c'e' —
+    # cioe' proprio nel caso in cui il codice si nasconde la colonna
+    # CIFRATA resterebbe nel dict e uscirebbe dall'API. La riga
+    # sembrava fare la minimizzazione e non la faceva quando serviva.
+    # L'ha trovato il collaudo e non la rilettura, e questa sentinella
+    # esiste perche' non si ricompri dalla stessa porta.
+    prova("...e la colonna cifrata esce dal dict SEMPRE, non solo li'",
+          (True, False),
+          ('cifrato = r.pop("busta_codice")' in lista,
+           'r.pop("busta_codice") or "")' in lista))
+    # LA MINIMIZZAZIONE, per costruzione e non per attenzione: quel
+    # che non e' nella SELECT non puo' uscire per distrazione.
+    _sel = lista[lista.index("SELECT id,"):lista.index("ORDER BY spedito_il")]
+    prova("...e la SELECT non porta ne' chi compra ne' cosa c'e' dentro",
+          [], [c for c in ("compratore_id", "venditore_id", "annuncio_id",
+                           "prezzo_sats", "nota_compratore", "indirizzo")
+               if c in _sel])
+    prova("...e nemmeno un tg_id", False, "tg_id" in _sel)
+
+    # ---- i due gate della busta -------------------------------------
+    dep = codice(pezzo("deposita_busta_ritiro"))
+    dic = codice(pezzo("dichiara_busta_diretta"))
+    prova("sulla rete di casa il venditore non deposita la busta",
+          True, 'if o["punto_barattolo"]:' in dep)
+    prova("...e nemmeno dichiara la busta diretta",
+          True, 'if o["punto_barattolo"]:' in dic)
+    # IL SECONDO NON E' UNA RIFINITURA: quella dichiarazione zittisce
+    # i promemoria (la sua WHERE guarda `busta_diretta_il=0`) per un
+    # fatto che su questa strada non succedera' mai.
+    prova("...e i due rifiuti dicono chi scrive il codice",
+          (True, True),
+          ("lo scriviamo noi" in dep, "lo\n                                 "
+           "scriviamo noi" in dic or "scriviamo noi" in dic))
+
+    # ---- i due promemoria -------------------------------------------
+    buste = codice(pezzo("sollecita_buste_ferme"))
+    prova("il promemoria della busta salta la rete di casa",
+          True, "AND o.punto_barattolo='' " in buste)
+    man = codice(pezzo("sollecita_venditore"))
+    prova("...e la maniglia del compratore cambia bersaglio",
+          (True, True),
+          ('nostro = busta and bool(o["punto_barattolo"])' in man,
+           "destinatario_busta(o) if nostro else 0" in man))
+    # IL PUNTO IRRAGGIUNGIBILE NON CONSUMA IL GETTONE, ed e' la riga
+    # che si perde per prima: bussare a nessuno non e' bussare.
+    prova("...e se il punto non si raggiunge il gettone resta",
+          True, "if nostro and not a_chi:" in man)
+    dest = codice(pezzo("destinatario_busta"))
+    prova("il destinatario si risolve dal catalogo, mai da una colonna",
+          (True, True),
+          ('if not o["punto_barattolo"]:' in dest,
+           "titolare_punto(" in dest))
+
+    # ---- la nota al moderatore --------------------------------------
+    disp = codice(pezzo("apri_disputa"))
+    i = disp.index('if o["via_punto"] and o["punto_barattolo"]:')
+    nota = disp[i:disp.index('elif o["via_punto"]:', i)]
+    # I DUE RAMI, e il secondo e' quello che una nota scritta di
+    # fretta perderebbe: «non e' mai arrivato» e «e' arrivato e non
+    # l'hanno ritirato» sono due storie diverse.
+    prova("la nota al moderatore ha i due rami",
+          (True, True),
+          ('if o["punto_preso_il"]:' in nota, "NON ha mai segnato" in nota))
+    # LA REGOLA DI DEFAULT, dichiarata prima dell'acquisto: e' la
+    # ragione per cui la strada B esiste, e senza quella riga la
+    # presa in carico non comprerebbe niente.
+    prova("...e dice la regola di default che la strada B compra",
+          True, "chi ha spedito ha consegnato" in nota)
+    # SOLO FATTI: il moderatore la busta non la legge MAI, da nessuna
+    # strada — a differenza del contenuto digitale.
+    prova("...e non nomina mai il codice ne' il nome sulla busta",
+          [], [c for c in ("busta_codice", "busta_nome",
+                           "_decifra_contenuto") if c in nota])
+
+    # ---- il libro mastro --------------------------------------------
+    i = src.index("CONTROLLI_LIBRO_MASTRO = (")
+    cat = src[i:src.index("\n)\n", i)]
+    prova("il libro mastro guarda la presa in carico",
+          True, "presa in carico fuori contratto" in cat)
+    prova("...e il punto scritto sulla strada sbagliata",
+          True, "punto di casa fuori contratto" in cat)
+    sql = open("query_libro_mastro.sql", encoding="utf-8").read()
+    prova("...e il gemello SQL li conosce tutti e due",
+          (True, True),
+          ("16h) PRESA IN CARICO" in sql, "16i) PUNTO DI CASA" in sql))
+    # ⚠️ CONOSCERLI NON BASTA: l'intestazione si puo' lasciare
+    # intatta e riscrivere la WHERE storta, e allora il gemello TACE
+    # dove la ronda parla — cioe' chi lancia le query a mano si sente
+    # dire che va tutto bene. Si confronta la condizione VERA, spazi
+    # collassati, che i due dialetti la spaziano diversamente.
+    for _nome in ("presa in carico fuori contratto",
+                  "punto di casa fuori contratto"):
+        _j = cat.index('("' + _nome + '"')
+        _w = cat[cat.index("WHERE", _j):cat.index('"),', _j)]
+        # gli spazi si tolgono TUTTI e da tutti e due i lati: il
+        # catalogo scrive `punto_preso_il>0` e il gemello
+        # `punto_preso_il > 0`, e collassarli non basterebbe. Via
+        # anche le virgolette, che di la' la stringa e' spezzata.
+        def _nudo(t):
+            return "".join(t.split()).replace('"', "")
+        prova(f"...e la WHERE di «{_nome}» combacia nei due posti",
+              True, _nudo(_w) in _nudo(sql))
+
+    # ---- il client ---------------------------------------------------
+    _mo = pezzo_js(mini, "function mapOrder(", "\n}")
+    prova("l'ordine porta i due fatti della rete di casa",
+          (True, True),
+          ("puntoBarattolo:o.punto_barattolo||''" in _mo,
+           "puntoPresoIl:o.punto_preso_il||0" in _mo))
+    # E NON PORTA IL CODICE: quello si legge solo da /busta-ritiro,
+    # che e' la regola di sempre e non cambia su questa strada.
+    prova("...e non il codice, che vive solo nella busta",
+          [], [c for c in ("busta_codice", "bustaCodice") if c in _mo])
+    _pb = pezzo_js(mini, "function pannelloBustaRitiro(", "\n}")
+    # I TRE TESTI CHE DICEVANO IL FALSO, biforcati: su questa strada
+    # la busta la scrive il server, non il venditore.
+    prova("l'attesa del compratore dice chi scrive il codice",
+          True, "Su un punto di Barattolo il codice <b>lo scriviamo noi</b>"
+          in _pb)
+    prova("...e il nome sul pacco dice che e' quello del punto",
+          True, "e' quello del punto".replace("e'", "è") in _pb)
+    # IL GATE DEL VENDITORE, che lo fa cadere nel ramo di RILETTURA:
+    # un form che porta a un 400 e' peggio di un form che non c'e'.
+    prova("il venditore non vede il form della busta su un punto nostro",
+          True, "if (o.role==='seller' && o.puntoBarattolo && !o.bustaIl)"
+          in _pb)
+    prova("...e il ramo di sempre lo esclude", True,
+          "if (o.role==='seller' && !o.puntoBarattolo" in _pb)
+
+    # ---- il cassetto del titolare -----------------------------------
+    # SENZA DI LUI LA ROTTA E' IRRAGGIUNGIBILE, ed e' la meta' che
+    # rende viva la tappa: il gesto del punto non esiste da nessuna
+    # altra parte.
+    _cass = pezzo_js(mini, "async function renderPuntoPacchi(", "\n}")
+    prova("il cassetto del titolare chiede la sua lista",
+          True, "/punto/pacchi" in _cass)
+    # CHI NON TIENE UN PUNTO NON VEDE NIENTE, e la domanda la fa il
+    # SERVER: la lista dei punti torna vuota, e non nasce un secondo
+    # giudice da tenere in pari col catalogo.
+    prova("...e chi non tiene un punto non lo vede",
+          True, "if (!punti.length){" in _cass)
+    prova("...ne' in DEMO ne' in vetrina",
+          True, "if (DEMO || VETRINA || !myTgId){" in _cass)
+    _segna = pezzo_js(mini, "async function segnaPaccoRicevuto(", "\n}")
+    prova("il gesto passa dalla domanda unica", 1,
+          _segna.count("chiediConferma({"))
+    prova("...e chiama la rotta della presa in carico",
+          True, "/punto/preso" in _segna)
+    # LA CACHE SI AZZERA, o il bottone resterebbe li' su un pacco
+    # gia' segnato — il modo piu' facile di far premere due volte.
+    prova("...e azzera la cache prima di ridisegnare",
+          True, _segna.index("myPacchiPunto = null")
+          < _segna.index("await renderPuntoPacchi()"))
+    prova("il cassetto si disegna col giro del Profilo",
+          1, codice(pezzo_js(mini, "function renderIdentita(", "\n}")
+                    ).count("renderPuntoPacchi();"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -44388,7 +44699,7 @@ def main():
               prove_vetrina_canale, prove_relay_leva,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
-              prove_punti_barattolo,
+              prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_salvati,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,

@@ -303,6 +303,31 @@ SELECT id, stato, via_punto, busta_il, busta_diretta_il
     OR (busta_diretta_il > 0 AND via_punto = 0)
     OR (busta_diretta_il > 0 AND busta_il > 0);
 
+SELECT '16h) PRESA IN CARICO FUORI CONTRATTO (vuoto)' AS controllo;
+-- la rete di punti di casa (ago 2026): il timbro e il codice negozio
+-- del punto si scrivono nello STESSO UPDATE, e solo su un ordine che
+-- passa di lì. Il secondo braccio è quello che morde: una presa in
+-- carico su una strada che non è la nostra vorrebbe dire che la
+-- guardia della rotta è caduta — e quella riga avrebbe una busta
+-- scritta da noi dove il codice lo deposita il venditore, cioè due
+-- sorgenti per lo stesso dato.
+SELECT id, stato, via_punto, punto_barattolo, punto_preso_il
+  FROM ordini
+ WHERE (punto_preso_il > 0) <> (punto_preso_da <> '')
+    OR (punto_preso_il > 0 AND (via_punto = 0 OR punto_barattolo = ''));
+
+SELECT '16i) PUNTO DI CASA FUORI CONTRATTO (vuoto)' AS controllo;
+-- l'id del punto lo fissa compra() insieme alla via, e nessuna rotta
+-- lo riscrive dopo: una riga con un punto di casa ma senza la via
+-- punto la vedrebbe il titolare mentre per le due parti quella strada
+-- non esiste.
+-- ⚠️ NON si guarda se l'id è nel catalogo: togliere una voce è un
+-- gesto LEGITTIMO — è la sola sanzione che abbiamo verso un punto — e
+-- gli ordini già nati continuano a nominarlo apposta.
+SELECT id, stato, via_punto, punto_barattolo
+  FROM ordini
+ WHERE punto_barattolo <> '' AND via_punto = 0;
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.

@@ -5181,7 +5181,22 @@ def init_db():
                     # nessun bottone di undo. E' una dichiarazione di
                     # PARTE non verificabile: in disputa il moderatore
                     # la legge etichettata cosi', con la sua data.
-                    "busta_diretta_il INTEGER DEFAULT 0"):
+                    "busta_diretta_il INTEGER DEFAULT 0",
+                    # LA PRESA IN CARICO DEL PUNTO DI CASA (ago 2026):
+                    # il fatto che la rete nostra compra, e l'unico che
+                    # in quella strada possiamo verificare. Dietro un
+                    # locker c'e' un sistema che sa che il pacco e' in
+                    # giacenza li'; dietro un punto nostro c'e' una
+                    # persona, e quel che resta scritto e' il momento
+                    # in cui l'ha segnato. Il pattern di `busta_il`: il
+                    # flag E il quando in una colonna sola.
+                    "punto_preso_il INTEGER DEFAULT 0",
+                    # ...e CHI, col codice negozio e mai il tg_id: e'
+                    # il dato che il moderatore legge in disputa e che
+                    # il libro mastro incrocia, e un id numerico li'
+                    # dentro sarebbe l'unica riga di `ordini` che
+                    # nomina una persona invece di una bottega.
+                    "punto_preso_da TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -24902,6 +24917,21 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "un punto di ritiro")
+    if o["punto_barattolo"]:
+        # SULLA RETE DI CASA LA BUSTA NON E' SUA (ago 2026), ed e' il
+        # ribaltamento del cantiere: il nome sull'etichetta e' quello
+        # del PUNTO e il codice lo conia il server quando il punto
+        # prende in carico. Il gate e' obbligatorio e non una
+        # rifinitura — senza, un deposito riscriverebbe un codice che
+        # chi compra ha gia' in mano, e lo manderebbe al banco con una
+        # stringa che non apre piu' niente. Il venditore la busta la
+        # LEGGE lo stesso, dalla rotta di sempre: quel che perde e'
+        # solo il diritto di scriverla.
+        con.close()
+        raise HTTPException(400, "Su un punto di Barattolo il codice di "
+                                 "ritiro lo scriviamo noi, quando il punto "
+                                 "segna di aver ricevuto il pacco: lo trovi "
+                                 "qui nell'ordine appena succede")
     vecchio = o["busta_file"]
     if togli_doc:
         file_nome = tipo_doc = etichetta = ""
@@ -25036,6 +25066,20 @@ async def dichiara_busta_diretta(ordine_id: int,
         raise HTTPException(400, "Le istruzioni di ritiro sono già "
                                  "nell'ordine: il compratore le legge "
                                  "da lì")
+    if o["punto_barattolo"]:
+        # E NEMMENO LA DICHIARAZIONE (ago 2026): la busta diretta dice
+        # «il codice arriva al compratore dal corriere, coi suoi
+        # recapiti sull'etichetta». Su un punto nostro non c'e' nessun
+        # corriere che conii un codice — lo conia il server quando il
+        # punto prende in carico — quindi quella dichiarazione non ha
+        # oggetto, e accettarla zittirebbe i promemoria (la sua WHERE
+        # guarda `busta_diretta_il=0`) per un fatto che non
+        # succedera' mai.
+        con.close()
+        raise HTTPException(400, "Su un punto di Barattolo il codice di "
+                                 "ritiro non passa dal corriere: lo "
+                                 "scriviamo noi quando il punto segna di "
+                                 "aver ricevuto il pacco")
     adesso = int(time.time())
     cur = con.execute("UPDATE ordini SET busta_diretta_il=? "
                       "WHERE id=? AND busta_diretta_il=0",
@@ -25057,6 +25101,237 @@ async def dichiara_busta_diretta(ordine_id: int,
                    "corriere, non dall'ordine. Se non ti arriva, "
                    "scrivigli o apri una disputa dall'ordine.")
     return {"ok": True, "busta_diretta_il": adesso}
+
+
+def destinatario_busta(o) -> int:
+    """CHI ASPETTIAMO per il codice di ritiro: il venditore, o il
+    TITOLARE DEL PUNTO se l'ordine passa dalla rete di casa.
+
+    E' il giudice di una domanda che prima aveva una risposta sola, e
+    da oggi ne ha due: su una rete di terzi il codice arriva al
+    venditore per email e lo deposita lui, su un punto nostro il pacco
+    ce l'ha in mano il punto e a segnarlo dev'essere lui. Bussare al
+    venditore li' sarebbe chiedergli una cosa che non puo' fare - il
+    difetto che il gate di `sollecita_buste_ferme` toglie dalla parte
+    automatica, e questo lo toglie da quella a comando.
+
+    Torna 0 quando non c'e' nessuno a cui bussare: punto uscito dal
+    catalogo, o codice negozio che non risolve piu'. Fail-closed come
+    il resto della rete - meglio nessuna bussata che una a caso - e il
+    chiamante lo tratta come «non si puo'», che e' la verita'."""
+    if not o["punto_barattolo"]:
+        return int(o["venditore_id"])
+    return titolare_punto(punto_barattolo(o["punto_barattolo"]).get(
+        "negozio", ""))
+
+
+@app.get("/api/punto/pacchi")
+async def pacchi_del_punto(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """I PACCHI CHE ARRIVANO AL MIO PUNTO — la superficie senza la
+    quale la presa in carico non esisterebbe.
+
+    Non era nel piano ed e' dichiarata: `/api/orders` serve le due
+    parti e i moderatori, e il titolare di un punto non e' nessuno dei
+    tre — quindi `POST /api/orders/{id}/punto/preso` sarebbe una rotta
+    che nessuno puo' raggiungere. E' il minimo che la rende viva.
+
+    IL PUNTO VEDE IL NUMERO E IL TRACCIAMENTO, MAI IL RESTO: non il
+    titolo dell'annuncio, non chi compra, non chi vende, non quanto e'
+    costato. E' la minimizzazione della busta applicata a un terzo, e
+    qui pesa di piu' che altrove — la busta la leggono le due parti
+    dell'affare, questa la legge qualcuno che nell'affare non c'entra.
+    IL TRACCIAMENTO PERO' CI VUOLE, ed e' l'unica cosa che rende la
+    lista usabile: sull'etichetta c'e' il nome DEL PUNTO, uguale su
+    tutti i pacchi, quindi senza il codice del corriere il titolare
+    avrebbe una fila di numeri e nessun modo di dire quale scatolone
+    e' quale. Non dice niente su chi compra ne' su cosa c'e' dentro.
+
+    UN UTENTE PUO' AVERE PIU' PUNTI, e non e' un caso di scuola: il
+    catalogo lega ogni punto a un codice negozio, e un negozio solo
+    puo' comparire in due voci (due locali, due indirizzi). Si
+    guardano quindi TUTTI i suoi punti, e ogni riga dice a quale.
+
+    LEGGE E BASTA: nessuna scrittura, quindi si puo' chiamare a ogni
+    apertura della vista senza che niente si muova — e chi non e'
+    titolare di nessun punto riceve una lista vuota e non un 403, che
+    e' la verita' e non un oracolo (non ci sono punti da nascondere:
+    il catalogo e' pubblico appena si compra).
+
+    I GIA' PRESI RESTANO, e per due ragioni: il titolare deve poter
+    rileggere il codice se chi ritira dice di non averlo, e vedere
+    quel che ha appena segnato e' l'unico riscontro che il gesto sia
+    andato a buon fine. Escono quando l'ordine esce da 'shipped',
+    cioe' quando il pacco e' stato ritirato davvero."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    miei = [p for p in punti_barattolo_vivi()
+            if titolare_punto(p.get("negozio", "")) == user["id"]]
+    if not miei:
+        return {"punti": [], "pacchi": []}
+    ids = [p["id"] for p in miei]
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT id, punto_barattolo, spedito_il, corriere, tracking, "
+        "punto_preso_il, busta_codice FROM ordini "
+        "WHERE stato='shipped' AND via_punto=1 "
+        "AND punto_barattolo IN (%s) ORDER BY spedito_il"
+        % ",".join("?" * len(ids)), ids)]
+    con.close()
+    nomi = {p["id"]: p.get("nome", "") for p in miei}
+    for r in righe:
+        r["punto_nome"] = nomi.get(r["punto_barattolo"], "")
+        # IL CODICE ESCE SOLO DOPO LA PRESA IN CARICO, ed e' il
+        # meccanismo del banco e non una comodita': chi ritira lo dice
+        # e il titolare lo confronta — senza, consegnerebbe il pacco a
+        # chiunque si presenti. Non e' un'escalation: quel pacco ce
+        # l'ha gia' in mano, e la stessa stringa e' nell'ordine di chi
+        # compra. PRIMA della presa in carico non esiste proprio: e'
+        # il server a coniarlo in quell'istante.
+        # ⚠️ IL `pop` STA FUORI DAL RAMO, e non e' pignoleria: dentro
+        # l'espressione condizionale gira SOLO quando la presa in
+        # carico c'e' — cioe' proprio nel caso in cui il codice si
+        # nasconde la colonna cifrata resterebbe nel dict e uscirebbe
+        # dall'API. La riga sembrava fare la minimizzazione e non la
+        # faceva quando serviva. L'ha trovato il collaudo, non la
+        # rilettura: la prova di prima girava su una colonna VUOTA,
+        # dove non c'era niente da nascondere.
+        cifrato = r.pop("busta_codice") or ""
+        r["codice"] = (_decifra_contenuto(cifrato)
+                       if r["punto_preso_il"] else "")
+    return {"punti": [{"id": p["id"], "nome": p.get("nome", "")}
+                      for p in miei],
+            "pacchi": righe}
+
+
+ALFABETO_RITIRO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+def conia_codice_ritiro() -> str:
+    """Il codice che chi compra dice al banco. Sei caratteri.
+
+    L'ALFABETO E' SENZA `0`, `1`, `I` e `O` APPOSTA: al banco quel
+    codice si legge ad alta voce o si mostra su uno schermo incrinato,
+    e «zero o o?» e' l'unico modo in cui questo pezzo puo' fallire.
+    Sei caratteri su 32 simboli fanno un miliardo di combinazioni: non
+    e' un segreto crittografico - a proteggere il pacco c'e' una
+    persona che ti vede in faccia - ma non si indovina provando.
+
+    `secrets` e non `random`: e' pur sempre la chiave che apre un
+    pacco di qualcun altro, e un generatore prevedibile non si usa mai
+    dove una stringa vale qualcosa.
+    """
+    return "".join(secrets.choice(ALFABETO_RITIRO) for _ in range(6))
+
+
+@app.post("/api/orders/{ordine_id}/punto/preso")
+async def punto_preso_in_carico(ordine_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """IL PUNTO SEGNA CHE IL PACCO E' ARRIVATO - la strada B.
+
+    E' l'unico fatto che la rete di casa compra, ed e' anche tutto
+    quello che compra: dal banco alla mano di chi ritira non c'e' piu'
+    niente che possiamo verificare, ed e' scritto in `sicu-limiti`.
+    Ma quel fatto ha una data ed e' NOSTRO - non la parola di una
+    delle due parti - e da li' discende il resto: il codice si conia
+    QUI, perche' prima non serve a nessuno e dopo sarebbe tardi.
+
+    CHI PUO': il titolare del punto di QUELL'ordine, risolto dal
+    catalogo col codice negozio. La guardia non sta nella WHERE come
+    nei fratelli e non ci puo' stare - il titolare vive nel catalogo,
+    che e' un letterale del codice e non una colonna - quindi si legge
+    l'ordine e si confronta dopo. Il 400 pero' e' lo STESSO dei
+    fratelli e per la stessa ragione: ordine inesistente, ordine di un
+    altro punto, rete di terzi, stato sbagliato e punto spento
+    rispondono identici - chi enumera non impara niente, e qui
+    imparerebbe quali ordini passano da un punto.
+
+    IL PUNTO SPENTO NON PRENDE PIU' IN CARICO NIENTE, ed e' l'unica
+    sanzione che abbiamo: con lui non c'e' nessun contratto da far
+    valere, e toglierlo dalla rete e' quel che la pagina pubblica
+    promette. Si guarda `punti_barattolo_vivi()` e non il catalogo
+    intero, o un punto tolto continuerebbe a lavorare.
+
+    IL PUNTO NON SA COSA C'E' NEL PACCO NE' CHI COMPRA: da questa
+    rotta esce un ok e basta, e la lista dei pacchi che gli arrivano
+    porta il numero d'ordine e nient'altro. E' la minimizzazione della
+    busta, applicata a un terzo.
+
+    IDEMPOTENTE: l'UPDATE e' condizionato a `punto_preso_il=0`, quindi
+    il secondo tocco su rete lenta risponde ok SENZA riconiare il
+    codice e senza una seconda notifica - riconiarlo sarebbe il
+    difetto peggiore di tutto il cantiere, perche' chi ha comprato
+    starebbe gia' andando al banco con quello di prima.
+
+    NON TOCCA `spedito_il` ne' `aggiornato`: sono le ancore dei
+    promemoria, e riscriverle farebbe ripartire da capo l'attesa di
+    qualcuno - la trappola gia' pagata quattro volte. E non tocca lo
+    STATO: 'shipped' resta 'shipped', i sats restano in cassaforte, e
+    a muoverli e' solo la conferma di chi ha comprato. Prendere in
+    carico non e' consegnare.
+    """
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND via_punto=1 "
+                    "AND stato='shipped' AND punto_barattolo<>''",
+                    (ordine_id,)).fetchone()
+    vivi = {p["id"]: p for p in punti_barattolo_vivi()}
+    pt = vivi.get(o["punto_barattolo"]) if o else None
+    if not pt or titolare_punto(pt.get("negozio", "")) != user["id"]:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["punto_preso_il"]:
+        con.close()
+        return {"ok": True, "punto_preso_il": o["punto_preso_il"]}
+    adesso = int(time.time())
+    codice = conia_codice_ritiro()
+    # LA BUSTA SI SCRIVE QUI, ed e' il ribaltamento del cantiere: su
+    # ogni altra rete la deposita il venditore col nome di fantasia
+    # che ha messo sull'etichetta, qui il nome sull'etichetta e' il
+    # NOME DEL PUNTO - lo sa gia' da `punto_ritiro` - e il codice
+    # serve a chi ritira e non al corriere per consegnare. Il
+    # venditore quindi non lo conia: lo legge, dalla stessa rotta
+    # della busta, che serve entrambe le parti.
+    cur = con.execute(
+        "UPDATE ordini SET punto_preso_il=?, punto_preso_da=?, "
+        "busta_nome=?, busta_codice=?, busta_il=? "
+        "WHERE id=? AND punto_preso_il=0",
+        (adesso, pt.get("negozio", ""),
+         _cifra_contenuto(pt.get("nome", "")),
+         _cifra_contenuto(codice), adesso, ordine_id))
+    if cur.rowcount == 0:
+        # La corsa fra due tocchi: il primo ha gia' scritto, e il
+        # secondo non deve riconiare niente ne' avvisare due volte.
+        con.close()
+        return {"ok": True, "punto_preso_il": adesso}
+    # Il titolo si legge con la connessione ANCORA APERTA:
+    # `_righe_ordine` la vuole, ed e' l'unico modo di coprire i set.
+    titolo = html.escape(_titolo_ordine(_righe_ordine(con, o)))
+    if titolo == "?":
+        titolo = "il tuo acquisto"
+    con.commit()
+    con.close()
+    print(f"\U0001f3ea Ordine #{ordine_id}: pacco preso in carico dal punto "
+          f"{o['punto_barattolo']}")
+    nome = html.escape(pt.get("nome", ""))
+    # A ENTRAMBE le parti, e non e' cortesia: al compratore e' il
+    # fatto che aspettava - il pacco c'e' e adesso ha un codice - e al
+    # venditore e' la PROVA che non aveva, cioe' la ragione per cui
+    # questa rete puo' esistere. Il codice pero' non entra in nessuna
+    # delle due notifiche: si legge dall'ordine, dove vive cifrato.
+    await notifica(o["compratore_id"],
+                   f"\U0001f3ea <b>Il tuo pacco e' arrivato</b> a {nome}."
+                   f"\n\n«{titolo}»\n\n"
+                   "Apri l'ordine: dentro trovi il <b>codice di ritiro</b> "
+                   "da dire al banco. Vai a ritirarlo presto — e quando "
+                   "ce l'hai in mano conferma la ricezione, così i sats "
+                   "vanno al venditore.")
+    await notifica(o["venditore_id"],
+                   f"\U0001f3ea <b>Il pacco è arrivato al punto</b> "
+                   f"({nome}).\n\n«{titolo}»\n\n"
+                   "Il punto lo ha segnato qui dentro, con la data: adesso "
+                   "tocca a chi ha comprato andare a ritirarlo.")
+    return {"ok": True, "punto_preso_il": adesso}
 
 
 @app.get("/api/orders/{ordine_id}/busta-ritiro")
@@ -25820,6 +26095,23 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
     # che nel frattempo deposita la busta risolve il problema, quindi
     # da li' in poi non c'e' piu' niente per cui bussare.
     diretta = busta and o["busta_diretta_il"] > 0
+    # LA RETE DI CASA HA UN ALTRO DESTINATARIO (ago 2026): li' il
+    # codice non arriva al venditore per email — lo conia il server
+    # quando il PUNTO segna di aver ricevuto il pacco — quindi
+    # bussare a chi ha spedito sarebbe chiedergli una cosa che non
+    # puo' fare. La fase e' la stessa (chi ha comprato aspetta il
+    # codice di ritiro), quindi restano identici finestra, pausa,
+    # tetto e contatori: a cambiare sono il destinatario e le parole.
+    nostro = busta and bool(o["punto_barattolo"])
+    a_chi = destinatario_busta(o) if nostro else 0
+    if nostro and not a_chi:
+        # il punto e' uscito dal catalogo, o il suo codice negozio non
+        # risolve piu': non c'e' nessuno a cui bussare, e il gettone
+        # non si consuma. Si dice la strada che resta.
+        con.close()
+        raise HTTPException(400, "Non riusciamo a raggiungere il punto di "
+                                 "ritiro. Se il pacco non arriva, apri una "
+                                 "disputa: i tuoi sats sono al sicuro")
     if not o["consegna_scelta"]:
         # LA STESSA DOMANDA CHE SI FA `segna_spedito` (ago 2026, dal
         # campo: il bottone non compariva su ordini vecchi e pagati da
@@ -25901,6 +26193,23 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     (adesso, ordine_id))
     con.commit()
     con.close()
+    if nostro:
+        # AL PUNTO, e il testo dice il GESTO che gli tocca: non
+        # «deposita il codice» — quello lo conia il server — ma
+        # «segna che il pacco e' arrivato», che e' l'unica cosa che
+        # solo lui puo' fare e da cui discende tutto il resto.
+        # Il titolo dell'annuncio NON entra: il punto non sa cosa c'e'
+        # nel pacco, ed e' la stessa minimizzazione della busta.
+        await notifica(a_chi,
+                       f"\U0001f3ea <b>Chi aspetta il pacco dell'ordine "
+                       f"#{ordine_id} sta aspettando il codice di "
+                       "ritiro.</b>\n"
+                       "Se il pacco \u00e8 gi\u00e0 da te, aprilo nella "
+                       "Mini App e <b>segnalo come arrivato</b>: da l\u00ec "
+                       "il codice parte da solo. Se non \u00e8 ancora "
+                       "arrivato non devi fare niente \u2014 questo "
+                       "messaggio te lo manda chi lo aspetta, non noi.")
+        return {"ok": True}
     if diretta:
         # IL FATTO CHE SOLO CHI COMPRA PUO' SAPERE (ago 2026): il
         # codice e' partito verso un recapito e li' non e' arrivato.
@@ -32867,7 +33176,54 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
     # correzioni si contano) — MAI il contenuto, che a differenza del
     # bene digitale nessun moderatore puo' leggere.
     nota_punto = ""
-    if o["via_punto"]:
+    if o["via_punto"] and o["punto_barattolo"]:
+        # LA RETE DI CASA HA UNA NOTA SUA, e non e' una variante di
+        # quella dei terzi: li' la busta la deposita il VENDITORE e
+        # «mai depositate» e' un rimprovero a lui, qui la scrive la
+        # PIATTAFORMA quando il punto prende in carico — quindi
+        # riusare quelle parole direbbe il falso su chi ha fatto cosa,
+        # che e' precisamente l'unica cosa che una nota al moderatore
+        # non puo' sbagliare.
+        #
+        # ⚠️ E QUI SI SCRIVE LA REGOLA DI DEFAULT, che e' la ragione
+        # per cui la strada B esiste: se il punto ha segnato, a zero
+        # prove chi ha spedito ha consegnato. E' il gemello esatto del
+        # codice digitale («a zero prove vince chi ha consegnato») ed
+        # e' DICHIARATA PRIMA dell'acquisto in `sicu-limiti` — non e'
+        # una decisione che il moderatore prende leggendo questa nota,
+        # e' quella che gli si ricorda mentre decide.
+        pnt = punto_barattolo(o["punto_barattolo"])
+        nome_p = pnt.get("nome") or o["punto_barattolo"]
+        if o["punto_preso_il"]:
+            quando_p = time.strftime(
+                "%d/%m/%Y %H:%M", time.localtime(o["punto_preso_il"]))
+            nota_punto = (
+                f"\n\U0001f3ea PUNTO DI BARATTOLO ({nome_p}): il punto ha "
+                f"segnato di aver RICEVUTO il pacco il {quando_p}, e da "
+                f"lì il codice di ritiro l'ha scritto la piattaforma — "
+                f"non il venditore. È un fatto NOSTRO con una data, e la "
+                f"regola dichiarata prima dell'acquisto dice che da qui "
+                f"in poi, a zero prove, chi ha spedito ha consegnato. "
+                f"Dal banco alla mano di chi ritira non c'è più niente "
+                f"che possiamo verificare: è lo stesso limite del "
+                f"ritiro a mano.")
+        else:
+            # IL CASO OPPOSTO E' ALTRETTANTO UTILE, ed e' la meta' che
+            # una nota scritta di fretta perderebbe: «il pacco non e'
+            # mai arrivato al punto» e «e' arrivato e non l'hanno
+            # ritirato» sono due storie diverse, e senza la presa in
+            # carico il moderatore non poteva distinguerle.
+            nota_punto = (
+                f"\n\U0001f3ea PUNTO DI BARATTOLO ({nome_p}): il punto "
+                f"NON ha mai segnato di aver ricevuto il pacco, quindi "
+                f"su questa rete il codice di ritiro non è mai esistito "
+                f"— lo scrive la piattaforma alla presa in carico, mai "
+                f"il venditore. Il tracciamento del corriere è l'unica "
+                f"cosa che dice dove sia arrivato.")
+        if o["punto_preso_da"]:
+            nota_punto += (f" Codice negozio del punto: "
+                           f"{o['punto_preso_da']}.")
+    elif o["via_punto"]:
         if o["busta_il"]:
             quando = time.strftime("%d/%m/%Y %H:%M",
                                    time.localtime(o["busta_il"]))
@@ -35198,6 +35554,19 @@ async def sollecita_buste_ferme():
         # la busta diretta: il codice va al compratore, qui non c'e'
         # niente da aspettare — ne' promemoria ne' 🧊
         "AND o.busta_diretta_il=0 "
+        # LA RETE DI CASA TACE ANCHE LEI (ago 2026), e qui il gate e'
+        # OBBLIGATORIO e non una rifinitura: su un punto nostro la
+        # busta non la deposita il venditore — la SCRIVE il server
+        # quando il punto prende in carico — quindi `busta_il` resta 0
+        # finche' il pacco non arriva, e senza questa riga il
+        # promemoria rimprovererebbe chi ha spedito per una cosa che
+        # non puo' fare, ogni tre giorni fino al 🧊.
+        # ⚠️ E' UN'ESCLUSIONE DIVERSA DALLA SORELLA: la busta diretta
+        # esce perche' NON C'E' NIENTE DA ASPETTARE, questa perche'
+        # ASPETTA QUALCUN ALTRO — e a guardare quella popolazione c'e'
+        # la maniglia del compratore, che sulla rete di casa cambia
+        # bersaglio (`sollecita_venditore`, fase busta).
+        "AND o.punto_barattolo='' "
         "AND o.spedito_il>0 AND o.solleciti_busta <= ? "
         "AND MAX(o.spedito_il + ?, o.sollecito_busta_il + ?) < ?",
         (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
@@ -39692,6 +40061,47 @@ CONTROLLI_LIBRO_MASTRO = (
      "WHERE (punto_obiettato_il>0) <> (punto_obiezione<>'') "
      "OR (punto_obiettato_il>0 AND via_punto=0) "
      "OR (punto_obiezioni=0 AND punto_obiettato_il>0)"),
+    # LA PRESA IN CARICO DEL PUNTO DI CASA (ago 2026), il calco della
+    # busta e per la stessa ragione: `punto_preso_il` e
+    # `punto_preso_da` si scrivono nello STESSO UPDATE, quindi non
+    # esiste uno stato transitorio legittimo in cui divergono.
+    # IL SECONDO RAMO E' QUELLO CHE MORDE: una presa in carico su un
+    # ordine che non passa dalla rete di casa vorrebbe dire che la
+    # guardia della rotta e' caduta — e quella riga avrebbe una busta
+    # scritta da noi su una strada dove il codice lo deposita il
+    # venditore, cioe' due sorgenti per lo stesso dato.
+    # ⚠️ DA NON AGGIUNGERE, e verra' in mente: «punto acceso e ordine
+    # senza presa in carico». E' lo stato NORMALE di ogni pacco in
+    # transito — suonerebbe su tutti — ed e' precisamente il caso che
+    # `sollecita_venditore` raccoglie a comando. E nemmeno «preso in
+    # carico senza codice»: `_cifra_contenuto` prefissa anche il
+    # vuoto, quindi quella colonna dopo la scrittura non e' mai '' e
+    # il braccio non potrebbe suonare — una guardia che nessuno
+    # esercita e' peggio di nessuna guardia.
+    ("presa in carico fuori contratto",
+     "il timbro e il codice negozio del punto si scrivono nello "
+     "stesso UPDATE, e solo su un ordine che passa dalla rete di "
+     "casa: una riga spaiata e' una guardia caduta",
+     "SELECT id FROM ordini "
+     "WHERE (punto_preso_il>0) <> (punto_preso_da<>'') "
+     "OR (punto_preso_il>0 AND (via_punto=0 OR punto_barattolo=''))"),
+    # E IL PUNTO SCRITTO SULLA STRADA SBAGLIATA: l'id lo fissa
+    # `compra` insieme alla via e nessuna rotta lo riscrive dopo —
+    # quindi un ordine con un punto di casa ma non via punto e' un
+    # ordine che il pannello del titolare mostrerebbe mentre per le
+    # due parti quella strada non esiste.
+    # ⚠️ NON SI GUARDA SE L'ID E' NEL CATALOGO, e la ragione e' la
+    # domanda d'ammissione: togliere una voce dal catalogo e' un gesto
+    # LEGITTIMO — e' la sola sanzione che abbiamo verso un punto — e
+    # gli ordini gia' nati continuano a nominarlo apposta (il patto di
+    # `punto_barattolo`, che lo spento lo restituisce). Un braccio
+    # sull'id sconosciuto suonerebbe su quelle righe per sempre, cioe'
+    # sarebbe un allarme permanente su uno stato normale.
+    ("punto di casa fuori contratto",
+     "l'id del punto si scrive solo insieme alla via punto: una riga "
+     "spaiata la vedrebbe il titolare e non le due parti",
+     "SELECT id FROM ordini "
+     "WHERE punto_barattolo<>'' AND via_punto=0"),
     # L'INDIRIZZO DI CASA. Il terzo ramo e' quello che vale davvero:
     # rende VERIFICABILE la promessa pubblica invece che raccontata —
     # se la scopa ha timbrato ma il testo e' ancora li', quello che
