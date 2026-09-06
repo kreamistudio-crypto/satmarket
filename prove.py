@@ -35215,14 +35215,25 @@ def prove_p2p_chiavi():
           in cod)
     am = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
     prova("assicuraMazzo legge il cloud PRIMA di generare", True,
-          0 < am.find("cloudLeggi(CLOUD_MAZZO)") < am.find("generateSecretKey"))
+          0 < am.find("cloudLeggiEsito(CLOUD_MAZZO)") < am.find("generateSecretKey"))
     # HA CAMBIATO LATO col cantiere della riconciliazione (set 2026), e
     # la nuova e' PIU' STRETTA: si guardava `nuvola` — il mazzo LETTO —
     # ma un testo che c'e' e non si legge da' `nuvola` a null pur non
     # essendo un posto libero, e sovrascriverlo butterebbe via una
     # chiave. Si guarda il testo GREZZO: si scrive solo sul vuoto vero.
+    # HA CAMBIATO LATO DUE VOLTE, e ogni giro ha STRETTO: prima si
+    # guardava `nuvola` (il mazzo LETTO), poi il testo grezzo, adesso
+    # l'ESITO della lettura. Il passo che mancava e' che `null` diceva
+    # tre cose insieme — vuoto, illeggibile, e LETTURA FALLITA — e la
+    # terza e' quella che costa: un errore di rete al momento sbagliato
+    # faceva scrivere il mazzo locale sopra una copia che c'era, cioe'
+    # distruggeva una chiave. Si scrive solo su un vuoto DIMOSTRATO.
     prova("...e scrive il cloud solo se era vuoto DAVVERO", True,
-          "if (!grezzo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO" in am)
+          "if (letto.ok && !letto.testo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO"
+          in am)
+    prova("...e una lettura FALLITA non e' un vuoto (non si scrive)", True,
+          "else if (letto.testo) mazzoNuvola = 'illeggibile';" in am
+          and "else mazzoNuvola = 'muto';" in am)
     prova("...e registra la pubkey appena nato", True,
           "await registraChiaviP2P([nuovo.pub]);" in am)
     prova("il codice entra nel campo col .value, mai in un template", True,
@@ -37311,7 +37322,7 @@ def prove_p2p_nuvola():
     # «dopo l'indice»: piu' sotto la scrittura della migrazione c'e'
     # eccome, solo che da qui e' irraggiungibile — una sentinella che la
     # trovasse direbbe il falso su una riga giusta.
-    ramo = sin[sin.index("if (grezzo) {"):]
+    ramo = sin[sin.index("if (letto.testo) {"):]
     ramo = ramo[:ramo.index("\n    }")]
     prova("nel ramo del cloud che C'E' non si scrive mai",
           -1, ramo.find("cloudScrivi"))
@@ -37320,13 +37331,54 @@ def prove_p2p_nuvola():
     prova("...e due mazzi diversi nemmeno", True,
           "if (su.sk !== m.sk) { mazzoNuvolaAltro = su;" in ramo)
     prova("il testo si legge GREZZO prima di interpretarlo", True,
-          sin.index("cloudLeggi") < sin.index("caricaNostrTools"))
-    # il bundle si carica solo dentro quel ramo: senza, `mazzoDaTesto`
-    # tornerebbe null su un cloud PIENO e il null si leggerebbe «vuoto»
+          sin.index("cloudLeggiEsito") < sin.index("caricaNostrTools"))
+    # IL BUNDLE SI CARICA SOLO DENTRO UN RAMO CHE HA GIA' VISTO DEL
+    # TESTO: senza, `mazzoDaTesto` tornerebbe null su un cloud PIENO e
+    # il null si leggerebbe «vuoto». Le occorrenze sono DUE da quando si
+    # adotta (adozione e conflitto) e si guardano TUTTE: elencarle
+    # vorrebbe dire che la terza di domani non la guarda nessuno.
+    _car = [i for i in range(len(sin)) if sin.startswith("caricaNostrTools", i)]
     prova("il bundle si carica solo quando c'e' qualcosa da leggere",
-          True, "caricaNostrTools" in ramo
-          and sin.index("if (grezzo) {") < sin.index("caricaNostrTools"))
+          True, len(_car) >= 2 and all("letto.testo" in sin[:i] for i in _car))
+    # ...E LA LETTURA FALLITA ESCE PRIMA DI TUTTO: `{ok:false}` non e' un
+    # cloud vuoto e non e' un cloud pieno — non si adotta, non si scrive,
+    # non si promette niente. E' la lezione di NON_CHIESTO, su un altro
+    # asse: «non ho potuto chiedere» non autorizza NIENTE.
+    prova("una lettura fallita esce prima di ogni scrittura", True,
+          0 < sin.index("if (!letto.ok)") < sin.index("cloudScrivi"))
     prova("una promessa sola per volta", True, "if (sincroInCorso)" in sin)
+
+    # L'ADOZIONE, la meta' della gamba 1 che mancava: su un dispositivo
+    # nuovo il mazzo sta nel cloud e qui non c'e' ancora. SI ADOTTA E NON
+    # SI GENERA — aprire una pagina non deve far nascere un'identita' che
+    # nessuno ha chiesto, e quella nasce da un gesto in `assicuraMazzo`.
+    _ado = sin[sin.index("if (!m) {"):sin.index("if (letto.testo) {")]
+    prova("senza mazzo e col cloud vuoto non si genera niente", True,
+          "if (!letto.testo) return (mazzoNuvola = \'\');" in _ado
+          and "generateSecretKey" not in _ado)
+    prova("...e col cloud pieno si adotta", True, "ricordaMazzo(su);" in _ado)
+    prova("...e il mazzo adottato si rimanda al server", True,
+          "await registraChiaviP2P([su.pub]);" in _ado)
+    prova("...e un testo illeggibile non si adotta ne' si sovrascrive",
+          True, "if (!su) return (mazzoNuvola = \'illeggibile\');" in _ado
+          and "cloudScrivi" not in _ado)
+
+    # L'ADOZIONE STA NEL RENDER E NON IN `vaiP2P`, ed e' la riga che
+    # leggendo non si vede: quello e' il solo ingresso dal TAB, mentre
+    # alla vista ci si torna col gesto indietro e dalla cronologia, che
+    # cadono nel `go(b.v)` generico e da li' non passano MAI (la lezione
+    # di `renderInteresse`). Il render invece lo attraversano tutte.
+    _rp2p = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("il render va a cercare il mazzo nel cloud quando manca", True,
+          "if (!mz && !p2pAdozione) {" in _rp2p and "sincronizzaMazzo()" in _rp2p)
+    prova("...una volta per sessione", True, "p2pAdozione = true;" in _rp2p)
+    # e la bandierina NON si azzera dimenticando il profilo: quel gesto
+    # cancella anche la copia, ma `cloudCancella` e' fail-open MUTA — se
+    # fallisse, si riadotterebbe un istante dopo quel che uno ha appena
+    # deciso di dimenticare
+    _dim = pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
+    prova("dimenticare il profilo non lo fa tornare dal cloud", -1,
+          _dim.find("p2pAdozione = false"))
 
     # i due agganci: senza il primo la migrazione non gira per chi il
     # foglio non lo apre mai, senza il secondo la riga di stato mente
@@ -37335,8 +37387,15 @@ def prove_p2p_nuvola():
           "if (m) { sincronizzaMazzo(); return Promise.resolve(m); }" in ass)
     prova("...e non fa aspettare nessuno (niente await)", -1,
           ass[:ass.index("sincronizzaMazzo()")].find("await sincronizzaMazzo"))
-    prova("alla nascita si scrive solo se il cloud era vuoto DAVVERO",
-          True, "if (!grezzo) mazzoNuvola = await cloudScrivi" in ass)
+    # E IL LETTORE E' UNO SOLO, il giudice a tre stati: la riga
+    # «alla nascita si scrive solo sul vuoto DIMOSTRATO» ce l'ha gia'
+    # `prove_p2p_chiavi`, e ripeterla qui non aggiungeva niente — anzi
+    # ha lasciato passare meta' cantiere restando indietro. Qui si
+    # afferma la cosa che la sorella non dice: che in TUTTO il client
+    # non resti un lettore a due stati, dove `null` vorrebbe dire
+    # insieme «vuoto» e «non ho potuto chiedere».
+    prova("il cloud si legge da un giudice solo, a tre stati", (0, 1),
+          (mini.count("cloudLeggi("), mini.count("function cloudLeggiEsito(")))
     apri = pezzo_js(mini, "async function apriProfiloP2P(", "\n}\n")
     prova("il foglio si apre subito e poi rilegge", True,
           "sincronizzaMazzo().then(renderProfiloP2P)" in apri)
@@ -37363,14 +37422,75 @@ def prove_p2p_nuvola():
     import json as _jsn
     import subprocess as _spn
     import tempfile as _tfn
+
+    # IL GIUDICE VERO GIRA PER PRIMO, e non e' un di piu': il banco
+    # grosso qui sotto `cloudLeggiEsito` la SOSTITUISCE con uno stub,
+    # quindi la funzione che distingue «vuoto» da «non ho potuto
+    # chiedere» non la esercitava NESSUNO — le due mutazioni che
+    # rimettevano `{ok: true}` sull'errore sopravvivevano a tutte le
+    # sentinelle. E' la classe di prova gia' smascherata otto volte:
+    # una sentinella dice che il giudice esiste, mai che risponda.
+    _cle = pezzo_js(mini, "function cloudLeggiEsito(", "\n}\n") + "\n}"
+    jsg = ("let API = 'ok', VALORE = 'ciao';\n"
+           "function cloudTelegram(){ return API === 'via' ? null : {\n"
+           "  getItem: (k, cb) => { if (API === 'esplode') throw 1;\n"
+           "    cb(API === 'errore' ? 'boom' : null, VALORE); } }; }\n"
+           + _cle + "\n"
+           "(async () => {\n"
+           "  const out = {};\n"
+           "  const giro = async (nome, a, v) => { API = a; VALORE = v;\n"
+           "    const r = await cloudLeggiEsito('k');\n"
+           "    out[nome] = [r.ok, r.testo]; };\n"
+           "  await giro('pieno', 'ok', 'un-mazzo-qualunque');\n"
+           "  await giro('vuoto', 'ok', null);\n"
+           "  await giro('errore', 'errore', 'x');\n"
+           "  await giro('esplode', 'esplode', 'x');\n"
+           "  await giro('api via', 'via', 'x');\n"
+           "  console.log(JSON.stringify(out));\n"
+           "})();\n")
+    fdg, pg = _tfn.mkstemp(suffix=".mjs")
+    with os.fdopen(fdg, "w", encoding="utf-8") as _w:
+        _w.write(jsg)
+    try:
+        rg = _spn.run(["node", pg], capture_output=True, text=True,
+                      encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _spn.TimeoutExpired):
+        os.unlink(pg)
+        salta("il lettore del cloud risponde giusto", "node non c'e'")
+    else:
+        os.unlink(pg)
+        if rg.returncode != 0:
+            prova("il banco del lettore gira", "",
+                  "\n".join((rg.stderr or "").strip().splitlines()[:6]))
+        else:
+            gg = _jsn.loads(rg.stdout)
+            prova("un cloud pieno si legge",
+                  [True, "un-mazzo-qualunque"], gg["pieno"])
+            # il VUOTO e' un `ok` con testo vuoto, non un fallimento:
+            # e' l'unico caso in cui si puo' scrivere
+            prova("...un cloud vuoto e' una lettura RIUSCITA",
+                  [True, ""], gg["vuoto"])
+            # ...e i TRE modi di non sapere: tutti e tre `ok: false`.
+            # Uno solo che tornasse `ok: true` rimetterebbe il disastro
+            # — il mazzo locale scritto sopra una copia che c'era.
+            prova("un errore del cloud NON e' un vuoto",
+                  [False, ""], gg["errore"])
+            prova("...ne' un'eccezione", [False, ""], gg["esplode"])
+            prova("...ne' un Telegram che non sa tenere una copia",
+                  [False, ""], gg["api via"])
     js = ("globalThis.window = {};\n"
           "let LOCALE = null, NUVOLA = null, SCRITTO = null, SCRIVIBILE = true;\n"
-          "let LEGGIBILE = true, CLOUD = true;\n"
+          "let LEGGIBILE = true, CLOUD = true, LETTURA_OK = true;\n"
+          "let REGISTRATE = null;\n"
           "const CLOUD_MAZZO = 'mostro_mazzo';\n"
           "let mazzoNuvola = '', mazzoNuvolaAltro = null, sincroInCorso = null;\n"
           "function mazzoMostro(){ return LOCALE; }\n"
           "function cloudTelegram(){ return CLOUD ? {} : null; }\n"
-          "function cloudLeggi(){ return Promise.resolve(NUVOLA); }\n"
+          "function cloudLeggiEsito(){ return Promise.resolve(LETTURA_OK\n"
+          "  ? {ok: true, testo: NUVOLA || ''} : {ok: false, testo: ''}); }\n"
+          "function ricordaMazzo(m){ LOCALE = m; }\n"
+          "function registraChiaviP2P(k){ REGISTRATE = k;\n"
+          "  return Promise.resolve(true); }\n"
           "function cloudScrivi(k, v){ if (SCRIVIBILE) SCRITTO = v;\n"
           "  return Promise.resolve(SCRIVIBILE); }\n"
           "function caricaNostrTools(){ return Promise.resolve(); }\n"
@@ -37382,9 +37502,12 @@ def prove_p2p_nuvola():
           "  const out = {};\n"
           "  const giro = async (nome, pre) => { SCRITTO = null;\n"
           "    LOCALE = null; NUVOLA = null; SCRIVIBILE = true;\n"
-          "    LEGGIBILE = true; CLOUD = true; mazzoNuvolaAltro = null;\n"
+          "    LEGGIBILE = true; CLOUD = true; LETTURA_OK = true;\n"
+          "    REGISTRATE = null; mazzoNuvolaAltro = null;\n"
           "    pre(); out[nome] = [await sincronizzaMazzo(), SCRITTO,\n"
-          "                        mazzoNuvolaAltro && mazzoNuvolaAltro.sk]; };\n"
+          "                        mazzoNuvolaAltro && mazzoNuvolaAltro.sk,\n"
+          "                        LOCALE && LOCALE.sk,\n"
+          "                        REGISTRATE && REGISTRATE[0]]; };\n"
           "  await giro('senza mazzo', () => {});\n"
           "  await giro('cloud spento', () => { LOCALE = A; CLOUD = false; });\n"
           "  await giro('migrazione', () => { LOCALE = A; });\n"
@@ -37395,6 +37518,16 @@ def prove_p2p_nuvola():
           "    LEGGIBILE = false; });\n"
           "  await giro('diverso', () => { LOCALE = A;\n"
           "    NUVOLA = JSON.stringify(B); });\n"
+          # L'ADOZIONE, e i suoi tre casi
+          "  await giro('adotta', () => { NUVOLA = JSON.stringify(B); });\n"
+          "  await giro('niente da adottare', () => {});\n"
+          "  await giro('adozione illeggibile', () => { NUVOLA = 'xx';\n"
+          "    LEGGIBILE = false; });\n"
+          # ...e il FAIL-CLOSED nuovo: la lettura che NON riesce
+          "  await giro('lettura fallita', () => { LOCALE = A;\n"
+          "    LETTURA_OK = false; });\n"
+          "  await giro('lettura fallita, senza mazzo', () => {\n"
+          "    LETTURA_OK = false; });\n"
           "  console.log(JSON.stringify(out));\n"
           "})();\n")
     with _tfn.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -37415,21 +37548,42 @@ def prove_p2p_nuvola():
         else:
             g = _jsn.loads(r.stdout)
             prova("senza mazzo non si tocca niente",
-                  ["", None, None], g["senza mazzo"])
+                  ["", None, None, None, None], g["senza mazzo"])
             prova("cloud spento: si dice, e non si scrive",
-                  ["spento", None, None], g["cloud spento"])
+                  ["spento", None, None, "aa", None], g["cloud spento"])
             # LA MIGRAZIONE: e' il difetto che ha aperto il cantiere
             prova("il mazzo locale sale nel cloud vuoto",
-                  ["copia", '{"sk":"aa","pub":"AA"}', None], g["migrazione"])
+                  ["copia", '{"sk":"aa","pub":"AA"}', None, "aa", None], g["migrazione"])
             prova("gia in pari: non si riscrive",
-                  ["copia", None, None], g["gia in pari"])
+                  ["copia", None, None, "aa", None], g["gia in pari"])
             prova("una scrittura fallita si SA (non resta muta)",
                   "muto", g["scrittura muta"][0])
             # il fail-closed che costa di piu': mai sovrascrivere
             prova("cloud illeggibile: si dice, e NON si sovrascrive",
-                  ["illeggibile", None, None], g["illeggibile"])
+                  ["illeggibile", None, None, "aa", None], g["illeggibile"])
             prova("due mazzi diversi: non si tocca niente, e si tiene l'altro",
-                  ["diverso", None, "bb"], g["diverso"])
+                  ["diverso", None, "bb", "aa", None], g["diverso"])
+            # L'ADOZIONE: la meta' della gamba 1 che mancava. Senza, un
+            # dispositivo nuovo restava senza mazzo pur avendone una
+            # copia a un centimetro di distanza — e' il sintomo dal
+            # campo («il Desktop dice che non c'e' un profilo»).
+            prova("senza mazzo, il cloud pieno si ADOTTA",
+                  ["copia", None, None, "bb", "BB"], g["adotta"])
+            # ...e non si GENERA: aprire una pagina non deve far nascere
+            # un'identita' che nessuno ha chiesto
+            prova("senza mazzo e senza copia non nasce niente",
+                  ["", None, None, None, None], g["niente da adottare"])
+            prova("...e una copia illeggibile non si adotta",
+                  ["illeggibile", None, None, None, None],
+                  g["adozione illeggibile"])
+            # IL FAIL-CLOSED NUOVO: «non ho potuto chiedere» non e' un
+            # cloud vuoto. Scriverci sopra il mazzo locale
+            # distruggerebbe la copia che c'era.
+            prova("una lettura fallita NON si scrive sopra",
+                  ["muto", None, None, "aa", None], g["lettura fallita"])
+            prova("...e senza mazzo non promette niente",
+                  ["", None, None, None, None],
+                  g["lettura fallita, senza mazzo"])
 
 
 def prove_p2p_bundle():
@@ -37859,7 +38013,10 @@ def prove_p2p_campanello():
     import re as _re
     _mini = open("miniapp.html", encoding="utf-8").read()
     _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
-    prova("i chiamanti di registraChiaviP2P sono cinque", 5, len(_reg))
+    # sei dal cantiere dell'adozione (set 2026): il mazzo che torna
+    # dal cloud si rimanda al server appena arriva, da qualunque
+    # strada — e la funzione ha gia' dentro le sue guardie.
+    prova("i chiamanti di registraChiaviP2P sono sei", 6, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))

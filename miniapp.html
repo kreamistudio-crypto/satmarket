@@ -32550,6 +32550,26 @@ function renderP2P(){
     p2pRegistrato = true;
     registraChiaviP2P([mz.pub]);
   }
+  /* ...e il mazzo che NON c'e' si va a cercare nel cloud, una volta per
+     sessione. GUARDARE IL P2P E' IL MOMENTO DI ADOTTARE: su un
+     dispositivo nuovo il mazzo sta nel cloud e qui non c'e' ancora, e
+     senza questa riga lo si prenderebbe solo al primo ordine — fino ad
+     allora il profilo direbbe «non ne hai» con la copia a un
+     centimetro di distanza.
+     STA QUI E NON IN `vaiP2P`, ed e' la riga che leggendo non si vede:
+     quello e' il solo ingresso dal TAB, mentre alla vista ci si torna
+     col gesto indietro e dalla cronologia, che cadono nel `go(b.v)`
+     generico e da li' non passano MAI (la lezione di
+     `renderInteresse`). Il render invece lo attraversano tutte le
+     strade, e la bandierina lo tiene a una lettura per sessione.
+     LA BANDIERINA NON SI AZZERA IN `dimenticaMazzoOra`, e non e' una
+     dimenticanza: quel gesto cancella anche la copia nel cloud, ma
+     `cloudCancella` e' fail-open MUTA — se fallisse, riadotteremmo un
+     istante dopo il profilo che uno ha appena deciso di dimenticare. */
+  if (!mz && !p2pAdozione) {
+    p2pAdozione = true;
+    sincronizzaMazzo().then(() => { if (mazzoMostro()) renderP2P(); });
+  }
   const box = el('p2pCorpo');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('active', p2pLato === 'compro');
@@ -32616,6 +32636,7 @@ const CLOUD_MAZZO = 'mostro_mazzo';
 const MAZZO_INFO = 'barattolo/mostro/scambio/';
 const FORMA_HEX64 = /^[0-9a-f]{64}$/;
 let p2pRegistrato = false;
+let p2pAdozione = false;
 let p2pCodiceVisibile = false;
 let p2pCodiceMostrato = '';
 let mazzoInCorso = null;
@@ -32646,7 +32667,7 @@ function mazzoSerializza(m){
    quella promessa non era garantita da niente.
    TRE CASI, e il terzo e' quello che si sbaglia per primo:
      cloud vuoto + locale c'e' -> si CARICA (la migrazione che mancava)
-     cloud c'e' + locale manca -> si scarica (lo fa assicuraMazzo)
+     cloud c'e' + locale manca -> si ADOTTA (e non si genera niente)
      tutti e due, DIVERSI      -> NON SI TOCCA NIENTE, e si dice.
    Sul terzo non si sovrascrive MAI in silenzio: sono due identita' con
    due storie, e sceglierne una al posto di chi guarda ne distrugge una
@@ -32657,7 +32678,15 @@ function mazzoSerializza(m){
    leggere ma che qualcuno potrebbe ancora recuperare. Per questo il
    testo si legge GREZZO e `NostrTools` si carica solo quando c'e'
    qualcosa da interpretare: senza il bundle `mazzoDaTesto` torna null,
-   e un null preso per «vuoto» sarebbe esattamente quel disastro. */
+   e un null preso per «vuoto» sarebbe esattamente quel disastro.
+   E LA LETTURA FALLITA E' IL TERZO STATO, quello che mancava: fin qui
+   `cloudLeggi` tornava `null` sia per «vuoto» sia per «non ho potuto
+   chiedere», e i due non sono la stessa cosa — su un errore di rete si
+   scriveva il mazzo locale SOPRA una copia che c'era. E' la lezione di
+   `NON_CHIESTO` in `paga_venditore`, sull'altro asse: «non ho potuto
+   chiedere» non autorizza NIENTE. Da qui `cloudLeggiEsito`, che
+   risponde `{ok, testo}`, e la scrittura che vuole un vuoto
+   DIMOSTRATO. */
 let mazzoNuvola = '';      /* '' | spento | copia | muto | illeggibile | diverso */
 let mazzoNuvolaAltro = null;   /* il mazzo del cloud, quando e' DIVERSO */
 let sincroInCorso = null;
@@ -32665,12 +32694,32 @@ function sincronizzaMazzo(){
   if (sincroInCorso) return sincroInCorso;
   sincroInCorso = (async () => {
     const m = mazzoMostro();
-    if (!m) return (mazzoNuvola = '');
-    if (!cloudTelegram()) return (mazzoNuvola = 'spento');
-    const grezzo = await cloudLeggi(CLOUD_MAZZO);
-    if (grezzo) {
+    if (!cloudTelegram()) return (mazzoNuvola = m ? 'spento' : '');
+    const letto = await cloudLeggiEsito(CLOUD_MAZZO);
+    /* una lettura FALLITA non e' un cloud vuoto: non si scrive e non
+       si promette niente. «muto» e' il piu' prudente dei testi — non
+       dice che una copia c'e', ed e' esattamente quel che non
+       sappiamo */
+    if (!letto.ok) return (mazzoNuvola = m ? 'muto' : '');
+    if (!m) {
+      /* SI ADOTTA, NON SI GENERA: qui il mazzo manca, e se il cloud ne
+         ha uno e' NOSTRO — prenderlo e' la meta' della gamba 1 che
+         mancava, quella per cui un dispositivo nuovo si allinea
+         GUARDANDO invece che al primo ordine. Generarlo no: aprire una
+         pagina non deve far nascere un'identita' che nessuno ha
+         chiesto, e quella nasce da un gesto in `assicuraMazzo`. */
+      if (!letto.testo) return (mazzoNuvola = '');
       await caricaNostrTools();
-      const su = mazzoDaTesto(grezzo);
+      const su = mazzoDaTesto(letto.testo);
+      if (!su) return (mazzoNuvola = 'illeggibile');
+      ricordaMazzo(su);
+      await registraChiaviP2P([su.pub]);
+      mazzoNuvolaAltro = null;
+      return (mazzoNuvola = 'copia');
+    }
+    if (letto.testo) {
+      await caricaNostrTools();
+      const su = mazzoDaTesto(letto.testo);
       if (!su) return (mazzoNuvola = 'illeggibile');
       if (su.sk !== m.sk) { mazzoNuvolaAltro = su; return (mazzoNuvola = 'diverso'); }
       mazzoNuvolaAltro = null;
@@ -32688,12 +32737,21 @@ function sincronizzaMazzo(){
 function cloudTelegram(){
   return (tg?.initData && tg.isVersionAtLeast?.('6.9') && tg.CloudStorage) ? tg.CloudStorage : null;
 }
-function cloudLeggi(chiave){
+/* TRE STATI E NON DUE (set 2026): `null` diceva insieme «vuoto» e
+   «non lo so», e chi legge un errore come «vuoto» SOVRASCRIVE — cioe'
+   butta via una chiave e la reputazione che ci sta attaccata. Adesso
+   `ok` dice se la risposta e' una risposta, e `testo` cosa c'era.
+   IL NOME E' NUOVO APPOSTA: cambiare cosa torna `cloudLeggi`
+   lasciandogli il nome vorrebbe dire che un chiamante rimasto
+   indietro legge male invece di rompersi subito — il patto dei nomi
+   di casa. */
+function cloudLeggiEsito(chiave){
   return new Promise(ok => {
     const c = cloudTelegram();
-    if (!c) return ok(null);
-    try { c.getItem(chiave, (err, v) => ok(err ? null : (v || null))); }
-    catch(e){ ok(null); }
+    if (!c) return ok({ok: false, testo: ''});
+    try { c.getItem(chiave, (err, v) => ok(err ? {ok: false, testo: ''}
+                                              : {ok: true, testo: v || ''})); }
+    catch(e){ ok({ok: false, testo: ''}); }
   });
 }
 function cloudScrivi(chiave, valore){
@@ -32794,8 +32852,8 @@ function assicuraMazzo(){
   if (!mazzoInCorso) mazzoInCorso = (async () => {
     await caricaNostrTools();
     const NT = window.NostrTools;
-    const grezzo = await cloudLeggi(CLOUD_MAZZO);
-    const nuvola = mazzoDaTesto(grezzo);
+    const letto = await cloudLeggiEsito(CLOUD_MAZZO);
+    const nuvola = letto.testo ? mazzoDaTesto(letto.testo) : null;
     let nuovo = nuvola;
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
@@ -32804,10 +32862,13 @@ function assicuraMazzo(){
     }
     ricordaMazzo(nuovo);
     /* si scrive solo se il cloud era vuoto DAVVERO: un testo illeggibile
-       non e' un posto libero, e sovrascriverlo butterebbe via una chiave
-       che qualcuno potrebbe ancora recuperare */
-    if (!grezzo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo)) ? 'copia' : 'muto';
+       non e' un posto libero, E NEMMENO UNA LETTURA FALLITA — sovrascrivere
+       butterebbe via una chiave che qualcuno potrebbe ancora recuperare.
+       Da qui `letto.ok &&`: il vuoto va SAPUTO, non dedotto da un silenzio. */
+    if (letto.ok && !letto.testo) mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(nuovo)) ? 'copia' : 'muto';
     else if (nuvola) mazzoNuvola = 'copia';
+    else if (letto.testo) mazzoNuvola = 'illeggibile';
+    else mazzoNuvola = 'muto';
     await registraChiaviP2P([nuovo.pub]);
     return nuovo;
   })().finally(() => { mazzoInCorso = null; });
