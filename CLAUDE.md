@@ -16808,6 +16808,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'è già, con la sua reputazione. L'accensione è un comando del bot
   (`/punti`), due righe in `impostazioni`, e un gate **IN LETTURA** —
   mai una scopa che spegne, il patto di `sponsor_vivo`.
+  ⚠️ E IL CATALOGO NASCE VUOTO, col solo commento che ne dice la
+  forma: il primo punto si scrive a mano il giorno che si sa il suo
+  codice negozio — «si riempie a mano quando lo spazio si vende», il
+  patto di `SLUG_SPONSOR` alla lettera. Quindi il codice della rete
+  gira in produzione prima che esista un punto, ed è voluto: è anche
+  ciò che rende il deploy a costo zero.
   FAIL-CLOSED IN TRE PUNTI, ed è la ragione per cui la rete può
   esistere prima di avere una mappa: un id fuori catalogo non si
   accende (né all'avvio né dal comando) e un codice negozio che non
@@ -28685,10 +28691,13 @@ tre prove che non potevano fallire, e soprattutto che **in tutto
 `prove.py` non esisteva una prova che chiamasse il criterio di un
 distintivo**.
 IN PRODUZIONE il deploy fa girare le migrazioni additive (due colonne
-su `ordini`, tutte a 0/'') e **non cambia niente**: `PUNTI_BARATTOLO`
-nasce col ristoratore dentro ma i punti si accendono da `/punti` sul
-bot, uno alla volta, e finché nessuno è acceso «Barattolo» non compare
-in nessun elenco. DA GUARDARE al primo giro vero: il primo ordine
+su `ordini`, tutte a 0/'') e **non cambia niente**, per una ragione più
+netta di quanto il piano prevedesse: `PUNTI_BARATTOLO` nasce **VUOTO**
+— c'è il solo commento che ne dice la forma — quindi non c'è nemmeno
+un id da accendere. Il ristoratore ci si scrive il giorno che si sa il
+suo **codice negozio**, e da lì si accende con `/punti` sul bot, uno
+alla volta. Finché nessuno è acceso «Barattolo» non compare in nessun
+elenco. DA GUARDARE al primo giro vero: il primo ordine
 verso il punto dentro Telegram — che il venditore veda il nome DEL
 PUNTO da scrivere sull'etichetta, che il titolare trovi il pacco nella
 sua coda, e che il codice arrivi a chi compra solo DOPO la presa in
