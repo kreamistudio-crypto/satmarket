@@ -23421,10 +23421,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   costruzione: `overflow:hidden` morde da solo. **La garanzia non si è
   allentata, è diventata STRUTTURALE** — e chi li rimettesse in un flex
   si ricompra il difetto, e allora quella riga torna obbligatoria.
-  IL PREZZO È DICHIARATO E MISURATO: la card è più ALTA della riga —
-  436px contro ~360 a 320 — perché i blocchi costano. Si paga
-  sapendolo: a 320 si vedono due offerte invece di tre, e in cambio
-  ognuna si legge senza rileggerla.
+  IL PREZZO È DICHIARATO E MISURATO DUE VOLTE, e la seconda misura
+  ROVESCIA la prima: qui c'era scritto «436px contro ~360 a 320, due
+  offerte invece di tre», e **erano i due CAPPELLI e non le due
+  altezze** — 436 è dove comincia la prima card, non quanto è alta.
+  I numeri veri, sonda uguale sui due alberi: la card è **158,9px** a
+  ogni larghezza contro i **99,8** della riga a 320 e i **77,7** a
+  360/375; col passo (168,9 contro 109,8 e 87,7) le offerte INTERE
+  passano da **2 a 1** a 320 e da **3 a 1** a 360 e 375. Il costo è
+  più alto di quanto la prima stesura dichiarasse, e si paga
+  sapendolo: in cambio ognuna si legge senza rileggerla.
+  DOVE STA IL MARGINE, misurato pezzo per pezzo e non stimato: le due
+  scatole pesano **83,5px, il 53% della card**, ma di quelli solo 35,5
+  sono TESTO — gli altri **48 sono aria** (16+16 di padding interno,
+  8+8 di stacco). Stringere quell'aria di un quarto vale **~12px**, e
+  non basta: per rivedere due card intere a 320 il cappello dovrebbe
+  scendere a 381 (`719 utili − 2×168,9`), cioè **55px in meno**.
+  IL PEZZO GROSSO NON È NELLA CARD, ED È LA DISCLOSURE: da sola pesa
+  **108,8px a 320**, un quarto del cappello e più del doppio di quel
+  che servirebbe — chiusa dietro uno «Scopri di più», come fa il
+  recinto escrow, le due card tornerebbero a 320 **e** a 360/375. La
+  regola dice che quelle tre righe non si accorciano e non diventano
+  verdi, NON che debbano stare sempre aperte: è una decisione di
+  prodotto e non un ritocco, e sta qui perché è la sola leva che
+  recupera una card senza toccare la struttura a blocchi.
+  ⚠️ E LA STIMA IN SATS SULLA SUA RIGA VALE 21,8px, che è la seconda
+  leva che verrà in mente: rimetterla in fila col prezzo li
+  ricompra — ed è precisamente il difetto MISURATO che questo
+  cantiere ha curato (2 card su 7 col prezzo a capo a 320).
   COSA NON SI È PRESO DAL RIFERIMENTO, e il perché vale più della
   lista: il TONDO ＋ FLOTTANTE (in casa il ＋ è una cella di nav
   rialzata, e i tondi veri vivono `absolute` sopra una foto — uno
@@ -28971,9 +28995,14 @@ metodi di pagamento, reputazione a zero voti, libro vuoto, e un
 `total_rating` fuori scala: testa su una riga sempre, zero scorrimento
 laterale, i puntini che mordono solo a 320, e le altre due case di
 `.p2p-testa` identiche al pixel.
-IL PREZZO È DICHIARATO: la card è più alta della riga (436px contro
-~360 a 320), quindi a 320 si vedono due offerte invece di tre. È il
-costo dei blocchi, e si paga sapendolo.
+IL PREZZO È DICHIARATO, e la prima stesura di questa riga lo diceva
+SBAGLIATO — «436 contro ~360» erano i due cappelli e non le due
+altezze. Misurato con la stessa sonda sui due alberi: card **158,9**
+contro **99,8** a 320 e **77,7** a 360/375, quindi le offerte intere
+passano da **2 a 1** a 320 e da **3 a 1** a 360/375. Il margine dentro
+la card è ~12px (l'aria delle due scatole), e non basta: la sola leva
+che ne recupera una è la DISCLOSURE, 108,8px a 320, che è una
+decisione di prodotto e non un ritocco. Vedi Architettura.
 IN PRODUZIONE non cambia niente: è solo client — nessuna colonna,
 nessuna migrazione, nessuna leva, nessuna rotta — e il P2P resta dietro
 `P2P_ATTIVO`. DA GUARDARE al primo giro vero: un libro con offerte VERE
