@@ -22917,6 +22917,72 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la cache», cioè la strada vera. Si taglia sul `;` a FINE RIGA. È la
   trappola della prosa, su un asse nuovo.
 
+- IL MAZZO VIAGGIA DAVVERO FRA I DISPOSITIVI (set 2026, dal campo:
+  Mini App sul telefono e Mini App su Telegram Desktop avevano due
+  mazzi DIVERSI, e un ordine pubblicato dall'uno non si vedeva
+  nell'altro). La prima gamba del mazzo — la copia nel CloudStorage di
+  Telegram — c'era e non funzionava, e il foglio del profilo prometteva
+  «lo ritrovi anche su un altro dispositivo» sulla base di una
+  promessa che nessuno aveva mai verificato.
+  I DUE DIFETTI, e nessuno dei due era la guardia di versione. 1) IL
+  CLOUD SI SCRIVEVA SOLO ALLA NASCITA del mazzo (`assicuraMazzo`, nel
+  ramo che lo genera): un mazzo GIÀ in localStorage — cioè quello di
+  chiunque avesse usato il P2P prima, o su un dispositivo dove il
+  cloud aveva taciuto una volta — non ci finiva MAI, e una migrazione
+  non esisteva. 2) `cloudScrivi` È FAIL-OPEN MUTA: torna `false` senza
+  un `console`, senza un toast e senza ritentare, quindi un fallimento
+  non lasciava traccia da nessuna parte — ed è la ragione per cui una
+  gamba rotta poteva restare rotta per settimane.
+  ⚠️ E IL FOGLIO PROMETTEVA SULLA BASE SBAGLIATA, che è la terza
+  faccia: `const dove = cloudTelegram() ? …` guardava se l'API
+  ESISTE, mai se la copia ci fosse davvero. Adesso la riga legge la
+  RISPOSTA di `sincronizzaMazzo`, che il cloud l'ha guardato.
+  LA CURA È UN GIUDICE SOLO, `sincronizzaMazzo()`, con cinque esiti in
+  `mazzoNuvola` — `spento` (questo Telegram non sa tenere una copia),
+  `copia` (c'è ed è la stessa), `muto` (non si è riusciti a
+  scriverla), `illeggibile`, `diverso` — e due agganci: il ramo VELOCE
+  di `assicuraMazzo`, che è la migrazione per chi il foglio non lo
+  apre mai, e l'apertura del foglio, che rilegge.
+  IL RAMO VELOCE NON ASPETTA (fire-and-forget, `sincronizzaMazzo();`
+  senza `await`), ed è la riga da non «sistemare»: da lì passa OGNI
+  gesto del P2P — pubblicare un ordine, prenderne uno — e farli
+  aspettare una chiamata al cloud vorrebbe dire pagare la migrazione
+  a ogni tocco. C'è la prova che quel ramo non chiami la rete e che
+  la copia si rifaccia lo stesso.
+  LA RIGA CHE COSTA DI PIÙ È IL FAIL-CLOSED: **un testo che C'È e non
+  si legge NON è un cloud vuoto.** Trattarlo come vuoto lo
+  sovrascriverebbe col mazzo locale, cioè distruggerebbe una chiave —
+  e con lei la reputazione che quel profilo ha sul coordinatore, che
+  da qui non si vede e non si recupera. Da qui la forma: si legge il
+  testo GREZZO e `caricaNostrTools()` si chiama solo DENTRO il ramo
+  del testo che c'è. Senza il bundle `mazzoDaTesto` torna `null`, e un
+  `null` preso per «vuoto» sarebbe esattamente quel disastro: il
+  bundle caricato prima è la mutazione che rimette il rischio.
+  Vale anche alla nascita: `if (!grezzo)` e mai `if (!nuvola)`.
+  IL CONFLITTO NON SI RISOLVE DA SOLO, ed è la regola delle lapidi
+  applicata alle chiavi: due mazzi diversi sono due identità con due
+  storie, e sceglierne una al posto di chi guarda ne distrugge una.
+  Quindi non si tocca niente — né il locale né la copia — e il foglio
+  mostra le due DATE con due bottoni. Le date sono l'unica cosa che
+  il client sa davvero: gli scambi e le recensioni vivono sul
+  coordinatore, e da qui non si contano.
+  ENTRAMBE LE USCITE CHIEDONO, perché entrambe lasciano indietro
+  qualcosa: la prima l'identità di questo dispositivo, la seconda la
+  COPIA dell'altra — che sul suo dispositivo resta, ma smette di
+  avere un posto dove ritrovarsi. C'è la prova su tutt'e due.
+  IL CASO VERO SI RICOSTRUISCE COSÌ, e serve per capire i due
+  bottoni: il telefono non aveva mai scritto nel cloud, quindi il
+  desktop ha trovato il cloud vuoto e ha caricato il SUO mazzo — e al
+  primo giro dopo il deploy è il TELEFONO a vedersi dire `diverso`.
+  Non c'è un «giusto» da indovinare: c'è chi ha fatto gli scambi.
+  ⚠️ E LA SINCRONIZZAZIONE DAL NOSTRO SERVER RESTA SCARTATA
+  (decisione di Andrea, ribadita in questo cantiere): custodire le
+  chiavi altrui è la cosa che il progetto ha rifiutato all'inizio, e
+  `chiavi_p2p` non ha nemmeno una colonna dove la metà privata
+  potrebbe finire. Le gambe sono e restano tre — il cloud di
+  Telegram, il backup cifrato per sé sui relay (tappa 9), il codice
+  nel foglio del profilo — e nessuna delle tre passa da noi.
+
 ## Produzione
 
 - VPS Hetzner Helsinki `46.62.162.103`, Ubuntu 26.04, servizio systemd
@@ -28444,3 +28510,45 @@ prima **non prende la cura al primo giro**, che è esattamente il
 difetto che cura: `sw.js` non è cambiato, quindi la dispensa resta
 quella finché il service worker in attesa non si attiva. Da lì in poi
 un bundle disallineato lo dice invece di far sparire un gesto.
+
+Il mazzo viaggia davvero fra i dispositivi (set 2026, dal campo: «Mini
+App sul telefono e Mini App su Telegram Desktop hanno mazzi diversi, un
+ordine pubblicato dal telefono non si vede sul desktop»). La prima gamba
+del mazzo — la copia nel CloudStorage di Telegram — c'era e non
+funzionava: si scriveva SOLO alla nascita, quindi un mazzo già in
+localStorage non ci finiva mai e una migrazione non esisteva; e
+`cloudScrivi` è fail-open MUTA, quindi un fallimento non lasciava
+traccia e nessuno riprovava. Più la terza faccia, che il foglio
+prometteva sulla base sbagliata: guardava se l'API del cloud ESISTE,
+mai se la copia ci fosse. Adesso c'è un giudice solo,
+`sincronizzaMazzo()`, con cinque esiti — e la riga del profilo li
+legge invece di indovinare. Vedi Architettura, «IL MAZZO VIAGGIA
+DAVVERO FRA I DISPOSITIVI», per il fail-closed che costa di più (un
+testo che c'è e non si legge NON è un cloud vuoto: sovrascriverlo
+butterebbe via una chiave) e per il conflitto, che non si risolve da
+solo — due mazzi diversi sono due identità, e il foglio mostra le due
+date con due bottoni invece di scegliere.
+⚠️ E LA SINCRONIZZAZIONE DAL NOSTRO SERVER RESTA SCARTATA (decisione
+di Andrea, ribadita qui): le tre gambe non passano da noi, e
+`chiavi_p2p` non ha una colonna dove la metà privata potrebbe finire.
+Provato: DELTA **+27 prove** (7963 → 7990 sul ramo isolato; le 4 rosse
+sono le preesistenti — il mojibake su console Windows, verde in CI) e
+**15 MUTAZIONI, 15 uccise**, una per riga sorvegliata: il cloud
+illeggibile sovrascritto, il bundle caricato prima di guardare se c'è
+del testo, due mazzi diversi sovrascritti in silenzio o tenuti senza
+dire quale, il ramo veloce che non migra o che fa aspettare,
+`if (!nuvola)` al posto di `if (!grezzo)`, la scrittura fallita
+raccontata come riuscita, il cloud spento raccontato come copia, i due
+giri che fanno due letture, il foglio che non rilegge, la riga di stato
+che torna a guardare l'API, e le due uscite del conflitto che non
+chiedono più niente. La prova che conta non è una sentinella: un banco
+node fa GIRARE `sincronizzaMazzo` su sette scenari — le sentinelle
+dicono che le righe ci sono, mai che il fail-closed scatti.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client. ⚠️ E AL PRIMO GIRO DOPO IL
+DEPLOY qualcuno vedrà il conflitto: il telefono non aveva mai scritto
+nel cloud, quindi il desktop ci ha messo il SUO mazzo, ed è il telefono
+a doversi scegliere quale tenere. DA GUARDARE: quel foglio (che le due
+date siano sensate) e, sui dispositivi allineati, la riga «Ne esiste una
+copia nel tuo Telegram» — che da oggi è un fatto verificato e non una
+promessa.
