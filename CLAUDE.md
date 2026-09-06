@@ -23023,6 +23023,27 @@ PC l'abbia preso); e la riconciliazione LND↔Mostro, rimandata al primo
 trade vero perché un controllo su un caso che non si produce ancora non
 prova niente.
 
+**LE RISPOSTE DEL TEAM MOSTRO (set 2026), a verbale.** 1) La hold
+invoice tiene i sats per 24 ORE e la finestra è CONFIGURABILE —
+NostroMostro la tiene a 3 giorni. La leva che combacia è
+`hold_invoice_cltv_delta` in `[lightning]` di `settings.toml`
+(verificata sul `settings.tpl.toml` del tag v0.18.6, la versione del
+nodo): è in BLOCCHI, 144 ≈ 24h — il numero che hanno detto — e 3
+giorni fanno 432. Il margine `escrow_deadline_margin_blocks` (24)
+resta com'è, quindi la finestra UTILE è sempre ~4 ore più corta
+dell'orizzonte: mostrod molla la presa PRIMA che LND sia costretto a
+chiudere il canale per salvare l'HTLC. A set 2026 il nodo è ancora al
+default. 2) I 15 minuti che avevamo visto NON sono la finestra del
+deposito: sono `expiration_seconds` (900) in `[mostro]`, il tempo per
+ACCETTARE l'ordine — erano due cose diverse. 3) Nessun vincolo di
+protocollo sul rilascio: «you need trustworthy moderators». La
+garanzia siamo noi — che è la stessa frase su cui poggia l'escrow di
+Barattolo. 4) Dicono che serve l'ADMIN macaroon, ma il nostro gira col
+RISTRETTO (info/invoices/offchain) e ha già risposto ad altri client:
+da verificare quando gli scambi partiranno — è la settima cosa aperta,
+accanto alle sei, e si chiude col primo trade vero come la
+riconciliazione.
+
 ## Regole ferree
 
 1. MAI committare `config.py`, `*.db`, `foto/`, chiavi, token, npub private.
