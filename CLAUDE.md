@@ -16759,6 +16759,195 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sempre; chi arriva dopo ha anche la riga discreta nel form Vendi
   (`#sellSpedizioniereHint`, solo a chi spedisce senza rete
   dichiarata).
+  LA RETE DI PUNTI DI BARATTOLO 📍 (ago 2026, da un ristoratore di
+  Milano che si è offerto come punto di ritiro: nessun documento,
+  basta il nome sul pacco). Fino a ieri la via punto appoggiava su
+  reti di TERZI — dietro ogni punto c'è un'azienda con un contratto, e
+  il punto scritto nell'ordine è testo libero che nessuno verifica
+  (`segna_spedito` controlla che ci SIA, mai che sia giusto). Questo
+  cantiere cambia quella riga: per la prima volta **un punto è
+  un'entità che proponiamo NOI**, e da lì discende tutto il resto.
+  LA DOMANDA CHE DECIDE È CHI RISPONDE SE IL PACCO SPARISCE, ed è
+  quella da non ammorbidire: `risolvi_disputa` ha tre esiti e tutti e
+  tre mandano i sats a una delle DUE parti, le quattro uscite di
+  denaro vanno tutte al venditore o al compratore, e in tutto
+  `server.py` **non esiste nessuna nozione di termini accettati** —
+  non c'è un posto dove un punto possa assumersi qualcosa. In più le
+  prove si ACCORCIANO: con una rete nostra il tracciamento finisce
+  alla porta del ristorante, e da lì alla mano di chi compra non c'è
+  nessun fatto verificabile. È lo stesso buco del ritiro a mano, con
+  una differenza: là le due parti si sono SCELTE, qui in mezzo c'è un
+  terzo che il compratore non ha scelto e che gli abbiamo proposto
+  noi. La risposta onesta è che risponde il VENDITORE — la rete
+  sposta un rischio dai corrieri a lui — ed è per questo che si è
+  scelta la strada che una prova gliela DÀ.
+  LE TRE DECISIONI DI ANDREA, che governano il cantiere e non si
+  rediscutono: **strada B, la presa in carico** (nasce un fatto nostro
+  con una data; chi paga non cambia); **incentivi NON-MONETARI** —
+  pagare i punti sarebbe una QUINTA uscita di sats verso un terzo,
+  cioè un flusso nuovo sul percorso dei soldi e di tasca nostra, e
+  soprattutto **il livello dell'incentivo fissa il livello della
+  responsabilità**: un punto che riceve un distintivo è un
+  volontario, uno che riceve sats è un fornitore, e di un fornitore
+  risponde chi lo ingaggia — non si può prendere il primo e la
+  responsabilità del secondo; **ingresso su INVITO, uno alla volta**,
+  perché una mappa nostra dice «questi sono buoni» e oggi non abbiamo
+  niente per dirlo (non verifichiamo l'identità di nessuno, ed è
+  coerente col resto del progetto).
+  COSA NON SI COSTRUISCE GRAZIE A QUELLE TRE, ed è metà del cantiere:
+  nessuna rotta pubblica di candidatura, **nessuna coda di
+  moderazione** — quindi niente `avvisa_*`/`decidi_*`, niente tastiera
+  inline, niente 409 fra due moderatori: tutto lo stampo del banner
+  resta fuori — nessuna vista MAPPA (con un punto solo una mappa non
+  è una mappa: è una voce nell'elenco delle vie), e nessuna uscita di
+  sats nuova.
+  IL CATALOGO È NEL CODICE, sul calco di `SLUG_SPONSOR`: `PUNTI_
+  BARATTOLO` con id, nome, indirizzo, comune, orari e **il codice
+  negozio** del titolare — che è pubblico e stabile per costruzione,
+  quindi **nessun tg_id entra nel repo**. Il punto è un venditore che
+  c'è già, con la sua reputazione. L'accensione è un comando del bot
+  (`/punti`), due righe in `impostazioni`, e un gate **IN LETTURA** —
+  mai una scopa che spegne, il patto di `sponsor_vivo`.
+  FAIL-CLOSED IN TRE PUNTI, ed è la ragione per cui la rete può
+  esistere prima di avere una mappa: un id fuori catalogo non si
+  accende (né all'avvio né dal comando) e un codice negozio che non
+  risolve lascia il punto SPENTO — meglio nessun punto che uno che
+  porta al vuoto.
+  IL TESTO DEL PUNTO LO COMPONE IL SERVER dal catalogo, e il client
+  manda solo l'ID: è la riga da non ammorbidire, perché su ogni ALTRA
+  rete quel campo è testo libero che nessuno verifica. Da lì anche il
+  TIPO («banco») viene dal catalogo e non da chi compra, e le due
+  guardie del testo libero ESENTANO la rete di casa — senza, chi ha
+  appena scelto un punto nostro si sentirebbe chiedere di indicarlo.
+  IL GATE SI CHIEDE SULL'ACQUISTO E MAI NEL GIUDICE: `reti_venditore`
+  resta PURO e prende `barattolo` come argomento, che il chiamante
+  risolve. ⚠️ In `/api/me` invece si passa `True` FISSO, ed è la riga
+  che si sbaglia: lì non si offre una rete a chi compra, si dice al
+  VENDITORE cosa ha dichiarato lui — e a punti spenti il cassetto se
+  la cancellerebbe da solo al primo salvataggio.
+  LA PRESA IN CARICO (la strada B): quando il punto riceve il pacco lo
+  segna qui dentro, e quel momento resta scritto. Due colonne additive
+  sul calco esatto di `busta_il` — `punto_preso_il` (il QUANDO, che è
+  anche il flag) e `punto_preso_da` (il codice negozio, per il libro
+  mastro) — una rotta sola (`POST /api/orders/{id}/punto/preso`) con
+  la guardia di proprietà DENTRO la WHERE e il 400 anti-oracolo dei
+  fratelli, **UPDATE condizionato** (il secondo tocco è un no-op senza
+  seconda notifica) e **NESSUNA ancora toccata**: non `spedito_il`,
+  non `aggiornato` — la trappola già pagata quattro volte. Notifica a
+  ENTRAMBE le parti: è il fatto che il compratore aspettava e la prova
+  che il venditore non aveva.
+  IL CODICE LO CONIA IL SERVER, ed è il ribaltamento che il quadro
+  chiamava punto 5. Su una rete di terzi il venditore compra
+  un'etichetta DELLA rete e ci scrive un nome di fantasia; al banco
+  quel nome basta perché il sistema del corriere sa che il pacco è in
+  giacenza lì. Con un ristoratore **non c'è nessun sistema**: si
+  spedisce con un corriere qualunque a un indirizzo normale, il pacco
+  arriverebbe a nome di uno sconosciuto che firma per lui, e il
+  tracciamento finirebbe a casa sua. Quindi `busta_nome` diventa **il
+  nome DEL PUNTO** — quello che il venditore scrive sull'etichetta — e
+  il codice serve **al compratore per ritirare**, non al corriere per
+  consegnare. Alfabeto senza 0/1/I/O, sei caratteri, da `secrets`; il
+  venditore non lo vede mai.
+  IL PUNTO VEDE UN CODICE E BASTA: mai cosa c'è nel pacco, mai chi
+  compra. Minimizzazione per COSTRUZIONE — quel che non è nella SELECT
+  non può uscire per distrazione — e il codice esce solo DOPO la presa
+  in carico, che è il gesto del banco.
+  CINQUE PEZZI NON ERANO NEL PIANO, e senza di loro la presa in carico
+  sarebbe stata codice morto: 1) `GET /api/punto/pacchi`, o la rotta
+  non si raggiunge da nessuna parte; 2) il gate su
+  `sollecita_buste_ferme`, che senza rimprovera il VENDITORE per una
+  busta che sulla rete di casa la deposita il server — fino al 🧊 ai
+  moderatori; 3) `destinatario_busta` + il ramo `nostro` di
+  `sollecita_venditore`, dove la maniglia a comando cambia BERSAGLIO
+  (bussa al PUNTO, e il testo dice il gesto che tocca a lui); 4) i due
+  gate della busta (`deposita_busta_ritiro`, `dichiara_busta_diretta`),
+  che sulla rete di casa il venditore non deposita e non dichiara — e
+  la seconda zittirebbe i promemoria di una consegna che non è quella;
+  5) il codice che esce al titolare dopo la presa, senza il quale il
+  punto non ha niente da dire a chi ritira. Più il cassetto del
+  titolare nel Profilo, che è la porta di tutto il resto.
+  ⚠️ E UN DIFETTO VERO trovato dal collaudo e non dalla rilettura: il
+  `pop` della colonna cifrata stava DENTRO l'espressione condizionale,
+  quindi girava solo quando la presa in carico c'era — cioè proprio
+  nel caso in cui il codice si nasconde la colonna restava nel dict e
+  usciva dall'API. La riga sembrava fare la minimizzazione e non la
+  faceva quando serviva; la prova che la sorvegliava girava su una
+  colonna VUOTA, dove non c'era niente da nascondere.
+  DUE INVARIANTI NUOVI nel libro mastro, sul calco dei tre della
+  busta: la presa in carico A METÀ (timbro e codice negozio si
+  scrivono nello stesso UPDATE, quindi non esiste uno stato
+  transitorio legittimo in cui divergono) e il punto di casa su una
+  strada che non è la via punto — col gemello in
+  `query_libro_mastro.sql`, e la WHERE confrontata fra i due posti
+  invece della sola intestazione.
+  I TESTI SI SCRIVONO PRIMA, ed è il passo che il piano metteva come
+  condizione: «se non si riescono a scrivere in modo onesto, il
+  cantiere non si fa». LA RIGA DA NON AMMORBIDIRE è una sola — **«se
+  il punto ha segnato, per noi chi ha spedito ha consegnato»** — e non
+  è una constatazione ma una DECISIONE, il gemello esatto della regola
+  del codice digitale («a zero prove vince chi ha consegnato»): è la
+  ragione per cui la presa in carico COMPRA qualcosa, perché senza
+  quel gesto non sposterebbe il peso di nessuna prova. Va detta PRIMA
+  dell'acquisto — sta in `sicu-limiti` — e `apri_disputa` la ricorda
+  al moderatore mentre decide. Chi la togliesse da lì lascerebbe una
+  regola che decide una disputa e che nessuno ha mai letto.
+  E LA SANZIONE È QUELLA CHE ABBIAMO: **toglierlo dalla mappa**, e
+  basta. Non c'è nessun contratto da fargli valere, quindi promettere
+  altro sarebbe la prima riga falsa di quella pagina.
+  LA VOCE STA FRA IL RITIRO A MANO E IL PACCO PERSO, e non è l'ordine
+  che capita: nomina lo STESSO buco del ritiro a mano, che è la sua
+  parentela vera.
+  «I TUOI DATI» SI EMENDA, NON SI SMENTISCE: la ragione per cui un
+  punto si può salvare REGGE — è un luogo pubblico anche adesso, e
+  casa tua no. A cambiare è che dietro il banco di un punto NOSTRO
+  c'è una persona che vede il pacco, legge il nome e ti vede in
+  faccia, e questo un locker non lo fa. **La seconda metà è quella che
+  rende sostenibile la prima**: quel che il punto NON sa è cosa c'è
+  nel pacco e chi te l'ha venduto — da noi riceve un codice e basta.
+  E IL NUMERO FRAGILE SI TOGLIE INVECE DI AGGIORNARSI: la nota diceva
+  «a differenza delle altre TRE», che aggiornato a «quattro» sarebbe
+  stato FALSO (il codice digitale non si cancella). Adesso le NOMINA —
+  «l'indirizzo e l'email» — e il conteggio resta in un posto solo, il
+  cappello, che è l'unico allarme automatico quando quella lista
+  cresce.
+  IL QUINTO GATE DELL'EMAIL, che il piano non prevedeva e che scrivere
+  i testi ha fatto trovare: su un punto di Barattolo il codice lo conia
+  il server, quindi **non c'è nessun corriere a cui dare un recapito**
+  — e `indica_email_corriere` aveva quattro gate e nessuno di questi.
+  La via punto è la nostra a tutti gli effetti, quindi il gate di
+  quella strada NON basta: ce ne vuole uno suo, col 400 che dice CHI
+  scrive il codice invece di rifiutare e basta. Il gemello nel client
+  c'è perché un bottone che porta a un muro è peggio di un bottone che
+  non c'è.
+  IL DISTINTIVO 📍 HA UN PONTE PIGRO, ed è la temporal dead zone già
+  pagata nel client, in versione Python: `init_db()` gira all'IMPORT e
+  nella sua passata retroattiva chiama i criteri di TUTTI i
+  distintivi, mentre il catalogo dei punti vive in fondo al file. Un
+  riferimento diretto sarebbe un **NameError all'AVVIO DEL SERVER** —
+  il guasto peggiore che quel file possa produrre. Il `globals()` vive
+  in UNA funzione (`_e_punto_barattolo`) e in nessun altro posto, o si
+  sparpaglierebbe in un criterio; durante quella passata si risponde
+  «no» e non si perde niente, che il sistema è auto-riparante per
+  costruzione (il catch-all di `/api/me` gira a modulo caricato). A
+  sorvegliarlo non c'è una sentinella ma il COLLAUDO eseguibile, che
+  importa il server: se quella riga torna diretta, quello non parte
+  affatto.
+  E NON È UN DISTINTIVO DI FIDUCIA: quel flag decide la PRECEDENZA
+  nella sfilza, e i badge di fiducia sono quelli che parlano di come
+  uno si comporta negli affari — ospitare un punto è un servizio alla
+  rete, non una garanzia su chi vende.
+  ⚠️ LA TORTURA HA TROVATO UN BUCO PREESISTENTE, ed è la parte che
+  serve oltre questo cantiere: in tutto `prove.py` **non esisteva UNA
+  prova che CHIAMASSE il criterio di un distintivo** — la mutazione
+  che apre questo a chiunque (`lambda d: True`) passava liscia davanti
+  a tutte le sentinelle, che guardano se la riga c'è e mai cosa
+  risponde. Adesso il criterio si fa GIRARE sui suoi due casi, più
+  quello che conta davvero: chi ha tutto il resto ma non ospita niente
+  non deve prenderlo.
+  RESTA FUORI, dichiarato: la mappa, la candidatura, la coda di
+  moderazione, qualunque incentivo in sats, e il **locker di riserva**
+  (un secondo punto se il primo non va), che è nell'elenco delle cose
+  da riprendere.
   IL PUNTO SI CONCORDA (ago 2026, caso vero: il venditore spedisce con
   InPost e chi compra indica un punto Poste, o un locker che non
   esiste). Il punto è testo LIBERO che nessuno verifica — `segna_
@@ -28460,6 +28649,50 @@ qualunque ornamento futuro di quella pagina. Sta in Architettura,
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva — il server torna alla whitelist di forma di prima
 (`cop` e le cifre, senza `logo`) e il file esce dal repo.
+La rete di punti di ritiro di Barattolo 📍 (ago 2026, da un ristoratore
+di Milano che si è offerto): per la prima volta un punto di ritiro è
+un'entità che proponiamo NOI e non una rete di terzi — «Barattolo»
+diventa una voce di `SPEDIZIONIERI`, chi compra sceglie da un elenco
+invece di scrivere un indirizzo a mano, il punto SEGNA che il pacco è
+arrivato e il codice di ritiro lo conia il server. Le tre decisioni di
+Andrea (presa in carico, incentivi non-monetari, ingresso su invito) e
+il vincolo che le governa — «il livello dell'incentivo fissa il livello
+della responsabilità» — stanno in Architettura, «LA RETE DI PUNTI DI
+BARATTOLO», insieme a quel che quelle tre decisioni permettono di NON
+costruire: nessuna candidatura, nessuna coda di moderazione, nessuna
+mappa, nessuna uscita di sats nuova.
+IN QUATTRO COMMIT, e il primo non tocca la rete: **la cintura del
+ritiro**, cioè il difetto vivo che il quadro ha trovato prima di
+scrivere una riga — i due rami fisici di `controlla_scadenze` non
+escludevano `'ritiro'`, quindi il giorno del rientro
+dell'auto-sblocco un ritiro segnato dal venditore si sarebbe sbloccato
+sulla SUA parola, e un punto che segna «ricevuto» farebbe la stessa
+cosa. Poi il catalogo col comando del bot, la presa in carico col
+codice coniato, e i testi pubblici col distintivo.
+LA RIGA CHE COMPRA TUTTO IL RESTO: «se il punto ha segnato, per noi chi
+ha spedito ha consegnato». È una DECISIONE dichiarata prima
+dell'acquisto — il gemello della regola del codice digitale — e senza
+di lei la presa in carico non sposterebbe il peso di nessuna prova. E
+la sanzione è quella che abbiamo: **toglierlo dalla mappa**, perché con
+un punto non c'è nessun contratto da fargli valere.
+Provato: il DELTA sull'albero ISOLATO a ogni commit (+62, +71, +24
+prove; la cartella è condivisa con altre sessioni, quindi il totale non
+dice niente su nessuno), `collaudo_punti_barattolo.py` da 33 a **111
+verdi** col server VERO su un database usa-e-getta, e **quattro
+torture** — 25 + 33 + 13 + 16 mutazioni, tutte uccise. Hanno fatto il
+loro mestiere: hanno trovato un'esenzione che nessuna prova guardava,
+tre prove che non potevano fallire, e soprattutto che **in tutto
+`prove.py` non esisteva una prova che chiamasse il criterio di un
+distintivo**.
+IN PRODUZIONE il deploy fa girare le migrazioni additive (due colonne
+su `ordini`, tutte a 0/'') e **non cambia niente**: `PUNTI_BARATTOLO`
+nasce col ristoratore dentro ma i punti si accendono da `/punti` sul
+bot, uno alla volta, e finché nessuno è acceso «Barattolo» non compare
+in nessun elenco. DA GUARDARE al primo giro vero: il primo ordine
+verso il punto dentro Telegram — che il venditore veda il nome DEL
+PUNTO da scrivere sull'etichetta, che il titolare trovi il pacco nella
+sua coda, e che il codice arrivi a chi compra solo DOPO la presa in
+carico.
 
 Da riprendere quando i cantieri in corso saranno chiusi (ago 2026,
 segnati da Andrea — non sono ancora decisi, sono da riprendere):
