@@ -337,7 +337,7 @@ def semina_b():
         con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
                     "registrato) VALUES(?,?,?,1)", (tg, nome, neg))
     ids = []
-    for n in range(8):
+    for n in range(10):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
@@ -733,7 +733,7 @@ def prove_anti_oracolo(ann, aperto):
     return o4, o5
 
 
-def prove_gate_busta(o5):
+def prove_gate_busta(o5, ann_busta):
     print("\n\u2500\u2500 SULLA RETE DI CASA IL VENDITORE NON DEPOSITA \u2500\u2500")
     come(222)
     cod, msg = rifiuta(SRV.deposita_busta_ritiro, o5, None,
@@ -747,6 +747,32 @@ def prove_gate_busta(o5):
     r = riga_ordine(o5)
     prova("...e la busta e' rimasta intatta", ("", 0),
           (r["busta_codice"], r["busta_il"]))
+
+    # E NEMMENO LA LEGGE (ago 2026, trovato dal GIRO DAL VIVO e non
+    # leggendo il codice): il gate qui sopra chiude la SCRITTURA, ma
+    # dopo la presa in carico `busta_il` e' pieno — l'ha scritto il
+    # server — e chi vende cadeva nel ramo di RILETTURA, leggendo un
+    # codice che non ha coniato, col pannello che gli diceva pure
+    # <<cio' che HAI depositato>>. Il piano lo dichiara al contrario:
+    # lo vedono il compratore e il punto, mai chi vende. La guardia
+    # sta nel SERVER e non nel solo client, o sarebbe mezza regola —
+    # un client rimasto in cache chiamerebbe la rotta lo stesso.
+    oid = al_punto(ann_busta[0])
+    spedisci(oid)
+    prendi(oid)
+    cod_vero = SRV._decifra_contenuto(riga_ordine(oid)["busta_codice"])
+    come(222)
+    cod, msg = rifiuta(SRV.leggi_busta_ritiro, oid)
+    prova("chi vende non legge la busta della rete di casa", 400, cod)
+    prova("...e il rifiuto dice il PERCHE', non il 400 muto", True,
+          "acquirente" in msg)
+    prova("...e non si porta dietro il codice", False, cod_vero in msg)
+    # IL ROVESCIO, che e' la meta' che rende la prova capace di
+    # fallire: a chi COMPRA la busta si legge come sempre.
+    come(111)
+    b = esegui(SRV.leggi_busta_ritiro, oid)
+    prova("...ma chi compra la legge, col codice", cod_vero, b["codice"])
+    prova("...e col nome del PUNTO sul pacco", True, "Bar Luna" in b["nome"])
 
 
 def prove_promemoria(nostro, terzi):
@@ -810,6 +836,37 @@ def prove_nota_moderatore(ann, terzi):
     # parti. La prova guarda che resti fuori.
     prova("...e senza il punto che il compratore ha scritto", False,
           "Via Verdi" in nota4)
+
+    # L'ALTRA STORIA, che nessuna prova guardava: <<il pacco non e'
+    # mai arrivato al punto>> e <<e' arrivato e non l'hanno ritirato>>
+    # sono due cose diverse, e prima della presa in carico il
+    # moderatore non poteva distinguerle. Il ramo `else` della nota
+    # esiste apposta, e va esercitato o resta una promessa che nessuno
+    # ha mai letto.
+    mai = al_punto(ann[8])
+    spedisci(mai)          # spedito, ma il punto non segna niente
+    DETTI.clear()
+    come(111)
+    esegui(SRV.apri_disputa, mai)
+    nota5 = " || ".join(t for c, t in DETTI if c == 999)
+    prova("il punto che NON ha ricevuto ha una nota sua", True,
+          "NON ha mai segnato" in nota5)
+    prova("...che manda a guardare il tracciamento", True,
+          "tracciamento del corriere" in nota5)
+    prova("...e NON applica la regola di default", False,
+          "chi ha spedito ha consegnato" in nota5)
+    prova("...e le due storie sono due note diverse", False, nota5 == nota)
+
+    # LA DOMANDA DEL PIANO, formulata come tale: <<se non gli dice
+    # niente di piu' di oggi, il cantiere non ha comprato quello che
+    # prometteva>>. Non basta che una riga esista: si guarda cosa la
+    # nota nuova dice E quella di ieri non puo' dire.
+    piu = [f for f in ("segnato di aver RICEVUTO il pacco il",
+                       "chi ha spedito ha consegnato",
+                       "l'ha scritto la piattaforma", "neg33333")
+           if f in nota and f not in nota4]
+    prova("la nota del punto dice 4 cose che ieri non si potevano dire",
+          4, len(piu))
 
 
 def prove_giro_chiuso(ann):
@@ -894,10 +951,10 @@ def main():
     prove_titolare()
     prove_spento_si_legge()
     # --- il secondo tempo: la presa in carico ---
-    ann = sezione(prove_presa_in_carico)
+    ann = sezione(prove_presa_in_carico) or []
     aperto = sezione(prove_lista_del_punto, ann)
     terzi, o5 = sezione(prove_anti_oracolo, ann, aperto) or (0, 0)
-    sezione(prove_gate_busta, o5)
+    sezione(prove_gate_busta, o5, ann[7:])
     sezione(prove_promemoria, o5, terzi)
     sezione(prove_nota_moderatore, ann, terzi)
     sano, o7 = sezione(prove_giro_chiuso, ann) or (0, 0)

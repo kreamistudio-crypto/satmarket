@@ -25424,6 +25424,26 @@ async def leggi_busta_ritiro(ordine_id: int,
     if not o["busta_il"]:
         raise HTTPException(404, "Nessuna istruzione di ritiro su "
                                  "questo ordine")
+    if o["punto_barattolo"] and user["id"] == o["venditore_id"]:
+        # SULLA RETE DI CASA IL CODICE NON E' DEL VENDITORE (ago
+        # 2026, trovato dal giro dal vivo): li' la busta la scrive
+        # il SERVER alla presa in carico, quindi chi ha spedito
+        # cadeva nel ramo di rilettura e leggeva un codice che non
+        # ha coniato — col pannello che gli diceva pure «cio' che
+        # HAI depositato». Il piano lo dichiara al contrario: lo
+        # vedono il compratore e il punto, mai chi vende. La
+        # guardia sta QUI e non nel solo client, o sarebbe mezza
+        # regola: un client rimasto in cache chiamerebbe la rotta e
+        # il codice uscirebbe lo stesso. Il messaggio dice il
+        # PERCHE' invece del 400 anti-oracolo dei fratelli: qui non
+        # c'e' niente da nascondere a chi bussa — l'ordine e' suo,
+        # e quel che gli serve (la PROVA che il pacco e' arrivato)
+        # ce l'ha gia' nell'ordine.
+        raise HTTPException(400, "Su un punto di Barattolo il codice "
+                                 "di ritiro e' dell'acquirente: non "
+                                 "passa da te. Nell'ordine trovi il "
+                                 "momento in cui il punto ha preso in "
+                                 "carico il pacco.")
     return {"ok": True,
             "nome": _decifra_contenuto(o["busta_nome"]),
             "codice": _decifra_contenuto(o["busta_codice"]),

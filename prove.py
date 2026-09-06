@@ -44642,6 +44642,38 @@ def prove_presa_in_carico():
           in _pb)
     prova("...e il ramo di sempre lo esclude", True,
           "if (o.role==='seller' && !o.puntoBarattolo" in _pb)
+    # E DOPO LA PRESA IN CARICO NEMMENO LO LEGGE (ago 2026, difetto
+    # trovato dal GIRO DAL VIVO e non leggendo il codice): li'
+    # `bustaIl` e' pieno — l'ha scritto il SERVER — quindi il gate
+    # qui sopra non morde piu' e chi vende cadeva nel ramo di
+    # RILETTURA, leggendo un codice che non ha coniato, col pannello
+    # che gli diceva pure «cio' che HAI depositato»: falso due volte.
+    # Al suo posto il FATTO, che e' quel che il cantiere gli ha
+    # promesso — il pacco e' arrivato, con la data.
+    prova("dopo la presa in carico chi vende legge la PROVA",
+          True, "if (o.role==='seller' && o.puntoBarattolo "
+          "&& o.puntoPresoIl)" in _pb)
+    _ramo = _pb[_pb.index("o.puntoPresoIl)"):
+                _pb.index("if (o.role==='seller' && o.bustaIl)")]
+    prova("...e in quel ramo il codice non si disegna", (False, False),
+          ("bustaLetta" in _ramo, "piattoCodice" in _ramo))
+    # ⚠️ L'ORDINE E' LA SOSTANZA E NON lo stile: il ramo di rilettura
+    # raccoglie QUALUNQUE venditore con la busta piena, quindi messo
+    # dopo di lui questo non si raggiungerebbe mai — e la mutazione
+    # che li scambia non romperebbe nessuna delle due righe di sopra.
+    prova("...e sta PRIMA del ramo di rilettura, o non si raggiunge",
+          True, _pb.index("o.puntoPresoIl)")
+          < _pb.index("if (o.role==='seller' && o.bustaIl)"))
+    # LA META' CHE VALE: una regola che vive solo nel client e' mezza
+    # regola — un client rimasto in cache chiamerebbe la rotta e il
+    # codice uscirebbe lo stesso. Questa riga toglie il bottone,
+    # quella impedisce al codice di uscire.
+    _lb = codice(pezzo("leggi_busta_ritiro"))
+    prova("e il SERVER non lascia uscire il codice a chi vende",
+          True, 'if o["punto_barattolo"] and user["id"] == '
+          'o["venditore_id"]:' in _lb)
+    prova("...col perche', che qui non c'e' niente da nascondere",
+          True, "acquirente" in _lb)
 
     # ---- il cassetto del titolare -----------------------------------
     # SENZA DI LUI LA ROTTA E' IRRAGGIUNGIBILE, ed e' la meta' che

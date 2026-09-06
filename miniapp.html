@@ -26408,6 +26408,15 @@ function pannelloBustaRitiro(o){
      disegnava nessuno — quindi col salto in cima tolto il tocco
      sarebbe diventato un tocco che non fa NIENTE. E' il suo codice:
      l'ha scritto lui, non gli si rivela niente di nuovo. */
+  /* MA SULLA RETE DI CASA LA BUSTA NON E' SUA (ago 2026, trovato
+     dal giro dal vivo): li' il codice lo conia il server alla presa
+     in carico, e questo ramo glielo mostrava dicendogli «cio' che
+     HAI depositato» — falso due volte. Al suo posto il FATTO, che e'
+     quel che il cantiere gli ha promesso: il pacco e' arrivato, con
+     la data. Il server ha la sua guardia (400 col perche'): questa
+     riga toglie il bottone, quella impedisce al codice di uscire. */
+  if (o.role==='seller' && o.puntoBarattolo && o.puntoPresoIl) return `
+    <div class="trust-note">✅ <span><b>Il punto ha segnato di aver ricevuto il pacco</b> il ${new Date(o.puntoPresoIl*1000).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}. È la prova che la consegna è arrivata a destinazione. Il codice per ritirare è nell'ordine dell'acquirente: non passa da te.</span></div>`;
   if (o.role==='seller' && o.bustaIl) return `
     <div class="payout" id="bustaPannello">
       <h4>📦 Istruzioni di ritiro</h4>
