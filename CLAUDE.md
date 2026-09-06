@@ -16950,6 +16950,43 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   risponde. Adesso il criterio si fa GIRARE sui suoi due casi, più
   quello che conta davvero: chi ha tutto il resto ma non ospita niente
   non deve prenderlo.
+  IL CODICE NON PASSA DA CHI VENDE, E DOPO LA PRESA IN CARICO NEMMENO
+  SI LEGGE (ago 2026, difetto trovato dal GIRO DAL VIVO e non leggendo
+  il codice): il pannello della busta si spegneva per il venditore su
+  `!o.bustaIl`, ma la presa in carico QUEL CAMPO LO SCRIVE — è il
+  server a coniare il codice — quindi da lì in poi il gate non mordeva
+  più e chi vende cadeva nel ramo di RILETTURA, leggendo un codice che
+  non ha coniato, col testo che gli diceva pure «ciò che HAI
+  depositato»: falso due volte.
+  LA CURA STA NEL SERVER E NON SOLO NEL CLIENT, la regola già scritta
+  per la zona e per lo stock: `leggi_busta_ritiro` rifiuta il venditore
+  su un punto di Barattolo — una regola che vale solo di là è mezza
+  regola, e un client rimasto in cache chiamerebbe la rotta e il codice
+  uscirebbe lo stesso. IL 400 DICE IL PERCHÉ e non è il muto dei
+  fratelli, ed è una distinzione e non una dimenticanza: là si tace
+  perché chi chiede può essere un estraneo che enumera, qui chi chiede
+  è una PARTE dell'ordine — non c'è niente da nascondergli, e la stessa
+  riga gli indica dove trovare il fatto che gli spetta.
+  AL POSTO DEL CODICE, LA PROVA: «il punto ha segnato di aver ricevuto
+  il pacco» con la data, che è esattamente quel che la strada B gli ha
+  promesso — e il codice che non vede non è una cosa in meno, è la
+  ragione per cui quel fatto vale qualcosa.
+  ⚠️ IL SUO RAMO STA PRIMA DI QUELLO DI RILETTURA, ed è la riga che un
+  riordino sposta senza vederla: quello raccoglie QUALUNQUE venditore
+  con la busta piena, quindi messo dopo non si raggiungerebbe mai — e
+  la mutazione che li scambia non romperebbe nessuna delle due
+  sentinelle sul contenuto, che guardano il ramo ritagliato e non
+  l'ordine. Ha la sua.
+  ⚠️ E IL `or []` NEL `main()` DEL COLLAUDO NON È COSMESI, ed è un buco
+  del BANCO e non del codice: `sezione()` protegge sé stessa e torna
+  None quando esplode, ma il CHIAMANTE la indicizzava (`ann[7:]`) —
+  quindi un TypeError si portava via la riga finale del conto, e il
+  banco della tortura leggeva «nessuna fallita» contando la mutazione
+  come SOPRAVVISSUTA. Su una lista vuota la sezione dopo alza dentro la
+  sua protezione: degrada CONTANDO. Da lì gli esiti della tortura sono
+  TRE e non due — uccisa, sopravvissuta, «il banco non arriva in fondo»
+  — o le mutazioni mirate male e i buchi del banco si confondono con le
+  sopravvissute, che è il modo in cui una tortura si autopromuove.
   RESTA FUORI, dichiarato: la mappa, la candidatura, la coda di
   moderazione, qualunque incentivo in sats, e il **locker di riserva**
   (un secondo punto se il primo non va), che è nell'elenco delle cose
@@ -28667,7 +28704,7 @@ della responsabilità» — stanno in Architettura, «LA RETE DI PUNTI DI
 BARATTOLO», insieme a quel che quelle tre decisioni permettono di NON
 costruire: nessuna candidatura, nessuna coda di moderazione, nessuna
 mappa, nessuna uscita di sats nuova.
-IN QUATTRO COMMIT, e il primo non tocca la rete: **la cintura del
+IN CINQUE COMMIT, e il primo non tocca la rete: **la cintura del
 ritiro**, cioè il difetto vivo che il quadro ha trovato prima di
 scrivere una riga — i due rami fisici di `controlla_scadenze` non
 escludevano `'ritiro'`, quindi il giorno del rientro
@@ -28681,15 +28718,21 @@ dell'acquisto — il gemello della regola del codice digitale — e senza
 di lei la presa in carico non sposterebbe il peso di nessuna prova. E
 la sanzione è quella che abbiamo: **toglierlo dalla mappa**, perché con
 un punto non c'è nessun contratto da fargli valere.
-Provato: il DELTA sull'albero ISOLATO a ogni commit (+62, +71, +24
+Provato: il DELTA sull'albero ISOLATO a ogni commit (+62, +71, +24, +5
 prove; la cartella è condivisa con altre sessioni, quindi il totale non
-dice niente su nessuno), `collaudo_punti_barattolo.py` da 33 a **111
-verdi** col server VERO su un database usa-e-getta, e **quattro
-torture** — 25 + 33 + 13 + 16 mutazioni, tutte uccise. Hanno fatto il
-loro mestiere: hanno trovato un'esenzione che nessuna prova guardava,
-tre prove che non potevano fallire, e soprattutto che **in tutto
-`prove.py` non esisteva una prova che chiamasse il criterio di un
-distintivo**.
+dice niente su nessuno), `collaudo_punti_barattolo.py` da 33 a **121
+verdi** col server VERO su un database usa-e-getta, e **sei torture** —
+25 + 33 + 13 + 16 + 5 + 5 mutazioni, tutte uccise. Hanno fatto il loro
+mestiere: hanno trovato un'esenzione che nessuna prova guardava, tre
+prove che non potevano fallire, che **in tutto `prove.py` non esisteva
+una prova che chiamasse il criterio di un distintivo**, e infine un
+buco del BANCO — una sezione esplosa si portava via il conto finale,
+quindi la tortura si autopromuoveva.
+E IL GIRO DAL VIVO HA TROVATO QUEL CHE NESSUNA DELLE QUATTRO TORTURE
+POTEVA: dopo la presa in carico il venditore LEGGEVA il codice che non
+ha coniato, col pannello che gli diceva pure «ciò che hai depositato».
+La cura è nel SERVER e non solo nel client — vedi la voce sua in
+Architettura — e al suo posto adesso c'è la PROVA con la data.
 IN PRODUZIONE il deploy fa girare le migrazioni additive (due colonne
 su `ordini`, tutte a 0/'') e **non cambia niente**, per una ragione più
 netta di quanto il piano prevedesse: `PUNTI_BARATTOLO` nasce **VUOTO**
