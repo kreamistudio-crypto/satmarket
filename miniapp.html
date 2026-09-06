@@ -31044,12 +31044,55 @@ async function provaLoginWeb(){
    sale a ogni export aggiunto: chi ne mette un sesto lo alzi, o i
    browser di chi ha gia' aperto l'app terranno il file di ieri. */
 let nostrToolsPromessa = null;
+/* I PEZZI CHE IL CLIENT CHIAMA, e il bundle deve averli TUTTI (set 2026,
+   dal campo: il primo new-order verso il coordinatore moriva su
+   «NT.hmac is not a function», e il messaggio non partiva).
+   IL PERCHE' VALE PIU' DELLA GUARDIA: un bundle vecchio NON alza dove lo
+   carichi — alza mille righe dopo, dentro una derivazione di chiavi, con
+   un messaggio che non nomina la causa. E' la famiglia del titolo nudo
+   nelle notifiche: un guasto che non fallisce da solo.
+   COME SI ARRIVA A UN BUNDLE VECCHIO COL CLIENT NUOVO: `/vendor/nostr.js`
+   sta in dispensa e il service worker lo serve CACHE-FIRST — alla rete
+   non chiede mai — mentre `miniapp.html` e' una navigazione e va sempre
+   in rete. Le due meta' si aggiornano a ritmi diversi, e la dispensa si
+   rifa' solo quando il service worker NUOVO si attiva (niente
+   skipWaiting: aspetta, ed e' una scelta giusta). Il `?v=` nell'URL non
+   serve a scavalcarlo: il service worker guarda `url.pathname`, e la
+   query non la vede.
+   L'ELENCO E' UN CENSIMENTO E NON UNA LISTA A MEMORIA: `prove.py` rifa'
+   il grep dei `NT.<nome>` sul client e pretende che ognuno sia qui — il
+   pezzo che qualcuno chiamera' fra sei mesi entra nel conto da solo. */
+const PEZZI_NOSTR = ['Relay', 'finalizeEvent', 'generateSecretKey',
+  'getEventHash', 'getPublicKey', 'hkdf', 'hmac', 'nip04', 'nip13',
+  'nip19', 'nip44', 'nip47', 'schnorr', 'secp256k1', 'sha256', 'utils',
+  'verifyEvent'];
+const MSG_BUNDLE_VECCHIO = 'La libreria di sicurezza e\' incompleta o di '
+  + 'una versione vecchia. Ricarica l\'app; se non basta, svuota la cache '
+  + 'del browser.';
+/* Fail-closed: nel dubbio si alza. Sbagliare qui costa un ricaricamento,
+   sbagliare nell'altro verso costa una firma che non torna e un
+   coordinatore che tace. */
+function esigiBundleNostr(){
+  const NT = window.NostrTools;
+  const mancano = PEZZI_NOSTR.filter(p => !NT || !NT[p]);
+  if (mancano.length) {
+    console.warn('[nostr] bundle incompleto, mancano:', mancano.join(', '));
+    throw new Error(MSG_BUNDLE_VECCHIO);
+  }
+  return NT;
+}
 function caricaNostrTools(){
-  if (window.NostrTools) return Promise.resolve();
+  /* la verifica sta in TUTTI E DUE i rami: se il primo caricamento ha
+     portato un bundle vecchio, senza di lei ogni chiamata successiva
+     tornerebbe subito senza dire niente */
+  if (window.NostrTools) { esigiBundleNostr(); return Promise.resolve(); }
   if (!nostrToolsPromessa) nostrToolsPromessa = new Promise((ok, no)=>{
     const s = document.createElement('script');
     s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12-mostro2`;
-    s.onload = ok;
+    /* si azzera come nel ramo dell'errore di rete: cosi' chi svuota la
+       cache e riprova non deve ricaricare la pagina */
+    s.onload = ()=>{ try { esigiBundleNostr(); ok(); }
+                     catch(e){ nostrToolsPromessa = null; no(e); } };
     s.onerror = ()=>{ nostrToolsPromessa = null; no(new Error('libreria non raggiungibile')); };
     document.head.appendChild(s);
   });
@@ -33588,6 +33631,9 @@ async function inviaNuovoOrdineP2P(){
   if (!(euro > 0)) { toast('Scrivi quanti euro'); const c = el('p2pNuovoEuro'); if (c) c.focus(); return; }
   if (!metodo) { toast('Scrivi come vi pagate gli euro'); const c = el('p2pNuovoMetodo'); if (c) c.focus(); return; }
   chiudiFoglioP2P('p2pNuovoSheet');
+  /* dice se l'ordine e' COMPARSO A SCHERMO: nel catch e' l'unica cosa
+     che distingue «lo racconta la pagina» da «non lo racconta nessuno» */
+  let aperto = false;
   const adesso = Math.floor(Date.now() / 1000);
   const lato = p2pLato === 'compro' ? 'compro' : 'vendo';
   let ord = {
@@ -33612,6 +33658,7 @@ async function inviaNuovoOrdineP2P(){
     ord.id = nomeProvvisorioP2P(indice);
     scriviOrdineP2P(ord);
     apriOrdineP2P(ord.id);
+    aperto = true;
     await registraChiaviP2P([tk.pub]);
     await mostroRiascolta();
     const msg = messaggioMostro('new-order', {
@@ -33637,7 +33684,16 @@ async function inviaNuovoOrdineP2P(){
     const agg = ordiniP2P()[p2pOrdineAperto] || ordiniP2P()[ord.id] || ord;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
     agg.errore = String(e && e.message || e);
-    scriviOrdineP2P(agg);
+    /* un ordine che non ha ancora un nome NON SI SCRIVE: sarebbe una riga
+       che nessuna vista puo' mostrare — e' quel che e' successo col
+       bundle vecchio, dove in memoria e' restata una riga con l'id vuoto */
+    if (agg.id) scriviOrdineP2P(agg);
+    /* E SE L'ORDINE NON E' MAI COMPARSO, A RACCONTARLO NON C'E' NESSUNO
+       (set 2026, dal campo): `renderOrdineP2P` ridisegna l'ordine APERTO,
+       e un guasto prima di `apriOrdineP2P` lascia schermo e console muti
+       — il gesto sembra non fare niente. Il toast e' l'unica voce che
+       resta, e dice il motivo VERO invece di un generico. */
+    if (!aperto) toast('Non si e\' potuto pubblicare: ' + agg.errore);
   }
   renderOrdineP2P();
 }

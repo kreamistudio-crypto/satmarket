@@ -37077,6 +37077,115 @@ console.log(JSON.stringify({
           "if (!idMostroVero(o.id))" in ch and "throw new Error" in ch)
 
 
+def prove_p2p_bundle():
+    """IL BUNDLE VECCHIO NON FALLISCE DOVE LO CARICHI (set 2026, dal
+    campo: il primo new-order verso il coordinatore moriva su «NT.hmac is
+    not a function», e il messaggio non partiva affatto).
+
+    LA CAUSA E' UN'ASIMMETRIA DEL SERVICE WORKER, ed e' la riga da
+    capire: `/vendor/nostr.js` sta in dispensa e viene servito
+    CACHE-FIRST — alla rete non si chiede mai — mentre `miniapp.html` e'
+    una navigazione e va sempre in rete. Quindi un client NUOVO puo'
+    girare con un bundle VECCHIO, che e' la classe di guasto peggiore:
+    due meta' che non si parlano. La dispensa si rifa' solo quando il
+    service worker nuovo si ATTIVA, e lui aspetta (niente skipWaiting,
+    scelta dichiarata); il `?v=` nell'URL non lo scavalca, perche' il
+    service worker guarda `url.pathname` e la query non la vede.
+
+    LA CURA E' UNA GUARDIA AL CARICAMENTO: se i pezzi che il client
+    chiama non ci sono tutti, si dice «ricarica l'app» invece di fallire
+    mille righe dopo dentro una derivazione di chiavi.
+
+    L'ELENCO E' UN CENSIMENTO E NON UNA LISTA A MEMORIA: qui si rifa' il
+    grep dei `NT.<nome>` sul client, quindi il pezzo che qualcuno
+    chiamera' fra sei mesi entra nel conto da solo — e il rovescio tiene
+    l'elenco onesto, che un pezzo preteso e mai chiamato e' una guardia
+    che non serve a nessuno."""
+    print("\n[il bundle Nostr e la sua guardia]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    i = mini.index("const PEZZI_NOSTR = [")
+    dichiarati = set(re.findall(r"'([A-Za-z0-9_]+)'",
+                                mini[i:mini.index("]", i)]))
+    # il censimento: quel che il client chiama davvero
+    usati = set(re.findall(r"\bNT\.([A-Za-z0-9_]+)", mini))
+    prova("ogni NT.<pezzo> chiamato dal client e' in PEZZI_NOSTR",
+          set(), usati - dichiarati)
+    prova("PEZZI_NOSTR non pretende pezzi che nessuno chiama",
+          set(), dichiarati - usati)
+    prova("hmac e' fra i pezzi pretesi", True, "hmac" in dichiarati)
+
+    # la guardia sta nei DUE rami: senza quella del ramo corto, un primo
+    # caricamento andato male resterebbe muto per tutte le volte dopo
+    car = pezzo_js(mini, "function caricaNostrTools(", "\n}\n")
+    prova("la guardia gira anche quando il bundle e' gia' in pagina",
+          True, "if (window.NostrTools) { esigiBundleNostr();" in car)
+    prova("la guardia gira dopo il caricamento", True,
+          "s.onload" in car and "esigiBundleNostr()" in car.split("s.onload")[1])
+    prova("un bundle incompleto non resta in cache come promessa",
+          2, car.count("nostrToolsPromessa = null"))
+
+    esigi = pezzo_js(mini, "function esigiBundleNostr(", "\n}\n")
+    prova("la guardia ALZA e non torna un booleano", True,
+          "throw new Error(MSG_BUNDLE_VECCHIO)" in esigi)
+    # il messaggio deve dire la STRADA: un «libreria incompleta» secco
+    # manda a cercare il guasto dove non e'
+    # ⚠️ il taglio NON e' al primo ';': uno sta DENTRO il testo
+    # («Ricarica l'app; se non basta»), e tagliando li' la prova
+    # diventerebbe cieca sulla meta' che dice la strada vera
+    msg = re.search(r"const MSG_BUNDLE_VECCHIO[\s\S]*?;\s*?\r?\n",
+                    mini).group(0)
+    for parola in ("Ricarica", "cache"):
+        prova("il messaggio del bundle vecchio dice «%s»" % parola,
+              True, parola in msg)
+
+    # --- il bundle VERO li esporta tutti: e' l'unica prova che guarda il
+    #     file committato invece di quel che il client si aspetta ---
+    import json as _jsb
+    import subprocess as _spb
+    import tempfile as _tfb
+    # il bundle e' `var NostrTools = ...` in strict mode: in un eval
+    # strict quella var NON finisce sul globale, si prende il VALORE
+    js = ("const fs = require('fs');\n"
+          "globalThis.window = globalThis;\n"
+          "const NT = (0, eval)(fs.readFileSync("
+          + repr(os.path.join("vendor", "nostr.bundle.js").replace("\\", "/"))
+          + ", 'utf8') + '\\n;NostrTools;');\n"
+          "console.log(JSON.stringify("
+          + _jsb.dumps(sorted(dichiarati))
+          + ".filter(p => !NT[p])));\n")
+    with _tfb.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as fh:
+        fh.write(js)
+        p = fh.name
+    try:
+        r = _spb.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _spb.TimeoutExpired):
+        os.unlink(p)
+        salta("il bundle vero esporta i pezzi", "node non c'e'")
+    else:
+        os.unlink(p)
+        if r.returncode != 0:
+            prova("il banco del bundle gira", "", r.stderr[-300:])
+        else:
+            prova("il bundle committato esporta TUTTI i pezzi pretesi",
+                  [], _jsb.loads(r.stdout))
+
+    # --- il catch che parla (set 2026): un guasto prima di
+    #     `apriOrdineP2P` lasciava schermo e console muti ---
+    inv = pezzo_js(mini, "async function inviaNuovoOrdineP2P(", "\n}\n")
+    prova("la bandierina si alza dove l'ordine compare a schermo", True,
+          "apriOrdineP2P(ord.id);" in inv and "aperto = true;" in inv)
+    cat = inv[inv.index("} catch(e) {"):]
+    prova("il catch parla quando l'ordine non e' mai comparso", True,
+          "if (!aperto) toast(" in cat)
+    # una riga senza nome nessuna vista puo' mostrarla: e' la spazzatura
+    # che il bundle vecchio ha lasciato in memoria
+    prova("un ordine senza id non si scrive", True,
+          "if (agg.id) scriviOrdineP2P(agg);" in cat)
+
+
 def prove_p2p_server():
     """LO SCAMBIO P2P, LATO SERVER (set 2026, tappa 1): tre leve, un
     giudice e due buste.
@@ -43688,6 +43797,7 @@ def main():
     prove_p2p_chat,
     prove_p2p_pubblica,
     prove_p2p_canonico,
+    prove_p2p_bundle,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
