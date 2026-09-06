@@ -28960,8 +28960,8 @@ I DUE DIFETTI TROVATI LÌ erano preesistenti e MISURATI: la testa senza
 `flex-wrap` spezzava il prezzo su 2 card su 7 a 320px col ripiego a
 cambio muto, e i metodi allargavano la pagina.
 Provato: **+34 prove** sul ramo (7990 → 8024 in modalità severa; le 4
-rosse sono le preesistenti — il mojibake della console cp1252, e la CI è
-l'autorità sui totali) con quattro che hanno CAMBIATO LATO col perché
+rosse sono le preesistenti — il mojibake della console cp1252: **in CI
+il ramo è 8028/0**, e su questo l'autorità è lei) con quattro che hanno CAMBIATO LATO col perché
 scritto, e **25 MUTAZIONI, 25 uccise**, una per riga sorvegliata. La
 tortura ha trovato una sentinella che guardava se la riga ESISTE invece
 di cosa DICE: restava verde con la stima tornata in fila col prezzo,
