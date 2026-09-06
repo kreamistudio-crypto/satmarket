@@ -23034,19 +23034,86 @@ resta com'è, quindi la finestra UTILE è sempre ~4 ore più corta
 dell'orizzonte: mostrod molla la presa PRIMA che LND sia costretto a
 chiudere il canale per salvare l'HTLC. GIRATA A 432 il 6 set 2026, a
 scambi fermi: riavvio pulito («Settings correctly loaded», transport
-nip44). ⚠️ Il container si chiama «mostro», NON mostrod — mostrod è
-il demone che ci gira dentro, e un `docker restart mostrod` fallisce
-cercando un container che non esiste. 2) I 15 minuti che avevamo
-visto NON sono la finestra del deposito: sono `expiration_seconds`
-(900) in `[mostro]`, il tempo per ACCETTARE l'ordine — erano due cose
-diverse. 3) Nessun vincolo di
-protocollo sul rilascio: «you need trustworthy moderators». La
+nip44). ⚠️ IL RIAVVIO SI FA DAL COMPOSE: `docker compose restart
+mostro` dalla cartella `~/nodo`. «mostro» è il nome del SERVIZIO,
+mentre il CONTAINER si chiama `nodo-mostro-1` — quindi sia
+`docker restart mostrod` sia `docker restart mostro` rispondono
+«No such container», e la prima stesura di questa riga sbagliava
+credendo che bastasse togliere la «d». Verificate tutt'e due il
+6 set 2026. 2) I 15 minuti che avevamo visto NON sono la finestra del
+deposito: sono `expiration_seconds` (900) in `[mostro]` — ma nemmeno
+«il tempo per accettare», che era la nostra lettura di allora: è il
+tempo per COMPLETARE la presa in carico DOPO averla accettata, e
+riparte a ogni gesto. Vedi «I TRE TIMER», qui sotto. 3) Nessun vincolo
+di protocollo sul rilascio: «you need trustworthy moderators». La
 garanzia siamo noi — che è la stessa frase su cui poggia l'escrow di
 Barattolo. 4) Dicono che serve l'ADMIN macaroon, ma il nostro gira col
 RISTRETTO (info/invoices/offchain) e ha già risposto ad altri client:
 da verificare quando gli scambi partiranno — è la settima cosa aperta,
 accanto alle sei, e si chiude col primo trade vero come la
 riconciliazione.
+
+**I TRE TIMER, letti sul sorgente di `v0.18.6`** (set 2026, prima di
+rispondere ad Alan, che proponeva di allungare «i 15 minuti» a un
+giorno e la vita dell'ordine a 7). Il commento del `settings.tpl.toml`
+su questo punto DICE IL FALSO, ed è la ragione per cui si legge il
+codice: attribuisce il mestiere a una voce inerte e lo nega a quella
+viva.
+• `expiration_seconds` (900) è il tempo per COMPLETARE la presa in
+carico: `find_order_by_seconds` in `src/db.rs` filtra
+`WHERE taken_at < now − expiration_seconds` sui SOLI stati
+`waiting-buyer-invoice` e `waiting-payment`. Non è la vita
+dell'ordine nel libro, e non è il tempo per accettare.
+• **E IL CRONOMETRO RIPARTE A OGNI FASE**, che è la parte che
+leggendo il config non si vede: `show_hold_invoice` in `src/util.rs`
+ri-timbra `taken_at` entrando in `waiting-payment`, col suo commento
+che spiega perché DEVE farlo — la colpa in
+`slash_or_release_on_timeout` cade su chi tiene il dovere corrente, e
+un compratore che si è attardato mangerebbe la finestra del venditore
+facendogli bruciare il bond. Quindi i 900 s sono PER GESTO: chi compra
+ha 15 minuti per incollare la invoice, e da lì chi vende ne ha altri
+15 per pagare — un umano ha già mezz'ora, in due tranche.
+• `hold_invoice_expiration_window` (300) **non la legge NESSUNO: è
+configurazione morta in v0.18.6.** Dichiarata nella struct, scritta
+dal wizard, presente in una fixture di test, e in nessun altro posto
+— censite tutte e 25 le `.rs` che potrebbero nominarla. Toccarla non
+fa niente, e il suo commento nel template descrive il mestiere di
+`expiration_seconds`.
+• `hold_invoice_cltv_delta` (432) alimenta SOLO il `cltv_expiry` della
+hold invoice (`create_hold_invoice` in `src/lightning/mod.rs`, che
+l'`expiry` della fattura non lo tocca proprio): è quanto l'HTLC resta
+appeso DOPO il pagamento, e la finestra utile la dà
+`escrow_guard_window_secs` — `(432−24)×600 = 68 ore`.
+• LA VITA NEL LIBRO È UN'ALTRA LEVA, `expiration_hours`:
+`get_expiration_date` in `src/util.rs` scrive `orders.expires_at` a
+`now + expiration_hours` quando il client non ne manda una sua, e la
+clampa a `max_expiration_days` (15) quando la manda. **GIRATA DA 24 A
+168 il 6 set 2026** (riga 56 del `settings.toml`, riavvio pulito): è
+la richiesta di Alan letta sulla voce giusta. Fino a 15 giorni si
+poteva già chiedere per singolo ordine dal client.
+COSA SUCCEDE AL TIMEOUT, che nessuno aveva verificato: `job_cancel_orders`
+in `src/scheduler.rs` cancella la hold invoice — **niente HTLC
+appeso** — e poi guarda di chi è la colpa: se manca il TAKER l'ordine
+TORNA NEL LIBRO (`Status::Pending`, `Action::NewOrder`, stato
+azzerato), se manca il MAKER l'ordine MUORE (`Status::Canceled`).
+**E I 900 SECONDI RESTANO 900** (decisione di Andrea): il motivo forte
+non è il curioso che congela l'ordine altrui — quello è vero e si
+paga — ma **l'OPZIONE GRATUITA SUL CAMBIO**. Sugli ordini a prezzo di
+mercato il tasso si fissa AL TAKE (`get_market_amount_and_fee` in
+`src/app/take_buy.rs`), quindi con una finestra di un giorno chi prende
+può aspettare e pagare solo se il BTC/EUR si è mosso a suo favore, e
+non pagare se si è mosso contro. A 15 minuti quell'opzione non vale
+niente. **E oggi abbandonare non costa NULLA**: `[anti_abuse_bond]` è
+opt-in e sul nostro nodo è tutta commentata (verificato, riga 215 in
+poi). Quindi **la cura per «15 minuti sono pochi» sono i BOND, non la
+finestra**: con quelli accesi `slash_or_release_on_timeout` brucia il
+bond di chi teneva il dovere, e allora la finestra si allunga senza
+regalare niente. Cantiere suo, e va PRIMA di qualunque ritocco ai 900.
+⚠️ LA PROVA CHE MANCA, dichiarata: che `expires_at` valga davvero
++7 giorni si vede solo creando un ordine, e sul coordinator non ne è
+mai nato uno. Si aggancia alla tappa 8 del cantiere client P2P —
+l'ordine dal vivo con due identità e mille sats — come il c5c, invece
+di aprire un giro a parte.
 
 ## Regole ferree
 
