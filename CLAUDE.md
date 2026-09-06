@@ -23249,7 +23249,70 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del testo che c'è. Senza il bundle `mazzoDaTesto` torna `null`, e un
   `null` preso per «vuoto» sarebbe esattamente quel disastro: il
   bundle caricato prima è la mutazione che rimette il rischio.
+  E IL TERZO STATO È QUELLO CHE MANCAVA (set 2026, il giro dopo, dal
+  campo: telefono e Telegram Desktop continuavano a mostrare due
+  mazzi diversi anche col cantiere qui sopra in produzione).
+  `cloudLeggi` tornava `null` per «vuoto» E per «non ho potuto
+  chiedere», e i due non sono la stessa cosa: **su un errore di rete
+  al momento sbagliato si scriveva il mazzo locale SOPRA una copia
+  che c'era**, cioè si distruggeva una chiave e la reputazione
+  attaccata. È la lezione di `NON_CHIESTO` in `paga_venditore`, sullo
+  stesso asse — «non ho potuto chiedere» non autorizza NIENTE — e da
+  qui `cloudLeggiEsito`, che risponde `{ok, testo}`: si scrive solo
+  su un vuoto **DIMOSTRATO** (`letto.ok && !letto.testo`), mai dedotto
+  da un silenzio. Il lettore è UNO e c'è il censimento: in tutto il
+  client non deve restare una lettura a due stati.
+  ⚠️ E IL GIUDICE SI FA GIRARE, o le sentinelle certificano una riga
+  che nessuno esercita — la classe di prova che questo repo ha già
+  smascherato otto volte, e qui è arrivata alla nona. Il banco grosso
+  della riconciliazione `cloudLeggiEsito` la SOSTITUISCE con uno stub
+  (gli serve pilotare l'esito, non provarlo), quindi le due mutazioni
+  che rimettevano `{ok: true}` su un errore passavano indenni davanti
+  a TUTTE le prove: il fail-closed era scritto e non sorvegliato.
+  Adesso c'è un secondo banco, piccolo, che estrae la funzione VERA e
+  la fa girare su un `CloudStorage` di cartone nei cinque casi — un
+  valore, il vuoto, la callback che porta un errore, il `getItem` che
+  LANCIA, e il Telegram che quell'API non ce l'ha. I tre modi di non
+  sapere devono rispondere tutti e tre `ok:false`: uno solo che
+  tornasse `true` rimetterebbe il disastro per intero.
+  E IL TESTO DI PROVA NON È UN JSON, ed è una scelta e non pigrizia:
+  quel giudice restituisce il testo GREZZO senza interpretarlo, quindi
+  un JSON dentro dimostrerebbe MENO di una stringa qualunque — e in
+  più costringerebbe a tre livelli di virgolette annidate (Python
+  dentro JS dentro JSON), che è esattamente il posto dove si sbaglia.
+  E SI ADOTTA, NON SI GENERA, che è la metà della gamba 1 che
+  mancava e il sintomo vero dal campo: `sincronizzaMazzo` usciva
+  subito quando il mazzo locale non c'era, e ad ADOTTARE era solo
+  `assicuraMazzo` — che ha due chiamanti, tutti e due gesti di
+  pubblicazione di un ordine. Quindi un dispositivo nuovo restava
+  senza profilo **con la copia a un centimetro di distanza**, e la
+  prendeva solo al primo scambio; il Desktop diceva alla lettera «non
+  hai ancora un profilo». Ora il ramo `if (!m)` legge il cloud e
+  prende quel che ci trova (`ricordaMazzo` + `registraChiaviP2P`),
+  MAI generando: aprire una pagina non deve far nascere un'identità
+  che nessuno ha chiesto — quella nasce da un gesto, in
+  `assicuraMazzo`, ed è l'unica differenza fra le due funzioni.
+  L'AGGANCIO STA IN `renderP2P` E NON IN `vaiP2P`, ed è la riga che
+  leggendo non si vede: quello è il solo ingresso dal TAB, mentre
+  alla vista ci si torna col gesto indietro e dalla cronologia, che
+  cadono nel `go(b.v)` generico di `navRendiVista` e da `vaiP2P` non
+  passano MAI (la lezione di `renderInteresse`). Il render invece lo
+  attraversano tutte le strade, e `p2pAdozione` lo tiene a una
+  lettura per sessione. ⚠️ E QUELLA BANDIERINA NON SI AZZERA IN
+  `dimenticaMazzoOra`: quel gesto cancella anche la copia, ma
+  `cloudCancella` è fail-open MUTA — se fallisse, si riadotterebbe un
+  istante dopo il profilo che uno ha appena deciso di dimenticare.
   Vale anche alla nascita: `if (!grezzo)` e mai `if (!nuvola)`.
+  ⚠️ MA GLI ORDINI NON VIAGGIANO, ed è il fatto da sapere prima di
+  chiudere una segnalazione dal campo con «adesso il mazzo si
+  allinea»: **gli ordini P2P vivono in `localStorage`** («gli ordini
+  presi vivono nel browser»), quindi adottare il mazzo dà l'identità
+  e la reputazione, non la lista degli scambi. Chi pubblica dal
+  telefono e apre il Desktop vede lo stesso profilo e NON vede quel
+  che ha pubblicato. Non è un difetto di questo cantiere: è un
+  perimetro, e chiuderlo è una decisione che tocca la linea del
+  «niente dal nostro server» — gli ordini stanno sul coordinatore,
+  quindi la strada onesta è rileggerli da lì e non salvarli da noi.
   IL CONFLITTO NON SI RISOLVE DA SOLO, ed è la regola delle lapidi
   applicata alle chiavi: due mazzi diversi sono due identità con due
   storie, e sceglierne una al posto di chi guarda ne distrugge una.
