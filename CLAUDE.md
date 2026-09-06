@@ -23015,9 +23015,10 @@ cosa che non si sarebbe potuta disfare.
 **LE SEI COSE APERTE**, dichiarate e non dimenticate: `/config`
 scrivibile da mostrod (prima serve sapere dove vive il db); macaroon
 senza IP lock (oggi il file non esce dalla macchina); LLMNR sulla 5355
-(superficie che non paga affitto); **nessun ordine mai creato sul
-coordinator** — che non è una manutenzione rimandata ma il fatto che
-quella macchina non ha mai fatto il suo mestiere nemmeno una volta; il
+(superficie che non paga affitto); **nessuno SCAMBIO mai portato a
+termine sul coordinator** — dal 6 set 2026 un ordine ci è nato ed è
+stato ritirato, quindi la macchina il suo mestiere l'ha cominciato, ma
+niente ha ancora toccato una hold invoice; il
 pull non è sorvegliato (il server sa che l'archivio esiste, non che il
 PC l'abbia preso); e la riconciliazione LND↔Mostro, rimandata al primo
 trade vero perché un controllo su un caso che non si produce ancora non
@@ -23109,11 +23110,27 @@ poi). Quindi **la cura per «15 minuti sono pochi» sono i BOND, non la
 finestra**: con quelli accesi `slash_or_release_on_timeout` brucia il
 bond di chi teneva il dovere, e allora la finestra si allunga senza
 regalare niente. Cantiere suo, e va PRIMA di qualunque ritocco ai 900.
-⚠️ LA PROVA CHE MANCA, dichiarata: che `expires_at` valga davvero
-+7 giorni si vede solo creando un ordine, e sul coordinator non ne è
-mai nato uno. Si aggancia alla tappa 8 del cantiere client P2P —
-l'ordine dal vivo con due identità e mille sats — come il c5c, invece
-di aprire un giro a parte.
+E LA PROVA È FATTA (6 set 2026, il primo ordine vero del coordinator:
+25 EUR, Satispay, id `992e288e`): `expires_at` è caduto **168 ore
+ESATTE** dopo la creazione — il 13 set alle 09:49:11 contro le 09:49:11
+del 6 — quindi non «circa sette giorni» ma il valore del config
+applicato al secondo.
+E L'ESATTEZZA DICE ANCHE QUALE RAMO È PASSATO, ed è la parte che vale
+più del numero: `now + expiration_hours`, cioè quello del client che
+NON manda un `expires_at` suo. L'altro finirebbe sotto il clamp di
+`max_expiration_days` e non avrebbe nessun motivo di combaciare al
+secondo — quindi la leva girata è proprio quella che decide, e non una
+che il client scavalca.
+Nello stesso giro ha risposto anche il RITIRO: l'ordine è andato a
+`canceled`.
+⚠️ MA UN ORDINE CREATO E RITIRATO NON HA MAI TOCCATO UNA HOLD INVOICE,
+ed è la riga da non leggere come «adesso è tutto provato»: quello è
+nato `pending` e da lì è uscito, quindi `taken_at` non si è mai
+scritto e restano NON provati `expiration_seconds`, la riconsegna al
+libro di `job_cancel_orders` e i 432 blocchi del `cltv_delta` — cioè
+tutto quel che sta a valle di una presa in carico. Si agganciano alla
+tappa 8 del cantiere client P2P — due identità e mille sats — insieme
+al macaroon ristretto.
 
 ## Regole ferree
 
