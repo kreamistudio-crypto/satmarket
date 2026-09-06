@@ -23037,8 +23037,9 @@ scambi fermi: riavvio pulito («Settings correctly loaded», transport
 nip44). ⚠️ Il container si chiama «mostro», NON mostrod — mostrod è
 il demone che ci gira dentro, e un `docker restart mostrod` fallisce
 cercando un container che non esiste. 2) I 15 minuti che avevamo
-visto NON sono la finestra del deposito: sono `expiration_seconds` (900) in `[mostro]`, il tempo per
-ACCETTARE l'ordine — erano due cose diverse. 3) Nessun vincolo di
+visto NON sono la finestra del deposito: sono `expiration_seconds`
+(900) in `[mostro]`, il tempo per ACCETTARE l'ordine — erano due cose
+diverse. 3) Nessun vincolo di
 protocollo sul rilascio: «you need trustworthy moderators». La
 garanzia siamo noi — che è la stessa frase su cui poggia l'escrow di
 Barattolo. 4) Dicono che serve l'ADMIN macaroon, ma il nostro gira col
