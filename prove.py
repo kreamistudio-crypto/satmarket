@@ -5529,6 +5529,7 @@ def prove_email_corriere():
         email_corriere_correzioni INT DEFAULT 0,
         email_corriere_purgata_il INT DEFAULT 0,
         indirizzo TEXT DEFAULT '', indirizzo_purgato_il INT DEFAULT 0,
+        punto_barattolo TEXT DEFAULT '',
         disputata INT DEFAULT 0);
       -- 1: via punto, pagato: il caso normale
       INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto)
@@ -5544,6 +5545,14 @@ def prove_email_corriere():
       INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
         email_corriere_il, email_corriere_purgata_il)
         VALUES(4, 111, 222, 'released', 1, 500, 900);
+      -- 5: un PUNTO DI BARATTOLO, dove il codice lo conia il server:
+      -- li' nessun corriere ha niente da mandare a nessuno, e un
+      -- recapito sarebbe un dato che passa da noi per una cosa che non
+      -- succede. E' la via punto a tutti gli effetti — quindi il gate
+      -- di sopra non basta, e ce ne vuole un quinto.
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,via_punto,
+        punto_barattolo)
+        VALUES(5, 111, 222, 'locked', 1, 'milano-centro');
     """)
     vero.commit()
 
@@ -5626,6 +5635,19 @@ def prove_email_corriere():
           "400 Operazione non permessa", scrivi(999, 1, "x@y.it"))
     prova("l'ordine che non esiste: la stessa risposta ancora",
           "400 Operazione non permessa", scrivi(111, 77, "x@y.it"))
+    # ⚠️ IL QUINTO GATE, e la prova sta QUI e non fra le sentinelle
+    # della sua famiglia: li' si guarda la FORMA, qui si guarda che
+    # l'endpoint VERO risponda no — e soprattutto che non scriva
+    # niente, che e' la meta' che una sentinella non puo' dire.
+    _r5 = str(scrivi(111, 5, "mario@esempio.it"))
+    prova("niente email su un punto di Barattolo",
+          True, _r5.startswith("400 Su un punto di Barattolo"))
+    prova("...e il rifiuto dice chi scrive il codice",
+          True, "lo scrive la piattaforma" in _r5)
+    prova("...e in colonna non e' finito niente",
+          ("", 0),
+          tuple(vero.execute("SELECT email_corriere, email_corriere_il "
+                             "FROM ordini WHERE id=5").fetchone()))
     prova("niente email sulla spedizione a casa", True,
           str(scrivi(111, 2, "x@y.it")).startswith("400 Questo ordine"))
     prova("dopo la spedizione il campo e' chiuso",
@@ -44650,6 +44672,171 @@ def prove_presa_in_carico():
                     ).count("renderPuntoPacchi();"))
 
 
+def prove_punti_pubblici():
+    """I TESTI E IL DISTINTIVO (ago 2026, il secondo tempo del cantiere).
+
+    Il piano dice «se non si riescono a scrivere in modo onesto, il
+    cantiere non si fa», e questa famiglia difende le righe che quel
+    passo ha prodotto — piu' il difetto che scriverle ha trovato.
+
+    La riga da non ammorbidire e' UNA: «se il punto ha segnato, per noi
+    chi ha spedito ha consegnato» e' una DECISIONE e non una
+    constatazione, ed e' la ragione per cui la presa in carico compra
+    qualcosa. Va detta PRIMA dell'acquisto, e `apri_disputa` la ricorda
+    al moderatore mentre decide: se sparisse da questa pagina
+    resterebbe una regola che decide una disputa e che nessuno ha mai
+    letto."""
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- (a) la voce in `sicu-limiti` --------------------------------
+    _lim = mini[mini.index('id="sicu-limiti"'):]
+    _lim = _lim[:_lim.index("</ul>")]
+    prova("la pagina dice che un punto e' una persona, non un'azienda",
+          True, "Un punto di ritiro di Barattolo è una persona, non "
+          "un'azienda" in _lim)
+    # LA REGOLA DI DEFAULT, che e' la meta' che conta: senza, la presa
+    # in carico non sposterebbe il peso di nessuna prova.
+    prova("...e dichiara la regola di default PRIMA dell'acquisto",
+          True, "chi ha spedito ha consegnato" in _lim)
+    # E DICE ANCHE COSA NON POSSIAMO FARE: e' l'unica sanzione che
+    # abbiamo, e prometterne altre sarebbe un contratto che non c'e'.
+    prova("...e l'unica sanzione: toglierlo dalla mappa",
+          True, "<b>toglierlo dalla mappa</b>" in _lim)
+    # LA POSIZIONE E' CONTENUTO: dopo il ritiro a mano — di cui
+    # condivide il buco, e il testo lo dice — e prima del pacco perso,
+    # che parla dei corrieri. Al contrario si leggerebbe come un caso
+    # dei corrieri, che e' precisamente quel che non e'.
+    _i_mano = _lim.index("Nel ritiro a mano, il controllo è il tuo")
+    _i_punto = _lim.index("Un punto di ritiro di Barattolo è una persona")
+    _i_perso = _lim.index("Il pacco perso o rovinato")
+    prova("la voce sta fra il ritiro a mano e il pacco perso",
+          True, _i_mano < _i_punto < _i_perso)
+    prova("...e nomina il buco che condivide col ritiro a mano",
+          True, "stesso buco del ritiro a mano" in _lim)
+
+    # ---- (b) l'emendamento a `priv-indirizzo` ------------------------
+    _pi = mini[mini.index('id="priv-indirizzo"'):]
+    _pi = _pi[:_pi.index("</ul>")]
+    # ⚠️ VIA I COMMENTI, ed e' la trappola della prosa in versione HTML:
+    # il commento della NOTA dice «e' l unica delle quattro che l utente
+    # sceglie di scrivere» — che parla d altro e REGGE ancora, perche il
+    # codice digitale non lo scrive l utente — e senza questa riga il
+    # conteggio qui sotto sarebbe rosso per colpa di una spiegazione.
+    _pi = re.sub(r"<!--.*?-->", "", _pi, flags=re.S)
+    # EMENDATA E NON SMENTITA: la ragione per cui il punto si puo'
+    # salvare REGGE (e' un luogo pubblico, casa tua no), e resta.
+    prova("la voce del punto tiene ancora il perche' del salvataggio",
+          True, "è un <i>luogo pubblico</i>" in _pi)
+    # LA SECONDA META', che e' quel che il cantiere aggiunge: dietro il
+    # banco c'e' una persona, e questo un locker non lo fa.
+    prova("...e dice cosa vede in piu' un punto di Barattolo",
+          True, "dietro il banco c'è una persona" in _pi)
+    # ⚠️ E COSA NON SA: e' la riga che rende sostenibile la prima, e un
+    # riordino che tenesse solo l'allarme la toglierebbe per prima.
+    prova("...e cosa NON sa: il contenuto e chi vende",
+          True, "cosa c'è nel pacco e chi te l'ha venduto" in _pi)
+
+    # ---- (c) i due conteggi ------------------------------------------
+    # Il cappello dice «Cinque cose» dall'email in poi: la voce del
+    # punto le contava QUATTRO, e riscriverla senza toccare il numero
+    # avrebbe lasciato l'incoerenza a meta'.
+    prova("il punto conta cinque cose come il cappello",
+          (True, False),
+          ("l'unica delle cinque" in _pi, "l'unica delle quattro" in _pi))
+    # IL NUMERO FRAGILE SI TOGLIE invece di aggiornarsi: a «quattro»
+    # sarebbe FALSO, che il codice digitale non si cancella. E' la
+    # regola gia' scritta per «Cinque cose».
+    prova("la nota non conta piu' le altre: le NOMINA",
+          (True, False),
+          ("a differenza dell'indirizzo e dell'email" in _pi,
+           "a differenza delle altre tre" in _pi))
+
+    # ---- (d) IL QUINTO GATE ------------------------------------------
+    # ⚠️ L'HA TROVATO IL TESTO PUBBLICO e non la rilettura: il pannello
+    # promette a chi compra che «il codice del locker te lo manda il
+    # corriere», e sulla rete di casa e' FALSO — quel codice lo conia
+    # il server. Un recapito raccolto per una cosa che non succede.
+    _em = codice(pezzo("indica_email_corriere"))
+    prova("l'email del corriere non si lascia su un punto di casa",
+          True, 'if o["punto_barattolo"]:' in _em)
+    # E IL RIFIUTO DICE PERCHE', che e' la regola dei fratelli: un 400
+    # muto manderebbe a cercare il guasto dalla parte sbagliata.
+    prova("...e il 400 dice chi scrive il codice",
+          True, "lo scrive la piattaforma" in _em)
+    # IL GEMELLO CLIENT: un bottone che porta a un muro e' peggio di un
+    # bottone che non c'e'. Il gate e' il campo dell'ORDINE e non la
+    # rete del venditore, che puo' cambiare sotto.
+    _pe = pezzo_js(mini, "function pannelloEmailCorriere(", "\n}")
+    prova("il pannello dell'email non nasce su un punto di casa",
+          True, "if (!o || !o.viaPunto || o.puntoBarattolo) return ''" in _pe)
+
+    # ---- (e) il distintivo -------------------------------------------
+    _dist = src[src.index("DISTINTIVI = ["):]
+    _dist = _dist[:_dist.index("\n]\n")]
+    prova("il punto ha il suo distintivo",
+          True, 'id="punto_ritiro"' in _dist)
+    # ⚠️ `fiducia=False` E' UNA DECISIONE: quel flag manda il badge in
+    # TESTA alla sfilza, cioe' dice «di questo ci si fida». Ospitare un
+    # punto e' un RUOLO che abbiamo chiesto noi — e il quadro dice che
+    # una mappa nostra direbbe «questi sono buoni», e oggi non abbiamo
+    # niente per dirlo. La mutazione che lo accende fa rossa questa.
+    _voce = _dist[_dist.index('id="punto_ritiro"'):]
+    prova("...e NON e' un distintivo di fiducia",
+          True, "fiducia=False" in _voce[:200])
+    # IL FATTO STA NEI DATI e il criterio resta puro come i suoi
+    # fratelli: una lettura dentro un lambda sarebbe la prima.
+    _dd = codice(pezzo("_dati_distintivi"))
+    prova("il fatto del punto vive nei dati",
+          True, "punto_barattolo=_e_punto_barattolo(" in _dd)
+    # ⚠️ E IL RIFERIMENTO E' PIGRO, che e' la riga senza la quale il
+    # SERVER NON PARTE: `init_db()` gira all'import e chiama i criteri
+    # di tutti i distintivi, mentre il catalogo dei punti vive in fondo
+    # al file — un riferimento diretto sarebbe un NameError all'avvio,
+    # la temporal dead zone gia' pagata nel client. A dirlo davvero e'
+    # il collaudo, che importa il server: qui si sorveglia che la
+    # lettura non torni diretta dentro i dati.
+    prova("...e i dati non nominano il catalogo dei punti",
+          [], [n for n in ("punti_barattolo_vivi", "_punti_accesi",
+                           "PUNTI_BARATTOLO") if n in _dd])
+    _ponte = codice(pezzo("_e_punto_barattolo"))
+    prova("il ponte legge pigro e confronta il codice negozio",
+          (True, True),
+          ('globals().get("punti_barattolo_vivi")' in _ponte,
+           'p["negozio"] == negozio' in _ponte))
+    # IL `globals()` STA IN UN POSTO SOLO, o si sparpaglierebbe in un
+    # criterio e nessuno saprebbe piu' perche' e' li'.
+    prova("...e il globals() vive solo li'",
+          1, codice(src).count('globals().get("punti_barattolo_vivi")'))
+
+    # ⚠️ E IL CRITERIO SI FA GIRARE, che e' la meta' senza la quale le
+    # righe qui sopra non dicono niente: una sentinella vede che il
+    # lambda c'e', mai che risponda giusto — e la mutazione che lo apre
+    # a chiunque (`lambda d: True`) passava liscia davanti a TUTTE. Non
+    # e' un buco di questo cantiere soltanto: in tutto questo file non
+    # c'era UNA prova che chiamasse un criterio di distintivo.
+    # I criteri sono lambda PURI su `d` — nessuno nomina una costante
+    # del modulo — quindi il catalogo si puo' eseguire da solo.
+    _amb_cat = {}
+    _i = src.index("DISTINTIVI = [")
+    exec(src[_i:src.index(chr(10) + "]" + chr(10), _i) + 2],
+         {"dict": dict}, _amb_cat)
+    _crit = {d["id"]: d["criterio"] for d in _amb_cat["DISTINTIVI"]}
+    prova("il criterio del punto guarda il suo fatto",
+          (True, False),
+          (bool(_crit["punto_ritiro"]({"punto_barattolo": True})),
+           bool(_crit["punto_ritiro"]({"punto_barattolo": False}))))
+    # LA PROVA PIU' FORTE DELLE DUE: chi ha tutti gli ALTRI fatti al
+    # massimo ma non ospita un punto non deve prenderlo lo stesso — e'
+    # quel che smaschera un criterio allargato per distrazione, che
+    # sulla riga di prima potrebbe ancora rispondere giusto.
+    _tutto = dict(npub_verificata=1, tg_id=1, npub_accesso="npub1x",
+                  vendite=99, acquisti=99, dispute_perse=0, posizione=1,
+                  annunci=99, fb_ricevuti=99, fb_media=5.0,
+                  fb_lasciati=99, lampo=99, punto_barattolo=False)
+    prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
+          False, bool(_crit["punto_ritiro"](_tutto)))
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -44700,6 +44887,7 @@ def main():
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_barattolo, prove_presa_in_carico,
+              prove_punti_pubblici,
               prove_punti_salvati,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,

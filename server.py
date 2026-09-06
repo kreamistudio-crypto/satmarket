@@ -1822,7 +1822,49 @@ DISTINTIVI = [
     dict(id="fulmine", emoji="🚀", nome="Fulmine", fiducia=False,
          descrizione="3 spedizioni partite entro un giorno dal pagamento",
          criterio=lambda d: d["lampo"] >= 3),
+    # ⚠️ `fiducia=False`, ed e' una decisione e non una svista: quel
+    # flag manda il distintivo in TESTA alla sfilza, cioe' dice a chi
+    # guarda «di questo ci si fida». Ospitare un punto e' un RUOLO che
+    # abbiamo chiesto noi, non una prova di affidabilita' commerciale —
+    # e il quadro lo dice alla lettera: una mappa nostra direbbe
+    # «questi sono buoni», e oggi non abbiamo niente per dirlo.
+    #
+    # E RESTA ANCHE A PUNTO SPENTO, che e' la regola del catalogo
+    # («append-only: non si revocano mai») e qui va detta perche' e' il
+    # primo distintivo che dipende da una LEVA: chi ha tenuto un punto
+    # l'ha tenuto davvero, e il giorno che lo chiude quel fatto non
+    # diventa falso. A dire chi e' un punto OGGI e' l'elenco delle vie,
+    # che si spegne all'istante — questo dice chi lo e' STATO.
+    dict(id="punto_ritiro", emoji="📍", nome="Punto di ritiro",
+         fiducia=False,
+         descrizione="Ospita un punto di ritiro della rete di Barattolo",
+         criterio=lambda d: d["punto_barattolo"]),
 ]
+
+
+def _e_punto_barattolo(negozio: str) -> bool:
+    """Il codice negozio e' quello di un punto ACCESO?
+
+    ⚠️ IL RIFERIMENTO E' PIGRO, E QUI STA TUTTO IL PERCHE': il catalogo
+    dei punti vive in fondo al file, con la famiglia della consegna che
+    e' il suo posto — mentre `init_db()` gira all'IMPORT, molto prima,
+    e nella sua passata retroattiva chiama i criteri di TUTTI i
+    distintivi. Un riferimento diretto a `punti_barattolo_vivi` sarebbe
+    quindi un NameError all'AVVIO DEL SERVER, cioe' il guasto peggiore
+    che questo file possa produrre: e' la temporal dead zone gia'
+    pagata nel client, in versione Python.
+    Durante quella passata si risponde «no» e non si assegna niente, e
+    non e' una perdita: il sistema e' auto-riparante per costruzione —
+    il catch-all silenzioso di `/api/me` gira quando il modulo e' tutto
+    caricato, e il gancio dal vivo del comando pure. Il `globals()` sta
+    QUI e in nessun altro posto, o si sparpaglierebbe in un criterio.
+    A sorvegliarlo non c'e' una sentinella ma il collaudo eseguibile,
+    che importa il server: se questa riga torna diretta, quello non
+    parte affatto."""
+    vivi = globals().get("punti_barattolo_vivi")
+    if not negozio or vivi is None:
+        return False
+    return any(p["negozio"] == negozio for p in vivi())
 
 
 def _dati_distintivi(con, tg_id: int) -> dict | None:
@@ -1869,7 +1911,13 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         # fisico del pagamento. Margine a favore del venditore.
         lampo=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
                 "AND stato='released' AND prova=0 AND spedito_il>0 "
-                "AND spedito_il-creato <= ?", tg_id, 86400 + 1800))
+                "AND spedito_il-creato <= ?", tg_id, 86400 + 1800),
+        # IL PUNTO NON SI CONTA DA UNA TABELLA: e' il codice negozio
+        # che compare fra i punti accesi, e il ponte qui sopra dice
+        # perche' quella lettura e' pigra. `punti_barattolo_vivi()`
+        # legge la CACHE (`_PUNTI`), quindi qui dentro non si apre
+        # nessuna seconda connessione mentre questa ha gia' la sua.
+        punto_barattolo=_e_punto_barattolo(u["negozio"]))
 
 
 def controlla_distintivi(con, tg_id: int) -> list[str]:
@@ -24742,6 +24790,22 @@ async def indica_email_corriere(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "un punto di ritiro")
+    # ⚠️ E MAI SULLA RETE DI CASA, che e' il quinto gate della
+    # famiglia: li' il codice di ritiro lo CONIA il server e lo legge
+    # il punto, quindi nessun corriere ha niente da mandare a nessuno —
+    # un recapito lasciato qui sarebbe un dato che passa da noi per una
+    # cosa che non succede. Il testo del pannello lo dice alla lettera
+    # («perche' il codice del locker te lo mandi il corriere»), quindi
+    # senza questa riga la promessa sarebbe falsa proprio dove il dato
+    # e' piu' delicato. Il client il pannello non lo disegna affatto —
+    # un bottone che porta a un muro e' peggio di un bottone che non
+    # c'e' — e questo e' il muro, per chi ci arrivasse da un'altra
+    # strada. L'ha trovato il TESTO PUBBLICO e non la rilettura.
+    if o["punto_barattolo"]:
+        con.close()
+        raise HTTPException(400, "Su un punto di Barattolo il codice di "
+                                 "ritiro lo scrive la piattaforma: non "
+                                 "serve nessuna email.")
     adesso = int(time.time())
     prima = bool(o["email_corriere"])
     dopo = bool(mail)
