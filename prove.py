@@ -37835,8 +37835,29 @@ def prove_p2p_nuvola():
     # trovasse direbbe il falso su una riga giusta.
     ramo = sin[sin.index("if (letto.testo) {"):]
     ramo = ramo[:ramo.index("\n    }")]
-    prova("nel ramo del cloud che C'E' non si scrive mai",
-          -1, ramo.find("cloudScrivi"))
+    # HA CAMBIATO LATO (set 2026, col cantiere della convergenza
+    # dell'indice): diceva «qui non si scrive MAI», e il suo perche' era
+    # che scrivere poteva sovrascrivere una chiave DIVERSA. Quel caso
+    # esce prima (`su.sk !== m.sk`), quindi la promessa vera non e' «non
+    # si scrive» ma «non si scrive PRIMA di aver verificato che la chiave
+    # e' la stessa» — che e' l'affermazione forte, e la mutazione che
+    # sposta il `cloudScrivi` sopra quella guardia la fa rossa.
+    prova("nel ramo del cloud che C'E' non si scrive prima della guardia",
+          True, ramo.find("cloudScrivi") > ramo.index("su.sk !== m.sk"))
+    # L'INDICE CONVERGE AL PIU' ALTO e non al piu' recente: un indice e'
+    # un contatore di chiavi BRUCIATE, e prenderne uno piu' basso le
+    # riusa — `ordiniAscoltoP2P` indicizza per `pubTrade` e l'ultimo
+    # vince, quindi i messaggi di uno scambio finirebbero sull'altro.
+    prova("...e l'indice converge al PIU' ALTO",
+          True, "Math.max(su.indice | 0, m.indice | 0)" in ramo)
+    # E NEI DUE VERSI: col LOCALE avanti si riscrive il cloud, che e' la
+    # riprova della scrittura persa — l'unico modo in cui i due possono
+    # divergere, visto che ogni incremento scrive il cloud e quella
+    # scrittura e' fail-open muta. Senza, il dispositivo arretrato
+    # prenderebbe il massimo fra il suo indice e un cloud vecchio.
+    prova("...e si scrive anche nel verso opposto", True,
+          "if (alto !== (su.indice | 0))" in ramo
+          and "if (alto !== (m.indice | 0)) ricordaMazzo(pari);" in ramo)
     prova("...e il testo illeggibile esce senza toccare niente", True,
           "if (!su) return (mazzoNuvola = 'illeggibile');" in ramo)
     prova("...e due mazzi diversi nemmeno", True,
@@ -38039,6 +38060,25 @@ def prove_p2p_nuvola():
           "    LETTURA_OK = false; });\n"
           "  await giro('lettura fallita, senza mazzo', () => {\n"
           "    LETTURA_OK = false; });\n"
+          # LA CONVERGENZA DELL'INDICE: il giro di sempre non lo guarda
+          # (torna le chiavi), quindi ne serve uno che lo dica — e
+          # cambiare la forma di `giro` renderebbe rosse tutte le prove
+          # di sopra per niente.
+          "  const giroI = async (nome, pre) => { SCRITTO = null;\n"
+          "    LOCALE = null; NUVOLA = null; SCRIVIBILE = true;\n"
+          "    LEGGIBILE = true; CLOUD = true; LETTURA_OK = true;\n"
+          "    REGISTRATE = null; mazzoNuvolaAltro = null;\n"
+          "    pre(); out[nome] = [await sincronizzaMazzo(), SCRITTO,\n"
+          "                        LOCALE && LOCALE.indice]; };\n"
+          "  const M = (i) => ({sk:'aa', pub:'AA', indice: i});\n"
+          "  await giroI('cloud avanti', () => { LOCALE = M(3);\n"
+          "    NUVOLA = JSON.stringify(M(7)); });\n"
+          "  await giroI('locale avanti', () => { LOCALE = M(7);\n"
+          "    NUVOLA = JSON.stringify(M(3)); });\n"
+          "  await giroI('locale avanti, cloud muto', () => { LOCALE = M(7);\n"
+          "    NUVOLA = JSON.stringify(M(3)); SCRIVIBILE = false; });\n"
+          "  await giroI('indici pari', () => { LOCALE = M(4);\n"
+          "    NUVOLA = JSON.stringify(M(4)); });\n"
           "  console.log(JSON.stringify(out));\n"
           "})();\n")
     with _tfn.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -38095,6 +38135,21 @@ def prove_p2p_nuvola():
             prova("...e senza mazzo non promette niente",
                   ["", None, None, None, None],
                   g["lettura fallita, senza mazzo"])
+            # LA CONVERGENZA DELL'INDICE (set 2026): fin qui lo stesso
+            # mazzo su due dispositivi tornava 'copia' e l'indice non lo
+            # toccava nessuno — cioe' si RIUSAVA una trade key gia' viva.
+            prova("il cloud avanti tira su il locale",
+                  ["copia", None, 7], g["cloud avanti"])
+            # ...e il verso opposto e' la RIPROVA della scrittura persa:
+            # senza, il dispositivo arretrato prenderebbe il massimo fra
+            # il suo indice e un cloud vecchio, e resterebbe indietro.
+            prova("il locale avanti riscrive il cloud",
+                  ["copia", '{"sk":"aa","pub":"AA","indice":7}', 7],
+                  g["locale avanti"])
+            prova("...e se il cloud non si lascia scrivere si SA",
+                  ["muto", None, 7], g["locale avanti, cloud muto"])
+            prova("indici pari: non si riscrive niente",
+                  ["copia", None, 4], g["indici pari"])
 
 
 def prove_p2p_bundle():

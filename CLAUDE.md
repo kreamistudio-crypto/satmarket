@@ -23842,6 +23842,61 @@ RISTRETTO (info/invoices/offchain) e ha già risposto ad altri client:
 da verificare quando gli scambi partiranno — è la settima cosa aperta,
 accanto alle sei, e si chiude col primo trade vero come la
 riconciliazione.
+**LA SONDA DEL COORDINATOR (set 2026), le otto domande della tappa 1.**
+Chieste al nodo VERO con un mazzo usa-e-getta generato dalla sonda —
+nessun segreto in gioco — e un ordine di prova nato e poi ritirato.
+CINQUE sono ferme, TRE restano aperte, e la prima delle tre e' quella
+che decide se il cantiere va avanti.
+**Q1 — RISPONDE, e alla chiave che ha chiesto.** L'ordine di prova e'
+nato ed e' comparso nel 38383 col suo tag rating (days 0, total_rating
+0.0, total_reviews 0); il `cancel` l'ha riportato a `canceled`.
+**Q2 — SI: accetta una trade key MAI VISTA con `trade_index: null`**, e
+con TUTT'E DUE le buste (`order` e `restore`). Non serve una chiave gia'
+bruciata per interrogare, ed e' la risposta che decide quale chiave usa
+il cantiere.
+**Q3 — col mazzo B, mai visto, risponde `{"orders": [], "disputes":
+[]}`.** Quindi «non ti riconosco» si serve COME una lista vuota: i due
+casi **non si distinguono**. Per noi va bene — la domanda che facciamo
+e' «quali ordini ha questa chiave», e la risposta e' giusta in tutti e
+due i casi — ma va scritto, perche' il giorno che servisse sapere se una
+chiave e' NOTA, da qui non si sa.
+**Q4 — `status` sta DENTRO ogni ordine**, e in questo giro vale
+`"pending"`. E' l'unica stringa che restore-session abbia detto: il
+`canceled` visto dopo il ritiro veniva dal LIBRO (38383), che e'
+un'altra fonte e un altro vocabolario. La tabella del giudice si
+completa vedendo gli altri stati, e finche' non li si vede il giudice
+non si scrive a memoria.
+**Q6 — SI: l'elenco include i `pending`** (l'ordine di prova c'era, e i
+log del nodo dicono «Background restore session completed with 1 orders,
+0 disputes»). Quindi un `pending` nella lista implica maker, e **il lato
+e' un fatto** invece di un'inferenza.
+⚠️ **Q5 E' APERTA ED E' QUELLA CHE BLOCCA.** Su `new-order` il
+`request_id` torna uguale; su `restore-session` NON risulta — ma **e'
+un'inferenza e non un fatto**, e va detto: la sonda prova la seconda
+busta solo se la prima non ha agganciato, e le ha provate tutt'e due pur
+avendo risposto tutt'e due. Se fosse vero, `p2pAttese` non chiuderebbe
+MAI su un restore e ogni lettura andrebbe in timeout. Il prossimo giro
+lo dice senza inferenze: la sonda adesso stampa i campi di primo livello
+e il `request_id` di ogni risposta.
+**Q7 e Q8 restano da riportare**: la sonda le calcola per conto suo (i
+due tag del 38385 per il PoW, il conteggio degli eventi per richiesta) e
+le stampa nel quadro, ma quel giro non e' stato riportato.
+E LA LEZIONE DEL GIRO VALE OLTRE LA SONDA: il lettore del quadro
+agganciava la risposta con UN criterio solo — il `request_id` — e da
+quell'aggancio dipendevano a cascata quattro risposte, che sono uscite
+**NO CATEGORICI su fatti veri** mentre il grezzo li' sopra diceva il
+contrario. **Un NO su un fatto vero e' peggio di un «non lo so»**: il
+primo chiude una domanda, il secondo la tiene aperta. La cura non e'
+indovinare il campo che manca ma rendere il lettore robusto — l'aggancio
+ha un ripiego DICHIARATO (la prima risposta che viene dal coordinatore
+verso la chiave interrogata, e chi legge se lo trova scritto accanto), e
+le risposte che elencano gli stati si ricavano da TUTTE le risposte del
+coordinatore nella finestra invece che dalla sola agganciata, che e' quel
+che fa un umano guardando il grezzo. IL SEGNO CHE IL DIFETTO ERA VECCHIO:
+Q1 aveva gia' il ramo «ha risposto ma non con quel request_id» e gli
+altri tre no — la stessa prudenza scritta in un posto e mancante negli
+altri, che e' il modo in cui una cecita' si nasconde in mezzo a del
+codice che funziona.
 
 **I TRE TIMER, letti sul sorgente di `v0.18.6`** (set 2026, prima di
 rispondere ad Alan, che proponeva di allungare «i 15 minuti» a un

@@ -32971,6 +32971,30 @@ function sincronizzaMazzo(){
       if (!su) return (mazzoNuvola = 'illeggibile');
       if (su.sk !== m.sk) { mazzoNuvolaAltro = su; return (mazzoNuvola = 'diverso'); }
       mazzoNuvolaAltro = null;
+      /* L'INDICE CONVERGE, ed e' la meta' che mancava: fin qui lo stesso
+         mazzo su due dispositivi tornava 'copia' e l'indice non lo
+         toccava nessuno — lo raccoglieva solo l'ADOZIONE. Due dispositivi
+         che scambiano entrambi RIUSANO una trade key gia' viva:
+         `ordiniAscoltoP2P` indicizza per `pubTrade` e l'ultimo vince,
+         quindi i messaggi di uno scambio finiscono sull'altro — e il
+         coordinatore risponde `invalid-trade-index`, che a schermo
+         diventa «prova a riaprire l'app»: riaprire non ripara niente.
+         VINCE IL PIU' ALTO e mai il piu' recente: l'indice conta le
+         chiavi BRUCIATE, quindi tornare indietro le riusa, e chi e'
+         avanti non ha niente da imparare da chi e' indietro.
+         E SI SCRIVE NEI DUE VERSI, che e' la meta' che si dimentica:
+         col cloud avanti si allinea il locale, col LOCALE avanti si
+         riscrive il cloud — ed e' la RIPROVA della scrittura persa,
+         l'unico modo in cui i due possono divergere (ogni incremento
+         scrive il cloud, e quella scrittura e' fail-open muta). Senza
+         il secondo verso la convergenza resta a meta': il dispositivo
+         arretrato prenderebbe il massimo fra il suo e un cloud vecchio. */
+      const alto = Math.max(su.indice | 0, m.indice | 0);
+      const pari = Object.assign({}, m, {indice: alto});
+      if (alto !== (m.indice | 0)) ricordaMazzo(pari);
+      if (alto !== (su.indice | 0))
+        return (mazzoNuvola = await cloudScrivi(CLOUD_MAZZO,
+          mazzoSerializza(pari)) ? 'copia' : 'muto');
       return (mazzoNuvola = 'copia');
     }
     mazzoNuvolaAltro = null;
