@@ -23444,7 +23444,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   regola dice che quelle tre righe non si accorciano e non diventano
   verdi, NON che debbano stare sempre aperte: è una decisione di
   prodotto e non un ritocco, e sta qui perché è la sola leva che
-  recupera una card senza toccare la struttura a blocchi.
+  recupera una card senza toccare la struttura a blocchi. **PRESA**
+  dall'ago 2026: vedi «LA DISCLOSURE SI RICHIUDE», in coda alla voce.
   ⚠️ E LA STIMA IN SATS SULLA SUA RIGA VALE 21,8px, che è la seconda
   leva che verrà in mente: rimetterla in fila col prezzo li
   ricompra — ed è precisamente il difetto MISURATO che questo
@@ -23463,11 +23464,86 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   custodisce Mostro e che «Barattolo non li tiene e non li vede» non si
   accorciano e non diventano verdi — il verde in casa vuol dire
   deposito di garanzia NOSTRO, e qui i sats li tiene un terzo.
+  ⚠️ E «NON SI TOCCA» VALE PER LE PAROLE, NON PER LA POSIZIONE: dall'ago
+  2026 la riga si richiude dopo la prima lettura, e la forma chiusa
+  nomina ancora il custode — vedi la voce qui sotto.
   ⚠️ E UNA SENTINELLA GUARDAVA SE LA RIGA ESISTE INVECE DI COSA DICE,
   per l'ennesima volta: chiedeva il solo selettore della stima e
   restava VERDE con `display:inline` dentro — cioè col difetto che il
   cantiere ha appena misurato a 320px. L'ha detto la tortura, non la
   rilettura.
+  LA DISCLOSURE SI RICHIUDE DOPO LA PRIMA VOLTA (ago 2026, decisione di
+  Andrea che EMENDA la riga qui sopra — e la emenda per METÀ, che è la
+  parte da leggere): «Non la chiudo del tutto: quella riga dice chi tiene
+  i sats, e nasconderla per guadagnare spazio è la cosa che non facciamo.
+  Ma aperta la PRIMA volta che uno apre il P2P, e da lì in poi richiusa
+  con lo "Scopri di più" — chi l'ha letta una volta non deve rileggerla a
+  ogni giro.»
+  A SPARIRE È LA RIPETIZIONE, MAI IL FATTO, ed è la condizione che rende
+  ammissibile tutta la variante: la riga CHIUSA continua a nominare il
+  custode — «I sats li custodisce il coordinatore (Mostro), non
+  Barattolo» — quindi chi torna al libro il giorno dopo legge comunque
+  chi tiene i suoi soldi. C'è la prova che quella parola ci sia.
+  LA FORMULA PIÙ CORTA È SCARTATA, e la ragione è di Andrea: «non cambia
+  il conto delle offerte, quindi accorciarla è rischio senza guadagno».
+  MISURATO: la riga chiusa sta su DUE righe a tutte e tre le larghezze
+  (43,5px), e una formula da una riga sola ne toglierebbe 21,8 — che non
+  fa comparire nessuna card in più e costa la parola «coordinatore».
+  IL COSTO E IL GUADAGNO, misurati sul DOM vero PRIMA di costruire: la
+  riga aperta pesa **108,8px a 320** (cinque righe) e **87,0 a 360/375**
+  (quattro), chiusa **43,5** dappertutto. Si riprendono 65,3px a 320 e
+  43,5 alle altre due, il cappello scende da 436,5 a 371,2, e le offerte
+  INTERE passano da **1 a 2** a tutte e tre le larghezze.
+  LE DUE FORME VIVONO TUTTE E DUE NEL MARKUP FISSO, E A NASCONDERE È IL
+  CSS, ed è la riga da non ammorbidire: `view-p2p` è markup fisso e TRE
+  sentinelle leggono quelle parole nel SORGENTE — quella che vieta le
+  interpolazioni, quella che vieta la parola «Nostr», e quella che
+  pretende «coordinatore» e «non li tiene e non li vede». Scritte da un
+  render quelle parole dal sorgente sparirebbero, e tutte e tre
+  diventerebbero VACUE senza che nessuna fallisca. Col CSS non cambia
+  lato NESSUNA di loro, ed è il pregio che ha deciso la forma.
+  NASCE APERTA (fail-soft, il patto di `vestiPaySheet`): se la regia non
+  gira si legge la riga intera, che è il comportamento di ieri — mai una
+  riga vuota, e mai la sola forma corta a chi non l'ha ancora letta.
+  IL TIMBRO SI SCRIVE ALLA COMPARSA E NON AL TOCCO, il patto di
+  `condcat`: chi la vede aperta l'ha letta, e alla prossima apertura
+  trova la corta senza aver premuto niente. Gated su `hintAttivi()`,
+  quindi in DEMO e in VETRINA non si timbra e la riga resta aperta per
+  sempre — il mondo di ieri, byte per byte.
+  LA BANDIERINA È OBBLIGATORIA (`p2pChiDeciso`), ed è la riga che
+  leggendo non si vede: `renderP2P` gira anche al cambio di LATO, quindi
+  senza di lei la riga si richiuderebbe sotto le dita di chi l'ha appena
+  riaperta.
+  E L'AGGANCIO STA IN `renderP2P` E NON IN `vaiP2P`, per la ragione già
+  scritta sopra per `p2pAdozione`: quello è il solo ingresso dal TAB,
+  mentre dalla cronologia e dal gesto indietro si cade nel `go(b.v)`
+  generico e da `vaiP2P` non si passa MAI.
+  IL RICORDO È DEL DISPOSITIVO E MAI UNA COLONNA, ed era la condizione
+  di Andrea alla lettera («se il ricordo dell'averla letta costa una riga
+  in localStorage, va bene; se costa una colonna sul server, no»): timbro
+  `p2pchi` in `barattolo_hint`, e c'è la prova che quel nome in
+  `server.py` non compaia.
+  ⚠️ TRE TRAPPOLE PAGATE COSTRUENDOLA, e sono di CASA e non di questo
+  cantiere. 1) `pezzo_js` TAGLIA ALLA PRIMA RIGA VUOTA e non alla graffa
+  a colonna zero: le tre funzioni nuove, nate attaccate, si sono mangiate
+  le sorelle (`vestiChiP2P` 107 righe invece di 7) e le sentinelle che le
+  affettano erano diventate VACUE senza che niente fallisse. **Le
+  funzioni JS di `miniapp.html` vanno separate da una riga vuota**, o la
+  prossima sentinella che ne affetta una sorveglia mezzo file.
+  2) LA SENTINELLA CHE VIETA LE INTERPOLAZIONI LEGGE LA FETTA GREZZA,
+  commenti compresi, mentre solo le due sulle parole passano da
+  `senza_commenti`: il mio stesso commento HTML, che nominava il segno
+  vietato per spiegarlo, l'ha fatta diventare rossa. È la trappola della
+  prosa, presa mentre la si scriveva — e adesso il commento lo dichiara.
+  3) `main()` CONTA UNA FAMIGLIA ESPLOSA COME UNA SOLA FALLITA e si
+  mangia in silenzio ogni `prova()` dopo il raise: un `.index()` dentro
+  una sentinella fa leggere alla TORTURA «uccisa» per la ragione
+  sbagliata, che è il modo in cui un banco si autopromuove. `find()` col
+  suo guardiano — la regola di casa, pagata qui per la quinta volta.
+  Provato: **DELTA +9 prove** sull'albero ISOLATO (8210 → 8219, le
+  quattro rosse sono le preesistenti) e **13 MUTAZIONI, 13 uccise**, una
+  per riga sorvegliata — e la prima ne fa rosse DUE, che togliendo lo
+  span cadono insieme «le due forme» e «il custode».
 
 ## Produzione
 

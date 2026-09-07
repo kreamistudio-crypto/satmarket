@@ -1690,6 +1690,13 @@
      questa pagina. Il margine e' di qui perche' quello della consegna
      nasce dentro un form, dove sopra c'e' gia' un campo. */
   #view-p2p .consegna-scelta{margin:12px 0 10px}
+  /* La riga che dice CHI tiene i sats ha DUE forme e ne mostra UNA. A
+     nascondere e' il CSS e MAI il JS, ed e' la riga da non ammorbidire:
+     `view-p2p` e' markup fisso, e tre sentinelle leggono quelle parole
+     nel sorgente — scritte da un render non ci sarebbero piu'. */
+  .p2p-chi .p2p-chi-corta{display:none}
+  .p2p-chi:not(.aperta) .p2p-chi-lunga{display:none}
+  .p2p-chi:not(.aperta) .p2p-chi-corta{display:inline}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 14px;margin-top:10px}
   /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
@@ -5335,7 +5342,28 @@ document.getElementById('cartello')?.remove();</script>
   <div class="view" id="view-p2p">
     <div class="sicu">
       <div class="section-label">🔁 Scambio P2P</div>
-      <div class="hint">Compri e vendi bitcoin con altre persone, in euro. Il coordinatore (Mostro, un servizio indipendente) custodisce i sats durante lo scambio: Barattolo non li tiene e non li vede.</div>
+      <!-- CHI TIENE I SATS: aperta la PRIMA volta che si apre il P2P, poi
+           richiusa dietro «Scopri di piu'» — chi l'ha letta una volta non
+           deve rileggerla a ogni giro. Il timbro e' quello di casa
+           (`barattolo_hint`, per dispositivo e per sempre) e MAI una
+           colonna: e' un fatto di chi guarda, non del conto.
+           LE DUE FRASI VIVONO TUTTE E DUE QUI, nel markup FISSO, e a
+           nascondere e' il CSS: cosi' la sentinella che vieta le
+           interpolazioni e quelle sulle parole restano verdi E restano
+           vere. (E qui non si scrive il segno che quella prova cerca:
+           lo cercherebbe anche dentro questo commento.)
+           NASCE APERTA (fail-soft, il patto di `vestiPaySheet`): se la
+           regia non gira si legge la riga intera, che e' il comportamento
+           di sempre — mai una riga vuota.
+           E LA RIGA CHIUSA NOMINA IL CUSTODE, che e' la condizione di
+           tutta la variante: nascondere chi tiene i sats per guadagnare
+           spazio e' la cosa che questo progetto non fa. Si guadagna la
+           RIPETIZIONE, mai il fatto. -->
+      <div class="hint p2p-chi aperta" id="p2pChi">
+        <span class="p2p-chi-lunga">Compri e vendi bitcoin con altre persone, in euro. Il coordinatore (Mostro, un servizio indipendente) custodisce i sats durante lo scambio: Barattolo non li tiene e non li vede.</span>
+        <span class="p2p-chi-corta">I sats li custodisce il coordinatore (Mostro), non Barattolo.</span>
+        <button type="button" class="scopri-link" id="p2pChiTasto" aria-expanded="true" aria-controls="p2pChi" onclick="toggleChiP2P()">Chiudi</button>
+      </div>
       <div class="consegna-scelta" role="tablist">
         <button class="consegna-pill attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compro sats</button>
         <button class="consegna-pill" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendo sats</button>
@@ -32700,7 +32728,46 @@ function infoRigaP2P(){
   return pezzi.join(' · ');
 }
 
+/* LA RIGA CHE DICE CHI TIENE I SATS si apre e si chiude in place: una
+   classe sola sul contenitore, e il tasto che dice il gesto opposto a
+   quel che si vede. E' la ricetta di `toggleRacconto`, l'altro cassetto
+   in-place di casa. */
+function vestiChiP2P(aperta){
+  const r = el('p2pChi'), t = el('p2pChiTasto');
+  if (!r || !t) return;
+  r.classList.toggle('aperta', aperta);
+  t.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+  t.textContent = aperta ? 'Chiudi' : 'Scopri di più ›';
+}
+
+function toggleChiP2P(){
+  vestiChiP2P(!el('p2pChi')?.classList.contains('aperta'));
+}
+
+/* ...e la DECISIONE si prende UNA VOLTA SOLA per sessione.
+   STA IN `renderP2P` e non in `vaiP2P`: quello e' il solo ingresso dal
+   TAB, mentre alla vista ci si torna col gesto indietro e dalla
+   cronologia, che cadono nel `go(b.v)` generico e da li' non passano MAI
+   (la lezione di `renderInteresse`, gia' pagata dieci righe piu' giu').
+   LA BANDIERINA E' OBBLIGATORIA, ed e' la riga che leggendo non si vede:
+   il render gira anche al cambio di LATO, e senza si richiuderebbe sotto
+   le dita di chi l'ha appena riaperta.
+   IL TIMBRO SI SCRIVE ALLA COMPARSA e non al tocco, il patto di
+   `condcat`: chi la vede aperta l'ha letta, e alla prossima apertura
+   trova la riga corta. In DEMO e in VETRINA `hintAttivi()` e' falsa,
+   quindi non si timbra e la riga resta aperta per sempre — il
+   comportamento di ieri, byte per byte. */
+function decidiChiP2P(){
+  if (p2pChiDeciso) return;
+  p2pChiDeciso = true;
+  const attivi = hintAttivi();
+  const gia = attivi && hintDismesso('p2pchi');
+  vestiChiP2P(!gia);
+  if (attivi && !gia) dismettiHint('p2pchi');
+}
+
 function renderP2P(){
+  decidiChiP2P();
   /* Il mazzo che c'e' gia' si rimanda al server una volta per sessione:
      l'INSERT OR IGNORE e' idempotente, e cosi' un profilo importato
      o tornato dal cloud finisce nella lista da guardare. */
@@ -32808,6 +32875,9 @@ const MAZZO_INFO = 'barattolo/mostro/scambio/';
 const FORMA_HEX64 = /^[0-9a-f]{64}$/;
 let p2pRegistrato = false;
 let p2pAdozione = false;
+/* Ho gia' deciso, in QUESTA sessione, se la riga che dice chi tiene i
+   sats nasce aperta o chiusa. Sopravvive al cambio di lato. */
+let p2pChiDeciso = false;
 let p2pCodiceVisibile = false;
 let p2pCodiceMostrato = '';
 let mazzoInCorso = null;

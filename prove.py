@@ -35111,6 +35111,56 @@ def prove_p2p_libro():
     prova("...e sulla riga sua puo' andare a capo", True,
           "white-space:normal" in st)
 
+    # --- 4c) LA RIGA CHE DICE CHI TIENE I SATS (ago 2026) ----------
+    # Aperta la PRIMA volta che si apre il P2P, poi richiusa dietro
+    # «Scopri di piu'». A sparire e' la RIPETIZIONE, mai il FATTO: la
+    # riga chiusa continua a nominare il custode, ed e' la condizione
+    # che rende ammissibile tutta la variante.
+    # `find` e MAI `index`: la mutazione che toglie lo span deve far
+    # diventare ROSSA la prova, non ESPLODERE la famiglia portandosi
+    # dietro le sorelle (la lezione gia' pagata quattro volte).
+    _i = fetta.find('class="p2p-chi-corta"')
+    _j = fetta.find("</span>", _i) if _i >= 0 else -1
+    corta = fetta[_i:_j] if _j > _i >= 0 else ""
+    prova("le due forme della riga vivono tutte e due nel markup fisso",
+          True, "p2p-chi-lunga" in senza_commenti
+          and "p2p-chi-corta" in senza_commenti)
+    prova("...e la riga CHIUSA nomina ancora il custode", True,
+          "coordinatore" in corta)
+    prova("...e nasce APERTA: senza la regia si legge la riga intera",
+          True, 'class="hint p2p-chi aperta"' in fetta)
+    prova("...e il tasto e' lo `.scopri-link` di casa, un bottone vero",
+          True, 'type="button" class="scopri-link"' in fetta
+          and 'aria-expanded="true"' in fetta)
+    # A NASCONDERE E' IL CSS E MAI IL JS, ed e' la riga da non
+    # ammorbidire: scritte da un render quelle parole sparirebbero dal
+    # sorgente, e le tre sentinelle del blocco 4 diventerebbero vacue.
+    prova("a nascondere una delle due forme e' il CSS, non il JS", True,
+          ".p2p-chi .p2p-chi-corta{display:none}" in mini
+          and ".p2p-chi:not(.aperta) .p2p-chi-lunga{display:none}" in mini)
+    _chi = pezzo_js(mini, "function decidiChiP2P(){")
+    # LA BANDIERINA E' OBBLIGATORIA: il render gira anche al cambio di
+    # LATO, e senza si richiuderebbe sotto le dita di chi l'ha riaperta.
+    prova("la decisione si prende UNA volta sola per sessione", True,
+          "if (p2pChiDeciso) return;" in _chi
+          and "let p2pChiDeciso = false;" in mini)
+    # E STA IN `renderP2P` e non in `vaiP2P`: quello e' il solo ingresso
+    # dal TAB, mentre dalla cronologia si cade nel `go(b.v)` generico.
+    prova("...e si prende in renderP2P, dove passa anche il ritorno",
+          True, "decidiChiP2P();" in pezzo_js(mini, "function renderP2P(){")
+          and "decidiChiP2P" not in _vp)
+    # IL TIMBRO SI SCRIVE ALLA COMPARSA e non al tocco (il patto di
+    # `condcat`), e gated su hintAttivi(): in DEMO e in VETRINA non si
+    # timbra e la riga resta aperta per sempre, com'era ieri.
+    prova("il timbro si scrive alla comparsa e mai al tocco", True,
+          "dismettiHint('p2pchi')" in _chi and "hintAttivi()" in _chi
+          and "dismettiHint" not in pezzo_js(
+              mini, "function toggleChiP2P(){"))
+    # E IL RICORDO E' DI CHI GUARDA, NON DEL CONTO: una colonna qui
+    # sarebbe la cosa che questa variante ha escluso per iscritto.
+    prova("il ricordo vive nel dispositivo e non e' una colonna", False,
+          "p2pchi" in _SORGENTE)
+
     # --- 5) IN TAPPA 2 NON SI FIRMA, NON SI CIFRA, NON SI PUBBLICA ---
     for spia in ("finalizeEvent", "publish(", "generateSecretKey", "nsec",
                  "nip44", "localStorage", "fetch("):
