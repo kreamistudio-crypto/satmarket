@@ -4,7 +4,7 @@ Scritto per essere letto alle due di notte, il giorno in cui il VPS —
 o l'intero account Hetzner — non c'è più. Niente qui dentro richiede
 il server vecchio.
 
-## Le quattro case (dove sta cosa)
+## Le cinque case (dove sta cosa)
 
 | Casa | Cosa contiene |
 |---|---|
