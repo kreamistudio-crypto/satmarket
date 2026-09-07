@@ -106,12 +106,16 @@ Un backup mai aperto è una speranza, non un backup:
 4. confrontare il conteggio file di `BarattoloBackup\foto\` col `du`
    del VPS;
 5. **rimettere in piedi la chiave dell'onion**, non solo vederla
-   nell'elenco: su una macchina di prova (o in un container) si segue
-   la liturgia del passo 4 della *sequenza del disastro* qui sopra, e
-   si guarda l'`hostname` che Tor scrive — se è
-   l'indirizzo di sempre, la chiave nell'archivio è viva. Vederla
-   comparire in `tar -tzf` dice solo che il file c'è: che sia la
-   chiave giusta, e che i permessi la lascino usare, lo dice Tor.
+   nell'elenco. ⚠️ NON si monta su una macchina in rete: farlo
+   **pubblicherebbe il servizio nascosto da lì**, e per la rete Tor
+   l'onion di barattolo.store punterebbe a un host che non serve
+   Barattolo. Si verifica invece **la matematica**, che è quel che rende
+   quella chiave l'indirizzo: dai 96 byte di `hs_ed25519_secret_key` si
+   ricava la pubblica, e dalla pubblica
+   `base32(pubkey + checksum + versione) + ".onion"` deve ridare
+   **esattamente** l'indirizzo di produzione. Se combacia, la chiave
+   nell'archivio è viva. Vederla comparire in `tar -tzf` dice solo che
+   il file c'è.
 
 **FATTO il 26 ago 2026, tutto verde**: le due copie (Telegram e pull
 sul PC) identiche allo sha256, integrity_check ok, 300 annunci / 45
@@ -120,15 +124,19 @@ file decifrati con la chiave letta dal config dentro l'archivio.
 L'unico intoppo è a verbale qui sopra: il prefisso age mancante nella
 copia Bitwarden.
 
-⚠️ **MA QUEL DRILL NON COPRE PIÙ TUTTO L'ARCHIVIO**: il 26 agosto la
-chiave dell'onion non c'era ancora — è entrata il 28 (commit
-`5c7f19a`) — quindi il verde di quel giorno non dice niente su di lei.
-Il 28 si è verificato che nell'archivio ci sia (`age -d … | tar -tzf -`
-elenca torrc e i tre file), che è metà della domanda: **la chiave va
-rimessa in piedi, non solo vista**. Finché il punto 5 qui sopra non è
-stato fatto almeno una volta, sull'onion siamo dove eravamo prima del
-26 agosto — un file che si presume buono perché è nell'elenco. E vale
-la regola di sotto: è una promessa non ancora provata.
+**E il punto 5 è FATTO il 7 set 2026, 8 controlli su 8**: dall'archivio
+delle 04:30 escono i tre file con le loro misure e le loro
+intestazioni, la privata rigenera la pubblica, la pubblica rigenera
+l'`hostname`, e quell'`hostname` è l'indirizzo che serve la produzione.
+Chiave e cartella estratta cancellate dopo.
+
+⚠️ **QUEL CHE RESTA SCOPERTO, e va detto invece di lasciarlo cadere**:
+la matematica prova che la chiave è quella giusta, **non** che i
+permessi la lascino usare — il proprietario `debian-tor` e il `700`
+della cartella li prova solo un ripristino vero, e quella è la stessa
+metà scoperta che il foglio del relay dichiara per il suo container.
+La differenza col 28 agosto è che allora non si sapeva nemmeno se
+fosse la chiave giusta: adesso si sa.
 
 ## Nota per chi tocca i testi
 
@@ -137,3 +145,10 @@ salvato ogni giorno **con copie cifrate anche fuori dal server** — la
 mezza frase è tornata col drill del 26 ago 2026. Se le chiavi cambiano
 e il drill non viene rifatto, quella frase torna una promessa non
 provata: si rifà il drill, non si lascia la frase sulla fiducia.
+
+## L'altra macchina
+
+Il relay ha il suo foglio: **`RIPRISTINO-RELAY.md`**, accanto a questo.
+⚠️ Da sapere prima di aprirlo: **la chiave age di Barattolo apre anche
+quello**, mentre il nodo ha la sua — è la confusione che è già costata
+un «no identity matched».
