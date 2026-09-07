@@ -34,6 +34,16 @@ censimento*.txt
 backup/
 .deploy-bocciato
 
+# La whitelist di chi puo' scrivere sul relay: la genera
+# aggiorna-chiavi.sh sul VPS leggendo il database, ed e' un elenco di
+# chiavi PUBBLICHE una per riga — cioe' esattamente la forma che il job
+# dei segreti esiste per prendere. La riga vale piu' di quanto sembri:
+# senza, un «git add deploy/» se la porta dentro, il job diventa rosso,
+# e la cura che verrebbe in mente e' escludere la cartella dal
+# workflow — cioe' spegnere la guardia proprio sul file che piu' di
+# ogni altro deve farla scattare.
+deploy/relay/policy/chiavi.txt
+
 # Varie
 .DS_Store
 Thumbs.db
