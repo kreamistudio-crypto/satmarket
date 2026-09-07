@@ -1,0 +1,10 @@
+[Unit]
+Description=Ogni dieci minuti, la lista di chi puo' scrivere
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup del relay Barattolo (configurazione, mai il database)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/backup-relay.sh

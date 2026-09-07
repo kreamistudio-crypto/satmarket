@@ -26,6 +26,7 @@ hanno presi: si riprendono col `sync` del passo 8.
 | **Il PC di Andrea** (`BarattoloBackup\relay\`) | lo specchio degli stessi archivi — la seconda gamba |
 | **Carta + Bitwarden** | la metà segreta della chiave age **di Barattolo** |
 | **Gli altri relay Nostr** | gli eventi. Non li salviamo noi: si riscaricano |
+| **GitHub** (`deploy/relay/`) | la configurazione. **Mai i segreti** |
 
 ⚠️ **LE CHIAVI AGE SONO DUE.** Quella di **Barattolo** apre il VPS *e*
 il relay; il **nodo** ha la sua. Se `age` risponde «no identity
@@ -36,15 +37,27 @@ trappola: manca il prefisso `AGE-SECRET-KEY-` (la chiave intera è di
 
 ## ⚠️ Quello che vive SOLO lì dentro
 
-Il VPS di Barattolo ha il suo codice su GitHub e l'archivio porta i
-soli dati. **Il relay no**: `compose.yml`, `Dockerfile`, `strfry.conf`,
-il plugin `policy/chi-scrive.py`, il `Caddyfile`, le quattro unit,
-`aggiorna-chiavi.sh` e `backup-relay.sh` **non stanno in nessun repo** —
-l'unica copia fuori da quella macchina è quell'archivio.
+**Dal 7 set 2026 la configurazione sta anche su GitHub**, in
+`deploy/relay/`: `compose.yml`, `Dockerfile`, `strfry.conf`, il plugin
+`policy/chi-scrive.py`, i tre script e le sei unit. Fino a quel giorno
+l'unica copia fuori da quella macchina era questo archivio, e non era
+il suo mestiere.
 
-È anche il motivo per cui non è «un backup di configurazione»: è il
-backup dell'unica copia del codice di quella macchina, e da lì la
-macchina si ricostruisce per intero.
+⚠️ **Ma il repo è una copia che qualcuno tiene in pari a mano**: nessun
+deploy va verso il relay, e la macchina non tira da GitHub. Se le due
+divergono **ha ragione la macchina** — quindi al ripristino si parte da
+qui, dall'archivio, e il repo serve per quel che l'archivio non ha e
+per capire cosa fa una riga senza doverlo aprire.
+
+Nell'archivio, e in nessun altro posto, restano i **tre segreti** e il
+`Caddyfile`:
+
+| File | Se manca |
+|---|---|
+| `token.header` | il timer delle chiavi non rinfresca più niente: resta la lista del giorno dell'archivio |
+| `policy/chiavi.txt` | il plugin ammette la sola piattaforma, che è cablata dentro: i venditori restano fuori |
+| `telegram.conf` | la ronda si ferma dicendolo, e nessuno si accorge più se il backup smette |
+| `caddy/Caddyfile` | niente certificato e niente WebSocket: il relay gira e non risponde a nessuno |
 
 ## La sequenza
 
@@ -87,9 +100,14 @@ macchina si ricostruisce per intero.
    ls -la /opt/relay /opt/relay/policy                  # i proprietari sono giusti?
    ```
 
-4. **Le unit al loro posto**: le quattro unit systemd stanno
-   nell'archivio. Si copiano in `/etc/systemd/system/`, poi
-   `systemctl daemon-reload`. Quali siano lo dice l'archivio stesso —
+4. **Le unit al loro posto.** ⚠️ Sono **sei**, ma nell'archivio ce ne
+   sono **quattro**: `backup-relay.sh` non prende ancora quelle della
+   ronda, che è nata dopo. `relay-ronda.service` e `relay-ronda.timer`
+   — e lo script `ronda-relay.sh` — vengono da `deploy/relay/` nel repo,
+   ed è il primo posto in cui il repo serve davvero.
+
+   Si copiano in `/etc/systemd/system/`, poi `systemctl daemon-reload`.
+   Quali siano nell'archivio lo dice l'archivio stesso —
    `tar tf /tmp/relay.tar | grep -Ei 'service|timer'` — e non si tirano
    a memoria alle due di notte.
 
@@ -128,6 +146,10 @@ macchina si ricostruisce per intero.
    dal PC. Il disastro successivo non aspetta che ce lo si ricordi — e
    un relay senza backup è esattamente il punto da cui si è appena
    usciti.
+
+   ⚠️ Della **ronda** l'archivio non ha né lo script né le due unit:
+   vengono dal repo. `telegram.conf`, che le serve per parlare, quello
+   sì (sta in `/opt/relay/`, e il tar prende tutta la cartella).
 
 ## Il database degli eventi non c'è nell'archivio, ed è voluto
 

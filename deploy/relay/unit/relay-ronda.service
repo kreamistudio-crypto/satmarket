@@ -1,0 +1,6 @@
+[Unit]
+Description=Ronda del backup del relay
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ronda-relay.sh

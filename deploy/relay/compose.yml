@@ -1,0 +1,20 @@
+# Come si avvia il relay. Vive qui e non in un comando battuto a mano:
+# le decisioni si dichiarano dove si rileggono.
+services:
+  relay:
+    build: .
+    image: barattolo-relay
+    container_name: relay
+    # Non gira come root: l'immagine regge l'UID di barattolo (provato).
+    user: "1001:1001"
+    restart: unless-stopped
+    ports:
+      # Il "127.0.0.1:" NON e' decorativo: senza, Docker scrive le sue
+      # regole PRIMA di ufw e la 7777 diventa raggiungibile dal mondo.
+      - "127.0.0.1:7777:7777"
+    volumes:
+      - ./db:/app/strfry-db
+      # Montarla e' un REQUISITO: senza, strfry.sh prova a copiarci il
+      # template e da non-root fallisce.
+      - ./strfry.conf:/etc/strfry.conf:ro
+      - ./policy:/etc/strfry-policy:ro

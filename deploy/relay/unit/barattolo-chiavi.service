@@ -1,0 +1,10 @@
+[Unit]
+Description=La lista di chi puo' scrivere sul relay di Barattolo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=barattolo
+Group=barattolo
+ExecStart=/opt/relay/aggiorna-chiavi.sh

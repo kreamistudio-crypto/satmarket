@@ -45478,6 +45478,55 @@ def prove_relay_chiavi():
           [A, B, D], r.corpo.split("\n")[:-1])
 
 
+def prove_esclusioni_relay():
+    """LE DUE LISTE DELLA REGOLA FORMA_HEX, IN PARI (ago 2026).
+
+    Il controllo dei segreti che cerca i 64-hex nudi e' scritto DUE
+    volte nel workflow — l'albero di lavoro e la CRONOLOGIA — e ognuno
+    porta la sua lista di esclusioni. Sono due letture della stessa
+    domanda, quindi le liste devono combaciare: due liste che divergono
+    lasciano ROSSA la storia mentre l'albero e' pulito, e la seconda
+    passata guarda le righe AGGIUNTE di tutta la cronologia, che un
+    commit dopo non ripulisce — quindi resterebbe rossa a ogni giro, e
+    col job dei segreti rosso il semaforo del deploy non avanza piu'.
+
+    E' successo di striscio col cantiere del relay: il primo patch
+    toccava il solo controllo dell'albero, e a dirlo non c'era nessuna
+    riga. Da qui il censimento, che e' la forma di casa
+    (`prove_script_nel_workflow`): non tiene un secondo elenco — sarebbe
+    lo stesso problema spostato — ma LEGGE le due liste dal workflow e
+    le confronta.
+
+    ⚠️ IL CENSIMENTO DEVE DIMOSTRARE DI VEDERE: due liste VUOTE
+    combaciano fra loro, quindi un ritaglio caduto sul blocco sbagliato
+    direbbe «identiche» invece di «non ho guardato niente». A impedirlo
+    sono le due righe che pretendono `vendor/` in tutte e due — quella
+    c'e' da sempre ed e' l'esclusione piu' vecchia del file.
+
+    La regex e' GENERICA e non nomina i file del relay: prende ogni
+    pathspec escluso, quindi la divergenza di domani — su una cartella
+    che oggi non esiste — ci entra da sola."""
+    print("\n[le esclusioni dei segreti, in due posti]")
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    liste = {}
+    for etichetta, ancora in (
+            ("albero", "if git ls-files -z -- . ':!vendor/'"),
+            ("cronologia", "if git log --all --full-history")):
+        # find() e non index(): a codice mutato la prova dev'essere
+        # rossa, mai esplodere portandosi via le sorelle.
+        prova("l'ancora del controllo %s si trova una volta sola"
+              % etichetta, 1, wf.count(ancora))
+        i = wf.find(ancora)
+        blocco = wf[i:wf.find("; then", i)]
+        liste[etichetta] = re.findall(r"':!([^']*)'", blocco)
+    prova("il controllo dell'albero guarda delle esclusioni",
+          True, "vendor/" in liste["albero"])
+    prova("...e quello della cronologia pure",
+          True, "vendor/" in liste["cronologia"])
+    prova("le due liste sono la stessa",
+          liste["albero"], liste["cronologia"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -45574,6 +45623,7 @@ def main():
     prove_p2p_canonico,
     prove_p2p_bundle,
     prove_p2p_nuvola,
+              prove_esclusioni_relay,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,

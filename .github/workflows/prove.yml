@@ -210,7 +210,32 @@ jobs:
           # La chiave Nostr in esadecimale nudo (64 caratteri). Fuori
           # vendor/, dove nostr.bundle.js ne contiene per mestiere ed e'
           # l'unico file del repo che lo fa.
+          #
+          # E fuori i TRE file della configurazione del relay, che ne
+          # portano uno ciascuno ed e' PUBBLICO in tutti e tre i casi: il
+          # digest dell'immagine strfry nel Dockerfile (inchiodato apposta
+          # invece di un tag che si muove, e cambia a ogni aggiornamento
+          # dell'immagine) e la chiave PUBBLICA della piattaforma nel
+          # plugin e in strfry.conf — quella che il relay serve gia' da
+          # se' nel suo NIP-11 a chiunque gliela chieda, e che il plugin
+          # confronta col campo `pubkey` degli eventi: una chiave privata
+          # li' dentro non ci potrebbe stare per costruzione.
+          #
+          # SI ESCLUDONO I TRE FILE E MAI LA CARTELLA, ed e' la riga da
+          # non allargare: in deploy/relay/ non deve entrare mai
+          # policy/chiavi.txt, che e' un elenco di 64-hex uno per riga,
+          # cioe' esattamente quel che questa regola prende. Escludendo
+          # la cartella si spegnerebbe la guardia sul file che piu' di
+          # ogni altro deve farla scattare — e un quarto file messo li'
+          # domani torna sotto la regola da solo.
+          #
+          # LA STESSA LISTA VALE PER LA CRONOLOGIA, piu' sotto: sono due
+          # letture della stessa domanda, e due liste che divergono
+          # lasciano rossa la storia mentre l'albero e' pulito.
           if git ls-files -z -- . ':!vendor/' \
+               ':!deploy/relay/Dockerfile' \
+               ':!deploy/relay/strfry.conf' \
+               ':!deploy/relay/policy/chi-scrive.py' \
                | xargs -0 grep -lIE "$FORMA_HEX" ; then
             echo "::error::Sembra esserci una chiave privata in esadecimale"
             exit 1
@@ -247,10 +272,18 @@ jobs:
           # Il --full-history NON e' un ornamento: con un pathspec git
           # semplifica la storia e SALTA dei commit (misurato su questo
           # repo: 867 invece di 868) — cioe' proprio quello che una
-          # passata di sicurezza non puo' permettersi. L'eccezione di
-          # vendor/ e' la stessa dei file di oggi, o il bundle si
-          # denuncerebbe da solo a ogni giro.
+          # passata di sicurezza non puo' permettersi. Le eccezioni sono
+          # LE STESSE dei file di oggi — vendor/ e i tre del relay — o il
+          # bundle si denuncerebbe da solo a ogni giro e i tre valori
+          # pubblici del relay farebbero rossa ogni passata dal commit in
+          # avanti: qui si guardano le righe AGGIUNTE di tutta la storia,
+          # che un commit dopo non ripulisce. Il perche' di ognuna sta
+          # sul controllo di sopra, in un posto solo: due copie di quel
+          # ragionamento divergono.
           if git log --all --full-history -p --no-color -- . ':!vendor/' \
+               ':!deploy/relay/Dockerfile' \
+               ':!deploy/relay/strfry.conf' \
+               ':!deploy/relay/policy/chi-scrive.py' \
                | grep -a '^+' | grep -aE "$FORMA_HEX" ; then
             echo "::error::Una chiave esadecimale nuda e' passata dalla repo: va RUOTATA"
             exit 1
