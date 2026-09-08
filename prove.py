@@ -39530,6 +39530,32 @@ def prove_p2p_server():
           "p2pMieiOrdini === null && !p2pMieiGiro" in rp)
     prova("...e senza far aspettare il libro", True,
           "chiediMieiOrdiniP2P().then(() => renderP2P())" in rp)
+
+    # --- 16) LE DUE CURE DEL 9 SET 2026 (il loop e la lista vuota) ---
+    # ⚠️ IL LOOP: la chiave si derivava PRIMA che il bundle fosse
+    # caricato; l'errore sincrono rientrava in renderP2P via `.then`
+    # senza mai cedere il passo al caricamento che l'avrebbe curato —
+    # 184.000 giri in console, pagina inchiodata. Due cinture, e si
+    # provano tutt'e due: l'ordine (la connessione, che carica il
+    # bundle, viene prima della derivazione) e il tentativo unico.
+    prova("il bundle si carica prima di derivare la chiave", True,
+          cm.index("mostroConnetti()") < cm.index("chiaveScambio("))
+    prova("un errore non rilancia: un tentativo per sessione", True,
+          "p2pMieiChiesto = true;" in rp and "!p2pMieiChiesto" in rp)
+    prova("...e il ritentativo costa un gesto", True,
+          "p2pMieiChiesto = false;" in pezzo_js(mini, "function ricaricaP2P(){", "\n}\n"))
+    # E LA META' MUTA: ci si metteva in ascolto senza mai CHIEDERE, e
+    # il coordinatore non risponde a una domanda mai fatta — la lista
+    # tornava vuota per tutti. La domanda parte con la busta `restore`
+    # e la prova d'identita' del mazzo: e' per identita' che risponde.
+    prova("la domanda parte davvero, con identita' e busta restore", True,
+          "busta: 'restore'" in cm and "relay.publish(firmato)" in cm
+          and "bustaMostro(tk.sk, mz.sk, msg)" in cm)
+    # E IL SILENZIO NON E' UNA RISPOSTA: il timeout senza messaggio
+    # lascia «non si sa», mai un vuoto spacciato per «non ne hai».
+    prova("il timeout muto non diventa un «non ne hai»", True,
+          "if (!risposto)" in cm
+          and "return p2pMieiOrdini;" in cm.split("if (!risposto)")[1])
     prova("il profilo di prima non si cancella, si mette da parte", True,
           "localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m))" in mini)
 

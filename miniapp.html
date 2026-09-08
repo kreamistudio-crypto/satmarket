@@ -32884,9 +32884,18 @@ function renderP2P(){
      e si ridisegna quando la risposta arriva — il patto del rientro
      istantaneo della cassa. Sta QUI e non in `vaiP2P` per la ragione
      gia' scritta sopra: alla vista ci si torna col gesto indietro e
-     dalla cronologia, che quel solo ingresso non lo attraversano. */
-  if (mz && p2pMieiOrdini === null && !p2pMieiGiro)
+     dalla cronologia, che quel solo ingresso non lo attraversano.
+     ⚠️ LA BANDIERINA SI ALZA PRIMA DI CHIEDERE, e non si riabbassa da
+     sola: il 9 set 2026 la domanda cadeva con un errore SINCRONO, il
+     `.then` rientrava qui, la condizione era ancora vera e il giro
+     ripartiva — tutto in microtask, senza mai cedere il passo, quindi
+     nemmeno il caricamento che avrebbe curato l'errore riusciva a
+     completarsi. Un tentativo per sessione; il gesto «Riprova» la
+     riabbassa, che un ritentativo deve costare un gesto. */
+  if (mz && !p2pMieiChiesto && p2pMieiOrdini === null && !p2pMieiGiro) {
+    p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then(() => renderP2P()).catch(() => {});
+  }
   const box = el('p2pCorpo');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
@@ -32937,6 +32946,9 @@ function ricaricaP2P(){
   p2pErrore = '';
   p2pParziale = false;
   p2pLibro = null;
+  /* anche la marcatura «e' mio» riprova col gesto: e' l'unico modo di
+     ritentarla dopo un giro caduto, che da solo non riparte mai */
+  p2pMieiChiesto = false;
   renderP2P();
 }
 
@@ -34242,6 +34254,11 @@ function ordiniAscoltoP2P(){
    deriva da li'. */
 let p2pMieiOrdini = null;      // {id: {indice, stato}} — null = mai chiesto
 let p2pMieiGiro = null;        // la promessa in volo
+/* la cintura del 9 set 2026: si e' gia' TENTATO in questa sessione.
+   E' un'altra cosa da «si sa la risposta» — un giro caduto lascia
+   `p2pMieiOrdini` a null (il fail-open) ma la bandierina alzata,
+   cosi' nessun render lo rilancia da solo. La riabbassa ricaricaP2P. */
+let p2pMieiChiesto = false;
 /* IL GIUDICE E' UNO SOLO, e lo chiamano la card, la porta del gesto e
    la cintura della presa: tre posti che devono dire la stessa cosa. */
 function ordineMioP2P(id){
@@ -34267,14 +34284,20 @@ async function chiediMieiOrdiniP2P(){
      e una richiesta che non puo' portare niente non si manda. */
   if (!mz || !(mz.indice | 0)) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
   p2pMieiGiro = (async () => {
+    /* PRIMA la connessione, che porta con se' il bundle: derivare la
+       chiave a bundle assente era il loop del 9 set 2026 — l'errore
+       sincrono non lasciava mai passare il caricamento che l'avrebbe
+       curato. Da qui in giu' NostrTools c'e' per costruzione. */
+    const relay = await mostroConnetti();
     const NT = window.NostrTools;
     const tk = chiaveScambio(mz.sk, mz.indice | 0);
     const mostro = mostroHexP2P();
-    const relay = await mostroConnetti();
+    const info = await mostroInfoP2P();
     const trovati = {};
+    let risposto = false;
     let sub = null;
     try {
-      await new Promise((fine) => {
+      await new Promise((fine, male) => {
         let chiuso = false;
         const basta = () => { if (!chiuso) { chiuso = true; fine(); } };
         sub = relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}], {
@@ -34290,14 +34313,50 @@ async function chiediMieiOrdiniP2P(){
                 if (r && r.order_id)
                   trovati[String(r.order_id)] = {indice: r.trade_index | 0,
                                                  stato: String(r.status || '')};
+              risposto = true;
               basta();
             } catch(e){ /* non e' per noi, o non si apre: si lascia stare */ }
           }
+        });
+        /* LA DOMANDA MANCAVA, ed era la meta' muta del difetto del
+           9 set: ci si metteva in ascolto senza mai CHIEDERE, e il
+           coordinatore non risponde a una domanda mai fatta — la
+           lista tornava vuota per tutti, su ogni dispositivo. Si
+           chiede DOPO aver aperto l'orecchio (il patto di
+           mostroChiama), con la busta `restore` e la prova
+           d'identita' del mazzo: e' per IDENTITA' che il
+           coordinatore risponde, non per trade key. */
+        const msg = messaggioMostro('restore-session',
+          {requestId: nuovaRichiestaP2P(), indice: null, busta: 'restore'});
+        const adesso = Math.floor(Date.now() / 1000);
+        const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
+        const ev = {
+          kind: 14,
+          pubkey: tk.pub,
+          created_at: adesso,
+          tags: [['p', mostro], ['expiration', String(adesso + P2P_SCADENZA_MSG)]],
+          content: NT.nip44.encrypt(bustaMostro(tk.sk, mz.sk, msg), conv)
+        };
+        /* il nonce si mina prima della firma — la riga da non
+           invertire, vedi mostroChiama (oggi la soglia e' zero) */
+        if ((info.pow || 0) > 0) NT.nip13.minePow(ev, info.pow);
+        const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(tk.sk));
+        relay.publish(firmato).catch((e) => {
+          /* «publish timed out» vuol dire partito senza OK: si resta
+             in ascolto — la lezione del bunker. Il resto chiude. */
+          if (!/timed out/i.test(String(e && e.message || e))) male(e);
         });
         setTimeout(basta, P2P_ATTESA_MS);
       });
     } finally {
       try { if (sub) sub.close(); } catch(e){}
+    }
+    /* IL SILENZIO NON E' UNA RISPOSTA: il timeout senza messaggio
+       lascia «non si sa» — il fail-open promesso qui sotto. Il vuoto
+       VERO arriva dentro una risposta, e quello si', si tiene. */
+    if (!risposto) {
+      console.log('🔁 [p2p] i miei ordini: il coordinatore non ha risposto');
+      return p2pMieiOrdini;
     }
     p2pMieiOrdini = trovati;
     console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
