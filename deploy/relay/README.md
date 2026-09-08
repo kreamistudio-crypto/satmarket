@@ -94,9 +94,18 @@ risponde o risponde male, `aggiorna-chiavi.sh` tiene la lista di ieri e
 lo dice. Una lista vecchia lascia scrivere chi scriveva ieri; una vuota
 chiuderebbe fuori tutti.
 
-## Il debito dichiarato
+## Il debito dichiarato — pagato (set 2026)
 
-`strfry.conf` ha `privacy = ""` e `terms = ""`. Si riempiono **il giorno
-in cui il relay entra in `RELAY_NOSTR`**, insieme alla riga che «I tuoi
-dati» guadagna sul relay: nello stesso commit, o una delle due pagine
-mente sull'altra.
+`privacy` porta a `https://barattolo.store/privacy`, e la pagina «I tuoi
+dati» ha guadagnato la riga sul relay **nello stesso commit**, che era
+la condizione: il pallino Nostr diceva che gli annunci vanno «sui relay,
+che sono di altri», e da `c7802e7` uno di quei relay è nostro. Puntare
+il NIP-11 a una pagina che dice il contrario sarebbe stato il difetto
+che questa nota esisteva per impedire.
+
+`terms` **resta vuoto, e ora è una scelta e non un debito**: Barattolo
+non ha una pagina di condizioni d'uso, e un URL che risponde 404 è
+peggio del campo vuoto — quello dice «non c'è», il link rotto dice
+«c'è, e siamo sciatti». La regola di scrittura vive nel `description`
+e la fa rispettare il plugin, non un testo. Si riempie il giorno che
+quella pagina esiste.
