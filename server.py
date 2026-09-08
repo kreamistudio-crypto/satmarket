@@ -3293,6 +3293,29 @@ def init_db():
         ultimo_nudge INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_indice(
+        -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
+        -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
+        -- non riusarne una viva quando lo stesso profilo si apre da un
+        -- dispositivo che l'indice non ce l'ha — e col profilo che si
+        -- ricava dall'account quel dispositivo diventa il caso NORMALE
+        -- invece che l'eccezione di chi si e' passato il codice a mano.
+        -- ⚠️ E' PER CHIAVE D'IDENTITA' E NON PER ACCOUNT, ed e' la riga
+        -- da non ammorbidire: due profili della stessa persona sono due
+        -- numerazioni diverse, e un contatore per tg_id le mescolerebbe
+        -- — cioe' farebbe saltare in avanti l'uno e riusare all'altro
+        -- proprio le chiavi che questa tabella esiste per proteggere.
+        -- VINCE SEMPRE IL PIU' ALTO e mai il piu' recente: e' un
+        -- pavimento, sale e basta. Tornare indietro riuserebbe chiavi
+        -- gia' bruciate, e chi e' avanti non ha niente da imparare da
+        -- chi e' indietro (la regola gia' scritta per il cloud).
+        -- Nessun segreto qui dentro: una pubkey e un numero.
+        pubkey TEXT PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        indice INTEGER DEFAULT 0,
+        aggiornato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_indice_tg ON p2p_indice(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
         -- d'identita' Mostro di chi entra da Telegram si ricava con
@@ -7748,6 +7771,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # l'UPDATE secco basta, come per i connettori — un OR IGNORE +
         # DELETE sarebbe una cintura che nessuno esercita.
         con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # E il pavimento dell'indice segue le sue chiavi: qui la PK e'
+        # la pubkey come in `chiavi_p2p`, quindi le due meta' non
+        # possono collidere e l'UPDATE secco basta.
+        con.execute("UPDATE p2p_indice SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
@@ -30041,6 +30069,52 @@ MAX_CHIAVI_P2P = 500      # per utente: l'identita' + una trade key per scambio
 FORMA_PUBKEY_P2P = re.compile(r"^[0-9a-f]{64}$")
 
 
+def _pavimento_indice_p2p(con, tg_id: int, identita, indice, adesso: int):
+    """Il pavimento dell'indice di UN profilo: si alza col numero che
+    arriva e si rilegge il massimo. Puro sulla connessione, il patto di
+    `_registra_chiavi_p2p`.
+
+    Torna il massimo (int) o None quando non c'e' niente da dire —
+    identita' storta, indice storto, o una pubkey che e' di un ALTRO
+    account. E None non e' zero: zero vorrebbe dire «riparti da capo»,
+    cioe' riusa la prima trade key.
+
+    ⚠️ LA CHIAVE DI UN ALTRO NON SI TOCCA E NON SI LEGGE, ed e' la
+    regola di `_registra_chiavi_p2p` letta dai due lati: il `tg_id` sta
+    nel WHERE della scrittura E in quello della lettura, quindi chi
+    prova con la pubkey di un altro non la sposta di un numero e non
+    riceve nemmeno il suo — o questa rotta diventerebbe un oracolo che
+    dice a quanti scambi e' arrivato qualcun altro.
+
+    NIENTE `ON CONFLICT ... DO UPDATE`, e non per gusto: la forma in tre
+    statement e' monotona per costruzione (l'UPDATE ha `indice<?` nel
+    WHERE, quindi non puo' scendere nemmeno se due richieste si
+    accavallano) e non chiede a SQLite niente che non abbia da sempre —
+    la stessa prudenza di `VETRINA_PER_VENDITORE`, che una versione
+    vecchia l'ha gia' morsa una volta."""
+    if not isinstance(identita, str):
+        return None
+    pk = identita.strip().lower()
+    if not FORMA_PUBKEY_P2P.fullmatch(pk):
+        return None
+    try:
+        n = int(indice)
+    except (TypeError, ValueError):
+        return None
+    if n < 0:
+        return None
+    con.execute("INSERT OR IGNORE INTO p2p_indice(pubkey, tg_id, indice, "
+                "aggiornato) VALUES(?,?,?,?)", (pk, tg_id, n, adesso))
+    con.execute("UPDATE p2p_indice SET indice=?, aggiornato=? "
+                "WHERE pubkey=? AND tg_id=? AND indice<?",
+                (n, adesso, pk, tg_id, n))
+    con.commit()
+    r = con.execute("SELECT indice FROM p2p_indice WHERE pubkey=? AND tg_id=?",
+                    (pk, tg_id)).fetchone()
+    return int(r[0]) if r else None
+
+
+
 def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
     """Scrive le pubkey di UN utente. Idempotente per costruzione (la PK
     e' la pubkey e l'INSERT e' OR IGNORE): il client le rimanda a ogni
@@ -30094,14 +30168,27 @@ async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
     except Exception:
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
+    adesso = int(time.time())
     try:
         esito = _registra_chiavi_p2p(con, user["id"],
-                                     (d or {}).get("pubkeys"),
-                                     int(time.time()))
+                                     (d or {}).get("pubkeys"), adesso)
     except ValueError as e:
         con.close()
         raise HTTPException(400, str(e))
+    # IL PAVIMENTO VIAGGIA SULLA RICHIESTA CHE C'E' GIA', e non su una
+    # rotta sua: l'indice cambia ESATTAMENTE nei due momenti in cui
+    # questa POST parte (una presa in carico, un ordine nuovo). Una
+    # seconda chiamata potrebbe fallire da sola, e lascerebbe la chiave
+    # registrata col contatore indietro — cioe' il guasto che questa
+    # tabella toglie, spostato di un metro.
+    # I DUE CAMPI SONO FACOLTATIVI: chi non li manda — il client di
+    # ieri, o una registrazione senza mazzo in mano — non riceve niente
+    # e non scrive niente, che e' il mondo di prima byte per byte.
+    pavimento = _pavimento_indice_p2p(con, user["id"], (d or {}).get("identita"),
+                                      (d or {}).get("indice"), adesso)
     con.close()
+    if pavimento is not None:
+        esito["indice"] = pavimento
     return {"ok": True, **esito}
 
 

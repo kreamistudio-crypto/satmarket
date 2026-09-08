@@ -35600,10 +35600,22 @@ def prove_p2p_chiavi():
     cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
     corpi = re.findall(r"body: ([^\n]*)", cod)
     prova("le fetch del blocco che portano un corpo sono UNA", 1, len(corpi))
-    prova("...e quel corpo e' `{pubkeys}` e nient'altro", True,
-          all(c.startswith("JSON.stringify({pubkeys:") for c in corpi))
-    prova("...senza un `sk` dentro", False,
-          any("sk" in c for c in corpi))
+    # ⚠️ IL CORPO NON E' PIU' UN LETTERALE (set 2026, il pavimento
+    # dell'indice): si costruisce in tre righe, quindi guardare la
+    # stringa del `body:` vorrebbe dire guardare `JSON.stringify(corpo)`
+    # e non dire piu' NIENTE — una sentinella che resta verde perche' ha
+    # smesso di capire cosa legge, che e' il modo peggiore di essere
+    # verde. Si guardano le CHIAVI che nel corpo ci finiscono, ed e' piu'
+    # STRETTO di prima: la vecchia `startswith` lasciava entrare
+    # qualunque cosa in coda al `{pubkeys:`.
+    chiavi_corpo = set(re.findall(r"corpo\.(\w+) =", cod))
+    chiavi_corpo |= set(re.findall(r"const corpo = \{(\w+):", cod))
+    prova("...e le chiavi del corpo sono esattamente quelle tre",
+          {"pubkeys", "identita", "indice"}, chiavi_corpo)
+    prova("...senza un `sk` fra loro", False,
+          any("sk" in c for c in chiavi_corpo))
+    prova("...e il `body:` non porta un letterale che le scavalchi", True,
+          all(c.startswith("JSON.stringify(corpo)") for c in corpi))
     # ERANO DUE E DA SET 2026 SONO TRE, ed e' il censimento ad aver
     # fatto il suo mestiere: e' venuto a chiedere di DICHIARARE la
     # terza invece di lasciarla entrare in silenzio. Le prime due
@@ -35971,10 +35983,14 @@ let tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
 function authHdr(){ return 'collaudo:111:x'; }
-let fetches = [], rispChiavi = null;
+let fetches = [], rispChiavi = null, rispPost = null;
 async function fetch(url, opt){ fetches.push({url, opt});
   if (String(url).endsWith('/p2p/chiavi') && !(opt && opt.method))
     return rispChiavi ? {ok: true, json: async () => rispChiavi} : {ok: false};
+  // LA POST RISPONDE SENZA `json` finche' nessuno gliene da' uno, ed e'
+  // il caso che conta: e' cosi' che rispondeva prima del pavimento, e
+  // il client deve cavarsela lo stesso.
+  if (rispPost) return {ok: true, json: async () => rispPost};
   return {ok: true}; }
 let toasts = []; function toast(m){ toasts.push(m); }
 function haptic(){}
@@ -35994,7 +36010,7 @@ let copiato = '';
 const navigator = {clipboard: {writeText: async t => { copiato = t; }}};
 """ + js_blocco + r"""
 function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches = [];
-  rispChiavi = null; p2pChiaviNote = null; p2pChiaviGiro = null;
+  rispChiavi = null; rispPost = null; p2pChiaviNote = null; p2pChiaviGiro = null;
   toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
   p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
   myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero}; }
@@ -36023,8 +36039,36 @@ const corpo = f => JSON.parse(f.opt.body);
   out.cloudPrimaLettoPoiScritto = cloudLog.join(',') === 'get,set';
   out.cloudPortaIlMazzo = JSON.parse(cloud.get('mostro_mazzo')).sk === m.sk;
   out.fetchUna = fetches.length === 1 && fetches[0].opt.method === 'POST';
-  out.corpoSoloPub = JSON.stringify(corpo(fetches[0])) === JSON.stringify({pubkeys: [m.pub]});
+  const c0 = corpo(fetches[0]);
+  out.corpoTreChiavi = JSON.stringify(Object.keys(c0).sort()) === JSON.stringify(['identita','indice','pubkeys']);
+  out.corpoPortaPubEIndice = c0.pubkeys.length === 1 && c0.pubkeys[0] === m.pub
+    && c0.identita === m.pub && c0.indice === 0;
   out.skMaiInRete = !JSON.stringify(fetches).includes(m.sk);
+  // 3b) IL PAVIMENTO TORNA INDIETRO DAL SERVER (fase 2)
+  // E' il TERZO posto in cui l'indice converge, dopo localStorage e il
+  // cloud di Telegram: un dispositivo che il cloud non ce l'ha —
+  // domani chiunque apra Barattolo da un browser nuovo — riparte da
+  // zero e RIUSA una trade key viva.
+  reset();
+  const mzPav = await assicuraMazzo();
+  ricordaMazzo(Object.assign({}, mzPav, {indice: 2}));
+  rispPost = {ok: true, registrate: 1, totale: 1, indice: 9};
+  await registraChiaviP2P([mzPav.pub]);
+  out.pavimentoAlza = mazzoMostro().indice === 9;
+  // VINCE IL PIU' ALTO e mai il piu' recente: un pavimento piu' basso
+  // del nostro non ci fa tornare indietro, o riuseremmo chiavi gia'
+  // bruciate.
+  rispPost = {ok: true, indice: 4};
+  await registraChiaviP2P([mzPav.pub]);
+  out.pavimentoNonAbbassa = mazzoMostro().indice === 9;
+  // ⚠️ E UNA RISPOSTA CHE NON SI LEGGE NON ANNULLA IL GESTO: le chiavi
+  // sono gia' registrate, quel che si perde e' solo il pavimento.
+  rispPost = null;
+  out.senzaCorpoVaBene = (await registraChiaviP2P([mzPav.pub])) === true
+    && mazzoMostro().indice === 9;
+  // E il mazzo cambiato SOTTO non si sovrascrive: si fonde solo se e'
+  // ancora lo stesso profilo che ha fatto la domanda.
+  out.indiceMaiSotto = mazzoMostro().indice >= 2;
   // 4) dal cloud non si fabbrica un mazzo nuovo
   reset();
   cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 2, creato: 9, backupFatto: true}));
@@ -36201,8 +36245,13 @@ const corpo = f => JSON.parse(f.opt.body);
         "cloudPrimaLettoPoiScritto": "il cloud si legge PRIMA e si scrive DOPO",
         "cloudPortaIlMazzo": "...e nel cloud c'e' il mazzo",
         "fetchUna": "al server parte UNA POST",
-        "corpoSoloPub": "...col solo {pubkeys: [pub]}",
+        "corpoTreChiavi": "...col corpo a tre chiavi e nient'altro",
+        "corpoPortaPubEIndice": "...che sono la pubkey, l'identita' e l'indice",
         "skMaiInRete": "...e il segreto non e' in nessuna fetch",
+        "pavimentoAlza": "il pavimento del server alza l'indice locale",
+        "pavimentoNonAbbassa": "...e uno piu' basso non lo fa scendere",
+        "senzaCorpoVaBene": "...e una risposta senza corpo non annulla il gesto",
+        "indiceMaiSotto": "...e l'indice non scende mai sotto quel che era",
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
@@ -38944,6 +38993,94 @@ def prove_p2p_server():
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
     prova("lo scanner dei segreti conosce SEGRETI_PROFILO_P2P", True,
           "SEGRETI_PROFILO_P2P)[[:space:]]*=" in wf)
+
+    # --- 10) IL PAVIMENTO DELL'INDICE (set 2026, fase 2) ------------
+    # IL BUCO ESISTE GIA' OGGI e il profilo derivato lo fa esplodere:
+    # l'indice delle trade key converge fra localStorage e cloud
+    # Telegram, quindi due dispositivi che NON passano dal cloud —
+    # oggi chi si e' passato il codice a mano, domani chiunque apra
+    # Barattolo da un browser nuovo — ripartono da zero e RIUSANO una
+    # chiave viva. Il coordinatore risponde `invalid-trade-index`, i
+    # messaggi di uno scambio finiscono sull'altro dispositivo, e nel
+    # caso peggiore una hold invoice parla con una chiave che li' non
+    # c'e'. Il server fa da TERZO posto in cui l'indice converge.
+    import sqlite3
+    i_p = src.index("CREATE TABLE IF NOT EXISTS p2p_indice(")
+    schema3 = src[i_p:src.index(");", i_p) + 2]
+    ddl3 = "\n".join(r for r in schema3.split("\n")
+                     if not r.strip().startswith("--"))
+    for spia in ("sk", "nsec", "secret", "segreto", "priv", "sale"):
+        prova(f"il DDL di p2p_indice non ha un posto per `{spia}`", False,
+              spia in ddl3.lower())
+    prova("le colonne sono quattro e sono quelle",
+          ["aggiornato", "indice", "pubkey", "tg_id"],
+          sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl3, re.M)))
+    # ⚠️ LA PK E' LA PUBKEY E NON IL tg_id, ed e' la riga da non
+    # ammorbidire: due profili della stessa persona sono due
+    # numerazioni, e un contatore per account le mescolerebbe — cioe'
+    # farebbe riusare all'uno le chiavi gia' bruciate dall'altro,
+    # che e' esattamente il guasto che questa tabella toglie.
+    prova("...e il pavimento e' per IDENTITA', non per account", True,
+          "pubkey TEXT PRIMARY KEY" in ddl3)
+
+    con3 = sqlite3.connect(":memory:")
+    con3.executescript(schema3)
+    forma3 = re.search(r'FORMA_PUBKEY_P2P = re\.compile\(r"([^"]+)"\)',
+                       src).group(1)
+    amb_i = {"FORMA_PUBKEY_P2P": re.compile(forma3)}
+    exec(pezzo("_pavimento_indice_p2p"), amb_i)
+    pav = amb_i["_pavimento_indice_p2p"]
+    ID = "e" * 64
+    prova("il primo giro scrive e rilegge quel che ha scritto",
+          3, pav(con3, 111, ID, 3, 1000))
+    prova("...un numero piu' alto lo alza", 7, pav(con3, 111, ID, 7, 1001))
+    # VINCE IL PIU' ALTO e mai il piu' recente: l'indice conta le chiavi
+    # BRUCIATE, quindi tornare indietro le riusa. E' un pavimento.
+    prova("...uno piu' basso NON lo abbassa, e torna il massimo",
+          7, pav(con3, 111, ID, 2, 1002))
+    prova("...e in tabella e' rimasto il massimo", 7, con3.execute(
+        "SELECT indice FROM p2p_indice WHERE pubkey=?", (ID,)).fetchone()[0])
+    # ⚠️ LA CHIAVE DI UN ALTRO NON SI TOCCA E NON SI LEGGE: il tg_id sta
+    # nel WHERE della scrittura E in quello della lettura, o questa
+    # rotta direbbe a chiunque a quanti scambi e' arrivato qualcun
+    # altro — un oracolo, sulla stessa correlazione per non fare la
+    # quale il mazzo esiste.
+    prova("la chiave di un altro non risponde", None, pav(con3, 222, ID, 99, 1003))
+    prova("...e non l'ha nemmeno spostata", 7, con3.execute(
+        "SELECT indice FROM p2p_indice WHERE pubkey=?", (ID,)).fetchone()[0])
+    prova("...e non ne ha creata una sua", 1, con3.execute(
+        "SELECT COUNT(*) FROM p2p_indice WHERE pubkey=?", (ID,)).fetchone()[0])
+    # QUEL CHE NON SI CAPISCE NON SI SCRIVE, e torna None: None non e'
+    # zero — zero vorrebbe dire «riparti da capo», cioe' riusa la prima
+    # trade key, che e' il danno da cui tutto questo difende.
+    for storto, che in ((None, "identita assente"), ("zz" * 32, "identita storta"),
+                        ("", "identita vuota")):
+        prova(f"{che}: niente pavimento", None, pav(con3, 111, storto, 1, 1004))
+    for storto, che in ((None, "assente"), ("tre", "non un numero"), (-1, "negativo")):
+        prova(f"indice {che}: niente pavimento", None,
+              pav(con3, 111, "f" * 64, storto, 1005))
+    prova("...e nessuna riga e' nata da quei tentativi", 1, con3.execute(
+        "SELECT COUNT(*) FROM p2p_indice").fetchone()[0])
+    # MAIUSCOLE ABBASSATE come per le pubkey, o la stessa identita'
+    # avrebbe due righe e due numerazioni.
+    prova("l'identita' in maiuscolo e' la stessa riga", 7,
+          pav(con3, 111, ID.upper(), 1, 1006))
+
+    # I DUE CAMPI SONO FACOLTATIVI: il client di ieri non li manda, e
+    # per lui non cambia un byte.
+    post = src[src.index('@app.post("/api/p2p/chiavi")'):]
+    post = post[:post.index("\n\n\n")]
+    prova("la POST chiede il pavimento con quel che le arriva", True,
+          '_pavimento_indice_p2p(con, user["id"], (d or {}).get("identita")' in post)
+    prova("...e l'indice esce solo se c'e' qualcosa da dire", True,
+          "if pavimento is not None:" in post)
+    # LA GET NON CAMBIA: resta due numeri e nessun parametro.
+    getp = src[src.index('@app.get("/api/p2p/chiavi")'):]
+    getp = getp[:getp.index("\n\n\n")]
+    prova("il pavimento non e' finito nella lettura", False,
+          "p2p_indice" in getp)
+    prova("il pavimento segue l'utente alla fusione", True,
+          "UPDATE p2p_indice SET tg_id=? WHERE tg_id=?" in src)
 
 
 def prove_p2p_campanello():

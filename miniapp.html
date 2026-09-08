@@ -33165,11 +33165,42 @@ async function registraChiaviP2P(pubkeys){
   if (DEMO || VETRINA || !myTgId) return false;
   const lista = (pubkeys || []).filter(p => FORMA_HEX64.test(p));
   if (!lista.length) return false;
+  /* IL PAVIMENTO VIAGGIA CON LE CHIAVI, e il mazzo se lo legge da solo
+     invece di farselo passare: questa funzione la chiamano sei posti,
+     e tutti e sei hanno gia' scritto il mazzo prima di arrivare qui.
+     Cosi' il TERZO posto in cui l'indice converge non costa un giro di
+     rete in piu' e non aggiunge un call-site che si puo' dimenticare. */
+  const mz = mazzoMostro();
+  const corpo = {pubkeys: lista};
+  if (mz) { corpo.identita = mz.pub; corpo.indice = mz.indice | 0; }
   try {
     const r = await fetch(`${API_BASE}/p2p/chiavi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({pubkeys: lista})});
-    return r.ok;
+      body: JSON.stringify(corpo)});
+    if (!r.ok) return false;
+    /* E IL MASSIMO TORNA INDIETRO: il server tiene il pavimento, noi
+       teniamo il piu' alto fra il suo e il nostro. VINCE IL PIU' ALTO e
+       mai il piu' recente — l'indice conta le chiavi BRUCIATE, quindi
+       tornare indietro le riusa (la stessa regola del cloud, e la
+       stessa ragione).
+       SI SCRIVE SOLO IL LOCALE, e il cloud lo allinea `sincronizzaMazzo`
+       coi suoi due versi: un secondo posto che scrive la copia
+       Telegram vorrebbe dire due scritture che possono divergere, e
+       questa e' fail-open muta come l'altra. */
+    /* ⚠️ IL `try` ATTORNO AL JSON NON E' PRUDENZA GENERICA: `r.json()`
+       puo' alzare SINCRONAMENTE — una risposta senza corpo, o un corpo
+       che non e' JSON — e allora `.catch()` non la prende affatto,
+       l'eccezione risale al try esterno e questa funzione tornerebbe
+       `false` su una registrazione RIUSCITA. Le chiavi sono gia' dal
+       server: quel che non si riesce a leggere e' solo il pavimento, e
+       non saperlo non annulla il gesto. */
+    let d = null;
+    try { d = await r.json(); } catch(e){}
+    const suo = d && Number.isInteger(d.indice) ? d.indice : -1;
+    const ora = mazzoMostro();
+    if (ora && mz && ora.sk === mz.sk && suo > (ora.indice | 0))
+      ricordaMazzo(Object.assign({}, ora, {indice: suo}));
+    return true;
   } catch(e){ return false; }
 }
 async function dimenticaChiaviP2P(){
