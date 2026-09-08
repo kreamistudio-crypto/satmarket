@@ -18531,6 +18531,10 @@ _SEGRETI_FINTI = {
     "TELEGRAM_WEBHOOK_SEGRETO": "SEGRETO-webhook",
     "TELEGRAM_CANALE_ID": "SEGRETO-canale",
     "CHIAVE_CONTENUTI_DIGITALI": "SEGRETO-contenuti",
+    # Il valore vero e' un DIZIONARIO {versione: segreto}: qui sta
+    # la stringa da cercare nel censimento, e `_censimento` la
+    # infila nel dizionario che il config finto consegna.
+    "SEGRETI_PROFILO_P2P": "SEGRETO-profilo-p2p",
     "RELAY_CHIAVI_TOKEN": "SEGRETO-token-del-relay",
     "DB": "SEGRETO-percorso-database",
 }
@@ -18577,6 +18581,14 @@ def _censimento(acceso):
     # quel ramo non lo guarderebbe nessuno.
     amb["P2P_PROVA_IDS"] = {1, 2, 3} if acceso else set()
     amb["MOSTRO_HEX"] = "ab" * 32 if acceso else ""
+    # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
+    # config finto darebbe la stringa di _SEGRETI_FINTI e il
+    # server la scarterebbe come leva storta — cioe' il ramo
+    # ACCESO non lo eserciterebbe nessuno, e la prova «il valore
+    # non esce» passerebbe senza aver guardato niente.
+    amb["SEGRETI_PROFILO_P2P"] = (
+        {1: _SEGRETI_FINTI["SEGRETI_PROFILO_P2P"]} if acceso else {})
+    amb["SEGRETO_PROFILO_P2P_VIVA"] = 1
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
     amb["ADMIN_IDS"] = [111111111, 222222222]
@@ -18665,8 +18677,14 @@ def _censimento(acceso):
     # `_p2p_leve` per la stessa ragione di `_prezzo_banner`: il
     # pannello lo CHIAMA, e da `__missing__` uscirebbe un 7 che non
     # si chiama — la prova esploderebbe invece di diventare rossa.
+    # `_segreto_p2p_vivo` per la stessa ragione, ed e' la terza volta
+    # che questa riga si allunga: il pannello NON legge la costante
+    # ma il giudice — un dizionario di segreti dichiarato senza la
+    # versione viva si leggerebbe «acceso» mentre non deriva niente —
+    # quindi qui dentro ci vuole la funzione vera.
     for f in ("webhook_attivo", "relay_chiavi_attivo", "_leva", "_elenco",
-              "_prezzo_banner", "_p2p_leve", "_leve_stato"):
+              "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
+              "_leve_stato"):
         exec(pezzo(f), amb)
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -38734,6 +38752,198 @@ def prove_p2p_server():
           "Promise.allSettled" in libro)
     prova("...e dice se e' COMPLETO o e' quel che aveva lo specchio",
           True, "completo:" in libro)
+
+    # --- 9) IL PROFILO CHE SI RICAVA DALL'ACCOUNT (set 2026) --------
+    # L'ECCEZIONE DICHIARATA ALLA REGOLA FERREA 2, e la ragione per cui
+    # queste sentinelle sono piu' fitte delle altre: fin qui il server
+    # non poteva firmare per nessuno perche' non aveva le chiavi;
+    # adesso non le CUSTODISCE — non c'e' una colonna dove potrebbero
+    # finire, e le prove qui sotto lo pretendono — ma le sa RICAVARE.
+    # Quel che era garantito dall'assenza adesso e' garantito da delle
+    # righe, e delle righe si sorvegliano.
+    # Gli import stanno qui e non in testa al file, il patto di casa.
+    import hashlib
+    import hmac
+    import secrets
+    import sqlite3
+
+    # a) LE DUE LEVE NASCONO SPENTE, E UNA STORTA NON DERIVA ----------
+    prova("SEGRETI_PROFILO_P2P nasce vuoto: profilo per dispositivo",
+          True, "except ImportError:\n    SEGRETI_PROFILO_P2P = {}" in cod)
+    prova("...ed e' un DIZIONARIO {versione: segreto}, mai una stringa",
+          True, "dict(SEGRETI_PROFILO_P2P).items()" in cod)
+    prova("...e una leva storta non deriva, e lo dice", True,
+          "except (TypeError, ValueError, AttributeError):" in cod)
+    prova("la versione viva nasce a 1", True,
+          "except ImportError:\n    SEGRETO_PROFILO_P2P_VIVA = 1" in cod)
+    # STORTA VALE 0 E NON 1, ed e' il verso che conta: 0 nel dizionario
+    # non c'e' mai, quindi una versione illeggibile spegne la strada
+    # invece di derivare con un segreto che non e' quello inteso.
+    prova("...e storta vale 0, che nel dizionario non c'e' mai", True,
+          "except (TypeError, ValueError):\n    SEGRETO_PROFILO_P2P_VIVA = 0"
+          in cod)
+    prova("la leva accesa ma senza versione viva lo dice all'avvio", True,
+          "if P2P_ATTIVO and not _segreto_p2p_vivo():" in cod)
+    # IL PANNELLO CHIEDE AL GIUDICE E NON ALLA COSTANTE: un dizionario
+    # dichiarato senza la versione viva si leggerebbe «acceso» mentre
+    # non deriva niente — la trappola per cui quel pannello esiste.
+    prova("il pannello legge il FATTO dal giudice", True,
+          '_leva("Profilo legato all\'account", "SEGRETI_PROFILO_P2P",\n'
+          "                  bool(_segreto_p2p_vivo())," in src)
+
+    # b) LA TABELLA DEL SALE: nessun posto per la meta' privata -------
+    s_i2 = src.index("CREATE TABLE IF NOT EXISTS p2p_semi(")
+    schema2 = src[s_i2:src.index(");", s_i2) + 2]
+    ddl2 = "\n".join(r for r in schema2.split("\n")
+                     if not r.strip().startswith("--"))
+    # Le stesse spie di `chiavi_p2p`, e per la stessa ragione: la meta'
+    # privata non ha una colonna dove finire nemmeno per sbaglio. Qui
+    # «sale» non e' un segreto — da solo non deriva niente, serve anche
+    # il segreto del config, che sta in un altro posto apposta.
+    for spia in ("sk", "nsec", "secret", "segreto", "priv", "seme"):
+        prova(f"il DDL di p2p_semi non ha un posto per `{spia}`", False,
+              spia in ddl2.lower())
+    prova("le colonne sono quattro e sono quelle",
+          ["creato", "sale", "tg_id", "versione"],
+          sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl2, re.M)))
+    # LA VERSIONE STA IN COLONNA, ed e' cio' che permette di ruotare
+    # senza un giorno-zero: i vecchi restano sulla loro finche' non
+    # passano alla nuova con un gesto. Senza, ruotare vorrebbe dire
+    # cambiare l'identita' di tutti insieme e in silenzio.
+    prova("...e la versione e' in colonna, o la rotazione non esiste",
+          True, "versione INTEGER" in ddl2)
+    prova("il sale segue l'utente alla fusione", True,
+          "UPDATE OR IGNORE p2p_semi SET tg_id=? WHERE tg_id=?" in src
+          and "DELETE FROM p2p_semi WHERE tg_id=?" in src)
+
+    # c) IL GIUDICE DELLA DERIVAZIONE GIRA DAVVERO -------------------
+    # Puro sulle sue leve, e senza `coincurve`: quel pacchetto e'
+    # opzionale e in CI non c'e', quindi l'ordine della curva si scrive
+    # invece di importarlo.
+    amb_s = {"hmac": hmac, "hashlib": hashlib}
+    for riga in src.split("\n"):
+        if (riga.startswith("ORDINE_SECP256K1 =")
+                or riga.startswith("ETICHETTA_SEME_P2P =")):
+            exec(riga, amb_s)
+    exec(pezzo("_seme_profilo_p2p"), amb_s)
+    seme = amb_s["_seme_profilo_p2p"]
+    N = amb_s["ORDINE_SECP256K1"]
+    prova("l'ordine e' quello di secp256k1", True, N ==
+          0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141)
+    prova("...e non si importa coincurve per averlo", False,
+          "coincurve" in cod)
+
+    SEG, SAL = "a" * 64, "b" * 32
+    uno = seme(SEG, SAL, 111, 1)
+    prova("lo stesso ingresso da' lo stesso seme", uno, seme(SEG, SAL, 111, 1))
+    prova("...ed e' 64 esadecimali minuscoli", True,
+          len(uno) == 64 and all(c in "0123456789abcdef" for c in uno))
+    prova("...ed e' uno scalare valido: 1 <= n < N", True,
+          1 <= int(uno, 16) < N)
+    # OGNI INGREDIENTE CONTA, e si prova uno per uno: un ingrediente
+    # inerte non fallisce, fa solo collidere due persone o due
+    # versioni — che e' lo stesso profilo consegnato a due account.
+    prova("cambiando il tg_id cambia il seme", True, seme(SEG, SAL, 112, 1) != uno)
+    prova("cambiando il sale cambia il seme", True, seme(SEG, "c" * 32, 111, 1) != uno)
+    prova("cambiando la versione cambia il seme", True, seme(SEG, SAL, 111, 2) != uno)
+    prova("cambiando il segreto cambia il seme", True, seme("d" * 64, SAL, 111, 1) != uno)
+    # SERVONO TUTTI E DUE I PEZZI: e' la riga su cui poggia «chi ruba
+    # il solo config non ricava niente».
+    prova("senza il segreto non si deriva", "", seme("", SAL, 111, 1))
+    prova("senza il sale non si deriva", "", seme(SEG, "", 111, 1))
+    # IL RAMO DEL RIPROVA, esercitato per davvero. Un HMAC sono 256 bit
+    # uniformi: puo' uscire >= N, e quel numero NON e' una chiave —
+    # firmarci darebbe una firma che il coordinatore butta senza dire
+    # niente. Con l'ordine vero il caso e' una su 2^128, quindi il ramo
+    # si guarda passando un ordine FINTO, che e' la ragione per cui
+    # quel parametro esiste.
+    # ⚠️ E L'ORDINE FINTO NON PUO' ESSERE PICCOLO A PIACERE: con 2 la
+    # condizione diventa «n == 1 esatto», che in 256 giri non capita
+    # mai — la funzione ESAURISCE invece di riprovare con successo, e
+    # la prova certificherebbe il ramo sbagliato. Con 2^252 un giro su
+    # 16 va bene: qui il giro 0 cade fuori e ne servono 37, ed e'
+    # deterministico perche' l'ingresso e' fisso.
+    PICCOLO = 2 ** 252
+    giro0 = int.from_bytes(hmac.new(
+        SEG.encode(), ("%s|%s|%d|%d" % (amb_s["ETICHETTA_SEME_P2P"] % 1,
+                                        SAL, 111, 0)).encode(),
+        hashlib.sha256).digest(), "big")
+    prova("col vettore di prova il primo giro cade FUORI dall'ordine",
+          True, giro0 >= PICCOLO)
+    stretto = seme(SEG, SAL, 111, 1, ordine=PICCOLO)
+    prova("...e allora si riprova, e quel che esce e' valido", True,
+          1 <= int(stretto, 16) < PICCOLO and len(stretto) == 64)
+    prova("...e non e' il primo giro travestito", True,
+          int(stretto, 16) != giro0)
+    # ⚠️ E QUEL CHE ESCE DEV'ESSERE UNO DEGLI HMAC DELLA SERIE, non
+    # un numero valido qualunque: la tortura ha mostrato che le due
+    # prove qui sopra restano VERDI se il riprova viene sostituito
+    # da un `n % ordine` — che da' un valore in [0, ordine) senza
+    # aver riprovato niente, e che a scalare zero ci arriva davvero.
+    # La domanda giusta non e' «e' valido?» ma «e' USCITO dalla
+    # serie?», ed e' la stessa lezione della sentinella cieca dello
+    # specchio: si guarda il fatto, non una sua conseguenza.
+    serie = [int.from_bytes(hmac.new(
+        SEG.encode(), ("%s|%s|%d|%d" % (amb_s["ETICHETTA_SEME_P2P"] % 1,
+                                        SAL, 111, g)).encode(),
+        hashlib.sha256).digest(), "big") for g in range(256)]
+    prova("...ed e' un HMAC della serie, non un numero rifatto",
+          True, int(stretto, 16) in serie)
+    # E SE NESSUNO SCALARE E' POSSIBILE, ALZA: mai una chiave storta
+    # spacciata per buona. Chi chiama tratta l'alzata come «la strada
+    # non si offre», che e' il verso giusto.
+    try:
+        seme(SEG, SAL, 111, 1, ordine=1)
+        esito = "NON HA ALZATO"
+    except ValueError:
+        esito = "alza"
+    prova("con nessuno scalare possibile alza, e non torna una chiave",
+          "alza", esito)
+
+    # d) IL SALE NASCE AL PRIMO GESTO, E UNO SOLO --------------------
+    con2 = sqlite3.connect(":memory:")
+    con2.executescript(schema2)
+    amb_sale = {"secrets": secrets, "SEGRETO_PROFILO_P2P_VIVA": 1}
+    exec(pezzo("_sale_profilo_p2p"), amb_sale)
+    dammi = amb_sale["_sale_profilo_p2p"]
+    a1 = dammi(con2, 111, 1000)
+    prova("il primo gesto fa nascere il sale", True,
+          bool(a1["sale"]) and a1["versione"] == 1)
+    # L'INSERT E' `OR IGNORE` E POI SI RILEGGE: due gesti insieme non
+    # devono fare due sali, e a garantirlo e' la chiave primaria — non
+    # un controllo nostro, che due connessioni attraversano insieme.
+    a2 = dammi(con2, 111, 2000)
+    prova("...e il secondo gesto NON ne fa un altro", a1["sale"], a2["sale"])
+    prova("...e in tabella la riga e' una sola", 1, con2.execute(
+        "SELECT COUNT(*) FROM p2p_semi WHERE tg_id=111").fetchone()[0])
+    prova("due persone hanno due sali diversi", True,
+          dammi(con2, 222, 3000)["sale"] != a1["sale"])
+    prova("il sale e' esadecimale e lungo abbastanza", True,
+          len(a1["sale"]) >= 32
+          and all(c in "0123456789abcdef" for c in a1["sale"]))
+    # E NON NASCE PRIMA: una riga che esiste dice qualcosa, e un sale
+    # creato alla registrazione direbbe «questa persona ha un profilo
+    # di scambio» di chiunque si sia iscritto.
+    prova("nessuno crea il sale fuori da questo giudice", 1,
+          src.count("INSERT OR IGNORE INTO p2p_semi"))
+
+    # e) IL SEGRETO NON ESCE, E IL CONFIG D'ESEMPIO LO DICE ----------
+    # Il NOME esce apposta (serve per andarlo a cambiare); il VALORE
+    # mai — e a garantirlo e' `prove_leve`, che gira il censimento con
+    # un segreto finto riconoscibile e lo cerca nel JSON.
+    prova("SEGRETI_PROFILO_P2P e' nel file da cui si copia", True,
+          "\nSEGRETI_PROFILO_P2P = {}" in cfg)
+    prova("...e nasce vuoto anche li'", True,
+          'SEGRETI_PROFILO_P2P = {}          # {1: "INCOLLA_QUI' in cfg)
+    prova("...e il config d'esempio dice come generarlo", True,
+          "secrets.token_hex(32)" in cfg)
+    # LO SCANNER DELLA CI LO CONOSCE PER NOME: non ha una forma sua —
+    # 32 byte esadecimali somigliano a mezzo mondo — quindi si ancora
+    # al NOME della variabile con un valore non vuoto, come le due
+    # chiavi LNbits e il segreto del webhook.
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    prova("lo scanner dei segreti conosce SEGRETI_PROFILO_P2P", True,
+          "SEGRETI_PROFILO_P2P)[[:space:]]*=" in wf)
 
 
 def prove_p2p_campanello():

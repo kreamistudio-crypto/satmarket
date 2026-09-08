@@ -539,6 +539,28 @@ P2P_ATTIVO = False
 # l'apertura vorrebbe dire uno scambio di denaro vero aperto al
 # mercatino intero senza averlo deciso.
 P2P_PROVA_IDS = []
+# IL SEGRETO DEL PROFILO DI SCAMBIO (set 2026): da qui si ricava la
+# chiave d'identita' Mostro di chi entra da Telegram, cosi' i suoi
+# scambi si vedono uguali dal bot, dal sito e dall'app. Serve anche il
+# SALE di ogni persona, che sta nel database (`p2p_semi`): chi si porta
+# via il solo questo file non ricava niente.
+# ⚠️ E' IL SEGRETO PIU' PESANTE DI QUESTO SERVER — chi lo ruba INSIEME
+# al database puo' firmare uno scambio al posto di chi entra da
+# Telegram, cioe' liberare sats e aprire dispute. Sta sul VPS come le
+# chiavi LNbits, esce su carta + Bitwarden, e non si incolla MAI in una
+# chat o in un canale Telegram (che non e' cifrato end-to-end).
+# Si genera cosi', 32 byte:
+#     python -c "import secrets; print(secrets.token_hex(32))"
+# VUOTO O NON DICHIARATO = il mondo di ieri: il profilo di scambio
+# nasce nel browser e vale per dispositivo. Non rompe niente.
+# E' UN DIZIONARIO {versione: segreto} PERCHE' SI RUOTA AGGIUNGENDO,
+# mai sostituendo: la versione entra nella derivazione, quindi
+# cambiarla a tutti insieme cancellerebbe l'identita' di tutti in
+# silenzio. La procedura sta in docs/PRODUZIONE.md.
+SEGRETI_PROFILO_P2P = {}          # {1: "INCOLLA_QUI_32_BYTE_ESADECIMALI"}
+# La versione con cui nascono i profili nuovi. Si sposta SOLO durante
+# una rotazione, e solo dopo aver aggiunto la riga nuova qui sopra.
+SEGRETO_PROFILO_P2P_VIVA = 1
 # La npub del coordinator: e' PUBBLICA (firma il libro ordini che tutti
 # leggono). Storta = lo scambio resta spento, e il journal lo dice.
 MOSTRO_NPUB = "npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0"

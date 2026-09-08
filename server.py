@@ -3293,6 +3293,30 @@ def init_db():
         ultimo_nudge INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_semi(
+        -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
+        -- d'identita' Mostro di chi entra da Telegram si ricava con
+        -- HMAC(segreto del config, sale + tg_id), e QUESTA e' la meta'
+        -- che sta nel database. Sta qui e non nel config apposta: chi
+        -- si porta via il solo config.py non ricava niente, e chi si
+        -- porta via il solo database nemmeno. Serve avere tutti e due.
+        -- ⚠️ E UNA RIGA DI QUI E' META' DI UN'IDENTITA': persa, il
+        -- profilo derivato cambia e la reputazione che quella persona
+        -- ha sul coordinatore resta attaccata a una chiave che nessuno
+        -- sa piu' ricavare. Non e' rigenerabile — un sale nuovo e' un
+        -- profilo nuovo — quindi vale quanto il resto del database nel
+        -- backup, e dopo un ripristino da una copia VECCHIA chi e'
+        -- nato in mezzo va AVVISATO invece di scoprirlo da solo.
+        -- `versione` dice con quale segreto quella riga deriva: e' cio'
+        -- che permette di ruotare senza un giorno-zero, tenendo i
+        -- vecchi sulla loro finche' non passano alla nuova con un gesto.
+        -- Nessuna colonna per la meta' PRIVATA, qui come in chiavi_p2p:
+        -- la chiave non si custodisce, si ricava.
+        tg_id INTEGER PRIMARY KEY,
+        sale TEXT NOT NULL,
+        versione INTEGER DEFAULT 1,
+        creato INTEGER
+    );
     CREATE TABLE IF NOT EXISTS punti_ritiro(
         -- I punti di ritiro che CHI COMPRA si tiene (ago 2026): il
         -- locker sotto casa non cambia, e riscriverlo a ogni acquisto
@@ -7725,6 +7749,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # DELETE sarebbe una cintura che nessuno esercita.
         con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # Il sale del profilo di scambio segue l'utente. Qui la PK E'
+        # il tg_id, quindi le due meta' POSSONO collidere — e allora
+        # vince la meta' Telegram, che e' l'unica delle due a poter
+        # avere un profilo derivato (la strada e' solo per tg_id > 0):
+        # `OR IGNORE` + `DELETE`, il calco di `interessi`. Oggi il
+        # nativo Nostr un sale non ce l'ha per costruzione; la riga
+        # c'e' lo stesso, o il giorno che una strada nuova gliene desse
+        # uno lo lascerebbe indietro in silenzio.
+        con.execute("UPDATE OR IGNORE p2p_semi SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_semi WHERE tg_id=?", (id_nostr,))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -16513,6 +16548,26 @@ def _leve_stato():
                   spento="senza i relay lo scambio non si accende: qui "
                          "non c'e' una lista di serie, e non deve "
                          "esserci"),
+            # IL SEGRETO NON ESCE MAI, esce il FATTO: la regola di
+            # CHIAVE_CONTENUTI_DIGITALI, applicata al segreto piu'
+            # pesante che questo server abbia — chi lo ruba, col sale
+            # del database, puo' FIRMARE come chi entra da Telegram.
+            # E il valore lo da' il giudice e non la costante: un
+            # dizionario dichiarato senza la versione viva si
+            # leggerebbe «acceso» mentre non deriva niente.
+            _leva("Profilo legato all'account", "SEGRETI_PROFILO_P2P",
+                  bool(_segreto_p2p_vivo()),
+                  acceso="chi entra da Telegram ha lo stesso profilo di "
+                         "scambio ovunque, e questo server lo sa "
+                         "RICAVARE: e' l'eccezione dichiarata alla "
+                         "regola ferrea 2, e «I tuoi dati» la dice",
+                  spento="il profilo di scambio nasce nel browser e vale "
+                         "per dispositivo: da un altro telefono se ne fa "
+                         "un altro, e le recensioni restano al primo"),
+            _leva("Versione del profilo", "SEGRETO_PROFILO_P2P_VIVA",
+                  SEGRETO_PROFILO_P2P_VIVA,
+                  spento="nessuna versione viva: la strada derivata non "
+                         "si offre, e si deriva con nessun segreto"),
             _leva("Specchi del libro", "MOSTRO_RELAY_SPECCHIO",
                   _elenco(MOSTRO_RELAY_SPECCHIO),
                   acceso="il libro si legge anche da qui, e questi "
@@ -29743,6 +29798,66 @@ except (TypeError, ValueError):
           "prova resta CHIUSA (0 e' un id che non esiste)")
 
 
+
+# IL SEGRETO DA CUI NASCE IL PROFILO DI SCAMBIO (set 2026, decisione di
+# Andrea): chi entra da Telegram non si porta piu' dietro un mazzo per
+# DISPOSITIVO — la sua chiave d'identita' Mostro si RICAVA dal suo
+# account, cosi' gli stessi scambi si vedono dal bot, dal sito e
+# dall'app. Il resto del patto sta in Architettura, «LA SCALA NOSTR
+# APPROVATA»: chi porta una chiave Nostr sua tiene la sovranita' piena,
+# chi entra con un'estensione o un bunker resta per dispositivo.
+# ⚠️ QUESTA E' L'ECCEZIONE DICHIARATA ALLA REGOLA FERREA 2, ed e'
+# scritta qui perche' chi legge questo blocco deve inciamparci: il
+# server non CUSTODISCE la chiave di nessuno — non c'e' una colonna
+# dove potrebbe finire, e non ce ne sara' — ma da qui in poi la sa
+# RICAVARE, cioe' potrebbe firmare uno scambio al posto di chi entra da
+# Telegram. Non lo fa e non c'e' niente che lo faccia; POTREBBE, e
+# «I tuoi dati» lo dice a chi ci entra con parole sue.
+# SERVONO DUE PEZZI E STANNO IN DUE POSTI, ed e' la sola ragione per
+# cui questa leva non basta da sola: il segreto sta qui, nel config, e
+# il SALE di ogni persona sta nel database (`p2p_semi`). Chi si porta
+# via il solo config — un `cat` finito in una chat, un log, un
+# messaggio d'errore — non ricava niente. Chi entra nella macchina viva
+# ha tutti e due, e quello non lo copre nessuna riga di codice.
+# E' UN DIZIONARIO {versione: segreto} E NON UNA STRINGA, ed e' la riga
+# che rende POSSIBILE la rotazione: la versione entra nell'etichetta di
+# derivazione, quindi due versioni sono due chiavi per costruzione.
+# Ruotare vuol dire AGGIUNGERE una riga e spostare la viva — chi c'era
+# continua a derivare con la sua finche' non passa alla nuova con un
+# GESTO. Senza la versione dal primo giorno si potrebbe solo cambiare
+# il segreto a tutti insieme, cioe' cancellare in silenzio l'identita'
+# di tutti. La procedura sta in docs/PRODUZIONE.md.
+# NON DICHIARATO = IL MONDO DI IERI, byte per byte: il profilo nasce
+# nel browser e vale per dispositivo. FAIL-OPEN e non fail-closed —
+# spegnere lo scambio perche' manca una riga nel config punirebbe chi
+# sta scambiando per un errore di configurazione.
+try:
+    from config import SEGRETI_PROFILO_P2P
+    SEGRETI_PROFILO_P2P = {int(v): str(s).strip()
+                           for v, s in dict(SEGRETI_PROFILO_P2P).items()
+                           if str(s).strip()}
+except ImportError:
+    SEGRETI_PROFILO_P2P = {}       # non dichiarato: profilo per dispositivo
+except (TypeError, ValueError, AttributeError):
+    SEGRETI_PROFILO_P2P = {}
+    print("[p2p] SEGRETI_PROFILO_P2P non e' un dizionario "
+          "{versione: segreto}: il profilo di scambio resta PER "
+          "DISPOSITIVO")
+# La versione con cui nascono i profili NUOVI. Storta vale 0, che in
+# `SEGRETI_PROFILO_P2P` non c'e' mai: nessuna versione viva, cioe' la
+# strada derivata non si offre — il verso giusto, come `{0}` per la
+# fase chiusa. Nel dubbio non si deriva.
+try:
+    from config import SEGRETO_PROFILO_P2P_VIVA
+    SEGRETO_PROFILO_P2P_VIVA = int(SEGRETO_PROFILO_P2P_VIVA)
+except ImportError:
+    SEGRETO_PROFILO_P2P_VIVA = 1
+except (TypeError, ValueError):
+    SEGRETO_PROFILO_P2P_VIVA = 0
+    print("[p2p] SEGRETO_PROFILO_P2P_VIVA non e' un numero: il profilo "
+          "di scambio resta PER DISPOSITIVO")
+
+
 def _mostro_hex(npub: str) -> str:
     """La chiave esadecimale del coordinator, calcolata UNA volta
     all'avvio. Una npub storta — o un esadecimale nudo incollato al
@@ -29819,6 +29934,99 @@ def _p2p_per(tg_id) -> dict:
     if leve["attivo"] and P2P_PROVA_IDS and tg_id not in P2P_PROVA_IDS:
         return {**leve, "attivo": False}
     return leve
+
+
+
+# IL PROFILO DI SCAMBIO CHE SI RICAVA DALL'ACCOUNT (set 2026): tutto il
+# motore sta qui, e non tocca un sat ne' una rotta finche' la fase 3 non
+# lo chiama. Le tre funzioni sono PURE — la prima sulle sole leve, le
+# altre due sulla connessione — il patto di `_registra_chiavi_p2p`,
+# cosi' si girano in CI su sqlite in memoria e senza `coincurve`, che
+# in CI non c'e'.
+
+
+def _segreto_p2p_vivo() -> str:
+    """Il segreto della versione VIVA, o '' se la strada non si offre.
+    A CHIEDERE E' SEMPRE QUESTO GIUDICE e mai la costante, ed e' la
+    trappola che il pannello delle leve esiste per non far ricadere: un
+    dizionario dichiarato ma senza la versione viva si leggerebbe
+    «acceso» mentre non deriva niente."""
+    return SEGRETI_PROFILO_P2P.get(SEGRETO_PROFILO_P2P_VIVA, "")
+
+
+if P2P_ATTIVO and not _segreto_p2p_vivo():
+    # Il gemello della riga di MOSTRO_HEX, e per la stessa ragione: il
+    # config del VPS non eredita niente da config_esempio.py, quindi
+    # senza questa riga il giorno dell'accensione tutti resterebbero
+    # per dispositivo e nessuno saprebbe perche'.
+    print("[p2p] P2P_ATTIVO ma SEGRETI_PROFILO_P2P vuoto o senza la "
+          "versione viva: il profilo di scambio resta PER DISPOSITIVO")
+
+# L'ordine del gruppo secp256k1. Uno scalare valido sta in [1, N): e'
+# la sola cosa che serve sapere della curva per derivare una chiave, e
+# si scrive qui invece di importare una libreria che in CI non c'e'.
+ORDINE_SECP256K1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+ETICHETTA_SEME_P2P = "barattolo/p2p/profilo/v%d"
+
+
+def _seme_profilo_p2p(segreto: str, sale: str, tg_id: int, versione: int,
+                      ordine: int = ORDINE_SECP256K1) -> str:
+    """La chiave d'identita' Mostro di UNA persona, in esadecimale.
+
+    HMAC-SHA256 col SEGRETO come chiave e, come messaggio, l'etichetta
+    di dominio COLLA VERSIONE DENTRO piu' il sale di quella persona e
+    il suo tg_id.
+    IL SEGRETO E' LA CHIAVE E IL SALE E' NEL MESSAGGIO, e non il
+    contrario: la sicurezza formale sarebbe la stessa, ma rovesciandoli
+    la cosa da proteggere di piu' diventerebbe il sale — che sta nel
+    database, cioe' nel meno protetto dei due posti.
+    E IL `tg_id` C'E' ANCHE SE IL SALE E' GIA' PER PERSONA: ridondante
+    apposta, cosi' due utenti a cui un errore d'amministrazione desse
+    lo stesso sale avrebbero comunque due chiavi diverse.
+
+    ⚠️ IL GIRO NON E' DECORATIVO. Un HMAC sono 256 bit uniformi: puo'
+    uscire zero, o >= N, e allora NON E' UNA CHIAVE — firmarci darebbe
+    una firma che il coordinatore butta via senza che niente lo dica.
+    Si incrementa un contatore DENTRO il messaggio e si riprova, che e'
+    il ramo di BIP-32. La probabilita' e' una su 2^128; il ramo esiste
+    lo stesso, e si PROVA passando un `ordine` finto.
+    `ordine` e' un parametro APPOSTA e non la costante letta qui
+    dentro: e' l'unico modo di far girare quel ramo in una prova, e
+    senza resterebbe scritto e mai visto funzionare.
+
+    E L'USCITA E' `%064x` E MAI `.hex()` DI UN to_bytes: torna sempre
+    64 caratteri, zeri di testa compresi. Un seme di 63 farebbe fallire
+    `FORMA_HEX64` nel client e nascere un profilo casuale in silenzio,
+    che e' esattamente il guasto che questo cantiere toglie."""
+    if not segreto or not sale:
+        return ""
+    chiave = segreto.encode()
+    for giro in range(256):
+        msg = "%s|%s|%d|%d" % (ETICHETTA_SEME_P2P % versione, sale, tg_id, giro)
+        n = int.from_bytes(hmac.new(chiave, msg.encode(),
+                                    hashlib.sha256).digest(), "big")
+        if 1 <= n < ordine:
+            return "%064x" % n
+    raise ValueError("seme del profilo non derivabile")
+
+
+def _sale_profilo_p2p(con, tg_id: int, adesso: int) -> dict:
+    """Il sale di UNA persona, che nasce al PRIMO GESTO che lo chiede e
+    mai prima — l'abitudine di casa: una riga che esiste dice qualcosa,
+    e un sale creato alla registrazione direbbe «questa persona ha un
+    profilo di scambio» di chiunque si sia iscritto.
+    L'INSERT E' `OR IGNORE` E POI SI RILEGGE, mai il contrario: due
+    gesti insieme non devono fare due sali, e a garantirlo e' la chiave
+    primaria — non un controllo nostro, che due connessioni possono
+    attraversare insieme.
+    Torna `{sale, versione}` e non il seme: chi chiama decide."""
+    con.execute("INSERT OR IGNORE INTO p2p_semi(tg_id, sale, versione, "
+                "creato) VALUES(?,?,?,?)",
+                (tg_id, secrets.token_hex(16), SEGRETO_PROFILO_P2P_VIVA,
+                 adesso))
+    r = con.execute("SELECT sale, versione FROM p2p_semi WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    return {"sale": r[0], "versione": int(r[1] or 0)} if r else {}
 
 
 # LE CHIAVI PUBBLICHE DELLO SCAMBIO (tappa 3): il client registra le
