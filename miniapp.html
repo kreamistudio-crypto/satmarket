@@ -33261,11 +33261,23 @@ function contaChiaviP2P(){
    chiusa, chi entra da Nostr, o un segreto che non c'e' — in tutti
    quei casi non si dice niente e si genera come sempre. */
 async function semeProfiloP2P(){
-  if (DEMO || VETRINA || !myTgId) return null;
+  /* ⚠️ LA RIGA IN CONSOLE NON E' DECORAZIONE, ed e' la lezione dello
+     specchio applicata qui: questa domanda fallisce in SILENZIO — 409,
+     e il client genera un profilo per dispositivo come ha sempre
+     fatto. Nessun errore, nessun toast, niente. Quindi una leva accesa
+     a meta' (o un id fuori dalla fase di prova) si legge come «funziona
+     tutto», e si scoprirebbe fra un mese invece che in un giorno. */
+  if (DEMO || VETRINA || !myTgId) {
+    console.log('🔑 [p2p] profilo: nel browser (non si chiede: vetrina o demo)');
+    return null;
+  }
   try {
     const r = await fetch(`${API_BASE}/p2p/seme`, {method: 'POST',
       headers: {'X-Tg-Init-Data': authHdr()}});
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.log('🔑 [p2p] profilo: nel browser (il conto non risponde: ' + r.status + ')');
+      return null;
+    }
     let d = null;
     try { d = await r.json(); } catch(e){}
     /* SI CONTROLLA LA FORMA PRIMA DI FIDARSI: un seme di 63 caratteri,
@@ -33273,9 +33285,16 @@ async function semeProfiloP2P(){
        cadere sul ramo che genera — e sarebbe un profilo rotto in
        silenzio, non un errore. */
     const sk = String((d && d.seme) || '').toLowerCase();
-    if (!FORMA_HEX64.test(sk)) return null;
+    if (!FORMA_HEX64.test(sk)) {
+      console.log('🔑 [p2p] profilo: nel browser (il conto ha risposto storto)');
+      return null;
+    }
+    console.log('🔑 [p2p] profilo: dal conto (v' + ((d && d.versione) | 0) + ')');
     return {sk, versione: (d && d.versione) | 0};
-  } catch(e){ return null; }
+  } catch(e){
+    console.log('🔑 [p2p] profilo: nel browser (' + (e.message || e) + ')');
+    return null;
+  }
 }
 /* ⚠️ GLI SCAMBI APERTI SONO LA GUARDIA CHE COSTA DI PIU', e non e'
    prudenza generica: se il mazzo cambia mentre una hold invoice tiene
@@ -33292,6 +33311,28 @@ async function semeProfiloP2P(){
 function scambiApertiP2P(){
   const o = ordiniP2P();
   return Object.keys(o).filter(k => o[k] && P2P_FINALI.indexOf(o[k].stato) < 0).length;
+}
+/* ADOTTARE IL PROFILO DEL CONTO DAL FOGLIO (set 2026, fase 4d — dal
+   campo, ed e' un buco del disegno di ieri). Fin qui il seme lo chiedeva
+   SOLO `assicuraMazzo`, cioe' solo chi prendeva o pubblicava un ordine:
+   dal foglio, senza profilo, l'unica strada offerta era il codice
+   segreto — e chi apriva il P2P da un browser nuovo non aveva nessun
+   modo di dire «dammi quello del mio account».
+   ⚠️ NON SI RIUSA `assicuraMazzo`, e va detto: quella a mani vuote
+   GENERA a caso, che qui sarebbe il contrario di quel che si e'
+   chiesto — chi tocca questo bottone vuole il profilo del CONTO, e se
+   non c'e' deve sentirselo dire, non ritrovarsi un profilo nuovo di
+   zecca senza sapere che e' un altro. */
+async function adottaProfiloDelConto(){
+  await caricaNostrTools();
+  const s = await semeProfiloP2P();
+  if (!s) { toast('Il profilo del tuo account non è disponibile ora'); return; }
+  const NT = window.NostrTools;
+  const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
+                 indice: 0, creato: Math.floor(Date.now()/1000),
+                 backupFatto: true, origine: 'conto', versione: s.versione | 0};
+  if (await applicaImportMazzo(nuovo) === false) return;
+  toast('Profilo del tuo account attivo ✓');
 }
 /* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
    il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
@@ -33473,9 +33514,26 @@ function renderProfiloP2P(){
     const quando = (altrove && p2pChiaviNote.dal)
       ? ` (almeno da ${esc(new Date(p2pChiaviNote.dal * 1000).toLocaleDateString('it-IT', {month: 'short', year: 'numeric'}))})`
       : '';
+    /* LA SECONDA STRADA, e l'ordine fra le due non e' neutro: chi ha
+       gia' un profilo altrove ha anche una REPUTAZIONE, e quella si
+       riprende solo col codice segreto — quindi l'import resta in
+       testa, che e' anche cio' che l'avviso qui sopra sta dicendo. Il
+       profilo del conto viene dopo, con la sua frase onesta: e' un
+       profilo NUOVO, riparte da zero, e in cambio torna ovunque senza
+       che ci sia niente da salvare.
+       A CHI NON HA NIENTE ALTROVE si offre solo quello del conto:
+       mettergli davanti un campo per incollare un codice che non ha
+       sarebbe un attrito e basta. */
+    const dalConto = myTgId
+      ? `<div class="hint" style="margin-top:14px">${altrove
+          ? `Oppure usa il <b>profilo del tuo account</b>: è un profilo <b>nuovo</b> — le recensioni di quello di prima restano dov'erano — e in cambio torna da solo ovunque entri, senza niente da salvare.`
+          : `Il <b>profilo del tuo account</b> torna da solo ogni volta che entri, da qualunque dispositivo: non c'è niente da salvare.`}
+        </div>
+        <button class="btn ${altrove ? 'ghost' : 'orange'}" onclick="adottaProfiloDelConto()">👤 Usa il profilo del mio account</button>`
+      : '';
     box.innerHTML = altrove
-      ? `<div class="trust-note"><span>⚠️</span><span>Su questo dispositivo il profilo di scambio non c'è, ma il tuo account ne ha già uno${quando}: l'hai creato altrove. Se ne fai nascere un altro qui, gli scambi e le recensioni restano attaccati a quello di prima.</span></div>${importa}`
-      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${importa}`;
+      ? `<div class="trust-note"><span>⚠️</span><span>Su questo dispositivo il profilo di scambio non c'è, ma il tuo account ne ha già uno${quando}: l'hai creato altrove. Se ne fai nascere un altro qui, gli scambi e le recensioni restano attaccati a quello di prima.</span></div>${importa}${dalConto}`
+      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${dalConto}${importa}`;
     return;
   }
   const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});

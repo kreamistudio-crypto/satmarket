@@ -36276,6 +36276,48 @@ const corpo = f => JSON.parse(f.opt.body);
   out.chiaveSuaPresa = mazzoMostro().sk === skMia
     && mazzoMostro().origine === 'mia';
   myNpubAccesso = '';
+  // 3g) IL PROFILO DEL CONTO SI ADOTTA ANCHE DAL FOGLIO (fase 4d)
+  // ⚠️ IL BUCO CHE QUESTA PARTE CHIUDE, dal campo: il seme lo chiedeva
+  // SOLO `assicuraMazzo`, cioe' solo chi prendeva o pubblicava un
+  // ordine. Dal foglio, senza profilo, l'unica strada offerta era il
+  // codice segreto — e chi apriva il P2P da un browser nuovo non aveva
+  // nessun modo di dire «dammi quello del mio account».
+  reset(); rispChiavi = {chiavi: 0, dal: 0};
+  rispSeme = {ok: true, seme: skSeme, versione: 1};
+  renderProfiloP2P();
+  await new Promise(r => setTimeout(r, 0));
+  renderProfiloP2P();
+  const senzaNiente = nodi['p2pProfiloCorpo'].innerHTML;
+  out.vuotoOffreIlConto = senzaNiente.includes('adottaProfiloDelConto()');
+  // A CHI NON HA NIENTE ALTROVE il conto viene PRIMA: mettergli davanti
+  // un campo per incollare un codice che non ha sarebbe attrito e basta.
+  out.vuotoContoPrima = senzaNiente.indexOf('adottaProfiloDelConto()')
+    < senzaNiente.indexOf('importaMazzoDalFoglio()');
+  // ⚠️ A CHI CE L'HA ALTROVE l'import resta in TESTA: quello ha una
+  // reputazione, e si riprende solo col codice segreto.
+  reset(); rispChiavi = {chiavi: 2, dal: 1735689600};
+  rispSeme = {ok: true, seme: skSeme, versione: 1};
+  renderProfiloP2P();
+  await new Promise(r => setTimeout(r, 0));
+  renderProfiloP2P();
+  const conAltrove = nodi['p2pProfiloCorpo'].innerHTML;
+  out.altroveOffreEntrambe = conAltrove.includes('importaMazzoDalFoglio()')
+    && conAltrove.includes('adottaProfiloDelConto()');
+  out.altroveImportPrima = conAltrove.indexOf('importaMazzoDalFoglio()')
+    < conAltrove.indexOf('adottaProfiloDelConto()');
+  // Il gesto: nasce il profilo del conto, non uno a caso.
+  reset(); rispSeme = {ok: true, seme: skSeme, versione: 1};
+  await adottaProfiloDelConto();
+  out.adozioneDalFoglio = mazzoMostro().sk === skSeme
+    && mazzoMostro().origine === 'conto';
+  // ⚠️ E SENZA SEME NON NASCE NIENTE, che e' tutta la differenza da
+  // `assicuraMazzo`: quella a mani vuote GENERA a caso, e qui sarebbe
+  // il contrario di quel che si e' chiesto — chi tocca quel bottone
+  // vuole il profilo del CONTO, e se non c'e' deve sentirselo dire.
+  reset(); rispSeme = null;
+  await adottaProfiloDelConto();
+  out.senzaSemeNonGenera = mazzoMostro() === null
+    && toasts.some(t => t.includes('non è disponibile'));
   // 4) dal cloud non si fabbrica un mazzo nuovo
   reset();
   cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 2, creato: 9, backupFatto: true}));
@@ -36491,6 +36533,12 @@ const corpo = f => JSON.parse(f.opt.body);
         "sovranoCompareConNpub": "...e compare a chi ce l'ha",
         "chiaveAltruiRifiutata": "una chiave che non e' la sua si rifiuta",
         "chiaveSuaPresa": "...e la sua diventa il profilo di scambio",
+        "vuotoOffreIlConto": "senza profilo il foglio offre quello del conto",
+        "vuotoContoPrima": "...e a chi non ha niente altrove viene per primo",
+        "altroveOffreEntrambe": "con un profilo altrove le strade sono due",
+        "altroveImportPrima": "...e l'import resta in testa, che conserva la reputazione",
+        "adozioneDalFoglio": "il gesto fa nascere il profilo del conto",
+        "senzaSemeNonGenera": "...e senza seme NON genera un profilo a caso",
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
@@ -39403,6 +39451,35 @@ def prove_p2p_server():
           "d.pub !== attesa" in uc)
     prova("...e se non combacia non si sostituisce niente", True,
           0 < uc.find("d.pub !== attesa") < uc.find("applicaImportMazzo"))
+
+    # --- 14) L'ADOZIONE DAL FOGLIO, E LA RIGA CHE LA RENDE VISIBILE -
+    # ⚠️ `adottaProfiloDelConto` NON RIUSA `assicuraMazzo`, ed e' la
+    # differenza che questa prova esiste per tenere: quella a mani
+    # vuote GENERA a caso — che qui sarebbe il contrario di quel che si
+    # e' chiesto. Chi tocca quel bottone vuole il profilo del CONTO, e
+    # se non c'e' deve sentirselo dire invece di ritrovarsi un profilo
+    # nuovo di zecca senza sapere che e' un altro.
+    ad = pezzo_js(mini, "async function adottaProfiloDelConto(", "\n}\n")
+    prova("l'adozione dal foglio non genera mai a caso", False,
+          "generateSecretKey" in ad or "assicuraMazzo" in ad)
+    prova("...e senza seme si ferma e lo dice", True,
+          "if (!s) { toast(" in ad)
+    # LA RIGA IN CONSOLE: questa domanda fallisce in SILENZIO — 409, e
+    # il client genera come sempre. Senza una traccia, una leva accesa a
+    # meta' si legge come «funziona tutto». E' la lezione dello
+    # specchio, che il conto per relay in console esiste per scoprire.
+    sp = pezzo_js(mini, "async function semeProfiloP2P(", "\n}\n")
+    # ⚠️ OGNI USCITA HA LA SUA TRACCIA, e non «almeno quattro»: la
+    # tortura ha mostrato che con un numero MINIMO se ne poteva togliere
+    # una e la prova restava VERDE — cioe' un ramo tornava muto, che e'
+    # esattamente il guasto per cui questa riga esiste. Si contano le
+    # USCITE: ogni `return null` e' un modo di non avere il profilo del
+    # conto, e ognuno deve dire il suo perche'.
+    prova("ogni uscita della richiesta del seme lascia una traccia",
+          sp.count("return null;") + 1,
+          sp.count("console.log('\U0001F511 [p2p] profilo:"))
+    prova("...e dice il codice quando il conto non risponde", True,
+          "il conto non risponde: ' + r.status" in sp)
 
 
 def prove_p2p_campanello():
