@@ -5351,3 +5351,82 @@ sezione aveva lavoro in volo. Resta in CLAUDE.md e la bussola nomina
 tre file, non quattro — un puntatore a un file che non c'è è
 esattamente ciò che questo cantiere toglie. Quando si sposterà,
 `prove_bussola` lo dirà da sola.
+
+Il relay nostro entra nella lista dove Barattolo pubblica (set 2026,
+l'ultimo passo del cantiere del relay). Da oggi ogni annuncio esce
+anche su `wss://relay.barattolo.store`, e la macchina che serve il
+nostro relay smette di essere un posto dove non arriva niente.
+LA DOMANDA È NATA DA UN SOSPETTO SBAGLIATO, e la lezione vale più
+della cura: aperta la sezione P2P dal sito, nei log dello strfry non
+compariva NESSUNA connessione — solo il check di salute al minuto.
+L'ipotesi era «il relay nostro non è in `RELAY_NOSTR`», ed era vera;
+ma non era la spiegazione, perché il P2P `RELAY_NOSTR` non la legge
+proprio. Un'ipotesi vera può spiegare la cosa sbagliata, e allora la
+si conferma per il motivo che non c'entra.
+SONO DUE LISTE E NON UNA: `RELAY_NOSTR` (→ `RELAYS_VERIFICA`) è dove
+il SERVER pubblica e legge gli annunci, e arriva al browser solo
+quando un venditore firma il suo annuncio con NIP-07; il P2P legge
+`MOSTRO_RELAY`, che viaggia in `/api/me` dentro `p2p_leve` e dice
+dove pubblica IL COORDINATOR. Il silenzio era il comportamento
+giusto.
+LA STRADA SCARTATA, e non si riproponga: mettere il nostro relay in
+`MOSTRO_RELAY`. Sarebbe stato un PEGGIORAMENTO, per due ragioni
+indipendenti. Il coordinator da noi non può scrivere — la policy è
+una whitelist fail-closed che ammette la piattaforma e i venditori
+con la chiave dimostrata, e la chiave di Mostro lì non c'è né ci deve
+entrare — quindi il nostro relay risponderebbe con zero eventi; e il
+client legge il libro da UN RELAY SOLO, il primo della lista che
+risponde. Un relay vuoto in testa non è un relay in più: è il libro
+ordini che diventa vuoto.
+I QUATTRO DI SEMPRE SI RIPETONO NELLA RIGA, ed è la trappola di
+questa leva: la variabile ASSENTE vale i quattro di serie, ma
+DICHIARATA comanda lei e basta. Vuota è protetta (il fail-safe
+rimette i quattro e lo stampa); CORTA no — quella è una scelta, e
+viene rispettata. Scriverci il solo relay nostro avrebbe tolto damus,
+nos.lol, primal e nostr.mom, cioè avrebbe fatto sparire gli annunci
+da dove la gente li legge, senza che niente protestasse.
+E VA IN CODA, NON IN TESTA, per una ragione precisa e non per
+prudenza: `RELAYS_VERIFICA[0]` è il relay hint dentro il tag `client`
+di ogni 30402 (`tag_client`). In testa avrebbe riscritto quel
+suggerimento su tutti gli annunci, mandando le classifiche dei
+marketplace a interrogare un relay nato ieri invece di damus.
+`RELAY_NOSTR_IMPORT` NON SI TOCCA: `importa_nostr` compone `RELAYS`
+da `RELAY_NOSTR + RELAY_NOSTR_IMPORT`, quindi il relay nostro entra
+anche nell'import PER COSTRUZIONE — che era il patto delle due leve
+il giorno che sono nate.
+PROVATO SUL VIVO: pannello admin «⚙️ Stato delle leve» → cinque
+relay, che è il valore VIVO e non la costante; riavvio pulito, e
+serviva — la lista si legge all'import del modulo, quindi senza
+riavvio non sarebbe cambiato niente; e il primo 30402 nel database
+dello strfry, l'annuncio `barattolo-193`, verificato con `strfry
+scan` e non dai soli log.
+DA GUARDARE, E NON È UN DIFETTO: dal VPS si vedono connessioni che si
+aprono e si chiudono ogni 2-3 secondi. Il sospettato è
+`rinfresca_profili_nostr` — al più una volta l'ora, venti utenti per
+giro, UNO ALLA VOLTA, e ognuno fa una REQ kind-0 a TUTTI i relay,
+ognuna con la sua websocket aperta e chiusa. Combacia col ritmo, e
+non è nuovo: il nostro relay è solo diventato la quinta destinazione
+di un ventaglio che c'era già. LA VERIFICA CHE LO FALSIFICA È LA
+FORMA, e va scritta perché è quel che rende il sospetto una diagnosi:
+dev'essere una RAFFICA CHE FINISCE — venti utenti, poi silenzio — e
+che torna a distanza d'ora. Se invece è continua giorno e notte la
+diagnosi è sbagliata e il sospettato è un altro.
+E IL NOSTRO RELAY RISPONDERÀ SEMPRE VUOTO A QUELLE DOMANDE, che i
+kind-0 lì non li pubblica nessuno: innocuo, perché `_profilo_nostr`
+tiene la prima risposta NON vuota e non la prima che arriva.
+⚠️ E DUE COMMENTI ADESSO MENTONO DI UNO: `_profilo_nostr` dice «il
+kind-0 dai 4 relay» e `rinfresca_profili_nostr` «sono quattro relay a
+testa». Erano già stantii dal giorno della leva — il numero non vive
+più nel codice — e si correggono al primo giro che passa di lì.
+IL DIFETTO LATENTE CHE RESTA SCRITTO: il plugin del relay ha la
+chiave della piattaforma CABLATA, una copia scritta a mano il giorno
+del montaggio. Finché combacia con la nsec viva tutto passa; il
+giorno che la nsec cambia il relay rifiuterebbe i NOSTRI annunci
+dicendo «restricted: solo Barattolo e i suoi venditori». La cura non
+è toccare il plugin ma `RELAY_CHIAVI_TOKEN`, che accende
+`/api/relay/chiavi` — quella rotta mette in testa alla whitelist la
+chiave con cui il server sta firmando ADESSO, e la lista resta giusta
+da sé.
+IN PRODUZIONE non c'era niente da deployare: nessuna colonna, nessuna
+rotta, nessuna riga di codice — solo cinque righe nel config del VPS
+e un riavvio. Che è esattamente ciò per cui la leva era nata.
