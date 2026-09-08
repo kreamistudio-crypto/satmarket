@@ -32786,7 +32786,7 @@ function rigaOrdineP2P(o){
      browser. Su un dispositivo dove quella lista non c'e', il proprio
      ordine resta indistinguibile: e' il limite dichiarato di questo
      mattone, e lo chiude la marcatura via coordinatore. */
-  const mio = !!ordiniP2P()[o.id];
+  const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
@@ -32879,6 +32879,14 @@ function renderP2P(){
     p2pAdozione = true;
     sincronizzaMazzo().then(() => { if (mazzoMostro()) renderP2P(); });
   }
+  /* I MIEI ORDINI si chiedono al coordinatore una volta per sessione, e
+     senza far aspettare nessuno: il libro si disegna con quel che si sa
+     e si ridisegna quando la risposta arriva — il patto del rientro
+     istantaneo della cassa. Sta QUI e non in `vaiP2P` per la ragione
+     gia' scritta sopra: alla vista ci si torna col gesto indietro e
+     dalla cronologia, che quel solo ingresso non lo attraversano. */
+  if (mz && p2pMieiOrdini === null && !p2pMieiGiro)
+    chiediMieiOrdiniP2P().then(() => renderP2P()).catch(() => {});
   const box = el('p2pCorpo');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
@@ -34216,6 +34224,94 @@ function ordiniAscoltoP2P(){
   }
   return m;
 }
+/* I MIEI ORDINI, CHIESTI AL COORDINATORE (set 2026, dal campo).
+   IL LIBRO NON PORTA NESSUNA PUBKEY DEL MAKER — il 38383 ha `d, k, s,
+   f, fa, amt, premium, pm, expires_at, rating` e basta — quindi
+   l'unica fonte che il client aveva era la propria lista, che vive nel
+   browser: da un altro dispositivo il proprio ordine era
+   indistinguibile da quelli degli altri, e prendibile.
+   LA SONDA HA RISPOSTO (set 2026, mazzo usa-e-getta, due trade key
+   della stessa identita'): `restore-session` risponde PER IDENTITA' e
+   non per trade key — una chiave mai usata ha visto l'ordine creato da
+   un'altra. Quindi UNA richiesta basta a qualunque indice, e la
+   marcatura vale ovunque, anche fuori Telegram. Senza quel fatto il
+   costo sarebbe stato N richieste con indice N, e il disegno un altro.
+   ⚠️ E LA RISPOSTA PORTA ANCHE `trade_index`, che qui non si usa ma va
+   detto: e' quel che un giorno permettera' di RIPRENDERE uno scambio da
+   un altro dispositivo, non solo di riconoscerlo — la trade key si
+   deriva da li'. */
+let p2pMieiOrdini = null;      // {id: {indice, stato}} — null = mai chiesto
+let p2pMieiGiro = null;        // la promessa in volo
+/* IL GIUDICE E' UNO SOLO, e lo chiamano la card, la porta del gesto e
+   la cintura della presa: tre posti che devono dire la stessa cosa. */
+function ordineMioP2P(id){
+  if (!id) return false;
+  if (ordiniP2P()[id]) return true;
+  return !!(p2pMieiOrdini && p2pMieiOrdini[id]);
+}
+/* UNA SOTTOSCRIZIONE SUA, aperta e chiusa dal gesto, e non un innesto
+   nel motore: `mostroArriva` scarterebbe questa risposta (la chiave che
+   chiede non e' di un ordine in ascolto) e `mostroChiama` aspetta un
+   `request_id` che su restore-session torna NULL — il fatto accertato
+   dalla sonda della tappa 1. Agganciare per chiave di destinazione e'
+   piu' forte che per un campo del contenuto: a garantire non e' un
+   valore che il mittente scrive come gli pare, e' la crittografia.
+   UNA ALLA VOLTA PER CHIAVE, che e' la regola a verbale: con due in
+   volo dalla stessa chiave le risposte tornano indistinguibili. Il
+   gate `p2pMieiGiro` la tiene. */
+async function chiediMieiOrdiniP2P(){
+  if (p2pMieiGiro) return p2pMieiGiro;
+  const mz = mazzoMostro();
+  /* SENZA INDICE NON C'E' NIENTE DA CHIEDERE: l'indice conta le trade
+     key BRUCIATE, quindi a zero non esiste nessun ordine da ritrovare —
+     e una richiesta che non puo' portare niente non si manda. */
+  if (!mz || !(mz.indice | 0)) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
+  p2pMieiGiro = (async () => {
+    const NT = window.NostrTools;
+    const tk = chiaveScambio(mz.sk, mz.indice | 0);
+    const mostro = mostroHexP2P();
+    const relay = await mostroConnetti();
+    const trovati = {};
+    let sub = null;
+    try {
+      await new Promise((fine) => {
+        let chiuso = false;
+        const basta = () => { if (!chiuso) { chiuso = true; fine(); } };
+        sub = relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}], {
+          onevent(ev){
+            try {
+              const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
+              const arr = JSON.parse(NT.nip44.decrypt(ev.content, conv));
+              const d = messaggioDentro(Array.isArray(arr) ? arr[0] : arr);
+              if (!d || d.action !== 'restore-session') return;
+              const righe = (d.payload && d.payload.restore_data
+                             && d.payload.restore_data.orders) || [];
+              for (const r of righe)
+                if (r && r.order_id)
+                  trovati[String(r.order_id)] = {indice: r.trade_index | 0,
+                                                 stato: String(r.status || '')};
+              basta();
+            } catch(e){ /* non e' per noi, o non si apre: si lascia stare */ }
+          }
+        });
+        setTimeout(basta, P2P_ATTESA_MS);
+      });
+    } finally {
+      try { if (sub) sub.close(); } catch(e){}
+    }
+    p2pMieiOrdini = trovati;
+    console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
+                + ' dal coordinatore');
+    return trovati;
+  })().catch((e) => {
+    /* FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva —
+       la lista locale. Mai un elenco vuoto spacciato per «non ne hai»,
+       che marcherebbe come altrui un ordine proprio. */
+    console.log('🔁 [p2p] i miei ordini: non si sa (' + (e && e.message || e) + ')');
+    return p2pMieiOrdini;
+  }).finally(() => { p2pMieiGiro = null; });
+  return p2pMieiGiro;
+}
 /* da quando riascoltare: dal piu' vecchio scambio aperto, cosi' un
    messaggio arrivato ad app chiusa si ritrova alla riapertura */
 function ultimoVistoP2P(){
@@ -34592,6 +34688,10 @@ function prendiOrdineP2P(id){
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   const gia = ordiniP2P()[id];
   if (gia) { apriOrdineP2P(id); return; }
+  /* MIO MA NON IN LISTA: l'ordine e' di questo profilo e l'ha
+     pubblicato un altro dispositivo. Non c'e' uno scambio da aprire —
+     quella lista vive nel browser che l'ha creato — ma prenderlo no. */
+  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: l\'hai pubblicato da un altro dispositivo'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const compro = riga.lato === 'sell';
@@ -34622,6 +34722,7 @@ async function eseguiPresaP2P(id){
     apriOrdineP2P(id);
     return;
   }
+  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: non puoi prenderlo'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const adesso = Math.floor(Date.now() / 1000);

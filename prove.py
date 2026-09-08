@@ -35360,6 +35360,10 @@ def prove_p2p_libro():
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
         "function satsMercatoP2P(o){",
+        # IL GIUDICE DI «e' mio» vive nel motore ma lo CHIAMA la card,
+        # che sta qui: si porta dentro quello VERO invece di stubbarlo,
+        # o la prova certificherebbe una copia di cartone.
+        "function ordineMioP2P(id){",
         "function rigaOrdineP2P(o){",
         "function infoRigaP2P(){")]
     banco = "\n".join(pezzi) + r"""
@@ -35371,6 +35375,8 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
 // prima funzione di QUESTO blocco a incontrarla.
 let ordiniFinti = {};
 function ordiniP2P(){ return ordiniFinti; }
+// e la lista che arriva dal coordinatore, che il giudice consulta
+let p2pMieiOrdini = null;
 let cambioVivo = true, eurPerSat = 0.0005, p2pInfo = null;
 const ora = 2000000000;
 const ev = (kind, tags, created) => ({kind, tags, created_at: created || 1});
@@ -35382,6 +35388,16 @@ out.cardAltrui = rigaOrdineP2P(out.fisso);
 ordiniFinti = {'ord-1': {id: 'ord-1', stato: 'attivo'}};
 out.cardMia = rigaOrdineP2P(out.fisso);
 ordiniFinti = {};
+// ⚠️ IL CASO CHE IL CANTIERE CHIUDE: l'ordine NON e' nella lista locale
+// — l'ha pubblicato un altro dispositivo — ma il coordinatore dice che
+// e' di questo profilo. Fin qui la card era indistinguibile da quelle
+// degli altri, e prendibile.
+p2pMieiOrdini = {'ord-1': {indice: 3, stato: 'pending'}};
+out.cardMiaDaAltrove = rigaOrdineP2P(out.fisso);
+p2pMieiOrdini = {'ord-9': {indice: 1, stato: 'pending'}};
+out.cardAltruiConLista = rigaOrdineP2P(out.fisso);
+p2pMieiOrdini = null;
+out.cardAltruiSenzaLista = rigaOrdineP2P(out.fisso);
 out.range = ordineDaEvento(ev(38383, [['d','ord-3'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['pm','x']]), ora);
 out.scaduto = ordineDaEvento(ev(38383, [['d','ord-4'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora-1)]]), ora);
 out.senzaD = ordineDaEvento(ev(38383, [['k','sell'],['f','EUR'],['fa','5']]), ora);
@@ -35461,6 +35477,12 @@ console.log(JSON.stringify(out));
           "p2p-tuo" in out["cardMia"] and "p2p-mio" in out["cardMia"])
     prova("...con le parole, non col solo colore", True,
           "\u00c8 il tuo ordine" in out["cardMia"])
+    prova("l'ordine pubblicato da un ALTRO dispositivo si riconosce", True,
+          "p2p-tuo" in out["cardMiaDaAltrove"])
+    prova("...e quello di un estraneo no, anche con la lista in mano", False,
+          "p2p-tuo" in out["cardAltruiConLista"])
+    prova("...e senza lista si torna a quel che si sapeva", False,
+          "p2p-tuo" in out["cardAltruiSenzaLista"])
     m = out["mercato"]
     prova("amt=0 e' il prezzo di mercato: sats 0 e premio letto", True,
           m is not None and m["sats"] == 0 and m["premium"] == 2
@@ -39462,6 +39484,52 @@ def prove_p2p_server():
     po = pezzo_js(mini, "function prendiOrdineP2P(", "\n}\n")
     prova("...e la porta del gesto continua a deviare sullo scambio", True,
           "const gia = ordiniP2P()[id];" in po)
+
+    # --- 15) I MIEI ORDINI, CHIESTI AL COORDINATORE (set 2026) -----
+    # LA SONDA HA DECISO IL DISEGNO: `restore-session` risponde per
+    # IDENTITA' e non per trade key — una chiave mai usata ha visto
+    # l'ordine creato da un'altra della stessa identita'. Quindi UNA
+    # richiesta basta a qualunque indice. Se avesse risposto per chiave
+    # ne sarebbero servite N, e questo codice sarebbe un altro.
+    gm = pezzo_js(mini, "function ordineMioP2P(", "\n}\n")
+    prova("il giudice di «e' mio» guarda DUE fonti", True,
+          "ordiniP2P()[id]" in gm and "p2pMieiOrdini[id]" in gm)
+    # ⚠️ E LO CHIAMANO IN TRE: la card, la porta del gesto e la cintura
+    # della presa. Tre posti che devono dire la stessa cosa, o si vede
+    # un segno e si riesce a prendere lo stesso.
+    prova("...e lo chiamano la card, la porta e la cintura", 3,
+          solo_codice(mini).count("ordineMioP2P(") - 1)   # -1: la definizione
+    cm = pezzo_js(mini, "async function chiediMieiOrdiniP2P(", "\n}\n")
+    # SENZA INDICE NON SI CHIEDE: l'indice conta le trade key BRUCIATE,
+    # quindi a zero non esiste nessun ordine da ritrovare — e una
+    # richiesta che non puo' portare niente non si manda.
+    prova("senza indice non si chiede niente", True,
+          "if (!mz || !(mz.indice | 0))" in cm)
+    # UNA ALLA VOLTA PER CHIAVE, la regola a verbale: con due in volo
+    # dalla stessa chiave le risposte tornano indistinguibili.
+    prova("...e una domanda alla volta", True,
+          "if (p2pMieiGiro) return p2pMieiGiro;" in cm)
+    # L'AGGANCIO E' LA CHIAVE DI DESTINAZIONE e non il `request_id`, che
+    # su restore-session torna NULL: e' piu' forte, perche' a garantire
+    # non e' un campo che il mittente scrive come gli pare ma la
+    # crittografia. La sottoscrizione e' sua e si chiude col gesto.
+    prova("la domanda ha una sottoscrizione sua, chiusa alla fine", True,
+          "relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}]" in cm
+          and "sub.close()" in cm)
+    prova("...e non aspetta un request_id, che qui e' null", False,
+          "request_id" in cm or "p2pAttese" in cm)
+    prova("...e tiene solo le risposte di restore-session", True,
+          "d.action !== 'restore-session'" in cm)
+    # ⚠️ FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva.
+    # Un elenco vuoto spacciato per «non ne hai» marcherebbe come altrui
+    # un ordine proprio — che e' il difetto, al contrario.
+    prova("se la domanda cade non si conclude niente", True,
+          "return p2pMieiOrdini;" in cm.split(".catch(")[1])
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("si chiede all'apertura del P2P, una volta per sessione", True,
+          "p2pMieiOrdini === null && !p2pMieiGiro" in rp)
+    prova("...e senza far aspettare il libro", True,
+          "chiediMieiOrdiniP2P().then(() => renderP2P())" in rp)
     prova("il profilo di prima non si cancella, si mette da parte", True,
           "localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m))" in mini)
 
