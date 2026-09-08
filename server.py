@@ -15991,7 +15991,7 @@ def _leve_stato():
                          "digitale restano armate lo stesso",
                   acceso="i sats partono da soli allo scadere delle finestre "
                          "fisiche: vanno rimessi i testi scritti sul mondo "
-                         "disarmato (l'elenco dei posti è in CLAUDE.md)"),
+                         "disarmato (l'elenco è in docs/ARCHITETTURA.md)"),
             _leva("Commissione (%)", "COMMISSIONE_PERCENTO",
                   COMMISSIONE_PERCENTO,
                   spento="sospesa: il venditore incassa tutto il netto"),
@@ -35554,7 +35554,7 @@ async def sollecita_conferme_ferme():
     # escluso qui sotto. Questo ramo resta perche' e' LA PORTA DEL
     # TRACKING VERIFICATO: quel giorno `consegnato` la scrivera' il
     # corriere — un fatto — al posto della parte che ci rimette a
-    # scriverla. Vedi il disarmo dell'auto-sblocco in CLAUDE.md.
+    # scriverla. Vedi il disarmo dell'auto-sblocco in docs/.
     for stato, ancora, finestra in (
             ("delivered", "o.consegnato", ORE_CONFERMA * 3600),
             ("shipped", "o.spedito_il", GIORNI_AUTO_SBLOCCO * 86400)):
@@ -36853,7 +36853,7 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
 
     Fin qui l'import scriveva dritto nel DB e saltava del tutto
     `pubblica()`: limite accettato quando il venditore era uno solo e
-    scelto a mano, e che CLAUDE.md prometteva di chiudere «se mai si
+    scelto a mano, e che i documenti promettevano di chiudere «se mai si
     aprira' ad altri». E' quel momento.
 
     I due strati non finiscono allo stesso modo, ed e' voluto:
@@ -39966,7 +39966,7 @@ async def riepilogo_settimana():
 
 
 # ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================
-# Gli INVARIANTI del database, quelli gia' dichiarati in CLAUDE.md,
+# Gli INVARIANTI del database, quelli gia' dichiarati in docs/,
 # diventano una ronda quotidiana invece di query da lanciare a mano —
 # perche' un controllo che dipende da qualcuno che si ricorda di
 # lanciarlo e' un controllo che un giorno non gira (la lezione del

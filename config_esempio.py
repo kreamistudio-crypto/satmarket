@@ -69,7 +69,7 @@ AUTO_SBLOCCO_ATTIVO = False  # IL DISARMO (ago 2026): False = i sats non
                              # armate comunque. True = si torna allo
                              # sblocco d'ufficio di ieri, e allora vanno
                              # rimessi i testi (l'elenco dei posti e'
-                             # nella voce sua in CLAUDE.md)
+                             # nella voce sua in docs/)
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna:
                              # a leva spenta e' quando parte il PRIMO
                              # promemoria, non piu' quando partono i sats

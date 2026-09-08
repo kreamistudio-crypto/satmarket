@@ -1463,7 +1463,7 @@ def prove_collaudo_ricategorizza():
     """IL COLLAUDO DEL PROMPT DI RICATEGORIZZA (ago 2026): il gemello
     di collaudo_impersonazione.py — e qui si fa meglio del fratello.
     Le sue sentinelle cercano l'atteso in una finestra di 400/500
-    caratteri dopo il titolo, fragilita' che CLAUDE.md dichiara: una
+    caratteri dopo il titolo, fragilita' che i documenti dichiarano: una
     descrizione piu' lunga spinge l'atteso fuori finestra e la prova
     diventa rossa per il motivo sbagliato. Questo collaudo si IMPORTA
     (il modello si chiama solo dentro main()), quindi la tabella si
@@ -2810,7 +2810,7 @@ def prove_pagamento_incerto():
                # Gli XP dell'affare concluso (ago 2026): qui non si
                # misurano, ma _sblocca_sats li chiama — e senza questi
                # due la prova ESPLODE invece di fallire, che e' la
-               # trappola scritta in CLAUDE.md sulle funzioni estratte.
+               # trappola scritta in docs/ sulle funzioni estratte.
                "premia_xp": _niente, "xp_ordine": lambda *a: 0,
                # ...e il titolo delle notifiche passa da html.escape
                # (ago 2026, la famiglia di B6): stessa trappola, secondo
@@ -4845,7 +4845,7 @@ def prove_foto_contenuto():
 
     # --- 3) I BYTE: CHI LI PUO' VEDERE ----------------------------
     # la regola del TESTO e non quella della busta — il moderatore in
-    # disputa legge, e' dichiarato in CLAUDE.md e nella pagina «I tuoi
+    # disputa legge, e' dichiarato in docs/ e nella pagina «I tuoi
     # dati» — PIU' un gate che la busta non ha
     prova("il compratore vede i byte solo DOPO la rivelazione", True,
           'o["consegnato"]' in _lf)
@@ -26677,7 +26677,7 @@ def prove_fogli_di_casa():
           True, "ev.prompt()" in mini)
     # IL CENSIMENTO CHE CHIUDE (ago 2026): anche confirm() e alert()
     # sono a ZERO — erano 29 confirm in tutto il client, piu' dei
-    # «gesti sui sats e admin» che CLAUDE.md dichiarava superstiti
+    # «gesti sui sats e admin» che i documenti dichiaravano superstiti
     # (la lezione dell'elenco a memoria), convertiti a chiediConferma
     # in tre gruppi. Stesso predicato del prompt: i commenti che
     # raccontano la storia scrivono «confirm()» a parentesi vuota
@@ -33214,7 +33214,7 @@ def prove_podio_sfondo():
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
-    L'elenco del workflow e' scritto A MANO, e CLAUDE.md lo dichiara
+    L'elenco del workflow e' scritto A MANO, e i documenti lo dichiarano
     da mesi come il punto in cui uno script nuovo si fa dimenticare —
     «ai tre nati il 3 ago 2026 e' successo». Un file fuori da
     quell'elenco non e' meno rotto: e' solo un file che nessuno
@@ -33255,7 +33255,7 @@ def prove_script_nel_workflow():
     # nudo: questa riga stessa contiene «def main()» dentro una
     # stringa, quindi un index() largo trovava SE' STESSO e la
     # fetta usciva vuota — tutte le prove «orfane», la trappola
-    # gia' scritta in CLAUDE.md presa mentre la si scriveva.
+    # gia' scritta in docs/ presa mentre la si scriveva.
     i = src.index(chr(10) + "def main():")
     dentro = src[i:src.index(chr(10) + "    return", i)]
     dentro_main = set(re.findall(r"(prove_\w+)", dentro))

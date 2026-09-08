@@ -23591,3 +23591,78 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   quattro rosse sono le preesistenti) e **13 MUTAZIONI, 13 uccise**, una
   per riga sorvegliata — e la prima ne fa rosse DUE, che togliendo lo
   span cadono insieme «le due forme» e «il custode».
+
+- LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
+  CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
+  due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
+  sorvegliarlo non è la memoria di chi legge ma le prove).
+3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
+   `/annuncio/*`, `/categoria/{slug}` (i 27 reparti, vocabolario CHIUSO
+   su `SLUG_CATEGORIE`), `/sicurezza` (la pagina «Il pagamento
+   protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
+   manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
+   ancora), `/privacy` (la sorella, «I tuoi dati», ago 2026: stessa
+   liturgia, ancora facoltativa `#indirizzo`), `/barattolo/{token}` (la
+   fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
+   NON legge mai il database — la garanzia della revoca),
+   `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
+   trovare»: la prima è una costante PURA che non tocca il database e
+   non può sollevare — un 5xx lì sospende la scansione di tutto il sito
+   per ore), `/widget/annuncio/{id}` e
+   `/widget/negozio/{chi}` (le UNICHE pagine fatte per stare
+   nell'iframe di un estraneo — tutte le altre lo vietano con
+   `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
+   `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
+   `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
+   da ago 2026 i font stanno in casa e non li chiede più nessuno a
+   Google — vedi «I FONT VENGONO IN CASA»),
+   `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
+   il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
+   calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
+   della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
+   ago 2026), `/assets/mascotte.jpeg`,
+   `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
+   `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
+   `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
+   `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
+   `/assets/apple-touch-icon.png`) — tutti file singoli, rotte
+   esplicite — e `/api/*`. Non montare mai StaticFiles sull'intera
+   directory (config e .git diventerebbero pubblici — falla già
+   successa e chiusa). Dall'ago 2026 non ce n'è più NESSUNO: anche
+   `/foto/*`, che era l'ultimo montato, è una rotta esplicita con la
+   sua whitelist di FORME (`NOME_FOTO`) — vedi la voce sua in
+   Architettura. La regola è verificabile e non solo raccomandata:
+   una sentinella di `prove.py` fallisce se in server.py ricompare
+   `app.mount(` o l'import di StaticFiles.
+   E L'ELENCO DELLE ROTTE-PAGINA SI CONTA (ago 2026): la lista in
+   `prove_anteprime` era scritta a mano, quindi una rotta pubblica
+   NUOVA non la sorvegliava nessuno finché qualcuno non si ricordava
+   di aggiungerla. Adesso una prova confronta la sua lunghezza col
+   numero di `return _pagina_con_meta(` nel sorgente: chi ne aggiunge
+   una senza elencarla trova la CI rossa.
+
+- LA SCALA NOSTR APPROVATA (la storia della regola ferrea 2, che in
+  CLAUDE.md resta nella sua forma corta: mai custodia di segreti
+  altrui, mai firme che richiedano di consegnare chiavi al server).
+  Qui ci sono i gradini col PERCHÉ di ognuno, che è la parte che serve
+  quando qualcuno propone un gradino nuovo: si guarda se somiglia a uno
+  già approvato o a quello che è stato RESPINTO.
+   Decisione permanente. La scala approvata: badge npub auto-dichiarato →
+   verifica con nota pubblica (fatta, lug 2026) → login Nostr con firma
+   di sfida (fatto, lug 2026: la nsec incollata nel login web firma
+   SOLO nella pagina, mai trasmessa né salvata, e la UI la sconsiglia
+   a favore di estensione/bunker — è l'estensione approvata della
+   scala, NON un'eccezione) → wallet NWC solo-nel-browser (lug 2026:
+   la stringa nostr+walletconnect:// è una credenziale di SPESA e
+   vive solo in localStorage del dispositivo, mai sul server — un
+   suo salvataggio server-side, anche cifrato, farebbe della
+   piattaforma il custode dei wallet di tutti: da respingere) →
+   DM di notifica NIP-17 (lug 2026: si CIFRA verso la chiave
+   PUBBLICA dell'utente e si firma con la chiave della piattaforma,
+   nessun segreto altrui coinvolto) → sessione bunker NIP-46
+   conservata (lug 2026: URI + chiave del CLIENT in localStorage del
+   dispositivo, pari grado del secret NWC — chiede firme al bunker,
+   che può negarle o revocare; NON contiene né può derivare la chiave
+   dell'utente, mai sul server) →
+   mai custodia di segreti altrui, mai firme che richiedano di
+   consegnare chiavi al server.

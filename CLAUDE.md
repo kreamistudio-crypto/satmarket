@@ -5,9 +5,23 @@ ed escrow Lightning custodial (LNbits). Proprietario: Andrea (principiante,
 guidalo passo passo, un comando alla volta, spiega con metafore semplici).
 Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 
-## Architettura
+## Dove sta il resto
 
-Vive in `docs/ARCHITETTURA.md`. NON e un import: si apre solo quando serve.
+Tre file in `docs/`, e NON sono import: si aprono quando servono.
+- `ARCHITETTURA.md` — com'è fatto: le parti, le rotte pubbliche, i
+  giudici unici, e il perché di ogni pezzo.
+- `CANTIERI.md` — perché è fatto così: un paragrafo per cantiere, in
+  ordine di tempo, con le decisioni, le strade scartate e le lezioni.
+- `PRODUZIONE.md` — la macchina, la catena del deploy, le procedure.
+
+Non c'è un indice e non deve nascerne uno: si cerca per NOME.
+`grep -n "sconto carrello" docs/*.md` — ogni voce porta il suo nome
+nella prima riga, e i rimandi già scritti dappertutto nel codice e in
+questi file («vedi Architettura, "IL SUPPLEMENTO PER PEZZO"») sono
+indirizzi che dopo il trasloco funzionano identici.
+PRIMA di toccare qualcosa, cercalo lì: se un cantiere l'ha già deciso,
+la decisione ha un perché scritto, e rovesciarla senza saperlo è il
+modo in cui si rifà un errore già pagato.
 
 ## Produzione
 
@@ -423,69 +437,25 @@ il codice, e la discrepanza è nell'issue.
 1. MAI committare `config.py`, `*.db`, `foto/`, chiavi, token, npub private.
    Se una chiave viene esposta ovunque (chat, log, commit): va RUOTATA.
 2. MAI chiedere o gestire nsec (chiave privata Nostr) degli utenti.
-   Decisione permanente. La scala approvata: badge npub auto-dichiarato →
-   verifica con nota pubblica (fatta, lug 2026) → login Nostr con firma
-   di sfida (fatto, lug 2026: la nsec incollata nel login web firma
-   SOLO nella pagina, mai trasmessa né salvata, e la UI la sconsiglia
-   a favore di estensione/bunker — è l'estensione approvata della
-   scala, NON un'eccezione) → wallet NWC solo-nel-browser (lug 2026:
-   la stringa nostr+walletconnect:// è una credenziale di SPESA e
-   vive solo in localStorage del dispositivo, mai sul server — un
-   suo salvataggio server-side, anche cifrato, farebbe della
-   piattaforma il custode dei wallet di tutti: da respingere) →
-   DM di notifica NIP-17 (lug 2026: si CIFRA verso la chiave
-   PUBBLICA dell'utente e si firma con la chiave della piattaforma,
-   nessun segreto altrui coinvolto) → sessione bunker NIP-46
-   conservata (lug 2026: URI + chiave del CLIENT in localStorage del
-   dispositivo, pari grado del secret NWC — chiede firme al bunker,
-   che può negarle o revocare; NON contiene né può derivare la chiave
-   dell'utente, mai sul server) →
-   mai custodia di segreti altrui, mai firme che richiedano di
-   consegnare chiavi al server.
-3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/categoria/{slug}` (i 27 reparti, vocabolario CHIUSO
-   su `SLUG_CATEGORIE`), `/sicurezza` (la pagina «Il pagamento
-   protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
-   manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
-   ancora), `/privacy` (la sorella, «I tuoi dati», ago 2026: stessa
-   liturgia, ancora facoltativa `#indirizzo`), `/barattolo/{token}` (la
-   fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
-   NON legge mai il database — la garanzia della revoca),
-   `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
-   trovare»: la prima è una costante PURA che non tocca il database e
-   non può sollevare — un 5xx lì sospende la scansione di tutto il sito
-   per ore), `/widget/annuncio/{id}` e
-   `/widget/negozio/{chi}` (le UNICHE pagine fatte per stare
-   nell'iframe di un estraneo — tutte le altre lo vietano con
-   `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
-   `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
-   `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
-   da ago 2026 i font stanno in casa e non li chiede più nessuno a
-   Google — vedi «I FONT VENGONO IN CASA»),
-   `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
-   il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
-   calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
-   della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
-   ago 2026), `/assets/mascotte.jpeg`,
-   `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
-   `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
-   `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
-   `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
-   `/assets/apple-touch-icon.png`) — tutti file singoli, rotte
-   esplicite — e `/api/*`. Non montare mai StaticFiles sull'intera
-   directory (config e .git diventerebbero pubblici — falla già
-   successa e chiusa). Dall'ago 2026 non ce n'è più NESSUNO: anche
-   `/foto/*`, che era l'ultimo montato, è una rotta esplicita con la
-   sua whitelist di FORME (`NOME_FOTO`) — vedi la voce sua in
-   Architettura. La regola è verificabile e non solo raccomandata:
-   una sentinella di `prove.py` fallisce se in server.py ricompare
-   `app.mount(` o l'import di StaticFiles.
-   E L'ELENCO DELLE ROTTE-PAGINA SI CONTA (ago 2026): la lista in
-   `prove_anteprime` era scritta a mano, quindi una rotta pubblica
-   NUOVA non la sorvegliava nessuno finché qualcuno non si ricordava
-   di aggiungerla. Adesso una prova confronta la sua lunghezza col
-   numero di `return _pagina_con_meta(` nel sorgente: chi ne aggiunge
-   una senza elencarla trova la CI rossa.
+   Decisione permanente: mai custodia di segreti altrui, mai firme che
+   richiedano di consegnare chiavi al server. La scala di quel che è
+   APPROVATO — badge npub auto-dichiarato, verifica con nota pubblica,
+   login con firma di sfida, wallet NWC solo-nel-browser, DM NIP-17,
+   sessione bunker NIP-46 conservata — col perché di ognuna e quel che
+   è stato RESPINTO (il secret NWC salvato sul server, anche cifrato)
+   sta in `docs/ARCHITETTURA.md`, alla voce «LA SCALA NOSTR APPROVATA».
+3. Il server pubblico non monta MAI StaticFiles su una directory
+   (config e .git diventerebbero pubblici — falla già successa e
+   chiusa): ogni file servito ha la sua rotta esplicita, e i nomi che
+   arrivano dal client passano da una whitelist. Dall'ago 2026 non c'è
+   più NESSUN mount: anche `/foto/*`, l'ultimo, è una rotta con la sua
+   whitelist di FORME (`NOME_FOTO`). L'elenco completo sta in
+   `docs/ARCHITETTURA.md`, alla voce «LE ROTTE PUBBLICHE». La regola è
+   verificabile e non solo raccomandata: una sentinella di `prove.py`
+   fallisce se in server.py ricompare `app.mount(` o l'import di
+   StaticFiles, e una seconda conta le rotte-pagina contro l'elenco
+   scritto a mano di `prove_anteprime`, perché una rotta pubblica nuova
+   non resti senza sorveglianza.
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
    released | dispute | return_pending | return_shipped | refund |
    refunded | annullato. Non inventarne di nuovi senza aggiornare
@@ -505,11 +475,15 @@ il codice, e la discrepanza è nell'issue.
    In produzione MODALITA_COLLAUDO deve restare False.
 7. Stile del codice esistente: commenti e nomi in italiano, tono caldo,
    niente refactoring di massa non richiesti, diff piccoli e verificabili.
-8. A fine cantiere, PRIMA del commit finale, valuta se il lavoro ha
-   cambiato architettura, API, schema del database o regole del progetto:
-   se sì, proponi l'aggiornamento di CLAUDE.md come commit separato,
-   senza aspettare che Andrea lo chieda. Ritocchi minori (testi,
-   tarature, fix) non lo richiedono.
+8. A fine cantiere, PRIMA del commit finale: la voce del cantiere —
+   cosa si è deciso, i perché, le strade scartate, cosa è stato provato
+   e cosa resta da guardare — va in fondo a `docs/CANTIERI.md`.
+   L'architettura va in `docs/ARCHITETTURA.md`, le procedure di
+   produzione in `docs/PRODUZIONE.md`. Questo file si tocca SOLO se è
+   cambiata una REGOLA di qui: è la ragione per cui era arrivato a
+   28.593 righe, e rientra intero a ogni /compact di ogni sessione.
+   Proponilo come commit separato, senza aspettare che Andrea lo
+   chieda. Ritocchi minori (testi, tarature, fix) non lo richiedono.
 9. Lessico dell'escrow (lug 2026): nei testi per gli utenti si dice
    sempre «deposito di garanzia» — «(escrow)» solo nella prima
    spiegazione lunga di ogni contesto; azione = «🔒 Compra in
