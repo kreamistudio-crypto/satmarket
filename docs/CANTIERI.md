@@ -5795,3 +5795,121 @@ E LA COSA CHE MANCAVA DA UN'ALTRA PARTE, trovata chiudendo: il foglio
 del panico del relay non diceva DI QUALE MACCHINA parlasse. Ora ha le
 tre in tabella con nome e indirizzo — il relay, il VPS e il nodo — che
 e' un'informazione da un rigo e si cercava sotto panico.
+
+Il profilo di scambio si lega all'account, e le tre strade piu' ovvie
+sono tutte sbagliate (set 2026, CANTIERE IN CORSO — questa voce cresce
+a ogni fase, e si chiude con l'ultima). Il mazzo Mostro nasceva casuale
+nel browser e viveva per DISPOSITIVO: chi apriva Barattolo da un altro
+telefono si ritrovava un'altra identita', con altre recensioni. Adesso
+chi entra da Telegram ha la chiave d'identita' RICAVATA dal suo
+account, cosi' gli stessi scambi si vedono dal bot, dal sito e
+dall'app.
+IL PATTO E' A TRE LIVELLI E SI DICHIARA, che e' la parte che non si
+puo' rimandare: Telegram = comodita', e il server SA RICAVARE quella
+chiave; chiave Nostr propria incollata = sovranita' piena, e non la
+ricava nessuno; estensione, bunker o Amber = sovranita' piena ma
+profilo per dispositivo, spostabile col codice segreto. Il terzo caso
+non e' una pigrizia: `firmaMostro` firma BYTES GREZZI, e NIP-07 e
+NIP-46 firmano solo EVENTI — non c'e' modo deterministico ne' di
+derivare ne' di firmare, quindi promettere di piu' sarebbe mentire.
+⚠️ E' L'ECCEZIONE DICHIARATA ALLA REGOLA FERREA 2, la prima da quando
+il progetto esiste, e va letta per quel che e': il server non
+CUSTODISCE la chiave di nessuno — non c'e' una colonna dove potrebbe
+finire — ma la sa RICAVARE, cioe' POTREBBE firmare uno scambio al posto
+di chi entra da Telegram. Non lo fa e non c'e' niente che lo faccia; e
+«potrebbe» e' scritto in «I tuoi dati» con le parole di chi legge,
+perche' un potere che non si dichiara e' un potere che si scopre male.
+Vedi Architettura, «LA SCALA NOSTR APPROVATA», dove il gradino nuovo
+sta accanto a quello RESPINTO.
+
+LE TRE STRADE SCARTATE, e sono le tre piu' ovvie — questa e' la parte
+che serve fra sei mesi, quando qualcuno le riproporra' perche' sono
+piu' semplici. Nessuna e' un'idea di qualcun altro da correggere: sono
+il primo disegno che viene in mente, ed e' giusto che venga in mente.
+
+1. UN SEGRETO SOLO, COME STRINGA. E' la forma naturale — una riga nel
+   config, come il segreto del webhook — e rende la ROTAZIONE
+   IMPOSSIBILE. Non «scomoda»: impossibile. Cambiando quella stringa
+   cambiano insieme le chiavi di TUTTI, cioe' si cancella in silenzio
+   l'identita' e la reputazione di chiunque non abbia salvato il suo
+   codice — e se il cambio arriva mentre uno scambio e' aperto, i sats
+   fermi sulla hold invoice restano senza nessuno che possa muoverli.
+   Da qui il DIZIONARIO `{versione: segreto}` e la colonna `versione`
+   in `p2p_semi`: la versione entra nell'etichetta di derivazione,
+   quindi due versioni sono due chiavi per COSTRUZIONE, e ruotare vuol
+   dire AGGIUNGERE una riga mentre i vecchi restano sulla loro finche'
+   non passano con un GESTO. Va deciso il primo giorno o non si puo'
+   piu' aggiungere: e' il senso di questa riga.
+   ⚠️ E LA ROTAZIONE NON RITIRA UN SEGRETO TRAPELATO, che va scritto
+   accanto o si crede il contrario: chi l'ha preso, col sale, ricava le
+   chiavi passate per sempre — quelle identita' sono BRUCIATE. La
+   rotazione serve a due cose sole, ed e' gia' molto: che nessun
+   profilo NUOVO nasca dal segreto bruciato, e che chi c'era sia
+   avvisato e traghettato con un gesto invece che in silenzio.
+
+2. IL SEGRETO DA SOLO, SENZA UN SALE PER PERSONA. Sembra sufficiente —
+   il segreto e' segreto — e regala il difetto peggiore: chi si porta
+   via il SOLO config.py deriva le chiavi di tutti. E il config letto
+   da solo e' il caso PROBABILE, non quello raro: un `cat` incollato in
+   una chat, una riga in un log, un messaggio d'errore, un backup
+   guardato di fretta. Col sale in `p2p_semi` servono DUE pezzi da DUE
+   posti, e il config rubato da solo e' inerte.
+   ⚠️ QUEL CHE IL SALE NON COPRE SI DICHIARA: chi apre l'archivio
+   cifrato del backup ha tutti e due (`backup-fuori.sh` mette database
+   e config nello STESSO archivio age), e chi entra nella macchina viva
+   pure. Il sale alza il costo del furto piu' probabile, non di tutti —
+   e la separazione vera (il segreto FUORI dall'archivio, solo carta e
+   Bitwarden) ha il suo prezzo, che un ripristino non rigenera i
+   profili finche' non lo si rimette a mano. Resta una cosa APERTA in
+   PRODUZIONE.md, non una cosa fatta.
+   E il sale NASCE AL PRIMO GESTO e mai alla registrazione, l'abitudine
+   di casa: una riga che esiste dice qualcosa, e un sale scritto
+   all'iscrizione direbbe «questa persona ha un profilo di scambio» di
+   chiunque si sia iscritto.
+
+3. LA DERIVAZIONE SENZA IL RAMO DEL RIPROVA. Un HMAC-SHA256 sono 256
+   bit uniformi, e sembra una chiave: non lo e'. Puo' uscire zero, o
+   maggiore-uguale all'ordine della curva, e allora NON E' UNO SCALARE
+   VALIDO — firmarci darebbe una firma che il coordinatore butta via
+   senza che niente lo dica, cioe' il guasto muto di sempre. Si
+   incrementa un contatore DENTRO il messaggio e si riprova, che e' il
+   ramo di BIP-32. La probabilita' e' una su 2^128, e il ramo esiste lo
+   stesso: le cose che capitano una volta ogni mai sono quelle che
+   nessuno sa diagnosticare il giorno che capitano.
+
+E LA TORTURA HA CORRETTO DUE VOLTE IL BANCO E MAI IL CODICE, che e' la
+lezione del giro. Primo: per esercitare il riprova avevo passato un
+ordine finto di 2, e con 2 la condizione diventa «n == 1 esatto» — in
+256 giri non capita mai, quindi la funzione ESAURISCE invece di
+riprovare con successo, e la prova avrebbe certificato il ramo
+opposto a quello che voleva guardare. Con 2^252 il giro 0 cade fuori e
+ne servono 37, deterministici perche' l'ingresso e' fisso.
+⚠️ SECONDO, E VALE DI PIU': sostituendo il riprova con un `n % ordine`
+le due prove restavano VERDI, perche' quel numero e' valido lo stesso.
+La domanda giusta non era «e' valido?» ma «e' USCITO dalla serie?» —
+ed e' la stessa cecita' della sentinella dello specchio, che cercava la
+parola nel testo e la trovava nei commenti. Una guardia che si
+accontenta di una CONSEGUENZA del fatto non guarda il fatto. Adesso si
+controlla che il seme sia uno degli HMAC della serie: nove mutazioni,
+nove uccise.
+
+FAIL-OPEN E NON FAIL-CLOSED, e qui il verso non e' ovvio: leva assente
+o storta vuol dire che la strada derivata non si offre e il profilo
+resta per dispositivo — il mondo di ieri byte per byte — perche'
+spegnere uno scambio per una riga mancante nel config punirebbe chi sta
+scambiando per un errore d'amministrazione. A dirlo e' il journal
+all'avvio, il gemello della riga di `MOSTRO_HEX`: il config del VPS non
+eredita niente da `config_esempio.py`, quindi senza quella riga il
+giorno dell'accensione resterebbero tutti per dispositivo e nessuno
+saprebbe perche'.
+
+E UN RAMO CHE NON C'ENTRA, a verbale perche' il nome torna: `p2p-pulito`
+(worktree in una cartella temporanea di un'altra sessione) NON contiene
+un tentativo precedente di questo cantiere. E' un ANTENATO di
+`origin/main` — zero commit avanti, cinquantanove indietro — e quel che
+porta e' gia' tutto in main: le tappe 3-7b del client P2P (il mazzo nel
+browser, il motore, l'ordine, la chat, il campanello, l'avviso «ce
+l'hai altrove»). Cercandoci `SEGRETI_PROFILO_P2P`, `p2p_semi` o un
+seme: nulla, e il suo albero e' pulito. Resta dov'e' e non si riusa;
+letto solo via `git show`, senza entrare nella sua cartella. Le tre
+strade qui sopra sono scelte di progetto e non vengono da li'.
