@@ -23845,21 +23845,25 @@ riconciliazione.
 **LA SONDA DEL COORDINATOR (set 2026), le otto domande della tappa 1.**
 Chieste al nodo VERO con un mazzo usa-e-getta generato dalla sonda —
 nessun segreto in gioco — e un ordine di prova nato e poi ritirato.
-CINQUE sono ferme, TRE restano aperte, e la prima delle tre e' quella
-che decide se il cantiere va avanti.
+**TUTT'E OTTO hanno una risposta**, e ci sono voluti DUE giri: il primo
+ne diede quattro FALSE, e la cura al lettore le ha rimesse in piedi
+tutte (la lezione sta in fondo alla voce).
 **Q1 — RISPONDE, e alla chiave che ha chiesto.** L'ordine di prova e'
 nato ed e' comparso nel 38383 col suo tag rating (days 0, total_rating
 0.0, total_reviews 0); il `cancel` l'ha riportato a `canceled`.
 **Q2 — SI: accetta una trade key MAI VISTA con `trade_index: null`**, e
 con TUTT'E DUE le buste (`order` e `restore`). Non serve una chiave gia'
 bruciata per interrogare, ed e' la risposta che decide quale chiave usa
-il cantiere.
+il cantiere. ⚠️ Agganciata di RIPIEGO, e non e' un dettaglio del
+lettore: e' Q5 vista dall'altro lato — senza il ripiego questa sarebbe
+ancora un NO su un fatto vero.
 **Q3 — col mazzo B, mai visto, risponde `{"orders": [], "disputes":
 []}`.** Quindi «non ti riconosco» si serve COME una lista vuota: i due
 casi **non si distinguono**. Per noi va bene — la domanda che facciamo
 e' «quali ordini ha questa chiave», e la risposta e' giusta in tutti e
 due i casi — ma va scritto, perche' il giorno che servisse sapere se una
-chiave e' NOTA, da qui non si sa.
+chiave e' NOTA, da qui non si sa. Agganciata di RIPIEGO anche lei, per
+la stessa ragione di Q2.
 **Q4 — `status` sta DENTRO ogni ordine**, e in questo giro vale
 `"pending"`. E' l'unica stringa che restore-session abbia detto: il
 `canceled` visto dopo il ritiro veniva dal LIBRO (38383), che e'
@@ -23870,17 +23874,43 @@ non si scrive a memoria.
 log del nodo dicono «Background restore session completed with 1 orders,
 0 disputes»). Quindi un `pending` nella lista implica maker, e **il lato
 e' un fatto** invece di un'inferenza.
-⚠️ **Q5 E' APERTA ED E' QUELLA CHE BLOCCA.** Su `new-order` il
-`request_id` torna uguale; su `restore-session` NON risulta — ma **e'
-un'inferenza e non un fatto**, e va detto: la sonda prova la seconda
-busta solo se la prima non ha agganciato, e le ha provate tutt'e due pur
-avendo risposto tutt'e due. Se fosse vero, `p2pAttese` non chiuderebbe
-MAI su un restore e ogni lettura andrebbe in timeout. Il prossimo giro
-lo dice senza inferenze: la sonda adesso stampa i campi di primo livello
-e il `request_id` di ogni risposta.
-**Q7 e Q8 restano da riportare**: la sonda le calcola per conto suo (i
-due tag del 38385 per il PoW, il conteggio degli eventi per richiesta) e
-le stampa nel quadro, ma quel giro non e' stato riportato.
+**Q5 — IL `request_id` TORNA SU DUE FAMIGLIE SU TRE**, ed e' un FATTO e
+non piu' un'inferenza: torna uguale su `new-order` e su `cancel`, e su
+`restore-session` vale **`null`** — il campo C'E', il valore no («campi
+del messaggio: [version, request_id, trade_index, action, payload],
+request_id: null»). Non e' che mostrod non lo capisca: non lo RICOPIA su
+quella famiglia.
+IL CANTIERE NON SI FERMA, MA IL DISEGNO CAMBIA, ed e' la riga da tenere:
+su restore-session l'aggancio non puo' essere il `request_id` e diventa
+**LA CHIAVE DI DESTINAZIONE** — la risposta e' un kind 14 cifrato verso
+la pubkey che ha chiesto, quindi se si apre con la chiave X e' per X.
+E' piu' forte di un aggancio sul contenuto, non piu' debole: a garantire
+non e' un campo che il mittente puo' scrivere come gli pare, e' la
+crittografia.
+LA CONDIZIONE CHE LO RENDE VERO va scritta, perche' e' l'unica cosa che
+il cantiere deve rispettare: **una restore-session alla volta per
+chiave**. Con due in volo dalla stessa chiave le risposte tornano
+indistinguibili — il client non ha nessuna ragione di mandarne due, ma
+la regola vale finche' qualcuno non la rompe, e allora si rompe in
+silenzio (due liste giuste attribuite alla domanda sbagliata).
+⚠️ QUEL CHE RESTA IGNOTO SI DICHIARA: se il coordinatore mandi messaggi
+SPONTANEI verso quella chiave con la stessa `action`. Se lo facesse,
+l'aggancio per sola chiave prenderebbe il primo che arriva. Il secondo
+criterio c'e' gia' nella risposta (`action`), e la prima cosa da
+guardare il giorno che una lettura tornasse storta e' quella.
+**Q7 — POW SPENTO** (`pow=0`, `pow_first_contact=0` nel 38385): conferma
+dal LIBRO la scelta gia' a verbale sul nodo, che si riapre solo se il
+termometro degli eventi salta di un ordine di grandezza.
+**Q8 — UNA RISPOSTA SOLA PER OGNI RICHIESTA**, ed e' la meta' che rende
+praticabile l'aggancio per chiave: non c'e' nessuna raffica da sceverare.
+I PARAMETRI DEL 38385 VALGONO PIU' DI UNA CONFERMA: `expiration_hours`
+168, `expiration_seconds` 900, `hold_invoice_cltv_delta` 432 — le tre
+leve girate il 6 set 2026 si leggono **DAL LIBRO PUBBLICO** e non piu'
+dal solo `settings.toml`, cioe' sono verificate dal lato di chi legge e
+non da quello di chi le ha scritte. Piu' `bond_enabled` false (coerente
+con `[anti_abuse_bond]` commentata), `maintenance_mode` false,
+`max_order_amount` 100000 e **`fee` 0.01** — l'1% del coordinatore, che
+e' un numero che il cantiere dovra' mostrare a chi scambia.
 E LA LEZIONE DEL GIRO VALE OLTRE LA SONDA: il lettore del quadro
 agganciava la risposta con UN criterio solo — il `request_id` — e da
 quell'aggancio dipendevano a cascata quattro risposte, che sono uscite
@@ -23897,6 +23927,13 @@ Q1 aveva gia' il ramo «ha risposto ma non con quel request_id» e gli
 altri tre no — la stessa prudenza scritta in un posto e mancante negli
 altri, che e' il modo in cui una cecita' si nasconde in mezzo a del
 codice che funziona.
+IL SECONDO GIRO HA CHIUSO IL CERCHIO, ed e' quel che rende la lezione
+verificata invece che raccontata: Q2 e Q3 sono tornate SI **dal
+ripiego**, e il grezzo ha detto perche' — `request_id: null` su
+restore-session. Cioe' il criterio che mancava non si sarebbe potuto
+indovinare (il campo c'era, era il VALORE a mancare), mentre il ripiego
+lo ha reso irrilevante. **Quando non si sa quale sara' il criterio buono,
+si rende robusto il lettore invece di scommettere sul campo.**
 
 **I TRE TIMER, letti sul sorgente di `v0.18.6`** (set 2026, prima di
 rispondere ad Alan, che proponeva di allungare «i 15 minuti» a un
