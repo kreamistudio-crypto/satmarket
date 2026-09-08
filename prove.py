@@ -33267,6 +33267,95 @@ def prove_script_nel_workflow():
     prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
+TETTO_CLAUDE_MD = 538   # misurato: 518 righe il giorno del taglio, piu' 20
+
+
+def prove_bussola():
+    """OGNI PUNTATORE A `docs/` PUNTA A UN FILE CHE C'E' (set 2026).
+
+    CLAUDE.md rientra INTERO a ogni /compact di ogni sessione, quindi
+    quel che sta li' si paga per sempre: il grosso vive in `docs/`, e a
+    tenere il collegamento c'e' una bussola di pochi nomi invece di un
+    indice. Un indice di ottantasei cantieri sarebbe un elenco scritto
+    a mano, e in questo repo un elenco scritto a mano rimpicciolisce —
+    la lezione del titolo nudo nelle notifiche.
+
+    Ma una bussola vale quanto i suoi puntatori, e i puntatori mentono
+    in silenzio. Il giorno del trasloco ne mentivano TREDICI fra
+    server.py, prove.py, miniapp.html e config_esempio.py — fra cui
+    una stringa che un MODERATORE legge nel pannello delle leve — e
+    tre di loro mentivano gia' da prima. Nessuna prova se n'era
+    accorta, perche' nessuna guardava.
+
+    Le due direzioni si guardano tutt'e due, ed e' quel che rende
+    questa una prova e non meta': un nome che punta a un file assente
+    manda a cercare nel vuoto, e un file di `docs/` che nessuno nomina
+    non lo trova nessuno. La seconda guidera' il trasloco del nodo
+    Mostro: il giorno che il suo documento nasce senza una riga nella
+    bussola, questa diventa rossa.
+
+    E il primo a farla rossa e' stato il suo autore, con la versione
+    di questa frase che il file del nodo lo NOMINAVA per percorso: un
+    rimando dentro una docstring e' un rimando come gli altri, e la
+    cura non e' escludere la prosa dal censimento — e' non scrivere
+    l'indirizzo di un file che ancora non c'e'."""
+    print("\n[la bussola verso docs/]")
+    claude = open("CLAUDE.md", encoding="utf-8").read()
+    nominati = set(re.findall(r"docs/([A-Z0-9-]+\.md)", claude))
+    prova("CLAUDE.md nomina i documenti", True, len(nominati) >= 2)
+
+    esistono = set(os.listdir("docs")) if os.path.isdir("docs") else set()
+    prova("...e ognuno di quei nomi esiste sul disco",
+          set(), nominati - esistono)
+    prova("...e nessun documento resta orfano, senza chi lo nomini",
+          set(), {f for f in esistono if f.endswith(".md")} - nominati)
+
+    # I sorgenti che rimandano a un documento: stessa regola, e qui il
+    # danno e' peggiore, perche' uno di quei rimandi esce dal repo e
+    # finisce davanti a una persona.
+    rotti = {}
+    for nome in ("server.py", "prove.py", "miniapp.html",
+                 "config_esempio.py"):
+        testo = open(nome, encoding="utf-8").read()
+        fuori = set(re.findall(r"docs/([A-Z0-9-]+\.md)", testo)) - esistono
+        if fuori:
+            rotti[nome] = sorted(fuori)
+    prova("i rimandi dei sorgenti puntano a file che ci sono", {}, rotti)
+
+
+def prove_tetto_claude_md():
+    """CLAUDE.md NON RICRESCE (set 2026, il freno del trasloco).
+
+    Il file era arrivato a 28.593 righe, e il motore era la regola
+    ferrea 8: «a fine cantiere proponi l'aggiornamento di CLAUDE.md».
+    La regola adesso dice DOVE va la voce — in fondo a
+    `docs/CANTIERI.md` — ma una regola scritta e non verificabile e'
+    quella che si scorda, che e' la ragione per cui in questo repo la
+    regola 3 ha la sua sentinella invece di una raccomandazione.
+
+    Il tetto e' MISURATO e non scelto a orecchio: 518 righe il giorno
+    del taglio, piu' venti. Venti bastano a una regola nuova e non a
+    una voce di cantiere, che ne pesa dalle quaranta alle sessanta —
+    quindi il primo diario che torna qui dentro fa rossa la CI, mentre
+    una regola in piu' passa.
+
+    Alzarlo e' legittimo il giorno che le REGOLE crescono davvero: il
+    gesto e' cambiare il numero e dire perche'. Quel che non deve
+    poter succedere e' che il file cresca senza che nessuno se ne
+    accorga.
+
+    E LA TORTURA LO CONFERMA: delle sei mutazioni, cinque muoiono e
+    una sopravvive — quella che alza il tetto INSIEME alla crescita.
+    E' irriducibile per costruzione, che sopra l'ultimo tetto non c'e'
+    nessun altro strato; ma non e' un difetto silenzioso, perche' quel
+    numero cambia in una riga di diff che si legge."""
+    print("\n[il tetto di CLAUDE.md]")
+    righe = open("CLAUDE.md", encoding="utf-8").read().count(chr(10))
+    prova("CLAUDE.md sta sotto il suo tetto di %d righe (ne ha %d): la "
+          "voce del cantiere va in docs/CANTIERI.md"
+          % (TETTO_CLAUDE_MD, righe), True, righe <= TETTO_CLAUDE_MD)
+
+
 def prove_annotazioni_negli_ambienti():
     """`Request` NELL'AMBIENTE DI OGNI ENDPOINT MONTATO (ago 2026, da
     una CI rossa che in locale era verde).
@@ -46094,6 +46183,7 @@ def main():
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
               prove_script_nel_workflow, prove_deploy,
+              prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,
               prove_podio_sfondo,
               prove_annotazioni_negli_ambienti,

@@ -5242,3 +5242,112 @@ DA GUARDARE alla tappa 8, ed è il pezzo che da qui non si può fare: il
 primo new-order vero verso il coordinator — nel journal del nodo non
 deve comparire nessun «trade signature does not verify», e l'ordine deve
 uscire come 38383 col suo `d`.
+
+CLAUDE.md scende a 518 righe, e la bussola diventa il grep (set 2026).
+Il file rientra INTERO a ogni /compact di ogni sessione, quindi ogni
+riga che sta lì si paga per sempre: da 28.593 righe è sceso a 518, in
+cinque commit. Il criterio l'ha dato Andrea, ed è quello che ha deciso
+ogni taglio: cosa una sessione deve sapere SEMPRE, prima di sapere su
+cosa sta lavorando.
+DUE VINCOLI TROVATI NEL CODICE E NON NEL FILE, ed è la parte che serve
+a chi vorrà tagliare ancora. 1) LE REGOLE FERREE SONO INDIRIZZATE PER
+NUMERO: ~15 siti fra server.py, prove.py e miniapp.html dicono «regola
+ferrea 1/2/3», quindi non si rinumerano e non se ne toglie nessuna —
+ed è anche il motivo per cui quella sezione non può traslocare, che una
+regola da aprire non è una regola ferrea. 2) TREDICI PUNTATORI NEL
+CODICE DICEVANO «in CLAUDE.md» per contenuto traslocato, fra cui una
+STRINGA CHE UN MODERATORE LEGGE nel pannello ⚙️ Stato delle leve — e
+tre di loro mentivano già prima di questo cantiere. Nessuna prova se
+n'era accorta, perché nessuna guardava.
+COSA RESTA, e perché: l'intestazione; la bussola; di Produzione solo
+ciò che cambia il GESTO invece del contenuto (push su main = online, il
+config del VPS che vince sul default del CODICE, il freno del deploy, e
+MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS — l'unica riga del
+file che permette di rompere la produzione da un portatile); le nove
+regole; e «Adesso», cioè cosa c'è da fare, mai cosa è stato fatto.
+NON RESTA L'ELENCO DELLE LEVE ACCESE, e ha un'autorità migliore: il
+pannello chiede al valore VIVO e non alla costante.
+LE DUE REGOLE DIMAGRITE sono l'unica riscrittura del cantiere, perché
+lì regola e catalogo erano la stessa frase: nella 3 restano il divieto
+(mai StaticFiles su una directory) e le sue due sentinelle, e l'elenco
+delle rotte va in ARCHITETTURA — dove peraltro era già sorvegliato da
+quelle prove, quindi non serviva stare in CLAUDE.md per essere
+rispettato; nella 2 i sei gradini della scala restano NOMINATI (chi
+propone qualcosa sa subito se è già in scala) e traslocano i perché.
+LA BUSSOLA NON È UN INDICE, ed è la decisione che regge il resto: tre
+nomi e il gesto del grep. Un indice di ottantasei cantieri sarebbe un
+elenco scritto a mano, e qui un elenco scritto a mano rimpicciolisce —
+la lezione del titolo nudo nelle notifiche. Funziona già così:
+ARCHITETTURA.md ha UN solo titolo in 23.593 righe e si legge per nome.
+IL FRENO È LA REGOLA 8, che era il MOTORE della crescita («a fine
+cantiere proponi l'aggiornamento di CLAUDE.md»): adesso dice DOVE va la
+voce — in fondo a questo file — e che CLAUDE.md si tocca solo se cambia
+una regola. Più le due sentinelle, perché una regola raccomandata e non
+verificabile è quella che si scorda: `prove_bussola` guarda le DUE
+direzioni (ogni nome punta a un file che c'è, e nessun documento resta
+orfano — è la seconda che guiderà il trasloco del nodo Mostro) e i
+rimandi dei sorgenti; `prove_tetto_claude_md` tiene il file sotto 538
+righe, misurate e non scelte a orecchio (518 + 20: venti bastano a una
+regola nuova, non a una voce di cantiere, che ne pesa 40-60).
+PROVATO: +5 asserzioni e SEI MUTAZIONI, cinque uccise. La sopravvissuta
+è dichiarata e irriducibile: chi alza il tetto INSIEME alla crescita
+passa, che sopra l'ultimo tetto non c'è nessun altro strato — ma quel
+numero cambia in una riga di diff che si legge. E LA SENTINELLA HA
+BOCCIATO IL SUO AUTORE al primo giro: la docstring nominava
+`docs/NODO-MOSTRO.md`, che non esiste ancora. La cura non è escludere
+la prosa dal censimento — un rimando dentro una docstring è un rimando
+— ma non scrivere l'indirizzo di un file che non c'è.
+IL CONTROLLO CHE RISPONDE A «SPOSTA, NON RIASSUMERE» non è un
+conteggio: uno script prende CLAUDE.md com'era e verifica che OGNI RIGA
+TOLTA si ritrovi IDENTICA in uno dei file nuovi, col pool stretto ai
+soli file nuovi più le righe APPESE ad ARCHITETTURA. Le righe di
+raccordo (le regole 2, 3, 8, il titolo della sezione e il puntatore
+vecchio) sono dichiarate a mano, e quel che non si riconosce ALZA
+invece di tirare avanti. Torturato anche lui: tolta una riga a caso dal
+diario, diventa rosso e la nomina. E NON È UNA FORMALITÀ: al secondo
+giro ha trovato un difetto vero che la rilettura non vedeva — lo split
+della Produzione mangiava il newline e i bullet uscivano INCOLLATI
+(«…con HTTPS).- Dominio: …»), col conto delle righe che tornava, anzi
+scendeva, cioè col segno che per un taglio sembra quello giusto.
+⚠️ E IL PRIMO GIRO ERA SU UNA BASE VECCHIA, che è la lezione più cara
+del cantiere. Il trasloco era stato fatto sopra il main LOCALE, indietro
+di 930 righe già pubblicate su origin/main — 686 delle quali proprio
+dentro l'Architettura, cioè dentro il file già traslocato. Committato
+così, `docs/ARCHITETTURA.md` sarebbe nato monco, e alla riconciliazione
+quelle righe sarebbero cadute in una zona rimossa dal commit: sparite
+risolvendo il conflitto, senza che niente protestasse. Il rifacimento è
+stato fatto in un worktree su origin/main — che non è né un fetch né un
+reset, e non tocca la working copy — riancorando ogni taglio al TESTO
+invece che ai numeri di riga. Verificato dopo: il nuovo ARCHITETTURA
+contiene TUTTE le righe di quello vecchio, zero perse.
+E LA BASE NUOVA HA CAMBIATO TRE TAGLI SU QUATTRO, che è la prova che
+riancorare non era formalità: lo Stato aveva i cantieri in TRE tronconi
+invece di due, la Produzione un bullet in più (le leve del P2P), e il
+blocco «Da riprendere» non è separato da una riga vuota dalla voce che
+lo segue — presa per paragrafo, se la sarebbe portata dentro CLAUDE.md.
+E LA RICONCILIAZIONE HA CAMBIATO ANCORA LA BASE, ed è il seguito di
+quella lezione: quando i quattro cantieri aperti hanno chiuso, il
+trasloco è stato rifatto una TERZA volta sopra il ramo che li porta
+tutti — relay, p2p-altrove, ordini-p2p — invece di essere rebasato. Un
+rebase di questi cinque commit chiederebbe a git di riapplicare «togli
+23.593 righe e mettile in un file nuovo» su un testo cambiato, cioè un
+conflitto da entrambi i lati; rifarlo con gli script ancorati al testo
+costa dieci minuti ed è verificabile.
+E IL TRASLOCO VA PER ULTIMO, mai per primo: se andasse prima, ogni ramo
+dopo di lui produrrebbe un conflitto della forma «riga aggiunta» contro
+«zona cancellata» — la più insidiosa che ci sia, perché la risoluzione
+istintiva («tengo la mia») cancella il lavoro dell'altro senza che
+niente protesti.
+E LA FUSIONE DEL NODO L'HA MOSTRATO SUL SERIO: i tre conflitti NON si
+risolvevano tutti allo stesso modo. Due erano revisioni dichiarate (il
+7 set che dice «Cade quindi la riga che stava qui»), il terzo erano DUE
+AGGIUNTE nello stesso punto — il macaroon e la voce della sonda — e
+lì tenere un lato solo avrebbe buttato 97 righe committate un'ora
+prima. A fermare il `--ours` è stata la cintura dello script, non la
+rilettura: un risolutore automatico vale per UNA forma di conflitto, e
+va fermato appena la forma cambia.
+IL NODO MOSTRO NON SI È SPOSTATO, per decisione di Andrea: quella
+sezione aveva lavoro in volo. Resta in CLAUDE.md e la bussola nomina
+tre file, non quattro — un puntatore a un file che non c'è è
+esattamente ciò che questo cantiere toglie. Quando si sposterà,
+`prove_bussola` lo dirà da sola.
