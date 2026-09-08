@@ -5561,16 +5561,30 @@ su `dal` che cade — con `dal` a zero la coda diventerebbe «(almeno da
 gen 1970)», una data precisa e falsa, che è peggio del silenzio.
 Rimesse a mano una per volta, file ripristinato prima di committare.
 Adesso 14 su 14.
-⚠️ IL DEBITO DICHIARATO: LA TORTURA DEL PEZZO 1 NON È STATA FATTA. Le
-sentinelle sull'endpoint ci sono e non sono poche — l'ordine delle
-fette, l'identità richiesta, il 409 a leva spenta chiesto al giudice,
-il COUNT con la prima data, il divieto di leggere le pubkey — e alcune
-girano su un database vero, compresa la fusione di due account, dove il
-conto deve seguire la PERSONA. Ma nessuna di quelle righe è stata
-rimessa a mano una per volta, quindi di loro sappiamo che sono verdi e
-non che rispondano: è esattamente la differenza che la tortura del pezzo
-2 ha reso visibile due mutazioni fa. Da fare al primo giro che passa di
-lì, e finché non è fatta questa riga resta scritta.
+IL DEBITO È PAGATO: LA TORTURA DEL PEZZO 1 È STATA FATTA (set 2026),
+e qui c'era scritto che finché non lo era questa riga restava. Sedici
+mutazioni, una per riga sorvegliata dell'endpoint, rimesse a mano una
+per volta su un worktree pulito da `origin/main` — mai sui file veri —
+con la base misurata prima (8336 passate, 0 fallite, `PYTHONUTF8=1`) e
+il file confrontato col suo `.bak` alla fine. QUINDICI UCCISE: via
+l'identità, via il gate, il gate che guarda la leva GLOBALE invece
+della persona, il 409 che diventa 403, un parametro nella firma, un
+parametro nel path, la GET rimessa FRA la POST e la DELETE, la DELETE
+che si mette a contare, `MIN` che diventa `MAX`, il `WHERE tg_id=?` che
+perde l'uguale, le pubkey che escono dal giudice, il pavimento di `dal`
+che cade, una scrittura dentro la lettura, la fusione che non porta più
+le chiavi, e le pubkey aggiunte alla risposta della rotta.
+UNA SOLA È SOPRAVVISSUTA, ed è la ragione per cui la tortura si fa: LA
+GET CHE SCAVALCA IL GIUDICE e si rifà la query in casa. Tutto restava
+verde — 8336 su 8336 — perché il banco sqlite continuava a esercitare
+`_conta_chiavi_p2p`, che intanto non chiamava più nessuno: le sue
+sentinelle parlavano di CODICE MORTO, e la rotta vera non la guardava
+nessuno. È la stessa forma della cecità già a verbale sulla sonda del
+coordinatore: la prudenza scritta in un posto e mancante in quello
+accanto — la POST aveva la sua «il conto lo fa il giudice puro» dal
+primo giorno, la GET no.
+LA SENTINELLA NUOVA è la gemella di quella della POST, e la mutazione
+rimessa dopo averla scritta muore su di lei sola. Provato: 8336 → 8337.
 IN PRODUZIONE basta il deploy, ma NON è solo client: c'è una rotta nuova
 (`GET /api/p2p/chiavi`) — nessuna colonna, nessuna migrazione, e a leva
 `P2P_ATTIVO` spenta risponde 409 come le sue sorelle. DA GUARDARE al
