@@ -6098,15 +6098,32 @@ di mostrod — quindi nel libro l'annuncio si legge ancora `pending`. Ma
 e' senza denti: chi lo prendesse sbatte sul coordinator, che guarda il
 DATABASE e non il relay (stato non piu' `pending` -> rifiuto pulito), e
 il job che a scadenza porta i pending a `expired` filtra anche lui su
-`status = 'pending'`, quindi salta la riga senza toccarla. Dovrebbe
-morire da solo alla `expires_at` (15 set) col tag `expiration` NIP-40 —
-DEDOTTO E NON VERIFICATO, dichiarato apposta: la verifica del tag e'
-stata lasciata perdere di proposito, perche' il problema e' cosmetico e
-scade da solo.
-LA STRADA SCARTATA, che non si riproponga: togliere l'evento subito con
-un sostitutivo o un NIP-09 firmati dalla chiave del coordinator.
-Esiste, ma maneggiare la nsec di mostro per un fastidio estetico che
-muore in sei giorni e' un prezzo sbagliato.
-DA GUARDARE, senza impegno: dopo il 15 set, se capita di leggere il
-libro, l'annuncio non deve piu' esserci — sarebbe la verifica gratuita
-della deduzione sul NIP-40.
+`status = 'pending'`, quindi salta la riga senza toccarla. Muore da
+solo alla `expires_at` (15 set) col tag `expiration` NIP-40, e non e'
+piu' una deduzione: VERIFICATO il 9 set stesso, leggendo l'evento
+`e0f3ca93…` dai tre relay del coordinator E dallo specchio — quattro
+copie concordi, un id solo, e il tag c'e' (1789509744 = 15 set
+22:02:24).
+LA STRADA SCARTATA E' STATA CAMMINATA A META', APPOSTA, E POI CHIUSA:
+Andrea aveva prima chiesto il sostitutivo subito — un 38383 gemello
+con `s` a `canceled`, firmato con la chiave del coordinator, che i
+relay sostituiscono per protocollo base (NIP-01) senza dipendere dal
+NIP-09 opzionale. Il giro era spezzato in tre perche' la nsec non
+lasciasse MAI la macchina: lettura dell'evento dal PC (fatta), firma
+sul nodo con uno script a zero dipendenze e quattro guardie (scritto
+e torturato in locale), pubblicazione dal PC. Poi il ripensamento,
+PRIMA che la chiave fosse toccata: non si maneggia la nsec per un
+problema cosmetico che muore da solo in sei giorni. Lo script non e'
+mai girato sul nodo, e se una copia ci fosse arrivata va tolta
+(`rm ~/firma_38383.py`): un attrezzo che legge la nsec non resta
+armato accanto a lei.
+DUE COSE VERE restano dalla meta' camminata, e valgono oltre il giro:
+la serializzazione NIP-01 di casa (json compatto, ensure_ascii
+spento) produce BYTE PER BYTE l'id che mostrod ha firmato, provato
+sul suo evento vero; e il vettore di prova giusto per Schnorr non e'
+quello ricordato a memoria — il primo banco ne aveva uno sbagliato,
+ed era il BANCO a mentire — ma una firma di PRODUZIONE: quella di
+mostrod, gia' accettata da quattro relay che le firme le verificano.
+DA GUARDARE, senza impegno: dopo il 15 set l'annuncio non deve piu'
+stare nel libro — ora e' il controllo di un fatto letto, non di una
+deduzione.
