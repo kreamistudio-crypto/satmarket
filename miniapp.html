@@ -32972,7 +32972,8 @@ function scordaMazzoLocale(){
 }
 function mazzoSerializza(m){
   return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
-                         creato: m.creato|0, backupFatto: !!m.backupFatto});
+                         creato: m.creato|0, backupFatto: !!m.backupFatto,
+                         origine: m.origine || '', versione: m.versione|0});
 }
 /* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
    desktop avevano due mazzi diversi, e un ordine pubblicato dall'uno
@@ -33135,9 +33136,16 @@ function mazzoDaTesto(testo){
   if (!FORMA_HEX64.test(sk)) return null;
   let pub;
   try { pub = NT.getPublicKey(NT.utils.hexToBytes(sk)); } catch(e){ return null; }
+  /* `origine` dice DA DOVE viene questo profilo — '' per dispositivo,
+     'conto' ricavato dall'account — e serve a non mentire nel foglio:
+     un profilo che torna da solo non ha un debito di backup, e dirgli
+     «se lo perdi riparti da zero» sarebbe falso. Un mazzo scritto prima
+     di set 2026 non ce l'ha e vale '', che e' esattamente quel che e'. */
   return {sk, pub, indice: d ? (d.indice|0) : 0,
           creato: (d && d.creato) ? (d.creato|0) : Math.floor(Date.now()/1000),
-          backupFatto: d ? !!d.backupFatto : true};
+          backupFatto: d ? !!d.backupFatto : true,
+          origine: (d && d.origine) ? String(d.origine) : '',
+          versione: d ? (d.versione|0) : 0};
 }
 /* La trade key numero `indice`: HMAC-SHA256 col segreto come chiave e
    un'etichetta di casa come messaggio — deterministica, quindi lo stesso
@@ -33231,6 +33239,31 @@ function contaChiaviP2P(){
   })();
   return p2pChiaviGiro;
 }
+/* IL SEME DEL PROFILO LEGATO ALL'ACCOUNT (set 2026, fase 3). Chiede
+   al server la chiave d'identita' che si ricava dal proprio account,
+   e la chiede SOLO quando non c'e' gia' un mazzo — ne' qui ne' nel
+   cloud. Una POST SENZA CORPO: non c'e' niente da mandare, e il
+   blocco continua ad avere UNA sola `body:`, quella delle pubkey.
+   IL 409 E' SILENZIO, il patto di `contaChiaviP2P`: leva spenta, fase
+   chiusa, chi entra da Nostr, o un segreto che non c'e' — in tutti
+   quei casi non si dice niente e si genera come sempre. */
+async function semeProfiloP2P(){
+  if (DEMO || VETRINA || !myTgId) return null;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/seme`, {method: 'POST',
+      headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) return null;
+    let d = null;
+    try { d = await r.json(); } catch(e){}
+    /* SI CONTROLLA LA FORMA PRIMA DI FIDARSI: un seme di 63 caratteri,
+       o non esadecimale, farebbe nascere un mazzo storto invece di
+       cadere sul ramo che genera — e sarebbe un profilo rotto in
+       silenzio, non un errore. */
+    const sk = String((d && d.seme) || '').toLowerCase();
+    if (!FORMA_HEX64.test(sk)) return null;
+    return {sk, versione: (d && d.versione) | 0};
+  } catch(e){ return null; }
+}
 /* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
    il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
    Telegram — la cache svuotata non deve fabbricare un profilo nuovo a
@@ -33248,10 +33281,31 @@ function assicuraMazzo(){
     const letto = await cloudLeggiEsito(CLOUD_MAZZO);
     const nuvola = letto.testo ? mazzoDaTesto(letto.testo) : null;
     let nuovo = nuvola;
+    /* IL SEME PRENDE IL POSTO DEL CASO, e non il posto di un mazzo:
+       ci si arriva SOLO da qui, cioe' solo quando il cloud non ne ha
+       dato uno. Un profilo che gia' esiste — in locale o nella copia
+       Telegram — non lo tocca nessuno, ed e' l'invariante di tutto il
+       cantiere: il derivato non e' «la versione giusta» di un profilo,
+       e' UN ALTRO profilo, con zero recensioni, che dal coordinatore e'
+       un estraneo. Sostituirlo in silenzio sarebbe distruggere
+       un'identita' — la stessa cosa che `cloudLeggiEsito` si rifiuta
+       di fare su una lettura fallita. */
+    if (!nuovo) {
+      const s = await semeProfiloP2P();
+      if (s) nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
+                      indice: 0, creato: Math.floor(Date.now()/1000),
+                      /* NESSUN DEBITO DI BACKUP: questo profilo torna
+                         da solo a ogni ingresso, su qualunque
+                         dispositivo. Timbrarlo «da mettere al sicuro»
+                         vorrebbe dire chiedere un gesto che non serve. */
+                      backupFatto: true, origine: 'conto',
+                      versione: s.versione | 0};
+    }
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
       nuovo = {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), indice: 0,
-               creato: Math.floor(Date.now()/1000), backupFatto: false};
+               creato: Math.floor(Date.now()/1000), backupFatto: false,
+               origine: '', versione: 0};
     }
     ricordaMazzo(nuovo);
     /* si scrive solo se il cloud era vuoto DAVVERO: un testo illeggibile

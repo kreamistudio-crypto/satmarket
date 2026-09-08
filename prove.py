@@ -35622,8 +35622,13 @@ def prove_p2p_chiavi():
     # SCRIVONO (registra e dimentica), la terza LEGGE e basta — il
     # conto delle chiavi altrove — e a tenerle distinte e' la riga
     # sopra, che di corpi ne conta sempre UNO.
-    prova("le fetch del blocco sono tre: registra, dimentica, il conto",
-          3, cod.count("fetch("))
+    # ERANO TRE E DA SET 2026 SONO QUATTRO, e il censimento fa il suo
+    # mestiere una terza volta: viene a chiedere di DICHIARARE quella
+    # nuova invece di lasciarla entrare in silenzio. La quarta e' il
+    # SEME del profilo legato all'account — una POST senza corpo, ed e'
+    # anche la ragione per cui i corpi restano UNO.
+    prova("le fetch del blocco sono quattro: registra, dimentica, il conto, il seme",
+          4, cod.count("fetch("))
     prova("la trade key si deriva con HMAC e mai con getConversationKey",
           True, "NT.hmac(NT.sha256, skB" in cod
           and "getConversationKey" not in cod)
@@ -35983,10 +35988,19 @@ let tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
 function authHdr(){ return 'collaudo:111:x'; }
-let fetches = [], rispChiavi = null, rispPost = null;
+let fetches = [], rispChiavi = null, rispPost = null, rispSeme = null;
+// LE CHIAVI SONO UNA FETCH FRA PIU', da quando c'e' il seme: chi
+// cerca `fetches[0]` prende quella sbagliata e `corpo()` esplode
+// su un corpo che non c'e'. Si filtra per rotta.
+const chiaviF = () => fetches.filter(f => String(f.url).endsWith('/p2p/chiavi'));
 async function fetch(url, opt){ fetches.push({url, opt});
   if (String(url).endsWith('/p2p/chiavi') && !(opt && opt.method))
     return rispChiavi ? {ok: true, json: async () => rispChiavi} : {ok: false};
+  // IL SEME: `null` vuol dire 409, cioe' la strada derivata non si
+  // offre — leva spenta, fase chiusa, o chi e' entrato da Nostr. Il
+  // client deve leggerlo come SILENZIO e generare come sempre.
+  if (String(url).endsWith('/p2p/seme'))
+    return rispSeme ? {ok: true, json: async () => rispSeme} : {ok: false};
   // LA POST RISPONDE SENZA `json` finche' nessuno gliene da' uno, ed e'
   // il caso che conta: e' cosi' che rispondeva prima del pavimento, e
   // il client deve cavarsela lo stesso.
@@ -36010,7 +36024,7 @@ let copiato = '';
 const navigator = {clipboard: {writeText: async t => { copiato = t; }}};
 """ + js_blocco + r"""
 function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches = [];
-  rispChiavi = null; rispPost = null; p2pChiaviNote = null; p2pChiaviGiro = null;
+  rispChiavi = null; rispPost = null; rispSeme = null; p2pChiaviNote = null; p2pChiaviGiro = null;
   toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
   p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
   myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero}; }
@@ -36038,8 +36052,8 @@ const corpo = f => JSON.parse(f.opt.body);
   out.inLocale = mazzoMostro() && mazzoMostro().sk === m.sk;
   out.cloudPrimaLettoPoiScritto = cloudLog.join(',') === 'get,set';
   out.cloudPortaIlMazzo = JSON.parse(cloud.get('mostro_mazzo')).sk === m.sk;
-  out.fetchUna = fetches.length === 1 && fetches[0].opt.method === 'POST';
-  const c0 = corpo(fetches[0]);
+  out.fetchUna = chiaviF().length === 1 && chiaviF()[0].opt.method === 'POST';
+  const c0 = corpo(chiaviF()[0]);
   out.corpoTreChiavi = JSON.stringify(Object.keys(c0).sort()) === JSON.stringify(['identita','indice','pubkeys']);
   out.corpoPortaPubEIndice = c0.pubkeys.length === 1 && c0.pubkeys[0] === m.pub
     && c0.identita === m.pub && c0.indice === 0;
@@ -36069,13 +36083,69 @@ const corpo = f => JSON.parse(f.opt.body);
   // E il mazzo cambiato SOTTO non si sovrascrive: si fonde solo se e'
   // ancora lo stesso profilo che ha fatto la domanda.
   out.indiceMaiSotto = mazzoMostro().indice >= 2;
+  // 3c) IL SEME DEL PROFILO LEGATO ALL'ACCOUNT (fase 3)
+  // Il derivato prende il posto del CASO e mai quello di un mazzo: ci
+  // si arriva solo col cloud vuoto DIMOSTRATO.
+  reset();
+  const skSeme = bytesToHex(NT.generateSecretKey());
+  rispSeme = {ok: true, seme: skSeme, versione: 1};
+  const md = await assicuraMazzo();
+  out.semeDiventaIlMazzo = md.sk === skSeme
+    && md.pub === NT.getPublicKey(hexToBytes(skSeme))
+    && md.origine === 'conto' && md.versione === 1;
+  // NESSUN DEBITO DI BACKUP: torna da solo a ogni ingresso, quindi
+  // timbrarlo «da mettere al sicuro» chiederebbe un gesto che non serve.
+  out.derivatoSenzaDebito = md.backupFatto === true;
+  out.derivatoInLocale = mazzoMostro().sk === skSeme;
+  // ⚠️ E IL CLOUD VINCE SUL SEME: un mazzo che gia' esiste non si tocca,
+  // e il seme non si chiede nemmeno. E' L'INVARIANTE DEL CANTIERE — il
+  // derivato e' un ALTRO profilo, con zero recensioni, e sostituirlo in
+  // silenzio distruggerebbe un'identita'.
+  reset();
+  rispSeme = {ok: true, seme: bytesToHex(NT.generateSecretKey()), versione: 1};
+  cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)),
+    indice: 4, creato: 9, backupFatto: true}));
+  const mcv = await assicuraMazzo();
+  out.cloudVinceSulSeme = mcv.sk === sk && mcv.indice === 4;
+  out.semeNemmenoChiesto = !fetches.some(f => String(f.url).endsWith('/p2p/seme'));
+  // 409 = SILENZIO: si genera come si e' sempre fatto.
+  reset(); rispSeme = null;
+  const mg = await assicuraMazzo();
+  out.senzaSemeSiGenera = /^[0-9a-f]{64}$/.test(mg.sk) && mg.sk !== skSeme
+    && mg.origine === '' && mg.backupFatto === false;
+  // ⚠️ UN SEME STORTO NON FA NASCERE UN PROFILO STORTO: 63 caratteri, o
+  // non esadecimale, e si cade sul ramo che genera — o sarebbe un
+  // profilo rotto in silenzio invece di un errore.
+  for (const brutto of ['ab'.repeat(31) + 'a', 'zz'.repeat(32), '', null]) {
+    reset(); rispSeme = {ok: true, seme: brutto, versione: 1};
+    const mb = await assicuraMazzo();
+    if (!/^[0-9a-f]{64}$/.test(mb.sk) || mb.origine !== '') out.semeStortoScartato = false;
+  }
+  if (out.semeStortoScartato !== false) out.semeStortoScartato = true;
+  // E IL MAZZO GIA' IN LOCALE non fa partire nemmeno una domanda.
+  reset(); ricordaMazzo(m); rispSeme = {ok: true, seme: skSeme, versione: 1};
+  await assicuraMazzo();
+  out.localeNienteSeme = !fetches.some(f => String(f.url).endsWith('/p2p/seme'))
+    && mazzoMostro().sk === m.sk;
+  // ⚠️ I DUE CAMPI DEVONO SOPRAVVIVERE AL GIRO NEL CLOUD, e la tortura
+  // e' venuta a chiederlo: togliendoli da `mazzoSerializza` non
+  // diventava rossa NESSUNA prova, e un profilo derivato riletto dalla
+  // copia Telegram sarebbe tornato «per dispositivo» — col foglio che
+  // gli dice «se lo perdi riparti da zero», falso per lui — e con la
+  // versione con cui deriva PERSA, che e' meta' della rotazione.
+  reset();
+  rispSeme = {ok: true, seme: skSeme, versione: 3};
+  await assicuraMazzo();
+  const dopoCloud = mazzoDaTesto(cloud.get('mostro_mazzo'));
+  out.originePersiste = dopoCloud && dopoCloud.origine === 'conto'
+    && dopoCloud.versione === 3 && dopoCloud.sk === skSeme;
   // 4) dal cloud non si fabbrica un mazzo nuovo
   reset();
   cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 2, creato: 9, backupFatto: true}));
   const mc = await assicuraMazzo();
   out.tornatoDalCloud = mc.sk === sk && mc.indice === 2 && mc.backupFatto === true;
   out.cloudNonRiscritto = cloudLog.join(',') === 'get';
-  out.registratoLoStesso = fetches.length === 1 && corpo(fetches[0]).pubkeys[0] === mc.pub;
+  out.registratoLoStesso = chiaviF().length === 1 && corpo(chiaviF()[0]).pubkeys[0] === mc.pub;
   // 5) col mazzo gia' in locale il gesto parte subito, e la copia nel
   //    cloud si rifa' per conto suo: e' LA MIGRAZIONE, il difetto che ha
   //    aperto il cantiere — un mazzo nato prima del cloud non ci finiva
@@ -36089,7 +36159,7 @@ const corpo = f => JSON.parse(f.opt.body);
   // 6) fuori da Telegram niente cloud, ma il mazzo nasce
   reset(); tg = undefined;
   const mf = await assicuraMazzo();
-  out.senzaTelegram = /^[0-9a-f]{64}$/.test(mf.sk) && cloudLog.length === 0 && fetches.length === 1;
+  out.senzaTelegram = /^[0-9a-f]{64}$/.test(mf.sk) && cloudLog.length === 0 && chiaviF().length === 1;
   reset(); tg = {initData: '', isVersionAtLeast: v => true, CloudStorage: cloudVero};
   await assicuraMazzo();
   out.stubNonInganna = cloudLog.length === 0;
@@ -36100,7 +36170,11 @@ const corpo = f => JSON.parse(f.opt.body);
   // 8) due gesti insieme = un mazzo solo
   reset();
   const [d1, d2] = await Promise.all([assicuraMazzo(), assicuraMazzo()]);
-  out.unoSolo = d1.sk === d2.sk && fetches.length === 1;
+  // UNA PROMESSA SOLA PER VOLTA, e adesso vale per DUE rotte: due
+  // gesti insieme non devono fare due mazzi ne' chiedere due volte
+  // il seme dell'account. A garantirlo e' il gate `mazzoInCorso`.
+  const semiF = () => fetches.filter(f => String(f.url).endsWith('/p2p/seme'));
+  out.unoSolo = d1.sk === d2.sk && chiaviF().length === 1 && semiF().length <= 1;
   // 9) mazzoMostro non crede a un dato storto
   reset(); store.set('barattolo_mostro', 'xx');
   out.corrotto = mazzoMostro() === null;
@@ -36252,6 +36326,15 @@ const corpo = f => JSON.parse(f.opt.body);
         "pavimentoNonAbbassa": "...e uno piu' basso non lo fa scendere",
         "senzaCorpoVaBene": "...e una risposta senza corpo non annulla il gesto",
         "indiceMaiSotto": "...e l'indice non scende mai sotto quel che era",
+        "semeDiventaIlMazzo": "il seme dell'account diventa il profilo",
+        "derivatoSenzaDebito": "...senza un debito di backup, che torna da solo",
+        "derivatoInLocale": "...e finisce in localStorage",
+        "cloudVinceSulSeme": "il mazzo del cloud VINCE sul seme",
+        "semeNemmenoChiesto": "...e il seme non si chiede nemmeno",
+        "senzaSemeSiGenera": "senza seme (409) si genera come sempre",
+        "semeStortoScartato": "un seme storto si scarta e non fa un profilo rotto",
+        "localeNienteSeme": "col mazzo gia' in locale il seme non si chiede",
+        "originePersiste": "...e origine e versione sopravvivono al giro nel cloud",
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
@@ -39081,6 +39164,46 @@ def prove_p2p_server():
           "p2p_indice" in getp)
     prova("il pavimento segue l'utente alla fusione", True,
           "UPDATE p2p_indice SET tg_id=? WHERE tg_id=?" in src)
+
+    # --- 11) IL SEME PRENDE IL POSTO DEL CASO (fase 3) --------------
+    # ⚠️ E' L'INVARIANTE DEL CANTIERE, e sta tutto in una riga di
+    # POSIZIONE: il seme si chiede DOPO aver guardato il cloud e PRIMA
+    # di generare a caso. Spostarlo sopra la lettura del cloud vorrebbe
+    # dire sostituire un profilo che esiste — cioe' distruggere
+    # un'identita' e la reputazione che ha sul coordinatore, che da qui
+    # non si vede e non si recupera.
+    am = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
+    prova("assicuraMazzo: prima il cloud, poi il seme, e SOLO in fondo genera",
+          True, 0 < am.find("cloudLeggiEsito(CLOUD_MAZZO)")
+                  < am.find("semeProfiloP2P(")
+                  < am.find("generateSecretKey"))
+    # E CHI HA GIA' UN MAZZO NON PASSA DI LI': `sincronizzaMazzo` non
+    # deve chiedere il seme nemmeno per sbaglio — la' un profilo c'e'
+    # gia', e il derivato non ha nessun titolo per entrare.
+    sm = pezzo_js(mini, "function sincronizzaMazzo(", "\n}\n")
+    prova("...e sincronizzaMazzo non chiede MAI il seme", False,
+          "semeProfiloP2P" in sm)
+    # LA ROTTA: nessun corpo, nessun parametro, e i tre gate.
+    seme_r = src[src.index('@app.post("/api/p2p/seme")'):]
+    seme_r = seme_r[:seme_r.index("\n\n\n")]
+    prova("la rotta del seme non prende parametri", True,
+          "def seme_profilo_p2p(x_tg_init_data: str = Header(\"\"),"
+          in seme_r and "Request" not in seme_r)
+    prova("...e ha il gate della persona", True,
+          'if not _p2p_per(user["id"])["attivo"]:' in seme_r)
+    # ⚠️ `tg_id > 0` TIENE IN PIEDI IL PATTO: chi entra da Nostr ha un id
+    # NEGATIVO ed e' venuto qui apposta per non farsi ricavare niente.
+    prova("...e la strada derivata e' SOLO per chi entra da Telegram", True,
+          'if user["id"] <= 0 or not _segreto_p2p_vivo():' in seme_r)
+    prova("...e non si mette in cache", True,
+          '"Cache-Control": "no-store, private"' in seme_r)
+    # LA VERSIONE E' QUELLA DELLA RIGA e non quella viva: e' cio' che
+    # permette di ruotare senza un giorno-zero.
+    prova("...e deriva con la versione della RIGA, non con quella viva",
+          True, 'versione = riga.get("versione", 0)' in seme_r
+          and "SEGRETI_PROFILO_P2P.get(versione" in seme_r)
+    prova("...e il seme non esce mai a meta'", True,
+          "if not seme:" in seme_r)
 
 
 def prove_p2p_campanello():

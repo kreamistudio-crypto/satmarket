@@ -30265,6 +30265,68 @@ def conta_chiavi_p2p(x_tg_init_data: str = Header(""),
     return {"ok": True, **esito}
 
 
+@app.post("/api/p2p/seme")
+def seme_profilo_p2p(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """Il seme del profilo di scambio di chi entra da Telegram.
+
+    NESSUN CORPO E NESSUN PARAMETRO, la regola della GET qui accanto:
+    non si puo' chiedere il seme DI UN ALTRO, e non esiste nemmeno la
+    sintassi per provarci. Ed e' anche cio' che tiene UNA sola `body:`
+    nel blocco del mazzo, dove la sentinella pretende che l'unico corpo
+    che parte di li' sia quello delle pubkey.
+
+    E' UNA ROTTA SUA E NON UN CAMPO DI `/api/me`, per quattro ragioni
+    che vanno tutte nello stesso verso: `/api/me` rispedisce la riga
+    intera di `utenti` e parte a ogni apertura per TUTTI — anche per chi
+    il P2P non lo tocca mai e anche in fase chiusa — mentre questo deve
+    partire una volta sola, al primo gesto che lo richiede; li' non c'e'
+    nessuno dei gate di qui; li' non c'e' `no-store`; e qui si SCRIVE
+    (il sale nasce ora), che su una GET non si fa.
+
+    ⚠️ `tg_id > 0` E' LA RIGA CHE TIENE IN PIEDI IL PATTO: la strada
+    derivata e' solo per chi entra da Telegram. Un nativo Nostr ha un
+    id NEGATIVO e prende 409 — e' venuto qui apposta per non farsi
+    ricavare niente, e questa rotta non deve poterglielo fare.
+
+    NON TORNA L'INDICE, e va detto perche' il disegno lo prevedeva:
+    per darlo servirebbe la PUBKEY del seme, cioe' una moltiplicazione
+    sulla curva, e in questo blocco non entra una libreria di curve (in
+    CI non c'e', e la regola e' che qui non si firma niente). Non serve:
+    il client deriva la pubkey da solo e la manda subito dopo a
+    `/api/p2p/chiavi`, che il pavimento glielo risponde — identita' e
+    contatore restano un colpo solo, in due rotte invece che in una.
+
+    409 IN TUTTI I MODI DI NON POTERE, e mai un seme a meta': leva
+    spenta, fase chiusa, id negativo, segreto assente, versione che nel
+    dizionario non c'e' piu' (un ripristino da un backup vecchio), o
+    uno scalare non derivabile. Il client legge il 409 come SILENZIO —
+    il patto della GET — e genera come ha sempre fatto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    if user["id"] <= 0 or not _segreto_p2p_vivo():
+        raise HTTPException(409, "Il profilo legato all'account non e' attivo")
+    con = db()
+    riga = _sale_profilo_p2p(con, user["id"], int(time.time()))
+    con.close()
+    # LA VERSIONE E' QUELLA DELLA RIGA e non quella viva: chi c'era
+    # prima di una rotazione continua a derivare con la SUA finche' non
+    # passa alla nuova con un gesto. E' tutto il senso della colonna.
+    versione = riga.get("versione", 0)
+    segreto = SEGRETI_PROFILO_P2P.get(versione, "")
+    if not riga.get("sale") or not segreto:
+        raise HTTPException(409, "Il profilo legato all'account non e' attivo")
+    try:
+        seme = _seme_profilo_p2p(segreto, riga["sale"], user["id"], versione)
+    except ValueError:
+        seme = ""
+    if not seme:
+        raise HTTPException(409, "Il profilo legato all'account non e' attivo")
+    return JSONResponse({"ok": True, "seme": seme, "versione": versione},
+                        headers={"Cache-Control": "no-store, private"})
+
+
 # ---------- IL CAMPANELLO DELLO SCAMBIO P2P (set 2026, tappa 7) ------
 # Uno scambio dura ore: il taker ha 900 secondi per la sua mossa,
 # l'ordine 24. Fra una mossa e l'altra la Mini App e' CHIUSA — e le
