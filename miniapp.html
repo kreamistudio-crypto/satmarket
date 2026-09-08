@@ -5795,7 +5795,11 @@ document.getElementById('cartello')?.remove();</script>
       </ul>
 
       <h3 id="priv-p2p">Il profilo di scambio P2P</h3>
-      <p>Per scambiare sats in euro con altre persone Barattolo ti fa da tramite verso un <b>coordinatore</b> (Mostro, un servizio indipendente), e per riconoscerti lì nasce nel tuo browser un <b>profilo di scambio</b>: un codice segreto che <b>il nostro server non riceve mai</b> — ne conosce solo la parte pubblica, per poterti avvisare quando c'è una novità in uno scambio. Se entri da Telegram il profilo viene salvato anche nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Dal profilo di scambio lo vedi, lo copi su un altro dispositivo o lo dimentichi; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
+      <p>Per scambiare sats in euro con altre persone Barattolo ti fa da tramite verso un <b>coordinatore</b> (Mostro, un servizio indipendente), e per riconoscerti lì serve un <b>profilo di scambio</b>. Da settembre 2026 può nascere in tre modi, e a cambiare è <b>chi lo può ricavare</b>.</p>
+      <p><b>Se entri da Telegram</b>, il profilo lo <b>ricaviamo noi dal tuo account</b>: così è lo stesso dal bot, dal sito e dall'app, e torna da solo su un telefono nuovo senza che tu debba salvare niente. Il prezzo lo diciamo per intero: <b>quel profilo il server di Barattolo lo sa ricavare</b>, quindi in linea di principio potrebbe firmare uno scambio al posto tuo. Non lo facciamo, e non c'è niente nel programma che lo faccia — ma <b>potremmo</b>, e questo è l'unico posto di Barattolo in cui possiamo dirlo di un tuo segreto. Per ricavarlo servono <b>due cose insieme</b>, una nella configurazione del server e una nel database: chi si portasse via una sola delle due non ricaverebbe nulla.</p>
+      <p><b>Se entri con una chiave Nostr che è tua</b> e ce l'hai tu (incollata, non dentro un'estensione o un firmatario esterno), puoi usare quella come profilo di scambio: allora <b>non lo può ricavare nessuno tranne te</b>, noi compresi, ed è lo stesso ovunque perché ce l'hai tu.</p>
+      <p><b>Negli altri casi</b> — un'estensione, un firmatario esterno, o il browser e basta — il profilo <b>nasce qui e resta qui</b>: non lo può ricavare nessuno, e per portarlo su un altro dispositivo se ne copia il codice segreto. Dentro Telegram ne salviamo anche una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo.</p>
+      <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal profilo di scambio lo vedi, lo copi, lo cambi o lo dimentichi; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Le vostre <b>conversazioni</b> non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
 
       <h3 id="priv-tor">Se ti colleghi da Tor</h3>
@@ -32942,6 +32946,15 @@ function ricaricaP2P(){
 const MOSTRO_CHIAVE = 'barattolo_mostro';
 const CLOUD_MAZZO = 'mostro_mazzo';
 const MAZZO_INFO = 'barattolo/mostro/scambio/';
+/* IL PROFILO DI PRIMA, quando si passa a quello legato all'account:
+   non si CANCELLA, si mette da parte. Senza un ritorno indietro quella
+   scelta si farebbe al buio — e a valere non e' la comodita' ma la
+   reputazione, che vive sul coordinatore e da qui non si vede. */
+const MAZZO_PRIMA = 'barattolo_mostro_prima';
+/* «Tengo questo»: l'offerta non deve tornare a ogni apertura. Non e'
+   irreversibile — resta la riga discreta sotto — ma chiedere due volte
+   la stessa cosa e' il modo di farsi dire di si' per stanchezza. */
+const MAZZO_OFFERTA = 'barattolo_mostro_offerta';
 const FORMA_HEX64 = /^[0-9a-f]{64}$/;
 let p2pRegistrato = false;
 let p2pAdozione = false;
@@ -33264,6 +33277,22 @@ async function semeProfiloP2P(){
     return {sk, versione: (d && d.versione) | 0};
   } catch(e){ return null; }
 }
+/* ⚠️ GLI SCAMBI APERTI SONO LA GUARDIA CHE COSTA DI PIU', e non e'
+   prudenza generica: se il mazzo cambia mentre una hold invoice tiene
+   dei sats, quei sats restano SENZA NESSUNO CHE POSSA MUOVERLI — la
+   chiave di trade con cui si libera o si disputa era in quel profilo,
+   e il coordinatore continuerebbe a parlare con una chiave che qui non
+   c'e' piu'. Non e' una riga che se ne va: e' un pagamento che perde il
+   padrone, la stessa ragione per cui uno scambio aperto non si toglie
+   dalla lista.
+   VALE PER OGNI SOSTITUZIONE e non solo per quella nuova: fin qui
+   `usaMazzoDellaNuvola` e l'importazione potevano sostituire il mazzo
+   senza chiederselo — un difetto che c'era gia' e che il profilo
+   legato all'account renderebbe frequente. */
+function scambiApertiP2P(){
+  const o = ordiniP2P();
+  return Object.keys(o).filter(k => o[k] && P2P_FINALI.indexOf(o[k].stato) < 0).length;
+}
 /* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
    il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
    Telegram — la cache svuotata non deve fabbricare un profilo nuovo a
@@ -33341,6 +33370,66 @@ async function apriProfiloP2P(){
      cassa — mai un'attesa davanti a un foglio già disegnabile */
   sincronizzaMazzo().then(renderProfiloP2P);
 }
+/* LA STRADA SOVRANA (set 2026, fase 4): chi entra con una chiave Nostr
+   SUA puo' usarla come profilo di scambio — allora non lo ricava
+   nessuno, noi compresi, ed e' lo stesso ovunque perche' ce l'ha lui.
+   ⚠️ QUESTA FUNZIONE STA FUORI DA `renderProfiloP2P` APPOSTA, e non per
+   ordine: la sentinella pretende che quella non dica mai «Nostr»,
+   «nsec» o «relay» — chi entra da Telegram non deve leggere parole di
+   protocollo. Qui chi legge e' arrivato proprio da li', e chiamare le
+   cose col loro nome e' l'unico modo di non confonderlo.
+   E CHI USA UN'ESTENSIONE O UN BUNKER NON PUO', e glielo si dice
+   invece di lasciarlo provare: `firmaMostro` firma BYTES GREZZI, e
+   NIP-07 e NIP-46 firmano solo EVENTI — non c'e' modo deterministico
+   ne' di derivare ne' di firmare. Promettere di piu' sarebbe mentire. */
+function pannelloSovranoP2P(){
+  if (!myNpubAccesso) return '';
+  const m = mazzoMostro();
+  const gia = m && m.origine === 'mia';
+  if (gia) return `<div class="hint">Il tuo profilo di scambio è la tua
+    chiave Nostr: non lo può ricavare nessuno, nemmeno noi, e lo ritrovi
+    ovunque perché ce l'hai tu.</div>`;
+  return `<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Usa la tua chiave Nostr</summary>
+    <div class="hint" style="margin-top:8px">Se la chiave con cui entri in
+      Barattolo ce l'hai <b>tu</b>, può diventare il tuo profilo di scambio:
+      allora nessuno lo può ricavare — noi compresi — ed è lo stesso su
+      ogni dispositivo.<br>
+      Se la tua chiave vive in un'<b>estensione</b> o in un firmatario
+      esterno (Amber, un bunker), qui non si può: il coordinatore vuole
+      firme che quelli non sanno fare. Va bene lo stesso — il profilo di
+      questo dispositivo funziona, e col codice segreto lo porti dove vuoi.</div>
+    <div class="field"><label>La tua nsec</label>
+      <input type="password" id="p2pNostrInp" autocomplete="new-password" spellcheck="false" placeholder="nsec1…"></div>
+    <button class="btn ghost" onclick="usaChiaveNostrP2P()">Usa questa chiave</button>
+  </details>`;
+}
+/* ⚠️ SI VERIFICA CHE SIA LA CHIAVE CON CUI ENTRA, e non e' pignoleria:
+   accettarne un'altra farebbe nascere un profilo che il server non sa
+   essere suo, che non tornerebbe da nessun'altra parte e che smetterebbe
+   di essere «lo stesso ovunque» — cioe' prometterebbe la sovranita' e
+   consegnerebbe un terzo mazzo per dispositivo travestito. */
+async function usaChiaveNostrP2P(){
+  const inp = el('p2pNostrInp');
+  const testo = (inp && inp.value || '').trim();
+  if (!testo) { toast('Incolla la tua nsec'); return; }
+  await caricaNostrTools();
+  const d = mazzoDaTesto(testo);
+  if (!d) { toast('Questa non sembra una chiave valida'); return; }
+  const NT = window.NostrTools;
+  let attesa = String(myNpubAccesso || '').toLowerCase();
+  if (attesa.startsWith('npub1')) {
+    try { attesa = NT.nip19.decode(attesa).data; } catch(e){ attesa = ''; }
+  }
+  if (!attesa || d.pub !== attesa) {
+    toast('Questa non è la chiave con cui entri in Barattolo: il profilo resta quello di adesso');
+    return;
+  }
+  if (inp) inp.value = '';
+  const m = mazzoMostro();
+  if (m) { try { localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m)); } catch(e){} }
+  if (await applicaImportMazzo(Object.assign({}, d, {origine: 'mia', versione: 0})) === false) return;
+  toast('Il tuo profilo di scambio è la tua chiave ✓');
+}
 function renderProfiloP2P(){
   const box = el('p2pProfiloCorpo');
   if (!box) return;
@@ -33390,7 +33479,16 @@ function renderProfiloP2P(){
     return;
   }
   const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
-  const debito = m.backupFatto
+  /* IL DEBITO NON VALE PER TUTTI, e dirlo a chi non ce l'ha sarebbe
+     falso: un profilo che si ricava dall'account torna da solo a ogni
+     ingresso, quindi «se lo perdi riparti da zero» per lui non e' vero.
+     Il codice segreto li' serve a un'altra cosa — portarlo FUORI da
+     Barattolo — e si dice quella. */
+  const debito = m.origine === 'conto'
+    ? 'Questo profilo <b>torna da solo</b> ogni volta che entri, su qualunque dispositivo: non c\'è niente da salvare. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.'
+    : m.origine === 'mia'
+    ? '✓ Il codice segreto ce l\'hai già tu: questo profilo non lo può ricavare nessun altro, noi compresi.'
+    : m.backupFatto
     ? '✓ Hai salvato il codice segreto.'
     : 'Il codice segreto è la tua copia: con lui il profilo torna su qualunque dispositivo, e le recensioni con lui. <b>Se lo perdi, la reputazione riparte da zero.</b> Gli scambi aperti restano qui.';
   /* IL CONFLITTO NON SI RISOLVE DA SOLO: due mazzi diversi sono due
@@ -33406,9 +33504,48 @@ function renderProfiloP2P(){
         <button class="btn ghost" onclick="tieniMazzoDiQui()">⬆️ Tieni questo e sostituisci la copia</button>
        </span></div>`
     : '';
+  /* L'OFFERTA, E NON UN AUTOMATISMO. Compare a chi ha un profilo che
+     vive su questo dispositivo e ha un account Telegram: dice cosa si
+     guadagna, cosa si perde e cosa costa, e lascia scegliere. Non
+     compare a chi ce l'ha gia' legato, a chi ha detto di no, e — la
+     riga che conta — a chi ha uno SCAMBIO APERTO: cambiare profilo li'
+     lascerebbe dei sats senza nessuno che possa muoverli. */
+  let rifiutata = false;
+  try { rifiutata = localStorage.getItem(MAZZO_OFFERTA) === 'no'; } catch(e){}
+  const aperti = scambiApertiP2P();
+  const offerta = (m.origine || myTgId) && m.origine !== 'conto' && m.origine !== 'mia' && myTgId
+    ? (aperti
+      ? `<div class="hint">Il tuo profilo può seguire il tuo account, ma hai uno scambio ancora aperto: <b>finiscilo prima</b>, poi torna qui.</div>`
+      : rifiutata
+      ? `<div class="hint">Il tuo profilo può seguire il tuo account.
+         <button class="btn mini" onclick="passaAlProfiloDelConto()">Vedi come</button></div>`
+      : `<div class="trust-note"><span>🔁</span><span>
+         <b>Il tuo profilo può seguire il tuo account.</b>
+         Quello di adesso vive su questo dispositivo: se cambi telefono lo
+         ritrovi solo col suo codice segreto. Possiamo dartene uno che
+         torna da solo ogni volta che entri, ovunque.<br>
+         <b>È un altro profilo, non questo trasformato:</b> gli scambi e le
+         recensioni di adesso restano attaccati a questo.<br>
+         In cambio: quello nuovo lo <b>ricava anche il server di
+         Barattolo</b>, e questo non lo ricava nessuno tranne te.
+         <button class="btn ghost" onclick="passaAlProfiloDelConto()">🔁 Lega al mio account</button>
+         <button class="btn ghost" onclick="rifiutaOffertaConto()">Tengo questo</button>
+        </span></div>`)
+    : '';
+  /* IL RITORNO INDIETRO e' cio' che rende la scelta reversibile: senza,
+     quel gesto si farebbe al buio. */
+  let hoPrima = false;
+  try { hoPrima = !!localStorage.getItem(MAZZO_PRIMA); } catch(e){}
+  const indietro = hoPrima
+    ? `<div class="hint">Il profilo di prima è ancora qui: puoi tornarci.
+       <button class="btn mini" onclick="tornaAlProfiloDiPrima()">↩︎ Torna a quello</button></div>`
+    : '';
   box.innerHTML = `<div class="hint">Profilo attivo dal <b>${esc(dal)}</b>. ${dove}</div>
     ${scelta}
     <div class="hint">${debito}</div>
+    ${offerta}
+    ${indietro}
+    ${pannelloSovranoP2P()}
     <form id="p2pCodiceForm" onsubmit="codiceP2PSalvato(); return false;" style="display:${p2pCodiceVisibile ? '' : 'none'}">
       <input type="text" name="username" value="barattolo-profilo-di-scambio" autocomplete="username" readonly tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px">
       <div class="field"><label>Il codice segreto del profilo</label>
@@ -33507,6 +33644,14 @@ L'altro non si cancella: resta sul dispositivo dov'è, ma senza copia.`,
     }});
 }
 async function applicaImportMazzo(d){
+  /* LA CINTURA STA QUI E NON SOLO NEI GESTI, perche' qui ci passano
+     TUTTE le sostituzioni: l'importazione, il profilo del Telegram, e
+     il passaggio a quello legato all'account. Un gesto nuovo che
+     domani dimenticasse di chiedere si troverebbe fermato lo stesso. */
+  if (scambiApertiP2P()) {
+    toast('Hai uno scambio ancora aperto: finiscilo prima di cambiare profilo');
+    return false;
+  }
   ricordaMazzo(d);
   mazzoNuvola = await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(d)) ? 'copia' : 'muto';
   mazzoNuvolaAltro = null;
@@ -33514,6 +33659,66 @@ async function applicaImportMazzo(d){
   p2pCodiceVisibile = false;
   renderProfiloP2P();
   toast('Profilo di scambio importato ✓');
+}
+/* IL PASSAGGIO AL PROFILO LEGATO ALL'ACCOUNT (set 2026, fase 4).
+   E' UN'OFFERTA E NON UN AUTOMATISMO, ed e' la riga che regge il
+   cantiere: il profilo che c'e' NON e' una versione sbagliata di
+   quello nuovo — e' un'altra identita', con le sue recensioni, che dal
+   coordinatore e' una persona diversa. Cambiarlo al posto di chi
+   guarda vorrebbe dire buttarne una. Quindi si spiega, si chiede, e si
+   lascia una strada per tornare indietro. */
+async function passaAlProfiloDelConto(){
+  const m = mazzoMostro();
+  if (!m) { toast('Non c\'è ancora un profilo da spostare'); return; }
+  if (scambiApertiP2P()) {
+    toast('Hai uno scambio ancora aperto: finiscilo prima di cambiare profilo');
+    return;
+  }
+  chiediConferma({titolo: 'Legare il profilo al tuo account?',
+    corpo: `Ne nasce uno nuovo, che torna da solo ogni volta che entri, da qualunque dispositivo.
+
+È un altro profilo, non questo trasformato: gli scambi e le recensioni di adesso restano attaccati a quello di adesso.
+
+Se non hai salvato il suo codice segreto, la sua reputazione non si recupera più.`,
+    etichetta: 'Lega al mio account', poi: async () => {
+      await caricaNostrTools();
+      const s = await semeProfiloP2P();
+      /* SE IL SEME NON ARRIVA NON SI TOCCA NIENTE: meglio un gesto che
+         non fa niente e lo dice, che un profilo mezzo cambiato. */
+      if (!s) { toast('Il profilo legato all\'account non è disponibile ora'); return; }
+      const NT = window.NostrTools;
+      const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
+                     indice: 0, creato: Math.floor(Date.now()/1000),
+                     backupFatto: true, origine: 'conto', versione: s.versione | 0};
+      if (nuovo.sk === m.sk) { toast('È già il profilo del tuo account'); return; }
+      /* IL VECCHIO SI METTE DA PARTE PRIMA di toccare qualunque cosa:
+         se qualcosa andasse storto dopo, la via del ritorno c'e' gia'. */
+      try { localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m)); } catch(e){}
+      if (await applicaImportMazzo(nuovo) === false) return;
+      toast('Profilo legato al tuo account ✓');
+    }});
+}
+/* Il ritorno indietro, che e' cio' che rende la scelta reversibile. */
+async function tornaAlProfiloDiPrima(){
+  let prima = null;
+  try { prima = localStorage.getItem(MAZZO_PRIMA); } catch(e){}
+  await caricaNostrTools();
+  const d = prima ? mazzoDaTesto(prima) : null;
+  if (!d) { toast('Non c\'è nessun profilo di prima da riprendere'); return; }
+  chiediConferma({titolo: 'Tornare al profilo di prima?',
+    corpo: `Torna il profilo che avevi su questo dispositivo, con le sue recensioni.
+
+Quello legato all'account non si perde: si ricava di nuovo dal tuo account quando vuoi.`,
+    etichetta: 'Torna a quello', poi: async () => {
+      if (await applicaImportMazzo(d) === false) return;
+      try { localStorage.removeItem(MAZZO_PRIMA); } catch(e){}
+      toast('Profilo di prima ripreso ✓');
+    }});
+}
+/* «Tengo questo»: l'offerta si richiude, e resta la riga discreta. */
+function rifiutaOffertaConto(){
+  try { localStorage.setItem(MAZZO_OFFERTA, 'no'); } catch(e){}
+  renderProfiloP2P();
 }
 function scordaMazzo(){
   chiediConferma({titolo: 'Dimenticare il profilo?',
