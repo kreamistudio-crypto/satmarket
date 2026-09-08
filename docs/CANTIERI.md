@@ -5796,6 +5796,37 @@ del panico del relay non diceva DI QUALE MACCHINA parlasse. Ora ha le
 tre in tabella con nome e indirizzo — il relay, il VPS e il nodo — che
 e' un'informazione da un rigo e si cercava sotto panico.
 
+L'indice del mazzo converge, e si scrive nei due versi (set 2026,
+`716f8d1`). VOCE RECUPERATA IN RITARDO, e si dice: quel cantiere ando'
+in commit senza la sua riga in questo file — i suoi perche' vivevano
+solo nel messaggio del commit e in CLAUDE.md — contro la regola 8. Sta
+qui adesso perche' la fase 2 del cantiere del profilo legato all'account
+ci e' passata sopra e ne ha esteso la regola al server: senza questa
+voce, quella si leggerebbe come una decisione nata dal nulla.
+IL DIFETTO: lo stesso mazzo su due dispositivi tornava `copia` e
+l'indice non lo toccava nessuno — lo raccoglieva solo l'ADOZIONE.
+Quindi due dispositivi che scambiano entrambi RIUSANO una trade key
+gia' viva: `ordiniAscoltoP2P` indicizza per `pubTrade` e l'ultimo
+vince, i messaggi di uno scambio finiscono sull'altro, e il
+coordinatore risponde `invalid-trade-index` — che a schermo diventa
+«prova a riaprire l'app», mentre riaprire non ripara niente.
+VINCE IL PIU' ALTO E MAI IL PIU' RECENTE, ed e' la regola che regge
+tutto il resto: l'indice conta le chiavi BRUCIATE, quindi tornare
+indietro le riusa, e chi e' avanti non ha niente da imparare da chi e'
+indietro. Non e' una sincronizzazione, e' un PAVIMENTO.
+E SI SCRIVE NEI DUE VERSI, che e' la meta' che si dimentica: col cloud
+avanti si allinea il locale, col LOCALE avanti si riscrive il cloud —
+ed e' la riprova della scrittura persa, l'unico modo in cui i due
+possono divergere (ogni incremento scrive il cloud, e quella scrittura
+e' fail-open MUTA). Senza il secondo verso la convergenza resta a
+meta': il dispositivo arretrato prenderebbe il massimo fra il suo e un
+cloud vecchio, cioe' si allineerebbe a un numero gia' superato.
+E IL SEGUITO STA PIU' IN BASSO: la fase 2 del cantiere del profilo
+legato all'account ha aggiunto il TERZO posto in cui l'indice converge
+— il server, con `p2p_indice` — perche' i due di qui bastano solo a chi
+passa dal cloud di Telegram, e col profilo che si ricava dall'account un
+browser mai visto diventa il caso normale invece dell'eccezione.
+
 Il profilo di scambio si lega all'account, e le tre strade piu' ovvie
 sono tutte sbagliate (set 2026, CANTIERE IN CORSO — questa voce cresce
 a ogni fase, e si chiude con l'ultima). Il mazzo Mostro nasceva casuale
