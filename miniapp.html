@@ -1756,6 +1756,19 @@
      capo e' meglio che allargare la pagina. */
   .p2p-rep{display:flex;flex-wrap:wrap;justify-content:space-between;
     gap:2px 10px;font-size:12px}
+  /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
+     l'auto-margine la spinge in fondo alla SUA riga.
+     MA COL CONTENUTO VERO QUEL CAPO NON ARRIVA MAI, ed e' misurato e
+     non dedotto: il caso peggiore sono DUE span e non tre, perche'
+     «tocca a te» esce da azioniDisponibili(), che tace su tutti gli
+     stati finali — cioe' esattamente quelli su cui la ✕ compare, e
+     le due cose non possono coesistere. A 320px con lo stato piu'
+     lungo («Scambio annullato») la ✕ resta IN RIGA con gli span, a
+     31px dal bordo destro (identico a 360 e 375: l'auto-margine fa il
+     suo mestiere). Il suo costo sono +3.8px di card, perche' il
+     bottone e' piu' alto del testo — non perche' scende.
+     Chi aggiunge un terzo span a questa riga RIMISURI a 320. */
+  .p2p-x{margin-left:auto}
   #view-p2p .btn{margin-top:14px}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
   /* le stelle sono l UNICO gesto del foglio: grandi, in fila, e col
@@ -33462,7 +33475,7 @@ let p2pOrdineAperto = '';
 let p2pHoldOrdine = '';
 let p2pIncassoOrdine = '';
 let p2pStatoChiesto = false;    // la via di riserva: una REQ per apertura
-const P2P_SCAMBI_MAX = 12;      // in lista i piu' recenti; i vecchi non spariscono
+const P2P_SCAMBI_MAX = 12;      // in lista i piu' recenti; gli altri li conta la riga in fondo
 
 /* ---- gli ordini presi vivono nel browser ----
    L'indice→ordine lo sa solo chi ha il profilo, e il server non deve
@@ -33498,6 +33511,115 @@ function scriviOrdineP2P(o){
   try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
   return o;
 }
+/* ---- QUANDO UNO SCAMBIO SI PUO' TOGLIERE ----
+   UN GIUDICE SOLO, e lo chiedono in due: la ✕ della riga e la scopa.
+   Due letture della stessa domanda un giorno direbbero due cose
+   diverse, e qui la differenza sta fra una riga che sparisce e dei
+   sats che restano senza padrone.
+
+   LA RAGIONE DELLA GUARDIA, che e' quel che va capito prima di
+   ammorbidirla: togliere una riga APERTA cancella la sua chiave di
+   trade, e i sats bloccati restano senza nessuno che li muova. Non
+   e' una riga che se ne va, e' un pagamento che non ha piu' padrone.
+   Su Barattolo la riga vive nel database e «nascondi» la lascia
+   dov'e'; qui il telefono E' l'archivio, quindi togliere e' per
+   sempre e per questo si guarda due volte.
+
+   «senza_risposta» E' IL CASO SOTTILE e non e' finale: il
+   coordinatore non ha risposto entro P2P_ATTESA_MS, ma l'ordine puo'
+   essere vivo lo stesso — e la sua chiave serve a riprenderlo (e'
+   quel che fa «↻ Riprova»). Si toglie solo dopo l'ORIZZONTE del
+   coordinatore, `expiration_hours` = 168 ore: oltre quello l'ordine
+   e' scaduto nel libro e non c'e' piu' niente da riprendere.
+   Torna anche i GIORNI che restano, perche' la riga possa DIRLO
+   invece di tacere: un bottone che non c'e' senza un perche' si
+   legge come un guasto. */
+const P2P_ORIZZONTE_S = 168 * 3600;
+function p2pTogliibile(o, adesso){
+  const zero = {si: false, giorni: 0};
+  if (!o) return zero;
+  if (P2P_FINALI.indexOf(o.stato) >= 0) return {si: true, giorni: 0};
+  if (o.stato !== 'senza_risposta') return zero;
+  /* senza un'ancora non si sa da quando aspetta: si TIENE.
+     Fail-closed nel verso giusto — una riga di troppo costa una riga,
+     una chiave buttata costa i sats di qualcuno. */
+  const nato = o.creato || o.aggiornato || 0;
+  if (!nato) return zero;
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const restano = P2P_ORIZZONTE_S - (ora - nato);
+  if (restano <= 0) return {si: true, giorni: 0};
+  return {si: false, giorni: Math.max(1, Math.ceil(restano / 86400))};
+}
+
+/* LA SCOPA: quel che si puo' togliere se ne va da solo dopo un mese.
+   Gira in testa a scambiP2P — la lista e' l'unico posto che li
+   mostra, quindi guardarla e' il momento giusto per farla pulita, e
+   non nasce nessun timer da ricordare.
+   Legge il GIUDICE e ci mette due condizioni SUE: da quanto lo STATO
+   non cambia, e il voto ancora da dare.
+   E' L'ULTIMO CAMBIO DI STATO E NON L'ULTIMO TOCCO, che e' la riga
+   da leggere prima di tarare i giorni: «aggiornato» lo scrive il
+   solo ramo di AVANZA_P2P e «quando» il solo ramo del coordinatore,
+   quindi un «non posso farlo» o un voto arrivato non spostano
+   niente. Sbaglia nel verso di togliere PRIMA, e l'unico caso in
+   cui conterebbe — il voto — lo copre la riga qui sotto.
+   IL «concluso» COL VOTO IN SOSPESO NON SI TOCCA: e' finale per i
+   sats, non per la reputazione — e sul coordinatore la reputazione e'
+   l'unica cosa che chi scambia si porta dietro. */
+const P2P_SCOPA_GIORNI = 30;
+function pulisciScambiP2P(){
+  const tutti = ordiniP2P();
+  const adesso = Math.floor(Date.now() / 1000);
+  let tolti = 0;
+  for (const k of Object.keys(tutti)) {
+    const o = tutti[k];
+    if (!o || !p2pTogliibile(o, adesso).si) continue;
+    if (o.stato === 'concluso' && o.votabile && !o.votato) continue;
+    const mosso = o.quando || o.aggiornato || o.creato || 0;
+    if (!mosso || adesso - mosso < P2P_SCOPA_GIORNI * 86400) continue;
+    delete tutti[k];
+    tolti++;
+  }
+  if (tolti) {
+    try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+  }
+  return tolti;
+}
+
+/* LA ✕ DELLA RIGA: si toglie una cosa alla volta, e si chiede prima.
+   L'id arriva dal DOM, e il DOM non e' la verita': il giudice si
+   RICHIEDE qui dentro — e' la stessa ragione per cui sul server la
+   guardia di proprieta' sta dentro la WHERE e non nel client. */
+function togliScambioP2P(id, ev){
+  if (ev) ev.stopPropagation();
+  const o = ordiniP2P()[id];
+  if (!o) return;
+  const g = p2pTogliibile(o);
+  if (!g.si) {
+    toast(g.giorni
+      ? 'Ancora ' + g.giorni + (g.giorni === 1 ? ' giorno' : ' giorni') + ': l\'ordine può essere ancora vivo'
+      : 'Questo scambio è ancora aperto');
+    return;
+  }
+  const votoAperto = o.stato === 'concluso' && o.votabile && !o.votato;
+  const perde = 'La riga e la sua chiave se ne vanno da questo dispositivo, e non tornano.';
+  chiediConferma({
+    titolo: 'Togliere questo scambio?',
+    corpo: votoAperto
+      ? 'Su questo scambio puoi ancora dare il voto: togliendolo lo perdi.\n\n' + perde
+      : perde + '\n\nLo scambio è chiuso, quindi non c\'è più niente da fare.',
+    etichetta: 'Togli',
+    poi: () => {
+      const tutti = ordiniP2P();
+      delete tutti[id];
+      try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+      if (p2pOrdineAperto === id) p2pOrdineAperto = '';
+      toast('Scambio tolto');
+      renderP2P();
+    }
+  });
+}
+
 function mostroHexP2P(){
   const c = p2pCoord();
   return (c && c.mostro) || '';
@@ -34205,6 +34327,7 @@ function renderOrdineP2P(){
     {t: 'Scambio concluso', d: 'I sats arrivano a chi compra'}
   ];
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
+  const tog = p2pTogliibile(o);
   const cifra = o.satsNetti > 0 ? fmt(o.satsNetti) + ' sats'
               : o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
   const meta = [];
@@ -34236,6 +34359,15 @@ function renderOrdineP2P(){
     (bottoni[azione] || '') +
     (o.stato === 'senza_risposta'
       ? '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprova</button>' : '') +
+    /* la riga che spiega perche' lo scambio RESTA: senza, un ordine
+       senza risposta e' una riga che non se ne va e non dice perche'.
+       Dice la RAGIONE (la chiave serve a riprenderlo) e non il solo
+       fatto, e cade da sola quando smette di essere vera. */
+    (tog.giorni
+      ? '<div class="hint">Resta qui ancora ' + tog.giorni +
+        (tog.giorni === 1 ? ' giorno' : ' giorni') + ': fino ad allora l\'ordine può essere ' +
+        'ancora vivo sul coordinatore, e la sua chiave serve a riprenderlo. Poi lo potrai togliere.</div>'
+      : '') +
     /* i messaggi stanno FRA il passo da fare e le uscite: e' il modo
        di mettersi d'accordo, e quasi sempre e' quel che serve prima
        di annullare o di aprire una disputa. Compare solo quando si sa
@@ -34900,7 +35032,11 @@ function rigaScambioP2P(o){
     '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
     '<span class="p2p-sats">' + esc(cifra) + '</span></div>' +
     '<div class="p2p-meta"><span>' + (o.lato === 'compro' ? '⬇️ Compri' : '⬆️ Vendi') + '</span>' +
-    '<span>' + esc(st.t) + '</span>' + agire + '</div></div>';
+    '<span>' + esc(st.t) + '</span>' + agire +
+    (p2pTogliibile(o).si
+      ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" ' +
+        'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
+      : '') + '</div></div>';
 }
 
 /* ---- LA VIA DI RISERVA: lo stato PUBBLICO dei propri scambi ----
@@ -34961,6 +35097,7 @@ async function statoPubblicoOrdini(ids){
    Le due cose che chiedono la rete partono di qui e si fanno vive
    quando arrivano. */
 function scambiP2P(){
+  pulisciScambiP2P();
   const tutti = ordiniP2P();
   const righe = Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id)
     .sort((a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0));

@@ -45813,12 +45813,213 @@ def prove_esclusioni_relay():
     prova("le due liste sono la stessa",
           liste["albero"], liste["cronologia"])
 
+def prove_scambi_p2p_vecchi():
+    """La ✕ e la scopa degli scambi P2P (set 2026): sul coordinatore
+    il telefono E' l'archivio — togliere e' per sempre, e con la riga
+    se ne va la sua trade key. Quindi un giudice SOLO
+    (`p2pTogliibile`), e la scopa che gli chiede il permesso.
+    LE PROVE FANNO GIRARE i due pezzi con node: una sentinella dice
+    che la guardia c'e', mai che risponda giusto — ed e' proprio il
+    caso limite («senza_risposta» a meta' strada) quello su cui una
+    guardia sbagliata non fallisce: tiene una riga in piu', o butta
+    una chiave."""
+    print("\n[gli scambi P2P vecchi]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # LE COSTANTI SI LEGGONO DAL CLIENT e non si ribattono qui: due
+    # numeri da tenere in pari sono due che un giorno divergono.
+    _fin = re.search(r"const P2P_FINALI = \[[^\]]*\];", mini)
+    _oriz = re.search(r"const P2P_ORIZZONTE_S = [^;]+;", mini)
+    _scopa = re.search(r"const P2P_SCOPA_GIORNI = \d+;", mini)
+    _chiave = re.search(r"const MOSTRO_ORDINI_CHIAVE = '[^']+';", mini)
+    prova("le quattro costanti degli scambi P2P vivono nel client",
+          [True] * 4,
+          [bool(x) for x in (_fin, _oriz, _scopa, _chiave)])
+    if not all((_fin, _oriz, _scopa, _chiave)):
+        return
+
+    # L'ORIZZONTE E' QUELLO DEL COORDINATORE, `expiration_hours`: se
+    # un giorno si tocca quella leva su mostrod, questa riga viene a
+    # chiedere di rileggere la voce invece di lasciar divergere i due.
+    prova("l'orizzonte e' le 168 ore del coordinatore",
+          "const P2P_ORIZZONTE_S = 168 * 3600;", _oriz.group(0))
+
+    # «senza_risposta» NON e' finale, ed e' la riga da non ammorbidire:
+    # quell'ordine puo' essere vivo sul coordinatore e la sua chiave
+    # serve a riprenderlo. Messo fra i finali, la ✕ lo cancellerebbe
+    # subito — chiave compresa.
+    prova("«senza_risposta» non e' fra i finali",
+          False, "senza_risposta" in _fin.group(0))
+    prova("i finali sono i tre dichiarati",
+          True,
+          all(s in _fin.group(0)
+              for s in ("'concluso'", "'annullato'", "'rifiutato'")))
+
+    # LA SCOPA CHIEDE AL GIUDICE e non si rifa' la domanda: due
+    # letture della stessa regola un giorno dicono due cose diverse
+    # sulla stessa riga (il patto dei giudici unici di casa).
+    _sc = pezzo_js(mini, "function pulisciScambiP2P(){", "\n}")
+    prova("la scopa passa dal giudice", True, "p2pTogliibile(o" in _sc)
+    prova("...e non si ricopia l'elenco dei finali",
+          False, "P2P_FINALI" in _sc)
+
+    # E IL GIUDICE SI RICHIEDE DENTRO IL GESTO: l'id arriva dal DOM, e
+    # il DOM non e' la verita' — la stessa ragione per cui sul server
+    # la guardia di proprieta' sta dentro la WHERE.
+    _tog = pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}")
+    prova("la ✕ richiede il giudice invece di fidarsi del DOM",
+          True, "p2pTogliibile(o)" in _tog)
+    prova("...e chiede conferma prima di togliere",
+          True, "chiediConferma(" in _tog)
+    # IL RIFIUTO DICE IL PERCHE': un gesto che non fa niente si legge
+    # come un guasto, e qui il perche' e' anche una scadenza vera.
+    prova("...e sul no dice quanti giorni mancano",
+          True, "g.giorni" in _tog)
+
+    # --- E SI FA GIRARE, che e' il punto -------------------------
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il giudice e la scopa rispondono giusto", "node non installato")
+        return
+
+    _banco = (
+        _chiave.group(0) + "\n" + _fin.group(0) + "\n"
+        + _oriz.group(0) + "\n" + _scopa.group(0) + "\n"
+        # un localStorage di cartone: la scopa SCRIVE, e quel che
+        # scrive e' meta' di quel che si vuole guardare
+        + "const _box = {};\n"
+        "const localStorage = {\n"
+        "  getItem: k => (k in _box ? _box[k] : null),\n"
+        "  setItem: (k, v) => { _box[k] = String(v); }\n"
+        "};\n"
+        + pezzo_js(mini, "function ordiniP2P(){", "\n}") + "\n}\n"
+        + pezzo_js(mini, "function p2pTogliibile(o, adesso){", "\n}") + "\n}\n"
+        + pezzo_js(mini, "function pulisciScambiP2P(){", "\n}") + "\n}\n"
+        "const ORA = Math.floor(Date.now() / 1000);\n"
+        "const fa = ore => Math.floor(ORA - ore * 3600);\n"
+    )
+
+    _prog = _banco + (
+        "const g = (o) => p2pTogliibile(o, ORA);\n"
+        "const esito = {};\n"
+        "esito.concluso = g({stato:'concluso', creato: fa(1)});\n"
+        "esito.annullato = g({stato:'annullato', creato: fa(1)});\n"
+        "esito.rifiutato = g({stato:'rifiutato', creato: fa(1)});\n"
+        "esito.aperto = g({stato:'attesa', creato: fa(9999)});\n"
+        "esito.nulla = g(null);\n"
+        "esito.sr_nato = g({stato:'senza_risposta', creato: fa(1)});\n"
+        "esito.sr_meta = g({stato:'senza_risposta', creato: fa(100)});\n"
+        "esito.sr_filo = g({stato:'senza_risposta', creato: fa(168)});\n"
+        "esito.sr_oltre = g({stato:'senza_risposta', creato: fa(200)});\n"
+        "esito.sr_quasi = g({stato:'senza_risposta', creato: fa(167.5)});\n"
+        "esito.sr_cieco = g({stato:'senza_risposta', creato: 0});\n"
+        "console.log(JSON.stringify(esito));\n")
+
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    _out = (_js.loads(_r.stdout.strip()) if _r.returncode == 0
+            else {"ERRORE": _r.stderr[:200]})
+
+    _si = {"si": True, "giorni": 0}
+    _no = {"si": False, "giorni": 0}
+    prova("i tre stati finali si tolgono subito",
+          [_si, _si, _si],
+          [_out.get("concluso"), _out.get("annullato"),
+           _out.get("rifiutato")])
+    # UN APERTO NON SI TOGLIE MAI, per vecchio che sia: la sua chiave
+    # e' l'unica strada verso dei sats che possono essere bloccati.
+    prova("uno scambio aperto non si toglie nemmeno dopo un anno",
+          _no, _out.get("aperto"))
+    prova("una riga che non c'e' non si tocca", _no, _out.get("nulla"))
+    # SENZA ANCORA SI TIENE: fail-closed nel verso giusto — una riga
+    # di troppo costa una riga, una chiave buttata costa dei sats.
+    prova("senza ancora si TIENE", _no, _out.get("sr_cieco"))
+    prova("«senza_risposta» appena nato: 7 giorni da aspettare",
+          {"si": False, "giorni": 7}, _out.get("sr_nato"))
+    prova("...a 100 ore ne restano 3",
+          {"si": False, "giorni": 3}, _out.get("sr_meta"))
+    prova("...al filo delle 168 ore si toglie", _si, _out.get("sr_filo"))
+    prova("...e dopo pure", _si, _out.get("sr_oltre"))
+    # IL CASO CHE SMASCHERA L'ARROTONDAMENTO: a mezz'ora dalla
+    # scadenza il conto in giorni fa ZERO, e uno zero li' vuol dire
+    # «nessun perche' da dire» — cioe' il gesto muto che questa riga
+    # esiste per non essere. Il pavimento a 1 e' quel che lo impedisce.
+    prova("...e a mezz'ora dalla fine dice ANCORA 1 giorno, mai zero",
+          {"si": False, "giorni": 1}, _out.get("sr_quasi"))
+
+    # --- la scopa, girata sull'archivio ---------------------------
+    _semi = (
+        "{"
+        " vecchio_finito: {id:'a', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*31)},"
+        " fresco_finito: {id:'b', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*29)},"
+        " voto_in_sospeso: {id:'c', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*31), votabile:true, votato:false},"
+        " voto_dato: {id:'d', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*31), votabile:true, votato:true},"
+        " aperto_vecchio: {id:'e', stato:'attesa', creato: fa(24*365),"
+        "   aggiornato: fa(24*365)},"
+        " sr_scaduto_ma_recente: {id:'f', stato:'senza_risposta',"
+        "   creato: fa(24*10), aggiornato: fa(24*10)},"
+        " sr_vecchio: {id:'g', stato:'senza_risposta', creato: fa(24*40),"
+        "   aggiornato: fa(24*40)},"
+        " chiuso_ieri_dal_coordinatore: {id:'h', stato:'annullato',"
+        "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(24)}"
+        "}")
+    _prog2 = _banco + (
+        "localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify("
+        + _semi + "));\n"
+        "const tolti = pulisciScambiP2P();\n"
+        "const resta = Object.keys(JSON.parse("
+        "localStorage.getItem(MOSTRO_ORDINI_CHIAVE))).sort();\n"
+        "console.log(JSON.stringify({tolti, resta}));\n")
+    _f2 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8")
+    _f2.write(_prog2)
+    _f2.close()
+    _r2 = _sp.run([_node, _f2.name], capture_output=True, text=True,
+                  timeout=60, encoding="utf-8")
+    os.unlink(_f2.name)
+    _o2 = (_js.loads(_r2.stdout.strip()) if _r2.returncode == 0
+           else {"ERRORE": _r2.stderr[:200]})
+
+    # LA SCOPA VUOLE LE DUE CONDIZIONI INSIEME, ed e' la coppia dei
+    # due «senza_risposta» a insegnarlo: `sr_scaduto_ma_recente` e'
+    # gia' togliibile (10 giorni, l'orizzonte e' 7) e RESTA, perche'
+    # si e' mosso otto giorni fa; `sr_vecchio` se ne va perche' e'
+    # tutt'e due le cose. Restano anche chi non e' togliibile
+    # (l'aperto, per vecchio che sia) e il voto in sospeso, che e'
+    # finale per i sats e non per la reputazione.
+    prova("la scopa toglie i tre vecchi e togliibili, e nient'altro",
+          {"tolti": 3,
+           "resta": ["aperto_vecchio", "chiuso_ieri_dal_coordinatore",
+                     "fresco_finito", "sr_scaduto_ma_recente",
+                     "voto_in_sospeso"]},
+          _o2)
+
+    # LA PROVA REGINA DELLA CATENA (set 2026): «quando» lo scrive il
+    # solo ramo del COORDINATORE, ed e' l'ultimo movimento vero di una
+    # riga che ha chiuso lui — mentre li' «aggiornato» e' rimasto al
+    # giorno della nascita. Togliendolo dalla catena la scopa
+    # leggerebbe il timbro piu' VECCHIO e spazzerebbe una riga chiusa
+    # ieri: chi «pulisce» quel ripiego fa rossa questa riga.
+    prova("...e uno chiuso IERI dal coordinatore resta, anche se nato "
+          "due mesi fa",
+          True, "chiuso_ieri_dal_coordinatore" in (_o2.get("resta") or []))
 
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
+              prove_scambi_p2p_vecchi,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
