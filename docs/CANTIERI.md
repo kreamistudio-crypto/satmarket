@@ -6073,3 +6073,40 @@ ordini vivi, il sospetto non è più questo difetto ma l'IDENTITÀ — la
 leva `SEGRETO_PROFILO_P2P_VIVA` accesa l'8 set può aver dato al client
 un mazzo diverso da quello che ha creato gli ordini, e allora il
 coordinatore risponde, giusto, «questa identità non ha niente».
+
+L'annuncio orfano si annulla nel database, e l'evento stantio non ha
+denti (9 set 2026). Nel libro del coordinator restava un buy da 5 EUR
+(Satispay), ordine `c430cbad`, pubblicato l'8 set da un profilo client
+che non esiste piu': nessun client poteva ritirarlo. Solo un annuncio
+— `pending`, nessuna hold invoice, zero sats in gioco — e la liturgia
+e' quella di `5eca1bc6` (voce qui sopra): lettura in `mode=ro` per
+trovarlo (era l'UNICO buy pending rimasto, e combaciava tutto, compresa
+la `expires_at` a 168 ore ESATTE dalla creazione — il marchio della
+leva del 6 set), copia con l'API `backup` di sqlite e mai `cp` a caldo
+su un WAL, poi UPDATE con guardia doppia (`hex(id)` esatto AND
+`status = 'pending'`) e commit solo a `rowcount == 1`. Fatto: 1 riga,
+rilettura `canceled`.
+LO STATO DI ARRIVO E' `canceled` E NON `canceled-by-admin`, ed e' la
+differenza da stanotte che merita il perche': `-by-admin` serviva a
+zittire tre code che filtravano su `settled-hold-invoice`, e qui non
+c'e' NIENTE in ascolto su un pending; `canceled` e' invece il
+vocabolario che il libro ha gia' mostrato dopo il ritiro della sonda
+(Q1), cioe' quello che ogni client sa leggere.
+L'EVENTO 38383 SUL RELAY RESTA STANTIO, E VA BENE COSI' (decisione di
+Andrea): la scrittura nel db non ripubblica — ripubblicare e' un'AZIONE
+di mostrod — quindi nel libro l'annuncio si legge ancora `pending`. Ma
+e' senza denti: chi lo prendesse sbatte sul coordinator, che guarda il
+DATABASE e non il relay (stato non piu' `pending` -> rifiuto pulito), e
+il job che a scadenza porta i pending a `expired` filtra anche lui su
+`status = 'pending'`, quindi salta la riga senza toccarla. Dovrebbe
+morire da solo alla `expires_at` (15 set) col tag `expiration` NIP-40 —
+DEDOTTO E NON VERIFICATO, dichiarato apposta: la verifica del tag e'
+stata lasciata perdere di proposito, perche' il problema e' cosmetico e
+scade da solo.
+LA STRADA SCARTATA, che non si riproponga: togliere l'evento subito con
+un sostitutivo o un NIP-09 firmati dalla chiave del coordinator.
+Esiste, ma maneggiare la nsec di mostro per un fastidio estetico che
+muore in sei giorni e' un prezzo sbagliato.
+DA GUARDARE, senza impegno: dopo il 15 set, se capita di leggere il
+libro, l'annuncio non deve piu' esserci — sarebbe la verifica gratuita
+della deduzione sul NIP-40.
