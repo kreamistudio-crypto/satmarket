@@ -29884,6 +29884,63 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     return {"ok": True, "tolte": tolte}
 
 
+# LA LETTURA DELLE CHIAVI (tappa 7b): «al tuo account ne risulta una?».
+# Serve a chi apre il P2P da un dispositivo dove il mazzo non c'e' — dal
+# sito, dalla PWA, dall'APK — e senza questa domanda ne farebbe nascere
+# uno nuovo in silenzio, lasciando identita' e reputazione sull'altro.
+#
+# ESCE UN CONTO, MAI UNA PUBKEY, ed e' la riga da non ammorbidire:
+# restituire l'elenco sembrerebbe piu' utile e sarebbe il difetto
+# peggiore di questa strada — metterebbe per iscritto, in una risposta
+# sola, il legame fra un account Telegram e TUTTE le sue identita' di
+# scambio, cioe' proprio la correlazione che il mazzo esiste per non
+# fare. La domanda qui e' «ce n'e' almeno una?», e a quella il
+# conteggio risponde esatto.
+#
+# ATTENZIONE: STA DOPO LA DELETE E NON FRA LE DUE, e non e' estetica.
+# `prove.py` taglia la fetta della POST da `@app.post` a `@app.delete`,
+# quindi una GET messa in mezzo finirebbe dentro quella fetta e farebbe
+# rossa la sentinella del vicino. La fetta della DELETE si chiude sul
+# primo `\n\n\n`, che e' proprio qui sopra: in coda non disturba
+# nessuno. C'e' la sentinella sull'ordine, o torna sbagliato per
+# distrazione.
+def _conta_chiavi_p2p(con, tg_id: int) -> dict:
+    """Quante pubkey conosciamo di UNA persona, e da quando. Puro sulla
+    connessione (il patto di `_registra_chiavi_p2p`) cosi' si gira in CI
+    su sqlite in memoria.
+    IL CONTO E' DI CHIAVI E NON DI PROFILI: la tabella non distingue
+    l'identita' del mazzo dalle trade key (una per scambio), quindi
+    risponde bene a «almeno una?» e MALE a «quante?» — ed e' per questo
+    che il numero non va mai a schermo.
+    `dal` E' UN PAVIMENTO, NON UN EVENTO: `MIN(creato)` e' la prima
+    volta che il SERVER ha visto una chiave tua, non la nascita del
+    mazzo (un profilo importato oggi porta la sua data di oggi). A
+    schermo diventa «dal 3 set 2026» e mai «creato il»."""
+    r = con.execute("SELECT COUNT(*), MIN(creato) FROM chiavi_p2p WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    return {"chiavi": int(r[0] or 0), "dal": int(r[1] or 0)}
+
+
+@app.get("/api/p2p/chiavi")
+def conta_chiavi_p2p(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """NESSUN PARAMETRO, IN NESSUNA FORMA — ne' path ne' query: non si
+    puo' chiedere DI UN ALTRO, e non esiste nemmeno la sintassi per
+    provarci. E' la regola della DELETE, letta dal lato della lettura.
+    IL GATE E' DELLA PERSONA come la POST (e non come la DELETE, che
+    non ne ha perche' uscire non dipende da una leva): in fase chiusa
+    chi non e' della partita non deve poter sapere niente di una
+    funzione che per lui non c'e'. Il client legge il 409 come
+    SILENZIO, e a silenzio non dice niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    con = db()
+    esito = _conta_chiavi_p2p(con, user["id"])
+    con.close()
+    return {"ok": True, **esito}
+
+
 # ---------- IL CAMPANELLO DELLO SCAMBIO P2P (set 2026, tappa 7) ------
 # Uno scambio dura ore: il taker ha 900 secondi per la sua mossa,
 # l'ordine 24. Fra una mossa e l'altra la Mini App e' CHIUSA — e le

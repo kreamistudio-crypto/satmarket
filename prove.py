@@ -35479,8 +35479,14 @@ def prove_p2p_chiavi():
           all(c.startswith("JSON.stringify({pubkeys:") for c in corpi))
     prova("...senza un `sk` dentro", False,
           any("sk" in c for c in corpi))
-    prova("le fetch del blocco sono due: registra e dimentica", 2,
-          cod.count("fetch("))
+    # ERANO DUE E DA SET 2026 SONO TRE, ed e' il censimento ad aver
+    # fatto il suo mestiere: e' venuto a chiedere di DICHIARARE la
+    # terza invece di lasciarla entrare in silenzio. Le prime due
+    # SCRIVONO (registra e dimentica), la terza LEGGE e basta — il
+    # conto delle chiavi altrove — e a tenerle distinte e' la riga
+    # sopra, che di corpi ne conta sempre UNO.
+    prova("le fetch del blocco sono tre: registra, dimentica, il conto",
+          3, cod.count("fetch("))
     prova("la trade key si deriva con HMAC e mai con getConversationKey",
           True, "NT.hmac(NT.sha256, skB" in cod
           and "getConversationKey" not in cod)
@@ -35532,11 +35538,19 @@ def prove_p2p_chiavi():
     # ne' «chiave» nei testi del profilo. Si guardano le funzioni che
     # PARLANO, tolti i due nomi di codice che quella parola la portano
     # per mestiere (il bundle e il suo loader).
+    # ⚠️ E TOLTA LA PROSA, che e' la trappola gia' pagata due volte in
+    # questo stesso file: un commento che SPIEGA perche' li' non si dice
+    # « chiave » contiene la parola « chiave », e la sentinella diventa
+    # rossa per colpa di una spiegazione. Quel che si vieta e' la parola
+    # A SCHERMO, e un commento a schermo non ci arriva. Si tolgono i soli
+    # commenti a BLOCCO, che sono l'idioma di casa: un `//` mangerebbe
+    # anche la coda di un `https://`.
     for fn in ("async function apriProfiloP2P(", "function renderProfiloP2P(",
                "function scordaMazzo(", "async function importaMazzoDalFoglio(",
                "async function codiceP2PSalvato(", "async function copiaCodiceP2P(",
                "async function dimenticaMazzoOra("):
-        testo = pezzo_js(mini, fn, "\n}\n").replace("caricaNostrTools", "") \
+        testo = re.sub(r"/\*[\s\S]*?\*/", "", pezzo_js(mini, fn, "\n}\n")) \
+            .replace("caricaNostrTools", "") \
             .replace("window.NostrTools", "").lower()
         prova(f"`{fn.split('function ')[1][:-1]}` non dice Nostr/nsec/relay/chiave",
               False, any(w in testo for w in ("nostr", "nsec", "relay", "chiave")))
@@ -35620,6 +35634,62 @@ def prove_p2p_chiavi():
     prova("la fusione porta le chiavi con l'utente", True,
           "UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?" in pezzo("esegui_fusione"))
 
+    # --- 2b) LA LETTURA: «al tuo account ne risulta una?» (tappa 7b) --
+    # L'ORDINE E' INCISO QUI, o torna sbagliato per distrazione: la
+    # fetta della POST va da `@app.post` a `@app.delete`, quindi una GET
+    # messa IN MEZZO ci finirebbe dentro e farebbe rossa la sentinella
+    # del vicino (l'inciampo gia' a verbale poche righe piu' su). In
+    # coda alla DELETE invece non disturba nessuno, perche' quella fetta
+    # si chiude sul primo `\n\n\n`.
+    prova("la GET sta DOPO la DELETE e non fra le due", True,
+          src.index('@app.post("/api/p2p/chiavi")')
+          < src.index('@app.delete("/api/p2p/chiavi")')
+          < src.index('@app.get("/api/p2p/chiavi")'))
+    prova("...quindi non finisce nella fetta della POST", False,
+          "@app.get" in post)
+    prova("...ne' in quella della DELETE", False,
+          "@app.get" in dele or "_conta_chiavi_p2p" in dele)
+    _g = src.index('@app.get("/api/p2p/chiavi")')
+    get = src[_g:src.index("\n\n\n", _g)]
+    prova("contare vuole l'identita'", True, "verifica_utente(" in get)
+    # IL GATE E' DELLA PERSONA come la POST, e non come la DELETE: in
+    # fase chiusa chi non e' della partita non deve sapere niente di una
+    # funzione che per lui non c'e'. Il client legge il 409 come
+    # SILENZIO, e a silenzio non dice niente.
+    prova("...e risponde 409 a leva spenta, chiedendo al giudice", True,
+          'if not _p2p_per(user["id"])["attivo"]:' in get
+          and "HTTPException(409" in get)
+    # NESSUN PARAMETRO, IN NESSUNA FORMA: non si puo' chiedere DI UN
+    # ALTRO, e non esiste nemmeno la sintassi per provarci. E' la regola
+    # della DELETE letta dal lato della lettura, e si guarda la FIRMA
+    # (i due soli argomenti sono le due credenziali).
+    firma = get[get.index("def conta_chiavi_p2p("):get.index("):", get.index("def conta_chiavi_p2p("))]
+    prova("la GET non prende nessun parametro oltre alle credenziali",
+          ["barattolo_sessione", "x_tg_init_data"],
+          sorted(re.findall(r"(\w+):", firma)))
+    prova("...e il path non ne dichiara nessuno", False,
+          "{" in src[_g:src.index("\n", _g)])
+    # ESCE UN CONTO, MAI UNA PUBKEY: restituire l'elenco metterebbe per
+    # iscritto, in una risposta sola, il legame fra un account e TUTTE
+    # le sue identita' di scambio — la correlazione che il mazzo esiste
+    # per non fare.
+    conta = pezzo("_conta_chiavi_p2p")
+    prova("il conto e' un COUNT con la prima data", True,
+          "SELECT COUNT(*), MIN(creato) FROM chiavi_p2p WHERE tg_id=?" in conta)
+    # SENZA LA PROSA: la docstring del giudice NOMINA la pubkey apposta
+    # («quante pubkey conosciamo») per dire cosa conta e cosa no — la
+    # trappola gia' pagata da `_decifra_contenuto` e dall'IVA di Woo.
+    prova("...e non legge MAI le pubkey", False,
+          "pubkey" in _senza_prosa(conta) or "pubkey" in _senza_prosa(get))
+    prova("...e quello che esce sono due numeri e basta",
+          ['"chiavi"', '"dal"'], sorted(re.findall(r'("(?:chiavi|dal|pubkey)")', conta)))
+    # UNA LETTURA NON SCRIVE, il patto di `controlla_libro_mastro`.
+    # Anche qui senza la prosa: la docstring della GET dice «la regola
+    # della DELETE» per spiegare da chi eredita il gate, non per farla.
+    for verbo in ("INSERT", "UPDATE", "DELETE", "commit()"):
+        prova(f"la lettura non fa {verbo}", False,
+              verbo in _senza_prosa(conta) or verbo in _senza_prosa(get))
+
     # --- 3) IL BANCO SQLITE: il giudice gira -------------------------
     con = sqlite3.connect(":memory:")
     con.executescript(schema)
@@ -35660,7 +35730,85 @@ def prove_p2p_chiavi():
     con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?", (111, -7))
     prova("la fusione sposta le chiavi del nativo sul Telegram", 3, con.execute(
         "SELECT COUNT(*) FROM chiavi_p2p WHERE tg_id=111").fetchone()[0])
+    # IL CONTO GIRA (tappa 7b): le sentinelle dicono che la funzione
+    # esiste, mai che risponda giusto — e qui la risposta e' quella su
+    # cui poggia una riga che parla a chi sta per perdere un profilo.
+    exec(conta, amb)
+    cnt = amb["_conta_chiavi_p2p"]
+    prova("chi non ha chiavi conta zero, e la data e' zero",
+          {"chiavi": 0, "dal": 0}, cnt(con, 999))
+    prova("...e chi ne ha conta le sue e dice la PRIMA data",
+          {"chiavi": 3, "dal": 1}, cnt(con, 111))
+    # LE CHIAVI DI UN ALTRO NON SI VEDONO: il `WHERE tg_id=?` e' tutta
+    # la guardia, e la rotta non ha un parametro per chiedere di altri.
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)",
+                ("f" * 64, 222, 5000))
+    prova("le chiavi di un altro non entrano nel conto",
+          {"chiavi": 3, "dal": 1}, cnt(con, 111))
+    prova("...e l'altro vede le sue", {"chiavi": 1, "dal": 5000}, cnt(con, 222))
+    # DOPO LA FUSIONE IL CONTO SEGUE LA PERSONA: `esegui_fusione` migra
+    # gia' la tabella, quindi chi aveva il profilo sull'account nativo
+    # e apre dal Telegram fuso VEDE la riga. Effetto voluto.
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)",
+                ("0" * 64, -9, 7))
+    prova("prima della fusione il nativo e' un altro",
+          {"chiavi": 1, "dal": 7}, cnt(con, -9))
+    con.execute("UPDATE chiavi_p2p SET tg_id=? WHERE tg_id=?", (111, -9))
+    prova("dopo la fusione il conto segue la persona",
+          {"chiavi": 4, "dal": 1}, cnt(con, 111))
+    prova("...e il nativo non ha piu' niente", {"chiavi": 0, "dal": 0},
+          cnt(con, -9))
     con.close()
+
+    # --- 2c) L'AVVISO CHE IL PROFILO C'E' ALTROVE (client) -----------
+    # LA FETTA VUOLE LA SUA FINE ESPLICITA: `pezzo_js` di serie taglia
+    # alla prima riga vuota, e qui sotto la riga vuota non c'e' — il
+    # taglio si mangiava `assicuraMazzo` e mezzo blocco, cioe' le tre
+    # sentinelle del « non genera » passavano PER LA RAGIONE SBAGLIATA.
+    # La graffa a colonna zero e' l'idioma di casa (le due chiuse di
+    # dentro sono rientrate, quindi non possono confondersi con lei).
+    lettore = pezzo_js(mini, "function contaChiaviP2P", "\n}\n")
+    _rend = mini[mini.index("function renderProfiloP2P"):]
+    ramo = _rend[_rend.index("  if (!m) {"):]
+    ramo = ramo[:ramo.index("\n    return;\n  }")]
+    # LA TRAPPOLA DELLA PROSA VALE ANCHE DI QUA: il commento del ramo
+    # NOMINA `assicuraMazzo` apposta, per dire che li' non si genera —
+    # e senza togliere i commenti la sentinella sarebbe rossa per colpa
+    # di una spiegazione. E' il gemello JS di `_senza_prosa`.
+    ramo_nudo = re.sub(r"/\*[\s\S]*?\*/", "", ramo)
+    prova("il lettore del conto e' UNO", 1, mini.count("function contaChiaviP2P"))
+    prova("...e a chiederlo e' il solo ramo senza mazzo", 1,
+          ramo.count("contaChiaviP2P()"))
+    prova("...e chiede in GET: nessun method", False, "method" in lettore)
+    for _g in ("DEMO", "VETRINA", "!myTgId"):
+        prova("il lettore tace se " + _g, True, _g in lettore)
+    prova("la cache e' la PROMESSA e non un booleano", True,
+          "p2pChiaviGiro = (async" in lettore and "return p2pChiaviGiro;" in lettore)
+    prova("il server muto vale « non lo so », mai « nessuna »", True,
+          "if (!r.ok) return null;" in lettore)
+    prova("...e un errore di rete non alza", True, "catch(e){}" in lettore)
+    for _g in ("assicuraMazzo", "generateSecretKey", "ricordaMazzo"):
+        prova("chiedere il conto non chiama " + _g, False,
+              _g in lettore or _g in ramo_nudo)
+    prova("il NUMERO delle chiavi non arriva mai a schermo", False,
+          "chiavi" in ramo[ramo.index("box.innerHTML"):])
+    prova("il ridisegno arriva solo a foglio ancora aperto", True,
+          "classList.contains('open')" in ramo)
+    prova("...e il render non aspetta il conto", False, "await" in ramo_nudo)
+    prova("si dice « almeno da », che e' un pavimento", True, "almeno da" in ramo)
+    prova("chi non ha chiavi altrove legge il testo di sempre", True,
+          "nasce da solo al primo scambio" in ramo)
+    prova("...e la via d'uscita resta quella dei due rami", 2,
+          ramo.count("${importa}"))
+    # DIMENTICARE BUTTA ANCHE IL CONTO: la chiave cancellata era una di
+    # quelle contate, quindi il numero in mano diventa falso nell'istante
+    # della DELETE — e senza questa riga il foglio direbbe « ce l'hai
+    # altrove » di una chiave che era proprio quella appena tolta.
+    _dimo = pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
+    prova("dimenticare butta il conto in cache", True,
+          "p2pChiaviNote = null;" in _dimo and "p2pChiaviGiro = null;" in _dimo)
+    prova("...e lo butta PRIMA di ridisegnare", True,
+          _dimo.index("p2pChiaviGiro = null;") < _dimo.index("renderProfiloP2P()"))
 
     # --- 4) IL BANCO NODE: il blocco gira col bundle VERO ------------
     node = _sh.which("node")
@@ -35687,14 +35835,18 @@ let tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
 let DEMO = false, VETRINA = false, myTgId = 111;
 const API_BASE = '/api';
 function authHdr(){ return 'collaudo:111:x'; }
-let fetches = [];
-async function fetch(url, opt){ fetches.push({url, opt}); return {ok: true}; }
+let fetches = [], rispChiavi = null;
+async function fetch(url, opt){ fetches.push({url, opt});
+  if (String(url).endsWith('/p2p/chiavi') && !(opt && opt.method))
+    return rispChiavi ? {ok: true, json: async () => rispChiavi} : {ok: false};
+  return {ok: true}; }
 let toasts = []; function toast(m){ toasts.push(m); }
 function haptic(){}
 let nodi = {}, aperti = [];
 function el(id){
   if (!nodi[id]) nodi[id] = {value: '', innerHTML: '', type: 'password',
-    classList: {add(c){ aperti.push(id); }, remove(){}}};
+    classList: {add(c){ aperti.push(id); }, remove(){},
+      contains(c){ return aperti.includes(id); }}};
   return nodi[id];
 }
 function esc(s){ return String(s); }
@@ -35706,6 +35858,7 @@ let copiato = '';
 const navigator = {clipboard: {writeText: async t => { copiato = t; }}};
 """ + js_blocco + r"""
 function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches = [];
+  rispChiavi = null; p2pChiaviNote = null; p2pChiaviGiro = null;
   toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
   p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
   myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero}; }
@@ -35807,8 +35960,13 @@ const corpo = f => JSON.parse(f.opt.body);
   fetches = []; conferme = [];
   scordaMazzo();
   await new Promise(r => setTimeout(r, 20));
+  // il conteggio secco delle fetch era un modo di dire « c'e' la DELETE »,
+  // e dalla tappa 7b non lo e' piu': dopo aver dimenticato, il foglio si
+  // ridisegna nel ramo senza mazzo e RICHIEDE il conto. Si conta la
+  // DELETE, che e' quel che questa riga esiste per garantire.
+  const cancella = fetches.filter(f => f.opt && f.opt.method === 'DELETE');
   out.dimenticato = conferme.length === 1 && mazzoMostro() === null && !cloud.has('mostro_mazzo')
-    && fetches.length === 1 && fetches[0].opt.method === 'DELETE';
+    && cancella.length === 1;
   // 14) in DEMO e in vetrina il foglio non si apre
   reset(); DEMO = true;
   await apriProfiloP2P();
@@ -35820,6 +35978,67 @@ const corpo = f => JSON.parse(f.opt.body);
   reset(); ricordaMazzo(m); await apriProfiloP2P();
   const t = nodi.p2pProfiloCorpo.innerHTML.toLowerCase();
   out.paroleDiCasa = !['nostr', 'nsec', 'relay', 'chiave'].some(w => t.includes(w));
+  // 16) tappa 7b: il mazzo qui non c'e', ma il SERVER sa che l'account
+  //     una chiave l'ha registrata altrove — e il foglio lo dice.
+  reset(); rispChiavi = {chiavi: 47, dal: 1735689600};
+  await apriProfiloP2P();
+  const primo = nodi.p2pProfiloCorpo.innerHTML;
+  out.subitoSenzaAvviso = primo.includes('nasce da solo') && !primo.includes('altrove');
+  await new Promise(r => setTimeout(r, 20));
+  const poi = nodi.p2pProfiloCorpo.innerHTML;
+  out.avvisoArrivato = poi.includes('altrove') && poi.includes('almeno da');
+  out.contoMaiAScherm = !poi.includes('47');
+  out.avvisoNienteMazzo = mazzoMostro() === null;
+  out.avvisoNienteRegistra = !fetches.some(f => f.opt && f.opt.method);
+  const giri = fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length;
+  renderProfiloP2P(); renderProfiloP2P();
+  out.unaDomandaSola = giri === 1
+    && fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length === 1;
+  // 16b) IL GATE E' LA PROMESSA, NON IL CONTO CHE NE ESCE. Due
+  //      chiamanti nello stesso istante — il foglio che si apre e il
+  //      render che rientra — devono fare UNA fetch sola: con la
+  //      guardia sul CONTO il secondo arriva mentre la risposta e' in
+  //      volo, trova ancora `null` e ne apre un'altra. E col server
+  //      muto il conto resta `null` per sempre, quindi si
+  //      richiederebbe a ogni giro — che e' proprio il caso in cui
+  //      non si sa niente e chiedere ancora non aiuta.
+  reset(); rispChiavi = {chiavi: 5, dal: 1735689600};
+  await Promise.all([contaChiaviP2P(), contaChiaviP2P()]);
+  out.duePerVoltaUnaFetch =
+    fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length === 1;
+  reset(); rispChiavi = null;
+  await contaChiaviP2P(); await contaChiaviP2P();
+  out.mutoNonRichiede =
+    fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length === 1;
+  // 16c) IL PAVIMENTO PUO' MANCARE: `dal` a zero vuol dire « non lo
+  //      so » e non il 1970 — il server lo manda cosi' quando il piu'
+  //      vecchio `creato` che conosce non c'e'. Senza la guardia la
+  //      coda diventerebbe « (almeno da gen 1970) »: una data precisa
+  //      e falsa, che e' peggio del silenzio. L'avviso resta, la data
+  //      sparisce.
+  reset(); rispChiavi = {chiavi: 3, dal: 0};
+  await apriProfiloP2P(); await new Promise(r => setTimeout(r, 20));
+  const senzaDal = nodi.p2pProfiloCorpo.innerHTML;
+  out.dalZeroAvvisaSenzaData = senzaDal.includes('altrove')
+    && !senzaDal.includes('almeno da') && !senzaDal.includes('1970');
+  reset(); rispChiavi = {chiavi: 0, dal: 0};
+  await apriProfiloP2P(); await new Promise(r => setTimeout(r, 20));
+  out.zeroTaceAvviso = nodi.p2pProfiloCorpo.innerHTML.includes('nasce da solo');
+  reset(); rispChiavi = null;
+  await apriProfiloP2P(); await new Promise(r => setTimeout(r, 20));
+  out.mutoTaceAvviso = nodi.p2pProfiloCorpo.innerHTML.includes('nasce da solo');
+  reset(); DEMO = true;
+  out.demoNonChiede = (await contaChiaviP2P()) === null && fetches.length === 0;
+  // 17) e dimenticare butta il conto: il server adesso dice zero, e il
+  //     foglio TACE invece di parlare di una chiave che era questa.
+  reset(); rispChiavi = {chiavi: 1, dal: 1735689600};
+  ricordaMazzo(m); await apriProfiloP2P();
+  await contaChiaviP2P();
+  rispChiavi = {chiavi: 0, dal: 0};
+  scordaMazzo();
+  await new Promise(r => setTimeout(r, 20));
+  out.dimenticaRichiede = nodi.p2pProfiloCorpo.innerHTML.includes('nasce da solo')
+    && !nodi.p2pProfiloCorpo.innerHTML.includes('altrove');
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -35872,6 +36091,19 @@ const corpo = f => JSON.parse(f.opt.body);
         "demoTace": "in DEMO il foglio non si apre e un toast lo dice",
         "vetrinaInvita": "in vetrina si apre l'invito con la chiave p2p",
         "paroleDiCasa": "a schermo nessuna parola di protocollo",
+        "subitoSenzaAvviso": "il foglio si apre senza aspettare il conto",
+        "avvisoArrivato": "...e quando arriva dice che il profilo c'e' ALTROVE",
+        "contoMaiAScherm": "...senza mai mettere a schermo il numero",
+        "avvisoNienteMazzo": "chiedere il conto non fa nascere nessun mazzo",
+        "avvisoNienteRegistra": "...e non registra niente al server",
+        "unaDomandaSola": "il conto si chiede UNA volta, non a ogni render",
+        "duePerVoltaUnaFetch": "...e due chiamanti insieme fanno UNA fetch sola",
+        "mutoNonRichiede": "...e col server muto non si richiede a ogni giro",
+        "dalZeroAvvisaSenzaData": "senza `dal` l'avviso c'e' ma la data no: mai « gen 1970 »",
+        "zeroTaceAvviso": "senza chiavi altrove resta il testo di sempre",
+        "mutoTaceAvviso": "...e col server muto pure: non si avvisa a vuoto",
+        "demoNonChiede": "in DEMO il conto non si chiede affatto",
+        "dimenticaRichiede": "dimenticare butta il conto: il foglio non parla di una chiave tolta",
     }
     for k, nome in attesi.items():
         prova(nome, True, out.get(k))

@@ -32881,6 +32881,13 @@ let p2pChiDeciso = false;
 let p2pCodiceVisibile = false;
 let p2pCodiceMostrato = '';
 let mazzoInCorso = null;
+/* Quante chiavi il SERVER conosce di questo account: `null` = non lo
+   sappiamo, che e' un'altra cosa da « nessuna » — la lezione di
+   NON_CHIESTO. Il giro e' la PROMESSA e non il risultato (il patto di
+   `caricaBannerTest`): col gate booleano il secondo chiamante arrivato
+   mentre la risposta e' in volo prenderebbe un vuoto. */
+let p2pChiaviNote = null;
+let p2pChiaviGiro = null;
 function mazzoMostro(){
   try {
     const d = JSON.parse(localStorage.getItem(MOSTRO_CHIAVE)) || null;
@@ -33079,6 +33086,26 @@ async function dimenticaChiaviP2P(){
     return r.ok;
   } catch(e){ return false; }
 }
+/* La terza sorella, e l'unica che LEGGE. Risponde a UNA domanda sola:
+   chi apre il profilo da un dispositivo senza il mazzo ne ha gia' uno
+   altrove? Si chiede UNA volta per sessione — un conto che cambia solo
+   quando nasce un mazzo, e un mazzo qui non e' nato. IL NUMERO NON VA
+   MAI A SCHERMO: a chi legge serve il FATTO, non quante chiavi abbiamo
+   visto passare. FAIL-OPEN: se non si sa, non si avvisa — meglio nessun
+   avviso che un avviso su un conto che non abbiamo. */
+function contaChiaviP2P(){
+  if (DEMO || VETRINA || !myTgId) return Promise.resolve(null);
+  if (!p2pChiaviGiro) p2pChiaviGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/chiavi`, {headers: {'X-Tg-Init-Data': authHdr()}});
+      if (!r.ok) return null;
+      const d = await r.json();
+      p2pChiaviNote = {chiavi: d.chiavi | 0, dal: d.dal | 0};
+    } catch(e){}
+    return p2pChiaviNote;
+  })();
+  return p2pChiaviGiro;
+}
 /* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
    il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
    Telegram — la cache svuotata non deve fabbricare un profilo nuovo a
@@ -33157,7 +33184,30 @@ function renderProfiloP2P(){
       <input type="text" id="p2pImportaInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui il suo codice segreto"></div>
     <button class="btn ghost" onclick="importaMazzoDalFoglio()">📥 Importa questo profilo</button>`;
   if (!m) {
-    box.innerHTML = `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${importa}`;
+    /* IL FOGLIO NON DICE « non ne hai » SENZA AVER CHIESTO (set 2026):
+       qui il mazzo non c'e' e il cloud non l'ha dato, ma il SERVER puo'
+       sapere che questo account una chiave l'ha registrata ALTROVE — e
+       allora « nasce da solo al primo scambio » e' falso: e' gia' nato,
+       e sta su un altro telefono. Chi si fida di quella riga fa nascere
+       una seconda identita' e lascia indietro la reputazione, che e'
+       precisamente il danno che questo avviso esiste per togliere.
+       SI CHIEDE, NON SI GENERA: qui non nasce niente — a generare e'
+       solo `assicuraMazzo`, che parte da un gesto.
+       IL FOGLIO NON ASPETTA: si disegna quel che si sa e si ridisegna
+       quando il conto arriva (il patto del rientro istantaneo della
+       cassa), e si ridisegna SOLO se il foglio e' ancora aperto. */
+    if (!p2pChiaviNote && !p2pChiaviGiro)
+      contaChiaviP2P().then(() => { if (el('p2pProfiloSheet')?.classList.contains('open')) renderProfiloP2P(); });
+    const altrove = !!(p2pChiaviNote && p2pChiaviNote.chiavi > 0);
+    /* « ALMENO DA » e non « dal »: il server manda il piu' vecchio dei
+       `creato` che CONOSCE, che e' un pavimento e non la nascita — una
+       chiave registrata tardi non dice quando il profilo e' nato. */
+    const quando = (altrove && p2pChiaviNote.dal)
+      ? ` (almeno da ${esc(new Date(p2pChiaviNote.dal * 1000).toLocaleDateString('it-IT', {month: 'short', year: 'numeric'}))})`
+      : '';
+    box.innerHTML = altrove
+      ? `<div class="trust-note"><span>⚠️</span><span>Su questo dispositivo il profilo di scambio non c'è, ma il tuo account ne ha già uno${quando}: l'hai creato altrove. Se ne fai nascere un altro qui, gli scambi e le recensioni restano attaccati a quello di prima.</span></div>${importa}`
+      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${importa}`;
     return;
   }
   const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
@@ -33298,6 +33348,14 @@ async function dimenticaMazzoOra(){
   p2pRegistrato = false;
   p2pCodiceVisibile = false;
   p2pCodiceMostrato = '';
+  /* IL CONTO CHE AVEVAMO IN MANO E' STANTIO, e non e' un dettaglio:
+     la chiave appena cancellata era una di quelle che il server
+     contava, quindi un conto letto PRIMA direbbe « ce l'hai altrove »
+     di una chiave che era PROPRIO QUESTA. Si butta e si richiede — il
+     render qui sotto lo rifa' da solo, e se il server adesso dice zero
+     il foglio tace. */
+  p2pChiaviNote = null;
+  p2pChiaviGiro = null;
   renderProfiloP2P();
   toast('Profilo di scambio dimenticato');
 }
