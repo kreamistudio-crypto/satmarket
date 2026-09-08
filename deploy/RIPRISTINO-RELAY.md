@@ -163,8 +163,14 @@ rotto**: ha trovato la regola. Il modo di rimetterli è il sync di
 strfry, che scarica da un altro relay:
 
 ```bash
-docker compose exec strfry strfry sync wss://relay.damus.io --dir down
+docker compose exec relay strfry sync wss://relay.damus.io --dir down
 ```
+
+⚠️ Il servizio si chiama **`relay`** (è il nome in `compose.yml`),
+mentre il binario dentro si chiama `strfry`: `docker compose exec
+strfry ...` risponde «no such service». Questa riga lo sbagliava, ed è
+un foglio che si legge col panico addosso — dove un comando che non
+parte costa piu' dei secondi che dura.
 
 ⚠️ Va dato **dopo** il passo 6 (il relay deve girare) e può prendere
 tempo. Vale la pena restringerlo a quel che ci serve davvero — i nostri

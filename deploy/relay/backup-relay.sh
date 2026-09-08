@@ -22,9 +22,13 @@ LISTA=$(tar -tf "$TAR")
 if printf '%s\n' "$LISTA" | grep -q '^relay/db'; then
     echo "il database e' finito nell'archivio: mi fermo" >&2; exit 1
 fi
+# NOVE nomi e non piu' otto: `router.conf` e' entrato con lo specchio
+# del libro P2P. La guardia va allungata NELLO STESSO GIRO del file
+# nuovo, o la sua assenza da un archivio non fermerebbe niente — ed e'
+# esattamente il buco gia' dichiarato per la ronda.
 for f in relay/strfry.conf relay/policy/chi-scrive.py relay/policy/chiavi.txt \
          relay/token.header relay/compose.yml relay/Dockerfile \
-         relay/aggiorna-chiavi.sh caddy/Caddyfile; do
+         relay/aggiorna-chiavi.sh relay/router.conf caddy/Caddyfile; do
     printf '%s\n' "$LISTA" | grep -qx "$f" || { echo "manca $f: mi fermo" >&2; exit 1; }
 done
 

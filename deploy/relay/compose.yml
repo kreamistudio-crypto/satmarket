@@ -18,3 +18,45 @@ services:
       # template e da non-root fallisce.
       - ./strfry.conf:/etc/strfry.conf:ro
       - ./policy:/etc/strfry-policy:ro
+
+  # LO SPECCHIO DEL LIBRO P2P (set 2026): tiene qui una copia degli
+  # ordini che il nostro coordinator Mostro pubblica sui relay
+  # pubblici. Il perche' e il filtro stanno in `router.conf`.
+  #
+  # E' UN SERVIZIO E NON UNA UNIT SYSTEMD, e la ragione e' il BACKUP:
+  # `backup-relay.sh` archivia tutta /opt/relay (meno il db), quindi
+  # `router.conf` entra per costruzione e `compose.yml` e' gia' nella
+  # sua guardia. Le unit invece il tar le prende PER NOME, quattro:
+  # una quinta sparirebbe in silenzio, che e' il buco gia' dichiarato
+  # per la ronda.
+  specchio:
+    build: .
+    image: barattolo-relay
+    container_name: relay-specchio
+    user: "1001:1001"
+    restart: unless-stopped
+    # ⚠️ L'ENTRYPOINT SI SCAVALCA, E IL BINARIO VUOLE IL PERCORSO
+    # INTERO. Provato sulla macchina (set 2026): `--entrypoint strfry`
+    # risponde «executable not found» — nel PATH non c'e' — e ci vuole
+    # `/app/strfry`.
+    # E si SCAVALCA `strfry.sh` invece di passargli degli argomenti,
+    # perche' e' cosi' che l'esperimento e' riuscito: quello script e'
+    # fatto per il RELAY — prova a copiarsi il template della config, e
+    # da non-root fallisce (il commento due righe sopra dice la stessa
+    # cosa dall'altro lato). Un `command:` da solo lo lascerebbe in
+    # mezzo, ed e' una forma che non ha provato nessuno.
+    entrypoint: ["/app/strfry"]
+    command: ["router", "/etc/strfry-router.conf"]
+    volumes:
+      # LO STESSO DATABASE del relay, ed e' il punto di tutto: due
+      # processi strfry sullo stesso LMDB e' il modo in cui strfry e'
+      # fatto per lavorare (`sync` e `import` girano gia' accanto al
+      # relay vivo).
+      - ./db:/app/strfry-db
+      # Gli serve anche la config del relay: da li' legge dove sta il db.
+      - ./strfry.conf:/etc/strfry.conf:ro
+      - ./router.conf:/etc/strfry-router.conf:ro
+    # NIENTE `ports:`, e non e' una dimenticanza: questo processo non
+    # ascolta nessuno, apre solo connessioni in uscita verso i relay
+    # del coordinator. Una porta qui sarebbe superficie che non paga
+    # affitto.

@@ -211,17 +211,26 @@ jobs:
           # vendor/, dove nostr.bundle.js ne contiene per mestiere ed e'
           # l'unico file del repo che lo fa.
           #
-          # E fuori i TRE file della configurazione del relay, che ne
-          # portano uno ciascuno ed e' PUBBLICO in tutti e tre i casi: il
+          # E fuori i QUATTRO file della configurazione del relay, che
+          # ne portano uno ciascuno ed e' PUBBLICO in tutti i casi: il
           # digest dell'immagine strfry nel Dockerfile (inchiodato apposta
           # invece di un tag che si muove, e cambia a ogni aggiornamento
-          # dell'immagine) e la chiave PUBBLICA della piattaforma nel
+          # dell'immagine), la chiave PUBBLICA della piattaforma nel
           # plugin e in strfry.conf — quella che il relay serve gia' da
           # se' nel suo NIP-11 a chiunque gliela chieda, e che il plugin
           # confronta col campo `pubkey` degli eventi: una chiave privata
-          # li' dentro non ci potrebbe stare per costruzione.
+          # li' dentro non ci potrebbe stare per costruzione — e la
+          # chiave PUBBLICA del coordinator Mostro in router.conf, che
+          # firma il libro ordini che tutti leggono e sta anche nel
+          # config di Barattolo come `MOSTRO_NPUB` (stessa chiave, altro
+          # alfabeto: i filtri Nostr non parlano bech32).
           #
-          # SI ESCLUDONO I TRE FILE E MAI LA CARTELLA, ed e' la riga da
+          # IL QUARTO E' ARRIVATO COME IL COMMENTO DICEVA (set 2026, lo
+          # specchio del libro P2P): «un quarto file messo li' domani
+          # torna sotto la regola da solo». C'e' tornato, e si e'
+          # dichiarato qui invece di allargare la regola alla cartella.
+          #
+          # SI ESCLUDONO I FILE E MAI LA CARTELLA, ed e' la riga da
           # non allargare: in deploy/relay/ non deve entrare mai
           # policy/chiavi.txt, che e' un elenco di 64-hex uno per riga,
           # cioe' esattamente quel che questa regola prende. Escludendo
@@ -236,6 +245,7 @@ jobs:
                ':!deploy/relay/Dockerfile' \
                ':!deploy/relay/strfry.conf' \
                ':!deploy/relay/policy/chi-scrive.py' \
+               ':!deploy/relay/router.conf' \
                | xargs -0 grep -lIE "$FORMA_HEX" ; then
             echo "::error::Sembra esserci una chiave privata in esadecimale"
             exit 1
@@ -273,7 +283,7 @@ jobs:
           # semplifica la storia e SALTA dei commit (misurato su questo
           # repo: 867 invece di 868) — cioe' proprio quello che una
           # passata di sicurezza non puo' permettersi. Le eccezioni sono
-          # LE STESSE dei file di oggi — vendor/ e i tre del relay — o il
+          # LE STESSE dei file di oggi — vendor/ e i quattro del relay — o il
           # bundle si denuncerebbe da solo a ogni giro e i tre valori
           # pubblici del relay farebbero rossa ogni passata dal commit in
           # avanti: qui si guardano le righe AGGIUNTE di tutta la storia,
@@ -284,6 +294,7 @@ jobs:
                ':!deploy/relay/Dockerfile' \
                ':!deploy/relay/strfry.conf' \
                ':!deploy/relay/policy/chi-scrive.py' \
+               ':!deploy/relay/router.conf' \
                | grep -a '^+' | grep -aE "$FORMA_HEX" ; then
             echo "::error::Una chiave esadecimale nuda e' passata dalla repo: va RUOTATA"
             exit 1

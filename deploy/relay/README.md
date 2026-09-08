@@ -74,9 +74,10 @@ un archivio incompleto.
 | `Dockerfile` | `/opt/relay/` | strfry inchiodato a un **digest** e non a un tag che si muove, più `python3` per il plugin |
 | `compose.yml` | `/opt/relay/` | il servizio. Porta due righe che non sono decorative: `user: "1001:1001"` e il `127.0.0.1:` davanti alla porta |
 | `strfry.conf` | `/opt/relay/` | il relay. `restrictedReadKinds` tiene i DM leggibili solo a chi li riguarda |
+| `router.conf` | `/opt/relay/` | lo **specchio** del libro ordini P2P: due kind, un autore, corrente in discesa |
 | `policy/chi-scrive.py` | `/opt/relay/policy/` | chi può scrivere. **Fail-closed**: se qualcosa esplode rifiuta |
 | `aggiorna-chiavi.sh` | `/opt/relay/` | rinfresca la whitelist da `/api/relay/chiavi`. Legge il token da `token.header` |
-| `backup-relay.sh` | `/usr/local/sbin/` | l'archivio cifrato delle 03:45. **Mai il database** — e ha la guardia che lo verifica |
+| `backup-relay.sh` | `/usr/local/sbin/` | l'archivio cifrato delle 03:45. **Mai il database** — e ha la guardia che lo verifica (**nove** nomi da quando c'è `router.conf`) |
 | `ronda-relay.sh` | `/usr/local/sbin/` | le 08:00: età e peso dell'ultimo archivio, sul canale Telegram |
 | `unit/*.service`, `unit/*.timer` | `/etc/systemd/system/` | le **sei** unit: chiavi ogni 10 min, backup 03:45, ronda 08:00 |
 
