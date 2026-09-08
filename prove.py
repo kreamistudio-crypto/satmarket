@@ -26879,8 +26879,14 @@ def prove_fogli_di_casa():
     # sposta il peso in disputa. Un gesto che non torna indietro si
     # chiede prima, e il corpo dice il fatto e non il gesto («segna
     # solo quello che hai davvero sul banco»).
-    prova("i gesti che passano dalla domanda unica sono cinquantaquattro",
-          54, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTACINQUE (set 2026, gli scambi P2P che si tolgono dalla
+    # lista): il ricordo di uno scambio vive nel localStorage del
+    # dispositivo e toglierlo non si disfa — e se il voto e' ancora
+    # aperto, con lo scambio se ne va anche quello. Il corpo lo dice
+    # nei due casi separati invece di una frase sola, che «lo perdi»
+    # e' vero solo in uno dei due.
+    prova("i gesti che passano dalla domanda unica sono cinquantacinque",
+          55, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
