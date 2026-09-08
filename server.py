@@ -16513,6 +16513,13 @@ def _leve_stato():
                   spento="senza i relay lo scambio non si accende: qui "
                          "non c'e' una lista di serie, e non deve "
                          "esserci"),
+            _leva("Specchi del libro", "MOSTRO_RELAY_SPECCHIO",
+                  _elenco(MOSTRO_RELAY_SPECCHIO),
+                  acceso="il libro si legge anche da qui, e questi "
+                         "relay non ricevono MAI una richiesta di "
+                         "scambio",
+                  spento="il libro si legge solo dai relay del "
+                         "coordinator: se cadono loro, cade il libro"),
         ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
@@ -29687,6 +29694,19 @@ try:
     MOSTRO_RELAY = [str(r) for r in MOSTRO_RELAY if str(r).strip()]
 except ImportError:
     MOSTRO_RELAY = []
+# LO SPECCHIO (set 2026): relay che tengono una COPIA del libro, e da
+# cui si LEGGE soltanto. NON si aggiungono a `MOSTRO_RELAY`, ed e' la
+# distinzione che regge il cantiere: quella e' la lista dei posti dove
+# il coordinator ASCOLTA, e il client la scorre anche per PUBBLICARE le
+# richieste di scambio. Uno specchio finito la' dentro si prenderebbe
+# una richiesta che nessuno leggera' mai — nessun errore, nessuna riga,
+# solo un coordinatore che «non risponde». Vuota = il mondo di ieri.
+try:
+    from config import MOSTRO_RELAY_SPECCHIO
+    MOSTRO_RELAY_SPECCHIO = [str(r) for r in MOSTRO_RELAY_SPECCHIO
+                             if str(r).strip()]
+except ImportError:
+    MOSTRO_RELAY_SPECCHIO = []
 # LA FASE CHIUSA (set 2026, decisione di Andrea): prima di aprire il
 # P2P a tutti lo usano solo Andrea e Alan, su scambi veri e piccoli.
 # La lista dei tg_id ammessi E' la leva, e IL VUOTO E' L'APERTURA —
@@ -29754,10 +29774,19 @@ def _p2p_leve() -> dict:
     raggiungibile per configurazione — e mai la sola costante: una
     leva accesa con la npub storta direbbe al client di parlare con
     nessuno. Npub e relay sono pubblici e viaggiano sempre; e' il
-    client a non usarli finche' `attivo` e' falso."""
+    client a non usarli finche' `attivo` e' falso.
+    LO SPECCHIO E' UNA CHIAVE IN PIU', NON UNA LISTA PIU' LUNGA (set
+    2026): `relay` resta dove il coordinator ascolta — e il client la
+    scorre anche per pubblicare — mentre `specchio` sono i relay che ne
+    tengono una copia e servono SOLO a leggere il libro. Fonderle
+    manderebbe una richiesta di scambio dove mostrod non ascolta.
+    E `attivo` NON lo guarda: uno specchio senza i relay del
+    coordinator non e' un P2P acceso a meta', e' un P2P spento con uno
+    specchio inutile."""
     return {"attivo": bool(P2P_ATTIVO and MOSTRO_HEX and MOSTRO_RELAY),
             "mostro": MOSTRO_HEX,
-            "relay": list(MOSTRO_RELAY)}
+            "relay": list(MOSTRO_RELAY),
+            "specchio": list(MOSTRO_RELAY_SPECCHIO)}
 
 
 def _p2p_per(tg_id) -> dict:

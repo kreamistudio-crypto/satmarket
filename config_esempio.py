@@ -550,6 +550,17 @@ MOSTRO_RELAY = [
     "wss://relay.damus.io",
     "wss://nos.lol",
 ]
+# LO SPECCHIO (set 2026): i relay che tengono una COPIA del libro senza
+# essere il posto dove il coordinator vive — il nostro
+# "wss://relay.barattolo.store" sta qui, e non nella lista qui sopra.
+# LA DIVISIONE E' IL PUNTO, non un ordine diverso: di qui si LEGGE
+# soltanto. Le richieste al coordinator (la gamba viva) scorrono
+# MOSTRO_RELAY e non passano mai da questa lista — mostrod sullo
+# specchio non ascolta, e uno scambio mandato li' morirebbe senza che
+# niente fallisca.
+# VUOTA E' IL MONDO DI IERI, byte per byte: il libro si legge dai soli
+# relay del coordinator, come prima che questa riga esistesse.
+MOSTRO_RELAY_SPECCHIO = []
 
 DB = "satmarket.db"
 

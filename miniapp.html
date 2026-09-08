@@ -32414,6 +32414,7 @@ let p2pLibro = null;               // {ordini:[...], quando} — null = mai lett
 let p2pNuovoMetodo = '';           // il metodo scelto nel foglio del nuovo ordine
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
+let p2pParziale = false;           // il libro e' arrivato solo dallo specchio
 let p2pLettura = null;             // la promessa in volo: due tocchi non fanno due REQ
 let p2pGiro = 0;                   // il patto di vetrinaGiro: la risposta di un giro vecchio si butta
 
@@ -32545,11 +32546,18 @@ function infoDaEvento(ev){
   };
 }
 
-/* LEGGE IL LIBRO da un relay solo — il primo di p2pLeve.relay che
-   risponde — con la REQ chiusa dall'EOSE e un timeout per relay: la
-   lezione del bunker (la factory `Relay.connect(url, opts)` IGNORA il
-   timeout, si costruisce a mano) e del login col telefono (un relay
-   muto in testa si porta via i suoi secondi prima che si veda niente).
+/* LEGGE IL LIBRO A VENTAGLIO — tutti i relay insieme, e quel che torna
+   si unisce. Prima si prendeva il PRIMO che rispondeva, e «risponde»
+   comprende «risponde con zero eventi»: un EOSE vuoto e una risposta
+   piena si servono uguali, quindi bastava un relay muto in testa per
+   far diventare vuoto il libro. Non si cura scegliendo l'ordine giusto
+   della lista — si cura rendendo ROBUSTO IL LETTORE, che e' la lezione
+   della sonda del coordinator: quando non si sa quale sara' il criterio
+   buono, non si scommette sul campo.
+   E IL TEMPO PEGGIORE MIGLIORA: tre relay muti in fila costavano 24
+   secondi, insieme ne costano 8.
+   La lezione del bunker resta valida (la factory `Relay.connect(url,
+   opts)` IGNORA il timeout, si costruisce a mano).
    Una REQ e basta: qui non si firma, non si cifra e non si pubblica. */
 async function leggiLibroMostro(){
   const c = p2pCoord();
@@ -32561,13 +32569,19 @@ async function leggiLibroMostro(){
     {kinds: [38383], authors: [c.mostro], '#f': [P2P_VALUTA], '#s': ['pending']},
     {kinds: [38385], authors: [c.mostro]}
   ];
-  let ultimo = null;
-  for (const url of c.relay) {
+  /* I DUE INSIEMI RESTANO DISTINTI QUI DENTRO: `vivi` sono i relay dove
+     il coordinator ASCOLTA, `specchi` quelli che ne tengono solo una
+     copia. Serve sotto, per sapere se il libro e' completo o e' quel
+     che aveva lo specchio. */
+  const vivi = c.relay;
+  const specchi = Array.isArray(c.specchio) ? c.specchio : [];
+  const tutti = vivi.concat(specchi);
+  const unRelay = async (url) => {
     let relay = null;
     try {
       relay = new NT.Relay(url);
       await relay.connect({timeout: P2P_LIBRO_MS});
-      const eventi = await new Promise((ok, no) => {
+      return await new Promise((ok, no) => {
         const presi = [];
         let sub = null;
         const t = setTimeout(() => { try { sub?.close(); } catch(e){}
@@ -32579,15 +32593,40 @@ async function leggiLibroMostro(){
           onclose(){ clearTimeout(t); ok(presi); }
         });
       });
-      return {eventi, relay: url};
-    } catch(e) {
-      ultimo = e;
-      console.log('🔁 [p2p] relay che non risponde: ' + url + ' (' + (e?.message || e) + ')');
     } finally {
       try { relay?.close(); } catch(e){}
     }
-  }
-  throw ultimo || new Error('nessun relay');
+  };
+  const esiti = await Promise.allSettled(tutti.map(url => unRelay(url)));
+  const fonti = [];
+  let eventi = [];
+  let ultimo = null;
+  esiti.forEach((e, i) => {
+    const url = tutti[i];
+    if (e.status === 'fulfilled') {
+      fonti.push({url, n: e.value.length, ok: true});
+      eventi = eventi.concat(e.value);
+    } else {
+      fonti.push({url, n: 0, ok: false});
+      ultimo = e.reason;
+      console.log('🔁 [p2p] relay che non risponde: ' + url
+                  + ' (' + (e.reason?.message || e.reason) + ')');
+    }
+  });
+  /* LA PROVENIENZA SI VEDE, ed e' il modo in cui uno specchio che ha
+     smesso di aggiornarsi si scopre in un giorno invece che in un mese:
+     non fallisce, torna zero — e senza questa riga «zero» si legge come
+     «oggi non c'e' nessun ordine». */
+  console.log('📖 [p2p] libro: '
+    + fonti.map(f => f.url + '=' + (f.ok ? f.n : 'muto')).join('  '));
+  if (!fonti.some(f => f.ok)) throw ultimo || new Error('nessun relay');
+  /* COMPLETO = ha risposto almeno un relay del coordinator. Se ha
+     parlato solo lo specchio, quel che si legge puo' essere vecchio —
+     un ordine gia' preso e' una SOSTITUZIONE, non una cancellazione,
+     quindi uno specchio indietro lo mostra ancora disponibile — e si
+     dice, invece di stampare «nessun ordine aperto». */
+  return {eventi, fonti,
+          completo: fonti.some((f, i) => f.ok && i < vivi.length)};
 }
 
 /* Carica (o ricarica) il libro. Gli ordini sono eventi ADDRESSABLE —
@@ -32600,11 +32639,16 @@ function caricaLibroP2P(forza){
   const giro = ++p2pGiro;
   p2pLettura = (async () => {
     try {
-      const {eventi} = await leggiLibroMostro();
+      const {eventi, completo} = await leggiLibroMostro();
       if (giro !== p2pGiro) return;
       const perId = new Map();
       /* gli intervalli si contano per `d` come gli ordini, o due relay
-         che mandano lo stesso evento lo conterebbero due volte */
+         che mandano lo stesso evento lo conterebbero due volte.
+         ⚠️ E COME GLI ORDINI SI CONFRONTANO PER DATA (set 2026, col
+         ventaglio): finche' i relay si leggevano uno alla volta
+         l'ultimo arrivato era anche l'unico, mentre ora una copia
+         vecchia dello specchio puo' arrivare dopo quella fresca e
+         scavalcarla — in silenzio, che e' il modo in cui si sbaglia. */
       const fuori = new Map();
       for (const ev of eventi) {
         if (ev.kind === 38385) {
@@ -32615,7 +32659,12 @@ function caricaLibroP2P(forza){
         const o = ordineDaEvento(ev);
         if (!o) {
           const lato = intervalloP2P(ev);
-          if (lato) fuori.set(String(tagValore(ev, 'd')), lato);
+          if (lato) {
+            const d = String(tagValore(ev, 'd'));
+            const quando = Number(ev.created_at) || 0;
+            const g = fuori.get(d);
+            if (!g || quando > g.quando) fuori.set(d, {lato, quando});
+          }
           continue;
         }
         const g = perId.get(o.id);
@@ -32625,10 +32674,11 @@ function caricaLibroP2P(forza){
         ordini: [...perId.values()]
           .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA)
           .sort((a, b) => b.creato - a.creato),
-        intervalli: [...fuori.values()],
+        intervalli: [...fuori.values()].map(v => v.lato),
         quando: Date.now()
       };
       p2pErrore = '';
+      p2pParziale = !completo;
     } catch(e) {
       if (giro === p2pGiro) p2pErrore = e?.message || String(e);
       throw e;
@@ -32839,6 +32889,11 @@ function renderP2P(){
        toglie l'unica bugia della pagina. */
     + (fuori ? `<div class="hint">${fuori} offert${fuori === 1 ? 'a' : 'e'} a intervallo `
         + `non si prend${fuori === 1 ? 'e' : 'ono'} ancora da qui.</div>` : '')
+    /* IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
+       arrivato dal solo specchio si legge come il libro vero, e un
+       ordine gia' preso sembra ancora libero. */
+    + (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
+        + `del libro, quindi qui puo' mancare qualcosa o restare un ordine gia' preso.</div>` : '')
     + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}</div>` : '');
   box.innerHTML = scambiP2P() + testa
     + (vivi.length ? vivi.map(rigaOrdineP2P).join('')
@@ -32852,6 +32907,7 @@ function renderP2P(){
 function ricaricaP2P(){
   haptic();
   p2pErrore = '';
+  p2pParziale = false;
   p2pLibro = null;
   renderP2P();
 }

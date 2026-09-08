@@ -18566,6 +18566,10 @@ def _censimento(acceso):
     # le altre lascerebbe la riga «accesa» anche nel censimento spento,
     # e la nota «senza i relay non si accende» non uscirebbe mai.
     amb["MOSTRO_RELAY"] = [1, 2, 3] if acceso else []
+    # LO SPECCHIO ha lo stesso verso: vuoto e' uno stato che vuol dire
+    # qualcosa («il libro si legge solo dai relay del coordinator»), non
+    # una leva non configurata.
+    amb["MOSTRO_RELAY_SPECCHIO"] = [1, 2, 3] if acceso else []
     # LA FASE CHIUSA e' una lista anche lei, e come i relay il VUOTO ha
     # un significato — «aperto a tutti» — quindi si esercitano tutti e
     # due i rami del pannello invece di inchiodarla a [1,2,3]: a leve
@@ -35286,9 +35290,17 @@ def prove_p2p_libro():
           and "a intervallo" in _rp)
     prova("...e a zero non si scrive niente", True,
           "fuori ? " in _rp)
+    # LA DATA E' ENTRATA NEL CONFRONTO (set 2026, col ventaglio), e la
+    # sentinella cambia forma con la riga che sorveglia: contarli per
+    # `d` non basta piu', perche' ora i relay rispondono INSIEME e una
+    # copia vecchia dello specchio puo' arrivare dopo quella fresca e
+    # scavalcarla. Il pezzo nuovo e' la seconda prova.
+    _cl = pezzo_js(mini, "function caricaLibroP2P(forza){")
     prova("gli intervalli si contano per `d`, come gli ordini", True,
-          "fuori.set(String(tagValore(ev, 'd')), lato)"
-          in pezzo_js(mini, "function caricaLibroP2P(forza){"))
+          "const g = fuori.get(d);" in _cl
+          and "fuori.set(d, {lato, quando});" in _cl)
+    prova("...e fra due copie vince la piu' recente, come gli ordini",
+          True, "if (!g || quando > g.quando)" in _cl)
     prova("la REQ filtra la sola valuta e i soli pending", True,
           "'#f': [P2P_VALUTA], '#s': ['pending']" in cod)
     prova("...e chiede anche le impostazioni (38385)", True,
@@ -38403,6 +38415,13 @@ def prove_p2p_server():
           and "RELAY_DI_SERIE" not in cod)
     prova("...e le stringhe vuote si scartano come per RELAY_NOSTR",
           True, "if str(r).strip()" in cod)
+    # LO SPECCHIO (set 2026): la lista dei relay da cui si LEGGE il
+    # libro senza parlarci. Nasce vuota come l'altra, e per la stessa
+    # ragione: uno specchio di serie non sarebbe quello di Andrea.
+    prova("MOSTRO_RELAY_SPECCHIO nasce vuota", True,
+          "except ImportError:\n    MOSTRO_RELAY_SPECCHIO = []" in cod)
+    prova("...e si legge dal config come le altre", True,
+          "from config import MOSTRO_RELAY_SPECCHIO" in cod)
 
     # --- 2) IL GIUDICE DELLA NPUB E' FAIL-CLOSED --------------------
     amb = {"__builtins__": __builtins__,
@@ -38430,9 +38449,10 @@ def prove_p2p_server():
     prova("un carattere fuori alfabeto vale ''", "", mh(npub[:-1] + "b"))
 
     # --- 3) `_p2p_leve` GIRA nei quattro casi -------------------------
-    def leve(attivo, hexv, relay):
+    def leve(attivo, hexv, relay, specchio=()):
         a = {"__builtins__": __builtins__, "P2P_ATTIVO": attivo,
-             "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay}
+             "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay,
+             "MOSTRO_RELAY_SPECCHIO": list(specchio)}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -38448,8 +38468,25 @@ def prove_p2p_server():
           leve(True, "", relay)["attivo"])
     prova("accesa ma senza relay: attivo False (fail-closed)", False,
           leve(True, hexv, [])["attivo"])
-    prova("le chiavi sono tre e sono sempre quelle",
-          ["attivo", "mostro", "relay"], sorted(piena.keys()))
+    prova("le chiavi sono quattro e sono sempre quelle",
+          ["attivo", "mostro", "relay", "specchio"], sorted(piena.keys()))
+    # LO SPECCHIO E' UNA CHIAVE IN PIU', NON UNA LISTA PIU' LUNGA: e' la
+    # riga che regge tutto il cantiere del relay nostro. Fondere le due
+    # liste manderebbe una richiesta di scambio a un relay dove mostrod
+    # non ascolta, e morirebbe senza che niente fallisca.
+    specchi = ["wss://relay.barattolo.store"]
+    conSp = leve(True, hexv, relay, specchi)
+    prova("lo specchio viaggia a parte, e non entra nei relay",
+          (relay, specchi), (conSp["relay"], conSp["specchio"]))
+    prova("...e anche la sua lista e' una COPIA", False,
+          conSp["specchio"] is specchi)
+    # UNO SPECCHIO SENZA COORDINATOR NON E' UN P2P A META': `attivo` non
+    # lo guarda, o il client si metterebbe a leggere una copia senza
+    # avere dove mandare le richieste.
+    prova("uno specchio da solo NON accende lo scambio", False,
+          leve(True, hexv, [], specchi)["attivo"])
+    prova("...e con i relay veri lo specchio non cambia `attivo`", True,
+          conSp["attivo"])
     # Il journal dice il perche' quando la leva e' accesa ma non morde:
     # una riga sul VPS e nessuna spiegazione sarebbe un guasto muto.
     prova("accesa e storta lo dice all'avvio", True,
@@ -38602,6 +38639,17 @@ def prove_p2p_server():
     prova("i relay vuoti dicono che lo scambio non si accende", True,
           "non si accende" in voci_off.get("MOSTRO_RELAY",
                                           {}).get("nota", ""))
+    prova("gli specchi del libro sono nel pannello, come elenco",
+          "1 \u00b7 2 \u00b7 3",
+          voci_on.get("MOSTRO_RELAY_SPECCHIO", {}).get("valore"))
+    # La nota accesa dice la cosa che il pannello esiste per dire: che
+    # da quei relay non passa MAI una richiesta di scambio.
+    prova("...e dicono che non ricevono richieste di scambio", True,
+          "richiesta" in voci_on.get("MOSTRO_RELAY_SPECCHIO",
+                                     {}).get("nota", ""))
+    prova("...e a specchi spenti dice cosa si perde", True,
+          "cade il libro" in voci_off.get("MOSTRO_RELAY_SPECCHIO",
+                                          {}).get("nota", ""))
     # LA FASE CHIUSA NEL PANNELLO (tappa 7b), e questa riga l'ha chiesta
     # la TORTURA: rinominando la chiave della voce non diventava rossa
     # NIENTE — il pannello e' l'unico posto da cui un moderatore sa che
@@ -38631,6 +38679,61 @@ def prove_p2p_server():
           in cfg)
     prova("...e il relay del coordinator per primo", True,
           "MOSTRO_RELAY = [\n    \"wss://relay.mostro.network\"," in cfg)
+    prova("MOSTRO_RELAY_SPECCHIO e' nel file da cui si copia", True,
+          "\nMOSTRO_RELAY_SPECCHIO = []" in cfg)
+
+    # --- 8) L'INVARIANTE DELLO SPECCHIO -----------------------------
+    # E' LA RIGA CHE REGGE IL CANTIERE DEL RELAY NOSTRO, e il modo in
+    # cui puo' rompersi non fallisce: gli specchi sono relay da cui si
+    # LEGGE il libro e dove mostrod NON ascolta. Se un giorno la
+    # connessione viva o la chiamata al coordinator pescassero di li',
+    # il client pubblicherebbe la sua richiesta dove nessuno la
+    # leggera' mai — nessun errore, nessuna riga nel log, solo un
+    # coordinatore che «non risponde mai».
+    # LA TERZA SENTINELLA GUARDA IL VERSO OPPOSTO, e vale quanto le
+    # altre due: se il lettore smettesse di usarli, la leva sarebbe
+    # morta e nessuno se ne accorgerebbe — il libro continuerebbe ad
+    # arrivare dai relay del coordinator. Una guardia che non guarda
+    # niente e' peggio di nessuna guardia.
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def corpo(apertura):
+        i = mini.index(apertura)
+        return mini[i:mini.index("\n}", i)]
+
+    def solo_codice(js):
+        """Il gemello di `codice()` per il JS: via i blocchi /* */ e le
+        righe //. LA TORTURA L'HA CHIESTO, e vale le due righe: la
+        prima stesura di queste sentinelle cercava la parola nel testo
+        e la trovava nei COMMENTI — svuotare la lista degli specchi
+        lasciava tutto verde. Una guardia che si accontenta della prosa
+        non guarda niente, ed e' peggio di nessuna guardia perche' si
+        ha l'impressione di essere sorvegliati."""
+        js = re.sub(r"/\*.*?\*/", "", js, flags=re.S)
+        return "\n".join(r for r in js.split("\n")
+                          if not r.strip().startswith("//"))
+
+    for nome, apertura in (("mostroConnetti", "function mostroConnetti(){"),
+                           ("mostroChiama",
+                            "async function mostroChiama(skTrade, msg, opz){")):
+        prova(f"`{nome}` non pesca MAI dagli specchi", False,
+              "specchio" in solo_codice(corpo(apertura)))
+    # IL VERSO OPPOSTO, e si guarda la RIGA che legge la leva: se il
+    # lettore smettesse di usarla, la leva sarebbe morta e il libro
+    # continuerebbe ad arrivare dai soli relay del coordinator — cioe'
+    # il cantiere sarebbe disfatto senza che niente diventasse rosso.
+    libro = solo_codice(corpo("async function leggiLibroMostro(){"))
+    prova("...e il lettore del libro invece li prende dalla leva", True,
+          "const specchi = Array.isArray(c.specchio) ? c.specchio : [];"
+          in libro)
+    prova("...e li unisce ai relay del coordinator", True,
+          "const tutti = vivi.concat(specchi);" in libro)
+    # IL VENTAGLIO: si legge da tutti insieme e si unisce, o un relay
+    # muto in testa torna a poter svuotare il libro.
+    prova("il libro si legge a ventaglio e non a uno a uno", True,
+          "Promise.allSettled" in libro)
+    prova("...e dice se e' COMPLETO o e' quel che aveva lo specchio",
+          True, "completo:" in libro)
 
 
 def prove_p2p_campanello():
