@@ -35754,6 +35754,17 @@ def prove_p2p_chiavi():
     prova("...e risponde 409 a leva spenta, chiedendo al giudice", True,
           'if not _p2p_per(user["id"])["attivo"]:' in get
           and "HTTPException(409" in get)
+    # E IL CONTO LO FA IL GIUDICE PURO, la gemella della POST: senza
+    # questa riga la rotta puo' rifarsi la query in casa e restare
+    # VERDE PER LA RAGIONE SBAGLIATA — il banco sqlite qui sotto
+    # continuerebbe a esercitare `_conta_chiavi_p2p`, che intanto non
+    # chiama piu' nessuno, e tutte le sentinelle del giudice
+    # parlerebbero di codice morto. E' l'unica mutazione sopravvissuta
+    # alla tortura del pezzo 1 (set 2026): la riga c'era di la' e
+    # mancava di qua, che e' il modo in cui una cecita' si nasconde in
+    # mezzo a del codice che funziona.
+    prova("...e il conto lo fa il giudice puro", True,
+          '_conta_chiavi_p2p(con, user["id"])' in get)
     # NESSUN PARAMETRO, IN NESSUNA FORMA: non si puo' chiedere DI UN
     # ALTRO, e non esiste nemmeno la sintassi per provarci. E' la regola
     # della DELETE letta dal lato della lettura, e si guarda la FIRMA
