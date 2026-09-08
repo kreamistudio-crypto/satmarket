@@ -1,0 +1,60 @@
+From 1d6652c5fa09e9e0e611ade6ef0f21a0d50bcdbb Mon Sep 17 00:00:00 2001
+From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 09:28:26 +0000
+Subject: [PATCH 2/3] config: let dev_fee_percentage = 0 mean no dev fee, not
+ an invalid value
+
+MIN_DEV_FEE_PERCENTAGE (0.10) rejected zero, so a coordinator that
+cannot pay the dev fee at all had no way to say so: the only options
+were to pay at least 10% of its fee or to fail startup validation.
+Orders with dev_fee = 0 are already excluded from the payment queue by
+find_unpaid_dev_fees, so zero is a meaningful, already-supported state
+everywhere except this check.
+
+Treat 0 as the explicit opt-out and keep everything else as it was:
+negatives stay invalid, the band between zero and the minimum stays
+invalid, and the maximum is untouched. Comparisons are ordering only,
+so no float equality is introduced.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ src/config/util.rs | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/src/config/util.rs b/src/config/util.rs
+index 635a5ce..381355f 100644
+--- a/src/config/util.rs
++++ b/src/config/util.rs
+@@ -50,10 +50,12 @@ fn apply_nsec_env_override(settings: &mut Settings) {
+ fn validate_mostro_settings(settings: &Settings) -> Result<(), MostroError> {
+     let dev_fee = settings.mostro.dev_fee_percentage;
+ 
+-    // Validate dev_fee_percentage range
+-    if dev_fee < MIN_DEV_FEE_PERCENTAGE {
++    // Validate dev_fee_percentage range. `0` is the explicit opt-out, i.e.
++    // no dev fee at all, so only negatives and the band between zero and the
++    // minimum are rejected. Ordering comparisons only, no float equality.
++    if dev_fee < 0.0 || (dev_fee > 0.0 && dev_fee < MIN_DEV_FEE_PERCENTAGE) {
+         return Err(MostroInternalErr(ServiceError::IOError(format!(
+-            "dev_fee_percentage ({}) is below minimum ({})",
++            "dev_fee_percentage ({}) is below minimum ({}); use 0 to disable the dev fee",
+             dev_fee, MIN_DEV_FEE_PERCENTAGE
+         ))));
+     }
+@@ -468,6 +470,13 @@ mod startup_validation_tests {
+         assert!(err.to_string().contains("below minimum"));
+     }
+ 
++    #[test]
++    fn dev_fee_zero_is_accepted_as_opt_out() {
++        let mut settings = base_settings();
++        settings.mostro.dev_fee_percentage = 0.0;
++        assert!(validate_mostro_settings(&settings).is_ok());
++    }
++
+     #[test]
+     fn dev_fee_above_maximum_is_rejected() {
+         let mut settings = base_settings();
+-- 
+2.47.3
+

@@ -1,0 +1,59 @@
+From a9d387b5d2ef484664c2186dd9cd859e86c44691 Mon Sep 17 00:00:00 2001
+From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 09:25:00 +0000
+Subject: [PATCH 1/3] lnurl: raise HTTP timeouts so Tor-routed coordinators can
+ resolve LNURL
+
+A coordinator whose egress is a transparent Tor proxy measures ~10.6s
+for the first LNURL request on a cold circuit (dns 0.138s, connect
+0.138s, tls 10.336s); the same requests take ~0.9s once the circuit is
+warm. With the previous 4s/2s/2s budgets both the dev fee payout and
+Lightning-address invoice validation failed on every cold circuit, with
+nothing surfaced to the user.
+
+Raise the budgets to 30s/15s/10s, about 3x the measured cold-circuit
+cost. This widens the DoS bound on the serial message loop, which the
+comments now state explicitly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ src/lnurl.rs | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/src/lnurl.rs b/src/lnurl.rs
+index 15052e1..b78c197 100644
+--- a/src/lnurl.rs
++++ b/src/lnurl.rs
+@@ -26,18 +26,24 @@ use tracing::{error, warn};
+ use std::sync::atomic::{AtomicBool, Ordering};
+ 
+ /// Cap on a single LNURL HTTP round-trip (connect + response).
+-/// Kept short so a silent/hanging host cannot stall the serial message
+-/// loop for long (DoS bound, not elimination).
+-const LNURL_REQUEST_TIMEOUT: Duration = Duration::from_secs(4);
++/// Bounds how long a silent/hanging host can stall the serial message
++/// loop (DoS bound, not elimination). Sized for coordinators whose
++/// egress is Tor: a cold circuit measured 10.6s to first byte, nearly
++/// all of it in the TLS handshake, so a 4s budget failed every LNURL
++/// resolution until some unrelated request happened to warm the circuit.
++const LNURL_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+ 
+ /// Cap on establishing the TCP/TLS connection alone, so an unroutable or
+ /// filtered host fails before burning the full request budget.
+-const LNURL_CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
++/// Behind a transparent Tor proxy this one barely bites: the local SYN
++/// completes at once and the circuit build shows up inside the TLS
++/// handshake, i.e. inside the request budget above.
++const LNURL_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+ 
+ /// Cap on DNS resolution before the HTTP client starts. Without this,
+ /// a hanging resolver (slow/malicious NS) can stall the serial message
+ /// loop longer than the HTTP timeouts below.
+-const LNURL_DNS_TIMEOUT: Duration = Duration::from_secs(2);
++const LNURL_DNS_TIMEOUT: Duration = Duration::from_secs(10);
+ 
+ #[cfg(test)]
+ static ALLOW_PRIVATE_LNURL_HOSTS: AtomicBool = AtomicBool::new(false);
+-- 
+2.47.3
+

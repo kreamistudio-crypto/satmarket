@@ -1,0 +1,69 @@
+From 1d5f6349e91a294291ede4e8a6e4e8f2e57d934d Mon Sep 17 00:00:00 2001
+From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 09:30:40 +0000
+Subject: [PATCH 3/3] dev fee: raise the resolution timeouts that cap LNURL
+ below its own budget
+
+Resolving the dev fee invoice is two HTTPS round-trips on two different
+domains (the .well-known document, then the callback). Under a
+transparent Tor proxy each one pays a cold-circuit cost of ~10.6s, so
+the resolution needs roughly 21s of wall clock before it can succeed at
+all -- against an inner cap of 15s and an outer cap of 20s. Neither
+could ever be met on a cold circuit, and raising the per-request LNURL
+budgets alone does not help while these two decide first.
+
+Raise the inner cap to 75s, which clears twice the per-request budget,
+and the outer one to 90s so it stays above the inner cap instead of
+pre-empting it. Both remain well under the 5 minute staleness window
+after which a PENDING claim is released. The timeouts around the LND
+payment itself are untouched: the observed failure was NoAPIResponse
+during resolution.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ src/app/dev_fee.rs | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/app/dev_fee.rs b/src/app/dev_fee.rs
+index 198e1a0..0b70f4c 100644
+--- a/src/app/dev_fee.rs
++++ b/src/app/dev_fee.rs
+@@ -479,8 +479,10 @@ async fn process_new_dev_fee_payments(
+         // STEP 1: Resolve invoice and extract real payment hash.
+         info!("Resolving dev fee invoice for order {}", order_id);
+ 
++        // Outer bound on the whole resolution. Must stay above the inner cap
++        // in resolve_dev_fee_invoice, otherwise this one decides instead.
+         let (payment_request, payment_hash_hex) = match tokio::time::timeout(
+-            std::time::Duration::from_secs(20),
++            std::time::Duration::from_secs(90),
+             resolve_dev_fee_invoice(&order, keys),
+         )
+         .await
+@@ -496,7 +498,7 @@ async fn process_new_dev_fee_payments(
+             }
+             Err(_) => {
+                 error!(
+-                    "Dev fee invoice resolution timeout (20s) for order {}",
++                    "Dev fee invoice resolution timeout (90s) for order {}",
+                     order_id
+                 );
+                 release_pending_claim(pool, order_id, &pending_marker).await;
+@@ -974,8 +976,13 @@ pub async fn resolve_dev_fee_invoice(
+     // fee payment came from.
+     let comment = dev_fee_comment(&order.id, &keys.public_key());
+ 
++    // Two HTTPS round-trips on two different domains (.well-known, then the
++    // callback), each bounded by LNURL_REQUEST_TIMEOUT. A Tor-routed
++    // coordinator pays a cold-circuit cost of ~10.6s per domain, so this cap
++    // must clear twice the per-request budget or it truncates a resolution
++    // that was about to succeed.
+     let payment_request = tokio::time::timeout(
+-        std::time::Duration::from_secs(15),
++        std::time::Duration::from_secs(75),
+         resolv_ln_address(
+             DEV_FEE_LIGHTNING_ADDRESS,
+             order.dev_fee as u64,
+-- 
+2.47.3
+
