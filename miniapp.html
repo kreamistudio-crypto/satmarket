@@ -1754,6 +1754,8 @@
      Le due cifre a destra come nel riferimento, e `wrap` perche' con
      «Senza voti» + «da 1 giorno» a 320 la riga puo' non bastare: a
      capo e' meglio che allargare la pagina. */
+  .p2p-mio{border-color:var(--orange);opacity:.85}
+  .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
   .p2p-rep{display:flex;flex-wrap:wrap;justify-content:space-between;
     gap:2px 10px;font-size:12px}
   /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
@@ -32773,14 +32775,27 @@ function rigaOrdineP2P(o){
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
       + esc(o.metodi.join(', ')) + '</div>' : '';
   const rep = repTestoP2P(o.rep);
+  /* ⚠️ IL PROPRIO ORDINE SI DICE, e fin qui non lo diceva nessuno: la
+     card era identica a quelle degli altri, quindi il proprio ordine
+     sembrava un'occasione da prendere. Toccarlo non lo prendeva —
+     `prendiOrdineP2P` apre lo scambio quando l'id e' gia' in lista — ma
+     scoprirlo col tocco non e' la stessa cosa che leggerlo.
+     E IL LIBRO NON PORTA NESSUNA PUBKEY DEL MAKER (il 38383 ha `d, k,
+     s, f, fa, amt, premium, pm, expires_at, rating` e basta), quindi
+     l'unica fonte che ha il client e' la propria LISTA — che vive nel
+     browser. Su un dispositivo dove quella lista non c'e', il proprio
+     ordine resta indistinguibile: e' il limite dichiarato di questo
+     mattone, e lo chiude la marcatura via coordinatore. */
+  const mio = !!ordiniP2P()[o.id];
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa"><span class="p2p-euro">${esc(fmtEur(o.euro))} €</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
     <span class="p2p-sats">${sats}${premio ? ' · ' + esc(premio) : ''}</span>
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
+    ${mio ? '<div class="p2p-box p2p-tuo">👤 È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
 }
 
@@ -34592,6 +34607,21 @@ function prendiOrdineP2P(id){
   });
 }
 async function eseguiPresaP2P(id){
+  /* LA CINTURA STA IN FONDO, dove passano tutte le prese: `prendiOrdineP2P`
+     devia gia' sul proprio ordine, ma quella e' la porta del GESTO —
+     e una guardia che vive solo nella porta e' mezza guardia (la
+     lezione del barattolo). Qui non si arriva mai per la strada
+     normale, ed e' esattamente perche' ci si deve arrivare quando
+     qualcosa e' andato storto.
+     PRENDERE IL PROPRIO ORDINE non e' un capriccio da vietare per
+     ordine: e' uno scambio con se stessi che congela l'ordine vero per
+     tutta la finestra della presa in carico, e lo toglie dal libro a
+     chi lo avrebbe preso davvero. */
+  if (ordiniP2P()[id]) {
+    toast('Questo ordine è tuo: non puoi prenderlo');
+    apriOrdineP2P(id);
+    return;
+  }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const adesso = Math.floor(Date.now() / 1000);

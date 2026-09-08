@@ -35365,6 +35365,12 @@ def prove_p2p_libro():
     banco = "\n".join(pezzi) + r"""
 const fmt = n => String(n);
 const fmtEur = e => e.toFixed(2).replace('.', ',');
+// LA LISTA DEI PROPRI SCAMBI vive nel blocco del motore, fuori di qui:
+// si stubba, e i casi che la vogliono la riempiono. La dipendenza non e'
+// nuova (renderP2P chiama gia' scambiP2P), ma `rigaOrdineP2P` e' la
+// prima funzione di QUESTO blocco a incontrarla.
+let ordiniFinti = {};
+function ordiniP2P(){ return ordiniFinti; }
 let cambioVivo = true, eurPerSat = 0.0005, p2pInfo = null;
 const ora = 2000000000;
 const ev = (kind, tags, created) => ({kind, tags, created_at: created || 1});
@@ -35372,6 +35378,10 @@ const out = {};
 out.fisso = ordineDaEvento(ev(38383, [['d','ord-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','80000'],['fa','50'],['pm','Revolut','Satispay'],['premium','0'],['expires_at', String(ora+3600)]]), ora);
 out.mercato = ordineDaEvento(ev(38383, [['d','ord-2'],['k','buy'],['f','eur'],['s','pending'],['amt','0'],['fa','50'],['pm','Bonifico'],['premium','2'],['expires_at', String(ora+90000)]]), ora);
 out.mercatoSats = satsMercatoP2P(out.mercato);
+out.cardAltrui = rigaOrdineP2P(out.fisso);
+ordiniFinti = {'ord-1': {id: 'ord-1', stato: 'attivo'}};
+out.cardMia = rigaOrdineP2P(out.fisso);
+ordiniFinti = {};
 out.range = ordineDaEvento(ev(38383, [['d','ord-3'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['pm','x']]), ora);
 out.scaduto = ordineDaEvento(ev(38383, [['d','ord-4'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora-1)]]), ora);
 out.senzaD = ordineDaEvento(ev(38383, [['k','sell'],['f','EUR'],['fa','5']]), ora);
@@ -35441,6 +35451,16 @@ console.log(JSON.stringify(out));
           and f["scade"] == 2000000000 + 3600)
     prova("...coi metodi di pagamento come tag a piu' valori",
           ["Revolut", "Satispay"], f["metodi"])
+    # ⚠️ IL PROPRIO ORDINE SI DICE (set 2026, dal campo): la card era
+    # identica a quelle degli altri, quindi il proprio ordine sembrava
+    # un'occasione da prendere. Toccarlo non lo prendeva — la porta del
+    # gesto devia gia' — ma scoprirlo col tocco non e' come leggerlo.
+    prova("la card di un ordine altrui non dice che e' tuo", False,
+          "p2p-tuo" in out["cardAltrui"] or "p2p-mio" in out["cardAltrui"])
+    prova("...e quella del proprio lo dice", True,
+          "p2p-tuo" in out["cardMia"] and "p2p-mio" in out["cardMia"])
+    prova("...con le parole, non col solo colore", True,
+          "\u00c8 il tuo ordine" in out["cardMia"])
     m = out["mercato"]
     prova("amt=0 e' il prezzo di mercato: sats 0 e premio letto", True,
           m is not None and m["sats"] == 0 and m["premium"] == 2
@@ -39426,6 +39446,22 @@ def prove_p2p_server():
     sa = pezzo_js(mini, "function scambiApertiP2P(", "\n}\n")
     prova("gli scambi aperti sono quelli NON finali", True,
           "P2P_FINALI.indexOf(o[k].stato) < 0" in sa)
+
+    # ⚠️ LA CINTURA CONTRO IL PRENDERE IL PROPRIO ORDINE sta in FONDO,
+    # dove passano tutte le prese: la porta del gesto (`prendiOrdineP2P`)
+    # devia gia', ma una guardia che vive solo nella porta e' mezza
+    # guardia — la lezione del barattolo. Prendere il proprio ordine non
+    # e' un capriccio da vietare per ordine: e' uno scambio con se
+    # stessi che CONGELA l'ordine vero per la finestra della presa in
+    # carico, e lo toglie dal libro a chi lo avrebbe preso davvero.
+    ep = pezzo_js(mini, "async function eseguiPresaP2P(", "\n}\n")
+    prova("la presa rifiuta il proprio ordine", True,
+          "if (ordiniP2P()[id]) {" in ep)
+    prova("...e lo fa PRIMA di toccare il mazzo", True,
+          0 < ep.find("ordiniP2P()[id]") < ep.find("assicuraMazzo"))
+    po = pezzo_js(mini, "function prendiOrdineP2P(", "\n}\n")
+    prova("...e la porta del gesto continua a deviare sullo scambio", True,
+          "const gia = ordiniP2P()[id];" in po)
     prova("il profilo di prima non si cancella, si mette da parte", True,
           "localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m))" in mini)
 
