@@ -23,6 +23,27 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   il P2P sembra acceso e non parla con nessuno. Vale per ogni leva
   aggiunta da un cantiere: il file d'esempio dice quale sia il valore
   giusto, non che quella riga esista di là.
+- `MOSTRO_RELAY_SPECCHIO` (set 2026) e' la QUARTA leva del P2P e vale
+  la stessa regola: si AGGIUNGE al config del VPS e serve un riavvio
+  (la lista si legge all'import del modulo). Sono i relay da cui si
+  LEGGE il libro senza parlarci — oggi `wss://relay.barattolo.store` —
+  e NON si mettono in `MOSTRO_RELAY`: quella e' dove il coordinator
+  ascolta, e il client la scorre anche per pubblicare le richieste di
+  scambio (vedi Architettura, «LE DUE LISTE DEL P2P NON SONO UNA LISTA
+  PIU' LUNGA»). Vuota o non dichiarata e' il mondo di ieri, byte per
+  byte: il libro si legge dai soli relay del coordinator.
+  Il pannello «⚙️ Stato delle leve» la mostra come «Specchi del
+  libro», e il conto per relay di ogni lettura finisce nella console
+  del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
+  specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
+  zero, e zero si legge come «oggi non c'e' nessun ordine».
+- LO SPECCHIO GIRA SULLA MACCHINA DEL RELAY, non su questo VPS: e' il
+  servizio `specchio` del `compose.yml` di `/opt/relay` (uno `strfry
+  router` con `router.conf`), e si accende con `docker compose up -d
+  specchio` — COL NOME DEL SERVIZIO IN FONDO, che un `up -d` nudo
+  ricrea anche il relay vivo. La configurazione sta in
+  `deploy/relay/`, e quella cartella e' una COPIA a mano: chi tocca un
+  file su quella macchina lo riporta nel repo nello stesso giro.
 - L'import aperto da Nostr si accende SOLO scrivendo
   `IMPORT_NOSTR_APERTO = True` nel config del VPS e riavviando: nel
   codice il default è False apposta (vedi Architettura). Prima di

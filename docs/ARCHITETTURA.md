@@ -5925,6 +5925,33 @@
   ci sono davvero su Nostr», e la lista è larga apposta) e
   `presenta_release.py`, una tantum lanciata dal PC di Andrea con la
   chiave release fredda. Nessuno dei due è il canale di Barattolo.
+  LE DUE LISTE DEL P2P NON SONO UNA LISTA PIU' LUNGA (set 2026, lo
+  specchio del libro): `MOSTRO_RELAY` sono i relay dove il coordinator
+  Mostro ASCOLTA, e il client li scorre sia per leggere il libro sia
+  per PUBBLICARE le sue richieste di scambio (kind 14);
+  `MOSTRO_RELAY_SPECCHIO` sono relay che tengono una COPIA del libro e
+  da cui si legge soltanto — oggi `relay.barattolo.store`. Viaggiano
+  al client come due chiavi distinte di `_p2p_leve`, e `attivo` non
+  guarda la seconda: uno specchio senza i relay del coordinator non e'
+  un P2P acceso a meta', e' un P2P spento con uno specchio inutile.
+  ⚠️ FONDERLE E' IL MODO IN CUI QUESTO SI ROMPE, ed e' un guasto MUTO:
+  una richiesta di scambio mandata a uno specchio finisce dove mostrod
+  non ascolta — nessun errore, nessuna riga, solo un coordinatore che
+  «non risponde mai». Per questo l'invariante ha tre sentinelle in
+  `prove.py` invece di un commento: `mostroConnetti` e `mostroChiama`
+  non devono nominare gli specchi, e `leggiLibroMostro` deve LEGGERLI
+  dalla leva — il terzo verso vale quanto gli altri due, perche' un
+  lettore che smettesse di usarla lascerebbe la leva morta senza che
+  niente diventi rosso.
+  E IL LIBRO SI LEGGE A VENTAGLIO, non dal primo che risponde: un EOSE
+  vuoto e una risposta piena si servono uguali, quindi con la lettura
+  a uno a uno bastava un relay muto in testa per svuotare il libro. Si
+  legge da tutti con `Promise.allSettled`, si unisce per `d`, e il
+  risultato dice anche se e' COMPLETO — cioe' se ha risposto almeno un
+  relay del coordinator. Se ha parlato solo lo specchio la pagina
+  scrive «elenco parziale»: un ordine gia' preso e' una SOSTITUZIONE e
+  non una cancellazione, quindi uno specchio indietro lo mostrerebbe
+  ancora libero.
   Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
   (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
   server firma un evento NIP-99 (kind 30402, tag `d` stabile

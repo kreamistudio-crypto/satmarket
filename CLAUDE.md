@@ -103,17 +103,23 @@ riaprirebbe in silenzio — provata con `--force-recreate`. Nessuno dei
 due era un errore di configurazione nostro: il primo era nel codice, il
 secondo era il residuo che le tre regole di redirect non coprivano.
 
-**LA 0.18.7 (4 set 2026) NON C'ENTRA COL NOSTRO GIRO**, e va scritto
-perche' la domanda torna: il changelog e' pagamenti, timelock, dev-fee,
-annullamenti e contatori di drain — **niente sulla verifica della
-firma, niente sul trasporto, e mostro-core resta 0.14.6**, cioe' la
-ricetta che il nostro client ricalca non si e' mossa. L'aggiornamento
-resta una cosa a parte e non un pezzo di diagnosi.
-⚠️ UNA SOLA VOCE MERITA UNO SGUARDO IL GIORNO CHE SI SALE: `c6efb2d`
-(#952) rinomina il campo con cui l'evento `info` annuncia la finestra
-della hold invoice (`invoice_expiration_window`). Il client lo legge
-(`mostroInfoP2P`), quindi si guarda quel nome PRIMA di aggiornare, o la
-finestra torna a essere quella di riserva senza che niente fallisca.
+**IL NODO GIRA LA 0.18.7**, e non lo dice il changelog ma il nodo
+stesso: il suo evento `info` (38385) si annuncia `mostro_version
+0.18.7`, letto il set 2026 dai tre relay pubblici E dal nostro
+specchio, cioe' verificato dal lato di chi legge. Il changelog di
+quella versione e' pagamenti, timelock, dev-fee, annullamenti e
+contatori di drain — **niente sulla verifica della firma, niente sul
+trasporto, e mostro-core resta 0.14.6**, cioe' la ricetta che il
+nostro client ricalca non si e' mossa.
+✅ E L'AVVISO CHE STAVA QUI E' RIENTRATO, verificato invece che
+dedotto: `c6efb2d` (#952) rinominava il campo con cui l'`info`
+annuncia la finestra della hold invoice, e nel 38385 vero i nomi sono
+ANCORA QUELLI VECCHI — `invoice_expiration_window` e
+`hold_invoice_expiration_window`. Quindi non morde, e non mordeva
+nemmeno di nascosto: il client quel campo lo parcheggia in
+`fattFinestra` e non lo usa da nessuna parte (un `grep` in
+`miniapp.html` lo trova una volta sola, dove nasce). Se un giorno
+qualcuno vorra' usarlo, si riguarda il nome prima di fidarsi.
 
 **LA RONDA DICE CINQUE COSE E LA QUINTA VALIDA LE ALTRE:** finestra
 blocchi/disco/ram, canale e HTLC, backup (allarme oltre 48h o sotto
@@ -166,8 +172,9 @@ retto tutto (vedi il punto 4 delle risposte del team, qui sotto).
 invoice tiene i sats per 24 ORE e la finestra è CONFIGURABILE —
 NostroMostro la tiene a 3 giorni. La leva che combacia è
 `hold_invoice_cltv_delta` in `[lightning]` di `settings.toml`
-(verificata sul `settings.tpl.toml` del tag v0.18.6, la versione del
-nodo): è in BLOCCHI, 144 ≈ 24h — il numero che hanno detto — e 3
+(verificata sul `settings.tpl.toml` del tag v0.18.6; il nodo da
+allora e' salito alla 0.18.7, e le letture del sorgente qui sotto
+restano quelle fatte al 0.18.6): è in BLOCCHI, 144 ≈ 24h — il numero che hanno detto — e 3
 giorni fanno 432. Il margine `escrow_deadline_margin_blocks` (24)
 resta com'è, quindi la finestra UTILE è sempre ~4 ore più corta
 dell'orizzonte: mostrod molla la presa PRIMA che LND sia costretto a

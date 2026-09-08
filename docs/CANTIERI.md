@@ -5664,3 +5664,121 @@ nessuno. DA GUARDARE: la prima riga «Resta qui ancora N giorni» su un
 ordine vero rimasto senza risposta, e la scopa, che non ha ancora potuto
 togliere niente — perché lo faccia serve uno scambio fermo da trenta
 giorni, e il più vecchio è del 6 set 2026.
+
+Gli ordini P2P si vedono anche sul relay nostro, e il lettore ha
+smesso di scommettere (set 2026). Il libro di Mostro viveva solo sui
+relay del coordinator: se cadevano loro, cadeva il libro. Adesso
+`relay.barattolo.store` ne tiene una copia, e il client legge da tutti
+insieme.
+QUESTA VOCE ROVESCIA UNA DECISIONE SCRITTA, e va detto in testa perche'
+chi la ritrova deve sapere che non e' una svista: la voce «Il relay
+nostro entra nella lista dove Barattolo pubblica» (`c7802e7`) aveva
+SCARTATO l'idea, con due ragioni. Erano giuste tutt'e due, e il
+cantiere non le ha ignorate — le ha tolte di mezzo una per una. «Il
+coordinator da noi non puo' scrivere»: infatti non gli si chiede, lo
+specchio siamo NOI che andiamo a prenderci i suoi eventi. «Il client
+legge da UN RELAY SOLO, e un relay vuoto in testa e' il libro che
+diventa vuoto»: infatti il lettore non e' piu' quello.
+IL DIFETTO ERA STRUTTURALE E NON DI CONFIGURAZIONE: `leggiLibroMostro`
+prendeva il primo relay che rispondeva, e «risponde» comprende
+«risponde con zero eventi» — un EOSE vuoto e una risposta piena si
+servono uguali. E' la stessa cecita' di Q3 della sonda del
+coordinator, dove «non ti riconosco» si serve COME una lista vuota. La
+cura non e' indovinare l'ordine giusto della lista: e' la lezione gia'
+a verbale — si rende ROBUSTO IL LETTORE invece di scommettere sul
+campo. Ventaglio con `Promise.allSettled`, unione per `d` (il dedup
+c'era gia', e il suo commento era scritto proprio per questo giorno).
+E IL TEMPO PEGGIORE MIGLIORA: tre relay muti in fila costavano 24
+secondi, insieme ne costano 8.
+LE DUE LISTE NON SI FONDONO, ed e' l'invariante che regge tutto.
+`MOSTRO_RELAY` e' dove il coordinator ASCOLTA — e il client la scorre
+anche per PUBBLICARE le richieste di scambio — mentre
+`MOSTRO_RELAY_SPECCHIO` sono relay da cui si LEGGE soltanto. Uno
+specchio finito nella prima si prenderebbe una richiesta di scambio
+che nessuno leggera' mai: nessun errore, nessuna riga nel log, solo un
+coordinatore che «non risponde». Lo sorvegliano tre sentinelle —
+`mostroConnetti` e `mostroChiama` non nominano gli specchi, e
+`leggiLibroMostro` invece li LEGGE dalla leva (il verso opposto vale
+quanto gli altri due: se il lettore smettesse di usarla, la leva
+sarebbe morta e il libro continuerebbe ad arrivare, cioe' il cantiere
+sarebbe disfatto senza che niente diventasse rosso).
+LA TORTURA HA TROVATO UNA SENTINELLA CIECA, ed e' la lezione del giro:
+la terza cercava la parola nel TESTO della funzione e la trovava nei
+COMMENTI, quindi svuotare la lista degli specchi la lasciava verde.
+Quattro mutazioni provate, tre uccise e quella sopravvissuta. La cura
+e' un `solo_codice` per il JS, gemello di `codice()`, e l'ancora
+spostata sulla RIGA che legge la leva. Una guardia che si accontenta
+della prosa e' peggio di nessuna guardia: da' l'impressione di
+sorvegliare.
+LO SPECCHIO E' UN `strfry router`, NON UN `sync` A TIMER: tiene una
+sottoscrizione viva, quindi il ritardo e' di secondi. Su questo libro
+il ritardo si paga caro — un ordine che passa da `pending` a preso e'
+una SOSTITUZIONE, non una cancellazione, quindi uno specchio indietro
+lo mostra ancora disponibile e chi prova a prenderlo si becca un
+errore che non sa spiegarsi. Per questo il libro dice anche se e'
+COMPLETO (ha risposto almeno un relay del coordinator): se ha parlato
+solo lo specchio, la pagina scrive «elenco parziale» invece di
+«nessun ordine aperto».
+LA WHITELIST NON SI E' TOCCATA, e non per fortuna: il plugin
+`chi-scrive.py` lo invoca l'ingester del processo `strfry relay`,
+mentre il router e' un ALTRO processo che apre l'LMDB e ci scrive
+dentro. Confermato sul binario di strfry 1.1.3, che porta sia
+`pluginDown` sia `pluginUp` — se il writePolicy coprisse gia' quella
+strada, quelle opzioni sarebbero ridondanti. La chiave del coordinator
+NON entra in `chiavi.txt` e non deve entrarci: quella lista e' di chi
+ci scrive DA FUORI. Il ramo di riserva (`MOSTRO_HEX` in testa a
+`/api/relay/chiavi`) e' decaduto prima di essere scritto.
+IL PERIMETRO, a verbale perche' la domanda torna: `authors =
+MOSTRO_HEX` vuol dire «del NOSTRO coordinator», NON «nato in
+Barattolo». Il nostro mostrod e' un coordinator PUBBLICO per
+costruzione — chiunque conosca la npub e un relay che ascoltiamo puo'
+mandargli un `new-order`, e non c'e' cancello (pow 0, bond
+commentati); la npub e' gia' scopribile, perche' ogni nostro 38383
+sui relay pubblici la porta come `author`. E NESSUN CAMPO DISTINGUE I
+DUE CASI: i tag del 38383 li scrive mostrod, non chi pubblica
+l'ordine — la stessa lezione gia' scritta per `rating` — e l'elenco
+verificato su `nip33.rs` non contiene niente che dica chi e' il
+client. Quindi il criterio in piu' non si puo' mettere ne' nello
+specchio ne' nel lettore: non c'e' nulla su cui filtrare. Oggi le due
+frasi coincidono per OSCURITA', non per costruzione, e l'oscurita' si
+consuma da sola man mano che il libro cresce.
+E IL RISCHIO VERO NON E' QUELLO TEMUTO: un ordine creato da un client
+esterno col nostro coordinator e' operativamente NOSTRO — lo
+garantiamo noi, la hold invoice sta sul nostro nodo, l'1% lo
+incassiamo noi. Non e' inquinamento, e' lavoro. Il rischio e' l'altro
+lato, che creare ordini junk oggi non costa niente, e la cura e' gia'
+scritta: i BOND, non un filtro. Il registro degli ordini «nati in
+Barattolo» resta un cantiere suo, e ha un costo di privacy da pesare
+(legare un conto Barattolo a un id di ordine Mostro) che non si
+decide di sfuggita.
+DUE TRAPPOLE PAGATE SULLA MACCHINA. L'entrypoint dell'immagine non
+inoltra: `--entrypoint strfry` risponde «executable not found», ci
+vuole `/app/strfry` — e si scavalca `strfry.sh` invece di passargli
+argomenti, perche' quello script e' fatto per il relay (si copia il
+template della config, e da non-root fallisce). E LO SCANNER DEI
+SEGRETI SAREBBE DIVENTATO ROSSO bloccando il deploy: `router.conf`
+porta 64 esadecimali nudi — la chiave PUBBLICA del coordinator, che i
+filtri Nostr vogliono cosi' perche' non parlano bech32 — e la CI non
+sa distinguerla da una privata. Provato prima di correggere (senza
+l'eccezione il file esce nell'elenco, con l'eccezione e' pulito), ed
+e' entrato come QUARTO FILE PER NOME e mai la cartella, in tutt'e due
+i posti. Il commento li' aveva gia' previsto il giorno: «un quarto
+file messo li' domani torna sotto la regola da solo».
+PROVATO DAL VIVO, e in due modi che rispondono a due domande diverse.
+Con relay finti in Node, otto casi sul solo lettore. E contro i relay
+VERI dentro la pagina: coordinator morto → il libro arriva dallo
+specchio con «elenco parziale»; specchio morto → il libro arriva
+intero; tutti morti → alza come prima; leva vuota → il mondo di ieri.
+Piu' una REQ mandata a mano da fuori ai quattro relay, che e' l'unica
+domanda a cui `strfry scan` non sa rispondere («quel che c'e' nel db,
+il relay lo SERVE a un client qualunque?»): lo specchio dice le stesse
+cose dei tre del coordinator, non gli manca niente e non ha niente di
+suo.
+⚠️ IL LIMITE DELLA PROVA SI DICHIARA: quel giorno il libro aveva ZERO
+ordini pending — c'era il solo 38385 — quindi l'unione di piu' eventi
+veri non e' stata esercitata, e a coprirla ci sono solo i relay finti.
+Si guarda il primo giorno che un ordine vero sta nel libro.
+DA GUARDARE: che lo specchio non resti indietro in silenzio (il conto
+per relay finisce in console a ogni lettura, ed e' il modo in cui uno
+specchio fermo si scopre in un giorno invece che in un mese), e il
+peso del db, che oggi e' 196K su 6,3 G liberi.
