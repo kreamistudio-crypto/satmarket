@@ -6027,3 +6027,49 @@ Il tentativo più vecchio (`8448dd70`, hold da 7.425 mai pagata) non
 c'entra e non si tocca: nessun HTLC, nessun sat in gioco, scade da
 solo. DA GUARDARE: che il client mostri quella richiesta, e che nessun
 pagamento fantasma raggiunga mai Alan.
+
+Il loop della restore-session e la domanda mai fatta (9 set 2026, cura
+d'urgenza a `d52dac1`, commit `63f623d`). Dal campo, la notte stessa
+del deploy: aprendo il P2P la pagina si inchiodava — 184.000 ripetizioni
+della stessa riga `[p2p]` in console — e su ogni dispositivo i propri
+ordini tornavano «di un estraneo». Confinato per costruzione a chi ha
+un mazzo con indice ≥ 1 dietro il gate di prova: il pubblico non ci
+passava, e per questo la cura ha battuto il rollback.
+IL LOOP ERA UNA FAME DI MICROTASK, ed è la specie da riconoscere:
+`chiaveScambio` girava PRIMA di `mostroConnetti()`, cioè prima che il
+bundle NostrTools fosse caricato, e l'errore sincrono
+(`undefined.utils`) cadeva nel catch fail-open → il `finally` riapriva
+il gate → il `.then(() => renderP2P())` rientrava nella condizione
+ancora vera. Tutto in microtask e codice sincrono, senza mai cedere il
+passo all'event loop: l'`onload` dello script che avrebbe CURATO
+l'errore non girava mai. **Un retry immediato su un errore sincrono non
+è un retry: è un loop che affama il proprio antidoto.** Due cinture,
+perché nessuna basta da sola: l'ordine giusto (la connessione, che
+carica il bundle, prima della derivazione) e la bandierina
+`p2pMieiChiesto` — si alza PRIMA di chiedere, non si riabbassa da sola,
+la riabbassa il gesto «Riprova». Un tentativo per sessione.
+E LA DOMANDA NON PARTIVA MAI, la metà muta: la funzione apriva la
+sottoscrizione alle risposte e non PUBBLICAVA la richiesta — il
+coordinatore taceva su una domanda mai fatta, il timeout scadeva e il
+vuoto veniva scritto come «non ne hai». È il difetto che il fail-open
+dichiarato nel commit padre prometteva di evitare, tradito da un'altra
+porta: **il timeout muto contava come risposta**. Ora la richiesta
+parte (busta `restore`, prova d'identità del mazzo — è per IDENTITÀ che
+il coordinatore risponde, il fatto della sonda — orecchio aperto prima
+di parlare, nonce minato se la soglia non è zero) e il silenzio lascia
+`null`, «non si sa»: solo un vuoto arrivato DENTRO una risposta si
+scrive, che per Q3 è legittimo.
+LA LEZIONE SULLE SENTINELLE, ed è la parte che vale oltre il giro: le
+prove di `d52dac1` guardavano la sottoscrizione, l'aggancio, il
+fail-open del catch — tutte vere — e nessuna chiedeva «ma la domanda
+PARTE?» né «e se l'errore è sincrono, chi ferma il rientro?». Una
+suite che certifica i pezzi non certifica il giro: il difetto stava
+nei due punti che nessuna prova nominava. Le cinque sentinelle nuove
+nominano esattamente quelli (l'ordine bundle→chiave, il tentativo
+unico, il gesto che riprova, il publish con identità, il timeout che
+non conclude).
+DA GUARDARE: se dopo la cura la lista torna ancora vuota coi propri
+ordini vivi, il sospetto non è più questo difetto ma l'IDENTITÀ — la
+leva `SEGRETO_PROFILO_P2P_VIVA` accesa l'8 set può aver dato al client
+un mazzo diverso da quello che ha creato gli ordini, e allora il
+coordinatore risponde, giusto, «questa identità non ha niente».
