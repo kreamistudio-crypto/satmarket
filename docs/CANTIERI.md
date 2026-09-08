@@ -5112,6 +5112,11 @@ passano da **2 a 1** a 320 e da **3 a 1** a 360/375. Il margine dentro
 la card è ~12px (l'aria delle due scatole), e non basta: la sola leva
 che ne recupera una è la DISCLOSURE, 108,8px a 320, che è una
 decisione di prodotto e non un ritocco. Vedi Architettura.
+⚠️ E QUELLA DECISIONE È STATA PRESA, nello stesso merge e il giorno
+dopo: la disclosure si richiude dalla prima lettura in poi, e la card
+in più è tornata a tutte e tre le larghezze — vedi la voce «La riga che
+dice chi tiene i sats si richiude dopo la prima lettura», in fondo a
+questo file. Fino a oggi questa riga diceva il contrario del codice.
 IN PRODUZIONE non cambia niente: è solo client — nessuna colonna,
 nessuna migrazione, nessuna leva, nessuna rotta — e il P2P resta dietro
 `P2P_ATTIVO`. DA GUARDARE al primo giro vero: un libro con offerte VERE
@@ -5430,3 +5435,218 @@ da sé.
 IN PRODUZIONE non c'era niente da deployare: nessuna colonna, nessuna
 rotta, nessuna riga di codice — solo cinque righe nel config del VPS
 e un riavvio. Che è esattamente ciò per cui la leva era nata.
+
+La riga che dice chi tiene i sats si richiude dopo la prima lettura
+(set 2026, la seconda metà del merge della vetrina — e la voce arriva
+oggi, col ritardo dichiarato in fondo). Aperta la prima volta che si
+apre il P2P, poi dietro «Scopri di più ›»: chi l'ha letta una volta non
+deve rileggerla a ogni giro.
+LA DECISIONE È DI ANDREA ED EMENDA PER METÀ la riga «la disclosure non
+si tocca» scritta il giorno prima, che è la parte da leggere: «Non la
+chiudo del tutto: quella riga dice chi tiene i sats, e nasconderla per
+guadagnare spazio è la cosa che non facciamo. Ma aperta la PRIMA volta,
+e da lì in poi richiusa.»
+A SPARIRE È LA RIPETIZIONE, MAI IL FATTO, ed è la condizione che rende
+ammissibile tutta la variante: la riga CHIUSA continua a nominare il
+custode — «I sats li custodisce il coordinatore (Mostro), non
+Barattolo» — quindi chi torna al libro il giorno dopo legge comunque
+chi tiene i suoi soldi.
+LA FORMULA PIÙ CORTA È SCARTATA, e la ragione è di Andrea: «non cambia
+il conto delle offerte, quindi accorciarla è rischio senza guadagno».
+Misurato: la riga chiusa sta su DUE righe a tutte e tre le larghezze
+(43,5px), e una formula da una riga sola ne toglierebbe 21,8 — che non
+fa comparire nessuna card in più e costa la parola «coordinatore».
+IL GUADAGNO, misurato sul DOM vero PRIMA di costruire: la riga aperta
+pesa 108,8px a 320 (cinque righe) e 87,0 a 360/375 (quattro), chiusa
+43,5 dappertutto; il cappello scende da 436,5 a 371,2, e le offerte
+INTERE passano da 1 a 2 a tutte e tre le larghezze — cioè proprio la
+card che la voce qui sopra dava per irrecuperabile.
+Vedi Architettura, «LA DISCLOSURE SI RICHIUDE DOPO LA PRIMA VOLTA», per
+il perché il CSS nasconde e il markup resta fisso (le tre sentinelle che
+leggono quelle parole nel SORGENTE restano verdi E restano vere: scritte
+da un render sarebbero diventate VACUE senza che nessuna fallisse), per
+il fail-soft che la fa nascere aperta, per il timbro alla COMPARSA e non
+al tocco, per la bandierina `p2pChiDeciso` senza la quale la riga si
+richiuderebbe sotto le dita di chi l'ha appena riaperta, e per l'aggancio
+in `renderP2P` invece che in `vaiP2P`.
+IL RICORDO È DEL DISPOSITIVO E MAI UNA COLONNA, ed era la condizione di
+Andrea alla lettera: timbro `p2pchi` in `barattolo_hint`, con la prova
+che quel nome in `server.py` non compaia.
+LE TRE TRAPPOLE PAGATE COSTRUENDOLA sono di CASA e non di questo
+cantiere, e per questo valgono oltre. 1) `pezzo_js` TAGLIA ALLA PRIMA
+RIGA VUOTA e non alla graffa a colonna zero: le funzioni nuove, nate
+attaccate, si sono mangiate le sorelle e le sentinelle che le affettano
+erano diventate VACUE senza che niente fallisse — le funzioni JS di
+`miniapp.html` vanno separate da una riga vuota. 2) La sentinella che
+vieta le interpolazioni legge la fetta GREZZA, commenti compresi: il
+commento che nominava il segno vietato per spiegarlo l'ha fatta
+diventare rossa, la trappola della prosa presa mentre la si scriveva.
+3) `main()` conta una famiglia esplosa come UNA sola fallita e si mangia
+in silenzio ogni `prova()` dopo il raise, quindi la TORTURA legge
+«uccisa» per la ragione sbagliata — `find()` col suo guardiano, la
+regola di casa pagata qui per la quinta volta.
+Provato: DELTA +9 prove sull'albero isolato (8210 → 8219, le quattro
+rosse sono le preesistenti) e 13 MUTAZIONI, 13 uccise, una per riga
+sorvegliata — e la prima ne fa rosse DUE, che togliendo lo span cadono
+insieme «le due forme» e «il custode»: è la prova visibile che la
+famiglia non esplode più al primo rosso. Più il giro del timbro dal
+vivo: prima apertura aperta e timbrata, ricarica chiusa senza aver
+premuto niente, il tocco riapre, e un `renderP2P` non la richiude.
+IN PRODUZIONE basta il deploy: solo client — nessuna colonna, nessuna
+migrazione, nessuna leva, nessuna rotta.
+⚠️ E LA VOCE DELLA VETRINA DICEVA IL CONTRARIO DEL CODICE fino a oggi,
+che è la ragione per cui questa voce nasce con un mese di ritardo: là la
+disclosure è nominata come «una decisione di prodotto e non un ritocco»,
+cioè come la leva NON presa, mentre era stata presa nello stesso merge.
+La frase è corretta adesso, e la lezione è quella della regola 8: un
+cantiere che atterra dentro il merge di un altro è esattamente quello
+che resta senza voce, perché il merge sembra già raccontato.
+
+
+L'avviso che il profilo c'è già, e sta su un altro dispositivo (set
+2026, tappa 7b del client P2P). Chi apre il P2P da dove il mazzo non c'è
+— il sito, la PWA, l'APK — ne farebbe nascere uno nuovo in silenzio,
+lasciando indietro identità e reputazione. Adesso il foglio glielo dice
+prima.
+IL SEGNALE SONO DUE FATTI INSIEME, e nessuno dei due basta da solo: qui
+il mazzo non c'è e il cloud di Telegram non l'ha dato, ma il SERVER sa
+che questo account una chiave l'ha registrata ALTROVE. Allora «nasce da
+solo al primo scambio» è falso — è già nato, e sta su un altro telefono
+— e chi si fida di quella riga fa nascere una seconda identità.
+LA RIGA STA NEL FOGLIO DEL PROFILO e non in testa alla vista: è il ramo
+senza mazzo di `renderProfiloP2P`, cioè lo stesso posto dove prima si
+leggeva la frase rassicurante, con accanto l'importazione da codice
+segreto che è la via d'uscita vera.
+SI CHIEDE, NON SI GENERA: qui non nasce niente — a generare è solo
+`assicuraMazzo`, che parte da un gesto.
+ESCE UN CONTO E MAI UNA PUBKEY, ed è la riga da non ammorbidire.
+L'elenco sembrerebbe più utile e sarebbe il difetto peggiore di questa
+strada: metterebbe per iscritto, in una risposta sola, il legame fra un
+account Telegram e TUTTE le sue identità di scambio — proprio la
+correlazione per non fare la quale il mazzo esiste. Nessun parametro, in
+nessuna forma: non si può chiedere DI UN ALTRO, e non esiste nemmeno la
+sintassi per provarci.
+`dal` È UN PAVIMENTO E NON UNA NASCITA: è `MIN(creato)`, cioè la prima
+volta che il server ha visto una chiave tua, e una chiave registrata
+tardi non dice quando il profilo è nato. A schermo diventa «almeno da» e
+mai «creato il».
+FAIL-OPEN, che è il verso giusto qui: se non si sa, non si avvisa —
+meglio nessun avviso che un avviso su un conto che non abbiamo. E il
+conto ha TRE stati e non due: `null` è «non lo sappiamo», che è un'altra
+cosa da «nessuna».
+LA CACHE È LA PROMESSA E NON IL CONTO CHE NE ESCE: col gate booleano il
+secondo chiamante arrivato mentre la risposta è in volo prenderebbe un
+vuoto. E il foglio non aspetta — si disegna quel che si sa e si
+ridisegna quando il conto arriva, solo se è ancora aperto.
+IL NUMERO NON VA MAI A SCHERMO, ed è una scelta di esattezza prima che
+di riserbo: la tabella non distingue l'identità del mazzo dalle trade
+key, quindi risponde bene a «almeno una?» e MALE a «quante?».
+DIMENTICARE BUTTA ANCHE IL CONTO, e non è un dettaglio: la chiave appena
+cancellata era una di quelle contate, quindi un conto letto prima
+direbbe «ce l'hai altrove» di una chiave che era PROPRIO QUESTA.
+LA GET STA DOPO LA DELETE E NON FRA LE DUE, con la sua sentinella: le
+fette di `prove.py` tagliano la POST fino a `@app.delete`, quindi una
+GET messa in mezzo finirebbe dentro quella fetta e farebbe rossa la
+sentinella del vicino. In coda non disturba nessuno.
+LE DUE MANI, dichiarate: i pezzi 1 e 2 vengono dalla sessione
+precedente, esauritasi mentre scriveva le sentinelle mancanti; le tre
+sentinelle sono di quella dopo.
+Provato: 8231 → 8234 (+3, con PYTHONUTF8=1). La tortura del pezzo 2
+aveva lasciato vive DUE mutazioni su 14, e le sentinelle nuove le
+uccidono: 1) la guardia sul CONTO invece che sul GIRO — due chiamanti
+nello stesso istante fanno due fetch, e col server muto il conto resta
+`null` per sempre, quindi si richiederebbe a ogni giro, cioè proprio nel
+caso in cui non si sa niente e chiedere ancora non aiuta; 2) la guardia
+su `dal` che cade — con `dal` a zero la coda diventerebbe «(almeno da
+gen 1970)», una data precisa e falsa, che è peggio del silenzio.
+Rimesse a mano una per volta, file ripristinato prima di committare.
+Adesso 14 su 14.
+⚠️ IL DEBITO DICHIARATO: LA TORTURA DEL PEZZO 1 NON È STATA FATTA. Le
+sentinelle sull'endpoint ci sono e non sono poche — l'ordine delle
+fette, l'identità richiesta, il 409 a leva spenta chiesto al giudice,
+il COUNT con la prima data, il divieto di leggere le pubkey — e alcune
+girano su un database vero, compresa la fusione di due account, dove il
+conto deve seguire la PERSONA. Ma nessuna di quelle righe è stata
+rimessa a mano una per volta, quindi di loro sappiamo che sono verdi e
+non che rispondano: è esattamente la differenza che la tortura del pezzo
+2 ha reso visibile due mutazioni fa. Da fare al primo giro che passa di
+lì, e finché non è fatta questa riga resta scritta.
+IN PRODUZIONE basta il deploy, ma NON è solo client: c'è una rotta nuova
+(`GET /api/p2p/chiavi`) — nessuna colonna, nessuna migrazione, e a leva
+`P2P_ATTIVO` spenta risponde 409 come le sue sorelle. DA GUARDARE al
+primo giro vero: qualcuno che apre il profilo dal sito avendo il mazzo
+sul telefono, e legge l'avviso invece della frase di prima.
+
+
+Gli scambi P2P finiti si tolgono, e a decidere è un giudice solo (set
+2026). Fin qui la lista degli scambi non aveva modo di accorciarsi: le
+righe finite restavano lì per sempre, e in fondo il tetto ne mostrava
+dodici mentre le altre si accumulavano invisibili.
+UN GIUDICE SOLO — `p2pTogliibile` — E LO CHIEDONO IN DUE: la ✕ della
+riga e la scopa che gira in testa a `scambiP2P()`. Due letture della
+stessa domanda un giorno direbbero due cose diverse, e qui la differenza
+sta fra una riga che sparisce e dei sats che restano senza padrone. Il
+giudice nuovo è la funzione, non l'elenco: `P2P_FINALI` (concluso,
+annullato, rifiutato) era già di casa e non si tocca.
+LA RAGIONE DELLA GUARDIA, che è quel che va capito prima di
+ammorbidirla: togliere una riga APERTA cancella la sua chiave di trade,
+e i sats bloccati restano senza nessuno che li muova. Non è una riga che
+se ne va, è un pagamento che non ha più padrone. Su Barattolo la riga
+vive nel database e «nascondi» la lascia dov'è; qui il telefono È
+l'archivio, quindi togliere è per sempre.
+«senza_risposta» È IL CASO SOTTILE e non è finale: il coordinatore non
+ha risposto in tempo, ma l'ordine può essere vivo lo stesso e la sua
+chiave serve a riprenderlo. Si toglie solo dopo l'ORIZZONTE del
+coordinatore — `expiration_hours` = 168 ore, la leva girata il 6 set —
+oltre il quale nel libro non c'è più niente da riprendere. E senza
+un'ancora si TIENE: fail-closed nel verso giusto, che una riga di troppo
+costa una riga e una chiave buttata costa i sats di qualcuno.
+E LA RIGA LO DICE invece di tacere: «Resta qui ancora N giorni», con la
+RAGIONE e non col solo fatto — un bottone che non c'è senza un perché si
+legge come un guasto — e cade da sola quando smette di essere vera.
+LA SCOPA CI METTE DUE CONDIZIONI SUE: trenta giorni senza cambi di
+STATO, e mai un «concluso» col voto ancora da dare, che è finale per i
+sats e non per la reputazione — e sul coordinatore la reputazione è
+l'unica cosa che chi scambia si porta dietro. Gira alla lista perché la
+lista è l'unico posto che li mostra: nessun timer da ricordare.
+«aggiornato» È L'ULTIMO CAMBIO DI STATO E NON L'ULTIMO TOCCO, ed è la
+riga da leggere prima di tarare i giorni: sbaglia nel verso di togliere
+PRIMA, e l'unico caso in cui conterebbe — il voto — lo copre la guardia
+qui sopra.
+L'ID ARRIVA DAL DOM, E IL DOM NON È LA VERITÀ: il giudice si RICHIEDE
+dentro `togliScambioP2P`, che è la stessa ragione per cui sul server la
+guardia di proprietà sta dentro la WHERE e non nel client.
+LA MISURA DELLA ✕ HA CORRETTO UN COMMENTO che prometteva più del fatto:
+il wrap della riga meta è vero, ma col contenuto reale non si presenta
+mai, perché il caso peggiore sono DUE span e non tre — «tocca a te» esce
+da `azioniDisponibili()`, che tace proprio sugli stati finali, cioè
+quelli su cui la ✕ compare, e le due cose non possono coesistere.
+Misurato a 320, 360 e 375px: la ✕ resta IN RIGA a 31px dal bordo destro,
+e il suo costo sono +3,8px di card perché il bottone è più alto del
+testo, non perché scenda. Col numero da rimisurare scritto accanto, se
+un domani si aggiunge uno span.
+NELLO STESSO GIRO SONO CADUTE DUE PROMESSE più larghe del fatto: il
+commento di «aggiornato», e quello del tetto che diceva «i vecchi non
+spariscono» — vero prima della scopa, falso dopo.
+A QUATTRO MANI, e va a verbale perché il cantiere è passato di sessione
+in sessione: il giudice, la scopa, la ✕, la riga che spiega l'attesa e
+il commento del tetto sono della sessione b6f014b5, esaurita il 7 set
+alle 11:20; di lì in poi le sentinelle, la tortura e la misura.
+Provato: 57 verdi fra commenti CSS, parse del client e le sentinelle
+nuove — `prove_scambi_p2p_vecchi`, che fa GIRARE il giudice su 21 casi
+in un banco node, perché una sentinella dice che il giudice esiste e mai
+che risponda — più DIECI MUTAZIONI, dieci uccise, zero sopravvissute.
+IL DEBITO CHE ARRIVA COL LAVORO, e si è pagato dopo: il gesto nuovo
+passa da `chiediConferma`, quindi il conteggio della domanda unica
+restava a 54 — prova già rossa sul SUO ramo, e non un effetto della
+riconciliazione. Pagato in `d65d3e9`: 55, col registro sopra la prova
+che dice QUALE gesto è e perché passa di lì, che è quel che fra sei mesi
+permette di sapere se un gesto nuovo ci deve stare. Il numero da solo
+non basta, e i conteggi si RIMISURANO invece di sommarli a mente.
+IN PRODUZIONE basta il deploy: solo client — nessuna colonna, nessuna
+migrazione, nessuna leva, nessuna rotta — e il ricordo degli scambi vive
+nel localStorage del dispositivo, quindi non c'è niente da migrare a
+nessuno. DA GUARDARE: la prima riga «Resta qui ancora N giorni» su un
+ordine vero rimasto senza risposta, e la scopa, che non ha ancora potuto
+togliere niente — perché lo faccia serve uno scambio fermo da trenta
+giorni, e il più vecchio è del 6 set 2026.
