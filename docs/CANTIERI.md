@@ -5778,7 +5778,20 @@ suo.
 ordini pending — c'era il solo 38385 — quindi l'unione di piu' eventi
 veri non e' stata esercitata, e a coprirla ci sono solo i relay finti.
 Si guarda il primo giorno che un ordine vero sta nel libro.
+IN PRODUZIONE SU TUTT'E TRE LE MACCHINE (set 2026), e le tre verifiche
+non sono la stessa domanda fatta tre volte. Sul relay: lo specchio e'
+un servizio del compose e il NIP-11 servito dice la pagina della
+privacy — chiesto al relay, non al file. Sul VPS: la leva e'
+`MOSTRO_RELAY_SPECCHIO` nel config, e `/api/listings` mostra `relay` e
+`specchio` come chiavi SEPARATE — che e' l'invariante guardato dal
+lato di chi lo consuma, e non dal lato di chi lo scrive. E il riavvio
+del relay si e' dato col NOME del servizio, cosi' lo specchio non si e'
+nemmeno interrotto.
 DA GUARDARE: che lo specchio non resti indietro in silenzio (il conto
 per relay finisce in console a ogni lettura, ed e' il modo in cui uno
 specchio fermo si scopre in un giorno invece che in un mese), e il
 peso del db, che oggi e' 196K su 6,3 G liberi.
+E LA COSA CHE MANCAVA DA UN'ALTRA PARTE, trovata chiudendo: il foglio
+del panico del relay non diceva DI QUALE MACCHINA parlasse. Ora ha le
+tre in tabella con nome e indirizzo — il relay, il VPS e il nodo — che
+e' un'informazione da un rigo e si cercava sotto panico.

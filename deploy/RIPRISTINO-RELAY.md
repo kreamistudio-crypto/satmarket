@@ -18,6 +18,22 @@ un servizio da rimettere in piedi, non quella di un disastro.
 ore in cui il relay è giù** — e nemmeno quelli, se gli altri relay li
 hanno presi: si riprendono col `sync` del passo 8.
 
+## Di quale macchina si parla
+
+⚠️ **Non è il VPS di Barattolo, e non è il nodo Mostro.** Sono tre
+macchine diverse, e chi legge questo foglio col panico addosso deve
+poterlo sapere in una riga invece di dedurlo:
+
+| Macchina | Chi è | Dove |
+|---|---|---|
+| **Il relay** — questo foglio | `relay.barattolo.store`, strfry + lo specchio del libro P2P | `VM1957`, `185.18.221.118` |
+| Il VPS di Barattolo | il mercatino, `barattolo.store` | Hetzner Helsinki, `46.62.162.103` |
+| Il nodo Mostro | il coordinator P2P, LND, bitcoind | LNVPS Dublino, `185.18.221.96` |
+
+Il relay non ospita nessun sat e non tiene nessun segreto degli utenti:
+è la macchina meno preziosa delle tre, ed è anche il motivo per cui il
+suo database non si salva (vedi più sotto).
+
 ## Dove sta cosa
 
 | Casa | Cosa contiene |
