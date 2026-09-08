@@ -5944,3 +5944,86 @@ l'hai altrove»). Cercandoci `SEGRETI_PROFILO_P2P`, `p2p_semi` o un
 seme: nulla, e il suo albero e' pulito. Resta dov'e' e non si riusa;
 letto solo via `git show`, senza entrare nella sua cartella. Le tre
 strade qui sopra sono scelte di progetto e non vengono da li'.
+
+L'ordine appeso in «settled-hold-invoice» si chiude a mano, e
+l'admin-cancel non c'entra (set 2026). Una prova con Alan sul
+coordinator — ordine `5eca1bc6`, nessun fiat mai arrivato — si è
+impantanata a metà: il venditore (Andrea) aveva rilasciato, la hold
+invoice era stata INCASSATA (7.439 sats = `amount` 7402 + `fee` 37) e
+il payout verso il compratore era fallito tre volte con
+`MalformedAPIRes`. Andrea chiedeva la via ufficiale per annullare da
+admin e farsi tornare i sats. Non esiste, e il perché vale più della
+procedura.
+UNA HOLD INVOICE SETTLED NON TORNA INDIETRO, ed è la lezione che regge
+tutte le altre: `cancel` agisce solo su una invoice ACCEPTED, cioè con
+l'HTLC ancora appeso. Dopo il settle il preimage è stato rivelato, i
+sats sono saldo del canale, e ANNULLARE UN ORDINE NON È RIMBORSARLO.
+Verificato sui byte di tutt'e due i lati e non a memoria: in LND
+`cancelInvoiceImpl` (`invoices/invoiceregistry.go`) su una invoice
+settled non è un no-op — `shouldCancel` torna `true`, l'update arriva a
+channeldb e channeldb rifiuta con `ErrInvoiceAlreadySettled`, la
+stringa «invoice already settled» (`invoices/errors.go`); in mostro
+`classify_cancel_error` (`src/app/bond/flow.rs`) conosce sei modelli di
+«già fatto» e quella stringa non è fra loro, quindi l'esito è
+`Transient` e l'admin-cancel ABORTISCE.
+E NON CI SAREBBE MAI ARRIVATO COMUNQUE, per due porte chiuse prima:
+`dispute.rs` apre una disputa solo da `Active` o `FiatSent` — da
+`settled-hold-invoice` non se ne apre più — e `admin_cancel.rs` vuole
+un solver assegnato più `check_status(Dispute)`. Idem `admin_settle`.
+Anche la via gRPC passa dallo stesso `admin_cancel_action`, e con
+`pretrade_only` viene rifiutata ancora prima (`rpc/service.rs`). Il
+commento «Funds returned to seller» che si legge in `admin_cancel.rs`
+vale solo per l'escrow ancora APPESO: leggerlo come una promessa di
+rimborso è l'errore che questo giro ha evitato.
+LA RIGA NON ERA FERMA, ERA ARMATA, ed è la ragione vera per cui si è
+scritto nel database. Il job dei retry aveva già smesso da solo
+(`payment_attempts` 3 contro la leva `payment_attempts` = 3, quindi
+`3 < 3` è falso) e la dev fee non c'entrava (`dev_fee` 0, col tappo
+`dev_fee_percentage = 0.0` acceso). Ma la richiesta di add-invoice
+mandata al compratore era ancora valida: il giorno che il suo client
+gliela avesse mostrata, `pay_new_invoice` avrebbe riazzerato
+`payment_attempts`, e al giro dopo il nodo gli avrebbe pagato 7.365
+sats per un fiat mai arrivato.
+LA CURA È UNA SOLA SCRITTURA, e funziona perché TRE code filtrano sullo
+stesso campo: `find_failed_payment` e `find_unpaid_dev_fees` (`db.rs`)
+e `add_invoice_action`. Portato lo stato a `canceled-by-admin` — la
+stringa esatta dell'enum di mostro-core — nessuno dei tre lo vede più,
+e a un'eventuale invoice di Alan il nodo risponde `NotAllowedByStatus`
+invece di pagare. `UPDATE` con la guardia `AND status =
+'settled-hold-invoice'` e commit solo a `rowcount == 1`: se qualcosa
+avesse mosso la riga nel frattempo la scrittura non parte invece di
+sovrascrivere. Copia del database PRIMA, con l'API `backup` di sqlite e
+non con un `cp` a caldo, che su un WAL può uscire incoerente.
+`failed_payment` LASCIATO A 1 APPOSTA: quel pagamento è davvero
+fallito, e la storia si tiene: il cancello è lo stato.
+I SATS RESTANO SUL NODO, E NON È RINUNCIA: il nodo è nostro, quindi
+erano già tornati nel momento in cui la hold è stata incassata — solo
+nel saldo del canale invece che nel portafoglio. Farli uscire verso una
+nostra invoice e rientrare costerebbe routing e sposterebbe liquidità
+per niente.
+QUEL CHE LA SCRITTURA NON FA, e va saputo: non ripubblica l'evento
+Nostr dell'ordine. Nel libro e nel client del compratore resta l'ultimo
+stato pubblicato, perché a ripubblicare è un'AZIONE di mostrod e non
+una riga nel database.
+IL DIFETTO CHE HA CAUSATO TUTTO È DEL CLIENT, E RESTA DA CURARE: a
+retry esauriti mostrod manda al compratore un `Action::AddInvoice` —
+«rimandami una invoice» — e il nostro client non la mostra. Da fuori
+l'ordine sembra semplicemente fermo, e l'unica persona che potrebbe
+sbloccarlo non sa di doverlo fare. È il cantiere del client P2P, e
+questa prova è il suo caso reale.
+E LA SECONDA LEZIONE È SULLA DESTINAZIONE DEL PAYOUT: mai un lightning
+address. `is_valid_invoice` accetta indirizzo e LNURL, e `do_payment`
+li RI-RISOLVE a ogni tentativo, quindi un server che risponde male
+rende il fallimento deterministico — nessun retry lo aggiusterà mai.
+`MalformedAPIRes` nasce solo da uno stato HTTP non-2xx (`lnurl.rs`),
+cioè la risposta è arrivata ed era un errore: NON è il circuito Tor
+freddo della dev fee, che dà `NoAPIResponse`. Due sintomi diversi per
+due malattie diverse, e confonderli manda a curare la cosa sbagliata.
+IL FORK È INNOCENTE, e conviene averlo scritto: `bar1` tocca solo
+`dev_fee.rs`, `config/util.rs` e `lnurl.rs`, quindi tutti i gate letti
+qui sopra sono upstream puri e le conclusioni valgono per la macchina
+che gira, non per quella di GitHub.
+Il tentativo più vecchio (`8448dd70`, hold da 7.425 mai pagata) non
+c'entra e non si tocca: nessun HTLC, nessun sat in gioco, scade da
+solo. DA GUARDARE: che il client mostri quella richiesta, e che nessun
+pagamento fantasma raggiunga mai Alan.
