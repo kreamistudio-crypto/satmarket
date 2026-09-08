@@ -26714,7 +26714,7 @@ def _kind0_profilo(relay: str, hexkey: str):
 
 
 async def _profilo_nostr(npub: str) -> dict:
-    """Il kind-0 dai 4 relay: si tiene il primo che risponde con
+    """Il kind-0 dai relay: si tiene il primo che risponde con
     qualcosa. Un giro solo per tutto — la faccia e il nome stanno
     nello stesso evento e non vale la pena chiederlo due volte."""
     if not create_connection:
@@ -26857,7 +26857,7 @@ async def rinfresca_profili_nostr():
          MAX_RINFRESCHI_GIRO)).fetchall()
     con.close()
     for r in righe:
-        # Uno alla volta: sono quattro relay a testa, non c'e' fretta
+        # Uno alla volta: e' un giro di relay a testa, non c'e' fretta
         await aggiorna_profilo_social(r["tg_id"])
 
 
