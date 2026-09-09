@@ -35331,39 +35331,39 @@ def prove_p2p_libro():
     prova("...e dai due avvii, subito dopo il reparto da URL", (2, 2),
           (mini.count("apriP2PDaUrl();"),
            mini.count("apriCategoriaDaUrl();\n    apriP2PDaUrl();")))
-    # 3) LA REGOLA CSS C'E', e sono i due ritocchi: il logo cresce
-    # (inset 5% = lato reso 144 invece di 125, il quadrato non si
-    # muove) e le frecce virano col crossfade dei due gemelli.
+    # 3) LA REGOLA CSS C'E', ed e' UNA RIGA SOLA: il logo cresce
+    # (inset 5% = lato reso 144 invece di 125, e il quadrato non si
+    # muove, quindi la fila resta allineata).
     prova("la regola c'e', e il logo cresce senza toccare il quadrato",
           True, ".cella-p2p .cat-fig{inset:5%}" in _css
           and ".cella-p2p .cat-quad{" not in _css)
-    prova("il viraggio e' un crossfade fra i due gemelli", True,
-          ".cella-p2p .p2p-rosso{opacity:0;" in _css
-          and "animation:p2pVira 2.5s ease-in-out infinite alternate"
-          in _css
-          and "@keyframes p2pVira{from{opacity:0}to{opacity:1}}" in _css)
-    # ...e NON un filtro: un hue-rotate girerebbe anche il barattolo,
-    # e mascherarne le sole frecce vorrebbe dire un file nuovo. La
-    # sentinella guarda le REGOLE della card, non il foglio intero:
-    # la parola sta nel commento che spiega perche' quella strada e'
-    # scartata, ed e' li' che deve restare.
-    prova("...e nessuna regola della card porta un filtro", [],
+    # ⚠️ QUATTRO PROVE CAMBIANO LATO (set 2026, decisione di Andrea
+    # dopo averlo visto dal vivo): certificavano il VIRAGGIO delle
+    # frecce — il crossfade fra i gemelli compra e vendi, i tre
+    # gemelli nel markup, il ripiego a movimento ridotto. Il viraggio
+    # e' stato tolto: la fila delle categorie e' una mappa da leggere,
+    # e l'unica cosa che si muove in quella riga tira l'occhio via da
+    # tutte le altre. Adesso sorvegliano che NON torni per sbaglio,
+    # che e' il verso opposto sulla stessa riga.
+    prova("sulla card non si muove niente", [],
           [r.strip() for r in _css.split("\n")
-           if ".cella-p2p" in r and "filter" in r])
-    prova("...e la card porta i tre gemelli, il completo per ultimo",
-          True, _cp2p.index("/assets/p2p-logo-compra.png")
-          < _cp2p.index("/assets/p2p-logo-vendi.png")
-          < _cp2p.index("/assets/p2p-logo-completo.png"))
-    # A MOVIMENTO SPENTO il marchio resta INTERO: la coppia si spegne
-    # tutt'e due (il solo verde sarebbe un logo a meta') e prende il
-    # posto il completo.
-    prova("a movimento spento si ferma sul logo COMPLETO", True,
-          "  .cella-p2p .p2p-fermo{opacity:0}\n"
-          "  @media (prefers-reduced-motion:reduce){\n"
-          "    .cella-p2p .p2p-verde,.cella-p2p .p2p-rosso"
-          "{animation:none;opacity:0}\n"
-          "    .cella-p2p .p2p-fermo{opacity:1}\n"
-          "  }" in _css)
+           if ".cella-p2p" in r
+           and ("animation" in r or "transition" in r or "filter" in r)])
+    prova("...e del viraggio non resta il fotogramma", 0,
+          _css.count("p2pVira") + _css.count("p2p-verde")
+          + _css.count("p2p-rosso") + _css.count("p2p-fermo"))
+    # UNA REGOLA SOLA IN TUTTO IL FOGLIO, ed e' il modo piu' corto di
+    # dire tutte e tre le cose: niente animazione, niente ripiego per
+    # il movimento ridotto (non ha piu' niente da fermare), niente
+    # classi sui gemelli.
+    prova("...e la card ha UNA regola sola in tutto il foglio", 1,
+          _css.count(".cella-p2p"))
+    # IL MARCHIO E' UNO, il completo: i due gemelli del libro restano
+    # dove servono a dire un LATO, che qui un lato non c'e'.
+    prova("il marchio e' uno solo, il logo completo", (1, 0, 0),
+          (_cp2p.count("/assets/p2p-logo-completo.png"),
+           _cp2p.count("/assets/p2p-logo-compra.png"),
+           _cp2p.count("/assets/p2p-logo-vendi.png")))
     # NON E' UN REPARTO: l'anello `.attiva` dice «sei qui», e da questa
     # card si ESCE dalla home invece di filtrarla.
     prova("la card non si accende mai: non e' un filtro", False,
@@ -35511,12 +35511,16 @@ def prove_p2p_libro():
     # stesso movimento dell'occhio.
     # EMENDATA (set 2026): i verbi sono IMPERATIVI («Paga», non
     # «Paghi») e le due righe si scambiano l'ORDINE col lato — a
-    # comprare si paga e poi si riceve, a vendere si invia e poi si
-    # riceve — ma non la TAGLIA: l'euro e' grande in tutt'e due.
+    # comprare si paga e poi si riceve, a vendere si paga (in sats) e
+    # poi si riceve — ma non la TAGLIA: l'euro e' grande in tutt'e due.
+    # EMENDATA DI NUOVO (set 2026, ritocco di Andrea): la riga in sats
+    # del tab «Vendi BTC» diceva «Invia» e adesso dice «Paga». IL
+    # VERBO DI CHI DA' E' UNO SOLO fra i due tab — il gesto non
+    # cambia, cambia la moneta.
     prova("la card parla in seconda persona, all'imperativo",
           True, "const paghiEuro = o.lato === 'sell';" in mini
           and "(paghiEuro ? 'Paga ' : 'Ricevi ')" in mini
-          and "(paghiEuro ? 'ricevi ' : 'Invia ')" in mini)
+          and "(paghiEuro ? 'ricevi ' : 'Paga ')" in mini)
     prova("...e le taglie restano fisse: euro grande, sats piccoli",
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
@@ -35992,19 +35996,33 @@ console.log(JSON.stringify(out));
     # riga occupi — e' la cifra che cambia col tab.
     # EMENDATA (set 2026): verbi all'IMPERATIVO, e l'ordine delle righe
     # segue il gesto — a comprare si paga e poi si riceve, a vendere si
-    # invia e poi si riceve. Le taglie non si muovono: euro grande.
+    # paga (in sats) e poi si riceve. Le taglie non si muovono: euro
+    # grande.
+    # EMENDATA DI NUOVO (set 2026, ritocco di Andrea): nel tab «Vendi
+    # BTC» la riga in sats diceva «Invia ≈ X sats» e adesso dice
+    # «Paga». IL VERBO DI CHI DA' E' UNO SOLO fra i due tab: il gesto
+    # non cambia, cambia CON COSA si paga — euro di la', sats di qua.
     prova("nel tab Compra: paga euro grande, ricevi sats sotto", True,
           '<span class="p2p-grande p2p-euro">Paga 8,00 €</span>'
           in out["rigaCompra"]
           and '<span class="p2p-piccola p2p-sats">ricevi ≈'
           in out["rigaCompra"])
-    prova("nel tab Vendi: invia sats prima, ricevi euro grande dopo",
-          True, '<span class="p2p-piccola p2p-sats">Invia ≈'
+    prova("nel tab Vendi: paga sats prima, ricevi euro grande dopo",
+          True, '<span class="p2p-piccola p2p-sats">Paga ≈'
           in out["rigaVendi"]
           and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
           in out["rigaVendi"]
-          and out["rigaVendi"].index("Invia")
+          and out["rigaVendi"].index("Paga")
               < out["rigaVendi"].index("Ricevi"))
+    # ...e i due tab dicono lo STESSO verbo a chi da', ognuno con la
+    # sua moneta: e' tutto il ritocco, e una sentinella che guardasse
+    # solo la parola nuova non direbbe questo.
+    prova("...e il verbo di chi da' e' uno solo nei due tab",
+          ("Paga", "Paga"),
+          (out["rigaCompra"].split('p2p-euro">')[1][:4],
+           out["rigaVendi"].split('p2p-sats">')[1][:4]))
+    prova("...e «Invia» non lo dice piu' nessuna delle due", [],
+          [k for k in ("rigaCompra", "rigaVendi") if "Invia" in out[k]])
     prova("...e del verbo della controparte non resta niente", True,
           "Vende" not in out["rigaCompra"]
           and "Compra" not in out["rigaVendi"])

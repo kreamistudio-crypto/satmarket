@@ -885,9 +885,9 @@
   .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
     line-height:1.2;color:var(--ink);text-align:center}
-  /* LA CARD DELLO SCAMBIO: il logo piu' grosso, e le frecce che
-     virano (set 2026, ritocchi di Andrea — vedi Architettura, «LA
-     CARD DELLO SCAMBIO NELLA STRISCIA»).
+  /* LA CARD DELLO SCAMBIO: una riga sola, il logo piu' grosso (set
+     2026, ritocco di Andrea — vedi Architettura, «LA CARD DELLO
+     SCAMBIO NELLA STRISCIA»).
      PIU' GROSSO DELLE SORELLE, ed e' una ragione e non un capriccio:
      le 27 illustrazioni sono pareggiate d'inchiostro FRA LORO
      (ritaglia_categorie.py), questo e' un MARCHIO — tratto sottile e
@@ -895,31 +895,17 @@
      misura pesa meno. `inset` porta il lato reso da 125 a 144 (su
      card da 160) e NON tocca il quadrato: la fila non si muove di un
      pixel, si allarga solo la figura dentro.
-     IL VIRAGGIO E' UN CROSSFADE FRA I DUE GEMELLI GIA' IN CASA —
-     compra (freccia di sopra verde) e vendi (freccia di sotto rossa)
-     — e non un hue-rotate: quel filtro girerebbe anche il barattolo,
-     e mascherarne le sole frecce vorrebbe dire un file nuovo. I due
-     gemelli hanno la PANCIA identica, misurato alla resa con la
-     soglia percettiva di casa (24): zero pixel sopra, quindi il vetro
-     resta fermo per costruzione e a muoversi e' solo il colore.
-     `alternate` con ease-in-out indugia sui due estremi e passa
-     svelto per il mezzo scolorito: 2,5s per verso, cinque secondi di
-     ciclo. Si anima l'OPACITA' e nient'altro, che e' la proprieta'
-     che il compositore muove senza ridisegnare niente. */
+     ⚠️ IL VIRAGGIO DELLE FRECCE E' STATO TOLTO (set 2026, decisione
+     di Andrea dopo averlo visto): c'era un crossfade fra i gemelli
+     compra e vendi, cinque secondi di ciclo, e qui resta il logo
+     COMPLETO e fermo. Non si riproponga come «miglioria»: la fila
+     delle categorie e' una mappa da leggere, e l'unica cosa che si
+     muove in quella riga tira l'occhio via da tutte le altre. In «Da
+     scoprire» la card P2P resta com'e', che quella e' un'altra fila e
+     un altro mestiere. Col viraggio se ne sono andate anche la regola
+     del movimento ridotto — non c'e' piu' niente da fermare — e le
+     due immagini in piu': qui il marchio e' UNO. */
   .cella-p2p .cat-fig{inset:5%}
-  .cella-p2p .p2p-rosso{opacity:0;
-    animation:p2pVira 2.5s ease-in-out infinite alternate}
-  @keyframes p2pVira{from{opacity:0}to{opacity:1}}
-  /* Il TERZO gemello — il logo completo, verde e rosso insieme — sta
-     sopra gli altri due e non si vede mai... finche' qualcuno non
-     chiede di fermare il movimento: allora la coppia si spegne e
-     prende il suo posto lui, intero. Un marchio a meta' (il solo
-     verde) sarebbe un ripiego che dice un'altra cosa. */
-  .cella-p2p .p2p-fermo{opacity:0}
-  @media (prefers-reduced-motion:reduce){
-    .cella-p2p .p2p-verde,.cella-p2p .p2p-rosso{animation:none;opacity:0}
-    .cella-p2p .p2p-fermo{opacity:1}
-  }
   /* LA CARD DEL BARATTOLO (ago 2026): il vetro di jarSVG al posto
      dell'illustrazione, in crema FISSA sul bruno del fondo — un
      disegno su un fondo che non segue il tema non lo segue nemmeno
@@ -10377,11 +10363,7 @@ function renderStriscia(){
     <a class="cat-cella cella-p2p" data-cat="${CAT_P2P}" href="/p2p"
        title="Scambio P2P" aria-label="Scambio P2P"
        onclick="vaiP2PDaTocco(event)">
-      <span class="cat-quad"><span class="cat-fig"><img class="p2p-verde"
-           src="/assets/p2p-logo-compra.png" alt="" loading="lazy"
-           decoding="async" onerror="this.remove()"><img class="p2p-rosso"
-           src="/assets/p2p-logo-vendi.png" alt="" loading="lazy"
-           decoding="async" onerror="this.remove()"><img class="p2p-fermo"
+      <span class="cat-quad"><span class="cat-fig"><img
            src="/assets/p2p-logo-completo.png" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"><span class="cat-emoji"
            aria-hidden="true">₿</span></span></span>
@@ -33527,7 +33509,7 @@ function rigaOrdineP2P(o){
      in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Paghi
      8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
      tab «Vendi BTC» (k=buy) — coi sats sempre sotto, «ricevi ≈ 11 828
-     sats» o «invia ≈ 11 828 sats». I due tab si leggono cosi' collo
+     sats» o «Paga ≈ 11 828 sats». I due tab si leggono cosi' collo
      stesso movimento dell'occhio: euro grande, sats piccoli, prezzo.
      (Il primo giro scambiava le righe col lato; Andrea l'ha
      rovesciato guardandolo: la coerenza fra i tab vale piu' del
@@ -33553,15 +33535,24 @@ function rigaOrdineP2P(o){
     + (o.euroMax ? ', scegli tu' : '');
   /* I VERBI SONO IMPERATIVI (set 2026, ritocco di Andrea): «Paga»,
      non «Paghi» — la card chiede, non descrive.
+     E IL VERBO DI CHI DA' E' UNO SOLO, «Paga» (set 2026, ritocco di
+     Andrea che EMENDA il giro prima, dove nel tab «Vendi BTC» si
+     leggeva «Invia ≈ X sats»): fra i due tab non cambia il gesto —
+     si paga in tutt'e due — cambia solo CON COSA, euro di la' e sats
+     di qua. Due verbi per lo stesso gesto facevano sembrare diverse
+     due cose che diverse non sono; e «Paga» dice anche meglio come
+     va: chi vende sats non li spedisce a mano a chi compra, PAGA una
+     fattura, e quella li tiene in garanzia finche' l'euro non e'
+     arrivato.
      E L'ORDINE DELLE RIGHE SEGUE IL GESTO: nel tab «Compra BTC» si
-     paga e poi si riceve, nel tab «Vendi BTC» si invia e poi si
-     riceve. Quindi a comprare la riga grande (l'euro) sta in cima, a
-     vendere ci arriva seconda: cambia l'ORDINE, mai la taglia — euro
-     grande e sats piccoli in tutt'e due i tab. */
+     paga e poi si riceve, nel tab «Vendi BTC» si paga (in sats) e poi
+     si riceve. Quindi a comprare la riga grande (l'euro) sta in cima,
+     a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
+     euro grande e sats piccoli in tutt'e due i tab. */
   const rigaEuro = '<span class="p2p-grande p2p-euro">'
     + (paghiEuro ? 'Paga ' : 'Ricevi ') + eurTxt + '</span>';
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + (paghiEuro ? 'ricevi ' : 'Invia ') + sats + '</span>';
+    + (paghiEuro ? 'ricevi ' : 'Paga ') + sats + '</span>';
   /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «prezzo di
      mercato» nudo a premio zero, «prezzo di mercato +4%» col premio —
      e in tinta ci va SOLO il segno con la percentuale, che le parole
