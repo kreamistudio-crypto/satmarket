@@ -1708,15 +1708,27 @@
      gemelli — freccia verde accesa a comprare, rossa a vendere —
      impilati nella stessa cella di griglia, col crossfade guidato da
      body.p2p-vendo: lo stesso giudice del + della nav, quindi la
-     reazione vale nel libro E nei miei senza una riga di JS nuova. */
+     reazione vale nel libro E nei miei senza una riga di JS nuova.
+     A SFUMARE E' SOLO IL GEMELLO SOPRA (vendi), mai il compra sotto:
+     il barattolo e' IDENTICO nei due PNG, quindi coprendolo con la
+     copia uguale le uniche cose che si vedono cambiare sono le
+     FRECCE — sfumandoli entrambi, a meta' corsa il barattolo calava
+     al 75% e sembrava trasformarsi (visto dal vivo da Andrea). */
   .p2p-logo-pila{display:grid}
   .p2p-logo{grid-area:1/1;width:76px;height:76px;
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
     transition:opacity .3s ease}
   .p2p-logo.vendi{opacity:0}
-  body.p2p-vendo .p2p-logo.compra{opacity:0}
   body.p2p-vendo .p2p-logo.vendi{opacity:1}
-  @media (prefers-reduced-motion:reduce){.p2p-logo{transition:none}}
+  /* LA SCOSSA al tocco del tab (set 2026): un dondolio breve sulla
+     pila intera, riavviato dal JS togli-e-rimetti (scuotiLogoP2P) */
+  .p2p-logo-pila.scossa{animation:logoScossa .35s ease}
+  @keyframes logoScossa{0%{transform:rotate(0)}25%{transform:rotate(-5deg)}
+    55%{transform:rotate(4deg)}80%{transform:rotate(-2deg)}100%{transform:rotate(0)}}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-logo{transition:none}
+    .p2p-logo-pila.scossa{animation:none}
+  }
   .p2p-testata{display:flex;flex-direction:column;align-items:center;
     margin:0 0 6px;text-align:center}
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
@@ -1727,17 +1739,19 @@
      del «Pubblica». */
   /* i tab si ancorano in basso (flex-end): la riga e' alta quanto il
      logo, e loro restano appoggiati alla linea come prima */
-  .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
-    border-bottom:2px solid var(--line)}
-  /* il logo siede SULLA linea, un filo oltre (margine negativo): cosi'
-     scende all'altezza delle scritte invece di galleggiare in alto —
-     il ritocco chiesto da Andrea guardando la riga */
+  /* LA STRISCIA CONTINUA NON C'E' PIU' (set 2026, ritocco di Andrea):
+     la linea vive sotto OGNI tab — grigia sul quieto, colorata
+     sull'attivo — e sotto il logo non passa niente */
+  .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px}
+  /* il logo siede all'altezza delle scritte (margine negativo): cosi'
+     scende invece di galleggiare in alto — il ritocco chiesto da
+     Andrea guardando la riga */
   .p2p-lati .p2p-logo-pila{margin:0 6px -8px}
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
   .p2p-lati .p2p-lato{flex:1;padding:11px 4px;background:none;border:none;
-    border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;
+    border-bottom:3px solid var(--line);cursor:pointer;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;
     line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
   .p2p-lati .p2p-lato.compra.attiva{color:var(--trust);
@@ -33087,8 +33101,21 @@ function caricaLibroP2P(forza){
    (k=sell), «Vendi BTC» chi COMPRA (k=buy). I due tab grandi stanno
    nel markup fisso e lo stato e' di sessione. */
 const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
+/* LA SCOSSA DEL LOGO (set 2026): al tocco di un tab la pila dondola
+   una volta. Togli-e-rimetti col reflow in mezzo, o un secondo tocco
+   nella stessa mezza secondo non riavvierebbe niente; parte anche sul
+   tab GIA' attivo, apposta — e' la risposta al dito, non al cambio. */
+function scuotiLogoP2P(){
+  document.querySelectorAll('.p2p-logo-pila').forEach(p => {
+    p.classList.remove('scossa');
+    void p.offsetWidth;
+    p.classList.add('scossa');
+  });
+}
 function setLatoP2P(lato){
-  if (!P2P_LATO_K[lato] || lato === p2pLato) return;
+  if (!P2P_LATO_K[lato]) return;
+  scuotiLogoP2P();
+  if (lato === p2pLato) return;
   haptic();
   p2pLato = lato;
   /* il + della nav trasformata veste il colore del lato: verde a

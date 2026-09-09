@@ -35882,15 +35882,43 @@ def prove_nav_p2p():
           mini.count('class="p2p-logo compra" src="/assets/p2p-logo-compra.png"'))
     prova("...col vendi accanto", 2,
           mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"'))
-    prova("il crossfade lo guida il giudice del lato", True,
-          "body.p2p-vendo .p2p-logo.compra{opacity:0}" in mini
-          and "body.p2p-vendo .p2p-logo.vendi{opacity:1}" in mini
-          and ".p2p-logo.vendi{opacity:0}" in mini)
+    # EMENDATA (set 2026, il barattolo che «si trasformava»): a sfumare
+    # e' SOLO il gemello sopra — il compra sotto resta pieno, cosi' il
+    # barattolo identico non cala mai e a muoversi si vedono solo le
+    # frecce. La regola che sfumava il compra non deve risorgere.
+    prova("il crossfade muove solo il gemello sopra", True,
+          "body.p2p-vendo .p2p-logo.vendi{opacity:1}" in mini
+          and ".p2p-logo.vendi{opacity:0}" in mini
+          and ".p2p-logo.compra{opacity" not in mini)
     prova("...con la sola opacity, e reduced-motion lo spegne", True,
           "transition:opacity .3s ease" in pezzo_js(
               mini, ".p2p-logo{", "}")
-          and "@media (prefers-reduced-motion:reduce){.p2p-logo{transition:none}}"
-          in mini)
+          and ".p2p-logo{transition:none}" in mini)
+    # LA SCOSSA al tocco del tab: parte anche sul tab gia' attivo (e'
+    # la risposta al dito), si riavvia col reflow in mezzo, e
+    # reduced-motion la spegne.
+    _sl = pezzo_js(mini, "function setLatoP2P(lato){", "\n}\n")
+    prova("il tocco sul tab scuote il logo, anche sul gia' attivo",
+          True, "scuotiLogoP2P();" in _sl
+          and _sl.index("scuotiLogoP2P()")
+              < _sl.index("if (lato === p2pLato) return;"))
+    _sc = pezzo_js(mini, "function scuotiLogoP2P(){", "\n}\n")
+    prova("...e la scossa si riavvia col reflow in mezzo", True,
+          "classList.remove('scossa')" in _sc
+          and "void p.offsetWidth;" in _sc
+          and "classList.add('scossa')" in _sc)
+    prova("...dura un dondolio e reduced-motion la spegne", True,
+          ".p2p-logo-pila.scossa{animation:logoScossa .35s ease}" in mini
+          and "@keyframes logoScossa{" in mini
+          and ".p2p-logo-pila.scossa{animation:none}" in mini)
+    # LA LINEA VIVE SOTTO OGNI TAB, mai sotto il logo: il contenitore
+    # non porta piu' la striscia continua, i tab si' — grigia sul
+    # quieto, colorata sull'attivo (le regole .attiva gia' sorvegliate
+    # da prove_p2p_libro).
+    prova("niente striscia continua sotto il logo", True,
+          "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}")
+          and "border-bottom:3px solid var(--line)"
+              in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}"))
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
     prova("...nemmeno nel server: le rotte sono i due gemelli", True,
