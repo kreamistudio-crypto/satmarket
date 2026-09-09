@@ -1702,8 +1702,10 @@
      sinistra, il marchio al centro, «Vendi BTC» a destra — cosi' i
      tab salgono in cima e la pagina comincia subito. Il PNG e'
      servito a 2x della resa (136px per 68) e pesa ~30 KB.
-     La .p2p-testata sopravvive nella vista dei MIEI, che tab non ne
-     ha: li' resta il solo logo centrato. */
+     E LA TESTATA COME BLOCCO NON ESISTE PIU' (set 2026): l'aveva
+     ancora la vista dei MIEI, che tab non ne ha, e Andrea l'ha tolta
+     — li' la pagina si apre sugli scambi e basta, quindi anche la
+     sua regola se n'e' andata: niente CSS orfano. */
   /* IL LOGO REAGISCE AL TAB (set 2026, ritocco di Andrea): due PNG
      gemelli — freccia verde accesa a comprare, rossa a vendere —
      impilati nella stessa cella di griglia, col crossfade guidato da
@@ -1719,15 +1721,17 @@
      e' sempre il COMPLETO — un lato attivo non c'e'. Due misure: in
      riga col testo e grande negli stati vuoti, al posto del glifo da
      44px.
-     LA MISURA IN RIGA E' 20px E NON UN `em`, ed e' misurato a schermo:
-     accanto a una section-label da 11px l'em dava 14px, e a 14 il
-     marchio non e' un marchio — e' un puntino colorato. Un'emoji a
-     quella taglia regge (e' disegnata per quello), un'illustrazione
-     no. Sotto i 20px, meglio nessun segno — ed e' la ragione per cui
-     il bottone arancio che pubblica resta senza. */
-  .p2p-simbolo{width:20px;height:20px;vertical-align:-6px}
-  .empty .p2p-simbolo{display:block;width:54px;height:54px;
-    margin:0 auto 10px;vertical-align:0}
+     LA MISURA E' 76px, la stessa in tutt'e due i posti (decisione di
+     Andrea, dopo averlo visto piccolo): un'illustrazione ha bisogno
+     di spazio per essere un marchio — a 20px era un puntino colorato,
+     a 14 (l'em di una label da 11px) peggio. Un'emoji a quelle taglie
+     regge perche' e' disegnata per quello, questa no: sotto la
+     misura giusta, meglio nessun segno — ed e' la ragione per cui il
+     bottone arancio che pubblica resta senza.
+     Nella label sta in una riga FLEX, quindi il vertical-align non
+     serve: la centra `align-items:center` di .section-label. */
+  .p2p-simbolo{width:76px;height:76px}
+  .empty .p2p-simbolo{display:block;margin:0 auto 10px}
   .p2p-logo-pila{display:grid}
   .p2p-logo{grid-area:1/1;width:76px;height:76px;
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
@@ -1743,8 +1747,6 @@
     .p2p-logo{transition:none}
     .p2p-logo-pila.scossa{animation:none}
   }
-  .p2p-testata{display:flex;flex-direction:column;align-items:center;
-    margin:0 0 6px;text-align:center}
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
      testo grosso, colore SOLO sull'attivo). Compra parla il verde
      della protezione (--trust), vendi il rosso di casa (--danger) —
@@ -5629,14 +5631,12 @@ document.getElementById('cartello')?.remove();</script>
        fase 6 valgono identiche: niente nomi di terzi. -->
   <div class="view" id="view-p2pmiei">
     <div class="sicu">
-      <!-- QUI IL LOGO E' COMPLETO E FERMO (set 2026, decisione di
-           Andrea): in questa vista un lato attivo non c'e' — sono i
-           MIEI scambi, di tutt'e due i versi — quindi niente pila
-           reattiva e niente crossfade, che risponderebbe a un tab che
-           qui non esiste. La coppia gemella resta al libro. -->
-      <div class="p2p-testata">
-        <img class="p2p-logo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">
-      </div>
+      <!-- QUI NON C'E' NESSUNA TESTATA (set 2026, decisione di
+           Andrea): la vista si apre sui propri scambi e basta. Il
+           marchio ha smesso di presiedere questa pagina — vive dove
+           dice qualcosa, cioe' nella riga «Lo scambio» e negli stati
+           vuoti; la coppia gemella e il suo crossfade restano al
+           libro, dove un lato attivo esiste. -->
       <div id="p2pMieiCorpo"></div>
     </div>
   </div>

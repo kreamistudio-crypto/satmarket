@@ -35890,8 +35890,12 @@ def prove_nav_p2p():
     prova("...senza «Nostr», «Mostro» o «coordinatore»", False,
           any(s in senza_commenti
               for s in ("Nostr", "Mostro", "coordinatore")))
-    prova("...con la testata di casa e il corpo dei miei", True,
-          'class="p2p-testata"' in fetta and 'id="p2pMieiCorpo"' in fetta)
+    # EMENDATA (set 2026, decisione di Andrea): la vista si apre sugli
+    # scambi e basta — nessuna testata, nessun logo che presieda.
+    prova("...e si apre dritta sul corpo dei miei, senza testata", True,
+          'id="p2pMieiCorpo"' in fetta
+          and "p2p-testata" not in fetta
+          and "p2p-logo" not in fetta)
 
     # --- 1b) IL LOGO REAGISCE AL TAB (set 2026) ----------------------
     # Due PNG gemelli impilati (compra/vendi), crossfade guidato da
@@ -35909,9 +35913,10 @@ def prove_nav_p2p():
           mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"'))
     _fm = mini[mini.index('id="view-p2pmiei"'):]
     _fm = _fm[:_fm.index('id="p2pMieiCorpo"')]
-    prova("la testata dei miei porta il COMPLETO, fermo", True,
-          '/assets/p2p-logo-completo.png' in _fm
-          and "p2p-logo-pila" not in _fm)
+    prova("i miei non hanno piu' testata ne' logo in cima", True,
+          "p2p-logo" not in _fm and "p2p-testata" not in _fm)
+    prova("...e della testata non resta nemmeno la regola CSS", 0,
+          mini.count("p2p-testata"))
     # EMENDATA (set 2026, il barattolo che «si trasformava»): a sfumare
     # e' SOLO il gemello sopra — il compra sotto resta pieno, cosi' il
     # barattolo identico non cala mai e a muoversi si vedono solo le
@@ -36009,14 +36014,15 @@ def prove_nav_p2p():
           and '<span class="big">🔁</span>' not in mini)
     prova("l'emoji dei doppioni su Nostr non si tocca: dice altro",
           True, '<span class="em">🔁</span>Doppioni su Nostr' in mini)
-    # LA MISURA IN RIGA E' 20px FISSI e non un em: a 14 (l'em di una
-    # section-label da 11px) il marchio e' un puntino colorato —
-    # un'emoji a quella taglia regge, un'illustrazione no. Misurato a
-    # schermo, ed e' la stessa ragione per cui il bottone resta nudo.
-    prova("...e le due misure del simbolo ci sono, la riga in px", True,
-          "width:20px;height:20px" in pezzo_js(mini, ".p2p-simbolo{", "}")
+    # LA MISURA E' 76px, UNA per tutt'e due i posti (set 2026,
+    # decisione di Andrea dopo averlo visto piccolo): a 20 era un
+    # puntino colorato, a 14 — l'em di una label da 11px — peggio.
+    # Un'emoji regge a quelle taglie, un'illustrazione no, ed e' la
+    # stessa ragione per cui il bottone arancio resta nudo.
+    prova("...e il simbolo e' grande, in px e uno solo per tutti", True,
+          "width:76px;height:76px" in pezzo_js(mini, ".p2p-simbolo{", "}")
           and "em" not in pezzo_js(mini, ".p2p-simbolo{", "}")
-          and "width:54px" in pezzo_js(mini, ".empty .p2p-simbolo{", "}"))
+          and "width" not in pezzo_js(mini, ".empty .p2p-simbolo{", "}"))
 
     # --- 2) UN RENDERER PER DUE CORPI ---------------------------------
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
