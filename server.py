@@ -3293,6 +3293,34 @@ def init_db():
         ultimo_nudge INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_ordini(
+        -- CHI HA PUBBLICATO QUALE ORDINE (set 2026, decisione di
+        -- Andrea che ROVESCIA una strada scartata — il perche' per
+        -- intero sta in CANTIERI, «I volti sul libro»).
+        -- La voce del cantiere della scopa lampo aveva scartato
+        -- proprio questo («una lista sul server ... gli insegnerebbe
+        -- QUALI ordini del libro sono di chi. Una comodita' pagata in
+        -- privacy»), e la decisione nuova la rovescia CON GLI OCCHI
+        -- APERTI: le card del libro mostrano il volto di chi ha
+        -- pubblicato, come il mercatino mostra quello di chi vende, e
+        -- chi vuole restare anonimo entra da Nostr — la stessa scala
+        -- di visibilita' del resto di Barattolo, senza aggiungerne.
+        -- COSA COSTA, scritto qui perche' non si dimentichi: il server
+        -- IMPARA quali ordini del libro pubblico sono di chi, e chi ha
+        -- una sessione Barattolo puo' chiedere il volto dietro un
+        -- ordine. Il libro sui relay resta leggibile da chiunque, ma
+        -- la corrispondenza col nostro account NO: la rotta che la
+        -- serve vuole la sessione, e un raccoglitore anonimo non
+        -- incrocia niente.
+        -- L'ID E' QUELLO DEL COORDINATORE (il `d` del 38383), mai un
+        -- provvisorio del client: quello cambia nome quando il
+        -- coordinatore risponde, e una riga col nome vecchio non
+        -- servirebbe a nessuno.
+        ordine TEXT PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        creato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_indice(
         -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
         -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
@@ -7776,6 +7804,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # la pubkey come in `chiavi_p2p`, quindi le due meta' non
         # possono collidere e l'UPDATE secco basta.
         con.execute("UPDATE p2p_indice SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e i VOLTI sul libro seguono l'utente per la stessa ragione
+        # (set 2026): la PK e' l'id dell'ordine, che nasce dal
+        # coordinatore e non contiene il tg_id — due meta' non possono
+        # rivendicare lo stesso ordine, quindi l'UPDATE secco basta.
+        # Senza questa riga le card dell'ordine pubblicato dalla meta'
+        # che muore resterebbero intestate a un account che non c'e'
+        # piu', cioe' senza faccia.
+        con.execute("UPDATE p2p_ordini SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
@@ -30067,6 +30104,11 @@ def _sale_profilo_p2p(con, tg_id: int, adesso: int) -> dict:
 # una leva: e' un guardrail contro un client impazzito, non una taratura.
 MAX_CHIAVI_P2P = 500      # per utente: l'identita' + una trade key per scambio
 FORMA_PUBKEY_P2P = re.compile(r"^[0-9a-f]{64}$")
+# L'id di un ordine e' il `d` del 38383: un UUID del coordinatore. La
+# forma si chiude qui — mai un id di fantasia in tabella, e mai uno
+# lungo quanto pare (finirebbe in una PK e in una query IN).
+FORMA_ORDINE_P2P = re.compile(r"^[0-9a-zA-Z-]{8,64}$")
+MAX_ORDINI_P2P = 200      # quanti se ne registrano o si chiedono in un giro
 
 
 def _pavimento_indice_p2p(con, tg_id: int, identita, indice, adesso: int):
@@ -30148,6 +30190,130 @@ def _registra_chiavi_p2p(con, tg_id: int, pubkeys, adesso: int) -> dict:
     return {"registrate": scritte, "totale": len(gia) + scritte}
 
 
+def _ordini_puliti_p2p(ordini) -> list:
+    """La lista di id in una forma che si puo' mettere in tabella.
+    Alza ValueError sulla forma storta e sul tetto — mai un 400 diretto
+    — cosi' la prova non ha bisogno di FastAPI. I doppioni cadono."""
+    if not isinstance(ordini, list) or not ordini:
+        raise ValueError("Nessun ordine")
+    pulite = []
+    for o in ordini:
+        o = str(o).strip()
+        if not FORMA_ORDINE_P2P.fullmatch(o):
+            raise ValueError("Ordine in una forma sconosciuta")
+        if o not in pulite:
+            pulite.append(o)
+    if len(pulite) > MAX_ORDINI_P2P:
+        raise ValueError("Troppi ordini in un giro solo")
+    return pulite
+
+
+def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int) -> dict:
+    """Scrive «questo ordine e' di questo account». Idempotente (PK
+    sull'id + INSERT OR IGNORE): il client li rimanda a ogni sessione.
+    UN ORDINE GIA' DI UN ALTRO NON SI RUBA — l'OR IGNORE lo lascia a
+    chi l'ha registrato per primo. E' la stessa prudenza delle chiavi,
+    e qui vale doppio: un id si legge dal libro PUBBLICO, quindi
+    chiunque potrebbe provare a intestarsi l'ordine di un altro per
+    metterci la propria faccia. Chi arriva primo e' chi l'ha
+    pubblicato, che l'id vero lo sa prima di tutti."""
+    pulite = _ordini_puliti_p2p(ordini)
+    scritti = 0
+    for o in pulite:
+        scritti += con.execute(
+            "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato) "
+            "VALUES(?,?,?)", (o, tg_id, adesso)).rowcount
+    con.commit()
+    return {"registrati": scritti}
+
+
+def _facce_ordini_p2p(con, ordini) -> dict:
+    """Da una lista di id al VOLTO PUBBLICO di chi li ha pubblicati:
+    nome, avatar, media delle stelline e quanti voti. PURA rispetto
+    alla sessione — chi puo' chiedere lo decide la rotta.
+    ESCE SOLO ROBA GIA' PUBBLICA nel mercatino: gli stessi quattro
+    campi che stanno sotto ogni annuncio e in ogni negozio. Niente
+    tg_id, niente npub, niente conto degli scambi P2P — quello lo dice
+    il coordinatore, non noi.
+    LA MEDIA ESCE SOLO SE QUALCUNO HA VOTATO: `n_feedback` a zero non
+    e' «zero stelle», e' «non si sa» — la card fa sparire la riga, che
+    e' la regola di casa (le stelle nascono col primo voto)."""
+    pulite = _ordini_puliti_p2p(ordini)
+    segni = ",".join("?" * len(pulite))
+    righe = con.execute(
+        f"SELECT p.ordine, u.nome, u.avatar, u.rating, u.n_feedback "
+        f"FROM p2p_ordini p JOIN utenti u ON u.tg_id = p.tg_id "
+        f"WHERE p.ordine IN ({segni})", pulite).fetchall()
+    fuori = {}
+    for r in righe:
+        voti = int(r["n_feedback"] or 0)
+        fuori[r["ordine"]] = {
+            "nome": r["nome"] or "",
+            "avatar": r["avatar"] or "",
+            "media": round(float(r["rating"] or 0), 1) if voti else 0,
+            "voti": voti,
+        }
+    return fuori
+
+
+@app.post("/api/p2p/ordini")
+async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """«Questi ordini del libro sono miei». Il gate e' per PERSONA come
+    per le chiavi: in fase chiusa chi non e' della partita non deve far
+    crescere una tabella per una cosa che per lui non c'e'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        esito = _registra_ordini_p2p(con, user["id"],
+                                     (d or {}).get("ordini"), int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return {"ok": True, **esito}
+
+
+@app.post("/api/p2p/facce")
+async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Chi ha pubblicato questi ordini, con la faccia che gia' mostra
+    nel mercatino.
+
+    ⚠️ LA SESSIONE SERVE, ed e' la decisione (Andrea, set 2026): il
+    libro sui relay lo legge chiunque, ma il collegamento coi nostri
+    account no — dentro Barattolo i volti si vedono, un raccoglitore
+    anonimo che incrocia il libro pubblico non incrocia niente. La
+    vetrina anonima vede le card senza volto, e le card funzionano
+    lo stesso: l'anello resta, la riga delle stelline sparisce.
+    NIENTE ID NELL'URL: sono in un POST apposta — una GET metterebbe
+    gli id degli ordini nei log del web server, e un log e' un posto
+    dove le cose restano.
+    NESSUN GATE SULLA LEVA, e non e' una dimenticanza: qui non si
+    scrive niente e non si registra nessuno — si legge roba gia'
+    pubblica. Un 409 servirebbe solo a far sparire i volti a chi la
+    leva ce l'ha spenta ma il libro lo sta guardando lo stesso."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        facce = _facce_ordini_p2p(con, (d or {}).get("ordini"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return {"facce": facce}
+
+
 @app.post("/api/p2p/chiavi")
 async def registra_chiavi_p2p(req: Request, x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
@@ -30198,14 +30364,22 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     """«Dimentica il profilo»: via TUTTE le pubkey di quell'utente.
     NESSUN gate sulla leva, ed e' deliberato: togliere il proprio nome
     da una lista non dipende da un interruttore (il patto di
-    `ritira_puntata` — uscire non dipende da una leva)."""
+    `ritira_puntata` — uscire non dipende da una leva).
+    ⚠️ E DAL SET 2026 SE NE VANNO ANCHE I VOLTI: «dimentica» vuol dire
+    che di me non resta niente da guardare, e lasciare le righe di
+    `p2p_ordini` terrebbe in piedi proprio il collegamento
+    ordine→account che quel gesto esiste per rompere. Le card di
+    quegli ordini tornano senza faccia, come quelle di chi non e' di
+    Barattolo."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     tolte = con.execute("DELETE FROM chiavi_p2p WHERE tg_id=?",
                         (user["id"],)).rowcount
+    volti = con.execute("DELETE FROM p2p_ordini WHERE tg_id=?",
+                        (user["id"],)).rowcount
     con.commit()
     con.close()
-    return {"ok": True, "tolte": tolte}
+    return {"ok": True, "tolte": tolte, "volti": volti}
 
 
 # LA LETTURA DELLE CHIAVI (tappa 7b): «al tuo account ne risulta una?».

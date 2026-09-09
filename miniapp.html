@@ -1809,18 +1809,47 @@
      riga grande gli lascia il posto col suo padding. */
   .p2p-anello{position:absolute;top:12px;right:14px;line-height:0}
   .p2p-ord .p2p-testa{padding-right:28px}
+  /* COL VOLTO DENTRO l'anello cresce e diventa la sua cornice (set
+     2026, i volti sul libro): 44px, la faccia tonda al centro e il
+     colore del tempo tutt'intorno. Un segno solo per due cose, nello
+     spazio che l'angolo aveva gia'. Senza volto resta il piccolo di
+     ieri, e la riga grande gli lascia il posto che gli serve. */
+  .p2p-anello.con-faccia{width:44px;height:44px}
+  .p2p-anello.con-faccia svg{width:44px;height:44px}
+  /* il posto che l'anello grande si prende lo dichiara la CARD, con
+     una classe sua: `:has()` avrebbe fatto lo stesso su un browser
+     recente e niente su uno vecchio, e qui il dato lo conosce gia'
+     chi scrive il markup */
+  .p2p-ord.con-faccia .p2p-testa{padding-right:52px}
+  /* la faccia: il cerchio dell'avatar di casa, rimpicciolito e
+     infilato nel buco dell'anello (l'inset lo tiene dentro il tratto).
+     L'iniziale sotto la foto e' la rete di sempre — se l'immagine non
+     arriva, `onerror` la toglie e resta la lettera. */
+  /* L'INSET E' 9px E NON 6, ed e' misurato: il tratto dell'anello a
+     44px va dal raggio 13,75 al 19,25, quindi un disco piu' largo di
+     13,75 gli si mangia la meta' interna — a 6px la faccia copriva
+     l'anello e i due scuri si impastavano (visto dal vivo). A 9 il
+     disco sta dentro il buco e fra i due resta la carta. */
+  .p2p-faccia{position:absolute;inset:9px;border-radius:50%;
+    background:var(--ink);color:var(--on-ink);display:flex;
+    align-items:center;justify-content:center;overflow:hidden;
+    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:14px;
+    line-height:1}
+  .p2p-faccia .av-foto{position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover}
   .p2p-anello svg{width:22px;height:22px;display:block;
     transform:rotate(-90deg)}
   .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
   .p2p-anello .pista{stroke:var(--line)}
-  /* il colore vero e' lo stile inline (color-mix, dall'arancio al
-     grigio secondo quanto resta): QUESTA e' la rete per i browser che
-     color-mix non ce l'hanno — li' lo stile intero cade e l'anello
-     resta grigio, che si legge lo stesso */
-  .p2p-anello .resta{stroke:var(--muted)}
+  /* TRE STATI NETTI, e le soglie le decide il JS: neutro finche' c'e'
+     tempo, arancio negli ultimi tre giorni, rosso che pulsa
+     nell'ultimo. Il neutro e' --ink-soft e NON il bianco: sulla card
+     bianca un anello bianco non esisterebbe, e questo token e' chiaro
+     di sera — dove la carta e' bruna — e scuro di giorno. */
+  .p2p-anello .resta{stroke:var(--ink-soft)}
+  .p2p-anello.vicina .resta{stroke:var(--sats)}
   /* l'ultimo giorno non e' piu' un'informazione ma un avviso: rosso e
-     PULSA. Li' lo stile inline non si scrive (vincerebbe sul rosso),
-     e la soglia la decide il JS — e' un giudizio, non un vestito. */
+     PULSA */
   .p2p-anello.ultimo-giorno .resta{stroke:var(--danger);
     animation:p2pPulsa 1.5s ease-in-out infinite}
   @keyframes p2pPulsa{0%,100%{opacity:1}50%{opacity:.3}}
@@ -1855,6 +1884,9 @@
   .p2p-grande{font-size:19px;white-space:normal}
   .p2p-piccola{display:block;margin-top:2px;font-size:14px;
     white-space:normal}
+  /* ...ma quando e' LEI la prima riga (tab «Vendi BTC») il respiro di
+     sopra non serve: ce l'ha gia' la card */
+  .p2p-testa .p2p-piccola{margin-top:0}
   /* la regola per l'euro in seconda riga e' MORTA col ritocco che ha
      fissato i posti (l'euro sta sempre in cima): niente CSS orfano */
   /* IL PREZZO RISPETTO AL MERCATO, terza riga: la tinta e' un
@@ -33245,19 +33277,21 @@ function frazioneVitaP2P(o, adesso){
    IL TESTO NON SI PERDE, e' l'aria dell'anello (title + aria-label):
    chi passa il dito o naviga con lo screen reader ha ancora la frase
    esatta, e la sua casa nel dettaglio dello scambio si decide dopo.
-   IL COLORE RACCONTA ANCHE LUI (set 2026, ritocco di Andrea): pieno
-   e' l'ARANCIO di casa, e sbiadendo scivola verso il grigio — un
-   ordine fresco si vede da lontano. La mescola la fa `color-mix` in
-   uno stile inline, perche' la percentuale cambia a ogni card; dove
-   `color-mix` non c'e' lo stile intero cade e resta la regola CSS,
-   cioe' l'anello grigio: un ripiego che si legge lo stesso.
-   L'ULTIMO GIORNO E' UN'ALTRA COSA: l'anello passa al rosso e
-   PULSA (1,5 s), perche' li' non e' piu' un'informazione ma un
-   avviso. LA SOGLIA STA QUI E NON NEL CSS — e' un giudizio, non un
-   vestito — ed e' il TEMPO che resta e non una frazione: su un
-   ordine di sette giorni l'ultimo giorno e' il 14%, su uno di
-   quindici il 7%, e a contare e' che manchi meno di un giorno.
-   Li' lo stile inline NON si scrive, o vincerebbe sul rosso.
+   IL COLORE RACCONTA ANCHE LUI, e dal set 2026 sono TRE STATI NETTI
+   (ritocco di Andrea, che rovescia lo sbiadimento con color-mix del
+   giro prima): NEUTRO finche' c'e' tempo, ARANCIO negli ultimi tre
+   giorni, ROSSO che PULSA nell'ultimo — e l'arco continua a
+   consumarsi in tutt'e tre. Tre stati si riconoscono al volo; una
+   sfumatura continua si legge solo confrontando due card.
+   ⚠️ IL NEUTRO NON E' BIANCO, ed e' una correzione misurata: la card
+   e' bianca (`--card` di giorno), quindi un anello bianco li' non
+   esisterebbe proprio. `--ink-soft` fa quel che «bianco acceso»
+   voleva dire — deciso e non timido — ed E' chiaro di sera, dove la
+   carta e' bruna: il token gira col tema, il bianco no.
+   LE DUE SOGLIE STANNO QUI E NON NEL CSS — sono giudizi, non vestiti
+   — e sono TEMPO che resta, non frazioni: su un ordine di sette
+   giorni l'ultimo giorno e' il 14%, su uno di quindici il 7%, e a
+   contare e' che manchi meno di un giorno.
    Il raggio 9 su un viewBox da 24 da' una circonferenza di 56,55: il
    dasharray e' tutta la pista e il dashoffset la parte gia' consumata,
    che e' il modo di disegnare un arco senza matematica per ogni
@@ -33265,51 +33299,60 @@ function frazioneVitaP2P(o, adesso){
 const P2P_ANELLO_R = 9;
 const P2P_ANELLO_GIRO = 2 * Math.PI * P2P_ANELLO_R;
 const P2P_ULTIMO_GIORNO_S = 86400;
+const P2P_ANELLO_VICINA_S = 3 * 86400;
 function anelloScadenzaP2P(o, adesso){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
   const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
-  const ultimo = manca <= P2P_ULTIMO_GIORNO_S;
+  const stato = manca <= P2P_ULTIMO_GIORNO_S ? ' ultimo-giorno'
+              : manca <= P2P_ANELLO_VICINA_S ? ' vicina' : '';
   const consumato = (P2P_ANELLO_GIRO * (1 - resta)).toFixed(2);
   const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
-  const tinta = ultimo ? '' : ' style="stroke:color-mix(in srgb, var(--sats) '
-    + Math.round(resta * 100) + '%, var(--muted))"';
-  return '<span class="p2p-anello' + (ultimo ? ' ultimo-giorno' : '')
+  /* DENTRO L'ANELLO CI STA LA FACCIA (set 2026, i volti sul libro):
+     l'anello diventa la cornice del volto di chi ha pubblicato, e il
+     suo colore dice il tempo — un solo segno per due cose, nell'angolo
+     che gia' era suo. Senza volto (vetrina anonima, o un ordine di chi
+     Barattolo non ce l'ha) resta l'anello vuoto di ieri: il tempo si
+     legge lo stesso. */
+  const f = p2pFacce[o.id];
+  const dentro = !f ? ''
+    : '<span class="p2p-faccia">' + avatarImg(f.avatar)
+      + esc((f.nome || '?')[0]) + '</span>';
+  return '<span class="p2p-anello' + stato + (f ? ' con-faccia' : '')
     + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<circle class="pista" cx="12" cy="12" r="' + P2P_ANELLO_R + '"/>'
     + '<circle class="resta" cx="12" cy="12" r="' + P2P_ANELLO_R + '"'
-    + tinta
     + ' stroke-dasharray="' + P2P_ANELLO_GIRO.toFixed(2) + '"'
-    + ' stroke-dashoffset="' + consumato + '"/></svg></span>';
+    + ' stroke-dashoffset="' + consumato + '"/></svg>'
+    + dentro + '</span>';
 }
 
-/* La striscia di chi c'e' dall'altra parte. E' un giudizio PURO come la
-   scadenza: numeri in, stringa out. Le stelle compaiono col PRIMO voto
-   — la regola che il mercatino ha gia' per i venditori, «0 ★» a chi e'
-   appena arrivato fa solo danno — e chi non ne ha ancora si presenta
-   con l'unica cosa che sappiamo di lui: da quanto e' sul coordinator.
-   L'HTML che ne esce e' nostro: i tre numeri li ha gia' tosati
-   repDaTag, e `contaFeedback` si chiama con UN argomento solo perche'
-   il tag non porta le persone distinte — dire «7 da 7 persone» sarebbe
-   un'affermazione inventata. */
-function repTestoP2P(rep){
-  if (!rep) return '';
-  const eta = rep.giorni >= 1
-    ? 'da ' + rep.giorni + (rep.giorni === 1 ? ' giorno' : ' giorni')
-    : 'da oggi';
-  /* UNA RIGA UMANA (set 2026, il ridisegno delle card): «⭐ 4,8 · 7
-     scambi · da 23 giorni» — via la fila di stelle e i due pezzi ai
-     bordi, la frase si legge come si dice. «Scambi» e non «voti»:
-     su Mostro ogni voto e' uno scambio concluso, ed e' il fatto che
-     interessa a chi guarda. */
-  if (!(rep.voti > 0) || !(rep.media > 0))
-    return '🆕 Senza voti · ' + eta;
-  const media = rep.media.toLocaleString('it-IT',
-    {minimumFractionDigits: 1, maximumFractionDigits: 1});
-  return '⭐ ' + media + ' · ' + rep.voti
-    + (rep.voti === 1 ? ' scambio' : ' scambi') + ' · ' + eta;
+/* LE STELLINE DEL MERCATINO, in una riga sola (set 2026): «⭐ 4,8 ·
+   💬 12» — l'icona al posto della parola «recensioni», che in una card
+   larga 300px una parola lunga costa piu' di quel che dice.
+   ⚠️ SENZA VOTI LA RIGA NON C'E' PROPRIO: e' la regola di casa (le
+   stelle nascono col primo voto, «0 ★» a chi arriva adesso fa solo
+   danno) e la decisione di Andrea per questa card — niente «Senza
+   voti», che riempirebbe di rumore un libro di sconosciuti. */
+function stellineP2P(f){
+  if (!f || !(f.voti > 0) || !(f.media > 0)) return '';
+  return '⭐ ' + f.media.toLocaleString('it-IT',
+    {minimumFractionDigits: 1, maximumFractionDigits: 1})
+    + ' · 💬 ' + f.voti;
 }
+
+/* LA RIGA DELLA REPUTAZIONE DEL COORDINATORE E' MORTA (set 2026, coi
+   volti sul libro): la card mostra le stelline del MERCATINO, e due
+   reputazioni nello stesso posto — una nostra e una di un'altra
+   piazza, con la stessa faccia di stella — direbbero cose diverse
+   sembrando la stessa. `repTestoP2P` se n'e' andata invece di restare
+   senza chiamanti: niente codice morto, e il giorno che il dettaglio
+   dello scambio vorra' dire «su quel coordinatore ha 7 scambi» si
+   riscrive in tre righe. IL DATO RESTA LETTO — `repDaTag` tosa ancora
+   il tag `rating` del 38383 in `o.rep` — perche' e' un fatto del libro
+   e la sua prova lo sorveglia: a mancare e' solo il posto dove si
+   mostrava. */
 
 /* A prezzo di mercato (amt=0) i sats si STIMANO col cambio di casa e il
    premio dell'ordine: e' una stima e porta il ≈ — la cifra vera la
@@ -33360,8 +33403,17 @@ function rigaOrdineP2P(o){
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     + (o.euroMax ? ', scegli tu' : '');
-  const rigaEuro = (paghiEuro ? 'Paghi ' : 'Ricevi ') + eurTxt;
-  const rigaSats = (paghiEuro ? 'ricevi ' : 'invia ') + sats;
+  /* I VERBI SONO IMPERATIVI (set 2026, ritocco di Andrea): «Paga»,
+     non «Paghi» — la card chiede, non descrive.
+     E L'ORDINE DELLE RIGHE SEGUE IL GESTO: nel tab «Compra BTC» si
+     paga e poi si riceve, nel tab «Vendi BTC» si invia e poi si
+     riceve. Quindi a comprare la riga grande (l'euro) sta in cima, a
+     vendere ci arriva seconda: cambia l'ORDINE, mai la taglia — euro
+     grande e sats piccoli in tutt'e due i tab. */
+  const rigaEuro = '<span class="p2p-grande p2p-euro">'
+    + (paghiEuro ? 'Paga ' : 'Ricevi ') + eurTxt + '</span>';
+  const rigaSats = '<span class="p2p-piccola p2p-sats">'
+    + (paghiEuro ? 'ricevi ' : 'Invia ') + sats + '</span>';
   /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «prezzo di
      mercato» nudo a premio zero, «prezzo di mercato +4%» col premio —
      e in tinta ci va SOLO il segno con la percentuale, che le parole
@@ -33394,7 +33446,14 @@ function rigaOrdineP2P(o){
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
       + esc(o.metodi.join(', ')) + '</div>' : '';
-  const rep = repTestoP2P(o.rep);
+  /* LE STELLINE SONO QUELLE DEL MERCATINO (set 2026, decisione di
+     Andrea): sotto il metodo, la media che quella persona ha gia'
+     ricevuto QUI — e non piu' quella del coordinatore, che parlava di
+     un'altra piazza e di un altro conto. Senza voti (o senza volto)
+     la riga non c'e'. La reputazione del coordinatore resta letta dal
+     38383 e vive nel dettaglio dello scambio: repTestoP2P non e'
+     morta, ha cambiato casa. */
+  const rep = stellineP2P(p2pFacce[o.id]);
   /* ⚠️ IL PROPRIO ORDINE SI DICE, e fin qui non lo diceva nessuno: la
      card era identica a quelle degli altri, quindi il proprio ordine
      sembrava un'occasione da prendere. Toccarlo non lo prendeva —
@@ -33409,10 +33468,10 @@ function rigaOrdineP2P(o){
   const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${rigaEuro}</span>${anelloScadenzaP2P(o)}</div>
-    <span class="p2p-piccola p2p-sats">${rigaSats}</span>
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
+    ${paghiEuro ? rigaSats : rigaEuro}
     ${prezzo}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
@@ -33482,7 +33541,16 @@ function renderP2P(){
      sostituisce la vecchia, un giro caduto lascia quel che si sapeva. */
   if (mz && !p2pMieiChiesto && !p2pMieiGiro) {
     p2pMieiChiesto = true;
-    chiediMieiOrdiniP2P().then(() => renderP2P()).catch(() => {});
+    chiediMieiOrdiniP2P().then((miei) => {
+      /* ...E I MIEI ORDINI SI DICONO AL SERVER (set 2026, i volti sul
+         libro): la restore e' il posto giusto e non il momento della
+         pubblicazione — qui gli id sono quelli VERI del coordinatore,
+         arrivano tutti insieme e ci si passa una volta per sessione.
+         Chi pubblica adesso ha il suo giro al prossimo ingresso, che
+         per una faccia e' un'attesa che non fa male a nessuno. */
+      registraOrdiniP2P(Object.keys(miei || {})).catch(() => {});
+      renderP2P();
+    }).catch(() => {});
   }
   /* DUE CORPI, UN RENDERER (set 2026, la nav trasformata): il libro
      in #p2pCorpo e «I miei scambi» in #p2pMieiCorpo si dipingono
@@ -33528,6 +33596,12 @@ function renderP2P(){
   /* in cima quel che conviene a chi legge, non il piu' recente: il
      criterio e il suo perche' stanno in ordinaLibroP2P */
   const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k), p2pLato);
+  /* I VOLTI si chiedono per gli ordini che si stanno per disegnare, in
+     sottofondo: la card nasce senza faccia e se la mette quando la
+     risposta arriva. Mai bloccante — il patto del rientro istantaneo
+     della cassa — e mai due volte per lo stesso id. */
+  chiediFacceP2P(vivi.map(o => o.id)).then(n => { if (n) renderP2P(); })
+    .catch(() => {});
   /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
      prima non si sapeva — quante ce ne sono — e per giunta dice che il
      libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
@@ -36526,6 +36600,65 @@ function scambiP2P(){
     + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
 }
 /* ============ fine del motore dello scambio ============ */
+
+/* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
+   Le card mostrano chi ha pubblicato, con la faccia che quella persona
+   gia' mostra nel mercatino. Due mezze rotte: una scrive «questi
+   ordini sono miei», l'altra chiede «di chi sono questi ordini».
+   ⚠️ QUESTA E' UNA STRADA CHE ERA STATA SCARTATA, e il perche' del
+   rovesciamento sta in CANTIERI («I volti sul libro»): il server
+   IMPARA quali ordini del libro sono di chi. La decisione e' che il
+   P2P erediti la visibilita' del mercatino — dove chi vende ha un
+   volto — e che l'anonimato si ottenga come li', entrando da Nostr.
+   IL COLLEGAMENTO NON E' PUBBLICO: la lettura vuole la sessione, e la
+   vetrina anonima vede le card senza volto. Le card funzionano lo
+   stesso — l'anello resta, la riga delle stelline sparisce — perche'
+   il volto e' un di piu' e non un pezzo di struttura. */
+let p2pOrdiniRegistrati = new Set();   // gia' detti al server, in questa sessione
+let p2pFacce = {};                     // ordine -> {nome, avatar, media, voti}
+let p2pFacceChieste = new Set();       // gia' chiesti: mai due volte
+let p2pFacceGiro = null;               // la domanda in volo
+async function registraOrdiniP2P(ids){
+  if (DEMO || VETRINA || !myTgId) return false;
+  /* SOLO GLI ID VERI del coordinatore: i provvisori del client
+     cambiano nome quando lui risponde, e una riga col nome vecchio non
+     servirebbe a nessuno (e occuperebbe una PK per sempre). */
+  const lista = (ids || []).filter(id =>
+    id && !provvisorioP2P(id) && !p2pOrdiniRegistrati.has(id));
+  if (!lista.length) return false;
+  lista.forEach(id => p2pOrdiniRegistrati.add(id));
+  try {
+    const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordini: lista})});
+    return r.ok;
+  } catch(e){ return false; }
+}
+/* «Di chi sono questi ordini?» — una domanda sola per giro di libro, e
+   mai due volte per lo stesso id. Chi non risponde resta senza volto,
+   e la card non se ne accorge. */
+async function chiediFacceP2P(ids){
+  if (DEMO || VETRINA || !myTgId) return false;
+  const lista = (ids || []).filter(id => id && !p2pFacceChieste.has(id));
+  if (!lista.length || p2pFacceGiro) return false;
+  lista.forEach(id => p2pFacceChieste.add(id));
+  p2pFacceGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/facce`, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({ordini: lista})});
+      if (!r.ok) return false;
+      const d = await r.json();
+      const facce = (d && d.facce) || {};
+      let nuove = 0;
+      for (const id in facce) { p2pFacce[id] = facce[id]; nuove++; }
+      return nuove > 0;
+    } catch(e){ return false; }
+    finally { p2pFacceGiro = null; }
+  })();
+  return p2pFacceGiro;
+}
+/* ============ fine dei volti sul libro ============ */
 
 /* ---- import in blocco da CSV: per i cataloghi grandi. Due fasi
    come sul server: prepara (anteprima onesta) e avvia (job in

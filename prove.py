@@ -35368,13 +35368,21 @@ def prove_p2p_libro():
     # l'euro sempre grande in cima, i sats sempre sotto — e nei due
     # tab cambiano i VERBI, non le taglie: i due tab si leggono collo
     # stesso movimento dell'occhio.
-    prova("la card parla in seconda persona, coi posti fissi",
+    # EMENDATA (set 2026): i verbi sono IMPERATIVI («Paga», non
+    # «Paghi») e le due righe si scambiano l'ORDINE col lato — a
+    # comprare si paga e poi si riceve, a vendere si invia e poi si
+    # riceve — ma non la TAGLIA: l'euro e' grande in tutt'e due.
+    prova("la card parla in seconda persona, all'imperativo",
           True, "const paghiEuro = o.lato === 'sell';" in mini
-          and "(paghiEuro ? 'Paghi ' : 'Ricevi ')" in mini
-          and "(paghiEuro ? 'ricevi ' : 'invia ')" in mini)
-    prova("...e le taglie non si scambiano piu' col lato", True,
-          '<span class="p2p-grande p2p-euro">${rigaEuro}</span>' in mini
-          and '<span class="p2p-piccola p2p-sats">${rigaSats}</span>' in mini)
+          and "(paghiEuro ? 'Paga ' : 'Ricevi ')" in mini
+          and "(paghiEuro ? 'ricevi ' : 'Invia ')" in mini)
+    prova("...e le taglie restano fisse: euro grande, sats piccoli",
+          True, '<span class="p2p-grande p2p-euro">' in mini
+          and '<span class="p2p-piccola p2p-sats">' in mini)
+    prova("...mentre l'ORDINE delle righe segue il gesto", True,
+          "${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}"
+          in mini
+          and "${paghiEuro ? rigaSats : rigaEuro}" in mini)
     prova("il verbo della controparte non c'e' piu'", True,
           "'Vende' : 'Compra'" not in mini)
     prova("le due righe hanno una taglia e possono andare a capo", True,
@@ -35508,7 +35516,7 @@ def prove_p2p_libro():
         "function tagValore(ev, nome){",
         "function repDaTag(s){",
         "function ordineDaEvento(ev, adesso){",
-        "function repTestoP2P(rep){",
+        "function stellineP2P(f){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
         # l'anello della scadenza (set 2026) e il suo giudice puro
@@ -35535,7 +35543,8 @@ def prove_p2p_libro():
     # le due costanti dell'anello: il raggio e il giro, che
     # anelloScadenzaP2P usa per il dasharray
     for riga in ("const P2P_ANELLO_R = ", "const P2P_ANELLO_GIRO = ",
-                 "const P2P_ULTIMO_GIORNO_S = "):
+                 "const P2P_ULTIMO_GIORNO_S = ",
+                 "const P2P_ANELLO_VICINA_S = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
     banco = "\n".join(pezzi) + r"""
@@ -35554,6 +35563,15 @@ let ordiniFinti = {};
 function ordiniP2P(){ return ordiniFinti; }
 // e la lista che arriva dal coordinatore, che il giudice consulta
 let p2pMieiOrdini = null;
+// I VOLTI (set 2026): la mappa che il server riempie, e il pezzetto di
+// markup dell'avatar — quello VERO vive nel blocco della vetrina, qui
+// e' uno stub dichiarato che ne ricalca la forma (l'onerror compreso,
+// che e' la rete dell'iniziale)
+let p2pFacce = {};
+function avatarImg(nome){
+  const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
+  return n ? '<img class="av-foto" src="/foto/' + n + '" alt="" onerror="this.remove()">' : '';
+}
 let cambioVivo = true, eurPerSat = 0.0005, p2pInfo = null;
 const ora = 2000000000;
 const ev = (kind, tags, created) => ({kind, tags, created_at: created || 1});
@@ -35598,14 +35616,24 @@ out.repZero   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 1}');
 out.repOggi   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 0.4}');
 out.repFuori  = conRep('{"total_reviews": 3, "total_rating": 999, "days": -5}');
 out.repStorta = conRep('{non sono json');
-out.testoPieno  = repTestoP2P(out.repPiena.rep);
-out.testoUno    = repTestoP2P(out.repUno.rep);
-out.testoZero   = repTestoP2P(out.repZero.rep);
-out.testoOggi   = repTestoP2P(out.repOggi.rep);
-out.testoFuori  = repTestoP2P(out.repFuori.rep);
-out.testoNiente = repTestoP2P(null);
-out.rigaRep      = rigaOrdineP2P(out.repPiena);
+/* LE STELLINE ORA SONO QUELLE DEL MERCATINO (set 2026, i volti sul
+   libro): la reputazione del coordinatore non si mostra piu' — resta
+   LETTA (il tag `rating` qui sopra) e basta. Il giudice nuovo lavora
+   sul volto che arriva dal server. */
+out.stelPiene = stellineP2P({nome: 'Ada', avatar: '', media: 4.8, voti: 12});
+out.stelUno   = stellineP2P({nome: 'Ada', avatar: '', media: 5, voti: 1});
+out.stelZero  = stellineP2P({nome: 'Ada', avatar: '', media: 0, voti: 0});
+out.stelNiente = stellineP2P(null);
+/* la card col volto e senza: la faccia entra nell'anello, e le
+   stelline compaiono solo se quel volto ha voti */
+p2pFacce = {};
 out.rigaSenzaRep = rigaOrdineP2P(out.fisso);
+p2pFacce = {[out.fisso.id]: {nome: 'Ada', avatar: 'av_x.jpg',
+                             media: 4.8, voti: 12}};
+out.rigaConFaccia = rigaOrdineP2P(out.fisso);
+p2pFacce = {[out.fisso.id]: {nome: 'Bruno', avatar: '', media: 0, voti: 0}};
+out.rigaFacciaSenzaVoti = rigaOrdineP2P(out.fisso);
+p2pFacce = {};
 /* IL RANGE (set 2026, il ridisegno): due importi crescenti sono un
    ordine come gli altri — la card lo dice — e i rotti restano rotti. */
 out.rangeInvertito = ordineDaEvento(ev(38383, [['d','ri'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','100','50'],['pm','x']]), ora);
@@ -35653,6 +35681,9 @@ out.svgMezzo = anelloScadenzaP2P({creato: 0, scade: meseS}, meseS / 2);
 out.svgUltimo = anelloScadenzaP2P({creato: 0, scade: meseS}, meseS - 3600);
 out.svgNiente = anelloScadenzaP2P({creato: 1000, scade: 0}, 1500);
 out.svgQuasiPieno = anelloScadenzaP2P({creato: 0, scade: meseS}, 60);
+/* ...e due giorni prima della fine: arancio, non ancora rosso */
+out.svgVicina = anelloScadenzaP2P({creato: 0, scade: meseS},
+                                  meseS - 2 * 86400);
 out.rigaAvviso = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ra'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','3'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 /* ...e fra due copie dello stesso range vince la piu' recente: la
    dedup e' quella di TUTTI gli ordini, non un binario a parte */
@@ -35706,6 +35737,8 @@ console.log(JSON.stringify(out));
     try:
         p = _os.path.join(d, "banco.js")
         open(p, "w", encoding="utf-8").write(banco)
+        if os.environ.get("BANCO_DUMP"):
+            open("banco_dump.js", "w", encoding="utf-8").write(banco)
         r = _sp.run([node, p], capture_output=True, encoding="utf-8",
                     timeout=60)
         if r.returncode != 0:
@@ -35800,18 +35833,21 @@ console.log(JSON.stringify(out));
     # tab «Vendi BTC» (k=buy) invia sats e riceve euro. La cifra in
     # SATS porta il colore del lato in tutt'e due i casi, qualunque
     # riga occupi — e' la cifra che cambia col tab.
-    prova("nel tab Compra: paghi euro grande, ricevi sats sotto", True,
-          '<span class="p2p-grande p2p-euro">Paghi 8,00 €</span>'
+    # EMENDATA (set 2026): verbi all'IMPERATIVO, e l'ordine delle righe
+    # segue il gesto — a comprare si paga e poi si riceve, a vendere si
+    # invia e poi si riceve. Le taglie non si muovono: euro grande.
+    prova("nel tab Compra: paga euro grande, ricevi sats sotto", True,
+          '<span class="p2p-grande p2p-euro">Paga 8,00 €</span>'
           in out["rigaCompra"]
           and '<span class="p2p-piccola p2p-sats">ricevi ≈'
           in out["rigaCompra"])
-    # EMENDATA (set 2026, ritocco di Andrea): anche nel tab Vendi
-    # l'euro e' la riga GRANDE — cambiano i verbi, non le taglie.
-    prova("nel tab Vendi: ricevi euro grande, invii sats sotto", True,
-          '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
+    prova("nel tab Vendi: invia sats prima, ricevi euro grande dopo",
+          True, '<span class="p2p-piccola p2p-sats">Invia ≈'
           in out["rigaVendi"]
-          and '<span class="p2p-piccola p2p-sats">invia ≈'
-          in out["rigaVendi"])
+          and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
+          in out["rigaVendi"]
+          and out["rigaVendi"].index("Invia")
+              < out["rigaVendi"].index("Ricevi"))
     prova("...e del verbo della controparte non resta niente", True,
           "Vende" not in out["rigaCompra"]
           and "Compra" not in out["rigaVendi"])
@@ -35874,16 +35910,25 @@ console.log(JSON.stringify(out));
           'role="img"' in out["svgMezzo"]
           and 'aria-label="' in out["svgMezzo"]
           and 'title="' in out["svgMezzo"])
-    # IL COLORE SBIADISCE (set 2026): pieno e' l'arancio di casa, e
-    # scendendo scivola verso il grigio. La mescola sta nello stile
-    # inline perche' la percentuale cambia a ogni card; dove color-mix
-    # non c'e' cade lo stile e resta la regola CSS, cioe' il grigio.
-    prova("l'anello parte arancio e sbiadisce col tempo", True,
-          "color-mix(in srgb, var(--sats) 50%, var(--muted))"
-          in out["svgMezzo"]
-          and "var(--sats) 100%" in out["svgQuasiPieno"])
-    prova("...e il ripiego dei browser senza color-mix e' il grigio",
-          True, ".p2p-anello .resta{stroke:var(--muted)}" in mini)
+    # TRE STATI NETTI (set 2026, ritocco di Andrea che rovescia lo
+    # sbiadimento con color-mix): neutro finche' c'e' tempo, arancio
+    # negli ultimi tre giorni, rosso che pulsa nell'ultimo. Tre stati
+    # si riconoscono al volo, una sfumatura continua solo confrontando
+    # due card. E il neutro NON e' bianco: sulla card bianca non
+    # esisterebbe — `--ink-soft` e' chiaro di sera e scuro di giorno.
+    prova("il neutro e' un token che gira col tema, mai il bianco",
+          True, ".p2p-anello .resta{stroke:var(--ink-soft)}" in mini
+          and "stroke:#fff" not in mini.lower())
+    prova("...e a tre giorni l'anello passa all'arancio di casa", True,
+          ".p2p-anello.vicina .resta{stroke:var(--sats)}" in mini
+          and "vicina" in out["svgVicina"]
+          and "vicina" not in out["svgMezzo"])
+    # `color-mix` vive anche altrove (la barra degli XP), quindi la
+    # domanda si fa DOVE conta: nel disegno dell'anello
+    prova("...e dello sbiadimento inline non resta niente", True,
+          "color-mix" not in pezzo_js(
+              mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n")
+          and "style=" not in out["svgMezzo"])
     # L'ULTIMO GIORNO E' UN AVVISO: rosso che pulsa, e la soglia sta
     # nel JS — e' un giudizio, non un vestito. Li' lo stile inline non
     # si scrive, o vincerebbe sul rosso.
@@ -35935,32 +35980,47 @@ console.log(JSON.stringify(out));
           out["repStorta"] is not None and out["repStorta"]["rep"] is None)
     prova("...e senza il tag la reputazione e' semplicemente assente",
           None, out["fisso"]["rep"])
-    # HA CAMBIATO PELLE (set 2026, il ridisegno): UNA RIGA UMANA —
-    # «⭐ 4,6 · 7 scambi · da 23 giorni» — via la fila di stelle e i
-    # due pezzi ai bordi. «Scambi» e non «voti»: su Mostro ogni voto
-    # e' uno scambio concluso. La stella emoji compare col primo voto,
-    # come prima; a zero voti si dice l'unica cosa che sappiamo.
-    prova("con voti la striscia e' la frase umana",
-          "⭐ 4,6 · 7 scambi · da 23 giorni", out["testoPieno"])
-    prova("...e a UN voto il singolare regge",
-          "⭐ 5,0 · 1 scambio · da 2 giorni", out["testoUno"])
-    prova("a zero voti niente stella: si dice da quanto e' li'",
-          "🆕 Senza voti · da 1 giorno", out["testoZero"])
-    prova("...e sotto il giorno si dice «da oggi»",
-          "🆕 Senza voti · da oggi", out["testoOggi"])
-    prova("...e in nessuno dei due casi compare una stella", 0,
-          out["testoZero"].count("⭐") + out["testoOggi"].count("⭐"))
-    prova("...e la media fuori scala si CLAMPA nella frase",
-          "⭐ 5,0 · 3 scambi · da oggi", out["testoFuori"])
-    prova("...e della fila di stelle non resta niente", 0,
-          out["testoPieno"].count("★") + out["testoFuori"].count("★"))
-    prova("senza il tag la striscia non si scrive proprio",
-          "", out["testoNiente"])
-    prova("...e la card infatti non la porta", False,
-          "p2p-rep" in out["rigaSenzaRep"])
-    prova("...mentre con la reputazione la card la porta IN CODA", True,
-          "p2p-rep" in out["rigaRep"]
-          and out["rigaRep"].index("p2p-euro") < out["rigaRep"].index("p2p-rep"))
+    # ROVESCIATA (set 2026, i volti sul libro): la card non mostra piu'
+    # la reputazione del COORDINATORE ma le stelline del MERCATINO —
+    # due reputazioni nello stesso posto, con la stessa faccia di
+    # stella, direbbero cose diverse sembrando la stessa. Il dato del
+    # coordinatore resta LETTO (le prove qui sopra), e repTestoP2P se
+    # n'e' andata invece di restare senza chiamanti.
+    # ⚠️ SI GUARDA LA DEFINIZIONE e non il nome: il commento che
+    # racconta il cambio la NOMINA, ed e' giusto che lo faccia — una
+    # sentinella sul nome nudo sarebbe rossa per colpa di una
+    # spiegazione (la stessa trappola del «nostr» nei commenti).
+    prova("la riga della reputazione del coordinatore e' morta", True,
+          "function repTestoP2P(" not in mini)
+    prova("...ma il tag `rating` si legge ancora, che e' un fatto",
+          True, "repDaTag" in mini)
+    # LE STELLINE DEL MERCATINO: «⭐ 4,8 · 💬 12», l'icona al posto
+    # della parola. Senza voti la riga non c'e' PROPRIO — la regola di
+    # casa (le stelle nascono col primo voto) e la decisione di Andrea
+    # per questa card: niente «Senza voti» in un libro di sconosciuti.
+    prova("le stelline sono la media e il conto, con l'icona",
+          "⭐ 4,8 · 💬 12", out["stelPiene"])
+    prova("...e a un voto solo la forma non cambia",
+          "⭐ 5,0 · 💬 1", out["stelUno"])
+    prova("senza voti la riga non si scrive proprio", ["", ""],
+          [out["stelZero"], out["stelNiente"]])
+    # IL VOLTO ENTRA NELL'ANELLO, e senza volto la card resta quella
+    # di ieri: l'anello c'e' lo stesso e le stelline no.
+    prova("col volto la faccia sta dentro l'anello", True,
+          "p2p-faccia" in out["rigaConFaccia"]
+          and "con-faccia" in out["rigaConFaccia"]
+          and "av_x.jpg" in out["rigaConFaccia"])
+    prova("...e la card porta le stelline IN CODA", True,
+          "p2p-rep" in out["rigaConFaccia"]
+          and out["rigaConFaccia"].index("p2p-euro")
+              < out["rigaConFaccia"].index("p2p-rep"))
+    prova("senza volto niente faccia e niente stelline", True,
+          "p2p-faccia" not in out["rigaSenzaRep"]
+          and "p2p-rep" not in out["rigaSenzaRep"]
+          and "p2p-anello" in out["rigaSenzaRep"])
+    prova("...e un volto senza voti porta la faccia, non la riga", True,
+          "p2p-faccia" in out["rigaFacciaSenzaVoti"]
+          and "p2p-rep" not in out["rigaFacciaSenzaVoti"])
 
     # --- 9) GLI ESCLUSI NON ESISTONO PIU' (set 2026, il ridisegno):
     # i range sono ordini come gli altri — i loro casi girano nel
@@ -36331,6 +36391,133 @@ console.log(JSON.stringify(out));
     prova("fuori dal P2P il + apre Vendi", True, out["fuoriApreVendi"])
     prova("...e dentro pubblica un ordine, senza navigare", True,
           out["dentroPubblica"])
+
+
+def prove_volti_libro():
+    """I VOLTI SUL LIBRO (set 2026, decisione di Andrea che ROVESCIA una
+    strada scartata). Le card mostrano chi ha pubblicato, con la faccia
+    che quella persona gia' mostra nel mercatino: serve che il server
+    sappia quale ordine e' di chi, cioe' esattamente la «lista sul
+    server» che il cantiere della scopa lampo aveva scartato («gli
+    insegnerebbe QUALI ordini del libro sono di chi»).
+
+    Quel che le prove difendono e' il CONFINE della decisione nuova:
+    che il collegamento non sia pubblico (la lettura vuole la
+    sessione), che non esca niente piu' di quel che il mercatino gia'
+    mostra, che «dimentica il profilo» se lo porti via, e che il
+    blocco che parla col server stia FUORI dai tre blocchi del P2P —
+    dove le sentinelle «zero fetch» dicono ancora la verita'."""
+    print("\n[i volti sul libro]")
+    import sqlite3
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL BLOCCO STA FUORI DAI TRE, o le loro sentinelle
+    # direbbero una cosa diversa da quella che sorvegliano
+    i_volti = mini.index("/* ============ I VOLTI SUL LIBRO")
+    prova("il blocco dei volti sta fuori da quello del libro", True,
+          i_volti > mini.index("IL MAZZO DEL PROFILO DI SCAMBIO"))
+    prova("...e fuori da quello del mazzo", True,
+          i_volti > mini.index("/* ---- export CSV degli affari conclusi"))
+    prova("...e fuori dal motore, che ha il suo marcatore", True,
+          i_volti > mini.index("/* ============ fine del motore dello scambio"))
+    prova("...e ha il suo di chiusura", True,
+          mini.index("/* ============ fine dei volti sul libro") > i_volti)
+
+    # --- 2) COSA ESCE DA QUI: gli id degli ordini e nient'altro -----
+    blocco = mini[i_volti:mini.index("/* ============ fine dei volti sul libro")]
+    cod = re.sub(r"/\*[\s\S]*?\*/", "", blocco)
+    prova("le fetch del blocco sono DUE: scrive e legge", 2,
+          cod.count("fetch("))
+    corpi = set(re.findall(r"JSON\.stringify\(\{(\w+):", cod))
+    prova("...e nei corpi va SOLO la lista degli ordini", {"ordini"},
+          corpi)
+    # NIENTE ID NELL'URL: una GET li metterebbe nei log del web server,
+    # e un log e' un posto dove le cose restano
+    prova("gli id viaggiano in POST, mai nell'indirizzo", 2,
+          cod.count("method: 'POST'"))
+    # I PROVVISORI NON SI REGISTRANO: cambiano nome quando il
+    # coordinatore risponde, e occuperebbero una PK per sempre
+    prova("i provvisori del client non si registrano", True,
+          "!provvisorioP2P(id)" in cod)
+    # la vetrina anonima non chiede niente: le card restano senza volto
+    prova("la vetrina anonima non chiede volti", 2,
+          cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
+
+    # --- 3) IL SERVER: le due rotte, e cosa NON esce ----------------
+    prova("la rotta che registra c'e', col gate per persona", True,
+          '@app.post("/api/p2p/ordini")' in _SORGENTE
+          and '_p2p_per(user["id"])["attivo"]' in pezzo(
+              "registra_ordini_p2p"))
+    facce = pezzo("facce_ordini_p2p")
+    prova("...e quella che legge CHIEDE LA SESSIONE", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in facce)
+    prova("...ed e' una POST, che una GET metterebbe gli id nei log",
+          True, '@app.post("/api/p2p/facce")' in _SORGENTE)
+    giudice = pezzo("_facce_ordini_p2p")
+    prova("dal giudice esce solo roba gia' pubblica nel mercatino",
+          True, "u.nome" in giudice and "u.avatar" in giudice
+          and "u.rating" in giudice and "u.n_feedback" in giudice)
+    # ⚠️ SI GUARDA IL CORPO, NON LA DOCSTRING: quella dice cosa NON
+    # esce, quindi NOMINA la npub — e `codice()` toglie i commenti ma
+    # non le stringhe. Il tg_id la query lo nomina per forza (e' la
+    # JOIN): la domanda vera e' che non sia una CHIAVE della risposta.
+    corpo_g = giudice[giudice.index('"""', giudice.index('"""') + 3):]
+    prova("...e mai il tg_id, la npub o l'indirizzo", True,
+          '"tg_id"' not in corpo_g
+          and not any(s in corpo_g for s in ("npub", "email")))
+    # LA MEDIA SOLO SE QUALCUNO HA VOTATO: zero voti non e' «zero
+    # stelle», e' «non si sa» — la card fa sparire la riga
+    prova("la media esce solo con almeno un voto", True,
+          "if voti else 0" in giudice)
+
+    # --- 4) «DIMENTICA IL PROFILO» PORTA VIA ANCHE I VOLTI ----------
+    # o resterebbe in piedi proprio il collegamento che quel gesto
+    # esiste per rompere
+    prova("dimenticare il profilo cancella anche gli ordini", True,
+          "DELETE FROM p2p_ordini WHERE tg_id=?" in pezzo(
+              "dimentica_chiavi_p2p"))
+
+    # --- 5) IL BANCO: i due giudici sul database vero ---------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER,"
+        " creato INTEGER);"
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
+        " avatar TEXT, rating REAL, n_feedback INTEGER);"
+        "INSERT INTO utenti VALUES(111,'Ada','av_a.jpg',4.8,12);"
+        "INSERT INTO utenti VALUES(222,'Bruno','',0,0);")
+    amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+           "MAX_ORDINI_P2P": 200}
+    for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p",
+              "_facce_ordini_p2p"):
+        exec(pezzo(f), amb)
+    reg, facce_di = amb["_registra_ordini_p2p"], amb["_facce_ordini_p2p"]
+    prova("una forma storta non entra in tabella", True,
+          bool(_alza(lambda: reg(con, 111, ["corto"], 1))))
+    prova("...e nemmeno una lista vuota", True,
+          bool(_alza(lambda: reg(con, 111, [], 1))))
+    prova("...ne' un carico oltre il tetto", True,
+          bool(_alza(lambda: reg(con, 111, ["ordine-%03d" % n
+                                            for n in range(201)], 1))))
+    prova("gli ordini si registrano, e i doppioni cadono",
+          {"registrati": 2},
+          reg(con, 111, ["ordine-aaa", "ordine-bbb", "ordine-aaa"], 1))
+    # UN ORDINE GIA' DI UN ALTRO NON SI RUBA: l'id si legge dal libro
+    # PUBBLICO, quindi chiunque potrebbe provare a metterci la faccia
+    prova("...e un ordine di un altro non si ruba", {"registrati": 0},
+          reg(con, 222, ["ordine-aaa"], 2))
+    reg(con, 222, ["ordine-ccc"], 2)
+    f = facce_di(con, ["ordine-aaa", "ordine-ccc", "ordine-mai-visto"])
+    prova("il volto esce con nome, faccia e stelline",
+          {"nome": "Ada", "avatar": "av_a.jpg", "media": 4.8, "voti": 12},
+          f.get("ordine-aaa"))
+    prova("...e chi non ha voti non porta una media inventata",
+          {"nome": "Bruno", "avatar": "", "media": 0, "voti": 0},
+          f.get("ordine-ccc"))
+    prova("...e un ordine che non conosciamo non c'e' proprio", False,
+          "ordine-mai-visto" in f)
+    con.close()
 
 
 def prove_timbro_asset():
@@ -40585,8 +40772,16 @@ def prove_p2p_server():
     # vecchio `=== null`, e cercarlo nella prosa lo ritroverebbe li'.
     prova("...e la risposta di ieri non chiude la porta di oggi", False,
           "p2pMieiOrdini === null" in solo_codice(rp))
+    # EMENDATA (set 2026, i volti sul libro): nel `.then` e' entrata
+    # anche la registrazione degli ordini al server — la restore e' il
+    # posto dove gli id sono quelli VERI e arrivano tutti insieme. Il
+    # patto che questa riga difende non cambia: il libro non aspetta
+    # nessuno, si ridisegna quando la risposta arriva.
     prova("...e senza far aspettare il libro", True,
-          "chiediMieiOrdiniP2P().then(() => renderP2P())" in rp)
+          "chiediMieiOrdiniP2P().then((miei) => {" in rp
+          and "renderP2P();" in rp)
+    prova("...e i propri ordini si dicono al server da li'", True,
+          "registraOrdiniP2P(Object.keys(miei || {}))" in rp)
 
     # --- 16) LE DUE CURE DEL 9 SET 2026 (il loop e la lista vuota) ---
     # ⚠️ IL LOOP: la chiave si derivava PRIMA che il bundle fosse
@@ -48487,6 +48682,7 @@ def main():
         prove_p2p_libro,
     prove_nav_p2p,
     prove_timbro_asset,
+    prove_volti_libro,
     prove_p2p_chiavi,
     prove_p2p_campanello,
     prove_p2p_motore,
