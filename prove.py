@@ -47278,11 +47278,12 @@ def prove_scambi_p2p_vecchi():
     _fin = re.search(r"const P2P_FINALI = \[[^\]]*\];", mini)
     _oriz = re.search(r"const P2P_ORIZZONTE_S = [^;]+;", mini)
     _scopa = re.search(r"const P2P_SCOPA_GIORNI = \d+;", mini)
+    _lampo = re.search(r"const P2P_SCOPA_LAMPO_S = [^;]+;", mini)
     _chiave = re.search(r"const MOSTRO_ORDINI_CHIAVE = '[^']+';", mini)
-    prova("le quattro costanti degli scambi P2P vivono nel client",
-          [True] * 4,
-          [bool(x) for x in (_fin, _oriz, _scopa, _chiave)])
-    if not all((_fin, _oriz, _scopa, _chiave)):
+    prova("le cinque costanti degli scambi P2P vivono nel client",
+          [True] * 5,
+          [bool(x) for x in (_fin, _oriz, _scopa, _lampo, _chiave)])
+    if not all((_fin, _oriz, _scopa, _lampo, _chiave)):
         return
 
     # L'ORIZZONTE E' QUELLO DEL COORDINATORE, `expiration_hours`: se
@@ -47333,6 +47334,7 @@ def prove_scambi_p2p_vecchi():
     _banco = (
         _chiave.group(0) + "\n" + _fin.group(0) + "\n"
         + _oriz.group(0) + "\n" + _scopa.group(0) + "\n"
+        + _lampo.group(0) + "\n"
         # un localStorage di cartone: la scopa SCRIVE, e quel che
         # scrive e' meta' di quel che si vuole guardare
         + "const _box = {};\n"
@@ -47417,8 +47419,15 @@ def prove_scambi_p2p_vecchi():
         "   creato: fa(24*10), aggiornato: fa(24*10)},"
         " sr_vecchio: {id:'g', stato:'senza_risposta', creato: fa(24*40),"
         "   aggiornato: fa(24*40)},"
-        " chiuso_ieri_dal_coordinatore: {id:'h', stato:'annullato',"
-        "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(24)}"
+        " chiuso_stamattina_dal_coordinatore: {id:'h', stato:'annullato',"
+        "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
+        " notizia_vecchia: {id:'i', stato:'annullato',"
+        "   creato: fa(24*3), aggiornato: fa(24*3), quando: fa(25)},"
+        " ricevuta_annullata: {id:'l', stato:'annullato',"
+        "   creato: fa(24*3), aggiornato: fa(25), quando: fa(25),"
+        "   hold: {bolt11:'lnbc1'}},"
+        " rifiuto_vecchio: {id:'m', stato:'rifiutato',"
+        "   creato: fa(25), aggiornato: fa(25)}"
         "}")
     _prog2 = _banco + (
         "localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify("
@@ -47444,22 +47453,36 @@ def prove_scambi_p2p_vecchi():
     # tutt'e due le cose. Restano anche chi non e' togliibile
     # (l'aperto, per vecchio che sia) e il voto in sospeso, che e'
     # finale per i sats e non per la reputazione.
-    prova("la scopa toglie i tre vecchi e togliibili, e nient'altro",
-          {"tolti": 3,
-           "resta": ["aperto_vecchio", "chiuso_ieri_dal_coordinatore",
-                     "fresco_finito", "sr_scaduto_ma_recente",
-                     "voto_in_sospeso"]},
+    # E LA SCOPA LAMPO (set 2026): un annullato o rifiutato che non ha
+    # mai tenuto sats e' una NOTIZIA — a 25 ore se ne va da solo, su
+    # ogni dispositivo, che lo stato e' gia' sincronizzato dal
+    # coordinatore. La RICEVUTA no: un annullato con la hold in mano
+    # tiene i 30 giorni, come il concluso — che porta il voto e finisce
+    # nell'export degli affari.
+    prova("la scopa toglie i vecchi, i rifiuti e le notizie fredde",
+          {"tolti": 5,
+           "resta": ["aperto_vecchio", "chiuso_stamattina_dal_coordinatore",
+                     "fresco_finito", "ricevuta_annullata",
+                     "sr_scaduto_ma_recente", "voto_in_sospeso"]},
           _o2)
+    prova("la notizia fredda (annullato senza sats, 25 ore) se ne va",
+          False, "notizia_vecchia" in (_o2.get("resta") or []))
+    prova("...e la RICEVUTA no: la hold la promuove ai 30 giorni",
+          True, "ricevuta_annullata" in (_o2.get("resta") or []))
 
     # LA PROVA REGINA DELLA CATENA (set 2026): «quando» lo scrive il
     # solo ramo del COORDINATORE, ed e' l'ultimo movimento vero di una
     # riga che ha chiuso lui — mentre li' «aggiornato» e' rimasto al
     # giorno della nascita. Togliendolo dalla catena la scopa
-    # leggerebbe il timbro piu' VECCHIO e spazzerebbe una riga chiusa
-    # ieri: chi «pulisce» quel ripiego fa rossa questa riga.
-    prova("...e uno chiuso IERI dal coordinatore resta, anche se nato "
-          "due mesi fa",
-          True, "chiuso_ieri_dal_coordinatore" in (_o2.get("resta") or []))
+    # leggerebbe il timbro piu' VECCHIO e — col lampo — spazzerebbe
+    # una riga chiusa STAMATTINA: chi «pulisce» quel ripiego fa rossa
+    # questa riga. (Era «chiuso ieri» quando la soglia era un mese: la
+    # scopa lampo ha spostato il caso a 12 ore, il mestiere e' lo
+    # stesso.)
+    prova("...e uno chiuso STAMATTINA dal coordinatore resta, anche se "
+          "nato due mesi fa",
+          True, "chiuso_stamattina_dal_coordinatore"
+          in (_o2.get("resta") or []))
 
 def main():
     print("=" * 58)

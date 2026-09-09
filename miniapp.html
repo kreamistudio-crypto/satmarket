@@ -34018,8 +34018,23 @@ function p2pTogliibile(o, adesso){
    cui conterebbe — il voto — lo copre la riga qui sotto.
    IL «concluso» COL VOTO IN SOSPESO NON SI TOCCA: e' finale per i
    sats, non per la reputazione — e sul coordinatore la reputazione e'
-   l'unica cosa che chi scambia si porta dietro. */
+   l'unica cosa che chi scambia si porta dietro.
+   E LA SCOPA LAMPO (set 2026, dal campo: la ✕ premuta su un
+   dispositivo non toglieva niente sugli altri): un annullato o un
+   rifiutato che non ha MAI tenuto sats e' una notizia, non una
+   ricevuta — detta una volta, la card non ha piu' niente da dire. Lo
+   stato e' gia' sincronizzato dal coordinatore, quindi la sparizione
+   derivata da lui arriva OVUNQUE da sola, senza nessun canale nuovo:
+   il cloud di Telegram non c'e' fuori da Telegram, una lista sul
+   server gli insegnerebbe quali ordini del libro sono tuoi, e il
+   quaderno cifrato sui relay e' un pilastro della ripresa piena, non
+   una coda di questo giro (le tre strade, coi perche', stanno nella
+   voce di CANTIERI). Un annullato che i sats li ha TENUTI (hold, o
+   satsNetti gia' detti) e' una ricevuta e tiene i 30 giorni, come il
+   concluso — che porta il voto e finisce nell'export degli affari.
+   La ✕ resta per il subito. */
 const P2P_SCOPA_GIORNI = 30;
+const P2P_SCOPA_LAMPO_S = 24 * 3600;
 function pulisciScambiP2P(){
   const tutti = ordiniP2P();
   const adesso = Math.floor(Date.now() / 1000);
@@ -34029,7 +34044,10 @@ function pulisciScambiP2P(){
     if (!o || !p2pTogliibile(o, adesso).si) continue;
     if (o.stato === 'concluso' && o.votabile && !o.votato) continue;
     const mosso = o.quando || o.aggiornato || o.creato || 0;
-    if (!mosso || adesso - mosso < P2P_SCOPA_GIORNI * 86400) continue;
+    const lampo = (o.stato === 'annullato' || o.stato === 'rifiutato')
+      && !o.hold && !(o.satsNetti > 0);
+    const soglia = lampo ? P2P_SCOPA_LAMPO_S : P2P_SCOPA_GIORNI * 86400;
+    if (!mosso || adesso - mosso < soglia) continue;
     delete tutti[k];
     tolti++;
   }
