@@ -6444,3 +6444,55 @@ giorni, il concluso com'era. La prova regina della catena dei timbri
 cambia portatore un'altra volta (dal «chiuso stamattina» al «rifiuto
 di stamattina») senza cambiare mestiere. Torturato: rimotore senza
 pulizia delle cache, rosse sentinella e banco del motore.
+
+
+FASE 6 DEL CLIENT P2P, PRIMA TAPPA: le parole e il libro che si
+aggiorna da solo (9 set 2026). La decisione di prodotto, di Andrea,
+a verbale: IL P2P E' BARATTOLO, PUNTO — l'identita' e' l'account con
+cui si e' entrati, e la UI non nomina nessun terzo. Questa tappa fa
+la meta' delle parole; il profilo invisibile e i campi cifrati al
+posto della chat sono le tappe dopo.
+DUE EMENDAMENTI A PRINCIPI GIA' A VERBALE, coi perche' — e si
+scrivono come emendamenti proprio perche' rovesciano una riga che
+qualcuno un giorno vorrebbe «correggere» all'indietro:
+1) LA RIGA CHIUSA NON NOMINA PIU' IL CUSTODE. Il principio di ago
+2026 («nascondere chi tiene i sats e' la cosa che questo progetto
+non fa») resta vero nella sua meta' che conta: il FATTO non si
+nasconde — ogni testo dice «custoditi in garanzia» e che Barattolo
+non li tiene e non li vede. A sparire e' il NOME («Mostro», «il
+coordinatore»): per chi entra da Telegram era un attore in piu' da
+capire senza poterci fare niente, e il nome intero con la spiegazione
+vive UNA volta, nella pagina «I tuoi dati», dove gia' stava. La
+sentinella 4c ora sorveglia il fatto (in garanzia + Barattolo) e che
+il nome non rientri; una seconda passa al setaccio TUTTE le stringhe
+a schermo del motore (sui letterali estratti, non su cod intero:
+la' «Mostro» vive negli identificatori tipo mazzoMostro).
+2) LA COMMISSIONE RESTA COL NUMERO E SENZA IL CHI (decisione 3 di
+Andrea): «commissione 1% - fino a 100.000 sats», niente
+«Coordinatore Mostro X.Y.Z»; senza numeri dal 38385 la riga non
+nasce affatto, che una riga vuota non dice niente.
+«AGGIORNA IL LIBRO» NON C'E' PIU', e al suo posto non c'e' un gesto:
+renderP2P rilegge da solo, in sottofondo, un libro piu' vecchio di
+P2P_LIBRO_FRESCO_MS (60 s), TENENDO a schermo quel che si vede — mai
+il lampo di «Leggo il libro...» sotto le dita, quindi niente
+ricaricaP2P (che azzera il libro) ma caricaLibroP2P diretto. I FRENI
+SONO DUE piu' la guardia di sempre: l'eta' del libro, l'eta'
+dell'ultimo TENTATIVO (p2pRiletto — o un giro caduto coi relay giu'
+riproverebbe a ogni render), e la lettura in volo che gia' evita i
+doppi. «Riprova» del ramo rotto resta: li' un libro non c'e' proprio.
+LA MARCATURA «E' MIO» NON SI RIARMA dalla rilettura silenziosa, ed
+e' voluto: e' una restore-session verso il coordinator — una alla
+volta per chiave, il vincolo della sonda — e resta a una per
+sessione (il gesto «Riprova» del ramo rotto la riarma come prima).
+LA TRAPPOLA DEL GIRO, per la prossima volta: la sentinella nuova
+(«niente Mostro nelle stringhe») scritta su cod intero era rossa sul
+codice giusto, e quella sul bottone sparito si beccava il proprio
+commento — il setaccio giusto guarda i letterali a schermo, e il
+segno di un markup si cerca col suo attributo (>...), non a parole.
+E pezzo_js ritaglia LUNGO (oltre la funzione chiesta): una prova
+NEGATIVA su quel ritaglio morde anche il vicino di sotto — la si
+restringe al ramo che si vuole guardare.
+RESTANO FUORI APPOSTA da questa tappa: i testi del foglio del
+profilo (muore intero nella tappa B) e la chat (tappa C); la pagina
+«I tuoi dati» tiene nome e spiegazione del coordinatore, ed e'
+l'unico posto. Prove: 8562 verdi, con le emendate una per una.
