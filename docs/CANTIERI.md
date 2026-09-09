@@ -6939,3 +6939,18 @@ morto con la sua rotta; al suo posto due rotte esplicite gemelle. Le
 sentinelle: l'ordine tab-logo-tab ora chiede il gemello compra, e il
 blocco nuovo di prove_nav_p2p conta le due pile, i quattro strati, il
 giudice del crossfade e che del singolo non resti niente.
+E TRE RIFINITURE DEL LOGO REATTIVO (stesso giorno, viste da Andrea):
+1) il barattolo «si trasformava» — sfumando ENTRAMBI i gemelli, a
+meta' corsa l'immagine calava al 75% e il barattolo respirava. Cura
+senza asset nuovi: sfuma SOLO il gemello sopra (vendi), il compra
+sotto resta pieno — i barattoli sono identici, quindi coprendosi non
+cambiano e a muoversi si vedono solo le FRECCE. Sentinella: la regola
+che sfumava il compra non deve risorgere. 2) LA SCOSSA: al tocco di un
+tab la pila dondola una volta (.35s, keyframes logoScossa, spenta in
+reduced-motion), riavviata dal togli-e-rimetti col reflow in mezzo
+(scuotiLogoP2P), e parte anche sul tab GIA' attivo — e' la risposta
+al dito, non al cambio, percio' sta PRIMA dell'early return di
+setLatoP2P. 3) NIENTE STRISCIA CONTINUA: la linea vive sotto ogni tab
+(grigia sul quieto, colorata sull'attivo, border del bottone) e sotto
+il logo non passa niente — il contenitore ha perso il border-bottom e
+i tab il margine negativo che lo scavalcava.
