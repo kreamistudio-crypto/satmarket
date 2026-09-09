@@ -1813,8 +1813,20 @@
     transform:rotate(-90deg)}
   .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
   .p2p-anello .pista{stroke:var(--line)}
+  /* il colore vero e' lo stile inline (color-mix, dall'arancio al
+     grigio secondo quanto resta): QUESTA e' la rete per i browser che
+     color-mix non ce l'hanno — li' lo stile intero cade e l'anello
+     resta grigio, che si legge lo stesso */
   .p2p-anello .resta{stroke:var(--muted)}
-  .p2p-anello.agli-sgoccioli .resta{stroke:var(--danger)}
+  /* l'ultimo giorno non e' piu' un'informazione ma un avviso: rosso e
+     PULSA. Li' lo stile inline non si scrive (vincerebbe sul rosso),
+     e la soglia la decide il JS — e' un giudizio, non un vestito. */
+  .p2p-anello.ultimo-giorno .resta{stroke:var(--danger);
+    animation:p2pPulsa 1.5s ease-in-out infinite}
+  @keyframes p2pPulsa{0%,100%{opacity:1}50%{opacity:.3}}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-anello.ultimo-giorno .resta{animation:none}
+  }
   /* LA STIMA SCENDE SOTTO IL PREZZO nella sola card del libro: era
      l'unica riga del riferimento che avevamo in fila invece che
      incolonnata. La CLASSE resta quella — stessa cifra, stesso
@@ -1833,26 +1845,28 @@
     .p2p-ord .p2p-sats{transition:none}
   }
   /* IL VESTITO DELLE TRE RIGHE (set 2026, la card in seconda persona):
-     la prima grande, la seconda sottovoce, la terza il prezzo rispetto
-     al mercato. Sono POSTI e non contenuti — quale cifra ci finisca lo
-     decide il lato — quindi le classi dicono la TAGLIA, e quelle dei
-     numeri (.p2p-euro coi suoi caratteri, .p2p-sats col mono e il
-     colore del lato) viaggiano insieme a loro.
+     l'euro grande in cima, i sats sottovoce, il prezzo rispetto al
+     mercato in fondo. I POSTI SONO FISSI dal ritocco di Andrea — nei
+     due tab cambiano i verbi, non le taglie — quindi le classi della
+     taglia e quelle dei numeri (.p2p-euro coi suoi caratteri,
+     .p2p-sats col mono e il colore del lato) viaggiano appaiate.
      Niente nowrap: su una riga tutta sua una cifra assurda di uno
      sconosciuto deve andare a capo, mai allargare la pagina. */
   .p2p-grande{font-size:19px;white-space:normal}
   .p2p-piccola{display:block;margin-top:2px;font-size:14px;
     white-space:normal}
-  /* la seconda riga in euro parla sottovoce: e' un fatto, non la
-     cifra che si sceglie */
-  .p2p-piccola.p2p-euro{font-size:14.5px;color:var(--ink-soft)}
-  /* IL PREZZO RISPETTO AL MERCATO, terza riga: la classe porta il
-     GIUDIZIO per chi legge (deciso dal lato, vedi rigaOrdineP2P), il
-     testo la direzione del prezzo — i token hanno gia' la loro sera */
+  /* la regola per l'euro in seconda riga e' MORTA col ritocco che ha
+     fissato i posti (l'euro sta sempre in cima): niente CSS orfano */
+  /* IL PREZZO RISPETTO AL MERCATO, terza riga: la tinta e' un
+     GIUDIZIO per chi legge (deciso dal lato, vedi rigaOrdineP2P), le
+     parole un fatto — i token hanno gia' la loro sera */
   .p2p-prezzo{display:block;margin-top:3px;font-size:13px;
     font-weight:600;color:var(--muted)}
-  .p2p-prezzo.p2p-avviso{color:var(--danger)}
-  .p2p-prezzo.p2p-affare{color:var(--trust)}
+  /* in tinta ci va SOLO il segno con la percentuale: le parole sono un
+     fatto, il giudizio sta nel numero */
+  .p2p-prezzo b{font-weight:800}
+  .p2p-prezzo .p2p-avviso{color:var(--danger)}
+  .p2p-prezzo .p2p-affare{color:var(--trust)}
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -33186,6 +33200,28 @@ function scadeTestoP2P(scade){
   return 'scade fra ' + Math.round(s / 86400) + ' g';
 }
 
+/* IL LIBRO SI ORDINA PER CONVENIENZA DI CHI LEGGE (set 2026, deciso
+   da Andrea), e non piu' per data: in cima quel che conviene di piu' a
+   chi sta guardando QUEL tab.
+   Il metro e' il PREMIO, e il verso si rovescia col lato per la
+   ragione letta sui byte: `sats -= premium/100 * sats`, quindi un
+   premio basso lascia piu' sats. Nel tab «Compra BTC» chi legge
+   compra sats e vuole il premio PIU' BASSO (piu' sats per i suoi
+   euro); nel tab «Vendi BTC» li vende e vuole il PIU' ALTO (meno sats
+   da consegnare per gli stessi euro, cioe' piu' euro per sat).
+   A PARITA' IL PIU' RECENTE, che e' l'ordine di ieri: fra due offerte
+   che valgono uguale, quella fresca ha piu' probabilita' di trovare
+   ancora chi l'ha scritta.
+   PURA e con la COPIA (`slice`): il libro in memoria non si tocca —
+   e' la stessa lista che serve ai due tab, e ordinarla sul posto
+   vorrebbe dire riordinarla a ogni giro. */
+function ordinaLibroP2P(righe, lato){
+  const verso = lato === 'compro' ? 1 : -1;
+  return righe.slice().sort((a, b) =>
+    ((a.premium || 0) - (b.premium || 0)) * verso
+    || ((b.creato || 0) - (a.creato || 0)));
+}
+
 /* QUANTO RESTA DELLA VITA DELL'ORDINE, da 1 (appena pubblicato) a 0
    (scaduto). PURA: numeri in, numero out — l'orologio si passa, cosi'
    il banco la fa girare sui casi invece di guardare le righe.
@@ -33209,24 +33245,41 @@ function frazioneVitaP2P(o, adesso){
    IL TESTO NON SI PERDE, e' l'aria dell'anello (title + aria-label):
    chi passa il dito o naviga con lo screen reader ha ancora la frase
    esatta, e la sua casa nel dettaglio dello scambio si decide dopo.
-   ULTIMI 10% IN TINTA D'AVVISO: la soglia sta qui e non nel CSS,
-   perche' e' un giudizio e non un vestito.
+   IL COLORE RACCONTA ANCHE LUI (set 2026, ritocco di Andrea): pieno
+   e' l'ARANCIO di casa, e sbiadendo scivola verso il grigio — un
+   ordine fresco si vede da lontano. La mescola la fa `color-mix` in
+   uno stile inline, perche' la percentuale cambia a ogni card; dove
+   `color-mix` non c'e' lo stile intero cade e resta la regola CSS,
+   cioe' l'anello grigio: un ripiego che si legge lo stesso.
+   L'ULTIMO GIORNO E' UN'ALTRA COSA: l'anello passa al rosso e
+   PULSA (1,5 s), perche' li' non e' piu' un'informazione ma un
+   avviso. LA SOGLIA STA QUI E NON NEL CSS — e' un giudizio, non un
+   vestito — ed e' il TEMPO che resta e non una frazione: su un
+   ordine di sette giorni l'ultimo giorno e' il 14%, su uno di
+   quindici il 7%, e a contare e' che manchi meno di un giorno.
+   Li' lo stile inline NON si scrive, o vincerebbe sul rosso.
    Il raggio 9 su un viewBox da 24 da' una circonferenza di 56,55: il
    dasharray e' tutta la pista e il dashoffset la parte gia' consumata,
    che e' il modo di disegnare un arco senza matematica per ogni
    segmento. La rotazione di -90° la mette a partire da mezzogiorno. */
 const P2P_ANELLO_R = 9;
 const P2P_ANELLO_GIRO = 2 * Math.PI * P2P_ANELLO_R;
+const P2P_ULTIMO_GIORNO_S = 86400;
 function anelloScadenzaP2P(o, adesso){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
+  const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
+  const ultimo = manca <= P2P_ULTIMO_GIORNO_S;
   const consumato = (P2P_ANELLO_GIRO * (1 - resta)).toFixed(2);
   const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
-  return '<span class="p2p-anello' + (resta <= 0.1 ? ' agli-sgoccioli' : '')
+  const tinta = ultimo ? '' : ' style="stroke:color-mix(in srgb, var(--sats) '
+    + Math.round(resta * 100) + '%, var(--muted))"';
+  return '<span class="p2p-anello' + (ultimo ? ' ultimo-giorno' : '')
     + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<circle class="pista" cx="12" cy="12" r="' + P2P_ANELLO_R + '"/>'
     + '<circle class="resta" cx="12" cy="12" r="' + P2P_ANELLO_R + '"'
+    + tinta
     + ' stroke-dasharray="' + P2P_ANELLO_GIRO.toFixed(2) + '"'
     + ' stroke-dashoffset="' + consumato + '"/></svg></span>';
 }
@@ -33280,17 +33333,19 @@ function satsMercatoP2P(o){
 function rigaOrdineP2P(o){
   const stima = satsMercatoP2P(o);
   /* LA CARD PARLA A CHI LEGGE (set 2026, ridisegno chiesto da Andrea):
-     in seconda persona, e le due righe si scambiano il posto col lato.
-     Nel tab «Compra BTC» (ordini k=sell) chi legge PAGA euro e RICEVE
-     sats: «Paghi 8,00 €» grande, «ricevi ≈ 11 828 sats» sotto. Nel tab
-     «Vendi BTC» (k=buy) fa il contrario: «Invia ≈ 11 828 sats» grande,
-     «ricevi 8,00 €» sotto. Il verbo VENDE/COMPRA della controparte non
-     c'e' piu': la seconda persona lo rende inutile.
+     in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Paghi
+     8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
+     tab «Vendi BTC» (k=buy) — coi sats sempre sotto, «ricevi ≈ 11 828
+     sats» o «invia ≈ 11 828 sats». I due tab si leggono cosi' collo
+     stesso movimento dell'occhio: euro grande, sats piccoli, prezzo.
+     (Il primo giro scambiava le righe col lato; Andrea l'ha
+     rovesciato guardandolo: la coerenza fra i tab vale piu' del
+     mettere in cima «quel che dai».)
+     Il verbo VENDE/COMPRA della controparte non c'e': la seconda
+     persona lo rende inutile.
      IL LATO LO DICE LA RIGA (o.lato) e non il tab, come sempre: il
      libro filtra per lato, quindi il risultato e' lo stesso, ma la
-     card resta onesta anche fuori da un elenco filtrato.
-     LA CIFRA IN SATS PORTA IL COLORE DEL LATO, qualunque riga occupi:
-     e' la cifra che cambia col tab, e la sua tinta lo dice. */
+     card resta onesta anche fuori da un elenco filtrato. */
   const paghiEuro = o.lato === 'sell';
   /* il range stima i DUE capi collo stesso metro; a cambio muto
      niente cifre, mai un numero inventato */
@@ -33305,26 +33360,37 @@ function rigaOrdineP2P(o){
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     + (o.euroMax ? ', scegli tu' : '');
-  const rigaEuro = (paghiEuro ? 'Paghi ' : 'ricevi ') + eurTxt;
-  const rigaSats = (paghiEuro ? 'ricevi ' : 'Invia ') + sats;
-  /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «al prezzo di
-     mercato» a premio zero, «+4% sopra» o «−4% sotto» col premio. A
-     importo fisso (amt>0) non c'e': quel prezzo non guarda il mercato.
-     LA TINTA E' UN GIUDIZIO PER CHI LEGGE, il testo un fatto del
-     prezzo. VERIFICATO SUI BYTE due volte (mostro v0.18.6,
-     get_market_quote in src/util.rs): `sats -= premium/100 * sats`,
-     sottrazione UNIFORME — il kind non tocca ne' formula ne' segno.
-     Quindi un premio positivo ASSOTTIGLIA sempre i sats: su un SELL
-     chi legge ne riceve meno per i suoi euro (paga di piu': avviso),
-     su un BUY ne invia meno per gli stessi euro (incassa di piu':
-     affare). Il segno del giudizio si rovescia col lato, il testo no. */
+  const rigaEuro = (paghiEuro ? 'Paghi ' : 'Ricevi ') + eurTxt;
+  const rigaSats = (paghiEuro ? 'ricevi ' : 'invia ') + sats;
+  /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «prezzo di
+     mercato» nudo a premio zero, «prezzo di mercato +4%» col premio —
+     e in tinta ci va SOLO il segno con la percentuale, che le parole
+     sono un fatto e il giudizio sta nel numero. Niente «sopra» e
+     «sotto» (set 2026, ritocco di Andrea): il segno e il colore lo
+     dicono gia', e due modi di dire la stessa cosa sono uno di
+     troppo. A importo fisso (amt>0) la riga non c'e': quel prezzo il
+     mercato non lo guarda.
+     ⚠️ E LA RIGA E' UNA SPIEGAZIONE, NON UN CONTO DA FARE: i sats
+     qui sopra sono GIA' al netto del premio (satsMercatoP2P lo
+     applica, la formula del coordinatore), quindi «ricevi ≈ X sats»
+     e' la cifra che passera' di mano davvero e questa riga dice solo
+     PERCHE' e' diversa dal cambio puro. Mai una cifra a mercato puro
+     col premio da applicare a mente.
+     LA TINTA E' UN GIUDIZIO PER CHI LEGGE. VERIFICATO SUI BYTE due
+     volte (mostro v0.18.6, get_market_quote in src/util.rs):
+     `sats -= premium/100 * sats`, sottrazione UNIFORME — il kind non
+     tocca ne' formula ne' segno. Quindi un premio positivo
+     ASSOTTIGLIA sempre i sats: su un SELL chi legge ne riceve meno
+     per i suoi euro (paga di piu': avviso), su un BUY ne invia meno
+     per gli stessi euro (incassa di piu': affare). Il segno del
+     giudizio si rovescia col lato, il testo no. */
   const affare = (o.lato === 'buy') === (o.premium > 0);
-  const premioTxt = o.premium > 0
-    ? '+' + esc(String(o.premium)) + '% sopra il mercato'
-    : '−' + esc(String(Math.abs(o.premium))) + '% sotto il mercato';
   const prezzo = o.sats > 0 ? ''
-    : '<span class="p2p-prezzo' + (o.premium ? (affare ? ' p2p-affare' : ' p2p-avviso') : '')
-      + '">' + (o.premium ? premioTxt : 'al prezzo di mercato') + '</span>';
+    : '<span class="p2p-prezzo">prezzo di mercato'
+      + (o.premium ? ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+          + (o.premium > 0 ? '+' : '−')
+          + esc(String(Math.abs(o.premium))) + '%</b>' : '')
+      + '</span>';
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
       + esc(o.metodi.join(', ')) + '</div>' : '';
@@ -33345,8 +33411,8 @@ function rigaOrdineP2P(o){
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    <div class="p2p-testa"><span class="p2p-grande ${paghiEuro ? 'p2p-euro' : 'p2p-sats'}">${paghiEuro ? rigaEuro : rigaSats}</span>${anelloScadenzaP2P(o)}</div>
-    <span class="p2p-piccola ${paghiEuro ? 'p2p-sats' : 'p2p-euro'}">${paghiEuro ? rigaSats : rigaEuro}</span>
+    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${rigaEuro}</span>${anelloScadenzaP2P(o)}</div>
+    <span class="p2p-piccola p2p-sats">${rigaSats}</span>
     ${prezzo}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
@@ -33459,7 +33525,9 @@ function renderP2P(){
     caricaLibroP2P().then(renderP2P, () => {});
   }
   const k = P2P_LATO_K[p2pLato];
-  const vivi = p2pLibro.ordini.filter(o => o.lato === k);
+  /* in cima quel che conviene a chi legge, non il piu' recente: il
+     criterio e il suo perche' stanno in ordinaLibroP2P */
+  const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k), p2pLato);
   /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
      prima non si sapeva — quante ce ne sono — e per giunta dice che il
      libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
