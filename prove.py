@@ -39306,6 +39306,49 @@ def prove_p2p_server():
     prova("nessuno crea il sale fuori da questo giudice", 1,
           src.count("INSERT OR IGNORE INTO p2p_semi"))
 
+    # d2) ...E SOPRAVVIVE ALLA CONNESSIONE CHE L'HA CONIATO ----------
+    # La prova che mancava, ed e' quella che il 9 set 2026 avrebbe
+    # fermato tutto: la rotta apriva, derivava e chiudeva SENZA commit
+    # — `db()` non e' in autocommit, quindi la close faceva rollback.
+    # La SELECT sulla stessa connessione vedeva l'INSERT non committato
+    # e rispondeva un seme valido, poi il sale evaporava: OGNI chiamata
+    # un'identita' nuova, tre superfici dello stesso account con tre
+    # profili «del conto» diversi, `p2p_semi` vuota in produzione.
+    # La prova (d) qui sopra non poteva vederlo: una connessione sola,
+    # mai chiusa, vede i propri INSERT. La transazionalita' vive nella
+    # CUCITURA fra la funzione pura e la rotta, e si prova con un
+    # database su FILE (:memory: muore con la connessione) e DUE
+    # connessioni, col gesto della rotta in mezzo — commit e close.
+    import tempfile
+    fdb = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    fdb.close()
+    con3 = sqlite3.connect(fdb.name)
+    con3.executescript(schema2)
+    s3 = dammi(con3, 111, 1000)
+    con3.commit()                       # il gesto della rotta, curato
+    con3.close()
+    con4 = sqlite3.connect(fdb.name)
+    prova("il sale sopravvive alla connessione che l'ha coniato",
+          s3["sale"], dammi(con4, 111, 2000)["sale"])
+    prova("...e la riga in tabella resta una anche fra due connessioni",
+          1, con4.execute("SELECT COUNT(*) FROM p2p_semi "
+                          "WHERE tg_id=111").fetchone()[0])
+    con4.commit()
+    con4.close()
+    # E IL CONTROESEMPIO tiene viva la ragione della riga: senza commit
+    # la close fa rollback e il sale muore. Se un giorno questa prova
+    # diventasse rossa e' cambiato il default di `isolation_level`, e
+    # allora il commit della rotta va RIGUARDATO, non dato per inutile.
+    con5 = sqlite3.connect(fdb.name)
+    dammi(con5, 333, 3000)
+    con5.close()                        # senza commit: il difetto vero
+    con6 = sqlite3.connect(fdb.name)
+    prova("...e senza commit il sale EVAPORA — il rollback e' reale",
+          0, con6.execute("SELECT COUNT(*) FROM p2p_semi "
+                          "WHERE tg_id=333").fetchone()[0])
+    con6.close()
+    os.unlink(fdb.name)
+
     # e) IL SEGRETO NON ESCE, E IL CONFIG D'ESEMPIO LO DICE ----------
     # Il NOME esce apposta (serve per andarlo a cambiare); il VALORE
     # mai — e a garantirlo e' `prove_leve`, che gira il censimento con
@@ -39451,6 +39494,14 @@ def prove_p2p_server():
           and "SEGRETI_PROFILO_P2P.get(versione" in seme_r)
     prova("...e il seme non esce mai a meta'", True,
           "if not seme:" in seme_r)
+    # ⚠️ E IL SALE SI COMMITTA PRIMA DELLA CLOSE (9 set 2026): senza,
+    # la rotta rispondeva un seme valido e il rollback della close si
+    # portava via il sale — un'identita' nuova a ogni chiamata. Il
+    # PERCHE' il commit serva lo dimostra la prova (d2) del rollback;
+    # qui si inchioda che la ROTTA lo faccia davvero.
+    prova("...e il sale si committa PRIMA della close", True,
+          "con.commit()" in seme_r
+          and seme_r.index("con.commit()") < seme_r.index("con.close()"))
 
     # --- 12) LA GUARDIA DEGLI SCAMBI APERTI (fase 4) ---------------
     # ⚠️ STA IN `applicaImportMazzo` E NON SOLO NEI GESTI, ed e' la

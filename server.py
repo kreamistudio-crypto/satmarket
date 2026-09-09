@@ -30309,6 +30309,17 @@ def seme_profilo_p2p(x_tg_init_data: str = Header(""),
         raise HTTPException(409, "Il profilo legato all'account non e' attivo")
     con = db()
     riga = _sale_profilo_p2p(con, user["id"], int(time.time()))
+    # ⚠️ IL COMMIT E' MEZZA IDENTITA' (9 set 2026): `db()` non e' in
+    # autocommit, quindi senza questa riga l'INSERT del sale viveva solo
+    # nella transazione — la SELECT di `_sale_profilo_p2p`, sulla STESSA
+    # connessione, lo vedeva e la rotta rispondeva un seme valido, poi la
+    # close() faceva rollback e il sale evaporava. Risultato: OGNI chiamata
+    # coniava un'identita' NUOVA con la faccia di una derivazione stabile
+    # (tre superfici dello stesso account, tre profili «del conto» diversi,
+    # `p2p_semi` vuota in produzione). La prova che lo tiene e' quella a
+    # DUE connessioni in prove.py: il sale deve sopravvivere a chi l'ha
+    # coniato.
+    con.commit()
     con.close()
     # LA VERSIONE E' QUELLA DELLA RIGA e non quella viva: chi c'era
     # prima di una rotazione continua a derivare con la SUA finche' non
