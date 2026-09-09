@@ -7126,3 +7126,61 @@ disegnata per quello, un'illustrazione no — o le si da' lo spazio di
 essere un marchio, o non si mette. Nella section-label il
 vertical-align non serve piu': quella riga e' un flex e la centra
 `align-items:center`.
+
+
+LA CARD PARLA A CHI LEGGE (9 set 2026, ridisegno chiesto da Andrea).
+Tre righe in SECONDA PERSONA, e le prime due si scambiano il posto col
+lato: nel tab «Compra BTC» (ordini k=sell) «Paghi 8,00 €» grande e
+«ricevi ≈ 11 828 sats» sotto; nel tab «Vendi BTC» (k=buy) «Invia ≈
+11 828 sats» grande e «ricevi 8,00 €» sotto. La terza riga e' il
+prezzo rispetto al mercato — «al prezzo di mercato», «+4% sopra», «−4%
+sotto» — e a importo fisso non c'e', che quel prezzo il mercato non lo
+guarda. Il verbo VENDE/COMPRA della controparte e' morto: la seconda
+persona lo rende inutile. Il range chiude la riga dell'euro con
+«, scegli tu», che e' li' che la scelta si fa. Metodo e reputazione
+restano, «È il tuo ordine» pure.
+LE CLASSI DICONO LA TAGLIA (.p2p-grande/.p2p-piccola) e non il
+contenuto, ed e' la conseguenza del disegno: quale cifra occupi quale
+riga lo decide il LATO, quindi le classi dei numeri (.p2p-euro coi
+suoi caratteri, .p2p-sats col mono) viaggiano con lei. La cifra in
+SATS porta il colore del lato in qualunque riga finisca: e' quella che
+cambia col tab, e la sua tinta lo dice.
+IL VERSO DEL PREMIO, RIVERIFICATO SUI BYTE (mostro v0.18.6,
+get_market_quote in src/util.rs, seconda lettura in due giorni):
+`sats -= premium/100 * sats`, sottrazione UNIFORME — il kind non tocca
+ne' formula ne' segno. Quindi un premio positivo ASSOTTIGLIA sempre i
+sats, e chi ci guadagna dipende da che parte dei sats si sta: su un
+SELL chi legge ne riceve meno per i suoi euro (paga di piu': AVVISO),
+su un BUY ne invia meno per gli stessi euro (incassa di piu':
+AFFARE). ⚠️ La premessa «il premium e' il guadagno di chi pubblica»
+regge solo meta': sui BUY il premio positivo e' un guadagno di chi
+PRENDE. Il testo resta un fatto del prezzo, la tinta un giudizio per
+chi legge, e il segno del giudizio si rovescia col lato.
+L'ANELLO AL POSTO DELLA SCADENZA: il testo «⏳ scade fra 7 g» esce
+dalla card e diventa un cerchio di progresso in alto a destra, pieno
+appena pubblicato e vuoto alla scadenza, ultimi 10% in rosso — in un
+elenco che si scorre col pollice la fretta e' una FORMA prima che una
+parola. La soglia del rosso sta nel JS e non nel CSS, che e' un
+giudizio e non un vestito. Il giudice e' PURO (frazioneVitaP2P prende
+l'orologio) e torna -1 sui due casi che non si sanno — niente
+scadenza, o una finestra rovescia (un `expires_at` piu' vecchio della
+nascita, roba che arriva da relay di sconosciuti): li' non si disegna
+niente, mai un anello su una finestra storta. IL TESTO NON SI PERDE:
+vive nell'aria dell'anello (title + aria-label), quindi il dito e lo
+screen reader ce l'hanno ancora — la sua casa nel dettaglio dello
+scambio la decide Andrea.
+⚠️ E L'ANELLO E' ANCORATO IN ASSOLUTO, non in fila: dentro il flex
+della testa una cifra lunga («≈ 74 029–148 058 sats») prendeva tutta
+la riga e lo faceva scendere a meta' card — visto dal vivo, curato
+con position:absolute e il padding della riga grande. Cosi' la cifra
+va a capo nella SUA scatola e l'anello non entra nel giro del wrap;
+e la .p2p-testa condivisa torna al suo align-items:baseline, che le
+altre due case (scambio e ordine preso) non si muovono di un pixel.
+CANTIERE FUTURO, a verbale: il PREMIUM impostabile dal foglio
+«Pubblica il tuo ordine» — oggi si pubblica sempre al prezzo di
+mercato, e il campo non c'e'.
+LE PROVE: la seconda persona e lo scambio di posto sui due lati, le
+tinte rovesciate, il range che sceglie, e l'anello col suo giudice
+puro (pieno, mezzo, vuoto, oltre la scadenza, i due «non si sa», il
+mezzo giro del dasharray, l'aria che porta il testo, gli sgoccioli).
+Guardato dal vivo sui due tab con card sintetiche dal renderer vero.
