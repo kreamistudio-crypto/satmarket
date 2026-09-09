@@ -21558,14 +21558,15 @@ def _amb_seo():
     (che vorrebbe config.py, anthropic e mezzo mondo). I due soli stub
     sono quelli che chiedono il dataset dei comuni e la rete — qui non
     si collauda ne' la geografia ne' CoinGecko."""
+    import hashlib as _hl
     import html as _html
     import json as _json
     import re as _re
     import time as _time
     import unicodedata as _ud
 
-    amb = {"html": _html, "json": _json, "os": os, "re": _re,
-           "time": _time, "unicodedata": _ud,
+    amb = {"hashlib": _hl, "html": _html, "json": _json, "os": os,
+           "re": _re, "time": _time, "unicodedata": _ud,
            "URL_PUBBLICO": "https://barattolo.store", "FOTO_DIR": "foto",
            "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
            else "",
@@ -21578,6 +21579,7 @@ def _amb_seo():
     amb["_FINTO_ONION"] = [False]
     amb["su_onion"] = lambda: amb["_FINTO_ONION"][0]
     for riga in ("IMMAGINE_BRAND = (", "SEGNO_META = ", "SEGNO_TITOLO = ",
+                 "_ASSET_HASH_CACHE: dict = {}",
                  "SEGNO_CORPO = ", "MAX_SLUG = ", "_ID_PERCORSO = ",
                  "META_NOINDEX = ", "TETTO_CARTELLO = ",
                  "CACHE_SEO_HOME = ", "CAMPI_CARTELLO = ",
@@ -21587,6 +21589,7 @@ def _amb_seo():
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
     for blocco in ("TLD_RECAPITO = (", "_RECAPITO = re.compile(",
+                   "_RX_ASSET = re.compile(",
                    "CATEGORIE = (", "CATEGORIE_SENZA_CONDIZIONE = ",
                    "CONDIZIONI = {", "CONDIZIONI_LD = {",
                    "_PAGINA_CACHE = {", "_SEO_HOME_CACHE = {",
@@ -21607,6 +21610,7 @@ def _amb_seo():
               "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
+              "_hash_asset", "_timbra_asset_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
@@ -23030,11 +23034,13 @@ def prove_anteprime():
           0 < pagina.index(amb["SEGNO_META"]) < pagina.index(b"<!--SEGNAPOSTO"))
     prova("...e i meta stanno subito dietro, prima del titolo", True,
           pagina.index(b"<!--SEGNAPOSTO") < pagina.index(b"<title>"))
-    # LA PAGINA ESCE IDENTICA A COM'E' SUL DISCO, byte per byte: la
-    # modalita' testo normalizzerebbe i fine-riga, e sarebbero 15 KB
-    # di differenza su cio' che scarica ogni utente — un effetto
-    # collaterale di un ornamento.
-    prova("...e la pagina esce identica al file, byte per byte", mini,
+    # LA PAGINA ESCE IDENTICA AL FILE TIMBRATO, byte per byte: la
+    # modalita' testo normalizzerebbe i fine-riga (15 KB di differenza
+    # per un ornamento), e dal set 2026 l'UNICA trasformazione ammessa
+    # e' il timbro degli asset (?v=<hash>), che ha la sua suite —
+    # qualunque altro byte mosso resta una regressione.
+    prova("...e la pagina esce identica al file timbrato, byte per byte",
+          amb["_timbra_asset_pagina"](mini),
           pagina.replace(b"\n<!--SEGNAPOSTO-->", b""))
 
     # --- 8ter) senza il segno la pagina VIVE, muta ------------------
@@ -36107,6 +36113,97 @@ console.log(JSON.stringify(out));
           out["dentroPubblica"])
 
 
+def prove_timbro_asset():
+    """IL TIMBRO DEGLI ASSET (set 2026, i loghi stantii): gli asset si
+    sostituiscono tenendo il nome, ma cache 24h + dispensa del service
+    worker servivano ai client versioni vecchie, ognuno la sua. La
+    cura e' strutturale: ogni /assets/... e /vendor/... LETTERALE
+    nella pagina esce timbrato ?v=<hash del file>, cosi' la
+    sostituzione invalida da sola ogni cache; e la dispensa del
+    service worker matcha l'URL INTERO, o il timbro non servirebbe a
+    niente (il buco vero, visto dal campo: match per pathname).
+
+    Il banco ESEGUE le funzioni vere del server sui casi che contano;
+    le sentinelle guardano la pipeline e il service worker."""
+    print("\n[il timbro degli asset]")
+    import hashlib as _hl
+    import os as _os
+    import re as _re2
+    mini = open("miniapp.html", encoding="utf-8").read()
+    sw = open("sw.js", encoding="utf-8").read()
+
+    # --- 1) IL BANCO: le funzioni vere sui casi che contano ----------
+    i = _SORGENTE.index("_ASSET_HASH_CACHE: dict = {}")
+    amb = {"os": _os, "re": _re2, "hashlib": _hl}
+    exec(_SORGENTE[i:_SORGENTE.index("def _spezza_pagina")], amb)
+    timbra = amb["_timbra_asset_pagina"]
+    t1 = timbra(b'<img src="/assets/p2p-logo-compra.png">')
+    prova("un asset vero esce timbrato con l'hash a 10 hex", True,
+          _re2.search(rb'/assets/p2p-logo-compra\.png\?v=[0-9a-f]{10}',
+                      t1) is not None)
+    # ...e l'hash e' DAVVERO quello del file, non un numero qualunque
+    atteso = _hl.sha1(
+        open("assets/p2p-logo-compra.png", "rb").read()).hexdigest()[:10]
+    prova("...ed e' lo sha1 del file, accorciato", True,
+          atteso.encode() in t1)
+    prova("un file che non esiste resta intatto (mai un timbro su un 404)",
+          b'/assets/non-esiste.png', timbra(b'/assets/non-esiste.png'))
+    prova("chi ha gia' una query resta suo (il ?b delle famiglie)",
+          b'/assets/icona-512.png?b=2',
+          timbra(b'/assets/icona-512.png?b=2'))
+    prova("i path costruiti in JS non si toccano", True,
+          b'?v=' not in timbra(
+              b'`/assets/categorie/${slugCat(c)}.webp?b=2`'))
+    prova("il timbro e' idempotente: due mani sono una", True,
+          timbra(t1) == t1)
+    # qrcode.js e non nostr.js: su disco vive nostr.BUNDLE.js e la
+    # rotta lo serve sotto il nome corto — un nome virtuale non si
+    # timbra (e in pagina ha comunque il suo ?v manuale, che il
+    # gruppo-query rispetta)
+    prova("...e /vendor/ si timbra come /assets/", True,
+          _re2.search(rb'/vendor/qrcode\.js\?v=[0-9a-f]{10}',
+                      timbra(b'src="/vendor/qrcode.js"')) is not None
+          and timbra(b'src="/vendor/nostr.js"')
+              == b'src="/vendor/nostr.js"')
+
+    # --- 2) LA PAGINA VERA, timbrata per intero ----------------------
+    pagina = timbra(open("miniapp.html", "rb").read())
+    timbrati = len(set(_re2.findall(
+        rb'/(?:assets|vendor)/[A-Za-z0-9/_\-.]+\?v=[0-9a-f]{10}', pagina)))
+    prova("i due loghi del P2P escono timbrati", True,
+          _re2.search(rb'p2p-logo-compra\.png\?v=[0-9a-f]{10}', pagina)
+          is not None
+          and _re2.search(rb'p2p-logo-vendi\.png\?v=[0-9a-f]{10}', pagina)
+          is not None)
+    prova("...e con loro almeno una decina di asset di casa", True,
+          timbrati >= 10)
+
+    # --- 3) LA PIPELINE: il timbro sta nella rilettura ---------------
+    fetta = _SORGENTE[_SORGENTE.index('with open("miniapp.html", "rb")'):]
+    fetta = fetta[:fetta.index("_PAGINA_CACHE.update")]
+    prova("la rilettura della pagina timbra prima di spezzare", True,
+          "grezzo = _timbra_asset_pagina(grezzo)" in fetta)
+    j = _SORGENTE.index('@app.get("/offline.html")')
+    prova("...e la rotta di offline.html NON timbra (la sua mascotte "
+          "deve combaciare colla dispensa)", False,
+          "_timbra_asset_pagina" in _SORGENTE[
+              j:_SORGENTE.index("@app.", j + 10)])
+
+    # --- 4) IL SERVICE WORKER: l'URL intero, mai il pathname ---------
+    prova("la dispensa matcha l'URL INTERO, query compresa", True,
+          "await c.match(r)" in sw
+          and "caches.match(url.pathname)" not in sw)
+    prova("...e la copia fresca si mette via per la prossima volta",
+          True, "c.put(r, fresca.clone())" in sw)
+    prova("...con la versione della dispensa alzata", True,
+          int(re.search(r"barattolo-v(\d+)", sw).group(1)) >= 8)
+    prova("il gate della dispensa resta sul pathname (il precache non "
+          "porta query)", True, "IN_DISPENSA.has(url.pathname)" in sw)
+    prova("il patto delle API e delle navigazioni non si e' mosso", True,
+          "startsWith('/api/')" in sw
+          and "mode === 'navigate'" in sw)
+
+
 def prove_p2p_chiavi():
     """IL MAZZO DEL PROFILO DI SCAMBIO (set 2026, tappa 3): le chiavi con
     cui si parla col coordinator nascono nel BROWSER, per tutti — anche
@@ -48169,6 +48266,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
     prove_nav_p2p,
+    prove_timbro_asset,
     prove_p2p_chiavi,
     prove_p2p_campanello,
     prove_p2p_motore,

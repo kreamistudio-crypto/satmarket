@@ -5,10 +5,14 @@
    rete muore. La regola d'oro: cio' che non tocca, NON lo tocca — le
    API e le pagine passano sempre dalla rete, come se lui non ci fosse.
 
-   REGOLA OPERATIVA: se cambi un file dell'elenco PRECACHE (o il file
-   stesso), alza VERSIONE — le dispense vecchie si svuotano da sole. */
+   REGOLA OPERATIVA (emendata set 2026): gli asset che la pagina chiede
+   col timbro ?v=<hash> si aggiornano DA SOLI — chiave nuova in
+   dispensa, nessun numero da alzare. VERSIONE resta per cio' che
+   viaggia senza timbro (offline.html e le richieste del precache):
+   se cambi quelli, o l'elenco, alzala e le dispense vecchie si
+   svuotano da sole. */
 
-const VERSIONE = 'barattolo-v7';
+const VERSIONE = 'barattolo-v8';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML
@@ -74,11 +78,22 @@ self.addEventListener('fetch', (e) => {
       return;
     }
 
-    // gli asset in dispensa: prima la dispensa, poi la rete
+    // gli asset in dispensa: prima la dispensa, poi la rete.
+    // IL MATCH E' SULL'URL INTERO, query compresa (set 2026, la cura
+    // dei loghi stantii): prima si cercava per pathname, quindi un
+    // asset sostituito col cache-buster nuovo (?v=<hash>) riceveva
+    // comunque la copia vecchia dalla dispensa — il buco esatto che
+    // rendeva inutile il timbro. Ora una versione nuova e' una chiave
+    // nuova: manca, si scarica, e si mette via per la prossima volta.
     if (IN_DISPENSA.has(url.pathname)) {
-      e.respondWith(
-        caches.match(url.pathname).then((pronta) => pronta || fetch(r))
-      );
+      e.respondWith((async () => {
+        const c = await caches.open(CACHE_STATICA);
+        const pronta = await c.match(r);
+        if (pronta) return pronta;
+        const fresca = await fetch(r);
+        if (fresca && fresca.ok) c.put(r, fresca.clone());
+        return fresca;
+      })());
     }
     return;
   }

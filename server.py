@@ -41386,6 +41386,67 @@ def _fessura_tg(p: dict) -> dict:
     return p
 
 
+# ---------------- IL TIMBRO DEGLI ASSET (set 2026) ------------------
+# Gli asset si sostituiscono TENENDO IL NOME (i loghi del P2P l'hanno
+# appena dimostrato: tre mani in un giorno), ma le rotte li servono con
+# cache 24h e fuori da Telegram c'e' anche la dispensa del service
+# worker — quindi i client vedevano versioni vecchie, ognuno una
+# diversa, anche a cache «svuotata». La cura STRUTTURALE e' il
+# cache-buster: ogni URL /assets/... letterale nella pagina esce
+# timbrato ?v=<hash del file>, cosi' una sostituzione invalida da sola
+# ogni cache di ogni client — nessun numero da alzare a mano, il timbro
+# E' il contenuto. L'hash si calcola una volta per (mtime, size) e la
+# pagina si ritimbra quando si rilegge (cioe' al riavvio, che il deploy
+# fa sempre, o quando miniapp.html cambia).
+# NON si timbrano: gli URL con una query gia' loro (il ?b=2 delle
+# famiglie dinamiche), i path costruiti in JS (contengono ${} e la
+# regex non li vede, ed e' giusto cosi'), e offline.html — la sua
+# mascotte deve combaciare con la chiave in dispensa del service
+# worker, o l'offline si romperebbe proprio senza rete.
+_ASSET_HASH_CACHE: dict = {}
+
+
+def _hash_asset(rel: str) -> str:
+    """sha1 corto (10 hex) del file, '' se non esiste. Cache per
+    (mtime, size): il costo e' una lettura per asset per riavvio."""
+    try:
+        s = os.stat(rel)
+    except OSError:
+        return ""
+    chiave = (s.st_mtime, s.st_size)
+    voce = _ASSET_HASH_CACHE.get(rel)
+    if voce and voce[0] == chiave:
+        return voce[1]
+    h = hashlib.sha1()
+    try:
+        with open(rel, "rb") as f:
+            for blocco in iter(lambda: f.read(65536), b""):
+                h.update(blocco)
+    except OSError:
+        return ""
+    corto = h.hexdigest()[:10]
+    _ASSET_HASH_CACHE[rel] = (chiave, corto)
+    return corto
+
+
+_RX_ASSET = re.compile(rb'/((?:assets|vendor)/[A-Za-z0-9/_\-.]+\.'
+                       rb'(?:png|jpe?g|webp|svg|js|woff2))(\??)')
+
+
+def _timbra_asset_pagina(grezzo: bytes) -> bytes:
+    """Ogni /assets/... e /vendor/... LETTERALE ed esistente esce con
+    ?v=<hash>. Chi ha gia' una query resta suo; chi non esiste su disco
+    resta intatto (mai un timbro inventato su un 404)."""
+    def timbra(m):
+        if m.group(2):
+            return m.group(0)
+        v = _hash_asset(m.group(1).decode("ascii"))
+        if not v:
+            return m.group(0)
+        return b"/" + m.group(1) + b"?v=" + v.encode("ascii")
+    return _RX_ASSET.sub(timbra, grezzo)
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -41462,6 +41523,10 @@ def _pagina_con_meta(meta: str, titolo: str = "",
     if timbro != _PAGINA_CACHE["timbro"]:
         with open("miniapp.html", "rb") as f:
             grezzo = f.read()
+        # IL TIMBRO DEGLI ASSET sta QUI, prima delle fessure: si paga
+        # una volta per rilettura e ogni rotta-pagina lo eredita per
+        # costruzione, come la quarta fessura.
+        grezzo = _timbra_asset_pagina(grezzo)
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.
