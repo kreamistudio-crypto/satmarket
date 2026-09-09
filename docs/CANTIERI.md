@@ -6826,3 +6826,23 @@ mobile chiaro e scuro, desktop, il lato che colora il +, il foglio dal
 +, il ritorno da Esplora via navIndietro. RESTA DA GUARDARE: la
 commissione per chi PRENDE un ordine (a verbale dal restyling della
 testata) e il giro a due identita' della tappa 8.
+IL GIRO DELLE RIFINITURE (stesso giorno, guardata dal vivo da Andrea):
+1) il RITORNO e' simmetrico — lo stato di quiete dei bottoni base porta
+il transition-delay dell'ingresso (.1s), che a riposo non fa nulla e al
+ritorno e' la scala che mancava: prima escono gli strati, poi salgono i
+normali, come all'andata; 2) lo SFONDO e' la BANDA SCURA (scelta di
+Andrea fra due varianti guardate a schermo: l'oro incassato #E3D0A6 e'
+la strada scartata) — bruna anche di giorno (#2B2214, di sera #0F0A04),
+incasso piu' profondo, e sulla banda le voci parlano la lingua della
+sera nei DUE temi con valori fissi (qui il tema non c'entra piu'):
+etichette #B5AA90, attiva #FFB25C, il lockup della topbar schiarito
+(#F1E8D5) o affogherebbe, la pillola attiva desktop e' un velo caldo
+rgba(255,178,92,.16) perche' il crema di --sats-soft renderebbe
+l'arancio illeggibile; 3) il + tondo sale a -15px (era -8); 4) i tempi
+rallentati per godersi la corsa: .4s il transform, .3s l'opacity, .4s
+il cambio della banda, scala .1s; 5) LA TESTATA HA IL SUO LOGO — il
+PNG dedicato del P2P (barattolo, lucchetto, le due frecce verde/rossa)
+scelto da Andrea, 98px scontornato con drop-shadow, al posto di
+tessera+lockup di casa: rotta esplicita /assets/p2p-logo.png (regola 3,
+mai un mount), sentinella della testata emendata sul logo nuovo.
+Prove: 8605 verdi anche qui.
