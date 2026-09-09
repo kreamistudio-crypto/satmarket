@@ -6415,3 +6415,32 @@ notizia resta (rosso).
 DA GUARDARE: se il rodaggio dira' che 24 ore sono troppe o poche, e'
 UNA costante (`P2P_SCOPA_LAMPO_S`); e se l'istantaneo tornera' a
 mancare, la strada 3 aspetta nella fase 6.
+
+Il ritirato non si vede piu' (set 2026, un'ora dopo: Andrea
+semplifica il lampo). La regola nuova, sua: ritirato = SPARITO,
+subito e ovunque — niente ✕, niente attesa, niente card «annullato»
+che resta in giro. La derivazione dallo stato resta la stessa della
+voce qui sopra, cambia la soglia: per l'annullato che non ha mai
+tenuto sats, zero.
+IL GIUDICE E' UNO (`p2pRitirato`: annullato, niente hold, niente
+satsNetti) E LO CHIAMANO I TRE POSTI dove l'annullato arriva o
+riposa: `applicaMessaggioP2P` (il kind 14 — toglie la riga, dice
+«Ordine ritirato ✓», e chi stava guardando proprio quella pagina
+torna al libro), `statoPubblicoOrdini` (la via di riserva
+all'apertura — in silenzio: la card di un ordine morto non deve
+nemmeno comparire, e qui passa anche lo SCADUTO senza sats), e la
+scopa (la rete per le righe rimaste da prima del cambio).
+⚠️ IL RIMOTORE PULISCE ANCHE LE DUE CACHE DI SESSIONE, ed e' la meta'
+che non si vede: la restore e il libro in cache dicono «pending» per
+tutta la sessione, e una riga tolta con quei due ancora caldi
+RINASCEREBBE «pubblicato» al render dopo, per mano dell'adozione — la
+tortura l'ha mostrato (rimotore senza pulizia: rosso il banco del
+motore, l'ordine risorto). Lo stesso rischio, in forma piu' rara,
+vale per la ✕ su una riga finita con le cache calde: dichiarato, non
+curato — se si vede sul campo, la pulizia si sposta in un posto solo.
+IL LAMPO DELLE 24 ORE RESTA AL SOLO `rifiutato` (porta un motivo da
+leggere), le RICEVUTE — annullato con hold o satsNetti — ai 30
+giorni, il concluso com'era. La prova regina della catena dei timbri
+cambia portatore un'altra volta (dal «chiuso stamattina» al «rifiuto
+di stamattina») senza cambiare mestiere. Torturato: rimotore senza
+pulizia delle cache, rosse sentinella e banco del motore.
