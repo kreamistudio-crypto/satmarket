@@ -1787,16 +1787,24 @@
      di `.acq-art .qta-mini`: le altre due case di `.p2p-testa` (lo
      scambio e l'ordine preso) non si toccano di un pixel. */
   /* ...E LA CIFRA VESTE IL LATO (set 2026, ritocco di Andrea): nel
-     libro i sats e il «prezzo di mercato» parlano il verde a comprare
-     e il rosso a vendere — stesso giudice, transizione morbida. SOLO
-     qui: nelle altre case di .p2p-sats (scambio, striscia) la cifra
-     resta arancio, che li' il lato e' della riga e non del tab. */
-  .p2p-ord > .p2p-sats{display:block;margin-top:3px;font-size:13px;
-    white-space:normal;color:var(--trust);transition:color .3s ease}
-  body.p2p-vendo .p2p-ord > .p2p-sats{color:var(--danger)}
+     libro i sats parlano il verde a comprare e il rosso a vendere —
+     stesso giudice, transizione morbida. SOLO qui: nelle altre case
+     di .p2p-sats (scambio, striscia) la cifra resta arancio, che li'
+     il lato e' della riga e non del tab. DISCENDENTE e non figlio:
+     dal set 2026 la cifra sta DENTRO la testa. */
+  .p2p-ord .p2p-sats{color:var(--trust);transition:color .3s ease}
+  body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}
   @media (prefers-reduced-motion:reduce){
-    .p2p-ord > .p2p-sats{transition:none}
+    .p2p-ord .p2p-sats{transition:none}
   }
+  /* IL VESTITO DELLE DUE RIGHE NUOVE (set 2026, «chi fa cosa»): la
+     cifra grande in testa senza il nowrap della base (su una riga
+     tutta sua puo' andare a capo, mai allargare la pagina), l'euro
+     sotto come blocco di prosa — le classi base restano, e le altre
+     case di .p2p-testa non portano queste due sorelle. */
+  .p2p-cifra{font-size:17px;white-space:normal}
+  .p2p-cambio{display:block;margin-top:3px;font-family:inherit;
+    font-weight:600;font-size:13.5px;color:var(--ink-soft)}
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -33193,17 +33201,21 @@ function satsMercatoP2P(o){
    sconosciuto davanti al numero. */
 function rigaOrdineP2P(o){
   const stima = satsMercatoP2P(o);
-  /* «al mercato» e non «al prezzo di mercato»: sono venti caratteri in
-     mono dentro una testa larga 258px a 320, e con la riga lunga il
-     prezzo andava a capo — misurato, 2 card su 7. */
+  /* LA CARD DICE CHI FA COSA (set 2026, richiesta di Andrea): riga
+     grande col VERBO e i sats — «Vende ≈ 12 000 sats» — e sotto
+     «in cambio di 8,00 € · prezzo di mercato». Il verbo e' un fatto
+     della RIGA (o.lato), mai del tab: dice quel che fa chi ha
+     pubblicato, e resterebbe giusto anche fuori da questo elenco. */
+  const verbo = o.lato === 'sell' ? 'Vende' : 'Compra';
   const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
              : stima ? '≈ ' + fmt(stima) + ' sats'
-             : 'al mercato';
-  /* col cambio muto la testa dice GIA' che il prezzo e' quello di
-     mercato: ripeterlo nella meta sarebbe la stessa cosa due volte */
-  const premio = o.sats > 0 ? ''
-               : o.premium ? (o.premium > 0 ? '+' : '−') + Math.abs(o.premium) + '% sul mercato'
-               : stima ? 'prezzo di mercato' : '';
+             : 'sats';
+  /* la coda della riga dell'euro: il premio quando c'e' (resta dov'era,
+     dopo il ·), «prezzo di mercato» col cambio vivo, «al mercato» a
+     cambio muto — mai un numero inventato */
+  const coda = o.sats > 0 ? ''
+             : o.premium ? (o.premium > 0 ? '+' : '−') + Math.abs(o.premium) + '% sul mercato'
+             : stima ? 'prezzo di mercato' : 'al mercato';
   const sc = scadeTestoP2P(o.scade);
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
@@ -33225,8 +33237,8 @@ function rigaOrdineP2P(o){
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    <div class="p2p-testa"><span class="p2p-euro">${esc(fmtEur(o.euro))} €</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
-    <span class="p2p-sats">${sats}${premio ? ' · ' + esc(premio) : ''}</span>
+    <div class="p2p-testa"><span class="p2p-sats p2p-cifra">${verbo} ${sats}</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
+    <span class="p2p-euro p2p-cambio">in cambio di ${esc(fmtEur(o.euro))} €${coda ? ' · ' + esc(coda) : ''}</span>
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">👤 È il tuo ordine — tocca per aprirlo</div>' : ''}

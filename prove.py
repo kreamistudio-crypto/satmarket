@@ -35353,25 +35353,28 @@ def prove_p2p_libro():
     # voto a sinistra e da quanto e' li' a destra.
     prova("...e le due cifre della striscia stanno ai due bordi", True,
           "justify-content:space-between" in rep)
-    # LA STIMA SCENDE SOTTO IL PREZZO nella SOLA card del libro: la
-    # classe resta quella — stessa cifra, stesso mestiere — e a cambiare
-    # e' il vestito in questa casa (il pattern di `.acq-art .qta-mini`).
-    # Il selettore DISCENDENTE e' quel che tiene ferme le altre due case
-    # di `.p2p-testa`: lo scambio e l'ordine preso non si muovono.
-    # ⚠️ E GUARDA COSA DICE, non se la riga c'e': la prima stesura
-    # chiedeva il solo selettore e restava VERDE con `display:inline`
-    # dentro — cioe' con la stima tornata in fila col prezzo, che e'
-    # esattamente il difetto che il cantiere ha misurato a 320px.
-    # L'ha detto la tortura, non la rilettura.
-    j_st = css.index(".p2p-ord > .p2p-sats{")
-    st = css[j_st:css.index("}", j_st)]
-    prova("la stima scende sotto il prezzo, e solo nella card del libro",
-          True, "display:block" in st)
-    # ...e li' PUO' andare a capo: la base e' `nowrap` perche' in fila
-    # una cifra spezzata e' illeggibile, ma su una riga tutta sua il
-    # nowrap allargherebbe la pagina con una cifra assurda di un terzo.
-    prova("...e sulla riga sua puo' andare a capo", True,
-          "white-space:normal" in st)
+    # HA CAMBIATO PELLE (set 2026, richiesta di Andrea): la card dice
+    # CHI FA COSA — riga grande col VERBO e i sats («Vende ≈ 12 000
+    # sats»), sotto «in cambio di 8,00 € · prezzo di mercato». Le
+    # classi base restano (il colore del lato e l'ordine con la
+    # reputazione le usano), il vestito nuovo sta nelle due sorelle
+    # .p2p-cifra/.p2p-cambio, che le ALTRE case di .p2p-testa
+    # (scambio e ordine preso) non portano: loro non si muovono.
+    prova("la cifra grande sta in testa col verbo, l'euro sotto", True,
+          '<span class="p2p-sats p2p-cifra">${verbo} ${sats}</span>'
+          in mini
+          and '"p2p-euro p2p-cambio">in cambio di' in mini)
+    prova("...e il verbo e' un fatto della RIGA, mai del tab", True,
+          "const verbo = o.lato === 'sell' ? 'Vende' : 'Compra';"
+          in mini)
+    prova("l'euro sotto e' un blocco di prosa", True,
+          "display:block" in pezzo_js(mini, ".p2p-cambio{", "}")
+          and "font-family:inherit" in pezzo_js(mini, ".p2p-cambio{", "}"))
+    # ...e la cifra grande PUO' andare a capo: la base e' `nowrap`
+    # perche' in fila una cifra spezzata e' illeggibile, ma su una
+    # riga tutta sua il nowrap allargherebbe la pagina.
+    prova("...e la cifra grande puo' andare a capo", True,
+          "white-space:normal" in pezzo_js(mini, ".p2p-cifra{", "}"))
 
     # --- 4c) LA RIGA CHE DICEVA CHI TIENE I SATS E' USCITA -----------
     # (set 2026, restyling della testata — decisione di Andrea). La
@@ -35691,9 +35694,15 @@ console.log(JSON.stringify(out));
     # testa e' un flex, quindi il prezzo si stringeva e andava a capo
     # (misurato, 2 card su 7). Quel che la prova garantisce non cambia:
     # a cambio muto non esce nessun numero inventato.
+    # EMENDATA (set 2026, «chi fa cosa»): col PREMIO la coda dice il
+    # premio anche a cambio muto («+2% sul mercato»), e «al mercato»
+    # resta al solo caso senza premio. Quel che la prova garantisce
+    # non cambia: a cambio muto nessun ≈ e nessun numero inventato.
     prova("...e a cambio muto non inventa nessun numero", True,
-          "al mercato" in out["rigaMercatoMuto"]
-          and "≈" not in out["rigaMercatoMuto"])
+          "≈" not in out["rigaMercatoMuto"]
+          and "≈" not in out["rigaMercatoZeroMuto"]
+          and "+2% sul mercato" in out["rigaMercatoMuto"]
+          and "al mercato" in out["rigaMercatoZeroMuto"])
     # E IL CASO CHE MORDE E' QUELLO SENZA PREMIO, che l'ha detto la
     # tortura: con `premium` pieno la meta dice «+2% sul mercato» e il
     # ripiego non si valuta affatto, quindi l'asserzione sul solo
@@ -35937,15 +35946,15 @@ def prove_nav_p2p():
     prova("...con la dissolvenza anche sul fondo", True,
           "nav button{transition:color .4s ease,background-color .4s ease}"
           in mini)
-    _ps = pezzo_js(mini, ".p2p-ord > .p2p-sats{", "}")
+    _ps = pezzo_js(mini, ".p2p-ord .p2p-sats{", "}")
     prova("la cifra delle card del libro veste il lato, morbida", True,
           "color:var(--trust)" in _ps
           and "transition:color .3s ease" in _ps
-          and "body.p2p-vendo .p2p-ord > .p2p-sats{color:var(--danger)}"
+          and "body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}"
           in mini)
     prova("...solo nel libro: le altre case restano arancio", True,
           "color:var(--sats-text)" in pezzo_js(mini, ".p2p-sats{", "}")
-          and mini.count("> .p2p-sats{color") <= 1)
+          and mini.count(".p2p-ord .p2p-sats{color") == 2)
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
     prova("...nemmeno nel server: le rotte sono i due gemelli", True,
