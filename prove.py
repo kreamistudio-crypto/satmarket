@@ -39794,6 +39794,17 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   out.strisciaNasce = s1.includes('I tuoi scambi') && s1.includes('data-id="ord-a"');
   out.strisciaNonInventa = !s1.includes('ord-x');
   out.latoVendi = s1.includes('Vendi') && !s1.includes('Compri');
+  // il bordo e' del LIBRO: nella striscia e' tutto tuo per definizione,
+  // e la riga di la' veste come quelle locali accanto (dal campo: la
+  // riga vestita e quella nuda fianco a fianco si leggevano come un
+  // guasto del giudice — che era innocente)
+  out.strisciaSenzaBordo = !s1.includes('p2p-mio');
+  // e l'etichetta dice SOLO il fatto che sa: l'assenza della riga
+  // locale non prova «un altro dispositivo» — la lista puo' mancare
+  // anche sul dispositivo che ha pubblicato (dal campo: tre ordini
+  // dello stesso PC, due etichettati «altrove»)
+  out.etichettaOnesta = s1.includes('si guarda soltanto')
+    && !s1.includes('altro tuo dispositivo');
   // e) l'ordine gia' in locale non si ripete
   ordiniFinti = {'ord-a': {id: 'ord-a', stato: 'attivo', creato: 100}};
   const s2 = scambiP2P();
@@ -39841,6 +39852,10 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
                   True, out5["strisciaNasce"])
             prova("...e non inventa righe per gli ordini degli altri",
                   True, out5["strisciaNonInventa"])
+            prova("...e veste come le righe locali: il bordo e' del libro",
+                  True, out5["strisciaSenzaBordo"])
+            prova("...e l'etichetta dice solo il fatto che sa", True,
+                  out5["etichettaOnesta"])
             prova("...col lato del maker: sell e' «vendi», buy e' «compri»",
                   True, out5["latoVendi"] and out5["latoCompri"])
             prova("l'ordine gia' in locale non si ripete", True,

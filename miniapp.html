@@ -34799,10 +34799,15 @@ function prendiOrdineP2P(id){
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   const gia = ordiniP2P()[id];
   if (gia) { apriOrdineP2P(id); return; }
-  /* MIO MA NON IN LISTA: l'ordine e' di questo profilo e l'ha
-     pubblicato un altro dispositivo. Non c'e' uno scambio da aprire —
-     quella lista vive nel browser che l'ha creato — ma prenderlo no. */
-  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: l\'hai pubblicato da un altro dispositivo'); return; }
+  /* MIO MA NON IN LISTA: l'ordine e' di questo profilo, e qui non c'e'
+     uno scambio da aprire — ma prenderlo no. ⚠️ E NON SI DICE DA DOVE
+     E' NATO (set 2026, dal campo): l'assenza della riga locale non
+     prova «un altro dispositivo» — la lista puo' mancare anche sul
+     dispositivo che ha pubblicato (svuotata, o sovrascritta da
+     un'altra scheda), e la frase vecchia era una bugia osservata. Si
+     dice il fatto che regge in tutti i casi; ad aprirlo davvero sara'
+     la ripresa delle fasi successive. */
+  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: da questo dispositivo, per ora, si guarda soltanto'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const compro = riga.lato === 'sell';
@@ -35762,20 +35767,32 @@ function righeAltroveP2P(locali){
   }
   return fuori.sort((a, b) => (b.creato || 0) - (a.creato || 0));
 }
-/* La riga dice il fatto e la sua casa: l'ordine e' tuo e vive su un
-   altro dispositivo. Il tocco passa dalla porta del gesto APPOSTA —
-   e' il giudice che gia' distingue «mio ma non in lista» e risponde
-   con la frase onesta, invece di aprire uno scambio che qui non c'e'.
+/* La riga dice SOLO il fatto che sa: l'ordine e' tuo e questo
+   dispositivo non ha le sue carte — quindi da qui si guarda soltanto.
+   ⚠️ NIENTE «da un altro dispositivo» (set 2026, dal campo):
+   l'assenza della riga locale non prova dove l'ordine e' nato — la
+   lista puo' mancare anche sul dispositivo che ha pubblicato — e
+   l'etichetta vecchia e' stata colta a mentire, tre ordini dello
+   stesso PC con due «altrove». Il tocco passa dalla porta del gesto
+   APPOSTA — e' il giudice che gia' distingue «mio ma non in lista» e
+   risponde con la stessa frase, invece di aprire uno scambio che qui
+   non c'e'.
    IL LATO E' QUELLO DEL MAKER, non di chi sfoglia il libro: un ordine
-   `sell` nella striscia e' «vendi», perche' qui l'ordine e' TUO. */
+   `sell` nella striscia e' «vendi», perche' qui l'ordine e' TUO.
+   E NIENTE `p2p-mio`, come le righe locali accanto (set 2026, dal
+   campo: la riga di la' vestita e quella di qua nuda, fianco a
+   fianco, si leggevano come un guasto). Il bordo e' del LIBRO —
+   distingue il tuo in mezzo a quelli degli sconosciuti — mentre
+   nella striscia e' tutto tuo per definizione: la casa la dice
+   l'etichetta, e la riga col 🌐 dice il resto. */
 function rigaScambioAltroveP2P(o){
   const sats = o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
-  return '<div class="p2p-ord p2p-mio" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
+  return '<div class="p2p-ord" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
     'onclick="prendiOrdineP2P(this.dataset.id)">' +
     '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
     '<span class="p2p-sats">' + esc(sats) + '</span></div>' +
     '<div class="p2p-meta"><span>' + (o.lato === 'sell' ? '⬆️ Vendi' : '⬇️ Compri') + '</span>' +
-    '<span>🌐 pubblicato da un altro tuo dispositivo</span></div></div>';
+    '<span>🌐 da qui si guarda soltanto</span></div></div>';
 }
 /* ---- «I tuoi scambi», in cima al libro ----
    SINCRONA apposta: renderP2P la incolla dentro l'innerHTML, e un
