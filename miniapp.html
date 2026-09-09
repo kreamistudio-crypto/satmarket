@@ -98,6 +98,10 @@
     --trust:#1B8B54; --trust-soft:#E7F5EC;
     --barra-da:#DCEEE4; --barra-a:#8FCBAB;
     --danger:#C2410C;
+    /* il "profondo" del rosso: nasce col + della nav trasformata nel
+       P2P (set 2026) — l'ombra piena sotto il tondo «Pubblica» quando
+       si sta nel tab «Vendi sats», gemello di --trust-deep */
+    --danger-deep:#9A3412;
     --radius:16px; --pad:16px;
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
        l'elenco dei contesti accanto a .btn) */
@@ -190,6 +194,10 @@
        di giorno, la carta delle card di sera) e a quella densita'
        non passa niente. */
     --header-bg:var(--bg); --nav-bg:rgba(255,255,255,.96);
+    /* la nav TRASFORMATA del P2P (set 2026): non piu' la carta
+       rialzata ma un incavo — piu' scura della pagina, con l'ombra
+       interna a dire «sei in un altro contesto» */
+    --nav-bg-p2p:rgba(240,231,210,.97);
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
     /* ---- LA SPEDIZIONE GRATUITA: UN COLORE SOLO, IN TUTTA L'APP ----
@@ -270,6 +278,7 @@
     --trust:#34B47A; --trust-soft:#1B2C20;
     --barra-da:#243B2C; --barra-a:#35684A;
     --danger:#F07A47;
+    --danger-deep:#A33A0E;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
        misurati: --asta vs bruno 3,77 (component ok) col bianco sopra
@@ -294,6 +303,7 @@
     --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
     --header-bg:var(--bg); --nav-bg:rgba(44,37,23,.96);
+    --nav-bg-p2p:rgba(24,19,11,.97);
     --ph-a:#332B1A; --ph-b:#2B2415;
     /* --ship-bg/--ship-text servono ai badge di STATO dell'ordine
        («spedito»): quelli si', al buio si scuriscono come le sorelle.
@@ -2115,6 +2125,73 @@
      celle equilarghe senza una regola dedicata. */
   /* Il lockup nella barra: esiste solo da desktop in su */
   .nav-logo{display:none}
+
+  /* ====== LA NAV CHE SI TRASFORMA NEL P2P (set 2026) ======
+     Entrando nello scambio (body.nav-p2p, che go() deriva dalla VISTA
+     e non dal gesto: cosi' vale anche per indietro e cronologia, la
+     lezione di renderInteresse) tre voci cambiano mestiere: P2P, Aste
+     e Ordini SCENDONO fuori dalla barra e dal basso salgono «Libro
+     ordini», «I miei scambi» e — al posto di Ordini — niente, per ora.
+     Esplora resta ferma: e' la via del ritorno.
+     IL TRUCCO E' LA CELLA A DUE STRATI: ogni voce che si trasforma
+     vive in una .nav-cella (grid, i due bottoni nella STESSA cella di
+     griglia), quindi la barra non cambia di un pixel — si muovono solo
+     transform e opacity, mai il layout. `nav button` resta il
+     selettore delle voci (CSS e spazzata di go()): e' un discendente,
+     li prende tutti. L'overflow:hidden taglia chi scende al bordo
+     della cella, cosi' da desktop nessuno cala sul contenuto. */
+  nav .nav-cella{flex:1;display:grid;position:relative;overflow:hidden}
+  nav .nav-cella>button{grid-area:1/1;width:100%;
+    transition:transform .28s cubic-bezier(.2,.7,.2,1),
+      opacity .22s ease,visibility 0s linear .28s}
+  /* i due stati: fuori scena = giu' oltre il bordo, invisibile e
+     intoccabile; la visibility gira DOPO la corsa (delay .28s) cosi'
+     l'uscita si vede, e chi entra la accende subito (delay 0) con un
+     .06s di scala sulla corsa: prima si esce, poi si sale */
+  nav .nav-cella>.strato-p2p{transform:translateY(110%);opacity:0;
+    visibility:hidden;pointer-events:none}
+  body.nav-p2p nav .nav-cella>button:not(.strato-p2p){
+    transform:translateY(110%);opacity:0;visibility:hidden;pointer-events:none}
+  body.nav-p2p nav .nav-cella>.strato-p2p{transform:none;opacity:1;
+    visibility:visible;pointer-events:auto;transition-delay:.06s,.06s,0s}
+  /* lo SFONDO INCASSATO: la barra si scava — piu' scura della pagina,
+     ombra interna dall'alto, il bordo di sopra si spegne. Un contesto
+     diverso deve VEDERSI, non solo leggersi nelle etichette. */
+  nav{transition:background-color .3s ease,box-shadow .3s ease,
+    border-color .3s ease}
+  body.nav-p2p nav{background:var(--nav-bg-p2p);border-top-color:transparent;
+    box-shadow:inset 0 3px 7px rgba(0,0,0,.16),
+      inset 0 -1px 0 rgba(255,255,255,.35)}
+  html[data-tema="scuro"] body.nav-p2p nav{
+    box-shadow:inset 0 3px 9px rgba(0,0,0,.55),
+      inset 0 -1px 0 rgba(255,255,255,.06)}
+  /* IL + CAMBIA PELLE: la scritta «Vendi» scende con le sorelle, il
+     tondo sale di un soffio e passa da quadrato arancio a CERCHIO col
+     colore del lato — verde protezione a comprare, rosso di casa a
+     vendere (body.p2p-vendo, scritto da setLatoP2P). E' lo stesso
+     bottone: cambia il vestito, mai la cella. */
+  nav button.sell .ic{transition:transform .3s cubic-bezier(.2,.7,.2,1),
+    border-radius .3s ease,background-color .3s ease,box-shadow .3s ease}
+  /* le due etichette del + stanno impilate nella stessa cella di
+     griglia: «Vendi» (base) e «Pubblica» (solo desktop, vedi giu') —
+     la pila e' larga quanto la piu' lunga, quindi il crossfade non
+     sposta niente */
+  nav button.sell .eti-pila{display:grid;justify-items:center}
+  nav button.sell .eti-pila>span{grid-area:1/1;
+    transition:transform .28s cubic-bezier(.2,.7,.2,1),
+      opacity .22s ease,visibility 0s linear .28s}
+  nav button.sell .eti-p2p{visibility:hidden;opacity:0}
+  body.nav-p2p nav button.sell .eti{transform:translateY(120%);
+    opacity:0;visibility:hidden}
+  body.nav-p2p nav button.sell .ic{transform:translateY(-8px);
+    border-radius:50%;background:var(--trust);
+    box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
+  body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger);
+    box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
+  @media (prefers-reduced-motion:reduce){
+    nav,nav .nav-cella>button,nav button.sell .ic,
+    nav button.sell .eti-pila>span{transition:none}
+  }
 
   /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
      Nel dettaglio di un annuncio comprabile la tab bar lascia il posto
@@ -4677,6 +4754,38 @@
       width:auto;height:auto;border-radius:0;background:none;
       font-size:17px;margin-top:0;box-shadow:none;font-family:inherit;
     }
+    /* LA NAV TRASFORMATA, DA DESKTOP (set 2026): qui le voci sono
+       pillole, non c'e' un + rialzato da far levitare. Le celle a
+       strati smettono di allargarsi (flex:0 0 auto come le sorelle) e
+       la pillola prende la larghezza dello strato piu' lungo: il
+       cambio e' un crossfade, mai uno spostamento. */
+    nav .nav-cella{flex:0 0 auto}
+    nav .nav-cella>button{justify-content:center}
+    /* la pillola del + non scappa in alto ne' diventa tonda: cambia
+       COLORE (il fondo del bottone, non l'.ic che qui e' solo il
+       glifo) e la scritta fa il crossfade «Vendi» → «Pubblica» */
+    nav button.sell{transition:background-color .3s ease,
+      box-shadow .3s ease}
+    body.nav-p2p nav button.sell .ic{transform:none;border-radius:0;
+      background:none;box-shadow:none}
+    body.nav-p2p nav button.sell{background:var(--trust);
+      box-shadow:0 3px 0 var(--trust-deep)}
+    body.nav-p2p.p2p-vendo nav button.sell{background:var(--danger);
+      box-shadow:0 3px 0 var(--danger-deep)}
+    /* le etichette: da desktop «Vendi» sfuma senza scivolare (dentro
+       una pillola la corsa verticale si vedrebbe tagliata male) e
+       «Pubblica» prende il suo posto */
+    body.nav-p2p nav button.sell .eti{transform:none}
+    body.nav-p2p nav button.sell .eti-p2p{visibility:visible;opacity:1;
+      transition-delay:.06s,.06s,0s}
+    /* l'incavo da desktop viene dal BASSO: la topbar e' appesa in
+       cima, il suo bordo vivo e' quello di sotto */
+    body.nav-p2p nav{border-bottom-color:transparent;
+      box-shadow:inset 0 -3px 7px rgba(0,0,0,.14),
+        inset 0 1px 0 rgba(255,255,255,.35)}
+    html[data-tema="scuro"] body.nav-p2p nav{
+      box-shadow:inset 0 -3px 9px rgba(0,0,0,.55),
+        inset 0 1px 0 rgba(255,255,255,.06)}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}
@@ -5379,6 +5488,23 @@ document.getElementById('cartello')?.remove();</script>
            l'identita' e' l'account, tutta sotto il cofano. Il
            foglietto ridotto (codice segreto + dimentica) si apre da
            «I tuoi dati», mai da qui. -->
+    </div>
+  </div>
+
+  <!-- ============ VISTA: I MIEI SCAMBI P2P (set 2026) ============
+       La striscia «I tuoi scambi» esce dal libro e diventa una vista
+       sua, aperta dal tasto «I miei scambi» della nav trasformata.
+       Markup FISSO come la sorella: dentro #p2pMieiCorpo scrive
+       renderP2P (che dipinge ENTRAMBI i corpi: i freni per sessione
+       restano suoi e non si sdoppiano), sotto esc(). Le parole della
+       fase 6 valgono identiche: niente nomi di terzi. -->
+  <div class="view" id="view-p2pmiei">
+    <div class="sicu">
+      <div class="p2p-testata">
+        <img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()">
+        <div class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></div>
+      </div>
+      <div id="p2pMieiCorpo"></div>
     </div>
   </div>
 
@@ -6547,6 +6673,10 @@ document.getElementById('cartello')?.remove();</script>
   <nav>
     <!-- Cinque voci in CINQUE posti, col + di Vendi al centro esatto
          perche' e' la TERZA di cinque celle equilarghe (flex:1).
+         Dal set 2026 tre posti sono CELLE A DUE STRATI (.nav-cella):
+         nel P2P il bottone di sempre scende e sale il gemello dello
+         scambio — ma le celle restano cinque, equilarghe, e il +
+         resta la terza: la geometria della barra non si muove.
          IL POSTO VUOTO NON ESISTE PIU' (ago 2026): era la cella di
          «Sfoglia», tenuta libera da uno spaziatore «finche' non ci
          andra' la voce nuova» — la voce e' arrivata, ed e' il P2P.
@@ -6596,8 +6726,24 @@ document.getElementById('cartello')?.remove();</script>
          nel ritaglio per costruzione: il punto piu' lontano dal
          centro sta a raggio ~9 tratto compreso, cioe' dentro [2,22]
          con qualunque angolo. -->
+    <!-- LA CELLA A DUE STRATI (set 2026, la nav che si trasforma nel
+         P2P): il bottone di sempre sotto, lo strato-p2p sopra — stessa
+         cella di griglia, si scambiano il posto con transform. Il
+         selettore `nav button` li prende tutti (discendente), quindi
+         CSS e spazzata di go() non cambiano. -->
+    <div class="nav-cella">
     <button id="nav-p2p" onclick="vaiP2P()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><g transform="rotate(13 12 12)"><path class="velo" d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3zM8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3z"/><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>P2P</button>
-    <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
+    <!-- Libro ordini: il LIBRO APERTO, disegnato nella grammatica
+         delle sorelle (griglia da 24 ritagliata a "2 2 20 20", tratto
+         1.5 currentColor, velo al 12%, curve un pelo fuori squadra).
+         Dentro: gli ordini di TUTTI, il libro del coordinatore. -->
+    <button id="nav-p2plibro" class="strato-p2p" onclick="go('p2p')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1 1.8-1.3 4.3-1.6 6.9-1V5.1c-2.6-.5-5.1-.2-6.9 1z"/><path d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1"/><path d="M12 6.1c1.8-1.2 4.3-1.5 6.9-1v12.6c-2.6-.6-5.1-.3-6.9 1"/><path d="M12 6.1v12.6"/></svg></span>Libro ordini</button>
+    </div>
+    <!-- Il + di Vendi: nel P2P la scritta scende e il tondo si
+         trasforma (vedi il CSS della nav trasformata). Le DUE
+         etichette stanno impilate in .eti-pila: «Pubblica» esiste
+         solo da desktop, dove il + resta una pillola. -->
+    <button id="nav-vendi" class="sell" onclick="toccaPiu()"><span class="ic">＋</span><span class="eti-pila"><span class="eti">Vendi</span><span class="eti eti-p2p">Pubblica</span></span></button>
     <!-- Aste: il MARTELLETTO (ago 2026). Il markup della barra e'
          STATICO — a leva spenta il tasto resta e porta al suo «coming
          soon» (vaiAste), mai una cella accesa e spenta a runtime, che
@@ -6605,7 +6751,14 @@ document.getElementById('cartello')?.remove();</script>
          le sorelle: si accende in arancio con currentColor, la
          convenzione della nav non cambia. Inchiostro dentro [2,22],
          la mano di tagliaSVG. -->
+    <div class="nav-cella">
     <button id="nav-aste" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
+    <!-- I miei scambi: le DUE FRECCE dello scambio, andata e ritorno —
+         niente velo perche' non c'e' una pancia da riempire, come
+         non ce l'ha il tratto della lente. Dentro: gli ordini
+         pubblicati da ME (la striscia di ieri, come vista sua). -->
+    <button id="nav-p2pmiei" class="strato-p2p" onclick="go('p2pmiei')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path d="M4.6 8.4h13.5"/><path d="M14.9 5.1l3.4 3.2-3.3 3.2"/><path d="M19.4 15.8H5.9"/><path d="M9.2 12.6l-3.4 3.1 3.3 3.2"/></svg></span>I miei scambi</button>
+    </div>
     <!-- Ordini: il PACCO di tre quarti. La scatola PIATTA (quadro +
          riga del coperchio, la famiglia di tagliaSVG) e' stata
          disegnata e scartata: a 24px con la riga in mezzo si legge
@@ -6614,7 +6767,12 @@ document.getElementById('cartello')?.remove();</script>
          Il 🤝 se n'e' andato di qui e resta al RITIRO IN ZONA degli
          annunci: due mestieri diversi — in nav dice dove sei, li' dice
          come arriva la roba -->
+    <!-- Nel P2P questa cella resta VUOTA (deciso da Andrea, set 2026):
+         Ordini scende e nessuno sale al suo posto — lo slot aspetta
+         la voce che verra', e intanto tiene la larghezza. -->
+    <div class="nav-cella">
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
+    </div>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
     <button class="avatar-btn" onclick="toccaTappo()" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
@@ -8537,7 +8695,11 @@ function voceNav(view){
   else if (view === 'astepresto') view = 'aste';
   /* ...e il gemello del P2P accende la sua: stessa ragione */
   else if (view === 'p2ppresto') view = 'p2p';
-  else if (view === 'p2pordine') view = 'p2p';
+  /* nella nav trasformata (set 2026) il libro accende «Libro ordini»
+     e uno scambio aperto accende «I miei scambi»: uno scambio e' MIO,
+     e la voce accesa dice la strada da cui ci si e' scesi */
+  else if (view === 'p2p') view = 'p2plibro';
+  else if (view === 'p2pordine') view = 'p2pmiei';
   /* Il ramo resta alle sole ASTE: quello di Sfoglia non esiste piu'.
      LA RIGA CHE SI ROVESCIA, col suo motivo — «MA LA NAV MENTIVA»:
      entrando in un reparto si accendeva Esplora su una vetrina
@@ -8601,6 +8763,22 @@ function vaiP2P(){
   go('p2p');
 }
 
+/* LA NAV TRASFORMATA (set 2026): quali viste accendono la modalita'
+   P2P della barra. Il coming soon NON c'e' — chi ha la leva spenta
+   alle tre viste non arriva mai, quindi il gate e' per costruzione.
+   La classe la scrive go() derivandola dalla VISTA (mai dal gesto):
+   cosi' vale anche per indietro e cronologia, la lezione di
+   renderInteresse. */
+const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine']);
+/* Il + della barra ha DUE mestieri e uno solo alla volta: fuori dal
+   P2P apre Vendi, dentro pubblica un ordine. Chiede alla classe sul
+   body — che e' la stessa verita' che l'utente ha davanti agli occhi:
+   se il + e' tondo e verde, pubblica. */
+function toccaPiu(){
+  if (document.body.classList.contains('nav-p2p')) { apriNuovoOrdineP2P(); return; }
+  go('vendi');
+}
+
 function go(view){
   haptic();
   /* In vetrina Vendi, Ordini e Profilo non esistono: si fanno su Telegram */
@@ -8645,6 +8823,13 @@ function go(view){
   /* Nella cassa la tab bar sparisce e basta: e' una cassa, non una
      vetrina, e Paga vive in pagina */
   document.body.classList.toggle('senza-nav', view==='acquisto');
+  /* LA NAV SI TRASFORMA NEL P2P (set 2026): la classe si deriva dalla
+     VISTA, qui e non nei vai* — cosi' indietro e cronologia la
+     rimettono giusta da soli. Il + cambia mestiere con lei (toccaPiu)
+     e l'aria-label dice quello del momento. */
+  document.body.classList.toggle('nav-p2p', VISTE_NAV_P2P.has(view));
+  el('nav-vendi')?.setAttribute('aria-label',
+    VISTE_NAV_P2P.has(view) ? 'Pubblica il tuo ordine' : 'Vendi un oggetto');
   /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
      senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
      l'utente puo' aver verificato la npub */
@@ -8657,8 +8842,9 @@ function go(view){
   if (view==='p2ppresto' || view==='astepresto') renderInteresse();
   /* la pagina vera dello scambio (set 2026): il libro si ridisegna QUI
      per la ragione delle due sorelle — ci si torna anche dalla
-     cronologia, e da vaiP2P non si passa */
-  if (view==='p2p') renderP2P();
+     cronologia, e da vaiP2P non si passa. renderP2P dipinge ENTRAMBI
+     i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
+  if (view==='p2p' || view==='p2pmiei') renderP2P();
   if (view==='p2pordine') renderOrdineP2P();
   if (view==='vendi') {
     aggiornaContattoHint();
@@ -8831,7 +9017,11 @@ const RADICI = new Set(['esplora','vendi','affari','profilo',
   'astepresto','p2ppresto',
   /* la pagina vera dello scambio (set 2026): radice sorella come il
      suo coming soon, che resta per chi ha la leva spenta */
-  'p2p']);
+  'p2p',
+  /* «I miei scambi» (set 2026, la nav trasformata): radice sorella
+     del libro — fra i due tasti della nav P2P si SOSTITUISCE, come
+     fra i tab di sempre */
+  'p2pmiei']);
 /* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
    quella del giorno prima): da ogni altra radice l'indietro passa da
    Esplora, e solo da Esplora si esce. E' come si comportano Subito e
@@ -8963,7 +9153,7 @@ function navRendiVista(b){
   /* lo scambio si ricostruisce solo se e' ancora nel browser: uno
      scambio dimenticato non si spaccia per quello di prima */
   if (b.v === 'p2pordine')
-    return ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2p');
+    return ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2pmiei');
   if (b.v === 'pacco') {
     /* il pacco si ricostruisce solo se lo stato in memoria e' ancora
        il suo (stesso annuncio di provenienza): svuotato da un acquisto
@@ -9258,7 +9448,7 @@ const PTR_SOGLIA = 64;         /* i pixel di tirata che valgono un «sì» */
 /* Le viste che aggiornaVista() sa davvero rileggere. Se un domani se ne
    aggiunge una la' dentro, va aggiunta anche qui — o il gesto girera'
    a vuoto proprio dove l'utente lo chiede. */
-const VISTE_PTR = new Set(['esplora','affari','profilo','p2p']);
+const VISTE_PTR = new Set(['esplora','affari','profilo','p2p','p2pmiei']);
 let ptrDa = 0, ptrDaX = 0, ptrTirato = 0, ptrInCorso = false;
 
 const ptrVista = () =>
@@ -9373,7 +9563,15 @@ async function aggiornaVista(){
   /* il libro ordini del P2P si rilegge dal coordinator (forza=true:
      una lettura in volo non basta, si chiede la NUOVA); un relay muto
      lascia il libro di prima e lo dice nella riga in testa */
-  if (v === 'p2p') { await caricaLibroP2P(true).catch(()=>{}); renderP2P(); return; }
+  if (v === 'p2p' || v === 'p2pmiei') {
+    /* dai miei scambi la tirata riarma anche la marcatura «e' mio»:
+       e' la risposta che quella vista mostra, e il gesto e' esplicito
+       come il «Riprova» (la bandierina e' l'unico gate) */
+    if (v === 'p2pmiei') p2pMieiChiesto = false;
+    await caricaLibroP2P(true).catch(()=>{});
+    renderP2P();
+    return;
+  }
   if (v === 'affari' || v === 'profilo') go(v);
 }
 
@@ -32753,6 +32951,11 @@ function setLatoP2P(lato){
   if (!P2P_LATO_K[lato] || lato === p2pLato) return;
   haptic();
   p2pLato = lato;
+  /* il + della nav trasformata veste il colore del lato: verde a
+     comprare, rosso a vendere. La classe resta anche fuori dal P2P
+     ed e' voluto: da sola non veste niente (serve anche nav-p2p),
+     e al ritorno il lato e' ancora quello scelto. */
+  document.body.classList.toggle('p2p-vendo', p2pLato === 'vendo');
   renderP2P();
 }
 
@@ -32912,15 +33115,27 @@ function renderP2P(){
     p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then(() => renderP2P()).catch(() => {});
   }
+  /* DUE CORPI, UN RENDERER (set 2026, la nav trasformata): il libro
+     in #p2pCorpo e «I miei scambi» in #p2pMieiCorpo si dipingono
+     INSIEME, a ogni giro — i freni per sessione restano qui e non si
+     sdoppiano, e ogni `.then(renderP2P)` gia' scritto rinfresca la
+     vista giusta qualunque essa sia. */
   const box = el('p2pCorpo');
+  const mieiBox = el('p2pMieiCorpo');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   if (p2pLibro === null) {
-    box.innerHTML = '<div class="hint">' + (p2pErrore
+    /* la stessa attesa in tutt'e due: anche la striscia vuole il
+       libro in mano (l'adozione ricostruisce solo cio' che il libro
+       sa descrivere), quindi prima del libro non c'e' niente di
+       onesto da mostrare nemmeno li' */
+    const attesa = '<div class="hint">' + (p2pErrore
       ? 'Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
         + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button>'
       : 'Leggo il libro degli ordini…') + '</div>';
+    box.innerHTML = attesa;
+    if (mieiBox) mieiBox.innerHTML = attesa;
     if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
     return;
   }
@@ -32962,13 +33177,21 @@ function renderP2P(){
     + (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
         + `del libro, quindi qui puo' mancare qualcosa o restare un ordine gia' preso.</div>` : '')
     + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}</div>` : '');
-  box.innerHTML = scambiP2P() + testa
+  /* IL LIBRO E' SOLO IL LIBRO (set 2026, decisione di Andrea): la
+     striscia e' andata nella sua vista e il «Pubblica» e' il + della
+     nav — UN gesto solo, gia' vestito del colore del lato. */
+  box.innerHTML = testa
     + (vivi.length ? vivi.map(rigaOrdineP2P).join('')
        : `<div class="empty"><span class="big">🔁</span><span class="empty-title">Nessun ordine aperto</span>${
            p2pLato === 'compro'
              ? 'In questo momento nessuno sta vendendo sats in euro.'
-             : 'In questo momento nessuno sta comprando sats in euro.'}</div>`)
-    + '<button class="btn orange" onclick="apriNuovoOrdineP2P()">➕ Pubblica il tuo ordine</button>';
+             : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
+  /* ...e i miei nella loro pagina: scambiP2P e' la striscia di sempre
+     (adozione compresa), lo stato vuoto invita al + qui sotto */
+  if (mieiBox) mieiBox.innerHTML = scambiP2P()
+    || '<div class="empty"><span class="big">🔁</span>'
+     + '<span class="empty-title">Nessuno scambio ancora</span>'
+     + 'Premi <b>＋</b> nella barra per pubblicare il tuo primo ordine.</div>';
 }
 function ricaricaP2P(){
   haptic();
@@ -34621,7 +34844,7 @@ function applicaMessaggioP2P(ord, dentro){
      quella pagina torna al libro con la notizia detta a voce. */
   if (p2pRitirato(nuovo) && togliRitiratoP2P(nuovo.id)) {
     toast('Ordine ritirato ✓');
-    if (p2pOrdineAperto === nuovo.id) { p2pOrdineAperto = ''; go('p2p'); }
+    if (p2pOrdineAperto === nuovo.id) { p2pOrdineAperto = ''; go('p2pmiei'); }
     else renderP2P();
     mostroRiascolta().catch(() => {});
     return;
@@ -34648,8 +34871,11 @@ function applicaMessaggioP2P(ord, dentro){
     toast('Scambio concluso 🎉');
   }
   if (P2P_FINALI.indexOf(nuovo.stato) >= 0) mostroRiascolta().catch(() => {});
-  if (document.querySelector('.view.active') &&
-      document.querySelector('.view.active').id === 'view-p2p') renderP2P();
+  /* le due viste della nav trasformata: libro e miei si ridisegnano
+     tutt'e due da renderP2P, basta essere su una delle due */
+  const vistaP2P = document.querySelector('.view.active');
+  if (vistaP2P && (vistaP2P.id === 'view-p2p'
+      || vistaP2P.id === 'view-p2pmiei')) renderP2P();
 }
 function chiudiFoglioP2P(idFoglio){
   const f = el(idFoglio);
@@ -34829,7 +35055,7 @@ function campiOrdineP2P(o){
 /* ---- la pagina di uno scambio ---- */
 function apriOrdineP2P(id){
   const o = ordiniP2P()[id];
-  if (!o) { go('p2p'); return; }
+  if (!o) { go('p2pmiei'); return; }
   p2pOrdineAperto = id;
   renderOrdineP2P();
   go('p2pordine');

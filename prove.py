@@ -24271,13 +24271,41 @@ def prove_seo():
     # e «cinque celle» direbbe quattro.
     barra = testo_mini[testo_mini.index("<nav>"):
                        testo_mini.index("</nav>")]
-    celle = _re.findall(r'<button id="(nav-[a-z0-9]+)"', barra)
+    # EMENDATA (set 2026, la nav che si trasforma nel P2P): tre posti
+    # sono diventati CELLE A DUE STRATI (.nav-cella) — il bottone di
+    # sempre sotto, il gemello dello scambio sopra, stessa cella di
+    # griglia. Le celle di PRIMO LIVELLO restano cinque ed equilarghe:
+    # prima si appiattiscono le .nav-cella, poi si conta come sempre.
+    piatta = _re.sub(r'<div class="nav-cella">.*?</div>', "<cella/>",
+                     barra, flags=_re.S)
+    celle = [m[0] or m[1] for m in _re.findall(
+        r'<button id="(nav-[a-z0-9]+)"|<(cella)/>', piatta)]
     prova("cinque celle in tutto", 5, len(celle))
     prova("...e il + di Vendi e' la terza", "nav-vendi", celle[2])
     # CAMBIATA DI LATO (ago 2026): qui si chiedeva lo spaziatore
     # nav-vuoto fra Esplora e Vendi — quel posto l'ha preso la voce
-    # nuova, come il commento della barra prometteva dall'inizio
-    prova("...col P2P fra Esplora e Vendi", "nav-p2p", celle[1])
+    # nuova, come il commento della barra prometteva dall'inizio.
+    # E DI NUOVO (set 2026): la voce vive in una cella a strati, e
+    # Esplora resta l'unico bottone diretto prima del + — e' lui la
+    # via del ritorno, e non si trasforma.
+    prova("...con la cella del P2P fra Esplora e Vendi", True,
+          celle[0] == "nav-esplora" and celle[1] == "cella"
+          and celle[3] == "cella" and celle[4] == "cella")
+    # ...e dentro le celle: il bottone di sempre PRIMA, lo strato
+    # dello scambio dopo — l'ultima (Ordini) ha il posto vuoto,
+    # deciso da Andrea: lo slot aspetta la voce che verra'
+    interne = _re.findall(r'<div class="nav-cella">(.*?)</div>',
+                          barra, _re.S)
+    prova("le tre celle a strati, nell'ordine del disegno",
+          [["nav-p2p", "nav-p2plibro"], ["nav-aste", "nav-p2pmiei"],
+           ["nav-affari"]],
+          [_re.findall(r'<button id="(nav-[a-z0-9]+)"', c)
+           for c in interne])
+    prova("...e gli strati portano la classe strato-p2p, loro soli",
+          True, '<button id="nav-p2plibro" class="strato-p2p"' in barra
+          and '<button id="nav-p2pmiei" class="strato-p2p"' in barra
+          and re.sub(r"<!--.*?-->", "", barra,
+                     flags=re.S).count('strato-p2p') == 2)
     # il markup della barra e' STATICO: niente celle accese e spente
     # a runtime, che era il posto dove il + poteva scentrarsi secondo
     # lo stato di una leva — e dello spaziatore non resta NIENTE,
@@ -35135,10 +35163,13 @@ def prove_p2p_libro():
     prova("il libro si rilegge tirando giu'", True, "'p2p'" in ptr)
     av = pezzo_js(mini, "async function aggiornaVista(){")
     prova("...e aggiornaVista chiede una lettura NUOVA", True,
-          "if (v === 'p2p')" in av and "caricaLibroP2P(true)" in av)
+          "if (v === 'p2p' || v === 'p2pmiei')" in av
+          and "caricaLibroP2P(true)" in av)
     _go = pezzo_js(mini, "function go(view){")
-    prova("go() ridisegna il libro entrando nella vista", True,
-          "if (view==='p2p') renderP2P();" in _go)
+    # EMENDATA (set 2026, la nav trasformata): le viste sono DUE e il
+    # renderer e' UNO — renderP2P dipinge libro e miei insieme
+    prova("go() ridisegna il libro entrando nelle due viste", True,
+          "if (view==='p2p' || view==='p2pmiei') renderP2P();" in _go)
     prova("...e vaiP2P NON lo ridisegna (ci si torna dalla cronologia)",
           False, "renderP2P" in _vp)
 
@@ -35706,6 +35737,181 @@ console.log(JSON.stringify(out));
           out["lapideFallback"])
     prova("...e un localStorage corrotto vale vuoto, mai un'esplosione",
           True, out["lapideCorrotta"])
+
+
+def prove_nav_p2p():
+    """LA NAV CHE SI TRASFORMA NEL P2P (set 2026, decisione di Andrea):
+    entrando nello scambio tre voci scendono e salgono i gemelli —
+    «Libro ordini» al posto di P2P, «I miei scambi» al posto di Aste,
+    NIENTE al posto di Ordini — mentre il + cambia mestiere (pubblica
+    un ordine, verde a comprare e rosso a vendere) ed Esplora resta la
+    via del ritorno. La striscia «I tuoi scambi» esce dal libro e
+    diventa la vista view-p2pmiei; il renderer resta UNO (renderP2P
+    dipinge entrambi i corpi, coi suoi freni per sessione).
+
+    Le sentinelle guardano la FORMA (la vista nuova fissa, la classe
+    derivata dalla vista in go(), i registri della cronologia, il CSS
+    che muove solo transform/opacity e la sua uscita reduced-motion);
+    il banco node fa GIRARE il giudice della voce (voceNav) e il + a
+    due mestieri (toccaPiu) nei due stati."""
+    print("\n[la nav che si trasforma nel P2P]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA VISTA NUOVA: fissa, al suo posto, senza nomi di terzi -
+    j = mini.index('id="view-p2pmiei"')
+    fetta = mini[j:mini.index("============", j)]
+    prova("view-p2pmiei sta DOPO il libro e PRIMA del pacco", True,
+          mini.index('id="view-p2p"') < j
+          < mini.index("VISTA: LA PAGINA DEL PACCO"))
+    prova("...ed e' markup fisso, senza interpolazioni", False,
+          "${" in fetta)
+    senza_commenti = re.sub(r"<!--.*?-->", "", fetta, flags=re.S)
+    prova("...senza «Nostr», «Mostro» o «coordinatore»", False,
+          any(s in senza_commenti
+              for s in ("Nostr", "Mostro", "coordinatore")))
+    prova("...con la testata di casa e il corpo dei miei", True,
+          'class="p2p-testata"' in fetta and 'id="p2pMieiCorpo"' in fetta)
+
+    # --- 2) UN RENDERER PER DUE CORPI ---------------------------------
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("renderP2P dipinge anche p2pMieiCorpo", True,
+          "el('p2pMieiCorpo')" in rp
+          and "mieiBox.innerHTML = scambiP2P()" in rp)
+    prova("...e prima del libro l'attesa sta in TUTT'E DUE", True,
+          "box.innerHTML = attesa;" in rp
+          and "if (mieiBox) mieiBox.innerHTML = attesa;" in rp)
+    # IL LIBRO E' SOLO IL LIBRO: via la striscia e via il bottone —
+    # pubblicare e' il + della nav, un gesto solo (decisione di Andrea)
+    prova("il libro non incolla piu' la striscia in testa", False,
+          "scambiP2P() + testa" in rp)
+    prova("...e non ha piu' il bottone «Pubblica» in pagina", False,
+          "apriNuovoOrdineP2P" in rp)
+    prova("lo stato vuoto dei miei invita al +", True,
+          "Nessuno scambio ancora" in rp)
+    # il campanello dei messaggi ridisegna anche dai miei: il guard
+    # sulla vista attiva copre entrambe le sorelle
+    prova("applicaMessaggioP2P ridisegna da entrambe le viste", True,
+          "vistaP2P.id === 'view-p2p'" in mini
+          and "vistaP2P.id === 'view-p2pmiei'" in mini)
+
+    # --- 3) LA MODALITA' SI DERIVA DALLA VISTA, IN go() ---------------
+    prova("VISTE_NAV_P2P e' il giudice, e il coming soon NON c'e'", True,
+          "const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine']);"
+          in mini)
+    _go = pezzo_js(mini, "function go(view){")
+    prova("go() veste e sveste la classe dalla VISTA", True,
+          "classList.toggle('nav-p2p', VISTE_NAV_P2P.has(view))" in _go)
+    prova("...e i vai* non la toccano mai (indietro e cronologia)",
+          1, mini.count("classList.toggle('nav-p2p'"))
+    prova("il + della barra chiama toccaPiu, non piu' go('vendi')", True,
+          '<button id="nav-vendi" class="sell" onclick="toccaPiu()"' in mini)
+    prova("...e il lato veste il body da setLatoP2P", True,
+          "classList.toggle('p2p-vendo', p2pLato === 'vendo')"
+          in pezzo_js(mini, "function setLatoP2P(lato){", "\n}\n"))
+
+    # --- 4) I REGISTRI DELLA CRONOLOGIA -------------------------------
+    i_r = mini.index("const RADICI = new Set(")
+    prova("'p2pmiei' e' una radice sorella", True,
+          "'p2pmiei'" in mini[i_r:mini.index("]);", i_r)])
+    prova("...e si rilegge tirando giu'", True,
+          "'p2pmiei'" in mini[mini.index("VISTE_PTR = "):
+                              mini.index("VISTE_PTR = ") + 120])
+    vn = pezzo_js(mini, "function voceNav(view){", "\n}") + "\n}"
+    prova("il libro accende «Libro ordini»", True,
+          "view = 'p2plibro';" in vn)
+    prova("...e uno scambio aperto accende «I miei scambi»", True,
+          "view = 'p2pmiei';" in vn)
+    prova("il ripiego dello scambio dimenticato porta ai miei", True,
+          "ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2pmiei')" in mini)
+
+    # --- 5) IL CSS MUOVE SOLO TRANSFORM/OPACITY, E SA FERMARSI --------
+    css = mini[mini.index("nav .nav-cella{"):
+               mini.index("@media (prefers-reduced-motion:reduce){",
+                          mini.index("nav .nav-cella{"))]
+    prova("la cella e' una griglia a strati impilati", True,
+          "display:grid" in css and "grid-area:1/1" in css
+          and "overflow:hidden" in css)
+    prova("gli strati transiscono solo transform/opacity/visibility",
+          False, any(p in t for t in re.findall(
+              r"transition:([^;}]*)", css)
+              for p in ("width", "height", "margin", "top", "left",
+                        "font", "flex")))
+    prova("chi e' fuori scena e' anche intoccabile", 2,
+          css.count("pointer-events:none"))
+    prova("l'incavo c'e', nei due temi e coi suoi token", True,
+          "body.nav-p2p nav{background:var(--nav-bg-p2p)" in css
+          and css.count("inset 0 3px") + css.count("inset 0 -1px") >= 2
+          and mini.count("--nav-bg-p2p:") >= 2
+          and mini.count("--danger-deep:") >= 2)
+    prova("...e reduced-motion spegne barra, strati, tondo e scritte",
+          True, "nav,nav .nav-cella>button,nav button.sell .ic,"
+          in mini and "nav button.sell .eti-pila>span{transition:none}"
+          in mini)
+    prova("il + tondo veste il lato: verde base, rosso col body vestito",
+          True, "body.nav-p2p nav button.sell .ic{" in css
+          and "body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger)"
+          in css)
+
+    # --- 6) IL BANCO: voceNav e toccaPiu GIRANO -----------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della nav trasformata", "node non c'e'")
+        return
+    banco = ("let ramoVetrina = 'esplora';\n"
+             + mini[mini.index("const VISTE_NAV_P2P = new Set("):
+                    mini.index(";", mini.index(
+                        "const VISTE_NAV_P2P = new Set(")) + 1] + "\n"
+             + vn + "\n"
+             + pezzo_js(mini, "function toccaPiu(){", "\n}") + "\n}" + r"""
+let inP2P = false, aperto = 0, andato = '';
+const document = {body: {classList: {contains: c => inP2P && c === 'nav-p2p'}}};
+function apriNuovoOrdineP2P(){ aperto++; }
+function go(v){ andato = v; }
+const out = {};
+out.libro = voceNav('p2p') === 'p2plibro';
+out.miei = voceNav('p2pmiei') === 'p2pmiei';
+out.scambio = voceNav('p2pordine') === 'p2pmiei';
+out.presto = voceNav('p2ppresto') === 'p2p';
+out.figlia = voceNav('dettaglio') === 'esplora';
+out.modalita = VISTE_NAV_P2P.has('p2p') && VISTE_NAV_P2P.has('p2pmiei')
+  && VISTE_NAV_P2P.has('p2pordine') && !VISTE_NAV_P2P.has('p2ppresto')
+  && VISTE_NAV_P2P.size === 3;
+toccaPiu();
+out.fuoriApreVendi = andato === 'vendi' && aperto === 0;
+inP2P = true; andato = '';
+toccaPiu();
+out.dentroPubblica = aperto === 1 && andato === '';
+console.log(JSON.stringify(out));
+""")
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco_nav_p2p.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True,
+                    encoding="utf-8", timeout=60)
+        out = (_json.loads(r.stdout.strip().splitlines()[-1])
+               if r.returncode == 0 else None)
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    if out is None:
+        prova("il banco della nav trasformata gira", "",
+              (r.stderr or "")[-600:])
+        return
+    prova("la vista del libro accende «Libro ordini»", True, out["libro"])
+    prova("...e i miei accendono «I miei scambi»", True, out["miei"])
+    prova("...come lo scambio aperto, che e' MIO", True, out["scambio"])
+    prova("il coming soon accende la voce di sempre", True, out["presto"])
+    prova("...e una figlia di Esplora non c'entra niente", True,
+          out["figlia"])
+    prova("il giudice della modalita' dice tre viste, mai il presto",
+          True, out["modalita"])
+    prova("fuori dal P2P il + apre Vendi", True, out["fuoriApreVendi"])
+    prova("...e dentro pubblica un ordine, senza navigare", True,
+          out["dentroPubblica"])
 
 
 def prove_p2p_chiavi():
@@ -36690,12 +36896,15 @@ def prove_p2p_motore():
     for f in ("p2pHoldSheet", "p2pIncassoSheet"):
         prova("il foglio %s si chiude con gli altri" % f, True,
               "el('%s').classList.remove('open')" % f in cs)
-    prova("la vista dello scambio accende la voce P2P", True,
-          "else if (view === 'p2pordine') view = 'p2p';" in mini)
+    # EMENDATA (set 2026, la nav trasformata): uno scambio aperto e'
+    # MIO, quindi accende «I miei scambi» — e il ripiego della
+    # cronologia porta li', non piu' al libro
+    prova("la vista dello scambio accende «I miei scambi»", True,
+          "else if (view === 'p2pordine') view = 'p2pmiei';" in mini)
     prova("...e si ridisegna entrandoci", True,
           "if (view==='p2pordine') renderOrdineP2P();" in mini)
     prova("...e la cronologia ricostruisce solo cio' che e' ancora qui",
-          True, "return ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2p');" in mini)
+          True, "return ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2pmiei');" in mini)
 
     # --- 7) L'ID DI UNO SCONOSCIUTO NON ENTRA IN UN ONCLICK ----------
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
@@ -37211,7 +37420,7 @@ function reset(){
   out.ordineRitiratoSparito = !ordiniP2P()[idA]
     && !(p2pMieiOrdini && p2pMieiOrdini[idA])
     && !((p2pLibro && p2pLibro.ordini) || []).some(x => x.id === idA);
-  out.ritiroRiportaAlLibro = viste.indexOf('p2p') >= 0;
+  out.ritiroRiportaAlLibro = viste.indexOf('p2pmiei') >= 0;
   out.ritiroDetto = toasts.some(t => String(t).indexOf('ritirato') >= 0);
 
   process.stdout.write(JSON.stringify(out));
@@ -37291,7 +37500,7 @@ function reset(){
         "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
         "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
         "ordineRitiratoSparito": "...e ritirato = sparito: riga e cache pulite",
-        "ritiroRiportaAlLibro": "...la pagina torna al libro",
+        "ritiroRiportaAlLibro": "...la pagina torna ai miei scambi",
         "ritiroDetto": "...e la notizia si dice a voce",
     }
     for k, nome in attesi.items():
@@ -47473,8 +47682,9 @@ def prove_scambi_p2p_vecchi():
     prova("...e il ritirato ha il suo giudice anche nella scopa", True,
           "p2pRitirato(o)" in _sc)
     _am = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")
-    prova("il kind 14 che annulla passa dal rimotore e riporta al libro",
-          True, "togliRitiratoP2P(nuovo.id)" in _am and "go('p2p')" in _am)
+    prova("il kind 14 che annulla passa dal rimotore e riporta ai miei",
+          True, "togliRitiratoP2P(nuovo.id)" in _am
+          and "go('p2pmiei')" in _am)
     _spo = pezzo_js(mini, "async function statoPubblicoOrdini(ids){", "\n}\n")
     prova("...e la via di riserva pure, in silenzio", True,
           "togliRitiratoP2P(o.id)" in _spo)
@@ -47765,6 +47975,7 @@ def main():
               prove_relay_chiavi,
               prove_p2p_server,
         prove_p2p_libro,
+    prove_nav_p2p,
     prove_p2p_chiavi,
     prove_p2p_campanello,
     prove_p2p_motore,
