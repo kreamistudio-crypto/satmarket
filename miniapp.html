@@ -32857,7 +32857,12 @@ function renderP2P(){
   const mz = mazzoMostro();
   if (mz && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
     p2pRegistrato = true;
-    registraChiaviP2P([mz.pub]);
+    /* LA PROMESSA SI TIENE (set 2026): dentro viaggia il pavimento
+       dell'indice, e la marcatura a indice zero la ASPETTA invece di
+       correre — sul dispositivo fresco lo zero locale e' un fatto non
+       ancora arrivato, non una risposta (la corsa e' a verbale nella
+       voce «Il seme senza commit» di CANTIERI.md). */
+    p2pPavimento = registraChiaviP2P([mz.pub]);
   }
   /* ...e il mazzo che NON c'e' si va a cercare nel cloud, una volta per
      sessione. GUARDARE IL P2P E' IL MOMENTO DI ADOTTARE: su un
@@ -32891,8 +32896,14 @@ function renderP2P(){
      ripartiva — tutto in microtask, senza mai cedere il passo, quindi
      nemmeno il caricamento che avrebbe curato l'errore riusciva a
      completarsi. Un tentativo per sessione; il gesto «Riprova» la
-     riabbassa, che un ritentativo deve costare un gesto. */
-  if (mz && !p2pMieiChiesto && p2pMieiOrdini === null && !p2pMieiGiro) {
+     riabbassa, che un ritentativo deve costare un gesto.
+     ⚠️ E LA BANDIERINA E' L'UNICO GATE (set 2026): prima si esigeva
+     anche `p2pMieiOrdini === null`, e cosi' «Riprova» non riarmava mai
+     la marcatura — il giro a indice zero scriveva `{}`, cioe'
+     «risposto», e da li' nessun gesto poteva piu' richiedere. Ora il
+     gesto riabbassa la bandierina e si richiede: una risposta fresca
+     sostituisce la vecchia, un giro caduto lascia quel che si sapeva. */
+  if (mz && !p2pMieiChiesto && !p2pMieiGiro) {
     p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then(() => renderP2P()).catch(() => {});
   }
@@ -32946,8 +32957,10 @@ function ricaricaP2P(){
   p2pErrore = '';
   p2pParziale = false;
   p2pLibro = null;
-  /* anche la marcatura «e' mio» riprova col gesto: e' l'unico modo di
-     ritentarla dopo un giro caduto, che da solo non riparte mai */
+  /* anche la marcatura «e' mio» riprova col gesto — e RIARMA sempre
+     (set 2026): la bandierina e' l'unico gate, quindi il gesto
+     richiede pure dopo una risposta gia' avuta. Una fresca sostituisce
+     la vecchia; un giro caduto lascia quel che si sapeva. */
   p2pMieiChiesto = false;
   renderP2P();
 }
@@ -34252,6 +34265,10 @@ function ordiniAscoltoP2P(){
    detto: e' quel che un giorno permettera' di RIPRENDERE uno scambio da
    un altro dispositivo, non solo di riconoscerlo — la trade key si
    deriva da li'. */
+/* la promessa dell'ultima registrazione delle chiavi: dentro torna il
+   pavimento dell'indice, e chi deve giudicare «indice zero» la aspetta
+   prima di rispondere. La scrive renderP2P, una volta per sessione. */
+let p2pPavimento = null;
 let p2pMieiOrdini = null;      // {id: {indice, stato}} — null = mai chiesto
 let p2pMieiGiro = null;        // la promessa in volo
 /* la cintura del 9 set 2026: si e' gia' TENTATO in questa sessione.
@@ -34278,12 +34295,24 @@ function ordineMioP2P(id){
    gate `p2pMieiGiro` la tiene. */
 async function chiediMieiOrdiniP2P(){
   if (p2pMieiGiro) return p2pMieiGiro;
-  const mz = mazzoMostro();
-  /* SENZA INDICE NON C'E' NIENTE DA CHIEDERE: l'indice conta le trade
-     key BRUCIATE, quindi a zero non esiste nessun ordine da ritrovare —
-     e una richiesta che non puo' portare niente non si manda. */
-  if (!mz || !(mz.indice | 0)) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
   p2pMieiGiro = (async () => {
+    /* PRIMA IL PAVIMENTO, POI IL GIUDIZIO (set 2026, la corsa a
+       verbale): sul dispositivo fresco l'indice locale e' zero mentre
+       quello vero sta ARRIVANDO — registraChiaviP2P parte senza await
+       tre righe sopra il gate di renderP2P, e concludere «niente da
+       chiedere» guardando lo zero locale era rispondere prima del
+       fatto. Si aspetta la promessa (fail-open: se cade non blocca
+       niente) e si RILEGGE il mazzo, che il pavimento alza. */
+    let mz = mazzoMostro();
+    if (mz && !(mz.indice | 0) && p2pPavimento) {
+      try { await p2pPavimento; } catch(e){}
+      mz = mazzoMostro();
+    }
+    /* SENZA INDICE NON C'E' NIENTE DA CHIEDERE: l'indice conta le trade
+       key BRUCIATE, quindi a zero — ora che il pavimento ha parlato —
+       non esiste nessun ordine da ritrovare, e una richiesta che non
+       puo' portare niente non si manda. */
+    if (!mz || !(mz.indice | 0)) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
     /* PRIMA la connessione, che porta con se' il bundle: derivare la
        chiave a bundle assente era il loop del 9 set 2026 — l'errore
        sincrono non lasciava mai passare il caricamento che l'avrebbe
@@ -35686,6 +35715,45 @@ async function statoPubblicoOrdini(ids){
   return mossi;
 }
 
+/* ---- gli scambi riconosciuti dal coordinatore, senza lista locale --
+   Il dispositivo che non ha pubblicato marcava gia' le card del libro
+   («e' il tuo ordine»), ma la striscia in cima taceva: nasceva dalla
+   sola lista locale, che vive nel browser che ha pubblicato. Qui si
+   aggiungono gli ordini che la restore-session ha riconosciuto e che
+   il LIBRO sa ancora descrivere — cifra e lato vengono dal 38383, che
+   per un pending dice tutto quel che serve a una riga.
+   QUEL CHE NEL LIBRO NON C'E' RESTA FUORI, ed e' dichiarato: di un
+   ordine preso o in corso la restore da' solo l'id e uno stato nel
+   vocabolario del coordinatore, che non si traduce a memoria (la
+   lezione di Q4: gli stati si scrivono quando si VEDONO). Lo aprira'
+   la ripresa vera, col trade_index che la risposta gia' porta — e' il
+   mattone delle fasi successive del cantiere. */
+function righeAltroveP2P(locali){
+  if (!p2pMieiOrdini) return [];
+  const libro = (p2pLibro && p2pLibro.ordini) || [];
+  const fuori = [];
+  for (const id in p2pMieiOrdini) {
+    if (locali[id]) continue;
+    const o = libro.find(x => x.id === id);
+    if (o) fuori.push(o);
+  }
+  return fuori.sort((a, b) => (b.creato || 0) - (a.creato || 0));
+}
+/* La riga dice il fatto e la sua casa: l'ordine e' tuo e vive su un
+   altro dispositivo. Il tocco passa dalla porta del gesto APPOSTA —
+   e' il giudice che gia' distingue «mio ma non in lista» e risponde
+   con la frase onesta, invece di aprire uno scambio che qui non c'e'.
+   IL LATO E' QUELLO DEL MAKER, non di chi sfoglia il libro: un ordine
+   `sell` nella striscia e' «vendi», perche' qui l'ordine e' TUO. */
+function rigaScambioAltroveP2P(o){
+  const sats = o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
+  return '<div class="p2p-ord p2p-mio" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
+    'onclick="prendiOrdineP2P(this.dataset.id)">' +
+    '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
+    '<span class="p2p-sats">' + esc(sats) + '</span></div>' +
+    '<div class="p2p-meta"><span>' + (o.lato === 'sell' ? '⬆️ Vendi' : '⬇️ Compri') + '</span>' +
+    '<span>🌐 pubblicato da un altro tuo dispositivo</span></div></div>';
+}
 /* ---- «I tuoi scambi», in cima al libro ----
    SINCRONA apposta: renderP2P la incolla dentro l'innerHTML, e un
    await qui vorrebbe dire una pagina che si riscrive sotto le dita.
@@ -35696,7 +35764,11 @@ function scambiP2P(){
   const tutti = ordiniP2P();
   const righe = Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id)
     .sort((a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0));
-  if (!righe.length) return '';
+  /* e quelli riconosciuti dal coordinatore che qui non hanno una riga:
+     la striscia deve nascere anche sul dispositivo che non ha
+     pubblicato — e' meta' della promessa «i tuoi ordini ovunque» */
+  const altrove = righeAltroveP2P(tutti);
+  if (!righe.length && !altrove.length) return '';
   const aperti = righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
   if (aperti.length) {
     /* chi apre la pagina dopo un'ora deve trovarci i messaggi
@@ -35722,7 +35794,8 @@ function scambiP2P(){
   const troppi = righe.length - P2P_SCAMBI_MAX;
   return '<div class="section-label">I tuoi scambi</div>' + debito
     + righe.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
-    + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
+    + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '')
+    + altrove.slice(0, P2P_SCAMBI_MAX).map(rigaScambioAltroveP2P).join('');
 }
 /* ============ fine del motore dello scambio ============ */
 

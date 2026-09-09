@@ -39577,8 +39577,18 @@ def prove_p2p_server():
     prova("se la domanda cade non si conclude niente", True,
           "return p2pMieiOrdini;" in cm.split(".catch(")[1])
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    # ⚠️ LA BANDIERINA E' L'UNICO GATE (set 2026): prima si esigeva
+    # anche `p2pMieiOrdini === null`, e cosi' «Riprova» non riarmava
+    # mai la marcatura — il giro a indice zero scriveva `{}`, cioe'
+    # «risposto», e da li' nessun gesto poteva piu' richiedere. La
+    # seconda prova e' il ROVESCIO, o la prima resterebbe verde anche
+    # col vecchio gate accanto al nuovo.
     prova("si chiede all'apertura del P2P, una volta per sessione", True,
-          "p2pMieiOrdini === null && !p2pMieiGiro" in rp)
+          "!p2pMieiChiesto && !p2pMieiGiro" in rp)
+    # `solo_codice`, non il testo: il commento del gate RACCONTA il
+    # vecchio `=== null`, e cercarlo nella prosa lo ritroverebbe li'.
+    prova("...e la risposta di ieri non chiude la porta di oggi", False,
+          "p2pMieiOrdini === null" in solo_codice(rp))
     prova("...e senza far aspettare il libro", True,
           "chiediMieiOrdiniP2P().then(() => renderP2P())" in rp)
 
@@ -39609,6 +39619,160 @@ def prove_p2p_server():
           and "return p2pMieiOrdini;" in cm.split("if (!risposto)")[1])
     prova("il profilo di prima non si cancella, si mette da parte", True,
           "localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m))" in mini)
+
+    # --- 16b) LA CORSA DELL'INDICE A ZERO E LA STRISCIA OVUNQUE -----
+    # ⚠️ LA CORSA (set 2026, dal campo: la marcatura arrivava solo alla
+    # SECONDA apertura fredda): sul dispositivo fresco l'indice locale
+    # e' zero mentre quello vero viaggia con registraChiaviP2P, lanciata
+    # senza await tre righe sopra il gate — e il giudizio concludeva
+    # «nessuno» prima del fatto. La cura e' in due pezzi: renderP2P
+    # TIENE la promessa del pavimento, e il giudizio la aspetta e
+    # RILEGGE il mazzo prima di rispondere.
+    prova("renderP2P tiene la promessa del pavimento", True,
+          "p2pPavimento = registraChiaviP2P([mz.pub])" in rp)
+    prova("...e il giudizio sull'indice la aspetta e rilegge il mazzo",
+          True, "await p2pPavimento" in cm
+          and cm.index("await p2pPavimento")
+              < cm.index("if (!mz || !(mz.indice | 0))")
+          and cm.index("mz = mazzoMostro();",
+                       cm.index("await p2pPavimento"))
+              < cm.index("if (!mz || !(mz.indice | 0))"))
+    # E LA STRISCIA OVUNQUE: gli ordini riconosciuti dalla restore
+    # entrano in «I tuoi scambi» — quelli che il LIBRO sa descrivere.
+    # Il tocco passa dalla porta del gesto, che gia' distingue «mio ma
+    # non in lista» e risponde con la frase onesta.
+    sc16 = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    prova("la striscia guarda anche gli ordini della restore", True,
+          "righeAltroveP2P(tutti)" in sc16
+          and "!righe.length && !altrove.length" in sc16)
+    ra16 = pezzo_js(mini, "function rigaScambioAltroveP2P(", "\n}\n")
+    prova("...e la riga di la' passa dalla porta del gesto", True,
+          "prendiOrdineP2P(this.dataset.id)" in ra16
+          and "apriOrdineP2P" not in ra16)
+    # IL BANCO: le due cure GIRANO, coi rami che contano. Le funzioni
+    # vere piu' stub dichiarati — mostroConnetti ALZA apposta, cosi'
+    # «ha chiesto davvero» si legge dal contatore senza nessuna rete.
+    import json as _json5, shutil as _sh5, subprocess as _sp5
+    import tempfile as _tf5
+    node5 = _sh5.which("node")
+    if not node5:
+        salta("il banco della corsa e della striscia", "node non c'e'")
+    else:
+        k5 = mini.index("const esc = s =>")
+        esc5 = mini[k5:mini.index(";\n", k5) + 1]
+        banco5 = esc5 + "\n" + "\n".join(
+            pezzo_js(mini, f, "\n}\n") + "\n}"
+            for f in ("async function chiediMieiOrdiniP2P(",
+                      "function righeAltroveP2P(",
+                      "function rigaScambioAltroveP2P(",
+                      "function scambiP2P(")) + r"""
+let p2pMieiOrdini = null, p2pMieiGiro = null, p2pPavimento = null;
+let p2pLibro = null, p2pStatoChiesto = false;
+let mazzoFinto = null;
+function mazzoMostro(){ return mazzoFinto; }
+let relayChiesto = 0;
+async function mostroConnetti(){ relayChiesto++; throw new Error('banco: niente relay'); }
+function pulisciScambiP2P(){ return 0; }
+let ordiniFinti = {};
+function ordiniP2P(){ return ordiniFinti; }
+const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
+const P2P_SCAMBI_MAX = 12;
+async function mostroRiascolta(){}
+async function statoPubblicoOrdini(){ return 0; }
+function cloudTelegram(){ return null; }
+function rigaScambioP2P(o){ return '<loc ' + o.id + '>'; }
+const fmt = n => String(n);
+const fmtEur = e => e.toFixed(2).replace('.', ',');
+(async () => {
+  const out = {};
+  // a) indice zero e nessun pavimento in volo: «nessuno», senza rete
+  mazzoFinto = {sk: 'aa'.repeat(32), pub: 'bb'.repeat(32), indice: 0};
+  const r1 = await chiediMieiOrdiniP2P();
+  out.zeroSenzaPavimento = JSON.stringify(r1) === '{}' && relayChiesto === 0;
+  // b) il pavimento in volo ALZA a 1: si aspetta e si chiede davvero.
+  // Il bump sta DOPO un await vero: il corpo di un'async IIFE gira
+  // sincrono fino al primo await, e un bump immediato farebbe passare
+  // la prova anche senza l'attesa — l'ha detto la tortura.
+  p2pMieiOrdini = null;
+  p2pPavimento = (async () => { await new Promise(r => setTimeout(r, 30)); mazzoFinto = Object.assign({}, mazzoFinto, {indice: 1}); return true; })();
+  const r2 = await chiediMieiOrdiniP2P();
+  out.pavimentoAspettato = relayChiesto === 1;
+  // ...e la rete caduta resta «non si sa»: mai un vuoto inventato
+  out.cadutaNonConclude = r2 === null && p2pMieiOrdini === null;
+  // c) un pavimento che NON alza conclude, senza chiedere ancora
+  mazzoFinto = {sk: 'aa'.repeat(32), pub: 'bb'.repeat(32), indice: 0};
+  p2pMieiOrdini = null;
+  p2pPavimento = Promise.resolve(true);
+  const r3 = await chiediMieiOrdiniP2P();
+  out.pavimentoBassoConclude = JSON.stringify(r3) === '{}' && relayChiesto === 1;
+  // d) la striscia sul dispositivo FRESCO: zero locali, restore + libro
+  mazzoFinto = null;
+  ordiniFinti = {};
+  p2pMieiOrdini = {'ord-a': {indice: 1, stato: 'pending'}};
+  p2pLibro = {ordini: [
+    {id: 'ord-a', lato: 'sell', euro: 5, sats: 0, premium: 0, metodi: ['PayPal'], creato: 100},
+    {id: 'ord-x', lato: 'sell', euro: 9, sats: 0, premium: 0, metodi: [], creato: 90}]};
+  const s1 = scambiP2P();
+  out.strisciaNasce = s1.includes('I tuoi scambi') && s1.includes('data-id="ord-a"');
+  out.strisciaNonInventa = !s1.includes('ord-x');
+  out.latoVendi = s1.includes('Vendi') && !s1.includes('Compri');
+  // e) l'ordine gia' in locale non si ripete
+  ordiniFinti = {'ord-a': {id: 'ord-a', stato: 'attivo', creato: 100}};
+  const s2 = scambiP2P();
+  out.nienteDoppioni = (s2.match(/ord-a/g) || []).length === 1 && s2.includes('<loc ord-a>');
+  // f) quel che il libro non sa descrivere resta fuori, dichiarato
+  ordiniFinti = {};
+  p2pMieiOrdini = {'ord-z': {indice: 2, stato: 'in-progress'}};
+  p2pLibro = {ordini: []};
+  out.fuoriLibroTace = scambiP2P() === '';
+  // g) senza restore niente cambia
+  p2pMieiOrdini = null;
+  out.senzaRestoreVuota = scambiP2P() === '';
+  // h) l'id viene dai relay: il veleno esce scappato
+  p2pMieiOrdini = {'ord-"x': {indice: 1, stato: 'pending'}};
+  p2pLibro = {ordini: [{id: 'ord-"x', lato: 'buy', euro: 7, sats: 0, premium: 0, metodi: [], creato: 1}]};
+  const s3 = scambiP2P();
+  out.velenoScappato = s3.includes('data-id="ord-&quot;x"');
+  out.latoCompri = s3.includes('Compri');
+  console.log(JSON.stringify(out));
+})();
+"""
+        d5 = _tf5.mkdtemp()
+        try:
+            p5 = os.path.join(d5, "banco_corsa.js")
+            open(p5, "w", encoding="utf-8").write(banco5)
+            r5 = _sp5.run([node5, p5], capture_output=True,
+                          encoding="utf-8", timeout=60)
+            out5 = (_json5.loads(r5.stdout.strip().splitlines()[-1])
+                    if r5.returncode == 0 else None)
+        finally:
+            _sh5.rmtree(d5, ignore_errors=True)
+        if out5 is None:
+            prova("il banco della corsa e della striscia gira", "",
+                  (r5.stderr or "")[-600:])
+        else:
+            prova("a indice zero senza pavimento non si chiede: «nessuno»",
+                  True, out5["zeroSenzaPavimento"])
+            prova("col pavimento in volo si ASPETTA, e poi si chiede davvero",
+                  True, out5["pavimentoAspettato"])
+            prova("...e la rete caduta resta «non si sa», mai un vuoto",
+                  True, out5["cadutaNonConclude"])
+            prova("un pavimento che non alza conclude, senza richiedere",
+                  True, out5["pavimentoBassoConclude"])
+            prova("la striscia nasce sul dispositivo fresco, dalla restore",
+                  True, out5["strisciaNasce"])
+            prova("...e non inventa righe per gli ordini degli altri",
+                  True, out5["strisciaNonInventa"])
+            prova("...col lato del maker: sell e' «vendi», buy e' «compri»",
+                  True, out5["latoVendi"] and out5["latoCompri"])
+            prova("l'ordine gia' in locale non si ripete", True,
+                  out5["nienteDoppioni"])
+            prova("quel che il libro non sa descrivere resta fuori", True,
+                  out5["fuoriLibroTace"])
+            prova("senza restore la striscia resta quella di prima", True,
+                  out5["senzaRestoreVuota"])
+            prova("l'id avvelenato esce scappato anche nella striscia", True,
+                  out5["velenoScappato"])
 
     # --- 13) IL FOGLIO E LA STRADA SOVRANA (fase 4b) ---------------
     # ⚠️ IL PANNELLO SOVRANO STA IN UNA FUNZIONE SUA, e non per ordine:
