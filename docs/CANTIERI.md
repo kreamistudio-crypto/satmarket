@@ -6866,3 +6866,14 @@ solo ai MIEI che tab non hanno. Logo a 68px, PNG rifatto dal sorgente
 480 recuperato dalla storia git (136px, ~30 KB, sempre 2x); la
 sentinella della testata chiede ora l'ORDINE tab-logo-tab. Conteggio
 e importi restano in sats, deciso da Andrea.
+E IL GEMELLO ROVESCIO (stesso giorno, visto da Andrea): il ritorno di
+«Vendi» era guarito ma l'ANDATA si era rotta — spariva di colpo. La
+regola di quiete (quattro classi) batteva anche lo stato P2P (tre), e
+la visibility spegneva a delay zero pure uscendo. Cura: lo stato P2P
+ricalca la STESSA catena lunga della quiete piu' body.nav-p2p (cinque
+classi), e cosi' anche l'override desktop del transform, o non lo
+batterebbe. Verificata la cascata dal vivo coi delay calcolati:
+quiete .1/.1/0, P2P 0/0/.4 — fluida nei due versi. La lezione: due
+stati della stessa proprieta' su catene di specificita' DIVERSE non
+sono due stati, sono uno stato e un'eccezione — le catene si tengono
+uguali.
