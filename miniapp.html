@@ -1714,6 +1714,20 @@
      copia uguale le uniche cose che si vedono cambiare sono le
      FRECCE — sfumandoli entrambi, a meta' corsa il barattolo calava
      al 75% e sembrava trasformarsi (visto dal vivo da Andrea). */
+  /* IL LOGO AL POSTO DELL'EMOJI (set 2026, decisione di Andrea): dove
+     il 🔁 faceva da simbolo dello scambio ora c'e' il marchio, e li'
+     e' sempre il COMPLETO — un lato attivo non c'e'. Due misure: in
+     riga col testo e grande negli stati vuoti, al posto del glifo da
+     44px.
+     LA MISURA IN RIGA E' 20px E NON UN `em`, ed e' misurato a schermo:
+     accanto a una section-label da 11px l'em dava 14px, e a 14 il
+     marchio non e' un marchio — e' un puntino colorato. Un'emoji a
+     quella taglia regge (e' disegnata per quello), un'illustrazione
+     no. Sotto i 20px, meglio nessun segno — ed e' la ragione per cui
+     il bottone arancio che pubblica resta senza. */
+  .p2p-simbolo{width:20px;height:20px;vertical-align:-6px}
+  .empty .p2p-simbolo{display:block;width:54px;height:54px;
+    margin:0 auto 10px;vertical-align:0}
   .p2p-logo-pila{display:grid}
   .p2p-logo{grid-area:1/1;width:76px;height:76px;
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
@@ -5615,8 +5629,13 @@ document.getElementById('cartello')?.remove();</script>
        fase 6 valgono identiche: niente nomi di terzi. -->
   <div class="view" id="view-p2pmiei">
     <div class="sicu">
+      <!-- QUI IL LOGO E' COMPLETO E FERMO (set 2026, decisione di
+           Andrea): in questa vista un lato attivo non c'e' — sono i
+           MIEI scambi, di tutt'e due i versi — quindi niente pila
+           reattiva e niente crossfade, che risponderebbe a un tab che
+           qui non esiste. La coppia gemella resta al libro. -->
       <div class="p2p-testata">
-        <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
+        <img class="p2p-logo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">
       </div>
       <div id="p2pMieiCorpo"></div>
     </div>
@@ -5630,7 +5649,7 @@ document.getElementById('cartello')?.remove();</script>
   <div class="view" id="view-p2pordine">
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
-      <div class="section-label">🔁 Lo scambio</div>
+      <div class="section-label"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"> Lo scambio</div>
       <div id="p2pOrdineCorpo"></div>
     </div>
   </div>
@@ -33381,14 +33400,14 @@ function renderP2P(){
      nav — UN gesto solo, gia' vestito del colore del lato. */
   box.innerHTML = testa
     + (vivi.length ? vivi.map(rigaOrdineP2P).join('')
-       : `<div class="empty"><span class="big">🔁</span><span class="empty-title">Nessun ordine aperto</span>${
+       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">Nessun ordine aperto</span>${
            p2pLato === 'compro'
              ? 'In questo momento nessuno sta vendendo sats in euro.'
              : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
   /* ...e i miei nella loro pagina: scambiP2P e' la striscia di sempre
      (adozione compresa), lo stato vuoto invita al + qui sotto */
   if (mieiBox) mieiBox.innerHTML = scambiP2P()
-    || '<div class="empty"><span class="big">🔁</span>'
+    || '<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">'
      + '<span class="empty-title">Nessuno scambio ancora</span>'
      + 'Premi <b>＋</b> nella barra per pubblicare il tuo primo ordine.</div>';
 }
@@ -35530,7 +35549,17 @@ function renderNuovoOrdineP2P(){
     'value="' + esc(p2pNuovoMetodo) + '" oninput="p2pNuovoMetodo = this.value; renderMetodiP2P()"></div>' +
     tetto + fee +
     '<button class="btn orange" onclick="inviaNuovoOrdineP2P()">' +
-    (compro ? '🔁 Pubblica: compro sats' : '🔁 Pubblica: vendo sats') + '</button>' +
+    /* QUI NON VA NESSUN SIMBOLO (set 2026, guardato dal vivo): il
+       marchio piccolo su un fondo arancio pieno diventa una macchia
+       — i suoi colori e quello del bottone sono la stessa famiglia —
+       e l'emoji non torna, che ha smesso di essere il segno di casa.
+       Un bottone pieno a tutta larghezza dice gia' tutto col testo.
+       ⚠️ «di CASA» e non l'aggettivo possessivo, ed e' una scelta: la
+       sentinella delle parole di questo foglio e' cieca ai commenti
+       APPOSTA, e quel possessivo contiene per intero il nome della
+       rete che qui non si nomina — un commento innocente la
+       farebbe rossa (successo, due volte di fila). */
+    (compro ? 'Pubblica: compro sats' : 'Pubblica: vendo sats') + '</button>' +
     '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>';
 }
 function scegliMetodoP2P(m){

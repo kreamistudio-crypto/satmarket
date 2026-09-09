@@ -35898,12 +35898,20 @@ def prove_nav_p2p():
     # body.p2p-vendo — lo stesso giudice del + — quindi la reazione
     # vale nel libro E nei miei senza JS nuovo. La pila c'e' DUE volte
     # (le due viste), il vecchio PNG singolo e' morto con la sua rotta.
-    prova("la pila del logo sta in tutt'e due le viste", 2,
+    # EMENDATA (set 2026, il terzo logo): la pila reattiva resta al
+    # SOLO libro — nei miei scambi un lato attivo non c'e' (sono i
+    # propri, di tutt'e due i versi) e va il COMPLETO, fermo.
+    prova("la pila del logo sta nel solo libro", 1,
           mini.count('class="p2p-logo-pila"'))
-    prova("...e ogni pila porta i due gemelli, compra prima", 2,
+    prova("...coi due gemelli, compra prima", 1,
           mini.count('class="p2p-logo compra" src="/assets/p2p-logo-compra.png"'))
-    prova("...col vendi accanto", 2,
+    prova("...col vendi accanto", 1,
           mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"'))
+    _fm = mini[mini.index('id="view-p2pmiei"'):]
+    _fm = _fm[:_fm.index('id="p2pMieiCorpo"')]
+    prova("la testata dei miei porta il COMPLETO, fermo", True,
+          '/assets/p2p-logo-completo.png' in _fm
+          and "p2p-logo-pila" not in _fm)
     # EMENDATA (set 2026, il barattolo che «si trasformava»): a sfumare
     # e' SOLO il gemello sopra — il compra sotto resta pieno, cosi' il
     # barattolo identico non cala mai e a muoversi si vedono solo le
@@ -35970,10 +35978,45 @@ def prove_nav_p2p():
           and mini.count(".p2p-ord .p2p-sats{color") == 2)
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
-    prova("...nemmeno nel server: le rotte sono i due gemelli", True,
-          '/assets/p2p-logo-compra.png' in _SORGENTE
+    prova("...nemmeno nel server: le rotte sono i tre della famiglia",
+          True, '/assets/p2p-logo-compra.png' in _SORGENTE
           and '/assets/p2p-logo-vendi.png' in _SORGENTE
+          and '/assets/p2p-logo-completo.png' in _SORGENTE
           and '"/assets/p2p-logo.png"' not in _SORGENTE)
+    prova("...e i tre file ci sono, tutti a 152", [(152, 152)] * 3,
+          [__import__("struct").unpack(
+              ">II", open(f"assets/p2p-logo-{n}.png", "rb").read()[16:24])
+           for n in ("compra", "vendi", "completo")])
+
+    # --- 2b) IL LOGO AL POSTO DELL'EMOJI (set 2026) ------------------
+    # Dove il 🔁 faceva da SIMBOLO dello scambio ora c'e' il marchio
+    # completo: la testata della vista scambio, i due stati vuoti, il
+    # bottone che pubblica. NON si tocca dove l'emoji ha un altro
+    # mestiere — «Doppioni su Nostr» nell'admin dice ripetizione, non
+    # P2P — ne' i prefissi dei console.log ne' i toast, che sono testo
+    # e non possono portare un'immagine.
+    # TRE e non quattro: sul bottone arancio il marchio diventava una
+    # macchia (stessa famiglia di colori del fondo, visto dal vivo) e
+    # li' non va nessun simbolo — l'emoji non torna, che ha smesso di
+    # essere il nostro segno.
+    prova("il simbolo veste i tre posti dove si legge", 3,
+          mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
+    prova("...e il bottone che pubblica resta senza segno", True,
+          "Pubblica: compro sats" in mini
+          and "🔁 Pubblica" not in mini)
+    prova("...e negli stati vuoti prende il posto del glifo", True,
+          '<div class="empty"><img class="p2p-simbolo"' in mini
+          and '<span class="big">🔁</span>' not in mini)
+    prova("l'emoji dei doppioni su Nostr non si tocca: dice altro",
+          True, '<span class="em">🔁</span>Doppioni su Nostr' in mini)
+    # LA MISURA IN RIGA E' 20px FISSI e non un em: a 14 (l'em di una
+    # section-label da 11px) il marchio e' un puntino colorato —
+    # un'emoji a quella taglia regge, un'illustrazione no. Misurato a
+    # schermo, ed e' la stessa ragione per cui il bottone resta nudo.
+    prova("...e le due misure del simbolo ci sono, la riga in px", True,
+          "width:20px;height:20px" in pezzo_js(mini, ".p2p-simbolo{", "}")
+          and "em" not in pezzo_js(mini, ".p2p-simbolo{", "}")
+          and "width:54px" in pezzo_js(mini, ".empty .p2p-simbolo{", "}"))
 
     # --- 2) UN RENDERER PER DUE CORPI ---------------------------------
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")

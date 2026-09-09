@@ -42682,6 +42682,16 @@ def asset_p2p_logo_vendi():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/p2p-logo-completo.png")
+def asset_p2p_logo_completo():
+    """Il terzo della famiglia: ENTRAMBE le frecce accese. Veste i posti
+    dove un lato attivo non c'e' — la testata dei propri scambi, e ogni
+    posto dove il 🔁 faceva da simbolo dello scambio."""
+    return FileResponse("assets/p2p-logo-completo.png",
+                        media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
