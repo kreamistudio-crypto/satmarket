@@ -26885,7 +26885,8 @@ def prove_fogli_di_casa():
     # QUARANTAQUATTRO E QUARANTACINQUE (set 2026, il profilo di
     # scambio): dimenticare il profilo e sostituirlo importandone un
     # altro — tutt'e due possono far perdere una reputazione che non
-    # torna, e il corpo lo dice.
+    # torna, e il corpo lo dice. ⚠️ CON LA FASE 6 (set 2026) l'import
+    # e' USCITO e resta il solo «dimentica»: il conto scende di uno.
     # col motore dello scambio (set 2026) sono tre in piu': prendere
     # un ordine, dire «ho inviato gli euro», liberare i sats
     # CINQUANTUNO con la disputa P2P (set 2026), ed e' il terzo dei
@@ -26894,7 +26895,9 @@ def prove_fogli_di_casa():
     # decidere e' il coordinatore, non Barattolo.
     # CINQUANTATRE' con le due uscite del conflitto fra mazzi (set
     # 2026): scegliere un mazzo lascia indietro un'identita', e nessuna
-    # delle due si fa in silenzio.
+    # delle due si fa in silenzio. ⚠️ USCITE CON LA FASE 6 (set 2026),
+    # col passaggio al conto e il suo ritorno indietro: meno quattro —
+    # il «diverso» del cloud e' un'informazione, non piu' un bivio.
     # CINQUANTAQUATTRO (ago 2026, la rete di punti di casa): la presa
     # in carico del titolare — da quel tocco il codice di ritiro parte
     # a chi compra e il momento resta scritto, cioe' e' la prova che
@@ -26907,8 +26910,8 @@ def prove_fogli_di_casa():
     # aperto, con lo scambio se ne va anche quello. Il corpo lo dice
     # nei due casi separati invece di una frase sola, che «lo perdi»
     # e' vero solo in uno dei due.
-    prova("i gesti che passano dalla domanda unica sono cinquantasette",
-          57, solo_codice(mini).count("chiediConferma({"))
+    prova("i gesti che passano dalla domanda unica sono cinquantadue",
+          52, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -35774,7 +35777,7 @@ def prove_p2p_chiavi():
     # commenti a BLOCCO, che sono l'idioma di casa: un `//` mangerebbe
     # anche la coda di un `https://`.
     for fn in ("async function apriProfiloP2P(", "function renderProfiloP2P(",
-               "function scordaMazzo(", "async function importaMazzoDalFoglio(",
+               "function scordaMazzo(",
                "async function codiceP2PSalvato(", "async function copiaCodiceP2P(",
                "async function dimenticaMazzoOra("):
         testo = re.sub(r"/\*[\s\S]*?\*/", "", pezzo_js(mini, fn, "\n}\n")) \
@@ -35794,8 +35797,14 @@ def prove_p2p_chiavi():
     prova("...e sta PRIMA della conferma nel DOM (navPila ordina per posizione)",
           True, sh_i < mini.index('<div class="sheet" id="paccoSvuotaSheet"')
           < mini.index('id="confermaSheet"'))
-    prova("la vista P2P ha la porta del profilo", True,
+    # EMENDATA (set 2026, fase 6, decisione di Andrea): la porta del
+    # profilo sta in «I tuoi dati» — MAI nella vista P2P, dove il
+    # profilo non si nomina proprio.
+    prova("la porta del profilo c'e', in «I tuoi dati»", True,
           'onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio' in mini)
+    _vp2p = mini[mini.index('id="view-p2p"'):mini.index('id="view-p2pordine"')]
+    prova("...e la vista P2P non la porta piu'", False,
+          "apriProfiloP2P" in _vp2p)
     prova("in vetrina apre l'invito con la SUA chiave", True,
           "invitoTelegram(INVITO_ONION.p2p, 'p2p')" in cod)
     cat = mini[mini.index("const INVITO_ONION = {"):]
@@ -35803,13 +35812,10 @@ def prove_p2p_chiavi():
     prova("...che sta nel catalogo dell'onion", True, "\n  p2p: '" in cat)
     prova("in DEMO si guarda soltanto", True,
           "if (DEMO) { toast('Nel demo si guarda soltanto" in cod)
-    # QUATTRO dal cantiere della riconciliazione (alle due di sempre si
-    # aggiungono le due uscite del conflitto fra il mazzo di qui e
-    # quello salvato nel Telegram), e SEI da set 2026: il passaggio al
-    # profilo legato all'account e il ritorno a quello di prima. Sono
-    # gesti che SOSTITUISCONO un'identita', cioe' esattamente quelli per
-    # cui la domanda unica esiste.
-    prova("i sei gesti del mazzo passano dalla domanda unica", 6,
+    # EMENDATA (fase 6): dei sei gesti di ieri resta il solo
+    # «dimentica» — import, conflitto, passaggio al conto e ritorno
+    # sono usciti. E' l'unico che tocca un'identita', e chiede.
+    prova("l'unico gesto rimasto del mazzo passa dalla domanda unica", 1,
           cod.count("chiediConferma({"))
     prova("dimenticare toglie locale, cloud E la lista del server", True,
           all(s in pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
@@ -35830,7 +35836,11 @@ def prove_p2p_chiavi():
           '<h3 id="priv-p2p">' in priv
           and "ricaviamo noi dal tuo account" in priv
           and "ricavare nessuno tranne te" in priv
-          and "nasce qui e resta" in priv)
+          and "vive sul dispositivo" in priv)
+    # ...E DALLA FASE 6 E' ANCHE LA PORTA DEL FOGLIETTO: il codice
+    # segreto e il «dimentica» si raggiungono SOLO da qui.
+    prova("...e porta il bottone del foglietto ridotto", True,
+          'onclick="apriProfiloP2P()"' in priv)
     prova("...e dice che quel profilo il server lo sa ricavare", True,
           "il server di Barattolo lo sa ricavare" in priv and "potremmo" in priv)
     prova("...e che servono DUE cose in due posti", True,
@@ -36061,7 +36071,9 @@ def prove_p2p_chiavi():
     prova("si dice « almeno da », che e' un pavimento", True, "almeno da" in ramo)
     prova("chi non ha chiavi altrove legge il testo di sempre", True,
           "nasce da solo al primo scambio" in ramo)
-    prova("...e la via d'uscita resta quella dei due rami", 2,
+    # EMENDATA (fase 6): la via d'uscita dell'import non c'e' piu' in
+    # nessuno dei due rami — l'avviso resta, il rimedio no.
+    prova("...e l'import non e' in nessuno dei due rami", 0,
           ramo.count("${importa}"))
     # DIMENTICARE BUTTA ANCHE IL CONTO: la chiave cancellata era una di
     # quelle contate, quindi il numero in mano diventa falso nell'istante
@@ -36264,146 +36276,36 @@ const corpo = f => JSON.parse(f.opt.body);
   const dopoCloud = mazzoDaTesto(cloud.get('mostro_mazzo'));
   out.originePersiste = dopoCloud && dopoCloud.origine === 'conto'
     && dopoCloud.versione === 3 && dopoCloud.sk === skSeme;
-  // 3d) LA GUARDIA DEGLI SCAMBI APERTI (fase 4)
-  // ⚠️ E' LA GUARDIA CHE COSTA DI PIU': se il mazzo cambia mentre una
-  // hold invoice tiene dei sats, quei sats restano senza nessuno che
-  // possa muoverli — la chiave di trade con cui si libera o si disputa
-  // era in quel profilo. Non e' una riga che se ne va, e' un pagamento
-  // che perde il padrone.
+  // 3d) LA GUARDIA DEGLI SCAMBI APERTI (fase 6: sta nel «dimentica»)
+  // ⚠️ E' LA GUARDIA CHE COSTA DI PIU': se il mazzo sparisce mentre
+  // una hold invoice tiene dei sats, quei sats restano senza nessuno
+  // che possa muoverli — la chiave di trade con cui si libera o si
+  // disputa era in quel profilo. Le SOSTITUZIONI sono uscite con la
+  // fase 6, quindi l'unico gesto che toglie il mazzo e' il
+  // «dimentica»: la guardia sta li', e prima avvisava solo a parole.
   reset(); ricordaMazzo(m);
   ordiniFinti = {a1: {stato: 'attivo'}};
-  const altro = mazzoDaTesto(bytesToHex(NT.generateSecretKey()));
-  const esitoBloccato = await applicaImportMazzo(altro);
-  out.apertoBlocca = esitoBloccato === false && mazzoMostro().sk === m.sk;
+  scordaMazzo();
+  out.apertoBlocca = conferme.length === 0 && mazzoMostro().sk === m.sk;
   out.apertoLoDice = toasts.some(t => t.includes('finiscilo prima'));
-  // ...e a scambi CHIUSI la sostituzione passa: la guardia non deve
-  // diventare un muro per chi ha solo una lista vecchia.
+  // ...e a scambi CHIUSI il gesto passa dalla domanda come sempre.
   reset(); ricordaMazzo(m);
   ordiniFinti = {a1: {stato: 'concluso'}, a2: {stato: 'annullato'}};
-  await applicaImportMazzo(altro);
-  out.chiusoNonBlocca = mazzoMostro().sk === altro.sk;
-  // 3e) IL PASSAGGIO AL PROFILO DELL'ACCOUNT, e il ritorno indietro
-  reset(); ricordaMazzo(m);
-  rispSeme = {ok: true, seme: skSeme, versione: 1};
-  await passaAlProfiloDelConto(); await ultimaConferma;
-  out.passaggioChiede = conferme.length === 1;
-  out.passaggioFatto = mazzoMostro().sk === skSeme
-    && mazzoMostro().origine === 'conto';
-  // ⚠️ IL VECCHIO NON SI CANCELLA: senza un ritorno indietro quella
-  // scelta si farebbe al buio.
-  const messoDaParte = mazzoDaTesto(localStorage.getItem('barattolo_mostro_prima'));
-  out.vecchioDaParte = messoDaParte && messoDaParte.sk === m.sk;
-  await tornaAlProfiloDiPrima(); await ultimaConferma;
-  out.ritornoRimette = mazzoMostro().sk === m.sk;
-  out.ritornoPulisce = localStorage.getItem('barattolo_mostro_prima') === null;
-  // Col seme che non arriva NON SI TOCCA NIENTE: meglio un gesto che
-  // non fa niente e lo dice, che un profilo mezzo cambiato.
-  reset(); ricordaMazzo(m); rispSeme = null;
-  await passaAlProfiloDelConto(); await ultimaConferma;
-  out.senzaSemeNienteCambia = mazzoMostro().sk === m.sk
-    && localStorage.getItem('barattolo_mostro_prima') === null;
-  // E con uno scambio aperto il passaggio non parte nemmeno.
-  reset(); ricordaMazzo(m);
-  ordiniFinti = {a1: {stato: 'attivo'}};
-  rispSeme = {ok: true, seme: skSeme, versione: 1};
-  await passaAlProfiloDelConto(); await ultimaConferma;
-  out.passaggioApertoBlocca = mazzoMostro().sk === m.sk && conferme.length === 0;
-  // 3f) IL FOGLIO: l'offerta, il debito, la strada sovrana (fase 4b)
-  // L'OFFERTA NON COMPARE A CHI HA UNO SCAMBIO APERTO, ed e' la stessa
-  // ragione della guardia: li' cambiare profilo lascerebbe dei sats
-  // senza nessuno che possa muoverli.
-  reset(); ricordaMazzo(m); ordiniFinti = {a1: {stato: 'attivo'}};
-  renderProfiloP2P();
-  const conAperto = nodi['p2pProfiloCorpo'].innerHTML;
-  out.offertaTaceConAperti = !conAperto.includes('passaAlProfiloDelConto()')
-    && conAperto.includes('finiscilo prima');
-  // ...e compare quando non ce ne sono.
-  reset(); ricordaMazzo(m);
-  renderProfiloP2P();
-  out.offertaCompare = nodi['p2pProfiloCorpo'].innerHTML
-    .includes('passaAlProfiloDelConto()');
-  // «Tengo questo» la richiude, e resta la riga discreta: chiedere due
-  // volte la stessa cosa e' il modo di farsi dire di si' per stanchezza.
-  rifiutaOffertaConto();
-  const dopoNo = nodi['p2pProfiloCorpo'].innerHTML;
-  out.offertaSiRichiude = !dopoNo.includes('Tengo questo')
-    && dopoNo.includes('passaAlProfiloDelConto()');
-  // A CHI CE L'HA GIA' LEGATO non si offre niente, e il debito dice
-  // un'altra cosa: quel profilo torna da solo, e «se lo perdi riparti
-  // da zero» per lui sarebbe FALSO.
+  scordaMazzo(); await ultimaConferma;
+  out.chiusoNonBlocca = conferme.length === 1 && mazzoMostro() === null;
+  // 3f) IL FOGLIETTO RIDOTTO (fase 6): il debito del conto resta
+  // onesto, e nessuna strada si offre piu' — ne' offerta, ne' import,
+  // ne' sovrana, ne' adozione dal foglio.
   reset();
   ricordaMazzo({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 0,
                 creato: 9, backupFatto: true, origine: 'conto', versione: 1});
   renderProfiloP2P();
   const conConto = nodi['p2pProfiloCorpo'].innerHTML;
-  out.contoNienteOfferta = !conConto.includes('passaAlProfiloDelConto()');
   out.contoDiceCheTorna = conConto.includes('torna da solo')
     && !conConto.includes('riparti da zero');
-  // LA STRADA SOVRANA compare solo a chi entra con una sua chiave.
-  reset(); ricordaMazzo(m); renderProfiloP2P();
-  out.sovranoTaceSenzaNpub = !nodi['p2pProfiloCorpo'].innerHTML
-    .includes('usaChiaveNostrP2P()');
-  const skMia = bytesToHex(NT.generateSecretKey());
-  myNpubAccesso = NT.getPublicKey(hexToBytes(skMia));
-  reset(); ricordaMazzo(m); renderProfiloP2P();
-  out.sovranoCompareConNpub = nodi['p2pProfiloCorpo'].innerHTML
-    .includes('usaChiaveNostrP2P()');
-  // ⚠️ UNA CHIAVE CHE NON E' LA SUA SI RIFIUTA, e non e' pignoleria:
-  // accettarla farebbe nascere un profilo che il server non sa essere
-  // suo e che non tornerebbe da nessun'altra parte — cioe'
-  // prometterebbe la sovranita' e darebbe un terzo mazzo travestito.
-  el('p2pNostrInp').value = bytesToHex(NT.generateSecretKey());
-  await usaChiaveNostrP2P();
-  out.chiaveAltruiRifiutata = mazzoMostro().sk === m.sk
-    && toasts.some(t => t.includes('non è la chiave con cui entri'));
-  // ...e la SUA si prende, e il profilo diventa 'mia'.
-  el('p2pNostrInp').value = skMia;
-  await usaChiaveNostrP2P();
-  out.chiaveSuaPresa = mazzoMostro().sk === skMia
-    && mazzoMostro().origine === 'mia';
-  myNpubAccesso = '';
-  // 3g) IL PROFILO DEL CONTO SI ADOTTA ANCHE DAL FOGLIO (fase 4d)
-  // ⚠️ IL BUCO CHE QUESTA PARTE CHIUDE, dal campo: il seme lo chiedeva
-  // SOLO `assicuraMazzo`, cioe' solo chi prendeva o pubblicava un
-  // ordine. Dal foglio, senza profilo, l'unica strada offerta era il
-  // codice segreto — e chi apriva il P2P da un browser nuovo non aveva
-  // nessun modo di dire «dammi quello del mio account».
-  reset(); rispChiavi = {chiavi: 0, dal: 0};
-  rispSeme = {ok: true, seme: skSeme, versione: 1};
-  renderProfiloP2P();
-  await new Promise(r => setTimeout(r, 0));
-  renderProfiloP2P();
-  const senzaNiente = nodi['p2pProfiloCorpo'].innerHTML;
-  out.vuotoOffreIlConto = senzaNiente.includes('adottaProfiloDelConto()');
-  // A CHI NON HA NIENTE ALTROVE il conto viene PRIMA: mettergli davanti
-  // un campo per incollare un codice che non ha sarebbe attrito e basta.
-  out.vuotoContoPrima = senzaNiente.indexOf('adottaProfiloDelConto()')
-    < senzaNiente.indexOf('importaMazzoDalFoglio()');
-  // ⚠️ A CHI CE L'HA ALTROVE l'import resta in TESTA: quello ha una
-  // reputazione, e si riprende solo col codice segreto.
-  reset(); rispChiavi = {chiavi: 2, dal: 1735689600};
-  rispSeme = {ok: true, seme: skSeme, versione: 1};
-  renderProfiloP2P();
-  await new Promise(r => setTimeout(r, 0));
-  renderProfiloP2P();
-  const conAltrove = nodi['p2pProfiloCorpo'].innerHTML;
-  out.altroveOffreEntrambe = conAltrove.includes('importaMazzoDalFoglio()')
-    && conAltrove.includes('adottaProfiloDelConto()');
-  out.altroveImportPrima = conAltrove.indexOf('importaMazzoDalFoglio()')
-    < conAltrove.indexOf('adottaProfiloDelConto()');
-  // Il gesto: nasce il profilo del conto, non uno a caso.
-  reset(); rispSeme = {ok: true, seme: skSeme, versione: 1};
-  await adottaProfiloDelConto();
-  out.adozioneDalFoglio = mazzoMostro().sk === skSeme
-    && mazzoMostro().origine === 'conto';
-  // ⚠️ E SENZA SEME NON NASCE NIENTE, che e' tutta la differenza da
-  // `assicuraMazzo`: quella a mani vuote GENERA a caso, e qui sarebbe
-  // il contrario di quel che si e' chiesto — chi tocca quel bottone
-  // vuole il profilo del CONTO, e se non c'e' deve sentirselo dire.
-  reset(); rispSeme = null;
-  await adottaProfiloDelConto();
-  out.senzaSemeNonGenera = mazzoMostro() === null
-    && toasts.some(t => t.includes('non è disponibile'));
+  out.foglioSenzaGesti = ['passaAlProfiloDelConto', 'usaChiaveNostrP2P',
+    'importaMazzoDalFoglio', 'adottaProfiloDelConto', 'usaMazzoDellaNuvola']
+    .every(g => !conConto.includes(g));
   // 4) dal cloud non si fabbrica un mazzo nuovo
   reset();
   cloud.set('mostro_mazzo', JSON.stringify({sk, pub: NT.getPublicKey(hexToBytes(sk)), indice: 2, creato: 9, backupFatto: true}));
@@ -36461,20 +36363,6 @@ const corpo = f => JSON.parse(f.opt.body);
   await codiceP2PSalvato();
   out.salvato = mazzoMostro().backupFatto === true && JSON.parse(cloud.get('mostro_mazzo')).backupFatto === true
     && nodi.p2pProfiloCorpo.innerHTML.includes('Hai salvato');
-  // 12) importa: lo stesso non fa niente, un altro chiede e sostituisce
-  nodi.p2pImportaInp = {value: cod};
-  await importaMazzoDalFoglio();
-  out.stessoNonImporta = conferme.length === 0 && toasts.some(t => t.includes('già'));
-  const sk2 = bytesToHex(NT.generateSecretKey());
-  nodi.p2pImportaInp.value = NT.nip19.nsecEncode(hexToBytes(sk2));
-  fetches = [];
-  await importaMazzoDalFoglio();
-  out.sostituisceChiedendo = conferme.length === 1 && mazzoMostro().sk === sk2
-    && corpo(fetches[0]).pubkeys[0] === NT.getPublicKey(hexToBytes(sk2));
-  nodi.p2pImportaInp.value = 'nsec1rotto';
-  toasts = [];
-  await importaMazzoDalFoglio();
-  out.stortoDetto = mazzoMostro().sk === sk2 && toasts.some(t => t.includes('forma giusta'));
   // 13) dimentica: via da locale, cloud e server
   fetches = []; conferme = [];
   scordaMazzo();
@@ -36600,31 +36488,11 @@ const corpo = f => JSON.parse(f.opt.body);
         "semeStortoScartato": "un seme storto si scarta e non fa un profilo rotto",
         "localeNienteSeme": "col mazzo gia' in locale il seme non si chiede",
         "originePersiste": "...e origine e versione sopravvivono al giro nel cloud",
-        "apertoBlocca": "con uno scambio aperto il profilo non si sostituisce",
+        "apertoBlocca": "con uno scambio aperto il profilo non si dimentica",
         "apertoLoDice": "...e lo dice invece di tacere",
-        "chiusoNonBlocca": "...ma a scambi chiusi la sostituzione passa",
-        "passaggioChiede": "il passaggio al profilo dell'account passa dalla domanda",
-        "passaggioFatto": "...e il profilo diventa quello dell'account",
-        "vecchioDaParte": "...col vecchio messo da parte, non cancellato",
-        "ritornoRimette": "e il ritorno indietro rimette quello di prima",
-        "ritornoPulisce": "...e non lascia un doppione da parte",
-        "senzaSemeNienteCambia": "senza seme il passaggio non tocca niente",
-        "passaggioApertoBlocca": "...e con uno scambio aperto non parte nemmeno",
-        "offertaTaceConAperti": "l'offerta tace se c'e' uno scambio aperto",
-        "offertaCompare": "...e compare quando non ce ne sono",
-        "offertaSiRichiude": "«Tengo questo» la richiude e lascia la riga discreta",
-        "contoNienteOfferta": "a chi ha gia' il profilo dell'account non si offre",
-        "contoDiceCheTorna": "...e il debito gli dice che torna da solo",
-        "sovranoTaceSenzaNpub": "la strada sovrana tace a chi non entra con una sua chiave",
-        "sovranoCompareConNpub": "...e compare a chi ce l'ha",
-        "chiaveAltruiRifiutata": "una chiave che non e' la sua si rifiuta",
-        "chiaveSuaPresa": "...e la sua diventa il profilo di scambio",
-        "vuotoOffreIlConto": "senza profilo il foglio offre quello del conto",
-        "vuotoContoPrima": "...e a chi non ha niente altrove viene per primo",
-        "altroveOffreEntrambe": "con un profilo altrove le strade sono due",
-        "altroveImportPrima": "...e l'import resta in testa, che conserva la reputazione",
-        "adozioneDalFoglio": "il gesto fa nascere il profilo del conto",
-        "senzaSemeNonGenera": "...e senza seme NON genera un profilo a caso",
+        "chiusoNonBlocca": "...ma a scambi chiusi il gesto passa dalla domanda",
+        "contoDiceCheTorna": "il debito del conto dice che torna da solo",
+        "foglioSenzaGesti": "il foglietto ridotto non offre piu' nessuna strada",
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
@@ -36642,9 +36510,6 @@ const corpo = f => JSON.parse(f.opt.body);
         "codiceNelCampo": "«mostra» mette il codice nel campo e MAI nel markup",
         "copiato": "«copia» copia quel codice",
         "salvato": "«l'ho salvato» timbra il backup in locale e nel cloud",
-        "stessoNonImporta": "importare lo stesso codice non fa niente e lo dice",
-        "sostituisceChiedendo": "importarne un altro chiede, sostituisce e registra",
-        "stortoDetto": "un codice storto non tocca il mazzo e lo dice",
         "dimenticato": "«dimentica» chiede, e poi via da locale, cloud e server",
         "demoTace": "in DEMO il foglio non si apre e un toast lo dice",
         "vetrinaInvita": "in vetrina si apre l'invito con la chiave p2p",
@@ -37051,8 +36916,12 @@ function reset(){
   manda(ordine('purchase-completed', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
   out.concluso = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
   out.dettoConcluso = toasts.some(t => t.indexOf('concluso') >= 0);
+  /* EMENDATA (fase 6): a scambio concluso il foglio del profilo NON
+     si apre piu' — nella vista P2P il profilo non si nomina, e per il
+     profilo del conto il debito di backup non esiste. La pausa resta
+     quella del vecchio timer (900 ms): si prova che non scatti. */
   await pausa(1000);
-  out.backupOfferto = aperti.indexOf('p2pProfiloSheet') >= 0;
+  out.backupOfferto = aperti.indexOf('p2pProfiloSheet') < 0;
   out.paroleDiCasa = !['nostr', 'nsec', 'relay']
     .some(w => (nodi.p2pOrdineCorpo.innerHTML || '').toLowerCase().includes(w));
 
@@ -37332,7 +37201,7 @@ function reset(){
         "rilasciato": ("il rilascio pure", "rilasciato"),
         "concluso": ("e lo scambio si chiude", "concluso"),
         "dettoConcluso": "...dicendolo",
-        "backupOfferto": "il codice si chiede quando vale: al primo scambio concluso",
+        "backupOfferto": "a scambio concluso il foglio del profilo NON si apre (fase 6)",
         "paroleDiCasa": "a schermo nessuna parola di protocollo",
         "dedup": "lo stesso messaggio due volte muove lo scambio una volta",
         "nonMio": "...e un messaggio che non e' nostro non lo tocca",
@@ -38630,11 +38499,11 @@ def prove_p2p_nuvola():
         prova("la riga di stato dice il caso «%s»" % stato,
               True, ("\n    %s:" % stato) in ren or ("    %s:" % stato) in ren)
 
-    # le due uscite del conflitto CHIEDONO: tutte e due lasciano
-    # indietro un'identita', e nessuna delle due si fa in silenzio
-    for fn in ("usaMazzoDellaNuvola", "tieniMazzoDiQui"):
-        c = pezzo_js(mini, "function %s(" % fn, "\n}\n")
-        prova("%s chiede prima di agire" % fn, True, "chiediConferma({" in c)
+    # EMENDATA (fase 6): le due uscite del conflitto sono USCITE — il
+    # «diverso» resta un'informazione della riga di stato, non un bivio.
+    # Nessuno dei due mazzi si tocca, che e' la meta' che gia' valeva.
+    prova("le due uscite del conflitto non esistono piu'", False,
+          "usaMazzoDellaNuvola" in mini or "tieniMazzoDiQui" in mini)
 
     # --- il banco: le sentinelle dicono che le righe ci sono, mai che
     #     la funzione risponda giusto sui cinque casi ---
@@ -39675,17 +39544,17 @@ def prove_p2p_server():
           "con.commit()" in seme_r
           and seme_r.index("con.commit()") < seme_r.index("con.close()"))
 
-    # --- 12) LA GUARDIA DEGLI SCAMBI APERTI (fase 4) ---------------
-    # ⚠️ STA IN `applicaImportMazzo` E NON SOLO NEI GESTI, ed e' la
-    # ragione per cui questa prova esiste: li' ci passano TUTTE le
-    # sostituzioni — l'importazione, il profilo del Telegram, il
-    # passaggio a quello legato all'account — quindi un gesto nuovo che
-    # domani dimenticasse di chiedere si troverebbe fermato lo stesso.
-    ai = pezzo_js(mini, "async function applicaImportMazzo(", "\n}\n")
-    prova("ogni sostituzione del mazzo passa dalla guardia", True,
+    # --- 12) LA GUARDIA DEGLI SCAMBI APERTI (fase 6: nel «dimentica»)
+    # ⚠️ EMENDATA: le sostituzioni del mazzo sono uscite con la fase 6
+    # e `applicaImportMazzo` con loro — l'unico gesto rimasto che
+    # toglie il profilo e' il «dimentica» del foglietto, e la guardia
+    # sta li' (prima avvisava solo a parole, e un pagamento che perde
+    # il padrone non si ferma con un avviso).
+    ai = pezzo_js(mini, "function scordaMazzo(", "\n}\n")
+    prova("il «dimentica» passa dalla guardia degli scambi aperti", True,
           "if (scambiApertiP2P()) {" in ai)
-    prova("...e la guardia sta PRIMA di toccare il mazzo", True,
-          0 < ai.find("scambiApertiP2P()") < ai.find("ricordaMazzo(d)"))
+    prova("...e la guardia sta PRIMA della domanda", True,
+          0 < ai.find("scambiApertiP2P()") < ai.find("chiediConferma("))
     # E IL GIUDICE GUARDA GLI STATI NON FINALI, non una lista sua: se
     # domani nasce uno stato nuovo, questa guardia lo copre da sola.
     sa = pezzo_js(mini, "function scambiApertiP2P(", "\n}\n")
@@ -39801,8 +39670,12 @@ def prove_p2p_server():
     prova("il timeout muto non diventa un «non ne hai»", True,
           "if (!risposto)" in cm
           and "return p2pMieiOrdini;" in cm.split("if (!risposto)")[1])
-    prova("il profilo di prima non si cancella, si mette da parte", True,
-          "localStorage.setItem(MAZZO_PRIMA, mazzoSerializza(m))" in mini)
+    # EMENDATA (fase 6): il passaggio di profilo non esiste piu', e con
+    # lui il «profilo di prima» — nessuno scrive piu' quella chiave (un
+    # residuo nel localStorage di ieri resta li', inerte e non spazzato:
+    # potrebbe essere l'unica copia di un'identita').
+    prova("nessuno scrive piu' il «profilo di prima»", False,
+          "localStorage.setItem(MAZZO_PRIMA" in mini)
 
     # --- 16b) LA CORSA DELL'INDICE A ZERO E LA STRISCIA OVUNQUE -----
     # ⚠️ LA CORSA (set 2026, dal campo: la marcatura arrivava solo alla
@@ -39987,41 +39860,22 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
             prova("senza restore la striscia resta quella di prima", True,
                   out5["senzaRestoreVuota"])
 
-    # --- 13) IL FOGLIO E LA STRADA SOVRANA (fase 4b) ---------------
-    # ⚠️ IL PANNELLO SOVRANO STA IN UNA FUNZIONE SUA, e non per ordine:
-    # `renderProfiloP2P` ha la sentinella che le vieta «Nostr», «nsec» e
-    # «relay» — chi entra da Telegram non legge parole di protocollo —
-    # mentre chi legge QUEL pannello e' arrivato proprio da li', e
-    # chiamare le cose col loro nome e' l'unico modo di non confonderlo.
-    prova("il pannello sovrano e' una funzione sua", True,
-          "function pannelloSovranoP2P(){" in mini)
-    ps = pezzo_js(mini, "function pannelloSovranoP2P(", "\n}\n")
-    prova("...e compare SOLO a chi entra con una sua chiave", True,
-          "if (!myNpubAccesso) return '';" in ps)
-    # E NON PROMETTE QUEL CHE NON SI PUO' FARE: con un'estensione o un
-    # bunker la chiave non c'e' nel browser, e `firmaMostro` firma byte
-    # grezzi — che NIP-07 e NIP-46 non sanno fare. Dirlo e' l'unica
-    # alternativa a farlo provare e basta.
-    prova("...e dice perche' con un'estensione non si puo'", True,
-          "estensione" in ps and "bunker" in ps)
-    uc = pezzo_js(mini, "async function usaChiaveNostrP2P(", "\n}\n")
-    prova("la chiave incollata si confronta con quella d'ingresso", True,
-          "d.pub !== attesa" in uc)
-    prova("...e se non combacia non si sostituisce niente", True,
-          0 < uc.find("d.pub !== attesa") < uc.find("applicaImportMazzo"))
-
-    # --- 14) L'ADOZIONE DAL FOGLIO, E LA RIGA CHE LA RENDE VISIBILE -
-    # ⚠️ `adottaProfiloDelConto` NON RIUSA `assicuraMazzo`, ed e' la
-    # differenza che questa prova esiste per tenere: quella a mani
-    # vuote GENERA a caso — che qui sarebbe il contrario di quel che si
-    # e' chiesto. Chi tocca quel bottone vuole il profilo del CONTO, e
-    # se non c'e' deve sentirselo dire invece di ritrovarsi un profilo
-    # nuovo di zecca senza sapere che e' un altro.
-    ad = pezzo_js(mini, "async function adottaProfiloDelConto(", "\n}\n")
-    prova("l'adozione dal foglio non genera mai a caso", False,
-          "generateSecretKey" in ad or "assicuraMazzo" in ad)
-    prova("...e senza seme si ferma e lo dice", True,
-          "if (!s) { toast(" in ad)
+    # --- 13-14) LA STRADA SOVRANA E L'ADOZIONE DAL FOGLIO SONO
+    # USCITE (fase 6, decisione di Andrea). La sovrana resta nel patto
+    # — una riga in «I tuoi dati» — e chi l'aveva gia' presa (origine
+    # 'mia') continua identico: `mazzoMostro` non distingue. Il GESTO
+    # pero' non c'e' piu', e nemmeno l'adozione manuale del conto: il
+    # seme lo chiede solo `assicuraMazzo`, in silenzio. Le ricette coi
+    # perche' (la verifica della chiave d'ingresso, il no a estensioni
+    # e bunker) stanno nelle voci di CANTIERI delle fasi 4 e in git.
+    prova("il pannello sovrano non esiste piu'", False,
+          "pannelloSovranoP2P" in mini)
+    prova("...e nemmeno il gesto della chiave incollata", False,
+          "usaChiaveNostrP2P" in mini)
+    prova("...e nemmeno l'adozione manuale del conto", False,
+          "adottaProfiloDelConto" in mini)
+    prova("...il seme lo chiede solo assicuraMazzo", 1,
+          mini.count("await semeProfiloP2P()"))
     # LA RIGA IN CONSOLE: questa domanda fallisce in SILENZIO — 409, e
     # il client genera come sempre. Senza una traccia, una leva accesa a
     # meta' si legge come «funziona tutto». E' la lezione dello
@@ -40092,10 +39946,9 @@ def prove_p2p_campanello():
     import re as _re
     _mini = open("miniapp.html", encoding="utf-8").read()
     _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
-    # sei dal cantiere dell'adozione (set 2026): il mazzo che torna
-    # dal cloud si rimanda al server appena arriva, da qualunque
-    # strada — e la funzione ha gia' dentro le sue guardie.
-    prova("i chiamanti di registraChiaviP2P sono sei", 6, len(_reg))
+    # cinque dalla fase 6 (era sei): con `applicaImportMazzo` e' uscito
+    # il suo chiamante — le sostituzioni del mazzo non esistono piu'.
+    prova("i chiamanti di registraChiaviP2P sono cinque", 5, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
