@@ -6657,3 +6657,61 @@ rivale rotto — le due cinture non sono ridondanti, coprono guasti
 diversi. Prove: 8557 verdi.
 RESTA VERO il gemello dichiarato della scopa lampo (la X su riga
 finita a cache calde), che e' un altro caso e resta a verbale la'.
+
+L'IDENTITA' DI PAGAMENTO: IL RECAPITO CONOSCE IL SUO METODO E SI
+RICORDA (9 set 2026, miglioria della terza tappa). «Dove ricevere gli
+euro» non e' piu' un campo di testo unico: il METODO dell'ordine
+sceglie il form — SEPA vuole intestatario e IBAN in due campi,
+Revolut un RevTag, Satispay un numero di telefono, PayPal un conto,
+i contanti un luogo di ritrovo proposto, e il metodo libero (che per
+il coordinatore resta testo libero, vedi P2P_METODI) il suo campo
+generico. Con piu' metodi sull'ordine, le pillole scelgono quale
+compilare.
+LA DOMANDA DEL CANTIERE ERA SE ESTENDERE IL VOCABOLARIO DEL TAG `t`,
+e la risposta e' NO, per due ragioni che vanno ricordate insieme:
+1) «per ogni tipo vince il piu' recente» e' il meccanismo di
+correzione — con un tipo per metodo (`euro:sepa`, `euro:revolut`),
+chi corregge passando da SEPA a Revolut lascerebbe DUE recapiti vivi
+e chi compra non saprebbe quale vale; il recapito degli euro e' UNO
+per scambio, quindi il tipo e' uno. 2) Il vocabolario e' chiuso
+apposta: un tipo nuovo, per un client di ieri, e' una busta lasciata
+cadere in silenzio. E SUL FILO VIAGGIA TESTO COMPOSTO, mai una
+struttura: chi riceve mostra quel che legge con qualunque versione
+(niente parser dall'altra parte, niente JSON mostrato grezzo da una
+versione vecchia). La tipizzazione vive nel client che scrive: form,
+validazione leggera (l'IBAN si ripulisce e si guarda nella sagoma,
+due lettere due cifre e una lunghezza da IBAN — mai nel contenuto),
+composizione canonica. La strada scartata — JSON nel content con
+fallback — non si riproponga senza un motivo nuovo: comprava un
+«copia campo» dall'altra parte al prezzo di un formato da mantenere
+in due versioni.
+IL RICORDO sta in localStorage (`barattolo_p2p_recapiti`), per FORMA
+di metodo ('sepa', 'revolut', …, 'altro:<nome>'), coi campi
+strutturati e il testo composto: si scrive a ogni invio riuscito —
+l'invio E' il salvataggio, vince l'ultimo per data come sul filo — e
+precompila il form. Mai sul server, come tutto il P2P.
+L'INVIO AUTOMATICO: quando la controparte si conosce (il passaggio di
+`peer` da vuoto a pieno in applicaMessaggioP2P), chi vende col
+ricordo giusto non riscrive niente: parte da solo. TRE prudenze:
+si aspetta qualche secondo e si RICONTROLLA allo sparo (l'eco
+multi-dispositivo fa in tempo ad arrivare, e un recapito gia' mandato
+da un altro dispositivo non viene scavalcato da una copia stantia);
+parte solo con UNA forma pronta fra i metodi dell'ordine (con due
+sceglie il venditore nel foglio — la riga che insiste c'e' apposta);
+e se non parte NON si riprova da solo, che e' la stessa regola della
+consegna dei campi (nessun rinvio automatico, vedi la voce della
+terza tappa). Il caso residuo dichiarato: chi corregge a mano il
+recapito per UNO scambio su un dispositivo e apre l'altro proprio
+nella finestra della presa in carico puo' vedersi scavalcare dalla
+copia ricordata — l'attesa con ricontrollo lo copre nei giri visti,
+e la cura e' sempre la stessa: re-inviare, l'ultimo vale.
+LE PROVE: il banco node guadagna storage finto e stati finali fra gli
+stub, e fa girare forme, composizione, ricordo che vince, auto-invio
+che parte una volta sola, il no con due ricordi, il no di chi compra
+e dello scambio finito; sentinelle su vocabolario fermo a due, ricordo
+scritto DOPO l'invio riuscito, localStorage e mai server, aggancio in
+applicaMessaggioP2P, e gli a-capo del recapito composto mostrati a chi
+compra. Prove: 8578 verdi. RESTA DA GUARDARE dal vivo col giro a due
+identita' della tappa 8 (il foglio nuovo, le pillole, l'auto-invio
+vero via coordinatore); e un editor del ricordo in «I tuoi dati»,
+fuori dallo scambio, e' possibile ma non deciso.
