@@ -30229,19 +30229,31 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int) -> dict:
 
 def _facce_ordini_p2p(con, ordini) -> dict:
     """Da una lista di id al VOLTO PUBBLICO di chi li ha pubblicati:
-    nome, avatar, media delle stelline e quanti voti. PURA rispetto
-    alla sessione — chi puo' chiedere lo decide la rotta.
-    ESCE SOLO ROBA GIA' PUBBLICA nel mercatino: gli stessi quattro
-    campi che stanno sotto ogni annuncio e in ogni negozio. Niente
-    tg_id, niente npub, niente conto degli scambi P2P — quello lo dice
-    il coordinatore, non noi.
+    nome, avatar, media delle stelline, quanti voti e l'indirizzo del
+    negozio. PURA rispetto alla sessione — chi puo' chiedere lo decide
+    la rotta.
+    ESCE SOLO ROBA GIA' PUBBLICA nel mercatino: gli stessi campi che
+    stanno sotto ogni annuncio e in ogni negozio. Niente tg_id, niente
+    npub, niente conto degli scambi P2P — quello lo dice il
+    coordinatore, non noi.
+    L'AVATAR RISPETTA LA SCELTA (set 2026, ritocco al primo giro dei
+    volti): chi ha detto «nessuna foto» non la mostra nemmeno qui — lo
+    stesso CASE della pagina negozio, che al primo giro non era stato
+    ricopiato e il volto del P2P avrebbe mostrato una foto che il
+    mercatino nasconde.
+    IL NEGOZIO E' LA PORTA DEL TOCCO (set 2026, richiesta di Andrea):
+    il client lo passa ad apriNegozio con la stessa preferenza del
+    dettaglio annuncio — prima il codice pubblico, poi lo username —
+    e chi non ha ne' l'uno ne' l'altro resta un volto senza porta.
     LA MEDIA ESCE SOLO SE QUALCUNO HA VOTATO: `n_feedback` a zero non
     e' «zero stelle», e' «non si sa» — la card fa sparire la riga, che
     e' la regola di casa (le stelle nascono col primo voto)."""
     pulite = _ordini_puliti_p2p(ordini)
     segni = ",".join("?" * len(pulite))
     righe = con.execute(
-        f"SELECT p.ordine, u.nome, u.avatar, u.rating, u.n_feedback "
+        f"SELECT p.ordine, u.nome, u.rating, u.n_feedback, u.negozio, "
+        f"u.username, (CASE WHEN u.avatar_scelta='nessuna' THEN '' "
+        f"ELSE u.avatar END) AS avatar "
         f"FROM p2p_ordini p JOIN utenti u ON u.tg_id = p.tg_id "
         f"WHERE p.ordine IN ({segni})", pulite).fetchall()
     fuori = {}
@@ -30252,6 +30264,7 @@ def _facce_ordini_p2p(con, ordini) -> dict:
             "avatar": r["avatar"] or "",
             "media": round(float(r["rating"] or 0), 1) if voti else 0,
             "voti": voti,
+            "negozio": r["negozio"] or r["username"] or "",
         }
     return fuori
 

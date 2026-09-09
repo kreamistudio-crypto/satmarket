@@ -35517,6 +35517,8 @@ def prove_p2p_libro():
         "function repDaTag(s){",
         "function ordineDaEvento(ev, adesso){",
         "function stellineP2P(f){",
+        # la riga dell'altra piazza (set 2026): rinata nel dettaglio
+        "function repRigaP2P(rep){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
         # l'anello della scadenza (set 2026) e il suo giudice puro
@@ -35633,7 +35635,21 @@ p2pFacce = {[out.fisso.id]: {nome: 'Ada', avatar: 'av_x.jpg',
 out.rigaConFaccia = rigaOrdineP2P(out.fisso);
 p2pFacce = {[out.fisso.id]: {nome: 'Bruno', avatar: '', media: 0, voti: 0}};
 out.rigaFacciaSenzaVoti = rigaOrdineP2P(out.fisso);
+/* IL VOLTO E' UNA PORTA (set 2026): col negozio arriva l'onclick che
+   apre la pagina del mercatino; senza negozio il volto resta un
+   volto e il tocco scivola sulla card come prima. */
+p2pFacce = {[out.fisso.id]: {nome: 'Ada', avatar: 'av_x.jpg',
+                             media: 4.8, voti: 12, negozio: 'ab12cd34'}};
+out.rigaFacciaPorta = rigaOrdineP2P(out.fisso);
 p2pFacce = {};
+/* LA RIGA DELL'ALTRA PIAZZA (set 2026): quel che repDaTag ha tosato
+   diventa una frase — mai «percento di positivi», che il tag non
+   porta. Senza voti si dice l'unica cosa vera: da quanto e' li'. */
+out.repRigaPiena  = repRigaP2P({voti: 7, media: 4.6, giorni: 23});
+out.repRigaUno    = repRigaP2P({voti: 1, media: 5, giorni: 1});
+out.repRigaNuovo  = repRigaP2P({voti: 0, media: 0, giorni: 3});
+out.repRigaOggi   = repRigaP2P({voti: 0, media: 0, giorni: 0});
+out.repRigaNiente = repRigaP2P(null);
 /* IL RANGE (set 2026, il ridisegno): due importi crescenti sono un
    ordine come gli altri — la card lo dice — e i rotti restano rotti. */
 out.rangeInvertito = ordineDaEvento(ev(38383, [['d','ri'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','100','50'],['pm','x']]), ora);
@@ -35990,7 +36006,9 @@ console.log(JSON.stringify(out));
     # racconta il cambio la NOMINA, ed e' giusto che lo faccia — una
     # sentinella sul nome nudo sarebbe rossa per colpa di una
     # spiegazione (la stessa trappola del «nostr» nei commenti).
-    prova("la riga della reputazione del coordinatore e' morta", True,
+    # (la voce dell'altra piazza e' RINATA come repRigaP2P, nel
+    # dettaglio della presa: i suoi casi girano qui sopra)
+    prova("la vecchia riga della card (repTestoP2P) resta morta", True,
           "function repTestoP2P(" not in mini)
     prova("...ma il tag `rating` si legge ancora, che e' un fatto",
           True, "repDaTag" in mini)
@@ -36021,6 +36039,35 @@ console.log(JSON.stringify(out));
     prova("...e un volto senza voti porta la faccia, non la riga", True,
           "p2p-faccia" in out["rigaFacciaSenzaVoti"]
           and "p2p-rep" not in out["rigaFacciaSenzaVoti"])
+    # IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): col
+    # negozio il tocco apre la pagina del mercatino — e SOLO col
+    # negozio, o un volto senza porta prometterebbe col cursore una
+    # cosa che il tocco non fa.
+    prova("il volto col negozio e' una porta", True,
+          'onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+          in out["rigaFacciaPorta"]
+          and 'data-negozio="ab12cd34"' in out["rigaFacciaPorta"])
+    prova("...e senza negozio resta un volto", True,
+          "apriNegozioP2P" not in out["rigaConFaccia"]
+          and "p2p-faccia" in out["rigaConFaccia"])
+    # LA RIGA DELL'ALTRA PIAZZA: il ⚡ e la parola «P2P» la tengono
+    # distinta dalle stelline del mercatino, e i numeri sono frasi.
+    prova("la riga P2P dice scambi, media ed eta'",
+          "⚡ 7 scambi P2P · ⭐ 4,6 · da 23 giorni", out["repRigaPiena"])
+    prova("...e al singolare parla al singolare",
+          "⚡ 1 scambio P2P · ⭐ 5,0 · da 1 giorno", out["repRigaUno"])
+    prova("senza voti si dice solo da quanto e' li'",
+          "⚡ Nuovo sul P2P · da 3 giorni", out["repRigaNuovo"])
+    prova("...e chi e' appena arrivato e' «da oggi»",
+          "⚡ Nuovo sul P2P · da oggi", out["repRigaOggi"])
+    prova("senza tag rating la riga non si scrive", "",
+          out["repRigaNiente"])
+    # ...e la riga vive nel DETTAGLIO della presa, non sulla card
+    _po = pezzo_js(mini, "function prendiOrdineP2P(id){", "\n}\n")
+    prova("il dettaglio della presa porta la riga P2P", True,
+          "repRigaP2P(riga.rep)" in _po and "+ rp +" in _po)
+    prova("...e la card no", False,
+          "repRigaP2P" in pezzo_js(mini, "function rigaOrdineP2P(o){"))
 
     # --- 9) GLI ESCLUSI NON ESISTONO PIU' (set 2026, il ridisegno):
     # i range sono ordini come gli altri — i loro casi girano nel
@@ -36442,6 +36489,19 @@ def prove_volti_libro():
     # la vetrina anonima non chiede niente: le card restano senza volto
     prova("la vetrina anonima non chiede volti", 2,
           cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
+    # IL TOCCO SUL VOLTO APRE IL NEGOZIO (set 2026, richiesta di
+    # Andrea): la porta vive nel blocco dei volti, ferma il tocco
+    # prima che cada sulla card, e la card la lega SOLO quando un
+    # negozio c'e' davvero.
+    prova("la porta del negozio vive nel blocco dei volti", True,
+          "function apriNegozioP2P(ev, chi){" in cod)
+    prova("...e ferma il tocco prima della card", True,
+          "ev.stopPropagation()" in cod)
+    prova("il volto si lega alla porta solo col negozio", True,
+          "(f.negozio" in mini
+          and 'this.dataset.negozio' in mini)
+    prova("...e il cursore lo dice solo sul volto-porta", True,
+          '.p2p-faccia[role="button"]{cursor:pointer}' in mini)
 
     # --- 3) IL SERVER: le due rotte, e cosa NON esce ----------------
     prova("la rotta che registra c'e', col gate per persona", True,
@@ -36457,6 +36517,16 @@ def prove_volti_libro():
     prova("dal giudice esce solo roba gia' pubblica nel mercatino",
           True, "u.nome" in giudice and "u.avatar" in giudice
           and "u.rating" in giudice and "u.n_feedback" in giudice)
+    # L'AVATAR RISPETTA LA SCELTA (set 2026, ritocco): chi ha detto
+    # «nessuna foto» non la mostra nemmeno qui — lo stesso CASE della
+    # pagina negozio, dimenticato al primo giro dei volti.
+    prova("...e chi ha scelto «nessuna foto» resta senza foto", True,
+          "avatar_scelta='nessuna' THEN ''" in giudice)
+    # IL NEGOZIO E' LA PORTA DEL TOCCO (set 2026): esce l'indirizzo
+    # pubblico, con la stessa preferenza del dettaglio annuncio —
+    # prima il codice, poi lo username.
+    prova("...e il negozio esce col codice prima dello username", True,
+          '"negozio": r["negozio"] or r["username"] or ""' in giudice)
     # ⚠️ SI GUARDA IL CORPO, NON LA DOCSTRING: quella dice cosa NON
     # esce, quindi NOMINA la npub — e `codice()` toglie i commenti ma
     # non le stringhe. Il tg_id la query lo nomina per forza (e' la
@@ -36484,9 +36554,16 @@ def prove_volti_libro():
         "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER,"
         " creato INTEGER);"
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
-        " avatar TEXT, rating REAL, n_feedback INTEGER);"
-        "INSERT INTO utenti VALUES(111,'Ada','av_a.jpg',4.8,12);"
-        "INSERT INTO utenti VALUES(222,'Bruno','',0,0);")
+        " avatar TEXT, rating REAL, n_feedback INTEGER,"
+        " avatar_scelta TEXT DEFAULT '', username TEXT DEFAULT '',"
+        " negozio TEXT DEFAULT '');"
+        "INSERT INTO utenti VALUES(111,'Ada','av_a.jpg',4.8,12,"
+        " '','ada_tg','ab12cd34');"
+        # Bruno HA una foto ma ha scelto di non mostrarla, e non ha un
+        # codice negozio: il volto esce senza foto e la porta ripiega
+        # sullo username
+        "INSERT INTO utenti VALUES(222,'Bruno','av_b.jpg',0,0,"
+        " 'nessuna','bruno_tg','');")
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
            "MAX_ORDINI_P2P": 200}
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p",
@@ -36509,11 +36586,14 @@ def prove_volti_libro():
           reg(con, 222, ["ordine-aaa"], 2))
     reg(con, 222, ["ordine-ccc"], 2)
     f = facce_di(con, ["ordine-aaa", "ordine-ccc", "ordine-mai-visto"])
-    prova("il volto esce con nome, faccia e stelline",
-          {"nome": "Ada", "avatar": "av_a.jpg", "media": 4.8, "voti": 12},
+    prova("il volto esce con nome, faccia, stelline e negozio",
+          {"nome": "Ada", "avatar": "av_a.jpg", "media": 4.8, "voti": 12,
+           "negozio": "ab12cd34"},
           f.get("ordine-aaa"))
-    prova("...e chi non ha voti non porta una media inventata",
-          {"nome": "Bruno", "avatar": "", "media": 0, "voti": 0},
+    prova("...e chi non ha voti non porta una media inventata "
+          "(e la foto negata resta negata)",
+          {"nome": "Bruno", "avatar": "", "media": 0, "voti": 0,
+           "negozio": "bruno_tg"},
           f.get("ordine-ccc"))
     prova("...e un ordine che non conosciamo non c'e' proprio", False,
           "ordine-mai-visto" in f)
@@ -37780,6 +37860,9 @@ const document = {querySelector: s => ({id: 'view-p2pordine'})};
 let qr = []; async function disegnaQr(box, testo, modo){ qr.push(testo); }
 function bottoneInAttesa(b, t){ return () => {}; }
 let renderP2Pn = 0; function renderP2P(){ renderP2Pn++; }
+/* la riga dell'altra piazza vive nel blocco del libro: qui si presta,
+   e i suoi casi veri girano nel banco del libro */
+function repRigaP2P(rep){ return rep ? '[rep]' : ''; }
 /* i pezzi della tappa 2: qui non si provano, si prestano */
 let P2P_LIBRO_MS = 8000;
 let p2pInfo = null;
@@ -38120,6 +38203,39 @@ function reset(){
   out.ritiroRiportaAlLibro = viste.indexOf('p2pmiei') >= 0;
   out.ritiroDetto = toasts.some(t => String(t).indexOf('ritirato') >= 0);
 
+  /* ---- LA GAMBA DELL'APP (set 2026, dal campo): il profilo del
+     conto rinasce all'ingresso su un dispositivo svuotato — fuori da
+     Telegram il cloud non c'e', e prima di questa gamba i propri
+     ordini si leggevano da estranei. */
+  reset();
+  mazzoNuvola = '';
+  const fetchVero = fetch;
+  let semeChiesto = 0;
+  fetch = async (url, opt) => {
+    fetches.push({url: url, opt: opt});
+    if (String(url).indexOf('/p2p/seme') >= 0) {
+      semeChiesto++;
+      return {ok: true, json: async () => ({seme: 'ab'.repeat(32), versione: 3})};
+    }
+    return {ok: true, json: async () => ({indice: 5})};
+  };
+  const nato = await adottaProfiloContoP2P();
+  out.contoNato = !!nato && nato.origine === 'conto'
+    && !!mazzoMostro() && mazzoMostro().sk === 'ab'.repeat(32);
+  out.contoPavimento = fetches.some(f => String(f.url).indexOf('/p2p/chiavi') >= 0);
+  /* il pavimento del server alza subito l'indice locale: e' il pezzo
+     che rende la restore possibile appena nati */
+  out.contoIndiceDalPavimento = !!mazzoMostro() && (mazzoMostro().indice | 0) === 5;
+  const secondo = await adottaProfiloContoP2P();
+  out.contoNonTocca = !!secondo && secondo.sk === nato.sk && semeChiesto === 1;
+  store = new Map(); myTgId = null;
+  out.contoSenzaIdentita = (await adottaProfiloContoP2P()) === null;
+  myTgId = 111;
+  /* il 409 e' silenzio: nessun profilo, nessun errore — chi ha la leva
+     spenta o entra con la chiave propria non deve accorgersi di niente */
+  fetch = async (url, opt) => ({ok: false, status: 409});
+  out.conto409 = (await adottaProfiloContoP2P()) === null && !mazzoMostro();
+  fetch = fetchVero;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -38136,6 +38252,12 @@ function reset(){
 
     attesi = {
         "chiestoUnaVolta": "prendere un ordine manda UNA richiesta",
+        "contoNato": "il profilo del conto rinasce dal seme, all'ingresso",
+        "contoPavimento": "...e si registra subito, chiedendo il pavimento",
+        "contoIndiceDalPavimento": "...che alza l'indice appena nato",
+        "contoNonTocca": "un mazzo che c'e' non si tocca, e il seme non si richiede",
+        "contoSenzaIdentita": "senza identita' non nasce niente",
+        "conto409": "e il 409 resta un silenzio senza profilo",
         "kind14": "...ed e' un kind 14",
         "versoMostro": "...indirizzato al coordinatore",
         "scade": "...con la sua scadenza",
@@ -39599,8 +39721,13 @@ def prove_p2p_nuvola():
     # cadono nel `go(b.v)` generico e da li' non passano MAI (la lezione
     # di `renderInteresse`). Il render invece lo attraversano tutte.
     _rp2p = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    # ⚠️ IL GATE E' CRESCIUTO (set 2026, il campo dell'app): fuori da
+    # Telegram si aspetta l'identita' prima di bruciare la bandierina
+    # — senza, il seme del conto risponderebbe 409 e la gamba nuova
+    # non partirebbe mai in quella sessione.
     prova("il render va a cercare il mazzo nel cloud quando manca", True,
-          "if (!mz && !p2pAdozione) {" in _rp2p and "sincronizzaMazzo()" in _rp2p)
+          "if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {" in _rp2p
+          and "sincronizzaMazzo()" in _rp2p)
     prova("...una volta per sessione", True, "p2pAdozione = true;" in _rp2p)
     # e la bandierina NON si azzera dimenticando il profilo: quel gesto
     # cancella anche la copia, ma `cloudCancella` e' fail-open MUTA — se
@@ -41015,7 +41142,8 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
     # — una riga in «I tuoi dati» — e chi l'aveva gia' presa (origine
     # 'mia') continua identico: `mazzoMostro` non distingue. Il GESTO
     # pero' non c'e' piu', e nemmeno l'adozione manuale del conto: il
-    # seme lo chiede solo `assicuraMazzo`, in silenzio. Le ricette coi
+    # seme lo chiedono `assicuraMazzo` (il gesto) e la gamba dell'app
+    # `adottaProfiloContoP2P` (l'ingresso), in silenzio. Le ricette coi
     # perche' (la verifica della chiave d'ingresso, il no a estensioni
     # e bunker) stanno nelle voci di CANTIERI delle fasi 4 e in git.
     prova("il pannello sovrano non esiste piu'", False,
@@ -41024,8 +41152,36 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
           "usaChiaveNostrP2P" in mini)
     prova("...e nemmeno l'adozione manuale del conto", False,
           "adottaProfiloDelConto" in mini)
-    prova("...il seme lo chiede solo assicuraMazzo", 1,
+    # ⚠️ DUE E NON UNO dal set 2026 (il campo dell'app): la tappa B
+    # aveva tolto l'adozione manuale credendo che il motore facesse
+    # tutto da solo, ma l'adozione silenziosa viveva SOLO nel gesto e
+    # il cloud fuori da Telegram non esiste — un dispositivo svuotato
+    # restava senza profilo e i propri ordini si leggevano da
+    # estranei. La gamba nuova e' `adottaProfiloContoP2P`.
+    prova("...il seme lo chiedono il gesto e la gamba dell'app", 2,
           mini.count("await semeProfiloP2P()"))
+    # --- LA GAMBA DELL'APP, i suoi confini -------------------------
+    ad = pezzo_js(mini, "function adottaProfiloContoP2P(){", "\n}\n")
+    prova("la gamba dell'app non GENERA mai", False,
+          "generateSecretKey" in ad)
+    prova("...e un mazzo che c'e' non si tocca, due volte", 2,
+          ad.count("if (mazzoMostro()) return"))
+    prova("...e una nuvola illeggibile la ferma", True,
+          "mazzoNuvola === 'illeggibile'" in ad)
+    prova("...e il profilo nasce del conto, senza debito di backup",
+          True, "origine: 'conto'" in ad and "backupFatto: true" in ad)
+    prova("...e porta subito la chiave al pavimento", True,
+          "await registraChiaviP2P([nuovo.pub]);" in ad)
+    rnd = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("il render prova il conto quando il cloud non da' niente",
+          True, "if (!mazzoMostro()) await adottaProfiloContoP2P();" in rnd)
+    prova("...e fuori da Telegram aspetta l'identita'", True,
+          "if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {" in rnd)
+    # E A INDICE ZERO LA RESTORE VUOLE IL PAVIMENTO IN VOLO: senza,
+    # un giro concluderebbe «non ne hai» su un fatto mai chiesto, e
+    # la bandierina alta lo renderebbe definitivo per la sessione.
+    prova("a indice zero la restore vuole il pavimento in volo", True,
+          "&& ((mz.indice | 0) > 0 || p2pPavimento)) {" in rnd)
     # LA RIGA IN CONSOLE: questa domanda fallisce in SILENZIO — 409, e
     # il client genera come sempre. Senza una traccia, una leva accesa a
     # meta' si legge come «funziona tutto». E' la lezione dello
@@ -41096,9 +41252,10 @@ def prove_p2p_campanello():
     import re as _re
     _mini = open("miniapp.html", encoding="utf-8").read()
     _reg = _re.findall(r"registraChiaviP2P\(\[([^\]]*)\]\)", _mini)
-    # cinque dalla fase 6 (era sei): con `applicaImportMazzo` e' uscito
-    # il suo chiamante — le sostituzioni del mazzo non esistono piu'.
-    prova("i chiamanti di registraChiaviP2P sono cinque", 5, len(_reg))
+    # sei dal set 2026 (erano cinque dalla fase 6): la gamba dell'app
+    # `adottaProfiloContoP2P` registra il profilo del conto appena
+    # rinato — e' il suo modo di farsi dare il pavimento dell'indice.
+    prova("i chiamanti di registraChiaviP2P sono sei", 6, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))

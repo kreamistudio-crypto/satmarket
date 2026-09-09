@@ -1837,6 +1837,8 @@
     line-height:1}
   .p2p-faccia .av-foto{position:absolute;inset:0;width:100%;height:100%;
     object-fit:cover}
+  /* il volto che porta a un negozio lo dice anche al mouse */
+  .p2p-faccia[role="button"]{cursor:pointer}
   .p2p-anello svg{width:22px;height:22px;display:block;
     transform:rotate(-90deg)}
   .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
@@ -33315,8 +33317,17 @@ function anelloScadenzaP2P(o, adesso){
      Barattolo non ce l'ha) resta l'anello vuoto di ieri: il tempo si
      legge lo stesso. */
   const f = p2pFacce[o.id];
+  /* IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): toccarlo
+     apre il NEGOZIO di chi ha pubblicato — la stessa pagina del
+     mercatino — mentre il resto della card resta l'ordine. Lo
+     stopPropagation vive in apriNegozioP2P: senza, il tocco cadrebbe
+     anche su prendiOrdineP2P. Senza un negozio da aprire il volto
+     resta un volto: nessun onclick, il tocco scivola sulla card. */
   const dentro = !f ? ''
-    : '<span class="p2p-faccia">' + avatarImg(f.avatar)
+    : '<span class="p2p-faccia"' + (f.negozio
+        ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
+          + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+        : '') + '>' + avatarImg(f.avatar)
       + esc((f.nome || '?')[0]) + '</span>';
   return '<span class="p2p-anello' + stato + (f ? ' con-faccia' : '')
     + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
@@ -33341,18 +33352,39 @@ function stellineP2P(f){
     {minimumFractionDigits: 1, maximumFractionDigits: 1})
     + ' · 💬 ' + f.voti;
 }
+/* L'ALTRA PIAZZA HA LA SUA RIGA (set 2026, richiesta di Andrea): la
+   reputazione che il libro pubblico porta accanto a ogni ordine —
+   quanti scambi conclusi, che media, da quanto tempo — detta col ⚡ e
+   con la parola «P2P», cosi' non si traveste da stelline del
+   mercatino. «Percento di positivi» il libro NON lo porta (il tag
+   rating ha total_reviews, total_rating e days): si dice quel che si
+   sa, mai un numero ricavato per sembrare piu' netto. Senza voti si
+   dice l'unica cosa vera: da quanto e' sul circuito. I tre numeri
+   sono gia' tosati da repDaTag, quindi la stringa e' nostra. */
+function repRigaP2P(rep){
+  if (!rep) return '';
+  const eta = rep.giorni >= 1
+    ? 'da ' + rep.giorni + (rep.giorni === 1 ? ' giorno' : ' giorni')
+    : 'da oggi';
+  if (!(rep.voti > 0) || !(rep.media > 0))
+    return '⚡ Nuovo sul P2P · ' + eta;
+  const media = rep.media.toLocaleString('it-IT',
+    {minimumFractionDigits: 1, maximumFractionDigits: 1});
+  return '⚡ ' + rep.voti + (rep.voti === 1 ? ' scambio' : ' scambi')
+    + ' P2P · ⭐ ' + media + ' · ' + eta;
+}
 
 /* LA RIGA DELLA REPUTAZIONE DEL COORDINATORE E' MORTA (set 2026, coi
    volti sul libro): la card mostra le stelline del MERCATINO, e due
    reputazioni nello stesso posto — una nostra e una di un'altra
    piazza, con la stessa faccia di stella — direbbero cose diverse
    sembrando la stessa. `repTestoP2P` se n'e' andata invece di restare
-   senza chiamanti: niente codice morto, e il giorno che il dettaglio
-   dello scambio vorra' dire «su quel coordinatore ha 7 scambi» si
-   riscrive in tre righe. IL DATO RESTA LETTO — `repDaTag` tosa ancora
-   il tag `rating` del 38383 in `o.rep` — perche' e' un fatto del libro
-   e la sua prova lo sorveglia: a mancare e' solo il posto dove si
-   mostrava. */
+   senza chiamanti, e il giorno promesso e' arrivato (set 2026,
+   richiesta di Andrea): la voce del circuito e' rinata come
+   `repRigaP2P`, qui sotto, e vive nel DETTAGLIO che si legge prima di
+   prendere — non sulla card. IL DATO RESTA LETTO — `repDaTag` tosa
+   ancora il tag `rating` del 38383 in `o.rep` — perche' e' un fatto
+   del libro e la sua prova lo sorveglia. */
 
 /* A prezzo di mercato (amt=0) i sats si STIMANO col cambio di casa e il
    premio dell'ordine: e' una stima e porta il ≈ — la cifra vera la
@@ -33512,13 +33544,27 @@ function renderP2P(){
      generico e da li' non passano MAI (la lezione di
      `renderInteresse`). Il render invece lo attraversano tutte le
      strade, e la bandierina lo tiene a una lettura per sessione.
+     E IL CLOUD NON E' L'UNICA GAMBA (set 2026, il campo dell'app):
+     fuori da Telegram il cloud non esiste — sull'app e sul sito
+     `cloudTelegram()` e' nullo — e fin qui un dispositivo svuotato
+     restava senza profilo finche' un GESTO non lo faceva rinascere:
+     nel frattempo i propri ordini si leggevano da estranei, cioe'
+     prendibili. Dopo il giro del cloud si prova il seme del conto
+     (`adottaProfiloContoP2P`), che su ogni superficie da' lo stesso
+     profilo. E IL GATE ASPETTA L'IDENTITA' fuori da Telegram: senza
+     `myTgId` il seme risponderebbe 409 e la bandierina bruciata
+     chiuderebbe la porta per la sessione — si lascia passare il
+     render, e ci si riprova quando l'identita' e' arrivata.
      LA BANDIERINA NON SI AZZERA IN `dimenticaMazzoOra`, e non e' una
      dimenticanza: quel gesto cancella anche la copia nel cloud, ma
      `cloudCancella` e' fail-open MUTA — se fallisse, riadotteremmo un
      istante dopo il profilo che uno ha appena deciso di dimenticare. */
-  if (!mz && !p2pAdozione) {
+  if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {
     p2pAdozione = true;
-    sincronizzaMazzo().then(() => { if (mazzoMostro()) renderP2P(); });
+    sincronizzaMazzo().then(async () => {
+      if (!mazzoMostro()) await adottaProfiloContoP2P();
+      if (mazzoMostro()) renderP2P();
+    });
   }
   /* I MIEI ORDINI si chiedono al coordinatore una volta per sessione, e
      senza far aspettare nessuno: il libro si disegna con quel che si sa
@@ -33538,8 +33584,16 @@ function renderP2P(){
      la marcatura — il giro a indice zero scriveva `{}`, cioe'
      «risposto», e da li' nessun gesto poteva piu' richiedere. Ora il
      gesto riabbassa la bandierina e si richiede: una risposta fresca
-     sostituisce la vecchia, un giro caduto lascia quel che si sapeva. */
-  if (mz && !p2pMieiChiesto && !p2pMieiGiro) {
+     sostituisce la vecchia, un giro caduto lascia quel che si sapeva.
+     ⚠️ E A INDICE ZERO SI PARTE SOLO COL PAVIMENTO IN VOLO (set
+     2026, il campo dell'app): se la registrazione delle chiavi non e'
+     nemmeno partita — l'identita' non e' ancora arrivata — il giro
+     concluderebbe «non ne hai» su un fatto mai chiesto, e la
+     bandierina alta lo renderebbe definitivo. Meglio non chiedere:
+     questo render passa, e uno dei prossimi — la rilettura dei 60
+     secondi basta — trova il pavimento partito e chiede davvero. */
+  if (mz && !p2pMieiChiesto && !p2pMieiGiro
+      && ((mz.indice | 0) > 0 || p2pPavimento)) {
     p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then((miei) => {
       /* ...E I MIEI ORDINI SI DICONO AL SERVER (set 2026, i volti sul
@@ -34091,6 +34145,55 @@ function assicuraMazzo(){
     return nuovo;
   })().finally(() => { mazzoInCorso = null; });
   return mazzoInCorso;
+}
+/* IL PROFILO DEL CONTO RINASCE ALL'INGRESSO (set 2026, dal campo:
+   l'app Android svuotata durante la caccia ai loghi ha perso il mazzo,
+   e i propri ordini si leggevano da estranei — prendibili). La tappa B
+   del profilo invisibile aveva tolto il bottone «Usa il profilo del
+   mio account» con la premessa che il motore facesse tutto da solo,
+   ma l'adozione silenziosa dal seme viveva SOLO in `assicuraMazzo` —
+   cioe' nel primo GESTO — e il cloud e' una gamba che fuori da
+   Telegram non esiste. La fase 4d aveva gia' trovato lo stesso buco e
+   l'aveva chiuso col bottone; il bottone e' uscito, la gamba rientra
+   AUTOMATICA, dal render del P2P, quando ne' il locale ne' il cloud
+   hanno dato un mazzo.
+   NON E' UN'IDENTITA' NUOVA: il seme del conto e' deterministico,
+   uguale su ogni superficie — adottarlo e' RITROVARE, non far
+   nascere. Il 409 resta silenzio (leva spenta, o chi entra con la
+   chiave propria): allora non nasce niente, che e' giusto cosi'.
+   ⚠️ NON SI RIUSA `assicuraMazzo`, per la ragione scritta gia' due
+   volte in questo file: quella a mani vuote GENERA a caso, e un
+   profilo a caso nato guardando il libro e' esattamente cio' che
+   l'invariante vieta.
+   E LA NUVOLA ILLEGGIBILE FERMA ANCHE QUI: un testo che c'e' e non si
+   apre non e' un posto libero — si resta a mani vuote, mai una
+   sovrascrittura muta (la regola delle lapidi, come in
+   `sincronizzaMazzo`). */
+let contoInCorso = null;
+function adottaProfiloContoP2P(){
+  if (DEMO || VETRINA || !myTgId) return Promise.resolve(null);
+  if (mazzoMostro()) return Promise.resolve(mazzoMostro());
+  if (mazzoInCorso) return mazzoInCorso;
+  if (mazzoNuvola === 'illeggibile' || mazzoNuvola === 'diverso') return Promise.resolve(null);
+  if (!contoInCorso) contoInCorso = (async () => {
+    const s = await semeProfiloP2P();
+    if (!s) return null;
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    /* nel frattempo un gesto puo' aver fatto nascere il mazzo: quello
+       che c'e' non si tocca, e' l'invariante di tutto il cantiere */
+    if (mazzoMostro()) return mazzoMostro();
+    const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
+                   indice: 0, creato: Math.floor(Date.now()/1000),
+                   backupFatto: true, origine: 'conto',
+                   versione: s.versione | 0};
+    ricordaMazzo(nuovo);
+    /* la registrazione porta indietro il pavimento dell'indice: e' il
+       pezzo che rende gli ordini «miei» anche qui, via restore */
+    await registraChiaviP2P([nuovo.pub]);
+    return nuovo;
+  })().finally(() => { contoInCorso = null; });
+  return contoInCorso;
 }
 function esportaMazzo(){
   const m = mazzoMostro();
@@ -35349,9 +35452,14 @@ function prendiOrdineP2P(id){
   if (riga.euroMax) { toast('Per quest\'ordine si sceglie l\'importo, e da qui non si può ancora'); return; }
   const compro = riga.lato === 'sell';
   const sats = riga.sats > 0 ? fmt(riga.sats) + ' sats' : 'al prezzo di mercato';
+  /* la reputazione del circuito si legge QUI, prima di dire si': e' il
+     momento in cui serve, e la card resta alle stelline di casa */
+  const rp = repRigaP2P(riga.rep);
   chiediConferma({
     titolo: compro ? 'Compri sats?' : 'Vendi sats?',
-    testata: '<b>' + esc(fmtEur(riga.euro)) + ' €</b> · ' + esc(sats),
+    testata: '<b>' + esc(fmtEur(riga.euro)) + ' €</b> · ' + esc(sats)
+      + (rp ? '<br><span style="font-size:12.5px;color:var(--muted);font-weight:700">'
+          + rp + '</span>' : ''),
     corpo: compro
       ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
       : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',
@@ -36657,6 +36765,13 @@ async function chiediFacceP2P(ids){
     finally { p2pFacceGiro = null; }
   })();
   return p2pFacceGiro;
+}
+/* Dal volto al negozio: il tocco sale fin qui e non oltre — la card
+   sotto aprirebbe l'ordine, e un tocco solo deve fare una cosa sola. */
+function apriNegozioP2P(ev, chi){
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  haptic();
+  apriNegozio(chi);
 }
 /* ============ fine dei volti sul libro ============ */
 
