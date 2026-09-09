@@ -6330,3 +6330,43 @@ l'altra aveva aggiunto. Se si ripresenta e' un cantiere suo (versione
 nella lista, o l'evento `storage` che riallinea); per ora e' a
 verbale, e la striscia della restore fa da rete: gli ordini persi
 localmente restano visibili e marcati.
+
+La riga si adotta, e l'ordine riconosciuto torna governabile (set
+2026, un'ora dopo la voce qui sopra). La conseguenza pratica del
+mistero e' arrivata subito, da Andrea: «NON POSSO PIU' ANNULLARE il
+4 e il 5 euro» — il PC li vedeva «da un altro dispositivo» e non
+offriva il ritiro, ma nessun altro dispositivo li governava. Ogni
+ordine fuori dalla lista locale era un ORFANO INGOVERNABILE.
+LA CURA HA CAMBIATO IL DISEGNO invece di rattoppare l'etichetta: per
+un ordine PENDING la restore e il libro insieme dicono TUTTO quel che
+una riga locale contiene — l'id, il `trade_index` da cui la trade key
+si rideriva (l'identita' e' condivisa), cifra, lato e metodi dal
+38383. Quindi `adottaOrdiniAltroveP2P` RICOSTRUISCE la riga vera, e
+l'ordine torna un cittadino normale: pagina apribile, «Ritira» col
+giro di sempre (`cancel` firmato con la chiave riderivata, aggancio
+per request_id — che su cancel TORNA, fatto della sonda, Q5),
+ascolto del campanello sulla sua chiave. Le righe «altrove» nate il
+giorno prima muoiono dopo un giorno, e va bene cosi': erano una riga
+di seconda classe, e la classe giusta esisteva gia'.
+IL PROVVISORIO SI RINOMINA invece di raddoppiare: una riga `nuovo:N`
+con lo stesso indice E' quell'ordine — la conferma che non e' mai
+arrivata, la restore gliela porta adesso. E' anche la rete
+dell'orfano in generale: la riga persa (una scheda che sovrascrive
+l'altra, una memoria svuotata) torna governabile OVUNQUE.
+I CONFINI, dichiarati: si adotta solo con l'INDICE in mano (senza,
+la chiave non si rideriva) e solo quel che il libro descrive come
+pending — di un ordine preso o in corso la restore da' uno stato nel
+vocabolario del coordinatore che non si traduce a memoria (Q4), e lo
+aprira' la ripresa piena delle fasi 5-6-7, che da qui eredita il
+mattone. L'adozione e' sincrona e senza rete: se il bundle manca si
+salta il giro, ma la restore che riempie la lista l'ha gia' caricato.
+PROVATO NEI DUE BANCHI: quello della striscia (stub dichiarati)
+guarda i confini — adotta/non adotta, il rinome, il doppione, il
+senza-indice — e quello del motore fa il giro INTERO col bundle vero:
+adozione con la chiave vera, `cancel` firmato con la chiave
+riderivata e la prova d'identita' verificata dal coordinatore di
+cartone, ordine che finisce `annullato`. Tortura: adozione tolta,
+sei rosse su due banchi.
+DA GUARDARE: il ritiro vero dei due ordini orfani di Andrea (4 e 5
+euro) — al prossimo giro sul PC devono comparire come righe normali
+con «Ritira», ed e' la verifica sul campo di questa voce.
