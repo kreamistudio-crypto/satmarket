@@ -6756,3 +6756,73 @@ la prova della riga-impostazioni ora guarda il foglio del nuovo
 ordine («tace su quel che non sa» vale identico lì). Guardata dal
 vivo in chiaro, scuro e mobile: i tab compongono, l'attivo cambia col
 gesto. Prove: 8569 verdi.
+
+
+LA NAV CHE SI TRASFORMA NEL P2P (9 set 2026, chiesto da Andrea). Entrando
+nello scambio la barra cambia mestiere CON ANIMAZIONE: P2P, Aste e Ordini
+scendono fuori dal bordo e dal basso salgono «Libro ordini» (icona libro
+aperto, apre il libro di tutti) e «I miei scambi» (le due frecce, apre gli
+ordini miei); al posto di Ordini NIENTE — lo slot resta vuoto, deciso da
+Andrea, in attesa della voce che verra'. Il + di Vendi cambia pelle: la
+scritta scende con le sorelle e il tondo sale di un soffio, si fa CERCHIO
+e veste il colore del lato — verde protezione su «Compra sats», rosso di
+casa su «Vendi sats» (body.p2p-vendo, scritto da setLatoP2P; token nuovo
+--danger-deep per l'ombra piena, nei due temi). Esplora non si muove: e'
+la via del ritorno, e uscendo l'animazione si rovescia da sola. Lo sfondo
+della barra si INCASSA (--nav-bg-p2p nei due temi + ombra interna, dal
+basso sulla topbar desktop): un contesto diverso deve vedersi, non solo
+leggersi.
+IL TRUCCO E' LA CELLA A DUE STRATI, ed e' quel che tiene ferma la
+geometria: le tre voci che si trasformano vivono in una .nav-cella (grid,
+i due bottoni nella STESSA cella di griglia, overflow:hidden), quindi le
+celle di primo livello restano CINQUE ed equilarghe e il + resta la terza
+— l'invariante del centro esatto non si e' mosso, e il censimento della
+barra in prove.py conta appiattendo le celle prima. `nav button` resta il
+selettore delle voci perche' e' un discendente: CSS e spazzata di go()
+prendono anche gli strati senza una riga nuova. Si muovono SOLO
+transform e opacity (visibility col delay per non troncare l'uscita,
+~.28s cubic-bezier morbida, scala di .06s fra uscita e ingresso), con la
+gemella reduced-motion. Da desktop niente levitazione: la pillola del +
+cambia colore e la scritta fa il crossfade «Vendi» → «Pubblica» dentro
+una pila a griglia larga quanto la parola piu' lunga — mai uno
+spostamento.
+LA CLASSE LA SCRIVE go() DERIVANDOLA DALLA VISTA (VISTE_NAV_P2P: p2p,
+p2pmiei, p2pordine — MAI p2ppresto, che a leva spenta e' l'unica cosa
+che si vede), non i vai*: cosi' indietro e cronologia la rimettono
+giusta da soli, la lezione di renderInteresse. Il + ha due mestieri e
+li decide toccaPiu() chiedendo alla classe sul body — la stessa verita'
+che l'utente ha davanti: se il tondo e' verde, pubblica.
+IL LIBRO E LA STRISCIA SI SONO SEPARATI: view-p2pmiei e' la vista nuova
+(markup fisso, la testata di casa, #p2pMieiCorpo), «I tuoi scambi» esce
+dal corpo del libro e il bottone «Pubblica il tuo ordine» in fondo alla
+pagina MUORE — il gesto e' solo il + (decisione di Andrea). MA IL
+RENDERER RESTA UNO: renderP2P dipinge ENTRAMBI i corpi a ogni giro,
+quindi i quattro freni per sessione (p2pRegistrato, p2pAdozione,
+p2pMieiChiesto, p2pRiletto) non si sdoppiano e ogni `.then(renderP2P)`
+gia' scritto rinfresca la vista giusta qualunque sia. Prima del libro
+l'attesa sta in TUTT'E DUE le viste, ed e' sostanza e non pigrizia:
+l'adozione ricostruisce solo cio' che il libro sa descrivere, quindi
+una striscia disegnata senza libro mentirebbe. p2pordine accende «I
+miei scambi» (uno scambio aperto e' MIO) e tutti i ripieghi go('p2p')
+del ritiro e della cronologia sono diventati go('p2pmiei'): si torna
+ai propri scambi, non al libro degli altri. p2pmiei e' radice sorella
+e sta in VISTE_PTR: la tirata riarma anche la marcatura «e' mio»
+(p2pMieiChiesto = false), che li' e' la risposta che si sta guardando.
+LE STRADE SCARTATE, coi perche': otto bottoni piatti in position:
+absolute (fragile da desktop, dove le pillole hanno larghezze sue);
+riusare gli stessi bottoni rietichettandoli a runtime (niente
+scorrimento, e il markup statico della barra e' un patto vecchio);
+rimappare i miei sulla voce Aste senza vista nuova (semantica storta
+in cronologia e nel censimento).
+LE PROVE: il censimento delle cinque celle EMENDATO (appiattisce le
+.nav-cella e chiede l'ordine dentro ognuna), le quattro sentinelle dei
+go('p2p') girate sui nuovi approdi, e la prova nuova prove_nav_p2p —
+forma della vista, un renderer per due corpi, la classe scritta solo
+da go(), CSS che muove solo transform/opacity col reduced-motion, e il
+banco node che fa GIRARE voceNav (libro→p2plibro, miei e scambio→
+p2pmiei, presto→p2p) e toccaPiu nei due stati. Prove: 8605 verdi.
+Guardata dal vivo (leve P2P accese nel config locale, poi tolte):
+mobile chiaro e scuro, desktop, il lato che colora il +, il foglio dal
++, il ritorno da Esplora via navIndietro. RESTA DA GUARDARE: la
+commissione per chi PRENDE un ordine (a verbale dal restyling della
+testata) e il giro a due identita' della tappa 8.
