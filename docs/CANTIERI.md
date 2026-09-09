@@ -6846,3 +6846,16 @@ scelto da Andrea, 98px scontornato con drop-shadow, al posto di
 tessera+lockup di casa: rotta esplicita /assets/p2p-logo.png (regola 3,
 mai un mount), sentinella della testata emendata sul logo nuovo.
 Prove: 8605 verdi anche qui.
+E IL TERZO GIRO DELLA TESTATA (stesso giorno): logo a 56px servito a
+2x (il PNG ridimensionato a 112px, da 278 a 21 KB), tutto compatto in
+cima (via i margini della testata, padding del contenitore a 2px per
+le sole due viste dello scambio), i tab rinominati «Compra BTC» e
+«Vendi BTC» (nessuna sentinella guardava le etichette; gli importi
+restano in sats). E il QUARTO RITOCCO, visto dal vivo da Andrea: al
+ritorno la scritta «Vendi» compariva DI COLPO — lo stato di quiete
+teneva il delay di visibility dell'uscita (.4s), quindi la scritta si
+mostrava a corsa finita. Ora la quiete porta il delay dell'ingresso
+(.1s, come i bottoni base) e lo stato P2P rimette quello dell'uscita;
+il selettore ESCLUDE «Pubblica», che porta anche lei la classe eti ma
+ha la quiete rovesciata (nascosta), o le si mangiava la dissolvenza
+d'uscita desktop.
