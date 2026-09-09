@@ -35150,25 +35150,34 @@ def prove_p2p_libro():
     senza_commenti = re.sub(r"<!--.*?-->", "", fetta, flags=re.S)
     prova("...e a chi legge non dice mai «Nostr»", False,
           "Nostr" in senza_commenti)
-    # EMENDATA (set 2026, fase 6): il custode non si nomina piu' — si
-    # sorveglia il FATTO (in garanzia, e noi non li vediamo) e che il
-    # nome non rientri di soppiatto.
-    prova("...ma dice il FATTO: in garanzia, e noi non li vediamo",
-          True, "in garanzia" in senza_commenti
-          and "non li tiene e non li vede" in senza_commenti)
+    # EMENDATA DUE VOLTE: prima (fase 6) il custode non si nominava
+    # piu'; poi (set 2026, restyling della testata — decisione di
+    # Andrea) la riga che diceva il fatto e' USCITA da questa vista.
+    # Il FATTO — in garanzia, Barattolo non li tiene — resta detto
+    # dalla vista dello scambio e da «I tuoi dati», e lo sorveglia la
+    # prova del motore («...e il fatto resta detto»). Qui si sorveglia
+    # che il nome non rientri e che la riga di ieri non risorga.
     prova("...e non nomina piu' Mostro ne' il coordinatore", False,
           "Mostro" in senza_commenti or "coordinatore" in senza_commenti)
-    # HA CAMBIATO LATO (ago 2026, cantiere della forma del libro): erano
-    # `tema-pill`, cioe' la pillola dell'ASPETTO — piccola, e accesa e'
-    # ARANCIO PIENO, mentre dieci righe piu' giu' c'e' gia' il `btn
-    # orange` del «Pubblica»: due pieni arancio nella stessa schermata.
-    # `consegna-scelta` e' il commutatore di casa (`flex:1`, quindi le
-    # due meta' si spartiscono la riga) ed e' lo STESSO gesto delle
-    # pillole del ruolo negli Ordini: filtrare una lista per ruolo.
-    prova("il lato si sceglie col commutatore di casa, non con le tema-pill",
-          True, senza_commenti.count("consegna-pill") == 2
-          and "consegna-scelta" in senza_commenti
+    prova("...e la riga di ieri su chi tiene i sats non risorge qui",
+          False, "p2p-chi" in fetta)
+    # HA CAMBIATO PELLE DUE VOLTE: tema-pill → consegna-pill (ago
+    # 2026), poi i DUE TAB GRANDI del restyling (set 2026, decisione
+    # di Andrea, sul modello dei libri P2P veri): larghi, testo
+    # grosso, colore SOLO sull'attivo — compra verde (--trust), vendi
+    # rosso (--danger), il non attivo neutro. Sopra, al posto del
+    # titolo, il logo di casa centrato.
+    prova("la testata e' il logo di casa", True,
+          'class="p2p-testata"' in fetta and "brand-jar" in fetta
+          and "lockup" in fetta)
+    prova("il lato si sceglie coi due tab grandi, non piu' a pillole",
+          True, senza_commenti.count("p2p-lato ") == 2
+          and "p2p-lati" in senza_commenti
+          and "consegna-pill" not in senza_commenti
           and "tema-pill" not in senza_commenti)
+    prova("...e l'attivo veste il suo colore: compra verde, vendi rosso",
+          True, ".p2p-lati .p2p-lato.compra.attiva{color:var(--trust);" in mini
+          and ".p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);" in mini)
     prova("view-p2p sta DOPO il coming soon e PRIMA del pacco", True,
           mini.index('id="view-p2ppresto"') < j
           < mini.index("VISTA: LA PAGINA DEL PACCO"))
@@ -35238,67 +35247,17 @@ def prove_p2p_libro():
     prova("...e sulla riga sua puo' andare a capo", True,
           "white-space:normal" in st)
 
-    # --- 4c) LA RIGA CHE DICE CHI TIENE I SATS (ago 2026) ----------
-    # Aperta la PRIMA volta che si apre il P2P, poi richiusa dietro
-    # «Scopri di piu'». A sparire e' la RIPETIZIONE, mai il FATTO.
-    # EMENDATA (set 2026, fase 6 P2P, decisione di Andrea): il custode
-    # NON SI NOMINA PIU' — niente «Mostro», niente «coordinatore»: si
-    # dice «custoditi in garanzia», e chi sia il coordinatore lo dice
-    # UNA volta la pagina «I tuoi dati». La condizione che rende
-    # ammissibile la variante resta pero' il FATTO, e la prova adesso
-    # sorveglia quello: anche la riga chiusa deve dire che i sats sono
-    # in garanzia e che Barattolo non li tiene.
-    # `find` e MAI `index`: la mutazione che toglie lo span deve far
-    # diventare ROSSA la prova, non ESPLODERE la famiglia portandosi
-    # dietro le sorelle (la lezione gia' pagata quattro volte).
-    _i = fetta.find('class="p2p-chi-corta"')
-    _j = fetta.find("</span>", _i) if _i >= 0 else -1
-    corta = fetta[_i:_j] if _j > _i >= 0 else ""
-    prova("le due forme della riga vivono tutte e due nel markup fisso",
-          True, "p2p-chi-lunga" in senza_commenti
-          and "p2p-chi-corta" in senza_commenti)
-    prova("...e la riga CHIUSA dice ancora il fatto: in garanzia, "
-          "non da Barattolo", True,
-          "in garanzia" in corta and "Barattolo" in corta)
-    # ...e il nome del custode non rientra di soppiatto in nessuna
-    # delle due forme: e' l'emendamento stesso, reso verificabile.
-    _chi2 = fetta[fetta.find('class="p2p-chi-lunga"'):_j] if _j > 0 else ""
-    prova("...e nessuna delle due forme nomina Mostro o il "
-          "coordinatore", False,
-          "Mostro" in _chi2 or "coordinatore" in _chi2)
-    prova("...e nasce APERTA: senza la regia si legge la riga intera",
-          True, 'class="hint p2p-chi aperta"' in fetta)
-    prova("...e il tasto e' lo `.scopri-link` di casa, un bottone vero",
-          True, 'type="button" class="scopri-link"' in fetta
-          and 'aria-expanded="true"' in fetta)
-    # A NASCONDERE E' IL CSS E MAI IL JS, ed e' la riga da non
-    # ammorbidire: scritte da un render quelle parole sparirebbero dal
-    # sorgente, e le tre sentinelle del blocco 4 diventerebbero vacue.
-    prova("a nascondere una delle due forme e' il CSS, non il JS", True,
-          ".p2p-chi .p2p-chi-corta{display:none}" in mini
-          and ".p2p-chi:not(.aperta) .p2p-chi-lunga{display:none}" in mini)
-    _chi = pezzo_js(mini, "function decidiChiP2P(){")
-    # LA BANDIERINA E' OBBLIGATORIA: il render gira anche al cambio di
-    # LATO, e senza si richiuderebbe sotto le dita di chi l'ha riaperta.
-    prova("la decisione si prende UNA volta sola per sessione", True,
-          "if (p2pChiDeciso) return;" in _chi
-          and "let p2pChiDeciso = false;" in mini)
-    # E STA IN `renderP2P` e non in `vaiP2P`: quello e' il solo ingresso
-    # dal TAB, mentre dalla cronologia si cade nel `go(b.v)` generico.
-    prova("...e si prende in renderP2P, dove passa anche il ritorno",
-          True, "decidiChiP2P();" in pezzo_js(mini, "function renderP2P(){")
-          and "decidiChiP2P" not in _vp)
-    # IL TIMBRO SI SCRIVE ALLA COMPARSA e non al tocco (il patto di
-    # `condcat`), e gated su hintAttivi(): in DEMO e in VETRINA non si
-    # timbra e la riga resta aperta per sempre, com'era ieri.
-    prova("il timbro si scrive alla comparsa e mai al tocco", True,
-          "dismettiHint('p2pchi')" in _chi and "hintAttivi()" in _chi
-          and "dismettiHint" not in pezzo_js(
-              mini, "function toggleChiP2P(){"))
-    # E IL RICORDO E' DI CHI GUARDA, NON DEL CONTO: una colonna qui
-    # sarebbe la cosa che questa variante ha escluso per iscritto.
-    prova("il ricordo vive nel dispositivo e non e' una colonna", False,
-          "p2pchi" in _SORGENTE)
+    # --- 4c) LA RIGA CHE DICEVA CHI TIENE I SATS E' USCITA -----------
+    # (set 2026, restyling della testata — decisione di Andrea). La
+    # famiglia che la sorvegliava — le due forme nel markup fisso, il
+    # CSS a nascondere, la decisione una volta per sessione, il timbro
+    # alla comparsa — e' caduta con lei. Il FATTO resta detto dalla
+    # vista dello scambio e da «I tuoi dati» (la prova del motore
+    # «...e il fatto resta detto»), e che la riga non risorga qui lo
+    # dice il blocco 4. Della regia non deve restare codice morto:
+    prova("della regia della riga di ieri non resta codice", False,
+          any(s in mini for s in ("decidiChiP2P", "p2pChiDeciso",
+                                  "vestiChiP2P", "toggleChiP2P")))
 
     # --- 5) IN TAPPA 2 NON SI FIRMA, NON SI CIFRA, NON SI PUBBLICA ---
     for spia in ("finalizeEvent", "publish(", "generateSecretKey", "nsec",
@@ -35318,7 +35277,7 @@ def prove_p2p_libro():
     # il mio, questa dice quello dell'offerta.
     prova("...e dice di chi sono le offerte", True,
           "p2pLato === 'compro' ? 'vende' : 'compra'" in _rp)
-    prova("il commutatore accende la pillola di casa", True,
+    prova("il commutatore accende il tab attivo", True,
           "classList.toggle('attiva', p2pLato === 'compro')" in _rp
           and "classList.toggle('attiva', p2pLato === 'vendo')" in _rp)
     # GLI ESCLUSI: il conteggio si legge dal LATO che si sta guardando,
@@ -35374,8 +35333,14 @@ def prove_p2p_libro():
           "fee: num('fee')," in cod and "num('max_order_amount')" in cod)
     prova("...e nessuna cifra del coordinator e' scritta qui", False,
           any(s in cod for s in ("100000", "100_000", "0.01", "0.02", "1%", "2%")))
-    prova("...e la riga delle impostazioni tace su quel che non sa", True,
-          "if (i && i.fee > 0)" in cod and "if (i && i.maxSats > 0)" in cod)
+    # EMENDATA (set 2026, restyling della testata): la riga sotto i
+    # tab e' uscita — i numeri del 38385 restano nel foglio del nuovo
+    # ordine, che tace su quel che il coordinator non ha detto. A
+    # VERBALE (CANTIERI, «La testata del P2P»): la commissione deve
+    # ricomparire anche per chi PRENDE, prima del pubblico.
+    prova("...e il foglio del nuovo ordine tace su quel che non sa", True,
+          "(p2pInfo && p2pInfo.fee > 0)" in mini
+          and "(p2pInfo && p2pInfo.maxSats > 0)" in mini)
 
     # --- 7) IL BANCO NODE: il parser GIRA ------------------------------
     node = _sh.which("node")
@@ -35403,7 +35368,6 @@ def prove_p2p_libro():
         # o la prova certificherebbe una copia di cartone.
         "function ordineMioP2P(id){",
         "function rigaOrdineP2P(o){",
-        "function infoRigaP2P(){",
         # il lettore puro e le lapidi (set 2026, il morto che risorge):
         # il primo gira sui casi della resurrezione, le seconde su un
         # localStorage di cartone
@@ -35493,8 +35457,6 @@ out.intervalloKind     = intervalloP2P(ev(38385, [['d','r'],['k','sell'],['f','E
 cambioVivo = false;
 out.rigaMercatoMuto = rigaOrdineP2P(out.mercato);
 out.rigaMercatoZeroMuto = rigaOrdineP2P(out.mercatoZero);
-p2pInfo = out.info; out.infoRiga = infoRigaP2P();
-p2pInfo = null; out.infoRigaVuota = infoRigaP2P();
 /* --- IL MORTO CHE RISORGE (set 2026, dal campo): il lettore puro
    sui casi della resurrezione. `ora` e' l'orologio finto dei casi. */
 const vivoEv  = ev(38383, [['d','r-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora+3600)]], 100);
@@ -35685,16 +35647,10 @@ console.log(JSON.stringify(out));
           [out["intervalloVecchio"], out["intervalloAltraVal"],
            out["intervalloPreso"], out["intervalloSingolo"],
            out["intervalloKind"]])
-    # EMENDATA (set 2026, fase 6): niente piu' «Coordinatore Mostro
-    # X.Y.Z» — i numeri restano (sono quel che il 38385 ha detto), il
-    # nome e la versione no, e senza numeri la riga non nasce affatto.
-    prova("la riga delle impostazioni dice commissione e tetto LETTI", True,
-          "commissione 1%" in out["infoRiga"]
-          and "fino a 100000 sats" in out["infoRiga"]
-          and "Mostro" not in out["infoRiga"]
-          and "0.18.2" not in out["infoRiga"])
-    prova("...e senza 38385 la riga e' vuota, non un nome a secco",
-          "", out["infoRigaVuota"])
+    # LA RIGA DELLE IMPOSTAZIONI E' USCITA (set 2026, restyling della
+    # testata): niente piu' infoRigaP2P — i numeri del 38385 restano
+    # nel foglio del nuovo ordine (sezione 6), e il verbale della
+    # commissione da rimostrare sta in CANTIERI, «La testata del P2P».
     # IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
     # «Aggiorna il libro» non c'e' piu' — al suo posto renderP2P
     # rilegge in sottofondo un libro piu' vecchio di

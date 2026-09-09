@@ -1681,22 +1681,29 @@
      carta e bordo di casa, l'euro in Baloo come un prezzo, i sats in
      mono come ogni cifra Lightning. Niente arancio pieno: in tappa 2
      non c'e' ancora nessun gesto, si guarda e basta. */
-  /* IL COMMUTATORE DEL LATO E' QUELLO DELLA CONSEGNA (.consegna-scelta):
-     due meta' che si spartiscono la riga (flex:1), e l'acceso e' il
-     VELATO arancio. Non le tema-pill, che sono strette e il cui acceso
-     e' arancio PIENO: dieci righe piu' giu' c'e' gia' il `btn orange`
-     del «Pubblica», e due pieni nella stessa schermata si fanno
-     concorrenza — contro quel che il commento qui sopra dice per
-     questa pagina. Il margine e' di qui perche' quello della consegna
-     nasce dentro un form, dove sopra c'e' gia' un campo. */
-  #view-p2p .consegna-scelta{margin:12px 0 10px}
-  /* La riga che dice CHI tiene i sats ha DUE forme e ne mostra UNA. A
-     nascondere e' il CSS e MAI il JS, ed e' la riga da non ammorbidire:
-     `view-p2p` e' markup fisso, e tre sentinelle leggono quelle parole
-     nel sorgente — scritte da un render non ci sarebbero piu'. */
-  .p2p-chi .p2p-chi-corta{display:none}
-  .p2p-chi:not(.aperta) .p2p-chi-lunga{display:none}
-  .p2p-chi:not(.aperta) .p2p-chi-corta{display:inline}
+  /* LA TESTATA E' IL LOGO, CENTRATO (set 2026, restyling — decisione
+     di Andrea): via il titolo, la riga di servizio e la riga che
+     diceva chi tiene i sats — resta il marchio di casa, tessera +
+     lockup, gli stessi byte della topbar. */
+  .p2p-testata{display:flex;flex-direction:column;align-items:center;gap:4px;
+    margin:4px 0 12px;text-align:center}
+  .p2p-testata .brand-jar{width:54px;height:54px;border-radius:16px;margin:0}
+  .p2p-testata .lockup{font-size:24px}
+  /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
+     testo grosso, colore SOLO sull'attivo). Compra parla il verde
+     della protezione (--trust), vendi il rosso di casa (--danger) —
+     token che hanno gia' la loro sera. Il non attivo e' NEUTRO, e
+     niente arancio: dieci righe piu' giu' c'e' gia' il `btn orange`
+     del «Pubblica». */
+  .p2p-lati{display:flex;margin:2px 0 12px;border-bottom:2px solid var(--line)}
+  .p2p-lati .p2p-lato{flex:1;padding:11px 8px;background:none;border:none;
+    border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;
+    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;
+    line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
+  .p2p-lati .p2p-lato.compra.attiva{color:var(--trust);
+    border-bottom-color:var(--trust);background:var(--trust-soft)}
+  .p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);
+    border-bottom-color:var(--danger);background:var(--warn-bg)}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 14px;margin-top:10px}
   /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
@@ -5346,40 +5353,27 @@ document.getElementById('cartello')?.remove();</script>
        garanzia», mai «Mostro», mai «il coordinatore», mai «Nostr». -->
   <div class="view" id="view-p2p">
     <div class="sicu">
-      <div class="section-label">🔁 Scambio P2P</div>
-      <!-- CHI TIENE I SATS: aperta la PRIMA volta che si apre il P2P, poi
-           richiusa dietro «Scopri di piu'» — chi l'ha letta una volta non
-           deve rileggerla a ogni giro. Il timbro e' quello di casa
-           (`barattolo_hint`, per dispositivo e per sempre) e MAI una
-           colonna: e' un fatto di chi guarda, non del conto.
-           LE DUE FRASI VIVONO TUTTE E DUE QUI, nel markup FISSO, e a
-           nascondere e' il CSS: cosi' la sentinella che vieta le
-           interpolazioni e quelle sulle parole restano verdi E restano
-           vere. (E qui non si scrive il segno che quella prova cerca:
-           lo cercherebbe anche dentro questo commento.)
-           NASCE APERTA (fail-soft, il patto di `vestiPaySheet`): se la
-           regia non gira si legge la riga intera, che e' il comportamento
-           di sempre — mai una riga vuota.
-           EMENDAMENTO (set 2026, fase 6 P2P, decisione di Andrea): il
-           custode NON SI NOMINA PIU' — ne' «Mostro» ne' «il
-           coordinatore» compaiono nella UI, si dice «custoditi in
-           garanzia». Il P2P e' Barattolo, punto. Quel che NON cambia
-           e' il FATTO, e resta la condizione di tutta la variante:
-           anche la riga chiusa dice che i sats sono in garanzia e che
-           Barattolo non li tiene. La verita' intera — chi e' il
-           coordinatore, col suo nome — vive UNA volta, nella pagina
-           «I tuoi dati», e la prova del blocco 4c sorveglia il fatto
-           invece del nome. -->
-      <div class="hint p2p-chi aperta" id="p2pChi">
-        <span class="p2p-chi-lunga">Compri e vendi bitcoin con altre persone, in euro. Durante lo scambio i sats restano custoditi in garanzia: Barattolo non li tiene e non li vede.</span>
-        <span class="p2p-chi-corta">I sats restano custoditi in garanzia: Barattolo non li tiene.</span>
-        <button type="button" class="scopri-link" id="p2pChiTasto" aria-expanded="true" aria-controls="p2pChi" onclick="toggleChiP2P()">Chiudi</button>
+      <!-- LA TESTATA E' IL LOGO (set 2026, restyling — decisione di
+           Andrea): via il titolo «Scambio P2P», via la riga che diceva
+           chi tiene i sats e via quella di commissione e tetto. Il
+           FATTO — sats custoditi in garanzia, Barattolo non li tiene —
+           resta detto dalla vista dello scambio e, col nome del
+           coordinatore, da «I tuoi dati»; i numeri del 38385 restano
+           nel foglio del nuovo ordine. A VERBALE (CANTIERI, «La
+           testata del P2P»): la commissione deve ricomparire anche per
+           chi PRENDE un ordine, prima del pubblico. -->
+      <div class="p2p-testata">
+        <img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()">
+        <div class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></div>
       </div>
-      <div class="consegna-scelta" role="tablist">
-        <button class="consegna-pill attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compro sats</button>
-        <button class="consegna-pill" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendo sats</button>
+      <!-- I DUE TAB DEL LATO, grandi come nel riferimento: colore solo
+           sull'attivo (compra verde, vendi rosso), il resto neutro.
+           Gli id restano quelli di ieri: renderP2P accende `attiva`
+           su questi due e basta. -->
+      <div class="p2p-lati" role="tablist">
+        <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra sats</button>
+        <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi sats</button>
       </div>
-      <div class="hint" id="p2pInfoRiga" style="display:none"></div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
            l'identita' e' l'account, tutta sotto il cofano. Il
@@ -32751,9 +32745,9 @@ function caricaLibroP2P(forza){
   return p2pLettura;
 }
 
-/* Il libro visto dal lato di chi guarda: «Compro sats» mostra chi VENDE
-   (k=sell), «Vendo sats» chi COMPRA (k=buy). Le due pillole sono le
-   tema-pill di casa e lo stato e' di sessione. */
+/* Il libro visto dal lato di chi guarda: «Compra sats» mostra chi VENDE
+   (k=sell), «Vendi sats» chi COMPRA (k=buy). I due tab grandi stanno
+   nel markup fisso e lo stato e' di sessione. */
 const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
 function setLatoP2P(lato){
   if (!P2P_LATO_K[lato] || lato === p2pLato) return;
@@ -32854,61 +32848,14 @@ function rigaOrdineP2P(o){
   </div>`;
 }
 
-/* la riga delle impostazioni: SOLO quel che il coordinator ha detto —
-   una commissione o un tetto scritti qui sarebbero cifre nostre su
-   una cosa che non decidiamo noi. IL NOME NON C'E' PIU' (set 2026,
-   fase 6): i numeri restano, «Coordinatore Mostro X.Y.Z» no — e
-   senza numeri la riga sparisce del tutto, che una riga vuota non
-   dice niente. */
-function infoRigaP2P(){
-  const i = p2pInfo;
-  const pezzi = [];
-  if (i && i.fee > 0)
-    pezzi.push('commissione ' + esc((i.fee * 100).toLocaleString('it-IT', {maximumFractionDigits: 2})) + '%');
-  if (i && i.maxSats > 0) pezzi.push('fino a ' + fmt(i.maxSats) + ' sats per scambio');
-  return pezzi.join(' · ');
-}
-
-/* LA RIGA CHE DICE CHI TIENE I SATS si apre e si chiude in place: una
-   classe sola sul contenitore, e il tasto che dice il gesto opposto a
-   quel che si vede. E' la ricetta di `toggleRacconto`, l'altro cassetto
-   in-place di casa. */
-function vestiChiP2P(aperta){
-  const r = el('p2pChi'), t = el('p2pChiTasto');
-  if (!r || !t) return;
-  r.classList.toggle('aperta', aperta);
-  t.setAttribute('aria-expanded', aperta ? 'true' : 'false');
-  t.textContent = aperta ? 'Chiudi' : 'Scopri di più ›';
-}
-
-function toggleChiP2P(){
-  vestiChiP2P(!el('p2pChi')?.classList.contains('aperta'));
-}
-
-/* ...e la DECISIONE si prende UNA VOLTA SOLA per sessione.
-   STA IN `renderP2P` e non in `vaiP2P`: quello e' il solo ingresso dal
-   TAB, mentre alla vista ci si torna col gesto indietro e dalla
-   cronologia, che cadono nel `go(b.v)` generico e da li' non passano MAI
-   (la lezione di `renderInteresse`, gia' pagata dieci righe piu' giu').
-   LA BANDIERINA E' OBBLIGATORIA, ed e' la riga che leggendo non si vede:
-   il render gira anche al cambio di LATO, e senza si richiuderebbe sotto
-   le dita di chi l'ha appena riaperta.
-   IL TIMBRO SI SCRIVE ALLA COMPARSA e non al tocco, il patto di
-   `condcat`: chi la vede aperta l'ha letta, e alla prossima apertura
-   trova la riga corta. In DEMO e in VETRINA `hintAttivi()` e' falsa,
-   quindi non si timbra e la riga resta aperta per sempre — il
-   comportamento di ieri, byte per byte. */
-function decidiChiP2P(){
-  if (p2pChiDeciso) return;
-  p2pChiDeciso = true;
-  const attivi = hintAttivi();
-  const gia = attivi && hintDismesso('p2pchi');
-  vestiChiP2P(!gia);
-  if (attivi && !gia) dismettiHint('p2pchi');
-}
-
+/* LA RIGA DELLE IMPOSTAZIONI E LA RIGA «CHI TIENE I SATS» SONO USCITE
+   (set 2026, restyling della testata — decisione di Andrea): al loro
+   posto il logo e i due tab grandi, nel markup fisso. I numeri del
+   38385 restano nel foglio del nuovo ordine (renderNuovoOrdineP2P), e
+   il fatto della garanzia lo dice la vista dello scambio. A VERBALE
+   (CANTIERI, «La testata del P2P»): la commissione deve ricomparire
+   anche per chi PRENDE un ordine, prima del pubblico. */
 function renderP2P(){
-  decidiChiP2P();
   /* Il mazzo che c'e' gia' si rimanda al server una volta per sessione:
      l'INSERT OR IGNORE e' idempotente, e cosi' un profilo importato
      o tornato dal cloud finisce nella lista da guardare. */
@@ -32969,8 +32916,6 @@ function renderP2P(){
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
-  const info = el('p2pInfoRiga');
-  if (info) { info.innerHTML = infoRigaP2P(); info.style.display = info.innerHTML ? '' : 'none'; }
   if (p2pLibro === null) {
     box.innerHTML = '<div class="hint">' + (p2pErrore
       ? 'Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
@@ -33001,8 +32946,8 @@ function renderP2P(){
   /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
      prima non si sapeva — quante ce ne sono — e per giunta dice che il
      libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
-     dice anche il LATO: la pillola accesa qui sopra dice il mio
-     («Compro sats»), questa dice quello di chi sta dall'altra parte. */
+     dice anche il LATO: il tab acceso qui sopra dice il mio
+     («Compra sats»), questa dice quello di chi sta dall'altra parte. */
   const testa = `<div class="section-label riga-conta"><span class="conta">${vivi.length}</span> `
     + `offert${vivi.length === 1 ? 'a' : 'e'} di chi `
     + (p2pLato === 'compro' ? 'vende' : 'compra') + ' sats</div>'
@@ -33075,9 +33020,6 @@ const MAZZO_INFO = 'barattolo/mostro/scambio/';
 const FORMA_HEX64 = /^[0-9a-f]{64}$/;
 let p2pRegistrato = false;
 let p2pAdozione = false;
-/* Ho gia' deciso, in QUESTA sessione, se la riga che dice chi tiene i
-   sats nasce aperta o chiusa. Sopravvive al cambio di lato. */
-let p2pChiDeciso = false;
 let p2pCodiceVisibile = false;
 let p2pCodiceMostrato = '';
 let mazzoInCorso = null;
