@@ -6292,3 +6292,41 @@ DA GUARDARE: la verifica sul campo che chiude — ordine fresco da un
 dispositivo, PRIMA apertura fredda su un altro: marcatura e striscia
 devono esserci. E resta il solo aperto di sempre: il profilo 'conto'
 che non si riverifica dopo l'adozione.
+
+La striscia si veste uguale, e l'etichetta dice solo il fatto che sa
+(set 2026, la coda del cantiere). LA VERIFICA SUL CAMPO E' PASSATA —
+marcatura e striscia alla PRIMA apertura fredda, contorni del libro
+perfetti su ogni dispositivo — e proprio lo screenshot della prova ha
+mostrato gli ultimi due difetti, tutti e due nella striscia e tutti e
+due miei del giro precedente.
+IL PRIMO ERA UN VESTITO DISUGUALE: la riga locale della striscia e'
+sempre stata nuda (`p2p-ord`), e a quelle della restore avevo messo
+`p2p-mio` — fianco a fianco si leggevano come un guasto del giudice,
+che era innocente (la diagnosi e' passata da un `querySelectorAll`
+che pescava le righe della striscia credendole card del libro: la
+card del libro dell'ordine fresco non era MAI nel DOM, il libro si
+carica una volta per sessione). Il bordo e' del LIBRO — distingue il
+tuo in mezzo a quelli degli sconosciuti — mentre nella striscia e'
+tutto tuo per definizione: ora nessuna riga della striscia lo porta.
+IL SECONDO ERA UN'ETICHETTA BUGIARDA, ed e' la lezione: «pubblicato
+da un altro tuo dispositivo» e' un'affermazione che il client NON
+puo' fare — l'assenza della riga locale non prova dove l'ordine e'
+nato, dice solo che QUI non ci sono le sue carte. Il campo l'ha colta
+a mentire: tre ordini pubblicati dallo stesso PC, la lista locale ne
+ricordava uno, e gli altri due portavano l'«altrove». Ora riga e
+toast dicono il fatto che regge in tutti i casi: «da qui si guarda
+soltanto» — e ad aprirli davvero sara' la ripresa delle fasi 5-6-7.
+SI AFFERMA SOLO CIO' CHE SI SA: e' la regola della sonda (un NO su un
+fatto vero e' peggio di un «non lo so») portata nei testi a schermo.
+DA GUARDARE, ed e' un mistero VERO non ancora spiegato: sul PC le
+righe locali di due ordini pubblicati li' sono SPARITE dalla lista
+(`barattolo_mostro_ordini`). Nessun codice le toglie («Dimentica il
+profilo» non tocca gli ordini, la scopa vuole 30 giorni e stati
+finali, la ✕ non compare su un 'pubblicato'). Il sospettato e' la
+CARTELLA CONDIVISA in miniatura: due schede dello stesso browser che
+si sovrascrivono la lista — ogni scrittura e' una fotografia INTERA
+del JSON, e una scheda vecchia che salva dopo cancella quel che
+l'altra aveva aggiunto. Se si ripresenta e' un cantiere suo (versione
+nella lista, o l'evento `storage` che riallinea); per ora e' a
+verbale, e la striscia della restore fa da rete: gli ordini persi
+localmente restano visibili e marcati.
