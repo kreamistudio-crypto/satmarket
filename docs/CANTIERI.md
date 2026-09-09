@@ -6600,3 +6600,60 @@ RESTA DA PROVARE SUL CAMPO (tappa 8, con Alan): il giro vero a due
 identita' — recapito che arriva, aggiornamento, contatto — e la
 scadenza dei timer mai vista (il verbale del nodo la aggancia gia'
 alla tappa 8). Prove: 8542 verdi.
+
+IL MORTO CHE RISORGE (9 set 2026, dal campo — il rischio gemello
+della scopa lampo, maturato in una forma peggiore). Al refresh il
+proprio ritirato RICOMPARIVA nel libro, non marcato come mio, cioe'
+prendibile da me stesso: la riga locale il rimotore l'aveva tolta
+(giusto), la restore i canceled non li elenca (giusto, Q6), e il
+libro serviva ancora la copia pending. LA CAUSA NON ERA LA DEDUP MA
+LA FAME: la REQ del libro filtrava `#s: pending`, quindi la
+sostituzione a `canceled` — che la sonda Q1 aveva gia' visto
+esistere nel 38383 — non veniva nemmeno RICHIESTA. Un relay rimasto
+indietro (o uno che non rimpiazza gli addressable) serviva la copia
+stantia senza rivali, e la dedup per `d`, che c'era gia' e avrebbe
+deciso giusto, non riceveva mai il rivale.
+LA CURA E' A DUE CINTURE, perche' i due guasti sono due:
+1) LA REQ CHIEDE LA FINESTRA INTERA — niente `#s`, e cade anche `#f`
+per la stessa prudenza (una sostituzione che perdesse il tag valuta
+resterebbe fuori): stato e valuta li giudica il client. La finestra
+e' `since` a 16 giorni (`max_expiration_days` 15 + 1): oltre, un
+pending non puo' esistere, quindi il libro resta leggero anche con
+un anno di annullati alle spalle. E la dedup e' diventata ROBUSTA
+ALLE SAGOME ROTTE con la mappa dei MORTI: un 38383 con `s` non
+pending uccide la copia pending piu' vecchia del suo stesso `d`
+anche quando il parser non saprebbe leggerlo (bastano d, s e la
+data). Il verso legittimo resta aperto: un pending PIU' FRESCO del
+suo morto e' l'ordine tornato nel libro (il taker che ha lasciato
+scadere) e si mostra. Anche il conteggio degli intervalli muore col
+suo morto.
+2) LE LAPIDI, per il relay che non si aggiorna MAI: quando il
+rimotore toglie un ritirato MIO da maker (`o.mio` — le righe
+pubblicate e adottate lo portano, quelle prese no), l'id si timbra
+in `barattolo_mostro_lapidi` con la scadenza dell'ordine (o creato +
+finestra), e `caricaLibroP2P` filtra le lapidate. SOLO i miei da
+maker, ed e' il confine che conta: un take andato a vuoto riporta
+nel libro l'ordine di un ALTRO, vivo, e lapidarlo sarebbe una bugia
+del libro. La lapide scade con l'ordine: potata, non puo' nascondere
+niente che il parser non scarterebbe comunque.
+IL LETTORE DEL LIBRO E' DIVENTATO PURO (`libroDaEventi`: da eventi a
+ordini/intervalli/info, zero rete e zero stato) apposta perche' il
+banco lo facesse GIRARE sui casi della resurrezione invece di
+guardare le righe — le lapidi restano fuori dal lettore, in
+`caricaLibroP2P`, perche' sono stato del dispositivo.
+LA TRAPPOLA DEL GIRO, gia' pagata e riscritta qui: una costante
+condivisa fra due blocchi (`P2P_LIBRO_FINESTRA_S`, usata dal filtro
+nel blocco del libro e dalle lapidi nel blocco del motore) viveva
+nel blocco sbagliato, e nel banco del motore il rimotore esplodeva
+in ReferenceError INGHIOTTITO dal catch della pipeline — tre prove
+rosse che sembravano della cura ed erano del banco. La costante ora
+vive accanto alle lapidi, dentro il blocco che i banchi affettano.
+TORTURATO, cinque mutazioni e cinque uccise (baseline 0): il filtro
+`#s` rimesso, la mappa dei morti spenta, il rimotore senza lapide,
+il libro che ignora le lapidi, lapidataP2P sempre falsa. La seconda
+ha insegnato la stratificazione: col rivale LEGGIBILE la dedup
+semplice basta gia', ed e' la mappa dei morti a morire solo sul
+rivale rotto — le due cinture non sono ridondanti, coprono guasti
+diversi. Prove: 8557 verdi.
+RESTA VERO il gemello dichiarato della scopa lampo (la X su riga
+finita a cache calde), che e' un altro caso e resta a verbale la'.
