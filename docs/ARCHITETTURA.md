@@ -21009,32 +21009,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.cella-p2p .cat-fig{inset:5%}` porta il lato reso da **125 a 144**
   (su card da 160) e NON tocca il `.cat-quad`: la fila non si muove di
   un pixel, si allarga solo la figura dentro.
-  LE FRECCE VIRANO, e il colore va dal verde della freccia di sopra al
-  rosso di quella di sotto e ritorno: è un CROSSFADE fra i due gemelli
-  già in casa — `p2p-logo-compra.png` e `p2p-logo-vendi.png`, gli
-  stessi della testata del libro — animando la sola `opacity`, che è
-  la proprietà che il compositore muove senza ridisegnare niente.
-  NON un `hue-rotate`: quel filtro girerebbe anche il barattolo, e
-  mascherarne le sole frecce vorrebbe dire un file nuovo.
-  IL BARATTOLO RESTA FERMO PER COSTRUZIONE, ed è misurato con la
-  ricetta di casa (i gemelli si giudicano ALLA RESA, nella pancia,
-  soglia percettiva 24): fra i due PNG a 152 zero pixel sopra soglia,
-  e sui due fotogrammi VERI presi a 480 — l'animazione fermata ai due
-  estremi con la Web Animations API — di nuovo zero, massimo 22.
-  Sulla tessera intera invece 35.760 pixel cambiano: cioè si muove
-  quel che deve.
-  `2.5s ease-in-out infinite alternate` = cinque secondi di ciclo, con
-  la curva che indugia sui due estremi e passa svelta per il mezzo
-  scolorito (opacità 0 → .08 → .33 → .50 → .67 → .92 → 1, misurata).
-  A MOVIMENTO SPENTO il marchio resta INTERO: sotto
-  `prefers-reduced-motion:reduce` la coppia si spegne TUTT'E DUE e
-  prende il posto il terzo gemello, il logo completo (verde e rosso
-  insieme) che sta ultimo nel markup e in condizioni normali non si
-  vede mai. Il solo verde sarebbe un logo a metà, cioè un ripiego che
-  dice un'altra cosa.
-  I TRE FILE NON COSTANO NIENTE IN PIÙ: stanno già tutti nel markup
-  fisso della vista scambio e degli stati vuoti, quindi il browser li
-  scarica comunque a ogni avvio.
+  ⚠️ E LE FRECCE NON VIRANO PIÙ (set 2026, decisione di Andrea dopo
+  averlo visto dal vivo). Per un giro ci fu un CROSSFADE fra i due
+  gemelli già in casa — compra e vendi, i due della testata del
+  libro — sulla sola `opacity`, `2.5s ease-in-out infinite alternate`,
+  cinque secondi di ciclo, col terzo gemello (il completo) come
+  ripiego sotto `prefers-reduced-motion:reduce`. Funzionava e il
+  barattolo restava fermo per costruzione (misurato ALLA RESA con la
+  ricetta di casa: zero pixel sopra soglia nella pancia, sia fra i PNG
+  a 152 sia sui due fotogrammi veri a 480). NON È STATO TOLTO PERCHÉ
+  ROTTO, ed è la ragione da tenere: la fila delle categorie è una
+  MAPPA da leggere, e l'unica cosa che si muove in quella riga tira
+  l'occhio via da tutte le altre — una card che si agita è una card
+  che pesa più di quanto vale. Non si riproponga come «miglioria».
+  QUINDI IL MARCHIO È UNO SOLO, il logo completo, FERMO — e con il
+  viraggio se ne sono andate la regola del movimento ridotto (non ha
+  più niente da fermare) e le due immagini in più. Della card resta
+  UNA riga di CSS in tutto il foglio, quella dell'`inset`, e c'è la
+  sentinella che lo conta.
+  LA CARD IN «DA SCOPRIRE» NON C'ENTRA e resta com'è: è un'altra fila
+  e un altro mestiere — lì si annunciano occasioni, qui si legge una
+  mappa.
   IL BARATTOLO SI CONDIVIDE COL SUO LINK (ago 2026, decisione di
   Andrea): la lista dei desideri esce dal dispositivo, ma come
   FOTOGRAFIA e non come vista viva — chi ha il link vede la lista di

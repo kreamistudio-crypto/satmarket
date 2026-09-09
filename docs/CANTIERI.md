@@ -7528,3 +7528,64 @@ rami; la condivisione produce `…/p2p` col suo testo; il delegato del
 tocco lungo vede la card (`.cat-cella[data-cat]` la trova, e le celle
 con quell'attributo salgono a 30); la figura misura 144 su un quadrato
 da 160, cioè la fila non si è mossa.
+I DUE RITOCCHI DEL GIORNO DOPO (set 2026, Andrea guardando la home e
+il libro). Il viraggio delle frecce se ne va, e nel tab «Vendi BTC» la
+riga in sats cambia verbo.
+1) VIA IL VIRAGGIO, E NON PERCHÉ ERA ROTTO. Il crossfade fra i gemelli
+compra e vendi funzionava, e il barattolo restava fermo per
+costruzione — misurato alla resa, zero pixel sopra soglia. La ragione
+è un'altra, ed è quella che vale: LA FILA DELLE CATEGORIE È UNA MAPPA
+DA LEGGERE, e l'unica cosa che si muove in quella riga tira l'occhio
+via da tutte le altre. Una card che si agita pesa più di quanto vale.
+Resta il logo COMPLETO e fermo, e resta il logo più grosso — quello
+del giro prima non si tocca.
+COL VIRAGGIO SE NE VANNO ANCHE LE SUE CONSEGUENZE, che è la parte che
+in un «togli» si dimentica: la regola del movimento ridotto (non ha
+più niente da fermare) e le due immagini in più. Della card resta UNA
+riga di CSS in tutto il foglio — quella dell'`inset` — e a contarla
+c'è una sentinella, perché «una regola sola» è la forma più corta di
+dire tutte e tre le cose insieme.
+LA CARD IN «DA SCOPRIRE» NON SI TOCCA (decisione di Andrea): è
+un'altra fila e un altro mestiere — lì si annunciano occasioni, qui si
+legge una mappa.
+2) «PAGA» E NON «INVIA», e il ritocco è più piccolo di quel che dice.
+Nel tab «Vendi BTC» la riga in sats diceva «Invia ≈ X sats», mentre
+nel tab «Compra BTC» la riga in euro dice «Paga 8,00 €». IL GESTO NON
+CAMBIA FRA I DUE TAB — chi dà, paga — quindi due verbi diversi
+facevano sembrare diverse due cose che diverse non sono. Cambia solo
+CON COSA si paga: euro di là, sats di qua.
+E «PAGA» DICE ANCHE MEGLIO COME VA: chi vende sats non li spedisce a
+mano a chi compra — paga una fattura, e quella li tiene in garanzia
+finché l'euro non è arrivato. «Invia» lasciava immaginare un bonifico
+in bitcoin da mandare a qualcuno.
+UNA SENTINELLA NUOVA NON GUARDA LA PAROLA MA IL PATTO: che il verbo di
+chi dà sia LO STESSO nei due tab, letto da tutt'e due le righe
+renderizzate. Una prova sulla sola parola nuova sarebbe passata anche
+il giorno che qualcuno cambia l'altro capo.
+⚠️ TRE PROVE NON CAMBIANO LATO MA VERSO, che è una cosa diversa dal
+solito: certificavano che il viraggio CI FOSSE, e adesso certificano
+che non torni — stessa riga sorvegliata, giudizio opposto. Sono la
+memoria della decisione: senza, fra sei mesi il crossfade rientra come
+«miglioria» e nessuno si accorge che era già stato tolto apposta.
+COLLAUDATI: **8774 prove verdi, 0 rosse** (+2 nette sulle 8772 di HEAD,
+misurate su una copia pulita: quattro del viraggio se ne vanno, quattro
+sulla card ferma le sostituiscono, due nuove sul verbo), con **quattro
+prove che cambiano lato** — le tre del viraggio e quella dei verbi
+imperativi — e **7 MUTAZIONI, 7 UCCISE**: il viraggio che rientra dalla
+finestra, il fotogramma orfano lasciato indietro, la regola del
+movimento ridotto che torna senza niente da fermare, il marchio che
+ridiventa un gemello del libro, il logo che torna alla misura delle
+sorelle, la riga in sats che torna a «Invia», e i due tab che tornano a
+due verbi diversi DALL'ALTRO CAPO — l'euro che diventa «Invia» — che è
+la mutazione che una sentinella sulla sola parola nuova non avrebbe
+preso.
+GIRO DAL VIVO col server vero: sulla card una sola immagine (il
+completo), `animationName: none`, 144 px dentro un quadrato da 160 —
+il logo grosso è rimasto e la fila non si è mossa. Le due righe del
+libro, renderizzate dai loro eventi 38383 veri, dicono «Paga 8,00 € /
+ricevi ≈ 13 115 sats» nel tab Compra e «Paga ≈ 13 115 sats / Ricevi
+8,00 €» nel tab Vendi. ⚠️ In locale il libro non ha relay, quindi le
+card VERE a schermo non si sono viste: a rispondere per loro è la
+prova ESEGUIBILE, che fa girare `ordineDaEvento` + `rigaOrdineP2P` sui
+due eventi sotto node — che è la stessa strada di sempre per questa
+famiglia, e va detto invece di lasciarlo intendere.
