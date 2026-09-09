@@ -34684,6 +34684,10 @@ function applicaMessaggioP2P(ord, dentro){
     mostroRiascolta().catch(() => {});
     return;
   }
+  /* LA CONTROPARTE APPENA CONOSCIUTA e' il momento in cui il recapito
+     ricordato di chi vende puo' partire da solo — le condizioni vere
+     si ricontrollano al momento dell'invio (vedi pianificaAutoRecapito) */
+  if (!ord.peer && nuovo.peer) pianificaAutoRecapito(nuovo.id);
   if (p2pOrdineAperto === nuovo.id) renderOrdineP2P();
   /* il foglio del pagamento si chiude DA SOLO quando i sats sono
      bloccati: e' il coordinatore a dirlo, non un bottone «ho pagato» */
@@ -34872,7 +34876,7 @@ function campiOrdineP2P(o){
   let fuori = '';
   if (o.lato === 'compro' && loro.euro)
     fuori += '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>'
-      + esc(loro.euro.testo) + '</span></div>';
+      + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>';
   if (o.lato === 'vendo' && !miei.euro)
     fuori += '<div class="hint">💶 Di\' a chi compra <b>dove mandarti gli euro</b>: senza, non può pagarti.</div>';
   fuori += '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
@@ -35376,6 +35380,7 @@ const CHAT_RAFFICA = 60;         // quante buste si accettano al minuto
    dentro si ignora — compresi i messaggi liberi della chat di ieri */
 const CAMPI_P2P = ['euro', 'contatto'];
 let p2pCampiOrdine = '';
+let p2pCampoMetodo = '';         // il metodo scelto con le pillole nel foglio
 let p2pChiaviChat = {};          // sk+peer -> {conv, firma}: l'ECDH costa
 let p2pChatSecchio = {};         // pub(firma) -> {quanti, da}
 
@@ -35524,14 +35529,135 @@ function campoArriva(o, ev){
               dentro.pubkey === mia);
 }
 
+/* ---- L'IDENTITA' DI PAGAMENTO (set 2026, dal campo) ----
+   «Dove ricevere gli euro» non e' piu' un campo di testo unico: il
+   METODO dell'ordine sceglie il form (SEPA vuole intestatario e IBAN,
+   Revolut un RevTag, Satispay un numero, i contanti un luogo), e quel
+   che si compila resta RICORDATO su questo dispositivo, per metodo —
+   al prossimo scambio con quel metodo parte da solo. Due decisioni
+   da non disfare senza un motivo nuovo:
+   1) IL VOCABOLARIO DEL TAG `t` NON SI ESTENDE: il tipo resta `euro`.
+      «Per ogni tipo vince il piu' recente» e' il meccanismo di
+      correzione, e con un tipo per metodo chi corregge passando da
+      SEPA a Revolut lascerebbe DUE recapiti vivi — e chi compra non
+      saprebbe quale vale. Il recapito degli euro e' UNO per scambio,
+      quindi il tipo e' uno. E un tipo nuovo, per un client di ieri,
+      sarebbe una busta lasciata cadere in silenzio.
+   2) SUL FILO VIAGGIA TESTO COMPOSTO, mai una struttura: chi riceve
+      mostra quel che legge, qualunque versione abbia — niente parser
+      dall'altra parte, niente JSON che una versione vecchia
+      mostrerebbe grezzo. La struttura vive solo QUI, nel form di chi
+      scrive e nel ricordo locale. E il ricordo sta in localStorage
+      come gli scambi: un IBAN non passa MAI dal server di Barattolo. */
+const RECAPITI_CHIAVE = 'barattolo_p2p_recapiti';
+const P2P_FORME_RECAPITO = [
+  {forma: 'sepa', riconosce: /sepa|bonific|iban/i,
+   campi: [{k: 'nome', et: 'Intestatario (nome e cognome)', ph: 'Mario Rossi'},
+           {k: 'iban', et: 'IBAN', ph: 'IT60X0542811101000000123456'}],
+   componi: c => 'Bonifico SEPA\nIntestatario: ' + c.nome + '\nIBAN: ' + c.iban},
+  {forma: 'revolut', riconosce: /revolut/i,
+   campi: [{k: 'tag', et: 'Il tuo RevTag', ph: '@mariorossi'}],
+   componi: c => 'Revolut: ' + c.tag},
+  {forma: 'satispay', riconosce: /satispay/i,
+   campi: [{k: 'tel', et: 'Numero di telefono Satispay', ph: '333 1234567'}],
+   componi: c => 'Satispay: ' + c.tel},
+  {forma: 'paypal', riconosce: /paypal/i,
+   campi: [{k: 'conto', et: 'Email o link paypal.me', ph: 'mario@esempio.it'}],
+   componi: c => 'PayPal: ' + c.conto},
+  {forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i,
+   campi: [{k: 'luogo', et: 'Dove proponi di vedervi', ph: 'Bar Sport, piazza Garibaldi…'}],
+   componi: c => 'Contanti alla mano — propongo di vederci: ' + c.luogo}
+];
+/* il metodo e' testo libero (vedi P2P_METODI): quel che nessuna forma
+   riconosce ha la sua, generica, col ricordo suo per quel nome */
+function formaRecapito(metodo){
+  const m = String(metodo || '').trim();
+  const f = P2P_FORME_RECAPITO.find(f => f.riconosce.test(m));
+  if (f) return f;
+  return {forma: m ? 'altro:' + m.toLowerCase() : 'altro',
+    campi: [{k: 'dove', et: m ? 'Dove vuoi ricevere gli euro (' + m + ')'
+                              : 'Dove vuoi ricevere gli euro',
+             ph: 'IBAN, @tag, numero…'}],
+    componi: c => (m ? m + ': ' : '') + c.dove};
+}
+function recapitiMiei(){
+  try {
+    const v = JSON.parse(localStorage.getItem(RECAPITI_CHIAVE) || '{}');
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  } catch(e) { return {}; }
+}
+function ricordaRecapito(forma, campi, testo){
+  const tutti = recapitiMiei();
+  tutti[forma] = {campi: campi, testo: testo, t: Math.floor(Date.now() / 1000)};
+  try { localStorage.setItem(RECAPITI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+}
+/* il metodo su cui sta il form: quello scelto con le pillole se
+   l'ordine ne ha piu' d'uno, altrimenti il primo che ha un ricordo */
+function metodoRecapitoScelto(o){
+  const metodi = (o && o.metodi && o.metodi.length) ? o.metodi : [''];
+  if (metodi.indexOf(p2pCampoMetodo) >= 0) return p2pCampoMetodo;
+  const salvati = recapitiMiei();
+  return metodi.find(m => salvati[formaRecapito(m).forma]) || metodi[0];
+}
+function scegliMetodoRecapito(m){
+  p2pCampoMetodo = m;
+  renderCampiP2P();
+}
+
+/* ---- l'invio automatico del recapito ricordato ----
+   Quando la controparte si conosce, chi vende col recapito gia'
+   compilato una volta non lo riscrive: parte da solo. TRE prudenze,
+   ognuna col suo perche':
+   1) SI ASPETTA QUALCHE SECONDO e si ricontrolla al momento dello
+      sparo: l'eco multi-dispositivo (campoArriva) fa in tempo ad
+      arrivare, e un recapito gia' mandato da un altro dispositivo
+      non viene scavalcato da una copia stantia di questo.
+   2) UNA SOLA FORMA PRONTA: con due ricordi buoni per lo stesso
+      ordine sceglie il venditore nel foglio, non noi — la riga che
+      insiste c'e' apposta.
+   3) SE NON PARTE NON SI RIPROVA da solo: resta la riga che insiste
+      e si manda a mano — la stessa regola della consegna dei campi
+      (nessun rinvio automatico, vedi la voce in CANTIERI). */
+let P2P_AUTOINVIO_MS = 8000;     // `let`: il banco lo accorcia
+let p2pAutoTentati = {};         // per sessione: un tentativo per scambio
+function recapitoDaAutoInvio(o){
+  if (!o || o.lato !== 'vendo' || !o.peer) return null;
+  if (P2P_FINALI.indexOf(o.stato) >= 0) return null;
+  if ((o.campiMiei || {}).euro) return null;
+  const salvati = recapitiMiei();
+  const pronte = {};
+  for (const m of (o.metodi || [])) {
+    const f = formaRecapito(m).forma;
+    if (salvati[f] && salvati[f].testo) pronte[f] = salvati[f];
+  }
+  const forme = Object.keys(pronte);
+  return forme.length === 1 ? pronte[forme[0]] : null;
+}
+function pianificaAutoRecapito(id){
+  if (p2pAutoTentati[id]) return;
+  if (!recapitoDaAutoInvio(ordiniP2P()[id])) return;
+  p2pAutoTentati[id] = 1;
+  setTimeout(async () => {
+    const o = ordiniP2P()[id];
+    const r = recapitoDaAutoInvio(o);
+    if (!r || !chiaviChatOrdine(o)) return;
+    try {
+      await campoInvia(o, 'euro', r.testo);
+      toast('💶 Recapito inviato a chi compra ✓ (quello ricordato)');
+    } catch(e) { }
+  }, P2P_AUTOINVIO_MS);
+}
+
 /* ---- il foglio dei recapiti ---- */
 function apriCampiP2P(){
+
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
   if (!chiaviChatOrdine(o)) { toast('Non si sa ancora con chi stai scambiando'); return; }
   haptic();
   p2pCampiOrdine = id;
+  p2pCampoMetodo = '';
   if (o.campiNuovi) { o.campiNuovi = 0; scriviOrdineP2P(o); renderOrdineP2P(); }
   renderCampiP2P();
   el('sheetBg').classList.add('open');
@@ -35545,26 +35671,47 @@ function renderCampiP2P(){
   const vende = o.lato === 'vendo';
   /* quel che si stava scrivendo sopravvive al ridisegno, e i valori
      entrano col .value: mai interpolati — il patto del codice segreto */
-  const scritti = {euro: el('p2pCampoEuro') ? el('p2pCampoEuro').value : '',
-                   contatto: el('p2pCampoContatto') ? el('p2pCampoContatto').value : ''};
+  const scritti = {};
+  try {
+    document.querySelectorAll('#p2pCampiCorpo input[id^="p2pCampo"]')
+      .forEach(i => { scritti[i.id] = i.value; });
+  } catch(e) {}
+  /* per chi vende il form lo sceglie il METODO dell'ordine: campi
+     suoi, e precompilati dal ricordo di questo dispositivo */
+  let parteEuro = '', fr = null, salvato = null;
+  if (vende) {
+    const metodi = (o.metodi && o.metodi.length) ? o.metodi : [''];
+    const scelto = metodoRecapitoScelto(o);
+    fr = formaRecapito(scelto);
+    salvato = recapitiMiei()[fr.forma] || null;
+    parteEuro =
+      (metodi.length > 1
+        ? '<div class="field"><label>Con quale metodo ricevi gli euro</label>' +
+          '<div class="p2p-metodi">' + metodi.map(m =>
+            '<button type="button" class="tema-pill' + (m === scelto ? ' active' : '') +
+            '" data-m="' + esc(m) + '" onclick="scegliMetodoRecapito(this.dataset.m)">' +
+            esc(m) + '</button>').join('') + '</div></div>'
+        : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>' + esc(scelto) + '</b>.</div>' : '')) +
+      fr.campi.map(c =>
+        '<div class="field"><label for="p2pCampoEuro_' + c.k + '">' + esc(c.et) + '</label>' +
+        '<input type="text" id="p2pCampoEuro_' + c.k + '" maxlength="' + CAMPO_MAX_TESTO + '" ' +
+        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="' + esc(c.ph) + '"></div>').join('') +
+      '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
+      (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
+      (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '') +
+      '<div class="hint">📌 Resta ricordato su questo dispositivo: al prossimo scambio con questo metodo parte da solo, e da qui lo correggi quando vuoi.</div>';
+  }
   box.innerHTML =
     (o.lato === 'compro'
       ? (loro.euro
-        ? '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>' + esc(loro.euro.testo) + '</span></div>'
+        ? '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>' + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
         : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
       : '') +
     (loro.contatto
       ? '<div class="hint">👤 Il contatto dell\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
       : '') +
-    (vende
-      ? '<div class="field"><label>Dove vuoi ricevere gli euro</label>' +
-        '<input type="text" id="p2pCampoEuro" maxlength="' + CAMPO_MAX_TESTO + '" ' +
-        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-        'placeholder="IBAN, @Revolut, numero Satispay…"></div>' +
-        '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
-        (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
-        (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '')
-      : '') +
+    parteEuro +
     '<div class="field" style="margin-top:14px"><label>Un tuo contatto (facoltativo)</label>' +
     '<input type="text" id="p2pCampoContatto" maxlength="' + CAMPO_MAX_TESTO + '" ' +
     'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
@@ -35573,24 +35720,50 @@ function renderCampiP2P(){
     '<button class="btn ghost" onclick="inviaCampoP2P(\'contatto\', this)">👤 ' +
     (miei.contatto ? 'Aggiorna il contatto' : 'Manda il contatto') + '</button>' +
     '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>';
-  const ce = el('p2pCampoEuro');
-  if (ce) ce.value = scritti.euro || (miei.euro ? miei.euro.testo : '');
+  if (fr) fr.campi.forEach(c => {
+    const inp = el('p2pCampoEuro_' + c.k);
+    if (!inp) return;
+    const id = 'p2pCampoEuro_' + c.k;
+    inp.value = scritti[id] !== undefined ? scritti[id]
+              : (salvato && salvato.campi && salvato.campi[c.k]) || '';
+  });
   const cc = el('p2pCampoContatto');
-  if (cc) cc.value = scritti.contatto || (miei.contatto ? miei.contatto.testo : '');
+  if (cc) cc.value = scritti['p2pCampoContatto'] !== undefined
+    ? scritti['p2pCampoContatto'] : (miei.contatto ? miei.contatto.testo : '');
 }
 async function inviaCampoP2P(tipo, btn){
   const o = ordiniP2P()[p2pCampiOrdine];
-  const inp = el(tipo === 'euro' ? 'p2pCampoEuro' : 'p2pCampoContatto');
-  if (!o || !inp || CAMPI_P2P.indexOf(tipo) < 0) return;
-  const testo = String(inp.value || '').trim().slice(0, CAMPO_MAX_TESTO);
-  if (!testo) {
-    toast(tipo === 'euro' ? 'Scrivi dove vuoi ricevere gli euro'
-                          : 'Scrivi un contatto prima di mandarlo');
-    return;
+  if (!o || CAMPI_P2P.indexOf(tipo) < 0) return;
+  let testo = '', daRicordare = null;
+  if (tipo === 'euro') {
+    /* il form del metodo: si raccolgono i campi, si compone il testo
+       che l'altra persona legge, e quel che si e' scritto si ricorda */
+    const fr = formaRecapito(metodoRecapitoScelto(o));
+    const campi = {};
+    for (const c of fr.campi) {
+      const inp = el('p2pCampoEuro_' + c.k);
+      let v = String((inp && inp.value) || '').trim();
+      if (c.k === 'iban') v = v.replace(/\s+/g, '').toUpperCase();
+      if (!v) { toast('Compila: ' + c.et); if (inp) inp.focus(); return; }
+      campi[c.k] = v;
+    }
+    /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
+       di paese, due cifre, e una lunghezza da IBAN */
+    if (campi.iban && !/^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/.test(campi.iban)) {
+      toast('Questo IBAN non sembra completo: controllalo');
+      return;
+    }
+    testo = fr.componi(campi).slice(0, CAMPO_MAX_TESTO);
+    daRicordare = {forma: fr.forma, campi: campi};
+  } else {
+    const inp = el('p2pCampoContatto');
+    testo = String((inp && inp.value) || '').trim().slice(0, CAMPO_MAX_TESTO);
+    if (!testo) { toast('Scrivi un contatto prima di mandarlo'); return; }
   }
   const rip = bottoneInAttesa(btn, 'Invio…');
   try {
     await campoInvia(o, tipo, testo);
+    if (daRicordare) ricordaRecapito(daRicordare.forma, daRicordare.campi, testo);
     toast(tipo === 'euro' ? 'Recapito inviato a chi compra ✓' : 'Contatto inviato ✓');
     renderCampiP2P();
   } catch(e) {

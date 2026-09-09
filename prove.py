@@ -37743,6 +37743,12 @@ function el(id){
 }
 function altroFoglioAperto(){ return false; }
 function bottoneInAttesa(){ return () => {}; }
+/* il magazzino del ricordo locale e gli stati finali: specchi del
+   mondo vero, quanto basta per far girare l'identita' di pagamento */
+const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
+const magazzino = {};
+const localStorage = {getItem: k => (k in magazzino ? magazzino[k] : null),
+                      setItem: (k, v) => { magazzino[k] = String(v); }};
 function chiediConferma(){}
 function renderOrdineP2P(){}
 let p2pOrdineAperto = '';
@@ -37969,6 +37975,48 @@ p2pChiaviChat = {};
 out.senzaPeerNessunAutore = Object.keys(autoriChatP2P()).length === 0;
 out.senzaPeerNienteChiavi = chiaviChatOrdine(mondo.a.ordini['X']) === null;
 
+/* ===== 5) l'identita' di pagamento e l'invio automatico ===== */
+apparecchia();
+LATO = 'a';
+/* le forme: il metodo (testo libero) sceglie il form giusto, e il
+   testo composto e' quello che l'altra persona legge */
+out.formaSepa = formaRecapito('Bonifico SEPA').forma;
+out.formaRev = formaRecapito('revolut').forma;
+out.formaLibera = formaRecapito('Hawala').forma;
+out.testoSepa = formaRecapito('SEPA').componi(
+  {nome: 'Mario Rossi', iban: 'IT60X0542811101000000123456'});
+/* il ricordo: si scrive, si rilegge, e l'ultimo scritto vince */
+ricordaRecapito('satispay', {tel: '333 0000000'}, 'Satispay: 333 0000000');
+ricordaRecapito('satispay', {tel: '333 1234567'}, 'Satispay: 333 1234567');
+out.ricordoTorna = (recapitiMiei().satispay || {}).testo === 'Satispay: 333 1234567';
+/* l'invio automatico: controparte nota, UN ricordo pronto -> parte */
+P2P_AUTOINVIO_MS = 0;
+mondo.a.ordini['X'].metodi = ['Satispay'];
+pianificaAutoRecapito('X');
+await new Promise(r => setTimeout(r, 50));
+out.autoParte = pubblicati.length === 1
+  && ((mondo.a.ordini['X'].campiMiei || {}).euro || {}).testo === 'Satispay: 333 1234567';
+/* gia' mandato: non riparte */
+pianificaAutoRecapito('X');
+await new Promise(r => setTimeout(r, 30));
+out.autoNonRaddoppia = pubblicati.length === 1;
+/* due ricordi buoni per lo stesso ordine: sceglie il venditore, non noi */
+ricordaRecapito('revolut', {tag: '@alice'}, 'Revolut: @alice');
+mondo.a.ordini['X'].metodi = ['Satispay', 'Revolut'];
+delete mondo.a.ordini['X'].campiMiei;
+out.dueProntiNonParte = recapitoDaAutoInvio(mondo.a.ordini['X']) === null;
+/* ...ma due nomi diversi della STESSA forma non contano due volte */
+mondo.a.ordini['X'].metodi = ['Satispay', 'satispay'];
+out.stessaFormaConta1 = (recapitoDaAutoInvio(mondo.a.ordini['X']) || {}).testo
+  === 'Satispay: 333 1234567';
+/* chi compra non manda niente da solo, e uno scambio finito nemmeno */
+LATO = 'b';
+mondo.b.ordini['X'].metodi = ['Satispay'];
+out.compraNonParte = recapitoDaAutoInvio(mondo.b.ordini['X']) === null;
+LATO = 'a';
+mondo.a.ordini['X'].stato = 'concluso';
+out.finitoNonParte = recapitoDaAutoInvio(mondo.a.ordini['X']) === null;
+
 console.log(JSON.stringify(out));
 })().catch(e => { console.log('BANCO ROTTO: ' + (e && e.stack || e)); process.exit(1); });
 """
@@ -38176,6 +38224,49 @@ def prove_p2p_chat():
           "o.lato === 'compro' && loro.euro" in co
           and "esc(loro.euro.testo)" in co)
 
+    # --- 7b) L'IDENTITA' DI PAGAMENTO (set 2026) ---------------------
+    # Il metodo sceglie il form, il ricordo sta sul dispositivo, e il
+    # vocabolario del tag `t` NON si estende: il tipo resta `euro`,
+    # perche' «vince il piu' recente per tipo» e' il meccanismo di
+    # correzione — con un tipo per metodo, chi corregge passando da
+    # SEPA a Revolut lascerebbe DUE recapiti vivi e chi compra non
+    # saprebbe quale vale.
+    prova("il vocabolario dei tipi resta chiuso a due", True,
+          "const CAMPI_P2P = ['euro', 'contatto'];" in mini)
+    prova("le cinque forme conosciute, piu' quella libera", True,
+          all("forma: '" + f + "'" in cod for f in
+              ("sepa", "revolut", "satispay", "paypal", "contanti"))
+          and "'altro:' + m.toLowerCase()" in cod)
+    inv2 = pezzo_js(mini, "async function inviaCampoP2P(", "\n}\n")
+    prova("l'IBAN si ripulisce (spazi via, maiuscole) e si guarda la sagoma",
+          True, "replace(/\\s+/g, '').toUpperCase()" in inv2
+          and "/^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/" in inv2)
+    prova("il ricordo si scrive DOPO che l'invio e' riuscito", True,
+          0 <= inv2.find("await campoInvia") < inv2.find("ricordaRecapito("))
+    prova("il ricordo vive in localStorage e mai sul server", 3,
+          mini.count("RECAPITI_CHIAVE"))
+    applica2 = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){",
+                        "\n}\n")
+    prova("l'invio automatico parte quando la controparte si conosce", True,
+          "if (!ord.peer && nuovo.peer) pianificaAutoRecapito(nuovo.id);"
+          in applica2)
+    auto = pezzo_js(mini, "function recapitoDaAutoInvio(", "\n}\n")
+    prova("...solo per chi vende, a scambio vivo e a campo ancora vuoto",
+          True, "o.lato !== 'vendo'" in auto and "P2P_FINALI" in auto
+          and "(o.campiMiei || {}).euro" in auto)
+    prova("...e con UNA sola forma pronta: con due sceglie il venditore",
+          True, "forme.length === 1" in auto)
+    pia = pezzo_js(mini, "function pianificaAutoRecapito(", "\n}\n")
+    prova("...ricontrollando le condizioni al momento dello sparo", True,
+          "recapitoDaAutoInvio(o)" in pia and "setTimeout" in pia)
+    prova("...e se non parte non si riprova da solo", True,
+          "p2pAutoTentati[id]" in pia)
+    prova("il form dice che il recapito resta ricordato e parte da solo",
+          True, "Resta ricordato su questo dispositivo" in rc)
+    prova("...e il recapito arrivato mostra anche gli a-capo", True,
+          "esc(loro.euro.testo).replace(/\\n/g, '<br>')" in rc
+          and "esc(loro.euro.testo).replace(/\\n/g, '<br>')" in co)
+
     # --- 8) IL BANCO: il blocco gira col bundle VERO ------------------
     node = _sh.which("node")
     if not node:
@@ -38267,6 +38358,25 @@ def prove_p2p_chat():
     prova("...e rimanda allo scambio giusto", True, o["autoreRimandaAlloScambio"])
     prova("senza controparte non si ascolta nessuno", [True, True],
           [o["senzaPeerNessunAutore"], o["senzaPeerNienteChiavi"]])
+
+    # L'IDENTITA' DI PAGAMENTO, fatta girare davvero
+    prova("il metodo sceglie il form: SEPA, Revolut, e la forma libera",
+          ["sepa", "revolut", "altro:hawala"],
+          [o["formaSepa"], o["formaRev"], o["formaLibera"]])
+    prova("il testo composto e' leggibile cosi' com'e'",
+          "Bonifico SEPA\nIntestatario: Mario Rossi\n"
+          "IBAN: IT60X0542811101000000123456", o["testoSepa"])
+    prova("il ricordo si rilegge, e l'ultimo scritto vince", True,
+          o["ricordoTorna"])
+    prova("il recapito ricordato parte da solo quando lo scambio parte",
+          True, o["autoParte"])
+    prova("...una volta sola", True, o["autoNonRaddoppia"])
+    prova("con due ricordi buoni non parte niente: sceglie il venditore",
+          True, o["dueProntiNonParte"])
+    prova("...ma due nomi della stessa forma non contano due volte", True,
+          o["stessaFormaConta1"])
+    prova("chi compra non manda niente da solo", True, o["compraNonParte"])
+    prova("...e uno scambio finito nemmeno", True, o["finitoNonParte"])
 
 
 def prove_p2p_pubblica():
