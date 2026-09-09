@@ -6546,3 +6546,57 @@ sezioni sovrana/adozione diventano sentinelle NEGATIVE (la porta e'
 chiusa e sorvegliata). Verificato dal vivo: pagina «I tuoi dati» col
 bottone, foglietto ridotto che risponde, zero errori console nuovi.
 Prove: 8535 verdi.
+
+FASE 6, TERZA TAPPA: I DUE RECAPITI CIFRATI AL POSTO DELLA CHAT
+(9 set 2026). La decisione di Andrea, eseguita: niente piu' chat
+libera — due CAMPI tipizzati, «dove ricevere gli euro» (per chi
+vende: senza, chi compra non puo' pagare) e «un tuo contatto»
+(facoltativo, per tutt'e due, con l'avvertenza a schermo che rivela
+l'identita' alla controparte).
+IL CANALE E' QUELLO DELLA CHAT, BUSTA PER BUSTA, ed e' la scelta che
+regge la tappa: cambiare anche il trasporto avrebbe buttato la
+crittografia gia' provata coi test vector di mostro-core (ECDH
+x-only, HKDF senza sale, le due chiavi conv/firma — chi ha solo conv
+LEGGE e non scrive, quindi la lettura per chi risolve una disputa
+resta possibile). Cambia il CONTENUTO: dentro la busta un kind 1 col
+tag `t` che porta il tipo — nell'evento INTERNO, firmato dalla trade
+key, mai sulla busta dove lo leggerebbe il relay. Il vocabolario e'
+CHIUSO (euro, contatto): un tipo ignoto o un kind 1 senza `t` — la
+chat di ieri — si lascia cadere.
+PER OGNI TIPO VINCE IL PIU' RECENTE, ed e' il disegno che risolve
+due problemi con una regola: l'IBAN sbagliato si corregge
+re-inviando (l'ultimo vale), e i PROPRI campi mandati da un altro
+dispositivo tornano dall'eco della stessa sottoscrizione — la chiave
+di firma e' condivisa fra le parti — e i dispositivi convergono da
+soli. Il replay della stessa busta non muove niente (l'id di
+dentro), e il vecchio rimesso in giro non torna (la data di dentro).
+LA CONSEGNA SI APPOGGIA ALLA STORIA DEL RELAY: la sub riparte dal
+piu' vecchio scambio aperto (ultimoVistoP2P), quindi un recapito
+mandato ad app chiusa si ritrova alla riapertura. LIMITE DICHIARATO:
+se il relay non tiene la storia, il recapito si ri-manda a mano
+(«Aggiorna il recapito») — nessun rinvio automatico, che con l'eco
+multi-dispositivo rischierebbe di far vincere una copia vecchia.
+«OBBLIGATORIO PER CHI VENDE» E' UNA RIGA CHE INSISTE, non un gate:
+nella pagina dello scambio, appena la controparte si conosce, chi
+vende senza recapito inviato legge «di' a chi compra dove mandarti
+gli euro: senza, non puo' pagarti» — ma il bottone della hold non si
+blocca, che i 900 secondi di expiration_seconds sono un timer vero e
+un campo di testo non deve mangiarselo. Chi compra vede il recapito
+arrivato in un riquadro, nella pagina e nel foglio.
+LA UI: un foglio solo («I vostri recapiti», p2pCampiSheet al posto di
+p2pChatSheet), coi pezzi di casa — via il CSS delle bolle. I testi
+della disputa si adeguano (decisione 5): «dai tempo all'altra
+persona... se vi siete mandati un contatto, provate a sentirvi» al
+posto di «prova a scrivere».
+LE PROVE: prove_p2p_chat diventa la suite dei recapiti — le
+sentinelle della catena di validazione restano IDENTICHE (autore
+prima di tutto, raffica prima di decifrare, doppia firma), il banco
+node col bundle vero guadagna aggiornamento-che-vince, il vecchio
+che non torna, l'eco nei propri, il vocabolario chiuso; e i rifiuti
+RIPARTONO DA RECAPITI VUOTI, che e' la trappola del giro: coi campi
+gia' pieni il «vince il piu' recente» rifiuterebbe da solo una busta
+vecchia, e le guardie sembrerebbero verdi anche da spente.
+RESTA DA PROVARE SUL CAMPO (tappa 8, con Alan): il giro vero a due
+identita' — recapito che arriva, aggiornamento, contatto — e la
+scadenza dei timer mai vista (il verbale del nodo la aggancia gia'
+alla tappa 8). Prove: 8542 verdi.
