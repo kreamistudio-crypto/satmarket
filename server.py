@@ -41435,6 +41435,16 @@ META_TESTO_SICUREZZA = (
 # protetto». La descrizione promette quello che la pagina mantiene —
 # cosa raccogliamo, per quanto, chi legge — e nomina la parte che ci
 # distingue, perche' e' quella per cui uno la cerca.
+# La terza pagina-vista (set 2026): lo scambio P2P, l'indirizzo che
+# esce dal tocco lungo sulla card nella striscia delle categorie. Il
+# titolo dice il NOME della sezione, com'e' scritto sulla card e nella
+# barra, e la descrizione dice la cosa senza promettere il nostro
+# deposito di garanzia: li' i sats non passano da noi.
+TITOLO_P2P = "Scambio P2P — Barattolo"
+META_TESTO_P2P = (
+    "Scambia sats a mano, da persona a persona: gli ordini aperti, il "
+    "prezzo e il metodo di pagamento, dentro Barattolo.")
+
 TITOLO_PRIVACY = "I tuoi dati — Barattolo"
 META_TESTO_PRIVACY = (
     "Cosa sappiamo di te, per quanto tempo e chi lo legge. E cosa non "
@@ -41883,6 +41893,19 @@ TESTA_SICUREZZA = _testa_seo(TITOLO_SICUREZZA, META_TESTO_SICUREZZA,
 # sulla privacy che non si trova non serve a niente.
 TESTA_PRIVACY = _testa_seo(TITOLO_PRIVACY, META_TESTO_PRIVACY,
                            f"{URL_PUBBLICO}/privacy")
+
+# E LA TERZA NON SI INDICIZZA, che e' una decisione e non una
+# dimenticanza: finche' la leva dello scambio e' una fase di prova,
+# chi arrivasse qui da un motore troverebbe quasi sempre un «coming
+# soon» — un risultato che promette una cosa e ne da' un'altra, cioe'
+# il danno che il noindex esiste per evitare. I meta pero' ci sono e
+# sono SUOI: questo indirizzo si MANDA, e l'anteprima deve dire di
+# cosa si tratta. Il giorno che la leva si apre a tutti si toglie
+# `indicizza=False` e si aggiunge la riga alla sitemap, dove oggi
+# stanno le due sorelle e questa no — una pagina deindicizzata dentro
+# la sitemap e' un segnale contro l'altro.
+TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P,
+                       f"{URL_PUBBLICO}/p2p", indicizza=False)
 
 
 # Quante schede entrano nel cartello di una pagina-elenco. Non e' una
@@ -42758,6 +42781,24 @@ def pagina_privacy():
     Nessun `{parametro}`: la pagina e' UNA, e per la stessa ragione la
     sua testa e' una costante."""
     return _pagina_con_meta(TESTA_PRIVACY, TITOLO_PRIVACY)
+
+
+@app.get("/p2p")
+def pagina_p2p():
+    """Link condivisibile dello scambio P2P: la terza sorella di
+    /sicurezza e /privacy, stessa liturgia — stessa Mini App, il JS
+    legge /p2p dall'URL e apre la vista.
+
+    NON E' UNA VISTA SCELTA QUI: il client chiama il suo giudice unico
+    (`vaiP2P`), quindi chi ha la leva accesa atterra sul libro degli
+    ordini e tutti gli altri sul «coming soon». Il server non sa e non
+    deve sapere quale dei due: la leva e' per persona, e una pagina
+    che la leggesse qui dovrebbe conoscere chi bussa — cosa che a un
+    link condiviso non succede.
+    Nessun `{parametro}` come nelle due sorelle: la pagina e' UNA, e
+    per la stessa ragione la sua testa e' una costante. Che sia
+    NOINDEX lo dice la voce di TESTA_P2P, col perche'."""
+    return _pagina_con_meta(TESTA_P2P, TITOLO_P2P)
 
 
 @app.get("/vendor/nostr.js")

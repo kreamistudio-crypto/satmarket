@@ -885,6 +885,41 @@
   .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
     line-height:1.2;color:var(--ink);text-align:center}
+  /* LA CARD DELLO SCAMBIO: il logo piu' grosso, e le frecce che
+     virano (set 2026, ritocchi di Andrea — vedi Architettura, «LA
+     CARD DELLO SCAMBIO NELLA STRISCIA»).
+     PIU' GROSSO DELLE SORELLE, ed e' una ragione e non un capriccio:
+     le 27 illustrazioni sono pareggiate d'inchiostro FRA LORO
+     (ritaglia_categorie.py), questo e' un MARCHIO — tratto sottile e
+     due frecce che girano attorno al vuoto — quindi alla stessa
+     misura pesa meno. `inset` porta il lato reso da 125 a 144 (su
+     card da 160) e NON tocca il quadrato: la fila non si muove di un
+     pixel, si allarga solo la figura dentro.
+     IL VIRAGGIO E' UN CROSSFADE FRA I DUE GEMELLI GIA' IN CASA —
+     compra (freccia di sopra verde) e vendi (freccia di sotto rossa)
+     — e non un hue-rotate: quel filtro girerebbe anche il barattolo,
+     e mascherarne le sole frecce vorrebbe dire un file nuovo. I due
+     gemelli hanno la PANCIA identica, misurato alla resa con la
+     soglia percettiva di casa (24): zero pixel sopra, quindi il vetro
+     resta fermo per costruzione e a muoversi e' solo il colore.
+     `alternate` con ease-in-out indugia sui due estremi e passa
+     svelto per il mezzo scolorito: 2,5s per verso, cinque secondi di
+     ciclo. Si anima l'OPACITA' e nient'altro, che e' la proprieta'
+     che il compositore muove senza ridisegnare niente. */
+  .cella-p2p .cat-fig{inset:5%}
+  .cella-p2p .p2p-rosso{opacity:0;
+    animation:p2pVira 2.5s ease-in-out infinite alternate}
+  @keyframes p2pVira{from{opacity:0}to{opacity:1}}
+  /* Il TERZO gemello — il logo completo, verde e rosso insieme — sta
+     sopra gli altri due e non si vede mai... finche' qualcuno non
+     chiede di fermare il movimento: allora la coppia si spegne e
+     prende il suo posto lui, intero. Un marchio a meta' (il solo
+     verde) sarebbe un ripiego che dice un'altra cosa. */
+  .cella-p2p .p2p-fermo{opacity:0}
+  @media (prefers-reduced-motion:reduce){
+    .cella-p2p .p2p-verde,.cella-p2p .p2p-rosso{animation:none;opacity:0}
+    .cella-p2p .p2p-fermo{opacity:1}
+  }
   /* LA CARD DEL BARATTOLO (ago 2026): il vetro di jarSVG al posto
      dell'illustrazione, in crema FISSA sul bruno del fondo — un
      disegno su un fondo che non segue il tema non lo segue nemmeno
@@ -8744,6 +8779,15 @@ const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
               "Strumenti musicali","Collezionismo","Arte e artigianato",
               "Buoni ed esperienze","Lezioni e corsi",
               "Lavoro e servizi","Altro"];
+/* IL NOME DELLA CARD DELLO SCAMBIO DENTRO `data-cat` (set 2026).
+   MINUSCOLO APPOSTA: i reparti sono nomi italiani con la maiuscola,
+   quindi questo in CATS non puo' entrare nemmeno per sbaglio — ed e'
+   cio' che permette alla card di portare lo STESSO `data-cat` delle
+   sorelle (il tocco lungo delega su `.cat-cella[data-cat]`, e un
+   secondo selettore sarebbe un secondo posto dove ricordarsi delle
+   bandierine) senza diventare un reparto da nessun'altra parte.
+   Lo leggono in due: il template della striscia e condividiCategoria. */
+const CAT_P2P = 'p2p';
 let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
@@ -10296,11 +10340,19 @@ function renderStriscia(){
      Due porte, un giudice: il giorno che il giudice cambia, cambia
      per tutt'e due.
      NON E' UN FILTRO, quindi non si accende mai — l'anello `.attiva`
-     dice «sei in questo reparto», e da qui si ESCE dalla home. E'
-     un <a> SENZA href col role=button e SENZA data-cat, come la card
-     del barattolo: fuori dal tocco lungo di condivisione PER
-     COSTRUZIONE (il delegato guarda `.cat-cella[data-cat]`), che una
-     vista dell'app un URL da condividere non ce l'ha.
+     dice «sei in questo reparto», e da qui si ESCE dalla home.
+     E SI CONDIVIDE COL TOCCO LUNGO, come le sorelle (set 2026,
+     ritocco di Andrea, che ROVESCIA il «niente href, niente data-cat»
+     del primo giro): quel giro diceva «una vista dell'app un URL da
+     condividere non ce l'ha», e adesso ce l'ha — /p2p e' una rotta
+     vera del server, la sorella di /sicurezza e /privacy. Quindi la
+     card e' un <a> VERO con href e col `data-cat` che il delegato
+     cerca, e il gesto e' quello di sempre senza un ramo apposta.
+     Il nome in `data-cat` e' CAT_P2P, minuscolo: vedi la sua voce.
+     E CADE ANCHE L'onkeydown, che non e' una perdita: serviva perche'
+     un <a> senza href non riceve il click da tastiera, e adesso
+     l'href c'e' — Invio lo attiva il browser, e il click finisce nel
+     nostro handler come quello del dito.
      E LA CARD C'E' PER TUTTI, anche in DEMO e in vetrina anonima:
      non porta a un muro come farebbe il barattolo vuoto — porta al
      coming soon, che e' markup fisso e la risposta e' una sola.
@@ -10322,12 +10374,17 @@ function renderStriscia(){
       <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)}</span>
       <span class="cat-eti">Nel tuo barattolo</span>
     </a>` : '') + `
-    <a class="cat-cella cella-p2p" role="button" tabindex="0"
-       title="Scambio P2P" aria-label="Scambio P2P" onclick="vaiP2P()"
-       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();vaiP2P()}">
-      <span class="cat-quad"><span class="cat-fig"><img src="/assets/p2p-logo-completo.png"
-           alt="" loading="lazy" decoding="async"
-           onerror="this.remove()"><span class="cat-emoji" aria-hidden="true">₿</span></span></span>
+    <a class="cat-cella cella-p2p" data-cat="${CAT_P2P}" href="/p2p"
+       title="Scambio P2P" aria-label="Scambio P2P"
+       onclick="vaiP2PDaTocco(event)">
+      <span class="cat-quad"><span class="cat-fig"><img class="p2p-verde"
+           src="/assets/p2p-logo-compra.png" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"><img class="p2p-rosso"
+           src="/assets/p2p-logo-vendi.png" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"><img class="p2p-fermo"
+           src="/assets/p2p-logo-completo.png" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"><span class="cat-emoji"
+           aria-hidden="true">₿</span></span></span>
       <span class="cat-eti">Scambio P2P</span>
     </a>` + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
@@ -11297,6 +11354,23 @@ function apriCategoriaDaTocco(e, c){
   e.preventDefault();
   if (premutaFatta) { premutaFatta = false; return; }
   apriCategoria(c);
+}
+
+/* IL TOCCO DELLA CARD DELLO SCAMBIO, il calco esatto di qui sopra
+   (set 2026): da quando la card ha un href vero il click va fermato,
+   o il browser seguirebbe /p2p e ricaricherebbe 900 KB per una vista
+   che e' gia' qui. La bandierina del tocco lungo si consuma come
+   nelle sorelle: dopo una condivisione il click arriva LO STESSO, e
+   senza questa riga partirebbe anche la navigazione. E clickNostro
+   lascia al browser i click modificati — ctrl+click apre /p2p in una
+   scheda nuova, come per le sorelle.
+   Il gesto vero resta `vaiP2P()`, il giudice unico delle due porte:
+   qui non si sceglie nessuna vista. */
+function vaiP2PDaTocco(e){
+  if (!clickNostro(e)) return;
+  e.preventDefault();
+  if (premutaFatta) { premutaFatta = false; return; }
+  vaiP2P();
 }
 
 /* La card «Tutto» in testa alla striscia: il ritorno al mercatino
@@ -22493,7 +22567,17 @@ function condividiPrivacy(){
    dal web e' proprio chi condivide, e un `!VETRINA` lo spegnerebbe
    dove serve di piu'. */
 function condividiCategoria(c){
-  if (DEMO || c === 'Tutto' || !CATS.includes(c)) return;
+  if (DEMO) return;
+  /* LA CARD DELLO SCAMBIO passa di qui perche' viaggia nello stesso
+     `data-cat` delle sorelle (vedi CAT_P2P), ma non e' un reparto:
+     il suo link e' /p2p, che il server serve coi suoi meta come
+     /sicurezza e /privacy. Sta PRIMA della guardia su CATS, che
+     altrimenti la butterebbe fuori — ed e' proprio quella guardia a
+     garantire che nessun altro nome finisca qui per sbaglio. */
+  if (c === CAT_P2P)
+    return condividiLink(`${baseCondivisione()}/p2p`,
+      'Scambia sats a mano su Barattolo ⚡', 'Scambio P2P');
+  if (c === 'Tutto' || !CATS.includes(c)) return;
   return condividiLink(`${baseCondivisione()}/categoria/${slugCat(c)}`,
     `${c} in vendita su Barattolo 🫙`, c);
 }
@@ -37057,6 +37141,25 @@ function apriPrivacyDaUrl(){
    secondo elenco da tenere allineato. Slug sconosciuto = `undefined`,
    e le due funzioni qui sotto non fanno NIENTE: mai svuotare la
    vetrina per una parola che non conosciamo. */
+/* /p2p — lo scambio come pagina vera (set 2026): l'indirizzo che
+   esce dal tocco lungo sulla card della striscia. NON apre una vista
+   a mano: chiama `vaiP2P()`, cioe' LO STESSO giudice delle due porte
+   — chi ha la leva accesa atterra sul libro, gli altri sul coming
+   soon. Per questo NON sta fra le viste anticipate come /sicurezza e
+   /privacy: quelle sono markup fisso e si mostrano subito, questa ha
+   bisogno delle leve — anticiparla vorrebbe dire rispondere «spenta»
+   a tutti, che e' il modo peggiore di sbagliare.
+   L'haptic di vaiP2P suona anche qui, senza un dito che l'abbia
+   chiesto: e' il prezzo del giudice unico, ed e' un prezzo che si
+   paga volentieri — la coppia di rami scritta due volte no. */
+const P2P_URL = location.pathname.match(/^\/p2p\/?$/);
+let p2pApertoDaUrl = false;
+function apriP2PDaUrl(){
+  if (!P2P_URL || p2pApertoDaUrl) return;
+  p2pApertoDaUrl = true;
+  vaiP2P();
+}
+
 const CATEGORIA_URL = location.pathname.match(/^\/categoria\/([a-z0-9-]+)\/?$/);
 const CATEGORIA_DA_URL = CATEGORIA_URL
   && CATS.find(c => slugCat(c) === CATEGORIA_URL[1]);
@@ -37236,6 +37339,7 @@ async function avviaVetrina(){
     apriSicurezzaDaUrl();
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
+    apriP2PDaUrl();
     apriOffertaDaUrl();
     apriBarattoloDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
@@ -37514,6 +37618,7 @@ async function avvia(){
     apriSicurezzaDaUrl();
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
+    apriP2PDaUrl();
     apriOffertaDaUrl();
     apriBarattoloDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour

@@ -23137,6 +23137,7 @@ def prove_anteprime():
                     '@app.get("/categoria/{slug}")',
                     '@app.get("/sicurezza")',
                     '@app.get("/privacy")',
+                    '@app.get("/p2p")',
                     '@app.get("/offerta/{oid}")',
                     '@app.get("/barattolo/{token}")')
     for rotta in ROTTE_PAGINA:
@@ -35246,37 +35247,123 @@ def prove_p2p_libro():
     # dentro». Li' adesso c'e' la sua card, col logo completo.
     _st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
     _cp2p = _st[_st.index("cella-p2p"):_st.index("voci.map(")]
+    _css = mini[mini.index("<style"):mini.index("</style>")]
     prova("una sola card, un solo ingresso in piu'", 1,
-          mini.count("cella-p2p"))
+          mini.count('class="cat-cella cella-p2p"'))
     prova("sta DOPO il barattolo e PRIMA delle categorie", True,
           0 <= _st.find("cella-barattolo")
           < _st.find("cella-p2p") < _st.find("voci.map("))
     # IL GATE VIVE IN UN POSTO SOLO: due porte, un giudice. Un `go`
     # scritto a mano qui sarebbe una seconda verita' da tenere
     # allineata, e il giorno che il giudice cambia ne cambierebbe una.
+    # EMENDATA (set 2026, il tocco lungo): il gesto passa da
+    # vaiP2PDaTocco, che ferma il click e consuma la bandierina della
+    # premuta — ma finisce li', su `vaiP2P()`, e non sceglie viste.
+    _vt = pezzo_js(mini, "function vaiP2PDaTocco(e){", "\n}\n")
     prova("il tocco e' quello del tab, mai un go scritto a mano", True,
-          'onclick="vaiP2P()"' in _cp2p and "go('p2p" not in _cp2p)
-    prova("...anche da tastiera: un <a> senza href non riceve click",
-          True, "onkeydown" in _cp2p and _cp2p.count("vaiP2P()") == 2)
-    prova("niente href: e' una vista dell'app, non un URL", True,
-          "href" not in _cp2p and 'role="button"' in _cp2p
-          and 'tabindex="0"' in _cp2p)
-    # senza data-cat resta fuori dal tocco lungo di condivisione PER
-    # COSTRUZIONE, come la card del barattolo e come «Tutto»
-    prova("niente data-cat: fuori dal tocco lungo per costruzione", 0,
-          _cp2p.count("data-cat"))
-    prova("porta il logo completo, nella figura delle sorelle", True,
-          '/assets/p2p-logo-completo.png' in _cp2p
-          and 'class="cat-quad"' in _cp2p and 'class="cat-fig"' in _cp2p)
-    # NESSUNA REGOLA CSS SUA, ed e' MISURATO a schermo e non dedotto:
-    # il logo e' quadrato (152x152) e il riquadro della figura sta a
-    # ~1,15 — contenuto rende 125x125, cioe' l'ALTEZZA PIENA delle
-    # sorelle, che stanno nello stesso box e sono contenute uguale
-    # («Casa e giardino» rende 114 di larghezza, meno di lui). Una
-    # classe sua sarebbe una taratura da mantenere per niente.
-    prova("...senza nessuna regola CSS dedicata", False,
-          ".cella-p2p" in mini[mini.index("<style"):
-                               mini.index("</style>")])
+          'onclick="vaiP2PDaTocco(event)"' in _cp2p
+          and "vaiP2P();" in _vt and "go('p2p" not in _vt
+          and "go('p2p" not in _cp2p)
+    # ...e il calco delle sorelle, per intero: senza clickNostro il
+    # ctrl+click non aprirebbe piu' una scheda, senza preventDefault
+    # il browser ricaricherebbe 900 KB, senza la bandierina dopo una
+    # condivisione partirebbe anche la navigazione.
+    prova("...col calco di apriCategoriaDaTocco, per intero", True,
+          "if (!clickNostro(e)) return;" in _vt
+          and "e.preventDefault();" in _vt
+          and "if (premutaFatta) { premutaFatta = false; return; }" in _vt)
+
+    # --- 2c) I TRE RITOCCHI (set 2026) -------------------------------
+    # TRE PROVE CAMBIANO LATO, e nessuna si allenta: certificavano che
+    # la card NON avesse href, NON avesse data-cat e NON avesse una
+    # regola CSS sua. Tutt'e tre erano vere quando la card non si
+    # poteva condividere e il logo non si muoveva; adesso il verso e'
+    # l'opposto, e la ragione sta scritta accanto a ognuna.
+    # 1) L'HREF C'E', ed e' una rotta VERA del server: /p2p, sorella
+    # di /sicurezza e /privacy. Con l'href cade anche l'onkeydown —
+    # serviva perche' un <a> senza href non riceve il click da
+    # tastiera, e adesso Invio lo attiva il browser.
+    prova("l'href c'e', ed e' /p2p", True,
+          'href="/p2p"' in _cp2p)
+    prova("...e con lui cadono role, tabindex e onkeydown", [],
+          [x for x in ('role="button"', 'tabindex="0"', "onkeydown")
+           if x in _cp2p])
+    prova("...e il server serve /p2p coi suoi meta", True,
+          '@app.get("/p2p")' in _SORGENTE
+          and "return _pagina_con_meta(TESTA_P2P, TITOLO_P2P)" in _SORGENTE)
+    # NOINDEX e non per prudenza generica: a leva in prova, chi
+    # arrivasse da un motore troverebbe quasi sempre il coming soon.
+    # Per la stessa ragione fuori dalla sitemap, dove stanno le due
+    # sorelle: deindicizzata e annunciata sarebbe un segnale contro
+    # l'altro.
+    prova("...ma non si indicizza, e resta fuori dalla sitemap", True,
+          "f\"{URL_PUBBLICO}/p2p\", indicizza=False)" in _SORGENTE
+          and '_riga_sitemap(f"{URL_PUBBLICO}/p2p"' not in _SORGENTE)
+    # 2) IL data-cat C'E', ed e' la sentinella minuscola: i reparti
+    # sono nomi italiani con la maiuscola, quindi in CATS non entra.
+    # Cosi' il tocco lungo e' UNO SOLO — il delegato guarda
+    # `.cat-cella[data-cat]` — senza che la card diventi un reparto.
+    prova("il data-cat c'e', e viaggia la sentinella minuscola", True,
+          'data-cat="${CAT_P2P}"' in _cp2p
+          and "const CAT_P2P = 'p2p';" in mini)
+    prova("...e la sentinella in CATS non ci puo' entrare", False,
+          '"p2p"' in mini[mini.index("const CATS = ["):
+                          mini.index('"Altro"];')])
+    _cc = pezzo_js(mini, "function condividiCategoria(c){", "\n}\n")
+    prova("...e la condivisione la riconosce PRIMA della guardia",
+          True, _cc.index("c === CAT_P2P") < _cc.index("CATS.includes(c)")
+          and "/p2p`" in _cc)
+    prova("...e in DEMO non si condivide niente, come le sorelle",
+          True, _cc.index("if (DEMO) return;") < _cc.index("CAT_P2P"))
+    # E L'INDIRIZZO ATTERRA: il client legge /p2p e chiama il GIUDICE,
+    # non una vista scelta a mano. Sta in coda al boot e non fra le
+    # viste anticipate (/sicurezza, /privacy): quelle sono markup
+    # fisso, questa ha bisogno delle leve — anticiparla vorrebbe dire
+    # rispondere «spenta» a tutti.
+    _pu = pezzo_js(mini, "function apriP2PDaUrl(){", "\n}\n")
+    prova("chi atterra su /p2p passa dal giudice, non da un go", True,
+          "vaiP2P();" in _pu and "go(" not in _pu
+          and "location.pathname.match(/^\\/p2p\\/?$/)" in mini)
+    prova("...una volta sola, come le sorelle", True,
+          "p2pApertoDaUrl" in _pu and "p2pApertoDaUrl = true;" in _pu)
+    # DUE volte, e tutt'e due in coda al reparto da URL: se una terza
+    # comparisse nel ramo delle viste anticipate, il conto lo direbbe.
+    prova("...e dai due avvii, subito dopo il reparto da URL", (2, 2),
+          (mini.count("apriP2PDaUrl();"),
+           mini.count("apriCategoriaDaUrl();\n    apriP2PDaUrl();")))
+    # 3) LA REGOLA CSS C'E', e sono i due ritocchi: il logo cresce
+    # (inset 5% = lato reso 144 invece di 125, il quadrato non si
+    # muove) e le frecce virano col crossfade dei due gemelli.
+    prova("la regola c'e', e il logo cresce senza toccare il quadrato",
+          True, ".cella-p2p .cat-fig{inset:5%}" in _css
+          and ".cella-p2p .cat-quad{" not in _css)
+    prova("il viraggio e' un crossfade fra i due gemelli", True,
+          ".cella-p2p .p2p-rosso{opacity:0;" in _css
+          and "animation:p2pVira 2.5s ease-in-out infinite alternate"
+          in _css
+          and "@keyframes p2pVira{from{opacity:0}to{opacity:1}}" in _css)
+    # ...e NON un filtro: un hue-rotate girerebbe anche il barattolo,
+    # e mascherarne le sole frecce vorrebbe dire un file nuovo. La
+    # sentinella guarda le REGOLE della card, non il foglio intero:
+    # la parola sta nel commento che spiega perche' quella strada e'
+    # scartata, ed e' li' che deve restare.
+    prova("...e nessuna regola della card porta un filtro", [],
+          [r.strip() for r in _css.split("\n")
+           if ".cella-p2p" in r and "filter" in r])
+    prova("...e la card porta i tre gemelli, il completo per ultimo",
+          True, _cp2p.index("/assets/p2p-logo-compra.png")
+          < _cp2p.index("/assets/p2p-logo-vendi.png")
+          < _cp2p.index("/assets/p2p-logo-completo.png"))
+    # A MOVIMENTO SPENTO il marchio resta INTERO: la coppia si spegne
+    # tutt'e due (il solo verde sarebbe un logo a meta') e prende il
+    # posto il completo.
+    prova("a movimento spento si ferma sul logo COMPLETO", True,
+          "  .cella-p2p .p2p-fermo{opacity:0}\n"
+          "  @media (prefers-reduced-motion:reduce){\n"
+          "    .cella-p2p .p2p-verde,.cella-p2p .p2p-rosso"
+          "{animation:none;opacity:0}\n"
+          "    .cella-p2p .p2p-fermo{opacity:1}\n"
+          "  }" in _css)
     # NON E' UN REPARTO: l'anello `.attiva` dice «sei qui», e da questa
     # card si ESCE dalla home invece di filtrarla.
     prova("la card non si accende mai: non e' un filtro", False,
