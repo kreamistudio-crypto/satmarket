@@ -35357,28 +35357,40 @@ def prove_p2p_libro():
     # deve risorgere.
     prova("...e la striscia e' una frase, non due pezzi ai bordi",
           False, "justify-content:space-between" in rep)
-    # HA CAMBIATO PELLE (set 2026, richiesta di Andrea): la card dice
-    # CHI FA COSA — riga grande col VERBO e i sats («Vende ≈ 12 000
-    # sats»), sotto «in cambio di 8,00 € · prezzo di mercato». Le
-    # classi base restano (il colore del lato e l'ordine con la
-    # reputazione le usano), il vestito nuovo sta nelle due sorelle
-    # .p2p-cifra/.p2p-cambio, che le ALTRE case di .p2p-testa
-    # (scambio e ordine preso) non portano: loro non si muovono.
-    prova("la cifra grande sta in testa col verbo, l'euro sotto", True,
-          '<span class="p2p-sats p2p-cifra">${verbo} ${sats}</span>'
-          in mini
-          and '"p2p-euro p2p-cambio">in cambio di' in mini)
-    prova("...e il verbo e' un fatto della RIGA, mai del tab", True,
-          "const verbo = o.lato === 'sell' ? 'Vende' : 'Compra';"
-          in mini)
-    prova("l'euro sotto e' un blocco di prosa", True,
-          "display:block" in pezzo_js(mini, ".p2p-cambio{", "}")
-          and "font-family:inherit" in pezzo_js(mini, ".p2p-cambio{", "}"))
-    # ...e la cifra grande PUO' andare a capo: la base e' `nowrap`
-    # perche' in fila una cifra spezzata e' illeggibile, ma su una
-    # riga tutta sua il nowrap allargherebbe la pagina.
-    prova("...e la cifra grande puo' andare a capo", True,
-          "white-space:normal" in pezzo_js(mini, ".p2p-cifra{", "}"))
+    # HA CAMBIATO PELLE DUE VOLTE (set 2026): prima «chi fa cosa» col
+    # verbo della controparte, poi la SECONDA PERSONA — la card parla
+    # a chi legge, e le due righe si scambiano il posto col lato. Le
+    # classi dicono la TAGLIA (.p2p-grande/.p2p-piccola) perche' sono
+    # POSTI: quale cifra ci finisca lo decide il lato, e le classi dei
+    # numeri viaggiano con lei. Le ALTRE case di .p2p-testa (scambio e
+    # ordine preso) non portano queste sorelle: loro non si muovono.
+    prova("la card parla in seconda persona, e il posto e' del lato",
+          True, "const paghiEuro = o.lato === 'sell';" in mini
+          and "(paghiEuro ? 'Paghi ' : 'ricevi ')" in mini
+          and "(paghiEuro ? 'ricevi ' : 'Invia ')" in mini)
+    prova("...e la cifra in sats porta il colore del lato in ogni riga",
+          True, "${paghiEuro ? 'p2p-euro' : 'p2p-sats'}" in mini
+          and "${paghiEuro ? 'p2p-sats' : 'p2p-euro'}" in mini)
+    prova("il verbo della controparte non c'e' piu'", True,
+          "'Vende' : 'Compra'" not in mini)
+    prova("le due righe hanno una taglia e possono andare a capo", True,
+          "font-size:19px" in pezzo_js(mini, ".p2p-grande{", "}")
+          and "white-space:normal" in pezzo_js(mini, ".p2p-grande{", "}")
+          and "display:block" in pezzo_js(mini, ".p2p-piccola{", "}"))
+    prova("...e la terza riga e' il prezzo, con la sua tinta", True,
+          ".p2p-prezzo.p2p-avviso{color:var(--danger)}" in mini
+          and ".p2p-prezzo.p2p-affare{color:var(--trust)}" in mini)
+    # L'ANELLO E' ANCORATO e non in fila: dentro il flex della testa
+    # una cifra lunga prendeva tutta la riga e lo faceva scendere a
+    # meta' card (visto dal vivo). In assoluto non entra nel wrap.
+    prova("l'anello sta ancorato in alto a destra", True,
+          "position:absolute" in pezzo_js(mini, ".p2p-anello{", "}")
+          and "position:relative" in pezzo_js(mini, ".p2p-ord{", "}")
+          and "padding-right" in pezzo_js(mini, ".p2p-ord .p2p-testa{", "}"))
+    # ...e le ALTRE due case di .p2p-testa non si muovono: l'allineamento
+    # condiviso resta quello di ieri
+    prova("...e la testa condivisa resta allineata come ieri", True,
+          "align-items:baseline" in pezzo_js(mini, ".p2p-testa{", "}"))
 
     # --- 4c) LA RIGA CHE DICEVA CHI TIENE I SATS E' USCITA -----------
     # (set 2026, restyling della testata — decisione di Andrea). La
@@ -35492,6 +35504,9 @@ def prove_p2p_libro():
         "function repTestoP2P(rep){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
+        # l'anello della scadenza (set 2026) e il suo giudice puro
+        "function frazioneVitaP2P(o, adesso){",
+        "function anelloScadenzaP2P(o, adesso){",
         "function satsMercatoP2P(o){",
         # IL GIUDICE DI «e' mio» vive nel motore ma lo CHIAMA la card,
         # che sta qui: si porta dentro quello VERO invece di stubbarlo,
@@ -35508,6 +35523,11 @@ def prove_p2p_libro():
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
+    # le due costanti dell'anello: il raggio e il giro, che
+    # anelloScadenzaP2P usa per il dasharray
+    for riga in ("const P2P_ANELLO_R = ", "const P2P_ANELLO_GIRO = "):
+        i_a = mini.index(riga)
+        pezzi.append(mini[i_a:mini.index("\n", i_a)])
     banco = "\n".join(pezzi) + r"""
 const fmt = n => String(n);
 const fmtEur = e => e.toFixed(2).replace('.', ',');
@@ -35583,6 +35603,24 @@ out.rangeTriplo = ordineDaEvento(ev(38383, [['d','rt'],['k','sell'],['f','EUR'],
 out.rigaRange = rigaOrdineP2P(out.range);
 out.rigaRangePremio = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rp'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['premium','4'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 out.rigaSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rs'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
+/* LA CARD IN SECONDA PERSONA: un sell (tab «Compra BTC») e un buy
+   (tab «Vendi BTC»), per vedere le righe scambiarsi il posto */
+out.rigaCompra = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','sp'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','8'],['pm','SEPA'],['expires_at', String(ora+3600)]]), ora));
+out.rigaVendi  = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','bp'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','8'],['pm','SEPA'],['expires_at', String(ora+3600)]]), ora));
+/* L'ANELLO DELLA SCADENZA: il giudice puro sui casi che contano —
+   l'orologio si passa, cosi' non dipende da quando gira il banco */
+const vita = (creato, scade, quando) => frazioneVitaP2P({creato, scade}, quando);
+out.anelloPieno   = vita(1000, 2000, 1000);
+out.anelloMezzo   = vita(1000, 2000, 1500);
+out.anelloFinito  = vita(1000, 2000, 2000);
+out.anelloSgoccioli = vita(1000, 2000, 1950);
+out.anelloOltre   = vita(1000, 2000, 3000);   // clampato a 0, mai negativo
+out.anelloSenza   = vita(1000, 0, 1500);      // nessuna scadenza: non si sa
+out.anelloStorto  = vita(2000, 1000, 1500);   // finestra rovescia: non si sa
+/* ...e il disegno: c'e', porta l'aria, e si allarma agli sgoccioli */
+out.svgMezzo = anelloScadenzaP2P({creato: 1000, scade: 2000}, 1500);
+out.svgSgocc = anelloScadenzaP2P({creato: 1000, scade: 2000}, 1950);
+out.svgNiente = anelloScadenzaP2P({creato: 1000, scade: 0}, 1500);
 out.rigaAvviso = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ra'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','3'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 /* ...e fra due copie dello stesso range vince la piu' recente: la
    dedup e' quella di TUTTI gli ordini, non un binario a parte */
@@ -35693,11 +35731,11 @@ console.log(JSON.stringify(out));
           and out["rangeDedup"][0]["euro"] == 60
           and out["rangeDedup"][0]["euroMax"] == 120)
     prova("la card del range dice i due capi e «scegli tu»", True,
-          "50,00–100,00 €" in out["rigaRange"]
-          and "al prezzo di mercato, scegli tu" in out["rigaRange"])
+          "50,00–100,00 €, scegli tu" in out["rigaRange"]
+          and "al prezzo di mercato" in out["rigaRange"])
     prova("...e col premio il range dice il premio, e sceglie lo stesso",
-          True, "+4% sopra il mercato</span>, scegli tu"
-          in out["rigaRangePremio"]
+          True, "+4% sopra il mercato" in out["rigaRangePremio"]
+          and "50,00–100,00 €, scegli tu" in out["rigaRangePremio"]
           and "al prezzo di mercato" not in out["rigaRangePremio"])
     prova("lo scaduto e' escluso", None, out["scaduto"])
     prova("senza id non e' un ordine", None, out["senzaD"])
@@ -35725,13 +35763,65 @@ console.log(JSON.stringify(out));
     # del coordinatore e' uniforme sui due versi.
     prova("a prezzo di mercato la riga porta il ≈ e il premio", True,
           "≈ 98000 sats" in out["rigaMercato"]
-          and '<span class="p2p-affare">, +2% sopra il mercato</span>'
+          and '<span class="p2p-prezzo p2p-affare">+2% sopra il mercato</span>'
           in out["rigaMercato"])
     prova("...e su un sell il sotto e' un affare, il sopra un avviso",
-          True, '<span class="p2p-affare">, −2% sotto il mercato</span>'
+          True,
+          '<span class="p2p-prezzo p2p-affare">−2% sotto il mercato</span>'
           in out["rigaSotto"]
-          and '<span class="p2p-avviso">, +3% sopra il mercato</span>'
+          and '<span class="p2p-prezzo p2p-avviso">+3% sopra il mercato</span>'
           in out["rigaAvviso"])
+    # LA SECONDA PERSONA, e le righe che si scambiano il posto: nel
+    # tab «Compra BTC» (k=sell) chi legge paga euro e riceve sats, nel
+    # tab «Vendi BTC» (k=buy) invia sats e riceve euro. La cifra in
+    # SATS porta il colore del lato in tutt'e due i casi, qualunque
+    # riga occupi — e' la cifra che cambia col tab.
+    prova("nel tab Compra: paghi euro grande, ricevi sats sotto", True,
+          '<span class="p2p-grande p2p-euro">Paghi 8,00 €</span>'
+          in out["rigaCompra"]
+          and '<span class="p2p-piccola p2p-sats">ricevi ≈'
+          in out["rigaCompra"])
+    prova("nel tab Vendi: invii sats grande, ricevi euro sotto", True,
+          '<span class="p2p-grande p2p-sats">Invia ≈' in out["rigaVendi"]
+          and '<span class="p2p-piccola p2p-euro">ricevi 8,00 €</span>'
+          in out["rigaVendi"])
+    prova("...e del verbo della controparte non resta niente", True,
+          "Vende" not in out["rigaCompra"]
+          and "Compra" not in out["rigaVendi"])
+
+    # --- 7b) L'ANELLO DELLA SCADENZA (set 2026) ---------------------
+    # Il testo «scade fra 7 g» esce dalla card e diventa un anello che
+    # si svuota. Il giudice e' PURO e prende l'orologio, cosi' i casi
+    # non dipendono da quando gira il banco.
+    prova("l'anello e' pieno appena pubblicato", 1, out["anelloPieno"])
+    prova("...mezzo a meta' strada", 0.5, out["anelloMezzo"])
+    prova("...vuoto alla scadenza", 0, out["anelloFinito"])
+    prova("...e oltre la scadenza resta vuoto, mai negativo", 0,
+          out["anelloOltre"])
+    # I DUE CASI CHE NON SI SANNO, e la risposta onesta e' la stessa:
+    # senza scadenza, e con una finestra rovescia (un `expires_at` piu'
+    # vecchio della nascita — roba che arriva da relay di sconosciuti).
+    prova("senza scadenza non si disegna niente", [-1, -1],
+          [out["anelloSenza"], out["anelloStorto"]])
+    prova("...e infatti il disegno non nasce", "", out["svgNiente"])
+    prova("il disegno porta la pista e l'arco che resta", True,
+          'class="pista"' in out["svgMezzo"]
+          and 'class="resta"' in out["svgMezzo"]
+          and "stroke-dasharray=" in out["svgMezzo"])
+    # a meta' strada il consumato e' mezzo giro: 56.55 / 2 = 28.27
+    prova("...e a meta' il consumato e' mezzo giro", True,
+          'stroke-dashoffset="28.27"' in out["svgMezzo"])
+    prova("il testo non si perde: vive nell'aria dell'anello", True,
+          'role="img"' in out["svgMezzo"]
+          and 'aria-label="' in out["svgMezzo"]
+          and 'title="' in out["svgMezzo"])
+    prova("...e agli sgoccioli l'anello si allarma", True,
+          "agli-sgoccioli" in out["svgSgocc"]
+          and "agli-sgoccioli" not in out["svgMezzo"])
+    prova("la card porta l'anello e non piu' il testo della scadenza",
+          True, "p2p-anello" in out["rigaCompra"]
+          and "p2p-quando" not in out["rigaCompra"]
+          and "⏳" not in out["rigaCompra"])
     # A CAMBIO MUTO nessun ≈ e nessun numero inventato: la cifra
     # degrada a «sats» nudo, la frase dell'euro resta intera (dice il
     # mercato o il premio, che non hanno bisogno del cambio).

@@ -1775,7 +1775,7 @@
   .p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);
     border-bottom-color:var(--danger);background:var(--warn-bg)}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
-    padding:12px 14px;margin-top:10px}
+    padding:12px 14px;margin-top:10px;position:relative}
   /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
      e il testo dell'euro va a capo DENTRO la sua scatola staccando il
      simbolo dalla cifra — misurato a 320px col ripiego lungo, 2 card
@@ -1794,8 +1794,27 @@
   /* IL TEMPO IN ALTO A DESTRA: e' il posto dove il riferimento mette
      l'ETA' dell'offerta, e da noi il tempo che fa decidere e' un altro
      — quanto ne RESTA, non quanto e' vecchia. Stesso posto, il tempo
-     nostro: la scadenza loro non ce l'hanno. */
-  .p2p-quando{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+     nostro: la scadenza loro non ce l'hanno.
+     E DAL SET 2026 NON E' PIU' UN TESTO MA UN ANELLO che si svuota
+     (decisione di Andrea): la fretta si guarda, non si legge. La
+     pista e' il filo di casa, l'arco che resta l'inchiostro tenue, e
+     gli ultimi 10% passano al rosso — la soglia la decide il JS, che
+     e' un giudizio e non un vestito. Il testo vive nell'aria
+     dell'anello, quindi chi passa il dito e chi naviga a voce ce
+     l'hanno ancora. */
+  /* ⚠️ L'ANELLO E' ANCORATO, non in fila: dentro il flex della testa
+     una cifra lunga («≈ 74 029–148 058 sats») prendeva tutta la riga
+     e lo faceva scendere a meta' card — visto dal vivo. In assoluto
+     sta sempre in alto a destra e non entra nel giro del wrap, e la
+     riga grande gli lascia il posto col suo padding. */
+  .p2p-anello{position:absolute;top:12px;right:14px;line-height:0}
+  .p2p-ord .p2p-testa{padding-right:28px}
+  .p2p-anello svg{width:22px;height:22px;display:block;
+    transform:rotate(-90deg)}
+  .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
+  .p2p-anello .pista{stroke:var(--line)}
+  .p2p-anello .resta{stroke:var(--muted)}
+  .p2p-anello.agli-sgoccioli .resta{stroke:var(--danger)}
   /* LA STIMA SCENDE SOTTO IL PREZZO nella sola card del libro: era
      l'unica riga del riferimento che avevamo in fila invece che
      incolonnata. La CLASSE resta quella — stessa cifra, stesso
@@ -1813,19 +1832,27 @@
   @media (prefers-reduced-motion:reduce){
     .p2p-ord .p2p-sats{transition:none}
   }
-  /* IL VESTITO DELLE DUE RIGHE NUOVE (set 2026, «chi fa cosa»): la
-     cifra grande in testa senza il nowrap della base (su una riga
-     tutta sua puo' andare a capo, mai allargare la pagina), l'euro
-     sotto come blocco di prosa — le classi base restano, e le altre
-     case di .p2p-testa non portano queste due sorelle. */
-  .p2p-cifra{font-size:17px;white-space:normal}
-  .p2p-cambio{display:block;margin-top:3px;font-family:inherit;
-    font-weight:600;font-size:13.5px;color:var(--ink-soft)}
-  /* il premio nella frase dell'euro: la classe porta il GIUDIZIO per
-     chi legge (deciso dal lato dell'ordine, vedi rigaOrdineP2P), il
-     testo la direzione del prezzo — i token hanno la sera */
-  .p2p-cambio .p2p-avviso{color:var(--danger)}
-  .p2p-cambio .p2p-affare{color:var(--trust)}
+  /* IL VESTITO DELLE TRE RIGHE (set 2026, la card in seconda persona):
+     la prima grande, la seconda sottovoce, la terza il prezzo rispetto
+     al mercato. Sono POSTI e non contenuti — quale cifra ci finisca lo
+     decide il lato — quindi le classi dicono la TAGLIA, e quelle dei
+     numeri (.p2p-euro coi suoi caratteri, .p2p-sats col mono e il
+     colore del lato) viaggiano insieme a loro.
+     Niente nowrap: su una riga tutta sua una cifra assurda di uno
+     sconosciuto deve andare a capo, mai allargare la pagina. */
+  .p2p-grande{font-size:19px;white-space:normal}
+  .p2p-piccola{display:block;margin-top:2px;font-size:14px;
+    white-space:normal}
+  /* la seconda riga in euro parla sottovoce: e' un fatto, non la
+     cifra che si sceglie */
+  .p2p-piccola.p2p-euro{font-size:14.5px;color:var(--ink-soft)}
+  /* IL PREZZO RISPETTO AL MERCATO, terza riga: la classe porta il
+     GIUDIZIO per chi legge (deciso dal lato, vedi rigaOrdineP2P), il
+     testo la direzione del prezzo — i token hanno gia' la loro sera */
+  .p2p-prezzo{display:block;margin-top:3px;font-size:13px;
+    font-weight:600;color:var(--muted)}
+  .p2p-prezzo.p2p-avviso{color:var(--danger)}
+  .p2p-prezzo.p2p-affare{color:var(--trust)}
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -33159,6 +33186,51 @@ function scadeTestoP2P(scade){
   return 'scade fra ' + Math.round(s / 86400) + ' g';
 }
 
+/* QUANTO RESTA DELLA VITA DELL'ORDINE, da 1 (appena pubblicato) a 0
+   (scaduto). PURA: numeri in, numero out — l'orologio si passa, cosi'
+   il banco la fa girare sui casi invece di guardare le righe.
+   Torna -1 quando non si puo' sapere, e sono due casi diversi con la
+   stessa risposta onesta: nessuna scadenza dichiarata, o una finestra
+   non positiva (un `expires_at` piu' vecchio della nascita — roba che
+   arriva da relay di sconosciuti, e un anello disegnato su una
+   finestra storta direbbe una bugia precisa). */
+function frazioneVitaP2P(o, adesso){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const fine = o.scade || 0, inizio = o.creato || 0;
+  if (!fine || !(fine > inizio)) return -1;
+  return Math.max(0, Math.min(1, (fine - adesso) / (fine - inizio)));
+}
+
+/* L'ANELLO CHE SI SVUOTA (set 2026, decisione di Andrea): al posto del
+   testo «⏳ scade fra 7 g» un cerchio di progresso in alto a destra —
+   pieno appena pubblicato, vuoto alla scadenza. Un tempo che si
+   guarda invece di leggersi: in un elenco che si scorre col pollice,
+   la fretta e' una FORMA prima che una parola.
+   IL TESTO NON SI PERDE, e' l'aria dell'anello (title + aria-label):
+   chi passa il dito o naviga con lo screen reader ha ancora la frase
+   esatta, e la sua casa nel dettaglio dello scambio si decide dopo.
+   ULTIMI 10% IN TINTA D'AVVISO: la soglia sta qui e non nel CSS,
+   perche' e' un giudizio e non un vestito.
+   Il raggio 9 su un viewBox da 24 da' una circonferenza di 56,55: il
+   dasharray e' tutta la pista e il dashoffset la parte gia' consumata,
+   che e' il modo di disegnare un arco senza matematica per ogni
+   segmento. La rotazione di -90° la mette a partire da mezzogiorno. */
+const P2P_ANELLO_R = 9;
+const P2P_ANELLO_GIRO = 2 * Math.PI * P2P_ANELLO_R;
+function anelloScadenzaP2P(o, adesso){
+  const resta = frazioneVitaP2P(o, adesso);
+  if (resta < 0) return '';
+  const consumato = (P2P_ANELLO_GIRO * (1 - resta)).toFixed(2);
+  const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
+  return '<span class="p2p-anello' + (resta <= 0.1 ? ' agli-sgoccioli' : '')
+    + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
+    + '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<circle class="pista" cx="12" cy="12" r="' + P2P_ANELLO_R + '"/>'
+    + '<circle class="resta" cx="12" cy="12" r="' + P2P_ANELLO_R + '"'
+    + ' stroke-dasharray="' + P2P_ANELLO_GIRO.toFixed(2) + '"'
+    + ' stroke-dashoffset="' + consumato + '"/></svg></span>';
+}
+
 /* La striscia di chi c'e' dall'altra parte. E' un giudizio PURO come la
    scadenza: numeri in, stringa out. Le stelle compaiono col PRIMO voto
    — la regola che il mercatino ha gia' per i venditori, «0 ★» a chi e'
@@ -33207,14 +33279,19 @@ function satsMercatoP2P(o){
    sconosciuto davanti al numero. */
 function rigaOrdineP2P(o){
   const stima = satsMercatoP2P(o);
-  /* LA CARD DICE CHI FA COSA (set 2026, richiesta di Andrea, poi il
-     ridisegno «capita in un secondo»): riga grande col VERBO e i sats
-     — «Vende ≈ 12 000 sats» — e sotto la frase UNICA dell'euro. Il
-     verbo e' un fatto della RIGA (o.lato), mai del tab: dice quel che
-     fa chi ha pubblicato, e resterebbe giusto anche fuori da questo
-     elenco. A destra resta la SCADENZA e non l'eta' (scelta nostra
-     fra le due): quanto RESTA fa decidere, quanto e' vecchio no. */
-  const verbo = o.lato === 'sell' ? 'Vende' : 'Compra';
+  /* LA CARD PARLA A CHI LEGGE (set 2026, ridisegno chiesto da Andrea):
+     in seconda persona, e le due righe si scambiano il posto col lato.
+     Nel tab «Compra BTC» (ordini k=sell) chi legge PAGA euro e RICEVE
+     sats: «Paghi 8,00 €» grande, «ricevi ≈ 11 828 sats» sotto. Nel tab
+     «Vendi BTC» (k=buy) fa il contrario: «Invia ≈ 11 828 sats» grande,
+     «ricevi 8,00 €» sotto. Il verbo VENDE/COMPRA della controparte non
+     c'e' piu': la seconda persona lo rende inutile.
+     IL LATO LO DICE LA RIGA (o.lato) e non il tab, come sempre: il
+     libro filtra per lato, quindi il risultato e' lo stesso, ma la
+     card resta onesta anche fuori da un elenco filtrato.
+     LA CIFRA IN SATS PORTA IL COLORE DEL LATO, qualunque riga occupi:
+     e' la cifra che cambia col tab, e la sua tinta lo dice. */
+  const paghiEuro = o.lato === 'sell';
   /* il range stima i DUE capi collo stesso metro; a cambio muto
      niente cifre, mai un numero inventato */
   const stima2 = o.euroMax && stima
@@ -33223,28 +33300,31 @@ function rigaOrdineP2P(o){
              : stima ? '≈ ' + fmt(stima)
                + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
              : 'sats';
-  /* LA FRASE UNICA DELL'EURO (il ridisegno): «al prezzo di mercato»
-     a premio zero, «, +4% sopra il mercato» o «, −2% sotto il
-     mercato» col premio, e il range chiude con «, scegli tu». A
-     importo fisso (amt>0) niente coda: il prezzo e' suo.
-     LA TINTA E' UN GIUDIZIO PER CHI LEGGE, il testo un fatto del
-     prezzo (verificato sui byte: la formula del coordinatore e'
-     uniforme sui due versi, sats -= premium%). Su un SELL chi legge
-     PAGA euro: sopra il mercato e' un avviso, sotto un affare. Su un
-     BUY chi legge RICEVE euro: il premio positivo e' la controparte
-     che paga di piu' — affare — e il negativo l'avviso. */
   const eurTxt = esc(fmtEur(o.euro))
-    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' €';
+    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' €'
+    /* il range: chi prende sceglie la cifra, e lo dice la riga
+       dell'euro — e' li' che la scelta si fa */
+    + (o.euroMax ? ', scegli tu' : '');
+  const rigaEuro = (paghiEuro ? 'Paghi ' : 'ricevi ') + eurTxt;
+  const rigaSats = (paghiEuro ? 'ricevi ' : 'Invia ') + sats;
+  /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «al prezzo di
+     mercato» a premio zero, «+4% sopra» o «−4% sotto» col premio. A
+     importo fisso (amt>0) non c'e': quel prezzo non guarda il mercato.
+     LA TINTA E' UN GIUDIZIO PER CHI LEGGE, il testo un fatto del
+     prezzo. VERIFICATO SUI BYTE due volte (mostro v0.18.6,
+     get_market_quote in src/util.rs): `sats -= premium/100 * sats`,
+     sottrazione UNIFORME — il kind non tocca ne' formula ne' segno.
+     Quindi un premio positivo ASSOTTIGLIA sempre i sats: su un SELL
+     chi legge ne riceve meno per i suoi euro (paga di piu': avviso),
+     su un BUY ne invia meno per gli stessi euro (incassa di piu':
+     affare). Il segno del giudizio si rovescia col lato, il testo no. */
   const affare = (o.lato === 'buy') === (o.premium > 0);
   const premioTxt = o.premium > 0
-    ? ', +' + esc(String(o.premium)) + '% sopra il mercato'
-    : ', −' + esc(String(Math.abs(o.premium))) + '% sotto il mercato';
-  const coda = o.sats > 0 ? ''
-             : o.premium ? '<span class="' + (affare ? 'p2p-affare' : 'p2p-avviso')
-               + '">' + premioTxt + '</span>'
-             : ' al prezzo di mercato';
-  const scegli = o.euroMax ? ', scegli tu' : '';
-  const sc = scadeTestoP2P(o.scade);
+    ? '+' + esc(String(o.premium)) + '% sopra il mercato'
+    : '−' + esc(String(Math.abs(o.premium))) + '% sotto il mercato';
+  const prezzo = o.sats > 0 ? ''
+    : '<span class="p2p-prezzo' + (o.premium ? (affare ? ' p2p-affare' : ' p2p-avviso') : '')
+      + '">' + (o.premium ? premioTxt : 'al prezzo di mercato') + '</span>';
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
       + esc(o.metodi.join(', ')) + '</div>' : '';
@@ -33265,8 +33345,9 @@ function rigaOrdineP2P(o){
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    <div class="p2p-testa"><span class="p2p-sats p2p-cifra">${verbo} ${sats}</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
-    <span class="p2p-euro p2p-cambio">in cambio di ${eurTxt}${coda}${scegli}</span>
+    <div class="p2p-testa"><span class="p2p-grande ${paghiEuro ? 'p2p-euro' : 'p2p-sats'}">${paghiEuro ? rigaEuro : rigaSats}</span>${anelloScadenzaP2P(o)}</div>
+    <span class="p2p-piccola ${paghiEuro ? 'p2p-sats' : 'p2p-euro'}">${paghiEuro ? rigaSats : rigaEuro}</span>
+    ${prezzo}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">👤 È il tuo ordine — tocca per aprirlo</div>' : ''}
