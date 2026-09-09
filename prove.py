@@ -36773,6 +36773,9 @@ const {bytesToHex, hexToBytes, utf8Encoder} = NT0.utils;
 const MOSTRO_SK = NT0.generateSecretKey();
 const MOSTRO_PUB = NT0.getPublicKey(MOSTRO_SK);
 let ricevuti = [], subs = [], chiuse = 0, rispondi = null;
+/* la STORIA del relay: quel che fu mandato a una chiave torna a chi
+   la ascolta, subito — e' il rigioco che la restore deve scansare */
+let storia = [];
 
 function esamina(ev){
   const r = {ok: false, perche: '', kind: ev.kind, pow: NT0.nip13.getPow(ev.id)};
@@ -36838,6 +36841,13 @@ class FintoRelay {
   subscribe(filtri, h){
     const s = {filtri: filtri, h: h, close(){ chiuse++; }};
     subs.push(s);
+    /* come il relay vero: prima gli eventi GIA' scritti che il filtro
+       pesca, poi il vivo — senza `since`, la storia arriva per prima */
+    const f = filtri[0] || {};
+    for (const ev of storia) {
+      const p = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
+      if (f['#p'] && f['#p'].indexOf(p) >= 0) setTimeout(() => s.h.onevent(ev), 0);
+    }
     return s;
   }
   async publish(ev){
@@ -36923,7 +36933,7 @@ function reset(){
   store = new Map(); cloud = new Map(); fetches = []; toasts = []; nodi = {};
   aperti = []; chiusi = []; conferme = []; inviti = []; viste = []; qr = [];
   copiato = ''; renderP2Pn = 0; ricevuti = []; subs = []; chiuse = 0;
-  rispondi = null; DEMO = false; VETRINA = false; myTgId = 111;
+  rispondi = null; storia = []; DEMO = false; VETRINA = false; myTgId = 111;
   p2pRelayVivo = null; p2pConnessa = null; p2pSub = null; p2pSubChiavi = '';
   p2pAttese = {}; p2pVisti = []; p2pOrdineAperto = ''; p2pHoldOrdine = '';
   p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
@@ -37150,6 +37160,42 @@ function reset(){
   out.giuLoDice = esploso.indexOf('non risponde') >= 0;
   out.giuNonNominaIlRelay = esploso.toLowerCase().indexOf('wss://') < 0;
 
+  /* ---- 9) LA RESTORE NON BEVE LA STORIA DEL RELAY --------------
+     Il caso dal campo (set 2026): sul relay c'e' ancora la risposta
+     di IERI, indirizzata alla trade key dell'ultimo indice — una
+     restore-session vera, con la lista vecchia. Se la domanda parte
+     da quella chiave, la storia arriva PRIMA della risposta fresca e
+     il lettore chiude sull'elenco di ieri: l'ordine nuovo resta «di
+     un estraneo» alla prima apertura, e alla seconda «funziona»
+     perche' il pavimento ha spostato la chiave. La cura e' la chiave
+     usa-e-getta, che una storia non ce l'ha per costruzione. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  P2P_ATTESA_MS = 3000;
+  const mzR = await assicuraMazzo();
+  ricordaMazzo(Object.assign({}, mzR, {indice: 1}));
+  const kVecchia = chiaveScambio(mzR.sk, 1);
+  const rispostaRestore = ordini => ({order: {version: 2, request_id: null,
+    trade_index: null, action: 'restore-session',
+    payload: {restore_data: {orders: ordini, disputes: []}}}});
+  const convV = NT0.nip44.getConversationKey(MOSTRO_SK, kVecchia.pub);
+  storia.push(NT0.finalizeEvent({
+    kind: 14, created_at: Math.floor(Date.now() / 1000) - 86400,
+    tags: [['p', kVecchia.pub]],
+    content: NT0.nip44.encrypt(JSON.stringify([
+      rispostaRestore([{order_id: 'ord-vecchio', trade_index: 1, status: 'pending'}]),
+      null, null]), convV)
+  }, MOSTRO_SK));
+  /* il coordinatore di OGGI risponde con la lista vera, fresca */
+  rispondi = r => String(r.msgJson || '').indexOf('restore-session') >= 0
+    ? [rispostaRestore([
+        {order_id: 'ord-vecchio', trade_index: 1, status: 'pending'},
+        {order_id: 'ord-fresco', trade_index: 2, status: 'pending'}])]
+    : [];
+  const miei = await chiediMieiOrdiniP2P();
+  out.restoreFresca = !!(miei && miei['ord-fresco']);
+  out.restoreCompleta = !!(miei && miei['ord-vecchio'] && miei['ord-fresco']);
+
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -37221,6 +37267,8 @@ function reset(){
         "indiceNonBruciato": "...e senza bruciarne uno",
         "giuLoDice": "un coordinatore giu' si dice",
         "giuNonNominaIlRelay": "...senza nominare il relay",
+        "restoreFresca": "la restore legge la risposta di OGGI, non la storia",
+        "restoreCompleta": "...e la lista fresca arriva intera",
     }
     for k, nome in attesi.items():
         if isinstance(nome, tuple):
@@ -39617,8 +39665,20 @@ def prove_p2p_server():
     # 184.000 giri in console, pagina inchiodata. Due cinture, e si
     # provano tutt'e due: l'ordine (la connessione, che carica il
     # bundle, viene prima della derivazione) e il tentativo unico.
-    prova("il bundle si carica prima di derivare la chiave", True,
-          cm.index("mostroConnetti()") < cm.index("chiaveScambio("))
+    # `find` e non `index`, e l'ha chiesto la tortura: con la chiave
+    # derivata rimessa, l'`index` ESPLODEVA e si portava via il resto
+    # della sezione — una sentinella che muore non e' una sentinella.
+    prova("il bundle si carica prima che nasca la chiave", True,
+          0 <= cm.find("mostroConnetti()") < cm.find("generateSecretKey()"))
+    # ⚠️ LA CHIAVE DELLA DOMANDA E' USA-E-GETTA (set 2026, dal campo):
+    # dalla trade key dell'ultimo indice il relay rigiocava la risposta
+    # di IERI — restore-session vera, action giusta — e il lettore
+    # chiudeva su una lista vecchia. Una chiave appena nata non ha
+    # storia per costruzione; il comportamento lo prova il caso 9 del
+    # banco del motore, qui si inchioda che la derivata non torni.
+    prova("la domanda parte da una chiave appena nata, senza storia",
+          True, "generateSecretKey()" in cm
+          and "chiaveScambio(" not in solo_codice(cm))
     prova("un errore non rilancia: un tentativo per sessione", True,
           "p2pMieiChiesto = true;" in rp and "!p2pMieiChiesto" in rp)
     prova("...e il ritentativo costa un gesto", True,
