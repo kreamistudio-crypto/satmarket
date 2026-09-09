@@ -6926,3 +6926,16 @@ quiete .1/.1/0, P2P 0/0/.4 — fluida nei due versi. La lezione: due
 stati della stessa proprieta' su catene di specificita' DIVERSE non
 sono due stati, sono uno stato e un'eccezione — le catene si tengono
 uguali.
+E IL LOGO CHE REAGISCE AL TAB (stesso giorno, ritocco di Andrea, coi
+suoi due PNG): il marchio fra i tab e' una PILA di due gemelli —
+freccia verde accesa a comprare, rossa a vendere, stesso barattolo
+nelle stesse posizioni — col crossfade (.3s, sola opacity, spento in
+reduced-motion) guidato da body.p2p-vendo: lo stesso giudice del +
+della nav, quindi la reazione vale nel libro E nei miei senza una
+riga di JS nuova. Logo a 76px, seduto SULLA linea dei tab (margine
+negativo -8px: stava troppo alto), PNG a 2x della resa (152px, ~34 KB
+l'uno) ritagliati dai sorgenti di Andrea. Il PNG singolo di ieri e'
+morto con la sua rotta; al suo posto due rotte esplicite gemelle. Le
+sentinelle: l'ordine tab-logo-tab ora chiede il gemello compra, e il
+blocco nuovo di prove_nav_p2p conta le due pile, i quattro strati, il
+giudice del crossfade e che del singolo non resti niente.
