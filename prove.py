@@ -8676,8 +8676,10 @@ def prove_barattolo_in_striscia():
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style"):mini.index("</style>")]
     st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
-    # la fetta della card nel template della striscia
-    card = st[st.index("cella-barattolo"):st.index("voci.map(")]
+    # la fetta della card nel template della striscia: finisce
+    # dove comincia la card P2P, che dal set 2026 sta FRA il
+    # barattolo e le categorie (vedi prove_p2p_libro).
+    card = st[st.index("cella-barattolo"):st.index("cella-p2p")]
 
     # --- 0) IL CERCHIETTO DI TESTATA E' MORTO (rovesciate) ---
     # Dicevano «due istanze jar-testa» e «renderJarTesta le regola»:
@@ -35236,6 +35238,58 @@ def prove_p2p_libro():
           True, "if (!p2pAcceso()) { go('p2ppresto'); return; }" in _vp)
     prova("...e a leva accesa apre la pagina vera", True,
           "go('p2p');" in _vp)
+
+    # --- 2b) LA SECONDA PORTA: LA CARD NELLA STRISCIA ----------------
+    # (set 2026, decisione di Andrea) Chi apre l'app dalla home lo
+    # scambio non lo vede: il tab e' un glifo in fondo, e la fila
+    # delle categorie e' il posto dove si guarda «cosa c'e' qui
+    # dentro». Li' adesso c'e' la sua card, col logo completo.
+    _st = pezzo_js(mini, "function renderStriscia(){", "\n}\n")
+    _cp2p = _st[_st.index("cella-p2p"):_st.index("voci.map(")]
+    prova("una sola card, un solo ingresso in piu'", 1,
+          mini.count("cella-p2p"))
+    prova("sta DOPO il barattolo e PRIMA delle categorie", True,
+          0 <= _st.find("cella-barattolo")
+          < _st.find("cella-p2p") < _st.find("voci.map("))
+    # IL GATE VIVE IN UN POSTO SOLO: due porte, un giudice. Un `go`
+    # scritto a mano qui sarebbe una seconda verita' da tenere
+    # allineata, e il giorno che il giudice cambia ne cambierebbe una.
+    prova("il tocco e' quello del tab, mai un go scritto a mano", True,
+          'onclick="vaiP2P()"' in _cp2p and "go('p2p" not in _cp2p)
+    prova("...anche da tastiera: un <a> senza href non riceve click",
+          True, "onkeydown" in _cp2p and _cp2p.count("vaiP2P()") == 2)
+    prova("niente href: e' una vista dell'app, non un URL", True,
+          "href" not in _cp2p and 'role="button"' in _cp2p
+          and 'tabindex="0"' in _cp2p)
+    # senza data-cat resta fuori dal tocco lungo di condivisione PER
+    # COSTRUZIONE, come la card del barattolo e come «Tutto»
+    prova("niente data-cat: fuori dal tocco lungo per costruzione", 0,
+          _cp2p.count("data-cat"))
+    prova("porta il logo completo, nella figura delle sorelle", True,
+          '/assets/p2p-logo-completo.png' in _cp2p
+          and 'class="cat-quad"' in _cp2p and 'class="cat-fig"' in _cp2p)
+    # NESSUNA REGOLA CSS SUA, ed e' MISURATO a schermo e non dedotto:
+    # il logo e' quadrato (152x152) e il riquadro della figura sta a
+    # ~1,15 — contenuto rende 125x125, cioe' l'ALTEZZA PIENA delle
+    # sorelle, che stanno nello stesso box e sono contenute uguale
+    # («Casa e giardino» rende 114 di larghezza, meno di lui). Una
+    # classe sua sarebbe una taratura da mantenere per niente.
+    prova("...senza nessuna regola CSS dedicata", False,
+          ".cella-p2p" in mini[mini.index("<style"):
+                               mini.index("</style>")])
+    # NON E' UN REPARTO: l'anello `.attiva` dice «sei qui», e da questa
+    # card si ESCE dalla home invece di filtrarla.
+    prova("la card non si accende mai: non e' un filtro", False,
+          "attiva" in _cp2p)
+    # E C'E' PER TUTTI, anche in DEMO e in vetrina anonima: non porta a
+    # un muro come farebbe il barattolo vuoto — porta al coming soon,
+    # che e' markup fisso e la risposta e' una sola.
+    prova("...e non porta la guardia del barattolo", False,
+          "jarCard" in _cp2p)
+    prova("...ne' entra nella firma: e' sempre uguale a se' stessa",
+          False,
+          "p2p" in _st[_st.index("const firma ="):
+                       _st.index("if (firma === strisciaFirma)")])
 
     # --- 3) RADICE, PULL-TO-REFRESH, go() ----------------------------
     i_r = mini.index("const RADICI = new Set(")

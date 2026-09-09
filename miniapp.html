@@ -10282,6 +10282,30 @@ function renderStriscia(){
      URL) e SENZA data-cat, quindi resta fuori dal tocco lungo di
      condivisione PER COSTRUZIONE, come «Tutto». Il tocco e' il toggle
      di sempre: accende il filtro, il ritocco lo spegne. */
+  /* E DOPO IL BARATTOLO C'E' LA PORTA DELLO SCAMBIO (set 2026,
+     decisione di Andrea): una card come le altre — stesso quadrato,
+     stessa figura scontornata, stessa etichetta sotto — col LOGO
+     COMPLETO del P2P al posto dell'illustrazione. E' il secondo
+     ingresso, accanto al tab della nav: chi apre l'app dalla home lo
+     scambio non lo vede, e la fila delle categorie e' il posto dove
+     si guarda «cosa c'e' qui dentro».
+     IL GESTO E' `vaiP2P()`, LO STESSO DEL TAB, e non un `go` scritto
+     a mano: il gate vive in UN posto solo — chi ha la leva accesa
+     atterra sulla vista vera (con la nav trasformata, che la classe
+     la scrive go() dalla VISTA), tutti gli altri sul coming soon.
+     Due porte, un giudice: il giorno che il giudice cambia, cambia
+     per tutt'e due.
+     NON E' UN FILTRO, quindi non si accende mai — l'anello `.attiva`
+     dice «sei in questo reparto», e da qui si ESCE dalla home. E'
+     un <a> SENZA href col role=button e SENZA data-cat, come la card
+     del barattolo: fuori dal tocco lungo di condivisione PER
+     COSTRUZIONE (il delegato guarda `.cat-cella[data-cat]`), che una
+     vista dell'app un URL da condividere non ce l'ha.
+     E LA CARD C'E' PER TUTTI, anche in DEMO e in vetrina anonima:
+     non porta a un muro come farebbe il barattolo vuoto — porta al
+     coming soon, che e' markup fisso e la risposta e' una sola.
+     Per la stessa ragione non entra nella `firma`: e' sempre uguale
+     a se' stessa. */
   el('catStrip').innerHTML = `
     <a class="cat-cella${activeCat === 'Tutto' && !vistaBarattolo ? ' attiva' : ''}" href="/"
        onclick="tornaATuttoDaTocco(event)">
@@ -10297,7 +10321,15 @@ function renderStriscia(){
        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternaBarattolo()}">
       <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)}</span>
       <span class="cat-eti">Nel tuo barattolo</span>
-    </a>` : '') + voci.map(c => `
+    </a>` : '') + `
+    <a class="cat-cella cella-p2p" role="button" tabindex="0"
+       title="Scambio P2P" aria-label="Scambio P2P" onclick="vaiP2P()"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();vaiP2P()}">
+      <span class="cat-quad"><span class="cat-fig"><img src="/assets/p2p-logo-completo.png"
+           alt="" loading="lazy" decoding="async"
+           onerror="this.remove()"><span class="cat-emoji" aria-hidden="true">₿</span></span></span>
+      <span class="cat-eti">Scambio P2P</span>
+    </a>` + voci.map(c => `
     <a class="cat-cella${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
