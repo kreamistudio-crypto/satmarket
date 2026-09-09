@@ -7112,3 +7112,17 @@ della rete; e la riscrittura che SPIEGAVA la trappola nominandola l'ha
 fatta rossa una seconda volta. Da qui la formula «il segno di casa» e
 la nota nel commento che non nomina niente. Chi scrive li' dentro se
 lo ricordi: la parola non si puo' nemmeno spiegare sul posto.
+E LA TESTATA DEI MIEI E' USCITA DEL TUTTO (stesso giorno, correzione
+di Andrea): niente logo in cima a «I miei scambi» — la vista si apre
+sugli scambi e basta —, e col blocco se n'e' andata la regola CSS
+.p2p-testata, che non aveva piu' nessuno: era l'ultima superstite del
+restyling della testata, e un CSS orfano fa credere a chi legge che
+qualcosa lo usi (il precedente di .sped-badge). Il marchio resta dove
+DICE qualcosa — la riga «Lo scambio» e i due stati vuoti — e li' e'
+GRANDE: 76px, una misura sola per tutt'e due i posti, che a 20 era un
+puntino colorato e a 14 peggio. La regola sotto e' quella misurata
+tre volte in un giorno: un'emoji regge a taglie piccole perche' e'
+disegnata per quello, un'illustrazione no — o le si da' lo spazio di
+essere un marchio, o non si mette. Nella section-label il
+vertical-align non serve piu': quella riga e' un flex e la centra
+`align-items:center`.
