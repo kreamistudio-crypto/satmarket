@@ -35198,9 +35198,13 @@ def prove_p2p_libro():
     # grosso, colore SOLO sull'attivo — compra verde (--trust), vendi
     # rosso (--danger), il non attivo neutro. Sopra, al posto del
     # titolo, il logo di casa centrato.
-    prova("la testata e' il logo di casa", True,
-          'class="p2p-testata"' in fetta and "brand-jar" in fetta
-          and "lockup" in fetta)
+    # EMENDATA (set 2026, con la nav trasformata): il marchio della
+    # testata e' il LOGO DEDICATO del P2P — barattolo, lucchetto e le
+    # due frecce — al posto di tessera e lockup di casa
+    prova("la testata e' il logo dedicato del P2P", True,
+          'class="p2p-testata"' in fetta
+          and '/assets/p2p-logo.png' in fetta
+          and "brand-jar" not in fetta and "lockup" not in fetta)
     prova("il lato si sceglie coi due tab grandi, non piu' a pillole",
           True, senza_commenti.count("p2p-lato ") == 2
           and "p2p-lati" in senza_commenti
@@ -35844,7 +35848,7 @@ def prove_nav_p2p():
           css.count("pointer-events:none"))
     prova("l'incavo c'e', nei due temi e coi suoi token", True,
           "body.nav-p2p nav{background:var(--nav-bg-p2p)" in css
-          and css.count("inset 0 3px") + css.count("inset 0 -1px") >= 2
+          and css.count("inset 0 4px") >= 2
           and mini.count("--nav-bg-p2p:") >= 2
           and mini.count("--danger-deep:") >= 2)
     prova("...e reduced-motion spegne barra, strati, tondo e scritte",

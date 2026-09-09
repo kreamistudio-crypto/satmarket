@@ -42597,6 +42597,16 @@ def asset_barattolo_hero():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/p2p-logo.png")
+def asset_p2p_logo():
+    """Il logo dedicato del P2P (set 2026, scelto da Andrea): il
+    barattolo col lucchetto e le due frecce dello scambio, scontornato.
+    Veste la testata delle due viste dello scambio al posto del logo
+    di casa. Rotta esplicita come le sorelle: mai un mount (regola 3)."""
+    return FileResponse("assets/p2p-logo.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
