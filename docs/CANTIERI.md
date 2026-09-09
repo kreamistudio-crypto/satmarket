@@ -6967,3 +6967,17 @@ gia'. SOLO le card del libro (.p2p-ord > .p2p-sats): nelle altre case
 della classe — scambio e striscia — la cifra resta arancio, perche'
 li' il lato e' della RIGA e non del tab, e una riga «vendo» tinta dal
 tab «compro» direbbe una bugia.
+E LA CARD DICE CHI FA COSA (stesso giorno, richiesta di Andrea): riga
+grande col VERBO e i sats — «Vende ≈ 12 000 sats» verde, «Compra …»
+rosso — e sotto «in cambio di 8,00 € · prezzo di mercato» in prosa;
+il premio, quando c'e', resta dov'era (la coda dopo il ·), e a cambio
+muto la coda dice «al mercato» senza inventare numeri. IL VERBO E' UN
+FATTO DELLA RIGA (o.lato), mai del tab: dice quel che fa chi ha
+pubblicato, e resterebbe giusto anche fuori dall'elenco filtrato. Le
+classi base (.p2p-euro/.p2p-sats) restano — le usano il colore del
+lato, l'ordine con la reputazione e le ALTRE due case di .p2p-testa
+(scambio e ordine preso), che non si muovono — e il vestito nuovo sta
+nelle sorelle .p2p-cifra/.p2p-cambio, solo del libro. Il selettore
+del colore diventa discendente (la cifra ora sta DENTRO la testa). Il
+banco delle card gira sui casi veri e le sentinelle della vecchia
+«stima che scende» sono diventate quelle del «chi fa cosa».
