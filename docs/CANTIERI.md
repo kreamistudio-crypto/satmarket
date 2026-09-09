@@ -6954,3 +6954,16 @@ setLatoP2P. 3) NIENTE STRISCIA CONTINUA: la linea vive sotto ogni tab
 (grigia sul quieto, colorata sull'attivo, border del bottone) e sotto
 il logo non passa niente — il contenitore ha perso il border-bottom e
 i tab il margine negativo che lo scavalcava.
+E IL COLORE DEL LATO SI PROPAGA (stesso giorno, ritocco di Andrea):
+la voce ATTIVA della nav trasformata (icona e scritta, e da desktop
+il velo della pillola) e la CIFRA delle card del libro (sats +
+«prezzo di mercato», che vivono in un solo span) vestono il verde a
+comprare e il rosso a vendere — sempre body.p2p-vendo, lo stesso
+giudice del + e del logo, con la dissolvenza morbida (.4s la nav, .3s
+le cifre, spenta in reduced-motion). Sulla banda scura i toni sono i
+chiari della sera FISSI (#34B47A / #F07A47: i pieni del giorno sul
+bruno affogano); nelle card sono i token, che la sera ce l'hanno
+gia'. SOLO le card del libro (.p2p-ord > .p2p-sats): nelle altre case
+della classe — scambio e striscia — la cifra resta arancio, perche'
+li' il lato e' della RIGA e non del tab, e una riga «vendo» tinta dal
+tab «compro» direbbe una bugia.
