@@ -42597,13 +42597,23 @@ def asset_barattolo_hero():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/assets/p2p-logo.png")
-def asset_p2p_logo():
-    """Il logo dedicato del P2P (set 2026, scelto da Andrea): il
-    barattolo col lucchetto e le due frecce dello scambio, scontornato.
-    Veste la testata delle due viste dello scambio al posto del logo
-    di casa. Rotta esplicita come le sorelle: mai un mount (regola 3)."""
-    return FileResponse("assets/p2p-logo.png", media_type="image/png",
+@app.get("/assets/p2p-logo-compra.png")
+def asset_p2p_logo_compra():
+    """Il logo dedicato del P2P, lato COMPRA (set 2026, scelto da
+    Andrea): il barattolo col lucchetto, la freccia verde accesa e la
+    rossa spenta. Il gemello qui sotto ha le frecce rovesciate, e il
+    client li incrocia col tab attivo. Rotte esplicite come le
+    sorelle: mai un mount (regola 3)."""
+    return FileResponse("assets/p2p-logo-compra.png",
+                        media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/p2p-logo-vendi.png")
+def asset_p2p_logo_vendi():
+    """Il gemello del lato VENDI: freccia rossa accesa, verde spenta."""
+    return FileResponse("assets/p2p-logo-vendi.png",
+                        media_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

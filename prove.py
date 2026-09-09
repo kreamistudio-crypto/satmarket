@@ -35282,16 +35282,19 @@ def prove_p2p_libro():
     # EMENDATA (set 2026, con la nav trasformata): il marchio della
     # testata e' il LOGO DEDICATO del P2P — barattolo, lucchetto e le
     # due frecce — al posto di tessera e lockup di casa
-    # EMENDATA DI NUOVO (set 2026, la riga sola): nel libro il logo
-    # dedicato sta IN MEZZO ai due tab, dentro .p2p-lati — la
-    # .p2p-testata qui non c'e' piu' (sopravvive nella vista dei MIEI,
-    # e la guarda prove_nav_p2p)
-    prova("il logo dedicato sta in mezzo ai due tab", True,
-          '/assets/p2p-logo.png' in fetta
+    # EMENDATA DI NUOVO (set 2026, la riga sola, poi il logo
+    # REATTIVO): nel libro il logo sta IN MEZZO ai due tab, dentro
+    # .p2p-lati, ed e' una PILA di due gemelli — compra e vendi — col
+    # crossfade guidato da body.p2p-vendo. La .p2p-testata qui non
+    # c'e' piu' (sopravvive nella vista dei MIEI, e la guarda
+    # prove_nav_p2p col resto del logo reattivo).
+    prova("il logo dedicato sta in mezzo ai due tab, a due strati",
+          True, '/assets/p2p-logo-compra.png' in fetta
+          and '/assets/p2p-logo-vendi.png' in fetta
           and 'class="p2p-testata"' not in fetta
           and "brand-jar" not in fetta and "lockup" not in fetta
           and fetta.index('id="p2pLatoCompro"')
-              < fetta.index('/assets/p2p-logo.png')
+              < fetta.index('/assets/p2p-logo-compra.png')
               < fetta.index('id="p2pLatoVendo"'))
     prova("il lato si sceglie coi due tab grandi, non piu' a pillole",
           True, senza_commenti.count("p2p-lato ") == 2
@@ -35867,6 +35870,33 @@ def prove_nav_p2p():
               for s in ("Nostr", "Mostro", "coordinatore")))
     prova("...con la testata di casa e il corpo dei miei", True,
           'class="p2p-testata"' in fetta and 'id="p2pMieiCorpo"' in fetta)
+
+    # --- 1b) IL LOGO REAGISCE AL TAB (set 2026) ----------------------
+    # Due PNG gemelli impilati (compra/vendi), crossfade guidato da
+    # body.p2p-vendo — lo stesso giudice del + — quindi la reazione
+    # vale nel libro E nei miei senza JS nuovo. La pila c'e' DUE volte
+    # (le due viste), il vecchio PNG singolo e' morto con la sua rotta.
+    prova("la pila del logo sta in tutt'e due le viste", 2,
+          mini.count('class="p2p-logo-pila"'))
+    prova("...e ogni pila porta i due gemelli, compra prima", 2,
+          mini.count('class="p2p-logo compra" src="/assets/p2p-logo-compra.png"'))
+    prova("...col vendi accanto", 2,
+          mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"'))
+    prova("il crossfade lo guida il giudice del lato", True,
+          "body.p2p-vendo .p2p-logo.compra{opacity:0}" in mini
+          and "body.p2p-vendo .p2p-logo.vendi{opacity:1}" in mini
+          and ".p2p-logo.vendi{opacity:0}" in mini)
+    prova("...con la sola opacity, e reduced-motion lo spegne", True,
+          "transition:opacity .3s ease" in pezzo_js(
+              mini, ".p2p-logo{", "}")
+          and "@media (prefers-reduced-motion:reduce){.p2p-logo{transition:none}}"
+          in mini)
+    prova("del PNG singolo di ieri non resta niente", 0,
+          mini.count('/assets/p2p-logo.png'))
+    prova("...nemmeno nel server: le rotte sono i due gemelli", True,
+          '/assets/p2p-logo-compra.png' in _SORGENTE
+          and '/assets/p2p-logo-vendi.png' in _SORGENTE
+          and '"/assets/p2p-logo.png"' not in _SORGENTE)
 
     # --- 2) UN RENDERER PER DUE CORPI ---------------------------------
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")

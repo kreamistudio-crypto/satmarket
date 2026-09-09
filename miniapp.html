@@ -1704,8 +1704,19 @@
      servito a 2x della resa (136px per 68) e pesa ~30 KB.
      La .p2p-testata sopravvive nella vista dei MIEI, che tab non ne
      ha: li' resta il solo logo centrato. */
-  .p2p-logo{width:68px;height:68px;
-    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18))}
+  /* IL LOGO REAGISCE AL TAB (set 2026, ritocco di Andrea): due PNG
+     gemelli — freccia verde accesa a comprare, rossa a vendere —
+     impilati nella stessa cella di griglia, col crossfade guidato da
+     body.p2p-vendo: lo stesso giudice del + della nav, quindi la
+     reazione vale nel libro E nei miei senza una riga di JS nuova. */
+  .p2p-logo-pila{display:grid}
+  .p2p-logo{grid-area:1/1;width:76px;height:76px;
+    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
+    transition:opacity .3s ease}
+  .p2p-logo.vendi{opacity:0}
+  body.p2p-vendo .p2p-logo.compra{opacity:0}
+  body.p2p-vendo .p2p-logo.vendi{opacity:1}
+  @media (prefers-reduced-motion:reduce){.p2p-logo{transition:none}}
   .p2p-testata{display:flex;flex-direction:column;align-items:center;
     margin:0 0 6px;text-align:center}
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
@@ -1718,7 +1729,10 @@
      logo, e loro restano appoggiati alla linea come prima */
   .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
     border-bottom:2px solid var(--line)}
-  .p2p-lati .p2p-logo{margin:0 6px 3px}
+  /* il logo siede SULLA linea, un filo oltre (margine negativo): cosi'
+     scende all'altezza delle scritte invece di galleggiare in alto —
+     il ritocco chiesto da Andrea guardando la riga */
+  .p2p-lati .p2p-logo-pila{margin:0 6px -8px}
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
@@ -5541,7 +5555,7 @@ document.getElementById('cartello')?.remove();</script>
            e' un'immagine, la spazzata dei tab non lo vede. -->
       <div class="p2p-lati" role="tablist">
         <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
-        <img class="p2p-logo" src="/assets/p2p-logo.png" alt="" onerror="this.remove()">
+        <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
         <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
       </div>
       <div id="p2pCorpo"></div>
@@ -5562,7 +5576,7 @@ document.getElementById('cartello')?.remove();</script>
   <div class="view" id="view-p2pmiei">
     <div class="sicu">
       <div class="p2p-testata">
-        <img class="p2p-logo" src="/assets/p2p-logo.png" alt="Scambio P2P" onerror="this.remove()">
+        <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
       </div>
       <div id="p2pMieiCorpo"></div>
     </div>
