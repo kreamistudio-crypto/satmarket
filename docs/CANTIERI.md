@@ -7031,3 +7031,42 @@ la stima si e' allineata alla formula vera: satsMercatoP2P faceva
 — ora e' la sottrazione sua, e il ≈ dice il numero che il taker
 riceve davvero. Verificato dal vivo nel tab Vendi: +5% verde, −3%
 rosso, stime che scendono col premio come dal coordinatore.
+
+
+IL TIMBRO DEGLI ASSET (9 set 2026, dal campo: i loghi del P2P
+sostituiti tre volte in un giorno NON arrivavano ai client — l'app
+Android mostrava la prima versione, la miniapp la penultima, anche a
+cache «svuotata»). Due mani sulla stessa ferita: le rotte servono gli
+asset con cache 24h, e fuori da Telegram c'e' la dispensa del service
+worker. La cura e' STRUTTURALE, come chiesto da Andrea: ogni URL
+/assets/... e /vendor/... LETTERALE nella pagina esce timbrato
+?v=<sha1 corto del file> — il timbro E' il contenuto, quindi ogni
+sostituzione invalida da sola ogni cache di ogni client, senza numeri
+da alzare a mano. Il timbro vive in _timbra_asset_pagina e si applica
+nella RILETTURA di _pagina_con_meta, prima delle fessure: si paga una
+volta per riavvio (che il deploy fa sempre) e ogni rotta-pagina lo
+eredita per costruzione, il pregio della quarta fessura. NON si
+timbrano: chi ha gia' una query sua (il ?b=2 delle famiglie, il ?v
+manuale del bundle Nostr — il gruppo-query della regex li salta), i
+path costruiti in JS (il ${} non matcha, ed e' giusto: le famiglie
+dinamiche hanno il loro giro), e offline.html — la sua mascotte deve
+combaciare colla chiave in dispensa, o l'offline si romperebbe
+proprio senza rete.
+E IL BUCO VERO ERA NEL SERVICE WORKER: la dispensa matchava per
+PATHNAME (`caches.match(url.pathname)`), quindi anche col timbro
+nuovo un asset in dispensa serviva la copia vecchia — il ?v ignorato
+per costruzione. Ora il match e' sull'URL INTERO (v8): una versione
+nuova e' una chiave nuova, manca, si scarica e si mette via
+(`c.put`). Il gate resta sul pathname (il precache non porta query),
+e la REGOLA OPERATIVA di sw.js e' emendata: gli asset timbrati si
+aggiornano da soli, VERSIONE resta per offline.html e l'elenco.
+LE PROVE (prove_timbro_asset): il banco esegue le funzioni vere —
+hash che e' davvero lo sha1 del file, 404 mai timbrato, query
+esistente rispettata, ${} intoccato, idempotenza, /vendor/ come
+/assets/ — poi la pagina VERA timbrata (i due loghi P2P + almeno una
+decina di asset), la pipeline (il timbro prima delle fessure,
+offline.html fuori), e il service worker (URL intero, put, v8+, i
+patti di API e navigazioni fermi). Verificato dal vivo: la pagina
+servita porta 13 asset timbrati, l'URL col timbro risponde 200, il
+SW v8 installa la dispensa nuova accanto alla vecchia che cade alla
+visita dopo (niente skipWaiting, com'era).
