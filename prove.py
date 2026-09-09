@@ -37196,6 +37196,42 @@ function reset(){
   out.restoreFresca = !!(miei && miei['ord-fresco']);
   out.restoreCompleta = !!(miei && miei['ord-vecchio'] && miei['ord-fresco']);
 
+  /* ---- 10) L'ORDINE ADOTTATO SI RITIRA, con la chiave riderivata --
+     Il caso dal campo («non posso piu' annullare»): la riga locale
+     non c'e' piu', la restore riconosce l'ordine, il libro lo
+     descrive. L'adozione ricostruisce la riga VERA — trade key
+     riderivata dall'indice della restore — e da li' il ritiro passa
+     dal giro di sempre: cancel firmato con quella chiave, prova
+     d'identita' compresa, e il coordinatore di cartone la verifica
+     come la verifica Mostro. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  P2P_ATTESA_MS = 3000;
+  p2pStatoChiesto = true;             /* la via di riserva qui non serve */
+  const mzA = await assicuraMazzo();
+  ricordaMazzo(Object.assign({}, mzA, {indice: 2}));
+  const idA = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60009';
+  p2pMieiOrdini = {};
+  p2pMieiOrdini[idA] = {indice: 2, stato: 'pending'};
+  p2pLibro = {ordini: [{id: idA, lato: 'sell', euro: 12, sats: 0, premium: 0,
+    metodi: ['SEPA'], creato: Math.floor(Date.now() / 1000) - 60}]};
+  scambiP2P();
+  const adottato = ordiniP2P()[idA];
+  out.adozioneVera = !!adottato && adottato.stato === 'pubblicato'
+    && adottato.pubTrade === chiaveScambio(mzA.sk, 2).pub;
+  rispondi = r => (r.dentro && r.dentro.action === 'cancel')
+    ? [ordine('canceled', r.dentro.request_id, idA)]
+    : [];
+  p2pOrdineAperto = idA;
+  await inviaAnnulloP2P();
+  await pausa(60);
+  const rc = ricevuti[ricevuti.length - 1] || {};
+  out.ritiroFirmatoDallaSuaChiave = rc.tradePub === chiaveScambio(mzA.sk, 2).pub
+    && rc.dentro && rc.dentro.action === 'cancel' && rc.dentro.id === idA;
+  out.ritiroConProvaIdentita = rc.provaIdentita === true
+    && rc.identitaPub === mzA.pub;
+  out.ordineAnnullato = ordiniP2P()[idA].stato === 'annullato';
+
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -37269,6 +37305,10 @@ function reset(){
         "giuNonNominaIlRelay": "...senza nominare il relay",
         "restoreFresca": "la restore legge la risposta di OGGI, non la storia",
         "restoreCompleta": "...e la lista fresca arriva intera",
+        "adozioneVera": "l'ordine della restore si adotta: riga vera, chiave vera",
+        "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
+        "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
+        "ordineAnnullato": "...e l'ordine adottato finisce annullato",
     }
     for k, nome in attesi.items():
         if isinstance(nome, tuple):
@@ -39715,18 +39755,27 @@ def prove_p2p_server():
           and cm.index("mz = mazzoMostro();",
                        cm.index("await p2pPavimento"))
               < cm.index("if (!mz || !(mz.indice | 0))"))
-    # E LA STRISCIA OVUNQUE: gli ordini riconosciuti dalla restore
-    # entrano in «I tuoi scambi» — quelli che il LIBRO sa descrivere.
-    # Il tocco passa dalla porta del gesto, che gia' distingue «mio ma
-    # non in lista» e risponde con la frase onesta.
+    # E LA RIGA SI ADOTTA (set 2026, dal campo: «non posso piu'
+    # annullare»): per un pending la restore + il libro dicono tutto
+    # quel che una riga locale contiene, quindi non si disegna una
+    # riga di seconda classe — si RICOSTRUISCE quella vera, e ritiro,
+    # pagina e ascolto tornano col giro di sempre. E' anche la rete
+    # dell'ORFANO: la riga persa (una scheda che sovrascrive l'altra)
+    # torna governabile ovunque.
     sc16 = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
-    prova("la striscia guarda anche gli ordini della restore", True,
-          "righeAltroveP2P(tutti)" in sc16
-          and "!righe.length && !altrove.length" in sc16)
-    ra16 = pezzo_js(mini, "function rigaScambioAltroveP2P(", "\n}\n")
-    prova("...e la riga di la' passa dalla porta del gesto", True,
-          "prendiOrdineP2P(this.dataset.id)" in ra16
-          and "apriOrdineP2P" not in ra16)
+    prova("la striscia ADOTTA gli ordini della restore, prima di leggere",
+          True, "adottaOrdiniAltroveP2P(ordiniP2P())" in sc16
+          and 0 <= sc16.find("adottaOrdiniAltroveP2P")
+              < sc16.find("const tutti = ordiniP2P()"))
+    ad16 = pezzo_js(mini, "function adottaOrdiniAltroveP2P(", "\n}\n")
+    prova("...solo con l'indice in mano e il libro che descrive", True,
+          "if (!(indice > 0)) continue;" in ad16
+          and "libro.find(" in ad16)
+    prova("...e il provvisorio si rinomina invece di raddoppiare", True,
+          "rinominaOrdineP2P(" in ad16)
+    prova("il tocco sul mio-ma-non-in-lista resta onesto", True,
+          "si guarda soltanto"
+          in pezzo_js(mini, "function prendiOrdineP2P(", "\n}\n"))
     # IL BANCO: le due cure GIRANO, coi rami che contano. Le funzioni
     # vere piu' stub dichiarati — mostroConnetti ALZA apposta, cosi'
     # «ha chiesto davvero» si legge dal contatore senza nessuna rete.
@@ -39741,13 +39790,20 @@ def prove_p2p_server():
         banco5 = esc5 + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("async function chiediMieiOrdiniP2P(",
-                      "function righeAltroveP2P(",
-                      "function rigaScambioAltroveP2P(",
+                      "function adottaOrdiniAltroveP2P(",
                       "function scambiP2P(")) + r"""
 let p2pMieiOrdini = null, p2pMieiGiro = null, p2pPavimento = null;
 let p2pLibro = null, p2pStatoChiesto = false;
 let mazzoFinto = null;
 function mazzoMostro(){ return mazzoFinto; }
+/* l'adozione deriva chiavi e scrive righe: qui le due cose sono
+   stub DICHIARATI — la derivazione vera e la rinomina vera girano
+   nel banco del motore, che le esercita col bundle intero */
+const window = {NostrTools: {}};
+function chiaveScambio(sk, i){ return {sk: 'sk:' + i, pub: 'pub:' + i, indice: i}; }
+function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
+function scriviOrdineP2P(o){ ordiniFinti[o.id] = o; return o; }
+function rinominaOrdineP2P(o, nuovo){ delete ordiniFinti[o.id]; o.id = String(nuovo); ordiniFinti[o.id] = o; return o; }
 let relayChiesto = 0;
 async function mostroConnetti(){ relayChiesto++; throw new Error('banco: niente relay'); }
 function pulisciScambiP2P(){ return 0; }
@@ -39783,46 +39839,46 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   p2pPavimento = Promise.resolve(true);
   const r3 = await chiediMieiOrdiniP2P();
   out.pavimentoBassoConclude = JSON.stringify(r3) === '{}' && relayChiesto === 1;
-  // d) la striscia sul dispositivo FRESCO: zero locali, restore + libro
-  mazzoFinto = null;
+  // d) l'ADOZIONE sul dispositivo fresco: la riga si RICOSTRUISCE
+  mazzoFinto = {sk: 'S'.repeat(64), pub: 'P', indice: 9};
   ordiniFinti = {};
   p2pMieiOrdini = {'ord-a': {indice: 1, stato: 'pending'}};
   p2pLibro = {ordini: [
     {id: 'ord-a', lato: 'sell', euro: 5, sats: 0, premium: 0, metodi: ['PayPal'], creato: 100},
     {id: 'ord-x', lato: 'sell', euro: 9, sats: 0, premium: 0, metodi: [], creato: 90}]};
   const s1 = scambiP2P();
-  out.strisciaNasce = s1.includes('I tuoi scambi') && s1.includes('data-id="ord-a"');
-  out.strisciaNonInventa = !s1.includes('ord-x');
-  out.latoVendi = s1.includes('Vendi') && !s1.includes('Compri');
-  // il bordo e' del LIBRO: nella striscia e' tutto tuo per definizione,
-  // e la riga di la' veste come quelle locali accanto (dal campo: la
-  // riga vestita e quella nuda fianco a fianco si leggevano come un
-  // guasto del giudice — che era innocente)
-  out.strisciaSenzaBordo = !s1.includes('p2p-mio');
-  // e l'etichetta dice SOLO il fatto che sa: l'assenza della riga
-  // locale non prova «un altro dispositivo» — la lista puo' mancare
-  // anche sul dispositivo che ha pubblicato (dal campo: tre ordini
-  // dello stesso PC, due etichettati «altrove»)
-  out.etichettaOnesta = s1.includes('si guarda soltanto')
-    && !s1.includes('altro tuo dispositivo');
-  // e) l'ordine gia' in locale non si ripete
+  const nato = ordiniFinti['ord-a'];
+  out.adottato = !!nato && nato.stato === 'pubblicato' && nato.indice === 1
+    && nato.lato === 'vendo' && nato.euro === 5 && nato.pubTrade === 'pub:1'
+    && nato.contattato === true;
+  out.strisciaSubito = s1.includes('I tuoi scambi') && s1.includes('<loc ord-a>');
+  out.nonAdottaAltrui = !ordiniFinti['ord-x'] && !s1.includes('ord-x');
+  // e) il provvisorio si RINOMINA, non si raddoppia
+  ordiniFinti = {'nuovo:2': {id: 'nuovo:2', indice: 2, stato: 'pubblico', euro: 7, creato: 50}};
+  p2pMieiOrdini = {'ord-b': {indice: 2, stato: 'pending'}};
+  p2pLibro = {ordini: [{id: 'ord-b', lato: 'buy', euro: 7, sats: 0, premium: 0, metodi: [], creato: 50}]};
+  scambiP2P();
+  out.provvisorioRinominato = !!ordiniFinti['ord-b'] && !ordiniFinti['nuovo:2']
+    && Object.keys(ordiniFinti).length === 1;
+  // f) la riga gia' locale non si tocca e non si ripete
   ordiniFinti = {'ord-a': {id: 'ord-a', stato: 'attivo', creato: 100}};
+  p2pMieiOrdini = {'ord-a': {indice: 1, stato: 'pending'}};
+  p2pLibro = {ordini: [{id: 'ord-a', lato: 'sell', euro: 5, sats: 0, premium: 0, metodi: [], creato: 100}]};
   const s2 = scambiP2P();
-  out.nienteDoppioni = (s2.match(/ord-a/g) || []).length === 1 && s2.includes('<loc ord-a>');
-  // f) quel che il libro non sa descrivere resta fuori, dichiarato
+  out.nienteDoppioni = (s2.match(/ord-a/g) || []).length === 1
+    && s2.includes('<loc ord-a>') && ordiniFinti['ord-a'].stato === 'attivo';
+  // g) quel che il libro non sa descrivere non nasce, dichiarato
   ordiniFinti = {};
-  p2pMieiOrdini = {'ord-z': {indice: 2, stato: 'in-progress'}};
+  p2pMieiOrdini = {'ord-z': {indice: 3, stato: 'in-progress'}};
   p2pLibro = {ordini: []};
-  out.fuoriLibroTace = scambiP2P() === '';
-  // g) senza restore niente cambia
-  p2pMieiOrdini = null;
+  out.fuoriLibroTace = scambiP2P() === '' && !ordiniFinti['ord-z'];
+  // h) senza indice la chiave non si rideriva: non nasce niente
+  p2pMieiOrdini = {'ord-anon': {indice: 0, stato: 'pending'}};
+  p2pLibro = {ordini: [{id: 'ord-anon', lato: 'sell', euro: 2, sats: 0, premium: 0, metodi: [], creato: 10}]};
+  out.senzaIndiceNonNasce = scambiP2P() === '' && !ordiniFinti['ord-anon'];
+  // i) senza restore niente cambia
+  p2pMieiOrdini = null; p2pLibro = null;
   out.senzaRestoreVuota = scambiP2P() === '';
-  // h) l'id viene dai relay: il veleno esce scappato
-  p2pMieiOrdini = {'ord-"x': {indice: 1, stato: 'pending'}};
-  p2pLibro = {ordini: [{id: 'ord-"x', lato: 'buy', euro: 7, sats: 0, premium: 0, metodi: [], creato: 1}]};
-  const s3 = scambiP2P();
-  out.velenoScappato = s3.includes('data-id="ord-&quot;x"');
-  out.latoCompri = s3.includes('Compri');
   console.log(JSON.stringify(out));
 })();
 """
@@ -39848,24 +39904,22 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
                   True, out5["cadutaNonConclude"])
             prova("un pavimento che non alza conclude, senza richiedere",
                   True, out5["pavimentoBassoConclude"])
-            prova("la striscia nasce sul dispositivo fresco, dalla restore",
-                  True, out5["strisciaNasce"])
-            prova("...e non inventa righe per gli ordini degli altri",
-                  True, out5["strisciaNonInventa"])
-            prova("...e veste come le righe locali: il bordo e' del libro",
-                  True, out5["strisciaSenzaBordo"])
-            prova("...e l'etichetta dice solo il fatto che sa", True,
-                  out5["etichettaOnesta"])
-            prova("...col lato del maker: sell e' «vendi», buy e' «compri»",
-                  True, out5["latoVendi"] and out5["latoCompri"])
-            prova("l'ordine gia' in locale non si ripete", True,
-                  out5["nienteDoppioni"])
-            prova("quel che il libro non sa descrivere resta fuori", True,
+            prova("l'ordine della restore si ADOTTA: riga vera, intera",
+                  True, out5["adottato"])
+            prova("...e sta nella striscia in QUESTO render", True,
+                  out5["strisciaSubito"])
+            prova("...senza inventare righe per gli ordini degli altri",
+                  True, out5["nonAdottaAltrui"])
+            prova("il provvisorio si rinomina invece di raddoppiare",
+                  True, out5["provvisorioRinominato"])
+            prova("la riga gia' locale non si tocca e non si ripete",
+                  True, out5["nienteDoppioni"])
+            prova("quel che il libro non sa descrivere non nasce", True,
                   out5["fuoriLibroTace"])
+            prova("senza indice la chiave non si rideriva: non nasce niente",
+                  True, out5["senzaIndiceNonNasce"])
             prova("senza restore la striscia resta quella di prima", True,
                   out5["senzaRestoreVuota"])
-            prova("l'id avvelenato esce scappato anche nella striscia", True,
-                  out5["velenoScappato"])
 
     # --- 13) IL FOGLIO E LA STRADA SOVRANA (fase 4b) ---------------
     # ⚠️ IL PANNELLO SOVRANO STA IN UNA FUNZIONE SUA, e non per ordine:

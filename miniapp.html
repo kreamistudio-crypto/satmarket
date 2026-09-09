@@ -35743,56 +35743,63 @@ async function statoPubblicoOrdini(ids){
   return mossi;
 }
 
-/* ---- gli scambi riconosciuti dal coordinatore, senza lista locale --
-   Il dispositivo che non ha pubblicato marcava gia' le card del libro
-   («e' il tuo ordine»), ma la striscia in cima taceva: nasceva dalla
-   sola lista locale, che vive nel browser che ha pubblicato. Qui si
-   aggiungono gli ordini che la restore-session ha riconosciuto e che
-   il LIBRO sa ancora descrivere — cifra e lato vengono dal 38383, che
-   per un pending dice tutto quel che serve a una riga.
+/* ---- gli scambi riconosciuti dal coordinatore, senza riga locale --
+   LA RIGA SI ADOTTA (set 2026, dal campo: «non posso piu' annullare»).
+   Per un ordine PENDING la restore e il libro insieme dicono tutto
+   quel che una riga locale contiene: l'id, il trade_index — da cui la
+   trade key si rideriva, che l'identita' e' condivisa — e cifra, lato
+   e metodi dal 38383. Quindi non si disegna una riga di seconda
+   classe che «si guarda soltanto»: si RICOSTRUISCE la riga vera, e
+   l'ordine torna un cittadino normale — pagina apribile, ritiro col
+   giro di sempre, ascolto del campanello sulla sua chiave. E' la
+   meta' pending della ripresa, e cura anche l'ORFANO: un ordine la
+   cui riga locale e' andata persa (una scheda che sovrascrive
+   l'altra, una memoria svuotata) torna governabile OVUNQUE, non solo
+   dov'era nato.
+   IL PROVVISORIO SI RINOMINA invece di raddoppiare: una riga
+   `nuovo:N` con lo stesso indice E' questo ordine — la conferma che
+   non e' mai arrivata, la restore gliela porta adesso.
    QUEL CHE NEL LIBRO NON C'E' RESTA FUORI, ed e' dichiarato: di un
-   ordine preso o in corso la restore da' solo l'id e uno stato nel
+   ordine preso o in corso la restore da' solo id e uno stato nel
    vocabolario del coordinatore, che non si traduce a memoria (la
    lezione di Q4: gli stati si scrivono quando si VEDONO). Lo aprira'
-   la ripresa vera, col trade_index che la risposta gia' porta — e' il
-   mattone delle fasi successive del cantiere. */
-function righeAltroveP2P(locali){
-  if (!p2pMieiOrdini) return [];
+   la ripresa piena delle fasi successive.
+   SINCRONA E SENZA RETE: deriva chiavi e scrive righe, non parla con
+   nessuno. Il bundle serve (chiaveScambio) e quando manca si salta
+   il giro: la restore che riempie `p2pMieiOrdini` lo ha gia'
+   caricato, quindi al render dopo c'e'. */
+function adottaOrdiniAltroveP2P(locali){
+  if (!p2pMieiOrdini || !window.NostrTools) return 0;
+  const mz = mazzoMostro();
+  if (!mz) return 0;
   const libro = (p2pLibro && p2pLibro.ordini) || [];
-  const fuori = [];
+  const adesso = Math.floor(Date.now() / 1000);
+  let nati = 0;
   for (const id in p2pMieiOrdini) {
     if (locali[id]) continue;
+    const voce = p2pMieiOrdini[id];
+    const indice = voce ? (voce.indice | 0) : 0;
+    /* senza indice la chiave non si rideriva: e' il caso anonimo, che
+       nella restore per identita' non dovrebbe nemmeno comparire */
+    if (!(indice > 0)) continue;
     const o = libro.find(x => x.id === id);
-    if (o) fuori.push(o);
+    if (!o) continue;
+    const prov = Object.keys(locali).find(k =>
+      provvisorioP2P(k) && ((locali[k].indice | 0) === indice));
+    if (prov) { rinominaOrdineP2P(locali[prov], id); nati++; continue; }
+    let tk = null;
+    try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
+    scriviOrdineP2P({
+      id: id, lato: o.lato === 'sell' ? 'vendo' : 'compro',
+      indice: indice, pubTrade: tk.pub, mio: true,
+      stato: 'pubblicato', euro: o.euro, sats: o.sats || 0, satsNetti: 0,
+      metodi: (o.metodi || []).slice(), premium: o.premium || 0, peer: '',
+      hold: null, contattato: true, cantDo: '', errore: '', votabile: false,
+      creato: o.creato || adesso, aggiornato: adesso
+    });
+    nati++;
   }
-  return fuori.sort((a, b) => (b.creato || 0) - (a.creato || 0));
-}
-/* La riga dice SOLO il fatto che sa: l'ordine e' tuo e questo
-   dispositivo non ha le sue carte — quindi da qui si guarda soltanto.
-   ⚠️ NIENTE «da un altro dispositivo» (set 2026, dal campo):
-   l'assenza della riga locale non prova dove l'ordine e' nato — la
-   lista puo' mancare anche sul dispositivo che ha pubblicato — e
-   l'etichetta vecchia e' stata colta a mentire, tre ordini dello
-   stesso PC con due «altrove». Il tocco passa dalla porta del gesto
-   APPOSTA — e' il giudice che gia' distingue «mio ma non in lista» e
-   risponde con la stessa frase, invece di aprire uno scambio che qui
-   non c'e'.
-   IL LATO E' QUELLO DEL MAKER, non di chi sfoglia il libro: un ordine
-   `sell` nella striscia e' «vendi», perche' qui l'ordine e' TUO.
-   E NIENTE `p2p-mio`, come le righe locali accanto (set 2026, dal
-   campo: la riga di la' vestita e quella di qua nuda, fianco a
-   fianco, si leggevano come un guasto). Il bordo e' del LIBRO —
-   distingue il tuo in mezzo a quelli degli sconosciuti — mentre
-   nella striscia e' tutto tuo per definizione: la casa la dice
-   l'etichetta, e la riga col 🌐 dice il resto. */
-function rigaScambioAltroveP2P(o){
-  const sats = o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
-  return '<div class="p2p-ord" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
-    'onclick="prendiOrdineP2P(this.dataset.id)">' +
-    '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
-    '<span class="p2p-sats">' + esc(sats) + '</span></div>' +
-    '<div class="p2p-meta"><span>' + (o.lato === 'sell' ? '⬆️ Vendi' : '⬇️ Compri') + '</span>' +
-    '<span>🌐 da qui si guarda soltanto</span></div></div>';
+  return nati;
 }
 /* ---- «I tuoi scambi», in cima al libro ----
    SINCRONA apposta: renderP2P la incolla dentro l'innerHTML, e un
@@ -35801,14 +35808,13 @@ function rigaScambioAltroveP2P(o){
    quando arrivano. */
 function scambiP2P(){
   pulisciScambiP2P();
+  /* PRIMA l'adozione, poi la lettura: le righe appena ricostruite
+     devono stare in QUESTO render, non nel prossimo */
+  adottaOrdiniAltroveP2P(ordiniP2P());
   const tutti = ordiniP2P();
   const righe = Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id)
     .sort((a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0));
-  /* e quelli riconosciuti dal coordinatore che qui non hanno una riga:
-     la striscia deve nascere anche sul dispositivo che non ha
-     pubblicato — e' meta' della promessa «i tuoi ordini ovunque» */
-  const altrove = righeAltroveP2P(tutti);
-  if (!righe.length && !altrove.length) return '';
+  if (!righe.length) return '';
   const aperti = righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
   if (aperti.length) {
     /* chi apre la pagina dopo un'ora deve trovarci i messaggi
@@ -35834,8 +35840,7 @@ function scambiP2P(){
   const troppi = righe.length - P2P_SCAMBI_MAX;
   return '<div class="section-label">I tuoi scambi</div>' + debito
     + righe.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
-    + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '')
-    + altrove.slice(0, P2P_SCAMBI_MAX).map(rigaScambioAltroveP2P).join('');
+    + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
 }
 /* ============ fine del motore dello scambio ============ */
 
