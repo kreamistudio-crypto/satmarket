@@ -9721,9 +9721,45 @@ function centraNellaFila(fila, voce){
      ritroverebbe un foglio di condivisione in faccia.
    La card «Tutto» resta fuori PER COSTRUZIONE, senza un ramo apposta:
    il gesto guarda `.cat-cella[data-cat]`, e quella non ce l'ha —
-   «Tutto» e' la home, che un link ce l'ha gia'. */
-const PREMUTA_MS = 500;      // sotto i 400 si scatta scorrendo piano
-const PREMUTA_SCARTO = 10;   // px: oltre, e' uno scorrimento
+   «Tutto» e' la home, che un link ce l'ha gia'.
+   · IL FONDO DI SISTEMA (set 2026, difetto DAL CAMPO: Andrea su
+     Telegram Android, «tenendo premuto non succede niente», mentre il
+     bottone «condividi» dell'annuncio — la STESSA scala — funziona,
+     che e' la misura che scagiona la condivisione e accusa il gesto).
+     Il tocco lungo non e' solo nostro: sotto c'e' quello del sistema
+     operativo, che su Android scatta a 500ms
+     (`getLongPressTimeout`), e a quel punto la WebView SI PRENDE il
+     gesto — manda un `pointercancel` alla pagina e, dentro Telegram,
+     nemmeno un `contextmenu` (il menu del link lo fa l'app, non il
+     DOM, quindi la riga che lo ferma non ha nemmeno modo di girare).
+     Con PREMUTA_MS a 500 i due traguardi cadevano nello STESSO
+     istante e vinceva il sistema: il cancel spegneva il timer un
+     attimo prima che sparasse, e restava il silenzio. Le prove col
+     CDP non potevano vederlo — `Input.dispatchTouchEvent` non sveglia
+     il riconoscitore nativo — ed e' la lezione da tenere: un tocco
+     lungo si collauda sul TELEFONO VERO, e la riga «da guardare dal
+     telefono» che stava in CLAUDE.md era quella giusta.
+     TRE RIGHE E NON UNA, che una sola sarebbe di nuovo una gara:
+     · il timer scende a 350ms, cioe' ARRIVA PRIMA del fondo di
+       sistema invece di pareggiarlo;
+     · lo scarto scende a 8px, la stessa soglia oltre cui il browser
+       comincia a scorrere — ed e' quello che rende leggibile il
+       cancel: se ne arriva uno e il gesto e' ANCORA ARMATO, non puo'
+       essere uno scorrimento (quello lo avrebbe gia' annullato), ed
+       e' per forza il sistema che se lo prende. Allora lo si ONORA:
+       un dito fermo da un quarto di secondo un tocco lungo LO E';
+     · il `contextmenu` col dito fa lo stesso, che e' il verdetto del
+       browser sul nostro stesso gesto (Chrome fuori da Telegram lo
+       manda, la WebView no: due strade per lo stesso fatto).
+     Il fondo dei 250ms tiene fuori i cancel che gesti non sono (una
+     telefonata, l'app che va in fondo). Col MOUSE non si passa mai di
+     li': il `contextmenu` del tasto destro SPEGNE il gesto invece di
+     scatenarlo — senza quella riga, tenere giu' il destro farebbe
+     partire una condivisione a sorpresa, che a 500ms non capitava e a
+     350 sarebbe diventato facile. */
+const PREMUTA_MS = 350;      // ms: PRIMA del fondo di sistema (500 su Android)
+const PREMUTA_SCARTO = 8;    // px: la soglia oltre cui il browser scorre
+const PREMUTA_FONDO = 250;   // ms: sotto, un cancel non e' un tocco lungo
 let premutaTimer = 0, premutaDa = null;
 let premutaFatta = false;    // il gesto lungo ha gia' agito: il click non filtra
 let premutaTopo = false;     // l'ultimo gesto veniva dal mouse
@@ -9731,6 +9767,26 @@ let premutaTopo = false;     // l'ultimo gesto veniva dal mouse
 function premutaFerma(){
   clearTimeout(premutaTimer);
   premutaTimer = 0; premutaDa = null;
+}
+/* LO SCATTO IN UN POSTO SOLO, e i chiamanti sono TRE: il timer, il
+   `contextmenu` col dito, il `pointercancel` a dito fermo. Tre strade
+   per lo stesso gesto, e ricopiarne il corpo vorrebbe dire vederle
+   divergere al primo ripiego che si aggiunge da una parte sola.
+   SI SPEGNE PRIMA DI CONDIVIDERE, e non e' un dettaglio d'ordine:
+   `premutaFerma` azzera `premutaDa`, che e' anche la guardia
+   d'ingresso qui sopra — quindi due verdetti che arrivano insieme (il
+   timer che spara e il cancel che lo segue di un millisecondo)
+   condividono UNA volta sola, senza una bandierina in piu' da tenere.
+   La cella se la porta dietro `premutaDa` e non una variabile a parte:
+   e' la stessa cosa — «il gesto in corso» — e due posti che dicono la
+   stessa cosa si disallineano. */
+function premutaScatta(){
+  if (!premutaDa) return;
+  const cella = premutaDa.cella;
+  premutaFerma();
+  premutaFatta = true;
+  haptic();
+  condividiCategoria(cella.dataset.cat);
 }
 {
   /* `fila` e non `st`: quel nome significa gia' «il palco del
@@ -9744,24 +9800,34 @@ function premutaFerma(){
     premutaTopo = e.pointerType === 'mouse';
     const cella = e.target.closest?.('.cat-cella[data-cat]');
     if (!cella) return;
-    premutaDa = {x: e.clientX, y: e.clientY};
-    premutaTimer = setTimeout(() => {
-      premutaTimer = 0;
-      premutaFatta = true;
-      haptic();
-      condividiCategoria(cella.dataset.cat);
-    }, PREMUTA_MS);
+    premutaDa = {x: e.clientX, y: e.clientY, t: Date.now(), cella};
+    premutaTimer = setTimeout(premutaScatta, PREMUTA_MS);
   }, {passive: true});
   fila.addEventListener('pointermove', e => {
     if (!premutaDa) return;
     if (Math.abs(e.clientX - premutaDa.x) > PREMUTA_SCARTO ||
         Math.abs(e.clientY - premutaDa.y) > PREMUTA_SCARTO) premutaFerma();
   }, {passive: true});
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'])
+  for (const ev of ['pointerup', 'pointerleave'])
     fila.addEventListener(ev, premutaFerma, {passive: true});
   fila.addEventListener('scroll', premutaFerma, {passive: true});
+  /* IL CANCEL CHE E' UN GESTO: col dito ancora fermo dopo
+     PREMUTA_FONDO non e' uno scorrimento — quello annulla di suo,
+     allo scarto, e qui non sarebbe piu' armato niente — ma la WebView
+     che si prende il tocco lungo. E' la strada di Telegram Android,
+     dove il `contextmenu` non arriva mai. */
+  fila.addEventListener('pointercancel', () => {
+    if (premutaTopo || !premutaDa || Date.now() - premutaDa.t < PREMUTA_FONDO)
+      return premutaFerma();
+    premutaScatta();
+  }, {passive: true});
   fila.addEventListener('contextmenu', e => {
     if (!premutaTopo) e.preventDefault();
+    /* col mouse il menu e' SUO, e il gesto si spegne: tenendo giu' il
+       tasto destro, altrimenti, partirebbe una condivisione a
+       sorpresa mentre il menu del sistema e' aperto */
+    if (premutaTopo) return premutaFerma();
+    premutaScatta();
   });
 }
 
