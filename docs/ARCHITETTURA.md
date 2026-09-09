@@ -20959,23 +20959,82 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   giudice cambia, cambia per tutt'e due — e una `go('p2p')` scritta
   qui a mano sarebbe una seconda verità da tenere allineata a mano.
   NON È UN REPARTO, quindi l'anello `.attiva` non si accende mai: da
-  quella card si ESCE dalla home invece di filtrarla. È un `<a>`
-  SENZA href con role/button e tabindex, e SENZA `data-cat` — fuori
-  dal tocco lungo di condivisione PER COSTRUZIONE, come il barattolo
-  e come «Tutto»: una vista dell'app un URL da condividere non ce
-  l'ha.
+  quella card si ESCE dalla home invece di filtrarla.
+  ⚠️ E QUI IL PRIMO GIRO È ROVESCIATO (set 2026, ritocco di Andrea):
+  diceva «un `<a>` SENZA href con role/button e tabindex, e SENZA
+  `data-cat`, perché una vista dell'app un URL da condividere non ce
+  l'ha». Adesso ce l'ha — `/p2p` è una rotta vera del server, la
+  terza sorella di `/sicurezza` e `/privacy` — quindi la card è un
+  `<a>` VERO col `data-cat` che il delegato del tocco lungo cerca, e
+  si CONDIVIDE come le sorelle, senza un ramo apposta.
+  IL NOME IN `data-cat` È `CAT_P2P`, cioè `p2p` MINUSCOLO, e la
+  minuscola è la garanzia: i reparti sono nomi italiani con la
+  maiuscola, quindi in `CATS` questo non può entrare nemmeno per
+  sbaglio — la card porta lo stesso attributo delle sorelle senza
+  diventare un reparto da nessun'altra parte. `condividiCategoria` lo
+  riconosce PRIMA della guardia su `CATS`, che altrimenti lo
+  butterebbe fuori: quella guardia resta, ed è ciò che impedisce a
+  qualunque altro nome di finire lì.
+  CON L'HREF CADONO role, tabindex e `onkeydown`, e non è una
+  perdita: l'onkeydown serviva perché un `<a>` senza href non riceve
+  il click da tastiera, e adesso Invio lo attiva il browser. Il click
+  passa da `vaiP2PDaTocco`, il calco esatto di `apriCategoriaDaTocco`
+  — `clickNostro` (ctrl+click apre `/p2p` in una scheda nuova),
+  `preventDefault` (o il browser seguirebbe l'href e ricaricherebbe
+  900 KB) e la bandierina `premutaFatta` consumata, che dopo una
+  condivisione il click arriva LO STESSO.
+  E L'INDIRIZZO ATTERRA SUL GIUDICE, non su una vista scelta a mano:
+  `apriP2PDaUrl` chiama `vaiP2P()`. Sta in coda al boot e NON fra le
+  viste anticipate con `/sicurezza` e `/privacy`: quelle sono markup
+  fisso e mostrarle subito è un guadagno secco, questa ha bisogno
+  delle leve — anticiparla vorrebbe dire rispondere «spenta» a tutti.
+  Il prezzo dichiarato è l'haptic di `vaiP2P` che suona anche senza un
+  dito: si paga volentieri, che la coppia di rami scritta due volte no.
   E C'È PER TUTTI, senza la guardia del barattolo: in DEMO e in
   vetrina anonima la card del vetro non nasce (filtrerebbe il nulla),
   questa sì — porta al coming soon, che è markup fisso e la risposta
   è una sola. Per la stessa ragione non entra nella `firma` della
   striscia: è sempre uguale a sé stessa, e la fila continua a rifarsi
   solo quando cambia l'ordine, il reparto o lo stato del barattolo.
-  NESSUNA REGOLA CSS NUOVA, ed è MISURATO e non dedotto: il logo è
-  quadrato (152×152) dentro il riquadro della figura, che sta a ~1,15
-  — contenuto rende **125×125**, cioè l'altezza PIENA delle sorelle,
-  che nello stesso box sono contenute uguale («Casa e giardino» rende
-  114 di larghezza, meno di lui). Una classe sua sarebbe una taratura
-  da mantenere per niente.
+  ⚠️ E ANCHE IL «NESSUNA REGOLA CSS NUOVA» È ROVESCIATO (set 2026,
+  gli altri due ritocchi). Il primo giro misurava giusto — il logo
+  quadrato (152×152) dentro il riquadro a ~1,15 rende 125×125, cioè
+  l'altezza piena delle sorelle — e concludeva che una classe sua
+  sarebbe stata una taratura da mantenere per niente. La conclusione
+  cade perché è cambiato quel che si vuole:
+  IL LOGO È PIÙ GROSSO DELLE SORELLE, e la ragione è che non è una
+  sorella: le 27 illustrazioni sono pareggiate d'inchiostro FRA LORO
+  (`ritaglia_categorie.py`), questo è un MARCHIO — tratto sottile e
+  due frecce attorno al vuoto — quindi alla stessa misura pesa meno.
+  `.cella-p2p .cat-fig{inset:5%}` porta il lato reso da **125 a 144**
+  (su card da 160) e NON tocca il `.cat-quad`: la fila non si muove di
+  un pixel, si allarga solo la figura dentro.
+  LE FRECCE VIRANO, e il colore va dal verde della freccia di sopra al
+  rosso di quella di sotto e ritorno: è un CROSSFADE fra i due gemelli
+  già in casa — `p2p-logo-compra.png` e `p2p-logo-vendi.png`, gli
+  stessi della testata del libro — animando la sola `opacity`, che è
+  la proprietà che il compositore muove senza ridisegnare niente.
+  NON un `hue-rotate`: quel filtro girerebbe anche il barattolo, e
+  mascherarne le sole frecce vorrebbe dire un file nuovo.
+  IL BARATTOLO RESTA FERMO PER COSTRUZIONE, ed è misurato con la
+  ricetta di casa (i gemelli si giudicano ALLA RESA, nella pancia,
+  soglia percettiva 24): fra i due PNG a 152 zero pixel sopra soglia,
+  e sui due fotogrammi VERI presi a 480 — l'animazione fermata ai due
+  estremi con la Web Animations API — di nuovo zero, massimo 22.
+  Sulla tessera intera invece 35.760 pixel cambiano: cioè si muove
+  quel che deve.
+  `2.5s ease-in-out infinite alternate` = cinque secondi di ciclo, con
+  la curva che indugia sui due estremi e passa svelta per il mezzo
+  scolorito (opacità 0 → .08 → .33 → .50 → .67 → .92 → 1, misurata).
+  A MOVIMENTO SPENTO il marchio resta INTERO: sotto
+  `prefers-reduced-motion:reduce` la coppia si spegne TUTT'E DUE e
+  prende il posto il terzo gemello, il logo completo (verde e rosso
+  insieme) che sta ultimo nel markup e in condizioni normali non si
+  vede mai. Il solo verde sarebbe un logo a metà, cioè un ripiego che
+  dice un'altra cosa.
+  I TRE FILE NON COSTANO NIENTE IN PIÙ: stanno già tutti nel markup
+  fisso della vista scambio e degli stati vuoti, quindi il browser li
+  scarica comunque a ogni avvio.
   IL BARATTOLO SI CONDIVIDE COL SUO LINK (ago 2026, decisione di
   Andrea): la lista dei desideri esce dal dispositivo, ma come
   FOTOGRAFIA e non come vista viva — chi ha il link vede la lista di
@@ -23708,7 +23767,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
    manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
    ancora), `/privacy` (la sorella, «I tuoi dati», ago 2026: stessa
-   liturgia, ancora facoltativa `#indirizzo`), `/barattolo/{token}` (la
+   liturgia, ancora facoltativa `#indirizzo`), `/p2p` (la terza
+   sorella, set 2026: lo scambio come pagina vera, l'indirizzo che
+   esce dal tocco lungo sulla card nella striscia — NOINDEX finché la
+   leva è una fase di prova, e fuori dalla sitemap per la stessa
+   ragione), `/barattolo/{token}` (la
    fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
    NON legge mai il database — la garanzia della revoca),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi

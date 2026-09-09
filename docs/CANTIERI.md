@@ -7437,3 +7437,94 @@ SPENTA il tocco porta a `view-p2ppresto` senza nav trasformata, a
 leva ACCESA a `view-p2p` con `body.nav-p2p`; e da anonimo (senza
 `myTgId`) la fila apre con «Tutto» e la card dello scambio subito
 dopo, che il vetro là non nasce.
+I TRE RITOCCHI ALLA CARD DELLO SCAMBIO (set 2026, chiesti da Andrea
+guardando la home). Il logo più grosso, il tocco lungo che condivide,
+le frecce che virano. Tre cose piccole, e due di loro ROVESCIANO una
+riga scritta il giorno prima — che è il motivo per cui questa voce
+esiste: le prove che le certificavano hanno cambiato lato col perché,
+nessuna si è allentata.
+1) PIÙ GROSSO, E LA RAGIONE NON È «PERCHÉ SÌ»: le 27 illustrazioni
+sono pareggiate d'inchiostro FRA LORO, questo è un marchio — tratto
+sottile, due frecce attorno al vuoto — quindi alla stessa misura pesa
+meno. `inset:5%` sulla sola `.cat-fig` porta il lato reso da 125 a 144
+(su card da 160) senza toccare il quadrato: la fila resta allineata al
+pixel, si allarga la figura dentro. Il primo giro aveva MISURATO
+giusto e concluso «nessuna regola CSS dedicata»; la misura resta vera,
+la conclusione cade perché è cambiato quel che si vuole.
+2) IL TOCCO LUNGO CONDIVIDE, e per farlo è servita una PAGINA.
+`/p2p` è una rotta vera del server, la terza sorella di `/sicurezza` e
+`/privacy`: stessa liturgia — stessa Mini App, il client legge il
+percorso e apre la vista. Quindi cade il «niente href, niente
+data-cat» del primo giro, che si reggeva su «una vista dell'app un URL
+da condividere non ce l'ha».
+IL data-cat È LA STESSA CHIAVE DELLE SORELLE, e il nome è `p2p`
+MINUSCOLO: i reparti sono nomi italiani con la maiuscola, quindi in
+`CATS` non può entrare nemmeno per sbaglio. Così il gesto resta UNO —
+il delegato guarda `.cat-cella[data-cat]`, e un secondo selettore
+sarebbe un secondo posto dove ricordarsi delle bandierine — senza che
+la card diventi un reparto da nessun'altra parte. `condividiCategoria`
+lo riconosce PRIMA della guardia su `CATS`: quella guardia resta, ed è
+ciò che impedisce a qualunque altro nome di finire lì.
+LA PAGINA NON SI INDICIZZA, ed è una decisione: finché la leva è una
+fase di prova, chi ci arrivasse da un motore troverebbe quasi sempre
+il «coming soon» — un risultato che promette una cosa e ne dà
+un'altra. I meta però sono suoi: l'indirizzo si MANDA, e l'anteprima
+deve dire di cosa si tratta. Fuori dalla sitemap per la stessa
+ragione — deindicizzata e annunciata sarebbe un segnale contro
+l'altro. Il giorno che la leva si apre a tutti si toglie
+`indicizza=False` e si aggiunge la riga.
+E CHI ATTERRA SU /p2p PASSA DAL GIUDICE, `vaiP2P()`, non da un `go`
+scritto lì: il gate resta in un posto solo, come per le due porte.
+Sta in coda al boot e NON fra le viste anticipate con /sicurezza e
+/privacy — quelle sono markup fisso, questa ha bisogno delle leve, e
+anticiparla vorrebbe dire rispondere «spenta» a tutti.
+3) LE FRECCE VIRANO, e la strada scelta è il CROSSFADE fra i due
+gemelli già in casa (compra, freccia di sopra verde; vendi, freccia di
+sotto rossa). Scartato l'hue-rotate: girerebbe anche il barattolo, e
+mascherarne le sole frecce vorrebbe dire un file nuovo. Si anima la
+sola `opacity` — la proprietà che il compositore muove senza
+ridisegnare — a `2.5s ease-in-out infinite alternate`, cinque secondi
+di ciclo, con la curva che indugia sui due estremi e passa svelta per
+il mezzo scolorito.
+IL BARATTOLO FERMO NON È UNA SPERANZA, È UNA MISURA, e la ricetta era
+già pagata (i gemelli si giudicano ALLA RESA, nella pancia, soglia
+percettiva 24 — il confronto esatto scatta anche a disegno identico):
+fra i due PNG a 152 zero pixel sopra soglia, e sui due fotogrammi VERI
+a 480 — l'animazione fermata ai due estremi con la Web Animations API,
+così il confronto è deterministico invece di una gara col cronometro —
+di nuovo zero, massimo 22. Sulla tessera intera 35.760 pixel cambiano:
+si muove quel che deve.
+A MOVIMENTO SPENTO IL MARCHIO RESTA INTERO: sotto
+`prefers-reduced-motion:reduce` la coppia si spegne tutt'e due e
+prende il posto il terzo gemello, il logo completo. Il solo verde
+sarebbe un logo a metà. I tre file non costano niente in più: stanno
+già nel markup fisso della vista scambio e degli stati vuoti, quindi
+il browser li scarica comunque a ogni avvio.
+⚠️ E IL VIRAGGIO NON SI PROVA NEL BROWSER PANE, che emula
+`prefers-reduced-motion:reduce`: lì l'animazione non parte proprio — il
+che ha provato GRATIS la via ridotta (verde 0, rosso 0, completo 1,
+`animation:none`), ma dell'altra non diceva niente. E LA STESSA
+TRAPPOLA STA IN HEADLESS: anche Chrome headless parte a «reduce», e il
+primo giro ha risposto «nessuna animazione» su un'animazione sana.
+Serve `Emulation.setEmulatedMedia` con `prefers-reduced-motion:
+no-preference` — senza, si conclude che il viraggio non c'è.
+COLLAUDATI: **8772 prove verdi, 0 rosse** (+13 sulle 8759 di HEAD,
+misurate su una copia pulita dell'albero), con **sei prove che cambiano
+lato** — l'href, il data-cat, la regola CSS, il gesto da tastiera, il
+conto della card (adesso conta l'ancora e non la parola, che la parola
+sta anche nel CSS) e il tocco, che ora passa da `vaiP2PDaTocco` — e
+**10 MUTAZIONI, 10 UCCISE**: il logo che torna alla misura delle
+sorelle, il viraggio senza `alternate`, il ridotto che si ferma su un
+logo a metà, il completo che scivola in testa e copre i gemelli,
+l'href tolto, il solo data-cat tolto, il ramo della condivisione
+spostato DOPO la guardia su `CATS`, l'atterraggio che scavalca il
+giudice, la rotta che si mette a farsi indicizzare, la rotta che
+sparisce.
+GIRO DAL VIVO col server vero: `/p2p` risponde 200 coi suoi meta e col
+`noindex` (nessun canonical, che sulla deindicizzata non ci va);
+atterrando lì la vista è `p2ppresto` a leva spenta e `p2p` con la nav
+trasformata a leva accesa; il tocco sulla card fa lo stesso nei due
+rami; la condivisione produce `…/p2p` col suo testo; il delegato del
+tocco lungo vede la card (`.cat-cella[data-cat]` la trova, e le celle
+con quell'attributo salgono a 30); la figura misura 144 su un quadrato
+da 160, cioè la fila non si è mossa.
