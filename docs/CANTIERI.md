@@ -7223,3 +7223,94 @@ tutt'e due i tab e non si riordina sul posto.
 Verificato dal vivo sui due tab: ordine s−3 > s0 > s+4 a comprare e
 b+5 > b0 > b−2 a vendere, tinte rovesciate, e le cifre nette che
 mostrano il premio (a +5% si inviano 9857 sats invece di 10 376).
+
+
+I VOLTI SUL LIBRO (9 set 2026, decisione di prodotto di Andrea, e
+ROVESCIA UNA STRADA SCARTATA — si scrive per intero perche' la
+prossima volta si sappia cosa si e' scelto).
+LA PREMESSA ANDAVA CORRETTA: la richiesta diceva «la strada 3 gia' a
+verbale», ma la strada 3 e' il QUADERNO CIFRATO sui relay, disegnato
+apposta per NON essere collegabile all'identita'. Quel che serve ai
+volti e' la STRADA 2 — la lista sul server — scartata nel cantiere
+della scopa lampo con questa motivazione: «mandargli gli id degli
+ordini nascosti gli insegnerebbe QUALI ordini del libro sono di chi.
+Una comodita' pagata in privacy». Detto ad Andrea prima di
+costruire; la decisione, presa con gli occhi aperti, e' di
+rovesciarla.
+IL PATTO, con le sue parole: la card mostra CIO' CHE L'UTENTE GIA'
+MOSTRA NEL MERCATINO — foto Telegram per chi entra da Telegram,
+foto o iniziale Nostr per chi entra da Nostr — e chi vuole
+l'anonimato lo ottiene come nel resto di Barattolo, entrando da
+Nostr. Il P2P EREDITA la visibilita' del mercatino, non ne aggiunge:
+chi toglie la foto dalle impostazioni la toglie anche dalle card,
+resta l'iniziale, e nessuna impostazione nuova nasce.
+LA FORMA, scelta da Andrea fra tre: endpoint CON SESSIONE. Gli utenti
+Barattolo vedono volto, nome e stelline sul libro; la vetrina anonima
+vede le card senza volto. Il libro sui relay resta leggibile da
+chiunque, ma la corrispondenza col nostro account no — un
+raccoglitore anonimo che incrocia il libro pubblico non incrocia
+niente. Le altre due strade guardate: pubblico per tutti (piu'
+fiducia, ma il collegamento ordine→persona diventava un dato aperto)
+e volto solo dopo la presa in carico (nessuna esposizione, ma sul
+libro spariva il segnale di fiducia).
+COSA COSTA, scritto perche' non si dimentichi: il server IMPARA quali
+ordini del libro pubblico sono di chi, e chi ha una sessione puo'
+chiedere il volto dietro un ordine (gli account sono gratis, quindi
+la barriera e' una frizione, non un muro). Il dato che si espone e'
+finanziario — chi compra o vende bitcoin, per quanto, con che metodo
+— e questa e' la differenza rispetto al vendere una bicicletta. Sta
+qui perche' il giorno del parere legale MiCA sia una riga da leggere
+e non una cosa da riscoprire.
+COME E' FATTO. Server: tabella `p2p_ordini(ordine, tg_id, creato)`,
+`POST /api/p2p/ordini` (il client dice «questi sono miei», gate per
+persona come le chiavi) e `POST /api/p2p/facce` (chiede la SESSIONE,
+POST e non GET perche' gli id in una query finirebbero nei log del
+web server, e un log e' un posto dove le cose restano). Esce solo
+roba gia' pubblica nel mercatino — nome, avatar, media, conteggio —
+mai il tg_id ne' la npub. UN ORDINE GIA' DI UN ALTRO NON SI RUBA
+(INSERT OR IGNORE): l'id si legge dal libro pubblico, quindi chiunque
+potrebbe provare a intestarsi l'ordine altrui per metterci la propria
+faccia; chi arriva primo e' chi l'ha pubblicato, che l'id vero lo sa
+prima di tutti. «Dimentica il profilo» porta via ANCHE i volti, o
+resterebbe in piedi il collegamento che quel gesto esiste per
+rompere; e la fusione degli account se li porta dietro (il censimento
+delle tabelle figlie l'ha trovato da solo — la prova ha fatto il suo
+mestiere).
+CLIENT: gli id si registrano nel `.then` della restore, dove sono
+quelli VERI del coordinatore e arrivano tutti insieme; i volti si
+chiedono per gli ordini che si stanno per disegnare, in sottofondo,
+mai due volte per lo stesso id. ⚠️ E IL BLOCCO STA FUORI DAI TRE del
+P2P: libro, mazzo e motore hanno sentinelle «zero fetch» e «una busta
+sola» che sono la forma scritta della privacy di ieri — infilarci
+dentro due chiamate nuove le avrebbe fatte mentire. I volti hanno il
+loro blocco, coi loro marcatori e la loro sentinella: due fetch, e
+nel corpo SOLO la lista degli ordini.
+LA CARD: il volto sta DENTRO l'anello, che cresce a 44px e diventa la
+sua cornice — un segno solo per due cose, nell'angolo che era gia'
+suo — e sotto il metodo compaiono le stelline del mercatino, «⭐ 4,8 ·
+💬 12», l'icona al posto della parola. Senza voti la riga non c'e'
+proprio; senza volto (vetrina anonima, o un ordine di chi Barattolo
+non ce l'ha) restano l'anello e la card di ieri, che il volto e' un
+di piu' e non un pezzo di struttura.
+⚠️ E LA REPUTAZIONE DEL COORDINATORE E' USCITA DALLA CARD: due
+reputazioni nello stesso posto, con la stessa faccia di stella,
+direbbero cose diverse sembrando la stessa. `repTestoP2P` e' stata
+TOLTA invece di restare senza chiamanti (niente codice morto); il
+dato resta letto dal 38383 in `o.rep`, che e' un fatto del libro, e
+il giorno che il dettaglio dello scambio vorra' dire «su quel
+coordinatore ha 7 scambi» si riscrive in tre righe.
+VERIFICATO DAL VIVO col giro intero: un ordine VERO del libro
+(89500454-…) registrato all'account di collaudo, il volto tornato
+dalla rotta con le stelline vere del mercatino (⭐ 3,0 · 💬 2 dalla
+tabella feedback), e la card che se lo mette dentro l'anello.
+⚠️ UN DIFETTO MISURATO E CURATO: il disco della faccia a `inset:6px`
+copriva la meta' interna del tratto — a 44px l'anello va dal raggio
+13,75 al 19,25, e un disco piu' largo se lo mangia — quindi i due
+scuri si impastavano. A 9px il disco sta nel buco e fra i due resta
+la carta.
+E LE DUE TRAPPOLE DELLE SENTINELLE, che sono le stesse di sempre: una
+prova su «color-mix» in tutto il file era rossa per la BARRA DEGLI XP,
+che quel colore lo usa da mesi; e una su «npub» dentro il giudice era
+rossa per la DOCSTRING che dice cosa NON esce — `codice()` toglie i
+commenti, non le stringhe. Le due domande si fanno DOVE contano: nel
+disegno dell'anello, e nel corpo della funzione senza la sua docstring.
