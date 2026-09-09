@@ -100,7 +100,7 @@
     --danger:#C2410C;
     /* il "profondo" del rosso: nasce col + della nav trasformata nel
        P2P (set 2026) — l'ombra piena sotto il tondo «Pubblica» quando
-       si sta nel tab «Vendi sats», gemello di --trust-deep */
+       si sta nel tab «Vendi BTC», gemello di --trust-deep */
     --danger-deep:#9A3412;
     --radius:16px; --pad:16px;
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
@@ -1697,17 +1697,24 @@
      casa ma il LOGO DEDICATO del P2P — il barattolo col lucchetto e
      le due frecce dello scambio (verde chi compra, rossa chi vende),
      scontornato. E' un altro posto, e lo dice anche il marchio. */
-  .p2p-testata{display:flex;flex-direction:column;align-items:center;gap:4px;
-    margin:4px 0 12px;text-align:center}
-  .p2p-testata .p2p-logo{width:98px;height:98px;
-    filter:drop-shadow(0 6px 12px rgba(60,45,10,.18))}
+  /* COMPATTA IN CIMA (set 2026, ritocco di Andrea): logo piccolo e
+     tab il piu' in alto possibile — via i margini di respiro, il
+     marchio e' un timbro e non un'insegna. Il PNG e' servito a 2x
+     della resa (112px per 56) e pesa ~21 KB. */
+  .p2p-testata{display:flex;flex-direction:column;align-items:center;
+    margin:0 0 6px;text-align:center}
+  .p2p-testata .p2p-logo{width:56px;height:56px;
+    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18))}
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
      testo grosso, colore SOLO sull'attivo). Compra parla il verde
      della protezione (--trust), vendi il rosso di casa (--danger) —
      token che hanno gia' la loro sera. Il non attivo e' NEUTRO, e
      niente arancio: dieci righe piu' giu' c'e' gia' il `btn orange`
      del «Pubblica». */
-  .p2p-lati{display:flex;margin:2px 0 12px;border-bottom:2px solid var(--line)}
+  .p2p-lati{display:flex;margin:0 0 12px;border-bottom:2px solid var(--line)}
+  /* ...e le due viste dello scambio stringono anche il respiro del
+     contenitore: i tab devono stare in cima, non a meta' pagina */
+  #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
   .p2p-lati .p2p-lato{flex:1;padding:11px 8px;background:none;border:none;
     border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;
@@ -2204,8 +2211,17 @@
     transition:transform .4s cubic-bezier(.2,.7,.2,1),
       opacity .3s ease,visibility 0s linear .4s}
   nav button.sell .eti-p2p{visibility:hidden;opacity:0}
+  /* lo stato di quiete di «Vendi» porta il delay dell'INGRESSO, come
+     i bottoni base delle celle: senza, al ritorno la visibility
+     terrebbe il delay dell'uscita (.4s) e la scritta comparirebbe DI
+     COLPO a corsa gia' finita — visto dal vivo da Andrea. Il
+     selettore ricalca la pila (o la shorthand piu' specifica dello
+     span vincerebbe lei) ed ESCLUDE «Pubblica», che porta anche lei
+     la classe eti: il suo stato di quiete e' il nascosto, e il delay
+     d'ingresso li' le mangerebbe la dissolvenza d'uscita. */
+  nav button.sell .eti-pila>.eti:not(.eti-p2p){transition-delay:.1s,.1s,0s}
   body.nav-p2p nav button.sell .eti{transform:translateY(120%);
-    opacity:0;visibility:hidden}
+    opacity:0;visibility:hidden;transition-delay:0s,0s,.4s}
   body.nav-p2p nav button.sell .ic{transform:translateY(-15px);
     border-radius:50%;background:var(--trust);
     box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
@@ -5508,8 +5524,8 @@ document.getElementById('cartello')?.remove();</script>
            Gli id restano quelli di ieri: renderP2P accende `attiva`
            su questi due e basta. -->
       <div class="p2p-lati" role="tablist">
-        <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra sats</button>
-        <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi sats</button>
+        <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
+        <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
       </div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
@@ -32970,8 +32986,8 @@ function caricaLibroP2P(forza){
   return p2pLettura;
 }
 
-/* Il libro visto dal lato di chi guarda: «Compra sats» mostra chi VENDE
-   (k=sell), «Vendi sats» chi COMPRA (k=buy). I due tab grandi stanno
+/* Il libro visto dal lato di chi guarda: «Compra BTC» mostra chi VENDE
+   (k=sell), «Vendi BTC» chi COMPRA (k=buy). I due tab grandi stanno
    nel markup fisso e lo stato e' di sessione. */
 const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
 function setLatoP2P(lato){
@@ -33189,7 +33205,7 @@ function renderP2P(){
      prima non si sapeva — quante ce ne sono — e per giunta dice che il
      libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
      dice anche il LATO: il tab acceso qui sopra dice il mio
-     («Compra sats»), questa dice quello di chi sta dall'altra parte. */
+     («Compra BTC»), questa dice quello di chi sta dall'altra parte. */
   const testa = `<div class="section-label riga-conta"><span class="conta">${vivi.length}</span> `
     + `offert${vivi.length === 1 ? 'a' : 'e'} di chi `
     + (p2pLato === 'compro' ? 'vende' : 'compra') + ' sats</div>'
