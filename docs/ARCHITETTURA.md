@@ -3504,11 +3504,55 @@
   guadagnano un terzo `onclick`: il gesto guarda
   `.cat-cella[data-cat]`, cioè la card «Tutto» resta fuori PER
   COSTRUZIONE senza un ramo apposta — quella un link ce l'ha già, è la
-  home. Lo scorrimento ANNULLA (`PREMUTA_SCARTO` 10px, più
+  home. Lo scorrimento ANNULLA (`PREMUTA_SCARTO` 8px, più
   `pointerup`/`pointercancel`/`pointerleave` e lo `scroll` della fila):
   la striscia si scorre di lato, e senza quella riga chi la scorre si
-  ritroverebbe un foglio di condivisione in faccia. `PREMUTA_MS` è 500
-  e non 400: sotto, il gesto scatta scorrendo piano.
+  ritroverebbe un foglio di condivisione in faccia.
+  IL FONDO DI SISTEMA, ed è il difetto DAL CAMPO che ha rovesciato il
+  numero (set 2026, Andrea su Telegram Android: «tenendo premuto non
+  succede niente», mentre il bottone «condividi» dell'annuncio — la
+  STESSA scala — funziona, che è la misura che scagiona la
+  condivisione e accusa il gesto). Il tocco lungo NON È SOLO NOSTRO:
+  sotto c'è quello del sistema operativo, che su Android scatta a
+  500ms (`getLongPressTimeout`) e a quel punto la WebView SI PRENDE il
+  gesto — manda un `pointercancel` alla pagina e, dentro Telegram,
+  nemmeno un `contextmenu` (il menu del link lo fa l'app, non il DOM,
+  quindi la riga che lo ferma non ha nemmeno modo di girare). Con
+  `PREMUTA_MS` a 500 i due traguardi cadevano nello STESSO istante e
+  vinceva il sistema: il cancel spegneva il timer un attimo prima che
+  sparasse, e restava il silenzio.
+  ⚠️ LA LEZIONE DI METODO, che vale oltre questo gesto: i due giri dal
+  vivo via CDP non potevano vederlo — `Input.dispatchTouchEvent` non
+  sveglia il riconoscitore nativo, quindi il difetto era INVISIBILE
+  alle prove che pure erano state fatte con eventi touch veri. La riga
+  «DA GUARDARE dal telefono» che stava qui era quella giusta, ed è
+  rimasta da guardare per un mese. UN TOCCO LUNGO SI COLLAUDA SUL
+  TELEFONO VERO, e nel dubbio si guarda prima quello.
+  TRE RIGHE E NON UNA, che una sola sarebbe di nuovo una gara: il
+  timer scende a 350ms (`PREMUTA_MS`), cioè ARRIVA PRIMA del fondo di
+  sistema invece di pareggiarlo; lo scarto scende a 8px, la stessa
+  soglia oltre cui il browser comincia a scorrere — ed è quello che
+  rende LEGGIBILE il cancel, perché se ne arriva uno e il gesto è
+  ANCORA ARMATO non può essere uno scorrimento (quello lo avrebbe già
+  annullato) ed è per forza il sistema che se lo prende, e allora lo
+  si ONORA (`PREMUTA_FONDO` 250ms: un dito fermo da un quarto di
+  secondo un tocco lungo LO È, e sotto restano fuori i cancel che
+  gesti non sono — una telefonata, l'app che va in fondo); e il
+  `contextmenu` col dito fa lo stesso, che è il verdetto del browser
+  sul nostro stesso gesto (Chrome fuori da Telegram lo manda, la
+  WebView no: due strade per lo stesso fatto).
+  LO SCATTO STA IN UN POSTO SOLO (`premutaScatta`) coi suoi TRE
+  chiamanti, e SI SPEGNE PRIMA di condividere: `premutaFerma` azzera
+  `premutaDa`, che è anche la guardia d'ingresso, quindi due verdetti
+  che arrivano insieme (il timer che spara e il cancel che lo segue di
+  un millisecondo) condividono UNA volta sola, senza una bandierina in
+  più da tenere. La cella se la porta dietro `premutaDa` e non una
+  variabile a parte: è la stessa cosa — «il gesto in corso» — e due
+  posti che dicono la stessa cosa si disallineano.
+  E IL TASTO DESTRO SPEGNE IL GESTO invece di scatenarlo: col mouse il
+  `contextmenu` chiama `premutaFerma`, o tenendo giù il destro
+  partirebbe una condivisione a sorpresa mentre il menu del sistema è
+  aperto — a 500ms non capitava, a 350 sarebbe diventato facile.
   IL MENU DEL SISTEMA VA SPENTO, MA SOLO COL DITO: la card è un `<a>`
   VERO (i crawler devono poterla seguire) e su un link il tocco lungo
   apre il menu del telefono, che si prenderebbe il nostro gesto — da

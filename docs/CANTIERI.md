@@ -3608,6 +3608,52 @@ WhatsApp tengono la card per giorni e dal nostro lato non si bustano,
 quindi si prova UNA VOLTA SOLA per slug — se qualcosa non va si
 ricontrolla su un ALTRO reparto invece di riprovare sullo stesso.
 
+E IL GESTO NON SCATTAVA SUL TELEFONO (set 2026, difetto dal campo:
+Andrea su Telegram Android, «tenendo premuto non succede niente»). La
+condivisione era scagionata dalla prova incrociata — il bottone
+«condividi» dell'annuncio, che è la STESSA scala, funzionava — quindi
+il colpevole era il gesto: `PREMUTA_MS` a 500 pareggiava i 500ms del
+riconoscitore di lungo di Android, la WebView si prendeva il tocco e
+il suo `pointercancel` spegneva il timer un attimo prima che sparasse.
+Dentro Telegram il `contextmenu` non arriva nemmeno, quindi la riga
+che lo ferma non aveva modo di girare. La correzione sono TRE righe e
+non una: il timer a 350ms (prima del fondo di sistema), lo scarto a
+8px (la soglia oltre cui il browser scorre, che rende leggibile il
+cancel: se il gesto è ancora armato non è uno scorrimento, è il
+sistema che ruba — e allora lo si onora, con un fondo di 250ms) e il
+`contextmenu` col dito che scatta invece di limitarsi a spegnere il
+menu. Lo scatto è finito in un posto solo (`premutaScatta`) coi suoi
+tre chiamanti, e col mouse il tasto destro ora SPEGNE il gesto invece
+di rischiare una condivisione a sorpresa. La lezione di metodo è la
+riga «da guardare dal telefono», rimasta da guardare un mese: il CDP
+con `Input.dispatchTouchEvent` non sveglia il riconoscitore nativo, e
+un tocco lungo si collauda sul TELEFONO VERO. Vedi Architettura, «IL
+REPARTO SI CONDIVIDE», «IL FONDO DI SISTEMA».
+Collaudato: 8582 prove verdi e DIECI MUTAZIONI, dieci uccise — una per
+riga sorvegliata (il timer che torna a 500, lo scarto che torna a 10,
+il fondo azzerato, il cancel che torna a spegnere e basta, il cancel
+che non guarda più il mouse, il tasto destro che non spegne, lo scatto
+che condivide prima di spegnersi, la bandierina non alzata, la guardia
+d'ingresso tolta, il contextmenu che non scatta). Più un GIRO DAL VIVO
+su un banco col markup vero e il gesto vero, guidato via CDP con eventi
+TOUCH (`Input.dispatchTouchEvent`): 12/12 — il tocco corto che filtra,
+il lungo che condivide la card premuta senza far scattare il filtro, il
+tocco dopo che torna a filtrare, il `touchCancel` a dito fermo che
+condivide lo stesso (è la WebView di Telegram), quello troppo presto
+che non è un gesto, lo scorrimento che annulla, «Tutto» che resta
+fuori. E LA CONTROPROVA, che è la parte che conta: lo STESSO banco col
+codice di ieri, col cancel a 470, 440, 400 e 360ms — quattro volte
+silenzio, e quattro volte la condivisione col codice di oggi. Il
+difetto si riproduce e la correzione lo toglie.
+⚠️ IL BANCO È UN MODELLO, non il telefono: il cancel lo manda il
+collaudo, non il riconoscitore nativo, e la distanza fra i due
+traguardi la scegliamo noi. Dice che il gesto ARRIVA PRIMA e che la
+strada del cancel funziona, NON che sul telefono di Andrea sia andata
+esattamente così — quello lo dice solo il telefono.
+DA GUARDARE dal telefono, ed è l'unico posto dove si può: il tocco
+lungo che ora condivide dentro Telegram Android, e che sul web copia
+il link negli appunti (l'ultimo gradino della scala).
+
 Il punto di ritiro si concorda (ago 2026, caso vero dal campo): il
 venditore che trova un punto sbagliato — un locker che non esiste, o di
 una rete che non serve — ora può dirlo e proporne fino a tre; chi compra
@@ -4008,9 +4054,12 @@ sorvegliata, tutte uccise; giro dal vivo via CDP a 320/360/375 nei due
 temi col server vero. IN PRODUZIONE basta il deploy: nessuna colonna,
 nessuna leva, nessuna rotta — solo client. `CLASSIFICA_ATTIVA` è GIÀ
 accesa sul VPS (Andrea, 24 ago), quindi il podio compare al deploy per
-tutti gli autenticati. DA GUARDARE dal telefono: il tocco lungo di
-condivisione sulla striscia (la card del barattolo non deve entrarci)
-e il podio dentro Telegram vero.
+tutti gli autenticati. GUARDATO dal telefono (set 2026): la card del
+barattolo resta fuori dal gesto, il podio dentro Telegram vero sta in
+piedi — e il tocco lungo di condivisione NON scattava affatto, che è
+il difetto poi corretto (vedi Architettura, «IL REPARTO SI CONDIVIDE»,
+«IL FONDO DI SISTEMA»: il timer pareggiava i 500ms del riconoscitore
+di Android e vinceva il sistema).
 
 E la riga di quanto manca al prossimo grado dice tre cose giuste (ago
 2026, dal campo: «mancano 0 XP e 1 affari conclusi» — lo zero scritto,
