@@ -35147,9 +35147,14 @@ def prove_p2p_libro():
     senza_commenti = re.sub(r"<!--.*?-->", "", fetta, flags=re.S)
     prova("...e a chi legge non dice mai «Nostr»", False,
           "Nostr" in senza_commenti)
-    prova("...ma dice CHI custodisce i sats e che noi non li vediamo",
-          True, "coordinatore" in senza_commenti
+    # EMENDATA (set 2026, fase 6): il custode non si nomina piu' — si
+    # sorveglia il FATTO (in garanzia, e noi non li vediamo) e che il
+    # nome non rientri di soppiatto.
+    prova("...ma dice il FATTO: in garanzia, e noi non li vediamo",
+          True, "in garanzia" in senza_commenti
           and "non li tiene e non li vede" in senza_commenti)
+    prova("...e non nomina piu' Mostro ne' il coordinatore", False,
+          "Mostro" in senza_commenti or "coordinatore" in senza_commenti)
     # HA CAMBIATO LATO (ago 2026, cantiere della forma del libro): erano
     # `tema-pill`, cioe' la pillola dell'ASPETTO — piccola, e accesa e'
     # ARANCIO PIENO, mentre dieci righe piu' giu' c'e' gia' il `btn
@@ -35232,9 +35237,14 @@ def prove_p2p_libro():
 
     # --- 4c) LA RIGA CHE DICE CHI TIENE I SATS (ago 2026) ----------
     # Aperta la PRIMA volta che si apre il P2P, poi richiusa dietro
-    # «Scopri di piu'». A sparire e' la RIPETIZIONE, mai il FATTO: la
-    # riga chiusa continua a nominare il custode, ed e' la condizione
-    # che rende ammissibile tutta la variante.
+    # «Scopri di piu'». A sparire e' la RIPETIZIONE, mai il FATTO.
+    # EMENDATA (set 2026, fase 6 P2P, decisione di Andrea): il custode
+    # NON SI NOMINA PIU' — niente «Mostro», niente «coordinatore»: si
+    # dice «custoditi in garanzia», e chi sia il coordinatore lo dice
+    # UNA volta la pagina «I tuoi dati». La condizione che rende
+    # ammissibile la variante resta pero' il FATTO, e la prova adesso
+    # sorveglia quello: anche la riga chiusa deve dire che i sats sono
+    # in garanzia e che Barattolo non li tiene.
     # `find` e MAI `index`: la mutazione che toglie lo span deve far
     # diventare ROSSA la prova, non ESPLODERE la famiglia portandosi
     # dietro le sorelle (la lezione gia' pagata quattro volte).
@@ -35244,8 +35254,15 @@ def prove_p2p_libro():
     prova("le due forme della riga vivono tutte e due nel markup fisso",
           True, "p2p-chi-lunga" in senza_commenti
           and "p2p-chi-corta" in senza_commenti)
-    prova("...e la riga CHIUSA nomina ancora il custode", True,
-          "coordinatore" in corta)
+    prova("...e la riga CHIUSA dice ancora il fatto: in garanzia, "
+          "non da Barattolo", True,
+          "in garanzia" in corta and "Barattolo" in corta)
+    # ...e il nome del custode non rientra di soppiatto in nessuna
+    # delle due forme: e' l'emendamento stesso, reso verificabile.
+    _chi2 = fetta[fetta.find('class="p2p-chi-lunga"'):_j] if _j > 0 else ""
+    prova("...e nessuna delle due forme nomina Mostro o il "
+          "coordinatore", False,
+          "Mostro" in _chi2 or "coordinatore" in _chi2)
     prova("...e nasce APERTA: senza la regia si legge la riga intera",
           True, 'class="hint p2p-chi aperta"' in fetta)
     prova("...e il tasto e' lo `.scopri-link` di casa, un bottone vero",
@@ -35599,12 +35616,39 @@ console.log(JSON.stringify(out));
           [out["intervalloVecchio"], out["intervalloAltraVal"],
            out["intervalloPreso"], out["intervalloSingolo"],
            out["intervalloKind"]])
+    # EMENDATA (set 2026, fase 6): niente piu' «Coordinatore Mostro
+    # X.Y.Z» — i numeri restano (sono quel che il 38385 ha detto), il
+    # nome e la versione no, e senza numeri la riga non nasce affatto.
     prova("la riga delle impostazioni dice commissione e tetto LETTI", True,
           "commissione 1%" in out["infoRiga"]
           and "fino a 100000 sats" in out["infoRiga"]
-          and "0.18.2" in out["infoRiga"])
-    prova("...e senza 38385 dice solo chi e' il coordinatore",
-          "Coordinatore Mostro", out["infoRigaVuota"])
+          and "Mostro" not in out["infoRiga"]
+          and "0.18.2" not in out["infoRiga"])
+    prova("...e senza 38385 la riga e' vuota, non un nome a secco",
+          "", out["infoRigaVuota"])
+    # IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
+    # «Aggiorna il libro» non c'e' piu' — al suo posto renderP2P
+    # rilegge in sottofondo un libro piu' vecchio di
+    # P2P_LIBRO_FRESCO_MS, TENENDO a schermo quel che si vede. I due
+    # freni (l'eta' del libro E quella dell'ultimo tentativo) piu' la
+    # lettura in volo evitano il martello quando i relay non
+    # rispondono; «Riprova» del ramo rotto resta, perche' li' un
+    # libro non c'e' proprio.
+    prova("il bottone «Aggiorna il libro» non c'e' piu'", False,
+          ">↻ Aggiorna il libro" in mini)
+    _rp2 = pezzo_js(mini, "function renderP2P(){")
+    prova("...e il libro stantio si rilegge da solo, coi due freni",
+          True, "P2P_LIBRO_FRESCO_MS && !p2pLettura" in _rp2
+          and "p2pRiletto = adesso;" in _rp2)
+    # il ramo stantio si guarda DA VICINO: rilegge diretto (mai via
+    # ricaricaP2P, che azzererebbe il libro e farebbe il lampo di
+    # «Leggo il libro…» sotto le dita di chi guarda)
+    _st = _rp2[_rp2.index("P2P_LIBRO_FRESCO_MS && !p2pLettura"):][:220]
+    prova("...senza buttare quel che si vede", True,
+          "caricaLibroP2P().then(renderP2P" in _st
+          and "p2pLibro = null" not in _st and "ricaricaP2P" not in _st)
+    prova("...e «Riprova» del ramo rotto resta", True,
+          'ricaricaP2P()">↻ Riprova' in _rp2)
     prova("la scadenza a grana grossa",
           ["", "scaduto", "scade fra 2 min", "scade fra 2 h", "scade fra 3 g"],
           out["scade"])
@@ -36711,8 +36755,19 @@ def prove_p2p_motore():
     sporche = [t for t in testi
                if re.search(r"\b(nostr|nsec|relay|chiave privata)\b", t, re.I)]
     prova("a schermo nessuna parola di protocollo", [], sporche)
-    prova("il coordinatore si presenta col suo nome e per quel che e'", True,
-          "(Mostro, un servizio indipendente)" in cod)
+    # EMENDATA (set 2026, fase 6): il coordinatore NON si presenta piu'
+    # — il fatto resta («custoditi in garanzia», Barattolo non li tiene
+    # e non li vede), il nome vive solo nella pagina «I tuoi dati».
+    # Si guardano le STRINGHE a schermo e non `cod` intero: la' dentro
+    # «Mostro» vive negli identificatori (mazzoMostro, mostroChiama) e
+    # quelli non li legge nessun utente.
+    nominate = [t for t in testi
+                if "Mostro" in t or "coordinatore" in t.lower()]
+    prova("il custode non si nomina in nessuna stringa a schermo", [],
+          nominate)
+    prova("...e il fatto resta detto", True,
+          "custoditi in garanzia" in cod
+          and "non li tiene e non li vede" in cod)
 
     # --- 6) I FOGLI, e la navigazione --------------------------------
     cs = pezzo_js(mini, "function closeSheet(){", "\n}\n")
@@ -37134,7 +37189,7 @@ function reset(){
   await pausa(30);
   const mu = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.senzaRisposta = mu.stato;
-  out.diceISecondi = String(mu.errore).indexOf('non ha risposto') >= 0;
+  out.diceISecondi = String(mu.errore).indexOf('Nessuna risposta') >= 0;
   out.offreRiprova = (nodi.p2pOrdineCorpo.innerHTML || '').indexOf('Riprova') >= 0;
 
   /* ---- 7) SENZA FIRMA GREZZA non si mente: anonimo ------------ */
@@ -37157,7 +37212,7 @@ function reset(){
   p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://rotto']});
   let esploso = '';
   try { await mostroConnetti(); } catch(e) { esploso = String(e.message || e); }
-  out.giuLoDice = esploso.indexOf('non risponde') >= 0;
+  out.giuLoDice = esploso.indexOf('Nessuna risposta') >= 0;
   out.giuNonNominaIlRelay = esploso.toLowerCase().indexOf('wss://') < 0;
 
   /* ---- 9) LA RESTORE NON BEVE LA STORIA DEL RELAY --------------
@@ -37621,13 +37676,15 @@ process.stdout.write(JSON.stringify(out));
           "concluso", out["finitoResta"])
     prova("...ne' uno annullato", "annullato", out["annullatoResta"])
     prova("un «no» lascia lo scambio dov'era", "attivo", out["noStato"])
+    # EMENDATE (set 2026, fase 6): il rifiuto si dice senza nominare
+    # chi rifiuta — il soggetto sparisce, il motivo resta intero.
     prova("...e lo dice in italiano",
-          "Il coordinatore ha detto di no: il profilo di scambio non è "
+          "La richiesta è stata rifiutata: il profilo di scambio non è "
           "allineato: prova a riaprire l'app", out["noMotivo"])
     prova("...un motivo che non conosciamo si dice com'e', mai si perde",
-          "Il coordinatore ha detto di no: roba-nuova", out["noIgnoto"])
+          "La richiesta è stata rifiutata: roba-nuova", out["noIgnoto"])
     prova("...e senza motivo si dice almeno che ha rifiutato",
-          "Il coordinatore ha rifiutato la richiesta", out["noVuoto"])
+          "La richiesta è stata rifiutata", out["noVuoto"])
     prova("il messaggio dopo cancella l'avviso vecchio", "", out["noSiPulisce"])
     prova("un'azione sconosciuta non muove niente", True, out["ignotoFermo"])
     prova("il voto si accende senza muovere lo stato", True, out["rate"])
@@ -38036,8 +38093,8 @@ def prove_p2p_chat():
     rc = pezzo_js(mini, "function renderChatP2P(", "\n}\n")
     prova("il messaggio di un altro passa da esc()", True,
           "esc(m.testo)" in rc)
-    prova("...e il foglio dice che nessuno dei due li legge", True,
-          "né Barattolo né il coordinatore li leggono" in rc)
+    prova("...e il foglio dice che nessun altro li legge", True,
+          "nessun altro li legge, nemmeno Barattolo" in rc)
     prova("il foglio della chat si chiude col velo", True,
           "el('p2pChatSheet').classList.remove('open');"
           in pezzo_js(mini, "function closeSheet(", "\n}\n"))
@@ -38241,7 +38298,7 @@ def prove_p2p_pubblica():
     # il coordinatore lo chiama per id: finche' non risponde, non c'e'
     # niente da nominargli — e un 400 sarebbe un vicolo cieco muto
     prova("...e lo si dice invece di lasciare il bottone muto", True,
-          "toast('Aspetta: il coordinatore non ha ancora risposto');" in annullo)
+          "toast('Aspetta: la risposta non è ancora arrivata');" in annullo)
 
     # --- 5) IL VELO SI SPEGNE ----------------------------------------
     # `bottoneInAttesa` RITORNA il ripristino: chiamarla una seconda

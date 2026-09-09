@@ -5352,8 +5352,9 @@ document.getElementById('cartello')?.remove();</script>
        view-p2ppresto ha le sue sentinelle (markup fisso, un bottone
        solo) e non deve cambiare di una riga.
        Markup FISSO come le sorelle: quel che arriva dal coordinator lo
-       scrive renderP2P dentro #p2pCorpo, sotto esc(). Le parole sono
-       per chi entra con Telegram: «il coordinatore», mai «Nostr». -->
+       scrive renderP2P dentro #p2pCorpo, sotto esc(). Le parole
+       (emendate set 2026, fase 6): niente nomi di terzi — «in
+       garanzia», mai «Mostro», mai «il coordinatore», mai «Nostr». -->
   <div class="view" id="view-p2p">
     <div class="sicu">
       <div class="section-label">🔁 Scambio P2P</div>
@@ -5370,13 +5371,19 @@ document.getElementById('cartello')?.remove();</script>
            NASCE APERTA (fail-soft, il patto di `vestiPaySheet`): se la
            regia non gira si legge la riga intera, che e' il comportamento
            di sempre — mai una riga vuota.
-           E LA RIGA CHIUSA NOMINA IL CUSTODE, che e' la condizione di
-           tutta la variante: nascondere chi tiene i sats per guadagnare
-           spazio e' la cosa che questo progetto non fa. Si guadagna la
-           RIPETIZIONE, mai il fatto. -->
+           EMENDAMENTO (set 2026, fase 6 P2P, decisione di Andrea): il
+           custode NON SI NOMINA PIU' — ne' «Mostro» ne' «il
+           coordinatore» compaiono nella UI, si dice «custoditi in
+           garanzia». Il P2P e' Barattolo, punto. Quel che NON cambia
+           e' il FATTO, e resta la condizione di tutta la variante:
+           anche la riga chiusa dice che i sats sono in garanzia e che
+           Barattolo non li tiene. La verita' intera — chi e' il
+           coordinatore, col suo nome — vive UNA volta, nella pagina
+           «I tuoi dati», e la prova del blocco 4c sorveglia il fatto
+           invece del nome. -->
       <div class="hint p2p-chi aperta" id="p2pChi">
-        <span class="p2p-chi-lunga">Compri e vendi bitcoin con altre persone, in euro. Il coordinatore (Mostro, un servizio indipendente) custodisce i sats durante lo scambio: Barattolo non li tiene e non li vede.</span>
-        <span class="p2p-chi-corta">I sats li custodisce il coordinatore (Mostro), non Barattolo.</span>
+        <span class="p2p-chi-lunga">Compri e vendi bitcoin con altre persone, in euro. Durante lo scambio i sats restano custoditi in garanzia: Barattolo non li tiene e non li vede.</span>
+        <span class="p2p-chi-corta">I sats restano custoditi in garanzia: Barattolo non li tiene.</span>
         <button type="button" class="scopri-link" id="p2pChiTasto" aria-expanded="true" aria-controls="p2pChi" onclick="toggleChiP2P()">Chiudi</button>
       </div>
       <div class="consegna-scelta" role="tablist">
@@ -18333,8 +18340,8 @@ const INVITO_ONION = {
   trattativa:'La tua trattativa ti aspetta dentro Barattolo: entra e '
          + 'la trovi nella scheda Ordini.',
   p2p: 'Per scambiare sats in euro con altre persone serve un account: il tuo '
-     + 'profilo di scambio nasce qui dentro, e i sats li custodisce il '
-     + 'coordinatore fino alla fine dello scambio.'
+     + 'profilo di scambio nasce qui dentro, e i sats restano custoditi '
+     + 'in garanzia fino alla fine dello scambio.'
 };
 const INVITO_ONION_GENERICO =
   'Per comprare, offrire o vendere serve un account: da qui si entra '
@@ -32416,8 +32423,10 @@ const p2pCoord = () => (p2pLeve && p2pLeve.mostro) ? p2pLeve : p2pLevaPubblica;
 
 const P2P_VALUTA = 'EUR';          // solo euro nel primo giro (decisione di Andrea)
 const P2P_LIBRO_MS = 8000;         // quanto si aspetta un relay prima di provare il prossimo
+const P2P_LIBRO_FRESCO_MS = 60000; // oltre, il libro si rilegge da solo al prossimo render
 let p2pLato = 'compro';            // 'compro' = k:sell (chi vende sats a me) | 'vendo' = k:buy
 let p2pLibro = null;               // {ordini:[...], quando} — null = mai letto
+let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
 let p2pNuovoMetodo = '';           // il metodo scelto nel foglio del nuovo ordine
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
@@ -32569,7 +32578,7 @@ function infoDaEvento(ev){
 async function leggiLibroMostro(){
   const c = p2pCoord();
   if (!c || !c.mostro || !Array.isArray(c.relay) || !c.relay.length)
-    throw new Error('coordinatore non configurato');
+    throw new Error('gli scambi non sono configurati');
   await caricaNostrTools();
   const NT = window.NostrTools;
   const filtri = [
@@ -32801,10 +32810,13 @@ function rigaOrdineP2P(o){
 
 /* la riga delle impostazioni: SOLO quel che il coordinator ha detto —
    una commissione o un tetto scritti qui sarebbero cifre nostre su
-   una cosa che non decidiamo noi */
+   una cosa che non decidiamo noi. IL NOME NON C'E' PIU' (set 2026,
+   fase 6): i numeri restano, «Coordinatore Mostro X.Y.Z» no — e
+   senza numeri la riga sparisce del tutto, che una riga vuota non
+   dice niente. */
 function infoRigaP2P(){
   const i = p2pInfo;
-  const pezzi = ['Coordinatore Mostro' + (i && i.versione ? ' ' + esc(i.versione) : '')];
+  const pezzi = [];
   if (i && i.fee > 0)
     pezzi.push('commissione ' + esc((i.fee * 100).toLocaleString('it-IT', {maximumFractionDigits: 2})) + '%');
   if (i && i.maxSats > 0) pezzi.push('fino a ' + fmt(i.maxSats) + ' sats per scambio');
@@ -32912,14 +32924,30 @@ function renderP2P(){
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   const info = el('p2pInfoRiga');
-  if (info) { info.innerHTML = infoRigaP2P(); info.style.display = p2pInfo ? '' : 'none'; }
+  if (info) { info.innerHTML = infoRigaP2P(); info.style.display = info.innerHTML ? '' : 'none'; }
   if (p2pLibro === null) {
     box.innerHTML = '<div class="hint">' + (p2pErrore
-      ? 'Il coordinatore non risponde (' + esc(p2pErrore) + ').'
+      ? 'Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
         + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button>'
-      : 'Leggo il libro ordini del coordinatore…') + '</div>';
+      : 'Leggo il libro degli ordini…') + '</div>';
     if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
     return;
+  }
+  /* IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
+     «Aggiorna il libro» non c'e' piu' — al posto del gesto, un libro
+     piu' vecchio di P2P_LIBRO_FRESCO_MS si rilegge in sottofondo al
+     primo render che lo attraversa, TENENDO quel che si vede (mai il
+     lampo di «Leggo il libro…» sotto le dita). `p2pRiletto` e' il
+     freno: un giro caduto non riparte a ogni render ma al giro dopo,
+     e la lettura in volo fa gia' da guardia ai doppi.
+     LA MARCATURA «e' mio» NON SI RIARMA QUI, ed e' voluto: e' una
+     restore-session verso il coordinator (una alla volta per chiave,
+     il vincolo della sonda) e resta a una per sessione. */
+  const adesso = Date.now();
+  if (adesso - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS
+      && adesso - p2pRiletto > P2P_LIBRO_FRESCO_MS && !p2pLettura) {
+    p2pRiletto = adesso;
+    caricaLibroP2P().then(renderP2P, () => {});
   }
   const k = P2P_LATO_K[p2pLato];
   const vivi = p2pLibro.ordini.filter(o => o.lato === k);
@@ -32949,8 +32977,7 @@ function renderP2P(){
            p2pLato === 'compro'
              ? 'In questo momento nessuno sta vendendo sats in euro.'
              : 'In questo momento nessuno sta comprando sats in euro.'}</div>`)
-    + '<button class="btn orange" onclick="apriNuovoOrdineP2P()">➕ Pubblica il tuo ordine</button>'
-    + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Aggiorna il libro</button>';
+    + '<button class="btn orange" onclick="apriNuovoOrdineP2P()">➕ Pubblica il tuo ordine</button>';
 }
 function ricaricaP2P(){
   haptic();
@@ -33581,7 +33608,7 @@ function renderProfiloP2P(){
       : '';
     box.innerHTML = altrove
       ? `<div class="trust-note"><span>⚠️</span><span>Su questo dispositivo il profilo di scambio non c'è, ma il tuo account ne ha già uno${quando}: l'hai creato altrove. Se ne fai nascere un altro qui, gli scambi e le recensioni restano attaccati a quello di prima.</span></div>${importa}${dalConto}`
-      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve al coordinatore per riconoscerti, e le recensioni che guadagni restano attaccate a lui.</div>${dalConto}${importa}`;
+      : `<div class="hint">Non hai ancora un profilo di scambio: nasce da solo al primo scambio. Serve a riconoscerti negli scambi, e le recensioni che guadagni restano attaccate a lui.</div>${dalConto}${importa}`;
     return;
   }
   const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
@@ -34256,7 +34283,7 @@ function mostroConnetti(){
   p2pConnessa = (async () => {
     const c = p2pCoord();
     if (!c || !c.mostro || !Array.isArray(c.relay) || !c.relay.length)
-      throw new Error('Il coordinatore non è configurato');
+      throw new Error('Gli scambi P2P non sono disponibili');
     await caricaNostrTools();
     const NT = window.NostrTools;
     for (const url of c.relay) {
@@ -34280,7 +34307,7 @@ function mostroConnetti(){
         console.log('🔁 [p2p] non risponde: ' + url + ' (' + (e && e.message || e) + ')');
       }
     }
-    throw new Error('Il coordinatore non risponde');
+    throw new Error('Nessuna risposta: riprova fra un momento');
   })();
   /* un fallimento non si ricorda: il gesto dopo riprova da capo */
   p2pConnessa.catch(() => { p2pConnessa = null; });
@@ -34455,12 +34482,12 @@ async function chiediMieiOrdiniP2P(){
        lascia «non si sa» — il fail-open promesso qui sotto. Il vuoto
        VERO arriva dentro una risposta, e quello si', si tiene. */
     if (!risposto) {
-      console.log('🔁 [p2p] i miei ordini: il coordinatore non ha risposto');
+      console.log('🔁 [p2p] i miei ordini: nessuna risposta');
       return p2pMieiOrdini;
     }
     p2pMieiOrdini = trovati;
     console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
-                + ' dal coordinatore');
+                + ' dalla restore');
     return trovati;
   })().catch((e) => {
     /* FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva —
@@ -34579,7 +34606,7 @@ async function mostroChiama(skTrade, msg, opz){
   const attesa = new Promise((ok, no) => {
     p2pAttese[rid] = {ok, no, t: setTimeout(() => {
       delete p2pAttese[rid];
-      no(new Error('Il coordinatore non ha risposto ('
+      no(new Error('Nessuna risposta ('
                    + Math.round((o.timeoutMs || P2P_ATTESA_MS) / 1000) + ' s)'));
     }, o.timeoutMs || P2P_ATTESA_MS)};
   });
@@ -34620,18 +34647,18 @@ const MOTIVI_CANTDO = {
   'invalid-order-status': 'l\'ordine non è più disponibile',
   'invalid-pubkey': 'il profilo di scambio non è stato riconosciuto',
   'invalid-peer': 'non sei tu a poter fare questa cosa',
-  'out-of-range-fiat-amount': 'l\'importo in euro è fuori dai limiti del coordinatore',
-  'out-of-range-sats-amount': 'l\'importo in sats è fuori dai limiti del coordinatore',
+  'out-of-range-fiat-amount': 'l\'importo in euro è fuori dai limiti consentiti',
+  'out-of-range-sats-amount': 'l\'importo in sats è fuori dai limiti consentiti',
   'is-not-your-order': 'questo ordine non è tuo',
   'not-allowed-by-status': 'non si può fare in questo momento dello scambio',
   'pending-order-exists': 'hai già un ordine in corso',
-  'cant-create-user': 'il coordinatore non ha potuto creare il profilo'
+  'cant-create-user': 'non è stato possibile creare il profilo di scambio'
 };
 function motivoCantDo(payload){
   const r = payload && (payload.cant_do || payload['cant-do'] || payload.reason);
   const k = String(r || '').trim();
-  if (!k) return 'Il coordinatore ha rifiutato la richiesta';
-  return 'Il coordinatore ha detto di no: ' + (MOTIVI_CANTDO[k] || k);
+  if (!k) return 'La richiesta è stata rifiutata';
+  return 'La richiesta è stata rifiutata: ' + (MOTIVI_CANTDO[k] || k);
 }
 
 /* ---- la macchina a stati ----
@@ -34753,17 +34780,17 @@ const P2P_PROGRESSO = {
   annullo_chiesto: 2, annullo_proposto: 2, in_disputa: 3, annullato: 0
 };
 const STATI_P2P = {
-  prendo: {t: 'Sto prendendo l\'ordine…', d: 'Chiedo al coordinatore di riservartelo.'},
-  pubblico: {t: 'Sto pubblicando l\'ordine…', d: 'Chiedo al coordinatore di metterlo nel libro.'},
+  prendo: {t: 'Sto prendendo l\'ordine…', d: 'Chiedo di riservartelo.'},
+  pubblico: {t: 'Sto pubblicando l\'ordine…', d: 'Lo metto nel libro degli ordini.'},
   pubblicato: {t: 'Ordine pubblicato', d_compro: 'È nel libro: aspetta che qualcuno ti venda i sats. Puoi ritirarlo quando vuoi, finché nessuno lo prende.',
                d_vendo: 'È nel libro: aspetta che qualcuno ti compri i sats. Puoi ritirarlo quando vuoi, finché nessuno lo prende.'},
-  senza_risposta: {t: 'Nessuna risposta', d: 'Il coordinatore non ha risposto. Puoi riprovare: se l\'ordine è ancora libero te lo riserva.'},
-  rifiutato: {t: 'Ordine non preso', d: 'Il coordinatore non ha accettato la richiesta.'},
+  senza_risposta: {t: 'Nessuna risposta', d: 'La risposta non è arrivata. Puoi riprovare: se l\'ordine è ancora libero, viene riservato a te.'},
+  rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.'},
   attesa_mia_fattura: {t: 'Dove vuoi i sats?', d: 'Indica il tuo indirizzo Lightning: è lì che arriveranno alla fine dello scambio.'},
-  attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena il coordinatore li ha in custodia te lo diciamo: da lì potrai pagare in euro.'},
+  attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai pagare in euro.'},
   attesa_fattura_compratore: {t: 'Chi compra sta indicando dove ricevere', d: 'Appena lo fa ti chiederemo di bloccare i sats.'},
-  attesa_mia_hold: {t: 'Blocca i sats', d: 'Paga la richiesta del coordinatore: i sats restano bloccati e non escono finché non li liberi tu.'},
-  attivo: {t: 'Sats in custodia', d_compro: 'I sats sono al sicuro presso il coordinatore. Ora manda gli euro con il metodo concordato, poi dillo qui.',
+  attesa_mia_hold: {t: 'Blocca i sats', d: 'Paga la richiesta: i sats restano bloccati in garanzia e non escono finché non li liberi tu.'},
+  attivo: {t: 'Sats in garanzia', d_compro: 'I sats sono al sicuro in garanzia. Ora manda gli euro con il metodo concordato, poi dillo qui.',
            d_vendo: 'I tuoi sats sono bloccati. Aspetta che chi compra mandi gli euro.'},
   euro_inviati: {t: 'Euro inviati', d_compro: 'Hai detto di aver mandato gli euro: appena chi vende li vede, libera i sats.',
                  d_vendo: 'Chi compra dice di aver mandato gli euro. Controlla di averli ricevuti: poi libera i sats.'},
@@ -34771,9 +34798,9 @@ const STATI_P2P = {
   concluso: {t: 'Scambio concluso', d: 'È andato tutto a buon fine.'},
   annullo_chiesto: {t: 'Hai chiesto di annullare', d: 'Serve anche il sì dell\'altra persona.'},
   annullo_proposto: {t: 'L\'altra persona vuole annullare', d: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati.'},
-  in_disputa: {t: 'Disputa aperta', d: 'Un moderatore del coordinatore esaminerà lo scambio. I sats restano bloccati fino alla decisione.'},
+  in_disputa: {t: 'Disputa aperta', d: 'Un moderatore indipendente esaminerà lo scambio. I sats restano bloccati fino alla decisione.'},
   annullato: {t: 'Scambio annullato', d: 'Nessuno ha perso niente: i sats sono tornati a chi li aveva bloccati.'},
-  pagamento_ritentato: {t: 'Pagamento non riuscito', d: 'Il coordinatore riproverà a mandare i sats. Se non ci riesce potrai indicare un altro indirizzo.'}
+  pagamento_ritentato: {t: 'Pagamento non riuscito', d: 'L\'invio dei sats si riprova da solo. Se non riesce potrai indicare un altro indirizzo.'}
 };
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
@@ -34876,8 +34903,8 @@ function prendiOrdineP2P(id){
     titolo: compro ? 'Compri sats?' : 'Vendi sats?',
     testata: '<b>' + esc(fmtEur(riga.euro)) + ' €</b> · ' + esc(sats),
     corpo: compro
-      ? 'Chi vende blocca i sats presso il coordinatore, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
-      : 'Blocchi i sats presso il coordinatore, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',
+      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
+      : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',
     etichetta: compro ? 'Sì, compro' : 'Sì, vendo',
     poi: () => { eseguiPresaP2P(id); }
   });
@@ -34974,7 +35001,7 @@ async function chiamataOrdineP2P(o, azione, payload){
      coordinatore non saprebbe di quale, quindi si dice invece di
      spedire un messaggio che verrebbe scartato in silenzio */
   if (!idMostroVero(o.id))
-    throw new Error('Il coordinatore non ha ancora registrato questo ordine: aspetta la sua risposta');
+    throw new Error('Questo ordine non risulta ancora registrato: aspetta un momento la risposta');
   const NT = window.NostrTools;
   const reput = !!(NT && NT.schnorr) && o.indice > 0;
   const conIndice = (azione === 'take-sell' || azione === 'take-buy' || azione === 'new-order');
@@ -35034,7 +35061,7 @@ function renderOrdineP2P(){
   const st = statoTestoP2P(o);
   const passi = [
     {t: 'Ordine preso', d: o.lato === 'compro' ? 'Compri sats' : 'Vendi sats'},
-    {t: 'Sats bloccati', d: 'Il coordinatore li tiene in custodia'},
+    {t: 'Sats bloccati', d: 'Restano in garanzia fino alla fine'},
     {t: 'Euro inviati', d: 'Con il metodo concordato fra voi'},
     {t: 'Scambio concluso', d: 'I sats arrivano a chi compra'}
   ];
@@ -35078,7 +35105,7 @@ function renderOrdineP2P(){
     (tog.giorni
       ? '<div class="hint">Resta qui ancora ' + tog.giorni +
         (tog.giorni === 1 ? ' giorno' : ' giorni') + ': fino ad allora l\'ordine può essere ' +
-        'ancora vivo sul coordinatore, e la sua chiave serve a riprenderlo. Poi lo potrai togliere.</div>'
+        'ancora vivo nel libro, e la sua chiave serve a riprenderlo. Poi lo potrai togliere.</div>'
       : '') +
     /* i messaggi stanno FRA il passo da fare e le uscite: e' il modo
        di mettersi d'accordo, e quasi sempre e' quel che serve prima
@@ -35090,7 +35117,7 @@ function renderOrdineP2P(){
       ? '<button class="btn ghost" onclick="apriChatP2P()">💬 Messaggi'
         + (o.chatNuovi ? ' <b>(' + fmt(o.chatNuovi) + ')</b>' : '') + '</button>' : '') +
     secondarie.map(a => SECONDARI_P2P[a] || '').join('') +
-    '<div class="hint">I sats li custodisce il coordinatore (Mostro, un servizio indipendente): Barattolo non li tiene e non li vede. Gli euro viaggiano fra voi due, fuori da qui.</div>';
+    '<div class="hint">I sats dello scambio restano custoditi in garanzia: Barattolo non li tiene e non li vede. Gli euro viaggiano fra voi due, fuori da qui.</div>';
 }
 
 /* ---- il foglio del pagamento da bloccare ----
@@ -35122,12 +35149,12 @@ function renderHoldP2P(){
     ? Math.max(1, Math.round(p2pInfo.holdFinestra / 60)) : 0;
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
-      'i sats restano <b>bloccati</b> presso il coordinatore e non escono finché non li liberi tu.' +
+      'i sats restano <b>bloccati in garanzia</b> e non escono finché non li liberi tu.' +
       (min ? ' Hai circa ' + min + ' minuti.' : '') + '</div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
     '<button class="btn ghost" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
-    '<div class="hint">Quando il coordinatore ha i sats in custodia questo foglio si chiude da solo: non c\'è niente da confermare.</div>';
+    '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.</div>';
   el('p2pHoldInvoice').textContent = o.hold.bolt11;
 }
 /* la fattura si legge dall'ordine e non da un onclick: e' lunga
@@ -35162,7 +35189,7 @@ function renderIncassoP2P(){
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
       '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tuonome@wallet.com"></div>' +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
-    '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia al coordinatore</button>';
+    '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
 }
 async function inviaIncassoP2P(){
   const o = ordiniP2P()[p2pIncassoOrdine];
@@ -35184,7 +35211,7 @@ async function inviaIncassoP2P(){
     dillo('Non sembra un indirizzo Lightning né una richiesta di pagamento.');
     return;
   }
-  const rip = bottoneInAttesa(el('p2pIncassoBtn'), 'Invio al coordinatore…');
+  const rip = bottoneInAttesa(el('p2pIncassoBtn'), 'Invio…');
   try {
     /* l'indirizzo Lightning si manda COSI' COM'E': lo risolve il
        coordinatore, che quel giro di rete lo sa gia' fare — e cosi'
@@ -35261,12 +35288,12 @@ function renderNuovoOrdineP2P(){
   if (!box) return;
   const compro = p2pLato === 'compro';
   const tetto = (p2pInfo && p2pInfo.maxSats > 0)
-    ? '<div class="hint">Il coordinatore accetta ordini fino a ' + fmt(p2pInfo.maxSats) + ' sats.</div>' : '';
+    ? '<div class="hint">Si accettano ordini fino a ' + fmt(p2pInfo.maxSats) + ' sats.</div>' : '';
   const fee = (p2pInfo && p2pInfo.fee > 0)
-    ? '<div class="hint">La commissione del coordinatore è ' + esc(String(Math.round(p2pInfo.fee * 10000) / 100)) + '%.</div>' : '';
+    ? '<div class="hint">La commissione è ' + esc(String(Math.round(p2pInfo.fee * 10000) / 100)) + '%.</div>' : '';
   box.innerHTML =
     '<div class="hint">' + (compro
-      ? 'Stai chiedendo di <b>comprare</b> sats pagando in euro. Chi risponde bloccherà i sats presso il coordinatore.'
+      ? 'Stai chiedendo di <b>comprare</b> sats pagando in euro. Chi risponde bloccherà i sats in garanzia.'
       : 'Stai offrendo di <b>vendere</b> sats in cambio di euro. Quando qualcuno risponde ti chiederemo di bloccare i sats.') + '</div>' +
     '<div class="field"><label for="p2pNuovoEuro">Quanti euro</label>' +
     '<div class="campo-pre"><span>€</span>' +
@@ -35402,7 +35429,7 @@ async function inviaAnnulloP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
-  if (provvisorioP2P(id)) { toast('Aspetta: il coordinatore non ha ancora risposto'); return; }
+  if (provvisorioP2P(id)) { toast('Aspetta: la risposta non è ancora arrivata'); return; }
   /* il velo e globale e il gesto arriva dal foglio della conferma, che
      il bottone se l e portato via: si passa null e a parlare e il velo */
   const rip = bottoneInAttesa(null, 'Chiedo di annullare…');
@@ -35434,12 +35461,12 @@ function renderVotoP2P(){
   const box = el('p2pVotoCorpo');
   if (!box) return;
   box.innerHTML =
-    '<div class="hint">Com\'è andata con l\'altra persona? Il voto resta sul suo profilo di scambio presso il coordinatore.</div>' +
+    '<div class="hint">Com\'è andata con l\'altra persona? Il voto resta sul suo profilo di scambio.</div>' +
     '<div class="p2p-stelle">' + [1, 2, 3, 4, 5].map(n =>
       '<button type="button" class="p2p-stella" data-n="' + n + '" ' +
       'aria-label="' + n + ' su 5" onclick="votaP2P(Number(this.dataset.n))">★</button>').join('') +
     '</div>' +
-    '<div class="hint">È il voto del coordinatore, e non ha niente a che vedere con le stelle del tuo negozio su Barattolo.</div>';
+    '<div class="hint">È il voto degli scambi P2P, e non ha niente a che vedere con le stelle del tuo negozio su Barattolo.</div>';
 }
 async function votaP2P(n){
   const id = p2pOrdineAperto;
@@ -35674,7 +35701,7 @@ function renderChatP2P(){
     '<textarea id="p2pChatInp" rows="2" maxlength="' + CHAT_MAX_TESTO + '" ' +
       'placeholder="Scrivi qui…"></textarea>' +
     '<button class="btn orange" onclick="inviaChatP2P(this)">Invia</button>' +
-    '<div class="hint">I messaggi viaggiano cifrati fra te e l\'altra persona: né Barattolo né il coordinatore li leggono. Non scrivere qui password o codici di accesso.</div>';
+    '<div class="hint">I messaggi viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>';
   const inp = el('p2pChatInp');
   if (inp && scritto) inp.value = scritto;
   const lista = el('p2pChatLista');
@@ -35708,7 +35735,7 @@ function apriDisputaP2P(){
   haptic();
   chiediConferma({
     titolo: 'Aprire una disputa?',
-    corpo: 'Un moderatore del coordinatore guarderà il caso e deciderà chi riceve i sats.\n\n'
+    corpo: 'Un moderatore indipendente guarderà il caso e deciderà chi riceve i sats.\n\n'
       + 'Da quel momento lo scambio si ferma: né tu né l\'altra persona potete più muovere i sats. '
       + 'Barattolo non decide e non può intervenire.\n\n'
       + 'Prima di aprirla, prova a scrivere all\'altra persona: quasi sempre è un ritardo.',
