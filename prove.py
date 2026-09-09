@@ -37230,7 +37230,14 @@ function reset(){
     && rc.dentro && rc.dentro.action === 'cancel' && rc.dentro.id === idA;
   out.ritiroConProvaIdentita = rc.provaIdentita === true
     && rc.identitaPub === mzA.pub;
-  out.ordineAnnullato = ordiniP2P()[idA].stato === 'annullato';
+  /* RITIRATO = SPARITO, subito e ovunque: niente riga, niente cache
+     (o l'adozione lo resusciterebbe), la pagina torna al libro e la
+     notizia si dice a voce */
+  out.ordineRitiratoSparito = !ordiniP2P()[idA]
+    && !(p2pMieiOrdini && p2pMieiOrdini[idA])
+    && !((p2pLibro && p2pLibro.ordini) || []).some(x => x.id === idA);
+  out.ritiroRiportaAlLibro = viste.indexOf('p2p') >= 0;
+  out.ritiroDetto = toasts.some(t => String(t).indexOf('ritirato') >= 0);
 
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
@@ -37308,7 +37315,9 @@ function reset(){
         "adozioneVera": "l'ordine della restore si adotta: riga vera, chiave vera",
         "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
         "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
-        "ordineAnnullato": "...e l'ordine adottato finisce annullato",
+        "ordineRitiratoSparito": "...e ritirato = sparito: riga e cache pulite",
+        "ritiroRiportaAlLibro": "...la pagina torna al libro",
+        "ritiroDetto": "...e la notizia si dice a voce",
     }
     for k, nome in attesi.items():
         if isinstance(nome, tuple):
@@ -47310,6 +47319,22 @@ def prove_scambi_p2p_vecchi():
     prova("la scopa passa dal giudice", True, "p2pTogliibile(o" in _sc)
     prova("...e non si ricopia l'elenco dei finali",
           False, "P2P_FINALI" in _sc)
+    # IL RITIRATO SPARISCE SUBITO E OVUNQUE (set 2026): il giudice e'
+    # uno (`p2pRitirato`) e lo chiamano i TRE posti dove l'annullato
+    # arriva o riposa — il kind 14, la via di riserva, e la scopa come
+    # rete. Il rimotore pulisce anche le due cache di sessione, o
+    # l'adozione resusciterebbe la riga appena tolta come «pubblicato».
+    prova("...e il ritirato ha il suo giudice anche nella scopa", True,
+          "p2pRitirato(o)" in _sc)
+    _am = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")
+    prova("il kind 14 che annulla passa dal rimotore e riporta al libro",
+          True, "togliRitiratoP2P(nuovo.id)" in _am and "go('p2p')" in _am)
+    _spo = pezzo_js(mini, "async function statoPubblicoOrdini(ids){", "\n}\n")
+    prova("...e la via di riserva pure, in silenzio", True,
+          "togliRitiratoP2P(o.id)" in _spo)
+    _rim = pezzo_js(mini, "function togliRitiratoP2P(id){", "\n}\n")
+    prova("il rimotore pulisce anche le cache, o l'adozione resuscita",
+          True, "p2pMieiOrdini[id]" in _rim and "p2pLibro.ordini" in _rim)
 
     # E IL GIUDICE SI RICHIEDE DENTRO IL GESTO: l'id arriva dal DOM, e
     # il DOM non e' la verita' — la stessa ragione per cui sul server
@@ -47344,6 +47369,7 @@ def prove_scambi_p2p_vecchi():
         "};\n"
         + pezzo_js(mini, "function ordiniP2P(){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function p2pTogliibile(o, adesso){", "\n}") + "\n}\n"
+        + pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function pulisciScambiP2P(){", "\n}") + "\n}\n"
         "const ORA = Math.floor(Date.now() / 1000);\n"
         "const fa = ore => Math.floor(ORA - ore * 3600);\n"
@@ -47363,6 +47389,11 @@ def prove_scambi_p2p_vecchi():
         "esito.sr_oltre = g({stato:'senza_risposta', creato: fa(200)});\n"
         "esito.sr_quasi = g({stato:'senza_risposta', creato: fa(167.5)});\n"
         "esito.sr_cieco = g({stato:'senza_risposta', creato: 0});\n"
+        "esito.ritirato = p2pRitirato({stato:'annullato'});\n"
+        "esito.ritiratoConHold = p2pRitirato({stato:'annullato', hold:{bolt11:'x'}});\n"
+        "esito.ritiratoConSats = p2pRitirato({stato:'annullato', satsNetti: 5});\n"
+        "esito.ritiratoNonERifiutato = p2pRitirato({stato:'rifiutato'});\n"
+        "esito.ritiratoNonEConcluso = p2pRitirato({stato:'concluso'});\n"
         "console.log(JSON.stringify(esito));\n")
 
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -47401,6 +47432,15 @@ def prove_scambi_p2p_vecchi():
     # esiste per non essere. Il pavimento a 1 e' quel che lo impedisce.
     prova("...e a mezz'ora dalla fine dice ANCORA 1 giorno, mai zero",
           {"si": False, "giorni": 1}, _out.get("sr_quasi"))
+    # IL GIUDICE DEL RITIRATO: solo l'annullato che non ha mai tenuto
+    # sats. La hold o i satsNetti lo promuovono a RICEVUTA, e gli
+    # altri stati non c'entrano — il rifiutato porta un motivo da
+    # leggere, il concluso il voto e l'export.
+    prova("il ritirato e' l'annullato senza sats, e nessun altro",
+          [True, False, False, False, False],
+          [_out.get(k) for k in ("ritirato", "ritiratoConHold",
+                                 "ritiratoConSats", "ritiratoNonERifiutato",
+                                 "ritiratoNonEConcluso")])
 
     # --- la scopa, girata sull'archivio ---------------------------
     _semi = (
@@ -47427,7 +47467,11 @@ def prove_scambi_p2p_vecchi():
         "   creato: fa(24*3), aggiornato: fa(25), quando: fa(25),"
         "   hold: {bolt11:'lnbc1'}},"
         " rifiuto_vecchio: {id:'m', stato:'rifiutato',"
-        "   creato: fa(25), aggiornato: fa(25)}"
+        "   creato: fa(25), aggiornato: fa(25)},"
+        " rifiutato_stamattina: {id:'n', stato:'rifiutato',"
+        "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
+        " ritirato_appena: {id:'o', stato:'annullato',"
+        "   creato: fa(1), quando: fa(0)}"
         "}")
     _prog2 = _banco + (
         "localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify("
@@ -47453,36 +47497,38 @@ def prove_scambi_p2p_vecchi():
     # tutt'e due le cose. Restano anche chi non e' togliibile
     # (l'aperto, per vecchio che sia) e il voto in sospeso, che e'
     # finale per i sats e non per la reputazione.
-    # E LA SCOPA LAMPO (set 2026): un annullato o rifiutato che non ha
-    # mai tenuto sats e' una NOTIZIA — a 25 ore se ne va da solo, su
-    # ogni dispositivo, che lo stato e' gia' sincronizzato dal
-    # coordinatore. La RICEVUTA no: un annullato con la hold in mano
-    # tiene i 30 giorni, come il concluso — che porta il voto e finisce
-    # nell'export degli affari.
-    prova("la scopa toglie i vecchi, i rifiuti e le notizie fredde",
-          {"tolti": 5,
-           "resta": ["aperto_vecchio", "chiuso_stamattina_dal_coordinatore",
-                     "fresco_finito", "ricevuta_annullata",
+    # E IL RITIRATO NON SI VEDE PIU' (set 2026, decisione di Andrea):
+    # ritirato = sparito, subito — anche dalla rete della scopa, che
+    # cosi' pulisce pure le righe rimaste da prima del cambio. Il
+    # rifiutato tiene il lampo delle 24 ore (porta un motivo da
+    # leggere), e la RICEVUTA — l'annullato con la hold in mano — i 30
+    # giorni, come il concluso che porta il voto e l'export.
+    prova("la scopa toglie i vecchi, i ritirati e le notizie fredde",
+          {"tolti": 7,
+           "resta": ["aperto_vecchio", "fresco_finito",
+                     "ricevuta_annullata", "rifiutato_stamattina",
                      "sr_scaduto_ma_recente", "voto_in_sospeso"]},
           _o2)
-    prova("la notizia fredda (annullato senza sats, 25 ore) se ne va",
-          False, "notizia_vecchia" in (_o2.get("resta") or []))
-    prova("...e la RICEVUTA no: la hold la promuove ai 30 giorni",
+    prova("il ritirato di ADESSO non arriva nemmeno al prossimo render",
+          False, "ritirato_appena" in (_o2.get("resta") or []))
+    prova("...e quello di stamattina, rimasto da prima, sparisce uguale",
+          False, "chiuso_stamattina_dal_coordinatore"
+          in (_o2.get("resta") or []))
+    prova("...mentre la RICEVUTA no: la hold la promuove ai 30 giorni",
           True, "ricevuta_annullata" in (_o2.get("resta") or []))
 
     # LA PROVA REGINA DELLA CATENA (set 2026): «quando» lo scrive il
     # solo ramo del COORDINATORE, ed e' l'ultimo movimento vero di una
     # riga che ha chiuso lui — mentre li' «aggiornato» e' rimasto al
     # giorno della nascita. Togliendolo dalla catena la scopa
-    # leggerebbe il timbro piu' VECCHIO e — col lampo — spazzerebbe
-    # una riga chiusa STAMATTINA: chi «pulisce» quel ripiego fa rossa
-    # questa riga. (Era «chiuso ieri» quando la soglia era un mese: la
-    # scopa lampo ha spostato il caso a 12 ore, il mestiere e' lo
-    # stesso.)
-    prova("...e uno chiuso STAMATTINA dal coordinatore resta, anche se "
+    # leggerebbe il timbro piu' VECCHIO e — col lampo — spazzerebbe un
+    # rifiuto arrivato STAMATTINA: chi «pulisce» quel ripiego fa rossa
+    # questa riga. (Il caso era un annullato quando l'annullato aveva
+    # una soglia; ora che il ritirato sparisce subito, a portare la
+    # catena e' il rifiutato — il mestiere e' lo stesso.)
+    prova("...e un rifiuto di STAMATTINA resta, anche se l'ordine e' "
           "nato due mesi fa",
-          True, "chiuso_stamattina_dal_coordinatore"
-          in (_o2.get("resta") or []))
+          True, "rifiutato_stamattina" in (_o2.get("resta") or []))
 
 def main():
     print("=" * 58)

@@ -34032,9 +34032,38 @@ function p2pTogliibile(o, adesso){
    voce di CANTIERI). Un annullato che i sats li ha TENUTI (hold, o
    satsNetti gia' detti) e' una ricevuta e tiene i 30 giorni, come il
    concluso — che porta il voto e finisce nell'export degli affari.
-   La ✕ resta per il subito. */
+   La ✕ resta per il subito.
+   E IL RITIRATO NON SI VEDE PROPRIO PIU' (set 2026, decisione di
+   Andrea che semplifica il lampo): un annullato che non ha mai tenuto
+   sats non e' nemmeno una notizia — ritirato = sparito, SUBITO e
+   ovunque. Qui nella scopa e' la RETE (righe rimaste da prima); a
+   toglierlo sul momento sono i due posti dove l'annullato ARRIVA,
+   `applicaMessaggioP2P` e `statoPubblicoOrdini`, che passano dal
+   rimotore. Il lampo delle 24 ore resta al solo `rifiutato`, che
+   porta un motivo da leggere. */
 const P2P_SCOPA_GIORNI = 30;
 const P2P_SCOPA_LAMPO_S = 24 * 3600;
+/* IL GIUDICE DEL RITIRATO, uno per i tre posti: annullato senza sats
+   mai tenuti. Un annullato con la hold in mano (o coi satsNetti gia'
+   detti) e' una RICEVUTA di uno scambio abortito, non un ritiro. */
+function p2pRitirato(o){
+  return !!o && o.stato === 'annullato' && !o.hold && !(o.satsNetti > 0);
+}
+/* IL RIMOTORE: toglie la riga E le due cache di sessione. Senza la
+   seconda meta' l'adozione lo RESUSCITEREBBE: la restore e il libro
+   in cache dicono «pending» per tutta la sessione, e una riga tolta
+   con quei due ancora caldi rinascerebbe «pubblicato» al render dopo. */
+function togliRitiratoP2P(id){
+  const o = ordiniP2P()[id];
+  if (!p2pRitirato(o)) return false;
+  const tutti = ordiniP2P();
+  delete tutti[id];
+  try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+  if (p2pMieiOrdini && p2pMieiOrdini[id]) delete p2pMieiOrdini[id];
+  if (p2pLibro && p2pLibro.ordini)
+    p2pLibro.ordini = p2pLibro.ordini.filter(x => x.id !== id);
+  return true;
+}
 function pulisciScambiP2P(){
   const tutti = ordiniP2P();
   const adesso = Math.floor(Date.now() / 1000);
@@ -34046,7 +34075,8 @@ function pulisciScambiP2P(){
     const mosso = o.quando || o.aggiornato || o.creato || 0;
     const lampo = (o.stato === 'annullato' || o.stato === 'rifiutato')
       && !o.hold && !(o.satsNetti > 0);
-    const soglia = lampo ? P2P_SCOPA_LAMPO_S : P2P_SCOPA_GIORNI * 86400;
+    const soglia = p2pRitirato(o) ? 0
+      : lampo ? P2P_SCOPA_LAMPO_S : P2P_SCOPA_GIORNI * 86400;
     if (!mosso || adesso - mosso < soglia) continue;
     delete tutti[k];
     tolti++;
@@ -34784,6 +34814,18 @@ function applicaMessaggioP2P(ord, dentro){
      col quale il coordinatore lo chiamera' per sempre. */
   if (provvisorioP2P(nuovo.id) && dentro.id) rinominaOrdineP2P(nuovo, dentro.id);
   else scriviOrdineP2P(nuovo);
+  /* IL RITIRATO NON SI VEDE PIU' (set 2026, decisione di Andrea):
+     ritirato = sparito, subito e ovunque — niente card «annullato»
+     che resta in giro. Il rimotore pulisce anche le cache di sessione
+     (o l'adozione lo resusciterebbe), e chi stava guardando proprio
+     quella pagina torna al libro con la notizia detta a voce. */
+  if (p2pRitirato(nuovo) && togliRitiratoP2P(nuovo.id)) {
+    toast('Ordine ritirato ✓');
+    if (p2pOrdineAperto === nuovo.id) { p2pOrdineAperto = ''; go('p2p'); }
+    else renderP2P();
+    mostroRiascolta().catch(() => {});
+    return;
+  }
   if (p2pOrdineAperto === nuovo.id) renderOrdineP2P();
   /* il foglio del pagamento si chiude DA SOLO quando i sats sono
      bloccati: e' il coordinatore a dirlo, non un bottone «ho pagato» */
@@ -35753,6 +35795,10 @@ async function statoPubblicoOrdini(ids){
     o.stato = fine;
     o.quando = adesso;
     scriviOrdineP2P(o);
+    /* il ritirato (o lo scaduto senza sats) sparisce QUI, in silenzio:
+       questa e' la via di riserva che gira all'apertura, e la card di
+       un ordine morto non deve nemmeno comparire */
+    if (p2pRitirato(o)) togliRitiratoP2P(o.id);
     mossi++;
   }
   /* uno scambio finito esce dall'ascolto: la sub si rifa' sulle sole
