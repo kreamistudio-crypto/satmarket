@@ -1805,6 +1805,11 @@
   .p2p-cifra{font-size:17px;white-space:normal}
   .p2p-cambio{display:block;margin-top:3px;font-family:inherit;
     font-weight:600;font-size:13.5px;color:var(--ink-soft)}
+  /* il premio nella frase dell'euro: la classe porta il GIUDIZIO per
+     chi legge (deciso dal lato dell'ordine, vedi rigaOrdineP2P), il
+     testo la direzione del prezzo — i token hanno la sera */
+  .p2p-cambio .p2p-avviso{color:var(--danger)}
+  .p2p-cambio .p2p-affare{color:var(--trust)}
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -1828,14 +1833,12 @@
      staccava non serve piu' — a staccarla e' il riquadro, come nel
      riferimento. Ultima e non prima: in un libro si scorre per PREZZO,
      e la persona davanti al numero metterebbe uno sconosciuto prima
-     della cifra.
-     Le due cifre a destra come nel riferimento, e `wrap` perche' con
-     «Senza voti» + «da 1 giorno» a 320 la riga puo' non bastare: a
-     capo e' meglio che allargare la pagina. */
+     della cifra. */
   .p2p-mio{border-color:var(--orange);opacity:.85}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
-  .p2p-rep{display:flex;flex-wrap:wrap;justify-content:space-between;
-    gap:2px 10px;font-size:12px}
+  /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
+     due pezzi ai bordi — si legge come si dice */
+  .p2p-rep{font-size:12px}
   /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
      l'auto-margine la spinge in fondo alla SUA riga.
      MA COL CONTENUTO VERO QUEL CAPO NON ARRIVA MAI, ed e' misurato e
@@ -32860,7 +32863,13 @@ function ordineDaEvento(ev, adesso){
   const lato = tagValore(ev, 'k');
   if (!id || (lato !== 'sell' && lato !== 'buy')) return null;
   const fa = tagValori(ev, 'fa').map(Number).filter(n => Number.isFinite(n) && n > 0);
-  if (fa.length !== 1) return null;   // range (o niente): riconosciuto, escluso
+  /* ANCHE GLI ORDINI A INTERVALLO ENTRANO (set 2026, col ridisegno
+     delle card): due importi buoni e crescenti sono un range — chi
+     prende sceglie la cifra — e la card lo dice («scegli tu»). Tre
+     importi, o un massimo che non supera il minimo, restano un ordine
+     ROTTO: null, come lo zero importi di sempre. */
+  if (fa.length !== 1 && fa.length !== 2) return null;
+  if (fa.length === 2 && !(fa[1] > fa[0])) return null;
   const scade = Number(tagValore(ev, 'expires_at')) || Number(tagValore(ev, 'expiration')) || 0;
   if (scade && scade <= adesso) return null;
   return {
@@ -32868,6 +32877,7 @@ function ordineDaEvento(ev, adesso){
     stato: String(tagValore(ev, 's') || ''),
     fiat: String(tagValore(ev, 'f') || '').toUpperCase(),
     euro: fa[0],
+    euroMax: fa.length === 2 ? fa[1] : 0,
     sats: Math.max(0, Math.floor(Number(tagValore(ev, 'amt')) || 0)),
     premium: Number(tagValore(ev, 'premium')) || 0,
     metodi: tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean),
@@ -32877,28 +32887,12 @@ function ordineDaEvento(ev, adesso){
   };
 }
 
-/* IL PARSER ESCLUDE GLI ORDINI A INTERVALLO, e fin qui sparivano in
-   silenzio: chi guardava vedeva sette offerte dove il coordinator ne
-   ha nove. Questo giudice riconosce QUEL caso e non gli altri due —
-   uno scaduto o un kind sbagliato non sono «a intervallo», e dirlo
-   sarebbe peggio del silenzio. La condizione e' la stessa del parser
-   scritta una volta sola (due importi buoni o piu'): `fa` VUOTO non e'
-   un intervallo, e' un ordine rotto, e non si conta. Si guardano anche
-   stato, valuta e scadenza, o si direbbe «due a intervallo» di ordini
-   che nel libro non sarebbero comunque entrati. Torna il LATO, che e'
-   insieme il giudizio e il dato che serve a chi conta. */
-function intervalloP2P(ev, adesso){
-  if (!ev || ev.kind !== 38383) return '';
-  const lato = tagValore(ev, 'k');
-  if (lato !== 'sell' && lato !== 'buy') return '';
-  const fa = tagValori(ev, 'fa').map(Number).filter(n => Number.isFinite(n) && n > 0);
-  if (fa.length < 2) return '';
-  if (String(tagValore(ev, 's') || '') !== 'pending') return '';
-  if (String(tagValore(ev, 'f') || '').toUpperCase() !== P2P_VALUTA) return '';
-  const scade = Number(tagValore(ev, 'expires_at')) || Number(tagValore(ev, 'expiration')) || 0;
-  if (scade && scade <= (adesso || Math.floor(Date.now() / 1000))) return '';
-  return lato;
-}
+/* IL GIUDICE DEGLI «ESCLUSI A INTERVALLO» NON C'E' PIU' (set 2026,
+   col ridisegno delle card): i range ENTRANO nel libro come ordini
+   veri, e la macchina che li contava a parte — il giudice, la mappa,
+   la riga fissa sopra il libro — e' morta con la sua ragione, nome
+   compreso (una sentinella lo vieta, il precedente dello spaziatore).
+   Prenderli da qui non si puo' ancora, e lo dice il TOCCO, una volta. */
 
 /* Le impostazioni del coordinator: `fee` e' una FRAZIONE (0.01 = 1%),
    i tetti sono in sats, la lista delle valute e' separata da virgole.
@@ -33025,15 +33019,15 @@ async function leggiLibroMostro(){
 }
 
 /* IL LETTORE DEL LIBRO E' PURO (set 2026, il morto che risorge): da
-   eventi a {ordini, intervalli, info}, senza rete ne' stato — cosi'
-   il banco lo fa GIRARE sui casi che contano invece di guardare le
-   righe. Gli ordini sono eventi ADDRESSABLE: per ogni `d` vale il
-   piu' recente, anche se un relay ne manda due.
+   eventi a {ordini, info}, senza rete ne' stato — cosi' il banco lo
+   fa GIRARE sui casi che contano invece di guardare le righe. Gli
+   ordini sono eventi ADDRESSABLE: per ogni `d` vale il piu' recente,
+   anche se un relay ne manda due. I range sono ordini come gli altri
+   dal set 2026 (il ridisegno delle card), quindi la dedup e' UNA.
    ⚠️ E COME GLI ORDINI SI CONFRONTANO PER DATA (set 2026, col
    ventaglio): una copia vecchia dello specchio puo' arrivare DOPO
    quella fresca e scavalcarla — in silenzio, che e' il modo in cui
-   si sbaglia. Gli intervalli si contano per `d` come gli ordini, o
-   due relay che mandano lo stesso evento lo conterebbero due volte.
+   si sbaglia.
    LA MAPPA DEI MORTI e' la meta' robusta della dedup: un 38383 con
    `s` diverso da pending uccide la copia pending piu' vecchia del
    suo stesso `d` ANCHE quando il parser non saprebbe leggerlo (una
@@ -33045,7 +33039,6 @@ async function leggiLibroMostro(){
 function libroDaEventi(eventi, adesso){
   adesso = adesso || Math.floor(Date.now() / 1000);
   const perId = new Map();
-  const fuori = new Map();
   const morti = new Map();
   let info = null;
   for (const ev of (eventi || [])) {
@@ -33063,16 +33056,7 @@ function libroDaEventi(eventi, adesso){
       if ((morti.get(dMorto) || 0) < quando) morti.set(dMorto, quando);
     }
     const o = ordineDaEvento(ev, adesso);
-    if (!o) {
-      const lato = intervalloP2P(ev, adesso);
-      if (lato) {
-        const d = String(tagValore(ev, 'd'));
-        const quando = Number(ev.created_at) || 0;
-        const g = fuori.get(d);
-        if (!g || quando > g.quando) fuori.set(d, {lato, quando});
-      }
-      continue;
-    }
+    if (!o) continue;
     const g = perId.get(o.id);
     if (!g || o.creato > g.creato) perId.set(o.id, o);
   }
@@ -33081,9 +33065,6 @@ function libroDaEventi(eventi, adesso){
       .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA
                 && !((morti.get(o.id) || 0) >= o.creato))
       .sort((a, b) => b.creato - a.creato),
-    intervalli: [...fuori.entries()]
-      .filter(e => !((morti.get(e[0]) || 0) >= e[1].quando))
-      .map(e => e[1].lato),
     info
   };
 }
@@ -33105,7 +33086,6 @@ function caricaLibroP2P(forza){
         p2pInfo = libro.info;
       p2pLibro = {
         ordini: libro.ordini.filter(o => !lapidataP2P(o.id)),
-        intervalli: libro.intervalli,
         quando: Date.now()
       };
       p2pErrore = '';
@@ -33174,25 +33154,32 @@ function repTestoP2P(rep){
   const eta = rep.giorni >= 1
     ? 'da ' + rep.giorni + (rep.giorni === 1 ? ' giorno' : ' giorni')
     : 'da oggi';
-  /* DUE PEZZI e non una frase: nel riferimento il voto sta a sinistra
-     e da quanto e' li' a destra, e la scatola li spinge ai due bordi.
-     Il separatore lo fa lo SPAZIO fra i due, non un puntino — un « · »
-     dentro un `space-between` si vedrebbe in mezzo al vuoto. */
+  /* UNA RIGA UMANA (set 2026, il ridisegno delle card): «⭐ 4,8 · 7
+     scambi · da 23 giorni» — via la fila di stelle e i due pezzi ai
+     bordi, la frase si legge come si dice. «Scambi» e non «voti»:
+     su Mostro ogni voto e' uno scambio concluso, ed e' il fatto che
+     interessa a chi guarda. */
   if (!(rep.voti > 0) || !(rep.media > 0))
-    return '<span>🆕 Senza voti</span><span>' + eta + '</span>';
+    return '🆕 Senza voti · ' + eta;
   const media = rep.media.toLocaleString('it-IT',
     {minimumFractionDigits: 1, maximumFractionDigits: 1});
-  return `<span><span class="stars">${'★'.repeat(Math.round(rep.media))}</span> `
-    + media + contaFeedback(rep.voti) + '</span><span>' + eta + '</span>';
+  return '⭐ ' + media + ' · ' + rep.voti
+    + (rep.voti === 1 ? ' scambio' : ' scambi') + ' · ' + eta;
 }
 
 /* A prezzo di mercato (amt=0) i sats si STIMANO col cambio di casa e il
    premio dell'ordine: e' una stima e porta il ≈ — la cifra vera la
    decide il coordinator al momento dello scambio. Senza cambio vivo
    non si inventa niente. */
+/* LA FORMULA E' QUELLA DEL COORDINATORE, letta sui byte (set 2026,
+   mostro v0.18.6, get_market_quote in src/util.rs):
+   `sats -= premium/100 * sats` — sottrazione UNIFORME sui due versi,
+   mai una divisione. Prima qui c'era /(1+p/100), che a +2% stimava
+   98039 dove il coordinatore consegna 98000: la stima ora dice il
+   numero che il taker riceve davvero. */
 function satsMercatoP2P(o){
   if (!cambioVivo || !(eurPerSat > 0)) return 0;
-  return Math.round(o.euro / (eurPerSat * (1 + o.premium / 100)));
+  return Math.round((o.euro / eurPerSat) * (1 - o.premium / 100));
 }
 
 /* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
@@ -33201,21 +33188,43 @@ function satsMercatoP2P(o){
    sconosciuto davanti al numero. */
 function rigaOrdineP2P(o){
   const stima = satsMercatoP2P(o);
-  /* LA CARD DICE CHI FA COSA (set 2026, richiesta di Andrea): riga
-     grande col VERBO e i sats — «Vende ≈ 12 000 sats» — e sotto
-     «in cambio di 8,00 € · prezzo di mercato». Il verbo e' un fatto
-     della RIGA (o.lato), mai del tab: dice quel che fa chi ha
-     pubblicato, e resterebbe giusto anche fuori da questo elenco. */
+  /* LA CARD DICE CHI FA COSA (set 2026, richiesta di Andrea, poi il
+     ridisegno «capita in un secondo»): riga grande col VERBO e i sats
+     — «Vende ≈ 12 000 sats» — e sotto la frase UNICA dell'euro. Il
+     verbo e' un fatto della RIGA (o.lato), mai del tab: dice quel che
+     fa chi ha pubblicato, e resterebbe giusto anche fuori da questo
+     elenco. A destra resta la SCADENZA e non l'eta' (scelta nostra
+     fra le due): quanto RESTA fa decidere, quanto e' vecchio no. */
   const verbo = o.lato === 'sell' ? 'Vende' : 'Compra';
+  /* il range stima i DUE capi collo stesso metro; a cambio muto
+     niente cifre, mai un numero inventato */
+  const stima2 = o.euroMax && stima
+    ? satsMercatoP2P({euro: o.euroMax, premium: o.premium}) : 0;
   const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
-             : stima ? '≈ ' + fmt(stima) + ' sats'
+             : stima ? '≈ ' + fmt(stima)
+               + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
              : 'sats';
-  /* la coda della riga dell'euro: il premio quando c'e' (resta dov'era,
-     dopo il ·), «prezzo di mercato» col cambio vivo, «al mercato» a
-     cambio muto — mai un numero inventato */
+  /* LA FRASE UNICA DELL'EURO (il ridisegno): «al prezzo di mercato»
+     a premio zero, «, +4% sopra il mercato» o «, −2% sotto il
+     mercato» col premio, e il range chiude con «, scegli tu». A
+     importo fisso (amt>0) niente coda: il prezzo e' suo.
+     LA TINTA E' UN GIUDIZIO PER CHI LEGGE, il testo un fatto del
+     prezzo (verificato sui byte: la formula del coordinatore e'
+     uniforme sui due versi, sats -= premium%). Su un SELL chi legge
+     PAGA euro: sopra il mercato e' un avviso, sotto un affare. Su un
+     BUY chi legge RICEVE euro: il premio positivo e' la controparte
+     che paga di piu' — affare — e il negativo l'avviso. */
+  const eurTxt = esc(fmtEur(o.euro))
+    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' €';
+  const affare = (o.lato === 'buy') === (o.premium > 0);
+  const premioTxt = o.premium > 0
+    ? ', +' + esc(String(o.premium)) + '% sopra il mercato'
+    : ', −' + esc(String(Math.abs(o.premium))) + '% sotto il mercato';
   const coda = o.sats > 0 ? ''
-             : o.premium ? (o.premium > 0 ? '+' : '−') + Math.abs(o.premium) + '% sul mercato'
-             : stima ? 'prezzo di mercato' : 'al mercato';
+             : o.premium ? '<span class="' + (affare ? 'p2p-affare' : 'p2p-avviso')
+               + '">' + premioTxt + '</span>'
+             : ' al prezzo di mercato';
+  const scegli = o.euroMax ? ', scegli tu' : '';
   const sc = scadeTestoP2P(o.scade);
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
@@ -33238,7 +33247,7 @@ function rigaOrdineP2P(o){
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa"><span class="p2p-sats p2p-cifra">${verbo} ${sats}</span>${sc ? '<span class="p2p-quando">⏳ ' + esc(sc) + '</span>' : ''}</div>
-    <span class="p2p-euro p2p-cambio">in cambio di ${esc(fmtEur(o.euro))} €${coda ? ' · ' + esc(coda) : ''}</span>
+    <span class="p2p-euro p2p-cambio">in cambio di ${eurTxt}${coda}${scegli}</span>
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">👤 È il tuo ordine — tocca per aprirlo</div>' : ''}
@@ -33351,20 +33360,16 @@ function renderP2P(){
   }
   const k = P2P_LATO_K[p2pLato];
   const vivi = p2pLibro.ordini.filter(o => o.lato === k);
-  const fuori = (p2pLibro.intervalli || []).filter(l => l === k).length;
   /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
      prima non si sapeva — quante ce ne sono — e per giunta dice che il
      libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
      dice anche il LATO: il tab acceso qui sopra dice il mio
-     («Compra BTC»), questa dice quello di chi sta dall'altra parte. */
+     («Compra BTC»), questa dice quello di chi sta dall'altra parte.
+     LA RIGA DEGLI «ESCLUSI A INTERVALLO» E' MORTA col ridisegno delle
+     card (set 2026): i range ora sono nel conteggio come tutti. */
   const testa = `<div class="section-label riga-conta"><span class="conta">${vivi.length}</span> `
     + `offert${vivi.length === 1 ? 'a' : 'e'} di chi `
     + (p2pLato === 'compro' ? 'vende' : 'compra') + ' sats</div>'
-    /* GLI ESCLUSI SI DICONO: il parser lascia fuori gli ordini a
-       intervallo, e fin qui sparivano in silenzio. Costa una riga e
-       toglie l'unica bugia della pagina. */
-    + (fuori ? `<div class="hint">${fuori} offert${fuori === 1 ? 'a' : 'e'} a intervallo `
-        + `non si prend${fuori === 1 ? 'e' : 'ono'} ancora da qui.</div>` : '')
     /* IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
        arrivato dal solo specchio si legge come il libro vero, e un
        ordine gia' preso sembra ancora libero. */
@@ -35095,6 +35100,11 @@ function prendiOrdineP2P(id){
   if (ordineMioP2P(id)) { toast('Questo ordine è tuo: da questo dispositivo, per ora, si guarda soltanto'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
+  /* IL RANGE SI GUARDA E NON SI PRENDE, per ora (set 2026, col
+     ridisegno che l'ha fatto entrare nel libro): prenderlo vuole la
+     scelta dell'importo, e quel foglio non c'e' ancora. Lo dice il
+     tocco, una volta — mai una riga fissa sopra il libro. */
+  if (riga.euroMax) { toast('Per quest\'ordine si sceglie l\'importo, e da qui non si può ancora'); return; }
   const compro = riga.lato === 'sell';
   const sats = riga.sats > 0 ? fmt(riga.sats) + ' sats' : 'al prezzo di mercato';
   chiediConferma({

@@ -17586,17 +17586,14 @@ def prove_conta_feedback():
     html = open("miniapp.html", encoding="utf-8").read()
     prova("il client ha un giudice unico", True,
           "function contaFeedback(" in html)
-    # QUATTRO posti la mostrano — negozio, Profilo, la CLASSIFICA (ago
-    # 2026) e la card del LIBRO P2P — e devono passare tutti da li', o
-    # diventano quattro rese diverse della stessa cosa. Il conto e' un
-    # CENSIMENTO, e ha fatto il suo mestiere: il quarto e' arrivato, ha
-    # trovato la riga rossa ed e' venuto a leggere il perche' invece di
-    # ricopiarsi la regola della soglia.
-    # ⚠️ IL QUARTO CHIAMA CON UN ARGOMENTO SOLO, ed e' una decisione e
-    # non una dimenticanza: il tag `rating` del coordinator porta i
-    # VOTI e non le persone distinte, quindi la seconda cifra non
-    # nasce — dire «7 da 7 persone» sarebbe un'affermazione inventata.
-    prova("i quattro posti lo usano tutti e quattro", 4,
+    # TRE posti la mostrano — negozio, Profilo e la CLASSIFICA (ago
+    # 2026) — e devono passare tutti da li', o diventano rese diverse
+    # della stessa cosa. Il conto e' un CENSIMENTO e ha gia' fatto il
+    # suo mestiere due volte: quando il quarto (la card del libro P2P)
+    # e' ARRIVATO, e quando se n'e' ANDATO — dal set 2026 la card
+    # parla la frase umana di repTestoP2P («N scambi») e questa
+    # famiglia non la chiama piu'.
+    prova("i tre posti lo usano tutti e tre", 3,
           html.count("contaFeedback(") - 1)   # -1 = la definizione
 
     # La regola della soglia, rifatta qui: la seconda cifra parla SOLO
@@ -35349,10 +35346,11 @@ def prove_p2p_libro():
     rep = css[css.index(".p2p-rep{"):css.index("}", css.index(".p2p-rep{"))]
     prova("...e la striscia la stacca il riquadro, non piu' un filo",
           False, "border-top" in rep)
-    # LE DUE CIFRE AI DUE BORDI, che e' la forma del riferimento: il
-    # voto a sinistra e da quanto e' li' a destra.
-    prova("...e le due cifre della striscia stanno ai due bordi", True,
-          "justify-content:space-between" in rep)
+    # EMENDATA (set 2026, il ridisegno): la reputazione e' UNA FRASE
+    # umana, non piu' due pezzi spinti ai bordi — lo space-between non
+    # deve risorgere.
+    prova("...e la striscia e' una frase, non due pezzi ai bordi",
+          False, "justify-content:space-between" in rep)
     # HA CAMBIATO PELLE (set 2026, richiesta di Andrea): la card dice
     # CHI FA COSA — riga grande col VERBO e i sats («Vende ≈ 12 000
     # sats»), sotto «in cambio di 8,00 € · prezzo di mercato». Le
@@ -35409,24 +35407,22 @@ def prove_p2p_libro():
     prova("il commutatore accende il tab attivo", True,
           "classList.toggle('attiva', p2pLato === 'compro')" in _rp
           and "classList.toggle('attiva', p2pLato === 'vendo')" in _rp)
-    # GLI ESCLUSI: il conteggio si legge dal LATO che si sta guardando,
-    # o si direbbe «3 a intervallo» a chi ne ha davanti uno solo.
-    prova("gli ordini a intervallo si dicono, e per lato", True,
-          "(p2pLibro.intervalli || []).filter(l => l === k).length" in _rp
-          and "a intervallo" in _rp)
-    prova("...e a zero non si scrive niente", True,
-          "fuori ? " in _rp)
-    # LA DATA E' ENTRATA NEL CONFRONTO (set 2026, col ventaglio), e la
-    # sentinella cambia forma con la riga che sorveglia: contarli per
-    # `d` non basta piu', perche' ora i relay rispondono INSIEME e una
-    # copia vecchia dello specchio puo' arrivare dopo quella fresca e
-    # scavalcarla. Il pezzo nuovo e' la seconda prova.
+    # LA MACCHINA DEGLI «ESCLUSI A INTERVALLO» E' MORTA (set 2026, il
+    # ridisegno delle card): i range ENTRANO nel libro come ordini —
+    # la dedup e' UNA, la riga fissa sopra il libro non c'e' piu', e
+    # a dire «non si prende ancora» e' il TOCCO. Niente codice morto:
+    # ne' il giudice, ne' la mappa, ne' il campo.
     _cl = pezzo_js(mini, "function libroDaEventi(eventi, adesso){")
-    prova("gli intervalli si contano per `d`, come gli ordini", True,
-          "const g = fuori.get(d);" in _cl
-          and "fuori.set(d, {lato, quando});" in _cl)
-    prova("...e fra due copie vince la piu' recente, come gli ordini",
-          True, "if (!g || quando > g.quando)" in _cl)
+    prova("la riga degli esclusi non c'e' piu'", False,
+          "a intervallo" in _rp)
+    prova("...e della macchina non resta niente", True,
+          "intervalloP2P" not in mini
+          and "intervalli" not in _cl
+          and "intervalli" not in pezzo_js(
+              mini, "function caricaLibroP2P(forza){"))
+    prova("il range si guarda ma non si prende, e lo dice il tocco",
+          True, "si sceglie l\\'importo"
+          in pezzo_js(mini, "function prendiOrdineP2P(id){", "\n}\n"))
     # EMENDATA (set 2026, il morto che risorge): la REQ NON filtra piu'
     # ne' stato ne' valuta — con `#s: pending` la sostituzione a
     # `canceled` non arrivava mai, e la copia stantia di un relay
@@ -35487,7 +35483,6 @@ def prove_p2p_libro():
         "function tagValore(ev, nome){",
         "function repDaTag(s){",
         "function ordineDaEvento(ev, adesso){",
-        "function intervalloP2P(ev, adesso){",
         "function repTestoP2P(rep){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
@@ -35562,27 +35557,33 @@ out.rigaMercatoZeroVivo = rigaOrdineP2P(out.mercatoZero);
    passa da relay di terzi — quindi si prova anche storto e assente. */
 const conRep = t => ordineDaEvento(ev(38383, [['d','rep-'+t.length],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['rating', t]]), ora);
 out.repPiena  = conRep('{"total_reviews": 7, "total_rating": 4.6, "days": 23}');
+out.repUno    = conRep('{"total_reviews": 1, "total_rating": 5, "days": 2}');
 out.repZero   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 1}');
 out.repOggi   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 0.4}');
 out.repFuori  = conRep('{"total_reviews": 3, "total_rating": 999, "days": -5}');
 out.repStorta = conRep('{non sono json');
 out.testoPieno  = repTestoP2P(out.repPiena.rep);
+out.testoUno    = repTestoP2P(out.repUno.rep);
 out.testoZero   = repTestoP2P(out.repZero.rep);
 out.testoOggi   = repTestoP2P(out.repOggi.rep);
 out.testoFuori  = repTestoP2P(out.repFuori.rep);
 out.testoNiente = repTestoP2P(null);
 out.rigaRep      = rigaOrdineP2P(out.repPiena);
 out.rigaSenzaRep = rigaOrdineP2P(out.fisso);
-/* GLI ESCLUSI: il giudice degli intervalli dice il LATO, e solo su
-   quelli che davvero non si prendono da qui. */
-const range = (extra) => ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']].concat(extra || []));
-out.intervallo         = intervalloP2P(range(), ora);
-out.intervalloComp     = intervalloP2P(ev(38383, [['d','r'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']]), ora);
-out.intervalloVecchio  = intervalloP2P(range([['expires_at', String(ora-1)]]), ora);
-out.intervalloAltraVal = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','USD'],['s','pending'],['amt','0'],['fa','50','100']]), ora);
-out.intervalloPreso    = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','in-progress'],['amt','0'],['fa','50','100']]), ora);
-out.intervalloSingolo  = intervalloP2P(ev(38383, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50']]), ora);
-out.intervalloKind     = intervalloP2P(ev(38385, [['d','r'],['k','sell'],['f','EUR'],['s','pending'],['fa','50','100']]), ora);
+/* IL RANGE (set 2026, il ridisegno): due importi crescenti sono un
+   ordine come gli altri — la card lo dice — e i rotti restano rotti. */
+out.rangeInvertito = ordineDaEvento(ev(38383, [['d','ri'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','100','50'],['pm','x']]), ora);
+out.rangeTriplo = ordineDaEvento(ev(38383, [['d','rt'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','10','20','30'],['pm','x']]), ora);
+out.rigaRange = rigaOrdineP2P(out.range);
+out.rigaRangePremio = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rp'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['premium','4'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
+out.rigaSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rs'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
+out.rigaAvviso = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ra'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','3'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
+/* ...e fra due copie dello stesso range vince la piu' recente: la
+   dedup e' quella di TUTTI gli ordini, non un binario a parte */
+out.rangeDedup = libroDaEventi([
+  ev(38383, [['d','rd'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['pm','x']], 100),
+  ev(38383, [['d','rd'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','60','120'],['pm','x']], 200)
+], ora).ordini;
 cambioVivo = false;
 out.rigaMercatoMuto = rigaOrdineP2P(out.mercato);
 out.rigaMercatoZeroMuto = rigaOrdineP2P(out.mercatoZero);
@@ -35601,11 +35602,12 @@ out.mortoRottoUccide = libroDaEventi([vivoEv, mortoRotto], ora).ordini.length ==
    morto e' l'ordine tornato nel libro (il taker che lascia scadere) */
 const rinato = ev(38383, [['d','r-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora+3600)]], 300);
 out.rinatoSiMostra = libroDaEventi([mortoEv, rinato], ora).ordini.length === 1;
-/* anche il conteggio degli intervalli muore col suo morto */
+/* anche il RANGE muore col suo morto — e' un ordine come gli altri
+   (set 2026, il ridisegno), quindi la mappa dei morti copre pure lui */
 const intVivo = ev(38383, [['d','r-2'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']], 100);
 const intMorto = ev(38383, [['d','r-2'],['s','canceled']], 200);
-out.intervalloMuore = libroDaEventi([intVivo, intMorto], ora).intervalli.length === 0
-  && libroDaEventi([intVivo], ora).intervalli.length === 1;
+out.intervalloMuore = libroDaEventi([intVivo, intMorto], ora).ordini.length === 0
+  && libroDaEventi([intVivo], ora).ordini.length === 1;
 /* e il 38385 esce dal lettore puro, per il chiamante */
 out.lettoreDaInfo = (libroDaEventi([ev(38385, [['fee','0.01'],['max_order_amount','1']], 5)], ora).info || {}).fee === 0.01;
 /* --- LE LAPIDI: orologio VERO, che dentro c'e' Date.now() --- */
@@ -35665,9 +35667,32 @@ console.log(JSON.stringify(out));
           m is not None and m["sats"] == 0 and m["premium"] == 2
           and m["lato"] == "buy")
     prova("...la valuta si normalizza in maiuscolo", "EUR", m["fiat"])
-    prova("...e i sats si STIMANO col cambio e il premio", 98039,
+    # EMENDATA (set 2026, letta sui byte): la formula e' quella del
+    # coordinatore — sats -= premium% (mostro v0.18.6, get_market_quote)
+    # — non piu' la divisione, che a +2% stimava 98039 dove il
+    # coordinatore consegna 98000.
+    prova("...e i sats si STIMANO colla formula del coordinatore", 98000,
           out["mercatoSats"])
-    prova("il range (due importi) e' ESCLUSO", None, out["range"])
+    # ROVESCIATA (set 2026, il ridisegno delle card): il range ENTRA,
+    # coi due capi — restano rotti l'invertito e il triplo.
+    prova("il range (due importi crescenti) ENTRA, coi due capi", True,
+          out["range"] is not None and out["range"]["euro"] == 50
+          and out["range"]["euroMax"] == 100)
+    prova("...e a importo singolo il massimo e' zero", 0,
+          out["fisso"]["euroMax"])
+    prova("...ma l'invertito e il triplo restano rotti",
+          [None, None], [out["rangeInvertito"], out["rangeTriplo"]])
+    prova("fra due copie del range vince la piu' recente, dedup UNA",
+          True, len(out["rangeDedup"]) == 1
+          and out["rangeDedup"][0]["euro"] == 60
+          and out["rangeDedup"][0]["euroMax"] == 120)
+    prova("la card del range dice i due capi e «scegli tu»", True,
+          "50,00–100,00 €" in out["rigaRange"]
+          and "al prezzo di mercato, scegli tu" in out["rigaRange"])
+    prova("...e col premio il range dice il premio, e sceglie lo stesso",
+          True, "+4% sopra il mercato</span>, scegli tu"
+          in out["rigaRangePremio"]
+          and "al prezzo di mercato" not in out["rigaRangePremio"])
     prova("lo scaduto e' escluso", None, out["scaduto"])
     prova("senza id non e' un ordine", None, out["senzaD"])
     prova("un lato sconosciuto non e' un ordine", None, out["latoStorto"])
@@ -35686,34 +35711,32 @@ console.log(JSON.stringify(out));
           "&lt;script&gt;" in rv and "<script>" not in rv)
     prova("...e l'id con la virgoletta non spezza l'attributo", True,
           'data-id="ord-6&quot;"' in rv)
+    # EMENDATA DI NUOVO (set 2026, il ridisegno + il verso del
+    # premio): la frase dell'euro e' UNA, il TESTO dice la direzione
+    # del prezzo e la TINTA il giudizio per chi legge — su un SELL chi
+    # legge paga (sopra=avviso, sotto=affare), su un BUY riceve
+    # (sopra=affare, sotto=avviso). Verificato sui byte: la formula
+    # del coordinatore e' uniforme sui due versi.
     prova("a prezzo di mercato la riga porta il ≈ e il premio", True,
-          "≈ 98039 sats" in out["rigaMercato"]
-          and "+2% sul mercato" in out["rigaMercato"])
-    # HA CAMBIATO LATO (ago 2026): il ripiego era «al prezzo di mercato»,
-    # venti caratteri in mono dentro una testa larga 258px a 320 — e la
-    # testa e' un flex, quindi il prezzo si stringeva e andava a capo
-    # (misurato, 2 card su 7). Quel che la prova garantisce non cambia:
-    # a cambio muto non esce nessun numero inventato.
-    # EMENDATA (set 2026, «chi fa cosa»): col PREMIO la coda dice il
-    # premio anche a cambio muto («+2% sul mercato»), e «al mercato»
-    # resta al solo caso senza premio. Quel che la prova garantisce
-    # non cambia: a cambio muto nessun ≈ e nessun numero inventato.
+          "≈ 98000 sats" in out["rigaMercato"]
+          and '<span class="p2p-affare">, +2% sopra il mercato</span>'
+          in out["rigaMercato"])
+    prova("...e su un sell il sotto e' un affare, il sopra un avviso",
+          True, '<span class="p2p-affare">, −2% sotto il mercato</span>'
+          in out["rigaSotto"]
+          and '<span class="p2p-avviso">, +3% sopra il mercato</span>'
+          in out["rigaAvviso"])
+    # A CAMBIO MUTO nessun ≈ e nessun numero inventato: la cifra
+    # degrada a «sats» nudo, la frase dell'euro resta intera (dice il
+    # mercato o il premio, che non hanno bisogno del cambio).
     prova("...e a cambio muto non inventa nessun numero", True,
           "≈" not in out["rigaMercatoMuto"]
           and "≈" not in out["rigaMercatoZeroMuto"]
-          and "+2% sul mercato" in out["rigaMercatoMuto"]
-          and "al mercato" in out["rigaMercatoZeroMuto"])
-    # E IL CASO CHE MORDE E' QUELLO SENZA PREMIO, che l'ha detto la
-    # tortura: con `premium` pieno la meta dice «+2% sul mercato» e il
-    # ripiego non si valuta affatto, quindi l'asserzione sul solo
-    # `rigaMercatoMuto` passava per la ragione sbagliata.
-    prova("...e la testa lo dice gia', quindi la meta non lo ripete",
-          False, "prezzo di mercato" in out["rigaMercatoMuto"]
-          or "prezzo di mercato" in out["rigaMercatoZeroMuto"])
-    # il ROVESCIO, o la riga di sopra sarebbe vera anche se quel ramo
-    # non scrivesse mai niente: col cambio vivo la meta lo dice.
-    prova("...mentre col cambio vivo la meta dice che e' quello di mercato",
-          True, "prezzo di mercato" in out["rigaMercatoZeroVivo"])
+          and "+2% sopra il mercato" in out["rigaMercatoMuto"]
+          and "al prezzo di mercato" in out["rigaMercatoZeroMuto"])
+    prova("...mentre col cambio vivo la frase dice il mercato E la stima",
+          True, "al prezzo di mercato" in out["rigaMercatoZeroVivo"]
+          and "≈" in out["rigaMercatoZeroVivo"])
 
     # --- 8) CHI C'E' DALL'ALTRA PARTE ------------------------------
     # Il tag `rating` lo scrive il NOSTRO coordinator (mostrod lo mette
@@ -35735,33 +35758,25 @@ console.log(JSON.stringify(out));
           out["repStorta"] is not None and out["repStorta"]["rep"] is None)
     prova("...e senza il tag la reputazione e' semplicemente assente",
           None, out["fisso"]["rep"])
-    prova("con voti la striscia porta stelle, media e conteggio", True,
-          '<span class="stars">★★★★★</span> 4,6 (7)' in out["testoPieno"]
-          and "da 23 giorni" in out["testoPieno"])
-    # LE STELLE COMPAIONO COL PRIMO VOTO — la regola che il mercatino ha
-    # gia' per i venditori: «0 ★» a chi e' appena arrivato fa solo danno.
-    # HANNO CAMBIATO LATO (ago 2026, il riordino a blocchi): la striscia
-    # era una frase sola col « · », e adesso sono DUE pezzi che la
-    # scatola spinge ai due bordi — quindi il separatore lo fa lo
-    # spazio, e un puntino si vedrebbe in mezzo al vuoto. Quel che le
-    # due prove garantiscono NON cambia di una virgola: a zero voti non
-    # esce nessuna stella, e si dice l'unica cosa che sappiamo di lui.
-    prova("a zero voti niente stelle: si dice da quanto e' li'",
-          "<span>🆕 Senza voti</span><span>da 1 giorno</span>",
-          out["testoZero"])
+    # HA CAMBIATO PELLE (set 2026, il ridisegno): UNA RIGA UMANA —
+    # «⭐ 4,6 · 7 scambi · da 23 giorni» — via la fila di stelle e i
+    # due pezzi ai bordi. «Scambi» e non «voti»: su Mostro ogni voto
+    # e' uno scambio concluso. La stella emoji compare col primo voto,
+    # come prima; a zero voti si dice l'unica cosa che sappiamo.
+    prova("con voti la striscia e' la frase umana",
+          "⭐ 4,6 · 7 scambi · da 23 giorni", out["testoPieno"])
+    prova("...e a UN voto il singolare regge",
+          "⭐ 5,0 · 1 scambio · da 2 giorni", out["testoUno"])
+    prova("a zero voti niente stella: si dice da quanto e' li'",
+          "🆕 Senza voti · da 1 giorno", out["testoZero"])
     prova("...e sotto il giorno si dice «da oggi»",
-          "<span>🆕 Senza voti</span><span>da oggi</span>", out["testoOggi"])
-    # LA SOSTANZA, detta a parte dal markup: se un domani la striscia
-    # cambia forma un'altra volta, questa riga resta e continua a
-    # chiedere la cosa per cui le due sopra esistono.
+          "🆕 Senza voti · da oggi", out["testoOggi"])
     prova("...e in nessuno dei due casi compare una stella", 0,
-          out["testoZero"].count("★") + out["testoOggi"].count("★"))
-    # E CON I VOTI le due cifre stanno in due pezzi come le altre.
-    prova("...e con i voti il voto e l'eta' sono due pezzi", True,
-          out["testoPieno"].startswith("<span>")
-          and "</span><span>da 23 giorni</span>" in out["testoPieno"])
-    prova("...e la media fuori scala non stampa 999 stelle", True,
-          out["testoFuori"].count("★") == 5)
+          out["testoZero"].count("⭐") + out["testoOggi"].count("⭐"))
+    prova("...e la media fuori scala si CLAMPA nella frase",
+          "⭐ 5,0 · 3 scambi · da oggi", out["testoFuori"])
+    prova("...e della fila di stelle non resta niente", 0,
+          out["testoPieno"].count("★") + out["testoFuori"].count("★"))
     prova("senza il tag la striscia non si scrive proprio",
           "", out["testoNiente"])
     prova("...e la card infatti non la porta", False,
@@ -35770,18 +35785,10 @@ console.log(JSON.stringify(out));
           "p2p-rep" in out["rigaRep"]
           and out["rigaRep"].index("p2p-euro") < out["rigaRep"].index("p2p-rep"))
 
-    # --- 9) GLI ESCLUSI SI DICONO ----------------------------------
-    # Il parser lascia fuori gli ordini a intervallo (due importi = due
-    # validazioni, e la seconda non c'e'), e fin qui sparivano in
-    # silenzio. Il giudice dice il LATO, cosi' il conteggio e' quello
-    # della pagina che si sta guardando e non di tutte e due.
-    prova("un ordine a intervallo si riconosce, col suo lato",
-          ["sell", "buy"], [out["intervallo"], out["intervalloComp"]])
-    prova("...ma NON si conta quel che non si mostrerebbe comunque",
-          ["", "", "", "", ""],
-          [out["intervalloVecchio"], out["intervalloAltraVal"],
-           out["intervalloPreso"], out["intervalloSingolo"],
-           out["intervalloKind"]])
+    # --- 9) GLI ESCLUSI NON ESISTONO PIU' (set 2026, il ridisegno):
+    # i range sono ordini come gli altri — i loro casi girano nel
+    # blocco del parser qui sopra, e della vecchia macchina del
+    # conteggio a parte sorveglia la sezione 3 che non resti niente.
     # LA RIGA DELLE IMPOSTAZIONI E' USCITA (set 2026, restyling della
     # testata): niente piu' infoRigaP2P — i numeri del 38385 restano
     # nel foglio del nuovo ordine (sezione 6), e il verbale della
@@ -35828,7 +35835,7 @@ console.log(JSON.stringify(out));
           True, out["mortoRottoUccide"])
     prova("un pending piu' fresco del suo morto e' RINATO e si mostra",
           True, out["rinatoSiMostra"])
-    prova("anche l'intervallo muore col suo morto", True,
+    prova("anche il range muore col suo morto, da ordine qual e'", True,
           out["intervalloMuore"])
     prova("il lettore puro consegna anche il 38385", True,
           out["lettoreDaInfo"])
