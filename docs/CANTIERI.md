@@ -6241,3 +6241,54 @@ DA GUARDARE: resta aperto — dalla voce qui sopra — il profilo 'conto'
 che non si riverifica mai dopo l'adozione; e alla prossima apertura
 fredda su un dispositivo che non ha pubblicato, la marcatura E la
 striscia devono arrivare alla PRIMA, non piu' alla seconda.
+
+La restore beveva la storia del relay, e la chiave della domanda
+diventa usa-e-getta (set 2026, dal campo: il controllo della voce qui
+sopra e' andato ROSSO). Prima apertura fredda dopo la cura della
+corsa: ordine fresco dal PC, app riaperta una volta — non marcato,
+niente striscia; alla seconda tutto giusto. Il «DA GUARDARE» ha fatto
+il suo mestiere, e il colpevole non era piu' la corsa.
+IL FATTO ERA DETERMINISTICO, ed e' la briciola che ha guidato: prima
+no e seconda si', sempre, e' STATO che cambia — non rete fredda (la
+cache HTTP sopravvive alla chiusura, la WSS e' fredda uguale in tutti
+e due i giri). Lo stato che cambia fra le due aperture e' l'INDICE,
+che il pavimento alza a fine primo giro: quindi la domanda partiva da
+DUE CHIAVI DIVERSE nei due giri, e la risposta cambiava con la chiave.
+IL MECCANISMO: la domanda partiva dalla trade key dell'ultimo indice
+bruciato, e la sottoscrizione (`#p` sulla chiave, SENZA `since`)
+riceve per prima la STORIA del relay — dove c'era la risposta di IERI
+alla stessa chiave, fatta quando l'ordine fresco non esisteva. Una
+restore-session vera, decifrabile, con l'action giusta: il lettore
+chiudeva li', su una lista vecchia. Alla seconda apertura l'indice
+era salito, la chiave era nuova, nessuna storia — e «funzionava»,
+travestendo il difetto da timing. E' l'ignoto DICHIARATO dalla sonda
+(«l'aggancio per sola chiave prende il primo che arriva») nella forma
+che nessuno aspettava: non un messaggio spontaneo del coordinatore —
+la NOSTRA risposta del giro prima.
+LA CURA E' QUELLA CHE LA SONDA AVEVA GIA' VALIDATO: la domanda parte
+da una chiave USA-E-GETTA appena nata (Q2: il coordinatore accetta
+una chiave mai vista, con la busta restore e la prova d'identita' —
+risponde per IDENTITA'). Una chiave senza storia non puo' ricevere
+repliche vecchie per costruzione: niente `since` da tarare, niente
+margini d'orologio, e cade pure la regola «una restore alla volta per
+chiave» — ogni domanda ha la sua chiave. E siccome una chiave nuova
+e' SEMPRE un primo contatto, il nonce si mina sulla soglia piu' alta
+fra `pow` e `pow_first_contact` (oggi tutt'e due a zero, Q7).
+LE STRADE SCARTATE, coi perche': il filtro `since` o il confronto su
+`created_at` vogliono un margine d'orologio fra noi e il coordinatore
+— un margine largo lascia rientrare il replay recente, uno stretto
+butta la risposta vera di un nodo con l'ora storta; il `request_id`
+non c'e' (su restore-session torna null, fatto della sonda). La
+chiave nuova non ha nessuna delle due debolezze.
+IL BANCO HA IMPARATO A RIGIOCARE: il relay finto del motore ora
+consegna la `storia` a chi si sottoscrive — com'e' il relay vero — e
+il caso 9 mette sul relay la risposta di ieri e nel coordinatore
+quella di oggi: con la chiave derivata vince ieri (torturato: 2 rosse
+esatte), con la usa-e-getta arriva oggi, intera. E la tortura ha
+morso anche una sentinella: l'`index()` su una stringa assente
+ESPLODEVA portandosi via il resto della sezione — una sentinella che
+muore non e' una sentinella, e ora usa `find`.
+DA GUARDARE: la verifica sul campo che chiude — ordine fresco da un
+dispositivo, PRIMA apertura fredda su un altro: marcatura e striscia
+devono esserci. E resta il solo aperto di sempre: il profilo 'conto'
+che non si riverifica dopo l'adozione.
