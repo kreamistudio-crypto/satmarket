@@ -7184,3 +7184,42 @@ tinte rovesciate, il range che sceglie, e l'anello col suo giudice
 puro (pieno, mezzo, vuoto, oltre la scadenza, i due «non si sa», il
 mezzo giro del dasharray, l'aria che porta il testo, gli sgoccioli).
 Guardato dal vivo sui due tab con card sintetiche dal renderer vero.
+E CINQUE RITOCCHI ALLE CARD E AL LIBRO (stesso giorno, Andrea):
+1) LA TERZA RIGA E' NUDA: «prezzo di mercato» senza «al», e col premio
+«prezzo di mercato +4%» — in tinta ci va SOLO il segno con la
+percentuale, che le parole sono un fatto e il giudizio sta nel numero.
+Via «sopra/sotto il mercato»: il segno e il colore lo dicono gia', e
+due modi di dire la stessa cosa sono uno di troppo.
+2) I SATS SONO SEMPRE AL NETTO DEL PREMIO, regola resa esplicita: la
+cifra mostrata e' quella che passera' di mano, e la terza riga SPIEGA
+perche' e' diversa dal cambio puro — mai un conto da fare a mente.
+Era gia' cosi' (satsMercatoP2P applica il premio), e ora c'e' la
+sentinella che lo protegge: due ordini identici tranne il premio, e il
+4% deve vedersi nella cifra della card.
+3) L'ANELLO SBIADISCE E POI SI ALLARMA: pieno e' l'ARANCIO di casa e
+scendendo scivola verso il grigio (color-mix in uno stile inline,
+perche' la percentuale cambia a ogni card; dove color-mix non c'e' lo
+stile cade e resta il grigio della regola CSS — un ripiego che si
+legge). NELL'ULTIMO GIORNO passa al rosso e PULSA (1,5 s, ferma con
+reduced-motion): li' non e' piu' un'informazione ma un avviso. LA
+SOGLIA E' IL TEMPO CHE RESTA E NON UNA FRAZIONE — su un ordine di
+sette giorni l'ultimo giorno e' il 14%, su uno di quindici il 7% — e
+vive nel JS, che e' un giudizio e non un vestito. Nell'ultimo giorno
+lo stile inline NON si scrive, o vincerebbe sul rosso.
+4) L'EURO E' SEMPRE LA RIGA GRANDE, anche nel tab Vendi («Ricevi 7,00
+€» in cima, «invia ≈ X sats» sotto): fra i due tab cambiano i VERBI,
+non le taglie, e si leggono collo stesso movimento dell'occhio. E'
+il rovescio del giro prima, deciso guardandolo: la coerenza fra i tab
+vale piu' del mettere in cima «quel che dai». La regola per l'euro in
+seconda riga e' morta con lui, niente CSS orfano.
+5) IL LIBRO SI ORDINA PER CONVENIENZA DI CHI LEGGE e non piu' per
+data: il metro e' il PREMIO e il verso si rovescia col tab — a
+comprare sats conviene il piu' BASSO (piu' sats per i propri euro), a
+venderli il piu' ALTO (meno sats da consegnare per gli stessi euro) —
+e a parita' vince il piu' recente, che fra due offerte uguali quella
+fresca ha piu' probabilita' di trovare ancora chi l'ha scritta. Il
+giudice e' puro e lavora su una COPIA: la lista in memoria serve a
+tutt'e due i tab e non si riordina sul posto.
+Verificato dal vivo sui due tab: ordine s−3 > s0 > s+4 a comprare e
+b+5 > b0 > b−2 a vendere, tinte rovesciate, e le cifre nette che
+mostrano il premio (a +5% si inviano 9857 sats invece di 10 376).
