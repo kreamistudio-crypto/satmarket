@@ -1697,25 +1697,32 @@
      casa ma il LOGO DEDICATO del P2P — il barattolo col lucchetto e
      le due frecce dello scambio (verde chi compra, rossa chi vende),
      scontornato. E' un altro posto, e lo dice anche il marchio. */
-  /* COMPATTA IN CIMA (set 2026, ritocco di Andrea): logo piccolo e
-     tab il piu' in alto possibile — via i margini di respiro, il
-     marchio e' un timbro e non un'insegna. Il PNG e' servito a 2x
-     della resa (112px per 56) e pesa ~21 KB. */
+  /* LA TESTATA DEL LIBRO E' UNA RIGA SOLA (set 2026, ritocco di
+     Andrea): il logo sta IN MEZZO ai due tab — «Compra BTC» a
+     sinistra, il marchio al centro, «Vendi BTC» a destra — cosi' i
+     tab salgono in cima e la pagina comincia subito. Il PNG e'
+     servito a 2x della resa (136px per 68) e pesa ~30 KB.
+     La .p2p-testata sopravvive nella vista dei MIEI, che tab non ne
+     ha: li' resta il solo logo centrato. */
+  .p2p-logo{width:68px;height:68px;
+    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18))}
   .p2p-testata{display:flex;flex-direction:column;align-items:center;
     margin:0 0 6px;text-align:center}
-  .p2p-testata .p2p-logo{width:56px;height:56px;
-    filter:drop-shadow(0 3px 6px rgba(60,45,10,.18))}
   /* I DUE TAB DEL LATO (il modello sono i libri P2P veri: tab larghi,
      testo grosso, colore SOLO sull'attivo). Compra parla il verde
      della protezione (--trust), vendi il rosso di casa (--danger) —
      token che hanno gia' la loro sera. Il non attivo e' NEUTRO, e
      niente arancio: dieci righe piu' giu' c'e' gia' il `btn orange`
      del «Pubblica». */
-  .p2p-lati{display:flex;margin:0 0 12px;border-bottom:2px solid var(--line)}
+  /* i tab si ancorano in basso (flex-end): la riga e' alta quanto il
+     logo, e loro restano appoggiati alla linea come prima */
+  .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
+    border-bottom:2px solid var(--line)}
+  .p2p-lati .p2p-logo{margin:0 6px 3px}
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
-  .p2p-lati .p2p-lato{flex:1;padding:11px 8px;background:none;border:none;
+  .p2p-lati .p2p-lato{flex:1;padding:11px 4px;background:none;border:none;
     border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;
     font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;
     line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
@@ -5514,17 +5521,19 @@ document.getElementById('cartello')?.remove();</script>
            nel foglio del nuovo ordine. A VERBALE (CANTIERI, «La
            testata del P2P»): la commissione deve ricomparire anche per
            chi PRENDE un ordine, prima del pubblico.
-           EMENDATA (set 2026): il marchio ora e' il LOGO DEDICATO del
-           P2P — barattolo, lucchetto e le due frecce dello scambio. -->
-      <div class="p2p-testata">
-        <img class="p2p-logo" src="/assets/p2p-logo.png" alt="Scambio P2P" onerror="this.remove()">
-      </div>
-      <!-- I DUE TAB DEL LATO, grandi come nel riferimento: colore solo
+           EMENDATA DUE VOLTE (set 2026): prima il marchio e' diventato
+           il LOGO DEDICATO del P2P — barattolo, lucchetto e le due
+           frecce dello scambio — poi la testata si e' fatta UNA RIGA:
+           il logo sta in mezzo ai due tab, e la pagina comincia
+           subito (ritocco di Andrea). -->
+      <!-- I DUE TAB DEL LATO col MARCHIO in mezzo: colore solo
            sull'attivo (compra verde, vendi rosso), il resto neutro.
            Gli id restano quelli di ieri: renderP2P accende `attiva`
-           su questi due e basta. -->
+           su questi due e basta, e il logo in mezzo non e' una voce —
+           e' un'immagine, la spazzata dei tab non lo vede. -->
       <div class="p2p-lati" role="tablist">
         <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
+        <img class="p2p-logo" src="/assets/p2p-logo.png" alt="" onerror="this.remove()">
         <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
       </div>
       <div id="p2pCorpo"></div>

@@ -35201,10 +35201,17 @@ def prove_p2p_libro():
     # EMENDATA (set 2026, con la nav trasformata): il marchio della
     # testata e' il LOGO DEDICATO del P2P — barattolo, lucchetto e le
     # due frecce — al posto di tessera e lockup di casa
-    prova("la testata e' il logo dedicato del P2P", True,
-          'class="p2p-testata"' in fetta
-          and '/assets/p2p-logo.png' in fetta
-          and "brand-jar" not in fetta and "lockup" not in fetta)
+    # EMENDATA DI NUOVO (set 2026, la riga sola): nel libro il logo
+    # dedicato sta IN MEZZO ai due tab, dentro .p2p-lati — la
+    # .p2p-testata qui non c'e' piu' (sopravvive nella vista dei MIEI,
+    # e la guarda prove_nav_p2p)
+    prova("il logo dedicato sta in mezzo ai due tab", True,
+          '/assets/p2p-logo.png' in fetta
+          and 'class="p2p-testata"' not in fetta
+          and "brand-jar" not in fetta and "lockup" not in fetta
+          and fetta.index('id="p2pLatoCompro"')
+              < fetta.index('/assets/p2p-logo.png')
+              < fetta.index('id="p2pLatoVendo"'))
     prova("il lato si sceglie coi due tab grandi, non piu' a pillole",
           True, senza_commenti.count("p2p-lato ") == 2
           and "p2p-lati" in senza_commenti
