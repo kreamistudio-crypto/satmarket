@@ -7070,3 +7070,45 @@ patti di API e navigazioni fermi). Verificato dal vivo: la pagina
 servita porta 13 asset timbrati, l'URL col timbro risponde 200, il
 SW v8 installa la dispensa nuova accanto alla vecchia che cade alla
 visita dopo (niente skipWaiting, com'era).
+E IL TERZO DELLA FAMIGLIA (9 set 2026, PNG di Andrea): il logo
+COMPLETO — entrambe le frecce accese — veste i posti dove un lato
+attivo NON c'e'. Nella testata dei propri scambi al posto della pila
+reattiva, ed e' il motivo: li' gli ordini sono i miei, di tutt'e due i
+versi, e un crossfade risponderebbe a un tab che quella vista non ha
+(la coppia gemella resta al libro, dove il tab c'e'). E al posto del
+🔁 dove l'emoji faceva da SIMBOLO dello scambio: la riga «Lo scambio»
+e i due stati vuoti. NON si e' toccato dove quell'emoji ha un altro
+mestiere — «Doppioni su Nostr» nell'admin dice ripetizione, non P2P —
+ne' i prefissi dei console.log ne' i tre toast, che sono testo e non
+possono portare un'immagine.
+⚠️ E DUE POSTI SONO RIMASTI SENZA SEGNO, misurando a schermo invece di
+dedurre: sul BOTTONE arancio che pubblica il marchio a 1,3em diventava
+una macchia (i suoi colori e quelli del fondo sono la stessa
+famiglia), e in riga con una section-label da 11px l'em dava 14px —
+a quella taglia un'emoji regge, un'illustrazione no: e' un puntino
+colorato. Cura: la misura in riga e' 20px FISSI (li' il marchio si
+riconosce, guardato), e sotto quella soglia meglio nessun segno —
+l'emoji non torna, che ha smesso di essere il nostro segno.
+E L'ICONA DELLA NAV RESTA IL DISEGNO (decisione di Andrea, chiesta
+guardando il conflitto): «I miei scambi» in nav non era un'emoji ma
+un SVG monocromatico a due frecce che eredita currentColor — cioe' e'
+quello che si accende verde o rosso col lato, come chiesto due giri
+prima. Un PNG a colori li' spegnerebbe la propagazione e metterebbe
+una figurina fra icone di linea.
+IL FILE: ridimensionato a 152px come i gemelli (~33 KB), barattolo
+verificato identico agli altri due alla resa (zero pixel oltre la
+soglia percettiva contro il vendi, due marginali contro il compra, e
+non conta: il completo non fa crossfade con nessuno). Rotta esplicita
+sua, e il TIMBRO se l'e' preso da solo — la prova che il cache-buster
+del giro prima vale anche per gli asset che nasceranno. Prove: 8662
+verdi.
+LA TRAPPOLA DEL GIRO, che vale oltre il cantiere: la sentinella delle
+parole del foglio del nuovo ordine (niente «nostr», «nsec», «npub»,
+«relay» a chi entra da Telegram) e' CIECA AI COMMENTI apposta — cosi'
+prende anche chi la parola la infilasse in una stringa — e cerca
+minuscolo dentro tutto il corpo. Un commento con «il segno nostro»
+l'ha fatta rossa, perche' quel possessivo contiene per intero il nome
+della rete; e la riscrittura che SPIEGAVA la trappola nominandola l'ha
+fatta rossa una seconda volta. Da qui la formula «il segno di casa» e
+la nota nel commento che non nomina niente. Chi scrive li' dentro se
+lo ricordi: la parola non si puo' nemmeno spiegare sul posto.
