@@ -24402,6 +24402,87 @@ def prove_seo():
     for ev in ("pointerup", "pointercancel", "pointerleave"):
         prova(f"...e cosi' «{ev}»", True, f"'{ev}'" in testo_mini)
 
+    # IL FONDO DI SISTEMA (set 2026, difetto DAL CAMPO: Andrea su
+    # Telegram Android, «tenendo premuto non succede niente», col
+    # bottone «condividi» dell'annuncio — la STESSA scala — che invece
+    # funziona: la misura che scagiona la condivisione e accusa il
+    # gesto). Il tocco lungo non e' solo nostro: sotto c'e' quello del
+    # sistema, che su Android scatta a 500ms e a quel punto la WebView
+    # SI PRENDE il gesto — `pointercancel` alla pagina e, dentro
+    # Telegram, nemmeno un `contextmenu`. A 500 i due traguardi
+    # cadevano nello stesso istante e vinceva il sistema: il cancel
+    # spegneva il timer un attimo prima che sparasse.
+    # ⚠️ QUESTA E' LA PROVA CHE IL CDP NON POTEVA FARE:
+    # `Input.dispatchTouchEvent` non sveglia il riconoscitore nativo,
+    # quindi il difetto era invisibile ai due giri dal vivo di agosto.
+    # Qui si sorveglia il NUMERO, che e' l'unica cosa che dal testo si
+    # puo' guardare — il resto lo dice il telefono.
+    ms = int(re.search(r"const PREMUTA_MS = (\d+);", testo_mini).group(1))
+    prova("il gesto arriva prima del fondo di sistema", True, ms < 500)
+    # ...e non cosi' presto da diventare un tocco normale: sotto i
+    # 300ms un tocco fermo un attimo di piu' sarebbe una condivisione
+    prova("...e non tanto da mangiarsi il tocco corto", True, ms >= 300)
+    # LO SCARTO E' LA SOGLIA DEL BROWSER, ed e' quello che rende
+    # LEGGIBILE il cancel: oltre 8px il browser scorre — quindi un
+    # `pointercancel` che trova il gesto ANCORA ARMATO non puo' essere
+    # uno scorrimento (quello lo avrebbe gia' annullato), ed e' per
+    # forza il sistema che se lo prende.
+    scarto = int(re.search(r"const PREMUTA_SCARTO = (\d+);", testo_mini).group(1))
+    prova("lo scarto e' la soglia oltre cui il browser scorre", True,
+          scarto <= 8)
+    fondo = int(re.search(r"const PREMUTA_FONDO = (\d+);", testo_mini).group(1))
+    # il fondo tiene fuori i cancel che gesti non sono (una telefonata,
+    # l'app che va in fondo) e sta SOTTO il timer, o la strada del
+    # cancel non si aprirebbe mai
+    prova("il fondo tiene fuori i cancel che non sono gesti", True,
+          0 < fondo < ms)
+
+    # LO SCATTO E' IN UN POSTO SOLO, coi suoi TRE chiamanti: il timer,
+    # il `contextmenu` col dito, il `pointercancel` a dito fermo. Tre
+    # strade per lo stesso gesto, e ricopiarne il corpo vorrebbe dire
+    # vederle divergere al primo ripiego aggiunto da una parte sola.
+    prova("lo scatto ha un corpo solo", 1,
+          testo_mini.count("function premutaScatta(){"))
+    # le tre strade sono il timer, il cancel e il contextmenu: si
+    # contano le citazioni del nome MENO la sua definizione, cosi' una
+    # quarta strada aggiunta domani senza pensarci fa rossa questa riga
+    prova("...e tre strade che ci arrivano", 3,
+          testo_mini.count("premutaScatta")
+          - testo_mini.count("function premutaScatta"))
+    ps = pezzo_js(testo_mini, "function premutaScatta(){", "\n}\n")
+    # SI SPEGNE PRIMA DI CONDIVIDERE, e non e' un dettaglio d'ordine:
+    # `premutaFerma` azzera `premutaDa`, che e' anche la guardia
+    # d'ingresso — quindi due verdetti che arrivano insieme (il timer
+    # che spara e il cancel che lo segue di un millisecondo)
+    # condividono UNA volta sola, senza una bandierina in piu'.
+    prova("lo scatto e' inerte a gesto spento", True, "if (!premutaDa)" in ps)
+    prova("...e si spegne prima di condividere", True,
+          0 <= ps.find("premutaFerma()") < ps.find("condividiCategoria("))
+    prova("...e alza la bandierina del click", True,
+          "premutaFatta = true;" in ps)
+    # la cella se la porta dietro `premutaDa` e non una variabile a
+    # parte: e' la stessa cosa — «il gesto in corso» — e due posti che
+    # dicono la stessa cosa si disallineano
+    prova("la cella viaggia col gesto", True, "premutaDa.cella" in ps)
+
+    # IL CANCEL CHE E' UN GESTO: e' la strada di Telegram Android, dove
+    # il `contextmenu` non arriva mai. Col dito ancora fermo dopo il
+    # fondo non e' uno scorrimento — e' la WebView che si prende il
+    # tocco lungo.
+    pc = pezzo_js(testo_mini, "fila.addEventListener('pointercancel'", "});")
+    prova("il cancel a dito fermo e' il gesto del sistema", True,
+          "premutaScatta();" in pc and "PREMUTA_FONDO" in pc)
+    # ...e col MOUSE mai: li' il cancel e' solo un cancel
+    prova("...e col mouse il cancel resta un cancel", True,
+          "premutaTopo ||" in pc)
+    # IL TASTO DESTRO NON CONDIVIDE: il menu del sistema e' suo, e il
+    # gesto si SPEGNE — senza questa riga, tenendo giu' il destro
+    # partirebbe una condivisione a sorpresa (a 500ms non capitava, a
+    # 350 sarebbe diventato facile)
+    prova("il tasto destro spegne il gesto invece di scatenarlo", True,
+          "if (premutaTopo) return premutaFerma();" in pezzo_js(
+              testo_mini, "fila.addEventListener('contextmenu'", "});"))
+
     # IL FILTRO NON DEVE SCATTARE AL RILASCIO, ed e' la convivenza che
     # Andrea ha chiesto di guardare: al pointerup il browser manda
     # comunque un click sulla card, quindi senza la bandierina chi
@@ -38569,9 +38650,14 @@ def prove_consegna_firmata():
           in vendi)
     # ...e publish deve CHIEDERE la consegna quando il blocco c'e':
     # senza, il form la mostra e non la valida nessuno.
+    # ⚠️ LA FIRMA SI CERCA COL SOLO «publish(», come nelle altre
+    # quattro sentinelle che guardano questa funzione: il giorno che
+    # publish ha preso il parametro della BOZZA, la sola qui che
+    # cercava «publish()» ha smesso di trovarla — e una sentinella che
+    # ESPLODE invece di giudicare non sorveglia piu' niente.
     prova("client: publish la chiede quando il blocco e' in pagina", True,
           "const mostraConsegna = !editandoNostr || consegnaFirmata;"
-          in pezzo_js(mini, "async function publish()"))
+          in pezzo_js(mini, "async function publish(", "\n}"))
 
 
 def prove_servizi():
