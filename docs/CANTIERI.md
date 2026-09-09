@@ -6127,3 +6127,64 @@ mostrod, gia' accettata da quattro relay che le firme le verificano.
 DA GUARDARE, senza impegno: dopo il 15 set l'annuncio non deve piu'
 stare nel libro — ora e' il controllo di un fatto letto, non di una
 deduzione.
+
+Il seme senza commit, e ogni chiamata coniava un'identita' (9 set
+2026). Il «DA GUARDARE» della voce del loop qui sopra si e' avverato
+il giorno stesso, ma il colpevole non era la leva: era la ROTTA. La
+restore funzionava sul PC e taceva su app e miniapp, e il controllo
+dei codici segreti ha detto la cosa che nessuna ipotesi prevedeva —
+TRE superfici dello stesso account, TRE profili «del conto» diversi,
+ognuno col foglio che prometteva «torna da solo ogni volta che entri».
+IL DIFETTO ERA UNA RIGA MANCANTE: `/api/p2p/seme` faceva
+`con = db()` → `_sale_profilo_p2p` → `con.close()`, senza commit. E
+`db()` non e' in autocommit: l'INSERT del sale viveva nella
+transazione, la SELECT — sulla STESSA connessione — lo vedeva, la
+rotta rispondeva un seme in tutto valido, e la close faceva rollback.
+`p2p_semi` in produzione era VUOTA con quattordici identita' passate
+da `p2p_indice` in una sera: un generatore di identita' casuali con
+la faccia di una derivazione stabile. La diagnosi e' stata tutta in
+sola lettura, e l'ha chiusa il database: tabella presente, zero
+righe — rollback, non assenza.
+PERCHE' LE PROVE ERANO VERDI, ed e' la meta' che vale piu' del fix:
+`_sale_profilo_p2p` si provava su UNA connessione mai chiusa — che i
+propri INSERT non committati li vede sempre — e la rotta si provava
+solo sul TESTO. La transazionalita' vive nella CUCITURA fra la
+funzione pura e la rotta, e li' non guardava nessuno. E' la lezione
+delle sentinelle della voce del loop, un gradino piu' su: una suite
+che certifica i pezzi non certifica il giro, e stavolta il giro era
+«il sale sopravvive a chi l'ha coniato?».
+LA CURA: `con.commit()` prima della close, la prova a DUE connessioni
+su un database su FILE (`:memory:` muore con la connessione e non puo'
+fare questa domanda) col CONTROESEMPIO che dimostra il rollback — se
+mai diventasse rossa, e' cambiato il default di `isolation_level` e il
+commit va riguardato, non dato per inutile — e il chiodo testuale che
+la rotta committi PRIMA di chiudere. Torturato: senza il commit la
+suite si accende, col commit e' verde.
+LE IDENTITA' GIA' NATE SONO ORFANE PER SEMPRE: i loro sali non sono
+mai stati scritti, il server non le ridera' mai piu'. Vivono solo nel
+localStorage dei rispettivi dispositivi, e quella del PC (`d5e641…`)
+tiene l'ordine da 5 EUR aperto sul coordinator: si chiude o si ritira
+CON QUELLA CHIAVE prima di far ripassare i dispositivi al profilo del
+conto — che dopo il fix nasce alla prima richiesta, stavolta per
+davvero e per sempre.
+DUE COSE RESTANO APERTE, dichiarate qui perche' non si perdano:
+1) IL PROFILO «DEL CONTO» NON SI RIVERIFICA MAI — adottato una volta,
+nessuno lo confronta piu' col server (`sincronizzaMazzo` guarda solo
+locale↔cloud). E' esattamente il buco che ha lasciato tre identita'
+dire «torna da solo» per ore: la sentinella naturale e' richiedere il
+seme a ogni ingresso quando `origine === 'conto'` e DIRLO se diverge,
+invece di tacere. Cantiere suo: la divergenza non si risolve da sola
+(due identita' sono due storie), quindi prima serve decidere il
+foglio di quel conflitto.
+2) LA CORSA DELL'INDICE A ZERO ammutolisce la restore sul dispositivo
+fresco: `chiediMieiOrdiniP2P` a indice 0 si auto-risponde «nessuno»
+senza chiedere, ma il pavimento che direbbe l'indice vero viaggia con
+`registraChiaviP2P`, lanciata senza await tre righe prima — la corsa
+la vince sempre il gate. E una volta scritto `{}`, nemmeno «Riprova»
+richiede: `ricaricaP2P` riabbassa `p2pMieiChiesto` ma il gate vuole
+`p2pMieiOrdini === null`. Si cura da solo alla sessione DOPO (il
+pavimento bumpa e persiste), che e' un ritardo di una sessione intera
+spacciato per «non ne hai»: o il gate aspetta il pavimento, o
+«Riprova» riarma anche la marcatura. Tutte e due costano poco; quel
+che non costa niente e' dimenticarsele, ed e' il motivo di questa
+voce.
