@@ -32417,6 +32417,8 @@ const p2pCoord = () => (p2pLeve && p2pLeve.mostro) ? p2pLeve : p2pLevaPubblica;
 const P2P_VALUTA = 'EUR';          // solo euro nel primo giro (decisione di Andrea)
 const P2P_LIBRO_MS = 8000;         // quanto si aspetta un relay prima di provare il prossimo
 const P2P_LIBRO_FRESCO_MS = 60000; // oltre, il libro si rilegge da solo al prossimo render
+/* P2P_LIBRO_FINESTRA_S vive accanto alle lapidi, nel blocco del
+   motore: la usano tutt'e due, e il banco del motore la deve avere */
 let p2pLato = 'compro';            // 'compro' = k:sell (chi vende sats a me) | 'vendo' = k:buy
 let p2pLibro = null;               // {ordini:[...], quando} — null = mai letto
 let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
@@ -32574,8 +32576,23 @@ async function leggiLibroMostro(){
     throw new Error('gli scambi non sono configurati');
   await caricaNostrTools();
   const NT = window.NostrTools;
+  /* NIENTE FILTRO SU STATO E VALUTA, ed e' la cura del morto che
+     risorge (set 2026, dal campo): con `#s: pending` la sostituzione
+     a `canceled` non si RICHIEDEVA nemmeno — quindi un relay rimasto
+     indietro serviva la copia pending SENZA RIVALI, e il proprio
+     ritirato ricompariva a ogni refresh, prendibile, perche' la riga
+     locale il rimotore l'aveva gia' tolta. La dedup per `d` e il
+     filtro sui pending c'erano gia': aspettavano solo di ricevere il
+     rivale. Il `#f` cade per la stessa prudenza — se la sostituzione
+     non portasse il tag, il filtro la lascerebbe fuori — e valuta e
+     stato si giudicano dal client, in `libroDaEventi`.
+     LA FINESTRA tiene il conto: un ordine non puo' essere pending
+     oltre `max_expiration_days` (15) dalla nascita, quindi 16 giorni
+     di `since` non perdono niente e tengono il libro leggero anche
+     con un anno di annullati alle spalle. */
   const filtri = [
-    {kinds: [38383], authors: [c.mostro], '#f': [P2P_VALUTA], '#s': ['pending']},
+    {kinds: [38383], authors: [c.mostro],
+     since: Math.floor(Date.now() / 1000) - P2P_LIBRO_FINESTRA_S},
     {kinds: [38385], authors: [c.mostro]}
   ];
   /* I DUE INSIEMI RESTANO DISTINTI QUI DENTRO: `vivi` sono i relay dove
@@ -32638,11 +32655,75 @@ async function leggiLibroMostro(){
           completo: fonti.some((f, i) => f.ok && i < vivi.length)};
 }
 
-/* Carica (o ricarica) il libro. Gli ordini sono eventi ADDRESSABLE —
-   per ogni `d` vale il piu' recente, anche se un relay ne manda due —
-   e delle impostazioni si tiene l'ultima pubblicata. Un tocco mentre
-   una lettura e' in volo la riusa (non due REQ), e la risposta di un
-   giro vecchio si butta: il patto di vetrinaGiro. */
+/* IL LETTORE DEL LIBRO E' PURO (set 2026, il morto che risorge): da
+   eventi a {ordini, intervalli, info}, senza rete ne' stato — cosi'
+   il banco lo fa GIRARE sui casi che contano invece di guardare le
+   righe. Gli ordini sono eventi ADDRESSABLE: per ogni `d` vale il
+   piu' recente, anche se un relay ne manda due.
+   ⚠️ E COME GLI ORDINI SI CONFRONTANO PER DATA (set 2026, col
+   ventaglio): una copia vecchia dello specchio puo' arrivare DOPO
+   quella fresca e scavalcarla — in silenzio, che e' il modo in cui
+   si sbaglia. Gli intervalli si contano per `d` come gli ordini, o
+   due relay che mandano lo stesso evento lo conterebbero due volte.
+   LA MAPPA DEI MORTI e' la meta' robusta della dedup: un 38383 con
+   `s` diverso da pending uccide la copia pending piu' vecchia del
+   suo stesso `d` ANCHE quando il parser non saprebbe leggerlo (una
+   sostituzione che perdesse `fa` o `k` non passerebbe da
+   `ordineDaEvento`, e senza questa mappa non farebbe da rivale) —
+   servono solo `d`, `s` e la data. E il verso legittimo resta
+   aperto: un pending PIU' FRESCO del suo morto e' un ordine tornato
+   nel libro (il taker che ha lasciato scadere), e si mostra. */
+function libroDaEventi(eventi, adesso){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const perId = new Map();
+  const fuori = new Map();
+  const morti = new Map();
+  let info = null;
+  for (const ev of (eventi || [])) {
+    if (!ev) continue;
+    if (ev.kind === 38385) {
+      const i = infoDaEvento(ev);
+      if (i && (!info || i.quando >= info.quando)) info = i;
+      continue;
+    }
+    if (ev.kind !== 38383) continue;
+    const st = String(tagValore(ev, 's') || '');
+    const dMorto = String(tagValore(ev, 'd') || '');
+    if (dMorto && st && st !== 'pending') {
+      const quando = Number(ev.created_at) || 0;
+      if ((morti.get(dMorto) || 0) < quando) morti.set(dMorto, quando);
+    }
+    const o = ordineDaEvento(ev, adesso);
+    if (!o) {
+      const lato = intervalloP2P(ev, adesso);
+      if (lato) {
+        const d = String(tagValore(ev, 'd'));
+        const quando = Number(ev.created_at) || 0;
+        const g = fuori.get(d);
+        if (!g || quando > g.quando) fuori.set(d, {lato, quando});
+      }
+      continue;
+    }
+    const g = perId.get(o.id);
+    if (!g || o.creato > g.creato) perId.set(o.id, o);
+  }
+  return {
+    ordini: [...perId.values()]
+      .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA
+                && !((morti.get(o.id) || 0) >= o.creato))
+      .sort((a, b) => b.creato - a.creato),
+    intervalli: [...fuori.entries()]
+      .filter(e => !((morti.get(e[0]) || 0) >= e[1].quando))
+      .map(e => e[1].lato),
+    info
+  };
+}
+
+/* Carica (o ricarica) il libro. Un tocco mentre una lettura e' in
+   volo la riusa (non due REQ), e la risposta di un giro vecchio si
+   butta: il patto di vetrinaGiro. LE LAPIDI si applicano QUI e non
+   nel lettore puro: sono stato del dispositivo (localStorage), e il
+   lettore deve restare da banco. */
 function caricaLibroP2P(forza){
   if (p2pLettura && !forza) return p2pLettura;
   const giro = ++p2pGiro;
@@ -32650,40 +32731,12 @@ function caricaLibroP2P(forza){
     try {
       const {eventi, completo} = await leggiLibroMostro();
       if (giro !== p2pGiro) return;
-      const perId = new Map();
-      /* gli intervalli si contano per `d` come gli ordini, o due relay
-         che mandano lo stesso evento lo conterebbero due volte.
-         ⚠️ E COME GLI ORDINI SI CONFRONTANO PER DATA (set 2026, col
-         ventaglio): finche' i relay si leggevano uno alla volta
-         l'ultimo arrivato era anche l'unico, mentre ora una copia
-         vecchia dello specchio puo' arrivare dopo quella fresca e
-         scavalcarla — in silenzio, che e' il modo in cui si sbaglia. */
-      const fuori = new Map();
-      for (const ev of eventi) {
-        if (ev.kind === 38385) {
-          const i = infoDaEvento(ev);
-          if (i && (!p2pInfo || i.quando >= p2pInfo.quando)) p2pInfo = i;
-          continue;
-        }
-        const o = ordineDaEvento(ev);
-        if (!o) {
-          const lato = intervalloP2P(ev);
-          if (lato) {
-            const d = String(tagValore(ev, 'd'));
-            const quando = Number(ev.created_at) || 0;
-            const g = fuori.get(d);
-            if (!g || quando > g.quando) fuori.set(d, {lato, quando});
-          }
-          continue;
-        }
-        const g = perId.get(o.id);
-        if (!g || o.creato > g.creato) perId.set(o.id, o);
-      }
+      const libro = libroDaEventi(eventi);
+      if (libro.info && (!p2pInfo || libro.info.quando >= p2pInfo.quando))
+        p2pInfo = libro.info;
       p2pLibro = {
-        ordini: [...perId.values()]
-          .filter(o => o.stato === 'pending' && o.fiat === P2P_VALUTA)
-          .sort((a, b) => b.creato - a.creato),
-        intervalli: [...fuori.values()].map(v => v.lato),
+        ordini: libro.ordini.filter(o => !lapidataP2P(o.id)),
+        intervalli: libro.intervalli,
         quando: Date.now()
       };
       p2pErrore = '';
@@ -33815,6 +33868,42 @@ const P2P_SCOPA_LAMPO_S = 24 * 3600;
 function p2pRitirato(o){
   return !!o && o.stato === 'annullato' && !o.hold && !(o.satsNetti > 0);
 }
+/* LE LAPIDI DEI RITIRATI (set 2026, dal campo: il morto che risorge).
+   Il rimotore toglie la riga, ma il LIBRO arriva dai relay — e un
+   relay rimasto indietro puo' servire la copia pending del proprio
+   ritirato per giorni: al refresh la card tornava, NON marcata come
+   mia (riga locale tolta, e la restore i canceled non li elenca),
+   cioe' prendibile da me stesso. La dedup coi morti cura il caso in
+   cui la sostituzione ARRIVA; la lapide cura quello in cui non
+   arriva mai. SOLO per gli ordini MIEI da maker (`o.mio`): un take
+   andato a vuoto riporta nel libro l'ordine di un ALTRO, vivo, e
+   nasconderlo sarebbe una bugia. La lapide scade con l'ordine
+   (`scade`, o creato + la finestra del libro): oltre, il parser lo
+   scarterebbe comunque, quindi una lapide potata non puo' far
+   risorgere niente. */
+/* la finestra del libro E delle lapidi: un ordine non puo' essere
+   pending oltre max_expiration_days (15) dalla nascita — 16 giorni
+   coprono tutto con un giorno di margine */
+const P2P_LIBRO_FINESTRA_S = 16 * 86400;
+const MOSTRO_LAPIDI_CHIAVE = 'barattolo_mostro_lapidi';
+function lapidiP2P(){
+  try {
+    const v = JSON.parse(localStorage.getItem(MOSTRO_LAPIDI_CHIAVE) || '{}');
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  } catch(e) { return {}; }
+}
+function lapideP2P(o){
+  if (!o || !o.id) return;
+  const tutte = lapidiP2P();
+  const adesso = Math.floor(Date.now() / 1000);
+  tutte[o.id] = (o.scade > 0 ? o.scade
+                 : (o.creato || adesso) + P2P_LIBRO_FINESTRA_S);
+  for (const k of Object.keys(tutte)) if (!(tutte[k] > adesso)) delete tutte[k];
+  try { localStorage.setItem(MOSTRO_LAPIDI_CHIAVE, JSON.stringify(tutte)); } catch(e){}
+}
+function lapidataP2P(id){
+  return (Number(lapidiP2P()[id]) || 0) > Math.floor(Date.now() / 1000);
+}
 /* IL RIMOTORE: toglie la riga E le due cache di sessione. Senza la
    seconda meta' l'adozione lo RESUSCITEREBBE: la restore e il libro
    in cache dicono «pending» per tutta la sessione, e una riga tolta
@@ -33822,6 +33911,9 @@ function p2pRitirato(o){
 function togliRitiratoP2P(id){
   const o = ordiniP2P()[id];
   if (!p2pRitirato(o)) return false;
+  /* la lapide PRIMA della rimozione: dopo, della riga non resta
+     niente da cui scriverla */
+  if (o.mio) lapideP2P(o);
   const tutti = ordiniP2P();
   delete tutti[id];
   try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}

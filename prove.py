@@ -35333,14 +35333,32 @@ def prove_p2p_libro():
     # `d` non basta piu', perche' ora i relay rispondono INSIEME e una
     # copia vecchia dello specchio puo' arrivare dopo quella fresca e
     # scavalcarla. Il pezzo nuovo e' la seconda prova.
-    _cl = pezzo_js(mini, "function caricaLibroP2P(forza){")
+    _cl = pezzo_js(mini, "function libroDaEventi(eventi, adesso){")
     prova("gli intervalli si contano per `d`, come gli ordini", True,
           "const g = fuori.get(d);" in _cl
           and "fuori.set(d, {lato, quando});" in _cl)
     prova("...e fra due copie vince la piu' recente, come gli ordini",
           True, "if (!g || quando > g.quando)" in _cl)
-    prova("la REQ filtra la sola valuta e i soli pending", True,
-          "'#f': [P2P_VALUTA], '#s': ['pending']" in cod)
+    # EMENDATA (set 2026, il morto che risorge): la REQ NON filtra piu'
+    # ne' stato ne' valuta — con `#s: pending` la sostituzione a
+    # `canceled` non arrivava mai, e la copia stantia di un relay
+    # indietro restava senza rivali. Si chiede la finestra intera e
+    # giudica il client: la dedup coi morti in `libroDaEventi`, la
+    # valuta nel suo filtro, le lapidi in `caricaLibroP2P`.
+    prova("la REQ chiede la finestra intera, senza `#s` ne' `#f`", True,
+          "since: Math.floor(Date.now() / 1000) - P2P_LIBRO_FINESTRA_S" in cod
+          and "'#s'" not in cod and "'#f'" not in cod)
+    prova("...e la copia pending piu' vecchia del suo morto non passa",
+          True, "!((morti.get(o.id) || 0) >= o.creato)" in _cl)
+    prova("...mentre le lapidi si applicano fuori dal lettore puro",
+          True, "libro.ordini.filter(o => !lapidataP2P(o.id))"
+          in pezzo_js(mini, "function caricaLibroP2P(forza){"))
+    # ...ED E' IL RIMOTORE A SCRIVERLE, solo per i MIEI da maker: un
+    # take andato a vuoto riporta nel libro l'ordine di un ALTRO,
+    # vivo, e lapidarlo sarebbe una bugia del libro.
+    prova("...e il rimotore scrive la lapide, solo per i MIEI", True,
+          "if (o.mio) lapideP2P(o);"
+          in pezzo_js(mini, "function togliRitiratoP2P(id){"))
     prova("...e chiede anche le impostazioni (38385)", True,
           "{kinds: [38385], authors: [c.mostro]}" in cod)
     prova("il relay si costruisce a mano, col timeout (la lezione del bunker)",
@@ -35385,10 +35403,25 @@ def prove_p2p_libro():
         # o la prova certificherebbe una copia di cartone.
         "function ordineMioP2P(id){",
         "function rigaOrdineP2P(o){",
-        "function infoRigaP2P(){")]
+        "function infoRigaP2P(){",
+        # il lettore puro e le lapidi (set 2026, il morto che risorge):
+        # il primo gira sui casi della resurrezione, le seconde su un
+        # localStorage di cartone
+        "function libroDaEventi(eventi, adesso){",
+        "function lapidiP2P(){",
+        "function lapideP2P(o){",
+        "function lapidataP2P(id){")]
+    j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
+    pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
+    pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
     banco = "\n".join(pezzi) + r"""
 const fmt = n => String(n);
 const fmtEur = e => e.toFixed(2).replace('.', ',');
+/* il localStorage di cartone, per le lapidi */
+const magazzino = new Map();
+const localStorage = {getItem: k => magazzino.has(k) ? magazzino.get(k) : null,
+                      setItem: (k, v) => magazzino.set(k, String(v)),
+                      removeItem: k => magazzino.delete(k)};
 // LA LISTA DEI PROPRI SCAMBI vive nel blocco del motore, fuori di qui:
 // si stubba, e i casi che la vogliono la riempiono. La dipendenza non e'
 // nuova (renderP2P chiama gia' scambiP2P), ma `rigaOrdineP2P` e' la
@@ -35462,6 +35495,39 @@ out.rigaMercatoMuto = rigaOrdineP2P(out.mercato);
 out.rigaMercatoZeroMuto = rigaOrdineP2P(out.mercatoZero);
 p2pInfo = out.info; out.infoRiga = infoRigaP2P();
 p2pInfo = null; out.infoRigaVuota = infoRigaP2P();
+/* --- IL MORTO CHE RISORGE (set 2026, dal campo): il lettore puro
+   sui casi della resurrezione. `ora` e' l'orologio finto dei casi. */
+const vivoEv  = ev(38383, [['d','r-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora+3600)]], 100);
+const mortoEv = ev(38383, [['d','r-1'],['k','sell'],['f','EUR'],['s','canceled'],['amt','1000'],['fa','5'],['expires_at', String(ora+3600)]], 200);
+out.mortoNonRisorge = libroDaEventi([vivoEv, mortoEv], ora).ordini.length === 0;
+out.mortoNonRisorgeInverso = libroDaEventi([mortoEv, vivoEv], ora).ordini.length === 0;
+out.vivoSenzaMortoResta = libroDaEventi([vivoEv], ora).ordini.length === 1;
+/* la sostituzione puo' arrivare ROTTA (senza importo ne' lato): per
+   fare da rivale bastano d, s e la data */
+const mortoRotto = ev(38383, [['d','r-1'],['s','canceled']], 200);
+out.mortoRottoUccide = libroDaEventi([vivoEv, mortoRotto], ora).ordini.length === 0;
+/* il verso legittimo resta aperto: un pending PIU' FRESCO del suo
+   morto e' l'ordine tornato nel libro (il taker che lascia scadere) */
+const rinato = ev(38383, [['d','r-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['expires_at', String(ora+3600)]], 300);
+out.rinatoSiMostra = libroDaEventi([mortoEv, rinato], ora).ordini.length === 1;
+/* anche il conteggio degli intervalli muore col suo morto */
+const intVivo = ev(38383, [['d','r-2'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100']], 100);
+const intMorto = ev(38383, [['d','r-2'],['s','canceled']], 200);
+out.intervalloMuore = libroDaEventi([intVivo, intMorto], ora).intervalli.length === 0
+  && libroDaEventi([intVivo], ora).intervalli.length === 1;
+/* e il 38385 esce dal lettore puro, per il chiamante */
+out.lettoreDaInfo = (libroDaEventi([ev(38385, [['fee','0.01'],['max_order_amount','1']], 5)], ora).info || {}).fee === 0.01;
+/* --- LE LAPIDI: orologio VERO, che dentro c'e' Date.now() --- */
+const veroAdesso = Math.floor(Date.now() / 1000);
+lapideP2P({id: 'lap-viva', scade: veroAdesso + 3600, creato: veroAdesso});
+lapideP2P({id: 'lap-scaduta', scade: veroAdesso - 10, creato: veroAdesso - 20});
+out.lapideCopre = lapidataP2P('lap-viva') === true;
+out.lapideNonInventa = lapidataP2P('mai-vista') === false;
+out.lapideScade = lapidataP2P('lap-scaduta') === false;
+lapideP2P({id: 'lap-fallback', creato: veroAdesso});
+out.lapideFallback = lapidataP2P('lap-fallback') === true;
+magazzino.set('barattolo_mostro_lapidi', '{rotto');
+out.lapideCorrotta = lapidataP2P('lap-viva') === false;
 const adesso = Math.floor(Date.now()/1000);
 out.scade = [scadeTestoP2P(0), scadeTestoP2P(adesso - 5), scadeTestoP2P(adesso + 120),
              scadeTestoP2P(adesso + 7200), scadeTestoP2P(adesso + 3*86400)];
@@ -35655,6 +35721,35 @@ console.log(JSON.stringify(out));
     prova("la scadenza a grana grossa",
           ["", "scaduto", "scade fra 2 min", "scade fra 2 h", "scade fra 3 g"],
           out["scade"])
+    # --- IL MORTO CHE RISORGE (set 2026, dal campo): al refresh il
+    # proprio ritirato ricompariva nel libro, NON marcato come mio —
+    # prendibile da me stesso. La REQ chiedeva i soli pending, quindi
+    # la sostituzione a canceled non arrivava mai e la copia stantia
+    # di un relay indietro restava senza rivali. Qui il lettore puro
+    # GIRA sui casi, nei due ordini di arrivo.
+    prova("il morto non risorge: canceled piu' fresco vince", True,
+          out["mortoNonRisorge"])
+    prova("...in qualunque ordine arrivino le copie", True,
+          out["mortoNonRisorgeInverso"])
+    prova("...e il vivo senza morto resta nel libro", True,
+          out["vivoSenzaMortoResta"])
+    prova("una sostituzione ROTTA fa da rivale lo stesso (d+s+data)",
+          True, out["mortoRottoUccide"])
+    prova("un pending piu' fresco del suo morto e' RINATO e si mostra",
+          True, out["rinatoSiMostra"])
+    prova("anche l'intervallo muore col suo morto", True,
+          out["intervalloMuore"])
+    prova("il lettore puro consegna anche il 38385", True,
+          out["lettoreDaInfo"])
+    prova("la lapide copre il proprio ritirato", True, out["lapideCopre"])
+    prova("...e non inventa lapidi mai scritte", True,
+          out["lapideNonInventa"])
+    prova("...e scade con l'ordine: potata, non puo' nascondere niente",
+          True, out["lapideScade"])
+    prova("...e senza scadenza vale creato + finestra", True,
+          out["lapideFallback"])
+    prova("...e un localStorage corrotto vale vuoto, mai un'esplosione",
+          True, out["lapideCorrotta"])
 
 
 def prove_p2p_chiavi():
