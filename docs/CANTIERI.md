@@ -6859,3 +6859,10 @@ mostrava a corsa finita. Ora la quiete porta il delay dell'ingresso
 il selettore ESCLUDE «Pubblica», che porta anche lei la classe eti ma
 ha la quiete rovesciata (nascosta), o le si mangiava la dissolvenza
 d'uscita desktop.
+E LA RIGA SOLA (stesso giorno, ritocco di Andrea): nel libro il logo
+sta IN MEZZO ai due tab — Compra BTC, marchio, Vendi BTC — dentro
+.p2p-lati coi tab ancorati in basso (flex-end), la .p2p-testata resta
+solo ai MIEI che tab non hanno. Logo a 68px, PNG rifatto dal sorgente
+480 recuperato dalla storia git (136px, ~30 KB, sempre 2x); la
+sentinella della testata chiede ora l'ORDINE tab-logo-tab. Conteggio
+e importi restano in sats, deciso da Andrea.
