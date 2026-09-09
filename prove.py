@@ -36907,6 +36907,18 @@ function tagValore(ev, n){
 /* ---- il banco ---- */
 const out = {};
 const pausa = ms => new Promise(r => setTimeout(r, ms || 30));
+/* L'ATTESA GUARDA IL FATTO, NON L'OROLOGIO (set 2026, dal campo: su
+   un runner CI lento i 120 ms fissi fra la presa e la lettura non
+   bastavano — mining del nonce e crypto comprese — e la prova
+   esplodeva su un nodo mai nato, `p2pHoldInvoice` di undefined).
+   Si aspetta la CONDIZIONE, col tetto che tiene il banco finito
+   anche quando il fatto non arriva: allora e' l'ASSERZIONE a dire
+   cosa manca, invece di un TypeError che parla d'altro.
+   ⚠️ E «oltre prendo» pretende che l'ordine ESISTA: appena dopo il
+   gesto la riga non e' ancora scritta, e uno `stato` undefined e'
+   gia' «diverso da prendo» — l'attesa uscirebbe prima del fatto. */
+const finoA = async (f, ms) => { const t0 = Date.now(); while (!f() && Date.now() - t0 < (ms || 5000)) await pausa(20); };
+const oltrePrendo = id => ((ordiniP2P()[id] || {}).stato || 'prendo') !== 'prendo';
 function reset(){
   store = new Map(); cloud = new Map(); fetches = []; toasts = []; nodi = {};
   aperti = []; chiusi = []; conferme = []; inviti = []; viste = []; qr = [];
@@ -36935,7 +36947,8 @@ function reset(){
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
-  await pausa(120);
+  await finoA(() => ricevuti.length >= 1 && oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+  await pausa(30);
   const r1 = ricevuti[0] || {};
   out.chiestoUnaVolta = ricevuti.length === 1;
   out.kind14 = r1.kind === 14;
@@ -37023,7 +37036,8 @@ function reset(){
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001');
-  await pausa(120);
+  await finoA(() => !!(ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'] || {}).hold);
+  await pausa(30);
   let ov = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001'];
   out.venditoreAspetta = ov.stato;
   out.holdArrivata = !!(ov.hold && ov.hold.bolt11 === BOLT);
@@ -37060,7 +37074,8 @@ function reset(){
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
-  await pausa(120);
+  await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+  await pausa(30);
   apriIncassoP2P();
   el('p2pIncassoInp').value = 'io@wallet.com';
   await inviaIncassoP2P();
@@ -37093,7 +37108,8 @@ function reset(){
   rispondi = r => [ordine('cant-do', r.dentro.request_id, r.dentro.id,
                           {cant_do: 'invalid-trade-index'})];
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
-  await pausa(150);
+  await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+  await pausa(30);
   const no = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.rifiutato = no.stato;
   out.motivoInItaliano = String(no.errore).indexOf('non è allineato') >= 0;
@@ -37104,7 +37120,8 @@ function reset(){
   rispondi = r => [];
   P2P_ATTESA_MS = 150;
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
-  await pausa(400);
+  await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+  await pausa(30);
   const mu = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.senzaRisposta = mu.stato;
   out.diceISecondi = String(mu.errore).indexOf('non ha risposto') >= 0;
@@ -37117,6 +37134,7 @@ function reset(){
   const schnorrVero = NT.schnorr;
   delete NT.schnorr;
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
+  await finoA(() => ricevuti.length >= 1);
   await pausa(400);
   const ra = ricevuti[0] || {};
   out.anonimo = ra.anonimo === true;
