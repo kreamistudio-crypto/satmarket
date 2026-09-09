@@ -6715,3 +6715,44 @@ compra. Prove: 8578 verdi. RESTA DA GUARDARE dal vivo col giro a due
 identita' della tappa 8 (il foglio nuovo, le pillole, l'auto-invio
 vero via coordinatore); e un editor del ricordo in «I tuoi dati»,
 fuori dallo scambio, e' possibile ma non deciso.
+
+
+LA TESTATA DEL P2P: IL LOGO E I DUE TAB GRANDI (9 set 2026,
+restyling — decisione di Andrea). La vista del libro apriva con tre
+righe di servizio: il titolo «🔁 Scambio P2P», la riga che diceva chi
+tiene i sats (aperta/richiusa dietro «Scopri di più», con la sua
+regia: decidiChiP2P, il timbro p2pchi, le due forme nel markup fisso)
+e la riga commissione/tetto sotto le pillole. Ora apre col MARCHIO:
+la tessera del barattolo e il lockup centrati, e sotto DUE TAB GRANDI
+sul modello dei libri P2P veri — «Compra sats» e «Vendi sats»,
+Baloo 2 grosso, colore SOLO sull'attivo: compra parla il verde della
+protezione (--trust), vendi il rosso di casa (--danger), il non
+attivo resta neutro. I token hanno già la loro sera, quindi il tema
+scuro è gratis. Gli id e il giro non si sono mossi: renderP2P accende
+`attiva` sugli stessi due bottoni di ieri, è cambiato solo il vestito
+(da consegna-pill a .p2p-lati/.p2p-lato) e il verbo delle etichette
+(da «Compro/Vendo», il mio lato in prima persona, a «Compra/Vendi»,
+il gesto — come nel riferimento).
+QUEL CHE È USCITO NON È SPARITO DAL PRODOTTO, ed è la mappa da
+tenere: il FATTO della garanzia («custoditi in garanzia, Barattolo
+non li tiene e non li vede») resta detto dalla vista dello scambio e,
+col nome del coordinatore, da «I tuoi dati» — la prova del motore
+«...e il fatto resta detto» lo sorveglia lì. I numeri del 38385
+(commissione e tetto) restano nel foglio del nuovo ordine
+(renderNuovoOrdineP2P), letti e mai cablati come prima. Con la riga è
+morta infoRigaP2P e tutta la regia della riga chi-tiene-i-sats
+(vestiChiP2P/toggleChiP2P/decidiChiP2P, la bandierina p2pChiDeciso):
+niente codice morto, e una sentinella nuova vieta che ne resti.
+⚠️ A VERBALE, LA RIGA CHE NON SI DIMENTICA: la commissione (oggi l'1%
+del coordinatore) ora si vede SOLO pubblicando un ordine — chi PRENDE
+un ordine dal libro non la incontra mai. PRIMA DEL PUBBLICO deve
+ricomparire anche per chi prende (nel foglio della presa in carico, o
+sulla card): richiesta esplicita di Andrea il giorno del restyling.
+LE PROVE: il blocco 4c (la famiglia della riga chi-tiene-i-sats) è
+caduto con la riga, sostituito dalla sentinella sul codice morto; il
+blocco 4 sorveglia il logo (.p2p-testata con tessera e lockup), i due
+tab coi loro colori e che né la vecchia riga né le pillole risorgano;
+la prova della riga-impostazioni ora guarda il foglio del nuovo
+ordine («tace su quel che non sa» vale identico lì). Guardata dal
+vivo in chiaro, scuro e mobile: i tab compongono, l'attivo cambia col
+gesto. Prove: 8569 verdi.
