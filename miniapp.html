@@ -1786,8 +1786,17 @@
      mestiere — e a cambiare e' il vestito in QUESTA casa, il pattern
      di `.acq-art .qta-mini`: le altre due case di `.p2p-testa` (lo
      scambio e l'ordine preso) non si toccano di un pixel. */
+  /* ...E LA CIFRA VESTE IL LATO (set 2026, ritocco di Andrea): nel
+     libro i sats e il «prezzo di mercato» parlano il verde a comprare
+     e il rosso a vendere — stesso giudice, transizione morbida. SOLO
+     qui: nelle altre case di .p2p-sats (scambio, striscia) la cifra
+     resta arancio, che li' il lato e' della riga e non del tab. */
   .p2p-ord > .p2p-sats{display:block;margin-top:3px;font-size:13px;
-    white-space:normal}
+    white-space:normal;color:var(--trust);transition:color .3s ease}
+  body.p2p-vendo .p2p-ord > .p2p-sats{color:var(--danger)}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-ord > .p2p-sats{transition:none}
+  }
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -2216,7 +2225,7 @@
     border-color .4s ease}
   /* ...e le voci sfumano il colore in pari con la banda: senza, il
      grigio del giorno scatterebbe al chiaro della sera a meta' corsa */
-  nav button{transition:color .4s ease}
+  nav button{transition:color .4s ease,background-color .4s ease}
   body.nav-p2p nav{background:var(--nav-bg-p2p);border-top-color:transparent;
     box-shadow:inset 0 4px 12px rgba(0,0,0,.5),
       inset 0 -1px 0 rgba(255,255,255,.08)}
@@ -2224,7 +2233,12 @@
     box-shadow:inset 0 4px 12px rgba(0,0,0,.65),
       inset 0 -1px 0 rgba(255,255,255,.06)}
   body.nav-p2p nav button{color:#B5AA90}
-  body.nav-p2p nav button.active{color:#FFB25C}
+  /* LA VOCE ATTIVA VESTE IL LATO (set 2026, ritocco di Andrea): verde
+     a comprare, rosso a vendere — lo stesso giudice del + e del logo.
+     Toni della sera fissi, come tutto sulla banda: i chiari del tema
+     scuro, che sul bruno rendono dove i pieni del giorno affogano. */
+  body.nav-p2p nav button.active{color:#34B47A}
+  body.nav-p2p.p2p-vendo nav button.active{color:#F07A47}
   /* il lockup della topbar eredita l'inchiostro della pagina, che
      sulla banda scura affoga: qui si schiarisce (il ₿ e il lampo
      restano arancio da soli, --sats non si tocca) */
@@ -4869,9 +4883,10 @@
       box-shadow:inset 0 -4px 12px rgba(0,0,0,.65),
         inset 0 1px 0 rgba(255,255,255,.06)}
     /* la pillola attiva sulla banda scura: il crema di giorno
-       (--sats-soft) renderebbe l'arancio illeggibile — qui la pillola
-       e' un velo caldo sulla banda, come le voci di sera */
-    body.nav-p2p nav button.active{background:rgba(255,178,92,.16)}
+       (--sats-soft) renderebbe il colore illeggibile — qui la pillola
+       e' un velo del LATO sulla banda, verde o rosso come la voce */
+    body.nav-p2p nav button.active{background:rgba(52,180,122,.14)}
+    body.nav-p2p.p2p-vendo nav button.active{background:rgba(240,122,71,.15)}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}

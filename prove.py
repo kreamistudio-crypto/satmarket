@@ -35919,6 +35919,33 @@ def prove_nav_p2p():
           "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}")
           and "border-bottom:3px solid var(--line)"
               in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}"))
+    # IL COLORE DEL LATO SI PROPAGA (set 2026): la voce attiva della
+    # nav trasformata e la cifra delle card del libro parlano il verde
+    # a comprare e il rosso a vendere — sempre body.p2p-vendo, lo
+    # stesso giudice del + e del logo. Sulla banda i toni sono i
+    # chiari della sera, fissi; nelle card sono i token, che la loro
+    # sera ce l'hanno gia'.
+    prova("la voce attiva della nav trasformata veste il lato", True,
+          "body.nav-p2p nav button.active{color:#34B47A}" in mini
+          and "body.nav-p2p.p2p-vendo nav button.active{color:#F07A47}"
+          in mini)
+    prova("...e da desktop il velo della pillola con lei", True,
+          "body.nav-p2p nav button.active{background:rgba(52,180,122,.14)}"
+          in mini
+          and "body.nav-p2p.p2p-vendo nav button.active{background:rgba(240,122,71,.15)}"
+          in mini)
+    prova("...con la dissolvenza anche sul fondo", True,
+          "nav button{transition:color .4s ease,background-color .4s ease}"
+          in mini)
+    _ps = pezzo_js(mini, ".p2p-ord > .p2p-sats{", "}")
+    prova("la cifra delle card del libro veste il lato, morbida", True,
+          "color:var(--trust)" in _ps
+          and "transition:color .3s ease" in _ps
+          and "body.p2p-vendo .p2p-ord > .p2p-sats{color:var(--danger)}"
+          in mini)
+    prova("...solo nel libro: le altre case restano arancio", True,
+          "color:var(--sats-text)" in pezzo_js(mini, ".p2p-sats{", "}")
+          and mini.count("> .p2p-sats{color") <= 1)
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
     prova("...nemmeno nel server: le rotte sono i due gemelli", True,
