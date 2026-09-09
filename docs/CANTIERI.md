@@ -6981,3 +6981,53 @@ nelle sorelle .p2p-cifra/.p2p-cambio, solo del libro. Il selettore
 del colore diventa discendente (la cifra ora sta DENTRO la testa). Il
 banco delle card gira sui casi veri e le sentinelle della vecchia
 «stima che scende» sono diventate quelle del «chi fa cosa».
+
+
+IL RIDISEGNO DELLE CARD DEL LIBRO (9 set 2026, chiesto da Andrea:
+«capite in un secondo, piu' semplici di Mostro»). Quattro righe:
+1) il verbo e i sats, grandi e col colore del lato, con la SCADENZA a
+destra (scelta nostra fra scadenza ed eta': quanto RESTA fa decidere,
+quanto e' vecchio no); 2) la frase UNICA dell'euro — «in cambio di
+8,00 € al prezzo di mercato» a premio zero, «, +4% sopra il mercato»
+in tinta d'avviso o «, −2% sotto il mercato» in tinta buona col
+premio (token --danger/--trust, la sera ce l'hanno), niente coda a
+importo fisso; 3) il metodo come prima; 4) la reputazione in UNA
+frase umana — «⭐ 4,8 · 37 scambi · da 232 giorni», «🆕 Senza voti ·
+da oggi» — via la fila di stelle e i due pezzi ai bordi («scambi» e
+non «voti»: su Mostro ogni voto e' uno scambio concluso). L'etichetta
+VENDENDO/COMPRANDO separata non e' mai esistita da noi: il verbo
+della riga 1 fa quel mestiere. «E' il tuo ordine» resta.
+E LA PARTE GROSSA E' SOTTO IL VESTITO: gli ordini A INTERVALLO
+ENTRANO NEL LIBRO. Il parser accetta due importi crescenti
+(euro/euroMax; invertito o triplo restano ordini rotti), la card dice
+i due capi e chiude con «, scegli tu», la stima in sats stima
+ENTRAMBI i capi collo stesso metro, e la dedup e' quella di tutti gli
+ordini — la macchina degli «esclusi» (il giudice, la mappa, la riga
+fissa «N offerte a intervallo») e' morta con la sua ragione, nome
+compreso: una sentinella vieta che risorga, il precedente dello
+spaziatore. PRENDERLI ANCORA NO: il take vuole la scelta dell'importo
+e quel foglio non c'e' — lo dice il TOCCO sulla card, una volta
+(«si sceglie l'importo, e da qui non si puo' ancora»), mai una riga
+fissa sopra il libro. E' il prossimo mattone naturale del cantiere.
+LE PROVE: i casi del range girano nel banco del parser (i due capi,
+i rotti, la dedup fra copie, le card coi tre premi), la reputazione
+umana ha i suoi (singolare compreso, e il clamp DENTRO la frase), la
+sezione degli «esclusi» e' diventata la sentinella che niente ne
+resti, e la prova del cambio muto e' stata riscritta sul fatto:
+nessun ≈ e nessun numero inventato, la frase dell'euro intera.
+Guardato dal vivo col renderer vero su card sintetiche (range, +4%,
+−2%, reputazioni) sopra il libro vero dei relay.
+E IL VERSO DEL PREMIO (stesso giorno, chiesto da Andrea: «dal punto
+di vista di chi legge»). VERIFICATO SUI BYTE, non dedotto: in mostro
+v0.18.6 `get_market_quote` (src/util.rs) fa `sats -= premium/100 *
+sats`, sottrazione UNIFORME sui due versi — quindi su un SELL il
+premio positivo lo paga chi legge (compra sats: avviso), su un BUY lo
+paga la controparte (chi legge vende e incassa di piu': affare). Il
+TESTO resta un fatto del prezzo («sopra/sotto il mercato»), la TINTA
+porta il giudizio per chi legge: classi p2p-affare/p2p-avviso decise
+da `(lato==='buy') === (premium>0)`. E GIA' CHE I BYTE ERANO APERTI,
+la stima si e' allineata alla formula vera: satsMercatoP2P faceva
+/(1+p/100) e a +2% stimava 98039 dove il coordinatore consegna 98000
+— ora e' la sottrazione sua, e il ≈ dice il numero che il taker
+riceve davvero. Verificato dal vivo nel tab Vendi: +5% verde, −3%
+rosso, stime che scendono col premio come dal coordinatore.
