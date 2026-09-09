@@ -6496,3 +6496,53 @@ RESTANO FUORI APPOSTA da questa tappa: i testi del foglio del
 profilo (muore intero nella tappa B) e la chat (tappa C); la pagina
 «I tuoi dati» tiene nome e spiegazione del coordinatore, ed e'
 l'unico posto. Prove: 8562 verdi, con le emendate una per una.
+
+FASE 6, SECONDA TAPPA: IL PROFILO INVISIBILE (9 set 2026). La
+decisione di Andrea, eseguita: l'identita' e' l'account con cui sei
+entrato, e non si gestisce. Dalla vista P2P sparisce il bottone del
+profilo, dal foglio spariscono l'import, l'offerta «lega al mio
+account» col suo ritorno indietro, le due uscite del conflitto fra
+mazzi, la strada sovrana della nsec incollata e l'adozione manuale
+del conto. Il MOTORE non si e' mosso di una riga: assicuraMazzo
+(cloud, poi seme del conto, poi il caso), la sincronizzazione,
+l'adozione silenziosa di renderP2P e la registrazione delle chiavi
+fanno gia' tutto da sole — il foglio era la faccia, e la faccia
+non serviva.
+IL FOGLIETTO RIDOTTO vive SOLO in «I tuoi dati» (decisione 2 di
+Andrea: mai nella vista P2P): mostra/copia il codice segreto,
+«dimentica», la riga di stato del cloud, e per chi non ha un mazzo
+l'avviso «ne hai gia' uno altrove» — L'AVVISO RESTA, IL RIMEDIO NO,
+che l'import e' uscito ma la sorpresa va detta lo stesso.
+SECONDO EMENDAMENTO A VERBALE: la pagina «I tuoi dati» prometteva
+«lo vedi, lo copi, lo CAMBI o lo dimentichi» — il «cambi» non e' piu'
+vero e la pagina adesso dice quel che c'e' (vedi, copi, dimentichi),
+col bottone che rende vera la promessa nel posto dove e' scritta.
+La strada sovrana resta NEL PATTO come riga della stessa pagina
+(«resta nel patto anche se oggi non ha piu' un gesto dentro l'app»):
+chi ha origine 'mia' continua identico, nessuno di nuovo puo'
+imboccarla da UI — scelta reversibile, la ricetta sta nella voce
+della fase 4 e in git.
+LA CINTURA DEGLI SCAMBI APERTI HA CAMBIATO CASA, ed e' l'unica
+aggiunta oltre il taglio: viveva in applicaImportMazzo (tutte le
+sostituzioni), e con le sostituzioni morte l'unico gesto che puo'
+orfanare dei sats e' il «dimentica» — che pero' avvisava solo a
+parole. Adesso scordaMazzo si ferma con uno scambio aperto, e un
+pagamento che perderebbe il padrone non passa da un avviso.
+COSA NON SI E' FATTO, coi perche': nessuna migrazione forzata dei
+profili di dispositivo (decisione 1 — sostituire un'identita' in
+silenzio e' distruggerla, e in rodaggio quei mazzi sono due);
+MAZZO_PRIMA orfano nel localStorage NON si spazza (potrebbe essere
+l'unica copia di un'identita'); il conflitto «diverso» del cloud
+resta un'informazione senza bivio (per i profili del conto non puo'
+piu' nascere, per i legacy si legge e non si decide al posto di chi
+guarda); l'autoapertura del foglio a scambio concluso e il nag
+«Mettilo al sicuro» sono usciti (il debito di backup del conto non
+esiste, quello dei legacy sta scritto in «I tuoi dati»).
+LE PROVE: cinque conferme in meno (57 diventa 52, registro emendato),
+i sei gesti del mazzo diventano uno, i chiamanti di registraChiaviP2P
+da sei a cinque, il banco node del mazzo perde i casi dei gesti morti
+e guadagna il foglietto-senza-gesti e la guardia nel dimentica; le
+sezioni sovrana/adozione diventano sentinelle NEGATIVE (la porta e'
+chiusa e sorvegliata). Verificato dal vivo: pagina «I tuoi dati» col
+bottone, foglietto ridotto che risponde, zero errori console nuovi.
+Prove: 8535 verdi.
