@@ -20941,6 +20941,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `preferitiInVetrina` fatto girare con node sui suoi casi: le
   sentinelle dicono che esiste, mai che risponda giusto) e la tortura
   a 17 mutazioni, tutte uccise una per una.
+  LA CARD DELLO SCAMBIO NELLA STRISCIA (set 2026, decisione di
+  Andrea): dopo il barattolo, terza della fila, una card come le
+  altre — stesso `.cat-quad` bruno, stessa `.cat-fig`, stessa
+  etichetta sotto — col LOGO COMPLETO del P2P
+  (`/assets/p2p-logo-completo.png`) al posto dell'illustrazione e
+  «Scambio P2P» scritto sotto. È il SECONDO ingresso allo scambio,
+  accanto al tab della nav: la fila delle categorie è il posto dove
+  si guarda «cosa c'è qui dentro», e chi apre l'app dalla home il
+  glifo in fondo non lo cerca.
+  IL GATE VIVE IN UN POSTO SOLO: il tocco è `vaiP2P()`, LA STESSA
+  funzione del tab, mai un `go` scritto a mano — chi ha la leva
+  accesa (`p2pAcceso()`, le due fonti di sempre) atterra sulla vista
+  vera con la nav trasformata (la classe la scrive `go()` dalla
+  VISTA e non dal gesto, quindi vale anche per l'indietro), tutti gli
+  altri sul coming soon. Due porte, un giudice: il giorno che il
+  giudice cambia, cambia per tutt'e due — e una `go('p2p')` scritta
+  qui a mano sarebbe una seconda verità da tenere allineata a mano.
+  NON È UN REPARTO, quindi l'anello `.attiva` non si accende mai: da
+  quella card si ESCE dalla home invece di filtrarla. È un `<a>`
+  SENZA href con role/button e tabindex, e SENZA `data-cat` — fuori
+  dal tocco lungo di condivisione PER COSTRUZIONE, come il barattolo
+  e come «Tutto»: una vista dell'app un URL da condividere non ce
+  l'ha.
+  E C'È PER TUTTI, senza la guardia del barattolo: in DEMO e in
+  vetrina anonima la card del vetro non nasce (filtrerebbe il nulla),
+  questa sì — porta al coming soon, che è markup fisso e la risposta
+  è una sola. Per la stessa ragione non entra nella `firma` della
+  striscia: è sempre uguale a sé stessa, e la fila continua a rifarsi
+  solo quando cambia l'ordine, il reparto o lo stato del barattolo.
+  NESSUNA REGOLA CSS NUOVA, ed è MISURATO e non dedotto: il logo è
+  quadrato (152×152) dentro il riquadro della figura, che sta a ~1,15
+  — contenuto rende **125×125**, cioè l'altezza PIENA delle sorelle,
+  che nello stesso box sono contenute uguale («Casa e giardino» rende
+  114 di larghezza, meno di lui). Una classe sua sarebbe una taratura
+  da mantenere per niente.
   IL BARATTOLO SI CONDIVIDE COL SUO LINK (ago 2026, decisione di
   Andrea): la lista dei desideri esce dal dispositivo, ma come
   FOTOGRAFIA e non come vista viva — chi ha il link vede la lista di

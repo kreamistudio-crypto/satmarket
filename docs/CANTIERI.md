@@ -7389,3 +7389,51 @@ RESTA A VERBALE il gemello non curato: un giudice lato server («e'
 tuo» dalla tabella p2p_ordini) marcherebbe anche a restore muta, ma
 saprebbe dire «e' tuo» senza saper APRIRE lo scambio — un tocco
 monco. Se un giorno servira', si costruira' insieme alla ripresa vera.
+LA PORTA DELLO SCAMBIO NELLA FILA DELLE CATEGORIE (set 2026,
+decisione di Andrea). Il P2P aveva due ingressi e nessuno dei due si
+incontra guardando la home: il tab in fondo alla nav — un glifo, che
+si trova solo se lo si cerca — e la card in «Da scoprire», che è una
+fila di occasioni e non una mappa. La fila delle CATEGORIE invece è
+il posto dove si guarda «cosa c'è qui dentro», e lì adesso c'è la
+card dello scambio: dopo il barattolo, col logo completo al posto
+dell'illustrazione, «Scambio P2P» scritto sotto.
+IL GATE NON SI RISCRIVE, si CHIAMA: il tocco è `vaiP2P()`, la stessa
+funzione del tab. Chi ha la leva accesa atterra sulla vista vera con
+la nav trasformata, tutti gli altri sul coming soon che c'era già.
+Una `go('p2p')` scritta a mano sulla card sarebbe stata più corta di
+mezza riga e avrebbe creato una seconda verità: due porte con due
+giudici restano allineate finché nessuno ne tocca uno.
+TRE STRADE SCARTATE, coi loro perché. 1) La card PRIMA del
+barattolo: quel posto è del vetro dall'ago 2026 e chi usa l'app
+l'ha già imparato — un ingresso nuovo non sposta uno vecchio.
+2) Una classe CSS sua per «pareggiare» il logo con le illustrazioni:
+misurato a schermo, non serve — il quadrato 152×152 dentro il
+riquadro a ~1,15 rende 125×125, che è l'altezza piena delle sorelle
+(«Casa e giardino» ne rende 114 di larghezza, meno di lui). Una
+taratura in più sarebbe stata una taratura da mantenere per niente.
+3) Togliere la card da «Da scoprire» adesso che c'è questa: non è
+una decisione di questo cantiere, e la sua voce dice perché resta —
+si guarda a rodaggio se due porte per lo stesso posto sono una di
+troppo.
+LA CARD C'È PER TUTTI e non porta la guardia del barattolo: quella
+serve perché una card che filtra il nulla è un bottone verso un muro,
+mentre qui il muro non c'è — a leva spenta si atterra sul coming
+soon, che è markup fisso. E non entra nella `firma` della striscia,
+che è sempre uguale a sé stessa: la fila si rifà quando cambia
+l'ordine, il reparto o lo stato del barattolo, e in nessun altro
+caso.
+UNA PROVA HA CAMBIATO FETTA, non lato: `prove_barattolo_in_striscia`
+ritagliava la card del vetro da «cella-barattolo» fino a
+«voci.map(», e con la card P2P in mezzo si sarebbe mangiata anche
+lei — il taglio adesso finisce dove quella comincia, col perché
+scritto accanto.
+COLLAUDATA: **8759 prove verdi, 0 rosse** (+11 sulle 8748 di HEAD,
+misurate su una copia pulita dell'albero), e **5 mutazioni, 5
+uccise** — il `go` scritto a mano, il `data-cat` che farebbe cadere
+la card nel tocco lungo, il gesto da tastiera tolto, la card che si
+accende come un reparto, la card che scavalca il barattolo. Giro dal
+vivo col server vero a 375 e a 1100 nei due rami del giudice: a leva
+SPENTA il tocco porta a `view-p2ppresto` senza nav trasformata, a
+leva ACCESA a `view-p2p` con `body.nav-p2p`; e da anonimo (senza
+`myTgId`) la fila apre con «Tutto» e la card dello scambio subito
+dopo, che il vetro là non nasce.
