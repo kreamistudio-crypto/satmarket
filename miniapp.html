@@ -1787,20 +1787,9 @@
      una bugia di registro, la stessa ragione per cui la riga di stato
      e' `.nota-scambio` e non il verde della fiducia. */
   .p2p-passi{margin:14px 0 4px}
-  /* i messaggi: la lingua e' quella delle chat che tutti hanno nel
-     telefono -- i miei a destra sull'arancio di casa, i suoi a
-     sinistra sulla carta. Il riquadro scorre da se': la pagina
-     sotto non si deve muovere mentre si scrive. */
-  .p2p-chat{max-height:46vh;overflow-y:auto;overscroll-behavior:contain;
-    display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-  .p2p-msg{max-width:82%;align-self:flex-start;background:var(--chip-bg);
-    color:var(--ink);border-radius:14px;padding:8px 11px;font-size:14px;
-    line-height:1.4;overflow-wrap:anywhere}
-  .p2p-msg.mio{align-self:flex-end;background:var(--sats-soft);color:var(--sats-text)}
-  .p2p-msg small{display:block;margin-top:3px;font-size:11px;opacity:.7}
-  #p2pChatCorpo textarea{width:100%;font:inherit;font-size:14px;padding:10px 12px;
-    border:1.5px solid var(--field-line);border-radius:12px;background:var(--card);
-    color:var(--ink);resize:none}
+  /* le bolle della chat sono uscite con la fase 6: al posto dei
+     messaggi ci sono i due recapiti cifrati, che vestono i pezzi di
+     casa (field, hint, trust-note) e non chiedono CSS loro. */
 
   /* ---------- hero di Esplora: esiste solo da desktop in su ---------- */
   .hero{display:none}
@@ -6745,10 +6734,10 @@ document.getElementById('cartello')?.remove();</script>
     <div id="p2pIncassoCorpo"></div>
   </div>
 
-  <div class="sheet" id="p2pChatSheet" role="dialog" aria-modal="true" aria-labelledby="p2pChatTit">
+  <div class="sheet" id="p2pCampiSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCampiTit">
     <div class="grab"></div>
-    <h3 id="p2pChatTit">💬 Messaggi</h3>
-    <div id="p2pChatCorpo"></div>
+    <h3 id="p2pCampiTit">🤝 I vostri recapiti</h3>
+    <div id="p2pCampiCorpo"></div>
   </div>
   <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
        aria-labelledby="paccoSvuotaTit">
@@ -18432,7 +18421,7 @@ function closeSheet(){
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
-  el('p2pChatSheet').classList.remove('open');
+  el('p2pCampiSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
@@ -34297,7 +34286,7 @@ async function mostroArriva(ev){
      persona, poi quelli del coordinatore, e tutto il resto si
      lascia stare. */
   const scambio = autoriChatP2P()[ev.pubkey];
-  if (scambio) { chatArriva(scambio, ev); return; }
+  if (scambio) { campoArriva(scambio, ev); return; }
   if (ev.pubkey !== mostroHexP2P()) return;    // non e' il coordinatore
   const pub = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
   const ord = ordiniAscoltoP2P()[pub];
@@ -34540,7 +34529,7 @@ const STATI_P2P = {
   attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai pagare in euro.'},
   attesa_fattura_compratore: {t: 'Chi compra sta indicando dove ricevere', d: 'Appena lo fa ti chiederemo di bloccare i sats.'},
   attesa_mia_hold: {t: 'Blocca i sats', d: 'Paga la richiesta: i sats restano bloccati in garanzia e non escono finché non li liberi tu.'},
-  attivo: {t: 'Sats in garanzia', d_compro: 'I sats sono al sicuro in garanzia. Ora manda gli euro con il metodo concordato, poi dillo qui.',
+  attivo: {t: 'Sats in garanzia', d_compro: 'I sats sono al sicuro in garanzia. Ora manda gli euro al recapito indicato da chi vende, poi dillo qui.',
            d_vendo: 'I tuoi sats sono bloccati. Aspetta che chi compra mandi gli euro.'},
   euro_inviati: {t: 'Euro inviati', d_compro: 'Hai detto di aver mandato gli euro: appena chi vende li vede, libera i sats.',
                  d_vendo: 'Chi compra dice di aver mandato gli euro. Controlla di averli ricevuti: poi libera i sats.'},
@@ -34781,6 +34770,24 @@ const SECONDARI_P2P = {
   disputa: '<button class="btn allarme" onclick="apriDisputaP2P()">⚠️ C’è un problema</button>'
 };
 
+/* I RECAPITI NELLA PAGINA DELLO SCAMBIO (fase 6): quel che e'
+   ARRIVATO si mostra, quel che MANCA si chiede — e per chi vende il
+   recapito degli euro e' il pezzo senza il quale l'altra persona non
+   puo' pagare: la riga insiste finche' non e' partito. Il testo
+   dell'altra persona passa da esc(), come ovunque. */
+function campiOrdineP2P(o){
+  const miei = o.campiMiei || {}, loro = o.campiLoro || {};
+  let fuori = '';
+  if (o.lato === 'compro' && loro.euro)
+    fuori += '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>'
+      + esc(loro.euro.testo) + '</span></div>';
+  if (o.lato === 'vendo' && !miei.euro)
+    fuori += '<div class="hint">💶 Di\' a chi compra <b>dove mandarti gli euro</b>: senza, non può pagarti.</div>';
+  fuori += '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
+    + (o.campiNuovi ? ' <b>(novità)</b>' : '') + '</button>';
+  return fuori;
+}
+
 /* ---- la pagina di uno scambio ---- */
 function apriOrdineP2P(id){
   const o = ordiniP2P()[id];
@@ -34813,7 +34820,7 @@ function renderOrdineP2P(){
   const passi = [
     {t: 'Ordine preso', d: o.lato === 'compro' ? 'Compri sats' : 'Vendi sats'},
     {t: 'Sats bloccati', d: 'Restano in garanzia fino alla fine'},
-    {t: 'Euro inviati', d: 'Con il metodo concordato fra voi'},
+    {t: 'Euro inviati', d: 'Al recapito indicato da chi vende'},
     {t: 'Scambio concluso', d: 'I sats arrivano a chi compra'}
   ];
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
@@ -34858,15 +34865,12 @@ function renderOrdineP2P(){
         (tog.giorni === 1 ? ' giorno' : ' giorni') + ': fino ad allora l\'ordine può essere ' +
         'ancora vivo nel libro, e la sua chiave serve a riprenderlo. Poi lo potrai togliere.</div>'
       : '') +
-    /* i messaggi stanno FRA il passo da fare e le uscite: e' il modo
-       di mettersi d'accordo, e quasi sempre e' quel che serve prima
-       di annullare o di aprire una disputa. Compare solo quando si sa
-       con chi si sta scambiando: prima non c'e' nessuno a cui
-       scrivere, e un bottone che porta a un muro e' peggio di un
-       bottone che non c'e'. */
-    (chiaviChatOrdine(o)
-      ? '<button class="btn ghost" onclick="apriChatP2P()">💬 Messaggi'
-        + (o.chatNuovi ? ' <b>(' + fmt(o.chatNuovi) + ')</b>' : '') + '</button>' : '') +
+    /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
+       posto della chat): quel che e' arrivato si mostra, quel che
+       manca si chiede. Compaiono solo quando si sa con chi si sta
+       scambiando: prima non c'e' nessuno a cui mandarli, e un bottone
+       che porta a un muro e' peggio di un bottone che non c'e'. */
+    (chiaviChatOrdine(o) ? campiOrdineP2P(o) : '') +
     secondarie.map(a => SECONDARI_P2P[a] || '').join('') +
     '<div class="hint">I sats dello scambio restano custoditi in garanzia: Barattolo non li tiene e non li vede. Gli euro viaggiano fra voi due, fuori da qui.</div>';
 }
@@ -35238,9 +35242,23 @@ async function votaP2P(n){
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
-/* ---- LA CHAT FRA PARI (set 2026, tappa 6) ----
+/* ---- I DUE RECAPITI CIFRATI (set 2026, fase 6 — al posto della chat)
+   LA CHAT LIBERA E' USCITA (decisione di Andrea): al suo posto due
+   CAMPI tipizzati — «dove ricevere gli euro» (per chi vende: senza,
+   chi compra non puo' pagare) e «un tuo contatto» (facoltativo, per
+   tutt'e due, con l'avvertenza che rivela l'identita'). Il canale e'
+   LO STESSO della chat, busta per busta: cambiare anche quello
+   avrebbe buttato la crittografia gia' provata coi test vector di
+   mostro-core. Il TIPO viaggia in un tag `t` dell'evento INTERNO,
+   che e' firmato dalla trade key: il tipo non lo puo' riscrivere
+   nessuno che non sia una delle due parti. Per ogni tipo vince il
+   piu' RECENTE (un IBAN sbagliato si corregge re-inviando), e l'eco
+   dei PROPRI campi mandati da un altro dispositivo torna dalla
+   stessa sottoscrizione — la chiave di firma e' condivisa — quindi i
+   due dispositivi convergono da soli. Un kind 1 senza tag `t` (i
+   messaggi della chat di ieri) si ignora.
    Il coordinatore non ci entra: le due chiavi della conversazione si
-   derivano da un ECDH fra le due chiavi dello scambio, e il messaggio
+   derivano da un ECDH fra le due chiavi dello scambio, e il campo
    viaggia cifrato fra le due persone. Barattolo non lo vede — non lo
    riceve nemmeno, il server di questo non sa niente.
 
@@ -35260,10 +35278,12 @@ const CHAT_INFO_CONV = 'mostro:chat:conv:v1';
 const CHAT_INFO_FIRMA = 'mostro:chat:sign:v1';
 const CHAT_TOLLERANZA = 60;      // lo scarto d'orologio che si accetta
 const CHAT_MAX_BYTE = 65536;     // una busta piu' grande non si apre
-const CHAT_MAX_TESTO = 1000;     // quanto si puo' scrivere in un colpo
-const CHAT_MAX_MSG = 200;        // quanti se ne tengono per scambio
-const CHAT_RAFFICA = 60;         // quanti se ne accettano al minuto
-let p2pChatOrdine = '';
+const CAMPO_MAX_TESTO = 300;     // un recapito e' corto: di piu' e' un'altra cosa
+const CHAT_RAFFICA = 60;         // quante buste si accettano al minuto
+/* i due tipi ammessi, e il vocabolario e' CHIUSO: quel che non e' qui
+   dentro si ignora — compresi i messaggi liberi della chat di ieri */
+const CAMPI_P2P = ['euro', 'contatto'];
+let p2pCampiOrdine = '';
 let p2pChiaviChat = {};          // sk+peer -> {conv, firma}: l'ECDH costa
 let p2pChatSecchio = {};         // pub(firma) -> {quanti, da}
 
@@ -35316,18 +35336,8 @@ function autoriChatP2P(){
   }
   return m;
 }
-/* da quando riprendere i messaggi di uno scambio. Il segnalibro non
-   supera MAI l'orologio di qui: la busta la firma anche l'altra
-   persona, e una data buttata nel futuro zittirebbe la conversazione
-   fino a quel giorno — un guasto che sopravvive a ogni riapertura. */
-function chatDaQuando(o){
-  const adesso = Math.floor(Date.now() / 1000);
-  const v = Math.min(Number(o.chatVisto) || 0, adesso);
-  return Math.max(0, (v || (o.creato || adesso)) - 600);
-}
-
 /* ---- quel che si scrive ---- */
-async function chatInvia(o, testo){
+async function campoInvia(o, tipo, testo){
   const NT = window.NostrTools;
   const mz = mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
@@ -35335,16 +35345,17 @@ async function chatInvia(o, testo){
   if (!k) throw new Error('Non si sa ancora con chi stai scambiando');
   const tk = chiaveScambio(mz.sk, o.indice);
   const quando = Math.floor(Date.now() / 1000);
-  /* dentro: il messaggio vero, firmato dalla chiave DELLO SCAMBIO —
+  /* dentro: il recapito vero, firmato dalla chiave DELLO SCAMBIO —
      e' l'unica cosa che dice chi l'ha scritto, perche' la busta la
-     sanno firmare tutte e due le parti */
+     sanno firmare tutte e due le parti. Il tag `t` porta il TIPO, e
+     sta QUI e non sulla busta: fuori lo leggerebbe il relay. */
   const dentro = NT.finalizeEvent({
-    kind: 1, created_at: quando, tags: [], content: testo
+    kind: 1, created_at: quando, tags: [['t', tipo]], content: testo
   }, NT.utils.hexToBytes(tk.sk));
   const conv = NT.nip44.getConversationKey(k.conv.sk, k.conv.pub);
   /* fuori: la busta. Un solo tag `p`, e la data UGUALE a quella di
      dentro: e' cosi' che si riconosce una busta rimessa in giro con
-     un messaggio vecchio. */
+     un recapito vecchio. */
   const fuori = NT.finalizeEvent({
     kind: 14, created_at: quando,
     tags: [['p', k.conv.pub]],
@@ -35353,21 +35364,23 @@ async function chatInvia(o, testo){
   const relay = await mostroConnetti();
   await relay.publish(fuori);
   const agg = ordiniP2P()[o.id] || o;
-  chatAggiungi(agg, {id: dentro.id, mio: true, testo: testo, t: quando});
+  campoScrivi(agg, tipo, {id: dentro.id, testo: testo, t: quando}, true);
   return agg;
 }
-/* i messaggi vivono accanto allo scambio: l'id di ognuno E' anche il
-   ricordo che serve a non riprendere due volte lo stesso — chi
-   ripubblica una busta vecchia ci sbatte contro. */
-function chatAggiungi(o, msg){
-  const lista = (o.chat || []).slice();
-  if (lista.some(m => m.id === msg.id)) return o;
-  lista.push(msg);
-  lista.sort((a, b) => (a.t || 0) - (b.t || 0));
-  o.chat = lista.slice(-CHAT_MAX_MSG);
-  if (!msg.mio) o.chatNuovi = (o.chatNuovi || 0) + 1;
+/* i recapiti vivono accanto allo scambio, UNO per tipo e per lato:
+   l'id di dentro e' il ricordo che ferma il replay, e fra due
+   recapiti dello stesso tipo vince il PIU' RECENTE — e' cosi' che un
+   IBAN sbagliato si corregge, e che due dispositivi convergono. */
+function campoScrivi(o, tipo, campo, mio){
+  const mappa = Object.assign({}, (mio ? o.campiMiei : o.campiLoro) || {});
+  const c = mappa[tipo];
+  if (c && c.id === campo.id) return o;
+  if (c && (c.t || 0) > (campo.t || 0)) return o;
+  mappa[tipo] = campo;
+  if (mio) o.campiMiei = mappa; else o.campiLoro = mappa;
+  if (!mio && p2pCampiOrdine !== o.id) o.campiNuovi = 1;
   scriviOrdineP2P(o);
-  if (p2pChatOrdine === o.id) renderChatP2P();
+  if (p2pCampiOrdine === o.id) renderCampiP2P();
   if (p2pOrdineAperto === o.id) renderOrdineP2P();
   return o;
 }
@@ -35377,7 +35390,7 @@ function chatAggiungi(o, msg){
    costano niente, e solo alla fine si decifra e si verificano le
    firme. Chi volesse tempestare la conversazione paga il lavoro suo,
    non il nostro. */
-function chatArriva(o, ev){
+function campoArriva(o, ev){
   const NT = window.NostrTools;
   const k = chiaviChatOrdine(o);
   if (!k) return;
@@ -35408,67 +35421,86 @@ function chatArriva(o, ev){
   const mia = chiaveScambio(mz.sk, o.indice).pub;
   if (dentro.pubkey !== o.peer && dentro.pubkey !== mia) return;
   if (Math.abs((dentro.created_at || 0) - (ev.created_at || 0)) > CHAT_TOLLERANZA) return;
+  /* IL TIPO decide, e il vocabolario e' chiuso: un kind 1 senza `t`
+     — la chat di ieri — o con un tipo mai visto si lascia cadere. */
+  const tipo = ((dentro.tags || []).find(t => t[0] === 't') || [])[1];
+  if (CAMPI_P2P.indexOf(tipo) < 0) return;
   const agg = ordiniP2P()[o.id] || o;
-  agg.chatVisto = Math.min(Math.max(Number(agg.chatVisto) || 0, ev.created_at || 0), adesso);
-  chatAggiungi(agg, {id: dentro.id, mio: dentro.pubkey === mia,
-                     testo: String(dentro.content || '').slice(0, CHAT_MAX_TESTO),
-                     t: dentro.created_at || adesso});
+  campoScrivi(agg, tipo, {id: dentro.id,
+                          testo: String(dentro.content || '').slice(0, CAMPO_MAX_TESTO),
+                          t: dentro.created_at || adesso},
+              dentro.pubkey === mia);
 }
 
-/* ---- il foglio ---- */
-function apriChatP2P(){
+/* ---- il foglio dei recapiti ---- */
+function apriCampiP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
   if (!chiaviChatOrdine(o)) { toast('Non si sa ancora con chi stai scambiando'); return; }
   haptic();
-  p2pChatOrdine = id;
-  if (o.chatNuovi) { o.chatNuovi = 0; scriviOrdineP2P(o); renderOrdineP2P(); }
-  renderChatP2P();
+  p2pCampiOrdine = id;
+  if (o.campiNuovi) { o.campiNuovi = 0; scriviOrdineP2P(o); renderOrdineP2P(); }
+  renderCampiP2P();
   el('sheetBg').classList.add('open');
-  el('p2pChatSheet').classList.add('open');
-  const c = el('p2pChatInp');
-  if (c) setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60);
+  el('p2pCampiSheet').classList.add('open');
 }
-function oraChatP2P(t){
-  try {
-    return new Date((t || 0) * 1000)
-      .toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
-  } catch(e) { return ''; }
-}
-function renderChatP2P(){
-  const box = el('p2pChatCorpo');
-  const o = ordiniP2P()[p2pChatOrdine];
+function renderCampiP2P(){
+  const box = el('p2pCampiCorpo');
+  const o = ordiniP2P()[p2pCampiOrdine];
   if (!box || !o) return;
-  const msg = o.chat || [];
-  const scritto = el('p2pChatInp') ? el('p2pChatInp').value : '';
+  const miei = o.campiMiei || {}, loro = o.campiLoro || {};
+  const vende = o.lato === 'vendo';
+  /* quel che si stava scrivendo sopravvive al ridisegno, e i valori
+     entrano col .value: mai interpolati — il patto del codice segreto */
+  const scritti = {euro: el('p2pCampoEuro') ? el('p2pCampoEuro').value : '',
+                   contatto: el('p2pCampoContatto') ? el('p2pCampoContatto').value : ''};
   box.innerHTML =
-    '<div class="p2p-chat" id="p2pChatLista">' +
-      (msg.length
-        ? msg.map(m => '<div class="p2p-msg' + (m.mio ? ' mio' : '') + '">' +
-            esc(m.testo) + '<small>' + esc(oraChatP2P(m.t)) + '</small></div>').join('')
-        : '<div class="hint" style="margin:0">Ancora nessun messaggio. Qui vi mettete d\'accordo su come mandare gli euro.</div>') +
-    '</div>' +
-    '<textarea id="p2pChatInp" rows="2" maxlength="' + CHAT_MAX_TESTO + '" ' +
-      'placeholder="Scrivi qui…"></textarea>' +
-    '<button class="btn orange" onclick="inviaChatP2P(this)">Invia</button>' +
-    '<div class="hint">I messaggi viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>';
-  const inp = el('p2pChatInp');
-  if (inp && scritto) inp.value = scritto;
-  const lista = el('p2pChatLista');
-  if (lista) lista.scrollTop = lista.scrollHeight;
+    (o.lato === 'compro'
+      ? (loro.euro
+        ? '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>' + esc(loro.euro.testo) + '</span></div>'
+        : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
+      : '') +
+    (loro.contatto
+      ? '<div class="hint">👤 Il contatto dell\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
+      : '') +
+    (vende
+      ? '<div class="field"><label>Dove vuoi ricevere gli euro</label>' +
+        '<input type="text" id="p2pCampoEuro" maxlength="' + CAMPO_MAX_TESTO + '" ' +
+        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="IBAN, @Revolut, numero Satispay…"></div>' +
+        '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
+        (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
+        (miei.euro ? '<div class="hint">✓ Inviato: l\'ultimo che mandi è quello che vale.</div>' : '')
+      : '') +
+    '<div class="field" style="margin-top:14px"><label>Un tuo contatto (facoltativo)</label>' +
+    '<input type="text" id="p2pCampoContatto" maxlength="' + CAMPO_MAX_TESTO + '" ' +
+    'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+    'placeholder="@tuonome su Telegram, npub…"></div>' +
+    '<div class="hint">⚠️ Facoltativo, e rivela chi sei: l\'altra persona potrà collegare questo scambio alla tua identità.</div>' +
+    '<button class="btn ghost" onclick="inviaCampoP2P(\'contatto\', this)">👤 ' +
+    (miei.contatto ? 'Aggiorna il contatto' : 'Manda il contatto') + '</button>' +
+    '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>';
+  const ce = el('p2pCampoEuro');
+  if (ce) ce.value = scritti.euro || (miei.euro ? miei.euro.testo : '');
+  const cc = el('p2pCampoContatto');
+  if (cc) cc.value = scritti.contatto || (miei.contatto ? miei.contatto.testo : '');
 }
-async function inviaChatP2P(btn){
-  const o = ordiniP2P()[p2pChatOrdine];
-  const inp = el('p2pChatInp');
-  if (!o || !inp) return;
-  const testo = String(inp.value || '').trim().slice(0, CHAT_MAX_TESTO);
-  if (!testo) { toast('Scrivi qualcosa prima di inviare'); return; }
-  const rip = bottoneInAttesa(btn, 'Mando il messaggio…');
+async function inviaCampoP2P(tipo, btn){
+  const o = ordiniP2P()[p2pCampiOrdine];
+  const inp = el(tipo === 'euro' ? 'p2pCampoEuro' : 'p2pCampoContatto');
+  if (!o || !inp || CAMPI_P2P.indexOf(tipo) < 0) return;
+  const testo = String(inp.value || '').trim().slice(0, CAMPO_MAX_TESTO);
+  if (!testo) {
+    toast(tipo === 'euro' ? 'Scrivi dove vuoi ricevere gli euro'
+                          : 'Scrivi un contatto prima di mandarlo');
+    return;
+  }
+  const rip = bottoneInAttesa(btn, 'Invio…');
   try {
-    await chatInvia(o, testo);
-    inp.value = '';
-    renderChatP2P();
+    await campoInvia(o, tipo, testo);
+    toast(tipo === 'euro' ? 'Recapito inviato a chi compra ✓' : 'Contatto inviato ✓');
+    renderCampiP2P();
   } catch(e) {
     toast('Non è partito: ' + String(e && e.message || e));
   }
@@ -35489,7 +35521,7 @@ function apriDisputaP2P(){
     corpo: 'Un moderatore indipendente guarderà il caso e deciderà chi riceve i sats.\n\n'
       + 'Da quel momento lo scambio si ferma: né tu né l\'altra persona potete più muovere i sats. '
       + 'Barattolo non decide e non può intervenire.\n\n'
-      + 'Prima di aprirla, prova a scrivere all\'altra persona: quasi sempre è un ritardo.',
+      + 'Prima di aprirla, dai tempo all\'altra persona: quasi sempre è un ritardo. Se vi siete mandati un contatto, provate a sentirvi.',
     etichetta: 'Sì, apri la disputa',
     poi: () => { inviaDisputaP2P(); }
   });
