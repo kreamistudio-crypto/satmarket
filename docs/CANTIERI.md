@@ -7314,3 +7314,78 @@ che quel colore lo usa da mesi; e una su «npub» dentro il giudice era
 rossa per la DOCSTRING che dice cosa NON esce — `codice()` toglie i
 commenti, non le stringhe. Le due domande si fanno DOVE contano: nel
 disegno dell'anello, e nel corpo della funzione senza la sua docstring.
+
+
+IL PROFILO CHE RINASCE, LA RIGA DELL'ALTRA PIAZZA E IL VOLTO-PORTA
+(set 2026). Tre punti di Andrea in un giro solo, e il primo dei tre
+era un DIFETTO DAL CAMPO: sull'app Android (Zapstore) i propri ordini
+non erano piu' marcati come «miei» — prendibili — mentre miniapp e
+sito li riconoscevano, con la stessa identita' su tutte e tre.
+LA DIAGNOSI, coi tre sospetti di Andrea sfilati uno a uno. Il service
+worker v8 era innocente: le navigazioni sono rete-prima e le pagine
+non entrano mai in dispensa. Il blocco dei volti era innocente: il
+callback della restore fa le stesse cose di prima piu' la
+registrazione, che e' async e ingoiata dal catch. La restore invece
+NON PARTIVA DAVVERO, ma piu' a monte di quanto si pensasse: sull'app
+non c'era piu' IL MAZZO. La catena: ieri sera i codici segreti erano
+uguali su PC, app e miniapp (la prova finale del seme); oggi
+pomeriggio, durante la caccia ai loghi stantii, la cache dell'app e'
+stata svuotata — e col localStorage se n'e' andato il mazzo; e la
+tappa B del profilo invisibile (stesso giorno, mattina) aveva tolto
+il bottone «Usa il profilo del mio account» con la premessa che «il
+motore facesse gia' tutto da solo». LA PREMESSA ERA FALSA FUORI DA
+TELEGRAM: l'adozione silenziosa dal seme viveva SOLO in
+`assicuraMazzo`, cioe' nel primo GESTO, e il cloud e' una gamba che
+sull'app e sul sito non esiste (`cloudTelegram()` nullo). Un
+dispositivo svuotato restava senza profilo per sempre, guardando i
+propri ordini da estraneo. La fase 4d aveva gia' trovato questo
+identico buco e l'aveva chiuso col bottone: il bottone e' uscito, il
+buco e' tornato.
+LA CURA E' LA GAMBA CHE MANCAVA: `adottaProfiloContoP2P`, chiamata
+dal render del P2P quando ne' il locale ne' il cloud danno un mazzo.
+Deriva dal seme del conto — che non e' un'identita' nuova: e' il nome
+di scambio dell'account, deterministico e uguale ovunque — e NON
+riusa `assicuraMazzo`, che a mani vuote genera a caso (l'invariante:
+guardare il libro non fa nascere identita'). Il 409 resta silenzio;
+una nuvola illeggibile ferma anche qui (la regola delle lapidi); il
+profilo rinato si registra subito e si fa dare il pavimento
+dell'indice, che e' cio' che rende la restore possibile appena nati.
+DUE GUARDIE DI CONTORNO trovate per strada: il gate dell'adozione
+fuori da Telegram ASPETTA l'identita' (`myTgId`) — senza, il seme
+risponderebbe 409 e la bandierina bruciata chiuderebbe la porta per
+la sessione — e il giro dei miei a indice zero parte solo col
+pavimento IN VOLO, o un giro concluderebbe «non ne hai» su un fatto
+mai chiesto e la bandierina lo renderebbe definitivo.
+IL SECONDO PUNTO e' la promessa mantenuta del giro scorso: la
+reputazione del circuito e' RINATA come `repRigaP2P`, nel DETTAGLIO
+della presa — il foglio che si legge prima di dire si', che e' il
+momento in cui serve — e non sulla card, dove le stelline sono del
+mercatino. Il ⚡ e la parola «P2P» la tengono distinta. La forma
+chiesta da Andrea («100% positivi») NON e' ricavabile dal tag rating
+del 38383, che porta total_reviews, total_rating e days: si dice quel
+che si sa — «⚡ 7 scambi P2P · ⭐ 4,6 · da 23 giorni», e senza voti
+«⚡ Nuovo sul P2P · da oggi» — mai un numero ricavato per sembrare
+piu' netto.
+IL TERZO PUNTO e' il volto che diventa una PORTA: il tocco sulla
+faccia apre il NEGOZIO del mercatino di chi ha pubblicato (lo stesso
+`apriNegozio` del dettaglio annuncio, col codice pubblico prima e lo
+username poi), mentre il resto della card resta l'ordine. Lo
+stopPropagation vive in `apriNegozioP2P`; senza un negozio da aprire
+il volto resta un volto, senza onclick ne' cursore. La rotta delle
+facce esce col campo `negozio` in piu' — roba gia' pubblica, e' lo
+stesso indirizzo che ogni annuncio porta — e nel passaggio si e'
+chiuso un buco del giro di ieri: l'avatar ora rispetta
+`avatar_scelta='nessuna'` con lo stesso CASE della pagina negozio,
+che al primo giro dei volti non era stato ricopiato.
+VERIFICATO DAL VIVO sul dispositivo «svuotato» simulato
+(localStorage.clear + ingresso nel P2P): mazzo rinato con origine
+'conto', pavimento partito, restore partita e conclusa su un fatto;
+la riga ⚡ dentro il foglio della presa su un ordine VERO del libro;
+il tocco sul volto che apre il negozio del Venditore di collaudo
+senza far scattare la presa. E il banco node fa girare la gamba vera
+con un coordinatore di cartone: nasce dal seme, non tocca un mazzo
+che c'e', tace sul 409, porta a casa il pavimento.
+RESTA A VERBALE il gemello non curato: un giudice lato server («e'
+tuo» dalla tabella p2p_ordini) marcherebbe anche a restore muta, ma
+saprebbe dire «e' tuo» senza saper APRIRE lo scambio — un tocco
+monco. Se un giorno servira', si costruira' insieme alla ripresa vera.
