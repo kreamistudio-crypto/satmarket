@@ -6370,3 +6370,48 @@ sei rosse su due banchi.
 DA GUARDARE: il ritiro vero dei due ordini orfani di Andrea (4 e 5
 euro) — al prossimo giro sul PC devono comparire come righe normali
 con «Ritira», ed e' la verifica sul campo di questa voce.
+
+La scopa lampo, e la ✕ che «si sincronizza» derivando dallo stato
+(set 2026, dopo il ritiro verificato sul campo). La richiesta era la
+✕ sincronizzata: chiusa una card su un dispositivo, sparisca ovunque.
+LE TRE STRADE VALUTATE, coi perche' — e due sono scartate:
+1) IL CLOUD DI TELEGRAM sincronizzerebbe solo miniapp↔miniapp:
+`cloudTelegram()` e' null sul PC (browser) e sull'app di Zapstore,
+cioe' proprio la coppia di superfici del caso reale. Non e' una
+strada, e' un vicolo.
+2) UNA LISTA SUL SERVER romperebbe un pezzo di disegno: il motore
+P2P ha la sentinella «zero fetch» apposta, e il server oggi sa SOLO
+quali pubkey guardare sui relay — mandargli gli id degli ordini
+nascosti gli insegnerebbe QUALI ordini del libro sono di chi. Una
+comodita' pagata in privacy, contro la voce «le chiavi pubbliche
+dello scambio».
+3) IL QUADERNO CIFRATO SUI RELAY — un kind 30078 cifrato a se stessi,
+pubblicato da una chiave derivata dal mazzo con un'etichetta sua
+(quindi non collegabile ne' all'identita' ne' alle trade key), con un
+`d` derivato per non marchiare il client — e' la strada GIUSTA per la
+sincronizzazione istantanea, e servira' comunque alla ripresa piena:
+ma e' un pilastro nuovo (storage personale sui relay), e si disegna
+DENTRO la fase 6, non in coda a questo giro. Registrata qui perche'
+il giorno che l'istantaneo servira' davvero, la via e' gia' scritta.
+LA STRADA COSTRUITA E' LA DERIVAZIONE DALLO STATO, che era anche
+nella richiesta: lo stato E' gia' sincronizzato dal coordinatore —
+ogni dispositivo vede l'annullato da solo — e quel che mancava era
+che la card, detta la notizia, se ne andasse. LA SCOPA LAMPO: un
+`annullato` o `rifiutato` che non ha MAI tenuto sats (niente hold,
+niente satsNetti) e' una notizia e non una ricevuta — 24 ore dopo il
+cambio di stato si toglie da sola, su ogni dispositivo, senza nessun
+canale nuovo. La ✕ resta per il subito. I CONFINI: il «concluso» non
+si tocca (porta il voto e finisce nell'export CSV degli affari — e'
+una ricevuta), e un annullato che i sats li ha tenuti (cooperative
+cancel con hold) resta ricevuta a 30 giorni.
+LA PROVA REGINA HA CAMBIATO VESTITO SENZA CAMBIARE MESTIERE: il caso
+«chiuso ieri dal coordinatore resta» difendeva la catena dei timbri
+(`quando` prima di `aggiornato`) con la soglia a un mese; col lampo a
+24 ore lo stesso caso e' passato a «chiuso stamattina» (12 ore) — chi
+pulisse `quando` dalla catena spazzerebbe una riga chiusa poche ore
+fa, e la riga diventa rossa uguale. Torturato nei due versi: senza la
+guardia della hold la ricevuta se ne va (rosso), senza il lampo la
+notizia resta (rosso).
+DA GUARDARE: se il rodaggio dira' che 24 ore sono troppe o poche, e'
+UNA costante (`P2P_SCOPA_LAMPO_S`); e se l'istantaneo tornera' a
+mancare, la strada 3 aspetta nella fase 6.
