@@ -6188,3 +6188,56 @@ spacciato per «non ne hai»: o il gate aspetta il pavimento, o
 «Riprova» riarma anche la marcatura. Tutte e due costano poco; quel
 che non costa niente e' dimenticarsele, ed e' il motivo di questa
 voce.
+
+La corsa dell'indice curata, e la striscia che nasce ovunque (set
+2026, il giro dopo la prova finale). I due aperti della voce qui sopra
+si chiudono insieme, perche' sono le due meta' della stessa promessa —
+«i tuoi ordini ovunque» — e la prova sul campo li aveva mostrati tutti
+e due: la marcatura arrivava solo alla SECONDA apertura fredda, e
+anche allora la striscia «I tuoi scambi» restava vuota sul dispositivo
+che non aveva pubblicato.
+LA CORSA SI CURA TENENDO LA PROMESSA: renderP2P adesso conserva in
+`p2pPavimento` la promessa di `registraChiaviP2P` — quella che porta
+indietro il pavimento dell'indice — e `chiediMieiOrdiniP2P`, quando
+l'indice locale e' zero, la ASPETTA e rilegge il mazzo prima di
+giudicare. Fail-open nel verso giusto: un pavimento che cade non
+blocca niente, si conclude come prima. E il giudizio sull'indice e'
+SCESO dentro il giro asincrono: prima viveva fuori, dove non poteva
+aspettare nessuno.
+E «RIPROVA» ADESSO RIARMA: il gate della marcatura esigeva
+`p2pMieiOrdini === null`, quindi il `{}` scritto dal giro a indice
+zero era definitivo — il gesto riabbassava la bandierina e il gate
+restava chiuso lo stesso. Ora la bandierina e' l'UNICO gate: una
+risposta fresca sostituisce la vecchia, un giro caduto lascia quel che
+si sapeva, e il ritentativo continua a costare un gesto.
+LA STRISCIA NASCE ANCHE SUL DISPOSITIVO FRESCO: `righeAltroveP2P`
+prende gli ordini riconosciuti dalla restore che NON hanno una riga
+locale e che il LIBRO sa ancora descrivere, e `scambiP2P` li accoda
+alla striscia con una riga loro — cifra e lato dal 38383, il lato
+letto da MAKER (un `sell` nella striscia e' «vendi», perche' li'
+l'ordine e' tuo), e il tocco che passa dalla porta del gesto, il
+giudice che gia' distingue «mio ma non in lista» e risponde con la
+frase onesta invece di aprire uno scambio che su quel dispositivo non
+c'e'.
+IL LIMITE E' DICHIARATO, non nascosto: di un ordine preso o in corso
+la restore da' solo l'id e uno stato nel vocabolario del coordinatore,
+che non si traduce a memoria (la lezione di Q4: gli stati si scrivono
+quando si VEDONO) — quegli ordini nella striscia non compaiono ancora.
+Li aprira' la RIPRESA vera, col `trade_index` che la risposta della
+restore gia' porta: e' il mattone delle fasi 5-6-7, che partono da
+qui.
+LA TORTURA HA MORSO ANCHE LA PROVA, ed e' la riga da tenere: il banco
+simulava il pavimento con un'async IIFE che bumpava l'indice PRIMA del
+primo await, cioe' in modo sincrono — e cosi' il caso «si aspetta la
+promessa» passava anche a cura tolta. Il corpo di un'async IIFE gira
+sincrono fino al primo await: un banco che deve provare un'attesa deve
+mettere il fatto DOPO un await vero. Stessa famiglia del rovescio
+trovato al primo giro: la sentinella «niente piu' `=== null` nel gate»
+lo ritrovava nel COMMENTO che raccontava il vecchio gate — si guarda
+`solo_codice`, mai la prosa. Tre mutazioni provate, tutte uccise:
+senza l'attesa del pavimento (4 rosse), col vecchio gate (2), senza le
+righe della restore nella striscia (3).
+DA GUARDARE: resta aperto — dalla voce qui sopra — il profilo 'conto'
+che non si riverifica mai dopo l'adozione; e alla prossima apertura
+fredda su un dispositivo che non ha pubblicato, la marcatura E la
+striscia devono arrivare alla PRIMA, non piu' alla seconda.
