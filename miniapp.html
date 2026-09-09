@@ -2227,8 +2227,14 @@
      la classe eti: il suo stato di quiete e' il nascosto, e il delay
      d'ingresso li' le mangerebbe la dissolvenza d'uscita. */
   nav button.sell .eti-pila>.eti:not(.eti-p2p){transition-delay:.1s,.1s,0s}
-  body.nav-p2p nav button.sell .eti{transform:translateY(120%);
-    opacity:0;visibility:hidden;transition-delay:0s,0s,.4s}
+  /* lo stato P2P ricalca la STESSA catena della quiete (piu'
+     body.nav-p2p): con la catena corta la quiete — quattro classi —
+     vinceva anche qui dentro, la visibility spegneva a delay zero e
+     «Vendi» SPARIVA DI COLPO all'andata. Visto dal vivo da Andrea,
+     ed e' il gemello rovescio del difetto del ritorno. */
+  body.nav-p2p nav button.sell .eti-pila>.eti:not(.eti-p2p){
+    transform:translateY(120%);opacity:0;visibility:hidden;
+    transition-delay:0s,0s,.4s}
   body.nav-p2p nav button.sell .ic{transform:translateY(-15px);
     border-radius:50%;background:var(--trust);
     box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
@@ -4821,7 +4827,9 @@
     /* le etichette: da desktop «Vendi» sfuma senza scivolare (dentro
        una pillola la corsa verticale si vedrebbe tagliata male) e
        «Pubblica» prende il suo posto */
-    body.nav-p2p nav button.sell .eti{transform:none}
+    /* stessa catena lunga dello stato P2P mobile, o non lo batterebbe:
+       da desktop «Vendi» sfuma sul posto, mai la corsa verticale */
+    body.nav-p2p nav button.sell .eti-pila>.eti:not(.eti-p2p){transform:none}
     body.nav-p2p nav button.sell .eti-p2p{visibility:visible;opacity:1;
       transition-delay:.1s,.1s,0s}
     /* l'incavo da desktop viene dal BASSO: la topbar e' appesa in
