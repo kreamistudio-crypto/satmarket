@@ -8550,3 +8550,73 @@ chiesto prima dell'intestazione è un no che da solo non si richiede,
 l'intestazione lo porta con un ridisegno, prima l'ordine al server e
 poi la domanda, il provvisorio resta fuori, e col server che dice no
 non si chiede niente.
+
+L'EURO È UN INTERO (10 set 2026, dal campo di Andrea: nel foglio
+Pubblica «5,5 €» usciva un ordine da 5 €).
+È UNA REGOLA DEL PROTOCOLLO e non del foglio — `fiat_amount` viaggia
+intero, e nemmeno Mostro prende i decimali — ma il foglio la applicava
+TRONCANDO IN SILENZIO, con `Math.floor(Number(...))`, negli stessi tre
+posti in cui si scrive una cifra in euro: `valeNuovoOrdineP2P` (il
+giudice del bottone), `ordineDaCampiP2P` (quel che si SPEDISCE) e
+`quantoValeP2P` (l'importo scelto dentro un intervallo). Chi scrive
+5,5 vede partire 5 e lo scopre dal libro, che è il modo più caro di
+saperlo.
+MISURATO SUI BYTE PRIMA DI SCRIVERE LA CURA, ed è lì che il difetto si
+è rivelato più largo di come si presentava. Fatte girare le funzioni
+vere: `'5.5'` → `"fiat_amount":5` (il troncamento raccontato), `'0.9'`
+→ `0`, e **`'5,5'` → `"fiat_amount":null`** — perché
+`Math.floor(Number('5,5'))` non è 5, è **NaN**, e `JSON.stringify`
+scrive `null`. Un `null` dove il coordinatore aspetta un i64 è una
+busta che non sa leggere, e a una busta storta Mostro non risponde un
+errore: TACE. Nel browser quella strada era tappata per caso (vedi
+sotto), ma esisteva.
+⚠️ LA VIRGOLA ARRIVA VUOTA, ed è il pezzo che leggendo il codice non
+si vede: un `<input type="number">` con dentro «5,5» risponde
+`value === ''` e alza `validity.badInput`. Quindi «non ho scritto
+niente» e «ho scritto una virgola» arrivavano al giudice IDENTICI, e
+il foglio rispondeva «Scrivi l'importo in euro» a chi l'importo
+l'aveva scritto — un vicolo cieco che manda a indovinare. È anche il
+motivo per cui il difetto si vedeva col punto e non con la virgola.
+LA CURA NON È ACCETTARE I DECIMALI, È DIRLO. Un giudice PURO e uno
+solo per i tre posti (`euroInteroP2P`): solo cifre, e `Number` non
+basta come giudice — accetta `'5.5'`, `'5e3'` e `' 5 '`, che qui sono
+tutti storti. Un lettore solo per i campi (`testoCampoNumero`) che
+traduce il badInput in un sentinella (la virgola, che un campo
+numerico non può mai produrre) così il giudice lo legge storto. La
+frase «Solo importi interi in euro» vive in una costante, che tre
+copie sono tre frasi che un giorno divergono. E i tre campi passano da
+`inputmode="numeric"` (era `decimal`, cioè una tastiera che OFFRIVA la
+virgola) tenendo `step="1"`: gli altri `decimal` del file sono prezzi
+del mercatino, dove i decimali sono legittimi, e per questo la
+sentinella guarda i tre id e non il conto del file.
+FAIL-CLOSED SUL FILO: a cifra storta l'euro vale ZERO e non «quel che
+ci somiglia». Un ordine da 0 il coordinatore lo rifiuta; uno da 5 al
+posto di 5,5 lo ESEGUE, ed è quello che nessuno voleva. E
+`ordineDaCampiP2P` legge dallo stesso giudice del bottone: quel che si
+vede acceso e quel che parte non possono divergere — è esattamente
+così che «5,5» diventava 5.
+L'ORDINE DEI MESSAGGI È PARTE DELLA CURA: la forma si giudica PRIMA
+del vuoto e PRIMA della fascia. A «5,5» dire «scrivi l'importo» (o
+«scegli una cifra fra 20 e 100») manda a cercare l'errore dove non c'è.
+COLLAUDATI: **8993 prove verdi, 0 rosse** sull'albero che porta anche
+la firma del canale arrivata da Alan mentre questo giro era aperto (da
+sola questa cura fa +14: 8976 → 8990) e **12 MUTAZIONI, 12
+uccise**: quel che si spedisce che torna a troncare, il giudice che
+accetta i decimali, il bottone che parla del vuoto prima della forma,
+il lettore che ignora il badInput, la presa che torna a troncare, i
+tre campi che tornano a offrire la virgola, il foglio e la presa che
+leggono col solo `value`, il giudice che si fida di `Number`, e la
+frase che si sdoppia.
+⚠️ E LA TORTURA HA TROVATO UNA PROVA CHE RISPONDEVA PER IL VICINO, la
+terza volta che succede in questo file: la sentinella dei campi
+affettava `id="p2pNuovoEuro"` più DUECENTO caratteri, e i due campi
+dell'importo distano poche righe — la mutazione sul MASSIMO tingeva di
+rosso anche la prova dell'IMPORTO. Adesso la fetta finisce dove
+comincia il campo dopo. Una finestra a misura fissa è sempre una fetta
+che un giorno sconfina.
+RESTA FUORI, e si dice: i SATS a prezzo fisso passano ancora da
+`Math.floor(Number(v.sats))` — stessa classe, campo diverso (e la sua
+tastiera è già `numeric`, quindi la virgola lì non la offre nessuno).
+Non è entrato in questo giro perché la richiesta era sull'euro e il
+messaggio dice «in euro»: il giorno che si fa, il giudice è già
+scritto e serve solo la sua frase.
