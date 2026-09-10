@@ -8989,3 +8989,89 @@ la pagina nasce DENTRO la fetta di sorgente che quel banco carica, e
 una dichiarazione di funzione scritta prima se la vede riscrivere
 sopra dalla vera, che poi cerca un DOM che lì non c'è. Va DOPO il
 sorgente, e allora vince lei.
+
+## Il conto scorporato del dettaglio, e la commissione del 2%
+
+IL RITOCCO CHIESTO DA ANDREA (set 2026, il giorno dopo la pagina):
+sotto il titolo resta il solo «Stai comprando/vendendo sats», e la
+riga del prezzo con la quantità scendono in un CONTO SCORPORATO
+sotto l'anello — il calco del foglio «Paga» del mercatino, stesso
+vestito (`.ctrl-conto`, `.ctrl-riga`, il `promo-tag`): Controvalore,
+Commissione Barattolo, Premio al venditore, e le due righe in
+evidenza — «Ricevi» in sats e «Totale da pagare» in euro, che nel
+tab Vendi si specchiano in «Paghi» (i sats bloccati) e «Ricevi»
+(gli euro). `prezzoRigaP2P` è morta con la sua ragione, nome
+compreso: quel che diceva lo dicono le righe del conto, ognuna col
+suo nome. Della moneta resta `monetaP2P` (la bandierina dove è
+vera), e il premio porta la tinta delle card (`.ctrl-riga
+.p2p-affare/.p2p-avviso`: la coppia CSS c'era solo sotto
+`.p2p-prezzo`, e senza il gemello la classe restava grigia).
+
+LA DECISIONE: la commissione di Barattolo sul P2P è il **2%**. E LA
+VERIFICA DI COME SI INCASSA, che era la domanda del cantiere:
+l'incasso è la **`fee` del coordinatore** (la voce di
+`settings.toml` sul nodo, oggi 0.01), e NON può essere altro — i
+sats viaggiano dalla hold invoice al payout DENTRO mostrod, e il
+client non ha nessun punto dove tirarne fuori uno. Quindi **il 2% È
+quella fee, alzata a 0.02: non si somma** — sommare vorrebbe dire
+inventare un secondo escrow per la sola trattenuta, cioè tradire
+«Barattolo non tiene e non vede i sats».
+LE DUE STRADE SCARTATE, coi perché: (a) una seconda trattenuta
+lato client — non esiste il punto dove prelevarla, vedi sopra; (b)
+cablare «2%» nel client — mentirebbe ogni volta che il settings
+dice un'altra cosa, e la regola delle impostazioni («si leggono
+dal 38385, mai cablate») esisteva già. La percentuale si legge
+VIVA dal 38385, e la leva nuova `P2P_COMMISSIONE_PERCENTO` (config,
+default 2, in busta con le leve P2P e nel pannello admin) è il solo
+LISTINO: quando la fee viva sta sotto, il conto mostra «in promo»
+col cartello del mercatino — quindi finché Andrea non gira la fee
+sul nodo il conto dice «in promo 0,5%», che è vero e in rodaggio è
+perfino un argomento.
+
+⚠️ E LA FEE SI SPARTISCE META' A TESTA, ed è il punto che ha
+piegato la lettera della richiesta («a destra 2%»): verificato sui
+numeri veri del primo scambio (74 sats su un ordine da 7301 — hold
+del venditore 7338, payout 7264, 37 per parte; e la hold
+dell'impantanato: 7439 = 7402 + 37). Nel conto di chi legge ci va
+quindi LA SUA METÀ (1% quando la fee è 2%), o «Controvalore −
+premio − commissione» non farebbe «Ricevi» — e un conto che non
+somma insegna a non fidarsi di tutti gli altri. Il 2% intero sta
+nella spiegazione sotto il conto («si divide metà a testa: nel
+conto c'è la tua metà»), scritta senza articolo davanti alla
+percentuale perché a fee 1% direbbe «il 1%».
+
+E LA CIFRA È UNA SOLA SU TUTTE LE SUPERFICI: `nettoLatoP2P` è il
+giudice nuovo — la metà si toglie a chi compra e si AGGIUNGE a chi
+vende, che la blocca insieme all'amount — e lo chiamano la card del
+libro, il foglio «Quanto» e il conto: la cifra «Ricevi»/«Paghi» è
+al netto di TUTTO (premio + commissione), mai un secondo conto
+sulla stessa offerta. A prezzo fisso il netto porta il ≈ che prima
+non c'era: l'arrotondamento buono della metà ce l'ha il
+coordinatore, e la nostra è una stima. A fee ignota (38385 mai
+arrivato) la commissione è un trattino e mai uno zero — «non si sa»
+non è «gratis» — e la cifra resta quella del mercato.
+
+COLLAUDATO: **9105 verdi, 0 rosse** — il banco del dettaglio fa
+girare il conto negli otto casi (mercato, premio in tinta coi
+segni, fisso, intervallo coi due capi, valuta ignota, promo, fee
+ignota, cambio muto) e verifica che le righe SOMMINO; il banco
+delle card prova il netto sui due lati e il ≈ sul fisso; la busta
+`_p2p_leve` porta la quinta chiave. Guardato in vetrina CDP a 375 e
+320, due lati e due temi. ⚠️ DIFETTO DICHIARATO E NON CURATO: a
+320px l'etichetta «Commissione Barattolo» cede coi puntini
+(«Commissione Bar…»), e nei casi promo e intervallo anche a 375 —
+è la regola del conto («a cedere è l'etichetta»), ma il precedente
+del mercatino l'ha già giudicata un difetto una volta: se dà
+fastidio la leva è il rinome secco «Commissione» (lo stesso
+rimedio di allora), da chiedere ad Andrea prima di rovesciare la
+sua parola.
+
+RESTA DA FARE SUL NODO (guarda-e-riferisci, non da questa repo):
+girare `fee` a 0.02 in `settings.toml` e riavviare DAL COMPOSE
+(`docker compose restart mostro` da ~/nodo — mai `docker restart`,
+vedi CLAUDE.md), poi verificare dal lato di chi legge che il 38385
+annunci `fee 0.02`. E IL CONTO ECONOMICO DA NON DIMENTICARE: la dev
+fee di Mostro è il 30% della NOSTRA fee — oggi il tappo
+`dev_fee_percentage = 0` (il circuito Tor freddo) la tiene a zero e
+il 2% resta intero, ma il giorno che il tappo si toglie 0,6 punti
+dei 2 se ne vanno upstream, e il margine va riguardato allora.
