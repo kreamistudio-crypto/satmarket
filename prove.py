@@ -35671,8 +35671,13 @@ def prove_p2p_libro():
     # L'ARIA SOTTO LA PILLOLA sta DENTRO il blocco attaccato, e non e' un
     # margine della card: dev'essere fondo DIPINTO, o da attaccati le
     # prime card si vedrebbero passare in quello spazio.
+    # ⚠️ SI GUARDA CHE L'ARIA CI SIA, non quanta: il numero e' una
+    # taratura che Andrea muove, e una sentinella che lo inchioda
+    # diventa rossa a ogni ritocco senza dire niente di vero. Quel
+    # che conta e' che stia DENTRO il blocco, cioe' che sia fondo
+    # dipinto e non margine della prima card.
     prova("sotto la pillola c'e' aria, dentro il blocco attaccato", True,
-          "padding-bottom:8px" in pezzo_js(mini, "  .p2p-sticky{", "}"))
+          "padding-bottom:" in pezzo_js(mini, "  .p2p-sticky{", "}"))
     # LA RIGA DEL PROPRIO ORDINE resta senza icona: la scritta basta
     # ⚠️ SI GUARDA LA CARD, non il file: il 👤 vive legittimamente nel
     # foglio del profilo e nei due recapiti — cercarlo in `mini` fa
@@ -35682,14 +35687,31 @@ def prove_p2p_libro():
           '<div class="p2p-box p2p-tuo">È il tuo ordine' in _riga
           and "👤" not in _riga)
     # LA STELLA: due disegni sovrapposti, e a tagliare e' la scatola
-    _st = pezzo_js(mini, "  .p2p-stella{", "}")
+    _st = pezzo_js(mini, "  .p2p-rep-stella{", "}")
     prova("la stella e' una scatola che taglia, non un gradiente", True,
           "position:relative" in _st
-          and "overflow:hidden" in pezzo_js(mini, "  .p2p-stella-piena{", "}")
+          and "overflow:hidden" in pezzo_js(mini, "  .p2p-rep-stella-piena{", "}")
           # ...e si guarda il DISEGNO, non il file: una `clipPath` con id
           # vive gia' nel lucchetto della cassa, e li' va benissimo
           and "linearGradient" not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n")
           and "clipPath" not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
+    # ⚠️ LA STELLA DELLA CARD NON PUO' CHIAMARSI `p2p-stella`, ed e' un
+    # difetto gia' pagato: quella classe e' dei cinque bottoni del
+    # foglio del voto, e mescolandosi li aveva ridotti a scatole da
+    # 16x14 px con dentro un glifo da 34 (misurato dal vivo). Le due
+    # famiglie restano separate per NOME.
+    prova("la stella della card non usa la classe dei bottoni del voto", True,
+          'class="p2p-rep-stella"' in mini
+          and 'class="p2p-stella"' not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
+    prova("...e i bottoni del voto restano i soli `p2p-stella`", 1,
+          mini.count('class="p2p-stella"'))
+    # LA STELLA E' PIU' GRANDE DELL'OMINO (set 2026, taratura di Andrea):
+    # e' la sola cosa che conta fra le due misure, e regge ai ritocchi
+    # meglio di due numeri inchiodati.
+    _mis = lambda blocco: int(re.search(r"width:(\d+)px", blocco).group(1))
+    prova("la stella e' piu' grande dell'omino", True,
+          _mis(pezzo_js(mini, "  .p2p-rep-stella{", "}"))
+          > _mis(pezzo_js(mini, "  .p2p-ico.p2p-ico-mini{", "}")))
     # il disegno vive in UNA costante: due stelle diverse sarebbero due
     # stelle diverse
     prova("il disegno della stella e' scritto una volta sola", 1,
@@ -36449,7 +36471,7 @@ console.log(JSON.stringify(out));
     # tutte. Il riempimento e' una SCATOLA che taglia.
     prova("...senza nessun id, che in un libro si ripeterebbe", True,
           "id=" not in out["stellaSenzaId"]
-          and out["stellaSenzaId"].count("p2p-stella-piena") == 2)
+          and out["stellaSenzaId"].count("p2p-rep-stella-piena") == 2)
     # L'OMINO al posto del fumetto: stesso tratto delle icone della nav
     prova("l'omino e' un'icona a tratto come quelle della nav", True,
           'class="p2p-ico p2p-ico-mini"' in out["omino"]

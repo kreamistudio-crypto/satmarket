@@ -1807,7 +1807,7 @@
      DIPINTO, o da attaccati le prime card si vedrebbero passare in
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
-    padding-bottom:8px}
+    padding-bottom:5px}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -2067,16 +2067,33 @@
   /* LA STELLA CHE SI RIEMPIE: due disegni sovrapposti, e a decidere
      quanto se ne vede e' la larghezza della scatola che taglia. Il
      vuoto e' il solo tratto, il pieno e' tratto E campitura, cosi'
-     il bordo resta continuo anche a meta' strada. */
-  .p2p-stella{position:relative;display:inline-block;width:14px;height:14px;
-    vertical-align:-2px}
-  .p2p-stella svg{position:absolute;left:0;top:0;width:14px;height:14px;
+     il bordo resta continuo anche a meta' strada.
+     ⚠️ SI CHIAMA `p2p-rep-stella` E NON `p2p-stella`, e non e' gusto:
+     `.p2p-stella` ESISTE GIA' — sono i cinque bottoni-stella del
+     foglio del voto, trecento righe piu' giu'. Stessa classe, stessa
+     specificita': le due regole si mescolavano, e siccome questa sta
+     PRIMA e fissa `width`/`height`, i bottoni del voto diventavano
+     scatole da 16x14 px con dentro un glifo da 34 (misurato dal
+     vivo). Nell'altro verso i bottoni passavano a questa il loro
+     `padding`, il `cursor` e l'ingrandimento all'hover.
+     UN NOME NUOVO PRIMA DI UNA REGOLA PIU' FORTE: alzare la
+     specificita' avrebbe curato un verso solo e lasciato la
+     mescolanza dov'era. */
+  .p2p-rep-stella{position:relative;display:inline-block;
+    width:17px;height:17px;vertical-align:-3.5px}
+  .p2p-rep-stella svg{position:absolute;left:0;top:0;width:17px;height:17px;
     display:block;fill:none;stroke:var(--oro,#E0A82E);stroke-width:1.7;
     stroke-linejoin:round}
-  .p2p-stella-piena{position:absolute;left:0;top:0;height:14px;
+  .p2p-rep-stella-piena{position:absolute;left:0;top:0;height:17px;
     overflow:hidden}
-  .p2p-stella-piena svg{fill:var(--oro,#E0A82E)}
-  .p2p-ico-mini{width:14px;height:14px;vertical-align:-2px}
+  .p2p-rep-stella-piena svg{fill:var(--oro,#E0A82E)}
+  /* ⚠️ DUE CLASSI E NON UNA, o la misura non arriva: l'omino porta
+     `class="p2p-ico p2p-ico-mini"`, e `.p2p-ico` — che fissa 22px —
+     sta PIU' IN BASSO nel foglio. Stessa specificita', vince chi
+     viene dopo: scritta con una classe sola questa riga non faceva
+     niente, e l'omino restava grande com'era (misurato: 22x22).
+     Due classi battono una, e la regola vince da dove sta. */
+  .p2p-ico.p2p-ico-mini{width:12px;height:12px;vertical-align:-1.5px}
   /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
      l'auto-margine la spinge in fondo alla SUA riga.
      MA COL CONTENUTO VERO QUEL CAPO NON ARRIVA MAI, ed e' misurato e
@@ -34006,8 +34023,8 @@ function stellaP2P(media){
   const q = Math.round(frazioneStellaP2P(media) * 1000) / 10;
   const disegno = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'
     + P2P_STELLA_D + '"/></svg>';
-  return '<span class="p2p-stella">' + disegno
-    + '<span class="p2p-stella-piena" style="width:' + q + '%">'
+  return '<span class="p2p-rep-stella">' + disegno
+    + '<span class="p2p-rep-stella-piena" style="width:' + q + '%">'
     + disegno + '</span></span>';
 }
 /* L'OMINO accanto al conto dei voti (set 2026, richiesta di Andrea, al
