@@ -23813,7 +23813,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'ordine del render (parcheggio sincrono PRIMA di registrare o di
   chiedere la restore) stanno nel commento «IL CONTO SUL DISPOSITIVO»
   di miniapp.html; il verbale con le strade scartate in CANTIERI, alla
-  voce con lo stesso nome.
+  voce con lo stesso nome. ⚠️ IL CONTO NON PASSA MAI DA `| 0`: i tg_id
+  nuovi stanno sopra 2^31 e un bitwise li tronca in silenzio
+  (`numeroConto`, con la sua sentinella). E il parcheggio con la STESSA
+  sk del mazzo che entra si RIPRENDE (`riprendiParcheggioP2P`): indice
+  più alto, scambi uniti, parcheggio svuotato.
 
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le

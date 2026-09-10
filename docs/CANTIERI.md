@@ -8462,3 +8462,48 @@ assente vale -1 e rende la catena falsa da sola.
 DA GUARDARE SUL CAMPO: la sequenza dei due account sul telefono
 (quale entra prima, e che il secondo veda solo il suo), e che l'ordine
 di ieri sparisca dal secondo e resti governabile dal primo.
+
+IL SECONDO GIRO DAL CAMPO, la sera stessa (10 set 2026): ritirato il
+vecchio ordine dal primo account, il secondo ne pubblica uno nuovo — e
+NON lo vede come suo: niente marcatura, niente striscia, card senza
+volto, nessun ritiro possibile. I sospetti di Andrea erano tre (mazzo
+nato e non salvato, registrazione mancata, restore con un'identità
+diversa) e la risposta è una riga sola: `8711624959 | 0` fa
+`121690367`. I tg_id nuovi di Telegram stanno SOPRA 2^31, e il campo
+`conto` passava da un bitwise in quattro punti — i due giudici, la
+serializzazione e la rilettura. Il mazzo appena derivato si
+serializzava col conto troncato, al render dopo si rileggeva «di un
+altro» e finiva nel parcheggio; l'adozione lo riderivava dal seme —
+stessa sk, indice 0 — e il render dopo lo parcheggiava di nuovo, per
+sempre. In mezzo a un giro Andrea ha pubblicato: il gesto passa da
+`assicuraMazzo`, che il mazzo timbrato lo prende al volo, quindi
+l'ordine è nato con la sk GIUSTA (quella del seme del secondo) e la
+riga locale è finita nel parcheggio `@altrui:<pub>` al render
+successivo, dove è rimasta intatta (i giri dopo trovavano il nome vivo
+vuoto e non sovrascrivevano). La restore non partiva mai — il
+parcheggio è sincrono e sta prima — e `registraOrdiniP2P` nemmeno:
+ecco la card senza volto. IL BANCO NON LO VEDEVA perché usava 111 e
+222, e la mutazione «tronca il conto» non esisteva: le prove sono
+esatte solo sui numeri che qualcuno ha pensato di provare.
+LA CURA: `numeroConto` (Number, mai bitwise) nei quattro punti, una
+sentinella che non ammette `| 0` sul conto in tutto il blocco del
+mazzo, e il banco con il tg_id vero. E LA STRADA b) È RIENTRATA, con
+un motivo nuovo: il difetto aveva parcheggiato IL MAZZO GIUSTO col suo
+ordine, e la prova che un parcheggio è del conto che entra è la più
+forte che esista — la STESSA sk. `riprendiParcheggioP2P`, chiamata dal
+render prima della registrazione: il mazzo riprende l'indice più alto
+(mai riusare una trade key), scambi, lapidi e recapiti tornano vivi
+(su un nome già occupato vince quel che c'è, che è il più recente), e
+il parcheggio si svuota. Una sk diversa non si tocca. È così che
+l'ordine del secondo account torna: al primo ingresso dopo il deploy
+il mazzo troncato di ieri va nel parcheggio ancora una volta, quello
+nuovo nasce col conto intero, trova nel parcheggio la sua stessa sk e
+si riprende riga e indice; la restore parte, l'ordine è «mio», si
+registra il volto, e il ritiro passa dal giro di sempre.
+COLLAUDATI: **8964 prove verdi, 0 rosse** (+10) e **20 MUTAZIONI, 20
+uccise** (le sedici di stamattina più: il conto che torna a un bitwise
+nel testo, il giudice che tronca, il render che non riprende il
+parcheggio, la ripresa che prende una sk diversa).
+LA LEZIONE, che vale oltre il P2P: un id di Telegram non è un
+`int32`, e `| 0` non è «arrotonda»: è «tronca a 32 bit e non dirlo».
+Ogni volta che un numero arriva dal server e serve intero, `Number`.
