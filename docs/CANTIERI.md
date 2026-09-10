@@ -7847,3 +7847,22 @@ dentro la riga, l'icona tonda finiva a mezza altezza di una lista di
 sei voci — un cerchio che galleggia in mezzo al nulla. Fuori, la lista
 prende tutta la larghezza del riquadro e l'icona resta col campo. Da lì
 il `sotto` di `sezioneNuovoP2P`, che serve a questa cosa sola.
+⚠️ E L'INCROCIO COL CANALE È IL DIFETTO CHE IL REBASE STAVA PER FAR
+PASSARE, ed è la lezione del giro. Mentre questo foglio si ridisegnava,
+un'altra sessione ha pubblicato «L'ordine P2P si racconta in vetrina»,
+che aggiunge `annunciaCanaleP2P(lato, euro, metodo)` in fondo al try di
+`inviaNuovoOrdineP2P` — cioè dentro la funzione che qui è stata
+riscritta da capo. Il rebase ha applicato TUTTO SENZA UN CONFLITTO: la
+riga di là è finita nella funzione di qua, dove `euro` e `metodo` non
+esistevano più (il ridisegno aveva sostituito l'importo unico e il
+metodo scritto a mano). Un ReferenceError, che a schermo si legge come
+«l'ordine non si pubblica» — e nessuna prova sul TESTO poteva vederlo,
+perché tutte e tre le righe erano esattamente quelle attese.
+LA CURA È DARE INDIETRO I DUE NOMI, non cambiare la chiamata: la rotta
+dell'altra sessione non si tocca. E la sentinella nuova non guarda una
+parola ma un LEGAME — che `lato`, `euro` e `metodo` esistano e siano
+dichiarati PRIMA di quella riga.
+⚠️ SU UN INTERVALLO IL POST NEL CANALE DICE IL MINIMO, dichiarato: la
+rotta vuole un intero e «20–100» non ci passa. Il capo basso è il
+prezzo d'ingresso, quindi non è una bugia — ma racconta meno
+dell'ordine, e chi tocca quella rotta lo sistemi là.

@@ -36652,6 +36652,18 @@ async function inviaNuovoOrdineP2P(){
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
   };
+  /* LE DUE PAROLE DEL CANALE (set 2026, incrociando questo ridisegno
+     con la vetrina P2P arrivata da un'altra sessione): `annunciaCanaleP2P`
+     vuole una cifra e un metodo, e le sue due variabili qui non
+     esistevano piu' — il ridisegno aveva sostituito l'importo unico e
+     il metodo scritto a mano. Si ridanno con lo stesso nome invece di
+     cambiare la chiamata: la rotta di la' non si tocca.
+     ⚠️ SU UN INTERVALLO IL POST DICE IL MINIMO, ed e' un mezzo vero
+     DICHIARATO: la rotta vuole un intero e «20–100» non ci passa. Il
+     capo basso e' il prezzo d'ingresso, quindi non e' una bugia — ma
+     racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'. */
+  const euro = ord.euro;
+  const metodo = metodi.join(', ');
   try {
     const mz = await assicuraMazzo();
     const NT = window.NostrTools;

@@ -39667,6 +39667,18 @@ def prove_p2p_pubblica():
           "'Satispay', 'PayPal', 'Contanti'];" in mini)
     prova("...e del campo libero di ieri non resta niente", False,
           "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
+    # ⚠️ LE TRE PAROLE CHE LA RIGA DEL CANALE CHIEDE, e non e' pedanteria:
+    # `annunciaCanaleP2P(lato, euro, metodo)` e' arrivata da un'ALTRA
+    # sessione mentre questo foglio si ridisegnava, e il ridisegno aveva
+    # portato via `euro` e `metodo` — due variabili che il git non poteva
+    # sapere legate. Il rebase ha applicato tutto senza un conflitto e la
+    # chiamata restava li' a chiedere nomi che non esistevano piu': un
+    # ReferenceError che nessuna prova sul TESTO avrebbe visto, e che a
+    # schermo si legge come «l'ordine non si pubblica».
+    for _n in ("const lato =", "const euro =", "const metodo ="):
+        prova("«%s» esiste, e prima della riga del canale" % _n.strip(), True,
+              _n in invia
+              and invia.index(_n) < invia.index("annunciaCanaleP2P("))
 
     # --- 3) LE DUE COSE CHE NON DEVONO SUCCEDERE ---------------------
     # l'indice si manda solo dove il coordinatore lo valida, e senza
