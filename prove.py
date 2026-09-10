@@ -35939,6 +35939,10 @@ def prove_p2p_libro():
         # l'ordine del libro per convenienza di chi legge (set 2026)
         "function ordinaLibroP2P(righe, lato){",
         "function satsMercatoP2P(o){",
+        # la commissione del coordinatore (set 2026): la card mostra il
+        # NETTO di tutto, e questi due sono i giudici che lo fanno
+        "function commissioneVivaP2P(){",
+        "function nettoLatoP2P(o, sats){",
         # IL GIUDICE DI «e' mio» vive nel motore ma lo CHIAMA la card,
         # che sta qui: si porta dentro quello VERO invece di stubbarlo,
         # o la prova certificherebbe una copia di cartone.
@@ -36093,6 +36097,16 @@ out.nettoPuro  = satsMercatoP2P(senzaPremio);
 out.nettoConPr = satsMercatoP2P(conPremio);
 /* ...e la cifra che finisce NELLA CARD e' quella netta, non la pura */
 out.cardNetta = rigaOrdineP2P(conPremio);
+/* ...E DAL SET 2026 ANCHE DELLA COMMISSIONE: con la fee viva del
+   38385 la cifra e' il netto di TUTTO — la meta' di chi legge si
+   toglie a chi compra e si AGGIUNGE a chi vende, che la blocca
+   insieme all'amount. E a prezzo fisso il netto porta il ≈: la meta'
+   e' una stima, l'arrotondamento buono ce l'ha il coordinatore. */
+p2pInfo = {fee: 0.02};
+out.cardNettaComm = rigaOrdineP2P(conPremio);
+out.cardVendiComm = rigaOrdineP2P(out.mercato);
+out.cardFissoComm = rigaOrdineP2P(out.fisso);
+p2pInfo = null;
 /* L'ORDINAMENTO PER CONVENIENZA: il premio e' il metro, il verso si
    rovescia col tab, e a parita' vince il piu' recente */
 const ord = (d, prem, creato) => ({id: d, premium: prem, creato: creato});
@@ -36384,6 +36398,17 @@ console.log(JSON.stringify(out));
     prova("...e la cifra della card e' quella netta, mai la pura", True,
           str(out["nettoConPr"]) in out["cardNetta"]
           and str(out["nettoPuro"]) not in out["cardNetta"])
+    # E LA COMMISSIONE (set 2026): con la fee viva la cifra scende
+    # anche della meta' di chi legge — 15360 − 154 comprando — mentre
+    # a chi vende si AGGIUNGE (98000 + 980: la blocca lui), e a prezzo
+    # fisso il netto porta il ≈ perche' la meta' e' una stima.
+    prova("con la fee viva la card toglie la meta' a chi compra", True,
+          "≈ 15206 sats" in out["cardNettaComm"])
+    prova("...e la aggiunge a chi vende, che la blocca", True,
+          "Paghi ≈ 98980 sats" in out["cardVendiComm"])
+    prova("...e a prezzo fisso il netto porta il ≈", True,
+          "≈ 79200 sats" in out["cardFissoComm"]
+          and "80000 sats" not in out["cardFissoComm"])
 
     # --- 7d) IL LIBRO IN ORDINE DI CONVENIENZA ----------------------
     # Il metro e' il premio e il verso si rovescia col tab: a comprare
@@ -36695,9 +36720,11 @@ def prove_p2p_dettaglio():
     ci sono, la porta del gesto apre la pagina invece della domanda, e
     il conto alla rovescia batte nell'UNICO interval dell'app. Il banco
     node fa GIRARE i pezzi puri e il render intero su un DOM di
-    cartone: il titolo che cambia col lato, la riga del prezzo nei
-    cinque casi (mercato, col premio, fisso, a intervallo, valuta
-    ignota), le pillole del metodo (una sola non e' un bottone), il
+    cartone: il titolo che cambia col lato, il conto scorporato (set
+    2026, il calco del foglio «Paga»: mercato, premio in tinta, fisso,
+    intervallo, valuta ignota, promo, fee ignota, cambio muto — e la
+    meta' della commissione che fa sommare le righe), le pillole del
+    metodo (una sola non e' un bottone), il
     riquadro che sparisce senza volto e i suoi trattini, le tacche
     dell'anello ai capi, e il bottone spento finche' il metodo non e'
     scelto. Una sentinella direbbe che la pagina esiste, mai che
@@ -36879,7 +36906,12 @@ def prove_p2p_dettaglio():
         "function taccheAnelloneP2P(resta){",
         "function anelloneP2P(o, adesso){",
         "function repRiquadroP2P(f){",
-        "function prezzoRigaP2P(o){",
+        "function monetaP2P(o){",
+        "function commissioneVivaP2P(){",
+        "function commissioneListinoP2P(){",
+        "function nettoLatoP2P(o, sats){",
+        "function premioTestoP2P(n){",
+        "function contoDettP2P(o){",
         "function metodiDettP2P(o){",
         "function scegliMetodoDettP2P(m){",
         "function rigaLibroP2P(id){",
@@ -36891,6 +36923,7 @@ def prove_p2p_dettaglio():
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
+                 "const p2pCoord = ",
                  "let p2pDettOrdine = ", "let p2pDettMetodo = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
@@ -36906,6 +36939,10 @@ const fmtEur = e => e.toLocaleString('it-IT',
 let cambioVivo = true, eurPerSat = 0.0005;
 let p2pFacce = {};
 let p2pLibro = null;
+/* le impostazioni del coordinator e la busta delle leve: i casi del
+   conto le girano come vogliono, e il p2pCoord e' quello VERO */
+let p2pInfo = null;
+let p2pLeve = null, p2pLevaPubblica = null;
 let toasts = []; function toast(m){ toasts.push(String(m)); }
 function haptic(){}
 /* IL DOM DI CARTONE: due nodi, e quel che ci si scrive dentro si
@@ -36937,16 +36974,35 @@ out.tacche = [taccheAnelloneP2P(1), taccheAnelloneP2P(0.5),
 out.stati = [statoAnelloP2P(7 * G), statoAnelloP2P(3 * G),
              statoAnelloP2P(2 * G), statoAnelloP2P(G), statoAnelloP2P(0)];
 
-/* ---- la riga del prezzo, nei cinque casi ---- */
-out.prezzoMercato = prezzoRigaP2P(ordine({}));
-out.prezzoPremio = prezzoRigaP2P(ordine({premium: 4}));
-out.prezzoFisso = prezzoRigaP2P(ordine({sats: 100000}));
-out.prezzoRange = prezzoRigaP2P(ordine({euro: 20, euroMax: 100}));
+/* ---- il conto scorporato, il calco del foglio «Paga» ----
+   fee viva 2% (la meta' di chi legge e' l'1%), listino 2: niente
+   promo. 6 € a 0.0005 €/sat: controvalore 12000, meta' 120. */
+p2pInfo = {fee: 0.02};
+p2pLevaPubblica = {mostro: 'm', commissione: 2};
+out.contoMercato = contoDettP2P(ordine({}));
+/* col premio: mercato 11520, meta' 115, premio 480 — e la tinta */
+out.contoPremio = contoDettP2P(ordine({premium: 4}));
+out.contoVendi = contoDettP2P(ordine({lato: 'buy', premium: 4}));
+/* a prezzo fisso: sats esatti, ma il netto resta una stima */
+out.contoFisso = contoDettP2P(ordine({sats: 100000}));
+/* l'intervallo: ogni riga porta i due capi */
+out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
 /* una valuta fuori dal catalogo porta la sigla e MAI una bandiera */
-out.prezzoAltra = prezzoRigaP2P(ordine({fiat: 'USD'}));
-/* il giudizio del premio si rovescia col lato, come sulle card */
-out.premioSell = prezzoRigaP2P(ordine({lato: 'sell', premium: 4}));
-out.premioBuy = prezzoRigaP2P(ordine({lato: 'buy', premium: 4}));
+out.contoAltra = contoDettP2P(ordine({fiat: 'USD'}));
+/* la fee viva sotto il listino e' una promo, e il conto la dice */
+p2pInfo = {fee: 0.01};
+out.contoPromo = contoDettP2P(ordine({}));
+/* a fee zero la commissione e' il cartello del mercatino: 0 sats */
+p2pInfo = {fee: 0};
+out.contoGratis = contoDettP2P(ordine({}));
+/* 38385 mai arrivato: NON SI SA, e non si sa e' un trattino */
+p2pInfo = null;
+out.contoIgnoto = contoDettP2P(ordine({}));
+/* cambio muto: trattini, mai numeri inventati */
+p2pInfo = {fee: 0.02};
+cambioVivo = false;
+out.contoMuto = contoDettP2P(ordine({}));
+cambioVivo = true;
 
 /* ---- il riquadro della reputazione ---- */
 out.repSenza = repRiquadroP2P(null);
@@ -36966,6 +37022,7 @@ out.anelloMeta = anelloneP2P(ordine({creato: ora - 7 * G / 2,
 out.anelloSenza = anelloneP2P(ordine({scade: 0}), ora);
 
 /* ---- la pagina intera, su un ordine con due metodi ---- */
+p2pInfo = {fee: 0.02};
 p2pLibro = {ordini: [ordine({id: 'ord-1', metodi: ['SEPA', 'Revolut'],
                              creato: ora - G, scade: ora + 6 * G})]};
 p2pFacce = {'ord-1': {nome: 'Ada', media: 4.8, voti: 12, giorni: 41}};
@@ -37039,27 +37096,71 @@ console.log(JSON.stringify(out));
     prova("i tre stati del colore sono quelli delle card",
           ["", "vicina", "vicina", "ultimo-giorno", "ultimo-giorno"], o["stati"])
 
-    prova("la riga del prezzo dice «per X € 🇪🇺 al prezzo di mercato»",
-          True, "per <b>6,00 € 🇪🇺</b> al prezzo di mercato" in o["prezzoMercato"]
-          and "%" not in o["prezzoMercato"])
-    prova("...col premio fra parentesi, e col segno", True,
-          'al prezzo di mercato <b class="p2p-avviso">(+4%)</b>' in o["prezzoPremio"])
-    prova("...e a prezzo fisso il mercato non si nomina",
-          "per <b>6,00 € 🇪🇺</b>", o["prezzoFisso"])
-    prova("...e un intervallo porta i due capi", True,
-          "per <b>20,00–100,00 € 🇪🇺</b>" in o["prezzoRange"])
+    # IL CONTO SCORPORATO (set 2026): il vestito e' quello del foglio
+    # «Paga» del mercatino, e ogni riga e' la verita' di CHI LEGGE —
+    # la meta' della commissione, o le righe non sommerebbero.
+    cm = o["contoMercato"]
+    prova("il conto veste il vestito del mercatino", True,
+          '<div class="ctrl-conto">' in cm and 'ctrl-riga' in cm)
+    prova("...e il controvalore e' al mercato puro", True,
+          "Controvalore" in cm and "≈ 12000 sats" in cm)
+    prova("la commissione dice la meta' di chi legge, col meno", True,
+          "Commissione Barattolo" in cm and "1% · ≈ −120 sats" in cm)
+    prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
+          "Ricevi" in cm and "≈ 11880 sats" in cm)
+    prova("...e l'ultima riga e' l'euro, in evidenza", True,
+          "Totale da pagare" in cm and "6,00 € 🇪🇺" in cm
+          and cm.count('ctrl-riga tot') == 2)
+    prova("...e senza premio la sua riga non c'e'", False,
+          "Premio al venditore" in cm)
+    prova("la spiegazione dice il 2% intero e la spartizione", True,
+          "(2% dello scambio)" in cm and "metà a testa" in cm
+          and "la tua metà" in cm)
+    # COL PREMIO: la percentuale in tinta (il giudizio delle card) e i
+    # sats col segno del CONTO — su un sell +4% toglie (avviso), su un
+    # buy toglie a chi paga (affare): stessa riga, tinta rovesciata.
+    prova("il premio porta tinta, segno e la sua riga che somma", True,
+          '<b class="p2p-avviso">+4%</b> · ≈ −480 sats' in o["contoPremio"]
+          and "≈ 11405 sats" in o["contoPremio"])
+    prova("...e nel tab Vendi la tinta si rovescia, il conto si specchia",
+          True, '<b class="p2p-affare">+4%</b> · ≈ −480 sats' in o["contoVendi"]
+          and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
+          and "Totale da pagare" not in o["contoVendi"]
+          and "Ricevi" in o["contoVendi"])
+    # ...dove la commissione si AGGIUNGE (niente meno): la blocca lui
+    prova("...e la commissione di chi vende si aggiunge, senza meno",
+          True, "1% · ≈ 115 sats" in o["contoVendi"])
+    prova("a prezzo fisso i sats sono esatti ma il netto resta stima",
+          True, ">100000 sats<" in o["contoFisso"]
+          and "≈ −1000 sats" in o["contoFisso"]
+          and "≈ 99000 sats" in o["contoFisso"]
+          and "prezzo di mercato" not in o["contoFisso"])
+    prova("un intervallo porta i due capi su ogni riga", True,
+          "≈ 40000–200000 sats" in o["contoRange"]
+          and "≈ 39600–198000 sats" in o["contoRange"]
+          and "20,00–100,00 € 🇪🇺" in o["contoRange"])
     # LA BANDIERINA STA DOVE E' VERA: una valuta fuori dal catalogo
     # porta la sua sigla, mai una bandiera inventata
     prova("...e una valuta sconosciuta porta la sigla, non una bandiera",
-          True, "per <b>6,00 USD</b>" in o["prezzoAltra"]
-          and "🇪🇺" not in o["prezzoAltra"])
-    # IL GIUDIZIO SI ROVESCIA COL LATO, dalla formula letta sui byte
-    # (`sats -= premium/100 * sats`): un premio positivo assottiglia
-    # sempre i sats — su un sell chi legge ne riceve meno (avviso), su
-    # un buy ne consegna meno (affare).
-    prova("il giudizio del premio si rovescia col lato, come sulle card",
-          [True, True], ["p2p-avviso" in o["premioSell"],
-                         "p2p-affare" in o["premioBuy"]])
+          True, "6,00 USD" in o["contoAltra"] and "🇪🇺" not in o["contoAltra"])
+    # LA PROMO E IL LISTINO: la fee viva sotto il listino e' una promo
+    # col cartello del mercatino; a zero resta il cartello e basta.
+    prova("la fee sotto il listino porta «in promo» e la meta' vera",
+          True, '<span class="promo-tag">in promo</span>' in o["contoPromo"]
+          and "0,5% · ≈ −60 sats" in o["contoPromo"]
+          and "≈ 11940 sats" in o["contoPromo"])
+    prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
+          True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
+          and "%" not in o["contoGratis"].split("Commissione Barattolo")[1]
+                                          .split("</div>")[0])
+    # NON SI SA NON E' GRATIS: senza il 38385 la commissione e' un
+    # trattino, mai uno zero — e nessun «in promo» inventato.
+    prova("senza 38385 la commissione e' un trattino, senza promo", True,
+          ">—<" in o["contoIgnoto"].split("Commissione Barattolo")[1]
+                                   .split("</div>")[0]
+          and "in promo" not in o["contoIgnoto"])
+    prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
+          o["contoMuto"].count("—") >= 3 and "6,00 € 🇪🇺" in o["contoMuto"])
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
@@ -37098,10 +37199,18 @@ console.log(JSON.stringify(out));
     prova("la pagina apre con «Stai comprando sats»", True,
           "Stai comprando sats" in o["pagina"]
           and "Stai vendendo sats" in o["paginaVendi"])
-    # LA QUANTITA' RESTA A VISTA: la card la porta, e una pagina che
-    # chiede di confermare uno scambio senza dire quanti sats passano
-    # di mano direbbe meno della card che si e' appena toccata.
-    prova("...e la quantita' resta a vista", True, "≈ 12000 sats" in o["pagina"])
+    # LA QUANTITA' RESTA A VISTA, ma dal set 2026 la casa sua e' il
+    # CONTO: la riga «Ricevi» porta il netto di tutto (12000 − 120 di
+    # meta' commissione), e la vecchia riga sotto il titolo non c'e'
+    # piu' — come la riga del prezzo, scesa anche lei nel conto.
+    prova("...e la quantita' sta nel conto, al netto di tutto", True,
+          "≈ 11880 sats" in o["pagina"] and "Totale da pagare" in o["pagina"])
+    prova("...e l'apertura dice solo il lato", False,
+          "p2p-dett-prezzo" in o["pagina"] or "p2p-dett-sats" in o["pagina"])
+    # LA RIGA DEL PREZZO DI IERI E' MORTA CON LA SUA RAGIONE: quel che
+    # diceva lo dicono le righe del conto, ognuna col suo nome.
+    prova("la riga del prezzo non esiste piu', nome compreso", False,
+          "prezzoRigaP2P" in mini)
     prova("senza metodo scelto il bottone e' spento e dice perche'",
           [True, True], [o["bottoneSpento"], o["dice"]])
     prova("...e premerlo non prende niente", True, o["senzaMetodoNonPrende"])
@@ -40844,12 +40953,17 @@ def prove_p2p_pubblica():
         return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
     _prog = (
         "let cambioVivo = true, eurPerSat = 0.0005;\n"
+        # il 38385 di cartone: null = fee ignota, quantoValeP2P non
+        # toglie niente; il caso col netto lo riempie da se'
+        "let p2pInfo = null;\n"
         "const fmt = n => String(n);\n"
         "const fmtEur = n => String(n);\n"
         + _intera("function interoP2P(testo){")
         + "\n" + _intera("function soloCifreP2P(ev){")
         + "\n" + _intera("function ripuliCifreP2P(inp){")
         + "\n" + _intera("function satsMercatoP2P(o){")
+        + "\n" + _intera("function commissioneVivaP2P(){")
+        + "\n" + _intera("function nettoLatoP2P(o, sats){")
         + "\n" + _intera("function ordineDaCampiP2P(v, lato){")
         + "\n" + _intera("function valeNuovoOrdineP2P(v){")
         + "\n" + _intera("function quantoValeP2P(riga, valore){")
@@ -40890,6 +41004,10 @@ def prove_p2p_pubblica():
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '20').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '100').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo],\n"
+        # con la fee viva la promessa e' il NETTO, dallo stesso giudice
+        # delle card: 50000 meno la meta' (500)
+        "  quantoNetto: (p2pInfo = {fee: 0.02},\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo),\n"
         "  premio: [premioTestoP2P(0), premioTestoP2P(4), premioTestoP2P(-7)],\n"
         "  fascia: [fasciaPremioP2P(-10), fasciaPremioP2P(0), fasciaPremioP2P(10),\n"
         "           fasciaPremioP2P(-5), fasciaPremioP2P(-99), fasciaPremioP2P(99)],\n"
@@ -41062,6 +41180,11 @@ def prove_p2p_pubblica():
     prova("la cifra scelta sta dentro la fascia, estremi compresi",
           [False, False, True, True, "Riceverai circa 50000 sats."],
           out["quanto"])
+    # ...e con la fee viva del 38385 la promessa e' il NETTO, dallo
+    # stesso giudice delle card: mai un secondo conto sulla stessa
+    # offerta (set 2026, col conto scorporato del dettaglio)
+    prova("...e con la fee viva la promessa e' al netto della meta'",
+          "Riceverai circa 49500 sats.", out["quantoNetto"])
     prova("il premio si legge col segno, sempre", ["0%", "+4%", "−7%"],
           out["premio"])
     # LA FASCIA DEL PREMIO, fatta girare. Parte dal CENTRO e va verso
@@ -42324,7 +42447,8 @@ def prove_p2p_server():
     def leve(attivo, hexv, relay, specchio=()):
         a = {"__builtins__": __builtins__, "P2P_ATTIVO": attivo,
              "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay,
-             "MOSTRO_RELAY_SPECCHIO": list(specchio)}
+             "MOSTRO_RELAY_SPECCHIO": list(specchio),
+             "P2P_COMMISSIONE_PERCENTO": 2}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -42340,8 +42464,13 @@ def prove_p2p_server():
           leve(True, "", relay)["attivo"])
     prova("accesa ma senza relay: attivo False (fail-closed)", False,
           leve(True, hexv, [])["attivo"])
-    prova("le chiavi sono quattro e sono sempre quelle",
-          ["attivo", "mostro", "relay", "specchio"], sorted(piena.keys()))
+    prova("le chiavi sono cinque e sono sempre quelle",
+          ["attivo", "commissione", "mostro", "relay", "specchio"],
+          sorted(piena.keys()))
+    # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
+    # client lo usa solo per dire quando la fee viva e' una promo.
+    prova("...e il listino della commissione e' un numero, il 2",
+          2.0, piena["commissione"])
     # LO SPECCHIO E' UNA CHIAVE IN PIU', NON UNA LISTA PIU' LUNGA: e' la
     # riga che regge tutto il cantiere del relay nostro. Fondere le due
     # liste manderebbe una richiesta di scambio a un relay dove mostrod

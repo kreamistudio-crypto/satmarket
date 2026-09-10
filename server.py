@@ -16624,6 +16624,18 @@ def _leve_stato():
                   spento="senza i relay lo scambio non si accende: qui "
                          "non c'e' una lista di serie, e non deve "
                          "esserci"),
+            # ⚠️ QUESTA E' LA SOLA RIGA DEL PANNELLO CHE DICE UN
+            # LISTINO E NON IL FATTO: l'incasso vero e' la `fee` del
+            # coordinator (settings.toml del nodo), e il server non la
+            # legge — la leggono i client, dal 38385. Sotto il listino
+            # il conto mostra «in promo».
+            _leva("Commissione P2P — listino (%)",
+                  "P2P_COMMISSIONE_PERCENTO", P2P_COMMISSIONE_PERCENTO,
+                  acceso="la promessa pubblica; a incassare e' la fee "
+                         "del coordinator (settings.toml), che i "
+                         "client leggono viva dal suo 38385",
+                  spento="nessuna promessa: il conto dei client dice "
+                         "la sola fee viva del coordinator"),
             # IL SEGRETO NON ESCE MAI, esce il FATTO: la regola di
             # CHIAVE_CONTENUTI_DIGITALI, applicata al segreto piu'
             # pesante che questo server abbia — chi lo ruba, col sale
@@ -29838,6 +29850,21 @@ try:
                              if str(r).strip()]
 except ImportError:
     MOSTRO_RELAY_SPECCHIO = []
+# LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026, decisione di Andrea):
+# il 2% dello scambio. ⚠️ QUESTA LEVA NON INCASSA NIENTE: l'incasso e'
+# la `fee` del coordinatore (settings.toml del nodo), perche' i sats
+# viaggiano dalla hold invoice al payout DENTRO mostrod e il client
+# non ha nessun punto dove tirarne fuori uno. I client la percentuale
+# viva la leggono dal 38385 del coordinatore — mai cablata — quindi
+# questa leva e' il LISTINO, la promessa pubblica: viaggia nella busta
+# delle leve P2P e quando la fee viva sta SOTTO, il conto del client
+# mostra «in promo», come la commissione del mercatino. Le due leve si
+# muovono insieme, ma sbagliarne una regala una promo e mai una bugia:
+# a dire quanto si paga davvero e' sempre il 38385.
+try:
+    from config import P2P_COMMISSIONE_PERCENTO
+except ImportError:
+    P2P_COMMISSIONE_PERCENTO = 2
 # LA FASE CHIUSA (set 2026, decisione di Andrea): prima di aprire il
 # P2P a tutti lo usano solo Andrea e Alan, su scambi veri e piccoli.
 # La lista dei tg_id ammessi E' la leva, e IL VUOTO E' L'APERTURA —
@@ -29977,7 +30004,11 @@ def _p2p_leve() -> dict:
     return {"attivo": bool(P2P_ATTIVO and MOSTRO_HEX and MOSTRO_RELAY),
             "mostro": MOSTRO_HEX,
             "relay": list(MOSTRO_RELAY),
-            "specchio": list(MOSTRO_RELAY_SPECCHIO)}
+            "specchio": list(MOSTRO_RELAY_SPECCHIO),
+            # il LISTINO della commissione (set 2026): la percentuale
+            # viva il client la legge dal 38385 del coordinatore, e
+            # questa serve solo a dire quand'e' che quella e' una promo
+            "commissione": float(P2P_COMMISSIONE_PERCENTO)}
 
 
 def _p2p_per(tg_id) -> dict:

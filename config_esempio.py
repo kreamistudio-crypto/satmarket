@@ -583,6 +583,13 @@ MOSTRO_RELAY = [
 # VUOTA E' IL MONDO DI IERI, byte per byte: il libro si legge dai soli
 # relay del coordinator, come prima che questa riga esistesse.
 MOSTRO_RELAY_SPECCHIO = []
+# LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026): il LISTINO, in
+# percentuale sull'intero scambio. ⚠️ NON incassa niente: a incassare
+# e' la `fee` del coordinator (settings.toml del nodo), che i client
+# leggono viva dal suo 38385 e spartiscono meta' a testa nel conto.
+# Questa dice solo QUANDO quella e' una promo: fee viva sotto il
+# listino = il conto mostra «in promo», come nel mercatino.
+P2P_COMMISSIONE_PERCENTO = 2
 
 DB = "satmarket.db"
 

@@ -2035,6 +2035,10 @@
   .p2p-prezzo b{font-weight:800}
   .p2p-prezzo .p2p-avviso{color:var(--danger)}
   .p2p-prezzo .p2p-affare{color:var(--trust)}
+  /* la stessa coppia nel conto scorporato del dettaglio (set 2026):
+     e' lo stesso giudizio delle card, sulla riga del premio */
+  .ctrl-riga .p2p-avviso{color:var(--danger)}
+  .ctrl-riga .p2p-affare{color:var(--trust)}
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -2206,9 +2210,6 @@
      scorrere con l'occhio — sono tre righe e si leggono in fila. */
   .p2p-dett-apre{padding:14px 0 2px;text-align:center}
   .p2p-dett-lato{display:block;font-size:19px;font-weight:800;line-height:1.2}
-  .p2p-dett-prezzo{margin-top:6px;font-size:15px;font-weight:700;color:var(--muted)}
-  .p2p-dett-prezzo b{color:var(--ink);font-weight:800}
-  .p2p-dett-sats{margin-top:4px;font-size:13px;font-weight:700;color:var(--muted)}
   .p2p-dett-uno{font-size:15px;font-weight:800}
   /* LE TRE COLONNE DELLA REPUTAZIONE pesano uguale per GRIGLIA e non
      per flex: le tre cifre hanno larghezze diverse («4,8», «12»,
@@ -34153,12 +34154,57 @@ function satsMercatoP2P(o){
   return Math.round((o.euro / eurPerSat) * (1 - o.premium / 100));
 }
 
+/* ---- LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026) ----
+   L'INCASSO E' LA `fee` DEL COORDINATORE, e non una seconda
+   trattenuta: i sats viaggiano dalla hold invoice al payout DENTRO
+   mostrod, e il client non ha nessun punto dove tirarne fuori uno.
+   Percio' la percentuale si LEGGE dal 38385 — la regola delle
+   impostazioni: mai cablate — e la cifra mostrata e' sempre quella
+   che il coordinatore prendera' davvero.
+   E LA FEE SI SPARTISCE META' A TESTA, letto sui numeri veri del
+   primo scambio (74 sats di fee su un ordine da 7301: hold del
+   venditore a 7338, payout al 7264 — 37 per parte): chi compra
+   riceve amount − meta', chi vende ne blocca amount + meta'. Nel
+   conto di CHI LEGGE ci va quindi la SUA meta', o le righe non
+   sommerebbero.
+   `null` = il 38385 non e' ancora arrivato: NON SI SA, e non si sa
+   e' un trattino — mai uno zero, che direbbe «gratis». */
+function commissioneVivaP2P(){
+  return p2pInfo ? (Number(p2pInfo.fee) || 0) : null;
+}
+/* il LISTINO e' la promessa di Barattolo (la leva
+   P2P_COMMISSIONE_PERCENTO del config, in busta con le leve P2P):
+   quando la fee viva del coordinatore sta SOTTO, la differenza e'
+   una promo e il conto la dice — il «in promo» del mercatino. */
+function commissioneListinoP2P(){
+  const c = p2pCoord();
+  const n = c ? Number(c.commissione) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+/* quanti sats passano DAVVERO di mano per chi legge: la meta' della
+   fee si toglie a chi compra e si aggiunge a chi vende. A fee ignota
+   (o zero) la cifra resta quella del mercato — una stima col suo ≈,
+   mai un numero inventato. */
+function nettoLatoP2P(o, sats){
+  const fee = commissioneVivaP2P();
+  if (!(sats > 0) || !(fee > 0)) return sats;
+  const meta = Math.round(sats * fee / 2);
+  return o.lato === 'sell' ? sats - meta : sats + meta;
+}
+
 /* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
    c'e' dall'altra parte. La cifra PRIMA e la persona ULTIMA — in un
    libro si scorre per prezzo, e la reputazione in cima metterebbe uno
    sconosciuto davanti al numero. */
 function rigaOrdineP2P(o){
   const stima = satsMercatoP2P(o);
+  /* LA CIFRA E' AL NETTO DI TUTTO (set 2026, col conto scorporato del
+     dettaglio): premio E commissione — la stessa cifra che il conto
+     chiama «Ricevi» (o «Paghi»). Anche a prezzo fisso il netto e' una
+     STIMA (l'arrotondamento buono della meta' ce l'ha il
+     coordinatore), quindi appena la commissione tocca la cifra
+     compare il ≈. */
+  const netto = nettoLatoP2P(o, o.sats > 0 ? o.sats : stima);
   /* LA CARD PARLA A CHI LEGGE (set 2026, ridisegno chiesto da Andrea):
      in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Paghi
      8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
@@ -34177,11 +34223,12 @@ function rigaOrdineP2P(o){
   /* il range stima i DUE capi collo stesso metro; a cambio muto
      niente cifre, mai un numero inventato */
   const stima2 = o.euroMax && stima
-    ? satsMercatoP2P({euro: o.euroMax, premium: o.premium}) : 0;
-  const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
-             : stima ? '≈ ' + fmt(stima)
-               + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
-             : 'sats';
+    ? nettoLatoP2P(o, satsMercatoP2P({euro: o.euroMax, premium: o.premium}))
+    : 0;
+  const sats = netto > 0
+    ? (o.sats > 0 && netto === o.sats ? '' : '≈ ') + fmt(netto)
+      + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
+    : 'sats';
   const eurTxt = esc(fmtEur(o.euro))
     + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' €'
     /* il range: chi prende sceglie la cifra, e lo dice la riga
@@ -34223,10 +34270,11 @@ function rigaOrdineP2P(o){
      mercato non lo guarda.
      ⚠️ E LA RIGA E' UNA SPIEGAZIONE, NON UN CONTO DA FARE: i sats
      qui sopra sono GIA' al netto del premio (satsMercatoP2P lo
-     applica, la formula del coordinatore), quindi «ricevi ≈ X sats»
-     e' la cifra che passera' di mano davvero e questa riga dice solo
-     PERCHE' e' diversa dal cambio puro. Mai una cifra a mercato puro
-     col premio da applicare a mente.
+     applica, la formula del coordinatore) E della meta' di
+     commissione (nettoLatoP2P), quindi «ricevi ≈ X sats» e' la cifra
+     che passera' di mano davvero e questa riga dice solo PERCHE' e'
+     diversa dal cambio puro. Mai una cifra a mercato puro col premio
+     da applicare a mente; il conto voce per voce sta nel dettaglio.
      LA TINTA E' UN GIUDIZIO PER CHI LEGGE. VERIFICATO SUI BYTE due
      volte (mostro v0.18.6, get_market_quote in src/util.rs):
      `sats -= premium/100 * sats`, sottrazione UNIFORME — il kind non
@@ -34282,9 +34330,10 @@ function rigaOrdineP2P(o){
    (set 2026, restyling della testata — decisione di Andrea): al loro
    posto il logo e i due tab grandi, nel markup fisso. I numeri del
    38385 restano nel foglio del nuovo ordine (renderNuovoOrdineP2P), e
-   il fatto della garanzia lo dice la vista dello scambio. A VERBALE
-   (CANTIERI, «La testata del P2P»): la commissione deve ricomparire
-   anche per chi PRENDE un ordine, prima del pubblico. */
+   il fatto della garanzia lo dice la vista dello scambio. E LA
+   COMMISSIONE PER CHI PRENDE E' RICOMPARSA (set 2026, chiudendo il
+   verbale della testata): sta nel conto scorporato del dettaglio,
+   e la cifra delle card e' gia' al netto suo. */
 function renderP2P(){
   /* IL MAZZO DI UN ALTRO CONTO NON ENTRA NEL RENDER (set 2026, vedi
      «IL CONTO SUL DISPOSITIVO»): quello che si dichiara di un altro
@@ -36770,7 +36819,10 @@ function quantoValeP2P(riga, valore){
   if (!(euro >= riga.euro && euro <= riga.euroMax))
     return {ok: false, euro: 0,
       dillo: 'Scegli una cifra fra ' + fmtEur(riga.euro) + ' e ' + fmtEur(riga.euroMax) + ' \u20ac.'};
-  const s = satsMercatoP2P({euro: euro, premium: riga.premium || 0});
+  /* al netto di premio E commissione, dallo stesso giudice delle
+     card: la cifra promessa qui e' quella che passera' di mano */
+  const s = nettoLatoP2P(riga,
+    satsMercatoP2P({euro: euro, premium: riga.premium || 0}));
   return {ok: true, euro: euro,
     dillo: s ? ((riga.lato === 'sell' ? 'Riceverai circa ' : 'Pagherai circa ') + fmt(s) + ' sats.') : ''};
 }
@@ -36957,33 +37009,107 @@ function repRiquadroP2P(f){
   });
 }
 
-/* ---- LA RIGA DEL PREZZO ----
-   PURA, e dice in una riga sola quel che la card diceva in tre: «per
-   6,00 € 🇪🇺 al prezzo di mercato (+4%)». Con un intervallo la cifra
-   diventa «per 20,00–100,00 €» — quale sara' lo sceglie chi prende, e
-   glielo chiede il foglio «Quanto» un gesto dopo.
+/* ---- LA MONETA DELL'ORDINE ----
    LA BANDIERINA STA DOVE E' VERA (la stessa regola del foglio
    Pubblica): esce dal catalogo delle valute, e una valuta che nel
    catalogo non c'e' porta la sua sigla e basta — mai una bandiera
    inventata. */
-function prezzoRigaP2P(o){
+function monetaP2P(o){
   const cod = String(o.fiat || P2P_VALUTA).toUpperCase();
   const val = P2P_VALUTE.find(v => v.cod === cod);
-  const cifre = esc(fmtEur(o.euro)) + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '');
-  const moneta = val ? esc(val.segno) + ' ' + val.bandiera : esc(cod);
-  /* a prezzo fisso il mercato non c'entra: quel cambio l'ha deciso chi
-     ha pubblicato, e nominarlo sarebbe un riferimento che non regge */
-  if (o.sats > 0) return 'per <b>' + cifre + ' ' + moneta + '</b>';
-  /* IL GIUDIZIO DEL PREMIO E' QUELLO DELLE CARD, dallo stesso giudice:
-     un premio positivo assottiglia sempre i sats, quindi su un ordine
-     di vendita chi legge ne riceve meno (avviso) e su uno d'acquisto
-     ne consegna meno (affare). */
+  return val ? esc(val.segno) + ' ' + val.bandiera : esc(cod);
+}
+
+/* ---- IL CONTO SCORPORATO (set 2026, il calco del foglio «Paga») ----
+   La riga del prezzo che stava sotto il titolo («per 6,00 € al prezzo
+   di mercato (+4%)») e' diventata QUESTO: le stesse righe nome/cifra
+   del conto del mercatino — .ctrl-conto e .ctrl-riga, il vestito e'
+   uno — con Controvalore, commissione, premio, e le due righe in
+   evidenza di quel che passa di mano.
+   OGNI RIGA E' LA VERITA' DI CHI LEGGE, ed e' la regola che decide i
+   numeri: la commissione del coordinatore si spartisce meta' a testa
+   (vedi commissioneVivaP2P), quindi qui c'e' la META' di chi guarda —
+   con la cifra intera scritta nella spiegazione sotto — o
+   Controvalore − premio − commissione non farebbe «Ricevi», e un
+   conto che non somma insegna a non fidarsi di tutti gli altri.
+   IL PREMIO PORTA LA TINTA DELLE CARD, dallo stesso giudizio: la
+   percentuale col segno, colorata da che parte pende — i sats della
+   riga invece portano il segno del CONTO (si tolgono o si
+   aggiungono), che col premio e' rovesciato rispetto al suo.
+   SU UN INTERVALLO ogni riga porta i due capi collo stesso metro
+   delle card; a cambio muto le cifre sono trattini, mai numeri
+   inventati (la regola dei giorni del riquadro reputazione).
+   NEL TAB «VENDI» LE RIGHE SI SPECCHIANO: la commissione si AGGIUNGE
+   a quel che si blocca, il premio si toglie, e le due righe in
+   evidenza diventano «Paghi» (i sats) e «Ricevi» (gli euro). */
+function contoDettP2P(o){
+  const compro = o.lato === 'sell';
+  const fisso = o.sats > 0;
+  const vivo = fisso || (cambioVivo && eurPerSat > 0);
+  const fee = commissioneVivaP2P();
+  const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '')
+    + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
+  /* i capi dell'intervallo, un contarello per ciascuno: `premio` e
+     `meta` sono POSITIVI, il verso lo mette la riga */
+  const euri = (o.euroMax && !fisso) ? [o.euro, o.euroMax] : [o.euro];
+  const conti = euri.map(e => {
+    const ctrl = fisso ? o.sats : (vivo ? Math.round(e / eurPerSat) : 0);
+    const merc = fisso ? o.sats
+               : (vivo ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
+    const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
+    return {ctrl: ctrl, premio: Math.abs(ctrl - merc), meta: meta,
+            netto: compro ? merc - meta : merc + meta};
+  });
+  /* la cifra di una voce, coi suoi capi: il ≈ sta su ogni stima — e la
+     meta' della commissione e' SEMPRE una stima, l'arrotondamento
+     buono ce l'ha il coordinatore */
+  const cifra = (campo, segno) => {
+    if (!vivo) return '—';
+    const circa = !fisso || campo === 'meta'
+      || (campo === 'netto' && conti[0].meta > 0);
+    return (circa ? '≈ ' : '') + (segno || '')
+      + conti.map(c => fmt(c[campo])).join('–') + ' sats';
+  };
+  const cifreEuro = esc(fmtEur(o.euro))
+    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' ' + monetaP2P(o);
+  /* la commissione: percentuale di chi legge + la sua cifra; «in
+     promo» quando la fee viva sta sotto il listino di Barattolo —
+     lo stesso cartello del conto del mercatino */
+  const promo = (fee !== null && commissioneListinoP2P() > 0
+                 && fee * 100 < commissioneListinoP2P())
+    ? '<span class="promo-tag">in promo</span>' : '';
+  const pct = n => esc(n.toLocaleString('it-IT', {maximumFractionDigits: 2}));
+  const commissione = fee === null ? '—'
+    : fee > 0 ? promo + pct(fee * 50) + '% · ' + cifra('meta', compro ? '−' : '')
+    : promo + '0 sats';
+  /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
+     premio», che non e' un'informazione (la regola dello sconto) */
   const affare = (o.lato === 'buy') === (o.premium > 0);
-  return 'per <b>' + cifre + ' ' + moneta + '</b> al prezzo di mercato'
-    + (o.premium
-      ? ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">('
-        + (o.premium > 0 ? '+' : '−') + esc(String(Math.abs(o.premium))) + '%)</b>'
-      : '');
+  const premio = (!fisso && o.premium)
+    ? r('Premio al venditore',
+        '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+        + premioTestoP2P(o.premium) + '</b> · '
+        + cifra('premio', o.premium > 0 ? '−' : ''))
+    : '';
+  /* la spiegazione sotto il conto: il mercato che si muove e la
+     commissione intera con la sua spartizione — le due cose che le
+     righe da sole non possono dire */
+  const dice = [
+    (!fisso && vivo)
+      ? 'Cifre al prezzo di mercato di adesso: quelle esatte si fissano allo scambio.'
+      : '',
+    (fee > 0)
+      ? 'La commissione (' + pct(fee * 100) + '% dello scambio) si divide metà a testa: nel conto c’è la tua metà.'
+      : ''
+  ].filter(Boolean).join(' ');
+  return '<div class="ctrl-conto">'
+    + r('Controvalore', cifra('ctrl'))
+    + r('Commissione Barattolo', commissione)
+    + premio
+    + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot')
+    + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot')
+    + '</div>'
+    + (dice ? '<div class="hint">' + dice + '</div>' : '');
 }
 
 /* ---- IL METODO, che qui si SCEGLIE ----
@@ -37042,15 +37168,6 @@ function renderDettaglioP2P(){
   const compro = o.lato === 'sell';
   const tit = el('p2pDettTit');
   if (tit) tit.textContent = 'Dettaglio ordine di ' + (compro ? 'acquisto' : 'vendita');
-  const stima = satsMercatoP2P(o);
-  const stima2 = o.euroMax && stima
-    ? satsMercatoP2P({euro: o.euroMax, premium: o.premium}) : 0;
-  /* LA QUANTITA' RESTA A VISTA, ed e' la riga che non si toglie: la
-     card la porta, e una pagina che chiede di confermare uno scambio
-     senza dire quanti sats passano di mano direbbe meno di lei. */
-  const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
-             : stima ? '≈ ' + fmt(stima) + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
-             : '';
   /* la riga che DICE PERCHE' il bottone e' spento: un bottone morto
      senza una ragione visibile e' il vicolo cieco muto (la lezione del
      foglio Pubblica). Le parentesi non sono decorazione: `||` lega
@@ -37058,15 +37175,20 @@ function renderDettaglioP2P(){
      un domani qualcuno lo «sistema» al contrario. */
   const manca = (p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
     ? '' : 'Scegli con quale metodo vuoi pagare.';
+  /* L'APERTURA DICE SOLO IL LATO (set 2026, ritocco di Andrea): la
+     riga del prezzo e la quantita' sono scese nel conto scorporato,
+     dove ogni cifra ha il suo nome — qui ripeterle sarebbe dire due
+     volte la stessa cosa con due vestiti. */
   box.innerHTML =
     '<div class="p2p-dett-apre">' +
       '<b class="p2p-dett-lato">Stai ' + (compro ? 'comprando' : 'vendendo') + ' sats</b>' +
-      '<div class="p2p-dett-prezzo">' + prezzoRigaP2P(o) + '</div>' +
-      (sats ? '<div class="p2p-dett-sats">' + esc(sats) + '</div>' : '') +
     '</div>' +
     metodiDettP2P(o) +
     repRiquadroP2P(p2pFacce[o.id]) +
     anelloneP2P(o) +
+    /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
+       del mercatino, righe nome/cifra e le due in evidenza. */
+    contoDettP2P(o) +
     /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
        col foglio, si sposta sopra i due bottoni — dove la legge chi
        sta per premerli. */
