@@ -27026,8 +27026,13 @@ def prove_fogli_di_casa():
     # aperto, con lo scambio se ne va anche quello. Il corpo lo dice
     # nei due casi separati invece di una frase sola, che «lo perdi»
     # e' vero solo in uno dei due.
-    prova("i gesti che passano dalla domanda unica sono cinquantadue",
-          52, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTAQUATTRO (set 2026, il ridisegno del foglio «Pubblica»):
+    # i due ⓘ — «Tipo di prezzo» e «Premio (%)» — sono AVVISI, cioe' la
+    # conferma degenere con un bottone solo. Spiegare una scelta e' una
+    # domanda che non chiede niente, e vive nello stesso foglio invece
+    # che in un terzo.
+    prova("i gesti che passano dalla domanda unica sono cinquantaquattro",
+          54, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -35599,9 +35604,32 @@ def prove_p2p_libro():
           and "intervalli" not in _cl
           and "intervalli" not in pezzo_js(
               mini, "function caricaLibroP2P(forza){"))
-    prova("il range si guarda ma non si prende, e lo dice il tocco",
-          True, "si sceglie l\\'importo"
-          in pezzo_js(mini, "function prendiOrdineP2P(id){", "\n}\n"))
+    # ROVESCIATA (set 2026, decisione di Andrea): il range si PRENDE.
+    # Prima il libro lo mostrava e il tocco diceva «da qui non si puo'
+    # ancora» — un'offerta visibile e non prendibile e' un buco
+    # peggiore del foglio che mancava. Ora il tocco DEVIA sul foglio
+    # che chiede quanto, e da li' si rientra nella stessa strada.
+    _pr = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
+    prova("il range devia sul foglio che chiede quanto", True,
+          "if (riga.euroMax && !(Number(scelto) > 0)) { apriQuantoP2P(id); return; }"
+          in _pr)
+    prova("...e del rifiuto di ieri non resta niente", False,
+          "si sceglie l\\'importo" in mini)
+    # LA CIFRA SCELTA VIAGGIA COME `Payload::Amount`, che mostrod legge
+    # SOLO su take-sell e take-buy (`get_amount` in message.rs) e
+    # confronta con min/max (`get_fiat_amount_requested`): fuori fascia
+    # risponde `OutOfRangeSatsAmount`. Su un ordine normale non si
+    # manda affatto — la cifra la mette lui dal libro.
+    _ep = pezzo_js(mini, "async function eseguiPresaP2P(id, scelto){", "\n}\n")
+    prova("la cifra scelta viaggia solo se c'e' un intervallo", True,
+          "payload: scelta ? {amount: scelta} : null});" in _ep
+          and "const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;" in _ep)
+    # senza, un «Riprova» su un intervallo ripartirebbe SENZA la
+    # scelta e si prenderebbe un `OutOfRangeSatsAmount` che nessuno
+    # collegherebbe al gesto
+    prova("...e il «Riprova» la rimanda", True,
+          "o.importoScelto ? {amount: o.importoScelto} : null);"
+          in pezzo_js(mini, "async function riprovaPresaP2P(){", "\n}\n"))
     # EMENDATA (set 2026, il morto che risorge): la REQ NON filtra piu'
     # ne' stato ne' valuta — con `#s: pending` la sostituzione a
     # `canceled` non arrivava mai, e la copia stantia di un relay
@@ -36223,7 +36251,7 @@ console.log(JSON.stringify(out));
     prova("senza tag rating la riga non si scrive", "",
           out["repRigaNiente"])
     # ...e la riga vive nel DETTAGLIO della presa, non sulla card
-    _po = pezzo_js(mini, "function prendiOrdineP2P(id){", "\n}\n")
+    _po = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
     prova("il dettaglio della presa porta la riga P2P", True,
           "repRigaP2P(riga.rep)" in _po and "+ rp +" in _po)
     prova("...e la card no", False,
@@ -36444,9 +36472,14 @@ def prove_nav_p2p():
     # essere il nostro segno.
     prova("il simbolo veste i tre posti dove si legge", 3,
           mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
+    # EMENDATA (set 2026, il ridisegno): il bottone non dice piu'
+    # «Pubblica: compro sats» — il lato lo dice il TITOLO del foglio,
+    # e in fondo restano le due uscite di sempre, «Annulla» e «Invia».
+    # La riga che conta e' la seconda: li' dentro nessun simbolo.
     prova("...e il bottone che pubblica resta senza segno", True,
-          "Pubblica: compro sats" in mini
-          and "🔁 Pubblica" not in mini)
+          '\'onclick="inviaNuovoOrdineP2P()">Invia</button>\'' in mini
+          and "🔁 Pubblica" not in mini
+          and "🔁 Invia" not in mini)
     prova("...e negli stati vuoti prende il posto del glifo", True,
           '<div class="empty"><img class="p2p-simbolo"' in mini
           and '<span class="big">🔁</span>' not in mini)
@@ -38569,6 +38602,9 @@ def prove_p2p_stati():
           riga_finali)
     prova("un «no» del coordinatore non muove lo stato", True,
           "if (azione === 'cant-do') { o.cantDo = motivoCantDo(p); return o; }" in avanza)
+    prova("...e l'intervallo collassa SOLO su una cifra vera", True,
+          "if (Number(ord.fiat_amount) > 0) { o.euro = Number(ord.fiat_amount); "
+          "o.euroMax = 0; }" in avanza)
 
     # --- 2) IL CENSIMENTO DELLA TABELLA ------------------------------
     # ogni stato che la tabella sa produrre deve avere delle parole da
@@ -38598,6 +38634,11 @@ def prove_p2p_stati():
         fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"),
         fn("function statoTestoP2P(o){"),
+        # la cifra in euro di uno scambio: il giudice unico delle due
+        # viste, e l'unico che sa dire un INTERVALLO
+        "const fmtEur = e => e.toLocaleString('it-IT', "
+        "{minimumFractionDigits: 2, maximumFractionDigits: 2});",
+        fn("function euroTestoP2P(o){"),
         avanza, azioni]) + r"""
 const out = {};
 /* uno scambio si «cammina»: si parte da com'e' nato e gli si danno i
@@ -38714,6 +38755,22 @@ out.giroPubblico = gp.tappe;
 out.pubblicatoSenzaPieno = azioniDisponibili({lato: 'vendo', stato: 'pubblicato'}) === ''
   && azioniDisponibili({lato: 'compro', stato: 'pubblicato'}) === '';
 
+/* 10-bis) L'INTERVALLO COLLASSA (set 2026): un ordine a range mostra
+   i due capi finche' nessuno lo prende, e dal `fiat_amount` della
+   risposta del coordinatore in poi ne mostra UNO — quello scelto da
+   chi ha preso. Senza, la pagina dello scambio continuerebbe a dire
+   «20,00-100,00 EUR» su uno scambio che vale 45. */
+const arange = {id: 'nuovo:9', lato: 'vendo', stato: 'pubblico', euro: 20,
+                euroMax: 100, sats: 0, satsNetti: 0, metodi: ['SEPA'],
+                cantDo: '', errore: ''};
+out.rangePrima = euroTestoP2P(arange);
+const rangePreso = avanzaOrdineP2P(arange, 'buyer-took-order',
+  {order: {fiat_amount: 45}});
+out.rangeDopo = [euroTestoP2P(rangePreso), rangePreso.euroMax];
+/* e una risposta che NON parla di cifre non lo tocca: cancellare
+   l'intervallo su un messaggio muto sarebbe perdere l'offerta vera */
+out.rangeIntatto = euroTestoP2P(avanzaOrdineP2P(arange, 'cant-do', {}));
+
 // 11) i gesti secondari: mai il passo successivo, sempre sotto
 out.secRitira = azioniSecondarieP2P({stato: 'pubblicato'});
 out.secAnnulla = azioniSecondarieP2P({stato: 'attivo'});
@@ -38825,6 +38882,17 @@ process.stdout.write(JSON.stringify(out));
            ["concluso", ""]], out["giroPubblico"])
     prova("un ordine appena pubblicato non chiede niente a chi l'ha messo",
           True, out["pubblicatoSenzaPieno"])
+    # L'INTERVALLO, DALLE DUE PARTI DELLA PRESA (set 2026): finche' e'
+    # nel libro la cifra non c'e' — ce ne sono due, e la terza la
+    # sceglie chi prende — e dalla risposta del coordinatore in poi
+    # ce n'e' una sola. Il giudice e' UNO (`euroTestoP2P`), che le due
+    # viste dello scambio non possano dire due cose.
+    prova("un intervallo pubblicato mostra i due capi",
+          "20,00–100,00 €", out["rangePrima"])
+    prova("...e appena qualcuno lo prende ne mostra uno",
+          ["45,00 €", 0], out["rangeDopo"])
+    prova("...ma una risposta senza cifre non lo cancella",
+          "20,00–100,00 €", out["rangeIntatto"])
     prova("da 'pubblicato' si RITIRA e basta", ["ritira"], out["secRitira"])
     # ...E POI, IN FONDO, L'USCITA (set 2026): a scambio in corso i
     # sats sono gia' in custodia, quindi la disputa vuol dire
@@ -39565,16 +39633,40 @@ def prove_p2p_pubblica():
               for n in ("OrdineAperto", "HoldOrdine", "IncassoOrdine")))
 
     # --- 2) IL PAYLOAD DI `new-order` --------------------------------
-    prova("l'ordine nasce in euro, coi sats al prezzo di mercato", True,
-          "amount: 0," in invia and "fiat_amount: euro," in invia)
+    # RISCRITTE COL RIDISEGNO (set 2026): un ordine non nasce piu' solo
+    # «in euro al prezzo di mercato». Puo' nascere a prezzo FISSO (i
+    # sats li dice chi pubblica) e a INTERVALLO (i due capi, e la cifra
+    # la sceglie chi prende), e i campi che lo dicono sono legati fra
+    # loro da regole del PROTOCOLLO e non da gusto. Vivono in una
+    # funzione PURA — `ordineDaCampiP2P` — ed e' anche l'unico modo di
+    # provarle: sbagliandole il coordinatore non risponde un errore,
+    # TACE (il precedente del JSON canonico).
+    puro = pezzo_js(mini, "function ordineDaCampiP2P(v, lato){", "\n}\n")
+    prova("chi spedisce non ricopia le regole: le CHIAMA", True,
+          "const ordine = ordineDaCampiP2P(" in invia
+          and "payload: {order: ordine}" in invia)
+    prova("...e la riga a schermo legge dallo STESSO ordine", True,
+          "euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,"
+          in invia and "euroMax: ordine.max_amount || 0," in invia)
     prova("...e in EUR, che e' l'unica valuta del coordinatore", True,
-          "fiat_code: 'EUR'," in invia)
+          "fiat_code: 'EUR'," in puro)
     prova("il lato lo dice la scheda in cui si sta", True,
-          "kind: lato === 'compro' ? 'buy' : 'sell'," in invia)
+          "kind: lato === 'compro' ? 'buy' : 'sell'," in puro)
     prova("l'ordine nasce 'pending': lo prende chi vuole", True,
-          "status: 'pending'," in invia)
-    prova("il metodo di pagamento e' quello scritto, non un codice",
-          True, "payment_method: metodo," in invia)
+          "status: 'pending'," in puro)
+    # SUL FILO I METODI VIAGGIANO SEPARATI DA VIRGOLE: e' cosi' che
+    # `nip33.rs` li spezza nei valori del tag `pm`, ed e' cosi' che il
+    # nostro lettore li ritrova. Una stringa sola, piu' metodi dentro.
+    prova("i metodi viaggiano separati da virgole", True,
+          "payment_method: (v.metodi || []).join(',')," in puro)
+    # IL VOCABOLARIO E' CHIUSO (set 2026, decisione di Andrea che
+    # ROVESCIA il campo libero di ieri): il perche' e' che ogni voce
+    # deve avere il SUO form di recapito, e lo prova il blocco 9.
+    prova("...e il vocabolario e' chiuso, sei voci", True,
+          "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', "
+          "'Satispay', 'PayPal', 'Contanti'];" in mini)
+    prova("...e del campo libero di ieri non resta niente", False,
+          "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
 
     # --- 3) LE DUE COSE CHE NON DEVONO SUCCEDERE ---------------------
     # l'indice si manda solo dove il coordinatore lo valida, e senza
@@ -39620,10 +39712,150 @@ def prove_p2p_pubblica():
     # chi entra da Telegram non deve leggere «Nostr», «chiave»,
     # «relay»: e' «il tuo profilo di scambio», e il coordinatore ha un
     # nome proprio
-    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    # ⚠️ LA SENTINELLA GUARDA ANCHE I PEZZI NUOVI (set 2026): col
+    # ridisegno il foglio non e' piu' una funzione sola — le sezioni
+    # nascono da `sezioneNuovoP2P` e la nota del premio da
+    # `premioNotaP2P`, e una parola vietata la' dentro sarebbe uscita
+    # a schermo con la sentinella verde.
+    nuovo = "".join(pezzo_js(mini, f, "\n}\n") for f in (
+        "function renderNuovoOrdineP2P(){",
+        "function sezioneNuovoP2P(o){",
+        "function premioNotaP2P(compro, premio){",
+        "function premioValP2P(){"))
     for parola in ("Nostr", "nsec", "npub", "relay"):
         prova("il foglio del nuovo ordine non nomina «%s»" % parola,
               False, parola.lower() in nuovo.lower())
+
+    # --- 9) LE REGOLE DEL PROTOCOLLO, FATTE GIRARE (set 2026) -------
+    # Le sentinelle qui sopra dicono che le righe CI SONO. Nessuna puo'
+    # dire che l'ordine che ne esce sia quello giusto nei quattro casi
+    # che contano, e questo e' il posto dove un errore non si vede: il
+    # coordinatore che rifiuta un ordine malfatto non risponde niente.
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("le regole del nuovo ordine: serve node")
+        return
+    _i = mini.index("const P2P_FORME_RECAPITO = [")
+    _forme = mini[_i:mini.index("\n];", _i) + 3]
+    # ⚠️ `pezzo_js` col terminatore "\n}\n" TOGLIE la graffa di
+    # chiusura: per SENTIRE una funzione va bene, per FARLA GIRARE no.
+    # Qui si rimette, e senza il pezzo esce troncato con un
+    # «Unexpected end of input» che non nomina nessuna delle funzioni.
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+    _prog = (
+        "let cambioVivo = true, eurPerSat = 0.0005;\n"
+        "const fmt = n => String(n);\n"
+        "const fmtEur = n => String(n);\n"
+        + _intera("function satsMercatoP2P(o){")
+        + "\n" + _intera("function ordineDaCampiP2P(v, lato){")
+        + "\n" + _intera("function valeNuovoOrdineP2P(v){")
+        + "\n" + _intera("function quantoValeP2P(riga, valore){")
+        + "\n" + _intera("function premioTestoP2P(n){")
+        + "\n" + _forme
+        + "\n" + _intera("function formaRecapito(metodo){")
+        + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
+          " 'Satispay', 'PayPal', 'Contanti'];\n"
+        "const base = {metodi: ['SEPA', 'Revolut'], maxSats: 100000, minSats: 100};\n"
+        "console.log(JSON.stringify({\n"
+        # a mercato, importo singolo: i sats a zero, il premio vivo
+        "  mercato: ordineDaCampiP2P({euro: '25', euroMax: '', sats: '',"
+        "    fisso: false, metodi: ['SEPA', 'Revolut'], premio: 3}, 'compro'),\n"
+        # a intervallo: i due capi, e l'importo singolo AZZERATO
+        "  range: ordineDaCampiP2P({euro: '20', euroMax: '100', sats: '',"
+        "    fisso: false, metodi: ['Contanti'], premio: -2}, 'vendo'),\n"
+        # a prezzo fisso: i sats scritti e il premio a ZERO per forza
+        "  fisso: ordineDaCampiP2P({euro: '25', euroMax: '100', sats: '50000',"
+        "    fisso: true, metodi: ['SEPA'], premio: 7}, 'compro'),\n"
+        # un massimo che non supera il minimo NON e' un intervallo
+        "  finto: ordineDaCampiP2P({euro: '40', euroMax: '40', sats: '',"
+        "    fisso: false, metodi: ['SEPA'], premio: 0}, 'compro'),\n"
+        "  manca: [\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: ''})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '30'})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', metodi: []})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: ''})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '100001'})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '99'})).manca,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90'})).manca],\n"
+        "  quanto: [\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '19').ok,\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '101').ok,\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '20').ok,\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '100').ok,\n"
+        "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo],\n"
+        "  premio: [premioTestoP2P(0), premioTestoP2P(4), premioTestoP2P(-7)],\n"
+        "  forme: METODI.map(m => formaRecapito(m).forma)\n"
+        "}));\n")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("le regole del nuovo ordine girano", "", _r.stderr[:300])
+        return
+    out = _js.loads(_r.stdout.strip())
+
+    # A MERCATO: i sats a ZERO (li fa il prezzo alla presa), il premio
+    # vivo, i due capi assenti — e `null` esplicito, che serde non fa
+    # `skip_serializing_if` su min/max e la firma dipende da questo.
+    prova("a mercato: sats 0, premio vivo, nessun capo",
+          {"kind": "buy", "status": "pending", "amount": 0,
+           "fiat_code": "EUR", "min_amount": None, "max_amount": None,
+           "fiat_amount": 25, "payment_method": "SEPA,Revolut",
+           "premium": 3, "created_at": 0}, out["mercato"])
+    # A INTERVALLO: `check_range_order_limits` vuole min < max e
+    # `amount` a ZERO; `create_fiat_amt_array` scrive il tag `fa` coi
+    # due capi, e allora `fiat_amount` DEVE essere 0.
+    prova("a intervallo: i due capi, l'importo singolo azzerato",
+          {"kind": "sell", "status": "pending", "amount": 0,
+           "fiat_code": "EUR", "min_amount": 20, "max_amount": 100,
+           "fiat_amount": 0, "payment_method": "Contanti",
+           "premium": -2, "created_at": 0}, out["range"])
+    # A PREZZO FISSO: `check_zero_amount_with_premium` rifiuta un
+    # ordine che porta insieme `amount` e `premium`, quindi il premio
+    # si AZZERA qui — e il massimo scritto prima di girare la leva non
+    # deve poter uscire (un range non puo' fissare i sats).
+    prova("a prezzo fisso: i sats scritti, premio 0, nessun intervallo",
+          {"kind": "buy", "status": "pending", "amount": 50000,
+           "fiat_code": "EUR", "min_amount": None, "max_amount": None,
+           "fiat_amount": 25, "payment_method": "SEPA",
+           "premium": 0, "created_at": 0}, out["fisso"])
+    # e un massimo che non SUPERA il minimo non e' un intervallo: e'
+    # un ordine normale, come lo legge il lettore del libro
+    prova("...e un massimo pari al minimo non fa un intervallo",
+          [None, None, 40], [out["finto"]["min_amount"],
+                             out["finto"]["max_amount"],
+                             out["finto"]["fiat_amount"]])
+    # IL BOTTONE SPENTO DICE PERCHE': un «Invia» che non risponde e
+    # non spiega e' un vicolo cieco muto (la lezione dell'annullo).
+    prova("...e quel che manca ha sempre un nome",
+          ["Scrivi l'importo in euro",
+           "L'importo massimo deve superare il primo",
+           "Scegli almeno un metodo di pagamento",
+           "Scrivi quanti sats",
+           "Troppi: il massimo è 100000 sats",
+           "Troppo pochi: il minimo è 100 sats",
+           ""], out["manca"])
+    # LA FASCIA DELL'INTERVALLO si guarda PRIMA del giro di rete: il
+    # coordinatore risponde `OutOfRangeSatsAmount`, ma quel no arriva
+    # dopo una chiave bruciata.
+    prova("la cifra scelta sta dentro la fascia, estremi compresi",
+          [False, False, True, True, "Riceverai circa 50000 sats."],
+          out["quanto"])
+    prova("il premio si legge col segno, sempre", ["0%", "+4%", "−7%"],
+          out["premio"])
+    # ⚠️ LA PROVA CHE REGGE IL ROVESCIAMENTO: il vocabolario e' chiuso
+    # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
+    # aggiunge una senza forma, chi deve ricevere gli euro si trova la
+    # casella generica — e questa riga diventa rossa prima.
+    prova("ognuna delle sei voci ha il suo form di recapito",
+          ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti"],
+          out["forme"])
 
 
 def prove_p2p_canale():

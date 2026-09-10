@@ -1966,6 +1966,141 @@
   .p2p-x{margin-left:auto}
   #view-p2p .btn{margin-top:14px}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+
+  /* ======= IL FOGLIO «PUBBLICA» A PIENO SCHERMO (set 2026) =======
+     Ricalca la STRUTTURA del foglio di Mostro — una sezione per
+     riquadro, l'icona tonda a sinistra, le due uscite in fondo — coi
+     colori e i caratteri di casa. A pieno schermo perche' le sezioni
+     sono cinque e un foglio dal basso le taglierebbe: si finirebbe a
+     scorrere dentro una finestra dentro una pagina, che e' il modo in
+     cui si perde il fondo.
+     LA COLONNA E' TRE PEZZI (testata ferma, corpo che scorre, piede
+     appiccicato) e il piede sta SEMPRE a vista: e' li' che si legge se
+     «Invia» e' ancora spento, cioe' che manca qualcosa.
+     LA TASTIERA NON LO ALZA, LO ACCORCIA: i fogli normali salgono di
+     `--tastiera` col transform, ma un foglio alto quanto lo schermo
+     salendo si porterebbe via la testata. Qui l'altezza si toglie in
+     fondo e il transform si spegne.
+     DA 768px IN SU NON SI TOCCA NIENTE: la' il foglio e' gia' un
+     modale centrato, e a pieno schermo su un monitor sarebbe una
+     finestra vuota con cinque riquadri in mezzo. */
+  .sheet.pieno .grab{display:none}
+  @media (max-width:767px){
+    .sheet.pieno{
+      border-radius:0;padding:0;max-height:none;
+      height:calc(100vh - var(--tastiera,0px));
+      height:calc(100dvh - var(--tastiera,0px));
+      display:flex;flex-direction:column;overflow:hidden;
+    }
+    .sheet.pieno.open{transform:none}
+    .sheet.pieno > .foglio-corpo{flex:1 1 auto;min-height:0;overflow-y:auto;
+      overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+    /* IL MARGINE E' DI CHI CE L'HA: a pieno schermo il foglio non ha
+       padding suo, quindi lo mettono la testata e il corpo. Da 768px
+       in su il modale ha gia' il padding di `.sheet`, e queste due
+       righe raddoppierebbero il rientro. */
+    .foglio-testa{padding:12px var(--pad) 10px}
+    .foglio-corpo{padding:0 var(--pad)}
+    /* IL PIEDE SI APPICCICA SOLO QUI (guardato dal vivo): da 768px in
+       su il foglio e' un modale che scorre dentro se stesso, e un
+       piede appiccicato lascia scorrere il contenuto NELLA striscia
+       d'aria sotto i bottoni — il padding del foglio. La' vale la
+       regola di tutti gli altri fogli: i bottoni stanno in fondo e ci
+       si arriva scorrendo. */
+    .foglio-piede{position:sticky;bottom:0;z-index:1}
+  }
+  /* la testata: la via d'uscita a sinistra, il titolo in mezzo. Il
+     gemello invisibile a destra esiste per quello — senza, il titolo
+     centrato slitta della larghezza della freccia. */
+  .foglio-testa{display:flex;align-items:center;gap:6px;flex:0 0 auto;
+    padding-bottom:10px;margin-bottom:2px;border-bottom:1px solid var(--line-soft)}
+  .foglio-testa h3{flex:1;min-width:0;margin:0;text-align:center;font-size:16.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .foglio-back{flex:0 0 auto;border:0;background:none;color:var(--ink);
+    font:inherit;font-size:19px;font-weight:800;line-height:1;
+    padding:8px 8px;cursor:pointer;border-radius:10px}
+  .foglio-back.vuoto{visibility:hidden}
+  /* il piede: le due uscite, sempre a vista */
+  .foglio-piede{display:flex;gap:10px;
+    background:var(--card);border-top:1px solid var(--line-soft);
+    margin-top:16px;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px))}
+  .foglio-piede .btn{flex:1 1 0;margin:0}
+
+  /* ---- il riquadro di una sezione ---- */
+  .p2p-sez{background:var(--chip-bg);border-radius:16px;padding:13px 14px;margin:12px 0}
+  .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
+    font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
+  .p2p-sez-tit span{flex:1;min-width:0}
+  .p2p-info{flex:0 0 auto;border:0;background:none;color:var(--muted);
+    font:inherit;font-size:15px;line-height:1;padding:2px 4px;cursor:pointer}
+  .p2p-sez-riga{display:flex;align-items:center;gap:12px}
+  .p2p-sez-ico{flex:0 0 auto;width:42px;height:42px;border-radius:999px;
+    display:grid;place-items:center;font-size:19px;line-height:1}
+  .p2p-sez-corpo{flex:1 1 auto;min-width:0}
+  /* IL CAMPO DENTRO UN RIQUADRO PERDE IL RECINTO e tiene la sola riga
+     sotto: il recinto ce l'ha gia' il riquadro, e due bordi annidati
+     sono il rumore che questo disegno esiste per togliere. */
+  .p2p-sez input[type=text],.p2p-sez input[type=number],.p2p-sez select{
+    width:100%;border:0;border-bottom:1.5px solid var(--field-line);border-radius:0;
+    background:none;color:var(--ink);font:inherit;font-weight:700;font-size:15px;
+    padding:6px 0;-webkit-appearance:none;appearance:none}
+  .p2p-sez select{cursor:pointer}
+  /* IL ▾ VA RIMESSO A MANO: `appearance:none` toglie la freccia del
+     sistema insieme al recinto, e un <select> senza freccia si legge
+     come testo fermo — nessuno lo tocca. Sta nel wrapper e non nel
+     campo, che uno pseudo-elemento su un <select> non si disegna. */
+  .p2p-sceglie{position:relative}
+  .p2p-sceglie::after{content:'\25BE';position:absolute;right:2px;top:8px;
+    color:var(--muted);font-size:11px;pointer-events:none}
+  .p2p-sez input:focus,.p2p-sez select:focus{outline:none;border-bottom-color:var(--sats)}
+  .p2p-sez .hint{margin-top:6px}
+  /* i due campi dell'importo: il secondo E' l'intervallo */
+  .p2p-duecampi{display:flex;align-items:baseline;gap:8px}
+  .p2p-duecampi input{flex:1 1 0;min-width:0}
+  .p2p-duecampi em{flex:0 0 auto;font-style:normal;color:var(--muted);
+    font-weight:700;font-size:13px}
+  /* la tendina dei metodi: la riga che si tocca, e sotto le voci */
+  .p2p-tendina{width:100%;display:flex;align-items:center;gap:8px;border:0;
+    background:none;border-bottom:1.5px solid var(--field-line);text-align:left;
+    font:inherit;font-weight:700;font-size:15px;color:var(--ink);
+    padding:6px 0;cursor:pointer}
+  .p2p-tendina span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  .p2p-tendina.vuota span{color:var(--muted)}
+  .p2p-tendina i{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--muted)}
+  .p2p-voci{margin-top:6px;display:grid;gap:2px}
+  .p2p-voce{width:100%;display:flex;align-items:center;gap:10px;border:0;
+    background:none;text-align:left;font:inherit;font-weight:700;font-size:14px;
+    color:var(--ink);padding:9px 8px;border-radius:10px;cursor:pointer}
+  .p2p-voce:hover{background:var(--card)}
+  .p2p-voce b{flex:0 0 auto;width:16px;text-align:center;color:var(--trust)}
+  /* la leva del tipo di prezzo */
+  .p2p-leva{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;
+    background:none;font:inherit;font-weight:700;font-size:12.5px;color:var(--muted);
+    padding:0;cursor:pointer}
+  .p2p-leva .cursore{width:46px;height:26px;border-radius:999px;
+    background:var(--off-bg);position:relative}
+  .p2p-leva .cursore::after{content:'';position:absolute;top:3px;left:3px;
+    width:20px;height:20px;border-radius:999px;background:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .p2p-leva.on{color:var(--trust)}
+  .p2p-leva.on .cursore{background:var(--trust)}
+  .p2p-leva.on .cursore::after{transform:translateX(20px)}
+  @media (prefers-reduced-motion: no-preference){
+    .p2p-leva .cursore,.p2p-leva .cursore::after{transition:background .15s,transform .15s}
+  }
+  /* il premio: la cifra a sinistra, il cursore a destra, i due capi
+     sotto — e i capi portano il colore del giudizio, come le card */
+  .p2p-premio{display:flex;align-items:center;gap:12px}
+  .p2p-premio input[type=range]{flex:1 1 auto;min-width:0;padding:0;
+    accent-color:var(--sats)}
+  .p2p-premio-val{flex:0 0 auto;text-align:center}
+  .p2p-premio-cifra{display:block;min-width:56px;padding:6px 10px;border-radius:999px;
+    background:var(--sats);color:#fff;font-weight:800;font-size:14px}
+  .p2p-premio-mod{border:0;background:none;color:var(--muted);font:inherit;
+    font-weight:700;font-size:11.5px;padding:3px 0 0;cursor:pointer}
+  .p2p-premio-capi{display:flex;justify-content:space-between;margin-top:6px;
+    font-size:11.5px;font-weight:800}
   /* le stelle sono l UNICO gesto del foglio: grandi, in fila, e col
      bersaglio che il dito trova senza guardare */
   .p2p-stelle{display:flex;gap:8px;justify-content:center;margin:16px 0}
@@ -7091,10 +7226,30 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pProfiloTit">👤 Il tuo profilo di scambio</h3>
     <div id="p2pProfiloCorpo"></div>
   </div>
-  <div class="sheet" id="p2pNuovoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pNuovoTit">
+  <!-- IL FOGLIO «PUBBLICA» E' A PIENO SCHERMO (set 2026, ridisegno):
+       cinque sezioni non stanno in un foglio dal basso, e a scorrere
+       dentro una finestra dentro una pagina si perde il fondo. La
+       testata e' sua — la via d'uscita a sinistra, il titolo in mezzo
+       (che cambia col tab: «Vuoi comprare Bitcoin» / «...vendere»), e
+       a destra un gemello invisibile senza il quale il titolo
+       centrato slitterebbe della larghezza della freccia. -->
+  <div class="sheet pieno" id="p2pNuovoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pNuovoTit">
     <div class="grab"></div>
-    <h3 id="p2pNuovoTit">➕ Pubblica il tuo ordine</h3>
-    <div id="p2pNuovoCorpo"></div>
+    <div class="foglio-testa">
+      <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#8592;</button>
+      <h3 id="p2pNuovoTit">Vuoi comprare Bitcoin</h3>
+      <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
+    </div>
+    <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- QUANTO: il foglio degli ordini a intervallo. Sta PRIMA di
+       #confermaSheet nel DOM come tutti gli altri, che la conferma
+       della presa si apre sopra di lui. -->
+  <div class="sheet" id="p2pQuantoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pQuantoTit">
+    <div class="grab"></div>
+    <h3 id="p2pQuantoTit">Quanto vuoi scambiare?</h3>
+    <div id="p2pQuantoCorpo"></div>
   </div>
 
   <div class="sheet" id="p2pVotoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pVotoTit">
@@ -18972,6 +19127,7 @@ function closeSheet(){
   el('jarShareSheet').classList.remove('open');
   el('p2pProfiloSheet').classList.remove('open');
   el('p2pNuovoSheet').classList.remove('open');
+  el('p2pQuantoSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -32986,7 +33142,6 @@ const P2P_LIBRO_FRESCO_MS = 60000; // oltre, il libro si rilegge da solo al pros
 let p2pLato = 'compro';            // 'compro' = k:sell (chi vende sats a me) | 'vendo' = k:buy
 let p2pLibro = null;               // {ordini:[...], quando} — null = mai letto
 let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
-let p2pNuovoMetodo = '';           // il metodo scelto nel foglio del nuovo ordine
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
 let p2pParziale = false;           // il libro e' arrivato solo dallo specchio
@@ -35346,7 +35501,12 @@ function avanzaOrdineP2P(ordine, azione, payload){
   const ord = p && p.order;
   if (ord) {
     if (Number(ord.amount) > 0) o.satsNetti = Math.floor(Number(ord.amount));
-    if (Number(ord.fiat_amount) > 0) o.euro = Number(ord.fiat_amount);
+    /* L'INTERVALLO COLLASSA QUI, ed e' l'unico posto che puo' farlo:
+       un ordine a range non ha una cifra finche' qualcuno non la
+       sceglie, e quella la dice il coordinatore col `fiat_amount`
+       della sua risposta. Senza questa riga la pagina dello scambio
+       continuerebbe a mostrare «20–100 €» su uno scambio che vale 30. */
+    if (Number(ord.fiat_amount) > 0) { o.euro = Number(ord.fiat_amount); o.euroMax = 0; }
     const pm = ord.payment_method;
     if (Array.isArray(pm)) o.metodi = pm.map(String).filter(Boolean);
     else if (typeof pm === 'string' && pm.trim())
@@ -35534,8 +35694,86 @@ function chiudiFoglioP2P(idFoglio){
   if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
 }
 
+/* la cifra in euro di uno scambio: un INTERVALLO finche' nessuno
+   l'ha preso, una cifra sola appena il coordinatore la fissa. Un
+   posto solo, che le due viste dello scambio non possano divergere. */
+function euroTestoP2P(o){
+  return fmtEur(o.euro) + (o.euroMax ? '–' + fmtEur(o.euroMax) : '') + ' €';
+}
+
+/* ---- QUANTO: l'importo scelto dentro un intervallo (set 2026) ----
+   Un range non ha una cifra: ne ha due, e la terza la sceglie chi
+   prende. Il foglio e' piccolo apposta — un campo e un bottone —
+   perche' cosa succede dopo lo dice la conferma che viene subito
+   dopo, e dirlo due volte lo farebbe leggere zero volte.
+   LA FASCIA LA GUARDA IL COORDINATORE (`get_fiat_amount_requested`
+   confronta con min/max e risponde `OutOfRangeSatsAmount`), e qui si
+   guarda lo stesso: un no che arriva dopo un giro di rete e una
+   chiave bruciata e' un no pagato troppo caro. */
+let p2pQuantoOrdine = '';
+function rigaLibroP2P(id){
+  return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null;
+}
+function apriQuantoP2P(id){
+  const riga = rigaLibroP2P(id);
+  if (!riga || !riga.euroMax) return;
+  p2pQuantoOrdine = id;
+  renderQuantoP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pQuantoSheet').classList.add('open');
+  setTimeout(() => { const c = el('p2pQuantoInp'); if (c) c.focus({preventScroll: true}); }, 260);
+}
+function renderQuantoP2P(){
+  const box = el('p2pQuantoCorpo');
+  const riga = rigaLibroP2P(p2pQuantoOrdine);
+  if (!box || !riga) return;
+  const paghiEuro = riga.lato === 'sell';
+  box.innerHTML =
+    '<div class="hint">Quest\'offerta va da <b>' + esc(fmtEur(riga.euro)) + ' \u20ac</b> a <b>' +
+      esc(fmtEur(riga.euroMax)) + ' \u20ac</b>: scegli tu quanto ' +
+      (paghiEuro ? 'vuoi pagare' : 'vuoi ricevere') + '.</div>' +
+    '<div class="field"><label for="p2pQuantoInp">Quanti euro</label>' +
+    '<div class="campo-pre"><span class="pre">\u20ac</span>' +
+    '<input id="p2pQuantoInp" type="number" inputmode="decimal" step="1" min="' +
+      esc(String(riga.euro)) + '" max="' + esc(String(riga.euroMax)) + '" value="' +
+      esc(String(riga.euro)) + '" oninput="stimaQuantoP2P()"></div></div>' +
+    '<div class="hint" id="p2pQuantoStima"></div>' +
+    '<button class="btn orange" onclick="confermaQuantoP2P()">Continua</button>';
+  stimaQuantoP2P();
+}
+/* PURO: dice se la cifra sta nella fascia, e quanto vale in sats. La
+   stima passa dalla stessa formula delle card — mai un secondo conto
+   che direbbe un altro numero sulla stessa offerta. */
+function quantoValeP2P(riga, valore){
+  const euro = Math.floor(Number(valore || 0));
+  if (!riga || !riga.euroMax) return {ok: false, euro: 0, dillo: ''};
+  if (!(euro >= riga.euro && euro <= riga.euroMax))
+    return {ok: false, euro: 0,
+      dillo: 'Scegli una cifra fra ' + fmtEur(riga.euro) + ' e ' + fmtEur(riga.euroMax) + ' \u20ac.'};
+  const s = satsMercatoP2P({euro: euro, premium: riga.premium || 0});
+  return {ok: true, euro: euro,
+    dillo: s ? ((riga.lato === 'sell' ? 'Riceverai circa ' : 'Pagherai circa ') + fmt(s) + ' sats.') : ''};
+}
+function stimaQuantoP2P(){
+  const riga = rigaLibroP2P(p2pQuantoOrdine);
+  const inp = el('p2pQuantoInp'), av = el('p2pQuantoStima');
+  if (!riga || !inp || !av) return;
+  av.textContent = quantoValeP2P(riga, inp.value).dillo;
+}
+function confermaQuantoP2P(){
+  const riga = rigaLibroP2P(p2pQuantoOrdine);
+  const inp = el('p2pQuantoInp');
+  if (!riga || !inp) return;
+  const g = quantoValeP2P(riga, inp.value);
+  if (!g.ok) { toast(g.dillo); return; }
+  const id = p2pQuantoOrdine;
+  chiudiFoglioP2P('p2pQuantoSheet');
+  p2pQuantoOrdine = '';
+  prendiOrdineP2P(id, g.euro);
+}
+
 /* ---- prendere un ordine del libro ---- */
-function prendiOrdineP2P(id){
+function prendiOrdineP2P(id, scelto){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -35552,11 +35790,15 @@ function prendiOrdineP2P(id){
   if (ordineMioP2P(id)) { toast('Questo ordine è tuo: da questo dispositivo, per ora, si guarda soltanto'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
-  /* IL RANGE SI GUARDA E NON SI PRENDE, per ora (set 2026, col
-     ridisegno che l'ha fatto entrare nel libro): prenderlo vuole la
-     scelta dell'importo, e quel foglio non c'e' ancora. Lo dice il
-     tocco, una volta — mai una riga fissa sopra il libro. */
-  if (riga.euroMax) { toast('Per quest\'ordine si sceglie l\'importo, e da qui non si può ancora'); return; }
+  /* IL RANGE ORA SI PRENDE (set 2026): prima il foglio che chiede
+     quanto, poi si rientra di qui con la cifra in mano e il gesto
+     prosegue identico a quello di un ordine normale. Il ramo e' UNA
+     DEVIAZIONE e non una seconda strada — la conferma, le cinture e
+     la presa sono le stesse. */
+  if (riga.euroMax && !(Number(scelto) > 0)) { apriQuantoP2P(id); return; }
+  const g = riga.euroMax ? quantoValeP2P(riga, scelto) : {ok: true, euro: riga.euro};
+  if (!g.ok) { toast(g.dillo); return; }
+  const euro = g.euro;
   const compro = riga.lato === 'sell';
   const sats = riga.sats > 0 ? fmt(riga.sats) + ' sats' : 'al prezzo di mercato';
   /* la reputazione del circuito si legge QUI, prima di dire si': e' il
@@ -35564,17 +35806,17 @@ function prendiOrdineP2P(id){
   const rp = repRigaP2P(riga.rep);
   chiediConferma({
     titolo: compro ? 'Compri sats?' : 'Vendi sats?',
-    testata: '<b>' + esc(fmtEur(riga.euro)) + ' €</b> · ' + esc(sats)
+    testata: '<b>' + esc(fmtEur(euro)) + ' €</b> · ' + esc(sats)
       + (rp ? '<br><span style="font-size:12.5px;color:var(--muted);font-weight:700">'
           + rp + '</span>' : ''),
     corpo: compro
       ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
       : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',
     etichetta: compro ? 'Sì, compro' : 'Sì, vendo',
-    poi: () => { eseguiPresaP2P(id); }
+    poi: () => { eseguiPresaP2P(id, riga.euroMax ? euro : 0); }
   });
 }
-async function eseguiPresaP2P(id){
+async function eseguiPresaP2P(id, scelto){
   /* LA CINTURA STA IN FONDO, dove passano tutte le prese: `prendiOrdineP2P`
      devia gia' sul proprio ordine, ma quella e' la porta del GESTO —
      e una guardia che vive solo nella porta e' mezza guardia (la
@@ -35594,9 +35836,18 @@ async function eseguiPresaP2P(id){
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const adesso = Math.floor(Date.now() / 1000);
+  /* L'IMPORTO SCELTO SI RICORDA, e non e' un doppione di `euro`: la
+     riga locale porta la cifra (quella si vede), questo porta il
+     FATTO che va rimandata al coordinatore a ogni tentativo — senza,
+     un «Riprova» su un intervallo ripartirebbe senza la scelta e si
+     prenderebbe un `OutOfRangeSatsAmount` che nessuno capirebbe.
+     `euroMax` a zero: questa riga non e' piu' un intervallo, e' lo
+     scambio che ne e' nato. */
+  const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;
   let ord = {
     id: id, lato: riga.lato === 'sell' ? 'compro' : 'vendo', indice: 0, pubTrade: '',
-    stato: 'prendo', euro: riga.euro, sats: riga.sats, satsNetti: 0,
+    stato: 'prendo', euro: scelta || riga.euro, euroMax: 0, importoScelto: scelta,
+    sats: riga.sats, satsNetti: 0,
     metodi: (riga.metodi || []).slice(), premium: riga.premium || 0, peer: '',
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
@@ -35620,7 +35871,11 @@ async function eseguiPresaP2P(id){
     await registraChiaviP2P([tk.pub]);
     await mostroRiascolta();
     const msg = messaggioMostro(ord.lato === 'compro' ? 'take-sell' : 'take-buy',
-      {requestId: nuovaRichiestaP2P(), indice: reput ? indice : null, id: id});
+      {requestId: nuovaRichiestaP2P(), indice: reput ? indice : null, id: id,
+       /* `Payload::Amount`, che mostrod legge SOLO su take-sell e
+          take-buy (`get_amount` in message.rs): su un ordine normale
+          non si manda affatto, e la cifra la mette lui dal libro. */
+       payload: scelta ? {amount: scelta} : null});
     await mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null, primoContatto: true});
     ord = ordiniP2P()[id] || ord;
     ord.contattato = true;
@@ -35644,7 +35899,8 @@ async function riprovaPresaP2P(){
   renderOrdineP2P();
   try {
     await mostroRiascolta();
-    await chiamataOrdineP2P(o, o.lato === 'compro' ? 'take-sell' : 'take-buy');
+    await chiamataOrdineP2P(o, o.lato === 'compro' ? 'take-sell' : 'take-buy',
+      o.importoScelto ? {amount: o.importoScelto} : null);
     const agg = ordiniP2P()[id] || o;
     agg.contattato = true;
     scriviOrdineP2P(agg);
@@ -35766,7 +36022,7 @@ function renderOrdineP2P(){
   const avviso = o.cantDo || o.errore;
   box.innerHTML =
     '<div class="p2p-ord">' +
-      '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
+      '<div class="p2p-testa"><span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>' +
       '<span class="p2p-sats">' + esc(cifra) + '</span></div>' +
       '<div class="p2p-meta">' + meta.map(m => '<span>' + m + '</span>').join('') + '</div>' +
     '</div>' +
@@ -35943,91 +36199,456 @@ async function mossaOrdineP2P(id, azione, fatto){
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
-/* ---- CREARE UN ORDINE (set 2026, tappa 5) ----
+/* ---- CREARE UN ORDINE (set 2026, tappa 5; RIDISEGNATO set 2026) ----
    Chi crea non prende: PUBBLICA, e poi aspetta. Il lato lo dice la
-   scheda in cui si sta (Compro / Vendo), l'importo e' in euro e i sats
-   li fa il prezzo di mercato al momento in cui qualcuno prende — che
-   e' anche perche' il libro mostra «al prezzo di mercato» invece di
-   una cifra che invecchierebbe. */
+   scheda in cui si sta (Compro / Vendo).
+   IL FOGLIO RICALCA LA STRUTTURA di quello che l'app di riferimento
+   chiama «creazione nuovo ordine» — valuta, importo, metodi, tipo di
+   prezzo — e non e' una citazione: sono le quattro cose che il
+   coordinatore chiede, quindi qualunque foglio onesto finisce con
+   quelle. Quel che e' di casa e' il resto: ogni sezione nel suo
+   riquadro con l'icona tonda, i colori e i caratteri del mercatino, e
+   le sezioni che non servono TOLTE invece che spente.
+   I DUE ESCLUSIVI SONO REGOLA DEL PROTOCOLLO E NON GRAFICA, letti sui
+   byte (mostro-core 0.14.6, order.rs):
+   • `check_zero_amount_with_premium` rifiuta un ordine che fissa
+     insieme `amount` e `premium`. Quindi la leva «Prezzo fisso /
+     Mercato» E' quella regola: o i sats o il premio, mai tutt'e due.
+   • `check_range_order_limits` vuole `min < max` e `amount` a ZERO.
+     Quindi un intervallo NON puo' fissare i sats, e col prezzo fisso
+     il secondo campo dell'importo sparisce.
+   ⚠️ L'INTERVALLO SI CHIUDE ALLA PRIMA PRESA, ed e' un limite
+   DICHIARATO e non un difetto: il resto di un range si ripubblica
+   solo se chi ha creato manda `NextTrade` (chiave e indice del
+   prossimo scambio) insieme al rilascio, e mostrod senza quel pezzo
+   «salta il resto» invece di dare errore (`release.rs`: handle_child_order
+   failed → skipping remainder). Mandarlo vorrebbe dire far nascere un
+   ordine FIGLIO con una chiave che questa pagina non sa ancora
+   governare, cioe' rifare il difetto degli «ordini ingovernabili»
+   appena chiuso. Si dice a chi pubblica, e il pezzo mancante ha il suo
+   cantiere. */
+
+/* LE VALUTE, e per ora ce n'e' una. La lista sta qui e non dentro il
+   render perche' aggiungerne una — USDT, il giorno che il
+   coordinatore l'accetta — sia UNA RIGA e non una caccia. */
+const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€'}];
+/* I METODI SONO UN VOCABOLARIO CHIUSO (set 2026, decisione di Andrea
+   che ROVESCIA la scelta di prima, dove le pillole erano un
+   suggerimento e sotto c'era un campo di testo libero).
+   IL PERCHE' DEL ROVESCIAMENTO: ogni metodo ha il SUO form di
+   recapito (`P2P_FORME_RECAPITO` — SEPA vuole intestatario e IBAN,
+   Revolut un RevTag, i contanti un luogo), e un metodo scritto a mano
+   cade nella forma generica, dove chi deve ricevere gli euro trova una
+   casella vuota invece delle sue due righe. Il testo libero restava
+   leggibile dal coordinatore e ILLEGGIBILE da noi.
+   Le sei voci qui sotto hanno tutte il loro form: «SEPA Instant» cade
+   in quella `sepa`, che riconosce /sepa|bonific|iban/. Una voce nuova
+   si aggiunge QUI, e se vuole un form suo anche la'. */
+const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Contanti'];
+/* la fascia del cursore: scelta di casa. Il protocollo non mette
+   nessun limite al premio (e' un i64 e nessun controllo lo guarda),
+   ma ±10% e' la fascia in cui un premio e' un premio e non un altro
+   prezzo. */
+const P2P_PREMIO_MAX = 10;
+
+let p2pNuovoEuro = '';        // quel che c'e' scritto nei campi, per sopravvivere ai render
+let p2pNuovoEuroMax = '';
+let p2pNuovoSats = '';
+let p2pNuovoMetodi = [];      // i metodi scelti, nell'ordine del vocabolario
+let p2pNuovoAperta = false;   // la tendina dei metodi e' aperta
+let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di mercato
+let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
+let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
+
 function apriNuovoOrdineP2P(){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
-  p2pNuovoMetodo = '';
+  p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
+  p2pNuovoMetodi = [];
+  p2pNuovoAperta = false;
+  p2pNuovoFisso = false;
+  p2pNuovoPremio = 0;
+  p2pNuovoPremioMano = false;
   renderNuovoOrdineP2P();
   el('sheetBg').classList.add('open');
   el('p2pNuovoSheet').classList.add('open');
-  setTimeout(() => { const c = el('p2pNuovoEuro'); if (c) c.focus({preventScroll: true}); }, 260);
+  /* NIENTE FUOCO SUL PRIMO CAMPO, e cambia rispetto al foglio di ieri:
+     a pieno schermo la tastiera che si apre da sola copre meta' delle
+     sezioni, e la prima cosa da leggere e' la valuta — non da
+     scrivere. Si tocca il campo quando ci si arriva. */
 }
-/* i metodi sono TESTO LIBERO per il coordinatore: le pillole sono un
-   suggerimento, non un vocabolario — chi paga in un altro modo lo
-   scrive, e nessuna lista di casa glielo impedisce */
-const P2P_METODI = ['SEPA', 'Revolut', 'Satispay', 'PayPal', 'Contanti'];
+
+/* IL RIQUADRO DI UNA SEZIONE: icona tonda, titolo, e quel che c'e'
+   dentro. Un pezzo solo per tutte, cosi' le cinque restano allineate
+   per COSTRUZIONE invece che per attenzione. */
+function sezioneNuovoP2P(o){
+  return '<div class="p2p-sez">' +
+    '<div class="p2p-sez-tit"><span>' + o.titolo + '</span>' +
+    (o.info ? '<button type="button" class="p2p-info" aria-label="Come funziona" onclick="'
+      + o.info + '">&#9432;</button>' : '') +
+    '</div>' +
+    '<div class="p2p-sez-riga">' +
+      '<span class="p2p-sez-ico" aria-hidden="true" style="background:' + o.fondo +
+      ';color:' + o.tinta + '">' + o.ico + '</span>' +
+      '<div class="p2p-sez-corpo">' + o.corpo + '</div>' +
+    '</div>' +
+    /* IL «SOTTO» ESCE DALLA RIGA DELL'ICONA, e serve a una cosa sola:
+       la tendina dei metodi aperta e' alta sei voci, e dentro la riga
+       l'icona tonda finiva a mezza altezza di quella lista — un
+       cerchio che galleggia in mezzo al nulla. Fuori, la lista prende
+       tutta la larghezza del riquadro e l'icona resta col campo. */
+    (o.sotto || '') + '</div>';
+}
+/* il premio si scrive col segno, sempre: «0» da solo non si legge
+   come «al prezzo di mercato senza aggiunte» */
+function premioTestoP2P(n){
+  const v = Math.round(Number(n) || 0);
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + '%';
+}
+/* PURO: dice se i campi bastano, e se non bastano DICE COSA MANCA —
+   un bottone spento che non dice perche' e' un vicolo cieco muto, ed
+   e' la lezione dell'annullo. Prende un oggetto e non il DOM, cosi' si
+   prova senza un browser. */
+function valeNuovoOrdineP2P(v){
+  const euro = Math.floor(Number(v.euro || 0));
+  const max = Math.floor(Number(v.euroMax || 0));
+  const sats = Math.floor(Number(v.sats || 0));
+  if (!(euro > 0)) return {ok: false, manca: 'Scrivi l\'importo in euro'};
+  if (v.euroMax && !(max > euro))
+    return {ok: false, manca: 'L\'importo massimo deve superare il primo'};
+  if (!(v.metodi || []).length) return {ok: false, manca: 'Scegli almeno un metodo di pagamento'};
+  if (v.fisso) {
+    if (!(sats > 0)) return {ok: false, manca: 'Scrivi quanti sats'};
+    /* i due tetti del coordinatore si guardano QUI, dove il numero e'
+       nostro: a prezzo di mercato i sats li fa lui al momento della
+       presa, e un controllo a vuoto direbbe una bugia */
+    if (v.maxSats > 0 && sats > v.maxSats)
+      return {ok: false, manca: 'Troppi: il massimo è ' + fmt(v.maxSats) + ' sats'};
+    if (v.minSats > 0 && sats < v.minSats)
+      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(v.minSats) + ' sats'};
+  }
+  return {ok: true, manca: ''};
+}
+/* quel che c'e' nei campi adesso: un posto solo a leggerlo, cosi' il
+   giudizio del bottone e quel che si spedisce non possono divergere */
+function campiNuovoP2P(){
+  return {
+    euro: p2pNuovoEuro,
+    euroMax: p2pNuovoFisso ? '' : p2pNuovoEuroMax,
+    sats: p2pNuovoFisso ? p2pNuovoSats : '',
+    fisso: p2pNuovoFisso,
+    metodi: p2pNuovoMetodi,
+    maxSats: (p2pInfo && p2pInfo.maxSats) || 0,
+    minSats: (p2pInfo && p2pInfo.minSats) || 0
+  };
+}
+/* PURA, e porta le REGOLE DEL PROTOCOLLO in un posto solo: prende i
+   campi del foglio e torna l'ordine da spedire. Si prova senza un
+   browser e senza un coordinatore, che e' l'unico modo di inchiodare i
+   tre esclusivi — sats fissi contro premio, intervallo contro sats
+   fissi, intervallo contro importo singolo — visto che sbagliandoli il
+   coordinatore non risponde un errore: TACE.
+   I TRE, coi loro nomi di la':
+   • `check_zero_amount_with_premium` — con `amount` > 0 il premio DEVE
+     essere 0, quindi a prezzo fisso il premio si azzera qui e non si
+     spera che il foglio l'abbia lasciato a zero;
+   • `check_range_order_limits` — un intervallo vuole `min < max` e
+     `amount` a ZERO;
+   • `create_fiat_amt_array` scrive il tag `fa` coi due capi quando
+     ci sono, e allora `fiat_amount` vale 0. */
+function ordineDaCampiP2P(v, lato){
+  const euro = Math.floor(Number(v.euro || 0));
+  const euroMax = Math.floor(Number(v.euroMax || 0));
+  const satsFissi = v.fisso ? Math.floor(Number(v.sats || 0)) : 0;
+  /* L'INTERVALLO E' UN FATTO DEI NUMERI e non della sezione aperta:
+     due importi buoni e crescenti sono un range, uno solo e' un ordine
+     normale. Lo stesso giudizio del lettore del libro. */
+  const range = !v.fisso && euroMax > euro;
+  return {
+    kind: lato === 'compro' ? 'buy' : 'sell',
+    status: 'pending',
+    /* 0 = al prezzo di mercato col premio; a prezzo fisso e' la
+       quantita' scritta, e allora il premio scende a zero qui sotto */
+    amount: satsFissi,
+    fiat_code: 'EUR',
+    min_amount: range ? euro : null,
+    max_amount: range ? euroMax : null,
+    fiat_amount: range ? 0 : euro,
+    payment_method: (v.metodi || []).join(','),
+    premium: v.fisso ? 0 : Math.round(Number(v.premio) || 0),
+    created_at: 0
+  };
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
   const compro = p2pLato === 'compro';
+  const tit = el('p2pNuovoTit');
+  if (tit) tit.textContent = compro ? 'Vuoi comprare Bitcoin' : 'Vuoi vendere Bitcoin';
+  const val = P2P_VALUTE[0];
+  const scelti = p2pNuovoMetodi.length
+    ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
+
+  const valuta = sezioneNuovoP2P({
+    ico: '🏳️', fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
+    titolo: 'Seleziona la valuta con cui ' + (compro ? 'pagherai' : 'riceverai'),
+    corpo: '<div class="p2p-sceglie"><select id="p2pNuovoValuta" aria-label="Valuta">' +
+      P2P_VALUTE.map(v => '<option value="' + esc(v.cod) + '">' +
+        esc(v.segno + ' ' + v.nome + ' (' + v.cod + ')') + '</option>').join('') +
+      '</select></div>'
+  });
+
+  const importo = sezioneNuovoP2P({
+    ico: '💶', fondo: 'var(--trust-soft)', tinta: 'var(--trust)',
+    titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
+      (compro ? 'inviare' : 'ricevere'),
+    corpo: '<div class="p2p-duecampi">' +
+      '<input id="p2pNuovoEuro" type="number" inputmode="decimal" min="1" step="1" ' +
+        'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
+        'oninput="cambiaCampoNuovoP2P()" aria-label="Importo">' +
+      (p2pNuovoFisso ? '' :
+        '<em>a</em><input id="p2pNuovoEuroMax" type="number" inputmode="decimal" min="1" ' +
+        'step="1" placeholder="Importo massimo" value="' + esc(p2pNuovoEuroMax) + '" ' +
+        'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
+      '</div>' +
+      (p2pNuovoFisso
+        ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
+        : '<div class="hint">💡 Tocca il secondo campo per creare un ordine a intervallo</div>')
+  });
+
+  const metodi = sezioneNuovoP2P({
+    ico: '💳', fondo: 'var(--ship-bg)', tinta: 'var(--ship-text)',
+    titolo: 'Metodi di pagamento — puoi sceglierne più di uno',
+    corpo: '<button type="button" class="p2p-tendina' +
+      (p2pNuovoMetodi.length ? '' : ' vuota') + '" aria-expanded="' +
+      (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
+      '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
+    sotto: p2pNuovoAperta
+      ? '<div class="p2p-voci">' + P2P_METODI.map(m =>
+          '<button type="button" class="p2p-voce" data-m="' + esc(m) + '" ' +
+          'aria-pressed="' + (p2pNuovoMetodi.indexOf(m) >= 0 ? 'true' : 'false') + '" ' +
+          'onclick="scegliMetodoP2P(this.dataset.m)"><b aria-hidden="true">' +
+          (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>' + esc(m) + '</button>').join('') +
+        '</div>'
+      : ''
+  });
+
+  const tipo = sezioneNuovoP2P({
+    ico: '💲', fondo: 'var(--chip-bg)', tinta: 'var(--ink)',
+    titolo: 'Tipo di prezzo', info: 'spiegaTipoPrezzoP2P()',
+    corpo: '<div class="p2p-sez-riga">' +
+      '<b style="flex:1;min-width:0;font-size:15px">' +
+        (p2pNuovoFisso ? 'Prezzo fisso' : 'Prezzo di mercato') + '</b>' +
+      '<button type="button" class="p2p-leva' + (p2pNuovoFisso ? '' : ' on') + '" ' +
+      'role="switch" aria-checked="' + (p2pNuovoFisso ? 'false' : 'true') + '" ' +
+      'onclick="cambiaTipoPrezzoP2P()">Mercato<span class="cursore"></span></button>' +
+      '</div>'
+  });
+
+  const quanti = !p2pNuovoFisso ? '' : sezioneNuovoP2P({
+    ico: '⚡', fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
+    titolo: 'Inserisci la quantità di sats che vuoi ' + (compro ? 'comprare' : 'vendere'),
+    corpo: '<input id="p2pNuovoSats" type="number" inputmode="numeric" min="1" step="1" ' +
+      'placeholder="Quantità di sats" value="' + esc(p2pNuovoSats) + '" ' +
+      'oninput="cambiaCampoNuovoP2P()" aria-label="Quantità di sats">' +
+      '<div class="hint">A prezzo fisso il cambio lo decidi tu: chi prende paga ' +
+      (compro ? 'gli euro che hai scritto per questi sats.' : 'questi sats per gli euro che hai scritto.') +
+      '</div>'
+  });
+
+  /* IL GIUDIZIO DEL PREMIO E' QUELLO DELLE CARD, dalla stessa formula
+     letta sui byte (`sats -= premium/100 * sats`, sottrazione uniforme
+     sui due versi): un premio positivo assottiglia SEMPRE i sats,
+     quindi chi vende ne consegna meno per gli stessi euro — e chi
+     compra ne riceve meno. Detto per il lato in cui si sta, che e'
+     l'unico che interessa a chi legge. */
+  const premio = p2pNuovoFisso ? '' : sezioneNuovoP2P({
+    ico: '📈', fondo: 'var(--trust-soft)', tinta: 'var(--trust)',
+    titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
+    corpo: '<div class="p2p-premio">' +
+      '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
+      '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
+        'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
+        'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
+      '</div>' +
+      '<div class="p2p-premio-capi"><span style="color:var(--danger)">−' + P2P_PREMIO_MAX +
+      '%</span><span style="color:var(--trust)">+' + P2P_PREMIO_MAX + '%</span></div>' +
+      '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
+  });
+
   const tetto = (p2pInfo && p2pInfo.maxSats > 0)
     ? '<div class="hint">Si accettano ordini fino a ' + fmt(p2pInfo.maxSats) + ' sats.</div>' : '';
   const fee = (p2pInfo && p2pInfo.fee > 0)
     ? '<div class="hint">La commissione è ' + esc(String(Math.round(p2pInfo.fee * 10000) / 100)) + '%.</div>' : '';
+
   box.innerHTML =
-    '<div class="hint">' + (compro
+    '<div class="hint" style="margin-top:12px">' + (compro
       ? 'Stai chiedendo di <b>comprare</b> sats pagando in euro. Chi risponde bloccherà i sats in garanzia.'
-      : 'Stai offrendo di <b>vendere</b> sats in cambio di euro. Quando qualcuno risponde ti chiederemo di bloccare i sats.') + '</div>' +
-    '<div class="field"><label for="p2pNuovoEuro">Quanti euro</label>' +
-    '<div class="campo-pre"><span>€</span>' +
-    '<input id="p2pNuovoEuro" type="number" inputmode="decimal" min="1" step="1" placeholder="25"></div></div>' +
-    '<div class="field"><label for="p2pNuovoMetodo">Come vi pagate gli euro</label>' +
-    '<div class="p2p-metodi">' + P2P_METODI.map(m =>
-      '<button type="button" class="tema-pill' + (p2pNuovoMetodo === m ? ' active' : '') +
-      '" data-m="' + esc(m) + '" onclick="scegliMetodoP2P(this.dataset.m)">' + esc(m) + '</button>').join('') +
+      : 'Stai offrendo di <b>vendere</b> sats in cambio di euro. Quando qualcuno risponde ti chiederemo di bloccare i sats.') +
     '</div>' +
-    '<input id="p2pNuovoMetodo" type="text" maxlength="60" placeholder="Oppure scrivilo tu" ' +
-    'value="' + esc(p2pNuovoMetodo) + '" oninput="p2pNuovoMetodo = this.value; renderMetodiP2P()"></div>' +
+    valuta + importo + metodi + tipo + quanti + premio +
+    /* QUEL CHE MANCA E' UN AVVISO, non un consiglio: in mezzo agli
+       altri suggerimenti dello stesso grigio non lo leggeva nessuno,
+       e un bottone spento senza una ragione visibile e' il vicolo
+       cieco muto che questa riga esiste per evitare. */
+    '<div class="hint" id="p2pNuovoManca" style="color:var(--danger);font-weight:800"></div>' +
     tetto + fee +
-    '<button class="btn orange" onclick="inviaNuovoOrdineP2P()">' +
-    /* QUI NON VA NESSUN SIMBOLO (set 2026, guardato dal vivo): il
-       marchio piccolo su un fondo arancio pieno diventa una macchia
-       — i suoi colori e quello del bottone sono la stessa famiglia —
-       e l'emoji non torna, che ha smesso di essere il segno di casa.
-       Un bottone pieno a tutta larghezza dice gia' tutto col testo.
-       ⚠️ «di CASA» e non l'aggettivo possessivo, ed e' una scelta: la
-       sentinella delle parole di questo foglio e' cieca ai commenti
-       APPOSTA, e quel possessivo contiene per intero il nome della
-       rete che qui non si nomina — un commento innocente la
-       farebbe rossa (successo, due volte di fila). */
-    (compro ? 'Pubblica: compro sats' : 'Pubblica: vendo sats') + '</button>' +
-    '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>';
+    '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
+    '<div class="foglio-piede">' +
+      '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
+      /* QUI NON VA NESSUN SIMBOLO (set 2026, guardato dal vivo): il
+         marchio piccolo su un fondo arancio pieno diventa una macchia
+         — i suoi colori e quello del bottone sono la stessa famiglia —
+         e l'emoji non torna, che ha smesso di essere il segno di casa.
+         ⚠️ «di CASA» e non l'aggettivo possessivo, ed e' una scelta: la
+         sentinella delle parole di questo foglio guarda anche i
+         commenti, e quel possessivo contiene per intero il nome della
+         rete che qui non si nomina — un commento innocente la farebbe
+         rossa (successo, due volte di fila). */
+      '<button type="button" class="btn orange" id="p2pNuovoInvia" ' +
+        'onclick="inviaNuovoOrdineP2P()">Invia</button>' +
+    '</div>';
+  aggiornaInviaP2P();
 }
+/* la nota del premio: cosa cambia PER CHI STA LEGGENDO, col lato che
+   ha scelto. A zero non c'e' niente da dire e la riga tace. */
+function premioNotaP2P(compro, premio){
+  const p = Math.round(Number(premio) || 0);
+  if (!p) return 'Al prezzo di mercato del momento in cui qualcuno prende l\'offerta.';
+  const su = p > 0;
+  return su
+    ? (compro ? 'Sopra il mercato: chi vende riceve i tuoi euro e consegna <b>meno</b> sats. Un ordine più appetibile per chi vende.'
+              : 'Sopra il mercato: consegni <b>meno</b> sats per gli stessi euro. Conviene a te, meno a chi compra.')
+    : (compro ? 'Sotto il mercato: chi vende consegna <b>più</b> sats per i tuoi euro. Conviene a te, meno a chi vende.'
+              : 'Sotto il mercato: consegni <b>più</b> sats per gli stessi euro. Un ordine più appetibile per chi compra.');
+}
+/* SI RISCRIVE IL SOLO BOTTONE, mai il foglio: un render intero mentre
+   si digita porta via il cursore (la lezione delle pillole). */
+function aggiornaInviaP2P(){
+  const g = valeNuovoOrdineP2P(campiNuovoP2P());
+  const b = el('p2pNuovoInvia');
+  if (b) b.disabled = !g.ok;
+  const m = el('p2pNuovoManca');
+  if (m) { m.textContent = g.ok ? '' : g.manca; m.style.display = g.ok ? 'none' : ''; }
+}
+function cambiaCampoNuovoP2P(){
+  const e = el('p2pNuovoEuro'), x = el('p2pNuovoEuroMax'), s = el('p2pNuovoSats');
+  if (e) p2pNuovoEuro = String(e.value || '');
+  if (x) p2pNuovoEuroMax = String(x.value || '');
+  if (s) p2pNuovoSats = String(s.value || '');
+  aggiornaInviaP2P();
+}
+function apriTendinaMetodiP2P(){
+  haptic();
+  p2pNuovoAperta = !p2pNuovoAperta;
+  renderNuovoOrdineP2P();
+}
+/* la scelta e' MULTIPLA e la tendina resta aperta: chi ne vuole tre
+   li tocca tre volte senza riaprire niente. L'ordine e' quello del
+   vocabolario e non quello dei tocchi — cosi' due ordini con gli
+   stessi metodi si leggono uguali nel libro. */
 function scegliMetodoP2P(m){
-  p2pNuovoMetodo = m;
-  const c = el('p2pNuovoMetodo');
-  if (c) c.value = m;
-  renderMetodiP2P();
+  haptic();
+  const i = p2pNuovoMetodi.indexOf(m);
+  if (i >= 0) p2pNuovoMetodi.splice(i, 1);
+  else p2pNuovoMetodi = P2P_METODI.filter(x =>
+    x === m || p2pNuovoMetodi.indexOf(x) >= 0);
+  renderNuovoOrdineP2P();
 }
-/* si riscrivono le sole pillole e non tutto il foglio: un render
-   intero mentre si digita porta via il cursore */
-function renderMetodiP2P(){
-  document.querySelectorAll('#p2pNuovoCorpo .p2p-metodi .tema-pill').forEach(b => {
-    b.classList.toggle('active', b.dataset.m === p2pNuovoMetodo);
+/* LA LEVA E' UN BIVIO DEL PROTOCOLLO e non una preferenza: passando a
+   prezzo fisso l'intervallo si SVUOTA davvero (non basta nasconderlo:
+   un massimo rimasto in memoria finirebbe nel messaggio), e tornando a
+   mercato il premio riparte da dove l'avevano lasciato. */
+function cambiaTipoPrezzoP2P(){
+  haptic();
+  p2pNuovoFisso = !p2pNuovoFisso;
+  if (p2pNuovoFisso) p2pNuovoEuroMax = '';
+  else p2pNuovoSats = '';
+  renderNuovoOrdineP2P();
+}
+function cambiaPremioP2P(v){
+  const n = Math.round(Number(v) || 0);
+  p2pNuovoPremio = Math.max(-P2P_PREMIO_MAX, Math.min(P2P_PREMIO_MAX, n));
+  const c = el('p2pNuovoPremioVal');
+  if (c) c.textContent = premioTestoP2P(p2pNuovoPremio);
+  const cur = el('p2pNuovoPremioCursore');
+  if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
+  const nota = el('p2pNuovoPremioNota');
+  if (nota) nota.innerHTML = premioNotaP2P(p2pLato === 'compro', p2pNuovoPremio);
+}
+/* IL PREMIO A MANO E' UN CAMPO IN RIGA e non un prompt() di sistema:
+   quelli sono usciti da questa pagina uno per uno, e non rientrano da
+   qui. La pillola col numero DIVENTA il campo, e «Modifica» diventa
+   «Fatto» — un posto solo, nessun foglio in piu'.
+   ⚠️ QUEL CHE SI SCRIVE SI TOSA ALLA FASCIA, ma il campo non si
+   riscrive sotto le dita: chi batte «-15» vede il cursore fermarsi a
+   -10, e il numero torna a -10 col «Fatto». Riscriverlo a ogni tasto
+   porterebbe via il cursore, che e' la lezione delle pillole. */
+function premioValP2P(){
+  if (p2pNuovoPremioMano)
+    return '<input id="p2pNuovoPremioMano" type="number" inputmode="numeric" step="1" ' +
+      'min="-' + P2P_PREMIO_MAX + '" max="' + P2P_PREMIO_MAX + '" value="' + p2pNuovoPremio +
+      '" style="width:64px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
+      'aria-label="Premio in percento">' +
+      '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">Fatto</button>';
+  return '<span class="p2p-premio-cifra" id="p2pNuovoPremioVal">' +
+    esc(premioTestoP2P(p2pNuovoPremio)) + '</span>' +
+    '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">✏️ Modifica</button>';
+}
+function scriviPremioP2P(){
+  haptic();
+  p2pNuovoPremioMano = !p2pNuovoPremioMano;
+  renderNuovoOrdineP2P();
+  if (p2pNuovoPremioMano) {
+    const c = el('p2pNuovoPremioMano');
+    if (c) { try { c.focus({preventScroll: true}); c.select(); } catch(e){} }
+  }
+}
+function spiegaTipoPrezzoP2P(){
+  haptic();
+  chiediConferma({
+    titolo: 'Tipo di prezzo',
+    corpo: '• Scegli Prezzo di mercato se vuoi usare il prezzo che ha Bitcoin quando qualcuno prende la tua offerta.\n\n'
+      + '• Scegli Prezzo fisso se vuoi definire tu l\'importo esatto di sats che scambierai.',
+    etichetta: 'Ho capito', avviso: true
+  });
+}
+function spiegaPremioP2P(){
+  haptic();
+  chiediConferma({
+    titolo: 'Premio (%)',
+    corpo: 'Il premio è quanto ti scosti dal prezzo di mercato.\n\n'
+      + 'Sopra lo zero passano meno sats a parità di euro; sotto lo zero ne passano di più. '
+      + 'Più il tuo premio è generoso per chi legge, prima qualcuno prende l\'offerta.\n\n'
+      + 'A zero vale il prezzo di mercato del momento in cui l\'offerta viene presa.',
+    etichetta: 'Ho capito', avviso: true
   });
 }
 async function inviaNuovoOrdineP2P(){
-  const euro = Math.floor(Number((el('p2pNuovoEuro') || {}).value || 0));
-  const metodo = String(p2pNuovoMetodo || '').trim();
-  if (!(euro > 0)) { toast('Scrivi quanti euro'); const c = el('p2pNuovoEuro'); if (c) c.focus(); return; }
-  if (!metodo) { toast('Scrivi come vi pagate gli euro'); const c = el('p2pNuovoMetodo'); if (c) c.focus(); return; }
+  const campi = campiNuovoP2P();
+  const g = valeNuovoOrdineP2P(campi);
+  if (!g.ok) { toast(g.manca); return; }
+  const lato = p2pLato === 'compro' ? 'compro' : 'vendo';
+  const metodi = p2pNuovoMetodi.slice();
+  /* L'ORDINE SI COSTRUISCE UNA VOLTA SOLA, e la riga locale legge da
+     LUI: cosi' quel che si vede a schermo e quel che e' partito non
+     possono raccontare due cose diverse. */
+  const ordine = ordineDaCampiP2P(
+    {euro: campi.euro, euroMax: campi.euroMax, sats: campi.sats,
+     fisso: campi.fisso, metodi: metodi, premio: p2pNuovoPremio}, lato);
   chiudiFoglioP2P('p2pNuovoSheet');
   /* dice se l'ordine e' COMPARSO A SCHERMO: nel catch e' l'unica cosa
      che distingue «lo racconta la pagina» da «non lo racconta nessuno» */
   let aperto = false;
   const adesso = Math.floor(Date.now() / 1000);
-  const lato = p2pLato === 'compro' ? 'compro' : 'vendo';
   let ord = {
     id: '', lato: lato, indice: 0, pubTrade: '', mio: true,
-    stato: 'pubblico', euro: euro, sats: 0, satsNetti: 0,
-    metodi: [metodo], premium: 0, peer: '',
+    stato: 'pubblico',
+    euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,
+    euroMax: ordine.max_amount || 0,
+    sats: ordine.amount, satsNetti: 0, importoScelto: 0,
+    metodi: metodi, premium: ordine.premium, peer: '',
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
   };
@@ -36051,16 +36672,7 @@ async function inviaNuovoOrdineP2P(){
     await mostroRiascolta();
     const msg = messaggioMostro('new-order', {
       requestId: nuovaRichiestaP2P(), indice: reput ? indice : null,
-      payload: {order: {
-        kind: lato === 'compro' ? 'buy' : 'sell',
-        status: 'pending',
-        amount: 0,                       /* 0 = al prezzo di mercato */
-        fiat_code: 'EUR',
-        fiat_amount: euro,
-        payment_method: metodo,
-        premium: 0,
-        created_at: 0
-      }}
+      payload: {order: ordine}
     });
     await mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null, primoContatto: true});
     const agg = ordiniP2P()[p2pOrdineAperto] || ord;
@@ -36659,7 +37271,7 @@ function rigaScambioP2P(o){
   const agire = azioniDisponibili(o) ? '<span>👉 tocca a te</span>' : '';
   return '<div class="p2p-ord" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
     'onclick="apriOrdineP2P(this.dataset.id)">' +
-    '<div class="p2p-testa"><span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>' +
+    '<div class="p2p-testa"><span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>' +
     '<span class="p2p-sats">' + esc(cifra) + '</span></div>' +
     '<div class="p2p-meta"><span>' + (o.lato === 'compro' ? '⬇️ Compri' : '⬆️ Vendi') + '</span>' +
     '<span>' + esc(st.t) + '</span>' + agire +
@@ -36774,7 +37386,8 @@ function adottaOrdiniAltroveP2P(locali){
     scriviOrdineP2P({
       id: id, lato: o.lato === 'sell' ? 'vendo' : 'compro',
       indice: indice, pubTrade: tk.pub, mio: true,
-      stato: 'pubblicato', euro: o.euro, sats: o.sats || 0, satsNetti: 0,
+      stato: 'pubblicato', euro: o.euro, euroMax: o.euroMax || 0,
+      sats: o.sats || 0, satsNetti: 0, importoScelto: 0,
       metodi: (o.metodi || []).slice(), premium: o.premium || 0, peer: '',
       hold: null, contattato: true, cantDo: '', errore: '', votabile: false,
       creato: o.creato || adesso, aggiornato: adesso
