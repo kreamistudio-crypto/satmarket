@@ -23477,6 +23477,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la cache», cioè la strada vera. Si taglia sul `;` a FINE RIGA. È la
   trappola della prosa, su un asse nuovo.
 
+- LA TESTATA DEL LIBRO RESTA IN ALTO (set 2026): tab, logo e pillola
+  del filtro stanno in `.p2p-sticky`, un blocco `position:sticky`
+  SOLO — con due impilati il secondo vorrebbe un `top` pari
+  all'altezza del primo, un numero da tenere in pari a mano. Ha un
+  fondo suo e uno `z-index` sopra le card, o le card salirebbero
+  visibili dietro i tab; e NON ha margini negativi, perché lo sticky
+  pinna il margine a `top` e un margine negativo lascia una fessura in
+  cima. La pillola vive in `#p2pTesta` dentro quel blocco (la riempie
+  `renderP2P`), gli avvisi del libro restano in `#p2pCorpo` che scorre.
+  ⚠️ IL DIVISORIO DELLA PILLOLA CADE SOTTO IL LOGO, e lo fa la
+  GRIGLIA: `grid-template-columns:1fr auto 1fr` con `width:fit-content`
+  rende i due lati grandi quanto il più capiente. Col flex NON
+  funziona — `flex:1 1 0` pareggia solo lo spazio avanzato, e con
+  `fit-content` non ne avanza. Misurato: 0,00px da 1 a 128 offerte.
+  ⚠️ E I CURSORI DEL FILTRO NON RIDISEGNANO IL FOGLIO mentre si
+  trascina: `renderFiltroP2P` riscrive `innerHTML` e distruggerebbe
+  l'`input[type=range]` che il dito sta tenendo. `muoviDoppioP2P`
+  tocca solo le due variabili CSS della fascia e il testo dei due capi,
+  che hanno un giudice solo (`capiDoppioP2P`). Il verbale in CANTIERI,
+  «I quattro ritocchi al P2P».
+
 - IL MAZZO VIAGGIA DAVVERO FRA I DISPOSITIVI (set 2026, dal campo:
   Mini App sul telefono e Mini App su Telegram Desktop avevano due
   mazzi DIVERSI, e un ordine pubblicato dall'uno non si vedeva

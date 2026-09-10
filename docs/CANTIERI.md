@@ -8676,3 +8676,87 @@ fondo; il giudice che accetta i decimali e quello che si fida di
 `Number`; il troncamento che torna sul filo, nel giudice, sui sats e
 sulla presa; i quattro campi che tornano `number` o perdono il filtro;
 il foglio e la presa che leggono senza la rete.
+
+I QUATTRO RITOCCHI AL P2P (10 set 2026, chiesti da Andrea): la pillola
+centrata sotto il logo, la testata attaccata in alto, l'aria nel foglio
+Filtro col titolo raddrizzato, e i cursori che scorrono.
+1) LA LINEA VERTICALE STA SOTTO IL LOGO, e non bastava centrare la
+pillola: i due lati hanno larghezze diverse — «Filtro» da una parte, «N
+offerte» dall'altra, e il numero cambia — quindi il divisorio cadrebbe
+spostato, e di quanto lo deciderebbe il conteggio.
+⚠️ E LO FA LA GRIGLIA, NON IL FLEX, che è la riga da non
+«semplificare»: la prima stesura dava `flex:1 1 0` ai due lati
+convinta che si pareggiassero, e MISURATA DAL VIVO si è rivelata
+falsa — `flex` pareggia solo lo spazio AVANZATO, e con
+`width:fit-content` non ne avanza: ogni lato prende la sua larghezza
+naturale. A «1 offerta» il divisorio se ne andava di 11,45px. Due
+colonne `1fr` di griglia, sotto dimensionamento intrinseco, valgono
+invece entrambe quanto la più capiente. Rimisurato su 1, 2, 3, 10, 99
+e 128 offerte: **scarto 0,00px in tutti e sei**.
+2) TAB, LOGO E PILLOLA RESTANO IN ALTO, in UN blocco `sticky` solo e
+non due impilati: con due il secondo vorrebbe un `top` pari
+all'altezza del primo, cioè un numero da tenere in pari a mano che al
+primo ritocco del logo diventa una sovrapposizione. La pillola esce da
+`#p2pCorpo` e prende un contenitore suo (`#p2pTesta`) — è l'unica
+ragione per cui ce l'ha. GLI AVVISI DEL LIBRO RESTANO COL LIBRO: la
+pillola è un comando e vale sempre, «elenco parziale» racconta la
+lettura di adesso e appeso in alto mangerebbe schermo per sempre.
+⚠️ E IL MARGINE NEGATIVO È USCITO, misurato: con `margin-top:-6px` lo
+sticky pinna il MARGINE a `top`, quindi il bordo resta 6px più in
+basso e in cima avanza una fessura trasparente da cui si vedono
+passare le card. Verificato dal vivo: da fermo il blocco sta a 62,8px,
+scorrendo si incolla a **0** e le card gli passano sotto (la prima
+card a −310 e a −1089), e a 2px dal tetto c'è il logo, non una card.
+3) IL FOGLIO FILTRO: 9px d'aria sotto ogni titolo (solo in questo
+foglio — la stessa classe vive in mezza app), e «Premio / Sconto»
+diventa «Sconto / Premio», che è l'ordine dei due capi qui sotto —
+sconto in rosso a sinistra, premio in verde a destra. Un titolo che
+legge al contrario del cursore fa cercare il segno dalla parte
+sbagliata.
+4) ⚠️ I CURSORI «A SCATTI» NON ERANO IL PASSO, ed è la scoperta del
+giro: `muoviDoppioP2P` chiamava `renderFiltroP2P`, che riscrive
+`innerHTML` — cioè DISTRUGGE E RICREA i due `input[type=range]` a ogni
+`oninput`. Il pallino che il dito sta tenendo sparisce a metà
+trascinamento, il browser perde la presa, e per continuare bisogna
+riafferrarlo. Cambiare `step` non avrebbe curato niente. È la lezione
+del lightbox «a scatti», sullo stesso asse: quel che sembra lentezza è
+quasi sempre qualcosa che si rifà da capo. Adesso si tocca solo quel
+che cambia — le due variabili CSS della fascia e il testo dei due capi
+— e i `min`/`max` si RILEGGONO dal campo invece di ribatterli. I due
+capi hanno un giudice solo (`capiDoppioP2P`), usato dal disegno
+iniziale E dal trascinamento: due formule direbbero due numeri diversi
+mentre il dito si muove. Verificato dal vivo: **11 `input` di fila e
+il nodo è sempre lo stesso**, i capi si aggiornano, la fascia si
+sposta (0,5 a metà corsa, 0,6 sulla reputazione a 3/5) e i due pallini
+continuano a non scavalcarsi.
+COLLAUDATI: **9012 prove verdi, 0 rosse** (+18) e **15 MUTAZIONI, 15
+uccise**.
+⚠️ E IL BANCO DELLA TORTURA HA MENTITO DUE VOLTE, che è la parte da
+tenere. PRIMA: la copia isolata non portava `assets/`, quindi
+`prove_nav_p2p` esplodeva su un PNG mancante, il giro si FERMAVA lì —
+le sezioni dopo non giravano affatto — e il banco usciva 1 su codice
+INTATTO. Con la baseline a `exit 1` la mia condizione «rossa o exit
+non zero» dichiarava uccise anche mutazioni mai provate: una l'aveva
+già timbrata così. Il segno che l'ha smascherato è una riga sola:
+**zero righe rosse ma exit 1**. Un banco che non parte non è un banco
+che passa. SECONDA: smascherata quella, la sentinella del contenimento
+è sopravvissuta davvero — guardava l'ORDINE dei due elementi, e
+spostando la pillola FUORI dal blocco l'ordine resta identico. È la
+trappola del contenitore sbagliato per la quinta volta in due giorni,
+in una veste nuova: non «cerco in un posto troppo grande» ma «guardo
+la proprietà sbagliata». La seconda stesura camminava sui tag per
+contare le graffe, e nel banco rispondeva diverso da quel che
+rispondeva a mano: buttata. Il markup qui è FISSO, e la forma si
+guarda per quello che è.
+DAL VIVO, e va detto com'è fatta la misura: la leva P2P è spenta in
+locale, quindi lo stato del client è stato FORZATO (leva accesa e un
+libro finto) per misurare la sola GEOMETRIA — non il comportamento
+della leva. ⚠️ E due misure hanno mentito prima di dire la verità: il
+centro del logo preso UNA volta e riusato (la barra di scorrimento va
+e viene col numero di card e sposta tutto di 7,5px — i due vanno
+misurati nello stesso fotogramma), e il Browser pane che emula
+`prefers-reduced-motion` e CONGELA a frame 0 l'animazione d'entrata
+della vista, lasciando `#view-p2p` con un `translateY(6px)` residuo:
+un antenato trasformato sposta lo sticky, e per un giro è sembrato un
+difetto del CSS. In un browser vero quell'animazione finisce in 180ms
+da sola; portata a termine a mano, lo sticky si incolla a 0.
