@@ -8013,3 +8013,110 @@ il foglio di casa col suo «🇪🇺 EUR» spuntato, l'importo ha un campo
 solo finché non lo si tocca, il premio a −6% e a +8% con la nota del
 lato giusto, i tratti bianchi dentro la barra, e le due uscite
 misurate uguali. Nessuno scorrimento orizzontale a 320.
+
+I cinque ritocchi del secondo giorno (set 2026, guardati dal vivo da
+Andrea). Quattro sono vestito; uno era un difetto vero, e non era
+quello che sembrava.
+
+1) L'ICONA DELLA VALUTA NON È PIÙ L'EURO. Era la bandierina della
+valuta scelta, e sembrava una buona idea — dice il fatto invece di
+annunciare la categoria — finché non si guarda avanti: nel catalogo
+domani c'è USDT, e un'icona che dice UNA valuta diventa una bugia il
+giorno che se ne sceglie un'altra. Adesso è un GLOBO, generico per
+costruzione. La bandierina resta dov'è vera: nella voce scelta
+(«🇪🇺 EUR») e nelle voci del foglio-picker.
+LE ALTRE DUE CANDIDATE SONO CADUTE GUARDANDOLE, e vale scriverlo:
+«due monete» a 22px diventa una macchia (i due cerchi si toccano e il
+velo li fonde), e «cambio» — due frecce dentro un cerchio — nella nav
+dice già «I miei scambi», quindi lo stesso segno avrebbe detto due
+cose in due posti.
+
+2) UN CAMPO SOLO ALL'APERTURA: era già così. Andrea l'ha segnalato
+come non fatto, ma passando dalla porta vera (il `+` della nav) il
+campo del massimo nasce con `display:none` — quel che si vedeva era la
+versione prima del deploy, o la cache dell'app. NON SI TOCCA NIENTE, e
+si aggiunge la prova che inchioda la garanzia dove sta davvero: non nel
+render (che disegna quel che lo stato dice) ma nell'AZZERAMENTO di
+`apriNuovoOrdineP2P`, che è l'unico posto da cui il foglio si apre.
+Una segnalazione dal campo che si rivela già curata lascia comunque
+qualcosa: il punto in cui la garanzia era solo implicita.
+
+3) ⚠️ «LA PAGINA SCENDE A TENDINA» NON ERA UNO SCROLL, ed è la voce
+che vale il giro. Al tocco sul campo dell'importo tutto il foglio
+scivolava giù. Le tre ipotesi ovvie erano `scrollIntoView`, il fuoco
+che sposta il foglio, il secondo campo che spinge il layout — e sono
+tutte sbagliate. La causa è geometrica: `.sheet` è
+`position:fixed; bottom:0`, e a questo foglio la tastiera toglie
+altezza (`height:calc(100dvh - var(--tastiera))`). Con l'ancora in
+BASSO, accorciare vuol dire ABBASSARE IL BORDO ALTO: il foglio non
+scorre, si accorcia dal lato sbagliato, e testata compresa scende di
+quanto la tastiera è alta.
+LA CURA È `top:0; bottom:auto` sul solo `.sheet.pieno`: l'altezza se ne
+va dal basso, dove la tastiera c'è davvero, e sopra non si muove
+niente. MISURATO: con `--tastiera` a 300px il `top` resta 0 e l'altezza
+passa da 812 a 512 — prima il top sarebbe finito a 300.
+E LA SECONDA MEZZA CAUSA SI CURA LO STESSO: la nota che compare
+allunga il riquadro, e l'ancoraggio dello scorrimento del browser può
+rispondere spostando il corpo sotto il dito. `svelaSecondoImportoP2P`
+si segna dov'era e ce lo rimette — il campo che si sta toccando non ha
+cambiato posizione, quindi non c'è niente da inseguire.
+LA LEZIONE: quando «la pagina si muove» su un foglio ancorato a un
+bordo, prima di cercare uno scroll si guarda DA CHE LATO il foglio
+cambia dimensione.
+
+4) LE ICONE SONO LINEE, con la loro tinta leggera. Cinque emoji in
+fila erano cinque disegni di cinque mani diverse, ognuna col suo colore
+e il suo stile — un'accozzaglia dentro cinque cerchi saturi. Adesso
+sono disegnate come quelle della nav: stesso `viewBox` (2 2 20 20),
+tratto 1.5, e il «velo» — la stessa forma riempita al 12% — che dà
+corpo senza aggiungere una seconda linea. Globo, banconota, carta,
+dollaro, fulmine.
+LA TINTA RESTA MA LEGGERA, una per sezione (scelta di Andrea contro la
+prima proposta, che le voleva tutte neutre): fondo tenue e tratto del
+suo «text», il tono fatto apposta per leggersi sui fondi tenui. Con una
+linea da un pixel e mezzo il colore si vede e non grida.
+⚠️ LE CLASSI STANNO NEL CSS E NON IN RIGA, e non è pulizia: uno di quei
+token porta nel nome una parola che la sentinella di questo foglio
+vieta, e scritta dentro il render la farebbe rossa. Il colore passa da
+`.ico-valuta`, `.ico-importo`, `.ico-metodi`, `.ico-prezzo`,
+`.ico-sats` — che è anche il posto dove le cinque coppie si leggono una
+sotto l'altra.
+E IL DOLLARO È DISEGNATO A TRATTO (scelta di Andrea: «il simbolo del
+dollaro come c'è adesso ma più elegante»): il segno resta quello, se ne
+va solo l'emoji.
+
+5) LA BARRA DEL PREMIO SI ACCENDE FINO AL PALLINO. Prima era tutta
+arancione e a dire «dove sono» c'era solo il pallino; adesso è accesa
+dal capo sinistro fino a lui e spenta oltre. Il tratteggio resta —
+sopra tutt'e due i lati, che è il motivo per cui lo spento non può
+essere chiaro quanto la carta: i tratti bianchi ci sparirebbero
+dentro. Da qui il token `--premio-spento`, coi suoi due valori.
+⚠️ IL CONFINE NON È LA PERCENTUALE NUDA, ed è il dettaglio che fa la
+differenza proprio dove si guarda: il pallino è largo venti pixel e il
+suo centro corre dentro `larghezza − 20`, quindi il conto è
+`frazione × (100% − 20px) + 10px`. Con la percentuale nuda il colore e
+il pallino si scollano ai due estremi — cioè a −10% e a +10%, che sono
+le due posizioni in cui uno prova la barra per capire come funziona.
+Il conto vive in `pienoPremioP2P`, PURA, e si fa girare: ai due capi,
+al centro, e coi numeri fuori fascia che si tosano invece di uscire dal
+binario.
+
+COLLAUDATI: **8861 prove verdi, 0 rosse** (+20 sulle 8841 del giro
+prima) e **11 MUTAZIONI, 11 UCCISE**: la valuta che torna una bandiera,
+un'icona che torna emoji, la tinta che sparisce dal CSS, le icone che
+perdono il tratto della nav, il foglio che torna ancorato in basso, lo
+svelare che lascia scivolare la pagina, l'apertura che non richiude più
+il secondo campo, il riempimento che non si riscrive al movimento, che
+parte muto, che perde la correzione del pallino, e i due strati del
+binario rovesciati.
+⚠️ QUELL'ULTIMA HA UNA PROVA NATA APPOSTA, e senza sarebbe passata: le
+due righe che guardano il tratteggio e il colore restano verdi anche a
+strati invertiti, perché ci sono tutt'e due — a cambiare è solo
+l'ORDINE, e con `background-size` posizionale le misure finirebbero
+sullo strato sbagliato. Si guarda la CUCITURA fra i due, non i due. È
+la stessa famiglia delle tre prove molli del giro prima.
+GIRO DAL VIVO col server vero, chiaro e scuro: il foglio si apre con
+un campo solo, le cinque icone a tratto nelle loro tinte tenui, il
+binario che si riempie a −4% e a +6% col pallino esattamente sul
+confine, e il foglio che a `--tastiera` 300px resta col bordo alto a
+zero.
