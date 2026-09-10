@@ -36378,6 +36378,54 @@ function euroTestoP2P(o){
   return fmtEur(o.euro) + (o.euroMax ? '–' + fmtEur(o.euroMax) : '') + ' €';
 }
 
+/* ---- L'EURO E' UN INTERO (10 set 2026, dal campo di Andrea: «5,5 €»
+   usciva un ordine da 5 €) ----
+   E' UNA REGOLA DEL PROTOCOLLO e non del foglio: `fiat_amount` viaggia
+   intero, e nemmeno Mostro prende i decimali. Qui pero' si troncava in
+   SILENZIO con `Math.floor`, negli stessi tre posti in cui si scrive
+   una cifra in euro — il giudice del bottone, quel che si SPEDISCE, e
+   l'importo scelto dentro un intervallo. Un troncamento muto e' la
+   bugia peggiore: chi scrive 5,5 vede partire 5 e lo scopre dal libro.
+   LA CURA NON E' ACCETTARE I DECIMALI, E' DIRLO. Un giudice PURO e uno
+   solo per i tre posti: due giudici sulla stessa cifra sono due
+   risposte diverse allo stesso «5,5».
+   ⚠️ E `Math.floor(Number('5,5'))` NON E' 5, e' NaN — che
+   `JSON.stringify` scrive `null`: sul filo partiva
+   `"fiat_amount":null`, cioe' un messaggio che il coordinatore non sa
+   leggere e a cui, come sempre quando la busta e' storta, non risponde
+   AFFATTO. Misurato sui byte prima di scrivere questa riga. Il campo
+   `type=number` del browser lo nascondeva (vedi `testoCampoNumero`),
+   ma la strada c'era.
+   FAIL-CLOSED: a cifra storta l'euro vale ZERO e non «quel che ci
+   somiglia». Un ordine da 0 il coordinatore lo rifiuta; uno da 5 al
+   posto di 5,5 lo accetta, ed e' quello che nessuno voleva. */
+const MSG_EURO_INTERO = 'Solo importi interi in euro';
+/* IL SENTINELLA DELLA VIRGOLA: un campo `type=number` non lo produce
+   mai (il suo `value` o e' vuoto o e' un numero valido), quindi non
+   puo' collidere con niente di scritto davvero. */
+const P2P_NON_NUMERO = ',';
+function euroInteroP2P(testo){
+  const t = String(testo == null ? '' : testo).trim();
+  if (!t) return {vuoto: true, storto: false, euro: 0};
+  /* SOLO CIFRE, e non «un numero»: `Number` accetta '5.5', '5e3' e
+     ' 5 ' — e tutti e tre qui sono storti, non interi. */
+  if (!/^[0-9]+$/.test(t)) return {vuoto: false, storto: true, euro: 0};
+  return {vuoto: false, storto: false, euro: Number(t)};
+}
+/* ⚠️ LA VIRGOLA ARRIVA VUOTA, ed e' il pezzo che leggendo non si vede:
+   un `<input type="number">` con dentro «5,5» risponde `value === ''`
+   e alza `validity.badInput` — quindi «non ho scritto niente» e «ho
+   scritto una virgola» arrivano al giudice IDENTICI. Chi legge il solo
+   `value` risponde «Scrivi l'importo in euro» a chi l'importo l'ha
+   scritto, ed e' un vicolo cieco che manda a indovinare. Qui il
+   badInput diventa il sentinella, e il giudice lo legge storto. */
+function testoCampoNumero(inp){
+  if (!inp) return '';
+  const v = String(inp.value || '');
+  if (v) return v;
+  return (inp.validity && inp.validity.badInput) ? P2P_NON_NUMERO : '';
+}
+
 /* ---- QUANTO: l'importo scelto dentro un intervallo (set 2026) ----
    Un range non ha una cifra: ne ha due, e la terza la sceglie chi
    prende. Il foglio e' piccolo apposta — un campo e un bottone —
@@ -36411,7 +36459,7 @@ function renderQuantoP2P(){
       (paghiEuro ? 'vuoi pagare' : 'vuoi ricevere') + '.</div>' +
     '<div class="field"><label for="p2pQuantoInp">Quanti euro</label>' +
     '<div class="campo-pre"><span class="pre">\u20ac</span>' +
-    '<input id="p2pQuantoInp" type="number" inputmode="decimal" step="1" min="' +
+    '<input id="p2pQuantoInp" type="number" inputmode="numeric" step="1" min="' +
       esc(String(riga.euro)) + '" max="' + esc(String(riga.euroMax)) + '" value="' +
       esc(String(riga.euro)) + '" oninput="stimaQuantoP2P()"></div></div>' +
     '<div class="hint" id="p2pQuantoStima"></div>' +
@@ -36422,8 +36470,12 @@ function renderQuantoP2P(){
    stima passa dalla stessa formula delle card — mai un secondo conto
    che direbbe un altro numero sulla stessa offerta. */
 function quantoValeP2P(riga, valore){
-  const euro = Math.floor(Number(valore || 0));
+  const g = euroInteroP2P(valore);
   if (!riga || !riga.euroMax) return {ok: false, euro: 0, dillo: ''};
+  /* PRIMA la forma, poi la fascia: a «25,5» dire «scegli fra 20 e
+     100» manda a cercare l'errore dove non c'e' */
+  if (g.storto) return {ok: false, euro: 0, dillo: MSG_EURO_INTERO};
+  const euro = g.euro;
   if (!(euro >= riga.euro && euro <= riga.euroMax))
     return {ok: false, euro: 0,
       dillo: 'Scegli una cifra fra ' + fmtEur(riga.euro) + ' e ' + fmtEur(riga.euroMax) + ' \u20ac.'};
@@ -36435,13 +36487,13 @@ function stimaQuantoP2P(){
   const riga = rigaLibroP2P(p2pQuantoOrdine);
   const inp = el('p2pQuantoInp'), av = el('p2pQuantoStima');
   if (!riga || !inp || !av) return;
-  av.textContent = quantoValeP2P(riga, inp.value).dillo;
+  av.textContent = quantoValeP2P(riga, testoCampoNumero(inp)).dillo;
 }
 function confermaQuantoP2P(){
   const riga = rigaLibroP2P(p2pQuantoOrdine);
   const inp = el('p2pQuantoInp');
   if (!riga || !inp) return;
-  const g = quantoValeP2P(riga, inp.value);
+  const g = quantoValeP2P(riga, testoCampoNumero(inp));
   if (!g.ok) { toast(g.dillo); return; }
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
@@ -37045,11 +37097,16 @@ function premioTestoP2P(n){
    e' la lezione dell'annullo. Prende un oggetto e non il DOM, cosi' si
    prova senza un browser. */
 function valeNuovoOrdineP2P(v){
-  const euro = Math.floor(Number(v.euro || 0));
-  const max = Math.floor(Number(v.euroMax || 0));
+  const e = euroInteroP2P(v.euro), x = euroInteroP2P(v.euroMax);
+  const euro = e.euro, max = x.euro;
   const sats = Math.floor(Number(v.sats || 0));
+  /* LA FORMA PRIMA DEL VUOTO, e non e' un dettaglio d'ordine: un
+     campo con «5,5» dentro arriva qui vuoto (il badInput), e
+     «Scrivi l'importo» a chi l'ha scritto e' la risposta che fa
+     riscrivere la stessa cosa. */
+  if (e.storto || x.storto) return {ok: false, manca: MSG_EURO_INTERO};
   if (!(euro > 0)) return {ok: false, manca: 'Scrivi l\'importo in euro'};
-  if (v.euroMax && !(max > euro))
+  if (!x.vuoto && !(max > euro))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo'};
   if (!(v.metodi || []).length) return {ok: false, manca: 'Scegli almeno un metodo di pagamento'};
   if (v.fisso) {
@@ -37092,8 +37149,11 @@ function campiNuovoP2P(){
    • `create_fiat_amt_array` scrive il tag `fa` coi due capi quando
      ci sono, e allora `fiat_amount` vale 0. */
 function ordineDaCampiP2P(v, lato){
-  const euro = Math.floor(Number(v.euro || 0));
-  const euroMax = Math.floor(Number(v.euroMax || 0));
+  /* DALLO STESSO GIUDICE del bottone, o quel che si vede acceso e
+     quel che parte possono divergere — ed e' esattamente cosi' che
+     «5,5» diventava 5 sul filo */
+  const euro = euroInteroP2P(v.euro).euro;
+  const euroMax = euroInteroP2P(v.euroMax).euro;
   const satsFissi = v.fisso ? Math.floor(Number(v.sats || 0)) : 0;
   /* L'INTERVALLO E' UN FATTO DEI NUMERI e non della sezione aperta:
      due importi buoni e crescenti sono un range, uno solo e' un ordine
@@ -37154,13 +37214,13 @@ function renderNuovoOrdineP2P(){
        Percio' `style="display:none"` e non l'attributo `hidden`: `.hint`
        potrebbe avere un `display` suo e vincerlo. */
     corpo: '<div class="p2p-duecampi">' +
-      '<input id="p2pNuovoEuro" type="number" inputmode="decimal" min="1" step="1" ' +
+      '<input id="p2pNuovoEuro" type="number" inputmode="numeric" min="1" step="1" ' +
         'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
         'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
         'aria-label="Importo">' +
       (p2pNuovoFisso ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
-        '<input id="p2pNuovoEuroMax" type="number" inputmode="decimal" min="1" ' +
+        '<input id="p2pNuovoEuroMax" type="number" inputmode="numeric" min="1" ' +
         'step="1" placeholder="Importo massimo" value="' + esc(p2pNuovoEuroMax) + '" ' +
         (p2pNuovoDue ? '' : 'style="display:none" ') +
         'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
@@ -37297,8 +37357,10 @@ function aggiornaInviaP2P(){
 }
 function cambiaCampoNuovoP2P(){
   const e = el('p2pNuovoEuro'), x = el('p2pNuovoEuroMax'), s = el('p2pNuovoSats');
-  if (e) p2pNuovoEuro = String(e.value || '');
-  if (x) p2pNuovoEuroMax = String(x.value || '');
+  /* `testoCampoNumero` e non `.value`: la virgola arriva vuota, e
+     senza di lui il messaggio direbbe «scrivi l'importo» */
+  if (e) p2pNuovoEuro = testoCampoNumero(e);
+  if (x) p2pNuovoEuroMax = testoCampoNumero(x);
   if (s) p2pNuovoSats = String(s.value || '');
   aggiornaInviaP2P();
 }
