@@ -34104,6 +34104,9 @@ function renderP2P(){
      o tornato dal cloud finisce nella lista da guardare. */
   if (mz && !daVerificare && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
     p2pRegistrato = true;
+    /* il parcheggio con la STESSA sk e' mio: torna PRIMA della
+       registrazione, che porta l'indice al server */
+    if (riprendiParcheggioP2P(mz)) mz = mazzoMostro();
     /* LA PROMESSA SI TIENE (set 2026): dentro viaggia il pavimento
        dell'indice, e la marcatura a indice zero la ASPETTA invece di
        correre — sul dispositivo fresco lo zero locale e' un fatto non
@@ -34564,11 +34567,23 @@ function azzeraSessioneP2P(){
   p2pOrdiniRegistrati = new Set(); p2pStatoChiesto = false; p2pAutoTentati = {};
   p2pContoEsito = '';
 }
+/* ⚠️ IL CONTO NON PASSA MAI DA `| 0` (10 set 2026, il secondo giro dal
+   campo): i tg_id nuovi di Telegram stanno SOPRA 2^31 — 8711624959 —
+   e un bitwise li tronca a 32 bit in silenzio (8711624959 | 0 fa
+   121690367). Il mazzo appena derivato si serializzava col conto
+   troncato, si rileggeva «di un altro» e finiva nel parcheggio a ogni
+   render: derivato, parcheggiato, riderivato, per sempre. Il banco
+   non lo vedeva perche' usava 111 e 222. Da qui `numeroConto`, e una
+   sentinella che non ammette bitwise sul conto in tutto il blocco. */
+function numeroConto(x){
+  const n = Number(x);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
 function mazzoEstraneoP2P(m){
-  return !!(m && m.origine === 'conto' && (m.conto | 0) && myTgId && (m.conto | 0) !== myTgId);
+  return !!(m && m.origine === 'conto' && numeroConto(m.conto) && myTgId && numeroConto(m.conto) !== numeroConto(myTgId));
 }
 function mazzoDaVerificareP2P(m){
-  return !!(m && m.origine === 'conto' && !(m.conto | 0) && myTgId && p2pContoEsito !== 'ignoto');
+  return !!(m && m.origine === 'conto' && !numeroConto(m.conto) && myTgId && p2pContoEsito !== 'ignoto');
 }
 async function verificaContoP2P(m){
   const s = await semeProfiloP2P();
@@ -34615,6 +34630,40 @@ function parcheggiaMazzoAltruiP2P(m){
     p2pAdozione = false;
   })();
 }
+/* LA RIPRESA DEL PARCHEGGIO (10 set 2026, il secondo giro dal campo):
+   la strada b) scartata la mattina e' rientrata la sera, perche' il
+   difetto del `| 0` ha parcheggiato IL MAZZO GIUSTO col suo ordine
+   appena pubblicato, e la prova che il parcheggio e' del conto che
+   entra e' la piu' forte che esista: la STESSA sk. Allora il mazzo
+   riprende l'indice piu' alto (mai riusare una trade key), e scambi,
+   lapidi e recapiti tornano vivi — su un nome gia' occupato vince
+   quel che c'e' (e' il piu' recente), e il parcheggio si svuota. Una
+   sk diversa non si tocca, e non si dice: il parcheggio resta la
+   lapide di un altro. */
+function riprendiParcheggioP2P(m){
+  const dove = '@altrui:' + String(m.pub || '').slice(0, 8);
+  let suo = null;
+  try { suo = JSON.parse(localStorage.getItem(MOSTRO_CHIAVE + dove)); } catch(e){}
+  if (!suo || suo.sk !== m.sk) return false;
+  for (const base of P2P_CHIAVI_DISPOSITIVO) {
+    try {
+      const v = localStorage.getItem(base + dove);
+      if (v === null) continue;
+      const vivo = localStorage.getItem(chiaveP2P(base));
+      let unito = v;
+      if (base === MOSTRO_CHIAVE)
+        unito = mazzoSerializza(Object.assign({}, m, {indice: Math.max(m.indice | 0, suo.indice | 0)}));
+      else if (vivo !== null) {
+        try { unito = JSON.stringify(Object.assign({}, JSON.parse(v), JSON.parse(vivo))); }
+        catch(e) { unito = vivo; }
+      }
+      localStorage.setItem(chiaveP2P(base), unito);
+      localStorage.removeItem(base + dove);
+    } catch(e){}
+  }
+  console.log('🔑 [p2p] profilo: ripreso dal parcheggio, con i suoi scambi');
+  return true;
+}
 /* ============ fine del conto sul dispositivo ============ */
 function mazzoMostro(){
   try {
@@ -34632,7 +34681,7 @@ function mazzoSerializza(m){
   return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
                          creato: m.creato|0, backupFatto: !!m.backupFatto,
                          origine: m.origine || '', versione: m.versione|0,
-                         conto: m.conto|0});
+                         conto: numeroConto(m.conto)});
 }
 /* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
    desktop avevano due mazzi diversi, e un ordine pubblicato dall'uno
@@ -34816,7 +34865,7 @@ function mazzoDaTesto(testo){
           /* `conto` e' il tg_id da cui un profilo 'conto' e' nato (set 2026,
              «IL CONTO SUL DISPOSITIVO»): 0 per quelli di ieri, che si
              verificano una volta col seme */
-          conto: d ? (d.conto|0) : 0};
+          conto: d ? numeroConto(d.conto) : 0};
 }
 /* La trade key numero `indice`: HMAC-SHA256 col segreto come chiave e
    un'etichetta di casa come messaggio — deterministica, quindi lo stesso

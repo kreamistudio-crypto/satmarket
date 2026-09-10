@@ -37942,6 +37942,37 @@ const corpo = f => JSON.parse(f.opt.body);
   const nato2 = await assicuraMazzo();
   out.derivatoPortaIlConto = nato2.conto === 111 && mazzoDaTesto(mazzoSerializza(nato2)).conto === 111
     && mazzoDaTesto(JSON.stringify({sk: skX})).conto === 0;
+
+  // G) IL TG_ID SOPRA 2^31 (il secondo giro dal campo: 8711624959): il
+  //    conto non passa da un bitwise, o si tronca e il mazzo appena
+  //    derivato si legge «di un altro» a ogni render
+  reset(); myTgId = 8711624959; allineaContoP2P();
+  rispSeme = {seme: skY, versione: 1};
+  const grande = await assicuraMazzo();
+  out.contoGrandeIntero = grande.conto === 8711624959
+    && JSON.parse(store.get('barattolo_mostro@8711624959')).conto === 8711624959
+    && mazzoMostro().conto === 8711624959;
+  out.contoGrandeNonEstraneo = mazzoEstraneoP2P(mazzoMostro()) === false
+    && mazzoDaVerificareP2P(mazzoMostro()) === false;
+  // H) LA RIPRESA: il parcheggio con la STESSA sk torna vivo — indice
+  //    piu' alto, scambi uniti (vince il vivo), parcheggio svuotato
+  reset();
+  const targaX = '@altrui:' + NT.getPublicKey(hexToBytes(skX)).slice(0, 8);
+  store.set('barattolo_mostro' + targaX, mazzoSerializza(Object.assign(contoDi(121690367, skX), {indice: 3})));
+  store.set('barattolo_mostro_ordini' + targaX, '{"o7":{"id":"o7","v":"parcheggiato"},"o8":{"id":"o8","v":"parcheggiato"}}');
+  store.set('barattolo_mostro_ordini@111', '{"o8":{"id":"o8","v":"vivo"}}');
+  ricordaMazzo(contoDi(111, skX));
+  out.ripresaPrende = riprendiParcheggioP2P(mazzoMostro()) === true
+    && mazzoMostro().indice === 3 && mazzoMostro().conto === 111 && mazzoMostro().sk === skX;
+  const uniti = JSON.parse(store.get('barattolo_mostro_ordini@111'));
+  out.ripresaUnisce = uniti.o7.v === 'parcheggiato' && uniti.o8.v === 'vivo'
+    && !store.has('barattolo_mostro' + targaX) && !store.has('barattolo_mostro_ordini' + targaX);
+  // ...e una sk diversa non si tocca
+  reset();
+  store.set('barattolo_mostro' + targaX, mazzoSerializza(contoDi(0, skY)));
+  ricordaMazzo(contoDi(111, skX));
+  out.ripresaNonRuba = riprendiParcheggioP2P(mazzoMostro()) === false
+    && store.has('barattolo_mostro' + targaX) && mazzoMostro().indice === 0;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -38044,6 +38075,11 @@ const corpo = f => JSON.parse(f.opt.body);
         "altruiCloudDiversoResta": "una copia nel cloud che non e' quella non si tocca",
         "cloudAltruiNonAdotta": "dal cloud un profilo di un altro conto non si adotta: se ne va",
         "derivatoPortaIlConto": "il mazzo derivato porta il conto, e il campo sopravvive al testo",
+        "contoGrandeIntero": "un tg_id sopra 2^31 resta intero nel mazzo e nel testo",
+        "contoGrandeNonEstraneo": "...e il mazzo appena derivato non si legge «di un altro»",
+        "ripresaPrende": "il parcheggio con la stessa sk torna vivo, con l'indice piu' alto",
+        "ripresaUnisce": "...unisce gli scambi (vince il vivo) e si svuota",
+        "ripresaNonRuba": "...e una sk diversa non si tocca",
     }
     for k, nome in attesi.items():
         prova(nome, True, out.get(k))
@@ -40733,8 +40769,10 @@ def prove_p2p_conto_dispositivo():
     # --- 1) NESSUNA CHIAVE DEL P2P SI LEGGE NUDA -----------------------
     # ogni getItem/setItem/removeItem delle quattro passa da chiaveP2P:
     # una lettura nuda e' una chiave che due conti condividono
+    # (la parentesi chiusa subito dopo il nome: `MOSTRO_CHIAVE + dove` e'
+    # il parcheggio, che per costruzione sta fuori dal conto)
     nude = re.findall(r"localStorage\.(?:getItem|setItem|removeItem)\("
-                      r"(?:MOSTRO_CHIAVE|MOSTRO_ORDINI_CHIAVE|MOSTRO_LAPIDI_CHIAVE|RECAPITI_CHIAVE)\b",
+                      r"(?:MOSTRO_CHIAVE|MOSTRO_ORDINI_CHIAVE|MOSTRO_LAPIDI_CHIAVE|RECAPITI_CHIAVE)\)",
                       mini)
     prova("le quattro chiavi del P2P non si leggono mai nude", [], nude)
     prova("...e passano tutte da chiaveP2P", True,
@@ -40812,10 +40850,11 @@ def prove_p2p_conto_dispositivo():
     prova("le due derivazioni dal seme timbrano il conto", 2,
           blocco_mazzo.count("conto: myTgId, versione: s.versione | 0"))
     prova("...e il campo viaggia nel testo, andata e ritorno", True,
-          "conto: m.conto|0});" in blocco_mazzo and "conto: d ? (d.conto|0) : 0};" in blocco_mazzo)
+          "conto: numeroConto(m.conto)});" in blocco_mazzo
+          and "conto: d ? numeroConto(d.conto) : 0};" in blocco_mazzo)
     prova("i due giudici: 'conto' con un altro tg_id = estraneo; 'conto' senza tg_id = da verificare",
-          True, "m.origine === 'conto' && (m.conto | 0) && myTgId && (m.conto | 0) !== myTgId" in blocco
-          and "m.origine === 'conto' && !(m.conto | 0) && myTgId && p2pContoEsito !== 'ignoto'" in blocco)
+          True, "m.origine === 'conto' && numeroConto(m.conto) && myTgId && numeroConto(m.conto) !== numeroConto(myTgId)" in blocco
+          and "m.origine === 'conto' && !numeroConto(m.conto) && myTgId && p2pContoEsito !== 'ignoto'" in blocco)
     ver = pezzo_js(mini, "async function verificaContoP2P(m){", "\n}\n")
     prova("la verifica rilegge il mazzo dopo l'attesa, e non giudica uno cambiato nel frattempo",
           True, "if (!ora || ora.sk !== m.sk) return;" in ver)
@@ -40826,6 +40865,25 @@ def prove_p2p_conto_dispositivo():
           and "await parcheggiaMazzoAltruiP2P(ora);" in ver)
     prova("una verifica sola per sessione", True,
           "if (!p2pContoVerifica) p2pContoVerifica = verificaContoP2P(m)" in mini)
+    # --- 6) IL TG_ID SOPRA 2^31 (il secondo giro dal campo) ---------
+    # 8711624959 | 0 fa 121690367: il conto non passa MAI da un
+    # bitwise, in nessun punto del blocco ne' nel testo del mazzo
+    # (`blocco` sta DENTRO `blocco_mazzo`: si conta sul secondo, o si
+    # conterebbe due volte)
+    prova("il conto non passa mai da un bitwise", [],
+          re.findall(r"conto\s*\|\s*0|conto\)\s*\|\s*0", blocco_mazzo))
+    prova("...e i giudici e il testo usano numeroConto", 6,
+          blocco_mazzo.count("numeroConto(m.conto)")
+          + blocco_mazzo.count("numeroConto(d.conto)")
+          + blocco_mazzo.count("numeroConto(myTgId)"))
+    # --- 7) LA RIPRESA DEL PARCHEGGIO ---------------------------------
+    rip = pezzo_js(mini, "function riprendiParcheggioP2P(m){", "\n}\n")
+    prova("la ripresa vuole la STESSA sk, e senza non tocca niente", True,
+          "if (!suo || suo.sk !== m.sk) return false;" in rip)
+    prova("...prende l'indice piu' alto e svuota il parcheggio", True,
+          "Math.max(m.indice | 0, suo.indice | 0)" in rip and "localStorage.removeItem(base + dove);" in rip)
+    prova("...e il render la chiama PRIMA di registrare", True,
+          0 < rp.find("if (riprendiParcheggioP2P(mz)) mz = mazzoMostro();") < rp.find("registraChiaviP2P([mz.pub])"))
 
 
 def prove_p2p_nuvola():
@@ -41065,6 +41123,7 @@ def prove_p2p_nuvola():
           # 'conto' che dichiara un altro tg_id
           "let myTgId = 111, p2pContoEsito = '';\n"
           "function cloudCancella(){ NUVOLA = null; return Promise.resolve(true); }\n"
+          + pezzo_js(mini, "function numeroConto(x){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function mazzoEstraneoP2P(m){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function mazzoDaVerificareP2P(m){", "\n}\n") + "\n}\n"
           + sin + "\n"
