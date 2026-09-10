@@ -14631,10 +14631,21 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         con, annuncio_id, ("released", "refunded", "annullato"), esclusi=True)
     con.close()
     if in_corso:
+        # Il ripiego che manca non e' al codice ma a chi legge: la
+        # quantita' si puo' gia' cambiare anche con un affare aperto
+        # (ricarica_quantita non guarda in_corso, apposta — vedi la
+        # sua docstring), ma il gesto naturale di chi vuole "cambiare
+        # qualcosa" e' proprio questa modifica, e senza la riga in piu'
+        # chi ci sbatte contro non scopre l'altra strada. Si arriva
+        # qui solo dopo le guardie di asta e origine_annuncio qui
+        # sopra, quindi il bottone che si nomina esiste per forza.
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
                                  "potrai modificarlo quando sarà concluso "
                                  "(chi compra deve trovare l'annuncio così "
-                                 "com'era quando ha deciso di pagare)")
+                                 "com'era quando ha deciso di pagare). Se ti "
+                                 "serve solo cambiare i pezzi disponibili, "
+                                 "puoi farlo subito con «🔄 Aggiorna i "
+                                 "pezzi», anche ad affare aperto")
 
     # --- Stessa moderazione di una pubblicazione nuova ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
