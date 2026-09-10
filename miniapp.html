@@ -1802,7 +1802,12 @@
      Misurata: bordo a 6px invece che a 0. Il blocco comincia dove
      comincia il contenuto e basta — il respiro sopra lo mette gia'
      `.sicu`, e da attaccato non serve. */
-  .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg)}
+  /* L'ARIA SOTTO LA PILLOLA sta DENTRO il blocco (set 2026, ritocco di
+     Andrea), e non e' un margine della card: dev'essere fondo
+     DIPINTO, o da attaccati le prime card si vedrebbero passare in
+     quello spazio invece di sparire sotto la pillola. */
+  .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
+    padding-bottom:8px}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -2059,6 +2064,19 @@
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
+  /* LA STELLA CHE SI RIEMPIE: due disegni sovrapposti, e a decidere
+     quanto se ne vede e' la larghezza della scatola che taglia. Il
+     vuoto e' il solo tratto, il pieno e' tratto E campitura, cosi'
+     il bordo resta continuo anche a meta' strada. */
+  .p2p-stella{position:relative;display:inline-block;width:14px;height:14px;
+    vertical-align:-2px}
+  .p2p-stella svg{position:absolute;left:0;top:0;width:14px;height:14px;
+    display:block;fill:none;stroke:var(--oro,#E0A82E);stroke-width:1.7;
+    stroke-linejoin:round}
+  .p2p-stella-piena{position:absolute;left:0;top:0;height:14px;
+    overflow:hidden}
+  .p2p-stella-piena svg{fill:var(--oro,#E0A82E)}
+  .p2p-ico-mini{width:14px;height:14px;vertical-align:-2px}
   /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
      l'auto-margine la spinge in fondo alla SUA riga.
      MA COL CONTENUTO VERO QUEL CAPO NON ARRIVA MAI, ed e' misurato e
@@ -33463,22 +33481,6 @@ function tagValori(ev, nome){
    numero di un terzo che arriva in una repeat(). I tre valori escono
    interi e non negativi, cosi' la stringa che ne nasce e' NOSTRA e non
    porta niente di sconosciuto a schermo. */
-function repDaTag(s){
-  if (!s) return null;
-  let d;
-  try { d = JSON.parse(s); } catch(e) { return null; }
-  if (!d || typeof d !== 'object') return null;
-  const num = (v, tetto) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.min(tetto, Math.max(0, n)) : 0;
-  };
-  return {
-    voti: Math.floor(num(d.total_reviews, 1e6)),
-    media: num(d.total_rating, 5),
-    giorni: Math.floor(num(d.days, 1e5))
-  };
-}
-
 /* IL PARSER E' PURO: prende un evento e torna un ordine o null. Torna
    null — cioe' ESCLUDE — su tre cose che si riconoscono e non si
    nascondono per sbaglio: il range (due importi = due validazioni,
@@ -33514,8 +33516,7 @@ function ordineDaEvento(ev, adesso){
     premium: Number(tagValore(ev, 'premium')) || 0,
     metodi: tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean),
     scade,
-    creato: Number(ev.created_at) || 0,
-    rep: repDaTag(tagValore(ev, 'rating'))
+    creato: Number(ev.created_at) || 0
   };
 }
 
@@ -33592,14 +33593,30 @@ function passaFiltroP2P(o, f){
   }
   const p = Math.round(Number(o.premium) || 0);
   if (p < f.premioDa || p > f.premioA) return false;
-  const vuoto = filtroVuotoP2P();
-  if (f.repDa > vuoto.repDa || f.repA < vuoto.repA) {
-    const voti = o.rep ? o.rep.voti : 0;
-    if (!voti) return f.repDa <= vuoto.repDa;
-    const media = o.rep.media;
-    if (media < f.repDa || media > f.repA) return false;
-  }
   return true;
+}
+/* LA REPUTAZIONE HA UN GIUDICE SUO, e non e' pulizia: dal set 2026 la
+   media e' quella di CASA (una sola reputazione, decisione di Andrea),
+   e casa la sa solo dopo aver chiesto i VOLTI — che si chiedono per
+   gli ordini che il resto del filtro ha lasciato passare. Un giudice
+   solo li vorrebbe insieme, e allora a reputazione filtrata non
+   passerebbe nessuno (i volti non ci sono ancora), quindi non si
+   chiederebbe nessun volto, quindi non passerebbe mai nessuno: un
+   cane che si morde la coda, e muto. Da qui i DUE passi in renderP2P.
+   PURO come il fratello: prende il filtro e il volto, mai il libro.
+   ⚠️ CHI NON HA UN ACCOUNT BARATTOLO — un ordine arrivato da un altro
+   client — qui non ha stelle, e non e' «scarso»: passa solo se la
+   reputazione non e' filtrata. E' la stessa regola di chi l'account
+   ce l'ha ma non ha ancora voti: «non si sa» non e' una prova, e chi
+   chiede almeno una stella sta chiedendo una prova. */
+function passaRepP2P(f, faccia){
+  if (!f) return true;
+  const vuoto = filtroVuotoP2P();
+  if (!(f.repDa > vuoto.repDa || f.repA < vuoto.repA)) return true;
+  const voti = faccia ? (faccia.voti | 0) : 0;
+  const media = faccia ? Number(faccia.media) : 0;
+  if (!voti || !(media > 0)) return f.repDa <= vuoto.repDa;
+  return !(media < f.repDa || media > f.repA);
 }
 
 /* IL GIUDICE DEGLI «ESCLUSI A INTERVALLO» NON C'E' PIU' (set 2026,
@@ -33967,45 +33984,64 @@ function anelloScadenzaP2P(o, adesso){
    stelle nascono col primo voto, «0 ★» a chi arriva adesso fa solo
    danno) e la decisione di Andrea per questa card — niente «Senza
    voti», che riempirebbe di rumore un libro di sconosciuti. */
+/* ⚠️ LA STELLA SI RIEMPIE PER QUANTO VALE (set 2026, richiesta di
+   Andrea): una sola, e piena a meta' a 2,5 — non cinque stelle da
+   contare, e nemmeno una stella intera che mente arrotondando.
+   NIENTE `id` NELL'SVG, ed e' la riga che decide la forma: un
+   `linearGradient` o una `clipPath` vogliono un id, e in un libro
+   ci sono N card — id ripetuti, e il primo vince per tutte. Qui il
+   riempimento e' una SCATOLA che taglia: due stelle sovrapposte,
+   quella piena dentro uno `span` largo il tanto per cento giusto e con
+   `overflow:hidden`. Nessun id, nessun conflitto, e funziona ovunque.
+   LA FRAZIONE E' PURA e sta fuori dal disegno: e' l'unica cosa che
+   puo' sbagliare da sola. */
+const P2P_STELLA_D = 'M12 3.2l2.7 5.5 6 .9-4.35 4.24 1.03 6-5.38-2.83'
+  + '-5.38 2.83 1.03-6L3.3 9.6l6-.9z';
+function frazioneStellaP2P(media){
+  const n = Number(media);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(1, n / 5);
+}
+function stellaP2P(media){
+  const q = Math.round(frazioneStellaP2P(media) * 1000) / 10;
+  const disegno = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'
+    + P2P_STELLA_D + '"/></svg>';
+  return '<span class="p2p-stella">' + disegno
+    + '<span class="p2p-stella-piena" style="width:' + q + '%">'
+    + disegno + '</span></span>';
+}
+/* L'OMINO accanto al conto dei voti (set 2026, richiesta di Andrea, al
+   posto del fumetto): stesso tratto delle icone della nav — `fill:none`,
+   `stroke:currentColor`, il velo sotto — perche' e' lo stesso alfabeto
+   e due alfabeti nella stessa card si notano. */
+function icoPersonaP2P(){
+  return '<svg class="p2p-ico p2p-ico-mini" viewBox="2 2 20 20" aria-hidden="true">'
+    + '<path class="velo" d="M12 4.7a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6z"/>'
+    + '<path d="M12 4.7a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6z"/>'
+    + '<path d="M5 19.3c0-3.3 3.1-5.5 7-5.5s7 2.2 7 5.5"/></svg>';
+}
 function stellineP2P(f){
   if (!f || !(f.voti > 0) || !(f.media > 0)) return '';
-  return '⭐ ' + f.media.toLocaleString('it-IT',
-    {minimumFractionDigits: 1, maximumFractionDigits: 1})
-    + ' · 💬 ' + f.voti;
+  return stellaP2P(f.media) + ' '
+    + f.media.toLocaleString('it-IT',
+        {minimumFractionDigits: 1, maximumFractionDigits: 1})
+    + ' · ' + icoPersonaP2P() + ' ' + f.voti;
 }
-/* L'ALTRA PIAZZA HA LA SUA RIGA (set 2026, richiesta di Andrea): la
-   reputazione che il libro pubblico porta accanto a ogni ordine —
-   quanti scambi conclusi, che media, da quanto tempo — detta col ⚡ e
-   con la parola «P2P», cosi' non si traveste da stelline del
-   mercatino. «Percento di positivi» il libro NON lo porta (il tag
-   rating ha total_reviews, total_rating e days): si dice quel che si
-   sa, mai un numero ricavato per sembrare piu' netto. Senza voti si
-   dice l'unica cosa vera: da quanto e' sul circuito. I tre numeri
-   sono gia' tosati da repDaTag, quindi la stringa e' nostra. */
-function repRigaP2P(rep){
-  if (!rep) return '';
-  const eta = rep.giorni >= 1
-    ? 'da ' + rep.giorni + (rep.giorni === 1 ? ' giorno' : ' giorni')
-    : 'da oggi';
-  if (!(rep.voti > 0) || !(rep.media > 0))
-    return '⚡ Nuovo sul P2P · ' + eta;
-  const media = rep.media.toLocaleString('it-IT',
-    {minimumFractionDigits: 1, maximumFractionDigits: 1});
-  return '⚡ ' + rep.voti + (rep.voti === 1 ? ' scambio' : ' scambi')
-    + ' P2P · ⭐ ' + media + ' · ' + eta;
-}
-
-/* LA RIGA DELLA REPUTAZIONE DEL COORDINATORE E' MORTA (set 2026, coi
-   volti sul libro): la card mostra le stelline del MERCATINO, e due
-   reputazioni nello stesso posto — una nostra e una di un'altra
-   piazza, con la stessa faccia di stella — direbbero cose diverse
-   sembrando la stessa. `repTestoP2P` se n'e' andata invece di restare
-   senza chiamanti, e il giorno promesso e' arrivato (set 2026,
-   richiesta di Andrea): la voce del circuito e' rinata come
-   `repRigaP2P`, qui sotto, e vive nel DETTAGLIO che si legge prima di
-   prendere — non sulla card. IL DATO RESTA LETTO — `repDaTag` tosa
-   ancora il tag `rating` del 38383 in `o.rep` — perche' e' un fatto
-   del libro e la sua prova lo sorveglia. */
+/* ⚠️ UNA REPUTAZIONE SOLA, QUELLA DEL MERCATINO (set 2026, decisione
+   di Andrea, e vale come regola): «chi e' onesto con gli oggetti e'
+   onesto anche sul P2P». La reputazione del coordinatore e' USCITA
+   tutta — la riga del dettaglio (`repRigaP2P`), il suo lettore
+   (`repDaTag`) e il campo `rep` dell'ordine — invece di restare senza
+   chiamanti: due reputazioni nello stesso posto, con la stessa faccia
+   di stella, dicono cose diverse sembrando la stessa, e sceglierne
+   una a occhio tocca a chi legge.
+   IL FILTRO DELLA REPUTAZIONE guarda ora la media di CASA, quella dei
+   volti. CHI NON HA UN ACCOUNT BARATTOLO — un ordine arrivato da un
+   altro client — resta senza stelle e passa solo se la reputazione
+   non e' filtrata: e' la stessa regola di «non si sa non e' scarso»,
+   letta su chi qui non c'e' proprio.
+   Se un giorno servisse di nuovo, la ricetta col suo perche' sta in
+   CANTIERI («Una reputazione sola») e in git. */
 
 /* A prezzo di mercato (amt=0) i sats si STIMANO col cambio di casa e il
    premio dell'ordine: e' una stima e porta il ≈ — la cifra vera la
@@ -34137,7 +34173,7 @@ function rigaOrdineP2P(o){
     ${prezzo}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
-    ${mio ? '<div class="p2p-box p2p-tuo">👤 È il tuo ordine — tocca per aprirlo</div>' : ''}
+    ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
 }
 
@@ -34313,7 +34349,11 @@ function renderP2P(){
      IL CONTEGGIO E' QUELLO FILTRATO, sempre: un numero che contasse il
      libro intero mentre a schermo se ne vedono tre sarebbe la bugia
      piu' facile da scrivere e la piu' difficile da notare. */
-  const mostrati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));
+  /* DUE PASSI, e l'ordine conta (set 2026, con la reputazione unica):
+     prima le regole che non chiedono niente a nessuno, poi i VOLTI di
+     chi e' rimasto — che la reputazione la portano loro — e solo
+     allora la reputazione. Il perche' sta in `passaRepP2P`. */
+  const candidati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));
   /* I VOLTI si chiedono per gli ordini che si stanno per DISEGNARE, in
      sottofondo: la card nasce senza faccia e se la mette quando la
      risposta arriva. Mai bloccante — il patto del rientro istantaneo
@@ -34322,8 +34362,9 @@ function renderP2P(){
      tutto il libro vorrebbe dire domandare al server di chi sono
      ordini che nessuno vedra' — e con un filtro stretto sarebbero
      quasi tutti. Meno domande, e nessuna di piu' del necessario. */
-  chiediFacceP2P(mostrati.map(o => o.id)).then(n => { if (n) renderP2P(); })
+  chiediFacceP2P(candidati.map(o => o.id)).then(n => { if (n) renderP2P(); })
     .catch(() => {});
+  const mostrati = candidati.filter(o => passaRepP2P(p2pFiltro, p2pFacce[o.id]));
   /* IL LATO SINISTRO STA IN UNA SCATOLA SUA, e non e' cosmesi: e'
      l'appiglio che permette ai due lati di valere uguale e al
      divisorio di cadere a meta' — sotto il logo (vedi il CSS della
@@ -34508,11 +34549,13 @@ function renderFiltroP2P(){
     '<div class="section-label">Reputazione</div>' +
     doppioP2P({nome: 'Rep', min: 0, max: 5, passo: 1,
       da: b.repDa, a: b.repA, tinta: 'var(--oro,#E0A82E)', aria: 'Reputazione'}) +
-    /* la reputazione e' quella del coordinatore, e chi non ha ancora
-       voti non e' «scarso»: si dice, o un libro che si svuota a mezzo
-       punto sembra un guasto */
-    '<div class="hint">Le stelle sono quelle del circuito di scambio. ' +
-      'Chi non ha ancora ricevuto voti compare solo col minimo a 0.</div>' +
+    /* LE STELLE SONO QUELLE DEL MERCATINO (set 2026, una reputazione
+       sola), e chi non ha voti — o non e' di Barattolo — non e'
+       «scarso»: si dice, o un libro che si svuota a mezzo punto
+       sembra un guasto */
+    '<div class="hint">Le stelle sono quelle del mercatino. ' +
+      'Chi non ha ancora ricevuto voti, o non ha un account Barattolo, ' +
+      'compare solo col minimo a 0.</div>' +
     '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="azzeraFiltroP2P()">Cancella</button>' +
       '<button type="button" class="btn orange" onclick="applicaFiltroP2P()">Applica</button>' +
@@ -36671,14 +36714,12 @@ function prendiOrdineP2P(id, scelto){
   const euro = g.euro;
   const compro = riga.lato === 'sell';
   const sats = riga.sats > 0 ? fmt(riga.sats) + ' sats' : 'al prezzo di mercato';
-  /* la reputazione del circuito si legge QUI, prima di dire si': e' il
-     momento in cui serve, e la card resta alle stelline di casa */
-  const rp = repRigaP2P(riga.rep);
   chiediConferma({
     titolo: compro ? 'Compri sats?' : 'Vendi sats?',
-    testata: '<b>' + esc(fmtEur(euro)) + ' €</b> · ' + esc(sats)
-      + (rp ? '<br><span style="font-size:12.5px;color:var(--muted);font-weight:700">'
-          + rp + '</span>' : ''),
+    /* NIENTE RIGA DELLA REPUTAZIONE QUI (set 2026, una reputazione
+       sola): quella di casa sta gia' sulla card che si e' appena
+       toccata, e quella del coordinatore non esiste piu'. */
+    testata: '<b>' + esc(fmtEur(euro)) + ' €</b> · ' + esc(sats),
     corpo: compro
       ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
       : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',

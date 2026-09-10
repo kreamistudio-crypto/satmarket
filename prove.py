@@ -35593,10 +35593,19 @@ def prove_p2p_libro():
     # ⚠️ E IL NUMERO E' QUELLO FILTRATO, sempre: un conteggio sul libro
     # intero mentre a schermo se ne vedono tre sarebbe la bugia piu'
     # facile da scrivere e la piu' difficile da notare.
+    # ⚠️ DUE PASSI, e l'ordine conta (set 2026, con la reputazione
+    # unica): prima le regole che non chiedono niente a nessuno, poi i
+    # VOLTI di chi e' rimasto, e solo allora la reputazione. Un passo
+    # solo si morderebbe la coda — a filtro stretto non passa nessuno,
+    # quindi non si chiede nessun volto, quindi non passa mai nessuno.
     prova("...e il numero e' quello che si vede, non il libro intero",
-          True, "const mostrati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));" in _rp
+          True, "const candidati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));" in _rp
+          and "const mostrati = candidati.filter(o => passaRepP2P(p2pFiltro, p2pFacce[o.id]));" in _rp
           and "${mostrati.length} " in _rp
           and "mostrati.map(rigaOrdineP2P)" in _rp)
+    prova("...e i volti si chiedono PRIMA della reputazione, o non si chiedono mai",
+          True, 0 < _rp.find("chiediFacceP2P(candidati.map(o => o.id))")
+          < _rp.find("const mostrati = candidati.filter"))
     # --- LA PILLOLA STA SOTTO IL LOGO (set 2026, ritocco di Andrea) ---
     # ⚠️ NON BASTA CENTRARE LA PILLOLA: i due lati hanno larghezze
     # diverse — «Filtro» da una parte, «N offerte» dall'altra, e il
@@ -35658,6 +35667,33 @@ def prove_p2p_libro():
     # alto mentre si legge e' il numero vero di una cosa non chiesta
     prova("...e in attesa del libro la testata resta vuota", True,
           "if (testaBox) testaBox.innerHTML = '';" in _rp)
+    # --- I RITOCCHI DEL 10 SET (chiesti da Andrea) --------------------
+    # L'ARIA SOTTO LA PILLOLA sta DENTRO il blocco attaccato, e non e' un
+    # margine della card: dev'essere fondo DIPINTO, o da attaccati le
+    # prime card si vedrebbero passare in quello spazio.
+    prova("sotto la pillola c'e' aria, dentro il blocco attaccato", True,
+          "padding-bottom:8px" in pezzo_js(mini, "  .p2p-sticky{", "}"))
+    # LA RIGA DEL PROPRIO ORDINE resta senza icona: la scritta basta
+    # ⚠️ SI GUARDA LA CARD, non il file: il 👤 vive legittimamente nel
+    # foglio del profilo e nei due recapiti — cercarlo in `mini` fa
+    # rispondere il vicino (la trappola di sempre).
+    _riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    prova("«E' il tuo ordine» non porta piu' un'icona", True,
+          '<div class="p2p-box p2p-tuo">È il tuo ordine' in _riga
+          and "👤" not in _riga)
+    # LA STELLA: due disegni sovrapposti, e a tagliare e' la scatola
+    _st = pezzo_js(mini, "  .p2p-stella{", "}")
+    prova("la stella e' una scatola che taglia, non un gradiente", True,
+          "position:relative" in _st
+          and "overflow:hidden" in pezzo_js(mini, "  .p2p-stella-piena{", "}")
+          # ...e si guarda il DISEGNO, non il file: una `clipPath` con id
+          # vive gia' nel lucchetto della cassa, e li' va benissimo
+          and "linearGradient" not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n")
+          and "clipPath" not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
+    # il disegno vive in UNA costante: due stelle diverse sarebbero due
+    # stelle diverse
+    prova("il disegno della stella e' scritto una volta sola", 1,
+          mini.count("const P2P_STELLA_D = "))
     # e la pillola si VESTE quando restringe: senza, il libro corto
     # sembrerebbe un libro vuoto
     prova("...e si veste solo quando il filtro restringe davvero", True,
@@ -35842,16 +35878,22 @@ def prove_p2p_libro():
     esc_js = mini[k:mini.index(";\n", k) + 1]
     # la valuta si LEGGE dal client e non si ribatte qui: e' la stessa
     # su cui `intervalloP2P` decide, e due copie direbbero due cose
+    # il disegno della stella e' una costante del client: si porta
+    # dentro invece di ribatterla, che due stelle diverse sarebbero
+    # due stelle diverse
+    i_st = mini.index("const P2P_STELLA_D = ")
+    stella_js = mini[i_st:mini.index(";", mini.index("z';", i_st))]
     j_val = mini.index("const P2P_VALUTA = ")
     val_js = mini[j_val:mini.index(";", j_val) + 1]
-    pezzi = [esc_js, val_js] + [pezzo_js(mini, f) for f in (
+    pezzi = [esc_js, val_js, stella_js] + [pezzo_js(mini, f) for f in (
         "function contaFeedback(n, persone){",
         "function tagValore(ev, nome){",
-        "function repDaTag(s){",
         "function ordineDaEvento(ev, adesso){",
+        # la stella che si RIEMPIE (set 2026) e i suoi due pezzi puri
+        "function frazioneStellaP2P(media){",
+        "function stellaP2P(media){",
+        "function icoPersonaP2P(){",
         "function stellineP2P(f){",
-        # la riga dell'altra piazza (set 2026): rinata nel dettaglio
-        "function repRigaP2P(rep){",
         "function infoDaEvento(ev){",
         "function scadeTestoP2P(scade){",
         # l'anello della scadenza (set 2026) e il suo giudice puro
@@ -35877,7 +35919,10 @@ def prove_p2p_libro():
         # relay
         "function filtroVuotoP2P(){",
         "function filtroAccesoP2P(f){",
-        "function passaFiltroP2P(o, f){")]
+        "function passaFiltroP2P(o, f){",
+        # la reputazione ha un giudice suo da quando la media e' quella
+        # di casa: la sa il VOLTO, non l'ordine
+        "function passaRepP2P(f, faccia){")]
     # la fascia del premio, che `filtroVuotoP2P` legge: dal client, mai
     # ribattuta qui
     i_pm = mini.index("const P2P_PREMIO_MAX = ")
@@ -35956,19 +36001,20 @@ out.rigaMercato = rigaOrdineP2P(out.mercato);
    si valuta davvero — con `premium` pieno il ternario non ci arriva. */
 out.mercatoZero = ordineDaEvento(ev(38383, [['d','ord-2z'],['k','buy'],['f','eur'],['s','pending'],['amt','0'],['fa','50'],['pm','Bonifico'],['expires_at', String(ora+90000)]]), ora);
 out.rigaMercatoZeroVivo = rigaOrdineP2P(out.mercatoZero);
-/* LA REPUTAZIONE: il tag `rating` lo scrive il NOSTRO coordinator, ma
-   passa da relay di terzi — quindi si prova anche storto e assente. */
-const conRep = t => ordineDaEvento(ev(38383, [['d','rep-'+t.length],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['rating', t]]), ora);
-out.repPiena  = conRep('{"total_reviews": 7, "total_rating": 4.6, "days": 23}');
-out.repUno    = conRep('{"total_reviews": 1, "total_rating": 5, "days": 2}');
-out.repZero   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 1}');
-out.repOggi   = conRep('{"total_reviews": 0, "total_rating": 0, "days": 0.4}');
-out.repFuori  = conRep('{"total_reviews": 3, "total_rating": 999, "days": -5}');
-out.repStorta = conRep('{non sono json');
-/* LE STELLINE ORA SONO QUELLE DEL MERCATINO (set 2026, i volti sul
-   libro): la reputazione del coordinatore non si mostra piu' — resta
-   LETTA (il tag `rating` qui sopra) e basta. Il giudice nuovo lavora
-   sul volto che arriva dal server. */
+/* UNA REPUTAZIONE SOLA, QUELLA DEL MERCATINO (set 2026, decisione di
+   Andrea): quella del coordinatore non si legge nemmeno piu'. E LA
+   STELLA SI RIEMPIE per quanto vale: la frazione e' pura e si prova
+   da sola, il disegno si guarda per quel che porta. */
+out.frazioni = [frazioneStellaP2P(2.5), frazioneStellaP2P(4.8),
+                frazioneStellaP2P(5), frazioneStellaP2P(0),
+                frazioneStellaP2P(-1), frazioneStellaP2P(7),
+                frazioneStellaP2P('storta'), frazioneStellaP2P(null)];
+out.stellaMeta = stellaP2P(2.5);
+out.stellaQuasi = stellaP2P(4.8);
+/* ⚠️ NESSUN `id` NEL DISEGNO: in un libro ci sono N card, e un id
+   ripetuto fa vincere il primo per tutte. */
+out.stellaSenzaId = stellaP2P(3) + stellaP2P(4);
+out.omino = icoPersonaP2P();
 out.stelPiene = stellineP2P({nome: 'Ada', avatar: '', media: 4.8, voti: 12});
 out.stelUno   = stellineP2P({nome: 'Ada', avatar: '', media: 5, voti: 1});
 out.stelZero  = stellineP2P({nome: 'Ada', avatar: '', media: 0, voti: 0});
@@ -35989,14 +36035,6 @@ p2pFacce = {[out.fisso.id]: {nome: 'Ada', avatar: 'av_x.jpg',
                              media: 4.8, voti: 12, negozio: 'ab12cd34'}};
 out.rigaFacciaPorta = rigaOrdineP2P(out.fisso);
 p2pFacce = {};
-/* LA RIGA DELL'ALTRA PIAZZA (set 2026): quel che repDaTag ha tosato
-   diventa una frase — mai «percento di positivi», che il tag non
-   porta. Senza voti si dice l'unica cosa vera: da quanto e' li'. */
-out.repRigaPiena  = repRigaP2P({voti: 7, media: 4.6, giorni: 23});
-out.repRigaUno    = repRigaP2P({voti: 1, media: 5, giorni: 1});
-out.repRigaNuovo  = repRigaP2P({voti: 0, media: 0, giorni: 3});
-out.repRigaOggi   = repRigaP2P({voti: 0, media: 0, giorni: 0});
-out.repRigaNiente = repRigaP2P(null);
 /* IL RANGE (set 2026, il ridisegno): due importi crescenti sono un
    ordine come gli altri — la card lo dice — e i rotti restano rotti. */
 out.rangeInvertito = ordineDaEvento(ev(38383, [['d','ri'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','100','50'],['pm','x']]), ora);
@@ -36031,8 +36069,7 @@ out.ordNonTocca = mazzo.map(x => x.id).join('');
    confronta per CONTENIMENTO (sul libro arriva testo libero degli altri
    client) e chi non ha ancora voti. */
 const vuoto = filtroVuotoP2P();
-const con = (o) => Object.assign({fiat: 'EUR', metodi: ['SEPA'], premium: 0,
-                                  rep: {voti: 7, media: 4.6, giorni: 23}}, o);
+const con = (o) => Object.assign({fiat: 'EUR', metodi: ['SEPA'], premium: 0}, o);
 const filtro = (o) => Object.assign(filtroVuotoP2P(), o);
 out.filtroSpentoNonFiltra = passaFiltroP2P(con({}), null);
 out.filtroVuotoNonFiltra = passaFiltroP2P(con({premium: 9}), vuoto);
@@ -36059,16 +36096,22 @@ out.valutaSua = passaFiltroP2P(con({fiat: 'EUR'}), filtro({valute: ['EUR']}));
 out.premioDentro = passaFiltroP2P(con({premium: 3}), filtro({premioDa: 0, premioA: 5}));
 out.premioSulFilo = passaFiltroP2P(con({premium: 5}), filtro({premioDa: 0, premioA: 5}));
 out.premioFuori = passaFiltroP2P(con({premium: 6}), filtro({premioDa: 0, premioA: 5}));
-/* ⚠️ CHI NON HA VOTI passa solo col minimo a ZERO: media 0 con zero
+/* LA REPUTAZIONE HA UN GIUDICE SUO e legge il VOLTO, che e' la media
+   del MERCATINO (set 2026, una reputazione sola).
+   ⚠️ CHI NON HA VOTI passa solo col minimo a ZERO: media 0 con zero
    voti non vuol dire «scarso», vuol dire «non si sa» — ma chi chiede
    almeno una stella sta chiedendo una prova, e «non si sa» non lo e'. */
-out.repSenzaVotiMinZero = passaFiltroP2P(con({rep: {voti: 0, media: 0, giorni: 1}}),
-  filtro({repA: 4}));
-out.repSenzaVotiMinUno = passaFiltroP2P(con({rep: {voti: 0, media: 0, giorni: 1}}),
-  filtro({repDa: 1}));
-out.repNiente = passaFiltroP2P(con({rep: null}), filtro({repDa: 1}));
-out.repAlta = passaFiltroP2P(con({rep: {voti: 7, media: 4.6, giorni: 3}}), filtro({repDa: 4}));
-out.repBassa = passaFiltroP2P(con({rep: {voti: 2, media: 3, giorni: 3}}), filtro({repDa: 4}));
+out.filtroNonGuardaRep = passaFiltroP2P(con({}), filtro({repDa: 5}));
+out.repFiltroSpento = passaRepP2P(null, null);
+out.repNonFiltrata = passaRepP2P(vuoto, null);
+out.repSenzaVotiMinZero = passaRepP2P(filtro({repA: 4}), {media: 0, voti: 0});
+out.repSenzaVotiMinUno = passaRepP2P(filtro({repDa: 1}), {media: 0, voti: 0});
+/* CHI NON HA UN ACCOUNT BARATTOLO non ha volto: stessa regola */
+out.repSenzaFaccia = passaRepP2P(filtro({repDa: 1}), null);
+out.repSenzaFacciaLibera = passaRepP2P(filtro({repA: 4}), null);
+out.repAlta = passaRepP2P(filtro({repDa: 4}), {media: 4.6, voti: 7});
+out.repBassa = passaRepP2P(filtro({repDa: 4}), {media: 3, voti: 2});
+out.repSulFilo = passaRepP2P(filtro({repDa: 4}), {media: 4, voti: 2});
 
 /* L'ANELLO DELLA SCADENZA: il giudice puro sui casi che contano —
    l'orologio si passa, cosi' non dipende da quando gira il banco */
@@ -36382,25 +36425,36 @@ console.log(JSON.stringify(out));
           and "≈" in out["rigaMercatoZeroVivo"])
 
     # --- 8) CHI C'E' DALL'ALTRA PARTE ------------------------------
-    # Il tag `rating` lo scrive il NOSTRO coordinator (mostrod lo mette
-    # sul 38383 dal profilo dell'utente) ed e' l'unico numero della
-    # pagina che non sia auto-dichiarato. Fino a ieri si scaricava e si
-    # buttava: `ordineDaEvento` non lo leggeva affatto.
-    r = out["repPiena"]["rep"]
-    prova("il tag rating si legge: voti, media, giorni", True,
-          r is not None and r["voti"] == 7 and r["media"] == 4.6
-          and r["giorni"] == 23)
-    prova("...e con la media fuori scala si CLAMPA a 5", 5,
-          out["repFuori"]["rep"]["media"])
-    prova("...e i giorni negativi valgono zero", 0,
-          out["repFuori"]["rep"]["giorni"])
-    # UN `rating` STORTO NON DEVE FAR SPARIRE L'ORDINE DAL LIBRO: e'
-    # una stringa che passa da relay di terzi, e il JSON.parse sta
-    # dentro un try apposta — l'ordine resta, la striscia non si scrive.
-    prova("un rating malformato non toglie l'ordine dal libro", True,
-          out["repStorta"] is not None and out["repStorta"]["rep"] is None)
-    prova("...e senza il tag la reputazione e' semplicemente assente",
-          None, out["fisso"]["rep"])
+    # ⚠️ UNA REPUTAZIONE SOLA, QUELLA DEL MERCATINO (set 2026, decisione
+    # di Andrea, e vale come regola: «chi e' onesto con gli oggetti e'
+    # onesto anche sul P2P»). La reputazione del coordinatore e' USCITA
+    # tutta — la riga del dettaglio, il suo lettore `repDaTag` e il
+    # campo `rep` dell'ordine — invece di restare senza chiamanti: due
+    # reputazioni nello stesso posto, con la stessa faccia di stella,
+    # dicono cose diverse sembrando la stessa.
+    prova("del lettore della reputazione del coordinatore non resta niente",
+          [0, 0], [mini.count("repDaTag("), mini.count("repRigaP2P(")])
+    prova("...e l'ordine del libro non porta piu' un campo `rep`", True,
+          "rep: repDaTag" not in mini
+          and "creato: Number(ev.created_at) || 0\n  };" in mini)
+    # LA STELLA SI RIEMPIE PER QUANTO VALE: 2,5 -> meta', 4,8 -> quasi
+    # piena. La frazione e' pura, e i tre casi che sbagliano da soli
+    # sono lo zero, il fuori scala e il non-numero.
+    prova("la stella si riempie in proporzione, e non esce mai dai capi",
+          [0.5, 0.96, 1, 0, 0, 1, 0, 0], out["frazioni"])
+    prova("...e la larghezza finisce nel disegno", True,
+          "width:50%" in out["stellaMeta"] and "width:96%" in out["stellaQuasi"])
+    # ⚠️ NESSUN `id`: in un libro ci sono N card, e un `linearGradient` o
+    # una `clipPath` vorrebbero un id — ripetuto, il primo vince per
+    # tutte. Il riempimento e' una SCATOLA che taglia.
+    prova("...senza nessun id, che in un libro si ripeterebbe", True,
+          "id=" not in out["stellaSenzaId"]
+          and out["stellaSenzaId"].count("p2p-stella-piena") == 2)
+    # L'OMINO al posto del fumetto: stesso tratto delle icone della nav
+    prova("l'omino e' un'icona a tratto come quelle della nav", True,
+          'class="p2p-ico p2p-ico-mini"' in out["omino"]
+          and 'class="velo"' in out["omino"]
+          and "<circle" not in out["omino"])
     # ROVESCIATA (set 2026, i volti sul libro): la card non mostra piu'
     # la reputazione del COORDINATORE ma le stelline del MERCATINO —
     # due reputazioni nello stesso posto, con la stessa faccia di
@@ -36415,16 +36469,19 @@ console.log(JSON.stringify(out));
     # dettaglio della presa: i suoi casi girano qui sopra)
     prova("la vecchia riga della card (repTestoP2P) resta morta", True,
           "function repTestoP2P(" not in mini)
-    prova("...ma il tag `rating` si legge ancora, che e' un fatto",
-          True, "repDaTag" in mini)
-    # LE STELLINE DEL MERCATINO: «⭐ 4,8 · 💬 12», l'icona al posto
-    # della parola. Senza voti la riga non c'e' PROPRIO — la regola di
+    # LE STELLINE DEL MERCATINO: la stella riempita, la media, l'omino
+    # e il conto. Senza voti la riga non c'e' PROPRIO — la regola di
     # casa (le stelle nascono col primo voto) e la decisione di Andrea
     # per questa card: niente «Senza voti» in un libro di sconosciuti.
-    prova("le stelline sono la media e il conto, con l'icona",
-          "⭐ 4,8 · 💬 12", out["stelPiene"])
-    prova("...e a un voto solo la forma non cambia",
-          "⭐ 5,0 · 💬 1", out["stelUno"])
+    prova("le stelline sono la stella riempita, la media e il conto", True,
+          "width:96%" in out["stelPiene"] and " 4,8 · " in out["stelPiene"]
+          and "p2p-ico-mini" in out["stelPiene"]
+          and out["stelPiene"].endswith(" 12"))
+    prova("...e le due faccine di ieri non ci sono piu'", True,
+          "⭐" not in out["stelPiene"] and "💬" not in out["stelPiene"])
+    prova("...e a un voto solo la forma non cambia", True,
+          "width:100%" in out["stelUno"] and " 5,0 · " in out["stelUno"]
+          and out["stelUno"].endswith(" 1"))
     prova("senza voti la riga non si scrive proprio", ["", ""],
           [out["stelZero"], out["stelNiente"]])
     # IL VOLTO ENTRA NELL'ANELLO, e senza volto la card resta quella
@@ -36455,18 +36512,6 @@ console.log(JSON.stringify(out));
     prova("...e senza negozio resta un volto", True,
           "apriNegozioP2P" not in out["rigaConFaccia"]
           and "p2p-faccia" in out["rigaConFaccia"])
-    # LA RIGA DELL'ALTRA PIAZZA: il ⚡ e la parola «P2P» la tengono
-    # distinta dalle stelline del mercatino, e i numeri sono frasi.
-    prova("la riga P2P dice scambi, media ed eta'",
-          "⚡ 7 scambi P2P · ⭐ 4,6 · da 23 giorni", out["repRigaPiena"])
-    prova("...e al singolare parla al singolare",
-          "⚡ 1 scambio P2P · ⭐ 5,0 · da 1 giorno", out["repRigaUno"])
-    prova("senza voti si dice solo da quanto e' li'",
-          "⚡ Nuovo sul P2P · da 3 giorni", out["repRigaNuovo"])
-    prova("...e chi e' appena arrivato e' «da oggi»",
-          "⚡ Nuovo sul P2P · da oggi", out["repRigaOggi"])
-    prova("senza tag rating la riga non si scrive", "",
-          out["repRigaNiente"])
 
     # --- IL FILTRO DEL LIBRO (set 2026, richiesta di Andrea) --------
     # Quattro leve su un foglio che si apre dalla pillola sotto i tab.
@@ -36498,16 +36543,27 @@ console.log(JSON.stringify(out));
     # col minimo a zero e sparisce appena si chiede una stella, perche'
     # chi la chiede sta chiedendo una PROVA. E' una scelta, non una
     # conseguenza: per questo ha una riga sua nel foglio.
+    # ⚠️ IL GIUDICE DELLA REPUTAZIONE E' UN ALTRO, e legge il VOLTO: la
+    # media e' quella del MERCATINO, e l'ordine non la porta.
+    prova("il giudice del libro non guarda piu' la reputazione", True,
+          out["filtroNonGuardaRep"])
+    prova("...e a filtro spento o non filtrata passano tutti", [True, True],
+          [out["repFiltroSpento"], out["repNonFiltrata"]])
     prova("chi non ha voti passa col minimo a zero", True,
           out["repSenzaVotiMinZero"])
-    prova("...e sparisce appena si chiede una stella", [False, False],
-          [out["repSenzaVotiMinUno"], out["repNiente"]])
-    prova("...e la media filtra chi i voti ce li ha", [True, False],
-          [out["repAlta"], out["repBassa"]])
-    # ...e la riga vive nel DETTAGLIO della presa, non sulla card
+    prova("...e sparisce appena si chiede una stella", False,
+          out["repSenzaVotiMinUno"])
+    # ⚠️ CHI NON HA UN ACCOUNT BARATTOLO — un ordine di un altro client
+    # — non ha volto: stessa regola, passa solo se la reputazione non
+    # e' filtrata. E' la decisione di Andrea, scritta.
+    prova("chi non e' di Barattolo passa solo se non si filtra",
+          [False, True], [out["repSenzaFaccia"], out["repSenzaFacciaLibera"]])
+    prova("...e la media filtra chi i voti ce li ha", [True, False, True],
+          [out["repAlta"], out["repBassa"], out["repSulFilo"]])
+    # ...e il DETTAGLIO della presa non nomina piu' l'altra piazza
     _po = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
-    prova("il dettaglio della presa porta la riga P2P", True,
-          "repRigaP2P(riga.rep)" in _po and "+ rp +" in _po)
+    prova("il dettaglio della presa non porta piu' una riga P2P", True,
+          "repRigaP2P" not in _po and "+ rp +" not in _po)
     prova("...e la card no", False,
           "repRigaP2P" in pezzo_js(mini, "function rigaOrdineP2P(o){"))
 
