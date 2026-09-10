@@ -23342,18 +23342,24 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   schermo e quel che è partito non possono divergere. È pura perché è
   l'unico modo di provarla: come per la firma, sbagliando questi campi
   **il coordinatore non risponde un errore — tace**.
-  ⚠️ L'EURO È UN INTERO, ed è del protocollo: `fiat_amount` viaggia
-  intero e i decimali non esistono. Il giudice è `euroInteroP2P` — PURO
-  e uno solo per i tre posti in cui si scrive una cifra (il giudice del
-  bottone, il payload, l'importo scelto dentro un intervallo) — e a
-  cifra storta DICE «Solo importi interi in euro» invece di troncare:
-  un `Math.floor` muto faceva partire 5 da un «5,5» scritto, e da un
-  «5,5» non filtrato dal campo faceva partire `"fiat_amount":null`
-  (NaN), cioè una busta a cui mostrod non risponde affatto. I campi
-  sono `inputmode="numeric"` con `step="1"`, e `testoCampoNumero` legge
-  il `validity.badInput` perché un `<input type=number>` che contiene
-  una virgola risponde `value === ''` — «vuoto» e «virgola» arriverebbero
-  identici. Il verbale in CANTIERI, «L'euro è un intero».
+  ⚠️ EURO E SATS SONO INTERI, ed è del protocollo: `fiat_amount` e
+  `amount` viaggiano interi e i decimali non esistono. LA REGOLA VIVE
+  NEL CAMPO, non in un messaggio: i quattro campi che portano una cifra
+  (importo, massimo, sats a prezzo fisso, importo scelto dentro un
+  intervallo) sono `type="text"` + `inputmode="numeric"` con
+  `soloCifreP2P` su `beforeinput`, che ferma il carattere PRIMA che
+  entri, più `ripuliCifreP2P` come rete dove `beforeinput` non arriva
+  (e lì tiene il cursore). ⚠️ `type="number"` NON PUÒ ESSERCI: con
+  dentro «5,5» risponde `value === ''` e alza `validity.badInput` — il
+  testo vero non arriva a chi vorrebbe filtrarlo — e `setSelectionRange`
+  ci alza sopra.
+  IL GIUDICE `interoP2P` RESTA COME GUARDIA DEL FILO, ed è fail-closed:
+  a cifra storta vale ZERO, mai «quel che ci somiglia». Un ordine da 0
+  il coordinatore lo rifiuta; uno da 5 al posto di 5,5 lo ESEGUE. Prima
+  della cura un `Math.floor` muto faceva partire 5 da un «5,5» scritto,
+  e da un «5,5» non filtrato `"fiat_amount":null` (NaN), cioè una busta
+  a cui mostrod non risponde affatto. Il verbale in CANTIERI, «L'euro è
+  un intero», con l'emendamento della sera.
   I METODI DI PAGAMENTO SONO UNA STRINGA SOLA separata da virgole:
   `nip33.rs` la spezza nei valori del tag `pm`, ed è così che il nostro
   lettore li ritrova. La selezione multipla non è una comodità nostra.

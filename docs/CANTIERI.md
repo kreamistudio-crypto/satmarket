@@ -8620,3 +8620,59 @@ tastiera è già `numeric`, quindi la virgola lì non la offre nessuno).
 Non è entrato in questo giro perché la richiesta era sull'euro e il
 messaggio dice «in euro»: il giorno che si fa, il giudice è già
 scritto e serve solo la sua frase.
+
+⚠️ E QUELLA STRADA È STATA CAMBIATA LA SERA STESSA (decisione di
+Andrea): «come Mostro — la virgola e il punto non si scrivono proprio
+nel campo; il tasto non produce nulla, solo cifre entrano. Niente
+messaggio da mostrare». Ed è meglio, per una ragione che vale oltre
+questo campo: un messaggio è un errore da leggere, capire e
+correggere, mentre un tasto che non produce niente non è un errore —
+è un campo che si comporta come dice di comportarsi. Il messaggio
+«Solo importi interi in euro» è uscito con la sua costante e con il
+sentinella della virgola.
+⚠️ E `type="number"` È USCITO CON LUI, che è la metà che non si vede:
+un campo numerico NON SI PUÒ FILTRARE. Con dentro «5,5» risponde
+`value === ''` e alza `validity.badInput`, quindi il testo vero non
+arriva mai a chi vorrebbe ripulirlo; e `setSelectionRange` — che serve
+a non far saltare il cursore in fondo a ogni tasto — su un `number`
+ALZA. `type="text"` + `inputmode="numeric"` tiene la tastiera dei
+numeri e rende il testo leggibile: è l'unico impianto in cui «solo
+cifre entrano» si può davvero garantire. Il CSS non se ne accorge:
+`.p2p-sez` stila già `input[type=text]` accanto a `input[type=number]`,
+e il campo della presa è stilato per tag.
+DUE PEZZI, e servono tutti e due. `soloCifreP2P` su `beforeinput`
+arriva PRIMA che il carattere entri e lo ferma; `ripuliCifreP2P` è la
+RETE per le strade che `beforeinput` non copre (un browser che non ce
+l'ha, una composizione IME, un valore messo da fuori) e lì ripulisce
+invece di rifiutare — il carattere è già dentro, e l'alternativa
+sarebbe lasciarcelo — tenendo il cursore dov'era meno quel che gli è
+stato tolto davanti.
+UN INCOLLA STORTO SI RIFIUTA INTERO e non si ripulisce: da «1,5»
+incollato uscirebbe «15», cioè dieci volte il numero voluto. Meglio
+niente che un altro numero — è la stessa regola del troncamento muto,
+letta dall'altro lato.
+⚠️ MA BATTUTO A MANO «5,5» DIVENTA «55», e va detto perché è il prezzo
+di questa strada: la virgola non entra, e la cifra dopo si attacca
+alla prima. Misurato. È il comportamento di ogni campo solo-cifre, ed
+è comunque meglio del difetto di partenza — il campo mostra SEMPRE
+esattamente quel che partirà, mentre prima mostrava 5,5 e spediva 5.
+Sul telefono la tastiera `numeric` non ha nemmeno il tasto della
+virgola, quindi ci vuole una tastiera vera per arrivarci. Se un giorno
+desse fastidio, la cura non è rimettere il messaggio: è la conferma
+prima di pubblicare, che oggi non c'è.
+E VALE ANCHE PER I SATS a prezzo fisso (stessa decisione, stesso
+giro): stesso filtro sul campo e stesso giudice: `Math.floor` era lì
+identico. Per questo il giudice non si chiama più `euroInteroP2P` — di
+euro non sa niente, sa di interi — e il campo che restava fuori dalla
+cura del mattino è rientrato.
+NIENTE TETTO ALL'IMPORTO, chiesto esplicitamente da Andrea: la cifra
+enorme resta possibile e resta fuori da questo giro.
+COLLAUDATI: **8994 prove verdi, 0 rosse** (+1 netta: la cura toglie il
+vecchio impianto mentre aggiunge il filtro) e **18 MUTAZIONI, 18
+uccise** — il filtro che lascia passare tutto, che ferma anche le
+cifre, che ripulisce l'incolla invece di rifiutarlo, che esplode senza
+evento; la rete che non ripulisce e quella che manda il cursore in
+fondo; il giudice che accetta i decimali e quello che si fida di
+`Number`; il troncamento che torna sul filo, nel giudice, sui sats e
+sulla presa; i quattro campi che tornano `number` o perdono il filtro;
+il foglio e la presa che leggono senza la rete.
