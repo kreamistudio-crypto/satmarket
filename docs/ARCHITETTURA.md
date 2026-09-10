@@ -23485,6 +23485,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   media di casa con la STELLA CHE SI RIEMPIE (`stellaP2P`: due disegni
   sovrapposti e una scatola che taglia — mai un `id`, che in un libro
   si ripeterebbe su N card) e l'omino a tratto accanto al conto.
+  ⚠️ LA CLASSE È `p2p-rep-stella` E NON `p2p-stella`: quest'ultima è dei
+  cinque bottoni del foglio del voto, e mescolandosi li aveva ridotti a
+  16x14 px. E l'omino vuole `.p2p-ico.p2p-ico-mini` (due classi), o
+  `.p2p-ico`, che sta più in basso nel foglio, gli rimette 22px.
   IL FILTRO DELLA REPUTAZIONE ha un giudice suo, `passaRepP2P(f,
   faccia)`, perché la media la sa il VOLTO e non l'ordine: `renderP2P`
   filtra in DUE PASSI — prima `passaFiltroP2P` (valute, metodi,

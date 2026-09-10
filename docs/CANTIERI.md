@@ -8833,3 +8833,46 @@ non prova il verde: lo prova il codice d'uscita**, ed è la stessa
 lezione che poche ore prima aveva salvato la tortura (baseline a exit 1
 con zero rosse). Da qui la guardia esplicita nel banco della tortura,
 che si ferma e lo dice invece di contare uccisioni finte.
+
+TRE TARATURE, E DUE COLLISIONI DI CSS TROVATE MISURANDOLE (10 set
+2026). Le tarature erano piccole — meno aria sotto la pillola (8→5px),
+la stella della card più grande (14→17px), l'omino più piccolo
+(14→12px) — e sono servite a scoprire due difetti che una taratura a
+occhio non avrebbe mai mostrato.
+⚠️ PRIMA COLLISIONE, ED ERA UN DIFETTO GIÀ IN PRODUZIONE: la stella
+della card si chiamava `.p2p-stella`, e QUELLA CLASSE ESISTEVA GIÀ —
+sono i cinque bottoni-stella del foglio del voto, trecento righe più
+giù. Stessa classe, stessa specificità: le due regole si mescolavano.
+La nostra sta PRIMA e fissa `width`/`height`, quindi vinceva su quelle
+misure e **i bottoni del voto erano diventati scatole da 16x14 px con
+dentro un glifo da 34** (misurato dal vivo, non dedotto). Nell'altro
+verso i bottoni passavano alla stella della card il loro `padding`, il
+`cursor:pointer` e l'ingrandimento all'hover. Curato col NOME —
+`p2p-rep-stella` — e non alzando la specificità: una regola più forte
+avrebbe curato un verso solo, lasciando la mescolanza dov'era. Dopo la
+cura i bottoni tornano **44x42**. La sentinella adesso è doppia: la
+stella della card non usa quella classe, e i bottoni del voto restano
+i soli a portarla.
+⚠️ SECONDA COLLISIONE, e la taratura non arrivava affatto: l'omino
+porta `class="p2p-ico p2p-ico-mini"`, e `.p2p-ico` — che fissa 22px —
+sta PIÙ IN BASSO nel foglio. Stessa specificità, vince chi viene dopo:
+la riga `.p2p-ico-mini{width:12px}` non faceva NIENTE, e l'omino
+restava 22px com'era sempre stato. Scritta `.p2p-ico.p2p-ico-mini`
+(due classi battono una) la misura arriva: **12x12** misurato.
+LA LEZIONE È UNA SOLA E VALE OLTRE IL CSS: due regole con la stessa
+specificità si decidono per POSIZIONE nel file, e la posizione non è
+una cosa che si vede leggendo la regola che si sta scrivendo. Una
+classe nuova si cerca PRIMA di usarla (`grep`), e una misura scritta
+si RILEGGE dal vivo — «l'ho scritta» non è «è arrivata».
+E LA SENTINELLA DELL'ARIA NON INCHIODA PIÙ IL NUMERO: guardava
+`padding-bottom:8px` e sarebbe diventata rossa a ogni ritocco di
+Andrea senza dire niente di vero. Adesso guarda che l'aria ci SIA
+dentro il blocco — cioè che sia fondo dipinto e non margine della
+prima card — e il quanto resta una taratura. Stessa cura per le due
+misure delle icone: la sentinella afferma che la stella è più grande
+dell'omino, che è la cosa chiesta, invece di due numeri inchiodati.
+MISURATO DAL VIVO su un libro finto a 375px: stella 17x17, omino
+12x12, i due sulla stessa riga (centri a 0,5px), aria sotto la pillola
+15px in tutto (5 del blocco più 10 del margine della pillola), e i
+riempimenti a 50%, 96%, 100%.
+COLLAUDATI: **9019 prove verdi, 0 rosse** (+3).
