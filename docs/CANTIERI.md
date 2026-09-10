@@ -8081,9 +8081,20 @@ vieta, e scritta dentro il render la farebbe rossa. Il colore passa da
 `.ico-valuta`, `.ico-importo`, `.ico-metodi`, `.ico-prezzo`,
 `.ico-sats` — che è anche il posto dove le cinque coppie si leggono una
 sotto l'altra.
-E IL DOLLARO È DISEGNATO A TRATTO (scelta di Andrea: «il simbolo del
-dollaro come c'è adesso ma più elegante»): il segno resta quello, se ne
-va solo l'emoji.
+E IL DOLLARO È IL GLIFO DEL CARATTERE DI CASA (scelta di Andrea: «il
+simbolo del dollaro come c'è adesso ma più elegante»). Il primo giro
+l'aveva DISEGNATO a tratto come le altre quattro, e a schermo si vedeva
+il perché non va: il «$» è un segno TIPOGRAFICO — ha un'asta, una
+larghezza e un peso che il font ha già risolto — e ridisegnarlo
+significa rifare peggio una cosa fatta. Le altre quattro restano
+disegni per la ragione opposta: un globo, una banconota, una carta e un
+fulmine il carattere non li ha.
+STA NELLO STESSO TONDO e ne prende il colore, ma non la misura: un
+glifo e un tratto da un pixel e mezzo non pesano uguale a parità di
+altezza, quindi il «$» si accorda all'occhio con le vicine. Il
+`line-height:1` toglie l'interlinea, che dentro un `place-items:center`
+lo lascerebbe sotto il centro — misurato a zero su tutt'e due gli
+assi.
 
 5) LA BARRA DEL PREMIO SI ACCENDE FINO AL PALLINO. Prima era tutta
 arancione e a dire «dove sono» c'era solo il pallino; adesso è accesa
@@ -8120,3 +8131,203 @@ un campo solo, le cinque icone a tratto nelle loro tinte tenui, il
 binario che si riempie a −4% e a +6% col pallino esattamente sul
 confine, e il foglio che a `--tastiera` 300px resta col bordo alto a
 zero.
+
+Il «$», la barra dal centro e la pillola che si tocca (set 2026, tre
+ritocchi arrivati in coda ai cinque del giorno, guardati dal vivo da
+Andrea). Due EMENDANO decisioni scritte poche ore prima, ed è la parte
+da leggere: erano giuste sulla carta e sbagliate a schermo.
+
+1) IL «$» È IL GLIFO DEL CARATTERE DI CASA, non un disegno. Il giro
+prima l'aveva disegnato a tratto come le altre quattro icone — coerente
+per costruzione — e a schermo si vede il perché non regge: il dollaro è
+un segno TIPOGRAFICO, ha un'asta, una larghezza e un peso che il font ha
+già risolto, e ridisegnarlo significa rifare peggio una cosa fatta. Le
+altre quattro restano disegni per la ragione opposta: un globo, una
+banconota, una carta e un fulmine il carattere non li ha.
+STA NELLO STESSO TONDO e ne prende il colore, ma NON la misura: un
+glifo e un tratto da un pixel e mezzo non pesano uguale a parità di
+altezza, quindi il «$» si accorda all'occhio con le vicine. Il
+`line-height:1` toglie l'interlinea, che dentro un `place-items:center`
+lo lascerebbe sotto il centro — misurato a zero su tutt'e due gli assi.
+LA REGOLA CHE NE RESTA: un'icona si disegna quando il carattere non ce
+l'ha. Se ce l'ha, il disegno è una copia peggiore.
+
+2) ⚠️ LA BARRA DEL PREMIO SI MISURA DAL CENTRO, e questo EMENDA il giro
+prima, dove si accendeva dal capo sinistro fino al pallino. Riempita dal
+capo la barra diceva QUANTO ci si era spostati e non DA CHE PARTE — e a
+zero, con mezza barra già accesa, sembrava una scelta già fatta invece
+del punto di partenza. Adesso a zero è tutta spenta, e da lì si accende
+SOLO il tratto fra il centro e il pallino: VERDE a destra, dove il
+premio è un sovrapprezzo, ROSSO a sinistra, dove è uno sconto. Il
+tratteggio resta su tutt'e due i lati.
+IL PALLINO VESTE LA STESSA TINTA (decisione mia, dichiarata): con la
+barra che parla verde e rosso, un pallino arancio sarebbe stato il terzo
+colore in dieci pixel. A fermo resta il grigio dello spento, che è il
+modo giusto di dire «di qui non ci si è ancora mossi».
+UN GIUDICE SOLO PER TUTTE E TRE LE COSE che dipendono dal segno —
+`fasciaPremioP2P`, pura: i due bordi della fascia, la sua tinta, e la
+classe che colora il numero nella pillola. Con due giudici sarebbe
+bastato un ritocco a uno per far raccontare due segni diversi sulla
+stessa cifra.
+
+3) LA PILLOLA DEL PREMIO SI TOCCA. Prima a scrivere il valore a mano
+portava solo il «Modifica» qui sotto, e nessuno tocca una parolina
+grigia quando ha una pillola grossa davanti. Adesso la pillola È il
+bottone, e a dirlo c'è la MATITA nel tondino bianco agganciata
+all'angolo in basso a destra, che SPORGE dal bordo — è lo sporgere che
+la fa leggere come un'aggiunta invece che come un disegno stampato
+dentro. «Modifica» resta sotto: la stessa porta detta a parole, per chi
+la matita non la riconosce.
+IL FONDO È NEUTRO E IL COLORE CE L'HA IL NUMERO (richiesta di Andrea):
+verde sopra il mercato, rosso sotto, neutro a zero, in pari con la
+barra. Un fondo pieno — arancio prima, viola nella proposta — faceva
+della pillola la cosa più accesa della sezione, davanti alla barra che è
+proprio quella da guardare; e non avrebbe potuto dire il segno, perché
+il testo bianco sopra deve restare leggibile su tutt'e due le tinte.
+⚠️ LA CLASSE DEL COLORE STA SULLA PILLOLA E LA CIFRA IN UN FIGLIO SUO,
+ed è una riga che sembra pignoleria e non lo è: se fossero lo stesso
+nodo, riscrivere il numero a ogni movimento del cursore porterebbe via
+la matita agganciata all'angolo. C'è la prova che lo inchioda.
+IL TONDINO È BIANCO NEI DUE TEMI e la matita scura: un tondino che
+seguisse il tema sparirebbe dentro la pillola di giorno, che è bianca
+anche lei. A staccarlo dal fondo chiaro c'è l'OMBRA e non un bordo — un
+bordo intorno a venti pixel diventa un anello e si vede più della
+matita.
+E SEI PIXEL D'ARIA IN PIÙ sotto la pillola, trovati guardando: la
+matita che sporge toccava la «M» di «Modifica».
+
+4) I DUE TAB DELLA TESTATA PESANO UN GRADINO SOTTO (ritocco di
+Andrea): da 800 a 700. Sono la cosa più grande della testata, e a peso
+pieno spingevano più del logo che gli sta in mezzo. È un peso VERO e non
+un grassetto tirato dal browser — Baloo 2 ha il file del 700 come quello
+dell'800 — e c'è la riga che lo sorveglia, insieme alla presenza di quel
+`@font-face`: senza il file, «700» diventerebbe una finta.
+
+COLLAUDATI: **8878 prove verdi, 0 rosse** (+17 sulle 8861 del giro
+prima) e **13 MUTAZIONI, 13 UCCISE**: il «$» che torna un disegno, il
+glifo che perde la sua misura, il ramo del glifo che passa dopo quello
+del disegno, la fascia che riparte dal capo, che non si ferma al
+centro, la tinta che non guarda più il segno, il numero che non cambia
+colore, la cifra che torna sulla pillola portando via la matita, la
+pillola che torna un'etichetta che non si tocca, che torna col fondo
+pieno, la matita che non sporge, il tondino che segue il tema invece di
+restare bianco, e il pallino che torna arancio.
+GIRO DAL VIVO col server vero, chiaro e scuro: a 0 la barra è tutta
+spenta col pallino grigio, a −6% il tratto fra centro e pallino è rosso
+col numero rosso, a +7% è verde col numero verde, e il «$» viola siede
+centrato nel suo tondo.
+
+Il filtro del libro (set 2026, richiesta di Andrea sul modello di
+quello di Mostro). Sotto i tab c'era una riga di servizio — «3 offerte
+di chi vende sats» — che diceva un numero e basta. Al suo posto una
+PILLOLA col simbolo dell'imbuto: stesso numero, e in più la porta per
+restringere. Il lato non si scrive più: lo dice il tab acceso due
+centimetri più su, e ripeterlo era la seconda copia della stessa
+verità.
+
+LE QUATTRO LEVE: valute (per ora EUR), metodi (le sei voci del
+vocabolario chiuso, a scelta multipla), premio/sconto da −10% a +10% e
+reputazione da 0 a 5 stelle. Le prime due sono pillole come nel foglio
+«Pubblica»; le altre due sono cursori a DUE pallini.
+
+⚠️ LA REPUTAZIONE È QUELLA DEL COORDINATORE e non le stelline del
+mercatino, ed è una decisione presa prima di scrivere una riga
+(domanda ad Andrea, risposta sua). Il tag `rating` sta DENTRO ogni
+38383, quindi ce l'hanno tutti gli ordini — anche quelli nati sugli
+altri client. Le stelline di casa le abbiamo solo per chi si è
+registrato da noi, e solo da loggati: un filtro su quelle avrebbe
+svuotato il libro al primo mezzo punto, e la colpa sarebbe sembrata del
+filtro invece che del dato mancante.
+E CHI NON HA ANCORA VOTI passa solo col minimo a ZERO. Media 0 con zero
+voti non vuol dire «scarso», vuol dire «non si sa» — ma chi chiede
+almeno una stella sta chiedendo una PROVA, e «non si sa» non lo è. È
+una scelta e non una conseguenza, quindi ha una riga sua nel foglio:
+senza, un libro che si svuota a mezzo punto sembra un guasto.
+
+⚠️ IL METODO SI CONFRONTA PER CONTENIMENTO, non per uguaglianza, ed è
+la riga che rende il filtro utile invece che pedante: sul libro
+arrivano i metodi scritti dagli ALTRI client, e sono testo libero —
+«SEPA Instant», «Bonifico SEPA», «sepa». Chiedere «SEPA» deve prenderli
+tutti; chiedere «SEPA Instant» solo chi lo dice. Uguaglianza secca
+avrebbe filtrato via mezzo libro senza che si capisse perché. Più
+metodi scelti valgono in OR: basta che l'ordine ne offra uno.
+
+IL CONTEGGIO NELLA PILLOLA È QUELLO FILTRATO, sempre. Un numero che
+contasse il libro intero mentre a schermo se ne vedono tre sarebbe la
+bugia più facile da scrivere e la più difficile da notare. E la pillola
+si VESTE del colore del lato quando il filtro restringe davvero: è
+l'unico modo di accorgersi che il libro non è tutto il libro.
+LO STATO VUOTO DICE QUALE DEI DUE VUOTI È: «non c'è niente» e «il tuo
+filtro non lascia passare niente» sono due cose diverse, e la seconda ha
+una strada d'uscita da offrire — il bottone che toglie il filtro.
+
+SI FILTRA SOLO IL LIBRO, mai «I miei scambi» (richiesta di Andrea, e
+c'è la sentinella): quelli sono roba mia, e nasconderne uno perché il
+premio non rientra vorrebbe dire perdere di vista uno scambio IN CORSO.
+E LO STATO È UNO SOLO per tutt'e due i tab: chi restringe a «SEPA»
+vuole SEPA di qua e di là, e un filtro che si azzera cambiando lato
+sarebbe una sorpresa a ogni tocco.
+
+SI LAVORA SU UNA BOZZA e non sul filtro vivo: chi tocca i cursori deve
+poter cambiare idea, e «Applica» dev'essere il momento in cui il libro
+si muove. Senza la bozza il libro si riscriverebbe sotto le dita a ogni
+scatto, e «Cancella» non avrebbe più niente da annullare.
+⚠️ E LE DUE LISTE SI COPIANO IN TUTT'E DUE I VERSI (`slice()`): senza,
+la bozza e il filtro vivo condividerebbero gli array, e toccare una
+pillola nel foglio filtrerebbe il libro PRIMA di «Applica» — cioè
+proprio la cosa che la bozza esiste per evitare.
+«CANCELLA» AZZERA E APPLICA in un gesto solo: uno che svuotasse i campi
+lasciando il libro filtrato chiederebbe un secondo tocco per fare la
+cosa già chiesta. È anche il bottone dello stato vuoto, dove è l'unica
+strada d'uscita.
+
+IL CURSORE A DUE PALLINI NON ESISTE IN HTML: sono DUE
+`input[type=range]` SOVRAPPOSTI sopra un binario disegnato da un div. I
+due campi non ricevono il dito (`pointer-events:none`) — lo ricevono i
+soli PALLINI — o quello sopra si prenderebbe tutti i tocchi e l'altro
+non si muoverebbe mai. I due bordi arrivano da `--da` e `--a`, con la
+STESSA correzione del pollice del premio (`bordoPremioP2P`): sarebbe
+assurdo che i pallini si scollassero dal colore qui e no là. E i due
+non si scavalcano: chi spinge il minimo oltre il massimo lo trova fermo
+lì, invece di vedere la fascia rovesciarsi.
+IL PEZZO È UNO SOLO per tutt'e due i cursori del foglio — premio e
+reputazione — così non possono divergere.
+
+⚠️ E LA TEMPORAL DEAD ZONE HA COLPITO DI NUOVO, alla seconda riga
+scritta: `P2P_FILTRO_VUOTO` era una `const` che leggeva
+`P2P_PREMIO_MAX`, la quale nasce diciassettemila righe più sotto col
+foglio «Pubblica». Stessa trappola del catalogo delle valute di ieri, e
+a bocciarla di nuovo è stata la prova che fa girare ogni blocco
+`<script>` fino in fondo. È diventata una FUNZIONE, che si issa e legge
+a pagina viva — e la cura ha portato con sé un secondo difetto che non
+avevo visto: un oggetto costante con dentro due ARRAY è una trappola,
+perché `Object.assign({}, VUOTO)` copia i RIFERIMENTI, quindi il primo
+`push` su una copia avrebbe scritto dentro la costante e il «vuoto» non
+sarebbe più stato vuoto per nessuno. Una funzione ne fa uno nuovo ogni
+volta.
+IL FILTRO SPENTO È `null` e non un oggetto pieno di valori neutri:
+così «non c'è filtro» è una cosa sola da controllare, e il giudice che
+decide se un ordine passa lo dice in una riga.
+
+COLLAUDATI: **8899 prove verdi, 0 rosse** (+19 sulle 8880 del giro
+prima) e **13 MUTAZIONI**: il conteggio che conta il libro intero, le
+card che si mostrano tutte, la pillola che non si veste mai, lo stato
+vuoto che non distingue i due vuoti, «I miei scambi» che si filtrano
+anche loro, il metodo per uguaglianza secca, chi non ha voti che passa
+sempre, la fascia del premio che esclude gli estremi, la bozza che
+condivide le liste, «Applica» che non ridisegna, i due pallini che si
+scavalcano, il foglio che non si chiude col censimento — più il tondino
+della matita, che al giro prima era sopravvissuto.
+⚠️ QUEL TONDINO È LA STESSA LEZIONE DI IERI, ed è la terza volta in due
+giorni: la prova cercava `border-radius:999px;background:#fff;` in
+TUTTO il foglio di stile, e quella riga sta anche nel pomello della
+leva del tipo di prezzo, dieci righe più su. Rispondeva per il vicino.
+Adesso il blocco `.p2p-premio-matita` si RITAGLIA prima di guardarci
+dentro. Stessa cura per il pallino in tinta, che col cursore doppio del
+filtro esiste ora in tre posti: si conta dentro il blocco del premio,
+non nel foglio intero.
+GIRO DAL VIVO col server vero, chiaro e scuro, su un libro di tre
+ordini: la pillola dice «3 offerte», «SEPA» la porta a 2 (prende anche
+«SEPA Instant») e la veste di verde, e col minimo di reputazione a 4
+resta la sola offerta da 4,6 stelle. I due pallini si muovono e le
+etichette li seguono.
