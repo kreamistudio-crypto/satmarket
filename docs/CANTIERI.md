@@ -9057,21 +9057,22 @@ segni, fisso, intervallo coi due capi, valuta ignota, promo, fee
 ignota, cambio muto) e verifica che le righe SOMMINO; il banco
 delle card prova il netto sui due lati e il ≈ sul fisso; la busta
 `_p2p_leve` porta la quinta chiave. Guardato in vetrina CDP a 375 e
-320, due lati e due temi. ⚠️ DIFETTO DICHIARATO E NON CURATO: a
-320px l'etichetta «Commissione Barattolo» cede coi puntini
-(«Commissione Bar…»), e nei casi promo e intervallo anche a 375 —
-è la regola del conto («a cedere è l'etichetta»), ma il precedente
-del mercatino l'ha già giudicata un difetto una volta: se dà
-fastidio la leva è il rinome secco «Commissione» (lo stesso
-rimedio di allora), da chiedere ad Andrea prima di rovesciare la
-sua parola.
+320, due lati e due temi. E IL DIFETTO DICHIARATO È STATO CURATO
+IL GIORNO STESSO, su decisione di Andrea: a 320px l'etichetta
+«Commissione Barattolo» cedeva coi puntini («Commissione Bar…»), e
+nei casi promo e intervallo anche a 375 — il rinome è quello secco
+del mercatino, «Commissione», per la stessa misura e con la stessa
+domanda («dentro il nostro conto, di chi altri sarebbe?»). La
+prova adesso pretende l'etichetta esatta e vieta il ritorno di
+quella lunga.
 
-RESTA DA FARE SUL NODO (guarda-e-riferisci, non da questa repo):
-girare `fee` a 0.02 in `settings.toml` e riavviare DAL COMPOSE
-(`docker compose restart mostro` da ~/nodo — mai `docker restart`,
-vedi CLAUDE.md), poi verificare dal lato di chi legge che il 38385
-annunci `fee 0.02`. E IL CONTO ECONOMICO DA NON DIMENTICARE: la dev
-fee di Mostro è il 30% della NOSTRA fee — oggi il tappo
-`dev_fee_percentage = 0` (il circuito Tor freddo) la tiene a zero e
-il 2% resta intero, ma il giorno che il tappo si toglie 0,6 punti
-dei 2 se ne vanno upstream, e il margine va riguardato allora.
+E IL NODO È GIRATO (10 set 2026, guarda-e-riferisci, mano di
+Andrea): `fee` a 0.02 in `settings.toml`, riavvio dal compose, e
+il 38385 annuncia `fee 0.02` — verificato dallo SPECCHIO, cioè dal
+lato di chi legge. Da lì il conto ha smesso da solo di dire «in
+promo»: nessun deploy, che è esattamente il disegno. IL CONTO
+ECONOMICO DA NON DIMENTICARE: la dev fee di Mostro è il 30% della
+NOSTRA fee — oggi il tappo `dev_fee_percentage = 0` (il circuito
+Tor freddo) la tiene a zero e il 2% resta intero, ma il giorno che
+il tappo si toglie 0,6 punti dei 2 se ne vanno upstream, e il
+margine va riguardato allora.

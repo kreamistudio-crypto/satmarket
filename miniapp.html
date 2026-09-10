@@ -37104,7 +37104,12 @@ function contoDettP2P(o){
   ].filter(Boolean).join(' ');
   return '<div class="ctrl-conto">'
     + r('Controvalore', cifra('ctrl'))
-    + r('Commissione Barattolo', commissione)
+    /* «COMMISSIONE» SECCA (10 set 2026, decisione di Andrea): lo
+       stesso rimedio del conto del mercatino, e per la stessa misura
+       — «Commissione Barattolo» cedeva coi puntini a 320px, e nei
+       casi promo e intervallo anche a 375. Dentro il nostro conto,
+       di chi altri sarebbe? */
+    + r('Commissione', commissione)
     + premio
     + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot')
     + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot')

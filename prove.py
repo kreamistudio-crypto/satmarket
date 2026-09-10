@@ -37104,8 +37104,12 @@ console.log(JSON.stringify(out));
           '<div class="ctrl-conto">' in cm and 'ctrl-riga' in cm)
     prova("...e il controvalore e' al mercato puro", True,
           "Controvalore" in cm and "≈ 12000 sats" in cm)
+    # «COMMISSIONE» SECCA (10 set 2026, decisione di Andrea): il
+    # rimedio del mercatino per la stessa misura — l'etichetta lunga
+    # cedeva coi puntini a 320px, e in promo/intervallo anche a 375.
     prova("la commissione dice la meta' di chi legge, col meno", True,
-          "Commissione Barattolo" in cm and "1% · ≈ −120 sats" in cm)
+          "<span>Commissione</span>" in cm and "1% · ≈ −120 sats" in cm
+          and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
           "Ricevi" in cm and "≈ 11880 sats" in cm)
     prova("...e l'ultima riga e' l'euro, in evidenza", True,
@@ -37151,12 +37155,12 @@ console.log(JSON.stringify(out));
           and "≈ 11940 sats" in o["contoPromo"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
           True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
-          and "%" not in o["contoGratis"].split("Commissione Barattolo")[1]
+          and "%" not in o["contoGratis"].split("<span>Commissione</span>")[1]
                                           .split("</div>")[0])
     # NON SI SA NON E' GRATIS: senza il 38385 la commissione e' un
     # trattino, mai uno zero — e nessun «in promo» inventato.
     prova("senza 38385 la commissione e' un trattino, senza promo", True,
-          ">—<" in o["contoIgnoto"].split("Commissione Barattolo")[1]
+          ">—<" in o["contoIgnoto"].split("<span>Commissione</span>")[1]
                                    .split("</div>")[0]
           and "in promo" not in o["contoIgnoto"])
     prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
