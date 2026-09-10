@@ -7866,3 +7866,150 @@ dichiarati PRIMA di quella riga.
 rotta vuole un intero e «20–100» non ci passa. Il capo basso è il
 prezzo d'ingresso, quindi non è una bugia — ma racconta meno
 dell'ordine, e chi tocca quella rotta lo sistemi là.
+
+I sei ritocchi al foglio «Pubblica» (set 2026, il giorno dopo, guardati
+dal vivo da Andrea). Il ridisegno stava in piedi; questi sono i sei
+punti in cui, a schermo, diceva ancora una cosa diversa da quella che
+voleva dire.
+
+1) VIA LA RIGA D'APERTURA. «Stai chiedendo di comprare sats pagando in
+euro. Chi risponde bloccherà i sats in garanzia» diceva col paragrafo
+quel che il titolo dice con tre parole, e su un foglio a pieno schermo
+si mangiava la prima sezione. Il fatto che i sats restino in garanzia
+resta detto dove serve davvero — la pagina dello scambio, «I tuoi
+dati» — e la riga in fondo a questo foglio lo ripete a chi arriva fin
+là.
+
+2) LA VALUTA APRE IL FOGLIO DI CASA. La tendina apriva il selettore del
+SISTEMA: quello non si può vestire, e dentro una Mini App si vede a
+occhio nudo che viene da fuori. Adesso apre `#pickerSheet`, LO STESSO
+di Categoria e Taglia — stesse voci, stessa chiusura, stesso ritorno
+del fuoco — con le voci fatte di bandierina più sigla («🇪🇺 EUR»),
+corte apposta: una valuta si riconosce dalla sigla, e il nome per
+esteso in un elenco di tre voci è solo più testo da scartare.
+⚠️ E IL CATALOGO SE LO PORTA LEI invece di stare nella mappa `PICKER`,
+che è la strada breve e sbagliata: quella mappa il boot la percorre
+TUTTA (`Object.keys(PICKER).forEach(aggiornaPicker)`) diciassettemila
+righe più su di `P2P_VALUTE`, quindi una voce che la legge è una const
+toccata dentro la sua temporal dead zone. NON È UN RAGIONAMENTO: la
+strada breve è stata presa, e a bocciarla è stata la prova di casa che
+fa girare ogni blocco `<script>` fino in fondo — «Cannot access
+'P2P_VALUTE' before initialization». In un browser vero oggi non
+scoppierebbe (il campo-bottone nasce col foglio, quindi al boot
+`el(...)` è null e la funzione esce prima), ma è un invariante che
+nessuno saprebbe di dover rispettare: basterebbe mettere quel bottone
+nel markup fisso.
+IL <select> NASCOSTO NON C'È PROPRIO, e non è una dimenticanza: il
+picker di casa lo usa come deposito del valore perché nasce dai form
+del venditore, dove il `<select>` c'era già. Qui il valore vive già in
+una variabile del foglio, quindi un elemento in più sarebbe solo un
+secondo posto da tenere in pari.
+
+3) UN CAMPO SOLO, ALL'APERTURA. Il secondo campo dell'importo — e la
+riga che lo spiega — si fanno vedere quando si TOCCA il primo. Chi
+vuole un importo secco non incontra mai una casella in più da capire,
+e chi vuole un intervallo la trova nel momento esatto in cui sta
+scrivendo la cifra. La nota cambia anche verso: da «Tocca il secondo
+campo PER creare un ordine a intervallo» (un invito) a «Tocca il
+secondo campo SOLO SE vuoi creare un ordine a intervallo» (un
+avvertimento) — con la casella già a schermo, la prima frase invitava
+a riempirla.
+⚠️ SI SVELA, NON SI RIDISEGNA, ed è la riga da non ammorbidire: il
+tocco che fa scattare la cosa è lo stesso che apre la tastiera, e un
+render lì porterebbe via il fuoco al campo che si sta per riempire (la
+lezione delle pillole). Perciò `style="display:none"` e non
+l'attributo `hidden`: `.hint` potrebbe avere un `display` suo e
+vincerlo. E tornando a mercato dopo un giro a prezzo fisso il secondo
+campo riparte CHIUSO — il massimo se n'è andato col passaggio, e una
+casella vuota già aperta direbbe che lì c'era qualcosa.
+
+4) IL PREMIO PERDE DUE DISEGNI E GUADAGNA UN ALLINEAMENTO. Via l'icona
+tonda (📈): qui la riga è occupata da una barra che vuole tutta la
+larghezza che trova, e il cerchio la accorciava di quaranta pixel per
+dire una cosa che il titolo «Premio (%)» dice già. Via la matita
+accanto a «Modifica», che su un fondo chiaro era la cosa più scura
+della sezione. E la pillola col numero passa A SINISTRA DELLA BARRA, a
+metà altezza della linea: prima la pillola e il suo bottone stavano in
+una colonna sola, e il centro della colonna non è il centro della
+pillola — il numero finiva sopra la linea. Adesso la riga tiene solo
+pillola e barra, e sotto ci va «Modifica» in fila coi due capi: sotto
+la pillola il suo bottone, sotto la barra i suoi estremi.
+L'ICONA È DIVENTATA FACOLTATIVA per costruzione (`sezioneNuovoP2P`):
+senza quel ramo restava un cerchio vuoto al posto di quello tolto.
+
+5) LA BARRA DICE CHE VA A SCATTI. Dentro il binario una LINEA
+tratteggiata bianca, venti tratti — uno per ogni punto percentuale da
+−10 a +10 — così chi la guarda capisce che non è un cursore continuo
+prima di provarlo. Il passo è in PERCENTUALE (5% = un punto su venti),
+quindi i tratti restano al loro posto qualunque sia la larghezza del
+riquadro.
+⚠️ È UNA LINEA E NON VENTI BLOCCHI, e la differenza si è vista solo a
+schermo: al primo giro il tratteggio era alto quanto tutta la barra, e
+il binario sembrava SPEZZATO in segmenti arancioni. Il
+`background-size:100% 2px` lo tiene a due pixel, in mezzo.
+E QUI SPARISCE `accent-color`: vestire il binario vuol dire
+`appearance:none`, e da lì in poi il pollice se lo disegna la pagina —
+su tutt'e due i motori, che i due pseudo-elementi non si possono
+raggruppare (una regola sconosciuta fa cadere l'intera dichiarazione).
+
+6) LE DUE USCITE SONO GEMELLE, e ci sono volute DUE cose. La prima:
+`.btn.ghost` porta un `margin-top:10px` suo e vive PIÙ IN BASSO nel
+foglio, quindi a pari specificità vinceva lui — e in una riga flex quei
+dieci pixel facevano «Annulla» più basso del gemello. La seconda l'ha
+trovata il righello e non l'occhio: col `box-sizing:border-box` di casa
+una `flex-basis:0` non parte davvero da zero, parte dai BORDI — e
+`.ghost` ne ha due da 2px mentre `.orange` non ne ha. Misurati dal
+vivo: **169 contro 165**. Due colonne `1fr` sono esattamente uguali
+qualunque bordo abbiano dentro, quindi il piede è una GRIGLIA. Adesso
+i due bottoni misurano **166,5 × 54,47 allo stesso `top`** a 375px, e
+**139 × 54,47** a 320.
+LA LEZIONE OLTRE IL BOTTONE: «stessa grandezza» in flex non si ottiene
+con `flex:1` quando i due elementi hanno bordi diversi. Chi mette due
+bottoni gemelli in una riga misuri, invece di guardare.
+
+COLLAUDATI: **8841 prove verdi, 0 rosse** (+27 sulle 8814 del giro
+prima) e **17 MUTAZIONI, 17 UCCISE** in due giri.
+Il primo giro (dieci cadute su tredici): la riga d'apertura che
+rientra, la valuta che torna al selettore del sistema, il catalogo che
+rientra nella mappa percorsa al boot, il tocco che non sveglia niente,
+lo svelare che diventa un render, la nota che torna a invitare invece
+di avvertire, l'icona che rientra sul premio, il piede che torna una
+riga flessibile, la pillola che torna in cima alla riga, e il catalogo
+delle valute che cresce lasciando il payload cablato su EUR.
+Il secondo, dopo aver stretto le tre prove molli: la «a» in mezzo ai
+campi, il campo del massimo e la nota dell'intervallo che nascono già
+visibili (tre mutazioni, una per nascosto), la matita che rientra —
+sia come carattere sia scritta `\u270f` —, e i tratti che tornano alti
+quanto la barra su webkit e spariscono del tutto su moz.
+⚠️ QUELL'ULTIMA È UNA PROVA CHE GUARDA AVANTI, ed è nata da questo
+giro: la tendina è «pronta per altre valute» ma `ordineDaCampiP2P`
+scrive `fiat_code: 'EUR'` a mano. Finché la scelta è una sola non è
+una bugia; il giorno che il catalogo cresce la prova diventa rossa e
+dice dove andare, invece di lasciar offrire USDT e spedire EUR.
+
+⚠️ IL PRIMO GIRO DI TORTURA NE LASCIÒ VIVE TRE, e le tre erano PROVE
+molli — non codice rotto. Vale scriverle, perché sono tre modi diversi
+di sbagliare una sentinella, e tornano.
+• GUARDARE UN POSTO SOLO DOVE I POSTI SONO TRE: i nascosti
+dell'intervallo sono la «a» in mezzo ai campi, il campo e la nota, e
+la prova cercava il ternario «da qualche parte» dentro il render —
+scoprirne uno solo la lasciava verde. Adesso i tre si nominano a uno a
+uno.
+• GUARDARE IL CARATTERE E NON IL SUO CODICE: la matita si scrive anche
+`\u270f`, e una sentinella che cerca «✏️» le passa davanti. Adesso
+guarda tutt'e due le forme.
+• NOMINARE DUE COSE E CERCARLE IN UNA SOLA: il ciclo sui due binari
+del cursore (`-webkit-` e `-moz-`) cercava dentro TUTTO il foglio di
+stile, quindi togliere i tratti da uno lasciava rispondere l'altro. Il
+ciclo c'era, l'isolamento no. Adesso ogni pseudo-elemento si ritaglia
+il suo blocco.
+LA REGOLA CHE LE UNISCE: una prova che cerca in un contenitore più
+grande di quello che sta sorvegliando risponde per il vicino. E a
+dirlo non è la lettura — è la mutazione: tutte e tre erano verdi, e
+tutte e tre lo restavano col guasto dentro.
+GIRO DAL VIVO col server vero, chiaro e scuro, a 375 e a 320: il
+foglio si apre sulla valuta senza paragrafo davanti, la tendina apre
+il foglio di casa col suo «🇪🇺 EUR» spuntato, l'importo ha un campo
+solo finché non lo si tocca, il premio a −6% e a +8% con la nota del
+lato giusto, i tratti bianchi dentro la barra, e le due uscite
+misurate uguali. Nessuno scorrimento orizzontale a 320.
