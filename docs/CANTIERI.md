@@ -8331,3 +8331,134 @@ ordini: la pillola dice «3 offerte», «SEPA» la porta a 2 (prende anche
 «SEPA Instant») e la veste di verde, e col minimo di reputazione a 4
 resta la sola offerta da 4,6 stelle. I due pallini si muovono e le
 etichette li seguono.
+
+
+IL CONTO SUL DISPOSITIVO (10 set 2026, dal campo di Andrea: due account
+Telegram sullo stesso telefono, e il P2P che li mischiava).
+IL SINTOMO: il secondo account (aggiunto a `P2P_PROVA_IDS`) entra nella
+Mini App, la home mostra il SUO profilo — e il P2P mostra quello del
+primo: i suoi ordini «miei», la sua foto nel profilo di scambio, e
+l'ordine appena pubblicato col secondo esce sulla card col volto del
+primo. Cache e dati della Mini App svuotati: resta il primo.
+LA DIAGNOSI STA IN TRE RIGHE, e nessuna è nel server. 1) Telegram ha
+UNA WebView per tutti gli account che scambia, e il localStorage è per
+ORIGINE: `barattolo.store` è lo stesso per tutt'e due. 2) Il mazzo
+viveva sotto `barattolo_mostro` senza nessun nome sopra, e
+l'invariante di tutto il cantiere — «un profilo che c'è non si tocca»
+— faceva il resto: `assicuraMazzo` e `adottaProfiloContoP2P` trovavano
+un mazzo e lo restituivano, senza chiedersi di chi fosse. 3) Il volto
+è la conseguenza: la restore fatta col mazzo del primo consegna gli
+ordini del primo, `registraOrdiniP2P` li intesta alla SESSIONE, e
+l'ordine nuovo — pubblicato con le trade key del primo — lo intesta
+chi fa la restore per primo (INSERT OR IGNORE: chi arriva primo
+tiene). E PERCHÉ SVUOTARE LA CACHE NON BASTAVA: `sincronizzaMazzo`,
+nel caso «locale c'è + cloud vuoto = si carica» (la migrazione del
+cantiere della nuvola), aveva già scritto il mazzo del primo nel
+CloudStorage del SECONDO — che è per utente — e da lì l'adozione lo
+riprendeva a ogni ingresso, cache o non cache.
+I TRE SOSPETTI DI ANDREA, riletti: il primo era giusto per intero; il
+secondo no — `/api/p2p/seme` risponde al tg_id dell'initData corrente,
+che Telegram inietta al lancio per l'account attivo, e nessuna sessione
+stantia c'entra; il terzo a metà — la registrazione usava la sessione
+giusta, ma su chiavi sbagliate, quindi la faccia seguiva le chiavi.
+LA CURA HA TRE PEZZI, e servono tutti e tre (il perché di ognuno sta
+nel commento «IL CONTO SUL DISPOSITIVO» in miniapp.html). 1) OGNI
+CHIAVE DEL P2P PORTA IL tg_id NEL NOME (`chiaveP2P`):
+`barattolo_mostro@111` e non `barattolo_mostro`, e così scambi, lapidi
+e recapiti. Il cambio di conto è il cambio di un suffisso, e due
+account sullo stesso dispositivo non si vedono per costruzione. Le
+chiavi di ieri, nude, passano al PRIMO conto che entra e solo su un
+posto vuoto (`allineaContoP2P`, chiamata da `avvia` appena `/api/me`
+ha detto chi sei): chi le ha scritte non si sa più, e il primo che
+entra è la scommessa più onesta — il pezzo 2 corregge il caso in cui
+sia sbagliata. 2) IL MAZZO DEL CONTO SA DI CHI È: il profilo derivato
+dal seme porta dentro `conto`, il tg_id da cui nasce, e un mazzo
+'conto' con un tg_id diverso dal mio è di un altro — giudizio
+sincrono, senza rete. Quelli scritti PRIMA di oggi il campo non ce
+l'hanno, e si chiede il seme UNA volta (`verificaContoP2P`): uguale,
+si timbra e non si richiede più; diverso, si mette da parte; 409 o
+rete, «non lo so» per la sessione e non si tocca niente. 3) UN MAZZO
+DI UN ALTRO SI METTE DA PARTE, MAI SI BUTTA (`parcheggiaMazzoAltruiP2P`):
+le quattro chiavi finiscono sotto `@altrui:<pub>` e nessuno le rilegge
+— la regola delle lapidi. La copia nel cloud, se è quella, se ne va:
+un profilo 'conto' non è mai l'unica copia (rinasce dal suo account,
+l'indice dal pavimento del server), e quel cloud è MIO anche se il
+profilo no.
+E TRE RIGHE ATTORNO: il gate dell'adozione in `renderP2P` vuole
+`myTgId` anche DENTRO Telegram (senza conto non c'è un posto in cui
+adottare: si scriverebbe nel nome di ieri, che il conto in arrivo poi
+assorbe); un mazzo adottato dal cloud che è ancora da verificare non
+si registra al server finché la verifica non ha detto che è mio (o la
+chiave dell'altro finirebbe intestata a me in `p2p_indice`); e
+`azzeraSessioneP2P` butta bandierine, pavimento, lista dei miei e conto
+delle chiavi quando il conto cambia a sessione viva — che in
+produzione non succede (Telegram riapre la Mini App), ma nel collaudo
+il cambio di identità passa da `setCollaudo` → `avvia`.
+L'ORDINE DEL RENDER È LA RIGA CHE COSTA: il mazzo estraneo si mette da
+parte in SINCRONO, prima che una restore o una registrazione partano
+con le sue chiavi; quello di ieri, finché la verifica non ha risposto,
+non si registra e non chiede la restore — direbbero al server «questi
+ordini sono miei» su chiavi forse altrui, che è precisamente il volto
+sbagliato. E `assicuraMazzo` lo verifica PRIMA di firmarci sopra.
+LE STRADE SCARTATE, coi perché. a) Buttare via il mazzo altrui: la
+chiave sì è rederivabile, ma scambi in corso, lapidi e recapiti no —
+la regola delle lapidi vale anche per lo stato di un altro. b) Un
+ripescaggio automatico del parcheggio quando il vero padrone entra
+(per pub): venti righe in più per un caso che nasce solo da un
+dispositivo contaminato PRIMA di oggi dove entra prima il conto
+sbagliato; Andrea ha chiesto «si scarta», e il parcheggio è la lapide
+che rispetta tutt'e due. c) Richiedere il seme a OGNI ingresso per
+ogni mazzo 'conto' (la sentinella che la voce «Il seme senza commit»
+aveva proposto): una POST per sessione per tutti, e soprattutto non
+distingue «di un altro» da «mio col sale cambiato» — il timbro `conto`
+rende il primo caso sincrono e lascia il secondo al suo cantiere.
+d) Dare il suffisso anche a NWC e bunker: sono dell'identità Nostr,
+non del P2P, e fuori dal perimetro di questo giro.
+IL CASO CHE RESTA AMBIGUO, dichiarato: un mazzo 'conto' di ieri che
+diverge dal seme può essere di un altro (questo difetto) o MIO con un
+sale cambiato (ripristino da un backup vecchio). Si mette da parte in
+tutt'e due i casi — mai distrutto — e il secondo caso resta il
+cantiere del foglio del conflitto, che questa voce non apre.
+COSA SUCCEDE SUL TELEFONO DI ANDREA al primo ingresso dopo il deploy,
+nei due ordini possibili. Se entra PRIMA il primo account: le chiavi
+nude diventano sue, tutto giusto; poi il secondo trova il suo nome
+vuoto, il suo cloud gli dà il mazzo del primo, la verifica col seme
+dice «non tuo», parcheggio, cloud ripulito, e nasce il SUO profilo dal
+seme. Se entra PRIMA il secondo: le chiavi nude diventano sue per un
+istante, la verifica col seme le smentisce, parcheggio sotto
+`@altrui:`, cloud ripulito, profilo suo; poi il primo entra a mani
+vuote — il suo cloud ha il suo mazzo e lo adotta, e gli ordini
+pendenti tornano dalla restore (le sue righe locali di ieri restano
+nel parcheggio: è il limite della strada b). In tutt'e due i casi i
+due account non si vedono più.
+E QUEL CHE IL SERVER TIENE DI IERI: l'ordine di prova pubblicato col
+secondo account porta le trade key del PRIMO, quindi per il
+coordinator è del primo — dal secondo non si vede più, e si ritira dal
+primo (o si lascia scadere). In `p2p_indice` resta una riga (pub del
+primo, tg_id del secondo) inerte, e in `p2p_ordini` quel che la prima
+restore ha intestato: righe che non mordono e non si toccano.
+COLLAUDATI: **8954 prove verdi, 0 rosse** (+55 sulle 8899 del giro
+prima): il banco del mazzo fa girare i sei casi — il cambio di conto
+come cambio di suffisso, la migrazione delle chiavi di ieri solo sul
+vuoto, i due giudici, il timbro dal seme, il 409 che non tocca, e IL
+CASO DEL CAMPO per intero (mazzo del primo in locale E nel cloud del
+secondo, seme del secondo: parcheggio, cloud ripulito, gesto che torna
+col profilo giusto e nessuna fetch che porti la chiave dell'altro);
+la nuvola ha il giro «altrui nel cloud» e quello del da-verificare che
+non si registra; e una sezione nuova, «il conto sul dispositivo»,
+tiene ferme le righe una per una. **16 MUTAZIONI, 16 uccise**: chiave
+letta nuda, cambio che non azzera, render che non parcheggia, gesto
+che non verifica, cloud che adotta l'altrui, derivato senza conto,
+parcheggio che svuota un cloud non suo, 409 che timbra, bandierina non
+alzata, migrazione che sovrascrive o che lascia la chiave nuda,
+giudice senza origine, testo che perde il conto, render che registra
+il da-verificare, chiaveP2P senza conto, adozione dal cloud che
+registra prima di verificare.
+LA LEZIONE DEL BANCO: quattro di quelle mutazioni la prima stesura le
+«uccideva» con un CRASH — `rp.index(riga)` su una riga tolta alza
+ValueError e la sezione muore intera, rosso in CI ma senza dire quale
+riga manca. Le catene di posizione si scrivono con `find`, che a riga
+assente vale -1 e rende la catena falsa da sola.
+DA GUARDARE SUL CAMPO: la sequenza dei due account sul telefono
+(quale entra prima, e che il secondo veda solo il suo), e che l'ordine
+di ieri sparisca dal secondo e resti governabile dal primo.

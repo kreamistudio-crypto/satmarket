@@ -23796,6 +23796,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per riga sorvegliata — e la prima ne fa rosse DUE, che togliendo lo
   span cadono insieme «le due forme» e «il custode».
 
+- IL CONTO SUL DISPOSITIVO (10 set 2026, dal campo: due account
+  Telegram sullo stesso telefono, e il secondo trovava nella WebView —
+  che è UNA, con UN localStorage per origine — il mazzo del primo).
+  OGNI CHIAVE DEL P2P PORTA IL tg_id NEL NOME: `chiaveP2P(base)` dà
+  `barattolo_mostro@<tg_id>` (e così `_ordini`, `_lapidi`,
+  `barattolo_p2p_recapiti`), e nessuna delle quattro si legge mai nuda
+  — una sentinella lo conta. Le chiavi di ieri passano al primo conto
+  che entra (`allineaContoP2P`, da `avvia`), solo su un posto vuoto.
+  IL MAZZO DERIVATO SA DI CHI È: il campo `conto` porta il tg_id da cui
+  nasce; un mazzo 'conto' con un altro tg_id è «estraneo» (giudizio
+  sincrono), uno senza il campo è «da verificare» col seme, una volta.
+  L'ESTRANEO SI METTE DA PARTE sotto `@altrui:<pub>` e non si rilegge
+  (la regola delle lapidi); la sua copia nel cloud, se è quella, se ne
+  va — un profilo del conto rinasce dal suo account. I giudici e
+  l'ordine del render (parcheggio sincrono PRIMA di registrare o di
+  chiedere la restore) stanno nel commento «IL CONTO SUL DISPOSITIVO»
+  di miniapp.html; il verbale con le strade scartate in CANTIERI, alla
+  voce con lo stesso nome.
+
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
