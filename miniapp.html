@@ -2025,16 +2025,20 @@
   .p2p-testa .p2p-piccola{margin-top:0}
   /* la regola per l'euro in seconda riga e' MORTA col ritocco che ha
      fissato i posti (l'euro sta sempre in cima): niente CSS orfano */
-  /* IL PREZZO RISPETTO AL MERCATO, terza riga: la tinta e' un
-     GIUDIZIO per chi legge (deciso dal lato, vedi rigaOrdineP2P), le
-     parole un fatto — i token hanno gia' la loro sera */
-  .p2p-prezzo{display:block;margin-top:3px;font-size:13px;
-    font-weight:600;color:var(--muted)}
-  /* in tinta ci va SOLO il segno con la percentuale: le parole sono un
-     fatto, il giudizio sta nel numero */
-  .p2p-prezzo b{font-weight:800}
-  .p2p-prezzo .p2p-avviso{color:var(--danger)}
-  .p2p-prezzo .p2p-affare{color:var(--trust)}
+  /* IL BADGE DEL PREMIO (10 set 2026, la card essenziale): la
+     pillola che ha preso il posto della riga «al prezzo di mercato».
+     Le due coppie sono quelle di casa — il verde della protezione e
+     il rosso dell'allarme sui loro fondi tenui (--warn-bg e' gia' il
+     fondo del rosso, vedi .btn.allarme): mai un colore nuovo. */
+  /* `display:table` e non inline-block: il badge e' la TERZA RIGA
+     della card, e nel tab «Vendi» la riga sopra e' lo span inline
+     dell'euro — inline-block gli si incollerebbe accanto. Il table
+     e' un blocco che si stringe sul contenuto: riga sua, larghezza
+     da pillola, nessun wrapper. */
+  .p2p-badge{display:table;margin-top:5px;border-radius:999px;
+    padding:2px 9px;font-size:11.5px;font-weight:800}
+  .p2p-badge.affare{background:var(--trust-soft);color:var(--trust)}
+  .p2p-badge.avviso{background:var(--warn-bg);color:var(--danger)}
   /* la stessa coppia nel conto scorporato del dettaglio (set 2026):
      e' lo stesso giudizio delle card, sulla riga del premio */
   .ctrl-riga .p2p-avviso{color:var(--danger)}
@@ -34237,11 +34241,11 @@ function rigaOrdineP2P(o){
   /* ⚠️ I VERBI ERANO IMPERATIVI E NON LO SONO PIU' (set 2026, ritocco
      di Andrea che ROVESCIA il suo di ieri): «Paghi», non «Paga» — la
      card DESCRIVE quel che succede a chi legge, invece di ordinarglielo.
-     E BASTA QUESTA PAROLA, che e' la ragione per cui non si tocca
-     l'altra: «ricevi» e' identico all'imperativo e all'indicativo,
-     quindi con «Paghi» accanto la card si legge tutta in seconda
-     persona — «Paghi 8,00 € / ricevi ≈ 11 828 sats» — senza nessun
-     altro ritocco e senza due righe che si contraddicono.
+     E «RICEVI» E' TORNATO MAIUSCOLO (10 set 2026, con la card
+     essenziale): finche' c'era la terza riga del prezzo le prime due
+     si leggevano come UNA frase, e il minuscolo la cuciva; adesso la
+     card e' due righe autonome — quel che dai, quel che ti arriva —
+     e ognuna comincia da capo.
      E IL VERBO DI CHI DA' RESTA UNO SOLO, «Paghi» (set 2026, ritocco di
      Andrea che EMENDA il giro prima, dove nel tab «Vendi BTC» si
      leggeva «Invia ≈ X sats»): fra i due tab non cambia il gesto —
@@ -34259,36 +34263,29 @@ function rigaOrdineP2P(o){
   const rigaEuro = '<span class="p2p-grande p2p-euro">'
     + (paghiEuro ? 'Paghi ' : 'Ricevi ') + eurTxt + '</span>';
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + (paghiEuro ? 'ricevi ' : 'Paghi ') + sats + '</span>';
-  /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «prezzo di
-     mercato» nudo a premio zero, «prezzo di mercato +4%» col premio —
-     e in tinta ci va SOLO il segno con la percentuale, che le parole
-     sono un fatto e il giudizio sta nel numero. Niente «sopra» e
-     «sotto» (set 2026, ritocco di Andrea): il segno e il colore lo
-     dicono gia', e due modi di dire la stessa cosa sono uno di
-     troppo. A importo fisso (amt>0) la riga non c'e': quel prezzo il
-     mercato non lo guarda.
-     ⚠️ E LA RIGA E' UNA SPIEGAZIONE, NON UN CONTO DA FARE: i sats
-     qui sopra sono GIA' al netto del premio (satsMercatoP2P lo
-     applica, la formula del coordinatore) E della meta' di
-     commissione (nettoLatoP2P), quindi «ricevi ≈ X sats» e' la cifra
-     che passera' di mano davvero e questa riga dice solo PERCHE' e'
-     diversa dal cambio puro. Mai una cifra a mercato puro col premio
-     da applicare a mente; il conto voce per voce sta nel dettaglio.
-     LA TINTA E' UN GIUDIZIO PER CHI LEGGE. VERIFICATO SUI BYTE due
-     volte (mostro v0.18.6, get_market_quote in src/util.rs):
-     `sats -= premium/100 * sats`, sottrazione UNIFORME — il kind non
-     tocca ne' formula ne' segno. Quindi un premio positivo
-     ASSOTTIGLIA sempre i sats: su un SELL chi legge ne riceve meno
-     per i suoi euro (paga di piu': avviso), su un BUY ne invia meno
-     per gli stessi euro (incassa di piu': affare). Il segno del
-     giudizio si rovescia col lato, il testo no. */
+    + (paghiEuro ? 'Ricevi ' : 'Paghi ') + sats + '</span>';
+  /* LA RIGA DEL PREZZO E' MORTA CON LA CARD ESSENZIALE (10 set 2026,
+     ritocco di Andrea): «al prezzo di mercato» non serviva a
+     decidere — la cifra qui sopra e' GIA' il netto di tutto, premio
+     e meta' di commissione (nettoLatoP2P), la stessa del conto nel
+     dettaglio — e il conto per esteso sta la'.
+     AL SUO POSTO UN BADGE, e solo quando c'e' un premio: e' il SOLO
+     premio del venditore, mai la commissione (che e' uguale per
+     tutti), perche' il suo mestiere e' CONFRONTARE le offerte fra
+     loro. Le parole dicono il gesto di chi legge — «piu' caro» /
+     «Risparmi» a comprare, «Incassi in piu'/in meno» a vendere — e
+     la tinta e' il giudizio delle card di sempre: affare/avviso dal
+     lato, la formula uniforme di get_market_quote (verificata sui
+     byte) per cui un premio positivo assottiglia sempre i sats.
+     A premio zero nessun badge, e a prezzo fisso nemmeno: quel
+     prezzo il mercato non lo guarda. */
   const affare = (o.lato === 'buy') === (o.premium > 0);
-  const prezzo = o.sats > 0 ? ''
-    : '<span class="p2p-prezzo">prezzo di mercato'
-      + (o.premium ? ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-          + (o.premium > 0 ? '+' : '−')
-          + esc(String(Math.abs(o.premium))) + '%</b>' : '')
+  const pr = Math.abs(Math.round(o.premium || 0));
+  const badge = (o.sats > 0 || !pr) ? ''
+    : '<span class="p2p-badge ' + (affare ? 'affare' : 'avviso') + '">'
+      + (paghiEuro
+        ? (o.premium > 0 ? pr + '% più caro' : 'Risparmi il ' + pr + '%')
+        : 'Incassi il ' + pr + '% in ' + (o.premium > 0 ? 'più' : 'meno'))
       + '</span>';
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
@@ -34319,7 +34316,7 @@ function rigaOrdineP2P(o){
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${prezzo}
+    ${badge}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
