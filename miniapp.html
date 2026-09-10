@@ -34188,7 +34188,7 @@ function renderP2P(){
          arrivano tutti insieme e ci si passa una volta per sessione.
          Chi pubblica adesso ha il suo giro al prossimo ingresso, che
          per una faccia e' un'attesa che non fa male a nessuno. */
-      registraOrdiniP2P(Object.keys(miei || {})).catch(() => {});
+      intestaOrdiniP2P(Object.keys(miei || {})).catch(() => {});
       renderP2P();
     }).catch(() => {});
   }
@@ -36318,8 +36318,13 @@ function applicaMessaggioP2P(ord, dentro){
      puo' arrivare anche quando nessuno la sta aspettando (app riaperta,
      relay che ripete), e da li' in poi lo scambio deve avere il nome
      col quale il coordinatore lo chiamera' per sempre. */
-  if (provvisorioP2P(nuovo.id) && dentro.id) rinominaOrdineP2P(nuovo, dentro.id);
-  else scriviOrdineP2P(nuovo);
+  if (provvisorioP2P(nuovo.id) && dentro.id) {
+    rinominaOrdineP2P(nuovo, dentro.id);
+    /* e col nome vero l'ordine si intesta SUBITO, volto compreso: la
+       restore della sessione dopo era una faccia in ritardo di tre
+       aperture (vedi `intestaOrdiniP2P`) */
+    intestaOrdiniP2P([nuovo.id]).catch(() => {});
+  } else scriviOrdineP2P(nuovo);
   /* IL RITIRATO NON SI VEDE PIU' (set 2026, decisione di Andrea):
      ritirato = sparito, subito e ovunque — niente card «annullato»
      che resta in giro. Il rimotore pulisce anche le cache di sessione
@@ -38399,6 +38404,31 @@ async function chiediFacceP2P(ids){
     finally { p2pFacceGiro = null; }
   })();
   return p2pFacceGiro;
+}
+/* IL VOLTO SUBITO, NON ALLA TERZA APERTURA (10 set 2026, dal campo di
+   Andrea: l'ordine appena pubblicato era «mio» ma la card restava
+   senza foto per tre chiusure/riaperture). Il perche' e' una corsa in
+   due tempi: la card chiede il volto appena il libro la mostra, il
+   server non sa ancora di chi e' l'ordine (l'intestazione partiva solo
+   con la restore, cioe' alla sessione DOPO), e `p2pFacceChieste`
+   ricorda «gia' chiesto» per tutta la sessione — quindi il no diventa
+   definitivo. Alla sessione dopo la restore intesta, ma la domanda dei
+   volti del render parte PRIMA che l'intestazione sia atterrata: altro
+   no, altra sessione. Da qui: si intesta, e DOPO che il server ha detto
+   ok si richiede il volto di quegli id (dimenticando il «gia' chiesto»)
+   e la card si ridisegna. Due chiamanti: la risposta del coordinatore
+   che assegna l'id vero a un ordine appena pubblicato, e la restore. */
+async function intestaOrdiniP2P(ids){
+  const lista = (ids || []).filter(id => id && !provvisorioP2P(id));
+  if (!lista.length) return false;
+  if (!(await registraOrdiniP2P(lista))) return false;
+  /* una domanda in volo si aspetta: `chiediFacceP2P` a giro occupato
+     rifiuta, e il volto resterebbe di nuovo indietro */
+  try { await p2pFacceGiro; } catch(e){}
+  lista.forEach(id => p2pFacceChieste.delete(id));
+  const nuove = await chiediFacceP2P(lista);
+  if (nuove) renderP2P();
+  return !!nuove;
 }
 /* Dal volto al negozio: il tocco sale fin qui e non oltre — la card
    sotto aprirebbe l'ordine, e un tocco solo deve fare una cosa sola. */

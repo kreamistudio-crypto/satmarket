@@ -36957,6 +36957,68 @@ def prove_volti_libro():
           "ordine-mai-visto" in f)
     con.close()
 
+    # --- IL VOLTO SUBITO (set 2026, dal campo: la foto alla terza apertura)
+    # La corsa: il volto si chiede prima che il server sappia di chi e'
+    # l'ordine, e «gia' chiesto» vale per la sessione. L'intestazione
+    # richiede DOPO l'ok del server, e ridisegna.
+    intesta = pezzo_js(mini, "async function intestaOrdiniP2P(ids){", "\n}\n")
+    prova("l'intestazione registra PRIMA di richiedere il volto", True,
+          0 < intesta.find("await registraOrdiniP2P(lista)")
+          < intesta.find("p2pFacceChieste.delete(id)") < intesta.find("await chiediFacceP2P(lista)"))
+    prova("...aspetta una domanda in volo", True, "try { await p2pFacceGiro; } catch(e){}" in intesta)
+    prova("...e ridisegna quando il volto arriva", True, "if (nuove) renderP2P();" in intesta)
+    appl = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")
+    prova("l'id vero del coordinatore intesta subito l'ordine appena pubblicato", True,
+          0 < appl.find("rinominaOrdineP2P(nuovo, dentro.id);") < appl.find("intestaOrdiniP2P([nuovo.id])"))
+    prova("...e la restore passa dalla stessa strada", True,
+          "intestaOrdiniP2P(Object.keys(miei || {}))" in mini
+          and "registraOrdiniP2P(Object.keys(miei" not in mini)
+    import shutil as _shv, subprocess as _spv, tempfile as _tfv, json as _jsv
+    _node = _shv.which("node")
+    if not _node:
+        salta("l'intestazione fa girare il volto", "node non installato")
+        return
+    volti = mini[mini.index("let p2pOrdiniRegistrati = new Set();"):
+                 mini.index("/* Dal volto al negozio")]
+    banco = (
+        "let DEMO = false, VETRINA = false, myTgId = 111; const API_BASE = '/api';\n"
+        "function authHdr(){ return 'x'; }\n"
+        "function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }\n"
+        "let renderN = 0; function renderP2P(){ renderN++; }\n"
+        "let registrati = new Set(), chiamate = [];\n"
+        "async function fetch(url, opt){ chiamate.push(url); const ids = JSON.parse(opt.body).ordini;\n"
+        "  if (url.endsWith('/p2p/ordini')) { ids.forEach(i => registrati.add(i)); return {ok: true}; }\n"
+        "  const facce = {}; ids.forEach(i => { if (registrati.has(i)) facce[i] = {nome: 'Ada'}; });\n"
+        "  return {ok: true, json: async () => ({facce})}; }\n"
+        + volti +
+        "(async () => { const out = {};\n"
+        "  out.primaNo = (await chiediFacceP2P(['ord-1'])) === false && !p2pFacce['ord-1'];\n"
+        "  out.nonRichiede = (await chiediFacceP2P(['ord-1'])) === false && chiamate.length === 1;\n"
+        "  out.intesta = (await intestaOrdiniP2P(['ord-1', 'nuovo:3'])) === true;\n"
+        "  out.voltoArrivato = !!p2pFacce['ord-1'] && renderN === 1;\n"
+        "  out.ordineGiusto = chiamate.slice(1).map(u => u.split('/').pop()).join(',') === 'ordini,facce';\n"
+        "  out.provvisorioFuori = !registrati.has('nuovo:3');\n"
+        "  const prima = chiamate.length; const fetchVero = fetch; fetch = async () => ({ok: false});\n"
+        "  out.rifiutoTace = (await intestaOrdiniP2P(['ord-2'])) === false && chiamate.length === prima;\n"
+        "  fetch = fetchVero;\n"
+        "  process.stdout.write(JSON.stringify(out)); })();\n")
+    _f = _tfv.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f.write(banco); _f.close()
+    _r = _spv.run([_node, _f.name], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("il banco del volto gira", "", _r.stderr[-400:])
+        return
+    o = _jsv.loads(_r.stdout.strip())
+    for k, nome in (("primaNo", "il volto chiesto prima dell'intestazione e' un no"),
+                    ("nonRichiede", "...e da solo non si richiede in sessione"),
+                    ("intesta", "l'intestazione registra e richiede"),
+                    ("voltoArrivato", "...e il volto arriva, con un ridisegno"),
+                    ("ordineGiusto", "...prima l'ordine al server, poi la domanda"),
+                    ("provvisorioFuori", "un id provvisorio non si intesta"),
+                    ("rifiutoTace", "col server che dice no non si richiede niente")):
+        prova(nome, True, o.get(k))
+
 
 def prove_timbro_asset():
     """IL TIMBRO DEGLI ASSET (set 2026, i loghi stantii): gli asset si
@@ -38379,6 +38441,8 @@ const document = {querySelector: s => ({id: 'view-p2pordine'})};
 let qr = []; async function disegnaQr(box, testo, modo){ qr.push(testo); }
 function bottoneInAttesa(b, t){ return () => {}; }
 let renderP2Pn = 0; function renderP2P(){ renderP2Pn++; }
+/* l'intestazione vive nel blocco dei volti, fuori dal motore: si stubba */
+let intestati = []; function intestaOrdiniP2P(ids){ intestati.push(...(ids || [])); return Promise.resolve(true); }
 /* la riga dell'altra piazza vive nel blocco del libro: qui si presta,
    e i suoi casi veri girano nel banco del libro */
 function repRigaP2P(rep){ return rep ? '[rep]' : ''; }
@@ -39301,6 +39365,7 @@ const mondo = {a: {mazzo: null, ordini: {}}, b: {mazzo: null, ordini: {}}};
 function mazzoMostro(){ return mondo[LATO].mazzo; }
 function ordiniP2P(){ return mondo[LATO].ordini; }
 function scriviOrdineP2P(o){ mondo[LATO].ordini[o.id] = o; return o; }
+function intestaOrdiniP2P(){ return Promise.resolve(false); }
 function ordiniAscoltoP2P(){
   const m = {};
   for (const id in ordiniP2P()) { const o = ordiniP2P()[id]; if (o.pubTrade) m[o.pubTrade] = o; }
@@ -39959,9 +40024,11 @@ def prove_p2p_pubblica():
                         "\n}\n")
 
     # --- 1) IL RINOME STA NEL FUNNEL ---------------------------------
+    # (dal 10 set 2026 il rinome apre una graffa: col nome vero l'ordine
+    # si intesta subito, volto compreso — vedi `intestaOrdiniP2P`)
     prova("il rinome vive dove passano TUTTE le risposte", True,
-          "if (provvisorioP2P(nuovo.id) && dentro.id) "
-          "rinominaOrdineP2P(nuovo, dentro.id);" in applica)
+          "if (provvisorioP2P(nuovo.id) && dentro.id) {" in applica
+          and "rinominaOrdineP2P(nuovo, dentro.id);" in applica)
     prova("...e chi crea l'ordine non se lo scrive per conto suo", False,
           "rinominaOrdineP2P(" in invia)
     prova("il nome vecchio si cancella dalla mappa", True,
@@ -42195,7 +42262,7 @@ def prove_p2p_server():
           "chiediMieiOrdiniP2P().then((miei) => {" in rp
           and "renderP2P();" in rp)
     prova("...e i propri ordini si dicono al server da li'", True,
-          "registraOrdiniP2P(Object.keys(miei || {}))" in rp)
+          "intestaOrdiniP2P(Object.keys(miei || {}))" in rp)
 
     # --- 16) LE DUE CURE DEL 9 SET 2026 (il loop e la lista vuota) ---
     # ⚠️ IL LOOP: la chiave si derivava PRIMA che il bundle fosse
@@ -42307,6 +42374,7 @@ function chiaveScambio(sk, i){ return {sk: 'sk:' + i, pub: 'pub:' + i, indice: i
 function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
 function scriviOrdineP2P(o){ ordiniFinti[o.id] = o; return o; }
 function rinominaOrdineP2P(o, nuovo){ delete ordiniFinti[o.id]; o.id = String(nuovo); ordiniFinti[o.id] = o; return o; }
+function intestaOrdiniP2P(){ return Promise.resolve(false); }
 let relayChiesto = 0;
 async function mostroConnetti(){ relayChiesto++; throw new Error('banco: niente relay'); }
 function pulisciScambiP2P(){ return 0; }
