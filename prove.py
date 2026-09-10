@@ -35597,6 +35597,67 @@ def prove_p2p_libro():
           True, "const mostrati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));" in _rp
           and "${mostrati.length} " in _rp
           and "mostrati.map(rigaOrdineP2P)" in _rp)
+    # --- LA PILLOLA STA SOTTO IL LOGO (set 2026, ritocco di Andrea) ---
+    # ⚠️ NON BASTA CENTRARE LA PILLOLA: i due lati hanno larghezze
+    # diverse — «Filtro» da una parte, «N offerte» dall'altra, e il
+    # numero cambia — quindi il divisorio cadrebbe spostato, e di quanto
+    # lo deciderebbe il conteggio. I due lati valgono `flex:1 1 0`, cioe'
+    # entrambi quanto il piu' largo: il divisorio cade a meta' della
+    # pillola, e la pillola a meta' della riga, dove sta il logo.
+    _pil = pezzo_js(mini, "  .p2p-filtro{", "}")
+    prova("la pillola e' stretta sul contenuto e centrata nella riga", True,
+          "width:fit-content" in _pil and "margin:2px auto 10px" in _pil)
+    # ⚠️ LO FA LA GRIGLIA E NON IL FLEX, ed e' la riga da non
+    # «semplificare»: `flex:1 1 0` pareggia solo lo spazio AVANZATO, e
+    # con `width:fit-content` non ne avanza — misurato dal vivo, a «1
+    # offerta» il divisorio se ne andava di 11px. Due colonne `1fr`,
+    # sotto dimensionamento intrinseco, valgono entrambe quanto la piu'
+    # capiente: scarto 0,00px da 1 a 128 offerte.
+    prova("...e i due lati pesano uguale per griglia, non per flex",
+          True, "display:grid" in _pil
+          and "grid-template-columns:1fr auto 1fr" in _pil
+          and "flex:1 1 0" not in _pil)
+    # il lato sinistro ha una scatola sua: senza, icona e «Filtro» sono
+    # due fratelli del conteggio e un flex non sa che vanno pesati insieme
+    prova("...e il lato sinistro sta in una scatola sua", True,
+          '<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>' in _rp)
+    # --- LA TESTATA RESTA IN ALTO -------------------------------------
+    # UN blocco solo per tab, logo e pillola: con due sticky impilati il
+    # secondo vorrebbe un `top` pari all'altezza del primo, cioe' un
+    # numero da tenere in pari a mano.
+    _stk = pezzo_js(mini, "  .p2p-sticky{", "}")
+    prova("tab, logo e pillola restano attaccati in alto", True,
+          "position:sticky" in _stk and "top:0" in _stk)
+    # ⚠️ IL FONDO NON E' DECORAZIONE: senza, le card salgono VISIBILI
+    # dietro i tab. E lo z-index sta sopra le card, che sono relative.
+    prova("...con un fondo suo e sopra le card", True,
+          "background:var(--bg)" in _stk and "z-index:" in _stk)
+    # ⚠️ CONTENIMENTO, NON ORDINE: la prima stesura guardava solo che la
+    # pillola venisse DOPO i tab — e spostandola FUORI dal blocco
+    # attaccato l'ordine resta identico, quindi taceva su una pillola
+    # che torna a scorrere. Trovato dalla tortura.
+    # ⚠️ E NON SI CAMMINA SUI TAG per contarli: la seconda stesura lo
+    # faceva, ed era un giro fragile che nel banco rispondeva un'altra
+    # cosa da quella che rispondeva a mano. Il markup qui e' FISSO, e la
+    # forma si guarda per quello che e': il blocco si apre sui tab, e si
+    # CHIUDE dopo la pillola — cioe' fra la pillola e il corpo che scorre
+    # c'e' la graffa del blocco.
+    prova("...e tab e pillola stanno DENTRO il blocco, non dopo", True,
+          re.search(r'<div class="p2p-sticky">\s*<div class="p2p-lati"', mini)
+          is not None
+          and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
+                        r'<div id="p2pCorpo">', mini) is not None)
+    prova("la pillola vive nella testata, fuori dal corpo che scorre", True,
+          "if (testaBox) testaBox.innerHTML = pillola;" in _rp
+          and "box.innerHTML = avvisi" in _rp)
+    # gli AVVISI restano col libro: appesi in alto mangerebbero schermo
+    # per sempre a chi scorre, e raccontano la lettura di adesso
+    prova("...e gli avvisi del libro restano col libro", True,
+          "const avvisi =" in _rp and "Elenco parziale" not in _rp[:_rp.index("const avvisi =")])
+    # niente pillola finche' non c'e' un libro: un «0 offerte» appeso in
+    # alto mentre si legge e' il numero vero di una cosa non chiesta
+    prova("...e in attesa del libro la testata resta vuota", True,
+          "if (testaBox) testaBox.innerHTML = '';" in _rp)
     # e la pillola si VESTE quando restringe: senza, il libro corto
     # sembrerebbe un libro vuoto
     prova("...e si veste solo quando il filtro restringe davvero", True,
@@ -35644,6 +35705,44 @@ def prove_p2p_libro():
     prova("i due pallini del cursore doppio non si scavalcano", True,
           "if (vDa > vA) { if (document.activeElement === da) vDa = vA; else vA = vDa; }"
           in pezzo_js(mini, "function muoviDoppioP2P(nome){", "\n}\n"))
+    # --- I CURSORI SCORRONO (set 2026, dal campo: «a scatti») --------
+    # ⚠️ NON ERA IL PASSO: `renderFiltroP2P` riscrive `innerHTML`, cioe'
+    # DISTRUGGE E RICREA i due `input[type=range]` a ogni `oninput` — il
+    # pallino che il dito tiene sparisce a meta' trascinamento e il
+    # browser perde la presa. Si tocca solo quel che cambia.
+    _mv = pezzo_js(mini, "function muoviDoppioP2P(nome){", "\n}\n")
+    _mv_codice = re.sub(r"/\*[\s\S]*?\*/", "", _mv)
+    prova("trascinare un pallino non ridisegna il foglio", False,
+          "renderFiltroP2P(" in _mv_codice)
+    prova("...si spostano i due bordi della fascia", True,
+          "scatola.style.setProperty('--da', f.da);" in _mv_codice
+          and "scatola.style.setProperty('--a', f.a);" in _mv_codice)
+    prova("...e si riscrivono i due capi, senza toccare altro", True,
+          "sx.textContent = capi.sx;" in _mv_codice
+          and "dx.textContent = capi.dx;" in _mv_codice)
+    # i min/max si RILEGGONO dal campo: una copia qui sarebbe la seconda
+    # da tenere in pari con le costanti del chiamante
+    prova("...leggendo min e max dal campo, non ribattendoli", True,
+          "fasciaDoppiaP2P(vDa, vA, Number(da.min), Number(da.max))" in _mv_codice)
+    # I DUE CAPI IN UN POSTO SOLO: li scrive il disegno iniziale E il
+    # trascinamento, e due formule direbbero due numeri diversi mentre
+    # il dito si muove
+    prova("i due capi hanno un giudice solo", True,
+          "function capiDoppioP2P(nome, da, a){" in mini
+          and mini.count("capiDoppioP2P(") == 3)
+    prova("...e il chiamante non se li scrive piu' da se'", False,
+          "capoSx" in mini or "capoDx" in mini)
+    # --- L'ARIA E IL TITOLO DEL FOGLIO -------------------------------
+    prova("i titoli del foglio filtro hanno aria sotto", True,
+          "#p2pFiltroCorpo .section-label{padding-top:20px;padding-bottom:9px}" in mini)
+    # SCONTO A SINISTRA, come lo slider: il titolo diceva l'ordine
+    # opposto ai due capi, e un titolo che legge al contrario del
+    # cursore fa cercare il segno dalla parte sbagliata
+    _rf = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
+    prova("il titolo dice «Sconto / Premio», come i due capi", True,
+          "Sconto / Premio" in _rf and "Premio / Sconto" not in _rf)
+    prova("...e i due capi restano sconto a sinistra, premio a destra", True,
+          "sx: 'Sconto: '" in mini and "dx: 'Premio: '" in mini)
     # e il foglio si chiude col censimento di casa, come i fratelli
     prova("#p2pFiltroSheet si chiude col censimento di casa", True,
           "el('p2pFiltroSheet').classList.remove('open');"

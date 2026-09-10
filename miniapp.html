@@ -1784,6 +1784,25 @@
      la linea vive sotto OGNI tab — grigia sul quieto, colorata
      sull'attivo — e sotto il logo non passa niente */
   .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px}
+  /* ---- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea:
+     «tab, logo e pillola attaccati in alto; scorrono solo le card»).
+     UN SOLO STICKY per tutt'e due, e non due impilati: con due
+     bisognerebbe dare al secondo un `top` pari all'altezza del
+     primo — un numero da tenere in pari a mano, che al primo
+     ritocco del logo diventa una sovrapposizione. Qui il blocco e'
+     uno e la sua altezza la decide il contenuto.
+     ⚠️ IL FONDO NON E' DECORAZIONE: senza, le card salgono VISIBILI
+     dietro i tab (lo sticky non ha sfondo suo). E lo `z-index` sta
+     sopra le card, che sono `position:relative` e senza di lui
+     vincerebbero per ordine di documento.
+     ⚠️ NIENTE MARGINE NEGATIVO QUI SOPRA, ed e' la prima stesura che
+     lo aveva: con un `margin-top` negativo lo sticky pinna il MARGINE
+     a `top`, quindi il bordo resta 6px piu' in basso e in cima avanza
+     una fessura trasparente da cui si vedono passare le card.
+     Misurata: bordo a 6px invece che a 0. Il blocco comincia dove
+     comincia il contenuto e basta — il respiro sopra lo mette gia'
+     `.sicu`, e da attaccato non serve. */
+  .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg)}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -1812,15 +1831,39 @@
      copia della stessa verita'.
      Quando un filtro e' acceso la pillola si veste del lato: e' l'unico
      modo di accorgersi che il libro non e' tutto il libro. */
-  .p2p-filtro{display:inline-flex;align-items:center;gap:8px;margin:2px 0 10px;
+  /* ⚠️ LA LINEA VERTICALE STA SOTTO IL LOGO (set 2026, ritocco di
+     Andrea), e non basta centrare la pillola: i due lati hanno
+     larghezze diverse — «Filtro» da una parte, «N offerte»
+     dall'altra, e il numero cambia — quindi una pillola centrata
+     terrebbe il divisorio SPOSTATO, e di quanto lo deciderebbe il
+     conteggio. Qui i due lati valgono UGUALE — entrambi quanto il piu'
+     largo — quindi il divisorio cade a meta' della pillola, e la
+     pillola sta a meta' della riga: dove sta il logo, centrato dai due
+     tab `flex:1` che lo stringono con margini uguali.
+     ⚠️ E LO FA LA GRIGLIA, NON IL FLEX, che e' la riga da non
+     «semplificare»: `flex:1 1 0` pareggia solo lo SPAZIO AVANZATO, e
+     con `width:fit-content` non ne avanza — ogni lato si prende la sua
+     larghezza naturale e il divisorio se ne va. Due colonne `1fr` di
+     griglia, sotto dimensionamento intrinseco, diventano invece
+     entrambe grandi quanto la piu' capiente. Misurato dal vivo su
+     1, 2, 3, 10, 99 e 128 offerte: scarto 0,00px in tutti e sei.
+     `width:fit-content` + margini automatici: la pillola resta
+     stretta sul suo contenuto E centrata, che con `inline-flex` in
+     un blocco allineato a sinistra non si poteva. */
+  .p2p-filtro{display:grid;grid-template-columns:1fr auto 1fr;
+    align-items:center;gap:8px;
+    width:fit-content;margin:2px auto 10px;
     padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;
     background:var(--card);color:var(--ink);font:inherit;font-weight:700;
     font-size:13px;cursor:pointer}
+  .p2p-filtro .p2p-filtro-sx{display:flex;align-items:center;
+    justify-content:flex-end;gap:8px}
   .p2p-filtro .p2p-ico{width:17px;height:17px;color:var(--muted)}
   .p2p-filtro b{font-weight:800;letter-spacing:.02em}
   .p2p-filtro s{width:1px;height:15px;background:var(--field-line);
     display:inline-block;text-decoration:none}
-  .p2p-filtro em{font-style:normal;color:var(--muted);font-weight:700}
+  .p2p-filtro em{text-align:left;
+    font-style:normal;color:var(--muted);font-weight:700}
   .p2p-filtro.acceso{border-color:var(--trust);color:var(--trust);
     background:var(--trust-soft)}
   .p2p-filtro.acceso .p2p-ico,.p2p-filtro.acceso em{color:inherit}
@@ -2031,6 +2074,14 @@
   .p2p-x{margin-left:auto}
   #view-p2p .btn{margin-top:14px}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  /* L'ARIA SOTTO I TITOLI del foglio filtro (set 2026, ritocco di
+     Andrea): l'etichetta di sezione di casa non ha respiro sotto —
+     va bene dove separa due blocchi larghi, qui incollava «Valute»
+     alle sue pillole. Si allarga SOLO in questo foglio: la stessa
+     classe vive in mezza app, e allargarla ovunque sarebbe un
+     ritocco che nessuno ha chiesto. */
+  #p2pFiltroCorpo .section-label{padding-top:20px;padding-bottom:9px}
+  #p2pFiltroCorpo .section-label:first-child{padding-top:6px}
 
   /* ======= IL FOGLIO «PUBBLICA» A PIENO SCHERMO (set 2026) =======
      Ricalca la STRUTTURA del foglio di Mostro — una sezione per
@@ -6052,10 +6103,21 @@ document.getElementById('cartello')?.remove();</script>
            Gli id restano quelli di ieri: renderP2P accende `attiva`
            su questi due e basta, e il logo in mezzo non e' una voce —
            e' un'immagine, la spazzata dei tab non lo vede. -->
-      <div class="p2p-lati" role="tablist">
-        <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
-        <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
-        <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
+      <!-- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea):
+           tab, logo e pillola del filtro stanno in UN blocco
+           `sticky`, e sotto scorrono le sole card. Un blocco solo e
+           non due impilati: con due il secondo vorrebbe un `top`
+           pari all'altezza del primo, cioe' un numero da tenere in
+           pari a mano. #p2pTesta e' vuoto nel markup e lo riempie
+           renderP2P — e' l'unica ragione per cui la pillola ha un
+           contenitore suo invece di stare in cima a #p2pCorpo. -->
+      <div class="p2p-sticky">
+        <div class="p2p-lati" role="tablist">
+          <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
+          <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
+          <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
+        </div>
+        <div id="p2pTesta"></div>
       </div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
@@ -34199,6 +34261,9 @@ function renderP2P(){
      vista giusta qualunque essa sia. */
   const box = el('p2pCorpo');
   const mieiBox = el('p2pMieiCorpo');
+  /* la pillola vive nella testata attaccata, fuori dal corpo che
+     scorre: e' l'unica ragione per cui ha un contenitore suo */
+  const testaBox = el('p2pTesta');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
@@ -34213,6 +34278,10 @@ function renderP2P(){
       : 'Leggo il libro degli ordini…') + '</div>';
     box.innerHTML = attesa;
     if (mieiBox) mieiBox.innerHTML = attesa;
+    /* niente pillola finche' non c'e' un libro da filtrare: un
+       «0 offerte» appeso in alto mentre si legge sarebbe un numero
+       vero di una cosa non ancora chiesta */
+    if (testaBox) testaBox.innerHTML = '';
     if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
     return;
   }
@@ -34255,14 +34324,25 @@ function renderP2P(){
      quasi tutti. Meno domande, e nessuna di piu' del necessario. */
   chiediFacceP2P(mostrati.map(o => o.id)).then(n => { if (n) renderP2P(); })
     .catch(() => {});
-  const testa = `<button type="button" class="p2p-filtro${
+  /* IL LATO SINISTRO STA IN UNA SCATOLA SUA, e non e' cosmesi: e'
+     l'appiglio che permette ai due lati di valere uguale e al
+     divisorio di cadere a meta' — sotto il logo (vedi il CSS della
+     pillola). Senza wrapper l'icona e «Filtro» sono due fratelli
+     del `em`, e un flex non sa che vanno pesati insieme. */
+  const pillola = `<button type="button" class="p2p-filtro${
       filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
-    + icoFiltroP2P() + `<b>Filtro</b><s></s><em>${mostrati.length} `
-    + `offert${mostrati.length === 1 ? 'a' : 'e'}</em></button>`
-    /* IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
-       arrivato dal solo specchio si legge come il libro vero, e un
-       ordine gia' preso sembra ancora libero. */
-    + (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
+    + `<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>`
+    + `<s></s><em>${mostrati.length} `
+    + `offert${mostrati.length === 1 ? 'a' : 'e'}</em></button>`;
+  /* GLI AVVISI RESTANO COL LIBRO e non salgono nella testata
+     attaccata: la pillola e' un COMANDO e vale sempre, questi
+     raccontano com'e' andata la lettura di adesso — appesi in alto
+     mangerebbero schermo per sempre a chi sta scorrendo le card.
+     IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
+     arrivato dal solo specchio si legge come il libro vero, e un
+     ordine gia' preso sembra ancora libero. */
+  const avvisi =
+      (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
         + `del libro, quindi qui puo' mancare qualcosa o restare un ordine gia' preso.</div>` : '')
     + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}</div>` : '');
   /* IL LIBRO E' SOLO IL LIBRO (set 2026, decisione di Andrea): la
@@ -34271,7 +34351,8 @@ function renderP2P(){
   /* LO STATO VUOTO DICE QUALE DEI DUE VUOTI E': «non c'e' niente» e
      «il tuo filtro non lascia passare niente» sono due cose diverse, e
      la seconda ha una strada d'uscita da offrire. */
-  box.innerHTML = testa
+  if (testaBox) testaBox.innerHTML = pillola;
+  box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
        : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">${
            vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'}</span>${
@@ -34323,15 +34404,24 @@ function fasciaDoppiaP2P(da, a, min, max){
 /* IL CURSORE A DUE PALLINI: due `input[type=range]` sovrapposti sopra
    un binario disegnato. Il pezzo e' UNO per tutt'e due i cursori del
    foglio — premio e reputazione — cosi' non possono divergere. */
+/* I DUE CAPI, in un posto solo (set 2026): li scrive il disegno
+   iniziale E il trascinamento, e due formule diverse sullo stesso
+   cursore direbbero due numeri diversi mentre il dito si muove. */
+function capiDoppioP2P(nome, da, a){
+  return nome === 'Premio'
+    ? {sx: 'Sconto: ' + premioTestoP2P(da), dx: 'Premio: ' + premioTestoP2P(a)}
+    : {sx: 'Min: ' + da, dx: 'Max: ' + a};
+}
 function doppioP2P(o){
   const f = fasciaDoppiaP2P(o.da, o.a, o.min, o.max);
+  const capi = capiDoppioP2P(o.nome, o.da, o.a);
   const campo = (quale, valore) =>
     '<input type="range" id="p2pF' + o.nome + quale + '" min="' + o.min +
     '" max="' + o.max + '" step="' + o.passo + '" value="' + valore +
     '" oninput="muoviDoppioP2P(\'' + o.nome + '\')" aria-label="' +
     esc(o.aria + ' ' + (quale === 'Da' ? 'minimo' : 'massimo')) + '">';
-  return '<div class="p2p-capi"><span style="color:var(--danger)">' + o.capoSx +
-      '</span><span style="color:var(--trust)">' + o.capoDx + '</span></div>' +
+  return '<div class="p2p-capi"><span id="p2pF' + o.nome + 'Sx" style="color:var(--danger)">' + capi.sx +
+      '</span><span id="p2pF' + o.nome + 'Dx" style="color:var(--trust)">' + capi.dx + '</span></div>' +
     '<div class="p2p-doppio" id="p2pF' + o.nome + '" style="--da:' + f.da +
       ';--a:' + f.a + ';--tinta:' + o.tinta + '">' +
     '<div class="p2p-doppio-binario"><span></span></div>' +
@@ -34350,7 +34440,30 @@ function muoviDoppioP2P(nome){
   a.value = String(vA);
   if (nome === 'Premio') { b.premioDa = vDa; b.premioA = vA; }
   else { b.repDa = vDa; b.repA = vA; }
-  renderFiltroP2P();
+  /* ⚠️ QUI NON SI RIDISEGNA IL FOGLIO, ed e' tutto il difetto degli
+     «scatti» (set 2026, dal campo: «i cursori scorrono a scatti»).
+     Non era il PASSO: `renderFiltroP2P` riscrive `innerHTML`, cioe'
+     DISTRUGGE E RICREA i due `input[type=range]` a ogni `oninput` —
+     quindi il pallino che il dito sta tenendo sparisce a meta'
+     trascinamento, il browser perde la presa, e per continuare
+     bisogna riafferrarlo. E' la lezione del lightbox «a scatti»:
+     quel che sembra lentezza e' quasi sempre qualcosa che si
+     rifa' da capo.
+     Si tocca solo quel che cambia: i due bordi della fascia (le
+     due variabili CSS) e il testo dei due capi. I `min`/`max` si
+     rileggono dal campo invece di ribatterli: le costanti stanno
+     nel chiamante, e una copia qui sarebbe la seconda da tenere in
+     pari. */
+  const f = fasciaDoppiaP2P(vDa, vA, Number(da.min), Number(da.max));
+  const scatola = el('p2pF' + nome);
+  if (scatola) {
+    scatola.style.setProperty('--da', f.da);
+    scatola.style.setProperty('--a', f.a);
+  }
+  const capi = capiDoppioP2P(nome, vDa, vA);
+  const sx = el('p2pF' + nome + 'Sx'), dx = el('p2pF' + nome + 'Dx');
+  if (sx) sx.textContent = capi.sx;
+  if (dx) dx.textContent = capi.dx;
 }
 function scegliValutaFiltroP2P(cod){
   const b = p2pFiltroBozza; if (!b) return;
@@ -34384,15 +34497,17 @@ function renderFiltroP2P(){
     '<div class="p2p-metodi">' + P2P_METODI.map(m =>
       pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P')).join('') +
     '</div>' +
-    '<div class="section-label">Premio / Sconto</div>' +
+    /* SCONTO A SINISTRA, come lo slider (set 2026, ritocco di
+       Andrea): il titolo diceva l'ordine opposto ai due capi qui
+       sotto — «Sconto» in rosso a sinistra, «Premio» in verde a
+       destra — e un titolo che legge al contrario del cursore
+       fa cercare il segno dalla parte sbagliata. */
+    '<div class="section-label">Sconto / Premio</div>' +
     doppioP2P({nome: 'Premio', min: -P2P_PREMIO_MAX, max: P2P_PREMIO_MAX, passo: 1,
-      da: b.premioDa, a: b.premioA, tinta: 'var(--sats)', aria: 'Premio',
-      capoSx: 'Sconto: ' + premioTestoP2P(b.premioDa),
-      capoDx: 'Premio: ' + premioTestoP2P(b.premioA)}) +
+      da: b.premioDa, a: b.premioA, tinta: 'var(--sats)', aria: 'Premio'}) +
     '<div class="section-label">Reputazione</div>' +
     doppioP2P({nome: 'Rep', min: 0, max: 5, passo: 1,
-      da: b.repDa, a: b.repA, tinta: 'var(--oro,#E0A82E)', aria: 'Reputazione',
-      capoSx: 'Min: ' + b.repDa, capoDx: 'Max: ' + b.repA}) +
+      da: b.repDa, a: b.repA, tinta: 'var(--oro,#E0A82E)', aria: 'Reputazione'}) +
     /* la reputazione e' quella del coordinatore, e chi non ha ancora
        voti non e' «scarso»: si dice, o un libro che si svuota a mezzo
        punto sembra un guasto */
