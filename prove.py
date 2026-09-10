@@ -35786,6 +35786,10 @@ def prove_p2p_libro():
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
+    # le chiavi del dispositivo portano il conto nel nome (set 2026):
+    # qui non c'e' identita', e senza vale il nome di ieri
+    pezzi.append("let myTgId = null;")
+    pezzi.append(pezzo_js(mini, "function chiaveP2P(base){", "\n}\n") + "\n}")
     # le due costanti dell'anello: il raggio e il giro, che
     # anelloScadenzaP2P usa per il dasharray
     for riga in ("const P2P_ANELLO_R = ", "const P2P_ANELLO_GIRO = ",
@@ -37552,7 +37556,8 @@ function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches =
   ordiniFinti = {}; toasts = []; conferme = []; ultimaConferma = null; p2pChiaviNote = null; p2pChiaviGiro = null;
   toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
   p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
-  myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero}; }
+  myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
+  p2pContoEsito = ''; p2pContoVerifica = null; p2pContoAllineato = null; p2pAdozione = false; }
 const corpo = f => JSON.parse(f.opt.body);
 (async () => {
   const out = {};
@@ -37834,6 +37839,109 @@ const corpo = f => JSON.parse(f.opt.body);
   await new Promise(r => setTimeout(r, 20));
   out.dimenticaRichiede = nodi.p2pProfiloCorpo.innerHTML.includes('nasce da solo')
     && !nodi.p2pProfiloCorpo.innerHTML.includes('altrove');
+
+  /* ---- IL CONTO SUL DISPOSITIVO (set 2026): due account, una WebView ----
+     Il caso dal campo: il secondo account Telegram sullo stesso telefono
+     trovava il mazzo del primo e lo usava. Da qui ogni chiave porta il
+     conto nel nome, il mazzo derivato sa di chi e', e quello di un altro
+     si mette da parte. NEL BANCO IL CLOUD E' UNO SOLO, mentre in Telegram
+     e' per utente: fra un conto e l'altro si svuota a mano. */
+  // A) il cambio di conto e' il cambio di un suffisso
+  reset();
+  allineaContoP2P();
+  const mUno = await assicuraMazzo();
+  out.contoChiaveConSuffisso = store.has('barattolo_mostro@111') && !store.has('barattolo_mostro');
+  myTgId = 222; cloud = new Map(); allineaContoP2P();
+  out.contoAltroNonVede = mazzoMostro() === null;
+  const mDue = await assicuraMazzo();
+  out.contoAltroFaIlSuo = !!mDue && mDue.sk !== mUno.sk && store.has('barattolo_mostro@222')
+    && JSON.parse(store.get('barattolo_mostro@111')).sk === mUno.sk;
+  myTgId = 111; allineaContoP2P();
+  out.contoRitrovaIlSuo = !!mazzoMostro() && mazzoMostro().sk === mUno.sk;
+  // ...e il cambio azzera quel che la sessione sapeva del conto di prima
+  p2pRegistrato = true; p2pChiaviNote = {chiavi: 3, dal: 1}; mazzoNuvola = 'copia';
+  myTgId = 222; allineaContoP2P();
+  out.contoAzzeraLaSessione = p2pRegistrato === false && p2pChiaviNote === null && mazzoNuvola === '';
+  // B) le chiavi di ieri, senza suffisso, passano al primo conto che
+  //    entra — e solo su un posto vuoto
+  reset();
+  const ieri = JSON.stringify({sk: mUno.sk, pub: mUno.pub, indice: 4, creato: 9, backupFatto: true, origine: '', versione: 0});
+  store.set('barattolo_mostro', ieri); store.set('barattolo_mostro_ordini', '{"o1":{"id":"o1"}}');
+  allineaContoP2P();
+  out.ieriMigra = store.get('barattolo_mostro@111') === ieri && !store.has('barattolo_mostro')
+    && store.get('barattolo_mostro_ordini@111') === '{"o1":{"id":"o1"}}' && !store.has('barattolo_mostro_ordini');
+  out.ieriLetto = !!mazzoMostro() && mazzoMostro().indice === 4;
+  store.set('barattolo_mostro', 'di-ieri');
+  allineaContoP2P();
+  out.ieriNonSovrascrive = store.get('barattolo_mostro@111') === ieri && store.get('barattolo_mostro') === 'di-ieri';
+  // C) i giudici: un mazzo 'conto' che dichiara un altro tg_id e' di un
+  //    altro; uno di ieri senza il campo si verifica; il resto no
+  const contoDi = (chi, s) => ({sk: s, pub: NT.getPublicKey(hexToBytes(s)), indice: 0, creato: 9,
+    backupFatto: true, origine: 'conto', versione: 1, conto: chi});
+  const skX = bytesToHex(NT.generateSecretKey()), skY = bytesToHex(NT.generateSecretKey());
+  reset();
+  out.giudiceEstraneo = mazzoEstraneoP2P(contoDi(222, skX)) === true
+    && mazzoEstraneoP2P(contoDi(111, skX)) === false
+    && mazzoEstraneoP2P(contoDi(0, skX)) === false
+    && mazzoEstraneoP2P(Object.assign(contoDi(222, skX), {origine: ''})) === false;
+  out.giudiceDaVerificare = mazzoDaVerificareP2P(contoDi(0, skX)) === true
+    && mazzoDaVerificareP2P(contoDi(111, skX)) === false
+    && mazzoDaVerificareP2P(Object.assign(contoDi(0, skX), {origine: ''})) === false;
+  // ...e il seme che torna nel mazzo lo timbra, una volta per sempre
+  reset();
+  ricordaMazzo(contoDi(0, skX));
+  rispSeme = {seme: skX, versione: 1};
+  await verificaContoInCorsoP2P(mazzoMostro());
+  out.verificaTimbra = mazzoMostro().conto === 111 && mazzoMostro().sk === skX && p2pContoEsito === 'mio'
+    && JSON.parse(store.get('barattolo_mostro@111')).conto === 111;
+  out.timbratoNonRichiede = mazzoDaVerificareP2P(mazzoMostro()) === false;
+  // ...il 409 e' «non lo so»: non si tocca e non si richiede in sessione
+  reset();
+  ricordaMazzo(contoDi(0, skX));
+  rispSeme = null;
+  await verificaContoInCorsoP2P(mazzoMostro());
+  out.verificaIgnotoNonTocca = !!mazzoMostro() && mazzoMostro().sk === skX && !mazzoMostro().conto
+    && p2pContoEsito === 'ignoto' && mazzoDaVerificareP2P(mazzoMostro()) === false;
+  // D) IL CASO DEL CAMPO: il mazzo di ieri e' del PRIMO account, il seme
+  //    del secondo dice un'altra chiave, e la copia sta anche nel cloud
+  //    del secondo. Si mette da parte, il cloud si ripulisce, e il gesto
+  //    torna col profilo del conto giusto — mai una firma con le chiavi
+  //    dell'altro.
+  reset();
+  const delPrimo = contoDi(0, skX);
+  ricordaMazzo(delPrimo);
+  store.set('barattolo_mostro_ordini@111', '{"o9":{"id":"o9"}}');
+  cloud.set('mostro_mazzo', mazzoSerializza(delPrimo));
+  rispSeme = {seme: skY, versione: 1};
+  const mio = await assicuraMazzo();
+  const targa = '@altrui:' + delPrimo.pub.slice(0, 8);
+  out.altruiMessoDaParte = store.get('barattolo_mostro' + targa) === mazzoSerializza(delPrimo)
+    && store.get('barattolo_mostro_ordini' + targa) === '{"o9":{"id":"o9"}}'
+    && !store.has('barattolo_mostro_ordini@111');
+  out.altruiNonFirmaPiu = !!mio && mio.sk === skY && mio.conto === 111 && mio.origine === 'conto'
+    && mazzoMostro().sk === skY;
+  out.altruiViaDalCloud = !!cloud.get('mostro_mazzo') && mazzoDaTesto(cloud.get('mostro_mazzo')).sk === skY;
+  out.altruiNienteFetchColSuo = !fetches.some(f => String(f.opt && f.opt.body || '').indexOf(delPrimo.pub) >= 0);
+  // ...ma una copia nel cloud che NON e' quella non si tocca
+  reset();
+  ricordaMazzo(contoDi(0, skX));
+  cloud.set('mostro_mazzo', JSON.stringify({sk: skY, pub: NT.getPublicKey(hexToBytes(skY))}));
+  rispSeme = {seme: bytesToHex(NT.generateSecretKey()), versione: 1};
+  await verificaContoInCorsoP2P(mazzoMostro());
+  out.altruiCloudDiversoResta = mazzoMostro() === null
+    && cloud.has('mostro_mazzo') && mazzoDaTesto(cloud.get('mostro_mazzo')).sk === skY;
+  // E) il cloud non da' un profilo di un altro conto: un mazzo timbrato
+  //    222 nel cloud di 111 se ne va invece di essere adottato
+  reset();
+  cloud.set('mostro_mazzo', mazzoSerializza(contoDi(222, skX)));
+  await sincronizzaMazzo();
+  out.cloudAltruiNonAdotta = mazzoMostro() === null && !cloud.has('mostro_mazzo') && mazzoNuvola === '';
+  // F) il mazzo derivato porta il conto, e il campo sopravvive al giro nel testo
+  reset();
+  rispSeme = {seme: skX, versione: 2};
+  const nato2 = await assicuraMazzo();
+  out.derivatoPortaIlConto = nato2.conto === 111 && mazzoDaTesto(mazzoSerializza(nato2)).conto === 111
+    && mazzoDaTesto(JSON.stringify({sk: skX})).conto === 0;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
 """
@@ -37915,6 +38023,27 @@ const corpo = f => JSON.parse(f.opt.body);
         "mutoTaceAvviso": "...e col server muto pure: non si avvisa a vuoto",
         "demoNonChiede": "in DEMO il conto non si chiede affatto",
         "dimenticaRichiede": "dimenticare butta il conto: il foglio non parla di una chiave tolta",
+        # il conto sul dispositivo (set 2026): due account, una WebView
+        "contoChiaveConSuffisso": "il mazzo vive sotto una chiave col conto nel nome",
+        "contoAltroNonVede": "un altro conto sullo stesso dispositivo non lo vede",
+        "contoAltroFaIlSuo": "...e fa il suo, senza toccare quello del primo",
+        "contoRitrovaIlSuo": "...e il primo, tornando, ritrova il suo",
+        "contoAzzeraLaSessione": "il cambio di conto azzera quel che la sessione sapeva",
+        "ieriMigra": "le chiavi di ieri passano al primo conto che entra",
+        "ieriLetto": "...e si leggono da li', indice compreso",
+        "ieriNonSovrascrive": "...ma un posto gia' occupato non si sovrascrive",
+        "giudiceEstraneo": "un mazzo 'conto' con un altro tg_id e' di un altro, e solo quello",
+        "giudiceDaVerificare": "un mazzo 'conto' di ieri si verifica, uno timbrato o di dispositivo no",
+        "verificaTimbra": "il seme uguale timbra il mazzo col conto",
+        "timbratoNonRichiede": "...e da li' non si richiede piu'",
+        "verificaIgnotoNonTocca": "il 409 e' «non lo so»: niente si tocca, e in sessione non si richiede",
+        "altruiMessoDaParte": "il mazzo di un altro conto si mette da parte, scambi compresi, mai buttato",
+        "altruiNonFirmaPiu": "...e il gesto torna col profilo del conto giusto",
+        "altruiViaDalCloud": "...la copia altrui nel cloud se ne va e ci finisce la mia",
+        "altruiNienteFetchColSuo": "...e nessuna richiesta al server porta la chiave dell'altro",
+        "altruiCloudDiversoResta": "una copia nel cloud che non e' quella non si tocca",
+        "cloudAltruiNonAdotta": "dal cloud un profilo di un altro conto non si adotta: se ne va",
+        "derivatoPortaIlConto": "il mazzo derivato porta il conto, e il campo sopravvive al testo",
     }
     for k, nome in attesi.items():
         prova(nome, True, out.get(k))
@@ -39119,6 +39248,11 @@ function bottoneInAttesa(){ return () => {}; }
 /* il magazzino del ricordo locale e gli stati finali: specchi del
    mondo vero, quanto basta per far girare l'identita' di pagamento */
 const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
+/* le chiavi del dispositivo portano il conto nel nome (set 2026): qui
+   non c'e' identita', e senza vale il nome di ieri (lo stub ricalca
+   `chiaveP2P`, che una sentinella tiene ferma in prove_p2p_conto_dispositivo) */
+let myTgId = null;
+function chiaveP2P(base){ return myTgId ? base + '@' + myTgId : base; }
 const magazzino = {};
 const localStorage = {getItem: k => (k in magazzino ? magazzino[k] : null),
                       setItem: (k, v) => { magazzino[k] = String(v); }};
@@ -40577,6 +40711,123 @@ console.log(JSON.stringify({
           "if (!idMostroVero(o.id))" in ch and "throw new Error" in ch)
 
 
+def prove_p2p_conto_dispositivo():
+    """IL CONTO SUL DISPOSITIVO (10 set 2026, dal campo di Andrea): due
+    account Telegram sullo stesso telefono, e il secondo trovava nella
+    WebView — che e' UNA, con UN localStorage per origine — il mazzo del
+    primo, e lo usava: i suoi ordini «miei», la sua faccia, e l'ordine
+    nuovo pubblicato con le SUE chiavi. Svuotare la cache non bastava:
+    `sincronizzaMazzo` aveva gia' caricato quel mazzo nel cloud del
+    secondo. Il banco che fa GIRARE la cura sta in `prove_p2p_chiavi`;
+    qui le righe che la tengono in piedi, una per una."""
+    print("\n[il conto sul dispositivo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    blocco = mini[mini.index("IL CONTO SUL DISPOSITIVO (10 set 2026)"):
+                  mini.index("/* ============ fine del conto sul dispositivo")]
+
+    # LE CATENE DI POSIZIONE USANO `find` E NON `index`, ed e' la tortura
+    # che l'ha chiesto: con `index` una riga TOLTA faceva esplodere la
+    # sezione invece di farla rossa — quattro mutazioni «uccise» da un
+    # crash, che in CI e' rosso lo stesso ma non dice QUALE riga manca.
+    # Con `find` la riga assente vale -1 e la catena e' falsa da sola.
+    # --- 1) NESSUNA CHIAVE DEL P2P SI LEGGE NUDA -----------------------
+    # ogni getItem/setItem/removeItem delle quattro passa da chiaveP2P:
+    # una lettura nuda e' una chiave che due conti condividono
+    nude = re.findall(r"localStorage\.(?:getItem|setItem|removeItem)\("
+                      r"(?:MOSTRO_CHIAVE|MOSTRO_ORDINI_CHIAVE|MOSTRO_LAPIDI_CHIAVE|RECAPITI_CHIAVE)\b",
+                      mini)
+    prova("le quattro chiavi del P2P non si leggono mai nude", [], nude)
+    prova("...e passano tutte da chiaveP2P", True,
+          mini.count("chiaveP2P(MOSTRO_CHIAVE)") == 3
+          and mini.count("chiaveP2P(MOSTRO_ORDINI_CHIAVE)") == 6
+          and mini.count("chiaveP2P(MOSTRO_LAPIDI_CHIAVE)") == 2
+          and mini.count("chiaveP2P(RECAPITI_CHIAVE)") == 2)
+    # la lista scritta per nome e le costanti tre blocchi piu' in la'
+    # devono dire le stesse quattro cose, o un nome nuovo resta di un
+    # conto solo per tutti
+    lista = re.search(r"const P2P_CHIAVI_DISPOSITIVO = \[([^\]]*)\];", mini)
+    nomi = re.findall(r"'([^']+)'", lista.group(1)) if lista else []
+    costanti = [re.search(r"const %s = '([^']+)';" % c, mini) for c in
+                ("MOSTRO_CHIAVE", "MOSTRO_ORDINI_CHIAVE", "MOSTRO_LAPIDI_CHIAVE", "RECAPITI_CHIAVE")]
+    prova("la lista delle chiavi del dispositivo e' in pari con le costanti",
+          [c.group(1) for c in costanti if c], nomi)
+    prova("chiaveP2P mette il conto nel nome, e senza conto vale il nome di ieri",
+          True, "return myTgId ? base + '@' + myTgId : base;" in blocco)
+
+    # --- 2) L'ALLINEAMENTO PARTE APPENA IL CONTO ARRIVA ----------------
+    avv = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    prova("avvia allinea il conto subito dopo aver saputo chi sei", True,
+          0 < avv.find("myTgId = me.tg_id;") < avv.find("allineaContoP2P();"))
+    all_ = pezzo_js(mini, "function allineaContoP2P(){", "\n}\n")
+    prova("...azzera la sessione se il conto e' cambiato", True,
+          "if (p2pContoAllineato !== null && p2pContoAllineato !== myTgId) azzeraSessioneP2P();" in all_)
+    prova("...e la chiave di ieri passa solo su un posto vuoto, poi sparisce dal nome nudo",
+          True, "if (localStorage.getItem(chiaveP2P(base)) !== null) continue;" in all_
+          and "localStorage.removeItem(base);" in all_)
+    azz = pezzo_js(mini, "function azzeraSessioneP2P(){", "\n}\n")
+    for v in ("p2pRegistrato = false", "p2pAdozione = false", "p2pPavimento = null",
+              "p2pMieiOrdini = null", "p2pMieiChiesto = false", "p2pChiaviNote = null",
+              "mazzoNuvola = ''", "p2pOrdiniRegistrati = new Set()", "p2pContoEsito = ''"):
+        prova("l'azzeramento tocca %s" % v.split(" =")[0], True, v in azz)
+
+    # --- 3) IL RENDER NON FIRMA CON LE CHIAVI DI UN ALTRO ---------------
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("il mazzo di un altro conto si mette da parte PRIMA di registrarlo",
+          True, 0 < rp.find("if (mz && mazzoEstraneoP2P(mz)) { parcheggiaMazzoAltruiP2P(mz); mz = null; }")
+          < rp.find("registraChiaviP2P([mz.pub])"))
+    prova("...e quello di ieri si verifica una volta, senza registrare ne' chiedere la restore",
+          True, "if (daVerificare && !p2pContoVerifica) verificaContoInCorsoP2P(mz).then(renderP2P, renderP2P);" in rp
+          and "if (mz && !daVerificare && !p2pRegistrato" in rp
+          and "if (mz && !daVerificare && !p2pMieiChiesto" in rp)
+    prova("l'adozione vuole l'identita', anche dentro Telegram", True,
+          "if (!mz && !p2pAdozione && myTgId) {" in rp
+          and "(cloudTelegram() || myTgId)" not in rp)
+    ass = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
+    prova("il gesto verifica un mazzo 'conto' di ieri PRIMA di firmarci sopra", True,
+          0 < ass.find("if (m && mazzoDaVerificareP2P(m)) return verificaContoInCorsoP2P(m).then(assicuraMazzo);")
+          < ass.find("if (m) { sincronizzaMazzo(); return Promise.resolve(m); }"))
+
+    # --- 4) DA PARTE, MAI VIA — e il cloud dopo -------------------------
+    par = pezzo_js(mini, "function parcheggiaMazzoAltruiP2P(m){", "\n}\n")
+    prova("il parcheggio scrive sotto @altrui e non cancella quel che ha scritto",
+          True, "const dove = '@altrui:' + String(m.pub || '').slice(0, 8);" in par
+          and "localStorage.setItem(base + dove, v);" in par
+          and "removeItem(base + dove" not in par)
+    prova("...alza la bandierina dell'adozione PRIMA di guardare il cloud, e la riabbassa dopo",
+          True, 0 < par.find("p2pAdozione = true;") < par.find("cloudLeggiEsito(CLOUD_MAZZO)")
+          < par.find("p2pAdozione = false;"))
+    prova("...e dal cloud toglie SOLO la copia di quel mazzo", True,
+          "if (su && su.sk === m.sk) await cloudCancella(CLOUD_MAZZO);" in par)
+    sin = pezzo_js(mini, "function sincronizzaMazzo(", "\n}\n")
+    ado = sin[sin.index("if (!m) {"):sin.index("if (letto.testo) {")]
+    prova("un mazzo di ieri adottato dal cloud non si registra prima della verifica", True,
+          "if (!mazzoDaVerificareP2P(su)) await registraChiaviP2P([su.pub]);" in ado)
+    prova("il cloud non da' un profilo di un altro conto: se ne va invece di essere adottato",
+          True, 0 < ado.find("if (mazzoEstraneoP2P(su)) { await cloudCancella(CLOUD_MAZZO); return (mazzoNuvola = ''); }")
+          < ado.find("ricordaMazzo(su);"))
+
+    # --- 5) IL MAZZO DEL CONTO SA DI CHI E' -----------------------------
+    blocco_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
+                        mini.index("/* ---- export CSV degli affari conclusi")]
+    prova("le due derivazioni dal seme timbrano il conto", 2,
+          blocco_mazzo.count("conto: myTgId, versione: s.versione | 0"))
+    prova("...e il campo viaggia nel testo, andata e ritorno", True,
+          "conto: m.conto|0});" in blocco_mazzo and "conto: d ? (d.conto|0) : 0};" in blocco_mazzo)
+    prova("i due giudici: 'conto' con un altro tg_id = estraneo; 'conto' senza tg_id = da verificare",
+          True, "m.origine === 'conto' && (m.conto | 0) && myTgId && (m.conto | 0) !== myTgId" in blocco
+          and "m.origine === 'conto' && !(m.conto | 0) && myTgId && p2pContoEsito !== 'ignoto'" in blocco)
+    ver = pezzo_js(mini, "async function verificaContoP2P(m){", "\n}\n")
+    prova("la verifica rilegge il mazzo dopo l'attesa, e non giudica uno cambiato nel frattempo",
+          True, "if (!ora || ora.sk !== m.sk) return;" in ver)
+    prova("...il 409 e' «non lo so» e non tocca niente", True,
+          "if (!s) { p2pContoEsito = 'ignoto'; return; }" in ver)
+    prova("...uguale timbra, diverso mette da parte", True,
+          "ricordaMazzo(Object.assign({}, ora, {conto: myTgId}));" in ver
+          and "await parcheggiaMazzoAltruiP2P(ora);" in ver)
+    prova("una verifica sola per sessione", True,
+          "if (!p2pContoVerifica) p2pContoVerifica = verificaContoP2P(m)" in mini)
+
+
 def prove_p2p_nuvola():
     """LA RICONCILIAZIONE DEL MAZZO COL CLOUD (set 2026, dal campo:
     telefono e desktop avevano due mazzi diversi, e un ordine pubblicato
@@ -40678,9 +40929,11 @@ def prove_p2p_nuvola():
     # ⚠️ IL GATE E' CRESCIUTO (set 2026, il campo dell'app): fuori da
     # Telegram si aspetta l'identita' prima di bruciare la bandierina
     # — senza, il seme del conto risponderebbe 409 e la gamba nuova
-    # non partirebbe mai in quella sessione.
+    # non partirebbe mai in quella sessione. E DAL 10 SET la vuole
+    # anche DENTRO Telegram: le chiavi portano il conto nel nome, e
+    # senza conto non c'e' un posto in cui adottare.
     prova("il render va a cercare il mazzo nel cloud quando manca", True,
-          "if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {" in _rp2p
+          "if (!mz && !p2pAdozione && myTgId) {" in _rp2p
           and "sincronizzaMazzo()" in _rp2p)
     prova("...una volta per sessione", True, "p2pAdozione = true;" in _rp2p)
     # e la bandierina NON si azzera dimenticando il profilo: quel gesto
@@ -40807,6 +41060,13 @@ def prove_p2p_nuvola():
           "function caricaNostrTools(){ return Promise.resolve(); }\n"
           "function mazzoDaTesto(t){ return LEGGIBILE && t ? JSON.parse(t) : null; }\n"
           "function mazzoSerializza(m){ return JSON.stringify(m); }\n"
+          # il conto sul dispositivo (set 2026): il giudice vero, e il cloud
+          # che si svuota — il ramo dell'adozione lo chiama per un mazzo
+          # 'conto' che dichiara un altro tg_id
+          "let myTgId = 111, p2pContoEsito = '';\n"
+          "function cloudCancella(){ NUVOLA = null; return Promise.resolve(true); }\n"
+          + pezzo_js(mini, "function mazzoEstraneoP2P(m){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function mazzoDaVerificareP2P(m){", "\n}\n") + "\n}\n"
           + sin + "\n"
           "const A = {sk:'aa', pub:'AA'}, B = {sk:'bb', pub:'BB'};\n"
           "(async () => {\n"
@@ -40834,6 +41094,15 @@ def prove_p2p_nuvola():
           "  await giro('niente da adottare', () => {});\n"
           "  await giro('adozione illeggibile', () => { NUVOLA = 'xx';\n"
           "    LEGGIBILE = false; });\n"
+          # ...e il profilo di un ALTRO conto (set 2026): non si adotta, e
+          # la copia se ne va dal cloud, che e' mio anche se lui no
+          "  await giro('altrui nel cloud', () => { NUVOLA = JSON.stringify(\n"
+          "    {sk:'cc', pub:'CC', origine:'conto', conto: 222}); });\n"
+          "  out['altrui via'] = NUVOLA === null;\n"
+          # ...e uno di ieri, 'conto' senza tg_id, si adotta ma NON si
+          # registra: lo fara' il render, dopo la verifica col seme
+          "  await giro('da verificare nel cloud', () => { NUVOLA = JSON.stringify(\n"
+          "    {sk:'cc', pub:'CC', origine:'conto'}); });\n"
           # ...e il FAIL-CLOSED nuovo: la lettura che NON riesce
           "  await giro('lettura fallita', () => { LOCALE = A;\n"
           "    LETTURA_OK = false; });\n"
@@ -40906,6 +41175,11 @@ def prove_p2p_nuvola():
             prova("...e una copia illeggibile non si adotta",
                   ["illeggibile", None, None, None, None],
                   g["adozione illeggibile"])
+            prova("...e un profilo di un altro conto nemmeno: niente adottato, niente registrato",
+                  ["", None, None, None, None], g["altrui nel cloud"])
+            prova("...e la sua copia se ne va dal cloud", True, g["altrui via"])
+            prova("un profilo di ieri, senza tg_id, si adotta ma non si registra prima della verifica",
+                  ["copia", None, None, "cc", None], g["da verificare nel cloud"])
             # IL FAIL-CLOSED NUOVO: «non ho potuto chiedere» non e' un
             # cloud vuoto. Scriverci sopra il mazzo locale
             # distruggerebbe la copia che c'era.
@@ -42112,7 +42386,11 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
     # il cloud fuori da Telegram non esiste — un dispositivo svuotato
     # restava senza profilo e i propri ordini si leggevano da
     # estranei. La gamba nuova e' `adottaProfiloContoP2P`.
-    prova("...il seme lo chiedono il gesto e la gamba dell'app", 2,
+    # ...E TRE DAL 10 SET 2026 (il conto sul dispositivo): la terza e'
+    # `verificaContoP2P`, che il seme lo chiede per sapere DI CHI e' un
+    # mazzo 'conto' di ieri — mai per farne uno. Il conto resta un
+    # censimento: un quarto chiamante va spiegato qui.
+    prova("...il seme lo chiedono il gesto, la gamba dell'app e la verifica del conto", 3,
           mini.count("await semeProfiloP2P()"))
     # --- LA GAMBA DELL'APP, i suoi confini -------------------------
     ad = pezzo_js(mini, "function adottaProfiloContoP2P(){", "\n}\n")
@@ -42130,7 +42408,7 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
     prova("il render prova il conto quando il cloud non da' niente",
           True, "if (!mazzoMostro()) await adottaProfiloContoP2P();" in rnd)
     prova("...e fuori da Telegram aspetta l'identita'", True,
-          "if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {" in rnd)
+          "if (!mz && !p2pAdozione && myTgId) {" in rnd)
     # E A INDICE ZERO LA RESTORE VUOLE IL PAVIMENTO IN VOLO: senza,
     # un giro concluderebbe «non ne hai» su un fatto mai chiesto, e
     # la bandierina alta lo renderebbe definitivo per la sessione.
@@ -49539,6 +49817,9 @@ def prove_scambi_p2p_vecchi():
         "  getItem: k => (k in _box ? _box[k] : null),\n"
         "  setItem: (k, v) => { _box[k] = String(v); }\n"
         "};\n"
+        # le chiavi del dispositivo portano il conto nel nome (set 2026)
+        + "let myTgId = null;\n"
+        + pezzo_js(mini, "function chiaveP2P(base){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function ordiniP2P(){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function p2pTogliibile(o, adesso){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}\n"
@@ -49804,6 +50085,7 @@ def main():
     prove_p2p_canonico,
     prove_p2p_bundle,
     prove_p2p_nuvola,
+    prove_p2p_conto_dispositivo,
               prove_esclusioni_relay,
               prove_pagina_dati,
               prove_font,

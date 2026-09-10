@@ -34087,11 +34087,22 @@ function rigaOrdineP2P(o){
    (CANTIERI, «La testata del P2P»): la commissione deve ricomparire
    anche per chi PRENDE un ordine, prima del pubblico. */
 function renderP2P(){
+  /* IL MAZZO DI UN ALTRO CONTO NON ENTRA NEL RENDER (set 2026, vedi
+     «IL CONTO SUL DISPOSITIVO»): quello che si dichiara di un altro
+     tg_id si mette da parte SUBITO, in sincrono, prima che una
+     restore o una registrazione partano con le sue chiavi; quello di
+     ieri, che non dice di chi e', si verifica una volta — e finche'
+     non ha risposto non si registra e non si chiede la restore, che
+     direbbero al server «questi ordini sono miei» su chiavi forse
+     altrui. */
+  let mz = mazzoMostro();
+  if (mz && mazzoEstraneoP2P(mz)) { parcheggiaMazzoAltruiP2P(mz); mz = null; }
+  const daVerificare = !!(mz && mazzoDaVerificareP2P(mz));
+  if (daVerificare && !p2pContoVerifica) verificaContoInCorsoP2P(mz).then(renderP2P, renderP2P);
   /* Il mazzo che c'e' gia' si rimanda al server una volta per sessione:
      l'INSERT OR IGNORE e' idempotente, e cosi' un profilo importato
      o tornato dal cloud finisce nella lista da guardare. */
-  const mz = mazzoMostro();
-  if (mz && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
+  if (mz && !daVerificare && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
     p2pRegistrato = true;
     /* LA PROMESSA SI TIENE (set 2026): dentro viaggia il pavimento
        dell'indice, e la marcatura a indice zero la ASPETTA invece di
@@ -34127,7 +34138,11 @@ function renderP2P(){
      dimenticanza: quel gesto cancella anche la copia nel cloud, ma
      `cloudCancella` e' fail-open MUTA — se fallisse, riadotteremmo un
      istante dopo il profilo che uno ha appena deciso di dimenticare. */
-  if (!mz && !p2pAdozione && (cloudTelegram() || myTgId)) {
+  /* E IL GATE VUOLE L'IDENTITA' ANCHE DENTRO TELEGRAM (set 2026): le
+     chiavi portano il conto nel nome, e senza conto non c'e' un posto
+     in cui adottare — si scriverebbe nel nome di ieri, che il conto
+     in arrivo poi assorbe. */
+  if (!mz && !p2pAdozione && myTgId) {
     p2pAdozione = true;
     sincronizzaMazzo().then(async () => {
       if (!mazzoMostro()) await adottaProfiloContoP2P();
@@ -34160,7 +34175,7 @@ function renderP2P(){
      bandierina alta lo renderebbe definitivo. Meglio non chiedere:
      questo render passa, e uno dei prossimi — la rilettura dei 60
      secondi basta — trova il pavimento partito e chiede davvero. */
-  if (mz && !p2pMieiChiesto && !p2pMieiGiro
+  if (mz && !daVerificare && !p2pMieiChiesto && !p2pMieiGiro
       && ((mz.indice | 0) > 0 || p2pPavimento)) {
     p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then((miei) => {
@@ -34469,22 +34484,155 @@ let mazzoInCorso = null;
    mentre la risposta e' in volo prenderebbe un vuoto. */
 let p2pChiaviNote = null;
 let p2pChiaviGiro = null;
+/* ============ IL CONTO SUL DISPOSITIVO (10 set 2026) ============
+   Dal campo: due account Telegram sullo stesso telefono, la stessa
+   app che li scambia — e la WebView e' UNA, con UN localStorage per
+   origine. Il mazzo stava sotto `barattolo_mostro` senza nessun nome
+   sopra, e l'invariante «un profilo che c'e' non si tocca» faceva il
+   resto: il secondo account trovava il mazzo del primo e lo usava —
+   i suoi ordini «miei», la sua faccia nel profilo, e l'ordine nuovo
+   pubblicato con le SUE trade key, quindi col SUO volto sulla card.
+   E svuotare la cache non bastava: `sincronizzaMazzo` aveva gia'
+   portato quel mazzo nel CLOUD del secondo account (locale c'e' +
+   cloud vuoto = si carica), e da li' rinasceva a ogni adozione.
+   TRE PEZZI, e servono tutti e tre:
+   1) OGNI CHIAVE DEL P2P PORTA IL tg_id NEL NOME (`chiaveP2P`):
+      mazzo, scambi, lapidi e recapiti di due account non si vedono
+      mai, e il cambio di conto e' il cambio di un suffisso. Le chiavi
+      di ieri, senza suffisso, passano al PRIMO conto che entra e
+      solo su un posto vuoto (`allineaContoP2P`): chi le ha scritte
+      non si sa piu', e il primo che entra e' la scommessa piu'
+      onesta — la 2) corregge il caso in cui sia sbagliata.
+   2) IL MAZZO DEL CONTO SA DI CHI E' (`conto`): il profilo derivato
+      dal seme porta dentro il tg_id da cui nasce, e un mazzo 'conto'
+      con un tg_id diverso dal mio e' di un ALTRO — giudizio sincrono,
+      senza rete. Quelli scritti PRIMA di oggi il campo non ce l'hanno:
+      si chiede il seme una volta (`verificaContoP2P`) — uguale, si
+      timbra e non si richiede piu'; diverso, si mette da parte.
+   3) UN MAZZO DI UN ALTRO SI METTE DA PARTE, MAI SI BUTTA
+      (`parcheggiaMazzoAltruiP2P`): le quattro chiavi finiscono sotto
+      `@altrui:<pub>` e nessuno le rilegge — la regola delle lapidi.
+      Un profilo 'conto' non e' mai l'unica copia (rinasce dal suo
+      account, l'indice dal pavimento del server), quindi la copia
+      nel cloud, se e' quella, se ne va: e' il MIO cloud e non e' il
+      mio profilo.
+   ⚠️ IL CASO CHE RESTA AMBIGUO va detto: un mazzo 'conto' di ieri
+   che diverge dal seme puo' essere di un altro (questo difetto) o
+   MIO con un sale cambiato (ripristino da un backup vecchio). Si
+   mette da parte in tutt'e due i casi — non si distrugge — e il
+   secondo caso ha il suo cantiere (il foglio del conflitto, voce
+   «Il seme senza commit» in CANTIERI).
+   LE QUATTRO CHIAVI SONO SCRITTE QUI PER NOME e non lette dalle
+   costanti, che vivono tre blocchi piu' in la': una prova le tiene
+   in pari, e un nome nuovo che non entri in questa lista resta di
+   un conto solo per tutti. */
+const P2P_CHIAVI_DISPOSITIVO = ['barattolo_mostro', 'barattolo_mostro_ordini',
+                                'barattolo_mostro_lapidi', 'barattolo_p2p_recapiti'];
+let p2pContoAllineato = null;   /* il tg_id per cui questa sessione e' allineata */
+let p2pContoEsito = '';         /* '' | mio | ignoto — la verifica del mazzo 'conto' di ieri */
+let p2pContoVerifica = null;    /* la promessa in volo: una per sessione */
+function chiaveP2P(base){
+  /* senza identita' vale il nome di ieri: e' il posto che
+     `allineaContoP2P` svuota nel conto appena questo arriva */
+  return myTgId ? base + '@' + myTgId : base;
+}
+function allineaContoP2P(){
+  if (!myTgId) return;
+  if (p2pContoAllineato !== null && p2pContoAllineato !== myTgId) azzeraSessioneP2P();
+  p2pContoAllineato = myTgId;
+  for (const base of P2P_CHIAVI_DISPOSITIVO) {
+    try {
+      const ieri = localStorage.getItem(base);
+      if (ieri === null) continue;
+      /* un posto gia' occupato non si sovrascrive: la chiave di ieri
+         resta dov'e', inerte per questo conto */
+      if (localStorage.getItem(chiaveP2P(base)) !== null) continue;
+      localStorage.setItem(chiaveP2P(base), ieri);
+      localStorage.removeItem(base);
+    } catch(e){}
+  }
+}
+/* Quel che la sessione sapeva del conto di prima non vale per quello
+   di adesso: bandierine, pavimento, lista dei miei, conto delle chiavi.
+   Le promesse in volo non si fermano — il loro esito lo giudica chi
+   lo riceve, che rilegge il mazzo prima di scrivere. */
+function azzeraSessioneP2P(){
+  p2pRegistrato = false; p2pAdozione = false; p2pPavimento = null;
+  p2pMieiOrdini = null; p2pMieiChiesto = false;
+  p2pChiaviNote = null; p2pChiaviGiro = null;
+  mazzoNuvola = ''; mazzoNuvolaAltro = null;
+  p2pOrdiniRegistrati = new Set(); p2pStatoChiesto = false; p2pAutoTentati = {};
+  p2pContoEsito = '';
+}
+function mazzoEstraneoP2P(m){
+  return !!(m && m.origine === 'conto' && (m.conto | 0) && myTgId && (m.conto | 0) !== myTgId);
+}
+function mazzoDaVerificareP2P(m){
+  return !!(m && m.origine === 'conto' && !(m.conto | 0) && myTgId && p2pContoEsito !== 'ignoto');
+}
+async function verificaContoP2P(m){
+  const s = await semeProfiloP2P();
+  const ora = mazzoMostro();
+  if (!ora || ora.sk !== m.sk) return;      /* nel frattempo e' cambiato: si giudica quello nuovo */
+  if (!s) { p2pContoEsito = 'ignoto'; return; }   /* 409 o rete: non si sa, e non si tocca */
+  if (s.sk === ora.sk) {
+    ricordaMazzo(Object.assign({}, ora, {conto: myTgId}));
+    p2pContoEsito = 'mio';
+    return;
+  }
+  await parcheggiaMazzoAltruiP2P(ora);
+}
+function verificaContoInCorsoP2P(m){
+  if (!p2pContoVerifica) p2pContoVerifica = verificaContoP2P(m)
+    .then(() => {}, () => { p2pContoEsito = 'ignoto'; })
+    .then(() => { p2pContoVerifica = null; });
+  return p2pContoVerifica;
+}
+function parcheggiaMazzoAltruiP2P(m){
+  const dove = '@altrui:' + String(m.pub || '').slice(0, 8);
+  for (const base of P2P_CHIAVI_DISPOSITIVO) {
+    try {
+      const v = localStorage.getItem(chiaveP2P(base));
+      if (v !== null) localStorage.setItem(base + dove, v);
+      localStorage.removeItem(chiaveP2P(base));
+    } catch(e){}
+  }
+  azzeraSessioneP2P();
+  /* il cloud si guarda DOPO averlo ripulito: con la bandierina giu'
+     l'adozione lo leggerebbe adesso e riprenderebbe quel che si e'
+     appena messo da parte */
+  p2pAdozione = true;
+  console.log('🔑 [p2p] profilo: era di un altro conto, messo da parte');
+  return (async () => {
+    try {
+      const letto = await cloudLeggiEsito(CLOUD_MAZZO);
+      if (letto.ok && letto.testo) {
+        await caricaNostrTools();
+        const su = mazzoDaTesto(letto.testo);
+        if (su && su.sk === m.sk) await cloudCancella(CLOUD_MAZZO);
+      }
+    } catch(e){}
+    p2pAdozione = false;
+  })();
+}
+/* ============ fine del conto sul dispositivo ============ */
 function mazzoMostro(){
   try {
-    const d = JSON.parse(localStorage.getItem(MOSTRO_CHIAVE)) || null;
+    const d = JSON.parse(localStorage.getItem(chiaveP2P(MOSTRO_CHIAVE))) || null;
     return (d && FORMA_HEX64.test(d.sk || '') && FORMA_HEX64.test(d.pub || '')) ? d : null;
   } catch(e){ return null; }
 }
 function ricordaMazzo(m){
-  try { localStorage.setItem(MOSTRO_CHIAVE, mazzoSerializza(m)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(MOSTRO_CHIAVE), mazzoSerializza(m)); } catch(e){}
 }
 function scordaMazzoLocale(){
-  try { localStorage.removeItem(MOSTRO_CHIAVE); } catch(e){}
+  try { localStorage.removeItem(chiaveP2P(MOSTRO_CHIAVE)); } catch(e){}
 }
 function mazzoSerializza(m){
   return JSON.stringify({sk: m.sk, pub: m.pub, indice: m.indice|0,
                          creato: m.creato|0, backupFatto: !!m.backupFatto,
-                         origine: m.origine || '', versione: m.versione|0});
+                         origine: m.origine || '', versione: m.versione|0,
+                         conto: m.conto|0});
 }
 /* LA RICONCILIAZIONE COL CLOUD (set 2026, dal campo: telefono e
    desktop avevano due mazzi diversi, e un ordine pubblicato dall'uno
@@ -34542,8 +34690,16 @@ function sincronizzaMazzo(){
       await caricaNostrTools();
       const su = mazzoDaTesto(letto.testo);
       if (!su) return (mazzoNuvola = 'illeggibile');
+      /* IL CLOUD NON DA' UN PROFILO DI UN ALTRO CONTO (set 2026): un
+         mazzo 'conto' che dichiara un tg_id diverso dal mio e' finito
+         qui per il difetto dei due account — non e' mio, e il suo
+         padrone lo rideriva dal suo account: se ne va. */
+      if (mazzoEstraneoP2P(su)) { await cloudCancella(CLOUD_MAZZO); return (mazzoNuvola = ''); }
       ricordaMazzo(su);
-      await registraChiaviP2P([su.pub]);
+      /* ...e uno di ieri, che non dice di chi e', non si registra finche'
+         la verifica del render non ha detto che e' mio: registrarlo ora
+         intesterebbe a me, in `p2p_indice`, la chiave di un altro */
+      if (!mazzoDaVerificareP2P(su)) await registraChiaviP2P([su.pub]);
       mazzoNuvolaAltro = null;
       return (mazzoNuvola = 'copia');
     }
@@ -34656,7 +34812,11 @@ function mazzoDaTesto(testo){
           creato: (d && d.creato) ? (d.creato|0) : Math.floor(Date.now()/1000),
           backupFatto: d ? !!d.backupFatto : true,
           origine: (d && d.origine) ? String(d.origine) : '',
-          versione: d ? (d.versione|0) : 0};
+          versione: d ? (d.versione|0) : 0,
+          /* `conto` e' il tg_id da cui un profilo 'conto' e' nato (set 2026,
+             «IL CONTO SUL DISPOSITIVO»): 0 per quelli di ieri, che si
+             verificano una volta col seme */
+          conto: d ? (d.conto|0) : 0};
 }
 /* La trade key numero `indice`: HMAC-SHA256 col segreto come chiave e
    un'etichetta di casa come messaggio — deterministica, quindi lo stesso
@@ -34817,6 +34977,10 @@ function scambiApertiP2P(){
    per volta: due gesti insieme non devono fare due mazzi. */
 function assicuraMazzo(){
   const m = mazzoMostro();
+  /* un mazzo 'conto' di ieri si verifica PRIMA di firmarci sopra: un
+     ordine pubblicato con le chiavi di un altro conto e' esattamente
+     il difetto (vedi «IL CONTO SUL DISPOSITIVO») */
+  if (m && mazzoDaVerificareP2P(m)) return verificaContoInCorsoP2P(m).then(assicuraMazzo);
   /* il mazzo c'e': il gesto parte SUBITO e la riconciliazione col cloud
      va per conto suo — e' la migrazione per chi il foglio non lo apre
      mai, e non deve far aspettare nessuno */
@@ -34845,7 +35009,7 @@ function assicuraMazzo(){
                          dispositivo. Timbrarlo «da mettere al sicuro»
                          vorrebbe dire chiedere un gesto che non serve. */
                       backupFatto: true, origine: 'conto',
-                      versione: s.versione | 0};
+                      conto: myTgId, versione: s.versione | 0};
     }
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
@@ -34907,7 +35071,7 @@ function adottaProfiloContoP2P(){
     const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
                    indice: 0, creato: Math.floor(Date.now()/1000),
                    backupFatto: true, origine: 'conto',
-                   versione: s.versione | 0};
+                   conto: myTgId, versione: s.versione | 0};
     ricordaMazzo(nuovo);
     /* la registrazione porta indietro il pavimento dell'indice: e' il
        pezzo che rende gli ordini «miei» anche qui, via restore */
@@ -35185,7 +35349,7 @@ const P2P_SCAMBI_MAX = 12;      // in lista i piu' recenti; gli altri li conta l
    si scrive mai accanto all'ordine. */
 function ordiniP2P(){
   try {
-    const v = JSON.parse(localStorage.getItem(MOSTRO_ORDINI_CHIAVE) || '{}');
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE)) || '{}');
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e) { return {}; }
 }
@@ -35201,7 +35365,7 @@ function rinominaOrdineP2P(o, nuovoId){
   delete m[vecchio];
   o.id = String(nuovoId);
   m[o.id] = o;
-  try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(m)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(m)); } catch(e){}
   if (p2pOrdineAperto === vecchio) p2pOrdineAperto = o.id;
   if (p2pHoldOrdine === vecchio) p2pHoldOrdine = o.id;
   if (p2pIncassoOrdine === vecchio) p2pIncassoOrdine = o.id;
@@ -35210,7 +35374,7 @@ function rinominaOrdineP2P(o, nuovoId){
 function scriviOrdineP2P(o){
   const tutti = ordiniP2P();
   tutti[o.id] = o;
-  try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
   return o;
 }
 /* ---- QUANDO UNO SCAMBIO SI PUO' TOGLIERE ----
@@ -35318,7 +35482,7 @@ const P2P_LIBRO_FINESTRA_S = 16 * 86400;
 const MOSTRO_LAPIDI_CHIAVE = 'barattolo_mostro_lapidi';
 function lapidiP2P(){
   try {
-    const v = JSON.parse(localStorage.getItem(MOSTRO_LAPIDI_CHIAVE) || '{}');
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(MOSTRO_LAPIDI_CHIAVE)) || '{}');
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e) { return {}; }
 }
@@ -35329,7 +35493,7 @@ function lapideP2P(o){
   tutte[o.id] = (o.scade > 0 ? o.scade
                  : (o.creato || adesso) + P2P_LIBRO_FINESTRA_S);
   for (const k of Object.keys(tutte)) if (!(tutte[k] > adesso)) delete tutte[k];
-  try { localStorage.setItem(MOSTRO_LAPIDI_CHIAVE, JSON.stringify(tutte)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(MOSTRO_LAPIDI_CHIAVE), JSON.stringify(tutte)); } catch(e){}
 }
 function lapidataP2P(id){
   return (Number(lapidiP2P()[id]) || 0) > Math.floor(Date.now() / 1000);
@@ -35346,7 +35510,7 @@ function togliRitiratoP2P(id){
   if (o.mio) lapideP2P(o);
   const tutti = ordiniP2P();
   delete tutti[id];
-  try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
   if (p2pMieiOrdini && p2pMieiOrdini[id]) delete p2pMieiOrdini[id];
   if (p2pLibro && p2pLibro.ordini)
     p2pLibro.ordini = p2pLibro.ordini.filter(x => x.id !== id);
@@ -35370,7 +35534,7 @@ function pulisciScambiP2P(){
     tolti++;
   }
   if (tolti) {
-    try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+    try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
   }
   return tolti;
 }
@@ -35401,7 +35565,7 @@ function togliScambioP2P(id, ev){
     poi: () => {
       const tutti = ordiniP2P();
       delete tutti[id];
-      try { localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+      try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
       if (p2pOrdineAperto === id) p2pOrdineAperto = '';
       toast('Scambio tolto');
       renderP2P();
@@ -37734,14 +37898,14 @@ function formaRecapito(metodo){
 }
 function recapitiMiei(){
   try {
-    const v = JSON.parse(localStorage.getItem(RECAPITI_CHIAVE) || '{}');
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(RECAPITI_CHIAVE)) || '{}');
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   } catch(e) { return {}; }
 }
 function ricordaRecapito(forma, campi, testo){
   const tutti = recapitiMiei();
   tutti[forma] = {campi: campi, testo: testo, t: Math.floor(Date.now() / 1000)};
-  try { localStorage.setItem(RECAPITI_CHIAVE, JSON.stringify(tutti)); } catch(e){}
+  try { localStorage.setItem(chiaveP2P(RECAPITI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
 }
 /* il metodo su cui sta il form: quello scelto con le pillole se
    l'ordine ne ha piu' d'uno, altrimenti il primo che ha un ricordo */
@@ -38748,6 +38912,7 @@ async function avvia(){
     scaduta = (r.status === 401 && !!tg?.initData);
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
     myNome = me.nome || ''; myUsername = me.username || '';
