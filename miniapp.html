@@ -1791,14 +1791,75 @@
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
+  /* SETTECENTO E NON OTTOCENTO (ritocco di Andrea): i due tab sono la
+     cosa piu' grande della testata, e a peso pieno spingevano piu' del
+     logo che gli sta in mezzo. Un gradino sotto e' un peso VERO — Baloo
+     2 ha il file del 700 come quello dell'800, quindi non e' un
+     grassetto finto tirato dal browser. */
   .p2p-lati .p2p-lato{flex:1;padding:11px 4px;background:none;border:none;
     border-bottom:3px solid var(--line);cursor:pointer;
-    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:19px;
+    font-family:'Baloo 2',sans-serif;font-weight:700;font-size:19px;
     line-height:1.1;color:var(--muted);border-radius:10px 10px 0 0}
   .p2p-lati .p2p-lato.compra.attiva{color:var(--trust);
     border-bottom-color:var(--trust);background:var(--trust-soft)}
   .p2p-lati .p2p-lato.vendi.attiva{color:var(--danger);
     border-bottom-color:var(--danger);background:var(--warn-bg)}
+  /* ---- LA PILLOLA DEL FILTRO (set 2026, richiesta di Andrea) ----
+     Ha preso il posto della riga «N offerte di chi vende sats»: quella
+     diceva un numero e basta, questa dice lo stesso numero E che si
+     puo' restringere. Il LATO non serve piu' scriverlo — lo dice il
+     tab acceso due centimetri piu' su, e ripeterlo era la seconda
+     copia della stessa verita'.
+     Quando un filtro e' acceso la pillola si veste del lato: e' l'unico
+     modo di accorgersi che il libro non e' tutto il libro. */
+  .p2p-filtro{display:inline-flex;align-items:center;gap:8px;margin:2px 0 10px;
+    padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;
+    background:var(--card);color:var(--ink);font:inherit;font-weight:700;
+    font-size:13px;cursor:pointer}
+  .p2p-filtro .p2p-ico{width:17px;height:17px;color:var(--muted)}
+  .p2p-filtro b{font-weight:800;letter-spacing:.02em}
+  .p2p-filtro s{width:1px;height:15px;background:var(--field-line);
+    display:inline-block;text-decoration:none}
+  .p2p-filtro em{font-style:normal;color:var(--muted);font-weight:700}
+  .p2p-filtro.acceso{border-color:var(--trust);color:var(--trust);
+    background:var(--trust-soft)}
+  .p2p-filtro.acceso .p2p-ico,.p2p-filtro.acceso em{color:inherit}
+  body.p2p-vendo .p2p-filtro.acceso{border-color:var(--danger);
+    color:var(--danger);background:var(--warn-bg)}
+
+  /* ---- IL CURSORE A DUE PALLINI ----
+     In HTML non esiste: sono DUE `input[type=range]` SOVRAPPOSTI, col
+     binario disegnato sotto da un div. I due campi non ricevono il
+     dito (`pointer-events:none`) — lo ricevono i soli PALLINI — o
+     quello sopra si prenderebbe tutti i tocchi e l'altro non si
+     muoverebbe mai.
+     I due bordi della fascia arrivano da `--da` e `--a`, scritte dal
+     JS con la stessa correzione del pollice del premio: senza, il
+     colore e i pallini si scollano ai due estremi. */
+  .p2p-doppio{position:relative;height:26px;margin:10px 0 2px}
+  .p2p-doppio-binario{position:absolute;left:0;right:0;top:8px;height:10px;
+    border-radius:999px;background:var(--premio-spento)}
+  .p2p-doppio-binario span{position:absolute;top:0;bottom:0;border-radius:999px;
+    left:var(--da,0%);right:calc(100% - var(--a,100%));background:var(--tinta,var(--muted))}
+  .p2p-doppio input[type=range]{position:absolute;left:0;right:0;top:0;
+    width:100%;height:26px;margin:0;padding:0;background:none;pointer-events:none;
+    -webkit-appearance:none;appearance:none}
+  .p2p-doppio input[type=range]:focus{outline:none}
+  .p2p-doppio input[type=range]::-webkit-slider-runnable-track{
+    height:10px;background:none;border:0}
+  .p2p-doppio input[type=range]::-moz-range-track{height:10px;background:none;border:0}
+  .p2p-doppio input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;pointer-events:auto;width:20px;height:20px;
+    border-radius:999px;margin-top:-5px;background:var(--card);
+    border:3px solid var(--tinta,var(--muted));cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  .p2p-doppio input[type=range]::-moz-range-thumb{
+    pointer-events:auto;width:20px;height:20px;border-radius:999px;
+    background:var(--card);border:3px solid var(--tinta,var(--muted));
+    cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  /* i due capi del cursore doppio: a sinistra il meno, a destra il piu' */
+  .p2p-capi{display:flex;justify-content:space-between;
+    font-size:12px;font-weight:800;margin-bottom:2px}
   .p2p-ord{background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:12px 14px;margin-top:10px;position:relative}
   /* La testa VA A CAPO. Senza wrap un flex non sfonda: STRINGE i figli,
@@ -2086,6 +2147,13 @@
   .p2p-sez-ico.ico-sats{background:var(--sats-soft);color:var(--sats-text)}
   .p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;
     stroke-linecap:round;stroke-linejoin:round}
+  /* IL GLIFO STA NELLO STESSO TONDO e ne prende il colore, ma non la
+     misura: un carattere e un tratto da un pixel e mezzo non pesano
+     uguale a parita' di altezza, quindi il «$» si accorda all'occhio
+     con le icone accanto — piu' piccolo del tondo e piu' leggero di un
+     titolo. Il `line-height:1` toglie l'interlinea, che dentro un
+     `place-items:center` sposterebbe il segno sotto il centro. */
+  .p2p-glifo{font-size:20px;font-weight:700;line-height:1}
   .p2p-ico .velo{fill:currentColor;fill-opacity:.12}
   .p2p-sez-corpo{flex:1 1 auto;min-width:0}
   /* IL CAMPO DENTRO UN RIQUADRO PERDE IL RECINTO e tiene la sola riga
@@ -2148,9 +2216,34 @@
      il suo bottone, sotto la barra i suoi estremi. */
   .p2p-premio{display:flex;align-items:center;gap:12px}
   .p2p-premio-val{flex:0 0 auto;min-width:56px;text-align:center}
-  .p2p-premio-cifra{display:block;min-width:56px;padding:6px 10px;border-radius:999px;
-    background:var(--sats);color:#fff;font-weight:800;font-size:14px}
-  .p2p-premio-pie{display:flex;align-items:center;gap:12px;margin-top:6px}
+  /* LA PILLOLA E' UN BOTTONE col fondo NEUTRO (ritocco di Andrea): il
+     colore ce l'ha il NUMERO, e dice il SEGNO — verde sopra il
+     mercato, rosso sotto, neutro a zero, in pari con la barra. Un
+     fondo pieno faceva della pillola la cosa piu' accesa della
+     sezione, davanti alla barra che e' quella da guardare; e non
+     avrebbe potuto dire il segno, che il testo bianco sopra deve
+     restare leggibile su tutt'e due le tinte.
+     `overflow:visible` non si scrive ma si tiene: la matita SPORGE
+     dall'angolo, ed e' quello che la fa leggere come un'aggiunta
+     invece che come un disegno stampato dentro. */
+  .p2p-premio-cifra{position:relative;display:block;min-width:56px;
+    padding:7px 12px;border:0;border-radius:999px;background:var(--card);
+    font:inherit;font-weight:800;font-size:15px;color:var(--ink);cursor:pointer}
+  .p2p-premio-cifra.su{color:var(--trust)}
+  .p2p-premio-cifra.giu{color:var(--danger)}
+  /* IL TONDINO E' BIANCO NEI DUE TEMI (scelta di Andrea) e la matita
+     scura: un tondino che seguisse il tema sparirebbe dentro la
+     pillola di giorno, che e' bianca anche lei. A staccarlo dal fondo
+     chiaro c'e' l'ombra, non un bordo — un bordo intorno a venti
+     pixel diventa un anello e si vede piu' della matita. */
+  .p2p-premio-matita{position:absolute;right:-6px;bottom:-6px;
+    width:20px;height:20px;border-radius:999px;background:#fff;
+    display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.32)}
+  .p2p-premio-matita svg{width:11px;height:11px;fill:none;stroke:#23282C;
+    stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* DODICI E NON SEI: la matita sporge di sei pixel sotto la pillola,
+     e con lo spazio di prima toccava la «M» di «Modifica» */
+  .p2p-premio-pie{display:flex;align-items:center;gap:12px;margin-top:12px}
   .p2p-premio-mod{flex:0 0 auto;min-width:56px;text-align:center;
     border:0;background:none;color:var(--muted);font:inherit;
     font-weight:700;font-size:11.5px;padding:0;cursor:pointer}
@@ -2160,13 +2253,18 @@
      tratteggiata bianca dentro il binario, venti tratti, uno per ogni
      punto percentuale da -10 a +10, e chi la guarda capisce che non
      e' un cursore continuo prima di provarlo.
-     LA SECONDA: DOV'E' ARRIVATA (ritocco di Andrea) — accesa dal capo
-     sinistro fino al pallino, spenta oltre. Il confine e' `--pieno`,
-     che scrive il JS a ogni movimento, e NON e' la percentuale nuda:
-     il pallino e' largo venti pixel e il suo centro corre dentro
-     `larghezza - 20`, quindi il conto e' `frazione x (100% - 20px) +
-     10px` — senza la correzione il colore e il pallino si scollano ai
-     due estremi, che e' proprio dove si guarda per capire la regola.
+     LA SECONDA: DA CHE PARTE CI SI E' MOSSI (ritocco di Andrea che
+     EMENDA il primo giro, dove si accendeva dal capo sinistro). A zero
+     e' tutta spenta; da li' si accende SOLO il tratto fra il CENTRO e
+     il pallino — verde a destra, che e' un sovrapprezzo, rosso a
+     sinistra, che e' uno sconto. Riempita dal capo la barra diceva
+     quanto ma non da che parte, e a zero sembrava gia' mezza scelta.
+     I due bordi (`--da`, `--a`) e la tinta li scrive il JS a ogni
+     movimento, e NON sono percentuali nude: il pallino e' largo venti
+     pixel e il suo centro corre dentro `larghezza - 20`, quindi il
+     conto e' `frazione x (100% - 20px) + 10px` — senza la correzione
+     il colore e il pallino si scollano ai due estremi, che e' proprio
+     dove si guarda per capire la regola.
      E' una linea e non venti blocchi, ed e' la differenza che si vede
      a schermo: col tratteggio alto quanto tutta la barra il binario
      sembrava SPEZZATO in segmenti arancioni. Il `background-size` la
@@ -2185,8 +2283,9 @@
     height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
         rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
-      linear-gradient(to right, var(--sats) 0 var(--pieno,50%),
-        var(--premio-spento) var(--pieno,50%) 100%);
+      linear-gradient(to right, var(--premio-spento) 0 var(--da,50%),
+        var(--tinta,var(--muted)) var(--da,50%) var(--a,50%),
+        var(--premio-spento) var(--a,50%) 100%);
     background-size:100% 2px, 100% 100%;
     background-position:0 center, 0 0;
     background-repeat:no-repeat, no-repeat}
@@ -2194,17 +2293,25 @@
     height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
         rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
-      linear-gradient(to right, var(--sats) 0 var(--pieno,50%),
-        var(--premio-spento) var(--pieno,50%) 100%);
+      linear-gradient(to right, var(--premio-spento) 0 var(--da,50%),
+        var(--tinta,var(--muted)) var(--da,50%) var(--a,50%),
+        var(--premio-spento) var(--a,50%) 100%);
     background-size:100% 2px, 100% 100%;
     background-position:0 center, 0 0;
     background-repeat:no-repeat, no-repeat}
+  /* IL PALLINO VESTE LA TINTA DELLA FASCIA e non l'arancio di casa:
+     con la barra che parla verde e rosso, un pallino arancio sarebbe
+     il terzo colore in dieci pixel — e a fermo, dove non c'e' fascia,
+     resta il grigio dello spento, che e' il modo giusto di dire «di
+     qui non ci si e' ancora mossi». */
   .p2p-premio input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none;width:20px;height:20px;border-radius:999px;
-    margin-top:-5px;background:var(--card);border:3px solid var(--sats);
+    margin-top:-5px;background:var(--card);
+    border:3px solid var(--tinta,var(--muted));
     box-shadow:0 1px 3px rgba(0,0,0,.28)}
   .p2p-premio input[type=range]::-moz-range-thumb{
-    width:20px;height:20px;border-radius:999px;border:3px solid var(--sats);
+    width:20px;height:20px;border-radius:999px;
+    border:3px solid var(--tinta,var(--muted));
     background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.28)}
   /* le stelle sono l UNICO gesto del foglio: grandi, in fila, e col
      bersaglio che il dito trova senza guardare */
@@ -7346,6 +7453,16 @@ document.getElementById('cartello')?.remove();</script>
       <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
     </div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- IL FILTRO DEL LIBRO (set 2026): si apre dalla pillola sotto i
+       tab. Foglio dal basso e non a pieno schermo — le quattro leve ci
+       stanno, e un filtro e' una cosa che si apre, si tocca e si
+       richiude: a pieno schermo sembrerebbe un'altra pagina. -->
+  <div class="sheet" id="p2pFiltroSheet" role="dialog" aria-modal="true" aria-labelledby="p2pFiltroTit">
+    <div class="grab"></div>
+    <h3 id="p2pFiltroTit">Filtro</h3>
+    <div id="p2pFiltroCorpo"></div>
   </div>
 
   <!-- QUANTO: il foglio degli ordini a intervallo. Sta PRIMA di
@@ -19233,6 +19350,7 @@ function closeSheet(){
   el('p2pProfiloSheet').classList.remove('open');
   el('p2pNuovoSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
+  el('p2pFiltroSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -33339,6 +33457,89 @@ function ordineDaEvento(ev, adesso){
   };
 }
 
+/* ============ IL FILTRO DEL LIBRO (set 2026, richiesta di Andrea) ===
+   Quattro leve — valute, metodi, premio, reputazione — su un foglio
+   che si apre dalla pillola sotto i tab. Filtra SOLO il libro: «I miei
+   scambi» sono roba mia, e nasconderne uno perche' il premio non
+   rientra vorrebbe dire perdere di vista uno scambio in corso.
+   LO STATO E' UNO SOLO e vale per tutt'e due i tab: chi restringe a
+   «SEPA» vuole SEPA di qua e di la', e un filtro che si azzera
+   cambiando lato sarebbe una sorpresa a ogni tocco.
+   ⚠️ LA REPUTAZIONE E' QUELLA DEL COORDINATORE (decisione di Andrea)
+   e non le stelline del mercatino: il tag `rating` sta DENTRO ogni
+   38383, quindi ce l'hanno tutti gli ordini — anche quelli nati sugli
+   altri client. Le stelline di casa le abbiamo solo per chi si e'
+   registrato da noi e solo da loggati, quindi un filtro su quelle
+   avrebbe svuotato il libro al primo mezzo punto. */
+/* ⚠️ UNA FUNZIONE E NON UNA COSTANTE, per due ragioni buone tutt'e due.
+   1) `P2P_PREMIO_MAX` nasce diciassettemila righe piu' sotto, col
+   foglio «Pubblica»: una const che la leggesse QUI la toccherebbe
+   dentro la sua temporal dead zone e lo script morirebbe al boot. Una
+   funzione si issa e legge quando la si chiama, cioe' a pagina viva.
+   (Non e' una deduzione: l'ho scritta come const, e a bocciarla e'
+   stata la prova che fa girare ogni blocco `<script>` fino in fondo —
+   la stessa che aveva preso il catalogo delle valute.)
+   2) Un oggetto costante con dentro due ARRAY sarebbe una trappola:
+   `Object.assign({}, VUOTO)` copia i riferimenti, quindi il primo
+   `push` su una copia scriverebbe nella costante e il «vuoto» non
+   sarebbe piu' vuoto per nessuno. Una funzione ne fa uno nuovo ogni
+   volta. */
+function filtroVuotoP2P(){
+  return {valute: [], metodi: [], premioDa: -P2P_PREMIO_MAX,
+          premioA: P2P_PREMIO_MAX, repDa: 0, repA: 5};
+}
+/* IL FILTRO SPENTO E' `null` e non un oggetto pieno di valori neutri:
+   cosi' «non c'e' filtro» e' una cosa sola da controllare, e il
+   giudice che decide se un ordine passa lo dice in una riga. */
+let p2pFiltro = null;
+let p2pFiltroBozza = null;    // quel che si sta scegliendo nel foglio, prima di «Applica»
+
+/* PURO: dice se un filtro e' ACCESO, cioe' se restringe qualcosa. Serve
+   alla pillola, che deve vestirsi solo quando il libro non e' tutto il
+   libro — e serve puro perche' e' la stessa domanda che un giorno fara'
+   chi vorra' dire «togli il filtro» da un'altra parte. */
+function filtroAccesoP2P(f){
+  if (!f) return false;
+  const v = filtroVuotoP2P();
+  return !!(f.valute.length || f.metodi.length
+    || f.premioDa > v.premioDa || f.premioA < v.premioA
+    || f.repDa > v.repDa || f.repA < v.repA);
+}
+/* PURO: un ordine passa o no. Si prova senza browser e senza libro, ed
+   e' l'unico posto dove le quattro regole vivono.
+   IL METODO SI CONFRONTA PER CONTENIMENTO, non per uguaglianza: sul
+   libro arrivano i metodi scritti dagli altri client, e sono testo
+   libero — «SEPA Instant», «Bonifico SEPA», «sepa». Chiedere «SEPA»
+   deve prenderli tutti, chiedere «SEPA Instant» solo quelli che lo
+   dicono. Uguaglianza secca avrebbe filtrato via mezzo libro senza che
+   si capisse perche'.
+   ⚠️ E CHI NON HA VOTI PASSA SOLO COL MINIMO A ZERO: media 0 con zero
+   voti non vuol dire «scarso», vuol dire «non si sa» — ma chi chiede
+   almeno una stella sta chiedendo una prova, e «non si sa» non e' una
+   prova. Detto qui perche' e' una scelta, non una conseguenza. */
+function passaFiltroP2P(o, f){
+  if (!o || !f) return true;
+  if (f.valute.length && f.valute.indexOf(o.fiat) < 0) return false;
+  if (f.metodi.length) {
+    const suoi = (o.metodi || []).map(m => String(m).toLowerCase());
+    const preso = f.metodi.some(scelto => {
+      const s = String(scelto).toLowerCase();
+      return suoi.some(m => m.indexOf(s) >= 0);
+    });
+    if (!preso) return false;
+  }
+  const p = Math.round(Number(o.premium) || 0);
+  if (p < f.premioDa || p > f.premioA) return false;
+  const vuoto = filtroVuotoP2P();
+  if (f.repDa > vuoto.repDa || f.repA < vuoto.repA) {
+    const voti = o.rep ? o.rep.voti : 0;
+    if (!voti) return f.repDa <= vuoto.repDa;
+    const media = o.rep.media;
+    if (media < f.repDa || media > f.repA) return false;
+  }
+  return true;
+}
+
 /* IL GIUDICE DEGLI «ESCLUSI A INTERVALLO» NON C'E' PIU' (set 2026,
    col ridisegno delle card): i range ENTRANO nel libro come ordini
    veri, e la macchina che li contava a parte — il giudice, la mappa,
@@ -34017,22 +34218,29 @@ function renderP2P(){
   /* in cima quel che conviene a chi legge, non il piu' recente: il
      criterio e il suo perche' stanno in ordinaLibroP2P */
   const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k), p2pLato);
-  /* I VOLTI si chiedono per gli ordini che si stanno per disegnare, in
+  /* LA PILLOLA DEL FILTRO ha preso il posto della riga «N offerte di
+     chi vende sats» (set 2026, richiesta di Andrea): quella diceva un
+     numero, questa dice lo stesso numero E che si puo' restringere. Il
+     LATO non si scrive piu' — lo dice il tab acceso due centimetri
+     piu' su, e ripeterlo era la seconda copia della stessa verita'.
+     IL CONTEGGIO E' QUELLO FILTRATO, sempre: un numero che contasse il
+     libro intero mentre a schermo se ne vedono tre sarebbe la bugia
+     piu' facile da scrivere e la piu' difficile da notare. */
+  const mostrati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));
+  /* I VOLTI si chiedono per gli ordini che si stanno per DISEGNARE, in
      sottofondo: la card nasce senza faccia e se la mette quando la
      risposta arriva. Mai bloccante — il patto del rientro istantaneo
-     della cassa — e mai due volte per lo stesso id. */
-  chiediFacceP2P(vivi.map(o => o.id)).then(n => { if (n) renderP2P(); })
+     della cassa — e mai due volte per lo stesso id.
+     ⚠️ DOPO IL FILTRO e non prima (set 2026, col filtro): chiederli per
+     tutto il libro vorrebbe dire domandare al server di chi sono
+     ordini che nessuno vedra' — e con un filtro stretto sarebbero
+     quasi tutti. Meno domande, e nessuna di piu' del necessario. */
+  chiediFacceP2P(mostrati.map(o => o.id)).then(n => { if (n) renderP2P(); })
     .catch(() => {});
-  /* IL CONTEGGIO al posto della riga di servizio: dice una cosa vera che
-     prima non si sapeva — quante ce ne sono — e per giunta dice che il
-     libro e' vivo. E' la forma di casa (`riga-conta` di renderGrid), e
-     dice anche il LATO: il tab acceso qui sopra dice il mio
-     («Compra BTC»), questa dice quello di chi sta dall'altra parte.
-     LA RIGA DEGLI «ESCLUSI A INTERVALLO» E' MORTA col ridisegno delle
-     card (set 2026): i range ora sono nel conteggio come tutti. */
-  const testa = `<div class="section-label riga-conta"><span class="conta">${vivi.length}</span> `
-    + `offert${vivi.length === 1 ? 'a' : 'e'} di chi `
-    + (p2pLato === 'compro' ? 'vende' : 'compra') + ' sats</div>'
+  const testa = `<button type="button" class="p2p-filtro${
+      filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
+    + icoFiltroP2P() + `<b>Filtro</b><s></s><em>${mostrati.length} `
+    + `offert${mostrati.length === 1 ? 'a' : 'e'}</em></button>`
     /* IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
        arrivato dal solo specchio si legge come il libro vero, e un
        ordine gia' preso sembra ancora libero. */
@@ -34042,12 +34250,19 @@ function renderP2P(){
   /* IL LIBRO E' SOLO IL LIBRO (set 2026, decisione di Andrea): la
      striscia e' andata nella sua vista e il «Pubblica» e' il + della
      nav — UN gesto solo, gia' vestito del colore del lato. */
+  /* LO STATO VUOTO DICE QUALE DEI DUE VUOTI E': «non c'e' niente» e
+     «il tuo filtro non lascia passare niente» sono due cose diverse, e
+     la seconda ha una strada d'uscita da offrire. */
   box.innerHTML = testa
-    + (vivi.length ? vivi.map(rigaOrdineP2P).join('')
-       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">Nessun ordine aperto</span>${
-           p2pLato === 'compro'
-             ? 'In questo momento nessuno sta vendendo sats in euro.'
-             : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
+    + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
+       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">${
+           vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'}</span>${
+           vivi.length
+             ? 'Ci sono ' + vivi.length + ' offerte, ma nessuna passa il filtro. '
+               + '<button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
+             : p2pLato === 'compro'
+               ? 'In questo momento nessuno sta vendendo sats in euro.'
+               : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
   /* ...e i miei nella loro pagina: scambiP2P e' la striscia di sempre
      (adozione compresa), lo stato vuoto invita al + qui sotto */
   if (mieiBox) mieiBox.innerHTML = scambiP2P()
@@ -34055,6 +34270,145 @@ function renderP2P(){
      + '<span class="empty-title">Nessuno scambio ancora</span>'
      + 'Premi <b>＋</b> nella barra per pubblicare il tuo primo ordine.</div>';
 }
+/* l'imbuto, nella lingua delle icone di casa: `viewBox` e tratto della
+   nav, come le cinque del foglio «Pubblica» */
+function icoFiltroP2P(){
+  return '<svg class="p2p-ico" viewBox="2 2 20 20" aria-hidden="true">'
+    + '<path class="velo" d="M3.4 4.6h17.2l-6.6 7.8v6.4l-4-2.4v-4z"/>'
+    + '<path d="M3.4 4.6h17.2l-6.6 7.8v6.4l-4-2.4v-4z"/></svg>';
+}
+
+/* ---- IL FOGLIO DEL FILTRO ----
+   Si lavora su una BOZZA e non sul filtro vivo: chi tocca i cursori
+   deve poter cambiare idea, e «Applica» dev'essere il momento in cui
+   il libro si muove. Senza la bozza il libro si riscriverebbe sotto le
+   dita a ogni scatto — e «Cancella» non avrebbe piu' niente da
+   annullare. */
+function apriFiltroP2P(){
+  haptic();
+  const ora = p2pFiltro || filtroVuotoP2P();
+  p2pFiltroBozza = Object.assign({}, ora,
+    {valute: ora.valute.slice(), metodi: ora.metodi.slice()});
+  renderFiltroP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pFiltroSheet').classList.add('open');
+}
+/* PURA: i due bordi della fascia di un cursore doppio, nella forma che
+   il CSS sa leggere. La correzione del pollice e' quella del premio —
+   `bordoPremioP2P` — perche' i pallini sono gli stessi e sarebbe
+   assurdo che si scollassero qui e no la'. */
+function fasciaDoppiaP2P(da, a, min, max){
+  const larghezza = (max - min) || 1;
+  return {da: bordoPremioP2P((da - min) / larghezza),
+          a: bordoPremioP2P((a - min) / larghezza)};
+}
+/* IL CURSORE A DUE PALLINI: due `input[type=range]` sovrapposti sopra
+   un binario disegnato. Il pezzo e' UNO per tutt'e due i cursori del
+   foglio — premio e reputazione — cosi' non possono divergere. */
+function doppioP2P(o){
+  const f = fasciaDoppiaP2P(o.da, o.a, o.min, o.max);
+  const campo = (quale, valore) =>
+    '<input type="range" id="p2pF' + o.nome + quale + '" min="' + o.min +
+    '" max="' + o.max + '" step="' + o.passo + '" value="' + valore +
+    '" oninput="muoviDoppioP2P(\'' + o.nome + '\')" aria-label="' +
+    esc(o.aria + ' ' + (quale === 'Da' ? 'minimo' : 'massimo')) + '">';
+  return '<div class="p2p-capi"><span style="color:var(--danger)">' + o.capoSx +
+      '</span><span style="color:var(--trust)">' + o.capoDx + '</span></div>' +
+    '<div class="p2p-doppio" id="p2pF' + o.nome + '" style="--da:' + f.da +
+      ';--a:' + f.a + ';--tinta:' + o.tinta + '">' +
+    '<div class="p2p-doppio-binario"><span></span></div>' +
+    campo('Da', o.da) + campo('A', o.a) + '</div>';
+}
+/* i due pallini non si scavalcano: chi spinge il minimo oltre il
+   massimo lo TROVA fermo li', invece di vedere la fascia rovesciarsi */
+function muoviDoppioP2P(nome){
+  const b = p2pFiltroBozza;
+  if (!b) return;
+  const da = el('p2pF' + nome + 'Da'), a = el('p2pF' + nome + 'A');
+  if (!da || !a) return;
+  let vDa = Number(da.value), vA = Number(a.value);
+  if (vDa > vA) { if (document.activeElement === da) vDa = vA; else vA = vDa; }
+  da.value = String(vDa);
+  a.value = String(vA);
+  if (nome === 'Premio') { b.premioDa = vDa; b.premioA = vA; }
+  else { b.repDa = vDa; b.repA = vA; }
+  renderFiltroP2P();
+}
+function scegliValutaFiltroP2P(cod){
+  const b = p2pFiltroBozza; if (!b) return;
+  haptic();
+  const i = b.valute.indexOf(cod);
+  if (i >= 0) b.valute.splice(i, 1); else b.valute.push(cod);
+  renderFiltroP2P();
+}
+function scegliMetodoFiltroP2P(m){
+  const b = p2pFiltroBozza; if (!b) return;
+  haptic();
+  const i = b.metodi.indexOf(m);
+  if (i >= 0) b.metodi.splice(i, 1);
+  else b.metodi = P2P_METODI.filter(x => x === m || b.metodi.indexOf(x) >= 0);
+  renderFiltroP2P();
+}
+function renderFiltroP2P(){
+  const box = el('p2pFiltroCorpo');
+  const b = p2pFiltroBozza;
+  if (!box || !b) return;
+  const pill = (testo, scelto, gesto) =>
+    '<button type="button" class="tema-pill' + (scelto ? ' active' : '') +
+    '" data-v="' + esc(testo) + '" onclick="' + gesto + '(this.dataset.v)">' +
+    esc(testo) + '</button>';
+  box.innerHTML =
+    '<div class="section-label">Valute</div>' +
+    '<div class="p2p-metodi">' + P2P_VALUTE.map(v =>
+      pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P')).join('') +
+    '</div>' +
+    '<div class="section-label">Metodi di pagamento</div>' +
+    '<div class="p2p-metodi">' + P2P_METODI.map(m =>
+      pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P')).join('') +
+    '</div>' +
+    '<div class="section-label">Premio / Sconto</div>' +
+    doppioP2P({nome: 'Premio', min: -P2P_PREMIO_MAX, max: P2P_PREMIO_MAX, passo: 1,
+      da: b.premioDa, a: b.premioA, tinta: 'var(--sats)', aria: 'Premio',
+      capoSx: 'Sconto: ' + premioTestoP2P(b.premioDa),
+      capoDx: 'Premio: ' + premioTestoP2P(b.premioA)}) +
+    '<div class="section-label">Reputazione</div>' +
+    doppioP2P({nome: 'Rep', min: 0, max: 5, passo: 1,
+      da: b.repDa, a: b.repA, tinta: 'var(--oro,#E0A82E)', aria: 'Reputazione',
+      capoSx: 'Min: ' + b.repDa, capoDx: 'Max: ' + b.repA}) +
+    /* la reputazione e' quella del coordinatore, e chi non ha ancora
+       voti non e' «scarso»: si dice, o un libro che si svuota a mezzo
+       punto sembra un guasto */
+    '<div class="hint">Le stelle sono quelle del circuito di scambio. ' +
+      'Chi non ha ancora ricevuto voti compare solo col minimo a 0.</div>' +
+    '<div class="foglio-piede">' +
+      '<button type="button" class="btn ghost" onclick="azzeraFiltroP2P()">Cancella</button>' +
+      '<button type="button" class="btn orange" onclick="applicaFiltroP2P()">Applica</button>' +
+    '</div>';
+}
+/* «Cancella» AZZERA E APPLICA in un gesto solo (e chiude): un
+   «Cancella» che svuotasse i campi lasciando il libro filtrato
+   chiederebbe un secondo tocco per fare la cosa che uno ha gia'
+   chiesto. E' anche il bottone dello stato vuoto, che da li' e'
+   l'unica strada d'uscita. */
+function azzeraFiltroP2P(){
+  haptic();
+  p2pFiltro = null;
+  p2pFiltroBozza = null;
+  if (el('p2pFiltroSheet').classList.contains('open'))
+    chiudiFoglioP2P('p2pFiltroSheet');
+  renderP2P();
+}
+function applicaFiltroP2P(){
+  haptic();
+  if (p2pFiltroBozza) {
+    p2pFiltro = Object.assign({}, p2pFiltroBozza,
+      {valute: p2pFiltroBozza.valute.slice(), metodi: p2pFiltroBozza.metodi.slice()});
+  }
+  p2pFiltroBozza = null;
+  chiudiFoglioP2P('p2pFiltroSheet');
+  renderP2P();
+}
+
 function ricaricaP2P(){
   haptic();
   p2pErrore = '';
@@ -36386,12 +36740,19 @@ const P2P_ICONE = {
   metodi: '<path class="velo" d="M4.4 5.9h15.2a1.5 1.5 0 0 1 1.5 1.5v9.2a1.5 1.5 0 0 1-1.5 1.5H4.4a1.5 1.5 0 0 1-1.5-1.5V7.4a1.5 1.5 0 0 1 1.5-1.5z"/>'
     + '<path d="M4.4 5.9h15.2a1.5 1.5 0 0 1 1.5 1.5v9.2a1.5 1.5 0 0 1-1.5 1.5H4.4a1.5 1.5 0 0 1-1.5-1.5V7.4a1.5 1.5 0 0 1 1.5-1.5z"/>'
     + '<path d="M2.9 9.8h18.2"/><path d="M6.4 14.3h4.2"/>',
-  prezzo: '<path d="M12 3.6v16.8"/>'
-    + '<path d="M16.4 7.8c0-2-2-3.3-4.4-3.3S7.6 5.8 7.6 7.9c0 4.8 8.8 2.6 8.8 7.4 0 2.1-2 3.4-4.4 3.4s-4.4-1.3-4.4-3.4"/>',
   sats: '<path class="velo" d="M13.6 2.6L5.4 13.4h5.3l-1.3 8 8.2-10.8h-5.3z"/>'
     + '<path d="M13.6 2.6L5.4 13.4h5.3l-1.3 8 8.2-10.8h-5.3z"/>'
 };
+/* IL «$» E' IL GLIFO VERO del carattere di casa (scelta di Andrea) e
+   non un disegno a tratto: il dollaro E' un segno tipografico, con le
+   sue proporzioni, la sua asta e il suo peso, e ridisegnarlo vuol dire
+   rifare peggio una cosa che il font fa gia'. Le altre quattro restano
+   disegni per la ragione opposta — un globo, una banconota, una carta
+   e un fulmine il carattere non li ha. */
+const P2P_GLIFI = {prezzo: '$'};
 function icoNuovoP2P(nome){
+  if (P2P_GLIFI[nome])
+    return '<span class="p2p-glifo" aria-hidden="true">' + P2P_GLIFI[nome] + '</span>';
   return '<svg class="p2p-ico" viewBox="2 2 20 20" aria-hidden="true">'
     + P2P_ICONE[nome] + '</svg>';
 }
@@ -36648,7 +37009,7 @@ function renderNuovoOrdineP2P(){
       '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
-        'style="--pieno:' + pienoPremioP2P(p2pNuovoPremio) + '" ' +
+        'style="' + stilePremioP2P(p2pNuovoPremio) + '" ' +
         'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
       '</div>' +
       /* sotto la pillola il suo bottone, sotto la barra i suoi capi */
@@ -36754,18 +37115,44 @@ function cambiaTipoPrezzoP2P(){
   else p2pNuovoSats = '';
   renderNuovoOrdineP2P();
 }
-/* PURA: dov'e' il confine fra l'acceso e lo spento, in una forma che
-   il CSS sa leggere. Non e' la percentuale nuda — il pallino e' largo
+/* IL PREMIO SI MISURA DAL CENTRO, non dal capo (ritocco di Andrea che
+   EMENDA il giro prima): a zero la barra e' tutta spenta, e da li' si
+   accende SOLO il tratto fra il centro e il pallino — verde a destra,
+   dove il premio e' un sovrapprezzo, rosso a sinistra, dove e' uno
+   sconto. Cosi' la barra dice due cose insieme: quanto ci si e'
+   spostati e DA CHE PARTE. Riempita dal capo sinistro diceva solo la
+   prima, e a zero sembrava gia' mezza scelta.
+   PURA, e un giudice solo per tutt'e tre le cose che dipendono dal
+   segno: i due bordi della fascia, la sua tinta, e la classe che
+   colora il numero nella pillola. Due giudici avrebbero potuto
+   raccontare due segni diversi sulla stessa cifra.
+   ⚠️ I BORDI NON SONO PERCENTUALI NUDE: il pallino e' largo
    `P2P_POLLICE` e il suo centro corre dentro `larghezza - pollice`,
-   quindi il colore e il pallino si scollerebbero ai due estremi, che
-   e' proprio dove si guarda per capire che la barra ha due lati. */
+   quindi senza la correzione il colore e il pallino si scollano ai due
+   estremi — proprio dove si guarda per capire la regola. */
 const P2P_POLLICE = 20;      // il diametro del pallino, in pixel: sta anche nel CSS
-function pienoPremioP2P(premio){
-  const p = Math.max(-P2P_PREMIO_MAX,
-    Math.min(P2P_PREMIO_MAX, Math.round(Number(premio) || 0)));
-  const frazione = (p + P2P_PREMIO_MAX) / (2 * P2P_PREMIO_MAX);
+function bordoPremioP2P(frazione){
   return 'calc(' + frazione + ' * (100% - ' + P2P_POLLICE + 'px) + '
     + (P2P_POLLICE / 2) + 'px)';
+}
+function fasciaPremioP2P(premio){
+  const p = Math.max(-P2P_PREMIO_MAX,
+    Math.min(P2P_PREMIO_MAX, Math.round(Number(premio) || 0)));
+  const dove = (p + P2P_PREMIO_MAX) / (2 * P2P_PREMIO_MAX);
+  return {
+    da: bordoPremioP2P(Math.min(0.5, dove)),
+    a: bordoPremioP2P(Math.max(0.5, dove)),
+    /* a zero la fascia e' larga zero, quindi la tinta non si vede: si
+       tiene lo spento, che e' anche il colore del pallino fermo */
+    tinta: p > 0 ? 'var(--trust)' : p < 0 ? 'var(--danger)' : 'var(--muted)',
+    segno: p > 0 ? 'su' : p < 0 ? 'giu' : ''
+  };
+}
+/* le tre variabili che il CSS legge, in una stringa sola: chi le
+   scrive (il render e ogni movimento) non deve ricordarsene i nomi */
+function stilePremioP2P(premio){
+  const f = fasciaPremioP2P(premio);
+  return '--da:' + f.da + ';--a:' + f.a + ';--tinta:' + f.tinta;
 }
 function cambiaPremioP2P(v){
   const n = Math.round(Number(v) || 0);
@@ -36774,7 +37161,21 @@ function cambiaPremioP2P(v){
   if (c) c.textContent = premioTestoP2P(p2pNuovoPremio);
   const cur = el('p2pNuovoPremioCursore');
   if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
-  if (cur) cur.style.setProperty('--pieno', pienoPremioP2P(p2pNuovoPremio));
+  if (cur) {
+    const f = fasciaPremioP2P(p2pNuovoPremio);
+    cur.style.setProperty('--da', f.da);
+    cur.style.setProperty('--a', f.a);
+    cur.style.setProperty('--tinta', f.tinta);
+  }
+  /* IL NUMERO CAMBIA COLORE COL SEGNO, in pari con la barra: la classe
+     sta sulla PILLOLA e il numero in un figlio suo, cosi' riscrivere la
+     cifra non porta via la matita agganciata all'angolo. */
+  const pil = el('p2pNuovoPremioPil');
+  if (pil) {
+    const s = fasciaPremioP2P(p2pNuovoPremio).segno;
+    pil.classList.toggle('su', s === 'su');
+    pil.classList.toggle('giu', s === 'giu');
+  }
   const nota = el('p2pNuovoPremioNota');
   if (nota) nota.innerHTML = premioNotaP2P(p2pLato === 'compro', p2pNuovoPremio);
 }
@@ -36851,14 +37252,34 @@ function premioModP2P(){
   return '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">' +
     (p2pNuovoPremioMano ? 'Fatto' : 'Modifica') + '</button>';
 }
+/* LA PILLOLA SI TOCCA (ritocco di Andrea): prima a scrivere il premio
+   a mano portava solo il «Modifica» qui sotto, e nessuno tocca una
+   parolina grigia quando ha una pillola grossa davanti. Adesso la
+   pillola E' il bottone, e a dirlo c'e' la MATITA nel tondino bianco
+   agganciata all'angolo in basso a destra, che sporge dal bordo —
+   il segno che una cosa si puo' cambiare, non che e' un'etichetta.
+   IL FONDO E' NEUTRO e il colore ce l'ha il NUMERO: un fondo pieno
+   (arancio prima, viola nella proposta) faceva della pillola la cosa
+   piu' accesa della sezione — davanti a una barra che e' proprio
+   quella che va guardata — e per giunta il colore del fondo non
+   poteva dire il segno, che il bianco sopra deve restare leggibile su
+   tutt'e due.
+   «Modifica» resta sotto: e' la stessa porta detta a parole, e chi non
+   riconosce la matita la trova scritta. */
 function premioValP2P(){
   if (p2pNuovoPremioMano)
     return '<input id="p2pNuovoPremioMano" type="number" inputmode="numeric" step="1" ' +
       'min="-' + P2P_PREMIO_MAX + '" max="' + P2P_PREMIO_MAX + '" value="' + p2pNuovoPremio +
       '" style="width:56px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
       'aria-label="Premio in percento">';
-  return '<span class="p2p-premio-cifra" id="p2pNuovoPremioVal">' +
-    esc(premioTestoP2P(p2pNuovoPremio)) + '</span>';
+  const segno = fasciaPremioP2P(p2pNuovoPremio).segno;
+  return '<button type="button" class="p2p-premio-cifra' + (segno ? ' ' + segno : '') +
+    '" id="p2pNuovoPremioPil" onclick="scriviPremioP2P()" ' +
+    'aria-label="Scrivi il premio a mano">' +
+    '<span id="p2pNuovoPremioVal">' + esc(premioTestoP2P(p2pNuovoPremio)) + '</span>' +
+    '<span class="p2p-premio-matita" aria-hidden="true">' +
+      '<svg viewBox="2 2 20 20"><path d="M15.2 3.6l5.2 5.2L9.6 19.6l-6 .8.8-6z"/>' +
+      '<path d="M13.4 5.4l5.2 5.2"/></svg></span></button>';
 }
 function scriviPremioP2P(){
   haptic();

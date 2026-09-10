@@ -35579,15 +35579,75 @@ def prove_p2p_libro():
     # IL CONTEGGIO al posto della riga di servizio: e' la forma di casa
     # (`riga-conta` di renderGrid) e dice una cosa vera che prima non si
     # sapeva — quante ce ne sono — e per giunta che il libro e' vivo.
-    prova("il libro dice QUANTE offerte ci sono, nella forma di casa",
-          True, 'class="section-label riga-conta"' in _rp
-          and '<span class="conta">${vivi.length}</span>' in _rp)
+    # LA RIGA DEL CONTEGGIO E' DIVENTATA LA PILLOLA DEL FILTRO (set
+    # 2026, richiesta di Andrea): diceva un numero, adesso dice lo
+    # stesso numero E che si puo' restringere. Il LATO non si scrive
+    # piu' — lo dice il tab acceso due centimetri piu' su, e ripeterlo
+    # era la seconda copia della stessa verita'.
+    prova("il libro dice quante offerte ci sono, nella pillola del filtro",
+          True, 'class="p2p-filtro${' in _rp
+          and "onclick=\"apriFiltroP2P()\"" in _rp
+          and "<b>Filtro</b>" in _rp)
     prova("...col singolare quando ne resta una",
-          True, "vivi.length === 1 ? 'a' : 'e'" in _rp)
-    # e dice il LATO di chi sta dall'ALTRA parte: la pillola accesa dice
-    # il mio, questa dice quello dell'offerta.
-    prova("...e dice di chi sono le offerte", True,
-          "p2pLato === 'compro' ? 'vende' : 'compra'" in _rp)
+          True, "mostrati.length === 1 ? 'a' : 'e'" in _rp)
+    # ⚠️ E IL NUMERO E' QUELLO FILTRATO, sempre: un conteggio sul libro
+    # intero mentre a schermo se ne vedono tre sarebbe la bugia piu'
+    # facile da scrivere e la piu' difficile da notare.
+    prova("...e il numero e' quello che si vede, non il libro intero",
+          True, "const mostrati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));" in _rp
+          and "${mostrati.length} " in _rp
+          and "mostrati.map(rigaOrdineP2P)" in _rp)
+    # e la pillola si VESTE quando restringe: senza, il libro corto
+    # sembrerebbe un libro vuoto
+    prova("...e si veste solo quando il filtro restringe davvero", True,
+          "filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''" in _rp)
+    # LO STATO VUOTO DICE QUALE DEI DUE VUOTI E': «non c'e' niente» e
+    # «il tuo filtro non lascia passare niente» sono due cose diverse,
+    # e la seconda ha una strada d'uscita da offrire.
+    prova("...e lo stato vuoto distingue i due vuoti", True,
+          "vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'" in _rp
+          and "onclick=\"azzeraFiltroP2P()\"" in _rp)
+    # ⚠️ SI FILTRA SOLO IL LIBRO, mai «I miei scambi» (decisione di
+    # Andrea): quelli sono roba mia, e nasconderne uno perche' il premio
+    # non rientra vorrebbe dire perdere di vista uno scambio IN CORSO.
+    prova("«I miei scambi» non si filtrano", False,
+          "passaFiltroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
+    # SI LAVORA SU UNA BOZZA e non sul filtro vivo: chi tocca i cursori
+    # deve poter cambiare idea, e «Applica» dev'essere il momento in cui
+    # il libro si muove. Senza la bozza il libro si riscriverebbe sotto
+    # le dita a ogni scatto, e «Cancella» non avrebbe piu' niente da
+    # annullare.
+    _ap = pezzo_js(mini, "function apriFiltroP2P(){", "\n}\n")
+    prova("il foglio lavora su una BOZZA", True,
+          "p2pFiltroBozza = Object.assign({}, ora," in _ap
+          and "valute: ora.valute.slice(), metodi: ora.metodi.slice()" in _ap)
+    _app = pezzo_js(mini, "function applicaFiltroP2P(){", "\n}\n")
+    prova("...e «Applica» e' il momento in cui il libro si muove", True,
+          "p2pFiltro = Object.assign({}, p2pFiltroBozza," in _app
+          and "renderP2P();" in _app)
+    # ⚠️ E LE DUE LISTE SI COPIANO, in tutt'e due i versi: senza le
+    # `slice()` la bozza e il filtro vivo condividerebbero gli array, e
+    # toccare una pillola nel foglio filtrerebbe il libro PRIMA di
+    # «Applica» — cioe' proprio la cosa che la bozza esiste per evitare.
+    prova("...copiando le due liste, mai il riferimento", True,
+          "valute: p2pFiltroBozza.valute.slice(), metodi: p2pFiltroBozza.metodi.slice()"
+          in _app)
+    # «Cancella» azzera E applica in un gesto solo: uno che svuotasse i
+    # campi lasciando il libro filtrato chiederebbe un secondo tocco per
+    # fare la cosa gia' chiesta
+    _az = pezzo_js(mini, "function azzeraFiltroP2P(){", "\n}\n")
+    prova("«Cancella» azzera, chiude e ridisegna", True,
+          "p2pFiltro = null;" in _az and "chiudiFoglioP2P('p2pFiltroSheet');" in _az
+          and "renderP2P();" in _az)
+    # i due pallini non si scavalcano: chi spinge il minimo oltre il
+    # massimo lo trova fermo li', invece di vedere la fascia rovesciarsi
+    prova("i due pallini del cursore doppio non si scavalcano", True,
+          "if (vDa > vA) { if (document.activeElement === da) vDa = vA; else vA = vDa; }"
+          in pezzo_js(mini, "function muoviDoppioP2P(nome){", "\n}\n"))
+    # e il foglio si chiude col censimento di casa, come i fratelli
+    prova("#p2pFiltroSheet si chiude col censimento di casa", True,
+          "el('p2pFiltroSheet').classList.remove('open');"
+          in pezzo_js(mini, "function closeSheet(){", "\n}\n"))
     prova("il commutatore accende il tab attivo", True,
           "classList.toggle('attiva', p2pLato === 'compro')" in _rp
           and "classList.toggle('attiva', p2pLato === 'vendo')" in _rp)
@@ -35712,7 +35772,17 @@ def prove_p2p_libro():
         "function libroDaEventi(eventi, adesso){",
         "function lapidiP2P(){",
         "function lapideP2P(o){",
-        "function lapidataP2P(id){")]
+        "function lapidataP2P(id){",
+        # i due giudici del FILTRO del libro (set 2026): puri apposta,
+        # cosi' le quattro leve si provano senza un foglio e senza un
+        # relay
+        "function filtroVuotoP2P(){",
+        "function filtroAccesoP2P(f){",
+        "function passaFiltroP2P(o, f){")]
+    # la fascia del premio, che `filtroVuotoP2P` legge: dal client, mai
+    # ribattuta qui
+    i_pm = mini.index("const P2P_PREMIO_MAX = ")
+    pezzi.append(mini[i_pm:mini.index("\n", i_pm)])
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
@@ -35853,6 +35923,50 @@ const mazzo = [ord('a', 4, 100), ord('b', -2, 100), ord('c', 0, 100),
 out.ordCompra = ordinaLibroP2P(mazzo, 'compro').map(x => x.id).join('');
 out.ordVendi  = ordinaLibroP2P(mazzo, 'vendo').map(x => x.id).join('');
 out.ordNonTocca = mazzo.map(x => x.id).join('');
+/* IL FILTRO DEL LIBRO (set 2026): le quattro leve, una per una, e
+   soprattutto i due casi in cui e' facile sbagliare — il metodo che si
+   confronta per CONTENIMENTO (sul libro arriva testo libero degli altri
+   client) e chi non ha ancora voti. */
+const vuoto = filtroVuotoP2P();
+const con = (o) => Object.assign({fiat: 'EUR', metodi: ['SEPA'], premium: 0,
+                                  rep: {voti: 7, media: 4.6, giorni: 23}}, o);
+const filtro = (o) => Object.assign(filtroVuotoP2P(), o);
+out.filtroSpentoNonFiltra = passaFiltroP2P(con({}), null);
+out.filtroVuotoNonFiltra = passaFiltroP2P(con({premium: 9}), vuoto);
+out.accesoNo = filtroAccesoP2P(vuoto);
+out.accesoNull = filtroAccesoP2P(null);
+out.accesoMetodi = filtroAccesoP2P(filtro({metodi: ['SEPA']}));
+out.accesoPremio = filtroAccesoP2P(filtro({premioDa: -3}));
+out.accesoRep = filtroAccesoP2P(filtro({repA: 4}));
+/* IL METODO PER CONTENIMENTO: chiedere «SEPA» prende anche «SEPA
+   Instant» e «Bonifico SEPA»; chiedere «SEPA Instant» prende solo chi
+   lo dice. Uguaglianza secca avrebbe filtrato via mezzo libro senza
+   che si capisse perche'. */
+out.metodoEsatto = passaFiltroP2P(con({metodi: ['SEPA']}), filtro({metodi: ['SEPA']}));
+out.metodoDentro = passaFiltroP2P(con({metodi: ['SEPA Instant']}), filtro({metodi: ['SEPA']}));
+out.metodoMaiuscole = passaFiltroP2P(con({metodi: ['bonifico sepa']}), filtro({metodi: ['SEPA']}));
+out.metodoStretto = passaFiltroP2P(con({metodi: ['SEPA']}), filtro({metodi: ['SEPA Instant']}));
+out.metodoAltro = passaFiltroP2P(con({metodi: ['Revolut']}), filtro({metodi: ['SEPA']}));
+/* piu' metodi scelti = OR: basta che l'ordine ne offra UNO */
+out.metodoUnoDeiDue = passaFiltroP2P(con({metodi: ['PayPal']}),
+  filtro({metodi: ['SEPA', 'PayPal']}));
+out.valutaAltra = passaFiltroP2P(con({fiat: 'USDT'}), filtro({valute: ['EUR']}));
+out.valutaSua = passaFiltroP2P(con({fiat: 'EUR'}), filtro({valute: ['EUR']}));
+/* la fascia del premio comprende gli ESTREMI */
+out.premioDentro = passaFiltroP2P(con({premium: 3}), filtro({premioDa: 0, premioA: 5}));
+out.premioSulFilo = passaFiltroP2P(con({premium: 5}), filtro({premioDa: 0, premioA: 5}));
+out.premioFuori = passaFiltroP2P(con({premium: 6}), filtro({premioDa: 0, premioA: 5}));
+/* ⚠️ CHI NON HA VOTI passa solo col minimo a ZERO: media 0 con zero
+   voti non vuol dire «scarso», vuol dire «non si sa» — ma chi chiede
+   almeno una stella sta chiedendo una prova, e «non si sa» non lo e'. */
+out.repSenzaVotiMinZero = passaFiltroP2P(con({rep: {voti: 0, media: 0, giorni: 1}}),
+  filtro({repA: 4}));
+out.repSenzaVotiMinUno = passaFiltroP2P(con({rep: {voti: 0, media: 0, giorni: 1}}),
+  filtro({repDa: 1}));
+out.repNiente = passaFiltroP2P(con({rep: null}), filtro({repDa: 1}));
+out.repAlta = passaFiltroP2P(con({rep: {voti: 7, media: 4.6, giorni: 3}}), filtro({repDa: 4}));
+out.repBassa = passaFiltroP2P(con({rep: {voti: 2, media: 3, giorni: 3}}), filtro({repDa: 4}));
+
 /* L'ANELLO DELLA SCADENZA: il giudice puro sui casi che contano —
    l'orologio si passa, cosi' non dipende da quando gira il banco */
 const vita = (creato, scade, quando) => frazioneVitaP2P({creato, scade}, quando);
@@ -36250,6 +36364,43 @@ console.log(JSON.stringify(out));
           "⚡ Nuovo sul P2P · da oggi", out["repRigaOggi"])
     prova("senza tag rating la riga non si scrive", "",
           out["repRigaNiente"])
+
+    # --- IL FILTRO DEL LIBRO (set 2026, richiesta di Andrea) --------
+    # Quattro leve su un foglio che si apre dalla pillola sotto i tab.
+    # Il giudice e' PURO, e qui gira: le sentinelle direbbero che le
+    # righe ci sono, mai che un ordine passi quando deve.
+    prova("senza filtro passa tutto", [True, True],
+          [out["filtroSpentoNonFiltra"], out["filtroVuotoNonFiltra"]])
+    prova("...e la pillola non si veste per niente",
+          [False, False], [out["accesoNo"], out["accesoNull"]])
+    prova("...ma si veste per ognuna delle leve", [True, True, True],
+          [out["accesoMetodi"], out["accesoPremio"], out["accesoRep"]])
+    # ⚠️ IL METODO SI CONFRONTA PER CONTENIMENTO: sul libro arrivano i
+    # metodi scritti dagli ALTRI client, che sono testo libero —
+    # «SEPA Instant», «Bonifico SEPA», «sepa». Chiedere «SEPA» deve
+    # prenderli tutti; chiedere «SEPA Instant» solo chi lo dice.
+    # Uguaglianza secca avrebbe filtrato via mezzo libro in silenzio.
+    prova("il metodo prende per contenimento, senza guardare le maiuscole",
+          [True, True, True], [out["metodoEsatto"], out["metodoDentro"],
+                               out["metodoMaiuscole"]])
+    prova("...ma non allarga al contrario", False, out["metodoStretto"])
+    prova("...e un altro metodo resta fuori", False, out["metodoAltro"])
+    prova("...e piu' metodi scelti bastano UNO", True, out["metodoUnoDeiDue"])
+    prova("la valuta filtra", [True, False],
+          [out["valutaSua"], out["valutaAltra"]])
+    prova("la fascia del premio comprende gli estremi",
+          [True, True, False], [out["premioDentro"], out["premioSulFilo"],
+                                out["premioFuori"]])
+    # ⚠️ CHI NON HA ANCORA VOTI non e' «scarso», e' «non si sa»: passa
+    # col minimo a zero e sparisce appena si chiede una stella, perche'
+    # chi la chiede sta chiedendo una PROVA. E' una scelta, non una
+    # conseguenza: per questo ha una riga sua nel foglio.
+    prova("chi non ha voti passa col minimo a zero", True,
+          out["repSenzaVotiMinZero"])
+    prova("...e sparisce appena si chiede una stella", [False, False],
+          [out["repSenzaVotiMinUno"], out["repNiente"]])
+    prova("...e la media filtra chi i voti ce li ha", [True, False],
+          [out["repAlta"], out["repBassa"]])
     # ...e la riga vive nel DETTAGLIO della presa, non sulla card
     _po = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
     prova("il dettaglio della presa porta la riga P2P", True,
@@ -36420,6 +36571,16 @@ def prove_nav_p2p():
           "border-bottom" not in pezzo_js(mini, ".p2p-lati{", "}")
           and "border-bottom:3px solid var(--line)"
               in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}"))
+    # SETTECENTO E NON OTTOCENTO (ritocco di Andrea): i due tab sono la
+    # cosa piu' grande della testata, e a peso pieno spingevano piu' del
+    # logo che gli sta in mezzo. E' un peso VERO e non un grassetto
+    # tirato dal browser — Baloo 2 ha il file del 700 come quello
+    # dell'800, e la riga qui sotto lo sorveglia.
+    prova("i due tab pesano un gradino sotto il pieno", True,
+          "font-weight:700;font-size:19px"
+          in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}"))
+    prova("...e quel peso ha il suo file, non e' sintetico", True,
+          "@font-face{font-family:'Baloo 2';font-style:normal;font-weight:700;" in mini)
     # IL COLORE DEL LATO SI PROPAGA (set 2026): la voce attiva della
     # nav trasformata e la cifra delle card del libro parlano il verde
     # a comprare e il rosso a vendere — sempre body.p2p-vendo, lo
@@ -39776,7 +39937,8 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function premioTestoP2P(n){")
         + "\nconst P2P_PREMIO_MAX = %d;\n" % P2P_PREMIO_MAX_da(mini)
         + re.search(r"const P2P_POLLICE = \d+;", mini).group(0) + "\n"
-        + _intera("function pienoPremioP2P(premio){")
+        + _intera("function bordoPremioP2P(frazione){")
+        + "\n" + _intera("function fasciaPremioP2P(premio){")
         + "\n" + _forme
         + "\n" + _intera("function formaRecapito(metodo){")
         + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
@@ -39810,8 +39972,8 @@ def prove_p2p_pubblica():
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '100').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo],\n"
         "  premio: [premioTestoP2P(0), premioTestoP2P(4), premioTestoP2P(-7)],\n"
-        "  pieno: [pienoPremioP2P(-10), pienoPremioP2P(0), pienoPremioP2P(10),\n"
-        "          pienoPremioP2P(-99), pienoPremioP2P(99)],\n"
+        "  fascia: [fasciaPremioP2P(-10), fasciaPremioP2P(0), fasciaPremioP2P(10),\n"
+        "           fasciaPremioP2P(-5), fasciaPremioP2P(-99), fasciaPremioP2P(99)],\n"
         "  forme: METODI.map(m => formaRecapito(m).forma)\n"
         "}));\n")
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -39875,16 +40037,28 @@ def prove_p2p_pubblica():
           out["quanto"])
     prova("il premio si legge col segno, sempre", ["0%", "+4%", "−7%"],
           out["premio"])
-    # IL CONFINE DEL RIEMPIMENTO, fatto girare: ai due estremi e al
-    # centro, e col numero fuori fascia che si tosa invece di uscire
-    # dal binario. La correzione del pollice c'e' in tutti e tre —
+    # LA FASCIA DEL PREMIO, fatta girare. Parte dal CENTRO e va verso
+    # il pallino: a zero e' larga zero (tutta spenta), a sinistra rossa
+    # e a destra verde. La correzione del pollice c'e' in ogni bordo —
     # senza, il colore e il pallino si scollano proprio agli estremi.
-    prova("il riempimento va da capo a capo, e si tosa",
-          ["calc(0 * (100% - 20px) + 10px)",
-           "calc(0.5 * (100% - 20px) + 10px)",
-           "calc(1 * (100% - 20px) + 10px)",
-           "calc(0 * (100% - 20px) + 10px)",
-           "calc(1 * (100% - 20px) + 10px)"], out["pieno"])
+    _C = "calc(0.5 * (100% - 20px) + 10px)"     # il centro
+    prova("a zero la fascia e' larga zero, e nessuno dei due segni",
+          {"da": _C, "a": _C, "tinta": "var(--muted)", "segno": ""},
+          out["fascia"][1])
+    prova("...a sinistra e' rossa e va dal capo al centro",
+          {"da": "calc(0 * (100% - 20px) + 10px)", "a": _C,
+           "tinta": "var(--danger)", "segno": "giu"}, out["fascia"][0])
+    prova("...a destra e' verde e va dal centro al capo",
+          {"da": _C, "a": "calc(1 * (100% - 20px) + 10px)",
+           "tinta": "var(--trust)", "segno": "su"}, out["fascia"][2])
+    # a meta' strada verso sinistra: il bordo mobile e' quello di
+    # SINISTRA e il centro resta l'altro capo — la fascia non scavalca
+    prova("...e a meta' strada il centro resta un capo",
+          {"da": "calc(0.25 * (100% - 20px) + 10px)", "a": _C,
+           "tinta": "var(--danger)", "segno": "giu"}, out["fascia"][3])
+    prova("...e i numeri fuori fascia si tosano ai due capi",
+          [out["fascia"][0], out["fascia"][2]],
+          [out["fascia"][4], out["fascia"][5]])
     # ⚠️ LA PROVA CHE REGGE IL ROVESCIAMENTO: il vocabolario e' chiuso
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
@@ -40006,9 +40180,10 @@ def prove_p2p_pubblica():
         # oltre, e il confine e' `--pieno`. Sta nello STESSO blocco dei
         # tratti perche' i due strati devono restare in quest'ordine —
         # rovesciandoli il colore coprirebbe il tratteggio.
-        prova("...e il binario si accende fino al pallino", True,
-              "linear-gradient(to right, var(--sats) 0 var(--pieno,50%)," in _b
-              and "var(--premio-spento) var(--pieno,50%) 100%)" in _b)
+        prova("...e il binario si accende DAL CENTRO al pallino", True,
+              "linear-gradient(to right, var(--premio-spento) 0 var(--da,50%)," in _b
+              and "var(--tinta,var(--muted)) var(--da,50%) var(--a,50%)," in _b
+              and "var(--premio-spento) var(--a,50%) 100%)" in _b)
         # ⚠️ E I DUE STRATI STANNO IN QUEST'ORDINE, che e' l'unica cosa
         # che le due righe qui sopra non direbbero: rovesciandoli il
         # colore coprirebbe il tratteggio, e per giunta le misure —
@@ -40017,7 +40192,7 @@ def prove_p2p_pubblica():
         prova("...e i tratti stanno SOPRA il colore", True,
               "background-image:repeating-linear-gradient(to right,\n"
               "        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),\n"
-              "      linear-gradient(to right, var(--sats)" in _b)
+              "      linear-gradient(to right, var(--premio-spento)" in _b)
     prova("...e i tratti sono venti, uno per punto percentuale",
           (10, 20), (P2P_PREMIO_MAX_da(mini), 100 // 5))
 
@@ -40025,6 +40200,21 @@ def prove_p2p_pubblica():
     # `box-sizing:border-box` di casa una `flex-basis:0` parte dai
     # BORDI — e `.ghost` ne ha due da 2px mentre `.orange` non ne ha
     # (misurati dal vivo: 169 contro 165).
+    # e il PALLINO veste la stessa tinta: con la barra che parla verde
+    # e rosso, un pallino arancio sarebbe il terzo colore in dieci
+    # pixel — e a fermo resta il grigio dello spento, che e' il modo
+    # giusto di dire «di qui non ci si e' ancora mossi»
+    # ⚠️ SI CONTA DENTRO IL BLOCCO DEL PREMIO e non in tutto il foglio:
+    # col cursore a due pallini del filtro quella riga esiste in altri
+    # due posti, e la prova avrebbe risposto per loro. Stessa famiglia
+    # del tondino della matita, che la tortura ha appena preso.
+    _prem = stile[stile.index(".p2p-premio input[type=range]{"):
+                  stile.index(".p2p-stelle{")]
+    prova("il pallino del premio veste la tinta della fascia", 2,
+          _prem.count("border:3px solid var(--tinta,var(--muted));"))
+    prova("...e dell'arancio di casa non resta traccia, li'", 0,
+          _prem.count("border:3px solid var(--sats)"))
+
     prova("il piede e' una griglia di due colonne uguali", True,
           ".foglio-piede{display:grid;grid-template-columns:1fr 1fr" in stile)
     prova("...e nessuno dei due porta margini suoi", True,
@@ -40037,9 +40227,26 @@ def prove_p2p_pubblica():
     # (nel CSS, dove le cinque coppie si leggono in fila).
     _cat = mini[mini.index("const P2P_ICONE = {"):]
     _cat = _cat[:_cat.index("\n};")]
-    prova("le cinque icone del foglio sono disegnate a tratto", 5,
-          sum(1 for k in ("valuta:", "importo:", "metodi:", "prezzo:", "sats:")
+    # QUATTRO DISEGNI E UN GLIFO (ritocco di Andrea): il «$» e' un
+    # segno TIPOGRAFICO e il carattere di casa ce l'ha gia', con le sue
+    # proporzioni e il suo peso — ridisegnarlo a tratto voleva dire
+    # rifare peggio una cosa gia' fatta. Le altre quattro restano
+    # disegni per la ragione opposta: un globo, una banconota, una
+    # carta e un fulmine il font non li ha.
+    prova("quattro icone del foglio sono disegnate a tratto", 4,
+          sum(1 for k in ("valuta:", "importo:", "metodi:", "sats:")
               if k in _cat))
+    prova("...e il prezzo NON e' fra loro: e' un glifo", True,
+          "prezzo:" not in _cat
+          and "const P2P_GLIFI = {prezzo: '$'};" in mini)
+    # il glifo passa dal RAMO suo e non finisce dentro un <svg>: la
+    # riga che li separa e' la sola cosa che tiene in piedi le due
+    # strade, e senza il «$» uscirebbe come un path vuoto
+    prova("...e il ramo del glifo viene PRIMA di quello del disegno",
+          True, "if (P2P_GLIFI[nome])\n    return '<span class=\"p2p-glifo\""
+          in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n"))
+    prova("...e sta nello stesso tondo, con la sua misura", True,
+          ".p2p-glifo{font-size:20px;font-weight:700;line-height:1}" in stile)
     prova("...e nessuna emoji e' rimasta al posto loro", False,
           any(e in nuovo for e in ("💶", "💳", "💲", "⚡", "🏳️")))
     prova("...e vestono come quelle della nav", True,
@@ -40085,11 +40292,52 @@ def prove_p2p_pubblica():
     # E) IL BINARIO SEGUE IL PALLINO, e il confine lo scrive il JS a
     # ogni movimento — non solo al render, o trascinando resterebbe
     # fermo dov'era.
-    prova("il riempimento parte gia' scritto", True,
-          "'style=\"--pieno:' + pienoPremioP2P(p2pNuovoPremio) + '\" '" in nuovo)
-    prova("...e si riscrive a ogni movimento", True,
-          "cur.style.setProperty('--pieno', pienoPremioP2P(p2pNuovoPremio));"
-          in pezzo_js(mini, "function cambiaPremioP2P(v){", "\n}\n"))
+    prova("la fascia parte gia' scritta", True,
+          "'style=\"' + stilePremioP2P(p2pNuovoPremio) + '\" '" in nuovo)
+    _cp = pezzo_js(mini, "function cambiaPremioP2P(v){", "\n}\n")
+    prova("...e si riscrive a ogni movimento, tutt'e tre le variabili",
+          True, all(("cur.style.setProperty('--%s', f.%s);" % (k, k)) in _cp
+                    for k in ("da", "a", "tinta")))
+    # ⚠️ IL NUMERO CAMBIA COLORE COL SEGNO e la classe sta sulla
+    # PILLOLA, non sul numero: riscrivere la cifra dentro un figlio
+    # lascia dov'e' la matita agganciata all'angolo. Fossero lo stesso
+    # nodo, ogni movimento del cursore la porterebbe via.
+    prova("...e il numero cambia colore col segno", True,
+          "pil.classList.toggle('su', s === 'su');" in _cp
+          and "pil.classList.toggle('giu', s === 'giu');" in _cp)
+    prova("...con la cifra in un figlio, che la matita resti", True,
+          "'<span id=\"p2pNuovoPremioVal\">' + esc(premioTestoP2P(p2pNuovoPremio))"
+          in pezzo_js(mini, "function premioValP2P(){", "\n}\n"))
+
+    # F) LA PILLOLA SI TOCCA, e lo dice la matita nel tondino bianco
+    # agganciata all'angolo — che SPORGE, o si leggerebbe come un
+    # disegno stampato dentro invece che come un'aggiunta.
+    _pv = pezzo_js(mini, "function premioValP2P(){", "\n}\n")
+    prova("la pillola del premio e' un bottone", True,
+          "<button type=\"button\" class=\"p2p-premio-cifra" in _pv
+          and "onclick=\"scriviPremioP2P()\"" in _pv)
+    prova("...col fondo NEUTRO, che il colore ce l'ha il numero", True,
+          "padding:7px 12px;border:0;border-radius:999px;background:var(--card);"
+          in stile
+          and ".p2p-premio-cifra.su{color:var(--trust)}" in stile
+          and ".p2p-premio-cifra.giu{color:var(--danger)}" in stile)
+    # ⚠️ IL BLOCCO SI RITAGLIA, e la tortura ha spiegato perche': la
+    # riga `border-radius:999px;background:#fff;` sta ANCHE nel pomello
+    # della leva del tipo di prezzo, dieci righe piu' su. Cercata in
+    # tutto il foglio di stile la prova rispondeva per il vicino, e il
+    # tondino poteva diventare `var(--card)` restando verde. E' la
+    # stessa famiglia delle tre prove molli di ieri: una sentinella che
+    # guarda in un contenitore piu' grande di quello che sorveglia.
+    _mat = stile[stile.index(".p2p-premio-matita{"):]
+    _mat = _mat[:_mat.index("}", _mat.index("svg{")) + 1]
+    prova("...e la matita sporge dall'angolo, tondino bianco", True,
+          "position:absolute;right:-6px;bottom:-6px;" in _mat
+          and "border-radius:999px;background:#fff;" in _mat
+          and "stroke:#23282C;" in _mat)
+    # e «Modifica» resta sotto: la stessa porta detta a parole, per chi
+    # la matita non la riconosce
+    prova("...e «Modifica» resta la porta scritta", True,
+          "'Fatto' : 'Modifica'" in pezzo_js(mini, "function premioModP2P(){", "\n}\n"))
 
 
 def prove_p2p_canale():
