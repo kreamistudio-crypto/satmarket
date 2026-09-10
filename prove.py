@@ -35515,18 +35515,22 @@ def prove_p2p_libro():
     # l'euro sempre grande in cima, i sats sempre sotto — e nei due
     # tab cambiano i VERBI, non le taglie: i due tab si leggono collo
     # stesso movimento dell'occhio.
-    # EMENDATA (set 2026): i verbi sono IMPERATIVI («Paga», non
-    # «Paghi») e le due righe si scambiano l'ORDINE col lato — a
-    # comprare si paga e poi si riceve, a vendere si paga (in sats) e
+    # EMENDATA (set 2026): le due righe si scambiano l'ORDINE col lato —
+    # a comprare si paga e poi si riceve, a vendere si paga (in sats) e
     # poi si riceve — ma non la TAGLIA: l'euro e' grande in tutt'e due.
     # EMENDATA DI NUOVO (set 2026, ritocco di Andrea): la riga in sats
-    # del tab «Vendi BTC» diceva «Invia» e adesso dice «Paga». IL
-    # VERBO DI CHI DA' E' UNO SOLO fra i due tab — il gesto non
-    # cambia, cambia la moneta.
-    prova("la card parla in seconda persona, all'imperativo",
+    # del tab «Vendi BTC» diceva «Invia» e adesso dice quel che dice
+    # l'altra. IL VERBO DI CHI DA' E' UNO SOLO fra i due tab — il gesto
+    # non cambia, cambia la moneta.
+    # ⚠️ E L'IMPERATIVO E' USCITO (set 2026, ritocco di Andrea che
+    # ROVESCIA il suo di ieri): «Paghi» e non «Paga» — la card DESCRIVE
+    # invece di ordinare. Basta quella parola perche' «ricevi» e'
+    # identico nei due modi, quindi la card si legge tutta in seconda
+    # persona senza altri ritocchi.
+    prova("la card parla in seconda persona, e descrive invece di ordinare",
           True, "const paghiEuro = o.lato === 'sell';" in mini
-          and "(paghiEuro ? 'Paga ' : 'Ricevi ')" in mini
-          and "(paghiEuro ? 'ricevi ' : 'Paga ')" in mini)
+          and "(paghiEuro ? 'Paghi ' : 'Ricevi ')" in mini
+          and "(paghiEuro ? 'ricevi ' : 'Paghi ')" in mini)
     prova("...e le taglie restano fisse: euro grande, sats piccoli",
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
@@ -36311,29 +36315,39 @@ console.log(JSON.stringify(out));
     # grande.
     # EMENDATA DI NUOVO (set 2026, ritocco di Andrea): nel tab «Vendi
     # BTC» la riga in sats diceva «Invia ≈ X sats» e adesso dice
-    # «Paga». IL VERBO DI CHI DA' E' UNO SOLO fra i due tab: il gesto
-    # non cambia, cambia CON COSA si paga — euro di la', sats di qua.
-    prova("nel tab Compra: paga euro grande, ricevi sats sotto", True,
-          '<span class="p2p-grande p2p-euro">Paga 8,00 €</span>'
+    # «Paghi» (set 2026: era «Paga», e Andrea ha rovesciato il suo
+    # ritocco di ieri — la card DESCRIVE invece di ordinare, e con
+    # «ricevi» accanto, che e' identico nei due modi, si legge tutta in
+    # seconda persona). IL VERBO DI CHI DA' E' UNO SOLO fra i due tab:
+    # il gesto non cambia, cambia CON COSA si paga — euro di la', sats
+    # di qua.
+    # ⚠️ E L'IMPERATIVO NON DEVE RIENTRARE DI SOPPIATTO: si guarda che la
+    # parola vecchia non ricompaia da sola — in «Paghi» c'e' dentro
+    # «Pagh» e non «Paga», quindi il confine di parola basta e morde.
+    prova("nel tab Compra: paghi euro grande, ricevi sats sotto", True,
+          '<span class="p2p-grande p2p-euro">Paghi 8,00 €</span>'
           in out["rigaCompra"]
           and '<span class="p2p-piccola p2p-sats">ricevi ≈'
           in out["rigaCompra"])
-    prova("nel tab Vendi: paga sats prima, ricevi euro grande dopo",
-          True, '<span class="p2p-piccola p2p-sats">Paga ≈'
+    prova("nel tab Vendi: paghi sats prima, ricevi euro grande dopo",
+          True, '<span class="p2p-piccola p2p-sats">Paghi ≈'
           in out["rigaVendi"]
           and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
           in out["rigaVendi"]
-          and out["rigaVendi"].index("Paga")
+          and out["rigaVendi"].index("Paghi")
               < out["rigaVendi"].index("Ricevi"))
     # ...e i due tab dicono lo STESSO verbo a chi da', ognuno con la
     # sua moneta: e' tutto il ritocco, e una sentinella che guardasse
     # solo la parola nuova non direbbe questo.
     prova("...e il verbo di chi da' e' uno solo nei due tab",
-          ("Paga", "Paga"),
-          (out["rigaCompra"].split('p2p-euro">')[1][:4],
-           out["rigaVendi"].split('p2p-sats">')[1][:4]))
+          ("Paghi", "Paghi"),
+          (out["rigaCompra"].split('p2p-euro">')[1][:5],
+           out["rigaVendi"].split('p2p-sats">')[1][:5]))
     prova("...e «Invia» non lo dice piu' nessuna delle due", [],
           [k for k in ("rigaCompra", "rigaVendi") if "Invia" in out[k]])
+    prova("...e nemmeno l'imperativo «Paga» di ieri", [],
+          [k for k in ("rigaCompra", "rigaVendi")
+           if re.search(r"Paga\b", out[k])])
     prova("...e del verbo della controparte non resta niente", True,
           "Vende" not in out["rigaCompra"]
           and "Compra" not in out["rigaVendi"])

@@ -34085,7 +34085,7 @@ function rigaOrdineP2P(o){
      in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Paghi
      8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
      tab «Vendi BTC» (k=buy) — coi sats sempre sotto, «ricevi ≈ 11 828
-     sats» o «Paga ≈ 11 828 sats». I due tab si leggono cosi' collo
+     sats» o «Paghi ≈ 11 828 sats». I due tab si leggono cosi' collo
      stesso movimento dell'occhio: euro grande, sats piccoli, prezzo.
      (Il primo giro scambiava le righe col lato; Andrea l'ha
      rovesciato guardandolo: la coerenza fra i tab vale piu' del
@@ -34109,14 +34109,20 @@ function rigaOrdineP2P(o){
     /* il range: chi prende sceglie la cifra, e lo dice la riga
        dell'euro — e' li' che la scelta si fa */
     + (o.euroMax ? ', scegli tu' : '');
-  /* I VERBI SONO IMPERATIVI (set 2026, ritocco di Andrea): «Paga»,
-     non «Paghi» — la card chiede, non descrive.
-     E IL VERBO DI CHI DA' E' UNO SOLO, «Paga» (set 2026, ritocco di
+  /* ⚠️ I VERBI ERANO IMPERATIVI E NON LO SONO PIU' (set 2026, ritocco
+     di Andrea che ROVESCIA il suo di ieri): «Paghi», non «Paga» — la
+     card DESCRIVE quel che succede a chi legge, invece di ordinarglielo.
+     E BASTA QUESTA PAROLA, che e' la ragione per cui non si tocca
+     l'altra: «ricevi» e' identico all'imperativo e all'indicativo,
+     quindi con «Paghi» accanto la card si legge tutta in seconda
+     persona — «Paghi 8,00 € / ricevi ≈ 11 828 sats» — senza nessun
+     altro ritocco e senza due righe che si contraddicono.
+     E IL VERBO DI CHI DA' RESTA UNO SOLO, «Paghi» (set 2026, ritocco di
      Andrea che EMENDA il giro prima, dove nel tab «Vendi BTC» si
      leggeva «Invia ≈ X sats»): fra i due tab non cambia il gesto —
      si paga in tutt'e due — cambia solo CON COSA, euro di la' e sats
      di qua. Due verbi per lo stesso gesto facevano sembrare diverse
-     due cose che diverse non sono; e «Paga» dice anche meglio come
+     due cose che diverse non sono; e «paghi» dice anche meglio come
      va: chi vende sats non li spedisce a mano a chi compra, PAGA una
      fattura, e quella li tiene in garanzia finche' l'euro non e'
      arrivato.
@@ -34126,9 +34132,9 @@ function rigaOrdineP2P(o){
      a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
      euro grande e sats piccoli in tutt'e due i tab. */
   const rigaEuro = '<span class="p2p-grande p2p-euro">'
-    + (paghiEuro ? 'Paga ' : 'Ricevi ') + eurTxt + '</span>';
+    + (paghiEuro ? 'Paghi ' : 'Ricevi ') + eurTxt + '</span>';
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + (paghiEuro ? 'ricevi ' : 'Paga ') + sats + '</span>';
+    + (paghiEuro ? 'ricevi ' : 'Paghi ') + sats + '</span>';
   /* LA TERZA RIGA E' IL PREZZO rispetto al mercato: «prezzo di
      mercato» nudo a premio zero, «prezzo di mercato +4%» col premio —
      e in tinta ci va SOLO il segno con la percentuale, che le parole
