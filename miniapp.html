@@ -2200,6 +2200,54 @@
   .foglio-piede .btn{margin:0;min-width:0}
   .foglio-piede .btn.ghost{margin:0}
 
+  /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
+     Il cappello della pagina: il lato in grande, il prezzo sotto, la
+     quantita' per ultima. Centrato, che qui non c'e' niente da
+     scorrere con l'occhio — sono tre righe e si leggono in fila. */
+  .p2p-dett-apre{padding:14px 0 2px;text-align:center}
+  .p2p-dett-lato{display:block;font-size:19px;font-weight:800;line-height:1.2}
+  .p2p-dett-prezzo{margin-top:6px;font-size:15px;font-weight:700;color:var(--muted)}
+  .p2p-dett-prezzo b{color:var(--ink);font-weight:800}
+  .p2p-dett-sats{margin-top:4px;font-size:13px;font-weight:700;color:var(--muted)}
+  .p2p-dett-uno{font-size:15px;font-weight:800}
+  /* LE TRE COLONNE DELLA REPUTAZIONE pesano uguale per GRIGLIA e non
+     per flex: le tre cifre hanno larghezze diverse («4,8», «12»,
+     «—»), e con lo spazio avanzato da spartire i due divisori
+     cadrebbero storti — la lezione gia' pagata dalla pillola del
+     filtro. Tre colonne `1fr` valgono uguale comunque. */
+  .p2p-rep-tre{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .p2p-rep-col{min-width:0;display:flex;flex-direction:column;
+    align-items:center;gap:3px;text-align:center}
+  .p2p-rep-col b{font-size:17px;font-weight:800;line-height:1}
+  .p2p-rep-col small{font-size:11px;font-weight:700;color:var(--muted)}
+  .p2p-rep-segno{display:flex;align-items:center;justify-content:center;
+    height:20px;color:var(--muted)}
+  /* L'ANELLO GRANDE: sessanta tacche, e a colorarsi sono le ACCESE.
+     La pista spenta resta `--line` come nell'anello piccolo, e i tre
+     stati sono gli stessi — stesso giudice nel JS, stessi token qui:
+     neutro, arancio negli ultimi tre giorni, rosso che pulsa
+     nell'ultimo. */
+  .p2p-tempone{display:flex;flex-direction:column;align-items:center;
+    gap:8px;margin:18px 0 6px}
+  .p2p-anellone{position:relative;width:132px;height:132px}
+  .p2p-anellone svg{width:132px;height:132px;display:block}
+  .p2p-anellone .tacca{stroke:var(--line);stroke-width:5;stroke-linecap:round}
+  .p2p-anellone .tacca.on{stroke:var(--ink-soft)}
+  .p2p-anellone.vicina .tacca.on{stroke:var(--sats)}
+  .p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--danger);
+    animation:p2pPulsa 1.5s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-anellone.ultimo-giorno .tacca.on{animation:none}
+  }
+  .p2p-anellone-cuore{position:absolute;inset:0;display:grid;
+    place-items:center;color:var(--muted)}
+  .p2p-anellone-cuore .p2p-ico{width:30px;height:30px}
+  /* LE CIFRE DEL CONTO NON BALLANO: senza `tabular-nums` la riga si
+     allarga e si stringe a ogni secondo, e a due centimetri
+     dall'occhio si vede benissimo. */
+  .p2p-tempo{font-size:14px;font-weight:700;color:var(--muted)}
+  .p2p-tempo b{color:var(--ink);font-weight:800;
+    font-variant-numeric:tabular-nums}
   /* ---- il riquadro di una sezione ---- */
   .p2p-sez{background:var(--chip-bg);border-radius:16px;padding:13px 14px;margin:12px 0}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
@@ -7550,6 +7598,26 @@ document.getElementById('cartello')?.remove();</script>
       <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
     </div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026, ridisegno): la
+       scheda di conferma alta tre righe diventa una PAGINA, col calco
+       di «Dettagli ordine» di Mostro e il vestito di casa. Stessa
+       ossatura del foglio «Pubblica» — testata con la via d'uscita e
+       il gemello invisibile a destra, corpo che scorre, piede coi due
+       bottoni gemelli — perche' e' la stessa cosa: una pagina che si
+       apre sopra il libro e si chiude col gesto indietro.
+       STA PRIMA di #p2pQuantoSheet nel DOM, ed e' l'ordine che decide
+       chi copre chi: su un ordine a intervallo «Quanto» si apre SOPRA
+       questa pagina. -->
+  <div class="sheet pieno" id="p2pDettSheet" role="dialog" aria-modal="true" aria-labelledby="p2pDettTit">
+    <div class="grab"></div>
+    <div class="foglio-testa">
+      <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#8592;</button>
+      <h3 id="p2pDettTit">Dettaglio ordine</h3>
+      <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
+    </div>
+    <div class="foglio-corpo" id="p2pDettCorpo"></div>
   </div>
 
   <!-- IL FILTRO DEL LIBRO (set 2026): si apre dalla pillola sotto i
@@ -13211,6 +13279,11 @@ const bloccoMioEsaurito = l => `
 setInterval(() => {
   const adesso = Date.now();
   let morta = false;
+  /* IL CONTO ALLA ROVESCIA DEL DETTAGLIO P2P batte qui dentro (set
+     2026): «UN solo interval per tutta l'app» vale anche per lui, e
+     due orologi sullo stesso secondo si sfasano. Esce subito se la
+     pagina non e' aperta — vedi «L'ANELLO GRANDE DEL TEMPO». */
+  battitoAnelloneP2P();
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -19446,6 +19519,7 @@ function closeSheet(){
   el('jarShareSheet').classList.remove('open');
   el('p2pProfiloSheet').classList.remove('open');
   el('p2pNuovoSheet').classList.remove('open');
+  el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
@@ -33961,8 +34035,12 @@ function anelloScadenzaP2P(o, adesso){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
   const manca = (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000));
-  const stato = manca <= P2P_ULTIMO_GIORNO_S ? ' ultimo-giorno'
-              : manca <= P2P_ANELLO_VICINA_S ? ' vicina' : '';
+  /* IL GIUDICE DEL COLORE E' UNO SOLO per i due anelli (set 2026, col
+     dettaglio-pagina): le due soglie stavano scritte qui, e adesso le
+     chiede anche l'anello grande. Due copie direbbero due colori sullo
+     stesso ordine, e a scoprirlo sarebbe chi guarda. */
+  const st = statoAnelloP2P(manca);
+  const stato = st ? ' ' + st : '';
   const consumato = (P2P_ANELLO_GIRO * (1 - resta)).toFixed(2);
   const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
   /* DENTRO L'ANELLO CI STA LA FACCIA (set 2026, i volti sul libro):
@@ -36521,7 +36599,13 @@ function applicaMessaggioP2P(ord, dentro){
   /* LA CONTROPARTE APPENA CONOSCIUTA e' il momento in cui il recapito
      ricordato di chi vende puo' partire da solo — le condizioni vere
      si ricontrollano al momento dell'invio (vedi pianificaAutoRecapito) */
-  if (!ord.peer && nuovo.peer) pianificaAutoRecapito(nuovo.id);
+  if (!ord.peer && nuovo.peer) {
+    /* IL METODO PRIMA DEL RECAPITO, e l'ordine conta: chi vende puo'
+       avere l'invio automatico armato, e senza la scelta gia' in
+       mano sceglierebbe lui la forma da mandare. */
+    pianificaMetodoP2P(nuovo.id);
+    pianificaAutoRecapito(nuovo.id);
+  }
   if (p2pOrdineAperto === nuovo.id) renderOrdineP2P();
   /* il foglio del pagamento si chiude DA SOLO quando i sats sono
      bloccati: e' il coordinatore a dirlo, non un bottone «ho pagato» */
@@ -36705,11 +36789,320 @@ function confermaQuantoP2P(){
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
   p2pQuantoOrdine = '';
-  prendiOrdineP2P(id, g.euro);
+  /* SI VA DRITTI ALLA PRESA (set 2026, col dettaglio-pagina): le
+     guardie le ha gia' passate `prendiOrdineP2P` aprendo la pagina,
+     la conferma l'ha data il bottone, e rientrare dalla porta del
+     gesto riaprirebbe la pagina che si e' appena chiusa. */
+  eseguiPresaP2P(id, g.euro, p2pDettMetodo);
+}
+
+/* ============ IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ======
+   Toccare una card non apre piu' un foglietto di conferma alto tre
+   righe: apre una PAGINA, a pieno schermo, col calco di «Dettagli
+   ordine» di Mostro e il vestito di casa. La ragione e' quella per cui
+   il foglio «Pubblica» era diventato una pagina: quel che si sta per
+   prendere ha sei cose da dire — il lato, la cifra, il prezzo, come si
+   paga, chi c'e' dall'altra parte, quanto tempo resta — e sei cose in
+   un foglietto dal basso o non ci stanno o si leggono a meta'.
+   LA CONFERMA NON SPARISCE, CAMBIA CASA: i due bottoni gemelli in
+   fondo — «Annulla» e «Compra» — SONO la conferma, e la spiegazione
+   («chi vende blocca i sats in garanzia…») sta sopra di loro invece
+   che dentro un secondo foglio. Un gesto solo al posto di due, e quel
+   che si conferma si vede tutto mentre lo si conferma.
+   ⚠️ E LA PAGINA E' UN FOGLIO `.sheet.pieno` E NON UNA VISTA, ed e' la
+   scelta da non disfare senza un motivo nuovo: cosi' il gesto indietro,
+   la cronologia e il velo sono quelli di sempre (navPila conta i fogli
+   aperti), e il foglio «Quanto» degli ordini a intervallo si apre SOPRA
+   di lei senza inventare niente — nel DOM sta dopo, ed e' l'ordine che
+   decide chi copre chi.
+   NIENTE «CREATO IL» E NIENTE «ID ORDINE» (decisione di Andrea): la
+   data di nascita e' gia' detta dall'anello, che dice la cosa utile —
+   quanto RESTA — invece di quella da sottrarre a mente; e l'id e' un
+   numero che non serve a nessuno di qua, mentre di la' apre la porta
+   a chi volesse dettarlo al telefono a una persona. */
+let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
+let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
+
+/* ---- L'ANELLO GRANDE DEL TEMPO ----
+   Quello delle card e' un cerchio da 22px in un angolo; qui il tempo e'
+   il protagonista della meta' bassa della pagina, e diventa un anello
+   SEGMENTATO che si spegne una tacca alla volta — il calco di Mostro,
+   e un tempo che si guarda invece di leggersi.
+   ⚠️ SESSANTA TACCHE DISEGNATE UNA A UNA, e non un `stroke-dasharray`
+   con una maschera: la maschera vuole un `id`, e un id nell'SVG e' la
+   trappola gia' pagata con la stella (in un elenco di N card il primo
+   id vince per tutte). Qui di anello grande ce n'e' uno solo alla
+   volta, ma la regola resta la stessa e costa sessanta `<line>`.
+   IL GIUDICE DEL COLORE E' UNO SOLO per i due anelli — `statoAnelloP2P`
+   — e le due soglie restano quelle: arancio negli ultimi tre giorni,
+   rosso nell'ultimo. Due copie direbbero due colori sullo stesso
+   ordine, e a scoprirlo sarebbe chi guarda. */
+const P2P_ANELLONE_TACCHE = 60;
+function statoAnelloP2P(manca){
+  return manca <= P2P_ULTIMO_GIORNO_S ? 'ultimo-giorno'
+       : manca <= P2P_ANELLO_VICINA_S ? 'vicina' : '';
+}
+/* PURA: i secondi che restano in «6g 23:47:17». I giorni compaiono
+   SOLO quando ce ne sono — un ordine di casa vive sette giorni, e
+   «167:47:17» sarebbe un numero da decifrare invece che da leggere. */
+function contoRimastoP2P(sec){
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const due = n => (n < 10 ? '0' : '') + n;
+  const g = Math.floor(s / 86400);
+  return (g ? g + 'g ' : '')
+    + due(Math.floor(s / 3600) % 24) + ':'
+    + due(Math.floor(s / 60) % 60) + ':' + due(s % 60);
+}
+/* PURA: quante tacche restano accese. L'ULTIMA NON SI SPEGNE FINCHE'
+   C'E' TEMPO — con l'arrotondamento secco, sotto lo 0,83% l'anello
+   sarebbe gia' vuoto con l'ordine ancora vivo, e un anello vuoto dice
+   «scaduto». A zero, invece, si spegne davvero. */
+function taccheAnelloneP2P(resta){
+  const r = Number(resta);
+  if (!Number.isFinite(r) || r <= 0) return 0;
+  if (r >= 1) return P2P_ANELLONE_TACCHE;
+  return Math.max(1, Math.round(r * P2P_ANELLONE_TACCHE));
+}
+function anelloneP2P(o, adesso){
+  const resta = frazioneVitaP2P(o, adesso);
+  if (resta < 0) return '';
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const manca = Math.max(0, (o.scade || 0) - ora);
+  const accese = taccheAnelloneP2P(resta);
+  let tacche = '';
+  for (let i = 0; i < P2P_ANELLONE_TACCHE; i++)
+    tacche += '<line class="tacca' + (i < accese ? ' on' : '') + '"'
+      + ' x1="60" y1="7" x2="60" y2="19" transform="rotate('
+      + (i * 360 / P2P_ANELLONE_TACCHE).toFixed(2) + ' 60 60)"/>';
+  return '<div class="p2p-tempone">'
+    + '<div class="p2p-anellone ' + statoAnelloP2P(manca) + '" data-fine="'
+      + (o.scade || 0) + '" data-inizio="' + (o.creato || 0) + '" data-accese="'
+      + accese + '" role="img" aria-label="' + esc(scadeTestoP2P(o.scade) || 'senza scadenza') + '">'
+    + '<svg viewBox="0 0 120 120" aria-hidden="true">' + tacche + '</svg>'
+    + '<span class="p2p-anellone-cuore" aria-hidden="true">'
+      + '<svg class="p2p-ico" viewBox="2 2 20 20">'
+      + '<path class="velo" d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8z"/>'
+      + '<path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8z"/>'
+      + '<path d="M12 7.4V12l3.2 2"/></svg></span></div>'
+    + '<div class="p2p-tempo">Tempo rimasto: <b id="p2pDettConto">'
+      + esc(contoRimastoP2P(manca)) + '</b></div></div>';
+}
+/* IL BATTITO SI ATTACCA ALL'UNICO INTERVAL DELL'APP (quello della
+   lampo): un secondo timer per un solo anello sarebbe un secondo
+   orologio da spegnere, e i due si sfaserebbero. Qui si riscrive IN
+   PLACE — mai un render al secondo, che porterebbe via il fuoco alle
+   pillole del metodo mentre uno le sta toccando.
+   LE TACCHE SI TOCCANO SOLO QUANDO CAMBIANO: su un ordine di sette
+   giorni una tacca dura due ore, quindi 7199 battiti su 7200 non
+   hanno niente da fare e lo si dice guardando un numero. */
+function battitoAnelloneP2P(){
+  const box = document.querySelector('.p2p-anellone');
+  if (!box) return;
+  const adesso = Math.floor(Date.now() / 1000);
+  const fine = Number(box.dataset.fine) || 0;
+  const manca = Math.max(0, fine - adesso);
+  const conto = el('p2pDettConto');
+  if (conto) conto.textContent = contoRimastoP2P(manca);
+  const accese = taccheAnelloneP2P(frazioneVitaP2P(
+    {scade: fine, creato: Number(box.dataset.inizio) || 0}, adesso));
+  if (Number(box.dataset.accese) !== accese) {
+    box.dataset.accese = accese;
+    box.querySelectorAll('.tacca').forEach((t, i) => t.classList.toggle('on', i < accese));
+  }
+  const st = statoAnelloP2P(manca);
+  box.classList.toggle('vicina', st === 'vicina');
+  box.classList.toggle('ultimo-giorno', st === 'ultimo-giorno');
+}
+
+/* ---- IL RIQUADRO DELLA REPUTAZIONE ----
+   Tre colonne, e sono le TRE domande che uno si fa davanti a uno
+   sconosciuto: quanto vale, quanti l'hanno detto, da quanto e' qui.
+   E' la reputazione DEL MERCATINO — la regola gia' a verbale, «chi e'
+   onesto con gli oggetti e' onesto anche sul P2P» — quindi chi ha
+   pubblicato da un altro client non ha nessun riquadro: meglio niente
+   che tre trattini che sembrano un giudizio.
+   I GLIFI SONO QUELLI DI CASA e non tre emoji: la stella che si riempie
+   per quanto vale e l'omino sono gia' quelli della card (decisioni di
+   Andrea, set 2026), e mettere accanto a loro un 📅 colorato da un'altra
+   mano sarebbe il terzo alfabeto nella stessa riga.
+   ⚠️ I GIORNI POSSONO MANCARE, e allora si dice «—»: gli account nati
+   prima che il server timbrasse l'iscrizione hanno `registrato` a zero,
+   e «0 giorni» direbbe «iscritto oggi» — una bugia esattamente al
+   contrario del vero (sono i piu' vecchi). Il server la chiave non la
+   manda proprio, e qui «non si sa» ha la sua faccia. */
+function icoGiorniP2P(){
+  return '<svg class="p2p-ico p2p-ico-mini" viewBox="2 2 20 20" aria-hidden="true">'
+    + '<path class="velo" d="M4.8 6.4h14.4a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H4.8a1.4 1.4 0 0 1-1.4-1.4V7.8a1.4 1.4 0 0 1 1.4-1.4z"/>'
+    + '<path d="M4.8 6.4h14.4a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H4.8a1.4 1.4 0 0 1-1.4-1.4V7.8a1.4 1.4 0 0 1 1.4-1.4z"/>'
+    + '<path d="M3.4 10.6h17.2"/><path d="M8.4 3.8v4M15.6 3.8v4"/></svg>';
+}
+function repRiquadroP2P(f){
+  if (!f) return '';
+  const media = (f.voti > 0 && f.media > 0)
+    ? esc(f.media.toLocaleString('it-IT',
+        {minimumFractionDigits: 1, maximumFractionDigits: 1})) : '—';
+  const voti = f.voti > 0 ? esc(String(f.voti)) : '—';
+  const giorni = (f.giorni === undefined || f.giorni === null)
+    ? '—' : esc(String(f.giorni));
+  const col = (segno, cifra, et) =>
+    '<div class="p2p-rep-col"><span class="p2p-rep-segno">' + segno + '</span>'
+    + '<b>' + cifra + '</b><small>' + et + '</small></div>';
+  return sezioneNuovoP2P({
+    ico: '', titolo: 'Chi ha pubblicato quest\'ordine',
+    corpo: '<div class="p2p-rep-tre">'
+      + col(stellaP2P(f.media), media, 'media')
+      + col(icoPersonaP2P(), voti, 'recensioni')
+      + col(icoGiorniP2P(), giorni, 'giorni qui')
+      + '</div>'
+  });
+}
+
+/* ---- LA RIGA DEL PREZZO ----
+   PURA, e dice in una riga sola quel che la card diceva in tre: «per
+   6,00 € 🇪🇺 al prezzo di mercato (+4%)». Con un intervallo la cifra
+   diventa «per 20,00–100,00 €» — quale sara' lo sceglie chi prende, e
+   glielo chiede il foglio «Quanto» un gesto dopo.
+   LA BANDIERINA STA DOVE E' VERA (la stessa regola del foglio
+   Pubblica): esce dal catalogo delle valute, e una valuta che nel
+   catalogo non c'e' porta la sua sigla e basta — mai una bandiera
+   inventata. */
+function prezzoRigaP2P(o){
+  const cod = String(o.fiat || P2P_VALUTA).toUpperCase();
+  const val = P2P_VALUTE.find(v => v.cod === cod);
+  const cifre = esc(fmtEur(o.euro)) + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '');
+  const moneta = val ? esc(val.segno) + ' ' + val.bandiera : esc(cod);
+  /* a prezzo fisso il mercato non c'entra: quel cambio l'ha deciso chi
+     ha pubblicato, e nominarlo sarebbe un riferimento che non regge */
+  if (o.sats > 0) return 'per <b>' + cifre + ' ' + moneta + '</b>';
+  /* IL GIUDIZIO DEL PREMIO E' QUELLO DELLE CARD, dallo stesso giudice:
+     un premio positivo assottiglia sempre i sats, quindi su un ordine
+     di vendita chi legge ne riceve meno (avviso) e su uno d'acquisto
+     ne consegna meno (affare). */
+  const affare = (o.lato === 'buy') === (o.premium > 0);
+  return 'per <b>' + cifre + ' ' + moneta + '</b> al prezzo di mercato'
+    + (o.premium
+      ? ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">('
+        + (o.premium > 0 ? '+' : '−') + esc(String(Math.abs(o.premium))) + '%)</b>'
+      : '');
+}
+
+/* ---- IL METODO, che qui si SCEGLIE ----
+   Chi pubblica puo' mettere piu' metodi; chi prende ne usa UNO, e fin
+   qui quello lo sceglieva il venditore nel foglio dei recapiti — cioe'
+   dopo, e dall'altra parte. Adesso lo sceglie chi prende, prima di
+   prendere, che e' il momento in cui uno guarda l'offerta e decide se
+   gli va bene.
+   ⚠️ E CON UN METODO SOLO NON C'E' NIENTE DA SCEGLIERE: si mostra e
+   basta. Una pillola sola gia' accesa e' un bottone che non fa niente,
+   e chi lo tocca aspettandosi un effetto impara che i bottoni qui a
+   volte non rispondono. */
+function metodiDettP2P(o){
+  const metodi = (o.metodi || []).slice();
+  if (!metodi.length)
+    return sezioneNuovoP2P({ico: 'metodi', titolo: 'Metodo di pagamento',
+      corpo: '<div class="hint">Chi ha pubblicato non l\'ha indicato: '
+        + 'mettetevi d\'accordo prima di mandare gli euro.</div>'});
+  if (metodi.length === 1)
+    return sezioneNuovoP2P({ico: 'metodi', titolo: 'Metodo di pagamento',
+      corpo: '<b class="p2p-dett-uno">' + esc(metodi[0]) + '</b>'});
+  return sezioneNuovoP2P({
+    ico: 'metodi', titolo: 'Metodo di pagamento — scegli quale usare',
+    corpo: '<div class="p2p-metodi">' + metodi.map(m =>
+      '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
+      + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
+      + esc(m) + '</button>').join('') + '</div>'
+  });
+}
+function scegliMetodoDettP2P(m){
+  haptic();
+  p2pDettMetodo = String(m || '');
+  renderDettaglioP2P();
+}
+
+function apriDettaglioP2P(id){
+  const riga = rigaLibroP2P(id);
+  if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
+  p2pDettOrdine = id;
+  /* con un metodo solo la scelta e' gia' fatta: non c'e' niente da
+     chiedere, e il bottone non deve restare spento per una domanda che
+     nessuno ha posto */
+  p2pDettMetodo = (riga.metodi && riga.metodi.length === 1) ? riga.metodi[0] : '';
+  renderDettaglioP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pDettSheet').classList.add('open');
+}
+function renderDettaglioP2P(){
+  const box = el('p2pDettCorpo');
+  if (!box) return;
+  const o = rigaLibroP2P(p2pDettOrdine);
+  if (!o) { box.innerHTML = '<div class="hint">Quest\'ordine non c\'è più.</div>'; return; }
+  /* IL LATO LO DICE LA RIGA e non il tab, come su ogni card: il libro
+     filtra per lato, quindi il risultato e' lo stesso — ma la pagina
+     resta onesta anche aperta da un elenco non filtrato. */
+  const compro = o.lato === 'sell';
+  const tit = el('p2pDettTit');
+  if (tit) tit.textContent = 'Dettaglio ordine di ' + (compro ? 'acquisto' : 'vendita');
+  const stima = satsMercatoP2P(o);
+  const stima2 = o.euroMax && stima
+    ? satsMercatoP2P({euro: o.euroMax, premium: o.premium}) : 0;
+  /* LA QUANTITA' RESTA A VISTA, ed e' la riga che non si toglie: la
+     card la porta, e una pagina che chiede di confermare uno scambio
+     senza dire quanti sats passano di mano direbbe meno di lei. */
+  const sats = o.sats > 0 ? fmt(o.sats) + ' sats'
+             : stima ? '≈ ' + fmt(stima) + (stima2 ? '–' + fmt(stima2) : '') + ' sats'
+             : '';
+  /* la riga che DICE PERCHE' il bottone e' spento: un bottone morto
+     senza una ragione visibile e' il vicolo cieco muto (la lezione del
+     foglio Pubblica). Le parentesi non sono decorazione: `||` lega
+     prima di `?:`, e leggerlo a occhio e' esattamente il modo in cui
+     un domani qualcuno lo «sistema» al contrario. */
+  const manca = (p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
+    ? '' : 'Scegli con quale metodo vuoi pagare.';
+  box.innerHTML =
+    '<div class="p2p-dett-apre">' +
+      '<b class="p2p-dett-lato">Stai ' + (compro ? 'comprando' : 'vendendo') + ' sats</b>' +
+      '<div class="p2p-dett-prezzo">' + prezzoRigaP2P(o) + '</div>' +
+      (sats ? '<div class="p2p-dett-sats">' + esc(sats) + '</div>' : '') +
+    '</div>' +
+    metodiDettP2P(o) +
+    repRiquadroP2P(p2pFacce[o.id]) +
+    anelloneP2P(o) +
+    /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
+       col foglio, si sposta sopra i due bottoni — dove la legge chi
+       sta per premerli. */
+    '<div class="trust-note nota-scambio"><span>' + (compro
+      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo scelto e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
+      : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.') +
+    '</span></div>' +
+    '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
+      + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
+    '<div class="foglio-piede">' +
+      '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
+      '<button type="button" class="btn orange" id="p2pDettVai"' +
+        (manca ? ' disabled' : '') + ' onclick="confermaDettaglioP2P()">' +
+        (compro ? 'Compra' : 'Vendi') + '</button>' +
+    '</div>';
+}
+/* IL «COMPRA» E' LA CONFERMA, e da qui in poi la strada e' quella di
+   sempre: su un intervallo si passa dal foglio «Quanto» (una
+   DEVIAZIONE, non una seconda strada) e da li' si rientra nella presa
+   con la cifra in mano. */
+function confermaDettaglioP2P(){
+  const id = p2pDettOrdine;
+  const o = rigaLibroP2P(id);
+  if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
+  if ((o.metodi || []).length > 1 && !p2pDettMetodo) {
+    toast('Scegli con quale metodo vuoi pagare');
+    return;
+  }
+  haptic();
+  chiudiFoglioP2P('p2pDettSheet');
+  if (o.euroMax) { apriQuantoP2P(id); return; }
+  eseguiPresaP2P(id, 0, p2pDettMetodo);
 }
 
 /* ---- prendere un ordine del libro ---- */
-function prendiOrdineP2P(id, scelto){
+function prendiOrdineP2P(id){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -36724,33 +37117,17 @@ function prendiOrdineP2P(id, scelto){
      dice il fatto che regge in tutti i casi; ad aprirlo davvero sara'
      la ripresa delle fasi successive. */
   if (ordineMioP2P(id)) { toast('Questo ordine è tuo: da questo dispositivo, per ora, si guarda soltanto'); return; }
-  const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
-  if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
-  /* IL RANGE ORA SI PRENDE (set 2026): prima il foglio che chiede
-     quanto, poi si rientra di qui con la cifra in mano e il gesto
-     prosegue identico a quello di un ordine normale. Il ramo e' UNA
-     DEVIAZIONE e non una seconda strada — la conferma, le cinture e
-     la presa sono le stesse. */
-  if (riga.euroMax && !(Number(scelto) > 0)) { apriQuantoP2P(id); return; }
-  const g = riga.euroMax ? quantoValeP2P(riga, scelto) : {ok: true, euro: riga.euro};
-  if (!g.ok) { toast(g.dillo); return; }
-  const euro = g.euro;
-  const compro = riga.lato === 'sell';
-  const sats = riga.sats > 0 ? fmt(riga.sats) + ' sats' : 'al prezzo di mercato';
-  chiediConferma({
-    titolo: compro ? 'Compri sats?' : 'Vendi sats?',
-    /* NIENTE RIGA DELLA REPUTAZIONE QUI (set 2026, una reputazione
-       sola): quella di casa sta gia' sulla card che si e' appena
-       toccata, e quella del coordinatore non esiste piu'. */
-    testata: '<b>' + esc(fmtEur(euro)) + ' €</b> · ' + esc(sats),
-    corpo: compro
-      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo concordato e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
-      : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.',
-    etichetta: compro ? 'Sì, compro' : 'Sì, vendo',
-    poi: () => { eseguiPresaP2P(id, riga.euroMax ? euro : 0); }
-  });
+  /* ⚠️ DA QUI IN POI NON SI CHIEDE PIU' NIENTE IN UN FOGLIETTO (set
+     2026, ridisegno): si apre la PAGINA del dettaglio, e la conferma
+     sono i suoi due bottoni in fondo. Le guardie restano QUI — sono
+     la porta del gesto — e la cintura in fondo a `eseguiPresaP2P` non
+     si tocca: e' quella che regge quando qualcosa e' andato storto.
+     LA DEVIAZIONE DELL'INTERVALLO NON VIVE PIU' QUI ma nel bottone
+     della pagina: chiedere «quanto» prima ancora di aver fatto
+     vedere l'offerta era il foglio che si apriva sopra il niente. */
+  apriDettaglioP2P(id);
 }
-async function eseguiPresaP2P(id, scelto){
+async function eseguiPresaP2P(id, scelto, metodo){
   /* LA CINTURA STA IN FONDO, dove passano tutte le prese: `prendiOrdineP2P`
      devia gia' sul proprio ordine, ma quella e' la porta del GESTO —
      e una guardia che vive solo nella porta e' mezza guardia (la
@@ -36778,10 +37155,15 @@ async function eseguiPresaP2P(id, scelto){
      `euroMax` a zero: questa riga non e' piu' un intervallo, e' lo
      scambio che ne e' nato. */
   const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;
+  /* IL METODO SCELTO SI SCRIVE SULLA RIGA, e si valida contro quelli
+     dell'ordine: qui arriva dal dettaglio, ma un metodo fuori
+     dall'elenco non e' una scelta — e' un errore, e vale come
+     «nessuna». Vedi «IL METODO SCELTO VIAGGIA», sotto. */
+  const met = (riga.metodi || []).indexOf(metodo) >= 0 ? metodo : '';
   let ord = {
     id: id, lato: riga.lato === 'sell' ? 'compro' : 'vendo', indice: 0, pubTrade: '',
     stato: 'prendo', euro: scelta || riga.euro, euroMax: 0, importoScelto: scelta,
-    sats: riga.sats, satsNetti: 0,
+    sats: riga.sats, satsNetti: 0, metodoScelto: met,
     metodi: (riga.metodi || []).slice(), premium: riga.premium || 0, peer: '',
     hold: null, contattato: false, cantDo: '', errore: '', votabile: false,
     creato: adesso, aggiornato: adesso
@@ -36943,7 +37325,12 @@ function renderOrdineP2P(){
   const cifra = o.satsNetti > 0 ? fmt(o.satsNetti) + ' sats'
               : o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
   const meta = [];
-  if (o.metodi && o.metodi.length) meta.push('💳 ' + esc(o.metodi.join(', ')));
+  /* IL METODO DECISO PRENDE IL POSTO DELL'ELENCO: da quando chi
+     prende sceglie, l'elenco intero direbbe una cosa che non e' piu'
+     vera — le altre voci non sono piu' in gioco. */
+  const metodoDeciso = metodoSceltoP2P(o);
+  if (metodoDeciso) meta.push('💳 ' + esc(metodoDeciso));
+  else if (o.metodi && o.metodi.length) meta.push('💳 ' + esc(o.metodi.join(', ')));
   meta.push(o.lato === 'compro' ? '⬇️ Compri sats' : '⬆️ Vendi sats');
   const azione = azioniDisponibili(o);
   const bottoni = {
@@ -38013,9 +38400,22 @@ const CHAT_TOLLERANZA = 60;      // lo scarto d'orologio che si accetta
 const CHAT_MAX_BYTE = 65536;     // una busta piu' grande non si apre
 const CAMPO_MAX_TESTO = 300;     // un recapito e' corto: di piu' e' un'altra cosa
 const CHAT_RAFFICA = 60;         // quante buste si accettano al minuto
-/* i due tipi ammessi, e il vocabolario e' CHIUSO: quel che non e' qui
-   dentro si ignora — compresi i messaggi liberi della chat di ieri */
-const CAMPI_P2P = ['euro', 'contatto'];
+/* i tipi ammessi, e il vocabolario e' CHIUSO: quel che non e' qui
+   dentro si ignora — compresi i messaggi liberi della chat di ieri.
+   ⚠️ IL TERZO E' ARRIVATO COL DETTAGLIO-PAGINA (set 2026), e non
+   contraddice la regola scritta sotto «L'IDENTITA' DI PAGAMENTO»:
+   quella vieta un tipo PER METODO — `euro:sepa`, `euro:revolut` —
+   perche' «vince il piu' recente per tipo» e' il meccanismo di
+   correzione, e con un tipo per metodo chi passa da SEPA a Revolut
+   lascerebbe due recapiti vivi. `metodo` non e' quello: e' UNO per
+   scambio, lo scrive solo chi PRENDE, e vince il piu' recente come
+   gli altri due.
+   ⚠️ E UN CLIENT DI IERI LO LASCIA CADERE IN SILENZIO — il suo
+   vocabolario e' chiuso a due — che qui e' una degradazione e non
+   una rottura: chi vende non vede la scelta e sceglie lui, com'era
+   ieri. Fuori di casa non lo capisce nessuno per costruzione: e'
+   la nostra busta cifrata, non un campo del coordinatore. */
+const CAMPI_P2P = ['euro', 'contatto', 'metodo'];
 let p2pCampiOrdine = '';
 let p2pCampoMetodo = '';         // il metodo scelto con le pillole nel foglio
 let p2pChiaviChat = {};          // sk+peer -> {conv, firma}: l'ECDH costa
@@ -38228,11 +38628,61 @@ function ricordaRecapito(forma, campi, testo){
   tutti[forma] = {campi: campi, testo: testo, t: Math.floor(Date.now() / 1000)};
   try { localStorage.setItem(chiaveP2P(RECAPITI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
 }
+/* ---- IL METODO SCELTO VIAGGIA (set 2026, col dettaglio-pagina) ----
+   ⚠️ VERIFICATO SUI BYTE, ed e' la riga che decide questo impianto:
+   il metodo scelto AL TAKE il coordinatore NON lo trasmette. Su
+   `take-sell` e `take-buy` mostrod legge dal messaggio due sole
+   cose — `Payload::Amount` (`get_fiat_amount_requested`, src/util.rs)
+   e, sul solo take-sell, una bolt11 — e il metodo lo ripesca dalla
+   RIGA DELL'ORDINE (`order.payment_method`, src/app/take_sell.rs e
+   take_buy.rs), cioe' l'elenco intero che ha scritto chi ha
+   pubblicato. In mostro-core `Payload` non ha nessuna variante che
+   porti un metodo, e `MessageKind` non ha nessun `get_payment_method`
+   (censite tutte le `get_*` di src/message.rs). Letto su mostro
+   v0.18.6 e mostro-core v0.14.6, che sono le versioni che il nostro
+   client ricalca.
+   QUINDI LA SCELTA VIAGGIA SUL NOSTRO FILO, quello dei recapiti
+   cifrati fra le due chiavi di scambio: parte appena si sa CON CHI
+   — prima non c'e' nessuno a cui mandarla — e chi vende la trova
+   gia' fatta quando apre il foglio del recapito.
+   E LA RIGA LOCALE RESTA LA VERITA' DI CHI HA SCELTO: chi prende
+   se la scrive su `metodoScelto` nel momento della presa, e la
+   busta e' come lo dice all'altra persona — non come lo ricorda. */
+function metodoSceltoP2P(o){
+  if (!o) return '';
+  const arrivato = ((o.campiLoro || {}).metodo || {}).testo || '';
+  const m = String(o.metodoScelto || arrivato || '');
+  /* FAIL-CLOSED, e non e' prudenza generica: `arrivato` e' testo che
+     ha scritto l'altra persona. Un metodo fuori dall'elenco
+     dell'ordine non e' una scelta, e vale come «non ha scelto». */
+  return (o.metodi || []).indexOf(m) >= 0 ? m : '';
+}
+let p2pMetodoInviato = {};      // per sessione: un invio per scambio
+function pianificaMetodoP2P(id){
+  if (p2pMetodoInviato[id]) return;
+  const o = ordiniP2P()[id];
+  /* solo chi ha PRESO ce l'ha scritto sulla riga, e solo se non e'
+     gia' partito da questo o da un altro dispositivo */
+  if (!o || !o.metodoScelto || (o.campiMiei || {}).metodo) return;
+  if (!chiaviChatOrdine(o)) return;
+  p2pMetodoInviato[id] = 1;
+  /* SE NON PARTE NON SI RIPROVA da solo, la regola dei campi: chi
+     vende sceglie come ieri, e a valere e' il metodo del suo
+     recapito — che il testo composto NOMINA sempre. */
+  campoInvia(o, 'metodo', o.metodoScelto).catch(() => {});
+}
+
 /* il metodo su cui sta il form: quello scelto con le pillole se
-   l'ordine ne ha piu' d'uno, altrimenti il primo che ha un ricordo */
+   l'ordine ne ha piu' d'uno, poi quello deciso da chi ha preso,
+   e solo alla fine il primo che ha un ricordo */
 function metodoRecapitoScelto(o){
   const metodi = (o && o.metodi && o.metodi.length) ? o.metodi : [''];
   if (metodi.indexOf(p2pCampoMetodo) >= 0) return p2pCampoMetodo;
+  /* ⚠️ LA SCELTA DI CHI PRENDE BATTE IL RICORDO, ed e' il punto di
+     tutto il cantiere: mandare l'IBAN a chi ha scelto Satispay
+     vuol dire far ricominciare l'accordo a voce. */
+  const deciso = metodoSceltoP2P(o);
+  if (deciso) return deciso;
   const salvati = recapitiMiei();
   return metodi.find(m => salvati[formaRecapito(m).forma]) || metodi[0];
 }
@@ -38263,7 +38713,11 @@ function recapitoDaAutoInvio(o){
   if ((o.campiMiei || {}).euro) return null;
   const salvati = recapitiMiei();
   const pronte = {};
-  for (const m of (o.metodi || [])) {
+  /* COL METODO GIA' DECISO la forma e' UNA per definizione, e la
+     regola «con due sceglie il venditore» non ha piu' niente da
+     scegliere: la scelta l'ha fatta chi ha preso. */
+  const deciso = metodoSceltoP2P(o);
+  for (const m of (deciso ? [deciso] : (o.metodi || []))) {
     const f = formaRecapito(m).forma;
     if (salvati[f] && salvati[f].testo) pronte[f] = salvati[f];
   }
@@ -38321,8 +38775,13 @@ function renderCampiP2P(){
     const scelto = metodoRecapitoScelto(o);
     fr = formaRecapito(scelto);
     salvato = recapitiMiei()[fr.forma] || null;
+    /* ⚠️ CON LA SCELTA DI CHI PRENDE LE PILLOLE NON CI SONO PIU':
+       non c'e' niente da scegliere, e offrirlo lo stesso vorrebbe
+       dire lasciar mandare un recapito che l'altra persona non puo'
+       usare. Resta la riga che dice qual e'. */
+    const deciso = metodoSceltoP2P(o);
     parteEuro =
-      (metodi.length > 1
+      (metodi.length > 1 && !deciso
         ? '<div class="field"><label>Con quale metodo ricevi gli euro</label>' +
           '<div class="p2p-metodi">' + metodi.map(m =>
             '<button type="button" class="tema-pill' + (m === scelto ? ' active' : '') +

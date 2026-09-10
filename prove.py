@@ -27031,8 +27031,12 @@ def prove_fogli_di_casa():
     # conferma degenere con un bottone solo. Spiegare una scelta e' una
     # domanda che non chiede niente, e vive nello stesso foglio invece
     # che in un terzo.
-    prova("i gesti che passano dalla domanda unica sono cinquantaquattro",
-          54, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTATRE (set 2026, il dettaglio-pagina del P2P): la presa di
+    # un ordine del libro non passa piu' di qui — la conferma sono i
+    # due bottoni gemelli in fondo alla pagina che si e' appena letta,
+    # e un foglietto sopra una pagina era la stessa domanda due volte.
+    prova("i gesti che passano dalla domanda unica sono cinquantatre",
+          53, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -35830,10 +35834,14 @@ def prove_p2p_libro():
     # ancora» — un'offerta visibile e non prendibile e' un buco
     # peggiore del foglio che mancava. Ora il tocco DEVIA sul foglio
     # che chiede quanto, e da li' si rientra nella stessa strada.
-    _pr = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
+    # ⚠️ E LA DEVIAZIONE HA CAMBIATO CASA (set 2026, il dettaglio-pagina):
+    # non sta piu' nella porta del gesto — la' il foglio «Quanto» si
+    # sarebbe aperto PRIMA che l'offerta si fosse vista — ma nel
+    # bottone della pagina. I suoi casi girano in prove_p2p_dettaglio;
+    # qui resta la meta' che riguarda il LIBRO: il range e' prendibile.
+    _pr = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
     prova("il range devia sul foglio che chiede quanto", True,
-          "if (riga.euroMax && !(Number(scelto) > 0)) { apriQuantoP2P(id); return; }"
-          in _pr)
+          "if (o.euroMax) { apriQuantoP2P(id); return; }" in _pr)
     prova("...e del rifiuto di ieri non resta niente", False,
           "si sceglie l\\'importo" in mini)
     # LA CIFRA SCELTA VIAGGIA COME `Payload::Amount`, che mostrod legge
@@ -35841,7 +35849,8 @@ def prove_p2p_libro():
     # confronta con min/max (`get_fiat_amount_requested`): fuori fascia
     # risponde `OutOfRangeSatsAmount`. Su un ordine normale non si
     # manda affatto — la cifra la mette lui dal libro.
-    _ep = pezzo_js(mini, "async function eseguiPresaP2P(id, scelto){", "\n}\n")
+    _ep = pezzo_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){",
+                   "\n}\n")
     prova("la cifra scelta viaggia solo se c'e' un intervallo", True,
           "payload: scelta ? {amount: scelta} : null});" in _ep
           and "const scelta = riga.euroMax ? Math.floor(Number(scelto) || 0) : 0;" in _ep)
@@ -35924,6 +35933,8 @@ def prove_p2p_libro():
         "function scadeTestoP2P(scade){",
         # l'anello della scadenza (set 2026) e il suo giudice puro
         "function frazioneVitaP2P(o, adesso){",
+        # il giudice del colore, che dal set 2026 e' UNO per i due anelli
+        "function statoAnelloP2P(manca){",
         "function anelloScadenzaP2P(o, adesso){",
         # l'ordine del libro per convenienza di chi legge (set 2026)
         "function ordinaLibroP2P(righe, lato){",
@@ -36596,8 +36607,11 @@ console.log(JSON.stringify(out));
           [False, True], [out["repSenzaFaccia"], out["repSenzaFacciaLibera"]])
     prova("...e la media filtra chi i voti ce li ha", [True, False, True],
           [out["repAlta"], out["repBassa"], out["repSulFilo"]])
-    # ...e il DETTAGLIO della presa non nomina piu' l'altra piazza
-    _po = pezzo_js(mini, "function prendiOrdineP2P(id, scelto){", "\n}\n")
+    # ...e il DETTAGLIO della presa non nomina piu' l'altra piazza.
+    # Dal ridisegno il dettaglio E' UNA PAGINA, e la domanda vale
+    # identica su di lei: la reputazione che si vede e' quella di casa,
+    # in tre colonne, e del coordinatore non resta una riga.
+    _po = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
     prova("il dettaglio della presa non porta piu' una riga P2P", True,
           "repRigaP2P" not in _po and "+ rp +" not in _po)
     prova("...e la card no", False,
@@ -36666,6 +36680,448 @@ console.log(JSON.stringify(out));
           out["lapideFallback"])
     prova("...e un localStorage corrotto vale vuoto, mai un'esplosione",
           True, out["lapideCorrotta"])
+
+
+def prove_p2p_dettaglio():
+    """IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026, ridisegno chiesto
+    da Andrea): toccare una card non apre piu' un foglietto di conferma
+    alto tre righe, apre una PAGINA a pieno schermo — titolo che dice il
+    lato, cifra e prezzo, il metodo che chi prende SCEGLIE, la
+    reputazione di casa in tre colonne, l'anello grande del tempo e i
+    due bottoni gemelli in fondo.
+
+    Le sentinelle guardano la FORMA — il foglio e' `.sheet.pieno` come
+    «Pubblica», il piede ha i due gemelli, «Creato il» e «ID ordine» non
+    ci sono, la porta del gesto apre la pagina invece della domanda, e
+    il conto alla rovescia batte nell'UNICO interval dell'app. Il banco
+    node fa GIRARE i pezzi puri e il render intero su un DOM di
+    cartone: il titolo che cambia col lato, la riga del prezzo nei
+    cinque casi (mercato, col premio, fisso, a intervallo, valuta
+    ignota), le pillole del metodo (una sola non e' un bottone), il
+    riquadro che sparisce senza volto e i suoi trattini, le tacche
+    dell'anello ai capi, e il bottone spento finche' il metodo non e'
+    scelto. Una sentinella direbbe che la pagina esiste, mai che
+    risponda giusto."""
+    print("\n[il P2P: il dettaglio di un ordine del libro]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    intera = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- 1) LA PAGINA E' UN FOGLIO PIENO, col calco di «Pubblica» ----
+    prova("il foglio del dettaglio e' a pieno schermo", True,
+          '<div class="sheet pieno" id="p2pDettSheet"' in mini)
+    prova("...con la testata, la via d'uscita e il gemello invisibile",
+          True, 'id="p2pDettTit"' in mini
+          and mini.count('<span class="foglio-back vuoto"') == 2
+          and '<div class="foglio-corpo" id="p2pDettCorpo"></div>' in mini)
+    # STA PRIMA di «Quanto» nel DOM, ed e' l'ordine che decide chi copre
+    # chi: su un intervallo il foglio della cifra si apre SOPRA la pagina
+    prova("...e nel DOM sta prima del foglio «Quanto»", True,
+          0 < mini.index('id="p2pDettSheet"') < mini.index('id="p2pQuantoSheet"'))
+    prova("...e si chiude con gli altri", True,
+          "el('p2pDettSheet').classList.remove('open');" in pezzo_js(
+              mini, "function closeSheet(){", "\n}\n"))
+
+    # --- 2) LA PORTA DEL GESTO APRE LA PAGINA, non la domanda -------
+    po = pezzo_js(mini, "function prendiOrdineP2P(id){", "\n}\n")
+    prova("il tocco sulla card apre il dettaglio", True,
+          "apriDettaglioP2P(id);" in po)
+    prova("...e non chiede piu' niente in un foglietto", False,
+          "chiediConferma" in po)
+    # LE GUARDIE RESTANO NELLA PORTA, tutte: sono la ragione per cui la
+    # pagina non si apre affatto su un ordine che non si puo' prendere —
+    # meglio del bottone che, in fondo alla lettura, dice di no.
+    prova("...e le guardie della porta restano tutte", True,
+          "if (DEMO)" in po and "if (VETRINA || !myTgId)" in po
+          and "const gia = ordiniP2P()[id];" in po
+          and "if (ordineMioP2P(id))" in po
+          and "si guarda soltanto" in po)
+    # LA DEVIAZIONE DELL'INTERVALLO HA CAMBIATO CASA: prima stava nella
+    # porta — cioe' il foglio «Quanto» si apriva PRIMA che si fosse
+    # visto l'ordine — e adesso sta nel bottone della pagina.
+    cd = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
+    prova("il range devia sul foglio che chiede quanto, dal bottone",
+          True, "if (o.euroMax) { apriQuantoP2P(id); return; }" in cd
+          and "apriQuantoP2P" not in po)
+    prova("...e senza metodo scelto non si prende niente", True,
+          "if ((o.metodi || []).length > 1 && !p2pDettMetodo) {" in cd)
+    prova("...e la pagina si chiude PRIMA di agire", True,
+          0 < cd.find("chiudiFoglioP2P('p2pDettSheet')")
+          < cd.find("eseguiPresaP2P("))
+    # ...e da «Quanto» si rientra DRITTI nella presa: ripassare dalla
+    # porta riaprirebbe la pagina appena chiusa
+    prova("da «Quanto» si va dritti alla presa, non alla porta", True,
+          "eseguiPresaP2P(id, g.euro, p2pDettMetodo);"
+          in pezzo_js(mini, "function confermaQuantoP2P(){", "\n}\n"))
+
+    # --- 3) QUEL CHE NON CI DEVE ESSERE (decisione di Andrea) -------
+    rd = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("niente «Creato il» e niente «ID ordine»", True,
+          "Creato il" not in rd and "ID ordine" not in rd)
+    prova("...e nemmeno l'id in chiaro nella pagina", False, "esc(o.id)" in rd)
+
+    # --- 4) IL CONTO BATTE NELL'UNICO INTERVAL DELL'APP -------------
+    # «UN solo interval per tutta l'app» e' una regola scritta: un
+    # secondo orologio per un solo anello sarebbe un secondo orologio
+    # da spegnere, e i due si sfaserebbero.
+    _i = mini.index("setInterval(() => {")
+    prova("il conto alla rovescia si attacca all'interval di casa", True,
+          "battitoAnelloneP2P();" in mini[_i:_i + 900])
+    ba = pezzo_js(mini, "function battitoAnelloneP2P(){", "\n}\n")
+    prova("...e non ne nasce uno suo", False,
+          "setInterval" in ba
+          or "setInterval" in pezzo_js(mini, "function apriDettaglioP2P(id){", "\n}\n"))
+    prova("...esce subito se la pagina non e' aperta", True,
+          "if (!box) return;" in ba)
+    # SI RISCRIVE IN PLACE e mai col render: un render al secondo
+    # porterebbe via il fuoco alle pillole mentre uno le sta toccando
+    prova("...e riscrive in place, mai col render", False,
+          "renderDettaglioP2P" in ba)
+    # e le tacche si toccano solo quando cambiano: su sette giorni una
+    # tacca dura due ore, quindi 7199 battiti su 7200 non hanno da fare
+    prova("...e le tacche si toccano solo quando cambiano", True,
+          "if (Number(box.dataset.accese) !== accese) {" in ba)
+
+    # --- 5) UN GIUDICE SOLO PER I DUE ANELLI ------------------------
+    # Le due soglie stavano dentro anelloScadenzaP2P; adesso i due
+    # anelli chiedono alla stessa funzione. Due copie direbbero due
+    # colori sullo stesso ordine, e a scoprirlo sarebbe chi guarda.
+    prova("il colore del tempo ha un giudice solo", True,
+          "function statoAnelloP2P(manca){" in mini
+          and "statoAnelloP2P(manca)" in pezzo_js(
+              mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n"))
+    # NIENTE `id` NELL'SVG: la maschera che «sarebbe piu' semplice»
+    # vuole un id, e un id nell'SVG e' la trappola gia' pagata con la
+    # stella (in un elenco di N card il primo id vince per tutte).
+    an = pezzo_js(mini, "function anelloneP2P(o, adesso){", "\n}\n")
+    prova("l'anello grande e' fatto di tacche, non di maschere", True,
+          '<line class="tacca' in an
+          and not any(s in an for s in ("<mask", "clipPath", "linearGradient")))
+    prova("...e i tre stati vestono le tacche accese", True,
+          all(s in mini for s in (".p2p-anellone .tacca.on{stroke:var(--ink-soft)}",
+                                  ".p2p-anellone.vicina .tacca.on{stroke:var(--sats)}",
+                                  ".p2p-anellone.ultimo-giorno .tacca.on{stroke:var(--danger);")))
+    prova("...e l'ultimo giorno non pulsa a chi ha chiesto di non muoversi",
+          True, ".p2p-anellone.ultimo-giorno .tacca.on{animation:none}" in mini)
+    prova("le cifre del conto non ballano", True,
+          "font-variant-numeric:tabular-nums" in pezzo_js(
+              mini, "  .p2p-tempo b{", "}"))
+
+    # --- 6) IL PIEDE: I DUE GEMELLI ---------------------------------
+    prova("in fondo ci sono i due bottoni gemelli, come in «Pubblica»",
+          True, '<div class="foglio-piede">' in rd
+          and 'class="btn ghost" onclick="navIndietro()">Annulla' in rd
+          and 'class="btn orange" id="p2pDettVai"' in rd)
+    # E IL BOTTONE SPENTO DICE PERCHE': un bottone morto senza una
+    # ragione visibile e' il vicolo cieco muto del foglio «Pubblica».
+    prova("...e il bottone spento porta la sua ragione", True,
+          'id="p2pDettManca"' in rd and "Scegli con quale metodo" in rd)
+
+    # --- 7) IL METODO SCELTO VIAGGIA (verificato sui byte) ----------
+    # ⚠️ MOSTRO AL TAKE NON LO TRASMETTE: su take-sell/take-buy legge
+    # `Payload::Amount` e (sul solo take-sell) una bolt11, e il metodo
+    # lo ripesca da `order.payment_method`, cioe' l'elenco intero di
+    # chi ha pubblicato. Quindi la scelta viaggia sul NOSTRO filo, e la
+    # riga che lo dice sta scritta accanto al lettore.
+    prova("il vocabolario dei tipi e' chiuso a tre", True,
+          "const CAMPI_P2P = ['euro', 'contatto', 'metodo'];" in mini)
+    prova("...e la verifica sui byte e' a verbale accanto al lettore",
+          True, "`order.payment_method`" in mini
+          and "get_fiat_amount_requested" in mini
+          and "get_payment_method" in mini)
+    ms = pezzo_js(mini, "function metodoSceltoP2P(o){", "\n}\n")
+    prova("il metodo arrivato si valida contro quelli dell'ordine", True,
+          "return (o.metodi || []).indexOf(m) >= 0 ? m : '';" in ms)
+    pm = pezzo_js(mini, "function pianificaMetodoP2P(id){", "\n}\n")
+    prova("...e parte una volta sola, quando si sa con chi", True,
+          "if (p2pMetodoInviato[id]) return;" in pm
+          and "if (!chiaviChatOrdine(o)) return;" in pm
+          and "campoInvia(o, 'metodo'" in pm)
+    prova("...e prima del recapito, che chi vende non scelga da solo",
+          True, 0 < mini.index("pianificaMetodoP2P(nuovo.id);")
+          < mini.index("pianificaAutoRecapito(nuovo.id);"))
+    prova("la scelta si scrive sulla riga al momento della presa", True,
+          "const met = (riga.metodi || []).indexOf(metodo) >= 0 ? metodo : '';"
+          in pezzo_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){",
+                      "\n}\n"))
+    # E COL METODO DECISO IL FOGLIO DEI RECAPITI NON OFFRE PIU' PILLOLE:
+    # non c'e' niente da scegliere, e offrirlo lo stesso vorrebbe dire
+    # lasciar mandare un recapito che l'altra persona non puo' usare.
+    prova("col metodo deciso il foglio dei recapiti non offre pillole",
+          True, "(metodi.length > 1 && !deciso" in pezzo_js(
+              mini, "function renderCampiP2P(){", "\n}\n"))
+    prova("...e l'invio automatico guarda la sola forma decisa", True,
+          "for (const m of (deciso ? [deciso] : (o.metodi || []))) {"
+          in pezzo_js(mini, "function recapitoDaAutoInvio(o){", "\n}\n"))
+
+    # --- 8) IL BANCO NODE: la pagina GIRA ---------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il dettaglio dell'ordine gira", "node non c'e'")
+        return
+    i_st = mini.index("const P2P_STELLA_D = ")
+    pezzi = [mini[i_st:mini.index(";", mini.index("z';", i_st))]]
+    pezzi += [intera(f) for f in (
+        "function frazioneStellaP2P(media){",
+        "function stellaP2P(media){",
+        "function icoPersonaP2P(){",
+        "function icoGiorniP2P(){",
+        "function scadeTestoP2P(scade){",
+        "function frazioneVitaP2P(o, adesso){",
+        "function satsMercatoP2P(o){",
+        "function sezioneNuovoP2P(o){",
+        "function icoNuovoP2P(nome){",
+        "function statoAnelloP2P(manca){",
+        "function contoRimastoP2P(sec){",
+        "function taccheAnelloneP2P(resta){",
+        "function anelloneP2P(o, adesso){",
+        "function repRiquadroP2P(f){",
+        "function prezzoRigaP2P(o){",
+        "function metodiDettP2P(o){",
+        "function scegliMetodoDettP2P(m){",
+        "function rigaLibroP2P(id){",
+        "function renderDettaglioP2P(){",
+        "function apriDettaglioP2P(id){",
+        "function confermaDettaglioP2P(){",
+        "function metodoSceltoP2P(o){")]
+    # le costanti e le due variabili del foglio: dal client, mai ribattute
+    for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
+                 "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
+                 "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
+                 "let p2pDettOrdine = ", "let p2pDettMetodo = "):
+        i_a = mini.index(riga)
+        pezzi.append(mini[i_a:mini.index("\n", i_a)])
+    i_ic = mini.index("const P2P_ICONE = ")
+    pezzi.append(mini[i_ic:mini.index("\n};", i_ic) + 3])
+    banco = "\n".join(pezzi) + r"""
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmt = n => String(n);
+const fmtEur = e => e.toLocaleString('it-IT',
+  {minimumFractionDigits:2, maximumFractionDigits:2});
+let cambioVivo = true, eurPerSat = 0.0005;
+let p2pFacce = {};
+let p2pLibro = null;
+let toasts = []; function toast(m){ toasts.push(String(m)); }
+function haptic(){}
+/* IL DOM DI CARTONE: due nodi, e quel che ci si scrive dentro si
+   rilegge. Basta: la pagina non frughi nel documento, scrive e basta. */
+const nodi = {};
+function el(id){
+  if (!nodi[id]) nodi[id] = {id: id, innerHTML: '', textContent: '',
+    classList: {add(){}, remove(){}}};
+  return nodi[id];
+}
+/* i vicini si prestano, e si conta chi e' stato chiamato: e' cosi' che
+   «il bottone devia» si legge senza aprire nessun foglio vero */
+let chiusi = [], quanti = [], prese = [];
+function chiudiFoglioP2P(f){ chiusi.push(f); }
+function apriQuantoP2P(id){ quanti.push(id); }
+function eseguiPresaP2P(id, scelto, metodo){ prese.push([id, scelto, metodo]); }
+const ora = 2000000000;
+const G = 86400;
+const ordine = (o) => Object.assign({
+  id: 'ord-1', lato: 'sell', fiat: 'EUR', euro: 6, euroMax: 0, sats: 0,
+  premium: 0, metodi: ['Revolut'], scade: ora + 7 * G, creato: ora}, o);
+const out = {};
+
+/* ---- i pezzi puri ---- */
+out.conto = [59, 85637, 604037, -10].map(contoRimastoP2P);
+out.tacche = [taccheAnelloneP2P(1), taccheAnelloneP2P(0.5),
+              taccheAnelloneP2P(0.001), taccheAnelloneP2P(0),
+              taccheAnelloneP2P(-1)];
+out.stati = [statoAnelloP2P(7 * G), statoAnelloP2P(3 * G),
+             statoAnelloP2P(2 * G), statoAnelloP2P(G), statoAnelloP2P(0)];
+
+/* ---- la riga del prezzo, nei cinque casi ---- */
+out.prezzoMercato = prezzoRigaP2P(ordine({}));
+out.prezzoPremio = prezzoRigaP2P(ordine({premium: 4}));
+out.prezzoFisso = prezzoRigaP2P(ordine({sats: 100000}));
+out.prezzoRange = prezzoRigaP2P(ordine({euro: 20, euroMax: 100}));
+/* una valuta fuori dal catalogo porta la sigla e MAI una bandiera */
+out.prezzoAltra = prezzoRigaP2P(ordine({fiat: 'USD'}));
+/* il giudizio del premio si rovescia col lato, come sulle card */
+out.premioSell = prezzoRigaP2P(ordine({lato: 'sell', premium: 4}));
+out.premioBuy = prezzoRigaP2P(ordine({lato: 'buy', premium: 4}));
+
+/* ---- il riquadro della reputazione ---- */
+out.repSenza = repRiquadroP2P(null);
+out.repPiena = repRiquadroP2P({nome: 'Ada', media: 4.8, voti: 12, giorni: 41});
+out.repSenzaVoti = repRiquadroP2P({nome: 'Bruno', media: 0, voti: 0, giorni: 3});
+out.repSenzaGiorni = repRiquadroP2P({nome: 'Cip', media: 5, voti: 2});
+
+/* ---- il metodo: una pillola sola non e' un bottone ---- */
+out.unoSolo = metodiDettP2P(ordine({metodi: ['Revolut']}));
+out.treMetodi = metodiDettP2P(ordine({metodi: ['SEPA', 'Revolut', 'Satispay']}));
+out.nessunMetodo = metodiDettP2P(ordine({metodi: []}));
+
+/* ---- l'anello grande ---- */
+out.anelloPieno = anelloneP2P(ordine({creato: ora, scade: ora + 7 * G}), ora);
+out.anelloMeta = anelloneP2P(ordine({creato: ora - 7 * G / 2,
+                                     scade: ora + 7 * G / 2}), ora);
+out.anelloSenza = anelloneP2P(ordine({scade: 0}), ora);
+
+/* ---- la pagina intera, su un ordine con due metodi ---- */
+p2pLibro = {ordini: [ordine({id: 'ord-1', metodi: ['SEPA', 'Revolut'],
+                             creato: ora - G, scade: ora + 6 * G})]};
+p2pFacce = {'ord-1': {nome: 'Ada', media: 4.8, voti: 12, giorni: 41}};
+apriDettaglioP2P('ord-1');
+out.titoloCompra = el('p2pDettTit').textContent;
+out.pagina = el('p2pDettCorpo').innerHTML;
+/* col metodo non scelto il bottone e' SPENTO e la ragione si vede */
+out.bottoneSpento = out.pagina.indexOf('id="p2pDettVai" disabled') >= 0;
+out.dice = out.pagina.indexOf('Scegli con quale metodo vuoi pagare.') >= 0;
+/* ...e premerlo non prende niente */
+confermaDettaglioP2P();
+out.senzaMetodoNonPrende = prese.length === 0 && toasts.length === 1;
+scegliMetodoDettP2P('Revolut');
+out.pagina2 = el('p2pDettCorpo').innerHTML;
+out.bottoneAcceso = out.pagina2.indexOf('id="p2pDettVai" disabled') < 0;
+out.pillolaAccesa = out.pagina2.indexOf('tema-pill active" data-m="Revolut"') >= 0;
+confermaDettaglioP2P();
+out.presa = prese[0];
+out.chiusaPrima = chiusi[0];
+
+/* ...e dal lato opposto il titolo e il verbo cambiano */
+p2pLibro = {ordini: [ordine({id: 'ord-2', lato: 'buy', metodi: ['Satispay']})]};
+p2pFacce = {};
+apriDettaglioP2P('ord-2');
+out.titoloVendi = el('p2pDettTit').textContent;
+out.paginaVendi = el('p2pDettCorpo').innerHTML;
+/* con UN metodo solo la scelta e' gia' fatta: il bottone nasce acceso */
+out.unMetodoAcceso = out.paginaVendi.indexOf('id="p2pDettVai" disabled') < 0;
+/* senza volto il riquadro della reputazione non c'e' proprio */
+out.senzaVoltoNienteRep = out.paginaVendi.indexOf('p2p-rep-tre') < 0;
+
+/* ...e su un intervallo il bottone devia sul foglio della cifra */
+p2pLibro = {ordini: [ordine({id: 'ord-3', euro: 20, euroMax: 100,
+                             metodi: ['SEPA']})]};
+apriDettaglioP2P('ord-3');
+prese = []; quanti = [];
+confermaDettaglioP2P();
+out.rangeDevia = [quanti.length, prese.length];
+
+/* ---- il lettore del metodo scelto, coi due lati ---- */
+out.metodoMio = metodoSceltoP2P({metodi: ['SEPA', 'Revolut'],
+                                 metodoScelto: 'Revolut'});
+out.metodoLoro = metodoSceltoP2P({metodi: ['SEPA', 'Revolut'],
+                                  campiLoro: {metodo: {testo: 'SEPA'}}});
+out.metodoStorto = metodoSceltoP2P({metodi: ['SEPA'],
+                                    campiLoro: {metodo: {testo: '<b>ciao</b>'}}});
+out.metodoNiente = metodoSceltoP2P({metodi: ['SEPA']});
+console.log(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        if os.environ.get("BANCO_DUMP"):
+            open("banco_dump.js", "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=90)
+        if r.returncode != 0:
+            prova("il banco node del dettaglio gira", "", (r.stderr or "")[-600:])
+            return
+        o = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+    prova("il conto alla rovescia si legge, e i giorni solo se ci sono",
+          ["00:00:59", "23:47:17", "6g 23:47:17", "00:00:00"], o["conto"])
+    # ⚠️ L'ULTIMA TACCA NON SI SPEGNE FINCHE' C'E' TEMPO: con
+    # l'arrotondamento secco, sotto lo 0,83% l'anello sarebbe gia' vuoto
+    # con l'ordine ancora vivo — e un anello vuoto dice «scaduto».
+    prova("le tacche si consumano, e l'ultima resta finche' c'e' tempo",
+          [60, 30, 1, 0, 0], o["tacche"])
+    prova("i tre stati del colore sono quelli delle card",
+          ["", "vicina", "vicina", "ultimo-giorno", "ultimo-giorno"], o["stati"])
+
+    prova("la riga del prezzo dice «per X € 🇪🇺 al prezzo di mercato»",
+          True, "per <b>6,00 € 🇪🇺</b> al prezzo di mercato" in o["prezzoMercato"]
+          and "%" not in o["prezzoMercato"])
+    prova("...col premio fra parentesi, e col segno", True,
+          'al prezzo di mercato <b class="p2p-avviso">(+4%)</b>' in o["prezzoPremio"])
+    prova("...e a prezzo fisso il mercato non si nomina",
+          "per <b>6,00 € 🇪🇺</b>", o["prezzoFisso"])
+    prova("...e un intervallo porta i due capi", True,
+          "per <b>20,00–100,00 € 🇪🇺</b>" in o["prezzoRange"])
+    # LA BANDIERINA STA DOVE E' VERA: una valuta fuori dal catalogo
+    # porta la sua sigla, mai una bandiera inventata
+    prova("...e una valuta sconosciuta porta la sigla, non una bandiera",
+          True, "per <b>6,00 USD</b>" in o["prezzoAltra"]
+          and "🇪🇺" not in o["prezzoAltra"])
+    # IL GIUDIZIO SI ROVESCIA COL LATO, dalla formula letta sui byte
+    # (`sats -= premium/100 * sats`): un premio positivo assottiglia
+    # sempre i sats — su un sell chi legge ne riceve meno (avviso), su
+    # un buy ne consegna meno (affare).
+    prova("il giudizio del premio si rovescia col lato, come sulle card",
+          [True, True], ["p2p-avviso" in o["premioSell"],
+                         "p2p-affare" in o["premioBuy"]])
+
+    prova("senza volto il riquadro della reputazione non c'e' proprio",
+          "", o["repSenza"])
+    prova("...e con lui ci sono le tre colonne", True,
+          "p2p-rep-tre" in o["repPiena"] and ">4,8<" in o["repPiena"]
+          and ">12<" in o["repPiena"] and ">41<" in o["repPiena"])
+    # ZERO VOTI NON E' «ZERO STELLE», e' «non si sa»: la regola di casa
+    prova("...e chi non ha voti porta un trattino, mai uno zero", True,
+          o["repSenzaVoti"].count(">—<") == 2 and ">0<" not in o["repSenzaVoti"])
+    # ⚠️ I GIORNI POSSONO MANCARE (account nati prima che il server
+    # timbrasse l'iscrizione): «0 giorni» direbbe «iscritto oggi», che
+    # e' il contrario esatto del vero — sono i piu' vecchi.
+    prova("...e i giorni che non si sanno sono un trattino, non uno zero",
+          1, o["repSenzaGiorni"].count(">—<"))
+
+    prova("con un metodo solo non c'e' niente da scegliere", True,
+          "p2p-dett-uno" in o["unoSolo"] and "tema-pill" not in o["unoSolo"])
+    prova("...con tre ci sono tre pillole, nessuna accesa", True,
+          o["treMetodi"].count("tema-pill") == 3
+          and "tema-pill active" not in o["treMetodi"])
+    prova("...e chi non l'ha indicato lo dice", True,
+          "non l'ha indicato" in o["nessunMetodo"])
+
+    prova("l'anello nasce pieno e si consuma", [60, 30],
+          [o["anelloPieno"].count("tacca on"), o["anelloMeta"].count("tacca on")])
+    prova("...e ha sempre sessanta tacche in pista", 60,
+          o["anelloMeta"].count('<line class="tacca'))
+    prova("...e senza scadenza non c'e' anello", "", o["anelloSenza"])
+    prova("...e sotto c'e' il tempo rimasto", True,
+          'Tempo rimasto: <b id="p2pDettConto">' in o["anelloPieno"])
+
+    prova("il titolo dice il lato: acquisto dal tab «Compra BTC»",
+          "Dettaglio ordine di acquisto", o["titoloCompra"])
+    prova("...e vendita dall'altro", "Dettaglio ordine di vendita",
+          o["titoloVendi"])
+    prova("la pagina apre con «Stai comprando sats»", True,
+          "Stai comprando sats" in o["pagina"]
+          and "Stai vendendo sats" in o["paginaVendi"])
+    # LA QUANTITA' RESTA A VISTA: la card la porta, e una pagina che
+    # chiede di confermare uno scambio senza dire quanti sats passano
+    # di mano direbbe meno della card che si e' appena toccata.
+    prova("...e la quantita' resta a vista", True, "≈ 12000 sats" in o["pagina"])
+    prova("senza metodo scelto il bottone e' spento e dice perche'",
+          [True, True], [o["bottoneSpento"], o["dice"]])
+    prova("...e premerlo non prende niente", True, o["senzaMetodoNonPrende"])
+    prova("scelto il metodo la pillola si accende e il bottone pure",
+          [True, True], [o["pillolaAccesa"], o["bottoneAcceso"]])
+    prova("...e la presa parte con l'id, la cifra e il metodo",
+          ["ord-1", 0, "Revolut"], o["presa"])
+    prova("...dopo aver chiuso la pagina", "p2pDettSheet", o["chiusaPrima"])
+    prova("con un metodo solo il bottone nasce acceso", True,
+          o["unMetodoAcceso"])
+    prova("...e senza volto niente riquadro della reputazione", True,
+          o["senzaVoltoNienteRep"])
+    prova("su un intervallo il bottone apre «Quanto» e non prende",
+          [1, 0], o["rangeDevia"])
+
+    prova("il metodo scelto si legge da chi ha preso e da chi ha pubblicato",
+          ["Revolut", "SEPA"], [o["metodoMio"], o["metodoLoro"]])
+    # FAIL-CLOSED: `campiLoro` e' testo che ha scritto l'altra persona
+    prova("...e un metodo fuori dall'elenco vale «non ha scelto»",
+          ["", ""], [o["metodoStorto"], o["metodoNiente"]])
 
 
 def prove_nav_p2p():
@@ -37105,14 +37561,17 @@ def prove_volti_libro():
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
         " avatar TEXT, rating REAL, n_feedback INTEGER,"
         " avatar_scelta TEXT DEFAULT '', username TEXT DEFAULT '',"
-        " negozio TEXT DEFAULT '');"
+        " negozio TEXT DEFAULT '', registrato INTEGER DEFAULT 0);"
+        # Ada si e' iscritta 41 giorni prima dell'orologio del banco
         "INSERT INTO utenti VALUES(111,'Ada','av_a.jpg',4.8,12,"
-        " '','ada_tg','ab12cd34');"
+        " '','ada_tg','ab12cd34', 1000000 - 41 * 86400);"
         # Bruno HA una foto ma ha scelto di non mostrarla, e non ha un
         # codice negozio: il volto esce senza foto e la porta ripiega
-        # sullo username
+        # sullo username. E il suo `registrato` e' ZERO — un account
+        # nato prima che il server timbrasse l'iscrizione: i giorni
+        # non si sanno, e la chiave non esce proprio.
         "INSERT INTO utenti VALUES(222,'Bruno','av_b.jpg',0,0,"
-        " 'nessuna','bruno_tg','');")
+        " 'nessuna','bruno_tg','', 0);")
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
            "MAX_ORDINI_P2P": 200}
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p",
@@ -37134,13 +37593,19 @@ def prove_volti_libro():
     prova("...e un ordine di un altro non si ruba", {"registrati": 0},
           reg(con, 222, ["ordine-aaa"], 2))
     reg(con, 222, ["ordine-ccc"], 2)
-    f = facce_di(con, ["ordine-aaa", "ordine-ccc", "ordine-mai-visto"])
-    prova("il volto esce con nome, faccia, stelline e negozio",
+    f = facce_di(con, ["ordine-aaa", "ordine-ccc", "ordine-mai-visto"],
+                 1000000)
+    prova("il volto esce con nome, faccia, stelline, negozio e giorni",
           {"nome": "Ada", "avatar": "av_a.jpg", "media": 4.8, "voti": 12,
-           "negozio": "ab12cd34"},
+           "negozio": "ab12cd34", "giorni": 41},
           f.get("ordine-aaa"))
+    # ⚠️ I GIORNI CHE NON SI SANNO NON ESCONO (set 2026, col riquadro
+    # della reputazione nel dettaglio): con `registrato` a zero un
+    # "giorni": 0 direbbe «iscritto oggi» — il contrario esatto del
+    # vero, perche' quegli account sono i piu' vecchi. Chiave assente,
+    # e il client ci mette il suo trattino.
     prova("...e chi non ha voti non porta una media inventata "
-          "(e la foto negata resta negata)",
+          "(e la foto negata resta negata, e i giorni ignoti non escono)",
           {"nome": "Bruno", "avatar": "", "media": 0, "voti": 0,
            "negozio": "bruno_tg"},
           f.get("ordine-ccc"))
@@ -38649,6 +39114,17 @@ function tagValore(ev, n){
 }
 """ + js_mazzo + js_motore + r"""
 /* ---- il banco ---- */
+/* IL DETTAGLIO-PAGINA vive nel blocco del libro, fuori dal motore: qui
+   si presta, e i suoi casi veri girano in prove_p2p_dettaglio. Lo stub
+   fa quel che fa il bottone «Compra» della pagina — prende, con la cifra
+   e il metodo — cosi' da qui in poi il banco parla del MOTORE, che e' il
+   suo mestiere.
+   ⚠️ E STA QUI, DOPO il sorgente vero, non fra gli stub del prologo: la
+   pagina nasce DENTRO la fetta del motore, e una dichiarazione di
+   funzione scritta prima se la vede riscrivere sopra dalla vera — che
+   poi cerca un DOM che qui non c'e'. */
+let pagine = [];
+function apriDettaglioP2P(id){ pagine.push(id); eseguiPresaP2P(id, 0, ''); }
 const out = {};
 const pausa = ms => new Promise(r => setTimeout(r, ms || 30));
 /* L'ATTESA GUARDA IL FATTO, NON L'OROLOGIO (set 2026, dal campo: su
@@ -38808,7 +39284,14 @@ function reset(){
                      && ricevuti[1].dentro.action === 'release';
   out.rilascioSenzaIndice = ricevuti[1].dentro.trade_index === null;
   out.rilascioConId = ricevuti[1].dentro.id === '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001';
-  out.rilascioChiede = conferme.length === 2;
+  /* ⚠️ UNA SOLA, e ne contava DUE fino al set 2026: la PRESA passava
+     da un foglietto di conferma, e adesso passa dalla pagina del
+     dettaglio — la conferma sono i suoi due bottoni gemelli. Quella che
+     resta e' quella del RILASCIO, ed e' l'unica che conta qui: si
+     guarda il TITOLO invece del numero, o il giorno che un gesto nuovo
+     chiede qualcosa questa riga direbbe di si' per il motivo sbagliato. */
+  out.rilascioChiede = conferme.length === 1
+                    && conferme[0].titolo === 'Liberi i sats?';
 
   /* ---- 4) DOVE RICEVERE I SATS: l'indirizzo si manda com'e' ---- */
   reset();
@@ -40030,8 +40513,13 @@ def prove_p2p_chat():
     # correzione — con un tipo per metodo, chi corregge passando da
     # SEPA a Revolut lascerebbe DUE recapiti vivi e chi compra non
     # saprebbe quale vale.
-    prova("il vocabolario dei tipi resta chiuso a due", True,
-          "const CAMPI_P2P = ['euro', 'contatto'];" in mini)
+    # ⚠️ E DAL set 2026 SONO TRE, col dettaglio-pagina: `metodo` — la
+    # scelta di chi PRENDE — non e' un tipo per metodo (quello resta
+    # vietato, e il perche' e' qui sopra): e' UNO per scambio, lo
+    # scrive un lato solo, e vince il piu' recente come gli altri due.
+    # I suoi casi girano in prove_p2p_dettaglio.
+    prova("il vocabolario dei tipi resta chiuso, e adesso a tre", True,
+          "const CAMPI_P2P = ['euro', 'contatto', 'metodo'];" in mini)
     prova("le cinque forme conosciute, piu' quella libera", True,
           all("forma: '" + f + "'" in cod for f in
               ("sepa", "revolut", "satispay", "paypal", "contanti"))
@@ -40047,8 +40535,8 @@ def prove_p2p_chat():
     applica2 = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){",
                         "\n}\n")
     prova("l'invio automatico parte quando la controparte si conosce", True,
-          "if (!ord.peer && nuovo.peer) pianificaAutoRecapito(nuovo.id);"
-          in applica2)
+          "if (!ord.peer && nuovo.peer) {" in applica2
+          and "pianificaAutoRecapito(nuovo.id);" in applica2)
     auto = pezzo_js(mini, "function recapitoDaAutoInvio(", "\n}\n")
     prova("...solo per chi vende, a scambio vivo e a campo ancora vuoto",
           True, "o.lato !== 'vendo'" in auto and "P2P_FINALI" in auto
@@ -50522,6 +51010,7 @@ def main():
               prove_relay_chiavi,
               prove_p2p_server,
         prove_p2p_libro,
+    prove_p2p_dettaglio,
     prove_nav_p2p,
     prove_timbro_asset,
     prove_volti_libro,

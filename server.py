@@ -30238,7 +30238,7 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int) -> dict:
     return {"registrati": scritti}
 
 
-def _facce_ordini_p2p(con, ordini) -> dict:
+def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     """Da una lista di id al VOLTO PUBBLICO di chi li ha pubblicati:
     nome, avatar, media delle stelline, quanti voti e l'indirizzo del
     negozio. PURA rispetto alla sessione — chi puo' chiedere lo decide
@@ -30258,25 +30258,40 @@ def _facce_ordini_p2p(con, ordini) -> dict:
     e chi non ha ne' l'uno ne' l'altro resta un volto senza porta.
     LA MEDIA ESCE SOLO SE QUALCUNO HA VOTATO: `n_feedback` a zero non
     e' «zero stelle», e' «non si sa» — la card fa sparire la riga, che
-    e' la regola di casa (le stelle nascono col primo voto)."""
+    e' la regola di casa (le stelle nascono col primo voto).
+    I GIORNI SU BARATTOLO (set 2026, col dettaglio-pagina del P2P):
+    la terza colonna del riquadro della reputazione, e la stessa
+    domanda che si fa Mostro — «da quanto e' qui?». Esce un NUMERO
+    DI GIORNI e mai la data: a grana di giorno non si incrocia
+    niente, mentre un timestamp al secondo e' un'impronta.
+    ⚠️ E LA CHIAVE MANCA QUANDO NON SI SA: gli account nati prima che
+    il server timbrasse l'iscrizione hanno `registrato` a zero, e
+    «0 giorni» direbbe «iscritto oggi» — il contrario esatto del
+    vero, che sono i piu' vecchi. Chiave assente, e il client ci
+    mette il suo trattino."""
     pulite = _ordini_puliti_p2p(ordini)
     segni = ",".join("?" * len(pulite))
     righe = con.execute(
         f"SELECT p.ordine, u.nome, u.rating, u.n_feedback, u.negozio, "
-        f"u.username, (CASE WHEN u.avatar_scelta='nessuna' THEN '' "
+        f"u.username, u.registrato, "
+        f"(CASE WHEN u.avatar_scelta='nessuna' THEN '' "
         f"ELSE u.avatar END) AS avatar "
         f"FROM p2p_ordini p JOIN utenti u ON u.tg_id = p.tg_id "
         f"WHERE p.ordine IN ({segni})", pulite).fetchall()
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
-        fuori[r["ordine"]] = {
+        volto = {
             "nome": r["nome"] or "",
             "avatar": r["avatar"] or "",
             "media": round(float(r["rating"] or 0), 1) if voti else 0,
             "voti": voti,
             "negozio": r["negozio"] or r["username"] or "",
         }
+        iscritto = int(r["registrato"] or 0)
+        if iscritto:
+            volto["giorni"] = max(0, (adesso - iscritto) // 86400)
+        fuori[r["ordine"]] = volto
     return fuori
 
 
@@ -30330,7 +30345,8 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
-        facce = _facce_ordini_p2p(con, (d or {}).get("ordini"))
+        facce = _facce_ordini_p2p(con, (d or {}).get("ordini"),
+                                  int(time.time()))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
