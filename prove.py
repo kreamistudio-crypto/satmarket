@@ -40583,32 +40583,45 @@ def prove_p2p_canale():
     Vetrina» dove escono gli annunci normali — la stessa fabbrica
     (`_manda_post_canale`), lo stesso giudice (`canale_id()`).
 
-    NIENTE FIRMA, ed e' la cosa da sorvegliare piu' delle altre:
-    l'identita' di scambio non si lega MAI all'account Telegram in un
-    posto pubblico — la stessa regola che tiene `_conta_chiavi_p2p`
-    senza una pubkey nella risposta. Il banco fa GIRARE la caption
-    vera invece di fidarsi che la parola «firma» non ci sia."""
+    LA FIRMA C'E' (ribaltato sulla prima stesura, sempre chiesto da
+    Andrea: «voglio sempre vedere chi l'ha pubblicato, come gia' in
+    Barattolo»): la riga e' `_firma_venditore`, la STESSA degli
+    annunci normali — non una sua imitazione — e il banco la fa
+    GIRARE sui quattro casi di sempre (solo Telegram, nativo Nostr,
+    doppio cittadino, npub dichiarata e non provata) invece di
+    fidarsi che la parola «Annuncio» compaia."""
     print("\n[l'ordine P2P in vetrina]")
     import html as _html
 
-    # --- 1) LA CAPTION E' PURA, E NON FIRMA NESSUNO ------------------
+    # --- 1) LA CAPTION E' PURA, E FIRMA DAVVERO --------------------
     amb = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
-    exec(pezzo("_fmt_eur"), amb)
-    exec(pezzo("_caption_canale_p2p"), amb)
+    exec(next(r for r in _SORGENTE.split("\n")
+              if r.startswith("CHARSET_BECH32")), amb)
+    for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
+              "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
+              "_firma_venditore", "_caption_canale_p2p"):
+        exec(pezzo(f), amb)
     cap = amb["_caption_canale_p2p"]
-    compra = cap("compro", 25, "Satispay")
-    vende = cap("vendo", 100, "Revolut")
+    NPUB = ("npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqq"
+            "hrjdv9")
+    rosina = {"venditore": "Rosina", "venditore_username": "rosina",
+              "venditore_negozio": "aaa11111"}
+    gino = {"venditore": "Gino", "venditore_negozio": "ccc33333",
+            "venditore_npub_accesso": NPUB}
+    compra = cap("compro", 25, "Satispay", rosina)
+    vende = cap("vendo", 100, "Revolut", gino)
     prova("chi compra si legge «Compra»", True, "Compra BTC" in compra)
     prova("chi vende si legge «Vende»", True, "Vende BTC" in vende)
     prova("l'euro e' quello passato", True,
           "25,00 €" in compra and "100,00 €" in vende)
     prova("il metodo e' quello scritto", True,
           "Satispay" in compra and "Revolut" in vende)
-    prova("niente firma, mai: e' la regola del profilo di scambio", True,
-          all(p not in compra + vende
-              for p in ("Annuncio da", "@", "njump.me")))
+    prova("chi ha solo Telegram si legge con la sua menzione", True,
+          "<b>@rosina</b>" in compra)
+    prova("il nativo Nostr guadagna l'ancora njump", True,
+          f'<a href="https://njump.me/{NPUB}">Gino</a>' in vende)
     prova("il metodo passa da html.escape", True,
-          "<script>" not in cap("compro", 1, "<script>x</script>"))
+          "<script>" not in cap("compro", 1, "<script>x</script>", rosina))
     prova("dice «deposito di garanzia», mai «escrow» ne' «assicurato»",
           True, "deposito di garanzia" in compra
           and "escrow" not in compra.lower()
@@ -40616,7 +40629,7 @@ def prove_p2p_canale():
     prova("porta il link all'app, non un URL nudo", True,
           'href="https://barattolo.store"' in compra)
 
-    # --- 2) LA ROTTA: STESSO GATE DELLE SORELLE P2P ------------------
+    # --- 2) LA ROTTA: STESSO GATE DELLE SORELLE P2P, E LEGGE IL VENDITORE
     rotta = pezzo("annuncia_ordine_p2p_canale")
     prova("il gate e' quello delle sorelle P2P", True,
           '_p2p_per(user["id"])["attivo"]' in rotta
@@ -40630,6 +40643,14 @@ def prove_p2p_canale():
           "not metodo or len(metodo) > MAX_METODO_P2P_CANALE" in rotta)
     prova("...e il tetto euro e' quello di mostrod (max_order_amount)",
           True, "MAX_EURO_P2P_CANALE = 100_000" in _SORGENTE)
+    prova("il venditore si legge da utenti per tg_id", True,
+          "FROM utenti WHERE tg_id=?" in rotta
+          and '(user["id"],)' in rotta)
+    prova("le sei chiavi combaciano con quelle di _firma_venditore", True,
+          all(k in rotta for k in (
+              '"venditore":', '"venditore_username":', '"venditore_npub":',
+              '"venditore_npub_verificata":', '"venditore_npub_accesso":',
+              '"venditore_negozio":')))
 
     # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
     prova("canale spento: nessun post, mai un errore", True,

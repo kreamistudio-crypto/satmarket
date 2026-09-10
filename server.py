@@ -30540,23 +30540,31 @@ MAX_EURO_P2P_CANALE = 100_000   # lo stesso tetto di mostrod (max_order_amount)
 MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
 
 
-def _caption_canale_p2p(lato: str, euro: int, metodo: str) -> str:
+def _caption_canale_p2p(lato: str, euro: int, metodo: str, venditore: dict) -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
     un annuncio qualunque).
 
-    NIENTE FIRMA, ed e' la riga da non aggiungere per «uniformita'»
-    con `_caption_canale`: la' il venditore si nomina apposta, qui
-    l'identita' di scambio non si lega MAI all'account Telegram in un
-    posto pubblico — la stessa regola che tiene `_conta_chiavi_p2p`
-    senza una pubkey nella risposta."""
+    LA FIRMA C'E' (decisione di Andrea, set 2026, ribaltata sulla
+    prima stesura): «voglio sempre vedere chi l'ha pubblicato, come
+    gia' faccio in Barattolo» — e la riga e' letteralmente quella,
+    `_firma_venditore`, non una sua imitazione. Chi pubblica un ordine
+    e' gia' un utente autenticato (il gate di `annuncia_ordine_p2p_canale`
+    lo richiede), quindi qui non si scopre niente che il server non
+    sapesse gia': si SCEGLIE di scriverlo, mentre altrove nel P2P
+    (`/api/p2p/chiavi`, la trade key) resta la regola opposta — quella
+    e' l'identita' DI SCAMBIO (pseudonima per costruzione, vedi regola
+    ferrea 2), questa e' l'identita' di chi ha PREMUTO PUBBLICA, e sono
+    due cose diverse: la seconda Barattolo la mostra da sempre per gli
+    annunci normali, e ora anche qui."""
     verbo = "Compra" if lato == "compro" else "Vende"
     testo = f"🔁 <b>{verbo} BTC su Barattolo</b>"
     testo += f"\n💶 {_fmt_eur(euro)} €"
     testo += f"\n💳 {html.escape(metodo)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
     testo += f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
+    testo += f"\n\n{_firma_venditore(venditore)}"
     testo += "\n\n#p2p #barattolo"
     return testo
 
@@ -30599,7 +30607,20 @@ async def annuncia_ordine_p2p_canale(req: Request,
     postato = False
     if canale_id():
         try:
-            caption = _caption_canale_p2p(lato, euro, metodo)
+            con = db()
+            riga = con.execute(
+                "SELECT nome, username, npub, npub_verificata, npub_accesso, "
+                "negozio FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
+            con.close()
+            venditore = {
+                "venditore": (riga["nome"] if riga else "") or "",
+                "venditore_username": (riga["username"] if riga else "") or "",
+                "venditore_npub": (riga["npub"] if riga else "") or "",
+                "venditore_npub_verificata": (riga["npub_verificata"] if riga else 0) or 0,
+                "venditore_npub_accesso": (riga["npub_accesso"] if riga else "") or "",
+                "venditore_negozio": (riga["negozio"] if riga else "") or "",
+            }
+            caption = _caption_canale_p2p(lato, euro, metodo, venditore)
             postato = bool(await _manda_post_canale(canale_id(), caption, []))
         except Exception as e:
             print(f"⚠️ Post P2P nel canale saltato: {e}")

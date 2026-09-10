@@ -7611,6 +7611,18 @@ di scambio non si lega MAI all'account Telegram in un posto pubblico,
 la stessa regola che tiene `_conta_chiavi_p2p` senza una pubkey nella
 risposta. Il corpo che il client manda è `{lato, euro, metodo}` e
 basta: mai una chiave, mai la trade key.
+⚠️ E QUELLA RIGA È STATA RIBALTATA lo stesso giorno (decisione di
+Andrea): «voglio sempre vedere chi l'ha pubblicato, come già in
+Barattolo». La firma ora c'è, ed è la STESSA `_firma_venditore` degli
+annunci normali — non una sua imitazione — con la riga che la
+distingue dal resto del P2P: questa non è l'identità DI SCAMBIO (la
+trade key, pseudonima per costruzione — regola ferrea 2, mai toccata),
+è l'identità di chi ha premuto «Pubblica», e il server la conosce già
+per forza (il gate di `annuncia_ordine_p2p_canale` chiede un utente
+autenticato) — qui si SCEGLIE di scriverla, non la si scopre. La rotta
+legge la riga di `utenti` per `tg_id` (nome, username, npub,
+npub_verificata, npub_accesso, negozio) e costruisce lo stesso dizionario
+a sei chiavi che `_firma_venditore` si aspetta dagli annunci.
 IL POSTO DOVE VIVE IL CLIENT NON È UN DETTAGLIO: `annunciaCanaleP2P`
 sta DOPO il marcatore «fine del motore dello scambio», mai dentro —
 quel blocco è sorvegliato da `prove_p2p_motore` a ZERO fetch e ZERO
