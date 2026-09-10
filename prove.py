@@ -40167,10 +40167,9 @@ def prove_p2p_pubblica():
         "let cambioVivo = true, eurPerSat = 0.0005;\n"
         "const fmt = n => String(n);\n"
         "const fmtEur = n => String(n);\n"
-        + re.search(r"const MSG_EURO_INTERO = '[^']+';", mini).group(0) + "\n"
-        + re.search(r"const P2P_NON_NUMERO = '[^']+';", mini).group(0) + "\n"
-        + _intera("function euroInteroP2P(testo){")
-        + "\n" + _intera("function testoCampoNumero(inp){")
+        + _intera("function interoP2P(testo){")
+        + "\n" + _intera("function soloCifreP2P(ev){")
+        + "\n" + _intera("function ripuliCifreP2P(inp){")
         + "\n" + _intera("function satsMercatoP2P(o){")
         + "\n" + _intera("function ordineDaCampiP2P(v, lato){")
         + "\n" + _intera("function valeNuovoOrdineP2P(v){")
@@ -40216,25 +40215,33 @@ def prove_p2p_pubblica():
         "  fascia: [fasciaPremioP2P(-10), fasciaPremioP2P(0), fasciaPremioP2P(10),\n"
         "           fasciaPremioP2P(-5), fasciaPremioP2P(-99), fasciaPremioP2P(99)],\n"
         "  forme: METODI.map(m => formaRecapito(m).forma),\n"
-        "  interi: [euroInteroP2P('5'), euroInteroP2P('5.5'),\n"
-        "           euroInteroP2P(','), euroInteroP2P(''),\n"
-        "           euroInteroP2P('  7  '), euroInteroP2P('5e3'),\n"
-        "           euroInteroP2P(null), euroInteroP2P('-3')],\n"
-        "  virgola: [testoCampoNumero({value: '', validity: {badInput: true}}),\n"
-        "            testoCampoNumero({value: '', validity: {badInput: false}}),\n"
-        "            testoCampoNumero({value: '12', validity: {badInput: false}}),\n"
-        "            testoCampoNumero(null)],\n"
+        "  interi: [interoP2P('5'), interoP2P('5.5'),\n"
+        "           interoP2P(','), interoP2P(''),\n"
+        "           interoP2P('  7  '), interoP2P('5e3'),\n"
+        "           interoP2P(null), interoP2P('-3')],\n"
+        "  tasto: ['5', '.', ',', '12', '1,5', null, ''].map(d => {\n"
+        "    let fermato = false;\n"
+        "    soloCifreP2P({data: d, preventDefault: () => { fermato = true; }});\n"
+        "    return fermato; }),\n"
+        "  tastoSenzaEvento: (() => { try { soloCifreP2P(null); return 'vivo'; }\n"
+        "    catch(e) { return 'esplode'; } })(),\n"
+        "  rete: (() => {\n"
+        "    const campo = (v, dove) => { const i = {value: v, selectionStart: dove,\n"
+        "      setSelectionRange: (a) => { i.selectionStart = a; }}; return i; };\n"
+        "    const a = campo('1,5', 3), b = campo('123', 2), c = campo('', 0);\n"
+        "    return [ripuliCifreP2P(a), a.selectionStart,\n"
+        "            ripuliCifreP2P(b), b.selectionStart,\n"
+        "            ripuliCifreP2P(c), ripuliCifreP2P(null)]; })(),\n"
         "  filo: [ordineDaCampiP2P(Object.assign({}, {euroMax: '', sats: '',\n"
         "           fisso: false, metodi: ['SEPA'], premio: 0}, {euro: '5.5'}), 'compro').fiat_amount,\n"
         "         ordineDaCampiP2P(Object.assign({}, {euroMax: '', sats: '',\n"
         "           fisso: false, metodi: ['SEPA'], premio: 0}, {euro: '5'}), 'compro').fiat_amount],\n"
-        "  mancaEuro: [\n"
-        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '5.5'})).manca,\n"
-        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: ','})).manca,\n"
-        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90.5'})).manca,\n"
-        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90'})).manca],\n"
-        "  quantoStorto: [quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25.5'),\n"
-        "                 quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, ',')]\n"
+        "  satsStorti: [ordineDaCampiP2P({euro: '25', euroMax: '', sats: '50000.5',\n"
+        "                 fisso: true, metodi: ['SEPA'], premio: 0}, 'compro').amount,\n"
+        "               ordineDaCampiP2P({euro: '25', euroMax: '', sats: '50000',\n"
+        "                 fisso: true, metodi: ['SEPA'], premio: 0}, 'compro').amount,\n"
+        "               valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30',\n"
+        "                 fisso: true, sats: '5000.5'})).manca]\n"
         "}));\n")
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                 encoding="utf-8")
@@ -40280,75 +40287,86 @@ def prove_p2p_pubblica():
                              out["finto"]["max_amount"],
                              out["finto"]["fiat_amount"]])
 
-    # --- L'EURO E' UN INTERO (set 2026, dal campo: 5,5 € -> ordine da 5)
+    # --- SOLO CIFRE (set 2026, dal campo: 5,5 € -> ordine da 5, e poi
+    # la decisione di Andrea di far rifiutare il carattere invece di
+    # spiegarlo) --------------------------------------------------------
     # Il giudice: solo cifre. `Number` accetta '5.5', '5e3' e ' 5 ', e
     # tutti e tre qui sono storti — non interi.
-    prova("il giudice dell'euro: intero, decimale, virgola, vuoto",
-          [{"vuoto": False, "storto": False, "euro": 5},
-           {"vuoto": False, "storto": True, "euro": 0},
-           {"vuoto": False, "storto": True, "euro": 0},
-           {"vuoto": True, "storto": False, "euro": 0}],
+    prova("il giudice dell'intero: intero, decimale, virgola, vuoto",
+          [{"vuoto": False, "storto": False, "n": 5},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": True, "storto": False, "n": 0}],
           out["interi"][:4])
     prova("...gli spazi non contano, e la notazione scientifica e' storta",
-          [{"vuoto": False, "storto": False, "euro": 7},
-           {"vuoto": False, "storto": True, "euro": 0},
-           {"vuoto": True, "storto": False, "euro": 0},
-           {"vuoto": False, "storto": True, "euro": 0}],
+          [{"vuoto": False, "storto": False, "n": 7},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": True, "storto": False, "n": 0},
+           {"vuoto": False, "storto": True, "n": 0}],
           out["interi"][4:])
-    # ⚠️ LA VIRGOLA ARRIVA VUOTA: `<input type=number>` con «5,5» dentro
-    # risponde value === '' e alza badInput. Senza guardarlo, «non ho
-    # scritto niente» e «ho scritto una virgola» sono la stessa cosa.
-    prova("il badInput diventa il sentinella, e il vuoto vero resta vuoto",
-          [",", "", "12", ""], out["virgola"])
+    # IL TASTO NON PRODUCE NULLA: `beforeinput` si ferma PRIMA che il
+    # carattere entri. Le cifre passano, il punto e la virgola no, e un
+    # incolla sporco si rifiuta INTERO — da «1,5» ripulito uscirebbe
+    # «15», dieci volte il numero voluto.
+    prova("il tasto: le cifre entrano, il punto e la virgola no",
+          [False, True, True, False, True, False, False], out["tasto"])
+    # `ev.data` e' null sulle cancellazioni (e un evento che non c'e'
+    # non deve far esplodere un handler inline)
+    prova("...e senza evento non esplode", "vivo", out["tastoSenzaEvento"])
+    # LA RETE, per le strade che `beforeinput` non copre: ripulisce e
+    # tiene il cursore dov'era MENO quel che gli e' stato tolto davanti,
+    # o scrivere in mezzo a un numero lo farebbe saltare in fondo.
+    prova("la rete ripulisce e il cursore non salta in fondo",
+          ["15", 2, "123", 2, "", ""], out["rete"])
     # SUL FILO, che e' il posto dove il difetto si pagava: un decimale
     # non diventa un intero PLAUSIBILE (5,5 -> 5), diventa zero — che il
     # coordinatore rifiuta invece di eseguire.
     prova("sul filo un decimale non diventa un intero plausibile",
           [0, 5], out["filo"])
-    # e il bottone lo dice PRIMA di parlare del vuoto o della fascia
-    prova("il foglio dice «solo interi», e non manda a indovinare",
-          ["Solo importi interi in euro", "Solo importi interi in euro",
-           "Solo importi interi in euro", ""], out["mancaEuro"])
-    prova("...e l'importo scelto dentro un intervallo pure",
-          [{"ok": False, "euro": 0, "dillo": "Solo importi interi in euro"},
-           {"ok": False, "euro": 0, "dillo": "Solo importi interi in euro"}],
-          out["quantoStorto"])
-    # I TRE CAMPI non offrono piu' la virgola: `inputmode="numeric"` e
-    # `step="1"`. Gli altri `decimal` del file sono prezzi del
-    # mercatino, dove i decimali sono legittimi — per questo si guardano
-    # i tre id e non il conto del file.
+    # ...E VALE ANCHE PER I SATS a prezzo fisso (stessa decisione): sono
+    # un intero anche loro, e passano dallo stesso giudice.
+    prova("i sats passano dallo stesso giudice, filo compreso",
+          [0, 50000, "Scrivi quanti sats"], out["satsStorti"])
+    # I QUATTRO CAMPI: testo filtrato, tastiera numerica, e il filtro
+    # attaccato. ⚠️ `type="number"` NON PUO' ESSERCI: con dentro «5,5»
+    # risponde value vuoto (badInput), quindi il testo vero non arriva a
+    # chi vorrebbe ripulirlo, e `setSelectionRange` alza.
     # ⚠️ LA FETTA FINISCE DOVE COMINCIA IL CAMPO DOPO, e non a «tot
     # caratteri»: i due campi dell'importo distano poche righe, e una
     # finestra fissa faceva rispondere il primo PER IL SECONDO — la
     # mutazione sul massimo tingeva di rosso anche la prova
     # dell'importo. E' la trappola del contenitore troppo grande,
     # trovata dalla tortura.
-    for _id in ("p2pQuantoInp", "p2pNuovoEuro", "p2pNuovoEuroMax"):
+    for _id in ("p2pQuantoInp", "p2pNuovoEuro", "p2pNuovoEuroMax", "p2pNuovoSats"):
         _i = mini.index('id="%s"' % _id)
         _dopo = mini.find("<input", _i)
         _tag = mini[_i:min(_dopo if _dopo > 0 else len(mini), _i + 400)]
-        prova("il campo %s non offre la virgola" % _id, True,
-              'inputmode="numeric"' in _tag and 'inputmode="decimal"' not in _tag)
-    # E IL TRONCAMENTO MUTO NON TORNA: nessuno dei tre posti rifa'
-    # `Math.floor` su una cifra in euro. Si guardano i nomi, che sono
-    # quelli che portano euro (i sats hanno la loro strada).
-    prova("nessun troncamento muto su una cifra in euro", [],
+        prova("il campo %s e' testo filtrato, non un number" % _id, True,
+              'type="text"' in _tag and 'type="number"' not in _tag
+              and 'inputmode="numeric"' in _tag
+              and 'onbeforeinput="soloCifreP2P(event)"' in _tag)
+    # E IL TRONCAMENTO MUTO NON TORNA: nessuno dei posti che portano una
+    # cifra rifa' `Math.floor` su quel che arriva dai campi.
+    prova("nessun troncamento muto su una cifra dei campi", [],
           re.findall(r"Math\.floor\(Number\(v\.euro[^)]*\)\)"
                      r"|Math\.floor\(Number\(v\.euroMax[^)]*\)\)"
+                     r"|Math\.floor\(Number\(v\.sats[^)]*\)\)"
                      r"|Math\.floor\(Number\(valore[^)]*\)\)", mini))
-    # ...e la frase vive in un posto solo: tre copie sono tre frasi che
-    # un giorno divergono
-    prova("la frase dell'intero e' scritta una volta sola", 1,
-          mini.count("'Solo importi interi in euro'"))
-    prova("...e i tre giudici la leggono da li'", 3,
-          mini.count("MSG_EURO_INTERO"))
-    # chi LEGGE i due campi passa dal lettore che vede la virgola
+    # ...e il vecchio impianto se n'e' andato tutto: il messaggio, il
+    # sentinella della virgola e il lettore del badInput non servono piu'
+    # a nessuno, e restare sarebbe codice che racconta un'altra strada
+    prova("del messaggio non resta niente da leggere", [0, 0, 0],
+          [mini.count("MSG_EURO_INTERO"), mini.count("P2P_NON_NUMERO"),
+           mini.count("testoCampoNumero(")])
+    # chi LEGGE i campi passa dalla rete, e la rete e' l'unico posto che
+    # tocca il loro `value`
     camb = pezzo_js(mini, "function cambiaCampoNuovoP2P(){", "\n}\n")
-    prova("i campi euro si leggono col lettore, non col solo value", True,
-          "p2pNuovoEuro = testoCampoNumero(e)" in camb
-          and "p2pNuovoEuroMax = testoCampoNumero(x)" in camb)
+    prova("i tre campi del foglio si leggono dalla rete", True,
+          "p2pNuovoEuro = ripuliCifreP2P(e)" in camb
+          and "p2pNuovoEuroMax = ripuliCifreP2P(x)" in camb
+          and "p2pNuovoSats = ripuliCifreP2P(s)" in camb)
     prova("...e cosi' l'importo scelto", 2,
-          mini.count("quantoValeP2P(riga, testoCampoNumero(inp))"))
+          mini.count("quantoValeP2P(riga, ripuliCifreP2P(inp))"))
     # IL BOTTONE SPENTO DICE PERCHE': un «Invia» che non risponde e
     # non spiega e' un vicolo cieco muto (la lezione dell'annullo).
     prova("...e quel che manca ha sempre un nome",
