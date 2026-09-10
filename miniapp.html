@@ -178,6 +178,9 @@
     --nostr:#7C3AED; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
     --field-line:#E0D7C0; --line-soft:#EEE7D6;
+    /* il pezzo di binario del premio DOPO il pallino: piu' scuro di
+       una riga di campo, o i tratti bianchi ci sparirebbero dentro */
+    --premio-spento:#BDB097;
     --gold-a:#FFE08A; --gold-b:#F7B32B; --gold-line:#E29B12; --gold-text:#7A4B06;
     /* il riflesso del vetro sul barattolino (jarSVG): celeste tenue */
     --jar-riflesso:#BFE3F0;
@@ -303,6 +306,7 @@
     --chip-bg:#37301F;
     --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
+    --premio-spento:#4A4029;
     --header-bg:var(--bg); --nav-bg:rgba(44,37,23,.96);
     --nav-bg-p2p:#0F0A04;
     --ph-a:#332B1A; --ph-b:#2B2415;
@@ -1986,7 +1990,18 @@
      finestra vuota con cinque riquadri in mezzo. */
   .sheet.pieno .grab{display:none}
   @media (max-width:767px){
+    /* ⚠️ ANCORATO IN ALTO, e questa riga cura un difetto vero
+       (ritocco di Andrea: «al tocco sul campo la pagina scende a
+       tendina»). `.sheet` e' `position:fixed; bottom:0`, e a questo
+       foglio la tastiera toglie altezza: con l'ancora in BASSO
+       accorciarlo vuol dire abbassarne il BORDO ALTO — cioe' tutto il
+       foglio, testata compresa, scivola giu' di quanto la tastiera e'
+       alta. Non era uno scroll ne' uno `scrollIntoView`: era il
+       foglio che si accorciava dal lato sbagliato.
+       Con `top:0` l'altezza se ne va dal BASSO, dove la tastiera c'e'
+       davvero, e sopra non si muove niente. */
     .sheet.pieno{
+      top:0;bottom:auto;
       border-radius:0;padding:0;max-height:none;
       height:calc(100vh - var(--tastiera,0px));
       height:calc(100dvh - var(--tastiera,0px));
@@ -2046,8 +2061,32 @@
   .p2p-info{flex:0 0 auto;border:0;background:none;color:var(--muted);
     font:inherit;font-size:15px;line-height:1;padding:2px 4px;cursor:pointer}
   .p2p-sez-riga{display:flex;align-items:center;gap:12px}
+  /* L'ICONA DI UNA SEZIONE E' UNA LINEA, non un'emoji (ritocco di
+     Andrea: «troppo colorate e poco eleganti»). Le emoji portavano
+     ognuna il suo colore e il suo autore — cinque disegni di cinque
+     mani diverse in fila — mentre queste sono le stesse icone della
+     nav: `viewBox` 2 2 20 20, tratto 1.5, velo al 12%.
+     LA TINTA RESTA, ma LEGGERA e una per sezione (scelta di Andrea):
+     fondo tenue e tratto del suo «text», che e' il tono fatto apposta
+     per leggersi sui fondi tenui. Con una linea da un pixel e mezzo
+     il colore si vede e non grida — che era il punto.
+     LE CLASSI STANNO QUI E NON NEL RENDER, ed e' voluto: il foglio ha
+     una sentinella che gli vieta certe parole, e uno di questi token
+     ne contiene una. Scritto nel CSS il colore non passa di li'. */
+  /* il fondo di riserva e' la CARTA e non `--chip-bg`: quello e' gia'
+     il fondo del riquadro, e un'icona senza la sua classe sparirebbe
+     dentro di lui invece di farsi notare come una dimenticanza */
   .p2p-sez-ico{flex:0 0 auto;width:42px;height:42px;border-radius:999px;
-    display:grid;place-items:center;font-size:19px;line-height:1}
+    display:grid;place-items:center;line-height:1;
+    background:var(--card);color:var(--ink-soft)}
+  .p2p-sez-ico.ico-valuta{background:var(--tg-soft);color:var(--tg-soft-on)}
+  .p2p-sez-ico.ico-importo{background:var(--trust-soft);color:var(--trust-text)}
+  .p2p-sez-ico.ico-metodi{background:var(--ship-bg);color:var(--ship-text)}
+  .p2p-sez-ico.ico-prezzo{background:var(--nostr-soft);color:var(--nostr-text)}
+  .p2p-sez-ico.ico-sats{background:var(--sats-soft);color:var(--sats-text)}
+  .p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round}
+  .p2p-ico .velo{fill:currentColor;fill-opacity:.12}
   .p2p-sez-corpo{flex:1 1 auto;min-width:0}
   /* IL CAMPO DENTRO UN RIQUADRO PERDE IL RECINTO e tiene la sola riga
      sotto: il recinto ce l'ha gia' il riquadro, e due bordi annidati
@@ -2117,10 +2156,17 @@
     font-weight:700;font-size:11.5px;padding:0;cursor:pointer}
   .p2p-premio-capi{flex:1 1 auto;min-width:0;display:flex;
     justify-content:space-between;font-size:11.5px;font-weight:800}
-  /* LA BARRA DICE CHE VA A SCATTI (ritocco di Andrea): una LINEA
-     tratteggiata bianca dentro il binario, venti tratti — uno per
-     ogni punto percentuale da -10 a +10 — e chi la guarda capisce
-     che non e' un cursore continuo prima di provarlo.
+  /* LA BARRA DICE DUE COSE. LA PRIMA: VA A SCATTI — una LINEA
+     tratteggiata bianca dentro il binario, venti tratti, uno per ogni
+     punto percentuale da -10 a +10, e chi la guarda capisce che non
+     e' un cursore continuo prima di provarlo.
+     LA SECONDA: DOV'E' ARRIVATA (ritocco di Andrea) — accesa dal capo
+     sinistro fino al pallino, spenta oltre. Il confine e' `--pieno`,
+     che scrive il JS a ogni movimento, e NON e' la percentuale nuda:
+     il pallino e' largo venti pixel e il suo centro corre dentro
+     `larghezza - 20`, quindi il conto e' `frazione x (100% - 20px) +
+     10px` — senza la correzione il colore e il pallino si scollano ai
+     due estremi, che e' proprio dove si guarda per capire la regola.
      E' una linea e non venti blocchi, ed e' la differenza che si vede
      a schermo: col tratteggio alto quanto tutta la barra il binario
      sembrava SPEZZATO in segmenti arancioni. Il `background-size` la
@@ -2136,17 +2182,23 @@
     height:22px;background:none;-webkit-appearance:none;appearance:none;cursor:pointer}
   .p2p-premio input[type=range]:focus{outline:none}
   .p2p-premio input[type=range]::-webkit-slider-runnable-track{
-    height:10px;border-radius:999px;background-color:var(--sats);
+    height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
-      rgba(255,255,255,.92) 0 2px, transparent 2px 5%);
-    background-size:100% 2px;background-position:0 center;
-    background-repeat:no-repeat}
+        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
+      linear-gradient(to right, var(--sats) 0 var(--pieno,50%),
+        var(--premio-spento) var(--pieno,50%) 100%);
+    background-size:100% 2px, 100% 100%;
+    background-position:0 center, 0 0;
+    background-repeat:no-repeat, no-repeat}
   .p2p-premio input[type=range]::-moz-range-track{
-    height:10px;border-radius:999px;background-color:var(--sats);
+    height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
-      rgba(255,255,255,.92) 0 2px, transparent 2px 5%);
-    background-size:100% 2px;background-position:0 center;
-    background-repeat:no-repeat}
+        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
+      linear-gradient(to right, var(--sats) 0 var(--pieno,50%),
+        var(--premio-spento) var(--pieno,50%) 100%);
+    background-size:100% 2px, 100% 100%;
+    background-position:0 center, 0 0;
+    background-repeat:no-repeat, no-repeat}
   .p2p-premio input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none;width:20px;height:20px;border-radius:999px;
     margin-top:-5px;background:var(--card);border:3px solid var(--sats);
@@ -36308,6 +36360,41 @@ const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Co
    ma ±10% e' la fascia in cui un premio e' un premio e non un altro
    prezzo. */
 const P2P_PREMIO_MAX = 10;
+/* LE CINQUE ICONE DEL FOGLIO, disegnate come quelle della nav: stesso
+   `viewBox`, stesso tratto, e il «velo» — la stessa forma riempita al
+   12% — che da' corpo senza aggiungere una seconda linea. Stanno qui
+   in un catalogo e non sparse nel render: cinque disegni allineati
+   per costruzione, e chi ne aggiunge uno vede subito con cosa deve
+   somigliare.
+   IL GLOBO PER LA VALUTA e non l'euro (scelta di Andrea): domani nel
+   catalogo c'e' anche USDT, e un'icona che dice una valuta sola
+   diventerebbe una bugia il giorno che se ne sceglie un'altra. La
+   bandierina resta dov'e' vera — nella voce scelta e nelle voci del
+   foglio-picker.
+   IL DOLLARO E' DISEGNATO A TRATTO (scelta di Andrea): il segno resta
+   quello di prima, l'emoji no — quella portava un colore e uno stile
+   che non erano di casa. */
+const P2P_ICONE = {
+  valuta: '<path class="velo" d="M12 3.4a8.6 8.6 0 1 1 0 17.2 8.6 8.6 0 0 1 0-17.2z"/>'
+    + '<path d="M12 3.4a8.6 8.6 0 1 1 0 17.2 8.6 8.6 0 0 1 0-17.2z"/>'
+    + '<path d="M3.6 12h16.8"/>'
+    + '<path d="M12 3.4c2.2 2.3 3.4 5.4 3.4 8.6s-1.2 6.3-3.4 8.6c-2.2-2.3-3.4-5.4-3.4-8.6S9.8 5.7 12 3.4z"/>',
+  importo: '<path class="velo" d="M4.4 6.8h15.2a1.4 1.4 0 0 1 1.4 1.4v7.6a1.4 1.4 0 0 1-1.4 1.4H4.4A1.4 1.4 0 0 1 3 15.8V8.2a1.4 1.4 0 0 1 1.4-1.4z"/>'
+    + '<path d="M4.4 6.8h15.2a1.4 1.4 0 0 1 1.4 1.4v7.6a1.4 1.4 0 0 1-1.4 1.4H4.4A1.4 1.4 0 0 1 3 15.8V8.2a1.4 1.4 0 0 1 1.4-1.4z"/>'
+    + '<path d="M12 9.6a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z"/>'
+    + '<path d="M6.2 10v4M17.8 10v4"/>',
+  metodi: '<path class="velo" d="M4.4 5.9h15.2a1.5 1.5 0 0 1 1.5 1.5v9.2a1.5 1.5 0 0 1-1.5 1.5H4.4a1.5 1.5 0 0 1-1.5-1.5V7.4a1.5 1.5 0 0 1 1.5-1.5z"/>'
+    + '<path d="M4.4 5.9h15.2a1.5 1.5 0 0 1 1.5 1.5v9.2a1.5 1.5 0 0 1-1.5 1.5H4.4a1.5 1.5 0 0 1-1.5-1.5V7.4a1.5 1.5 0 0 1 1.5-1.5z"/>'
+    + '<path d="M2.9 9.8h18.2"/><path d="M6.4 14.3h4.2"/>',
+  prezzo: '<path d="M12 3.6v16.8"/>'
+    + '<path d="M16.4 7.8c0-2-2-3.3-4.4-3.3S7.6 5.8 7.6 7.9c0 4.8 8.8 2.6 8.8 7.4 0 2.1-2 3.4-4.4 3.4s-4.4-1.3-4.4-3.4"/>',
+  sats: '<path class="velo" d="M13.6 2.6L5.4 13.4h5.3l-1.3 8 8.2-10.8h-5.3z"/>'
+    + '<path d="M13.6 2.6L5.4 13.4h5.3l-1.3 8 8.2-10.8h-5.3z"/>'
+};
+function icoNuovoP2P(nome){
+  return '<svg class="p2p-ico" viewBox="2 2 20 20" aria-hidden="true">'
+    + P2P_ICONE[nome] + '</svg>';
+}
 
 let p2pNuovoEuro = '';        // quel che c'e' scritto nei campi, per sopravvivere ai render
 let p2pNuovoEuroMax = '';
@@ -36353,9 +36440,12 @@ function sezioneNuovoP2P(o){
     '<div class="p2p-sez-riga">' +
       /* L'ICONA E' FACOLTATIVA (ritocco di Andrea): il Premio non ne
          ha piu' una, e senza questo ramo restava un cerchio vuoto che
-         rubava quaranta pixel alla barra. */
-      (o.ico ? '<span class="p2p-sez-ico" aria-hidden="true" style="background:' + o.fondo +
-        ';color:' + o.tinta + '">' + o.ico + '</span>' : '') +
+         rubava quaranta pixel alla barra.
+         LA TINTA E' UNA CLASSE e non uno stile in riga: il colore vive
+         nel CSS, dove le cinque coppie si leggono una sotto l'altra e
+         si cambiano in un posto solo. */
+      (o.ico ? '<span class="p2p-sez-ico ico-' + o.ico + '" aria-hidden="true">'
+        + icoNuovoP2P(o.ico) + '</span>' : '') +
       '<div class="p2p-sez-corpo">' + o.corpo + '</div>' +
     '</div>' +
     /* IL «SOTTO» ESCE DALLA RIGA DELL'ICONA, e serve a una cosa sola:
@@ -36462,9 +36552,7 @@ function renderNuovoOrdineP2P(){
      con una valuta sola e' una tendina che si apre e si richiude, ma
      e' gia' la strada giusta per la seconda. */
   const valuta = sezioneNuovoP2P({
-    /* l'icona tonda porta la bandiera della valuta SCELTA: dice il
-       fatto invece di annunciare la categoria, e cambia con lei */
-    ico: val.bandiera, fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
+    ico: 'valuta',
     titolo: 'Seleziona la valuta con cui ' + (compro ? 'pagherai' : 'riceverai'),
     corpo: '<button type="button" class="p2p-tendina" id="p2pNuovoValutaBtn" ' +
       'aria-haspopup="dialog" onclick="apriValutaP2P()">' +
@@ -36473,7 +36561,7 @@ function renderNuovoOrdineP2P(){
   });
 
   const importo = sezioneNuovoP2P({
-    ico: '💶', fondo: 'var(--trust-soft)', tinta: 'var(--trust)',
+    ico: 'importo',
     titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
       (compro ? 'inviare' : 'ricevere'),
     /* UN CAMPO SOLO, ALL'APERTURA (ritocco di Andrea): il secondo —
@@ -36505,7 +36593,7 @@ function renderNuovoOrdineP2P(){
   });
 
   const metodi = sezioneNuovoP2P({
-    ico: '💳', fondo: 'var(--ship-bg)', tinta: 'var(--ship-text)',
+    ico: 'metodi',
     titolo: 'Metodi di pagamento — puoi sceglierne più di uno',
     corpo: '<button type="button" class="p2p-tendina' +
       (p2pNuovoMetodi.length ? '' : ' vuota') + '" aria-expanded="' +
@@ -36522,7 +36610,7 @@ function renderNuovoOrdineP2P(){
   });
 
   const tipo = sezioneNuovoP2P({
-    ico: '💲', fondo: 'var(--chip-bg)', tinta: 'var(--ink)',
+    ico: 'prezzo',
     titolo: 'Tipo di prezzo', info: 'spiegaTipoPrezzoP2P()',
     corpo: '<div class="p2p-sez-riga">' +
       '<b style="flex:1;min-width:0;font-size:15px">' +
@@ -36534,7 +36622,7 @@ function renderNuovoOrdineP2P(){
   });
 
   const quanti = !p2pNuovoFisso ? '' : sezioneNuovoP2P({
-    ico: '⚡', fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
+    ico: 'sats',
     titolo: 'Inserisci la quantità di sats che vuoi ' + (compro ? 'comprare' : 'vendere'),
     corpo: '<input id="p2pNuovoSats" type="number" inputmode="numeric" min="1" step="1" ' +
       'placeholder="Quantità di sats" value="' + esc(p2pNuovoSats) + '" ' +
@@ -36560,6 +36648,7 @@ function renderNuovoOrdineP2P(){
       '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
+        'style="--pieno:' + pienoPremioP2P(p2pNuovoPremio) + '" ' +
         'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
       '</div>' +
       /* sotto la pillola il suo bottone, sotto la barra i suoi capi */
@@ -36665,6 +36754,19 @@ function cambiaTipoPrezzoP2P(){
   else p2pNuovoSats = '';
   renderNuovoOrdineP2P();
 }
+/* PURA: dov'e' il confine fra l'acceso e lo spento, in una forma che
+   il CSS sa leggere. Non e' la percentuale nuda — il pallino e' largo
+   `P2P_POLLICE` e il suo centro corre dentro `larghezza - pollice`,
+   quindi il colore e il pallino si scollerebbero ai due estremi, che
+   e' proprio dove si guarda per capire che la barra ha due lati. */
+const P2P_POLLICE = 20;      // il diametro del pallino, in pixel: sta anche nel CSS
+function pienoPremioP2P(premio){
+  const p = Math.max(-P2P_PREMIO_MAX,
+    Math.min(P2P_PREMIO_MAX, Math.round(Number(premio) || 0)));
+  const frazione = (p + P2P_PREMIO_MAX) / (2 * P2P_PREMIO_MAX);
+  return 'calc(' + frazione + ' * (100% - ' + P2P_POLLICE + 'px) + '
+    + (P2P_POLLICE / 2) + 'px)';
+}
 function cambiaPremioP2P(v){
   const n = Math.round(Number(v) || 0);
   p2pNuovoPremio = Math.max(-P2P_PREMIO_MAX, Math.min(P2P_PREMIO_MAX, n));
@@ -36672,6 +36774,7 @@ function cambiaPremioP2P(v){
   if (c) c.textContent = premioTestoP2P(p2pNuovoPremio);
   const cur = el('p2pNuovoPremioCursore');
   if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
+  if (cur) cur.style.setProperty('--pieno', pienoPremioP2P(p2pNuovoPremio));
   const nota = el('p2pNuovoPremioNota');
   if (nota) nota.innerHTML = premioNotaP2P(p2pLato === 'compro', p2pNuovoPremio);
 }
@@ -36728,10 +36831,18 @@ function scegliValutaP2P(cod){
 function svelaSecondoImportoP2P(){
   if (p2pNuovoDue || p2pNuovoFisso) return;
   p2pNuovoDue = true;
+  /* LA PAGINA NON SI MUOVE (ritocco di Andrea): la nota che compare
+     allunga il riquadro, e l'ancoraggio dello scorrimento del browser
+     puo' rispondere spostando il corpo sotto il dito. Si segna dov'era
+     e ce lo si rimette — il campo che si sta toccando non e' cambiato
+     di posizione, quindi non c'e' niente da inseguire. */
+  const corpo = el('p2pNuovoCorpo');
+  const dove = corpo ? corpo.scrollTop : 0;
   ['p2pNuovoA', 'p2pNuovoEuroMax', 'p2pNuovoNotaDue'].forEach(k => {
     const n = el(k);
     if (n) n.style.display = '';
   });
+  if (corpo) corpo.scrollTop = dove;
 }
 /* «Modifica» senza la matita (ritocco di Andrea): l'emoji accanto a
    una parola che dice gia' tutto e' rumore, e su un fondo chiaro

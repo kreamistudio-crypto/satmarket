@@ -39774,6 +39774,9 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function valeNuovoOrdineP2P(v){")
         + "\n" + _intera("function quantoValeP2P(riga, valore){")
         + "\n" + _intera("function premioTestoP2P(n){")
+        + "\nconst P2P_PREMIO_MAX = %d;\n" % P2P_PREMIO_MAX_da(mini)
+        + re.search(r"const P2P_POLLICE = \d+;", mini).group(0) + "\n"
+        + _intera("function pienoPremioP2P(premio){")
         + "\n" + _forme
         + "\n" + _intera("function formaRecapito(metodo){")
         + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
@@ -39807,6 +39810,8 @@ def prove_p2p_pubblica():
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '100').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo],\n"
         "  premio: [premioTestoP2P(0), premioTestoP2P(4), premioTestoP2P(-7)],\n"
+        "  pieno: [pienoPremioP2P(-10), pienoPremioP2P(0), pienoPremioP2P(10),\n"
+        "          pienoPremioP2P(-99), pienoPremioP2P(99)],\n"
         "  forme: METODI.map(m => formaRecapito(m).forma)\n"
         "}));\n")
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -39870,6 +39875,16 @@ def prove_p2p_pubblica():
           out["quanto"])
     prova("il premio si legge col segno, sempre", ["0%", "+4%", "−7%"],
           out["premio"])
+    # IL CONFINE DEL RIEMPIMENTO, fatto girare: ai due estremi e al
+    # centro, e col numero fuori fascia che si tosa invece di uscire
+    # dal binario. La correzione del pollice c'e' in tutti e tre —
+    # senza, il colore e il pallino si scollano proprio agli estremi.
+    prova("il riempimento va da capo a capo, e si tosa",
+          ["calc(0 * (100% - 20px) + 10px)",
+           "calc(0.5 * (100% - 20px) + 10px)",
+           "calc(1 * (100% - 20px) + 10px)",
+           "calc(0 * (100% - 20px) + 10px)",
+           "calc(1 * (100% - 20px) + 10px)"], out["pieno"])
     # ⚠️ LA PROVA CHE REGGE IL ROVESCIAMENTO: il vocabolario e' chiuso
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
@@ -39948,7 +39963,7 @@ def prove_p2p_pubblica():
     prova("la sezione del premio non ha icona tonda", True,
           "ico: '', titolo: 'Premio (%)'," in nuovo)
     prova("...e l'icona e' facoltativa per costruzione", True,
-          "(o.ico ? '<span class=\"p2p-sez-ico\"" in
+          "(o.ico ? '<span class=\"p2p-sez-ico ico-' + o.ico" in
           pezzo_js(mini, "function sezioneNuovoP2P(o){", "\n}\n"))
     # LA MATITA VIVE ANCHE ALTROVE, e li' ci sta bene («✏️ Modifica
     # questo annuncio»): la domanda e' su QUESTO foglio, quindi si
@@ -39983,8 +39998,26 @@ def prove_p2p_pubblica():
         prova("il binario (%s) porta i tratti" % _p, True,
               "rgba(255,255,255,.92) 0 2px, transparent 2px 5%)" in _b)
         prova("...e sono una LINEA, non blocchi alti quanto la barra",
-              True, "background-size:100% 2px;background-position:0 center"
-              in _b and "background-repeat:no-repeat" in _b)
+              True, "background-size:100% 2px, 100% 100%" in _b
+              and "background-position:0 center, 0 0" in _b
+              and "background-repeat:no-repeat, no-repeat" in _b)
+        # ⚠️ IL SECONDO STRATO E' IL RIEMPIMENTO (ritocco di Andrea): il
+        # binario e' acceso dal capo sinistro fino al pallino e spento
+        # oltre, e il confine e' `--pieno`. Sta nello STESSO blocco dei
+        # tratti perche' i due strati devono restare in quest'ordine —
+        # rovesciandoli il colore coprirebbe il tratteggio.
+        prova("...e il binario si accende fino al pallino", True,
+              "linear-gradient(to right, var(--sats) 0 var(--pieno,50%)," in _b
+              and "var(--premio-spento) var(--pieno,50%) 100%)" in _b)
+        # ⚠️ E I DUE STRATI STANNO IN QUEST'ORDINE, che e' l'unica cosa
+        # che le due righe qui sopra non direbbero: rovesciandoli il
+        # colore coprirebbe il tratteggio, e per giunta le misure —
+        # `background-size` e' posizionale — finirebbero sullo strato
+        # sbagliato. Si guarda la cucitura fra i due, non i due.
+        prova("...e i tratti stanno SOPRA il colore", True,
+              "background-image:repeating-linear-gradient(to right,\n"
+              "        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),\n"
+              "      linear-gradient(to right, var(--sats)" in _b)
     prova("...e i tratti sono venti, uno per punto percentuale",
           (10, 20), (P2P_PREMIO_MAX_da(mini), 100 // 5))
 
@@ -39997,6 +40030,66 @@ def prove_p2p_pubblica():
     prova("...e nessuno dei due porta margini suoi", True,
           ".foglio-piede .btn{margin:0;min-width:0}" in stile
           and ".foglio-piede .btn.ghost{margin:0}" in stile)
+
+    # --- 11) I CINQUE RITOCCHI DEL GIORNO DOPO ----------------------
+    # A) LE ICONE SONO LINEE, non emoji: stesso `viewBox`, stesso
+    # tratto e stesso velo della nav, e la tinta la porta una CLASSE
+    # (nel CSS, dove le cinque coppie si leggono in fila).
+    _cat = mini[mini.index("const P2P_ICONE = {"):]
+    _cat = _cat[:_cat.index("\n};")]
+    prova("le cinque icone del foglio sono disegnate a tratto", 5,
+          sum(1 for k in ("valuta:", "importo:", "metodi:", "prezzo:", "sats:")
+              if k in _cat))
+    prova("...e nessuna emoji e' rimasta al posto loro", False,
+          any(e in nuovo for e in ("💶", "💳", "💲", "⚡", "🏳️")))
+    prova("...e vestono come quelle della nav", True,
+          'class="p2p-ico" viewBox="2 2 20 20"'
+          in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n")
+          and ".p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;"
+              "stroke-width:1.5;" in stile
+          and ".p2p-ico .velo{fill:currentColor;fill-opacity:.12}" in stile)
+    # ⚠️ LA TINTA E' LEGGERA E STA NEL CSS, e le due cose vanno insieme:
+    # uno di quei token porta nel nome una parola che la sentinella di
+    # questo foglio vieta, e scritto in riga nel render la farebbe
+    # rossa. Cinque classi, cinque coppie fondo/tratto.
+    for _c in ("valuta", "importo", "metodi", "prezzo", "sats"):
+        prova("l'icona «%s» ha la sua tinta, nel CSS" % _c, True,
+              (".p2p-sez-ico.ico-%s{background:var(--" % _c) in stile)
+    # B) LA VALUTA NON HA PIU' L'EURO ADDOSSO (richiesta di Andrea:
+    # domani c'e' USDT). La bandierina resta dov'e' vera — la voce
+    # scelta e le voci del foglio-picker — mai sull'icona del riquadro.
+    prova("l'icona della valuta e' generica, non una bandiera", True,
+          "ico: 'valuta'," in nuovo and "ico: val.bandiera" not in nuovo)
+    prova("...e la bandierina resta nella voce e nel picker", True,
+          "val.bandiera + ' ' + esc(val.cod)" in nuovo
+          and "v.bandiera" in pezzo_js(mini, "function apriValutaP2P(){", "\n}\n"))
+
+    # C) UN CAMPO SOLO ALL'APERTURA: la garanzia non e' il render, e'
+    # l'AZZERAMENTO — il foglio si apre da un posto solo (`toccaPiu`),
+    # e di li' passa questa riga.
+    prova("aprire il foglio richiude il secondo campo", True,
+          "p2pNuovoDue = false;"
+          in pezzo_js(mini, "function apriNuovoOrdineP2P(){", "\n}\n"))
+
+    # D) LA PAGINA NON SCENDE PIU' AL TOCCO DEL CAMPO. Non era uno
+    # scroll: `.sheet` e' ancorato in BASSO, e la tastiera toglie
+    # altezza al foglio — cioe' ne abbassa il bordo ALTO, testata
+    # compresa. Con `top:0` l'altezza se ne va dal basso, dove la
+    # tastiera c'e' davvero.
+    prova("il foglio a pieno schermo e' ancorato in alto", True,
+          ".sheet.pieno{\n      top:0;bottom:auto;" in stile)
+    prova("...e lo svelare rimette lo scorrimento dov'era", True,
+          "const dove = corpo ? corpo.scrollTop : 0;" in _sv
+          and "if (corpo) corpo.scrollTop = dove;" in _sv)
+
+    # E) IL BINARIO SEGUE IL PALLINO, e il confine lo scrive il JS a
+    # ogni movimento — non solo al render, o trascinando resterebbe
+    # fermo dov'era.
+    prova("il riempimento parte gia' scritto", True,
+          "'style=\"--pieno:' + pienoPremioP2P(p2pNuovoPremio) + '\" '" in nuovo)
+    prova("...e si riscrive a ogni movimento", True,
+          "cur.style.setProperty('--pieno', pienoPremioP2P(p2pNuovoPremio));"
+          in pezzo_js(mini, "function cambiaPremioP2P(v){", "\n}\n"))
 
 
 def prove_p2p_canale():
