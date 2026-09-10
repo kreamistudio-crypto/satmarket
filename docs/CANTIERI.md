@@ -8507,3 +8507,34 @@ parcheggio, la ripresa che prende una sk diversa).
 LA LEZIONE, che vale oltre il P2P: un id di Telegram non è un
 `int32`, e `| 0` non è «arrotonda»: è «tronca a 32 bit e non dirlo».
 Ogni volta che un numero arriva dal server e serve intero, `Number`.
+
+IL TERZO GIRO DAL CAMPO, il volto in ritardo (10 set 2026): la
+sequenza primo→secondo→primo funziona, l'ordine pubblicato col secondo
+è subito «mio» — ma la card resta SENZA foto, e la foto compare solo
+dopo circa tre chiusure e riaperture. È una corsa in due tempi. La
+card chiede il volto (`chiediFacceP2P`) appena il libro la mostra; il
+server non sa ancora di chi è l'ordine, perché l'intestazione
+(`registraOrdiniP2P`) partiva SOLO con la restore, cioè alla sessione
+dopo — «chi pubblica adesso ha il suo giro al prossimo ingresso», che
+era vero e sbagliato insieme; e `p2pFacceChieste` ricorda «già
+chiesto» per tutta la sessione, quindi quel no diventa definitivo.
+Alla sessione dopo la restore intesta, ma la domanda dei volti del
+render parte PRIMA che l'intestazione sia atterrata: un altro no, e
+un'altra sessione. Ecco le tre aperture.
+LA CURA È UNA FUNZIONE SOLA, `intestaOrdiniP2P`: registra, aspetta
+l'ok del server (e una domanda dei volti eventualmente in volo, che a
+giro occupato `chiediFacceP2P` rifiuta), dimentica il «già chiesto»
+di quegli id, richiede il volto e ridisegna. Due chiamanti: la
+risposta del coordinatore che assegna l'id vero a un ordine appena
+pubblicato (in `applicaMessaggioP2P`, subito dopo il rinome — l'id
+provvisorio non si intesta, cambierebbe nome), e la restore, che ora
+passa dalla stessa strada invece di registrare e basta.
+COLLAUDATI: **8976 prove verdi, 0 rosse** (+12) e **24 MUTAZIONI, 24
+uccise** (le venti di prima più: l'intestazione che non dimentica il
+«già chiesto», l'id vero che non intesta, la restore che torna a
+registrare senza richiedere, l'intestazione che richiede senza
+aspettare il server). Il banco del volto fa girare la corsa vera:
+chiesto prima dell'intestazione è un no che da solo non si richiede,
+l'intestazione lo porta con un ridisegno, prima l'ordine al server e
+poi la domanda, il provvisorio resta fuori, e col server che dice no
+non si chiede niente.
