@@ -9069,7 +9069,42 @@ quella lunga.
 E IL NODO È GIRATO (10 set 2026, guarda-e-riferisci, mano di
 Andrea): `fee` a 0.02 in `settings.toml`, riavvio dal compose, e
 il 38385 annuncia `fee 0.02` — verificato dallo SPECCHIO, cioè dal
-lato di chi legge. Da lì il conto ha smesso da solo di dire «in
+lato di chi legge.
+
+## La card essenziale del libro
+
+IL TERZO RITOCCO DELLO STESSO GIORNO (10 set 2026, Andrea): la card
+scende a DUE RIGHE — «Paghi 2,00 €» grande, «Ricevi ≈ 2.940 sats»
+sotto (nel tab Vendi specchiate: «Paghi ≈ X sats», «Ricevi 2,00 €»)
+— e la riga «prezzo di mercato» muore: la cifra è GIÀ il netto di
+tutto (premio + metà commissione, `nettoLatoP2P`), la stessa del
+conto nel dettaglio, e il conto per esteso sta là. Metodo,
+reputazione e anello restano.
+AL POSTO DELLA RIGA UN BADGE, e solo col premio: pillola coi
+vestiti di casa (trust-soft/trust il verde; `--warn-bg`/`--danger`
+il rosso — il fondo che il rosso aveva già in `.btn.allarme`, mai
+un colore nuovo). ⚠️ IL BADGE DICE IL SOLO PREMIO DEL VENDITORE,
+MAI LA COMMISSIONE, ed è la riga da tenere: la commissione è uguale
+per tutti, il mestiere del badge è CONFRONTARE le offerte. I
+quattro testi dicono il gesto di chi legge col valore ASSOLUTO —
+a comprare «4% più caro» (rosso) / «Risparmi il 4%» (verde), a
+vendere «Incassi il 4% in più» (verde) / «in meno» (rosso) — mai un
+segno da interpretare; la tinta è il giudizio affare/avviso di
+sempre, dal lato. A premio zero nessun badge, a prezzo fisso
+nemmeno.
+E «RICEVI» È TORNATO MAIUSCOLO: il minuscolo cuciva le prime due
+righe in una frase sola con la terza sotto — senza la terza, la
+card è righe autonome e ognuna comincia da capo.
+IL BADGE È `display:table` E NON inline-block, ed è la trappola
+vista in vetrina: nel tab Vendi la riga sopra è lo span inline
+dell'euro, e un inline-block gli si incollava accanto sulla stessa
+riga. Il table è un blocco che si stringe sul contenuto: riga sua,
+larghezza da pillola, nessun wrapper.
+COLLAUDATO: 9106 verdi — i quattro testi del badge coi loro colori,
+il premio-zero e il fisso senza badge, il cambio muto che tiene il
+badge (non ha bisogno del cambio) e perde solo le cifre, e la
+sentinella CSS che pretende le coppie di casa e vieta il ritorno di
+`.p2p-prezzo`. Guardato in vetrina CDP: sei card nei due temi. Da lì il conto ha smesso da solo di dire «in
 promo»: nessun deploy, che è esattamente il disegno. IL CONTO
 ECONOMICO DA NON DIMENTICARE: la dev fee di Mostro è il 30% della
 NOSTRA fee — oggi il tappo `dev_fee_percentage = 0` (il circuito
