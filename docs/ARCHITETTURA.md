@@ -23477,6 +23477,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la cache», cioè la strada vera. Si taglia sul `;` a FINE RIGA. È la
   trappola della prosa, su un asse nuovo.
 
+- ⚠️ UNA REPUTAZIONE SOLA, QUELLA DEL MERCATINO (set 2026, decisione di
+  Andrea): «chi è onesto con gli oggetti è onesto anche sul P2P». Del
+  circuito di scambio non si legge più niente — `repRigaP2P`,
+  `repDaTag` e il campo `rep` dell'ordine sono usciti, e il tag
+  `rating` del 38383 arriva senza che nessuno lo apra. Sulla card la
+  media di casa con la STELLA CHE SI RIEMPIE (`stellaP2P`: due disegni
+  sovrapposti e una scatola che taglia — mai un `id`, che in un libro
+  si ripeterebbe su N card) e l'omino a tratto accanto al conto.
+  IL FILTRO DELLA REPUTAZIONE ha un giudice suo, `passaRepP2P(f,
+  faccia)`, perché la media la sa il VOLTO e non l'ordine: `renderP2P`
+  filtra in DUE PASSI — prima `passaFiltroP2P` (valute, metodi,
+  premio), poi i volti dei rimasti, poi la reputazione. Un passo solo
+  si morderebbe la coda: senza volti non passa nessuno, e senza
+  passanti non si chiedono volti. Chi non ha un account Barattolo non
+  ha stelle e passa solo col minimo a zero, come chi non ha ancora
+  voti. Il verbale in CANTIERI, «Una reputazione sola».
+
 - LA TESTATA DEL LIBRO RESTA IN ALTO (set 2026): tab, logo e pillola
   del filtro stanno in `.p2p-sticky`, un blocco `position:sticky`
   SOLO — con due impilati il secondo vorrebbe un `top` pari

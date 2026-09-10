@@ -8760,3 +8760,76 @@ della vista, lasciando `#view-p2p` con un `translateY(6px)` residuo:
 un antenato trasformato sposta lo sticky, e per un giro è sembrato un
 difetto del CSS. In un browser vero quell'animazione finisce in 180ms
 da sola; portata a termine a mano, lo sticky si incolla a 0.
+
+UNA REPUTAZIONE SOLA (10 set 2026, DECISIONE DI ANDREA, e vale come
+regola): **chi è onesto con gli oggetti è onesto anche sul P2P**.
+Fino a stamattina ce n'erano due: le stelline del MERCATINO sulla card,
+e la reputazione del COORDINATORE — quanti scambi, che media, da quanto
+— che il libro pubblico porta nel tag `rating` e che vivevano nella
+riga «⚡ scambi P2P» del dettaglio, più il filtro «Reputazione» che
+guardava quella. Due reputazioni nello stesso posto, con la stessa
+faccia di stella, dicono cose diverse sembrando la stessa, e sceglierne
+una a occhio tocca a chi legge.
+È USCITA TUTTA, non solo nascosta: la riga (`repRigaP2P`), il suo
+lettore (`repDaTag`) e il campo `rep` dell'ordine. Restare senza
+chiamanti sarebbe codice che racconta una strada che non si percorre
+più — è il precedente di `repTestoP2P`, applicato al suo erede. Il tag
+`rating` del 38383 continua ad arrivare: semplicemente non lo legge
+più nessuno.
+IL FILTRO GUARDA ORA LA MEDIA DI CASA, e la conseguenza tecnica non è
+piccola: quella media la sa il VOLTO, che arriva dal nostro server, non
+l'ordine che arriva dai relay. Quindi il giudice si è SDOPPIATO —
+`passaFiltroP2P` per valute, metodi e premio, `passaRepP2P(f, faccia)`
+per la reputazione — e `renderP2P` fa DUE PASSI coi volti in mezzo.
+⚠️ UN PASSO SOLO SI MORDEREBBE LA CODA, ed è la ragione vera della
+divisione: i volti si chiedono per gli ordini che il filtro lascia
+passare, quindi a reputazione filtrata non passerebbe nessuno (i volti
+non ci sono ancora), quindi non si chiederebbe nessun volto, quindi non
+passerebbe mai nessuno. Muto, e per sempre.
+CHI NON HA UN ACCOUNT BARATTOLO — un ordine arrivato da un altro client
+Mostro — resta senza stelle e passa solo se la reputazione non è
+filtrata. È la stessa regola di chi l'account ce l'ha ma non ha ancora
+voti: «non si sa» non è «scarso», ma chi chiede almeno una stella sta
+chiedendo una PROVA, e «non si sa» non lo è.
+⚠️ E «NON FILTRATA» VUOL DIRE «MINIMO A ZERO», che è la lettura più
+stretta della richiesta e va detta: con `repDa` a 0 e `repA` abbassato
+i senza-stelle passano lo stesso. Si è tenuta UNA regola per tutt'e due
+i modi di non avere stelle, perché la riga del foglio ne dice una sola
+(«compare solo col minimo a 0») e due regole diverse per due tipi di
+«nessuna stella» non si potrebbero spiegare in una frase.
+E QUATTRO RITOCCHI NELLO STESSO GIRO (chiesti da Andrea).
+1) ARIA SOTTO LA PILLOLA, dentro il blocco attaccato e non come
+margine della prima card: dev'essere fondo DIPINTO, o da attaccati le
+card si vedrebbero passare in quello spazio.
+2) LA STELLA SI RIEMPIE PER QUANTO VALE: una sola, piena a metà a 2,5 e
+quasi tutta a 4,8 — non cinque da contare, e nemmeno una intera che
+mente arrotondando. ⚠️ NIENTE `id` NELL'SVG, ed è la riga che decide
+la forma: un `linearGradient` o una `clipPath` ne vogliono uno, e in un
+libro ci sono N card — id ripetuto, il primo vince per tutte. Il
+riempimento è una SCATOLA che taglia: due stelle sovrapposte, quella
+piena dentro uno `span` largo il tanto per cento giusto con
+`overflow:hidden`. La frazione è pura e sta fuori dal disegno.
+Misurato dal vivo su quattro card: 2,5→50%, 4,8→96%, 5→100%, 3,2→64%.
+3) L'OMINO al posto del fumetto accanto al conto dei voti, con lo
+stesso tratto delle icone della nav (`fill:none`, `stroke:currentColor`,
+il velo sotto): è lo stesso alfabeto, e due alfabeti nella stessa card
+si notano.
+4) LA RIGA DEL PROPRIO ORDINE resta senza icona: la scritta basta.
+COLLAUDATI: **9016 prove verdi, 0 rosse** (+4 netti: la cura toglie le
+prove di una reputazione che non c'è più mentre aggiunge quelle della
+stella e del filtro nuovo) e **16 MUTAZIONI, 16 uccise** — la stella
+sempre piena, la frazione fuori scala, il non-numero, la larghezza che
+non arriva al disegno, la scatola che non taglia, l'id che torna,
+l'omino pieno, le faccine che tornano, l'icona del proprio ordine,
+l'aria che sparisce, il giudice che si riprende la reputazione, il
+senza-volto che passa sempre e quello che non passa mai, la fascia che
+esclude gli estremi, i volti chiesti dopo (il cane e la coda) e il
+dettaglio che si riprende la riga dell'altra piazza.
+⚠️ E L'HEREDOC HA MANGIATO LE ESCAPE PER LA TERZA VOLTA IN UN GIORNO,
+lasciando `prove.py` con una stringa non terminata: il file non
+COMPILAVA. Il giro di controllo che avevo fatto subito dopo cercava le
+righe rosse e non ne trovava — perché non girava niente. **Cercare «✗»
+non prova il verde: lo prova il codice d'uscita**, ed è la stessa
+lezione che poche ore prima aveva salvato la tortura (baseline a exit 1
+con zero rosse). Da qui la guardia esplicita nel banco della tortura,
+che si ferma e lo dice invece di contare uccisioni finte.
