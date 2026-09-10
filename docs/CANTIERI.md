@@ -7651,3 +7651,199 @@ quello già acceso o spento del P2P. DA GUARDARE al primo ordine vero
 con `P2P_ATTIVO` aperto: che il canale riceva davvero il post (serve
 `canale_id()` configurato) e che la caption si legga bene accanto
 agli annunci normali.
+
+Il foglio «Pubblica» ridisegnato, e l'intervallo che si prende (set
+2026, richiesta di Andrea sul modello della «creazione nuovo ordine»
+dell'app di riferimento). Il foglio del + della nav trasformata era due
+campi in croce — quanti euro, e un metodo scritto a mano — su un ordine
+che nasceva sempre uguale: al prezzo di mercato, importo singolo,
+premio zero. Il ridisegno lo apre a tutto quello che il coordinatore sa
+già fare, e le due cose nuove — il PREMIO e l'INTERVALLO — erano
+tutt'e due a verbale come cantieri futuri: si chiudono qui.
+
+STRUTTURA: A PIENO SCHERMO, UNA SEZIONE PER RIQUADRO. Cinque riquadri
+con l'icona tonda a sinistra — valuta, importo, metodi, tipo di prezzo,
+e la quinta che cambia col tipo (sats fissi o premio) — testata con la
+via d'uscita a sinistra e il titolo in mezzo («Vuoi comprare Bitcoin» /
+«Vuoi vendere Bitcoin», che è il tab), piede appiccicato con «Annulla»
+e «Invia». A pieno schermo perché cinque sezioni in un foglio dal basso
+vogliono dire scorrere dentro una finestra dentro una pagina, che è il
+modo in cui si perde il fondo — e il piede sempre a vista è dove si
+legge che «Invia» è ancora spento, cioè che manca qualcosa.
+LA TASTIERA NON LO ALZA, LO ACCORCIA: i fogli normali salgono di
+`--tastiera` col transform, ma un foglio alto quanto lo schermo salendo
+si porterebbe via la testata. Qui l'altezza si toglie in fondo e il
+transform si spegne (`.sheet.pieno.open{transform:none}`). Da 768px in
+su non cambia niente: là il foglio è già un modale centrato, e a pieno
+schermo su un monitor sarebbe una finestra vuota con cinque riquadri in
+mezzo.
+
+I DUE ESCLUSIVI SONO REGOLA DEL PROTOCOLLO, NON GRAFICA, e sono la
+scoperta che ha disegnato il foglio più di qualunque screenshot. Letti
+sui byte di mostro-core 0.14.6 (`order.rs`) e di mostrod v0.18.7:
+• `check_zero_amount_with_premium` RIFIUTA un ordine che porta insieme
+  `amount` e `premium`. Quindi la leva «Prezzo fisso / Mercato» *è*
+  quella regola: o i sats o il premio, mai tutt'e due — e il premio si
+  azzera nel codice, invece di sperare che il foglio l'abbia lasciato a
+  zero.
+• `check_range_order_limits` vuole `min < max` e `amount` a ZERO: un
+  intervallo non può fissare i sats. Quindi col prezzo fisso il secondo
+  campo dell'importo SPARISCE, e passando alla leva il massimo scritto
+  si svuota davvero — nasconderlo non basta, un numero rimasto in
+  memoria finirebbe nel messaggio.
+• `create_fiat_amt_array` (`nip33.rs`) scrive il tag `fa` coi due capi
+  quando ci sono, e allora `fiat_amount` vale 0.
+La tabella canonica NON si tocca: l'ordine dei campi di `SmallOrder` è
+ancora quello di `CAMPI_MOSTRO.ordine`, `min_amount` e `max_amount`
+c'erano già (a `null`), quindi la firma regge senza toccare niente.
+
+I METODI DIVENTANO UN VOCABOLARIO CHIUSO, e ROVESCIA una decisione
+scritta: prima le pillole erano un suggerimento e sotto c'era un campo
+di testo libero, col suo commento che lo difendeva («chi paga in un
+altro modo lo scrive, e nessuna lista di casa glielo impedisce»).
+IL PERCHÉ DEL ROVESCIAMENTO (decisione di Andrea): ogni metodo ha il
+SUO form di recapito — `P2P_FORME_RECAPITO`, dove SEPA vuole
+intestatario e IBAN, Revolut un RevTag, i contanti un luogo — e un
+metodo scritto a mano cade nella forma generica, dove chi deve ricevere
+gli euro trova una casella vuota invece delle sue due righe. Il testo
+libero restava leggibile dal coordinatore e ILLEGGIBILE da noi. Le sei
+voci (SEPA, SEPA Instant, Revolut, Satispay, PayPal, Contanti) hanno
+tutte il loro form — «SEPA Instant» cade in quella `sepa`, che
+riconosce /sepa|bonific|iban/ — e c'è la prova ESEGUIBILE che lo dice:
+`formaRecapito` sui sei nomi non deve mai tornare la generica. Una voce
+nuova si aggiunge nel vocabolario e, se vuole un form suo, anche là.
+SUL FILO VIAGGIANO SEPARATI DA VIRGOLE, in una stringa sola: è così che
+`nip33.rs` li spezza nei valori del tag `pm`, ed è così che il nostro
+lettore li ritrova. La selezione multipla non è una comodità nostra: è
+una cosa che il coordinatore sa già fare.
+
+IL PREMIO È IMPOSTABILE, e la nota sotto il cursore dice cosa cambia
+PER IL LATO IN CUI SI STA — dalla stessa formula letta sui byte
+(`sats -= premium/100 * sats`, sottrazione uniforme sui due versi): un
+premio positivo assottiglia sempre i sats, quindi chi vende ne consegna
+meno per gli stessi euro e chi compra ne riceve meno. La fascia ±10% è
+una scelta di casa e non un limite del protocollo (il premio è un i64 e
+nessun controllo lo guarda), e si scrive anche a mano — ma con un CAMPO
+IN RIGA, mai un `prompt()` di sistema: quelli sono usciti da questa
+pagina uno per uno e non rientrano da qui. La pillola col numero
+diventa il campo e «Modifica» diventa «Fatto».
+
+L'INTERVALLO SI PUBBLICA **E** SI PRENDE (decisione di Andrea, che ha
+scartato la strada «pubblicalo e basta»): un range che i nostri utenti
+vedono e non possono prendere è un buco peggiore del cantiere più
+largo. Il libro li mostrava già dal ridisegno delle card, e il tocco
+diceva «da qui non si può ancora». Adesso il tocco DEVIA su un foglio
+piccolo — «Quanto vuoi scambiare?», un campo e la stima in sats — e da
+lì si rientra nella STESSA strada: stessa conferma, stesse cinture,
+stessa presa. La cifra viaggia come `Payload::Amount`, che mostrod
+legge SOLO su take-sell e take-buy (`get_amount` in `message.rs`) e
+confronta con min/max (`get_fiat_amount_requested`): fuori fascia
+risponde `OutOfRangeSatsAmount`. Il controllo che facciamo qui è
+cortesia — a tenere il patto è lui — ma un no che arriva dopo un giro
+di rete e una chiave bruciata è un no pagato troppo caro.
+L'IMPORTO SCELTO SI RICORDA (`importoScelto`) e non è un doppione di
+`euro`: la riga locale porta la cifra, questo porta il FATTO che va
+rimandata a ogni tentativo. Senza, un «Riprova» su un intervallo
+ripartirebbe senza la scelta e si prenderebbe un `OutOfRangeSatsAmount`
+che nessuno collegherebbe al gesto.
+E L'INTERVALLO COLLASSA quando il coordinatore fissa la cifra: dal
+`fiat_amount` della sua risposta in poi la pagina dello scambio mostra
+un numero solo. Senza quella riga continuerebbe a dire «20,00–100,00 €»
+su uno scambio che vale 45. Il giudice è UNO (`euroTestoP2P`), che le
+due viste dello scambio non possano dire due cose.
+
+⚠️ IL LIMITE DICHIARATO DELL'INTERVALLO, e non è un difetto: si CHIUDE
+alla prima presa. Il resto di un range si ripubblica solo se chi ha
+creato manda `NextTrade` (chiave e indice del prossimo scambio) insieme
+al rilascio, e mostrod senza quel pezzo «salta il resto» invece di dare
+errore (`release.rs`: handle_child_order failed → skipping remainder,
+resolving maker bond). Mandarlo NON è la strada corta che sembra:
+farebbe nascere un ordine FIGLIO con una chiave che questa pagina non
+sa ancora governare, cioè rifarebbe il difetto degli «ordini
+ingovernabili» chiuso il 9 set. Quindi oggi non si manda, ed è una
+scelta: il pezzo mancante è il suo cantiere, e sta accanto alla ripresa
+delle fasi 5-6-7 che eredita lo stesso mattone.
+
+⚠️ IL LIGHTNING ADDRESS NON C'È, ed è la sezione che il disegno di
+partenza aveva e questo foglio non ha (decisione di Andrea). Due
+ragioni, e la seconda è più forte della prima. UNO: il verbale dice già
+«mai un lightning address» come destinazione del payout — `do_payment`
+li RI-RISOLVE a ogni tentativo, quindi un server che risponde male rende
+il fallimento deterministico e nessun retry lo aggiusterà mai
+(`MalformedAPIRes`, la prova impantanata con Alan). DUE, e vale per la
+CREAZIONE: su new-order mostrod fa girare `validate_invoice`, e
+`is_valid_invoice` prova PRIMA il Lightning address e l'LNURL — su un
+circuito Tor freddo (10,6 s contro i tre budget compilati da 4s/2s/2s)
+l'ordine non nasce proprio, in silenzio. Un campo che può far fallire
+la pubblicazione senza dire perché è peggio di un campo che non c'è.
+Il Lightning address si chiede DOPO, nel foglio «💸 Dove ricevere i
+sats», che c'è già ed è il momento in cui un guasto si può ancora
+recuperare.
+
+LA VALUTA È UNA TENDINA CON UNA VOCE SOLA, ed è deliberato: `P2P_VALUTE`
+è una lista, quindi aggiungerne una — USDT, il giorno che il
+coordinatore l'accetta — è UNA RIGA e non una caccia. Il ▾ va rimesso a
+mano (`appearance:none` toglie la freccia insieme al recinto, e un
+select senza freccia si legge come testo fermo: nessuno lo tocca), e
+sta nel wrapper perché uno pseudo-elemento su un `<select>` non si
+disegna.
+
+LE REGOLE VIVONO IN UNA FUNZIONE PURA, `ordineDaCampiP2P`, ed è l'unico
+modo di provarle: sbagliando questi campi il coordinatore NON risponde
+un errore — TACE (è il precedente del JSON canonico, dove la firma
+cadeva e nessuno lo leggeva da nessuna parte). Chi spedisce la CHIAMA
+invece di ricopiarne le regole, e la riga locale legge dallo STESSO
+ordine, così quel che si vede a schermo e quel che è partito non
+possono raccontare due cose diverse.
+E IL GIUDIZIO DEL BOTTONE È PURO ANCHE LUI (`valeNuovoOrdineP2P`): dice
+se i campi bastano e, se non bastano, DICE COSA MANCA — in rosso, non
+nel grigio degli altri suggerimenti, dove non lo leggeva nessuno. Un
+bottone spento senza una ragione visibile è il vicolo cieco muto che
+questa riga esiste per evitare.
+
+LA SENTINELLA DELLE PAROLE SI ALLARGA, ed era il modo in cui questo
+cantiere poteva scivolare: il foglio non è più una funzione sola — le
+sezioni nascono da `sezioneNuovoP2P`, la nota del premio da
+`premioNotaP2P` — e una parola vietata là dentro sarebbe uscita a
+schermo con la sentinella verde. Ora guarda tutt'e quattro i pezzi.
+
+COLLAUDATI: **8792 prove verdi, 0 rosse** (+18 sulle 8774 di HEAD,
+misurate su un worktree pulito), e **11 MUTAZIONI, 11 UCCISE**: il
+premio che non si azzera a prezzo fisso, l'intervallo che porta anche
+l'importo singolo, il capo basso che viaggia senza intervallo, i sats
+fissi che non partono, l'intervallo che non collassa alla presa, la
+cifra scelta che non viaggia col take, l'intervallo che si prende senza
+chiedere quanto, i metodi separati da spazi invece che da virgole, il
+tetto dei sats che non si guarda, la fascia dell'intervallo che non si
+guarda, e il «Riprova» che dimentica la cifra scelta.
+GIRO DAL VIVO col server vero, chiaro e scuro, a 375×812: la testata
+con la freccia e il titolo che cambia col tab, le cinque sezioni, la
+tendina dei metodi che si apre e spunta due voci, la leva che porta a
+prezzo fisso (secondo campo e premio VIA, sezione sats che compare,
+«Invia» spento con «Scrivi quanti sats»), il premio a +4% con la nota
+del lato giusto, e il foglio «Quanto» su un range 20–100 che stima
+«Riceverai circa 88 200 sats» a 45 € col premio al 2%. E le due
+deviazioni della presa provate dal vivo: senza cifra si apre «Quanto»,
+con la cifra si apre la conferma che dice «45,00 € · al prezzo di
+mercato».
+⚠️ QUEL CHE IL GIRO DAL VIVO **NON** HA PROVATO, e va detto invece di
+lasciarlo intendere: nessun ordine è stato PUBBLICATO davvero. In
+locale non c'è coordinatore, quindi a rispondere per il messaggio è la
+prova eseguibile che fa girare `ordineDaCampiP2P` sui quattro casi
+sotto node. Il primo intervallo vero — e la prima presa a importo
+scelto — restano da fare sul campo, e si agganciano alla tappa 8.
+E DUE COSE LE HA TROVATE IL GIRO, non il ragionamento. 1) A 320px
+niente scorrimento orizzontale (scrollWidth = clientWidth = 320) col
+caso peggiore addosso: intervallo scritto, due metodi lunghi («SEPA
+Instant, Contanti»), e la riga «20 a 100» che regge. 2) DA 768px IN SU
+IL PIEDE NON SI APPICCICA PIÙ: là il foglio è un modale che scorre
+dentro sé stesso, e un piede sticky lasciava scorrere il contenuto
+NELLA striscia d'aria sotto i bottoni — il padding del foglio. Vale la
+regola di tutti gli altri fogli: i bottoni stanno in fondo e ci si
+arriva scorrendo. Stessa famiglia il rientro doppio della testata, che
+sul modale aggiungeva il proprio padding a quello di `.sheet`.
+⚠️ LA TENDINA APERTA È USCITA DALLA RIGA DELL'ICONA, trovato guardando:
+dentro la riga, l'icona tonda finiva a mezza altezza di una lista di
+sei voci — un cerchio che galleggia in mezzo al nulla. Fuori, la lista
+prende tutta la larghezza del riquadro e l'icona resta col campo. Da lì
+il `sotto` di `sezioneNuovoP2P`, che serve a questa cosa sola.

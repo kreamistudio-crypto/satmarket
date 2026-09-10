@@ -23318,6 +23318,50 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   così oggi, ma il tag `d` non è roba nostra) darebbe due stringhe
   diverse e la solita firma che non torna, in silenzio. La cura è una
   minuscola in quel giudice, il giorno che si tocca.
+
+- LE TRE REGOLE DI UN ORDINE NUOVO (set 2026, col ridisegno del foglio
+  «Pubblica»). Un ordine P2P può nascere a prezzo di MERCATO o a prezzo
+  FISSO, e a importo SINGOLO o a INTERVALLO. Le combinazioni non sono
+  libere, e i vincoli non sono di gusto: stanno nel codice del
+  coordinatore, letti sui byte di mostro-core 0.14.6 (`order.rs`) e di
+  mostrod v0.18.7.
+  1) `check_zero_amount_with_premium` — con `amount` > 0 il `premium`
+     DEVE essere 0. Fissare i sats e chiedere uno scarto dal mercato è
+     ambiguo, quindi si esclude: la leva «Prezzo fisso / Mercato» del
+     foglio È questa regola.
+  2) `check_range_order_limits` — un intervallo vuole `min_amount` e
+     `max_amount` non negativi con `min < max`, e `amount` a ZERO: un
+     range non può fissare la quantità di sats. Quindi intervallo e
+     prezzo fisso si escludono a vicenda.
+  3) `create_fiat_amt_array` (`nip33.rs`) scrive il tag `fa` coi due
+     capi quando ci sono; allora `fiat_amount` vale 0, e il controllo
+     «fiat_amount > 0» viene saltato apposta per i range.
+  IL PAYLOAD LO COSTRUISCE UNA FUNZIONE PURA, `ordineDaCampiP2P`, e chi
+  spedisce la CHIAMA invece di ricopiarne le regole — la riga locale
+  dello scambio legge dallo stesso oggetto, così quel che si vede a
+  schermo e quel che è partito non possono divergere. È pura perché è
+  l'unico modo di provarla: come per la firma, sbagliando questi campi
+  **il coordinatore non risponde un errore — tace**.
+  I METODI DI PAGAMENTO SONO UNA STRINGA SOLA separata da virgole:
+  `nip33.rs` la spezza nei valori del tag `pm`, ed è così che il nostro
+  lettore li ritrova. La selezione multipla non è una comodità nostra.
+  E IL VOCABOLARIO DEI METODI È CHIUSO perché ogni voce deve avere il
+  suo form di recapito (`P2P_FORME_RECAPITO`): un metodo scritto a mano
+  cadrebbe nella forma generica, dove chi deve ricevere gli euro trova
+  una casella vuota invece dei suoi campi.
+  LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
+  (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
+  (`get_amount` in `message.rs`) e confronta con min/max
+  (`get_fiat_amount_requested`): fuori fascia risponde
+  `OutOfRangeSatsAmount`. Su un ordine normale non si manda affatto —
+  la cifra la mette lui dal libro.
+  ⚠️ IL RESTO DI UN INTERVALLO NON SI RIPUBBLICA, ed è dichiarato: il
+  figlio nasce solo se chi ha creato manda `Payload::NextTrade` (chiave
+  e indice del prossimo scambio) col rilascio, e senza quel pezzo
+  mostrod «salta il resto» invece di dare errore. Non si manda perché
+  farebbe nascere un ordine con una chiave che il client non sa ancora
+  governare. Il perché per esteso in CANTIERI, «Il foglio «Pubblica»
+  ridisegnato».
   Fail-closed: nel dubbio si omette, e chi aveva
   bisogno dell'id lo sente da una porta che si chiude A VOCE
   (`chiamataOrdineP2P` alza invece di spedire un messaggio che verrebbe
