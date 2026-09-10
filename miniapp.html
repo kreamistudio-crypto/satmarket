@@ -2020,11 +2020,23 @@
     font:inherit;font-size:19px;font-weight:800;line-height:1;
     padding:8px 8px;cursor:pointer;border-radius:10px}
   .foglio-back.vuoto{visibility:hidden}
-  /* il piede: le due uscite, sempre a vista */
-  .foglio-piede{display:flex;gap:10px;
+  /* IL PIEDE: LE DUE USCITE, SEMPRE A VISTA — e sono GEMELLE, che ci
+     sono volute due cose (ritocco di Andrea, misurato dal vivo).
+     1) `.btn.ghost` porta un `margin-top:10px` suo e sta PIU' IN BASSO
+     in questo foglio, quindi a pari specificita' vinceva lui: quei
+     dieci pixel facevano «Annulla» piu' basso del gemello. Il
+     `.ghost` nominato alza il peso quel tanto che basta.
+     2) E LA GRIGLIA AL POSTO DELLA RIGA FLESSIBILE, che e' la meta'
+     che il primo giro non aveva visto: col `box-sizing:border-box` di
+     casa una `flex-basis:0` non parte davvero da zero — parte dai
+     BORDI, e `.ghost` ne ha due da 2px mentre `.orange` non ne ha.
+     Misurati: 169 contro 165. Due colonne `1fr` sono esattamente
+     uguali, qualunque bordo abbiano dentro. */
+  .foglio-piede{display:grid;grid-template-columns:1fr 1fr;gap:10px;
     background:var(--card);border-top:1px solid var(--line-soft);
     margin-top:16px;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px))}
-  .foglio-piede .btn{flex:1 1 0;margin:0}
+  .foglio-piede .btn{margin:0;min-width:0}
+  .foglio-piede .btn.ghost{margin:0}
 
   /* ---- il riquadro di una sezione ---- */
   .p2p-sez{background:var(--chip-bg);border-radius:16px;padding:13px 14px;margin:12px 0}
@@ -2044,14 +2056,13 @@
     width:100%;border:0;border-bottom:1.5px solid var(--field-line);border-radius:0;
     background:none;color:var(--ink);font:inherit;font-weight:700;font-size:15px;
     padding:6px 0;-webkit-appearance:none;appearance:none}
-  .p2p-sez select{cursor:pointer}
-  /* IL ▾ VA RIMESSO A MANO: `appearance:none` toglie la freccia del
-     sistema insieme al recinto, e un <select> senza freccia si legge
-     come testo fermo — nessuno lo tocca. Sta nel wrapper e non nel
-     campo, che uno pseudo-elemento su un <select> non si disegna. */
-  .p2p-sceglie{position:relative}
-  .p2p-sceglie::after{content:'\25BE';position:absolute;right:2px;top:8px;
-    color:var(--muted);font-size:11px;pointer-events:none}
+  /* IL <select> DEL SISTEMA NON SI APRE PIU' (ritocco di Andrea): la
+     tendina della valuta apriva il selettore del telefono, che non e'
+     di casa e non si puo' vestire. Adesso apre il foglio-picker di
+     casa, lo stesso di Categoria e Taglia — e non ha portato CSS suo:
+     il campo resta il `.p2p-tendina` qui sopra e le voci sono le
+     `.picker-voce` di sempre. Il <select> nascosto non c'e' proprio,
+     che il valore vive gia' in una variabile del foglio. */
   .p2p-sez input:focus,.p2p-sez select:focus{outline:none;border-bottom-color:var(--sats)}
   .p2p-sez .hint{margin-top:6px}
   /* i due campi dell'importo: il secondo E' l'intervallo */
@@ -2064,7 +2075,7 @@
     background:none;border-bottom:1.5px solid var(--field-line);text-align:left;
     font:inherit;font-weight:700;font-size:15px;color:var(--ink);
     padding:6px 0;cursor:pointer}
-  .p2p-tendina span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  .p2p-tendina > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
   .p2p-tendina.vuota span{color:var(--muted)}
   .p2p-tendina i{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--muted)}
@@ -2089,18 +2100,60 @@
   @media (prefers-reduced-motion: no-preference){
     .p2p-leva .cursore,.p2p-leva .cursore::after{transition:background .15s,transform .15s}
   }
-  /* il premio: la cifra a sinistra, il cursore a destra, i due capi
-     sotto — e i capi portano il colore del giudizio, come le card */
+  /* IL PREMIO: LA CIFRA A SINISTRA DELLA BARRA, a meta' altezza della
+     linea (ritocco di Andrea). Prima la pillola e il suo «Modifica»
+     stavano in una colonna sola, e il centro della colonna non e' il
+     centro della pillola: il numero finiva sopra la linea. Adesso la
+     riga tiene SOLO la pillola e la barra — allineate al centro — e
+     «Modifica» scende sotto, in fila coi due capi: sotto la pillola
+     il suo bottone, sotto la barra i suoi estremi. */
   .p2p-premio{display:flex;align-items:center;gap:12px}
-  .p2p-premio input[type=range]{flex:1 1 auto;min-width:0;padding:0;
-    accent-color:var(--sats)}
-  .p2p-premio-val{flex:0 0 auto;text-align:center}
+  .p2p-premio-val{flex:0 0 auto;min-width:56px;text-align:center}
   .p2p-premio-cifra{display:block;min-width:56px;padding:6px 10px;border-radius:999px;
     background:var(--sats);color:#fff;font-weight:800;font-size:14px}
-  .p2p-premio-mod{border:0;background:none;color:var(--muted);font:inherit;
-    font-weight:700;font-size:11.5px;padding:3px 0 0;cursor:pointer}
-  .p2p-premio-capi{display:flex;justify-content:space-between;margin-top:6px;
-    font-size:11.5px;font-weight:800}
+  .p2p-premio-pie{display:flex;align-items:center;gap:12px;margin-top:6px}
+  .p2p-premio-mod{flex:0 0 auto;min-width:56px;text-align:center;
+    border:0;background:none;color:var(--muted);font:inherit;
+    font-weight:700;font-size:11.5px;padding:0;cursor:pointer}
+  .p2p-premio-capi{flex:1 1 auto;min-width:0;display:flex;
+    justify-content:space-between;font-size:11.5px;font-weight:800}
+  /* LA BARRA DICE CHE VA A SCATTI (ritocco di Andrea): una LINEA
+     tratteggiata bianca dentro il binario, venti tratti — uno per
+     ogni punto percentuale da -10 a +10 — e chi la guarda capisce
+     che non e' un cursore continuo prima di provarlo.
+     E' una linea e non venti blocchi, ed e' la differenza che si vede
+     a schermo: col tratteggio alto quanto tutta la barra il binario
+     sembrava SPEZZATO in segmenti arancioni. Il `background-size` la
+     tiene a due pixel, in mezzo. Il passo e' in PERCENTUALE (5% = un
+     punto su venti), cosi' i tratti restano al loro posto qualunque
+     sia la larghezza del riquadro.
+     ⚠️ QUI SPARISCE `accent-color`: vestire il binario vuol dire
+     `appearance:none`, e da li' in poi il pollice se lo disegna la
+     pagina — su tutt'e due i motori, che i due pseudo-elementi non si
+     possono raggruppare (una regola sconosciuta fa cadere l'intera
+     dichiarazione). */
+  .p2p-premio input[type=range]{flex:1 1 auto;min-width:0;padding:0;margin:0;
+    height:22px;background:none;-webkit-appearance:none;appearance:none;cursor:pointer}
+  .p2p-premio input[type=range]:focus{outline:none}
+  .p2p-premio input[type=range]::-webkit-slider-runnable-track{
+    height:10px;border-radius:999px;background-color:var(--sats);
+    background-image:repeating-linear-gradient(to right,
+      rgba(255,255,255,.92) 0 2px, transparent 2px 5%);
+    background-size:100% 2px;background-position:0 center;
+    background-repeat:no-repeat}
+  .p2p-premio input[type=range]::-moz-range-track{
+    height:10px;border-radius:999px;background-color:var(--sats);
+    background-image:repeating-linear-gradient(to right,
+      rgba(255,255,255,.92) 0 2px, transparent 2px 5%);
+    background-size:100% 2px;background-position:0 center;
+    background-repeat:no-repeat}
+  .p2p-premio input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:20px;height:20px;border-radius:999px;
+    margin-top:-5px;background:var(--card);border:3px solid var(--sats);
+    box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  .p2p-premio input[type=range]::-moz-range-thumb{
+    width:20px;height:20px;border-radius:999px;border:3px solid var(--sats);
+    background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.28)}
   /* le stelle sono l UNICO gesto del foglio: grandi, in fila, e col
      bersaglio che il dito trova senza guardare */
   .p2p-stelle{display:flex;gap:8px;justify-content:center;margin:16px 0}
@@ -36230,8 +36283,13 @@ async function mossaOrdineP2P(id, azione, fatto){
 
 /* LE VALUTE, e per ora ce n'e' una. La lista sta qui e non dentro il
    render perche' aggiungerne una — USDT, il giorno che il
-   coordinatore l'accetta — sia UNA RIGA e non una caccia. */
-const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€'}];
+   coordinatore l'accetta — sia UNA RIGA e non una caccia.
+   ⚠️ MA LE RIGHE SONO DUE, e va detto: `ordineDaCampiP2P` scrive
+   `fiat_code: 'EUR'` a mano, ed e' onesto solo finche' la scelta e'
+   una sola. Chi aggiunge una voce qui deve portarla anche la' — c'e'
+   una prova che diventa rossa apposta il giorno che questa lista
+   cresce. */
+const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺'}];
 /* I METODI SONO UN VOCABOLARIO CHIUSO (set 2026, decisione di Andrea
    che ROVESCIA la scelta di prima, dove le pillole erano un
    suggerimento e sotto c'era un campo di testo libero).
@@ -36256,6 +36314,8 @@ let p2pNuovoEuroMax = '';
 let p2pNuovoSats = '';
 let p2pNuovoMetodi = [];      // i metodi scelti, nell'ordine del vocabolario
 let p2pNuovoAperta = false;   // la tendina dei metodi e' aperta
+let p2pNuovoValuta = 'EUR';  // la valuta scelta nel foglio-picker di casa
+let p2pNuovoDue = false;     // il secondo campo dell'importo si e' fatto vedere
 let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di mercato
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
@@ -36267,6 +36327,8 @@ function apriNuovoOrdineP2P(){
   p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
   p2pNuovoMetodi = [];
   p2pNuovoAperta = false;
+  p2pNuovoValuta = P2P_VALUTE[0].cod;
+  p2pNuovoDue = false;
   p2pNuovoFisso = false;
   p2pNuovoPremio = 0;
   p2pNuovoPremioMano = false;
@@ -36289,8 +36351,11 @@ function sezioneNuovoP2P(o){
       + o.info + '">&#9432;</button>' : '') +
     '</div>' +
     '<div class="p2p-sez-riga">' +
-      '<span class="p2p-sez-ico" aria-hidden="true" style="background:' + o.fondo +
-      ';color:' + o.tinta + '">' + o.ico + '</span>' +
+      /* L'ICONA E' FACOLTATIVA (ritocco di Andrea): il Premio non ne
+         ha piu' una, e senza questo ramo restava un cerchio vuoto che
+         rubava quaranta pixel alla barra. */
+      (o.ico ? '<span class="p2p-sez-ico" aria-hidden="true" style="background:' + o.fondo +
+        ';color:' + o.tinta + '">' + o.ico + '</span>' : '') +
       '<div class="p2p-sez-corpo">' + o.corpo + '</div>' +
     '</div>' +
     /* IL «SOTTO» ESCE DALLA RIGA DELL'ICONA, e serve a una cosa sola:
@@ -36386,35 +36451,57 @@ function renderNuovoOrdineP2P(){
   const compro = p2pLato === 'compro';
   const tit = el('p2pNuovoTit');
   if (tit) tit.textContent = compro ? 'Vuoi comprare Bitcoin' : 'Vuoi vendere Bitcoin';
-  const val = P2P_VALUTE[0];
+  const val = P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0];
   const scelti = p2pNuovoMetodi.length
     ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
 
+  /* LA VALUTA PASSA DAL FOGLIO-PICKER DI CASA e non dal selettore del
+     telefono: il <select> resta come DEPOSITO del valore (hidden) e a
+     parlare col dito e' il campo-bottone, esattamente come Categoria
+     e Taglia nel form del venditore. Le voci sono bandierina + sigla:
+     con una valuta sola e' una tendina che si apre e si richiude, ma
+     e' gia' la strada giusta per la seconda. */
   const valuta = sezioneNuovoP2P({
-    ico: '🏳️', fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
+    /* l'icona tonda porta la bandiera della valuta SCELTA: dice il
+       fatto invece di annunciare la categoria, e cambia con lei */
+    ico: val.bandiera, fondo: 'var(--sats-soft)', tinta: 'var(--sats)',
     titolo: 'Seleziona la valuta con cui ' + (compro ? 'pagherai' : 'riceverai'),
-    corpo: '<div class="p2p-sceglie"><select id="p2pNuovoValuta" aria-label="Valuta">' +
-      P2P_VALUTE.map(v => '<option value="' + esc(v.cod) + '">' +
-        esc(v.segno + ' ' + v.nome + ' (' + v.cod + ')') + '</option>').join('') +
-      '</select></div>'
+    corpo: '<button type="button" class="p2p-tendina" id="p2pNuovoValutaBtn" ' +
+      'aria-haspopup="dialog" onclick="apriValutaP2P()">' +
+      '<span>' + val.bandiera + ' ' + esc(val.cod) + '</span>' +
+      '<i aria-hidden="true">▾</i></button>'
   });
 
   const importo = sezioneNuovoP2P({
     ico: '💶', fondo: 'var(--trust-soft)', tinta: 'var(--trust)',
     titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
       (compro ? 'inviare' : 'ricevere'),
+    /* UN CAMPO SOLO, ALL'APERTURA (ritocco di Andrea): il secondo —
+       e la riga che lo spiega — si fanno vedere quando si tocca il
+       primo. Chi vuole un importo secco non incontra mai una casella
+       in piu' da capire, e chi vuole un intervallo lo trova nel
+       momento esatto in cui sta scrivendo la cifra.
+       ⚠️ NASCOSTI, NON ASSENTI: si SVELANO col `display`, mai con un
+       render — ridisegnare mentre il dito e' sul campo porterebbe via
+       il fuoco e chiuderebbe la tastiera (la lezione delle pillole).
+       Percio' `style="display:none"` e non l'attributo `hidden`: `.hint`
+       potrebbe avere un `display` suo e vincerlo. */
     corpo: '<div class="p2p-duecampi">' +
       '<input id="p2pNuovoEuro" type="number" inputmode="decimal" min="1" step="1" ' +
         'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
-        'oninput="cambiaCampoNuovoP2P()" aria-label="Importo">' +
+        'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
+        'aria-label="Importo">' +
       (p2pNuovoFisso ? '' :
-        '<em>a</em><input id="p2pNuovoEuroMax" type="number" inputmode="decimal" min="1" ' +
+        '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
+        '<input id="p2pNuovoEuroMax" type="number" inputmode="decimal" min="1" ' +
         'step="1" placeholder="Importo massimo" value="' + esc(p2pNuovoEuroMax) + '" ' +
+        (p2pNuovoDue ? '' : 'style="display:none" ') +
         'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
       '</div>' +
       (p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
-        : '<div class="hint">💡 Tocca il secondo campo per creare un ordine a intervallo</div>')
+        : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
+          '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
   });
 
   const metodi = sezioneNuovoP2P({
@@ -36463,17 +36550,22 @@ function renderNuovoOrdineP2P(){
      quindi chi vende ne consegna meno per gli stessi euro — e chi
      compra ne riceve meno. Detto per il lato in cui si sta, che e'
      l'unico che interessa a chi legge. */
+  /* SENZA ICONA TONDA (ritocco di Andrea): qui la riga e' occupata da
+     una barra che vuole tutta la larghezza che trova, e il cerchio la
+     accorciava di quaranta pixel per dire una cosa che il titolo
+     «Premio (%)» dice gia'. */
   const premio = p2pNuovoFisso ? '' : sezioneNuovoP2P({
-    ico: '📈', fondo: 'var(--trust-soft)', tinta: 'var(--trust)',
-    titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
+    ico: '', titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
     corpo: '<div class="p2p-premio">' +
       '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
         'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
       '</div>' +
-      '<div class="p2p-premio-capi"><span style="color:var(--danger)">−' + P2P_PREMIO_MAX +
-      '%</span><span style="color:var(--trust)">+' + P2P_PREMIO_MAX + '%</span></div>' +
+      /* sotto la pillola il suo bottone, sotto la barra i suoi capi */
+      '<div class="p2p-premio-pie">' + premioModP2P() +
+      '<span class="p2p-premio-capi"><span style="color:var(--danger)">−' + P2P_PREMIO_MAX +
+      '%</span><span style="color:var(--trust)">+' + P2P_PREMIO_MAX + '%</span></span></div>' +
       '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
   });
 
@@ -36482,11 +36574,14 @@ function renderNuovoOrdineP2P(){
   const fee = (p2pInfo && p2pInfo.fee > 0)
     ? '<div class="hint">La commissione è ' + esc(String(Math.round(p2pInfo.fee * 10000) / 100)) + '%.</div>' : '';
 
+  /* LA RIGA D'APERTURA NON C'E' PIU' (ritocco di Andrea): «Stai
+     chiedendo di comprare sats pagando in euro…» diceva col paragrafo
+     quel che il titolo dice con tre parole, e su un foglio a pieno
+     schermo si mangiava la prima sezione. Il fatto che i sats restino
+     in garanzia resta detto dove serve davvero — nella pagina dello
+     scambio e in «I tuoi dati» — e la riga in fondo a questo foglio lo
+     ripete a chi arriva fin la'. */
   box.innerHTML =
-    '<div class="hint" style="margin-top:12px">' + (compro
-      ? 'Stai chiedendo di <b>comprare</b> sats pagando in euro. Chi risponde bloccherà i sats in garanzia.'
-      : 'Stai offrendo di <b>vendere</b> sats in cambio di euro. Quando qualcuno risponde ti chiederemo di bloccare i sats.') +
-    '</div>' +
     valuta + importo + metodi + tipo + quanti + premio +
     /* QUEL CHE MANCA E' UN AVVISO, non un consiglio: in mezzo agli
        altri suggerimenti dello stesso grigio non lo leggeva nessuno,
@@ -36563,7 +36658,10 @@ function scegliMetodoP2P(m){
 function cambiaTipoPrezzoP2P(){
   haptic();
   p2pNuovoFisso = !p2pNuovoFisso;
-  if (p2pNuovoFisso) p2pNuovoEuroMax = '';
+  /* tornando a mercato il secondo campo riparte CHIUSO: il massimo se
+     n'e' andato col passaggio a prezzo fisso, e una casella vuota gia'
+     aperta direbbe che li' c'era qualcosa */
+  if (p2pNuovoFisso) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
   else p2pNuovoSats = '';
   renderNuovoOrdineP2P();
 }
@@ -36585,16 +36683,71 @@ function cambiaPremioP2P(v){
    riscrive sotto le dita: chi batte «-15» vede il cursore fermarsi a
    -10, e il numero torna a -10 col «Fatto». Riscriverlo a ogni tasto
    porterebbe via il cursore, che e' la lezione delle pillole. */
+/* LA TENDINA DELLA VALUTA APRE IL FOGLIO DI CASA e non il selettore
+   del telefono (ritocco di Andrea): quello e' di sistema, non si puo'
+   vestire e in una Mini App si vede che viene da fuori. Il foglio e'
+   #pickerSheet, LO STESSO di Categoria e Taglia — stesse voci, stessa
+   chiusura, stesso ritorno del fuoco — e le voci sono bandierina piu'
+   sigla, corte apposta: una valuta si riconosce dalla sigla.
+   ⚠️ IL CATALOGO SE LO PORTA LEI invece di stare in `PICKER`, e non e'
+   una preferenza: quella mappa il boot la percorre TUTTA
+   (`Object.keys(PICKER).forEach(aggiornaPicker)`) diciassettemila
+   righe piu' su di `P2P_VALUTE`, quindi una voce che la legge sarebbe
+   una const toccata dentro la sua temporal dead zone. C'e' una prova
+   di casa che quel guasto lo trova, e l'ha trovato: qui e' scritto
+   perche' la strada breve non si riprende. */
+function apriValutaP2P(){
+  haptic();
+  pickerTrigger = el('p2pNuovoValutaBtn');
+  el('pickerTitolo').textContent = 'Valuta';
+  el('pickerLista').innerHTML = P2P_VALUTE.map(v => {
+    const mia = v.cod === p2pNuovoValuta;
+    return '<button type="button" role="radio" aria-checked="' + (mia ? 'true' : 'false') +
+      '" class="picker-voce' + (mia ? ' sel' : '') + '" data-val="' + esc(v.cod) +
+      '" onclick="scegliValutaP2P(this.dataset.val)">' +
+      '<span class="p-ico">' + v.bandiera + '</span><span><b>' + esc(v.cod) + '</b></span>' +
+      (mia ? '<span class="p-check">✓</span>' : '') + '</button>';
+  }).join('');
+  el('sheetBg').classList.add('open');
+  el('pickerSheet').classList.add('open');
+  const sel = el('pickerLista').querySelector('.sel') || el('pickerLista').firstElementChild;
+  if (sel) sel.focus();
+}
+function scegliValutaP2P(cod){
+  if (!P2P_VALUTE.some(v => v.cod === cod)) return;
+  p2pNuovoValuta = cod;
+  haptic();
+  chiudiPicker();
+  renderNuovoOrdineP2P();
+}
+
+/* IL SECONDO CAMPO SI SVELA, non si ridisegna: chiamata dal `focus`
+   del primo, e una volta sola. Il tocco che la fa scattare e' lo
+   stesso che apre la tastiera, quindi un render qui porterebbe via il
+   fuoco al campo che si sta per riempire. */
+function svelaSecondoImportoP2P(){
+  if (p2pNuovoDue || p2pNuovoFisso) return;
+  p2pNuovoDue = true;
+  ['p2pNuovoA', 'p2pNuovoEuroMax', 'p2pNuovoNotaDue'].forEach(k => {
+    const n = el(k);
+    if (n) n.style.display = '';
+  });
+}
+/* «Modifica» senza la matita (ritocco di Andrea): l'emoji accanto a
+   una parola che dice gia' tutto e' rumore, e su un fondo chiaro
+   quella matita era la cosa piu' scura della sezione. */
+function premioModP2P(){
+  return '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">' +
+    (p2pNuovoPremioMano ? 'Fatto' : 'Modifica') + '</button>';
+}
 function premioValP2P(){
   if (p2pNuovoPremioMano)
     return '<input id="p2pNuovoPremioMano" type="number" inputmode="numeric" step="1" ' +
       'min="-' + P2P_PREMIO_MAX + '" max="' + P2P_PREMIO_MAX + '" value="' + p2pNuovoPremio +
-      '" style="width:64px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
-      'aria-label="Premio in percento">' +
-      '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">Fatto</button>';
+      '" style="width:56px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
+      'aria-label="Premio in percento">';
   return '<span class="p2p-premio-cifra" id="p2pNuovoPremioVal">' +
-    esc(premioTestoP2P(p2pNuovoPremio)) + '</span>' +
-    '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">✏️ Modifica</button>';
+    esc(premioTestoP2P(p2pNuovoPremio)) + '</span>';
 }
 function scriviPremioP2P(){
   haptic();

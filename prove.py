@@ -39591,6 +39591,15 @@ def prove_p2p_chat():
     prova("...e uno scambio finito nemmeno", True, o["finitoNonParte"])
 
 
+def P2P_PREMIO_MAX_da(mini):
+    """La fascia del cursore del premio, letta dal client invece che
+    ricopiata: se un giorno diventa 20 i tratti non sono piu' venti, e
+    la prova dei tratti lo deve dire da se'."""
+    import re as _re
+    m = _re.search(r"const P2P_PREMIO_MAX = (\d+);", mini)
+    return int(m.group(1)) if m else 0
+
+
 def prove_p2p_pubblica():
     """PUBBLICARE UN ORDINE (set 2026, tappa 5).
 
@@ -39868,6 +39877,126 @@ def prove_p2p_pubblica():
     prova("ognuna delle sei voci ha il suo form di recapito",
           ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti"],
           out["forme"])
+    # FINCHE' LA VALUTA E' UNA SOLA il codice puo' restare cablato in
+    # `ordineDaCampiP2P` (`fiat_code: 'EUR'`). Il giorno che il
+    # catalogo cresce questa riga diventa rossa e dice dove andare:
+    # una tendina che offre USDT e un payload che scrive EUR sarebbe
+    # una bugia sul filo, non un dettaglio.
+    _cat = mini[mini.index("const P2P_VALUTE = ["):]
+    _cat = _cat[:_cat.index("];")]
+    prova("il catalogo delle valute ne ha una, come il payload",
+          (1, True), (_cat.count("cod:"), "fiat_code: 'EUR'," in puro))
+
+    # --- 10) I SEI RITOCCHI (set 2026, guardati dal vivo da Andrea) --
+    stile = mini[mini.index("<style>"):mini.index("</style>")]
+
+    # 1) LA RIGA D'APERTURA E' USCITA: diceva col paragrafo quel che il
+    # titolo dice con tre parole, e mangiava la prima sezione.
+    prova("il foglio non si apre piu' con un paragrafo", False,
+          "Stai chiedendo di" in mini or "Stai offrendo di" in mini)
+
+    # 2) LA VALUTA APRE IL FOGLIO DI CASA e non il selettore del
+    # sistema. ⚠️ E il catalogo NON sta in `PICKER`: quella mappa il
+    # boot la percorre tutta, e `P2P_VALUTE` nasce diciassettemila
+    # righe piu' sotto — sarebbe la temporal dead zone che la prova dei
+    # blocchi sorveglia. Questa riga tiene il ricordo del perche'.
+    prova("la valuta apre il foglio-picker di casa", True,
+          'onclick="apriValutaP2P()"' in nuovo
+          and "el('pickerSheet').classList.add('open');"
+          in pezzo_js(mini, "function apriValutaP2P(){", "\n}\n"))
+    prova("...e non c'e' piu' nessun <select> nel foglio", False,
+          "<select id=\"p2pNuovoValuta\"" in mini)
+    prova("...e il catalogo resta FUORI dalla mappa percorsa al boot",
+          False, "p2pNuovoValuta: {titolo:" in mini)
+    prova("...con la bandierina accanto alla sigla", True,
+          "bandiera: '🇪🇺'" in mini
+          and "'<span class=\"p-ico\">' + v.bandiera +"
+          in pezzo_js(mini, "function apriValutaP2P(){", "\n}\n"))
+
+    # 3) UN CAMPO SOLO ALL'APERTURA: il secondo si SVELA al tocco del
+    # primo, e senza un render — ridisegnare mentre il dito e' sul
+    # campo porterebbe via il fuoco e chiuderebbe la tastiera.
+    _sv = pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n")
+    # I NASCOSTI SONO TRE — la «a» in mezzo, il campo, la nota — e si
+    # nominano UNO PER UNO: la prima stesura cercava il ternario e
+    # basta, quindi scoprirne uno solo la lasciava verde. L'ha detto
+    # la tortura.
+    for _q in ("'<em id=\"p2pNuovoA\"' + (p2pNuovoDue ? '' : ' style=\"display:none\"')",
+               "(p2pNuovoDue ? '' : 'style=\"display:none\" ') +",
+               "'<div class=\"hint\" id=\"p2pNuovoNotaDue\"' + "
+               "(p2pNuovoDue ? '' : ' style=\"display:none\"')"):
+        prova("il secondo campo nasce nascosto (%s…)" % _q[:26], True,
+              _q in nuovo)
+    prova("...e si svela al tocco del primo", True,
+          'onfocus="svelaSecondoImportoP2P()"' in nuovo)
+    prova("...svelando, non ridisegnando", True,
+          "n.style.display = '';" in _sv and "renderNuovoOrdineP2P" not in _sv)
+    prova("...una volta sola, e mai a prezzo fisso", True,
+          "if (p2pNuovoDue || p2pNuovoFisso) return;" in _sv)
+    prova("la nota dice quando serve il secondo campo, alla lettera",
+          True, "Tocca il secondo campo solo se vuoi creare un ordine "
+          "a intervallo" in nuovo)
+    # e tornando a mercato riparte chiuso: una casella gia' aperta e
+    # vuota direbbe che li' c'era qualcosa
+    prova("...e tornando a mercato il secondo campo riparte chiuso",
+          True, "p2pNuovoEuroMax = ''; p2pNuovoDue = false;"
+          in pezzo_js(mini, "function cambiaTipoPrezzoP2P(){", "\n}\n"))
+
+    # 4) IL PREMIO: niente icona tonda (la barra vuole la larghezza),
+    # niente matita accanto a «Modifica», e la pillola IN RIGA con la
+    # barra invece che in colonna col suo bottone.
+    prova("la sezione del premio non ha icona tonda", True,
+          "ico: '', titolo: 'Premio (%)'," in nuovo)
+    prova("...e l'icona e' facoltativa per costruzione", True,
+          "(o.ico ? '<span class=\"p2p-sez-ico\"" in
+          pezzo_js(mini, "function sezioneNuovoP2P(o){", "\n}\n"))
+    # LA MATITA VIVE ANCHE ALTROVE, e li' ci sta bene («✏️ Modifica
+    # questo annuncio»): la domanda e' su QUESTO foglio, quindi si
+    # guardano i due pezzi che scrivono il premio — non tutta la
+    # pagina, che rispondeva del vicino.
+    _mod = (pezzo_js(mini, "function premioModP2P(){", "\n}\n")
+            + pezzo_js(mini, "function premioValP2P(){", "\n}\n"))
+    prova("«Modifica» non porta piu' la matita", False,
+          "✏️" in _mod or "\\u270f" in _mod.lower())
+    prova("la pillola sta nella riga della barra, sola", True,
+          "p2p-premio-mod" not in pezzo_js(mini, "function premioValP2P(){", "\n}\n"))
+    prova("...e «Modifica» scende nel piede, sotto la pillola", True,
+          "'<div class=\"p2p-premio-pie\">' + premioModP2P()" in nuovo
+          and ".p2p-premio-pie{display:flex;align-items:center" in stile)
+    prova("...con la riga allineata a meta' altezza", True,
+          ".p2p-premio{display:flex;align-items:center;gap:12px}" in stile)
+
+    # 5) LA BARRA DICE CHE VA A SCATTI: una LINEA tratteggiata bianca
+    # dentro il binario, venti tratti (5% = un punto su venti). E' una
+    # linea e non venti blocchi — col tratteggio alto quanto la barra
+    # il binario sembrava spezzato in segmenti.
+    # ⚠️ OGNI BINARIO NEL SUO BLOCCO: la prima stesura nominava i due
+    # pseudo-elementi ma cercava in TUTTO il foglio di stile, quindi
+    # togliere i tratti da webkit lasciava rispondere moz — e la
+    # mutazione passava. L'ha detto la tortura.
+    def _binario(pseudo):
+        k = ".p2p-premio input[type=range]::" + pseudo + "{"
+        i = stile.index(k)
+        return stile[i:stile.index("}", i)]
+    for _p in ("-webkit-slider-runnable-track", "-moz-range-track"):
+        _b = _binario(_p)
+        prova("il binario (%s) porta i tratti" % _p, True,
+              "rgba(255,255,255,.92) 0 2px, transparent 2px 5%)" in _b)
+        prova("...e sono una LINEA, non blocchi alti quanto la barra",
+              True, "background-size:100% 2px;background-position:0 center"
+              in _b and "background-repeat:no-repeat" in _b)
+    prova("...e i tratti sono venti, uno per punto percentuale",
+          (10, 20), (P2P_PREMIO_MAX_da(mini), 100 // 5))
+
+    # 6) LE DUE USCITE SONO GEMELLE: due colonne `1fr`, che col
+    # `box-sizing:border-box` di casa una `flex-basis:0` parte dai
+    # BORDI — e `.ghost` ne ha due da 2px mentre `.orange` non ne ha
+    # (misurati dal vivo: 169 contro 165).
+    prova("il piede e' una griglia di due colonne uguali", True,
+          ".foglio-piede{display:grid;grid-template-columns:1fr 1fr" in stile)
+    prova("...e nessuno dei due porta margini suoi", True,
+          ".foglio-piede .btn{margin:0;min-width:0}" in stile
+          and ".foglio-piede .btn.ghost{margin:0}" in stile)
 
 
 def prove_p2p_canale():
