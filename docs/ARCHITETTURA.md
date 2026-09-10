@@ -23879,6 +23879,106 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sk del mazzo che entra si RIPRENDE (`riprendiParcheggioP2P`): indice
   più alto, scambi uniti, parcheggio svuotato.
 
+- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026): la PAGINA che si
+  apre toccando una card, in tutt'e due i tab. Prima era un foglietto
+  di conferma alto tre righe — titolo, cifra, una frase, due bottoni —
+  e quel che si stava per prendere non si vedeva mai per intero.
+  DOV'È: `p2pDettSheet` nel markup fisso, `renderDettaglioP2P` per il
+  corpo, e la porta del gesto resta `prendiOrdineP2P` — che adesso
+  fa le sue guardie (DEMO, vetrina, scambio già preso, ordine mio,
+  riga sparita dal libro) e poi apre la pagina invece di chiedere.
+  È UN `.sheet.pieno` E NON UNA VISTA, ed è la scelta da non disfare
+  senza un motivo nuovo: così il gesto indietro, la cronologia e il
+  velo sono quelli di sempre (`navPila` conta i fogli aperti, e
+  l'osservatore delle classi riflette da solo), e il foglio «Quanto»
+  degli ordini a intervallo si apre SOPRA di lei senza inventare
+  niente — nel DOM sta dopo, ed è l'ordine che decide chi copre chi.
+  LA CONFERMA NON SPARISCE, CAMBIA CASA: i due bottoni gemelli in
+  fondo — «Annulla» e «Compra»/«Vendi», il piede di «Pubblica» — SONO
+  la conferma, e la frase che spiegava l'escrow sta sopra di loro
+  invece che dentro un secondo foglio. Un gesto al posto di due, e
+  `chiediConferma` perde un chiamante (54 → 53, con la sua sentinella).
+  QUEL CHE NON C'È, per decisione di Andrea: «Creato il» e «ID
+  ordine». La data di nascita la dice già l'anello, che dice la cosa
+  utile — quanto RESTA — invece di quella da sottrarre a mente; l'id
+  è un numero che di qua non serve a nessuno e di là apre la porta a
+  chi volesse dettarlo al telefono a una persona.
+  L'ANELLO GRANDE è sessanta `<line>` disegnate una a una e NON un
+  `stroke-dasharray` con una maschera: la maschera vuole un `id`, e
+  un id nell'SVG è la trappola già pagata con la stella (in un elenco
+  di N card il primo id vince per tutte). Il colore lo decide
+  `statoAnelloP2P`, che dal set 2026 è il GIUDICE UNICO dei due
+  anelli — le due soglie (arancio a tre giorni, rosso nell'ultimo)
+  stavano dentro `anelloScadenzaP2P` e adesso le chiedono tutt'e due.
+  ⚠️ L'ULTIMA TACCA NON SI SPEGNE FINCHÉ C'È TEMPO: con
+  l'arrotondamento secco, sotto lo 0,83% l'anello sarebbe già vuoto
+  con l'ordine ancora vivo, e un anello vuoto dice «scaduto».
+  IL CONTO ALLA ROVESCIA BATTE NELL'UNICO INTERVAL DELL'APP, quello
+  della lampo, e si riscrive IN PLACE: un render al secondo
+  porterebbe via il fuoco alle pillole del metodo mentre uno le sta
+  toccando, e un secondo orologio sarebbe un secondo orologio da
+  spegnere. Le tacche si toccano solo quando CAMBIANO: su un ordine
+  di sette giorni una tacca dura due ore.
+  IL RIQUADRO DELLA REPUTAZIONE sono tre colonne — media, recensioni,
+  giorni su Barattolo — ed è la reputazione DEL MERCATINO, la regola
+  già a verbale («chi è onesto con gli oggetti è onesto anche sul
+  P2P», vedi «UNA REPUTAZIONE SOLA»). Chi ha pubblicato da un altro
+  client non ha volto e il riquadro non compare: meglio niente che
+  tre trattini che sembrano un giudizio. I glifi sono quelli di casa
+  — la stella che si riempie e l'omino, più un calendario disegnato
+  con lo stesso tratto — e non tre emoji di tre mani diverse.
+  ⚠️ I GIORNI POSSONO MANCARE, e allora è «—»: `/api/p2p/facce` manda
+  la chiave `giorni` SOLO se `registrato` non è zero, e a zero sono
+  gli account nati prima che il server timbrasse l'iscrizione — cioè
+  i PIÙ VECCHI, per i quali «0 giorni» direbbe il contrario esatto
+  del vero. Esce un numero di giorni e mai una data: a grana di
+  giorno non si incrocia niente, un timestamp al secondo è
+  un'impronta.
+
+- IL METODO DI PAGAMENTO LO SCEGLIE CHI PRENDE (set 2026): se chi ha
+  pubblicato ne ha messi più d'uno, il dettaglio mostra le pillole e
+  il bottone resta SPENTO finché non se ne tocca una (con la riga che
+  dice perché, il patto del foglio «Pubblica»); con un metodo solo la
+  scelta è già fatta e la pillola non esiste — un bottone che non fa
+  niente insegna che qui i bottoni a volte non rispondono.
+  ⚠️ COME VIAGGIA, E QUI C'È UN FATTO LETTO SUI BYTE: **Mostro al take
+  non trasmette il metodo scelto.** Su `take-sell` e `take-buy`
+  mostrod legge dal messaggio due sole cose — `Payload::Amount`
+  (`get_fiat_amount_requested`, `src/util.rs`) e, sul solo take-sell,
+  una bolt11 — e il metodo lo ripesca dalla RIGA DELL'ORDINE
+  (`order.payment_method`, `src/app/take_sell.rs` e `take_buy.rs`),
+  cioè l'elenco intero che ha scritto chi ha pubblicato. In
+  mostro-core `Payload` non ha nessuna variante che porti un metodo e
+  `MessageKind` non ha nessun `get_payment_method` (censite tutte le
+  `get_*` di `src/message.rs`). Letto su mostro v0.18.6 e mostro-core
+  v0.14.6, che sono le versioni che il nostro client ricalca.
+  QUINDI VIAGGIA SUL NOSTRO FILO, quello dei recapiti cifrati fra le
+  due chiavi di scambio: chi prende se lo scrive su `metodoScelto`
+  nel momento della presa, e `pianificaMetodoP2P` lo manda come tipo
+  `metodo` appena si sa CON CHI — prima non c'è nessuno a cui
+  mandarlo. Parte PRIMA del recapito, perché chi vende può avere
+  l'invio automatico armato e senza la scelta in mano sceglierebbe
+  lui la forma.
+  IL VOCABOLARIO DEI CAMPI PASSA DA DUE A TRE, e non contraddice la
+  regola di «L'IDENTITÀ DI PAGAMENTO»: quella vieta un tipo PER
+  METODO (`euro:sepa`, `euro:revolut`), perché «vince il più recente
+  per tipo» è il meccanismo di correzione e con un tipo per metodo
+  chi passa da SEPA a Revolut lascerebbe due recapiti vivi. `metodo`
+  è UNO per scambio, lo scrive un lato solo, e vince il più recente
+  come gli altri due.
+  UN CLIENT DI IERI LO LASCIA CADERE IN SILENZIO — il suo vocabolario
+  è chiuso a due — e qui è una degradazione, non una rottura: chi
+  vende non vede la scelta e sceglie lui, com'era ieri. Fuori di casa
+  non lo capisce nessuno per costruzione: è la nostra busta cifrata,
+  non un campo del coordinatore.
+  CHI LO LEGGE è `metodoSceltoP2P(o)`, e vale da tutt'e due i lati —
+  la riga locale per chi ha preso, `campiLoro` per chi ha pubblicato.
+  ⚠️ FAIL-CLOSED: un metodo che non è fra quelli dell'ordine vale
+  «non ha scelto», perché `campiLoro` è testo scritto dall'altra
+  persona. Col metodo deciso il foglio dei recapiti non offre più le
+  pillole (non c'è niente da scegliere) e l'invio automatico guarda
+  la sola forma decisa: mandare l'IBAN a chi ha scelto Satispay vuol
+  dire far ricominciare l'accordo a voce.
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a

@@ -8876,3 +8876,116 @@ MISURATO DAL VIVO su un libro finto a 375px: stella 17x17, omino
 15px in tutto (5 del blocco più 10 del margine della pillola), e i
 riempimenti a 50%, 96%, 100%.
 COLLAUDATI: **9019 prove verdi, 0 rosse** (+3).
+
+IL DETTAGLIO DI UN ORDINE DEL LIBRO DIVENTA UNA PAGINA (10 set 2026,
+ridisegno chiesto da Andrea: «struttura come Dettagli ordine di
+Mostro, stile Barattolo»). Toccare una card apriva un foglietto di
+conferma alto tre righe — titolo, cifra, una frase, due bottoni — e
+quel che si stava per prendere non si vedeva mai per intero: il
+metodo di pagamento, chi c'era dall'altra parte e quanto tempo
+restava erano rimasti sulla card, sotto il foglietto. Adesso è una
+pagina a pieno schermo, e i suoi due bottoni gemelli in fondo SONO
+la conferma: un gesto al posto di due, e la spiegazione dell'escrow
+sta sopra di loro invece che dentro un secondo foglio.
+LE SETTE COSE CHIESTE, e come sono state fatte: titolo che dice il
+lato («Dettaglio ordine di acquisto» / «di vendita»); apertura in
+seconda persona («Stai comprando sats») con la riga del prezzo («per
+6,00 € 🇪🇺 al prezzo di mercato (+4%)», e «per 20,00–100,00 €» su un
+intervallo); il riquadro del metodo, che con più d'uno si SCEGLIE;
+niente «Creato il» e niente «ID ordine»; il riquadro della
+reputazione in tre colonne; l'anello grande segmentato col «Tempo
+rimasto» sotto; i due gemelli col piede di «Pubblica».
+TRE COSE SONO STATE AGGIUNTE ALLA LETTERA DELLA RICHIESTA, e vanno
+dette. 1) LA QUANTITÀ IN SATS resta a vista sotto il prezzo: la card
+la porta, e una pagina che chiede di confermare uno scambio senza
+dire quanti sats passano di mano direbbe MENO della card che si è
+appena toccata. 2) IL BOTTONE DICE «VENDI» dal tab «Vendi BTC»: il
+titolo e la riga di apertura cambiano già col lato, e un «Compra»
+sotto «Stai vendendo sats» sarebbe l'unica parola in disaccordo con
+le altre due. 3) I GLIFI DELLE TRE COLONNE sono quelli di casa — la
+stella che si riempie, l'omino, e un calendario disegnato collo
+stesso tratto — e non tre emoji: la stella e l'omino sono già
+decisioni di Andrea di questo mese (l'omino ha SOSTITUITO il fumetto
+💬 apposta), e rimetterci accanto un 📅 colorato da un'altra mano
+sarebbe il terzo alfabeto nella stessa riga.
+⚠️ E UNA COSA CHIESTA NON SI POTEVA FARE COM'ERA SCRITTA: «la scelta
+viaggia con la presa». **Mostro al take il metodo scelto non lo
+trasmette**, e non è una deduzione — è letto sui byte di v0.18.6 e
+di mostro-core v0.14.6: su `take-sell` e `take-buy` mostrod legge
+`Payload::Amount` e (sul solo take-sell) una bolt11, e il metodo lo
+ripesca da `order.payment_method`, cioè l'ELENCO INTERO scritto da
+chi ha pubblicato; in mostro-core nessuna variante di `Payload`
+porta un metodo e non esiste nessun `get_payment_method` (censite
+tutte le `get_*` di `src/message.rs`). Senza un posto dove metterlo,
+le pillole sarebbero state un gesto che non produce niente — che è
+esattamente il difetto che il cantiere «solo cifre» aveva chiuso.
+LA STRADA PRESA: la scelta si scrive sulla riga locale al momento
+della presa e viaggia sul NOSTRO filo, quello dei recapiti cifrati
+fra le due chiavi di scambio, come terzo tipo `metodo`. Parte appena
+si sa CON CHI — prima non c'è nessuno a cui mandarla — e PRIMA del
+recapito, perché chi vende può avere l'invio automatico armato e
+senza la scelta in mano sceglierebbe lui la forma da spedire.
+IL VOCABOLARIO DEI CAMPI PASSA DA DUE A TRE, e la regola che lo
+vietava non è stata rovesciata: quella vieta un tipo PER METODO
+(`euro:sepa`, `euro:revolut`), perché «vince il più recente per
+tipo» è il meccanismo di correzione e due recapiti vivi non si
+sanno scegliere. `metodo` è UNO per scambio e lo scrive un lato
+solo. Un client di ieri lo lascia cadere in silenzio, e lì degrada
+a com'era: chi vende sceglie lui.
+L'ANELLO GRANDE È SESSANTA TACCHE DISEGNATE UNA A UNA, e la
+scorciatoia era a un passo: un `stroke-dasharray` con una maschera.
+La maschera vuole un `id`, e un id nell'SVG è la trappola già pagata
+con la stella (in un elenco di N card il primo id vince per tutte).
+Di anello grande ce n'è uno solo alla volta, ma la regola resta la
+stessa e costa sessanta `<line>`.
+E IL COLORE HA UN GIUDICE SOLO da questo cantiere: le due soglie
+(arancio a tre giorni, rosso nell'ultimo) stavano dentro
+`anelloScadenzaP2P`, e ricopiarle nell'anello grande avrebbe fatto
+due copie che possono divergere — cioè due colori sullo stesso
+ordine, e a scoprirlo sarebbe chi guarda. Adesso tutt'e due chiedono
+a `statoAnelloP2P`.
+IL CONTO ALLA ROVESCIA BATTE NELL'UNICO INTERVAL DELL'APP, quello
+della lampo, che è una regola già scritta lì («UN solo interval per
+tutta l'app»): un secondo orologio si sfaserebbe col primo e sarebbe
+un secondo orologio da spegnere. Si riscrive IN PLACE — un render al
+secondo porterebbe via il fuoco alle pillole mentre uno le sta
+toccando (la lezione delle pillole del foglio «Pubblica») — e le
+tacche si toccano solo quando CAMBIANO: su sette giorni una tacca
+dura due ore, cioè 7199 battiti su 7200 non hanno niente da fare.
+I GIORNI SU BARATTOLO SONO UN CAMPO NUOVO del volto pubblico
+(`/api/p2p/facce`), ed esce un NUMERO DI GIORNI e mai una data: a
+grana di giorno non si incrocia niente, un timestamp al secondo è
+un'impronta. ⚠️ E LA CHIAVE MANCA QUANDO NON SI SA: gli account con
+`registrato` a zero sono nati prima che il server timbrasse
+l'iscrizione — cioè sono i PIÙ VECCHI — e un «0 giorni» direbbe
+«iscritto oggi», il contrario esatto del vero. Chiave assente, e il
+client ci mette il suo trattino.
+LA DEVIAZIONE DELL'INTERVALLO HA CAMBIATO CASA, ed era un difetto
+che si vede solo dopo: stava nella porta del gesto, quindi su un
+ordine a intervallo il foglio «Quanto» si apriva PRIMA che l'offerta
+si fosse vista. Adesso sta nel bottone della pagina, e da «Quanto»
+si rientra DRITTI nella presa invece di ripassare dalla porta — che
+riaprirebbe la pagina appena chiusa.
+GUARDATO DAL VIVO a 375px, sui due lati e sui due temi: titolo e
+verbo che cambiano col lato, le tre pillole con nessuna accesa e il
+bottone spento con la sua riga rossa, la pillola che si accende e il
+bottone con lei, l'anello a 52 tacche su 60 di un ordine di otto
+giorni con uno consumato, quello ROSSO a 8 tacche nell'ultimo
+giorno, il conto che scorre davvero (23:47:15 → 23:46:20 fra due
+fotografie), il riquadro della reputazione che sparisce senza volto,
+e il bottone che su un intervallo apre «Quanto» senza prendere
+niente. Sul tema chiaro le tacche spente diventano `--line` e le
+accese `--ink-soft`: il token gira col tema, ed è la ragione per cui
+il neutro non è mai stato «bianco».
+COLLAUDATI: **9087 prove verdi, 0 rosse**, di cui **67 nuove** in
+`prove_p2p_dettaglio` — sentinelle sulla forma più un banco node che
+fa GIRARE la pagina intera su un DOM di cartone (il titolo coi due
+lati, la riga del prezzo nei cinque casi, le pillole, il riquadro
+coi suoi trattini, le tacche ai capi, il bottone spento che non
+prende niente e la presa che parte con l'id, la cifra e il metodo).
+⚠️ E IL BANCO DEL MOTORE HA DOVUTO PRESTARSI LA PAGINA, con la sua
+lezione: lo stub scritto fra gli altri del prologo NON funzionava —
+la pagina nasce DENTRO la fetta di sorgente che quel banco carica, e
+una dichiarazione di funzione scritta prima se la vede riscrivere
+sopra dalla vera, che poi cerca un DOM che lì non c'è. Va DOPO il
+sorgente, e allora vince lei.
