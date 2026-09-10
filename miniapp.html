@@ -36066,6 +36066,10 @@ async function inviaNuovoOrdineP2P(){
     const agg = ordiniP2P()[p2pOrdineAperto] || ord;
     agg.contattato = true;
     scriviOrdineP2P(agg);
+    /* Il canale e' un bonus e non un secondo giudice: l'ordine e' gia'
+       partito davvero, quindi non si aspetta la risposta ne' si tocca
+       lo schermo se va storta (stessa regola di Barattolo in vetrina). */
+    annunciaCanaleP2P(lato, euro, metodo);
   } catch(e) {
     /* la chiave VIVA e p2pOrdineAperto e non ord.id: fra l apertura e
        l errore il coordinatore puo aver gia dato il nome definitivo */
@@ -36881,6 +36885,26 @@ function apriNegozioP2P(ev, chi){
   apriNegozio(chi);
 }
 /* ============ fine dei volti sul libro ============ */
+
+/* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
+   come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI
+   E NON NEL MOTORE, apposta: quel blocco e' sorvegliato a zero fetch
+   e zero corpo — «il segreto non esce, il denaro non passa di qui» —
+   e questa e' una chiamata vera al nostro server, anche se innocua.
+   NIENTE CHIAVE nel corpo, mai: il server la' dentro non deve mai
+   poter scrivere un post che lega la trade key all'account — gli
+   bastano lato/euro/metodo, gia' pubblici sull'ordine stesso.
+   Fail-open muta come le sorelle del mazzo: chi chiama (dal motore,
+   dopo che l'ordine e' gia' partito davvero) non aspetta e non
+   controlla l'esito. */
+async function annunciaCanaleP2P(lato, euro, metodo){
+  if (DEMO || VETRINA || !myTgId) return;
+  try {
+    await fetch(`${API_BASE}/p2p/canale`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({lato: lato, euro: euro, metodo: metodo})});
+  } catch(e){}
+}
 
 /* ---- import in blocco da CSV: per i cataloghi grandi. Due fasi
    come sul server: prepara (anteprima onesta) e avvia (job in

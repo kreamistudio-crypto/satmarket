@@ -7589,3 +7589,65 @@ card VERE a schermo non si sono viste: a rispondere per loro è la
 prova ESEGUIBILE, che fa girare `ordineDaEvento` + `rigaOrdineP2P` sui
 due eventi sotto node — che è la stessa strada di sempre per questa
 famiglia, e va detto invece di lasciarlo intendere.
+
+L'ordine P2P in vetrina (set 2026, chiesto da Andrea: «ogni nuovo
+annuncio della sezione p2p deve essere pubblicato nella vetrina
+similmente a come succede con barattolo»). La richiesta ambigua si e'
+chiarita per iscritto: non la griglia della home, non il libro P2P —
+il CANALE TELEGRAM «Barattolo Vetrina», lo stesso dove escono gli
+annunci normali (vedi «Il canale diventa la vetrina», sopra).
+UNA ROTTA NUOVA E FERMA LI', `POST /api/p2p/canale`: il client la
+chiama subito dopo che `mostroChiama` e' tornato con successo (dentro
+`inviaNuovoOrdineP2P`, riga `agg.contattato = true`), il server
+costruisce la caption con `_caption_canale_p2p` — gemella di
+`_caption_canale` — e la manda con la STESSA fabbrica di sempre,
+`_manda_post_canale(canale_id(), ...)`. Stesso gate delle sorelle
+P2P (`_p2p_per(user["id"])["attivo"]`, 409 altrimenti), stesso
+fail-open della vetrina normale: canale spento o post fallito non
+rompono mai il gesto di chi ha appena pubblicato un ordine vero.
+NIENTE FIRMA, ed è la riga da non ammorbidire: `_caption_canale_p2p`
+non chiama mai `_firma_venditore` né `_npub_venditore` — l'identità
+di scambio non si lega MAI all'account Telegram in un posto pubblico,
+la stessa regola che tiene `_conta_chiavi_p2p` senza una pubkey nella
+risposta. Il corpo che il client manda è `{lato, euro, metodo}` e
+basta: mai una chiave, mai la trade key.
+IL POSTO DOVE VIVE IL CLIENT NON È UN DETTAGLIO: `annunciaCanaleP2P`
+sta DOPO il marcatore «fine del motore dello scambio», mai dentro —
+quel blocco è sorvegliato da `prove_p2p_motore` a ZERO fetch e ZERO
+`body:` («il segreto non esce, il denaro non passa di qui»), e
+infilarci una vera chiamata di rete lì dentro l'avrebbe fatta rossa a
+ragione. `inviaNuovoOrdineP2P` (che vive dentro il motore) si limita
+a CHIAMARE `annunciaCanaleP2P(...)` per nome — un identificatore, non
+un `fetch(` — lo stesso schema che la funzione usa già per
+`renderOrdineP2P()`. La prima stesura la metteva vicino alle sorelle
+del mazzo (`registraChiaviP2P` e c.) e la tortura testuale di TRE
+sentinelle diverse l'ha bocciata subito: quel blocco conta le fetch
+col corpo e le vuole ESATTAMENTE quattro (registra, dimentica, il
+conto, il seme) — la quinta andava nominata altrove, non lì.
+NESSUN THROTTLE, a differenza del drenatore degli annunci normali
+(anti-spam, un post al giorno per venditore, aggregati sulle
+raffiche): quella macchina legge righe di `annunci`/`utenti` che un
+ordine P2P non ha, e il volume atteso oggi è zero — la leva
+`P2P_ATTIVO` è ancora chiusa a una lista di prova. Se il volume
+crescesse, il freno da aggiungere è quello di casa
+(`ritmo_vetrina()`), non uno nuovo. Il tetto sull'importo
+(`MAX_EURO_P2P_CANALE = 100_000`) ricalca `max_order_amount` di
+mostrod letto dal 38385 (vedi sopra, «I PARAMETRI DEL 38385»): un
+ordine più grande di così il coordinatore non lo accetterebbe
+comunque.
+Collaudato: **+19 prove** (`prove_p2p_canale`, nuova) — la caption
+FATTA GIRARE per davvero (non solo grep) su entrambi i lati, la
+regola del lessico (rule 9: «deposito di garanzia», mai «escrow» né
+«assicurato»), l'escape HTML del metodo, il gate e le validazioni
+della rotta lette sul sorgente, e le due posizioni sorvegliate lato
+client (fuori dal motore; chiamata solo DOPO `agg.contattato = true`).
+Il ramo resta a 8427/1 prima di queste prove nuove come dopo — l'unica
+riga rossa è preesistente e indipendente da questo cantiere (un file
+di scratch di una sessione precedente, non tracciato, fuori
+dall'elenco del compileall).
+IN PRODUZIONE basta il deploy: nessuna migrazione (la rotta non
+scrive niente su nessuna tabella), nessuna leva nuova — il gate è
+quello già acceso o spento del P2P. DA GUARDARE al primo ordine vero
+con `P2P_ATTIVO` aperto: che il canale riceva davvero il post (serve
+`canale_id()` configurato) e che la caption si legga bene accanto
+agli annunci normali.

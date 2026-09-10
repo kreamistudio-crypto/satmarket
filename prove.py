@@ -19003,7 +19003,8 @@ def prove_canale_bot():
            # il riepilogo non c'e' piu': ha il suo canale (ci ricade
            # dentro da solo, ma passando dal SUO giudice)
            "_posta_negozio",          # la raffica di un negozio solo
-           "comando_canale"},         # che il canale lo DICE, non ci posta
+           "comando_canale",          # che il canale lo DICE, non ci posta
+           "annuncia_ordine_p2p_canale"},  # l'ordine P2P appena pubblicato
           # `_manda_post_canale` non c'e': il canale non lo sceglie,
           # lo RICEVE — ed e' precisamente quel che la prova qui
           # sopra le chiede
@@ -39625,6 +39626,86 @@ def prove_p2p_pubblica():
               False, parola.lower() in nuovo.lower())
 
 
+def prove_p2p_canale():
+    """L'ORDINE P2P IN VETRINA (set 2026, chiesto da Andrea): un ordine
+    appena pubblicato si racconta nello stesso canale «Barattolo
+    Vetrina» dove escono gli annunci normali — la stessa fabbrica
+    (`_manda_post_canale`), lo stesso giudice (`canale_id()`).
+
+    NIENTE FIRMA, ed e' la cosa da sorvegliare piu' delle altre:
+    l'identita' di scambio non si lega MAI all'account Telegram in un
+    posto pubblico — la stessa regola che tiene `_conta_chiavi_p2p`
+    senza una pubkey nella risposta. Il banco fa GIRARE la caption
+    vera invece di fidarsi che la parola «firma» non ci sia."""
+    print("\n[l'ordine P2P in vetrina]")
+    import html as _html
+
+    # --- 1) LA CAPTION E' PURA, E NON FIRMA NESSUNO ------------------
+    amb = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    exec(pezzo("_fmt_eur"), amb)
+    exec(pezzo("_caption_canale_p2p"), amb)
+    cap = amb["_caption_canale_p2p"]
+    compra = cap("compro", 25, "Satispay")
+    vende = cap("vendo", 100, "Revolut")
+    prova("chi compra si legge «Compra»", True, "Compra BTC" in compra)
+    prova("chi vende si legge «Vende»", True, "Vende BTC" in vende)
+    prova("l'euro e' quello passato", True,
+          "25,00 €" in compra and "100,00 €" in vende)
+    prova("il metodo e' quello scritto", True,
+          "Satispay" in compra and "Revolut" in vende)
+    prova("niente firma, mai: e' la regola del profilo di scambio", True,
+          all(p not in compra + vende
+              for p in ("Annuncio da", "@", "njump.me")))
+    prova("il metodo passa da html.escape", True,
+          "<script>" not in cap("compro", 1, "<script>x</script>"))
+    prova("dice «deposito di garanzia», mai «escrow» ne' «assicurato»",
+          True, "deposito di garanzia" in compra
+          and "escrow" not in compra.lower()
+          and "assicurat" not in compra.lower())
+    prova("porta il link all'app, non un URL nudo", True,
+          'href="https://barattolo.store"' in compra)
+
+    # --- 2) LA ROTTA: STESSO GATE DELLE SORELLE P2P ------------------
+    rotta = pezzo("annuncia_ordine_p2p_canale")
+    prova("il gate e' quello delle sorelle P2P", True,
+          '_p2p_per(user["id"])["attivo"]' in rotta
+          and "raise HTTPException(409, \"Lo scambio P2P non e' attivo\")"
+          in rotta)
+    prova("il lato e' validato in un catalogo chiuso", True,
+          'lato not in ("compro", "vendo")' in rotta)
+    prova("l'importo e' un intero dentro un tetto", True,
+          "0 < euro <= MAX_EURO_P2P_CANALE" in rotta)
+    prova("il metodo non e' vuoto e ha un tetto", True,
+          "not metodo or len(metodo) > MAX_METODO_P2P_CANALE" in rotta)
+    prova("...e il tetto euro e' quello di mostrod (max_order_amount)",
+          True, "MAX_EURO_P2P_CANALE = 100_000" in _SORGENTE)
+
+    # --- 3) FAIL-OPEN: un canale spento o un post fallito non rompono
+    prova("canale spento: nessun post, mai un errore", True,
+          "if canale_id():" in rotta and 'return {"ok": True' in rotta)
+    prova("un post fallito si logga e non esplode", True,
+          "except Exception as e:" in rotta
+          and "Post P2P nel canale saltato" in rotta)
+
+    # --- 4) IL CLIENT: CHI CHIAMA, E CON COSA -------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo){",
+                   "\n}\n")
+    prova("il corpo porta solo lato/euro/metodo, mai una chiave", True,
+          all(k not in ann for k in ("sk", "nsec", "trade"))
+          and "body: JSON.stringify({lato: lato, euro: euro, metodo: metodo})"
+          in ann)
+    prova("sta fuori dal motore dello scambio", True,
+          mini.index("async function annunciaCanaleP2P")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    prova("si chiama da dentro il motore, ma non c'e' scritto niente",
+          True, "fetch(" not in invia)
+    prova("...e SOLO dopo che l'ordine e' partito davvero", True,
+          invia.index("annunciaCanaleP2P(lato, euro, metodo);")
+          > invia.index("agg.contattato = true;"))
+
+
 def prove_p2p_canonico():
     """IL JSON CHE SI FIRMA E' QUELLO DI SERDE (set 2026, dal campo: il
     coordinatore rifiutava ogni new-order con «trade signature does not
@@ -49005,6 +49086,7 @@ def main():
     prove_p2p_stati,
     prove_p2p_chat,
     prove_p2p_pubblica,
+    prove_p2p_canale,
     prove_p2p_canonico,
     prove_p2p_bundle,
     prove_p2p_nuvola,

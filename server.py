@@ -30525,6 +30525,76 @@ def seme_profilo_p2p(x_tg_init_data: str = Header(""),
                         headers={"Cache-Control": "no-store, private"})
 
 
+MAX_EURO_P2P_CANALE = 100_000   # lo stesso tetto di mostrod (max_order_amount)
+MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
+
+
+def _caption_canale_p2p(lato: str, euro: int, metodo: str) -> str:
+    """La caption del post P2P nel canale «Barattolo Vetrina», gemella
+    di `_caption_canale` ma per un ordine invece che per un annuncio
+    (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
+    un annuncio qualunque).
+
+    NIENTE FIRMA, ed e' la riga da non aggiungere per «uniformita'»
+    con `_caption_canale`: la' il venditore si nomina apposta, qui
+    l'identita' di scambio non si lega MAI all'account Telegram in un
+    posto pubblico — la stessa regola che tiene `_conta_chiavi_p2p`
+    senza una pubkey nella risposta."""
+    verbo = "Compra" if lato == "compro" else "Vende"
+    testo = f"🔁 <b>{verbo} BTC su Barattolo</b>"
+    testo += f"\n💶 {_fmt_eur(euro)} €"
+    testo += f"\n💳 {html.escape(metodo)}"
+    testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
+    testo += f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
+    testo += "\n\n#p2p #barattolo"
+    return testo
+
+
+@app.post("/api/p2p/canale")
+async def annuncia_ordine_p2p_canale(req: Request,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """Il client dice al server «ho appena pubblicato un ordine», e il
+    server lo racconta nello stesso canale dove escono gli annunci
+    normali (`canale_id()`, «Barattolo Vetrina»). Fail-open come
+    `_posta_promo_singolo`: un post di vetrina saltato non deve mai
+    rompere il gesto di chi ha appena scambiato.
+
+    NIENTE PROVA CRITTOGRAFICA che l'ordine sia vero: il server non
+    parla mai col coordinatore (e' il patto di privacy del P2P, vedi
+    Architettura), quindi non puo' verificare questa richiesta piu' di
+    quanto verifichi le pubkey di `/api/p2p/chiavi`. Il gate e' lo
+    stesso di quella rotta — leva P2P accesa E persona nella lista."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    d = d or {}
+    lato = str(d.get("lato") or "")
+    if lato not in ("compro", "vendo"):
+        raise HTTPException(400, "Lato sconosciuto")
+    try:
+        euro = int(d.get("euro"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Importo storto")
+    if not (0 < euro <= MAX_EURO_P2P_CANALE):
+        raise HTTPException(400, "Importo fuori misura")
+    metodo = str(d.get("metodo") or "").strip()
+    if not metodo or len(metodo) > MAX_METODO_P2P_CANALE:
+        raise HTTPException(400, "Metodo di pagamento storto")
+    postato = False
+    if canale_id():
+        try:
+            caption = _caption_canale_p2p(lato, euro, metodo)
+            postato = bool(await _manda_post_canale(canale_id(), caption, []))
+        except Exception as e:
+            print(f"⚠️ Post P2P nel canale saltato: {e}")
+    return {"ok": True, "postato": postato}
+
+
 # ---------- IL CAMPANELLO DELLO SCAMBIO P2P (set 2026, tappa 7) ------
 # Uno scambio dura ore: il taker ha 900 secondi per la sua mossa,
 # l'ordine 24. Fra una mossa e l'altra la Mini App e' CHIUSA — e le
