@@ -9993,3 +9993,47 @@ restituiscono esattamente il padding che la scatola aggiunge, quindi
 la larghezza utile dell'etichetta non cambia). Guardato nei due temi.
 COLLAUDATO: **9212 verdi**, con la sentinella che pretende i margini
 negativi e quella che vieta il ritorno del filo pieno.
+
+## Il riquadro coi colori dei sats, e la levetta nel libro
+
+DUE RITOCCHI (11 set 2026, Andrea).
+IL RIQUADRO DELLE DUE RIGHE FINALI si vedeva poco nel tema CHIARO, ed
+era vero: il primo giro usava `--bg` dentro `--card`, che di sera
+sono bruno e bruno chiaro (staccano) e di giorno crema e bianco — due
+colori che a un dito di distanza si somigliano. Il riquadro spariva
+proprio nel tema in cui serviva di più.
+ORA PORTA I COLORI DEI SATS, `--sats-soft` col bordo `--sats`: una
+coppia tarata per i due temi, e soprattutto non un colore nuovo — è
+l'arancio della riga «Ricevi» che ci sta dentro. **La scatola porta
+il colore di quel che contiene.**
+E VALE PER TUTT'E DUE I CONTI: il selettore è `.ctrl-conto` e non
+`.conto-p2p`, e nel mercatino la scatola tiene il solo «Totale da
+pagare». I due conti si vestono uguali da sempre, e una scatola sola
+dei due sarebbe stata la prima differenza.
+⚠️ E IL MARGINE NEGATIVO VALE 11,5 E NON 10, che è il difetto che ho
+introdotto io e che il righello ha preso: col `box-sizing:border-box`
+di casa la scatola si mangia il padding (10+10) E I BORDI (1,5+1,5)
+dalla larghezza che riceve, quindi a −10 per lato restituiva il
+padding e si teneva i tre pixel dei bordi. Misurato: «Totale da
+pagare» del mercatino, che già cedeva a 137 su 134, era passato a
+132. Tre pixel non si vedono, ma lì dentro diventano una parola
+mozzata in più. A −11,5 l'etichetta ne ha 135, cioè uno in più di
+prima della scatola.
+LA LEVETTA DEL TEMA STA NEL LIBRO, accanto alla pillola Filtro: il
+libro è la vista dove si sta più a lungo, e per cambiare tema si
+doveva uscire fino al Profilo. È la STESSA di casa — `.tema-btn` +
+`alternaTema()`, stessa memoria e stessa icona che gira — mai una
+seconda levetta con una preferenza sua, che sarebbe due verità sullo
+stesso tema.
+⚠️ L'ICONA SI CALCOLA AL RENDER: `applicaTema` ritocca i `.tema-btn`
+che TROVA all'avvio, e questa nasce dopo, a ogni disegno del libro —
+cablando la luna, su un telefono già scuro si sarebbe vista la luna
+che promette il buio quando il buio c'è già.
+⚠️ E LE COLONNE DELLA GRIGLIA SI DICHIARANO, difetto preso dalla
+misura e non dall'occhio: i figli sono DUE e le colonne TRE, quindi
+senza `grid-column` la pillola cadeva nella PRIMA — **75px a sinistra
+del centro**, uno scarto che guardando lo scatto non avevo notato e
+che il righello ha detto al primo giro. Con le colonne dichiarate la
+pillola resta centrata (scarto 0) e la levetta le sta a destra di
+10px, allineata al suo centro verticale.
+COLLAUDATO: **9216 verdi**. Guardato nei due temi e misurato a 320px.
