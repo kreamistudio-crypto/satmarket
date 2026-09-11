@@ -15412,6 +15412,12 @@ def prove_pagina_acquisto():
            "promo-tag dopo" in _cr))
     prova("...e la cifra della commissione e' quella del server",
           True, "cifraCtrl(c.commissione || 0" in _cr)
+    #    E IL TOTALE STA NELLA STESSA SCATOLA del conto del P2P (set
+    #    2026): in un elenco di voci tutte uguali il solo grassetto si
+    #    perde, e questa e' l'unica riga che dice quanto si paga.
+    prova("...e il totale del mercatino sta nella scatola", True,
+          "'<div class=\"ctrl-chiusa\">'" in _cr
+          and _cr.index("ctrl-chiusa") < _cr.index("Totale da pagare"))
     #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
     #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
     #    c'e' e vale lo stesso ragionamento. La percentuale e' la
@@ -35805,8 +35811,32 @@ def prove_p2p_libro():
           and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
                         r'<div id="p2pCorpo">', mini) is not None)
     prova("la pillola vive nella testata, fuori dal corpo che scorre", True,
-          "if (testaBox) testaBox.innerHTML = pillola;" in _rp
+          "if (testaBox) testaBox.innerHTML =" in _rp
+          and "'<div class=\"p2p-testa-riga\">' + pillola" in _rp
           and "box.innerHTML = avvisi" in _rp)
+    # ⚠️ LA LEVETTA DEL TEMA E' QUELLA DI CASA (set 2026, richiesta di
+    # Andrea): `.tema-btn` + `alternaTema()`, che scrive la preferenza
+    # e gira l'icona — mai una seconda levetta con una memoria sua,
+    # che sarebbe due verita' sullo stesso tema.
+    prova("...e accanto c'e' la levetta del tema, quella di casa", True,
+          'class="tema-btn" onclick="alternaTema()"' in _rp
+          and "function alternaTema(){" in mini)
+    # ...e l'ICONA si calcola al render: `applicaTema` ritocca i
+    # `.tema-btn` che TROVA all'avvio, e questa nasce dopo — cablando
+    # la luna, su un telefono gia' scuro si vedrebbe la luna che
+    # promette il buio quando il buio c'e' gia'
+    prova("...e la sua icona guarda il tema di adesso", True,
+          "temaEffettivo() === 'scuro' ? '☀️' : '🌙'" in _rp)
+    # ⚠️ E LE COLONNE DELLA GRIGLIA SI DICHIARANO: i figli sono DUE e
+    # le colonne TRE, quindi senza `grid-column` la pillola cade nella
+    # prima — misurata 75px a sinistra del centro, uno scarto che
+    # l'occhio non prende e il righello sì.
+    prova("...e la pillola resta al centro, la levetta nella terza",
+          (True, True),
+          ("grid-column:2" in pezzo_js(
+              mini, "  .p2p-testa-riga .p2p-filtro{", "}"),
+           "grid-column:3" in pezzo_js(
+              mini, "  .p2p-testa-riga .tema-btn{", "}")))
     # gli AVVISI restano col libro: appesi in alto mangerebbero schermo
     # per sempre a chi scorre, e raccontano la lettura di adesso
     prova("...e gli avvisi del libro restano col libro", True,
@@ -37534,10 +37564,22 @@ console.log(JSON.stringify(out));
     prova("le due righe finali vivono in una scatola loro", True,
           '<div class="ctrl-chiusa">' in cm
           and cm.index('<div class="ctrl-chiusa">') < cm.index("Ricevi")
-          and "margin:8px -10px -4px" in pezzo_js(
-              mini, "  .conto-p2p .ctrl-chiusa{", "}")
-          and "border:1.5px solid var(--line)" in pezzo_js(
-              mini, "  .conto-p2p .ctrl-chiusa{", "}"))
+          # ⚠️ 11,5 e non 10: col box-sizing di casa la scatola si
+          # mangia padding E BORDI dalla larghezza che riceve, e a −10
+          # si teneva i tre pixel dei bordi — misurato, l'etichetta
+          # del mercatino passava da 134 a 132 disponibili
+          and "margin:8px -11.5px -4px" in pezzo_js(
+              mini, "  .ctrl-conto .ctrl-chiusa{", "}")
+          # ⚠️ IL FONDO E IL BORDO SONO QUELLI DEI SATS (set 2026,
+          # ritocco di Andrea: nel tema chiaro `--bg` su `--card` sono
+          # crema e bianco, e il riquadro spariva proprio dove serviva
+          # di piu'). La coppia `--sats-soft`/`--sats` e' tarata per i
+          # due temi, e non e' un colore nuovo: e' l'arancio della
+          # riga «Ricevi» che ci sta dentro.
+          and "border:1.5px solid var(--sats)" in pezzo_js(
+              mini, "  .ctrl-conto .ctrl-chiusa{", "}")
+          and "background:var(--sats-soft)" in pezzo_js(
+              mini, "  .ctrl-conto .ctrl-chiusa{", "}"))
     # ...e il filo pieno che le staccava non serve piu': lo stacco lo
     # fa la scatola, e due segni per la stessa cosa sono uno di troppo
     prova("...e il filo pieno di ieri e' uscito", False,

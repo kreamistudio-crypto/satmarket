@@ -1855,6 +1855,21 @@
      `width:fit-content` + margini automatici: la pillola resta
      stretta sul suo contenuto E centrata, che con `inline-flex` in
      un blocco allineato a sinistra non si poteva. */
+  /* LA RIGA DELLA TESTATA: la pillola resta CENTRATA nella riga e la
+     levetta le sta a destra, appoggiata al suo fianco. Tre colonne
+     `1fr auto 1fr` con la levetta in `justify-self:start` — cosi' il
+     centro della riga resta il centro della pillola (che e' sotto il
+     logo, la misura decisa col restyling della testata) e la levetta
+     non lo sposta di mezzo pixel. */
+  .p2p-testa-riga{display:grid;grid-template-columns:1fr auto 1fr;
+    align-items:center;gap:10px}
+  /* ⚠️ LE COLONNE SI DICHIARANO, e questa riga cura un difetto che la
+     misura ha preso e l'occhio no: i figli sono DUE e le colonne TRE,
+     quindi senza `grid-column` la pillola cadeva nella PRIMA e la
+     levetta nella seconda — la pillola finiva 75px a sinistra del
+     centro, e lo scarto si vede solo mettendo un righello. */
+  .p2p-testa-riga .p2p-filtro{grid-column:2;margin:2px 0 10px}
+  .p2p-testa-riga .tema-btn{grid-column:3;justify-self:start;margin:0 0 8px}
   .p2p-filtro{display:grid;grid-template-columns:1fr auto 1fr;
     align-items:center;gap:8px;
     width:fit-content;margin:2px auto 10px;
@@ -3543,9 +3558,30 @@
      rientrata di quei dieci per lato, cioe' una scatola dentro una
      scatola con la stessa forma — due bordi paralleli a un dito di
      distanza, che e' la cosa che si nota per sbaglio. */
-  .conto-p2p .ctrl-chiusa{margin:8px -10px -4px;padding:0 10px;
-    border:1.5px solid var(--line);border-radius:12px;
-    background:var(--bg)}
+  /* ⚠️ IL FONDO E IL BORDO SONO QUELLI DEI SATS (set 2026, ritocco di
+     Andrea: «nel chiaro si vede troppo poco»). Il primo giro usava
+     `--bg` su `--card`: di sera stacca (bruno su bruno chiaro), di
+     giorno sono crema e bianco — due colori che a un dito di distanza
+     si somigliano, e il riquadro spariva proprio nel tema in cui
+     serviva di piu'.
+     `--sats-soft` col bordo `--sats` stacca UGUALE nei due temi
+     perche' e' una coppia tarata per i due, e non e' un colore nuovo:
+     e' l'arancio della riga «Ricevi» che ci sta dentro — la scatola
+     porta il colore di quel che contiene.
+     VALE PER TUTT'E DUE I CONTI, `.ctrl-conto` e non `.conto-p2p`:
+     nel mercatino la scatola tiene il solo «Totale da pagare», e i due
+     conti si vestono uguali da sempre. */
+  /* ⚠️ IL MARGINE NEGATIVO VALE 11,5 E NON 10, e l'ha detto il
+     righello: col `box-sizing:border-box` di casa la scatola si
+     mangia il PADDING (10+10) E I BORDI (1,5+1,5) dalla larghezza che
+     riceve — quindi a −10 per lato restituiva il padding e si teneva
+     i tre pixel dei bordi, che uscivano dalla larghezza utile
+     dell'etichetta. Misurato: «Totale da pagare» del mercatino, che
+     gia' cedeva a 137 su 134, passava a 132. Tre pixel non si vedono,
+     ma li' dentro si traducono in una parola mozzata in piu'. */
+  .ctrl-conto .ctrl-chiusa{margin:8px -11.5px -4px;padding:0 10px;
+    border:1.5px solid var(--sats);border-radius:12px;
+    background:var(--sats-soft)}
   .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
@@ -15182,7 +15218,13 @@ function contoRighe(c){
         ? `<span class="via-gratis">gratuita</span>`
         : cifraCtrl(c.sped, c.circa, c.spedEur))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
-    + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot');
+    /* LA RIGA CHE CONTA STA IN UNA SCATOLA, come le due del conto del
+       P2P (set 2026, ritocco di Andrea): in un elenco di voci tutte
+       uguali il solo grassetto si perde, e questa e' l'unica riga che
+       dice quanto si paga davvero. */
+    + '<div class="ctrl-chiusa">'
+    + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot')
+    + '</div>';
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
    vivono gia' la'. Il codice negozio arriva dagli annunci del pacco.
@@ -35082,7 +35124,22 @@ function renderP2P(){
   /* LO STATO VUOTO DICE QUALE DEI DUE VUOTI E': «non c'e' niente» e
      «il tuo filtro non lascia passare niente» sono due cose diverse, e
      la seconda ha una strada d'uscita da offrire. */
-  if (testaBox) testaBox.innerHTML = pillola;
+  /* ⚠️ LA LEVETTA DEL TEMA ACCANTO ALLA PILLOLA (set 2026, richiesta
+     di Andrea): e' la STESSA di casa — `.tema-btn` + `alternaTema()`,
+     che scrive la preferenza e gira l'icona — e non una seconda
+     levetta con una memoria sua. Qui serve perche' il libro e' la
+     vista dove si sta piu' a lungo, e per cambiare tema si doveva
+     uscire fino al Profilo.
+     L'ICONA SI CALCOLA AL RENDER e non si lascia quella del markup:
+     `applicaTema` gira all'avvio e ritocca i `.tema-btn` che TROVA,
+     mentre questa nasce dopo, a ogni disegno del libro — cablando la
+     luna, su un telefono gia' scuro si sarebbe vista la luna che
+     promette il buio quando il buio c'e' gia'. */
+  if (testaBox) testaBox.innerHTML =
+    '<div class="p2p-testa-riga">' + pillola
+    + '<button type="button" class="tema-btn" onclick="alternaTema()">'
+    + '<span class="tema-ico" aria-hidden="true">'
+    + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
   box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
        : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">${
