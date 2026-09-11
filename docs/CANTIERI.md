@@ -9069,7 +9069,13 @@ quella lunga.
 E IL NODO È GIRATO (10 set 2026, guarda-e-riferisci, mano di
 Andrea): `fee` a 0.02 in `settings.toml`, riavvio dal compose, e
 il 38385 annuncia `fee 0.02` — verificato dallo SPECCHIO, cioè dal
-lato di chi legge.
+lato di chi legge. Da lì il conto ha smesso da solo di dire «in
+promo»: nessun deploy, che è esattamente il disegno. IL CONTO
+ECONOMICO DA NON DIMENTICARE: la dev fee di Mostro è il 30% della
+NOSTRA fee — oggi il tappo `dev_fee_percentage = 0` (il circuito
+Tor freddo) la tiene a zero e il 2% resta intero, ma il giorno che
+il tappo si toglie 0,6 punti dei 2 se ne vanno upstream, e il
+margine va riguardato allora.
 
 ## La card essenziale del libro
 
@@ -9106,59 +9112,93 @@ badge (non ha bisogno del cambio) e perde solo le cifre, e la
 sentinella CSS che pretende le coppie di casa e vieta il ritorno di
 `.p2p-prezzo`. Guardato in vetrina CDP: sei card nei due temi.
 ⚠️ DUE SCELTE DI QUESTA VOCE SONO CADUTE IL GIORNO DOPO — le quattro
-frasi del gesto e la pillola col fondo tinto: vedi la voce qui sotto,
-che dice anche perché.
+frasi del gesto e la pillola col fondo tinto: le racconta, coi
+perché, «Il badge del premio, e le sue tre stesure», qui sotto.
 
-## Il badge dice il mercato, non il gesto
+## Il badge del premio, e le sue tre stesure
 
-IL RITOCCO DEL GIORNO DOPO (11 set 2026, Andrea), che rovescia due
-scelte della voce qui sopra e ne lascia in piedi la terza (il badge
-mostra il SOLO premio del venditore, mai la commissione: quella è
-uguale per tutti, e il mestiere del badge è confrontare le offerte).
-LE PAROLE: «4% sopra il mercato» / «2% sotto il mercato», e a premio
-zero «al prezzo di mercato». Via «più caro / Risparmi / Incassi»,
-che erano QUATTRO frasi diverse per la stessa cosa a seconda del
-lato — e due offerte si confrontano solo con lo stesso metro. Il
-metro è il mercato, ed è uno solo.
-A ZERO LA FRASE C'È LO STESSO, ed è la parte che non era stata
-chiesta ieri: «nessun badge» lasciava la card muta proprio sul caso
-più comune, e chi scorre non poteva sapere se il premio mancava o se
-nessuno gliel'aveva detto. A prezzo fisso resta il nulla: quel
-prezzo il mercato non lo guarda.
-IL VESTITO TORNA MUTO: la pillola col fondo tinto è durata un
-giorno — due pillole colorate per card, in un elenco che si scorre,
-gridavano più delle cifre — e torna il grigio delle card con la
-TINTA SUL SOLO NUMERO. Il giudice è sempre lo stesso
-(`affare = (lato==='buy') === (premium>0)`), e resta `display:block`
-perché nel tab Vendi la riga sopra è lo span inline dell'euro.
+IL BADGE È STATO RISCRITTO TRE VOLTE IN DUE GIORNI (10-11 set 2026,
+tutte e tre di Andrea), e le due scartate stanno qui perché la terza
+si capisce solo con loro accanto. Quel che NON è mai cambiato, ed è
+la riga da tenere: **il badge mostra il SOLO premio del venditore,
+mai la commissione** — quella è uguale per tutti, e il mestiere del
+badge è CONFRONTARE le offerte fra loro.
+LA PRIMA diceva il GESTO di chi legge, con quattro frasi che
+cambiavano col lato: «4% più caro» / «Risparmi il 4%» a comprare,
+«Incassi il 4% in più / in meno» a vendere. Scartata perché quattro
+frasi per la stessa cosa non si confrontano: due offerte vogliono lo
+stesso metro.
+LA SECONDA prese il mercato come metro — «4% sopra il mercato» /
+«2% sotto il mercato» — ed è durata mezza giornata: giusta nella
+logica, lunga da leggere in un elenco che si scorre, e «sopra il
+mercato» dice dove sta il prezzo ma non che effetto ti fa.
+LA TERZA, quella viva: **«4% più caro» / «2% di sconto»**, e a
+premio zero **«al prezzo di mercato»**. Due parole per verso, UGUALI
+nei due tab, che è la lezione della prima stesura tenuta insieme a
+quella della seconda: sono le parole che uno usa guardando un
+prezzo, e restano le stesse comunque si stia scambiando.
+⚠️ E QUI IL TESTO E LA TINTA GUARDANO DUE COSE DIVERSE, che è la
+sottigliezza da non perdere leggendo il codice: il TESTO guarda il
+PREZZO dell'offerta (più caro o scontato: lo stesso in tutti e due i
+tab), la TINTA guarda CHI LEGGE. Per questo un «4% più caro» può
+essere VERDE — chi VENDE sats a un prezzo più caro ci guadagna. Il
+giudice non è mai cambiato in nessuna delle tre stesure:
+`affare = (lato==='buy') === (premium>0)`.
+A ZERO LA FRASE C'È LO STESSO, ed è la cosa che nessuna delle tre
+richieste diceva e che è stata aggiunta guardando l'elenco: «nessun
+badge» lasciava la card muta proprio sul caso più comune, e chi
+scorre non poteva sapere se il premio mancava o se nessuno gliel'aveva
+detto. A prezzo fisso resta il nulla: quel prezzo il mercato non lo
+guarda.
+IL VESTITO: la pillola col fondo tinto è durata un giorno — due
+pillole colorate per card, in un elenco che si scorre, gridavano più
+delle cifre — e ha lasciato il posto al grigio muto delle card con
+la TINTA SUL SOLO NUMERO. Resta `display:block`, perché nel tab
+Vendi la riga sopra è lo span inline dell'euro e un inline le si
+incollerebbe accanto.
 ⚠️ E UNA SENTINELLA È STATA ROVESCIATA, col suo perché scritto
-accanto: fino a ieri VIETAVA «sopra/sotto il mercato» — la riga del
-prezzo portava già segno e colore, e le parole erano un terzo modo
-di dire la stessa cosa. Oggi il segno non c'è più (il badge porta il
+accanto: vietava le parole del verso, perché la riga del prezzo di
+allora portava già segno e colore e le parole erano un terzo modo di
+dire la stessa cosa. Oggi il segno non c'è più (il badge porta il
 valore ASSOLUTO) e il colore da solo non dice da che parte pende:
 quelle parole sono diventate l'unica cosa che lo dice. **La
 decisione di allora non era sbagliata: è cambiato ciò che le stava
 accanto** — ed è la ragione per cui una sentinella si rovescia
 leggendo il perché invece di cancellarla.
-NEL CONTO LA PERCENTUALE PASSA NELL'ETICHETTA — «Premio al
-venditore (+4% sopra il mercato)», a destra i soli sats — così chi
-ha letto «4% sopra il mercato» sulla card ritrova la stessa frase e
-capisce che quella riga è quel premio lì. Due misure pagate subito:
+NEL CONTO LA PERCENTUALE STA NELL'ETICHETTA, attaccata al nome della
+voce e in tinta: «Premio al venditore +4%», a destra i soli sats.
+⚠️ E IL NOME DELLA VOCE CAMBIA COL VERSO — «Sconto del venditore
+−2%» — perché un premio negativo non è «un premio di meno», è uno
+sconto: col nome giusto non si deve leggere il segno per capire di
+cosa si parla, che è proprio il lavoro che un'etichetta risparmia.
+Anche qui una stesura intermedia scartata: «(+4% sopra il mercato)»
+in corpo piccolo di `.ctrl-nota`, che andava bene finché era una
+parentetica esplicativa e non quando è diventata il DATO della voce
+— un dato in corpo piccolo si legge come una precisazione
+facoltativa.
+LE DUE MISURE PAGATE, tutt'e due viste in vetrina e non a occhio:
 l'etichetta del premio VA A CAPO invece di cedere coi puntini (è
-l'unica del conto che porta un DATO, e troncarla mangerebbe proprio
-quello), e la nota va a capo INTERA (`nowrap` su di lei), o la
-spezzatura cade dentro la frase — «…(+4% sopra» / «il mercato)» —
-che si legge come due cose. Misurato a 375 e a 320.
-⚠️ E LA COPPIA DI TINTE DEL CONTO HA DOVUTO CAMBIARE POSTO nel CSS:
-la percentuale vive DENTRO `.ctrl-nota`, che è grigia, e a parità di
-specificità vince l'ultima scritta — restando dov'era, il grigio
-avrebbe spento il numero senza che niente fallisse. Ora sta dopo la
-nota, con una sentinella sull'ORDINE delle due regole.
-COLLAUDATO: 9107 verdi. Guardato in vetrina CDP nei due temi: sei
-card e cinque conti, a 375 e a 320. Da lì il conto ha smesso da solo di dire «in
-promo»: nessun deploy, che è esattamente il disegno. IL CONTO
-ECONOMICO DA NON DIMENTICARE: la dev fee di Mostro è il 30% della
-NOSTRA fee — oggi il tappo `dev_fee_percentage = 0` (il circuito
-Tor freddo) la tiene a zero e il 2% resta intero, ma il giorno che
-il tappo si toglie 0,6 punti dei 2 se ne vanno upstream, e il
-margine va riguardato allora.
+l'unica riga del conto la cui etichetta porta un dato, e troncarla
+mangerebbe proprio quello — a 320 si legge «Premio al venditore» e
+«+4%» sotto, che è brutto ma intero); e nella stesura con la
+parentesi serviva anche un `nowrap` sulla nota, o la spezzatura
+cadeva dentro la frase.
+⚠️ E LA COPPIA DI TINTE DEL CONTO HA CAMBIATO POSTO nel CSS: quando
+la percentuale viveva dentro `.ctrl-nota`, che è grigia, a parità di
+specificità vinceva l'ultima scritta — e le tinte stavano più su,
+quindi il grigio avrebbe spento il numero senza che niente fallisse.
+Ora stanno dopo la nota e valgono in tutti e due i casi, con una
+sentinella sull'ORDINE delle due regole: oggi difende un rischio
+rientrato, e costa zero il giorno che la percentuale ci rientrasse.
+COLLAUDATO: **9108 verdi**. Guardato in vetrina CDP nei due temi:
+sei card e sette conti, a 375 e a 320, col caso sconto che somma
+(719.424 − 7.338 + 14.389 = 726.475).
+⚠️ E UN DIFETTO DI QUESTO STESSO FILE È STATO TROVATO SCRIVENDOLO,
+perché vale più della voce: la stesura di stamattina era stata
+infilata in mezzo alla voce della fee del nodo, che si è ritrovata
+TRONCATA a metà frase con la sua coda (il conto economico della dev
+fee) attaccata in fondo al badge. Nessuna prova copre la prosa, il
+commit era già pushato, e a trovarlo è stata solo la rilettura del
+contesto prima di riscrivere. **Una voce nuova si inserisce fra due
+voci, mai dentro una**: si guarda che il paragrafo sopra FINISCA
+davvero — un punto e una riga vuota — e non che cominci bene.
