@@ -271,6 +271,14 @@ Barattolo, girata da 0.01 il 10 set 2026 col cantiere del conto
 scorporato e verificata dallo specchio: il client la legge viva dal
 38385 e la mostra a chi scambia, meta' a testa (vedi CANTIERI, «Il
 conto scorporato del dettaglio, e la commissione del 2%»).
+⚠️ E SI CALCOLA DOPO IL PREMIO, verificato sui byte (11 set 2026,
+`src/util.rs`): `get_market_amount_and_fee` chiama
+`get_fee(new_sats_amount)`, e quel numero esce da `get_market_quote`
+col premio GIA' applicato. Quindi la base dell'aliquota non e' il
+controvalore a mercato puro ma l'importo scontato o caricato dal
+premio — l'ordine in cui il conto del client mostra le righe
+(Controvalore, premio, Subtotale, fee) e' quello, e non e'
+impaginazione.
 E LA LEZIONE DEL GIRO VALE OLTRE LA SONDA: il lettore del quadro
 agganciava la risposta con UN criterio solo — il `request_id` — e da
 quell'aggancio dipendevano a cascata quattro risposte, che sono uscite
