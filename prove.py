@@ -36388,22 +36388,35 @@ console.log(JSON.stringify(out));
     prova("nel tab Compra: paghi euro grande, ricevi sats sotto", True,
           '<span class="p2p-grande p2p-euro">Paghi 8,00 €</span>'
           in out["rigaCompra"]
-          and '<span class="p2p-piccola p2p-sats">Ricevi ≈'
-          in out["rigaCompra"])
+          and '<span class="p2p-verbo">Ricevi </span>≈' in out["rigaCompra"])
     prova("nel tab Vendi: paghi sats prima, ricevi euro grande dopo",
-          True, '<span class="p2p-piccola p2p-sats">Paghi ≈'
-          in out["rigaVendi"]
+          True, '<span class="p2p-verbo">Paghi </span>≈' in out["rigaVendi"]
           and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
           in out["rigaVendi"]
           and out["rigaVendi"].index("Paghi")
               < out["rigaVendi"].index("Ricevi"))
+    # ⚠️ IN TINTA CI VA LA CIFRA, NON IL VERBO (set 2026, ritocco di
+    # Andrea): dentro la card quel colore e' quello del LATO (verde a
+    # comprare, rosso a vendere) e appartiene al NUMERO, che e' la
+    # cosa che cambia col tab; «Ricevi» e «Paghi» prendono
+    # l'inchiostro di casa, lo stesso della riga grande. Colorata
+    # tutta, la riga si leggeva come un blocco unico e il colore
+    # smetteva di indicare qualcosa.
+    prova("...e in tinta c'e' la cifra, non il verbo", True,
+          ".p2p-sats .p2p-verbo{color:var(--ink)}" in mini
+          # e la tinta del LATO resta dov'era, sulla riga intera
+          and ".p2p-ord .p2p-sats{color:var(--trust)" in mini
+          and "body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}" in mini)
     # ...e i due tab dicono lo STESSO verbo a chi da', ognuno con la
     # sua moneta: e' tutto il ritocco, e una sentinella che guardasse
     # solo la parola nuova non direbbe questo.
+    # l'ancora della riga in sats e' il VERBO nel suo span (set 2026,
+    # da quando la tinta e' della sola cifra): «p2p-sats">» adesso e'
+    # seguito dallo span del verbo, non dalla parola
     prova("...e il verbo di chi da' e' uno solo nei due tab",
           ("Paghi", "Paghi"),
           (out["rigaCompra"].split('p2p-euro">')[1][:5],
-           out["rigaVendi"].split('p2p-sats">')[1][:5]))
+           out["rigaVendi"].split('p2p-verbo">')[1][:5]))
     prova("...e «Invia» non lo dice piu' nessuna delle due", [],
           [k for k in ("rigaCompra", "rigaVendi") if "Invia" in out[k]])
     prova("...e nemmeno l'imperativo «Paga» di ieri", [],
@@ -36480,7 +36493,8 @@ console.log(JSON.stringify(out));
     prova("con la fee viva la card toglie la meta' a chi compra", True,
           "≈ 15206 sats" in out["cardNettaComm"])
     prova("...e la aggiunge a chi vende, che la blocca", True,
-          "Paghi ≈ 98980 sats" in out["cardVendiComm"])
+          '<span class="p2p-verbo">Paghi </span>≈ 98980 sats'
+          in out["cardVendiComm"])
     prova("...e a prezzo fisso il netto porta il ≈", True,
           "≈ 79200 sats" in out["cardFissoComm"]
           and "80000 sats" not in out["cardFissoComm"])
