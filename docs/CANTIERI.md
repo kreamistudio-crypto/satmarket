@@ -9464,3 +9464,65 @@ La colonna resta senza `<small>`, e il volto si centra nell'altezza
 della riga invece di restare appeso in cima. La sezione resta
 cliccabile — decisione di Andrea: il segno ora è il solo cursore.
 COLLAUDATO: **9129 verdi**. Guardato nei due temi.
+
+## La fascia a ±20 e i cartellini dell'affare
+
+DUE COSE CHE VANNO INSIEME (11 set 2026, Andrea), ed è il motivo per
+cui stanno in una voce sola: la fascia del premio si allarga, e oltre
+una certa convenienza l'offerta si accende.
+LA FASCIA PASSA DA ±10 A ±20, step 1, per tutt'e due i cursori — il
+foglio «Pubblica» e il filtro del libro — che non hanno un numero
+loro: leggono `P2P_PREMIO_MAX`. A ±10 il cursore finiva la corsa
+proprio dove il premio comincia a essere interessante.
+IL TRATTEGGIO CONTA I PASSI, NON I PIXEL: il passo va da 5% a 2,5%,
+cioè da venti a **quaranta tratti**, uno per punto percentuale. La
+prova non ribatte i due numeri, li LEGGE e li confronta: se un domani
+la fascia si muove senza il passo, il tratteggio smette di contare i
+punti e la riga lo dice.
+E IL CURSORE DEL FILTRO IL TRATTEGGIO NON CE L'AVEVA: gliel'ho messo,
+perché è lo stesso dato e due cursori vestiti diverso sembrano due
+cose diverse. ⚠️ STA IN UNO PSEUDO-ELEMENTO SOPRA il binario e non
+nel suo fondo: la fascia scelta è uno `span` colorato che copre il
+fondo, e un tratteggio dipinto sotto sparirebbe proprio nel tratto
+che si sta guardando; sullo span nemmeno, perché quello parte da
+`--da` e i tratti si scollerebbero appena si muove un capo.
+I CARTELLINI: oltre il 10% di convenienza **per chi legge**, accanto
+alla riga del premio compare «⚡ Ottimo affare» (verde pieno), e oltre
+il 15% «⚡⚡ Super affare» (sfumato verde→oro, con un bagliore). Le
+soglie stanno in due costanti accanto alla fascia, perché sono lo
+stesso righello.
+⚠️ SOLO SUL VERSO FAVOREVOLE, ed è la riga da non ammorbidire: lo
+stesso 20% è un affare per chi compra sotto mercato e una bastonata
+per chi ci vende. Il giudice è quello di sempre (`affare`, dal lato):
+su un premio sfavorevole nessun cartellino, mai — un «Ottimo affare»
+rosso sarebbe un colore e una parola che si contraddicono.
+LA PILLOLA PIENA QUI CI STA, ed è il contrario di quel che si era
+deciso per il badge del premio: quella era su OGNI card e gridava più
+delle cifre, questa compare di rado ed è esattamente il segnale che
+deve saltare all'occhio scorrendo il libro. Il bagliore è un'OMBRA
+FERMA e non un'animazione — una card che pulsa in un elenco è un
+difetto di accessibilità prima che di gusto — e l'oro è `--oro`,
+quello della stella: nessun colore nuovo.
+IL CARTELLINO STA A DESTRA con `margin-left:auto` e non con
+`space-between`: a capo, il secondo resterebbe a sinistra. Misurato a
+320px: con la frase più lunga ci sta ancora in riga.
+⚠️ E L'OMINO DEL RIQUADRO SCENDE DA 28 A 22 (taratura di Andrea nello
+stesso giro): alla pari esatta con la stella pesava troppo. Non
+rovescia la misura «visiva» di ieri — a parità di altezza disegnata
+un TRATTO da un pixel e mezzo e una forma PIENA non pesano uguale, ed
+è la regola già scritta per il glifo dentro il tondo.
+TRE TRAPPOLE DEL BANCO, tutte della stessa famiglia — **il banco che
+accusa il codice sano**:
+1) cinque prove della fascia sono diventate rosse senza che il codice
+sbagliasse: erano scritte su `fasciaPremioP2P(-10)`, che con ±10 era
+IL CAPO e con ±20 è un punto qualunque. Riscritte chiedendo i capi
+alla costante, valgono per qualunque fascia si scelga domani;
+2) la sonda dei tratti cercava le regole per `selectorText`, e gli
+pseudo-elementi dei cursori il browser li riscrive: tornava `null` su
+un CSS sanissimo;
+3) e sul valore CALCOLATO `transparent` diventa `rgba(0, 0, 0, 0)` e
+lo stop si spezza in due — un altro `null` su un CSS che il browser
+stava applicando davvero, come diceva il suo `background-size`.
+COLLAUDATO: **9139 verdi**. Guardato nei due temi: le soglie a 9 /
+10 / 15 / 16 / 20, il verso sfavorevole senza cartellino, il prezzo
+fisso senza, e i due cursori coi loro quaranta tratti.
