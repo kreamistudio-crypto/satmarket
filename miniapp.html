@@ -7507,7 +7507,13 @@ document.getElementById('cartello')?.remove();</script>
         </div>
       </div>
 
+      <div class="grp" id="grpAdmin">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpAdmin')"
+                aria-expanded="false">👑 Amministrazione<span class="fr">▾</span></button>
+        <div class="grp-b">
       <div id="adminStats"></div>
+        </div>
+      </div>
       <!-- La terza porta alla pagina del pagamento protetto (le altre
            due sono il recinto del dettaglio e la riga di fiducia della
            vetrina): qui la si cerca a mente fredda, non davanti a un
@@ -29959,11 +29965,24 @@ let admBadge = [], admBadgeDettaglio = null;
 async function loadAdminStats(){
   const box = el('adminStats');
   if (!box) return;
-  if (!isAdmin || DEMO) { box.innerHTML = ''; return; }
+  /* La sezione «👑 Amministrazione» che la contiene si spegne con lei:
+     un titolo che si apre sul vuoto e' peggio di un titolo che non
+     c'e' (la stessa regola di aggiornaGruppiProfilo, qui esplicita
+     perche' adminStats si popola in async — aspettare il prossimo
+     giro di quella funzione lascerebbe la sezione vuota nel mezzo). */
+  if (!isAdmin || DEMO) {
+    box.innerHTML = '';
+    if (el('grpAdmin')) el('grpAdmin').style.display = 'none';
+    return;
+  }
   try {
     const r = await fetch(`${API_BASE}/admin/stats`,
       {headers:{'X-Tg-Init-Data':authHdr()}});
-    if (!r.ok) { box.innerHTML = ''; return; }
+    if (!r.ok) {
+      box.innerHTML = '';
+      if (el('grpAdmin')) el('grpAdmin').style.display = 'none';
+      return;
+    }
     const s = await r.json();
     admUtenti = s.lista_utenti || []; admMsgDest = 0;
     aggiornaAdmDot(s.in_revisione||0);
@@ -30152,7 +30171,11 @@ async function loadAdminStats(){
       ${boxBadgeLive()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
-  } catch(e) { box.innerHTML = ''; }
+    if (el('grpAdmin')) el('grpAdmin').style.display = '';
+  } catch(e) {
+    box.innerHTML = '';
+    if (el('grpAdmin')) el('grpAdmin').style.display = 'none';
+  }
 }
 
 /* Il moderatore apre un ordine di cui ha il numero (il venditore

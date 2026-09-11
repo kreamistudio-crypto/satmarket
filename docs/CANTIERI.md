@@ -9780,3 +9780,37 @@ COLLAUDATO: **9139 verdi**. Guardato nei due temi: il rosso e il
 verde sui sats coi segni, «Ricevi» arancio e «Totale da pagare»
 neutro, il Vendi specchiato (fee col più, «Paghi» arancio), il caso
 sconto che somma (12000 − 122 + 240 = 12118).
+
+IL QUARTO GIRO, la stessa sera: la sesta sezione del Profilo. Prima
+`adminStats` viveva nudo in fondo al Profilo, sempre spalancato per
+chi è admin — l'unica cosa senza un titolo su cui richiudersi, mentre
+le altre cinque (Catalogo, Negozio, Quando compri, Privacy, Il tuo
+account) sono cassetti richiudibili. Ora è avvolto in una sesta
+sezione, «👑 Amministrazione», stesso involucro delle altre cinque,
+chiusa di serie, posizionata esattamente dov'era prima (subito dopo
+«Il tuo account»). LA DIFFICOLTÀ VERA non era il markup ma il tempo:
+le altre cinque sezioni si nascondono da sole quando restano vuote
+tramite `aggiornaGruppiProfilo()`, chiamata da `renderProfilo`/
+`renderIdentita` — ma quelle girano PRIMA che `loadAdminStats()`
+(asincrona, una manciata di fetch) abbia finito, quindi affidarsi al
+meccanismo generico avrebbe lasciato la sezione visibile-e-vuota per
+gli admin nell'istante fra il render e la fine dei fetch, e nascosta
+per sempre se un fetch falliva a metà. Risolto scrivendo la
+visibilità DENTRO `loadAdminStats()` stessa, ai quattro punti in cui
+già decide cosa mettere in `adminStats` (non-admin, fetch fallita,
+successo, eccezione) — la stessa funzione che sa se ha qualcosa da
+mostrare decide anche se il titolo che lo contiene deve esserci.
+Una SESTA sezione voluta esplicitamente da Alan, non una terza opzione
+di design: la barra di navigazione a 5 celle (vedi il vincolo trovato
+prima di proporre le alternative) resta intatta, e chi non è admin
+non vede traccia della sezione — provato dal vivo passando da Admin a
+Compratore nello stesso pannello di collaudo.
+COLLAUDATO (quarto giro): il test del Profilo aggiornato da «le
+sezioni sono cinque» a «sei», più quattro prove nuove sulla sezione
+Amministrazione (l'involucro, lo spegnimento esplicito, la riaccensione
+solo a successo) — 47 verdi sul Profilo, suite intera a 166 rosse
+preesistenti (una in meno del solito: pulendo i file estranei di un
+altro cantiere è sparita anche una rossa vera, la sentinella del
+compileall). Riprovato nel browser: chiusa di serie, si apre e mostra
+tutto incluso il badge, sparisce del tutto passando a un'identità non
+admin.

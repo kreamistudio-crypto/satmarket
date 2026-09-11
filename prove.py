@@ -49368,10 +49368,20 @@ def prove_profilo_sezioni():
     """IL PROFILO A SEZIONI e il cassetto «🧅 Sito Tor» (ago 2026).
 
     Diciannove cassetti in fila erano ~1660px, tre schermate e mezzo di
-    titoli senza un appiglio. Adesso stanno in CINQUE sezioni
-    richiudibili, tutte chiuse entrando; e il ventesimo cassetto porta
-    l'indirizzo .onion, che il servizio nascosto aveva da mesi senza
-    che nessuno potesse saperlo."""
+    titoli senza un appiglio. Adesso stanno in sezioni richiudibili,
+    tutte chiuse entrando; e il ventesimo cassetto porta l'indirizzo
+    .onion, che il servizio nascosto aveva da mesi senza che nessuno
+    potesse saperlo.
+
+    LA SESTA SEZIONE (set 2026): «👑 Amministrazione» avvolge
+    `adminStats` con lo stesso involucro delle altre cinque — prima
+    stava li' nuda, sempre spalancata per chi e' admin, l'unica cosa
+    in fondo al Profilo senza un titolo su cui richiudersi. Si spegne
+    da sola per chi non e' admin (stesso motivo delle altre: un
+    titolo sul vuoto e' peggio di nessun titolo), ma esplicitamente
+    dentro loadAdminStats() e non aspettando aggiornaGruppiProfilo()
+    — quella gira PRIMA che le fetch finiscano, e adminStats si
+    popola in async."""
     print("\n🔐 Il Profilo a sezioni, e l'indirizzo Tor")
     mini = open("miniapp.html", encoding="utf-8").read()
     srv = open("server.py", encoding="utf-8").read()
@@ -49403,10 +49413,22 @@ def prove_profilo_sezioni():
     prova("nessun cassetto del Profilo resta fuori da una sezione",
           [], orfani)
     prova("e ognuno compare una volta sola", len(ids), len(set(ids)))
-    prova("le sezioni sono cinque", 5, vista.count('<div class="grp"'))
+    prova("le sezioni sono sei", 6, vista.count('<div class="grp"'))
     # LE SEZIONI NASCONO CHIUSE (decisione di Andrea): il Profilo si
     # apre sulla mappa intera, non su un cassetto gia' spalancato.
     prova("nessuna sezione nasce aperta", 0, vista.count('class="grp open"'))
+    # vista si ferma apposta PRIMA di "adminStats" (e' il confine i1
+    # scelto sopra), quindi il contenitore va cercato in mini per
+    # intero: qui basta che grpAdmin la preceda e la richiuda dopo.
+    i_grp = mini.index('id="grpAdmin"', i0)
+    prova("«Amministrazione» avvolge adminStats, non il contrario", True,
+          i_grp < i1 < mini.index('</div>', mini.index('</div>', i1)))
+    las = pezzo_js(mini, "async function loadAdminStats(){", "\n}\n")
+    prova("...e si spegne da sola quando adminStats resta vuoto: non "
+          "aspetta aggiornaGruppiProfilo (gira prima che l'async finisca)",
+          3, las.count("el('grpAdmin').style.display = 'none'"))
+    prova("...e si riaccende solo a caricamento riuscito", True,
+          "el('grpAdmin').style.display = '';" in las)
 
     # --- 2) LA FORMA RESTA DISTINTA, ed e' una TERZA e non una delle
     # due che c'erano (ago 2026): un `.acc` dentro un `.acc-b` non
