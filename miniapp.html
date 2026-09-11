@@ -14901,20 +14901,21 @@ function contoRighe(c){
     + (c.accordo>0
         ? r('🤝 Accordo', cifraCtrl(c.accordo, c.circa, c.accordoEur, 1),
             'sconto') : '')
-    /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
-       «Commissione Barattolo» questa riga TRONCAVA a 320px —
-       l'etichetta ne chiedeva 148 e ne aveva 135, e si leggeva
-       «Commissione Baratt…» su OGNI acquisto, perche' il suo valore
-       porta sempre la pillola «in promo» accanto allo zero e non
-       dipende dalle cifre dell'ordine. Difetto vecchio, trovato
-       misurando il rinome dello sconto. La leva del respiro NON ci
-       arrivava (per farla stare il padding del riquadro sarebbe
-       dovuto scendere da 14 a 4, cioe' le cifre contro il bordo):
-       l'unica che bastava era la parola. Dentro il nostro checkout
-       di chi altri sarebbe la commissione? — e le altre etichette
-       della colonna sono gia' nomi comuni: Prezzo, Spedizione,
-       Protezione acquisti. Adesso avanzano 50px. */
-    + r('Commissione', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
+    /* «FEE BARATTOLO» (11 set 2026, decisione di Andrea), e il nome
+       torna a dire DI CHI e' — la cosa che «Commissione» secca aveva
+       perso. Sta nella stessa misura che aveva bocciato la formula
+       lunga, ed e' la ragione per cui si poteva fare: «Commissione
+       Barattolo» chiedeva 148px e ne aveva 135 (si leggeva
+       «Commissione Baratt…» su OGNI acquisto, perche' il valore
+       porta sempre la pillola «in promo» e non dipende dalle cifre
+       dell'ordine); «Fee Barattolo» ne chiede ~97, cioe' quaranta
+       meno della secca — misurato a 320px in vista sats, non
+       stimato. La leva del respiro non c'entrava allora e non
+       c'entra adesso: a decidere e' sempre la parola.
+       ⚠️ E VIETATA RESTA LA FORMULA LUNGA, non il nome: chi un
+       domani volesse «Commissione Barattolo» riaprirebbe il difetto
+       gia' pagato due volte. */
+    + r('Fee Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i
@@ -37151,12 +37152,15 @@ function contoDettP2P(o){
   ].filter(Boolean).join(' ');
   return '<div class="ctrl-conto">'
     + r('Controvalore', cifra('ctrl'))
-    /* «COMMISSIONE» SECCA (10 set 2026, decisione di Andrea): lo
-       stesso rimedio del conto del mercatino, e per la stessa misura
-       — «Commissione Barattolo» cedeva coi puntini a 320px, e nei
-       casi promo e intervallo anche a 375. Dentro il nostro conto,
-       di chi altri sarebbe? */
-    + r('Commissione', commissione)
+    /* «FEE BARATTOLO» (11 set 2026, decisione di Andrea), lo stesso
+       nome del conto del mercatino: i due conti si vestono uguali e
+       adesso dicono anche lo stesso nome. «Commissione Barattolo»
+       resta bocciata — cedeva coi puntini a 320px e, coi casi promo
+       e intervallo, perfino a 375 — mentre questa e' piu' CORTA
+       della secca che l'aveva sostituita, e nel caso peggiore
+       (pillola «in promo» + percentuale + cifra a intervallo) sta.
+       Misurato a 320, non stimato. */
+    + r('Fee Barattolo', commissione)
     + premio
     + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot')
     + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot')

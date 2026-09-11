@@ -15289,6 +15289,17 @@ def prove_pagina_acquisto():
            "Sconto sugli articoli" in _cr))
     prova("...e il codice in chiaro non entra nel conto", (False, False),
           ("codice_sconto" in _cr, "codRisp" in _cr))
+    #    E LA FEE PORTA IL NOME DI CASA (11 set 2026, decisione di
+    #    Andrea): «Fee Barattolo», lo stesso nome del conto del P2P —
+    #    i due conti si vestivano gia' uguali, adesso dicono anche la
+    #    stessa parola. A restare VIETATA e' la FORMULA LUNGA e non il
+    #    nome: «Commissione Barattolo» chiedeva 148px su 135 e si
+    #    leggeva mozzata su OGNI acquisto, mentre questa ne chiede ~97
+    #    — piu' corta perfino della secca che l'aveva sostituita.
+    #    Misurata a 320px in vista sats, col valore che porta sempre
+    #    la pillola «in promo» accanto allo zero.
+    prova("nel conto la fee porta il nome di casa", (True, False),
+          ("r('Fee Barattolo'" in _cr, "Commissione Barattolo" in _cr))
     #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
     #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
     #    c'e' e vale lo stesso ragionamento. La percentuale e' la
@@ -37151,11 +37162,14 @@ console.log(JSON.stringify(out));
           '<div class="ctrl-conto">' in cm and 'ctrl-riga' in cm)
     prova("...e il controvalore e' al mercato puro", True,
           "Controvalore" in cm and "≈ 12000 sats" in cm)
-    # «COMMISSIONE» SECCA (10 set 2026, decisione di Andrea): il
-    # rimedio del mercatino per la stessa misura — l'etichetta lunga
-    # cedeva coi puntini a 320px, e in promo/intervallo anche a 375.
-    prova("la commissione dice la meta' di chi legge, col meno", True,
-          "<span>Commissione</span>" in cm and "1% · ≈ −120 sats" in cm
+    # «FEE BARATTOLO» (11 set 2026, decisione di Andrea): lo stesso
+    # nome nei due conti, e il nome torna a dire DI CHI e'. A restare
+    # VIETATA e' la formula lunga, non il nome: «Commissione
+    # Barattolo» cedeva coi puntini a 320px (e in promo/intervallo
+    # anche a 375), mentre questa e' piu' corta perfino della secca
+    # che l'aveva sostituita — misurato, non stimato.
+    prova("la fee dice la meta' di chi legge, col meno", True,
+          "<span>Fee Barattolo</span>" in cm and "1% · ≈ −120 sats" in cm
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
           "Ricevi" in cm and "≈ 11880 sats" in cm)
@@ -37214,12 +37228,12 @@ console.log(JSON.stringify(out));
           and "≈ 11940 sats" in o["contoPromo"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
           True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
-          and "%" not in o["contoGratis"].split("<span>Commissione</span>")[1]
+          and "%" not in o["contoGratis"].split("<span>Fee Barattolo</span>")[1]
                                           .split("</div>")[0])
     # NON SI SA NON E' GRATIS: senza il 38385 la commissione e' un
     # trattino, mai uno zero — e nessun «in promo» inventato.
     prova("senza 38385 la commissione e' un trattino, senza promo", True,
-          ">—<" in o["contoIgnoto"].split("<span>Commissione</span>")[1]
+          ">—<" in o["contoIgnoto"].split("<span>Fee Barattolo</span>")[1]
                                    .split("</div>")[0]
           and "in promo" not in o["contoIgnoto"])
     prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
