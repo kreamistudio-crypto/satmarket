@@ -9966,3 +9966,30 @@ stampa il rettangolo di ogni colonna, e il ritaglio va dove serve al
 primo colpo.
 COLLAUDATO: **9210 verdi**, col caso vero di oggi a verbale nel banco
 (listino 3, fee 2, la pillola accanto all'1%).
+
+## Le due righe che contano stanno in una scatola
+
+RITOCCO DI ANDREA (11 set 2026): «Ricevi» e «Totale da pagare» devono
+vedersi subito e non perdersi tra le righe. Il grassetto non bastava,
+ed è una conseguenza dei ritocchi di oggi: in un conto dove OGNI riga
+porta una cifra in colore — verde, rosso, grigio del subtotale — due
+righe in neretto si leggono come le altre, mentre sono le uniche due
+che dicono quel che passa di mano davvero.
+LA SOLUZIONE È UNA SCATOLA e non un altro segno di separazione: il
+filo pieno che avevo messo ieri diceva «da qui in giù è un'altra
+cosa» ma lasciava le due righe nello stesso foglio delle altre. Il
+riquadro le TOGLIE dall'elenco — bordo sottile, fondo appena diverso
+(la crema della pagina dentro il bianco della card, e di sera il
+contrario per costruzione: sono i token di casa, non due colori
+scelti a mano). Il filo pieno è uscito: due segni per la stessa cosa
+sono uno di troppo.
+⚠️ I MARGINI NEGATIVI NON SONO UN TRUCCO DI IMPAGINAZIONE: il conto ha
+10px di padding, e senza `-10px` per lato la scatola resterebbe
+rientrata di quei dieci — cioè una scatola dentro una scatola con la
+stessa forma, due bordi paralleli a un dito di distanza. È il genere
+di cosa che non si nota decidendola e si nota guardandola.
+MISURATO A 320px: nessun troncamento nuovo (i margini negativi
+restituiscono esattamente il padding che la scatola aggiunge, quindi
+la larghezza utile dell'etichetta non cambia). Guardato nei due temi.
+COLLAUDATO: **9212 verdi**, con la sentinella che pretende i margini
+negativi e quella che vieta il ritorno del filo pieno.
