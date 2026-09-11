@@ -9814,3 +9814,68 @@ altro cantiere è sparita anche una rossa vera, la sentinella del
 compileall). Riprovato nel browser: chiusa di serie, si apre e mostra
 tutto incluso il badge, sparisce del tutto passando a un'identità non
 admin.
+
+## LA BASE DELLA FEE DEL COORDINATORE, e l'ordine delle righe
+
+⚠️ VERIFICATO SUI BYTE (11 set 2026, domanda di Andrea nata guardando
+il conto: «−90 su ~9.033, non su 7.528»): **la fee di mostro si
+calcola DOPO il premio**. In `src/util.rs`,
+`get_market_amount_and_fee` chiama `get_market_quote(fiat, code,
+premium)` e poi `get_fee(new_sats_amount)` — cioè sull'importo che ha
+GIÀ il premio dentro. Il nostro conto lo faceva già così (la metà si
+calcola su `merc`, non su `ctrl`), ma finché non era verificato era
+una somiglianza, non un fatto.
+E IL CONTO ADESSO LO MOSTRA NELL'ORDINE IN CUI SI APPLICA:
+Controvalore → Sconto/Premio del venditore → **Subtotale** → Fee
+Barattolo → il separatore → Ricevi / Totale da pagare. Il Subtotale
+è la BASE su cui l'aliquota morde, e senza di lui un lettore che
+volesse rifare il conto a mano applicherebbe l'1% al Controvalore,
+trovando un altro numero.
+IL SUBTOTALE C'È SOLO COL PREMIO (senza, ripeterebbe il Controvalore
+parola per parola) ed è grigio muto, senza evidenza: è un passaggio,
+non una cifra che qualcuno paga. Le due righe finali si staccano dal
+calcolo con un filo pieno invece del tratteggio — sopra come ci si
+arriva, sotto la cifra.
+
+## Le percentuali del conto tornano in tinta
+
+ANDREA ROVESCIA LA SCELTA DEL GIRO PRIMA, ed è giusto che stia
+scritto: ieri avevo tolto la tinta alla percentuale del premio perché
+nel conto il colore era appena diventato una DIREZIONE (i sats che
+entrano o escono), e due significati per lo stesso verde mi
+sembravano un difetto. Lui la rimette, e aggiunge il rosso
+all'aliquota della fee.
+⚠️ LA REGOLA CHE NE ESCE, e che va letta prima di «sistemare» una
+delle due: **nella riga del conto le due tinte dicono due cose
+diverse perché stanno in due colonne diverse.** A SINISTRA, attaccata
+al nome della voce, la percentuale porta il GIUDIZIO per chi legge —
+verde se quel prezzo gli conviene, rosso se no (e la fee è sempre
+rossa: è un costo in tutti e due i tab). A DESTRA la cifra porta la
+DIREZIONE: verde se quei sats si aggiungono, rosso se si tolgono, col
+segno sempre scritto.
+IL CASO CHE LE FA DIVERGERE è il tab Vendi con un premio: la
+percentuale è VERDE (il prezzo è favorevole a chi vende) e la cifra
+è ROSSA (quei sats dal conto escono lo stesso). Non è un errore ed è
+provato apposta: ogni colonna è coerente nella sua lettura.
+L'ALIQUOTA SALE NELL'ETICHETTA in tutti e due i conti — «Fee
+Barattolo 1%» nel P2P, «Fee Barattolo 3%» nel mercatino — perché
+spinta all'altro capo della riga sembrava un secondo numero da
+mettere in relazione con la cifra, mentre attaccata al nome si legge
+in un colpo. La pillola «in promo» le sta accanto (classe `dopo`:
+l'aria le serve dall'altra parte, ora che segue una parola invece di
+precedere una cifra).
+⚠️ E LA PERCENTUALE DEL MERCATINO È QUELLA VIVA, dal server: la
+chiave `commissione_percento` è nuova nelle due rotte del preventivo,
+accanto a `commissione_sats`. Cablarla nel client avrebbe messo nel
+conto un numero che vive nel config del VPS — la trappola esatta che
+il pannello delle leve esiste per non far ricadere. A zero non si
+scrive «0%»: resta la pillola, che dice la stessa cosa meglio.
+MISURATO A 320px: zero etichette troncate nel conto del P2P (il caso
+peggiore, «Sconto del venditore 20%» col suo valore, manda il valore
+a capo e tiene il nome intero) e «Fee Barattolo 3%» sta anche nel
+mercatino. Resta il solo troncamento già dichiarato ieri, «Totale da
+pagare» del mercatino a sette cifre: 137px su 134, preesistente.
+COLLAUDATO: **9192 verdi**. Provato il caso di Andrea nei numeri:
+Controvalore + sconto = Subtotale, meno l'1% = «Ricevi» (12000 − 480
+= 11520, −115 = 11405 nel banco; 599.520 + 119.904 = 719.424, −7.194
+= 712.230 in vetrina).
