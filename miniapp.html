@@ -3335,12 +3335,35 @@
      casi. */
   .ctrl-riga .p2p-avviso{color:var(--danger)}
   .ctrl-riga .p2p-affare{color:var(--trust)}
-  /* ⚠️ E L'ETICHETTA DEL PREMIO VA A CAPO invece di cedere coi
-     puntini: e' l'unica riga del conto la cui etichetta porta un
-     DATO — «Premio al venditore +4%» — e troncarla mangerebbe
-     proprio quello. Le altre cedono come sempre: li' a destra c'e'
-     tutto. */
-  .ctrl-riga.premio>span:first-child{white-space:normal}
+  /* ══ IL CONTO DEL P2P CEDE DALLA DESTRA (11 set 2026, decisione di
+     Andrea) ══ e rovescia, SOLO QUI, la regola di casa «a cedere e'
+     l'etichetta coi puntini». Il perche' e' che qui le due parti non
+     sono piu' una etichetta e una cifra: a destra c'e' un cartello
+     («in promo»), una percentuale e una cifra che su un ordine a
+     INTERVALLO porta due capi da otto cifre — misurata, schiacciava
+     l'etichetta fino a ZERO pixel, cioe' la riga non diceva piu' di
+     COSA parlava. Fra un nome mozzato e un valore che va a capo, a
+     perdere dev'essere l'impaginazione.
+     Le tre regole lavorano insieme e nessuna basta da sola:
+     1) la riga puo' ANDARE A CAPO (`wrap`);
+     2) l'etichetta non si stringe sotto il suo contenuto minimo
+        (`min-width:min-content`) e non porta piu' i puntini, quindi
+        al massimo va a capo lei stessa — che e' quel che fa la riga
+        del premio, l'unica con un DATO nell'etichetta;
+     3) il valore resta incollato a destra anche quando scende su una
+        riga sua (`margin-left:auto`), o si ritroverebbe a sinistra
+        sotto il nome. */
+  .conto-p2p .ctrl-riga{flex-wrap:wrap}
+  .conto-p2p .ctrl-riga>span:first-child{flex:0 1 auto;min-width:min-content;
+    overflow:visible;text-overflow:clip;white-space:normal}
+  .conto-p2p .ctrl-riga .mono{flex:0 1 auto;margin-left:auto;text-align:right;
+    white-space:normal}
+  /* ⚠️ E DENTRO IL VALORE IL CAPO CADE IN UN POSTO SOLO: fra la
+     pillola e il numero. `.num` e' il gruppo indivisibile — la cifra
+     col suo ≈, il segno e l'unita' — ed e' la regola di casa che
+     questa apertura NON tocca: «≈ −3453 sats» spezzato a meta'
+     sarebbe un altro numero. */
+  .conto-p2p .ctrl-riga .mono .num{white-space:nowrap}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
   /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
@@ -37102,15 +37125,25 @@ function contoDettP2P(o){
   /* la cifra di una voce, coi suoi capi: il ≈ sta su ogni stima — e la
      meta' della commissione e' SEMPRE una stima, l'arrotondamento
      buono ce l'ha il coordinatore */
-  const cifra = (campo, segno) => {
+  /* ⚠️ LA CIFRA VIAGGIA IN UN `.num`, e non e' decorazione: nel conto
+     del P2P a cedere e' la DESTRA (vedi il CSS di `.conto-p2p`),
+     quindi il valore PUO' andare a capo — e questo span e' il pezzo
+     che non si spezza MAI, cosi' il capo cade fra la pillola e il
+     numero e mai dentro «≈ −3453 sats». E' la regola di casa («la
+     cifra col suo ≈ e la sua unita' e' un gruppo indivisibile»)
+     portata dentro una riga che adesso ha il permesso di andare a
+     capo. */
+  const cifraNuda = (campo, segno) => {
     if (!vivo) return '—';
     const circa = !fisso || campo === 'meta'
       || (campo === 'netto' && conti[0].meta > 0);
     return (circa ? '≈ ' : '') + (segno || '')
       + conti.map(c => fmt(c[campo])).join('–') + ' sats';
   };
-  const cifreEuro = esc(fmtEur(o.euro))
-    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' ' + monetaP2P(o);
+  const num = t => '<span class="num">' + t + '</span>';
+  const cifra = (campo, segno) => num(cifraNuda(campo, segno));
+  const cifreEuro = num(esc(fmtEur(o.euro))
+    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' ' + monetaP2P(o));
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —
      lo stesso cartello del conto del mercatino */
@@ -37118,9 +37151,13 @@ function contoDettP2P(o){
                  && fee * 100 < commissioneListinoP2P())
     ? '<span class="promo-tag">in promo</span>' : '';
   const pct = n => esc(n.toLocaleString('it-IT', {maximumFractionDigits: 2}));
-  const commissione = fee === null ? '—'
-    : fee > 0 ? promo + pct(fee * 50) + '% · ' + cifra('meta', compro ? '−' : '')
-    : promo + '0 sats';
+  /* la percentuale sta nello stesso `.num` della cifra: sono un
+     dato solo («0,5% · ≈ −3453 sats»), e a cedere dev'essere la
+     PILLOLA, che e' un cartello e non un numero */
+  const commissione = fee === null ? num('—')
+    : fee > 0 ? promo + num(pct(fee * 50) + '% · '
+                            + cifraNuda('meta', compro ? '−' : ''))
+    : promo + num('0 sats');
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto) */
   const affare = (o.lato === 'buy') === (o.premium > 0);
@@ -37156,7 +37193,14 @@ function contoDettP2P(o){
       ? 'La commissione (' + pct(fee * 100) + '% dello scambio) si divide metà a testa: nel conto c’è la tua metà.'
       : ''
   ].filter(Boolean).join(' ');
-  return '<div class="ctrl-conto">'
+  /* `conto-p2p` NON e' un vestito diverso: e' il permesso di cedere
+     dalla parte giusta. Qui i valori sono lunghi come in nessun'altra
+     riga dell'app — una percentuale, un cartello e due capi di un
+     intervallo nella stessa riga — e senza questa classe a pagare
+     sarebbe l'etichetta. Il conto del mercatino non ce l'ha e resta
+     identico: la' le cifre sono corte e la regola di casa («a cedere
+     e' l'etichetta») non fa danni. */
+  return '<div class="ctrl-conto conto-p2p">'
     + r('Controvalore', cifra('ctrl'))
     /* «FEE BARATTOLO» (11 set 2026, decisione di Andrea), lo stesso
        nome del conto del mercatino: i due conti si vestono uguali e

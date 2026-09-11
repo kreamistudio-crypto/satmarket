@@ -37178,7 +37178,40 @@ console.log(JSON.stringify(out));
     # la meta' della commissione, o le righe non sommerebbero.
     cm = o["contoMercato"]
     prova("il conto veste il vestito del mercatino", True,
-          '<div class="ctrl-conto">' in cm and 'ctrl-riga' in cm)
+          '<div class="ctrl-conto conto-p2p">' in cm and 'ctrl-riga' in cm)
+    # ══ IL CONTO DEL P2P CEDE DALLA DESTRA (11 set 2026, decisione di
+    # Andrea) ══ e rovescia SOLO QUI la regola di casa «a cedere e'
+    # l'etichetta coi puntini»: qui a destra ci sono un cartello, una
+    # percentuale e una cifra a due capi, che MISURATI schiacciavano
+    # l'etichetta fino a ZERO pixel — cioe' la riga non diceva piu' di
+    # cosa parlava. Le tre regole lavorano insieme e nessuna basta da
+    # sola; la quarta tiene la cifra indivisibile, che e' la regola di
+    # casa che questa apertura NON tocca.
+    prova("il conto del P2P fa cedere la destra, non l'etichetta", True,
+          ".conto-p2p .ctrl-riga{flex-wrap:wrap}" in mini
+          and "min-width:min-content" in pezzo_js(
+              mini, "  .conto-p2p .ctrl-riga>span:first-child{", "}")
+          and "text-overflow:clip" in pezzo_js(
+              mini, "  .conto-p2p .ctrl-riga>span:first-child{", "}")
+          and "margin-left:auto" in pezzo_js(
+              mini, "  .conto-p2p .ctrl-riga .mono{", "}"))
+    prova("...ma la cifra col suo ≈ resta indivisibile", True,
+          ".conto-p2p .ctrl-riga .mono .num{white-space:nowrap}" in mini)
+    # ⚠️ E IL MERCATINO NON PRENDE LA CLASSE: la' le cifre sono corte,
+    # la regola di casa non fa danni, e un conto che va a capo dove non
+    # serve sarebbe piu' alto per niente.
+    prova("...e il conto del mercatino resta com'era", True,
+          "conto-p2p" not in re.sub(r"/\*[\s\S]*?\*/", "",
+                                    pezzo_js(mini, "function contoRighe(c){",
+                                             "\n}")))
+    # il `.num` e' il pezzo che il capo non spezza MAI: lo portano
+    # tutte le cifre del conto, compreso il trattino del «non si sa».
+    # QUATTRO e non cinque: su questo ordine il premio e' zero e la
+    # sua riga non c'e' (la regola dello sconto). Col premio sono
+    # cinque, ed e' la prova qui sotto.
+    prova("ogni valore del conto viaggia in un `.num`", [4, 5],
+          [cm.count('<span class="num">'),
+           o["contoPremio"].count('<span class="num">')])
     prova("...e il controvalore e' al mercato puro", True,
           "Controvalore" in cm and "≈ 12000 sats" in cm)
     # «FEE BARATTOLO» (11 set 2026, decisione di Andrea): lo stesso
