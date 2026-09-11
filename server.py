@@ -26846,13 +26846,26 @@ async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
     """La foto profilo che il bot vede (se l'utente la nasconde ai
     non-contatti, il bot non vede nulla: e' il suo modo di dire no).
     L'URL del file va scaricato subito e mai esposto: porta il token.
-    In collaudo bot_api simula e qui esce None, come deve."""
+    In collaudo bot_api simula e qui esce None, come deve.
+
+    b'' = Telegram ha risposto per bene e la foto non c'e' davvero
+    (fatto CONFERMATO: chi ha scelto 'telegram' senza ripiego deve
+    vedere l'iniziale). None = non si sa — l'API non ha risposto, o lo
+    scaricamento e' fallito a meta' — ed e' un fatto diverso: un
+    fallimento di rete non e' un «non ce l'ha», e il chiamante non deve
+    scambiare l'uno per l'altro cancellando una foto buona per un
+    intoppo di un istante (caso vero dal campo, set 2026)."""
     r = await bot_api("getUserProfilePhotos",
                       {"user_id": tg_id, "limit": 1})
+    if not r or not r.get("ok"):
+        return None
+    taglie_tutte = (r.get("result") or {}).get("photos") or []
+    if not taglie_tutte:
+        return b""
     try:
-        taglie = r["result"]["photos"][0]
         # le misure arrivano in ordine crescente: la prima che copre
         # il francobollo basta, e pesa meno
+        taglie = taglie_tutte[0]
         t = next((t for t in taglie
                   if t.get("width", 0) >= AVATAR_LATO), taglie[-1])
         f = await bot_api("getFile", {"file_id": t["file_id"]})
@@ -26863,7 +26876,7 @@ async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
             resp.raise_for_status()
             return resp.content
     except Exception:
-        return None    # niente foto, privacy o rete che manca: pari sono
+        return None    # scaricamento fallito: idem, non si sa
 
 
 def _kind0_profilo(relay: str, hexkey: str):
@@ -26996,6 +27009,15 @@ async def aggiorna_profilo_social(tg_id: int):
         raw = None
         if tg_id > 0 and scelta in ("", "telegram"):
             raw = await _foto_profilo_telegram(tg_id)
+            if raw is None and scelta == "telegram":
+                # scelta ESPLICITA e Telegram non ha risposto (rete o
+                # API a vuoto): non e' un "non ce l'ha" confermato (quel
+                # caso torna b'', falsy come None ma gia' passato di
+                # qui), quindi non si tocca l'avatar che gia' c'era —
+                # il bottone «Telegram» non deve poter cancellare una
+                # foto buona per un intoppo di un istante. Ci si
+                # riprova al prossimo tocco o al rinfresco settimanale.
+                return
         if not raw and profilo and scelta in ("", "nostr"):
             raw = await _foto_profilo_nostr(profilo)
         _scrivi_avatar(tg_id, _salva_avatar(u["negozio"], raw))

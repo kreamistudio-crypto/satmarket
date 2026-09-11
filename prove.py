@@ -7910,6 +7910,99 @@ def prove_foto_spenta():
           social[1:])
 
 
+def prove_foto_telegram_fallita():
+    """IL BOTTONE «TELEGRAM» NON DEVE CANCELLARE UNA FOTO BUONA (set
+    2026, dal campo di Andrea): l'account aveva la foto vera di
+    Telegram fin dall'inizio, e' passato a Nostr (funzionava), poi e'
+    tornato su Telegram — e li' e' rimasto senza foto per niente, ne'
+    Telegram ne' Nostr.
+
+    LA CAUSA: `_foto_profilo_telegram` restituiva un solo None sia per
+    «Telegram ha risposto: la foto non c'e'» sia per «l'API o la rete
+    non hanno risposto», e la scelta ESPLICITA (senza ripiego su Nostr,
+    voce di `aggiorna_profilo_social`) scriveva '' in colonna in
+    entrambi i casi: un intoppo di un istante bastava a cancellare una
+    foto che c'era davvero.
+
+    LA CURA distingue i due casi: b'' = Telegram ha risposto per bene e
+    conferma zero foto (si scrive '', e' la scelta senza ripiego che
+    l'utente ha chiesto); None = non si sa (rete o API a vuoto), e
+    l'avatar che gia' c'era non si tocca."""
+    import asyncio
+    print("\n[il bottone Telegram non cancella una foto buona per un intoppo]")
+
+    # --- _foto_profilo_telegram distingue i tre casi -----------------
+    ft = pezzo("_foto_profilo_telegram")
+
+    def chiama(risposta):
+        async def _bot_api(metodo, dati):
+            return risposta
+        amb = {"bot_api": _bot_api, "AVATAR_LATO": 128, "BOT_TOKEN": "x",
+               "httpx": None}
+        exec("async " + ft, amb)
+        return asyncio.new_event_loop().run_until_complete(
+            amb["_foto_profilo_telegram"](111))
+
+    prova("rete/API a vuoto: non si sa (None), non e' un 'non ce l'ha'",
+          None, chiama(None))
+    prova("Telegram risponde ok=False (es. 429): idem, None", None,
+          chiama({"ok": False, "error_code": 429}))
+    prova("Telegram conferma zero foto: b'' e non None",
+          b"", chiama({"ok": True,
+                      "result": {"total_count": 0, "photos": []}}))
+
+    # --- aggiorna_profilo_social: il None esplicito non scrive nulla -
+    agg = pezzo("aggiorna_profilo_social")
+
+    def mondo(esito_telegram):
+        riga = {"negozio": "ab12cd34", "avatar": "av_ab12cd34_100.jpg",
+                "npub": "", "npub_verificata": 0, "npub_accesso": "",
+                "avatar_scelta": "telegram"}
+
+        class _Con:
+            def execute(self, q, p=()):
+                return self
+
+            def fetchone(self):
+                return dict(riga)
+
+            def close(self):
+                pass
+
+        scritture = []
+
+        async def _foto_tg(tg_id):
+            return esito_telegram
+
+        async def _foto_ns(profilo):
+            return None
+
+        async def _prof_ns(npub):
+            return {}
+
+        amb = {"db": lambda: _Con(), "_AVATAR_IN_CORSO": set(),
+               "_profilo_nostr": _prof_ns,
+               "_scrivi_nome_nostr": lambda tg_id, nome: None,
+               "nome_da_profilo": lambda profilo: "",
+               "_foto_profilo_telegram": _foto_tg,
+               "_foto_profilo_nostr": _foto_ns,
+               "_scrivi_avatar": lambda tg_id, nome: scritture.append(nome),
+               "_salva_avatar": lambda negozio, raw:
+                   ("av_ab12cd34_NUOVA.jpg" if raw else ""),
+               "print": lambda *a, **k: None}
+        exec("async " + agg, amb)
+        asyncio.new_event_loop().run_until_complete(
+            amb["aggiorna_profilo_social"](111))
+        return scritture
+
+    prova("rete giu': non si scrive NIENTE, la foto buona resta",
+          [], mondo(None))
+    prova("Telegram conferma zero foto: si scrive '' (senza ripiego)",
+          [""], mondo(b""))
+    prova("Telegram risponde con la foto: si scrive quella nuova",
+          ["av_ab12cd34_NUOVA.jpg"], mondo(b"jpegfinto"))
+
+
 def prove_duplica_annuncio():
     """IL DUPLICATO (ago 2026, chiesto da Andrea): si ricalca un
     proprio annuncio invece di ricompilare tutto, e i tre campi che
@@ -51689,7 +51782,7 @@ def main():
               prove_initdata, prove_portachiavi,
               prove_foto, prove_foto_scarti,
               prove_duplica_annuncio, prove_avatar,
-              prove_foto_spenta,
+              prove_foto_spenta, prove_foto_telegram_fallita,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
