@@ -36331,7 +36331,7 @@ console.log(JSON.stringify(out));
           "50,00–100,00 €, scegli tu" in out["rigaRange"]
           and ">al prezzo di mercato<" in out["rigaRange"])
     prova("...e col premio il range porta il badge, e sceglie lo stesso",
-          True, "4%</b> più caro" in out["rigaRangePremio"]
+          True, "4%</b> più conveniente" in out["rigaRangePremio"]
           and "50,00–100,00 €, scegli tu" in out["rigaRangePremio"])
     prova("lo scaduto e' escluso", None, out["scaduto"])
     prova("senza id non e' un ordine", None, out["senzaD"])
@@ -36354,14 +36354,17 @@ console.log(JSON.stringify(out));
     # LA CARD ESSENZIALE (10 set 2026, ritocco di Andrea): due righe
     # e un badge. Il badge dice il SOLO premio del venditore — mai la
     # commissione, che e' uguale per tutti: il suo mestiere e'
-    # confrontare le offerte — con DUE parole sole, uguali nei due
-    # tab, che dicono il prezzo («piu' caro» / «di sconto», 11 set
-    # 2026: prima erano quattro e cambiavano col lato) e la tinta del
-    # giudizio di sempre sul solo numero (affare/avviso dal lato, la
-    # formula uniforme di get_market_quote, verificata sui byte).
+    # confrontare le offerte — col GIUDIZIO per chi legge in due
+    # frasi sole, «piu'/meno conveniente» (11 set 2026, quarta e
+    # ultima stesura: la prima ne voleva quattro, le intermedie
+    # dicevano il prezzo e lasciavano il giudizio a chi legge). Testo
+    # e tinta escono ORA dallo stesso `affare`, quindi dicono la
+    # stessa cosa: il giudice di sempre (dal lato, sulla formula
+    # uniforme di get_market_quote verificata sui byte).
     prova("a prezzo di mercato la cifra porta il ≈ e il badge il premio",
           True, "≈ 98000 sats" in out["rigaMercato"]
-          and '<b class="p2p-affare">2%</b> più caro' in out["rigaMercato"])
+          and '<b class="p2p-affare">2%</b> più conveniente'
+          in out["rigaMercato"])
     # LA SECONDA PERSONA, e le righe che si scambiano il posto: nel
     # tab «Compra BTC» (k=sell) chi legge paga euro e riceve sats, nel
     # tab «Vendi BTC» (k=buy) invia sats e riceve euro. La cifra in
@@ -36420,19 +36423,34 @@ console.log(JSON.stringify(out));
           in out["rigaCompra"]
           and "p2p-affare" not in out["rigaCompra"]
           and "p2p-avviso" not in out["rigaCompra"])
-    # IL TESTO GUARDA IL PREZZO E LA TINTA GUARDA CHI LEGGE, ed e' la
-    # distinzione che rende sensato un «piu' caro» VERDE: il prezzo
-    # dell'offerta e' sopra il mercato in tutti e due i tab, ma chi
-    # VENDE sats a un prezzo piu' caro ci guadagna. Due parole sole,
-    # uguali nei due tab, e sempre il valore ASSOLUTO: il verso lo
+    # TESTO E TINTA DICONO LA STESSA COSA (11 set 2026, quarta
+    # stesura): tutt'e due escono da `affare`, quindi verde dice
+    # sempre «piu' conveniente» e rosso «meno». Lo stesso premio
+    # cambia giudizio col lato — +3% a comprare e' meno conveniente
+    # (si ricevono meno sats), +2% a vendere e' piu' conveniente (se
+    # ne consegnano meno) — e il valore resta ASSOLUTO: il verso lo
     # dicono le parole, mai un segno da interpretare.
-    prova("a comprare: «3% più caro» rosso e «2% di sconto» verde", True,
-          '<b class="p2p-avviso">3%</b> più caro' in out["rigaAvviso"]
-          and '<b class="p2p-affare">2%</b> di sconto' in out["rigaSotto"])
-    prova("...e a vendere le parole non cambiano, la tinta si rovescia",
-          True, '<b class="p2p-affare">2%</b> più caro' in out["rigaMercato"]
-          and '<b class="p2p-avviso">2%</b> di sconto'
+    prova("a comprare: «3% meno conveniente» rosso e «2% più» verde", True,
+          '<b class="p2p-avviso">3%</b> meno conveniente' in out["rigaAvviso"]
+          and '<b class="p2p-affare">2%</b> più conveniente'
+          in out["rigaSotto"])
+    prova("...e a vendere lo stesso premio si rovescia, parole comprese",
+          True, '<b class="p2p-affare">2%</b> più conveniente'
+          in out["rigaMercato"]
+          and '<b class="p2p-avviso">2%</b> meno conveniente'
           in out["rigaVendiSotto"])
+    # ⚠️ E IL BADGE VERDE DICE SEMPRE «PIU'», il rosso sempre «MENO»:
+    # e' la cintura del ritocco — se un domani qualcuno rimettesse il
+    # testo sul PREZZO (le stesure di mezzo) tornerebbe possibile un
+    # «piu' caro» verde, cioe' due letture da tenere insieme a mente.
+    prova("...e la tinta non contraddice mai le parole",
+          [0, 0],
+          [sum(1 for k in ("rigaAvviso", "rigaSotto", "rigaMercato",
+                           "rigaVendiSotto")
+               if 'p2p-affare">' in out[k] and "meno conveniente" in out[k]),
+           sum(1 for k in ("rigaAvviso", "rigaSotto", "rigaMercato",
+                           "rigaVendiSotto")
+               if 'p2p-avviso">' in out[k] and "più conveniente" in out[k])])
     # ⚠️ QUESTA SENTINELLA E' STATA ROVESCIATA, e il perche' vale piu'
     # della riga: fino al 10 set VIETAVA le parole del verso, perche'
     # la riga del prezzo portava gia' il segno e il colore e le
@@ -36443,7 +36461,8 @@ console.log(JSON.stringify(out));
     # La decisione di allora non era sbagliata: e' cambiato cio' che
     # le stava accanto.
     prova("le parole del verso sono le sole a dirlo", True,
-          "(o.premium > 0 ? 'più caro' : 'di sconto')" in mini)
+          "+ pr + '%</b> ' + (affare ? 'più' : 'meno') + ' conveniente'"
+          in mini)
 
     # --- 7c) I SATS SONO SEMPRE AL NETTO DEL PREMIO -----------------
     # (set 2026, regola resa esplicita da Andrea) La cifra mostrata e'
@@ -36546,7 +36565,7 @@ console.log(JSON.stringify(out));
     prova("...e a cambio muto non inventa nessun numero", True,
           "≈" not in out["rigaMercatoMuto"]
           and "≈" not in out["rigaMercatoZeroMuto"]
-          and "2%</b> più caro" in out["rigaMercatoMuto"]
+          and "2%</b> più conveniente" in out["rigaMercatoMuto"]
           and ">al prezzo di mercato<" in out["rigaMercatoZeroMuto"])
     prova("...mentre col cambio vivo la stima c'e', e il badge non cambia",
           True, "≈" in out["rigaMercatoZeroVivo"]
