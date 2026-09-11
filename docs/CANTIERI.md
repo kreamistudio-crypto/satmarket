@@ -9104,7 +9104,58 @@ COLLAUDATO: 9106 verdi — i quattro testi del badge coi loro colori,
 il premio-zero e il fisso senza badge, il cambio muto che tiene il
 badge (non ha bisogno del cambio) e perde solo le cifre, e la
 sentinella CSS che pretende le coppie di casa e vieta il ritorno di
-`.p2p-prezzo`. Guardato in vetrina CDP: sei card nei due temi. Da lì il conto ha smesso da solo di dire «in
+`.p2p-prezzo`. Guardato in vetrina CDP: sei card nei due temi.
+⚠️ DUE SCELTE DI QUESTA VOCE SONO CADUTE IL GIORNO DOPO — le quattro
+frasi del gesto e la pillola col fondo tinto: vedi la voce qui sotto,
+che dice anche perché.
+
+## Il badge dice il mercato, non il gesto
+
+IL RITOCCO DEL GIORNO DOPO (11 set 2026, Andrea), che rovescia due
+scelte della voce qui sopra e ne lascia in piedi la terza (il badge
+mostra il SOLO premio del venditore, mai la commissione: quella è
+uguale per tutti, e il mestiere del badge è confrontare le offerte).
+LE PAROLE: «4% sopra il mercato» / «2% sotto il mercato», e a premio
+zero «al prezzo di mercato». Via «più caro / Risparmi / Incassi»,
+che erano QUATTRO frasi diverse per la stessa cosa a seconda del
+lato — e due offerte si confrontano solo con lo stesso metro. Il
+metro è il mercato, ed è uno solo.
+A ZERO LA FRASE C'È LO STESSO, ed è la parte che non era stata
+chiesta ieri: «nessun badge» lasciava la card muta proprio sul caso
+più comune, e chi scorre non poteva sapere se il premio mancava o se
+nessuno gliel'aveva detto. A prezzo fisso resta il nulla: quel
+prezzo il mercato non lo guarda.
+IL VESTITO TORNA MUTO: la pillola col fondo tinto è durata un
+giorno — due pillole colorate per card, in un elenco che si scorre,
+gridavano più delle cifre — e torna il grigio delle card con la
+TINTA SUL SOLO NUMERO. Il giudice è sempre lo stesso
+(`affare = (lato==='buy') === (premium>0)`), e resta `display:block`
+perché nel tab Vendi la riga sopra è lo span inline dell'euro.
+⚠️ E UNA SENTINELLA È STATA ROVESCIATA, col suo perché scritto
+accanto: fino a ieri VIETAVA «sopra/sotto il mercato» — la riga del
+prezzo portava già segno e colore, e le parole erano un terzo modo
+di dire la stessa cosa. Oggi il segno non c'è più (il badge porta il
+valore ASSOLUTO) e il colore da solo non dice da che parte pende:
+quelle parole sono diventate l'unica cosa che lo dice. **La
+decisione di allora non era sbagliata: è cambiato ciò che le stava
+accanto** — ed è la ragione per cui una sentinella si rovescia
+leggendo il perché invece di cancellarla.
+NEL CONTO LA PERCENTUALE PASSA NELL'ETICHETTA — «Premio al
+venditore (+4% sopra il mercato)», a destra i soli sats — così chi
+ha letto «4% sopra il mercato» sulla card ritrova la stessa frase e
+capisce che quella riga è quel premio lì. Due misure pagate subito:
+l'etichetta del premio VA A CAPO invece di cedere coi puntini (è
+l'unica del conto che porta un DATO, e troncarla mangerebbe proprio
+quello), e la nota va a capo INTERA (`nowrap` su di lei), o la
+spezzatura cade dentro la frase — «…(+4% sopra» / «il mercato)» —
+che si legge come due cose. Misurato a 375 e a 320.
+⚠️ E LA COPPIA DI TINTE DEL CONTO HA DOVUTO CAMBIARE POSTO nel CSS:
+la percentuale vive DENTRO `.ctrl-nota`, che è grigia, e a parità di
+specificità vince l'ultima scritta — restando dov'era, il grigio
+avrebbe spento il numero senza che niente fallisse. Ora sta dopo la
+nota, con una sentinella sull'ORDINE delle due regole.
+COLLAUDATO: 9107 verdi. Guardato in vetrina CDP nei due temi: sei
+card e cinque conti, a 375 e a 320. Da lì il conto ha smesso da solo di dire «in
 promo»: nessun deploy, che è esattamente il disegno. IL CONTO
 ECONOMICO DA NON DIMENTICARE: la dev fee di Mostro è il 30% della
 NOSTRA fee — oggi il tappo `dev_fee_percentage = 0` (il circuito
