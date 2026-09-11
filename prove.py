@@ -37524,6 +37524,24 @@ console.log(JSON.stringify(out));
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
           "Ricevi" in cm and "≈ 11880 sats" in cm)
+    # ⚠️ LE DUE RIGHE FINALI STANNO IN UNA SCATOLA LORO (set 2026,
+    # ritocco di Andrea: «devono vedersi subito e non perdersi tra le
+    # righe»): il grassetto non bastava in un conto dove ogni riga
+    # porta una cifra in colore. I margini NEGATIVI la portano a filo
+    # del riquadro esterno — senza, sarebbe una scatola dentro una
+    # scatola con la stessa forma, due bordi paralleli a un dito di
+    # distanza.
+    prova("le due righe finali vivono in una scatola loro", True,
+          '<div class="ctrl-chiusa">' in cm
+          and cm.index('<div class="ctrl-chiusa">') < cm.index("Ricevi")
+          and "margin:8px -10px -4px" in pezzo_js(
+              mini, "  .conto-p2p .ctrl-chiusa{", "}")
+          and "border:1.5px solid var(--line)" in pezzo_js(
+              mini, "  .conto-p2p .ctrl-chiusa{", "}"))
+    # ...e il filo pieno che le staccava non serve piu': lo stacco lo
+    # fa la scatola, e due segni per la stessa cosa sono uno di troppo
+    prova("...e il filo pieno di ieri e' uscito", False,
+          ".conto-p2p .ctrl-riga.tot.sats{border-top" in mini)
     prova("...e l'ultima riga e' l'euro, in evidenza", True,
           "Totale da pagare" in cm and "6,00 € 🇪🇺" in cm
           and cm.count('ctrl-riga tot') == 2)

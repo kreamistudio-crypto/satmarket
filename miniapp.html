@@ -3532,10 +3532,20 @@
      mostro — e chi vuole rifare il conto a mano deve poterla vedere. */
   .conto-p2p .ctrl-riga.sub>span:first-child,
   .conto-p2p .ctrl-riga.sub .mono{color:var(--muted)}
-  /* ...e le due righe finali si staccano da quelle del calcolo con un
-     filo pieno invece del tratteggio: sopra c'e' come si arriva alla
-     cifra, sotto la cifra. */
-  .conto-p2p .ctrl-riga.tot.sats{border-top:1.5px solid var(--line)}
+  /* ...e le due righe finali vivono in una SCATOLA loro, staccata dal
+     calcolo: sopra come si arriva alla cifra, dentro la cifra. Fondo
+     appena diverso (la crema della pagina dentro il bianco della
+     card, e di sera il contrario per costruzione: sono i token di
+     casa) e un bordo sottile — quanto basta perche' l'occhio ci cada
+     senza che gridi.
+     I MARGINI NEGATIVI la portano a filo del riquadro esterno: il
+     conto ha 10px di padding, e senza questi la scatola resterebbe
+     rientrata di quei dieci per lato, cioe' una scatola dentro una
+     scatola con la stessa forma — due bordi paralleli a un dito di
+     distanza, che e' la cosa che si nota per sbaglio. */
+  .conto-p2p .ctrl-chiusa{margin:8px -10px -4px;padding:0 10px;
+    border:1.5px solid var(--line);border-radius:12px;
+    background:var(--bg)}
   .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
@@ -37767,8 +37777,20 @@ function contoDettP2P(o){
        mentre l'euro resta nell'inchiostro. Due arancioni in fondo al
        conto facevano una macchia sola, e nessuna delle due si
        staccava. */
+    /* ⚠️ LE DUE RIGHE FINALI STANNO IN UNA SCATOLA LORO (set 2026,
+       ritocco di Andrea: «devono vedersi subito e non perdersi tra le
+       righe»). Il grassetto non bastava: in un conto dove ogni riga
+       porta una cifra in colore, due righe in neretto si leggevano
+       come le altre — e sono le uniche due che dicono quel che passa
+       di mano davvero.
+       UNA SCATOLA E NON UN'ALTRA RIGA DI SEPARAZIONE: il filo pieno
+       che c'era diceva «da qui in giu' e' un'altra cosa», ma lasciava
+       le due righe nello stesso foglio delle altre. Il riquadro le
+       toglie dall'elenco. */
+    + '<div class="ctrl-chiusa">'
     + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot sats')
     + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot euro')
+    + '</div>'
     + '</div>'
     + (dice ? '<div class="hint">' + dice + '</div>' : '');
 }
