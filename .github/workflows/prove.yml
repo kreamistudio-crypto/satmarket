@@ -40,7 +40,13 @@ jobs:
       # locale passava perche' in locale Pillow c'e'. Misurato: 211
       # prove invece di 212. Coincurve, anthropic & co. restano fuori
       # per davvero: i pezzi che le usano sono fail-open per
-      # costruzione e qui non si esercitano.
+      # costruzione e qui non si esercitano — il badge Nostr NIP-58
+      # (set 2026) lo conferma invece di romperlo: il suo giudice della
+      # firma vera esisteva nella prima stesura, chiedeva coincurve per
+      # davvero, ed e' sparito insieme al meccanismo che lo usava
+      # (niente piu' challenge da verificare sui relay — vedi
+      # docs/CANTIERI.md, "IL SECONDO GIRO"). Quel che resta si prova
+      # con un doppio, come sempre qui.
       - name: Installa il minimo indispensabile
         run: pip install --quiet websocket-client pillow cryptography snowballstemmer
 

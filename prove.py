@@ -51613,7 +51613,16 @@ def prove_badge_nostr():
           ["k", "8"] in lapide["tags"])
 
     # --- 3) _pubkey_normalizzata: npub o hex, mai altro ---------------
-    from fastapi import HTTPException as _HTTPException
+    # Un doppio leggero e non il vero fastapi.HTTPException: qui serve
+    # solo lo status_code che _pubkey_normalizzata gli passa, e tirare
+    # dentro un framework web intero (con tutto cio' che installa)
+    # sarebbe il prezzo sbagliato per una riga sola — la stessa
+    # prudenza di CI, che installa il minimo indispensabile.
+    class _HTTPException(Exception):
+        def __init__(self, status_code, detail=""):
+            self.status_code = status_code
+            self.detail = detail
+            super().__init__(detail)
 
     amb3 = {"HTTPException": _HTTPException, "RE_HEX_64": re.compile(
         r"[0-9a-f]{64}")}
