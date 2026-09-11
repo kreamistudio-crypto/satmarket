@@ -9388,3 +9388,33 @@ DICHIARATO E NON CURATO: il server manda ancora `giorni` in
 numero di giorni, mai una data, e la regola della privacy che lo
 aveva disegnato resta scritta — ma il giorno che si tocchi quella
 rotta, quella chiave si può togliere.
+
+## In tinta va la cifra, non il verbo
+
+RITOCCO DI UNA RIGA (11 set 2026, Andrea): nella riga dei sats delle
+card — «Ricevi ≈ 7.605 sats», «Paghi ≈ 4.472 sats» — il VERBO passa
+all'inchiostro di casa e in tinta resta solo la cifra con la sua
+unità. Colorata tutta, la riga si leggeva come un blocco unico di
+colore, e un colore che tinge anche le parole smette di indicare
+qualcosa.
+⚠️ E LA TINTA NON È L'ARANCIO DEI SATS, che è la cosa che avevo
+scritto in tre commenti prima di andarla a guardare: dentro la card
+quel colore viene da `.p2p-ord .p2p-sats` ed è **il colore del
+LATO** — `--trust` verde nel tab Compra, `--danger` rosso nel tab
+Vendi via `body.p2p-vendo`. L'arancio `--sats-text` vale fuori dalla
+card (scambio, striscia), e c'era già un commento che lo diceva.
+**Una spiegazione sbagliata in un commento è peggio di nessun
+commento**: l'ho corretta nei tre posti prima del commit.
+LA REGOLA COLPISCE IL VERBO e non si affida alla specificità: il
+colore del lato arriva al verbo per EREDITÀ, e una dichiarazione
+sull'elemento stesso vince l'eredità comunque sia scritto chi tinge
+il genitore.
+⚠️ E LA VETRINA MOSTRAVA IL LATO SBAGLIATO, difetto del banco e non
+del codice: la tinta del Vendi vive su una classe del `body`, che la
+vetrina non metteva — quindi le card «Vendi» si vedevano VERDI, cioè
+proprio il colore che si voleva guardare era finto. Ora la classe si
+accende da un parametro dell'URL e lo scatto si fa due volte
+(`scatta_card.py vendo`), in due file diversi o il secondo copre il
+primo.
+COLLAUDATO: **9124 verdi**. Guardato nei due temi e nei DUE LATI: il
+verbo neutro col numero verde a comprare e rosso a vendere.
