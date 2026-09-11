@@ -9715,3 +9715,68 @@ nel browser (crea badge, manda a mano, ritira) con lo stesso esito di
 prima — la semplificazione non ha rotto niente perché il motore che
 firma e pubblica (`_premia_pubkey`) non è mai stato toccato, solo chi
 lo chiama.
+
+## Nel conto il colore è una direzione
+
+QUATTRO RITOCCHI DELLO STESSO GIRO (11 set 2026, Andrea), e il primo
+detta la regola a tutti gli altri.
+IL COLORE DEI SATS DICE DOVE VANNO: verde quel che si AGGIUNGE a
+quel che ti arriva, rosso quel che si TOGLIE, col segno sempre
+scritto accanto — «+1.505 sats», «−90 sats». ⚠️ NON È UN GIUDIZIO DI
+CONVENIENZA, ed è la distinzione che regge tutto il conto: la stessa
+voce (la commissione) si TOGLIE a chi compra e si AGGIUNGE a chi
+vende, e un colore che dicesse «conviene» dovrebbe dire due cose
+opposte sulla stessa parola. Il Controvalore resta neutro apposta:
+è la base da cui si parte, non un pezzo che entra o esce.
+LA PERCENTUALE DEL PREMIO PERDE IL SEGNO — «Premio al venditore 4%»,
+«Sconto del venditore 20%» — perché il verso lo dice già la PAROLA, e
+il segno sta sui sats. Chiesto da Andrea.
+⚠️ E LE HO TOLTO ANCHE LA TINTA, che non era chiesto e va detto: con
+la regola nuova il colore nel conto significa DIREZIONE, e la tinta
+di «convenienza» sulla percentuale avrebbe messo due significati
+nello stesso rosso e verde a dieci centimetri di distanza — su un
+ordine di VENDITA col premio, la percentuale sarebbe stata verde
+accanto a sats rossi, nella stessa riga. È la stessa regola già
+scritta per il badge delle card («testo e tinta devono dire la
+stessa cosa»). Se dà fastidio si rimette in una riga.
+E L'ALIQUOTA DELLA FEE ESCE DAL GRUPPO DELLA CIFRA: «1%» non è una
+quantità che si muove — è quanto vale la trattenuta — e tinta di
+rosso direbbe che quell'uno per cento se ne va. Restano due gruppi
+indivisibili con un punto di capo in mezzo, che è il posto giusto
+dove spezzare.
+LE DUE RIGHE IN EVIDENZA NON PESANO PIÙ UGUALE: quella in SATS porta
+l'arancio di casa, l'euro resta nell'inchiostro. Due arancioni in
+fondo al conto facevano una macchia sola e nessuna delle due si
+staccava. L'arancio è `--sats-text` e non `--sats`: quello è
+l'arancio bitcoin puro, un colore da fondi e da icone che su carta
+chiara, come testo, non regge — ed è una taratura già scritta in
+casa.
+IL VOLTO SI ALLINEA IN ALTO COI DUE SEGNI, e `center` era proprio la
+causa di quel che Andrea aveva visto («la foto non è centrata»):
+centrava il tondo nell'altezza dell'INTERA colonna — segno, cifra ed
+etichetta — mentre stella e omino stanno tutti e due nella fascia
+alta. Misurati: i loro centri a 14px dal bordo del riquadro, quello
+del volto a 33. ⚠️ IL CENTRO ESATTO A 14 NON SI PUÒ AVERE con un
+tondo da 48: lo porterebbe da −10 a +38, cioè a sporgere sopra il
+riquadro e sotto il titolo. Da `flex-start` il suo centro va a 24 e i
+tre pezzi cominciano alla stessa altezza — è il massimo allineamento
+che sta dentro le righe.
+⚠️ E UNA SOSTITUZIONE È FALLITA IN SILENZIO, la trappola di casa
+ripagata: `miniapp.html` è tutto CRLF, e uno script che cerca ancore
+a righe separate da solo-LF non trova niente E NON PROTESTA — «+0
+byte» e via, col codice intatto. Da quel giro in poi la funzione di
+sostituzione converte le ancore e **alza** se non trova o se trova
+due volte: quattro modifiche, quattro conferme stampate. (E la
+stessa trappola è tornata a mordere scrivendo QUESTA voce, dove
+l'escape citata nel testo se l'è mangiata l'heredoc: la prosa con
+caratteri di escape si scrive col tool che non passa dalla shell, ed
+è una regola già in memoria.)
+⚠️ E UN ATTESO L'AVEVO DEDOTTO DA UNO SCREENSHOT invece di leggerlo:
+la cifra dello sconto nel banco è «+240», non «+14.389» — quello era
+un altro ordine, in un'altra vetrina. La prova è rimasta rossa finché
+non sono andato a guardare l'uscita vera del banco (`BANCO_DUMP=1`).
+Un numero visto in una figura non è il numero di quel caso.
+COLLAUDATO: **9139 verdi**. Guardato nei due temi: il rosso e il
+verde sui sats coi segni, «Ricevi» arancio e «Totale da pagare»
+neutro, il Vendi specchiato (fee col più, «Paghi» arancio), il caso
+sconto che somma (12000 − 122 + 240 = 12118).
