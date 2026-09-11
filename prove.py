@@ -36819,6 +36819,33 @@ def prove_p2p_dettaglio():
           True, 'id="p2pDettTit"' in mini
           and mini.count('<span class="foglio-back vuoto"') == 2
           and '<div class="foglio-corpo" id="p2pDettCorpo"></div>' in mini)
+    # LA VIA D'USCITA E' UNA ✕ (set 2026, ritocco di Andrea): questa
+    # pagina non e' una tappa di un cammino — e' una cosa che si apre
+    # sopra il libro e si CHIUDE. Il gesto resta `navIndietro()`: a
+    # cambiare e' il segno, non la strada.
+    # ⚠️ IL RITAGLIO NON PUO' FERMARSI AL PRIMO `</div>`: il primo che
+    # incontra e' quello del `.grab`, due righe dopo l'inizio, e la
+    # testata resterebbe fuori — la prova cercherebbe la ✕ in un pezzo
+    # che non la contiene e sarebbe rossa sul codice buono. Si ritaglia
+    # fino al corpo, che e' l'altro capo della testata.
+    _i = mini.index('<div class="sheet pieno" id="p2pDettSheet"')
+    _tt = mini[_i:mini.index('id="p2pDettCorpo"', _i)]
+    prova("la via d'uscita del dettaglio e' una ✕, non una freccia",
+          (True, False),
+          ("&#10005;" in _tt and 'onclick="navIndietro()"' in _tt,
+           "&#8592;" in _tt))
+    # E LA TESTATA RESTA ATTACCATA IN ALTO: sotto i 767 lo era gia'
+    # (li' il foglio e' una colonna flex e la testata sta fuori dal
+    # pezzo che scorre), questa regola serve al modale largo — col
+    # fondo opaco, o il conto ci scorrerebbe sotto in trasparenza.
+    prova("...e la testata resta attaccata in alto quando si scorre",
+          True, "#p2pDettSheet .foglio-testa{position:sticky;top:0;z-index:2;"
+          in mini
+          # il fondo opaco, o il conto ci scorrerebbe sotto in
+          # trasparenza (`pezzo_js` si ferma ALLA graffa, che quindi
+          # non e' nel pezzo: si cerca la dichiarazione, non il bordo)
+          and "background:var(--card)" in pezzo_js(
+              mini, "  #p2pDettSheet .foglio-testa{", "}"))
     # STA PRIMA di «Quanto» nel DOM, ed e' l'ordine che decide chi copre
     # chi: su un intervallo il foglio della cifra si apre SOPRA la pagina
     prova("...e nel DOM sta prima del foglio «Quanto»", True,
@@ -36970,7 +36997,6 @@ def prove_p2p_dettaglio():
         "function frazioneStellaP2P(media){",
         "function stellaP2P(media){",
         "function icoPersonaP2P(){",
-        "function icoGiorniP2P(){",
         "function scadeTestoP2P(scade){",
         "function frazioneVitaP2P(o, adesso){",
         "function satsMercatoP2P(o){",
@@ -36988,6 +37014,7 @@ def prove_p2p_dettaglio():
         "function premioTestoP2P(n){",
         "function contoDettP2P(o){",
         "function metodiDettP2P(o){",
+        "function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
         "function rigaLibroP2P(id){",
         "function renderDettaglioP2P(){",
@@ -37020,6 +37047,17 @@ let p2pInfo = null;
 let p2pLeve = null, p2pLevaPubblica = null;
 let toasts = []; function toast(m){ toasts.push(String(m)); }
 function haptic(){}
+/* IL VOLTO NEL RIQUADRO (set 2026): `avatarImg` vive nel blocco della
+   vetrina, fuori di qui — e' uno stub DICHIARATO che ne ricalca la
+   forma, l'onerror compreso (che e' la rete dell'iniziale). E
+   `apriNegozio` e' della vetrina anche lui: qui si conta solo che
+   venga chiamato, e DOPO la chiusura del foglio. */
+function avatarImg(nome){
+  const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
+  return n ? '<img class="av-foto" src="/foto/' + n + '" alt="" onerror="this.remove()">' : '';
+}
+let negoziAperti = [];
+function apriNegozio(chi){ negoziAperti.push(chi); }
 /* IL DOM DI CARTONE: due nodi, e quel che ci si scrive dentro si
    rilegge. Basta: la pagina non frughi nel documento, scrive e basta. */
 const nodi = {};
@@ -37083,9 +37121,18 @@ cambioVivo = true;
 
 /* ---- il riquadro della reputazione ---- */
 out.repSenza = repRiquadroP2P(null);
-out.repPiena = repRiquadroP2P({nome: 'Ada', media: 4.8, voti: 12, giorni: 41});
-out.repSenzaVoti = repRiquadroP2P({nome: 'Bruno', media: 0, voti: 0, giorni: 3});
-out.repSenzaGiorni = repRiquadroP2P({nome: 'Cip', media: 5, voti: 2});
+out.repPiena = repRiquadroP2P({nome: 'Ada', media: 4.8, voti: 12,
+                               avatar: 'av_x.jpg', negozio: 'ab12cd34'});
+out.repSenzaVoti = repRiquadroP2P({nome: 'Bruno', media: 0, voti: 0});
+/* senza FOTO resta l'iniziale sul tondo, come nell'anello delle card */
+out.repSenzaFoto = repRiquadroP2P({nome: 'Cip', media: 5, voti: 2,
+                                   negozio: 'ab12cd34'});
+/* senza NEGOZIO la sezione non e' un bersaglio, e l'etichetta lo dice */
+out.repSenzaNegozio = repRiquadroP2P({nome: 'Dina', media: 5, voti: 2,
+                                      avatar: 'av_y.jpg'});
+/* e un veleno nel nome del negozio non esce dall'attributo */
+out.repVeleno = repRiquadroP2P({nome: 'Evo', media: 5, voti: 2,
+                                negozio: 'a" onclick="rubo()'});
 
 /* ---- il metodo: una pillola sola non e' un bottone ---- */
 out.unoSolo = metodiDettP2P(ordine({metodi: ['Revolut']}));
@@ -37293,17 +37340,62 @@ console.log(JSON.stringify(out));
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
+    # LE TRE COLONNE SONO STELLA, RECENSIONI e VOLTO (set 2026, ritocco
+    # di Andrea): i giorni sono usciti — una faccia dice in un colpo
+    # quel che «41 giorni qui» diceva in due parole e un conto, ed e'
+    # la cosa che si riconosce fra un ordine e l'altro.
     prova("...e con lui ci sono le tre colonne", True,
           "p2p-rep-tre" in o["repPiena"] and ">4,8<" in o["repPiena"]
-          and ">12<" in o["repPiena"] and ">41<" in o["repPiena"])
+          and ">12<" in o["repPiena"]
+          and "p2p-rep-volto" in o["repPiena"]
+          and "giorni qui" not in o["repPiena"])
+    # LA STELLA E' PIU' GRANDE DELLE ALTRE DUE: cresce il SEGNO e non
+    # la cifra, o le tre colonne si scalerebbero fra loro
+    prova("...e la stella della media e' la piu' grande", True,
+          '<div class="p2p-rep-col media">' in o["repPiena"]
+          and ".p2p-rep-col.media .p2p-rep-segno svg{width:28px;height:28px}"
+              in mini
+          # ⚠️ e la RIGA del segno e' alta 28 per tutt'e tre: misurato,
+          # con le righe «quanto serve» le tre colonne partivano
+          # sfalsate di 8px — una griglia nata per tenerle in riga
+          and "height:28px" in pezzo_js(mini, "  .p2p-rep-segno{", "}"))
     # ZERO VOTI NON E' «ZERO STELLE», e' «non si sa»: la regola di casa
     prova("...e chi non ha voti porta un trattino, mai uno zero", True,
           o["repSenzaVoti"].count(">—<") == 2 and ">0<" not in o["repSenzaVoti"])
-    # ⚠️ I GIORNI POSSONO MANCARE (account nati prima che il server
-    # timbrasse l'iscrizione): «0 giorni» direbbe «iscritto oggi», che
-    # e' il contrario esatto del vero — sono i piu' vecchi.
-    prova("...e i giorni che non si sanno sono un trattino, non uno zero",
-          1, o["repSenzaGiorni"].count(">—<"))
+    # IL VOLTO E' QUELLO DELLE CARD, ripieghi compresi: foto se c'e'
+    # (con l'onerror che la toglie da sola), altrimenti l'iniziale
+    prova("il volto porta la foto quando c'e'", True,
+          'class="av-foto"' in o["repPiena"]
+          and "onerror=\"this.remove()\"" in o["repPiena"])
+    prova("...e l'iniziale quando non c'e'", True,
+          "av-foto" not in o["repSenzaFoto"]
+          and ">C</span>" in o["repSenzaFoto"])
+    # ⚠️ LA SEZIONE INTERA E' LA PORTA, e solo col negozio: una sezione
+    # che si annuncia cliccabile e non risponde e' il difetto gia'
+    # pagato con la pillola sola del metodo.
+    prova("col negozio la sezione e' un bersaglio, e dice dove porta",
+          True, 'role="button"' in o["repPiena"]
+          and 'data-negozio="ab12cd34"' in o["repPiena"]
+          and "apriNegozioDettP2P(event, this.dataset.negozio)" in o["repPiena"]
+          and "il negozio ›" in o["repPiena"])
+    prova("...e senza negozio non e' un bersaglio, e nemmeno lo dice",
+          True, 'role="button"' not in o["repSenzaNegozio"]
+          and "onclick" not in o["repSenzaNegozio"]
+          and ">venditore<" in o["repSenzaNegozio"])
+    # il codice del negozio e' testo che arriva dal server: scappato
+    prova("...e un veleno nel codice non esce dall'attributo", True,
+          'onclick="rubo()' not in o["repVeleno"]
+          and "&quot;" in o["repVeleno"])
+    # IL FOGLIO SI CHIUDE PRIMA: il negozio e' una VISTA, e aperta da
+    # sotto una pagina a pieno schermo ancora `open` resterebbe coperta
+    an = pezzo_js(mini, "function apriNegozioDettP2P(ev, chi){", "\n}\n")
+    prova("la porta chiude la pagina prima di aprire il negozio", True,
+          0 < an.find("chiudiFoglioP2P('p2pDettSheet')")
+          < an.find("apriNegozio(chi)"))
+    # e i giorni escono col loro glifo: una funzione senza chiamanti
+    # non resta in giro (il precedente dello spaziatore)
+    prova("il calendario dei giorni e' morto col suo chiamante", False,
+          "icoGiorniP2P" in mini)
 
     prova("con un metodo solo non c'e' niente da scegliere", True,
           "p2p-dett-uno" in o["unoSolo"] and "tema-pill" not in o["unoSolo"])
@@ -37321,13 +37413,28 @@ console.log(JSON.stringify(out));
     prova("...e sotto c'e' il tempo rimasto", True,
           'Tempo rimasto: <b id="p2pDettConto">' in o["anelloPieno"])
 
-    prova("il titolo dice il lato: acquisto dal tab «Compra BTC»",
-          "Dettaglio ordine di acquisto", o["titoloCompra"])
-    prova("...e vendita dall'altro", "Dettaglio ordine di vendita",
-          o["titoloVendi"])
-    prova("la pagina apre con «Stai comprando sats»", True,
-          "Stai comprando sats" in o["pagina"]
-          and "Stai vendendo sats" in o["paginaVendi"])
+    # IL TITOLO E' IL CAPPELLO (set 2026, ritocco di Andrea): «Stai
+    # comprando sats» era la prima riga del corpo ed e' salito nella
+    # testata, che resta a vista mentre si scorre. Il vecchio titolo
+    # nominava la PAGINA («Dettaglio ordine di acquisto») invece del
+    # fatto — e che sia un dettaglio lo si vede, e' li' davanti.
+    prova("il titolo dice il lato in seconda persona",
+          ["Stai comprando sats", "Stai vendendo sats"],
+          [o["titoloCompra"], o["titoloVendi"]])
+    # ⚠️ SI CERCA NEL SORGENTE RIPULITO DAI COMMENTI, ed e' la trappola
+    # gia' pagata dalla sentinella dello sconto: il commento che
+    # introduce il titolo nuovo CITA quello vecchio — e' la storia del
+    # cambio, vale piu' di una prova comoda, e senza questa pulizia la
+    # sentinella sarebbe rossa proprio sul codice buono.
+    _vivo = re.sub(r"/\*[\s\S]*?\*/", "",
+                   re.sub(r"<!--[\s\S]*?-->", "", mini))
+    prova("...e il vecchio titolo non c'e' piu' da nessuna parte", False,
+          "Dettaglio ordine" in _vivo)
+    # ...e il corpo non lo ripete: sarebbe la stessa frase due volte a
+    # due centimetri di distanza
+    prova("...e il corpo non ripete il cappello", True,
+          "Stai comprando sats" not in o["pagina"]
+          and "p2p-dett-apre" not in mini and "p2p-dett-lato" not in mini)
     # LA QUANTITA' RESTA A VISTA, ma dal set 2026 la casa sua e' il
     # CONTO: la riga «Ricevi» porta il netto di tutto (12000 − 120 di
     # meta' commissione), e la vecchia riga sotto il titolo non c'e'

@@ -2213,11 +2213,18 @@
   .foglio-piede .btn.ghost{margin:0}
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
-     Il cappello della pagina: il lato in grande, il prezzo sotto, la
-     quantita' per ultima. Centrato, che qui non c'e' niente da
-     scorrere con l'occhio — sono tre righe e si leggono in fila. */
-  .p2p-dett-apre{padding:14px 0 2px;text-align:center}
-  .p2p-dett-lato{display:block;font-size:19px;font-weight:800;line-height:1.2}
+     IL CAPPELLO NEL CORPO NON C'E' PIU' (ritocco di Andrea): il lato
+     e' diventato il TITOLO della pagina, e tenerlo anche qui sotto
+     sarebbe la stessa frase due volte a due centimetri di distanza.
+     ⚠️ E LA TESTATA RESTA ATTACCATA IN ALTO anche da 768px in su,
+     dove il foglio e' un modale che scorre dentro se stesso e la
+     testata scorreva via con tutto il resto: sotto i 767 era gia'
+     ferma — li' il foglio e' una colonna flex e la testata sta FUORI
+     dal pezzo che scorre — quindi questa regola non la tocca e serve
+     solo al modale largo. Il fondo opaco non e' decorazione: senza,
+     il conto ci scorrerebbe sotto in trasparenza. */
+  #p2pDettSheet .foglio-testa{position:sticky;top:0;z-index:2;
+    background:var(--card)}
   .p2p-dett-uno{font-size:15px;font-weight:800}
   /* LE TRE COLONNE DELLA REPUTAZIONE pesano uguale per GRIGLIA e non
      per flex: le tre cifre hanno larghezze diverse («4,8», «12»,
@@ -2229,8 +2236,41 @@
     align-items:center;gap:3px;text-align:center}
   .p2p-rep-col b{font-size:17px;font-weight:800;line-height:1}
   .p2p-rep-col small{font-size:11px;font-weight:700;color:var(--muted)}
+  /* ⚠️ LA RIGA DEL SEGNO E' ALTA 28 PER TUTT'E TRE, e non e' un numero
+     scelto a occhio: e' l'altezza della stella grande. Misurato, con
+     le righe alte «quanto serve» le tre colonne partivano sfalsate —
+     la cifra della media a 31px dal bordo e quella delle recensioni a
+     23, cioe' otto pixel di dislivello su una griglia nata apposta
+     per tenerle in riga. L'icona piccola si centra dentro la riga
+     alta; a crescere e' lo SPAZIO, non l'omino. */
   .p2p-rep-segno{display:flex;align-items:center;justify-content:center;
-    height:20px;color:var(--muted)}
+    height:28px;color:var(--muted)}
+  /* LA STELLA DELLA MEDIA E' PIU' GRANDE DELLE ALTRE DUE (set 2026,
+     ritocco di Andrea): fra i tre elementi e' quello che si guarda
+     per primo, e a 20px pesava come l'omino accanto. Cresce il SEGNO,
+     non la cifra — le tre cifre restano allineate, o le colonne si
+     scalerebbero fra loro. */
+  .p2p-rep-col.media .p2p-rep-segno svg{width:28px;height:28px}
+  /* IL VOLTO AL POSTO DEI GIORNI: la stessa faccia che sta
+     nell'anello delle card — foto se c'e', iniziale sul tondo scuro
+     se non c'e' — ma qui grande abbastanza da riconoscere qualcuno.
+     E' alto quanto segno + cifra delle altre due colonne (28+3+17),
+     cosi' le tre etichette restano sulla stessa riga. */
+  .p2p-rep-volto{width:48px;height:48px;border-radius:50%;
+    background:var(--ink);color:var(--on-ink);position:relative;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;font-family:'Baloo 2',sans-serif;font-weight:800;
+    font-size:20px;line-height:1;flex:0 0 auto}
+  .p2p-rep-volto .av-foto{position:absolute;inset:0;width:100%;
+    height:100%;object-fit:cover}
+  /* LA SEZIONE INTERA E' LA PORTA (set 2026, richiesta di Andrea):
+     non il solo volto, come sulle card — li' il volto e' un francobollo
+     dentro una card che fa gia' un'altra cosa, qui la sezione non ha
+     altri mestieri e un bersaglio piu' grande e' piu' facile da
+     prendere col pollice. Il dito lo dice al mouse, e a chi non ha
+     mouse lo dice l'etichetta sotto il volto. */
+  .p2p-sez[role="button"]{cursor:pointer}
+  .p2p-sez[role="button"]:active{background:var(--line-soft)}
   /* L'ANELLO GRANDE: sessanta tacche, e a colorarsi sono le ACCESE.
      La pista spenta resta `--line` come nell'anello piccolo, e i tre
      stati sono gli stessi — stesso giudice nel JS, stessi token qui:
@@ -7659,10 +7699,19 @@ document.getElementById('cartello')?.remove();</script>
        questa pagina. -->
   <div class="sheet pieno" id="p2pDettSheet" role="dialog" aria-modal="true" aria-labelledby="p2pDettTit">
     <div class="grab"></div>
+    <!-- LA VIA D'USCITA E' UNA ✕ E NON UNA FRECCIA (set 2026, ritocco
+         di Andrea): la freccia promette «torni da dove sei venuto», e
+         da qui si torna al libro comunque si sia arrivati — ma
+         soprattutto questa pagina non e' una tappa di un cammino, e'
+         una cosa che si apre sopra il libro e si CHIUDE. Il gesto
+         resta `navIndietro()`, che e' la stessa uscita di prima: a
+         cambiare e' il segno, non la strada.
+         IL TITOLO LO SCRIVE IL JS ed e' «Stai comprando/vendendo
+         sats» — il cappello che stava nel corpo e' salito qui. -->
     <div class="foglio-testa">
-      <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#8592;</button>
-      <h3 id="p2pDettTit">Dettaglio ordine</h3>
-      <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
+      <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#10005;</button>
+      <h3 id="p2pDettTit">Stai comprando sats</h3>
+      <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
     </div>
     <div class="foglio-corpo" id="p2pDettCorpo"></div>
   </div>
@@ -37044,31 +37093,57 @@ function battitoAnelloneP2P(){
    e «0 giorni» direbbe «iscritto oggi» — una bugia esattamente al
    contrario del vero (sono i piu' vecchi). Il server la chiave non la
    manda proprio, e qui «non si sa» ha la sua faccia. */
-function icoGiorniP2P(){
-  return '<svg class="p2p-ico p2p-ico-mini" viewBox="2 2 20 20" aria-hidden="true">'
-    + '<path class="velo" d="M4.8 6.4h14.4a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H4.8a1.4 1.4 0 0 1-1.4-1.4V7.8a1.4 1.4 0 0 1 1.4-1.4z"/>'
-    + '<path d="M4.8 6.4h14.4a1.4 1.4 0 0 1 1.4 1.4v10.8a1.4 1.4 0 0 1-1.4 1.4H4.8a1.4 1.4 0 0 1-1.4-1.4V7.8a1.4 1.4 0 0 1 1.4-1.4z"/>'
-    + '<path d="M3.4 10.6h17.2"/><path d="M8.4 3.8v4M15.6 3.8v4"/></svg>';
-}
+/* IL CALENDARIO DEI GIORNI E' MORTO COL SUO CHIAMANTE (set 2026, col
+   volto nel riquadro): era il terzo glifo della reputazione, disegnato
+   col tratto di casa per non mettere un 📅 di un'altra mano accanto
+   alla stella e all'omino. Se un giorno i giorni tornassero, il
+   disegno sta in git — e il nome NON si riusa per altro. */
 function repRiquadroP2P(f){
   if (!f) return '';
   const media = (f.voti > 0 && f.media > 0)
     ? esc(f.media.toLocaleString('it-IT',
         {minimumFractionDigits: 1, maximumFractionDigits: 1})) : '—';
   const voti = f.voti > 0 ? esc(String(f.voti)) : '—';
-  const giorni = (f.giorni === undefined || f.giorni === null)
-    ? '—' : esc(String(f.giorni));
-  const col = (segno, cifra, et) =>
-    '<div class="p2p-rep-col"><span class="p2p-rep-segno">' + segno + '</span>'
+  const col = (segno, cifra, et, cls) =>
+    '<div class="p2p-rep-col' + (cls ? ' ' + cls : '')
+    + '"><span class="p2p-rep-segno">' + segno + '</span>'
     + '<b>' + cifra + '</b><small>' + et + '</small></div>';
+  /* ⚠️ IL VOLTO AL POSTO DEI GIORNI (set 2026, ritocco di Andrea), e
+     i giorni escono con la loro icona: una faccia dice in un colpo
+     quel che «41 giorni qui» diceva in due parole e un conto, e
+     soprattutto e' la cosa che si riconosce fra un ordine e l'altro.
+     LO STESSO GIUDICE DEI VOLTI DELLE CARD, e non una copia: foto se
+     c'e' (`avatarImg`, che se ne va da sola quando il file non
+     risponde), altrimenti l'iniziale sul tondo scuro — la stessa
+     scala di ripieghi di `anelloScadenzaP2P`, scritta li' per primo.
+     L'ETICHETTA SOTTO DICE DOVE PORTA il tocco quando c'e' un negozio
+     da aprire: e' l'unico segno visibile che questa sezione e' un
+     bersaglio, e senza negozio torna a dire soltanto chi e'. */
+  const volto = '<span class="p2p-rep-volto">' + avatarImg(f.avatar)
+    + esc((f.nome || '?')[0]) + '</span>';
   return sezioneNuovoP2P({
     ico: '', titolo: 'Chi ha pubblicato quest\'ordine',
+    porta: f.negozio || '',
     corpo: '<div class="p2p-rep-tre">'
-      + col(stellaP2P(f.media), media, 'media')
+      + col(stellaP2P(f.media), media, 'media', 'media')
       + col(icoPersonaP2P(), voti, 'recensioni')
-      + col(icoGiorniP2P(), giorni, 'giorni qui')
+      + '<div class="p2p-rep-col">' + volto
+        + '<small>' + (f.negozio ? 'il negozio ›' : 'venditore') + '</small>'
+      + '</div>'
       + '</div>'
   });
+}
+/* La porta dal dettaglio al negozio: il gemello di `apriNegozioP2P`
+   delle card, con una cosa in piu' che qui e' obbligatoria — IL
+   FOGLIO SI CHIUDE PRIMA. Il negozio e' una VISTA, non un foglio:
+   aperto da sotto una pagina a pieno schermo ancora `open` si
+   ritroverebbe coperto da lei, e da fuori sembrerebbe che il tocco
+   non abbia fatto niente. */
+function apriNegozioDettP2P(ev, chi){
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  haptic();
+  chiudiFoglioP2P('p2pDettSheet');
+  apriNegozio(chi);
 }
 
 /* ---- LA MONETA DELL'ORDINE ----
@@ -37273,7 +37348,14 @@ function renderDettaglioP2P(){
      resta onesta anche aperta da un elenco non filtrato. */
   const compro = o.lato === 'sell';
   const tit = el('p2pDettTit');
-  if (tit) tit.textContent = 'Dettaglio ordine di ' + (compro ? 'acquisto' : 'vendita');
+  /* IL TITOLO E' IL CAPPELLO (set 2026, ritocco di Andrea): «Stai
+     comprando sats» era la prima riga del corpo e adesso e' la
+     testata, che resta a vista mentre si scorre — cioe' la frase che
+     dice cosa si sta facendo non se ne va piu' scorrendo verso i
+     bottoni. Il vecchio titolo, «Dettaglio ordine di acquisto»,
+     nominava la PAGINA invece del fatto: chi la guarda vede gia' che
+     e' un dettaglio, perche' ce l'ha davanti. */
+  if (tit) tit.textContent = 'Stai ' + (compro ? 'comprando' : 'vendendo') + ' sats';
   /* la riga che DICE PERCHE' il bottone e' spento: un bottone morto
      senza una ragione visibile e' il vicolo cieco muto (la lezione del
      foglio Pubblica). Le parentesi non sono decorazione: `||` lega
@@ -37281,14 +37363,12 @@ function renderDettaglioP2P(){
      un domani qualcuno lo «sistema» al contrario. */
   const manca = (p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
     ? '' : 'Scegli con quale metodo vuoi pagare.';
-  /* L'APERTURA DICE SOLO IL LATO (set 2026, ritocco di Andrea): la
-     riga del prezzo e la quantita' sono scese nel conto scorporato,
-     dove ogni cifra ha il suo nome — qui ripeterle sarebbe dire due
-     volte la stessa cosa con due vestiti. */
+  /* IL CORPO COMINCIA DAL METODO, e sopra non c'e' piu' niente: il
+     prezzo e la quantita' sono scesi nel conto scorporato (dove ogni
+     cifra ha il suo nome) e il lato e' salito nel TITOLO. Quel che
+     resta e' l'ordine dei gesti — come pago, con chi ho a che fare,
+     quanto tempo resta, quanto viene. */
   box.innerHTML =
-    '<div class="p2p-dett-apre">' +
-      '<b class="p2p-dett-lato">Stai ' + (compro ? 'comprando' : 'vendendo') + ' sats</b>' +
-    '</div>' +
     metodiDettP2P(o) +
     repRiquadroP2P(p2pFacce[o.id]) +
     anelloneP2P(o) +
@@ -37883,7 +37963,15 @@ function apriNuovoOrdineP2P(){
    dentro. Un pezzo solo per tutte, cosi' le cinque restano allineate
    per COSTRUZIONE invece che per attenzione. */
 function sezioneNuovoP2P(o){
-  return '<div class="p2p-sez">' +
+  /* `porta` = il codice di un negozio: la sezione diventa un bersaglio
+     solo. Senza codice non si mette nessun attributo — una sezione che
+     si annuncia cliccabile e non risponde e' il difetto gia' pagato
+     con la pillola sola del metodo. */
+  const porta = o.porta
+    ? ' role="button" tabindex="0" data-negozio="' + esc(o.porta)
+      + '" onclick="apriNegozioDettP2P(event, this.dataset.negozio)"'
+    : '';
+  return '<div class="p2p-sez"' + porta + '>' +
     '<div class="p2p-sez-tit"><span>' + o.titolo + '</span>' +
     (o.info ? '<button type="button" class="p2p-info" aria-label="Come funziona" onclick="'
       + o.info + '">&#9432;</button>' : '') +
