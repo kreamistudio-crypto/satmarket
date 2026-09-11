@@ -9259,3 +9259,58 @@ percentuale fuori dal valore).
 COLLAUDATO: 9109 verdi, con la sentinella del mercatino che finora
 non c'era — l'etichetta di quella riga non era guardata da nessuno,
 e il divieto della formula lunga viveva solo in un commento.
+✅ E IL DIFETTO DICHIARATO QUI SOPRA È STATO CURATO lo stesso
+giorno, su richiesta di Andrea: vedi «Il conto del P2P cede dalla
+destra», qui sotto.
+
+## Il conto del P2P cede dalla destra
+
+LA REGOLA DI CASA SI ROVESCIA, MA SOLO QUI (11 set 2026, decisione
+di Andrea): nel conto del P2P a cedere non è più l'etichetta coi
+puntini — è il VALORE, che va a capo sotto il suo nome.
+IL PERCHÉ NON È IL GUSTO, È CHE LE DUE PARTI NON SONO PIÙ QUELLE:
+la regola «a cedere è l'etichetta» nasce dove a destra c'è UNA
+cifra, e allora troncare il nome è il male minore perché il dato si
+salva. Nel conto del P2P a destra ci sono un cartello («in promo»),
+una percentuale e una cifra che su un ordine a INTERVALLO porta due
+capi da otto cifre: misurato, quel valore schiacciava l'etichetta
+fino a **zero pixel** — cioè la riga non diceva più di che cosa
+parlava, e il dato «salvato» restava senza nome. Fra un nome
+mozzato e un'impaginazione più alta, a perdere dev'essere
+l'impaginazione.
+LE TRE REGOLE LAVORANO INSIEME, e nessuna basta da sola: la riga può
+andare a capo (`flex-wrap:wrap`); l'etichetta non si stringe sotto
+il suo contenuto minimo (`min-width:min-content`) e perde i puntini
+(`text-overflow:clip`), quindi al massimo va a capo lei; il valore
+resta incollato a destra anche quando scende su una riga sua
+(`margin-left:auto`), o si ritroverebbe a sinistra sotto il nome.
+⚠️ E LA CIFRA RESTA INDIVISIBILE, che è la regola di casa che questa
+apertura NON tocca: ogni valore viaggia in uno `<span class="num">`
+con `nowrap`, così il capo cade fra la pillola e il numero e mai
+dentro «≈ −3453 sats» — una cifra spezzata a metà è un altro numero,
+ed è il difetto già pagato col «≈» che finiva sopra la sua cifra.
+IL MERCATINO NON PRENDE LA CLASSE, ed è deliberato: là le cifre sono
+corte, la regola di casa non fa danni, e un conto che va a capo dove
+non serve sarebbe più alto per niente. La classe `conto-p2p` non è
+un vestito diverso — è il permesso di cedere dalla parte giusta.
+MISURATO A 320px, non guardato: **zero etichette troncate** nel
+conto P2P (prima erano tre, di cui una a zero pixel) e nessuna riga
+che sfonda il riquadro; vanno a capo solo le CINQUE righe dove il
+valore è davvero lungo — le due dei casi promo e le tre
+dell'intervallo — mentre le righe normali restano su una riga sola.
+⚠️ E LA SONDA HA MENTITO AL PRIMO GIRO, con un errore che vale la
+pena scrivere: chiedeva «la riga è andata a capo?» guardando
+l'ALTEZZA (`> 30px`), e con `padding:9px` sopra e sotto più il
+line-height una riga SANA è già alta 37 — quindi diceva che andavano
+a capo tutte e 23, compreso il mercatino che non ha nemmeno la
+classe. La domanda giusta si fa sulle POSIZIONI: il valore sta sotto
+l'etichetta? Una soglia inventata a mente misura la soglia, non il
+fatto.
+RESTA FUORI, ed è l'unico troncamento vivo: «Totale da pagare» nel
+conto del MERCATINO chiede 137px e ne ha 134 in vista sats con un
+totale a sette cifre. Tre pixel, preesistente, e sta dall'altra
+parte del confine che questo cantiere ha tracciato: si cura il
+giorno che si decida di dare la classe anche a lui.
+COLLAUDATO: **9114 verdi**, di cui quattro nuove — la classe sul
+contenitore, le tre regole del cedere, la cifra indivisibile, e che
+il mercatino NON la prenda.
