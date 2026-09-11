@@ -15393,6 +15393,18 @@ def prove_pagina_acquisto():
     #    la pillola «in promo» accanto allo zero.
     prova("nel conto la fee porta il nome di casa", (True, False),
           ("r('Fee Barattolo'" in _cr, "Commissione Barattolo" in _cr))
+    #    E L'ALIQUOTA STA ATTACCATA AL NOME (set 2026, ritocco di
+    #    Andrea), come nel conto del P2P: «Fee Barattolo 3%». ⚠️ E' LA
+    #    PERCENTUALE VIVA DEL SERVER e mai un numero cablato — la leva
+    #    sta nel config del VPS, ed e' la trappola che il pannello
+    #    delle leve esiste per non far ricadere. A zero non si scrive
+    #    «0%»: ci sta la pillola, che dice la stessa cosa meglio.
+    prova("...e l'aliquota le sta attaccata, dal server", (True, True, True),
+          ("c.commissionePct > 0" in _cr,
+           "fmt(c.commissionePct)}%" in _cr,
+           "promo-tag dopo" in _cr))
+    prova("...e la cifra della commissione e' quella del server",
+          True, "cifraCtrl(c.commissione || 0" in _cr)
     #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
     #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
     #    c'e' e vale lo stesso ragionamento. La percentuale e' la
@@ -37475,7 +37487,11 @@ console.log(JSON.stringify(out));
     # CINQUE nel conto base: il Controvalore, i DUE della fee
     # (aliquota e cifra, separati da quando il colore dice la
     # direzione), «Ricevi» e il totale in euro. Sei col premio.
-    prova("ogni valore del conto viaggia in un `.num`", [5, 6],
+    # QUATTRO nel conto base da quando l'aliquota della fee e' salita
+    # nell'ETICHETTA (set 2026): Controvalore, la cifra della fee,
+    # «Ricevi» e il totale in euro. SEI col premio, che porta la sua
+    # riga E il Subtotale — la base su cui la fee si calcola.
+    prova("ogni valore del conto viaggia in un `.num`", [4, 6],
           [cm.count('<span class="num'),
            o["contoPremio"].count('<span class="num')])
     prova("...e il controvalore e' al mercato puro", True,
@@ -37487,10 +37503,9 @@ console.log(JSON.stringify(out));
     # anche a 375), mentre questa e' piu' corta perfino della secca
     # che l'aveva sostituita — misurato, non stimato.
     prova("la fee dice la meta' di chi legge, col meno", True,
-          "<span>Fee Barattolo</span>" in cm
-          # l'aliquota e la cifra sono due gruppi separati (il colore
-          # veste la sola cifra), e il segno c'e' sempre
-          and '<span class="num">1% ·</span>' in cm
+          # l'aliquota sta ATTACCATA al nome e in rosso (e' un costo),
+          # la cifra a destra col suo segno e il colore della direzione
+          '<span>Fee Barattolo <b class="p2p-avviso">1%</b></span>' in cm
           and '<span class="num meno">≈ −120 sats</span>' in cm
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
@@ -37513,25 +37528,58 @@ console.log(JSON.stringify(out));
     # uscita perche' nel conto il colore ora significa DIREZIONE — un
     # verde di «convenienza» accanto a sats rossi sarebbe lo stesso
     # colore con due significati nella stessa riga.
-    prova("il premio dice la percentuale nuda, e i sats il verso", True,
-          'Premio al venditore <b>4%</b>' in o["contoPremio"]
+    # ⚠️ LA PERCENTUALE E' TORNATA IN TINTA (set 2026, ritocco di
+    # Andrea che rovescia la scelta del giro prima), e resta senza
+    # segno perche' il verso lo dice la PAROLA. Le due tinte della
+    # riga dicono due cose diverse, ed e' voluto: a sinistra il
+    # GIUDIZIO (conviene a chi legge?), a destra la DIREZIONE (questi
+    # sats entrano o escono?) — vedi il caso del Vendi qui sotto.
+    # ⚠️ L'ORDINE DELLE RIGHE E' UN FATTO VERIFICATO SUI BYTE, non una
+    # scelta di impaginazione: in mostro `get_market_amount_and_fee`
+    # (src/util.rs) chiama `get_fee(new_sats_amount)`, e quel numero
+    # esce da `get_market_quote` col premio GIA' applicato — la fee
+    # morde DOPO il premio. Il conto lo mostra in quell'ordine, col
+    # Subtotale in mezzo a dire su cosa si calcola l'aliquota.
+    prova("il premio viene PRIMA della fee, col subtotale in mezzo",
+          True,
+          o["contoPremio"].index("Premio al venditore")
+          < o["contoPremio"].index("Subtotale")
+          < o["contoPremio"].index("Fee Barattolo"))
+    # ...e il conto SOMMA: 12000 − 480 = 11520, meno l'1% (115) = 11405
+    prova("...e il subtotale e' la base su cui la fee si calcola", True,
+          '<span class="num">≈ 11520 sats</span>' in o["contoPremio"]
+          and '<span class="num meno">≈ −115 sats</span>' in o["contoPremio"]
+          and "≈ 11405 sats" in o["contoPremio"])
+    # SENZA PREMIO non c'e': ripeterebbe il Controvalore parola per
+    # parola, che e' una riga che non dice niente
+    prova("...e senza premio il subtotale non c'e'", False,
+          "Subtotale" in cm)
+    prova("il premio porta la percentuale in tinta, e i sats il verso",
+          True,
+          'Premio al venditore <b class="p2p-avviso">4%</b>'
+          in o["contoPremio"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoPremio"]
-          and "≈ 11405 sats" in o["contoPremio"]
-          and "p2p-avviso" not in o["contoPremio"]
-          and "p2p-affare" not in o["contoPremio"])
+          and "≈ 11405 sats" in o["contoPremio"])
     # ⚠️ E UN PREMIO NEGATIVO CAMBIA IL NOME DELLA VOCE: non e' «un
     # premio di meno», e' uno SCONTO — col nome giusto non serve
     # leggere il segno per capire di cosa si parla.
     prova("...e un premio negativo e' uno SCONTO, col suo nome", True,
-          'Sconto del venditore <b>2%</b>' in o["contoSconto"]
+          'Sconto del venditore <b class="p2p-affare">2%</b>'
+          in o["contoSconto"]
           and "Premio al venditore" not in o["contoSconto"]
           # ...e i suoi sats si AGGIUNGONO: segno piu' e verde. E il
           # conto SOMMA anche col verso rovesciato: 12000 − 122 + 240
           and '<span class="num piu">≈ +240 sats</span>' in o["contoSconto"]
           and '<span class="num meno">≈ −122 sats</span>' in o["contoSconto"]
           and "≈ 12118 sats" in o["contoSconto"])
+    # ⚠️ E NEL VENDI LE DUE TINTE DELLA RIGA DIVERGONO, ed e' il caso
+    # che rende esplicita la regola: il premio e' FAVOREVOLE a chi
+    # vende (percentuale verde) e quei sats dal conto ESCONO lo stesso
+    # (cifra rossa). Due colonne, due letture, ognuna coerente.
     prova("...e nel tab Vendi il conto si specchia",
-          True, 'Premio al venditore <b>4%</b>' in o["contoVendi"]
+          True, 'Premio al venditore <b class="p2p-affare">4%</b>'
+          in o["contoVendi"]
+          and '<span class="num meno">≈ −480 sats</span>' in o["contoVendi"]
           and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
           and "Totale da pagare" not in o["contoVendi"]
           and "Ricevi" in o["contoVendi"])
@@ -37557,20 +37605,32 @@ console.log(JSON.stringify(out));
     # LA PROMO E IL LISTINO: la fee viva sotto il listino e' una promo
     # col cartello del mercatino; a zero resta il cartello e basta.
     prova("la fee sotto il listino porta «in promo» e la meta' vera",
-          True, '<span class="promo-tag">in promo</span>' in o["contoPromo"]
-          and '<span class="num">0,5% ·</span>' in o["contoPromo"]
+          # la pillola SEGUE il nome (classe `dopo`: l'aria le serve
+          # dall'altra parte) e l'aliquota e' quella VIVA, meta' di
+          # chi legge
+          True, '<span class="promo-tag dopo">in promo</span>'
+          in o["contoPromo"]
+          and '<b class="p2p-avviso">0,5%</b>' in o["contoPromo"]
           and '<span class="num meno">≈ −60 sats</span>' in o["contoPromo"]
           and "≈ 11940 sats" in o["contoPromo"])
+    # ⚠️ SI RITAGLIA LA RIGA, non si splitta sull'etichetta: da quando
+    # l'aliquota e la pillola vivono DENTRO l'etichetta, la stringa
+    # «<span>Fee Barattolo</span>» non esiste piu' — e uno split che
+    # non trova niente fa esplodere la suite con un IndexError invece
+    # di dire una rossa leggibile.
+    def _riga_fee(html):
+        i = html.index("Fee Barattolo")
+        return html[i:html.index("</div>", i)]
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
           True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
-          and "%" not in o["contoGratis"].split("<span>Fee Barattolo</span>")[1]
-                                          .split("</div>")[0])
+          and "%" not in _riga_fee(o["contoGratis"]))
     # NON SI SA NON E' GRATIS: senza il 38385 la commissione e' un
     # trattino, mai uno zero — e nessun «in promo» inventato.
     prova("senza 38385 la commissione e' un trattino, senza promo", True,
-          ">—<" in o["contoIgnoto"].split("<span>Fee Barattolo</span>")[1]
-                                   .split("</div>")[0]
-          and "in promo" not in o["contoIgnoto"])
+          ">—<" in _riga_fee(o["contoIgnoto"])
+          and "in promo" not in o["contoIgnoto"]
+          # ...e nemmeno un'aliquota inventata accanto al nome
+          and "%" not in _riga_fee(o["contoIgnoto"]))
     prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
           o["contoMuto"].count("—") >= 3 and "6,00 € 🇪🇺" in o["contoMuto"])
 

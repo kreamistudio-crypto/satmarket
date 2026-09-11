@@ -3465,6 +3465,15 @@
      un'altra voce — piu' piccola e in grigio, e cede coi puntini
      insieme all'etichetta che accompagna (sta dentro lo stesso span) */
   .ctrl-riga .ctrl-nota{font-size:12.5px;font-weight:600;color:var(--muted)}
+  /* L'ALIQUOTA ATTACCATA AL NOME DELLA VOCE (set 2026): in rosso,
+     che e' un costo — e vale nei due conti, quello del mercatino e
+     quello del P2P (dove la coppia affare/avviso fa lo stesso
+     mestiere sulla riga del premio). */
+  .ctrl-riga .ctrl-costo{color:var(--danger);font-weight:800}
+  /* ...e la pillola «in promo» che SEGUE il nome invece di precedere
+     una cifra vuole l'aria dall'altra parte: senza, si incolla alla
+     parola. */
+  .ctrl-riga .promo-tag.dopo{margin-right:0;margin-left:8px}
   /* IL GIUDIZIO DEL PREMIO, lo stesso delle card (set 2026): sta qui
      sotto e non nel blocco del P2P per una ragione che vale anche
      adesso che la percentuale e' uscita dalla nota — se un domani ci
@@ -3517,6 +3526,16 @@
      icone, e su carta chiara come testo non regge), l'euro
      nell'inchiostro. Vale piu' della regola generale `.ctrl-riga.tot`,
      che li tingeva tutti e due d'arancio. */
+  /* IL SUBTOTALE E' UN PASSAGGIO, non una cifra che qualcuno paga:
+     grigio muto e senza evidenza (ritocco di Andrea). Sta li' perche'
+     e' la BASE su cui la fee si calcola — verificato sui byte di
+     mostro — e chi vuole rifare il conto a mano deve poterla vedere. */
+  .conto-p2p .ctrl-riga.sub>span:first-child,
+  .conto-p2p .ctrl-riga.sub .mono{color:var(--muted)}
+  /* ...e le due righe finali si staccano da quelle del calcolo con un
+     filo pieno invece del tratteggio: sopra c'e' come si arriva alla
+     cifra, sotto la cifra. */
+  .conto-p2p .ctrl-riga.tot.sats{border-top:1.5px solid var(--line)}
   .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
@@ -15108,7 +15127,22 @@ function contoRighe(c){
        ⚠️ E VIETATA RESTA LA FORMULA LUNGA, non il nome: chi un
        domani volesse «Commissione Barattolo» riaprirebbe il difetto
        gia' pagato due volte. */
-    + r('Fee Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
+    /* ⚠️ L'ALIQUOTA STA ATTACCATA AL NOME (set 2026, ritocco di
+       Andrea), come nel conto del P2P: «Fee Barattolo 3%» si legge in
+       un colpo, mentre spinta all'altro capo della riga sembrava un
+       secondo numero da mettere in relazione con la cifra. In rosso,
+       che e' un costo.
+       ⚠️ E LA PERCENTUALE E' QUELLA VIVA, dal server (`commissione_
+       percento`), mai un numero cablato qui: la leva vive nel config
+       del VPS, ed e' esattamente la trappola che il pannello delle
+       leve esiste per non far ricadere. A ZERO non si scrive «0%» —
+       ci sta la pillola «in promo», che dice la stessa cosa meglio e
+       non fa leggere uno zero come un'aliquota. */
+    + r('Fee Barattolo'
+        + (c.commissionePct > 0
+            ? ` <b class="ctrl-costo">${fmt(c.commissionePct)}%</b>`
+            : '<span class="promo-tag dopo">in promo</span>'),
+        cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur))
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i
@@ -16634,6 +16668,11 @@ function renderAcquisto(){
                                articolo, che direbbe 9,99%) */
                             scontoPct: p.sconto_percento||0,
                             scontoOrigine: p.sconto_origine||'',
+                            /* la commissione: la sua CIFRA e la sua
+                               ALIQUOTA, tutt'e due dal server — a zero
+                               la riga porta «in promo» come sempre */
+                            commissione: p.commissione_sats||0,
+                            commissionePct: p.commissione_percento||0,
                             /* l'accordo sul carrello: la riga gemella
                                dello sconto, cifre del server */
                             accordo: p.accordo_sats||0,
@@ -37548,7 +37587,8 @@ function contoDettP2P(o){
     const merc = fisso ? o.sats
                : (vivo ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
     const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
-    return {ctrl: ctrl, premio: Math.abs(ctrl - merc), meta: meta,
+    return {ctrl: ctrl, premio: Math.abs(ctrl - merc), merc: merc,
+            meta: meta,
             netto: compro ? merc - meta : merc + meta};
   });
   /* la cifra di una voce, coi suoi capi: il ≈ sta su ogni stima — e la
@@ -37588,24 +37628,31 @@ function contoDettP2P(o){
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —
      lo stesso cartello del conto del mercatino */
+  /* `dopo` perche' da oggi la pillola SEGUE il nome della voce
+     invece di precedere la cifra: l'aria le serve dall'altra parte */
   const promo = (fee !== null && commissioneListinoP2P() > 0
                  && fee * 100 < commissioneListinoP2P())
-    ? '<span class="promo-tag">in promo</span>' : '';
+    ? '<span class="promo-tag dopo">in promo</span>' : '';
   const pct = n => esc(n.toLocaleString('it-IT', {maximumFractionDigits: 2}));
-  /* ⚠️ LA PERCENTUALE ESCE DAL `.num` DELLA CIFRA (set 2026, col
-     colore per direzione): un'aliquota non e' una quantita' che si
-     aggiunge o si toglie — e' quanto vale la trattenuta — e tinta di
-     rosso direbbe che «1%» se ne va. Restano due gruppi indivisibili
-     e il capo puo' cadere fra loro, che e' il punto giusto dove
-     spezzare.
-     E IL SEGNO C'E' SEMPRE, anche il piu': a chi vende la meta' si
-     AGGIUNGE ai sats da bloccare (li mette lui), e senza segno quella
-     riga si leggeva come una sottrazione. */
+  /* ⚠️ L'ALIQUOTA STA NELL'ETICHETTA (set 2026, ritocco di Andrea),
+     come la percentuale del premio: a destra vanno le CIFRE, a
+     sinistra il nome della voce con quanto vale — «Fee Barattolo 1%»
+     si legge in un colpo, mentre spinta all'altro capo della riga
+     sembrava un secondo numero da mettere in relazione col primo.
+     E LA PILLOLA «IN PROMO» LE STA ACCANTO, come nel foglio «Paga»
+     del mercatino: e' un cartello sul NOME, non sulla cifra.
+     IL ROSSO DELL'ALIQUOTA dice che e' un costo, ed e' vero nei due
+     tab — chi compra la vede uscire dai sats che riceve, chi vende la
+     aggiunge a quelli che blocca. E' un giudizio, non la direzione
+     che vestono le cifre a destra: le due letture stanno in due
+     colonne diverse. */
+  const etichettaFee = 'Fee Barattolo'
+    + (fee > 0 ? ' <b class="p2p-avviso">' + pct(fee * 50) + '%</b>' : '')
+    + promo;
   const commissione = fee === null ? num('—')
-    : fee > 0 ? promo + num(pct(fee * 50) + '% ·') + ' '
-                + num(cifraNuda('meta', compro ? '−' : '+'),
-                      compro ? '−' : '+')
-    : promo + num('0 sats');
+    : fee > 0 ? num(cifraNuda('meta', compro ? '−' : '+'),
+                    compro ? '−' : '+')
+    : num('0 sats');
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto) */
   const affare = (o.lato === 'buy') === (o.premium > 0);
@@ -37624,17 +37671,21 @@ function contoDettP2P(o){
      («(+4% sopra il mercato)»), adesso e' il DATO della voce — e un
      dato in corpo piccolo accanto al suo nome si legge come una
      precisazione facoltativa. */
-  /* ⚠️ LA PERCENTUALE NON PORTA PIU' NE' SEGNO NE' TINTA (set 2026,
-     ritocco di Andrea): il verso lo dice gia' la PAROLA — «Premio» o
-     «Sconto» — e ripeterlo col segno era dirlo due volte. La tinta e'
-     uscita per una ragione piu' forte: da oggi nel conto il colore
-     significa DIREZIONE (i sats che entrano o escono, a destra), e un
-     verde di «convenienza» sulla stessa riga sarebbe lo stesso colore
-     con due significati — su un ordine di vendita col premio la
-     percentuale sarebbe stata VERDE accanto a sats ROSSI. */
+  /* LA PERCENTUALE NON PORTA IL SEGNO — lo dice la PAROLA, «Premio»
+     o «Sconto» — MA TORNA IN TINTA (set 2026, ritocco di Andrea che
+     rovescia la scelta del giro prima).
+     ⚠️ E LE DUE TINTE DELLA RIGA DICONO DUE COSE DIVERSE, che e' la
+     cosa da sapere leggendo: a SINISTRA il giudizio (questa offerta
+     conviene a chi legge?), a DESTRA la direzione (questi sats
+     entrano o escono?). Su un ordine di VENDITA col premio si vede
+     nella stessa riga un «4%» verde accanto a «−28.777» rosso, e non
+     e' un errore: il prezzo e' favorevole a chi vende, e quei sats
+     dal conto escono lo stesso. Le due letture stanno in due colonne,
+     e ognuna e' coerente nella sua. */
   const premio = (!fisso && o.premium)
     ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
-        + ' <b>' + Math.abs(Math.round(o.premium)) + '%</b>',
+        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+        + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la
@@ -37657,6 +37708,21 @@ function contoDettP2P(o){
      e' l'etichetta») non fa danni. */
   return '<div class="ctrl-conto conto-p2p">'
     + r('Controvalore', cifra('ctrl'))
+    + premio
+    /* ⚠️ IL SUBTOTALE STA FRA IL PREMIO E LA FEE, e non e' un vezzo di
+       impaginazione: e' la BASE su cui la fee si calcola. VERIFICATO
+       SUI BYTE di mostro (`get_market_amount_and_fee` in
+       `src/util.rs`): chiama `get_fee(new_sats_amount)`, dove
+       `new_sats_amount` esce da `get_market_quote` col premio GIA'
+       applicato — quindi la fee morde sull'importo DOPO il premio, e
+       un conto che la mettesse prima farebbe leggere la percentuale
+       su un numero sbagliato.
+       C'E' SOLO COL PREMIO: senza, il subtotale ripeterebbe il
+       Controvalore parola per parola — una riga che non dice niente.
+       ED E' GRIGIO E SENZA EVIDENZA (ritocco di Andrea): e' un
+       passaggio del conto, non una cifra che qualcuno paga. */
+    + ((!fisso && o.premium)
+        ? r('Subtotale', cifra('merc'), 'sub') : '')
     /* «FEE BARATTOLO» (11 set 2026, decisione di Andrea), lo stesso
        nome del conto del mercatino: i due conti si vestono uguali e
        adesso dicono anche lo stesso nome. «Commissione Barattolo»
@@ -37665,8 +37731,7 @@ function contoDettP2P(o){
        della secca che l'aveva sostituita, e nel caso peggiore
        (pillola «in promo» + percentuale + cifra a intervallo) sta.
        Misurato a 320, non stimato. */
-    + r('Fee Barattolo', commissione)
-    + premio
+    + r(etichettaFee, commissione)
     /* LE DUE RIGHE IN EVIDENZA NON PESANO UGUALE (set 2026, ritocco
        di Andrea): quella in SATS porta l'arancio di casa — e' la
        cifra che parla di bitcoin, ed e' quella che si va a cercare —

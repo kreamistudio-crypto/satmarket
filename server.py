@@ -22720,6 +22720,14 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "articolo_unitario_netto_eur": unit_netto_eur,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
+            # LA PERCENTUALE VIVA, accanto alla sua cifra (set 2026):
+            # il conto la scrive attaccata al nome della voce («Fee
+            # Barattolo 3%»), e finche' e' a zero al suo posto sta la
+            # pillola «in promo». Senza questa chiave il client
+            # dovrebbe cablare un numero che vive nel config del VPS,
+            # cioe' la trappola che il pannello delle leve esiste per
+            # non far ricadere.
+            "commissione_percento": COMMISSIONE_PERCENTO,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
@@ -23208,6 +23216,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                             and _val_sc == "eur" else 0),
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
+            # LA PERCENTUALE VIVA, accanto alla sua cifra (set 2026):
+            # il conto la scrive attaccata al nome della voce («Fee
+            # Barattolo 3%»), e finche' e' a zero al suo posto sta la
+            # pillola «in promo». Senza questa chiave il client
+            # dovrebbe cablare un numero che vive nel config del VPS,
+            # cioe' la trappola che il pannello delle leve esiste per
+            # non far ricadere.
+            "commissione_percento": COMMISSIONE_PERCENTO,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
