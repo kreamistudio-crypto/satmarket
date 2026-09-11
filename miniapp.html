@@ -15138,10 +15138,20 @@ function contoRighe(c){
        leve esiste per non far ricadere. A ZERO non si scrive «0%» —
        ci sta la pillola «in promo», che dice la stessa cosa meglio e
        non fa leggere uno zero come un'aliquota. */
+    /* ⚠️ L'ALIQUOTA SI SCRIVE SEMPRE, anche a ZERO (set 2026, ritocco
+       di Andrea): «Fee Barattolo 0% [in promo]» dice quanto si paga
+       ORA — cioe' niente — mentre la sola pillola diceva «c'e' uno
+       sconto» senza dire su cosa. E' la stessa forma del conto del
+       P2P, dove la percentuale e la pillola stanno una accanto
+       all'altra attaccate al nome.
+       LO ZERO PERO' NON E' ROSSO: il rosso dell'aliquota dice «questo
+       e' un costo», e un costo che non c'e' non lo e'. Sopra lo zero
+       torna rosso da se'. */
     + r('Fee Barattolo'
+        + ` <b class="${c.commissionePct > 0 ? 'ctrl-costo' : ''}">`
+        + `${fmt(c.commissionePct || 0)}%</b>`
         + (c.commissionePct > 0
-            ? ` <b class="ctrl-costo">${fmt(c.commissionePct)}%</b>`
-            : '<span class="promo-tag dopo">in promo</span>'),
+            ? '' : '<span class="promo-tag dopo">in promo</span>'),
         cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur))
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la

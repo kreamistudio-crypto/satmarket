@@ -15399,9 +15399,16 @@ def prove_pagina_acquisto():
     #    sta nel config del VPS, ed e' la trappola che il pannello
     #    delle leve esiste per non far ricadere. A zero non si scrive
     #    «0%»: ci sta la pillola, che dice la stessa cosa meglio.
-    prova("...e l'aliquota le sta attaccata, dal server", (True, True, True),
-          ("c.commissionePct > 0" in _cr,
-           "fmt(c.commissionePct)}%" in _cr,
+    #    ⚠️ E L'ALIQUOTA SI SCRIVE SEMPRE, anche a ZERO (set 2026,
+    #    ritocco di Andrea): «Fee Barattolo 0% [in promo]» dice quanto
+    #    si paga ORA — cioe' niente — mentre la sola pillola diceva
+    #    «c'e' uno sconto» senza dire su cosa. Lo zero pero' non e'
+    #    rosso: il rosso dice «questo e' un costo», e un costo che non
+    #    c'e' non lo e'.
+    prova("...e l'aliquota le sta attaccata, dal server e sempre",
+          (True, True, True),
+          ("fmt(c.commissionePct || 0)}%" in _cr,
+           "c.commissionePct > 0 ? 'ctrl-costo' : ''" in _cr,
            "promo-tag dopo" in _cr))
     prova("...e la cifra della commissione e' quella del server",
           True, "cifraCtrl(c.commissione || 0" in _cr)
@@ -37331,6 +37338,13 @@ out.contoAltra = contoDettP2P(ordine({fiat: 'USD'}));
 /* la fee viva sotto il listino e' una promo, e il conto la dice */
 p2pInfo = {fee: 0.01};
 out.contoPromo = contoDettP2P(ordine({}));
+/* IL CASO VERO DI OGGI (11 set 2026): il listino sul VPS e' 3 e la
+   fee viva del coordinator e' 2 — la promo scatta, e la pillola sta
+   accanto all'aliquota di chi legge (l'1%, che e' la sua meta'). */
+p2pLevaPubblica = {mostro: 'm', commissione: 3};
+p2pInfo = {fee: 0.02};
+out.contoListino3 = contoDettP2P(ordine({}));
+p2pLevaPubblica = {mostro: 'm', commissione: 2};
 /* a fee zero la commissione e' il cartello del mercatino: 0 sats */
 p2pInfo = {fee: 0};
 out.contoGratis = contoDettP2P(ordine({}));
@@ -37621,6 +37635,14 @@ console.log(JSON.stringify(out));
     def _riga_fee(html):
         i = html.index("Fee Barattolo")
         return html[i:html.index("</div>", i)]
+    # ⚠️ IL CASO VERO DI OGGI: listino 3 sul VPS, fee viva 2 — la
+    # promo scatta e la pillola sta accanto all'aliquota di chi legge,
+    # che e' la META' (1%) e non la fee intera.
+    prova("col listino 3 la fee al 2% e' in promo, e la meta' e' 1%",
+          True,
+          '<span>Fee Barattolo <b class="p2p-avviso">1%</b>'
+          '<span class="promo-tag dopo">in promo</span></span>'
+          in o["contoListino3"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
           True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
           and "%" not in _riga_fee(o["contoGratis"]))
