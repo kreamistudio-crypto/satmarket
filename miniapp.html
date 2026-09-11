@@ -2337,9 +2337,21 @@
      se non c'e' — ma qui grande abbastanza da riconoscere qualcuno.
      E' alto quanto segno + cifra delle altre due colonne (28+3+17),
      cosi' le tre etichette restano sulla stessa riga. */
-  /* la colonna del volto non ha etichetta sotto: il tondo si centra
-     nell'altezza della riga invece di restare appeso in cima */
-  .p2p-rep-col.volto{justify-content:center}
+  /* ⚠️ IL VOLTO SI ALLINEA IN ALTO COI DUE SEGNI (set 2026, ritocco
+     di Andrea: «la foto non è centrata»), e `center` era proprio la
+     causa: centrava il tondo nell'altezza dell'INTERA colonna —
+     segno, cifra ed etichetta — mentre stella e omino stanno tutti e
+     due nella fascia alta. Misurato: i loro centri a 14px dal bordo
+     del riquadro, quello del volto a 33, cioe' diciannove piu' giu'.
+     Da `flex-start` il tondo parte dove partono loro e copre la
+     fascia del segno piu' quella della cifra (48px esatti, che e' il
+     motivo per cui e' alto cosi'): i tre pezzi cominciano alla stessa
+     altezza e la colonna smette di galleggiare.
+     ⚠️ IL CENTRO ESATTO A 14 NON SI PUO' AVERE con un tondo da 48: lo
+     porterebbe da −10 a +38, cioe' a sporgere sopra il riquadro e
+     sotto il titolo. Questo e' il massimo allineamento che sta dentro
+     le righe. */
+  .p2p-rep-col.volto{justify-content:flex-start}
   .p2p-rep-volto{width:48px;height:48px;border-radius:50%;
     background:var(--ink);color:var(--on-ink);position:relative;
     display:flex;align-items:center;justify-content:center;
@@ -3491,6 +3503,22 @@
      questa apertura NON tocca: «≈ −3453 sats» spezzato a meta'
      sarebbe un altro numero. */
   .conto-p2p .ctrl-riga .mono .num{white-space:nowrap}
+  /* ══ IL COLORE DEI SATS E' UNA DIREZIONE (set 2026, ritocco di
+     Andrea) ══ verde quel che si AGGIUNGE, rosso quel che si TOGLIE,
+     col segno sempre scritto accanto — mai un giudizio di
+     convenienza, che sulla stessa parola dovrebbe dire due cose
+     opposte nei due tab. Le righe senza segno (il Controvalore, che
+     e' la base) restano nell'inchiostro. */
+  .conto-p2p .ctrl-riga .num.piu{color:var(--trust)}
+  .conto-p2p .ctrl-riga .num.meno{color:var(--danger)}
+  /* ...e le due righe in evidenza si staccano fra loro: i SATS
+     nell'arancio di casa (`--sats-text`, la versione leggibile
+     dell'arancio bitcoin: `--sats` puro e' un colore da fondi e da
+     icone, e su carta chiara come testo non regge), l'euro
+     nell'inchiostro. Vale piu' della regola generale `.ctrl-riga.tot`,
+     che li tingeva tutti e due d'arancio. */
+  .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
+  .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
   /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
@@ -37518,8 +37546,20 @@ function contoDettP2P(o){
     return (circa ? '≈ ' : '') + (segno || '')
       + conti.map(c => fmt(c[campo])).join('–') + ' sats';
   };
-  const num = t => '<span class="num">' + t + '</span>';
-  const cifra = (campo, segno) => num(cifraNuda(campo, segno));
+  /* ⚠️ IL SEGNO DECIDE IL COLORE (set 2026, ritocco di Andrea): nel
+     conto il verde e il rosso non sono un GIUDIZIO ma una DIREZIONE —
+     verde se quei sats si aggiungono a quel che ti arriva, rosso se
+     si tolgono — e il segno sta sempre scritto accanto. E' l'unica
+     lettura che regge su tutte e cinque le righe: la stessa voce (la
+     commissione) si toglie a chi compra e si aggiunge a chi vende, e
+     un colore che dicesse «conviene» dovrebbe dire due cose opposte
+     sulla stessa parola.
+     Il Controvalore resta NEUTRO apposta: e' la base da cui si parte,
+     non un pezzo che entra o esce. */
+  const num = (t, segno) => '<span class="num'
+    + (segno === '+' ? ' piu' : segno === '−' ? ' meno' : '')
+    + '">' + t + '</span>';
+  const cifra = (campo, segno) => num(cifraNuda(campo, segno), segno);
   const cifreEuro = num(esc(fmtEur(o.euro))
     + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' ' + monetaP2P(o));
   /* la commissione: percentuale di chi legge + la sua cifra; «in
@@ -37529,12 +37569,19 @@ function contoDettP2P(o){
                  && fee * 100 < commissioneListinoP2P())
     ? '<span class="promo-tag">in promo</span>' : '';
   const pct = n => esc(n.toLocaleString('it-IT', {maximumFractionDigits: 2}));
-  /* la percentuale sta nello stesso `.num` della cifra: sono un
-     dato solo («0,5% · ≈ −3453 sats»), e a cedere dev'essere la
-     PILLOLA, che e' un cartello e non un numero */
+  /* ⚠️ LA PERCENTUALE ESCE DAL `.num` DELLA CIFRA (set 2026, col
+     colore per direzione): un'aliquota non e' una quantita' che si
+     aggiunge o si toglie — e' quanto vale la trattenuta — e tinta di
+     rosso direbbe che «1%» se ne va. Restano due gruppi indivisibili
+     e il capo puo' cadere fra loro, che e' il punto giusto dove
+     spezzare.
+     E IL SEGNO C'E' SEMPRE, anche il piu': a chi vende la meta' si
+     AGGIUNGE ai sats da bloccare (li mette lui), e senza segno quella
+     riga si leggeva come una sottrazione. */
   const commissione = fee === null ? num('—')
-    : fee > 0 ? promo + num(pct(fee * 50) + '% · '
-                            + cifraNuda('meta', compro ? '−' : ''))
+    : fee > 0 ? promo + num(pct(fee * 50) + '% ·') + ' '
+                + num(cifraNuda('meta', compro ? '−' : '+'),
+                      compro ? '−' : '+')
     : promo + num('0 sats');
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto) */
@@ -37554,11 +37601,18 @@ function contoDettP2P(o){
      («(+4% sopra il mercato)»), adesso e' il DATO della voce — e un
      dato in corpo piccolo accanto al suo nome si legge come una
      precisazione facoltativa. */
+  /* ⚠️ LA PERCENTUALE NON PORTA PIU' NE' SEGNO NE' TINTA (set 2026,
+     ritocco di Andrea): il verso lo dice gia' la PAROLA — «Premio» o
+     «Sconto» — e ripeterlo col segno era dirlo due volte. La tinta e'
+     uscita per una ragione piu' forte: da oggi nel conto il colore
+     significa DIREZIONE (i sats che entrano o escono, a destra), e un
+     verde di «convenienza» sulla stessa riga sarebbe lo stesso colore
+     con due significati — su un ordine di vendita col premio la
+     percentuale sarebbe stata VERDE accanto a sats ROSSI. */
   const premio = (!fisso && o.premium)
     ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
-        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + premioTestoP2P(o.premium) + '</b>',
-        cifra('premio', o.premium > 0 ? '−' : ''), 'premio')
+        + ' <b>' + Math.abs(Math.round(o.premium)) + '%</b>',
+        cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la
      commissione intera con la sua spartizione — le due cose che le
@@ -37590,8 +37644,14 @@ function contoDettP2P(o){
        Misurato a 320, non stimato. */
     + r('Fee Barattolo', commissione)
     + premio
-    + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot')
-    + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot')
+    /* LE DUE RIGHE IN EVIDENZA NON PESANO UGUALE (set 2026, ritocco
+       di Andrea): quella in SATS porta l'arancio di casa — e' la
+       cifra che parla di bitcoin, ed e' quella che si va a cercare —
+       mentre l'euro resta nell'inchiostro. Due arancioni in fondo al
+       conto facevano una macchia sola, e nessuna delle due si
+       staccava. */
+    + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot sats')
+    + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
     + (dice ? '<div class="hint">' + dice + '</div>' : '');
 }

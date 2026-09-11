@@ -37468,9 +37468,16 @@ console.log(JSON.stringify(out));
     # QUATTRO e non cinque: su questo ordine il premio e' zero e la
     # sua riga non c'e' (la regola dello sconto). Col premio sono
     # cinque, ed e' la prova qui sotto.
-    prova("ogni valore del conto viaggia in un `.num`", [4, 5],
-          [cm.count('<span class="num">'),
-           o["contoPremio"].count('<span class="num">')])
+    # ⚠️ SI CONTA IL PREFISSO, non `class="num"` intero: dal set 2026
+    # i valori col segno portano anche la classe del colore
+    # (`num meno`), e la stringa chiusa ne contava meno di quanti ce
+    # ne fossero — una prova che diceva «4» su un conto da 5.
+    # CINQUE nel conto base: il Controvalore, i DUE della fee
+    # (aliquota e cifra, separati da quando il colore dice la
+    # direzione), «Ricevi» e il totale in euro. Sei col premio.
+    prova("ogni valore del conto viaggia in un `.num`", [5, 6],
+          [cm.count('<span class="num'),
+           o["contoPremio"].count('<span class="num')])
     prova("...e il controvalore e' al mercato puro", True,
           "Controvalore" in cm and "≈ 12000 sats" in cm)
     # «FEE BARATTOLO» (11 set 2026, decisione di Andrea): lo stesso
@@ -37480,7 +37487,11 @@ console.log(JSON.stringify(out));
     # anche a 375), mentre questa e' piu' corta perfino della secca
     # che l'aveva sostituita — misurato, non stimato.
     prova("la fee dice la meta' di chi legge, col meno", True,
-          "<span>Fee Barattolo</span>" in cm and "1% · ≈ −120 sats" in cm
+          "<span>Fee Barattolo</span>" in cm
+          # l'aliquota e la cifra sono due gruppi separati (il colore
+          # veste la sola cifra), e il segno c'e' sempre
+          and '<span class="num">1% ·</span>' in cm
+          and '<span class="num meno">≈ −120 sats</span>' in cm
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
           "Ricevi" in cm and "≈ 11880 sats" in cm)
@@ -37497,27 +37508,39 @@ console.log(JSON.stringify(out));
     # venditore +4%» — e a destra i soli sats col segno del CONTO: su
     # un sell +4% toglie (avviso), su un buy toglie a chi paga
     # (affare), stessa riga e tinta rovesciata.
-    prova("il premio porta tinta, segno e la sua riga che somma", True,
-          'Premio al venditore <b class="p2p-avviso">+4%</b>'
-          in o["contoPremio"]
-          and "≈ −480 sats" in o["contoPremio"]
-          and "≈ 11405 sats" in o["contoPremio"])
+    # ⚠️ LA PERCENTUALE NON PORTA PIU' NE' SEGNO NE' TINTA (set 2026):
+    # il verso lo dice la PAROLA («Premio»/«Sconto»), e la tinta e'
+    # uscita perche' nel conto il colore ora significa DIREZIONE — un
+    # verde di «convenienza» accanto a sats rossi sarebbe lo stesso
+    # colore con due significati nella stessa riga.
+    prova("il premio dice la percentuale nuda, e i sats il verso", True,
+          'Premio al venditore <b>4%</b>' in o["contoPremio"]
+          and '<span class="num meno">≈ −480 sats</span>' in o["contoPremio"]
+          and "≈ 11405 sats" in o["contoPremio"]
+          and "p2p-avviso" not in o["contoPremio"]
+          and "p2p-affare" not in o["contoPremio"])
     # ⚠️ E UN PREMIO NEGATIVO CAMBIA IL NOME DELLA VOCE: non e' «un
     # premio di meno», e' uno SCONTO — col nome giusto non serve
     # leggere il segno per capire di cosa si parla.
     prova("...e un premio negativo e' uno SCONTO, col suo nome", True,
-          'Sconto del venditore <b class="p2p-affare">−2%</b>'
-          in o["contoSconto"]
-          and "Premio al venditore" not in o["contoSconto"])
-    prova("...e nel tab Vendi la tinta si rovescia, il conto si specchia",
-          True, 'Premio al venditore <b class="p2p-affare">+4%</b>'
-          in o["contoVendi"]
+          'Sconto del venditore <b>2%</b>' in o["contoSconto"]
+          and "Premio al venditore" not in o["contoSconto"]
+          # ...e i suoi sats si AGGIUNGONO: segno piu' e verde. E il
+          # conto SOMMA anche col verso rovesciato: 12000 − 122 + 240
+          and '<span class="num piu">≈ +240 sats</span>' in o["contoSconto"]
+          and '<span class="num meno">≈ −122 sats</span>' in o["contoSconto"]
+          and "≈ 12118 sats" in o["contoSconto"])
+    prova("...e nel tab Vendi il conto si specchia",
+          True, 'Premio al venditore <b>4%</b>' in o["contoVendi"]
           and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
           and "Totale da pagare" not in o["contoVendi"]
           and "Ricevi" in o["contoVendi"])
     # ...dove la commissione si AGGIUNGE (niente meno): la blocca lui
-    prova("...e la commissione di chi vende si aggiunge, senza meno",
-          True, "1% · ≈ 115 sats" in o["contoVendi"])
+    # ⚠️ A CHI VENDE LA META' SI AGGIUNGE, e adesso lo dice il SEGNO
+    # oltre al colore: senza il piu' quella riga si leggeva come una
+    # sottrazione in mezzo a due sottrazioni vere.
+    prova("...e la commissione di chi vende si aggiunge, col piu'",
+          True, '<span class="num piu">≈ +115 sats</span>' in o["contoVendi"])
     prova("a prezzo fisso i sats sono esatti ma il netto resta stima",
           True, ">100000 sats<" in o["contoFisso"]
           and "≈ −1000 sats" in o["contoFisso"]
@@ -37535,7 +37558,8 @@ console.log(JSON.stringify(out));
     # col cartello del mercatino; a zero resta il cartello e basta.
     prova("la fee sotto il listino porta «in promo» e la meta' vera",
           True, '<span class="promo-tag">in promo</span>' in o["contoPromo"]
-          and "0,5% · ≈ −60 sats" in o["contoPromo"]
+          and '<span class="num">0,5% ·</span>' in o["contoPromo"]
+          and '<span class="num meno">≈ −60 sats</span>' in o["contoPromo"]
           and "≈ 11940 sats" in o["contoPromo"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
           True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
@@ -37602,8 +37626,13 @@ console.log(JSON.stringify(out));
     prova("sotto la foto non c'e' nessuna etichetta", [False, False, True],
           ["il negozio" in o["repPiena"], "venditore" in o["repSenzaNegozio"],
            '<div class="p2p-rep-col volto">' in o["repPiena"]])
-    prova("...e il volto si centra nella riga", True,
-          "justify-content:center" in pezzo_js(
+    # ⚠️ IL VOLTO SI ALLINEA IN ALTO COI DUE SEGNI (11 set 2026,
+    # ritocco di Andrea), e `center` era la causa di quel che aveva
+    # visto: centrava il tondo nell'altezza dell'INTERA colonna mentre
+    # stella e omino stanno nella fascia alta — misurati, i loro centri
+    # a 14px dal bordo del riquadro e quello del volto a 33.
+    prova("...e il volto parte dove partono gli altri due segni", True,
+          "justify-content:flex-start" in pezzo_js(
               mini, "  .p2p-rep-col.volto{", "}"))
     # il codice del negozio e' testo che arriva dal server: scappato
     prova("...e un veleno nel codice non esce dall'attributo", True,
