@@ -35562,13 +35562,15 @@ def prove_p2p_libro():
           and ".p2p-badge.affare" not in mini
           and ".p2p-badge.avviso" not in mini
           and ".p2p-prezzo" not in mini)
-    # ⚠️ E LA COPPIA DEL CONTO STA DOPO `.ctrl-nota`: la percentuale
-    # del premio vive DENTRO quella nota grigia, e a parita' di
-    # specificita' vince l'ultima scritta — piu' su, il grigio
-    # spegnerebbe il numero senza che niente fallisca.
+    # ⚠️ E LA COPPIA DEL CONTO STA DOPO `.ctrl-nota`: oggi la
+    # percentuale del premio sta FUORI da quella nota, ma se un
+    # domani ci rientrasse (com'era nella prima stesura dell'11 set)
+    # il grigio della nota vincerebbe per ordine e spegnerebbe il
+    # numero, senza che niente fallisca. Dopo, vale in tutti e due i
+    # casi — e costa zero.
     prova("...e nel conto la tinta e' scritta DOPO la nota che la spegnerebbe",
           True, 0 < mini.index(".ctrl-riga .ctrl-nota{")
-          < mini.index(".ctrl-riga .ctrl-nota .p2p-avviso{"))
+          < mini.index(".ctrl-riga .p2p-avviso{"))
     # L'ANELLO E' ANCORATO e non in fila: dentro il flex della testa
     # una cifra lunga prendeva tutta la riga e lo faceva scendere a
     # meta' card (visto dal vivo). In assoluto non entra nel wrap.
@@ -36098,8 +36100,8 @@ out.rangeTriplo = ordineDaEvento(ev(38383, [['d','rt'],['k','sell'],['f','EUR'],
 out.rigaRange = rigaOrdineP2P(out.range);
 out.rigaRangePremio = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rp'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['premium','4'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 out.rigaSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rs'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
-/* il quarto testo del badge: a vendere sotto il mercato si incassa
-   di meno, e la pillola e' rossa */
+/* il quarto caso del badge: a vendere sotto il mercato si incassa
+   di meno, e il numero e' rosso */
 out.rigaVendiSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','vs'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 /* LA CARD IN SECONDA PERSONA: un sell (tab «Compra BTC») e un buy
    (tab «Vendi BTC»), per vedere le righe scambiarsi il posto */
@@ -36318,7 +36320,7 @@ console.log(JSON.stringify(out));
           "50,00–100,00 €, scegli tu" in out["rigaRange"]
           and ">al prezzo di mercato<" in out["rigaRange"])
     prova("...e col premio il range porta il badge, e sceglie lo stesso",
-          True, "4%</b> sopra il mercato" in out["rigaRangePremio"]
+          True, "4%</b> più caro" in out["rigaRangePremio"]
           and "50,00–100,00 €, scegli tu" in out["rigaRangePremio"])
     prova("lo scaduto e' escluso", None, out["scaduto"])
     prova("senza id non e' un ordine", None, out["senzaD"])
@@ -36341,15 +36343,14 @@ console.log(JSON.stringify(out));
     # LA CARD ESSENZIALE (10 set 2026, ritocco di Andrea): due righe
     # e un badge. Il badge dice il SOLO premio del venditore — mai la
     # commissione, che e' uguale per tutti: il suo mestiere e'
-    # confrontare le offerte — col MERCATO come metro (11 set 2026,
-    # emenda le quattro frasi «piu' caro / Risparmi / Incassi»: due
-    # offerte si confrontano solo con lo stesso metro) e la tinta del
+    # confrontare le offerte — con DUE parole sole, uguali nei due
+    # tab, che dicono il prezzo («piu' caro» / «di sconto», 11 set
+    # 2026: prima erano quattro e cambiavano col lato) e la tinta del
     # giudizio di sempre sul solo numero (affare/avviso dal lato, la
     # formula uniforme di get_market_quote, verificata sui byte).
     prova("a prezzo di mercato la cifra porta il ≈ e il badge il premio",
           True, "≈ 98000 sats" in out["rigaMercato"]
-          and '<b class="p2p-affare">2%</b> sopra il mercato'
-          in out["rigaMercato"])
+          and '<b class="p2p-affare">2%</b> più caro' in out["rigaMercato"])
     # LA SECONDA PERSONA, e le righe che si scambiano il posto: nel
     # tab «Compra BTC» (k=sell) chi legge paga euro e riceve sats, nel
     # tab «Vendi BTC» (k=buy) invia sats e riceve euro. La cifra in
@@ -36408,32 +36409,30 @@ console.log(JSON.stringify(out));
           in out["rigaCompra"]
           and "p2p-affare" not in out["rigaCompra"]
           and "p2p-avviso" not in out["rigaCompra"])
-    # IL TESTO E' UNO SOLO E IL METRO E' IL MERCATO: cambia la TINTA
-    # col lato, mai la frase — «piu' caro / Risparmi / Incassi»
-    # raccontava la stessa cosa in quattro modi, e due offerte si
-    # confrontano solo con lo stesso metro. Sempre il valore
-    # ASSOLUTO: il verso lo dicono le parole, mai un segno.
-    prova("a comprare: «3% sopra» rosso e «2% sotto» verde", True,
-          '<b class="p2p-avviso">3%</b> sopra il mercato' in out["rigaAvviso"]
-          and '<b class="p2p-affare">2%</b> sotto il mercato'
-          in out["rigaSotto"])
-    prova("...e a vendere la frase e' la stessa, la tinta si rovescia",
-          True, '<b class="p2p-affare">2%</b> sopra il mercato'
-          in out["rigaMercato"]
-          and '<b class="p2p-avviso">2%</b> sotto il mercato'
+    # IL TESTO GUARDA IL PREZZO E LA TINTA GUARDA CHI LEGGE, ed e' la
+    # distinzione che rende sensato un «piu' caro» VERDE: il prezzo
+    # dell'offerta e' sopra il mercato in tutti e due i tab, ma chi
+    # VENDE sats a un prezzo piu' caro ci guadagna. Due parole sole,
+    # uguali nei due tab, e sempre il valore ASSOLUTO: il verso lo
+    # dicono le parole, mai un segno da interpretare.
+    prova("a comprare: «3% più caro» rosso e «2% di sconto» verde", True,
+          '<b class="p2p-avviso">3%</b> più caro' in out["rigaAvviso"]
+          and '<b class="p2p-affare">2%</b> di sconto' in out["rigaSotto"])
+    prova("...e a vendere le parole non cambiano, la tinta si rovescia",
+          True, '<b class="p2p-affare">2%</b> più caro' in out["rigaMercato"]
+          and '<b class="p2p-avviso">2%</b> di sconto'
           in out["rigaVendiSotto"])
-    # ⚠️ QUESTA SENTINELLA E' ROVESCIATA, e il perche' vale piu' della
-    # riga: fino a ieri VIETAVA «sopra/sotto il mercato», perche' la
-    # riga del prezzo portava gia' il segno e il colore e le parole
-    # erano un terzo modo di dire la stessa cosa. Oggi il segno NON
-    # c'e' piu' (il badge porta il valore assoluto) e il colore da
-    # solo non dice da che parte pende — quindi quelle parole sono
-    # diventate l'UNICA cosa che lo dice, e sono chieste. La
-    # decisione di allora non era sbagliata: e' cambiato cio' che le
-    # stava accanto.
-    prova("le parole del mercato sono le sole a dire il verso", True,
-          "'sopra' : 'sotto'" in mini
-          and "+ '%</b> ' + (o.premium > 0 ? 'sopra' : 'sotto')" in mini)
+    # ⚠️ QUESTA SENTINELLA E' STATA ROVESCIATA, e il perche' vale piu'
+    # della riga: fino al 10 set VIETAVA le parole del verso, perche'
+    # la riga del prezzo portava gia' il segno e il colore e le
+    # parole erano un terzo modo di dire la stessa cosa. Oggi il
+    # segno NON c'e' piu' (il badge porta il valore assoluto) e il
+    # colore da solo non dice da che parte pende — quindi quelle
+    # parole sono diventate l'UNICA cosa che lo dice, e sono chieste.
+    # La decisione di allora non era sbagliata: e' cambiato cio' che
+    # le stava accanto.
+    prova("le parole del verso sono le sole a dirlo", True,
+          "(o.premium > 0 ? 'più caro' : 'di sconto')" in mini)
 
     # --- 7c) I SATS SONO SEMPRE AL NETTO DEL PREMIO -----------------
     # (set 2026, regola resa esplicita da Andrea) La cifra mostrata e'
@@ -36536,7 +36535,7 @@ console.log(JSON.stringify(out));
     prova("...e a cambio muto non inventa nessun numero", True,
           "≈" not in out["rigaMercatoMuto"]
           and "≈" not in out["rigaMercatoZeroMuto"]
-          and "2%</b> sopra il mercato" in out["rigaMercatoMuto"]
+          and "2%</b> più caro" in out["rigaMercatoMuto"]
           and ">al prezzo di mercato<" in out["rigaMercatoZeroMuto"])
     prova("...mentre col cambio vivo la stima c'e', e il badge non cambia",
           True, "≈" in out["rigaMercatoZeroVivo"]
@@ -37029,6 +37028,8 @@ out.contoMercato = contoDettP2P(ordine({}));
 /* col premio: mercato 11520, meta' 115, premio 480 — e la tinta */
 out.contoPremio = contoDettP2P(ordine({premium: 4}));
 out.contoVendi = contoDettP2P(ordine({lato: 'buy', premium: 4}));
+/* un premio NEGATIVO non e' un premio: la voce cambia nome */
+out.contoSconto = contoDettP2P(ordine({premium: -2}));
 /* a prezzo fisso: sats esatti, ma il netto resta una stima */
 out.contoFisso = contoDettP2P(ordine({sats: 100000}));
 /* l'intervallo: ogni riga porta i due capi */
@@ -37166,19 +37167,26 @@ console.log(JSON.stringify(out));
     prova("la spiegazione dice il 2% intero e la spartizione", True,
           "(2% dello scambio)" in cm and "metà a testa" in cm
           and "la tua metà" in cm)
-    # COL PREMIO: la percentuale sta nell'ETICHETTA con le parole
-    # delle card (11 set 2026) — «Premio al venditore (+4% sopra il
-    # mercato)», cosi' chi ha letto la card ritrova qui la stessa
-    # frase — in tinta col giudizio di sempre, e a destra i soli sats
-    # col segno del CONTO: su un sell +4% toglie (avviso), su un buy
-    # toglie a chi paga (affare), stessa riga e tinta rovesciata.
+    # COL PREMIO: la percentuale sta nell'ETICHETTA, attaccata al
+    # nome della voce e in tinta col giudizio di sempre — «Premio al
+    # venditore +4%» — e a destra i soli sats col segno del CONTO: su
+    # un sell +4% toglie (avviso), su un buy toglie a chi paga
+    # (affare), stessa riga e tinta rovesciata.
     prova("il premio porta tinta, segno e la sua riga che somma", True,
-          'Premio al venditore <span class="ctrl-nota">(<b class="p2p-avviso">'
-          '+4%</b> sopra il mercato)</span>' in o["contoPremio"]
+          'Premio al venditore <b class="p2p-avviso">+4%</b>'
+          in o["contoPremio"]
           and "≈ −480 sats" in o["contoPremio"]
           and "≈ 11405 sats" in o["contoPremio"])
+    # ⚠️ E UN PREMIO NEGATIVO CAMBIA IL NOME DELLA VOCE: non e' «un
+    # premio di meno», e' uno SCONTO — col nome giusto non serve
+    # leggere il segno per capire di cosa si parla.
+    prova("...e un premio negativo e' uno SCONTO, col suo nome", True,
+          'Sconto del venditore <b class="p2p-affare">−2%</b>'
+          in o["contoSconto"]
+          and "Premio al venditore" not in o["contoSconto"])
     prova("...e nel tab Vendi la tinta si rovescia, il conto si specchia",
-          True, '<b class="p2p-affare">+4%</b> sopra il mercato' in o["contoVendi"]
+          True, 'Premio al venditore <b class="p2p-affare">+4%</b>'
+          in o["contoVendi"]
           and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
           and "Totale da pagare" not in o["contoVendi"]
           and "Ricevi" in o["contoVendi"])

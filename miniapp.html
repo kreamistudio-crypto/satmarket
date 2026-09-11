@@ -3327,21 +3327,20 @@
      insieme all'etichetta che accompagna (sta dentro lo stesso span) */
   .ctrl-riga .ctrl-nota{font-size:12.5px;font-weight:600;color:var(--muted)}
   /* IL GIUDIZIO DEL PREMIO, lo stesso delle card (set 2026): sta qui
-     e non nel blocco del P2P perche' la percentuale vive DENTRO la
-     nota grigia, e a parita' di specificita' vince l'ultima scritta.
-     ⚠️ E L'ETICHETTA DEL PREMIO VA A CAPO invece di cedere coi
-     puntini (11 set 2026, con «(+4% sopra il mercato)»): e' l'unica
-     riga del conto la cui etichetta porta un DATO, e troncarla
-     mangerebbe proprio quello — «Premio al venditore (+4% sopra i…».
-     Le altre cedono come sempre: li' a destra c'e' tutto. */
-  .ctrl-riga .ctrl-nota .p2p-avviso{color:var(--danger)}
-  .ctrl-riga .ctrl-nota .p2p-affare{color:var(--trust)}
+     sotto e non nel blocco del P2P per una ragione che vale anche
+     adesso che la percentuale e' uscita dalla nota — se un domani ci
+     rientrasse, `.ctrl-nota` e' scritta qui sopra e a parita' di
+     specificita' vincerebbe l'ultima, spegnendo il numero in grigio
+     senza che niente fallisca. Dopo la nota vale in tutti e due i
+     casi. */
+  .ctrl-riga .p2p-avviso{color:var(--danger)}
+  .ctrl-riga .p2p-affare{color:var(--trust)}
+  /* ⚠️ E L'ETICHETTA DEL PREMIO VA A CAPO invece di cedere coi
+     puntini: e' l'unica riga del conto la cui etichetta porta un
+     DATO — «Premio al venditore +4%» — e troncarla mangerebbe
+     proprio quello. Le altre cedono come sempre: li' a destra c'e'
+     tutto. */
   .ctrl-riga.premio>span:first-child{white-space:normal}
-  /* ...e la nota va a capo INTERA: senza il nowrap la spezzatura
-     cade dentro la frase («…(+4% sopra» / «il mercato)»), che si
-     legge come due cose. Cosi' il capo va dove deve, fra il nome
-     della voce e la sua parentesi — misurato a 375 e a 320. */
-  .ctrl-riga.premio .ctrl-nota{white-space:nowrap}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
   /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
@@ -34292,33 +34291,35 @@ function rigaOrdineP2P(o){
      AL SUO POSTO IL BADGE DEL PREMIO: e' il SOLO premio del
      venditore, mai la commissione (che e' uguale per tutti), perche'
      il suo mestiere e' CONFRONTARE le offerte fra loro.
-     ⚠️ E IL TESTO DICE IL MERCATO, NON IL GESTO (11 set 2026,
-     ritocco di Andrea che EMENDA il giro di ieri): «4% sopra il
-     mercato», non «4% piu' caro» — «piu' caro / Risparmi / Incassi»
-     raccontava la stessa cosa in quattro modi diversi a seconda del
-     lato, e per confrontare due offerte servono due frasi che si
-     misurino con lo stesso metro. Il metro e' il mercato, ed e' uno
-     solo.
-     A ZERO LA FRASE C'E' LO STESSO — «al prezzo di mercato» — e non
-     e' un ritorno alla riga di ieri: quella spiegava una cifra, e
-     questa dice DOVE sta l'offerta. «Nessun badge» a premio zero
-     lascerebbe la card muta proprio sul caso piu' comune, e chi
-     scorre non saprebbe se il premio manca o se nessuno gliel'ha
-     detto. A prezzo fisso nemmeno: quel prezzo il mercato non lo
-     guarda.
+     ⚠️ IL TESTO E' DUE PAROLE E DICE IL PREZZO (11 set 2026,
+     seconda stesura dello stesso giorno): «4% piu' caro» / «2% di
+     sconto», e a zero «al prezzo di mercato». Prima erano quattro
+     frasi che cambiavano col lato («piu' caro / Risparmi /
+     Incassi»), poi due che nominavano il mercato («sopra / sotto il
+     mercato»): queste sono ancora due — una per verso, uguali nei
+     due tab — e dicono la stessa cosa con le parole che uno usa
+     guardando un prezzo.
+     A ZERO LA FRASE C'E' LO STESSO: «nessun badge» lascerebbe la
+     card muta proprio sul caso piu' comune, e chi scorre non
+     saprebbe se il premio manca o se nessuno gliel'ha detto. A
+     prezzo fisso nemmeno: quel prezzo il mercato non lo guarda.
      LA TINTA STA SUL SOLO NUMERO, il resto e' il grigio muto delle
      card: le parole sono un fatto, il giudizio e' il numero — e a
-     zero non c'e' niente da giudicare, quindi niente tinta. Il
-     giudice e' quello di sempre (affare/avviso dal lato, la formula
-     uniforme di get_market_quote verificata sui byte, per cui un
-     premio positivo assottiglia sempre i sats). */
+     zero non c'e' niente da giudicare, quindi niente tinta.
+     ⚠️ E LE PAROLE NON SONO IL GIUDIZIO, che e' la ragione per cui
+     «piu' caro» puo' essere VERDE: il testo guarda il PREZZO
+     dell'offerta (sopra o sotto il mercato, uguale nei due tab), la
+     tinta guarda CHI LEGGE — e chi vende sats a un prezzo piu' caro
+     ci guadagna. Il giudice e' quello di sempre (affare/avviso dal
+     lato, la formula uniforme di get_market_quote verificata sui
+     byte, per cui un premio positivo assottiglia sempre i sats). */
   const affare = (o.lato === 'buy') === (o.premium > 0);
   const pr = Math.abs(Math.round(o.premium || 0));
   const badge = o.sats > 0 ? ''
     : '<span class="p2p-badge">'
       + (pr
         ? '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-          + pr + '%</b> ' + (o.premium > 0 ? 'sopra' : 'sotto') + ' il mercato'
+          + pr + '%</b> ' + (o.premium > 0 ? 'più caro' : 'di sconto')
         : 'al prezzo di mercato')
       + '</span>';
   const paga = o.metodi.length
@@ -37116,17 +37117,25 @@ function contoDettP2P(o){
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto) */
   const affare = (o.lato === 'buy') === (o.premium > 0);
-  /* LA PERCENTUALE STA NELL'ETICHETTA, con le parole delle card
-     (11 set 2026, ritocco di Andrea): «Premio al venditore (+4%
-     sopra il mercato)» — cosi' chi ha letto «4% sopra il mercato»
-     sulla card ritrova QUI la stessa frase, e capisce che la riga
-     dei sats e' quel premio li'. A destra restano i soli sats, che
-     e' il posto delle cifre in ogni riga del conto. */
+  /* LA PERCENTUALE STA NELL'ETICHETTA, attaccata al nome della voce
+     (11 set 2026, ritocco di Andrea): «Premio al venditore +4%» /
+     «Sconto del venditore −2%», e a destra i soli sats — il posto
+     delle cifre in ogni riga del conto.
+     ⚠️ E IL NOME DELLA VOCE CAMBIA COL VERSO: un premio negativo
+     non e' «un premio di meno», e' uno SCONTO — chiamarlo premio
+     costringerebbe a leggere il segno per capire di cosa si parla,
+     che e' proprio il lavoro che l'etichetta dovrebbe risparmiare.
+     Il segno resta lo stesso (premioTestoP2P lo scrive sempre), e
+     insieme al nome non lascia nessun dubbio.
+     LA PERCENTUALE NON E' UNA NOTA, ed e' cambiata di taglia dalla
+     stesura di stamattina: allora era una parentetica che spiegava
+     («(+4% sopra il mercato)»), adesso e' il DATO della voce — e un
+     dato in corpo piccolo accanto al suo nome si legge come una
+     precisazione facoltativa. */
   const premio = (!fisso && o.premium)
-    ? r('Premio al venditore <span class="ctrl-nota">(<b class="'
-        + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + premioTestoP2P(o.premium) + '</b> '
-        + (o.premium > 0 ? 'sopra' : 'sotto') + ' il mercato)</span>',
+    ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
+        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+        + premioTestoP2P(o.premium) + '</b>',
         cifra('premio', o.premium > 0 ? '−' : ''), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la
