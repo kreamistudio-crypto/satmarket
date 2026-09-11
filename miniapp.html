@@ -2030,19 +2030,23 @@
      Le due coppie sono quelle di casa — il verde della protezione e
      il rosso dell'allarme sui loro fondi tenui (--warn-bg e' gia' il
      fondo del rosso, vedi .btn.allarme): mai un colore nuovo. */
-  /* `display:table` e non inline-block: il badge e' la TERZA RIGA
-     della card, e nel tab «Vendi» la riga sopra e' lo span inline
-     dell'euro — inline-block gli si incollerebbe accanto. Il table
-     e' un blocco che si stringe sul contenuto: riga sua, larghezza
-     da pillola, nessun wrapper. */
-  .p2p-badge{display:table;margin-top:5px;border-radius:999px;
-    padding:2px 9px;font-size:11.5px;font-weight:800}
-  .p2p-badge.affare{background:var(--trust-soft);color:var(--trust)}
-  .p2p-badge.avviso{background:var(--warn-bg);color:var(--danger)}
-  /* la stessa coppia nel conto scorporato del dettaglio (set 2026):
-     e' lo stesso giudizio delle card, sulla riga del premio */
-  .ctrl-riga .p2p-avviso{color:var(--danger)}
-  .ctrl-riga .p2p-affare{color:var(--trust)}
+  /* IL BADGE DEL PREMIO, terza riga della card: la pillola col fondo
+     tinto e' durata un giorno (11 set 2026, ritocco di Andrea) — due
+     pillole colorate per card, in un elenco che si scorre, gridavano
+     piu' delle cifre. Torna il grigio muto delle card, e la tinta
+     resta sul SOLO numero.
+     `display:block` e non inline: nel tab «Vendi» la riga sopra e'
+     lo span inline dell'euro, e un inline gli si incollerebbe
+     accanto invece di andare a capo. */
+  .p2p-badge{display:block;margin-top:3px;font-size:13px;
+    font-weight:600;color:var(--muted)}
+  .p2p-badge b{font-weight:800}
+  .p2p-badge .p2p-avviso{color:var(--danger)}
+  .p2p-badge .p2p-affare{color:var(--trust)}
+  /* la coppia gemella nel conto scorporato vive nel CSS del conto,
+     dopo `.ctrl-nota`: la percentuale del premio sta DENTRO quella
+     nota, e a parita' di specificita' vince chi e' scritto dopo —
+     scritta qui, il grigio della nota spegnerebbe il numero */
   /* LE DUE SCATOLE, che sono la struttura del riferimento: i metodi e
      chi c'e' dall'altra parte non sono righe di prosa in mezzo al
      resto — sono due FATTI, ognuno nel suo riquadro. `--chip-bg` e non
@@ -3322,6 +3326,22 @@
      un'altra voce — piu' piccola e in grigio, e cede coi puntini
      insieme all'etichetta che accompagna (sta dentro lo stesso span) */
   .ctrl-riga .ctrl-nota{font-size:12.5px;font-weight:600;color:var(--muted)}
+  /* IL GIUDIZIO DEL PREMIO, lo stesso delle card (set 2026): sta qui
+     e non nel blocco del P2P perche' la percentuale vive DENTRO la
+     nota grigia, e a parita' di specificita' vince l'ultima scritta.
+     ⚠️ E L'ETICHETTA DEL PREMIO VA A CAPO invece di cedere coi
+     puntini (11 set 2026, con «(+4% sopra il mercato)»): e' l'unica
+     riga del conto la cui etichetta porta un DATO, e troncarla
+     mangerebbe proprio quello — «Premio al venditore (+4% sopra i…».
+     Le altre cedono come sempre: li' a destra c'e' tutto. */
+  .ctrl-riga .ctrl-nota .p2p-avviso{color:var(--danger)}
+  .ctrl-riga .ctrl-nota .p2p-affare{color:var(--trust)}
+  .ctrl-riga.premio>span:first-child{white-space:normal}
+  /* ...e la nota va a capo INTERA: senza il nowrap la spezzatura
+     cade dentro la frase («…(+4% sopra» / «il mercato)»), che si
+     legge come due cose. Cosi' il capo va dove deve, fra il nome
+     della voce e la sua parentesi — misurato a 375 e a 320. */
+  .ctrl-riga.premio .ctrl-nota{white-space:nowrap}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
   /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
@@ -34269,23 +34289,37 @@ function rigaOrdineP2P(o){
      decidere — la cifra qui sopra e' GIA' il netto di tutto, premio
      e meta' di commissione (nettoLatoP2P), la stessa del conto nel
      dettaglio — e il conto per esteso sta la'.
-     AL SUO POSTO UN BADGE, e solo quando c'e' un premio: e' il SOLO
-     premio del venditore, mai la commissione (che e' uguale per
-     tutti), perche' il suo mestiere e' CONFRONTARE le offerte fra
-     loro. Le parole dicono il gesto di chi legge — «piu' caro» /
-     «Risparmi» a comprare, «Incassi in piu'/in meno» a vendere — e
-     la tinta e' il giudizio delle card di sempre: affare/avviso dal
-     lato, la formula uniforme di get_market_quote (verificata sui
-     byte) per cui un premio positivo assottiglia sempre i sats.
-     A premio zero nessun badge, e a prezzo fisso nemmeno: quel
-     prezzo il mercato non lo guarda. */
+     AL SUO POSTO IL BADGE DEL PREMIO: e' il SOLO premio del
+     venditore, mai la commissione (che e' uguale per tutti), perche'
+     il suo mestiere e' CONFRONTARE le offerte fra loro.
+     ⚠️ E IL TESTO DICE IL MERCATO, NON IL GESTO (11 set 2026,
+     ritocco di Andrea che EMENDA il giro di ieri): «4% sopra il
+     mercato», non «4% piu' caro» — «piu' caro / Risparmi / Incassi»
+     raccontava la stessa cosa in quattro modi diversi a seconda del
+     lato, e per confrontare due offerte servono due frasi che si
+     misurino con lo stesso metro. Il metro e' il mercato, ed e' uno
+     solo.
+     A ZERO LA FRASE C'E' LO STESSO — «al prezzo di mercato» — e non
+     e' un ritorno alla riga di ieri: quella spiegava una cifra, e
+     questa dice DOVE sta l'offerta. «Nessun badge» a premio zero
+     lascerebbe la card muta proprio sul caso piu' comune, e chi
+     scorre non saprebbe se il premio manca o se nessuno gliel'ha
+     detto. A prezzo fisso nemmeno: quel prezzo il mercato non lo
+     guarda.
+     LA TINTA STA SUL SOLO NUMERO, il resto e' il grigio muto delle
+     card: le parole sono un fatto, il giudizio e' il numero — e a
+     zero non c'e' niente da giudicare, quindi niente tinta. Il
+     giudice e' quello di sempre (affare/avviso dal lato, la formula
+     uniforme di get_market_quote verificata sui byte, per cui un
+     premio positivo assottiglia sempre i sats). */
   const affare = (o.lato === 'buy') === (o.premium > 0);
   const pr = Math.abs(Math.round(o.premium || 0));
-  const badge = (o.sats > 0 || !pr) ? ''
-    : '<span class="p2p-badge ' + (affare ? 'affare' : 'avviso') + '">'
-      + (paghiEuro
-        ? (o.premium > 0 ? pr + '% più caro' : 'Risparmi il ' + pr + '%')
-        : 'Incassi il ' + pr + '% in ' + (o.premium > 0 ? 'più' : 'meno'))
+  const badge = o.sats > 0 ? ''
+    : '<span class="p2p-badge">'
+      + (pr
+        ? '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+          + pr + '%</b> ' + (o.premium > 0 ? 'sopra' : 'sotto') + ' il mercato'
+        : 'al prezzo di mercato')
       + '</span>';
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
@@ -37082,11 +37116,18 @@ function contoDettP2P(o){
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
      premio», che non e' un'informazione (la regola dello sconto) */
   const affare = (o.lato === 'buy') === (o.premium > 0);
+  /* LA PERCENTUALE STA NELL'ETICHETTA, con le parole delle card
+     (11 set 2026, ritocco di Andrea): «Premio al venditore (+4%
+     sopra il mercato)» — cosi' chi ha letto «4% sopra il mercato»
+     sulla card ritrova QUI la stessa frase, e capisce che la riga
+     dei sats e' quel premio li'. A destra restano i soli sats, che
+     e' il posto delle cifre in ogni riga del conto. */
   const premio = (!fisso && o.premium)
-    ? r('Premio al venditore',
-        '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + premioTestoP2P(o.premium) + '</b> · '
-        + cifra('premio', o.premium > 0 ? '−' : ''))
+    ? r('Premio al venditore <span class="ctrl-nota">(<b class="'
+        + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+        + premioTestoP2P(o.premium) + '</b> '
+        + (o.premium > 0 ? 'sopra' : 'sotto') + ' il mercato)</span>',
+        cifra('premio', o.premium > 0 ? '−' : ''), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la
      commissione intera con la sua spartizione — le due cose che le
