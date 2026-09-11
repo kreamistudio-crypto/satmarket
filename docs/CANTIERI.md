@@ -9418,3 +9418,49 @@ accende da un parametro dell'URL e lo scatto si fa due volte
 primo.
 COLLAUDATO: **9124 verdi**. Guardato nei due temi e nei DUE LATI: il
 verbo neutro col numero verde a comprare e rosso a vendere.
+
+## La stella rotta, e la taglia che stava in tre posti
+
+IL DIFETTO L'HA VISTO ANDREA (11 set 2026): «a 5,0 la stella mostra
+una striscia verticale più chiara in mezzo». Era vero, ed era mio —
+del ritocco del giorno prima, quando la stella del riquadro è
+cresciuta a 28px.
+LA CAUSA, e vale più del rimedio: la stella è **due disegni
+sovrapposti** — il contorno, e sopra la stella piena dentro una
+finestra `overflow:hidden` larga quanto la percentuale del voto. La
+sua taglia però era scritta TRE volte, un `17px` cablato per ognuno
+dei tre pezzi (la scatola, gli svg, la finestra). La regola che
+l'aveva ingrandita colpiva i soli `svg`: contorno a 28, **finestra
+ferma a 17**. Risultato: a 5,0 il pieno copriva il 61% della stella
+e il resto restava contorno vuoto — una banda. Non un errore di
+disegno: **due misure della stessa cosa che si sono separate.**
+LA CURA È UNA VARIABILE, `--st`: la scatola, i due svg e la finestra
+la leggono tutti, e la taglia grande si ottiene girando quella
+(`.p2p-rep-col.media .p2p-rep-stella{--st:28px}`) invece di toccare
+gli `svg`. Ora è impossibile che i tre pezzi si sfasino, e due
+sentinelle lo tengono: che tutti e tre usino `var(--st)`, e che
+nessuno dei tre torni a portare un px cablato.
+⚠️ E LA VERIFICA SULLE CARD (17px), che Andrea ha chiesto insieme
+alla cura: **il difetto lì non c'era** — a quella taglia i tre
+numeri combaciavano, ed è esattamente il motivo per cui il difetto
+è nato solo ingrandendo. Misurate undici stelle nelle due taglie
+(5 / 4,8 / 4 / 2,5 / 0,5): strati sovrapposti alla stessa larghezza,
+e frazione RESA uguale a quella CHIESTA fino al decimo.
+IL BANCO CHE L'HA PROVATO NON GUARDA UNO SCATTO, e questa è la parte
+riusabile: `misura_stella.py` chiede al browser la larghezza dei due
+strati e della finestra, e confronta la percentuale resa con quella
+scritta nello `style`. Una banda è proprio ciò che uno screenshot
+mostra e nessuna prova vede; qui invece il numero lo dice.
+L'OMINO VA ALLA PARI CON LA STELLA nel riquadro: `.p2p-ico-mini` lo
+teneva a 12px — misura giusta dentro una riga di testo, minuscola
+accanto a una stella da 28. Portato a 28 con un selettore che nomina
+tutt'e due le classi, così non dipende da chi è scritto dopo nel
+foglio. **«Stessa altezza visiva» è stata misurata e non guardata**:
+l'altezza del DISEGNO (il bbox scalato, non il box) è 19,4px per la
+stella e 20,4 per l'omino — un pixel di scarto su venti.
+VIA L'ETICHETTA SOTTO LA FOTO: «il negozio ›» spiegava il tocco, e
+una faccia non ha bisogno di un cartello che dica che è una faccia.
+La colonna resta senza `<small>`, e il volto si centra nell'altezza
+della riga invece di restare appeso in cima. La sezione resta
+cliccabile — decisione di Andrea: il segno ora è il solo cursore.
+COLLAUDATO: **9129 verdi**. Guardato nei due temi.
