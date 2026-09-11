@@ -9113,17 +9113,17 @@ sentinella CSS che pretende le coppie di casa e vieta il ritorno di
 `.p2p-prezzo`. Guardato in vetrina CDP: sei card nei due temi.
 ⚠️ DUE SCELTE DI QUESTA VOCE SONO CADUTE IL GIORNO DOPO — le quattro
 frasi del gesto e la pillola col fondo tinto: le racconta, coi
-perché, «Il badge del premio, e le sue tre stesure», qui sotto.
+perché, «Il badge del premio, e le sue quattro stesure», qui sotto.
 
-## Il badge del premio, e le sue tre stesure
+## Il badge del premio, e le sue quattro stesure
 
-IL BADGE È STATO RISCRITTO TRE VOLTE IN DUE GIORNI (10-11 set 2026,
-tutte e tre di Andrea), e le due scartate stanno qui perché la terza
+IL BADGE È STATO RISCRITTO QUATTRO VOLTE IN DUE GIORNI (10-11 set
+2026, tutte di Andrea), e le tre scartate stanno qui perché l'ultima
 si capisce solo con loro accanto. Quel che NON è mai cambiato, ed è
 la riga da tenere: **il badge mostra il SOLO premio del venditore,
 mai la commissione** — quella è uguale per tutti, e il mestiere del
 badge è CONFRONTARE le offerte fra loro.
-LA PRIMA diceva il GESTO di chi legge, con quattro frasi che
+LA PRIMA diceva il GIUDIZIO per chi legge, ma con quattro frasi che
 cambiavano col lato: «4% più caro» / «Risparmi il 4%» a comprare,
 «Incassi il 4% in più / in meno» a vendere. Scartata perché quattro
 frasi per la stessa cosa non si confrontano: due offerte vogliono lo
@@ -9132,19 +9132,30 @@ LA SECONDA prese il mercato come metro — «4% sopra il mercato» /
 «2% sotto il mercato» — ed è durata mezza giornata: giusta nella
 logica, lunga da leggere in un elenco che si scorre, e «sopra il
 mercato» dice dove sta il prezzo ma non che effetto ti fa.
-LA TERZA, quella viva: **«4% più caro» / «2% di sconto»**, e a
-premio zero **«al prezzo di mercato»**. Due parole per verso, UGUALI
-nei due tab, che è la lezione della prima stesura tenuta insieme a
-quella della seconda: sono le parole che uno usa guardando un
-prezzo, e restano le stesse comunque si stia scambiando.
-⚠️ E QUI IL TESTO E LA TINTA GUARDANO DUE COSE DIVERSE, che è la
-sottigliezza da non perdere leggendo il codice: il TESTO guarda il
-PREZZO dell'offerta (più caro o scontato: lo stesso in tutti e due i
-tab), la TINTA guarda CHI LEGGE. Per questo un «4% più caro» può
-essere VERDE — chi VENDE sats a un prezzo più caro ci guadagna. Il
-giudice non è mai cambiato in nessuna delle tre stesure:
+LA TERZA accorciò senza cambiare strada: «4% più caro» / «2% di
+sconto», due parole per verso, uguali nei due tab. Durata poche ore,
+e il motivo per cui è caduta è la lezione dell'intero giro:
+**diceva il PREZZO, cioè un fatto vero che lascia il lavoro a chi
+legge**. Su un ordine di vendita «più caro» è una buona notizia, e
+capirlo toccava a lui — con la tinta che diceva già il contrario di
+quel che la parola suggeriva (un «più caro» VERDE).
+LA QUARTA, quella viva: **«4% più conveniente» (verde) / «4% meno
+conveniente» (rosso)**, e a premio zero **«al prezzo di mercato»**.
+È la strada della PRIMA — dire l'effetto su chi guarda — con la
+disciplina della seconda: DUE frasi sole, che valgono nei due tab
+senza cambiare parola. Lo stesso premio cambia giudizio col lato,
+e il badge lo dice invece di lasciarlo dedurre: +4% a comprare è
+«meno conveniente» (si ricevono meno sats), +4% a vendere è «più
+conveniente» (se ne consegnano meno).
+⚠️ E ADESSO TESTO E TINTA ESCONO DALLO STESSO GIUDICE, che è il
+guadagno vero dell'ultima stesura: fino a stamattina il testo
+guardava il prezzo e il colore guardava chi legge — due letture da
+tenere insieme a mente — mentre ora un badge verde dice sempre «più»
+e uno rosso sempre «meno». Una prova nuova lo tiene fermo: nessuna
+card può avere la tinta di un verso e le parole dell'altro. Il
+giudice non è mai cambiato in nessuna delle quattro stesure:
 `affare = (lato==='buy') === (premium>0)`.
-A ZERO LA FRASE C'È LO STESSO, ed è la cosa che nessuna delle tre
+A ZERO LA FRASE C'È LO STESSO, ed è la cosa che nessuna delle quattro
 richieste diceva e che è stata aggiunta guardando l'elenco: «nessun
 badge» lasciava la card muta proprio sul caso più comune, e chi
 scorre non poteva sapere se il premio mancava o se nessuno gliel'aveva
@@ -9190,9 +9201,12 @@ quindi il grigio avrebbe spento il numero senza che niente fallisse.
 Ora stanno dopo la nota e valgono in tutti e due i casi, con una
 sentinella sull'ORDINE delle due regole: oggi difende un rischio
 rientrato, e costa zero il giorno che la percentuale ci rientrasse.
-COLLAUDATO: **9108 verdi**. Guardato in vetrina CDP nei due temi:
+COLLAUDATO: **9110 verdi**. Guardato in vetrina CDP nei due temi:
 sei card e sette conti, a 375 e a 320, col caso sconto che somma
-(719.424 − 7.338 + 14.389 = 726.475).
+(719.424 − 7.338 + 14.389 = 726.475). E LA FRASE PIÙ LUNGA È STATA
+MISURATA, non guardata: «4% meno conveniente» sta su UNA riga a
+320px (300px di contenuto), che è la misura di casa — il badge è la
+riga più lunga della card, e ogni stesura l'ha allungata.
 ⚠️ E UN DIFETTO DI QUESTO STESSO FILE È STATO TROVATO SCRIVENDOLO,
 perché vale più della voce: la stesura di stamattina era stata
 infilata in mezzo alla voce della fee del nodo, che si è ritrovata
