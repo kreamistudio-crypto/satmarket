@@ -9314,3 +9314,77 @@ giorno che si decida di dare la classe anche a lui.
 COLLAUDATO: **9114 verdi**, di cui quattro nuove — la classe sul
 contenitore, le tre regole del cedere, la cifra indivisibile, e che
 il mercatino NON la prenda.
+
+## La testata del dettaglio, e il volto di chi ha pubblicato
+
+DUE RITOCCHI ALLA PAGINA (11 set 2026, Andrea), che la spostano da
+«scheda che descrive un ordine» a «pagina in cui stai facendo una
+cosa».
+LA TESTATA DICE IL FATTO E RESTA A VISTA. Il titolo era «Dettaglio
+ordine di acquisto» — nominava la PAGINA, che chi ce l'ha davanti
+vede già — e adesso è **«Stai comprando sats» / «Stai vendendo
+sats»**: il cappello che stava nella prima riga del corpo è salito
+nella testata, e dal corpo è sparito (era la stessa frase due volte
+a due centimetri di distanza, e `.p2p-dett-apre` è morta con lui).
+⚠️ E LA TESTATA È STICKY SOLO DOVE SERVIVA: sotto i 767px era **già
+ferma** e nessuno l'aveva notato — lì il foglio pieno è una colonna
+flex e la testata sta FUORI dal pezzo che scorre — mentre da 768 in
+su il foglio è un modale che scorre dentro sé stesso e la testata se
+ne andava con tutto il resto. La regola nuova serve a quel caso, col
+fondo opaco che non è decorazione: senza, il conto le scorrerebbe
+sotto in trasparenza.
+LA VIA D'USCITA È UNA ✕ e non più una freccia: la freccia promette
+«torni da dove sei venuto», e questa pagina non è una tappa di un
+cammino — si apre sopra il libro e si chiude. Il gesto resta
+`navIndietro()`: **a cambiare è il segno, non la strada.**
+IL VOLTO AL POSTO DEI GIORNI, nel riquadro «Chi ha pubblicato
+quest'ordine»: stella con la media (più grande delle altre due),
+numero di recensioni, e la FOTO di chi ha pubblicato. Una faccia
+dice in un colpo quel che «41 giorni qui» diceva in due parole e un
+conto, ed è la cosa che si riconosce fra un ordine e l'altro. È lo
+STESSO giudice dei volti delle card, ripieghi compresi: foto se c'è
+(con l'`onerror` che la toglie da sola), altrimenti l'iniziale sul
+tondo scuro. `icoGiorniP2P` è morta col suo chiamante — il disegno
+resta in git, e il nome non si riusa.
+TUTTA LA SEZIONE È LA PORTA, non il solo volto come sulle card: lì
+il volto è un francobollo dentro una card che fa già un altro
+mestiere, qui la sezione non ne ha altri e un bersaglio grande è più
+facile da prendere col pollice. Senza un negozio da aprire non c'è
+nessun attributo: una sezione che si annuncia cliccabile e non
+risponde è il difetto già pagato con la pillola sola del metodo.
+E L'ETICHETTA SOTTO IL VOLTO DICE DOVE PORTA — «il negozio ›»,
+oppure «venditore» quando non c'è niente da aprire: è l'unico segno
+visibile che quella sezione è un bersaglio, e il cursore lo dice
+solo a chi ha un mouse.
+⚠️ E IL FOGLIO SI CHIUDE PRIMA DI APRIRE IL NEGOZIO, che è la cosa
+che `apriNegozioP2P` delle card non fa e qui è obbligatoria: il
+negozio è una VISTA, non un foglio — aperto da sotto una pagina a
+pieno schermo ancora `open` resterebbe coperto da lei, e da fuori
+sembrerebbe che il tocco non abbia fatto niente.
+LE TRE COLONNE ERANO SFALSATE, E L'HA DETTO LA MISURA: con la stella
+cresciuta a 28 e gli altri segni a 20, la cifra della media partiva
+a 31px dal bordo e quella delle recensioni a 23 — otto pixel di
+dislivello su una griglia nata apposta per tenerle in riga, e a
+occhio, sullo scatto, «sembrava quasi giusto». Curato pareggiando
+l'ALTEZZA DELLA RIGA del segno (28 per tutte e tre, l'icona piccola
+centrata dentro): a crescere è lo spazio, non l'omino. Rimisurato:
+le tre etichette a 51px tutte e tre.
+TRE TRAPPOLE DELLE PROVE, pagate in questo giro e tutte della stessa
+famiglia — **la sentinella che guarda nel posto sbagliato**:
+1) «il vecchio titolo non c'è più» era rossa sul codice buono, perché
+il commento che introduce il titolo nuovo CITA quello vecchio (la
+storia del cambio vale più di una prova comoda): si cerca nel
+sorgente ripulito dai commenti, com'era già per lo sconto;
+2) `pezzo_js(..., "}")` si ferma ALLA graffa, che quindi non è nel
+pezzo — cercarci dentro `background:var(--card)}` è sempre falso;
+3) il ritaglio della testata fermato al primo `</div>` prendeva
+quello del `.grab`, due righe dopo l'inizio, e la ✕ restava fuori.
+COLLAUDATO: **9123 verdi**. Guardato in vetrina CDP nei due temi, a
+375 e a 320: la testata coi due lati, il riquadro col negozio e
+senza, il volto con la foto e con l'iniziale (di sera il tondo si
+inverte come nelle card).
+DICHIARATO E NON CURATO: il server manda ancora `giorni` in
+`/api/p2p/facce` e adesso non lo legge nessuno. Non fa danni — è un
+numero di giorni, mai una data, e la regola della privacy che lo
+aveva disegnato resta scritta — ma il giorno che si tocchi quella
+rotta, quella chiave si può togliere.
