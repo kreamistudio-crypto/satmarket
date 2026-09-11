@@ -51443,6 +51443,233 @@ def prove_scambi_p2p_vecchi():
           "nato due mesi fa",
           True, "rifiutato_stamattina" in (_o2.get("resta") or []))
 
+
+def prove_badge_nostr():
+    """Il badge NIP-58 delle live (set 2026, semplificato lo stesso
+    giorno: niente challenge — vedi il perche' in docs/CANTIERI.md, la
+    voce "IL SECONDO GIRO"). La definizione (kind 30009) e il premio
+    (kind 8) sono eventi Nostr VERI, firmati con lo stesso firma_evento
+    del NIP-99 — zero formato inventato. Qui si provano: i tag dei due
+    eventi, il ritiro (NIP-09), la normalizzazione di npub/pubkey, il
+    motore di assegnazione condiviso (_premia_pubkey — si segna SOLO
+    dopo che un relay accetta), e che tutte le rotte siano SOLO ADMIN.
+
+    ATTENZIONE: "badge" qui e' un oggetto DIVERSO dal badge_utente/
+    DISTINTIVI interno (i distintivi ricalcolabili, es. "🟣 npub
+    verificata") — la disambiguazione e' nel prefisso nostr_badge_ di
+    ogni tabella e funzione qui provata."""
+    print("\n[badge Nostr NIP-58 delle live]")
+    import asyncio
+    import time
+
+    # --- 1) i tag del 30009 e dell'8 ----------------------------------
+    amb = {"URL_PUBBLICO": "https://barattolo.store",
+           "tag_client": lambda: ["client", "Barattolo"],
+           "_NOSTR": (None, "f" * 64),
+           # la firma vera non serve a questa prova: si guarda l'evento
+           "firma_evento": lambda kind, tags, content: {
+               "kind": kind, "tags": tags, "content": content}}
+    exec(pezzo("_tags_badge_definizione"), amb)
+    exec(pezzo("evento_badge_definizione"), amb)
+    exec(pezzo("evento_badge_premio"), amb)
+
+    riga = {"live_id": "live-001-genesis",
+            "nome": "Barattolo Live #001 — Genesis",
+            "descrizione": "Badge commemorativo per chi ha partecipato "
+                           "alla prima live ufficiale di Barattolo con "
+                           "BitVero.",
+            "immagine": ""}
+    ev = amb["evento_badge_definizione"](riga)
+    prova("il 30009 e' un 30009", 30009, ev["kind"])
+    prova("...porta d/name/description", True,
+          ["d", "live-001-genesis"] in ev["tags"]
+          and ["name", riga["nome"]] in ev["tags"]
+          and ["description", riga["descrizione"]] in ev["tags"])
+    prova("senza immagine, niente tag image/thumb", False,
+          any(t[0] in ("image", "thumb") for t in ev["tags"]))
+    prova("...ma il riferimento a Barattolo si' (tag r + client)", True,
+          ["r", "https://barattolo.store"] in ev["tags"]
+          and ["client", "Barattolo"] in ev["tags"])
+
+    riga["immagine"] = "bdg_live-001-genesis_123.jpg"
+    ev2 = amb["evento_badge_definizione"](riga)
+    url = "https://barattolo.store/foto/bdg_live-001-genesis_123.jpg"
+    prova("con l'immagine caricata, image e thumb puntano a /foto/",
+          True, ["image", url] in ev2["tags"] and ["thumb", url] in ev2["tags"])
+
+    premio = amb["evento_badge_premio"](riga, "e" * 64)
+    prova("l'8 e' un 8", 8, premio["kind"])
+    prova("...il tag a punta al 30009 di QUESTA live", True,
+          ["a", f"30009:{'f' * 64}:live-001-genesis"] in premio["tags"])
+    prova("...e il tag p alla pubkey giusta", True,
+          ["p", "e" * 64] in premio["tags"])
+
+    # --- 2) _lapide_badge: il ritiro (NIP-09, kind 5) -----------------
+    amb2 = {"_NOSTR": (None, "f" * 64),
+            "firma_evento": lambda kind, tags, content: {
+                "kind": kind, "tags": tags, "content": content}}
+    exec(pezzo("_lapide_badge"), amb2)
+    lapide = amb2["_lapide_badge"]("live-001-genesis", "e" * 64, "1" * 64)
+    prova("il ritiro e' un kind 5 (NIP-09)", 5, lapide["kind"])
+    prova("...punta all'evento premio che ritira", True,
+          ["e", "1" * 64] in lapide["tags"])
+    prova("...e alla definizione della live", True,
+          ["a", f"30009:{'f' * 64}:live-001-genesis"] in lapide["tags"])
+    prova("...dice a chi lo toglie", True, ["p", "e" * 64] in lapide["tags"])
+    prova("...e dichiara il kind che sta ritirando", True,
+          ["k", "8"] in lapide["tags"])
+
+    # --- 3) _pubkey_normalizzata: npub o hex, mai altro ---------------
+    from fastapi import HTTPException as _HTTPException
+
+    amb3 = {"HTTPException": _HTTPException, "RE_HEX_64": re.compile(
+        r"[0-9a-f]{64}")}
+    exec(_SORGENTE[_SORGENTE.index("CHARSET_BECH32 = "):
+                   _SORGENTE.index("\n\n\n",
+                                   _SORGENTE.index("CHARSET_BECH32 = "))],
+         amb3)
+    exec(pezzo("npub_to_hex"), amb3)
+    exec(pezzo("_bech32_polymod"), amb3)
+    exec(pezzo("hex_to_npub"), amb3)
+    exec(pezzo("_pubkey_normalizzata"), amb3)
+    norm = amb3["_pubkey_normalizzata"]
+
+    pk_test = "ab" * 32
+    prova("una pubkey esadecimale passa cosi' com'e'", pk_test,
+          norm({"pubkey": pk_test}))
+    prova("...anche in maiuscolo, torna minuscola", pk_test,
+          norm({"pubkey": pk_test.upper()}))
+    npub_test = amb3["hex_to_npub"](pk_test)
+    prova("una npub1... si converte nella stessa hex", pk_test,
+          norm({"npub": npub_test}))
+    try:
+        norm({})
+        prova("senza npub ne' pubkey: solleva 400", True, False)
+    except _HTTPException as e:
+        prova("senza npub ne' pubkey: solleva 400", 400, e.status_code)
+    try:
+        norm({"npub": "npub1xxxxxxxxxxxxxxxx"})
+        prova("npub rotta: solleva 400", True, False)
+    except _HTTPException as e:
+        prova("npub rotta: solleva 400", 400, e.status_code)
+    try:
+        norm({"pubkey": "troppo corta"})
+        prova("hex della lunghezza sbagliata: solleva 400", True, False)
+    except _HTTPException as e:
+        prova("hex della lunghezza sbagliata: solleva 400", 400,
+              e.status_code)
+
+    # --- 4) _premia_pubkey: si segna SOLO dopo un relay OK ------------
+    import sqlite3
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute("CREATE TABLE nostr_badge_partecipanti(live_id TEXT, "
+                "pubkey TEXT, premiato_evento TEXT DEFAULT '', "
+                "premiato_il INTEGER DEFAULT 0, ritirato INTEGER DEFAULT 1,"
+                " PRIMARY KEY(live_id, pubkey))")
+    vero.execute("INSERT INTO nostr_badge_partecipanti(live_id, pubkey) "
+                "VALUES('live-z','pk-z')")
+    vero.commit()
+
+    class _ConViva:
+        """close() non chiude davvero: il :memory: deve sopravvivere
+        fra una chiamata e l'altra (stesso pattern di altre prove)."""
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    async def _corout(v):
+        return v
+
+    esito_relay = {"ok": True}
+    amb4 = {"db": lambda: _ConViva(), "time": time,
+            "evento_badge_premio": lambda live, pk: {
+                "id": "evpremio123", "kind": 8},
+            "_spedisci_ai_relay": lambda ev: _corout(
+                1 if esito_relay["ok"] else 0)}
+    exec("async " + pezzo("_premia_pubkey"), amb4)
+
+    esito_relay["ok"] = True
+    r_id = asyncio.new_event_loop().run_until_complete(
+        amb4["_premia_pubkey"]({"live_id": "live-z"}, "pk-z"))
+    prova("relay che accetta: torna l'id dell'evento", "evpremio123", r_id)
+    riga_db = vero.execute("SELECT premiato_evento, ritirato FROM "
+                           "nostr_badge_partecipanti WHERE live_id='live-z' "
+                           "AND pubkey='pk-z'").fetchone()
+    prova("...e scrive premiato_evento", "evpremio123",
+          riga_db["premiato_evento"])
+    prova("...azzerando ritirato (riassegnare rimette il badge)", 0,
+          riga_db["ritirato"])
+
+    vero.execute("UPDATE nostr_badge_partecipanti SET premiato_evento='', "
+                "ritirato=1 WHERE live_id='live-z'")
+    vero.commit()
+    esito_relay["ok"] = False
+    r_id2 = asyncio.new_event_loop().run_until_complete(
+        amb4["_premia_pubkey"]({"live_id": "live-z"}, "pk-z"))
+    prova("nessun relay accetta: torna vuoto, non si segna nulla", "", r_id2)
+    riga_db2 = vero.execute("SELECT premiato_evento, ritirato FROM "
+                            "nostr_badge_partecipanti WHERE live_id='live-z' "
+                            "AND pubkey='pk-z'").fetchone()
+    prova("...la riga resta come prima", (
+        "", 1), (riga_db2["premiato_evento"], riga_db2["ritirato"]))
+    vero.close()
+
+    # --- 5) assegna-manuale/assegna-admin/ritira: un motore solo -----
+    prova("assegna_manuale_live riusa _premia_pubkey (nessuna firma "
+          "duplicata)", True,
+          "await _premia_pubkey(live, pubkey)" in
+          pezzo("assegna_manuale_live"))
+    prova("...e prima assicura la riga senza toccarla se gia' c'e'",
+          True, "DO NOTHING" in pezzo("assegna_manuale_live"))
+    prova("assegna_admin_live riusa lo stesso motore", True,
+          "await _premia_pubkey(live, pubkey)" in
+          pezzo("assegna_admin_live"))
+    prova("...e chi non ha una npub verificata si vede in risposta, "
+          "non sparisce", True,
+          "senza_npub_verificata" in pezzo("assegna_admin_live"))
+    prova("ritira_badge_live si segna SOLO dopo che un relay accetta",
+          True, "if not ok:" in pezzo("ritira_badge_live"))
+    prova("...e usa la stessa normalizzazione di assegna-manuale", True,
+          "_pubkey_normalizzata(d)" in pezzo("ritira_badge_live"))
+
+    # --- 6) niente piu' challenge: la sezione non la nomina neppure --
+    sezione = _SORGENTE[_SORGENTE.index("BADGE NOSTR NIP-58 (LE LIVE)"):
+                        _SORGENTE.index("I POST AUTOMATICI: la "
+                                       "piattaforma racconta i fatti")]
+    prova("nessuna rotta /challenge o /verify e' rimasta", False,
+          '"/challenge"' in sezione or '"/verify"' in sezione)
+    prova("nessuna tabella nostr_badge_challenge", False,
+          "nostr_badge_challenge" in sezione)
+
+    # --- 7) tutte le rotte sono SOLO ADMIN -----------------------------
+    for nome in ("crea_badge_live", "carica_immagine_badge",
+                "assegna_manuale_live", "assegna_admin_live",
+                "ritira_badge_live", "elenco_live_badge", "stato_live"):
+        corpo = pezzo(nome)
+        prova(f"{nome}: riservato ai moderatori", True,
+              "verifica_utente(x_tg_init_data, barattolo_sessione)" in corpo
+              and 'if not e_admin(user["id"]):' in corpo)
+
+    # --- 8) l'immagine del badge passa dalla whitelist delle foto ----
+    i = _SORGENTE.index("NOME_FOTO = re.compile(")
+    amb5 = {"re": re}
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb5)
+    prova("il nome del badge passa la whitelist delle foto pubbliche",
+          True, bool(amb5["NOME_FOTO"].match(
+              "bdg_live-001-genesis_123.jpg")))
+    prova("...ma non un nome a caso", False,
+          bool(amb5["NOME_FOTO"].match("bdg_../../etc_1.jpg")))
+    prova("...e non serve una rotta nuova: /foto/{nome} basta", True,
+          '@app.get("/foto/{nome}")' in _SORGENTE)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -51565,6 +51792,7 @@ def main():
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,
+              prove_badge_nostr,
               prove_config_esempio):
         try:
             f()

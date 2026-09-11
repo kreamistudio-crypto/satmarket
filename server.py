@@ -3852,6 +3852,33 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_uscite_annuncio
         ON connettori_uscite(annuncio_id, stato);
+    CREATE TABLE IF NOT EXISTS nostr_badge_live(
+        -- il badge NIP-58 (kind 30009) di una live: una riga per
+        -- live_id, che e' anche il tag "d" dell'evento. ATTENZIONE: e'
+        -- un oggetto DIVERSO da badge_utente/DISTINTIVI qui sopra —
+        -- quelli sono distintivi interni ricalcolabili, questo e' un
+        -- vero evento Nostr firmato dalla piattaforma.
+        live_id TEXT PRIMARY KEY,
+        nome TEXT NOT NULL,
+        descrizione TEXT NOT NULL,
+        immagine TEXT DEFAULT '',   -- nome file in foto/ (bdg_*), '' = non caricata
+        evento_id TEXT DEFAULT '',  -- id del kind 30009 pubblicato, '' = non ancora firmato
+        creato INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS nostr_badge_partecipanti(
+        -- una riga per (live, pubkey): SOLO lo stato di assegnazione.
+        -- La prova resta l'evento Nostr sui relay, non una riga qui —
+        -- questa tabella serve a retry e audit (mai a se stessa come
+        -- prova). Niente challenge: la npub arriva da fuori (l'admin
+        -- la raccoglie seguendo la diretta) e chi la assegna la scrive
+        -- qui direttamente — vedi la nota in testa alla sezione.
+        live_id TEXT NOT NULL,
+        pubkey TEXT NOT NULL,            -- hex, mai npub
+        premiato_evento TEXT DEFAULT '', -- id del kind 8 pubblicato, '' = non ancora premiato
+        premiato_il INTEGER DEFAULT 0,
+        ritirato INTEGER DEFAULT 0,      -- 1 = premiato e poi ritirato (NIP-09)
+        PRIMARY KEY(live_id, pubkey)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -32001,6 +32028,421 @@ async def trasloca_annunci_nostr():
         await asyncio.sleep(0.5)     # mai una raffica verso i relay
 
 
+# ==================== BADGE NOSTR NIP-58 (LE LIVE) ====================
+# Il badge commemorativo di una live: un vero evento Nostr firmato dalla
+# piattaforma — NIP-58, la definizione (kind 30009) e l'assegnazione
+# (kind 8) — non una riga nel nostro database che dice "ce l'ha". Qui
+# dentro si tiene SOLO lo stato: a chi e' stato assegnato, se e quando,
+# se e' stato ritirato. La prova resta l'evento firmato, verificabile
+# da chiunque sui relay, mai una riga di questo database.
+#
+# ATTENZIONE AL NOME: "badge" in Barattolo esiste gia' ed e' un'altra
+# cosa — i distintivi interni (badge_utente/DISTINTIVI, qualche
+# migliaio di righe piu' sopra, tutti ricalcolabili dai dati, es. "🟣
+# npub verificata"). Questo e' un oggetto Nostr vero e per non
+# confondersi con quello ogni tabella e ogni funzione qui porta il
+# prefisso nostr_badge_.
+#
+# NIENTE CHALLENGE (set 2026, deciso da Alan dopo il primo giro): qui
+# c'era un meccanismo a codici — l'admin ne annunciava uno a voce, il
+# partecipante lo pubblicava come nota Nostr, il server lo cercava sui
+# relay e verificava la firma in locale. Funzionava, ed e' stato tolto:
+# per un pubblico che l'admin segue di persona in diretta la prova non
+# e' un protocollo, e' il suo giudizio — chi ha partecipato manda la
+# sua npub (in chat, in un messaggio), l'admin la incolla e la manda.
+# Se un giorno tornasse utile (un pubblico troppo grande da curare a
+# mano) il meccanismo a codici sta nella storia di questo file.
+#
+# Il flusso, tutto SOLO ADMIN (i partecipanti non toccano mai Barattolo,
+# nemmeno per mandare la npub: quella arriva fuori da qui):
+#  1) POST .../badge           crea/pubblica la definizione (kind 30009)
+#  2) POST .../immagine        carica l'immagine e ripubblica se serve
+#  3) POST .../assegna-manuale firma e pubblica il kind 8 per UNA pubkey
+#  4) POST .../assegna-admin   lo stesso, in blocco, per gli admin
+#  5) POST .../ritira          NIP-09 (kind 5): toglie un'assegnazione
+
+BADGE_LATO = 512            # il badge e' un'icona, non un francobollo
+RE_LIVE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{2,39}$")
+
+
+def _tags_badge_definizione(riga) -> list:
+    """I tag NIP-58 del kind 30009: d/name/description sempre,
+    image/thumb solo se l'immagine e' gia' stata caricata. Il
+    riferimento all'identita' di Barattolo non e' un tag — lo e' gia'
+    il pubkey che firma l'evento, che e' quello che conta per NIP-58 —
+    ma tag_client() e il tag "r" (stessa convenzione di evento_annuncio,
+    NIP-99) lo rendono leggibile anche a un umano che guarda il json."""
+    tags = [["d", riga["live_id"]],
+            ["name", riga["nome"]],
+            ["description", riga["descrizione"]],
+            ["r", URL_PUBBLICO],
+            tag_client()]
+    if riga["immagine"]:
+        url = f"{URL_PUBBLICO}/foto/{riga['immagine']}"
+        tags.append(["image", url])
+        tags.append(["thumb", url])
+    return tags
+
+
+def evento_badge_definizione(riga) -> dict:
+    """Costruisce e firma il kind 30009 (Badge Definition, NIP-58) di
+    una live. Il tag "d" stabile lo rende sostituibile: ripubblicarlo
+    (es. dopo aver caricato l'immagine) aggiorna la definizione sui
+    relay senza crearne una seconda — lo stesso meccanismo di
+    evento_annuncio per il NIP-99 (riga ~31345)."""
+    return firma_evento(30009, _tags_badge_definizione(riga), "")
+
+
+def evento_badge_premio(riga_live, pubkey_hex: str) -> dict:
+    """Costruisce e firma il kind 8 (Badge Award, NIP-58) che assegna
+    il badge di una live a UNA pubkey: il tag "a" punta alla
+    definizione (sostituibile per costruzione, come sopra), il tag "p"
+    dice a chi. Un evento per pubkey e non un unico evento con piu' tag
+    "p": ogni riga di nostr_badge_partecipanti mappa 1:1 un evento
+    Nostr, quindi il retry e' granulare (chi non e' passato non blocca
+    chi lo e') e "mai due volte" e' un semplice WHERE."""
+    return firma_evento(8, [
+        ["a", f"30009:{_NOSTR[1]}:{riga_live['live_id']}"],
+        ["p", pubkey_hex]], "")
+
+
+def _lapide_badge(live_id: str, pubkey_hex: str, evento_premio_id: str) -> dict:
+    """La NIP-09 (kind 5) che ritira un Badge Award nostro — gemella di
+    _lapide_nostra per gli annunci (riga ~31789), kind diverso."""
+    return firma_evento(5, [
+        ["e", evento_premio_id],
+        ["a", f"30009:{_NOSTR[1]}:{live_id}"],
+        ["p", pubkey_hex],
+        ["k", "8"]],
+        "Badge ritirato da Barattolo")
+
+
+def _pubkey_normalizzata(d: dict) -> str:
+    """Accetta 'npub' o 'pubkey' nel body di una richiesta e ritorna
+    sempre l'hex a 64 caratteri, o solleva un 400 onesto — lo stesso
+    posto per ognuna delle rotte che l'admin puo' azionare a mano
+    (assegna_manuale, ritira), cosi' il messaggio d'errore e' identico
+    ovunque invece di essere reinventato una volta a rotta."""
+    grezza = (d.get("npub") or d.get("pubkey") or "").strip()
+    if not grezza:
+        raise HTTPException(400, "Manca 'npub' o 'pubkey'")
+    try:
+        pubkey = npub_to_hex(grezza) if grezza.startswith("npub1") else grezza
+    except ValueError as e:
+        raise HTTPException(400, f"npub non valida: {e}")
+    pubkey = pubkey.strip().lower()
+    if not RE_HEX_64.fullmatch(pubkey):
+        raise HTTPException(400, "pubkey non valida: servono 64 caratteri "
+                                 "esadecimali (o una npub1... valida)")
+    return pubkey
+
+
+async def _premia_pubkey(live, pubkey: str) -> str:
+    """Firma e pubblica il kind 8 per UNA pubkey e, solo se almeno un
+    relay accetta, registra premiato_evento/premiato_il (e azzera
+    ritirato: riassegnare a mano e' la via per rimettere un badge
+    ritirato). Ritorna l'id dell'evento pubblicato, '' se nessun relay
+    ha accettato. Presuppone che la riga esista gia' in
+    nostr_badge_partecipanti (i chiamanti la creano con un INSERT ...
+    DO NOTHING prima di chiamare)."""
+    evento = evento_badge_premio(live, pubkey)
+    if not await _spedisci_ai_relay(evento):
+        return ""
+    con = db()
+    con.execute("UPDATE nostr_badge_partecipanti SET premiato_evento=?, "
+                "premiato_il=?, ritirato=0 WHERE live_id=? AND pubkey=?",
+                (evento["id"], int(time.time()), live["live_id"], pubkey))
+    con.commit()
+    con.close()
+    return evento["id"]
+
+
+@app.post("/api/admin/live/{live_id}/badge")
+async def crea_badge_live(live_id: str, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: crea o aggiorna la definizione NIP-58 (kind 30009)
+    del badge di una live e la pubblica sui relay. Idempotente: lo
+    stesso live_id (tag "d") aggiorna la definizione invece di
+    duplicarla — utile per quando arriva l'immagine (endpoint sotto)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not RE_LIVE_ID.fullmatch(live_id):
+        raise HTTPException(400, "live_id non valido: solo minuscole, "
+                                 "cifre e trattini, 3-40 caratteri")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server: manca "
+                                 "NOSTR_NSEC_PIATTAFORMA")
+    d = await leggi_json(req)
+    nome = (d.get("nome") or "").strip()
+    descrizione = (d.get("descrizione") or "").strip()
+    if not nome or not descrizione:
+        raise HTTPException(400, "Nome e descrizione sono obbligatori")
+    con = db()
+    con.execute(
+        "INSERT INTO nostr_badge_live(live_id, nome, descrizione, "
+        "creato) VALUES(?,?,?,?) ON CONFLICT(live_id) DO UPDATE SET "
+        "nome=excluded.nome, descrizione=excluded.descrizione",
+        (live_id, nome, descrizione, int(time.time())))
+    con.commit()
+    riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    con.close()
+    evento = evento_badge_definizione(riga)
+    ok = await _spedisci_ai_relay(evento)
+    if not ok:
+        raise HTTPException(502, "Nessun relay ha accettato la "
+                                 "definizione del badge: riprova")
+    con = db()
+    con.execute("UPDATE nostr_badge_live SET evento_id=? WHERE live_id=?",
+                (evento["id"], live_id))
+    con.commit()
+    con.close()
+    print(f"🏺 Badge live «{live_id}» pubblicato ({ok}/"
+          f"{len(RELAYS_VERIFICA)} relay)")
+    return {"ok": True, "live_id": live_id, "evento_id": evento["id"],
+            "relay_ok": ok, "relay_totali": len(RELAYS_VERIFICA)}
+
+
+@app.post("/api/admin/live/{live_id}/immagine")
+async def carica_immagine_badge(live_id: str, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: carica l'immagine del badge — un data URL base64,
+    la stessa forma delle foto degli annunci (vedi salva_foto, riga
+    ~9298) — e, se la definizione era gia' pubblicata, la ripubblica
+    con image/thumb aggiornati (stesso "d": e' un aggiornamento, non
+    un badge nuovo)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    con.close()
+    if not riga:
+        raise HTTPException(404, "Prima crea il badge (nome e descrizione)")
+    if not ImmaginePillow:
+        raise HTTPException(503, "Sul server manca Pillow: caricamento "
+                                 "immagine non disponibile")
+    d = await leggi_json(req)
+    m = re.match(r"^data:image/(jpeg|jpg|png|webp);base64,(.+)$",
+                d.get("foto") or "", re.S)
+    if not m:
+        raise HTTPException(400, "Immagine non leggibile: usa JPG, PNG o WebP")
+    try:
+        raw = base64.b64decode(m.group(2))
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img).convert("RGB")
+        img = ImageOps.fit(img, (BADGE_LATO, BADGE_LATO),
+                           ImmaginePillow.Resampling.LANCZOS)
+    except Exception:
+        raise HTTPException(400, "Questa immagine non si riesce a leggere")
+    vecchia = riga["immagine"]
+    nome = f"bdg_{live_id}_{int(time.time())}.jpg"
+    img.save(os.path.join(FOTO_DIR, nome), "JPEG", quality=AVATAR_QUALITA)
+    con = db()
+    con.execute("UPDATE nostr_badge_live SET immagine=? WHERE live_id=?",
+                (nome, live_id))
+    con.commit()
+    con.close()
+    if vecchia:
+        try:
+            os.remove(os.path.join(FOTO_DIR, vecchia))
+        except OSError:
+            pass
+    ripubblicato = False
+    if riga["evento_id"] and _NOSTR:
+        con = db()
+        riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                           (live_id,)).fetchone()
+        con.close()
+        evento = evento_badge_definizione(riga)
+        if await _spedisci_ai_relay(evento):
+            con = db()
+            con.execute("UPDATE nostr_badge_live SET evento_id=? "
+                        "WHERE live_id=?", (evento["id"], live_id))
+            con.commit()
+            con.close()
+            ripubblicato = True
+    return {"ok": True, "immagine": nome, "ripubblicato": ripubblicato}
+
+
+@app.post("/api/admin/live/{live_id}/assegna-manuale")
+async def assegna_manuale_live(live_id: str, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: assegna il badge a UNA npub/pubkey scelta a mano —
+    «mandalo a chi voglio». Chi ha partecipato manda la sua npub fuori
+    da qui (in chat, in un messaggio); l'admin la incolla qui e la
+    manda — la verifica e' il suo giudizio nel seguire la diretta, non
+    un protocollo (vedi la nota in testa alla sezione). Se quella
+    pubkey l'aveva gia' (magari ritirato in seguito), la ripropone: e'
+    la via per rimettere un badge tolto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    con = db()
+    live = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    if not live or not live["evento_id"]:
+        con.close()
+        raise HTTPException(400, "Prima crea e pubblica il badge (kind 30009)")
+    con.close()
+    d = await leggi_json(req)
+    pubkey = _pubkey_normalizzata(d)
+    con = db()
+    con.execute(
+        "INSERT INTO nostr_badge_partecipanti(live_id, pubkey) "
+        "VALUES(?,?) ON CONFLICT(live_id, pubkey) DO NOTHING",
+        (live_id, pubkey))
+    con.commit()
+    con.close()
+    evento_id = await _premia_pubkey(live, pubkey)
+    if not evento_id:
+        raise HTTPException(502, "Nessun relay ha accettato: riprova")
+    return {"ok": True, "pubkey": pubkey, "evento_id": evento_id}
+
+
+@app.post("/api/admin/live/{live_id}/assegna-admin")
+async def assegna_admin_live(live_id: str,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: assegna il badge a tutti i moderatori (ADMIN_IDS)
+    che hanno una npub verificata — «prima agli admin». Chi non ha una
+    npub verificata resta fuori e si VEDE nella risposta, non sparisce
+    in silenzio."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    con = db()
+    live = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    if not live or not live["evento_id"]:
+        con.close()
+        raise HTTPException(400, "Prima crea e pubblica il badge (kind 30009)")
+    righe = []
+    if ADMIN_IDS:
+        segnaposto = ",".join("?" * len(ADMIN_IDS))
+        righe = con.execute(
+            f"SELECT tg_id, npub FROM utenti WHERE tg_id IN ({segnaposto}) "
+            "AND npub_verificata=1", tuple(ADMIN_IDS)).fetchall()
+    con.close()
+    assegnati, non_pubblicato, npub_rotta = [], [], []
+    for r in righe:
+        try:
+            pubkey = npub_to_hex(r["npub"])
+        except ValueError:
+            npub_rotta.append(r["tg_id"])
+            continue
+        con = db()
+        con.execute(
+            "INSERT INTO nostr_badge_partecipanti(live_id, pubkey) "
+            "VALUES(?,?) ON CONFLICT(live_id, pubkey) DO NOTHING",
+            (live_id, pubkey))
+        con.commit()
+        con.close()
+        (assegnati if await _premia_pubkey(live, pubkey)
+         else non_pubblicato).append(r["tg_id"])
+        await asyncio.sleep(0.3)
+    visti = {r["tg_id"] for r in righe}
+    senza_npub = [a for a in ADMIN_IDS if a not in visti]
+    return {"ok": True, "assegnati": assegnati,
+            "non_pubblicato": non_pubblicato, "npub_non_valida": npub_rotta,
+            "senza_npub_verificata": senza_npub}
+
+
+@app.post("/api/admin/live/{live_id}/ritira")
+async def ritira_badge_live(live_id: str, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: ritira un badge già assegnato (NIP-09, kind 5). Come
+    ritira_da_nostr per gli annunci: si segna ritirato SOLO se almeno
+    un relay accetta la cancellazione, altrimenti si può ripetere.
+    Riassegnare a mano (assegna_manuale_live) rimette il badge e
+    azzera ritirato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    d = await leggi_json(req)
+    pubkey = _pubkey_normalizzata(d)
+    con = db()
+    riga = con.execute(
+        "SELECT premiato_evento FROM nostr_badge_partecipanti "
+        "WHERE live_id=? AND pubkey=?", (live_id, pubkey)).fetchone()
+    con.close()
+    if not riga or not riga["premiato_evento"]:
+        raise HTTPException(400, "Questa pubkey non ha un badge da ritirare")
+    ok = await _spedisci_ai_relay(
+        _lapide_badge(live_id, pubkey, riga["premiato_evento"]))
+    if not ok:
+        raise HTTPException(502, "Nessun relay ha accettato il ritiro: riprova")
+    con = db()
+    con.execute("UPDATE nostr_badge_partecipanti SET premiato_evento='', "
+                "premiato_il=0, ritirato=1 WHERE live_id=? AND pubkey=?",
+                (live_id, pubkey))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/live")
+async def elenco_live_badge(x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: l'elenco di tutti i badge live creati coi
+    conteggi — il pannello altrimenti dovrebbe indovinare i live_id a
+    memoria."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = con.execute(
+        "SELECT l.*, "
+        "(SELECT COUNT(*) FROM nostr_badge_partecipanti p "
+        " WHERE p.live_id=l.live_id) AS partecipanti, "
+        "(SELECT COUNT(*) FROM nostr_badge_partecipanti p "
+        " WHERE p.live_id=l.live_id AND p.premiato_evento<>'') AS premiati "
+        "FROM nostr_badge_live l ORDER BY l.creato DESC").fetchall()
+    con.close()
+    return {"ok": True, "live": [dict(r) for r in righe]}
+
+
+@app.get("/api/admin/live/{live_id}")
+async def stato_live(live_id: str,
+                     x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: lo stato di una live — definizione, quanti
+    partecipanti/premiati e l'elenco per pubkey (serve al pannello per
+    offrire il ritiro riga per riga)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    live = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    if not live:
+        con.close()
+        raise HTTPException(404, "Live non trovata")
+    totale = con.execute(
+        "SELECT COUNT(*) n, SUM(premiato_evento<>'') p FROM "
+        "nostr_badge_partecipanti WHERE live_id=?", (live_id,)).fetchone()
+    partecipanti = con.execute(
+        "SELECT pubkey, premiato_evento<>'' AS premiato, ritirato "
+        "FROM nostr_badge_partecipanti WHERE live_id=? ORDER BY "
+        "premiato_il DESC, pubkey", (live_id,)).fetchall()
+    con.close()
+    return {"ok": True, "live": dict(live),
+            "partecipanti": totale["n"] or 0, "premiati": totale["p"] or 0,
+            "lista": [dict(p) for p in partecipanti]}
+
+
 # ---------- I POST AUTOMATICI: la piattaforma racconta i fatti -------
 # Quando un annuncio nuovo entra in vetrina, Barattolo lo annuncia da
 # solo sui suoi canali: una nota Nostr kind-1 (firmata dalla chiave
@@ -43287,7 +43729,11 @@ NOME_FOTO = re.compile(
     r"|pod_prova-\d+\.jpg"
     # la figura del negozio nelle raffiche: stesso motivo del podio —
     # il canale la mostra per URL
-    r"|neg_\d+_\d+\.jpg)\Z")
+    r"|neg_\d+_\d+\.jpg"
+    # l'immagine del badge NIP-58 di una live: il tag "image" del kind
+    # 30009 la porta per URL, quindi senza questa forma risponderebbe
+    # 404 a chiunque apra il badge da un client Nostr
+    r"|bdg_[a-z0-9-]{3,40}_\d+\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 

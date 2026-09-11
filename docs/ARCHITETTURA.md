@@ -24057,3 +24057,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    dell'utente, mai sul server) →
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
+- IL BADGE NIP-58 DELLE LIVE (set 2026, il perché intero — e perché
+  NON c'è nessuna challenge, nonostante NIP-58 la renderebbe possibile
+  — stanno in `docs/CANTIERI.md`, alla voce omonima). Vive dentro
+  `server.py`, subito dopo il trasloco degli annunci Nostr: due
+  tabelle (`nostr_badge_live`, `nostr_badge_partecipanti` — prefisso
+  `nostr_badge_` apposta, per non confondersi col `badge_utente`/
+  `DISTINTIVI` interno, un oggetto diverso) e sette rotte
+  `/api/admin/live/...` (SOLO ADMIN): `badge`, `immagine`,
+  `assegna-manuale` (una npub/pubkey a scelta — l'unica via
+  d'assegnazione: la npub arriva da fuori, l'admin la incolla),
+  `assegna-admin` (bulk su `ADMIN_IDS` con npub verificata), `ritira`
+  (NIP-09 kind 5) e due `GET` (elenco, stato). Zero primitive Nostr
+  nuove: la definizione (kind 30009) e il premio (kind 8) passano
+  dallo stesso `firma_evento`/`_spedisci_ai_relay`/`_NOSTR`/
+  `RELAYS_VERIFICA` del NIP-99, e le rotte che assegnano condividono
+  `_premia_pubkey` (assicura la riga con un `INSERT ... DO NOTHING`,
+  firma, pubblica, scrive `premiato_evento` solo se un relay accetta —
+  un motore solo, mai duplicato). `nostr_badge_partecipanti` è minima:
+  `(live_id, pubkey, premiato_evento, premiato_il, ritirato)` — niente
+  fasi, niente soglia, niente stato "verificato" da calcolare: chi
+  entra nella tabella è già stato scelto dall'admin. L'immagine passa
+  dalla stessa whitelist `NOME_FOTO`/rotta `/foto/{nome}` di sempre
+  (forma `bdg_*`), nessuna rotta nuova per servirla, e dallo stesso
+  `ridimensiona()` del client che comprime avatar/foto annunci/banner.
+  IL PANNELLO ADMIN vive in `miniapp.html`, dentro `#adminStats` (tab
+  Profilo, `loadAdminStats`) come un `cassettoAdm` — `boxBadgeLive()`
+  — accanto a «Stato delle leve»: stesso linguaggio visivo, stesso
+  fetch a mano con `authHdr()`, nessun helper centralizzato (non
+  esiste, in questo file).

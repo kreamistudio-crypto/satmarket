@@ -29921,6 +29921,12 @@ function revocaJarShare(){
    gia' caricata), e il destinatario scelto — sempre e solo il tg_id
    numerico, mai un nome dentro un onclick. */
 let admUtenti = [], admMsgDest = 0;
+/* I badge Nostr NIP-58 delle live: l'elenco (admBadge, leggero) e il
+   dettaglio di UNA sola live alla volta (admBadgeDettaglio — quella
+   che l'admin ha aperto), mai i due livelli insieme in una sola
+   struttura: l'elenco si ricarica ad ogni giro di loadAdminStats,
+   il dettaglio solo quando serve (apriBadgeLive). */
+let admBadge = [], admBadgeDettaglio = null;
 
 async function loadAdminStats(){
   const box = el('adminStats');
@@ -30001,6 +30007,17 @@ async function loadAdminStats(){
       const rl = await fetch(`${API_BASE}/admin/leve`,
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rl.ok) leve = (await rl.json()).gruppi || [];
+    } catch(e) {}
+    /* i badge Nostr NIP-58 delle live: solo l'elenco coi conteggi qui
+       (interroga una tabella minuscola), il dettaglio di uno solo
+       (partecipanti, challenge attive) si carica al bisogno quando lo
+       si apre — apriBadgeLive() sotto, mai qui: una live e' roba rara,
+       non merita una seconda query ad ogni apertura del pannello */
+    admBadge = [];
+    try {
+      const rbg = await fetch(`${API_BASE}/admin/live`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rbg.ok) admBadge = (await rbg.json()).live || [];
     } catch(e) {}
     const card = (emoji, valore, nome) => `
       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
@@ -30104,6 +30121,7 @@ async function loadAdminStats(){
         </div>
       </div>
       ${boxLeve(leve)}
+      ${boxBadgeLive()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
@@ -30647,6 +30665,179 @@ function boxLeve(gruppi){
     allarmi ? `⚠️ ${allarmi} da guardare` : `${quante} leve`, `
     <div class="sub">Il valore con cui il server sta girando <b>adesso</b>. Si guarda e basta: si cambia nel <b>config del VPS</b>, poi un riavvio.</div>
     ${corpo}`);
+}
+
+/* --- Badge Nostr NIP-58 delle live (set 2026) -----------------------
+   Un badge commemorativo VERO — kind 30009 la definizione, kind 8 il
+   premio, firmati dalla chiave della piattaforma (firma_evento sul
+   server, mai un formato nostro). Qui solo la parte ADMIN: creare/
+   pubblicare, caricare l'immagine, assegnare (a una npub scelta o in
+   blocco agli admin), ritirare.
+
+   NIENTE CHALLENGE (deciso lo stesso giorno del primo giro): chi ha
+   partecipato manda la sua npub fuori da qui — in chat, in un
+   messaggio — e l'admin la incolla e la manda. La verifica e' il suo
+   giudizio nel seguire la diretta, non un protocollo automatico. */
+
+function boxBadgeLive(){
+  const righe = admBadge.map(b => `
+    <div class="leva-riga" style="cursor:pointer" onclick="apriBadgeLive('${b.live_id}')">
+      <div class="leva-testo">
+        <div class="leva-nome">${esc(b.nome)}</div>
+        <div class="leva-chiave">${esc(b.live_id)}${b.evento_id ? '' : ' · non ancora pubblicato'}</div>
+      </div>
+      <div class="leva-val" style="font-size:12px;color:var(--muted)">👥${b.partecipanti||0} · 🏅${b.premiati||0}</div>
+    </div>`).join('') || '<div class="sub">Nessun badge creato ancora.</div>';
+  return cassettoAdm('accAdmBadge', '🏺', 'Badge Nostr (live)', admBadge.length, `
+    <div class="sub">Un badge per ogni live: crealo, carica l'immagine, e mandalo a chi ti scrive la sua npub — o a tutti gli admin in blocco.</div>
+    ${righe}
+    <div style="margin-top:14px">
+      <div class="section-label">+ Nuovo badge</div>
+      <input id="badgeNomeNuovo" placeholder="Nome (es. Barattolo Live #001 — Genesis)" style="margin-top:8px;width:100%">
+      <textarea id="badgeDescNuovo" placeholder="Descrizione" style="margin-top:8px;width:100%"></textarea>
+      <button class="btn ghost" style="margin-top:8px" onclick="creaBadgeLive()">Crea e pubblica</button>
+    </div>
+    <div id="badgeDettaglio" style="margin-top:14px"></div>`);
+}
+
+/* Dal nome allo slug del live_id: minuscolo, solo lettere/cifre/
+   trattini, 3-40 caratteri — la stessa forma che il server impone
+   (RE_LIVE_ID). Se il nome non lascia abbastanza caratteri buoni si
+   completa con l'istante di adesso, cosi' non nasce mai troppo corto. */
+function slugLive(nome){
+  let s = (nome||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+  if (s.length < 3) s = (s + '-' + Date.now()).slice(0,40);
+  return s;
+}
+
+async function creaBadgeLive(){
+  haptic();
+  const nome = (el('badgeNomeNuovo')?.value||'').trim();
+  const descrizione = (el('badgeDescNuovo')?.value||'').trim();
+  if (!nome || !descrizione) { toast('Scrivi nome e descrizione'); return; }
+  const liveId = slugLive(nome);
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/${liveId}/badge`,
+      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({nome, descrizione})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Creazione non riuscita', 6000); return; }
+    toast('🏺 Badge creato e pubblicato su Nostr');
+    el('badgeNomeNuovo').value = ''; el('badgeDescNuovo').value = '';
+    await loadAdminStats();
+    apriBadgeLive(liveId);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function apriBadgeLive(liveId){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/${liveId}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non trovato', 5000); return; }
+    admBadgeDettaglio = d;
+    el('badgeDettaglio').innerHTML = badgeDettaglioHTML(d);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function badgeDettaglioHTML(d){
+  const liveId = d.live.live_id;
+  const righeLista = (d.lista||[]).map(p => `
+    <div class="leva-riga">
+      <div class="leva-testo">
+        <div class="leva-chiave">${esc(p.pubkey.slice(0,16))}…</div>
+        <div class="sub">${p.premiato ? 'premiato' : (p.ritirato ? 'ritirato' : '')}</div>
+      </div>
+      <div>${p.premiato
+        ? `<button class="btn ghost" onclick="ritiraBadgeLive('${liveId}','${p.pubkey}')">Ritira</button>`
+        : ''}</div>
+    </div>`).join('') || '<div class="sub">Nessun partecipante ancora.</div>';
+  return `
+    <div class="section-label">${esc(d.live.nome)}</div>
+    <div class="sub">${esc(liveId)} · ${d.live.evento_id ? 'pubblicato' : 'NON pubblicato'} · ${d.partecipanti} partecipanti, ${d.premiati} premiati</div>
+    <div style="margin-top:10px">
+      <input type="file" accept="image/*" id="badgeFoto_${liveId}" style="display:none" onchange="caricaImmagineBadgeLive('${liveId}', this.files[0])">
+      <button class="btn ghost" onclick="el('badgeFoto_${liveId}').click()">📷 ${d.live.immagine ? 'Cambia' : 'Carica'} immagine</button>
+    </div>
+    <div style="margin-top:10px">
+      <div class="section-label">Manda a chi voglio</div>
+      <div class="filtri-riga" style="margin-top:6px">
+        <input id="badgeNpub_${liveId}" placeholder="npub1... o pubkey esadecimale">
+        <button class="btn ghost" onclick="assegnaManualeLive('${liveId}')">Invia</button>
+      </div>
+      <button class="btn ghost" style="margin-top:8px" onclick="assegnaAdminLive('${liveId}')">👥 Assegna a tutti gli admin con npub verificata</button>
+    </div>
+    <div style="margin-top:14px">
+      <div class="section-label">Partecipanti (${(d.lista||[]).length})</div>
+      ${righeLista}
+    </div>`;
+}
+
+async function caricaImmagineBadgeLive(liveId, file){
+  if (!file) return;
+  try {
+    const foto = await ridimensiona(file);
+    if (!foto) { toast('Immagine non leggibile'); return; }
+    const r = await fetch(`${API_BASE}/admin/live/${liveId}/immagine`,
+      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({foto})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Caricamento non riuscito', 6000); return; }
+    toast('📷 Immagine caricata' + (d.ripubblicato ? ' e badge ripubblicato' : ''));
+    apriBadgeLive(liveId);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function assegnaManualeLive(liveId){
+  haptic();
+  const campo = el(`badgeNpub_${liveId}`);
+  const valore = (campo?.value||'').trim();
+  if (!valore) { toast('Incolla una npub o una pubkey'); return; }
+  const body = valore.startsWith('npub1') ? {npub: valore} : {pubkey: valore};
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/${liveId}/assegna-manuale`,
+      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riuscito', 6000); return; }
+    toast('🏅 Badge inviato');
+    if (campo) campo.value = '';
+    await loadAdminStats(); apriBadgeLive(liveId);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function assegnaAdminLive(liveId){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/${liveId}/assegna-admin`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riuscito', 6000); return; }
+    toast(`👥 ${d.assegnati.length} admin premiati` +
+      (d.senza_npub_verificata.length ? `, ${d.senza_npub_verificata.length} senza npub verificata` : ''));
+    await loadAdminStats(); apriBadgeLive(liveId);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function ritiraBadgeLive(liveId, pubkey){
+  chiediConferma({
+    titolo: 'Ritirare il badge?',
+    corpo: `Barattolo pubblica una cancellazione Nostr (kind 5) per l'assegnazione a ${pubkey.slice(0,16)}…. Si può sempre riassegnare a mano in seguito.`,
+    etichetta: 'Ritira',
+    poi: async () => {
+      try {
+        const r = await fetch(`${API_BASE}/admin/live/${liveId}/ritira`,
+          {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+           body: JSON.stringify({pubkey})});
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
+        toast('↩︎ Badge ritirato');
+        await loadAdminStats(); apriBadgeLive(liveId);
+      } catch(e) { toast('Rete assente: riprova'); }
+    }});
 }
 
 /* La decisione dalla Mini App: stesso cuore della tastiera Telegram

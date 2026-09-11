@@ -9526,3 +9526,192 @@ stava applicando davvero, come diceva il suo `background-size`.
 COLLAUDATO: **9139 verdi**. Guardato nei due temi: le soglie a 9 /
 10 / 15 / 16 / 20, il verso sfavorevole senza cartellino, il prezzo
 fisso senza, e i due cursori coi loro quaranta tratti.
+
+IL BADGE NIP-58 DELLE LIVE (11 set 2026): un badge commemorativo vero
+— non un record nostro che dice «ce l'ha» — per chi partecipa a una
+live di Barattolo. Due eventi Nostr firmati dalla piattaforma: la
+definizione (kind 30009, un badge per live, tag `d` = live_id) e
+l'assegnazione (kind 8, un evento per pubkey). Zero primitive Nostr
+nuove: firma, pubblicazione e identità sono le stesse di sempre
+(`firma_evento`, `_spedisci_ai_relay`, `_NOSTR`, `RELAYS_VERIFICA`) —
+il cantiere le COMPONE, non le reinventa.
+IL NOME ERA GIÀ OCCUPATO, ed è la prima cosa da sapere leggendo questo
+codice: «badge» in Barattolo è da tempo i distintivi interni
+(`badge_utente`/`DISTINTIVI`, ricalcolabili dai dati, tipo «🟣 npub
+verificata»). Questo è un oggetto diverso — un evento Nostr firmato,
+non una riga ricalcolabile — e per non confondere i due ogni tabella e
+ogni funzione nuova porta il prefisso `nostr_badge_`.
+LA PROVA DI PARTECIPAZIONE è una challenge a codice, non una firma
+consegnata al server: durante la live l'admin emette un codice per
+fase (`start`/`end`, endpoint `.../challenge`), lo annuncia a voce, e
+chi ha seguito lo pubblica come nota kind-1 dal PROPRIO client Nostr —
+Barattolo non chiede mai un login né una firma ai partecipanti, cerca
+e basta (endpoint `.../verify`). Soglia configurabile (leva
+`SOGLIA_BADGE_LIVE`, di serie 2 = servono entrambe le fasi) invece di
+pretendere una prova assoluta di presenza, che via Nostr non esiste.
+LA DIFFERENZA CHE CONTA CON `cerca_nota_verifica` (la verifica npub
+già in produzione): lì il relay cerca le note di UNA pubkey nota in
+anticipo (l'utente verifica sé stesso), qui il partecipante non è
+noto — la ricerca (`_cerca_partecipazione_live`) interroga i relay
+SENZA filtro `authors`. Un relay permissivo potrebbe quindi restituire
+un evento con pubkey e firma che non tornano, e la cura è che il
+giudice (`_evento_valido`) RICALCOLA l'id canonico e verifica la firma
+Schnorr in locale SEMPRE, stesso schema di `verifica_evento_login` —
+mai fidarsi di quel che il relay dichiara valido.
+DUE SCELTE, E LE STRADE SCARTATE. Un evento kind 8 per pubkey, non un
+unico evento con più tag `p` (che NIP-58 permetterebbe): ogni riga di
+`nostr_badge_partecipanti` mappa 1:1 un evento, quindi il retry è
+granulare (chi non è passato non blocca chi lo è) e «mai due volte» è
+un semplice `WHERE premiato_evento=''` — la strada scartata avrebbe
+richiesto ricostruire il batch a ogni giro coi soli nuovi, per
+risparmiare scritture sui relay che qui non sono il collo di
+bottiglia. L'immagine si carica da un endpoint admin
+(`.../immagine`, data URL base64 come `salva_foto`, ritaglio quadrato
+con Pillow come `_salva_avatar`) e non piazzandola a mano sul VPS: zero
+accesso SSH per un gesto che càpita più di una volta (ogni live ha la
+sua), e se il badge (30009) era già pubblicato lo ripubblica con
+`image`/`thumb` aggiornati sullo stesso `d`.
+ANTI-ABUSO, PUNTO PER PUNTO: stesso pubkey più volte e eventi
+duplicati → `PRIMARY KEY(live_id, pubkey)` e `_upsert_fase_live` scrive
+una sola volta per fase (vince la prima prova valida, un `WHERE
+...=''` sull'upsert); codice sbagliato o fuori finestra → confronto
+esatto sul codice DELLA fase e controllo del `created_at` DELL'EVENTO
+(non di quando l'abbiamo trovato) contro `[apre, scade]`; replay di un
+vecchio codice → un nuovo codice per la stessa fase SOSTITUISCE il
+precedente (`_ultima_challenge_per_fase` guarda solo l'ultimo emesso),
+e i codici sono casuali per emissione; relay bugiardo → la riverifica
+locale della firma qui sopra. Più account della stessa persona resta
+DICHIARATAMENTE fuori scope: «prova ragionevole», non prova di
+presenza fisica, e senza KYC non c'è cura tecnica sensata.
+LE SEI ROTTE, TUTTE `/api/admin/live/{live_id}/...` (SOLO ADMIN,
+stesso `verifica_utente`+`e_admin` di ogni altra `/api/admin/`):
+`badge` (crea/pubblica il 30009, idempotente sullo stesso `d`),
+`immagine`, `challenge`, `verify`, `award-badges`, e un `GET` di stato.
+Nessuna rotta lato partecipante: chi partecipa non tocca mai
+Barattolo, solo il proprio client Nostr — coerente con la regola
+ferrea 2 (mai segreti altrui, mai firme che il server debba chiedere).
+COSA RESTA DA GUARDARE SUL CAMPO, perché le prove automatiche mockano
+il websocket dei relay (mai testare contro relay veri: «una prova che
+dipende da un server altrui non è una prova, è un oroscopo», dice
+prove.py) e non l'hanno mai esercitato: il comportamento reale contro
+`RELAYS_VERIFICA` durante la live di lunedì, e la latenza di
+propagazione (`verify` è richiamabile quante volte serve, apposta).
+COLLAUDATI (primo giro): prove.py torna a 167 rosse preesistenti e
+indipendenti da questo cantiere, **8799 verdi**, di cui 35 nuove: i
+tag dei due eventi, il giudice della firma con crypto vera (coincurve,
+non simulata), la finestra e il codice della challenge con un
+websocket finto, l'idempotenza dell'upsert e dell'intero giro di
+verifica, la guardia SOLO ADMIN su tutte e sei le rotte, e la
+whitelist `NOME_FOTO` che accetta il nome del badge e rifiuta un path
+a caso.
+
+IL SECONDO GIRO (11 set 2026, la sera): tre cose chieste da Alan dopo
+aver visto il primo giro — un pannello admin SEMPLICE invece del
+curl, la possibilità di assegnare il badge a CHI SI VUOLE (non solo a
+chi supera la challenge), e la domanda «si possono ritirare i badge?».
+TRE ROTTE NUOVE, stesso motore di prima: `assegna-manuale` (una
+npub/pubkey a scelta, bypassa la challenge, segna `assegnato_a_mano`
+per l'audit — si vede sempre COME una pubkey ha guadagnato il badge),
+`assegna-admin` (bulk sugli `ADMIN_IDS` con npub verificata: «prima
+distribuiamoli agli admin», e chi non ha una npub verificata non
+sparisce, torna nella risposta), `ritira` (NIP-09, kind 5, gemella di
+`_lapide_nostra` per gli annunci: ritirare NON è «non l'ha mai avuto»
+— `verificato` resta 1, solo `premiato_evento` si svuota e una nuova
+colonna `ritirato` impedisce ad `award-badges` di riproporlo da solo;
+riassegnarlo a mano lo rimette, azzerando `ritirato`). Le tre condividono
+`_premia_pubkey`, lo stesso motore di firma+pubblica+scrivi-solo-se-
+un-relay-accetta che già usava `award-badges`: zero firma duplicata.
+IL PANNELLO ADMIN vive dentro la tab Profilo, nello stesso posto e
+con lo stesso linguaggio visivo di «⚙️ Stato delle leve» — un
+`cassettoAdm` chiuso di serie (badge è storico/consultazione, non una
+coda che aspetta una decisione), l'elenco caricato eagerly dentro
+`loadAdminStats()` (una query minuscola, lo stesso giro delle altre
+sette), il dettaglio di UNA live (challenge, partecipanti coi bottoni
+Ritira, i tre modi di assegnare) caricato SOLO quando si apre — una
+live è rara, non merita una seconda query a ogni apertura del
+pannello. L'immagine passa da `ridimensiona()`, la stessa funzione
+che comprime avatar/foto annunci/banner: zero codice nuovo lato
+client per il caricamento.
+DUE DIFETTI VERI, TROVATI SOLO PROVANDO NEL BROWSER — e la lezione è
+proprio questa: le 35 prove automatiche del primo giro erano tutte
+verdi, e nessuna delle due li avrebbe presi, perché testano funzioni
+isolate e non il GIRO nel browser vero. 1) Il codice della challenge
+duplicava il nome: `BARATTOLO-BARATTOLO-LIVE-001-GEN-500B`, perché il
+`live_id` nasce quasi sempre da un nome che comincia già per
+"Barattolo" e la funzione ci appiccicava un secondo prefisso fisso —
+si vedeva SOLO leggendo il codice vero mostrato nel pannello, mai in
+un test che passa una stringa finta. Cura: il prefisso "barattolo-"
+si toglie dal `live_id` prima di comporre il codice. 2) Una corsa
+vera: `assegna_manuale_live`/`assegna_admin_live`/`assegna_badge_live`/
+`ritira_badge_live` chiamavano `apriBadgeLive(liveId)` (ridisegna il
+dettaglio) e subito dopo `loadAdminStats()` (ricostruisce TUTTO il
+pannello, dettaglio compreso, stavolta vuoto) senza aspettare
+nessuna delle due — chi delle due arrivava per ultima vinceva, e
+`loadAdminStats()` fa piu' fetch quindi arrivava quasi sempre lei:
+il dettaglio spariva un istante dopo ogni azione, e l'unico modo di
+vederlo era il conteggio della card (che restava giusto). Cura:
+`await loadAdminStats(); apriBadgeLive(liveId);` — prima il giro
+lungo, poi il dettaglio, mai il contrario. `creaBadgeLive` aveva
+già questo ordine giusto per caso; gli altri quattro punti l'hanno
+preso ora.
+COLLAUDATI (secondo giro): il flusso intero provato DAVVERO in un
+browser (non un test che lo simula) contro un server locale vero —
+crea badge, due challenge, assegnazione manuale a due chiavi finte,
+ritiro di una, riassegnazione, verifica sui relay veri (0 trovati,
+com'era giusto: nessun client vero aveva pubblicato quei codici),
+bulk agli admin (0 su 1: l'admin di collaudo non ha una npub
+verificata, ed è la risposta corretta) — e la suite resta verde
+allo stesso modo (167 rosse preesistenti, invariata).
+LA SANDBOX LOCALE PER PROVARE: creata una venv a parte (mai il
+Python di sistema, che qui condivide pacchetti con un mucchio
+d'altri progetti — un `pip install --upgrade anthropic` per sbloccare
+l'avvio locale ha tirato dentro pydantic 2.x e rotto `lnurl`, poi
+rimesso a posto con altri due giri di pip: la lezione è che il
+Python di sistema NON è un posto dove installare pacchetti per una
+prova, mai più) e un piccolo shim (`import server;
+server.IMPORT_NOSTR_APERTO = False` prima dello startup, altrimenti
+lo scheduler scarica sul serio centinaia di annunci veri dai relay e
+il database resta occupato — «database is locked» al primo giro,
+capito solo guardando il traceback vero) con una chiave Nostr
+usa-e-getta iniettata a mano in `_NOSTR` (mai la vera, mai nel
+config). Non è entrata nel repo: è tutta fuori, nello scratchpad
+della sessione.
+
+IL TERZO GIRO, la stessa sera: TOLTA LA CHALLENGE. Vista la Mini App
+vera, Alan ha detto la frase che vale più di ogni prova automatica:
+«gli utenti in live dovranno solo inviarci la loro npub e poi noi
+manderemo lì il badge, molto più semplice». Per un pubblico che
+l'admin segue di persona in diretta, un protocollo a codici che
+cerca sui relay è complessità senza un problema da risolvere — la
+verifica diventa il SUO giudizio nel seguire la diretta (chi scrive
+in chat, chi riconosce), non un algoritmo. Tolto per intero: le rotte
+`/challenge` e `/verify`, `/award-badges` (il bulk automatico — senza
+challenge niente popola più `verificato` da solo, e manuale/admin
+già premiano inline), le funzioni `_evento_valido`,
+`_cerca_partecipazione_live`, `_upsert_fase_live`,
+`_ultima_challenge_per_fase`, `_verifica_live`, la tabella
+`nostr_badge_challenge`, le colonne `fase_start_*`/`fase_end_*`/
+`verificato`/`assegnato_a_mano`/`soglia`, le due leve
+`DURATA_CHALLENGE_MINUTI`/`SOGLIA_BADGE_LIVE` (config_esempio.py torna
+com'era: zero leve dedicate al badge, adesso). Restano tre rotte di
+scrittura — `assegna-manuale`, `assegna-admin`, `ritira` — più
+`badge`/`immagine` e i due `GET`, tutte già scritte nel secondo giro:
+non e' stato un progetto nuovo, solo un taglio.
+`nostr_badge_partecipanti` si riduce a `(live_id, pubkey,
+premiato_evento, premiato_il, ritirato)`: senza challenge non c'è più
+niente da "verificare" prima di premiare, un INSERT ... DO NOTHING
+basta ad assicurare la riga e poi `_premia_pubkey` fa il resto — lo
+stesso motore di prima, con un giudizio in meno da spiegare.
+IL PANNELLO PERDE due bottoni ("Avvia start/end", "🔍 Verifica",
+"🏅 Assegna a chi ha superato la soglia") e la riga per-partecipante
+torna a dire solo "premiato" o "ritirato", non più due fasi e la
+provenienza: con una sola via di assegnazione, "a mano" era l'unica
+possibile e dirlo non aggiungeva niente.
+COLLAUDATI (terzo giro): prove.py passa da 59 a 42 prove sul badge (le
+17 che sparite erano tutte sulla challenge — finestra, ricerca relay,
+`_evento_valido`, l'orchestrazione di `_verifica_live`), la suite
+resta a 167 rosse preesistenti, e il giro intero riprovato di nuovo
+nel browser (crea badge, manda a mano, ritira) con lo stesso esito di
+prima — la semplificazione non ha rotto niente perché il motore che
+firma e pubblica (`_premia_pubkey`) non è mai stato toccato, solo chi
+lo chiama.
