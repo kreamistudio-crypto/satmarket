@@ -9202,3 +9202,46 @@ commit era già pushato, e a trovarlo è stata solo la rilettura del
 contesto prima di riscrivere. **Una voce nuova si inserisce fra due
 voci, mai dentro una**: si guarda che il paragrafo sopra FINISCA
 davvero — un punto e una riga vuota — e non che cominci bene.
+
+## «Fee Barattolo» nei due conti, e la misura che l'ha permesso
+
+L'ETICHETTA DELLA COMMISSIONE PRENDE IL NOME DI CASA (11 set 2026,
+decisione di Andrea) in TUTT'E DUE i conti — quello del P2P e il
+foglio «Paga» del mercatino: si vestivano già uguali (`.ctrl-conto`,
+`.ctrl-riga`), adesso dicono anche la stessa parola, e il nome torna
+a dire DI CHI è quella riga — la cosa che «Commissione» secca aveva
+perso per stare nella larghezza.
+LA MISURA È IL CUORE DELLA VOCE, perché questa riga ha già un
+precedente: «Commissione Barattolo» fu bocciata DUE volte (ago 2026
+nel mercatino, 10 set nel P2P) perché cedeva coi puntini a 320px.
+Misurato adesso a 320 veri, col Range sul testo e non a occhio:
+**«Fee Barattolo» = 85px, «Commissione» = 86px** — il nome nuovo è
+perfino UN PIXEL più corto di quello che sostituisce, e nel
+mercatino gliene avanzano 74 (85 su 159), nel P2P 58 (85 su 143).
+Quindi non è una deroga alla decisione di allora: è la stessa
+decisione: **a restare vietata è la FORMULA LUNGA, non il nome.**
+⚠️ E IL BANCO DI MISURA HA MENTITO AL PRIMO GIRO, con la trappola
+già scritta in memoria: senza `<meta name="viewport">` la pagina in
+emulazione mobile impagina a **980px**, quindi le prime misure erano
+di un'altra pagina. Il controllo che l'ha preso è `window.innerWidth`
+letto e CONFRONTATO col numero atteso — non guardato: lo script si
+ferma se non è 320. Una misura sbagliata qui non fallisce, dà numeri
+plausibili.
+IL SECONDO STRUMENTO CHE È SERVITO è l'**A/B nella stessa pagina**:
+lo stesso conto reso due volte, una col nome nuovo e una col vecchio
+(sostituito nell'HTML), e il confronto riga per riga. Senza, i
+troncamenti trovati sarebbero sembrati tutti colpa del rinome —
+mentre erano **zero regressioni**, come ha detto il confronto.
+⚠️ MA I TRONCAMENTI TROVATI SONO VERI, e restano DICHIARATI e NON
+curati (fuori dal perimetro chiesto): nel conto P2P, quando il
+valore a destra è lungo, a cedere è l'etichetta — «in promo 0,5% ·
+≈ −3453 sats» le lascia 55px su 85 richiesti, e su un ordine a
+INTERVALLO le cifre a due capi («≈ −11.990–59.952 sats») la
+schiacciano a **zero**, portandosi dietro anche «Ricevi» e «Totale
+da pagare». Erano identici col nome vecchio: la causa è il valore,
+non l'etichetta. Il giorno che si curi, la leva non è la parola —
+è far cedere qualcosa a DESTRA (la pillola «in promo» a capo, o la
+percentuale fuori dal valore).
+COLLAUDATO: 9109 verdi, con la sentinella del mercatino che finora
+non c'era — l'etichetta di quella riga non era guardata da nessuno,
+e il divieto della formula lunga viveva solo in un commento.
