@@ -35768,9 +35768,16 @@ def prove_p2p_libro():
     _mis = lambda blocco: int(re.search(r"width:(\d+)px", blocco).group(1))
     prova("nella card la stella e' piu' grande dell'omino", True,
           _var(_st_box) > _mis(pezzo_js(mini, "  .p2p-ico.p2p-ico-mini{", "}")))
-    prova("...e nel riquadro i due segni vanno alla pari", (28, 28),
-          (_var(pezzo_js(mini, "  .p2p-rep-col.media .p2p-rep-stella{", "}")),
-           _mis(pezzo_js(mini, "  .p2p-rep-segno .p2p-ico.p2p-ico-mini{", "}"))))
+    # ⚠️ E NEL RIQUADRO L'OMINO STA POCO SOTTO LA STELLA, non alla pari
+    # (11 set 2026, taratura di Andrea guardandolo: 28 e poi 22): a
+    # parita' di altezza disegnata un TRATTO da un pixel e mezzo e una
+    # forma PIENA non pesano uguale, ed e' la stessa regola gia'
+    # scritta per il glifo dentro il tondo. Si guarda la RELAZIONE fra
+    # le due misure, che regge ai ritocchi meglio di due numeri.
+    _st28 = _var(pezzo_js(mini, "  .p2p-rep-col.media .p2p-rep-stella{", "}"))
+    _om = _mis(pezzo_js(mini, "  .p2p-rep-segno .p2p-ico.p2p-ico-mini{", "}"))
+    prova("...e nel riquadro l'omino e' poco sotto la stella", True,
+          _st28 == 28 and _om == 22 and _st28 > _om > _st28 * 0.7)
     # il disegno vive in UNA costante: due stelle diverse sarebbero due
     # stelle diverse
     prova("il disegno della stella e' scritto una volta sola", 1,
@@ -36019,6 +36026,11 @@ def prove_p2p_libro():
     # ribattuta qui
     i_pm = mini.index("const P2P_PREMIO_MAX = ")
     pezzi.append(mini[i_pm:mini.index("\n", i_pm)])
+    # e le due soglie del cartellino dell'affare, che la card legge:
+    # dal client come tutte le altre, mai ribattute qui
+    for _c in ("const P2P_AFFARE_OTTIMO = ", "const P2P_AFFARE_SUPER = "):
+        i_c = mini.index(_c)
+        pezzi.append(mini[i_c:mini.index("\n", i_c)])
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
@@ -36134,6 +36146,31 @@ out.rangeTriplo = ordineDaEvento(ev(38383, [['d','rt'],['k','sell'],['f','EUR'],
 out.rigaRange = rigaOrdineP2P(out.range);
 out.rigaRangePremio = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rp'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50','100'],['premium','4'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
 out.rigaSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','rs'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
+/* ---- IL CARTELLINO DELL'AFFARE (set 2026) ----
+   le due soglie sui DUE lati, piu' i confini esatti: a 9 niente, a 10
+   «Ottimo», a 15 ancora «Ottimo», a 16 «Super». E sul verso
+   sfavorevole MAI, per quanto grosso sia il premio. */
+const affaroneCaso = (lato, prem) => rigaOrdineP2P(ordineDaEvento(
+  ev(38383, [['d','af'+lato+prem],['k',lato],['f','EUR'],['s','pending'],
+             ['amt','0'],['fa','50'],['premium',String(prem)],['pm','x'],
+             ['expires_at', String(ora+3600)]]), ora));
+/* a COMPRARE (k=sell) conviene il premio NEGATIVO: si pagano meno sats */
+out.affNiente  = affaroneCaso('sell', -9);
+out.affOttimo  = affaroneCaso('sell', -10);
+out.affOttimo15 = affaroneCaso('sell', -15);
+out.affSuper   = affaroneCaso('sell', -16);
+out.affSuperMax = affaroneCaso('sell', -20);
+/* ...e il verso sfavorevole non ne porta NESSUNO, per quanto grosso */
+out.affContrario = affaroneCaso('sell', 20);
+/* a VENDERE (k=buy) si rovescia tutto: conviene il premio POSITIVO */
+out.affVendiSuper = affaroneCaso('buy', 20);
+out.affVendiContrario = affaroneCaso('buy', -20);
+/* e a prezzo FISSO nessun cartellino: quel prezzo il mercato non lo guarda */
+out.affFisso = rigaOrdineP2P(ordineDaEvento(
+  ev(38383, [['d','affisso'],['k','sell'],['f','EUR'],['s','pending'],
+             ['amt','80000'],['fa','50'],['premium','-20'],['pm','x'],
+             ['expires_at', String(ora+3600)]]), ora));
+
 /* il quarto caso del badge: a vendere sotto il mercato si incassa
    di meno, e il numero e' rosso */
 out.rigaVendiSotto = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','vs'],['k','buy'],['f','EUR'],['s','pending'],['amt','0'],['fa','50'],['premium','-2'],['pm','x'],['expires_at', String(ora+3600)]]), ora));
@@ -36499,6 +36536,51 @@ console.log(JSON.stringify(out));
     prova("le parole del verso sono le sole a dirlo", True,
           "+ pr + '%</b> ' + (affare ? 'più' : 'meno') + ' conveniente'"
           in mini)
+    # ══ IL CARTELLINO DELL'AFFARE (set 2026, richiesta di Andrea) ══
+    # oltre il 10% di convenienza PER CHI LEGGE, accanto alla riga del
+    # premio compare un cartellino. Le soglie stanno in due costanti e
+    # si leggono da li': ribatterle qui vorrebbe dire che il giorno che
+    # si muovono la prova resta verde dicendo un'altra cosa.
+    _ott = int(re.search(r"const P2P_AFFARE_OTTIMO = (\d+);", mini).group(1))
+    _sup = int(re.search(r"const P2P_AFFARE_SUPER = (\d+);", mini).group(1))
+    prova("le due soglie del cartellino sono 10 e 15", (10, 15), (_ott, _sup))
+    prova("sotto la soglia non c'e' cartellino", False,
+          "p2p-affarone" in out["affNiente"])
+    prova("...dalla soglia in su c'e' «Ottimo affare», col suo lampo",
+          [True, True],
+          ['<span class="p2p-affarone">⚡ Ottimo affare</span>' in out[k]
+           for k in ("affOttimo", "affOttimo15")])
+    prova("...e oltre la seconda soglia diventa «Super affare»", [True, True],
+          ['<span class="p2p-affarone super">⚡⚡ Super affare</span>' in out[k]
+           for k in ("affSuper", "affSuperMax")])
+    # ⚠️ MAI SUL VERSO SFAVOREVOLE, ed e' la riga da non ammorbidire: lo
+    # stesso 20% e' un affare per chi compra sotto mercato e una
+    # bastonata per chi ci vende. Il giudice e' quello del lato.
+    prova("sul verso sfavorevole non c'e' nessun cartellino, mai",
+          [False, False],
+          ["p2p-affarone" in out["affContrario"],
+           "p2p-affarone" in out["affVendiContrario"]])
+    prova("...e a vendere si rovescia: il +20% e' il Super affare", True,
+          "Super affare" in out["affVendiSuper"])
+    # e a prezzo fisso niente: quel prezzo il mercato non lo guarda
+    prova("...e a prezzo fisso nessun cartellino", False,
+          "p2p-affarone" in out["affFisso"])
+    # LA RIGA TIENE I DUE PEZZI e il cartellino sta a DESTRA: `wrap`
+    # piu' `margin-left:auto`, che a capo lo lascia a destra mentre
+    # `space-between` lo rimanderebbe a sinistra.
+    prova("i due badge stanno su una riga che sa andare a capo", True,
+          '<div class="p2p-badge-riga">' in out["affOttimo"]
+          and "flex-wrap:wrap" in pezzo_js(mini, "  .p2p-badge-riga{", "}")
+          and "margin-left:auto" in pezzo_js(
+              mini, "  .p2p-badge-riga .p2p-affarone{", "}"))
+    # IL SUPER E' SFUMATO VERDE→ORO col bagliore, e l'oro e' quello
+    # della stella: nessun colore nuovo. Il bagliore e' un'OMBRA FERMA
+    # e non un'animazione — una card che pulsa in un elenco e' un
+    # difetto di accessibilita' prima che di gusto.
+    prova("il Super veste la sfumatura verde→oro e un bagliore fermo",
+          True, "var(--trust), var(--oro,#E0A82E));" in mini
+          and "box-shadow:0 0 10px rgba(224,168,46,.45)" in mini
+          and "animation" not in pezzo_js(mini, "  .p2p-affarone.super{", "}"))
 
     # --- 7c) I SATS SONO SEMPRE AL NETTO DEL PREMIO -----------------
     # (set 2026, regola resa esplicita da Andrea) La cifra mostrata e'
@@ -41293,8 +41375,18 @@ def prove_p2p_pubblica():
         "  quantoNetto: (p2pInfo = {fee: 0.02},\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '25').dillo),\n"
         "  premio: [premioTestoP2P(0), premioTestoP2P(4), premioTestoP2P(-7)],\n"
-        "  fascia: [fasciaPremioP2P(-10), fasciaPremioP2P(0), fasciaPremioP2P(10),\n"
-        "           fasciaPremioP2P(-5), fasciaPremioP2P(-99), fasciaPremioP2P(99)],\n"
+        # ⚠️ I CASI SI CHIEDONO AI CAPI, NON A ±10 (set 2026, con la
+        # fascia allargata a ±20): scritti coi numeri di ieri, questi
+        # casi hanno smesso di essere «il capo» e «mezza strada» e
+        # sono diventati due punti qualunque — cinque rosse che non
+        # dicevano niente sul codice. Chiesti alla costante, gli
+        # attesi restano gli stessi qualunque fascia si scelga domani.
+        "  fascia: [fasciaPremioP2P(-P2P_PREMIO_MAX), fasciaPremioP2P(0),\n"
+        "           fasciaPremioP2P(P2P_PREMIO_MAX),\n"
+        # «mezza strada» e' meta' fascia, e i due fuori-fascia si
+        # tosano ai capi qualunque sia la fascia
+        "           fasciaPremioP2P(-P2P_PREMIO_MAX / 2),\n"
+        "           fasciaPremioP2P(-999), fasciaPremioP2P(999)],\n"
         "  forme: METODI.map(m => formaRecapito(m).forma),\n"
         "  interi: [interoP2P('5'), interoP2P('5.5'),\n"
         "           interoP2P(','), interoP2P(''),\n"
@@ -41604,7 +41696,7 @@ def prove_p2p_pubblica():
     for _p in ("-webkit-slider-runnable-track", "-moz-range-track"):
         _b = _binario(_p)
         prova("il binario (%s) porta i tratti" % _p, True,
-              "rgba(255,255,255,.92) 0 2px, transparent 2px 5%)" in _b)
+              "rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%)" in _b)
         prova("...e sono una LINEA, non blocchi alti quanto la barra",
               True, "background-size:100% 2px, 100% 100%" in _b
               and "background-position:0 center, 0 0" in _b
@@ -41625,10 +41717,27 @@ def prove_p2p_pubblica():
         # sbagliato. Si guarda la cucitura fra i due, non i due.
         prova("...e i tratti stanno SOPRA il colore", True,
               "background-image:repeating-linear-gradient(to right,\n"
-              "        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),\n"
+              "        rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%),\n"
               "      linear-gradient(to right, var(--premio-spento)" in _b)
-    prova("...e i tratti sono venti, uno per punto percentuale",
-          (10, 20), (P2P_PREMIO_MAX_da(mini), 100 // 5))
+    # LA FASCIA E' ±20 E I TRATTI SONO QUARANTA (set 2026, decisione
+    # di Andrea): il tratteggio conta i PASSI del cursore, non i pixel
+    # — un tratto per punto percentuale — quindi raddoppiata la fascia
+    # il passo si dimezza. I due numeri si leggono dal codice e non si
+    # ribattono qui: se uno dei due si muove senza l'altro, il
+    # tratteggio smette di contare i punti e questa riga lo dice.
+    prova("...e i tratti sono quaranta, uno per punto percentuale",
+          (20, 40), (P2P_PREMIO_MAX_da(mini), int(100 / 2.5)))
+    # E IL CURSORE DOPPIO DEL FILTRO PORTA LO STESSO TRATTEGGIO: e' lo
+    # stesso dato, e due cursori vestiti diverso sembrano due cose
+    # diverse. Sta in uno PSEUDO-ELEMENTO sopra il binario, perche' la
+    # fascia scelta e' uno span che copre il fondo — dipinto sotto,
+    # sparirebbe proprio nel tratto che si sta guardando.
+    _dp = stile[stile.index(".p2p-doppio-binario::after{"):]
+    _dp = _dp[:_dp.index("}")]
+    prova("anche il cursore del filtro porta i quaranta tratti", True,
+          "rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%)" in _dp
+          and "background-size:100% 2px" in _dp
+          and "pointer-events:none" in _dp)
 
     # 6) LE DUE USCITE SONO GEMELLE: due colonne `1fr`, che col
     # `box-sizing:border-box` di casa una `flex-basis:0` parte dai

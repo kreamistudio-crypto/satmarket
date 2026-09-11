@@ -1889,6 +1889,21 @@
     border-radius:999px;background:var(--premio-spento)}
   .p2p-doppio-binario span{position:absolute;top:0;bottom:0;border-radius:999px;
     left:var(--da,0%);right:calc(100% - var(--a,100%));background:var(--tinta,var(--muted))}
+  /* IL TRATTEGGIO ANCHE QUI (set 2026, coi ±20): e' lo stesso dato e
+     lo stesso passo del cursore di «Pubblica» — 2,5%, un tratto per
+     punto — e due cursori della stessa cosa che si vestono diverso
+     sembrano due cose diverse.
+     ⚠️ STA IN UNO PSEUDO-ELEMENTO SOPRA, non nel fondo del binario:
+     la fascia scelta e' uno `span` colorato che copre il fondo, e un
+     tratteggio dipinto sotto sparirebbe proprio nel tratto che si sta
+     guardando. Sullo span no: quello parte da `--da`, e i tratti si
+     scollerebbero dal binario appena si muove un capo. */
+  .p2p-doppio-binario::after{content:'';position:absolute;inset:0;
+    border-radius:999px;pointer-events:none;
+    background-image:repeating-linear-gradient(to right,
+      rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%);
+    background-size:100% 2px;background-position:0 center;
+    background-repeat:no-repeat}
   .p2p-doppio input[type=range]{position:absolute;left:0;right:0;top:0;
     width:100%;height:26px;margin:0;padding:0;background:none;pointer-events:none;
     -webkit-appearance:none;appearance:none}
@@ -2054,6 +2069,36 @@
   .p2p-badge b{font-weight:800}
   .p2p-badge .p2p-avviso{color:var(--danger)}
   .p2p-badge .p2p-affare{color:var(--trust)}
+  /* ══ LA RIGA DEL PREMIO (set 2026, coi badge dell'affare) ══
+     due pezzi sulla stessa riga: a sinistra quanto pende, a destra il
+     cartellino quando pende MOLTO a favore. `wrap` piu' `margin-left:
+     auto` sul cartellino: sta a destra finche' ci sta, e quando non
+     ci sta scende — restando a destra anche sulla riga sua, che e'
+     quel che `justify-content:space-between` NON farebbe (a capo
+     tornerebbe a sinistra). */
+  .p2p-badge-riga{display:flex;flex-wrap:wrap;align-items:center;
+    gap:4px 8px;margin-top:3px}
+  .p2p-badge-riga .p2p-badge{margin-top:0}
+  .p2p-badge-riga .p2p-affarone{margin-left:auto}
+  /* IL CARTELLINO DELL'AFFARE: qui la pillola PIENA ci sta, ed e' il
+     contrario di quel che si era deciso per il badge del premio — il
+     motivo e' che questa non c'e' quasi mai. Una pillola colorata su
+     OGNI card gridava piu' delle cifre (ed e' stata tolta), una che
+     compare oltre il 10% di convenienza e' esattamente il segnale che
+     deve saltare all'occhio scorrendo il libro. */
+  .p2p-affarone{display:inline-flex;align-items:center;gap:4px;
+    border-radius:999px;padding:2px 9px 3px;font-size:11.5px;
+    font-weight:800;color:#fff;white-space:nowrap;
+    background:var(--trust)}
+  /* IL SUPER: la sfumatura verde→oro e un bagliore appena percettibile.
+     Il bagliore e' un'OMBRA FERMA e non un'animazione, che una card in
+     un elenco che pulsa e' un difetto di accessibilita' prima che di
+     gusto (e la regola reduced-motion di casa vale per il movimento,
+     non per un colore). L'oro e' `--oro`, lo stesso della stella: non
+     nasce nessun colore nuovo. */
+  .p2p-affarone.super{background:linear-gradient(90deg,
+      var(--trust), var(--oro,#E0A82E));
+    box-shadow:0 0 10px rgba(224,168,46,.45)}
   /* la coppia gemella nel conto scorporato vive nel CSS del conto,
      dopo `.ctrl-nota`: la percentuale del premio sta DENTRO quella
      nota, e a parita' di specificita' vince chi e' scritto dopo —
@@ -2277,11 +2322,16 @@
      ⚠️ SI GIRA LA VARIABILE E NON GLI `svg`: ingrandire i soli svg e'
      esattamente il difetto della banda, curato qui sopra. */
   .p2p-rep-col.media .p2p-rep-stella{--st:28px}
-  /* E L'OMINO STA ALLA PARI: `.p2p-ico-mini` lo teneva a 12px — la
+  /* E L'OMINO STA POCO SOTTO: `.p2p-ico-mini` lo teneva a 12px — la
      misura buona in una riga di testo, minuscola accanto a una stella
-     da 28. Il selettore nomina tutt'e due le classi (0,3,0) cosi' non
-     dipende da chi e' scritto dopo nel foglio. */
-  .p2p-rep-segno .p2p-ico.p2p-ico-mini{width:28px;height:28px}
+     da 28 — ma alla pari esatta pesava troppo (taratura di Andrea,
+     guardandolo: 28 e poi 22). Non e' un ripensamento sulla misura
+     «visiva»: a parita' di altezza disegnata un TRATTO da un pixel e
+     mezzo e una forma PIENA non pesano uguale, ed e' la stessa regola
+     gia' scritta per il glifo dentro il tondo. Il selettore nomina
+     tutt'e due le classi (0,3,0) cosi' non dipende da chi e' scritto
+     dopo nel foglio. */
+  .p2p-rep-segno .p2p-ico.p2p-ico-mini{width:22px;height:22px}
   /* IL VOLTO AL POSTO DEI GIORNI: la stessa faccia che sta
      nell'anello delle card — foto se c'e', iniziale sul tondo scuro
      se non c'e' — ma qui grande abbastanza da riconoscere qualcuno.
@@ -2485,9 +2535,12 @@
      E' una linea e non venti blocchi, ed e' la differenza che si vede
      a schermo: col tratteggio alto quanto tutta la barra il binario
      sembrava SPEZZATO in segmenti arancioni. Il `background-size` la
-     tiene a due pixel, in mezzo. Il passo e' in PERCENTUALE (5% = un
-     punto su venti), cosi' i tratti restano al loro posto qualunque
-     sia la larghezza del riquadro.
+     tiene a due pixel, in mezzo. Il passo e' in PERCENTUALE (2,5% =
+     un punto su QUARANTA, che e' il numero dei passi da −20 a +20),
+     cosi' i tratti restano al loro posto qualunque sia la larghezza
+     del riquadro — e restano UNO PER PUNTO anche dopo che la fascia
+     e' raddoppiata: il tratteggio conta i passi del cursore, non i
+     pixel.
      ⚠️ QUI SPARISCE `accent-color`: vestire il binario vuol dire
      `appearance:none`, e da li' in poi il pollice se lo disegna la
      pagina — su tutt'e due i motori, che i due pseudo-elementi non si
@@ -2499,7 +2552,7 @@
   .p2p-premio input[type=range]::-webkit-slider-runnable-track{
     height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
-        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
+        rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%),
       linear-gradient(to right, var(--premio-spento) 0 var(--da,50%),
         var(--tinta,var(--muted)) var(--da,50%) var(--a,50%),
         var(--premio-spento) var(--a,50%) 100%);
@@ -2509,7 +2562,7 @@
   .p2p-premio input[type=range]::-moz-range-track{
     height:10px;border-radius:999px;
     background-image:repeating-linear-gradient(to right,
-        rgba(255,255,255,.92) 0 2px, transparent 2px 5%),
+        rgba(255,255,255,.92) 0 2px, transparent 2px 2.5%),
       linear-gradient(to right, var(--premio-spento) 0 var(--da,50%),
         var(--tinta,var(--muted)) var(--da,50%) var(--a,50%),
         var(--premio-spento) var(--a,50%) 100%);
@@ -34439,6 +34492,24 @@ function rigaOrdineP2P(o){
           + pr + '%</b> ' + (affare ? 'più' : 'meno') + ' conveniente'
         : 'al prezzo di mercato')
       + '</span>';
+  /* ---- IL CARTELLINO DELL'AFFARE (set 2026, richiesta di Andrea) ----
+     Quando la convenienza PER CHI LEGGE passa il 10%, accanto alla
+     riga del premio compare un cartellino: «Ottimo affare» da 10 a
+     15, «Super affare» oltre.
+     ⚠️ SOLO SUL VERSO FAVOREVOLE, ed e' la riga da non ammorbidire: lo
+     stesso 12% e' un affare per chi compra sotto mercato e una
+     bastonata per chi ci vende. Il giudice e' quello di sempre
+     (`affare`, dal lato), e su un premio sfavorevole non c'e' nessun
+     cartellino — mai un «Ottimo affare» rosso, che sarebbe un colore
+     e una parola che si contraddicono.
+     LE SOGLIE STANNO IN DUE COSTANTI, non nei numeri qui dentro: le
+     stesse due che il foglio «Pubblica» potra' mostrare a chi pubblica
+     il giorno che gli si voglia dire «con questo premio la tua offerta
+     si accende». */
+  const affarone = (o.sats > 0 || !affare || pr < P2P_AFFARE_OTTIMO) ? ''
+    : pr > P2P_AFFARE_SUPER
+      ? '<span class="p2p-affarone super">⚡⚡ Super affare</span>'
+      : '<span class="p2p-affarone">⚡ Ottimo affare</span>';
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
       + esc(o.metodi.join(', ')) + '</div>' : '';
@@ -34468,7 +34539,7 @@ function rigaOrdineP2P(o){
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${badge}
+    ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
@@ -37922,9 +37993,20 @@ const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺
 const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Contanti'];
 /* la fascia del cursore: scelta di casa. Il protocollo non mette
    nessun limite al premio (e' un i64 e nessun controllo lo guarda),
-   ma ±10% e' la fascia in cui un premio e' un premio e non un altro
-   prezzo. */
-const P2P_PREMIO_MAX = 10;
+   e la fascia dice quanto un premio puo' pendere restando un premio
+   e non un altro prezzo. ALLARGATA A ±20 il set 2026 (decisione di
+   Andrea): a ±10 il cursore finiva la corsa proprio dove comincia a
+   essere interessante — un affare vero sta oltre quel confine, ed e'
+   la stessa soglia che accende i badge «Ottimo/Super affare».
+   ⚠️ VALE PER TUTT'E DUE I CURSORI, il foglio «Pubblica» e il filtro
+   del libro: nessuno dei due ha un numero suo, leggono questo. */
+const P2P_PREMIO_MAX = 20;
+/* LE DUE SOGLIE DEL CARTELLINO (set 2026): da 10 in su l'offerta e'
+   un «Ottimo affare», oltre 15 un «Super affare». Stanno accanto alla
+   fascia del cursore perche' sono lo stesso righello — e con ±20 la
+   seconda soglia cade a tre quarti della corsa, non oltre il fondo. */
+const P2P_AFFARE_OTTIMO = 10;
+const P2P_AFFARE_SUPER = 15;
 /* LE CINQUE ICONE DEL FOGLIO, disegnate come quelle della nav: stesso
    `viewBox`, stesso tratto, e il «velo» — la stessa forma riempita al
    12% — che da' corpo senza aggiungere una seconda linea. Stanno qui
