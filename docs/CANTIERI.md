@@ -9936,3 +9936,33 @@ del database locale con quel distintivo e la npub verificata — 13 per
 Nostrano, 14 per Pioniere, 3 per Bottega avviata. Richiamato subito
 dopo: stesso riepilogo nei numeri, **zero righe nuove nel journal** —
 la riprova che «non duplica mai» non è un modo di dire.
+
+## «0% in promo»: l'aliquota si scrive anche quando è zero
+
+IL LISTINO P2P È A 3 SUL VPS (11 set 2026, mano di Andrea), e con la
+fee viva del coordinator al 2% la promo scatta da sé: nel conto del
+P2P la pillola compare accanto all'aliquota di chi legge — «Fee
+Barattolo 1% [in promo]» — dove l'1% è la METÀ della fee, non la fee
+intera. Nessun deploy: il client confronta la fee letta dal 38385 col
+listino che arriva in busta, ed è il disegno di quel cantiere.
+E NEL MERCATINO L'ALIQUOTA ORA SI SCRIVE ANCHE A ZERO: «Fee Barattolo
+0% [in promo]». La sola pillola diceva «c'è uno sconto» senza dire su
+cosa; lo zero dice quanto si paga ORA, che è la domanda vera di chi
+guarda un conto.
+⚠️ LO ZERO PERÒ NON È ROSSO, ed è una distinzione che vale la riga: il
+rosso dell'aliquota significa «questo è un costo», e un costo che non
+c'è non lo è. Sopra lo zero il rosso torna da sé, senza un secondo
+ramo da ricordare.
+MISURATO A 320px, che era la domanda: «Fee Barattolo 0% [in promo]»
+sta nel mercatino (la pillola è passata dal VALORE all'etichetta, e
+il valore accorciandosi le ha lasciato lo spazio) e «Fee Barattolo 1%
+[in promo]» sta su una riga sola nel P2P. Nessun troncamento nuovo;
+resta il solo «Totale da pagare» del mercatino a sette cifre, 137px
+su 134, dichiarato da due giorni.
+⚠️ E LO SCATTO L'HO RITAGLIATO DUE VOLTE A VUOTO prima di chiedere
+alla pagina DOVE fossero i riquadri: su una vetrina alta cinquemila
+pixel, «più o meno in fondo» non è un indirizzo. La sonda adesso
+stampa il rettangolo di ogni colonna, e il ritaglio va dove serve al
+primo colpo.
+COLLAUDATO: **9210 verdi**, col caso vero di oggi a verbale nel banco
+(listino 3, fee 2, la pillola accanto all'1%).
