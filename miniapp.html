@@ -2102,12 +2102,25 @@
      UN NOME NUOVO PRIMA DI UNA REGOLA PIU' FORTE: alzare la
      specificita' avrebbe curato un verso solo e lasciato la
      mescolanza dov'era. */
-  .p2p-rep-stella{position:relative;display:inline-block;
-    width:17px;height:17px;vertical-align:-3.5px}
-  .p2p-rep-stella svg{position:absolute;left:0;top:0;width:17px;height:17px;
+  /* ⚠️ LA TAGLIA DELLA STELLA STA IN UNA VARIABILE SOLA, e questa
+     riga cura un difetto vero (set 2026, visto da Andrea: «a 5,0 una
+     striscia verticale più chiara in mezzo»). I tre pezzi — il
+     contenitore, i due svg e la finestra dello strato pieno —
+     portavano 17px CABLATO ognuno per conto suo: ingrandire i soli
+     `svg` faceva crescere il contorno a 28 lasciando la finestra del
+     pieno larga 17, cioe' il riempimento si fermava al 61% della
+     stella e il resto restava vuoto. Da fuori si legge come una
+     banda, e a 5,0 — dove la stella DEVE essere piena — e' il caso
+     in cui salta di piu' all'occhio.
+     Con `--st` la misura si cambia in UN posto e i tre pezzi si
+     muovono insieme: e' impossibile che tornino a sfasarsi. */
+  .p2p-rep-stella{--st:17px;position:relative;display:inline-block;
+    width:var(--st);height:var(--st);vertical-align:-3.5px}
+  .p2p-rep-stella svg{position:absolute;left:0;top:0;
+    width:var(--st);height:var(--st);
     display:block;fill:none;stroke:var(--oro,#E0A82E);stroke-width:1.7;
     stroke-linejoin:round}
-  .p2p-rep-stella-piena{position:absolute;left:0;top:0;height:17px;
+  .p2p-rep-stella-piena{position:absolute;left:0;top:0;height:var(--st);
     overflow:hidden}
   .p2p-rep-stella-piena svg{fill:var(--oro,#E0A82E)}
   /* ⚠️ DUE CLASSI E NON UNA, o la misura non arriva: l'omino porta
@@ -2260,13 +2273,23 @@
      ritocco di Andrea): fra i tre elementi e' quello che si guarda
      per primo, e a 20px pesava come l'omino accanto. Cresce il SEGNO,
      non la cifra — le tre cifre restano allineate, o le colonne si
-     scalerebbero fra loro. */
-  .p2p-rep-col.media .p2p-rep-segno svg{width:28px;height:28px}
+     scalerebbero fra loro.
+     ⚠️ SI GIRA LA VARIABILE E NON GLI `svg`: ingrandire i soli svg e'
+     esattamente il difetto della banda, curato qui sopra. */
+  .p2p-rep-col.media .p2p-rep-stella{--st:28px}
+  /* E L'OMINO STA ALLA PARI: `.p2p-ico-mini` lo teneva a 12px — la
+     misura buona in una riga di testo, minuscola accanto a una stella
+     da 28. Il selettore nomina tutt'e due le classi (0,3,0) cosi' non
+     dipende da chi e' scritto dopo nel foglio. */
+  .p2p-rep-segno .p2p-ico.p2p-ico-mini{width:28px;height:28px}
   /* IL VOLTO AL POSTO DEI GIORNI: la stessa faccia che sta
      nell'anello delle card — foto se c'e', iniziale sul tondo scuro
      se non c'e' — ma qui grande abbastanza da riconoscere qualcuno.
      E' alto quanto segno + cifra delle altre due colonne (28+3+17),
      cosi' le tre etichette restano sulla stessa riga. */
+  /* la colonna del volto non ha etichetta sotto: il tondo si centra
+     nell'altezza della riga invece di restare appeso in cima */
+  .p2p-rep-col.volto{justify-content:center}
   .p2p-rep-volto{width:48px;height:48px;border-radius:50%;
     background:var(--ink);color:var(--on-ink);position:relative;
     display:flex;align-items:center;justify-content:center;
@@ -37142,9 +37165,12 @@ function repRiquadroP2P(f){
     corpo: '<div class="p2p-rep-tre">'
       + col(stellaP2P(f.media), media, 'media', 'media')
       + col(icoPersonaP2P(), voti, 'recensioni')
-      + '<div class="p2p-rep-col">' + volto
-        + '<small>' + (f.negozio ? 'il negozio ›' : 'venditore') + '</small>'
-      + '</div>'
+      /* ⚠️ SOTTO LA FOTO NON C'E' SCRITTO NIENTE (set 2026, ritocco
+         di Andrea): «il negozio ›» spiegava il tocco, e una faccia
+         non ha bisogno di un'etichetta che dica che e' una faccia.
+         La colonna resta senza `<small>`, quindi il volto si centra
+         nell'altezza della riga invece di restare appeso in alto. */
+      + '<div class="p2p-rep-col volto">' + volto + '</div>'
       + '</div>'
   });
 }

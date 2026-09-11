@@ -35741,13 +35741,36 @@ def prove_p2p_libro():
           and 'class="p2p-stella"' not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
     prova("...e i bottoni del voto restano i soli `p2p-stella`", 1,
           mini.count('class="p2p-stella"'))
-    # LA STELLA E' PIU' GRANDE DELL'OMINO (set 2026, taratura di Andrea):
-    # e' la sola cosa che conta fra le due misure, e regge ai ritocchi
-    # meglio di due numeri inchiodati.
+    # ⚠️ LA TAGLIA DELLA STELLA STA IN UNA VARIABILE SOLA, e questa
+    # sentinella nasce da un difetto VERO (11 set 2026, visto da
+    # Andrea: «a 5,0 una striscia verticale più chiara in mezzo»).
+    # I tre pezzi — il contenitore, i due svg e la finestra dello
+    # strato pieno — portavano ognuno il suo `17px` cablato: bastava
+    # ingrandire i soli `svg` perche' il contorno andasse a 28 e la
+    # finestra del pieno restasse a 17, cioe' il riempimento si
+    # fermava al 61% e a 5,0 si vedeva una banda. Con `--st` la
+    # misura si cambia in un posto e i tre pezzi si muovono insieme.
+    _st_box = pezzo_js(mini, "  .p2p-rep-stella{", "}")
+    _st_svg = pezzo_js(mini, "  .p2p-rep-stella svg{", "}")
+    _st_pieno = pezzo_js(mini, "  .p2p-rep-stella-piena{", "}")
+    prova("la taglia della stella viene da UNA variabile, in tutti e tre",
+          [True, True, True],
+          ["var(--st)" in b for b in (_st_box, _st_svg, _st_pieno)])
+    prova("...e nessuno dei tre porta piu' un px cablato", [],
+          [n for n, b in (("scatola", _st_box), ("svg", _st_svg),
+                          ("finestra", _st_pieno))
+           if re.search(r"(width|height):\d+px", b)])
+    # LA STELLA E' PIU' GRANDE DELL'OMINO nella misura di casa (la
+    # riga di testo delle card), e nel RIQUADRO vanno alla pari —
+    # taratura di Andrea: li' l'omino a 12px era minuscolo accanto a
+    # una stella da 28.
+    _var = lambda blocco: int(re.search(r"--st:(\d+)px", blocco).group(1))
     _mis = lambda blocco: int(re.search(r"width:(\d+)px", blocco).group(1))
-    prova("la stella e' piu' grande dell'omino", True,
-          _mis(pezzo_js(mini, "  .p2p-rep-stella{", "}"))
-          > _mis(pezzo_js(mini, "  .p2p-ico.p2p-ico-mini{", "}")))
+    prova("nella card la stella e' piu' grande dell'omino", True,
+          _var(_st_box) > _mis(pezzo_js(mini, "  .p2p-ico.p2p-ico-mini{", "}")))
+    prova("...e nel riquadro i due segni vanno alla pari", (28, 28),
+          (_var(pezzo_js(mini, "  .p2p-rep-col.media .p2p-rep-stella{", "}")),
+           _mis(pezzo_js(mini, "  .p2p-rep-segno .p2p-ico.p2p-ico-mini{", "}"))))
     # il disegno vive in UNA costante: due stelle diverse sarebbero due
     # stelle diverse
     prova("il disegno della stella e' scritto una volta sola", 1,
@@ -37367,8 +37390,10 @@ console.log(JSON.stringify(out));
     # la cifra, o le tre colonne si scalerebbero fra loro
     prova("...e la stella della media e' la piu' grande", True,
           '<div class="p2p-rep-col media">' in o["repPiena"]
-          and ".p2p-rep-col.media .p2p-rep-segno svg{width:28px;height:28px}"
-              in mini
+          # ⚠️ SI GIRA LA VARIABILE E NON GLI `svg`: ingrandire i soli
+          # svg e' il difetto della banda, e lo vieta la sentinella
+          # della taglia unica (blocco della stella, piu' su)
+          and ".p2p-rep-col.media .p2p-rep-stella{--st:28px}" in mini
           # ⚠️ e la RIGA del segno e' alta 28 per tutt'e tre: misurato,
           # con le righe «quanto serve» le tre colonne partivano
           # sfalsate di 8px — una griglia nata per tenerle in riga
@@ -37387,15 +37412,24 @@ console.log(JSON.stringify(out));
     # ⚠️ LA SEZIONE INTERA E' LA PORTA, e solo col negozio: una sezione
     # che si annuncia cliccabile e non risponde e' il difetto gia'
     # pagato con la pillola sola del metodo.
-    prova("col negozio la sezione e' un bersaglio, e dice dove porta",
-          True, 'role="button"' in o["repPiena"]
+    prova("col negozio la sezione e' un bersaglio", True,
+          'role="button"' in o["repPiena"]
           and 'data-negozio="ab12cd34"' in o["repPiena"]
-          and "apriNegozioDettP2P(event, this.dataset.negozio)" in o["repPiena"]
-          and "il negozio ›" in o["repPiena"])
-    prova("...e senza negozio non e' un bersaglio, e nemmeno lo dice",
-          True, 'role="button"' not in o["repSenzaNegozio"]
-          and "onclick" not in o["repSenzaNegozio"]
-          and ">venditore<" in o["repSenzaNegozio"])
+          and "apriNegozioDettP2P(event, this.dataset.negozio)" in o["repPiena"])
+    prova("...e senza negozio non lo e'", True,
+          'role="button"' not in o["repSenzaNegozio"]
+          and "onclick" not in o["repSenzaNegozio"])
+    # ⚠️ SOTTO LA FOTO NON C'E' SCRITTO NIENTE (11 set 2026, ritocco di
+    # Andrea): «il negozio ›» spiegava il tocco, e una faccia non ha
+    # bisogno di un'etichetta che dica che e' una faccia. La colonna
+    # resta senza `<small>`, quindi il volto si CENTRA nell'altezza
+    # della riga invece di restare appeso in alto.
+    prova("sotto la foto non c'e' nessuna etichetta", [False, False, True],
+          ["il negozio" in o["repPiena"], "venditore" in o["repSenzaNegozio"],
+           '<div class="p2p-rep-col volto">' in o["repPiena"]])
+    prova("...e il volto si centra nella riga", True,
+          "justify-content:center" in pezzo_js(
+              mini, "  .p2p-rep-col.volto{", "}"))
     # il codice del negozio e' testo che arriva dal server: scappato
     prova("...e un veleno nel codice non esce dall'attributo", True,
           'onclick="rubo()' not in o["repVeleno"]
