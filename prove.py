@@ -51864,7 +51864,8 @@ def prove_badge_nostr():
     # --- 7) tutte le rotte sono SOLO ADMIN -----------------------------
     for nome in ("crea_badge_live", "carica_immagine_badge",
                 "assegna_manuale_live", "assegna_admin_live",
-                "ritira_badge_live", "elenco_live_badge", "stato_live"):
+                "ritira_badge_live", "elenco_live_badge", "stato_live",
+                "sincronizza_badge_distintivi"):
         corpo = pezzo(nome)
         prova(f"{nome}: riservato ai moderatori", True,
               "verifica_utente(x_tg_init_data, barattolo_sessione)" in corpo
@@ -51881,6 +51882,116 @@ def prove_badge_nostr():
           bool(amb5["NOME_FOTO"].match("bdg_../../etc_1.jpg")))
     prova("...e non serve una rotta nuova: /foto/{nome} basta", True,
           '@app.get("/foto/{nome}")' in _SORGENTE)
+
+    # --- 9) i distintivi diventano badge Nostr (set 2026) -------------
+    pk_dist = "cd" * 32
+    npub_dist = amb3["hex_to_npub"](pk_dist)
+
+    vero2 = sqlite3.connect(":memory:")
+    vero2.row_factory = sqlite3.Row
+    vero2.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                 "npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0)")
+    vero2.execute("CREATE TABLE nostr_badge_live(live_id TEXT PRIMARY "
+                 "KEY, nome TEXT, descrizione TEXT, immagine TEXT "
+                 "DEFAULT '', evento_id TEXT DEFAULT '', creato INTEGER)")
+    vero2.execute("CREATE TABLE nostr_badge_partecipanti(live_id TEXT, "
+                 "pubkey TEXT, premiato_evento TEXT DEFAULT '', "
+                 "premiato_il INTEGER DEFAULT 0, ritirato INTEGER "
+                 "DEFAULT 0, PRIMARY KEY(live_id, pubkey))")
+    vero2.execute("INSERT INTO utenti VALUES(111, ?, 1)", (npub_dist,))
+    vero2.execute("INSERT INTO utenti VALUES(222, '', 0)")   # niente npub
+    vero2.commit()
+
+    class _ConViva3:
+        def execute(self, *a):
+            return vero2.execute(*a)
+
+        def commit(self):
+            vero2.commit()
+
+        def close(self):
+            pass
+
+    esito_relay2 = {"ok": True}
+
+    async def _corout2(v):
+        return v
+
+    amb9 = {"db": lambda: _ConViva3(), "time": time,
+            "npub_to_hex": amb3["npub_to_hex"],
+            "evento_badge_definizione": lambda riga: {
+                "id": f"ev-{riga['live_id']}", "kind": 30009},
+            "evento_badge_premio": lambda live, pk: {
+                "id": f"premio-{live['live_id']}-{pk[:6]}", "kind": 8},
+            "_spedisci_ai_relay": lambda ev: _corout2(
+                1 if esito_relay2["ok"] else 0)}
+    exec("async " + pezzo("_assicura_badge_distintivo"), amb9)
+    exec("async " + pezzo("_premia_pubkey"), amb9)
+    exec("async " + pezzo("_premia_distintivo"), amb9)
+
+    dist = {"id": "nostrano", "emoji": "🟣", "nome": "Nostrano",
+            "descrizione": "Npub Nostr verificata con nota pubblica"}
+
+    riga_badge = asyncio.new_event_loop().run_until_complete(
+        amb9["_assicura_badge_distintivo"](dist))
+    prova("il badge del distintivo prende nome ed emoji da DISTINTIVI",
+          "🟣 Nostrano", riga_badge["nome"])
+    prova("...e riusa la sua descrizione, non una copia",
+          "Npub Nostr verificata con nota pubblica",
+          riga_badge["descrizione"])
+    prova("...con un live_id deterministico (si ricalcola, non si "
+          "cerca)", "distintivo-nostrano", riga_badge["live_id"])
+
+    chiamate = {"n": 0}
+    _evento_originale = amb9["evento_badge_definizione"]
+
+    def _conta_chiamate(riga):
+        chiamate["n"] += 1
+        return _evento_originale(riga)
+    amb9["evento_badge_definizione"] = _conta_chiamate
+    asyncio.new_event_loop().run_until_complete(
+        amb9["_assicura_badge_distintivo"](dist))
+    prova("richiamata di nuovo non ripubblica (evento_id gia' c'e')",
+          0, chiamate["n"])
+
+    ok1 = asyncio.new_event_loop().run_until_complete(
+        amb9["_premia_distintivo"](dist, 111))
+    prova("chi ha una npub verificata riceve il badge del distintivo",
+          True, ok1)
+    riga_prem = vero2.execute(
+        "SELECT premiato_evento FROM nostr_badge_partecipanti "
+        "WHERE live_id=? AND pubkey=?",
+        ("distintivo-nostrano", pk_dist)).fetchone()
+    prova("...e resta scritto chi l'ha ricevuto", True,
+          bool(riga_prem and riga_prem["premiato_evento"]))
+
+    ok2 = asyncio.new_event_loop().run_until_complete(
+        amb9["_premia_distintivo"](dist, 222))
+    prova("senza npub verificata: niente badge, fail-open e non un "
+          "errore", False, ok2)
+
+    esito_relay2["ok"] = False   # se riprovasse a firmare, fallirebbe
+    ok3 = asyncio.new_event_loop().run_until_complete(
+        amb9["_premia_distintivo"](dist, 111))
+    prova("richiamata di nuovo per chi l'ha gia': non rifirma, mai due "
+          "volte", True, ok3)
+    vero2.close()
+
+    corpo_sync = pezzo("sincronizza_badge_distintivi")
+    prova("la sincronizzazione scorre TUTTI i distintivi", True,
+          "for dist in DISTINTIVI:" in corpo_sync)
+    prova("...prende chi ce l'ha gia' con npub verificata", True,
+          "badge_id=? AND u.npub_verificata=1" in
+          " ".join(corpo_sync.split()))
+    prova("...riusando lo stesso motore del gancio automatico", True,
+          'await _premia_distintivo(dist, r["tg_id"])' in corpo_sync)
+
+    corpo_gancio = pezzo("premia_distintivi")
+    prova("premia_distintivi aggancia il badge Nostr per ogni "
+          "distintivo nuovo", True,
+          "await _premia_distintivo(dd, tg_id)" in corpo_gancio)
+    prova("...ma un intoppo su Nostr non rompe il resto (due try, non "
+          "uno solo)", 2, corpo_gancio.count("try:"))
 
 
 def main():

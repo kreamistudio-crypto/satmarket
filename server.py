@@ -7619,6 +7619,17 @@ async def premia_distintivi(tg_id: int):
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
                        f"{dd['nome']}!</b>\n{dd['descrizione']}. "
                        f"Lo trovi nel tuo Profilo. 🫙")
+        # Il gemello su Nostr (set 2026): fail-open anche qui, un giro
+        # in piu' oltre a quello gia' dentro _premia_distintivo — un
+        # intoppo su Nostr non deve MAI intaccare un flusso che stava
+        # gia' premiando un distintivo vero (login, un ordine appena
+        # concluso, un feedback lasciato: nessuno di questi aspetta
+        # un relay per finire il suo lavoro).
+        try:
+            await _premia_distintivo(dd, tg_id)
+        except Exception as e:
+            print(f"⚠️ Badge Nostr del distintivo saltato per {tg_id}/"
+                  f"{did}: {e}")
 
 
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
@@ -32193,6 +32204,130 @@ async def _premia_pubkey(live, pubkey: str) -> str:
     con.commit()
     con.close()
     return evento["id"]
+
+
+# --- I DISTINTIVI DIVENTANO BADGE NOSTR (set 2026) --------------------
+# "live_id" qui non e' piu' solo una live: e' l'identificativo di
+# QUALUNQUE badge — una live vera (assegnata a mano, vedi sopra) o un
+# distintivo interno (assegnato da solo). Il nome e' rimasto quello di
+# quando esisteva solo la live perche' rinominare una colonna e sette
+# rotte per un fatto che non cambia il comportamento sarebbe stato il
+# refactoring di massa che la regola ferrea 7 vieta — quel che conta,
+# "possiamo farci badge di qualunque cosa", e' gia' vero cosi'.
+# Ogni distintivo ha il suo live_id deterministico ("distintivo-<id>"):
+# non serve cercarlo, si ricalcola.
+
+
+async def _assicura_badge_distintivo(dist: dict):
+    """Crea e pubblica (SOLO se manca) il badge Nostr di un distintivo
+    interno, riusando nome/emoji/descrizione di DISTINTIVI — mai una
+    seconda copia di quel testo, che un giorno direbbe un'altra cosa.
+    Idempotente sullo stesso "d" (live_id deterministico), come
+    crea_badge_live: ripubblicarlo aggiorna, non duplica."""
+    live_id = f"distintivo-{dist['id']}"
+    con = db()
+    riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    if riga and riga["evento_id"]:
+        con.close()
+        return riga
+    con.execute(
+        "INSERT INTO nostr_badge_live(live_id, nome, descrizione, "
+        "creato) VALUES(?,?,?,?) ON CONFLICT(live_id) DO UPDATE SET "
+        "nome=excluded.nome, descrizione=excluded.descrizione",
+        (live_id, f"{dist['emoji']} {dist['nome']}", dist["descrizione"],
+         int(time.time())))
+    con.commit()
+    riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    con.close()
+    evento = evento_badge_definizione(riga)
+    if not await _spedisci_ai_relay(evento):
+        return riga
+    con = db()
+    con.execute("UPDATE nostr_badge_live SET evento_id=? WHERE live_id=?",
+                (evento["id"], live_id))
+    con.commit()
+    riga = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                       (live_id,)).fetchone()
+    con.close()
+    return riga
+
+
+async def _premia_distintivo(dist: dict, tg_id: int) -> bool:
+    """Assegna il badge Nostr di un distintivo a chi l'ha gia'
+    guadagnato — chiamata sia dal gancio automatico (premia_distintivi,
+    riga ~7604, un utente alla volta appena lo guadagna) sia dalla
+    sincronizzazione manuale (tutti quelli che ce l'hanno gia'). Fail-
+    open se manca la npub verificata: e' la stessa regola di sempre,
+    niente npub vuol dire niente badge, mai un errore per chi su Nostr
+    non c'e'. Torna True anche se l'aveva gia' ricevuto (non e' un
+    errore, e' il motivo per cui si puo' rilanciare la sincronizzazione
+    quante volte si vuole senza doppioni)."""
+    con = db()
+    u = con.execute("SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not u or not u["npub_verificata"] or not u["npub"]:
+        return False
+    try:
+        pubkey = npub_to_hex(u["npub"])
+    except ValueError:
+        return False
+    live = await _assicura_badge_distintivo(dist)
+    if not live["evento_id"]:
+        return False
+    con = db()
+    con.execute(
+        "INSERT INTO nostr_badge_partecipanti(live_id, pubkey) "
+        "VALUES(?,?) ON CONFLICT(live_id, pubkey) DO NOTHING",
+        (live["live_id"], pubkey))
+    con.commit()
+    riga = con.execute(
+        "SELECT premiato_evento FROM nostr_badge_partecipanti "
+        "WHERE live_id=? AND pubkey=?", (live["live_id"], pubkey)).fetchone()
+    con.close()
+    if riga["premiato_evento"]:
+        return True
+    return bool(await _premia_pubkey(live, pubkey))
+
+
+@app.post("/api/admin/live/sincronizza-distintivi")
+async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: crea (se mancano) i badge Nostr dei distintivi
+    interni e li assegna a chi li ha gia' guadagnati e ha una npub
+    verificata. Da qui in poi chi guadagna un distintivo nuovo riceve
+    il suo badge da solo (vedi premia_distintivi); questo bottone
+    mette in pari chi l'aveva gia' prima, e si puo' rilanciare quando
+    si vuole — non riassegna mai due volte (vedi _premia_distintivo)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    riepilogo = {}
+    for dist in DISTINTIVI:
+        live = await _assicura_badge_distintivo(dist)
+        if not live["evento_id"]:
+            riepilogo[dist["id"]] = {"errore": "definizione non pubblicata"}
+            continue
+        con = db()
+        candidati = con.execute(
+            "SELECT b.tg_id FROM badge_utente b JOIN utenti u "
+            "ON u.tg_id=b.tg_id WHERE b.badge_id=? AND u.npub_verificata=1",
+            (dist["id"],)).fetchall()
+        con.close()
+        assegnati, falliti = 0, 0
+        for r in candidati:
+            if await _premia_distintivo(dist, r["tg_id"]):
+                assegnati += 1
+            else:
+                falliti += 1
+            await asyncio.sleep(0.3)
+        riepilogo[dist["id"]] = {"assegnati": assegnati, "falliti": falliti,
+                                 "candidati": len(candidati)}
+    return {"ok": True, "riepilogo": riepilogo}
 
 
 @app.post("/api/admin/live/{live_id}/badge")

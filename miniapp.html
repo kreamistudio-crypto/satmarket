@@ -30778,8 +30778,8 @@ function boxBadgeLive(){
       </div>
       <div class="leva-val" style="font-size:12px;color:var(--muted)">👥${b.partecipanti||0} · 🏅${b.premiati||0}</div>
     </div>`).join('') || '<div class="sub">Nessun badge creato ancora.</div>';
-  return cassettoAdm('accAdmBadge', '🏺', 'Badge Nostr (live)', admBadge.length, `
-    <div class="sub">Un badge per ogni live: crealo, carica l'immagine, e mandalo a chi ti scrive la sua npub — o a tutti gli admin in blocco.</div>
+  return cassettoAdm('accAdmBadge', '🏺', 'Badge Nostr', admBadge.length, `
+    <div class="sub">Un badge per ogni occasione — una live, un distintivo, quello che vuoi: lo crei, carichi l'immagine, e lo mandi a chi ti scrive la sua npub o a tutti gli admin in blocco.</div>
     ${righe}
     <div style="margin-top:14px">
       <div class="section-label">+ Nuovo badge</div>
@@ -30787,7 +30787,26 @@ function boxBadgeLive(){
       <textarea id="badgeDescNuovo" placeholder="Descrizione" style="margin-top:8px;width:100%"></textarea>
       <button class="btn ghost" style="margin-top:8px" onclick="creaBadgeLive()">Crea e pubblica</button>
     </div>
+    <div style="margin-top:14px">
+      <div class="section-label">Distintivi → Nostr</div>
+      <div class="sub" style="margin-top:6px">Ogni distintivo (🟣 Nostrano, ⭐ Stimato, 🚀 Fulmine...) ha il suo badge: da oggi chi lo guadagna con una npub verificata lo riceve da solo. Questo bottone mette in pari chi l'aveva già prima — si può rilanciare quando si vuole, non duplica mai.</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="sincronizzaDistintivi()">🔄 Sincronizza i distintivi</button>
+    </div>
     <div id="badgeDettaglio" style="margin-top:14px"></div>`);
+}
+
+async function sincronizzaDistintivi(){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/sincronizza-distintivi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riuscito', 6000); return; }
+    const tot = Object.values(d.riepilogo||{}).reduce(
+      (s,v) => s + (v.assegnati||0), 0);
+    toast(`🔄 ${tot} badge assegnati sui distintivi già guadagnati`);
+    await loadAdminStats();
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 /* Dal nome allo slug del live_id: minuscolo, solo lettere/cifre/

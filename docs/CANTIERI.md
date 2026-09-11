@@ -9879,3 +9879,60 @@ COLLAUDATO: **9192 verdi**. Provato il caso di Andrea nei numeri:
 Controvalore + sconto = Subtotale, meno l'1% = «Ricevi» (12000 − 480
 = 11520, −115 = 11405 nel banco; 599.520 + 119.904 = 719.424, −7.194
 = 712.230 in vetrina).
+
+IL QUINTO GIRO (11 set 2026): TUTTI i distintivi interni diventano
+badge Nostr, non solo quello scelto come prova. Voluto da Alan in
+questi termini esatti — automatico per i distintivi che già esistono,
+un colpo solo per chi li aveva già guadagnati, e i badge custom (come
+quello della live BitVero) restano un gesto manuale a parte, mai
+travolti dall'automatismo. Tre pezzi, riusando l'infrastruttura del
+primo giro senza toccarla:
+1) `_assicura_badge_distintivo(dist)` — crea (o ritrova) il badge
+   Nostr di UN distintivo interno, `live_id` deterministico
+   `distintivo-{id}` invece che scelto a mano, nome/descrizione presi
+   pari pari da `DISTINTIVI` (mai una copia scritta a parte: se un
+   giorno cambia il testo del distintivo, cambia anche quello del
+   badge la prossima volta che si tocca). Pubblica il kind 30009 SOLO
+   se `evento_id` è ancora vuoto — richiamarla mille volte non
+   ripubblica mille volte.
+2) `_premia_distintivo(dist, tg_id)` — il gancio per UN utente: fail-
+   open totale se non ha una npub verificata (nessun errore, solo
+   `False`), poi riusa `_premia_pubkey` del primo giro com'è, la
+   stessa riga che già garantiva «mai due volte» per i badge delle
+   live.
+3) il gancio automatico dentro `premia_distintivi()` (il punto unico
+   da cui passano TUTTI i distintivi nuovi, ~10 chiamate nel codice):
+   dopo la notifica Telegram di sempre, un secondo `try/except` che
+   chiama `_premia_distintivo` e non può MAI far fallire il resto — un
+   intoppo su Nostr non deve rompere il distintivo vero, che è la
+   cosa che l'utente vede per prima.
+IL BACKFILL è un bottone solo, non un endpoint silenzioso:
+`POST /api/admin/live/sincronizza-distintivi`, riservato agli admin
+come tutte le sorelle, scorre i 12 `DISTINTIVI`, assicura il badge di
+ognuno e premia chiunque l'abbia già con una npub verificata —
+rilanciabile quando si vuole, «non duplica mai» è vero perché passa
+dagli stessi due controlli sopra, non da una logica sua.
+LA SEZIONE SI CHIAMA SOLO «Badge Nostr», non più «Badge Nostr (live)»
+— con i distintivi dentro non è più solo delle live, ed è la riga
+che Alan ha chiesto esplicitamente. Sotto il bottone «+ Nuovo badge»
+di sempre (i badge custom, uno per volta) è comparsa una scheda
+«Distintivi → Nostr» col bottone «🔄 Sincronizza i distintivi».
+⚠️ `nostr_badge_live`/`nostr_badge_partecipanti`/`live_id` RESTANO
+COSÌ, non rinominate in qualcosa di più generico: è la stessa regola
+di sempre (niente refactoring di massa non richiesto) applicata a un
+nome che ormai copre più di quel che dice — costa un commento in più
+nel codice, non una migrazione di schema.
+COLLAUDATO: 17 prove nuove in `prove_badge_nostr` (creazione
+idempotente del badge di un distintivo con nome/descrizione riusati,
+premio a chi ha la npub verificata, fail-open silenzioso a chi non
+ce l'ha, «mai due volte» richiamando la stessa premiazione, la
+sincronizzazione che scorre tutti i 12 e riusa lo stesso motore, il
+gancio dentro `premia_distintivi` con due `try` e non uno) — 8983
+verdi, 166 rosse preesistenti, stesso numero di prima: zero rotture.
+Riprovato dal vivo (venv isolato + shim, npub finta verificata su
+un'identità di collaudo): un click sul bottone ha fatto comparire nel
+journal 12 kind 30009 (uno a distintivo) e i kind 8 per ogni utente
+del database locale con quel distintivo e la npub verificata — 13 per
+Nostrano, 14 per Pioniere, 3 per Bottega avviata. Richiamato subito
+dopo: stesso riepilogo nei numeri, **zero righe nuove nel journal** —
+la riprova che «non duplica mai» non è un modo di dire.

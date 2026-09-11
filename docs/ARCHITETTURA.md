@@ -24082,7 +24082,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (forma `bdg_*`), nessuna rotta nuova per servirla, e dallo stesso
   `ridimensiona()` del client che comprime avatar/foto annunci/banner.
   IL PANNELLO ADMIN vive in `miniapp.html`, dentro `#adminStats` (tab
-  Profilo, `loadAdminStats`) come un `cassettoAdm` — `boxBadgeLive()`
-  — accanto a «Stato delle leve»: stesso linguaggio visivo, stesso
-  fetch a mano con `authHdr()`, nessun helper centralizzato (non
-  esiste, in questo file).
+  Profilo, `loadAdminStats`) come un `cassettoAdm` — `boxBadgeLive()`,
+  intitolato solo «Badge Nostr» — accanto a «Stato delle leve»: stesso
+  linguaggio visivo, stesso fetch a mano con `authHdr()`, nessun
+  helper centralizzato (non esiste, in questo file).
+  TUTTI E DODICI I DISTINTIVI INTERNI (set 2026, perché in
+  `docs/CANTIERI.md` alla voce «IL QUINTO GIRO») hanno il loro badge
+  Nostr, riusando le stesse due tabelle e lo stesso `_premia_pubkey`:
+  `_assicura_badge_distintivo(dist)` crea/ritrova la riga
+  `nostr_badge_live` con `live_id = f"distintivo-{dist['id']}"` (nome/
+  descrizione presi da `DISTINTIVI`, mai una copia), `_premia_distintivo
+  (dist, tg_id)` premia un utente se ha `npub_verificata` (fail-open
+  altrimenti). Il gancio automatico sta dentro `premia_distintivi()` —
+  il punto unico da cui passano tutti i distintivi nuovi — in un
+  secondo `try/except` dopo la notifica Telegram, per costruzione mai
+  capace di romperla. Il backfill di chi li aveva già è un bottone
+  solo, `POST /api/admin/live/sincronizza-distintivi`, che scorre i 12
+  `DISTINTIVI` chiamando gli stessi due motori sopra — rilanciabile
+  a piacere, non duplica mai. I badge custom (creati con «+ Nuovo
+  badge», come quello di una live) restano un gesto manuale separato:
+  l'automatismo copre solo i 12 distintivi, non li sostituisce.
