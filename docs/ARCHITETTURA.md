@@ -1609,12 +1609,36 @@
   qualcuno scriverà l'anno prossimo. LA RISPOSTA DI TELEGRAM NON LA
   GUARDAVA NESSUNO — un `await c.post(...)` e via — ed è la parte
   LETTERALE di «senza errore e senza traccia»: il 400 «can't parse
-  entities» finiva nel nulla. Ora su un rifiuto del PARSE (e solo su
-  quello: bot bloccato, chat inesistente e 429 non li ripara un
-  secondo invio) il messaggio si rimanda SPOGLIO — `spoglia_html`, lo
-  stesso ripiego dei DM Nostr — così arriva senza grassetti invece di
-  non arrivare. E si STAMPA, o sarebbe un guasto che si autoripara in
-  silenzio e nessuno andrebbe mai a scappare il sito che l'ha causato.
+  entities» finiva nel nulla. Ora su un rifiuto del PARSE il messaggio
+  si rimanda SPOGLIO — `spoglia_html`, lo stesso ripiego dei DM Nostr
+  — così arriva senza grassetti invece di non arrivare. E si STAMPA, o
+  sarebbe un guasto che si autoripara in silenzio e nessuno andrebbe
+  mai a scappare il sito che l'ha causato.
+  ⚠️ E QUESTA VOCE DICEVA «bot bloccato, chat inesistente e 429 non li
+  ripara un secondo invio» COME SE FOSSE UNA RAGIONE PER NON
+  GUARDARLI: è vero che un secondo invio non li ripara, e resta vero
+  che non si ritenta — ma da lì si era concluso di non LEGGERE
+  nemmeno la risposta, che è un'altra cosa. Dal set 2026
+  `_manda_telegram` la legge sempre, con tre voci perché non sono la
+  stessa notizia: il **429** è un avviso PERDUTO e un ordine ne manda
+  quattro o cinque in raffica, quindi chiede di guardare la raffica;
+  il **403** è un fatto normale (non ha avviato il bot, o l'ha
+  bloccato) e si dice piano; ogni altro codice porta il suo numero.
+  Anche il RIPIEGO spoglio adesso ha il suo esito letto — resta un
+  tentativo solo, ma se anche quello si prende un 429 il messaggio è
+  perduto e va detto: per questo il ripiego prende il posto di `r`.
+  IL TIMEOUT ESPLICITO, 20 secondi come `bot_api`: era l'unico
+  `httpx.AsyncClient()` NUDO del file su dieci, e i 5 di serie di
+  httpx contro un `ConnectTimeout` sono costati un ordine intero di
+  notifiche (vedi CANTIERI, «La notifica che si portava via le
+  altre»). La sentinella non chiede più un elenco di nomi: guarda
+  ogni riga `async with httpx.AsyncClient(` del file e pretende il
+  suo `timeout=`.
+  E `notifica()` È DAVVERO FAIL-OPEN, TRASPORTO COMPRESO: il suo
+  docstring lo promette da sempre, ma il `try` copriva solo la
+  lettura del canale nel database. È la riga che rende INDIPENDENTI
+  le notifiche in fila di un flusso — e va in `notifica()`, non nei
+  chiamanti, che sono decine.
   LA PROVA CHE CONTA È IL CENSIMENTO, non un elenco: guarda tutte le
   funzioni del file, tiene quelle che notificano e chiede che ogni
   `titolo = …` nasca scappato — così il sollecito nuovo di domani entra

@@ -10108,3 +10108,106 @@ della `write`. Il file restava com'era e il registro diceva di sì.
 Adesso la funzione RACCOGLIE i fallimenti, scrive quel che è riuscito
 e alza DOPO: un fallimento parziale si vede, e non si porta via il
 lavoro buono.
+
+## La notifica che si portava via le altre
+
+Segnalazione di Andrea: l'11 set 2026 due ordini del mercatino, uno
+alle 10:17 UTC e uno alle 13:02, e il polso «🛒 Nuovo ordine» ai
+moderatori è arrivato per il primo e non per il secondo.
+
+LA DIAGNOSI PRIMA DELLA CURA, e sui byte: nel journal del VPS, alle
+13:03:17 UTC, `POST /api/orders/151/verifica-pagamento` → **500**,
+«Exception in ASGI application», traceback con
+`httpcore.ConnectTimeout` / `httpx.ConnectTimeout`. I due POST di
+prima (13:02:05 e 13:03:12) erano 200.
+
+IL MECCANISMO, che è la parte che vale: «🛒 Nuovo ordine» nasce in un
+posto solo, ed è la **terza** di tre notifiche in fila dentro
+`_incassa_ordine` — venditore, compratore, moderatori — con il
+`con.commit()` **prima** di tutte e tre. L'eccezione del trasporto è
+risalita dalla seconda e si è portata via quel che veniva dopo. E non
+si recupera: al retry del poll `_incassa_ordine` esce subito, perché
+lo stato non è più 'creato'. Ordine regolarmente in cassaforte,
+notifiche perdute.
+
+DUE DIFETTI VERI, e nessuno dei due era configurazione nostra.
+1) `notifica()` PROMETTEVA il fail-open totale nel suo docstring — «mai
+un errore al flusso chiamante» — ma il `try` copriva solo la lettura
+del canale nel database: `await _manda_telegram(...)` era nudo. Una
+promessa scritta e non mantenuta è peggio di una promessa assente,
+perché i chiamanti ci contano.
+2) `_manda_telegram` era l'unico `httpx.AsyncClient()` **NUDO** del
+file (dieci client, nove col loro `timeout=`), cioè i 5 secondi di
+serie di httpx verso api.telegram.org.
+
+E LA REGOLA C'ERA GIÀ, SCRITTA PER QUATTRO NOMI: `prove.py` aveva la
+sentinella «i quattro tubi LNbits dicono quanto aspettano», un elenco
+a mano — e il quinto tubo, quello delle notifiche, non era nell'elenco.
+È la stessa lezione del titolo nudo, seconda volta: **un elenco a
+memoria invecchia e rimpicciolisce**. La sentinella nuova non chiede
+nomi: guarda ogni riga `async with httpx.AsyncClient(` del file e
+pretende il `timeout=`, più un conto (dieci) perché il giorno che
+qualcuno scrivesse i client in un altro modo una lista vuota non possa
+dire «tutto in regola» su zero righe guardate.
+
+LA CURA, tre righe di sostanza. Il `try/except` attorno al trasporto
+in `notifica()` — **lì e non nei chiamanti**, che sono decine, ed è
+ciò che rende indipendenti tre notifiche in fila. Il `timeout=20`,
+gli stessi di `bot_api`: una convenzione sola. E la risposta di
+Telegram letta oltre il caso «parse», con tre voci perché non sono la
+stessa notizia — il **429** è un avviso PERDUTO (e un ordine ne manda
+quattro o cinque in raffica: al venditore, al compratore, ai
+moderatori, più i 🕊 delle offerte decadute), il **403** è un fatto
+normale e si dice piano, ogni altro codice porta il suo numero. Anche
+il ripiego spoglio ora ha l'esito letto: resta un tentativo solo — una
+notifica non deve mai diventare un ciclo — ma se anche quello si
+prende un 429 il messaggio è perduto e va detto.
+
+LA PROVA CHE CONTA MISURA IL FATTO, non la forma: il trasporto di
+cartone alza SEMPRE, e si contano i tentativi che la catena vera di
+`_incassa_ordine` fa comunque. Quattro — venditore, compratore e due
+moderatori — dove prima ne partiva **uno**. Una sentinella sull'ordine
+delle righe avrebbe detto soltanto che nessuno le ha riordinate.
+E IL GIRO A CODICE INTATTO È LA META' CHE RENDE VERA L'ALTRA: le prove
+nuove contro il `server.py` di prima della cura vanno rosse e poi
+**esplodono esattamente dove è esploso il 151** —
+`_incassa_ordine` → `notifica` → trasporto. Cioè il banco riproduce il
+guasto di produzione, non una sua imitazione.
+⚠️ E LA PRIMA CONTROPROVA ERA UNA BUGIA VERDE: passava dal dizionario
+tornato da `runpy.run_path`, che è una **copia** — riscrivere
+`_SORGENTE` là dentro non cambia quello che vedono `pezzo` e le sue
+sorelle, quindi stava misurando il server CURATO e usciva tutta verde.
+Il file si scambia davvero, e si rimette in un `finally`.
+
+LE DUE ROSSE DEL PRIMO GIRO, tenute perché sono fatti: l'ordine dei
+moderatori **non esiste** (`notifica_admin` cicla su `set(ADMIN_IDS)`)
+e la prova lo dava per scontato; e la sentinella del timeout contava
+`httpx.AsyncClient()` nel sorgente, quindi rispondeva al **docstring
+che questo cantiere aveva appena scritto** — `codice()` toglie i
+commenti, non le stringhe. Si guarda la riga dell'apertura, che la
+scrive solo il codice.
+
+IL RECUPERO PER GLI ORDINI GIÀ 'LOCKED' — VALUTATO E SCARTATO, con i
+suoi perché. Dopo questa cura una mandata che fallisce perde **al
+massimo sé stessa**, mai le altre. Il residuo è «Telegram ha detto
+429/403», e un retry non lo ripara: un 403 non diventa un 200, e una
+notifica non deve diventare un ciclo. Una coda «notifiche da rimandare»
+vorrebbe stato per messaggio (tre destinatari, tre testi), un timbro
+d'idempotenza per non raddoppiare e un ciclo verso Telegram: macchina
+nuova, con guasti nuovi, per un buco appena chiuso. E LA RETE
+STATO-BASATA ESISTE GIÀ, che è l'argomento forte:
+`sollecita_venditori_fermi` squilla al venditore che non fa partire la
+merce (5 giorni per un pacco, 48 ore per un codice), lo dice una volta
+al compratore e al tetto passa la pratica ai moderatori — e si ancora
+allo STATO dell'ordine, non a «il messaggio è uscito?», quindi vale
+qualunque sia la ragione per cui il venditore non ha sentito. Il polso
+ai moderatori, invece, è cortesia: la verità sta nel pannello.
+RESTA UNA COSA A MANO, dichiarata: per il **151** la rete del
+venditore squilla solo il 16 set, e se quell'ordine è fermo conviene
+guardarlo prima.
+
+COLLAUDATO: **9235 verdi** (17 prove nuove), più la rossa di rimbalzo
+che ha detto una cosa utile — il banco di `prove_titoli_scappati`
+montava `AsyncClient=lambda: ClientFinto(esiti)` e col `timeout=`
+rispondeva `TypeError`, cioè rosso per il motivo sbagliato. **Cede il
+banco, mai la regola.**
