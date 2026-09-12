@@ -3543,15 +3543,23 @@
      questa apertura NON tocca: «≈ −3453 sats» spezzato a meta'
      sarebbe un altro numero. */
   .conto-p2p .ctrl-riga .mono .num{white-space:nowrap}
-  /* ⚠️ LE RIGHE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
+  /* ⚠️ LE CIFRE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
      ritocco di Andrea che rovescia il verde/rosso «direzione» del
-     giorno prima): a dire dove vanno i sats restano i SEGNI, + e −,
-     e il conto torna una colonna di cifre neutre.
-     IL PERCHE' STA IN QUEL CHE RESTA ACCESO: una riga sola, «Ricevi»
-     (o «Paghi»), nel colore del lato. Con quattro righe in verde e
-     rosso quella non si distingueva — era un colore forte in mezzo a
-     colori uguali — e il conto gridava tutto insieme. Meno colore,
-     piu' gerarchia.
+     giorno prima): i sats di fee, premio e subtotale perdono la
+     tinta, e a dire dove vanno restano i SEGNI, + e −.
+     IL PERCHE' STA IN QUEL CHE RESTA ACCESO A DESTRA: una cifra sola,
+     quella di «Ricevi» (o «Paghi»), nel colore del lato. Con quattro
+     numeri in verde e rosso quella non si distingueva — era un colore
+     forte in mezzo a colori uguali — e la colonna gridava tutta
+     insieme. Meno colore, piu' gerarchia.
+     ⚠️ MA LA COLONNA DI SINISTRA RESTA IN TINTA, ed e' la meta' che il
+     primo giro aveva spento di troppo (rimessa da Andrea lo stesso
+     giorno): le percentuali non dicono una direzione, dicono un
+     GIUDIZIO — rosso il costo della fee, verde o rosso il premio
+     secondo che convenga a chi legge. Sono due letture in due
+     colonne, e spegnere quella di sinistra non serviva a far
+     risaltare la riga di destra: il numero che doveva emergere sta
+     dall'altra parte.
      I SEGNI RESTANO, e portano da soli quel che diceva la tinta: chi
      legge vede «+1.505» e «−90» e sa cosa entra e cosa esce. */
   /* ...e le due righe in evidenza si staccano fra loro: i SATS
@@ -37781,10 +37789,8 @@ function contoDettP2P(o){
      aggiunge a quelli che blocca. E' un giudizio, non la direzione
      che vestono le cifre a destra: le due letture stanno in due
      colonne diverse. */
-  /* l'aliquota resta attaccata al nome ma NON e' piu' rossa: nel
-     conto e' rimasto un colore solo, quello della riga «Ricevi» */
   const etichettaFee = 'Fee Barattolo'
-    + (fee > 0 ? ' <b>' + pct(fee * 50) + '%</b>' : '')
+    + (fee > 0 ? ' <b class="p2p-avviso">' + pct(fee * 50) + '%</b>' : '')
     + promo;
   const commissione = fee === null ? num('—')
     : fee > 0 ? num(cifraNuda('meta', compro ? '−' : '+'),
@@ -37821,7 +37827,8 @@ function contoDettP2P(o){
      e ognuna e' coerente nella sua. */
   const premio = (!fisso && o.premium)
     ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
-        + ' <b>' + Math.abs(Math.round(o.premium)) + '%</b>',
+        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+        + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la

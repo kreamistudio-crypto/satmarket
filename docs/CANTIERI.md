@@ -10211,3 +10211,70 @@ che ha detto una cosa utile — il banco di `prove_titoli_scappati`
 montava `AsyncClient=lambda: ClientFinto(esiti)` e col `timeout=`
 rispondeva `TypeError`, cioè rosso per il motivo sbagliato. **Cede il
 banco, mai la regola.**
+
+
+## Il colore torna a sinistra: due colonne, due letture (12 set 2026)
+
+RITOCCO CHE CORREGGE IL GIRO DI POCHE ORE PRIMA, ed è la ragione per cui
+ha una voce sua invece di un emendamento a quella: il giro precedente
+aveva spento il verde e il rosso in TUTTO il conto del dettaglio, e
+Andrea ne voleva spenta solo metà. «Avevo chiesto di togliere i colori
+solo ai sats delle righe intermedie, non alla percentuale.»
+
+**LA REGOLA CHE NE ESCE, e vale oltre questo conto: nella riga ci sono
+DUE colonne e dicono DUE cose diverse.** A destra la DIREZIONE — questi
+sats entrano o escono — e lì il colore è uscito per sempre, perché il
+segno la porta da solo: chi legge vede «+1.505» e «−90» e non ha bisogno
+di una tinta che ripeta l'informazione. A sinistra il GIUDIZIO — questa
+voce è un costo? questo prezzo conviene a chi legge? — e lì il colore
+NON è ridondante, perché nessun altro segno lo dice: «Fee Barattolo 1%»
+in nero non direbbe che è un costo, e un premio del 4% non direbbe da
+che parte pende.
+
+QUINDI IL CONTO ADESSO PARLA COSÌ: `Fee Barattolo` sempre in rosso (è un
+costo nei due tab — chi compra la vede uscire dai sats che riceve, chi
+vende la aggiunge a quelli che blocca); `Premio`/`Sconto del venditore`
+col giudizio del LATO (`affare = (lato === 'buy') === (premium > 0)`,
+lo stesso giudice dei badge sulle card); tutte le cifre a destra
+nell'inchiostro, col loro segno, e il Subtotale in grigio muto; e UNA
+sola cifra accesa, quella di «Ricevi» (o «Paghi» nel Vendi), nel colore
+del lato — verde nel Compra, rosso nel Vendi, come la cifra sulle card.
+
+⚠️ **E LA RIGA DI VENDITA COL PREMIO È IL CASO CHE RENDE ESPLICITA LA
+REGOLA**, quello che a prima vista sembra un errore: «4%» VERDE accanto
+a «−28.777» col meno e senza colore. Il prezzo è favorevole a chi vende
+(giudizio, colonna sinistra) e quei sats dal conto escono lo stesso
+(direzione, colonna destra). Due letture, ognuna coerente nella sua
+colonna — e il giorno che qualcuno le trovasse in contraddizione, la
+contraddizione è nella lettura, non nel conto.
+
+PERCHÉ IL PRIMO GIRO AVEVA SPENTO TROPPO: l'argomento era «con quattro
+righe colorate la riga che conta non si distingue», e resta vero — ma le
+quattro righe colorate erano le CIFRE, cioè la stessa colonna di
+«Ricevi». Le percentuali stanno dall'altra parte e non le facevano
+concorrenza: spegnerle non aggiungeva niente alla gerarchia e toglieva
+l'unica cosa che dicevano. **Quando si spegne un colore per far
+risaltare qualcosa, si spegne quello che sta nella STESSA colonna di
+quel qualcosa** — il resto è rumore tolto a caso.
+
+LE CLASSI NON ERANO MAI STATE TOLTE: `.ctrl-riga .p2p-avviso` e
+`.ctrl-riga .p2p-affare` erano rimaste nel foglio, era il markup ad
+aver smesso di usarle. Il ripristino è di due righe in `contoDettP2P`,
+e la macchina già c'era.
+
+MISURATO INVECE CHE GUARDATO, e serviva: a quelle dimensioni un rosso
+spento e un grigio caldo si somigliano nel PNG. Una sonda chiede al
+browser il colore CALCOLATO di ogni percentuale e di ogni cifra, in
+tutti e otto i riquadri della vetrina e nei due lati — la mappa che ne
+esce è la tabella qui sopra, riga per riga, e tiene anche il caso del
+premio in vendita. ⚠️ Due trappole pagate: il computed style torna
+`rgb()` e non il nome della variabile, quindi il confronto passa da un
+elemento usa-e-getta a cui si dà il colore di casa e si rilegge cosa
+diventa; e la bandierina 🇪🇺 del «Totale da pagare» arriva come coppia
+surrogata e fa esplodere la STAMPA — non la misura — quindi si
+sterilizza al momento di scriverla, mai alla fonte.
+
+COLLAUDATO: **9236 verdi**, una in più del giro prima — la sentinella
+nuova guarda che le percentuali siano in tinta E che le due classi di
+casa esistano nel foglio, perché una classe applicata a un selettore
+sparito passerebbe la prima metà e non colorerebbe niente.
