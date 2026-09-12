@@ -214,7 +214,8 @@
        conto dove il colore ha gia' due mestieri (giudizio a sinistra,
        direzione a destra) una cornice colorata era un terzo uso dello
        stesso alfabeto. */
-    --chiusa-bg:var(--off-bg); --chiusa-line:var(--field-line);
+    --chiusa-bg:var(--field-line); --chiusa-line:var(--muted);
+    --chiusa-bordo:2px;
     /* ---- LA SPEDIZIONE GRATUITA: UN COLORE SOLO, IN TUTTA L'APP ----
        Questa coppia veste l'UNICA cosa che vale la pena colorare della
        consegna: che non si paga. «Spedizione disponibile», «Ritiro in
@@ -329,7 +330,7 @@
     /* ...e di sera la scatola resta quella di prima: bruno su bruno
        chiaro stacca gia', e lo `--off-bg` scuro sarebbe un terzo
        grigio in tre centimetri. Due temi, due valori, UNA regola. */
-    --chiusa-bg:var(--bg); --chiusa-line:var(--line);
+    --chiusa-bg:var(--bg); --chiusa-line:var(--line); --chiusa-bordo:1.5px;
     /* UNICA taratura notturna della spedizione gratuita (lug 2026,
        feedback di Andrea: «di sera e' troppo evidente»). Il chiaro su
        fondo bruno rendeva piu' di quanto rendesse sul crema — stesso
@@ -3542,14 +3543,17 @@
      questa apertura NON tocca: «≈ −3453 sats» spezzato a meta'
      sarebbe un altro numero. */
   .conto-p2p .ctrl-riga .mono .num{white-space:nowrap}
-  /* ══ IL COLORE DEI SATS E' UNA DIREZIONE (set 2026, ritocco di
-     Andrea) ══ verde quel che si AGGIUNGE, rosso quel che si TOGLIE,
-     col segno sempre scritto accanto — mai un giudizio di
-     convenienza, che sulla stessa parola dovrebbe dire due cose
-     opposte nei due tab. Le righe senza segno (il Controvalore, che
-     e' la base) restano nell'inchiostro. */
-  .conto-p2p .ctrl-riga .num.piu{color:var(--trust)}
-  .conto-p2p .ctrl-riga .num.meno{color:var(--danger)}
+  /* ⚠️ LE RIGHE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
+     ritocco di Andrea che rovescia il verde/rosso «direzione» del
+     giorno prima): a dire dove vanno i sats restano i SEGNI, + e −,
+     e il conto torna una colonna di cifre neutre.
+     IL PERCHE' STA IN QUEL CHE RESTA ACCESO: una riga sola, «Ricevi»
+     (o «Paghi»), nel colore del lato. Con quattro righe in verde e
+     rosso quella non si distingueva — era un colore forte in mezzo a
+     colori uguali — e il conto gridava tutto insieme. Meno colore,
+     piu' gerarchia.
+     I SEGNI RESTANO, e portano da soli quel che diceva la tinta: chi
+     legge vede «+1.505» e «−90» e sa cosa entra e cosa esce. */
   /* ...e le due righe in evidenza si staccano fra loro: i SATS
      nell'arancio di casa (`--sats-text`, la versione leggibile
      dell'arancio bitcoin: `--sats` puro e' un colore da fondi e da
@@ -3594,10 +3598,30 @@
      dell'etichetta. Misurato: «Totale da pagare» del mercatino, che
      gia' cedeva a 137 su 134, passava a 132. Tre pixel non si vedono,
      ma li' dentro si traducono in una parola mozzata in piu'. */
-  .ctrl-conto .ctrl-chiusa{margin:8px -11.5px -4px;padding:0 10px;
-    border:1.5px solid var(--chiusa-line);border-radius:12px;
+  /* ⚠️ IL MARGINE SEGUE LO SPESSORE, e non e' pignoleria: col
+     `box-sizing:border-box` la scatola si mangia dalla larghezza il
+     padding E i bordi, quindi per stare a filo del conto (che ha 10px
+     di padding) il rientro negativo dev'essere `10 + il bordo`. Con
+     un numero fisso, cambiando spessore si tornerebbe a rubare pixel
+     all'etichetta — il difetto gia' pagato ieri, che costo' due
+     pixel al «Totale da pagare» del mercatino. */
+  .ctrl-conto .ctrl-chiusa{
+    margin:8px calc(-10px - var(--chiusa-bordo)) -4px;padding:0 10px;
+    border:var(--chiusa-bordo) solid var(--chiusa-line);border-radius:12px;
     background:var(--chiusa-bg)}
-  .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
+  /* ⚠️ LA RIGA DEI SATS PORTA IL COLORE DEL LATO (12 set 2026,
+     ritocco di Andrea) — verde nel tab «Compra BTC», rosso in «Vendi
+     BTC» — ed e' lo STESSO giudice della cifra sulle card, dove il
+     colore del lato vive gia' su `.p2p-ord .p2p-sats`. Un conto che
+     dicesse arancio dove la card dice verde parlerebbe di due cose.
+     L'ARANCIO E' USCITO: era il colore «dei sats» in astratto, e qui
+     serve il colore di QUESTO scambio.
+     ED E' L'UNICA RIGA ACCESA del conto: le altre hanno perso il
+     verde e il rosso proprio perche' questa si vedesse. L'euro resta
+     nell'inchiostro — due righe colorate in fondo tornerebbero a
+     essere una macchia sola. */
+  .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}
+  body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
@@ -37757,8 +37781,10 @@ function contoDettP2P(o){
      aggiunge a quelli che blocca. E' un giudizio, non la direzione
      che vestono le cifre a destra: le due letture stanno in due
      colonne diverse. */
+  /* l'aliquota resta attaccata al nome ma NON e' piu' rossa: nel
+     conto e' rimasto un colore solo, quello della riga «Ricevi» */
   const etichettaFee = 'Fee Barattolo'
-    + (fee > 0 ? ' <b class="p2p-avviso">' + pct(fee * 50) + '%</b>' : '')
+    + (fee > 0 ? ' <b>' + pct(fee * 50) + '%</b>' : '')
     + promo;
   const commissione = fee === null ? num('—')
     : fee > 0 ? num(cifraNuda('meta', compro ? '−' : '+'),
@@ -37795,8 +37821,7 @@ function contoDettP2P(o){
      e ognuna e' coerente nella sua. */
   const premio = (!fisso && o.premium)
     ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
-        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + Math.abs(Math.round(o.premium)) + '%</b>',
+        + ' <b>' + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
   /* la spiegazione sotto il conto: il mercato che si muove e la

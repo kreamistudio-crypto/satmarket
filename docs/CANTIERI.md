@@ -10073,3 +10073,38 @@ COLLAUDATO: **9216 verdi**, con la sentinella che pretende le due
 variabili e VIETA i colori dentro la scatola — perché un ritocco che
 la ricolora domani deve inciampare in una riga rossa, non nel gusto di
 chi guarda. Guardato nei due temi.
+
+## Un colore solo nel conto, e quello del lato
+
+⚠️ IL VERDE/ROSSO «DIREZIONE» È DURATO UN GIORNO (12 set 2026,
+ritocco di Andrea): le righe del calcolo — fee, premio/sconto,
+subtotale — perdono la tinta, e restano i SEGNI, + e −, in grigio.
+Neutre anche le due percentuali.
+IL PERCHÉ STA IN QUEL CHE RESTA ACCESO: con quattro righe in verde e
+rosso, la riga che conta — «Ricevi» — era un colore forte in mezzo a
+colori uguali, e non si distingueva più. **Meno colore, più
+gerarchia**: adesso nel conto c'è UNA riga accesa sola.
+E PORTA IL COLORE DEL LATO, non l'arancio: verde nel tab «Compra
+BTC», rosso in «Vendi BTC» — lo stesso giudice della cifra sulle
+card, dove il colore del lato vive già su `.p2p-ord .p2p-sats`. Un
+conto che dicesse arancio dove la card dice verde parlerebbe di due
+cose. L'arancio era il colore «dei sats» in astratto; qui serve il
+colore di QUESTO scambio.
+I SEGNI BASTANO DA SOLI a dire dove vanno i sats: «+1.505» e «−90» si
+leggono senza ricavarlo da una tinta — che è poi la ragione per cui
+il colore lì si poteva togliere senza perdere nulla.
+COLLAUDATO: **9235 verdi**, con tre sentinelle nuove: le righe del
+calcolo NON portano più `.num.piu`/`.num.meno`, i segni restano, e
+l'unica riga accesa ha il colore del lato (con l'arancio vietato).
+Guardato nei due temi e nei DUE LATI — la vetrina del conto ha
+imparato `body.p2p-vendo`, o le colonne «Vendi» avrebbero mostrato il
+verde del Compra, cioè proprio il colore da giudicare sarebbe stato
+finto (la stessa lezione già pagata con le card).
+
+⚠️ E UNO SCRIPT DI SOSTITUZIONE CHE ESCE PRIMA DI SCRIVERE PERDE
+TUTTO: tre modifiche riuscite («ok» stampato tre volte) sono sparite
+perché la quarta non trovava l'ancora e il `sys.exit` arrivava prima
+della `write`. Il file restava com'era e il registro diceva di sì.
+Adesso la funzione RACCOGLIE i fallimenti, scrive quel che è riuscito
+e alza DOPO: un fallimento parziale si vede, e non si porta via il
+lavoro buono.

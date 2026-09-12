@@ -37547,9 +37547,9 @@ console.log(JSON.stringify(out));
     # anche a 375), mentre questa e' piu' corta perfino della secca
     # che l'aveva sostituita — misurato, non stimato.
     prova("la fee dice la meta' di chi legge, col meno", True,
-          # l'aliquota sta ATTACCATA al nome e in rosso (e' un costo),
-          # la cifra a destra col suo segno e il colore della direzione
-          '<span>Fee Barattolo <b class="p2p-avviso">1%</b></span>' in cm
+          # l'aliquota sta ATTACCATA al nome, e dal 12 set NEUTRA: nel
+          # conto e' rimasto un colore solo, quello della riga «Ricevi»
+          '<span>Fee Barattolo <b>1%</b></span>' in cm
           and '<span class="num meno">≈ −120 sats</span>' in cm
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
@@ -37564,11 +37564,14 @@ console.log(JSON.stringify(out));
     prova("le due righe finali vivono in una scatola loro", True,
           '<div class="ctrl-chiusa">' in cm
           and cm.index('<div class="ctrl-chiusa">') < cm.index("Ricevi")
-          # ⚠️ 11,5 e non 10: col box-sizing di casa la scatola si
-          # mangia padding E BORDI dalla larghezza che riceve, e a −10
-          # si teneva i tre pixel dei bordi — misurato, l'etichetta
-          # del mercatino passava da 134 a 132 disponibili
-          and "margin:8px -11.5px -4px" in pezzo_js(
+          # ⚠️ IL MARGINE E' UN CALCOLO E SEGUE LO SPESSORE: col
+          # box-sizing di casa la scatola si mangia padding E BORDI
+          # dalla larghezza che riceve, quindi il rientro dev'essere
+          # «10px di padding + il bordo». Con un numero fisso, il
+          # giorno che il bordo cambia si tornano a rubare pixel
+          # all'etichetta — successo davvero, due al «Totale da
+          # pagare» del mercatino.
+          and "margin:8px calc(-10px - var(--chiusa-bordo)) -4px" in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}")
           # ⚠️ IL FONDO E IL BORDO SONO NEUTRI E CAMBIANO COL TEMA (set
           # 2026): la regola e' UNA e legge due variabili, che i due
@@ -37582,13 +37585,21 @@ console.log(JSON.stringify(out));
           # conto dove il colore ha gia' due mestieri (giudizio a
           # sinistra, direzione a destra) una cornice colorata era un
           # terzo uso dello stesso alfabeto.
-          and "border:1.5px solid var(--chiusa-line)" in pezzo_js(
+          and "border:var(--chiusa-bordo) solid var(--chiusa-line)" in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}")
           and "background:var(--chiusa-bg)" in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}")
-          and "--chiusa-bg:var(--off-bg); --chiusa-line:var(--field-line);"
+          # ⚠️ E IL CHIARO STACCA PIU' DELLO SCURO, misurato e non
+          # deciso a occhio: col fondo `--field-line` su `--card` il
+          # rapporto e' 1,43 contro l'1,13 di sera, e col bordo
+          # `--muted` 2,66 contro 1,44. Il primo giro col solo
+          # `--off-bg` dava 1,21 e 1,18 — il bordo spariva nel fondo,
+          # ed e' quello che Andrea vedeva.
+          and "--chiusa-bg:var(--field-line); --chiusa-line:var(--muted);"
               in mini
-          and "--chiusa-bg:var(--bg); --chiusa-line:var(--line);" in mini
+          and "--chiusa-bordo:2px;" in mini
+          and "--chiusa-bg:var(--bg); --chiusa-line:var(--line); "
+              "--chiusa-bordo:1.5px;" in mini
           # e nessun colore nella scatola: il vestito resta neutro
           and "--sats" not in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}"))
@@ -37596,6 +37607,24 @@ console.log(JSON.stringify(out));
     # fa la scatola, e due segni per la stessa cosa sono uno di troppo
     prova("...e il filo pieno di ieri e' uscito", False,
           ".conto-p2p .ctrl-riga.tot.sats{border-top" in mini)
+    # ⚠️ NEL CONTO E' RIMASTO UN COLORE SOLO (12 set 2026): le righe
+    # del calcolo hanno perso verde e rosso — restano i SEGNI — e
+    # l'unica riga accesa e' «Ricevi»/«Paghi», nel colore del LATO
+    # come la cifra sulle card. Un conto che dicesse arancio dove la
+    # card dice verde parlerebbe di due cose.
+    prova("le righe del calcolo non portano piu' colore", [False, False],
+          [".conto-p2p .ctrl-riga .num.piu" in mini,
+           ".conto-p2p .ctrl-riga .num.meno" in mini])
+    prova("...e i segni restano, che e' quel che il colore diceva",
+          True, "≈ −120 sats" in cm)
+    prova("...e l'unica riga accesa porta il colore del lato",
+          True,
+          ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}" in mini
+          and "body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono"
+              "{color:var(--danger)}" in mini
+          # ...e l'arancio «dei sats in astratto» e' uscito di qui
+          and ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}"
+              not in mini)
     prova("...e l'ultima riga e' l'euro, in evidenza", True,
           "Totale da pagare" in cm and "6,00 € 🇪🇺" in cm
           and cm.count('ctrl-riga tot') == 2)
@@ -37640,18 +37669,21 @@ console.log(JSON.stringify(out));
     # parola, che e' una riga che non dice niente
     prova("...e senza premio il subtotale non c'e'", False,
           "Subtotale" in cm)
-    prova("il premio porta la percentuale in tinta, e i sats il verso",
+    # ⚠️ LA PERCENTUALE E' TORNATA NEUTRA (12 set 2026, e rovescia il
+    # ritocco del giorno prima): nel conto e' rimasto UN colore solo,
+    # quello della riga «Ricevi» — con le percentuali in verde e rosso
+    # quella riga non si distingueva piu'. Il verso lo dice la PAROLA
+    # («Premio»/«Sconto») e il segno sui sats.
+    prova("il premio porta la percentuale nuda, e i sats il verso",
           True,
-          'Premio al venditore <b class="p2p-avviso">4%</b>'
-          in o["contoPremio"]
+          'Premio al venditore <b>4%</b>' in o["contoPremio"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoPremio"]
           and "≈ 11405 sats" in o["contoPremio"])
     # ⚠️ E UN PREMIO NEGATIVO CAMBIA IL NOME DELLA VOCE: non e' «un
     # premio di meno», e' uno SCONTO — col nome giusto non serve
     # leggere il segno per capire di cosa si parla.
     prova("...e un premio negativo e' uno SCONTO, col suo nome", True,
-          'Sconto del venditore <b class="p2p-affare">2%</b>'
-          in o["contoSconto"]
+          'Sconto del venditore <b>2%</b>' in o["contoSconto"]
           and "Premio al venditore" not in o["contoSconto"]
           # ...e i suoi sats si AGGIUNGONO: segno piu' e verde. E il
           # conto SOMMA anche col verso rovesciato: 12000 − 122 + 240
@@ -37663,8 +37695,7 @@ console.log(JSON.stringify(out));
     # vende (percentuale verde) e quei sats dal conto ESCONO lo stesso
     # (cifra rossa). Due colonne, due letture, ognuna coerente.
     prova("...e nel tab Vendi il conto si specchia",
-          True, 'Premio al venditore <b class="p2p-affare">4%</b>'
-          in o["contoVendi"]
+          True, 'Premio al venditore <b>4%</b>' in o["contoVendi"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoVendi"]
           and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
           and "Totale da pagare" not in o["contoVendi"]
@@ -37696,7 +37727,7 @@ console.log(JSON.stringify(out));
           # chi legge
           True, '<span class="promo-tag dopo">in promo</span>'
           in o["contoPromo"]
-          and '<b class="p2p-avviso">0,5%</b>' in o["contoPromo"]
+          and '<b>0,5%</b>' in o["contoPromo"]
           and '<span class="num meno">≈ −60 sats</span>' in o["contoPromo"]
           and "≈ 11940 sats" in o["contoPromo"])
     # ⚠️ SI RITAGLIA LA RIGA, non si splitta sull'etichetta: da quando
@@ -37712,7 +37743,7 @@ console.log(JSON.stringify(out));
     # che e' la META' (1%) e non la fee intera.
     prova("col listino 3 la fee al 2% e' in promo, e la meta' e' 1%",
           True,
-          '<span>Fee Barattolo <b class="p2p-avviso">1%</b>'
+          '<span>Fee Barattolo <b>1%</b>'
           '<span class="promo-tag dopo">in promo</span></span>'
           in o["contoListino3"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
