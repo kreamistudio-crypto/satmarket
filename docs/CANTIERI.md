@@ -9996,6 +9996,11 @@ negativi e quella che vieta il ritorno del filo pieno.
 
 ## Il riquadro coi colori dei sats, e la levetta nel libro
 
+⚠️ L'ARANCIO DI QUESTA VOCE È DURATO UN GIORNO: Andrea l'ha bocciato
+il 12 set e la scatola è tornata NEUTRA — vedi «La scatola neutra, un
+valore per tema», in fondo. Quel che resta vero qui è la diagnosi (di
+giorno `--bg` su `--card` non stacca) e tutto il resto della voce.
+
 DUE RITOCCHI (11 set 2026, Andrea).
 IL RIQUADRO DELLE DUE RIGHE FINALI si vedeva poco nel tema CHIARO, ed
 era vero: il primo giro usava `--bg` dentro `--card`, che di sera
@@ -10037,3 +10042,34 @@ che il righello ha detto al primo giro. Con le colonne dichiarate la
 pillola resta centrata (scarto 0) e la levetta le sta a destra di
 10px, allineata al suo centro verticale.
 COLLAUDATO: **9216 verdi**. Guardato nei due temi e misurato a 320px.
+
+## La scatola neutra, un valore per tema
+
+⚠️ L'ARANCIO È DURATO UN GIORNO (12 set 2026): «non mi piace, via
+l'arancio». La diagnosi di ieri restava giusta — di giorno `--bg`
+dentro `--card` sono crema e bianco e non staccano — ma la cura
+sbagliava strada, e il perché vale più della riga: **in questo conto
+il colore ha già due mestieri** (a sinistra il giudizio sulla
+percentuale, a destra la direzione dei sats), e una cornice colorata
+era un terzo uso dello stesso alfabeto. Il vestito di una scatola non
+è il posto dove aggiungere significato.
+LA REGOLA È UNA E LEGGE DUE VARIABILI, che i due blocchi di token
+riempiono diverso:
+• di GIORNO lo spento di casa — `--off-bg` col bordo `--field-line`,
+  un tono più scuro della riga normale: neutro, più deciso di prima, e
+  nessun colore nuovo (è la coppia che veste tutto ciò che in pagina è
+  «spento»);
+• di SERA esattamente quelli di prima, `--bg` col bordo `--line`:
+  bruno su bruno chiaro stacca già, e un terzo grigio in tre
+  centimetri sarebbe stato un peggioramento.
+⚠️ E NON SI FA CON UN `html:not([data-tema])`: il tema «auto» segue il
+sistema e non mette nessun attributo, quindi un selettore negativo
+prenderebbe anche il telefono scuro in auto — cioè il caso più comune.
+I due valori stanno nei due BLOCCHI DI TOKEN, che è dove il tema è già
+risolto una volta per tutte: `html[data-tema="scuro"]` è acceso dal JS
+anche quando la scelta è auto, ed è scritto nel commento di quel
+blocco da quando esiste.
+COLLAUDATO: **9216 verdi**, con la sentinella che pretende le due
+variabili e VIETA i colori dentro la scatola — perché un ritocco che
+la ricolora domani deve inciampare in una riga rossa, non nel gusto di
+chi guarda. Guardato nei due temi.
