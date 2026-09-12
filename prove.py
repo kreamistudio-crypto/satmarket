@@ -37529,6 +37529,7 @@ def prove_p2p_dettaglio():
         "function anelloneP2P(o, adesso){",
         "function repRiquadroP2P(f){",
         "function monetaP2P(o){",
+        "function segnoMonetaP2P(o){",
         "function commissioneVivaP2P(){",
         "function commissioneListinoP2P(){",
         "function nettoLatoP2P(o, sats){",
@@ -37798,8 +37799,29 @@ console.log(JSON.stringify(out));
     prova("ogni valore del conto viaggia in un `.num`", [4, 6],
           [cm.count('<span class="num'),
            o["contoPremio"].count('<span class="num')])
-    prova("...e il controvalore e' al mercato puro", True,
-          "Controvalore" in cm and "≈ 12000 sats" in cm)
+    # ⚠️ E L'ETICHETTA PORTA LA BASE IN EURO (12 set 2026, ritocco di
+    # Andrea): la prima riga dice da DOVE parte il conto, non solo
+    # dove arriva. Si guarda l'etichetta INTERA, `<span>` compreso:
+    # cosi' la prova dice anche che dentro non c'e' altro — in
+    # particolare NON la bandierina, che resta alla cifra in fondo.
+    prova("...e il controvalore e' al mercato puro, con la sua base",
+          True,
+          '<span>Controvalore di <b>6,00 €</b></span>' in cm
+          and "≈ 12000 sats" in cm)
+    # ...e l'intervallo porta i due capi anche nell'etichetta
+    prova("...e con l'intervallo la base sono i due capi", True,
+          '<span>Controvalore di <b>20,00–100,00 €</b></span>'
+          in o["contoRange"])
+    # ⚠️ E UNA VALUTA FUORI DAL CATALOGO PORTA LA SIGLA, qui come in
+    # fondo: `segnoMonetaP2P` ricalca la regola di `monetaP2P` invece
+    # di inventarsi un segno che non esiste.
+    prova("...e una valuta ignota porta la sigla, mai un segno finto",
+          True,
+          '<span>Controvalore di <b>6,00 USD</b></span>' in o["contoAltra"])
+    # ...e nel Vendi l'etichetta e' la stessa: la base non si specchia,
+    # e' il verso delle righe sotto a cambiare
+    prova("...e nel Vendi la base e' la stessa", True,
+          '<span>Controvalore di <b>6,00 €</b></span>' in o["contoVendi"])
     # «FEE BARATTOLO» (11 set 2026, decisione di Andrea): lo stesso
     # nome nei due conti, e il nome torna a dire DI CHI e'. A restare
     # VIETATA e' la formula lunga, non il nome: «Commissione

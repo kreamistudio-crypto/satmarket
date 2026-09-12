@@ -37692,6 +37692,19 @@ function monetaP2P(o){
   const val = P2P_VALUTE.find(v => v.cod === cod);
   return val ? esc(val.segno) + ' ' + val.bandiera : esc(cod);
 }
+/* ...e il SOLO SEGNO, per quando la moneta sta DENTRO una frase invece
+   che in fondo a una cifra: «Controvalore di 5,00 €».
+   ⚠️ LA BANDIERINA NON CI VA, ed e' una scelta e non una svista: in
+   fondo alla riga e' il cartello che dice in che valuta si paga, ma in
+   mezzo a un'etichetta non indicherebbe niente che il segno non abbia
+   gia' detto — e ruberebbe larghezza alla riga piu' stretta del conto.
+   La regola del catalogo resta identica: una valuta che non c'e' porta
+   la sua sigla, mai una bandiera inventata. */
+function segnoMonetaP2P(o){
+  const cod = String(o.fiat || P2P_VALUTA).toUpperCase();
+  const val = P2P_VALUTE.find(v => v.cod === cod);
+  return val ? esc(val.segno) : esc(cod);
+}
 
 /* ---- IL CONTO SCORPORATO (set 2026, il calco del foglio «Paga») ----
    La riga del prezzo che stava sotto il titolo («per 6,00 € al prezzo
@@ -37766,8 +37779,22 @@ function contoDettP2P(o){
     + (segno === '+' ? ' piu' : segno === '−' ? ' meno' : '')
     + '">' + t + '</span>';
   const cifra = (campo, segno) => num(cifraNuda(campo, segno), segno);
-  const cifreEuro = num(esc(fmtEur(o.euro))
-    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '') + ' ' + monetaP2P(o));
+  /* ⚠️ L'IMPORTO IN EURO COMPARE DUE VOLTE, E NON E' UN DOPPIONE
+     (12 set 2026, ritocco di Andrea): in fondo, a destra, e' quel che
+     si PAGA; nell'etichetta del Controvalore e' la BASE da cui il
+     conto parte. «Controvalore di 6,00 € ≈ 12.000 sats» si legge come
+     una frase sola e dice a che cambio si sta guardando — senza, la
+     prima riga era una cifra di sats senza un da-dove, e il lettore
+     doveva andare a cercarselo in fondo.
+     E STA NELL'ETICHETTA come ci stanno gia' l'aliquota della fee e la
+     percentuale del premio: a sinistra il nome della voce con quanto
+     vale, a destra le sole cifre in sats. La riga e' una sola regola
+     ripetuta tre volte. */
+  const euriTesto = esc(fmtEur(o.euro))
+    + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '');
+  const cifreEuro = num(euriTesto + ' ' + monetaP2P(o));
+  const etichettaCtrl = 'Controvalore di <b>' + euriTesto + ' '
+    + segnoMonetaP2P(o) + '</b>';
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —
      lo stesso cartello del conto del mercatino */
@@ -37850,7 +37877,7 @@ function contoDettP2P(o){
      identico: la' le cifre sono corte e la regola di casa («a cedere
      e' l'etichetta») non fa danni. */
   return '<div class="ctrl-conto conto-p2p">'
-    + r('Controvalore', cifra('ctrl'))
+    + r(etichettaCtrl, cifra('ctrl'))
     + premio
     /* ⚠️ IL SUBTOTALE STA FRA IL PREMIO E LA FEE, e non e' un vezzo di
        impaginazione: e' la BASE su cui la fee si calcola. VERIFICATO

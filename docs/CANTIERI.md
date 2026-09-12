@@ -10278,3 +10278,58 @@ COLLAUDATO: **9236 verdi**, una in più del giro prima — la sentinella
 nuova guarda che le percentuali siano in tinta E che le due classi di
 casa esistano nel foglio, perché una classe applicata a un selettore
 sparito passerebbe la prima metà e non colorerebbe niente.
+
+
+## «Controvalore di 6,00 €»: la prima riga dice da dove parte (12 set 2026)
+
+L'IMPORTO IN EURO SALE NELL'ETICHETTA della prima riga del conto del
+dettaglio, accanto al nome della voce; a destra resta la cifra in sats.
+È il terzo dato che fa questa strada, dopo l'aliquota della fee e la
+percentuale del premio, e adesso la regola del conto è una sola ripetuta
+tre volte: **a sinistra il nome della voce con quanto vale, a destra le
+sole cifre in sats.**
+
+PERCHÉ NON È UN DOPPIONE dell'euro che sta già in fondo: le due
+occorrenze dicono due cose. In fondo, nella scatola, è quel che si
+**paga**; in cima è la **base** da cui il conto parte. «Controvalore di
+6,00 € ≈ 12.000 sats» si legge come una frase sola e dice a che cambio
+si sta guardando — prima la riga era una cifra di sats senza un
+da-dove, e chi voleva saperlo doveva scendere in fondo e tornare su.
+
+LA BANDIERINA NON SALE CON L'IMPORTO, ed è una scelta: in fondo alla
+riga è il cartello che dice in che valuta si paga, ma in mezzo a
+un'etichetta non indicherebbe niente che il segno non abbia già detto, e
+ruberebbe larghezza alla riga più stretta del conto. Nasce quindi
+`segnoMonetaP2P`, gemella di `monetaP2P` meno la bandiera — e **ricalca
+la stessa regola del catalogo**: una valuta che nel catalogo non c'è
+porta la sua sigla («Controvalore di 6,00 USD»), mai un segno inventato.
+
+MISURATO A 320, non stimato: **nessuna etichetta si tronca**, in nessuno
+dei dieci riquadri della vetrina. Il caso peggiore — l'intervallo, dove
+l'etichetta più lunga («Controvalore di 20,00–100,00 €», 204px) incontra
+la cifra più lunga (i due capi in sats, 208px) — non entra nei 300px
+utili e **manda la cifra a capo**: è il comportamento che il conto P2P
+ha già, dove a cedere è la DESTRA e mai l'etichetta, ed è lo stesso che
+fa la riga del premio a 320. Il numero resta intero, che è la cosa che
+conta: «≈ 2.398.082–11.990.408 sats» spezzato a metà sarebbe un altro
+numero.
+
+⚠️ **LA FUNZIONE NUOVA VA AGGIUNTA AI DUE RITAGLI, e l'ho scoperto due
+volte nello stesso giro** — è la trappola da mettere a verbale. Sia il
+banco di `prove.py` sia la vetrina dello scratchpad costruiscono il loro
+mondo ritagliando da `miniapp.html` un ELENCO ESPLICITO di funzioni: una
+funzione nuova chiamata da `contoDettP2P` non c'è, e il conto esplode.
+Nel banco è uscita una rossa onesta («il banco node del dettaglio gira»);
+**nella vetrina no**, e questa è la lezione: la pagina è rimasta vuota e
+la sonda della larghezza ha stampato «0 etichette troncate su 0», cioè
+un verde perfetto su un foglio bianco. Da qui la guardia: **zero elementi
+misurati non è un pass**, è un errore — la sonda adesso si ferma con
+codice 2. È la stessa famiglia delle prove che rispondono per il vicino:
+una misura che non trova niente non ha trovato «tutto a posto».
+
+COLLAUDATO: **9239 verdi**, quattro sentinelle nuove al posto di una —
+la base in euro, i due capi dell'intervallo, la valuta fuori catalogo e
+il Vendi (dove l'etichetta è la STESSA: la base non si specchia, a
+cambiare verso sono le righe sotto). Si guarda l'etichetta INTERA,
+`<span>` compreso, così la prova dice anche che dentro non c'è altro —
+in particolare non la bandierina.
