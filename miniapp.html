@@ -204,6 +204,17 @@
     --nav-bg-p2p:#2B2214;
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
+    /* LA SCATOLA DELLE RIGHE FINALI DEL CONTO (set 2026): di giorno
+       `--bg` su `--card` sono crema e bianco e a un dito di distanza
+       si somigliano, quindi il riquadro prende lo SPENTO di casa —
+       `--off-bg` col bordo `--field-line`, un tono piu' scuro della
+       riga normale. Neutro, e nessun colore nuovo: e' la stessa
+       coppia che veste tutto cio' che in pagina e' «spento».
+       ⚠️ L'ARANCIO E' STATO PROVATO E BOCCIATO da Andrea: dentro un
+       conto dove il colore ha gia' due mestieri (giudizio a sinistra,
+       direzione a destra) una cornice colorata era un terzo uso dello
+       stesso alfabeto. */
+    --chiusa-bg:var(--off-bg); --chiusa-line:var(--field-line);
     /* ---- LA SPEDIZIONE GRATUITA: UN COLORE SOLO, IN TUTTA L'APP ----
        Questa coppia veste l'UNICA cosa che vale la pena colorare della
        consegna: che non si paga. «Spedizione disponibile», «Ritiro in
@@ -315,6 +326,10 @@
        I token dei badge della SPEDIZIONE non seguono questa strada:
        sono un codice colore, la ragione lunga sta in cima. */
     --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
+    /* ...e di sera la scatola resta quella di prima: bruno su bruno
+       chiaro stacca gia', e lo `--off-bg` scuro sarebbe un terzo
+       grigio in tre centimetri. Due temi, due valori, UNA regola. */
+    --chiusa-bg:var(--bg); --chiusa-line:var(--line);
     /* UNICA taratura notturna della spedizione gratuita (lug 2026,
        feedback di Andrea: «di sera e' troppo evidente»). Il chiaro su
        fondo bruno rendeva piu' di quanto rendesse sul crema — stesso
@@ -3580,8 +3595,8 @@
      gia' cedeva a 137 su 134, passava a 132. Tre pixel non si vedono,
      ma li' dentro si traducono in una parola mozzata in piu'. */
   .ctrl-conto .ctrl-chiusa{margin:8px -11.5px -4px;padding:0 10px;
-    border:1.5px solid var(--sats);border-radius:12px;
-    background:var(--sats-soft)}
+    border:1.5px solid var(--chiusa-line);border-radius:12px;
+    background:var(--chiusa-bg)}
   .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}

@@ -37570,15 +37570,27 @@ console.log(JSON.stringify(out));
           # del mercatino passava da 134 a 132 disponibili
           and "margin:8px -11.5px -4px" in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}")
-          # ⚠️ IL FONDO E IL BORDO SONO QUELLI DEI SATS (set 2026,
-          # ritocco di Andrea: nel tema chiaro `--bg` su `--card` sono
-          # crema e bianco, e il riquadro spariva proprio dove serviva
-          # di piu'). La coppia `--sats-soft`/`--sats` e' tarata per i
-          # due temi, e non e' un colore nuovo: e' l'arancio della
-          # riga «Ricevi» che ci sta dentro.
-          and "border:1.5px solid var(--sats)" in pezzo_js(
+          # ⚠️ IL FONDO E IL BORDO SONO NEUTRI E CAMBIANO COL TEMA (set
+          # 2026): la regola e' UNA e legge due variabili, che i due
+          # blocchi di token riempiono diverso — di giorno lo SPENTO di
+          # casa (`--off-bg` col bordo `--field-line`, un tono piu'
+          # scuro), perche' `--bg` su `--card` e' crema su bianco e a
+          # un dito di distanza si somigliano; di sera quelli di
+          # sempre (`--bg`/`--line`), che bruno su bruno chiaro stacca
+          # gia'.
+          # ⚠️ L'ARANCIO E' STATO PROVATO E BOCCIATO da Andrea: in un
+          # conto dove il colore ha gia' due mestieri (giudizio a
+          # sinistra, direzione a destra) una cornice colorata era un
+          # terzo uso dello stesso alfabeto.
+          and "border:1.5px solid var(--chiusa-line)" in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}")
-          and "background:var(--sats-soft)" in pezzo_js(
+          and "background:var(--chiusa-bg)" in pezzo_js(
+              mini, "  .ctrl-conto .ctrl-chiusa{", "}")
+          and "--chiusa-bg:var(--off-bg); --chiusa-line:var(--field-line);"
+              in mini
+          and "--chiusa-bg:var(--bg); --chiusa-line:var(--line);" in mini
+          # e nessun colore nella scatola: il vestito resta neutro
+          and "--sats" not in pezzo_js(
               mini, "  .ctrl-conto .ctrl-chiusa{", "}"))
     # ...e il filo pieno che le staccava non serve piu': lo stacco lo
     # fa la scatola, e due segni per la stessa cosa sono uno di troppo
