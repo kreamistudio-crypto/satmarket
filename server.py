@@ -7445,23 +7445,54 @@ async def _manda_telegram(tg_id: int, testo: str):
     arrivare, che e' sempre il verso giusto in cui sbagliare. E si
     STAMPA, o resterebbe un guasto che si autoripara in silenzio e
     nessuno andrebbe mai a scappare il sito che l'ha causato.
-    Il ripiego si tenta UNA volta sola e non guarda il suo esito: qui
-    non si puo' fare altro, e una notifica non deve mai diventare un
-    ciclo. Ogni altro errore (utente che ha bloccato il bot, rete giu')
-    resta muto come sempre — quelli non li ripara un secondo invio."""
+    Il ripiego si tenta UNA volta sola: qui non si puo' fare altro, e
+    una notifica non deve mai diventare un ciclo. Il suo ESITO, per
+    contro, adesso si legge — era l'ultimo pezzo rimasto muto.
+
+    NESSUNA RISPOSTA RESTA MUTA (set 2026, dopo l'ordine 151): il ramo
+    del parse guardava UN caso e lasciava cadere tutti gli altri, cosi'
+    un 429 — Telegram a briglia corta, e un ordine ne manda quattro o
+    cinque in raffica: al venditore, al compratore, ai moderatori, piu'
+    i 🕊 delle offerte decadute — o un 403 perdevano il messaggio
+    senza una riga da nessuna parte. Tre famiglie e tre voci, perche'
+    non sono la stessa notizia: il 429 e' un avviso PERDUTO e chiede di
+    guardare la raffica, il 403 e' un fatto normale (non ha avviato il
+    bot, o l'ha bloccato) e si dice piano, il resto e' un ⚠️ e basta.
+
+    IL TIMEOUT ESPLICITO E' LA CURA DELL'ORDINE 151, ed era l'unico
+    `httpx.AsyncClient()` NUDO del file (tutti gli altri nove ce
+    l'hanno): i 5 secondi di serie di httpx contro una connessione
+    lenta verso api.telegram.org danno `ConnectTimeout`, e l'11 set
+    2026 quell'eccezione — risalendo da notifica(), che non la fermava
+    — si e' portata via la ricevuta del compratore e il polso dei
+    moderatori di un ordine GIA' incassato. Venti secondi, gli stessi
+    di `bot_api`: una convenzione sola, e la sentinella la fa valere."""
     if MODALITA_COLLAUDO and tg_id < 100000:
         # Utente finto del collaudo: la notifica si stampa in console
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    async with httpx.AsyncClient() as c:
+    async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(url, json={"chat_id": tg_id, "text": testo,
                                     "parse_mode": "HTML"})
         if r.status_code == 400 and "parse" in r.text.lower():
             print(f"⚠️ HTML rifiutato da Telegram per l'utente {tg_id}: "
                   f"rimando spoglio. Da scappare alla fonte — {r.text[:200]}")
-            await c.post(url, json={"chat_id": tg_id,
-                                    "text": spoglia_html(testo)})
+            # il ripiego PRENDE IL POSTO di `r`: un tentativo solo,
+            # ma e' il suo esito quello che conta per le righe qui
+            # sotto — se anche lo spoglio si prende un 429, il
+            # messaggio e' perduto e va detto.
+            r = await c.post(url, json={"chat_id": tg_id,
+                                        "text": spoglia_html(testo)})
+        if r.status_code == 429:
+            print(f"⚠️ Telegram a briglia corta (429) per l'utente "
+                  f"{tg_id}: l'avviso NON e' arrivato — {r.text[:200]}")
+        elif r.status_code == 403:
+            print(f"🔕 L'utente {tg_id} non riceve dal bot (403): "
+                  f"non l'ha avviato o l'ha bloccato — {r.text[:120]}")
+        elif r.status_code != 200:
+            print(f"⚠️ Telegram ha rifiutato l'avviso per l'utente "
+                  f"{tg_id} ({r.status_code}): {r.text[:200]}")
 
 
 async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int):
@@ -7483,7 +7514,8 @@ async def notifica(tg_id: int, testo: str):
     """Recapita un avviso sul canale che l'utente preferisce: Telegram,
     DM Nostr cifrato (NIP-17), o entrambi. Senza preferenza decide il
     buon senso: chi ha Telegram riceve li', il nativo Nostr riceve il
-    DM. Fail-open totale: mai un errore al flusso chiamante."""
+    DM. Fail-open totale, TRASPORTO COMPRESO: mai un errore al flusso
+    chiamante — vedi la riga dove quella promessa diventa vera."""
     riga = None
     try:
         con = db()
@@ -7514,7 +7546,26 @@ async def notifica(tg_id: int, testo: str):
         asyncio.create_task(_dm_nostr_con_ripiego(
             dest_npub, testo, 0 if via_telegram else max(tg_id, 0)))
     if via_telegram:
-        await _manda_telegram(tg_id, testo)
+        # IL FAIL-OPEN CHE IL DOCSTRING PROMETTEVA DA SEMPRE (set 2026,
+        # ordine 151): qui l'unico `try` copriva la lettura del
+        # database — «admin mai registrato o DB in affanno» — e il
+        # TRASPORTO restava nudo. L'11 set 2026 un `ConnectTimeout`
+        # verso api.telegram.org e' risalito da qui fino a
+        # _incassa_ordine, su un ordine gia' 'locked' e committato, e
+        # si e' portato via le due notifiche SUCCESSIVE: la ricevuta
+        # del compratore e il polso dei moderatori. E non si
+        # recuperano — al retry del poll _incassa_ordine esce subito,
+        # perche' lo stato non e' piu' 'creato'.
+        # LA RIGA VA QUI E NON NEI CHIAMANTI, ed e' la ragione per cui
+        # questa cura e' una riga sola: i chiamanti sono decine, e cio'
+        # che rende INDIPENDENTI tre notifiche in fila e' che nessuna
+        # delle tre possa alzare. Chi vuole sapere com'e' andata non ha
+        # un valore di ritorno da guardare: ha il journal.
+        try:
+            await _manda_telegram(tg_id, testo)
+        except Exception as e:
+            print(f"⚠️ Avviso Telegram non consegnato all'utente "
+                  f"{tg_id} ({e}): il flusso continua")
     elif not via_nostr and MODALITA_COLLAUDO:
         print(f"🔕 [utente {tg_id}: nessun canale per la notifica] {testo}")
 

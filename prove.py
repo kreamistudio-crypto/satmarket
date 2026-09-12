@@ -8347,6 +8347,261 @@ def prove_tracking_corretto():
           mo.index("e_admin(user") < mo.index("OR o.id=?"))
 
 
+def prove_notifica_fail_open():
+    """LA NOTIFICA CHE NON FERMA LE ALTRE (set 2026, ordine 151).
+
+    Il caso vero: l'11 set 2026 due ordini del mercatino, e per il
+    secondo il polso «🛒 Nuovo ordine» ai moderatori non e' mai arrivato.
+    Nel journal, alle 13:03:17 UTC, un 500 su
+    POST /api/orders/151/verifica-pagamento con
+    `httpx.ConnectTimeout` — l'ordine era GIA' 'locked' e committato, la
+    notifica al venditore era partita, e l'eccezione del trasporto ha
+    portato via le DUE successive: la ricevuta del compratore e il polso.
+    Non recuperabili: al retry del poll _incassa_ordine esce subito,
+    perche' lo stato non e' piu' 'creato'.
+
+    DUE DIFETTI, e nessuno dei due era un errore di configurazione:
+    notifica() PROMETTEVA il fail-open totale nel suo docstring ma il
+    `try` copriva solo la lettura del database, e _manda_telegram era
+    l'unico `httpx.AsyncClient()` nudo del file — 5 secondi di serie.
+
+    QUI SI PROVA IL FATTO E NON LA FORMA: il trasporto di cartone alza
+    sempre, e si conta quante volte la catena di _incassa_ordine ci
+    prova comunque. Tre: venditore, compratore, moderatori. E' l'unica
+    misura che dice «indipendenti» — una sentinella sull'ordine delle
+    righe direbbe soltanto che nessuno le ha riordinate."""
+    print("\n[la notifica che non ferma le altre]")
+    import asyncio
+    import html as _h
+    import sqlite3
+    import time as _t
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    async def _niente(*a, **k):
+        return None
+
+    class Cascata(Exception):
+        """Quel che e' arrivato davvero: httpx.ConnectTimeout. Una
+        classe nostra e non quella di httpx, perche' la cura deve
+        reggere QUALUNQUE eccezione del trasporto — un `except
+        httpx.TimeoutException` avrebbe lasciato passare il prossimo
+        guasto con un altro nome."""
+
+    # --- 1) notifica(): il trasporto che muore non risale ------------
+    def _db_in_affanno():
+        raise sqlite3.OperationalError("database is locked")
+
+    mandati, stampe = [], []
+
+    async def _trasporto_rotto(tg_id, testo):
+        mandati.append(tg_id)
+        raise Cascata("ConnectTimeout: api.telegram.org")
+
+    amb = {"db": _db_in_affanno, "_manda_telegram": _trasporto_rotto,
+           "_dm_nostr_con_ripiego": _niente, "asyncio": asyncio,
+           "MODALITA_COLLAUDO": False, "print": lambda s: stampe.append(s)}
+    exec(pezzo_async("notifica"), amb)
+    alzata = ""
+    try:
+        gira(amb["notifica"](555, "ciao"))
+    except Exception as e:
+        alzata = f"{type(e).__name__}: {e}"
+    prova("il trasporto che muore NON risale al chiamante", "", alzata)
+    prova("...ma l'invio era stato tentato", [555], mandati)
+    prova("...e resta scritto nel journal", True,
+          any("non consegnato" in s and "555" in s for s in stampe))
+
+    # --- 2) LA CATENA VERA di _incassa_ordine ------------------------
+    # notifica, notifica_admin e polso_ordini_admin sono i pezzi VERI:
+    # di cartone c'e' solo il trasporto, che e' il punto che si e'
+    # rotto. Cosi' la prova misura la catena come gira in produzione.
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute(
+        "CREATE TABLE ordini(id INT, annuncio_id INT, compratore_id INT, "
+        "venditore_id INT, prezzo_sats INT, spedizione_sats INT, "
+        "protezione_sats INT, sconto_sats INT, quantita INT, stato TEXT, "
+        "consegna_scelta TEXT, punto_ritiro TEXT, via_punto INT, "
+        "indirizzo_il INT, indirizzo_atteso INT, nota_compratore TEXT, "
+        "email_corriere_il INT, payment_hash TEXT, creato INT, "
+        "aggiornato INT)")
+    vero.execute(
+        "INSERT INTO ordini VALUES(151,7,111,222,7338,0,0,0,1,'creato',"
+        "'spedizione','',0,1,0,'',0,'hash',1000,1000)")
+    vero.execute("CREATE TABLE annunci(id INT, venditore_id INT, "
+                 "titolo TEXT, quantita INT, stato TEXT, "
+                 "contatto_nostr TEXT, taglia_pacco TEXT)")
+    vero.execute("INSERT INTO annunci VALUES(7,222,'una lampada',1,"
+                 "'attivo','','M')")
+    vero.execute("CREATE TABLE offerte(id INT, compratore_id INT, "
+                 "annuncio_id INT, stato TEXT, ordine_id INT, "
+                 "aggiornato INT)")
+    vero.execute("CREATE TABLE offerte_righe(offerta_id INT, "
+                 "annuncio_id INT)")
+    # utenti: la legge notifica() per sapere su che canale parlare.
+    # Nessuna riga per il 999, che e' il moderatore mai registrato —
+    # il caso che il `try` del database copriva gia'.
+    vero.execute("CREATE TABLE utenti(tg_id INT, canale_notifiche TEXT, "
+                 "npub TEXT, npub_verificata INT, npub_accesso TEXT)")
+    for tg in (111, 222):
+        vero.execute("INSERT INTO utenti VALUES(?,'telegram','',0,'')",
+                     (tg,))
+    vero.commit()
+
+    class Con:
+        """close() non chiude: il :memory: deve sopravvivere fra una
+        chiamata e l'altra (e notifica() ne apre una sua per ogni
+        avviso, dentro la stessa catena)."""
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    tentativi = []
+
+    async def _trasporto_sempre_rotto(tg_id, testo):
+        tentativi.append(tg_id)
+        raise Cascata("ConnectTimeout: api.telegram.org")
+
+    catena = {"db": Con, "time": _t, "asyncio": asyncio, "html": _h,
+              "_manda_telegram": _trasporto_sempre_rotto,
+              "_dm_nostr_con_ripiego": _niente,
+              "MODALITA_COLLAUDO": False, "ADMIN_IDS": [999, 998],
+              "AVVISI_ORDINI_ADMIN": True,
+              "_righe_ordine": reale("_righe_ordine"),
+              "_titolo_ordine": reale("_titolo_ordine"),
+              "_fmt_sats": reale("_fmt_sats"),
+              # fuori dal cantiere: qui si misura CHI viene avvisato,
+              # non con che parole
+              "_coda_ricevuta": lambda *a: "ecco cosa succede",
+              "_coda_nota": lambda *a: "c'e' una nota",
+              "_coda_email_corriere": lambda *a: "c'e' un'email",
+              "_coda_magazzino": lambda *a: "",
+              "stima_taglia_set": lambda t: "",
+              "registra_uscita_negozio": lambda *a: "",
+              "annuncio_su_nostr": _niente, "promo_venduto": _niente,
+              "print": lambda s: None}
+    exec(pezzo_async("notifica"), catena)
+    exec(pezzo_async("notifica_admin"), catena)
+    exec(pezzo_async("polso_ordini_admin"), catena)
+    exec(pezzo_async("_incassa_ordine"), catena)
+    esito = gira(catena["_incassa_ordine"](151))
+    prova("l'incasso arriva in fondo anche col trasporto tutto rotto",
+          {"stato": "locked"}, esito)
+    # 222 venditore, 111 compratore, poi i moderatori: QUATTRO
+    # tentativi, e prima della cura ne partiva UNO SOLO — quello del
+    # venditore, il primo della fila.
+    prova("le parti vengono avvisate, in quest'ordine", [222, 111],
+          tentativi[:2])
+    # I MODERATORI IN ORDINE SPARSO, ed e' un fatto e non una
+    # sciatteria della prova: notifica_admin cicla su `set(ADMIN_IDS)`,
+    # quindi un ordine non esiste. Scritto qui perche' il primo giro
+    # di questa prova l'aveva dato per scontato ed e' uscito rosso.
+    prova("...e i moderatori tutti, in ordine sparso", [998, 999],
+          sorted(tentativi[2:]))
+    prova("...e i sats sono in cassaforte comunque", "locked",
+          vero.execute("SELECT stato FROM ordini WHERE id=151")
+          .fetchone()["stato"])
+    vero.close()
+
+    # --- 3) _manda_telegram: il timeout e la risposta LETTA ----------
+    amb_s = {"re": __import__("re"), "html": _h}
+    exec(pezzo("spoglia_html"), amb_s)
+
+    class Risposta:
+        def __init__(self, status_code, testo=""):
+            self.status_code = status_code
+            self.text = testo
+
+    def bussa(risposte):
+        """Manda un avviso a un Telegram di cartone che risponde quel
+        che gli si dice, e riporta (timeout chiesto, POST fatte, righe
+        stampate)."""
+        visti, poste, righe = [], [], []
+        coda = list(risposte)
+
+        class Cliente:
+            def __init__(self, timeout=None):
+                visti.append(timeout)
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None):
+                poste.append(json)
+                return coda.pop(0)
+
+        amb2 = {"httpx": type("H", (), {"AsyncClient": Cliente}),
+                "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
+                "spoglia_html": amb_s["spoglia_html"],
+                "print": lambda s: righe.append(s)}
+        exec(pezzo_async("_manda_telegram"), amb2)
+        gira(amb2["_manda_telegram"](555, "<b>ciao</b>"))
+        return visti, poste, righe
+
+    visti, _, righe = bussa([Risposta(200)])
+    prova("il timeout e' esplicito, e sono i 20 di bot_api", [20], visti)
+    prova("il giorno buono non stampa niente", [], righe)
+
+    _, _, righe = bussa([Risposta(429, '{"parameters":{"retry_after":9}}')])
+    prova("il 429 non e' piu' muto", True,
+          len(righe) == 1 and "429" in righe[0] and "NON e'" in righe[0])
+
+    _, _, righe = bussa([Risposta(403, "bot was blocked by the user")])
+    prova("il 403 si dice, e si dice piano", True,
+          len(righe) == 1 and "403" in righe[0] and righe[0][0] == "\U0001f515")
+
+    _, _, righe = bussa([Risposta(500, "Bad Gateway")])
+    prova("e ogni altro rifiuto porta il suo numero", True,
+          len(righe) == 1 and "500" in righe[0])
+
+    # IL RIPIEGO DELLO SPOGLIO lo prova gia' prove_titoli_scappati,
+    # sezione 6 (che il rimando avvenga e sia uno solo): qui si
+    # guarda la cosa NUOVA, cioe' che di quel secondo tentativo si
+    # legga l'esito. Se passa, silenzio oltre alla riga dell'HTML...
+    _, _, righe = bussa([Risposta(400, "can't parse entities"),
+                         Risposta(200)])
+    prova("spoglio riuscito: l'unica riga e' quella dell'HTML",
+          1, len(righe))
+    # ...e se NON passa, il messaggio e' perduto e va detto: e' la
+    # ragione per cui il ripiego prende il posto di `r`
+    _, _, righe = bussa([Risposta(400, "can't parse entities"),
+                         Risposta(429, "too many requests")])
+    prova("...ma se anche lo spoglio si prende un 429, si sa", True,
+          len(righe) == 2 and "429" in righe[1])
+
+    # --- 4) LA SENTINELLA: nessun trasporto senza timeout -----------
+    # La convenzione c'era su nove client su dieci, e il decimo era
+    # proprio quello delle notifiche. Scritta qui, non si riapre.
+    # ⚠️ E SI GUARDA `async with`, NON IL NOME: la prima stesura
+    # contava «httpx.AsyncClient()» nel sorgente e usciva rossa per
+    # colpa del docstring che il cantiere aveva appena scritto — in
+    # un progetto che commenta molto la parola-spia finisce nella
+    # prosa che la spiega, e `codice()` toglie i commenti ma non le
+    # stringhe. La riga dell'apertura, invece, la scrive solo il
+    # codice.
+    aperture = [r.strip() for r in _SORGENTE.splitlines()
+                if "async with httpx.AsyncClient(" in r]
+    prova("sentinella: ogni trasporto httpx ha il suo timeout", [],
+          [r for r in aperture if "timeout=" not in r])
+    # ...e la sentinella non deve poter passare a vuoto: il giorno
+    # che qualcuno scrivesse i client in un altro modo, una lista
+    # vuota direbbe «tutto in regola» su zero righe guardate
+    prova("...e ne ha guardati dieci, non zero", 10, len(aperture))
+
+
 def prove_messaggio_admin():
     """Lo strumento «scrivi a un utente» dei moderatori (ago 2026,
     caso vero: la venditrice senza username ne' npub che nessuno
@@ -21453,8 +21708,13 @@ def prove_titoli_scappati():
         exec(pezzo("spoglia_html"), spoglia)
         amb = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "t",
                "spoglia_html": spoglia["spoglia_html"],
+               # il `timeout=` e' arrivato con la cura dell'ordine
+               # 151 (set 2026): senza il parametro qui, il banco
+               # rispondeva TypeError e questa prova usciva rossa
+               # per il motivo sbagliato — cede il banco, mai la
+               # regola
                "httpx": _types.SimpleNamespace(
-                   AsyncClient=lambda: ClientFinto(esiti))}
+                   AsyncClient=lambda timeout=None: ClientFinto(esiti))}
         exec("async " + pezzo("_manda_telegram"), amb)
         _aio.run(amb["_manda_telegram"](12345678, testo))
         return list(mandati)
@@ -52153,6 +52413,7 @@ def main():
               prove_savers_proprietario, prove_barattolo_in_striscia,
               prove_interesse,
               prove_barattolo_filtra, prove_barattolo_condiviso,
+              prove_notifica_fail_open,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr,
               prove_trasloco_nostr, prove_conta_feedback,
