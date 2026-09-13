@@ -723,6 +723,14 @@
   .strumenti .campo-scelta{width:auto;min-width:0;min-height:0;gap:6px}
   .strumenti .campo-scelta .cs-val{display:block;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
+  /* LE ICONE DEGLI STRUMENTI DELLA VETRINA (set 2026): le stesse del
+     P2P, alla misura di questa riga — i bottoni qui sono da 12,5px e
+     le icone da 22 (la taglia base di `.p2p-ico`) li sfonderebbero.
+     Il `line-height:0` toglie il mezzo pixel di disallineamento che
+     un inline con l'interlinea del testo si porta dietro. */
+  .strumenti .ico-strum{display:inline-flex;align-items:center;line-height:0}
+  .strumenti .ico-strum .p2p-ico{width:15px;height:15px}
+  #filtriBtn{display:inline-flex;align-items:center;gap:6px}
   .strumenti .campo-scelta .cs-freccia{font-size:11px}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
@@ -1906,7 +1914,17 @@
   .p2p-testa-riga{display:flex;flex-wrap:wrap;align-items:center;
     justify-content:flex-end;gap:8px;margin:2px 0 10px}
   .p2p-testa-riga .p2p-filtro{margin:0;flex:none;white-space:nowrap}
-  .p2p-testa-riga .p2p-ordina{margin-right:auto}
+  /* ⚠️ IL FILTRO STA ESATTAMENTE A META' fra «Ordina» e la levetta
+     (set 2026, richiesta di Andrea), e lo fa il MARGINE AUTO sui due
+     fianchi: lo spazio che avanza si divide in parti uguali, quindi
+     il centro della pillola cade a meta' esatta fra il bordo destro
+     di «Ordina» e quello sinistro della levetta — qualunque siano le
+     loro larghezze, e senza un numero da tenere in pari a mano.
+     ⚠️ E IL SELETTORE ESCLUDE «Ordina», che porta LA STESSA classe
+     `.p2p-filtro` (e' la pelle condivisa): senza il `:not` il margine
+     auto finirebbe su tutt'e due e la riga si aprirebbe in mezzo nel
+     posto sbagliato. */
+  .p2p-testa-riga .p2p-filtro:not(.p2p-ordina){margin:0 auto}
   .p2p-testa-riga .tema-btn{margin:0;flex:none}
   @media (max-width:399px){
     .p2p-testa-riga{gap:6px}
@@ -6247,8 +6265,17 @@ document.getElementById('cartello')?.remove();</script>
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
       </select>
-      <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
-      <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
+      <!-- LE DUE ICONE SONO QUELLE DEL P2P (set 2026, richiesta di
+           Andrea): stesso disegno, stessa classe, stessa grammatica —
+           la scaletta per l'ordinamento e l'imbuto per il filtro. Il
+           mercatino e lo scambio fanno la stessa cosa in due pagine
+           diverse, e fin qui la dicevano con due vocabolari: uno
+           scriveva «Filtri» e basta, l'altro aveva i segni. Le
+           funzioni che le disegnano restano UNA per icona
+           (`icoOrdinaP2P`, `icoFiltroP2P`): due copie, prima o poi,
+           diventano due disegni. -->
+      <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="ico-strum" id="icoOrdinaVetrina"></span><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
+      <button id="filtriBtn" type="button" onclick="toggleFiltri()"><span class="ico-strum" id="icoFiltriVetrina"></span>Filtri</button>
     </div>
     <div id="filtriBox" style="display:none">
       <div class="filtri-riga">
@@ -6570,8 +6597,8 @@ document.getElementById('cartello')?.remove();</script>
            tiene i due nomi nella STESSA voce: un catalogo solo, e chi
            aggiunge un criterio non puo' dimenticarsene la metà. -->
       <select id="p2pOrdinaSel" hidden>
-        <option value="conv" data-corta="Convenienza" selected>Convenienza</option>
-        <option value="recenti" data-corta="Recenti">Più recenti</option>
+        <option value="recenti" data-corta="Recenti" selected>Più recenti</option>
+        <option value="conv" data-corta="Convenienza">Convenienza</option>
         <option value="imp-giu" data-corta="Più grandi">Importo: dal più grande</option>
         <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
       </select>
@@ -34767,10 +34794,15 @@ function scadeTestoP2P(scade){
    Il criterio si sceglie dalla pillola «Ordina» e vale SOLO per il
    libro: «I miei scambi» sono i propri, di tutt'e due i versi, e
    ordinarli per convenienza non vorrebbe dire niente.
-   IL PREDEFINITO RESTA LA CONVENIENZA, che e' l'ordinamento che il
-   libro aveva gia' da solo: cambiare il default insieme all'aggiunta
-   della leva avrebbe spostato il libro sotto gli occhi di chi non ha
-   chiesto niente.
+   IL PREDEFINITO E' «PIU' RECENTI» (set 2026, decisione di Andrea che
+   ROVESCIA quella del giorno prima). La convenienza era il criterio
+   che il libro aveva gia' da solo, e il primo giro l'aveva TENUTA
+   apposta — «aggiungere la leva non deve spostare il libro sotto gli
+   occhi di chi non ha chiesto niente». Con la pillola quel motivo
+   cade: adesso il criterio si vede e si cambia in due tocchi, quindi
+   il default puo' tornare a essere quello che un libro degli ordini
+   si aspetta di essere, cioe' cronologico. La convenienza resta a un
+   tocco di distanza, e la dice il suo nome.
    L'IMPORTO GUARDA IL CAPO CHE CONTA NELLA DIREZIONE CHIESTA, e con
    gli ordini a intervallo e' l'unica scelta che si spiega in una
    riga: chi cerca il grande guarda fin dove l'ordine puo' SALIRE
@@ -34799,7 +34831,7 @@ function scadeTestoP2P(scade){
    e' la stessa lista che serve ai due tab, e ordinarla sul posto
    vorrebbe dire riordinarla a ogni giro. */
 const P2P_ORDINI_LIBRO = ['conv', 'recenti', 'imp-giu', 'imp-su'];
-const P2P_ORDINE_CASA = 'conv';
+const P2P_ORDINE_CASA = 'recenti';
 /* il capo dell'importo che conta nel verso chiesto (vedi sopra) */
 const capoImportoP2P = (o, giu) =>
   giu ? ((o.euroMax || o.euro) || 0) : (o.euro || 0);
@@ -34835,13 +34867,20 @@ function etichettaOrdineP2P(v){
      `data-corta` non resta muta nella pillola */
   return o ? (o.dataset.corta || o.text) : 'Convenienza';
 }
-/* le due frecce dello scambio non c'entrano: qui sono un SU e un GIU'
-   accostati, il segno dell'ordinamento. Niente velo, come la lente e
-   come le frecce di «I miei scambi»: non c'e' una pancia da riempire. */
+/* ⚠️ LE TRE RIGHE DECRESCENTI, E NON PIU' DUE FRECCE (set 2026,
+   dal campo): il primo disegno era un SU e un GIU' accostati, e in
+   una barra dove «I miei scambi» porta gia' due frecce — andata e
+   ritorno — le due icone si scambiavano a colpo d'occhio. A cedere e'
+   questa e non quella: le frecce dello scambio sono il segno del P2P
+   da prima, e un ordinamento un segno suo ce l'ha gia' — la scaletta
+   che dal lungo va al corto, che e' il glifo che tutti leggono come
+   «ordina» senza doverlo imparare.
+   Niente velo, come la lente e come le frecce: non c'e' una pancia da
+   riempire, solo tratti. */
 function icoOrdinaP2P(){
   return '<svg class="p2p-ico" viewBox="2 2 20 20" aria-hidden="true">'
-    + '<path d="M8.2 4.6v14.6"/><path d="M4.9 15.9l3.3 3.5 3.3-3.5"/>'
-    + '<path d="M15.8 19.4V4.8"/><path d="M19.1 8.1l-3.3-3.5-3.3 3.5"/></svg>';
+    + '<path d="M4.6 7.2h14.8"/><path d="M4.6 12h10"/>'
+    + '<path d="M4.6 16.8h5.2"/></svg>';
 }
 
 /* QUANTO RESTA DELLA VITA DELL'ORDINE, da 1 (appena pubblicato) a 0
@@ -35517,16 +35556,20 @@ function renderP2P(){
      luna, su un telefono gia' scuro si sarebbe vista la luna che
      promette il buio quando il buio c'e' gia'. */
   /* LA PILLOLA «ORDINA» (set 2026, decisione di Andrea): la pelle e'
-     quella del Filtro e il dentro e' icona + scelta viva. Si accende
-     come la sorella quando NON e' il predefinito — un libro riordinato
-     e' un libro che non dice piu' quel che diceva, e accorgersene deve
-     costare un'occhiata.
+     quella del Filtro e il dentro e' icona + scelta viva.
+     ⚠️ MA NON SI VESTE DEL LATO, e questo la separa dalla sorella
+     (ritocco di Andrea che rovescia il primo giro): il Filtro acceso
+     dice «il libro che vedi NON e' tutto il libro», ed e' un avviso —
+     l'ordinamento invece non nasconde niente, riordina soltanto, e
+     colorarlo di verde o di rosso metteva un allarme su una cosa che
+     non lo e'. A dire qual e' il criterio basta il suo NOME, che la
+     pillola porta scritto: nessuno stato da indovinare.
      L'id `p2pOrdinaSelBtn` non e' decorativo: e' il nome che
      `aggiornaPicker` cerca per riscrivere l'etichetta dopo la scelta,
      ed e' il campo che `chiudiPicker` rimette a fuoco. */
   const ordAttivo = ordineLibroP2P();
   const pillOrdina = '<button type="button" id="p2pOrdinaSelBtn"'
-    + ' class="p2p-filtro p2p-ordina' + (ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')
+    + ' class="p2p-filtro p2p-ordina'
     + '" aria-haspopup="dialog" title="Ordina il libro"'
     + ' onclick="apriPicker(\'p2pOrdinaSel\')">'
     + icoOrdinaP2P() + '<span class="cs-val">'
@@ -35560,6 +35603,24 @@ function icoFiltroP2P(){
     + '<path class="velo" d="M3.4 4.6h17.2l-6.6 7.8v6.4l-4-2.4v-4z"/>'
     + '<path d="M3.4 4.6h17.2l-6.6 7.8v6.4l-4-2.4v-4z"/></svg>';
 }
+/* ---- LE STESSE DUE ICONE NELLA HOME DEL MERCATINO (set 2026) ----
+   Ordinare e filtrare sono la stessa cosa in due pagine diverse, e fin
+   qui le due pagine lo dicevano con due vocabolari: nel P2P i segni,
+   in vetrina due bottoni di solo testo. Adesso il segno e' UNO per
+   mestiere, e viene dalla STESSA funzione — un SVG ricopiato nel
+   markup della vetrina sarebbe un secondo disegno, e due disegni
+   prima o poi divergono (il precedente dei tre logo del P2P).
+   SEGNAPOSTO VUOTI nel markup e riempiti qui una volta all'avvio: e'
+   il pattern dei `data-tempo` della pagina «Il pagamento protetto».
+   Gira a top-level DOPO le due funzioni e nell'ultimo blocco
+   `<script>`, quindi la vetrina in pagina c'e' gia'. */
+function scriviIcoStrumenti(){
+  const o = el('icoOrdinaVetrina');
+  if (o) o.innerHTML = icoOrdinaP2P();
+  const f = el('icoFiltriVetrina');
+  if (f) f.innerHTML = icoFiltroP2P();
+}
+scriviIcoStrumenti();
 
 /* ---- IL FOGLIO DEL FILTRO ----
    Si lavora su una BOZZA e non sul filtro vivo: chi tocca i cursori

@@ -36347,9 +36347,18 @@ def prove_p2p_libro():
     prova("la riga della testata e' un flex a due capi", True,
           "display:flex" in _riga
           and "grid-template-columns" not in _riga)
-    prova("...con «Ordina» che spinge le altre a destra", True,
-          "margin-right:auto" in pezzo_js(
-              mini, "  .p2p-testa-riga .p2p-ordina{", "}"))
+    # ⚠️ IL FILTRO STA ESATTAMENTE A META' fra «Ordina» e la levetta
+    # (set 2026, richiesta di Andrea, che rovescia il `margin-right`
+    # sulla prima): lo spazio che avanza si divide in parti uguali sui
+    # due fianchi, quindi il centro della pillola cade a meta' esatta
+    # fra i due — qualunque siano le loro larghezze. E il selettore
+    # ESCLUDE «Ordina», che porta la stessa classe `.p2p-filtro`: senza
+    # il `:not` il margine auto finirebbe su tutt'e due.
+    prova("il Filtro sta a meta' fra «Ordina» e la levetta", True,
+          ".p2p-testa-riga .p2p-filtro:not(.p2p-ordina){margin:0 auto}"
+          in mini)
+    prova("...e «Ordina» non spinge piu' nessuno", 0,
+          mini.count(".p2p-testa-riga .p2p-ordina{margin-right:auto}"))
     prova("...e dei grid-column di ieri non resta niente", 0,
           mini.count("grid-column:2;margin:2px 0 10px")
           + mini.count(".p2p-testa-riga .tema-btn{grid-column:3"))
@@ -36374,11 +36383,42 @@ def prove_p2p_libro():
     # il libro aveva gia': la convenienza.
     prova("le due pillole hanno la stessa pelle", True,
           ".p2p-filtro.p2p-ordina{display:flex" in mini)
+    # ⚠️ L'ICONA NON SOMIGLIA PIU' ALLE FRECCE DELLA NAV (set 2026, dal
+    # campo): il primo disegno era un SU e un GIU' accostati, e con «I
+    # miei scambi» — due frecce, andata e ritorno — le due si
+    # scambiavano a colpo d'occhio. Adesso e' la scaletta che dal lungo
+    # va al corto. La sentinella guarda il FATTO che le distingue: qui
+    # nessuna punta di freccia (i tratti obliqui), e i due disegni non
+    # condividono un solo path.
+    _io = pezzo_js(mini, "function icoOrdinaP2P(){", "\n}")
+    _im = mini[mini.index('id="nav-p2pmiei"'):]
+    _im = _im[:_im.index('</button>')]
+    _pi = re.findall(r'd="([^"]+)"', _io)
+    prova("l'icona di «Ordina» e' la scaletta, tre tratti dritti",
+          3, len(_pi))
+    prova("...senza nessuna punta di freccia", True,
+          all(re.fullmatch(r'M[\d.]+ [\d.]+h[\d.]+', d) for d in _pi))
+    prova("...e non divide un solo tratto con «I miei scambi»", True,
+          not any(d in _im for d in _pi))
+    prova("...e resta nella grammatica di casa, senza velo", True,
+          'class="p2p-ico" viewBox="2 2 20 20"' in _io
+          and 'class="velo"' not in _io)
     prova("la pillola apre il picker di casa, non un secondo foglio",
           True, "onclick=\"apriPicker(\\'p2pOrdinaSel\\')\"" in _rp
           and "id=\"p2pOrdinaSelBtn\"" in _rp)
-    prova("...e si accende solo fuori dal predefinito", True,
-          "(ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')" in _rp)
+    # ⚠️ E NON SI VESTE DEL LATO, che la separa dalla sorella (set
+    # 2026, ritocco di Andrea che rovescia il primo giro): il Filtro
+    # acceso dice «quel che vedi NON e' tutto il libro», ed e' un
+    # avviso; l'ordinamento non nasconde niente, riordina soltanto, e
+    # il verde o il rosso ci mettevano un allarme sopra. A dire qual e'
+    # il criterio basta il suo NOME, che la pillola porta scritto.
+    # La sentinella e' rovesciata apposta: certifica che l'`acceso`
+    # NON ci sia — e' la cosa che una regressione rimetterebbe.
+    prova("...e NON si veste del lato: nessun acceso su «Ordina»",
+          True, "p2p-ordina' + (ordAttivo" not in _rp
+          and "p2p-ordina acceso" not in mini
+          and "' acceso')" not in _rp[_rp.index("const pillOrdina"):
+                                      _rp.index("if (testaBox)")])
     prova("...e il libro si ordina col criterio vivo", True,
           "ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k),"
           in _rp and "p2pLato, ordineLibroP2P())" in _rp)
@@ -36390,12 +36430,18 @@ def prove_p2p_libro():
     prova("il deposito e' una select nascosta, nella vista", True,
           '<select id="p2pOrdinaSel" hidden>' in _vp
           and _vp.index('id="p2pOrdinaSel"') < _vp.index('id="p2pTesta"'))
-    prova("...coi quattro criteri, convenienza per prima e scelta",
-          ['conv', 'recenti', 'imp-giu', 'imp-su'],
+    # il predefinito apre la lista, come «Qualsiasi condizione» nel
+    # filtro della vetrina: la prima voce e' quella che si ha addosso
+    prova("...coi quattro criteri, il predefinito per primo",
+          ['recenti', 'conv', 'imp-giu', 'imp-su'],
           re.findall(r'<option value="([a-z-]+)"', _vp))
+    # ⚠️ IL `selected` DEL MARKUP E LA COSTANTE DEL CODICE SONO LA
+    # STESSA DECISIONE IN DUE POSTI: se divergono, la pillola dice un
+    # criterio e il libro ne usa un altro — e nessuno dei due lo
+    # segnala. Questa riga li tiene incollati.
     prova("...e il predefinito del markup e' quello del codice", True,
-          '<option value="conv" data-corta="Convenienza" selected>' in _vp
-          and "const P2P_ORDINE_CASA = 'conv';" in mini)
+          '<option value="recenti" data-corta="Recenti" selected>' in _vp
+          and "const P2P_ORDINE_CASA = 'recenti';" in mini)
     # ⚠️ OGNI VOCE HA DUE NOMI: nel foglio quello intero, che spiega;
     # nella pillola quello corto, o la riga andrebbe a capo pure a 375.
     # Stanno nella STESSA voce (`data-corta`), cosi' chi ne aggiunge
@@ -36414,6 +36460,29 @@ def prove_p2p_libro():
     # propri, di tutt'e due i versi, e ordinarli per convenienza non
     # vorrebbe dire niente. La striscia la scrive scambiP2P, che di
     # ordinaLibroP2P non sa nulla.
+    # --- LE STESSE ICONE NELLA HOME DEL MERCATINO (set 2026) ---------
+    # Ordinare e filtrare sono la stessa cosa in due pagine diverse, e
+    # fin qui le dicevano con due vocabolari: nel P2P i segni, in
+    # vetrina due bottoni di solo testo. Il segno adesso e' UNO per
+    # mestiere e viene dalla STESSA funzione — un SVG ricopiato nel
+    # markup sarebbe un secondo disegno, e due disegni divergono (il
+    # precedente dei tre logo del P2P).
+    prova("la vetrina porta i due segnaposto, vuoti", True,
+          '<span class="ico-strum" id="icoOrdinaVetrina"></span>' in mini
+          and '<span class="ico-strum" id="icoFiltriVetrina"></span>' in mini)
+    _si = pezzo_js(mini, "function scriviIcoStrumenti(){", "\n}")
+    prova("...e li riempiono le funzioni del P2P, non una copia", True,
+          "icoOrdinaP2P()" in _si and "icoFiltroP2P()" in _si)
+    prova("...una volta all'avvio", True, "\nscriviIcoStrumenti();" in mini)
+    # il disegno resta UNO: una seconda `<svg` con gli stessi path nel
+    # markup sarebbe la copia che questo cantiere evita
+    prova("...e di disegni ce n'e' uno per mestiere", [1, 1],
+          [mini.count('d="M4.6 7.2h14.8"'),
+           mini.count('d="M3.4 4.6h17.2l-6.6 7.8v6.4l-4-2.4v-4z"') - 1])
+    prova("...alla misura della riga degli strumenti", True,
+          ".strumenti .ico-strum .p2p-ico{width:15px;height:15px}" in mini
+          and "#filtriBtn{display:inline-flex" in mini)
+
     prova("i miei scambi non si riordinano", False,
           "ordinaLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n")
           or "ordineLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
@@ -36934,8 +37003,11 @@ p2pInfo = null;
 const ord = (d, prem, creato) => ({id: d, premium: prem, creato: creato});
 const mazzo = [ord('a', 4, 100), ord('b', -2, 100), ord('c', 0, 100),
                ord('d', 0, 300)];
-out.ordCompra = ordinaLibroP2P(mazzo, 'compro').map(x => x.id).join('');
-out.ordVendi  = ordinaLibroP2P(mazzo, 'vendo').map(x => x.id).join('');
+/* il criterio si CHIEDE PER NOME: dal set 2026 il predefinito e' la
+   data, quindi due chiamate senza terzo argomento proverebbero un
+   altro ordinamento da quello che il nome della prova promette */
+out.ordCompra = ordinaLibroP2P(mazzo, 'compro', 'conv').map(x => x.id).join('');
+out.ordVendi  = ordinaLibroP2P(mazzo, 'vendo', 'conv').map(x => x.id).join('');
 out.ordNonTocca = mazzo.map(x => x.id).join('');
 /* IL CRITERIO SI PASSA (set 2026, la pillola «Ordina»). Senza terzo
    argomento vale il predefinito, che e' la convenienza: e' la riga che
@@ -37372,10 +37444,20 @@ console.log(JSON.stringify(out));
     # IL PREDEFINITO NON E' CAMBIATO, ed e' la riga che conta piu' di
     # tutte: aggiungere la leva non deve spostare il libro sotto gli
     # occhi di chi non ha chiesto niente.
-    prova("senza criterio vale la convenienza, come ieri",
-          ["bdca", "bdca"], [out["ordDefault"], out["ordConv"]])
+    # ⚠️ IL PREDEFINITO E' «PIU' RECENTI» (set 2026, decisione di
+    # Andrea che ROVESCIA quella del giorno prima). La convenienza era
+    # il criterio che il libro aveva gia' da solo, e il primo giro
+    # l'aveva tenuta apposta — «la leva non deve spostare il libro
+    # sotto gli occhi di chi non ha chiesto niente». Con la pillola
+    # quel motivo cade: il criterio adesso si vede e si cambia in due
+    # tocchi, e un libro degli ordini cronologico e' quel che uno si
+    # aspetta di trovare aprendolo.
+    prova("senza criterio il libro e' cronologico",
+          "dabc", out["ordDefault"])
     prova("...e un criterio sconosciuto ci ricade sopra",
-          "bdca", out["ordIgnoto"])
+          "dabc", out["ordIgnoto"])
+    prova("...mentre la convenienza resta, chiesta per nome",
+          "bdca", out["ordConv"])
     prova("«Piu' recenti» guarda solo la data, e il lato non conta",
           ["bca", "bca"], [out["ordRecenti"], out["ordRecentiVendi"]])
     # ⚠️ L'INTERVALLO E' IL CASO CHE DECIDE: «g» va da 10 a 90 euro, e

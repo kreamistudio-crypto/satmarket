@@ -10638,11 +10638,22 @@ muta: chi guardava il libro non aveva modo di sapere né che fosse
 ordinato né come. Adesso la pillola lo dice, e ne offre altri tre.
 
 **I QUATTRO CRITERI**, e il primo è il predefinito:
-**Convenienza** · **Più recenti** · **Importo: dal più grande** ·
-**Importo: dal più piccolo**. Il predefinito non è cambiato apposta:
-aggiungere la leva non deve spostare il libro sotto gli occhi di chi non
-ha chiesto niente — e una sentinella lo tiene fermo, sia senza terzo
-argomento sia con un criterio che non conosciamo.
+**Più recenti** · **Convenienza** · **Importo: dal più grande** ·
+**Importo: dal più piccolo**.
+
+⚠️ **IL PREDEFINITO È CAMBIATO IL GIORNO DOPO, ed è un rovesciamento
+con un perché.** Il primo giro aveva *tenuto* la convenienza — «il
+libro si ordinava già così, e aggiungere la leva non deve spostarlo
+sotto gli occhi di chi non ha chiesto niente». Ragionamento giusto
+finché il criterio era invisibile. Con la pillola quel motivo cade: il
+criterio adesso **si vede e si cambia in due tocchi**, quindi il
+default può tornare a essere quel che un libro degli ordini uno si
+aspetta di trovare aprendolo, cioè **cronologico**. La convenienza
+resta a un tocco, e la dice il suo nome. La sentinella che teneva
+fermo il vecchio default è stata emendata, non tolta: adesso tiene
+fermo il nuovo — e tiene incollati il `selected` del markup e la
+costante del codice, che se divergono la pillola dice un criterio e il
+libro ne usa un altro **senza che niente lo segnali**.
 
 **L'IMPORTO GUARDA IL CAPO CHE CONTA NELLA DIREZIONE CHIESTA**, ed è il
 caso su cui si decide qualcosa. Un ordine a intervallo («da 10 a 90 €»)
@@ -10651,6 +10662,19 @@ non ha *un* importo: chi cerca il grande guarda fin dove può **salire**
 un punto solo — la media, o sempre il capo basso — uno dei due versi
 direbbe un numero che nessuno sta cercando. Nel banco quell'ordine va
 **primo in tutt'e due i versi**, ed è la riga che prova la scelta.
+
+**LA PILLOLA NON SI VESTE DEL LATO**, e qui si separa dalla sorella
+(ritocco di Andrea, il giorno dopo: il primo giro la accendeva di verde
+o di rosso quando il criterio non era il predefinito). Il **Filtro**
+acceso dice «quel che vedi NON è tutto il libro», ed è un **avviso**;
+l'**ordinamento** non nasconde niente, riordina soltanto — e metterci
+sopra lo stesso colore significava mettere un allarme su una cosa che
+non lo è. A dire qual è il criterio basta il suo **nome**, che la
+pillola porta scritto: nessuno stato da indovinare. La sentinella si è
+rovesciata con la decisione — certifica che l'`acceso` **non** ci sia.
+Nel foglio non c'era e non c'è nulla di colorato col lato: la voce
+scelta porta il crema e il ✓ del picker di casa, gli stessi in tutta
+l'app.
 
 **IL FOGLIO È QUELLO DI CASA**, e questa è la decisione che ha risparmiato
 più codice: `#pickerSheet` — «le tendine vestite da Barattolo» — esiste
@@ -10678,6 +10702,28 @@ spaziatore. Sono uscite tutte, e le sentinelle che le sorvegliavano sono
 **rovesciate**: certificano che non ci siano. Chi un domani rimette la
 centratura deve rimettere anche loro, e sapere perché.
 
+**IL FILTRO STA ESATTAMENTE A METÀ** fra «Ordina» e la levetta
+(richiesta di Andrea, il giorno dopo: prima era «Ordina» a spingere le
+altre due a destra con un `margin-right:auto`). Lo fa il **margine auto
+sui due fianchi** della pillola di mezzo: lo spazio che avanza si divide
+in parti uguali, quindi il suo centro cade a metà esatta fra il bordo
+destro di «Ordina» e quello sinistro della levetta, **qualunque siano le
+loro larghezze** e senza un numero da tenere in pari a mano. Misurato:
+scarto **0,00px**. ⚠️ E il selettore deve escludere «Ordina», che porta
+la *stessa* classe `.p2p-filtro` — è la pelle condivisa —, o il margine
+auto finirebbe su tutt'e due e la riga si aprirebbe nel posto sbagliato.
+
+⚠️ **L'ICONA HA DOVUTO CEDERE, e non era prevedibile a tavolino.** Il
+primo disegno era un **su e un giù** accostati: corretto come segno di
+ordinamento, e in una barra dove «I miei scambi» porta già **due
+frecce** — andata e ritorno — le due si scambiavano a colpo d'occhio.
+A cedere è la nuova e non quella: le frecce dello scambio sono il segno
+del P2P da prima, e un ordinamento un segno suo ce l'ha già — la
+**scaletta** che dal lungo va al corto, il glifo che tutti leggono come
+«ordina» senza doverlo imparare. La sentinella non guarda il disegno ma
+il **fatto che li distingue**: tre tratti dritti e orizzontali, nessuna
+punta di freccia, e nessun path in comune con l'icona della nav.
+
 ⚠️ **A 320 LE TRE COSE NON CI STANNO, ed è misurato e non stimato**:
 332px in 288 di riga. Il modo in cui cedevano era il peggiore — il
 conteggio spezzato in due righe DENTRO la pillola («3 / offerte») e la
@@ -10693,6 +10739,18 @@ l'ospite, mai uno dei due comandi. Misurato: 375 sempre una riga (anche
 con 128 offerte), 360 una riga fino a un conteggio a due cifre, 320 la
 levetta sulla seconda. Overflow: **mai**.
 
+**E LE DUE ICONE SONO ANDATE ANCHE NELLA HOME DEL MERCATINO**
+(richiesta di Andrea): ordinare e filtrare sono la stessa cosa in due
+pagine diverse, e fin qui le due pagine la dicevano con **due
+vocabolari** — nel P2P i segni, in vetrina due bottoni di solo testo.
+Adesso il segno è **uno per mestiere**, la scaletta e l'imbuto, e viene
+dalla **stessa funzione**: `icoOrdinaP2P` e `icoFiltroP2P` scrivono in
+due segnaposto vuoti del markup della vetrina, una volta all'avvio (il
+pattern dei `data-tempo`). Un SVG ricopiato nel markup sarebbe stato un
+**secondo disegno**, e due disegni prima o poi divergono — è il
+precedente dei tre logo del P2P. La misura è l'unica cosa che cambia:
+15px invece di 22, che la riga degli strumenti è da 12,5.
+
 **VALE SOLO PER IL LIBRO.** «I miei scambi» sono i propri, di tutt'e due
 i versi, e ordinarli per convenienza non vorrebbe dire niente: la
 striscia la scrive `scambiP2P`, che di `ordinaLibroP2P` non sa nulla — e
@@ -10706,7 +10764,7 @@ ELENCO ESPLICITO. La firma vecchia nell'elenco ha fatto esplodere l'intera
 fortuna. Le costanti compagne no: quelle sarebbero mancate a runtime.
 Vanno portate dentro insieme alla funzione, sempre.
 
-COLLAUDATO: **9285 verdi**, ventuno sentinelle nuove e cinque rovesciate.
+COLLAUDATO: **9326 verdi** a fine giornata, dopo i cinque ritocchi del giorno dopo — ventuno sentinelle nuove alla prima passata, e otto emendate o rovesciate dopo.
 E il giro è stato verificato **sull'albero dell'INDICE** e non sul working
 tree: un'altra sessione stava lavorando sugli stessi file (le foto senza
 metadati), i suoi hunk sono rimasti fuori dal commit con lo script dei
