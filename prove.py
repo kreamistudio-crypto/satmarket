@@ -37671,6 +37671,12 @@ out.repVeleno = repRiquadroP2P({nome: 'Evo', media: 5, voti: 2,
 /* ---- il metodo: una pillola sola non e' un bottone ---- */
 out.unoSolo = metodiDettP2P(ordine({metodi: ['Revolut']}));
 out.treMetodi = metodiDettP2P(ordine({metodi: ['SEPA', 'Revolut', 'Satispay']}));
+/* ...e dall'altro lato l'etichetta si specchia: chi VENDE sats gli
+   euro li riceve. `lato: 'buy'` = l'ordine compra sats, cioe' chi
+   legge vende. */
+out.treMetodiVendi = metodiDettP2P(ordine({lato: 'buy',
+                                           metodi: ['SEPA', 'Revolut']}));
+out.unoSoloVendi = metodiDettP2P(ordine({lato: 'buy', metodi: ['SEPA']}));
 out.nessunMetodo = metodiDettP2P(ordine({metodi: []}));
 
 /* ---- l'anello grande ---- */
@@ -38150,6 +38156,29 @@ console.log(JSON.stringify(out));
     prova("...con tre ci sono tre pillole, nessuna accesa", True,
           o["treMetodi"].count("tema-pill") == 3
           and "tema-pill active" not in o["treMetodi"])
+    # L'ETICHETTA DICE COSA SI STA SCEGLIENDO E SI SPECCHIA COL LATO
+    # (13 set 2026, decisione di Andrea): «scegli quale usare» era
+    # vero e non diceva niente — che si debba scegliere lo dicono gia'
+    # le pillole. Quel che uno non sa al primo scambio e' da che parte
+    # sta il denaro: chi compra sats gli euro li MANDA, chi li vende
+    # li RICEVE.
+    prova("chi compra sats sceglie come PAGARE gli euro", True,
+          "Metodo di pagamento — scegli come pagare gli euro"
+          in o["treMetodi"])
+    prova("...e chi li vende come RICEVERLI", True,
+          "Metodo di pagamento — scegli come ricevere gli euro"
+          in o["treMetodiVendi"])
+    # il vecchio testo se n'e' andato dal CODICE: nel commento che
+    # spiega il cambio resta citato, ed e' giusto cosi'
+    prova("...e del «scegli quale usare» non resta niente", 0,
+          mini.count("'Metodo di pagamento — scegli quale usare'"))
+    # ...MA SOLO DOVE C'E' DAVVERO UNA SCELTA: con un metodo solo
+    # l'etichetta resta nuda, o inviterebbe a un gesto che non
+    # esiste — e' la stessa decisione della pillola sola che non e'
+    # un bottone.
+    prova("con un metodo solo l'etichetta non invita a scegliere",
+          True, all("scegli" not in o[k]
+                    for k in ("unoSolo", "unoSoloVendi", "nessunMetodo")))
     prova("...e chi non l'ha indicato lo dice", True,
           "non l'ha indicato" in o["nessunMetodo"])
 

@@ -38144,8 +38144,22 @@ function metodiDettP2P(o){
   if (metodi.length === 1)
     return sezioneNuovoP2P({ico: 'metodi', titolo: 'Metodo di pagamento',
       corpo: '<b class="p2p-dett-uno">' + esc(metodi[0]) + '</b>'});
+  /* ⚠️ L'ETICHETTA DICE COSA SI STA SCEGLIENDO, E SI SPECCHIA COL
+     LATO (set 2026, decisione di Andrea): «scegli quale usare» era
+     vero e non diceva niente — chi legge sa gia' che deve scegliere,
+     lo vedono le pillole. Quel che NON sa, al primo scambio, e' da
+     che parte sta il denaro: chi compra sats gli euro li MANDA, chi
+     li vende li RICEVE, e il metodo e' la strada dell'una o
+     dell'altra cosa. Detto qui, e' detto prima di sceglierlo.
+     IL LATO VIENE DALL'ORDINE e non dal tab (`o.lato === 'sell'`
+     vuol dire che l'ordine VENDE sats, cioe' chi legge compra): e'
+     lo stesso giudice del titolo del foglio e del conto, quindi le
+     tre frasi della stessa pagina non possono dire due lati
+     diversi. */
   return sezioneNuovoP2P({
-    ico: 'metodi', titolo: 'Metodo di pagamento — scegli quale usare',
+    ico: 'metodi', titolo: 'Metodo di pagamento — '
+      + (o.lato === 'sell' ? 'scegli come pagare gli euro'
+                           : 'scegli come ricevere gli euro'),
     corpo: '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
