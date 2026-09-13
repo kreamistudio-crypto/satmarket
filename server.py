@@ -9334,6 +9334,189 @@ def _e_immagine(raw: bytes) -> bool:
         return False
 
 
+# LE FOTO NON PORTANO FUORI CASA (set 2026, cantiere suo). Una foto
+# scattata col telefono porta negli EXIF il GPS di dove e' stata
+# scattata — in un mercatino, la casa di chi vende. La strada normale
+# questo difetto non l'ha mai avuto, e non per merito nostro: la Mini
+# App il file scelto non lo manda MAI, lo ridisegna in un canvas, e un
+# JPEG che esce da un canvas i metadati non sa nemmeno scriverli. Ma
+# le porte non sono una sola, e le altre i byte li passavano com'erano
+# — l'import CSV/ZIP e i connettori (il ramo VERBATIM di
+# `normalizza_foto_import`, nato per non ricomprimere due volte) e i
+# due documenti privati, la busta di ritiro e la foto del contenuto
+# digitale.
+#
+# SI TOGLIE SENZA RICOMPRIMERE, ed e' la riga che tiene in piedi il
+# patto della filiera: si tagliano i SEGMENTI del contenitore e i
+# pixel non si toccano — quel che entra esce identico, byte per byte,
+# meno i metadati. Ricomprimere sarebbe stato molto piu' corto e
+# avrebbe pagato ~2dB a ogni giro.
+#
+# LA LISTA DICE COSA SI TIENE, non cosa si butta, per la stessa
+# ragione di NOME_FOTO e delle FIRME: quel che non si riconosce non
+# passa, cosi' il posto nuovo dove un domani qualcuno scrivesse il
+# luogo lo trova gia' chiuso. Di un JPEG restano i tre segmenti che
+# servono a DISEGNARLO — JFIF (APP0), il profilo colore ICC (APP2) e
+# il marcatore Adobe (APP14, senza il quale certi JPEG cambiano
+# colore) — e se ne vanno tutti gli altri APPn: APP1 e' dove stanno
+# EXIF e XMP, APP13 dove sta l'IPTC (che i campi del luogo ce li ha
+# anche lui), e i commenti (COM) sono testo libero di cui non
+# sappiamo niente.
+SEGMENTI_JPEG_TENUTI = {0xE0, 0xE2, 0xEE}          # JFIF, ICC, Adobe
+# Del PNG restano i pezzi che disegnano o che dicono i colori. Se ne
+# vanno tEXt/zTXt/iTXt (testo libero), eXIf (gli stessi EXIF del
+# JPEG) e tIME. I tre dell'animazione ci sono perche' senza di loro
+# un PNG animato diventerebbe il primo fotogramma, in silenzio.
+PEZZI_PNG_TENUTI = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS",
+                    b"gAMA", b"cHRM", b"sRGB", b"iCCP", b"sBIT",
+                    b"bKGD", b"pHYs", b"hIST", b"sPLT",
+                    b"acTL", b"fcTL", b"fdAT"}
+# Le chiavi con cui Pillow ci ridice in faccia i metadati che ha
+# trovato: servono al COLLAUDO dell'esito, non alla chirurgia.
+CHIAVI_METADATO = ("exif", "xmp", "XML:com.adobe.xmp", "photoshop",
+                   "comment")
+
+
+def _spoglia_jpeg(raw: bytes) -> bytes | None:
+    """Il JPEG senza i segmenti che non disegnano. None se i byte non
+    hanno la forma che ci aspettiamo: meglio dire «non so» e lasciare
+    che il chiamante ricomprima, che tagliare a caso dentro un file
+    che non abbiamo capito."""
+    if raw[:2] != b"\xff\xd8":
+        return None
+    out = bytearray(b"\xff\xd8")
+    i, n = 2, len(raw)
+    while i + 1 < n:
+        if raw[i] != 0xFF:
+            return None
+        mark = raw[i + 1]
+        if mark == 0xFF:            # riempitivo: legale, si scorre
+            i += 1
+            continue
+        # i marcatori SENZA corpo: si ricopiano e via
+        if mark == 0x01 or 0xD0 <= mark <= 0xD9:
+            out += raw[i:i + 2]
+            i += 2
+            continue
+        if mark == 0xDA:
+            # inizio della scansione: da qui in poi sono i PIXEL, e
+            # non si guardano nemmeno — dentro non ci sono segmenti
+            out += raw[i:]
+            return bytes(out)
+        if i + 4 > n:
+            return None
+        lung = int.from_bytes(raw[i + 2:i + 4], "big")
+        if lung < 2 or i + 2 + lung > n:
+            return None
+        scarto = 0xE0 <= mark <= 0xEF or mark == 0xFE
+        if not scarto or mark in SEGMENTI_JPEG_TENUTI:
+            out += raw[i:i + 2 + lung]
+        i += 2 + lung
+    return None
+
+
+def _spoglia_png(raw: bytes) -> bytes | None:
+    """Il PNG coi soli pezzi della whitelist. Stessa regola del JPEG:
+    None quando la catena dei pezzi non torna."""
+    if raw[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    out = bytearray(raw[:8])
+    i, n = 8, len(raw)
+    while i + 12 <= n:
+        lung = int.from_bytes(raw[i:i + 4], "big")
+        tipo = raw[i + 4:i + 8]
+        fine = i + 12 + lung                  # 4 lunghezza + 4 tipo + dati + 4 CRC
+        if fine > n:
+            return None
+        if tipo in PEZZI_PNG_TENUTI:
+            out += raw[i:fine]
+        i = fine
+        if tipo == b"IEND":
+            return bytes(out)
+    return None
+
+
+def _spoglia_webp(raw: bytes) -> bytes | None:
+    """Il WebP senza i pezzi EXIF e XMP. QUI NON BASTA TAGLIARE, ed e'
+    la trappola del formato: la lunghezza del RIFF va rifatta, e nei
+    flag del pezzo VP8X restano due bit che ANNUNCIANO dei metadati
+    che non ci sono piu' — un file che mente cosi' certi lettori lo
+    rifiutano in blocco."""
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WEBP":
+        return None
+    corpo = bytearray()
+    vp8x = None
+    i, n = 12, len(raw)
+    while i + 8 <= n:
+        tipo = raw[i:i + 4]
+        lung = int.from_bytes(raw[i + 4:i + 8], "little")
+        fine = i + 8 + lung + (lung & 1)      # i pezzi si allineano al pari
+        if fine > n:
+            return None
+        if tipo not in (b"EXIF", b"XMP "):
+            if tipo == b"VP8X":
+                vp8x = len(corpo)
+            corpo += raw[i:fine]
+        i = fine
+    if not corpo:
+        return None
+    if vp8x is not None:
+        corpo[vp8x + 8] &= ~0x0C              # via i bit EXIF (0x08) e XMP (0x04)
+    return (b"RIFF" + (4 + len(corpo)).to_bytes(4, "little")
+            + b"WEBP" + bytes(corpo))
+
+
+def _porta_metadati(raw: bytes) -> bool:
+    """Vero se in questi byte c'e' ANCORA qualcosa che racconta di chi
+    ha scattato. E' il collaudo dell'esito, non la chirurgia: senza,
+    la promessa «niente GPS» sarebbe una deduzione dal codice invece
+    di un fatto misurato sul file che sta per essere scritto.
+    Fail-CHIUSO al contrario di tutte le altre guardie della filiera:
+    qui il dubbio non costa una foto storta in vetrina, costa
+    l'indirizzo di casa di chi vende — e chi chiama, sul dubbio,
+    ricomprime (che spoglia per forza)."""
+    if not ImmaginePillow:
+        # senza Pillow non si puo' aprire niente: si guardano le due
+        # firme che si riconoscono a occhio, nel primo pezzo di file
+        testa = raw[:65536]
+        return (b"Exif\x00\x00" in testa
+                or b"http://ns.adobe.com/xap/" in testa)
+    try:
+        with ImmaginePillow.open(io.BytesIO(raw)) as img:
+            if img.getexif():
+                return True
+            return any(c in img.info for c in CHIAVI_METADATO)
+    except Exception:
+        return True
+
+
+def spoglia_metadati(raw: bytes) -> bytes | None:
+    """L'UNICA porta: i byte senza EXIF, XMP, IPTC e commenti, e senza
+    ricomprimere. None quando non si riesce a garantirlo — formato che
+    non sappiamo operare e che porta gia' dei metadati suoi, oppure
+    un esito che al collaudo risulta ancora sporco: chi chiama ripiega
+    su `converti_in_jpeg`, che spoglia per forza perche' ridisegna.
+
+    I formati che non hanno un chirurgo (GIF, e tutto il resto) NON
+    sono automaticamente respinti: si guarda il file vero, e se non
+    porta niente passa com'e' — un GIF di norma i metadati non li ha
+    proprio, e convertirlo per un pericolo teorico vorrebbe dire
+    cambiare il file di qualcuno senza che serva."""
+    if not raw:
+        return None
+    if raw[:2] == b"\xff\xd8":
+        pulito = _spoglia_jpeg(raw)
+    elif raw[:8] == b"\x89PNG\r\n\x1a\n":
+        pulito = _spoglia_png(raw)
+    elif raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        pulito = _spoglia_webp(raw)
+    else:
+        pulito = raw
+    if pulito is None or _porta_metadati(pulito):
+        return None
+    return pulito
+
+
 # Il documento di ritiro: il tipo lo dicono i BYTE e non l'etichetta
 # — e' la lezione gia' pagata col PDF rinominato .jpg, e qui pesa di
 # piu' perche' quel tipo torna indietro come Content-Type. Whitelist
@@ -9381,6 +9564,24 @@ def _documento_busta(dataurl: str) -> tuple[bytes, str, str]:
     if tipo != "application/pdf" and not _e_immagine(raw):
         raise HTTPException(400, "Questa immagine non si riesce a "
                                  "leggere: riprova con un'altra")
+    if tipo != "application/pdf":
+        # I METADATI SE NE VANNO ANCHE DA QUI (set 2026). Questa foto
+        # la scatta il venditore — l'etichetta, il QR del locker — e la
+        # scatta a casa sua: il pubblico e' una persona sola invece che
+        # tutta la vetrina, ma il GPS dentro e' lo stesso. Il file resta
+        # quello che ha scelto; se il formato non si sa spogliare si
+        # ridisegna in JPEG, e allora il TIPO cambia insieme ai byte —
+        # o torneremmo un Content-Type che mente. Il PDF resta fuori, e
+        # il perche' sta nel cantiere.
+        pulito = spoglia_metadati(raw)
+        if pulito is None:
+            pulito = converti_in_jpeg(raw)
+            if pulito is None:
+                raise HTTPException(400, "Questa immagine non si riesce "
+                                         "a preparare: riprova con "
+                                         "un'altra")
+            tipo, est = "image/jpeg", "jpg"
+        raw = pulito
     return raw, tipo, est
 
 
@@ -9431,6 +9632,21 @@ def salva_foto(annuncio_id: int, foto_lista: list,
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
             # con Pillow diventano JPEG per davvero
             raw = converti_in_jpeg(raw) or raw
+        # I METADATI NON ESCONO DI QUI (set 2026). Dalla Mini App
+        # questa foto arriva gia' nuda — il canvas i metadati non li sa
+        # scrivere — ma questa e' un'API, e la promessa la fa la porta,
+        # non chi bussa: un client scritto da altri, o un domani in cui
+        # il canvas non c'e' piu', trovano la stessa guardia.
+        # (il `if raw` non e' prudenza: la conversione HEIC qui sopra
+        # puo' aver gia' risposto None, e quel caso ha il suo scarto
+        # qualche riga piu' giu' — con parole che dicono la verita')
+        if raw:
+            pulito = spoglia_metadati(raw) or converti_in_jpeg(raw)
+            if pulito is None:
+                scarti.append("foto con dati nascosti che non riesco "
+                              "a togliere")
+                continue
+            raw = pulito
         # La foto che non mostra niente (vedi _foto_vuota): il file
         # e' sano e il caricamento e' andato, ma in vetrina sarebbe un
         # rettangolo di un colore solo. Si dice subito, invece di
@@ -9681,7 +9897,17 @@ def normalizza_foto_import(raw: bytes) -> bytes | None:
                 # la _min sdraiata. Le altre le raddrizza la conversione.
                 dritto = img.getexif().get(0x0112, 1) == 1
                 if max(img.size) <= 1600 and dritto:
-                    return raw
+                    # IL VERBATIM SI SPOGLIA (set 2026): fin qui
+                    # passava i byte com'erano, GPS compreso, ed era
+                    # l'unica porta da cui una foto poteva uscire con
+                    # dentro la casa di chi vende. `spoglia_metadati`
+                    # taglia i segmenti e lascia i pixel: il patto
+                    # della compressione unica resta intero. Se non ce
+                    # la fa si cade sulla conversione qui sotto — una
+                    # ricompressione costa ~2dB, un indirizzo di piu'.
+                    pulito = spoglia_metadati(raw)
+                    if pulito is not None:
+                        return pulito
         except Exception:
             return None
     return converti_in_jpeg(raw)

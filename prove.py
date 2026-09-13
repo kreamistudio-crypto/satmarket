@@ -3276,6 +3276,30 @@ def prove_contenuti_cifrati():
           a["_chiave_fernet"]("f2") != a["_chiave_fernet"]("f"))
 
 
+def _exif_con_gps(orientamento=1):
+    """I byte EXIF di una foto scattata a casa: orientamento, marca,
+    ora e il GPS — che e' quello che non deve uscire. Attrezzo delle
+    prove del cantiere «niente GPS nelle foto» (set 2026)."""
+    from PIL import Image
+    from PIL.TiffImagePlugin import IFDRational
+    ex = Image.Exif()
+    ex[0x0112] = orientamento
+    ex[0x010F] = "Apple"
+    ex[0x9003] = "2026:09:13 10:00:00"
+    ex[0x8825] = {1: "N", 2: tuple(IFDRational(v) for v in (45, 27, 0)),
+                  3: "E", 4: tuple(IFDRational(v) for v in (9, 11, 0))}
+    return ex.tobytes()
+
+
+def _gps_dentro(raw):
+    """I campi GPS che questi byte portano ANCORA: {} e' la risposta
+    che si vuole leggere dappertutto."""
+    import io
+    from PIL import Image
+    with Image.open(io.BytesIO(raw)) as im:
+        return dict(im.getexif().get_ifd(0x8825))
+
+
 def prove_busta_ritiro():
     """La busta di consegna (ago 2026): nome del destinatario e codice
     di ritiro DENTRO l'ordine, cifrati col trasporto dei contenuti
@@ -3289,6 +3313,15 @@ def prove_busta_ritiro():
     import sqlite3
     import tempfile
     import time as _t
+
+    # Pillow e io servono a _amb, che gira molto prima del punto in
+    # cui la foto del documento nasce: se Pillow manca, questa prova si
+    # gira come si e' sempre girata (il perche' sta dentro _amb)
+    import io as _io
+    try:
+        from PIL import Image as _Im, ImageOps as _IOps
+    except ImportError:
+        _Im = _IOps = None
 
     # la whitelist delle firme e' una costante, non una funzione:
     # si estrae per testo come tutto il resto, o la prova giudicherebbe
@@ -3896,12 +3929,30 @@ def prove_busta_ritiro():
                "base64": __import__("base64"),
                "secrets": __import__("secrets"),
                "BUSTE_DIR": buste_dir, "MAX_DOC_BUSTA": 15 * 1024 * 1024,
-               "_e_immagine": lambda raw: True}
+               "_e_immagine": lambda raw: True,
+               "io": _io, "ImmaginePillow": _Im, "ImageOps": _IOps}
         exec(pezzo("_cifra_contenuto"), amb)
         exec(pezzo("_decifra_contenuto"), amb)
         exec(pezzo("_cifra_blob"), amb)
         exec(pezzo("_decifra_blob"), amb)
         exec(_firme_doc, amb)
+        # LA SPOLIAZIONE DEI METADATI (set 2026): il documento di
+        # ritiro e' una foto scattata in casa del venditore, e adesso
+        # esce senza il GPS. I pezzi sono quelli VERI — uno stub qui
+        # direbbe verde su una cosa non fatta. Senza Pillow non si sa
+        # nemmeno COSTRUIRE una foto vera da dargli in pasto: allora
+        # la busta si gira come prima, e la promessa sul GPS la tiene
+        # prove_foto_metadati (che senza Pillow si SALTA, e la saltata
+        # si conta).
+        if _Im:
+            i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            for _f in ("_spoglia_jpeg", "_spoglia_png", "_spoglia_webp",
+                       "_porta_metadati", "spoglia_metadati",
+                       "converti_in_jpeg"):
+                exec(pezzo(_f), amb)
+        else:
+            amb["spoglia_metadati"] = lambda raw: raw
         exec(pezzo("_documento_busta"), amb)
         exec(pezzo("_etichetta_documento"), amb)
         return amb
@@ -4074,10 +4125,26 @@ def prove_busta_ritiro():
     # (ago 2026: un PIN si trascrive, un QR no)
     import base64 as _b64
     import os as _os
+
+    def _doc_con_gps():
+        """La foto del documento di ritiro: una VERA, col GPS dentro.
+        Senza Pillow non si sa costruirne una, e si torna ai quattro
+        byte di prima (il perche' sta dentro _amb)."""
+        if not _Im:
+            return b"\xff\xd8\xff finto"
+        out = _io.BytesIO()
+        foto_finta(120, 80).save(out, "JPEG", quality=90,
+                                 exif=_exif_con_gps())
+        return out.getvalue()
+
     PDF = "data:application/pdf;base64," + _b64.b64encode(
         b"%PDF-1.4 finto ma con la firma giusta").decode()
-    JPG = "data:image/jpeg;base64," + _b64.b64encode(
-        b"\xff\xd8\xff finto").decode()
+    # UNA FOTO VERA, E COL GPS DENTRO (set 2026): prima qui bastavano
+    # quattro byte con la firma giusta, ma da quando il documento si
+    # spoglia dei metadati il finto non arriverebbe in fondo — e
+    # soprattutto, con una foto vera questa prova dice anche che
+    # l'indirizzo di chi vende non esce insieme al QR del locker.
+    JPG = "data:image/jpeg;base64," + _b64.b64encode(_doc_con_gps()).decode()
     prova("il tipo lo dicono i BYTE, non l'etichetta", True,
           str(deposita(222, 1, {"nome": "Mario", "codice": "P",
                                 "file": "data:image/jpeg;base64," +
@@ -4185,7 +4252,16 @@ def prove_busta_ritiro():
         exec("async " + pezzo("leggi_documento_busta"), amb)
         return corri(amb, "leggi_documento_busta", oid)
 
-    veri = _b64.b64decode(JPG.split(",", 1)[1])
+    # I BYTE ATTESI NON SONO PIU' QUELLI CARICATI, sono quelli
+    # SPOGLIATI: la foto entra col GPS e deve uscire senza, coi pixel
+    # intatti — spogliare non e' ricomprimere.
+    caricati = _b64.b64decode(JPG.split(",", 1)[1])
+    veri = _amb(222)["spoglia_metadati"](caricati)
+    if _Im:
+        prova("il documento di ritiro entra col GPS dentro", True,
+              b"Exif\x00\x00" in caricati)
+        prova("...e al compratore arriva senza", False,
+              b"Exif\x00\x00" in veri)
     r = byte(111, 1)
     prova("il compratore riceve i byte VERI, decifrati", True,
           isinstance(r, _Resp) and r.content == veri)
@@ -7411,8 +7487,15 @@ def prove_foto_scarti():
             # loro: chi estrae una funzione ne eredita le dipendenze
             i = _SORGENTE.index("FOTO_COLORI_MIN = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            # e le whitelist della spoliazione (set 2026): salva_foto
+            # adesso toglie i metadati, e senza i suoi pezzi qui il
+            # pezzo VERO esploderebbe invece di dire la sua
+            i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
             for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
-                      "_salva_una_foto", "_e_immagine", "salva_foto"):
+                      "_salva_una_foto", "_e_immagine", "_spoglia_jpeg",
+                      "_spoglia_png", "_spoglia_webp", "_porta_metadati",
+                      "spoglia_metadati", "salva_foto"):
                 exec(pezzo(f), amb)
 
             def uri(raw, tipo="jpeg"):
@@ -7646,8 +7729,14 @@ def prove_foto_vuota():
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
             i = _SORGENTE.index("FOTO_COLORI_MIN = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+            # e le whitelist della spoliazione (set 2026), che salva_foto
+            # adesso chiama: senza, il pezzo vero esplode qui
+            i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
             for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
-                      "_salva_una_foto", "_e_immagine", "salva_foto"):
+                      "_salva_una_foto", "_e_immagine", "_spoglia_jpeg",
+                      "_spoglia_png", "_spoglia_webp", "_porta_metadati",
+                      "spoglia_metadati", "salva_foto"):
                 exec(pezzo(f), amb2)
 
             def uri(raw):
@@ -7694,6 +7783,166 @@ def prove_foto_vuota():
     prova("sentinella: le due soglie sono leve, non numeri sparsi",
           (True, True), ("maxcolors=FOTO_COLORI_MIN" in giudice,
                          "<= FOTO_PIATTA_SD" in giudice))
+
+
+def prove_foto_metadati():
+    """NESSUNA FOTO PORTA FUORI CASA (set 2026, cantiere suo). Il GPS
+    di dove e' stata scattata viaggia negli EXIF, e in un mercatino
+    quello e' l'indirizzo di chi vende. La porta grande era gia' pulita
+    per fortuna e non per scelta — la Mini App ridisegna tutto in un
+    canvas, che i metadati non li sa nemmeno scrivere — ma l'import
+    passava i byte VERBATIM, e da li' uscivano interi.
+    Qui si gira la spoliazione VERA su foto vere, e si guardano le due
+    cose che contano: che dopo il giro il GPS non ci sia, e che i pixel
+    siano ancora identici — spogliare non e' ricomprimere, o il patto
+    della compressione unica cadrebbe da un'altra parte."""
+    print("\n[le foto senza metadati]")
+    import base64
+    import io
+    import os
+    import re
+
+    try:
+        from PIL import Image, ImageOps, ImageStat
+        from PIL.PngImagePlugin import PngInfo
+    except ImportError:
+        Image = None
+        salta("la spoliazione dei metadati, girata per davvero",
+              "Pillow non e' installata")
+    if Image:
+        amb = {"io": io, "os": os, "re": re, "base64": base64,
+               "ImmaginePillow": Image, "ImageOps": ImageOps,
+               "ImageStat": ImageStat}
+        i = _SORGENTE.index("SEGMENTI_JPEG_TENUTI = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        for f in ("_spoglia_jpeg", "_spoglia_png", "_spoglia_webp",
+                  "_porta_metadati", "spoglia_metadati",
+                  "converti_in_jpeg", "_e_immagine",
+                  "normalizza_foto_import"):
+            exec(pezzo(f), amb)
+        spoglia = amb["spoglia_metadati"]
+
+        def pixel(raw):
+            """I PIXEL, non i byte: e' la misura che dice se qualcuno
+            ha ricompresso di nascosto."""
+            with Image.open(io.BytesIO(raw)) as im:
+                return im.convert("RGB").tobytes()
+
+        def jpeg(exif=None, **extra):
+            out = io.BytesIO()
+            if exif:
+                extra["exif"] = exif
+            foto_finta(120, 80).save(out, "JPEG", quality=90, **extra)
+            return out.getvalue()
+
+        # --- JPEG: il caso del cantiere -------------------------------
+        sporco = jpeg(_exif_con_gps(), comment=b"scattata a casa")
+        prova("la foto di partenza porta il GPS", 4,
+              len(_gps_dentro(sporco)))
+        pulito = spoglia(sporco)
+        prova("la spoliazione risponde", True, pulito is not None)
+        prova("...e il GPS non c'e' piu'", {}, _gps_dentro(pulito))
+        prova("...ne' un solo tag EXIF", 0,
+              len(dict(Image.open(io.BytesIO(pulito)).getexif())))
+        prova("...ne' il commento", None,
+              Image.open(io.BytesIO(pulito)).info.get("comment"))
+        prova("...E I PIXEL SONO GLI STESSI (niente ricompressione)",
+              pixel(sporco), pixel(pulito))
+        prova("...il file e' piu' leggero, non piu' pesante", True,
+              len(pulito) < len(sporco))
+        prova("...e resta un JPEG che si apre", True,
+              amb["_e_immagine"](pulito))
+        prova("il JFIF (APP0) resta: e' di quelli che disegnano",
+              b"\xff\xd8\xff\xe0", pulito[:4])
+        # quel che arriva dal canvas della Mini App e' gia' nudo: non
+        # deve essere toccato nemmeno di un byte
+        nudo = jpeg()
+        prova("un JPEG gia' nudo torna IDENTICO", nudo, spoglia(nudo))
+
+        # --- PNG -------------------------------------------------------
+        testo = PngInfo()
+        testo.add_text("Comment", "scattata a casa mia")
+        out = io.BytesIO()
+        foto_finta(120, 80).save(out, "PNG", pnginfo=testo,
+                                 exif=_exif_con_gps())
+        png = out.getvalue()
+        prova("il PNG di partenza porta il GPS", 4, len(_gps_dentro(png)))
+        png_pulito = spoglia(png)
+        prova("il PNG spogliato: niente GPS", {}, _gps_dentro(png_pulito))
+        prova("...niente testo libero", {},
+              getattr(Image.open(io.BytesIO(png_pulito)), "text", {}))
+        prova("...e i pixel intatti", pixel(png), pixel(png_pulito))
+
+        # --- WebP: quello dove tagliare non basta ----------------------
+        webp = b""
+        try:
+            out = io.BytesIO()
+            foto_finta(120, 80).save(out, "WEBP", quality=90,
+                                     exif=_exif_con_gps())
+            webp = out.getvalue()
+        except Exception:
+            pass
+        if webp and _gps_dentro(webp):
+            webp_pulito = spoglia(webp)
+            prova("il WebP spogliato: niente GPS", {},
+                  _gps_dentro(webp_pulito))
+            prova("...e i pixel intatti", pixel(webp), pixel(webp_pulito))
+            # la lunghezza del RIFF va RIFATTA, e i due bit del VP8X che
+            # ANNUNCIANO i metadati vanno spenti: un contenitore che
+            # dichiara quel che non ha certi lettori lo rifiutano in
+            # blocco — e' il modo silenzioso in cui questa cura poteva
+            # rompere le foto invece di salvarle
+            prova("...e la lunghezza del RIFF torna", len(webp_pulito) - 8,
+                  int.from_bytes(webp_pulito[4:8], "little"))
+        else:
+            salta("il WebP coi metadati", "questa Pillow non lo scrive")
+
+        # --- cio' che non si sa spogliare ------------------------------
+        out = io.BytesIO()
+        foto_finta(120, 80).convert("P").save(out, "GIF")
+        gif = out.getvalue()
+        prova("un GIF pulito passa com'e' (non si converte per paura)",
+              gif, spoglia(gif))
+        prova("i byte che non si capiscono: «non lo so», mai un taglio "
+              "a caso", (None, None),
+              (spoglia(b"\xff\xd8\xff finto"), spoglia(b"")))
+
+        # --- LA PORTA DEL CANTIERE: l'import verbatim ------------------
+        grande = io.BytesIO()
+        foto_finta(1200, 900).save(grande, "JPEG", quality=90,
+                                   exif=_exif_con_gps())
+        dritta = amb["normalizza_foto_import"](grande.getvalue())
+        prova("L'IMPORT VERBATIM NON PORTA PIU' IL GPS", {},
+              _gps_dentro(dritta))
+        prova("...e non ha ricompresso: i pixel sono quelli",
+              pixel(grande.getvalue()), pixel(dritta))
+        # la storta passava gia' dalla conversione, ed e' l'ironia del
+        # difetto: era protetta LEI e non la dritta
+        storta = io.BytesIO()
+        foto_finta(1200, 900).save(storta, "JPEG", quality=90,
+                                   exif=_exif_con_gps(orientamento=6))
+        prova("e la storta resta senza GPS, com'era gia'", {},
+              _gps_dentro(amb["normalizza_foto_import"](storta.getvalue())))
+
+    # --- SENTINELLE ---------------------------------------------------
+    # le tre porte: se un riordino toglie la chiamata, la promessa cade
+    # in silenzio e nessuna prova funzionale se ne accorge
+    for porta in ("salva_foto", "normalizza_foto_import",
+                  "_documento_busta"):
+        prova(f"sentinella: {porta} spoglia ancora", True,
+              "spoglia_metadati" in codice(pezzo(porta)))
+    # il ripiego di tutte e tre e' la conversione, che spoglia perche'
+    # RIDISEGNA: e lo fa solo finche' nessuno le passa gli exif
+    prova("sentinella: converti_in_jpeg non si riporta dietro gli EXIF",
+          True, "exif=" not in codice(pezzo("converti_in_jpeg")))
+    # il giudice dell'esito e' l'unico fail-CHIUSO della filiera: sul
+    # dubbio dice «sporca», e chi chiama ricomprime
+    prova("sentinella: sul dubbio _porta_metadati dice di si'", True,
+          codice(pezzo("_porta_metadati")).rstrip().endswith("return True"))
+    # e la ragione per cui la porta grande era gia' pulita: il canvas
+    prova("sentinella: la Mini App ridisegna ancora nel canvas", True,
+          "toDataURL('image/jpeg'" in open("miniapp.html",
+                                           encoding="utf-8").read())
 
 
 def prove_foto_spenta():
@@ -52772,7 +53021,7 @@ def main():
               prove_servizi,
               prove_sintassi_client,
               prove_banner_negozio,
-              prove_foto_vuota,
+              prove_foto_vuota, prove_foto_metadati,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
