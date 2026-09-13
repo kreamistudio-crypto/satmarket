@@ -10418,14 +10418,35 @@ nella fase dopo il cronometro riparte (`show_hold_invoice` ri-timbra
 cosa che leggendo il solo `settings.toml` non si vede, ed è
 esattamente quella che un utente si domanda.
 
-⚠️ **QUEL CHE RESTA DA GUARDARE**: il foglio della hold invoice dice
-«Hai circa N minuti» leggendo `hold_invoice_expiration_window` (300 →
-5 minuti), ma quella voce in v0.18.6 **non la legge nessuno** — è
-configurazione morta, e il mestiere che il suo commento descrive è di
-`expiration_seconds` (900 → 15). Quel foglio quindi promette metà del
-tempo che c'è. Non è stato toccato in questo giro perché è un'altra
-riga con un'altra decisione dietro; la pagina nuova usa il numero
-verificato.
+✅ **E IL FOGLIO DELLA HOLD INVOICE È RIENTRATO SUBITO DOPO** (stesso
+giorno, decisione di Andrea): qui c'era scritto «quel che resta da
+guardare», ed è durato il tempo di dirlo. Il foglio contava i minuti
+su `hold_invoice_expiration_window` (300 → **5 minuti**) e ne prometteva
+quindi **la metà** di quelli veri, su un gesto che chiede di pagare.
+Adesso li conta su `expiration_seconds` (900 → **15**), che è la voce
+che decide davvero: `find_order_by_seconds` in `src/db.rs` taglia su
+`taken_at < now − expiration_seconds`, e quella finestra è per GESTO
+perché `show_hold_invoice` ri-timbra `taken_at` entrando nella fase
+dopo.
+
+**LA VOCE MORTA RESTA LETTA, MA CON L'AVVISO ACCANTO.** In v0.18.6
+`hold_invoice_expiration_window` non la legge nessuno — dichiarata
+nella struct, scritta dal wizard, presente in una fixture di test, e in
+nessun altro posto delle 25 `.rs` (censite) — e il suo commento nel
+template **descrive il mestiere di un'altra voce**. È così che il
+difetto è nato: non da una svista nostra, ma dal nome più un commento
+che dice il falso. Il campo continua a leggersi (il coordinatore lo
+dichiara, e un domani può tornare vivo), ma accanto c'è scritto perché
+non si usa e cosa è costato — una riga parcheggiata **senza** il suo
+avviso è un invito a ricascarci. Da qui la regola generale: **il nome
+di una leva non è una prova che qualcuno la legga**, e il giorno che
+serve si verifica sul sorgente prima di fidarsi.
+
+Tre sentinelle: il foglio conta da `scadenzaSec`, non nomina mai
+`holdFinestra`, e l'avviso è accanto alla riga che la parcheggia.
+Provato dal vivo: con 900 dice «Hai circa **15** minuti», e con la
+finestra ignota la frase **sparisce** invece di inventare un numero.
+Totale del giro: **9255 verdi**.
 
 COLLAUDATO: **9252 verdi**, tredici sentinelle nuove — la vista al suo
 posto e senza interpolazioni, il vestito, la radice, il richiamo in

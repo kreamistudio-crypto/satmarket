@@ -39997,6 +39997,27 @@ def prove_p2p_motore():
     prova("il foglio della hold non e' un terzo vestiPaySheet", True,
           "vestiPaySheet" not in cod and "mostraQr(" not in cod)
     prova("...e disegna il QR da se'", True, "disegnaQr(el('p2pHoldQr')" in cod)
+    # ⚠️ IL TEMPO DEL FOGLIO VIENE DA `expiration_seconds` (13 set
+    # 2026, cura di un difetto vissuto): `hold_invoice_expiration_window`
+    # in v0.18.6 non la legge NESSUNO nel coordinatore — dichiarata
+    # nella struct, scritta dal wizard, e in nessuna delle 25 `.rs` —
+    # e il suo commento nel template descrive il mestiere dell'altra.
+    # Il foglio prometteva CINQUE minuti dove ce ne sono QUINDICI: la
+    # meta' del tempo vero, su un gesto che chiede di pagare. La
+    # sentinella e' in due tempi perche' il difetto ha due facce —
+    # usare la voce morta, e cablare il numero invece di leggerlo.
+    _rh = pezzo_js(mini, "function renderHoldP2P(){", "\n}\n")
+    prova("il foglio della hold conta i minuti da expiration_seconds",
+          True, "p2pInfo.scadenzaSec" in _rh)
+    prova("...e MAI dalla voce morta del coordinatore", False,
+          "holdFinestra" in _rh)
+    # la voce morta resta LETTA (il coordinatore la dichiara), ma il
+    # perche' sta scritto accanto: una riga parcheggiata senza il suo
+    # avviso e' un invito a ricascarci
+    prova("...che resta letta, col suo avviso accanto", True,
+          "holdFinestra: Math.floor(num('hold_invoice_expiration_window'))"
+          in mini
+          and "configurazione\n       MORTA" in mini)
 
     # --- 3) LA RIGA DA NON INVERTIRE --------------------------------
     ch = pezzo_js(mini, "async function mostroChiama(skTrade, msg, opz){", "\n}\n")

@@ -34429,15 +34429,30 @@ function infoDaEvento(ev){
     powPrimo: num('pow_first_contact') || num('pow'),
     maxSats: Math.floor(num('max_order_amount')),
     minSats: Math.floor(num('min_order_amount')),
-    /* le tre finestre: quanto vive un ordine, quanto si ha per
-       pagare la richiesta del coordinatore, quanto per consegnare
-       la propria. Si LEGGONO, mai cablate: sono impostazioni sue. */
+    /* LA FINESTRA CHE DECIDE E' QUESTA, ed e' PER GESTO: quindici
+       minuti sul nostro nodo, e il cronometro RIPARTE a ogni fase.
+       Verificato sul sorgente del coordinatore — `find_order_by_seconds`
+       taglia su `taken_at < now − expiration_seconds`, e
+       `show_hold_invoice` ri-timbra `taken_at` entrando nella fase
+       dopo (vedi CLAUDE.md, «I TRE TIMER»). Si LEGGE, mai cablata. */
     scadenzaSec: Math.floor(num('expiration_seconds')),
     /* quanto vive un ordine NEL LIBRO, in ore (168 sul nostro nodo):
        la legge la pagina «Informazioni», e come le altre si LEGGE —
        il numero cablato in P2P_ORIZZONTE_S resta il ripiego di chi
        deve decidere prima che il 38385 arrivi, mai la fonte. */
     oreVita: Math.floor(num('expiration_hours')),
+    /* ⚠️ LE DUE QUI SOTTO SI PARCHEGGIANO E NON LE USA NESSUNO, e va
+       scritto perche' il nome invita a crederci.
+       `hold_invoice_expiration_window` in v0.18.6 e' configurazione
+       MORTA: dichiarata nella struct, scritta dal wizard, presente in
+       una fixture di test e in nessun altro posto delle 25 `.rs` del
+       coordinatore (censite) — e il suo commento nel template descrive
+       il mestiere di `expiration_seconds`. Chi la usa per promettere
+       un tempo dice 5 minuti dove ce ne sono 15: E' SUCCESSO, al
+       foglio della hold invoice, e la cura e' stata rimetterlo su
+       `scadenzaSec` (13 set 2026). Restano LETTE perche' il
+       coordinatore le dichiara e un domani possono tornare vive: quel
+       giorno si verifica sul sorgente PRIMA di fidarsi del nome. */
     holdFinestra: Math.floor(num('hold_invoice_expiration_window')),
     fattFinestra: Math.floor(num('invoice_expiration_window')),
     valute: String(tagValore(ev, 'fiat_currencies_accepted') || '')
@@ -38519,8 +38534,14 @@ function renderHoldP2P(){
   const o = ordiniP2P()[p2pHoldOrdine];
   if (!box || !o || !o.hold) return;
   const quanti = o.hold.sats > 0 ? fmt(o.hold.sats) + ' sats' : '';
-  const min = p2pInfo && p2pInfo.holdFinestra
-    ? Math.max(1, Math.round(p2pInfo.holdFinestra / 60)) : 0;
+  /* ⚠️ IL TEMPO LO DA' `expiration_seconds`, MAI
+     `hold_invoice_expiration_window` (13 set 2026): la seconda non la
+     legge nessuno nel coordinatore, e con lei questo foglio prometteva
+     CINQUE minuti dove ce ne sono QUINDICI — la metà del tempo vero,
+     su un foglio che chiede di pagare. Il perche' per intero sta sul
+     lettore del 38385, in infoDaEvento. */
+  const min = p2pInfo && p2pInfo.scadenzaSec > 0
+    ? Math.max(1, Math.round(p2pInfo.scadenzaSec / 60)) : 0;
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'i sats restano <b>bloccati in garanzia</b> e non escono finché non li liberi tu.' +
