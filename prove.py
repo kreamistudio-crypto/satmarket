@@ -24688,20 +24688,22 @@ def prove_seo():
           celle[0] == "nav-esplora" and celle[1] == "cella"
           and celle[3] == "cella" and celle[4] == "cella")
     # ...e dentro le celle: il bottone di sempre PRIMA, lo strato
-    # dello scambio dopo — l'ultima (Ordini) ha il posto vuoto,
-    # deciso da Andrea: lo slot aspetta la voce che verra'
+    # dello scambio dopo. EMENDATA (set 2026): l'ultima cella non ha
+    # piu' il posto vuoto — lo slot che «aspettava la voce che verra'»
+    # ce l'ha, ed e' «Informazioni», la pagina che spiega lo scambio.
     interne = _re.findall(r'<div class="nav-cella">(.*?)</div>',
                           barra, _re.S)
     prova("le tre celle a strati, nell'ordine del disegno",
           [["nav-p2p", "nav-p2plibro"], ["nav-aste", "nav-p2pmiei"],
-           ["nav-affari"]],
+           ["nav-affari", "nav-p2pinfo"]],
           [_re.findall(r'<button id="(nav-[a-z0-9]+)"', c)
            for c in interne])
     prova("...e gli strati portano la classe strato-p2p, loro soli",
           True, '<button id="nav-p2plibro" class="strato-p2p"' in barra
           and '<button id="nav-p2pmiei" class="strato-p2p"' in barra
+          and '<button id="nav-p2pinfo" class="strato-p2p"' in barra
           and re.sub(r"<!--.*?-->", "", barra,
-                     flags=re.S).count('strato-p2p') == 2)
+                     flags=re.S).count('strato-p2p') == 3)
     # il markup della barra e' STATICO: niente celle accese e spente
     # a runtime, che era il posto dove il + poteva scentrarsi secondo
     # lo stato di una leva — e dello spaziatore non resta NIENTE,
@@ -38409,8 +38411,8 @@ def prove_nav_p2p():
 
     # --- 3) LA MODALITA' SI DERIVA DALLA VISTA, IN go() ---------------
     prova("VISTE_NAV_P2P e' il giudice, e il coming soon NON c'e'", True,
-          "const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine']);"
-          in mini)
+          "const VISTE_NAV_P2P = new Set("
+          "['p2p','p2pmiei','p2pordine','p2pinfo']);" in mini)
     _go = pezzo_js(mini, "function go(view){")
     prova("go() veste e sveste la classe dalla VISTA", True,
           "classList.toggle('nav-p2p', VISTE_NAV_P2P.has(view))" in _go)
@@ -38436,6 +38438,63 @@ def prove_nav_p2p():
           "view = 'p2pmiei';" in vn)
     prova("il ripiego dello scambio dimenticato porta ai miei", True,
           "ordiniP2P()[b.k] ? apriOrdineP2P(b.k) : go('p2pmiei')" in mini)
+
+    # --- 4b) LA PAGINA «INFORMAZIONI» (set 2026) ---------------------
+    # La terza voce della nav trasformata: come funziona lo scambio e
+    # il suo regolamento, in un posto solo invece che sparso nei
+    # fogli. Markup FISSO (nessuna interpolazione da ricordare col
+    # `${`) tranne i NUMERI, che li scrive renderP2PInfo dal 38385 —
+    # un numero battuto a mano nella prosa direbbe quello di ieri il
+    # giorno che una leva del coordinatore gira, e qui chi legge la
+    # prende per il regolamento.
+    ji = mini.index('id="view-p2pinfo"')
+    fi = mini[ji:mini.index("============", ji)]
+    prova("view-p2pinfo sta DOPO i miei e PRIMA dello scambio", True,
+          mini.index('id="view-p2pmiei"') < ji
+          < mini.index('id="view-p2pordine"'))
+    prova("...ed e' markup fisso, senza interpolazioni", False,
+          "${" in fi)
+    prova("...e indossa il vestito delle pagine lunghe", True,
+          'class="sicu"' in fi and 'class="sicu-hero"' in fi
+          and 'class="sicu-apre"' in fi and 'class="sicu-piede"' in fi)
+    prova("'p2pinfo' e' una radice sorella", True,
+          "'p2pinfo'" in mini[i_r:mini.index("]);", i_r)])
+    prova("...e go() la riempie a ogni ingresso", True,
+          "if (view==='p2pinfo') renderP2PInfo();" in _go)
+    prova("...e il tasto della barra la chiama", True,
+          "onclick=\"go('p2pinfo')\"" in mini)
+    # ⚠️ NESSUN NUMERO NELLA PROSA: le tre cifre che la pagina dice —
+    # la commissione, le due finestre, la fascia del premio — devono
+    # arrivare dal render. La sentinella cerca una percentuale o una
+    # durata scritte a mano fuori dai commenti, che e' il modo in cui
+    # un numero vecchio si intrufola in una pagina che spiega.
+    _pi = re.sub(r"<!--.*?-->", "", fi, flags=re.S)
+    prova("...e nella prosa non c'e' nessuna cifra battuta a mano",
+          [], re.findall(r"\d+\s*(?:%|minut|or[ea]\b|giorn)", _pi))
+    # I SEGNAPOSTO sono vuoti e li riempie il render: il pattern dei
+    # data-tempo e di #pionieriRiga — una cifra che si corregge da
+    # sola sotto gli occhi e' peggio di un attimo di silenzio.
+    prova("i segnaposto ci sono, vuoti", True,
+          '<span data-p2pinfo="premio"></span>' in fi
+          and '<span data-p2pinfo="metodi"></span>' in fi
+          and '<div id="p2pInfoFee"></div>' in fi
+          and '<ul class="sicu-lista" id="p2pInfoTempi"></ul>' in fi)
+    _rp = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
+    prova("il render legge la commissione dal giudice unico", True,
+          "commissioneVivaP2P()" in _rp
+          and "commissioneListinoP2P()" in _rp)
+    prova("...e il «non lo so» non diventa uno zero", True,
+          "(fee === null)" in _rp
+          and "abbiamo ancora letta" in _rp)
+    prova("...le finestre vengono dal 38385, coi ripieghi dichiarati",
+          True, "p2pInfo.oreVita" in _rp and "p2pInfo.scadenzaSec" in _rp
+          and "P2P_ORIZZONTE_S" in _rp)
+    prova("...e la fascia del premio e i metodi dai cataloghi di casa",
+          True, "P2P_PREMIO_MAX" in _rp and "P2P_METODI.join" in _rp)
+    # `expiration_hours` si LEGGE come le altre: era l'unica finestra
+    # che il lettore del 38385 buttava via, e la pagina la dice.
+    prova("infoDaEvento legge anche la vita nel libro", True,
+          "oreVita: Math.floor(num('expiration_hours'))" in mini)
 
     # --- 5) IL CSS MUOVE SOLO TRANSFORM/OPACITY, E SA FERMARSI --------
     css = mini[mini.index("nav .nav-cella{"):
@@ -38487,8 +38546,9 @@ out.scambio = voceNav('p2pordine') === 'p2pmiei';
 out.presto = voceNav('p2ppresto') === 'p2p';
 out.figlia = voceNav('dettaglio') === 'esplora';
 out.modalita = VISTE_NAV_P2P.has('p2p') && VISTE_NAV_P2P.has('p2pmiei')
-  && VISTE_NAV_P2P.has('p2pordine') && !VISTE_NAV_P2P.has('p2ppresto')
-  && VISTE_NAV_P2P.size === 3;
+  && VISTE_NAV_P2P.has('p2pordine') && VISTE_NAV_P2P.has('p2pinfo')
+  && !VISTE_NAV_P2P.has('p2ppresto')
+  && VISTE_NAV_P2P.size === 4;
 toccaPiu();
 out.fuoriApreVendi = andato === 'vendi' && aperto === 0;
 inP2P = true; andato = '';
@@ -38516,7 +38576,7 @@ console.log(JSON.stringify(out));
     prova("il coming soon accende la voce di sempre", True, out["presto"])
     prova("...e una figlia di Esplora non c'entra niente", True,
           out["figlia"])
-    prova("il giudice della modalita' dice tre viste, mai il presto",
+    prova("il giudice della modalita' dice quattro viste, mai il presto",
           True, out["modalita"])
     prova("fuori dal P2P il + apre Vendi", True, out["fuoriApreVendi"])
     prova("...e dentro pubblica un ordine, senza navigare", True,

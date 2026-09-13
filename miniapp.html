@@ -6543,6 +6543,99 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: INFORMAZIONI SUL P2P (set 2026) ============
+       La terza voce della nav trasformata, nello slot che aspettava:
+       come funziona lo scambio e il suo regolamento, tutto in un
+       posto solo invece che sparso nei fogli.
+       IL VESTITO E' QUELLO DELLE PAGINE LUNGHE (.sicu-*), lo stesso
+       di «Il pagamento protetto» e «I tuoi dati»: trenta regole gia'
+       tarate per la lettura, e rinominarle costerebbe righe per zero
+       pixel — il patto dei nomi interni del carrello.
+       ⚠️ QUI IL COORDINATORE SI NOMINA, e non e' uno strappo alla
+       regola della fase 6: quella vieta i nomi di terzi nelle viste
+       dello SCAMBIO, dove uno sta facendo un gesto e un nome nuovo e'
+       solo rumore. Questa e' la pagina che SPIEGA, ed e' la sorella
+       di «I tuoi dati», dove il coordinatore ha gia' il suo nome per
+       intero: una pagina che dicesse «qualcuno tiene i sats» senza
+       dire chi sarebbe reticente proprio dove si e' venuti a capire.
+       Markup FISSO tranne i NUMERI, che li scrive renderP2PInfo dal
+       38385 — la regola delle impostazioni: mai cablate. Un numero
+       battuto a mano qui direbbe quello di ieri il giorno che una
+       leva del coordinatore gira. -->
+  <div class="view" id="view-p2pinfo">
+    <div class="sicu">
+      <div class="sicu-hero">
+        <img src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">
+        <h2>Lo scambio P2P</h2>
+        <p class="occhiello">Comprare e vendere bitcoin fra persone, coi sats fermi in garanzia finché non è tutto a posto.</p>
+      </div>
+
+      <p class="sicu-apre">Qui non compri da Barattolo: compri da <b>un'altra persona</b>. Vi mettete d'accordo su un prezzo, gli <b>euro viaggiano fra voi due</b> col metodo che scegliete, e i <b>sats restano bloccati in garanzia</b> finché gli euro non sono arrivati davvero. Barattolo non tiene i sats e non tocca i tuoi euro.</p>
+
+      <h3>Come funziona, in cinque passi</h3>
+      <ol class="sicu-passi">
+        <li><b>Qualcuno pubblica un ordine.</b> Dice se compra o vende sats, per quanti euro e con quali metodi di pagamento. L'ordine finisce nel <b>libro degli ordini</b>, che vedono tutti.</li>
+        <li><b>Tu lo prendi.</b> Scegli con quale metodo vuoi pagare (o essere pagato) e l'ordine si riserva a te: da quel momento non lo può più prendere nessun altro.</li>
+        <li><b>Chi vende blocca i sats.</b> Paga una richiesta particolare, che <b>trattiene</b> i sats invece di consegnarli: escono dal suo wallet ma non arrivano a nessuno. Da qui in poi sono <b>in garanzia</b>.</li>
+        <li><b>Chi compra manda gli euro.</b> Col metodo scelto, al recapito che l'altra persona gli lascia qui dentro. Poi lo dice qui.</li>
+        <li><b>Chi vende libera i sats.</b> Controlla di aver ricevuto gli euro e li libera: arrivano all'indirizzo Lightning indicato da chi compra all'inizio.</li>
+      </ol>
+
+      <h3 id="p2pinfo-garanzia">La garanzia: chi può muovere i sats</h3>
+      <p>«In garanzia» non è un modo di dire. La richiesta di pagamento del terzo passo è speciale: <b>si paga, ma non si incassa</b>. I sats restano appesi a mezz'aria, e da lì possono prendere <b>due strade sole</b> — andare a chi compra, oppure <b>tornare</b> a chi vende. Una terza strada non esiste: nessuno può dirottarli altrove, nemmeno chi li sta tenendo.</p>
+      <p>E a tenerli non è Barattolo: è un <b>coordinatore</b> indipendente (si chiama Mostro), lo stesso che tiene il libro degli ordini. <b>I sats non passano dai nostri conti</b>, e le uniche due cose che il coordinatore può fare sono <b>rilasciare</b> e <b>rimborsare</b>.</p>
+      <p class="sicu-nota">È diverso dal deposito di garanzia del mercatino, dove i sats si fermano su un nodo Lightning nostro. Qui no: qui Barattolo è la <i>finestra</i> su uno scambio che avviene altrove.</p>
+
+      <h3>Il prezzo, e perché le cifre ballano</h3>
+      <p>Gli ordini si scrivono <b>in euro</b> — «vendo 50 € di sats» — e i sats si contano al <b>cambio del momento</b>. Il cambio si muove in continuazione, quindi finché l'ordine è nel libro la cifra in sats è una <b>stima</b>: la vedi col segno <b>≈</b> davanti, che è il modo onesto di dire «più o meno tanti».</p>
+      <p>La cifra <b>esatta si fissa quando l'ordine viene preso</b>, non un attimo prima. Da lì in poi non cambia più: quello che leggi nello scambio è quello che passa di mano.</p>
+      <p>Alcuni ordini portano un <b>intervallo</b> («da 20 a 100 €»): quelli li prendi scegliendo tu quanto, dentro la fascia.</p>
+
+      <h3>Il premio e lo sconto</h3>
+      <p>Chi pubblica può chiedere un po' più o un po' meno del mercato, fino a <b>±<span data-p2pinfo="premio"></span>%</b>. Sopra il mercato si chiama <b>premio</b> e conviene a chi vende; sotto si chiama <b>sconto</b> e conviene a chi compra. Nel conto dello scambio quella riga c'è sempre, col suo nome e la sua percentuale.</p>
+      <p class="sicu-nota">Il premio si applica <b>prima</b> della commissione: prima si calcola il controvalore col premio, poi la commissione morde su quello. È l'ordine in cui il conto mostra le righe, e non è impaginazione.</p>
+
+      <h3>La commissione</h3>
+      <!-- SEGNAPOSTO VUOTO e non interpolazione: la commissione la
+           dice il 38385 e finche' non e' arrivato NON SI SA — e non
+           si sa e' il silenzio, mai uno zero che direbbe «gratis».
+           Il pattern e' quello di #pionieriRiga e dei data-tempo. -->
+      <div id="p2pInfoFee"></div>
+
+      <h3>Come si pagano gli euro</h3>
+      <p>I metodi sono un elenco chiuso: <b><span data-p2pinfo="metodi"></span></b>. Chi pubblica sceglie quali accetta, chi prende ne sceglie uno.</p>
+      <p><b>Gli euro non passano da Barattolo.</b> Viaggiano fra te e l'altra persona sul circuito che avete scelto, come se vi foste messi d'accordo per strada. Il recapito che serve — l'IBAN, il RevTag, il numero — ve lo scambiate <b>qui dentro e cifrato</b>: lo legge solo chi deve pagare.</p>
+      <p>Per questo la garanzia protegge <b>i sats e non gli euro</b>: se dici di aver pagato e non hai pagato, chi vende semplicemente non libera. E se hai pagato e non liberano, c'è la disputa.</p>
+
+      <h3>I tempi</h3>
+      <!-- gli stessi segnaposto, per la stessa ragione: le finestre
+           sono impostazioni del coordinatore e si LEGGONO -->
+      <ul class="sicu-lista" id="p2pInfoTempi"></ul>
+      <ul class="sicu-lista">
+        <li>Se il tempo scade <b>prima</b> che i sats siano bloccati, la richiesta di pagamento si annulla e <b>nessuno perde niente</b>. Se a mancare è stato chi ha <i>preso</i> l'ordine, l'ordine <b>torna nel libro</b> per qualcun altro; se è stato chi l'ha <i>pubblicato</i>, si chiude.</li>
+        <li>Quando invece i sats sono <b>già in garanzia</b>, nessun timer li sblocca da solo. Restano lì finché uno dei due si muove, o finché decide un moderatore.</li>
+      </ul>
+
+      <h3 id="p2pinfo-storto">Se qualcosa va storto</h3>
+      <p>Prima di tutto: <b>dai tempo all'altra persona</b>. Quasi sempre è un bonifico che deve arrivare, o qualcuno che dorme.</p>
+      <p><b>Annullare d'accordo.</b> Uno dei due propone di annullare, l'altro accetta, e i sats tornano a chi li aveva bloccati. Serve il <b>sì di tutti e due</b>: nessuno si tira indietro da solo dopo che l'altro si è mosso.</p>
+      <p><b>La disputa.</b> Si apre quando i sats sono <b>già in garanzia</b> — prima non c'è niente da contendere. Da quel momento lo scambio si ferma: né tu né l'altra persona potete più muovere i sats, e a decidere chi li riceve è un <b>moderatore del coordinatore</b>. <b>Barattolo non decide e non può intervenire</b> — lo diciamo adesso, invece di lasciartelo scoprire quel giorno.</p>
+      <p class="sicu-nota">Tieni le prove di quello che hai fatto: la ricevuta del bonifico, la schermata del pagamento. Sono quelle che guarda chi decide.</p>
+
+      <h3>Chi sei, qui dentro</h3>
+      <ul class="sicu-lista sicu-cose">
+        <li><span class="em">✈️</span><b>Se entri da Telegram</b>, il tuo profilo di scambio lo ricaviamo dal tuo account: ti segue da solo fra telefono e computer, e non c'è niente da creare. Il prezzo lo diciamo per intero — <b>il server di Barattolo lo sa ricavare</b>: non lo facciamo e niente nel programma lo fa, ma potremmo.</li>
+        <li><span class="em">🟣</span><b>Se entri con una chiave Nostr tua</b> e in passato l'hai resa il tuo profilo di scambio, quel profilo <b>non lo può ricavare nessuno</b>, noi compresi.</li>
+        <li><span class="em">🎭</span><b>Il tuo nome non c'è.</b> Ogni scambio usa una <b>chiave usa-e-getta</b>, diversa ogni volta: nell'ordine pubblico si leggono l'importo e il metodo di pagamento, mai chi sei. Anche dentro l'app, di nomi non ne compaiono.</li>
+        <li><span class="em">📖</span><b>Gli ordini sono pubblici.</b> Il libro vive fuori da qui e lo legge chiunque: è così che funziona uno scambio senza padrone. I <b>recapiti</b> e i vostri <b>messaggi</b> no: quelli sono cifrati, e passano solo fra voi due.</li>
+      </ul>
+
+      <button class="btn ghost" onclick="apriPrivacy('priv-p2p')">🔐 Il patto sui tuoi dati, per intero</button>
+
+      <div class="sicu-piede">🫙 Qualcosa non torna, o non è chiaro? Scrivici: durante il rodaggio leggiamo tutto.</div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: LO SCAMBIO (set 2026) ============
        Uno scambio preso dal libro: i quattro passi, e SOTTO l'unico
        gesto che tocca a chi guarda. La vista e' fissa e il corpo lo
@@ -7808,11 +7901,15 @@ document.getElementById('cartello')?.remove();</script>
          Il 🤝 se n'e' andato di qui e resta al RITIRO IN ZONA degli
          annunci: due mestieri diversi — in nav dice dove sei, li' dice
          come arriva la roba -->
-    <!-- Nel P2P questa cella resta VUOTA (deciso da Andrea, set 2026):
-         Ordini scende e nessuno sale al suo posto — lo slot aspetta
-         la voce che verra', e intanto tiene la larghezza. -->
+    <!-- Nel P2P questa cella porta «Informazioni» (set 2026): lo slot
+         che aspettava la voce che verra' ce l'ha. La ⓘ e' disegnata
+         nella grammatica delle sorelle — griglia da 24 ritagliata a
+         "2 2 20 20", tratto 1.5 currentColor, velo al 12% e il tondo
+         un pelo fuori squadra. Dentro: come funziona lo scambio e il
+         suo regolamento, che fin qui stava sparso nei fogli. -->
     <div class="nav-cella">
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
+    <button id="nav-p2pinfo" class="strato-p2p" onclick="go('p2pinfo')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 7.9v.6"/><path d="M12 11.2v5.4"/></svg></span>Informazioni</button>
     </div>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
@@ -9878,7 +9975,7 @@ function vaiP2P(){
    La classe la scrive go() derivandola dalla VISTA (mai dal gesto):
    cosi' vale anche per indietro e cronologia, la lezione di
    renderInteresse. */
-const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine']);
+const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine','p2pinfo']);
 /* Il + della barra ha DUE mestieri e uno solo alla volta: fuori dal
    P2P apre Vendi, dentro pubblica un ordine. Chiede alla classe sul
    body — che e' la stessa verita' che l'utente ha davanti agli occhi:
@@ -9955,6 +10052,12 @@ function go(view){
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
   if (view==='p2pordine') renderOrdineP2P();
+  /* «Informazioni»: i numeri vengono dal 38385, e QUI e' l'unico
+     posto da cui passano tutte le strade — il tasto della nav, il
+     gesto indietro, la cronologia. Rinfrescarli a ogni ingresso e'
+     la stessa ragione delle due sorelle: fra un giro e l'altro una
+     leva del coordinatore puo' essere girata. */
+  if (view==='p2pinfo') renderP2PInfo();
   if (view==='vendi') {
     aggiornaContattoHint();
     /* e le due righe delle politiche, per la stessa ragione: fra un
@@ -10130,7 +10233,10 @@ const RADICI = new Set(['esplora','vendi','affari','profilo',
   /* «I miei scambi» (set 2026, la nav trasformata): radice sorella
      del libro — fra i due tasti della nav P2P si SOSTITUISCE, come
      fra i tab di sempre */
-  'p2pmiei']);
+  'p2pmiei',
+  /* ...e «Informazioni» con loro: e' il terzo tasto della stessa
+     barra, e fra tre tasti sorelle si sostituisce uguale */
+  'p2pinfo']);
 /* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
    quella del giorno prima): da ogni altra radice l'indietro passa da
    Esplora, e solo da Esplora si esce. E' come si comportano Subito e
@@ -34327,6 +34433,11 @@ function infoDaEvento(ev){
        pagare la richiesta del coordinatore, quanto per consegnare
        la propria. Si LEGGONO, mai cablate: sono impostazioni sue. */
     scadenzaSec: Math.floor(num('expiration_seconds')),
+    /* quanto vive un ordine NEL LIBRO, in ore (168 sul nostro nodo):
+       la legge la pagina «Informazioni», e come le altre si LEGGE —
+       il numero cablato in P2P_ORIZZONTE_S resta il ripiego di chi
+       deve decidere prima che il 38385 arrivi, mai la fonte. */
+    oreVita: Math.floor(num('expiration_hours')),
     holdFinestra: Math.floor(num('hold_invoice_expiration_window')),
     fattFinestra: Math.floor(num('invoice_expiration_window')),
     valute: String(tagValore(ev, 'fiat_currencies_accepted') || '')
@@ -34782,6 +34893,72 @@ function nettoLatoP2P(o, sats){
   if (!(sats > 0) || !(fee > 0)) return sats;
   const meta = Math.round(sats * fee / 2);
   return o.lato === 'sell' ? sats - meta : sats + meta;
+}
+
+/* ---- LA PAGINA «INFORMAZIONI» DEL P2P (set 2026) ----
+   Il markup e' fisso, i NUMERI no: la commissione, le due finestre e
+   la fascia del premio si leggono dalle impostazioni del coordinatore
+   (38385) e dalle costanti di casa, mai battute a mano nella prosa —
+   una pagina che spiega le regole e' il posto dove un numero vecchio
+   fa piu' danno, perche' chi la legge la prende per il regolamento.
+   E QUEL CHE NON SI SA NON SI INVENTA: senza il 38385 la commissione
+   non ha una cifra, e al suo posto va la frase che dice dove
+   trovarla — mai uno zero, che si leggerebbe «gratis». E' la stessa
+   regola di commissioneVivaP2P, che il `null` lo distingue apposta.
+   IL LIBRO NON SI CHIEDE DA QUI: chi ha la leva accesa passa dal
+   libro prima o poi e p2pInfo arriva con lui; una fetch di piu' da
+   una pagina di sola lettura pagherebbe l'attesa per un numero che
+   la frase di ripiego gia' copre. */
+function renderP2PInfo(){
+  const num = n => esc(Number(n).toLocaleString('it-IT',
+                                               {maximumFractionDigits: 2}));
+  document.querySelectorAll('[data-p2pinfo]').forEach(e => {
+    const q = e.getAttribute('data-p2pinfo');
+    if (q === 'premio') e.textContent = String(P2P_PREMIO_MAX);
+    if (q === 'metodi') e.textContent = P2P_METODI.join(', ');
+  });
+  /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
+     due cifre non possono divergere perche' la fonte e' una sola. */
+  const box = el('p2pInfoFee');
+  if (box) {
+    const fee = commissioneVivaP2P();
+    const list = commissioneListinoP2P();
+    box.innerHTML = (fee === null)
+      ? '<p>La commissione la dichiara il coordinatore, e in questo momento non l\'abbiamo ancora letta. La trovi sempre scritta <b>nel conto dello scambio</b>, prima che tu confermi: si divide <b>met&agrave; a testa</b>.</p>'
+      : (fee <= 0)
+      ? '<p>In questo momento lo scambio <b>non ha commissione</b>. Quando ci sar&agrave;, la vedrai scritta nel conto prima di confermare.</p>'
+      : '<p>La commissione dello scambio &egrave; <b>' + num(fee * 100)
+        + '%</b>, e si divide <b>met&agrave; a testa</b>: nel conto che leggi c\'&egrave; la <b>tua met&agrave;</b>, cio&egrave; <b>'
+        + num(fee * 50) + '%</b>.</p>'
+        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>'
+        + (list > fee * 100
+            ? '<p class="sicu-nota">Il listino di Barattolo &egrave; ' + num(list)
+              + '%: adesso la commissione sta sotto, ed &egrave; una <b>promo</b> del rodaggio.</p>'
+            : '');
+  }
+  /* LE DUE FINESTRE. La vita nel libro e' `expiration_hours`, la
+     finestra del gesto `expiration_seconds`: si leggono, e i ripieghi
+     sono i numeri che il codice gia' usa per decidere (P2P_ORIZZONTE_S
+     e i 900 s del coordinatore) — un ripiego, non la fonte.
+     ⚠️ LA FINESTRA E' PER GESTO e non per scambio, ed e' la parte che
+     leggendo il config non si vede: entrando nella fase dopo il
+     cronometro RIPARTE, quindi in due passi il tempo utile e' il
+     doppio. Verificato sul sorgente del coordinatore (show_hold_invoice
+     ri-timbra `taken_at`): vedi CLAUDE.md, «I TRE TIMER». */
+  const ul = el('p2pInfoTempi');
+  if (ul) {
+    const ore = (p2pInfo && p2pInfo.oreVita > 0)
+      ? p2pInfo.oreVita : Math.round(P2P_ORIZZONTE_S / 3600);
+    const gg = Math.round(ore / 24);
+    const mi = Math.max(1, Math.round(
+      ((p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900) / 60));
+    ul.innerHTML =
+      '<li>Un ordine vive nel libro <b>' + (gg >= 2 ? gg + ' giorni' : ore + ' ore')
+        + '</b>. Scaduto quello sparisce da solo, e non &egrave; successo niente.</li>'
+      + '<li>Preso l\'ordine, <b>ogni passo ha ' + mi + ' minuti</b>: ' + mi
+        + ' a chi compra per dire dove vuole i sats, e da l&igrave; altri ' + mi
+        + ' a chi vende per bloccarli. Il cronometro <b>riparte a ogni mossa</b>, quindi in due passi il tempo &egrave; il doppio.</li>';
+  }
 }
 
 /* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
@@ -37858,17 +38035,16 @@ function contoDettP2P(o){
         + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
-  /* la spiegazione sotto il conto: il mercato che si muove e la
-     commissione intera con la sua spartizione — le due cose che le
-     righe da sole non possono dire */
-  const dice = [
-    (!fisso && vivo)
-      ? 'Cifre al prezzo di mercato di adesso: quelle esatte si fissano allo scambio.'
-      : '',
-    (fee > 0)
-      ? 'La commissione (' + pct(fee * 100) + '% dello scambio) si divide metà a testa: nel conto c’è la tua metà.'
-      : ''
-  ].filter(Boolean).join(' ');
+  /* la spiegazione sotto il conto: la commissione intera con la sua
+     spartizione — la cosa che le righe da sole non possono dire.
+     ⚠️ QUI STAVA ANCHE «Cifre al prezzo di mercato di adesso», ed è
+     stata TOLTA (set 2026, decisione di Andrea): sotto il conto
+     restano due righe che spiegano, e la nota della garanzia sopra i
+     bottoni è quella che si legge davvero. Il mercato che si muove lo
+     dice adesso la pagina «Informazioni» del P2P. */
+  const dice = (fee > 0)
+    ? 'La commissione (' + pct(fee * 100) + '% dello scambio) si divide metà a testa: nel conto c’è la tua metà.'
+    : '';
   /* `conto-p2p` NON e' un vestito diverso: e' il permesso di cedere
      dalla parte giusta. Qui i valori sono lunghi come in nessun'altra
      riga dell'app — una percentuale, un cartello e due capi di un
@@ -38012,8 +38188,8 @@ function renderDettaglioP2P(){
        col foglio, si sposta sopra i due bottoni — dove la legge chi
        sta per premerli. */
     '<div class="trust-note nota-scambio"><span>' + (compro
-      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro con il metodo scelto e i sats arrivano a te. Barattolo non tiene e non vede i sats.'
-      : 'Blocchi i sats in garanzia, ricevi gli euro e poi li liberi tu. Finché non li liberi restano bloccati e nessuno può prenderli.') +
+      ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro col metodo scelto e i sats arrivano a te.'
+      : 'Tu blocchi i sats in garanzia, ricevi gli euro col metodo scelto e i sats vanno al compratore.') +
     '</span></div>' +
     '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
