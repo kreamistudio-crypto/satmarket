@@ -6543,10 +6543,15 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
-  <!-- ============ VISTA: INFORMAZIONI SUL P2P (set 2026) ============
+  <!-- ============ VISTA: INFO P2P (set 2026) ============
        La terza voce della nav trasformata, nello slot che aspettava:
        come funziona lo scambio e il suo regolamento, tutto in un
        posto solo invece che sparso nei fogli.
+       ⚠️ LA VOCE SI CHIAMA «Info P2P» E NON «Informazioni» (ritocco
+       di Andrea lo stesso giorno): in una barra a cinque celle
+       l'etichetta lunga era la piu' larga di tutte, e «Info P2P» dice
+       anche DI COSA — che in una nav dove le sorelle si chiamano
+       «Libro ordini» e «I miei scambi» non e' un dettaglio.
        IL VESTITO E' QUELLO DELLE PAGINE LUNGHE (.sicu-*), lo stesso
        di «Il pagamento protetto» e «I tuoi dati»: trenta regole gia'
        tarate per la lettura, e rinominarle costerebbe righe per zero
@@ -7901,7 +7906,7 @@ document.getElementById('cartello')?.remove();</script>
          Il 🤝 se n'e' andato di qui e resta al RITIRO IN ZONA degli
          annunci: due mestieri diversi — in nav dice dove sei, li' dice
          come arriva la roba -->
-    <!-- Nel P2P questa cella porta «Informazioni» (set 2026): lo slot
+    <!-- Nel P2P questa cella porta «Info P2P» (set 2026): lo slot
          che aspettava la voce che verra' ce l'ha. La ⓘ e' disegnata
          nella grammatica delle sorelle — griglia da 24 ritagliata a
          "2 2 20 20", tratto 1.5 currentColor, velo al 12% e il tondo
@@ -7909,7 +7914,7 @@ document.getElementById('cartello')?.remove();</script>
          suo regolamento, che fin qui stava sparso nei fogli. -->
     <div class="nav-cella">
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
-    <button id="nav-p2pinfo" class="strato-p2p" onclick="go('p2pinfo')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 7.9v.6"/><path d="M12 11.2v5.4"/></svg></span>Informazioni</button>
+    <button id="nav-p2pinfo" class="strato-p2p" onclick="go('p2pinfo')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 7.9v.6"/><path d="M12 11.2v5.4"/></svg></span>Info P2P</button>
     </div>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
@@ -10052,7 +10057,7 @@ function go(view){
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
   if (view==='p2pordine') renderOrdineP2P();
-  /* «Informazioni»: i numeri vengono dal 38385, e QUI e' l'unico
+  /* «Info P2P»: i numeri vengono dal 38385, e QUI e' l'unico
      posto da cui passano tutte le strade — il tasto della nav, il
      gesto indietro, la cronologia. Rinfrescarli a ogni ingresso e'
      la stessa ragione delle due sorelle: fra un giro e l'altro una
@@ -10234,7 +10239,7 @@ const RADICI = new Set(['esplora','vendi','affari','profilo',
      del libro — fra i due tasti della nav P2P si SOSTITUISCE, come
      fra i tab di sempre */
   'p2pmiei',
-  /* ...e «Informazioni» con loro: e' il terzo tasto della stessa
+  /* ...e «Info P2P» con loro: e' il terzo tasto della stessa
      barra, e fra tre tasti sorelle si sostituisce uguale */
   'p2pinfo']);
 /* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
@@ -34437,7 +34442,7 @@ function infoDaEvento(ev){
        dopo (vedi CLAUDE.md, «I TRE TIMER»). Si LEGGE, mai cablata. */
     scadenzaSec: Math.floor(num('expiration_seconds')),
     /* quanto vive un ordine NEL LIBRO, in ore (168 sul nostro nodo):
-       la legge la pagina «Informazioni», e come le altre si LEGGE —
+       la legge la pagina «Info P2P», e come le altre si LEGGE —
        il numero cablato in P2P_ORIZZONTE_S resta il ripiego di chi
        deve decidere prima che il 38385 arrivi, mai la fonte. */
     oreVita: Math.floor(num('expiration_hours')),
@@ -38050,16 +38055,20 @@ function contoDettP2P(o){
         + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
     : '';
-  /* la spiegazione sotto il conto: la commissione intera con la sua
-     spartizione — la cosa che le righe da sole non possono dire.
-     ⚠️ QUI STAVA ANCHE «Cifre al prezzo di mercato di adesso», ed è
-     stata TOLTA (set 2026, decisione di Andrea): sotto il conto
-     restano due righe che spiegano, e la nota della garanzia sopra i
-     bottoni è quella che si legge davvero. Il mercato che si muove lo
-     dice adesso la pagina «Informazioni» del P2P. */
-  const dice = (fee > 0)
-    ? 'La commissione (' + pct(fee * 100) + '% dello scambio) si divide metà a testa: nel conto c’è la tua metà.'
-    : '';
+  /* ⚠️ SOTTO IL CONTO NON C'E' PIU' NIENTE, e ci sono voluti due
+     giri (set 2026, decisione di Andrea). Qui stavano due frasi:
+     «Cifre al prezzo di mercato di adesso» e la commissione intera
+     con la sua spartizione. Se ne sono andate tutt'e due, e la
+     ragione e' la stessa — non erano false, erano nel posto
+     sbagliato: sotto un conto che chi legge sta per confermare, e
+     sopra la nota della garanzia, che e' quella che uno legge
+     davvero. Adesso quelle due cose le dice per intero la pagina
+     «Info P2P», dove c'e' lo spazio per dire anche il perche', e qui
+     restano le sole CIFRE — che il conto le sappia spiegare da solo
+     e' il patto del foglio «Paga» del mercatino.
+     Quel che resta a dirlo in un carattere: il `≈` davanti a ogni
+     stima, e la percentuale accanto a «Fee Barattolo», che e' la
+     META' di chi legge. */
   /* `conto-p2p` NON e' un vestito diverso: e' il permesso di cedere
      dalla parte giusta. Qui i valori sono lunghi come in nessun'altra
      riga dell'app — una percentuale, un cartello e due capi di un
@@ -38113,8 +38122,7 @@ function contoDettP2P(o){
     + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot sats')
     + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
-    + '</div>'
-    + (dice ? '<div class="hint">' + dice + '</div>' : '');
+    + '</div>';
 }
 
 /* ---- IL METODO, che qui si SCEGLIE ----

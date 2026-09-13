@@ -24690,7 +24690,7 @@ def prove_seo():
     # ...e dentro le celle: il bottone di sempre PRIMA, lo strato
     # dello scambio dopo. EMENDATA (set 2026): l'ultima cella non ha
     # piu' il posto vuoto — lo slot che «aspettava la voce che verra'»
-    # ce l'ha, ed e' «Informazioni», la pagina che spiega lo scambio.
+    # ce l'ha, ed e' «Info P2P», la pagina che spiega lo scambio.
     interne = _re.findall(r'<div class="nav-cella">(.*?)</div>',
                           barra, _re.S)
     prova("le tre celle a strati, nell'ordine del disegno",
@@ -24709,6 +24709,9 @@ def prove_seo():
     # lo stato di una leva — e dello spaziatore non resta NIENTE,
     # nemmeno una regola CSS orfana (il precedente di .sped-badge:
     # una regola morta fa credere a chi legge che qualcosa la usi)
+    prova("...e la voce nuova si chiama «Info P2P», non «Informazioni»",
+          True, '</svg></span>Info P2P</button>' in barra
+          and "Informazioni</button>" not in barra)
     prova("dello spaziatore non resta niente", 0,
           testo_mini.count("nav-vuoto"))
     prova("...e il tasto Aste nasce visibile", False,
@@ -37923,9 +37926,19 @@ console.log(JSON.stringify(out));
           and cm.count('ctrl-riga tot') == 2)
     prova("...e senza premio la sua riga non c'e'", False,
           "Premio al venditore" in cm)
-    prova("la spiegazione dice il 2% intero e la spartizione", True,
-          "(2% dello scambio)" in cm and "metà a testa" in cm
-          and "la tua metà" in cm)
+    # ⚠️ SOTTO IL CONTO NON C'E' PIU' NESSUNA SPIEGAZIONE (13 set
+    # 2026, decisione di Andrea): la riga della commissione intera con
+    # la sua spartizione ha seguito quella del prezzo di mercato, e
+    # per la stessa ragione — non era falsa, era nel posto sbagliato.
+    # Le due cose le dice la pagina «Info P2P». Qui restano le sole
+    # CIFRE, e la sentinella e' rovesciata apposta: certifica il
+    # SILENZIO, che e' la cosa che una regressione romperebbe.
+    prova("sotto il conto non c'e' nessuna spiegazione", True,
+          "dello scambio)" not in cm and "metà a testa" not in cm
+          and 'class="hint"' not in cm)
+    prova("...e la commissione la dice la riga, con la meta' di chi legge",
+          True, "Fee Barattolo" in cm
+          and '<b class="p2p-avviso">1%</b>' in cm)
     # COL PREMIO: la percentuale sta nell'ETICHETTA, attaccata al
     # nome della voce e in tinta col giudizio di sempre — «Premio al
     # venditore +4%» — e a destra i soli sats col segno del CONTO: su
