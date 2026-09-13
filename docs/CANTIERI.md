@@ -10498,6 +10498,127 @@ vivo, a 375: le due frasi specchiate, il conto senza la riga tolta, i
 quattro stati della commissione e la pagina intera fino al piede, che
 sotto la nav non nasconde niente.
 
+## NIENTE GPS NELLE FOTO, E LA PORTA CHE ERA PULITA PER FORTUNA (set 2026)
+
+Andrea toglieva i metadati alle sue foto **a mano, prima di
+caricarle**, perché contengono la posizione. Da lì la domanda che ha
+aperto il cantiere, e che era la più importante delle tre: **li
+togliamo noi?** Perché se non li togliessimo, ogni annuncio
+pubblicato porterebbe in vetrina la casa di chi vende — un difetto
+molto più grosso di quello da cui si era partiti.
+
+**La risposta era «sì, ma per fortuna».** La Mini App il file scelto
+non lo manda MAI: `ridimensiona()` lo ridisegna in un canvas e
+`toDataURL('image/jpeg')` riscrive i soli pixel — un JPEG che esce da
+un canvas i metadati non li sa nemmeno scrivere. E la strada di
+ripiego (le HEIC, i formati che il browser non decodifica) passa da
+`converti_in_jpeg`, che salva **senza** `exif=` e quindi li perde per
+lo stesso motivo: misurato al banco, entrata con GPS a 4 campi,
+uscita 0 tag. Nessuna delle due era una scelta di privacy: erano due
+effetti collaterali di decisioni prese per la QUALITÀ dell'immagine, e
+un effetto collaterale non è una promessa — il giorno che qualcuno
+aggiunge `exif=` a `converti_in_jpeg` per raddrizzare meglio le foto,
+la casa di tutti esce insieme all'orientamento. Per questo adesso
+c'è una sentinella che quella riga la sorveglia.
+
+**IL BUCO VERO ERA L'IMPORT**, e l'ironia dice tutto su come nascono
+questi difetti: `normalizza_foto_import` faceva passare VERBATIM ogni
+JPEG fino a 1600px **purché DRITTO** — la condizione «dritto» non
+c'entrava niente con la privacy, serviva solo perché `miniatura_jpeg`
+non sa ruotare. Risultato: la foto STORTA era protetta (veniva
+riconvertita, e nella conversione il GPS spariva) e quella dritta no.
+Da lì passano l'import CSV/ZIP dei negozi e i connettori. Più i due
+documenti privati — la busta di ritiro e la foto del contenuto
+digitale — che `_documento_busta` scriveva byte per byte: pubblico più
+stretto (una persona sola), stesso GPS dentro.
+
+**LA CURA NON RICOMPRIME, ed è la riga che tiene insieme questo
+cantiere col patto della filiera.** Ricomprimere sarebbe stato tre
+righe: `converti_in_jpeg` e via. Ma il patto dice una compressione
+sola (~2dB a ogni giro JPEG→JPEG), e una cura per la privacy che
+peggiora tutte le foto del mercatino è una cura che qualcuno, prima o
+poi, spegne. Quindi `spoglia_metadati` fa **chirurgia sui segmenti**:
+i pixel non si toccano mai, e la prova lo misura confrontando i
+PIXEL — non i byte — prima e dopo.
+
+**La whitelist dice cosa si tiene, non cosa si butta**, per la stessa
+ragione di `NOME_FOTO` e delle `FIRME`: il posto nuovo dove un domani
+qualcuno scriverà il luogo lo trova già chiuso. Di un JPEG restano i
+tre segmenti che servono a DISEGNARLO (JFIF, ICC, Adobe: senza
+quest'ultimo certi JPEG cambiano colore), di un PNG i pezzi del
+disegno e del colore più i tre dell'animazione — che senza di loro un
+APNG diventerebbe il primo fotogramma, in silenzio.
+
+**IL WEBP È QUELLO DOVE TAGLIARE NON BASTA**, ed è la trappola che
+poteva rompere le foto invece di salvarle: dopo aver tolto i pezzi
+EXIF e XMP bisogna **rifare la lunghezza del RIFF** e **spegnere i due
+bit del VP8X** che annunciano quei pezzi. Un contenitore che dichiara
+quel che non ha è un file che mente, e certi lettori lo rifiutano in
+blocco — cioè la cura si sarebbe vista come «la foto non si apre più»,
+esattamente il sintomo da cui questo cantiere è partito.
+
+**L'ESITO SI COLLAUDA INVECE DI DEDURLO.** `_porta_metadati` riapre i
+byte spogliati e risponde se è rimasto qualcosa; è l'**unica guardia
+fail-CHIUSO** di tutta la filiera delle foto (tutte le altre sono
+fail-open per scelta: meglio una foto storta in vetrina che una buona
+rifiutata). Qui il dubbio non costa una foto storta, costa un
+indirizzo — e chi chiama, sul dubbio, ricomprime. Così la promessa
+non è «il codice dovrebbe togliere gli EXIF» ma «questi byte, appena
+prima di essere scritti, sono stati guardati».
+
+**QUEL CHE NON SI SA SPOGLIARE NON SI CONVERTE PER PAURA.** Il GIF non
+ha un chirurgo: si guarda il file vero, e se non porta metadati passa
+com'è. Convertirlo per un pericolo teorico (un GIF con XMP non lo
+produce nessun telefono) vorrebbe dire cambiare il file di qualcuno
+senza che serva. **Il PDF della busta resta fuori e sta scritto**: lì
+i metadati vivono dentro il documento e vogliono un altro attrezzo.
+Fuori anche i file **già** sul disco in `buste/` e `contenuti/`, che
+sono cifrati a riposo: per spogliarli servirebbe la chiave, ed è un
+attrezzo diverso da questo.
+
+**LE FOTO GIÀ PUBBLICATE** le spoglia `spoglia_foto_esistenti.py`:
+anteprima di default (sola lettura, dice quante e quali), `--scrivi`
+per farlo davvero. Prima di sostituire un file **confronta i pixel**,
+e se non tornano lo lascia dov'è e lo dice; `os.replace` è atomico,
+quindi si può girare a server acceso — chi sta scaricando prende la
+vecchia o la nuova, mai metà e metà. Le funzioni non sono una copia:
+si estraggono dal sorgente di server.py, che è la fonte unica (la
+strada di `ricategorizza.py`). In locale, sulle 478 foto della
+cartella, ha trovato **zero** metadati e zero GPS — coerente con la
+storia raccontata qui sopra, e da rifare sul VPS, che è l'unico posto
+dove la risposta conta.
+
+**COSA HANNO DOVUTO CEDERE LE PROVE.** La prova della busta di ritiro
+usava, come documento, quattro byte con la firma giusta
+(`b"\xff\xd8\xff finto"`): da quando il documento si spoglia, un
+finto non arriva più in fondo — Pillow non lo apre, `_porta_metadati`
+sul dubbio dice «sporca», e la conversione di ripiego fallisce. Adesso
+quella prova usa una **foto vera col GPS dentro**, e nel farlo è
+diventata anche una prova del cantiere: il documento entra con
+l'indirizzo e arriva al compratore senza. Senza Pillow non si sa
+costruire una foto vera: lì la busta si gira come si è sempre girata
+(con la spoliazione finta) e la promessa la tiene
+`prove_foto_metadati`, che senza Pillow si SALTA — e una saltata si
+conta, che è la regola di `salta()`.
+
+**Totale del giro: 28 prove nuove** (il giro completo della
+spoliazione su JPEG, PNG e WebP, i pixel confrontati a ogni formato,
+il verbatim dell'import, il GIF che passa com'è, i byte che non si
+capiscono) più **due nel documento di ritiro**, e cinque sentinelle:
+le tre porte che devono continuare a chiamare `spoglia_metadati`,
+`converti_in_jpeg` che non deve riportarsi dietro gli EXIF, il
+fail-chiuso di `_porta_metadati`, e il canvas della Mini App — che è
+il motivo per cui la porta grande era pulita fin dall'inizio.
+
+**QUEL CHE RESTA APERTO**, dichiarato: il sintomo da cui si era
+partiti — «tolgo i metadati e la foto non si vede più» — **non è
+spiegato da niente di tutto questo**. Nessuna guardia della filiera
+chiede che gli EXIF esistano, e al banco la stessa foto spogliata
+passa tutti i cancelli. Dal campo Andrea riferisce che l'annuncio
+nasce ma al posto dell'immagine compare il segnaposto, cioè il file
+sul server o non c'è o non si apre: è un'altra indagine, e la prima
+cosa da guardare è se `foto/a<id>_0.jpg` esiste davvero sul VPS.
+
 ## La pillola «Ordina», e la centratura che è caduta con lei (13 set 2026)
 
 **IL LIBRO SI ORDINAVA GIÀ, e nessuno lo sapeva.** Il criterio era — ed è

@@ -5635,6 +5635,47 @@
   contenuti digitali: un fail-open silenzioso anche per chi guarda il
   server non è dichiarato, è solo silenzio. Con Pillow anche i
   PNG/WebP grezzi diventano JPEG veri.
+  NIENTE GPS NELLE FOTO (set 2026, cantiere suo). Una foto scattata
+  col telefono porta negli EXIF il luogo dove è stata scattata, e in
+  un mercatino quello è la casa di chi vende. La porta grande era
+  già pulita, ma per FORTUNA e non per scelta: la Mini App il file
+  scelto non lo manda mai — `ridimensiona()` lo ridisegna in un
+  canvas e `toDataURL` riscrive solo i pixel, che i metadati il
+  canvas non li sa nemmeno scrivere — e `converti_in_jpeg`, che
+  salva senza `exif=`, li perde per lo stesso motivo. Passavano
+  invece dal ramo VERBATIM di `normalizza_foto_import` (import
+  CSV/ZIP e connettori: un JPEG fino a 1600px e DRITTO tornava
+  identico, GPS compreso) e dai due documenti privati — la busta di
+  ritiro e la foto del contenuto digitale — che `_documento_busta`
+  scriveva com'erano.
+  ADESSO OGNI PORTA SPOGLIA, e lo fa SENZA RICOMPRIMERE:
+  `spoglia_metadati` taglia i segmenti del contenitore e non tocca i
+  pixel, quindi il patto della compressione unica resta intero.
+  Whitelist e non lista nera, come `NOME_FOTO` e le `FIRME`: di un
+  JPEG restano JFIF (APP0), ICC (APP2) e il marcatore Adobe (APP14)
+  — via APP1 (EXIF e XMP), APP13 (IPTC, che i campi del luogo ce li
+  ha anche lui) e i commenti; di un PNG restano i pezzi che
+  disegnano e quelli del colore; di un WebP se ne vanno i pezzi EXIF
+  e XMP, e li' NON BASTA TAGLIARE — la lunghezza del RIFF va rifatta
+  e i due bit del VP8X che ANNUNCIANO i metadati vanno spenti, o il
+  file mente sul proprio contenuto e certi lettori lo rifiutano in
+  blocco.
+  L'ESITO SI COLLAUDA, non si deduce: `_porta_metadati` riapre i
+  byte e dice se è rimasto qualcosa, ed è l'unica guardia
+  fail-CHIUSO della filiera (sul dubbio risponde «sporca»). Il
+  ripiego di tutte e tre le porte è `converti_in_jpeg`, che spoglia
+  per forza perché RIDISEGNA: costa ~2dB, e un indirizzo di casa
+  costa di più. Chi non ha un chirurgo (il GIF) non viene convertito
+  per paura: si guarda il file vero, e se non porta niente passa
+  com'è.
+  IL PDF DELLA BUSTA RESTA FUORI, dichiarato: lì i metadati sono
+  un'altra storia (XMP dentro il documento) e vorrebbero un altro
+  attrezzo. Restano fuori anche i file GIÀ sul disco in `buste/` e
+  `contenuti/`, che sono cifrati: per quelli servirebbe la chiave.
+  Le foto già pubblicate in `foto/` le spoglia
+  `spoglia_foto_esistenti.py` (anteprima di default, `--scrivi` per
+  farlo; verifica i pixel prima di sostituire, e `os.replace` è
+  atomico, quindi si può girare a server acceso).
   NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo: «carico
   un JPG dal computer, qualche mega, e non succede NULLA — nessun
   errore, nessun chip»). La causa NON era il canvas, ed è la prima
