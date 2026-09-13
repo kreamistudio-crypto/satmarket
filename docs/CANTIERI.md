@@ -10333,3 +10333,106 @@ il Vendi (dove l'etichetta è la STESSA: la base non si specchia, a
 cambiare verso sono le righe sotto). Si guarda l'etichetta INTERA,
 `<span>` compreso, così la prova dice anche che dentro non c'è altro —
 in particolare non la bandierina.
+
+## La pagina «Informazioni» del P2P, e la frase che se n'è andata (13 set 2026)
+
+Due gesti nello stesso giro, e vanno insieme perché il secondo è il
+posto dove finisce quel che il primo toglie.
+
+**LA FRASE TOLTA** è quella che chiudeva il conto del dettaglio:
+«Cifre al prezzo di mercato di adesso: quelle esatte si fissano allo
+scambio.» Non era falsa — è la stessa cosa che la pagina nuova dice per
+intero — ma stava nel posto sbagliato: sotto un conto che chi legge sta
+per confermare, e sopra la nota della garanzia, che è quella che uno
+legge davvero. Sotto il conto resta la sola commissione con la sua
+spartizione, che è l'unica delle due che le righe da sole non possono
+dire. Il `≈` davanti a ogni stima continua a dire la stessa cosa in un
+carattere.
+
+**E LE DUE NOTE DELLA GARANZIA SI SPECCHIANO** (decisione di Andrea):
+prima quella di chi compra portava una coda in più («Barattolo non
+tiene e non vede i sats») e quella di chi vende raccontava un'altra
+cosa («poi li liberi tu, finché non li liberi restano bloccati»). Ora
+sono la stessa frase vista dai due lati — «Chi vende blocca i sats in
+garanzia, tu mandi gli euro col metodo scelto e i sats arrivano a te» /
+«Tu blocchi i sats in garanzia, ricevi gli euro col metodo scelto e i
+sats vanno al compratore» — e il fatto che se n'è andato con la coda
+non è perso: ha una sezione sua nella pagina nuova, dove c'è lo spazio
+per dire anche *perché*.
+
+**LA VOCE NUOVA STA NELLO SLOT CHE ASPETTAVA.** La nav trasformata
+aveva tre celle a due strati e la terza — quella di Ordini — nel P2P
+restava vuota apposta: «lo slot aspetta la voce che verrà». È
+«Informazioni», con la ⓘ disegnata nella grammatica delle sorelle
+(griglia da 24 ritagliata a `2 2 20 20`, tratto 1,5 currentColor, velo
+al 12%, il tondo un pelo fuori squadra). Radice sorella come il libro e
+i miei scambi: fra i tre tasti della barra si SOSTITUISCE, e l'indietro
+passa da Esplora come per tutti i tab.
+
+**IL VESTITO È QUELLO DELLE PAGINE LUNGHE** (`.sicu-*`), lo stesso di
+«Il pagamento protetto» e «I tuoi dati»: trenta regole già tarate per
+la lettura. È il patto dei nomi interni del carrello — quelle classi
+sono il nome di un VESTITO, non di un argomento, e rinominarle
+costerebbe righe per zero pixel.
+
+**QUI IL COORDINATORE SI NOMINA**, e non è uno strappo alla regola
+della fase 6. Quella vieta i nomi di terzi nelle viste dello SCAMBIO,
+dove uno sta facendo un gesto e un nome nuovo è solo rumore. Questa è
+la pagina che SPIEGA, ed è la sorella di «I tuoi dati», dove il
+coordinatore ha già il suo nome per intero: una pagina che dicesse
+«qualcuno tiene i sats» senza dire chi sarebbe reticente proprio dove
+si è venuti a capire. Il bottone in fondo porta là, all'ancora
+`priv-p2p`.
+
+**I NUMERI NON SI BATTONO A MANO, ed è la regola che vale più delle
+parole**: una pagina che spiega le regole è il posto dove un numero
+vecchio fa più danno, perché chi la legge la prende per il regolamento.
+Il markup è fisso e i numeri li scrive `renderP2PInfo` — la
+commissione dallo stesso giudice del conto dello scambio
+(`commissioneVivaP2P` / `commissioneListinoP2P`, così le due cifre non
+possono divergere), le due finestre dal 38385, la fascia del premio e i
+metodi dai cataloghi di casa (`P2P_PREMIO_MAX`, `P2P_METODI`). Una
+sentinella cerca una percentuale o una durata scritte nella prosa fuori
+dai commenti e fallisce se ne trova una.
+
+**E `expiration_hours` ADESSO SI LEGGE.** Era l'unica finestra che
+`infoDaEvento` buttava via: la vita di un ordine nel libro esisteva
+solo cablata, in `P2P_ORIZZONTE_S`, per decidere quando una riga
+abbandonata si può togliere. Ora il lettore del 38385 la prende
+(`oreVita`) e la pagina la dice — 7 giorni sul nostro nodo — col
+cablato che resta il RIPIEGO di chi deve rispondere prima che il libro
+arrivi, mai la fonte.
+
+**IL «NON LO SO» NON DIVENTA UNO ZERO**, che è la stessa regola di
+`commissioneVivaP2P`: senza il 38385 la commissione non ha una cifra, e
+al suo posto va la frase che dice dove trovarla («la trovi scritta nel
+conto dello scambio, prima che tu confermi»). Uno zero lì si
+leggerebbe «gratis». I quattro stati sono stati provati dal vivo, uno
+per uno: ignota, zero, 2% e 2% con la promo del listino a 3%.
+
+**LA FINESTRA È PER GESTO, e la pagina lo dice** invece di lasciar
+credere che quindici minuti siano tutto il tempo che c'è: entrando
+nella fase dopo il cronometro riparte (`show_hold_invoice` ri-timbra
+`taken_at`, verificato sul sorgente del coordinatore — vedi CLAUDE.md,
+«I TRE TIMER»), quindi in due passi il tempo utile è il doppio. È la
+cosa che leggendo il solo `settings.toml` non si vede, ed è
+esattamente quella che un utente si domanda.
+
+⚠️ **QUEL CHE RESTA DA GUARDARE**: il foglio della hold invoice dice
+«Hai circa N minuti» leggendo `hold_invoice_expiration_window` (300 →
+5 minuti), ma quella voce in v0.18.6 **non la legge nessuno** — è
+configurazione morta, e il mestiere che il suo commento descrive è di
+`expiration_seconds` (900 → 15). Quel foglio quindi promette metà del
+tempo che c'è. Non è stato toccato in questo giro perché è un'altra
+riga con un'altra decisione dietro; la pagina nuova usa il numero
+verificato.
+
+COLLAUDATO: **9252 verdi**, tredici sentinelle nuove — la vista al suo
+posto e senza interpolazioni, il vestito, la radice, il richiamo in
+`go()`, il tasto della barra, i quattro segnaposto vuoti, i giudici del
+render, il ripiego dichiarato, `oreVita` nel lettore del 38385 e la
+guardia sulle cifre nella prosa — più le tre emendate (la terza cella a
+strati, il conto dei `strato-p2p`, il giudice a quattro viste). E dal
+vivo, a 375: le due frasi specchiate, il conto senza la riga tolta, i
+quattro stati della commissione e la pagina intera fino al piede, che
+sotto la nav non nasconde niente.
