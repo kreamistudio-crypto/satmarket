@@ -36025,26 +36025,23 @@ def prove_p2p_libro():
     prova("...e i volti si chiedono PRIMA della reputazione, o non si chiedono mai",
           True, 0 < _rp.find("chiediFacceP2P(candidati.map(o => o.id))")
           < _rp.find("const mostrati = candidati.filter"))
-    # --- LA PILLOLA STA SOTTO IL LOGO (set 2026, ritocco di Andrea) ---
-    # ⚠️ NON BASTA CENTRARE LA PILLOLA: i due lati hanno larghezze
-    # diverse — «Filtro» da una parte, «N offerte» dall'altra, e il
-    # numero cambia — quindi il divisorio cadrebbe spostato, e di quanto
-    # lo deciderebbe il conteggio. I due lati valgono `flex:1 1 0`, cioe'
-    # entrambi quanto il piu' largo: il divisorio cade a meta' della
-    # pillola, e la pillola a meta' della riga, dove sta il logo.
+    # --- LE DUE PILLOLE AI DUE CAPI DELLA RIGA (set 2026) -------------
+    # ⚠️ LA CENTRATURA SOTTO IL LOGO E' CADUTA, e con lei il suo intero
+    # apparato: le tre colonne `1fr auto 1fr` della riga, i
+    # `grid-column` dichiarati e i due lati della pillola pesati
+    # uguale esistevano per UNA cosa sola — far cadere il divisorio
+    # esattamente sotto il logo. Spostato «Filtro» a destra quella cosa
+    # non c'e' piu', e tenere le regole sarebbe lasciare in giro un
+    # apparato morto (il precedente dello spaziatore). Le sentinelle
+    # che le sorvegliavano sono rovesciate qui sotto, apposta: se
+    # qualcuno rimette la centratura, deve rimettere anche loro.
     _pil = pezzo_js(mini, "  .p2p-filtro{", "}")
-    prova("la pillola e' stretta sul contenuto e centrata nella riga", True,
-          "width:fit-content" in _pil and "margin:2px auto 10px" in _pil)
-    # ⚠️ LO FA LA GRIGLIA E NON IL FLEX, ed e' la riga da non
-    # «semplificare»: `flex:1 1 0` pareggia solo lo spazio AVANZATO, e
-    # con `width:fit-content` non ne avanza — misurato dal vivo, a «1
-    # offerta» il divisorio se ne andava di 11px. Due colonne `1fr`,
-    # sotto dimensionamento intrinseco, valgono entrambe quanto la piu'
-    # capiente: scarto 0,00px da 1 a 128 offerte.
-    prova("...e i due lati pesano uguale per griglia, non per flex",
-          True, "display:grid" in _pil
-          and "grid-template-columns:1fr auto 1fr" in _pil
-          and "flex:1 1 0" not in _pil)
+    prova("la pillola resta stretta sul suo contenuto", True,
+          "width:fit-content" in _pil)
+    prova("...e le sue colonne sono a larghezza naturale", True,
+          "display:grid" in _pil
+          and "grid-template-columns:auto auto auto" in _pil
+          and "grid-template-columns:1fr auto 1fr" not in _pil)
     # il lato sinistro ha una scatola sua: senza, icona e «Filtro» sono
     # due fratelli del conteggio e un flex non sa che vanno pesati insieme
     prova("...e il lato sinistro sta in una scatola sua", True,
@@ -36075,9 +36072,9 @@ def prove_p2p_libro():
           is not None
           and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
                         r'<div id="p2pCorpo">', mini) is not None)
-    prova("la pillola vive nella testata, fuori dal corpo che scorre", True,
-          "if (testaBox) testaBox.innerHTML =" in _rp
-          and "'<div class=\"p2p-testa-riga\">' + pillola" in _rp
+    prova("le pillole vivono nella testata, fuori dal corpo che scorre",
+          True, "if (testaBox) testaBox.innerHTML =" in _rp
+          and "'<div class=\"p2p-testa-riga\">' + pillOrdina + pillola" in _rp
           and "box.innerHTML = avvisi" in _rp)
     # ⚠️ LA LEVETTA DEL TEMA E' QUELLA DI CASA (set 2026, richiesta di
     # Andrea): `.tema-btn` + `alternaTema()`, che scrive la preferenza
@@ -36092,16 +36089,85 @@ def prove_p2p_libro():
     # promette il buio quando il buio c'e' gia'
     prova("...e la sua icona guarda il tema di adesso", True,
           "temaEffettivo() === 'scuro' ? '☀️' : '🌙'" in _rp)
-    # ⚠️ E LE COLONNE DELLA GRIGLIA SI DICHIARANO: i figli sono DUE e
-    # le colonne TRE, quindi senza `grid-column` la pillola cade nella
-    # prima — misurata 75px a sinistra del centro, uno scarto che
-    # l'occhio non prende e il righello sì.
-    prova("...e la pillola resta al centro, la levetta nella terza",
-          (True, True),
-          ("grid-column:2" in pezzo_js(
-              mini, "  .p2p-testa-riga .p2p-filtro{", "}"),
-           "grid-column:3" in pezzo_js(
-              mini, "  .p2p-testa-riga .tema-btn{", "}")))
+    # ⚠️ I DUE CAPI LI FA UN `margin-right:auto` SULLA PRIMA, non tre
+    # colonne dichiarate: il vuoto sta in MEZZO, che a 320 e' l'unico
+    # posto dove non fa danni. E dei `grid-column` di ieri non resta
+    # niente — una riga flex li ignora in silenzio, che e' il modo in
+    # cui una regola morta sopravvive senza che nessuno se ne accorga.
+    _riga = pezzo_js(mini, "  .p2p-testa-riga{", "}")
+    prova("la riga della testata e' un flex a due capi", True,
+          "display:flex" in _riga
+          and "grid-template-columns" not in _riga)
+    prova("...con «Ordina» che spinge le altre a destra", True,
+          "margin-right:auto" in pezzo_js(
+              mini, "  .p2p-testa-riga .p2p-ordina{", "}"))
+    prova("...e dei grid-column di ieri non resta niente", 0,
+          mini.count("grid-column:2;margin:2px 0 10px")
+          + mini.count(".p2p-testa-riga .tema-btn{grid-column:3"))
+    # ⚠️ A 320 LE TRE COSE NON CI STANNO — misurate, 332px in 288 di
+    # riga — e il modo in cui cedevano era il peggiore: il conteggio
+    # spezzato in due DENTRO la pillola («3 / offerte») e la levetta
+    # tagliata dal bordo. Due cure, e nessuna tocca quel che si legge:
+    # la pillola non spezza mai la sua etichetta, e la riga VA A CAPO
+    # invece di sfondare — a scendere e' la levetta, che e' l'ospite,
+    # mai uno dei due comandi.
+    prova("la riga va a capo invece di sfondare", True,
+          "flex-wrap:wrap" in _riga and "justify-content:flex-end" in _riga)
+    prova("...e una pillola non spezza mai la sua etichetta", True,
+          "white-space:nowrap" in pezzo_js(
+              mini, "  .p2p-testa-riga .p2p-filtro{", "}"))
+    prova("...e sotto i 400 le due pillole si stringono", True,
+          "  @media (max-width:399px){" in mini
+          and ".p2p-testa-riga .p2p-filtro{padding:8px 11px;gap:6px}" in mini)
+
+    # --- LA PILLOLA «ORDINA» (set 2026, decisione di Andrea) ----------
+    # Quattro criteri, foglio di casa, e il predefinito e' quello che
+    # il libro aveva gia': la convenienza.
+    prova("le due pillole hanno la stessa pelle", True,
+          ".p2p-filtro.p2p-ordina{display:flex" in mini)
+    prova("la pillola apre il picker di casa, non un secondo foglio",
+          True, "onclick=\"apriPicker(\\'p2pOrdinaSel\\')\"" in _rp
+          and "id=\"p2pOrdinaSelBtn\"" in _rp)
+    prova("...e si accende solo fuori dal predefinito", True,
+          "(ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')" in _rp)
+    prova("...e il libro si ordina col criterio vivo", True,
+          "ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k),"
+          in _rp and "p2pLato, ordineLibroP2P())" in _rp)
+    # IL DEPOSITO E' LA `<select>` NASCOSTA, che e' anche il CATALOGO
+    # delle voci: un secondo posto dove tenere il valore sarebbe la
+    # stessa verita' in due copie. E sta nella VISTA, non in #p2pTesta,
+    # che renderP2P riscrive a ogni giro — li' il valore morirebbe.
+    _vp = mini[mini.index('id="view-p2p"'):mini.index('id="p2pCorpo"')]
+    prova("il deposito e' una select nascosta, nella vista", True,
+          '<select id="p2pOrdinaSel" hidden>' in _vp
+          and _vp.index('id="p2pOrdinaSel"') < _vp.index('id="p2pTesta"'))
+    prova("...coi quattro criteri, convenienza per prima e scelta",
+          ['conv', 'recenti', 'imp-giu', 'imp-su'],
+          re.findall(r'<option value="([a-z-]+)"', _vp))
+    prova("...e il predefinito del markup e' quello del codice", True,
+          '<option value="conv" data-corta="Convenienza" selected>' in _vp
+          and "const P2P_ORDINE_CASA = 'conv';" in mini)
+    # ⚠️ OGNI VOCE HA DUE NOMI: nel foglio quello intero, che spiega;
+    # nella pillola quello corto, o la riga andrebbe a capo pure a 375.
+    # Stanno nella STESSA voce (`data-corta`), cosi' chi ne aggiunge
+    # una non puo' dimenticarsene la meta'.
+    prova("ogni criterio porta il suo nome corto", 4,
+          len(re.findall(r'data-corta="[^"]+"', _vp)))
+    prova("...e la pillola legge il corto, il foglio l'intero", True,
+          "o.dataset.corta || o.text" in mini
+          and "resa: `<span>${esc(o.text)}</span>`" in pezzo_js(
+              mini, "  p2pOrdinaSel: {", "\n  },"))
+    prova("la voce del picker c'e', col suo titolo", True,
+          "p2pOrdinaSel: {titolo: 'Ordina il libro'," in mini)
+    prova("...e dopo la scelta ridisegna il libro, e basta", True,
+          "poi: () => renderP2P()}" in mini)
+    # L'ORDINAMENTO VALE SOLO PER IL LIBRO: «I miei scambi» sono i
+    # propri, di tutt'e due i versi, e ordinarli per convenienza non
+    # vorrebbe dire niente. La striscia la scrive scambiP2P, che di
+    # ordinaLibroP2P non sa nulla.
+    prova("i miei scambi non si riordinano", False,
+          "ordinaLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+          or "ordineLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
     # gli AVVISI restano col libro: appesi in alto mangerebbero schermo
     # per sempre a chi scorre, e raccontano la lettura di adesso
     prova("...e gli avvisi del libro restano col libro", True,
@@ -36385,7 +36451,15 @@ def prove_p2p_libro():
     stella_js = mini[i_st:mini.index(";", mini.index("z';", i_st))]
     j_val = mini.index("const P2P_VALUTA = ")
     val_js = mini[j_val:mini.index(";", j_val) + 1]
-    pezzi = [esc_js, val_js, stella_js] + [pezzo_js(mini, f) for f in (
+    # ⚠️ I COMPAGNI DELL'ORDINAMENTO VANNO PORTATI DENTRO, o la
+    # funzione ritagliata cerca costanti che qui non esistono: e' la
+    # trappola dei DUE RITAGLI, gia' pagata col conto del dettaglio —
+    # una funzione nuova chiamata da una vecchia non c'e', e il banco
+    # esplode (qui) o disegna il vuoto (nella vetrina dello
+    # scratchpad, che e' il caso che non fa rumore).
+    i_ord = mini.index("const P2P_ORDINI_LIBRO = ")
+    ord_js = mini[i_ord:mini.index("(o.euro || 0);", i_ord) + 14]
+    pezzi = [esc_js, val_js, stella_js, ord_js] + [pezzo_js(mini, f) for f in (
         "function contaFeedback(n, persone){",
         "function tagValore(ev, nome){",
         "function ordineDaEvento(ev, adesso){",
@@ -36401,8 +36475,9 @@ def prove_p2p_libro():
         # il giudice del colore, che dal set 2026 e' UNO per i due anelli
         "function statoAnelloP2P(manca){",
         "function anelloScadenzaP2P(o, adesso){",
-        # l'ordine del libro per convenienza di chi legge (set 2026)
-        "function ordinaLibroP2P(righe, lato){",
+        # i QUATTRO ordini del libro (set 2026): convenienza (il
+        # predefinito), piu' recenti, importo nei due versi
+        "function ordinaLibroP2P(righe, lato, criterio){",
         "function satsMercatoP2P(o){",
         # la commissione del coordinatore (set 2026): la card mostra il
         # NETTO di tutto, e questi due sono i giudici che lo fanno
@@ -36613,6 +36688,32 @@ const mazzo = [ord('a', 4, 100), ord('b', -2, 100), ord('c', 0, 100),
 out.ordCompra = ordinaLibroP2P(mazzo, 'compro').map(x => x.id).join('');
 out.ordVendi  = ordinaLibroP2P(mazzo, 'vendo').map(x => x.id).join('');
 out.ordNonTocca = mazzo.map(x => x.id).join('');
+/* IL CRITERIO SI PASSA (set 2026, la pillola «Ordina»). Senza terzo
+   argomento vale il predefinito, che e' la convenienza: e' la riga che
+   garantisce che l'aggiunta della leva non abbia spostato il libro
+   sotto gli occhi di chi non ha chiesto niente. */
+out.ordDefault = ordinaLibroP2P(mazzo, 'compro', undefined).map(x => x.id).join('');
+out.ordConv = ordinaLibroP2P(mazzo, 'compro', 'conv').map(x => x.id).join('');
+/* ...e un criterio che non conosciamo (un domani, una vista vecchia)
+   ricade sul predefinito invece di lasciare la lista come capita */
+out.ordIgnoto = ordinaLibroP2P(mazzo, 'compro', 'pinco').map(x => x.id).join('');
+/* PIU' RECENTI: il premio non conta piu', e il lato nemmeno */
+const perData = [ord('a', 4, 100), ord('b', -2, 300), ord('c', 0, 200)];
+out.ordRecenti = ordinaLibroP2P(perData, 'compro', 'recenti').map(x => x.id).join('');
+out.ordRecentiVendi = ordinaLibroP2P(perData, 'vendo', 'recenti').map(x => x.id).join('');
+/* IMPORTO, e il caso che decide: l'intervallo. «g» va da 10 a 90,
+   quindi in DISCESA conta il capo alto (90, davanti a «m» che sta a
+   50) e in SALITA il capo basso (10, davanti a «p» che sta a 20). Un
+   punto solo direbbe un numero che nessuno dei due sta cercando. */
+const imp = (d, e, eMax, creato) => ({id: d, euro: e, euroMax: eMax || 0,
+                                      premium: 0, creato: creato || 100});
+const mazzoImp = [imp('m', 50), imp('p', 20), imp('g', 10, 90)];
+out.ordImpGiu = ordinaLibroP2P(mazzoImp, 'compro', 'imp-giu').map(x => x.id).join('');
+out.ordImpSu = ordinaLibroP2P(mazzoImp, 'compro', 'imp-su').map(x => x.id).join('');
+/* a parita' di importo vince il piu' recente, in tutti e quattro */
+const pari = [imp('v', 50, 0, 100), imp('n', 50, 0, 300)];
+out.ordImpPari = ordinaLibroP2P(pari, 'compro', 'imp-giu').map(x => x.id).join('');
+out.ordImpNonTocca = mazzoImp.map(x => x.id).join('');
 /* IL FILTRO DEL LIBRO (set 2026): le quattro leve, una per una, e
    soprattutto i due casi in cui e' facile sbagliare — il metodo che si
    confronta per CONTENIMENTO (sul libro arriva testo libero degli altri
@@ -37018,6 +37119,27 @@ console.log(JSON.stringify(out));
     prova("nel tab Compra viene prima il premio piu' basso",
           "bdca", out["ordCompra"])
     prova("...e nel tab Vendi il piu' alto", "adcb", out["ordVendi"])
+    # --- I QUATTRO ORDINI DEL LIBRO (set 2026, la pillola «Ordina») ---
+    # IL PREDEFINITO NON E' CAMBIATO, ed e' la riga che conta piu' di
+    # tutte: aggiungere la leva non deve spostare il libro sotto gli
+    # occhi di chi non ha chiesto niente.
+    prova("senza criterio vale la convenienza, come ieri",
+          ["bdca", "bdca"], [out["ordDefault"], out["ordConv"]])
+    prova("...e un criterio sconosciuto ci ricade sopra",
+          "bdca", out["ordIgnoto"])
+    prova("«Piu' recenti» guarda solo la data, e il lato non conta",
+          ["bca", "bca"], [out["ordRecenti"], out["ordRecentiVendi"]])
+    # ⚠️ L'INTERVALLO E' IL CASO CHE DECIDE: «g» va da 10 a 90 euro, e
+    # va PRIMA in tutt'e due i versi — in discesa perche' puo' salire a
+    # 90, in salita perche' puo' partire da 10. Con un punto solo (la
+    # media, o sempre il capo basso) uno dei due sarebbe sbagliato.
+    prova("«dal piu' grande» guarda il capo ALTO dell'intervallo",
+          "gmp", out["ordImpGiu"])
+    prova("...e «dal piu' piccolo» il capo BASSO", "gpm", out["ordImpSu"])
+    prova("...e a parita' di importo vince il piu' recente",
+          "nv", out["ordImpPari"])
+    prova("...e nemmeno l'importo tocca la lista di partenza",
+          "mpg", out["ordImpNonTocca"])
     prova("...e la lista in memoria non si tocca", "abcd",
           out["ordNonTocca"])
 

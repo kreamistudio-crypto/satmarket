@@ -10497,3 +10497,89 @@ strati, il conto dei `strato-p2p`, il giudice a quattro viste). E dal
 vivo, a 375: le due frasi specchiate, il conto senza la riga tolta, i
 quattro stati della commissione e la pagina intera fino al piede, che
 sotto la nav non nasconde niente.
+
+## La pillola «Ordina», e la centratura che è caduta con lei (13 set 2026)
+
+**IL LIBRO SI ORDINAVA GIÀ, e nessuno lo sapeva.** Il criterio era — ed è
+rimasto — la **convenienza**: il premio come metro, il verso rovesciato
+col tab (chi compra sats vuole il premio più basso, chi li vende il più
+alto) e il più recente a parità. Era una scelta buona presa da sola, ma
+muta: chi guardava il libro non aveva modo di sapere né che fosse
+ordinato né come. Adesso la pillola lo dice, e ne offre altri tre.
+
+**I QUATTRO CRITERI**, e il primo è il predefinito:
+**Convenienza** · **Più recenti** · **Importo: dal più grande** ·
+**Importo: dal più piccolo**. Il predefinito non è cambiato apposta:
+aggiungere la leva non deve spostare il libro sotto gli occhi di chi non
+ha chiesto niente — e una sentinella lo tiene fermo, sia senza terzo
+argomento sia con un criterio che non conosciamo.
+
+**L'IMPORTO GUARDA IL CAPO CHE CONTA NELLA DIREZIONE CHIESTA**, ed è il
+caso su cui si decide qualcosa. Un ordine a intervallo («da 10 a 90 €»)
+non ha *un* importo: chi cerca il grande guarda fin dove può **salire**
+(`euroMax`), chi cerca il piccolo da dove può **partire** (`euro`). Con
+un punto solo — la media, o sempre il capo basso — uno dei due versi
+direbbe un numero che nessuno sta cercando. Nel banco quell'ordine va
+**primo in tutt'e due i versi**, ed è la riga che prova la scelta.
+
+**IL FOGLIO È QUELLO DI CASA**, e questa è la decisione che ha risparmiato
+più codice: `#pickerSheet` — «le tendine vestite da Barattolo» — esiste
+già, con selezione singola, spunta, Esc, frecce e focus. Basta una
+`<select hidden>` che fa da **deposito del valore** e da **catalogo delle
+voci**, più una riga nel `PICKER`. Un secondo foglio «Ordina» scritto a
+mano sarebbe stato una seconda cosa da tenere allineata, e un secondo
+posto dove tenere il valore sarebbe stata la stessa verità in due copie.
+La `<select>` sta nella **vista** e non in `#p2pTesta`, che renderP2P
+riscrive a ogni giro: lì il valore ci morirebbe dentro.
+
+**OGNI VOCE HA DUE NOMI** (`data-corta`): nel foglio quello intero, che
+spiega («Importo: dal più grande»); nella pillola quello corto («Più
+grandi»), o la riga andrebbe a capo anche a 375. Il foglio insegna, la
+pillola ricorda — e i due nomi stanno nella **stessa voce**, così chi ne
+aggiunge una non può dimenticarsene la metà.
+
+**LA CENTRATURA SOTTO IL LOGO È CADUTA, e con lei tutto il suo
+apparato.** Le tre colonne `1fr auto 1fr` della riga, i `grid-column`
+dichiarati e i due lati della pillola Filtro pesati uguale esistevano per
+UNA cosa sola: far cadere il divisorio esattamente sotto il logo. Spostato
+il Filtro a destra quella cosa non c'è più, e tenere le regole sarebbe
+stato lasciare in giro un apparato morto — il precedente dello
+spaziatore. Sono uscite tutte, e le sentinelle che le sorvegliavano sono
+**rovesciate**: certificano che non ci siano. Chi un domani rimette la
+centratura deve rimettere anche loro, e sapere perché.
+
+⚠️ **A 320 LE TRE COSE NON CI STANNO, ed è misurato e non stimato**:
+332px in 288 di riga. Il modo in cui cedevano era il peggiore — il
+conteggio spezzato in due righe DENTRO la pillola («3 / offerte») e la
+levetta del tema **tagliata dal bordo**, cioè un comando che sparisce
+senza dirlo. Provate e scartate, coi numeri: la sola compattazione di
+respiro e distanze arriva a 309, il solo nome corto a 288 esatti (zero
+slack, e con «128 offerte» torna a sfondare). La cura è in due pezzi e
+nessuno dei due tocca quel che si legge: `white-space:nowrap` sulle
+pillole — **una pillola non spezza mai la sua etichetta**, la regola di
+casa — e la riga che **va a capo** invece di sfondare, con le due
+pillole strette un po' sotto i 400. A scendere è la **levetta**, che è
+l'ospite, mai uno dei due comandi. Misurato: 375 sempre una riga (anche
+con 128 offerte), 360 una riga fino a un conteggio a due cifre, 320 la
+levetta sulla seconda. Overflow: **mai**.
+
+**VALE SOLO PER IL LIBRO.** «I miei scambi» sono i propri, di tutt'e due
+i versi, e ordinarli per convenienza non vorrebbe dire niente: la
+striscia la scrive `scambiP2P`, che di `ordinaLibroP2P` non sa nulla — e
+una sentinella lo tiene così.
+
+⚠️ **LA TRAPPOLA DEI DUE RITAGLI HA MORSO DI NUOVO**, terza volta in due
+giorni: `ordinaLibroP2P` ha cambiato firma e si è portata dietro tre
+costanti nuove, e il banco di `prove.py` ritaglia le funzioni da un
+ELENCO ESPLICITO. La firma vecchia nell'elenco ha fatto esplodere l'intera
+`prove_p2p_libro` con un `ValueError: substring not found` — rumoroso, per
+fortuna. Le costanti compagne no: quelle sarebbero mancate a runtime.
+Vanno portate dentro insieme alla funzione, sempre.
+
+COLLAUDATO: **9285 verdi**, ventuno sentinelle nuove e cinque rovesciate.
+E il giro è stato verificato **sull'albero dell'INDICE** e non sul working
+tree: un'altra sessione stava lavorando sugli stessi file (le foto senza
+metadati), i suoi hunk sono rimasti fuori dal commit con lo script dei
+marcatori, e le sue quattro prove a metà rendevano il conto locale
+illeggibile. L'indice è l'unico posto dove il numero dice quel che si sta
+per committare.

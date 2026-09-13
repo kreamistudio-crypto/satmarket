@@ -1871,22 +1871,60 @@
      `width:fit-content` + margini automatici: la pillola resta
      stretta sul suo contenuto E centrata, che con `inline-flex` in
      un blocco allineato a sinistra non si poteva. */
-  /* LA RIGA DELLA TESTATA: la pillola resta CENTRATA nella riga e la
-     levetta le sta a destra, appoggiata al suo fianco. Tre colonne
-     `1fr auto 1fr` con la levetta in `justify-self:start` — cosi' il
-     centro della riga resta il centro della pillola (che e' sotto il
-     logo, la misura decisa col restyling della testata) e la levetta
-     non lo sposta di mezzo pixel. */
-  .p2p-testa-riga{display:grid;grid-template-columns:1fr auto 1fr;
-    align-items:center;gap:10px}
-  /* ⚠️ LE COLONNE SI DICHIARANO, e questa riga cura un difetto che la
-     misura ha preso e l'occhio no: i figli sono DUE e le colonne TRE,
-     quindi senza `grid-column` la pillola cadeva nella PRIMA e la
-     levetta nella seconda — la pillola finiva 75px a sinistra del
-     centro, e lo scarto si vede solo mettendo un righello. */
-  .p2p-testa-riga .p2p-filtro{grid-column:2;margin:2px 0 10px}
-  .p2p-testa-riga .tema-btn{grid-column:3;justify-self:start;margin:0 0 8px}
-  .p2p-filtro{display:grid;grid-template-columns:1fr auto 1fr;
+  /* LA RIGA DELLA TESTATA, RIFATTA (set 2026, decisione di Andrea):
+     «Ordina» a SINISTRA, «Filtro» e la levetta del tema a DESTRA. Le
+     due pillole sono i due comandi del libro e stanno ai due capi
+     della riga; la levetta e' un ospite e si appoggia in fondo.
+     ⚠️ QUI CADE LA CENTRATURA SOTTO IL LOGO, e con lei tutto il suo
+     apparato — le tre colonne `1fr auto 1fr`, i `grid-column`
+     dichiarati, i due lati della pillola pesati uguale. Quelle regole
+     esistevano per UNA cosa sola: far cadere il divisorio della
+     pillola esattamente sotto il logo. Spostata la pillola a destra
+     quella cosa non c'e' piu', e tenere le regole sarebbe lasciare in
+     giro un apparato che non serve piu' a niente — il precedente
+     dello spaziatore. Chi rimettesse la pillola al centro rimetta
+     anche loro, e sappia perche'.
+     UN FLEX CON `margin-right:auto` SULLA PRIMA: due capi e nessuna
+     colonna da dichiarare. Il vuoto sta in mezzo, che e' l'unico
+     posto dove non fa danni. Il `justify-content:flex-end` serve alla
+     riga CAPOVERSA (vedi sotto): senza, quel che va a capo si
+     appoggerebbe a sinistra invece che sotto ai suoi.
+     ⚠️ A 320 LE TRE COSE NON CI STANNO, e non e' una stima: misurate,
+     fanno 332px in 288 di riga — e il modo in cui cedevano era il
+     peggiore, il conteggio spezzato in due righe DENTRO la pillola
+     («3 / offerte») e la levetta tagliata dal bordo. Due cure, e
+     nessuna delle due tocca quel che si legge:
+     • `white-space:nowrap` sulle pillole — una pillola non spezza mai
+       la sua etichetta, che e' la regola di casa («a cedere e' la
+       destra, mai l'etichetta»);
+     • la riga VA A CAPO invece di sfondare. Sotto i 400 le due
+       pillole si stringono un po' (respiro e distanze, mai il corpo
+       del testo) e ci stanno insieme: a 320 e' la LEVETTA a scendere
+       sulla seconda riga, appoggiata a destra sotto il Filtro. Cede
+       l'ospite e non i due comandi, che e' l'ordine giusto.
+     Da 360 in su tornano tutte e tre in fila. */
+  .p2p-testa-riga{display:flex;flex-wrap:wrap;align-items:center;
+    justify-content:flex-end;gap:8px;margin:2px 0 10px}
+  .p2p-testa-riga .p2p-filtro{margin:0;flex:none;white-space:nowrap}
+  .p2p-testa-riga .p2p-ordina{margin-right:auto}
+  .p2p-testa-riga .tema-btn{margin:0;flex:none}
+  @media (max-width:399px){
+    .p2p-testa-riga{gap:6px}
+    .p2p-testa-riga .p2p-filtro{padding:8px 11px;gap:6px}
+    .p2p-testa-riga .p2p-filtro .p2p-filtro-sx{gap:6px}
+  }
+  /* LE DUE PILLOLE HANNO LA STESSA PELLE e cambiano solo il dentro:
+     `.p2p-filtro` porta bordo, raggio, respiro e i due stati accesi
+     (che vestono il lato), `.p2p-ordina` gli toglie la griglia e mette
+     in fila icona e scelta. Una seconda pelle sarebbe una seconda
+     cosa da tenere allineata a mano. */
+  .p2p-filtro.p2p-ordina{display:flex;gap:7px}
+  .p2p-filtro.p2p-ordina .cs-val{font-weight:800;letter-spacing:.02em}
+  /* ⚠️ LE COLONNE SONO A LARGHEZZA NATURALE (set 2026): erano `1fr auto
+     1fr` per pesare i due lati uguale, che serviva SOLO alla
+     centratura di ieri — e a 320, in una riga con due pillole, quel
+     pareggio si mangiava una trentina di pixel per niente. */
+  .p2p-filtro{display:grid;grid-template-columns:auto auto auto;
     align-items:center;gap:8px;
     width:fit-content;margin:2px auto 10px;
     padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;
@@ -6514,7 +6552,30 @@ document.getElementById('cartello')?.remove();</script>
           <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
           <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
         </div>
-        <div id="p2pTesta"></div>
+        <!-- IL DEPOSITO DELL'ORDINAMENTO (set 2026): la `<select>` del
+           sistema non si puo' vestire, quindi resta qui nascosta a
+           tenere il VALORE e a parlare col dito e' la pillola, che
+           apre il #pickerSheet di casa — le tendine vestite da
+           Barattolo, gia' fatte, con la selezione singola, la spunta,
+           Esc e le frecce. Un secondo foglio «Ordina» scritto a mano
+           sarebbe una seconda cosa da tenere allineata.
+           STA QUI E NON IN #p2pTesta perche' #p2pTesta lo riscrive
+           renderP2P a ogni giro: il valore ci morirebbe dentro. -->
+      <!-- ⚠️ OGNI VOCE HA DUE NOMI, e il secondo non e' un vezzo: nel
+           FOGLIO si legge la voce intera, che spiega («Importo: dal
+           più grande»); nella PILLOLA ci sta il nome corto («Più
+           grandi»), perche' la riga della testata ha due pillole e
+           una levetta, e il nome lungo la manderebbe a capo pure a
+           375. Il foglio insegna, la pillola ricorda. Il `data-corta`
+           tiene i due nomi nella STESSA voce: un catalogo solo, e chi
+           aggiunge un criterio non puo' dimenticarsene la metà. -->
+      <select id="p2pOrdinaSel" hidden>
+        <option value="conv" data-corta="Convenienza" selected>Convenienza</option>
+        <option value="recenti" data-corta="Recenti">Più recenti</option>
+        <option value="imp-giu" data-corta="Più grandi">Importo: dal più grande</option>
+        <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
+      </select>
+      <div id="p2pTesta"></div>
       </div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
@@ -20073,6 +20134,21 @@ const PICKER = {
         || '')}</span>`;
     },
     poi: v => setOrdina(v)},
+  /* L'ORDINAMENTO DEL LIBRO P2P (set 2026): stesso foglio, stesso
+     catalogo-nella-select, stessa spunta. `campo` scrive dentro la
+     pillola e non in un `.campo-scelta`, ma il contratto e' lo
+     stesso — un `.cs-val` da riempire — e la stringa la da'
+     `etichettaOrdineP2P`, la stessa che usa renderP2P: le due strade
+     non possono dire due cose diverse.
+     `poi` ridisegna il libro, che e' tutto quel che l'ordinamento
+     deve fare: non tocca il filtro, non rilegge i relay. */
+  p2pOrdinaSel: {titolo: 'Ordina il libro',
+    voci: () => [...el('p2pOrdinaSel').options].map(o => ({val: o.value,
+      resa: `<span>${esc(o.text)}</span>`})),
+    /* la pillola non e' un `.campo-scelta`: dentro il suo `.cs-val`
+       va il TESTO NUDO, lo stesso che ci scrive renderP2P */
+    campo: v => esc(etichettaOrdineP2P(v)),
+    poi: () => renderP2P()},
 };
 let pickerTrigger = null;      /* il campo-bottone da rimettere a fuoco */
 function aggiornaPicker(id){
@@ -34687,9 +34763,29 @@ function scadeTestoP2P(scade){
   return 'scade fra ' + Math.round(s / 86400) + ' g';
 }
 
-/* IL LIBRO SI ORDINA PER CONVENIENZA DI CHI LEGGE (set 2026, deciso
-   da Andrea), e non piu' per data: in cima quel che conviene di piu' a
-   chi sta guardando QUEL tab.
+/* I QUATTRO ORDINAMENTI DEL LIBRO (set 2026, decisione di Andrea).
+   Il criterio si sceglie dalla pillola «Ordina» e vale SOLO per il
+   libro: «I miei scambi» sono i propri, di tutt'e due i versi, e
+   ordinarli per convenienza non vorrebbe dire niente.
+   IL PREDEFINITO RESTA LA CONVENIENZA, che e' l'ordinamento che il
+   libro aveva gia' da solo: cambiare il default insieme all'aggiunta
+   della leva avrebbe spostato il libro sotto gli occhi di chi non ha
+   chiesto niente.
+   L'IMPORTO GUARDA IL CAPO CHE CONTA NELLA DIREZIONE CHIESTA, e con
+   gli ordini a intervallo e' l'unica scelta che si spiega in una
+   riga: chi cerca il grande guarda fin dove l'ordine puo' SALIRE
+   (`euroMax` se c'e'), chi cerca il piccolo da dove puo' PARTIRE
+   (`euro`). Un punto solo — la media, o sempre il capo basso — su un
+   «da 20 a 100 €» direbbe un numero che nessuno dei due sta
+   cercando.
+   A PARITA' IL PIU' RECENTE, sempre e in tutti e quattro: fra due
+   offerte che valgono uguale, quella fresca ha piu' probabilita' di
+   trovare ancora chi l'ha scritta.
+   PURA, e il criterio si PASSA: il banco la fa girare sui casi invece
+   di guardare le righe, e il default vale per chi non lo passa.
+
+   LA CONVENIENZA, che e' il primo dei quattro: in cima quel che
+   conviene di piu' a chi sta guardando QUEL tab.
    Il metro e' il PREMIO, e il verso si rovescia col lato per la
    ragione letta sui byte: `sats -= premium/100 * sats`, quindi un
    premio basso lascia piu' sats. Nel tab «Compra BTC» chi legge
@@ -34702,11 +34798,50 @@ function scadeTestoP2P(scade){
    PURA e con la COPIA (`slice`): il libro in memoria non si tocca —
    e' la stessa lista che serve ai due tab, e ordinarla sul posto
    vorrebbe dire riordinarla a ogni giro. */
-function ordinaLibroP2P(righe, lato){
+const P2P_ORDINI_LIBRO = ['conv', 'recenti', 'imp-giu', 'imp-su'];
+const P2P_ORDINE_CASA = 'conv';
+/* il capo dell'importo che conta nel verso chiesto (vedi sopra) */
+const capoImportoP2P = (o, giu) =>
+  giu ? ((o.euroMax || o.euro) || 0) : (o.euro || 0);
+function ordinaLibroP2P(righe, lato, criterio){
+  const c = P2P_ORDINI_LIBRO.indexOf(criterio) >= 0 ? criterio : P2P_ORDINE_CASA;
+  const recente = (a, b) => (b.creato || 0) - (a.creato || 0);
   const verso = lato === 'compro' ? 1 : -1;
-  return righe.slice().sort((a, b) =>
-    ((a.premium || 0) - (b.premium || 0)) * verso
-    || ((b.creato || 0) - (a.creato || 0)));
+  const metro = c === 'recenti' ? () => 0
+    : c === 'imp-giu' ? (a, b) => capoImportoP2P(b, true) - capoImportoP2P(a, true)
+    : c === 'imp-su' ? (a, b) => capoImportoP2P(a, false) - capoImportoP2P(b, false)
+    : (a, b) => ((a.premium || 0) - (b.premium || 0)) * verso;
+  return righe.slice().sort((a, b) => metro(a, b) || recente(a, b));
+}
+/* IL VALORE VIVO sta nella `<select>` nascosta della vista, che e' il
+   deposito del picker di casa: un secondo posto dove tenerlo (una
+   variabile di sessione) sarebbe la stessa verita' in due copie, e a
+   divergere ci vorrebbe un render. Prima che la vista esista — o se
+   qualcuno ci scrive dentro un valore che non conosciamo — vale il
+   predefinito. */
+function ordineLibroP2P(){
+  const v = el('p2pOrdinaSel') ? el('p2pOrdinaSel').value : '';
+  return P2P_ORDINI_LIBRO.indexOf(v) >= 0 ? v : P2P_ORDINE_CASA;
+}
+/* l'etichetta della pillola: la scrivono in DUE — renderP2P quando
+   ridisegna la testata, e aggiornaPicker subito dopo la scelta — e
+   sono la stessa stringa perche' la fonte e' questa. Le voci del
+   foglio invece le legge il picker dalla `<select>`, che e' il
+   catalogo: cosi' una voce nuova si aggiunge in un posto solo. */
+function etichettaOrdineP2P(v){
+  const o = el('p2pOrdinaSel')
+    && [...el('p2pOrdinaSel').options].find(x => x.value === v);
+  /* il nome CORTO se c'e', o quello intero: una voce senza
+     `data-corta` non resta muta nella pillola */
+  return o ? (o.dataset.corta || o.text) : 'Convenienza';
+}
+/* le due frecce dello scambio non c'entrano: qui sono un SU e un GIU'
+   accostati, il segno dell'ordinamento. Niente velo, come la lente e
+   come le frecce di «I miei scambi»: non c'e' una pancia da riempire. */
+function icoOrdinaP2P(){
+  return '<svg class="p2p-ico" viewBox="2 2 20 20" aria-hidden="true">'
+    + '<path d="M8.2 4.6v14.6"/><path d="M4.9 15.9l3.3 3.5 3.3-3.5"/>'
+    + '<path d="M15.8 19.4V4.8"/><path d="M19.1 8.1l-3.3-3.5-3.3 3.5"/></svg>';
 }
 
 /* QUANTO RESTA DELLA VITA DELL'ORDINE, da 1 (appena pubblicato) a 0
@@ -35314,9 +35449,11 @@ function renderP2P(){
     caricaLibroP2P().then(renderP2P, () => {});
   }
   const k = P2P_LATO_K[p2pLato];
-  /* in cima quel che conviene a chi legge, non il piu' recente: il
-     criterio e il suo perche' stanno in ordinaLibroP2P */
-  const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k), p2pLato);
+  /* il criterio lo dice la pillola «Ordina» (predefinito: la
+     convenienza), e i quattro col loro perche' stanno in
+     ordinaLibroP2P */
+  const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k),
+                              p2pLato, ordineLibroP2P());
   /* LA PILLOLA DEL FILTRO ha preso il posto della riga «N offerte di
      chi vende sats» (set 2026, richiesta di Andrea): quella diceva un
      numero, questa dice lo stesso numero E che si puo' restringere. Il
@@ -35379,8 +35516,23 @@ function renderP2P(){
      mentre questa nasce dopo, a ogni disegno del libro — cablando la
      luna, su un telefono gia' scuro si sarebbe vista la luna che
      promette il buio quando il buio c'e' gia'. */
+  /* LA PILLOLA «ORDINA» (set 2026, decisione di Andrea): la pelle e'
+     quella del Filtro e il dentro e' icona + scelta viva. Si accende
+     come la sorella quando NON e' il predefinito — un libro riordinato
+     e' un libro che non dice piu' quel che diceva, e accorgersene deve
+     costare un'occhiata.
+     L'id `p2pOrdinaSelBtn` non e' decorativo: e' il nome che
+     `aggiornaPicker` cerca per riscrivere l'etichetta dopo la scelta,
+     ed e' il campo che `chiudiPicker` rimette a fuoco. */
+  const ordAttivo = ordineLibroP2P();
+  const pillOrdina = '<button type="button" id="p2pOrdinaSelBtn"'
+    + ' class="p2p-filtro p2p-ordina' + (ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')
+    + '" aria-haspopup="dialog" title="Ordina il libro"'
+    + ' onclick="apriPicker(\'p2pOrdinaSel\')">'
+    + icoOrdinaP2P() + '<span class="cs-val">'
+    + esc(etichettaOrdineP2P(ordAttivo)) + '</span></button>';
   if (testaBox) testaBox.innerHTML =
-    '<div class="p2p-testa-riga">' + pillola
+    '<div class="p2p-testa-riga">' + pillOrdina + pillola
     + '<button type="button" class="tema-btn" onclick="alternaTema()">'
     + '<span class="tema-ico" aria-hidden="true">'
     + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
