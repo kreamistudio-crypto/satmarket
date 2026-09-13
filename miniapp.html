@@ -702,7 +702,20 @@
     background:var(--card);border:1.5px solid var(--line);
     border-radius:999px;padding:6px 12px;cursor:pointer}
   /* Il bottone si accende quando un filtro e' applicato */
-  .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
+  /* ⚠️ IL SEGNO DELL'ATTIVO E' UNO SOLO IN TUTTA L'APP, ED E' IL
+     CONTORNO ARANCIO (set 2026, decisione di Andrea). Vale per i
+     QUATTRO comandi — «Ordina» e «Filtro», nel mercatino e nello
+     scambio — e sta in una regola sola perche' un segno che vive in
+     due posti, prima o poi, dice due cose.
+     ⚠️ E IL CONTORNO E' L'UNICO SEGNO: via il testo arancio che
+     c'era qui (era un secondo modo di dire la stessa cosa) e via il
+     verde/rosso del lato che vestiva la pillola del P2P — quello
+     faceva sembrare un AVVISO una cosa che e' solo uno stato. Il
+     token e' `--sats-text`, il peso l'1,5px del bordo a riposo:
+     cambia il colore della riga, non il suo spessore, cosi' il
+     bottone non balla di un pixel quando si accende. */
+  .strumenti button.attivo,
+  .p2p-filtro.acceso{border-color:var(--sats-text)}
   /* I due conteggi sono un BLOCCO in colonna dentro la riga, accanto a
      ordina+filtri: il controllo dell'ordinamento e' alto il triplo di
      una riga di testo, quindi le due righe ci stanno dentro senza
@@ -1956,11 +1969,10 @@
     display:inline-block;text-decoration:none}
   .p2p-filtro em{text-align:left;
     font-style:normal;color:var(--muted);font-weight:700}
-  .p2p-filtro.acceso{border-color:var(--trust);color:var(--trust);
-    background:var(--trust-soft)}
-  .p2p-filtro.acceso .p2p-ico,.p2p-filtro.acceso em{color:inherit}
-  body.p2p-vendo .p2p-filtro.acceso{border-color:var(--danger);
-    color:var(--danger);background:var(--warn-bg)}
+  /* l'acceso della pillola vive con le sorelle del mercatino, in una
+     regola sola: vedi «IL SEGNO DELL'ATTIVO E' UNO SOLO». Qui non
+     resta niente — il verde e il rosso del lato se ne sono andati
+     con lei. */
 
   /* ---- IL CURSORE A DUE PALLINI ----
      In HTML non esiste: sono DUE `input[type=range]` SOVRAPPOSTI, col
@@ -6275,7 +6287,7 @@ document.getElementById('cartello')?.remove();</script>
            (`icoOrdinaP2P`, `icoFiltroP2P`): due copie, prima o poi,
            diventano due disegni. -->
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="ico-strum" id="icoOrdinaVetrina"></span><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
-      <button id="filtriBtn" type="button" onclick="toggleFiltri()"><span class="ico-strum" id="icoFiltriVetrina"></span>Filtri</button>
+      <button id="filtriBtn" type="button" onclick="toggleFiltri()"><span class="ico-strum" id="icoFiltriVetrina"></span>Filtro</button>
     </div>
     <div id="filtriBox" style="display:none">
       <div class="filtri-riga">
@@ -20160,6 +20172,12 @@ const PICKER = {
         || [...el('ordinaSel').options].find(o => o.value === e)?.text
         || '')}</span>`;
     },
+    /* IL CONTORNO ARANCIO segue l'ordine EFFETTIVO e non il valore
+       del select, per la stessa ragione del `campo` qui sopra: con
+       un'occasione spuntata l'ordine e' ereditato, e un campo che si
+       spegnesse mentre la vetrina e' ordinata per scadenza direbbe
+       che non sta facendo niente. */
+    attivo: () => ordinaEffettivo() !== '',
     poi: v => setOrdina(v)},
   /* L'ORDINAMENTO DEL LIBRO P2P (set 2026): stesso foglio, stesso
      catalogo-nella-select, stessa spunta. `campo` scrive dentro la
@@ -20182,6 +20200,13 @@ function aggiornaPicker(id){
   const btn = el(id+'Btn'), cfg = PICKER[id];
   if (!btn || !cfg) return;
   btn.querySelector('.cs-val').innerHTML = cfg.campo(el(id).value);
+  /* IL CONTORNO ARANCIO quando il campo NON e' al suo predefinito
+     (set 2026): lo dichiara la voce del catalogo, non questa funzione
+     — cosi' il giudice sta accanto alle sue voci e un picker che non
+     lo dichiara resta com'era. Il `toggle` gira solo per chi ha il
+     giudice: senza il guard, un `false` toglierebbe la classe a
+     bottoni che la portano per un'altra ragione. */
+  if (cfg.attivo) btn.classList.toggle('attivo', !!cfg.attivo());
 }
 function apriPicker(id){
   const cfg = PICKER[id]; if (!cfg) return;
@@ -35557,19 +35582,23 @@ function renderP2P(){
      promette il buio quando il buio c'e' gia'. */
   /* LA PILLOLA «ORDINA» (set 2026, decisione di Andrea): la pelle e'
      quella del Filtro e il dentro e' icona + scelta viva.
-     ⚠️ MA NON SI VESTE DEL LATO, e questo la separa dalla sorella
-     (ritocco di Andrea che rovescia il primo giro): il Filtro acceso
-     dice «il libro che vedi NON e' tutto il libro», ed e' un avviso —
-     l'ordinamento invece non nasconde niente, riordina soltanto, e
-     colorarlo di verde o di rosso metteva un allarme su una cosa che
-     non lo e'. A dire qual e' il criterio basta il suo NOME, che la
-     pillola porta scritto: nessuno stato da indovinare.
+     ⚠️ E NON SI VESTE DEL LATO, in due tempi (ritocchi di Andrea).
+     Prima il verde e il rosso sono usciti di scena: il Filtro acceso
+     dice «il libro che vedi NON e' tutto il libro», ed e' un avviso,
+     mentre l'ordinamento non nasconde niente e colorarlo di rosso
+     metteva un allarme su una cosa che non lo e'. Poi l'accesa e'
+     tornata, ma ARANCIO: il segno di casa per «questo comando sta
+     facendo qualcosa», lo stesso dei due bottoni del mercatino, ed e'
+     un contorno e basta. Cosi' i quattro comandi dell'app parlano una
+     lingua sola, e la pillola dice DUE cose senza urlare — il nome
+     del criterio, e che non e' quello di casa.
      L'id `p2pOrdinaSelBtn` non e' decorativo: e' il nome che
      `aggiornaPicker` cerca per riscrivere l'etichetta dopo la scelta,
      ed e' il campo che `chiudiPicker` rimette a fuoco. */
   const ordAttivo = ordineLibroP2P();
   const pillOrdina = '<button type="button" id="p2pOrdinaSelBtn"'
     + ' class="p2p-filtro p2p-ordina'
+    + (ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')
     + '" aria-haspopup="dialog" title="Ordina il libro"'
     + ' onclick="apriPicker(\'p2pOrdinaSel\')">'
     + icoOrdinaP2P() + '<span class="cs-val">'

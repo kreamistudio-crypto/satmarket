@@ -30680,9 +30680,14 @@ def prove_verde_e_filtri():
     _oe = pezzo_js(mini, "function ordinaEffettivo(){", "\n}")
     prova("l'ordine effettivo ha un giudice solo", 1,
           mini.count("function ordinaEffettivo("))
-    # 4 = la definizione piu' i TRE chiamanti (parametro al server,
-    # campo-bottone, ramo DEMO)
-    prova("...e lo chiedono in tre", 4, mini.count("ordinaEffettivo()"))
+    # 5 = la definizione piu' i QUATTRO chiamanti: parametro al
+    # server, campo-bottone, ramo DEMO e — dal set 2026 — il
+    # giudice del CONTORNO ARANCIO, che segue l'ordine effettivo
+    # e non il valore del select (con un'occasione spuntata
+    # l'ordine e' ereditato, e un campo spento mentre la vetrina
+    # e' ordinata per scadenza direbbe che non sta facendo niente)
+    prova("...e lo chiedono in quattro", 5,
+          mini.count("ordinaEffettivo()"))
     # LA SCELTA ESPLICITA VINCE: l'eredita' vale solo sul default
     prova("la scelta esplicita vince sull'eredita'", True,
           "if (ordinaVista) return ordinaVista;" in _oe)
@@ -36383,6 +36388,30 @@ def prove_p2p_libro():
     # il libro aveva gia': la convenienza.
     prova("le due pillole hanno la stessa pelle", True,
           ".p2p-filtro.p2p-ordina{display:flex" in mini)
+    # ⚠️ IL SEGNO DELL'ATTIVO E' UNO SOLO IN TUTTA L'APP, ED E' IL
+    # CONTORNO ARANCIO (set 2026, decisione di Andrea): i quattro
+    # comandi — «Ordina» e «Filtro», nel mercatino e nello scambio —
+    # stanno in UNA regola, perche' un segno che vive in due posti
+    # prima o poi dice due cose. E il contorno e' l'UNICO segno: via
+    # il testo arancio che il mercatino aveva (secondo modo di dire la
+    # stessa cosa) e via il verde/rosso del lato che vestiva la
+    # pillola del P2P, sfondo compreso.
+    prova("il segno dell'attivo e' una regola sola, e il contorno",
+          True, "  .strumenti button.attivo,\n"
+          "  .p2p-filtro.acceso{border-color:var(--sats-text)}"
+          in mini.replace("\r\n", "\n"))
+    prova("...e l'acceso non porta piu' ne' fondo ne' inchiostro", 0,
+          mini.count(".p2p-filtro.acceso{border-color:var(--trust)")
+          + mini.count(".p2p-filtro.acceso .p2p-ico")
+          + mini.count("body.p2p-vendo .p2p-filtro.acceso")
+          + mini.count(".strumenti button.attivo{color:var(--sats-text)"))
+    # il PESO non cambia con lo stato: il bordo resta 1,5px a riposo e
+    # acceso, o il bottone ballerebbe di un pixel accendendosi
+    prova("...e cambia il colore della riga, mai il suo spessore",
+          True, "border:1.5px solid var(--line)" in pezzo_js(
+              mini, "  .strumenti select,.strumenti button{", "}")
+          and "border:1.5px solid var(--line)" in pezzo_js(
+              mini, "  .p2p-filtro{", "}"))
     # ⚠️ L'ICONA NON SOMIGLIA PIU' ALLE FRECCE DELLA NAV (set 2026, dal
     # campo): il primo disegno era un SU e un GIU' accostati, e con «I
     # miei scambi» — due frecce, andata e ritorno — le due si
@@ -36406,19 +36435,16 @@ def prove_p2p_libro():
     prova("la pillola apre il picker di casa, non un secondo foglio",
           True, "onclick=\"apriPicker(\\'p2pOrdinaSel\\')\"" in _rp
           and "id=\"p2pOrdinaSelBtn\"" in _rp)
-    # ⚠️ E NON SI VESTE DEL LATO, che la separa dalla sorella (set
-    # 2026, ritocco di Andrea che rovescia il primo giro): il Filtro
-    # acceso dice «quel che vedi NON e' tutto il libro», ed e' un
-    # avviso; l'ordinamento non nasconde niente, riordina soltanto, e
-    # il verde o il rosso ci mettevano un allarme sopra. A dire qual e'
-    # il criterio basta il suo NOME, che la pillola porta scritto.
-    # La sentinella e' rovesciata apposta: certifica che l'`acceso`
-    # NON ci sia — e' la cosa che una regressione rimetterebbe.
-    prova("...e NON si veste del lato: nessun acceso su «Ordina»",
-          True, "p2p-ordina' + (ordAttivo" not in _rp
-          and "p2p-ordina acceso" not in mini
-          and "' acceso')" not in _rp[_rp.index("const pillOrdina"):
-                                      _rp.index("if (testaBox)")])
+    # ⚠️ L'ACCESA DELLA PILLOLA IN DUE TEMPI (set 2026, due ritocchi
+    # di Andrea). Prima il verde e il rosso del lato sono usciti: il
+    # Filtro acceso dice «quel che vedi NON e' tutto il libro», ed e'
+    # un avviso, mentre l'ordinamento non nasconde niente e quel
+    # colore ci metteva un allarme sopra. Poi l'accesa e' tornata, ma
+    # ARANCIO — il segno di casa per «questo comando sta facendo
+    # qualcosa» — e adesso i quattro comandi dell'app parlano una
+    # lingua sola.
+    prova("...e si accende quando il criterio non e' quello di casa",
+          True, "(ordAttivo === P2P_ORDINE_CASA ? '' : ' acceso')" in _rp)
     prova("...e il libro si ordina col criterio vivo", True,
           "ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k),"
           in _rp and "p2pLato, ordineLibroP2P())" in _rp)
@@ -36482,6 +36508,28 @@ def prove_p2p_libro():
     prova("...alla misura della riga degli strumenti", True,
           ".strumenti .ico-strum .p2p-ico{width:15px;height:15px}" in mini
           and "#filtriBtn{display:inline-flex" in mini)
+    # ANCHE L'«ORDINA» DELLA VETRINA SI ACCENDE (set 2026): il giudice
+    # lo dichiara la VOCE del catalogo e non aggiornaPicker, cosi' sta
+    # accanto alle sue voci e un picker che non lo dichiara resta
+    # com'era — il `toggle` gira solo per chi ce l'ha, o un `false`
+    # toglierebbe la classe a bottoni che la portano per altro.
+    _ap = pezzo_js(mini, "function aggiornaPicker(id){", "\n}")
+    prova("il contorno della vetrina lo decide la voce del catalogo",
+          True, "if (cfg.attivo) btn.classList.toggle('attivo', !!cfg.attivo());"
+          in _ap)
+    prova("...e l'Ordina della vetrina lo dichiara", True,
+          "attivo: () => ordinaEffettivo() !== ''," in mini)
+    # ⚠️ SEGUE L'ORDINE EFFETTIVO e non il valore del select: con
+    # un'occasione spuntata l'ordine e' EREDITATO, e un campo spento
+    # su una vetrina ordinata per scadenza direbbe il falso — e' la
+    # stessa ragione per cui `campo` non legge il select.
+    prova("...guardando l'ordine effettivo, non il select", False,
+          "attivo: () => el('ordinaSel').value" in mini)
+    # «FILTRO» AL SINGOLARE, come nel P2P (set 2026): due nomi per lo
+    # stesso comando sono due comandi, per chi legge
+    prova("nella vetrina il comando si chiama «Filtro»", True,
+          'id="icoFiltriVetrina"></span>Filtro</button>' in mini
+          and ">Filtri</button>" not in mini)
 
     prova("i miei scambi non si riordinano", False,
           "ordinaLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n")

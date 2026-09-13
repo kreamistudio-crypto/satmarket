@@ -10663,15 +10663,44 @@ un punto solo — la media, o sempre il capo basso — uno dei due versi
 direbbe un numero che nessuno sta cercando. Nel banco quell'ordine va
 **primo in tutt'e due i versi**, ed è la riga che prova la scelta.
 
-**LA PILLOLA NON SI VESTE DEL LATO**, e qui si separa dalla sorella
-(ritocco di Andrea, il giorno dopo: il primo giro la accendeva di verde
-o di rosso quando il criterio non era il predefinito). Il **Filtro**
-acceso dice «quel che vedi NON è tutto il libro», ed è un **avviso**;
-l'**ordinamento** non nasconde niente, riordina soltanto — e metterci
-sopra lo stesso colore significava mettere un allarme su una cosa che
-non lo è. A dire qual è il criterio basta il suo **nome**, che la
-pillola porta scritto: nessuno stato da indovinare. La sentinella si è
-rovesciata con la decisione — certifica che l'`acceso` **non** ci sia.
+**L'ACCESA DELLA PILLOLA, IN DUE TEMPI, e il secondo vale per tutta
+l'app.** Il primo giro la accendeva col **colore del lato** — verde a
+comprare, rosso a vendere — quando il criterio non era il predefinito.
+È uscito subito: il **Filtro** acceso dice «quel che vedi NON è tutto
+il libro», ed è un **avviso**; l'**ordinamento** non nasconde niente,
+riordina soltanto, e metterci sopra lo stesso verde o lo stesso rosso
+significava mettere un allarme su una cosa che non lo è.
+
+Poi l'accesa è tornata, ma **arancio** (decisione di Andrea), e con lei
+è arrivata la regola che mancava: **il segno dell'attivo è UNO SOLO in
+tutta l'app, ed è il contorno**. Vale per i **quattro** comandi —
+«Ordina» e «Filtro», nel mercatino e nello scambio — e sta in **una
+riga sola di CSS**, perché un segno che vive in due posti prima o poi
+dice due cose. Il token è `--sats-text`, e il peso resta l'1,5px del
+bordo a riposo: cambia il colore della riga, mai il suo spessore, così
+il bottone non balla di un pixel quando si accende.
+
+**E IL CONTORNO È L'UNICO SEGNO.** Se n'è andato anche quel che c'era
+prima e non era il contorno: il **testo arancio** che il mercatino
+metteva sui suoi due bottoni (era un secondo modo di dire la stessa
+cosa) e lo **sfondo tinto** che la pillola del P2P si portava dietro
+col verde e col rosso. Misurato acceso: cambia il solo
+`border-color`, `color` e `background` restano quelli di riposo — e in
+tutt'e due i tab, che è la cosa che il lato faceva divergere.
+
+**ANCHE L'«ORDINA» DELLA VETRINA SI ACCENDE**, e il giudice lo dichiara
+la **voce del catalogo** (`attivo:` accanto a `campo:` e `poi:`), non
+`aggiornaPicker`: così sta accanto alle sue voci, e un picker che non
+lo dichiara resta com'era — il `toggle` gira solo per chi ce l'ha, o un
+`false` toglierebbe la classe a bottoni che la portano per un'altra
+ragione. ⚠️ E segue l'ordine **effettivo** e non il valore del select,
+per la stessa ragione per cui `campo` fa lo stesso: con un'occasione
+spuntata l'ordine è **ereditato**, e un campo spento su una vetrina
+ordinata per scadenza direbbe che non sta facendo niente.
+
+**E «FILTRI» È DIVENTATO «FILTRO»**, come nel P2P: due nomi per lo
+stesso comando, per chi legge, sono due comandi.
+
 Nel foglio non c'era e non c'è nulla di colorato col lato: la voce
 scelta porta il crema e il ✓ del picker di casa, gli stessi in tutta
 l'app.
