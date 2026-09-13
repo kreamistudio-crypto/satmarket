@@ -36388,23 +36388,33 @@ def prove_p2p_libro():
     # il libro aveva gia': la convenienza.
     prova("le due pillole hanno la stessa pelle", True,
           ".p2p-filtro.p2p-ordina{display:flex" in mini)
-    # ⚠️ IL SEGNO DELL'ATTIVO E' UNO SOLO IN TUTTA L'APP, ED E' IL
-    # CONTORNO ARANCIO (set 2026, decisione di Andrea): i quattro
-    # comandi — «Ordina» e «Filtro», nel mercatino e nello scambio —
-    # stanno in UNA regola, perche' un segno che vive in due posti
-    # prima o poi dice due cose. E il contorno e' l'UNICO segno: via
-    # il testo arancio che il mercatino aveva (secondo modo di dire la
-    # stessa cosa) e via il verde/rosso del lato che vestiva la
-    # pillola del P2P, sfondo compreso.
-    prova("il segno dell'attivo e' una regola sola, e il contorno",
+    # ⚠️ IL SEGNO DELL'ATTIVO E' UNO SOLO IN TUTTA L'APP (set 2026,
+    # decisione di Andrea): i quattro comandi — «Ordina» e «Filtro»,
+    # nel mercatino e nello scambio — stanno in UNA regola, perche' un
+    # segno che vive in due posti prima o poi dice due cose.
+    # ⚠️ E SONO DUE COSE INSIEME, contorno E inchiostro (correzione di
+    # Andrea sul giro dopo, che rimette il testo arancio del
+    # mercatino): un bordo da un pixel e mezzo su un bottone piccolo
+    # si nota poco, e questo e' uno stato che deve VEDERSI — un libro
+    # riordinato e filtrato non deve leggersi come il libro intero.
+    _regola = mini.replace("\r\n", "\n")
+    prova("il segno dell'attivo e' una regola sola, contorno e testo",
           True, "  .strumenti button.attivo,\n"
-          "  .p2p-filtro.acceso{border-color:var(--sats-text)}"
-          in mini.replace("\r\n", "\n"))
-    prova("...e l'acceso non porta piu' ne' fondo ne' inchiostro", 0,
+          "  .p2p-filtro.acceso{color:var(--sats-text);"
+          "border-color:var(--sats-text)}" in _regola)
+    # ...e dentro la pillola i pezzi con un inchiostro LORO lo cedono,
+    # o l'arancio prenderebbe le sole parole che ereditano: l'icona e
+    # il conteggio nascono `--muted` e resterebbero grigi accanto a un
+    # «Filtro» acceso
+    prova("...e nella pillola icona e conteggio lo ereditano", True,
+          "  .p2p-filtro.acceso .p2p-ico,\n"
+          "  .p2p-filtro.acceso em{color:inherit}" in _regola)
+    # QUEL CHE RESTA FUORI e' il colore del LATO, sfondo compreso:
+    # quello faceva sembrare un avviso una cosa che e' solo uno stato
+    prova("...ma del verde e del rosso del lato non resta niente", 0,
           mini.count(".p2p-filtro.acceso{border-color:var(--trust)")
-          + mini.count(".p2p-filtro.acceso .p2p-ico")
           + mini.count("body.p2p-vendo .p2p-filtro.acceso")
-          + mini.count(".strumenti button.attivo{color:var(--sats-text)"))
+          + mini.count(".p2p-filtro.acceso{border-color:var(--danger)"))
     # il PESO non cambia con lo stato: il bordo resta 1,5px a riposo e
     # acceso, o il bottone ballerebbe di un pixel accendendosi
     prova("...e cambia il colore della riga, mai il suo spessore",

@@ -707,15 +707,30 @@
      QUATTRO comandi — «Ordina» e «Filtro», nel mercatino e nello
      scambio — e sta in una regola sola perche' un segno che vive in
      due posti, prima o poi, dice due cose.
-     ⚠️ E IL CONTORNO E' L'UNICO SEGNO: via il testo arancio che
-     c'era qui (era un secondo modo di dire la stessa cosa) e via il
-     verde/rosso del lato che vestiva la pillola del P2P — quello
-     faceva sembrare un AVVISO una cosa che e' solo uno stato. Il
-     token e' `--sats-text`, il peso l'1,5px del bordo a riposo:
-     cambia il colore della riga, non il suo spessore, cosi' il
+     ⚠️ SEGNANO IL CONTORNO E L'INCHIOSTRO, non uno solo dei due
+     (correzione di Andrea, che rimette il testo arancio del
+     mercatino): un bordo da un pixel e mezzo, su un bottone piccolo
+     e in mezzo ad altri, si nota poco — e questo e' uno stato che
+     deve VEDERSI, o un libro riordinato e filtrato si legge come il
+     libro intero. Il giro prima aveva tolto il testo chiamandolo «un
+     secondo modo di dire la stessa cosa»: e' vero, e serve.
+     QUEL CHE RESTA FUORI e' il verde/rosso del lato che vestiva la
+     pillola del P2P, sfondo compreso — quello faceva sembrare un
+     AVVISO una cosa che e' solo uno stato, ed e' la ragione per cui
+     il segno e' arancio in tutt'e due i tab.
+     Il token e' `--sats-text`, il peso l'1,5px del bordo a riposo:
+     cambia il COLORE della riga, non il suo spessore, cosi' il
      bottone non balla di un pixel quando si accende. */
   .strumenti button.attivo,
-  .p2p-filtro.acceso{border-color:var(--sats-text)}
+  .p2p-filtro.acceso{color:var(--sats-text);border-color:var(--sats-text)}
+  /* ...e dentro la pillola del P2P i pezzi che hanno un inchiostro
+     LORO lo cedono, o l'arancio prenderebbe le sole parole che
+     ereditano: l'icona e il conteggio nascono `--muted` e resterebbero
+     grigi accanto a un «Filtro» acceso. Nel mercatino non serve — li'
+     dentro non c'e' niente con un colore suo tranne la ▾, che resta
+     grigia com'era. */
+  .p2p-filtro.acceso .p2p-ico,
+  .p2p-filtro.acceso em{color:inherit}
   /* I due conteggi sono un BLOCCO in colonna dentro la riga, accanto a
      ordina+filtri: il controllo dell'ordinamento e' alto il triplo di
      una riga di testo, quindi le due righe ci stanno dentro senza

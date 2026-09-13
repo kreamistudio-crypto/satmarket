@@ -10673,20 +10673,37 @@ significava mettere un allarme su una cosa che non lo è.
 
 Poi l'accesa è tornata, ma **arancio** (decisione di Andrea), e con lei
 è arrivata la regola che mancava: **il segno dell'attivo è UNO SOLO in
-tutta l'app, ed è il contorno**. Vale per i **quattro** comandi —
-«Ordina» e «Filtro», nel mercatino e nello scambio — e sta in **una
-riga sola di CSS**, perché un segno che vive in due posti prima o poi
-dice due cose. Il token è `--sats-text`, e il peso resta l'1,5px del
-bordo a riposo: cambia il colore della riga, mai il suo spessore, così
-il bottone non balla di un pixel quando si accende.
+tutta l'app**. Vale per i **quattro** comandi — «Ordina» e «Filtro»,
+nel mercatino e nello scambio — e sta in **una riga sola di CSS**,
+perché un segno che vive in due posti prima o poi dice due cose. Il
+token è `--sats-text`, e il peso resta l'1,5px del bordo a riposo:
+cambia il **colore** della riga, mai il suo spessore, così il bottone
+non balla di un pixel quando si accende.
 
-**E IL CONTORNO È L'UNICO SEGNO.** Se n'è andato anche quel che c'era
-prima e non era il contorno: il **testo arancio** che il mercatino
-metteva sui suoi due bottoni (era un secondo modo di dire la stessa
-cosa) e lo **sfondo tinto** che la pillola del P2P si portava dietro
-col verde e col rosso. Misurato acceso: cambia il solo
-`border-color`, `color` e `background` restano quelli di riposo — e in
-tutt'e due i tab, che è la cosa che il lato faceva divergere.
+⚠️ **E IL SEGNO SONO DUE COSE INSIEME: CONTORNO E INCHIOSTRO.** Il
+primo giro aveva tenuto il solo bordo e tolto il testo arancio del
+mercatino, chiamandolo «un secondo modo di dire la stessa cosa». È
+vero — e **serve**: un bordo da un pixel e mezzo, su un bottone piccolo
+in mezzo ad altri, si nota poco, e questo è uno stato che deve
+**vedersi**, o un libro riordinato e filtrato si legge come il libro
+intero. Rimesso il giorno stesso da Andrea, in tutt'e due le sezioni.
+La lezione, che vale oltre questa pillola: **«ridondante» non è di per
+sé un difetto** — su uno stato che deve saltare all'occhio, due segni
+concordi valgono più di uno elegante.
+
+**DENTRO LA PILLOLA DEL P2P I PEZZI CON UN INCHIOSTRO LORO LO CEDONO**
+(`color:inherit` su icona e conteggio), o l'arancio avrebbe preso le
+sole parole che ereditano: l'icona e il «3 offerte» nascono `--muted` e
+sarebbero restati grigi accanto a un «Filtro» acceso. Nel mercatino non
+serve — lì dentro non c'è niente con un colore suo tranne la **▾**, che
+resta grigia com'era.
+
+**QUEL CHE RESTA FUORI È IL COLORE DEL LATO**, sfondo compreso: quello
+faceva sembrare un **avviso** una cosa che è solo uno stato, ed è la
+ragione per cui il segno è arancio anche nel tab Vendi. Misurato acceso
+su tutt'e quattro i comandi e in tutt'e due i tab: ogni pezzo —
+contorno, etichetta, icona, conteggio — vale `rgb(180,83,9)`, e a
+riposo torna ognuno al suo.
 
 **ANCHE L'«ORDINA» DELLA VETRINA SI ACCENDE**, e il giudice lo dichiara
 la **voce del catalogo** (`attivo:` accanto a `campo:` e `poi:`), non
