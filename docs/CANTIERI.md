@@ -10334,20 +10334,29 @@ cambiare verso sono le righe sotto). Si guarda l'etichetta INTERA,
 `<span>` compreso, così la prova dice anche che dentro non c'è altro —
 in particolare non la bandierina.
 
-## La pagina «Informazioni» del P2P, e la frase che se n'è andata (13 set 2026)
+## La pagina «Info P2P», e le due frasi che se ne sono andate (13 set 2026)
 
 Due gesti nello stesso giro, e vanno insieme perché il secondo è il
 posto dove finisce quel che il primo toglie.
 
-**LA FRASE TOLTA** è quella che chiudeva il conto del dettaglio:
-«Cifre al prezzo di mercato di adesso: quelle esatte si fissano allo
-scambio.» Non era falsa — è la stessa cosa che la pagina nuova dice per
-intero — ma stava nel posto sbagliato: sotto un conto che chi legge sta
-per confermare, e sopra la nota della garanzia, che è quella che uno
-legge davvero. Sotto il conto resta la sola commissione con la sua
-spartizione, che è l'unica delle due che le righe da sole non possono
-dire. Il `≈` davanti a ogni stima continua a dire la stessa cosa in un
-carattere.
+**LE FRASI TOLTE SONO DUE, e in due tempi** — prima «Cifre al prezzo
+di mercato di adesso: quelle esatte si fissano allo scambio», poi, lo
+stesso giorno, «La commissione (2% dello scambio) si divide metà a
+testa: nel conto c'è la tua metà». Il primo giro aveva tenuto la
+seconda («è l'unica delle due che le righe da sole non possono dire»);
+il secondo l'ha tolta, e la ragione è la stessa che valeva per la
+prima: **non erano false, erano nel posto sbagliato** — sotto un conto
+che chi legge sta per confermare, e sopra la nota della garanzia, che è
+quella che uno legge davvero.
+
+**SOTTO IL CONTO ORA NON C'È PIÙ NIENTE**, e le cifre si spiegano da
+sole: il `≈` davanti a ogni stima, e la percentuale accanto a «Fee
+Barattolo», che è già la **metà** di chi legge. È il patto del foglio
+«Paga» del mercatino — un conto che ha bisogno di una didascalia è un
+conto scritto male. Le due cose le dice per intero la pagina nuova,
+dove c'è lo spazio anche per il *perché*. La sentinella si è rovesciata
+con la decisione: prima certificava la frase, ora certifica il
+**silenzio** — che è la cosa che una regressione romperebbe.
 
 **E LE DUE NOTE DELLA GARANZIA SI SPECCHIANO** (decisione di Andrea):
 prima quella di chi compra portava una coda in più («Barattolo non
@@ -10363,7 +10372,11 @@ per dire anche *perché*.
 **LA VOCE NUOVA STA NELLO SLOT CHE ASPETTAVA.** La nav trasformata
 aveva tre celle a due strati e la terza — quella di Ordini — nel P2P
 restava vuota apposta: «lo slot aspetta la voce che verrà». È
-«Informazioni», con la ⓘ disegnata nella grammatica delle sorelle
+**«Info P2P»** — la prima stesura diceva «Informazioni», cambiata da
+Andrea lo stesso giorno: in una barra a cinque celle era l'etichetta
+più larga di tutte, e «Info P2P» dice anche *di cosa*, che fra sorelle
+chiamate «Libro ordini» e «I miei scambi» non è un dettaglio —
+con la ⓘ disegnata nella grammatica delle sorelle
 (griglia da 24 ritagliata a `2 2 20 20`, tratto 1,5 currentColor, velo
 al 12%, il tondo un pelo fuori squadra). Radice sorella come il libro e
 i miei scambi: fra i tre tasti della barra si SOSTITUISCE, e l'indietro
@@ -10446,9 +10459,9 @@ Tre sentinelle: il foglio conta da `scadenzaSec`, non nomina mai
 `holdFinestra`, e l'avviso è accanto alla riga che la parcheggia.
 Provato dal vivo: con 900 dice «Hai circa **15** minuti», e con la
 finestra ignota la frase **sparisce** invece di inventare un numero.
-Totale del giro: **9255 verdi**.
+Totale del giro: **9257 verdi**.
 
-COLLAUDATO: **9252 verdi**, tredici sentinelle nuove — la vista al suo
+COLLAUDATO: **9257 verdi** a fine giornata, tredici sentinelle nuove alla prima passata — la vista al suo
 posto e senza interpolazioni, il vestito, la radice, il richiamo in
 `go()`, il tasto della barra, i quattro segnaposto vuoti, i giudici del
 render, il ripiego dichiarato, `oreVita` nel lettore del 38385 e la
