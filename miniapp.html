@@ -38287,31 +38287,42 @@ function contoDettP2P(o){
    basta. Una pillola sola gia' accesa e' un bottone che non fa niente,
    e chi lo tocca aspettandosi un effetto impara che i bottoni qui a
    volte non rispondono. */
+/* ⚠️ L'ETICHETTA DICE DA CHE PARTE STA IL DENARO, E SI SPECCHIA COL
+   LATO (set 2026, decisione di Andrea): «come invii gli euro» a chi
+   compra sats, «come ricevi gli euro» a chi li vende. Quel che uno
+   non sa al primo scambio non e' che deve scegliere — lo dicono le
+   pillole — ma da che parte va il denaro, e il metodo e' la strada
+   dell'una o dell'altra cosa.
+   ⚠️ E STA SU TUTT'E TRE I CASI, che ROVESCIA la prima stesura di
+   stamattina: quella diceva «scegli come pagare/ricevere» e la
+   teneva ai soli ordini con PIU' metodi, perche' con un metodo solo
+   invitava a un gesto che non esiste. Ma la maggioranza degli ordini
+   del libro un metodo solo ce l'ha, quindi la riga non si vedeva
+   quasi mai — Andrea l'ha cercata e non l'ha trovata, ed e' il modo
+   in cui una decisione ragionevole sul singolo caso sbaglia sul
+   caso VERO. La cura non e' rimettere l'invito dove non serve: e'
+   togliere il verbo. «Come invii gli euro» DESCRIVE, non chiede, e
+   allora vale anche dove non c'e' niente da scegliere.
+   IL LATO VIENE DALL'ORDINE e non dal tab (`o.lato === 'sell'` vuol
+   dire che l'ordine VENDE sats, cioe' chi legge compra): e' lo stesso
+   giudice del titolo del foglio e del conto, quindi le tre frasi
+   della stessa pagina non possono dire due lati diversi. */
+function titoloMetodiP2P(o){
+  return 'Metodo di pagamento — '
+    + (o.lato === 'sell' ? 'come invii gli euro' : 'come ricevi gli euro');
+}
 function metodiDettP2P(o){
   const metodi = (o.metodi || []).slice();
+  const titolo = titoloMetodiP2P(o);
   if (!metodi.length)
-    return sezioneNuovoP2P({ico: 'metodi', titolo: 'Metodo di pagamento',
+    return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<div class="hint">Chi ha pubblicato non l\'ha indicato: '
         + 'mettetevi d\'accordo prima di mandare gli euro.</div>'});
   if (metodi.length === 1)
-    return sezioneNuovoP2P({ico: 'metodi', titolo: 'Metodo di pagamento',
+    return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<b class="p2p-dett-uno">' + esc(metodi[0]) + '</b>'});
-  /* ⚠️ L'ETICHETTA DICE COSA SI STA SCEGLIENDO, E SI SPECCHIA COL
-     LATO (set 2026, decisione di Andrea): «scegli quale usare» era
-     vero e non diceva niente — chi legge sa gia' che deve scegliere,
-     lo vedono le pillole. Quel che NON sa, al primo scambio, e' da
-     che parte sta il denaro: chi compra sats gli euro li MANDA, chi
-     li vende li RICEVE, e il metodo e' la strada dell'una o
-     dell'altra cosa. Detto qui, e' detto prima di sceglierlo.
-     IL LATO VIENE DALL'ORDINE e non dal tab (`o.lato === 'sell'`
-     vuol dire che l'ordine VENDE sats, cioe' chi legge compra): e'
-     lo stesso giudice del titolo del foglio e del conto, quindi le
-     tre frasi della stessa pagina non possono dire due lati
-     diversi. */
   return sezioneNuovoP2P({
-    ico: 'metodi', titolo: 'Metodo di pagamento — '
-      + (o.lato === 'sell' ? 'scegli come pagare gli euro'
-                           : 'scegli come ricevere gli euro'),
+    ico: 'metodi', titolo: titolo,
     corpo: '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'

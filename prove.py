@@ -37911,6 +37911,10 @@ def prove_p2p_dettaglio():
         "function nettoLatoP2P(o, sats){",
         "function premioTestoP2P(n){",
         "function contoDettP2P(o){",
+        # ⚠️ IL TITOLO STA IN UNA FUNZIONE SUA e va portato dentro
+        # con lei: e' la trappola dei DUE RITAGLI, e senza questa
+        # riga il banco esplode su `titoloMetodiP2P is not defined`
+        "function titoloMetodiP2P(o){",
         "function metodiDettP2P(o){",
         "function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
@@ -38527,29 +38531,40 @@ console.log(JSON.stringify(out));
     prova("...con tre ci sono tre pillole, nessuna accesa", True,
           o["treMetodi"].count("tema-pill") == 3
           and "tema-pill active" not in o["treMetodi"])
-    # L'ETICHETTA DICE COSA SI STA SCEGLIENDO E SI SPECCHIA COL LATO
-    # (13 set 2026, decisione di Andrea): «scegli quale usare» era
-    # vero e non diceva niente — che si debba scegliere lo dicono gia'
-    # le pillole. Quel che uno non sa al primo scambio e' da che parte
-    # sta il denaro: chi compra sats gli euro li MANDA, chi li vende
-    # li RICEVE.
-    prova("chi compra sats sceglie come PAGARE gli euro", True,
-          "Metodo di pagamento — scegli come pagare gli euro"
-          in o["treMetodi"])
-    prova("...e chi li vende come RICEVERLI", True,
-          "Metodo di pagamento — scegli come ricevere gli euro"
-          in o["treMetodiVendi"])
-    # il vecchio testo se n'e' andato dal CODICE: nel commento che
-    # spiega il cambio resta citato, ed e' giusto cosi'
-    prova("...e del «scegli quale usare» non resta niente", 0,
-          mini.count("'Metodo di pagamento — scegli quale usare'"))
-    # ...MA SOLO DOVE C'E' DAVVERO UNA SCELTA: con un metodo solo
-    # l'etichetta resta nuda, o inviterebbe a un gesto che non
-    # esiste — e' la stessa decisione della pillola sola che non e'
-    # un bottone.
-    prova("con un metodo solo l'etichetta non invita a scegliere",
-          True, all("scegli" not in o[k]
-                    for k in ("unoSolo", "unoSoloVendi", "nessunMetodo")))
+    # L'ETICHETTA DICE DA CHE PARTE STA IL DENARO E SI SPECCHIA COL
+    # LATO (13 set 2026, decisione di Andrea): quel che uno non sa al
+    # primo scambio non e' che deve scegliere — lo dicono le pillole —
+    # ma dove va il denaro, e il metodo e' la strada dell'una o
+    # dell'altra cosa.
+    # ⚠️ E STA SU TUTT'E TRE I CASI, che ROVESCIA la prima stesura
+    # dello stesso giorno: quella diceva «scegli come pagare/ricevere»
+    # e la teneva ai soli ordini con PIU' metodi, perche' con un
+    # metodo solo invitava a un gesto che non esiste. Ma la
+    # maggioranza degli ordini un metodo solo ce l'ha, quindi la riga
+    # non si vedeva quasi mai — Andrea l'ha cercata e non l'ha
+    # trovata, ed e' il modo in cui una decisione ragionevole sul
+    # singolo caso sbaglia sul caso VERO. La cura non e' stata
+    # rimettere l'invito dove non serve: e' stata togliere il VERBO —
+    # «come invii gli euro» DESCRIVE e non chiede, e allora vale
+    # anche dove non c'e' niente da scegliere.
+    prova("chi compra sats legge come INVIA gli euro", True,
+          all("Metodo di pagamento — come invii gli euro" in o[k]
+              for k in ("treMetodi", "unoSolo", "nessunMetodo")))
+    prova("...e chi li vende come li RICEVE", True,
+          all("Metodo di pagamento — come ricevi gli euro" in o[k]
+              for k in ("treMetodiVendi", "unoSoloVendi")))
+    # delle DUE stesure di ieri non resta niente nel codice: nei
+    # commenti che spiegano il cambio restano citate, ed e' giusto
+    prova("...e delle due stesure di ieri non resta niente", 0,
+          mini.count("'Metodo di pagamento — scegli quale usare'")
+          + mini.count("'scegli come pagare gli euro'")
+          + mini.count("'scegli come ricevere gli euro'"))
+    # il titolo lo da' UNA funzione per tutt'e tre i rami: tre
+    # stringhe scritte a mano sono tre posti dove divergere
+    prova("...e il titolo esce da un giudice solo", True,
+          "function titoloMetodiP2P(o){" in mini
+          and pezzo_js(mini, "function metodiDettP2P(o){",
+                       "\n}\n").count("titolo: titolo") == 3)
     prova("...e chi non l'ha indicato lo dice", True,
           "non l'ha indicato" in o["nessunMetodo"])
 

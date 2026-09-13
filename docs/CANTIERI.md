@@ -10369,32 +10369,41 @@ sats vanno al compratore» — e il fatto che se n'è andato con la coda
 non è perso: ha una sezione sua nella pagina nuova, dove c'è lo spazio
 per dire anche *perché*.
 
-**E L'ETICHETTA DEL METODO DICE COSA SI STA SCEGLIENDO**, specchiata
+**E L'ETICHETTA DEL METODO DICE DA CHE PARTE STA IL DENARO**, specchiata
 col lato (decisione di Andrea, stesso giorno): «Metodo di pagamento —
-scegli come **pagare** gli euro» a chi compra sats, «— scegli come
-**ricevere** gli euro» a chi li vende. Prima diceva «scegli quale
-usare», che era vero e non diceva niente: *che* si debba scegliere lo
-dicono già le pillole. Quel che uno non sa, al primo scambio, è **da
-che parte sta il denaro** — e il metodo è la strada dell'una o
-dell'altra cosa, detta prima di sceglierlo.
+come **invii** gli euro» a chi compra sats, «— come **ricevi** gli
+euro» a chi li vende. Prima diceva «scegli quale usare», che era vero e
+non diceva niente: *che* si debba scegliere lo dicono già le pillole.
+Quel che uno non sa, al primo scambio, è dove va il denaro — e il metodo
+è la strada dell'una o dell'altra cosa.
 
 IL LATO VIENE DALL'ORDINE E NON DAL TAB (`o.lato === 'sell'` vuol dire
 che l'ordine vende sats, cioè chi legge compra): è lo stesso giudice
 del titolo del foglio e del conto, quindi le tre frasi della stessa
 pagina non possono dire due lati diversi.
 
-**MA SOLO DOVE C'È DAVVERO UNA SCELTA**: con un metodo solo l'etichetta
-resta nuda, o inviterebbe a un gesto che non esiste. È la stessa
-decisione della pillola sola che non è un bottone — quel difetto è già
-stato pagato, e la sentinella lo tiene fermo su tutt'e tre i casi
-(un metodo per lato, e nessun metodo).
+⚠️ **CI SONO VOLUTE DUE STESURE, E LA PRIMA È LA LEZIONE.** Diceva
+«scegli come pagare / scegli come ricevere», e la teneva ai soli ordini
+con **più** metodi: con un metodo solo un invito a scegliere chiede un
+gesto che non esiste, ed è la stessa decisione — giusta — della pillola
+sola che non è un bottone. Ragionamento corretto sul caso singolo, e
+sbagliato sul caso VERO: **la maggioranza degli ordini del libro un
+metodo solo ce l'ha**, quindi la riga non si vedeva quasi mai. Andrea
+l'ha cercata e non l'ha trovata, e me l'ha ridetta come mancante.
 
-MISURATO, che l'etichetta si è allungata di dieci caratteri: a **375**
-sta su **una riga** (17px) dai due lati; a **320** va a **due righe**
-(34px) e **non si tronca** — il testo occupa 260px dei 288 del
-riquadro, e il capo cade dopo «pagare»/«ricevere». Due righe su
-un'etichetta di sezione sono il comportamento di casa, non un difetto:
-lì a cedere è sempre l'etichetta e mai il contenuto.
+**LA CURA NON È STATA RIMETTERE L'INVITO DOVE NON SERVE: È STATA
+TOGLIERE IL VERBO.** «Come invii gli euro» **descrive**, non chiede — e
+una descrizione vale anche dove non c'è niente da scegliere. Così
+l'etichetta sta su **tutt'e tre** i rami (nessun metodo, uno, molti), e
+il titolo esce da una funzione sola (`titoloMetodiP2P`) invece che da
+tre stringhe scritte a mano, che sarebbero tre posti dove divergere. La
+regola generale: quando una frase non entra in un caso, prima di
+restringere il caso si guarda se è la FRASE a chiedere troppo.
+
+MISURATO su tutt'e cinque i casi (un metodo per lato, tre e due metodi,
+nessun metodo): a **320** — e quindi ovunque — **una riga sola**, 17px,
+nessun troncamento. La stesura di prima, più lunga di dieci caratteri, a
+320 andava a due righe: la seconda è anche più corta.
 
 **LA VOCE NUOVA STA NELLO SLOT CHE ASPETTAVA.** La nav trasformata
 aveva tre celle a due strati e la terza — quella di Ordini — nel P2P
@@ -10486,7 +10495,7 @@ Tre sentinelle: il foglio conta da `scadenzaSec`, non nomina mai
 `holdFinestra`, e l'avviso è accanto alla riga che la parcheggia.
 Provato dal vivo: con 900 dice «Hai circa **15** minuti», e con la
 finestra ignota la frase **sparisce** invece di inventare un numero.
-Totale del giro: **9261 verdi**.
+Totale del giro: **9315 verdi**.
 
 COLLAUDATO: **9261 verdi** a fine giornata, tredici sentinelle nuove alla prima passata — la vista al suo
 posto e senza interpolazioni, il vestito, la radice, il richiamo in
