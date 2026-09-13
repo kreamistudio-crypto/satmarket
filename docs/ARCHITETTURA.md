@@ -23943,6 +23943,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`numeroConto`, con la sua sentinella). E il parcheggio con la STESSA
   sk del mazzo che entra si RIPRENDE (`riprendiParcheggioP2P`): indice
   più alto, scambi uniti, parcheggio svuotato.
+  ⚠️ E IL GIUDICE «È MIO» GUARDA DUE IDENTITÀ (13 set 2026): i due
+  giudici qui sopra chiedono `origine === 'conto'`, quindi un mazzo
+  nato sul dispositivo (origine '') o la strada sovrana ('mia') non li
+  riesamina nessuno — e su un PC che ne tiene uno, l'ordine pubblicato
+  altrove con l'identità del conto rispondeva a una restore che non gli
+  chiedeva niente. `identitaMieP2P` mette in fila il mazzo vivo (solo
+  con almeno una trade key bruciata) e, quando quello non è già il
+  seme, l'identità del conto — che è MIA per costruzione, la ricava il
+  server dal mio account. `chiediMieiOrdiniP2P` le chiede INSIEME, una
+  chiave usa-e-getta a testa (`unaRestoreP2P`: la regola della sonda è
+  «una alla volta per CHIAVE», e le chiavi sono due), unisce le liste e
+  conclude SOLO se hanno risposto tutte — una lista parziale scritta
+  come definitiva direbbe «non è tuo» di un ordine proprio. Il verbale
+  in CANTIERI, voce «LE MIE IDENTITÀ POSSONO ESSERE DUE».
 
 - IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026): la PAGINA che si
   apre toccando una card, in tutt'e due i tab. Prima era un foglietto

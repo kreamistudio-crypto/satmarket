@@ -10817,3 +10817,117 @@ metadati), i suoi hunk sono rimasti fuori dal commit con lo script dei
 marcatori, e le sue quattro prove a metà rendevano il conto locale
 illeggibile. L'indice è l'unico posto dove il numero dice quel che si sta
 per committare.
+
+LE MIE IDENTITÀ POSSONO ESSERE DUE (13 set 2026, il quarto giro dal campo
+di Andrea).
+IL SINTOMO, e la sua asimmetria è già mezza diagnosi: dal PC (Telegram
+Desktop) col conto SECONDARIO il P2P riconosce i propri ordini; col conto
+PRINCIPALE no — niente contorno, niente striscia «È il tuo ordine». Dallo
+smartphone funzionano tutt'e due.
+LA DIAGNOSI È SUI BYTE e non ancora sul campo, e va detto: il dump della
+console del PC è chiesto e non ancora arrivato: dirà in quale dei rami è
+finito quel dispositivo. Ma il buco che spiega tutte e tre le facce del
+sintomo si legge nel codice, e non ha bisogno del dump per esistere.
+IL LIBRO NON PORTA NESSUNA PUBKEY DEL MAKER (il 38383 ha `d, k, s, f, fa,
+amt, premium, pm, expires_at, rating` e basta), quindi l'unica fonte di
+«questo ordine è mio» è la restore-session — che risponde per IDENTITÀ, il
+fatto che la sonda della tappa 1 ha accertato. E fin qui `chiediMieiOrdiniP2P`
+chiedeva per UNA identità sola: quella del mazzo che sta in QUESTO
+dispositivo. Se quel mazzo non è l'identità con cui l'ordine è stato
+pubblicato altrove, la risposta è una lista vuota VERA — non un silenzio,
+una risposta — e il proprio ordine si legge da estraneo: prendibile.
+E IL MAZZO DI UN DISPOSITIVO PUÒ BENISSIMO NON ESSERE QUELLO DEL CONTO,
+per una strada che la cura del 10 set ha lasciato aperta in piena vista.
+`allineaContoP2P` consegna le chiavi di ieri — quelle senza suffisso, le
+uniche che due account sullo stesso dispositivo si sono davvero divisi —
+al PRIMO conto che entra, e la voce di quel giorno la chiama «la scommessa
+più onesta», con il pezzo 2 a correggerla quando è sbagliata. Ma il pezzo 2
+sono `mazzoEstraneoP2P` e `mazzoDaVerificareP2P`, e **tutti e due chiedono
+`origine === 'conto'`**: un mazzo nato sul dispositivo prima che il seme
+esistesse (origine ''), o la strada sovrana di chi ha usato la propria
+chiave ('mia'), non li guarda NESSUNO. È il controllo dei documenti fatto
+solo a chi i documenti ce li ha: e chi non li ha è esattamente la
+popolazione per cui la cura era stata scritta — i mazzi di IERI.
+DA QUI L'ASIMMETRIA, per intero: il conto principale è quello vecchio, e
+sul PC ha ereditato il mazzo di dispositivo di prima del seme; il
+secondario è nato dopo la cura e sul PC ha trovato il suo nome vuoto,
+quindi ha adottato il profilo del conto — lo stesso che ha sul telefono.
+Sul telefono il principale il mazzo di ieri non ce l'ha (la cache
+dell'app svuotata durante la caccia ai loghi, voce «la gamba dell'app»),
+e infatti lì funziona.
+I TRE SOSPETTI DI ANDREA, riletti. 1) Il localStorage condiviso fra i due
+account su Desktop: vero, ed è la PREMESSA — ma non è più il difetto, il
+suffisso li separa da tre giorni. 2) «Un mazzo vecchio che viene
+parcheggiato e non ripreso»: mezzo giusto e più grave di così — non viene
+parcheggiato AFFATTO, perché il parcheggio giudica solo i mazzi 'conto'.
+3) «Il seme risponde per il tg_id giusto su desktop?»: sì, e l'aveva già
+stabilito il primo giro (l'initData lo inietta Telegram al lancio, per
+l'account attivo). Anche la restore rispondeva giusto: sulla domanda
+sbagliata.
+LA CURA È UN GIUDICE CHE GUARDA TUTTE LE MIE IDENTITÀ, non quella che
+capita di avere in tasca su questo dispositivo. `identitaMieP2P` mette in
+fila il mazzo vivo (solo se ha bruciato almeno una trade key: a indice
+zero non può avere ordini) e, quando quello non è GIÀ il seme,
+l'identità del conto. `chiediMieiOrdiniP2P` le chiede INSIEME —
+`unaRestoreP2P`, una domanda a testa, ognuna con la sua chiave
+usa-e-getta — e unisce le due liste.
+IL SEME È MIO PER COSTRUZIONE, ed è la riga che rende lecita la seconda
+domanda: lo ricava il server DAL MIO ACCOUNT (`/api/p2p/seme`, nessun
+corpo e nessun parametro: non esiste la sintassi per chiedere quello di
+un altro). Quindi marcare i suoi ordini non può marcare come mio
+l'ordine di qualcun altro — che è l'unico danno che questo giudice sappia
+fare, ed è il difetto del 10 set al contrario.
+DUE DOMANDE INSIEME SI POSSONO FARE, e non contro il vincolo della sonda:
+la regola a verbale è «una restore-session alla volta per CHIAVE», e
+queste sono due chiavi appena nate e diverse — a tenere separate le due
+risposte non è un campo del contenuto, è la crittografia. In fila
+costerebbero P2P_ATTESA_MS (30 s) due volte proprio a chi questo giro
+serve.
+E LA REGOLA DEL SILENZIO SI FA PIÙ SEVERA, non più larga: si conclude
+solo se hanno risposto TUTTE. Una lista parziale scritta come definitiva
+direbbe «non è tuo» di un ordine che l'altra identità avrebbe
+riconosciuto — cioè di nuovo il difetto. Il vuoto VERO arriva dentro una
+risposta, e Q3 dice che il coordinatore risponde anche a un'identità che
+non conosce: quindi «silenzio» qui vuol dire rete, mai «non ne hai».
+LE STRADE SCARTATE, coi perché. a) Mettere da parte anche i mazzi non
+'conto' quando divergono dal seme: un profilo di dispositivo È una
+identità legittima con la sua reputazione, e il derivato non è «la
+versione giusta» di un profilo — è UN ALTRO profilo. Sostituirlo in
+silenzio è la cosa che l'invariante di tutto il cantiere vieta.
+b) Rendere più furba la scommessa di `allineaContoP2P` (una lista dei
+conti già visti sul dispositivo): non salva il caso in cui il profilo di
+dispositivo sia nato legittimamente prima che i due account esistessero,
+che è proprio questo. c) Chiedere al server se una pubkey è di un ALTRO
+account — `p2p_indice` lo sa, e sarebbe un fatto invece di una
+deduzione: **no**, e vale la pena scriverlo, perché è la strada che
+sembra più forte. Farebbe di quella rotta un ORACOLO che risponde «questa
+chiave Nostr è di un utente Barattolo» a chiunque abbia una chiave in
+mano — e le trade key sui relay sono pubbliche. È esattamente la
+correlazione che il mazzo esiste per non fare (la stessa ragione per cui
+la GET delle chiavi restituisce un CONTO e mai un elenco). d) Chiedere il
+seme a ogni ingresso per tutti: una POST e una domanda in più per chi ha
+già il profilo del conto, cioè per quasi tutti, e per niente.
+COSA RESTA APERTO, dichiarato. Da quel PC il PROPRIO ordine adesso si
+vede segnato, ma pubblicarne uno nuovo userebbe ancora il profilo di
+dispositivo — un'altra identità, un'altra reputazione. Il tocco dice già
+la cosa onesta («Questo ordine è tuo: da questo dispositivo, per ora, si
+guarda soltanto»), e la ripresa vera è delle fasi successive. E se
+l'adozione dal cloud è bloccata da una copia illeggibile il mazzo non
+c'è affatto: lì `renderP2P` non arriva nemmeno a chiedere, e il foglio
+del profilo lo dice a parole. Nessuno dei due è questo cantiere.
+COLLAUDATI: **9350 prove verdi, 0 rosse** (+24 sulle 9326 del giro prima)
+e **8 MUTAZIONI, 8 uccise**: il seme che non si chiede mai (la cura
+spenta), il mazzo che entra anche a indice zero, la stessa chiave chiesta
+due volte, una risposta su due che conclude lo stesso, la busta che perde
+l'identità e firma con la chiave usa-e-getta, il ritorno alla domanda
+sola, la seconda domanda che non parte, e la chiave che smette di essere
+usa-e-getta. Il banco del motore fa girare il caso vero contro il
+coordinatore di cartone: due identità, due domande, due chiavi diverse,
+due prove d'identità, e le due liste che si uniscono — più il rovescio,
+che un mazzo 'conto' resta UNA domanda e il seme non lo chiede nessuno.
+LA LEZIONE, che vale oltre il P2P: **una guardia che controlla i
+documenti solo a chi li porta non è una guardia**. La cura del 10 set
+giudicava i mazzi che DICHIARANO da dove vengono, e quelli che non lo
+dichiarano sono per definizione i più vecchi — cioè la popolazione per
+cui la cura serviva. Quando un giudizio si appoggia a un campo nuovo, la
+domanda da farsi è chi quel campo non ce l'ha.
