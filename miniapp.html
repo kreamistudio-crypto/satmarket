@@ -37238,16 +37238,143 @@ function ordineMioP2P(id){
   if (ordiniP2P()[id]) return true;
   return !!(p2pMieiOrdini && p2pMieiOrdini[id]);
 }
-/* UNA SOTTOSCRIZIONE SUA, aperta e chiusa dal gesto, e non un innesto
-   nel motore: `mostroArriva` scarterebbe questa risposta (la chiave che
-   chiede non e' di un ordine in ascolto) e `mostroChiama` aspetta un
-   `request_id` che su restore-session torna NULL — il fatto accertato
-   dalla sonda della tappa 1. Agganciare per chiave di destinazione e'
-   piu' forte che per un campo del contenuto: a garantire non e' un
-   valore che il mittente scrive come gli pare, e' la crittografia.
-   UNA ALLA VOLTA PER CHIAVE, che e' la regola a verbale: con due in
-   volo dalla stessa chiave le risposte tornano indistinguibili. Il
-   gate `p2pMieiGiro` la tiene. */
+/* ⚠️ LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026, dal campo di
+   Andrea: dal PC, col conto PRINCIPALE, i propri ordini non si
+   marcavano — dallo smartphone si', e col conto secondario si' anche
+   dal PC).
+   IL LIBRO NON PORTA NESSUNA PUBKEY DEL MAKER, quindi l'unica fonte e'
+   la restore — e la restore risponde per IDENTITA'. Fin qui si chiedeva
+   per UNA sola, quella del mazzo che sta in QUESTO dispositivo, e su un
+   dispositivo che ne tiene uno SUO — nato qui prima che il seme
+   esistesse, o ereditato dalla scommessa di `allineaContoP2P`, che per
+   un mazzo non 'conto' nessuno rilegge mai — quella non e' l'identita'
+   con cui l'ordine e' stato pubblicato altrove. La risposta e' una
+   lista vuota VERA, e il proprio ordine si legge da estraneo:
+   prendibile, e senza la striscia che dice di chi e'.
+   IL SEME E' MIO PER COSTRUZIONE, ed e' la riga che rende lecita la
+   seconda domanda: lo ricava il server DAL MIO ACCOUNT (`/api/p2p/seme`
+   — nessun corpo, nessun parametro, non esiste la sintassi per chiedere
+   quello di un altro), quindi marcare i suoi ordini non puo' marcare
+   come mio l'ordine di qualcun altro, che e' l'unico danno che questo
+   giudice sappia fare.
+   SI CHIEDE SOLO QUANDO CAMBIA QUALCOSA: un mazzo 'conto' E' GIA' il
+   seme, e per lui la seconda domanda sarebbe la prima due volte — la
+   POST non parte nemmeno.
+   E L'INDICE VALE SOLO PER IL MAZZO VIVO: a zero non ha bruciato
+   nessuna trade key e non puo' avere ordini, mentre del seme l'indice
+   non lo sappiamo — e non saperlo non e' saperlo zero. */
+async function identitaMieP2P(mz){
+  const mie = [];
+  if (mz && (mz.indice | 0)) mie.push(mz.sk);
+  if (mz && mz.origine === 'conto') return mie;
+  const s = await semeProfiloP2P();
+  if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);
+  return mie;
+}
+/* UNA DOMANDA SOLA, A UN'IDENTITA' SOLA, con una sottoscrizione sua —
+   aperta e chiusa qui dentro, e non un innesto nel motore: `mostroArriva`
+   scarterebbe questa risposta (la chiave che chiede non e' di un ordine
+   in ascolto) e `mostroChiama` aspetta un `request_id` che su
+   restore-session torna NULL — il fatto accertato dalla sonda della
+   tappa 1. Agganciare per chiave di destinazione e' piu' forte che per
+   un campo del contenuto: a garantire non e' un valore che il mittente
+   scrive come gli pare, e' la crittografia.
+   ⚠️ LA CHIAVE DELLA DOMANDA E' USA-E-GETTA (set 2026, dal campo: la
+   prima apertura fredda leggeva IERI). L'aggancio della risposta e' la
+   chiave di destinazione, ma il relay RIGIOCA la storia: chiedendo dalla
+   trade key dell'ultimo indice, la prima cosa che arrivava era la
+   risposta di ieri alla stessa chiave — una restore-session vera,
+   decifrabile, con l'action giusta — e il lettore chiudeva su una lista
+   vecchia che l'ordine fresco non l'aveva. Alla seconda apertura il
+   pavimento aveva alzato l'indice, la chiave era nuova, e «funzionava»:
+   il difetto si travestiva da timing. E' l'ignoto dichiarato a verbale
+   («l'aggancio per sola chiave prende il primo che arriva») nella forma
+   che nessuno aspettava: non un messaggio spontaneo del coordinatore —
+   la NOSTRA risposta di ieri. Una chiave appena nata non ha storia PER
+   COSTRUZIONE: la prima restore-session che le arriva e' la risposta
+   alla domanda appena fatta. La sonda l'ha gia' provato (Q2: il
+   coordinatore accetta una chiave mai vista, con la busta restore e la
+   prova d'identita' — e' per IDENTITA' che risponde, non per trade key).
+   ⚠️ E DUE DOMANDE INSIEME SI POSSONO FARE proprio per questo: la regola
+   a verbale e' «una restore-session alla volta per CHIAVE», e queste
+   sono due chiavi appena nate e diverse — a tenere separate le due
+   risposte non e' un campo del contenuto, e' di nuovo la crittografia.
+   TORNA `true` SOLO SE IL COORDINATORE HA RISPOSTO: il silenzio non e'
+   una risposta, e il vuoto vero arriva dentro una risposta. Le righe
+   trovate si versano in `dentro`, che e' comune alle domande di questo
+   giro: due liste della stessa persona non si contraddicono. */
+async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
+  const NT = window.NostrTools;
+  const tkSk = NT.utils.bytesToHex(NT.generateSecretKey());
+  const tk = {sk: tkSk, pub: NT.getPublicKey(NT.utils.hexToBytes(tkSk))};
+  let risposto = false;
+  let sub = null;
+  try {
+    await new Promise((fine, male) => {
+      let chiuso = false;
+      const basta = () => { if (!chiuso) { chiuso = true; fine(); } };
+      sub = relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}], {
+        onevent(ev){
+          try {
+            const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
+            const arr = JSON.parse(NT.nip44.decrypt(ev.content, conv));
+            const d = messaggioDentro(Array.isArray(arr) ? arr[0] : arr);
+            if (!d || d.action !== 'restore-session') return;
+            const righe = (d.payload && d.payload.restore_data
+                           && d.payload.restore_data.orders) || [];
+            for (const r of righe)
+              if (r && r.order_id)
+                dentro[String(r.order_id)] = {indice: r.trade_index | 0,
+                                              stato: String(r.status || '')};
+            risposto = true;
+            basta();
+          } catch(e){ /* non e' per noi, o non si apre: si lascia stare */ }
+        }
+      });
+      /* LA DOMANDA MANCAVA, ed era la meta' muta del difetto del
+         9 set: ci si metteva in ascolto senza mai CHIEDERE, e il
+         coordinatore non risponde a una domanda mai fatta — la
+         lista tornava vuota per tutti, su ogni dispositivo. Si
+         chiede DOPO aver aperto l'orecchio (il patto di
+         mostroChiama), con la busta `restore` e la prova
+         d'identita': e' per IDENTITA' che il coordinatore
+         risponde, non per trade key. */
+      const msg = messaggioMostro('restore-session',
+        {requestId: nuovaRichiestaP2P(), indice: null, busta: 'restore'});
+      const adesso = Math.floor(Date.now() / 1000);
+      const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
+      const ev = {
+        kind: 14,
+        pubkey: tk.pub,
+        created_at: adesso,
+        tags: [['p', mostro], ['expiration', String(adesso + P2P_SCADENZA_MSG)]],
+        content: NT.nip44.encrypt(bustaMostro(tk.sk, identitaSk, msg), conv)
+      };
+      /* il nonce si mina prima della firma — la riga da non
+         invertire, vedi mostroChiama (oggi le soglie sono zero).
+         E UNA CHIAVE APPENA NATA E' SEMPRE UN PRIMO CONTATTO:
+         vale la soglia piu' alta delle due, o il giorno che
+         pow_first_contact si accende la domanda cade in silenzio. */
+      const bits = Math.max(info.pow || 0, info.powPrimo || 0);
+      if (bits > 0) NT.nip13.minePow(ev, bits);
+      const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(tk.sk));
+      relay.publish(firmato).catch((e) => {
+        /* «publish timed out» vuol dire partito senza OK: si resta
+           in ascolto — la lezione del bunker. Il resto chiude. */
+        if (!/timed out/i.test(String(e && e.message || e))) male(e);
+      });
+      setTimeout(basta, P2P_ATTESA_MS);
+    });
+  } finally {
+    try { if (sub) sub.close(); } catch(e){}
+  }
+  return risposto;
+}
+/* IL GIRO DELLE MIE IDENTITA', uno per sessione: il gate `p2pMieiGiro`
+   tiene la regola della sonda (una alla volta per chiave) e impedisce
+   che due render facciano due giri. Le domande partono INSIEME — una
+   chiave a testa — o un'attesa muta costerebbe P2P_ATTESA_MS due volte
+   a chi ha due identita', cioe' proprio a chi questo giro serve. */
 async function chiediMieiOrdiniP2P(){
   if (p2pMieiGiro) return p2pMieiGiro;
   p2pMieiGiro = (async () => {
@@ -37263,111 +37390,37 @@ async function chiediMieiOrdiniP2P(){
       try { await p2pPavimento; } catch(e){}
       mz = mazzoMostro();
     }
-    /* SENZA INDICE NON C'E' NIENTE DA CHIEDERE: l'indice conta le trade
-       key BRUCIATE, quindi a zero — ora che il pavimento ha parlato —
-       non esiste nessun ordine da ritrovare, e una richiesta che non
-       puo' portare niente non si manda. */
-    if (!mz || !(mz.indice | 0)) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
+    /* SENZA UN'IDENTITA' NON C'E' NIENTE DA CHIEDERE: il mazzo a indice
+       zero non ha bruciato nessuna trade key — ora che il pavimento ha
+       parlato — e il seme, se il conto non lo da', non esiste. Una
+       richiesta che non puo' portare niente non si manda. */
+    const mie = await identitaMieP2P(mz);
+    if (!mie.length) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }
     /* PRIMA la connessione, che porta con se' il bundle: derivare la
        chiave a bundle assente era il loop del 9 set 2026 — l'errore
        sincrono non lasciava mai passare il caricamento che l'avrebbe
        curato. Da qui in giu' NostrTools c'e' per costruzione. */
     const relay = await mostroConnetti();
-    const NT = window.NostrTools;
-    /* ⚠️ LA CHIAVE DELLA DOMANDA E' USA-E-GETTA (set 2026, dal campo:
-       la prima apertura fredda leggeva IERI). L'aggancio della risposta
-       e' la chiave di destinazione, ma il relay RIGIOCA la storia:
-       chiedendo dalla trade key dell'ultimo indice, la prima cosa che
-       arrivava era la risposta di ieri alla stessa chiave — una
-       restore-session vera, decifrabile, con l'action giusta — e il
-       lettore chiudeva su una lista vecchia che l'ordine fresco non
-       l'aveva. Alla seconda apertura il pavimento aveva alzato
-       l'indice, la chiave era nuova, e «funzionava»: il difetto si
-       travestiva da timing. E' l'ignoto dichiarato a verbale
-       («l'aggancio per sola chiave prende il primo che arriva») nella
-       forma che nessuno aspettava: non un messaggio spontaneo del
-       coordinatore — la NOSTRA risposta di ieri. Una chiave appena
-       nata non ha storia PER COSTRUZIONE: la prima restore-session
-       che le arriva e' la risposta alla domanda appena fatta. La
-       sonda l'ha gia' provato (Q2: il coordinatore accetta una chiave
-       mai vista, con la busta restore e la prova d'identita' — e' per
-       IDENTITA' che risponde, non per trade key). */
-    const tkSk = NT.utils.bytesToHex(NT.generateSecretKey());
-    const tk = {sk: tkSk, pub: NT.getPublicKey(NT.utils.hexToBytes(tkSk))};
     const mostro = mostroHexP2P();
     const info = await mostroInfoP2P();
     const trovati = {};
-    let risposto = false;
-    let sub = null;
-    try {
-      await new Promise((fine, male) => {
-        let chiuso = false;
-        const basta = () => { if (!chiuso) { chiuso = true; fine(); } };
-        sub = relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}], {
-          onevent(ev){
-            try {
-              const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
-              const arr = JSON.parse(NT.nip44.decrypt(ev.content, conv));
-              const d = messaggioDentro(Array.isArray(arr) ? arr[0] : arr);
-              if (!d || d.action !== 'restore-session') return;
-              const righe = (d.payload && d.payload.restore_data
-                             && d.payload.restore_data.orders) || [];
-              for (const r of righe)
-                if (r && r.order_id)
-                  trovati[String(r.order_id)] = {indice: r.trade_index | 0,
-                                                 stato: String(r.status || '')};
-              risposto = true;
-              basta();
-            } catch(e){ /* non e' per noi, o non si apre: si lascia stare */ }
-          }
-        });
-        /* LA DOMANDA MANCAVA, ed era la meta' muta del difetto del
-           9 set: ci si metteva in ascolto senza mai CHIEDERE, e il
-           coordinatore non risponde a una domanda mai fatta — la
-           lista tornava vuota per tutti, su ogni dispositivo. Si
-           chiede DOPO aver aperto l'orecchio (il patto di
-           mostroChiama), con la busta `restore` e la prova
-           d'identita' del mazzo: e' per IDENTITA' che il
-           coordinatore risponde, non per trade key. */
-        const msg = messaggioMostro('restore-session',
-          {requestId: nuovaRichiestaP2P(), indice: null, busta: 'restore'});
-        const adesso = Math.floor(Date.now() / 1000);
-        const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(tk.sk), mostro);
-        const ev = {
-          kind: 14,
-          pubkey: tk.pub,
-          created_at: adesso,
-          tags: [['p', mostro], ['expiration', String(adesso + P2P_SCADENZA_MSG)]],
-          content: NT.nip44.encrypt(bustaMostro(tk.sk, mz.sk, msg), conv)
-        };
-        /* il nonce si mina prima della firma — la riga da non
-           invertire, vedi mostroChiama (oggi le soglie sono zero).
-           E UNA CHIAVE APPENA NATA E' SEMPRE UN PRIMO CONTATTO:
-           vale la soglia piu' alta delle due, o il giorno che
-           pow_first_contact si accende la domanda cade in silenzio. */
-        const bits = Math.max(info.pow || 0, info.powPrimo || 0);
-        if (bits > 0) NT.nip13.minePow(ev, bits);
-        const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(tk.sk));
-        relay.publish(firmato).catch((e) => {
-          /* «publish timed out» vuol dire partito senza OK: si resta
-             in ascolto — la lezione del bunker. Il resto chiude. */
-          if (!/timed out/i.test(String(e && e.message || e))) male(e);
-        });
-        setTimeout(basta, P2P_ATTESA_MS);
-      });
-    } finally {
-      try { if (sub) sub.close(); } catch(e){}
-    }
-    /* IL SILENZIO NON E' UNA RISPOSTA: il timeout senza messaggio
-       lascia «non si sa» — il fail-open promesso qui sotto. Il vuoto
-       VERO arriva dentro una risposta, e quello si', si tiene. */
-    if (!risposto) {
-      console.log('🔁 [p2p] i miei ordini: nessuna risposta');
+    const esiti = await Promise.all(mie.map(
+      sk => unaRestoreP2P(relay, mostro, info, sk, trovati).catch(() => false)));
+    /* IL SILENZIO NON E' UNA RISPOSTA, e con due domande la regola si
+       fa piu' severa invece che piu' larga: si conclude solo se hanno
+       risposto TUTTE. Una lista parziale scritta come definitiva
+       direbbe «non e' tuo» di un ordine che l'altra identita' avrebbe
+       riconosciuto — cioe' il difetto, al contrario. Il vuoto VERO
+       arriva dentro una risposta, e quello si', si tiene. */
+    if (!esiti.every(Boolean)) {
+      console.log('🔁 [p2p] i miei ordini: hanno risposto in '
+                  + esiti.filter(Boolean).length + ' su ' + esiti.length
+                  + ', non si conclude');
       return p2pMieiOrdini;
     }
     p2pMieiOrdini = trovati;
     console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
-                + ' dalla restore');
+                + ' dalla restore (identità chieste: ' + esiti.length + ')');
     return trovati;
   })().catch((e) => {
     /* FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva —

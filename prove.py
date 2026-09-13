@@ -41144,6 +41144,75 @@ function reset(){
   out.restoreFresca = !!(miei && miei['ord-fresco']);
   out.restoreCompleta = !!(miei && miei['ord-vecchio'] && miei['ord-fresco']);
 
+  /* ---- 9b) LE MIE IDENTITA' POSSONO ESSERE DUE ------------------
+     Il caso dal campo (13 set 2026): sul PC il conto principale tiene
+     un profilo SUO — nato li' prima che il seme esistesse, o ereditato
+     dalla scommessa di `allineaContoP2P`, che per un mazzo non 'conto'
+     nessuno rilegge mai — mentre l'ordine e' stato pubblicato dal
+     telefono con l'identita' DEL CONTO. Chiedendo per la sola
+     identita' locale la risposta e' una lista vuota VERA, e il proprio
+     ordine si legge da estraneo: niente marcatura, niente striscia,
+     e prendibile. Qui il coordinatore di cartone risponde a ciascuna
+     identita' la SUA lista, e si guarda che il giro le chieda tutt'e
+     due — con due chiavi diverse, ognuna con la sua prova. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  P2P_ATTESA_MS = 3000;
+  p2pMieiOrdini = null; p2pMieiGiro = null; p2pPavimento = null;
+  const skQui = bytesToHex(NT.generateSecretKey());
+  const pubQui = NT.getPublicKey(hexToBytes(skQui));
+  ricordaMazzo({sk: skQui, pub: pubQui, indice: 4, creato: 1,
+                backupFatto: true, origine: '', versione: 0, conto: 0});
+  const skConto = bytesToHex(NT.generateSecretKey());
+  const pubConto = NT.getPublicKey(hexToBytes(skConto));
+  const fetchPrima = fetch;
+  fetch = async (url, opt) => {
+    fetches.push({url: url, opt: opt});
+    if (String(url).indexOf('/p2p/seme') >= 0)
+      return {ok: true, json: async () => ({seme: skConto, versione: 1})};
+    return {ok: true};
+  };
+  rispondi = r => String(r.msgJson || '').indexOf('restore-session') >= 0
+    ? [rispostaRestore(r.identitaPub === pubConto
+        ? [{order_id: 'ord-del-conto', trade_index: 2, status: 'pending'}]
+        : [{order_id: 'ord-di-qui', trade_index: 4, status: 'pending'}])]
+    : [];
+  const quanti = ricevuti.length;
+  const due = await chiediMieiOrdiniP2P();
+  fetch = fetchPrima;
+  out.dueIdentitaUnite = !!(due && due['ord-di-qui'] && due['ord-del-conto']);
+  const dom = ricevuti.slice(quanti).filter(
+    x => String(x.msgJson || '').indexOf('restore-session') >= 0);
+  out.dueDomande = dom.length === 2;
+  out.dueChiaviDiverse = dom.length === 2 && dom[0].tradePub !== dom[1].tradePub;
+  out.dueProveIdentita = dom.length === 2 && dom.every(x => x.provaIdentita === true);
+  out.leDueIdentitaGiuste = JSON.stringify(dom.map(x => x.identitaPub).sort())
+    === JSON.stringify([pubQui, pubConto].sort());
+  /* e un mazzo 'conto' resta UNA domanda sola: il seme e' lui */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  P2P_ATTESA_MS = 3000;
+  p2pMieiOrdini = null; p2pMieiGiro = null; p2pPavimento = null;
+  ricordaMazzo({sk: skConto, pub: pubConto, indice: 2, creato: 1,
+                backupFatto: true, origine: 'conto', versione: 1, conto: 111});
+  const fetchPrima2 = fetch;
+  let semeDomandato = 0;
+  fetch = async (url, opt) => {
+    fetches.push({url: url, opt: opt});
+    if (String(url).indexOf('/p2p/seme') >= 0) semeDomandato++;
+    return {ok: true};
+  };
+  rispondi = r => String(r.msgJson || '').indexOf('restore-session') >= 0
+    ? [rispostaRestore([{order_id: 'ord-del-conto', trade_index: 2, status: 'pending'}])]
+    : [];
+  const quanti2 = ricevuti.length;
+  const uno = await chiediMieiOrdiniP2P();
+  fetch = fetchPrima2;
+  out.contoUnaDomanda = !!(uno && uno['ord-del-conto'])
+    && ricevuti.slice(quanti2).filter(
+         x => String(x.msgJson || '').indexOf('restore-session') >= 0).length === 1
+    && semeDomandato === 0;
+
   /* ---- 10) L'ORDINE ADOTTATO SI RITIRA, con la chiave riderivata --
      Il caso dal campo («non posso piu' annullare»): la riga locale
      non c'e' piu', la restore riconosce l'ordine, il libro lo
@@ -41299,6 +41368,15 @@ function reset(){
         "giuNonNominaIlRelay": "...senza nominare il relay",
         "restoreFresca": "la restore legge la risposta di OGGI, non la storia",
         "restoreCompleta": "...e la lista fresca arriva intera",
+        # LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026, il PC di
+        # Andrea): un profilo di dispositivo non e' l'identita' del
+        # conto, e all'ordine pubblicato altrove risponde solo quella.
+        "dueDomande": "con un profilo di dispositivo si chiede anche al conto",
+        "dueChiaviDiverse": "...ognuna con la sua chiave appena nata",
+        "dueProveIdentita": "...ognuna con la sua prova d'identita'",
+        "leDueIdentitaGiuste": "...e sono proprio le due identita' che ho",
+        "dueIdentitaUnite": "...e le due liste si UNISCONO: l'ordine e' mio anche da qui",
+        "contoUnaDomanda": "un mazzo 'conto' resta UNA domanda, e il seme non si chiede",
         "adozioneVera": "l'ordine della restore si adotta: riga vera, chiave vera",
         "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
         "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
@@ -44800,11 +44878,16 @@ def prove_p2p_server():
     prova("...e lo chiamano la card, la porta e la cintura", 3,
           solo_codice(mini).count("ordineMioP2P(") - 1)   # -1: la definizione
     cm = pezzo_js(mini, "async function chiediMieiOrdiniP2P(", "\n}\n")
-    # SENZA INDICE NON SI CHIEDE: l'indice conta le trade key BRUCIATE,
-    # quindi a zero non esiste nessun ordine da ritrovare — e una
-    # richiesta che non puo' portare niente non si manda.
-    prova("senza indice non si chiede niente", True,
-          "if (!mz || !(mz.indice | 0))" in cm)
+    ur = pezzo_js(mini, "async function unaRestoreP2P(", "\n}\n")
+    im = pezzo_js(mini, "async function identitaMieP2P(mz){", "\n}\n")
+    # SENZA UN'IDENTITA' NON SI CHIEDE: sul mazzo l'indice conta le
+    # trade key BRUCIATE, quindi a zero non esiste nessun ordine da
+    # ritrovare; il seme, se il conto non lo da', non esiste affatto.
+    # Il giudice e' UNO SOLO — `identitaMieP2P` — e il giro lo
+    # interroga PRIMA di aprire la connessione.
+    prova("senza identita' non si chiede niente", True,
+          "if (!mie.length) { p2pMieiOrdini = p2pMieiOrdini || {}; return p2pMieiOrdini; }" in cm
+          and "if (mz && (mz.indice | 0)) mie.push(mz.sk);" in im)
     # UNA ALLA VOLTA PER CHIAVE, la regola a verbale: con due in volo
     # dalla stessa chiave le risposte tornano indistinguibili.
     prova("...e una domanda alla volta", True,
@@ -44814,17 +44897,17 @@ def prove_p2p_server():
     # non e' un campo che il mittente scrive come gli pare ma la
     # crittografia. La sottoscrizione e' sua e si chiude col gesto.
     prova("la domanda ha una sottoscrizione sua, chiusa alla fine", True,
-          "relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}]" in cm
-          and "sub.close()" in cm)
+          "relay.subscribe([{kinds: [14], authors: [mostro], '#p': [tk.pub]}]" in ur
+          and "sub.close()" in ur)
     prova("...e non aspetta un request_id, che qui e' null", False,
-          "request_id" in cm or "p2pAttese" in cm)
+          "request_id" in solo_codice(ur) or "p2pAttese" in solo_codice(ur))
     prova("...e tiene solo le risposte di restore-session", True,
-          "d.action !== 'restore-session'" in cm)
+          "d.action !== 'restore-session'" in ur)
     # ⚠️ FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva.
     # Un elenco vuoto spacciato per «non ne hai» marcherebbe come altrui
     # un ordine proprio — che e' il difetto, al contrario.
     prova("se la domanda cade non si conclude niente", True,
-          "return p2pMieiOrdini;" in cm.split(".catch(")[1])
+          "return p2pMieiOrdini;" in cm.split(".catch((e) => {")[1])
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
     # ⚠️ LA BANDIERINA E' L'UNICO GATE (set 2026): prima si esigeva
     # anche `p2pMieiOrdini === null`, e cosi' «Riprova» non riarmava
@@ -44860,7 +44943,9 @@ def prove_p2p_server():
     # derivata rimessa, l'`index` ESPLODEVA e si portava via il resto
     # della sezione — una sentinella che muore non e' una sentinella.
     prova("il bundle si carica prima che nasca la chiave", True,
-          0 <= cm.find("mostroConnetti()") < cm.find("generateSecretKey()"))
+          0 <= cm.find("mostroConnetti()") < cm.find("unaRestoreP2P(")
+          and "generateSecretKey()" in ur
+          and "generateSecretKey()" not in cm)
     # ⚠️ LA CHIAVE DELLA DOMANDA E' USA-E-GETTA (set 2026, dal campo):
     # dalla trade key dell'ultimo indice il relay rigiocava la risposta
     # di IERI — restore-session vera, action giusta — e il lettore
@@ -44868,8 +44953,8 @@ def prove_p2p_server():
     # storia per costruzione; il comportamento lo prova il caso 9 del
     # banco del motore, qui si inchioda che la derivata non torni.
     prova("la domanda parte da una chiave appena nata, senza storia",
-          True, "generateSecretKey()" in cm
-          and "chiaveScambio(" not in solo_codice(cm))
+          True, "generateSecretKey()" in ur
+          and "chiaveScambio(" not in solo_codice(ur))
     prova("un errore non rilancia: un tentativo per sessione", True,
           "p2pMieiChiesto = true;" in rp and "!p2pMieiChiesto" in rp)
     prova("...e il ritentativo costa un gesto", True,
@@ -44879,13 +44964,38 @@ def prove_p2p_server():
     # tornava vuota per tutti. La domanda parte con la busta `restore`
     # e la prova d'identita' del mazzo: e' per identita' che risponde.
     prova("la domanda parte davvero, con identita' e busta restore", True,
-          "busta: 'restore'" in cm and "relay.publish(firmato)" in cm
-          and "bustaMostro(tk.sk, mz.sk, msg)" in cm)
+          "busta: 'restore'" in ur and "relay.publish(firmato)" in ur
+          and "bustaMostro(tk.sk, identitaSk, msg)" in ur)
+    # --- 15b) LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026) -----
+    # Dal campo: dal PC, col conto principale, i propri ordini non si
+    # marcavano — dallo smartphone si'. Il dispositivo teneva un
+    # profilo SUO (origine '', ereditato dalla scommessa di
+    # `allineaContoP2P`, che per un mazzo non 'conto' nessuno rilegge),
+    # e la restore chiedeva per quello solo: lista vuota VERA, e
+    # l'ordine proprio letto da estraneo.
+    prova("il seme non si chiede a un mazzo che E' gia' lui", True,
+          "if (mz && mz.origine === 'conto') return mie;" in im)
+    prova("...e a un profilo di dispositivo si chiede anche il conto",
+          True, "const s = await semeProfiloP2P();" in im
+          and "if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);" in im)
+    # LE DUE DOMANDE PARTONO INSIEME, o un'attesa muta costerebbe
+    # P2P_ATTESA_MS due volte proprio a chi questo giro serve. Si puo'
+    # perche' la regola a verbale e' «una alla volta per CHIAVE», e le
+    # chiavi sono due, nate adesso.
+    prova("...e le due domande partono insieme, una chiave a testa",
+          True, "await Promise.all(mie.map(" in cm
+          and "unaRestoreP2P(relay, mostro, info, sk, trovati)" in cm)
+    # E LA REGOLA SI FA PIU' SEVERA, non piu' larga: con due domande
+    # una risposta sola non conclude — direbbe «non e' tuo» di un
+    # ordine che l'altra identita' avrebbe riconosciuto.
+    prova("...e una risposta sola su due non conclude niente", True,
+          "if (!esiti.every(Boolean)) {" in cm)
     # E IL SILENZIO NON E' UNA RISPOSTA: il timeout senza messaggio
     # lascia «non si sa», mai un vuoto spacciato per «non ne hai».
     prova("il timeout muto non diventa un «non ne hai»", True,
-          "if (!risposto)" in cm
-          and "return p2pMieiOrdini;" in cm.split("if (!risposto)")[1])
+          "let risposto = false;" in ur and "return risposto;" in ur
+          and "return p2pMieiOrdini;"
+              in cm.split("if (!esiti.every(Boolean)) {")[1])
     # EMENDATA (fase 6): il passaggio di profilo non esiste piu', e con
     # lui il «profilo di prima» — nessuno scrive piu' quella chiave (un
     # residuo nel localStorage di ieri resta li', inerte e non spazzato:
@@ -44906,10 +45016,10 @@ def prove_p2p_server():
     prova("...e il giudizio sull'indice la aspetta e rilegge il mazzo",
           True, "await p2pPavimento" in cm
           and cm.index("await p2pPavimento")
-              < cm.index("if (!mz || !(mz.indice | 0))")
+              < cm.index("identitaMieP2P(mz)")
           and cm.index("mz = mazzoMostro();",
                        cm.index("await p2pPavimento"))
-              < cm.index("if (!mz || !(mz.indice | 0))"))
+              < cm.index("identitaMieP2P(mz)"))
     # E LA RIGA SI ADOTTA (set 2026, dal campo: «non posso piu'
     # annullare»): per un pending la restore + il libro dicono tutto
     # quel che una riga locale contiene, quindi non si disegna una
@@ -44945,9 +45055,14 @@ def prove_p2p_server():
         banco5 = esc5 + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("async function chiediMieiOrdiniP2P(",
+                      "async function identitaMieP2P(mz){",
                       "function adottaOrdiniAltroveP2P(",
                       "function scambiP2P(")) + r"""
 let p2pMieiOrdini = null, p2pMieiGiro = null, p2pPavimento = null;
+/* il seme del conto e' una fetch, e qui e' uno stub DICHIARATO: il
+   suo giro vero (409 compreso) gira nel banco del motore */
+let SEME = null, semeChiesto = 0;
+function semeProfiloP2P(){ semeChiesto++; return Promise.resolve(SEME); }
 let p2pLibro = null, p2pStatoChiesto = false;
 let mazzoFinto = null;
 function mazzoMostro(){ return mazzoFinto; }
@@ -45035,6 +45150,32 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   // i) senza restore niente cambia
   p2pMieiOrdini = null; p2pLibro = null;
   out.senzaRestoreVuota = scambiP2P() === '';
+  // j) LE MIE IDENTITA': un mazzo 'conto' E' gia' il seme, e la
+  //    seconda domanda non parte nemmeno — nemmeno la POST
+  const SK_SEME = 'cd'.repeat(32);
+  SEME = {sk: SK_SEME}; semeChiesto = 0;
+  out.contoNonChiedeIlSeme = JSON.stringify(await identitaMieP2P(
+      {sk: 'aa', pub: 'AA', indice: 3, origine: 'conto'})) === '["aa"]'
+    && semeChiesto === 0;
+  // k) un profilo DI DISPOSITIVO ne ha due, e il mazzo viene per primo
+  out.dispositivoDue = JSON.stringify(await identitaMieP2P(
+      {sk: 'aa', pub: 'AA', indice: 3, origine: ''}))
+    === JSON.stringify(['aa', SK_SEME]);
+  // l) ...e a indice zero resta il solo conto: l'indice vale per il
+  //    mazzo, e del seme non sappiamo l'indice — che non e' zero
+  out.zeroSoloIlConto = JSON.stringify(await identitaMieP2P(
+      {sk: 'aa', pub: 'AA', indice: 0, origine: ''}))
+    === JSON.stringify([SK_SEME]);
+  // m) il seme che tace (409) lascia quel che c'era
+  SEME = null;
+  out.semeMutoLasciaIlMazzo = JSON.stringify(await identitaMieP2P(
+      {sk: 'aa', pub: 'AA', indice: 3, origine: ''})) === '["aa"]';
+  // n) ...e senza mazzo e senza seme non si chiede niente
+  out.nienteDaChiedere = JSON.stringify(await identitaMieP2P(null)) === '[]';
+  // o) e se il seme E' il mazzo (un 'conto' che non lo dice) niente doppioni
+  SEME = {sk: 'aa'};
+  out.senzaDoppioni = JSON.stringify(await identitaMieP2P(
+      {sk: 'aa', pub: 'AA', indice: 3, origine: ''})) === '["aa"]';
   console.log(JSON.stringify(out));
 })();
 """
@@ -45076,6 +45217,20 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
                   True, out5["senzaIndiceNonNasce"])
             prova("senza restore la striscia resta quella di prima", True,
                   out5["senzaRestoreVuota"])
+            # LE MIE IDENTITA' (13 set 2026, il PC di Andrea): il
+            # giudice gira davvero, coi sei rami che contano.
+            prova("a un mazzo 'conto' il seme non si chiede: E' lui",
+                  True, out5["contoNonChiedeIlSeme"])
+            prova("...e un profilo di dispositivo ne ha DUE, il mazzo per primo",
+                  True, out5["dispositivoDue"])
+            prova("...a indice zero resta il solo conto", True,
+                  out5["zeroSoloIlConto"])
+            prova("...il seme che tace lascia quel che c'era", True,
+                  out5["semeMutoLasciaIlMazzo"])
+            prova("...senza mazzo e senza seme non si chiede niente",
+                  True, out5["nienteDaChiedere"])
+            prova("...e la stessa chiave non si chiede due volte", True,
+                  out5["senzaDoppioni"])
 
     # --- 13-14) LA STRADA SOVRANA E L'ADOZIONE DAL FOGLIO SONO
     # USCITE (fase 6, decisione di Andrea). La sovrana resta nel patto
@@ -45100,9 +45255,15 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
     # estranei. La gamba nuova e' `adottaProfiloContoP2P`.
     # ...E TRE DAL 10 SET 2026 (il conto sul dispositivo): la terza e'
     # `verificaContoP2P`, che il seme lo chiede per sapere DI CHI e' un
-    # mazzo 'conto' di ieri — mai per farne uno. Il conto resta un
-    # censimento: un quarto chiamante va spiegato qui.
-    prova("...il seme lo chiedono il gesto, la gamba dell'app e la verifica del conto", 3,
+    # mazzo 'conto' di ieri — mai per farne uno.
+    # ...E QUATTRO DAL 13 SET 2026 (le mie identita' possono essere
+    # due): la quarta e' `identitaMieP2P`, che lo chiede per sapere
+    # A CHI domandare i propri ordini quando il dispositivo tiene un
+    # profilo suo — anche lei mai per farne uno, e solo se il mazzo
+    # vivo non e' gia' il seme. Il conto resta un censimento: un
+    # quinto chiamante va spiegato qui.
+    prova("...il seme lo chiedono il gesto, la gamba dell'app, la verifica"
+          " del conto e le mie identita'", 4,
           mini.count("await semeProfiloP2P()"))
     # --- LA GAMBA DELL'APP, i suoi confini -------------------------
     ad = pezzo_js(mini, "function adottaProfiloContoP2P(){", "\n}\n")
