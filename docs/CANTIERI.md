@@ -12695,3 +12695,130 @@ trasforma — vede due stati e un lampo in mezzo — e allora tanto
 varrebbe non farla, la morfosi. La sentinella nuova guarda **quello**,
 non il numero di oggi: è l'unica cosa che una sesta taratura non deve
 poter scavalcare per sbaglio.
+
+
+## La terza stesura: i sats in testa, e il giudizio che torna «per te» (14 set 2026)
+
+**LA CARD È STATA RIFATTA TRE VOLTE IN DUE GIORNI**, e le due stesure
+scartate stanno qui perché l'ultima si capisce solo con loro accanto.
+Adesso le prime tre righe sono:
+
+```
+Stai vendendo ≈ 17 115 sats
+per ricevere 12,00 €
++4% più conveniente per te
+```
+
+**I SATS SALGONO IN TESTA, e hanno cambiato posto tre volte**: una riga
+loro col badge accanto (prima stesura), fuori del tutto (seconda), in
+coda alla riga dell'euro dietro un puntino, e adesso **in cima** — che
+è la cifra che si va a cercare scorrendo i propri scambi. L'euro scende
+in seconda riga e diventa la frase di servizio: quel che si dà in
+cambio.
+⚠️ **E SENZA CIFRA LA FRASE RESTA IN PIEDI**: a cambio muto si legge
+«Stai vendendo sats», che è esattamente la frase di ieri — un ripiego
+che non sembra un ripiego. Mai un numero inventato.
+**Col puntino se n'è andata anche la sua regola CSS**, e la riga flex
+che teneva insieme le due cifre: niente CSS orfano, e la sentinella che
+le sorvegliava è **rovesciata** — certifica che non ci siano.
+
+**DUE VERBI DIVERSI IN SECONDA RIGA, e la scelta sul lato compro è
+mia** (Andrea aveva fissato «per ricevere 5,00 €» sul lato vendo e ha
+chiesto la forma migliore per l'altro). Il candidato ovvio era «per
+5,00 €», e **non va bene per una ragione di elenco**: le due card
+stanno una sotto l'altra, e con lo stesso «per» su tutt'e due l'occhio
+completa l'ellissi — «per [ricevere] 5,00 €» — cioè il contrario di
+quel che succede a chi compra. Due verbi che non si possono
+confondere: **`per ricevere` e `pagando`**, gli stessi due mestieri che
+il libro chiama «Ricevi» e «Paghi».
+
+**E IL GIUDIZIO TORNA, ma DICHIARATO.** La stesura di stamattina
+l'aveva tolto dalla propria card, col suo perché scritto: *chi legge è
+l'autore, il premio se l'è scelto, dirgli «più conveniente» è
+spiegargli una cosa che sa*. Andrea l'ha rovesciata guardandola, e il
+motivo nuovo è più forte del vecchio: **che il premio l'abbia scelto tu
+non vuol dire che ti ricordi da che parte pende**, e un numero col
+segno lascia il lavoro a chi legge. La tinta da sola dice il verso ma
+non dice che ci sei dentro tu.
+⚠️ **IL «PER TE» È LA PARTE CHE NON SI PUÒ TOGLIERE**, ed è quel che
+distingue questa frase da quella del libro: *lo stesso premio si legge
+al rovescio dai due lati del vetro*. Sul mio ordine di **vendita** un
++4% è a mio favore — consegno meno sats per gli stessi euro — mentre a
+chi lo guarda dal libro per comprarlo è una bastonata. Due lettori, due
+frasi; il **giudice invece è uno solo** (`affareP2P`), e la traduzione
+del lato la fa `comeLibroP2P`. La prova che tiene fermo il
+rovesciamento c'era già ed è rimasta lì: *lo stesso segno porta
+tutt'e due le tinte*.
+**`premioSeccoP2P` SI È RINOMINATA `premioMioP2P`**: «secco» voleva
+dire «senza giudizio», e con «per te» dentro quel nome avrebbe detto il
+contrario di quel che fa.
+
+**E IL VERBO È USCITO DALLA FRASE.** Fino a stamattina `fraseLatoP2P`
+dava «Stai comprando sats» e la usavano in due — la card e il cappello
+del foglio di dettaglio. Adesso la card dice «Stai comprando ≈ 7 281
+sats» e il cappello «Stai comprando sats»: la coda cambia, il verbo no.
+Quindi a essere condiviso è `verboLatoP2P`, ed è la stessa mossa fatta
+col badge — due lettori, due frasi, un pezzo solo in mezzo. Quel che
+conta resta fermo: «comprando» e «vendendo» si decidono in un posto
+solo.
+
+**I NUMERI.** Suite: **9705 → 9711, zero rosse** (+6), anche con
+`PROVE_SEVERE=1`; il banco della card ne conta 67, e la linea di
+partenza è stata misurata in un **worktree staccato su HEAD**. Dal
+vivo, quattro scatti nei due temi a 375 e a **320**: il documento resta
+largo 320, **nessuna card sfora**, e i sats della prima riga misurano
+16px in `--sats-text` — cioè l'arancio di casa e non il verde/rosso del
+tab del libro, che a questa card arriverebbe se non ci fosse la riga
+che lo ferma.
+⚠️ **UNA ROSSA SOLA, e non si è riprodotta**: un giro ha dato 9688/1 e
+i tre successivi 9711/0. Era un giro **sovrapposto** a un altro (la
+suite girata due volte nello stesso comando), non un difetto del
+cantiere — si dichiara invece di lasciarla non spiegata.
+
+**E DUE COSE SONO ARRIVATE A CANTIERE APERTO**, tutt'e due di Andrea.
+
+⚠️ **«TOCCA A TE» È SALITO DENTRO LA CASELLA DELLO STATO**, accanto
+allo stato, e non è più una riga grigia in fondo. La ragione è la
+tinta: quella casella è **già arancio** quando c'è un gesto da fare —
+la palette del mercatino dice esattamente questo —, quindi il gesto e
+il suo colore stanno finalmente nello stesso posto. In fondo diceva la
+stessa cosa tre centimetri più giù, dove l'occhio arriva per ultimo.
+Il piede è rimasto alla **sola ✕**, e le due non potevano comunque
+coesistere: l'una vive sugli stati vivi, l'altra sui finali.
+**E LA MANINA SI MUOVE**: tre pixel avanti e indietro, verso le parole
+che indica. È **l'unica cosa che si muove** in tutta la card, e ci sta
+perché non racconta — **chiama**. ⚠️ Con la sua uscita: chi ha chiesto
+di non vedere movimento non lo vede (`prefers-reduced-motion`), che è
+la regola di casa dell'anello che pulsa nell'ultimo giorno, e vale per
+il movimento e mai per un colore. Il segno porta `aria-hidden`: le
+parole accanto lo dicono già, e chi ascolta la card non deve sentirsi
+leggere una manina.
+**IL MOVIMENTO NON L'HO GIUDICATO IO**, e va detto: il Browser pane
+emula `prefers-reduced-motion`, quindi lì la manina è ferma per
+costruzione — verificato che sia proprio quello il motivo
+(`matchMedia` risponde `true` e l'`animationName` calcolato è `none`,
+mentre il `@keyframes` nel foglio c'è). Cioè: la regola e la sua uscita
+sono provate, la velocità e l'ampiezza le guarda Andrea sul telefono.
+
+**IL TITOLO È TORNATO, in un altro posto.** Non più l'etichetta di
+sezione in mezzo al corpo che scorre — quella se n'era andata la
+mattina perché ripeteva il nome della pagina e spariva al primo dito —
+ma il **cappello del blocco attaccato**, SOPRA gli strumenti: resta a
+vista mentre si scorre, ed è la differenza fra un'etichetta e un
+titolo.
+⚠️ **E SI CHIAMA COME LA VOCE DELLA NAV, parola per parola**: «I miei
+scambi». Due nomi per lo stesso posto, per chi legge, sono due posti —
+è la regola con cui «Filtri» è diventato «Filtro» e «Informazioni» è
+diventato «Info P2P». **La sentinella confronta col testo del TASTO** e
+non con una stringa ribattuta nella prova: se un domani la voce cambia
+nome, quella riga lo pretende anche dal titolo.
+LA TAGLIA È QUELLA DEI DUE TAB del libro (19px Baloo): le due sorelle
+cominciano alla stessa altezza, e passando dall'una all'altra la pagina
+non sobbalza.
+
+⚠️ **UNA NOTA SULLE MAIUSCOLE, che è una scelta e non una svista:**
+Andrea l'ha chiesto scrivendo «I Miei Scambi», e in pagina c'è «I miei
+scambi». Non è per gusto tipografico: è la **stessa stringa** del tasto
+che ci porta, e la regola di sopra vale sulle maiuscole come sulle
+parole. Se le vuole capitalizzate, si cambiano in due posti — il tasto
+e il titolo — e la sentinella li tiene insieme.
