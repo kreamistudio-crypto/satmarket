@@ -13917,3 +13917,79 @@ solo lì ogni conio ha un hash nuovo; e **le parole al venditore**, che
 oggi gli dicono «il tuo wallet non ha risposto come doveva» mentre il
 suo wallet non è mai stato nemmeno raggiunto. Sono la stessa famiglia di
 bugie della notifica del 14 settembre, e vanno chiuse insieme.
+
+## Il foglio che non si zoomava, e 81px di cappello sopra la nav (14 set 2026)
+
+Segnalazione di Andrea: **Aspetto → «Quanto grande si legge Barattolo»
+→ «Piccolo», e in fondo al mercatino compariva «Stai comprando sats»**,
+al posto della nav. Il sospetto naturale era un rirender che pescava
+dalla vista P2P, o un id condiviso fra la nav e la testata dello
+scambio. **Non era ne' l'uno ne' l'altro, e nessuno dei due sarebbe mai
+stato trovato cercando in JavaScript**: era un foglio chiuso che sbucava.
+
+**LA CAUSA, in due righe di CSS.** `.sheet.pieno` fissava
+`height:calc(100dvh - var(--tastiera,0px))` — le **uniche due** altezze
+di viewport dell'intero foglio di stile che non si dividevano per
+`--fs-zoom` (le altre sette lo facevano gia'). Le unita' di viewport non
+si zoomano: a scala 0,9 il foglio resta alto uno schermo di **layout**
+ma se ne dipinge il 90%, e il `translateY(100%)` che lo tiene fuori
+vista lo spinge giu' **dello stesso 90%**. Su un telefono da 812px
+restavano in vista 81px — `812 × (1 − 0,9)` — cioe' esattamente il suo
+**cappello**, con la ✕ e il titolo, steso sopra la nav. Misurato:
+foglio chiuso a top 731, titolo a 744, schermo 812.
+
+**E LA SCRITTA ERA QUELLA PERCHE' I FOGLI A PIENO SCHERMO SONO DUE**,
+`p2pNuovoSheet` e `p2pDettSheet`, con gli stessi identici numeri: a pari
+z-index vince l'ultimo del DOM, che e' il secondo. Cioe' il testo non
+diceva niente sulla causa — era solo chi stava sopra.
+
+**PERCHE' SOLO «PICCOLO», che e' la parte che spiega come sia campato
+tanto.** Sopra il 100% la spinta e' **piu'** di uno schermo e il foglio
+sparisce comunque: a 115 e a 130 il difetto c'e' e non si vede. Un
+difetto che si manifesta a **una sola** delle quattro voci, e per giunta
+quella che meno gente sceglie, e' un difetto che aspetta.
+
+**⚠️ MA IL FOGLIO APERTO ERA ROTTO ANCHE LUI, NEI DUE VERSI**, e questo
+non lo aveva segnalato nessuno — perche' non somiglia a un guasto.
+Misurato con la formula vecchia rimessa in linea: a 0,9 la pagina
+copriva 731px di 812, cioe' una cosa che si chiama «a pieno schermo»
+**scopriva 81px di mercatino** in fondo; a 1,15 e a 1,3 **sbordava di
+122 e 244px sotto la piega**, e con `overflow:hidden` sul foglio (scorre
+solo `.foglio-corpo`) quel fondo **non si raggiunge scrollando**: e'
+tagliato via. Cioe' **il taglio peggiore capitava a chi ha CHIESTO i
+caratteri grandi**, che e' l'esatto contrario del mestiere di quella
+leva. Dopo la cura, sulle quattro scale: chiuso a top 812 esatto e 0px
+di sbavatura, aperto a top 0 e alto 812 — lo schermo preciso.
+
+**LA CURA E' UNA SOLA PERCHE' I DUE DIFETTI SONO UNO**: dividere per
+`--fs-zoom`, e `--tastiera` si sottrae **dopo** la divisione, che e'
+l'unico dettaglio che si puo' sbagliare — `tastieraSegue` la scrive
+gia' divisa per la scala, dividerla due volte sarebbe un foglio che si
+alza di troppo.
+
+**LA LEZIONE VERA STA NELLA SENTINELLA, che c'era gia' e non vedeva.**
+`prove.py` sorvegliava questa identica regola — «ogni altezza in vh/dvh
+dentro la radice DEVE dividersi per la scala» — e la riga rotta le e'
+passata sotto il naso per un mese. Il setaccio cercava
+`(?:min|max)-height:calc`, e la riga rotta era un **`height:` nudo**.
+Non era una regola mancante: era una regola scritta per intero e un
+setaccio piu' stretto di lei. Allargato (`min-`/`max-` opzionali, con un
+lookbehind che tiene fuori `line-height`), e nell'occasione **stretto**,
+perche' il corpo del match sbavava fino a tre righe piu' in la' — una
+riga rotta sarebbe passata per il `var(--fs-zoom,1)` della **vicina**,
+che e' il modo esatto in cui una prova risponde per il vicino. Provata
+**nei due versi**: con la riga di ieri rimessa si fa rossa (una), con la
+cura dieci dichiarazioni verdi. 9882 verdi, 0 rosse.
+
+**LA REGOLA CHE NE ESCE, e vale oltre questo foglio:** quando una prova
+non ha visto un difetto che era nel suo argomento, la domanda non e'
+«che prova aggiungo» ma **«perche' quella che c'era non guardava li'»**.
+Aggiungerne una seconda accanto avrebbe lasciato in piedi la prima
+cieca, e la prossima riga rotta sarebbe caduta di nuovo nella sua ombra.
+
+**CHI HA COMMITTATO COSA**, perche' non torni la domanda: il ritocco al
+setaccio di `prove.py` e' finito dentro **5ac8464**, commit di un'altra
+sessione sul cantiere del backoff dei payout, che ha committato mentre
+questo cantiere era aperto. Il codice e' quello giusto e intero — e'
+solo alloggiato in un commit che parla d'altro. Qui resta la sola cura
+di `miniapp.html`.
