@@ -58,6 +58,24 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   nostr_origine_d LIKE 'barattolo-%'`: se è >0 l'anello si è chiuso su
   noi stessi), poi si spegne l'import, poi `ripulisci_anello_nostr.py`
   — prima su una copia del database, poi su quello vero.
+- I LINK TOCCABILI NELLE DESCRIZIONI si accendono ALLA RESA, non alla
+  scrittura: il giudice gira in lettura e non scrive niente in colonna,
+  quindi al primo deploy si accendono anche gli annunci GIÀ pubblicati
+  — nessuna migrazione, e svuotare `LINK_DESCRIZIONE_AMMESSI` nel
+  config li spegne tutti insieme.
+  ⚠️ IL PUNTO CIECO VA GUARDATO UNA VOLTA, prima di pubblicare: gli
+  avvisi 🔗 al moderatore stanno sulla SCRITTURA (annuncio nuovo,
+  revisione, modifica), quindi il parco esistente si accende senza che
+  nessuno riceva niente — e la popolazione dove me lo aspetto di più
+  sono gli importati da Nostr, che sono descrizioni scritte per altri
+  mercatini. Il censimento è in SOLA LETTURA e non tocca niente:
+  `cd ~/satmarket && python3 -c "import sqlite3, server;
+  con = sqlite3.connect(server.DB); con.row_factory = sqlite3.Row;
+  [print(r['id'], '·'.join(v['dominio'] for v in server.link_vivi(r['descrizione'] or '')), '|', (r['titolo'] or '')[:50])
+   for r in con.execute(\"SELECT id, titolo, descrizione FROM annunci WHERE stato='attivo' AND descrizione LIKE '%https://%'\")
+   if server.link_vivi(r['descrizione'] or '')]"`
+  Lista corta = si guarda a occhio e si va; lista lunga o con qualcosa
+  di strano = si decide prima di pubblicare, non dopo.
 - Il Login Widget esige il dominio registrato: BotFather → `/setdomain`
   su @ilbarattolobot → `barattolo.store` (senza, il bottone non compare;
   su localhost non compare mai: si collauda col bottone "cookie web").

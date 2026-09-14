@@ -7173,6 +7173,127 @@
   pattern di casa — `tg.openLink` dentro Telegram, `window.open` con
   `noopener` fuori. Il dominio si vede SEMPRE anche sotto il banner:
   un'insegna che nasconde dove porta è il difetto.
+
+  I LINK TOCCABILI NELLA DESCRIZIONE (set 2026) sono il SECONDO
+  indirizzo scritto da un utente che l'app apre davanti a un altro, e
+  quasi tutto quel che serviva era già qui: il giudice del banner, il
+  foglio dell'uscita, il pattern per aprire. La cosa nuova è una sola,
+  la LISTA BIANCA.
+  FINO A IERI UNA DESCRIZIONE ERA TESTO, e non per una decisione: per
+  l'EFFETTO COLLATERALE di `esc`. Nei documenti non c'era scritto
+  niente — quindi non c'era nessuna scelta da rovesciare, ma nemmeno
+  nessuna protezione disegnata, e un'assenza non ha un perché che
+  fermi chi un giorno la toglie senza pensarci. Adesso ce l'ha.
+  IL PATTO CHE REGGE TUTTO: `testo` e `link` sono LA STESSA STRINGA,
+  ed escono dalla stessa variabile apposta. Quel che si legge È la
+  destinazione, quindi l'inganno classico — il testo dice una cosa, il
+  link ne apre un'altra — qui non è difficile: è IMPOSSIBILE. È la
+  differenza col banner, che è un'immagine e il suo indirizzo lo
+  nasconde per forza (ed è per questo che lì il dominio va scritto
+  nella testata del foglio). DA QUI LA REGOLA A VERBALE (decisione di
+  Andrea): **NESSUNA ETICHETTA, MAI**. Un «guarda il video» al posto
+  dell'indirizzo ricomprerebbe in un colpo solo tutto il phishing che
+  questa funzione esiste per tenere fuori, e il giorno che sembrerà
+  un'idea carina è questa riga che deve fermarla. Il patto si difende
+  sui DUE lati — `link_descrizione` non emette mai una coppia diversa,
+  `descrizioneHTML` e `apriLinkDescrizione` non renderebbero mai una
+  coppia diversa — perché su un lato solo sarebbe una speranza.
+  IL GIUDICE È UNO E PURO, `link_descrizione(testo, ammessi, vietati,
+  casa)`, girato in CI: torna `[{"testo", "link", "dominio"}, ...]`,
+  quasi sempre vuota. LE SEI REGOLE DURE NON SI RISCRIVONO — le fa
+  `link_banner_ammesso`, che vale identica qui. Sopra ci sta la lista
+  bianca, e sotto tre cose che il banner non aveva:
+  · IL DOMINIO SI CHIEDE ALL'HOST, MAI AL TESTO. `"youtube.com" in
+    url` è il modo sbagliato ed è quello con cui `youtube.com.tizio.ru`
+    passerebbe — il suo host finisce per `.ru`. Si confronta `host ==
+    dominio` oppure `host.endswith("." + dominio)`, e a fare tutto il
+    lavoro è IL PUNTO DAVANTI: senza, entrerebbe `evilyoutube.com`.
+  · IL PERCORSO È IN LISTA BIANCA ANCHE LUI dove serve, e non è un
+    ornamento: `youtube.com/redirect?q=…` è una pagina YouTube VERA, e
+    un dominio fidato che rimanda dove gli pare scavalca la lista
+    dall'INTERNO. Coppia `(dominio, percorsi)`; tupla vuota = tutto il
+    dominio, e si scrive solo dove ogni percorso è un video.
+  · NESSUN INDIRIZZO DENTRO L'INDIRIZZO, su qualunque dominio: un link
+    a un video non ha motivo di portarsene un altro nella query. È la
+    rete che prende i redirect aperti che ancora non sappiamo di
+    avere — quelli si scoprono sempre dopo.
+  E LA CODA DELLA FRASE NON ENTRA NELL'INDIRIZZO (`_coda_sbucciata`):
+  il punto, la virgola, la parentesi della prosa. La parentesi chiusa
+  se ne va SOLO se dentro l'indirizzo non ce n'è una aperta — `.../
+  a_(b)` ha le parentesi PARI ed è un indirizzo vero; il confronto è
+  `>=` e non `>`, ed è l'unica riga di questo giudice che è nata
+  sbagliata (la prova l'ha presa al primo giro).
+  I FALSI NON DANNO ERRORE E NON AVVISANO NESSUNO: restano testo. È il
+  verso giusto in cui sbagliare — chi ha scritto un indirizzo onesto
+  fuori lista si ritrova la vita di oggi, e chi ne ha scritto uno
+  finto pure. Per la stessa ragione la lista è BIANCA e non nera: una
+  nera è una rincorsa, una bianca può sbagliare solo per DIFETTO.
+  IL CLIENT NON PARSA NIENTE, ed è la riga da non ammorbidire. Il
+  campo `link_descrizione` nasce nel collo di bottiglia
+  (`arricchisci_righe_vetrina`, accanto ad `avviso_wallet`: è un campo
+  DERIVATO dalla descrizione come lui) e il client si limita a TROVARE
+  quelle stringhe nel testo — che è un'altra cosa dal giudicarle. Un
+  secondo parser qui sarebbe il posto da cui un giorno quel che si
+  legge e quel che si apre direbbero due cose diverse: la ragione
+  scritta sopra `dominio_link`, portata fino in fondo. Ed è anche il
+  motivo per cui il verdetto è UNO: lo stesso lo legge la moderazione.
+  ALLA RESA, NON ALLA SCRITTURA: il giudice gira in lettura e non
+  scrive niente in colonna, quindi gli annunci GIÀ pubblicati si
+  accendono al deploy senza nessuna migrazione, e svuotare la leva li
+  spegne tutti insieme. ⚠️ Il rovescio va saputo: gli avvisi 🔗 sono
+  sulla SCRITTURA (annuncio nuovo, revisione, modifica), quindi il
+  parco esistente si accende SENZA che nessun moderatore riceva una
+  riga — punto cieco dichiarato, e la cura è il censimento una-tantum
+  prima del deploy (vedi Produzione).
+  SI VEDE CHE È TOCCABILE, E SOPRATTUTTO CHE GLI ALTRI NON LO SONO:
+  `.desc-link` in `var(--trust)`, grassetto, sottolineatura
+  TRATTEGGIATA — che dice «toccabile» senza travestirsi da link
+  qualunque del web — e `word-break:break-all` sul solo link, che la
+  prosa intorno tiene le sue parole. Quella metà è la più importante:
+  il giorno che tutto sembrasse uguale, chi legge imparerebbe «i link
+  si toccano» e proverebbe anche su quello di phishing.
+  L'USCITA SI CHIEDE, col DOMINIO in testata — `apriLinkDescrizione`,
+  gemello di `apriLinkBanner`: `role="button"` e nessun `href` (senza
+  href non c'è niente che un `target="_blank"` possa scavalcare),
+  l'URL MAI in un attributo — nell'onclick va l'INDICE —, e si esce
+  col pattern di casa. IL TESTO È LEGGERO e non quello del banner
+  (decisione di Andrea): «non è protetto dal deposito di garanzia» su
+  un video è rumore, e il rumore si impara a saltare. La conferma non
+  è un doppione della lista bianca: quella risponde «la destinazione è
+  onesta?», questa «lo sai che stai uscendo?» — due domande diverse, e
+  la seconda è quella che rende VISIBILE la prima.
+  PER CHI MODERA C'È UNA RIGA SUA, `riga_link_moderazione`, e non è un
+  ornamento: NESSUNO dei giudici vede la descrizione intera — l'AI ne
+  legge 600 caratteri, il messaggio Telegram 300, la riga nella coda
+  del pannello 200 — e il form non ha nessun tetto. Un link messo più
+  in là non lo vedrebbe nessuno. A contare è il GIUDICE e non l'occhio,
+  quindi il troncamento non se la può mangiare. Tre chiamanti:
+  l'avviso dell'annuncio nuovo, `avvisa_revisione` (che copre anche
+  gli import da Nostr) e la MODIFICA — quest'ultima solo sui link
+  NUOVI, perché senza si pubblicava pulito e si infilava il link il
+  giorno dopo: l'AI ri-giudica davvero e blocca il vietato, ma un link
+  AMMESSO le passa davanti senza lasciare traccia.
+  DOVE NON ENTRA: nella riga della coda admin (`rigaRevisione` resta
+  `esc` su 200 caratteri — un moderatore non deve avere link vivi
+  sotto il dito mentre decide), nei meta Open Graph, e su Nostr, dove
+  il `content` è la descrizione PURA e non cambia di una virgola.
+  QUEL CHE RESTA APERTO, dichiarato: YouTube è una PIATTAFORMA, quindi
+  ammetterla ammette anche quel che dice un video — il phishing non
+  sparisce, si sposta di un passo, e a un passo di distanza sta su un
+  sito che chi guarda riconosce, che è la differenza che si sta
+  comprando. E un video può CAMBIARE: l'URL è stabile, il contenuto
+  no, quindi l'ispezionabilità che la regola degli accorciatori compra
+  al banner qui è comprata a metà.
+  LA LEVA È `LINK_DESCRIZIONE_AMMESSI` (leva-LISTA: va aggiunta a mano
+  al censimento di `prove.py`, o la suite ESPLODE invece di diventare
+  rossa — e qui con una causa in più, che è una lista di COPPIE e non
+  di nomi). Svuotarla spegne tutto. Più `LINK_DESCRIZIONE_QUANTI` (5)
+  come misura e non come divieto: oltre, una descrizione non è più una
+  descrizione ma una bacheca di link — e lo spazio pubblicitario qui
+  SI VENDE, ed è il banner, che costa una revisione umana. Per la
+  stessa ragione NON entrano le schede prodotto degli altri mercatini:
+  quasi tutti quei link portano un tag di affiliazione, e metterli in
+  lista regalerebbe gratis quel che il banner fa pagare.
   LA FOTO è il calco di `_salva_avatar` (`_salva_banner`, `ImageOps.fit`
   a 1200×400, nome versionato `ban_{negozio}_{ts}.jpg`, sesta forma in
   `NOME_FOTO`, saltata da `genera_miniature_mancanti` come gli `av_`).

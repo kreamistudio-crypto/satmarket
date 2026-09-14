@@ -14301,3 +14301,141 @@ isolati per **marcatore** e applicati all'indice in byte
 (`git apply --cached`), con la regola che un hunk che contiene marcatori
 di entrambi **ferma tutto** invece di indovinare. Su diciannove hunk, i
 miei sette sono entrati e gli altri dodici sono rimasti dov'erano.
+**I LINK TOCCABILI NELLA DESCRIZIONE, E LA LISTA BIANCA CHE LI TIENE
+ONESTI** (set 2026, richiesta dal campo: nelle descrizioni i link si
+copiavano a mano). Chiesto un quadro prima di costruire, e la prima
+risposta e' stata la piu' utile: **non c'era nessuna decisione a
+verbale**. Cercato «phishing», «cliccabile», «linkify» nei tre
+documenti — niente. I link erano morti per l'EFFETTO COLLATERALE di
+`esc`, lo scudo anti-XSS, e non per un disegno. Buona notizia (niente
+da rovesciare) e cattiva: **un'assenza non ha un perche' che fermi chi
+un giorno la toglie senza pensarci**. Adesso ce l'ha.
+
+**LA LISTA E' BIANCA E NON NERA, ed e' la scelta che decide tutto il
+resto:** una lista nera e' una rincorsa — ogni dominio di phishing
+nuovo passa finche' qualcuno non lo aggiunge — mentre una bianca puo'
+sbagliare solo per DIFETTO, e il suo errore e' un sito onesto che resta
+testo, cioe' esattamente la vita di ieri. Si sbaglia dalla parte
+giusta. Di serie tre domini: `youtube.com`, `youtu.be`, `vimeo.com`.
+**NON i marketplace e non i siti di marca**, ed e' una scelta con due
+ragioni: una lista di marche e' infinita e invecchia da sola (e una
+voce sbagliata in una lista BIANCA e' peggio di una mancante, perche'
+la lista e' una promessa), e quasi tutti i link a schede prodotto
+portano un **tag di affiliazione** — metterli in lista regalerebbe
+gratis lo spazio pubblicitario che qui **si vende**, ed e' il banner
+del negozio, che costa una revisione umana. Il resto della lista non si
+indovina: si guardera' quali domini compaiono per davvero.
+
+**QUASI TUTTO C'ERA GIA', e il cantiere e' stato soprattutto un
+riuso:** `link_banner_ammesso` (le sei regole dure), `dominio_link`,
+il foglio `chiediConferma` dell'uscita, il pattern di casa per aprire.
+La cosa nuova e' UNA, la lista bianca — piu' tre regole che il banner
+non aveva: **l'host e non il testo** (`"youtube.com" in url` e' il modo
+con cui `youtube.com.tizio.ru` passa; si confronta `host == dominio` o
+`host.endswith("." + dominio)`, e a fare tutto il lavoro e' IL PUNTO
+DAVANTI, senza il quale entra `evilyoutube.com`), **il percorso in
+lista bianca** (`youtube.com/redirect?q=...` e' una pagina YouTube
+VERA: un dominio fidato che rimanda dove gli pare scavalca la lista
+dall'INTERNO), e **nessun indirizzo dentro l'indirizzo** su qualunque
+dominio, che e' la rete per i redirect aperti che ancora non sappiamo
+di avere.
+
+**IL PATTO CHE REGGE TUTTO: `testo` e `link` sono la stessa stringa.**
+Quel che si legge E' la destinazione, quindi l'inganno classico — il
+testo dice una cosa, il link ne apre un'altra — qui non e' difficile:
+e' IMPOSSIBILE. E' la differenza col banner, che e' un'immagine e il
+suo indirizzo lo nasconde per forza. Da qui la **regola a verbale**
+(decisione di Andrea): **nessuna etichetta, mai**. Un «guarda il
+video» al posto dell'indirizzo ricomprerebbe in un colpo tutto il
+phishing che questa roba esiste per tenere fuori. Difesa sui DUE lati
+— il giudice non emette mai una coppia diversa, il client non
+renderebbe mai una coppia diversa — perche' su un lato solo sarebbe
+una speranza.
+
+**IL BANCO HA TROVATO UN DIFETTO PRIMA DELLA TORTURA, e vale come
+promemoria:** `_coda_sbucciata` toglie la punteggiatura della frase
+dalla coda dell'indirizzo, e la parentesi chiusa deve restare se
+dentro ce n'e' una aperta (`.../a_(b)` e' un indirizzo vero). Il
+commento diceva `>=`, il codice diceva `>`, e su parentesi PARI se la
+mangiava. Il commento era giusto e il codice no — il genere di
+scollamento che si vede solo girando la funzione, mai rileggendola.
+
+**LA TORTURA: 13 MUTAZIONI, 13 UCCISE — ma in DUE giri, e il primo ne
+ha lasciate passare TRE.** Le tre insegnano la stessa cosa in due
+forme, e vale piu' del codice:
+· **UNA PROVA PUO' ESSERE VERDE PER UNA RAGIONE DIVERSA DA QUELLA CHE
+  CREDI.** Tolto il controllo del PERCORSO, la prova del redirect di
+  YouTube e' rimasta verde: quel caso lo prende **la rete dell'URL
+  annidato**, non la lista dei percorsi. Cioe' la lista dei percorsi
+  non la provava NESSUNO, e sembrava provata. L'unico caso che la
+  isola e' un percorso storto SENZA un indirizzo dentro
+  (`youtube.com/signin`).
+· **LO STESSO, in grande:** tolte le sei regole dure di
+  `link_banner_ammesso`, le prove dell'accorciatore e delle credenziali
+  sono rimaste verdi — perche' su un host FUORI lista a fermarli basta
+  la lista bianca. Le sole che isolano quelle regole sono su un host
+  **AMMESSO** con la forma storta (`https://youtu.be:8080/...`,
+  `https://tizio:x@youtu.be/...`), e non c'erano.
+· **E UNA SENTINELLA DAVVERO CIECA**, l'unica delle tre che era un
+  difetto e non un'aspettativa: cercava che `apriLinkDescrizione(${i})`
+  ci fosse DA QUALCHE PARTE, e mettendo l'URL nell'onclick restava
+  verde perche' **la forma buona sopravviveva nell'onkeydown due righe
+  sotto**. La cura e' doppia e la seconda meta' vale piu' della prima:
+  contare i DUE attributi, e soprattutto dire la cosa NEGATIVA —
+  dentro lo span non deve entrare nessun `.link`. E' la lezione delle
+  «prove che rispondono per il vicino» in una forma nuova: qui il
+  vicino era **la riga sotto, dentro la stessa funzione**.
+
+**IL GIRO DAL VIVO** su database usa-e-getta e porta sua (8177, mai la
+cartella condivisa): due annunci veri, uno con un link YouTube + un
+sito onesto fuori lista + `https://youtube.com.tizio.ru/watch?v=truffa`
+nella stessa descrizione — perche' la differenza si deve VEDERE, ed e'
+quella meta' che conta. A schermo: il video toccabile in `var(--trust)`
+con la sottolineatura tratteggiata, gli altri due testo nudo. Il
+secondo annuncio prova la punteggiatura (`(guarda qui: …vimeo.com/
+123456789).` e `…&t=42.`): la coda della frase resta fuori dal link.
+Foglio di conferma col dominio in testata, chiaro e scuro (`#1B8B54` e
+`#34B47A`), 375px.
+
+**ALLA RESA, NON ALLA SCRITTURA — e il rovescio e' un punto cieco
+dichiarato.** Il giudice gira in lettura e non scrive niente in
+colonna: al deploy si accendono anche gli annunci GIA' pubblicati,
+senza migrazione, e svuotare la leva li spegne tutti insieme. Ma gli
+avvisi 🔗 al moderatore stanno sulla SCRITTURA (annuncio nuovo,
+revisione, modifica), quindi **il parco esistente si accende in
+silenzio**. Non e' un buco (quei link passano dalla stessa lista), e'
+un punto cieco al lancio — e la popolazione dove pesa di piu' sono gli
+importati da Nostr, che sono descrizioni scritte per altri mercatini.
+La cura e' un censimento una-tantum in sola lettura, PRIMA del deploy:
+sta in `docs/PRODUZIONE.md`.
+
+**LA RIGA PER CHI MODERA NON E' UN ORNAMENTO**, e il perche' e' un
+numero: **nessuno dei giudici vede la descrizione intera** — l'AI ne
+legge 600 caratteri, il messaggio Telegram 300, la riga nella coda del
+pannello 200 — e il form non ha nessun tetto. Un link piu' in la' non
+lo vedrebbe nessuno. A contarli e' il GIUDICE e non l'occhio, quindi
+il troncamento non se la mangia. E la MODIFICA avvisa dei link NUOVI,
+che senza si pubblicava pulito e si infilava il link il giorno dopo:
+l'AI ri-giudica davvero e blocca il vietato, ma un link **ammesso** le
+passa davanti senza lasciare traccia da nessuna parte.
+
+**QUEL CHE RESTA APERTO, dichiarato invece che dimenticato:** YouTube
+e' una **piattaforma**, quindi ammetterla ammette anche quel che dice
+un video — il phishing non sparisce, si sposta di un passo, e a un
+passo sta su un sito che chi guarda riconosce, che e' la differenza
+che si sta comprando. E **un video puo' cambiare**: l'URL e' stabile,
+il contenuto no, quindi l'ispezionabilita' che la regola degli
+accorciatori compra al banner qui e' comprata a meta'. Piu' due cose
+notate e non toccate, che sono cantieri loro: **la descrizione non ha
+un tetto di lunghezza** (ne' nel form ne' sul server), e non esiste un
+«segnala questo annuncio» per gli utenti.
+
+**9974 verdi, 0 rosse, di cui 73 nuove** (la base era 9901: i 19 di
+scarto sono le prove arrivate coi cinque commit della riconciliazione,
+atterrati da un'altra sessione mentre questo cantiere era aperto — i
+file contesi sono i soliti tre, e gli hunk sono stati verificati uno a
+uno prima di mettere in staging per nome). In produzione basta il
+deploy: nessuna colonna nuova, nessuna migrazione. La leva
+`LINK_DESCRIZIONE_AMMESSI` e' dichiarata in `config_esempio.py` e non
+serve toccarla — il default nel codice e' quello giusto; **svuotarla
+spegne tutto**, ed e' l'interruttore d'emergenza.
