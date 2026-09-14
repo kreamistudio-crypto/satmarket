@@ -25866,10 +25866,14 @@ async function scegliFotoBanner(files){
     return;
   }
   if (chip) chip.textContent = 'Preparo l\'immagine…';
-  bannerScelta = await ridimensiona(f) || '';
+  /* il motivo VERO invece della frase di scorta: qui la bocca e' il
+     chip, che in questo cassetto si legge meglio di un toast */
+  const esito = await ridimensiona(f) || {};
+  bannerScelta = esito.foto || '';
   if (chip) chip.textContent = bannerScelta
     ? `✅ ${f.name.slice(0, 40)}`
-    : 'Questa immagine non si riesce a leggere: provane un\'altra.';
+    : (esito.motivo
+       || 'Questa immagine non si riesce a leggere: provane un\'altra.');
 }
 
 /* IL PREFISSO E' FUORI DAL CAMPO, quindi qui dentro si scrive quel che
@@ -31251,8 +31255,9 @@ function badgeDettaglioHTML(d){
 async function caricaImmagineBadgeLive(liveId, file){
   if (!file) return;
   try {
-    const foto = await ridimensiona(file);
-    if (!foto) { toast('Immagine non leggibile'); return; }
+    const esito = await ridimensiona(file) || {};
+    if (!esito.foto) { toast(esito.motivo || 'Immagine non leggibile', 6000); return; }
+    const foto = esito.foto;
     const r = await fetch(`${API_BASE}/admin/live/${liveId}/immagine`,
       {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
        body: JSON.stringify({foto})});
@@ -32249,15 +32254,125 @@ function aggiornaFormVendi(){
   }
 }
 
+/* IL RIPIEGO DEL SERVER: i byte grezzi a `/foto/anteprima`, che ha
+   Pillow e la memoria di una macchina vera. E' nato per le HEIC, che
+   il browser non conosce, e dal set 2026 vale per QUALUNQUE foto che
+   qui non si decodifica — il rovesciamento di una premessa che era
+   scritta proprio qui e diceva il falso: «il browser JPEG, PNG, WebP
+   e GIF li sa leggere, quindi se ha detto di no il file e' rotto».
+   Non e' vero. Un JPEG sano da 12 Mpx puo' non decodificarsi dentro
+   una WebView a corto di memoria, e lo stesso file Pillow lo apre
+   senza fiatare: rifiutarlo qui voleva dire dare del rotto a una foto
+   buona, e dirlo a chi non poteva farci niente. Adesso si CHIEDE.
+   IL PREZZO E' DICHIARATO: un PDF rinominato .jpg prima si fermava
+   qui e adesso sale (fino a 15MB) per sentirsi dire di no dal server.
+   E' il conto giusto da pagare — quel caso e' raro e chi lo produce
+   lo sa, mentre la foto buona rifiutata capitava a chi non aveva
+   sbagliato niente.
+   Risponde SEMPRE con un oggetto, {foto} oppure {motivo}, e non fa
+   MAI un toast: chi parla e' uno solo, ed e' `aggiungiFoto`. */
+function fotoDalServer(file){
+  return new Promise(res=>{
+    if (DEMO || VETRINA) {
+      /* la conversione la fa il server, e qui non c'e': meglio dirlo
+         che promettere una conversione che non avverra' mai */
+      res({motivo:'Questa foto va convertita dal server: qui non si può'});
+      return;
+    }
+    if (file.size > 15_000_000) {
+      res({motivo:`«${file.name}» è troppo grande: il massimo è 15MB`});
+      return;
+    }
+    const fr = new FileReader();
+    fr.onload = async ()=>{
+      let uri = fr.result;
+      /* Il server accetta solo MIME image/…: se il sistema non lo
+         dichiara (capita su Android con le HEIC), si scommette su
+         heic — tanto Pillow riconosce il formato dai byte veri,
+         non dall'etichetta */
+      if (!/^data:image\/(jpeg|jpg|png|webp|heic|heif);/.test(uri)) {
+        const heif = /\.heif$/i.test(file.name);
+        uri = uri.replace(/^data:[^;,]*/, `data:image/${heif?'heif':'heic'}`);
+      }
+      /* Anteprima vera: il server la converte al volo (stateless,
+         niente disco) e il JPEG che torna e' lo stesso che verra'
+         salvato — e alla pubblicazione viaggia gia' leggero.
+         Se NON ci riesce la foto si rifiuta QUI, dicendo il motivo
+         che il server manda in `detail`: prima l'errore si ingoiava
+         (`if (r.ok)` senza else) e restava in pagina il segnaposto
+         «verra' convertita alla pubblicazione» — una promessa che
+         nessuno aveva verificato, e che alla pubblicazione veniva
+         disattesa in silenzio. */
+      try {
+        const r = await fetch(`${API_BASE}/foto/anteprima`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+          body: JSON.stringify({foto: uri})});
+        const d = await r.json().catch(()=>({}));
+        if (!r.ok || !d.foto) {
+          res({motivo: d.detail || `Non riesco a preparare «${file.name}»`});
+          return;
+        }
+        res({foto: d.foto});
+      } catch(e){
+        res({motivo:'Non sono riuscito a preparare la foto: riprova'});
+      }
+    };
+    fr.onerror = ()=> res({motivo:`Non riesco a leggere «${file.name}»`});
+    /* E SE NON PARTE NEMMENO IL LETTORE, si risolve lo stesso: una
+       Promise che non si risolve e' il silenzio peggiore che ci sia —
+       il chip «Carico la foto…» resta li' per sempre, Pubblica dice
+       «un attimo» a ogni tocco, e quel chip non ha nemmeno la ✕ per
+       toglierlo. E' esattamente il buco da cui e' nato questo
+       cantiere, dall'altra parte della filiera. */
+    try { fr.readAsDataURL(file); }
+    catch(e){ res({motivo:`Non riesco a leggere «${file.name}»`}); }
+  });
+}
+
+/* Il JPEG che esce dal canvas, o la stringa vuota. LA TELA SA
+   RISPONDERE COSE CHE SEMBRANO FOTO E NON LO SONO, ed e' il silenzio
+   che questo cantiere ha chiuso: con `naturalWidth` a zero — certe
+   WebView chiamano `onload` prima di avere davvero i pixel — la tela
+   nasce 0x0 e `toDataURL` torna la stringa `data:,`, che e' vera
+   quanto basta per entrare in `sellFoto`. Da li' in poi: anteprima
+   rotta in pagina, e alla pubblicazione uno scarto «formato non
+   riconosciuto» — cioe' un difetto che si scopre a cose fatte. */
+function jpegDalCanvas(img){
+  const larg = img.naturalWidth || img.width || 0;
+  const alt = img.naturalHeight || img.height || 0;
+  if (!larg || !alt) return '';
+  const MAX = 1200, k = Math.min(1, MAX/Math.max(larg, alt));
+  const c = document.createElement('canvas');
+  c.width = Math.round(larg*k); c.height = Math.round(alt*k);
+  if (!c.width || !c.height) return '';
+  try {
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';   // Safari lo ignora: pazienza, il suo default e' onesto
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const uri = c.toDataURL('image/jpeg', .9);
+    /* e il giudizio sul RISULTATO, non sul gesto: una tela senza
+       memoria puo' tornare una stringa vuota o un data-URL monco, e
+       nessuna delle due alza un'eccezione */
+    return /^data:image\/jpeg;base64,.{100,}/.test(uri) ? uri : '';
+  } catch(e){ return ''; }
+}
+
 function ridimensiona(file){
   /* Riduce la foto a max 1200px lato lungo, JPEG di qualita': questa
      e' l'UNICA compressione della filiera (il server salva il JPEG
      cosi' com'e', mai riconvertito), quindi si fa bene una volta —
      filtro 'high' (senza, il canvas usa quello veloce e sgranato) e
-     qualita' 0.9. Se il browser non sa leggere il formato (le HEIC
-     degli iPhone su Android e desktop), la foto parte com'e' in
-     base64 e la converte il server con Pillow — max 15MB, il suo
-     limite — e anche li' la compressione e' una sola. */
+     qualita' 0.9.
+     RISPONDE {foto} O {motivo}, e il motivo lo dice il chiamante: qui
+     dentro non c'e' piu' nessun toast, ed e' la riga che rende la
+     promessa «nessuna foto sparisce in silenzio» una cosa di
+     STRUTTURA invece che di memoria — prima ogni ramo doveva
+     ricordarsi di parlare, e bastava uno che tacesse.
+     Ogni strada che non porta a un JPEG finisce nel ripiego del
+     server (vedi `fotoDalServer`): i byte sono gli stessi, ma di la'
+     c'e' Pillow e non la WebView di un telefono. */
   return new Promise(res=>{
     const img = new Image();
     /* IL WATCHDOG DEL DECODE (ago 2026, dal campo: su un Android
@@ -32268,95 +32383,32 @@ function ridimensiona(file){
        un decode vero, anche su hardware lento, finisce in pochi.
        Il watchdog copre SOLO il silenzio — si disarma appena UNO dei
        due callback parla, non quando la Promise si risolve: la
-       strada del server (dentro onerror) puo' legittimamente durare
-       piu' di trenta secondi su rete lenta, e ha gia' i suoi toast
-       per ogni ramo. Al timeout si risolve null, che e' la lingua
-       del rifiuto: il chiamante toglie il chip da solo. */
+       strada del server puo' legittimamente durare piu' di trenta
+       secondi su rete lenta.
+       E AL TIMEOUT NON SI MOLLA PIU': trenta secondi di silenzio
+       dicono che QUESTO telefono quel file non lo decodifica, non che
+       il file sia rotto — quindi si chiede al server, che i byte li
+       ha uguali e la memoria ce l'ha. */
     let decodeMuto = false;
-    const watchdog = setTimeout(()=>{
+    const watchdog = setTimeout(async ()=>{
       decodeMuto = true;
       URL.revokeObjectURL(img.src);
-      toast(`Non riesco a caricare «${file.name}»: forse è troppo grande per questo telefono — prova con una foto più piccola (uno screenshot va bene)`, 8000);
-      res(null);
+      res(await fotoDalServer(file));
     }, 30_000);
-    img.onload = ()=>{
+    img.onload = async ()=>{
       if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente lavoro postumo
       clearTimeout(watchdog);
-      const MAX = 1200, k = Math.min(1, MAX/Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';   // Safari lo ignora: pazienza, il suo default e' onesto
-      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const uri = jpegDalCanvas(img);
       URL.revokeObjectURL(img.src);
-      res(c.toDataURL('image/jpeg', .9));
+      /* la tela ha risposto una cosa che non e' un JPEG: i byte veri
+         ce li ha ancora il file, e il server sa leggerli */
+      res(uri ? {foto: uri} : await fotoDalServer(file));
     };
-    img.onerror = ()=>{
-      if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente doppio toast
+    img.onerror = async ()=>{
+      if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente doppia strada
       clearTimeout(watchdog);
       URL.revokeObjectURL(img.src);
-      if (file.size > 15_000_000) { toast('Foto troppo grande (max 15MB)'); res(null); return; }
-      /* Il browser JPEG, PNG, WebP e GIF li sa leggere: se ha detto di
-         no su uno di quelli, il file non e' quello che il suo nome
-         promette (un PDF rinominato .jpg arriva qui etichettato
-         image/jpeg dal sistema) oppure e' rovinato. Si rifiuta SUBITO,
-         senza chiedere niente al server: solo le HEIC hanno bisogno
-         di lui, e tutto il resto — tipi sconosciuti compresi — ci
-         prova, che Pillow legge i byte e non l'etichetta. */
-      const nativo = /^image\/(jpeg|png|webp|gif|bmp)$/i.test(file.type)
-                  || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name);
-      if (nativo) {
-        toast(`«${file.name}» non è una foto che riesco a leggere`, 6000);
-        res(null); return;
-      }
-      if (DEMO || VETRINA) {
-        /* la conversione la fa il server, e qui non c'e': meglio dirlo
-           che promettere una conversione che non avverra' mai */
-        toast('Questa foto va convertita dal server: qui non si può', 6000);
-        res(null); return;
-      }
-      const fr = new FileReader();
-      fr.onload = async ()=>{
-        let uri = fr.result;
-        /* Il server accetta solo MIME image/…: se il sistema non lo
-           dichiara (capita su Android con le HEIC), si scommette su
-           heic — tanto Pillow riconosce il formato dai byte veri,
-           non dall'etichetta */
-        if (!/^data:image\/(jpeg|jpg|png|webp|heic|heif);/.test(uri)) {
-          const heif = /\.heif$/i.test(file.name);
-          uri = uri.replace(/^data:[^;,]*/, `data:image/${heif?'heif':'heic'}`);
-        }
-        /* Anteprima vera: il server la converte al volo (stateless,
-           niente disco) e il JPEG che torna e' lo stesso che verra'
-           salvato — e alla pubblicazione viaggia gia' leggero.
-           Se NON ci riesce la foto si rifiuta QUI, dicendo il motivo
-           che il server manda in `detail`: prima l'errore si ingoiava
-           (`if (r.ok)` senza else) e restava in pagina il segnaposto
-           «verra' convertita alla pubblicazione» — una promessa che
-           nessuno aveva verificato, e che alla pubblicazione veniva
-           disattesa in silenzio. */
-        try {
-          const r = await fetch(`${API_BASE}/foto/anteprima`, {
-            method:'POST',
-            headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-            body: JSON.stringify({foto: uri})});
-          const d = await r.json().catch(()=>({}));
-          if (!r.ok || !d.foto) {
-            toast(d.detail || 'Non riesco a preparare questa foto', 6000);
-            res(null); return;
-          }
-          res(d.foto);
-        } catch(e){
-          toast('Non sono riuscito a preparare la foto: riprova', 6000);
-          res(null);
-        }
-      };
-      fr.onerror = ()=>{
-        toast(`Non riesco a leggere «${file.name}»`, 6000);
-        res(null);
-      };
-      fr.readAsDataURL(file);
+      res(await fotoDalServer(file));
     };
     img.src = URL.createObjectURL(file);
   });
@@ -32400,9 +32452,19 @@ async function aggiungiFoto(files){
     const segn = 'caricando:' + Math.random();
     sellFoto.push(segn);
     renderFotoPreview();
-    const f = await ridimensiona(file);   /* il perche' del no lo dice lei */
+    /* QUI PARLA UNA BOCCA SOLA (set 2026). `ridimensiona` risponde
+       {foto} o {motivo} e non fa piu' toast: cosi' «se una foto non
+       entra, chi l'ha scelta lo viene a sapere» non dipende piu' dal
+       fatto che OGNI ramo si sia ricordato di dirlo — basta questo.
+       E il `||` in coda copre anche il caso che nessuno ha previsto:
+       un rifiuto senza motivo resta un rifiuto DETTO. */
+    const esito = await ridimensiona(file) || {};
     const j = sellFoto.indexOf(segn);   // puo' essersi spostato (✕ su altre)
-    if (j >= 0) { if (f) sellFoto[j] = f; else sellFoto.splice(j, 1); }
+    if (j >= 0) {
+      if (esito.foto) sellFoto[j] = esito.foto; else sellFoto.splice(j, 1);
+    }
+    if (!esito.foto)
+      toast(esito.motivo || `«${file.name}» non è entrata: riprova con un'altra foto`, 7000);
     renderFotoPreview();
   }
 }

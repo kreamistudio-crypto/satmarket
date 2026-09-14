@@ -13820,7 +13820,19 @@ async def anteprima_foto(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Foto troppo grande (max 15MB)")
     jpeg = await asyncio.to_thread(converti_in_jpeg, raw)
     if not jpeg:
+        print(f"📷 Anteprima NON convertita: {m.group(1)}, "
+              f"{len(raw) // 1024} KB — Pillow non l'ha aperta", flush=True)
         raise HTTPException(400, "Non riesco a leggere questa foto")
+    # LA RIGA CHE RENDE VISIBILE IL FENOMENO (set 2026). Da questo
+    # cantiere il client chiede QUI anche per i JPEG e i PNG, cioe' per
+    # formati che il browser dovrebbe saper leggere da solo: se arriva
+    # roba del genere vuol dire che un telefono vero non e' riuscito a
+    # decodificarla, ed e' un fatto che nessuno avrebbe altrimenti modo
+    # di sapere — l'utente vede solo che la foto entra. Niente id e
+    # niente nomi: il formato, i kilobyte in ingresso e quelli in
+    # uscita, che sono quel che serve a capire DOVE sta il muro.
+    print(f"📷 Anteprima convertita dal server: {m.group(1)}, "
+          f"{len(raw) // 1024} KB → {len(jpeg) // 1024} KB", flush=True)
     return {"foto": "data:image/jpeg;base64,"
                     + base64.b64encode(jpeg).decode()}
 

@@ -7572,7 +7572,7 @@ def prove_foto_scarti():
     # `if (r.ok)` senza else, e in pagina restava il segnaposto «verra'
     # convertita alla pubblicazione» — una promessa mai verificata
     prova("sentinella: il motivo del server arriva all'utente", True,
-          "d.detail || 'Non riesco a preparare questa foto'" in mini)
+          "res({motivo: d.detail || `Non riesco a preparare" in mini)
     prova("sentinella: il segnaposto bugiardo non c'e' piu'", False,
           "verrà convertita" in mini)
     # 3) il FileReader che fallisce non e' piu' muto
@@ -7616,9 +7616,13 @@ def prove_foto_scarti():
     j = corpo.index("img.onload")
     k = corpo.index("img.onerror")
     prova("sentinella: il watchdog del decode e' armato prima dei callback",
-          True, "setTimeout" in corpo[:j] and "res(null)" in corpo[:j])
-    prova("sentinella: ...e al timeout lo DICE, con la via d'uscita", True,
-          "troppo grande per questo telefono" in corpo[:j])
+          True, "setTimeout" in corpo[:j])
+    # E AL TIMEOUT NON SI MOLLA PIU' (set 2026): trenta secondi di
+    # silenzio dicono che QUESTO telefono non decodifica quel file, non
+    # che il file sia rotto — quindi si chiede al server, che i byte li
+    # ha uguali. La via d'uscita non e' piu' una frase: e' una strada.
+    prova("sentinella: ...e al timeout si chiede al server, non si molla",
+          True, "res(await fotoDalServer(file))" in corpo[:j])
     prova("sentinella: onload disarma il watchdog nel SUO ramo", True,
           "clearTimeout(watchdog)" in corpo[j:k])
     prova("sentinella: onerror pure — o la strada del server, che puo' "
@@ -7626,6 +7630,154 @@ def prove_foto_scarti():
           "timer addosso", True, "clearTimeout(watchdog)" in corpo[k:])
     prova("sentinella: e il callback postumo tace, in tutti e due i rami",
           2, corpo.count("if (decodeMuto) return"))
+
+    # ---- NESSUNA FOTO SPARISCE IN SILENZIO, NEMMENO NEL BROWSER ----
+    # (set 2026, caso dal campo: annuncio #354 nato SENZA foto, colonna
+    # `foto` vuota, e chi ha pubblicato non ha visto nessun avviso.)
+    # Le sentinelle dicono come sono scritti i rami; questo li FA
+    # GIRARE, che e' l'unico modo di rispondere alla domanda vera:
+    # «se la foto non entra, chi l'ha scelta lo viene a sapere?».
+    import shutil as _sh5
+    import subprocess as _sp5
+    import json as _json5
+    if not _sh5.which("node"):
+        salta("le quattro strade di ridimensiona, girate per davvero",
+              "node non installato")
+    else:
+        _pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+            "function fotoDalServer(file){", "function jpegDalCanvas(img){",
+            "function ridimensiona(file){", "async function aggiungiFoto(files){"))
+        _banco = """
+          // il banco: un telefono finto, con la tela e il server che
+          // si comportano come dice CASO
+          let CASO = {};
+          const _st = setTimeout;
+          // il watchdog e' a 30 secondi: qui si sveglia subito, o la
+          // prova aspetterebbe mezzo minuto per ogni caso
+          globalThis.setTimeout = (fn, ms, ...a) => _st(fn, ms >= 1000 ? 1 : ms, ...a);
+          let toasts = [], sellFoto = [], editandoNostr = false;
+          const tg = {initData:'x'};
+          let DEMO = false, VETRINA = false;
+          const API_BASE = '/api';
+          function authHdr(){ return ''; }
+          function toast(t){ toasts.push(String(t)); }
+          function renderFotoPreview(){}
+          function haptic(){}
+          globalThis.URL = {createObjectURL:()=>'blob:finto',
+                            revokeObjectURL:()=>{}};
+          globalThis.document = {createElement:()=>({
+            getContext:()=>({drawImage(){}}),
+            toDataURL:()=>CASO.tela})};
+          function Image(){}
+          Object.defineProperty(Image.prototype, 'src', {
+            set(v){ this._s = v; const io = this;
+              if (CASO.decode === 'muto') return;   // ne' onload ne' onerror
+              setTimeout(()=>{ if (CASO.decode === 'errore') { io.onerror(); }
+                else { io.naturalWidth = CASO.larg; io.naturalHeight = CASO.alt;
+                       io.onload(); } }, 0); },
+            get(){ return this._s; }});
+          globalThis.Image = Image;
+          function FileReader(){}
+          FileReader.prototype.readAsDataURL = function(){
+            const fr = this;
+            setTimeout(()=>{ if (CASO.lettore === 'errore') fr.onerror();
+              else { fr.result = 'data:image/jpeg;base64,QUJD'; fr.onload(); } }, 0);
+          };
+          globalThis.FileReader = FileReader;
+          globalThis.fetch = async ()=>{
+            if (CASO.server === 'rete') throw new Error('rete');
+            return {ok: CASO.server === 'ok', json: async ()=>
+              CASO.server === 'ok' ? {foto:'data:image/jpeg;base64,DALSERVER'}
+                                   : {detail:'Non riesco a leggere questa foto'}};
+          };
+          const BUONA = 'data:image/jpeg;base64,' + 'Q'.repeat(200);
+        """ + _pezzi + """
+          async function giro(caso){
+            CASO = Object.assign({decode:'ok', larg:4080, alt:3060,
+                                  tela:BUONA, server:'ok'}, caso);
+            DEMO = !!caso.demo; VETRINA = false;
+            toasts = []; sellFoto = [];
+            await aggiungiFoto([{name:'IMG_2032.jpg', type:'image/jpeg',
+                                 size: caso.peso || 3498244}]);
+            return [sellFoto.length, toasts.length,
+                    (toasts[0] || '').slice(0, 60)];
+          }
+          (async ()=>{
+            const out = {};
+            out.buona = await giro({});
+            out.tela0 = await giro({larg:0, alt:0});
+            out.telaVuota = await giro({tela:'data:,'});
+            out.decodeNo = await giro({decode:'errore'});
+            out.muto = await giro({decode:'muto'});
+            out.serverNo = await giro({decode:'errore', server:'no'});
+            out.reteNo = await giro({decode:'errore', server:'rete'});
+            out.demo = await giro({decode:'errore', demo:true});
+            out.pesante = await giro({decode:'errore', peso: 20000000});
+            console.log(JSON.stringify(out));
+          })();
+        """
+        _r = _sp5.run(["node", "-e", _banco], capture_output=True,
+                      text=True, encoding="utf-8", timeout=60)
+        try:
+            v = _json5.loads((_r.stdout or "").strip())
+        except Exception:
+            v = None
+            prova("il banco del client gira", True,
+                  f"node ha detto: {(_r.stderr or '')[:300]}")
+        if v:
+            # 1) la strada normale: entra, e nessuno dice niente
+            prova("la foto buona entra, e nessuno parla", [1, 0, ""],
+                  v["buona"])
+            # 2) IL SILENZIO NUOVO, quello che ha aperto il cantiere:
+            # onload parla ma i pixel non ci sono (naturalWidth 0), la
+            # tela nasce 0x0 e toDataURL torna 'data:,' — una stringa
+            # che SEMBRA una foto. Prima entrava in sellFoto cosi'
+            # com'era: anteprima rotta, e alla pubblicazione lo scarto
+            # «formato non riconosciuto». Adesso e' il server a salvarla.
+            prova("la tela 0x0 non e' un rifiuto: la salva il server",
+                  [1, 0, ""], v["tela0"])
+            prova("...e cosi' la tela che torna 'data:,'", [1, 0, ""],
+                  v["telaVuota"])
+            # 3) il decode che fallisce su un JPEG: PRIMA si rifiutava
+            # qui («non è una foto che riesco a leggere») perche' si
+            # dava per scontato che il browser i JPEG li sappia leggere
+            # tutti. Un JPEG da 12 Mpx dentro una WebView a corto di
+            # memoria dice di no, e Pillow lo apre senza fiatare.
+            prova("il JPEG che il telefono non decodifica lo prende il server",
+                  [1, 0, ""], v["decodeNo"])
+            # 4) il decode muto: il watchdog non molla piu', chiede
+            prova("il decode che non risponde MAI finisce dal server",
+                  [1, 0, ""], v["muto"])
+            # 5) e quando non entra, si DICE — sempre, e col perche'
+            prova("il server che rifiuta: niente foto, e il suo motivo",
+                  [0, 1, "Non riesco a leggere questa foto"], v["serverNo"])
+            prova("la rete che cade: niente foto, e lo dice", [0, 1],
+                  v["reteNo"][:2])
+            prova("in DEMO il ripiego non c'e', e non si finge", [0, 1],
+                  v["demo"][:2])
+            prova("...e il troppo pesante dice il tetto", True,
+                  v["pesante"][0] == 0 and "15MB" in v["pesante"][2])
+            # LA REGOLA, in una riga: in nessuno dei nove casi la foto
+            # sparisce senza che qualcuno lo dica
+            prova("REGOLA: o la foto entra, o qualcuno parla. Sempre.",
+                  [], [k for k, r in v.items() if r[0] == 0 and r[1] == 0])
+    # LA REGOLA E' DI STRUTTURA, non di memoria: `ridimensiona` e i suoi
+    # due aiutanti non hanno piu' una bocca — rispondono {foto} o
+    # {motivo} — e a parlare e' il chiamante, in un posto solo. Finche'
+    # e' cosi', un ramo nuovo che dimentica di dire il no non esiste.
+    for f in ("function ridimensiona(", "function fotoDalServer(",
+              "function jpegDalCanvas("):
+        prova(f"sentinella: {f.split()[1][:-1]} non parla, risponde",
+              False, "toast(" in pezzo_js(mini, f, "\n}\n"))
+    _agg = pezzo_js(mini, "async function aggiungiFoto(files){", "\n}\n")
+    prova("sentinella: ...e chi la chiama dice SEMPRE il no", True,
+          "if (!esito.foto)" in _agg and "esito.motivo ||" in _agg)
+    # i tre chiamanti prendono .foto: con la risposta vecchia (una
+    # stringa) un oggetto sarebbe stato truthy SEMPRE, e la foto rotta
+    # sarebbe entrata dappertutto
+    prova("sentinella: tutti e tre i chiamanti leggono l'esito",
+          (3, 3), (mini.count("await ridimensiona("),
+                   mini.count("esito = await ridimensiona(")))
 
 
 def prove_foto_vuota():
