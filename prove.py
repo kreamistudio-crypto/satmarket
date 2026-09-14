@@ -25552,7 +25552,14 @@ def prove_seo():
     # sempre sotto, il gemello dello scambio sopra, stessa cella di
     # griglia. Le celle di PRIMO LIVELLO restano cinque ed equilarghe:
     # prima si appiattiscono le .nav-cella, poi si conta come sempre.
-    piatta = _re.sub(r'<div class="nav-cella">.*?</div>', "<cella/>",
+    # EMENDATA DI NUOVO (set 2026, la barra che si apre con la
+    # morfosi del +): le celle portano anche `nav-lato`, e la regex
+    # che chiedeva la classe ESATTA non le riconosceva piu' — quattro
+    # rosse che parlavano di uno spostamento del + mai avvenuto. Si
+    # chiede che la prima classe sia `nav-cella` e si lascia libera la
+    # coda: e' quel che la riga esiste per sorvegliare, cioe' che le
+    # celle di primo livello siano cinque e il + la terza.
+    piatta = _re.sub(r'<div class="nav-cella[^"]*">.*?</div>', "<cella/>",
                      barra, flags=_re.S)
     celle = [m[0] or m[1] for m in _re.findall(
         r'<button id="(nav-[a-z0-9]+)"|<(cella)/>', piatta)]
@@ -25571,7 +25578,7 @@ def prove_seo():
     # dello scambio dopo. EMENDATA (set 2026): l'ultima cella non ha
     # piu' il posto vuoto — lo slot che «aspettava la voce che verra'»
     # ce l'ha, ed e' «Info P2P», la pagina che spiega lo scambio.
-    interne = _re.findall(r'<div class="nav-cella">(.*?)</div>',
+    interne = _re.findall(r'<div class="nav-cella[^"]*">(.*?)</div>',
                           barra, _re.S)
     prova("le tre celle a strati, nell'ordine del disegno",
           [["nav-p2p", "nav-p2plibro"], ["nav-aste", "nav-p2pmiei"],
@@ -25589,6 +25596,13 @@ def prove_seo():
     # lo stato di una leva — e dello spaziatore non resta NIENTE,
     # nemmeno una regola CSS orfana (il precedente di .sped-badge:
     # una regola morta fa credere a chi legge che qualcosa la usi)
+    # LE QUATTRO VOCI DI LATO (set 2026, la barra che si apre): sono
+    # quelle che la morfosi del + spinge fuori — le due prima del +
+    # e le due dopo. Il + non e' fra loro, ed e' il punto: lui non si
+    # sposta, si TRASFORMA.
+    prova("le quattro voci di lato, e il + non e' fra loro", True,
+          barra.count("nav-lato") == 4
+          and 'id="nav-vendi" class="sell"' in barra)
     prova("...e la voce nuova si chiama «Info P2P», non «Informazioni»",
           True, '</svg></span>Info P2P</button>' in barra
           and "Informazioni</button>" not in barra)
@@ -44059,6 +44073,7 @@ def prove_p2p_pubblica():
     chiumo = pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
     puoi = pezzo_js(mini, "function morfoPuoiP2P(){", "\n}\n")
     vesti = pezzo_js(mini, "function vestiMorfoP2P(g, da, a, eti){", "\n}\n")
+    tempi = pezzo_js(mini, "function tempiMorfoP2P(){", "\n}\n")
 
     # A) I NUMERI, fatti girare. La funzione e' pura apposta: due
     #    rettangoli entrano, ne escono lo spostamento del centro e le
@@ -44129,9 +44144,20 @@ def prove_p2p_pubblica():
           morfo.index("vestiFoglioMorfoP2P(foglio, true)")
           < morfo.index("meta.getBoundingClientRect()"))
     prova("...e il foglio della morfosi non sale: sfuma sul posto", True,
-          ".sheet.pieno.morfo{transform:none;opacity:0;"
-          "transition:opacity .2s ease}" in stile
-          and ".sheet.pieno.morfo.open{opacity:1}" in stile)
+          ".sheet.pieno.morfo{transform:none;opacity:0;" in stile
+          and ".sheet.pieno.morfo.open{opacity:1;" in stile)
+    # ...E ARRIVA PER ULTIMO (ritocco di Andrea, con la barra che si
+    # apre): entra con l'ATTESA, cioe' resta trasparente finche' la
+    # corsa non e' quasi finita. Senza, la pagina a pieno schermo
+    # coprirebbe la barra dopo due decimi e delle voci spinte ai lati
+    # non si vedrebbe niente — l'effetto ci sarebbe e nessuno lo
+    # vedrebbe. In USCITA il ritardo non c'e': la corsa e' quella dello
+    # stato che si RAGGIUNGE, e li' il foglio deve sparire subito.
+    prova("...e arriva per ultimo, che la barra si deve vedere", True,
+          "transition:opacity var(--morfo-velo) ease var(--morfo-attesa)}"
+          in stile
+          and ".sheet.pieno.morfo{transform:none;opacity:0;\n"
+              "      transition:opacity var(--morfo-velo) ease}" in stile)
     # 3) e il vestito si mette a corsa spenta, o il transitorio si vede
     prova("...e `.morfo` si mette e si toglie a corsa spenta", True,
           "foglio.style.transition = 'none';" in
@@ -44158,24 +44184,44 @@ def prove_p2p_pubblica():
     #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
     #    la corsa finisce, e non un istante dopo. Ribattuta nel CSS,
     #    il giorno che una delle due cambia il conto non torna piu'.
-    prova("la corsa dura 380ms e la dissolvenza 160", True,
-          "const P2P_MORFO_MS = 380;" in mini
-          and "const P2P_MORFO_VELO = 160;" in mini)
-    prova("...e l'attesa della scritta e' la differenza", True,
-          "(P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms'" in vesti
+    # MEZZO SECONDO (ritocco di Andrea): a 380, con una curva che
+    # schizzava via al primo fotogramma, la corsa finiva prima di
+    # essere letta.
+    prova("la corsa dura 520ms e la dissolvenza 180", True,
+          "const P2P_MORFO_MS = 520;" in mini
+          and "const P2P_MORFO_VELO = 180;" in mini)
+    prova("...e l'attesa e' la differenza, per la scritta e per il foglio",
+          True, "(P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms'" in tempi
           and "transition-delay:0s,var(--morfo-attesa)" in stile)
+    # LA CURVA E' DOLCE e non piu' quella della nav: quella partiva a
+    # velocita' piena (a un decimo della corsa era gia' a meta'
+    # strada), e su mezzo secondo lo scatto si legge.
+    prova("...e la curva parte piano e atterra lunga", True,
+          ":root{--morfo-curva:cubic-bezier(.4,0,.2,1)}" in stile)
+    # ...E STA SU :root, che a seguirla sono in tre e due stanno fuori
+    # dal fantasma: una variabile scritta sul fantasma non arriva ne'
+    # al foglio ne' alla barra.
+    prova("...e i tempi li scrive la RADICE, non il fantasma", True,
+          "document.documentElement.style" in tempi
+          and set(re.findall(r"setProperty\('(--morfo-[a-z]+)'", vesti))
+              == {"--morfo-x", "--morfo-y", "--morfo-sx", "--morfo-sy"})
     prova("...e la corsa in volo si puo' interrompere", True,
           "clearTimeout(p2pMorfoTimer)" in
           pezzo_js(mini, "function posaMorfoP2P(){", "\n}\n"))
-    # IL COLORE CORRE COL VELO e non con la corsa, e l'ha deciso un
-    # fotogramma: dal verde del lato all'arancio di casa la strada
-    # passa per un verde-oliva torbido, e a 380ms quel guado si vedeva
-    # per un terzo del volo (misurato a t=95: rgb(123,142,59)). A 160
-    # il cambio d'identita' si consuma insieme alla sparizione del
-    # glifo (a t=131 il colore e' gia' arancio).
-    prova("...e il colore corre col velo, non con la corsa", True,
-          "background-color var(--morfo-velo) ease," in stile
-          and "box-shadow var(--morfo-velo) ease}" in stile)
+    # IL COLORE CORRE QUANTO LA FORMA (ritocco di Andrea, che ROVESCIA
+    # la scorciatoia del giro prima): il verde del lato diventa
+    # l'arancio di casa lungo TUTTA la corsa, interpolato. Ieri correva
+    # sulla dissolvenza per scansare il verde-oliva che sta a meta'
+    # strada fra i due colori — ma un cambio che finisce mentre la
+    # forma e' ancora a meta' si legge come uno scatto, ed era
+    # esattamente quello che si vedeva.
+    # IL GUADO TORBIDO SE LO MANGIA LA CURVA: col cubic-bezier dolce il
+    # tratto fangoso (fra il 35% e il 60% della strada) sta fra i 90 e
+    # i 150 ms, sessanta millesimi dentro mezzo secondo.
+    prova("...e il colore corre quanto la forma, non a scatto", True,
+          "background-color var(--morfo-corsa) var(--morfo-curva),"
+          in stile
+          and "box-shadow var(--morfo-corsa) var(--morfo-curva)}" in stile)
 
     # H) LA LEZIONE DEL GIRO, e vale piu' di tutte le righe qui sopra.
     #    `--morfo-curva` era USATA nel `transition` e scritta da
@@ -44191,7 +44237,7 @@ def prove_p2p_pubblica():
     #    usata nel foglio di stile dev'essere scritta o dal CSS o da
     #    vestiMorfoP2P.
     _usate = set(re.findall(r"var\((--morfo-[a-z]+)", stile))
-    _scritte = (set(re.findall(r"setProperty\('(--morfo-[a-z]+)'", vesti))
+    _scritte = (set(re.findall(r"setProperty\('(--morfo-[a-z]+)'", vesti + tempi))
                 | set(re.findall(r"(--morfo-[a-z]+):", stile)))
     prova("ogni --morfo-* usata la scrive qualcuno", set(), _usate - _scritte)
     prova("...e sono otto, non una di piu'", 8, len(_usate | _scritte))
@@ -44221,6 +44267,51 @@ def prove_p2p_pubblica():
     # tastiera puo' essersi alzata e il bottone non e' piu' dov'era
     prova("...e il ritorno rimisura invece di riciclare", True,
           "vestiMorfoP2P(g, tondo.getBoundingClientRect()," in chiumo)
+
+    # I) LA BARRA SI APRE (set 2026, richiesta di Andrea). Mentre il
+    #    bottone si allarga, le voci ai due lati del + vengono spinte
+    #    fuori e rientrano alla chiusura. Quattro voci si muovono — le
+    #    due prima del + e le due dopo — e il VERSO lo dice la
+    #    posizione (`~` = «dopo il +»), non una classe per parte:
+    #    cosi' il giorno che una voce cambia posto nella barra il
+    #    verso la segue da solo.
+    prova("le quattro voci di lato portano la loro classe", 4,
+          mini.count('class="nav-cella nav-lato"')
+          + mini.count('class="active nav-lato"'))
+    prova("...e il verso lo dice la posizione, non una classe", True,
+          "body.barra-via nav .nav-lato{opacity:0;pointer-events:none;"
+          in stile
+          and "body.barra-via nav #nav-vendi ~ .nav-lato{"
+              "transform:translateX(38px)}" in stile)
+    # ⚠️ LA TRANSIZIONE RIPETE color E background-color: `nav .nav-lato`
+    # batte `nav button`, quindi senza quelle due voci Esplora
+    # perderebbe la sfumatura del colore entrando nel P2P — una riga
+    # nuova che spegne una vecchia, in silenzio.
+    _lato = stile[stile.index("nav .nav-lato{transition:"):]
+    _lato = _lato[:_lato.index("}") + 1]
+    prova("...e la riga nuova non spegne la sfumatura di Esplora", True,
+          "color .4s ease,background-color .4s ease" in _lato)
+    # ...e in reduced-motion stanno ferme come tutta la barra
+    prova("...e in reduced-motion restano ferme", True,
+          "#p2pMorfo .morfo-forma,#p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti,\n"
+          "    nav .nav-lato{transition:none}" in stile)
+    # LE DUE CLASSI HANNO DUE VITE DIVERSE, e per questo sono due:
+    # `barra-via` vale dalla partenza dell'andata alla partenza del
+    # ritorno, `morfosi` copre ANCHE il ritorno — perche' e' lei ad
+    # alzare la barra sopra il velo, e li' deve restare fino
+    # all'ultimo fotogramma. Una sola avrebbe sbagliato una meta'.
+    prova("la barra sale sopra il velo per tutta la morfosi", True,
+          "body.morfosi nav{z-index:41}" in stile
+          and "document.body.classList.add('morfosi');" in morfo
+          and "document.body.classList.remove('morfosi');" in
+              pezzo_js(mini, "function spegniMorfoP2P(){", "\n}\n"))
+    # e le voci partono e rientrano nello STESSO giro di stile del
+    # fantasma: un giro dopo, e si muoverebbero in ritardo di un frame
+    prova("...e le voci si muovono col fantasma, non dopo", True,
+          morfo.index("g.classList.remove('parte')") < morfo.index("barraViaP2P(true)")
+          and chiumo.index("g.classList.add('parte')") < chiumo.index("barraViaP2P(false)")
+          and (morfo.index("barraViaP2P(true)")
+               - morfo.index("g.classList.remove('parte')")) < 120)
 
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
     #    cronologia censisce `.sheet.open`, e un quarto strato li'

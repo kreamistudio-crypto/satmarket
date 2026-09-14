@@ -2429,8 +2429,19 @@
        bottone scende sono due movimenti che si contraddicono.
        `.morfo` si mette e si toglie a corsa spenta (vedi
        vestiFoglioMorfoP2P): il transitorio non si deve vedere. */
-    .sheet.pieno.morfo{transform:none;opacity:0;transition:opacity .2s ease}
-    .sheet.pieno.morfo.open{opacity:1}
+    .sheet.pieno.morfo{transform:none;opacity:0;
+      transition:opacity var(--morfo-velo) ease}
+    /* IL FOGLIO ARRIVA PER ULTIMO (ritocco di Andrea, con la barra che
+       si apre): entra con l'ATTESA, cioe' sta trasparente finche' la
+       corsa non e' quasi finita, e chiude esattamente col suo ultimo
+       fotogramma. Senza, la pagina a pieno schermo coprirebbe la barra
+       dopo due decimi e delle voci spinte ai lati non si vedrebbe
+       niente — l'effetto ci sarebbe e nessuno lo vedrebbe.
+       In uscita il ritardo NON c'e' (la corsa e' quella dello stato
+       che si RAGGIUNGE): il foglio svanisce subito e il ritorno delle
+       voci si guarda per intero. */
+    .sheet.pieno.morfo.open{opacity:1;
+      transition:opacity var(--morfo-velo) ease var(--morfo-attesa)}
     .sheet.pieno.morfo:not(.open){pointer-events:none}
     .sheet.pieno > .foglio-corpo{flex:1 1 auto;min-height:0;overflow-y:auto;
       overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
@@ -2506,10 +2517,21 @@
      stanno in due costanti, e l'attesa della scritta e' la loro
      differenza. Ribattuti qui, il giorno che una delle due cambia la
      scritta comparirebbe a corsa gia' finita. */
-  /* LA CURVA STA QUI e i TEMPI li scrive il JS, ed e' una divisione
-     col suo perche': la curva e' quella di casa (la stessa della nav)
-     e non dipende da nessuna misura, i tempi sono due costanti che
-     devono tornare col conto dell'attesa.
+  /* LA CURVA STA SU :root e i TEMPI li scrive il JS, ed e' una
+     divisione col suo perche': la curva non dipende da nessuna
+     misura, i tempi sono due costanti che devono tornare col conto
+     dell'attesa.
+     ⚠️ E STA SU :root E NON SUL FANTASMA (ritocco di Andrea, con la
+     barra che si apre): a seguire questa corsa sono in TRE — il
+     fantasma, il foglio e la barra — e due di loro stanno fuori dal
+     fantasma, dove una sua variabile non arriva. Per la stessa
+     ragione i tempi li scrive `tempiMorfoP2P` sulla radice.
+     LA CURVA E' DOLCE e non piu' quella della nav (ritocco di
+     Andrea): `cubic-bezier(.2,.7,.2,1)` schizzava via al primo
+     fotogramma — a un decimo della corsa era gia' a meta' strada — e
+     su mezzo secondo quello scatto si legge. Questa parte piano e
+     atterra lunga, che e' il modo in cui un morphing dice «mi sto
+     posando» invece di «sono arrivato».
      ⚠️ UNA --morfo-* USATA E NON SCRITTA NON FALLISCE: un `var()`
      irrisolto invalida TUTTA la riga `transition`, che torna al suo
      valore iniziale — `all 0s` — e la corsa non parte, senza un
@@ -2518,24 +2540,28 @@
      e a dirlo e' stato un browser vero: nel Browser pane le
      transizioni sono spente e li' si vedeva identico. C'e' una
      sentinella che censisce le usate contro le scritte. */
-  #p2pMorfo{position:fixed;z-index:42;display:none;pointer-events:none;
-    --morfo-curva:cubic-bezier(.2,.7,.2,1)}
+  :root{--morfo-curva:cubic-bezier(.4,0,.2,1)}
+  #p2pMorfo{position:fixed;z-index:42;display:none;pointer-events:none}
   #p2pMorfo.acceso{display:block}
   #p2pMorfo>*{position:absolute;inset:0}
   #p2pMorfo .morfo-forma{background:var(--sats);color:#fff;
     border-radius:var(--radius-btn);box-shadow:0 3px 0 var(--sats-deep);
     will-change:transform;
-    /* IL COLORE CORRE PIU' IN FRETTA della forma (la dissolvenza, non
-       la corsa), e l'ha deciso un fotogramma: dal verde del lato
-       all'arancio di casa la strada passa per un verde-oliva torbido,
-       e a 380ms quel guado si vedeva per un terzo del volo. A 160 il
-       cambio d'identita' — il + del lato che diventa il bottone che
-       pubblica — si consuma insieme alla sparizione del glifo, e il
-       resto della corsa e' pura geometria. */
+    /* IL COLORE CORRE QUANTO LA FORMA (ritocco di Andrea, che
+       ROVESCIA la scorciatoia di ieri): il verde del lato diventa
+       l'arancio di casa lungo TUTTA la corsa, interpolato, non a
+       scatto. Ieri correva sulla dissolvenza (160ms) per scansare il
+       verde-oliva torbido che sta a meta' strada fra i due colori —
+       ma un cambio che finisce mentre la forma e' ancora a meta' si
+       legge come uno scatto, ed era proprio quello che si vedeva.
+       IL GUADO TORBIDO SE LO MANGIA LA CURVA: con una curva dolce il
+       tratto fangoso (fra il 35% e il 60% della strada) sta fra i 90
+       e i 150 ms — sessanta millesimi, dentro un volo di mezzo
+       secondo. Misurato, non stimato. */
     transition:transform var(--morfo-corsa) var(--morfo-curva),
       border-radius var(--morfo-corsa) var(--morfo-curva),
-      background-color var(--morfo-velo) ease,
-      box-shadow var(--morfo-velo) ease}
+      background-color var(--morfo-corsa) var(--morfo-curva),
+      box-shadow var(--morfo-corsa) var(--morfo-curva)}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
     display:flex;align-items:center;justify-content:center;
     color:#fff;font-weight:800;
@@ -2562,12 +2588,43 @@
   #p2pMorfo.parte .morfo-eti{opacity:0;
     transform:translate(var(--morfo-x),var(--morfo-y));
     transition-delay:0s,0s}
+  /* ---- LA BARRA SI APRE (set 2026, richiesta di Andrea) ----
+     Mentre il bottone si allarga, le voci ai due lati del + vengono
+     SPINTE FUORI — a sinistra quelle prima, a destra quelle dopo — e
+     rientrano alla chiusura. Non e' decorazione: a piena larghezza il
+     bottone occupa la barra da un bordo all'altro, e delle voci ferme
+     sotto un bottone che le copre direbbero che sono due cose
+     diverse. Spinte, dicono che e' una sola.
+     IL LATO LO DICE LA POSIZIONE, non una classe per parte: `~` vuol
+     dire «dopo il +», e chi non lo e' sta prima. Una classe sola
+     (`nav-lato`) sui quattro che si muovono, e il verso e' una
+     conseguenza — cosi' il giorno che una voce cambia posto nella
+     barra il verso la segue da solo.
+     ⚠️ LA TRANSIZIONE RIPETE color E background-color, e non e'
+     ridondanza: `nav .nav-lato` batte `nav button`, quindi senza
+     quelle due voci Esplora perderebbe la sfumatura del colore
+     entrando nel P2P — la riga nuova avrebbe spento una vecchia. */
+  nav .nav-lato{transition:
+    transform var(--morfo-corsa,.4s) var(--morfo-curva,ease),
+    opacity var(--morfo-corsa,.4s) var(--morfo-curva,ease),
+    color .4s ease,background-color .4s ease}
+  body.barra-via nav .nav-lato{opacity:0;pointer-events:none;
+    transform:translateX(-38px)}
+  body.barra-via nav #nav-vendi ~ .nav-lato{transform:translateX(38px)}
+  /* E PER VEDERSI, LA BARRA SALE SOPRA IL VELO: il velo dei fogli e'
+     un nero al 50% steso su tutto, e sotto di lui l'uscita delle voci
+     si leggerebbe a meta'. Sale a 41 come i fogli, mai piu' in su: il
+     foglio viene DOPO nel documento, quindi a pari quota copre lui —
+     che e' esattamente quel che deve succedere quando la pagina
+     arriva. Dura quanto la morfosi, andata e ritorno. */
+  body.morfosi nav{z-index:41}
+
   /* in reduced-motion il fantasma non nasce proprio (lo dice
-     morfoPuoiP2P), e questa riga e' la cintura: se nascesse per un
+     morfoPuoiP2P), e queste righe sono la cintura: se nascesse per un
      difetto, resterebbe fermo invece di volare */
   @media (prefers-reduced-motion:reduce){
-    #p2pMorfo .morfo-forma,#p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
-      transition:none}
+    #p2pMorfo .morfo-forma,#p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti,
+    nav .nav-lato{transition:none}
   }
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
@@ -8162,7 +8219,7 @@ document.getElementById('cartello')?.remove();</script>
          nella stessa schermata farebbe tre mestieri (marchio in
          testata, "l'ho messo via" sulle card, "dove sono" qui), la
          lente invece non dice niente altrove: e' libera -->
-    <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg></span>Esplora</button>
+    <button id="nav-esplora" class="active nav-lato" onclick="vaiEsplora()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg></span>Esplora</button>
     <!-- P2P: la ₿ INCLINATA (ago 2026, scelta da Andrea in TRE tempi
          di candidate guardate a schermo — dritta, moneta, larga,
          frecce dello scambio, girotondo, cambio €₿, le due pesanti:
@@ -8187,7 +8244,7 @@ document.getElementById('cartello')?.remove();</script>
          cella di griglia, si scambiano il posto con transform. Il
          selettore `nav button` li prende tutti (discendente), quindi
          CSS e spazzata di go() non cambiano. -->
-    <div class="nav-cella">
+    <div class="nav-cella nav-lato">
     <button id="nav-p2p" onclick="vaiP2P()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><g transform="rotate(13 12 12)"><path class="velo" d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3zM8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3z"/><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>P2P</button>
     <!-- Libro ordini: il LIBRO APERTO, disegnato nella grammatica
          delle sorelle (griglia da 24 ritagliata a "2 2 20 20", tratto
@@ -8207,7 +8264,7 @@ document.getElementById('cartello')?.remove();</script>
          le sorelle: si accende in arancio con currentColor, la
          convenzione della nav non cambia. Inchiostro dentro [2,22],
          la mano di tagliaSVG. -->
-    <div class="nav-cella">
+    <div class="nav-cella nav-lato">
     <button id="nav-aste" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
     <!-- I miei scambi: le DUE FRECCE dello scambio, andata e ritorno —
          niente velo perche' non c'e' una pancia da riempire, come
@@ -8229,7 +8286,7 @@ document.getElementById('cartello')?.remove();</script>
          "2 2 20 20", tratto 1.5 currentColor, velo al 12% e il tondo
          un pelo fuori squadra. Dentro: come funziona lo scambio e il
          suo regolamento, che fin qui stava sparso nei fogli. -->
-    <div class="nav-cella">
+    <div class="nav-cella nav-lato">
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button id="nav-p2pinfo" class="strato-p2p" onclick="go('p2pinfo')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 7.9v.6"/><path d="M12 11.2v5.4"/></svg></span>Info P2P</button>
     </div>
@@ -40243,8 +40300,13 @@ let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
    il foglio un modale centrato — non c'e' nessun tondo che scende —
    e in reduced-motion il foglio si apre come si e' sempre aperto. In
    tutt'e due i casi la via di ieri non e' un ripiego: e' la strada. */
-const P2P_MORFO_MS = 380;     /* la corsa intera: forma, centro, raggio */
-const P2P_MORFO_VELO = 160;   /* la dissolvenza fra il glifo e la scritta */
+/* MEZZO SECONDO, non piu' 380 (ritocco di Andrea): la corsa si deve
+   godere, e a 380 con una curva che schizzava via era finita prima di
+   essere letta. I due numeri restano due, e l'attesa e' ancora la loro
+   differenza — 340 — cosi' la scritta e il foglio finiscono di
+   comparire esattamente sull'ultimo fotogramma della corsa. */
+const P2P_MORFO_MS = 520;     /* la corsa intera: forma, centro, raggio, colore */
+const P2P_MORFO_VELO = 180;   /* la dissolvenza fra il glifo e la scritta */
 let p2pMorfoTimer = null;     /* la corsa in volo, per poterla interrompere */
 let p2pMorfoOcchio = null;    /* l'osservatore che si accorge della chiusura */
 
@@ -40286,6 +40348,22 @@ function vestiFoglioMorfoP2P(foglio, dentro){
   foglio.style.transition = '';
 }
 
+/* I TEMPI STANNO SULLA RADICE e non sul fantasma: a seguire questa
+   corsa sono in TRE — il fantasma, il foglio che sfuma e la barra che
+   si apre — e gli ultimi due stanno fuori dal fantasma, dove una sua
+   variabile non arriva.
+   E SI SCRIVONO PER PRIMI, prima di qualunque classe: una `--morfo-*`
+   che manca invalida tutta la riga `transition` di chi la legge, e
+   quella riga tornerebbe `all 0s`. */
+function tempiMorfoP2P(){
+  const r = document.documentElement.style;
+  r.setProperty('--morfo-corsa', P2P_MORFO_MS + 'ms');
+  r.setProperty('--morfo-velo', P2P_MORFO_VELO + 'ms');
+  /* l'attesa e' la DIFFERENZA: la scritta e il foglio finiscono di
+     comparire esattamente quando la corsa finisce, non un istante dopo */
+  r.setProperty('--morfo-attesa', (P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms');
+}
+
 /* il fantasma prende la MISURA e il POSTO del bottone d'arrivo, piu' le
    quattro variabili che dicono da dove parte */
 function vestiMorfoP2P(g, da, a, eti){
@@ -40298,11 +40376,6 @@ function vestiMorfoP2P(g, da, a, eti){
   g.style.setProperty('--morfo-y', m.y + 'px');
   g.style.setProperty('--morfo-sx', m.sx);
   g.style.setProperty('--morfo-sy', m.sy);
-  g.style.setProperty('--morfo-corsa', P2P_MORFO_MS + 'ms');
-  g.style.setProperty('--morfo-velo', P2P_MORFO_VELO + 'ms');
-  /* l'attesa e' la DIFFERENZA: la scritta finisce di comparire
-     esattamente quando la corsa finisce, non un istante dopo */
-  g.style.setProperty('--morfo-attesa', (P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms');
   /* L'ETICHETTA SI COPIA dal bottone vero e non si riscrive: due
      scritte uguali in due posti divergono al primo ritocco. */
   const e = g.querySelector('.morfo-eti');
@@ -40319,6 +40392,16 @@ function celaVeriP2P(cela){
   if (meta) meta.style.visibility = cela ? 'hidden' : '';
 }
 
+/* LE DUE CLASSI SUL BODY HANNO DUE VITE DIVERSE, e per questo sono
+   due: `barra-via` dice «le voci sono spinte fuori» e vale dalla
+   partenza dell'andata alla partenza del ritorno; `morfosi` dice «la
+   corsa e' in corso» e copre ANCHE il ritorno, perche' e' lei ad
+   alzare la barra sopra il velo e li' deve restare fino all'ultimo
+   fotogramma. Una classe sola avrebbe sbagliato una delle due meta'. */
+function barraViaP2P(via){
+  document.body.classList.toggle('barra-via', via);
+}
+
 /* il fantasma si posa: torna invisibile e ridA' il posto ai due veri */
 function posaMorfoP2P(){
   if (p2pMorfoTimer) { clearTimeout(p2pMorfoTimer); p2pMorfoTimer = null; }
@@ -40326,9 +40409,11 @@ function posaMorfoP2P(){
   if (g) g.classList.remove('acceso', 'parte');
   celaVeriP2P(false);
 }
-/* ...e a foglio chiuso si sveste anche lui */
+/* ...e a foglio chiuso si sveste anche lui, barra compresa */
 function spegniMorfoP2P(){
   posaMorfoP2P();
+  barraViaP2P(false);
+  document.body.classList.remove('morfosi');
   const foglio = el('p2pNuovoSheet');
   if (foglio && foglio.classList.contains('morfo'))
     vestiFoglioMorfoP2P(foglio, false);
@@ -40362,15 +40447,22 @@ function apriMorfoP2P(){
   spegniMorfoP2P();          /* niente corse a meta' da un giro di prima */
   if (!morfoPuoiP2P()) return false;
   occhioMorfoP2P();
+  tempiMorfoP2P();
   const g = el('p2pMorfo'), tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
+  /* la barra sale sopra il velo PRIMA di muoversi: alzarla a corsa
+     iniziata vorrebbe dire vederla schiarire a meta' strada */
+  document.body.classList.add('morfosi');
   vestiFoglioMorfoP2P(foglio, true);
   vestiMorfoP2P(g, tondo.getBoundingClientRect(),
                 meta.getBoundingClientRect(), meta.textContent);
   celaVeriP2P(true);
   g.classList.add('acceso', 'parte');
   void g.offsetWidth;        /* il fotogramma di partenza esiste solo se lo si CHIEDE */
+  /* i tre che partono INSIEME, nello stesso giro di stile: il foglio
+     che sfuma, il fantasma che vola e le voci che si aprono */
   foglio.classList.add('open');
   g.classList.remove('parte');
+  barraViaP2P(true);
   p2pMorfoTimer = setTimeout(posaMorfoP2P, P2P_MORFO_MS + 30);
   return true;
 }
@@ -40386,12 +40478,17 @@ function chiudiMorfoP2P(){
   posaMorfoP2P();
   const g = el('p2pMorfo'), tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
   if (!morfoPuoiP2P() || !g || !tondo || !meta) { spegniMorfoP2P(); return; }
+  tempiMorfoP2P();
   vestiMorfoP2P(g, tondo.getBoundingClientRect(),
                 meta.getBoundingClientRect(), meta.textContent);
   celaVeriP2P(true);
   g.classList.add('acceso');
   void g.offsetWidth;
+  /* le voci rientrano nello STESSO giro in cui il fantasma riparte: e'
+     l'allargamento che le aveva spinte fuori, e a rientrare devono
+     seguire il restringimento */
   g.classList.add('parte');
+  barraViaP2P(false);
   p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
 }
 
