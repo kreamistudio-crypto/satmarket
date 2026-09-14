@@ -38569,9 +38569,18 @@ def prove_p2p_dettaglio():
     # --- 1) LA PAGINA E' UN FOGLIO PIENO, col calco di «Pubblica» ----
     prova("il foglio del dettaglio e' a pieno schermo", True,
           '<div class="sheet pieno" id="p2pDettSheet"' in mini)
+    # ⚠️ IL GEMELLO SI CONTA DENTRO QUESTO FOGLIO, non nel file: la
+    # riga contava i ghost dell'app INTERA e ne pretendeva due, cioe'
+    # rispondeva per il vicino — e il giorno che il cappello di «I miei
+    # scambi» ne ha aggiunti due suoi (set 2026) e' diventata rossa
+    # parlando d'altro. Qui il ghost e' UNO, a destra, e tiene il
+    # titolo in centro contro la ✕ di sinistra.
+    _dett = mini[mini.index('<div class="sheet pieno" id="p2pDettSheet"'):]
+    _dett = _dett[:_dett.index('class="sheet', 40)]
     prova("...con la testata, la via d'uscita e il gemello invisibile",
-          True, 'id="p2pDettTit"' in mini
-          and mini.count('<span class="foglio-back vuoto"') == 2
+          True, 'id="p2pDettTit"' in _dett
+          and _dett.count('<span class="foglio-back vuoto"') == 1
+          and '<button type="button" class="foglio-back"' in _dett
           and '<div class="foglio-corpo" id="p2pDettCorpo"></div>' in mini)
     # LA VIA D'USCITA E' UNA ✕ (set 2026, ritocco di Andrea): questa
     # pagina non e' una tappa di un cammino — e' una cosa che si apre
@@ -48083,9 +48092,20 @@ def prove_p2p_vista_miei():
     # somiglia si scolla al primo ritocco, e nessuno se ne accorge
     # finche' non si mettono le due pagine una accanto all'altra.
     prova("...col titolo in cima, dentro il blocco attaccato", True,
-          '<div class="foglio-testa"><h3>I miei scambi</h3></div>' in fetta
+          "<h3>I miei scambi</h3>" in fetta
+          and 'class="foglio-testa"' in fetta
           and fetta.index("foglio-testa") > fetta.index('class="p2p-sticky"')
           and fetta.index("foglio-testa") < fetta.index('id="p2pMieiTesta"'))
+    # ⚠️ E PORTA I DUE GEMELLI INVISIBILI, uno per lato: nel foglio il
+    # cappello contiene la ✕ che lo chiude, e quel bottone e' PIU'
+    # ALTO del testo — e' lui a dare l'altezza alla riga
+    # (`align-items:center`). Senza, lo stesso cappello qui veniva
+    # 53px invece di 58: identico nelle regole e diverso a vedersi, che
+    # e' esattamente il difetto che una prova sul CSS non prende. Il
+    # ghost e' quello che il foglio usa gia' a destra per tenere il
+    # titolo in centro; qui ce ne vogliono due.
+    prova("...coi due gemelli invisibili che gli danno l'altezza", 2,
+          fetta.count('class="foglio-back vuoto" aria-hidden="true"'))
     # ...e non e' rimasto in giro il vestito suo di ieri
     prova("...e il vestito di ieri non e' rimasto da morto", False,
           "p2p-miei-tit" in mini)
@@ -48148,6 +48168,22 @@ def prove_p2p_vista_miei():
     prova("...e la forma porta la riga che lo stacca, e l'aria", True,
           "border-bottom:1px solid var(--line-soft)" in _box
           and "padding-bottom:10px" in _box and "margin-bottom:2px" in _box)
+    # ⚠️ E DUE RIGHE GLI RIMETTONO QUEL CHE `.sicu h3` GLI PORTA VIA, ed
+    # e' la TERZA regola che vince per posizione in questo cantiere —
+    # trovata misurando il TESTO, non leggendo il foglio. Dentro una
+    # `.sicu` vale anche `.sicu h3{margin:26px 0 8px;line-height:1.2}`:
+    # stessa specificita' di `.foglio-testa h3` e scritta 2600 righe
+    # piu' in basso, quindi vince. Nel foglio la `.sicu` non c'e' e il
+    # problema nemmeno — per questo i due cappelli sembravano identici
+    # leggendo il CSS: la regola di troppo dipende da DOVE lo metti.
+    # I due valori non sono scelti adesso: `margin-top:0` e' quel che
+    # `.foglio-testa h3` gia' dichiara, e `line-height:inherit` e' quel
+    # che l'h3 avrebbe senza nessuno che ci metta mano.
+    prova("...e due righe rimettono al cappello quel che .sicu h3 gli toglie",
+          True,
+          ".foglio-testa h3{margin-top:0;line-height:inherit}" in mini
+          and mini.index("  .sicu h3{")
+              < mini.index(".foglio-testa h3{margin-top:0"))
     prova("...e la variabile e' dichiarata una volta sola", 1,
           mini.count("--tit-foglio:"))
     # CENTRATO, e adesso da UNA regola sola: i due cappelli sono lo

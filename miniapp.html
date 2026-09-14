@@ -5970,6 +5970,23 @@
      giusto di taglia e sbagliato di tutto il resto. Dentro un foglio
      non cambia un pixel: i due selettori danno gli stessi valori. */
   .sheet h3,.foglio-testa h3{font-family:'Baloo 2',sans-serif;font-size:var(--tit-foglio);font-weight:800;margin-bottom:4px}
+  /* ⚠️ E QUESTE DUE RIGHE RIMETTONO AL CAPPELLO QUEL CHE `.sicu h3`
+     GLI PORTA VIA (set 2026, misurato dal vivo e non letto). Dentro
+     una `.sicu` — cioe' il cappello di «I miei scambi» — vale anche
+     `.sicu h3{margin:26px 0 8px;line-height:1.2}`: stessa
+     specificita' di `.foglio-testa h3`, scritta 2600 righe piu' in
+     basso, quindi vince. Nel foglio la `.sicu` non c'e' e il problema
+     nemmeno, ed e' per questo che i due cappelli sembravano identici
+     leggendo il CSS: la regola di troppo dipende da DOVE lo metti.
+     Il conto pagato: 26px di aria in piu' sopra (34 contro 13,5) e la
+     riga stretta a 21,6px invece di 26,1.
+     NON E' UN VESTITO NUOVO, e' il vestito del cappello rimesso dove
+     glielo tolgono: `margin-top:0` e' il valore che `.foglio-testa h3`
+     gia' dichiara, e `line-height:inherit` e' quel che l'h3 avrebbe
+     senza nessuno che ci metta mano — i due valori di un cappello
+     dentro un foglio, non due numeri scelti adesso. Sul cappello dei
+     fogli non cambia un pixel: li' erano gia' questi. */
+  .foglio-testa h3{margin-top:0;line-height:inherit}
   /* La testata di un foglio: titolo, e a destra gli inquilini di
      servizio (toggle valuta, ✕). A 320px stanno in tre su una riga
      sola, e a stringersi dev'essere il TITOLO — mai la via d'uscita. */
@@ -7058,7 +7075,20 @@ document.getElementById('cartello')?.remove();</script>
            cosi' le due sorelle cominciano alla stessa altezza, e
            passando dall'una all'altra la pagina non sobbalza. -->
       <div class="p2p-sticky">
-        <div class="foglio-testa"><h3>I miei scambi</h3></div>
+        <!-- ⚠️ I DUE GEMELLI INVISIBILI non sono decorazione: nel foglio
+             il cappello contiene la ✕ che lo chiude, e quel bottone e'
+             PIU' ALTO del testo — e' lui a dare l'altezza alla riga
+             (`align-items:center`). Senza, lo stesso cappello qui
+             verrebbe 53px invece di 58, cioe' due pixel e mezzo di aria
+             in meno sopra e sotto: identico nelle regole e diverso a
+             vedersi. Il ghost e' lo stesso che il foglio usa gia' a
+             destra per tenere il titolo in centro; qui ce ne vogliono
+             due, uno per lato. -->
+        <div class="foglio-testa">
+          <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+          <h3>I miei scambi</h3>
+          <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+        </div>
         <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
              libro: la `<select>` di sistema non si veste, quindi sta
              qui nascosta a tenere il VALORE e col dito parla la
