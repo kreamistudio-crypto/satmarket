@@ -6907,31 +6907,45 @@ def prove_lista_ordini():
         c = sqlite3.connect(":memory:")
         c.row_factory = sqlite3.Row
         c.executescript("""
-        CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+          zona TEXT, servizio_dove TEXT);
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, username TEXT);
         CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
           compratore_id INT, venditore_id INT, prezzo_sats INT,
-          stato TEXT, cambio_eur REAL, aggiornato INT);
-        INSERT INTO annunci VALUES(1,'Un oggetto');
+          stato TEXT, cambio_eur REAL, aggiornato INT,
+          consegna_scelta TEXT, indirizzo TEXT, indirizzo_purgato_il INT);
+        INSERT INTO annunci VALUES(1,'Un oggetto','Torino (TO)','');
+        INSERT INTO utenti VALUES(222,'mariorossi');
         INSERT INTO ordini VALUES
-          (1,1,222,111,1000,'released',60000,1000),
-          (2,1,222,111,2000,'creato',60000,2000),
-          (3,1,222,111,3000,'dispute',60000,3000),
-          (4,1,222,111,4000,'annullato',60000,4000);
+          -- released, spedizione, ma indirizzo GIA' PURGATO: dove resta vuoto
+          (1,1,222,111,1000,'released',60000,1000,'spedizione','{"nome":"Mario Rossi"}',1500),
+          -- creato, ritiro: dove diventa la zona dell'annuncio
+          (2,1,222,111,2000,'creato',60000,2000,'ritiro','',0),
+          -- dispute, spedizione, indirizzo VIVO: dove mostra i campi
+          (3,1,222,111,3000,'dispute',60000,3000,'spedizione','{"nome":"Ada Bianchi","via":"Via Roma 1","cap":"10100","citta":"Torino"}',0),
+          -- annullato, digitale: nessun indirizzo possibile
+          (4,1,222,111,4000,'annullato',60000,4000,'digitale','',0);
         """)
         return c
 
-    def _righe_csv(con, tutti):
+    def _righe_csv(con, tutti, chi=111):
         amb = {"db": lambda: _SenzaClose(con), "time": time,
                "csv": csv_mod, "io": io_mod, "HTTPException": _ErrExp,
                "Response": lambda content, **k: content,
                "_titolo_ordine": lambda righe: "SET",
-               "BIGLIETTI_EXPORT": {"tik": (111, time.time() + 300, tutti)}}
+               # finto e non cifrato per davvero: la cifratura la prova
+               # gia' a fondo un'altra famiglia (buste/indirizzi), qui
+               # si prova solo il FILO fra scarica_export e il letto
+               "_indirizzo_letto": lambda blob: (
+                   json_mod.loads(blob) if blob else None),
+               "BIGLIETTI_EXPORT": {"tik": (chi, time.time() + 300, tutti)}}
         exec(pezzo("scarica_export"), amb)
         testo = amb["scarica_export"]("tik").lstrip("﻿")
         return list(csv_mod.reader(io_mod.StringIO(testo), delimiter=";"))
 
     import csv as csv_mod
     import io as io_mod
+    import json as json_mod
 
     class _SenzaClose:
         def __init__(self, c): self._c = c
@@ -6948,6 +6962,36 @@ def prove_lista_ordini():
           {r[4] for r in tutti_csv[1:]})
     prova("...e sono davvero TUTTI i quattro ordini, non un sottoinsieme",
           4, len(tutti_csv) - 1)
+
+    # ---- chi ha comprato, e dove consegnare (set 2026) ----
+    # ORDER BY o.aggiornato DESC: l'ordine 4 (piu' recente) e' in
+    # testa, l'ordine 1 (il piu' vecchio, released) in coda
+    per_esito = {r[4]: r for r in tutti_csv[1:]}
+    prova("il venditore vede sempre chi ha comprato", {"mariorossi"},
+          {r[6] for r in tutti_csv[1:]})
+    prova("indirizzo GIA' PURGATO (l'ordine released): 'dove' resta "
+          "onestamente vuoto", ("spedizione", ""),
+          (per_esito["released"][7], per_esito["released"][8]))
+    prova("ritiro: 'dove' e' la zona dell'annuncio, non un indirizzo",
+          ("ritiro in zona", "Torino (TO)"),
+          (per_esito["creato"][7], per_esito["creato"][8]))
+    prova("spedizione con indirizzo vivo: 'dove' porta i campi", True,
+          "Ada Bianchi" in per_esito["dispute"][8]
+          and "Via Roma 1" in per_esito["dispute"][8]
+          and "10100" in per_esito["dispute"][8])
+    prova("digitale: nessun indirizzo, nessuna via di mezzo",
+          ("digitale", ""),
+          (per_esito["annullato"][7], per_esito["annullato"][8]))
+
+    # PRIVACY: dallo stesso database, guardato dal COMPRATORE — non
+    # deve vedere ne' il proprio username spacciato per «compratore»
+    # (e' un fatto suo, non un dato altrui) ne' l'indirizzo che ha
+    # scritto lui stesso: sono colonne per chi deve SPEDIRE, non per
+    # chi ha gia' comprato
+    dal_compratore = _righe_csv(con_exp, True, chi=222)
+    prova("il compratore non vede 'compratore' ne' 'dove' nel proprio "
+          "export: sono dati per chi vende, non per chi ha comprato",
+          {("", "")}, {(r[6], r[8]) for r in dal_compratore[1:]})
 
 
 def prove_dettaglio_ordine():

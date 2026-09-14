@@ -36420,9 +36420,14 @@ def scarica_export(biglietto: str):
     dove = "" if tutti else "AND o.stato IN ('released','refunded') "
     righe = con.execute(
         "SELECT o.id, o.annuncio_id, o.aggiornato, o.prezzo_sats, o.stato, "
-        "o.cambio_eur, o.venditore_id, a.titolo FROM ordini o "
+        "o.cambio_eur, o.venditore_id, o.consegna_scelta, o.indirizzo, "
+        "o.indirizzo_purgato_il, a.titolo, a.zona, a.servizio_dove, "
+        "uc.username AS compratore_username FROM ordini o "
         # LEFT: i SET (annuncio_id=0) devono uscire in contabilita'
         "LEFT JOIN annunci a ON a.id=o.annuncio_id "
+        # LEFT anche qui: un compratore mai arrivato a completare la
+        # riga non deve far sparire l'ordine dall'export di chi vende
+        "LEFT JOIN utenti uc ON uc.tg_id=o.compratore_id "
         "WHERE (o.venditore_id=? OR o.compratore_id=?) "
         f"{dove}"
         "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
@@ -36437,7 +36442,10 @@ def scarica_export(biglietto: str):
     con.close()
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")    # il ; e' il CSV che Excel italiano apre bene
-    w.writerow(["data", "ruolo", "annuncio", "sats", "esito", "controvalore_eur"])
+    w.writerow(["data", "ruolo", "annuncio", "sats", "esito",
+               "controvalore_eur", "compratore", "consegna", "dove"])
+    CONSEGNA_ETICHETTA = {"spedizione": "spedizione", "ritiro": "ritiro in zona",
+                          "digitale": "digitale", "servizio": "servizio"}
     for r in righe:
         eur = ""
         if r["cambio_eur"]:               # 0 = ordine storico: campo vuoto, onesto
@@ -36445,10 +36453,41 @@ def scarica_export(biglietto: str):
                    .replace(".", ","))
         esito = r["stato"] if tutti else (
             "concluso" if r["stato"] == "released" else "rimborsato")
+        # CHI HA COMPRATO E DOVE CONSEGNARE escono SOLO sulle proprie
+        # vendite: sulle righe d'acquisto sono i dati del lettore
+        # stesso — inutili, e un venditore altrui non deve comparire
+        # nell'export di chi ha comprato da lui. Stessa regola di
+        # leggi_indirizzo: le due parti possono leggerlo, ma qui la
+        # colonna ha senso solo per chi deve SPEDIRE.
+        mio_lato_vendita = r["venditore_id"] == tg_id
+        compratore = (r["compratore_username"] or "") if mio_lato_vendita else ""
+        consegna = CONSEGNA_ETICHETTA.get(r["consegna_scelta"], "")
+        dove_consegnare = ""
+        if mio_lato_vendita:
+            if r["consegna_scelta"] == "ritiro":
+                dove_consegnare = r["zona"] or ""
+            elif r["consegna_scelta"] == "servizio":
+                dove_consegnare = r["servizio_dove"] or ""
+            elif (r["consegna_scelta"] in ("spedizione", "")
+                  and r["indirizzo"] and not r["indirizzo_purgato_il"]):
+                # onesto e non un errore: un indirizzo gia' PURGATO (10
+                # giorni dalla consegna, o prima alla conferma) resta
+                # vuoto qui esattamente come per leggi_indirizzo — la
+                # contabilita' esce sugli ordini CHIUSI, dove quasi
+                # sempre l'indirizzo e' gia' sparito per costruzione
+                campi = _indirizzo_letto(r["indirizzo"])
+                if campi:
+                    riga_via = ", ".join(x for x in (
+                        campi.get("via"),
+                        f"{campi.get('cap','')} {campi.get('citta','')}".strip()
+                    ) if x)
+                    dove_consegnare = ", ".join(x for x in (
+                        campi.get("nome"), riga_via, campi.get("provincia"),
+                        campi.get("telefono")) if x)
         w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
-                    "vendita" if r["venditore_id"] == tg_id else "acquisto",
+                    "vendita" if mio_lato_vendita else "acquisto",
                     titoli_set.get(r["id"], r["titolo"] or "?"), r["prezzo_sats"],
-                    esito, eur])
+                    esito, eur, compratore, consegna, dove_consegnare])
     nome = time.strftime(
         f"barattolo-affari{'-tutti' if tutti else ''}-%Y%m%d.csv")
     return Response(content="\ufeff" + buf.getvalue(),   # BOM: cosi' Excel legge l'UTF-8
