@@ -57,6 +57,46 @@
   E `paga_venditore` HA QUATTRO ESITI (ago 2026): PAGATO, NON_PAGATO,
   INCERTO e **NON_CHIESTO** — la voce dei tre sta qui sotto, il quarto
   è più giù, sotto «NON HO POTUTO CHIEDERE».
+  IL GIUDICE DELL'ESITO, E L'ECO DI LNBITS (set 2026, dal campo). Il
+  numero HTTP dice se la richiesta è stata PRESA IN CARICO, mai come è
+  finita: `_esito_lnbits` legge il CORPO — lo stesso lettore per la
+  risposta che paga e per la domanda per hash — e torna 'success',
+  'failed' o 'pending'; nel dubbio dice sempre 'pending', mai
+  'success'. `_stato_pagamento` chiede per hash e distingue la stringa
+  VUOTA (404: mai visto, si può pagare) da 'pending' (esiste, non si sa
+  ancora): il primo autorizza a pagare, il secondo lo VIETA. L'hash si
+  conosce PRIMA che i sats si muovano — esce dallo stesso decode della
+  cintura, e per questo `importo_invoice` accetta ora la fattura già
+  letta (`dec`), così il decode resta uno e l'aritmetica dei millisat
+  continua a vivere in un posto solo. L'ECO si riconosce prima di
+  pagare: LNbits tiene UNA riga per payment hash e a una seconda
+  richiesta sulla stessa bolt11 restituisce il record vecchio senza
+  ritentare niente — quindi se per quell'hash esiste già qualcosa non
+  si bussa al nodo ('success' → PAGATO, e la funzione è idempotente;
+  'failed' → NON_PAGATO, fattura bruciata, ne serve una nuova;
+  'pending' → INCERTO). L'attesa inline è corta e tarata su due misure
+  vere (`ATTESE_ESITO` 4 × `SECONDI_FRA_ATTESE` 2 = 8s): un successo si
+  dichiara subito nel corpo, un fallimento ci ha messo 86 secondi, e
+  `_sblocca_sats` la chiamano le rotte HTTP — dall'altra parte c'è una
+  persona che aspetta. Chi cade fuori diventa INCERTO, cioè la coda dei
+  moderatori: prezzo dichiarato, lo toglie il cantiere B. IL DIARIO
+  (`_timbra_pagamento`) scrive `payout_hash` SEMPRE, più
+  `payout_tentativi`, `payout_ultimo` e `payout_errore` su `ordini`,
+  `rimborsi_asta` e `pagamenti`, e i quattro rami riusciti timbrano
+  `payout_stato='uscito'` — prima il vuoto voleva dire sia «mai
+  provato» sia «riuscito». La divisione da non rompere: **il diario
+  dice cos'è successo, lo stato dice cosa fare**; il timbro non scrive
+  `payout_stato`, non tocca `aggiornato`, non committa e non chiude, e
+  se non sa niente non scrive niente. `_avvisa_payout_fallito` dice ai
+  moderatori ogni fallimento dichiarato, con hash e motivo: prima un
+  payout senza rotta non lo sapeva nessuno di noi. Il taccuino è un
+  dizionario che va e viene perché `paga_venditore` non sa in che
+  TABELLA vive la riga che aspetta i sats. I verbi restano QUATTRO, e
+  le sentinelle nuove sorvegliano che `r.status_code < 300` non torni a
+  decidere da solo, che il corpo si legga, che l'eco si chieda prima
+  della chiave che paga e che i quattro rami timbrino. Il perché per
+  intero — l'ordine 149 e i 67.672 sats — sta in CANTIERI, alla voce
+  «Il giudice dell'esito: un 201 che diceva «fallito»».
   I TRE ESITI storici (ago 2026, la voce media
   più grave dell'audit): PAGATO, NON_PAGATO e **INCERTO**. La POST
   verso LNbits stava senza `try`: se il nodo pagava ma non riusciva a

@@ -13657,3 +13657,161 @@ perché è esattamente il genere di dettaglio che al prossimo giro
 qualcuno «allinea» senza sapere perché erano diversi.
 
 **9786 verdi**, 0 rosse.
+
+
+## Il giudice dell'esito: un 201 che diceva «fallito» (set 2026)
+
+L'ordine **149** del mercatino — «Buono Carburante Eni - 50 euro» — si è
+chiuso il **14 settembre 2026 alle 18:04:11** con tutte le cerimonie di
+un affare riuscito: stato `released`, contatori incrementati, XP a
+entrambe le parti, «🔓 Sats sbloccati!» al venditore e «✅ Ordine
+concluso — 67.672 sats al venditore» ai moderatori. **Al venditore non
+era arrivato niente**, e non sarebbe arrivato mai.
+
+**LA CATENA, LETTA AL CONTRARIO.** La notifica non partiva prima del
+pagamento: stava già dentro `if esito == PAGATO`, cioè dopo aver chiesto
+a LNbits. Il difetto era **cosa contava come risposta buona**, e stava
+in una riga sola: `return PAGATO if r.status_code < 300 else
+NON_PAGATO`. Il corpo della risposta non si leggeva **mai**. LNbits
+aveva risposto **201** — richiesta presa in carico — e **86 secondi
+dopo** (18:04:01 → 18:05:27) il nodo tornava indietro con un fallimento
+che non ascoltava nessuno. Il numero HTTP dice se la richiesta è stata
+presa; solo il corpo dice come è finita.
+
+⚠️ **E POI IL FATTO CHE HA CAMBIATO IL DISEGNO.** Provando a ripagare la
+stessa bolt11, LNbits ha risposto **201 restituendo il RECORD VECCHIO**
+— `created_at` di un'ora prima, `status: failed`, preimage vuota. Non
+aveva ritentato niente: **tiene UNA riga per payment hash**, e a una
+seconda richiesta serve quella. Quindi il giudizio sul solo numero HTTP
+non sbagliava soltanto scambiando la ricevuta per l'esito: sbagliava
+anche quando LNbits stava **dicendo esplicitamente che il pagamento era
+fallito**. E cade con lui il ritentativo sulla stessa fattura, che nella
+prima stesura di questo cantiere era dato per sicuro: **una fattura
+bruciata non si ripaga, se ne chiede una nuova.**
+
+**PERCHÉ NON SI È POTUTO SAPERE DAL NOSTRO LATO**, che è la metà più
+larga del guasto. Di un payout riuscito non restava scritto NIENTE:
+`payout_hash` si scriveva solo congelando, la bolt11 coniata da un
+Lightning address spariva con la variabile locale, e `payout_stato`
+vuoto voleva dire sia «mai provato» sia «riuscito» — cioè niente.
+L'unico posto dove il fatto viveva era LNbits, e l'elenco dei suoi
+pagamenti si è rivelato **ordinato in modo crescente**: `limit=200`
+tagliava il *presente*, non il passato, e la riga cercata stava oltre il
+taglio. **Un elenco di cui non hai fissato l'ordine non è una fonte.**
+
+**IL RECUPERO** è stato fatto a mano e in due tempi, **in sola lettura
+fino all'ultimo gesto**: pre-volo (`paid` ancora false, importo 67.672,
+scadenza nel futuro), poi il pagamento di una fattura **nuova** —
+l'hash mai visto rispondeva `404`, quindi nessuna eco — saldata in **9
+secondi**, preimage `71013aac…`, 179 sats di commissione di routing. La
+vecchia (`2a9b18b4…`) resta lì, bruciata e leggibile: **non si
+cancella**, è l'unica traccia esistente di quel giorno.
+⚠️ E il venditore non poteva rimediare da solo nemmeno volendo:
+`deposita_invoice` accetta `locked`, `shipped` e `confirmed`, e l'ordine
+era `released` — **il falso successo chiude anche la porta di
+servizio**.
+
+### La cura, cantiere A
+
+**L'IDEA PORTANTE: l'hash si conosce PRIMA che i sats si muovano.** La
+cintura dell'importo già decodificava la bolt11, e quel decode
+restituisce anche il `payment_hash`: lo buttavamo via. Tenendolo, il
+pagamento ha un nome prima di partire — e con un nome, nessuna risposta
+del nodo è più indecifrabile. `importo_invoice` prende ora la fattura
+**già letta** (`dec`), così il decode resta uno solo e l'aritmetica dei
+millisat continua a vivere in un posto solo, come dice la sua sentinella.
+
+**IL GIUDICE.** `_esito_lnbits` legge il **corpo** — lo stesso lettore
+per la risposta che paga e per la domanda per hash — e torna `success`,
+`failed` o `pending`. **Nel dubbio dice sempre `pending`, mai
+`success`**: un «non lo so» lascia la domanda aperta e il giro ci torna,
+un falso «è andata» chiude l'affare e mente. `_stato_pagamento` chiede
+per hash e distingue **la stringa vuota** (404: mai visto, si può
+pagare) da `pending` (esiste, non si sa ancora): il primo autorizza a
+pagare, il secondo lo vieta, e scambiarli è il modo esatto di far uscire
+i sats due volte. Un guasto del canale alza `LnbitsMuto` come il decode.
+
+**L'ECO SI RICONOSCE PRIMA DI PAGARE.** Se per quell'hash un record
+esiste già, non si bussa nemmeno al nodo: `success` → PAGATO (e la
+funzione diventa **idempotente**, che è il rimedio profondo alla paura
+del doppio pagamento), `failed` → NON_PAGATO con «fattura bruciata»,
+`pending` → INCERTO.
+
+**L'ATTESA È CORTA, E IL NUMERO È TARATO SU DUE MISURE VERE**: quattro
+domande a due secondi, **otto secondi**. Il pagamento riuscito si è
+saldato in nove secondi e lo diceva già il corpo della prima risposta,
+quindi lì dentro non aspetta nessuno; quello fallito ci ha messo 86
+secondi, cioè molto più di quanto si possa far aspettare a chi ha appena
+premuto un bottone — `_sblocca_sats` la chiamano le **rotte HTTP**, e
+dall'altra parte c'è una persona che guarda una rotella girare. ⚠️ **Il
+prezzo è dichiarato**: chi cade fuori dagli otto secondi diventa
+INCERTO, cioè la coda dei moderatori. Con zero utenti in rodaggio si
+regge; a toglierlo di mezzo sarà il cantiere B.
+
+**IL DIARIO.** `_timbra_pagamento` scrive nella riga che aspettava i
+sats: `payout_hash` **sempre**, più `payout_tentativi`, `payout_ultimo`
+e `payout_errore` (le tre colonne nuove, su `ordini`, `rimborsi_asta` e
+`pagamenti`). E i quattro rami riusciti timbrano `payout_stato='uscito'`.
+LA DIVISIONE CHE TIENE SU IL RESTO: **il diario dice cos'è successo, lo
+stato dice cosa fare** — `payout_stato` resta affare dei suoi tre
+scrittori, e un quarto che lo scrivesse di straforo li farebbe
+litigare. Non tocca `aggiornato` (l'ancora dei promemoria), non committa
+e non chiude, e **se non si sa niente non scrive niente**: il pagamento
+NON CHIESTO deve lasciare la riga identica, ed è il patto del quarto
+esito.
+
+**L'AVVISO AI MODERATORI.** Prima di oggi un payout che falliva non lo
+sapeva **nessuno di noi**: l'unico `notifica_admin` parlava di importi
+storti, cioè di wallet rotti e tentativi di prelievo, mai di sats che
+non arrivano a chi li aspetta. Ora `_avvisa_payout_fallito` parla su
+ogni fallimento dichiarato, con hash e motivo, e dice che quella fattura
+non si può ripagare.
+
+**TUTTE E QUATTRO LE BOCCHE senza toccarne nessuna**: la cura sta dentro
+`paga_venditore`, e i quattro chiamanti — incasso del venditore,
+rimborso d'asta, sblocco banner, rimborso al compratore — parlano già i
+quattro verbi. Il solo lavoro per chiamante è il taccuino (un dizionario
+che va pre-riempito con l'etichetta e torna con hash, tentativi ed
+errore: è un dizionario perché la funzione **non sa in che tabella vive**
+la riga che aspetta i sats) e la riga del timbro.
+
+**I VERBI RESTANO QUATTRO.** Nessun vocabolario nuovo: un corpo che dice
+`failed` è NON_PAGATO, un'eco riconosciuta è NON_PAGATO, un `pending` a
+budget scaduto è INCERTO. È il vincolo che ha tenuto il cantiere piccolo.
+
+**LE PROVE.** 42 asserzioni nuove in `prove_esito_pagamento`, fra cui la
+riga del 14 settembre rifatta al banco (**201 col fallimento nel corpo →
+NON_PAGATO**, dove prima usciva `pagato`) e le quattro dell'eco con
+«zero pagamenti partiti». Più le sentinelle che impediscono il ritorno:
+`r.status_code < 300` non deve più comparire nella funzione, il corpo si
+legge, l'esito si richiede per hash, l'eco si chiede **prima** della
+chiave che paga, i quattro rami timbrano, il diario non scrive lo stato
+né tocca `aggiornato`. **9829 verdi, 0 rosse.**
+
+⚠️ **E IL BANCO DEL NODO MUTO ORA MODELLA IL REGISTRO**, che è la
+proprietà di LNbits che ci è costata l'ordine: una riga per hash, e la
+GET per hash che risponde 404 su una fattura mai vista. Con quello si è
+potuta mettere in scena la **storia** dell'eco — nodo che prende e non
+consegna, ordine che NON si chiude, moderatori avvisati, e la stessa
+bolt11 ridepositata che non fa partire nessun secondo pagamento
+(`collaudo_lnbits_muto.py`, **38 verdi**, erano 27). Un nodo di cartone
+che avesse accettato due volte avrebbe detto che il ritentativo
+funziona, cioè proprio la cosa falsa.
+
+⚠️ **UNA RIGA DI IERI È CADUTA**: dopo il primo giro di analisi avevo
+scritto che `invoice_venditore` non andava più cancellata sul
+fallimento, perché «la stessa bolt11 si ritenta in sicurezza». La
+dedica per hash l'ha falsificata: **il comportamento che c'era era
+quello giusto**, e adesso ha il suo perché scritto.
+
+**QUEL CHE RESTA APERTO, dichiarato.** Il motivo del fallimento lo
+conserviamo come lo dice LNbits (`LNbits: failed`) e non più in là:
+quella API non ci ha dato una ragione, e inventarla sarebbe peggio del
+silenzio. Il **censimento** degli altri ordini `released` con una
+`invoice_venditore` — hash per hash, per sapere se il 149 fosse solo —
+non è ancora stato fatto. E il **cantiere B** ha il disegno già scritto
+qui sopra: risoluzione di fondo senza far aspettare nessuno, ritentativo
+col backoff **su una fattura nuova** (automatico solo dove c'è un
+Lightning address, perché lì ogni conio ha un hash nuovo), e le parole
+al venditore, che oggi gli dicono «il tuo wallet non ha risposto come
+doveva» mentre il suo wallet non è mai stato raggiunto.
