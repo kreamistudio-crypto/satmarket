@@ -46900,6 +46900,47 @@ out.cardPubblicato = rigaScambioP2P(riga({stato: 'pubblicato'}));
 out.cardAttivo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo'}));
 out.cardConcluso = rigaScambioP2P(riga({stato: 'concluso'}));
 out.cardDisputa = rigaScambioP2P(riga({stato: 'in_disputa'}));
+/* ⚠️ LA PROPORZIONE FRA I DUE VERSI, e i numeri sono scelti perche' NON
+   ci sia nessun arrotondamento: a 1/2000 per sat, 5,00 € fanno 10.000
+   sats tondi, e le mezze commissioni vengono intere. Cosi' la prova
+   guarda la REGOLA e non la virgola. */
+eurPerSat = 1 / 2000;
+/* ⚠️ IL NETTO SI LEGGE DALLA CARD, non si ricompone qui: a metterlo in
+   pagina e' `satsScambioP2P`, e un conto che rifacesse la catena per
+   conto suo certificherebbe una catena che nessuno usa. La tortura ha
+   preso esattamente questo: una mutazione nel PUNTO DI GIUNZIONE — la
+   commissione spostata prima del premio dentro satsScambioP2P —
+   passava liscia, perche' la prova non ci passava. */
+const soloCifre = s => Number(String(s).replace(/[^0-9]/g, ''));
+const conto = (lato, premium) => {
+  const r = riga({lato: lato, premium: premium});
+  return {merc: satsMercatoP2P(comeLibroP2P(r)),
+          netto: soloCifre(satsScambioP2P(r))};
+};
+out.prop = {};
+for (const pm of [6, 0, -5]) {
+  const v = conto('vendo', pm), c = conto('compro', pm);
+  out.prop[pm] = {
+    merc: v.merc, vendo: v.netto, compro: c.netto,
+    /* la meta' aggiunta e quella tolta sono LA STESSA, e la sua base
+       e' l'importo POST-premio */
+    mezzaSu: v.netto - v.merc,
+    mezzaGiu: v.merc - c.netto,
+    /* quella che uscirebbe dal mercato PURO, se qualcuno invertisse
+       l'ordine delle due operazioni */
+    mezzaSulPuro: Math.round(10000 * p2pInfo.fee / 2),
+    /* la proporzione in INTERI: niente virgola mobile in una prova */
+    incrocio: v.netto * 99 === c.netto * 101,
+    /* e lo scarto fra i due versi E' la commissione annunciata */
+    scarto: (v.netto - c.netto) / v.merc
+  };
+}
+/* IL CASO DEL CAMPO, al satoshi (Andrea, 14 set 2026): due card che
+   sembravano non tornare, e tornavano — 7408 sats di mercato puro per
+   5,00 € spiegano tutt'e due le cifre. Ci sta l'arrotondamento vero,
+   ed e' apposta: questo e' il caso come lo si e' visto. */
+eurPerSat = 5 / 7408;
+out.campo = {vendo: conto('vendo', 6).netto, compro: conto('compro', -5).netto};
 /* LO STESSO SEGNO CON TUTT'E DUE LE TINTE, su tutte le combinazioni:
    se il colore si mettesse a seguire il segno invece del giudizio,
    queste due liste diventerebbero una sola */
@@ -47061,6 +47102,58 @@ console.log(JSON.stringify(out));
           "border-radius:10px" in _geo and "font-size:13px" in _geo
           and "border-color:transparent" in _geo
           and mini.index("  .badge{") > mini.index("  .p2p-scambio-stato{"))
+
+    # --- 7) LA PROPORZIONE FRA I DUE VERSI --------------------------
+    # ⚠️ NASCE DAL CAMPO (Andrea, 14 set 2026): «vendo 5,00 € +6% ≈ 7034
+    # sats» e «compro 5,00 € −5% ≈ 7700 sats» sembravano non tornare —
+    # risalendo al mercato davano 7483 e 7333, il 2% di scarto. Non era
+    # un errore: quel 2% E' la commissione, perche' la meta' va nei due
+    # versi OPPOSTI. Si pianta qui perche' e' un invariante che nessuna
+    # prova sorvegliava, e che si rompe SENZA ROMPERE NIENTE: basta un
+    # segno girato in `nettoLatoP2P` — e allora due ordini gemelli
+    # sembrerebbero coincidere (o distare il doppio), sullo schermo di
+    # chi decide.
+    _p = o["prop"]
+    # a) IL VERSO: chi vende consegna PIU' del mercato scontato dal
+    #    premio, chi compra ne riceve MENO. La fee e' un costo per
+    #    tutt'e due, e si somma sempre CONTRO chi legge.
+    prova("chi vende consegna di piu', chi compra riceve di meno",
+          [True, True, True],
+          [_p[k]["vendo"] > _p[k]["merc"] > _p[k]["compro"]
+           for k in ("6", "0", "-5")])
+    # b) LA META' E' LA STESSA nei due versi: una sola cifra, due segni
+    prova("...e la meta' aggiunta e' la stessa che si toglie",
+          [True, True, True],
+          [_p[k]["mezzaSu"] == _p[k]["mezzaGiu"] for k in ("6", "0", "-5")])
+    # c) ⚠️ L'ORDINE DELLE DUE OPERAZIONI: il premio PRIMA, la
+    #    commissione DOPO — e la base della meta' e' l'importo gia'
+    #    scontato, non il mercato puro. E' la stessa base che usa il
+    #    coordinatore (`get_market_amount_and_fee` chiama `get_fee` sul
+    #    valore col premio gia' applicato, verificato sui byte a
+    #    verbale in CLAUDE.md). Col premio a 6 le due basi danno 94 e
+    #    100: se un domani qualcuno invertisse l'ordine, la prova lo
+    #    vedrebbe qui e non su una cifra a schermo.
+    prova("la commissione morde DOPO il premio, non prima",
+          [94, 100], [_p["6"]["mezzaSu"], _p["6"]["mezzaSulPuro"]])
+    prova("...e a premio zero le due basi coincidono, com'e' giusto",
+          [100, 100], [_p["0"]["mezzaSu"], _p["0"]["mezzaSulPuro"]])
+    # d) LA PROPORZIONE, in interi: (1 + fee/2) / (1 − fee/2), cioe'
+    #    101/99 col 2% del coordinatore. Il confronto e' incrociato
+    #    (a*99 == b*101) per non far entrare la virgola mobile in una
+    #    prova che parla di esattezza.
+    prova("due ordini gemelli ai due lati stanno come 101 a 99",
+          [True, True, True], [_p[k]["incrocio"] for k in ("6", "0", "-5")])
+    # e) ...e lo scarto fra i due versi E' la commissione annunciata dal
+    #    38385, non un numero scritto qui: il giorno che il coordinatore
+    #    gira la fee, questa riga segue.
+    prova("...e il loro scarto e' esattamente la commissione",
+          [0.02, 0.02, 0.02],
+          [round(_p[k]["scarto"], 10) for k in ("6", "0", "-5")])
+    # f) IL CASO DEL CAMPO, al satoshi: un cambio SOLO spiega tutt'e due
+    #    le cifre che Andrea aveva davanti. Se un domani non le
+    #    spiegasse piu', qualcosa in mezzo si e' mosso.
+    prova("le due cifre viste dal campo escono da un cambio solo",
+          [7034, 7700], [o["campo"]["vendo"], o["campo"]["compro"]])
 
 
 
