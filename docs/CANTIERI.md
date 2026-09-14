@@ -12822,3 +12822,40 @@ scambi». Non è per gusto tipografico: è la **stessa stringa** del tasto
 che ci porta, e la regola di sopra vale sulle maiuscole come sulle
 parole. Se le vuole capitalizzate, si cambiano in due posti — il tasto
 e il titolo — e la sentinella li tiene insieme.
+
+⚠️ **E IL TITOLO SI È CENTRATO, alla misura del cappello di un foglio**
+(ritocco di Andrea, lo stesso giorno): «grande esattamente come "Stai
+comprando sats"». È lo stesso oggetto — il titolo che presiede una
+pagina — quindi si veste come lui invece che come i due tab della
+sorella, che era la prima stesura. **La misura non si ribatte**: sta in
+`--tit-foglio` e le regole la leggono da lì, perché due numeri uguali
+scritti in due posti sono due numeri — al primo ritocco uno resta
+indietro, e a dirlo non c'è niente.
+
+⚠️ **E QUI IL VIVO HA CORRETTO LA LETTURA, che è la lezione del giro.**
+Leggendo il sorgente, «Stai comprando sats» sembrava **16,5px**: è il
+numero scritto in `.foglio-testa h3`, la regola che porta il suo nome e
+il suo `text-align:center`. Ho messo la variabile lì e sono andato a
+**misurare**: il titolo rende **18px**. Il motivo è la cascata —
+`.sheet h3` ha la **stessa specificità** (una classe più un elemento) ed
+è scritta **più in basso**, quindi vince; e tutt'e due i `.foglio-testa`
+dell'app vivono dentro un `.sheet`. **Quel 16,5 era morto in ogni sua
+occorrenza**, e dal sorgente sembrava il numero buono.
+Adesso **le tre regole leggono la stessa variabile** — quella che vince
+e quella che perde —, così chiunque vinca il numero è lo stesso, e il
+giorno che qualcuno togliesse `.sheet h3` i titoli non si
+rimpicciolirebbero di nascosto. Misurato dopo: i sei titoli dei fogli
+restano a 18px, nessuno si è mosso, e il titolo di «I miei scambi» è
+**identico** al cappello — taglia, peso e famiglia — con scarto **0px**
+dal centro.
+**La regola che ne esce, e vale oltre questo titolo:** *per «di che
+taglia è?» risponde il pixel, non il selettore che porta il nome
+giusto*. Una regola può avere il nome dell'elemento, il commento che la
+spiega e nessun effetto — ed è invisibile finché non la si misura.
+
+⚠️ **E UNA VARIABILE DI PROVA HA COPERTO UN IMPORT**: chiamando `_sh` il
+mio ritaglio di `.sheet h3` ho oscurato `import shutil as _sh` di
+quella stessa prova, e il banco è esploso su
+`'str' object has no attribute 'which'` — un errore che parla di
+tutt'altro. Rinominato `_fog`. Nei nomi corti di una prova lunga si
+guarda prima cosa c'è già in casa.
