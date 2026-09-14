@@ -12488,3 +12488,109 @@ stessa scrittura, e un giro vero con `TestClient` contro il database
 locale — un utente con scelta 'nostr' che riapre l'app con un nome
 Telegram diverso mantiene il proprio nome Nostr; un utente in
 automatico si aggiorna come sempre. 9646 verdi, 0 rosse.
+
+## I tre ritocchi alla morfosi, e la barra che si apre (14 set 2026)
+
+**CHIESTI DA ANDREA dopo averla vista correre**, e tutt'e tre dicono la
+stessa cosa da tre lati: la corsa doveva **farsi guardare**.
+
+**1) MEZZO SECONDO, E UNA CURVA CHE PARTE PIANO.** Da 380 a **520 ms**,
+e la curva da `cubic-bezier(.2,.7,.2,1)` a **`cubic-bezier(.4,0,.2,1)`**.
+La vecchia era quella della nav e schizzava via al primo fotogramma —
+misurata, a un decimo della corsa era già a metà strada —; su mezzo
+secondo quello scatto si legge. La nuova parte piano e atterra lunga,
+che è il modo in cui un morphing dice «mi sto posando» invece di «sono
+arrivato». La dissolvenza sale da 160 a **180**, e l'attesa resta la
+**differenza** — 340 — così la scritta chiude esattamente sull'ultimo
+fotogramma.
+
+**2) IL COLORE CORRE QUANTO LA FORMA, e ROVESCIA la scorciatoia del
+giro prima.** Il verde del lato diventa l'arancio di casa lungo TUTTA
+la corsa, interpolato. Ieri correva sulla sola dissolvenza per scansare
+il **verde-oliva torbido** che sta a metà strada fra i due colori — ma
+un cambio che finisce mentre la forma è ancora a metà si legge come uno
+scatto, ed era esattamente quello che Andrea ha visto.
+**IL GUADO TORBIDO SE LO MANGIA LA CURVA**, ed è la ragione per cui la
+scorciatoia non serviva più: col `cubic-bezier` dolce il tratto fangoso
+sta fra i **150 e i 220 ms** — misurato fotogramma per fotogramma,
+`rgb(138,143,55)` a 181 e già `rgb(192,145,40)` a 252 — cioè settanta
+millesimi dentro un volo di mezzo secondo.
+
+**3) LA BARRA SI APRE.** Mentre il bottone si allarga, le quattro voci
+ai lati del + vengono **spinte fuori** — 38 px, a sinistra quelle
+prima, a destra quelle dopo — e sfumano; alla chiusura rientrano con la
+corsa all'indietro. Non è decorazione: a piena larghezza il bottone
+occupa la barra da un bordo all'altro, e delle voci ferme sotto un
+bottone che le copre direbbero che sono **due cose diverse**. Spinte,
+dicono che è una sola.
+**IL VERSO LO DICE LA POSIZIONE**, non una classe per parte: `~` vuol
+dire «dopo il +», e chi non lo è sta prima. Una classe sola
+(`nav-lato`) sui quattro che si muovono — il + non è fra loro, ed è il
+punto: lui non si sposta, si **trasforma**.
+
+**E PERCHÉ SI VEDA, DUE COSE CHE NON SI SAREBBERO INDOVINATE.**
+- **Il foglio arriva per ultimo**: entra con l'ATTESA, cioè resta
+  trasparente per i primi 340 ms e chiude col fotogramma finale della
+  corsa. Senza, la pagina a pieno schermo coprirebbe la barra dopo due
+  decimi e **l'effetto ci sarebbe e nessuno lo vedrebbe**. In uscita il
+  ritardo non c'è — la transizione è quella dello stato che si
+  RAGGIUNGE — quindi il foglio svanisce subito e il rientro delle voci
+  si guarda per intero (misurato: opacità del foglio a 0,04 già a 134
+  ms).
+- **La barra sale sopra il velo**: il velo dei fogli è un nero al 50%
+  steso su tutto, e sotto di lui l'uscita delle voci si leggerebbe a
+  metà. `z-index` da 30 a 41 — come i fogli, mai più su: il foglio
+  viene DOPO nel documento, quindi a pari quota copre lui, che è
+  esattamente quel che deve succedere quando la pagina arriva.
+
+**DUE CLASSI SUL BODY, E HANNO DUE VITE DIVERSE** — per questo sono
+due, e una sola avrebbe sbagliato una metà. `barra-via` («le voci sono
+fuori») vale dalla partenza dell'andata alla partenza del ritorno;
+`morfosi` («la corsa è in corso») copre ANCHE il ritorno, perché è lei
+ad alzare la barra sopra il velo e lì deve restare fino all'ultimo
+fotogramma.
+
+⚠️ **E I TEMPI SONO SALITI SU `:root`.** Stavano sul fantasma, e
+andavano bene finché a seguirli era lui solo; adesso sono in **tre** —
+il fantasma, il foglio che sfuma e la barra che si apre — e gli ultimi
+due stanno **fuori** dal fantasma, dove una sua variabile non arriva.
+`tempiMorfoP2P` li scrive sulla radice, e li scrive **per primi**: una
+`--morfo-*` che manca invalida tutta la riga `transition` di chi la
+legge, ed è il difetto muto del giro scorso.
+
+⚠️ **UNA CLASSE IN PIÙ HA FATTO QUATTRO ROSSE, e non sul suo
+argomento.** Il censimento della barra chiedeva la classe **ESATTA**
+`<div class="nav-cella">`, e con `nav-lato` accanto non riconosceva più
+nessuna cella: il risultato è stato «cinque celle → otto» e «il + è la
+terza → è nav-p2plibro», cioè quattro sentinelle che raccontavano uno
+**spostamento del + mai avvenuto**. La regex adesso chiede la prima
+classe e lascia libera la coda — che è quel che quella riga esiste per
+sorvegliare. La lezione è la stessa di altre volte, su un asse nuovo:
+una sentinella ancorata a una stringa più stretta del fatto che
+sorveglia mente **nella direzione dell'allarme**, e un allarme falso
+costa quanto uno mancato.
+
+**COSA È STATO PROVATO.** Le sentinelle salgono a 9680 (zero rosse), e
+i tre ritocchi sono misurati in Chrome vero, fotogramma per fotogramma,
+in tutt'e due i versi.
+- **Andata**: la forma da `(160,5) 54` a `(16) 343`, il colore da
+  `rgb(27,139,84)` a `rgb(247,147,26)` passo passo, le voci da `+6,0` a
+  `−32,0` con l'opacità che scende insieme a loro, il foglio che resta
+  a zero fino a 340 ms.
+- **Ritorno**: lo specchio esatto — la forma torna a `(160,5) 54`, cioè
+  il tondo al pixel, il colore torna verde, le voci tornano a `+6,0`
+  con opacità 1, e alla fine il body non porta più nessuna delle due
+  classi e la barra è di nuovo a `z-index` 30.
+**E LA PRIMA STESURA DELLA TERZA AVEVA UN DIFETTO CHE SOLO IL VIVO
+DICEVA**: le voci sfumavano sulla dissolvenza (180 ms) e sparivano
+**prima** di essere spinte — a 130 ms erano già a opacità 0,09 e
+spostate di sette pixel, cioè si vedeva una sparizione e non una
+spinta. L'opacità è passata sulla corsa intera: adesso a 131 ms stanno
+a 0,75 e a 252 a 0,25, mentre scivolano.
+
+**COSA RESTA DA GUARDARE.** Il movimento, sempre: qui ci sono i numeri
+e tre fotogrammi fermati a 130, 260 e 390 ms. E il **verde-oliva** di
+metà strada — settanta millesimi — è la cosa da dire ad Andrea prima
+che la trovi lui: se dà fastidio, la cura non è tornare alla
+scorciatoia ma far passare il colore per una tappa intermedia scelta,
+che vuole i keyframes al posto della transizione.
