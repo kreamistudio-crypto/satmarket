@@ -98,11 +98,19 @@ async def _muta(*a, **k):
 ESITO = ["non_pagato"]
 
 
-async def _finta_uscita(bolt11, atteso_sats):
+async def _finta_uscita(bolt11, atteso_sats, diario=None):
     """Il gemello di `paga_venditore`. Prende `atteso_sats` senza
     default come l'originale: se un domani la cintura sparisse dal
-    chiamante, qui esploderebbe invece di pagare a caso."""
+    chiamante, qui esploderebbe invece di pagare a caso.
+
+    E dal set 2026 prende anche il TACCUINO, e lo riempie come il vero:
+    l'hash di quel pagamento e' l'unica traccia che resta di un payout
+    riuscito, e un doppio che non lo scrivesse farebbe passare per
+    verde una strada che nella riga non lascia niente."""
     USCITE.append((bolt11, atteso_sats))
+    if diario is not None:
+        diario["hash"] = "hash-di-cartone"
+        diario["tentato"] = True
     return ESITO[0]
 
 

@@ -201,7 +201,7 @@ def avvio():
     async def ln_finta(_addr, sats):
         return f"lnbc{sats}collaudo"
 
-    async def paga_finta(_bolt11, _atteso):
+    async def paga_finta(_bolt11, _atteso, _diario=None):
         return server.PAGATO
 
     server.crea_invoice_escrow = invoice_finta

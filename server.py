@@ -5477,6 +5477,21 @@ def init_db():
             con.execute(f"ALTER TABLE rimborsi_asta ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # LE TRE DEL DIARIO (set 2026), su tutt'e tre i registri che pagano
+    # — e in un giro solo perche' la domanda e' la stessa per tutti:
+    # «di questa uscita, cosa sappiamo?». `payout_tentativi` conta le
+    # volte che il nodo e' stato toccato davvero, `payout_ultimo` dice
+    # quando (e sara' la sveglia del ritentativo), `payout_errore`
+    # conserva l'ultima parola di LNbits. Prima di loro, di un payout
+    # riuscito non restava scritto NIENTE da nessuna parte.
+    for tabella in ("ordini", "rimborsi_asta", "pagamenti"):
+        for colonna in ("payout_tentativi INTEGER DEFAULT 0",
+                        "payout_ultimo INTEGER DEFAULT 0",
+                        "payout_errore TEXT DEFAULT ''"):
+            try:
+                con.execute(f"ALTER TABLE {tabella} ADD COLUMN {colonna}")
+            except sqlite3.OperationalError:
+                pass
     # Backfill di disputata: questi stati esistono SOLO a valle di una
     # disputa, quindi gli ordini storici che ci si trovano sono marcabili
     # a colpo sicuro. I released passati da una disputa prima della
@@ -6373,7 +6388,119 @@ class LnbitsMuto(Exception):
     aggiunge uno lo sente dalle sentinelle in prove.py."""
 
 
-async def paga_venditore(invoice: str, atteso_sats: int) -> str:
+def _esito_lnbits(dati: dict) -> str:
+    """IL VERDETTO CHE STA DENTRO LA RISPOSTA (set 2026). Torna
+    'success', 'failed' o 'pending' leggendo il CORPO di LNbits — lo
+    stesso corpo, che arrivi dalla richiesta che paga o dalla domanda
+    che chiede l'esito per hash.
+
+    NASCE DA UN FATTO DEL CAMPO, il 14 set 2026: a una richiesta di
+    pagamento LNbits ha risposto **201 con dentro `status: failed`**,
+    e il codice di allora guardava solo il numero HTTP. Un pagamento
+    mai riuscito e' stato annunciato come concluso, l'ordine e' finito
+    in 'released' e al venditore non e' arrivato niente. Il numero
+    HTTP dice se la RICHIESTA e' stata presa in carico; solo il corpo
+    dice come e' andata a finire. Lo stesso giorno, sul pagamento di
+    recupero, il 201 portava dentro `status: success`: sono la stessa
+    riga letta bene, ed e' il motivo per cui questo lettore serve
+    tutt'e due i tubi invece di uno solo.
+
+    NEL DUBBIO SI DICE 'pending', MAI 'success'. Un «non lo so» lascia
+    la domanda aperta e il giro ci ritorna; un falso «e' andata»
+    chiude l'affare, paga i contatori, manda le notifiche e mente. Le
+    istanze vecchie che rispondono col solo `pending: False` restano
+    coperte, ed e' l'unico caso in cui l'assenza di uno stato vale un
+    successo."""
+    if dati.get("paid") is True:
+        return "success"
+    stato = str(dati.get("status") or "").lower()
+    if stato in ("success", "failed", "pending"):
+        return stato
+    if dati.get("pending") is False:
+        return "success"
+    return "pending"
+
+
+async def _stato_pagamento(payment_hash: str) -> str:
+    """Com'e' finita l'uscita con questo hash, chiesto a LNbits.
+    Torna 'success', 'failed' o 'pending' — oppure la stringa VUOTA
+    quando di quel pagamento non c'e' nessuna traccia.
+
+    LA DIFFERENZA FRA '' E 'pending' E' TUTTA LA FUNZIONE: '' vuol
+    dire «non l'ho mai visto» e sul campo arriva come un 404 pulito
+    (verificato il 14 set 2026 su una fattura mai vista); 'pending'
+    vuol dire «esiste, e non si sa ancora com'e' finita». Il primo
+    autorizza a pagare, il secondo lo VIETA — e scambiarli e' il modo
+    esatto di far uscire i sats due volte.
+
+    Un guasto del CANALE alza LnbitsMuto come il decode, e la ragione
+    e' la stessa: se un 520 tornasse come «non c'e' nessun pagamento»,
+    pagheremmo di nuovo proprio nel momento in cui non vediamo
+    niente."""
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(f"{LNBITS_URL}/api/v1/payments/{payment_hash}",
+                            headers={"X-Api-Key": LNBITS_INVOICE_KEY})
+    except Exception as e:
+        raise LnbitsMuto(f"stato del pagamento non chiesto "
+                         f"({type(e).__name__}: {e})")
+    if r.status_code == 404:
+        return ""
+    if r.status_code >= 300:
+        raise LnbitsMuto(f"stato del pagamento: LNbits ha risposto "
+                         f"{r.status_code}")
+    try:
+        return _esito_lnbits(r.json())
+    except Exception:
+        raise LnbitsMuto("stato del pagamento: risposta illeggibile")
+
+
+async def _avvisa_payout_fallito(taccuino: dict, sats: int):
+    """L'avviso ai moderatori quando un pagamento in USCITA fallisce
+    davvero (set 2026). Prima di questa riga un payout senza rotta non
+    lo sapeva nessuno di noi: l'unico avviso che c'era parlava di
+    importi storti, cioe' del wallet rotto e del tentativo di
+    prelievo. Un pagamento che non parte e' un venditore che non
+    incassa, e va detto a voce.
+
+    Sotto try come il suo gemello del rifiuto: un avviso non deve mai
+    rompere l'esito che lo ha generato."""
+    try:
+        await notifica_admin(
+            f"⚠️ <b>Pagamento in uscita FALLITO.</b> "
+            f"{taccuino.get('etichetta') or 'Un pagamento'} — "
+            f"<b>{_fmt_sats(sats)} sats</b>.\n\n"
+            f"I sats <b>non sono usciti</b> e restano nel deposito di "
+            f"garanzia. Quella fattura non si può ripagare: LNbits tiene "
+            f"una riga per payment hash e a una seconda richiesta "
+            f"restituisce la vecchia senza ritentare nulla. Ne serve una "
+            f"<b>nuova</b>."
+            + (f"\n<code>{taccuino.get('hash')}</code>"
+               if taccuino.get("hash") else "")
+            + (f"\n{taccuino.get('errore')}" if taccuino.get("errore")
+               else ""))
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+
+
+# L'ATTESA DELL'ESITO (set 2026). Quattro domande a due secondi: otto
+# secondi, e il numero e' tarato su due misure vere dello stesso
+# giorno. Il pagamento RIUSCITO si e' saldato in nove secondi e lo
+# diceva gia' il corpo della prima risposta, quindi qui dentro non
+# aspetta nessuno; quello FALLITO ci ha messo 86 secondi a dichiararsi,
+# cioe' molto piu' di qualunque attesa che si possa far pagare a chi ha
+# appena premuto un bottone — `_sblocca_sats` la chiamano le rotte HTTP,
+# e dall'altra parte c'e' una persona che guarda una rotella gira.
+# CHI CADE FUORI DA QUESTI OTTO SECONDI DIVENTA INCERTO, cioe' la coda
+# dei moderatori: e' il patto dichiarato di questo cantiere, non una
+# svista. A toglierlo di mezzo sara' il giro di fondo, che il tempo ce
+# l'ha e non fa aspettare nessuno.
+ATTESE_ESITO = 4
+SECONDI_FRA_ATTESE = 2
+
+
+async def paga_venditore(invoice: str, atteso_sats: int,
+                         diario: dict | None = None) -> str:
     """Sblocca i sats: paga la invoice fornita dal venditore.
 
     LA CINTURA (ago 2026): l'importo si controlla QUI, sull'ultimo
@@ -6396,9 +6523,35 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
     messa dentro un «if» questa funzione direbbe che l'incerto e' un
     successo, e messa sotto un «not» che e' un fallimento — sono
     entrambe bugie, e una sentinella in prove.py verifica che nessuno
-    la rimetta li'."""
+    la rimetta li'.
+
+    IL GIUDICE E' L'ESITO, NON IL NUMERO HTTP (set 2026). Si legge il
+    corpo della risposta, e se dice «in corso» si richiede per hash
+    finche' non e' deciso: il codice HTTP da solo dice se la richiesta
+    e' stata presa, mai come e' finita. Vedi `_esito_lnbits`, che
+    quella lezione la porta scritta.
+
+    E PRIMA DI PAGARE SI CHIEDE SE QUELL'HASH ESISTE GIA'. LNbits
+    tiene una riga per payment hash: a una seconda richiesta sulla
+    stessa bolt11 non ritenta niente e restituisce il record vecchio —
+    provato sul campo, col record di un'ora prima tornato dentro un
+    201. Senza questa domanda un ritentativo leggerebbe l'eco come una
+    risposta fresca; con questa domanda la funzione diventa anche
+    idempotente, che e' il rimedio profondo alla paura del doppio
+    pagamento.
+
+    IL TACCUINO va e viene: chi chiama lo pre-riempie con
+    l'`etichetta` (per l'avviso ai moderatori, che deve dire di CHE
+    pagamento parla) e lo ritrova con dentro `hash`, `tentato` ed
+    `errore`. E' un dizionario e non tre valori di ritorno perche' la
+    funzione non sa in che TABELLA vive la riga che aspetta i sats —
+    quello lo sa il chiamante, che poi li passa a `_timbra_pagamento`.
+    Il tipo di ritorno resta la stringa dei quattro verbi, e non e'
+    pigrizia: c'e' una sentinella che verifica che nessuno la rimetta
+    dentro un «if»."""
+    taccuino = diario if diario is not None else {}
     try:
-        chiesto = await importo_invoice(invoice)
+        dec = await decodifica_invoice(invoice)
     except LnbitsMuto as e:
         # NON HO POTUTO CHIEDERE (ago 2026). Sta QUI, prima della
         # cintura e prima di ogni notifica, e la posizione e' la cosa
@@ -6413,6 +6566,7 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
         print(f"🔁 Pagamento NON CHIESTO ({e}): la fattura non si e' potuta "
               f"verificare. Niente e' partito, niente si tocca.")
         return NON_CHIESTO
+    chiesto = None if dec is None else await importo_invoice(invoice, dec)
     if chiesto is None or atteso_sats <= 0 or chiesto != atteso_sats:
         # I motivi del rifiuto sono tre e vogliono parole diverse: una
         # bolt11 che non si decodifica non «chiede None sats», e'
@@ -6437,12 +6591,51 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
         except Exception as e:   # un avviso non deve mai rompere il rifiuto
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
         return NON_PAGATO
+    phash = str((dec or {}).get("payment_hash", ""))[:100]
+    taccuino["hash"] = phash
+    # L'ECO. Se per questo hash un pagamento esiste gia', una seconda
+    # richiesta non ritenta: torna il record vecchio, e chi guardasse
+    # solo il numero HTTP lo leggerebbe come una risposta fresca. Qui
+    # si risponde con quel che quel record dice, senza toccare il nodo.
     try:
+        gia = await _stato_pagamento(phash) if phash else ""
+    except LnbitsMuto as e:
+        print(f"🔁 Pagamento NON CHIESTO ({e}): non si e' potuto sapere se "
+              f"quell'hash fosse gia' uscito. Niente e' partito.")
+        return NON_CHIESTO
+    if gia == "success":
+        print(f"✅ Pagamento gia' uscito per questo hash: non si ripaga.")
+        return PAGATO
+    if gia == "pending":
+        taccuino["errore"] = "un pagamento con questo hash e' gia' in volo"
+        return INCERTO
+    if gia == "failed":
+        # La fattura e' bruciata: LNbits non la ritentera' mai piu'. Non
+        # e' un «non lo so» — e' un no definitivo, e chi aspetta i sats
+        # deve dartene una nuova.
+        taccuino["errore"] = "fattura gia' bruciata da un tentativo fallito"
+        await _avvisa_payout_fallito(taccuino, atteso_sats)
+        return NON_PAGATO
+    try:
+        taccuino["tentato"] = True
         async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(f"{LNBITS_URL}/api/v1/payments",
                              headers={"X-Api-Key": LNBITS_ADMIN_KEY},
                              json={"out": True, "bolt11": invoice})
-            return PAGATO if r.status_code < 300 else NON_PAGATO
+        if r.status_code >= 300:
+            taccuino["errore"] = f"LNbits ha risposto {r.status_code}"
+            await _avvisa_payout_fallito(taccuino, atteso_sats)
+            return NON_PAGATO
+        try:
+            verdetto = _esito_lnbits(r.json())
+        except Exception:
+            verdetto = "pending"   # un corpo illeggibile non e' un successo
+        attese = 0
+        while verdetto == "pending" and attese < ATTESE_ESITO:
+            await asyncio.sleep(SECONDI_FRA_ATTESE)
+            attese += 1
+            verdetto = await _stato_pagamento(phash) or "pending"
+        taccuino["errore"] = f"LNbits: {verdetto}"
     except Exception as e:
         # Il nodo ha taciuto. Prima di questa riga l'eccezione risaliva
         # e il database non registrava NIENTE: l'ordine restava
@@ -6453,6 +6646,75 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
         print(f"🧊 Pagamento INCERTO ({type(e).__name__}: {e}): il nodo "
               f"non ha risposto in tempo. Non si ritenta.")
         return INCERTO
+    if verdetto == "success":
+        taccuino["errore"] = ""
+        return PAGATO
+    if verdetto == "failed":
+        print(f"⛔ Pagamento fallito ({phash[:16]}): il nodo non ha "
+              f"consegnato. I sats non sono usciti.")
+        await _avvisa_payout_fallito(taccuino, atteso_sats)
+        return NON_PAGATO
+    # Ancora in corso a budget scaduto: e' un «non lo so» a tutti gli
+    # effetti — i sats POSSONO essere usciti — quindi vale la regola
+    # dell'incerto: si congela e si chiede a un umano. Adesso pero' la
+    # riga porta l'hash, cioe' la domanda che il moderatore deve fare.
+    print(f"🧊 Pagamento ancora in corso dopo "
+          f"{ATTESE_ESITO * SECONDI_FRA_ATTESE}s ({phash[:16]}): non si "
+          f"ritenta, decide una persona.")
+    return INCERTO
+
+
+def _timbra_pagamento(con, tabella: str, riga_id: int, diario: dict):
+    """IL DIARIO DEL PAGAMENTO (set 2026): quel poco che sappiamo di
+    un'uscita, scritto nella riga che aspettava i sats. `tabella` e'
+    un letterale del nostro codice, mai roba che arriva da fuori.
+
+    PERCHE' ESISTE: fino al 14 set 2026 di un pagamento RIUSCITO non
+    restava traccia nessuna — `payout_hash` si scriveva solo
+    congelando — e quando si e' dovuto sapere se un payout fosse
+    davvero uscito, l'unico posto dove il fatto viveva era LNbits. Un
+    elenco paginato di cui non conosci l'ordine non e' una fonte: la
+    traccia va scritta qui.
+
+    NON TOCCA `payout_stato`, ed e' la divisione che tiene su tutto il
+    resto: il DIARIO dice cos'e' successo, lo STATO dice cosa fare. Lo
+    stato resta affare dei suoi tre scrittori — `_congela_pagamento`
+    ('incerto'), `_sospendi_pagamento` ('da_riprovare') e il ramo
+    riuscito ('uscito') — e un quarto che lo scrivesse di straforo li
+    farebbe litigare.
+
+    NON TOCCA `aggiornato`, per la ragione del gemello mite: quella e'
+    l'ANCORA dei promemoria e della coda dei fermi, e riscriverla
+    farebbe ripartire da capo l'attesa di qualcuno.
+
+    NON COMMITTA E NON CHIUDE: la connessione e' di chi chiama, che da
+    qui ci torna — al contrario dei due timbri dello stato, che invece
+    la chiudono perche' la loro strada finisce li'.
+
+    E SE NON SI SA NIENTE NON SCRIVE NIENTE: il pagamento che non si e'
+    potuto CHIEDERE non ha hash e non ha tentativi, e deve lasciare la
+    riga esattamente com'era. E' il patto del quarto esito, e c'e' una
+    prova che guarda proprio quali colonne si muovono."""
+    if not diario:
+        return
+    pezzi, valori = [], []
+    if diario.get("hash"):
+        pezzi.append("payout_hash=?")
+        valori.append(str(diario["hash"])[:100])
+    if diario.get("tentato"):
+        # il conto dei tentativi e' RELATIVO: due strade diverse
+        # possono timbrare la stessa riga, e una scrittura assoluta
+        # riazzererebbe il conto dell'altra
+        pezzi.append("payout_tentativi=payout_tentativi+1")
+        pezzi.append("payout_ultimo=?")
+        valori.append(int(time.time()))
+    if diario.get("errore"):
+        pezzi.append("payout_errore=?")
+        valori.append(str(diario["errore"])[:200])
+    if not pezzi:
+        return
+    con.execute(f"UPDATE {tabella} SET {', '.join(pezzi)} WHERE id=?",
+                valori + [riga_id])
 
 
 async def _payment_hash(bolt11: str) -> str:
@@ -6575,7 +6837,8 @@ async def decodifica_invoice(bolt11: str) -> dict | None:
     return r.json()
 
 
-async def importo_invoice(bolt11: str) -> int | None:
+async def importo_invoice(bolt11: str,
+                          dec: dict | None = None) -> int | None:
     """Quanti sats chiede questa invoice. None = illeggibile.
 
     E' il GIUDICE UNICO dell'importo: ci passano il deposito a mano
@@ -6584,8 +6847,19 @@ async def importo_invoice(bolt11: str) -> int | None:
     altro posto, o le tre strade potrebbero contare in modo diverso.
     Fail-closed per costruzione: campo mancante -> 0, che non combacia
     mai con un importo dovuto, quindi anche le invoice a importo
-    libero (senza cifra dentro) si rifiutano da sole."""
-    dec = await decodifica_invoice(bolt11)
+    libero (senza cifra dentro) si rifiutano da sole.
+
+    `dec` E' LA FATTURA GIA' LETTA (set 2026). Chi ha appena chiamato
+    `decodifica_invoice` per un altro motivo — `paga_venditore`, che da
+    li' prende il payment_hash — la passa qui invece di far bussare a
+    LNbits una seconda volta per la stessa bolt11. Il giudice resta
+    UNO: l'aritmetica dei millisat vive nella riga qui sotto e in
+    nessun altro posto, e chi non ha niente in mano non cambia una
+    virgola. Il default e' None e non un dizionario vuoto, o una
+    fattura illeggibile (che e' proprio None) verrebbe riletta da capo
+    invece di essere riconosciuta."""
+    if dec is None:
+        dec = await decodifica_invoice(bolt11)
     if dec is None:
         return None
     return int(dec.get("amount_msat", 0)) // 1000
@@ -20122,17 +20396,20 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         importo = r["importo_sats"]      # integrale, al sat
         titolo = html.escape((r["titolo"] or "un'asta")[:60])
         bolt11 = ""
+        taccuino = {"etichetta": f"Riscossione del rimborso d'asta "
+                                 f"#{rimborso_id}"}
         try:
             if r["payout_stato"] != "uscito":
                 bolt11 = r["invoice_riscossione"]
                 if not bolt11 and u and u["ln_address"]:
                     bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
             esito = (PAGATO if r["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo) if bolt11
-                     else NON_PAGATO)
+                     else await paga_venditore(bolt11, importo, taccuino)
+                     if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso d'asta #{rimborso_id}: {e}")
             esito = NON_CHIESTO
+        _timbra_pagamento(con, "rimborsi_asta", rimborso_id, taccuino)
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
@@ -20150,6 +20427,7 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
 
         if esito == PAGATO:
             con.execute("UPDATE rimborsi_asta SET stato='riscosso', "
+                        "payout_stato='uscito', "
                         "aggiornato=? WHERE id=?",
                         (int(time.time()), rimborso_id))
             con.commit()
@@ -29477,6 +29755,8 @@ async def _rimborsa_sblocco(pagamento_id: int,
                         (p["tg_id"],)).fetchone()
         importo = p["importo_sats"]      # integrale, al sat
         bolt11 = ""
+        taccuino = {"etichetta": f"Rimborso dello sblocco banner "
+                                 f"#{pagamento_id}"}
         try:
             if p["payout_stato"] != "uscito":
                 bolt11 = p["invoice_rimborso"]
@@ -29484,11 +29764,12 @@ async def _rimborsa_sblocco(pagamento_id: int,
                     bolt11 = await invoice_da_ln_address(u["ln_address"],
                                                          importo)
             esito = (PAGATO if p["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo) if bolt11
-                     else NON_PAGATO)
+                     else await paga_venditore(bolt11, importo, taccuino)
+                     if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso dello sblocco #{pagamento_id}: {e}")
             esito = NON_CHIESTO
+        _timbra_pagamento(con, "pagamenti", pagamento_id, taccuino)
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "pagamenti", pagamento_id, bolt11, "pagante",
@@ -29508,6 +29789,7 @@ async def _rimborsa_sblocco(pagamento_id: int,
         if esito == PAGATO:
             con.execute(
                 "UPDATE pagamenti SET stato='rimborsato', "
+                "payout_stato='uscito', "
                 "rimborso_il=?, rimborso_da=?, aggiornato=? "
                 "WHERE id=? AND stato='pagato'",
                 (adesso, moderatore_id, adesso, pagamento_id))
@@ -35268,17 +35550,23 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # l'ha verificato su LNbits: non si conia nessuna fattura e
         # non si chiama il nodo, si va dritti al ramo riuscito.
         bolt11 = ""
+        taccuino = {"etichetta": f"Incasso del venditore sull'ordine "
+                                 f"#{ordine_id}"}
         try:
             if o["payout_stato"] != "uscito":
                 bolt11 = o["invoice_venditore"]
                 if not bolt11 and v and v["ln_address"]:
                     bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
             esito = (PAGATO if o["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, netto) if bolt11
-                     else NON_PAGATO)
+                     else await paga_venditore(bolt11, netto, taccuino)
+                     if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Ordine #{ordine_id}: {e}")
             esito = NON_CHIESTO
+        # Il diario si scrive PRIMA dei rami, e per tutti gli esiti: i
+        # due timbri dello stato chiudono la connessione, quindi da
+        # dentro quei rami non ci si tornerebbe piu'.
+        _timbra_pagamento(con, "ordini", ordine_id, taccuino)
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
@@ -35313,7 +35601,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             if titolo == "?":
                 titolo = "il tuo acquisto"
             cambio = await cambio_btc_eur()
+            # `payout_stato='uscito'` sul ramo riuscito (set 2026): da
+            # qui in poi il vuoto vuol dire «mai provato» e basta —
+            # prima diceva anche «riuscito», cioe' non diceva niente.
             con.execute("UPDATE ordini SET stato='released', cambio_eur=?, "
+                        "payout_stato='uscito', "
                         "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
                         "aggiornato=? WHERE id=?",
                         (cambio, auto_il, int(time.time()), ordine_id))
@@ -35483,6 +35775,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         importo = o["prezzo_sats"]
 
         bolt11 = ""
+        taccuino = {"etichetta": f"Rimborso al compratore sull'ordine "
+                                 f"#{ordine_id}"}
         try:
             if o["payout_stato"] != "uscito":
                 bolt11 = o["invoice_rimborso"]
@@ -35490,11 +35784,12 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                     bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
                                                          importo)
             esito = (PAGATO if o["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo) if bolt11
-                     else NON_PAGATO)
+                     else await paga_venditore(bolt11, importo, taccuino)
+                     if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso sull'ordine #{ordine_id}: {e}")
             esito = NON_CHIESTO
+        _timbra_pagamento(con, "ordini", ordine_id, taccuino)
         if esito == INCERTO:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "compratore",
@@ -35510,6 +35805,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if esito == PAGATO:
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
+                        "payout_stato='uscito', "
                         "aggiornato=? WHERE id=?",
                         (cambio, int(time.time()), ordine_id))
             # I pezzi rimborsati tornano nello stock e l'oggetto in

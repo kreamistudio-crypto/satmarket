@@ -24,7 +24,7 @@ c'e' solo il nodo.
      compratore conferma la ricezione → la invoice E' ANCORA LI', lo
      stato e' quello di prima, e a nessuno e' arrivato un messaggio;
   2. il nodo torna su, gira l'orologio → il pagamento parte, l'ordine
-     si chiude, e il timbro si azzera;
+     si chiude, e il timbro dice «uscito»;
   3. col nodo giu' anche il DEPOSITO di una invoice risponde 503 e non
      scrive niente: chi ne ha incollata una buona non se la sente dire
      sbagliata;
@@ -34,7 +34,14 @@ c'e' solo il nodo.
      deve mandare il messaggio dell'AUTOMATICO, non «l'acquirente ha
      confermato la ricezione» — cioe' la classe di bugie che il
      cantiere esiste per chiudere, che la cura poteva reintrodurre;
-  6. e la ronda del libro mastro, che su tutto questo deve TACERE.
+  6. e la ronda del libro mastro, che su tutto questo deve TACERE;
+  7. L'ECO (set 2026, dal campo): un nodo che prende la richiesta,
+     risponde 201 e poi NON consegna. L'ordine non si chiude, i
+     moderatori lo sanno, e la stessa bolt11 ridepositata non fa
+     partire nessun secondo pagamento — perche' LNbits tiene una riga
+     per payment hash e a chiederglielo due volte restituisce quella
+     vecchia. E' il difetto che ha lasciato un venditore non pagato
+     con un ordine scritto 'released'.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna rete,
@@ -44,6 +51,7 @@ USO:  python collaudo_lnbits_muto.py
 """
 
 import asyncio
+import hashlib
 import os
 import sqlite3
 import sys
@@ -60,7 +68,26 @@ USCITE = []         # ogni POST verso la chiave che paga
 
 # Lo stato del nodo, a comando. `codice` e' quello che risponde alla
 # DECODIFICA: 520 = il canale sta male, 400 = la fattura non si legge.
-NODO = {"codice": 200, "sats": 50_000}
+# `esito` e' come finisce un pagamento in USCITA, e dal set 2026 e' una
+# leva a se': un nodo che prende la richiesta e poi non consegna e' il
+# caso vero del 14 settembre, e prima di quella data qui non si poteva
+# nemmeno mettere in scena.
+NODO = {"codice": 200, "sats": 50_000, "esito": "success"}
+
+# IL REGISTRO DEI PAGAMENTI, hash per hash. Non e' un vezzo del banco:
+# e' LA proprieta' di LNbits che ci e' costata un ordine — tiene UNA
+# riga per payment hash, e a una seconda richiesta sulla stessa bolt11
+# restituisce quella vecchia senza ritentare niente. Un nodo di
+# cartone che accettasse due volte direbbe che il ritentativo funziona,
+# cioe' proprio la cosa falsa.
+PAGAMENTI = {}
+
+
+def _hash_di(bolt11):
+    """L'hash di una bolt11, come lo darebbe il decode vero: fatture
+    diverse, hash diversi — o il registro qui sopra non proverebbe
+    niente."""
+    return "h-" + hashlib.sha256(str(bolt11).encode()).hexdigest()[:16]
 
 
 def prova(nome, atteso, avuto):
@@ -106,12 +133,28 @@ class _FintoHttpx:
             if "decode" in url:
                 if NODO["codice"] >= 300:
                     return _Risposta(NODO["codice"], {})
-                return _Risposta(200, {"amount_msat": NODO["sats"] * 1000})
+                # il payment_hash sta nel decode anche in produzione: e'
+                # da li' che il pagamento prende un nome PRIMA che i
+                # sats si muovano
+                return _Risposta(200, {
+                    "amount_msat": NODO["sats"] * 1000,
+                    "payment_hash": _hash_di(
+                        (kw.get("json") or {}).get("data", ""))})
             USCITE.append(url)          # la richiesta di PAGAMENTO
-            return _Risposta(200, {"payment_hash": "h"})
+            h = _hash_di((kw.get("json") or {}).get("bolt11", ""))
+            PAGAMENTI[h] = NODO["esito"]
+            # 201 CON L'ESITO DENTRO: e' la forma vera, ed e' quella su
+            # cui il vecchio codice si e' rotto — guardava il 201 e non
+            # leggeva mai questa riga
+            return _Risposta(201, {"payment_hash": h,
+                                   "status": NODO["esito"]})
 
         async def get(self, url, **kw):
-            return _Risposta(200, {})
+            h = url.rsplit("/", 1)[-1]
+            if h not in PAGAMENTI:
+                return _Risposta(404, {})   # mai visto: si puo' pagare
+            s = PAGAMENTI[h]
+            return _Risposta(200, {"status": s, "paid": s == "success"})
 
 
 def avvio():
@@ -280,7 +323,17 @@ def main():
     fine = riga(oid)
     prova("il giro paga davvero", 1, len(USCITE))
     prova("...e l'ordine si chiude", "released", fine["stato"])
-    prova("il timbro si azzera", "", fine["payout_stato"])
+    # DAL SET 2026 NON SI AZZERA PIU', ed e' la cura di un buco: il
+    # ramo riuscito scrive 'uscito', e l'azzeramento del giro resta
+    # CONDIZIONATO a 'da_riprovare' apposta, per non cancellare il
+    # timbro di un pagamento verificato. Prima qui restava il vuoto,
+    # che voleva dire sia «mai provato» sia «riuscito» — cioe' niente,
+    # ed e' il motivo per cui il 14 settembre da questa riga non si e'
+    # potuto sapere se i sats fossero usciti.
+    prova("il timbro dice che i sats sono usciti", "uscito",
+          fine["payout_stato"])
+    prova("...e la riga porta l'hash di quel pagamento", True,
+          bool(fine["payout_hash"]))
     prova("il venditore lo viene a sapere", True,
           any(chi == 222 for chi, _ in DETTO))
     prova("...con le parole di chi ha CONFERMATO, non del timer", True,
@@ -372,6 +425,51 @@ def main():
     SRV.timbro_scrivi(SRV.TIMBRO_LIBRO_MASTRO, "")
     asyncio.run(SRV.controlla_libro_mastro())
     prova("la ronda tace su una riga da riprovare", [], AVVISI)
+
+    # ---- 7) L'ECO: una fattura bruciata non si ritenta -----------
+    # IL FATTO DEL 14 SET 2026, messo in scena. Il nodo prende la
+    # richiesta e risponde 201 — cioe' esattamente come quando va bene
+    # — ma dentro il corpo c'e' scritto che non ha consegnato. Prima
+    # della cura questo ordine finiva 'released' con un venditore mai
+    # pagato, e la notifica diceva «Ordine concluso».
+    print("\n[l'eco di una fattura bruciata]")
+    oid5 = ordine_pagato(a2)
+    NODO["codice"] = 200
+    NODO["esito"] = "failed"        # prende, e poi non consegna
+    come(222)
+    chiama(SRV.deposita_invoice, oid5, None,
+           corpo={"invoice": "lnbc-che-fallisce"})
+    DETTO.clear(); AVVISI.clear(); USCITE.clear()
+    come(111)
+    chiama(SRV.conferma_ricezione, oid5, None)
+    uno = riga(oid5)
+    prova("201 col fallimento dentro: l'ordine NON si chiude",
+          "confirmed", uno["stato"])
+    prova("...il pagamento e' partito davvero", 1, len(USCITE))
+    prova("...e il diario scrive l'hash di quel tentativo", True,
+          bool(uno["payout_hash"]))
+    prova("...e lo conta", 1, uno["payout_tentativi"])
+    # PRIMA DI OGGI QUESTO NON ARRIVAVA A NESSUNO DI NOI: l'unico
+    # avviso che c'era parlava di importi storti, mai di sats che non
+    # raggiungono chi li aspetta.
+    prova("...e i moderatori lo vengono a sapere", 1, len(AVVISI))
+    prova("...con le parole giuste", True, "FALLITO" in " ".join(AVVISI))
+
+    # Il venditore ci riprova con LA STESSA fattura — il gesto piu'
+    # naturale del mondo. Qui il vecchio codice avrebbe letto l'eco del
+    # record vecchio come una risposta fresca, e chiuso l'ordine.
+    AVVISI.clear(); USCITE.clear()
+    come(222)
+    chiama(SRV.deposita_invoice, oid5, None,
+           corpo={"invoice": "lnbc-che-fallisce"})
+    due = riga(oid5)
+    prova("la stessa bolt11 non fa partire NESSUN pagamento",
+          0, len(USCITE))
+    prova("...l'ordine resta in 'confirmed'", "confirmed", due["stato"])
+    prova("...il conto dei tentativi non sale", 1, due["payout_tentativi"])
+    prova("...e il motivo dice che la fattura e' bruciata", True,
+          "bruciata" in (due["payout_errore"] or ""))
+    NODO["esito"] = "success"
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

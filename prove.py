@@ -2432,12 +2432,18 @@ def prove_niente_passo_intermedio():
     prova("...e dice comunque che il compratore verra' sollecitato",
           True, "se tace lo sollecitiamo noi" in mini[i:i + 900])
 
-def _finto_lnbits(uscite, codice=200, muto=False):
+def _finto_lnbits(uscite, codice=200, muto=False, corpo=None):
     """Un LNbits di cartone che REGISTRA ogni chiamata invece di
     farla. L'asserzione che conta in questa sezione e' sempre la
     stessa: la richiesta di pagamento non e' mai partita.
     Con `muto` il nodo prende la chiamata e non risponde mai: e' il
-    caso in cui i sats possono essere usciti senza che lo sappiamo."""
+    caso in cui i sats possono essere usciti senza che lo sappiamo.
+
+    `corpo` E' ARRIVATO COL CANTIERE DI SET 2026, e senza di lui il
+    difetto del 14 settembre non si potrebbe nemmeno mettere in scena:
+    LNbits ha risposto **201 con dentro `status: failed`**, cioe' il
+    numero HTTP e il corpo dicevano due cose opposte. Il default resta
+    il dizionario vuoto, che e' quel che serve alle prove del decode."""
     import types
 
     class R:
@@ -2447,7 +2453,7 @@ def _finto_lnbits(uscite, codice=200, muto=False):
             pass
 
         def json(self):
-            return {}
+            return dict(corpo) if corpo else {}
 
     class C:
         def __init__(self, **kw):
@@ -2461,6 +2467,14 @@ def _finto_lnbits(uscite, codice=200, muto=False):
 
         async def post(self, url, **kw):
             uscite.append(url)
+            if muto:
+                raise TimeoutError("il nodo non ha risposto")
+            return R()
+
+        async def get(self, url, **kw):
+            # la DOMANDA non e' un'uscita: non finisce in `uscite`, o
+            # le prove che contano «zero pagamenti partiti» si
+            # metterebbero a contare anche le letture
             if muto:
                 raise TimeoutError("il nodo non ha risposto")
             return R()
@@ -2527,15 +2541,31 @@ def prove_importo_uscita():
         il testo degli avvisi si ritrova in `detti`."""
         uscite, avvisi = [], []
 
-        async def _importo(_b):
+        async def _importo(_b, _dec=None):
             return dice_la_fattura
+
+        async def _decodifica(_b):
+            # la fattura si legge una volta sola e da li' esce anche
+            # l'hash: e' il decode che dal set 2026 apre la funzione
+            return {"payment_hash": "abc123"}
+
+        async def _mai_visto(_h):
+            return ""        # nessuna eco: per quell'hash non c'e' niente
 
         async def _admin(t):
             avvisi.append(t)
             detti.append(t)
 
-        amb = {"httpx": _finto_lnbits(uscite, codice),
+        amb = {"httpx": _finto_lnbits(uscite, codice,
+                                      corpo={"status": "success"}),
                "importo_invoice": _importo, "notifica_admin": _admin,
+               "decodifica_invoice": _decodifica,
+               "_stato_pagamento": _mai_visto,
+               "_esito_lnbits": reale("_esito_lnbits"),
+               "asyncio": __import__("asyncio"),
+               # zero secondi fra un'attesa e l'altra: qui si prova la
+               # logica, non la pazienza
+               "ATTESE_ESITO": 4, "SECONDI_FRA_ATTESE": 0,
                "print": lambda *a, **k: None,
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
                # i quattro esiti (ago 2026): qui interessa il rifiuto,
@@ -2548,6 +2578,10 @@ def prove_importo_uscita():
                # modo solo: chi estrae una funzione ne eredita le
                # dipendenze, ed e' cosi' che questa prova e' esplosa
                "_fmt_sats": reale("_fmt_sats")}
+        # l'avviso del fallimento gira DAVVERO, nello stesso ambiente:
+        # e' lui che parla ai moderatori, e uno stub direbbe di si' a
+        # prescindere
+        exec(pezzo_async("_avvisa_payout_fallito"), amb)
         exec(pezzo_async("paga_venditore"), amb)
         return gira(amb["paga_venditore"]("lnbc", dovuti)), len(uscite), len(avvisi)
 
@@ -2622,7 +2656,7 @@ def prove_importo_uscita():
     # 1: obbligatorio SENZA default, o chi scrive la prossima strada
     #    d'uscita puo' dimenticarlo senza che Python fiati
     prova("sentinella: atteso_sats obbligatorio, senza default", True,
-          "async def paga_venditore(invoice: str, atteso_sats: int)"
+          "async def paga_venditore(invoice: str, atteso_sats: int,"
           in _SORGENTE)
     # 2: il rifiuto sta PRIMA della chiamata all'admin key
     prova("sentinella: si rifiuta prima di toccare l'admin key", True,
@@ -2640,6 +2674,252 @@ def prove_importo_uscita():
     prova("sentinella: la fattura del wallet si rilegge sempre", True,
           "importo_invoice" in lna
           and 'return r.json().get("pr")' not in lna)
+
+
+def prove_esito_pagamento():
+    """IL GIUDICE VERO DEI PAGAMENTI IN USCITA (set 2026).
+
+    Dal campo, e il fatto e' datato: il 14 settembre un payout da
+    67.672 sats e' fallito per mancanza di rotta, e il mercatino ha
+    scritto 'released', dato gli XP e annunciato «✅ Ordine concluso»
+    perche' guardava SOLO il numero HTTP. LNbits aveva risposto 201 —
+    la richiesta era stata presa in carico — e 86 secondi dopo il nodo
+    tornava indietro con un fallimento che non ascoltava nessuno.
+
+    Qui si prova la cura in tre pezzi: il CORPO si legge (un 201 puo'
+    portare dentro `status: failed`), l'ESITO si chiede per hash
+    finche' non e' deciso, e l'ECO si riconosce PRIMA di pagare —
+    perche' LNbits tiene una riga per payment hash e a una seconda
+    richiesta sulla stessa bolt11 restituisce il record vecchio senza
+    ritentare niente."""
+    print("\n[l'esito del pagamento]")
+    import asyncio
+    import sqlite3
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    ESITI = {"PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+             "LnbitsMuto": LnbitsMuto}
+    leggi = reale("_esito_lnbits")
+
+    # --- 1. Il lettore del corpo ------------------------------------
+    # LA RIGA DEL 14 SETTEMBRE, per prima: e' la sola che il vecchio
+    # codice sbagliava, ed e' quella che costa i sats.
+    prova("corpo: un 201 con «failed» dentro e' un FALLIMENTO",
+          "failed", leggi({"status": "failed", "paid": False}))
+    prova("corpo: «success» e' un successo", "success",
+          leggi({"status": "success"}))
+    prova("corpo: paid=true basta da solo", "success", leggi({"paid": True}))
+    # le istanze vecchie non dicono `status`: la' l'assenza di attesa
+    # E' il successo, ed e' l'unico caso in cui un'assenza vale un si'
+    prova("corpo: le istanze vecchie dicono pending=False", "success",
+          leggi({"pending": False}))
+    # ...e nel dubbio non si dice mai di si': un «non lo so» tiene la
+    # domanda aperta e il giro ci torna, un falso si' chiude e mente
+    prova("corpo: un corpo muto NON e' un successo", "pending", leggi({}))
+    prova("corpo: uno stato mai visto NON e' un successo", "pending",
+          leggi({"status": "chissa"}))
+    prova("corpo: «pending» resta pending", "pending",
+          leggi({"status": "pending"}))
+
+    # --- 2. La domanda per hash -------------------------------------
+    def stato(codice=200, corpo=None, esplode=False):
+        import types
+
+        class Rotto:
+            def __init__(self, **kw):
+                pass
+
+            async def __aenter__(self):
+                raise ConnectionError("nodo irraggiungibile")
+
+            async def __aexit__(self, *a):
+                return False
+
+        amb = {"httpx": (types.SimpleNamespace(AsyncClient=Rotto) if esplode
+                         else _finto_lnbits([], codice, corpo=corpo)),
+               "LNBITS_URL": "http://x", "LNBITS_INVOICE_KEY": "k",
+               "LnbitsMuto": LnbitsMuto, "_esito_lnbits": leggi}
+        exec(pezzo_async("_stato_pagamento"), amb)
+        try:
+            return gira(amb["_stato_pagamento"]("abc123"))
+        except LnbitsMuto:
+            return "muto"
+
+    # LA DIFFERENZA CHE VALE I SATS: «non l'ho mai visto» (404) e «non
+    # si sa ancora» sono due cose diverse. Il primo autorizza a pagare,
+    # il secondo lo vieta — e scambiarli fa uscire i sats due volte.
+    prova("hash mai visto: nessuna traccia, non «in corso»", "",
+          stato(codice=404))
+    prova("hash gia' fallito: lo dice", "failed",
+          stato(corpo={"status": "failed"}))
+    prova("hash gia' saldato: lo dice", "success",
+          stato(corpo={"status": "success"}))
+    # e un guasto del canale non e' MAI «non c'e' nessun pagamento»
+    prova("LNbits a 520: e' il canale, non una risposta", "muto",
+          stato(codice=520))
+    prova("rete caduta: idem", "muto", stato(esplode=True))
+
+    # --- 3. paga_venditore, dal corpo all'eco -----------------------
+    def paga(corpo=None, eco=(), codice=201, muto=False, chiesto=1000):
+        uscite, avvisi, chieste = [], [], []
+        fila = list(eco)
+        taccuino = {"etichetta": "una prova"}
+
+        async def _decodifica(_b):
+            return {"payment_hash": "abc123"}
+
+        async def _importo(_b, _dec=None):
+            return chiesto
+
+        async def _stato(h):
+            chieste.append(h)
+            if not fila:
+                return ""
+            v = fila.pop(0)
+            if v == "muto":
+                raise LnbitsMuto("stato del pagamento: LNbits a 520")
+            return v
+
+        async def _avvisa(t):
+            avvisi.append(t)
+
+        amb = {"httpx": _finto_lnbits(uscite, codice, muto, corpo),
+               "decodifica_invoice": _decodifica, "importo_invoice": _importo,
+               "_stato_pagamento": _stato, "_esito_lnbits": leggi,
+               "notifica_admin": _avvisa, "asyncio": asyncio,
+               "print": lambda *a, **k: None,
+               "_fmt_sats": reale("_fmt_sats"),
+               "ATTESE_ESITO": 4, "SECONDI_FRA_ATTESE": 0,
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
+        exec(pezzo_async("_avvisa_payout_fallito"), amb)
+        exec(pezzo_async("paga_venditore"), amb)
+        esito = gira(amb["paga_venditore"]("lnbc1", 1000, taccuino))
+        return esito, len(uscite), len(avvisi), taccuino
+
+    # IL CASO DEL 14 SETTEMBRE, rifatto al banco: HTTP 201, corpo che
+    # dice «failed». Prima di oggi qui usciva «pagato».
+    prova("201 col fallimento nel corpo: NON_PAGATO (era 'pagato')",
+          ("non_pagato", 1, 1),
+          paga(corpo={"status": "failed", "paid": False})[:3])
+    prova("201 col successo nel corpo: PAGATO senza aspettare",
+          ("pagato", 1, 0), paga(corpo={"status": "success"})[:3])
+    # il corpo non decide: si richiede per hash finche' non e' deciso
+    prova("corpo in sospeso, poi l'hash dice di si': PAGATO",
+          ("pagato", 1, 0), paga(corpo={}, eco=("", "success"))[:3])
+    prova("corpo in sospeso, poi l'hash dice di no: NON_PAGATO",
+          ("non_pagato", 1, 1), paga(corpo={}, eco=("", "failed"))[:3])
+    # ...e se a budget scaduto non si sa ancora, non si indovina
+    prova("in corso a budget scaduto: INCERTO, mai 'pagato'",
+          ("incerto", 1, 0), paga(corpo={}, eco=("",))[:3])
+
+    # L'ECO. LNbits tiene una riga per hash: una seconda richiesta
+    # sulla stessa bolt11 torna col record vecchio senza ritentare.
+    # Quindi la si riconosce PRIMA, e non si bussa nemmeno al nodo.
+    prova("eco di un fallito: NON_PAGATO e ZERO pagamenti partiti",
+          ("non_pagato", 0, 1), paga(eco=("failed",))[:3])
+    prova("eco di un saldato: PAGATO e zero pagamenti partiti",
+          ("pagato", 0, 0), paga(eco=("success",))[:3])
+    prova("eco di uno in volo: INCERTO e zero pagamenti partiti",
+          ("incerto", 0, 0), paga(eco=("pending",))[:3])
+    # e se la domanda dell'eco tace, nessun sat si e' mosso: e' il
+    # quarto esito, quello che si puo' ritentare senza pericolo
+    prova("eco muta: NON_CHIESTO e zero pagamenti partiti",
+          ("non_chiesto", 0, 0), paga(eco=("muto",))[:3])
+
+    # il taccuino torna pieno a chi ha chiamato: senza l'hash, di un
+    # pagamento riuscito non resterebbe traccia da nessuna parte
+    prova("il taccuino porta l'hash del pagamento", "abc123",
+          paga(corpo={"status": "success"})[3].get("hash"))
+    prova("...e dice che il nodo e' stato toccato davvero", True,
+          paga(corpo={"status": "success"})[3].get("tentato") is True)
+    prova("l'eco invece non tocca il nodo, e il taccuino lo dice",
+          None, paga(eco=("failed",))[3].get("tentato"))
+
+    # --- 4. Il diario nella riga ------------------------------------
+    def timbro(*diari):
+        vero = sqlite3.connect(":memory:")
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+            "payout_stato TEXT DEFAULT '', payout_hash TEXT DEFAULT '', "
+            "payout_tentativi INT DEFAULT 0, payout_ultimo INT DEFAULT 0, "
+            "payout_errore TEXT DEFAULT '', aggiornato INT DEFAULT 7)")
+        vero.execute("INSERT INTO ordini(id) VALUES(1)")
+        amb = {"time": __import__("time")}
+        exec(pezzo("_timbra_pagamento"), amb)
+        for d in diari:
+            amb["_timbra_pagamento"](vero, "ordini", 1, d)
+        r = vero.execute(
+            "SELECT payout_hash, payout_tentativi, payout_errore, "
+            "payout_stato, aggiornato FROM ordini WHERE id=1").fetchone()
+        vero.close()
+        return tuple(r)
+
+    # il patto del quarto esito: se non si sa niente, non si scrive
+    # niente — la riga dev'essere identica a com'era
+    prova("diario vuoto: la riga non si muove", ("", 0, "", "", 7),
+          timbro({}))
+    prova("diario con la sola etichetta: la riga non si muove",
+          ("", 0, "", "", 7), timbro({"etichetta": "x"}))
+    prova("diario con l'hash: scrive l'hash e basta",
+          ("abc123", 0, "", "", 7), timbro({"hash": "abc123"}))
+    prova("diario di un tentativo: hash, conto e motivo",
+          ("abc123", 1, "LNbits: failed", "", 7),
+          timbro({"hash": "abc123", "tentato": True,
+                  "errore": "LNbits: failed"}))
+    # il conto e' RELATIVO: due strade diverse timbrano la stessa riga
+    prova("due tentativi: il conto sale, non si riazzera", 2,
+          timbro({"hash": "a", "tentato": True},
+                 {"hash": "a", "tentato": True})[1])
+    # e le due colonne che NON sono sue restano intatte
+    prova("il diario non scrive lo stato del payout", "",
+          timbro({"hash": "a", "tentato": True})[3])
+    prova("il diario non muove l'ancora dei promemoria", 7,
+          timbro({"hash": "a", "tentato": True})[4])
+
+    # --- 5. SENTINELLE ----------------------------------------------
+    pv = codice(pezzo("paga_venditore"))
+    # LA SENTINELLA DEL CANTIERE: il numero HTTP non decide piu' da
+    # solo. Se questa torna rossa, e' tornato il difetto del 14 set.
+    prova("sentinella: il numero HTTP non decide piu' da solo", True,
+          "r.status_code < 300" not in pv)
+    prova("sentinella: il corpo della risposta si legge davvero", True,
+          "_esito_lnbits(r.json())" in pv)
+    prova("sentinella: l'esito si richiede per hash", True,
+          "_stato_pagamento(phash)" in pv)
+    # l'eco si chiede PRIMA di toccare la chiave che paga, o non
+    # servirebbe a niente: e' li' che si evita il secondo pagamento
+    prova("sentinella: l'eco si chiede prima della chiave che paga",
+          True, pv.index("_stato_pagamento") < pv.index("LNBITS_ADMIN_KEY"))
+    # i quattro rami riusciti timbrano, e il conto cresce A MANO come
+    # quello dell'INCERTO: se CALA, qualcuno ha tolto una traccia
+    prova("sentinella: tutt'e quattro i rami riusciti timbrano 'uscito'",
+          4, _SORGENTE.count("payout_stato='uscito', "))
+    prova("sentinella: tutt'e quattro le uscite scrivono il diario",
+          4, _SORGENTE.count('_timbra_pagamento(con, "'))
+    # il diario dice cos'e' successo, lo stato dice cosa fare: se
+    # questo timbro scrivesse anche lo stato, i suoi tre scrittori si
+    # metterebbero a litigare. ⚠️ SENZA LA PROSA: la docstring nomina
+    # apposta le due colonne che non tocca.
+    tp = codice(_senza_prosa(pezzo("_timbra_pagamento")))
+    prova("sentinella: il diario non scrive payout_stato", True,
+          "payout_stato" not in tp)
+    prova("sentinella: il diario non tocca `aggiornato`", True,
+          "aggiornato" not in tp)
+    prova("sentinella: il diario non committa e non chiude", True,
+          "commit()" not in tp and "close()" not in tp)
+    # il quinto tubo verso LNbits dice quanto aspetta, come gli altri
+    prova("sentinella: il tubo dell'esito dice quanto aspetta", True,
+          "httpx.AsyncClient(timeout=" in pezzo("_stato_pagamento"))
+    # e il 404 non si confonde col resto: e' l'unica risposta che
+    # autorizza a pagare
+    prova("sentinella: il 404 ha il suo ramo, separato dal resto", True,
+          "r.status_code == 404" in codice(pezzo("_stato_pagamento")))
 
 
 def prove_pagamento_incerto():
@@ -2670,31 +2950,49 @@ def prove_pagamento_incerto():
     def paga(codice=200, muto=False, chiesto=1000, muto_decode=False):
         uscite, avvisi = [], []
 
-        async def _importo(_b):
-            # `muto_decode` e' il caso nuovo (ago 2026): non e' il NODO
-            # a tacere mentre paga, e' la DOMANDA che lo precede — «
-            # quanto chiede questa fattura?» — a non aver ricevuto
-            # risposta. Da li' nessun sat si e' mosso.
+        async def _importo(_b, _dec=None):
+            return chiesto
+
+        async def _decodifica(_b):
+            # `muto_decode` e' il caso di ago 2026: non e' il NODO a
+            # tacere mentre paga, e' la DOMANDA che lo precede — «quanto
+            # chiede questa fattura?» — a non aver ricevuto risposta. Da
+            # li' nessun sat si e' mosso. Dal set 2026 quella domanda la
+            # fa `decodifica_invoice`, che serve anche l'hash.
             if muto_decode:
                 raise LnbitsMuto("decode: LNbits ha risposto 520")
-            return chiesto
+            return {"payment_hash": "abc123"}
+
+        async def _mai_visto(_h):
+            return ""
 
         async def _avvisa(t):
             avvisi.append(t)
 
-        amb = {"httpx": _finto_lnbits(uscite, codice, muto),
+        amb = {"httpx": _finto_lnbits(uscite, codice, muto,
+                                      corpo={"status": "success"}),
                "importo_invoice": _importo, "notifica_admin": _avvisa,
+               "decodifica_invoice": _decodifica,
+               "_stato_pagamento": _mai_visto,
+               "_esito_lnbits": reale("_esito_lnbits"),
+               "asyncio": __import__("asyncio"),
+               "ATTESE_ESITO": 4, "SECONDI_FRA_ATTESE": 0,
                "print": lambda *a, **k: None,
                # chi estrae una funzione ne eredita le dipendenze
                "_fmt_sats": reale("_fmt_sats"),
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
+        exec(pezzo_async("_avvisa_payout_fallito"), amb)
         exec(pezzo_async("paga_venditore"), amb)
         return (gira(amb["paga_venditore"]("lnbc1", 1000)),
                 len(uscite), len(avvisi))
 
     prova("nodo che risponde ok: PAGATO", ("pagato", 1, 0), paga())
-    prova("nodo che risponde no: NON_PAGATO", ("non_pagato", 1, 0),
-          paga(codice=500))
+    # ...e dal set 2026 un no lo sanno anche i moderatori: prima un
+    # payout che falliva non lo sapeva NESSUNO di noi — l'unico avviso
+    # parlava di importi storti, cioe' di wallet rotti e di tentativi
+    # di prelievo, mai di sats che non arrivano a chi li aspetta.
+    prova("nodo che risponde no: NON_PAGATO, e i moderatori lo sanno",
+          ("non_pagato", 1, 1), paga(codice=500))
     prova("nodo che TACE: INCERTO, non un fallimento", ("incerto", 1, 0),
           paga(muto=True))
     prova("importo storto: NON_PAGATO e zero uscite", ("non_pagato", 0, 1),
@@ -2758,10 +3056,12 @@ def prove_pagamento_incerto():
             "protezione_sats INT, quantita INT, stato TEXT, disputata INT, "
             "invoice_venditore TEXT, aggiornato INT, cambio_eur REAL, "
             "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT, "
-            "sbloccato_auto_il INT DEFAULT 0)")
+            "sbloccato_auto_il INT DEFAULT 0, "
+            "payout_tentativi INT DEFAULT 0, payout_ultimo INT DEFAULT 0, "
+            "payout_errore TEXT DEFAULT '')")
         vero.execute(
             "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
-            f"'{invoice}',0,0,'{payout_stato}','','',0)")
+            f"'{invoice}',0,0,'{payout_stato}','','',0,0,0,'')")
         vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                      "vendite_ok INT, acquisti_ok INT)")
         vero.execute("INSERT INTO utenti VALUES(222,'io@wallet.tld',0,0)")
@@ -2782,8 +3082,13 @@ def prove_pagamento_incerto():
         tentativi, coniate = [], []
         resto = list(esiti)
 
-        async def _paga(bolt11, atteso):
+        async def _paga(bolt11, atteso, diario=None):
             tentativi.append((bolt11, atteso))
+            # il taccuino di set 2026: chi chiama lo pre-riempie con
+            # l'etichetta e lo ritrova pieno. Qui si risponde come il
+            # vero, cioe' scrivendoci dentro quel che si e' saputo.
+            if diario is not None and resto[:1] != ["non_chiesto"]:
+                diario["hash"] = "abc123"
             return resto.pop(0) if resto else "non_pagato"
 
         async def _address(addr, importo):
@@ -2822,6 +3127,9 @@ def prove_pagamento_incerto():
                "html": __import__("html"),
                "print": lambda *a, **k: None, **ESITI}
         exec(pezzo_async("_congela_pagamento"), amb)
+        # il diario VERO, come i due timbri qui sotto: quel che si
+        # guarda e' proprio quali colonne muove — e quali no
+        exec(pezzo("_timbra_pagamento"), amb)
         # il timbro VERO, non la lambda di ESITI: quel che si guarda e'
         # proprio quel che scrive — e quel che NON scrive
         exec(pezzo("_sospendi_pagamento"), amb)
@@ -2866,8 +3174,15 @@ def prove_pagamento_incerto():
     # regressione: il giorno buono resta il giorno buono
     sblocca, vero, tentativi, _ = mondo(esiti=("pagato",))
     gira(sblocca(1))
-    prova("pagamento riuscito: 'released' come sempre",
-          ("released", "", ""), riga(vero))
+    # 'uscito' dal set 2026: prima il vuoto voleva dire sia «mai
+    # provato» sia «riuscito», cioe' non voleva dire niente — ed e'
+    # esattamente il buco per cui il 14 settembre non si e' potuto
+    # sapere da qui se un payout fosse davvero uscito.
+    prova("pagamento riuscito: 'released', e il payout si timbra",
+          ("released", "uscito", ""), riga(vero))
+    prova("...e il diario porta l'hash di quel pagamento", "abc123",
+          vero.execute("SELECT payout_hash FROM ordini "
+                       "WHERE id=1").fetchone()[0])
     vero.close()
 
     # --- 2-bis. NON_CHIESTO: quel che NON si tocca ------------------
@@ -49403,6 +49718,10 @@ def prove_porta_timer():
                # e senza il nome la prova ESPLODE invece di fallire.
                "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
                "LnbitsMuto": LnbitsMuto}
+        # il diario di set 2026: qui non ha niente da scrivere — non si
+        # e' mai chiesto niente a nessuno — e la prova sta proprio nel
+        # fatto che la riga non si muove
+        exec(pezzo("_timbra_pagamento"), amb)
         exec("async " + sbl, amb)
         esito = asyncio.run(amb["_sblocca_sats"](7, automatico=automatico))
         riga = con.execute("SELECT * FROM ordini WHERE id=7").fetchone()
@@ -51609,7 +51928,7 @@ def prove_banner_negozio():
     # default, quindi nemmeno la strada d'uscita nata oggi puo' far
     # partire una cifra diversa da quella incassata.
     prova("...e paga esattamente l'importo incassato", True,
-          "paga_venditore(bolt11, importo)" in _rim
+          "paga_venditore(bolt11, importo, taccuino)" in _rim
           and "importo = p[\"importo_sats\"]" in _rim)
     # IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea), e
     # nella STESSA transazione dei sats restituiti.
@@ -57262,7 +57581,8 @@ def main():
               prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
-              prove_pagamento_incerto, prove_disputa_incagliata,
+              prove_pagamento_incerto, prove_esito_pagamento,
+              prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
               prove_foto_contenuto,

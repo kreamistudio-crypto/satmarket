@@ -93,7 +93,7 @@ def avvio():
     async def notifica_finta(chi, testo, *a, **k):
         DETTO.append((chi, testo))
 
-    async def paga_finto(bolt11, atteso_sats):
+    async def paga_finto(bolt11, atteso_sats, diario=None):
         return SRV.PAGATO
 
     async def invoice_da_address(addr, sats):
