@@ -1780,7 +1780,7 @@
     font-weight:600}
 
   /* ---------- lo scambio P2P: il libro ordini (set 2026) ----------
-     Le card del libro sono ordini di ESTRANEI su un servizio di terzi:
+     Le card del libro sono ordini di ESTRANEI in una piazza aperta:
      carta e bordo di casa, l'euro in Baloo come un prezzo, i sats in
      mono come ogni cifra Lightning. Niente arancio pieno: in tappa 2
      non c'e' ancora nessun gesto, si guarda e basta. */
@@ -3050,9 +3050,11 @@
   /* i quattro passi dello scambio: la timeline di casa, in un
      contenitore NEUTRO. Mai `.vault` — quel recinto verde tratteggiato
      e' il SIGILLO dell'escrow di Barattolo («il pagamento e' custodito
-     dalla piattaforma»), e qui i sats li tiene il coordinatore: sarebbe
-     una bugia di registro, la stessa ragione per cui la riga di stato
-     e' `.nota-scambio` e non il verde della fiducia. */
+     dalla piattaforma»), e qui i sats stanno in una hold invoice fra
+     due persone: il coordinatore e' NOSTRO — il nodo e' di Barattolo —
+     ma il meccanismo e' un altro, e il sigillo prometterebbe un'altra
+     cosa. La stessa ragione per cui la riga di stato e' `.nota-scambio`
+     e non il verde della fiducia. */
   .p2p-passi{margin:14px 0 4px}
   /* le bolle della chat sono uscite con la fase 6: al posto dei
      messaggi ci sono i due recapiti cifrati, che vestono i pezzi di
@@ -5051,7 +5053,8 @@
      solo per quattro nomi: quattro regole gemelle sarebbero quattro
      valori da tenere in pari. Il quarto e' la riga di stato dello
      scambio P2P (set 2026), che per la stessa ragione non e' verde:
-     li' il deposito e' del coordinatore e non nostro. */
+     li' il deposito non e' l'escrow di un acquisto ma la garanzia di
+     uno scambio fra due persone. */
   .trust-note.nota-punto,.trust-note.nota-savers,
   .trust-note.nota-promessa,.trust-note.nota-scambio{background:var(--chip-bg);color:var(--ink)}
   /* LE DUE PROMESSE DEL NEGOZIO, sotto «In vetrina in questo
@@ -6933,12 +6936,13 @@ document.getElementById('cartello')?.remove();</script>
       <!-- LA TESTATA E' IL LOGO (set 2026, restyling — decisione di
            Andrea): via il titolo «Scambio P2P», via la riga che diceva
            chi tiene i sats e via quella di commissione e tetto. Il
-           FATTO — sats custoditi in garanzia, Barattolo non li tiene —
-           resta detto dalla vista dello scambio e, col nome del
-           coordinatore, da «I tuoi dati»; i numeri del 38385 restano
-           nel foglio del nuovo ordine. A VERBALE (CANTIERI, «La
-           testata del P2P»): la commissione deve ricomparire anche per
-           chi PRENDE un ordine, prima del pubblico.
+           FATTO — sats custoditi in garanzia, e le due sole strade
+           che possono prendere — resta detto dalla vista dello scambio
+           e, col nome del coordinatore, da «I tuoi dati»; i numeri del
+           38385 restano nel foglio del nuovo ordine. A VERBALE
+           (CANTIERI, «La testata del P2P»): la commissione deve
+           ricomparire anche per chi PRENDE un ordine, prima del
+           pubblico.
            EMENDATA DUE VOLTE (set 2026): prima il marchio e' diventato
            il LOGO DEDICATO del P2P — barattolo, lucchetto e le due
            frecce dello scambio — poi la testata si e' fatta UNA RIGA:
@@ -7091,7 +7095,7 @@ document.getElementById('cartello')?.remove();</script>
         <p class="occhiello">Comprare e vendere bitcoin fra persone, coi sats fermi in garanzia finché non è tutto a posto.</p>
       </div>
 
-      <p class="sicu-apre">Qui non compri da Barattolo: compri da <b>un'altra persona</b>. Vi mettete d'accordo su un prezzo, gli <b>euro viaggiano fra voi due</b> col metodo che scegliete, e i <b>sats restano bloccati in garanzia</b> finché gli euro non sono arrivati davvero. Barattolo non tiene i sats e non tocca i tuoi euro.</p>
+      <p class="sicu-apre">Qui non compri da Barattolo: compri da <b>un'altra persona</b>. Vi mettete d'accordo su un prezzo, gli <b>euro viaggiano fra voi due</b> col metodo che scegliete, e i <b>sats restano bloccati in garanzia</b> finché gli euro non sono arrivati davvero. Barattolo non tocca i tuoi euro, e i sats li tiene <b>in garanzia</b>: solo per farli arrivare a chi compra, o tornare a chi vende.</p>
 
       <h3>Come funziona, in cinque passi</h3>
       <ol class="sicu-passi">
@@ -7104,8 +7108,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <h3 id="p2pinfo-garanzia">La garanzia: chi può muovere i sats</h3>
       <p>«In garanzia» non è un modo di dire. La richiesta di pagamento del terzo passo è speciale: <b>si paga, ma non si incassa</b>. I sats restano appesi a mezz'aria, e da lì possono prendere <b>due strade sole</b> — andare a chi compra, oppure <b>tornare</b> a chi vende. Una terza strada non esiste: nessuno può dirottarli altrove, nemmeno chi li sta tenendo.</p>
-      <p>E a tenerli non è Barattolo: è un <b>coordinatore</b> indipendente (si chiama Mostro), lo stesso che tiene il libro degli ordini. <b>I sats non passano dai nostri conti</b>, e le uniche due cose che il coordinatore può fare sono <b>rilasciare</b> e <b>rimborsare</b>.</p>
-      <p class="sicu-nota">È diverso dal deposito di garanzia del mercatino, dove i sats si fermano su un nodo Lightning nostro. Qui no: qui Barattolo è la <i>finestra</i> su uno scambio che avviene altrove.</p>
+      <p>E a tenerli è il <b>coordinatore</b>, che siamo <b>noi</b>: il programma si chiama Mostro, a farlo girare è Barattolo e il <b>nodo è nostro</b> — è lo stesso che tiene il libro degli ordini. Lo scriviamo invece di lasciartelo scoprire, perché non toglie niente a quello che c'è scritto qui sopra: le uniche due cose che il coordinatore fa coi sats sono <b>consegnarli a chi compra</b> o <b>restituirli a chi vende</b>. Non li tiene per sé e non li porta altrove.</p>
 
       <h3>Il prezzo, e perché le cifre ballano</h3>
       <p>Gli ordini si scrivono <b>in euro</b> — «vendo 50 € di sats» — e i sats si contano al <b>cambio del momento</b>. Il cambio si muove in continuazione, quindi finché l'ordine è nel libro la cifra in sats è una <b>stima</b>: la vedi col segno <b>≈</b> davanti, che è il modo onesto di dire «più o meno tanti».</p>
@@ -7140,7 +7143,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="p2pinfo-storto">Se qualcosa va storto</h3>
       <p>Prima di tutto: <b>dai tempo all'altra persona</b>. Quasi sempre è un bonifico che deve arrivare, o qualcuno che dorme.</p>
       <p><b>Annullare d'accordo.</b> Uno dei due propone di annullare, l'altro accetta, e i sats tornano a chi li aveva bloccati. Serve il <b>sì di tutti e due</b>: nessuno si tira indietro da solo dopo che l'altro si è mosso.</p>
-      <p><b>La disputa.</b> Si apre quando i sats sono <b>già in garanzia</b> — prima non c'è niente da contendere. Da quel momento lo scambio si ferma: né tu né l'altra persona potete più muovere i sats, e a decidere chi li riceve è un <b>moderatore del coordinatore</b>. <b>Barattolo non decide e non può intervenire</b> — lo diciamo adesso, invece di lasciartelo scoprire quel giorno.</p>
+      <p><b>La disputa.</b> Si apre quando i sats sono <b>già in garanzia</b> — prima non c'è niente da contendere. Da quel momento lo scambio si ferma: né tu né l'altra persona potete più muovere i sats, e a decidere chi li riceve è un <b>moderatore del coordinatore</b>, cioè <b>di Barattolo</b>: guardiamo le prove di tutti e due e scegliamo. Anche lì le strade restano <b>due</b> — i sats vanno a chi compra o tornano a chi vende — e lo diciamo adesso, invece di lasciartelo scoprire quel giorno.</p>
       <p class="sicu-nota">Tieni le prove di quello che hai fatto: la ricevuta del bonifico, la schermata del pagamento. Sono quelle che guarda chi decide.</p>
 
       <h3>Chi sei, qui dentro</h3>
@@ -7565,7 +7568,7 @@ document.getElementById('cartello')?.remove();</script>
       </ul>
 
       <h3 id="priv-p2p">Il profilo di scambio P2P</h3>
-      <p>Per scambiare sats in euro con altre persone Barattolo ti fa da tramite verso un <b>coordinatore</b> (Mostro, un servizio indipendente), e per riconoscerti lì serve un <b>profilo di scambio</b>. <b>Nasce e funziona da solo</b>: dentro l'app non c'è niente da creare né da gestire. Qui sotto diciamo per intero da dove viene e <b>chi lo può ricavare</b>, perché dipende da come entri.</p>
+      <p>Per scambiare sats in euro con altre persone lo scambio passa da un <b>coordinatore</b> (il programma si chiama Mostro, e a farlo girare è <b>Barattolo</b>, sul nostro nodo), e per riconoscerti lì serve un <b>profilo di scambio</b>. <b>Nasce e funziona da solo</b>: dentro l'app non c'è niente da creare né da gestire. Qui sotto diciamo per intero da dove viene e <b>chi lo può ricavare</b>, perché dipende da come entri.</p>
       <p><b>Se entri da Telegram</b>, il profilo lo <b>ricaviamo noi dal tuo account</b>: così è lo stesso dal bot, dal sito e dall'app, e torna da solo su un telefono nuovo senza che tu debba salvare niente. Il prezzo lo diciamo per intero: <b>quel profilo il server di Barattolo lo sa ricavare</b>, quindi in linea di principio potrebbe firmare uno scambio al posto tuo. Non lo facciamo, e non c'è niente nel programma che lo faccia — ma <b>potremmo</b>, e questo è l'unico posto di Barattolo in cui possiamo dirlo di un tuo segreto. Per ricavarlo servono <b>due cose insieme</b>, una nella configurazione del server e una nel database: chi si portasse via una sola delle due non ricaverebbe nulla.</p>
       <p><b>Se entri con una chiave Nostr che è tua</b> e in passato l'hai resa il tuo profilo di scambio, resta così: <b>non lo può ricavare nessuno tranne te</b>, noi compresi, ed è lo stesso ovunque perché ce l'hai tu. Questa strada resta nel patto anche se oggi non ha più un gesto dentro l'app.</p>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
@@ -35154,14 +35157,14 @@ function scollegaWallet(){
 
 
 /* ================= LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO (set 2026) =================
-   Barattolo diventa un CLIENT del coordinator Mostro — un servizio
-   indipendente su una macchina di Andrea, che custodisce i sats degli
-   scambi euro<->bitcoin fra utenti in una hold invoice. Il server di
-   Barattolo dice solo DOV'E' il coordinator (npub e relay, dalle due
-   buste) e se la funzione e' accesa: tutto il resto — chiavi, firme,
-   cifratura, il libro ordini — vive QUI, nel browser. Regola ferrea 2,
-   e decisione di Andrea: mai la piattaforma come firmataria degli
-   scambi altrui.
+   Barattolo diventa un CLIENT del coordinator Mostro — che gira su una
+   macchina NOSTRA e non di terzi: il coordinatore e' Barattolo, e
+   custodisce i sats degli scambi euro<->bitcoin in una hold invoice.
+   Il server di Barattolo dice solo DOV'E' il coordinator (npub e relay,
+   dalle due buste) e se la funzione e' accesa: tutto il resto — chiavi,
+   firme, cifratura, il libro ordini — vive QUI, nel browser. Regola
+   ferrea 2, e decisione di Andrea: mai la piattaforma come firmataria
+   degli scambi altrui.
    TAPPA 2 (questa): la leva a due fonti, la pagina col LIBRO ORDINI in
    sola lettura — anche per chi guarda dalla vetrina senza essere
    entrato — e le impostazioni del coordinator (kind 38385), da cui si
@@ -35964,11 +35967,17 @@ function renderP2PInfo(){
     if (q === 'metodi') e.textContent = P2P_METODI.join(', ');
   });
   /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
-     due cifre non possono divergere perche' la fonte e' una sola. */
+     due cifre non possono divergere perche' la fonte e' una sola.
+     ⚠️ E IL LISTINO NON SI NOMINA (14 set 2026, correzione di Andrea):
+     qui si dice la commissione VIVA e come si divide, e basta. Il
+     «listino 3%, e adesso e' promo» raccontava un prezzo che non e'
+     mai stato applicato a nessuno, e in una pagina che chi legge
+     prende per il REGOLAMENTO un prezzo che non esiste fa piu' danno
+     di un numero vecchio. La pillola «in promo» del conto questo giro
+     non la tocca: la' e' un cartello sulla riga, non una tariffa. */
   const box = el('p2pInfoFee');
   if (box) {
     const fee = commissioneVivaP2P();
-    const list = commissioneListinoP2P();
     box.innerHTML = (fee === null)
       ? '<p>La commissione la dichiara il coordinatore, e in questo momento non l\'abbiamo ancora letta. La trovi sempre scritta <b>nel conto dello scambio</b>, prima che tu confermi: si divide <b>met&agrave; a testa</b>.</p>'
       : (fee <= 0)
@@ -35976,11 +35985,7 @@ function renderP2PInfo(){
       : '<p>La commissione dello scambio &egrave; <b>' + num(fee * 100)
         + '%</b>, e si divide <b>met&agrave; a testa</b>: nel conto che leggi c\'&egrave; la <b>tua met&agrave;</b>, cio&egrave; <b>'
         + num(fee * 50) + '%</b>.</p>'
-        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>'
-        + (list > fee * 100
-            ? '<p class="sicu-nota">Il listino di Barattolo &egrave; ' + num(list)
-              + '%: adesso la commissione sta sotto, ed &egrave; una <b>promo</b> del rodaggio.</p>'
-            : '');
+        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>';
   }
   /* LE DUE FINESTRE. La vita nel libro e' `expiration_hours`, la
      finestra del gesto `expiration_seconds`: si leggono, e i ripieghi
@@ -39054,7 +39059,7 @@ const STATI_P2P = {
   concluso: {t: 'Scambio concluso', d: 'È andato tutto a buon fine.'},
   annullo_chiesto: {t: 'Hai chiesto di annullare', d: 'Serve anche il sì dell\'altra persona.'},
   annullo_proposto: {t: 'L\'altra persona vuole annullare', d: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati.'},
-  in_disputa: {t: 'Disputa aperta', d: 'Un moderatore indipendente esaminerà lo scambio. I sats restano bloccati fino alla decisione.'},
+  in_disputa: {t: 'Disputa aperta', d: 'Un moderatore esaminerà lo scambio. I sats restano bloccati fino alla decisione.'},
   annullato: {t: 'Scambio annullato', d: 'Nessuno ha perso niente: i sats sono tornati a chi li aveva bloccati.'},
   pagamento_ritentato: {t: 'Pagamento non riuscito', d: 'L\'invio dei sats si riprova da solo. Se non riesce potrai indicare un altro indirizzo.'}
 };
@@ -42017,18 +42022,23 @@ async function inviaCampoP2P(tipo, btn){
 
 /* ---- la disputa ----
    L'ultima uscita, e per questo il testo dice cosa succede DOPO: da li'
-   in poi i sats non li muove piu' nessuno dei due, e a decidere e' chi
-   risolve le dispute presso il coordinatore. Barattolo non c'entra e
-   non puo' farci niente: si dice, invece di lasciarlo credere. */
+   in poi i sats non li muove piu' nessuno dei due, e a decidere e' un
+   moderatore del coordinatore — cioe' NOSTRO, che il coordinatore lo
+   facciamo girare noi. Si dice, invece di lasciar credere che decida un
+   terzo; e si dice anche che le strade restano DUE, che e' la parte che
+   non indebolisce niente.
+   ⚠️ IL NOME DEL COORDINATORE QUI NON SI PRONUNCIA (regola della fase
+   6: nelle viste dello SCAMBIO niente nomi di terzi). Il testo dice
+   «Barattolo», che e' la stessa cosa detta nella lingua di chi legge. */
 function apriDisputaP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
   haptic();
   chiediConferma({
     titolo: 'Aprire una disputa?',
-    corpo: 'Un moderatore indipendente guarderà il caso e deciderà chi riceve i sats.\n\n'
+    corpo: 'Un moderatore guarderà il caso e deciderà chi riceve i sats.\n\n'
       + 'Da quel momento lo scambio si ferma: né tu né l\'altra persona potete più muovere i sats. '
-      + 'Barattolo non decide e non può intervenire.\n\n'
+      + 'A decidere è Barattolo, e le strade restano due: i sats vanno a chi compra o tornano a chi vende.\n\n'
       + 'Prima di aprirla, dai tempo all\'altra persona: quasi sempre è un ritardo. Se vi siete mandati un contatto, provate a sentirvi.',
     etichetta: 'Sì, apri la disputa',
     poi: () => { inviaDisputaP2P(); }

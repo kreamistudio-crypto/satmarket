@@ -39780,6 +39780,23 @@ def prove_nav_p2p():
     _pi = re.sub(r"<!--.*?-->", "", fi, flags=re.S)
     prova("...e nella prosa non c'e' nessuna cifra battuta a mano",
           [], re.findall(r"\d+\s*(?:%|minut|or[ea]\b|giorn)", _pi))
+    # ⚠️ LE PAROLE CHE ERANO FALSE NON DEVONO TORNARE (14 set 2026,
+    # correzione di Andrea). La pagina presentava il coordinatore come
+    # «indipendente» e Barattolo come la «finestra su uno scambio che
+    # avviene altrove»: non e' cosi' — Barattolo INTEGRA Mostro e FA da
+    # coordinatore, il nodo e' nostro. Ed erano rassicurazioni COMODE,
+    # che e' il genere di frase che rientra da sola al primo ritocco.
+    # Quel che non cambia, e che la pagina dice, sono le DUE strade: i
+    # sats arrivano al destinatario o tornano al mittente, mai altrove.
+    prova("...e non ripresenta il coordinatore come un terzo", [],
+          [s for s in ("indipendente", "avviene altrove",
+                       "non passano dai nostri conti",
+                       "Barattolo non tiene i sats",
+                       "non decide e non può intervenire") if s in _pi])
+    prova("...e dice invece che il coordinatore siamo noi", True,
+          "<b>nodo è nostro</b>" in _pi
+          and "consegnarli a chi compra" in _pi
+          and "restituirli a chi vende" in _pi)
     # I SEGNAPOSTO sono vuoti e li riempie il render: il pattern dei
     # data-tempo e di #pionieriRiga — una cifra che si corregge da
     # sola sotto gli occhi e' peggio di un attimo di silenzio.
@@ -39790,8 +39807,19 @@ def prove_nav_p2p():
           and '<ul class="sicu-lista" id="p2pInfoTempi"></ul>' in fi)
     _rp = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
     prova("il render legge la commissione dal giudice unico", True,
-          "commissioneVivaP2P()" in _rp
-          and "commissioneListinoP2P()" in _rp)
+          "commissioneVivaP2P()" in _rp)
+    # ⚠️ E IL LISTINO NON LO NOMINA PIU' (14 set 2026, correzione di
+    # Andrea): la pagina dice la commissione VIVA e come si divide, e
+    # basta. Il «listino 3%, e adesso e' promo» raccontava un prezzo che
+    # non e' mai stato applicato a nessuno, e qui chi legge prende la
+    # pagina per il REGOLAMENTO. La sentinella si rovescia con la
+    # decisione, come quella della frase sotto il conto: prima
+    # certificava la riga, adesso certifica il silenzio.
+    # (il VERBALE il listino deve poterlo nominare — e' il posto dove si
+    # dice perche' se n'e' andato: la sentinella guarda il CODICE)
+    _rpn = re.sub(r"/\*.*?\*/", "", _rp, flags=re.S)
+    prova("...e il listino non lo nomina affatto", [],
+          [s for s in ("commissioneListinoP2P", "listino") if s in _rpn])
     prova("...e il «non lo so» non diventa uno zero", True,
           "(fee === null)" in _rp
           and "abbiamo ancora letta" in _rp)
@@ -40416,6 +40444,15 @@ def prove_p2p_chiavi():
           "a che numero di scambio sei arrivato" in priv)
     prova("...e il cloud di Telegram resta detto com'era", True,
           "chi ha il tuo account Telegram ce l'ha anche lui" in priv)
+    # ⚠️ E IL COORDINATORE NON E' UN TERZO (14 set 2026, correzione di
+    # Andrea): «Mostro, un servizio indipendente» diceva il falso — il
+    # nodo e' nostro e a farlo girare e' Barattolo. Si dichiara QUI
+    # perche' questa e' la pagina dove i poteri si dichiarano: un potere
+    # che non si dichiara e' un potere che si scopre male, ed e' la
+    # stessa regola del «potremmo» qui sopra.
+    prova("...e dice chi fa girare il coordinatore", True,
+          "a farlo girare è <b>Barattolo</b>" in priv
+          and "servizio indipendente" not in priv)
 
     # --- 2) IL SERVER: la tabella senza un posto per il segreto ------
     s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
@@ -43119,7 +43156,14 @@ def prove_p2p_chat():
           "stato" in dis)
     ap = pezzo_js(mini, "function apriDisputaP2P(", "\n}\n")
     prova("si chiede prima, e si dice cosa succede DOPO", True,
-          "chiediConferma({" in ap and "non decide e non può intervenire" in ap)
+          "chiediConferma({" in ap and "A decidere è Barattolo" in ap
+          and "tornano a chi vende" in ap)
+    # ⚠️ E IL COORDINATORE QUI NON SI PRONUNCIA: e' una vista dello
+    # SCAMBIO, e la regola della fase 6 vieta i nomi di terzi dove uno
+    # sta facendo un gesto. Il testo dice «Barattolo», che dal 14 set
+    # 2026 e' anche la cosa VERA: il coordinatore lo facciamo girare noi.
+    prova("...e non nomina il coordinatore, che qui non si dice", [],
+          [s for s in ("coordinator", "Mostro") if s in ap])
     # EMENDATA (fase 6): la chat non c'e' piu', quindi il consiglio non
     # e' «scrivi» ma «dai tempo» — e il contatto, se c'e', e' la strada.
     prova("...e si consiglia di dare tempo prima di aprirla", True,
