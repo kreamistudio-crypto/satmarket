@@ -12668,3 +12668,17 @@ lo scorrimento, e che i sette campi tornati dal giudice sono quelli —
 fatti girare in node, come le altre regole del foglio. Dal vivo: il
 bottone acceso a foglio appena aperto, il toast giusto nei due casi
 (importo, metodi) e l'anello sulla sezione giusta.
+
+⚠️ **E IL NUMERO SI È MOSSO UNA QUARTA VOLTA, poche ore dopo: 380** —
+`380 → 520 → 450 → 380`. Torna al primo, e non è un giro a vuoto: il
+primo 380 andava stretto perché la **curva** schizzava via (a un
+decimo della corsa era già a metà strada), e a cambiare da allora è
+stata quella. Con una curva che parte piano gli stessi millesimi si
+leggono. Scendono **tutt'e due** i numeri — la dissolvenza da 180 a
+150 — così la coreografia non si tocca: la dissolvenza resta i **due
+quinti** della corsa e l'attesa i tre quinti, cioè la finestra in cui
+la barra si apre a vista. La sentinella adesso guarda la
+**proporzione** e non la coppia di numeri: il giorno di una quinta
+taratura dice ancora qualcosa. Misurato in Chrome vero: forma a
+destinazione a 364 ms, fantasma posato a 431, colore e voci
+interpolati per intero come prima.

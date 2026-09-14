@@ -44205,14 +44205,21 @@ def prove_p2p_pubblica():
     #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
     #    la corsa finisce, e non un istante dopo. Ribattuta nel CSS,
     #    il giorno che una delle due cambia il conto non torna piu'.
-    # 450, DOPO UN GIRO A 380 E UNO A 520 (ritocchi di Andrea,
-    # guardati sul telefono): a 380 con una curva che schizzava via la
-    # corsa finiva prima di essere letta, a 520 si godeva ma cominciava
-    # a farsi ASPETTARE — e un'apertura che si fa aspettare la seconda
-    # volta e' gia' troppo lenta.
-    prova("la corsa dura 450ms e la dissolvenza 180", True,
-          "const P2P_MORFO_MS = 450;" in mini
-          and "const P2P_MORFO_VELO = 180;" in mini)
+    # 380, ED E' IL QUARTO NUMERO: 380 -> 520 -> 450 -> 380 (tarature
+    # di Andrea, guardate sul telefono). Torna al primo e non e' un
+    # giro a vuoto: il primo 380 andava stretto perche' la CURVA
+    # schizzava via, e a cambiare da allora e' stata quella.
+    # I DUE NUMERI SCENDONO INSIEME, e la riga lo dice col CONTO: la
+    # dissolvenza resta il 40% della corsa, quindi l'attesa — la loro
+    # differenza — resta i tre quinti in cui la barra si apre a vista.
+    # Scritto come proporzione e non come coppia di numeri, il giorno
+    # che Andrea ne chiede un quinto la riga dice ancora qualcosa.
+    _ms = int(re.search(r"const P2P_MORFO_MS = (\d+);", mini).group(1))
+    _velo = int(re.search(r"const P2P_MORFO_VELO = (\d+);", mini).group(1))
+    prova("la corsa dura 380ms e la dissolvenza 150", (380, 150),
+          (_ms, _velo))
+    prova("...e la dissolvenza resta i due quinti della corsa", 0.4,
+          round(_velo / _ms, 1))
     prova("...e l'attesa e' la differenza, per la scritta e per il foglio",
           True, "(P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms'" in tempi
           and "transition-delay:0s,var(--morfo-attesa)" in stile)
