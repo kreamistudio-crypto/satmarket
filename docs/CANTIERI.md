@@ -11868,3 +11868,88 @@ del singolo scambio (`renderOrdineP2P`) ha ancora la vecchia forma e
 dice «⬇️ Compri sats» in fondo. Non era nella richiesta; le funzioni
 pure di questo cantiere gli servono già tutte, quindi è un giro corto
 il giorno che lo si vuole.
+
+⚠️ **TRE SCELTE DI QUESTA VOCE SONO CADUTE LO STESSO GIORNO** — i sats
+in card, le parole del verso sul proprio ordine, e lo stato in corpo
+piccolo grigio: le racconta, coi perché, «La seconda stesura: il premio
+secco e i due riquadri», qui sotto.
+
+
+## La seconda stesura: il premio secco e i due riquadri (14 set 2026)
+
+**LO STESSO GIORNO, GUARDANDO LE CARD DAL VIVO, Andrea ne ha chiesta
+un'altra.** Le quattro righe restano quattro, ma tre cose cambiano — e
+tutt'e tre nascono dalla stessa osservazione, che vale più del
+ridisegno: **su questa pagina chi legge è l'AUTORE dell'ordine**, non
+uno che deve decidere se prenderlo.
+
+**IL PREMIO DIVENTA SECCO: «+5%», «−5%».** Le parole del verso — «4%
+più conveniente» — restano al libro e se ne vanno di qui, perché
+spiegare a chi ha scelto il premio che quel premio gli conviene è
+dirgli una cosa che sa. Si dice il **fatto col suo segno**, e il segno
+lo scrive `premioTestoP2P`, che già lo faceva per i capi del cursore
+del filtro: il «−» tipografico resta in un posto solo.
+⚠️ **MA LA TINTA RESTA IL GIUDIZIO, e le due cose non si confondono**:
+il segno dice QUANTO pende, il colore DA CHE PARTE. Lo stesso «+4%» è
+**rosso** sul proprio ordine di acquisto (si ricevono meno sats) e
+**verde** su quello di vendita (se ne consegnano meno) — ed è il caso
+che una prova nuova pianta: *lo stesso segno porta tutt'e due le
+tinte*. Se un domani il colore si mettesse a seguire il segno — il
+difetto più facile da scrivere qui dentro — quelle due liste
+diventerebbero una sola e la prova diventa rossa.
+**E IL BADGE NON È PIÙ CONDIVISO**, dopo esserlo diventato stamattina:
+i due elenchi dicono lo stesso premio a due lettori diversi, quindi due
+testi e due funzioni. **Il giudice invece resta uno solo**
+(`affareP2P`), ed è quel che le tiene in pari — la condivisione che
+serviva era quella, non il markup.
+
+**IL «PER» SALE NELLA PRIMA RIGA**, e le prime due si leggono come una
+frase sola: «Stai comprando sats per» / «5,00 € +4%». Stamattina il
+«per» stava davanti ai sats, in quarta riga; adesso lega la frase alla
+cifra, che è la cosa che quella frase introduce davvero.
+
+**I SATS ESCONO DALLA CARD.** L'importo in euro dice l'affare, e la
+cifra in sats — che si muove col cambio e col premio — si legge
+aprendo lo scambio, dove c'è il conto per esteso. Con loro se ne va
+`satsScambioP2P`, nata stamattina e morta la sera: quel che nessuno
+chiama non resta in giro.
+⚠️ **E CON LORO ESCE ANCHE LA RIGA DI COLORE SCRITTA STAMATTINA.** Il
+neutralizzatore `body .p2p-ord.p2p-scambio .p2p-sats` esisteva per
+impedire che i propri sats si vestissero del tab del libro; senza sats
+non ha più niente da tingere, e tenerlo sarebbe stato CSS orfano. **La
+sentinella che lo sorvegliava non si cancella: si ROVESCIA** — adesso
+certifica che nella card non ci sia nessuna `.p2p-sats`, cioè che la
+regola del libro non possa raggiungerla. È la stessa mossa della
+sentinella della centratura sotto il logo: chi un domani rimette una
+cifra in sats trova quella riga rossa, ed è esattamente il momento in
+cui deve ripensare al colore.
+
+**I DUE RIQUADRI.** Lo **stato** scende in terza riga dentro un
+riquadro **contornato** — in corpo piccolo grigio si perdeva, ed è la
+cosa per cui uno apre questa pagina. Il contorno è quello del conto del
+dettaglio (`1.5px solid var(--line)`), mai una tinta nuova; il
+**raggio** invece è quello della scatola che gli sta sotto (10px) e non
+i 16 del conto, perché due riquadri incolonnati nella stessa card con
+due raggi diversi si leggono come una svista — e quello del conto è
+tarato su una scatola larga quanto la pagina.
+In quarta riga il **metodo di pagamento**, nella scatola piena delle
+card del libro: stessa classe, stesso vestito, e i puntini di
+`.p2p-paga` quando l'elenco è lungo. **Il metodo DECISO prende il posto
+dell'elenco**, come nella pagina dello scambio: da quando chi prende
+sceglie, le altre voci non sono più in gioco. E resta **fail-closed** —
+un metodo fuori dall'elenco dell'ordine non è una scelta, quindi
+l'elenco resta.
+
+**I NUMERI.** Suite: **9567 → 9572, zero rosse** (+5 netti: il banco
+della card è stato rifatto da capo e ne conta 40), anche con
+`PROVE_SEVERE=1`. Dal vivo, quattro scatti via CDP nei due temi a 375 e
+a **320**: il documento resta largo 320, **nessuna card sfora** — con
+un elenco di cinque metodi compreso, che cede coi puntini — e la ✕ sta
+a 15px dal bordo della card.
+
+**QUEL CHE HO DETTO AD ANDREA, e resta una sua scelta:** l'unico caso
+in cui i sats mancano davvero è l'ordine a **prezzo fisso**. Lì il
+premio non c'è per definizione, quindi la seconda riga è il solo euro —
+ed è l'unica card che non dice l'altra metà del prezzo che l'autore ha
+scritto. Se un giorno la si vuole colmare, il posto è lo slot del
+premio, che su quelle card è vuoto: una riga di codice.
