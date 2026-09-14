@@ -194,7 +194,27 @@
   CASSA — hash scritto nella riga, esito chiesto per hash, ritentativo,
   avviso ai moderatori. Una prova per riga batte una quadratura globale
   su un conto misto: la prima nomina il caso e dice cosa fare, la
-  seconda dà un numero che non si sa leggere. Il perché
+  seconda dà un numero che non si sa leggere.
+  LA RONDA DI RICONCILIAZIONE (`riconcilia_payout`, set 2026) è quella
+  regola fatta macchina: una volta al giorno chiede a LNbits PER HASH
+  com'è finito ogni pagamento in uscita che il database dà per concluso
+  — `ordini` released/refunded, `rimborsi_asta` riscosso, `pagamenti`
+  rimborsato, con `payout_hash` scritto — e alza il 🧊 sui falliti,
+  tenendo «nessuna traccia» in un elenco SEPARATO (non è la stessa cosa
+  di un fallimento: lì il pagamento potrebbe non essere mai stato
+  creato). LEGGE E AVVISA, non corregge e non ripaga: ripagare da lì
+  sarebbe pagare due volte il giorno che la lettura sbaglia. NON SI FIDA
+  DEL NOSTRO TIMBRO — guarda anche le righe con `payout_stato='uscito'`,
+  perché una riconciliazione che chiede conferma alla parte che deve
+  controllare non è una riconciliazione (sentinella: `payout_stato` non
+  compare nella funzione). Il timbro è DOPPIO: quello del giorno
+  (`TIMBRO_RICONCILIA`, scritto PRIMA delle domande) evita i 144 giri al
+  giorno, quello della riga (`payout_verificato`, colonna nuova sulle tre
+  tabelle) evita di richiedere in eterno un pagamento saldato, che è
+  terminale. Leva `RICONCILIA_PAYOUT`, accesa di serie e nel pannello
+  delle leve; `RICONCILIA_PER_GIRO` 50, per educazione verso LNbits. Il
+  perché per intero sta in CANTIERI, alla voce «La ronda di
+  riconciliazione: si chiede alla controparte». Il perché
   per intero sta in CANTIERI, alla voce «Il ritentativo, le parole, e il
   conto di cassa».
   I TRE ESITI storici (ago 2026, la voce media

@@ -14223,3 +14223,81 @@ sessione sul cantiere del backoff dei payout, che ha committato mentre
 questo cantiere era aperto. Il codice e' quello giusto e intero — e'
 solo alloggiato in un commit che parla d'altro. Qui resta la sola cura
 di `miniapp.html`.
+
+
+## La ronda di riconciliazione: si chiede alla controparte (set 2026)
+
+La conseguenza dei quattro giorni precedenti, e la protezione che il 14
+settembre non c'era. **Una volta al giorno**, per ogni pagamento in
+uscita che il nostro database dà per **concluso**, si chiede a LNbits
+**per hash** com'è andata davvero, e si alza il 🧊 su quelli che LNbits
+dichiara falliti.
+
+**LA FORMA VIENE DALLA DECISIONE DI IERI.** Il conto di cassa su un
+wallet misto non torna mai e infatti è stato declassato a polso; questa
+invece **nomina l'ordine** e dice a chi modera cosa guardare. È la stessa
+frase scritta due volte, e vale la pena ripeterla perché è la regola:
+**una prova per riga batte una quadratura globale**. E poteva nascere
+solo adesso — prima del cantiere A l'hash non lo scrivevamo, quindi non
+c'era niente da chiedere.
+
+**NON CORREGGE E NON RIPAGA NULLA**, che è il patto della sua sorella
+maggiore del libro mastro: legge, e avvisa. Ripagare da qui sarebbe
+pagare due volte il giorno che la lettura sbaglia — e la lettura
+sbaglierà, prima o poi, perché parla con la rete.
+
+⚠️ **E NON SI FIDA DEL NOSTRO TIMBRO.** Guarda anche — soprattutto — le
+righe che portano già `payout_stato='uscito'`. Se filtrasse su quella
+colonna verificherebbe solo ciò di cui già non dubita, e **una
+riconciliazione che chiede conferma alla parte che deve controllare non
+è una riconciliazione**. C'è una sentinella che tiene `payout_stato`
+fuori da quella funzione.
+
+**IL TIMBRO È DOPPIO, e i due fanno mestieri diversi.** Quello del
+**giorno** impedisce alla ronda di girare a ogni battito — 144 volte al
+giorno — e si scrive **prima** delle domande, come il patto delle
+campagne: un errore a metà giro costa un giorno di ritardo su un allarme
+che comunque si ripete domani, e non 144 allarmi oggi. Quello della
+**riga** — `payout_verificato`, colonna nuova sulle tre tabelle —
+impedisce di richiedere in eterno la stessa cosa: **un pagamento saldato
+è terminale**, non torna indietro, quindi una volta confermato non si
+ricontrolla mai più. Senza il secondo, fra un anno questa ronda
+chiederebbe di mille pagamenti vecchi ogni giorno per niente.
+
+**LE QUATTRO RISPOSTE, e la terza è quella che si sbaglia facilmente.**
+Saldato → si timbra e non se ne parla più. Fallito → nell'avviso, col
+nome della tabella, l'id, l'importo e l'hash: è il caso del 149, i sats
+sono ancora in cassaforte e qualcuno non è stato pagato. Ancora in corso
+→ non si timbra e **non si grida**: ci torna domani (il giro dei
+pagamenti in volo lavora su una scala di minuti, questo di giorni, e non
+si pestano perché guardano stati diversi). ⚠️ **Nessuna traccia → si
+dice, ma SEPARATA dai falliti**: un pagamento che diamo per fatto e di
+cui LNbits non sa niente non è la stessa cosa di uno che ha provato e non
+ce l'ha fatta — il primo forse non è mai stato creato — e confonderli
+manderebbe chi modera a cercare la cosa sbagliata.
+
+**Le quattro bocche stanno in tre righe** e non è una svista: su
+`ordini` ne convivono due — il payout al venditore e il rimborso al
+compratore — e la domanda da fare è la stessa, perché quel che si
+verifica è il **pagamento**, non chi lo aspettava.
+
+La leva è `RICONCILIA_PAYOUT`, accesa di serie, e compare nel pannello
+«⚙️ Stato delle leve» col suo testo di spegnimento. Cinquanta righe per
+giro, che è una misura di educazione verso LNbits e non una paura: le
+righe che avanzano le prende il giro di domani, ognuna una volta sola.
+
+**19 asserzioni nuove**, fra cui le sette sentinelle che difendono le
+promesse: che non ripaghi, che non corregga nessuno stato, che l'unica
+scrittura sia il timbro, che non filtri su `payout_stato`, che si fermi
+al primo silenzio, che il timbro del giorno preceda le domande, e che
+giri davvero nell'orologio. **9972 verdi**, 0 rosse.
+
+⚠️ **E UNA NOTA SU COME QUESTO COMMIT È STATO MESSO IN STAGING**, perché
+il giorno prima era andata storta: nella stessa cartella lavorava
+un'altra sessione, e **tutti e tre i file toccati avevano hunk suoi e
+miei**. Scegliere i file per nome non basta — ieri un hunk altrui è
+finito dentro un mio commit proprio così. Qui i miei hunk sono stati
+isolati per **marcatore** e applicati all'indice in byte
+(`git apply --cached`), con la regola che un hunk che contiene marcatori
+di entrambi **ferma tutto** invece di indovinare. Su diciannove hunk, i
+miei sette sono entrati e gli altri dodici sono rimasti dov'erano.
