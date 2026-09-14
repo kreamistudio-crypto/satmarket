@@ -23966,14 +23966,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   DOPO il pavimento del server, nessuna riga, nessuna lapide
   (`senzaStoriaP2P`, e ognuno dei tre da solo sarebbe una scommessa).
   Con una storia il posto non si tocca e lo dice il foglio, che offre il
-  gesto (`passaAlContoDalFoglioP2P`, con la cintura degli scambi aperti
-  del «dimentica»); la strada sovrana ('mia') non cede mai da sola —
+  gesto (`passaAlContoDalFoglioP2P`); la strada sovrana ('mia') non
+  cede mai da sola —
   il foglio le ha promesso che quella chiave non la ricava nessuno, noi
   compresi. Il vecchio va sulla mensola `@altrui:<pub>` come sempre, e
   il journal dice QUALE dei due inquilini sta mettendo via (la `nota` di
   `parcheggiaMazzoAltruiP2P`). Il seme si chiede una volta per sessione
   (`semeContoP2P`). Verbale in CANTIERI, «IL POSTO CEDUTO AL PROFILO
   DEL CONTO».
+  ⚠️ E LA CINTURA DEGLI SCAMBI APERTI LEGGE LO STATO VIVO (14 set 2026):
+  `scambiApertiP2P` contava le righe locali non finali — una memoria, non
+  un fatto — e un ordine già annullato o scaduto dal lato del
+  coordinatore bloccava per sempre. `offertaVivaP2P` toglie dal conto le
+  righe `'pubblicato'` il cui id è ANCORA nel libro: il libro tiene i
+  soli `s === 'pending'`, quindi quell'id è un'offerta che nessuno ha
+  preso — e un'offerta non tiene sats (la hold invoice nasce al take, e
+  il bond anti-abuso è spento). Fail-closed in tre modi: senza libro, con
+  un libro più vecchio di `P2P_LIBRO_FRESCO_MS`, e su qualunque stato
+  diverso da `'pubblicato'`. Il gesto chiede lo stato vivo PRIMA di
+  giudicare (`rinfrescaScambiP2P`: libro forzato più
+  `statoPubblicoOrdini`, col velo ritardato delle letture); il
+  «dimentica» no, e resta il più severo dei due. Verbale in CANTIERI,
+  «UN'OFFERTA NON È UNO SCAMBIO».
 
 - IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026): la PAGINA che si
   apre toccando una card, in tutt'e due i tab. Prima era un foglietto

@@ -11047,3 +11047,73 @@ se non si sa non si tocca niente — e nel banco del mazzo, dove
 quel catch ha trasformato uno stub mancante in un esito legittimo. Qui è
 uscito rosso per fortuna; con l'assertion girata al contrario sarebbe
 stato un VERDE per la ragione sbagliata.
+
+UN'OFFERTA NON È UNO SCAMBIO (14 set 2026, dal campo: il bottone del
+passaggio bloccato da un ordine FANTASMA).
+IL SINTOMO: sul PC il bottone «Usa il profilo del tuo account» c'era —
+quindi il profilo di quel dispositivo ha una storia, ramo «tenuto» — ma
+premendolo rispondeva «hai uno scambio ancora aperto». Lo scambio non
+esisteva: era un ordine delle prime prove, pubblicato e mai preso da
+nessuno, che non si riusciva più ad annullare e si stava lasciando
+scadere.
+LA DIAGNOSI È UNA RIGA: `scambiApertiP2P` contava le righe LOCALI non
+finali, e **una riga locale è una memoria, non un fatto**. Un ordine che
+il coordinatore ha già annullato, fatto scadere o concluso restava
+«aperto» qui per sempre — e teneva chiusa una porta che non aveva niente
+da proteggere. La guardia nata per fermare un pagamento che perde il
+padrone fermava anche chi non aveva nessun pagamento in ballo.
+IL FATTO STA NEL LIBRO, E CI STAVA GIÀ: `libroDaEventi` tiene i soli
+38383 con `s === 'pending'`, nella valuta giusta, non scaduti e non
+superati da un evento più nuovo. Quindi **un id che compare nel libro è
+un'offerta viva, che nessuno ha ancora preso** — e non serviva una
+domanda nuova al coordinatore per saperlo, bastava guardare dove la
+risposta era già arrivata.
+E UN'OFFERTA NON TIENE SATS, che è la riga su cui poggia tutto il
+cantiere: la hold invoice nasce quando qualcuno PRENDE — è il venditore
+a pagarla entrando in `waiting-payment` — e il bond anti-abuso sul nostro
+coordinatore è spento (`[anti_abuse_bond]` commentata, verificata sul
+settings.toml). Cambiare profilo con un'offerta appesa non lascia nessun
+pagamento senza padrone. Costa un'altra cosa, e la conferma la dice:
+da lì in poi quell'offerta **da qui non si ritira più**, perché la chiave
+con cui si firma il ritiro va sulla mensola insieme al mazzo vecchio.
+FAIL-CLOSED IN TRE MODI, perché resta la guardia che costa di più:
+senza libro non si giudica e si blocca; con un libro **vecchio** nemmeno
+(un'offerta presa un minuto fa è già uno scambio, e il libro di ieri
+direbbe ancora «offerta»); e ogni stato che non sia esattamente
+`'pubblicato'` blocca — anche quelli che non conosciamo, che è il verso
+giusto in cui sbagliare. Il banco prova tutti e tre i «non lo so».
+LO STATO VIVO SI CHIEDE PRIMA DI GIUDICARE (`rinfrescaScambiP2P`): il
+libro si rilegge FORZANDO (una lettura in volo non basta, si vuole la
+nuova) e poi parte la via di riserva `statoPubblicoOrdini`, che chiude le
+righe che il coordinatore dice annullate, scadute o concluse. Le due
+cadute sono fail-open sulla LETTURA e fail-closed sul GIUDIZIO: se non si
+sa niente il libro resta vecchio, e con un libro vecchio la guardia
+blocca. È una lettura, quindi il velo è quello RITARDATO — la cosa che
+non torna indietro sta dietro la conferma, ed è lì che il secondo tocco
+trova la sua guardia. Il censimento dei chiamanti dell'attesa ritardata
+sale a dieci, e la voce dice perché questo è una lettura.
+⚠️ IL «DIMENTICA» RESTA PIÙ SEVERO, ed è voluto: quel gesto porta via il
+mazzo, la copia nel cloud E le chiavi dal server, quindi non rinfresca
+niente e con un libro vecchio blocca. Il GIUDICE però è lo stesso, quindi
+quando il libro è fresco — ci si arriva dalla vista P2P — ne gode anche
+lui.
+LA STRADA SCARTATA: leggere «non è più nel libro» come «è finito». È il
+rovescio esatto del difetto e sarebbe molto peggio: uno scambio VERO, con
+la hold invoice pagata, dal libro pubblico è sparito da un pezzo — il
+libro elenca i `pending`, non gli scambi in corso. Da lì si sarebbe
+cambiato profilo con dei sats appesi, cioè il danno che questa guardia
+esiste per impedire. Il libro risponde bene a «è ancora un'offerta?» e
+malissimo a «è finito?»: la seconda domanda ha la sua strada, ed è la via
+di riserva.
+COLLAUDATI: **9411 prove verdi, 0 rosse** (+17) e **8 MUTAZIONI, 8
+uccise**: qualunque stato nel libro preso per un'offerta, il libro
+vecchio che giudica lo stesso, il «senza libro» che lascia passare, la
+guardia che torna a contare le offerte, il gesto che giudica senza
+chiedere, il libro non forzato, la riserva prima del libro, e l'offerta
+appesa taciuta a chi conferma.
+E L'ULTIMA È LA LEZIONE DEL GIRO: la prima stesura di quella sentinella
+cercava **la frase** nella conferma, e con il gate rovesciato a `false`
+la frase restava nel sorgente — mutazione VIVA, sentinella verde. Si
+inchioda il GATE, non il testo: `+ (offerte ? '`, e la riga che quel
+numero lo calcola. È la terza volta che la tortura trova una guardia che
+guardava la prosa invece del programma.
