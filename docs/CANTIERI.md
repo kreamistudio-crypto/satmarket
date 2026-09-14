@@ -12594,3 +12594,77 @@ metà strada — settanta millesimi — è la cosa da dire ad Andrea prima
 che la trovi lui: se dà fastidio, la cura non è tornare alla
 scorciatoia ma far passare il colore per una tappa intermedia scelta,
 che vuole i keyframes al posto della transizione.
+
+## Il bottone che pubblica resta acceso, e l'avviso arriva al tocco (14 set 2026)
+
+**DECISIONE DI ANDREA**, e cade un modo di fare che qui dentro era
+scritto come una virtù: il «⚡ Pubblica ordine» **non si spegne più**.
+Chi lo preme senza i dati non pubblica, e si prende la liturgia del
+foglio del mercatino — **un toast con la frase e il campo che si fa
+vedere**, esattamente come `publish()` fa da sempre con titolo, prezzo,
+consegna, condizioni e zona.
+
+**IL PERCHÉ, ed è più forte del gusto.** Un bottone spento **non dice
+mai cosa si deve fare**: dice solo cosa non si può fare, e per giunta a
+chi non ha chiesto niente. La riga di ieri qui sopra diceva «un Invia
+che non risponde e non spiega è un vicolo cieco muto», e aveva ragione
+— ma la cura era la riga rossa accanto, cioè una toppa sul sintomo. La
+cura vera è che il vicolo cieco non ci sia: si preme, e la risposta
+arriva.
+
+**CON LUI CADE LA RIGA ROSSA SEMPRE ACCESA**, e cade **insieme alla sua
+ragione**: `p2pNuovoManca` esisteva per spiegare lo spegnimento. Senza
+spegnimento, quella riga su un modulo appena aperto è un rimprovero per
+una cosa che **nessuno ha ancora sbagliato** — e sugli screenshot del
+foglio nuovo si vedeva proprio così: «Scrivi l'importo in euro» in
+rosso, sotto sezioni tutte vuote, prima di qualunque gesto.
+
+**OGNI «MANCA» SI PORTA IL SUO CAMPO.** `valeNuovoOrdineP2P` torna
+adesso `{ok, manca, campo}`, e il campo è l'id da far vedere:
+`p2pNuovoEuro`, `p2pNuovoEuroMax`, `p2pNuovoMetodiBtn` (nato apposta:
+un metodo non si scrive, si sceglie, ma il posto dove si sceglie è un
+campo come gli altri) e `p2pNuovoSats` per tutt'e tre i casi dei sats —
+il posto da correggere è uno solo, comunque ci si sia sbagliati.
+**Sta nel giudice e non nell'avviso**, ed è la riga da non
+ammorbidire: la frase e il posto sono **la stessa decisione**, e
+separarli vuol dire che il giorno di un controllo nuovo arriva la
+frase e il campo no, in silenzio. Una sentinella controlla anche che
+gli id nominati **esistano davvero** nel foglio.
+
+**LO SCORRIMENTO VA SUL CAMPO, L'ANELLO SULLA SEZIONE**, e a deciderlo
+sono stati i pixel. Intorno all'`<input>` l'anello si vede benissimo,
+ma ha gli **angoli vivi** — il campo non ha raggio — e quel
+rettangolino squadrato è il riquadro d'errore di un modulo di un altro
+mondo; la sezione invece è una carta col raggio di casa e l'anello ci
+gira intorno come un contorno suo. Dura 1,2 s e **se ne va da solo**:
+uno stato d'errore che resta acceso torna a essere il rimprovero
+permanente che si è appena tolto. E si toglie e si rimette a ogni
+tocco, o al secondo tocco sullo stesso riquadro l'animazione non
+ripartirebbe — la classe c'è già e il browser non vede nessun cambio.
+
+⚠️ **UNO SCATTO ARRIVATO TARDI HA QUASI DECISO AL POSTO DEI PIXEL.**
+L'anello si spegne da solo dopo 1300 ms, e la fotografia presa **dopo**
+quel termine mostra un riquadro senza niente — cioè la stessa immagine
+che darebbe un'ombra che non si dipinge affatto. La sonda leggeva
+`getComputedStyle` e diceva che c'era; lo scatto diceva di no; e la
+conclusione sbagliata («sull'input non si vede») era già scritta in un
+commento del codice prima che me ne accorgessi. **Quando una cosa si
+spegne da sola, il fotogramma va preso prima che si spenga**, o si
+legge il contrario di quel che succede — ed è il gemello rovescio
+dello scatto preso troppo PRESTO, che mostra la pagina di prima.
+
+**E LA CORSA SCENDE A 450 ms**, terzo numero dopo 380 e 520: a 380 con
+la vecchia curva finiva prima di essere letta, a 520 si godeva ma
+cominciava a **farsi aspettare** — e un'apertura che si fa aspettare la
+seconda volta è già troppo lenta. Curva invariata, l'attesa resta la
+differenza (270). Misurata in Chrome vero: la forma è a destinazione a
+430 ms e il fantasma si posa a 481.
+
+**PROVE: 9703 verdi, zero rosse.** Le nuove dicono che il bottone non
+porta mai `disabled`, che di `p2pNuovoManca` non resta niente, che
+`inviaNuovoOrdineP2P` passa dall'avviso **prima** di chiudere il
+foglio, che l'avviso usa lo stesso `tourRidotto()` di `publish()` per
+lo scorrimento, e che i sette campi tornati dal giudice sono quelli —
+fatti girare in node, come le altre regole del foglio. Dal vivo: il
+bottone acceso a foglio appena aperto, il toast giusto nei due casi
+(importo, metodi) e l'anello sulla sezione giusta.
