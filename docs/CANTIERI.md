@@ -14039,6 +14039,61 @@ create e mai pagate** non c'entrano, perché non è mai arrivato niente.
 Sul database di sviluppo: 622.050 entrati, 135.000 usciti, **atteso
 487.050**. Il file intero gira senza errori.
 
+⚠️ **EMENDA, LO STESSO GIORNO** (14 set 2026, trovata da Andrea appena
+letta la voce qui sopra): **il wallet non era nato vuoto.** Dei sats
+nostri erano già in cassaforte prima del primo ordine, e senza contarli
+il conto legge quel capitale come uno scarto inspiegato — cioè come
+«sats dati per pagati e ancora qui», che è **esattamente l'allarme che
+il controllo esiste per dare**. Il controllo, così com'era nato, aveva
+un **falso positivo garantito**: avrebbe suonato per sempre, e nel
+rumore un surplus vero non si sarebbe distinto.
+
+LA CURA È UNA VOCE IN PIÙ, `capitale_nostro_sats`, dichiarata in
+`impostazioni`. Tre decisioni dentro, e ognuna ha un perché.
+- **Nel database e non nel file `.sql`**, perché il deploy TIRA: un
+  numero scritto a mano nel repo sparirebbe al primo giro, e nessuno se
+  ne accorgerebbe finché il conto non tornasse a mentire. Il recinto di
+  `impostazioni` dice «niente segreti, niente leve che muovono denaro»:
+  questa non muove niente e non accende niente — è un **fatto
+  dichiarato** che tara un numero in sola lettura — e la riga che lo
+  spiega sta accanto alla chiave.
+- **Si chiama «nostro» e non «iniziale»**, che è la parola con cui la
+  domanda è nata. Il giorno del secondo versamento «iniziale»
+  diventerebbe una bugia, e una bugia in un nome non la vede nessuno: il
+  campo è il NETTO di quel che ci abbiamo messo noi — capitale di
+  partenza più versamenti successivi, meno i prelievi — e si aggiorna
+  quando quel denaro si muove.
+- **Se manca, `saldo_atteso_sats` viene VUOTO invece che sbagliato.** Un
+  numero che manca non si sostituisce con zero: è la stessa regola del
+  lettore degli esiti, dove nel dubbio si dice «non lo so» e mai un sì.
+  E il CAST torna su se stesso (`CAST(CAST(x AS INTEGER) AS TEXT) = x`)
+  perché in SQLite `CAST('' AS INTEGER)` fa **zero**: una riga scritta
+  male — vuota, con uno spazio, con «123 sats» dentro — passerebbe per
+  un capitale nullo e il controllo tornerebbe a mentire in silenzio.
+  Provato su tutt'e quattro le forme storte.
+
+Resta stampato anche **`movimento_mercatino`**, che vale *senza* il
+capitale: se quel numero è negativo sono usciti più sats di quanti ne
+siano entrati dagli utenti, e lì non serve nessun confronto.
+
+⚠️⚠️ **E LA STRADA SCARTATA, perché viene in mente per prima:** ricavare
+il capitale come «saldo di oggi meno il movimento del mercatino». È
+**circolare** — farebbe leggere zero al controllo per sempre, e ci
+murerebbe dentro qualunque buco ci sia adesso. Il capitale si legge dal
+**registro LNbits**, o non si legge.
+
+E per leggerlo c'è `capitale_cassa.py`, in sola lettura: scorre il
+registro **pagina per pagina con l'offset** (fermarsi al primo `limit` è
+il modo in cui, due giorni fa, un elenco crescente ha fatto credere che
+un pagamento non esistesse), e separa gli incassi col memo NOSTRO — i
+quattro che scriviamo noi sulle fatture in entrata — da tutti gli altri,
+che per definizione non vengono da un ordine. ⚠️ **Dichiara il suo mezzo
+punto cieco:** sulle USCITE il memo lo scrive il wallet di chi riceve,
+quindi da lì non si distingue un payout da un prelievo nostro — le
+elenca tutte e lascia riconoscere i (pochi, o zero) prelievi a una
+persona. La macchina fa la parte che sa fare e **nomina** quella che non
+sa.
+
 **9882 verdi**, 0 rosse (+28 fra backoff, giro e parole); i sei collaudi
 che toccano i pagamenti tutti verdi.
 

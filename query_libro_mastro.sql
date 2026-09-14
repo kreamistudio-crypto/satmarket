@@ -486,6 +486,38 @@ SELECT '23) IL CONTO DI CASSA (set 2026) — non e'' un allarme, e'' un metro' A
 --      (GET /api/v1/wallet -> `balance`, in MILLIsatoshi: si divide per 1000)
 -- e si confrontano.
 --
+-- ⚠️ IL WALLET NON E'' NATO VUOTO, ed e'' la voce senza la quale questo
+-- controllo dava un FALSO POSITIVO GARANTITO (trovata da Andrea il 14
+-- set 2026, il giorno stesso in cui e'' nato): dei sats nostri erano
+-- gia'' li'' prima del primo ordine, e senza contarli lo scarto si
+-- legge come «sats dati per pagati e ancora in cassa» — cioe''
+-- esattamente l''allarme che deve restare raro. Il capitale si
+-- DICHIARA, in `impostazioni`, con la chiave `capitale_nostro_sats`:
+--
+--   INSERT OR REPLACE INTO impostazioni(chiave, valore)
+--        VALUES('capitale_nostro_sats', '123456');
+--
+-- E'' il NETTO di quel che ci abbiamo messo NOI — il capitale iniziale
+-- piu'' i versamenti successivi, meno i prelievi per noi — e si aggiorna
+-- a mano ogni volta che quel denaro si muove. Si chiama «nostro» e non
+-- «iniziale» perche'' un nome che invecchia male costa piu'' di un nome
+-- diverso di una parola: il giorno del secondo versamento, «iniziale»
+-- diventerebbe una bugia e nessuno lo verrebbe a sapere.
+--
+-- ⚠️⚠️ E NON SI RICAVA DAL SALDO DI OGGI. La scorciatoia che viene in
+-- mente — «capitale = saldo vero meno (entrate - uscite)» — e'' circolare:
+-- farebbe leggere ZERO a questo controllo per sempre, e ci murerebbe
+-- dentro qualunque buco ci sia adesso. Il capitale si legge dal registro
+-- LNbits: sono gli incassi che NON hanno un memo di Barattolo (i nostri
+-- memo sono «Barattolo escrow #», «Barattolo escrow set:», «Barattolo
+-- asta #», «Barattolo sblocco banner #»), meno i prelievi che abbiamo
+-- fatto per noi.
+--
+-- SE IL CAPITALE NON E'' DICHIARATO, `saldo_atteso_sats` viene VUOTO
+-- invece che sbagliato: un numero che manca non si sostituisce con zero.
+-- E'' la stessa regola del lettore degli esiti — nel dubbio si dice «non
+-- lo so», mai un si''.
+--
 -- COME SI LEGGE LO SCARTO, ed e'' la parte che conta:
 --   * saldo vero POCO SOTTO l'atteso  -> NORMALE. Sono le commissioni di
 --     routing dei pagamenti in uscita, che escono davvero dal wallet e
@@ -514,6 +546,17 @@ SELECT '23) IL CONTO DI CASSA (set 2026) — non e'' un allarme, e'' un metro' A
 --   c) LE FATTURE IN ENTRATA CREATE E NON PAGATE non c'entrano: non e''
 --      mai arrivato niente. Gli stati 'creato' e 'annullato' sono fuori.
 WITH
+  -- IL CAPITALE NOSTRO, dichiarato. Il CAST che torna su se stesso non
+  -- e'' pignoleria: `CAST('' AS INTEGER)` fa ZERO, quindi una riga
+  -- scritta male — vuota, con uno spazio, con «123 sats» dentro —
+  -- passerebbe per un capitale nullo e il controllo tornerebbe a
+  -- mentire in silenzio. Se il valore non e'' un intero pulito, qui
+  -- resta NULL e il saldo atteso resta vuoto.
+  capitale AS (
+    SELECT CASE WHEN CAST(CAST(TRIM(valore) AS INTEGER) AS TEXT)
+                     = TRIM(valore)
+                THEN CAST(TRIM(valore) AS INTEGER) END AS sats
+      FROM impostazioni WHERE chiave = 'capitale_nostro_sats'),
   -- ENTRATE: gli escrow degli ordini NON nati da un'asta
   dentro_ordini AS (
     SELECT COALESCE(SUM(o.prezzo_sats), 0) AS sats
@@ -546,6 +589,10 @@ WITH
     SELECT COALESCE(SUM(importo_sats), 0) AS sats
       FROM pagamenti WHERE stato = 'rimborsato')
 SELECT
+  CASE WHEN (SELECT sats FROM capitale) IS NULL
+       THEN 'NO — dichiaralo, o il confronto non si puo'' fare'
+       ELSE 'si' END                  AS capitale_dichiarato,
+  (SELECT sats FROM capitale)         AS capitale_nostro,
   (SELECT sats FROM dentro_ordini)    AS in_escrow_ordini,
   (SELECT sats FROM dentro_aste)      AS in_versamenti_asta,
   (SELECT sats FROM dentro_nostri)    AS in_incassi_nostri,
@@ -553,7 +600,18 @@ SELECT
   (SELECT sats FROM fuori_compratori) AS out_ai_compratori,
   (SELECT sats FROM fuori_aste)       AS out_rimborsi_asta,
   (SELECT sats FROM fuori_nostri)     AS out_sblocchi_resi,
+  -- il movimento del solo mercatino, che vale anche senza il capitale:
+  -- se questo numero e'' negativo sono usciti piu'' sats di quanti ne
+  -- siano entrati dagli utenti, e li'' non serve nessun confronto
   (SELECT sats FROM dentro_ordini) + (SELECT sats FROM dentro_aste)
+    + (SELECT sats FROM dentro_nostri)
+    - (SELECT sats FROM fuori_venditori) - (SELECT sats FROM fuori_compratori)
+    - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)
+                                      AS movimento_mercatino,
+  -- e l''atteso vero, che senza il capitale resta VUOTO invece che
+  -- sbagliato (NULL si propaga da solo in tutta la somma)
+  (SELECT sats FROM capitale)
+    + (SELECT sats FROM dentro_ordini) + (SELECT sats FROM dentro_aste)
     + (SELECT sats FROM dentro_nostri)
     - (SELECT sats FROM fuori_venditori) - (SELECT sats FROM fuori_compratori)
     - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)

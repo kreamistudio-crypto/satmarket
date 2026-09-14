@@ -161,9 +161,25 @@
   calcola quanti sats DOVREBBERO esserci nel wallet, voce per voce; il
   confronto col saldo vero (GET /api/v1/wallet) lo fa una persona. Poco
   sotto = routing; SOPRA = sats dati per pagati ancora in cassa, la forma
-  del guasto del 149. Dichiara le tre cose che non sa: la commissione non
-  fotografata sull'ordine, gli ordini nati da un'asta (i cui sats erano
-  già in cassa dai `rilanci`), e le fatture create e mai pagate. Il perché
+  del guasto del 149. ⚠️ IL CAPITALE È UNA VOCE, e senza di lei il
+  controllo aveva un falso positivo garantito (emendato il giorno stesso
+  in cui è nato): il wallet non era nato vuoto, e dei sats nostri già in
+  cassa si leggevano come lo scarto da allarme. Si dichiara in
+  `impostazioni` alla chiave `capitale_nostro_sats` — nel database e non
+  nel file .sql perché il deploy TIRA, e un numero scritto a mano nel
+  repo sparirebbe al primo giro; si chiama «nostro» e non «iniziale»
+  perché al secondo versamento quel nome sarebbe una bugia. Se manca,
+  `saldo_atteso_sats` viene VUOTO invece che sbagliato, e il CAST torna
+  su se stesso perché `CAST('' AS INTEGER)` fa zero. Il capitale NON si
+  ricava dal saldo di oggi meno il movimento — è circolare, e murerebbe
+  dentro il buco di adesso: si legge dal registro LNbits con
+  `capitale_cassa.py`, che pagina con l'offset e separa gli incassi col
+  memo nostro da tutti gli altri, dichiarando il suo mezzo punto cieco
+  (sulle uscite il memo lo scrive chi riceve, quindi i prelievi li
+  riconosce una persona). Dichiara poi le tre cose che non sa: la
+  commissione non fotografata sull'ordine, gli ordini nati da un'asta (i
+  cui sats erano già in cassa dai `rilanci`), e le fatture create e mai
+  pagate. Il perché
   per intero sta in CANTIERI, alla voce «Il ritentativo, le parole, e il
   conto di cassa».
   I TRE ESITI storici (ago 2026, la voce media
