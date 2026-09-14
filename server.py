@@ -5594,18 +5594,39 @@ except ImportError:
     MAX_ACCOUNT_BROWSER = 5    # quanti account insieme sullo stesso browser
 
 
+def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
+    """Crea l'utente al primo ingresso (data di registrazione, codice
+    negozio) o aggiorna nome/username se esiste gia' — la SOLA porta,
+    le tre chiamano tutte questa: la Mini App a ogni richiesta
+    autenticata, il login web, il collaudo.
+
+    IL NOME RISPETTA 'nostr' (set 2026): chi ha scelto esplicitamente
+    l'identita' Nostr (avatar_scelta='nostr', lo stesso selettore
+    della foto — un'identita' sola, non due preferenze separate) non
+    se lo vede riscrivere qui a ogni apertura. Senza questa riga
+    `_scrivi_nome_nostr` potrebbe scrivere il nome giusto e vederselo
+    cancellare dalla richiesta SUCCESSIVA — la Mini App ne fa
+    decine per sessione. In automatico ('') e per chi ha scelto
+    'telegram'/'nessuna' vince sempre Telegram, com'e' sempre stato:
+    e' la stessa precedenza gia' scritta per la foto in
+    aggiorna_profilo_social. `username` non ha questa preferenza —
+    Nostr non ne ha uno equivalente — e si aggiorna sempre."""
+    con.execute(
+        "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
+        "VALUES(?,?,?,?,?) "
+        "ON CONFLICT(tg_id) DO UPDATE SET "
+        "nome=CASE WHEN avatar_scelta='nostr' THEN nome ELSE excluded.nome END, "
+        "username=excluded.username",
+        (tg_id, nome, username, int(time.time()), nuovo_codice_negozio(con)))
+
+
 def upsert_utente(user: dict):
     """Il benvenuto standard: crea l'utente al primo ingresso (con data
     di registrazione e codice negozio), aggiorna nome e username se
     esiste gia'. Stessa accoglienza della Mini App."""
     con = db()
-    con.execute(
-        "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
-        "VALUES(?,?,?,?,?) "
-        "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
-        (user["id"], user.get("first_name", ""), user.get("username", ""),
-         int(time.time()), nuovo_codice_negozio(con),
-         user.get("first_name", ""), user.get("username", "")))
+    _upsert_da_telegram(con, user["id"], user.get("first_name", ""),
+                        user.get("username", ""))
     con.commit()
     con.close()
 
@@ -5820,12 +5841,7 @@ def verifica_utente(init_data: str, sessione: str = "") -> dict:
         _, uid, nome = init_data.split(":", 2)
         user = {"id": int(uid), "first_name": nome, "username": nome.lower()}
         con = db()
-        con.execute(
-            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
-            "VALUES(?,?,?,?,?) "
-            "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
-            (user["id"], nome, nome.lower(), int(time.time()),
-             nuovo_codice_negozio(con), nome, nome.lower()))
+        _upsert_da_telegram(con, user["id"], nome, nome.lower())
         con.commit()
         con.close()
         return user
@@ -5856,13 +5872,8 @@ def verifica_utente(init_data: str, sessione: str = "") -> dict:
         raise HTTPException(401, MSG_INITDATA_SCADUTO)
     try:
         con = db()
-        con.execute(
-            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
-            "VALUES(?,?,?,?,?) "
-            "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
-            (user["id"], user.get("first_name", ""), user.get("username", ""),
-             int(time.time()), nuovo_codice_negozio(con),
-             user.get("first_name", ""), user.get("username", "")))
+        _upsert_da_telegram(con, user["id"], user.get("first_name", ""),
+                            user.get("username", ""))
         con.commit()
         con.close()
         return user
@@ -27422,11 +27433,20 @@ def nome_da_profilo(profilo: dict) -> str:
 def _scrivi_nome_nostr(tg_id: int, nome: str):
     """Il nome di un NATIVO Nostr (tg_id negativo) viene dal suo
     kind-0: qui non c'e' altra anagrafica, e senza questa riga resta
-    per sempre la npub abbreviata di crea_utente_nostr. Mai sui tg_id
-    positivi: li' comanda Telegram (upsert_utente), che riscriverebbe
-    comunque al primo accesso. Un kind-0 muto non cancella nulla: si
-    tiene quello che c'e' gia'."""
-    if tg_id > 0 or not nome:
+    per sempre la npub abbreviata di crea_utente_nostr.
+
+    DAL SET 2026 SCRIVE ANCHE SUI TG_ID POSITIVI (prima mai: «comanda
+    Telegram, che riscriverebbe comunque al primo accesso» — vero, ma
+    solo per chi la Mini App la riapre davvero; chi vive di sessione
+    web non ci passava mai, e restava fermo al nome della prima
+    registrazione per sempre, qualunque profilo aggiornasse). Il
+    chiamante (aggiorna_profilo_social) chiede il kind-0 per un
+    tg_id>0 SOLO se avatar_scelta e' '' o 'nostr' — qui non serve
+    ripetere quel controllo. E chi ha scelto 'nostr' non se lo vede
+    ricancellare dalla Mini App: `_upsert_da_telegram` rispetta la
+    stessa scelta. Un kind-0 muto non cancella nulla: si tiene quello
+    che c'e' gia'."""
+    if not nome:
         return
     con = db()
     con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=?",
@@ -27449,7 +27469,11 @@ async def aggiorna_profilo_social(tg_id: int):
     Il nome invece NON e' una preferenza estetica: e' come si chiama
     quello che vende, e per un nativo Nostr esiste solo nel kind-0.
     Per questo si chiede anche con 'nessuna' — chi non vuole la faccia
-    vuole comunque essere chiamato per nome.
+    vuole comunque essere chiamato per nome. Per un tg_id>0 pero'
+    Telegram un nome ce l'ha SEMPRE (a differenza della foto, che puo'
+    mancare): 'nostr' e' l'unica scelta che lo fa scrivere (set 2026)
+    — l'automatico ('') resterebbe altrimenti un nome che sfarfalla
+    fra Telegram e Nostr a ogni giro, mai voluto da nessuno dei due.
 
     La gamba Nostr SOLO da chiave dal possesso dimostrato, la regola
     di notifica(): mai pescare la faccia (o il nome) di Caio perche'
@@ -27473,7 +27497,14 @@ async def aggiorna_profilo_social(tg_id: int):
         profilo = {}
         if npub and (tg_id < 0 or scelta in ("", "nostr")):
             profilo = await _profilo_nostr(npub)
-        _scrivi_nome_nostr(tg_id, nome_da_profilo(profilo))
+        # IL NOME SCRIVE SOLO SE tg_id<0 (nativo, sempre) O scelta E'
+        # 'nostr' (esplicita): l'automatico resta fuori apposta, a
+        # differenza della foto — Telegram un nome ce l'ha sempre,
+        # quindi per l'automatico non sarebbe un ripiego ma un furto a
+        # turno, un giro sì e un giro no secondo chi ha girato per
+        # ultimo (`_upsert_da_telegram` protegge solo 'nostr').
+        if tg_id < 0 or scelta == "nostr":
+            _scrivi_nome_nostr(tg_id, nome_da_profilo(profilo))
         if scelta == "nessuna":
             # niente da scaricare, ma il giro e' fatto: si timbra lo
             # stesso, o il kind-0 si richiederebbe a ogni battito

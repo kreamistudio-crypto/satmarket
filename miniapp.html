@@ -24161,7 +24161,12 @@ function renderIdentita(){
     ? 'Nessuna: accanto al tuo nome compare la tua iniziale.'
     : `Viene dal tuo profilo <b style="color:var(--ink)">${attivaFoto==='telegram'?'✈️ Telegram':'🟣 Nostr'}</b>`
       + (myAvatarScelta ? '' : ' (automatico)')
-      + ` e compare accanto al tuo nome in vetrina e nel negozio.`;
+      + ` e compare accanto al tuo nome in vetrina e nel negozio.`
+      /* SOLO 'nostr' ESPLICITO governa anche il nome (set 2026): in
+         automatico Telegram un nome ce l'ha sempre, quindi la scelta
+         non ricadrebbe mai su Nostr — dirlo qui solo quando è vero */
+      + (attivaFoto === 'nostr' && tgFotoOk
+         ? ' Anche il tuo nome viene da lì.' : '');
   const fotoRiga = riga('📷', 'La tua foto',
                         `<span id="fotoStato">${statoFoto}</span>`)
     + `<div id="fotoPillole" style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">

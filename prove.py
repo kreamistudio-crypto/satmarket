@@ -7446,6 +7446,10 @@ def prove_initdata():
                "db": lambda: FintoDb(visite),
                "nuovo_codice_negozio": lambda con: "abcd1234",
                "utente_da_sessione": lambda t: in_sessione}
+        # verifica_utente non scrive piu' l'UPSERT a mano: lo chiede a
+        # _upsert_da_telegram, la porta unica delle tre — reale() e non
+        # uno stub, per non imitarne anche i bug (la lezione di sempre)
+        exec(pezzo("_upsert_da_telegram"), amb)
         exec(pezzo("verifica_utente"), amb)
         return amb["verifica_utente"]
 
@@ -7496,10 +7500,10 @@ def prove_initdata():
     # --- SENTINELLE: il controllo non deve sparire in un riordino ----
     vu = pezzo("verifica_utente")
     prova("sentinella: auth_date si legge davvero", True, "auth_date" in vu)
-    # l'INSERT del ramo vero e' l'ULTIMO del pezzo (il primo e' quello
-    # del collaudo): rindex, o si confronterebbe col ramo sbagliato
+    # la scrittura del ramo vero e' l'ULTIMA del pezzo (la prima e'
+    # quella del collaudo): rindex, o si confronterebbe col ramo sbagliato
     prova("sentinella: si controlla PRIMA di scrivere sul database",
-          True, vu.index("ORE_INITDATA") < vu.rindex("INSERT INTO utenti"))
+          True, vu.index("ORE_INITDATA") < vu.rindex("_upsert_da_telegram("))
     # dentro il try l'except si mangerebbe l'HTTPException e la
     # riscriverebbe col messaggio generico: il client perderebbe il
     # solo segnale che gli dice di riaprirsi
@@ -8572,6 +8576,142 @@ def prove_foto_telegram_fallita():
           [""], mondo(b""))
     prova("Telegram risponde con la foto: si scrive quella nuova",
           ["av_ab12cd34_NUOVA.jpg"], mondo(b"jpegfinto"))
+
+
+def prove_nome_da_nostr():
+    """IL NOME SEGUE LA FOTO (set 2026, chiesto da Andrea: «quando un
+    utente aggiorna il profilo da Nostr o da Telegram, deve prendere
+    la foto e anche il nome»). Prima `_scrivi_nome_nostr` si arrendeva
+    su OGNI tg_id positivo — «comanda Telegram», diceva il commento,
+    ma quello riscrive il nome SOLO a chi la Mini App la riapre
+    davvero: chi vive di sessione web restava fermo al nome della
+    prima registrazione per sempre, qualunque profilo aggiornasse.
+    Ora scrive anche li', ma SOLO con la scelta 'nostr' esplicita:
+    mai in automatico, perche' Telegram un nome ce l'ha SEMPRE (a
+    differenza della foto) — l'automatico non sarebbe un ripiego ma
+    uno sfarfallio a ogni giro."""
+    print("\n[il nome segue la scelta della foto]")
+    import sqlite3
+    import time as _time
+
+    def con_utenti():
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,
+          username TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
+          registrato INTEGER DEFAULT 0, negozio TEXT DEFAULT '');
+        INSERT INTO utenti VALUES(-1,'npub1abc…','','',0,'nat1');
+        INSERT INTO utenti VALUES(111,'Mario (Telegram)','mario','',0,'mar1');
+        INSERT INTO utenti VALUES(222,'Luigi (Telegram)','luigi','nostr',0,'lui1');
+        """)
+        return c
+
+    class _SenzaClose2:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    # --- _scrivi_nome_nostr: ORA scrive anche sui tg_id positivi ----
+    def scrivi_nome(con, tg_id, nome):
+        amb = {"db": lambda: _SenzaClose2(con), "time": _time}
+        exec(pezzo("_scrivi_nome_nostr"), amb)
+        amb["_scrivi_nome_nostr"](tg_id, nome)
+
+    c = con_utenti()
+    scrivi_nome(c, -1, "Nome Nativo")
+    prova("nativo Nostr: scrive come sempre", "Nome Nativo",
+          c.execute("SELECT nome FROM utenti WHERE tg_id=-1").fetchone()[0])
+    scrivi_nome(c, 111, "Nome Da Nostr")
+    prova("tg_id positivo: ORA scrive (prima si arrendeva sempre)",
+          "Nome Da Nostr",
+          c.execute("SELECT nome FROM utenti WHERE tg_id=111").fetchone()[0])
+    scrivi_nome(c, -1, "")
+    prova("nome vuoto (kind-0 muto): non tocca niente", "Nome Nativo",
+          c.execute("SELECT nome FROM utenti WHERE tg_id=-1").fetchone()[0])
+
+    # --- _upsert_da_telegram: protegge SOLO chi ha scelto 'nostr' ---
+    def upsert(con, tg_id, nome, username):
+        amb = {"time": _time, "nuovo_codice_negozio": lambda con: "zz00zz00"}
+        exec(pezzo("_upsert_da_telegram"), amb)
+        amb["_upsert_da_telegram"](con, tg_id, nome, username)
+
+    c = con_utenti()
+    upsert(c, 111, "Mario (da Telegram ORA)", "mario_tg")
+    prova("automatico (''): Telegram vince sempre, come sempre",
+          "Mario (da Telegram ORA)",
+          c.execute("SELECT nome FROM utenti WHERE tg_id=111").fetchone()[0])
+    upsert(c, 222, "Luigi (da Telegram ORA)", "luigi_tg")
+    prova("scelta 'nostr': Telegram NON sovrascrive piu' il nome",
+          "Luigi (Telegram)",
+          c.execute("SELECT nome FROM utenti WHERE tg_id=222").fetchone()[0])
+    prova("...ma lo username si aggiorna comunque (Nostr non ne ha uno)",
+          "luigi_tg",
+          c.execute("SELECT username FROM utenti WHERE tg_id=222").fetchone()[0])
+
+    # --- SENTINELLA: le tre porte passano tutte dalla stessa scrittura
+    for porta in ("upsert_utente", "verifica_utente"):
+        prova(f"sentinella: {porta} passa da _upsert_da_telegram", True,
+              "_upsert_da_telegram(" in pezzo(porta))
+
+    # --- il chiamante di aggiorna_profilo_social: il nome si chiede
+    #     solo se tg_id<0 o scelta=='nostr', mai in automatico -------
+    import asyncio
+
+    def mondo(tg_id, scelta):
+        riga = {"negozio": "ab12cd34", "avatar": "", "npub": "npub1x",
+                "npub_verificata": 1, "npub_accesso": "",
+                "avatar_scelta": scelta}
+
+        class _Con:
+            def execute(self, q, p=()):
+                return self
+
+            def fetchone(self):
+                return dict(riga)
+
+            def close(self):
+                pass
+
+        chiamate = []
+
+        async def _prof_ns(npub):
+            return {"name": "NomeDaiRelay"}
+
+        async def _foto_tg(tg_id):
+            return None
+
+        async def _foto_ns(profilo):
+            return None
+
+        amb = {"db": lambda: _Con(), "_AVATAR_IN_CORSO": set(),
+               "_profilo_nostr": _prof_ns,
+               "_scrivi_nome_nostr": lambda tg_id, nome: chiamate.append(nome),
+               "nome_da_profilo": lambda profilo: profilo.get("name", ""),
+               "_foto_profilo_telegram": _foto_tg,
+               "_foto_profilo_nostr": _foto_ns,
+               "_scrivi_avatar": lambda tg_id, nome: None,
+               "_salva_avatar": lambda negozio, raw: "",
+               "print": lambda *a, **k: None}
+        exec("async " + pezzo("aggiorna_profilo_social"), amb)
+        asyncio.new_event_loop().run_until_complete(
+            amb["aggiorna_profilo_social"](tg_id))
+        return chiamate
+
+    prova("nativo Nostr (tg_id<0): il nome si chiede sempre",
+          ["NomeDaiRelay"], mondo(-1, ""))
+    prova("tg_id>0, automatico: il nome NON si chiede (Telegram vince "
+          "gia')", [], mondo(111, ""))
+    prova("tg_id>0, 'telegram' esplicito: idem, nessuna chiamata",
+          [], mondo(111, "telegram"))
+    prova("tg_id>0, 'nostr' esplicito: ORA il nome si chiede",
+          ["NomeDaiRelay"], mondo(111, "nostr"))
+
+    # --- il client dice che il nome segue, solo quando e' vero ------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client avvisa SOLO quando Nostr governa anche il nome",
+          True, "Anche il tuo nome viene da lì." in mini
+          and "attivaFoto === 'nostr' && tgFotoOk" in mini)
 
 
 def prove_duplica_annuncio():
@@ -56094,6 +56234,7 @@ def main():
               prove_foto, prove_foto_scarti,
               prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta, prove_foto_telegram_fallita,
+              prove_nome_da_nostr,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
