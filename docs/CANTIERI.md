@@ -12935,6 +12935,37 @@ costante live); e — cantiere SEPARATO, tracciato su Trello e non qui
 — le personalizzazioni di livello (cornici, temi colore) di cui la
 fee dinamica cita solo il nome nel testo del pannello admin.
 
+**IL RITOCCO CHIESTO DA ANDREA, LO STESSO GIORNO**: la riga
+informativa fissa nel conto (sempre visibile) è diventata la riga
+«Fee Barattolo» stessa resa CLICCABILE — un ⓘ accanto alla pillola
+«in promo» — che apre un foglio col dettaglio vero: le due percentuali
+di OGGI (compratore/venditore, coi sats che varrebbero su quel netto),
+IL PERCHÉ di ciascuna (pioniere sì/no, livello massimo sì/no — non
+solo il numero finale) e la base di partenza col punteggio del
+sentiment. Riusa `chiediConferma` in modalità avviso (nessuna azione,
+un solo «Ho capito»): niente foglio nuovo da disegnare e mantenere.
+Il JSON è cambiato di conseguenza — da due chiavi piatte
+(`fee_dinamica_compratore_percento`/`..._venditore_percento`) a una
+sola `fee_dinamica: {punteggio, totale_percento, compratore:
+{base_percento, pioniere, livello_max, percento, sats}, venditore:
+{...}}` — un cambio di forma sicuro perché il codice di questa stessa
+sessione era l'unico consumatore. Provato dal vivo su acquisto singolo
+e carrello: il foglio mostra 2,5%/1,5% con «sconto pioniere» su
+entrambi i lati, coerente coi 3%/2% di base letti dal pannello leve.
+
+⚠️ **E IL DEPLOY SI È FERMATO SUBITO DOPO** (commit «Le tre rosse
+della fee dinamica: il banco, la chiave, il conto», stesso giorno):
+tre prove rosse, corrette a valle e non in questa voce — il censimento
+delle leve che apriva il database dentro un banco che lo vieta (stub
+per `_fee_dinamica_leva_valore()`, come già per `canale_id` e
+`ritmo_vetrina`), la chiave della leva nuova senza il prefisso `db:`
+che il patto delle chiavi lecite richiede (`db: fee_dinamica_stato`,
+non il nome nudo — quella forma dice «lo scrive il ricalcolo
+notturno», non un config né un pacchetto), e il conteggio a mano dei
+trasporti httpx superato dal client nuovo del backfill (da «esattamente
+dieci» a «dieci o più»). Nessuna delle tre nel codice che sposta i
+sats — **9727 verdi, 0 rosse** dopo la correzione.
+
 ## Il coordinatore siamo noi, e la pagina lo dice (14 set 2026)
 
 Tre correzioni ad «Info P2P» chieste da Andrea, e la prima è quella da

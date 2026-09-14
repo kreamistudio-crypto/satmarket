@@ -7104,32 +7104,62 @@ def fee_dinamica_oggi(con) -> tuple:
     return (r["compratore_percento"], r["venditore_percento"])
 
 
-def _sconto_fedelta_lato(con, tg_id: int) -> float:
-    """Quanto si toglie alla quota di QUESTO lato: 0,5 se e' pioniere,
-    altri 0,5 se ha raggiunto il livello piu' alto — si sommano, e non
-    scendono mai sotto zero (quello lo fa il chiamante)."""
+def _fedelta_lato(con, tg_id: int) -> tuple:
+    """(pioniere, livello_massimo) di QUESTO lato — i due FATTI da cui
+    dipende il suo sconto, separati dal numero: il dettaglio che il
+    cliente vede vuole sapere IL PERCHE', non solo il risultato."""
     r = con.execute("SELECT coorte, xp, vendite_ok, acquisti_ok FROM "
                     "utenti WHERE tg_id=?", (tg_id,)).fetchone()
     if not r:
-        return 0.0
-    sconto = FEE_DINAMICA_SCONTO_PIONIERE if r["coorte"] == "pioniere" else 0.0
+        return (False, False)
+    pioniere = r["coorte"] == "pioniere"
     liv = livello_utente(r["xp"] or 0,
                          (r["vendite_ok"] or 0) + (r["acquisti_ok"] or 0))
-    if liv["numero"] == len(LIVELLI):
-        sconto += FEE_DINAMICA_SCONTO_LIVELLO_MAX
-    return sconto
+    return (pioniere, liv["numero"] == len(LIVELLI))
 
 
-def fee_dinamica_anteprima(con, tg_compratore: int, tg_venditore: int) -> dict:
-    """Le due percentuali da mostrare in ANTEPRIMA nel preventivo di
-    questi due, al netto dello sconto fedelta' di ciascuno (mai sotto
-    zero). Non tocca il conto vero — siamo in beta — e' solo quel che
-    accadrebbe il giorno che la promo finisce."""
+def _fedelta_sconto(pioniere: bool, livello_max: bool) -> float:
+    """Il numero che i due fatti valgono insieme, sommati."""
+    return ((FEE_DINAMICA_SCONTO_PIONIERE if pioniere else 0.0)
+           + (FEE_DINAMICA_SCONTO_LIVELLO_MAX if livello_max else 0.0))
+
+
+def fee_dinamica_dettaglio_pre(con, tg_compratore: int, tg_venditore: int) -> dict:
+    """Tutto quel che serve dal DATABASE per il dettaglio della fee
+    dinamica di questi due, PRIMA che la connessione chiuda: lo split
+    di base di oggi, il punteggio, e i fatti di fedelta' di ciascun
+    lato. La combinazione con l'importo vero (che nasce dal NETTO,
+    calcolato dopo `_conto_ordine`) la fa fee_dinamica_dettaglio —
+    pura, senza database."""
     base_c, base_v = fee_dinamica_oggi(con)
-    c = max(0.0, base_c - _sconto_fedelta_lato(con, tg_compratore))
-    v = max(0.0, base_v - _sconto_fedelta_lato(con, tg_venditore))
-    return {"fee_dinamica_compratore_percento": round(c, 2),
-            "fee_dinamica_venditore_percento": round(v, 2)}
+    r = con.execute("SELECT punteggio FROM fee_dinamica_stato "
+                    "WHERE id=1").fetchone()
+    pion_c, liv_c = _fedelta_lato(con, tg_compratore)
+    pion_v, liv_v = _fedelta_lato(con, tg_venditore)
+    return {"punteggio": r["punteggio"] if r else 50.0,
+            "base_compratore": base_c, "base_venditore": base_v,
+            "pioniere_compratore": pion_c, "livello_compratore": liv_c,
+            "pioniere_venditore": pion_v, "livello_venditore": liv_v}
+
+
+def fee_dinamica_dettaglio(pre: dict, netto_sats: int) -> dict:
+    """Il dettaglio completo da mandare al client, ANTEPRIMA in beta:
+    base di oggi, i due fatti di fedelta' e il risultato finale (mai
+    sotto zero), per ciascun lato — coi sats che quel lato pagherebbe
+    sul netto di QUESTO ordine, non tocca il conto vero."""
+    def lato(base, pioniere, livello_max):
+        percento = max(0.0, base - _fedelta_sconto(pioniere, livello_max))
+        return {"base_percento": base, "pioniere": pioniere,
+                "livello_max": livello_max, "percento": round(percento, 2),
+                "sats": round(netto_sats * percento / 100)}
+    return {"punteggio": pre["punteggio"],
+            "totale_percento": FEE_DINAMICA_TOTALE_PERCENTO,
+            "compratore": lato(pre["base_compratore"],
+                               pre["pioniere_compratore"],
+                               pre["livello_compratore"]),
+            "venditore": lato(pre["base_venditore"],
+                              pre["pioniere_venditore"],
+                              pre["livello_venditore"])}
 
 
 def _fee_dinamica_leva_valore() -> str:
@@ -23227,10 +23257,12 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # legge una sola: gli si da' la prima, che e' un'omissione e non
     # una bugia (la regola d'oro di _sconto_pubblico)
     spedizioniere = reti[0] if reti else ""
-    # L'ANTEPRIMA della fee dinamica (set 2026, beta): calcolata QUI,
-    # con `con` ancora aperta, e non dopo il con.close() qui sotto —
-    # vedi fee_dinamica_anteprima per il perche' non tocca il conto vero.
-    _fee_din = fee_dinamica_anteprima(con, user["id"], a["venditore_id"])
+    # L'ANTEPRIMA della fee dinamica (set 2026, beta): la parte che
+    # legge il DATABASE si fa QUI, con `con` ancora aperta — la
+    # combinazione col netto (che nasce da _conto_ordine, piu' sotto)
+    # e' pura e aspetta dopo il con.close(). Vedi fee_dinamica_dettaglio
+    # per il perche' non tocca il conto vero.
+    _fee_din_pre = fee_dinamica_dettaglio_pre(con, user["id"], a["venditore_id"])
     # I PUNTI SALVATI da chi compra che valgono per QUESTO venditore
     # (ago 2026): il match lo fa qui il server — vedi il perche' in
     # `punti_per_venditore`, che e' anche minimizzazione e non solo la
@@ -23341,6 +23373,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
+    _fee_din = fee_dinamica_dettaglio(_fee_din_pre, conto["netto"])
     # quanto manca, NELL'UNITA' DELLA PROMESSA: la chiave dell'altra
     # unita' resta a zero, cosi' il client non puo' leggere dei sats
     # come euro (la regola d'oro di _sped_gratis_pubblico, applicata
@@ -23472,7 +23505,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.
             "commissione_percento": COMMISSIONE_PERCENTO,
-            **_fee_din,
+            "fee_dinamica": _fee_din,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
@@ -23628,10 +23661,10 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         con.close()
         raise HTTPException(400, "L'accordo è con un altro venditore")
     guardia_ferie(con, venditore_id)   # il gemello di _compra_set
-    # L'ANTEPRIMA della fee dinamica (set 2026, beta): calcolata QUI, con
-    # `con` ancora aperta — vedi fee_dinamica_anteprima per il perche'
-    # non tocca il conto vero.
-    _fee_din = fee_dinamica_anteprima(con, user["id"], venditore_id)
+    # L'ANTEPRIMA della fee dinamica (set 2026, beta): la parte che
+    # legge il DATABASE si fa QUI, con `con` ancora aperta — vedi
+    # fee_dinamica_dettaglio per il perche' non tocca il conto vero.
+    _fee_din_pre = fee_dinamica_dettaglio_pre(con, user["id"], venditore_id)
     origini = {chiave_origine(a) for a in tutti.values()}
     if len(origini) > 1:
         con.close()
@@ -23875,6 +23908,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto, accordo_sats_v)
+    _fee_din = fee_dinamica_dettaglio(_fee_din_pre, conto["netto"])
     # `articolo_sats` e' il NETTO — ha sempre voluto dire «quanto paghi
     # per la merce», ed e' la cifra che con spedizione e protezione FA
     # il totale: cosi' un client fermo a ieri somma comunque giusto, e
@@ -23973,7 +24007,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.
             "commissione_percento": COMMISSIONE_PERCENTO,
-            **_fee_din,
+            "fee_dinamica": _fee_din,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,

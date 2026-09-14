@@ -15907,12 +15907,20 @@ function contoRighe(c){
        LO ZERO PERO' NON E' ROSSO: il rosso dell'aliquota dice «questo
        e' un costo», e un costo che non c'e' non lo e'. Sopra lo zero
        torna rosso da se'. */
-    + r('Fee Barattolo'
+    /* CLICCABILE (set 2026): la riga apre il dettaglio della fee
+       dinamica — quanto varrebbe OGGI per questo compratore e questo
+       venditore, sconti compresi, se la beta non azzerasse tutto.
+       Il ⓘ e' l'unico segno che invita al tocco: nessun altro colore,
+       la riga resta quella di sempre finche' non ci si clicca. */
+    + `<div class="ctrl-riga" style="cursor:pointer" role="button" onclick="apriDettaglioFeeDinamica()">`
+    + `<span>Fee Barattolo`
         + ` <b class="${c.commissionePct > 0 ? 'ctrl-costo' : ''}">`
         + `${fmt(c.commissionePct || 0)}%</b>`
         + (c.commissionePct > 0
-            ? '' : '<span class="promo-tag dopo">in promo</span>'),
-        cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur))
+            ? '' : '<span class="promo-tag dopo">in promo</span>')
+        + ` <span class="ctrl-nota" style="color:var(--muted)">ⓘ</span></span>`
+    + `<span class="mono">${cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur)}</span>`
+    + `</div>`
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i
@@ -15932,22 +15940,6 @@ function contoRighe(c){
         ? `<span class="via-gratis">gratuita</span>`
         : cifraCtrl(c.sped, c.circa, c.spedEur))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
-    /* L'ANTEPRIMA DELLA FEE DINAMICA (set 2026, beta): non e' una riga
-       del conto — non entra nel totale, non ha una cifra in sats — e'
-       una nota a parte apposta perche' non si confonda con le righe
-       che invece si pagano davvero. Compare solo se il server la manda
-       (client vecchi in cache restano come ieri, un'assenza e non una
-       bugia). */
-    + (c.feeDinCompratore != null
-        ? `<div class="ctrl-riga ctrl-anteprima-fee">`
-          + `<span>🔮 Fee dinamica, in arrivo</span>`
-          + `<span class="mono">${fmt(c.feeDinCompratore)}% a te</span>`
-          + `</div>`
-          + `<div class="hint" style="margin:2px 0 8px">Anteprima: quando `
-          + `la fase beta finirà, oggi pagheresti questa quota (al `
-          + `venditore ne resterebbe ${fmt(c.feeDinVenditore)}%) — per `
-          + `ora la fee è azzerata per tutti.</div>`
-        : '')
     /* LA RIGA CHE CONTA STA IN UNA SCATOLA, come le due del conto del
        P2P (set 2026, ritocco di Andrea): in un elenco di voci tutte
        uguali il solo grassetto si perde, e questa e' l'unica riga che
@@ -15955,6 +15947,46 @@ function contoRighe(c){
     + '<div class="ctrl-chiusa">'
     + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot')
     + '</div>';
+}
+/* Il dettaglio della fee dinamica (set 2026, beta): si tocca la riga
+   «Fee Barattolo» del conto e si apre — riusa il foglio di
+   chiediConferma in modalita' avviso (nessuna azione, solo un «Ho
+   capito»), la stessa strada di avvisoBarattoloMio. Legge
+   acqDati.preventivo invece di ricevere un parametro: e' lo stesso
+   oggetto che contoRighe ha appena disegnato, e passarlo per due
+   strade diverse (l'onclick incollato nell'HTML, la chiamata diretta)
+   vorrebbe dire tenerle in pari a mano. */
+function apriDettaglioFeeDinamica(){
+  const fd = acqDati && acqDati.preventivo && acqDati.preventivo.fee_dinamica;
+  if (!fd) return;
+  haptic();
+  const lato = (nome, o) => {
+    const perche = [];
+    if (o.pioniere) perche.push('sconto pioniere');
+    if (o.livello_max) perche.push('sconto livello massimo');
+    return `<div style="flex:1;min-width:0;text-align:center">
+      <div class="hint" style="margin:0">${esc(nome)}</div>
+      <div style="font:800 22px 'Baloo 2',sans-serif;margin-top:2px">${fmt(o.percento)}<span style="font-size:13px">%</span></div>
+      <div class="hint" style="margin-top:2px">${fmt(o.sats)} sats</div>
+      <div class="hint" style="margin-top:4px;font-size:10.5px;line-height:1.3">${perche.length ? esc(perche.join(' + ')) : 'nessuno sconto oggi'}</div>
+    </div>`;
+  };
+  const testata = `<div style="width:100%">
+    <div style="display:flex;gap:14px">
+      ${lato('Tu (compratore)', fd.compratore)}
+      ${lato('Il venditore', fd.venditore)}
+    </div>
+    <div class="hint" style="margin-top:12px;text-align:left;line-height:1.4">
+      Il totale è <b>${fmt(fd.totale_percento)}%</b>, diviso secondo il sentiment del mercato Bitcoin di oggi (punteggio ${fmt(Math.round(fd.punteggio))}/100 — sopra 50 pesa di più su chi compra, sotto 50 su chi vende): base ${fmt(fd.compratore.base_percento)}% / ${fmt(fd.venditore.base_percento)}%, poi lo sconto fedeltà di ciascuno.
+    </div>
+  </div>`;
+  chiediConferma({
+    titolo: '🔮 La fee dinamica di Barattolo',
+    testata,
+    corpo: 'Siamo in fase beta: oggi non paga né tu né il venditore, questi numeri sono solo l\'anteprima di quanto varrebbe adesso.',
+    etichetta: 'Ho capito',
+    avviso: true
+  });
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
    vivono gia' la'. Il codice negozio arriva dagli annunci del pacco.
@@ -17465,13 +17497,6 @@ function renderAcquisto(){
                                la riga porta «in promo» come sempre */
                             commissione: p.commissione_sats||0,
                             commissionePct: p.commissione_percento||0,
-                            /* L'ANTEPRIMA della fee dinamica (set 2026,
-                               beta): due percentuali informative, non
-                               tocca `tot` ne' `commissione` qui sopra —
-                               quelle restano il conto vero, sempre a
-                               zero finche' la promo non finisce. */
-                            feeDinCompratore: p.fee_dinamica_compratore_percento,
-                            feeDinVenditore: p.fee_dinamica_venditore_percento,
                             /* l'accordo sul carrello: la riga gemella
                                dello sconto, cifre del server */
                             accordo: p.accordo_sats||0,
