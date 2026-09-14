@@ -6498,6 +6498,22 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
 ATTESE_ESITO = 4
 SECONDI_FRA_ATTESE = 2
 
+# IL CANTIERE B (set 2026): un pagamento che a budget scaduto non ha
+# ancora un verdetto NON chiama piu' una persona. Se ha un NOME — e da
+# quando l'hash si conosce prima che i sats si muovano ce l'ha sempre —
+# basta richiederlo al battito dopo. `IN_VOLO_LIMITE_S` e' quanto lo si
+# lascia in volo prima di arrendersi: mezz'ora e' molto piu' degli 86
+# secondi del caso peggiore misurato, e un pagamento che dopo mezz'ora
+# non e' ne' saldato ne' fallito e' una stranezza vera, da guardare.
+# `MAX_TENTATIVI_PAYOUT` e' il freno dell'anello: senza, un payout che
+# fallisce sempre si rimetterebbe in volo per sempre, coniando una
+# fattura nuova dal Lightning address a ogni giro — nessun doppio
+# pagamento (ogni tentativo e' confermato fallito prima del successivo),
+# ma bussare in eterno al wallet di un venditore e' la strada per
+# farsi limitare, ed e' maleducazione verso un servizio di terzi.
+IN_VOLO_LIMITE_S = 1800
+MAX_TENTATIVI_PAYOUT = 3
+
 
 async def paga_venditore(invoice: str, atteso_sats: int,
                          diario: dict | None = None) -> str:
@@ -6593,6 +6609,12 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         return NON_PAGATO
     phash = str((dec or {}).get("payment_hash", ""))[:100]
     taccuino["hash"] = phash
+    # CON UN NOME, «non lo so» smette di essere una condanna: qualunque
+    # cosa succeda da qui in poi — il nodo che tace, la POST che scade,
+    # un verdetto che tarda — si potra' CHIEDERE di nuovo per questo
+    # hash invece di svegliare un moderatore. E' il perno del cantiere
+    # B, e sta qui perche' qui l'hash esiste gia' ed e' gratis.
+    taccuino["risolvibile"] = bool(phash)
     # L'ECO. Se per questo hash un pagamento esiste gia', una seconda
     # richiesta non ritenta: torna il record vecchio, e chi guardasse
     # solo il numero HTTP lo leggerebbe come una risposta fresca. Qui
@@ -6765,6 +6787,33 @@ async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
                "(il payment_hash non si è potuto leggere)"))
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
+
+
+def _in_volo(con, tabella: str, riga_id: int, verso: str):
+    """IL TERZO TIMBRO (set 2026): il pagamento e' partito, ha un nome,
+    e non si sa ancora com'e' finito. `tabella` e' un letterale del
+    nostro codice, mai roba che arriva da fuori. Chiude la connessione
+    che riceve, come i suoi due gemelli.
+
+    NON E' 'da_riprovare' E NON E' 'incerto', ed e' la distinzione che
+    regge il cantiere. 'da_riprovare' vuol dire «nessun sat si e'
+    mosso», quindi si puo' ribussare subito; qui invece i sats POSSONO
+    essere usciti, e ripagare sarebbe il doppio pagamento che tutta la
+    dottrina esiste per impedire. 'incerto' vuol dire la stessa cosa ma
+    aggiunge «e non si puo' sapere», quindi chiama una persona: qui la
+    persona non serve, perche' l'hash c'e' e la domanda si puo' rifare
+    da soli. Chi legge questa riga sappia che **da 'in_volo' non parte
+    mai un pagamento**: le quattro uscite lo trattano come il
+    congelamento, e a toglierlo e' solo il giro che ha chiesto.
+
+    NON TOCCA `aggiornato` e NON AVVISA NESSUNO, per le due ragioni del
+    gemello mite: quella colonna e' l'ANCORA dei promemoria, e un
+    pagamento che si sta risolvendo da solo non e' una notizia per
+    nessuno — se lo diventa, lo dira' il giro arrendendosi."""
+    con.execute(f"UPDATE {tabella} SET payout_stato='in_volo', "
+                "payout_verso=? WHERE id=?", (verso, riga_id))
+    con.commit()
+    con.close()
 
 
 def _sospendi_pagamento(con, tabella: str, riga_id: int, verso: str):
@@ -20388,7 +20437,7 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         if r["stato"] != "da_riscuotere":
             con.close()
             return {"ok": r["stato"] == "riscosso", "stato": r["stato"]}
-        if r["payout_stato"] == "incerto":
+        if r["payout_stato"] in ("incerto", "in_volo"):
             con.close()          # gemello di _sblocca_sats: mai due uscite
             return {"ok": False, "stato": r["stato"], "incerto": True}
         u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
@@ -20411,6 +20460,10 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             esito = NON_CHIESTO
         _timbra_pagamento(con, "rimborsi_asta", rimborso_id, taccuino)
         if esito == INCERTO:
+            if (taccuino.get("risolvibile")
+                    and (r["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT):
+                _in_volo(con, "rimborsi_asta", rimborso_id, "puntatore")
+                return {"ok": False, "stato": r["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
                 f"Riscossione del rimborso d'asta #{rimborso_id} "
@@ -29748,7 +29801,7 @@ async def _rimborsa_sblocco(pagamento_id: int,
             con.close()
             return {"ok": p["stato"] == "rimborsato",
                     "stato": p["stato"]}
-        if p["payout_stato"] == "incerto":
+        if p["payout_stato"] in ("incerto", "in_volo"):
             con.close()
             return {"ok": False, "stato": p["stato"], "incerto": True}
         u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
@@ -29771,6 +29824,10 @@ async def _rimborsa_sblocco(pagamento_id: int,
             esito = NON_CHIESTO
         _timbra_pagamento(con, "pagamenti", pagamento_id, taccuino)
         if esito == INCERTO:
+            if (taccuino.get("risolvibile")
+                    and (p["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT):
+                _in_volo(con, "pagamenti", pagamento_id, "pagante")
+                return {"ok": False, "stato": p["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "pagamenti", pagamento_id, bolt11, "pagante",
                 f"Rimborso dello sblocco banner #{pagamento_id} "
@@ -35528,9 +35585,9 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if o["stato"] in ("released", "refunded", "refund", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "released", "stato": o["stato"]}
-        if o["payout_stato"] == "incerto":
+        if o["payout_stato"] in ("incerto", "in_volo"):
             con.close()   # un pagamento in volo di cui non sappiamo l'esito:
-            #               finche' un moderatore non guarda, qui non si paga
+            #               finche' non si sa com'e' finito, qui non si paga
             return {"ok": False, "stato": o["stato"], "incerto": True}
         v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (o["venditore_id"],)).fetchone()
@@ -35568,6 +35625,14 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # dentro quei rami non ci si tornerebbe piu'.
         _timbra_pagamento(con, "ordini", ordine_id, taccuino)
         if esito == INCERTO:
+            # IL CANTIERE B: se quel pagamento ha un nome, non serve
+            # nessuno — lo si richiede al battito dopo. Il tetto dei
+            # tentativi e' il freno dell'anello: esaurito quello,
+            # l'umano torna a essere la risposta giusta.
+            if (taccuino.get("risolvibile")
+                    and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT):
+                _in_volo(con, "ordini", ordine_id, "venditore")
+                return {"ok": False, "stato": o["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
                 f"Incasso del venditore sull'ordine #{ordine_id}: "
@@ -35764,7 +35829,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["stato"] in ("refunded", "released", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "refunded", "stato": o["stato"]}
-        if o["payout_stato"] == "incerto":
+        if o["payout_stato"] in ("incerto", "in_volo"):
             con.close()          # gemello di _sblocca_sats: mai due uscite
             return {"ok": False, "stato": o["stato"], "incerto": True}
         c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
@@ -35791,6 +35856,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             esito = NON_CHIESTO
         _timbra_pagamento(con, "ordini", ordine_id, taccuino)
         if esito == INCERTO:
+            if (taccuino.get("risolvibile")
+                    and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT):
+                _in_volo(con, "ordini", ordine_id, "compratore")
+                return {"ok": False, "stato": o["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "compratore",
                 f"Rimborso al compratore sull'ordine #{ordine_id}: "
@@ -39213,6 +39282,148 @@ except ImportError:
 TIMBRO_SOSPESI = "pagamenti_sospesi"   # il giorno dell'ultimo avviso
 
 
+async def _riprendi_uscita(tabella: str, riga_id: int, verso: str) -> dict:
+    """Ripassa dalla strada d'uscita di quella riga. La usano i DUE
+    giri — quello dei sospesi e quello dei pagamenti in volo — e sta in
+    un posto solo perche' una seconda copia di questa scelta e' una
+    copia che un giorno manda i sats alla persona sbagliata.
+
+    CHI ASPETTAVA I SATS LO DICE `payout_verso`, mai lo stato: un
+    ordine in 'dispute' puo' essere sulla strada del venditore o su
+    quella del compratore, e indovinare vorrebbe dire chiudere
+    l'affare a favore di chi non doveva.
+
+    E `automatico` NON SI PERDE: si rilegge da `sbloccato_auto_il`,
+    che i rami miti scrivono apposta. Senza, un ordine chiuso da un
+    timer e ripreso da un giro direbbe al venditore «l'acquirente ha
+    confermato la ricezione» — e non ha confermato nessuno."""
+    if tabella == "rimborsi_asta":
+        return await _paga_rimborso(riga_id)
+    if tabella == "pagamenti":
+        return await _rimborsa_sblocco(riga_id, 0)
+    if verso == "compratore":
+        return await _rimborsa_compratore(riga_id)
+    con = db()
+    o = con.execute("SELECT sbloccato_auto_il FROM ordini WHERE id=?",
+                    (riga_id,)).fetchone()
+    con.close()
+    return await _sblocca_sats(
+        riga_id, automatico=bool(o and o["sbloccato_auto_il"]))
+
+
+async def risolvi_pagamenti_in_volo():
+    """IL GIRO CHE TOGLIE L'UMANO DALLA CATENA (set 2026, cantiere B).
+
+    Un pagamento che a budget scaduto non aveva ancora un verdetto
+    finiva in mano a un moderatore, e non perche' servisse un giudizio
+    umano: perche' non sapevamo COME CHIEDERLO. Adesso l'hash si
+    conosce prima che i sats si muovano, quindi la domanda si puo'
+    rifare — e una domanda che una macchina sa fare non si gira a una
+    persona.
+
+    LE TRE RISPOSTE. **Saldato**: si timbra 'uscito' e si ripassa dalla
+    strada di sempre, che vede il timbro, NON paga e va dritta alla
+    chiusura — contatori, notifiche e stato finale restano scritti in
+    un posto solo, come per la decisione di un moderatore. **Fallito**:
+    si toglie il fermo e si ripassa di li' lo stesso, dove la cintura
+    riconoscera' l'eco della fattura bruciata e prendera' la strada del
+    fallimento — invoice azzerata, venditore avvisato, moderatori
+    avvisati. **Ancora in corso**: si lascia dov'e' e si riguarda al
+    battito dopo, finche' non scade `IN_VOLO_LIMITE_S`; a quel punto
+    l'umano torna a essere la risposta giusta, e stavolta gli si
+    consegna l'hash invece di un'alzata di spalle.
+
+    ⚠️ E IL RITARDO E' UNA SICUREZZA, non un difetto da limare: se la
+    richiesta di pagamento era scaduta nel nulla, LNbits potrebbe
+    averla registrata un istante DOPO. Chiederlo dieci minuti piu'
+    tardi e trovare 'nessuna traccia' vuol dire davvero «non e' mai
+    partita»; chiederlo subito no. Per questo il 'nessuna traccia'
+    qui e' trattato come un fallimento — si ripassa dalla strada di
+    sempre, che ricontrolla tutto da capo prima di muovere un sat.
+
+    UNA RIGA ALLA VOLTA E SI FERMA AL PRIMO SILENZIO, come il giro
+    gemello: se LNbits tace per una tace per tutte, e insistere
+    vorrebbe dire bussare venti volte per niente a ogni battito."""
+    con = db()
+    righe = []
+    for tab in ("ordini", "rimborsi_asta", "pagamenti"):
+        try:
+            righe += [(tab, r["id"], r["payout_hash"] or "",
+                       r["payout_verso"] or "", r["payout_ultimo"] or 0)
+                      for r in con.execute(
+                          f"SELECT id, payout_hash, payout_verso, "
+                          f"payout_ultimo FROM {tab} "
+                          "WHERE payout_stato='in_volo' ORDER BY id")]
+        except Exception as e:
+            print(f"⚠️ In volo, tabella {tab} saltata: {e}")
+    con.close()
+    if not righe:
+        return
+    adesso = int(time.time())
+    decisi = fermi = 0
+    for tab, riga_id, phash, verso, quando in righe[:MAX_RIPRESE_GIRO]:
+        verdetto = ""
+        if phash:
+            try:
+                verdetto = await _stato_pagamento(phash)
+            except LnbitsMuto as e:
+                print(f"🔁 In volo, LNbits tace ({e}): si riguarda al "
+                      f"battito dopo.")
+                break
+            if verdetto == "pending":
+                if adesso - quando <= IN_VOLO_LIMITE_S:
+                    fermi += 1
+                    continue
+        # o e' deciso, o e' in volo da troppo (o non ha un nome, che e'
+        # un difetto nostro): in tutti e tre i casi si esce da qui.
+        if verdetto == "pending" or not phash:
+            await _arrenditi_in_volo(tab, riga_id, phash, quando)
+            continue
+        con = db()
+        con.execute(f"UPDATE {tab} SET payout_stato=? WHERE id=? "
+                    "AND payout_stato='in_volo'",
+                    ("uscito" if verdetto == "success" else "", riga_id))
+        con.commit()
+        con.close()
+        try:
+            await _riprendi_uscita(tab, riga_id, verso)
+        except Exception as e:
+            print(f"⚠️ Ripresa dal volo saltata ({tab} #{riga_id}): {e}")
+        decisi += 1
+    print(f"🛬 Pagamenti in volo: {len(righe)}, decisi {decisi}, "
+          f"ancora in volo {fermi}")
+
+
+async def _arrenditi_in_volo(tabella: str, riga_id: int, phash: str,
+                             quando: int):
+    """Mezz'ora in volo senza un verdetto: da qui in poi decide una
+    persona. Si timbra 'incerto' — cioe' le quattro uscite restano
+    chiuse, che e' la parte che conta — e ai moderatori si consegna
+    l'HASH, che e' la domanda da fare a LNbits. L'UPDATE e'
+    condizionato a 'in_volo' come tutti i suoi fratelli: se nel
+    frattempo qualcuno ha deciso, qui non si riscrive niente."""
+    con = db()
+    cur = con.execute(f"UPDATE {tabella} SET payout_stato='incerto' "
+                      "WHERE id=? AND payout_stato='in_volo'", (riga_id,))
+    con.commit()
+    con.close()
+    if not cur.rowcount:
+        return
+    minuti = max(1, (int(time.time()) - (quando or 0)) // 60)
+    try:
+        await notifica_admin(
+            f"🧊 <b>Pagamento da verificare a mano.</b> {tabella} "
+            f"#{riga_id} è in volo da <b>{minuti} minuti</b> e LNbits non "
+            f"dice ancora com'è finito.\n\nNessun ritentativo partirà da "
+            f"solo. Cerca questo pagamento su LNbits e poi rispondi dal "
+            f"Profilo, nella sezione «🧊 Pagamenti da verificare».\n"
+            + (f"<code>{phash}</code>" if phash else
+               "(questa riga non ha un payment_hash: è un difetto "
+               "nostro, e va guardata con calma)"))
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+
+
 async def riprova_pagamenti_sospesi():
     """LA META' CHE CONTA del quarto esito (ago 2026): senza di lei
     avremmo scambiato un danno rumoroso con un silenzio.
@@ -39266,21 +39477,11 @@ async def riprova_pagamenti_sospesi():
     ripresi = 0
     for tab, riga_id, verso in righe[:MAX_RIPRESE_GIRO]:
         try:
-            if tab == "rimborsi_asta":
-                esito = await _paga_rimborso(riga_id)
-            elif tab == "pagamenti":
-                esito = await _rimborsa_sblocco(riga_id, 0)
-            elif verso == "compratore":
-                esito = await _rimborsa_compratore(riga_id)
-            else:
-                # Il timbro del timer dice se questo sblocco era
-                # automatico: le parole delle notifiche dipendono da li'.
-                con = db()
-                o = con.execute("SELECT sbloccato_auto_il FROM ordini "
-                                "WHERE id=?", (riga_id,)).fetchone()
-                con.close()
-                esito = await _sblocca_sats(
-                    riga_id, automatico=bool(o and o["sbloccato_auto_il"]))
+            # la scelta della strada — e il timbro del timer riletto —
+            # vivono in `_riprendi_uscita`, che usa anche il giro dei
+            # pagamenti in volo: una copia di quella scelta e' una copia
+            # che un giorno manda i sats alla persona sbagliata
+            esito = await _riprendi_uscita(tab, riga_id, verso)
         except Exception as e:
             print(f"⚠️ Ripresa saltata ({tab} #{riga_id}): {e}")
             continue
@@ -42114,6 +42315,14 @@ async def orologio():
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            # PRIMA DI TUTTO quel che e' gia' in volo: una riga decisa
+            # qui puo' diventare da riprovare nello stesso battito, e
+            # il giro qui sotto la raccoglie subito invece che fra
+            # dieci minuti.
+            await risolvi_pagamenti_in_volo()
+        except Exception as e:
+            print(f"⚠️ Pagamenti in volo saltati: {e}")
         try:
             # Prima di bussare a qualcuno, si riprova quel che era
             # rimasto in sospeso: un ordine ripreso qui non deve poi

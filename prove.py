@@ -2922,6 +2922,122 @@ def prove_esito_pagamento():
           "r.status_code == 404" in codice(pezzo("_stato_pagamento")))
 
 
+    # --- 6. IL VOLO (cantiere B) ------------------------------------
+    # Un pagamento senza verdetto a budget scaduto non chiama piu' una
+    # persona: ha un NOME, quindi la domanda si rifa' da soli al battito
+    # dopo. Qui si prova che il timbro nuovo non paga, che il giro lo
+    # scioglie nelle tre direzioni, e che dopo mezz'ora si arrende.
+    def in_volo(verdetto="success", eta=60, phash="h-volo", muto=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, payout_stato TEXT, "
+            "payout_hash TEXT, payout_verso TEXT, payout_ultimo INT, "
+            "aggiornato INT DEFAULT 7)")
+        adesso = int(__import__("time").time())
+        vero.execute("INSERT INTO ordini VALUES(1,'in_volo',?,'venditore',?,7)",
+                     (phash, adesso - eta))
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        ripresi, avvisi = [], []
+
+        async def _stato(_h):
+            if muto:
+                raise LnbitsMuto("stato del pagamento: LNbits a 520")
+            return verdetto
+
+        async def _riprendi(tab, rid, verso):
+            ripresi.append((tab, rid, verso))
+            return {"ok": True}
+
+        async def _avvisa(t):
+            avvisi.append(t)
+
+        amb = {"db": Con, "time": __import__("time"),
+               "_stato_pagamento": _stato, "_riprendi_uscita": _riprendi,
+               "notifica_admin": _avvisa, "LnbitsMuto": LnbitsMuto,
+               "MAX_RIPRESE_GIRO": 20, "IN_VOLO_LIMITE_S": 1800,
+               "print": lambda *a, **k: None}
+        exec(pezzo_async("_arrenditi_in_volo"), amb)
+        exec(pezzo_async("risolvi_pagamenti_in_volo"), amb)
+        gira(amb["risolvi_pagamenti_in_volo"]())
+        r = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        fuori = (r["payout_stato"], r["aggiornato"], ripresi, avvisi)
+        vero.close()
+        return fuori
+
+    stato, ancora, ripresi, avvisi = in_volo("success")
+    prova("volo saldato: la riga timbra 'uscito'", "uscito", stato)
+    prova("...e si ripassa dalla strada di sempre, che NON ripaga",
+          [("ordini", 1, "venditore")], ripresi)
+    prova("...senza svegliare nessuno", [], avvisi)
+
+    stato, _, ripresi, avvisi = in_volo("failed")
+    prova("volo fallito: il fermo si toglie", "", stato)
+    prova("...e si ripassa di li', dove l'eco fara' il resto",
+          [("ordini", 1, "venditore")], ripresi)
+
+    # «nessuna traccia» si tratta come un fallimento, ed e' voluto: si
+    # ripassa dalla strada di sempre, che ricontrolla tutto da capo
+    # prima di muovere un sat
+    stato, _, ripresi, _ = in_volo("")
+    prova("volo senza traccia: si ripassa dalla strada di sempre",
+          ("", [("ordini", 1, "venditore")]), (stato, ripresi))
+
+    stato, ancora, ripresi, avvisi = in_volo("pending", eta=60)
+    prova("volo ancora in corso: la riga non si muove", "in_volo", stato)
+    prova("...e non si ripassa da nessuna parte", ([], []), (ripresi, avvisi))
+    prova("...e nemmeno l'ancora dei promemoria", 7, ancora)
+
+    stato, _, ripresi, avvisi = in_volo("pending", eta=3600)
+    prova("volo troppo lungo: adesso decide una persona", "incerto", stato)
+    prova("...e non si ripassa a pagare", [], ripresi)
+    prova("...ai moderatori arriva l'hash, non un'alzata di spalle",
+          True, len(avvisi) == 1 and "h-volo" in avvisi[0])
+
+    stato, _, ripresi, avvisi = in_volo(muto=True)
+    prova("LNbits muto: la riga resta in volo e non si insiste",
+          ("in_volo", [], []), (stato, ripresi, avvisi))
+
+    # una riga in volo SENZA hash e' un difetto nostro: non si puo'
+    # chiedere niente, quindi la guarda una persona — e glielo si dice
+    stato, _, _, avvisi = in_volo(phash="")
+    prova("volo senza nome: passa a una persona, e l'avviso lo dice",
+          True, stato == "incerto" and len(avvisi) == 1
+          and "difetto" in avvisi[0])
+
+    # --- 7. SENTINELLE DEL VOLO -------------------------------------
+    iv = codice(_senza_prosa(pezzo("_in_volo")))
+    prova("sentinella: il timbro del volo non tocca `aggiornato`", True,
+          "aggiornato" not in iv)
+    prova("sentinella: il timbro del volo non avvisa nessuno", True,
+          "notifica" not in iv)
+    prova("sentinella: il timbro del volo scrive CHI aspettava i sats",
+          True, "payout_verso=?" in iv)
+    # l'arresa e' CONDIZIONATA come tutte le sue sorelle: se nel
+    # frattempo qualcuno ha deciso, qui non si riscrive niente
+    prova("sentinella: l'arresa non scavalca chi ha gia' deciso", True,
+          "AND payout_stato='in_volo'" in codice(pezzo("_arrenditi_in_volo")))
+    prova("sentinella: il giro del volo si ferma al primo silenzio", True,
+          "break" in codice(pezzo("risolvi_pagamenti_in_volo")))
+    # e il giro sta nell'orologio PRIMA della ripresa, o una riga decisa
+    # aspetterebbe dieci minuti per essere riprovata
+    _oro = codice(pezzo("orologio"))
+    prova("sentinella: il volo si scioglie prima della ripresa", True,
+          "risolvi_pagamenti_in_volo()" in _oro
+          and _oro.index("risolvi_pagamenti_in_volo()")
+          < _oro.index("riprova_pagamenti_sospesi()"))
+
+
 def prove_pagamento_incerto():
     """Il timeout di paga_venditore (ago 2026, audit). LNbits puo'
     aver pagato e non essere riuscito a dircelo: prima l'eccezione
@@ -3047,7 +3163,7 @@ def prove_pagamento_incerto():
     # Un ordine vero in un database vero (in memoria), e tutto il
     # resto di cartone: quello che si guarda e' la riga dopo.
     def mondo(payout_stato="", esiti=("incerto",), muta=False,
-              invoice=""):
+              invoice="", risolvibile=False):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
         vero.execute(
@@ -3089,6 +3205,9 @@ def prove_pagamento_incerto():
             # vero, cioe' scrivendoci dentro quel che si e' saputo.
             if diario is not None and resto[:1] != ["non_chiesto"]:
                 diario["hash"] = "abc123"
+                # dal cantiere B: con un hash in mano l'incerto si
+                # risolve da solo, e il finto deve dirlo come il vero
+                diario["risolvibile"] = risolvibile
             return resto.pop(0) if resto else "non_pagato"
 
         async def _address(addr, importo):
@@ -3125,6 +3244,10 @@ def prove_pagamento_incerto():
                # (ago 2026, la famiglia di B6): stessa trappola, secondo
                # giro — chi estrae una funzione ne eredita le dipendenze.
                "html": __import__("html"),
+               # le due leve del cantiere B: senza i nomi il ramo del
+               # volo non si valuta nemmeno, e la prova ESPLODE invece
+               # di fallire — la trappola delle funzioni estratte
+               "MAX_TENTATIVI_PAYOUT": 3, "IN_VOLO_LIMITE_S": 1800,
                "print": lambda *a, **k: None, **ESITI}
         exec(pezzo_async("_congela_pagamento"), amb)
         # il diario VERO, come i due timbri qui sotto: quel che si
@@ -3133,6 +3256,8 @@ def prove_pagamento_incerto():
         # il timbro VERO, non la lambda di ESITI: quel che si guarda e'
         # proprio quel che scrive — e quel che NON scrive
         exec(pezzo("_sospendi_pagamento"), amb)
+        # e il terzo, quello del volo: stessa ragione dei due sopra
+        exec(pezzo("_in_volo"), amb)
         exec(pezzo_async("_sblocca_sats"), amb)
         return amb["_sblocca_sats"], vero, tentativi, coniate
 
@@ -3140,7 +3265,8 @@ def prove_pagamento_incerto():
         r = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
         return (r["stato"], r["payout_stato"], r["payout_verso"])
 
-    # il nodo tace: si congela e NON si tocca niente
+    # il nodo tace e il pagamento non ha un nome: si congela come
+    # sempre — e' la strada che resta quando non c'e' niente da chiedere
     sblocca, vero, tentativi, coniate = mondo(esiti=("incerto",))
     gira(sblocca(1))
     prova("incerto: lo stato dell'ordine NON si riscrive",
@@ -3153,6 +3279,21 @@ def prove_pagamento_incerto():
     prova("incerto: nessun secondo pagamento, mai", 1, len(tentativi))
     prova("incerto: nessuna fattura nuova coniata dall'address", 1,
           len(coniate))
+    vero.close()
+
+    # ...ma se quel pagamento un NOME ce l'ha, nessuno sveglia
+    # nessuno: la riga va IN VOLO e il giro la scioglie da solo.
+    sblocca, vero, tentativi, coniate = mondo(esiti=("incerto",),
+                                              risolvibile=True)
+    esito = gira(sblocca(1))
+    prova("incerto con un nome: la riga vola, non si congela",
+          ("delivered", "in_volo", "venditore"), riga(vero))
+    prova("...e chi ha chiamato lo sa", True, bool(esito.get("in_volo")))
+    # e da 'in_volo' non parte un secondo pagamento, come dal gelo
+    gira(sblocca(1))
+    gira(sblocca(1))
+    prova("in volo: nessun secondo pagamento, mai", 1, len(tentativi))
+    prova("in volo: nessuna fattura nuova coniata", 1, len(coniate))
     vero.close()
 
     # il nodo risponde di no: il ramo di sempre, invariato
@@ -3263,8 +3404,12 @@ def prove_pagamento_incerto():
     # tolto una guardia.
     prova("sentinella: tutt'e quattro le uscite guardano l'INCERTO",
           4, _SORGENTE.count("esito == INCERTO"))
-    prova("sentinella: tutt'e quattro si fermano se sono congelate",
-          4, _SORGENTE.count('payout_stato"] == "incerto"'))
+    # dal set 2026 la guardia ferma DUE timbri: 'incerto' (decide una
+    # persona) e 'in_volo' (decide il giro, chiedendo per hash). Da
+    # nessuno dei due parte un pagamento, ed e' la proprieta' che il
+    # conto a mano difende — se CALA, qualcuno ha tolto una guardia.
+    prova("sentinella: tutt'e quattro si fermano se sono congelate", 4,
+          _SORGENTE.count('payout_stato"] in ("incerto", "in_volo")'))
     prova("sentinella: il congelamento scrive CHI aspettava i sats",
           True, "payout_verso=?" in pezzo("_congela_pagamento"))
     # e la coda admin non deve indovinare la strada dallo stato
@@ -3313,8 +3458,15 @@ def prove_pagamento_incerto():
           True, 'if esito.get("non_chiesto"):' in rip and "break" in rip)
     # `automatico` non si perde, o l'ordine chiuso da un timer e ripreso
     # dal giro direbbe «l'acquirente ha confermato la ricezione»
-    prova("sentinella: la ripresa rilegge se era un timer",
-          True, "automatico=bool(" in rip)
+    # `automatico` si rilegge in `_riprendi_uscita`, che dal cantiere B
+    # e' la strada comune ai DUE giri (i sospesi e quelli in volo): una
+    # seconda copia di quella scelta e' una copia che un giorno manda i
+    # sats alla persona sbagliata.
+    prova("sentinella: la ripresa rilegge se era un timer", True,
+          "automatico=bool(" in codice(pezzo("_riprendi_uscita")))
+    prova("sentinella: la scelta della strada vive in un posto solo",
+          True, "_paga_rimborso(riga_id)" not in rip
+          and "_riprendi_uscita(tab, riga_id, verso)" in rip)
     # e il ramo mite di _sblocca_sats quel timbro lo SCRIVE, o non ci
     # sarebbe niente da rileggere. ⚠️ Si guarda la SCRITTURA e non la
     # parola: l'ha detto la tortura, un `_ = ("UPDATE ordini SET
@@ -51920,7 +52072,7 @@ def prove_banner_negozio():
           "parallelo", True,
           "_lucchetti_sblocco[pagamento_id]" in _rim)
     prova("...e non ritenta su un pagamento congelato", True,
-          'payout_stato"] == "incerto"' in _rim)
+          'payout_stato"] in ("incerto", "in_volo")' in _rim)
     prova("...e su INCERTO congela invece di indovinare", True,
           "esito == INCERTO" in _rim
           and '"pagamenti", pagamento_id' in _rim)
