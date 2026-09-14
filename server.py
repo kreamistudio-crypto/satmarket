@@ -6512,7 +6512,34 @@ SECONDI_FRA_ATTESE = 2
 # ma bussare in eterno al wallet di un venditore e' la strada per
 # farsi limitare, ed e' maleducazione verso un servizio di terzi.
 IN_VOLO_LIMITE_S = 1800
-MAX_TENTATIVI_PAYOUT = 3
+MAX_TENTATIVI_PAYOUT = 5
+
+# LA CADENZA DEL RITENTATIVO (set 2026, cantiere B2). Cinque passi:
+# 5 minuti, 30 minuti, 2 ore, 6 ore, 24 ore — l'ultimo tentativo cade
+# circa 33 ore dopo il primo fallimento, e la fattura del venditore
+# campa 60 giorni, quindi il tempo c'e' con abbondanza.
+# IL NUMERO VIENE DALLA NATURA DEL GUASTO: una rotta Lightning che non
+# c'e' torna a esserci in ORE — un canale che si riequilibra, un wallet
+# che si ricollega — non in secondi. Ritentare ogni minuto sarebbe
+# bussare venti volte alla stessa porta chiusa; ritentare una volta
+# sola sprecherebbe il caso piu' comune, che e' il telefono spento.
+BACKOFF_PAYOUT = (300, 1800, 7200, 21600, 86400)
+
+
+def _quando_ritentare(tentativi: int, ultimo: int) -> int:
+    """Da che momento in poi si puo' ribussare. Zero = adesso.
+
+    CON `ultimo` A ZERO SI RIPROVA SUBITO, ed e' la riga che tiene
+    intatto il comportamento di ieri: sulla strada del quarto esito
+    — non abbiamo potuto CHIEDERE — il nodo non e' mai stato toccato,
+    quindi `_timbra_pagamento` non scrive nessun `payout_ultimo` e qui
+    non c'e' niente da aspettare. Il backoff morde SOLO dove un
+    tentativo vero e' stato fatto ed e' fallito."""
+    if not ultimo:
+        return 0
+    passo = BACKOFF_PAYOUT[min(max(tentativi - 1, 0),
+                               len(BACKOFF_PAYOUT) - 1)]
+    return ultimo + passo
 
 
 async def paga_venditore(invoice: str, atteso_sats: int,
@@ -6636,6 +6663,12 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         # e' un «non lo so» — e' un no definitivo, e chi aspetta i sats
         # deve dartene una nuova.
         taccuino["errore"] = "fattura gia' bruciata da un tentativo fallito"
+        # Con una fattura NUOVA si potrebbe riprovare: e' il caso in cui
+        # il ritentativo ha senso, e chi chiama lo sapra' da qui. Non si
+        # scrive invece sul rifiuto della cintura piu' sopra — un importo
+        # storto e' un wallet rotto o un tentativo di prelievo, e
+        # ribussarci da soli sarebbe insistere su un allarme.
+        taccuino["ritentabile"] = True
         await _avvisa_payout_fallito(taccuino, atteso_sats)
         return NON_PAGATO
     try:
@@ -6646,6 +6679,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
                              json={"out": True, "bolt11": invoice})
         if r.status_code >= 300:
             taccuino["errore"] = f"LNbits ha risposto {r.status_code}"
+            taccuino["ritentabile"] = True
             await _avvisa_payout_fallito(taccuino, atteso_sats)
             return NON_PAGATO
         try:
@@ -6674,6 +6708,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     if verdetto == "failed":
         print(f"⛔ Pagamento fallito ({phash[:16]}): il nodo non ha "
               f"consegnato. I sats non sono usciti.")
+        taccuino["ritentabile"] = True
         await _avvisa_payout_fallito(taccuino, atteso_sats)
         return NON_PAGATO
     # Ancora in corso a budget scaduto: e' un «non lo so» a tutti gli
@@ -6684,6 +6719,38 @@ async def paga_venditore(invoice: str, atteso_sats: int,
           f"{ATTESE_ESITO * SECONDI_FRA_ATTESE}s ({phash[:16]}): non si "
           f"ritenta, decide una persona.")
     return INCERTO
+
+
+def _msg_ritentiamo(sats: int) -> str:
+    """LE PAROLE DI CHI ASPETTA I SATS mentre ci riproviamo (set 2026).
+
+    Quella che sostituisce diceva «il pagamento automatico dei tuoi sats
+    e' fallito (il tuo wallet non ha risposto come doveva)», e su un
+    fallimento di ROTTA era falsa due volte: il wallet non aveva
+    risposto male, non era mai stato RAGGIUNTO — e la colpa cadeva
+    addosso a chi aspettava i soldi. E' la stessa famiglia di bugie del
+    «Ordine concluso» su un pagamento mai uscito: si dichiara un fatto
+    che non si e' verificato.
+
+    LE TRE COSE CHE DEVE FARE, in quest'ordine. Dire che i sats sono
+    SUOI e dove stanno — e' la prima domanda di chiunque legga. Dire
+    che ci pensiamo NOI, perche' un invito ad agire mentre una macchina
+    sta gia' agendo produce due fatture e nessuna certezza. E dare
+    l'unico gesto che aiuta davvero, senza spacciarlo per una colpa: i
+    wallet che vivono su un telefono si fanno raggiungere solo da
+    svegli, ed e' il caso piu' comune di tutti.
+
+    NON PROMETTE UN TEMPO, ed e' voluto: non lo sappiamo. «Nelle
+    prossime ore» e' il massimo che si puo' dire restando veri, e una
+    promessa piu' precisa sarebbe la riga che poi fa scrivere ai
+    moderatori."""
+    return (f"⏳ <b>I tuoi sats non sono ancora arrivati.</b> Sono tuoi — "
+            f"<b>{_fmt_sats(sats)} sats</b> — e restano nel deposito di "
+            f"garanzia finché non li ricevi. Al primo tentativo la rete "
+            f"Lightning non ha trovato una strada fino al tuo wallet: "
+            f"<b>ci riproviamo noi</b> nelle prossime ore, non devi fare "
+            f"niente. Se il tuo wallet vive su un telefono, tenere l'app "
+            f"aperta un momento aiuta.")
 
 
 def _timbra_pagamento(con, tabella: str, riga_id: int, diario: dict):
@@ -20490,19 +20557,23 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                            f"{_fmt_sats(importo)} sats da «{titolo}» "
                            f"stanno tornando sul tuo wallet. ⚡")
             return {"ok": True, "stato": "riscosso"}
+        ritenta = bool(taccuino.get("ritentabile") and u and u["ln_address"]
+                       and (r["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
         con.execute("UPDATE rimborsi_asta SET invoice_riscossione='', "
-                    "aggiornato=? WHERE id=?",
-                    (int(time.time()), rimborso_id))
+                    "payout_stato=?, aggiornato=? WHERE id=?",
+                    ("da_riprovare" if ritenta else "",
+                     int(time.time()), rimborso_id))
         con.commit()
         con.close()
-        await notifica(r["tg_id"],
-                       f"💰 <b>Hai {_fmt_sats(importo)} sats da "
-                       f"riscuotere</b> da «{titolo}»: il pagamento "
-                       f"automatico non è riuscito. Controlla il tuo "
-                       f"Lightning address nel Profilo, oppure incolla "
-                       f"una invoice di esattamente quell'importo nella "
-                       f"sezione «Da riscuotere».")
-        return {"ok": False, "stato": "da_riscuotere"}
+        await notifica(
+            r["tg_id"], _msg_ritentiamo(importo) if ritenta else
+            f"💰 <b>Hai {_fmt_sats(importo)} sats da "
+            f"riscuotere</b> da «{titolo}»: il pagamento "
+            f"automatico non è riuscito. Controlla il tuo "
+            f"Lightning address nel Profilo, oppure incolla "
+            f"una invoice di esattamente quell'importo nella "
+            f"sezione «Da riscuotere».")
+        return {"ok": False, "stato": "da_riscuotere", "ritenta": ritenta}
 
 
 @app.post("/api/aste/{annuncio_id}/ritirati")
@@ -29878,21 +29949,30 @@ async def _rimborsa_sblocco(pagamento_id: int,
         # RESTA 'pagato' — la porta non si tocca finche' i sats non
         # sono tornati davvero. Mai chiudere una porta gia' pagata
         # per un rimborso che non e' partito.
+        ritenta = bool(taccuino.get("ritentabile") and u and u["ln_address"]
+                       and (p["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
         con.execute("UPDATE pagamenti SET invoice_rimborso='', "
-                    "aggiornato=? WHERE id=?", (adesso, pagamento_id))
+                    "payout_stato=?, aggiornato=? WHERE id=?",
+                    ("da_riprovare" if ritenta else "", adesso, pagamento_id))
         con.commit()
         con.close()
         try:
+            # «non è partito» diceva il falso quando il pagamento era
+            # partito ed era FALLITO: sono due guasti diversi, e chi
+            # modera deve poterli distinguere al primo sguardo.
             await notifica_admin(
                 f"⚠️ <b>Rimborso dello sblocco non riuscito</b> "
                 f"(pagamento #{pagamento_id}, "
                 f"{_fmt_sats(importo)} sats): il pagamento automatico "
-                "non è partito. Serve una invoice di esattamente "
-                "quell'importo, oppure il venditore deve mettere un "
-                "Lightning address nel Profilo.")
+                "non è andato a buon fine e i sats non sono usciti. "
+                + ("Ci riproviamo da soli nelle prossime ore."
+                   if ritenta else
+                   "Serve una invoice di esattamente quell'importo, "
+                   "oppure il venditore deve mettere un Lightning "
+                   "address nel Profilo."))
         except Exception as e:
             print(f"⚠️ Avviso del rimborso non partito: {e}")
-        return {"ok": False, "stato": "pagato"}
+        return {"ok": False, "stato": "pagato", "ritenta": ritenta}
 
 
 async def avvisa_banner(tg_id: int):
@@ -35754,10 +35834,24 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # Chi perdeva il controllo era il MODERATORE, e a rimetterlo in
         # gioco e' la coda di risolvi_disputa, che ora guarda anche qui.
         primo_giro = o["stato"] != "confirmed"
+        # IL RITENTATIVO (cantiere B2). Si riprova da soli SOLO col
+        # Lightning address, e la ragione e' la dedup di LNbits: una
+        # bolt11 gia' fallita non si ripaga — a chiederlo due volte
+        # torna l'eco del record vecchio — mentre ogni conio da un
+        # address produce un payment hash NUOVO. Il timbro e' quello
+        # di sempre, 'da_riprovare', il cui invariante e' «nessuna
+        # fattura e' mai stata pagata»: ci si arriva per la strada del
+        # quarto esito (non si e' chiesto) e ora anche per questa
+        # (si e' chiesto e la risposta e' stata un no definitivo, senza
+        # preimage). A distanziare i tentativi e' `_quando_ritentare`.
+        ritenta = bool(taccuino.get("ritentabile") and v and v["ln_address"]
+                       and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
         con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
+                    "payout_stato=?, "
                     "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
                     "aggiornato=? WHERE id=?",
-                    (auto_il, int(time.time()), ordine_id))
+                    ("da_riprovare" if ritenta else "",
+                     auto_il, int(time.time()), ordine_id))
         con.commit()
         con.close()
         # Chi ha perso la disputa ha diritto di saperlo, e UNA volta
@@ -35791,12 +35885,39 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 f"scrivi ai moderatori col numero dell'ordine "
                 f"(<b>#{ordine_id}</b>): finché i sats sono lì, il caso si "
                 f"può ancora decidere.")
-        if o["invoice_venditore"] or (v and v["ln_address"]):
-            msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
-                   "(il tuo wallet non ha risposto come doveva). I sats sono al "
-                   "sicuro nel deposito di garanzia: apri l'ordine nella Mini App "
-                   "per riprovare "
-                   f"con una invoice da <b>{_fmt_sats(netto)} sats</b>.")
+        if ritenta:
+            msg = _msg_ritentiamo(netto)
+        elif taccuino.get("ritentabile") and v and v["ln_address"]:
+            # LA RESA: si e' provato e riprovato, e la strada non c'e'.
+            # Adesso l'invito ad agire e' giusto, perche' da soli non
+            # abbiamo piu' niente da tentare.
+            msg = ("⚠️ <b>Non siamo riusciti a consegnarti i sats.</b> "
+                   "Abbiamo riprovato piu' volte e la rete Lightning non ha "
+                   "trovato una strada fino al tuo wallet. I "
+                   f"<b>{_fmt_sats(netto)} sats</b> sono tuoi e sono al sicuro "
+                   "nel deposito di garanzia: apri l'ordine nella Mini App e "
+                   "incolla una invoice di esattamente quell'importo, oppure "
+                   "cambia il Lightning address nel Profilo e ci riproviamo.")
+        elif taccuino.get("ritentabile"):
+            # La fattura incollata a mano, bruciata: dirgli «riprova»
+            # senza dirgli «con una NUOVA» lo manderebbe a incollare la
+            # stessa, che LNbits non ripaghera' mai.
+            msg = ("⚠️ <b>Il pagamento non è arrivato al tuo wallet.</b> "
+                   "La rete Lightning non ha trovato una strada fino alla "
+                   "fattura che ci avevi dato, e quella fattura ora non si "
+                   "può più usare. I sats sono al sicuro nel deposito di "
+                   "garanzia: apri l'ordine nella Mini App e incollane una "
+                   f"<b>nuova</b> da <b>{_fmt_sats(netto)} sats</b>. Se "
+                   "imposti il tuo Lightning address, la prossima volta ci "
+                   "pensiamo noi.")
+        elif o["invoice_venditore"] or (v and v["ln_address"]):
+            # Un metodo c'era, ma al nodo non ci siamo nemmeno arrivati:
+            # non si dichiara un fallimento che non e' stato osservato.
+            msg = ("⏳ <b>I tuoi sats non sono ancora partiti.</b> Non siamo "
+                   "riusciti a completare il pagamento, e i sats restano nel "
+                   "deposito di garanzia: apri l'ordine nella Mini App per "
+                   f"riprovare con una invoice da <b>{_fmt_sats(netto)} "
+                   "sats</b>.")
         else:
             # Tre casi e non due: sul ramo del timer nessuno ha
             # confermato niente — e' scaduto il tempo — e dirgli che
@@ -35811,7 +35932,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    f"imposta il tuo Lightning address (incassi automatici, per "
                    f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
         await notifica(o["venditore_id"], msg)
-        return {"ok": False, "stato": "confirmed"}
+        return {"ok": False, "stato": "confirmed", "ritenta": ritenta}
 
 
 async def _rimborsa_compratore(ordine_id: int) -> dict:
@@ -35938,15 +36059,22 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
 
         # Nessun metodo di rimborso disponibile: si mette in attesa
         primo_giro = o["stato"] != "refund"
+        # Il gemello del ritentativo di `_sblocca_sats`, stesse ragioni
+        ritenta = bool(taccuino.get("ritentabile") and c_utente
+                       and c_utente["ln_address"]
+                       and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
         con.execute("UPDATE ordini SET invoice_rimborso='', stato='refund', "
-                    "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
+                    "payout_stato=?, aggiornato=? WHERE id=?",
+                    ("da_riprovare" if ritenta else "",
+                     int(time.time()), ordine_id))
         con.commit()
         con.close()
-        await notifica(o["compratore_id"],
-                       f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
-                       f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
-                       f"Mini App e imposta il tuo Lightning address, oppure "
-                       f"incolla una invoice di esattamente quell'importo.")
+        await notifica(
+            o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
+            f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
+            f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
+            f"Mini App e imposta il tuo Lightning address, oppure "
+            f"incolla una invoice di esattamente quell'importo.")
         # Il gemello del ramo di sopra: anche qui chi ha perso deve
         # saperlo, e una volta sola
         if o["disputata"] and primo_giro:
@@ -35956,7 +36084,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 "I sats gli verranno rimborsati appena ci dà un modo per "
                 "riceverli. Se pensi che ci sia stato un errore, scrivi ai "
                 "moderatori.")
-        return {"ok": False, "stato": "refund"}
+        return {"ok": False, "stato": "refund", "ritenta": ritenta}
 
 
 @app.post("/api/admin/orders/{ordine_id}/risolvi")
@@ -39464,17 +39592,24 @@ async def riprova_pagamenti_sospesi():
        limitare. Costo massimo per giro: UNA fattura coniata a vuoto."""
     con = db()
     righe = []
+    adesso = int(time.time())
     for tab in ("ordini", "rimborsi_asta", "pagamenti"):
         try:
             righe += [(tab, r["id"], r["payout_verso"]) for r in con.execute(
-                f"SELECT id, payout_verso FROM {tab} "
-                "WHERE payout_stato='da_riprovare' ORDER BY id")]
+                f"SELECT id, payout_verso, payout_tentativi, payout_ultimo "
+                f"FROM {tab} WHERE payout_stato='da_riprovare' ORDER BY id")
+                # LA GUARDIA DEL BACKOFF: una riga che ha gia' bussato
+                # al nodo aspetta il suo turno. Il filtro sta QUI e non
+                # dopo il taglio di MAX_RIPRESE_GIRO, o venti righe in
+                # attesa coprirebbero quella pronta.
+                if _quando_ritentare(r["payout_tentativi"] or 0,
+                                     r["payout_ultimo"] or 0) <= adesso]
         except Exception as e:
             print(f"⚠️ Ripresa, tabella {tab} saltata: {e}")
     con.close()
     if not righe:
         return
-    ripresi = 0
+    ripresi = rinviati = 0
     for tab, riga_id, verso in righe[:MAX_RIPRESE_GIRO]:
         try:
             # la scelta della strada — e il timbro del timer riletto —
@@ -39487,6 +39622,18 @@ async def riprova_pagamenti_sospesi():
             continue
         if esito.get("non_chiesto"):
             break            # il nodo tace ancora: inutile insistere
+        if esito.get("ritenta"):
+            # HA CHIESTO UN ALTRO GIRO, e il timbro se l'e' riscritto
+            # da solo: cancellarlo qui spegnerebbe il ritentativo al
+            # primo fallimento, cioe' proprio dove serve.
+            # E SI CONTA A PARTE, non fra i «rimasti»: quel conto fa
+            # suonare l'avviso giornaliero, il cui testo dice «non
+            # riusciamo a farci leggere le fatture da LNbits, quindi non
+            # e' partito niente» — che su una riga rinviata sarebbe
+            # falso due volte. Un ritentativo in corso non e' un guasto
+            # da annunciare: e' il sistema che sta lavorando.
+            rinviati += 1
+            continue
         con = db()
         con.execute(f"UPDATE {tab} SET payout_stato='' "
                     "WHERE id=? AND payout_stato='da_riprovare'",
@@ -39494,9 +39641,9 @@ async def riprova_pagamenti_sospesi():
         con.commit()
         con.close()
         ripresi += 1
-    rimasti = len(righe) - ripresi
+    rimasti = len(righe) - ripresi - rinviati
     print(f"🔁 Pagamenti da riprovare: {len(righe)}, ripresi {ripresi}, "
-          f"restano {rimasti}")
+          f"rinviati {rinviati}, restano {rimasti}")
     # L'AVVISO SUONA SOLO SE A FINE GIRO NE RESTANO, ed e' la condizione
     # che lo rende un allarme invece che rumore: un singhiozzo di trenta
     # secondi si risolve al battito dopo e non arriva mai qui — nessun

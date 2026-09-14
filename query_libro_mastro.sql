@@ -472,3 +472,107 @@ SELECT id, stato, giri, importo_sats, contro_sats, importo_eur, contro_eur
 -- ping-pong, visto che il rilancio non consuma i tentativi per
 -- annuncio.
 SELECT id, stato, giri FROM offerte WHERE giri < 0 OR giri > 9;
+
+SELECT '23) IL CONTO DI CASSA (set 2026) — non e'' un allarme, e'' un metro' AS cassa;
+-- QUANTO DOVREBBE ESSERCI nel wallet LNbits della piattaforma, adesso.
+-- Nasce dal 14 set 2026: un payout fallito era stato scritto come
+-- riuscito, e per sapere se i sats fossero ancora in cassa non c'era
+-- nessun numero da guardare — solo un elenco di pagamenti paginato di
+-- cui non conoscevamo nemmeno l'ordine. Questo e' quel numero.
+--
+-- COME SI USA, in due gesti:
+--   1. qui si legge `saldo_atteso_sats`;
+--   2. si chiede a LNbits il saldo vero
+--      (GET /api/v1/wallet -> `balance`, in MILLIsatoshi: si divide per 1000)
+-- e si confrontano.
+--
+-- COME SI LEGGE LO SCARTO, ed e'' la parte che conta:
+--   * saldo vero POCO SOTTO l'atteso  -> NORMALE. Sono le commissioni di
+--     routing dei pagamenti in uscita, che escono davvero dal wallet e
+--     non sono registrate da nessuna parte (misurate: 179 sats su
+--     67.672, cioe'' lo 0,26%). Uno scarto sotto l'1% non dice niente.
+--   * saldo vero SOPRA l'atteso       -> GUARDARE. Vuol dire che dei
+--     sats che risultano PAGATI sono ancora qui: e'' esattamente la
+--     forma del guasto del 149, e la ragione per cui questo controllo
+--     esiste. Il censimento (`censimento_payout.py`) nomina le righe.
+--   * saldo vero MOLTO SOTTO l'atteso -> GUARDARE, ed e'' il caso
+--     peggiore dei due: dei sats sono usciti senza che una riga lo
+--     dica.
+--
+-- TRE COSE CHE QUESTO CONTO NON SA, dichiarate perche'' chi legge non
+-- ci inciampi:
+--   a) LA COMMISSIONE NON E'' FOTOGRAFATA sull'ordine. Il netto del
+--      venditore si ricalcola con la leva di OGGI, quindi il giorno che
+--      COMMISSIONE_PERCENTO cambia, le righe vecchie vengono ricontate
+--      con l'aliquota nuova e questo numero sbanda. Oggi la leva e'' 0 e
+--      il netto e'' prezzo - protezione: la riga sotto lo scrive cosi'',
+--      e chi accende la commissione deve tornare qui.
+--   b) GLI ORDINI NATI DA UN'ASTA non hanno pagato una fattura loro: i
+--      sats erano gia'' in cassa dai `rilanci`. Contarli due volte
+--      gonfierebbe l'atteso, quindi si escludono guardando l'annuncio
+--      (`asta_base_sats > 0`).
+--   c) LE FATTURE IN ENTRATA CREATE E NON PAGATE non c'entrano: non e''
+--      mai arrivato niente. Gli stati 'creato' e 'annullato' sono fuori.
+WITH
+  -- ENTRATE: gli escrow degli ordini NON nati da un'asta
+  dentro_ordini AS (
+    SELECT COALESCE(SUM(o.prezzo_sats), 0) AS sats
+      FROM ordini o LEFT JOIN annunci a ON a.id = o.annuncio_id
+     WHERE o.stato NOT IN ('creato', 'annullato')
+       AND COALESCE(a.asta_base_sats, 0) = 0),
+  -- ENTRATE: i versamenti d'asta saldati (anche i tardivi: quei sats
+  -- sono in cassa, e ne escono come rimborso)
+  dentro_aste AS (
+    SELECT COALESCE(SUM(delta_sats), 0) AS sats
+      FROM rilanci WHERE stato IN ('saldato', 'tardivo')),
+  -- ENTRATE: i nostri incassi (lo sblocco del banner)
+  dentro_nostri AS (
+    SELECT COALESCE(SUM(importo_sats), 0) AS sats
+      FROM pagamenti WHERE stato IN ('pagato', 'rimborsato')),
+  -- USCITE: il netto ai venditori sugli ordini chiusi
+  fuori_venditori AS (
+    SELECT COALESCE(SUM(prezzo_sats - protezione_sats), 0) AS sats
+      FROM ordini WHERE stato = 'released'),
+  -- USCITE: i rimborsi integrali ai compratori
+  fuori_compratori AS (
+    SELECT COALESCE(SUM(prezzo_sats), 0) AS sats
+      FROM ordini WHERE stato = 'refunded'),
+  -- USCITE: i rimborsi d'asta riscossi
+  fuori_aste AS (
+    SELECT COALESCE(SUM(importo_sats), 0) AS sats
+      FROM rimborsi_asta WHERE stato = 'riscosso'),
+  -- USCITE: gli sblocchi restituiti da un moderatore
+  fuori_nostri AS (
+    SELECT COALESCE(SUM(importo_sats), 0) AS sats
+      FROM pagamenti WHERE stato = 'rimborsato')
+SELECT
+  (SELECT sats FROM dentro_ordini)    AS in_escrow_ordini,
+  (SELECT sats FROM dentro_aste)      AS in_versamenti_asta,
+  (SELECT sats FROM dentro_nostri)    AS in_incassi_nostri,
+  (SELECT sats FROM fuori_venditori)  AS out_ai_venditori,
+  (SELECT sats FROM fuori_compratori) AS out_ai_compratori,
+  (SELECT sats FROM fuori_aste)       AS out_rimborsi_asta,
+  (SELECT sats FROM fuori_nostri)     AS out_sblocchi_resi,
+  (SELECT sats FROM dentro_ordini) + (SELECT sats FROM dentro_aste)
+    + (SELECT sats FROM dentro_nostri)
+    - (SELECT sats FROM fuori_venditori) - (SELECT sats FROM fuori_compratori)
+    - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)
+                                      AS saldo_atteso_sats;
+
+SELECT '23b) DI CHE COSA E'' FATTO L''ATTESO (le voci che restano a noi)' AS cassa;
+-- Le due leve che NON escono mai dalla cassaforte: servono a capire
+-- quanta parte dell'atteso e'' denaro NOSTRO e quanta e'' deposito di
+-- garanzia di qualcun altro. Non entrano nel conto qui sopra — sono
+-- gia'' dentro `prezzo_sats` — ma dicono dove guardare quando il numero
+-- non torna.
+SELECT
+  (SELECT COALESCE(SUM(protezione_sats), 0) FROM ordini
+    WHERE stato = 'released')                       AS protezioni_trattenute,
+  (SELECT COALESCE(SUM(prezzo_sats - protezione_sats), 0) FROM ordini
+    WHERE stato = 'released')                       AS netti_gia_usciti,
+  (SELECT COALESCE(SUM(prezzo_sats), 0) FROM ordini
+    WHERE stato NOT IN ('creato','annullato','released','refunded'))
+                                                    AS escrow_ancora_aperti,
+  (SELECT COUNT(*) FROM ordini
+    WHERE stato NOT IN ('creato','annullato','released','refunded'))
+                                                    AS ordini_aperti;

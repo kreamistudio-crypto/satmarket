@@ -2707,6 +2707,9 @@ def prove_esito_pagamento():
              "LnbitsMuto": LnbitsMuto}
     leggi = reale("_esito_lnbits")
 
+    async def _zitto(*a, **k):
+        return None
+
     # --- 1. Il lettore del corpo ------------------------------------
     # LA RIGA DEL 14 SETTEMBRE, per prima: e' la sola che il vecchio
     # codice sbagliava, ed e' quella che costa i sats.
@@ -3038,6 +3041,90 @@ def prove_esito_pagamento():
           < _oro.index("riprova_pagamenti_sospesi()"))
 
 
+    # --- 8. IL BACKOFF E LE PAROLE (cantiere B2) --------------------
+    # la scala si legge DAL SORGENTE, non si ricopia qui: altrimenti le
+    # righe che pinzano i cinque numeri proverebbero se stesse
+    _ambq = {}
+    exec([r for r in _SORGENTE.splitlines()
+          if r.startswith("BACKOFF_PAYOUT = ")][0], _ambq)
+    exec(pezzo("_quando_ritentare"), _ambq)
+    quando = _ambq["_quando_ritentare"]
+    # con `ultimo` a zero non c'e' niente da aspettare: e' la strada del
+    # quarto esito, dove il nodo non e' mai stato toccato, e il
+    # comportamento di ieri deve restare identico
+    prova("mai bussato al nodo: si riprova subito", 0, quando(0, 0))
+    prova("...anche dopo qualche giro a vuoto", 0, quando(3, 0))
+    prova("primo fallimento: cinque minuti", 1000 + 300, quando(1, 1000))
+    prova("secondo: mezz'ora", 1000 + 1800, quando(2, 1000))
+    prova("terzo: due ore", 1000 + 7200, quando(3, 1000))
+    prova("quarto: sei ore", 1000 + 21600, quando(4, 1000))
+    prova("quinto: un giorno", 1000 + 86400, quando(5, 1000))
+    prova("oltre la scala non si accorcia", 1000 + 86400, quando(99, 1000))
+
+    # --- 9. IL GIRO PESCA COL BACKOFF -------------------------------
+    def giro(tentativi, ultimo, esito=None):
+        """riprova_pagamenti_sospesi su UNA riga timbrata: dice se e'
+        stata pescata, e se il timbro e' sopravvissuto."""
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, payout_stato TEXT, "
+            "payout_verso TEXT, payout_tentativi INT, payout_ultimo INT)")
+        vero.execute("INSERT INTO ordini VALUES(1,'da_riprovare','venditore',?,?)",
+                     (tentativi, ultimo))
+        for t in ("rimborsi_asta", "pagamenti"):
+            vero.execute(f"CREATE TABLE {t}(id INTEGER PRIMARY KEY, "
+                         "payout_stato TEXT, payout_verso TEXT, "
+                         "payout_tentativi INT, payout_ultimo INT)")
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        pescate = []
+
+        async def _riprendi(tab, rid, verso):
+            pescate.append((tab, rid))
+            return esito or {"ok": True}
+
+        amb = {"db": Con, "time": __import__("time"),
+               "_riprendi_uscita": _riprendi, "MAX_RIPRESE_GIRO": 20,
+               "BACKOFF_PAYOUT": _ambq["BACKOFF_PAYOUT"],
+               "timbro_letto": lambda _n: "gia-oggi",
+               "timbro_scrivi": lambda *a: None,
+               "TIMBRO_SOSPESI": "x", "notifica_admin": _zitto,
+               "print": lambda *a, **k: None}
+        exec(pezzo("_quando_ritentare"), amb)
+        exec(pezzo_async("riprova_pagamenti_sospesi"), amb)
+        gira(amb["riprova_pagamenti_sospesi"]())
+        timbro = vero.execute("SELECT payout_stato FROM ordini "
+                              "WHERE id=1").fetchone()[0]
+        vero.close()
+        return len(pescate), timbro
+
+    adesso = int(__import__("time").time())
+    prova("timbro senza tentativi: pescata subito, e il timbro si pulisce",
+          (1, ""), giro(0, 0))
+    prova("fallita or ora: il giro NON la ripesca", (0, "da_riprovare"),
+          giro(1, adesso))
+    prova("...ma dopo cinque minuti si", (1, ""), giro(1, adesso - 301))
+    prova("al secondo giro aspetta mezz'ora", (0, "da_riprovare"),
+          giro(2, adesso - 301))
+    prova("...e dopo mezz'ora riparte", (1, ""), giro(2, adesso - 1801))
+    # LA RIGA CHE TIENE VIVO IL RITENTATIVO: se l'uscita chiede un altro
+    # giro, il timbro NON si cancella — altrimenti il backoff morirebbe
+    # al primo fallimento, cioe' esattamente dove serve.
+    prova("se l'uscita chiede un altro giro, il timbro resta",
+          (1, "da_riprovare"),
+          giro(1, adesso - 301, esito={"ok": False, "ritenta": True}))
+
+
 def prove_pagamento_incerto():
     """Il timeout di paga_venditore (ago 2026, audit). LNbits puo'
     aver pagato e non essere riuscito a dircelo: prima l'eccezione
@@ -3163,7 +3250,8 @@ def prove_pagamento_incerto():
     # Un ordine vero in un database vero (in memoria), e tutto il
     # resto di cartone: quello che si guarda e' la riga dopo.
     def mondo(payout_stato="", esiti=("incerto",), muta=False,
-              invoice="", risolvibile=False):
+              invoice="", risolvibile=False, ritentabile=False,
+              address="io@wallet.tld", tentativi=0):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
         vero.execute(
@@ -3177,10 +3265,10 @@ def prove_pagamento_incerto():
             "payout_errore TEXT DEFAULT '')")
         vero.execute(
             "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
-            f"'{invoice}',0,0,'{payout_stato}','','',0,0,0,'')")
+            f"'{invoice}',0,0,'{payout_stato}','','',0,{tentativi},0,'')")
         vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                      "vendite_ok INT, acquisti_ok INT)")
-        vero.execute("INSERT INTO utenti VALUES(222,'io@wallet.tld',0,0)")
+        vero.execute("INSERT INTO utenti VALUES(222,?,0,0)", (address,))
         vero.commit()
 
         class Con:
@@ -3195,8 +3283,11 @@ def prove_pagamento_incerto():
             def close(self):
                 pass
 
-        tentativi, coniate = [], []
+        tentativi, coniate, detto = [], [], []
         resto = list(esiti)
+
+        async def _dice(chi, testo, *a, **k):
+            detto.append((chi, testo))
 
         async def _paga(bolt11, atteso, diario=None):
             tentativi.append((bolt11, atteso))
@@ -3208,6 +3299,9 @@ def prove_pagamento_incerto():
                 # dal cantiere B: con un hash in mano l'incerto si
                 # risolve da solo, e il finto deve dirlo come il vero
                 diario["risolvibile"] = risolvibile
+                # ...e se una fattura NUOVA avrebbe senso: e' la leva
+                # che accende il ritentativo col backoff
+                diario["ritentabile"] = ritentabile
             return resto.pop(0) if resto else "non_pagato"
 
         async def _address(addr, importo):
@@ -3228,7 +3322,7 @@ def prove_pagamento_incerto():
                "invoice_da_ln_address": _address, "paga_venditore": _paga,
                "_righe_ordine": lambda con, o: [],
                "_titolo_ordine": lambda righe: "una cosa",
-               "cambio_btc_eur": _niente, "notifica": _niente,
+               "cambio_btc_eur": _niente, "notifica": _dice,
                "premia_distintivi": _niente, "polso_ordini_admin": _niente,
                "notifica_admin": _niente, "_payment_hash": _niente,
                # Gli XP dell'affare concluso (ago 2026): qui non si
@@ -3258,8 +3352,11 @@ def prove_pagamento_incerto():
         exec(pezzo("_sospendi_pagamento"), amb)
         # e il terzo, quello del volo: stessa ragione dei due sopra
         exec(pezzo("_in_volo"), amb)
+        # la frase del ritentativo gira DAVVERO: uno stub direbbe di si'
+        # a prescindere, e qui il punto e' proprio CHE COSA dice
+        exec(pezzo("_msg_ritentiamo"), amb)
         exec(pezzo_async("_sblocca_sats"), amb)
-        return amb["_sblocca_sats"], vero, tentativi, coniate
+        return amb["_sblocca_sats"], vero, tentativi, coniate, detto
 
     def riga(vero):
         r = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
@@ -3267,7 +3364,7 @@ def prove_pagamento_incerto():
 
     # il nodo tace e il pagamento non ha un nome: si congela come
     # sempre — e' la strada che resta quando non c'e' niente da chiedere
-    sblocca, vero, tentativi, coniate = mondo(esiti=("incerto",))
+    sblocca, vero, tentativi, coniate, _d = mondo(esiti=("incerto",))
     gira(sblocca(1))
     prova("incerto: lo stato dell'ordine NON si riscrive",
           ("delivered", "incerto", "venditore"), riga(vero))
@@ -3283,7 +3380,7 @@ def prove_pagamento_incerto():
 
     # ...ma se quel pagamento un NOME ce l'ha, nessuno sveglia
     # nessuno: la riga va IN VOLO e il giro la scioglie da solo.
-    sblocca, vero, tentativi, coniate = mondo(esiti=("incerto",),
+    sblocca, vero, tentativi, coniate, _d = mondo(esiti=("incerto",),
                                               risolvibile=True)
     esito = gira(sblocca(1))
     prova("incerto con un nome: la riga vola, non si congela",
@@ -3297,14 +3394,14 @@ def prove_pagamento_incerto():
     vero.close()
 
     # il nodo risponde di no: il ramo di sempre, invariato
-    sblocca, vero, tentativi, _ = mondo(esiti=("non_pagato",))
+    sblocca, vero, tentativi, _, _d = mondo(esiti=("non_pagato",))
     gira(sblocca(1))
     prova("fallimento vero: si va in 'confirmed' come sempre",
           ("confirmed", "", ""), riga(vero))
     vero.close()
 
     # il moderatore ha guardato su LNbits: era uscito
-    sblocca, vero, tentativi, coniate = mondo(payout_stato="uscito")
+    sblocca, vero, tentativi, coniate, _d = mondo(payout_stato="uscito")
     gira(sblocca(1))
     prova("«è uscito»: si chiude l'ordine SENZA pagare di nuovo",
           ("released", "uscito", ""), riga(vero))
@@ -3313,7 +3410,7 @@ def prove_pagamento_incerto():
     vero.close()
 
     # regressione: il giorno buono resta il giorno buono
-    sblocca, vero, tentativi, _ = mondo(esiti=("pagato",))
+    sblocca, vero, tentativi, _, _d = mondo(esiti=("pagato",))
     gira(sblocca(1))
     # 'uscito' dal set 2026: prima il vuoto voleva dire sia «mai
     # provato» sia «riuscito», cioe' non voleva dire niente — ed e'
@@ -3333,7 +3430,7 @@ def prove_pagamento_incerto():
     # notizia che il suo wallet non aveva risposto come doveva.
     # (a) la strada dell'invoice INCOLLATA A MANO: `paga_venditore` ha
     #     chiesto il decode, non ha avuto risposta, e torna NON_CHIESTO
-    sblocca, vero, tentativi, coniate = mondo(esiti=("non_chiesto",),
+    sblocca, vero, tentativi, coniate, _d = mondo(esiti=("non_chiesto",),
                                               invoice="lnbc-del-venditore")
     prima = dict(vero.execute("SELECT * FROM ordini WHERE id=1").fetchone())
     gira(sblocca(1))
@@ -3356,7 +3453,7 @@ def prove_pagamento_incerto():
     #     lasciarne traccia: e' quel che il giro rilegge per sapere
     #     con che parole notificare, e senza l'ordine ripreso direbbe
     #     al venditore «l'acquirente ha confermato la ricezione»
-    sblocca, vero, _, _ = mondo(esiti=("non_chiesto",),
+    sblocca, vero, _, _, _d = mondo(esiti=("non_chiesto",),
                                 invoice="lnbc-del-venditore")
     gira(sblocca(1, automatico=True))
     prova("non chiesto: il timbro del timer resta scritto", True,
@@ -3369,7 +3466,7 @@ def prove_pagamento_incerto():
     #     della fattura appena coniata dal wallet del venditore, e
     #     l'eccezione deve arrivare fin qui invece di travestirsi da
     #     «nessun metodo di pagamento»
-    sblocca, vero, tentativi, coniate = mondo(muta=True)
+    sblocca, vero, tentativi, coniate, _d = mondo(muta=True)
     gira(sblocca(1))
     prova("non chiesto (address): si timbra, non si va in 'confirmed'",
           ("delivered", "da_riprovare", "venditore"), riga(vero))
@@ -3378,7 +3475,7 @@ def prove_pagamento_incerto():
     vero.close()
 
     # e il giro dopo, col nodo tornato, paga davvero
-    sblocca, vero, tentativi, _ = mondo(esiti=("pagato",),
+    sblocca, vero, tentativi, _, _d = mondo(esiti=("pagato",),
                                         invoice="lnbc-del-venditore")
     vero.execute("UPDATE ordini SET payout_stato='da_riprovare', "
                  "payout_verso='venditore' WHERE id=1")
@@ -3388,6 +3485,68 @@ def prove_pagamento_incerto():
     prova("da riprovare: si riusa la invoice di prima, non se ne conia",
           [("lnbc-del-venditore", 1000)], tentativi)
     vero.close()
+
+    # --- 2-ter. LE PAROLE AL VENDITORE (cantiere B2) ----------------
+    # Quella che se ne va diceva «il tuo wallet non ha risposto come
+    # doveva»: su un fallimento di ROTTA il wallet non era mai stato
+    # RAGGIUNTO, e la colpa cadeva addosso a chi aspettava i soldi.
+    # ⚠️ SENZA LA PROSA: la docstring della frase nuova CITA quella
+    # vecchia per dire perche' se n'e' andata, e una sentinella che
+    # cercasse nel file intero diventerebbe rossa per colpa della
+    # spiegazione — la trappola gia' pagata tre volte in due giorni.
+    _sbl2 = codice(_senza_prosa(pezzo("_sblocca_sats")))
+    prova("sentinella: la frase che accusava il wallet non c'e' piu'",
+          True, "il tuo wallet non ha risposto" not in _sbl2)
+
+    def parole(**kw):
+        sblocca2, vero2, _, _, detto = mondo(esiti=("non_pagato",), **kw)
+        esito = gira(sblocca2(1))
+        r2 = vero2.execute("SELECT payout_stato FROM ordini "
+                           "WHERE id=1").fetchone()
+        vero2.close()
+        return (" ".join(t for chi, t in detto if chi == 222),
+                r2[0], bool(esito.get("ritenta")))
+
+    testo, timbro, ritenta = parole(ritentabile=True)
+    prova("fallito col Lightning address: la riga si timbra",
+          ("da_riprovare", True), (timbro, ritenta))
+    prova("...e al venditore si dice che ci pensiamo NOI", True,
+          "ci riproviamo noi" in testo)
+    prova("...che i sats sono suoi e dove stanno", True,
+          "Sono tuoi" in testo and "deposito di garanzia" in testo)
+    # LA RIGA PIU' IMPORTANTE DELLE PAROLE: mentre una macchina sta
+    # gia' agendo, un invito ad agire produce due fatture e nessuna
+    # certezza — e al venditore fa credere che tocchi a lui.
+    prova("...e non gli si chiede di fare niente", False,
+          "incolla una invoice" in testo)
+
+    testo, timbro, ritenta = parole(ritentabile=True, tentativi=5)
+    prova("esauriti i tentativi: niente timbro, e adesso si chiede a lui",
+          ("", False), (timbro, ritenta))
+    prova("...con le parole della resa", True,
+          "Non siamo riusciti a consegnarti i sats" in testo
+          and "incolla una invoice" in testo)
+
+    testo, timbro, _ = parole(ritentabile=True, address="",
+                              invoice="lnbc-bruciata")
+    prova("senza address non si ritenta da soli", "", timbro)
+    # dirgli «riprova» senza dirgli «con una NUOVA» lo manderebbe a
+    # incollare la stessa, che LNbits non ripaghera' mai
+    prova("...e gli si dice che quella fattura e' bruciata", True,
+          "non si può più usare" in testo and "<b>nuova</b>" in testo)
+
+    testo, timbro, _ = parole()
+    prova("non ritentabile: nessun timbro", "", timbro)
+    prova("...e NON si dichiara un fallimento che non si e' visto",
+          True, "non sono ancora partiti" in testo
+          and "fallito" not in testo)
+
+    # e il giro giornaliero non chiama «fermo» quel che sta lavorando:
+    # il suo avviso dice «non e' partito niente», che su una riga
+    # rinviata sarebbe falso due volte
+    prova("sentinella: i rinviati non contano fra i fermi", True,
+          "rimasti = len(righe) - ripresi - rinviati"
+          in codice(pezzo("riprova_pagamenti_sospesi")))
 
     # --- 3. SENTINELLE ----------------------------------------------
     # Il tri-stato sparisce in un riordino: basta che qualcuno rimetta
@@ -17568,8 +17727,19 @@ def prove_pagina_acquisto():
     srv = open("server.py", encoding="utf-8").read()
     prova("la scala del testo si applica in UN posto solo", 1,
           mini.count("html{zoom:var(--fs-zoom,1)}"))
-    for riga_vh in re.findall(r"(?:min|max)-height:calc\([^;]*?d?vh[^;]*\)",
-                              mini):
+    # ⚠️ IL SETACCIO GUARDA ANCHE `height:` NUDO, e la riga che
+    # glielo ha insegnato e' costata un difetto vero (set 2026):
+    # `.sheet.pieno` fissava `height:calc(100dvh - ...)` senza il
+    # `min-`/`max-` davanti, e questa prova — che la regola la
+    # diceva già per intero — non la vedeva nemmeno. Due delle
+    # dieci dichiarazioni di oggi entrano SOLO da qui.
+    # E NON SBAVA PIU' NEL VICINO: il corpo del calc si ferma alla
+    # dichiarazione (niente `;`, `{`, `}` né a capo dentro), o un
+    # match lungo tre righe farebbe passare una riga rotta per il
+    # `var(--fs-zoom,1)` della sua vicina.
+    for riga_vh in re.findall(
+            r"(?<![-\w])(?:(?:min|max)-)?height:\s*calc"
+            r"\([^;{}\r\n]*?d?vh[^;{}\r\n]*\)", mini):
         prova("altezza di viewport divisa per la scala: "
               + riga_vh[:44], True, "var(--fs-zoom,1)" in riga_vh)
     prova("la misura vive anche in colonna (segue la persona)", True,
