@@ -13013,3 +13013,41 @@ dove si dice perché se n'è andato.
 Le tre rese della commissione provate a mano in un banco node, su
 quattro casi (ignota, 0, 2% → metà 1%, 1% → metà 0,5%): nessuna porta
 più la riga del listino, nemmeno quella che prima la faceva comparire. **9727 verdi.**
+
+⚠️ **E ALLA TERZA STESURA IL TITOLO HA SMESSO DI SOMIGLIARE AL CAPPELLO
+E HA INDOSSATO QUELLO** (richiesta di Andrea: «oltre alla misura, la
+STESSA forma — stessa aria sopra e sotto, e la riga che lo stacca;
+riusa lo stesso vestito, non una regola nuova»). Le tre stesure in fila
+dicono la parabola: 19px come i due tab della sorella → la sola
+**misura** del cappello, presa da una variabile → il cappello
+**intero**, cioè `.foglio-testa` col suo `h3`. Con l'ultima se ne va
+`.p2p-miei-tit`: **niente vestito orfano**, e soprattutto niente copia
+da tenere in pari — una copia si scolla al primo ritocco, e non se ne
+accorge nessuno finché non si mettono le due pagine una accanto
+all'altra.
+
+⚠️ **E PER INDOSSARLO FUORI DA UN FOGLIO MANCAVA UN PEZZO, che dal
+sorgente non si vedeva:** il **carattere e il peso** del cappello
+venivano da `.sheet h3`, non da `.foglio-testa h3`. Un cappello messo
+fuori da un `.sheet` restava **giusto di taglia e col font di
+sistema** — il difetto che si vede solo misurando, come il 16,5 della
+voce qui sopra. La cura è una riga sola: `.sheet h3` è diventata
+`.sheet h3,.foglio-testa h3`, così il vestito del cappello vale dovunque
+lo si metta. Dentro un foglio non cambia un pixel — i due selettori
+danno gli stessi valori.
+**MISURATO, e i due sono identici in tutto quel che è dichiarato**:
+padding 12/10, margine 2, `border-bottom: 1px solid var(--line-soft)`,
+18px/800/Baloo, centrato. L'unica differenza è dove comincia la
+scatola: il mio va da 16 a 359 (dentro il rientro di `.sicu`), quello
+del foglio da 0 a 375 (a pieno schermo il foglio il rientro non ce
+l'ha). È la differenza giusta — **la riga di separazione cade esatta
+sul bordo della fila di strumenti sotto**, 16 e 359 come lei.
+
+⚠️ **E UNA SENTINELLA LEGGEVA LA REGOLA SBAGLIATA**, trovata scrivendo
+queste righe: `pezzo_js(mini, "  .foglio-testa{", "}")` combacia **anche
+dentro i quattro spazi** della gemella nella media query — che nel
+foglio viene prima e porta solo il padding. Cercava il bordo e leggeva
+un padding. È la famiglia delle *prove che rispondono per il vicino*,
+stavolta su un'**indentazione** invece che su un contenitore: si ancora
+alla prima dichiarazione (`.foglio-testa{display:flex`), che è di una
+sola delle due.
