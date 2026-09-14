@@ -11953,3 +11953,121 @@ premio non c'è per definizione, quindi la seconda riga è il solo euro —
 ed è l'unica card che non dice l'altra metà del prezzo che l'autore ha
 scritto. Se un giorno la si vuole colmare, il posto è lo slot del
 premio, che su quelle card è vuoto: una riga di codice.
+
+⚠️ **E LA SCELTA È ARRIVATA IL GIORNO DOPO: i sats TORNANO**, accanto
+al premio e dietro un puntino. Il resto lo racconta «La vista prende
+gli strumenti del libro», qui sotto.
+
+
+## La vista prende gli strumenti del libro (14 set 2026)
+
+**IL TITOLO «I tuoi scambi» SE N'È ANDATO**, e al suo posto c'è la
+stessa riga del libro: **«Ordina»** a sinistra, **«Filtro»** in mezzo,
+la **levetta del tema** a destra. Il titolo ripeteva il nome che la nav
+dice già due centimetri più giù — la seconda copia della stessa verità
+— mentre quella riga è tre comandi che prima qui non c'erano.
+**LE CLASSI SONO QUELLE DI LÀ**, ed è la decisione che ha risparmiato
+più codice: `.p2p-testa-riga`, `.p2p-filtro`, `.p2p-ordina`,
+`.tema-btn`. Così l'arancio dell'attivo, il margine automatico che
+centra la pillola di mezzo e le misure già pagate arrivano tutti dal
+libro, tarati. Misurato: a **375** la riga sta su una riga sola e il
+centro del «Filtro» cade a **0,00px** dal punto medio fra «Ordina» e la
+levetta; a **320** va a capo — la levetta scende — **esattamente come
+quella del libro**, stesse larghezze e stessa altezza (77px). Non è un
+difetto introdotto qui: è il comportamento della sorella, e le due
+restano gemelle anche quando cedono.
+
+**IL FOGLIO «ORDINA» È IL PICKER DI CASA**, come nel libro: una
+`<select hidden>` che fa da deposito del valore E da catalogo delle
+voci, più una riga nel `PICKER`. Quattro criteri, ognuno coi suoi due
+nomi (`data-corta`): **Più recenti** (il predefinito, cioè quel che la
+striscia faceva da sempre), **Prima quelli da fare**, **Importo: dal
+più grande**, **dal più piccolo**.
+⚠️ **E NON SI PRENDE IN PRESTITO `ordinaLibroP2P`**, che è la riga da
+tenere: il suo metro è la **convenienza**, e su un ordine tuo la
+convenienza non vuol dire niente — il premio l'hai scelto tu. Due
+mestieri diversi, due funzioni; quel che si riusa è `capoImportoP2P`,
+perché «quale capo di un intervallo conta nella direzione chiesta» è la
+stessa domanda in tutt'e due i posti.
+
+**IL FILTRO È PER STATO, e i cinque gruppi sono una PARTIZIONE:**
+**Tocca a te · In corso · Nel libro · Conclusi · Annullati**. Ogni
+stato cade in uno e uno solo — c'è la prova, girata su tutt'e due i
+lati — e non è pignoleria: così i conti tornano (la somma dei gruppi è
+il totale, e il foglio li mostra accanto a ogni pillola) e due gruppi
+scelti insieme non possono mostrare due volte la stessa card.
+⚠️ **IL GIUDICE DI «Tocca a te» È QUELLO DELLA CARD**
+(`azioniDisponibili`) e non una seconda lista di stati: due liste della
+stessa cosa si scollano, e il giorno che si scollassero la pillola
+direbbe un numero e il 👉 sulle card un altro — senza che niente
+protesti. Una prova pianta i quattro casi, gli stessi che accendono il
+dito.
+**QUEL CHE RESTA FUORI, dichiarato:** `annullo_proposto` («l'altra
+persona vuole annullare») e il voto da dare sono gesti miei, ma non
+escono da `azioniDisponibili` — che è, per decisione vecchia, l'UNICO
+bottone pieno della pagina — quindi finiscono in «In corso» e in
+«Conclusi». È coerenza col 👉, non una svista: il giorno che si vuole
+allargare «tocca a te» si allarga QUEL giudice, e si muovono insieme.
+
+**DUE SENTINELLE SONO STATE ROVESCIATE, col loro perché accanto.**
+Dicevano «i miei scambi non si riordinano» e ««I miei scambi» non si
+filtrano» — decisioni di Andrea, e il motivo scritto allora era buono:
+*nasconderne uno perché il premio non rientra vorrebbe dire perdere di
+vista uno scambio in corso*. Quel motivo **resta giusto**: a cambiare è
+la LEVA. Qui non si filtra per com'è fatta un'offerta (premio, valuta,
+metodo) ma per dove è arrivata — e «In corso» è una delle scelte,
+quindi il rischio di allora non c'è. Il divieto che sopravvive è il
+**prestito**, e le due sentinelle adesso sorvegliano quello.
+
+**IL RIQUADRO DELLO STATO SI COLORA, con la palette del MERCATINO.**
+Non nasce nessun colore: il riquadro prende le stesse classi `.badge.*`
+con cui il mercatino veste gli stati di un ordine, e qui si rimette a
+posto la sola **geometria** — là sono pillole da 11px, qui è un
+riquadro. I significati sono quelli di là e si rispettano:
+- **arancio** — c'è un gesto da fare, o i sats sono in deposito;
+- **viola** — la palla è dall'altra parte: si aspetta una conferma;
+- **azzurro** — qualcosa è in viaggio (i sats liberati che stanno
+  arrivando: l'unico stato che il mercatino chiamerebbe «spedito»);
+- **verde** — finito bene. ⚠️ Il verde è il registro della FIDUCIA e
+  non se lo prende nessun altro stato;
+- **rosso** — ⚠️ nel mercatino il rosso è **solo** della disputa, e qui
+  vale identico: un ritardo non è un problema conclamato;
+- **spento** — finito senza esito (annullato, rifiutato, nessuna
+  risposta).
+**IL NEUTRO È «non è ancora successo niente che ti riguardi»** — la
+richiesta di Andrea era «"Ordine pubblicato" resta neutro», e con lui
+ci stanno i suoi due gemelli di un istante (`pubblico`, `prendo`),
+mentre la risposta è in volo. Non è un terzo caso: è lo stesso.
+⚠️ **E LA MAPPA È ESAUSTIVA, con la prova che la tiene tale**: ogni
+stato che la macchina sa produrre ha la sua voce, e ogni voce il suo
+stato. Uno stato nuovo senza tinta uscirebbe **neutro** — cioè direbbe
+«non è successo niente» proprio quando è successo qualcosa —, ed è un
+difetto che non rompe niente e non si vede. Altre due prove piantano le
+due regole che si perdono per prime: il rosso solo alla disputa, il
+verde solo al concluso.
+⚠️ **IL CONTORNO SPARISCE QUANDO C'È IL FONDO**, ma resta dichiarato
+trasparente: a dare la forma basta la tinta, e senza quella riga la
+scatola si accorcerebbe di tre pixel passando da uno stato all'altro.
+
+**I SATS SONO TORNATI** (richiesta di Andrea), accanto al premio:
+«5,00 € +6% · ≈ 8 943 sats». Con loro è tornata `satsScambioP2P` —
+nata, morta e risorta in un giorno — e la riga di CSS che impedisce
+alla cifra di vestirsi del tab del *libro*. La sentinella di quel
+colore è ormai alla **terza stesura**: neutralizzatore, poi rovesciata
+quando i sats se n'erano andati, e adesso di nuovo al suo posto. Quel
+che non è mai cambiato è la domanda.
+⚠️ **E IL PUNTINO STA FUORI DALLO SPAN DEI SATS**, che è una misura
+presa in vetrina e non un gusto: dentro, quando la cifra va a capo — a
+375 succede a due card su otto — la riga nuova **cominciava col punto**
+e si leggeva come un elenco puntato. Da solo è un elemento del flex
+largo quattro pixel, che in fondo alla riga di prima ci sta sempre: e
+lì vuol dire «continua sotto».
+
+**I NUMERI.** Suite: **9572 → 9616, zero rosse** (+44), anche con
+`PROVE_SEVERE=1`. Dal vivo, oltre ai quattro scatti nei due temi a 375
+e 320, il giro dei GESTI: il picker apre coi suoi quattro criteri e il
+titolo giusto, la scelta riordina e accende l'arancio; il foglio del
+filtro mostra i cinque gruppi **coi conti veri accanto** (2+3+1+1+1 su
+otto scambi: la partizione si vede), «Applica» porta la lista a due e
+la pillola a «2 scambi», «Cancella» rimette tutto. A 320 il documento
+resta largo 320 e nessuna card sfora.
