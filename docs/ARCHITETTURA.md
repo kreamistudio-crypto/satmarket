@@ -23974,8 +23974,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   — una sentinella lo conta. Le chiavi di ieri passano al primo conto
   che entra (`allineaContoP2P`, da `avvia`), solo su un posto vuoto.
   IL MAZZO DERIVATO SA DI CHI È: il campo `conto` porta il tg_id da cui
-  nasce; un mazzo 'conto' con un altro tg_id è «estraneo» (giudizio
-  sincrono), uno senza il campo è «da verificare» col seme, una volta.
+  nasce; un mazzo 'conto' con un altro tg_id è «estraneo» — giudizio
+  SINCRONO, la scorciatoia che non chiede niente a nessuno perché la
+  prova ce l'ha in mano. ⚠️ DAL 14 SET 2026 TUTTO IL RESTO LO DECIDE UN
+  GIUDICE SOLO (`giudicaMazzoP2P`, vedi più sotto): i tre predicati di
+  prima erano indicizzati su `origine`, e tre fette disgiunte di un
+  campo descrittivo non coprono l'insieme.
   L'ESTRANEO SI METTE DA PARTE sotto `@altrui:<pub>` e non si rilegge
   (la regola delle lapidi); la sua copia nel cloud, se è quella, se ne
   va — un profilo del conto rinasce dal suo account. I giudici e
@@ -24003,21 +24007,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   in CANTIERI, voce «LE MIE IDENTITÀ POSSONO ESSERE DUE».
   ⚠️ E SCRIVERE DA DUE NON SI PUÒ (14 set 2026, il rovescio): leggere da
   due identità è giusto per sempre, pubblicare da due costruirebbe due
-  storie sullo stesso account. `cediIlPostoAlContoP2P` giudica UNA volta
-  per sessione ogni mazzo non 'conto' — dal render, da `assicuraMazzo`
-  (cioè prima di firmare) e dal foglio del profilo — e il profilo del
-  conto prende il posto di uno che non ha MAI scambiato: indice zero
-  DOPO il pavimento del server, nessuna riga, nessuna lapide
-  (`senzaStoriaP2P`, e ognuno dei tre da solo sarebbe una scommessa).
-  Con una storia il posto non si tocca e lo dice il foglio, che offre il
-  gesto (`passaAlContoDalFoglioP2P`); la strada sovrana ('mia') non
-  cede mai da sola —
-  il foglio le ha promesso che quella chiave non la ricava nessuno, noi
-  compresi. Il vecchio va sulla mensola `@altrui:<pub>` come sempre, e
-  il journal dice QUALE dei due inquilini sta mettendo via (la `nota` di
-  `parcheggiaMazzoAltruiP2P`). Il seme si chiede una volta per sessione
-  (`semeContoP2P`). Verbale in CANTIERI, «IL POSTO CEDUTO AL PROFILO
-  DEL CONTO».
+  storie sullo stesso account. `giudicaMazzoP2P` giudica UNA volta per
+  sessione il mazzo che trova — dal render, da `assicuraMazzo` (cioè
+  prima di firmare) e dal foglio del profilo — e la sua tabella è
+  ESAUSTIVA per costruzione, perché l'ultimo ramo è «tutto il resto»:
+
+      il conto non risponde        → ignoto, non si tocca niente
+      è il seme                    → mio: si timbra e basta
+      dice un conto NON mio, o non
+      dice quale                   → mensola (l'ambiguo del 10 set)
+      strada sovrana ('mia')       → avviso, mai in silenzio
+      il resto, con storia         → tenuto, e lo dice il foglio
+      il resto, senza storia       → cede il posto al profilo del conto
+
+  «SENZA STORIA» HA TRE APPIGLI (`senzaStoriaP2P`): indice zero DOPO il
+  pavimento del server, nessuna riga di scambio, nessuna lapide — ognuno
+  da solo sarebbe una scommessa. Il pavimento se lo chiede il giudice, e
+  solo DOPO aver escluso i conti altrui: registrare la pubkey di un
+  mazzo ancora da giudicare intesterebbe a me, in `p2p_indice`, la
+  chiave di un altro. Per la stessa ragione il render non registra e non
+  chiede la restore finché il giudizio non ha risposto.
+  ⚠️ `origine` NON È UNA SOLA ETICHETTA: un mazzo che DICHIARA di venire
+  da un account e non è il mio è un indizio, e resta un fatto del
+  giudizio; il timbro col MIO tg_id invece lo salva — l'ha scritto una
+  mia sessione, quindi è mio, e vale la regola della storia. Quel che
+  `origine` non è più è un CRITERIO sparso in tre predicati.
+  Il vecchio va sulla mensola `@altrui:<pub>` come sempre, e il journal
+  dice QUALE dei due inquilini sta mettendo via (la `nota` di
+  `parcheggiaMazzoAltruiP2P`); il gesto per chi tiene il posto è
+  `passaAlContoDalFoglioP2P`. Il seme si chiede una volta per sessione
+  (`semeContoP2P`), e il mazzo del conto lo costruisce UN SOLO posto
+  (`mazzoDalSemeP2P`: col secondo argomento timbra, e indice e nascita
+  restano quelli del mazzo che c'era). Verbale in CANTIERI, «IL POSTO
+  CEDUTO AL PROFILO DEL CONTO» e «I TRE PEZZI DEL QUADRO D'INSIEME».
+  ⚠️ E PRIMA DI FIRMARE SI GUARDA DI CHI È L'ORDINE: otto posti derivano
+  la trade key dal mazzo vivo dando per scontato che la riga sia sua, e
+  solo `mostroArriva` controllava che la chiave tornasse — in ARRIVO. In
+  uscita la cintura sta in `chiamataOrdineP2P`, la porta unica di presa,
+  fattura, rilascio, ritiro, voto e disputa: `ordineDiUnAltroMazzoP2P`
+  risponde con la RESTORE (la parola del coordinatore, l'unica che
+  smaschera una riga ricostruita con la chiave storta) e poi con la
+  derivazione, ed è fail-OPEN sull'ignoranza — una cintura che ferma
+  quando non sa ferma un gesto legittimo, e uno scambio anonimo ha
+  indice 0 con una chiave buona.
   ⚠️ E LA CINTURA DEGLI SCAMBI APERTI LEGGE LO STATO VIVO (14 set 2026):
   `scambiApertiP2P` contava le righe locali non finali — una memoria, non
   un fatto — e un ordine già annullato o scaduto dal lato del

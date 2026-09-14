@@ -11626,3 +11626,118 @@ unexpected keyword argument 'proxies'`) sulla riga
 cantiere: il giro sopra l'ha aggirato SOLO nel processo di prova
 (un `Anthropic` finto iniettato prima dell'import), senza toccare le
 dipendenze vere. Da guardare in un cantiere suo.
+
+I TRE PEZZI DEL QUADRO D'INSIEME (14 set 2026, dopo il quarto giro sullo
+stesso punto — chiesto da Andrea: «fermati, fammi il quadro, e dimmi se
+il disegno regge o va semplificato»).
+IL QUADRO, in numeri: cinque SORGENTI da cui un mazzo può nascere (il
+gesto, la gamba dell'app, il cloud, il parcheggio, la cessione), TRE
+giudici, QUATTRO posti dove un'identità vive (localStorage, mensola
+`@altrui:`, cloud Telegram, server), TRE famiglie di domande al
+coordinatore e ~17 bandierine di sessione. Il disegno non ha cicli e
+ogni bandierina ha il suo perché: da quel lato reggeva.
+DOVE AVEVA CEDUTO ERA IL CRITERIO. Tutti e tre i giudici erano
+indicizzati su `origine`, che dice la PROVENIENZA, mentre ogni decisione
+dipende da altro. E tre predicati su tre fette disgiunte di un campo
+descrittivo hanno una conseguenza strutturale: **le fette non coprono
+l'insieme**. Quel che restava fuori — un mazzo 'conto' col MIO timbro ma
+con una sk che il seme di oggi non rifà più, cioè la popolazione che il
+sale non committato dell'8-9 set ha fabbricato — non lo guardava
+nessuno. Non era sfortuna: era il modo in cui quel disegno sbagliava.
+
+PEZZO 1 — LA CINTURA PRIMA DI FIRMARE, ed è lo strato che stava sotto
+all'avviso. OTTO posti derivano la trade key da
+`chiaveScambio(mazzoVivo.sk, riga.indice)` dando per scontato che la
+riga sia di questo mazzo, e UNO SOLO controllava che la chiave tornasse:
+`mostroArriva`, in ARRIVO. In uscita no — e `chiamataOrdineP2P` è la
+porta unica di presa, fattura, rilascio, RITIRO, voto e disputa. Con una
+riga di un'altra identità il messaggio partiva firmato da una chiave che
+quell'ordine non ha mai visto: il coordinatore lo scarta e a schermo non
+succedeva niente. **È il «non riesco più ad annullare» che ci siamo
+portati dietro due giorni.**
+`ordineDiUnAltroMazzoP2P` risponde con due fonti in ordine di forza: la
+RESTORE — la parola del coordinatore, e l'unica che smaschera una riga
+ricostruita con la chiave storta, perché quella una chiave di questo
+mazzo ce l'ha scritta sopra — e poi la DERIVAZIONE, per le righe che la
+restore non ha ancora nominato. FAIL-OPEN sull'ignoranza, e qui è il
+verso giusto: una cintura che ferma quando non sa ferma un gesto
+legittimo, e uno scambio ANONIMO ha indice 0 con una chiave buona (da lì
+anche la correzione a `rigaDiQuestoMazzoP2P`: lo zero è un indice).
+E IL CONTEGGIO DELL'AVVISO PASSA DALLO STESSO GIUDICE — con la restore
+chiesta se manca, perché al foglio ci si arriva anche da «I tuoi dati»
+senza passare dalla vista P2P. Se la restore tace, nessun numero: un
+avviso sbagliato spaventa per la ragione opposta a quella vera.
+Collaudato: **537 verdi nelle sezioni toccate (+13), 7 mutazioni e 7
+uccise.**
+
+PEZZO 2 — UN GIUDICE SOLO, E LA TABELLA È ESAUSTIVA. `giudicaMazzoP2P`
+prende il posto di `mazzoDaVerificareP2P` + `mazzoDiDispositivoP2P` (la
+scorciatoia sincrona dell'estraneo resta: la prova ce l'ha in mano e non
+costa una POST), e l'ultimo ramo è «tutto il resto»:
+il conto non risponde → ignoto; è il seme → mio, si timbra; dice un
+conto NON mio o non dice quale → mensola (l'ambiguo del 10 set); strada
+sovrana → avviso, mai in silenzio; il resto con storia → tenuto; il
+resto senza storia → cede il posto.
+⚠️ `origine` NON È DIVENTATA UNA SOLA ETICHETTA, e il quadro d'insieme
+lo diceva troppo forte: un mazzo che DICHIARA di venire da un account e
+non è il mio è un indizio forte, e resta un fatto del giudizio. Il
+timbro col MIO tg_id invece lo SALVA — l'ha scritto una mia sessione,
+quindi è mio, e vale la regola della storia. È così che la fetta
+scoperta si chiude: metterlo sulla mensola perché «dice conto» ne
+butterebbe via la reputazione in silenzio.
+E IL PAVIMENTO SI CHIEDE DOPO, non prima: registrare la pubkey di un
+mazzo ancora da giudicare intesterebbe a me, in `p2p_indice`, la chiave
+di un altro. Da dove sta adesso si sa già che è mio. Per la stessa
+ragione il render non registra e non chiede la restore finché il
+giudizio non ha risposto — due freni dove prima ce n'era uno solo.
+IL PREZZO, DICHIARATO: una POST del seme per sessione per TUTTI (era per
+i soli mazzi non-'conto'), memoizzata. È la strada che il 10 set aveva
+scartato per il costo — ma l'obiezione vera di allora era «non distingue
+di un altro da mio col sale cambiato», e a quella risponde il test della
+storia, che allora non esisteva.
+Collaudato: **538 verdi nelle sezioni toccate, 9453 nel giro intero, 8
+mutazioni e 8 uccise.**
+
+PEZZO 3 — IL MAZZO DEL CONTO NASCE IN UN POSTO SOLO. Lo stesso oggetto
+era scritto a mano in tre posti più il timbro con un `Object.assign`, e
+il difetto del 10 set è stato esattamente questo: un campo aggiunto in
+due copie su tre, col derivato che senza `conto` si rileggeva «da
+verificare» a ogni render. `mazzoDalSemeP2P(s, vecchio)`: col secondo
+argomento TIMBRA, e indice, nascita e debito restano quelli del mazzo
+che c'era — un timbro che azzerasse l'indice farebbe riusare una trade
+key bruciata, ed è la prima mutazione della tortura.
+Collaudato: **541 verdi nelle sezioni toccate, 9532 nel giro intero, 5
+mutazioni e 5 uccise.**
+
+COSA RESTA APERTO, a verbale e non dimenticato: la promessa della
+ROTAZIONE del segreto (`/api/p2p/seme` dice che dopo una rotazione si
+passa alla versione nuova «con un gesto», e quel gesto non esiste:
+`_sale_profilo_p2p` scrive il sale una volta e la versione non la muove
+nessuno — innocuo finché non si ruota); l'esito `'ignoto'` è MUTO (il
+seme non risponde, e a schermo non c'è niente che lo dica); e due schede
+della stessa origine possono giudicare insieme, che `p2pGiudizio` è per
+pagina mentre il localStorage è condiviso.
+
+DUE LEZIONI, e la prima vale oltre il P2P. 1) **Tre predicati su tre
+fette disgiunte di un campo descrittivo non coprono l'insieme**, e il
+buco non si vede leggendo nessuno dei tre: si vede solo mettendoli in
+fila. Quando le condizioni di un giudizio si indicizzano su un campo che
+DESCRIVE invece che su fatti che DECIDONO, la tabella esaustiva non c'è
+— e l'unica cura è scriverla, con un ramo «tutto il resto» in fondo.
+2) **Il quadro d'insieme ha sbagliato una riga, e la correzione è
+arrivata costruendo**: avevo scritto «`origine` resta solo un'etichetta»,
+e non era vero — dichiarare di venire da un account è un indizio che il
+giudice usa. Un disegno si verifica scrivendolo.
+
+⚠️ E UNA NOTA DI CANTIERE CHE NON RIGUARDA IL CODICE: per metà di questa
+giornata un'ALTRA sessione ha lavorato sulla stessa working copy (le
+foto/EXIF, poi le visualizzazioni e il NIP-85). Me ne sono accorto da un
+numero che non tornava — la sezione «le foto che sparivano in silenzio»
+è passata da 32 a 47 prove senza che io avessi toccato niente. I miei
+commit sono stati verificati hunk per hunk (zero righe altrui), il pezzo
+1 è entrato con un indice TEMPORANEO e `update-ref` col compare-and-swap,
+e l'indice condiviso è stato riallineato PER PATH — era rimasto alla
+base di prima e diceva «178 righe tolte», cioè un `git commit` fatto lì
+sopra avrebbe cancellato in silenzio il lavoro appena spinto. **Finché
+siamo in due sulla stessa cartella il numero globale delle prove non è
+più di nessuno dei due: vale il delta delle sezioni che si toccano.**
