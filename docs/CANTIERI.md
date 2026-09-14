@@ -12232,3 +12232,78 @@ cantiere doveva verificare. Un giro vero con `TestClient` contro il
 database locale, con un indirizzo VERO cifrato e decifrato dalle
 funzioni reali del server, ha confermato il formato finale:
 «Mario Rossi, Via Test 5, 10100 Torino, TO». 9633 verdi, 0 rosse.
+
+## La proporzione fra i due versi, e la tortura che ha trovato il buco (14 set 2026)
+
+**È ARRIVATA DAL CAMPO, come una domanda.** Andrea aveva davanti due
+card — «vendo sats per 5,00 € +6% ≈ 7034 sats» e «compro sats per
+5,00 € −5% ≈ 7700 sats» — e risalendo al mercato puro non tornavano:
+7483 contro 7333, **~2% di scarto**. La domanda era «una delle due è
+calcolata male?».
+
+**NON LO ERA, e la verifica è stata fatta sui byte**: si estraggono le
+quattro funzioni vere (`comeLibroP2P`, `satsMercatoP2P`,
+`nettoLatoP2P`, `commissioneVivaP2P`), si fanno girare, e invece di
+invertire le formule a mano si **cerca quale mercato puro produce quei
+numeri** — così a rispondere sono anche i due `Math.round`. Le due
+fasce compatibili sono `[7408, 7409]` e `[7408, 7408]`: si intersecano
+in un punto solo, **7408 sats per 5,00 €**. Un cambio solo spiega
+tutt'e due le card al satoshi.
+
+**IL 2% È LA COMMISSIONE**, e si vede solo tenendo insieme due cose: il
+premio si applica **prima**, la commissione **dopo** — sull'importo già
+scontato, la stessa base del coordinatore — e la **metà va nei due
+versi opposti**, perché è un costo per tutt'e due: si aggiunge a quel
+che consegna chi vende, si toglie da quel che riceve chi compra.
+Invertendo il solo premio la fee resta dentro **due volte**: `1,01 /
+0,99 = 1,0202`, cioè esattamente lo scarto misurato (1,0204 — la
+differenza è l'arrotondamento su numeri da settemila).
+
+**LA SENTINELLA CHE NON C'ERA.** Questo invariante non lo sorvegliava
+nessuno, e si rompe **senza rompere niente**: basta un segno girato in
+`nettoLatoP2P` e due ordini gemelli sembrerebbero coincidere — o
+distare il doppio — sullo schermo di chi sta decidendo. Sette prove nel
+banco della card, coi numeri scelti perché **non ci sia nessun
+arrotondamento** (a 1/2000 per sat, 5,00 € fanno 10.000 sats tondi e le
+mezze commissioni vengono intere): così la prova guarda la regola e non
+la virgola.
+- il **verso** (chi vende consegna di più, chi compra riceve di meno);
+- la metà aggiunta è la **stessa** che si toglie;
+- la commissione morde **DOPO** il premio — col premio a 6 la base è 94
+  e non 100, ed è il modo di vedere l'ORDINE delle due operazioni
+  invece del loro risultato;
+- la proporzione **in interi**, `netto_vendo × 99 === netto_compro ×
+  101`: niente virgola mobile in una prova che parla di esattezza;
+- lo scarto **È la fee annunciata dal 38385**, non un numero scritto
+  nella prova: il giorno che il coordinatore la gira, la riga segue;
+- e **il caso del campo al satoshi**, così quelle due cifre restano
+  piantate.
+
+**TORTURATE, perché una prova che passa sul codice rotto non protegge
+niente.** Cinque mutazioni in una copia usa-e-getta — verso girato,
+`/2` dimenticato, premio col segno rovesciato, fee sul mercato puro,
+metà tolta a un lato solo — e **tutte e cinque escono rosse**, ognuna su
+più sentinelle.
+
+⚠️ **E LA TORTURA HA TROVATO UN BUCO NEL BANCO, non nella regola.** Al
+primo giro una mutazione passava liscia: il conto della proporzione
+**ricomponeva la catena per conto suo** (`satsMercatoP2P` +
+`nettoLatoP2P`) invece di leggere la cifra da `satsScambioP2P`, che è
+la funzione che la mette in pagina — quindi una mutazione nel **punto
+di giunzione** era invisibile. La prova certificava una catena che
+nessuno usa. Adesso il netto si legge **dalla card**, numero
+compreso.
+**La lezione, che vale oltre questa prova:** un banco che rifà da sé i
+passaggi della funzione che vuole provare li prova due volte e non
+prova la loro CUCITURA — ed è lì che i difetti si infilano.
+
+⚠️ **E IL COMMIT È NATO IN UN ALBERO ISOLATO**, che quel giorno nella
+cartella c'era anche il cantiere di un'altra sessione (il foglio
+«Pubblica»): `miniapp.html` aveva 301 righe non mie e `prove.py` ne
+aveva 216. Lo script dei marcatori si è **fermato** su un hunk che non
+sapeva di chi fosse — il piede a una colonna, che era loro — invece di
+scartarlo in silenzio, ed è la cintura che vale più dell'elenco: un
+hunk scartato di nascosto esce dal commit senza che niente protesti.
+Il conto torna: 216 + 93 = 309, cioè i miei 93 sono esattamente quelli
+che sono usciti. Prove nell'albero isolato — «HEAD più i miei soli
+hunk», che è come sta la CI — **9616 → 9623, zero rosse**.
