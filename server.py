@@ -624,6 +624,23 @@ try:
 except ImportError:
     PROTEZIONE_PERCENTO = 0   # 0 = spenta
 
+# LA FEE DINAMICA (set 2026, ancora in ANTEPRIMA): il 5% del mercatino
+# non e' piu' un numero fisso ma uno split che si sposta fra compratore
+# e venditore secondo il sentiment di Bitcoin — vedi fee_dinamica_oggi()
+# e orologio_fee_dinamica() piu' sotto, vicino al cambio. FASE BETA: e'
+# SOLO un'anteprima nel preventivo, non tocca _conto_ordine ne' un sat
+# vero — quelli restano COMMISSIONE_PERCENTO/PROTEZIONE_PERCENTO come
+# sempre. Accenderla per davvero e' un cantiere a parte (va congelata
+# sull'ordine, non basta girare una leva).
+try:
+    from config import FEE_DINAMICA_TOTALE_PERCENTO
+except ImportError:
+    FEE_DINAMICA_TOTALE_PERCENTO = 5.0
+FEE_DINAMICA_SCONTO_PIONIERE = 0.5      # per lato, se quel lato e' pioniere
+FEE_DINAMICA_SCONTO_LIVELLO_MAX = 0.5   # per lato, se al livello piu' alto
+FEE_DINAMICA_MEDIA_GIORNI = 200         # la media mobile lunga: il ciclo
+FEE_DINAMICA_RSI_GIORNI = 14            # il momentum: il RSI di sempre
+
 # La data di pubblicazione nel dettaglio (lug 2026): «pubblicato 3
 # giorni fa» sotto la foto. Oltre questi giorni la riga sparisce —
 # un annuncio stagionato non deve auto-denunciarsi in vetrina.
@@ -3929,6 +3946,27 @@ def init_db():
         evento_id TEXT DEFAULT '',
         pubblicato_il INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS prezzo_storico(
+        -- Un prezzo BTC/EUR al giorno (set 2026), per il termometro
+        -- della fee dinamica: la media mobile lunga e il RSI vogliono
+        -- una SERIE, che 'cambio_noto' non tiene (una riga sola,
+        -- sovrascritta a ogni lettura). La riempie orologio_fee_dinamica:
+        -- un backfill da CoinGecko la prima volta che e' quasi vuota,
+        -- poi una riga in piu' al giorno.
+        data TEXT PRIMARY KEY,       -- 'AAAA-MM-GG', UTC
+        prezzo_eur REAL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS fee_dinamica_stato(
+        -- Lo split di OGGI fra compratore e venditore (set 2026), riga
+        -- singola (id=1): il sentiment si ricalcola una volta al
+        -- giorno, non a ogni preventivo. FASE BETA: e' un'ANTEPRIMA —
+        -- non tocca un sat vero, vedi FEE_DINAMICA_TOTALE_PERCENTO.
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data TEXT DEFAULT '',
+        punteggio REAL DEFAULT 50,
+        compratore_percento REAL DEFAULT 2.5,
+        venditore_percento REAL DEFAULT 2.5
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -6915,6 +6953,229 @@ async def scalda_cambio():
               "database nuovo). Lo si chiede adesso.", flush=True)
     global _TASK_CAMBIO
     _TASK_CAMBIO = asyncio.create_task(orologio_cambio())
+
+
+# ==================== LA FEE DINAMICA (set 2026) =======================
+# ANCORA IN ANTEPRIMA — leggi la nota sopra FEE_DINAMICA_TOTALE_PERCENTO.
+# Il 5% del mercatino si sposta fra compratore e venditore secondo il
+# sentiment di Bitcoin: mercato euforico (prezzo sopra il suo trend
+# lungo, RSI alto) pesa di piu' sul compratore — chi vuole comprare,
+# compra comunque — mercato pauroso pesa di piu' sul venditore, per lo
+# stesso motivo dal lato opposto. Ricalcolato UNA VOLTA AL GIORNO e mai
+# piu' di uno scatto di 0,5% rispetto a ieri: segue il ciclo, non il
+# rumore di un pomeriggio.
+# NIENTE INDICE ESTERNO: i due soli ingredienti (media mobile lunga,
+# RSI) si ricalcolano dal solo prezzo BTC/EUR che gia' usiamo per le
+# invoice — chiunque, con la stessa serie pubblica, rifa' lo stesso
+# conto. E' la differenza con un "Fear & Greed" di terzi: oggettivo nel
+# senso forte, non solo "pubblicato da chi ci fidiamo".
+
+def _rsi_giorni(chiusure: list) -> float:
+    """RSI a FEE_DINAMICA_RSI_GIORNI giorni sulla serie (piu' vecchia
+    prima). 50 (neutro) se la serie e' troppo corta — non e' un errore,
+    e' semplicemente presto per dirlo."""
+    n = FEE_DINAMICA_RSI_GIORNI
+    if len(chiusure) < n + 1:
+        return 50.0
+    diffs = [chiusure[i] - chiusure[i - 1] for i in range(-n, 0)]
+    guadagni = sum(d for d in diffs if d > 0) / n
+    perdite = sum(-d for d in diffs if d < 0) / n
+    if perdite == 0:
+        return 100.0 if guadagni else 50.0
+    return 100 - 100 / (1 + guadagni / perdite)
+
+
+def _punteggio_sentiment(chiusure: list) -> float:
+    """0-100: 50 e' neutro, sopra e' euforia, sotto e' paura. Due
+    ingredienti pesati e dichiarati — 60% quanto il prezzo di oggi sta
+    sopra o sotto la sua media mobile lunga (il CICLO), 40% il RSI (il
+    MOMENTUM) — invece di uno solo, per non far ballare lo split dietro
+    a un singolo numero. Sotto i 30 giorni di storia e' ancora presto:
+    resta il neutro."""
+    if len(chiusure) < 30:
+        return 50.0
+    finestra = chiusure[-FEE_DINAMICA_MEDIA_GIORNI:]
+    media = sum(finestra) / len(finestra)
+    scarto = (chiusure[-1] - media) / media if media else 0.0
+    # Uno scarto del 30% e' gia' un ciclo intero da un lato: oltre, il
+    # punteggio non ha bisogno di dire di piu'.
+    comp_media = max(0.0, min(100.0, 50 + scarto / 0.30 * 50))
+    return 0.6 * comp_media + 0.4 * _rsi_giorni(chiusure)
+
+
+def _split_da_punteggio(punteggio: float) -> tuple:
+    """Il punteggio (0-100) in uno split a scatti di 0,5%, da 0/5 a
+    5/0: 50 e' il centro (meta' a testa), ogni scatto vale 50/passi
+    punti di punteggio — coi passi che dipendono dal totale, mai
+    scritti a mano due volte."""
+    passi = int(FEE_DINAMICA_TOTALE_PERCENTO / 0.5 / 2)
+    scatti = max(-passi, min(passi, round((punteggio - 50) / 50 * passi)))
+    compratore = FEE_DINAMICA_TOTALE_PERCENTO / 2 + scatti * 0.5
+    return (compratore, FEE_DINAMICA_TOTALE_PERCENTO - compratore)
+
+
+def _applica_inerzia(nuovo: float, precedente) -> float:
+    """Non piu' di uno scatto (0,5%) al giorno rispetto a ieri, anche
+    se il punteggio grezzo ne chiederebbe di piu': il freno che tiene
+    la fee sul ciclo invece che sul rumore di un giorno storto."""
+    if precedente is None:
+        return nuovo
+    passo = max(-0.5, min(0.5, nuovo - precedente))
+    return precedente + passo
+
+
+async def _backfill_prezzo_storico(con):
+    """Riempie prezzo_storico da CoinGecko una tantum, quando e' vuota
+    o quasi: senza una storia vera la media mobile direbbe «neutro» per
+    mesi. Idempotente (INSERT OR IGNORE sulla data): un secondo giro
+    non duplica niente, e se CoinGecko non risponde si riprova al
+    prossimo giro, fail-open come il resto del cambio."""
+    gia = con.execute("SELECT COUNT(*) c FROM prezzo_storico").fetchone()["c"]
+    if gia >= FEE_DINAMICA_MEDIA_GIORNI:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get(
+                "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
+                params={"vs_currency": "eur",
+                        "days": FEE_DINAMICA_MEDIA_GIORNI + 10,
+                        "interval": "daily"})
+            r.raise_for_status()
+            prezzi = r.json().get("prices", [])
+    except Exception as e:
+        print(f"⚠️ Fee dinamica: storico prezzi non scaricato: {e}",
+              flush=True)
+        return
+    for ts_ms, prezzo in prezzi:
+        data = time.strftime("%Y-%m-%d", time.gmtime(ts_ms / 1000))
+        con.execute("INSERT OR IGNORE INTO prezzo_storico(data, prezzo_eur) "
+                    "VALUES(?, ?)", (data, prezzo))
+    con.commit()
+    print(f"📈 Fee dinamica: storico prezzi BTC/EUR scaricato "
+          f"({len(prezzi)} giorni)", flush=True)
+
+
+async def _aggiorna_fee_dinamica():
+    """Il ricalcolo di un giorno: backfill se serve, la riga di oggi
+    (se il cambio la conosce — altrimenti si riprova domani, fail-open:
+    non e' una scrittura di denaro), poi il nuovo split con l'inerzia
+    contro ieri."""
+    con = db()
+    await _backfill_prezzo_storico(con)
+    oggi = time.strftime("%Y-%m-%d", time.gmtime())
+    prezzo = cambio_noto_ora("eur")
+    if prezzo > 0:
+        con.execute("INSERT OR IGNORE INTO prezzo_storico(data, prezzo_eur) "
+                    "VALUES(?, ?)", (oggi, prezzo))
+        con.commit()
+    chiusure = [r["prezzo_eur"] for r in con.execute(
+        "SELECT prezzo_eur FROM prezzo_storico ORDER BY data").fetchall()]
+    punteggio = _punteggio_sentiment(chiusure)
+    grezzo_c, _ = _split_da_punteggio(punteggio)
+    precedente = con.execute("SELECT compratore_percento FROM "
+                             "fee_dinamica_stato WHERE id=1").fetchone()
+    compratore = _applica_inerzia(
+        grezzo_c, precedente["compratore_percento"] if precedente else None)
+    venditore = FEE_DINAMICA_TOTALE_PERCENTO - compratore
+    con.execute(
+        "INSERT INTO fee_dinamica_stato(id, data, punteggio, "
+        "compratore_percento, venditore_percento) VALUES(1,?,?,?,?) "
+        "ON CONFLICT(id) DO UPDATE SET data=excluded.data, "
+        "punteggio=excluded.punteggio, "
+        "compratore_percento=excluded.compratore_percento, "
+        "venditore_percento=excluded.venditore_percento",
+        (oggi, punteggio, compratore, venditore))
+    con.commit()
+    con.close()
+    print(f"📊 Fee dinamica: punteggio {punteggio:.0f}/100 → anteprima "
+          f"compratore {compratore:.1f}% / venditore {venditore:.1f}%",
+          flush=True)
+
+
+def fee_dinamica_oggi(con) -> tuple:
+    """Lo split di oggi (compratore, venditore) PRIMA degli sconti
+    fedelta' — il neutro (meta' a testa) finche' il cron non e' mai
+    girato."""
+    r = con.execute("SELECT compratore_percento, venditore_percento "
+                    "FROM fee_dinamica_stato WHERE id=1").fetchone()
+    if not r:
+        meta = FEE_DINAMICA_TOTALE_PERCENTO / 2
+        return (meta, meta)
+    return (r["compratore_percento"], r["venditore_percento"])
+
+
+def _sconto_fedelta_lato(con, tg_id: int) -> float:
+    """Quanto si toglie alla quota di QUESTO lato: 0,5 se e' pioniere,
+    altri 0,5 se ha raggiunto il livello piu' alto — si sommano, e non
+    scendono mai sotto zero (quello lo fa il chiamante)."""
+    r = con.execute("SELECT coorte, xp, vendite_ok, acquisti_ok FROM "
+                    "utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not r:
+        return 0.0
+    sconto = FEE_DINAMICA_SCONTO_PIONIERE if r["coorte"] == "pioniere" else 0.0
+    liv = livello_utente(r["xp"] or 0,
+                         (r["vendite_ok"] or 0) + (r["acquisti_ok"] or 0))
+    if liv["numero"] == len(LIVELLI):
+        sconto += FEE_DINAMICA_SCONTO_LIVELLO_MAX
+    return sconto
+
+
+def fee_dinamica_anteprima(con, tg_compratore: int, tg_venditore: int) -> dict:
+    """Le due percentuali da mostrare in ANTEPRIMA nel preventivo di
+    questi due, al netto dello sconto fedelta' di ciascuno (mai sotto
+    zero). Non tocca il conto vero — siamo in beta — e' solo quel che
+    accadrebbe il giorno che la promo finisce."""
+    base_c, base_v = fee_dinamica_oggi(con)
+    c = max(0.0, base_c - _sconto_fedelta_lato(con, tg_compratore))
+    v = max(0.0, base_v - _sconto_fedelta_lato(con, tg_venditore))
+    return {"fee_dinamica_compratore_percento": round(c, 2),
+            "fee_dinamica_venditore_percento": round(v, 2)}
+
+
+def _fee_dinamica_leva_valore() -> str:
+    """Lo split di base di oggi (prima degli sconti fedeltà di ognuno,
+    che dipendono da CHI compra e CHI vende — qui non c'è nessuno dei
+    due), per il pannello «Stato delle leve». Connessione sua, breve:
+    questa funzione la chiama solo un admin di passaggio, mai un
+    percorso caldo."""
+    try:
+        con = db()
+        c, v = fee_dinamica_oggi(con)
+        r = con.execute("SELECT punteggio, data FROM fee_dinamica_stato "
+                        "WHERE id=1").fetchone()
+        con.close()
+    except Exception:
+        return "non calcolabile ora"
+    if not r:
+        return "mai calcolata: neutro di default (2,5% / 2,5%)"
+    return (f"compratore {c:.1f}% · venditore {v:.1f}% "
+           f"(punteggio {r['punteggio']:.0f}/100, {r['data']})")
+
+
+_TASK_FEE_DINAMICA = None   # stesso patto di _TASK_CAMBIO: il riferimento
+#                             tiene vivo il task
+
+
+async def orologio_fee_dinamica():
+    """Il ricalcolo quotidiano: il primo giro parte subito al boot (un
+    preventivo di stanotte trova gia' un'anteprima), poi dorme fino
+    alla mezzanotte UTC successiva — un giro al giorno, non uno al
+    minuto come il cambio: qui il rumore che si vuole tagliare fuori e'
+    proprio quello di un giorno solo."""
+    while True:
+        try:
+            await _aggiorna_fee_dinamica()
+        except Exception as e:
+            print(f"⚠️ Fee dinamica: ricalcolo saltato: {e}", flush=True)
+        adesso = time.time()
+        prossima_mezzanotte = ((adesso // 86400) + 1) * 86400
+        await asyncio.sleep(prossima_mezzanotte - adesso)
+
+
+@app.on_event("startup")
+async def avvia_fee_dinamica():
+    global _TASK_FEE_DINAMICA
+    _TASK_FEE_DINAMICA = asyncio.create_task(orologio_fee_dinamica())
 
 
 async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
@@ -16604,6 +16865,17 @@ def _leve_stato():
             _leva("Protezione acquisti (%)", "PROTEZIONE_PERCENTO",
                   PROTEZIONE_PERCENTO,
                   spento="al conto del compratore non si aggiunge niente"),
+            _leva("Fee dinamica: totale da spartire (%)",
+                  "FEE_DINAMICA_TOTALE_PERCENTO",
+                  FEE_DINAMICA_TOTALE_PERCENTO,
+                  acceso="ANTEPRIMA in beta: nel preventivo si mostra, "
+                         "ma non è ancora questa leva a muovere i sats — "
+                         "quelli restano Commissione/Protezione qui sopra"),
+            _leva("Fee dinamica: split di base oggi",
+                  "fee_dinamica_stato", _fee_dinamica_leva_valore(),
+                  acceso="prima degli sconti fedeltà (pionieri, livello "
+                         "massimo), che dipendono da chi compra e chi "
+                         "vende in quel preventivo"),
             _leva("Tetto di prezzo per annuncio (sats)",
                   "TETTO_SATS_ANNUNCIO", TETTO_SATS_ANNUNCIO,
                   spento="nessun limite di prezzo"),
@@ -22955,6 +23227,10 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # legge una sola: gli si da' la prima, che e' un'omissione e non
     # una bugia (la regola d'oro di _sconto_pubblico)
     spedizioniere = reti[0] if reti else ""
+    # L'ANTEPRIMA della fee dinamica (set 2026, beta): calcolata QUI,
+    # con `con` ancora aperta, e non dopo il con.close() qui sotto —
+    # vedi fee_dinamica_anteprima per il perche' non tocca il conto vero.
+    _fee_din = fee_dinamica_anteprima(con, user["id"], a["venditore_id"])
     # I PUNTI SALVATI da chi compra che valgono per QUESTO venditore
     # (ago 2026): il match lo fa qui il server — vedi il perche' in
     # `punti_per_venditore`, che e' anche minimizzazione e non solo la
@@ -23196,6 +23472,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.
             "commissione_percento": COMMISSIONE_PERCENTO,
+            **_fee_din,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,
@@ -23351,6 +23628,10 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         con.close()
         raise HTTPException(400, "L'accordo è con un altro venditore")
     guardia_ferie(con, venditore_id)   # il gemello di _compra_set
+    # L'ANTEPRIMA della fee dinamica (set 2026, beta): calcolata QUI, con
+    # `con` ancora aperta — vedi fee_dinamica_anteprima per il perche'
+    # non tocca il conto vero.
+    _fee_din = fee_dinamica_anteprima(con, user["id"], venditore_id)
     origini = {chiave_origine(a) for a in tutti.values()}
     if len(origini) > 1:
         con.close()
@@ -23692,6 +23973,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.
             "commissione_percento": COMMISSIONE_PERCENTO,
+            **_fee_din,
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
             "punti_salvati": punti_salvati,

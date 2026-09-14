@@ -15930,6 +15930,22 @@ function contoRighe(c){
         ? `<span class="via-gratis">gratuita</span>`
         : cifraCtrl(c.sped, c.circa, c.spedEur))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
+    /* L'ANTEPRIMA DELLA FEE DINAMICA (set 2026, beta): non e' una riga
+       del conto — non entra nel totale, non ha una cifra in sats — e'
+       una nota a parte apposta perche' non si confonda con le righe
+       che invece si pagano davvero. Compare solo se il server la manda
+       (client vecchi in cache restano come ieri, un'assenza e non una
+       bugia). */
+    + (c.feeDinCompratore != null
+        ? `<div class="ctrl-riga ctrl-anteprima-fee">`
+          + `<span>🔮 Fee dinamica, in arrivo</span>`
+          + `<span class="mono">${fmt(c.feeDinCompratore)}% a te</span>`
+          + `</div>`
+          + `<div class="hint" style="margin:2px 0 8px">Anteprima: quando `
+          + `la fase beta finirà, oggi pagheresti questa quota (al `
+          + `venditore ne resterebbe ${fmt(c.feeDinVenditore)}%) — per `
+          + `ora la fee è azzerata per tutti.</div>`
+        : '')
     /* LA RIGA CHE CONTA STA IN UNA SCATOLA, come le due del conto del
        P2P (set 2026, ritocco di Andrea): in un elenco di voci tutte
        uguali il solo grassetto si perde, e questa e' l'unica riga che
@@ -17447,6 +17463,13 @@ function renderAcquisto(){
                                la riga porta «in promo» come sempre */
                             commissione: p.commissione_sats||0,
                             commissionePct: p.commissione_percento||0,
+                            /* L'ANTEPRIMA della fee dinamica (set 2026,
+                               beta): due percentuali informative, non
+                               tocca `tot` ne' `commissione` qui sopra —
+                               quelle restano il conto vero, sempre a
+                               zero finche' la promo non finisce. */
+                            feeDinCompratore: p.fee_dinamica_compratore_percento,
+                            feeDinVenditore: p.fee_dinamica_venditore_percento,
                             /* l'accordo sul carrello: la riga gemella
                                dello sconto, cifre del server */
                             accordo: p.accordo_sats||0,

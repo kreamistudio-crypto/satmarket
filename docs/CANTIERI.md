@@ -12696,7 +12696,6 @@ varrebbe non farla, la morfosi. La sentinella nuova guarda **quello**,
 non il numero di oggi: è l'unica cosa che una sesta taratura non deve
 poter scavalcare per sbaglio.
 
-
 ## La terza stesura: i sats in testa, e il giudizio che torna «per te» (14 set 2026)
 
 **LA CARD È STATA RIFATTA TRE VOLTE IN DUE GIORNI**, e le due stesure
@@ -12859,3 +12858,79 @@ quella stessa prova, e il banco è esploso su
 `'str' object has no attribute 'which'` — un errore che parla di
 tutt'altro. Rinominato `_fog`. Nei nomi corti di una prova lunga si
 guarda prima cosa c'è già in casa.
+
+## La fee dinamica del mercatino, in anteprima (set 2026)
+
+LA DECISIONE (Andrea): il mercatino passa da fee sospesa a un **5% da
+spartire fra compratore e venditore**, con lo split che si sposta da
+solo secondo il sentiment di Bitcoin — mercato euforico pesa di più
+sul compratore (chi vuole comprare, compra comunque), mercato pauroso
+pesa di più sul venditore, per lo stesso motivo dal lato opposto.
+Sopra, due **sconti fedeltà** che si sottraggono alla quota di
+ciascun lato, mai sotto zero: −0,5% da pioniere, −0,5% da livello
+massimo (oggi "maestro", il 5°), cumulabili.
+
+**FASE BETA, ed è la riga da tenere: non tocca un sat vero.** La
+richiesta di Andrea era precisa — mostrarla per intero nel preventivo,
+ma tenerla azzerata perché siamo in rodaggio. Invece di inventare un
+interruttore "carica/non caricare" (che avrebbe un ramo mai
+esercitato, e un ramo che sposta soldi non lo si scrive senza
+provarlo), la scelta è stata più netta: **il conto vero non cambia
+per niente**. `_conto_ordine`, `compra()`, `_compra_set` e
+`netto_venditore()` restano esattamente come ieri, guidati da
+`COMMISSIONE_PERCENTO`/`PROTEZIONE_PERCENTO` (ancora sospese a 0). La
+fee dinamica vive SOLO nei due endpoint di preventivo
+(`preventivo_ordine`, `_preventivo_set`), come due chiavi in più nel
+JSON (`fee_dinamica_compratore_percento`, `..._venditore_percento`) e
+una riga informativa nel conto del client — "🔮 Fee dinamica, in
+arrivo" — che non entra nel totale e non ha una cifra in sats. Il
+giorno che la beta finisce, ACCENDERLA PER DAVVERO è un cantiere a
+parte apposta: va congelata sull'ordine (il precedente è
+`ordini.sconto_percento`, "la fotografia della REGOLA"), e
+`netto_venditore()` deve smettere di leggere la costante globale
+live al momento del payout — oggi lo fa, ed è già un difetto
+dormiente per qualunque fee che cambi nel tempo, semplicemente non
+morde finché quella fee resta 0.
+
+**IL TERMOMETRO, e perché non è un indice esterno.** Il sentiment è
+un punteggio 0-100 (50 = neutro) calcolato dal SOLO prezzo BTC/EUR che
+già usiamo per le invoice: 60% quanto il prezzo di oggi sta sopra o
+sotto la sua media mobile a 200 giorni (il ciclo), 40% il RSI a 14
+giorni (il momentum) — pesi dichiarati, non tarati a occhio. Niente
+Fear&Greed o indice di terzi: chiunque, con lo stesso prezzo pubblico,
+ricalcola lo stesso numero, che è l'oggettività nel senso forte e non
+solo "pubblicato da chi ci fidiamo". Il punteggio diventa uno split a
+scatti di 0,5% (da 0/5 a 5/0, il centro è 2,5/2,5), e **non si muove
+mai più di uno scatto al giorno rispetto a ieri** anche se il
+punteggio grezzo ne chiederebbe di più — il freno che tiene la fee
+sul ciclo di Bitcoin invece che sul rumore di un pomeriggio storto.
+
+**LO STORICO NON ESISTEVA** (verificato prima di scrivere una riga:
+`cambio_noto` tiene una riga sola, sovrascritta a ogni lettura — mai
+una serie). Tabella nuova, `prezzo_storico` (una riga al giorno),
+riempita una tantum da un backfill di ~210 giorni da CoinGecko
+(`market_chart`, `days=210`) al primo avvio dopo il deploy — provato
+dal vivo: 211 giorni scaricati al boot, punteggio 58/100 il primo
+giro. Il ricalcolo gira come `orologio_cambio` (stesso patto: un
+`asyncio.create_task` con riferimento globale, o il garbage collector
+lo taglia a metà volo), ma con un giro suo — **una volta al giorno, a
+mezzanotte UTC** — perché qui il rumore da tagliare fuori è proprio
+quello di un giorno solo, l'opposto del cambio che vuole essere
+freschissimo.
+
+COLLAUDATO dal vivo, non solo letto: acquisto singolo e carrello
+(stesso venditore, due articoli), con le identità 111/222 del
+collaudo che nel database locale sono **entrambe pioniere** — lo
+split di base del giorno (3,0%/2,0%, punteggio 58) è arrivato nel
+conto già scontato a 2,5%/1,5%, la prova che lo sconto fedeltà si
+applica per lato e non sul totale. Il pannello «Stato delle leve»
+mostra lo split di BASE (prima degli sconti, che dipendono da chi
+compra e chi vende in quel preventivo specifico) e il totale da
+spartire, con la nota che dice chiaro che non è ancora questa leva a
+muovere i sats.
+
+CHE RESTA APERTO: il cantiere dell'accensione vera (colonna
+congelata sull'ordine, `netto_venditore()` che smette di leggere la
+costante live); e — cantiere SEPARATO, tracciato su Trello e non qui
+— le personalizzazioni di livello (cornici, temi colore) di cui la
+fee dinamica cita solo il nome nel testo del pannello admin.

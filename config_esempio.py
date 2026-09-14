@@ -52,6 +52,13 @@ PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
                              # (modello Vinted): % sul solo prezzo articolo,
                              # si aggiunge al conto e resta alla piattaforma.
                              # 0 = spenta
+FEE_DINAMICA_TOTALE_PERCENTO = 5.0
+                             # il 5% da spartire fra compratore e venditore
+                             # secondo il sentiment di Bitcoin (set 2026).
+                             # ANCORA IN ANTEPRIMA: si vede nel preventivo,
+                             # non muove un sat vero finché la beta non
+                             # finisce — vedi la nota sopra la costante
+                             # in server.py, vicino a orologio_fee_dinamica.
 GIORNI_DATA_ANNUNCIO = 60    # «pubblicato N giorni fa» nel dettaglio:
                              # oltre questi giorni la riga non si mostra
 VETRINA_PER_VENDITORE = 3    # «3 ogni 30» (ago 2026): in testa alla
