@@ -13254,3 +13254,41 @@ parlando d'altro. Adesso conta **dentro il foglio di cui parla**, dove
 il ghost è uno. Fa tre in questo cantiere — il `16,5px`, l'ancora a due
 spazi, e questa: tutte e tre **passavano**, e tutte e tre guardavano un
 contenitore più largo della domanda.
+
+⚠️ **E LA RIGA DI STRUMENTI STAVA INCOLLATA ALLA LINEA** (richiesta di
+Andrea, e di nuovo: «misura dal vivo, non dedurre dal CSS»). Misurato:
+**2px sopra e 13 sotto**. I 2 sono il margine del cappello — che
+**collassa** con quello della riga invece di sommarcisi, e sono lo
+stesso 2 due volte; i 13 sono una **somma**, i 10 del margine della
+riga più i 3 del fondo dipinto del blocco attaccato. Adesso sono
+**13 e 13, scarto 0,0px**: la riga sta in mezzo esatto fra la linea di
+separazione e il bordo del blocco.
+**SI TOCCA SOLO QUESTA CASA**, ed è la riga da tenere: `.p2p-testa-riga`
+è la **stessa** del libro, e là sopra non c'è nessuna linea da cui
+staccarsi — ci sono i due tab, che l'aria ce l'hanno già. Misurato
+anche quello: il margine del libro è rimasto `2px/10px`.
+⚠️ **E IL NUMERO NON SI RIBATTE NELLA PROVA**: i 13 di sotto sono una
+somma di due cose che vivono in due regole diverse, quindi la
+sentinella **rifà la somma** e la confronta col margine di sopra. Il
+giorno che uno dei due addendi cambia, quella riga lo dice — invece di
+lasciare la riga storta e muta.
+
+⚠️ **E HO RIPETUTO UN ERRORE DI IERI**, che vale la pena scrivere due
+volte perché è costato due volte: un nome corto di due lettere (`_sp`)
+ha coperto `import subprocess as _sp` della stessa prova, e il banco è
+esploso con `'str' object has no attribute 'run'` — un errore che parla
+di tutt'altro. È la seconda volta in due giorni (la prima era `_sh` su
+`shutil`). **In una prova lunga i nomi si scelgono guardando prima cosa
+c'è già in casa**, e tre lettere non bastano: adesso si chiamano
+`_ariaRiga`, `_ariaBlocco`, `_ariaSopra`.
+
+**I NUMERI, e stavolta il conto globale non vale.** Nella cartella c'era
+il cantiere in volo di un'altra sessione — il *lordo* di `order.amount`
+e il foglio dell'incasso — che ha anche **emendato una mia asserzione**
+nel banco della card (la cifra del coordinatore ora passa dal netto:
+9999 → ≈ 9899). Quella resta loro, è il loro cambio a chiederla. Il mio
+delta è misurato in un **albero isolato**, «HEAD più i miei soli due
+hunk», che è com'è la CI: **9748 → 9750, zero rosse** — le due
+sentinelle dell'aria. Lo script dei marcatori ha diviso 12 hunk in 2
+miei e 10 loro **senza dubbi**, e quando un hunk non ha padrone si
+ferma invece di scartarlo.
