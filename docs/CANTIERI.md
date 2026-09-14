@@ -12934,3 +12934,82 @@ congelata sull'ordine, `netto_venditore()` che smette di leggere la
 costante live); e — cantiere SEPARATO, tracciato su Trello e non qui
 — le personalizzazioni di livello (cornici, temi colore) di cui la
 fee dinamica cita solo il nome nel testo del pannello admin.
+
+## Il coordinatore siamo noi, e la pagina lo dice (14 set 2026)
+
+Tre correzioni ad «Info P2P» chieste da Andrea, e la prima è quella da
+cui scendono le altre.
+
+**LA GARANZIA POGGIAVA SU UNA COSA FALSA.** La sezione diceva «a
+tenerli non è Barattolo: è un coordinatore **indipendente** (si chiama
+Mostro) […] i sats non passano dai nostri conti». Non è così:
+**Barattolo integra Mostro e fa da coordinatore, il nodo è nostro**. La
+frase era comoda — scaricava su un terzo il momento in cui i sats di
+qualcun altro stanno fermi da qualche parte — ed è esattamente il
+genere di rassicurazione che non si può tenere.
+
+**E TOGLIENDOLA LA GARANZIA NON SI INDEBOLISCE, perché non poggiava
+lì.** Quel che protegge chi scambia non è che a tenere i sats sia un
+estraneo: è che dalla hold invoice **le strade sono due sole** —
+arrivare al destinatario o tornare al mittente — e quelle restano due
+anche adesso che il nome di chi tiene è il nostro. La pagina ora lo
+dice in quest'ordine: prima il meccanismo (già scritto), poi chi lo fa
+girare. *Lo scriviamo invece di lasciartelo scoprire* è la stessa riga
+di «I tuoi dati», dove il «potremmo» sul profilo derivato sta da
+giugno: un potere che non si dichiara è un potere che si scopre male.
+
+**LA NOTA DELLA CONTRAPPOSIZIONE È USCITA INTERA** — «È diverso dal
+deposito di garanzia del mercatino, dove i sats si fermano su un nodo
+Lightning nostro. Qui no: qui Barattolo è la *finestra* su uno scambio
+che avviene altrove». Due cose sbagliate in due righe: il nodo è lo
+stesso, e lo scambio non avviene altrove. Non è stata sostituita da un
+paragone al contrario, ed è deliberato: **il P2P non ha bisogno di
+dirsi rispetto al mercatino**, e quel metodo — i sats appesi in una
+hold invoice invece che fermi su un conto — un giorno potremmo
+adottarlo anche di là.
+
+**DOVE LA STESSA COSA ERA DETTA ALTROVE, si è allineata**, che è la
+metà del lavoro e la parte che si dimentica: l'apertura della pagina
+(«Barattolo non tiene i sats» → li tiene, **in garanzia**, e solo per
+consegnarli o restituirli), lo stato «in disputa» («un moderatore
+**indipendente**»), «I tuoi dati» («Mostro, un **servizio
+indipendente**») e quattro verbali nel codice, compreso quello della
+sezione P2P che apriva con «un servizio indipendente su una macchina di
+Andrea».
+
+⚠️ **LA DISPUTA ERA LA PIÙ GROSSA, e non era nella lista di Andrea.**
+Diceva «**Barattolo non decide e non può intervenire**» — in pagina e
+nel foglio di conferma dello scambio. È il rovescio esatto del vero: i
+moderatori del coordinatore sono i nostri, e «you need trustworthy
+moderators» è la frase del team Mostro che sta a verbale in CLAUDE.md.
+Adesso dice che a decidere siamo noi, che guardiamo le prove di tutti e
+due, e che **anche lì le strade restano due**. Nel foglio dello scambio
+il coordinatore non si nomina (regola della fase 6: niente nomi di
+terzi nelle viste dove uno sta facendo un gesto), e il testo dice
+«Barattolo» — che dal 14 set è anche la cosa esatta.
+
+**LA COMMISSIONE PERDE IL LISTINO.** «Il listino di Barattolo è 3%:
+adesso la commissione sta sotto, ed è una promo del rodaggio» se n'è
+andata: il 3% **non è mai stato applicato a nessuno**, e un prezzo che
+non esiste, in una pagina che chi legge prende per il regolamento, fa
+più danno di un numero vecchio. Restano la commissione **viva** (letta
+dal 38385, mai cablata) e la metà a testa. `commissioneListinoP2P`
+resta viva per il conto del dettaglio, dove la pillola «in promo» è un
+cartello sulla riga e non una tariffa — **quella questo giro non è
+stata toccata**, e resta da decidere se togliere anche lei, ora che in
+pagina non ha più la sua spiegazione.
+
+**LE SENTINELLE: quattro nuove e due rovesciate.** Quella del render
+certificava che il listino ci FOSSE, ora certifica il **silenzio** — lo
+stesso rovesciamento della frase sotto il conto, un giro fa. Le altre
+tengono ferme le **parole tolte** («indipendente», «avviene altrove»,
+«non passano dai nostri conti», «Barattolo non tiene i sats», «non
+decide e non può intervenire»): una rassicurazione comoda rientra da
+sola al primo ritocco, e una prova sulla frase che NON deve esserci è
+l'unica cosa che se ne accorge. Una guarda il codice con i commenti
+tolti, perché il verbale il listino deve poterlo nominare — è il posto
+dove si dice perché se n'è andato.
+
+Le tre rese della commissione provate a mano in un banco node, su
+quattro casi (ignota, 0, 2% → metà 1%, 1% → metà 0,5%): nessuna porta
+più la riga del listino, nemmeno quella che prima la faceva comparire. **9727 verdi.**
