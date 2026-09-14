@@ -37355,8 +37355,8 @@ def prove_p2p_libro():
     # SI LAVORA SU UNA BOZZA e non sul filtro vivo: chi tocca i cursori
     # deve poter cambiare idea, e «Applica» dev'essere il momento in cui
     # il libro si muove. Senza la bozza il libro si riscriverebbe sotto
-    # le dita a ogni scatto, e «Cancella» non avrebbe piu' niente da
-    # annullare.
+    # le dita a ogni scatto, e «Azzera» non avrebbe piu' niente da
+    # riportare a zero.
     _ap = pezzo_js(mini, "function apriFiltroP2P(){", "\n}\n")
     prova("il foglio lavora su una BOZZA", True,
           "p2pFiltroBozza = Object.assign({}, ora," in _ap
@@ -37372,13 +37372,24 @@ def prove_p2p_libro():
     prova("...copiando le due liste, mai il riferimento", True,
           "valute: p2pFiltroBozza.valute.slice(), metodi: p2pFiltroBozza.metodi.slice()"
           in _app)
-    # «Cancella» azzera E applica in un gesto solo: uno che svuotasse i
-    # campi lasciando il libro filtrato chiederebbe un secondo tocco per
-    # fare la cosa gia' chiesta
+    # «Azzera» riporta a zero E applica in un gesto solo: uno che
+    # svuotasse i campi lasciando il libro filtrato chiederebbe un
+    # secondo tocco per fare la cosa gia' chiesta.
+    # ⚠️ E SI CHIAMA COME LA FUNZIONE (set 2026, ritocco di Andrea):
+    # «Cancella» e' la parola di chi butta via, e un filtro non si
+    # butta via — si riporta a zero. Il piede del foglio dice le due
+    # parole del gesto, «Azzera» e «Applica».
     _az = pezzo_js(mini, "function azzeraFiltroP2P(){", "\n}\n")
-    prova("«Cancella» azzera, chiude e ridisegna", True,
+    prova("«Azzera» riporta a zero, chiude e ridisegna", True,
           "p2pFiltro = null;" in _az and "chiudiFoglioP2P('p2pFiltroSheet');" in _az
           and "renderP2P();" in _az)
+    # (si guarda DENTRO il renderer del filtro e non il `.foglio-piede`
+    # nudo: quella classe veste il piede di mezza app, e la sentinella
+    # risponderebbe per il vicino)
+    _rf = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
+    prova("...e il piede del filtro dice «Azzera» e «Applica»", True,
+          ">Azzera</button>" in _rf and ">Applica</button>" in _rf
+          and "Cancella" not in _rf)
     # i due pallini non si scavalcano: chi spinge il minimo oltre il
     # massimo lo trova fermo li', invece di vedere la fascia rovesciarsi
     prova("i due pallini del cursore doppio non si scavalcano", True,
@@ -38921,7 +38932,7 @@ const mio = (o) => Object.assign({
   id: 'x', lato: 'compro', euro: 25, euroMax: 0, sats: 0, premium: 0,
   satsNetti: 0}, o);
 const contoMio = o => contoDettP2P(Object.assign(
-  comeLibroP2P(o), {satsDetti: o.satsNetti || 0}));
+  comeLibroP2P(o), {satsDetti: o.satsNetti || 0, mio: true}));
 out.mioStima = contoMio(mio({}));
 out.mioDetto = contoMio(mio({satsNetti: 7301}));
 out.mioDettoPremio = contoMio(mio({satsNetti: 7301, premium: 4}));
@@ -38933,6 +38944,17 @@ out.mioRange = contoMio(mio({euro: 20, euroMax: 100, satsNetti: 7301}));
 cambioVivo = false;
 out.mioDettoMuto = contoMio(mio({satsNetti: 7301, premium: 4}));
 cambioVivo = true;
+/* ---- L'ETICHETTA DEL PREMIO, DAL VERSO DI CHI LEGGE (set 2026) ----
+   Dal LIBRO si guarda l'offerta di un ALTRO e il premio e' «al
+   venditore»; nella pagina di uno scambio PROPRIO chi legge quella
+   riga l'ha scritta. E «richiesto» o «offerto» non lo decide il
+   SEGNO ma il giudice: un premio positivo favorisce sempre chi vende
+   sats, quindi sul mio ordine di vendita lo CHIEDO e su quello di
+   acquisto lo OFFRO. I quattro casi ci sono tutti. */
+out.premioMioVendo = contoMio(mio({lato: 'vendo', premium: 4}));
+out.scontoMioVendo = contoMio(mio({lato: 'vendo', premium: -2}));
+out.premioMioCompro = contoMio(mio({lato: 'compro', premium: 4}));
+out.scontoMioCompro = contoMio(mio({lato: 'compro', premium: -2}));
 out.scorporo = [scorporaPremioP2P(7301, 4), scorporaPremioP2P(7301, -2),
                 scorporaPremioP2P(7301, 0), scorporaPremioP2P(0, 4),
                 scorporaPremioP2P(7301, 100)];
@@ -39417,6 +39439,35 @@ console.log(JSON.stringify(out));
     prova("lo scorporo e' la formula del coordinatore, rovesciata",
           [7605, 7158, 7301, 0, 7301], o["scorporo"])
 
+    # ══ L'ETICHETTA DEL PREMIO DAL VERSO DI CHI LEGGE (set 2026,
+    # richiesta di Andrea) ══ Dal libro si guarda l'offerta di un
+    # ALTRO — «Premio al venditore», di lui si parla —, nella pagina
+    # di uno scambio proprio chi legge quella riga l'ha scritta, e
+    # sentirsela raccontare in terza persona suona come se il premio
+    # fosse di un terzo.
+    # ⚠️ E «RICHIESTO» O «OFFERTO» NON LO DECIDE IL SEGNO, ed e' la
+    # riga che questa prova esiste per difendere: un premio positivo
+    # favorisce SEMPRE chi vende sats (`sats -= premium/100 * sats`),
+    # quindi sul mio ordine di VENDITA un +4% e' un premio che CHIEDO
+    # e sul mio ordine di ACQUISTO lo stesso +4% e' un premio che
+    # OFFRO — mi fa ricevere meno sats. La richiesta diceva «Premio
+    # richiesto» per il segno positivo, che e' giusto sul lato vendo e
+    # direbbe il contrario sul lato compro: a decidere e' `affareP2P`,
+    # lo stesso giudice del colore, che alla domanda «pende dalla mia
+    # parte?» risponde gia'.
+    prova("sul mio ordine di VENDITA il premio si CHIEDE", True,
+          "<span>Premio richiesto <b" in o["premioMioVendo"])
+    prova("...e lo sconto si OFFRE", True,
+          "<span>Sconto offerto <b" in o["scontoMioVendo"])
+    prova("sul mio ordine di ACQUISTO lo stesso segno si rovescia",
+          [True, True],
+          ["<span>Premio offerto <b" in o["premioMioCompro"],
+           "<span>Sconto richiesto <b" in o["scontoMioCompro"]])
+    # ...e il LIBRO non si tocca: la' chi legge non e' il proprietario
+    prova("...e dal libro il premio resta «al venditore»", [True, True],
+          ["Premio al venditore" in o["contoPremio"],
+           "Premio richiesto" not in o["contoPremio"]])
+
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
     # LE TRE COLONNE SONO STELLA, RECENSIONI e VOLTO (set 2026, ritocco
@@ -39791,7 +39842,13 @@ def prove_nav_p2p():
     # scambi, ma nessuno passa il filtro» —, che e' uno stato vuoto
     # come gli altri tre e non un posto nuovo. Il bottone arancio resta
     # senza: li' il marchio diventava una macchia.
-    prova("il simbolo veste i quattro posti dove si legge", 4,
+    # ⚠️ E TORNATA A TRE (set 2026, richiesta di Andrea): la testata
+    # della pagina di uno scambio proprio non e' piu' il marchio ma il
+    # CAPPELLO di casa, «Nel dettaglio» — una pagina si chiama col suo
+    # nome, come le sorelle. I tre che restano sono tutti STATI VUOTI,
+    # che e' l'unico posto dove il marchio fa da voce: li' non c'e'
+    # niente da nominare.
+    prova("il simbolo veste i tre stati vuoti, e nessuna testata", 3,
           mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
     # EMENDATA DUE VOLTE. La prima (set 2026, il ridisegno): il bottone
     # non diceva piu' «Pubblica: compro sats» — il lato lo dice il
@@ -41603,21 +41660,102 @@ def prove_p2p_motore():
           'class="vault"' not in vista and "vault" not in cod)
     prova("...e i passi vivono in un contenitore suo", True,
           '<div class="p2p-passi"><div class="steps">' in cod)
-    # ⚠️ IN CIMA RESTA IL SOLO MARCHIO (set 2026, decisione di Andrea):
-    # «Lo scambio» diceva a parole quel che il marchio dice gia', e con
-    # lei se n'e' andata la riga puntinata di `.section-label` — che
-    # separa DUE sezioni, e qui sotto ce n'e' una sola. Il marchio
-    # resta quello di sempre: e' uno dei quattro posti contati dalla
-    # prova del logo, e questa non lo sposta.
+    # ══ I QUATTRO PASSI PARLANO A CHI L'ORDINE CE L'HA (set 2026,
+    # richiesta di Andrea) ══ Prima erano UNA lista sola e parlavano
+    # del proprietario in terza persona: «Al recapito indicato da chi
+    # vende» lo leggeva anche IL VENDITORE, cioe' si sentiva chiamare
+    # «chi vende» a casa sua. Adesso sono due liste, una per verso, e
+    # la regola della parentesi e' questa: il titolo dice DOVE si e',
+    # la parentesi dice cosa tocca A TE quando tocca a te e il FATTO
+    # quando la mossa e' dell'altra persona.
+    _ren = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("i quattro passi del lato VENDO parlano al venditore", True,
+          "{t: 'Ordine preso', d: 'invia i sats'}," in _ren
+          and "{t: 'Sats bloccati', d: 'restano in garanzia fino alla fine'},"
+          in _ren
+          and "{t: 'Euro inviati', d: 'al recapito che hai indicato'},"
+          in _ren
+          and "{t: 'Scambio concluso', d: 'i sats sono arrivati al compratore'}"
+          in _ren)
+    prova("...e quelli del lato COMPRO si specchiano al verso giusto",
+          True,
+          "{t: 'Ordine preso', d: 'di\\' dove ricevere i sats'}," in _ren
+          and "{t: 'Sats bloccati', d: 'chi vende li ha messi in garanzia'},"
+          in _ren
+          and "{t: 'Euro inviati', d: 'al recapito che ti dà chi vende'},"
+          in _ren
+          and "{t: 'Scambio concluso', d: 'i sats sono arrivati a te'}"
+          in _ren)
+    # ⚠️ E LA PRIMA PARENTESI DI OGNI LISTA E' IL GESTO DEL BOTTONE:
+    # `azioniDisponibili` da' «fattura» a chi compra e «hold» a chi
+    # vende, e le due frasi dicono la stessa cosa nello stesso ordine.
+    # Se un domani la tabella dei passi si girasse, la pagina direbbe
+    # a chi compra di fare quel che tocca a chi vende.
+    prova("...e il primo passo dice il gesto che il bottone offre",
+          True,
+          _ren.index("di\' dove ricevere i sats") < _ren.index("invia i sats")
+          and "'<button class=\"btn orange\" onclick=\"apriIncassoP2P()\">"
+              "💸 Dove ricevere i sats</button>" in _ren)
+    # la spiegazione sta FRA PARENTESI, e la parentesi la scrive il
+    # render: nelle stringhe ci sono le sole parole
+    prova("...e la spiegazione sta fra parentesi", True,
+          "'</b><small>('" in _ren and "+ esc(p.d) + ')</small></div>'" in _ren)
+    # ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO: portava il
+    # metodo e il lato, e tutt'e due lo dicono gia' altri — le due
+    # righe della card da cui si arriva e i quattro passi qui sopra,
+    # il metodo il foglio dei recapiti.
+    # (i commenti si tolgono prima: il verbale accanto CITA la riga
+    #  che se n'e' andata, ed e' la quarta volta questa settimana che
+    #  una sentinella si fa ingannare dalla propria spiegazione)
+    _ren_nudo = re.sub(r"/\*[\s\S]*?\*/", "", _ren)
+    prova("sotto il conto non c'e' piu' la riga di servizio",
+          [False, False, False],
+          ['class="p2p-meta"' in _ren_nudo.split("box.innerHTML")[1],
+           "Vendi sats" in _ren_nudo, "metodoSceltoP2P" in _ren_nudo])
+    # «ANNULLA» E NON «RITIRA»: il gesto e' lo stesso (`cancel`), e la
+    # sorella resta «Chiedi di annullare» — quella e' una PROPOSTA che
+    # vuole anche il si' dell'altra persona, questa sparisce e basta.
+    prova("dal libro l'ordine proprio si ANNULLA, non si ritira",
+          [True, True, False],
+          ["✕ Annulla l\\'ordine</button>" in mini,
+           "✕ Chiedi di annullare</button>" in mini,
+           "Ritira l\\'ordine</button>" in mini])
+    # ⚠️ LA TESTATA E' IL CAPPELLO DI CASA (set 2026, richiesta di
+    # Andrea), e ha avuto tre stesure in due giorni: l'etichetta di
+    # sezione «Lo scambio», poi il solo marchio, e adesso il titolo
+    # «Nel dettaglio» dentro `.foglio-testa` — lo STESSO oggetto del
+    # cappello dei fogli e di «I miei scambi», non una copia che gli
+    # somiglia. Una copia si scolla al primo ritocco e non se ne
+    # accorge nessuno finche' non si mettono le due pagine una accanto
+    # all'altra.
     # (i commenti si tolgono prima: il perche' della riga NOMINA quel
     # che la riga non deve piu' avere, ed e' il modo in cui una
     # sentinella si fa ingannare dalla propria spiegazione)
     _vista_nuda = re.sub(r"<!--.*?-->", "", vista, flags=re.S)
-    prova("la testata dello scambio e' il solo marchio, centrato", True,
-          '<div class="p2p-marchio"><img class="p2p-simbolo"' in _vista_nuda
+    prova("la testata dello scambio e' il cappello di casa", True,
+          "<h3>Nel dettaglio</h3>" in _vista_nuda
+          and '<div class="foglio-testa">' in _vista_nuda
           and "Lo scambio</div>" not in _vista_nuda
-          and "section-label" not in _vista_nuda
-          and "text-align:center" in pezzo_js(mini, ".p2p-marchio{", "}"))
+          and "section-label" not in _vista_nuda)
+    # ⚠️ I DUE GEMELLI INVISIBILI non sono decorazione: nel foglio il
+    # cappello contiene la ✕ che lo chiude, ed e' quel bottone a dare
+    # l'altezza alla riga. Senza, lo stesso cappello qui verrebbe piu'
+    # basso — identico nelle regole e diverso a vedersi. E' la stessa
+    # coppia che «I miei scambi» ha gia'.
+    prova("...coi due gemelli invisibili che ne fanno l'altezza", 2,
+          _vista_nuda.count('<span class="foglio-back vuoto"'))
+    # ...e il marchio se n'e' andato con la sua regola CSS: niente
+    # vestito orfano
+    prova("...e il marchio non c'e' piu', ne' lui ne' il suo vestito",
+          [False, False],
+          ["p2p-marchio" in _vista_nuda, "p2p-marchio" in mini])
+    # ⚠️ LA FRECCIA E' NUDA: «← Torna» diceva a parole quel che la
+    # freccia dice da sola, e le parole sono passate in `aria-label` —
+    # chi naviga a voce sente «Torna indietro» come prima.
+    prova("la via indietro e' la sola freccia, e parla agli assistivi",
+          True,
+          'aria-label="Torna indietro">←</button>' in _vista_nuda
+          and "Torna</button>" not in _vista_nuda)
     prova("lo stato si dice sulla superficie neutra", True,
           '"trust-note nota-scambio"' in cod)
 
@@ -41722,7 +41860,6 @@ def prove_p2p_motore():
             "function nettoLatoP2P(o, sats){",
             "function verboLatoP2P(o){",
             "function fraseLatoP2P(o){",
-            "function vogliaLatoP2P(o){",
             "function affareP2P(o){",
             "function badgePremioP2P(o){",
             "function premioTestoP2P(n){",
@@ -47597,32 +47734,44 @@ def prove_p2p_card_scambio():
           rs.index("p2p-scambio-lato") < rs.index("p2p-scambio-euro")
           < rs.index("premioMioP2P") < rs.index("p2p-scambio-stato")
           < rs.index("p2p-paga"))
-    # ⚠️ I SATS HANNO CAMBIATO POSTO TRE VOLTE IN DUE GIORNI: una riga
-    # loro col badge accanto, poi fuori del tutto, poi in coda alla
-    # riga dell'euro — e adesso in TESTA, che e' la cifra che si va a
-    # cercare scorrendo i propri scambi (terzo ridisegno di Andrea).
-    prova("la prima riga porta i sats, in evidenza", True,
-          rs.index("satsScambioP2P(o)") < rs.index("euroTestoP2P(o)")
-          and 'class="p2p-sats"' in rs)
+    # ⚠️ IN TESTA VA QUEL CHE SI RICEVE, e non piu' sempre i sats (set
+    # 2026, ritocco di Andrea che rovescia le due righe): «Vuoi
+    # ricevere X» sopra e «pagando Y» sotto, la STESSA formula nei due
+    # versi — a cambiare e' la moneta. Prima, secondo il lato, in cima
+    # c'era una volta quel che entra e una volta quel che esce, e
+    # scorrendo la lista l'occhio doveva ricominciare da capo a ogni
+    # card.
+    # ⚠️ E IL LATO DECIDE SOLO IL POSTO: le due cifre si preparano
+    # PRIMA, ognuna con la sua classe, e il ternario le dispone. Se un
+    # domani qualcuno rimettesse la classe sulla RIGA invece che sulla
+    # moneta, il colore dei sats dipenderebbe dal lato.
+    prova("in testa va quel che si riceve, e sotto quel che si paga",
+          True,
+          "'<div class=\"p2p-scambio-lato\">Vuoi ricevere '" in rs
+          and "'<div class=\"p2p-scambio-euro\">pagando '" in rs
+          and "(ricevoSats ? cifraSats : cifraEuro)" in rs
+          and "(ricevoSats ? cifraEuro : cifraSats)" in rs)
+    prova("...e la classe sta sulla MONETA, non sulla riga", True,
+          "const cifraEuro = '<span class=\"p2p-euro\">" in rs
+          and "'<span class=\"p2p-sats\">' + esc(sats) + '</span>'" in rs)
     # ⚠️ E SENZA CIFRA LA FRASE RESTA IN PIEDI: a cambio muto si legge
-    # «Vuoi vendere sats», che e' la frase senza la cifra — un ripiego
-    # che non sembra un ripiego. Mai un numero inventato.
+    # «Vuoi ricevere sats» / «pagando sats», che e' la frase senza la
+    # cifra — un ripiego che non sembra un ripiego. Mai un numero
+    # inventato.
     prova("...e senza cifra la frase regge lo stesso", True,
-          ": 'sats')" in rs)
+          ": 'sats';" in rs)
     # IL PUNTINO E' MORTO col terzo ridisegno: le due cifre non stanno
     # piu' sulla stessa riga, quindi non c'e' piu' niente da separare —
     # e la sua regola CSS se n'e' andata con lui (niente CSS orfano).
     prova("il puntino non c'e' piu', ne' in pagina ne' nel foglio",
           [False, False], ["p2p-sep" in rs, "p2p-sep" in mini])
-    # ⚠️ DUE VERBI DIVERSI, e non lo stesso «per» (richiesta di Andrea
-    # sul lato vendo, scelta mia sul lato compro): le due card stanno
-    # una sotto l'altra nello stesso elenco, e se una dicesse «per
-    # ricevere 5,00 €» e l'altra «per 5,00 €» l'occhio completerebbe
-    # l'ellissi — «per [ricevere] 5,00 €» — cioe' il contrario di quel
-    # che succede.
-    prova("la seconda riga dice cosa si da' e cosa si ottiene, con due "
-          "verbi che non si confondono", True,
-          "'per ricevere ' : 'pagando '" in rs)
+    # ⚠️ I DUE VERBI DIVERSI SONO MORTI COL ROVESCIAMENTO, ed e' la
+    # parte da tenere: «per ricevere» / «pagando» erano la toppa a un
+    # difetto — in cima c'era una volta quel che entra e una volta
+    # quel che esce — e con le righe rimesse per MESTIERE la toppa non
+    # serve piu'. Il verbo e' uno solo per riga, uguale nei due versi.
+    prova("i due verbi del ripiego non ci sono piu'", [False, False],
+          ["'per ricevere ' : 'pagando '" in rs, "vogliaLatoP2P" in rs])
     # ⚠️ IL PIEDE E' RIMASTO ALLA SOLA ✕ (set 2026, richiesta di
     # Andrea): «tocca a te» e' salito DENTRO la casella dello stato,
     # che e' gia' tinta dal gesto da fare — appeso in fondo diceva la
@@ -47665,34 +47814,32 @@ def prove_p2p_card_scambio():
     # del cursore del filtro: il «−» tipografico sta in un posto solo.
     prova("il segno del premio viene da premioTestoP2P", True,
           "premioTestoP2P(o.premium)" in _mio)
-    # ⚠️ E ADESSO NON SI CONDIVIDE NEMMENO IL VERBO (set 2026, ritocco
-    # di Andrea): la card dice «Vuoi vendere ≈ 7 034 sats» e il
-    # cappello del foglio del libro «Stai vendendo sats». Sono due
-    # frasi per due momenti diversi — nella lista c'e' un'INTENZIONE
-    # (l'ordine puo' essere appena pubblicato e non averlo preso
-    # nessuno), nel foglio c'e' uno scambio che si sta facendo — e
-    # tenerle in una funzione sola con un interruttore vorrebbe dire
-    # che il giorno che una cambia si trascina l'altra.
-    # ⚠️ QUEL CHE RESTA CONDIVISO E' LA TABELLA DEL LATO, ed e' la
-    # cosa da non perdere: tutt'e due leggono `sell` come «chi legge
-    # riceve sats». Se una delle due si girasse, le due superfici
-    # direbbero il contrario l'una dell'altra sullo stesso ordine.
-    _vo = pezzo_js(mini, "function vogliaLatoP2P(o){", "\n}\n")
-    prova("la card dice la VOGLIA, il cappello l'azione in corso", True,
-          "vogliaLatoP2P(l)" in rs
-          and "verboLatoP2P(o)" in pezzo_js(
-              mini, "function fraseLatoP2P(o){", "\n}\n")
-          and "fraseLatoP2P(o)" in rd)
-    prova("...e sono due frasi intere, non un verbo con due code", True,
-          "'Vuoi comprare' : 'Vuoi vendere'" in _vo
-          and "verboLatoP2P" not in _vo)
-    prova("...ma la tabella del lato e' la stessa", True,
-          "o.lato === 'sell' ?" in _vo
+    # ⚠️ LA CARD E IL CAPPELLO NON CONDIVIDONO PIU' NIENTE DI TESTO
+    # (set 2026, due ritocchi di Andrea in fila). Il primo aveva
+    # spezzato il verbo — «Vuoi comprare/vendere» nella lista, «Stai
+    # comprando sats» nel foglio del libro — e si era portato dietro
+    # `vogliaLatoP2P`; il secondo ha ROVESCIATO le righe, e con «Vuoi
+    # ricevere X» uguale nei due versi quella funzione sceglieva fra
+    # due parole identiche. E' morta dopo un giro, e al suo posto c'e'
+    # una riga in linea: una funzione che non decide niente non e' un
+    # giudice.
+    # ⚠️ QUEL CHE LA CARD USA ANCORA DEL LATO e' il POSTO delle due
+    # cifre (`ricevoSats`), e legge `sell` come «chi legge riceve
+    # sats» — la stessa tabella del verbo del cappello. Se una delle
+    # due si girasse, le due superfici direbbero il contrario l'una
+    # dell'altra sullo stesso ordine.
+    # (si guarda la DICHIARAZIONE e non il nome: il nome vive ancora
+    # nel verbale che dice perche' la funzione non c'e' piu', ed e' la
+    # trappola in cui una sentinella si fa ingannare dalla propria
+    # spiegazione — gia' pagata due volte questa settimana)
+    prova("la card non chiama piu' ne' il verbo ne' la frase del foglio",
+          [False, False, False],
+          ["verboLatoP2P(" in rs, "fraseLatoP2P(" in rs,
+           "function vogliaLatoP2P" in mini])
+    prova("...ma legge il lato con la stessa tabella", True,
+          "const ricevoSats = l.lato === 'sell';" in rs
           and "o.lato === 'sell' ?" in pezzo_js(
               mini, "function verboLatoP2P(o){", "\n}\n"))
-    prova("...e la card non chiama piu' ne' il verbo ne' la frase",
-          [False, False],
-          ["verboLatoP2P(" in rs, "fraseLatoP2P(" in rs])
     # ...e il cappello del libro NON e' cambiato: li' lo scambio si sta
     # davvero facendo, e «Stai» e' la parola giusta
     prova("il cappello del foglio del libro resta «Stai»", True,
@@ -47734,22 +47881,24 @@ def prove_p2p_card_scambio():
     # spaziatore.
     prova("...e non e' rimasta la riga flex di ieri", False,
           "p2p-scambio-riga" in mini)
-    # I SATS SONO LA CIFRA IN EVIDENZA: il mono e l'arancio se li porta
-    # `.p2p-sats`, qui si alza la sola taglia — e resta UN GRADINO
-    # SOTTO al Baloo che gli sta attorno, che il mono a parita' di
-    # corpo pesa di piu'.
-    _ev = pezzo_js(mini, "  .p2p-scambio-lato .p2p-sats{", "}")
+    # LA CIFRA IN TESTA E' IN EVIDENZA, e da quando le righe si sono
+    # rovesciate non e' piu' sempre la stessa moneta: la regola nomina
+    # tutte e due, e la taglia resta UN GRADINO SOTTO al Baloo che le
+    # sta attorno — il mono a parita' di corpo pesa di piu'.
+    _ev = pezzo_js(mini, "  .p2p-scambio-lato .p2p-sats,\n"
+                         "  .p2p-scambio-lato .p2p-euro{", "}")
     _lato = pezzo_js(mini, "  .p2p-scambio-lato{", "}")
-    prova("i sati della prima riga sono in evidenza, ma sotto la frase",
+    prova("la cifra della prima riga e' in evidenza, ma sotto la frase",
           True,
           "font-size:16px" in _ev and "font-size:17px" in _lato)
-    # ...e la riga dell'euro e' la frase di servizio: muta fuori, col
-    # dato nell'inchiostro di casa e un gradino sotto ai sats.
+    # ...e la seconda riga e' la frase di servizio: muta fuori, col
+    # dato nell'inchiostro di casa e un gradino sotto alla prima.
     _eu = pezzo_js(mini, "  .p2p-scambio-euro{", "}")
-    prova("...e la riga dell'euro resta la frase di servizio", True,
+    prova("...e la seconda riga resta la frase di servizio", True,
           "color:var(--muted)" in _eu
           and "font-size:15px" in pezzo_js(
-              mini, "  .p2p-scambio-euro .p2p-euro{", "}"))
+              mini, "  .p2p-scambio-euro .p2p-euro,\n"
+                    "  .p2p-scambio-euro .p2p-sats{", "}"))
     # LO STATO E' UN RIQUADRO CONTORNATO (richiesta di Andrea): il
     # contorno e' quello del conto del dettaglio, mai una tinta nuova.
     # ⚠️ IL RAGGIO invece e' quello della scatola qui sotto
@@ -47792,8 +47941,6 @@ def prove_p2p_card_scambio():
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function verboLatoP2P(o){",
         "function fraseLatoP2P(o){",
-        # la frase della card, sorella del cappello e non un suo ramo
-        "function vogliaLatoP2P(o){",
         "function affareP2P(o){",
         "function premioTestoP2P(n){",
         "function premioMioP2P(o){",
@@ -47944,14 +48091,23 @@ console.log(JSON.stringify(out));
         return
     o = _json.loads(r.stdout)
 
-    # LA PRIMA RIGA DICE DA CHE PARTE STAI E QUANTI SATS, che e' la
-    # cifra che si va a cercare scorrendo i propri scambi.
-    prova("la prima riga dice il lato e i sats", [True, True],
-          ['Vuoi comprare <span class="p2p-sats">' in o["compro"],
-           'Vuoi vendere <span class="p2p-sats">' in o["vendo"]])
-    # ...e il gerundio non e' rimasto da nessuna parte nella card
-    prova("...e il gerundio se n'e' andato dalla lista", [False, False],
-          ["Stai comprando" in o["compro"], "Stai vendendo" in o["vendo"]])
+    # ⚠️ IN TESTA VA QUEL CHE SI RICEVE, nei due versi (set 2026,
+    # ritocco di Andrea): «Vuoi ricevere X» sopra e «pagando Y» sotto,
+    # e a cambiare col lato e' la MONETA — i sats a chi compra, gli
+    # euro a chi vende. E' il caso che prova il rovesciamento: le due
+    # card mettono in cima due monete diverse e la stessa frase.
+    prova("in testa va quel che si riceve: i sats a chi compra",
+          [True, True],
+          ['Vuoi ricevere <span class="p2p-sats">' in o["compro"],
+           'pagando <span class="p2p-euro">5,00 €</span>' in o["compro"]])
+    prova("...e gli euro a chi vende", [True, True],
+          ['Vuoi ricevere <span class="p2p-euro">5,00 €</span>' in o["vendo"],
+           'pagando <span class="p2p-sats">' in o["vendo"]])
+    # ...e le stesure vecchie non sono rimaste da nessuna parte
+    prova("...e le frasi dei due giri prima se ne sono andate",
+          [False, False, False, False],
+          ["Stai comprando" in o["compro"], "Stai vendendo" in o["vendo"],
+           "Vuoi comprare" in o["compro"], "per ricevere" in o["vendo"]])
 
     # ══ LA FRECCETTA CHE DICE «SI ENTRA» (set 2026, richiesta di
     # Andrea) ══ La card e' `role="button"` da sempre, ma niente lo
@@ -48001,17 +48157,18 @@ console.log(JSON.stringify(out));
     # ce l'ha gia' per l'anello del libro, e questa ci si appoggia
     prova("...e la card resta il riferimento dell'ancora", True,
           "position:relative" in pezzo_js(mini, ".p2p-ord{", "}"))
-    # ⚠️ ...E LA SECONDA DICE COSA SI DA' E COSA SI OTTIENE, con due
-    # verbi DIVERSI: le due card stanno una sotto l'altra nello stesso
-    # elenco, e uno stesso «per» su tutt'e due farebbe completare
-    # l'ellissi all'occhio — «per [ricevere] 5,00 €» — cioe' il
-    # contrario di quel che succede a chi compra.
-    prova("...e la seconda cosa si da' in cambio, senza ambiguita'",
-          [True, True],
-          ['pagando <span class="p2p-euro">5,00 €</span>' in o["compro"],
-           'per ricevere <span class="p2p-euro">5,00 €</span>' in o["vendo"]])
-    prova("...e i due verbi non si possono confondere", [False, False],
-          ["per ricevere" in o["compro"], "pagando" in o["vendo"]])
+    # ⚠️ E LA TAGLIA VA COL POSTO, IL COLORE CON LA MONETA: le due
+    # classi restano attaccate ai sats e agli euro dovunque cadano —
+    # cosi' il mono e il colore della cifra non dipendono dal lato — e
+    # a cambiare con la riga e' la sola misura. Due regole CSS, e la
+    # prova pretende che ognuna nomini TUTTE E DUE le monete: con una
+    # sola, la cifra che cambia riga si rimpicciolisce o si ingrandisce
+    # secondo il lato.
+    prova("la taglia va col posto e nomina le due monete", [True, True],
+          [".p2p-scambio-lato .p2p-sats,\n  .p2p-scambio-lato "
+           ".p2p-euro{font-size:16px}" in mini,
+           ".p2p-scambio-euro .p2p-euro,\n  .p2p-scambio-euro "
+           ".p2p-sats{font-size:15px}" in mini])
     prova("...e la terza lo stato, nel suo riquadro", True,
           '<div class="p2p-scambio-stato"><span>Ordine pubblicato</span></div>'
           in o["compro"])

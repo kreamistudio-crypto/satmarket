@@ -1824,11 +1824,6 @@
      serve: la centra `align-items:center` di .section-label. */
   .p2p-simbolo{width:76px;height:76px}
   .empty .p2p-simbolo{display:block;margin:0 auto 10px}
-  /* il marchio DA SOLO, centrato: e' la testata della pagina dello
-     scambio da quando «Lo scambio» se n'e' andato. Niente
-     `.section-label` qui — quella e' un'etichetta che separa due
-     sezioni, e sotto ce n'e' una sola. */
-  .p2p-marchio{padding:16px 0 2px;text-align:center}
   .p2p-logo-pila{display:grid}
   .p2p-logo{grid-area:1/1;width:76px;height:76px;
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
@@ -2316,14 +2311,22 @@
      basta. UN GRADINO SOTTO al Baloo che gli sta attorno, non pari:
      il mono a parita' di corpo pesa di piu', e a 17 avrebbe spinto
      piu' della frase che lo introduce. */
-  .p2p-scambio-lato .p2p-sats{font-size:16px}
+  /* ⚠️ E LE DUE CIFRE CAMBIANO RIGA COL LATO (set 2026): in testa va
+     quel che si riceve, quindi i sats stanno SOPRA a chi compra e
+     SOTTO a chi vende — l'euro il contrario. Le classi restano
+     attaccate alla MONETA (il colore, il mono), e a cambiare col
+     posto e' la sola taglia: sono i due numeri che le due righe
+     avevano gia', rimessi per POSTO invece che per moneta. */
+  .p2p-scambio-lato .p2p-sats,
+  .p2p-scambio-lato .p2p-euro{font-size:16px}
   /* la seconda riga e' la frase di servizio — quel che si da' in
      cambio — quindi muta; dentro, la cifra torna nell'inchiostro di
      casa, che e' un DATO e non una parola. Un gradino sotto ai sats:
      l'evidenza e' loro. */
   .p2p-scambio-euro{margin-top:2px;font-size:13.5px;font-weight:600;
     color:var(--muted)}
-  .p2p-scambio-euro .p2p-euro{font-size:15px}
+  .p2p-scambio-euro .p2p-euro,
+  .p2p-scambio-euro .p2p-sats{font-size:15px}
   /* LO STATO IN UN RIQUADRO CONTORNATO (richiesta di Andrea): il
      contorno e' quello del conto del dettaglio — `1.5px solid
      var(--line)` —, mai una tinta nuova. Il RAGGIO invece e' quello
@@ -7251,14 +7254,37 @@ document.getElementById('cartello')?.remove();</script>
        scrive renderOrdineP2P — che rilegge sempre da ordiniP2P(), o
        una copia in memoria racconterebbe uno scambio fermo a ieri. -->
   <div class="view" id="view-p2pordine">
-    <button class="back" onclick="navIndietro()">← Torna</button>
+    <!-- LA FRECCIA NUDA (set 2026, ritocco di Andrea): «← Torna»
+         diceva a parole quel che la freccia dice da sola, e sopra un
+         cappello che gia' nomina la pagina la parola era la terza
+         etichetta in tre centimetri. Il bottone resta dov'era e resta
+         quello di casa (`.back`): a cambiare e' solo il contenuto, e
+         le parole passano in `aria-label` — chi naviga a voce sente
+         «Torna indietro» come prima. -->
+    <button class="back" onclick="navIndietro()" title="Torna indietro"
+            aria-label="Torna indietro">←</button>
     <div class="sicu">
-      <!-- IN CIMA RESTA IL SOLO MARCHIO (set 2026, decisione di
-           Andrea): «Lo scambio» diceva a parole quel che il marchio
-           dice gia', e se n'e' andata con lei la riga puntinata di
-           `.section-label` — che serve a SEPARARE due sezioni, e qui
-           sotto ce n'e' UNA sola. -->
-      <div class="p2p-marchio"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"></div>
+      <!-- IL CAPPELLO E' QUELLO DEI FOGLI (set 2026, richiesta di
+           Andrea), lo stesso oggetto di «Vuoi comprare sats» e di «I
+           miei scambi»: `.foglio-testa` col suo `h3`, quindi stessa
+           aria sopra e sotto e la stessa riga che lo stacca dal
+           resto. Non una copia che somiglia — una copia si scolla al
+           primo ritocco, e non se ne accorge nessuno finche' non si
+           mettono le due pagine una accanto all'altra.
+           ⚠️ I DUE GEMELLI INVISIBILI sono la riga che leggendo non
+           si vede: nel foglio il cappello contiene la ✕ che lo
+           chiude, ed e' quel bottone a dare l'altezza alla riga
+           (`align-items:center`). Senza, lo stesso cappello qui
+           verrebbe piu' basso — identico nelle regole e diverso a
+           vedersi. E' la stessa coppia che tiene in centro il titolo
+           di «I miei scambi».
+           IL MARCHIO SE N'E' ANDATO, e con lui la sua regola CSS: la
+           pagina si chiama col suo nome, come le sorelle. -->
+      <div class="foglio-testa">
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+        <h3>Nel dettaglio</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
       <div id="p2pOrdineCorpo"></div>
     </div>
   </div>
@@ -36158,26 +36184,13 @@ function verboLatoP2P(o){
 function fraseLatoP2P(o){
   return 'Stai ' + verboLatoP2P(o) + ' sats';
 }
-/* ...e la VOGLIA, che e' la frase della card di «I miei scambi» (set
-   2026, ritocco di Andrea): «Vuoi vendere ≈ 7.034 sats» al posto di
-   «Stai vendendo». Il gerundio raccontava un'azione IN CORSO anche
-   sull'ordine appena pubblicato, dove in corso non c'e' ancora
-   niente — nel libro non l'ha preso nessuno, e quel che c'e' e'
-   un'INTENZIONE. «Vuoi» regge su tutti gli stati della lista, dal
-   pubblicato al concluso, che e' la prova che serve a una frase che
-   sta in cima a ogni card.
-   ⚠️ SORELLA DI `fraseLatoP2P` E NON UN SUO PARAMETRO: sono due frasi
-   in due posti diversi, e il cappello del foglio del LIBRO — dove lo
-   scambio si sta davvero facendo — resta «Stai comprando sats». Un
-   interruttore dentro una funzione sola le terrebbe legate, e il
-   giorno che una cambia si trascina l'altra.
-   ⚠️ E IL LATO E' QUELLO DEL LIBRO: `comeLibroP2P` traduce prima, e
-   `sell` vuol dire che chi legge RICEVE sats — la stessa tabella di
-   `verboLatoP2P`, o le due frasi direbbero il contrario l'una
-   dell'altra. */
-function vogliaLatoP2P(o){
-  return o.lato === 'sell' ? 'Vuoi comprare' : 'Vuoi vendere';
-}
+/* ⚠️ `vogliaLatoP2P` E' VISSUTA UN GIRO SOLO (set 2026): diceva «Vuoi
+   comprare» / «Vuoi vendere» in cima alla card, e il ritocco dopo ha
+   ROVESCIATO le due righe — in testa va quel che si RICEVE, e la
+   frase e' la stessa nei due versi («Vuoi ricevere X»). Una funzione
+   che sceglie fra due parole uguali non e' un giudice: la frase e'
+   tornata in linea dentro `rigaScambioP2P`, e qui resta solo il
+   perche', che e' la cosa che non si ricostruisce. */
 /* IL GIUDICE DELL'AFFARE, uno per tutti: la formula uniforme di
    get_market_quote verificata sui byte (`sats -= premium/100 * sats`),
    per cui un premio positivo assottiglia SEMPRE i sats — chi compra ne
@@ -36857,15 +36870,19 @@ function renderFiltroP2P(){
       'Chi non ha ancora ricevuto voti, o non ha un account Barattolo, ' +
       'compare solo col minimo a 0.</div>' +
     '<div class="foglio-piede">' +
-      '<button type="button" class="btn ghost" onclick="azzeraFiltroP2P()">Cancella</button>' +
+      '<button type="button" class="btn ghost" onclick="azzeraFiltroP2P()">Azzera</button>' +
       '<button type="button" class="btn orange" onclick="applicaFiltroP2P()">Applica</button>' +
     '</div>';
 }
-/* «Cancella» AZZERA E APPLICA in un gesto solo (e chiude): un
-   «Cancella» che svuotasse i campi lasciando il libro filtrato
-   chiederebbe un secondo tocco per fare la cosa che uno ha gia'
-   chiesto. E' anche il bottone dello stato vuoto, che da li' e'
-   l'unica strada d'uscita. */
+/* «AZZERA» E NON «CANCELLA» (set 2026, ritocco di Andrea): un filtro
+   non si cancella, si riporta a zero — «cancella» e' la parola di chi
+   butta via una cosa, e qui non si butta via niente. Il nome dice
+   quel che la funzione fa da sempre, e infatti la funzione si chiama
+   gia' cosi'.
+   E AZZERA E APPLICA IN UN GESTO SOLO (e chiude): uno che svuotasse i
+   campi lasciando il libro filtrato chiederebbe un secondo tocco per
+   fare la cosa che uno ha gia' chiesto. E' anche il bottone dello
+   stato vuoto, che da li' e' l'unica strada d'uscita. */
 function azzeraFiltroP2P(){
   haptic();
   p2pFiltro = null;
@@ -39946,8 +39963,31 @@ function contoDettP2P(o){
      e' un errore: il prezzo e' favorevole a chi vende, e quei sats
      dal conto escono lo stesso. Le due letture stanno in due colonne,
      e ognuna e' coerente nella sua. */
+  /* ⚠️ E IL NOME DELLA VOCE CAMBIA COL LETTORE (set 2026, richiesta
+     di Andrea): dal LIBRO si guarda l'offerta di un ALTRO, e il premio
+     e' «al venditore» — di lui si parla. Nella pagina di uno scambio
+     PROPRIO chi legge quell'offerta l'ha scritta, e sentirsi
+     raccontare in terza persona suona come se il premio fosse di un
+     terzo. Arriva con `mio`, come `satsDetti`: il conto sa per quali
+     occhi sta scrivendo.
+     ⚠️ E «RICHIESTO» O «OFFERTO» NON LO DECIDE IL SEGNO, lo decide il
+     GIUDICE, ed e' la riga da non ammorbidire: un premio positivo
+     favorisce SEMPRE chi vende sats (`sats -= premium/100 * sats`,
+     letta sui byte), quindi sul mio ordine di VENDITA un +4% e' un
+     premio che CHIEDO, ma sul mio ordine di ACQUISTO lo stesso +4%
+     e' un premio che OFFRO — mi fa ricevere meno sats. Chiamarlo
+     «richiesto» li' direbbe a chi legge che sta chiedendo una cosa
+     che invece sta pagando. `affareP2P` risponde esattamente a questa
+     domanda — il premio pende dalla mia parte? — e la traduzione del
+     lato l'ha gia' fatta `comeLibroP2P`: quindi «richiesto» E'
+     `affare`, senza una seconda tabella da tenere in pari. */
+  const nomePremio = !o.mio
+    ? (o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
+    : affare
+      ? (o.premium > 0 ? 'Premio richiesto' : 'Sconto richiesto')
+      : (o.premium > 0 ? 'Premio offerto' : 'Sconto offerto');
   const premio = (!fisso && o.premium)
-    ? r((o.premium > 0 ? 'Premio al venditore' : 'Sconto del venditore')
+    ? r(nomePremio
         + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
         + Math.abs(Math.round(o.premium)) + '%</b>',
         cifra('premio', o.premium > 0 ? '−' : '+'), 'premio')
@@ -40331,7 +40371,14 @@ async function chiamataOrdineP2P(o, azione, payload){
    nell'ordine di Barattolo: qui non c'e' niente di irreversibile che
    costi dei sats, quindi restano ghost e basta. */
 const SECONDARI_P2P = {
-  ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Ritira l\'ordine</button>',
+  /* «ANNULLA» E NON «RITIRA» (set 2026, ritocco di Andrea): il gesto
+     e' lo stesso di sempre (`cancel` al coordinatore) e la parola
+     cambia perche' «ritirare» un ordine dal libro e' il vocabolario
+     di chi lo ha messo li', mentre chi guarda pensa a uno scambio da
+     annullare. La sorella qui sotto resta «Chiedi di annullare», e le
+     due non si confondono: quella e' una PROPOSTA che vuole anche il
+     si' dell'altra persona, questa sparisce e basta. */
+  ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Annulla l\'ordine</button>',
   annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Chiedi di annullare</button>',
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
   vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>',
@@ -40388,11 +40435,29 @@ function renderOrdineP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) { box.innerHTML = '<div class="hint">Questo scambio non c\'è più.</div>'; return; }
   const st = statoTestoP2P(o);
-  const passi = [
-    {t: 'Ordine preso', d: o.lato === 'compro' ? 'Compri sats' : 'Vendi sats'},
-    {t: 'Sats bloccati', d: 'Restano in garanzia fino alla fine'},
-    {t: 'Euro inviati', d: 'Al recapito indicato da chi vende'},
-    {t: 'Scambio concluso', d: 'I sats arrivano a chi compra'}
+  /* ⚠️ I QUATTRO PASSI PARLANO A CHI L'ORDINE CE L'HA (set 2026,
+     richiesta di Andrea), e prima parlavano di lui in terza persona:
+     «Al recapito indicato da chi vende» lo leggeva anche IL
+     VENDITORE, cioe' si sentiva chiamare «chi vende» a casa sua.
+     LA REGOLA DELLA PARENTESI: il titolo dice DOVE si e', la
+     parentesi dice cosa tocca A TE quando tocca a te, e il FATTO
+     quando la mossa e' dell'altra persona. Per questo i due elenchi
+     non sono la stessa frase con le parole girate — a cambiare e' chi
+     deve muoversi, passo per passo.
+     Tabella PURA e gemella di `azioniDisponibili`: li' c'e' il
+     bottone del gesto, qui la sua frase, e le due dicono la stessa
+     cosa nello stesso ordine — «di' dove ricevere i sats» e «💸 Dove
+     ricevere i sats», «invia i sats» e «🔒 Blocca i sats». */
+  const passi = o.lato === 'compro' ? [
+    {t: 'Ordine preso', d: 'di\' dove ricevere i sats'},
+    {t: 'Sats bloccati', d: 'chi vende li ha messi in garanzia'},
+    {t: 'Euro inviati', d: 'al recapito che ti dà chi vende'},
+    {t: 'Scambio concluso', d: 'i sats sono arrivati a te'}
+  ] : [
+    {t: 'Ordine preso', d: 'invia i sats'},
+    {t: 'Sats bloccati', d: 'restano in garanzia fino alla fine'},
+    {t: 'Euro inviati', d: 'al recapito che hai indicato'},
+    {t: 'Scambio concluso', d: 'i sats sono arrivati al compratore'}
   ];
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
   const tog = p2pTogliibile(o);
@@ -40413,15 +40478,8 @@ function renderOrdineP2P(){
      e' un fatto invece di una stima — vedi il suo avviso dentro
      `contoDettP2P`. */
   const conto = contoDettP2P(Object.assign(comeLibroP2P(o),
-                                           {satsDetti: o.satsNetti || 0}));
-  const meta = [];
-  /* IL METODO DECISO PRENDE IL POSTO DELL'ELENCO: da quando chi
-     prende sceglie, l'elenco intero direbbe una cosa che non e' piu'
-     vera — le altre voci non sono piu' in gioco. */
-  const metodoDeciso = metodoSceltoP2P(o);
-  if (metodoDeciso) meta.push('💳 ' + esc(metodoDeciso));
-  else if (o.metodi && o.metodi.length) meta.push('💳 ' + esc(o.metodi.join(', ')));
-  meta.push(o.lato === 'compro' ? '⬇️ Compri sats' : '⬆️ Vendi sats');
+                                           {satsDetti: o.satsNetti || 0,
+                                            mio: true}));
   const azione = azioniDisponibili(o);
   const bottoni = {
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
@@ -40432,13 +40490,21 @@ function renderOrdineP2P(){
   const secondarie = azioniSecondarieP2P(o);
   const avviso = o.cantDo || o.errore;
   box.innerHTML =
-    '<div class="p2p-ord">' + conto +
-      '<div class="p2p-meta">' + meta.map(m => '<span>' + m + '</span>').join('') + '</div>' +
-    '</div>' +
+    /* ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO (set 2026,
+       decisione di Andrea): portava il metodo di pagamento e il lato
+       («💳 SEPA · ⬆️ Vendi sats»), e tutt'e due lo dicono gia' altri
+       — il lato le due righe della card da cui si arriva («Vuoi
+       ricevere 5,00 €», «pagando ≈ 7.034 sats») e i quattro passi
+       qui sotto, il metodo
+       il foglio dei recapiti, che e' dove serve davvero. Ripetuti
+       qui, in grigio piccolo sotto un conto, erano due etichette che
+       non decidevano niente. */
+    '<div class="p2p-ord">' + conto + '</div>' +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) =>
         '<div class="step ' + (i < prog ? 'done' : i === prog ? 'now' : 'todo') + '">' +
-        '<span class="dot"></span><b>' + esc(p.t) + '</b><small>' + esc(p.d) + '</small></div>'
+        '<span class="dot"></span><b>' + esc(p.t) + '</b><small>('
+        + esc(p.d) + ')</small></div>'
       ).join('') +
     '</div></div>' +
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
@@ -42553,6 +42619,12 @@ function rigaScambioP2P(o){
      sono piu' in gioco e scriverle direbbe una cosa non piu' vera. */
   const met = metodoSceltoP2P(o) || (o.metodi || []).join(', ');
   const sats = satsScambioP2P(o);
+  /* le due cifre, e il lato dice SOLO in quale riga vanno: `sell` nel
+     vocabolario del libro vuol dire che chi legge riceve sats */
+  const ricevoSats = l.lato === 'sell';
+  const cifraEuro = '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>';
+  const cifraSats = sats
+    ? '<span class="p2p-sats">' + esc(sats) + '</span>' : 'sats';
   /* ⚠️ «TOCCA A TE» STA DENTRO LA CASELLA DELLO STATO (set 2026,
      richiesta di Andrea), e non piu' in una riga sua in fondo: quella
      casella e' gia' tinta dallo stato — arancio quando c'e' un gesto
@@ -42579,21 +42651,29 @@ function rigaScambioP2P(o){
        ⚠️ A CAMBIO MUTO LA FRASE RESTA IN PIEDI: senza cifra si legge
        «Stai vendendo sats», che e' esattamente la frase di ieri — un
        ripiego che non sembra un ripiego. Mai un numero inventato. */
-    + '<div class="p2p-scambio-lato">' + esc(vogliaLatoP2P(l)) + ' '
-    + (sats ? '<span class="p2p-sats">' + esc(sats) + '</span>' : 'sats')
-    + '</div>'
-    /* ...E LA SECONDA DICE COSA SI DA' E COSA SI OTTIENE, con due verbi
-       DIVERSI e non con lo stesso «per» (richiesta di Andrea sul lato
-       vendo, e la scelta sul lato compro e' mia): le due card stanno
-       una sotto l'altra nello stesso elenco, e se una dicesse «per
-       ricevere 5,00 €» e l'altra «per 5,00 €» l'occhio completerebbe
-       l'ellissi — «per [ricevere] 5,00 €» — cioe' il contrario di
-       quel che succede. Due verbi che non si possono confondere:
-       `ricevere` e `pagando`, gli stessi due mestieri che il libro
-       chiama «Ricevi» e «Paghi». */
-    + '<div class="p2p-scambio-euro">'
-    + (l.lato === 'buy' ? 'per ricevere ' : 'pagando ')
-    + '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span></div>'
+    /* ⚠️ IN TESTA VA SEMPRE QUEL CHE SI RICEVE (set 2026, ritocco di
+       Andrea che ROVESCIA le due righe del giro prima): «Vuoi ricevere
+       X» sopra, «pagando Y» sotto, e la formula e' la STESSA nei due
+       versi — a cambiare e' la moneta, non le parole. Prima la prima
+       riga portava sempre i sats e la seconda sempre l'euro, quindi
+       secondo il lato in cima c'era una volta quel che ENTRA e una
+       volta quel che ESCE: scorrendo la lista l'occhio doveva
+       ricominciare da capo a ogni card, e i due verbi diversi
+       («per ricevere» / «pagando») erano la toppa a quel difetto
+       invece della cura.
+       ⚠️ E LE CLASSI RESTANO ATTACCATE ALLA MONETA, non alla riga:
+       `.p2p-sats` sta coi sats e `.p2p-euro` con gli euro dovunque
+       cadano, cosi' il colore e il mono della cifra non dipendono da
+       dove l'ha messa il lato. A cambiare col POSTO e' la sola
+       taglia, e sono due righe di CSS.
+       ⚠️ A CAMBIO MUTO LA FRASE REGGE LO STESSO: al posto della cifra
+       resta la parola «sats» — «Vuoi ricevere sats», «pagando sats» —
+       che e' un ripiego che non sembra un ripiego. Mai un numero
+       inventato. */
+    + '<div class="p2p-scambio-lato">Vuoi ricevere '
+    + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+    + '<div class="p2p-scambio-euro">pagando '
+    + (ricevoSats ? cifraEuro : cifraSats) + '</div>'
     + premioMioP2P(l)
     + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
     + '<span>' + esc(st.t) + '</span>' + agire + '</div>'
