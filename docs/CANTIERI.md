@@ -12071,3 +12071,104 @@ filtro mostra i cinque gruppi **coi conti veri accanto** (2+3+1+1+1 su
 otto scambi: la partizione si vede), «Applica» porta la lista a due e
 la pillola a «2 scambi», «Cancella» rimette tutto. A 320 il documento
 resta largo 320 e nessuna card sfora.
+
+## La quarta porta: l'import da Nostr non spogliava le foto
+
+Andrea ha chiesto di essere sicuri che le foto non portino mai
+metadati (GPS compreso) e di farlo anche RETROATTIVAMENTE sui file già
+sul disco. Il cantiere «niente GPS nelle foto» (qui sopra) aveva già
+chiuso tre porte — `salva_foto`, `normalizza_foto_import`,
+`_documento_busta` — e aveva già scritto lo script per la passata
+retroattiva (`spoglia_foto_esistenti.py`), mai lanciato in produzione.
+**MANCAVA UNA QUARTA PORTA, ancora aperta**: `scarica_foto` in
+`importa_nostr.py`, che gira OGNI ORA in produzione quando
+`IMPORT_NOSTR_APERTO` è acceso, scriveva `raw()` com'era arrivato dal
+relay — GPS compreso, se il venditore Nostr lo portava nella sua foto.
+Le tre sentinelle di `prove.py` (8091-8094) censivano tre porte, non
+quattro: un bug qui non lo avrebbe mai fatto sapere nessuna prova.
+
+**LA CURA, STESSO IDIOMA DI `vaglio` E `scarica`**: un nuovo parametro
+`pulisci=None` viaggia da `importa_venditore` a `localizza_foto` a
+`scarica_foto`, esattamente come già viaggiano il filtro di
+moderazione e lo scaricatore anti-SSRF — vivi nel server (che ha
+Pillow, `spoglia_metadati`, le chiavi) e assenti nello script lanciato
+a mano («la fiducia sta nella npub scritta nel config», la stessa
+frase già scritta per `vaglio`). Il server inietta `spoglia_metadati`
+STESSA, non un involucro: a differenza di `normalizza_foto_import`
+(che serve la filiera del CSV e forza sempre il JPEG) preserva il
+formato, e l'estensione del file la decide già il Content-Type prima
+di scaricare — nessun bisogno di rifiutare o ri-sniffare dopo.
+**SE NON SA PULIRLA, LA FOTO NON SI SALVA IN LOCALE**: stessa cintura
+della foto troppo grande, `pulisci(raw) is None` → si tiene solo
+l'URL remoto. Mai un file sporco sul disco per scelta, mai per
+dimenticanza.
+
+**COLLAUDATO**: due sentinelle nuove (la chiamata dentro `scarica_foto`,
+l'iniezione dentro il giro orario del server — quest'ultima è la più
+importante: senza, il parametro resta `None` in silenzio e la porta si
+richiude senza che nessuna prova se ne accorga) più un banco VERO —
+`scarica_foto` estratta ed eseguita con un `pulisci` finto, su un
+filesystem temporaneo: il file salvato è il RISULTATO di `pulisci` (mai
+il raw), e se `pulisci` si arrende non tocca il disco. Due prove
+preesistenti verificavano la firma e la chiamata testuali di
+`scarica_foto`/l'iniezione nel server: aggiornate per il parametro
+nuovo, non aggirate. 9536 verdi, 0 rosse.
+
+**LA RETROATTIVA, SENZA SSH** (decisione di Alan: «evitiamo SSH» —
+Andrea non deve doverci passare, e per un'operazione una tantum
+costruire un endpoint pesa meno del rischio). `spoglia_foto_esistenti.py`
+esisteva già e funziona (provato in locale: 567 foto, 67 con residui di
+metadati — zero GPS — ripulite, un secondo giro conferma zero rimasti,
+idempotente) ma non era mai girato sul VPS vero. Invece di chiedere
+l'SSH, la STESSA logica (non una copia: qui dentro il server ha già
+`spoglia_metadati` in casa, senza il trucco dell'`exec()` su sorgente
+estratta che lo script usa per non importare tutto `server.py`) vive in
+un endpoint ADMIN temporaneo, `POST /api/admin/foto/spoglia-retroattiva`
+— senza `scrivi` è un'anteprima, nessun file si tocca — più un bottone
+in Amministrazione che prima mostra l'anteprima nel foglio di conferma
+e solo dopo un sì scrive davvero. **SINCRONA MA CHIAMATA DA UN THREAD**
+(`asyncio.to_thread`, lo stesso patto dell'import Nostr): centinaia di
+file con Pillow di mezzo bloccherebbero il loop dell'unico processo per
+tutta la durata — su un mercatino con pagamenti Lightning veri, un
+webhook che aspetta quel momento sarebbe la cosa sbagliata da fare
+aspettare. **TEMPORANEO PER COSTRUZIONE**: endpoint e bottone vanno
+tolti (un commit suo) una volta usati in produzione — non è una leva,
+è un attrezzo che ha finito il suo compito appena il conteggio torna a
+zero.
+
+## Tutti gli ordini in CSV, non solo la contabilità
+
+La pagina «I tuoi affari» diceva in coda «Il CSV completo è nel
+Profilo → Esporta i tuoi dati» — ma quell'export (`/api/me/export-
+biglietto` + `/api/export/{biglietto}`, nato per la contabilità)
+filtra `stato IN ('released','refunded')`: gli ordini ancora aperti,
+in disputa o annullati non ci sono mai stati. «Il CSV completo»
+prometteva più di quel che consegnava.
+
+**UN SOLO EXPORT, NON DUE FUNZIONI GEMELLE**: `tutti` viaggia nel
+BIGLIETTO stesso (`BIGLIETTI_EXPORT[biglietto] = (tg_id, scadenza,
+tutti)`) e non nella richiesta di download, che dentro Telegram la fa
+l'app a modo suo (una sonda HEAD, poi il GET, a volte a range) — non
+c'è un posto lì per passare un flag. Stessa colonna «esito» delle due
+facce: con la contabilità resta «concluso»/«rimborsato» (due valori,
+derivati); con `tutti` è lo STATO GREZZO — i dodici valori della
+regola ferrea 4, mai un'etichetta duplicata che potrebbe disallinearsi
+da quella vera. Il nome del file cambia (`barattolo-affari-tutti-
+AAAAMMGG.csv` contro `barattolo-affari-AAAAMMGG.csv`), così chi scarica
+prima uno e poi l'altro non si ritrova un file sovrascritto.
+
+LATO CLIENT: `esportaDati(tutti)` invece di una seconda funzione — il
+bottone del Profilo resta `esportaDati()` (contabilità, come sempre),
+la riga in coda alla lista ordini è diventata un bottone vero che
+chiama `esportaDati(true)` invece di un rimando testuale a un'altra
+pagina.
+
+**COLLAUDATO**: un banco VERO — `scarica_export` estratta e fatta
+girare su un database di cartone con quattro ordini in quattro stati
+diversi (released, creato, dispute, annullato) — verifica che senza
+`tutti` esca solo il released (esito «concluso»), e che con `tutti`
+escano tutti e quattro con lo stato grezzo. Più le sentinelle sul
+bottone nuovo e sulla firma di `esportaDati`. Un giro vero con
+`TestClient` contro il server reale ha confermato l'intero giro HTTP
+(biglietto → download) per entrambe le facce, nomi di file compresi.
+9543 verdi, 0 rosse.
