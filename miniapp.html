@@ -36150,17 +36150,33 @@ function cessioneInCorsoP2P(m){
    ⚠️ LA CINTURA DEGLI SCAMBI APERTI E' LA STESSA DEL «DIMENTICA», e per
    la stessa ragione: se il mazzo cambia mentre una hold invoice tiene
    dei sats, quei sats restano senza nessuno che possa muoverli. */
-function passaAlContoDalFoglioP2P(){
+async function passaAlContoDalFoglioP2P(btn){
   haptic();
+  /* PRIMA SI CHIEDE AL COORDINATORE com'e' andata davvero, e poi si
+     giudica: e' una LETTURA, quindi il velo e' quello ritardato — la
+     cosa che non torna indietro sta dietro la conferma, ed e' li' che
+     il secondo tocco trova la sua guardia. */
+  const ripristina = attesaRitardata(btn, 'Controllo i tuoi scambi…');
+  let mossi = 0;
+  try { mossi = await rinfrescaScambiP2P(); } finally { ripristina(); }
+  if (mossi) renderP2P();
   if (scambiApertiP2P()) {
     toast('Hai uno scambio ancora aperto: finiscilo prima di cambiare profilo');
     return;
   }
+  /* L'OFFERTA APPESA SI DICE: non blocca, ma da qui in poi non si
+     ritira piu' — la chiave con cui si firma il ritiro va sulla
+     mensola col mazzo vecchio. Tacerlo sarebbe una sorpresa. */
+  const righe = ordiniP2P();
+  const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])).length;
   chiediConferma({titolo: 'Usare il profilo del tuo account?',
     corpo: 'Da qui in poi pubblichi e scambi con il profilo legato al tuo '
       + 'account, lo stesso che hai sugli altri dispositivi.\n\nQuello nato '
       + 'qui resta da parte su questo dispositivo, con i suoi scambi: non si '
-      + 'cancella. Le recensioni che ha guadagnato restano attaccate a lui.',
+      + 'cancella. Le recensioni che ha guadagnato restano attaccate a lui.'
+      + (offerte ? '\n\n⚠️ ' + (offerte === 1
+          ? 'Hai un ordine ancora nel libro: dopo il passaggio non potrai più ritirarlo da qui, e scadrà da solo.'
+          : 'Hai ' + offerte + ' ordini ancora nel libro: dopo il passaggio non potrai più ritirarli da qui, e scadranno da soli.') : ''),
     etichetta: 'Usa quello del conto', poi: async () => {
       const m = mazzoMostro();
       const s = await semeContoP2P();
@@ -36591,9 +36607,60 @@ async function semeProfiloP2P(){
    puo' togliere il mazzo e' il «dimentica» del foglietto: la guardia
    sta li' — prima avvisava solo a parole, e un pagamento che perde il
    padrone non si ferma con un avviso. */
+/* ⚠️ MA UN'OFFERTA NON E' UNO SCAMBIO (14 set 2026, dal campo di
+   Andrea: il passaggio al profilo del conto bloccato da un ordine
+   FANTASMA delle prime prove — pubblicato, mai preso da nessuno, che
+   si stava lasciando scadere). La guardia contava le righe locali non
+   finali, e UNA RIGA LOCALE E' UNA MEMORIA, NON UN FATTO: un ordine
+   che il coordinatore ha gia' annullato o fatto scadere restava
+   «aperto» qui per sempre, e teneva chiusa una porta che non aveva
+   niente da proteggere.
+   IL FATTO STA NEL LIBRO, e ci sta gia': `libroDaEventi` tiene i soli
+   38383 con `s === 'pending'`, nella valuta giusta, non scaduti e non
+   superati da un evento piu' nuovo — quindi un id che compare nel
+   libro E' un'offerta viva, che nessuno ha ancora preso.
+   E UN'OFFERTA NON TIENE SATS: la hold invoice nasce quando qualcuno
+   PRENDE (e' il venditore a pagarla entrando in waiting-payment), e il
+   bond anti-abuso sul nostro coordinatore e' spento — `[anti_abuse_bond]`
+   commentata, verificata sul settings.toml. Cambiare profilo con
+   un'offerta appesa non lascia nessun pagamento senza padrone: costa
+   che da qui quell'offerta non si ritira piu', e lo dice la conferma.
+   FAIL-CLOSED IN TRE MODI, perche' questa resta la guardia che costa
+   di piu': senza libro non si giudica e si BLOCCA; con un libro
+   VECCHIO nemmeno (un'offerta presa un minuto fa e' gia' uno scambio,
+   e il libro di ieri direbbe ancora «offerta»); e ogni stato che non
+   sia esattamente 'pubblicato' blocca — anche quelli che non
+   conosciamo, che e' il verso giusto in cui sbagliare. */
+function offertaVivaP2P(o){
+  if (!o || o.stato !== 'pubblicato') return false;
+  if (!p2pLibro || Date.now() - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS) return false;
+  return ((p2pLibro && p2pLibro.ordini) || []).some(x => x && x.id === o.id);
+}
 function scambiApertiP2P(){
   const o = ordiniP2P();
-  return Object.keys(o).filter(k => o[k] && P2P_FINALI.indexOf(o[k].stato) < 0).length;
+  return Object.keys(o).filter(k => o[k]
+    && P2P_FINALI.indexOf(o[k].stato) < 0
+    && !offertaVivaP2P(o[k])).length;
+}
+/* LO STATO VIVO PRIMA DI GIUDICARE, che e' la meta' che mancava: il
+   libro FRESCO — senza, `offertaVivaP2P` non giudica e blocca — e la
+   via di riserva `statoPubblicoOrdini`, che chiude le righe che il
+   coordinatore dice annullate, scadute o concluse. Le due cadute sono
+   fail-open sulla LETTURA e fail-closed sul GIUDIZIO: se non si sa
+   niente il libro resta vecchio, e con un libro vecchio la guardia
+   blocca — il verso giusto.
+   ⚠️ NON LA CHIAMA `scordaMazzo`, ed e' voluto: quel gesto porta via
+   il mazzo, la copia nel cloud E le chiavi dal server, quindi la sua
+   guardia resta la piu' severa delle due. Il giudice pero' e' lo
+   stesso, e quando il libro e' fresco (si arriva dalla vista P2P) ne
+   gode anche lui. */
+async function rinfrescaScambiP2P(){
+  const tutti = ordiniP2P();
+  const aperti = Object.keys(tutti).filter(k => tutti[k]
+    && P2P_FINALI.indexOf(tutti[k].stato) < 0);
+  if (!aperti.length) return 0;
+  try { await caricaLibroP2P(true); } catch(e){}
+  try { return await statoPubblicoOrdini(aperti); } catch(e){ return 0; }
 }
 /* Il mazzo nasce al PRIMO GESTO che lo richiede, mai prima: chi guarda
    il libro non ha bisogno di un profilo. PRIMA si guarda il cloud di
@@ -36814,7 +36881,7 @@ function renderProfiloP2P(){
   const dueProfili = (p2pDispositivoEsito === 'tenuto' || p2pDispositivoEsito === 'sovrano')
     ? `<div class="trust-note"><span>⚠️</span><span>Questo profilo è nato su <b>questo dispositivo</b>, e il tuo account ne ha un altro — quello che usi altrove. Gli scambi e le recensioni restano attaccati al profilo con cui li hai fatti.</span></div>`
       + (p2pDispositivoEsito === 'tenuto'
-         ? `<button class="btn ghost" onclick="passaAlContoDalFoglioP2P()">🔁 Usa il profilo del tuo account</button>`
+         ? `<button class="btn ghost" onclick="passaAlContoDalFoglioP2P(this)">🔁 Usa il profilo del tuo account</button>`
          : '')
     : '';
   const dal = new Date((m.creato || 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});

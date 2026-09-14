@@ -3672,9 +3672,14 @@ def prove_busta_ritiro():
     # aprirla e rileggerla per correggerla sono GET puri, come il
     # collegamento del servizio. La sola lettura che NON sta qui e' la
     # rivelazione del codice digitale, dove leggere E' la ricevuta.
-    prova("l'attesa ritardata la chiamano solo le nove LETTURE",
+    # DIECI dal 14 set 2026: `passaAlContoDalFoglioP2P` chiede al
+    # coordinatore com'e' andata davvero PRIMA di giudicare se il
+    # passaggio di profilo si puo' fare. E' una lettura, e la cosa che
+    # non torna indietro sta dietro la conferma — e' li' che il secondo
+    # tocco trova la sua guardia, non qui.
+    prova("l'attesa ritardata la chiamano solo le dieci LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
-           "apriDocBusta", "mostraAccesso",
+           "apriDocBusta", "mostraAccesso", "passaAlContoDalFoglioP2P",
            "apriFotoContenuto", "apriCorrezioneContenuto",
            # l'email per il corriere (ago 2026): due LETTURE, e la sua
            # SCRITTURA (mandaEmailCorriere) sta apposta fuori — le due
@@ -43682,7 +43687,7 @@ def prove_p2p_conto_dispositivo():
     # ma PUBBLICARE no — e un solo account avrebbe avuto due storie.
     ced = pezzo_js(mini, "async function cediIlPostoAlContoP2P(m){", "\n}\n")
     pas = pezzo_js(mini, "async function passaAlContoP2P(m, s){", "\n}\n")
-    ges = pezzo_js(mini, "function passaAlContoDalFoglioP2P(){", "\n}\n")
+    ges = pezzo_js(mini, "async function passaAlContoDalFoglioP2P(btn){", "\n}\n")
     rpr = pezzo_js(mini, "function renderProfiloP2P(){", "\n}\n")
     prova("il giudice nuovo guarda i mazzi che NON vengono dal conto",
           True, "m.origine !== 'conto' && myTgId && !p2pDispositivoEsito" in blocco)
@@ -43748,6 +43753,131 @@ def prove_p2p_conto_dispositivo():
     # stessa ragione (un pagamento che perde il padrone).
     prova("il gesto si ferma davanti a uno scambio aperto", True,
           0 < ges.find("if (scambiApertiP2P()) {") < ges.find("chiediConferma({"))
+    # --- 8c) UN'OFFERTA NON E' UNO SCAMBIO (14 set 2026) -----------
+    # Dal campo: il bottone bloccato da un ordine FANTASMA delle prime
+    # prove — pubblicato, mai preso, lasciato scadere. La guardia
+    # contava le righe locali non finali, e una riga locale e' una
+    # MEMORIA: quel che il coordinatore ha gia' chiuso restava «aperto»
+    # qui per sempre.
+    ofv = pezzo_js(mini, "function offertaVivaP2P(o){", "\n}\n")
+    rin = pezzo_js(mini, "async function rinfrescaScambiP2P(){", "\n}\n")
+    sca = pezzo_js(mini, "function scambiApertiP2P(){", "\n}\n")
+    prova("la guardia non conta le offerte ancora nel libro", True,
+          "&& !offertaVivaP2P(o[k])).length;" in sca)
+    # FAIL-CLOSED IN TRE MODI, ed e' il cuore: e' la guardia che
+    # protegge dei sats appesi, quindi ogni «non lo so» deve bloccare.
+    prova("...e lo stato dev'essere ESATTAMENTE 'pubblicato'", True,
+          "if (!o || o.stato !== 'pubblicato') return false;" in ofv)
+    prova("...senza libro non si giudica, e si blocca", True,
+          "if (!p2pLibro || " in ofv)
+    prova("...e nemmeno con un libro VECCHIO", True,
+          "Date.now() - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS" in ofv)
+    # LO STATO VIVO PRIMA DEL GIUDIZIO: il libro FORZATO (una lettura in
+    # volo non basta, si vuole la nuova) e poi la via di riserva, che
+    # chiude annullati, scaduti e conclusi.
+    prova("lo stato vivo si chiede prima: libro forzato, poi la riserva",
+          True, 0 <= rin.find("await caricaLibroP2P(true)")
+          < rin.find("await statoPubblicoOrdini(aperti)"))
+    prova("...e le due cadute non fanno cadere il gesto", 2,
+          rin.count("catch(e)"))
+    prova("il gesto lo chiede PRIMA di giudicare", True,
+          0 <= ges.find("await rinfrescaScambiP2P()")
+          < ges.find("if (scambiApertiP2P()) {"))
+    # ...e l'offerta appesa si DICE: da li' in poi non si ritira piu'
+    # ⚠️ NON BASTA CHE LA FRASE CI SIA: la tortura l'ha chiesto — col
+    # gate rovesciato a `false` la frase resta nel sorgente e la
+    # sentinella passava liscia. Si inchioda il GATE, non il testo.
+    prova("...e dice che l'offerta appesa non si ritira piu' da qui",
+          True, "const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])).length;" in ges
+          and "+ (offerte ? '" in ges and "ancora nel libro" in ges)
+    # IL «DIMENTICA» RESTA PIU' SEVERO, e va detto: porta via mazzo,
+    # copia nel cloud e chiavi dal server, quindi non rinfresca niente
+    # e con un libro vecchio blocca.
+    prova("il «dimentica» resta il piu' severo dei due", False,
+          "rinfrescaScambiP2P" in pezzo_js(mini, "function scordaMazzo(){", "\n}\n"))
+
+    # --- 8d) IL BANCO DELLA GUARDIA --------------------------------
+    # Le sentinelle dicono che le righe ci sono; qui la guardia GIRA
+    # sugli otto casi che contano — il fantasma di Andrea per primo, e
+    # i tre modi di non sapere, che devono bloccare tutti e tre.
+    import json as _json9, shutil as _sh9, subprocess as _sp9
+    import tempfile as _tf9
+    node9 = _sh9.which("node")
+    if not node9:
+        salta("il banco della guardia", "node non c'e'")
+    else:
+        banco9 = "\n".join(
+            pezzo_js(mini, f, "\n}\n") + "\n}"
+            for f in ("function offertaVivaP2P(o){",
+                      "function scambiApertiP2P(){")) + r"""
+let SCAMBI = {}, p2pLibro = null;
+function ordiniP2P(){ return SCAMBI; }
+const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
+const P2P_LIBRO_FRESCO_MS = 60000;
+const out = {};
+const libro = (ids, eta) => ({ordini: ids.map(i => ({id: i})),
+                              quando: Date.now() - (eta || 0)});
+// a) IL CASO DAL CAMPO: l'offerta fantasma e' ancora nel libro, cioe'
+//    nessuno l'ha presa, cioe' non tiene sats: non blocca
+SCAMBI = {'ord-f': {id: 'ord-f', stato: 'pubblicato'}};
+p2pLibro = libro(['ord-f']);
+out.offertaNonBlocca = scambiApertiP2P() === 0;
+// b) col libro VECCHIO non si giudica: un'offerta presa un minuto fa
+//    e' gia' uno scambio, e il libro di ieri direbbe ancora «offerta»
+p2pLibro = libro(['ord-f'], 61000);
+out.libroVecchioBlocca = scambiApertiP2P() === 1;
+// c) senza libro nemmeno
+p2pLibro = null;
+out.senzaLibroBlocca = scambiApertiP2P() === 1;
+// d) fuori dal libro (presa, scaduta o annullata): blocca
+p2pLibro = libro(['un-altro']);
+out.fuoriDalLibroBlocca = scambiApertiP2P() === 1;
+// e) uno scambio VERO non diventa un'offerta perche' l'id e' nel libro
+SCAMBI = {'ord-f': {id: 'ord-f', stato: 'attivo'}};
+p2pLibro = libro(['ord-f']);
+out.scambioVeroBlocca = scambiApertiP2P() === 1;
+// f) uno stato che non conosciamo blocca: il verso giusto in cui
+//    sbagliare e' sempre lo stesso
+SCAMBI = {'ord-f': {id: 'ord-f', stato: 'boh'}};
+out.statoIgnotoBlocca = scambiApertiP2P() === 1;
+// g) una riga finale non blocca, libro o non libro
+SCAMBI = {'ord-f': {id: 'ord-f', stato: 'annullato'}};
+p2pLibro = null;
+out.finaleNonBlocca = scambiApertiP2P() === 0;
+// h) e un'offerta viva non copre lo scambio vero che le sta accanto
+SCAMBI = {'ord-f': {id: 'ord-f', stato: 'pubblicato'},
+          'ord-v': {id: 'ord-v', stato: 'euro_inviati'}};
+p2pLibro = libro(['ord-f', 'ord-v']);
+out.unaSolaConta = scambiApertiP2P() === 1;
+console.log(JSON.stringify(out));
+"""
+        d9 = _tf9.mkdtemp()
+        try:
+            p9 = os.path.join(d9, "banco_guardia.js")
+            open(p9, "w", encoding="utf-8").write(banco9)
+            r9 = _sp9.run([node9, p9], capture_output=True, encoding="utf-8",
+                          timeout=60)
+            o9 = _json9.loads(r9.stdout.strip()) if r9.returncode == 0 else None
+        finally:
+            _sh9.rmtree(d9, ignore_errors=True)
+        if o9 is None:
+            prova("il banco della guardia gira", "", (r9.stderr or "")[-600:])
+        else:
+            prova("IL FANTASMA: un'offerta ancora nel libro non blocca il "
+                  "passaggio", True, o9["offertaNonBlocca"])
+            prova("...ma con un libro vecchio si blocca", True,
+                  o9["libroVecchioBlocca"])
+            prova("...e senza libro pure", True, o9["senzaLibroBlocca"])
+            prova("...e un'offerta che dal libro e' sparita pure", True,
+                  o9["fuoriDalLibroBlocca"])
+            prova("uno scambio vero blocca anche se l'id e' nel libro",
+                  True, o9["scambioVeroBlocca"])
+            prova("...e uno stato sconosciuto blocca lo stesso", True,
+                  o9["statoIgnotoBlocca"])
+            prova("una riga finale non blocca, libro o non libro", True,
+                  o9["finaleNonBlocca"])
+            prova("...e l'offerta viva non copre lo scambio accanto", True,
+                  o9["unaSolaConta"])
     prova("...e chiede conferma dicendo che il vecchio resta", True,
           "resta da parte" in ges and "cancella" in ges)
     prova("l'avviso dei due profili si vede a «tenuto» e a «sovrano»",
@@ -43756,7 +43886,7 @@ def prove_p2p_conto_dispositivo():
     # una volta sola e acceso per tutti — si guarda anche la condizione
     prova("...ma il bottone SOLO a «tenuto»", True,
           "+ (p2pDispositivoEsito === 'tenuto'" in rpr
-          and rpr.count("passaAlContoDalFoglioP2P()") == 1)
+          and rpr.count("passaAlContoDalFoglioP2P(this)") == 1)
     prova("...e il foglio fa partire il giudizio da solo", True,
           "if (mazzoDiDispositivoP2P(m) && !p2pCessione)" in rpr)
 
