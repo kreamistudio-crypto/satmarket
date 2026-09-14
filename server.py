@@ -2928,6 +2928,11 @@ def init_db():
         contatto_nostr TEXT DEFAULT '',    -- npub del venditore (annunci importati)
         nostr_event_id TEXT DEFAULT '',    -- evento NIP-99 firmato dalla piattaforma
         stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso
+        -- quante volte l'annuncio e' stato visto (set 2026): PRIVATO,
+        -- lo vede solo il proprietario (e gli admin) — mai un dato
+        -- pubblico come i savers. Cresce da registra_vista, una volta
+        -- all'ora per identita' (vedi viste_annuncio, piu' sotto).
+        visualizzazioni INTEGER DEFAULT 0,
         creato INTEGER
     );
     CREATE TABLE IF NOT EXISTS ordini(
@@ -3654,6 +3659,25 @@ def init_db():
         giorno TEXT NOT NULL,            -- 'AAAA-MM-GG' locale
         quante INTEGER DEFAULT 0,
         PRIMARY KEY (slug, giorno)
+    );
+    CREATE TABLE IF NOT EXISTS viste_annuncio(
+        -- Il DEDUPLICATORE delle visualizzazioni (set 2026): una riga
+        -- per (annuncio, identita'), e serve SOLO a sapere se questa
+        -- identita' ha gia' contato una vista nell'ultima ora — non
+        -- esce MAI da qui, nemmeno verso il proprietario, che vede
+        -- solo il totale in annunci.visualizzazioni. Stessa regola di
+        -- preferiti e sponsor_aperture: il numero conta, i nomi mai.
+        -- L'IDENTITA' e' "tg:<tg_id>" per chi e' loggato, "osp:<token>"
+        -- per chi arriva anonimo — un token CASUALE generato dal
+        -- client e tenuto nel suo localStorage: mai un IP, mai
+        -- un'impronta del dispositivo, e chi cancella i dati del
+        -- browser ne riceve uno nuovo (si riparte a contare, ed e'
+        -- la scelta giusta — nessuna traccia che sopravviva a un
+        -- browser ripulito).
+        annuncio_id INTEGER NOT NULL,
+        identita TEXT NOT NULL,
+        vista INTEGER NOT NULL,          -- l'ultima volta che ha contato
+        PRIMARY KEY (annuncio_id, identita)
     );
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
@@ -4570,7 +4594,12 @@ def init_db():
                     # rispetto a questa spegne una pendente di
                     # `connettori_uscite`. -1 = mai letta, che e'
                     # diverso da «zero pezzi».
-                    "origine_stock_visto INTEGER DEFAULT -1"):
+                    "origine_stock_visto INTEGER DEFAULT -1",
+                    # IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026):
+                    # privato, lo vede solo il proprietario (e gli
+                    # admin) — vedi la CREATE TABLE qui sopra per il
+                    # perche' e viste_annuncio per il deduplicatore.
+                    "visualizzazioni INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -13987,7 +14016,11 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     Il 'rimosso' e il 'revisione' restano 404: quelli non sono scaffali
     vuoti, sono annunci che non esistono (piu')."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
-    campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
+    # le visualizzazioni viaggiano SOLO se c'e' un utente: a chi guarda
+    # anonimo il campo non arriva nemmeno dalla query. Chi non e' il
+    # proprietario ne' un admin se le vede togliere due righe piu' giu'
+    # — stesso patto del venditore_id qui sopra, un giro in piu'.
+    campi = CAMPI_VETRINA + (", a.venditore_id, a.visualizzazioni" if user else "")
     con = db()
     r = con.execute(f"SELECT {campi}, a.stato FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
@@ -13996,7 +14029,68 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con.close()
     if not r:
         raise HTTPException(404, "Annuncio non trovato")
-    return arricchisci_righe_vetrina([dict(r)])[0]
+    riga = arricchisci_righe_vetrina([dict(r)])[0]
+    if not user or (user["id"] != riga.get("venditore_id")
+                    and not e_admin(user["id"])):
+        riga.pop("visualizzazioni", None)
+    return riga
+
+
+# ---- Il conteggio delle visualizzazioni (set 2026) -------------------
+# UNA volta all'ora per identita' (utente o ospite), e SOLO al
+# proprietario (e agli admin) il numero si mostra mai — mai una prova
+# sociale pubblica come i savers. Il client la manda scorrendo il
+# mercatino (una card vista abbastanza a lungo) e aprendo la scheda.
+_RE_OSPITE = re.compile(r'^[a-f0-9]{16,64}$')
+
+
+def _identita_vista(user, x_ospite_id: str) -> str:
+    """La chiave del deduplicatore: "tg:<id>" per chi e' loggato,
+    "osp:<token>" per chi arriva anonimo col suo token di localStorage
+    — validato nella FORMA (esadecimale, lunghezza sensata) perche' e'
+    l'unico pezzo che arriva dal client senza nessuna firma dietro.
+    Stringa vuota = nessuna identita' riconoscibile, e chi chiama sa
+    che vuol dire «non contare niente»."""
+    if user:
+        return f"tg:{user['id']}"
+    token = (x_ospite_id or "").strip()
+    return f"osp:{token}" if _RE_OSPITE.match(token) else ""
+
+
+@app.post("/api/listings/{annuncio_id}/vista")
+async def registra_vista(annuncio_id: int, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie(""),
+                          x_ospite_id: str = Header("")):
+    """Fail-open: un contatore non deve poter rompere una pagina, quindi
+    qui non si solleva MAI un errore — il client la spara e dimentica."""
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    identita = _identita_vista(user, x_ospite_id)
+    if not identita:
+        return {"ok": True}
+    con = db()
+    try:
+        r = con.execute("SELECT venditore_id FROM annunci WHERE id=? "
+                        "AND stato IN ('attivo','venduto')",
+                        (annuncio_id,)).fetchone()
+        # il proprio annuncio non si conta da soli: scorrere la propria
+        # vetrina non e' un compratore interessato (la stessa regola
+        # del barattolo, MSG_BARATTOLO_MIO qui sotto)
+        if r and not (user and user["id"] == r["venditore_id"]):
+            un_ora_fa = int(time.time()) - 3600
+            cur = con.execute(
+                "INSERT INTO viste_annuncio(annuncio_id, identita, vista) "
+                "VALUES(?,?,?) ON CONFLICT(annuncio_id, identita) DO UPDATE "
+                "SET vista=excluded.vista WHERE viste_annuncio.vista<?",
+                (annuncio_id, identita, int(time.time()), un_ora_fa))
+            if cur.rowcount:
+                con.execute("UPDATE annunci SET visualizzazioni="
+                            "visualizzazioni+1 WHERE id=?", (annuncio_id,))
+            con.commit()
+    except Exception as e:
+        print(f"[!] Vista annuncio: {e}")
+    finally:
+        con.close()
+    return {"ok": True}
 
 
 # ---- Preferiti: «nel tuo barattolo» 🫙 -------------------------------

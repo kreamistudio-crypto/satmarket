@@ -9160,6 +9160,10 @@ function mapListing(a){
     creato:a.creato||0, modificato:a.modificato||0,
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
+    /* le visualizzazioni (set 2026): private, il server le manda SOLO
+       al proprietario (e agli admin) — un annuncio altrui non porta
+       mai questo campo, e undefined||0 lo fa sparire da solo */
+    visualizzazioni:a.visualizzazioni||0,
     /* username e npub finiscono dentro stringhe JS negli onclick:
        li' l'escaping HTML non basta, quindi si tiene SOLO il loro
        alfabeto naturale (Telegram: lettere/cifre/_ ; bech32: a-z0-9) */
@@ -9826,6 +9830,7 @@ async function caricaAltri(){
     inCatalogo(nuovi);
     if (nuovi.length)
       el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+    armaViste();
     /* il patto di `osservaSentinella`: true = ho appeso righe, chiedi
        ancora se lo schermo e' scoperto. Le vie d'uscita qui sopra
        tornano `undefined`, che vale «fermati» — ed e' giusto: senza
@@ -12267,6 +12272,7 @@ function renderGrid(items){
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
+  armaViste();
   /* La griglia non ha piu' contatori da aggiornare (il badge dice
      solo la percentuale), ma allo scadere va comunque ridisegnata o
      resterebbe col prezzo scontato di una lampo morta: qui si segna
@@ -12613,7 +12619,7 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
@@ -12979,6 +12985,7 @@ async function caricaAltriNegozio(){
     inCatalogo(nuovi);
     if (nuovi.length)
       el('negozioGrid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+    armaViste();
     return nuovi.length > 0;    // il patto di `osservaSentinella`
   } catch(e) {} finally { negozioPag.caricando = false; }
 }
@@ -13357,6 +13364,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="section-label" style="margin-top:16px">Esauriti di recente</div>
       <div class="grid" style="margin-top:12px">${fin.map(cardHTML).join('')}</div>`;
   }
+  armaViste();
   go('negozio');
 }
 
@@ -15191,6 +15199,7 @@ async function sezioneAltriOggetti(l){
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
       <div class="grid altri-griglia">${altri.map(cardHTML).join('')}</div>
     </div>`);
+  armaViste();
 }
 
 /* La pagina dopo di «Altri oggetti»: il calco di caricaAltriNegozio,
@@ -15217,6 +15226,7 @@ async function caricaAltriOggetti(){
     const g = document.querySelector('#detailContent .altri-griglia');
     if (g && nuovi.length)
       g.insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+    armaViste();
     aggiunti = nuovi.length;
   } catch(e) {}
   /* solo a giro invariato: sul ramo catch con dettaglio gia' cambiato
@@ -17917,6 +17927,7 @@ function renderPacco(){
   el('paccoGrid').innerHTML =
     (inGriglia.map(cellaPacco).join('') + rigaDigitali)
     || '<div class="eur-hint" style="grid-column:1/-1">Questo venditore non ha oggetti attivi.</div>';
+  armaViste();
   /* il sottotitolo dice il MODELLO, in una riga corta: un venditore
      alla volta, ed e' quel che permette la spedizione unica. SENZA il
      «di {venditore}» di prima: misurato a 375px, col nome davanti la
@@ -18528,6 +18539,10 @@ function openDetail(id){
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  /* Il conteggio delle visualizzazioni (set 2026): aprire la scheda è
+     la vista più forte che c'è. Sul proprio annuncio non si manda
+     nemmeno — il server la scarterebbe comunque, ma perché chiedere. */
+  if (!mio) registraVista(id);
   /* l'offerta accettata dell'utente su QUESTO annuncio: banner e
      totali dei bottoni compra parlano la cifra pattuita */
   const offAcc = offertaAccettataPer(l.id);
@@ -18695,7 +18710,7 @@ function openDetail(id){
            Sull'ESAURITO e' anche l'ordine che racconta meglio: N
            persone lo vogliono → e' finito → [🔄 Rifornisci]. Il
            numero arriva PRIMA della ragione, non dopo. */''}
-      ${mio ? saversFrase(l) : ''}${mio
+      ${visteFrase(l)}${mio ? saversFrase(l) : ''}${mio
         ? asta ? mioAstaBlocco
         : esa ? bloccoMioEsaurito(l)
         : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
@@ -29555,7 +29570,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
       ${/* in coda alla meta il conteggio dei barattoli, nudo (saversPunto):
            qui il venditore i suoi annunci li guarda in fila, ed e' il
            posto dove quel numero si confronta a colpo d'occhio */''}
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}${saversPunto(l)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}${saversPunto(l)}${vistePunto(l)}</div>
       ${/* le azioni chiudono la card, sotto il prezzo e staccate da
            lui: il posto dove il pollice arriva senza coprire quello
            che sta leggendo */''}
@@ -29947,6 +29962,102 @@ function saversFrase(l){
   return `<div class="trust-note nota-savers">🫙 <span><b>${fmt(n)} `
     + `${n === 1 ? 'persona' : 'persone'}</b> l'${n === 1 ? 'ha' : 'hanno'}`
     + ` messo nel barattolo.</span></div>`;
+}
+
+/* ---- LE VISUALIZZAZIONI, SOLO AL PROPRIETARIO (set 2026) ----
+   Quante volte l'annuncio e' stato visto scorrendo il mercatino o
+   aprendo la scheda — MAI una prova sociale pubblica come i savers:
+   il server manda il campo solo al proprietario (e agli admin), a
+   chiunque altro non arriva nemmeno (vedi un_annuncio, server.py).
+   Guardia rovesciata rispetto a saversMio: qui conta anche l'admin,
+   che deve poter vedere il numero su un annuncio che non e' suo.
+   LA SOGLIA E' UNO (a differenza dei savers): non e' una prova
+   sociale che si moltiplica in una griglia di estranei, e' un fatto
+   che riguarda solo chi guarda. */
+function visteMie(l){
+  if (DEMO || VETRINA || !myTgId || !l) return 0;
+  if (l.sellerId !== myTgId && !isAdmin) return 0;
+  return l.visualizzazioni | 0;
+}
+function vistePunto(l){                   // coda delle righe elenco
+  const n = visteMie(l);
+  return n ? ` · 👁️ ${fmt(n)}` : '';
+}
+function visteFrase(l){                   // la frase intera della scheda
+  const n = visteMie(l);
+  if (!n) return '';
+  return `<div class="trust-note nota-savers">👁️ <span>Il tuo annuncio `
+    + `è stato visto <b>${fmt(n)} ${n === 1 ? 'volta' : 'volte'}</b>.`
+    + `</span></div>`;
+}
+
+/* L'OSSERVATORE DELLE VISUALIZZAZIONI: uno condiviso per tutta la
+   pagina, come quello dei chip appiccicati piu' su — leggero, armato
+   una volta. Ogni card che diventa VISIBILE ALMENO A META' e ci
+   RESTA 600ms manda la sua vista: una che passa veloce sotto il
+   pollice durante uno scroll veloce non deve contare. Chi ha gia'
+   armato una card porta data-va e non si riarma — armaViste si
+   richiama a ogni pagina nuova di card, ed e' l'unico posto che deve
+   saperlo (il patto di osservaSentinella, qui applicato alle card
+   invece che alla sentinella di fondo pagina). */
+const osservatoreViste = ('IntersectionObserver' in window)
+  ? new IntersectionObserver(voci => {
+      voci.forEach(v => {
+        const t = v.target;
+        if (v.isIntersecting) {
+          t._vistaTimer = setTimeout(() => {
+            osservatoreViste.unobserve(t);
+            registraVista(t.dataset.vid);
+          }, 600);
+        } else if (t._vistaTimer) {
+          clearTimeout(t._vistaTimer);
+          t._vistaTimer = null;
+        }
+      });
+    }, {threshold: 0.5})
+  : null;
+function armaViste(){
+  if (!osservatoreViste || DEMO) return;
+  document.querySelectorAll('.card[data-vid]:not([data-va])').forEach(c => {
+    c.dataset.va = '1';
+    osservatoreViste.observe(c);
+  });
+}
+/* IL TOKEN DELL'OSPITE: chi arriva senza Telegram (la vetrina
+   pubblica, sola lettura) non ha nessuna identita' — e non deve
+   averne una vera: un numero CASUALE nel suo localStorage, mai un IP,
+   mai un'impronta del dispositivo. Nasce alla prima vista e resta lo
+   stesso finche' non cancella i dati del browser; da li' si riparte a
+   contare, ed e' la scelta giusta — nessuna traccia che sopravviva a
+   un browser ripulito. */
+function idOspite(){
+  try {
+    let id = localStorage.getItem('barattolo_ospite');
+    if (!id) {
+      id = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '')
+        : Array.from(crypto.getRandomValues(new Uint8Array(16)))
+               .map(b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('barattolo_ospite', id);
+    }
+    return id;
+  } catch(e) { return ''; }
+}
+/* IL CONTEGGIO E' FIRE-AND-FORGET: chi guarda non deve accorgersi di
+   niente, e un errore di rete non deve mai rompere una pagina.
+   Deduplica anche in casa (visteInviate), per non rimandare la stessa
+   richiesta due volte nella sessione — il server dedupe comunque
+   un'ora per identita', ma risparmiare la chiamata quando gia' si sa
+   la risposta e' gratis. */
+const visteInviate = new Set();
+async function registraVista(id){
+  id = id | 0;
+  if (!id || DEMO || visteInviate.has(id)) return;
+  visteInviate.add(id);
+  try {
+    const headers = myTgId ? {'X-Tg-Init-Data': authHdr()}
+                            : {'X-Ospite-Id': idOspite()};
+    await fetch(`${API_BASE}/listings/${id}/vista`, {method: 'POST', headers});
+  } catch(e) {}
 }
 
 /* La regia unica del riempimento: porta ogni barattolo in pagina al

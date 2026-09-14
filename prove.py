@@ -9388,7 +9388,7 @@ def prove_savers_proprietario():
 
     # la riga di «I tuoi annunci» e la scheda del proprietario
     prova("«I tuoi annunci» porta il conteggio in coda alla meta", True,
-          "${luogoPunto(l)}${saversPunto(l)}</div>" in src)
+          "${luogoPunto(l)}${saversPunto(l)}${vistePunto(l)}</div>" in src)
     prova("la frase sta in testa al blocco del proprietario, fuori dai "
           "tre rami", True, "${mio ? saversFrase(l) : ''}${mio" in src)
     prova("...e si chiama una volta sola (la ereditano tutti e tre)", 1,
@@ -9412,6 +9412,174 @@ def prove_savers_proprietario():
           (".trust-note.nota-punto" in _reg,
            ".trust-note.nota-savers" in _reg,
            ".trust-note.nota-promessa" in _reg))
+
+
+def prove_visualizzazioni():
+    """IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026): quante volte
+    l'annuncio e' stato visto scorrendo il mercatino o aprendo la
+    scheda — UNA volta all'ora per identita' (utente o ospite), e
+    SOLO al proprietario (e agli admin) il numero si mostra mai. Il
+    contrario esatto dei savers: li' il numero e' pubblico e i nomi
+    mai, qui il numero stesso e' privato."""
+    print("\n[il conteggio delle visualizzazioni]")
+    src = open("miniapp.html", encoding="utf-8").read()
+
+    def fun(nome):
+        i = src.index(f"function {nome}(")
+        return src[i:src.index("\n}", i)]
+
+    # ---- IL CLIENT: i giudici, sullo stampo di saversMio/Punto/Frase
+    vm = fun("visteMie")
+    prova("il giudice tace in DEMO/vetrina e senza identita'", True,
+          "DEMO || VETRINA || !myTgId" in vm)
+    prova("...e a chi non e' ne' il proprietario ne' un admin", True,
+          "l.sellerId !== myTgId && !isAdmin" in vm)
+
+    vp = fun("vistePunto")
+    prova("il punto e' muto a zero visualizzazioni", True,
+          "n ? ` · 👁️ ${fmt(n)}` : ''" in vp)
+
+    vf = fun("visteFrase")
+    prova("la frase veste la stessa superficie neutra dei savers", True,
+          "trust-note nota-savers" in vf)
+    prova("...ed e' muta a zero, come il punto", True,
+          "if (!n) return ''" in vf)
+
+    # la card porta l'id per l'osservatore, e mapListing porta il dato
+    prova("ogni card porta il suo id per l'osservatore delle viste",
+          True, 'data-vid="${l.id}"' in src)
+    prova("mapListing riceve visualizzazioni dal server (0 se assente,"
+          " cioe' se il campo non e' arrivato affatto)", True,
+          "visualizzazioni:a.visualizzazioni||0" in src)
+
+    # aprire la scheda e' la vista piu' forte: si manda SUBITO, tranne
+    # sul proprio annuncio (il server la scarterebbe comunque)
+    od = fun("openDetail")
+    prova("aprire la scheda registra una vista", True,
+          "if (!mio) registraVista(id);" in od)
+
+    # l'osservatore condiviso: soglia e sosta, per non contare uno
+    # scroll veloce, e un solo armamento per card
+    prova("l'osservatore ha una sosta di 600ms prima di contare", True,
+          "}, 600);" in src)
+    prova("...e non riarma una card gia' armata", True,
+          "'.card[data-vid]:not([data-va])'" in src)
+
+    # UNA sola chiamata condivisa in ogni punto in cui nascono nuove
+    # card: il censimento vale quanto quello di cardHTML stesso, e
+    # cresce insieme a lui se un domani nascesse un nono punto — qui
+    # si conta quanti match ha VISTO fun(cardHTML)... ma cardHTML e'
+    # una fabbrica invocata altrove, quindi si conta armaViste() e i
+    # punti in cui cardHTML produce html da inserire in pagina.
+    prova("armaViste() e' chiamata in ognuno dei punti che inseriscono "
+          "cardHTML in pagina", True,
+          src.count("armaViste();") >= 7)
+
+    # l'identita' dell'ospite: un token nel SUO localStorage, mai un
+    # IP, mai un'impronta — e la stessa chiave la rilegge la prossima
+    # volta (persistenza, non un numero nuovo ogni giro)
+    io = fun("idOspite")
+    prova("il token dell'ospite vive in localStorage, non altrove",
+          True, "localStorage" in io and "getItem" in io
+          and "setItem" in io)
+
+    rv = fun("registraVista")
+    prova("registraVista non manda niente in DEMO", True,
+          "if (!id || DEMO ||" in rv)
+    prova("...e sceglie l'header giusto secondo l'identita'", True,
+          "myTgId ? {'X-Tg-Init-Data': authHdr()}" in rv
+          and "'X-Ospite-Id': idOspite()" in rv)
+
+    # ---- IL SERVER: la stessa regola vale dall'API, eseguita per
+    # davvero — non solo scritta nel client (la lezione gia' pagata
+    # coi savers: «una regola che vive solo nel client e' mezza
+    # regola»)
+    import sqlite3
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    def apparecchia():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+          stato TEXT, visualizzazioni INTEGER DEFAULT 0);
+        CREATE TABLE viste_annuncio(annuncio_id INT, identita TEXT,
+          vista INT, PRIMARY KEY(annuncio_id, identita));
+        INSERT INTO annunci VALUES(7,222,'attivo',0);
+        """)
+        return con
+
+    # _identita_vista per davvero: il pezzo di sopra ha il suo regex a
+    # livello di modulo, e serve copiarlo qui (come MAX_PREFERITI nel
+    # collaudo dei preferiti — un valore, non uno stub che potrebbe
+    # imitarne anche i bug)
+    amb_id = {"_RE_OSPITE": __import__("re").compile(r'^[a-f0-9]{16,64}$')}
+    exec(pezzo("_identita_vista"), amb_id)
+    identita_vista = amb_id["_identita_vista"]
+
+    T1, T2 = "a" * 32, "b" * 32
+    prova("chi e' loggato porta la sua identita', a prescindere "
+          "dall'ospite", "tg:222", identita_vista({"id": 222}, "ignoto"))
+    prova("un token ospite valido diventa identita'", f"osp:{T1}",
+          identita_vista(None, T1))
+    prova("un token troppo corto (o non esadecimale) e' rifiutato",
+          "", identita_vista(None, "corto"))
+    prova("nessun utente e nessun token: nessuna identita'", "",
+          identita_vista(None, ""))
+
+    OROLOGIO = {"t": 10_000.0}
+
+    def gira_vista(con, annuncio_id, tg="", ospite=""):
+        amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+               "db": lambda: _SenzaClose(con),
+               "utente_se_autenticato":
+                   lambda init, sess: {"id": int(init)} if init else None,
+               "_identita_vista": identita_vista,
+               "time": type("t", (), {
+                   "time": staticmethod(lambda: OROLOGIO["t"])})}
+        exec(pezzo("registra_vista"), amb)
+        return amb["registra_vista"](annuncio_id, str(tg) if tg else "",
+                                      "", ospite)
+
+    codice_api = "\n".join(r.split("#")[0]
+                            for r in pezzo("registra_vista").splitlines())
+    prova("nemmeno qui c'e' un await (il fail-open resta sincrono)",
+          False, "await " in codice_api)
+
+    con = apparecchia()
+    viste = lambda: con.execute(
+        "SELECT visualizzazioni FROM annunci WHERE id=7").fetchone()[0]
+
+    gira_vista(con, 7, ospite=T1)
+    prova("la prima vista di un ospite conta", 1, viste())
+    gira_vista(con, 7, ospite=T1)
+    prova("...la stessa identita' entro l'ora NON conta due volte",
+          1, viste())
+    gira_vista(con, 7, ospite=T2)
+    prova("un'identita' diversa conta separatamente", 2, viste())
+    gira_vista(con, 7, tg=222)
+    prova("il proprietario che guarda il proprio annuncio non si conta"
+          " da solo", 2, viste())
+    prova("...e non gli si scrive nemmeno una riga di dedup", 0,
+          con.execute("SELECT COUNT(*) FROM viste_annuncio "
+                      "WHERE identita='tg:222'").fetchone()[0])
+    gira_vista(con, 7, tg=111)
+    prova("un altro utente loggato (non il proprietario) conta", 3,
+          viste())
+    OROLOGIO["t"] += 3601
+    gira_vista(con, 7, ospite=T1)
+    prova("passata un'ora la STESSA identita' puo' contare di nuovo",
+          4, viste())
+    gira_vista(con, 999)   # annuncio inesistente
+    prova("un annuncio che non c'e' non solleva niente ed esce in "
+          "pace", 4, viste())
+    gira_vista(con, 7)     # ne' loggato ne' ospite valido
+    prova("senza nessuna identita' riconoscibile non si conta niente",
+          4, viste())
 
 
 def prove_barattolo_in_striscia():
@@ -54580,7 +54748,8 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_savers_proprietario, prove_barattolo_in_striscia,
+              prove_savers_proprietario, prove_visualizzazioni,
+              prove_barattolo_in_striscia,
               prove_interesse,
               prove_barattolo_filtra, prove_barattolo_condiviso,
               prove_notifica_fail_open,
