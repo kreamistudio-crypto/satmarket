@@ -13593,6 +13593,9 @@ due.
 «si entra»: qui rivolto a sinistra dice «si torna». Il `←` non torna
 perché quello è un **bottone con la sua cornice**, e sopra un cappello
 faceva due cartelli dove ne basta uno.
+⚠️ **EMENDATO subito dopo** (voce qui sotto): il ‹ era **troppo
+piccolo**, e con lui se ne va tutta la misura che viene qui sotto — al
+suo posto c'è la **✕ dei fogli**, che non ha bisogno di niente.
 ⚠️ **E IL ‹ È PIÙ GRANDE DEL ✕, che è una misura e non un gusto**: a
 pari corpo quel glifo è molto più magro, e **misurato** il bottone
 veniva **23px** di larghezza contro i **32** dell'uscita di casa — cioè
@@ -13620,3 +13623,37 @@ riga torna al vestito di casa. Se invece la minuscola era voluta, è una
 stringa per passo.
 
 **9785 verdi**, 0 rosse. Guardato e **misurato** dal vivo a 375.
+
+## La ✕ dei fogli, e le tre dichiarazioni che non servivano (14 set 2026)
+
+Terzo giro sulla stessa riga, e questa volta la cura è **togliere**.
+
+**IL ‹ ERA TROPPO PICCOLO** — deciso guardandolo, che è il solo modo di
+decidere una cosa così. Al suo posto la **✕ dei fogli**, la stessa
+identica: stesso glifo, stessa misura, stesso bersaglio.
+
+⚠️ **E CON LUI SE NE VANNO TRE DICHIARAZIONI SU MISURA**, che è la parte
+che vale oltre il ritocco. Il ‹ a pari corpo è molto più magro della ✕
+(misurato: **23px** di larghezza contro **32**), quindi per pareggiarlo
+al gemello ci volevano `min-width`, `height` e il flex per ricentrarlo —
+cioè **un vestito nuovo per rifare una cosa che in casa esisteva già**.
+Con la ✕ non serve niente: è `.foglio-back` e basta, come nel foglio del
+libro. La regola scoped `#view-p2pordine .foglio-back` **non c'è più**:
+niente CSS orfano, e c'è una prova rovesciata che lo certifica — il
+giorno che qualcuno rimettesse un glifo che non ci sta, la regola su
+misura tornerebbe e quella riga lo direbbe. È il modo di provare
+«stessa misura, stesso bersaglio» **senza ribattere i numeri** del
+vestito di casa.
+
+**MISURATO dopo**: i quattro `.foglio-back` della pagina e della sorella
+sono **identici** — ✕, 19px, **32×35** tutti e quattro —, i due cappelli
+**58px**, e il titolo centrato al pixel (188 su 375).
+
+⚠️ **L'ETICHETTA RESTA «Torna indietro» e non «Chiudi»** come nel
+foglio, ed è voluto: lì la ✕ chiude una cosa che si è aperta *sopra* il
+libro, qui il gesto è `navIndietro()` da una **pagina**. Il glifo si
+riusa, la parola dice quel che succede — e c'è la prova anche su questo,
+perché è esattamente il genere di dettaglio che al prossimo giro
+qualcuno «allinea» senza sapere perché erano diversi.
+
+**9786 verdi**, 0 rosse.
