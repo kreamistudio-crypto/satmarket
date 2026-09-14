@@ -35516,6 +35516,18 @@ function infoDaEvento(ev){
        `scadenzaSec` (13 set 2026). Restano LETTE perche' il
        coordinatore le dichiara e un domani possono tornare vive: quel
        giorno si verifica sul sorgente PRIMA di fidarsi del nome. */
+    /* ⚠️ `invoice_expiration_window` INVECE E' VIVA, e adesso si sa a
+       cosa serve (set 2026, letta sui byte di v0.18.6 mentre si
+       curava la guardia della fattura): `validate_bolt11_invoice` la
+       usa per pretendere che la fattura di chi compra scada NON PRIMA
+       di `adesso + invoice_expiration_window` — una fattura troppo
+       corta viene rifiutata con lo stesso `InvoiceInvalidError`
+       dell'importo sbagliato, cioe' con un «no» che non dice quale
+       delle due cose non andava. Resta PARCHEGGIATA per ora: il
+       foglio non promette tempi e non sbarra la strada, e il giorno
+       che la si volesse usare va riguardato prima il NOME — il commit
+       `c6efb2d` (#952) lo rinomina upstream, e nel 38385 del nostro
+       nodo i nomi sono ancora questi (vedi CLAUDE.md). */
     holdFinestra: Math.floor(num('hold_invoice_expiration_window')),
     fattFinestra: Math.floor(num('invoice_expiration_window')),
     valute: String(tagValore(ev, 'fiat_currencies_accepted') || '')
@@ -39053,6 +39065,17 @@ function avanzaOrdineP2P(ordine, azione, payload){
   const finito = P2P_FINALI.indexOf(o.stato) >= 0;
   const ord = p && p.order;
   if (ord) {
+    /* ⚠️ E' IL LORDO, E IL NOME MENTE (set 2026): `order.amount` e'
+       l'importo dell'ORDINE, non quel che passa di mano — chi compra
+       ne riceve la meta' della commissione IN MENO, chi vende
+       altrettanto in piu'. Il nome resta perche' la riga vive in
+       localStorage sui dispositivi di chi ha gia' scambiato, e
+       ribattezzare il campo perderebbe la cifra a chi aggiorna: la
+       cura e' non leggerlo MAI a crudo. I tre giudici sono
+       `satsDaRicevereP2P` (la fattura di chi compra),
+       `satsScambioP2P` (la card della lista) e il `satsDetti` del
+       conto, che e' l'unico posto dove il lordo E' la cosa giusta —
+       li' fa il Subtotale. */
     if (Number(ord.amount) > 0) o.satsNetti = Math.floor(Number(ord.amount));
     /* L'INTERVALLO COLLASSA QUI, ed e' l'unico posto che puo' farlo:
        un ordine a range non ha una cifra finche' qualcuno non la
@@ -40473,11 +40496,42 @@ function apriIncassoP2P(){
   const c = el('p2pIncassoInp');
   if (c) { c.value = myLnAddress || ''; setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60); }
 }
+/* ---- QUANTI SATS ARRIVANO DAVVERO A CHI COMPRA ----
+   PURA, ed e' l'importo che la sua fattura DEVE portare.
+   ⚠️ VERIFICATO SUI BYTE DI MOSTRO v0.18.6, ed e' la ragione per cui
+   questa funzione esiste: `validate_bolt11_invoice`
+   (`src/lightning/invoice.rs`) accetta la fattura solo se
+   `amount_sat == order.amount − order.fee`, e `order.fee` esce da
+   `get_fee` (`src/util.rs`), che la meta' la fa GIA' lui —
+   `split_fee = (fee * amount) / 2.0`. Quindi pretendere `satsNetti`
+   secco rifiutava la fattura GIUSTA e lasciava passare quella che il
+   coordinatore avrebbe scartato: due bugie che si tenevano in piedi a
+   vicenda, e che potevano fermare uno scambio vero senza che niente
+   dicesse perche'.
+   ⚠️ LA CIFRA NON LA MANDA IL COORDINATORE: `SmallOrder` (mostro-core
+   0.14.6) non ha nessun campo `fee` — censiti tutti i suoi campi —
+   quindi la meta' si RICALCOLA dalla percentuale viva del 38385, con
+   la stessa formula e lo stesso arrotondamento (`nettoLatoP2P`, il
+   giudice che gia' veste il libro e il conto).
+   ⚠️ E SE LA PERCENTUALE NON SI SA, LA CIFRA NON SI SA: torna 0, e
+   allora il foglio non promette un numero e la guardia non pretende
+   un importo che non abbiamo il diritto di pretendere. E' la regola
+   di `commissioneVivaP2P`, che il `null` lo distingue apposta.
+   ⚠️ E LA FATTURA SENZA IMPORTO VA SEMPRE BENE, sempre dagli stessi
+   byte (`&& amount_sat != 0`): e' la via d'uscita per i wallet che la
+   cifra non la lasciano scegliere, ed e' quella che il foglio
+   suggerisce da sempre. */
+function satsDaRicevereP2P(o){
+  const lordo = (o && o.satsNetti > 0) ? o.satsNetti : 0;
+  if (!(lordo > 0) || commissioneVivaP2P() === null) return 0;
+  return nettoLatoP2P({lato: 'sell'}, lordo);
+}
 function renderIncassoP2P(){
   const box = el('p2pIncassoCorpo');
   const o = ordiniP2P()[p2pIncassoOrdine];
   if (!box || !o) return;
-  const quanti = o.satsNetti > 0 ? fmt(o.satsNetti) + ' sats' : '';
+  const netto = satsDaRicevereP2P(o);
+  const quanti = netto > 0 ? fmt(netto) + ' sats' : '';
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
       'Scrivi il tuo indirizzo Lightning (quello che finisce per @qualcosa) oppure incolla una richiesta di pagamento del tuo wallet.</div>' +
@@ -40498,8 +40552,13 @@ async function inviaIncassoP2P(){
   if (bolt) {
     const q = importoBolt11(testo);
     if (q === null) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
-    if (q > 0 && o.satsNetti > 0 && q !== o.satsNetti) {
-      dillo('La richiesta è di ' + fmt(q) + ' sats, ma ne devi ricevere ' + fmt(o.satsNetti) + '. Rifalla dell\'importo esatto, oppure lascia l\'importo libero.');
+    /* la cifra che il coordinatore pretende, non quella dell'ordine:
+       vedi l'avviso su `satsDaRicevereP2P`. A cifra ignota non si
+       sbarra la strada — meglio un «no» del coordinatore con la sua
+       ragione che un «no» nostro su un numero inventato. */
+    const deve = satsDaRicevereP2P(o);
+    if (q > 0 && deve > 0 && q !== deve) {
+      dillo('La richiesta è di ' + fmt(q) + ' sats, ma ne devi ricevere ' + fmt(deve) + '. Rifalla dell\'importo esatto, oppure lascia l\'importo libero.');
       return;
     }
   } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testo)) {
@@ -42371,7 +42430,19 @@ function comeLibroP2P(o){
    ed e' il caso che ha deciso il rientro. */
 function satsScambioP2P(o){
   const l = comeLibroP2P(o);
-  if (o.satsNetti > 0) return fmt(o.satsNetti) + ' sats';
+  /* ⚠️ ANCHE QUI IL LORDO PASSA DAL GIUDICE (set 2026): la card
+     diceva «Stai comprando 7301 sats» dove la pagina dello scambio
+     dice «Ricevi ≈ 7228», e due numeri per la stessa cosa sono la
+     bugia piu' facile da scrivere e la piu' difficile da notare — la
+     riga era gia' scritta qui sotto, e il ramo del coordinatore la
+     scavalcava. Il verso lo mette `comeLibroP2P`: chi compra riceve
+     meno, chi vende blocca di piu'. Il `≈` c'e' quando la meta' e'
+     stata applicata, che l'arrotondamento buono ce l'ha il
+     coordinatore. */
+  if (o.satsNetti > 0) {
+    const n = nettoLatoP2P(l, o.satsNetti);
+    return (n === o.satsNetti ? '' : '≈ ') + fmt(n) + ' sats';
+  }
   if (l.sats > 0) {
     const n = nettoLatoP2P(l, l.sats);
     return (n === l.sats ? '' : '≈ ') + fmt(n) + ' sats';
