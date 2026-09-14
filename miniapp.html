@@ -2249,6 +2249,38 @@
   .p2p-scambio-stato{margin-top:8px;border:1.5px solid var(--line);
     border-radius:10px;padding:6px 10px;font-size:13px;
     font-weight:700;color:var(--ink)}
+  /* ⚠️ LA TINTA DELLO STATO NON NASCE QUI: il riquadro prende le
+     classi con cui il mercatino veste gli stati di un ordine, e i
+     colori restano nel loro unico posto. Qui si rimette a posto la
+     sola GEOMETRIA — la' sono pillole da 11px, qui e' un riquadro —
+     e serve la doppia classe perche' quelle regole stanno PIU' IN
+     BASSO nel foglio: a parita' di specificita' vincerebbero loro (e'
+     la lezione di `.p2p-ico.p2p-ico-mini`).
+     IL CONTORNO SPARISCE QUANDO C'E' IL FONDO: a dare la forma basta
+     la tinta. Resta dichiarato — trasparente — o la scatola si
+     accorcerebbe di tre pixel passando da uno stato all'altro. */
+  .p2p-scambio-stato.badge{font-size:13px;font-weight:700;
+    padding:6px 10px;border-radius:10px;white-space:normal;
+    border-color:transparent}
+  /* il puntino fra il premio e i sats: e' punteggiatura, non un dato */
+  .p2p-sep{color:var(--muted);font-weight:700}
+  /* ⚠️ QUI LA CIFRA NON VESTE IL TAB DEL LIBRO, e questa riga e' nata,
+     morta e tornata in un giorno — con i sats, che la card ha perso e
+     ripreso. Il commento di `.p2p-ord .p2p-sats` promette «solo nel
+     libro: nelle altre case la cifra resta arancio», e c'e' pure una
+     sentinella che si chiama cosi'; ma la card di uno scambio E' una
+     `.p2p-ord`, quindi senza questa riga i propri sats si vestono del
+     tab del LIBRO — rossi solo perche' l'ultima volta si e' guardato
+     «Vendi BTC». Un rosso che non dice niente, nel posto dove il rosso
+     e' l'allarme.
+     IL `body` IN TESTA NON E' DECORAZIONE: pareggia la specificita' di
+     `body.p2p-vendo .p2p-ord .p2p-sats` (tre classi piu' un elemento),
+     e questa riga sta DOPO, quindi vince.
+     E `white-space:normal` perche' su un intervallo la cifra e' lunga
+     («≈ 74 029–148 058 sats») e il `nowrap` di `.p2p-sats`
+     allargherebbe la PAGINA invece di andare a capo. */
+  body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text);
+    white-space:normal}
   /* la coppia gemella nel conto scorporato vive nel CSS del conto,
      dopo `.ctrl-nota`: la percentuale del premio sta DENTRO quella
      nota, e a parita' di specificita' vince chi e' scritto dopo —
@@ -6687,12 +6719,39 @@ document.getElementById('cartello')?.remove();</script>
        fase 6 valgono identiche: niente nomi di terzi. -->
   <div class="view" id="view-p2pmiei">
     <div class="sicu">
-      <!-- QUI NON C'E' NESSUNA TESTATA (set 2026, decisione di
+      <!-- QUI NON C'E' NESSUN MARCHIO (set 2026, decisione di
            Andrea): la vista si apre sui propri scambi e basta. Il
-           marchio ha smesso di presiedere questa pagina — vive dove
+           logo ha smesso di presiedere questa pagina — vive dove
            dice qualcosa, cioe' nella riga «Lo scambio» e negli stati
            vuoti; la coppia gemella e il suo crossfade restano al
-           libro, dove un lato attivo esiste. -->
+           libro, dove un lato attivo esiste.
+           ⚠️ MA GLI STRUMENTI SI', dal set 2026 (ridisegno di
+           Andrea): il titolo «I tuoi scambi» se n'e' andato e al suo
+           posto c'e' la STESSA riga del libro — «Ordina» a sinistra,
+           «Filtro» in mezzo, la levetta del tema a destra. Stesse
+           classi e stesso arancio dell'attivo: e' il segno unico di
+           casa, e due righe di strumenti che si assomigliano a meta'
+           sarebbero due comandi diversi per chi legge.
+           Il blocco `sticky` e' quello della sorella, per la stessa
+           ragione: sopra gli strumenti, sotto scorrono le card. -->
+      <div class="p2p-sticky">
+        <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
+             libro: la `<select>` di sistema non si veste, quindi sta
+             qui nascosta a tenere il VALORE e col dito parla la
+             pillola, che apre il #pickerSheet di casa. E sta nella
+             VISTA e non in #p2pMieiTesta, che renderP2P riscrive a
+             ogni giro: li' dentro il valore morirebbe.
+             OGNI VOCE HA DUE NOMI (`data-corta`): nel foglio quello
+             intero, che spiega; nella pillola quello corto, o la riga
+             va a capo pure a 375. -->
+        <select id="p2pMieiOrdinaSel" hidden>
+          <option value="recenti" data-corta="Recenti" selected>Più recenti</option>
+          <option value="fare" data-corta="Da fare">Prima quelli da fare</option>
+          <option value="imp-giu" data-corta="Più grandi">Importo: dal più grande</option>
+          <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
+        </select>
+        <div id="p2pMieiTesta"></div>
+      </div>
       <div id="p2pMieiCorpo"></div>
     </div>
   </div>
@@ -8213,6 +8272,19 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pFiltroTit">Filtro</h3>
     <div id="p2pFiltroCorpo"></div>
+  </div>
+
+  <!-- IL FILTRO DEI PROPRI SCAMBI (set 2026): stessa pelle del foglio
+       qui sopra — si apre dalla pillola, si tocca, si richiude — ma
+       qui le leve sono di un'altra specie. Il libro si filtra per
+       valuta, metodo, premio e reputazione, cioe' per com'e' FATTA
+       un'offerta di uno sconosciuto; i propri scambi si filtrano per
+       DOVE SONO ARRIVATI, che e' l'unica cosa che cambia fra uno e
+       l'altro quando sono tutti tuoi. -->
+  <div class="sheet" id="p2pMieiFiltroSheet" role="dialog" aria-modal="true" aria-labelledby="p2pMieiFiltroTit">
+    <div class="grab"></div>
+    <h3 id="p2pMieiFiltroTit">Filtro</h3>
+    <div id="p2pMieiFiltroCorpo"></div>
   </div>
 
   <!-- QUANTO: il foglio degli ordini a intervallo. Sta PRIMA di
@@ -20168,6 +20240,7 @@ function closeSheet(){
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
+  el('p2pMieiFiltroSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -20262,6 +20335,14 @@ const PICKER = {
     /* la pillola non e' un `.campo-scelta`: dentro il suo `.cs-val`
        va il TESTO NUDO, lo stesso che ci scrive renderP2P */
     campo: v => esc(etichettaOrdineP2P(v)),
+    poi: () => renderP2P()},
+  /* la gemella dei propri scambi: stesso foglio, stesso deposito,
+     altro catalogo — le voci le legge dalla SUA `<select>`, che e'
+     l'unico posto dove un criterio si aggiunge */
+  p2pMieiOrdinaSel: {titolo: 'Ordina i tuoi scambi',
+    voci: () => [...el('p2pMieiOrdinaSel').options].map(o => ({val: o.value,
+      resa: `<span>${esc(o.text)}</span>`})),
+    campo: v => esc(etichettaOrdineMieiP2P(v)),
     poi: () => renderP2P()},
 };
 let pickerTrigger = null;      /* il campo-bottone da rimettere a fuoco */
@@ -35201,11 +35282,10 @@ function ordineLibroP2P(){
    foglio invece le legge il picker dalla `<select>`, che e' il
    catalogo: cosi' una voce nuova si aggiunge in un posto solo. */
 function etichettaOrdineP2P(v){
-  const o = el('p2pOrdinaSel')
-    && [...el('p2pOrdinaSel').options].find(x => x.value === v);
   /* il nome CORTO se c'e', o quello intero: una voce senza
-     `data-corta` non resta muta nella pillola */
-  return o ? (o.dataset.corta || o.text) : 'Convenienza';
+     `data-corta` non resta muta nella pillola. Il lavoro lo fa
+     `etichettaOrdineSelP2P`, che serve tutt'e due i cataloghi. */
+  return etichettaOrdineSelP2P('p2pOrdinaSel', v) || 'Convenienza';
 }
 /* ⚠️ LE TRE RIGHE DECRESCENTI, E NON PIU' DUE FRECCE (set 2026,
    dal campo): il primo disegno era un SU e un GIU' accostati, e in
@@ -35836,6 +35916,8 @@ function renderP2P(){
   /* la pillola vive nella testata attaccata, fuori dal corpo che
      scorre: e' l'unica ragione per cui ha un contenitore suo */
   const testaBox = el('p2pTesta');
+  /* la gemella dei propri scambi: stessa ragione, stesso contenitore */
+  const mieiTesta = el('p2pMieiTesta');
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
@@ -35854,6 +35936,10 @@ function renderP2P(){
        «0 offerte» appeso in alto mentre si legge sarebbe un numero
        vero di una cosa non ancora chiesta */
     if (testaBox) testaBox.innerHTML = '';
+    /* e nemmeno di la': la striscia aspetta il libro anche lei (e'
+       l'adozione a volerlo), quindi un conteggio adesso direbbe un
+       numero vero di una lista non ancora completa */
+    if (mieiTesta) mieiTesta.innerHTML = '';
     if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
     return;
   }
@@ -35979,6 +36065,35 @@ function renderP2P(){
              : p2pLato === 'compro'
                ? 'In questo momento nessuno sta vendendo sats in euro.'
                : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
+  /* ...E LA STESSA RIGA DI STRUMENTI ANCHE DI LA' (set 2026, ridisegno
+     di Andrea): «Ordina» a sinistra, «Filtro» in mezzo, la levetta del
+     tema a destra. Le classi sono LE STESSE del libro — `.p2p-filtro`,
+     `.p2p-ordina`, `.tema-btn` dentro `.p2p-testa-riga` — quindi
+     l'arancio dell'attivo, il margine automatico che centra la pillola
+     di mezzo e le misure a 320 arrivano tutti di la', gia' tarati.
+     ⚠️ IL CONTEGGIO E' QUELLO FILTRATO, come nel libro: un numero che
+     contasse tutti gli scambi mentre a schermo se ne vedono tre
+     sarebbe la bugia piu' facile da scrivere e la piu' difficile da
+     notare. Lo da' `mieiMostratiP2P`, la stessa che disegna le card. */
+  const mieiTutti = mieiRigheP2P();
+  const mieiVisti = mieiMostratiP2P(mieiTutti).length;
+  const ordMiei = ordineMieiP2P();
+  if (mieiTesta) mieiTesta.innerHTML = '<div class="p2p-testa-riga">'
+    + '<button type="button" id="p2pMieiOrdinaSelBtn" class="p2p-filtro p2p-ordina'
+    + (ordMiei === P2P_ORDINE_MIEI_CASA ? '' : ' acceso')
+    + '" aria-haspopup="dialog" title="Ordina i tuoi scambi"'
+    + ' onclick="apriPicker(\'p2pMieiOrdinaSel\')">'
+    + icoOrdinaP2P() + '<span class="cs-val">'
+    + esc(etichettaOrdineMieiP2P(ordMiei)) + '</span></button>'
+    + '<button type="button" class="p2p-filtro'
+    + (filtroAccesoMieiP2P(p2pMieiFiltro) ? ' acceso' : '')
+    + '" onclick="apriFiltroMieiP2P()">'
+    + '<span class="p2p-filtro-sx">' + icoFiltroP2P() + '<b>Filtro</b></span>'
+    + '<s></s><em>' + mieiVisti + ' scambi' + (mieiVisti === 1 ? 'o' : '')
+    + '</em></button>'
+    + '<button type="button" class="tema-btn" onclick="alternaTema()">'
+    + '<span class="tema-ico" aria-hidden="true">'
+    + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
   /* ...e i miei nella loro pagina: scambiP2P e' la striscia di sempre
      (adozione compresa), lo stato vuoto invita al + qui sotto */
   if (mieiBox) mieiBox.innerHTML = scambiP2P()
@@ -36176,6 +36291,71 @@ function applicaFiltroP2P(){
   }
   p2pFiltroBozza = null;
   chiudiFoglioP2P('p2pFiltroSheet');
+  renderP2P();
+}
+
+/* ---- IL FOGLIO DEL FILTRO DEI PROPRI SCAMBI ----
+   Stessa liturgia della sorella del libro: si lavora su una BOZZA e
+   non sul filtro vivo, cosi' chi tocca le pillole puo' cambiare idea e
+   «Applica» e' il momento in cui la lista si muove. Qui le pillole non
+   si riscrivono sotto le dita come i cursori, ma i due fogli si
+   chiamano tutt'e due «Filtro» e si aprono dallo stesso posto: due
+   liturgie diverse sarebbero due comandi, per chi legge. */
+function apriFiltroMieiP2P(){
+  haptic();
+  p2pMieiFiltroBozza = (p2pMieiFiltro || []).slice();
+  renderFiltroMieiP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pMieiFiltroSheet').classList.add('open');
+}
+function scegliGruppoMieiP2P(k){
+  const b = p2pMieiFiltroBozza; if (!b) return;
+  haptic();
+  const i = b.indexOf(k);
+  if (i >= 0) b.splice(i, 1); else b.push(k);
+  renderFiltroMieiP2P();
+}
+function renderFiltroMieiP2P(){
+  const box = el('p2pMieiFiltroCorpo');
+  const b = p2pMieiFiltroBozza;
+  if (!box || !b) return;
+  /* IL CONTO ACCANTO AL NOME e' quello VERO di adesso: un gruppo
+     vuoto si vede prima di toccarlo, e nessuno sceglie una pillola
+     che non lascerebbe passare niente. Le stesse pillole del foglio
+     del libro — `tema-pill` — che qui non nasce nessun vestito. */
+  const righe = mieiRigheP2P();
+  const quanti = k => righe.filter(o => gruppoScambioP2P(o) === k).length;
+  box.innerHTML =
+    '<div class="section-label">A che punto sono</div>' +
+    '<div class="p2p-metodi">' + P2P_GRUPPI.map(g =>
+      '<button type="button" class="tema-pill' + (b.indexOf(g.k) >= 0 ? ' active' : '') +
+      '" data-v="' + esc(g.k) + '" onclick="scegliGruppoMieiP2P(this.dataset.v)">' +
+      esc(g.n) + ' <b>' + quanti(g.k) + '</b></button>').join('') +
+    '</div>' +
+    '<div class="hint">Senza nessuna scelta si vedono tutti. ' +
+      '«Tocca a te» sono quelli che aspettano un tuo gesto.</div>' +
+    '<div class="foglio-piede">' +
+      '<button type="button" class="btn ghost" onclick="azzeraFiltroMieiP2P()">Cancella</button>' +
+      '<button type="button" class="btn orange" onclick="applicaFiltroMieiP2P()">Applica</button>' +
+    '</div>';
+}
+/* «Cancella» AZZERA E APPLICA in un gesto solo (e chiude), come nel
+   libro: un «Cancella» che svuotasse le pillole lasciando la lista
+   filtrata chiederebbe un secondo tocco per la cosa gia' chiesta. E'
+   anche il bottone dello stato vuoto, che da li' e' l'unica uscita. */
+function azzeraFiltroMieiP2P(){
+  haptic();
+  p2pMieiFiltro = [];
+  p2pMieiFiltroBozza = null;
+  if (el('p2pMieiFiltroSheet').classList.contains('open'))
+    chiudiFoglioP2P('p2pMieiFiltroSheet');
+  renderP2P();
+}
+function applicaFiltroMieiP2P(){
+  haptic();
+  if (p2pMieiFiltroBozza) p2pMieiFiltro = p2pMieiFiltroBozza.slice();
+  p2pMieiFiltroBozza = null;
+  chiudiFoglioP2P('p2pMieiFiltroSheet');
   renderP2P();
 }
 
@@ -38439,6 +38619,53 @@ const STATI_P2P = {
   annullato: {t: 'Scambio annullato', d: 'Nessuno ha perso niente: i sats sono tornati a chi li aveva bloccati.'},
   pagamento_ritentato: {t: 'Pagamento non riuscito', d: 'L\'invio dei sats si riprova da solo. Se non riesce potrai indicare un altro indirizzo.'}
 };
+/* ═══ LA TINTA DEL RIQUADRO DI STATO (set 2026, richiesta di Andrea) ══
+   La palette NON e' nuova: sono le stesse classi `.badge.*` con cui il
+   mercatino veste gli stati di un ordine, e qui si riusano tali e
+   quali — solo la geometria si rimette a posto nel CSS, perche' la'
+   sono pillole e qui e' un riquadro. I significati sono quelli di la',
+   e si rispettano:
+   • arancio (`locked`) — c'e' un gesto da fare, o i sats sono in
+     deposito;
+   • viola (`confirmed`) — la palla e' dall'altra parte: si aspetta
+     che qualcuno confermi o decida;
+   • azzurro (`shipped`) — qualcosa e' in viaggio;
+   • verde (`released`) — finito bene. ⚠️ Il verde e' il registro della
+     FIDUCIA e non se lo prende nessun altro stato;
+   • rosso (`dispute`) — ⚠️ nel mercatino il rosso e' SOLO della
+     disputa, e qui vale identico: un problema conclamato, non un
+     ritardo;
+   • spento (`annullato`) — finito senza esito.
+   IL NEUTRO E' «non e' ancora successo niente che ti riguardi»
+   (richiesta di Andrea: «Ordine pubblicato» resta neutro), e con lui
+   ci stanno i suoi due gemelli di un istante — `pubblico` e `prendo`,
+   che sono la stessa cosa mentre la risposta e' in volo. Non e' un
+   terzo caso: e' lo stesso.
+   ⚠️ E LA MAPPA E' ESAUSTIVA, con una prova che la tiene tale: ogni
+   stato che la macchina sa produrre ha la sua voce, e ogni voce ha il
+   suo stato. Uno stato nuovo senza tinta uscirebbe neutro — cioe'
+   sembrerebbe «non e' successo niente» proprio quando e' successo
+   qualcosa. */
+const P2P_TINTA_STATO = {
+  prendo: '', pubblico: '', pubblicato: '',
+  attesa_mia_fattura: 'locked', attesa_mia_hold: 'locked',
+  attivo: 'locked', pagamento_ritentato: 'locked',
+  attesa_hold_venditore: 'confirmed', attesa_fattura_compratore: 'confirmed',
+  euro_inviati: 'confirmed', annullo_chiesto: 'confirmed',
+  annullo_proposto: 'confirmed',
+  rilasciato: 'shipped',
+  concluso: 'released',
+  in_disputa: 'dispute',
+  annullato: 'annullato', rifiutato: 'annullato', senza_risposta: 'annullato'
+};
+/* PURA: la classe da appendere al riquadro, gia' col suo spazio. La
+   chiave viene dalla nostra macchina a stati e la mappa e' una
+   whitelist, quindi qui dentro non puo' entrare niente di scritto da
+   altri. */
+function tintaStatoP2P(o){
+  const c = P2P_TINTA_STATO[o && o.stato];
+  return c ? ' badge ' + c : '';
+}
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
   const d = (o && o.lato === 'compro' && s.d_compro) ? s.d_compro
@@ -41120,6 +41347,108 @@ async function inviaDisputaP2P(){
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
+/* ═══ I PROPRI SCAMBI: I GRUPPI, L'ORDINE, IL FILTRO (set 2026) ═══
+   La vista ha gli strumenti del libro, ma le leve sono di un'altra
+   specie: il libro si filtra per com'e' FATTA l'offerta di uno
+   sconosciuto (valuta, metodo, premio, reputazione), i propri scambi
+   per DOVE SONO ARRIVATI — che quando sono tutti tuoi e' l'unica cosa
+   che cambia davvero fra uno e l'altro.
+   ⚠️ E NON SI PRENDONO IN PRESTITO I GIUDICI DEL LIBRO, che e' la riga
+   da tenere: `ordinaLibroP2P` ha come metro la CONVENIENZA, che su un
+   ordine proprio non vuol dire niente (il premio l'hai scelto tu), e
+   `passaFiltroP2P` guarda campi che qui non si guardano. Due mestieri
+   diversi, due funzioni. */
+/* I CINQUE GRUPPI SONO UNA PARTIZIONE: ogni stato cade in uno e uno
+   solo. Non e' pignoleria — cosi' i conti tornano (la somma dei
+   gruppi e' il totale) e due gruppi scelti insieme non possono
+   mostrare due volte la stessa card.
+   L'ORDINE E' QUELLO DELL'URGENZA, ed e' anche il criterio «Prima
+   quelli da fare» della pillola Ordina: un catalogo solo per due
+   mestieri, come il `data-corta` delle voci. */
+const P2P_GRUPPI = [
+  {k: 'fare', n: 'Tocca a te'},
+  {k: 'corso', n: 'In corso'},
+  {k: 'libro', n: 'Nel libro'},
+  {k: 'fatti', n: 'Conclusi'},
+  {k: 'morti', n: 'Annullati'}
+];
+/* PURO: a quale gruppo appartiene uno scambio. L'ordine dei rami E' la
+   priorita' — «tocca a te» vince su «in corso», perche' uno scambio
+   dove la mossa e' mia e' prima di tutto una cosa DA FARE.
+   ⚠️ IL GIUDICE DI «tocca a te» E' LO STESSO DELLA CARD
+   (`azioniDisponibili`) e non una seconda lista di stati: due liste
+   della stessa cosa si scollano, e il giorno che si scollassero la
+   pillola direbbe un numero e il 👉 sulle card un altro — senza che
+   niente protesti.
+   QUEL CHE RESTA FUORI, dichiarato: `annullo_proposto` e il voto da
+   dare sono gesti miei, ma non escono da `azioniDisponibili` (che e'
+   l'UNICO bottone pieno della pagina) e finiscono in «In corso» e in
+   «Conclusi». E' una scelta di coerenza col 👉, non una svista: il
+   giorno che si vuole allargare «tocca a te» si allarga QUEL giudice,
+   e si muovono insieme. */
+function gruppoScambioP2P(o){
+  if (!o) return 'corso';
+  if (o.stato === 'concluso') return 'fatti';
+  if (o.stato === 'annullato' || o.stato === 'rifiutato') return 'morti';
+  if (azioniDisponibili(o)) return 'fare';
+  if (o.stato === 'pubblicato' || o.stato === 'pubblico') return 'libro';
+  return 'corso';
+}
+/* IL FILTRO SPENTO E' UN ARRAY VUOTO e non `null` come quello del
+   libro, e la differenza ha un perche': la' il filtro e' un oggetto di
+   sei campi, e «nessun filtro» andava distinto da «tutti i campi al
+   neutro»; qui e' un elenco di gruppi scelti, e l'elenco vuoto E'
+   gia' «nessun filtro» — una cosa sola da controllare, con `.length`. */
+let p2pMieiFiltro = [];
+let p2pMieiFiltroBozza = null;
+/* PURI, la coppia di sempre: uno dice se il filtro restringe, l'altro
+   se uno scambio passa. Il secondo e' l'unico posto dove vive la
+   regola, e si prova senza browser. */
+function filtroAccesoMieiP2P(f){ return !!(f && f.length); }
+function passaStatoMieiP2P(o, f){
+  if (!f || !f.length) return true;
+  return f.indexOf(gruppoScambioP2P(o)) >= 0;
+}
+/* I QUATTRO ORDINI DEI PROPRI SCAMBI: il piu' recente (di casa), i
+   «da fare» prima, e l'importo nei due versi.
+   ⚠️ IL RECENTE GUARDA `quando` PRIMA DI `creato`, e non e' un
+   dettaglio: su uno scambio che si muove la data che conta e' l'ULTIMO
+   passo, non la nascita — e' lo stesso criterio con cui la striscia si
+   ordinava da sempre, qui dentro invece di sparso.
+   Il capo dell'importo lo da' `capoImportoP2P`, lo stesso del libro:
+   un intervallo non ha UN importo, e chi cerca il grande guarda fin
+   dove puo' salire, chi cerca il piccolo da dove puo' partire. */
+const P2P_ORDINI_MIEI = ['recenti', 'fare', 'imp-giu', 'imp-su'];
+const P2P_ORDINE_MIEI_CASA = 'recenti';
+function ordinaMieiP2P(righe, criterio){
+  const c = P2P_ORDINI_MIEI.indexOf(criterio) >= 0 ? criterio : P2P_ORDINE_MIEI_CASA;
+  const recente = (a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0);
+  const peso = o => P2P_GRUPPI.findIndex(g => g.k === gruppoScambioP2P(o));
+  const metro = c === 'fare' ? (a, b) => peso(a) - peso(b)
+    : c === 'imp-giu' ? (a, b) => capoImportoP2P(b, true) - capoImportoP2P(a, true)
+    : c === 'imp-su' ? (a, b) => capoImportoP2P(a, false) - capoImportoP2P(b, false)
+    : () => 0;
+  return righe.slice().sort((a, b) => metro(a, b) || recente(a, b));
+}
+/* il valore vivo sta nella `<select>` nascosta della vista, che e' il
+   deposito del picker: un secondo posto dove tenerlo sarebbe la stessa
+   verita' in due copie */
+function ordineMieiP2P(){
+  const v = el('p2pMieiOrdinaSel') ? el('p2pMieiOrdinaSel').value : '';
+  return P2P_ORDINI_MIEI.indexOf(v) >= 0 ? v : P2P_ORDINE_MIEI_CASA;
+}
+/* l'etichetta della pillola, per tutt'e due i cataloghi: il nome CORTO
+   se c'e', o quello intero. Una funzione sola con l'id del catalogo,
+   invece di due gemelle che un giorno divergono. */
+function etichettaOrdineSelP2P(sel, v){
+  const s = el(sel);
+  const o = s && [...s.options].find(x => x.value === v);
+  return o ? (o.dataset.corta || o.text) : '';
+}
+function etichettaOrdineMieiP2P(v){
+  return etichettaOrdineSelP2P('p2pMieiOrdinaSel', v) || 'Recenti';
+}
+
 /* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----
    Le due liste dicono il lato con parole diverse E dal lato opposto:
    nel libro `sell` e' l'ordine di CHI VENDE sats, cioe' chi legge
@@ -41139,6 +41468,36 @@ function comeLibroP2P(o){
   return {lato: o.lato === 'compro' ? 'sell' : 'buy',
           euro: o.euro, euroMax: o.euroMax || 0,
           sats: o.sats || 0, premium: o.premium || 0};
+}
+/* PURA: i sats di uno scambio mio, in tre casi per ordine di VERITA'.
+   Quel che ha detto il coordinatore vince su tutto (`satsNetti`: e'
+   l'importo vero di QUESTO scambio); poi l'importo fisso dichiarato;
+   e quando non c'e' ne' l'uno ne' l'altro — un ordine a prezzo di
+   mercato ancora nel libro — la stima di adesso, con la STESSA catena
+   della card del libro (satsMercatoP2P + nettoLatoP2P), che due stime
+   diverse dello stesso ordine sono la bugia piu' facile da scrivere e
+   la piu' difficile da notare. Coi due capi, su un intervallo.
+   ⚠️ A CAMBIO MUTO NON ESCE NESSUN NUMERO: stringa vuota, e la riga
+   resta con l'euro e il premio. Mai un numero inventato — la regola
+   dei giorni del riquadro reputazione.
+   ⚠️ E' NATA, MORTA E TORNATA IN UN GIORNO (set 2026): la seconda
+   stesura aveva tolto i sats dalla card, la terza li ha rimessi
+   accanto al premio. A prezzo fisso sono l'unica cosa che dice
+   l'altra meta' del prezzo — li' il premio non c'e' per definizione —
+   ed e' il caso che ha deciso il rientro. */
+function satsScambioP2P(o){
+  const l = comeLibroP2P(o);
+  if (o.satsNetti > 0) return fmt(o.satsNetti) + ' sats';
+  if (l.sats > 0) {
+    const n = nettoLatoP2P(l, l.sats);
+    return (n === l.sats ? '' : '≈ ') + fmt(n) + ' sats';
+  }
+  const da = nettoLatoP2P(l, satsMercatoP2P(l));
+  if (!(da > 0)) return '';
+  const a = l.euroMax
+    ? nettoLatoP2P(l, satsMercatoP2P({euro: l.euroMax, premium: l.premium}))
+    : 0;
+  return '≈ ' + fmt(da) + (a ? '–' + fmt(a) : '') + ' sats';
 }
 /* PURA: il premio in forma SECCA, per la card di chi l'ordine l'ha
    scritto lui (set 2026, secondo ridisegno di Andrea).
@@ -41190,6 +41549,7 @@ function rigaScambioP2P(o){
      dello scambio: da quando chi prende sceglie, le altre voci non
      sono piu' in gioco e scriverle direbbe una cosa non piu' vera. */
   const met = metodoSceltoP2P(o) || (o.metodi || []).join(', ');
+  const sats = satsScambioP2P(o);
   const agire = azioniDisponibili(o) ? '<span>👉 tocca a te</span>' : '';
   const via = p2pTogliibile(o).si
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
@@ -41200,8 +41560,19 @@ function rigaScambioP2P(o){
     + '<div class="p2p-scambio-lato">' + esc(fraseLatoP2P(l)) + ' per</div>'
     + '<div class="p2p-scambio-riga">'
     + '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>'
-    + premioSeccoP2P(l) + '</div>'
-    + '<div class="p2p-scambio-stato">' + esc(st.t) + '</div>'
+    + premioSeccoP2P(l)
+    /* ⚠️ IL PUNTINO E' UN PEZZO SUO, e non sta dentro lo span dei sats:
+       visto in vetrina, a 375 due card su otto mandano la cifra a capo
+       — e col puntino attaccato a lei la riga nuova COMINCIAVA con un
+       punto, che si legge come un elenco puntato. Da solo e' un
+       elemento del flex largo quattro pixel, quindi ci sta sempre in
+       fondo alla riga di prima: e li' vuol dire «continua sotto».
+       `aria-hidden` perche' e' punteggiatura: chi ascolta la card non
+       deve sentirsi leggere un puntino in mezzo a due cifre. */
+    + (sats ? '<span class="p2p-sep" aria-hidden="true">·</span>'
+              + '<span class="p2p-sats">' + esc(sats) + '</span>' : '')
+    + '</div>'
+    + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">' + esc(st.t) + '</div>'
     + (met ? '<div class="p2p-box p2p-paga" title="' + esc(met) + '">💳 '
              + esc(met) + '</div>' : '')
     + (agire || via ? '<div class="p2p-meta">' + agire + via + '</div>' : '')
@@ -41352,9 +41723,10 @@ function scambiP2P(){
   /* PRIMA l'adozione, poi la lettura: le righe appena ricostruite
      devono stare in QUESTO render, non nel prossimo */
   adottaOrdiniAltroveP2P(ordiniP2P());
-  const tutti = ordiniP2P();
-  const righe = Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id)
-    .sort((a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0));
+  /* L'ORDINE NON E' PIU' CABLATO QUI (set 2026): lo dice la pillola
+     «Ordina», e il «piu' recenti» di sempre e' rimasto il suo
+     predefinito — chi non tocca niente vede quel che vedeva ieri. */
+  const righe = mieiRigheP2P();
   if (!righe.length) return '';
   const aperti = righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
   if (aperti.length) {
@@ -41372,10 +41744,34 @@ function scambiP2P(){
   }
   /* IL NAG DEL BACKUP E' USCITO (fase 6): nella vista P2P il profilo
      non si nomina — il codice segreto vive in «I tuoi dati». */
-  const troppi = righe.length - P2P_SCAMBI_MAX;
-  return '<div class="section-label">I tuoi scambi</div>'
-    + righe.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
+  /* IL TITOLO «I tuoi scambi» E' USCITO (set 2026, ridisegno di
+     Andrea): al suo posto, in cima, la riga di strumenti del libro —
+     e un titolo che ripete il nome della pagina che la nav dice gia'
+     e' la seconda copia della stessa verita'. */
+  const mostrati = mieiMostratiP2P(righe);
+  if (!mostrati.length)
+    return '<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">'
+      + '<span class="empty-title">Nessuno scambio col tuo filtro</span>'
+      + 'Hai ' + righe.length + ' scambi, ma nessuno passa il filtro. '
+      + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';
+  const troppi = mostrati.length - P2P_SCAMBI_MAX;
+  return mostrati.slice(0, P2P_SCAMBI_MAX).map(rigaScambioP2P).join('')
     + (troppi > 0 ? '<div class="hint">…e altri ' + troppi + ' più vecchi</div>' : '');
+}
+/* PURA: quali dei propri scambi passano il filtro, e in che ordine.
+   La chiamano in DUE — la pillola per il CONTEGGIO e la striscia per
+   le card — e da qui esce una lista sola: un secondo conto sarebbe il
+   modo piu' facile di scrivere un numero che non corrisponde a quel
+   che si vede, ed e' la bugia piu' difficile da notare. */
+function mieiMostratiP2P(righe){
+  return ordinaMieiP2P(righe.filter(o => passaStatoMieiP2P(o, p2pMieiFiltro)),
+                       ordineMieiP2P());
+}
+/* le righe dei propri scambi, nude: le stesse che la striscia
+   disegna, per chi deve solo contarle */
+function mieiRigheP2P(){
+  const tutti = ordiniP2P();
+  return Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id);
 }
 /* ============ fine del motore dello scambio ============ */
 

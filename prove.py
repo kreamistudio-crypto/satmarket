@@ -36875,9 +36875,19 @@ def prove_p2p_libro():
           'id="icoFiltriVetrina"></span>Filtro</button>' in mini
           and ">Filtri</button>" not in mini)
 
-    prova("i miei scambi non si riordinano", False,
+    # ⚠️ ROVESCIATA (set 2026, ridisegno di Andrea): «I miei scambi» si
+    # riordinano eccome, da oggi — ma con un giudice LORO. Quel che
+    # resta vietato e' prendere in prestito quello del libro, e il
+    # motivo e' nel metro: `ordinaLibroP2P` ordina per CONVENIENZA, che
+    # su un ordine proprio non vuol dire niente — il premio l'hai
+    # scelto tu. La decisione di allora non era sbagliata: e' cambiato
+    # cio' che le stava accanto.
+    prova("i miei scambi non prendono in prestito l'ordine del libro",
+          False,
           "ordinaLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n")
           or "ordineLibroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
+    prova("...e hanno il loro", True,
+          "ordinaMieiP2P(" in pezzo_js(mini, "function mieiMostratiP2P(righe){", "\n}\n"))
     # gli AVVISI restano col libro: appesi in alto mangerebbero schermo
     # per sempre a chi scorre, e raccontano la lettura di adesso
     prova("...e gli avvisi del libro restano col libro", True,
@@ -36975,11 +36985,21 @@ def prove_p2p_libro():
     prova("...e lo stato vuoto distingue i due vuoti", True,
           "vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'" in _rp
           and "onclick=\"azzeraFiltroP2P()\"" in _rp)
-    # ⚠️ SI FILTRA SOLO IL LIBRO, mai «I miei scambi» (decisione di
-    # Andrea): quelli sono roba mia, e nasconderne uno perche' il premio
-    # non rientra vorrebbe dire perdere di vista uno scambio IN CORSO.
-    prova("«I miei scambi» non si filtrano", False,
-          "passaFiltroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n"))
+    # ⚠️ ROVESCIATA (set 2026, ridisegno di Andrea). Diceva: «si filtra
+    # solo il libro — nasconderne uno perche' il premio non rientra
+    # vorrebbe dire perdere di vista uno scambio IN CORSO». Il motivo
+    # era giusto e resta giusto: quel che e' cambiato e' la LEVA. I
+    # propri scambi non si filtrano per com'e' fatta l'offerta (premio,
+    # valuta, metodo) ma per DOVE SONO ARRIVATI — e «In corso» e'
+    # esattamente una delle scelte, quindi il rischio di allora qui non
+    # c'e'. Il divieto che resta e' il prestito: il giudice del libro
+    # guarda campi che qui non si guardano.
+    prova("«I miei scambi» non prendono in prestito il filtro del libro",
+          False,
+          "passaFiltroP2P" in pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+          or "passaFiltroP2P" in pezzo_js(mini, "function mieiMostratiP2P(righe){", "\n}\n"))
+    prova("...e hanno il loro, per stato", True,
+          "passaStatoMieiP2P(" in pezzo_js(mini, "function mieiMostratiP2P(righe){", "\n}\n"))
     # SI LAVORA SU UNA BOZZA e non sul filtro vivo: chi tocca i cursori
     # deve poter cambiare idea, e «Applica» dev'essere il momento in cui
     # il libro si muove. Senza la bozza il libro si riscriverebbe sotto
@@ -39274,13 +39294,22 @@ def prove_nav_p2p():
     # libro non puo' raggiungerla. Chi un domani ci rimette una cifra
     # in sats trova questa riga rossa, ed e' esattamente il momento in
     # cui deve ripensare al colore.
+    # ⚠️ TERZA STESURA IN UN GIORNO, e la storia vale piu' della riga.
+    # Contava DUE regole `.p2p-ord .p2p-sats{color` e ne concludeva «le
+    # altre case restano arancio» — falso, perche' la card di uno
+    # scambio e' anche lei una `.p2p-ord`. Il primo giro l'ha curata
+    # col neutralizzatore; il secondo ha portato via i sats dalla card
+    # e il neutralizzatore e' uscito con loro (niente CSS orfano); il
+    # terzo li ha rimessi, e con loro la riga di colore. Quel che
+    # NON e' mai cambiato e' la domanda: la cifra dei propri scambi
+    # non deve vestirsi del tab del libro.
     prova("...solo nel libro: le altre case restano arancio", True,
           "color:var(--sats-text)" in pezzo_js(mini, ".p2p-sats{", "}")
           and mini.count(".p2p-ord .p2p-sats{color") == 2
-          and "p2p-sats" not in pezzo_js(
-              mini, "function rigaScambioP2P(o){", "\n}\n")
-          # ...e il neutralizzatore non e' rimasto in giro da morto
-          and "p2p-scambio .p2p-sats" not in mini)
+          and "body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text)"
+              in mini
+          and mini.index("body.p2p-vendo .p2p-ord .p2p-sats{")
+              < mini.index("body .p2p-ord.p2p-scambio .p2p-sats{"))
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
     prova("...nemmeno nel server: le rotte sono i tre della famiglia",
@@ -39304,7 +39333,12 @@ def prove_nav_p2p():
     # macchia (stessa famiglia di colori del fondo, visto dal vivo) e
     # li' non va nessun simbolo — l'emoji non torna, che ha smesso di
     # essere il nostro segno.
-    prova("il simbolo veste i tre posti dove si legge", 3,
+    # EMENDATA a QUATTRO (set 2026, il ridisegno della vista): il
+    # quarto e' lo stato vuoto del FILTRO dei propri scambi — «hai N
+    # scambi, ma nessuno passa il filtro» —, che e' uno stato vuoto
+    # come gli altri tre e non un posto nuovo. Il bottone arancio resta
+    # senza: li' il marchio diventava una macchia.
+    prova("il simbolo veste i quattro posti dove si legge", 4,
           mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
     # EMENDATA (set 2026, il ridisegno): il bottone non dice piu'
     # «Pubblica: compro sats» — il lato lo dice il TITOLO del foglio,
@@ -42240,10 +42274,20 @@ process.stdout.write(JSON.stringify(out));
     # sovrappongono. E' la prova che la tortura ha chiesto — con le
     # liste disgiunte la mutazione dell'`else` e' inerte, quindi
     # l'esito da solo non basta a sorvegliare quel ramo.
-    _sub = set(re.findall(r"'([a-z_]+)'",
-                          liste.split("P2P_ANNULLA_INSIEME")[0]))
-    _ins = set(re.findall(r"'([a-z_]+)'",
-                          liste.split("P2P_ANNULLA_INSIEME")[1]))
+    # ⚠️ SI LEGGONO LE DUE LISTE PER NOME, e non si spacca il mucchio
+    # di TUTTE le `const P2P_*` su una parola: quel taglio dava per
+    # scontato che li' dentro non nascesse mai un'altra lista con le
+    # stesse parole, e il set 2026 l'ha smentito — `P2P_ORDINI_MIEI`
+    # porta 'recenti' come `P2P_ORDINI_LIBRO`, i due finivano ai due
+    # lati del taglio e l'intersezione diceva «le liste dell'annullo si
+    # sovrappongono» parlando di tutt'altro. E' la trappola delle prove
+    # che rispondono per il vicino: si cercava in un contenitore piu'
+    # largo della domanda.
+    _duel = lambda nome: set(re.findall(
+        r"'([a-z_]+)'",
+        re.search(r"const " + nome + r" = \[[^\]]*\];", mini).group(0)))
+    _sub = _duel("P2P_ANNULLA_SUBITO")
+    _ins = _duel("P2P_ANNULLA_INSIEME")
     prova("le due liste dell'annullo sono disgiunte", set(), _sub & _ins)
     prova("...e nessuna delle due e' vuota", (True, True),
           (len(_sub) > 0, len(_ins) > 0))
@@ -46069,10 +46113,16 @@ console.log(JSON.stringify(out));
     # dell'ORFANO: la riga persa (una scheda che sovrascrive l'altra)
     # torna governabile ovunque.
     sc16 = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    # EMENDATA (set 2026, il ridisegno della vista): la lettura delle
+    # righe e' finita in `mieiRigheP2P`, che serve in DUE — la striscia
+    # e il conteggio della pillola —, quindi qui si guarda quella
+    # invece di `const tutti = ordiniP2P()`. La cosa sorvegliata non
+    # cambia di un capello: l'adozione deve girare PRIMA, o le righe
+    # appena ricostruite finirebbero nel render dopo.
     prova("la striscia ADOTTA gli ordini della restore, prima di leggere",
           True, "adottaOrdiniAltroveP2P(ordiniP2P())" in sc16
           and 0 <= sc16.find("adottaOrdiniAltroveP2P")
-              < sc16.find("const tutti = ordiniP2P()"))
+              < sc16.find("mieiRigheP2P()"))
     ad16 = pezzo_js(mini, "function adottaOrdiniAltroveP2P(", "\n}\n")
     prova("...solo con l'indice in mano e il libro che descrive", True,
           "if (!(indice > 0)) continue;" in ad16
@@ -46113,7 +46163,27 @@ console.log(JSON.stringify(out));
             for f in ("async function chiediMieiOrdiniP2P(",
                       "async function identitaMieP2P(mz){",
                       "function adottaOrdiniAltroveP2P(",
+                      # i giudici dei propri scambi (set 2026, il
+                      # ridisegno della vista): la striscia li chiama,
+                      # e si portano dentro QUELLI VERI — con un filtro
+                      # di cartone questo banco certificherebbe se
+                      # stesso
+                      "function gruppoScambioP2P(o){",
+                      "function passaStatoMieiP2P(o, f){",
+                      "function ordinaMieiP2P(righe, criterio){",
+                      "function mieiMostratiP2P(righe){",
+                      "function mieiRigheP2P(){",
                       "function scambiP2P(")) + r"""
+/* il filtro spento e l'ordine di casa: qui non si provano le leve, si
+   presta la lista intera — i loro casi girano nel banco della card */
+let p2pMieiFiltro = [];
+const P2P_GRUPPI = [{k: 'fare'}, {k: 'corso'}, {k: 'libro'},
+                    {k: 'fatti'}, {k: 'morti'}];
+const P2P_ORDINI_MIEI = ['recenti', 'fare', 'imp-giu', 'imp-su'];
+const P2P_ORDINE_MIEI_CASA = 'recenti';
+function ordineMieiP2P(){ return P2P_ORDINE_MIEI_CASA; }
+function azioniDisponibili(o){ return ''; }
+const capoImportoP2P = (o, giu) => giu ? ((o.euroMax || o.euro) || 0) : (o.euro || 0);
 let p2pMieiOrdini = null, p2pMieiGiro = null, p2pPavimento = null;
 /* il seme del conto e' una fetch, e qui e' uno stub DICHIARATO: il
    suo giro vero (409 compreso) gira nel banco del motore */
@@ -46178,7 +46248,11 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   out.adottato = !!nato && nato.stato === 'pubblicato' && nato.indice === 1
     && nato.lato === 'vendo' && nato.euro === 5 && nato.pubTrade === 'pub:1'
     && nato.contattato === true;
-  out.strisciaSubito = s1.includes('I tuoi scambi') && s1.includes('<loc ord-a>');
+  /* IL TITOLO «I tuoi scambi» NON C'E' PIU' (set 2026, il ridisegno
+   della vista): al suo posto, in cima, la riga di strumenti — quindi
+   qui si guarda la CARD, che e' la cosa che questa prova vuole
+   davvero vedere comparire */
+out.strisciaSubito = s1.includes('<loc ord-a>');
   out.nonAdottaAltrui = !ordiniFinti['ord-x'] && !s1.includes('ord-x');
   // e) il provvisorio si RINOMINA, non si raddoppia
   ordiniFinti = {'nuovo:2': {id: 'nuovo:2', indice: 2, stato: 'pubblico', euro: 7, creato: 50}};
@@ -46463,15 +46537,24 @@ def prove_p2p_card_scambio():
     prova("le quattro righe stanno in quest'ordine", True,
           rs.index("p2p-scambio-lato") < rs.index("p2p-scambio-riga")
           < rs.index("p2p-scambio-stato") < rs.index("p2p-paga"))
-    # I SATS SONO USCITI (seconda stesura): l'importo in euro dice
-    # l'affare, e la cifra in sats — che cambia col cambio e col
-    # premio — si legge aprendo lo scambio, dove c'e' il conto per
-    # esteso. Si guarda la CARD e non il file: «sats» vive
-    # legittimamente nella frase del lato («Stai comprando sats»).
-    prova("nella card non c'e' nessuna cifra in sats", True,
-          "p2p-sats" not in rs and "satsScambioP2P" not in rs)
-    prova("...e la funzione che li contava e' uscita con loro", 0,
-          mini.count("satsScambioP2P"))
+    # ⚠️ I SATS SONO USCITI E TORNATI NELLO STESSO GIORNO (terza
+    # stesura, richiesta di Andrea): la seconda li aveva tolti — «la
+    # cifra si legge aprendo lo scambio» — e la terza li ha rimessi
+    # accanto al premio, dietro un puntino. A decidere il rientro e'
+    # stato il PREZZO FISSO: li' il premio non c'e' per definizione,
+    # quindi senza i sats quella card non dice l'altra meta' del
+    # prezzo che l'autore ha scritto.
+    prova("la cifra in sats sta accanto al premio", True,
+          "satsScambioP2P(o)" in rs and 'class="p2p-sats"' in rs)
+    # ⚠️ IL PUNTINO STA FUORI DALLO SPAN DEI SATS, ed e' una misura
+    # presa in vetrina e non un gusto: dentro, quando la cifra va a
+    # capo (a 375 succede a due card su otto) la riga nuova COMINCIA
+    # col punto e si legge come un elenco puntato. Da solo e' un
+    # elemento del flex largo quattro pixel, che in fondo alla riga di
+    # prima ci sta sempre — e li' vuol dire «continua sotto».
+    prova("...col puntino fuori dallo span dei sats, non dentro", True,
+          rs.index('class="p2p-sep"') < rs.index('class="p2p-sats"')
+          and 'aria-hidden="true">·' in rs)
     # IL PIEDE SI SCRIVE SOLO SE HA QUALCOSA DENTRO: «tocca a te» e la
     # ✕ non possono coesistere, quindi li' dentro c'e' al massimo UNA
     # cosa — e una `.p2p-meta` vuota lascerebbe un respiro che non
@@ -46577,11 +46660,20 @@ def prove_p2p_card_scambio():
                   mini.index("\n", mini.index("const P2P_ORIZZONTE_S = "))],
              mini[mini.index("const STATI_P2P = {"):
                   mini.index("\n};", mini.index("const STATI_P2P = {")) + 3]]
+    pezzi.append(mini[mini.index("const fmt = n =>"):
+                      mini.index("\n", mini.index("const fmt = n =>"))])
+    pezzi.append(mini[mini.index("const P2P_TINTA_STATO = {"):
+                      mini.index("\n};", mini.index("const P2P_TINTA_STATO = {")) + 3])
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function fraseLatoP2P(o){",
         "function affareP2P(o){",
         "function premioTestoP2P(n){",
         "function premioSeccoP2P(o){",
+        "function tintaStatoP2P(o){",
+        "function commissioneVivaP2P(){",
+        "function satsMercatoP2P(o){",
+        "function nettoLatoP2P(o, sats){",
+        "function satsScambioP2P(o){",
         "function statoTestoP2P(o){",
         "function azioniDisponibili(o){",
         "function p2pTogliibile(o, adesso){",
@@ -46590,6 +46682,9 @@ def prove_p2p_card_scambio():
         "function comeLibroP2P(o){",
         "function rigaScambioP2P(o){")]
     banco = "\n".join(pezzi) + r"""
+/* il cambio e la commissione sono le SOLE cose di cartone */
+let cambioVivo = true, eurPerSat = 0.001;
+let p2pInfo = {fee: 0.02};
 const riga = (o) => Object.assign({
   id: 'ord-1', lato: 'compro', stato: 'pubblicato', euro: 5, euroMax: 0,
   sats: 0, satsNetti: 0, premium: 0, creato: 1000, metodi: ['SEPA']}, o);
@@ -46624,6 +46719,23 @@ out.senzaMetodo = rigaScambioP2P(riga({metodi: []}));
 out.tocca = rigaScambioP2P(riga({stato: 'attesa_mia_fattura'}));
 out.finale = rigaScambioP2P(riga({stato: 'annullato'}));
 out.nudo = out.compro.indexOf('p2p-meta') < 0;
+/* LA CIFRA IN SATS, nei tre casi per ordine di verita' */
+out.satsStima = satsScambioP2P(riga({}));
+out.satsFisso = satsScambioP2P(riga({sats: 12000}));
+out.satsDetto = satsScambioP2P(riga({sats: 12000, satsNetti: 9999}));
+out.satsRange = satsScambioP2P(riga({euro: 50, euroMax: 100}));
+cambioVivo = false;
+out.satsMuti = satsScambioP2P(riga({}));
+out.cardMuta = rigaScambioP2P(riga({}));
+cambioVivo = true;
+/* LA TINTA DEL RIQUADRO: la classe che esce da ogni stato */
+out.tinte = {};
+for (const s of Object.keys(STATI_P2P))
+  out.tinte[s] = tintaStatoP2P({stato: s});
+out.cardPubblicato = rigaScambioP2P(riga({stato: 'pubblicato'}));
+out.cardAttivo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo'}));
+out.cardConcluso = rigaScambioP2P(riga({stato: 'concluso'}));
+out.cardDisputa = rigaScambioP2P(riga({stato: 'in_disputa'}));
 /* LO STESSO SEGNO CON TUTT'E DUE LE TINTE, su tutte le combinazioni:
    se il colore si mettesse a seguire il segno invece del giudizio,
    queste due liste diventerebbero una sola */
@@ -46716,6 +46828,303 @@ console.log(JSON.stringify(out));
     prova("...e senza nessuna delle due il piede non si scrive", True,
           o["nudo"])
 
+    # --- 5) LA CIFRA IN SATS, tre casi per ordine di VERITA' --------
+    # Quel che ha detto il coordinatore vince su tutto; poi l'importo
+    # fisso; e solo allora la stima al mercato di adesso.
+    prova("la stima al mercato ha il suo ≈", True,
+          o["satsStima"].startswith("≈ ") and o["satsStima"].endswith(" sats"))
+    prova("...il prezzo fisso porta il netto, e il ≈ che la fee gli da'",
+          "≈ 11 880 sats", o["satsFisso"])
+    prova("...e quel che ha detto il coordinatore vince", "9999 sats",
+          o["satsDetto"])
+    prova("l'intervallo porta i due capi anche in sats", True,
+          o["satsRange"].count("–") == 1)
+    # ⚠️ A CAMBIO MUTO NESSUN NUMERO, mai uno inventato — e la card
+    # resta in piedi lo stesso, con l'euro e il premio.
+    prova("a cambio muto niente cifra, e la card regge", True,
+          o["satsMuti"] == ""
+          and "p2p-sats" not in o["cardMuta"]
+          and "5,00 €" in o["cardMuta"])
+
+    # --- 6) IL RIQUADRO DI STATO SI TINGE ---------------------------
+    # ⚠️ LA MAPPA E' ESAUSTIVA: ogni stato che la macchina sa produrre
+    # ha la sua voce. Uno stato nuovo senza tinta uscirebbe NEUTRO,
+    # cioe' direbbe «non e' ancora successo niente» proprio quando e'
+    # successo qualcosa — ed e' un difetto che non rompe niente.
+    # il ritaglio di una costante-oggetto: `blocco_const` vive dentro
+    # un'altra prova, e copiarne il corpo qui sarebbe la stessa
+    # verita' in due posti — questa e' la sua forma minima, tre righe
+    _bc = lambda nome: mini[mini.index("const " + nome + " = {"):
+                            mini.index("\n};", mini.index("const " + nome + " = {")) + 3]
+    _stati = set(re.findall(r"^  ([a-z_]+):", _bc("STATI_P2P"), re.M))
+    _tinte = set(re.findall(r"([a-z_]+): '", _bc("P2P_TINTA_STATO")))
+    prova("ogni stato ha la sua tinta", set(), _stati - _tinte)
+    prova("...e ogni tinta il suo stato", set(), _tinte - _stati)
+    # LA PALETTE NON E' NUOVA: sono le classi con cui il mercatino
+    # veste gli stati di un ordine, e qui non ne nasce nessuna.
+    _classi = set(v for v in o["tinte"].values() if v)
+    prova("le tinte sono quelle dei badge del mercatino", set(),
+          _classi - set(" badge " + c for c in
+                        re.findall(r"badge:'([a-z]+)'", _bc("STATES"))))
+    # IL NEUTRO E' «non e' ancora successo niente che ti riguardi»:
+    # «Ordine pubblicato» (richiesta di Andrea) e i suoi due gemelli di
+    # un istante, mentre la risposta e' in volo.
+    prova("restano neutri i tre del «non e' successo niente»",
+          ["", "", ""],
+          [o["tinte"]["pubblicato"], o["tinte"]["pubblico"],
+           o["tinte"]["prendo"]])
+    prova("...e nessun altro", [],
+          [s for s, c in o["tinte"].items() if not c
+           and s not in ("pubblicato", "pubblico", "prendo")])
+    # ⚠️ IL ROSSO E' SOLO DELLA DISPUTA, ed e' la regola del mercatino
+    # portata qui intera: un ritardo non e' un problema conclamato.
+    prova("il rosso e' solo della disputa", ["in_disputa"],
+          sorted(s for s, c in o["tinte"].items() if c == " badge dispute"))
+    # ...e il verde solo di quel che e' finito bene: il verde e' il
+    # registro della FIDUCIA e non se lo prende nessun altro stato.
+    prova("...e il verde solo di quel che e' finito bene", ["concluso"],
+          sorted(s for s, c in o["tinte"].items() if c == " badge released"))
+    prova("il riquadro porta la classe in pagina", [True, True, True, True],
+          ['<div class="p2p-scambio-stato">' in o["cardPubblicato"],
+           '<div class="p2p-scambio-stato badge locked">' in o["cardAttivo"],
+           '<div class="p2p-scambio-stato badge released">' in o["cardConcluso"],
+           '<div class="p2p-scambio-stato badge dispute">' in o["cardDisputa"]])
+    # e la GEOMETRIA si rimette a posto: la' sono pillole da 11px, qui
+    # e' un riquadro — e serve la doppia classe, che `.badge` sta piu'
+    # in basso nel foglio e a parita' vincerebbe lui.
+    _geo = pezzo_js(mini, "  .p2p-scambio-stato.badge{", "}")
+    prova("il riquadro tinto resta un riquadro", True,
+          "border-radius:10px" in _geo and "font-size:13px" in _geo
+          and "border-color:transparent" in _geo
+          and mini.index("  .badge{") > mini.index("  .p2p-scambio-stato{"))
+
+
+
+def prove_p2p_vista_miei():
+    """LA VISTA «I MIEI SCAMBI» (set 2026, ridisegno di Andrea): via il
+    titolo, e al suo posto la STESSA riga di strumenti del libro —
+    «Ordina» a sinistra, «Filtro» in mezzo, la levetta del tema a
+    destra.
+
+    ⚠️ LE LEVE PERO' SONO DI UN'ALTRA SPECIE, ed e' la cosa che queste
+    prove sorvegliano: il libro si filtra per com'e' FATTA l'offerta di
+    uno sconosciuto (valuta, metodo, premio, reputazione), i propri
+    scambi per DOVE SONO ARRIVATI. Prendere in prestito i giudici del
+    libro sarebbe il difetto facile: `ordinaLibroP2P` ha come metro la
+    convenienza, che su un ordine tuo non vuol dire niente.
+
+    I CINQUE GRUPPI SONO UNA PARTIZIONE, e c'e' la prova: ogni stato
+    che la macchina sa produrre cade in uno e uno solo. Senza, due
+    gruppi scelti insieme mostrerebbero due volte la stessa card e il
+    conteggio della pillola direbbe un numero che non torna."""
+    print("\n[la vista «I miei scambi»]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL MARKUP: gli strumenti, il deposito, il foglio --------
+    j = mini.index('id="view-p2pmiei"')
+    fetta = mini[j:mini.index("============", j)]
+    prova("la vista porta la riga di strumenti, attaccata in alto", True,
+          '<div class="p2p-sticky">' in fetta
+          and 'id="p2pMieiTesta"' in fetta
+          and 'id="p2pMieiCorpo"' in fetta)
+    # IL DEPOSITO STA NELLA VISTA e non nella testata: #p2pMieiTesta lo
+    # riscrive renderP2P a ogni giro, e li' dentro il valore morirebbe.
+    prova("...e il deposito dell'ordine sta nella VISTA, non nella testata",
+          True,
+          fetta.index('<select id="p2pMieiOrdinaSel" hidden>')
+          < fetta.index('id="p2pMieiTesta"'))
+    _sel = fetta[fetta.index('<select id="p2pMieiOrdinaSel"'):
+                 fetta.index("</select>")]
+    prova("...con quattro criteri, e uno solo predefinito",
+          [4, 1], [_sel.count("<option "), _sel.count("selected")])
+    # OGNI VOCE HA DUE NOMI: nel foglio quello intero, nella pillola
+    # quello corto — o la riga va a capo pure a 375. Una voce senza
+    # `data-corta` resterebbe muta a meta'.
+    prova("...e ogni voce porta il suo nome corto", 4,
+          _sel.count("data-corta="))
+    prova("il foglio del filtro si chiude con gli altri", True,
+          "el('p2pMieiFiltroSheet').classList.remove('open');"
+          in pezzo_js(mini, "function closeSheet(){", "\n}"))
+    prova("...ed e' registrato nel picker di casa", True,
+          "p2pMieiOrdinaSel: {titolo: 'Ordina i tuoi scambi'," in mini)
+
+    # --- 2) LA RIGA DI STRUMENTI, e sono le classi del libro --------
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("la testata dei miei ha i tre pezzi del libro", True,
+          all(s in rp for s in ('id="p2pMieiOrdinaSelBtn"',
+                                "class=\"p2p-testa-riga\"",
+                                "apriFiltroMieiP2P()", "alternaTema()")))
+    # LE CLASSI SONO LE STESSE: cosi' l'arancio dell'attivo, il margine
+    # che centra la pillola di mezzo e le misure a 320 arrivano di la',
+    # gia' tarati. Due righe che si assomigliano a meta' sarebbero due
+    # comandi diversi per chi legge.
+    prova("...e veste le classi del libro, non un vestito suo", True,
+          "p2p-filtro p2p-ordina" in rp and 'class="tema-btn"' in rp
+          and "p2p-miei-filtro" not in mini)
+    # ⚠️ IL CONTEGGIO E' QUELLO FILTRATO, e viene dalla STESSA funzione
+    # che disegna le card: un numero contato a parte sarebbe la bugia
+    # piu' facile da scrivere e la piu' difficile da notare.
+    prova("il conteggio della pillola esce da chi disegna le card", True,
+          "mieiMostratiP2P(mieiTutti).length" in rp)
+    # e i due accesi seguono il FATTO, non il gesto: l'arancio dice
+    # «questo comando sta facendo qualcosa»
+    prova("...e i due accesi guardano il valore vivo", True,
+          "(ordMiei === P2P_ORDINE_MIEI_CASA ? '' : ' acceso')" in rp
+          and "filtroAccesoMieiP2P(p2pMieiFiltro) ? ' acceso' : ''" in rp)
+    # il titolo se n'e' andato: la nav dice gia' il nome della pagina
+    prova("il titolo «I tuoi scambi» non c'e' piu'", False,
+          'section-label">I tuoi scambi' in mini)
+
+    # --- 3) IL BANCO: i gruppi, il filtro, i quattro ordini ---------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della vista dei propri scambi", "node non c'e'")
+        return
+    pezzi = [mini[mini.index("const STATI_P2P = {"):
+                  mini.index("\n};", mini.index("const STATI_P2P = {")) + 3],
+             mini[mini.index("const P2P_GRUPPI = ["):
+                  mini.index("\n];", mini.index("const P2P_GRUPPI = [")) + 3],
+             mini[mini.index("const P2P_ORDINI_MIEI = "):
+                  mini.index("\n", mini.index("const P2P_ORDINI_MIEI = "))],
+             mini[mini.index("const P2P_ORDINE_MIEI_CASA = "):
+                  mini.index("\n", mini.index("const P2P_ORDINE_MIEI_CASA = "))],
+             mini[mini.index("const capoImportoP2P = "):
+                  mini.index(";\n", mini.index("const capoImportoP2P = ")) + 1]]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function azioniDisponibili(o){",
+        "function gruppoScambioP2P(o){",
+        "function filtroAccesoMieiP2P(f){",
+        "function passaStatoMieiP2P(o, f){",
+        "function ordinaMieiP2P(righe, criterio){",
+        "function mieiMostratiP2P(righe){")]
+    banco = "\n".join(pezzi) + r"""
+/* le sole cose di cartone: il deposito dell'ordine (che nel client e'
+   una <select> nascosta) e il filtro vivo */
+let CRITERIO = 'recenti';
+function ordineMieiP2P(){ return CRITERIO; }
+let p2pMieiFiltro = [];
+const out = {};
+/* ⚠️ LA PARTIZIONE: ogni stato in uno e un solo gruppo, e si guardano
+   TUTT'E DUE I LATI — «tocca a te» esce da `azioniDisponibili`, che
+   guarda il lato insieme allo stato, quindi lo stesso stato puo'
+   cadere in due gruppi diversi a seconda di chi lo legge */
+out.gruppi = {};
+for (const lato of ['compro', 'vendo']) {
+  out.gruppi[lato] = {};
+  for (const s of Object.keys(STATI_P2P))
+    out.gruppi[lato][s] = gruppoScambioP2P({lato: lato, stato: s});
+}
+out.chiaviNote = P2P_GRUPPI.map(g => g.k);
+/* IL GIUDICE DI «tocca a te» E' QUELLO DELLA CARD: gli stessi quattro
+   casi di azioniDisponibili, e nessun altro */
+out.fare = [];
+for (const lato of ['compro', 'vendo'])
+  for (const s of Object.keys(STATI_P2P))
+    if (gruppoScambioP2P({lato: lato, stato: s}) === 'fare')
+      out.fare.push(lato + ':' + s);
+out.fare.sort();
+/* IL FILTRO: spento passa tutto, acceso passa i suoi, e due gruppi
+   fanno l'unione */
+const r = (id, o) => Object.assign({id: id, lato: 'compro', stato: 'pubblicato',
+  euro: 10, euroMax: 0, creato: 100, quando: 100}, o);
+const righe = [
+  r('a', {stato: 'pubblicato', creato: 500, quando: 500}),
+  r('b', {stato: 'attesa_mia_fattura', creato: 400, quando: 400, euro: 90}),
+  r('c', {stato: 'euro_inviati', creato: 300, quando: 300, euro: 5}),
+  r('d', {stato: 'concluso', creato: 200, quando: 200, euro: 50, euroMax: 100}),
+  r('e', {stato: 'annullato', creato: 100, quando: 100, euro: 1})
+];
+out.gruppiDelBanco = righe.map(o => gruppoScambioP2P(o));
+out.spentoPassa = righe.filter(o => passaStatoMieiP2P(o, [])).length;
+out.unGruppo = righe.filter(o => passaStatoMieiP2P(o, ['fatti'])).map(o => o.id);
+out.dueGruppi = righe.filter(o => passaStatoMieiP2P(o, ['fatti', 'morti'])).map(o => o.id);
+out.acceso = [filtroAccesoMieiP2P([]), filtroAccesoMieiP2P(['fatti'])];
+/* I QUATTRO ORDINI */
+out.recenti = ordinaMieiP2P(righe, 'recenti').map(o => o.id);
+out.daFare = ordinaMieiP2P(righe, 'fare').map(o => o.id);
+/* l'intervallo guarda il capo che conta nella direzione chiesta: chi
+   cerca il grande guarda fin dove puo' SALIRE (100), chi cerca il
+   piccolo da dove puo' PARTIRE (50) — quindi 'd' va primo in tutt'e due */
+out.giu = ordinaMieiP2P(righe, 'imp-giu').map(o => o.id);
+out.su = ordinaMieiP2P(righe, 'imp-su').map(o => o.id);
+out.criterioIgnoto = ordinaMieiP2P(righe, 'boh').map(o => o.id);
+/* e la lista che vede la pillola e' quella che vedono le card */
+p2pMieiFiltro = ['fatti', 'morti'];
+out.mostrati = mieiMostratiP2P(righe).map(o => o.id);
+p2pMieiFiltro = [];
+/* PURA: la lista di partenza non si tocca */
+out.nonMuta = righe.map(o => o.id).join(',') === 'a,b,c,d,e';
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    import os as _os
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r2 = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node della vista gira", "", (r2.stderr or "")[-600:])
+    if r2.returncode:
+        return
+    o = _json.loads(r2.stdout)
+
+    # ⚠️ LA PARTIZIONE, e si guarda su TUTT'E DUE i lati: nessuno stato
+    # resta senza gruppo, e nessun gruppo e' un nome che non esce mai.
+    note = set(o["chiaviNote"])
+    usciti = set()
+    for lato in o["gruppi"]:
+        for s, g in o["gruppi"][lato].items():
+            usciti.add(g)
+            if g not in note:
+                usciti.add("IGNOTO:" + s)
+    prova("ogni stato cade in un gruppo che esiste", set(),
+          set(x for x in usciti if x.startswith("IGNOTO:")))
+    prova("...e nessun gruppo resta un nome senza stati", set(),
+          note - usciti)
+    # IL GIUDICE DI «tocca a te» E' QUELLO DELLA CARD e non una seconda
+    # lista di stati: sono i quattro casi di `azioniDisponibili`, gli
+    # stessi che accendono il 👉. Due liste della stessa cosa si
+    # scollano, e il giorno che si scollassero la pillola direbbe un
+    # numero e le card un altro.
+    prova("«tocca a te» sono i quattro casi del 👉, e nessun altro",
+          ["compro:attesa_mia_fattura", "compro:attivo",
+           "vendo:attesa_mia_hold", "vendo:euro_inviati"],
+          o["fare"])
+    prova("...e il gruppo lo decide chiamandolo, non ricopiandolo", True,
+          "azioniDisponibili(o)" in pezzo_js(
+              mini, "function gruppoScambioP2P(o){", "\n}\n"))
+
+    prova("i cinque casi del banco cadono dove devono",
+          ["libro", "fare", "corso", "fatti", "morti"], o["gruppiDelBanco"])
+    prova("il filtro spento lascia passare tutti", 5, o["spentoPassa"])
+    prova("...un gruppo solo lascia passare i suoi", ["d"], o["unGruppo"])
+    prova("...e due gruppi fanno l'unione", ["d", "e"], o["dueGruppi"])
+    prova("...e il filtro e' acceso solo quando restringe",
+          [False, True], o["acceso"])
+
+    # I QUATTRO ORDINI. Il predefinito e' il piu' recente — quel che la
+    # striscia faceva da sempre — e a parita' vale sempre lui.
+    prova("il predefinito e' il piu' recente", ["a", "b", "c", "d", "e"],
+          o["recenti"])
+    # «Prima quelli da fare» segue l'URGENZA, che e' l'ordine in cui i
+    # cinque gruppi sono dichiarati: un catalogo solo per due mestieri.
+    prova("«da fare» mette in testa quel che aspetta un tuo gesto",
+          ["b", "c", "a", "d", "e"], o["daFare"])
+    # ⚠️ L'INTERVALLO GUARDA IL CAPO CHE CONTA NELLA DIREZIONE CHIESTA:
+    # 'd' va da 50 a 100, quindi e' primo sia fra i grandi (sale a 100)
+    # sia fra i piccoli (parte da 50 solo dopo c ed e). E' la stessa
+    # regola del libro, e il capo lo da' la stessa funzione.
+    prova("i grandi guardano fin dove si sale", ["d", "b", "a", "c", "e"],
+          o["giu"])
+    prova("...e i piccoli da dove si parte", ["e", "c", "a", "d", "b"],
+          o["su"])
+    prova("un criterio che non conosciamo vale il predefinito",
+          o["recenti"], o["criterioIgnoto"])
+    prova("la pillola conta la stessa lista che disegnano le card",
+          ["d", "e"], o["mostrati"])
+    prova("e la lista di partenza non si tocca", True, o["nonMuta"])
 
 
 def prove_p2p_campanello():
@@ -55275,6 +55684,7 @@ def main():
     prove_volti_libro,
     prove_p2p_chiavi,
     prove_p2p_card_scambio,
+    prove_p2p_vista_miei,
     prove_p2p_campanello,
     prove_p2p_motore,
     prove_p2p_stati,
