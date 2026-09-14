@@ -14062,16 +14062,12 @@ async def registra_vista(annuncio_id: int, x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie(""),
                           x_ospite_id: str = Header("")):
     """Fail-open: un contatore non deve poter rompere una pagina, quindi
-    qui non si solleva MAI un errore HTTP — ma la risposta dice la
-    verita' (`contata`/`motivo`), diagnostica temporanea per il
-    collaudo in produzione senza bisogno del registro del server
-    (set 2026, da togliere una volta chiuso il cantiere)."""
+    qui non si solleva MAI un errore — il client la spara e dimentica."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     identita = _identita_vista(user, x_ospite_id)
     if not identita:
-        return {"ok": True, "contata": False, "motivo": "nessuna identita'"}
+        return {"ok": True}
     con = db()
-    contata, motivo = False, "annuncio non trovato"
     try:
         r = con.execute("SELECT venditore_id FROM annunci WHERE id=? "
                         "AND stato IN ('attivo','venduto')",
@@ -14079,9 +14075,7 @@ async def registra_vista(annuncio_id: int, x_tg_init_data: str = Header(""),
         # il proprio annuncio non si conta da soli: scorrere la propria
         # vetrina non e' un compratore interessato (la stessa regola
         # del barattolo, MSG_BARATTOLO_MIO qui sotto)
-        if r and user and user["id"] == r["venditore_id"]:
-            motivo = "sei il proprietario"
-        elif r:
+        if r and not (user and user["id"] == r["venditore_id"]):
             un_ora_fa = int(time.time()) - 3600
             cur = con.execute(
                 "INSERT INTO viste_annuncio(annuncio_id, identita, vista) "
@@ -14091,16 +14085,12 @@ async def registra_vista(annuncio_id: int, x_tg_init_data: str = Header(""),
             if cur.rowcount:
                 con.execute("UPDATE annunci SET visualizzazioni="
                             "visualizzazioni+1 WHERE id=?", (annuncio_id,))
-                contata, motivo = True, "contata"
-            else:
-                motivo = "gia' contata in quest'ora"
             con.commit()
     except Exception as e:
-        motivo = f"{type(e).__name__}: {e}"
-        print(f"[!] Vista annuncio: {motivo}")
+        print(f"[!] Vista annuncio: {e}")
     finally:
         con.close()
-    return {"ok": True, "contata": contata, "motivo": motivo}
+    return {"ok": True}
 
 
 # ---- Preferiti: «nel tuo barattolo» 🫙 -------------------------------

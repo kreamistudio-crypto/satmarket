@@ -11627,6 +11627,23 @@ cantiere: il giro sopra l'ha aggirato SOLO nel processo di prova
 (un `Anthropic` finto iniettato prima dell'import), senza toccare le
 dipendenze vere. Da guardare in un cantiere suo.
 
+IL FALSO ALLARME DEL PRIMO GIORNO IN PRODUZIONE (14 set 2026): Alan
+vedeva «1 persona nel barattolo» ma zero visualizzazioni, anche dopo
+una vista vera da un altro account. Diagnosi FATTA DA FUORI, senza
+SSH (scelta di Alan, da rispettare): l'endpoint è stato reso
+temporaneamente onesto sulla risposta (`contata`/`motivo` invece del
+solo `{"ok": true}`), interrogato a mano dal server vero — e la
+scrittura funzionava, semplicemente non ancora nella finestra in cui
+Alan aveva provato. LA CAUSA VERA È DEL DEPLOY, NON DEL CANTIERE: il
+«minuto» di CLAUDE.md parte da quando il ref `pronto` si muove, e
+PRIMA di quello c'è tutta la CI remota — 9500+ prove che hanno il
+loro tempo. Verificare subito dopo un push cade facilmente nella
+finestra morta. Nota lasciata in `docs/PRODUZIONE.md` («IL MINUTO SI
+CONTA DA QUANDO pronto SI MUOVE»), perché è una lezione sul deploy e
+si ripresenterà con qualunque altro cantiere. La diagnostica
+temporanea è stata tolta appena chiuso il dubbio: l'endpoint è
+tornato silenzioso com'era.
+
 I TRE PEZZI DEL QUADRO D'INSIEME (14 set 2026, dopo il quarto giro sullo
 stesso punto — chiesto da Andrea: «fermati, fammi il quadro, e dimmi se
 il disegno regge o va semplificato»).

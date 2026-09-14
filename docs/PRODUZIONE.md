@@ -98,6 +98,16 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `.timer`. `prove.py` difende le quattro righe che contano — il
   semaforo che aspetta i due job, il freno, l'ordine del rollback, e
   la salute che non racconta niente di sé.
+  IL MINUTO SI CONTA DA QUANDO `pronto` SI MUOVE, NON DA QUANDO SI FA
+  PUSH (set 2026, dal cantiere del conteggio visualizzazioni): prima
+  del timer sul VPS c'è la CI remota — le prove di `prove.py`, che sono
+  9500+ e crescono — e quel giro ha il suo tempo, non incluso nel
+  «minuto». Verificare un deploy subito dopo il push con una richiesta
+  che tocca il codice nuovo (mai solo `/api/salute`, che risponde
+  identica prima e dopo) può cadere nella finestra in cui `pronto` non
+  si è ancora mosso: sembra un difetto del codice ed è solo la CI
+  che sta ancora girando. Aspettare di più prima di concludere che
+  qualcosa non funziona, o controllare `--dimmi` da chi ha le chiavi.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
   servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
 - La pubblicazione su Nostr richiede anche `coincurve`: installarla con
