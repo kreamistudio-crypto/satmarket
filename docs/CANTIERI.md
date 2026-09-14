@@ -13201,6 +13201,9 @@ sats» dice ancora «Riceverai 7301 sats» e **rifiuta una fattura da
 secco. Da verificare sui byte di mostro (`is_valid_invoice`) prima di
 toccarlo — ma il nome `satsNetti` su un numero che netto non è viene da
 lì, ed è la stessa origine. Cantiere suo.
+**APERTO E CHIUSO LO STESSO GIORNO**: la verifica sui byte c'è, e la
+cura anche — vedi «`satsNetti` è il lordo: la fattura che il nostro
+client rifiutava», qui sotto.
 
 ⚠️ **E «IDENTICO» NON LO ERA, e a dirlo è stata una misura diversa dalle
 prime due.** Andrea: «c'è troppa aria sopra e il testo è troppo piccolo
@@ -13292,3 +13295,113 @@ hunk», che è com'è la CI: **9748 → 9750, zero rosse** — le due
 sentinelle dell'aria. Lo script dei marcatori ha diviso 12 hunk in 2
 miei e 10 loro **senza dubbi**, e quando un hunk non ha padrone si
 ferma invece di scartarlo.
+
+## `satsNetti` è il lordo: la fattura che il nostro client rifiutava (14 set 2026)
+
+Segnalato in coda al cantiere del conto e aperto subito da Andrea,
+perché **poteva fermare uno scambio vero**: il foglio «Dove ricevere i
+sats» diceva a chi compra «Riceverai 7301 sats» e poi **rifiutava** la
+fattura da 7264 — cioè proprio quella dell'importo che incassa davvero.
+Chi avesse fatto la fattura giusta col suo wallet si sarebbe sentito
+dire di no dalla nostra app, senza nessun modo di capire perché.
+
+**VERIFICATO SUI BYTE, che era la domanda del cantiere** (mostro
+v0.18.6, il tag che il nodo girava quando le altre letture sono state
+fatte). Tre pezzi, e il terzo è quello che decide il disegno:
+
+1. `get_fee` (`src/util.rs`) **la metà la fa già lui**:
+   `split_fee = (mostro_settings.fee * amount as f64) / 2.0`, poi
+   `.round()`. Quindi `order.fee` nel database del coordinatore è la
+   **metà** della commissione, quella di un lato solo.
+2. `validate_bolt11_invoice` (`src/lightning/invoice.rs`) accetta la
+   fattura solo se `amount_sat == amt.checked_sub(fee)` — cioè
+   `order.amount − order.fee` — **oppure se `amount_sat` è 0**, che è
+   la fattura senza importo. `validate_invoice` (`src/util.rs`) le
+   passa `Some(order.amount)` e `Some(order.fee)`, col suo commento:
+   la dev fee al compratore non si tocca, la paga mostrod dai suoi.
+3. **La cifra al client non arriva mai.** `SmallOrder` (mostro-core
+   0.14.6) porta `amount`, `fiat_amount`, `premium`, le due trade key,
+   le date — e **nessun campo `fee`**: censiti tutti. Quindi la metà
+   non si può leggere, **si ricalcola**.
+
+**IL DIFETTO ERANO DUE BUGIE CHE SI TENEVANO IN PIEDI A VICENDA:** il
+testo prometteva il lordo e la guardia pretendeva il lordo, quindi
+erano coerenti fra loro e **incoerenti col coordinatore**. Una sola
+delle due sarebbe saltata all'occhio; insieme, no. E la guardia
+sbagliava in tutti e due i versi — rifiutava la fattura giusta *e*
+lasciava passare quella che mostrod avrebbe scartato, cioè spostava il
+«no» dal nostro foglio (dove si può spiegare) a un
+`InvoiceInvalidError` del coordinatore (dove si legge «la richiesta di
+pagamento non è valida» e basta).
+
+**LA CURA È UN GIUDICE, `satsDaRicevereP2P`**, e il campo non si legge
+più a crudo da nessuna parte. Riusa `nettoLatoP2P`, che è già il
+giudice della metà su tutte le altre superfici: stessa formula, stesso
+arrotondamento (`Math.round(sats * fee / 2)` contro il `.round()` di
+Rust sullo stesso prodotto). Le tre case di `satsNetti` adesso sono:
+il **conto** della pagina dello scambio, dove il lordo è la cosa
+giusta perché fa il Subtotale (`satsDetti`, cantiere di ieri); la
+**card della lista**, che diceva «Stai comprando 7301 sats» mentre la
+pagina diceva «Ricevi ≈ 7228» — due numeri per la stessa cosa; e il
+**foglio della fattura**, testo e guardia.
+
+⚠️ **E DOVE LA METÀ NON SI SA, NON SI PRETENDE.** Senza il 38385 la
+percentuale non c'è (`commissioneVivaP2P` torna `null`, che non è
+zero), e allora il giudice torna 0: il foglio **non promette nessuna
+cifra** e la guardia **non sbarra la strada**. È la scelta che conta
+più della cifra giusta: un rifiuto nostro su un numero inventato è
+peggio del «no» del coordinatore, che almeno arriva con la sua
+ragione. Il caso è reale — l'app riaperta su uno scambio in corso
+prima che il libro sia arrivato — e ha la sua prova, col motore
+completo e `p2pInfo = null`.
+
+**IL NOME NON SI TOCCA, ed è una decisione e non una pigrizia.**
+`satsNetti` mente, ma la riga vive in `localStorage` sui dispositivi di
+chi ha già scambiato: ribattezzare il campo perderebbe la cifra a chi
+aggiorna l'app con uno scambio aperto — cioè romperebbe esattamente le
+persone che il cantiere vuole proteggere. Al suo posto c'è un avviso
+dove il campo **nasce** (in `avanzaOrdineP2P`, sulla riga che lo
+scrive) che dice che è il lordo e nomina i tre giudici.
+
+**LA SECONDA VOCE PARCHEGGIATA ADESSO HA UN MESTIERE.** Dallo stesso
+`validate_bolt11_invoice`: `invoice_expiration_window` è **viva** —
+pretende che la fattura di chi compra scada non prima di
+`adesso + finestra` — mentre la sorella `hold_invoice_expiration_window`
+resta la configurazione morta di sempre. È scritto accanto a
+`fattFinestra`, che continua a non essere usata: il foglio non promette
+tempi e non sbarra la strada. **RESTA DA GUARDARE**, e il giorno che si
+volesse usare va riguardato prima il NOME (il commit `c6efb2d`/#952 lo
+rinomina upstream; nel 38385 del nostro nodo i nomi sono ancora
+questi). Oggi una fattura di importo giusto ma troppo corta prende lo
+stesso `InvoiceInvalidError` dell'importo sbagliato: un «no» che non
+dice quale delle due cose non andava.
+
+⚠️ **E L'ALTRA STRADA DEL FOGLIO HA UNA TRAPPOLA SUA, già a verbale:**
+col Lightning address `is_valid_invoice` non guarda nessun importo
+(`validate_lightning_address` fa solo `ln_exists`) — ma quel giro è la
+risoluzione LNURL che a circuito Tor freddo va in timeout sui budget
+compilati di mostro. Chi dà un indirizzo non si prende un «no»
+sull'importo: si prende un `InvoiceInvalidError` sulla rete. Le due
+strade del foglio falliscono per ragioni diverse e con la stessa
+faccia.
+
+⚠️ **UNA SPIA DELLA PUREZZA SI È FATTA INGANNARE DALLA PROSA, ed è la
+TERZA volta in due giorni.** La sentinella «`avanzaOrdineP2P` non tocca
+`localStorage`» leggeva quella parola dentro il **commento che spiega
+perché il campo non si ribattezza** — cioè proprio la riga che dice il
+contrario di quel che la spia teme. Una prova sulla purezza parla di
+quel che il programma FA: i commenti si tolgono prima di guardare, e
+adesso le sette spie girano sul codice nudo. La famiglia è quella nota
+(*prove che rispondono per il vicino*), e le tre occorrenze in fila —
+la fetta tagliata dal proprio delimitatore, la sentinella del markup, e
+questa — dicono che il modo più comune di sbagliare una sentinella è
+**farle leggere la spiegazione invece del programma**.
+
+**9760 verdi**, 0 rosse. Il banco del motore fa la strada intera quattro
+volte: il foglio che promette 98505 e non nomina più 99000, la fattura
+sbagliata che si ferma con la cifra giusta nella ragione, **la fattura
+GIUSTA che parte** (`985050n` = 98505 sats, il caso che poteva fermare
+uno scambio), e il giro a commissione ignota dove non si promette e non
+si sbarra. Nel banco della card la cifra del coordinatore adesso è
+`≈ 9899` invece di `9999`, cioè lo stesso numero che la pagina dello
+scambio mostra per la stessa riga.
