@@ -32995,6 +32995,88 @@ async def sincronizza_reputazione_nostr(x_tg_init_data: str = Header(""),
     return {"ok": True, "candidati": len(candidati)}
 
 
+# ---- Pulizia retroattiva dei metadati foto (set 2026, TEMPORANEA) ----
+# La stessa passata di spoglia_foto_esistenti.py, ma dentro il server
+# cosi' si lancia dalla Mini App senza SSH — chiesto da Alan per non
+# dover far passare Andrea da li'. UNA TANTUM: va tolta (endpoint e
+# bottone in Amministrazione) una volta usata in produzione, vedi
+# CANTIERI.md «Il conteggio delle visualizzazioni...» in fondo, dove
+# e' annotata insieme alla quarta porta (l'import Nostr) che questo
+# cantiere ha chiuso.
+def _spoglia_foto_esistenti(scrivi: bool) -> dict:
+    """SINCRONA e va chiamata da un thread (asyncio.to_thread): decine
+    o centinaia di file con Pillow di mezzo bloccherebbero il loop
+    dell'unico processo — lo stesso motivo per cui l'import Nostr gira
+    li'. Nessun await qui dentro per costruzione."""
+    tot = sporche = con_gps = riscritte = arenate = 0
+    nomi_arenate = []
+    for nome in sorted(os.listdir(FOTO_DIR)):
+        percorso = os.path.join(FOTO_DIR, nome)
+        if not os.path.isfile(percorso):
+            continue
+        tot += 1
+        try:
+            raw = open(percorso, "rb").read()
+        except OSError:
+            continue
+        if not _porta_metadati(raw):
+            continue
+        sporche += 1
+        try:
+            with ImmaginePillow.open(io.BytesIO(raw)) as im:
+                gps = dict(im.getexif().get_ifd(0x8825))
+        except Exception:
+            gps = {}
+        if gps:
+            con_gps += 1
+        pulito = spoglia_metadati(raw)
+        if pulito is None:
+            arenate += 1
+            nomi_arenate.append(nome)
+            continue
+        if not scrivi:
+            continue
+        # LA GUARDIA: i pixel devono restare quelli. Sul dubbio si
+        # lascia il file com'era — meglio un metadato di troppo che
+        # una vetrina che cambia da sola (stessa regola dello script).
+        try:
+            with ImmaginePillow.open(io.BytesIO(raw)) as im1, \
+                 ImmaginePillow.open(io.BytesIO(pulito)) as im2:
+                if im1.convert("RGB").tobytes() != im2.convert("RGB").tobytes():
+                    arenate += 1
+                    nomi_arenate.append(nome)
+                    continue
+        except Exception:
+            arenate += 1
+            nomi_arenate.append(nome)
+            continue
+        tmp = percorso + ".nuova"
+        with open(tmp, "wb") as out:
+            out.write(pulito)
+        os.replace(tmp, percorso)          # atomico: mai meta' file servito
+        riscritte += 1
+    return {"file_guardati": tot, "con_metadati": sporche,
+            "con_gps": con_gps, "riscritte": riscritte, "arenate": arenate,
+            "nomi_arenate": nomi_arenate[:20], "scrivi": scrivi}
+
+
+@app.post("/api/admin/foto/spoglia-retroattiva")
+async def spoglia_foto_retroattiva(scrivi: bool = False,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN. Senza `scrivi` e' un'ANTEPRIMA — nessun file si
+    tocca, si conta solo. Idempotente: rilanciata a lavoro fatto non
+    trova piu' niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato agli admin")
+    if not ImmaginePillow:
+        raise HTTPException(503, "Pillow non installato sul server")
+    if not os.path.isdir(FOTO_DIR):
+        raise HTTPException(404, "Cartella foto/ non trovata")
+    return await asyncio.to_thread(_spoglia_foto_esistenti, scrivi)
+
+
 @app.post("/api/me/nip85-dichiarazione")
 async def conferma_nip85_dichiarazione(req: Request,
                                        x_tg_init_data: str = Header(""),
@@ -36297,21 +36379,32 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
 # fa piu' richieste sullo stesso link (una HEAD di sonda prima del
 # popup, poi il GET vero, a volte a range): bruciarlo alla prima
 # gli farebbe scaricare un 410. Vale 5 minuti, poi la purga.
+#
+# TUTTI GLI ORDINI (set 2026): la pagina \u00abI tuoi affari\u00bb diceva \u00abil
+# CSV completo \u00e8 nel Profilo\u00bb \u2014 ma quello e' solo la contabilita'
+# (released/refunded), non \u00abtutti\u00bb. `tutti` viaggia nel BIGLIETTO
+# stesso (non nella richiesta del download, che Telegram la fa a
+# modo suo): stessa colonna \u00abesito\u00bb, ma qui e' lo STATO grezzo \u2014 dodici
+# valori invece di due, il vocabolario di sempre (regola ferrea 4) e
+# non un'etichetta duplicata che potrebbe disallinearsi da quella del
+# client.
 
-BIGLIETTI_EXPORT: dict[str, tuple[int, float]] = {}  # biglietto -> (tg_id, scadenza)
+BIGLIETTI_EXPORT: dict[str, tuple[int, float, bool]] = {}
+# biglietto -> (tg_id, scadenza, tutti)
 
 
 @app.post("/api/me/export-biglietto")
-def export_biglietto(x_tg_init_data: str = Header(""),
+def export_biglietto(tutti: bool = False, x_tg_init_data: str = Header(""),
                      barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     adesso = time.time()
-    for b in [b for b, (_, scade) in BIGLIETTI_EXPORT.items() if scade < adesso]:
+    for b in [b for b, (_, scade, _) in BIGLIETTI_EXPORT.items()
+              if scade < adesso]:
         BIGLIETTI_EXPORT.pop(b, None)
     while len(BIGLIETTI_EXPORT) >= 1000:
         BIGLIETTI_EXPORT.pop(next(iter(BIGLIETTI_EXPORT)))
     biglietto = secrets.token_urlsafe(32)
-    BIGLIETTI_EXPORT[biglietto] = (user["id"], adesso + 300)
+    BIGLIETTI_EXPORT[biglietto] = (user["id"], adesso + 300, tutti)
     return {"biglietto": biglietto}
 
 
@@ -36322,15 +36415,16 @@ def scarica_export(biglietto: str):
     if not dati or dati[1] < time.time():
         BIGLIETTI_EXPORT.pop(biglietto, None)
         raise HTTPException(410, "Link scaduto: riprova dal Profilo")
-    tg_id = dati[0]
+    tg_id, _, tutti = dati
     con = db()
+    dove = "" if tutti else "AND o.stato IN ('released','refunded') "
     righe = con.execute(
         "SELECT o.id, o.annuncio_id, o.aggiornato, o.prezzo_sats, o.stato, "
         "o.cambio_eur, o.venditore_id, a.titolo FROM ordini o "
         # LEFT: i SET (annuncio_id=0) devono uscire in contabilita'
         "LEFT JOIN annunci a ON a.id=o.annuncio_id "
         "WHERE (o.venditore_id=? OR o.compratore_id=?) "
-        "AND o.stato IN ('released','refunded') "
+        f"{dove}"
         "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
     # Un set = UNA riga di CSV (un incasso = una riga di contabilita'),
     # col titolo sintetizzato dalle righe fotografate all'acquisto
@@ -36349,12 +36443,14 @@ def scarica_export(biglietto: str):
         if r["cambio_eur"]:               # 0 = ordine storico: campo vuoto, onesto
             eur = (f"{r['prezzo_sats'] * r['cambio_eur'] / 100_000_000:.2f}"
                    .replace(".", ","))
+        esito = r["stato"] if tutti else (
+            "concluso" if r["stato"] == "released" else "rimborsato")
         w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
                     "vendita" if r["venditore_id"] == tg_id else "acquisto",
                     titoli_set.get(r["id"], r["titolo"] or "?"), r["prezzo_sats"],
-                    "concluso" if r["stato"] == "released" else "rimborsato",
-                    eur])
-    nome = time.strftime("barattolo-affari-%Y%m%d.csv")
+                    esito, eur])
+    nome = time.strftime(
+        f"barattolo-affari{'-tutti' if tutti else ''}-%Y%m%d.csv")
     return Response(content="\ufeff" + buf.getvalue(),   # BOM: cosi' Excel legge l'UTF-8
                     media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition":
@@ -39544,9 +39640,15 @@ async def importa_nostr_periodico():
             # ...e lo scaricatore col guardiano anti-SSRF: l'URL della
             # foto di un evento lo scrive chiunque su Nostr, e prima
             # l'import se lo prendeva senza chiedere niente a nessuno.
+            # PIU' IL RIPULITORE (set 2026, la quarta porta rimasta
+            # aperta dal cantiere «niente GPS»): senza, una foto
+            # scaricata da un venditore Nostr finiva sul disco con
+            # dentro l'EXIF che porta, GPS compreso — l'unica delle
+            # quattro filiere che ancora scriveva raw() com'era arrivato.
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
-                vaglio, scarica_foto_url, cambio_import)
+                vaglio, scarica_foto_url, cambio_import,
+                pulisci=spoglia_metadati)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)

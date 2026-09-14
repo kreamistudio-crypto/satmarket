@@ -22336,7 +22336,7 @@ function renderOrders(){
       </div>
     </div>`;}).join('')
     + rigaNascosti
-    + `<div class="csv-line">Il CSV completo è nel Profilo → Esporta i tuoi dati</div>`;
+    + `<div class="csv-line"><button class="btn link" style="margin:0;font-size:12px;font-weight:700" onclick="esportaDati(true)">📄 Esporta tutti gli ordini in CSV</button></div>`;
 }
 
 function openOrder(id){
@@ -30819,6 +30819,15 @@ async function loadAdminStats(){
           <button class="btn ghost" onclick="chiediRimborsoSblocco()">Rimborsa</button>
         </div>
       </div>
+      <!-- PULIZIA RETROATTIVA DEI METADATI (set 2026), UNA TANTUM:
+           chiude sul disco vero il cantiere «niente GPS nelle foto» —
+           da togliere, insieme al suo endpoint, una volta usata in
+           produzione (vedi CANTIERI.md). -->
+      <div style="margin-top:14px">
+        <div class="section-label">🧹 Pulisci i metadati delle foto (una tantum)</div>
+        <div class="sub" style="margin-top:6px">Ripassa le foto già pubblicate e toglie i metadati rimasti (GPS compreso) — sicuro anche a server acceso, prima un'anteprima poi si conferma.</div>
+        <button class="btn ghost" style="margin-top:8px" onclick="pulisciFotoRetroattivo()">🧹 Controlla le foto</button>
+      </div>
       ${boxLeve(leve)}
       ${boxBadgeLive()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
@@ -31419,6 +31428,34 @@ async function sincronizzaDistintivi(){
       (s,v) => s + (v.assegnati||0), 0);
     toast(`🔄 ${tot} badge assegnati sui distintivi già guadagnati`);
     await loadAdminStats();
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* PULIZIA RETROATTIVA DEI METADATI, UNA TANTUM (set 2026): prima
+   un'anteprima (nessun file toccato), poi — solo se c'è qualcosa da
+   pulire — il foglio di conferma prima di scrivere davvero. Stesso
+   giudizio dello script gemello (spoglia_foto_esistenti.py): mai
+   ricomprimere, e chi non si sa pulire in sicurezza resta com'è. */
+async function pulisciFotoRetroattivo(scrivi){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/foto/spoglia-retroattiva`
+      + (scrivi ? '?scrivi=1' : ''), {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riuscito', 6000); return; }
+    if (!scrivi) {
+      if (!d.con_metadati) { toast('✅ Nessuna foto porta ancora metadati'); return; }
+      chiediConferma({
+        titolo: '🧹 Pulizia foto',
+        corpo: `${d.con_metadati} foto su ${d.file_guardati} portano ancora `
+          + `dei metadati${d.con_gps ? ` (${d.con_gps} col GPS)` : ''}.`
+          + `${d.arenate ? ` ${d.arenate} non si sanno pulire e resteranno com'erano.` : ''}`
+          + ` Vuoi ripulirle adesso?`,
+        etichetta: 'Ripulisci', poi: () => pulisciFotoRetroattivo(true)});
+      return;
+    }
+    toast(`🧹 ${d.riscritte} foto ripulite`
+      + (d.arenate ? `, ${d.arenate} lasciate com'erano` : ''));
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -37587,21 +37624,25 @@ async function dimenticaMazzoOra(){
 }
 
 /* ---- export CSV degli affari conclusi (contabilità) ---- */
-async function esportaDati(){
+async function esportaDati(tutti){
   haptic();
   if (DEMO) { toast('Nel demo non c\'è nulla da esportare: prova nell\'app vera 📄'); return; }
   try{
-    const r = await fetch(`${API_BASE}/me/export-biglietto`,
+    const r = await fetch(`${API_BASE}/me/export-biglietto${tutti ? '?tutti=1' : ''}`,
       {method:'POST', headers:{'X-Tg-Init-Data': authHdr()}});
     if (!r.ok) throw new Error();
     const {biglietto} = await r.json();
     const url = API_BASE.startsWith('http')
       ? `${API_BASE}/export/${biglietto}`
       : `${location.origin}${API_BASE}/export/${biglietto}`;
+    /* TUTTI GLI ORDINI (set 2026): stesso biglietto, stesso download —
+       solo il nome del file cambia, cosi' chi scarica prima uno e poi
+       l'altro non si ritrova due file che si sovrascrivono */
+    const nome = tutti ? 'barattolo-affari-tutti.csv' : 'barattolo-affari.csv';
     if (tg?.initData && tg.isVersionAtLeast?.('8.0')) {
       /* dentro Telegram (recente) il download si chiede alla app */
       try {
-        tg.downloadFile({url, file_name: 'barattolo-affari.csv'}, ok => {
+        tg.downloadFile({url, file_name: nome}, ok => {
           if (ok) toast('📄 CSV in download: lo trovi tra i file scaricati');
         });
       } catch(e) {
@@ -37610,7 +37651,7 @@ async function esportaDati(){
       }
     } else {
       const a = document.createElement('a');
-      a.href = url; a.download = 'barattolo-affari.csv';
+      a.href = url; a.download = nome;
       document.body.appendChild(a); a.click(); a.remove();
     }
   } catch(e){ toast('❌ Export non riuscito, riprova'); }

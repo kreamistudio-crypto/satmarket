@@ -6875,6 +6875,80 @@ def prove_lista_ordini():
           (mini.count("o.listing.price - (o.protSats||0)"),
            mini.count("nettoVenditore(o)") - 1))
 
+    # ---- 17: TUTTI GLI ORDINI IN CSV (set 2026) ----
+    # La riga in coda alla lista prometteva «il CSV completo» ma era
+    # solo la contabilita' (released/refunded): ora e' un bottone vero,
+    # e chiama lo stesso esportaDati con un secondo parametro — mai
+    # una funzione gemella da tenere in pari.
+    prova("la coda della lista e' un bottone, non piu' un rimando",
+          True, "onclick=\"esportaDati(true)\">📄 Esporta tutti gli "
+          "ordini in CSV</button>" in mini)
+    prova("...e il bottone del Profilo resta quello di sempre "
+          "(nessun secondo argomento: la contabilita' non cambia)",
+          True, 'onclick="esportaDati()"' in mini)
+    ed = solo_codice(pezzo_js(mini, "async function esportaDati(tutti){"))
+    prova("il biglietto porta `tutti` alla richiesta", True,
+          "export-biglietto${tutti ? '?tutti=1' : ''}" in ed)
+    prova("...e il nome del file distingue le due esportazioni", True,
+          "'barattolo-affari-tutti.csv'" in ed
+          and "'barattolo-affari.csv'" in ed)
+
+    # ESEGUIBILE: il giro vero, database di cartone, sulle DUE facce
+    # del biglietto — `tutti` non e' un flag scritto e poi ignorato.
+    import sqlite3
+    import time
+
+    class _ErrExp(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+            super().__init__(f"{codice}: {testo}")
+
+    def _con_export():
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+          compratore_id INT, venditore_id INT, prezzo_sats INT,
+          stato TEXT, cambio_eur REAL, aggiornato INT);
+        INSERT INTO annunci VALUES(1,'Un oggetto');
+        INSERT INTO ordini VALUES
+          (1,1,222,111,1000,'released',60000,1000),
+          (2,1,222,111,2000,'creato',60000,2000),
+          (3,1,222,111,3000,'dispute',60000,3000),
+          (4,1,222,111,4000,'annullato',60000,4000);
+        """)
+        return c
+
+    def _righe_csv(con, tutti):
+        amb = {"db": lambda: _SenzaClose(con), "time": time,
+               "csv": csv_mod, "io": io_mod, "HTTPException": _ErrExp,
+               "Response": lambda content, **k: content,
+               "_titolo_ordine": lambda righe: "SET",
+               "BIGLIETTI_EXPORT": {"tik": (111, time.time() + 300, tutti)}}
+        exec(pezzo("scarica_export"), amb)
+        testo = amb["scarica_export"]("tik").lstrip("﻿")
+        return list(csv_mod.reader(io_mod.StringIO(testo), delimiter=";"))
+
+    import csv as csv_mod
+    import io as io_mod
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    con_exp = _con_export()
+    solo_contab = _righe_csv(con_exp, False)
+    prova("senza `tutti`: solo released/refunded, come sempre",
+          {"concluso"}, {r[4] for r in solo_contab[1:]})
+    tutti_csv = _righe_csv(con_exp, True)
+    prova("con `tutti`: escono anche creato, dispute, annullato",
+          {"released", "creato", "dispute", "annullato"},
+          {r[4] for r in tutti_csv[1:]})
+    prova("...e sono davvero TUTTI i quattro ordini, non un sottoinsieme",
+          4, len(tutti_csv) - 1)
+
 
 def prove_dettaglio_ordine():
     """IL DETTAGLIO PARLA A CHI LEGGE (ago 2026): la vista e' UNA per
@@ -7208,13 +7282,16 @@ def prove_ssrf_redirect():
     prova("sentinella: il guardiano si chiama anche sulla partenza",
           True, "url_foto_ammesso(url)" in pezzo("scarica_foto_url"))
     # e l'import da Nostr lo riceve: il patto del `vaglio` — insieme al
-    # cambio, che dall'ago 2026 viaggia sulla stessa strada
+    # cambio, che dall'ago 2026 viaggia sulla stessa strada, e dal set
+    # 2026 anche il ripulitore (vedi piu' sotto, «la QUARTA porta»)
     prova("sentinella: l'import orario riceve lo scaricatore del server",
-          True, "vaglio, scarica_foto_url, cambio_import)" in _SORGENTE)
+          True, "vaglio, scarica_foto_url, cambio_import,\n"
+          "                pulisci=spoglia_metadati)" in _SORGENTE)
     imp = open("importa_nostr.py", encoding="utf-8").read()
     prova("sentinella: e l'import lo usa quando ce l'ha", True,
           "def scarica_foto(url: str, annuncio_id: int, indice: int, "
-          "scarica=None)" in imp and "esito = scarica(url)" in imp)
+          "scarica=None,\n                 pulisci=None)" in imp
+          and "esito = scarica(url)" in imp)
 
 
 def prove_niente_ai_nella_ricerca():
@@ -8092,6 +8169,46 @@ def prove_foto_metadati():
                   "_documento_busta"):
         prova(f"sentinella: {porta} spoglia ancora", True,
               "spoglia_metadati" in codice(pezzo(porta)))
+    # la QUARTA porta (set 2026): l'import da Nostr scriveva raw() com'era
+    # arrivato, ed era l'unica delle quattro filiere a non passare mai da
+    # qui — e gira ogni ora in produzione. Due controlli, non uno: che
+    # scarica_foto (in importa_nostr.py, non server.py: pezzo() non ci
+    # arriva) chiami davvero il suo `pulisci`, e che il server lo INIETTI
+    # davvero nel giro orario — senza il secondo, il parametro resta None
+    # in silenzio e la porta si richiude senza che nessuna prova se ne
+    # accorga.
+    _imp_nostr = open("importa_nostr.py", encoding="utf-8").read()
+    _i = _imp_nostr.index("def scarica_foto(")
+    _scarica_foto_src = _imp_nostr[_i:_imp_nostr.index("\ndef ", _i)]
+    prova("sentinella: scarica_foto (import Nostr) chiama pulisci", True,
+          "pulisci(raw)" in codice(_scarica_foto_src))
+    prova("sentinella: il server inietta il ripulitore nell'import orario",
+          True, "pulisci=spoglia_metadati" in codice(_SORGENTE))
+    # ESEGUIBILE, non solo sentinella: scarica_foto VERA (estratta,
+    # come pezzo()/reale() fanno per server.py — mai una copia a mano
+    # che diverge), su un `pulisci` finto — la logica di spoglia_metadati
+    # e' gia' provata a fondo qui sopra, qui si prova solo il FILO che
+    # la collega a scarica_foto: il file salvato e' il RISULTATO di
+    # pulisci (mai il raw), e se pulisci si arrende NESSUN file tocca
+    # il disco — la stessa cintura della foto troppo grande.
+    import tempfile
+    _amb_sf = {"os": os, "FOTO_DIR": None, "MAX_FOTO_BYTES": 3_000_000}
+    exec(_scarica_foto_src, _amb_sf)
+    with tempfile.TemporaryDirectory() as _tmp:
+        _amb_sf["FOTO_DIR"] = _tmp
+        _nome = _amb_sf["scarica_foto"](
+            "https://esempio.tld/foto.jpg", 999, 0,
+            scarica=lambda url: (b"sporcoEXIF", "image/jpeg"),
+            pulisci=lambda raw: raw.replace(b"sporcoEXIF", b"pulito"))
+        prova("il file salvato e' il risultato di pulisci, non il raw",
+              b"pulito", open(os.path.join(_tmp, _nome), "rb").read())
+        _prima = set(os.listdir(_tmp))
+        _esito = _amb_sf["scarica_foto"](
+            "https://esempio.tld/sporca.jpg", 998, 0,
+            scarica=lambda url: (b"irriconoscibile", "image/jpeg"),
+            pulisci=lambda raw: None)
+        prova("pulisci che si arrende: nessun file scritto, resta l'URL",
+              (None, True), (_esito, set(os.listdir(_tmp)) == _prima))
     # il ripiego di tutte e tre e' la conversione, che spoglia perche'
     # RIDISEGNA: e lo fa solo finche' nessuno le passa gli exif
     prova("sentinella: converti_in_jpeg non si riporta dietro gli EXIF",
@@ -28012,8 +28129,11 @@ def prove_fogli_di_casa():
     # conto): il passaggio al profilo dell'account, per chi sul suo
     # dispositivo ne ha uno con una storia. Cambia l'identita' con cui
     # si pubblica: e' esattamente il genere di gesto che chiede.
-    prova("i gesti che passano dalla domanda unica sono cinquantaquattro",
-          54, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTACINQUE (14 set 2026, la pulizia retroattiva dei
+    # metadati): scrivere sul disco vero centinaia di foto e' un gesto
+    # che chiede, non un bottone che parte da solo.
+    prova("i gesti che passano dalla domanda unica sono cinquantacinque",
+          55, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo

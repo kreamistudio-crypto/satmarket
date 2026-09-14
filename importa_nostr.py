@@ -306,7 +306,8 @@ def in_sats(importo: float, valuta: str, cambio: dict):
     return None
 
 
-def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None):
+def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None,
+                 pulisci=None):
     """Scarica una foto esterna e la salva in foto/ con lo stesso
     schema nomi degli annunci normali (a{id}_{indice}.ext).
     Ritorna il nome del file locale, o None se qualcosa va storto.
@@ -315,7 +316,17 @@ def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None):
     ha le guardie anti-SSRF e ricontrolla ogni salto dei redirect.
     Vive li' e non qui per lo stesso motivo del `vaglio`. Senza —
     script lanciato a mano, con la npub fidata scritta nel config —
-    si scarica come si e' sempre fatto."""
+    si scarica come si e' sempre fatto.
+
+    `pulisci` e' `spoglia_metadati` del server (set 2026, la QUARTA
+    porta che il cantiere «niente GPS» aveva lasciato aperta): questa
+    era l'unica strada per cui una foto arrivava sul disco senza mai
+    passare da li', GPS compreso se il venditore Nostr lo portava. A
+    differenza di `normalizza_foto_import` (che serve la filiera del
+    CSV e forza sempre il JPEG) preserva il formato — qui l'estensione
+    la decide gia' il Content-Type, e deve restare quella vera. Se non
+    sa pulirla la foto NON si scrive in locale: resta l'URL, la stessa
+    cintura della foto troppo grande — mai un file sporco sul disco."""
     try:
         if scarica is not None:
             esito = scarica(url)
@@ -334,6 +345,13 @@ def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None):
                     print(f"    ⚠️  foto troppo grande, tengo l'URL: {url[:60]}")
                     return None
                 ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
+        if pulisci is not None:
+            pulito = pulisci(raw)
+            if pulito is None:
+                print(f"    ⚠️  foto non ripulibile dai metadati, tengo "
+                      f"l'URL: {url[:60]}")
+                return None
+            raw = pulito
         est = {"image/png": "png", "image/webp": "webp",
                "image/gif": "gif"}.get(ctype, "jpg")
         nome = f"a{annuncio_id}_{indice}.{est}"
@@ -371,7 +389,8 @@ def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None):
         return None
 
 
-def localizza_foto(annuncio_id: int, foto_json: str, scarica=None) -> str:
+def localizza_foto(annuncio_id: int, foto_json: str, scarica=None,
+                   pulisci=None) -> str:
     """Prende la lista foto (JSON) e scarica in locale gli URL esterni.
     Se un download fallisce, l'URL resta com'e' (meglio di niente)."""
     try:
@@ -383,7 +402,7 @@ def localizza_foto(annuncio_id: int, foto_json: str, scarica=None) -> str:
         if not isinstance(f, str) or not f.startswith("http"):
             nuove.append(f)                    # gia' un file locale
             continue
-        nome = scarica_foto(f, annuncio_id, i, scarica)
+        nome = scarica_foto(f, annuncio_id, i, scarica, pulisci)
         nuove.append(nome or f)
     return json.dumps(nuove) if nuove else ""
 
@@ -703,7 +722,7 @@ def e_riflesso(riga, pubkey: str) -> bool:
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
                       db: str = DB, vaglio=None, scarica=None,
-                      cambio=None):
+                      cambio=None, pulisci=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
     Ritorna la terna (importati, aggiornati, saltati).
@@ -731,6 +750,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     Un dizionario VUOTO passato apposta vuol dire «non ce l'ho»: gli
     annunci in EUR/USD si saltano e lo si dice, come quando falliva la
     lettura di qui.
+
+    `pulisci` e' `spoglia_metadati` del server — vedi il docstring di
+    `scarica_foto`, dove finisce per davvero. Senza (script a mano) le
+    foto scaricate portano i metadati che il venditore ci ha messo,
+    come sempre: la fiducia sta tutta nella npub scritta a mano nel
+    config, non in uno sconosciuto sui relay.
     """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
@@ -1111,7 +1136,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             if a["origine_foto"] and a["origine_foto"] == gia[2]:
                 foto_loc = gia[1]      # stesse foto: niente ri-download
             else:
-                foto_loc = localizza_foto(gia[0], a["foto"], scarica)
+                foto_loc = localizza_foto(gia[0], a["foto"], scarica, pulisci)
             con.execute(
                 "UPDATE annunci SET titolo=?, descrizione=?, zona=?, "
                 "foto=?, contatto_nostr=?, prezzo_sats=?, valuta=?, "
@@ -1152,7 +1177,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
              "revisione" if e.get("_revisione") else "attivo"))
         scrivi_commercio(con, cur.lastrowid, a["commercio"])
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
-        foto_loc = localizza_foto(cur.lastrowid, a["foto"], scarica)
+        foto_loc = localizza_foto(cur.lastrowid, a["foto"], scarica, pulisci)
         if foto_loc != a["foto"]:
             con.execute("UPDATE annunci SET foto=? WHERE id=?",
                         (foto_loc, cur.lastrowid))
