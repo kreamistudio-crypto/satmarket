@@ -37197,6 +37197,13 @@ def prove_p2p_libro():
         # che sta qui: si porta dentro quello VERO invece di stubbarlo,
         # o la prova certificherebbe una copia di cartone.
         "function ordineMioP2P(id){",
+        # IL BADGE DEL PREMIO non si scrive piu' dentro la card (set
+        # 2026, col ridisegno di «I miei scambi»): lo mostrano due
+        # elenchi, e la stessa frase scritta in due posti diverge al
+        # primo ritocco. Le due pure si portano dentro QUELLE VERE —
+        # i casi del badge qui sotto girano su di loro.
+        "function affareP2P(o){",
+        "function badgePremioP2P(o){",
         "function rigaOrdineP2P(o){",
         # il lettore puro e le lapidi (set 2026, il morto che risorge):
         # il primo gira sui casi della resurrezione, le seconde su un
@@ -37754,9 +37761,13 @@ console.log(JSON.stringify(out));
     # parole sono diventate l'UNICA cosa che lo dice, e sono chieste.
     # La decisione di allora non era sbagliata: e' cambiato cio' che
     # le stava accanto.
+    # ...e dal set 2026 si guardano DENTRO `badgePremioP2P`: il badge
+    # e' uscito dalla card perche' lo mostrano due elenchi (il libro e
+    # «I miei scambi»), e cercarlo in `mini` intero farebbe rispondere
+    # il vicino — la trappola di sempre.
     prova("le parole del verso sono le sole a dirlo", True,
-          "+ pr + '%</b> ' + (affare ? 'più' : 'meno') + ' conveniente'"
-          in mini)
+          "+ (a ? 'più' : 'meno') + ' conveniente</span>'"
+          in pezzo_js(mini, "function badgePremioP2P(o){", "\n}\n"))
     # ══ IL CARTELLINO DELL'AFFARE (set 2026, richiesta di Andrea) ══
     # oltre il 10% di convenienza PER CHI LEGGE, accanto alla riga del
     # premio compare un cartellino. Le soglie stanno in due costanti e
@@ -38383,6 +38394,9 @@ def prove_p2p_dettaglio():
         "function commissioneVivaP2P(){",
         "function commissioneListinoP2P(){",
         "function nettoLatoP2P(o, sats){",
+        # il conto del dettaglio tinge la percentuale del premio col
+        # giudizio, e dal set 2026 lo CHIAMA invece di ribatterlo
+        "function affareP2P(o){",
         "function premioTestoP2P(n){",
         "function contoDettP2P(o){",
         # ⚠️ IL TITOLO STA IN UNA FUNZIONE SUA e va portato dentro
@@ -38393,6 +38407,11 @@ def prove_p2p_dettaglio():
         "function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
         "function rigaLibroP2P(id){",
+        # ⚠️ IL CAPPELLO STA IN UNA FUNZIONE SUA dal set 2026 (la dice
+        # anche la prima riga delle card di «I miei scambi»), ed e' la
+        # stessa trappola dei DUE RITAGLI: senza questa riga il banco
+        # esplode su `fraseLatoP2P is not defined`.
+        "function fraseLatoP2P(o){",
         "function renderDettaglioP2P(){",
         "function apriDettaglioP2P(id){",
         "function confermaDettaglioP2P(){",
@@ -39238,9 +39257,24 @@ def prove_nav_p2p():
           and "transition:color .3s ease" in _ps
           and "body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}"
           in mini)
+    # ⚠️ QUESTA SENTINELLA CREDEVA A UNA COSA FALSA, e il ridisegno
+    # delle card di «I miei scambi» (set 2026) l'ha resa vera: contava
+    # DUE regole `.p2p-ord .p2p-sats{color` e ne concludeva «le altre
+    # case restano arancio» — ma la card di uno scambio e' anche lei
+    # una `.p2p-ord`, quindi i propri sats si vestivano del tab del
+    # LIBRO: rossi solo perche' l'ultima volta si era guardato «Vendi
+    # BTC». E' la famiglia delle prove che rispondono per il vicino —
+    # si contava il numero di regole invece del colore che ne esce.
+    # Adesso pretende anche il neutralizzatore, e che stia DOPO le due
+    # del libro: a parita' di specificita' vince chi e' scritto dopo,
+    # quindi l'ordine E' la regola.
     prova("...solo nel libro: le altre case restano arancio", True,
           "color:var(--sats-text)" in pezzo_js(mini, ".p2p-sats{", "}")
-          and mini.count(".p2p-ord .p2p-sats{color") == 2)
+          and mini.count(".p2p-ord .p2p-sats{color") == 2
+          and "body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text)"
+              in mini
+          and mini.index("body.p2p-vendo .p2p-ord .p2p-sats{")
+              < mini.index("body .p2p-ord.p2p-scambio .p2p-sats{"))
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
     prova("...nemmeno nel server: le rotte sono i tre della famiglia",
@@ -41073,6 +41107,22 @@ def prove_p2p_motore():
     js_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
                     mini.index("/* ---- export CSV degli affari conclusi")]
     js_motore = mini[i_cod:i_fine]
+    # LE PURE DELLA CARD DI UNO SCAMBIO vivono nel blocco del libro,
+    # cioe' FUORI dalla fetta del motore — e la card le chiama da
+    # quando ha quattro righe (set 2026). Si portano dentro QUELLE
+    # VERE: stubbarle vorrebbe dire certificare una copia di cartone,
+    # che e' il patto gia' scritto per `ordineMioP2P` nel banco del
+    # libro. Piu' il cambio SPENTO, che qui non deve uscire nessuna
+    # stima al mercato: i casi col cambio vivo girano nel banco della
+    # card, in prove_p2p_card_scambio.
+    js_pure = "let cambioVivo = false, eurPerSat = 0;\n" + "\n".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+            "function commissioneVivaP2P(){",
+            "function satsMercatoP2P(o){",
+            "function nettoLatoP2P(o, sats){",
+            "function fraseLatoP2P(o){",
+            "function affareP2P(o){",
+            "function badgePremioP2P(o){")) + "\n"
     banco = r"""
 const fs = require('fs'), vm = require('vm');
 vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
@@ -41232,7 +41282,7 @@ function tagValore(ev, n){
   const t = (ev.tags || []).filter(x => x[0] === n)[0];
   return t ? t[1] : '';
 }
-""" + js_mazzo + js_motore + r"""
+""" + js_pure + js_mazzo + js_motore + r"""
 /* ---- il banco ---- */
 /* IL DETTAGLIO-PAGINA vive nel blocco del libro, fuori dal motore: qui
    si presta, e i suoi casi veri girano in prove_p2p_dettaglio. Lo stub
@@ -42538,8 +42588,13 @@ def prove_p2p_chat():
     import subprocess as _sp
     import tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read()
+    # ⚠️ L'ANCORA DI CODA E' CAMBIATA col ridisegno delle card di «I
+    # miei scambi» (set 2026): il commento che chiudeva questo blocco
+    # («la riga di uno scambio nella lista») adesso ha un seguito, e
+    # fra lui e la chat sono nate le due pure della card. Il confine
+    # vero e' la PRIMA di loro — il blocco ritagliato resta identico.
     blocco = mini[mini.index("/* ---- I DUE RECAPITI CIFRATI"):
-                  mini.index("/* ---- la riga di uno scambio nella lista ---- */")]
+                  mini.index("/* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----")]
     cod = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
 
     # --- 1) LE ETICHETTE DELL'HKDF sono quelle del coordinatore ------
@@ -46355,6 +46410,277 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
           sp.count("console.log('\U0001F511 [p2p] profilo:"))
     prova("...e dice il codice quando il conto non risponde", True,
           "il conto non risponde: ' + r.status" in sp)
+
+
+def prove_p2p_card_scambio():
+    """LA CARD DI UNO SCAMBIO MIO, in quattro righe (set 2026,
+    ridisegno di Andrea): il LATO in cima — «Stai comprando sats» —,
+    sotto lo STATO, poi la cifra in euro e in fondo i sats col badge
+    del premio, con la formula e le tinte delle card del libro.
+
+    ⚠️ IL GIUDIZIO SI ROVESCIA rispetto al libro, ed e' la ragione per
+    cui questo banco esiste. Il premio e' a somma zero: lo stesso +4%
+    e' «meno conveniente» per chi compra sats e «piu' conveniente»
+    per chi li vende — e nel libro la card descrive l'ordine di UN
+    ALTRO (chi legge sta dall'altra parte), qui il PROPRIO. A tenere
+    insieme le due letture e' `comeLibroP2P`, che TRADUCE il lato
+    invece di duplicare le formule col segno girato: una seconda
+    formula si sarebbe scollata dalla prima al primo ritocco, e in
+    silenzio — un badge verde su un affare cattivo non rompe niente.
+
+    E il banco gira le funzioni VERE, badge compreso: la sola cosa di
+    cartone e' il cambio, che qui si accende e si spegne apposta."""
+    print("\n[la card di uno scambio mio]")
+    import json as _json
+    import re as _re
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    rs = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    # --- 1) IL LATO NON SI DICE PIU' IN FONDO ------------------------
+    # Era una riga grigia che metteva in fila tre cose diverse — il
+    # lato, lo stato e «tocca a te» — e per sapere da che parte si
+    # stava bisognava leggere in FONDO alla card.
+    prova("il lato non si dice piu' in fondo alla card", True,
+          "Compri" not in rs and "Vendi" not in rs
+          and "⬇️" not in rs and "⬆️" not in rs)
+    # ...e con lui esce `.p2p-testa`: la portava per l'euro e i sats
+    # affiancati, e con quattro righe non c'e' piu' niente da
+    # affiancare. Se ne va anche il suo `padding-right:28px`, che
+    # teneva il posto a un anello di scadenza che qui non c'e' mai
+    # stato.
+    prova("...e con lui la testa a due colonne", False, "p2p-testa" in rs)
+    prova("le quattro righe stanno in quest'ordine", True,
+          rs.index("p2p-scambio-lato") < rs.index("p2p-scambio-stato")
+          < rs.index("p2p-scambio-euro") < rs.index("p2p-scambio-riga"))
+    # IL PIEDE SI SCRIVE SOLO SE HA QUALCOSA DENTRO: «tocca a te» e la
+    # ✕ non possono coesistere, quindi li' dentro c'e' al massimo UNA
+    # cosa — e una `.p2p-meta` vuota lascerebbe un respiro che non
+    # separa niente.
+    prova("il piede non si scrive quando non ha niente da dire", True,
+          "(agire || via ? '<div class=\"p2p-meta\">'" in rs)
+
+    # --- 2) UN POSTO SOLO PER IL BADGE E PER LA FRASE ----------------
+    # Due elenchi dicono le stesse cose, e due stesure della stessa
+    # frase divergono al primo ritocco (il precedente dei tre logo).
+    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    rd = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("il badge del premio lo chiamano tutt'e due gli elenchi", True,
+          "badgePremioP2P(" in riga and "badgePremioP2P(" in rs)
+    prova("la frase del lato la chiamano la card e il cappello", True,
+          "fraseLatoP2P(" in rs and "fraseLatoP2P(o)" in rd)
+    # ⚠️ SI CONTANO FRAMMENTI CHE SOLO IL CODICE PUO' CONTENERE, e non
+    # le parole nel sorgente ripulito dai commenti. Due ragioni, e la
+    # seconda e' un difetto misurato: i commenti CITANO le stesure
+    # vecchie del badge («piu' caro», «sopra il mercato») — la storia
+    # vale piu' di una prova comoda —, e lo spogliatoio dei commenti
+    # ha un BUCO che questa prova ha scoperto: `accept="image/*,.heic"`
+    # apre un finto commento JS che si mangia sessantamila caratteri
+    # di markup, il segnaposto del titolo compreso. Aggiustare lo
+    # spogliatoio vorrebbe dire toccare una decina di sentinelle
+    # altrui; un frammento con le sue virgolette e il suo `+` in un
+    # commento non ci finisce mai.
+    prova("...e la parola del badge si scrive in un posto solo", 1,
+          mini.count("' conveniente</span>'"))
+    prova("...e cosi' la frase del lato", 1,
+          mini.count("comprando' : 'vendendo'"))
+    # IL GIUDICE ERA IN TRE COPIE fino al set 2026 — le due card e il
+    # conto del dettaglio — e tre copie di un giudizio si scollano
+    # senza rompere niente: un verde su un affare cattivo non fa
+    # fallire nessuna prova, lo legge solo chi sta per decidere.
+    prova("il giudice dell'affare e' uno per tutti", 1,
+          mini.count("(o.lato === 'buy') === (o.premium > 0)"))
+    prova("...e il conto del dettaglio lo chiama", True,
+          "const affare = affareP2P(o);"
+          in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
+
+    # --- 3) IL VESTITO ----------------------------------------------
+    for sel in (".p2p-scambio-lato{", ".p2p-scambio-stato{",
+                ".p2p-scambio-euro{", ".p2p-scambio-riga{"):
+        prova("il CSS della card porta %s" % sel.strip("{."), True,
+              sel in mini)
+    prova("i sats e il badge vanno a capo insieme, allineati alla riga",
+          True, "flex-wrap:wrap" in pezzo_js(mini, "  .p2p-scambio-riga{", "}")
+          and "align-items:baseline"
+              in pezzo_js(mini, "  .p2p-scambio-riga{", "}"))
+    prova("...e il badge non porta il suo respiro dentro la riga", True,
+          ".p2p-scambio-riga .p2p-badge{margin-top:0}" in mini)
+    # SU UN INTERVALLO LA CIFRA E' LUNGA («≈ 74 029–148 058 sats») e il
+    # `nowrap` di `.p2p-sats` allargherebbe la PAGINA invece di andare
+    # a capo: e' il mestiere che nel libro fa `.p2p-piccola`.
+    prova("la cifra di uno scambio puo' andare a capo", True,
+          "white-space:normal"
+          in pezzo_js(mini, "  body .p2p-ord.p2p-scambio .p2p-sats{", "}"))
+
+    # --- 4) IL BANCO: le funzioni vere, il cambio di cartone ---------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della card di uno scambio", "node non c'e'")
+        return
+    pezzi = [mini[mini.index("const fmt = n =>"):
+                  mini.index("\n", mini.index("const fmt = n =>"))],
+             mini[mini.index("const esc = s =>"):
+                  mini.index(";\n", mini.index("const esc = s =>")) + 1],
+             mini[mini.index("const fmtEur = e =>"):
+                  mini.index(";\n", mini.index("const fmtEur = e =>")) + 1],
+             mini[mini.index("const P2P_FINALI = "):
+                  mini.index("\n", mini.index("const P2P_FINALI = "))],
+             mini[mini.index("const P2P_ORIZZONTE_S = "):
+                  mini.index("\n", mini.index("const P2P_ORIZZONTE_S = "))],
+             mini[mini.index("const STATI_P2P = {"):
+                  mini.index("\n};", mini.index("const STATI_P2P = {")) + 3]]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function commissioneVivaP2P(){",
+        "function satsMercatoP2P(o){",
+        "function nettoLatoP2P(o, sats){",
+        "function fraseLatoP2P(o){",
+        "function affareP2P(o){",
+        "function badgePremioP2P(o){",
+        "function statoTestoP2P(o){",
+        "function azioniDisponibili(o){",
+        "function p2pTogliibile(o, adesso){",
+        "function euroTestoP2P(o){",
+        "function comeLibroP2P(o){",
+        "function satsScambioP2P(o){",
+        "function rigaScambioP2P(o){")]
+    banco = "\n".join(pezzi) + r"""
+/* il cambio e la commissione sono le SOLE cose di cartone: si
+   accendono e si spengono per esercitare i rami, e tutto il resto —
+   badge, giudice, traduzione del lato — e' il codice vero */
+let cambioVivo = true, eurPerSat = 0.001;
+let p2pInfo = {fee: 0.02};
+const riga = (o) => Object.assign({
+  id: 'ord-1', lato: 'compro', stato: 'pubblicato', euro: 5, euroMax: 0,
+  sats: 0, satsNetti: 0, premium: 0, creato: 1000, metodi: ['SEPA']}, o);
+const out = {};
+out.compro = rigaScambioP2P(riga({}));
+out.vendo = rigaScambioP2P(riga({lato: 'vendo'}));
+/* IL ROVESCIAMENTO, i quattro casi che contano: lo stesso premio
+   giudicato dai due lati, nei due versi */
+out.comproSopra = rigaScambioP2P(riga({premium: 4}));
+out.vendoSopra = rigaScambioP2P(riga({lato: 'vendo', premium: 4}));
+out.comproSotto = rigaScambioP2P(riga({premium: -4}));
+out.vendoSotto = rigaScambioP2P(riga({lato: 'vendo', premium: -4}));
+/* e la traduzione, guardata da sola */
+out.tradotto = [comeLibroP2P(riga({})).lato,
+                comeLibroP2P(riga({lato: 'vendo'})).lato];
+/* a premio zero la frase c'e' lo stesso: «nessun badge» lascerebbe la
+   card muta proprio sul caso piu' comune */
+out.zeroParla = out.compro.indexOf('al prezzo di mercato') >= 0;
+/* A PREZZO FISSO niente badge — quel prezzo il mercato non lo guarda —
+   MA i sats ci sono lo stesso: e' la richiesta di Andrea, la cifra in
+   sats non sparisce mai da questa card */
+out.fisso = rigaScambioP2P(riga({sats: 12000}));
+out.fissoSats = satsScambioP2P(riga({sats: 12000}));
+/* quel che ha detto il coordinatore vince su tutto */
+out.detto = rigaScambioP2P(riga({sats: 12000, satsNetti: 9999}));
+out.dettoSats = satsScambioP2P(riga({sats: 12000, satsNetti: 9999}));
+/* a cambio muto nessun numero, e il badge resta */
+cambioVivo = false;
+out.muto = rigaScambioP2P(riga({premium: 4}));
+cambioVivo = true;
+/* l'intervallo porta i due capi di qua e di la' */
+out.range = rigaScambioP2P(riga({euro: 50, euroMax: 100}));
+/* il piede: «tocca a te» sugli stati vivi, la ✕ sui finali, mai
+   insieme — e senza nessuna delle due la riga non si scrive */
+out.tocca = rigaScambioP2P(riga({stato: 'attesa_mia_fattura'}));
+out.finale = rigaScambioP2P(riga({stato: 'annullato'}));
+out.nudo = out.compro.indexOf('p2p-meta') < 0;
+/* LA COERENZA TESTO↔TINTA su tutte le combinazioni: mai un verde che
+   dice «meno», mai un rosso che dice «piu'» */
+const storte = [];
+for (const lato of ['compro', 'vendo'])
+  for (const pm of [-9, -4, -1, 1, 4, 9]) {
+    const h = rigaScambioP2P(riga({lato: lato, premium: pm}));
+    const verde = h.indexOf('p2p-affare') >= 0;
+    const piu = h.indexOf('</b> più conveniente') >= 0;
+    if (verde !== piu) storte.push(lato + ' ' + pm);
+  }
+out.storte = storte;
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    import os as _os
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node della card gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _json.loads(r.stdout)
+
+    # LA PRIMA RIGA DICE DA CHE PARTE STAI, in seconda persona: e' la
+    # stessa frase del cappello del dettaglio del libro.
+    prova("la prima riga dice il lato, in seconda persona", [True, True],
+          ['<div class="p2p-scambio-lato">Stai comprando sats</div>'
+           in o["compro"],
+           '<div class="p2p-scambio-lato">Stai vendendo sats</div>'
+           in o["vendo"]])
+    prova("...e la seconda lo stato", True,
+          '<div class="p2p-scambio-stato">Ordine pubblicato</div>'
+          in o["compro"])
+    prova("...e la terza la cifra in euro", True,
+          '<div class="p2p-scambio-euro p2p-euro">5,00 €</div>'
+          in o["compro"])
+    prova("...e la quarta i sats, col «per» che li lega alla riga sopra",
+          True,
+          '<span class="p2p-verbo">per </span>' in o["compro"]
+          and "sats</span>" in o["compro"])
+
+    # ⚠️ IL ROVESCIAMENTO, ed e' il cuore di questo banco: lo stesso
+    # +4% e' un affare per chi VENDE sats (ne consegna meno) e una
+    # bastonata per chi li COMPRA (ne riceve meno) — e sulla card del
+    # libro, dove chi legge sta dall'altra parte, i due casi sono
+    # scambiati. Il giudice e' lo stesso: cambia da che parte lo si
+    # guarda, e a dirlo e' `comeLibroP2P`.
+    prova("la riga propria si traduce nel vocabolario del libro",
+          ["sell", "buy"], o["tradotto"])
+    prova("col premio sopra, chi COMPRA sats ci perde", True,
+          '<b class="p2p-avviso">4%</b> meno conveniente' in o["comproSopra"])
+    prova("...e chi li VENDE ci guadagna", True,
+          '<b class="p2p-affare">4%</b> più conveniente' in o["vendoSopra"])
+    prova("col premio sotto si rovescia", [True, True],
+          ['<b class="p2p-affare">4%</b> più conveniente' in o["comproSotto"],
+           '<b class="p2p-avviso">4%</b> meno conveniente' in o["vendoSotto"]])
+    prova("nessuna card ha la tinta di un verso e le parole dell'altro",
+          [], o["storte"])
+    prova("a premio zero la frase c'e' lo stesso", True, o["zeroParla"])
+
+    # A PREZZO FISSO il badge non c'e' — quel prezzo il mercato non lo
+    # guarda — ma i sats restano: e' la richiesta di Andrea, la cifra
+    # non sparisce mai da questa card.
+    # ⚠️ E LA CIFRA E' IL NETTO, non l'importo nudo: 12.000 meno la
+    # meta' della commissione fa 11.880, ed e' la stessa cifra che il
+    # libro chiama «Ricevi» — e il ≈ ci va proprio perche' la
+    # commissione l'ha toccata. Una prova che cercasse «12» qui
+    # sarebbe verde su un numero che nessuno vede.
+    prova("a prezzo fisso niente badge, ma i sats restano", True,
+          "p2p-badge" not in o["fisso"]
+          and "al prezzo di mercato" not in o["fisso"]
+          and o["fissoSats"] == "≈ 11 880 sats")
+    prova("quel che ha detto il coordinatore vince sull'importo fisso",
+          # ⚠️ «9999» SENZA PUNTO, e non e' un refuso: l'italiano
+          # raggruppa solo da cinque cifre in su (minimumGroupingDigits
+          # = 2), quindi `fmt` scrive 9999 e 11 880 — ed e' lo stesso
+          # numero che vede chi guarda la card.
+          "9999 sats", o["dettoSats"])
+    # A CAMBIO MUTO NESSUN NUMERO, mai uno inventato — e il badge
+    # resta, che del cambio non ha bisogno.
+    prova("a cambio muto niente cifra, e il badge resta", True,
+          "sats</span>" not in o["muto"]
+          and "meno conveniente" in o["muto"])
+    prova("l'intervallo porta i due capi di qua e di la'", True,
+          "50,00–100,00 €" in o["range"]
+          and o["range"].count("–") >= 2)
+
+    prova("«tocca a te» sugli stati vivi, e da solo", True,
+          "tocca a te" in o["tocca"] and "order-x" not in o["tocca"])
+    prova("...la ✕ sui finali, e da sola", True,
+          "order-x" in o["finale"] and "tocca a te" not in o["finale"])
+    prova("...e senza nessuna delle due il piede non si scrive", True,
+          o["nudo"])
 
 
 def prove_p2p_campanello():
@@ -54913,6 +55239,7 @@ def main():
     prove_timbro_asset,
     prove_volti_libro,
     prove_p2p_chiavi,
+    prove_p2p_card_scambio,
     prove_p2p_campanello,
     prove_p2p_motore,
     prove_p2p_stati,

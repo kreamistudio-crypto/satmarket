@@ -2213,6 +2213,44 @@
   .p2p-affarone.super{background:linear-gradient(90deg,
       var(--trust), var(--oro,#E0A82E));
     box-shadow:0 0 10px rgba(224,168,46,.45)}
+  /* ══ LA CARD DI UNO SCAMBIO MIO, in quattro righe (set 2026,
+     ridisegno di Andrea) ══
+     Il LATO in cima, sotto lo STATO, poi la cifra in euro e in fondo i
+     sats col badge del premio. Le quattro righe e il perche' stanno in
+     `rigaScambioP2P`; qui c'e' solo come si vestono.
+     IN QUESTA CASA NON C'E' PIU' `.p2p-testa`, e con lei se ne va il
+     suo `padding-right:28px`: teneva il posto all'anello di scadenza,
+     che di case ne ha una sola — il libro. */
+  .p2p-scambio-lato{font-family:'Baloo 2',sans-serif;font-weight:800;
+    font-size:17px;color:var(--ink)}
+  .p2p-scambio-stato{margin-top:1px;font-size:12.5px;font-weight:700;
+    color:var(--muted)}
+  .p2p-scambio-euro{margin-top:6px}
+  /* i sats e il badge sulla stessa riga, e a capo insieme quando non
+     ci stanno: `baseline` perche' i due pezzi hanno caratteri e taglie
+     diverse, e ad allinearli dev'essere la riga di scrittura invece
+     della scatola */
+  .p2p-scambio-riga{display:flex;flex-wrap:wrap;align-items:baseline;
+    gap:2px 8px;margin-top:2px}
+  .p2p-scambio-riga .p2p-badge{margin-top:0}
+  /* ⚠️ QUI LA CIFRA NON VESTE IL TAB DEL LIBRO, e questa riga RIMETTE
+     IN PIEDI una promessa gia' scritta: il commento di
+     `.p2p-ord .p2p-sats` dice «solo nel libro: nelle altre case la
+     cifra resta arancio», e c'e' perfino una sentinella che si chiama
+     cosi' — ma la card di uno scambio E' una `.p2p-ord`, quindi fin
+     qui i propri sats si vestivano del tab del LIBRO: diventavano
+     rossi solo perche' l'ultima volta si era guardato «Vendi BTC».
+     Un rosso che non dice niente, nel posto dove il rosso e'
+     l'allarme.
+     IL `body` IN TESTA NON E' DECORAZIONE: pareggia la specificita' di
+     `body.p2p-vendo .p2p-ord .p2p-sats` (tre classi piu' un elemento),
+     e questa riga sta DOPO, quindi vince. Senza, il rosso resterebbe.
+     E `white-space:normal` perche' su un intervallo la cifra e' lunga
+     («≈ 74 029–148 058 sats») e il `nowrap` di `.p2p-sats`
+     allargherebbe la PAGINA invece di andare a capo — lo stesso
+     mestiere che nel libro fa `.p2p-piccola`. */
+  body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text);
+    white-space:normal}
   /* la coppia gemella nel conto scorporato vive nel CSS del conto,
      dopo `.ctrl-nota`: la percentuale del premio sta DENTRO quella
      nota, e a parita' di specificita' vince chi e' scritto dopo —
@@ -2291,16 +2329,19 @@
   .p2p-ico.p2p-ico-mini{width:12px;height:12px;vertical-align:-1.5px}
   /* la ✕ a destra: la riga meta e' un flex che va a capo, quindi
      l'auto-margine la spinge in fondo alla SUA riga.
-     MA COL CONTENUTO VERO QUEL CAPO NON ARRIVA MAI, ed e' misurato e
-     non dedotto: il caso peggiore sono DUE span e non tre, perche'
-     «tocca a te» esce da azioniDisponibili(), che tace su tutti gli
-     stati finali — cioe' esattamente quelli su cui la ✕ compare, e
-     le due cose non possono coesistere. A 320px con lo stato piu'
-     lungo («Scambio annullato») la ✕ resta IN RIGA con gli span, a
-     31px dal bordo destro (identico a 360 e 375: l'auto-margine fa il
-     suo mestiere). Il suo costo sono +3.8px di card, perche' il
-     bottone e' piu' alto del testo — non perche' scende.
-     Chi aggiunge un terzo span a questa riga RIMISURI a 320. */
+     ⚠️ E DAL RIDISEGNO DELLE QUATTRO RIGHE LI' DENTRO C'E' UNA COSA
+     SOLA: il lato se n'e' andato e lo stato e' salito in seconda
+     riga, quindi restano «👉 tocca a te» OPPURE la ✕ — e le due non
+     possono coesistere, perche' «tocca a te» esce da
+     azioniDisponibili(), che tace su tutti gli stati finali, cioe'
+     esattamente quelli su cui la ✕ compare. La misura di prima (caso
+     peggiore DUE span, la ✕ in riga a 31px dal bordo a 320, 360 e
+     375) valeva per una riga piu' affollata di questa, quindi non
+     morde piu': chi un domani ci rimette un secondo pezzo RIMISURI
+     a 320.
+     E LA RIGA NON SI SCRIVE AFFATTO quando non c'e' nessuna delle
+     due: `.p2p-meta` vuota lascerebbe un respiro che non separa
+     niente. */
   .p2p-x{margin-left:auto}
   #view-p2p .btn{margin-top:14px}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
@@ -35456,6 +35497,43 @@ function renderP2PInfo(){
   }
 }
 
+/* ---- I TRE GIUDIZI CHE I DUE ELENCHI SI DIVIDONO ----
+   Il libro e «I miei scambi» dicono le stesse tre cose — da che parte
+   stai, quanto pende il premio e con che parole — e fin qui le sapeva
+   dire solo il libro. Da adesso stanno qui, PURE, e le due card le
+   chiamano: due stesure della stessa frase, in un elenco che si
+   scorre, divergono al primo ritocco (il precedente dei tre logo).
+   ⚠️ VOGLIONO IL LATO NEL VOCABOLARIO DEL LIBRO — 'buy'/'sell' —, e la
+   riga di uno scambio proprio dice 'compro'/'vendo': a tradurre e'
+   `comeLibroP2P`, che sta accanto a chi la usa. */
+function fraseLatoP2P(o){
+  return 'Stai ' + (o.lato === 'sell' ? 'comprando' : 'vendendo') + ' sats';
+}
+/* IL GIUDICE DELL'AFFARE, uno per tutti: la formula uniforme di
+   get_market_quote verificata sui byte (`sats -= premium/100 * sats`),
+   per cui un premio positivo assottiglia SEMPRE i sats — chi compra ne
+   riceve meno, chi vende ne consegna meno. */
+function affareP2P(o){
+  return (o.lato === 'buy') === (o.premium > 0);
+}
+/* IL BADGE DEL PREMIO, in un posto solo: il SOLO premio del venditore,
+   mai la commissione (uguale per tutti), perche' il suo mestiere e'
+   CONFRONTARE le offerte fra loro. Il testo dice l'EFFETTO su chi
+   legge e la tinta esce dallo stesso giudice, quindi un badge verde
+   dice sempre «piu'» e uno rosso sempre «meno».
+   Le quattro stesure e il perche' di quest'ultima stanno nella card
+   del libro, dove il badge e' nato, e in CANTIERI («Il badge del
+   premio, e le sue quattro stesure»). */
+function badgePremioP2P(o){
+  if (o.sats > 0) return '';
+  const pr = Math.abs(Math.round(o.premium || 0));
+  if (!pr) return '<span class="p2p-badge">al prezzo di mercato</span>';
+  const a = affareP2P(o);
+  return '<span class="p2p-badge"><b class="'
+    + (a ? 'p2p-affare' : 'p2p-avviso') + '">' + pr + '%</b> '
+    + (a ? 'più' : 'meno') + ' conveniente</span>';
+}
+
 /* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
    c'e' dall'altra parte. La cifra PRIMA e la persona ULTIMA — in un
    libro si scorre per prezzo, e la reputazione in cima metterebbe uno
@@ -35563,16 +35641,16 @@ function rigaOrdineP2P(o){
      get_market_quote verificata sui byte, per cui un premio
      positivo assottiglia sempre i sats — chi COMPRA ne riceve meno
      (meno conveniente), chi VENDE ne consegna meno (piu'
-     conveniente). */
-  const affare = (o.lato === 'buy') === (o.premium > 0);
+     conveniente).
+     ⚠️ E DAL SET 2026 IL BADGE NON SI SCRIVE PIU' QUI: le sue tre
+     righe sono diventate `badgePremioP2P`, perche' da oggi lo mostra
+     anche la card di uno scambio proprio — e la stessa frase scritta
+     in due elenchi diverge al primo ritocco. Qui resta la STORIA,
+     che e' di questa card: il badge e' nato al posto della riga del
+     prezzo, quando la cifra e' diventata il netto di tutto. */
+  const affare = affareP2P(o);
   const pr = Math.abs(Math.round(o.premium || 0));
-  const badge = o.sats > 0 ? ''
-    : '<span class="p2p-badge">'
-      + (pr
-        ? '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-          + pr + '%</b> ' + (affare ? 'più' : 'meno') + ' conveniente'
-        : 'al prezzo di mercato')
-      + '</span>';
+  const badge = badgePremioP2P(o);
   /* ---- IL CARTELLINO DELL'AFFARE (set 2026, richiesta di Andrea) ----
      Quando la convenienza PER CHI LEGGE passa il 10%, accanto alla
      riga del premio compare un cartellino: «Ottimo affare» da 10 a
@@ -38954,8 +39032,13 @@ function contoDettP2P(o){
                     compro ? '−' : '+')
     : num('0 sats');
   /* il premio c'e' solo quando pende: una riga a zero direbbe «niente
-     premio», che non e' un'informazione (la regola dello sconto) */
-  const affare = (o.lato === 'buy') === (o.premium > 0);
+     premio», che non e' un'informazione (la regola dello sconto).
+     ⚠️ E IL GIUDIZIO NON SI RIBATTE QUI: era la TERZA copia della
+     stessa riga — card del libro, card di uno scambio e questo conto
+     — e tre copie di un giudizio si scollano senza rompere niente:
+     un verde su un affare cattivo non fa fallire nessuna prova, lo
+     legge solo chi sta per decidere. */
+  const affare = affareP2P(o);
   /* LA PERCENTUALE STA NELL'ETICHETTA, attaccata al nome della voce
      (11 set 2026, ritocco di Andrea): «Premio al venditore +4%» /
      «Sconto del venditore −2%», e a destra i soli sats — il posto
@@ -39144,8 +39227,11 @@ function renderDettaglioP2P(){
      dice cosa si sta facendo non se ne va piu' scorrendo verso i
      bottoni. Il vecchio titolo, «Dettaglio ordine di acquisto»,
      nominava la PAGINA invece del fatto: chi la guarda vede gia' che
-     e' un dettaglio, perche' ce l'ha davanti. */
-  if (tit) tit.textContent = 'Stai ' + (compro ? 'comprando' : 'vendendo') + ' sats';
+     e' un dettaglio, perche' ce l'ha davanti.
+     E LA FRASE NON SI SCRIVE PIU' QUI: e' `fraseLatoP2P`, perche' la
+     dice anche la prima riga delle card di «I miei scambi» — e due
+     stesure della stessa frase prima o poi dicono due cose. */
+  if (tit) tit.textContent = fraseLatoP2P(o);
   /* la riga che DICE PERCHE' il bottone e' spento: un bottone morto
      senza una ragione visibile e' il vicolo cieco muto (la lezione del
      foglio Pubblica). Le parentesi non sono decorazione: `||` lega
@@ -41036,22 +41122,85 @@ async function inviaDisputaP2P(){
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
-/* ---- la riga di uno scambio nella lista ---- */
+/* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----
+   Le due liste dicono il lato con parole diverse E dal lato opposto:
+   nel libro `sell` e' l'ordine di CHI VENDE sats, cioe' chi legge
+   COMPRA; qui chi legge e' il titolare dell'ordine, e la sua riga dice
+   'compro'. Quindi 'compro' ↦ 'sell': in tutt'e due i casi chi legge
+   riceve sats, ed e' quel che le formule del libro guardano.
+   ⚠️ E IL GIUDIZIO SI ROVESCIA, che non e' un difetto ma la cosa
+   stessa: il premio e' a somma zero, quindi lo stesso +4% e' un
+   affare per uno e una bastonata per l'altro. Sul MIO ordine di
+   acquisto mi fa ricevere meno sats («meno conveniente»), mentre a
+   chi lo prende — che vende — ne fa consegnare meno («piu'
+   conveniente»). Il giudice resta UNO: cambia da che parte lo si
+   guarda, e a dirlo e' questa traduzione invece di una seconda
+   formula col segno girato.
+   PURA: copia, non muta. */
+function comeLibroP2P(o){
+  return {lato: o.lato === 'compro' ? 'sell' : 'buy',
+          euro: o.euro, euroMax: o.euroMax || 0,
+          sats: o.sats || 0, premium: o.premium || 0};
+}
+/* PURA: i sats di uno scambio mio, in tre casi per ordine di VERITA'.
+   Quel che ha detto il coordinatore vince su tutto (`satsNetti`: e'
+   l'importo vero di QUESTO scambio); poi l'importo fisso dichiarato;
+   e quando non c'e' ne' l'uno ne' l'altro — un ordine a prezzo di
+   mercato ancora nel libro — la stima di adesso, con la STESSA catena
+   della card del libro (satsMercatoP2P + nettoLatoP2P), che due stime
+   diverse dello stesso ordine sono la bugia piu' facile da scrivere e
+   la piu' difficile da notare. Coi due capi, su un intervallo.
+   ⚠️ A CAMBIO MUTO NON ESCE NESSUN NUMERO: stringa vuota, e la riga
+   resta col solo badge. Mai un numero inventato — la regola dei
+   giorni del riquadro reputazione. */
+function satsScambioP2P(o){
+  const l = comeLibroP2P(o);
+  if (o.satsNetti > 0) return fmt(o.satsNetti) + ' sats';
+  if (l.sats > 0) {
+    const n = nettoLatoP2P(l, l.sats);
+    return (n === l.sats ? '' : '≈ ') + fmt(n) + ' sats';
+  }
+  const da = nettoLatoP2P(l, satsMercatoP2P(l));
+  if (!(da > 0)) return '';
+  const a = l.euroMax
+    ? nettoLatoP2P(l, satsMercatoP2P({euro: l.euroMax, premium: l.premium}))
+    : 0;
+  return '≈ ' + fmt(da) + (a ? '–' + fmt(a) : '') + ' sats';
+}
+/* ---- la riga di uno scambio nella lista ----
+   QUATTRO RIGHE (set 2026, ridisegno di Andrea): il LATO in cima —
+   «Stai comprando sats», la stessa frase del cappello del dettaglio
+   del libro —, sotto lo STATO, poi la cifra in euro e in fondo i sats
+   col badge del premio, con la formula e le tinte del libro.
+   Prima erano due righe strette (euro a sinistra, sats a destra) e una
+   riga grigia che metteva in fila tre cose diverse: il lato, lo stato
+   e «tocca a te». Per sapere da che parte si stava bisognava leggere
+   in FONDO, e lo stato — che e' la ragione per cui uno apre questa
+   pagina — stava in mezzo a due vicini che non c'entrano.
+   IL PIEDE SI SCRIVE SOLO SE HA QUALCOSA DENTRO: «tocca a te» e la ✕
+   non possono coesistere (l'uno vive sugli stati vivi, l'altra sui
+   finali), quindi li' dentro c'e' al massimo UNA cosa — e una riga
+   vuota lascerebbe un respiro che non separa niente. */
 function rigaScambioP2P(o){
   const st = statoTestoP2P(o);
-  const cifra = o.satsNetti > 0 ? fmt(o.satsNetti) + ' sats'
-              : o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
+  const l = comeLibroP2P(o);
+  const sats = satsScambioP2P(o);
   const agire = azioniDisponibili(o) ? '<span>👉 tocca a te</span>' : '';
-  return '<div class="p2p-ord" role="button" tabindex="0" data-id="' + esc(o.id) + '" ' +
-    'onclick="apriOrdineP2P(this.dataset.id)">' +
-    '<div class="p2p-testa"><span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>' +
-    '<span class="p2p-sats">' + esc(cifra) + '</span></div>' +
-    '<div class="p2p-meta"><span>' + (o.lato === 'compro' ? '⬇️ Compri' : '⬆️ Vendi') + '</span>' +
-    '<span>' + esc(st.t) + '</span>' + agire +
-    (p2pTogliibile(o).si
-      ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" ' +
-        'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
-      : '') + '</div></div>';
+  const via = p2pTogliibile(o).si
+    ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
+      + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
+    : '';
+  return '<div class="p2p-ord p2p-scambio" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
+    + 'onclick="apriOrdineP2P(this.dataset.id)">'
+    + '<div class="p2p-scambio-lato">' + esc(fraseLatoP2P(l)) + '</div>'
+    + '<div class="p2p-scambio-stato">' + esc(st.t) + '</div>'
+    + '<div class="p2p-scambio-euro p2p-euro">' + esc(euroTestoP2P(o)) + '</div>'
+    + '<div class="p2p-scambio-riga">'
+    + (sats ? '<span class="p2p-sats"><span class="p2p-verbo">per </span>'
+              + esc(sats) + '</span>' : '')
+    + badgePremioP2P(l) + '</div>'
+    + (agire || via ? '<div class="p2p-meta">' + agire + via + '</div>' : '')
+    + '</div>';
 }
 
 /* ---- LA VIA DI RISERVA: lo stato PUBBLICO dei propri scambi ----
