@@ -23988,6 +23988,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `statoPubblicoOrdini`, col velo ritardato delle letture); il
   «dimentica» no, e resta il più severo dei due. Verbale in CANTIERI,
   «UN'OFFERTA NON È UNO SCAMBIO».
+  ⚠️ E OGNI RIGA DELLA RESTORE DICE DI QUALE IDENTITÀ È (14 set 2026):
+  da quando le domande sono due, `p2pMieiOrdini` mescola gli ordini di
+  due mazzi, e chi ne deriva le trade key ne userebbe uno solo.
+  `unaRestoreP2P` timbra `identita` (la PUBKEY, mai il segreto);
+  `adottaOrdiniAltroveP2P` non ricostruisce le righe che questo mazzo
+  non sa firmare — restano MIE, la card le marca, ma una riga che
+  promette un ritiro che non partirebbe non nasce — e RIPARA quelle
+  scritte con la chiave storta quando l'identità è la mia (le finite
+  no). Il conteggio dell'avviso del passaggio guarda la DERIVAZIONE e
+  non un campo (`rigaDiQuestoMazzoP2P`): la trade key di una riga si
+  rifà dal segreto del mazzo e dall'indice, e se torna uguale è sua.
+  Verbale in CANTIERI, «LE DUE RESTORE MESCOLANO DUE IDENTITÀ».
 
 - IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026): la PAGINA che si
   apre toccando una card, in tutt'e due i tab. Prima era un foglietto

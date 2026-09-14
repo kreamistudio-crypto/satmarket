@@ -11117,3 +11117,54 @@ la frase restava nel sorgente — mutazione VIVA, sentinella verde. Si
 inchioda il GATE, non il testo: `+ (offerte ? '`, e la riga che quel
 numero lo calcola. È la terza volta che la tortura trova una guardia che
 guardava la prosa invece del programma.
+
+LE DUE RESTORE MESCOLANO DUE IDENTITÀ (14 set 2026, il terzo giro del
+giorno — e una regressione del giro di ieri, trovata da Andrea).
+IL SINTOMO SEMBRAVA UN CONTEGGIO: l'avviso della conferma diceva «Hai 7
+ordini ancora nel libro: dopo il passaggio non potrai più ritirarli da
+qui», e **nessuno dei sette era del profilo che stava per andare sulla
+mensola**. Erano dell'identità del CONTO — quelli che dal telefono si
+ritirano davvero — cioè esattamente quelli che dopo il passaggio
+restano ritirabili, anzi gli unici. Un avviso che spaventa per la
+ragione opposta a quella vera.
+MA LA DIAGNOSI È PIÙ LARGA, ed è mia di ieri: da quando le domande sono
+DUE, `p2pMieiOrdini` mescola gli ordini di due mazzi — e
+`adottaOrdiniAltroveP2P` le trade key le deriva da UNO solo, il mazzo
+vivo. Quindi sul PC le righe dell'identità del conto nascevano con le
+chiavi del profilo di dispositivo: **righe che sembrano governabili e
+non lo sono**, perché il ritiro parte firmato da una chiave che
+quell'ordine non ha mai visto. È anche la spiegazione del «non riesco
+più ad annullare» che ci portavamo dietro: le stesse righe, dal telefono
+si ritirano e dal PC no.
+LA CURA HA TRE PEZZI, e il primo li regge tutti. 1) OGNI RIGA DELLA
+RESTORE PORTA L'IDENTITÀ CHE L'HA AVUTA IN RISPOSTA (`unaRestoreP2P`
+timbra `identita`): è la PUBKEY e mai il segreto — quella lista vive in
+memoria, e un segreto lì dentro sarebbe un segreto in più da custodire.
+2) L'ADOZIONE NON RICOSTRUISCE QUEL CHE QUESTO MAZZO NON SA FIRMARE: un
+ordine dell'altra identità resta MIO — la card lo marca e il tocco lo
+dice («da questo dispositivo, per ora, si guarda soltanto») — ma non
+nasce nessuna riga che prometta un ritiro che non partirebbe. 3) LA
+RIPARAZIONE, per le righe già scritte storte: se l'identità è la mia, la
+trade key GIUSTA è quella che si deriva adesso — non è un'ipotesi, è la
+stessa formula con cui l'ordine è nato. Le righe già finite non si
+toccano, e quelle che combaciano nemmeno.
+E IL CONTEGGIO DELL'AVVISO GUARDA LA DERIVAZIONE, non un campo: una riga
+è di questo mazzo se la sua trade key si rifà dal suo segreto e dal suo
+indice (`rigaDiQuestoMazzoP2P`). Un campo lo si può scrivere; una
+derivazione no. Senza bundle o senza indice non si sa, e non sapere vuol
+dire non dire niente — se non ce n'è nessuna, nessun avviso.
+LA LEZIONE, e vale oltre il P2P: **una lista che prima veniva da una
+fonte sola e adesso viene da due non è più la stessa lista**, anche se
+la forma delle righe è identica alla virgola. Ogni lettore che ne
+ricavava qualcosa «dal contesto» — qui: da quale mazzo derivare la
+chiave — da quel momento lo ricava dal contesto sbagliato per metà delle
+righe, e continua a girare senza un errore. Quando si allarga una fonte
+si rileggono TUTTI i suoi lettori: qui erano due, l'adozione e il
+conteggio, e nessuno dei due era nel diff di ieri.
+COLLAUDATI: **9422 prove verdi, 0 rosse** (+11) e **8 MUTAZIONI, 8
+uccise**: la restore che non dice più di chi è la riga, il timbro col
+SEGRETO invece della pubkey, l'adozione che ricostruisce anche le righe
+di un altro mazzo, la riparazione che non guarda se la chiave è già
+giusta, quella che tocca anche le finite, l'avviso che torna a contare
+gli ordini di tutti, «di questo mazzo» ridotto a un campo, e la riga
+senza indice presa per sua.
