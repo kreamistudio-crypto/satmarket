@@ -12132,7 +12132,10 @@ def prove_supplemento_spedizione():
     # la fetta e' cresciuta con l'accordo sul carrello (ago 2026): a
     # 20_000 la chiamata a _strade_preventivo restava fuori e la
     # sentinella diceva di no a una riga che c'e'
-    corpo_pset = src[src.index("async def _preventivo_set("):][:26_000]
+    # ...ed e' cresciuta ANCORA con l'anteprima della fee dinamica (set
+    # 2026, letta PRIMA del con.close() che sta piu' sopra nella
+    # funzione): a 26_000 il bersaglio cadeva a 26_009, nove byte fuori
+    corpo_pset = src[src.index("async def _preventivo_set("):][:27_000]
     prova("preventivo set: le quantita' si prendono da `richieste`",
           True, "[(tutti[aid], q) for aid, q" in corpo_pset)
     prova("...e MAI zippando due dizionari diversi", False,
@@ -28358,8 +28361,11 @@ def prove_fogli_di_casa():
     # CINQUANTACINQUE (14 set 2026, la pulizia retroattiva dei
     # metadati): scrivere sul disco vero centinaia di foto e' un gesto
     # che chiede, non un bottone che parte da solo.
-    prova("i gesti che passano dalla domanda unica sono cinquantacinque",
-          55, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTASEI (14 set 2026, il dettaglio della fee dinamica): un
+    # AVVISO degenere, nessuna azione — solo un «Ho capito» — perche'
+    # spiegare due percentuali non e' un gesto che si possa sbagliare.
+    prova("i gesti che passano dalla domanda unica sono cinquantasei",
+          56, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo

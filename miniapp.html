@@ -15827,7 +15827,12 @@ function cifraCtrl(sats, circa, eurNativo, meno){
    quando esiste, e il totale evidenziato. artEur/spedEur/totEur sono
    gli euro NATIVI dal server (0 = quella cifra e' nata in sats). */
 function contoRighe(c){
-  const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"><span>${t}</span><span class="mono">${v}</span></div>`;
+  /* `onclick` (set 2026, la fee dinamica): facoltativo, e quando c'e'
+     porta anche il cursore a mano — l'unico segno che invita al
+     tocco, la riga resta quella di sempre finche' nessuno ci clicca. */
+  const r = (t, v, cls, onclick) => `<div class="ctrl-riga${cls?' '+cls:''}"`
+    + (onclick ? ` style="cursor:pointer" onclick="${onclick}"` : '')
+    + `><span>${t}</span><span class="mono">${v}</span></div>`;
   return r('Prezzo', cifraCtrl(c.art, c.circa, c.artEur))
     /* Lo sconto del negozio: c'e' SOLO quando scatta — una riga a zero
        direbbe «non hai avuto niente», che non e' un'informazione. Sta
@@ -15912,15 +15917,14 @@ function contoRighe(c){
        venditore, sconti compresi, se la beta non azzerasse tutto.
        Il ⓘ e' l'unico segno che invita al tocco: nessun altro colore,
        la riga resta quella di sempre finche' non ci si clicca. */
-    + `<div class="ctrl-riga" style="cursor:pointer" role="button" onclick="apriDettaglioFeeDinamica()">`
-    + `<span>Fee Barattolo`
+    + r('Fee Barattolo'
         + ` <b class="${c.commissionePct > 0 ? 'ctrl-costo' : ''}">`
         + `${fmt(c.commissionePct || 0)}%</b>`
         + (c.commissionePct > 0
             ? '' : '<span class="promo-tag dopo">in promo</span>')
-        + ` <span class="ctrl-nota" style="color:var(--muted)">ⓘ</span></span>`
-    + `<span class="mono">${cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur)}</span>`
-    + `</div>`
+        + ' <span class="ctrl-nota" style="color:var(--muted)">ⓘ</span>',
+        cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur),
+        '', 'apriDettaglioFeeDinamica()')
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i
