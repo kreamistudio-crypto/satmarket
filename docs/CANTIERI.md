@@ -12172,3 +12172,63 @@ bottone nuovo e sulla firma di `esportaDati`. Un giro vero con
 `TestClient` contro il server reale ha confermato l'intero giro HTTP
 (biglietto → download) per entrambe le facce, nomi di file compresi.
 9543 verdi, 0 rosse.
+
+## Chi ha comprato, e dove consegnare, nel CSV degli ordini
+
+Subito dopo l'export di «tutti gli ordini», Andrea ha chiesto tre
+colonne in più: chi ha comprato, dove spedire, e in che modalità —
+esplicitamente citando il ritiro in zona. Tre colonne, non una
+funzione nuova: `compratore`, `consegna`, `dove` si aggiungono in coda
+allo stesso CSV di `scarica_export`.
+
+**«DOVE» NON È SEMPRE UN INDIRIZZO**, ed è la parte che ha richiesto
+di leggere il modello dati prima di scrivere codice: dipende dalla
+`consegna_scelta` dell'ordine — `spedizione` legge l'indirizzo vero
+(decifrato con `_indirizzo_letto`, lo stesso giudice di
+`GET /api/orders/{id}/indirizzo`), `ritiro` non ha mai salvato un
+luogo d'incontro preciso e mostra la ZONA dell'annuncio (l'unica
+informazione «dove» che esiste per quella modalità), `servizio` legge
+`annunci.servizio_dove` (la prestazione, non una spedizione),
+`digitale` resta vuoto per costruzione — non c'è niente da consegnare
+fisicamente. Il codice del locker (`busta_codice`) resta fuori
+apposta: è un segreto operativo che il venditore deposita DOPO aver
+spedito, non un dato dell'indirizzo, ed esce solo dal suo endpoint
+dedicato.
+
+**LE DUE COLONNE ESCONO SOLO SULLE PROPRIE VENDITE** (`ruolo=='vendita'`,
+cioè `venditore_id==tg_id`), mai sugli acquisti: sulla propria riga
+d'acquisto «chi ha comprato» sarebbe il proprio username e «dove
+consegnare» il proprio indirizzo — dati che il lettore già conosce,
+inutili nel CSV e confondibili col dato vero che manca (a chi si è
+comprato, non da chi). Non è una regola di sicurezza nuova —
+`leggi_indirizzo` autorizza già entrambe le parti, l'indirizzo non è
+un segreto per chi l'ha scritto — è una scelta di cosa vale la pena
+SCRIVERE in una colonna.
+
+**L'INDIRIZZO SI PURGA**, e l'export lo eredita onestamente:
+`pulisci_indirizzi()` cancella `ordini.indirizzo` entro ~10 minuti
+dalla conferma di ricezione (o entro `GIORNI_INDIRIZZO` per le
+chiusure senza conferma) — la stessa ragione per cui l'export di
+default (contabilità, solo `released`/`refunded`) mostrerà quasi
+sempre «dove» vuoto: quegli ordini sono già chiusi, quindi l'indirizzo
+è quasi sempre già sparito. È con `tutti=True` (ordini ancora aperti,
+appena spediti) che la colonna vale davvero — ed è li che un venditore
+la userebbe come foglio di spedizione. `indirizzo_purgato_il` si
+controlla PRIMA di provare a decifrare: `_indirizzo_letto` su un blob
+vuoto tornerebbe comunque None, ma la riga si legge meglio dicendo
+perché.
+
+**COLLAUDATO**: la stessa famiglia di prove del CSV, estesa con un
+database di cartone a quattro consegne diverse (spedizione purgata,
+ritiro, spedizione viva, digitale) — verificato che ognuna mostri
+esattamente il «dove» giusto, incluso l'onesto vuoto sul purgato. Più
+una prova di privacy dedicata: lo stesso database, guardato dal
+COMPRATORE invece che dal venditore, non porta né `compratore` né
+`dove` su nessuna riga. `_indirizzo_letto` è iniettata finta (un
+semplice `json.loads`, la cifratura vera la prova già un'altra
+famiglia) apposta per isolare il FILO che collega l'export
+all'indirizzo dal meccanismo di cifratura, che non è quello che questo
+cantiere doveva verificare. Un giro vero con `TestClient` contro il
+database locale, con un indirizzo VERO cifrato e decifrato dalle
+funzioni reali del server, ha confermato il formato finale:
+«Mario Rossi, Via Test 5, 10100 Torino, TO». 9633 verdi, 0 rosse.
