@@ -12426,3 +12426,65 @@ fotogrammi fermati a 95, 190 e 285 ms, che è un'altra cosa dal
 guardarla correre. E il primo fotogramma dopo che `.morfo` si toglie
 dal foglio è verificato **coi numeri e non a occhio**: se lì scappasse
 un lampo, si vede solo dal vivo.
+
+## Il nome segue la foto, anche da Nostr
+
+Andrea ha chiesto: «quando un utente aggiorna il profilo da Nostr o
+da Telegram, deve prendere la foto e anche il nome». La foto già lo
+faceva (`aggiorna_profilo_social`, cantiere dell'avatar); il nome no
+— e non per distrazione, per una riga scritta a verbale nel codice
+stesso: `_scrivi_nome_nostr` si arrendeva su OGNI `tg_id` positivo,
+«comanda Telegram, che riscriverebbe comunque al primo accesso».
+
+**LA RIGA ERA VERA SOLO PER META' DEI CASI.** È vera per chi la Mini
+App la riapre davvero — `verifica_utente` fa l'UPSERT del nome a
+OGNI richiesta autenticata, quindi un nome scritto da Nostr sarebbe
+durato una sola chiamata. Ma **non è vera per chi vive di sessione
+web** (`utente_da_sessione`, il cookie del login): quella porta non
+tocca mai `nome`, quindi chi ci passa restava fermo per sempre al
+nome della sua prima registrazione — cambiasse pure il profilo
+Telegram, cambiasse pure il profilo Nostr, non si aggiornava mai.
+
+**LA CURA TOCCA DUE LATI, NON UNO**, o il primo senza il secondo non
+si vedrebbe mai:
+1. `_scrivi_nome_nostr` non si arrende più sui `tg_id` positivi (resta
+   solo la guardia sul nome vuoto — un kind-0 muto non cancella
+   nulla). Il chiamante (`aggiorna_profilo_social`) decide QUANDO:
+   sempre per i nativi (`tg_id<0`), e per un `tg_id>0` **solo con
+   `avatar_scelta=='nostr'` esplicita** — mai in automatico. Qui il
+   nome NON è simmetrico alla foto: Telegram un nome ce l'ha SEMPRE
+   (a differenza della foto, che può mancare), quindi per
+   l'automatico Nostr non sarebbe un ripiego ma uno sfarfallio — un
+   giro sì e un giro no, secondo chi ha aggiornato per ultimo.
+2. **Le TRE porte che scrivevano l'upsert del nome da Telegram**
+   (`upsert_utente` per il login web, `verifica_utente` nel ramo vero
+   e in quello di collaudo) erano tre copie della stessa INSERT — ora
+   sono una chiamata sola a `_upsert_da_telegram`, che rispetta la
+   STESSA scelta: `nome=CASE WHEN avatar_scelta='nostr' THEN nome
+   ELSE excluded.nome END` dentro l'UPSERT stesso, un giro solo,
+   nessuna corsa fra una SELECT e una UPDATE. Senza questo secondo
+   lato, il nome scritto da Nostr sarebbe durato esattamente fino
+   alla prossima apertura della Mini App — la stessa ragione per cui
+   la prima cura, da sola, non sarebbe bastata.
+
+`username` non ha questa preferenza (Nostr non ne ha uno equivalente)
+e si aggiorna sempre da Telegram, come prima.
+
+**LATO CLIENT**: il selettore «La tua foto» (Identità, nel Profilo)
+resta lo stesso — non ne serve un secondo per il nome, è la STESSA
+identità scelta una volta sola — ma quando la scelta attiva è
+`'nostr'` per un `tg_id>0`, lo stato sotto la pillola dice anche
+«Anche il tuo nome viene da lì», così la promessa non resta muta nel
+posto dove si fa la scelta.
+
+**COLLAUDATO**: un banco VERO — `_scrivi_nome_nostr` e
+`_upsert_da_telegram` estratte ed eseguite su un database di cartone
+reale (nativo Nostr, `tg_id` positivo automatico, `tg_id` positivo
+con scelta 'nostr') — più il chiamante `aggiorna_profilo_social`
+estratto con dipendenze finte, che verifica il nome si CHIEDE solo
+nei due casi giusti (nativo, o esplicito 'nostr') e mai in
+automatico. Due sentinelle sulle porte che devono passare tutte dalla
+stessa scrittura, e un giro vero con `TestClient` contro il database
+locale — un utente con scelta 'nostr' che riapre l'app con un nome
+Telegram diverso mantiene il proprio nome Nostr; un utente in
+automatico si aggiorna come sempre. 9646 verdi, 0 rosse.
