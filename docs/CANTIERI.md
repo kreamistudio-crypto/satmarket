@@ -13201,3 +13201,56 @@ sats» dice ancora «Riceverai 7301 sats» e **rifiuta una fattura da
 secco. Da verificare sui byte di mostro (`is_valid_invoice`) prima di
 toccarlo — ma il nome `satsNetti` su un numero che netto non è viene da
 lì, ed è la stessa origine. Cantiere suo.
+
+⚠️ **E «IDENTICO» NON LO ERA, e a dirlo è stata una misura diversa dalle
+prime due.** Andrea: «c'è troppa aria sopra e il testo è troppo piccolo
+— vai a MISURARE quel cappello dal vivo». Le misure di ieri guardavano
+le **proprietà dichiarate** (padding, margine, bordo, font) e tornavano
+tutte uguali; quella che ha trovato i difetti guarda l'**inchiostro del
+testo** — un `Range` sul nodo di testo — e l'**altezza della scatola**.
+Due differenze, tutt'e due invisibili al confronto delle regole:
+
+**1) VENTISEI PIXEL DI ARIA DI TROPPO, e una riga più stretta.** Dentro
+una `.sicu` vale anche `.sicu h3{margin:26px 0 8px;line-height:1.2}`:
+**stessa specificità** di `.foglio-testa h3` (una classe più un
+elemento) e scritta **2600 righe più in basso**, quindi vince. Nel
+foglio la `.sicu` non c'è, e il problema nemmeno — **è per questo che i
+due cappelli sembravano identici leggendo il CSS: la regola di troppo
+dipende da DOVE lo metti.** Misurato: aria sopra 34px contro 13,5, riga
+alta 21,6px contro 26,1.
+La cura è di due righe, e i due valori non sono scelti adesso:
+`margin-top:0` è quel che `.foglio-testa h3` **già dichiara**, e
+`line-height:inherit` è quel che l'`h3` avrebbe **senza nessuno che ci
+metta mano**. Sul cappello dei fogli non cambia un pixel.
+
+**2) IL CAPPELLO DEL FOGLIO È PIÙ ALTO DEL SUO TESTO**, e non per il
+testo: dentro c'è la **✕ che lo chiude**, e quel bottone (19px con 8px
+di padding) è più alto della riga — con `align-items:center` è **lui**
+a dare l'altezza. Il mio, che aveva solo l'`h3`, veniva **53px invece
+di 58**: identico in ogni regola e diverso a vedersi.
+La cura non è un `min-height` ma **due gemelli invisibili**, uno per
+lato — lo stesso ghost che il foglio usa già a destra per tenere il
+titolo in centro. Zero CSS nuovo, e l'altezza viene da sé.
+
+**MISURATO DOPO, riga per riga**: font `18px/800/Baloo 2`, line-height
+`26,1px`, margini `0/4`, padding `12/10`, bordo `1px solid
+var(--line-soft)`, scatola `58px`, inchiostro `28px`, aria sopra
+`13,4` contro `13,5` e sotto `16,6` contro `16,5`. **L'unico scarto
+residuo è un decimo di pixel**, l'arrotondamento della centratura
+flex.
+
+⚠️ **E SUL «TESTO TROPPO PICCOLO» LA MISURA DICE UN'ALTRA COSA**, e va
+scritto perché è una domanda aperta e non una svista: i due testi sono
+**identici** — 18px, peso 800, inchiostro alto 28px in tutt'e due. Quel
+che rendeva il titolo *piccolo a vedersi* era la **riga stretta** del
+punto 1, che gli toglieva aria attorno. Se il cappello dei fogli deve
+diventare più grande in assoluto, la leva è `--tit-foglio` e **muove
+tutt'e due** — che è esattamente quel che «identico» chiede.
+
+⚠️ **E UNA TERZA SENTINELLA RISPONDEVA PER IL VICINO**: quella del
+gemello del dettaglio contava i ghost del **file intero** e ne
+pretendeva due; nati i due del cappello nuovo, è diventata rossa
+parlando d'altro. Adesso conta **dentro il foglio di cui parla**, dove
+il ghost è uno. Fa tre in questo cantiere — il `16,5px`, l'ancora a due
+spazi, e questa: tutte e tre **passavano**, e tutte e tre guardavano un
+contenitore più largo della domanda.
