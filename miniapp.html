@@ -2421,6 +2421,17 @@
       display:flex;flex-direction:column;overflow:hidden;
     }
     .sheet.pieno.open{transform:none}
+    /* IL FOGLIO DELLA MORFOSI NON SALE: sfuma sul posto. Due
+       ragioni, e la prima e' una misura — per sapere DOVE arriva il
+       bottone bisogna misurarlo a foglio gia' alla sua altezza, e
+       misurare a meta' salita e' il modo in cui la corsa parte
+       storta. La seconda e' l'occhio: un foglio che sale mentre un
+       bottone scende sono due movimenti che si contraddicono.
+       `.morfo` si mette e si toglie a corsa spenta (vedi
+       vestiFoglioMorfoP2P): il transitorio non si deve vedere. */
+    .sheet.pieno.morfo{transform:none;opacity:0;transition:opacity .2s ease}
+    .sheet.pieno.morfo.open{opacity:1}
+    .sheet.pieno.morfo:not(.open){pointer-events:none}
     .sheet.pieno > .foglio-corpo{flex:1 1 auto;min-height:0;overflow-y:auto;
       overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
     /* IL MARGINE E' DI CHI CE L'HA: a pieno schermo il foglio non ha
@@ -2465,6 +2476,99 @@
     margin-top:16px;padding:12px 0 calc(14px + env(safe-area-inset-bottom,0px))}
   .foglio-piede .btn{margin:0;min-width:0}
   .foglio-piede .btn.ghost{margin:0}
+  /* UNA SOLA USCITA (set 2026, decisione di Andrea): dal foglio
+     «Pubblica» «Annulla» se n'e' andato — da una pagina a pieno
+     schermo si torna con la freccia in alto, che e' la stessa via del
+     gesto indietro, e un secondo modo di dire la stessa cosa in fondo
+     alla pagina e' un bivio senza scelta. Una colonna sola, e il
+     bottone che pubblica prende tutta la larghezza. Il piede a due
+     colonne resta dov'e' vero: il dettaglio di un ordine, dove le
+     uscite sono davvero due. */
+  .foglio-piede.sola{grid-template-columns:1fr}
+
+  /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
+     Il tondo della barra SCENDE verso la nav e si allarga fino a
+     diventare il bottone che pubblica, agganciato in fondo al foglio.
+     Non sono due bottoni che si somigliano: e' UN FANTASMA solo —
+     #p2pMorfo — che parte dove sta il tondo e finisce dove sta il
+     bottone, e per tutta la corsa i due veri restano nascosti.
+     TRE STRATI, E UNO SOLO SCALA: scalando il fantasma intero si
+     schiaccerebbero anche il glifo e la scritta, e una scala contraria
+     dentro non li raddrizzerebbe — il prodotto delle due
+     interpolazioni non fa 1 a meta' corsa (partendo da .15, a meta'
+     fa 2,2). Quindi la FORMA si scala, il glifo e l'etichetta
+     TRASLANO soltanto — stessa curva, stesso centro — e si scambiano
+     il posto in dissolvenza.
+     IL RAGGIO PARTE DA 50% e non da un numero di pixel: schiacciata
+     alla misura del tondo, l'ellisse del 50% torna un CERCHIO esatto
+     qualunque sia la larghezza del bottone d'arrivo.
+     I TEMPI LI SCRIVE IL JS (le --morfo-*): il totale e la dissolvenza
+     stanno in due costanti, e l'attesa della scritta e' la loro
+     differenza. Ribattuti qui, il giorno che una delle due cambia la
+     scritta comparirebbe a corsa gia' finita. */
+  /* LA CURVA STA QUI e i TEMPI li scrive il JS, ed e' una divisione
+     col suo perche': la curva e' quella di casa (la stessa della nav)
+     e non dipende da nessuna misura, i tempi sono due costanti che
+     devono tornare col conto dell'attesa.
+     ⚠️ UNA --morfo-* USATA E NON SCRITTA NON FALLISCE: un `var()`
+     irrisolto invalida TUTTA la riga `transition`, che torna al suo
+     valore iniziale — `all 0s` — e la corsa non parte, senza un
+     errore, senza una riga in console, con lo stato di partenza e
+     quello d'arrivo giusti. Successo per davvero con `--morfo-curva`,
+     e a dirlo e' stato un browser vero: nel Browser pane le
+     transizioni sono spente e li' si vedeva identico. C'e' una
+     sentinella che censisce le usate contro le scritte. */
+  #p2pMorfo{position:fixed;z-index:42;display:none;pointer-events:none;
+    --morfo-curva:cubic-bezier(.2,.7,.2,1)}
+  #p2pMorfo.acceso{display:block}
+  #p2pMorfo>*{position:absolute;inset:0}
+  #p2pMorfo .morfo-forma{background:var(--sats);color:#fff;
+    border-radius:var(--radius-btn);box-shadow:0 3px 0 var(--sats-deep);
+    will-change:transform;
+    /* IL COLORE CORRE PIU' IN FRETTA della forma (la dissolvenza, non
+       la corsa), e l'ha deciso un fotogramma: dal verde del lato
+       all'arancio di casa la strada passa per un verde-oliva torbido,
+       e a 380ms quel guado si vedeva per un terzo del volo. A 160 il
+       cambio d'identita' — il + del lato che diventa il bottone che
+       pubblica — si consuma insieme alla sparizione del glifo, e il
+       resto della corsa e' pura geometria. */
+    transition:transform var(--morfo-corsa) var(--morfo-curva),
+      border-radius var(--morfo-corsa) var(--morfo-curva),
+      background-color var(--morfo-velo) ease,
+      box-shadow var(--morfo-velo) ease}
+  #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:800;
+    transition:transform var(--morfo-corsa) var(--morfo-curva),
+      opacity var(--morfo-velo) ease}
+  /* il glifo e' quello della barra, stesso carattere e stessa misura */
+  #p2pMorfo .morfo-glifo{font-family:'Baloo 2',sans-serif;font-size:26px;
+    opacity:0;transition-delay:0s,0s}
+  #p2pMorfo .morfo-eti{font-size:15.5px;opacity:1;
+    transition-delay:0s,var(--morfo-attesa)}
+  /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
+     compreso: verde a comprare, rosso a vendere — lo stesso giudice
+     del + e del logo, che e' una classe sul body e non una tinta
+     letta a mano da JS. */
+  #p2pMorfo.parte .morfo-forma{border-radius:50%;
+    background:var(--trust);box-shadow:0 4px 0 var(--trust-deep);
+    transform:translate(var(--morfo-x),var(--morfo-y))
+      scale(var(--morfo-sx),var(--morfo-sy))}
+  body.p2p-vendo #p2pMorfo.parte .morfo-forma{
+    background:var(--danger);box-shadow:0 4px 0 var(--danger-deep)}
+  #p2pMorfo.parte .morfo-glifo{opacity:1;
+    transform:translate(var(--morfo-x),var(--morfo-y));
+    transition-delay:0s,var(--morfo-attesa)}
+  #p2pMorfo.parte .morfo-eti{opacity:0;
+    transform:translate(var(--morfo-x),var(--morfo-y));
+    transition-delay:0s,0s}
+  /* in reduced-motion il fantasma non nasce proprio (lo dice
+     morfoPuoiP2P), e questa riga e' la cintura: se nascesse per un
+     difetto, resterebbe fermo invece di volare */
+  @media (prefers-reduced-motion:reduce){
+    #p2pMorfo .morfo-forma,#p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
+      transition:none}
+  }
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
      IL CAPPELLO NEL CORPO NON C'E' PIU' (ritocco di Andrea): il lato
@@ -8233,6 +8337,21 @@ document.getElementById('cartello')?.remove();</script>
       <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
     </div>
     <div class="foglio-corpo" id="p2pNuovoCorpo"></div>
+  </div>
+
+  <!-- IL FANTASMA DELLA MORFOSI (set 2026): il bottone che, al tocco
+       sul + della barra, scende e si allarga fino a diventare il
+       «Pubblica ordine» in fondo al foglio qui sopra. Vive FUORI dal
+       foglio — deve restargli sopra mentre lui sfuma — e non e' un
+       `.sheet`: la pila della cronologia non lo vede, e nemmeno
+       l'occhio della nav. Tre strati perche' uno solo si scala: la
+       forma. Vuoto e inerte finche' non serve; l'etichetta gliela
+       COPIA il JS dal bottone vero, cosi' le due scritte non possono
+       divergere. -->
+  <div id="p2pMorfo" aria-hidden="true">
+    <i class="morfo-forma"></i>
+    <span class="morfo-glifo">＋</span>
+    <span class="morfo-eti"></span>
   </div>
 
   <!-- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026, ridisegno): la
@@ -40106,6 +40225,171 @@ let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 
+/* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
+   Il + della barra e il bottone che pubblica SONO LA STESSA COSA: al
+   tocco il tondo scende verso la nav, si allarga a piena larghezza e
+   si aggancia in fondo al foglio. A chiuderlo, la corsa si rifa'
+   all'indietro.
+   IL MESTIERE VERO E' MISURARE, e tutto il resto ne discende: si
+   prendono due rettangoli — il tondo com'e' adesso e il bottone dove
+   SARA' — e se ne ricavano lo spostamento del centro e le due scale.
+   Il vestito lo porta il CSS; qui ci sono i numeri.
+   DOVE NON SI FA: da 768px in su il + e' una pillola nella topbar e
+   il foglio un modale centrato — non c'e' nessun tondo che scende —
+   e in reduced-motion il foglio si apre come si e' sempre aperto. In
+   tutt'e due i casi la via di ieri non e' un ripiego: e' la strada. */
+const P2P_MORFO_MS = 380;     /* la corsa intera: forma, centro, raggio */
+const P2P_MORFO_VELO = 160;   /* la dissolvenza fra il glifo e la scritta */
+let p2pMorfoTimer = null;     /* la corsa in volo, per poterla interrompere */
+let p2pMorfoOcchio = null;    /* l'osservatore che si accorge della chiusura */
+
+/* I QUATTRO NUMERI, in una funzione PURA: due rettangoli entrano, ne
+   escono lo spostamento del CENTRO (il transform ha origine li') e le
+   due scale. Pura perche' e' l'unica parte che si puo' provare — il
+   resto e' vestire un nodo, e a schermo un numero sbagliato si legge
+   come «il bottone parte da un punto a caso». */
+function morfosiP2P(da, a){
+  const largo = a.width || 1, alto = a.height || 1;
+  return {
+    x: (da.left + da.width / 2) - (a.left + largo / 2),
+    y: (da.top + da.height / 2) - (a.top + alto / 2),
+    sx: da.width / largo,
+    sy: da.height / alto
+  };
+}
+
+/* il tondo della barra: un posto solo, che i chiamanti sono tre */
+const tondoBarraP2P = () => document.querySelector('#nav-vendi .ic');
+
+function morfoPuoiP2P(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (!matchMedia('(max-width: 767px)').matches) return false;
+  const tondo = tondoBarraP2P();
+  return !!(el('p2pMorfo') && el('p2pNuovoInvia') && tondo
+            && tondo.getBoundingClientRect().width);
+}
+
+/* `.morfo` si mette e si toglie A CORSA SPENTA, o il foglio farebbe un
+   salto visibile: entrando passerebbe da opaco a trasparente in 200ms
+   — cioe' un lampo a pieno schermo —, e uscendo tornerebbe opaco per
+   scivolare giu' come un foglio qualunque. Del cambio di vestito non
+   si deve vedere il transitorio: solo lo stato nuovo. */
+function vestiFoglioMorfoP2P(foglio, dentro){
+  foglio.style.transition = 'none';
+  foglio.classList.toggle('morfo', dentro);
+  void foglio.offsetWidth;
+  foglio.style.transition = '';
+}
+
+/* il fantasma prende la MISURA e il POSTO del bottone d'arrivo, piu' le
+   quattro variabili che dicono da dove parte */
+function vestiMorfoP2P(g, da, a, eti){
+  const m = morfosiP2P(da, a);
+  g.style.left = a.left + 'px';
+  g.style.top = a.top + 'px';
+  g.style.width = a.width + 'px';
+  g.style.height = a.height + 'px';
+  g.style.setProperty('--morfo-x', m.x + 'px');
+  g.style.setProperty('--morfo-y', m.y + 'px');
+  g.style.setProperty('--morfo-sx', m.sx);
+  g.style.setProperty('--morfo-sy', m.sy);
+  g.style.setProperty('--morfo-corsa', P2P_MORFO_MS + 'ms');
+  g.style.setProperty('--morfo-velo', P2P_MORFO_VELO + 'ms');
+  /* l'attesa e' la DIFFERENZA: la scritta finisce di comparire
+     esattamente quando la corsa finisce, non un istante dopo */
+  g.style.setProperty('--morfo-attesa', (P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms');
+  /* L'ETICHETTA SI COPIA dal bottone vero e non si riscrive: due
+     scritte uguali in due posti divergono al primo ritocco. */
+  const e = g.querySelector('.morfo-eti');
+  if (e) e.textContent = eti;
+  return m;
+}
+
+/* i due veri spariscono per la durata della corsa: il fantasma DEVE
+   sembrare lo stesso bottone che si muove, e un tondo fermo dietro lo
+   smentirebbe. `visibility` e non `display`: il posto resta. */
+function celaVeriP2P(cela){
+  const tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
+  if (tondo) tondo.style.visibility = cela ? 'hidden' : '';
+  if (meta) meta.style.visibility = cela ? 'hidden' : '';
+}
+
+/* il fantasma si posa: torna invisibile e ridA' il posto ai due veri */
+function posaMorfoP2P(){
+  if (p2pMorfoTimer) { clearTimeout(p2pMorfoTimer); p2pMorfoTimer = null; }
+  const g = el('p2pMorfo');
+  if (g) g.classList.remove('acceso', 'parte');
+  celaVeriP2P(false);
+}
+/* ...e a foglio chiuso si sveste anche lui */
+function spegniMorfoP2P(){
+  posaMorfoP2P();
+  const foglio = el('p2pNuovoSheet');
+  if (foglio && foglio.classList.contains('morfo'))
+    vestiFoglioMorfoP2P(foglio, false);
+}
+
+/* IL RITORNO SI AGGANCIA ALLA CLASSE, non a chi chiude: il foglio lo
+   chiudono in tre — il gesto indietro (navChiudiStrato), la spazzata
+   di closeSheet e chiudiFoglioP2P dopo la pubblicazione — e un quarto
+   domani lo dimenticherebbe in silenzio. E' la stessa strada che la
+   nav fa gia' per il suo diff: un occhio sulle classi. */
+function occhioMorfoP2P(){
+  if (p2pMorfoOcchio) return;
+  const f = el('p2pNuovoSheet');
+  if (!f) return;
+  let era = f.classList.contains('open');
+  p2pMorfoOcchio = new MutationObserver(() => {
+    const ora = f.classList.contains('open');
+    if (era && !ora) chiudiMorfoP2P();
+    era = ora;
+  });
+  p2pMorfoOcchio.observe(f, {attributes: true, attributeFilter: ['class']});
+}
+
+/* L'ANDATA. Si prende in carico anche l'APERTURA del foglio, e non e'
+   un di piu': il bottone d'arrivo si misura solo a foglio gia' alla
+   sua altezza. Torna `false` quando non se ne occupa — e allora il
+   foglio si apre come sempre. */
+function apriMorfoP2P(){
+  const foglio = el('p2pNuovoSheet');
+  if (!foglio) return false;
+  spegniMorfoP2P();          /* niente corse a meta' da un giro di prima */
+  if (!morfoPuoiP2P()) return false;
+  occhioMorfoP2P();
+  const g = el('p2pMorfo'), tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
+  vestiFoglioMorfoP2P(foglio, true);
+  vestiMorfoP2P(g, tondo.getBoundingClientRect(),
+                meta.getBoundingClientRect(), meta.textContent);
+  celaVeriP2P(true);
+  g.classList.add('acceso', 'parte');
+  void g.offsetWidth;        /* il fotogramma di partenza esiste solo se lo si CHIEDE */
+  foglio.classList.add('open');
+  g.classList.remove('parte');
+  p2pMorfoTimer = setTimeout(posaMorfoP2P, P2P_MORFO_MS + 30);
+  return true;
+}
+
+/* IL RITORNO. Si RIMISURA e non si ricicla la misura dell'andata: fra
+   l'apertura e la chiusura la tastiera puo' essersi alzata e il
+   bottone non sta piu' dov'era. Il foglio ha ancora `.morfo` — cioe'
+   e' alla sua altezza vera anche mentre svanisce — quindi la misura
+   e' buona anche adesso. */
+function chiudiMorfoP2P(){
+  const foglio = el('p2pNuovoSheet');
+  if (!foglio || !foglio.classList.contains('morfo')) return;
+  posaMorfoP2P();
+  const g = el('p2pMorfo'), tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
+  if (!morfoPuoiP2P() || !g || !tondo || !meta) { spegniMorfoP2P(); return; }
+  vestiMorfoP2P(g, tondo.getBoundingClientRect(),
+                meta.getBoundingClientRect(), meta.textContent);
+  celaVeriP2P(true);
+  g.classList.add('acceso');
+  void g.offsetWidth;
+  g.classList.add('parte');
+  p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
+}
+
 function apriNuovoOrdineP2P(){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
@@ -40120,7 +40404,10 @@ function apriNuovoOrdineP2P(){
   p2pNuovoPremioMano = false;
   renderNuovoOrdineP2P();
   el('sheetBg').classList.add('open');
-  el('p2pNuovoSheet').classList.add('open');
+  /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
+     a foglio gia' a posto): se non se ne occupa — reduced-motion,
+     schermo largo — si apre come si e' sempre aperto. */
+  if (!apriMorfoP2P()) el('p2pNuovoSheet').classList.add('open');
   /* NIENTE FUOCO SUL PRIMO CAMPO, e cambia rispetto al foglio di ieri:
      a pieno schermo la tastiera che si apre da sola copre meta' delle
      sezioni, e la prima cosa da leggere e' la valuta — non da
@@ -40394,19 +40681,27 @@ function renderNuovoOrdineP2P(){
     '<div class="hint" id="p2pNuovoManca" style="color:var(--danger);font-weight:800"></div>' +
     tetto + fee +
     '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
-    '<div class="foglio-piede">' +
-      '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
-      /* QUI NON VA NESSUN SIMBOLO (set 2026, guardato dal vivo): il
-         marchio piccolo su un fondo arancio pieno diventa una macchia
-         — i suoi colori e quello del bottone sono la stessa famiglia —
-         e l'emoji non torna, che ha smesso di essere il segno di casa.
-         ⚠️ «di CASA» e non l'aggettivo possessivo, ed e' una scelta: la
-         sentinella delle parole di questo foglio guarda anche i
-         commenti, e quel possessivo contiene per intero il nome della
-         rete che qui non si nomina — un commento innocente la farebbe
-         rossa (successo, due volte di fila). */
+    /* IL PIEDE HA UNA SOLA USCITA (set 2026, decisione di Andrea):
+       «Annulla» se n'e' andato. Da una pagina a pieno schermo si
+       torna con la freccia in alto, che e' la stessa via del gesto
+       indietro e dello scivolo: ridirla in fondo era un bivio senza
+       scelta. Resta il bottone che pubblica, a piena larghezza — ed
+       e' anche quello in cui il + della barra si trasforma.
+       ⚠️ E IL FULMINE TORNA, che qui c'era scritto il contrario: la
+       riga di ieri vietava OGNI simbolo perche' il marchio dello
+       scambio — arancio su arancio — diventava una macchia. Il ⚡ e'
+       un'altra cosa: e' il segno con cui si PUBBLICA in tutta la casa
+       («⚡ Pubblica annuncio» del mercatino), bianco su arancio, e
+       questo bottone e' il gemello di quello. Il divieto resta per il
+       marchio, e la sentinella lo tiene.
+       ⚠️ E LE PAROLE DI QUI DENTRO PASSANO DA UNA SENTINELLA che
+       guarda anche i commenti: l'aggettivo possessivo di prima
+       persona plurale contiene per intero il nome della rete che
+       questo foglio non nomina, e un commento innocente la farebbe
+       rossa (successo, due volte di fila). */
+    '<div class="foglio-piede sola">' +
       '<button type="button" class="btn orange" id="p2pNuovoInvia" ' +
-        'onclick="inviaNuovoOrdineP2P()">Invia</button>' +
+        'onclick="inviaNuovoOrdineP2P()">⚡ Pubblica ordine</button>' +
     '</div>';
   aggiornaInviaP2P();
 }

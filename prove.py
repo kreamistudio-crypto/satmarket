@@ -39504,14 +39504,26 @@ def prove_nav_p2p():
     # senza: li' il marchio diventava una macchia.
     prova("il simbolo veste i quattro posti dove si legge", 4,
           mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
-    # EMENDATA (set 2026, il ridisegno): il bottone non dice piu'
-    # «Pubblica: compro sats» — il lato lo dice il TITOLO del foglio,
-    # e in fondo restano le due uscite di sempre, «Annulla» e «Invia».
-    # La riga che conta e' la seconda: li' dentro nessun simbolo.
-    prova("...e il bottone che pubblica resta senza segno", True,
-          '\'onclick="inviaNuovoOrdineP2P()">Invia</button>\'' in mini
+    # EMENDATA DUE VOLTE. La prima (set 2026, il ridisegno): il bottone
+    # non diceva piu' «Pubblica: compro sats» — il lato lo dice il
+    # TITOLO del foglio — e in fondo restavano le due uscite di sempre,
+    # «Annulla» e «Invia».
+    # LA SECONDA (set 2026, la morfosi del +) rovescia meta' della
+    # riga, e la meta' che resta e' quella che conta: «Annulla» se
+    # n'e' andato e «Invia» e' diventato «⚡ Pubblica ordine», cioe'
+    # il gemello del bottone del mercatino. Il divieto NON era sulle
+    # emoji in generale: era sul MARCHIO dello scambio, che arancio su
+    # arancio diventava una macchia — e quello vale ancora.
+    prova("...e il bottone che pubblica non porta il marchio", True,
+          '\'onclick="inviaNuovoOrdineP2P()">⚡ Pubblica ordine</button>\''
+          in mini
           and "🔁 Pubblica" not in mini
           and "🔁 Invia" not in mini)
+    # e la seconda uscita non c'e' piu': dal foglio a pieno schermo si
+    # torna con la freccia in alto, che e' gia' il gesto indietro
+    prova("...e in fondo non c'e' piu' nessun «Annulla»", False,
+          '<button type="button" class="btn ghost" onclick="navIndietro()">'
+          'Annulla</button>\' +\n      /*' in mini)
     prova("...e negli stati vuoti prende il posto del glifo", True,
           '<div class="empty"><img class="p2p-simbolo"' in mini
           and '<span class="big">🔁</span>' not in mini)
@@ -43760,6 +43772,11 @@ def prove_p2p_pubblica():
     prova("...e nessuno dei due porta margini suoi", True,
           ".foglio-piede .btn{margin:0;min-width:0}" in stile
           and ".foglio-piede .btn.ghost{margin:0}" in stile)
+    # ...e dove l'uscita e' UNA la griglia si stringe a una colonna.
+    # La regola base resta a due, ed e' voluto: il dettaglio di un
+    # ordine ha davvero due uscite, e il piede e' lo stesso pezzo.
+    prova("...e dove l'uscita e' una sola, una colonna", True,
+          ".foglio-piede.sola{grid-template-columns:1fr}" in stile)
 
     # --- 11) I CINQUE RITOCCHI DEL GIORNO DOPO ----------------------
     # A) LE ICONE SONO LINEE, non emoji: stesso `viewBox`, stesso
@@ -43787,8 +43804,21 @@ def prove_p2p_pubblica():
           in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n"))
     prova("...e sta nello stesso tondo, con la sua misura", True,
           ".p2p-glifo{font-size:20px;font-weight:700;line-height:1}" in stile)
+    # EMENDATA (set 2026, la morfosi del +): il ⚡ e' TORNATO, ma non
+    # al posto di un'icona di sezione — sta sul bottone che pubblica,
+    # dov'e' il segno con cui si pubblica in tutta la casa. La riga
+    # guarda le SEZIONI, e il piede non e' una sezione: si taglia via
+    # invece di ammorbidire l'elenco, che allargato al ⚡ non direbbe
+    # piu' niente sul giorno che un'icona torni emoji.
+    # ⚠️ SI TAGLIA AL COMMENTO e non alla riga di markup: il commento
+    # che racconta il cambio NOMINA il ⚡ due volte, ed e' giusto che
+    # lo faccia — e' la stessa trappola del «nostr» nei commenti, una
+    # sentinella rossa per colpa di una spiegazione.
+    _sez = nuovo[:nuovo.index("    /* IL PIEDE HA UNA SOLA USCITA")]
     prova("...e nessuna emoji e' rimasta al posto loro", False,
-          any(e in nuovo for e in ("💶", "💳", "💲", "⚡", "🏳️")))
+          any(e in _sez for e in ("💶", "💳", "💲", "⚡", "🏳️")))
+    prova("...e il ⚡ che arriva a schermo e' solo quello del bottone",
+          1, nuovo.count('">⚡ Pubblica ordine</button>'))
     prova("...e vestono come quelle della nav", True,
           'class="p2p-ico" viewBox="2 2 20 20"'
           in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n")
@@ -43878,6 +43908,206 @@ def prove_p2p_pubblica():
     # la matita non la riconosce
     prova("...e «Modifica» resta la porta scritta", True,
           "'Fatto' : 'Modifica'" in pezzo_js(mini, "function premioModP2P(){", "\n}\n"))
+
+    # --- 12) LA MORFOSI DEL + (set 2026, richiesta di Andrea) -------
+    # Il + della barra e il bottone che pubblica sono LO STESSO
+    # elemento: al tocco il tondo scende, si allarga e si aggancia in
+    # fondo al foglio. A schermo si giudica a occhio; qui si giudica
+    # quel che a occhio non si vede — i NUMERI della corsa e le tre
+    # trappole che la spengono in silenzio.
+    morfo = pezzo_js(mini, "function apriMorfoP2P(){", "\n}\n")
+    chiumo = pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
+    puoi = pezzo_js(mini, "function morfoPuoiP2P(){", "\n}\n")
+    vesti = pezzo_js(mini, "function vestiMorfoP2P(g, da, a, eti){", "\n}\n")
+
+    # A) I NUMERI, fatti girare. La funzione e' pura apposta: due
+    #    rettangoli entrano, ne escono lo spostamento del centro e le
+    #    due scale. L'invariante non e' «i numeri sono questi» ma
+    #    «applicando il transform al bottone si ritrova ESATTAMENTE il
+    #    tondo» — se un giorno il conto cambia strada, questa riga sa
+    #    ancora dire se e' giusto.
+    _pm = (_intera("function morfosiP2P(da, a){")
+           + "\nconst g6 = v => Math.round(v * 1e6) / 1e6;"
+           + "\nconst tondo = {left: 160, top: 700, width: 54, height: 54};"
+           + "\nconst meta = {left: 16, top: 800, width: 343, height: 48};"
+           + "\nconst m = morfosiP2P(tondo, meta);"
+           + "\nconst cx = meta.left + meta.width / 2, cy = meta.top + meta.height / 2;"
+           # il rettangolo d'arrivo, applicato il transform (origine al
+           # centro), deve tornare il tondo di partenza
+           + "\nconst reso = [g6(cx + m.x - meta.width * m.sx / 2),"
+             " g6(cy + m.y - meta.height * m.sy / 2),"
+             " g6(meta.width * m.sx), g6(meta.height * m.sy)];"
+           # e il raggio del 50% schiacciato deve tornare il raggio del
+           # tondo: e' la ragione per cui il CSS parte da 50% e non da
+           # un numero di pixel
+           + "\nconst raggio = [g6(meta.width / 2 * m.sx), g6(meta.height / 2 * m.sy)];"
+           # un bottone di misura zero (foglio mai disegnato) non deve
+           # produrre Infinity: uscirebbe un transform che il browser
+           # butta via, cioe' nessuna corsa e nessun errore
+           + "\nconst vuoto = morfosiP2P(tondo, {left: 0, top: 0, width: 0, height: 0});"
+           + "\nconsole.log(JSON.stringify({m: [g6(m.x), g6(m.y), g6(m.sx), g6(m.sy)],"
+             " reso: reso, raggio: raggio,"
+             " sano: Object.values(vuoto).every(v => Number.isFinite(v))}));")
+    _f2 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f2.write(_pm)
+    _f2.close()
+    _r2 = _sp.run([_node, _f2.name], capture_output=True, text=True,
+                  timeout=60, encoding="utf-8")
+    os.unlink(_f2.name)
+    if _r2.returncode != 0:
+        prova("i numeri della morfosi girano", "", _r2.stderr[:300])
+    else:
+        m2 = _js.loads(_r2.stdout.strip())
+        prova("i quattro numeri della corsa", [-0.5, -97, 0.157434, 1.125], m2["m"])
+        prova("...e il bottone schiacciato TORNA il tondo, al pixel",
+              [160, 700, 54, 54], m2["reso"])
+        prova("...e il raggio del 50% torna il cerchio del tondo",
+              [27, 27], m2["raggio"])
+        prova("...e un bottone di misura zero non fa Infinity",
+              True, m2["sano"])
+
+    # B) LE TRE TRAPPOLE CHE SPENGONO UNA CORSA IN SILENZIO.
+    # 1) senza il reflow fra lo stato di partenza e quello d'arrivo il
+    #    browser vede un cambio solo e non transisce NIENTE: il
+    #    bottone comparirebbe gia' arrivato. E' il difetto che non
+    #    fallisce — non c'e' errore, non c'e' log, semplicemente non
+    #    si muove niente.
+    prova("il fotogramma di partenza si CHIEDE, o non esiste", True,
+          "void g.offsetWidth;" in morfo
+          and morfo.index("classList.add('acceso', 'parte')")
+              < morfo.index("void g.offsetWidth;")
+              < morfo.index("classList.remove('parte')"))
+    # il ritorno fa lo stesso giro al contrario, e lo stato di partenza
+    # glielo azzera `posaMorfoP2P` (che toglie `parte`) prima del reflow
+    prova("...e il ritorno fa lo stesso giro al contrario", True,
+          chiumo.index("posaMorfoP2P();") < chiumo.index("void g.offsetWidth;")
+          < chiumo.index("classList.add('parte')"))
+    # 2) il foglio deve essere GIA' alla sua altezza quando si misura:
+    #    misurato a meta' salita, il bottone d'arrivo sta dove passa e
+    #    non dove sara' — e la corsa parte storta di quanto manca.
+    prova("si misura a foglio gia' a posto, non a meta' salita", True,
+          morfo.index("vestiFoglioMorfoP2P(foglio, true)")
+          < morfo.index("meta.getBoundingClientRect()"))
+    prova("...e il foglio della morfosi non sale: sfuma sul posto", True,
+          ".sheet.pieno.morfo{transform:none;opacity:0;"
+          "transition:opacity .2s ease}" in stile
+          and ".sheet.pieno.morfo.open{opacity:1}" in stile)
+    # 3) e il vestito si mette a corsa spenta, o il transitorio si vede
+    prova("...e `.morfo` si mette e si toglie a corsa spenta", True,
+          "foglio.style.transition = 'none';" in
+          pezzo_js(mini, "function vestiFoglioMorfoP2P(foglio, dentro){", "\n}\n"))
+
+    # C) UNO SOLO SCALA. Se scalasse anche il glifo o la scritta si
+    #    schiaccerebbero con lui, e una scala contraria dentro non li
+    #    raddrizzerebbe: il prodotto delle due interpolazioni non fa 1
+    #    a meta' corsa. Quindi la FORMA scala, gli altri due traslano.
+    _mf = stile[stile.index("#p2pMorfo.parte .morfo-forma{"):
+                stile.index("@media (prefers-reduced-motion:reduce){\n    #p2pMorfo")]
+    prova("solo la forma scala; glifo e scritta traslano", (1, 3),
+          (_mf.count("scale("), _mf.count("translate(")))
+    prova("...e il raggio di partenza e' il 50%, non dei pixel", True,
+          "#p2pMorfo.parte .morfo-forma{border-radius:50%;" in stile)
+    # il colore di partenza e' quello del LATO, e lo dice la classe sul
+    # body — la stessa che veste il + e il logo, mai una tinta letta a
+    # mano da JS
+    prova("...e la tinta di partenza e' quella del lato", True,
+          "body.p2p-vendo #p2pMorfo.parte .morfo-forma{" in stile
+          and "getComputedStyle" not in morfo + chiumo + vesti)
+
+    # D) I TEMPI STANNO IN DUE COSTANTI e l'attesa della scritta e' la
+    #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
+    #    la corsa finisce, e non un istante dopo. Ribattuta nel CSS,
+    #    il giorno che una delle due cambia il conto non torna piu'.
+    prova("la corsa dura 380ms e la dissolvenza 160", True,
+          "const P2P_MORFO_MS = 380;" in mini
+          and "const P2P_MORFO_VELO = 160;" in mini)
+    prova("...e l'attesa della scritta e' la differenza", True,
+          "(P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms'" in vesti
+          and "transition-delay:0s,var(--morfo-attesa)" in stile)
+    prova("...e la corsa in volo si puo' interrompere", True,
+          "clearTimeout(p2pMorfoTimer)" in
+          pezzo_js(mini, "function posaMorfoP2P(){", "\n}\n"))
+    # IL COLORE CORRE COL VELO e non con la corsa, e l'ha deciso un
+    # fotogramma: dal verde del lato all'arancio di casa la strada
+    # passa per un verde-oliva torbido, e a 380ms quel guado si vedeva
+    # per un terzo del volo (misurato a t=95: rgb(123,142,59)). A 160
+    # il cambio d'identita' si consuma insieme alla sparizione del
+    # glifo (a t=131 il colore e' gia' arancio).
+    prova("...e il colore corre col velo, non con la corsa", True,
+          "background-color var(--morfo-velo) ease," in stile
+          and "box-shadow var(--morfo-velo) ease}" in stile)
+
+    # H) LA LEZIONE DEL GIRO, e vale piu' di tutte le righe qui sopra.
+    #    `--morfo-curva` era USATA nel `transition` e scritta da
+    #    nessuno. Un `var()` irrisolto NON fallisce: invalida TUTTA la
+    #    riga `transition`, che torna al suo valore iniziale (`all
+    #    0s`). Nessun errore, nessuna riga in console, lo stato di
+    #    partenza e quello d'arrivo giusti al pixel, e la corsa che
+    #    semplicemente non c'e' — il bottone compariva gia' arrivato.
+    #    ⚠️ E NEL BROWSER PANE SI VEDEVA IDENTICO, perche' li' le
+    #    transizioni sono spente per emulazione: a trovarlo e' stato
+    #    un Chrome vero via CDP, campionando `transitionDuration`
+    #    (0s invece di 0.38s). Da qui il censimento: ogni --morfo-*
+    #    usata nel foglio di stile dev'essere scritta o dal CSS o da
+    #    vestiMorfoP2P.
+    _usate = set(re.findall(r"var\((--morfo-[a-z]+)", stile))
+    _scritte = (set(re.findall(r"setProperty\('(--morfo-[a-z]+)'", vesti))
+                | set(re.findall(r"(--morfo-[a-z]+):", stile)))
+    prova("ogni --morfo-* usata la scrive qualcuno", set(), _usate - _scritte)
+    prova("...e sono otto, non una di piu'", 8, len(_usate | _scritte))
+
+    # E) DOVE NON SI FA, ed e' la meta' che tiene in piedi la promessa
+    #    di sempre: in reduced-motion il foglio si apre come si e'
+    #    sempre aperto, e da 768px in su non c'e' nessun tondo che
+    #    scende (il + e' una pillola nella topbar).
+    prova("in reduced-motion la morfosi non nasce", True,
+          "matchMedia('(prefers-reduced-motion: reduce)').matches" in puoi)
+    prova("...e nemmeno da 768px in su", True,
+          "matchMedia('(max-width: 767px)').matches" in puoi)
+    prova("...e allora il foglio si apre come sempre", True,
+          "if (!apriMorfoP2P()) el('p2pNuovoSheet').classList.add('open');"
+          in pezzo_js(mini, "function apriNuovoOrdineP2P(){", "\n}\n"))
+
+    # F) IL RITORNO SI AGGANCIA ALLA CLASSE e non ai chiamanti: il
+    #    foglio lo chiudono in tre (il gesto indietro, la spazzata di
+    #    closeSheet, chiudiFoglioP2P dopo la pubblicazione) e un
+    #    quarto domani lo dimenticherebbe in silenzio.
+    occhio = pezzo_js(mini, "function occhioMorfoP2P(){", "\n}\n")
+    prova("il ritorno lo accorge un occhio sulle classi", True,
+          "new MutationObserver(" in occhio
+          and "attributeFilter: ['class']" in occhio
+          and "if (era && !ora) chiudiMorfoP2P();" in occhio)
+    # ...e si RIMISURA invece di riciclare: fra apertura e chiusura la
+    # tastiera puo' essersi alzata e il bottone non e' piu' dov'era
+    prova("...e il ritorno rimisura invece di riciclare", True,
+          "vestiMorfoP2P(g, tondo.getBoundingClientRect()," in chiumo)
+
+    # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
+    #    cronologia censisce `.sheet.open`, e un quarto strato li'
+    #    dentro costerebbe un gradino di indietro per niente.
+    prova("il fantasma c'e', coi suoi tre strati", True,
+          '<div id="p2pMorfo" aria-hidden="true">' in mini
+          and '<i class="morfo-forma"></i>' in mini
+          and '<span class="morfo-glifo">＋</span>' in mini
+          and '<span class="morfo-eti"></span>' in mini)
+    prova("...e non e' un foglio: la cronologia non lo vede", False,
+          '<div id="p2pMorfo" class="sheet"' in mini)
+    # l'etichetta si COPIA dal bottone vero: due scritte uguali in due
+    # posti divergono al primo ritocco, e il fantasma direbbe una cosa
+    # e il bottone un'altra a mezza corsa
+    # ...e il motore della corsa quella scritta non la NOMINA mai: la
+    # prende dal bottone. (Contarla in tutto il file direbbe 2, che e'
+    # il commento del fantasma a nominarla — la trappola di sempre.)
+    prova("...e l'etichetta la copia dal bottone vero", True,
+          "if (e) e.textContent = eti;" in vesti
+          and "Pubblica ordine" not in morfo + chiumo + vesti)
+    # e i due VERI spariscono per la durata della corsa: un tondo fermo
+    # dietro il fantasma smentirebbe l'illusione
+    prova("...e i due veri si nascondono, senza perdere il posto", True,
+          "tondo.style.visibility = cela ? 'hidden' : '';" in
+          pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n")
+          and "meta.style.visibility = cela ? 'hidden' : '';" in
+          pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n"))
 
 
 def prove_p2p_canale():
