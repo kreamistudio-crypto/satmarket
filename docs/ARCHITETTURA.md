@@ -23780,8 +23780,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   riquadro — un riquadro dice «questo è un blocco» meglio di una riga.
   ⚠️ IL VESTITO DELLA STIMA È UN SELETTORE DISCENDENTE
   (`.p2p-ord > .p2p-sats`), e non è pignoleria: `.p2p-sats` vive in
-  altre DUE case — `renderOrdineP2P` e `rigaScambioP2P` — e un
-  `display:block` sulla classe nuda le manderebbe a capo tutte. È il
+  un'altra casa — `rigaScambioP2P`, la card di «I miei scambi» — e un
+  `display:block` sulla classe nuda la manderebbe a capo anche lì.
+  (ERANO DUE fino al set 2026: la terza era `renderOrdineP2P`, dove la
+  riga euro/sats ha lasciato il posto al CONTO intero — vedi CANTIERI,
+  «Il conto del proprietario, nella pagina del suo scambio».) È il
   patto di casa «stessa classe, stesso mestiere, vestito diverso in
   casa diversa» (`.acq-art .qta-mini`, `.av-foto`), e a dire che tiene
   è la MISURA prima e dopo: le altre due case identiche al pixel.

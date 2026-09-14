@@ -13082,3 +13082,122 @@ un padding. È la famiglia delle *prove che rispondono per il vicino*,
 stavolta su un'**indentazione** invece che su un contenitore: si ancora
 alla prima dichiarazione (`.foglio-testa{display:flex`), che è di una
 sola delle due.
+
+## Il conto del proprietario, nella pagina del suo scambio (14 set 2026)
+
+Due ritocchi chiesti da Andrea, tutti e due nella pagina che si apre da
+«I miei scambi» (`renderOrdineP2P`), e il secondo è piccolo solo a
+guardarlo.
+
+**LA CARD DICEVA MENO DI QUEL CHE DICE IL LIBRO A UNO SCONOSCIUTO.** In
+cima allo scambio c'era una riga sola — «25,00 €» a sinistra, «≈ 7 301
+sats» a destra — mentre chi apre lo stesso ordine dal libro vede il
+CONTO SCORPORATO per intero: Controvalore, premio o sconto, Subtotale,
+«Fee Barattolo» con la sua pillola, e il riquadro finale con quel che
+passa di mano. Cioè **il proprietario dell'ordine era l'unico a non
+sapere quanto paga e quanto riceve davvero**, e in particolare a non
+vedere la sua metà della commissione. Adesso la card **è** quel conto.
+
+**LA TRADUZIONE ESISTEVA GIÀ, e non se n'è scritta una seconda:**
+`comeLibroP2P` porta la riga locale nel vocabolario del libro
+(«compro» ↦ `sell`, perché in tutti e due i casi chi legge riceve
+sats), e da lì `contoDettP2P` fa il resto — il verso, i nomi delle
+voci, il segno di ogni riga e la METÀ della commissione che tocca a chi
+guarda. Un giudice solo, mai una formula col segno girato: è la stessa
+regola già scritta per il giudizio del premio, che dai due lati del
+vetro si legge al rovescio.
+
+⚠️ **E QUI IL CONTO NON PUÒ STIMARE, che è la parte che non si vedeva
+chiedendo il ritocco.** Nella pagina di uno scambio l'ordine è quasi
+sempre **già preso**, e da quel momento il cambio è fissato: «Info P2P»
+lo promette con queste parole — *da lì in poi non cambia più*. Il conto
+del libro invece stima dal cambio di adesso, quindi messo lì com'era
+avrebbe detto oggi un numero e domani un altro su un affare chiuso — e,
+a cambio muto, **tutti trattini** su una pagina dove il numero è un
+fatto. Di più: togliendo la riga vecchia sarebbe sparita dalla pagina
+l'unica cifra esatta che c'era.
+
+**LA CURA È UN INGRESSO SOLO, `satsDetti`**, e vale il **Subtotale** e
+non il Controvalore. Il perché sta nei byte di mostro, ed era già a
+verbale: `get_market_amount_and_fee` chiama `get_fee(new_sats_amount)`,
+e quel numero esce da `get_market_quote` **col premio già applicato**.
+Quindi la cifra del coordinatore è il gradino DOPO il premio, e a farle
+fare il Controvalore si scriverebbe «Controvalore di 25,00 €» accanto a
+un numero che il premio se l'è già mangiato. Il Controvalore si **ricava
+all'indietro** con la formula del coordinatore rovesciata
+(`scorporaPremioP2P`: mercato = controvalore × (1 − p/100)), e allora le
+righe **sommano**: 7605 − 304 = 7301, − 73 di metà commissione = 7228.
+Sono i numeri del primo scambio vero, ed è così che la prova li chiede —
+le cifre in fila, non «la riga c'è».
+
+**LE TRE COSE CHE IL RAMO DICHIARA.** 1) A premio zero non c'è niente da
+scorporare e il Controvalore È la cifra detta, **senza il `≈`**: è un
+fatto. 2) Il Subtotale resta l'unica riga esatta delle tre, e
+Controvalore e premio tornano a portare il `≈` perché li abbiamo
+ricavati noi. 3) **Su un intervallo ancora aperto la cifra detta non si
+usa**: il coordinatore collassa i due capi (`fiat_amount`) insieme
+all'importo, e finché l'euro è una fascia («20,00–100,00 €») un numero
+solo di sats non le corrisponde — meglio le due stime.
+
+**IL VESTITO: una scatola sola.** Il conto sta DENTRO `.p2p-ord`, e lì
+perde la sua cornice — fondo, bordo e raggio li mette già la card, e
+due scatole della stessa forma a un dito di distanza sono il difetto
+che il riquadro finale aveva già pagato. Col padding a zero il riquadro
+finale perde anche i suoi **margini negativi**, ed è una cosa sola e non
+due: quei margini erano calcolati sui 10px del conto per portarlo a filo
+di un bordo che qui non c'è più. Guardato a 375 e a 320 su quattro casi
+(preso, preso col premio, ancora in stima, lato vendo): a 320 la riga
+della fee manda la cifra a capo, che è il `.conto-p2p` di sempre — «a
+cedere è la destra».
+
+**IN CIMA RESTA IL SOLO MARCHIO.** «Lo scambio» diceva a parole quel che
+il marchio dice già, e con lei se n'è andata la riga puntinata di
+`.section-label` — che serve a separare DUE sezioni, e sotto ce n'è una
+sola.
+
+⚠️ **E LA FRASE IN FONDO SE N'È ANDATA PER DUE RAGIONI, non per una.**
+«I sats dello scambio restano custoditi in garanzia: Barattolo non li
+tiene e non li vede» stava **sotto «Ritira l'ordine»**, cioè dopo che
+uno ha già deciso — la stessa ragione per cui sotto il conto del libro
+non c'è più niente. Ma la seconda pesa di più: dal 14 set 2026 **il
+coordinatore siamo noi**, e «Barattolo non li tiene» diceva il contrario
+di quel che «Info P2P» adesso scrive per esteso. Era una delle *frasi
+comode* del giro prima, rimasta in piedi in un posto dove non l'aveva
+cercata nessuno. Il FATTO che regge — i sats stanno **in garanzia** —
+resta detto dai passi, dallo stato e dal foglio della hold, e la
+sentinella è stata **rovesciata**: prima pretendeva la formula, adesso
+la vieta.
+
+⚠️ **UNA SENTINELLA DEL RECINTO RISPONDEVA PER IL VICINO**, trovata
+mettendoci accanto la prova nuova: la fetta della vista dello scambio
+tagliava al secondo «============» della sua **stessa intestazione**,
+cioè dopo 47 caratteri — `'class="vault"' not in vista` era verde su una
+stringa che non conteneva nessun markup. Adesso la fetta parte dal `<div
+class="view">` e arriva al commento della vista dopo. È la famiglia già
+nota (*prove che rispondono per il vicino*), qui su un **delimitatore
+che compare due volte nella riga di apertura**.
+⚠️ E LA PROVA NUOVA CI È CASCATA SUBITO, nel modo più istruttivo: «niente
+`section-label` qui dentro» falliva perché quella parola sta nel
+**commento che spiega perché non c'è più**. I commenti si tolgono prima
+di guardare — una sentinella ingannata dalla propria spiegazione è il
+caso limite di questa famiglia.
+
+**9746 verdi**, 0 rosse. Nel banco del conto sette casi nuovi (stima,
+cifra detta secca, col premio, con lo sconto, lato vendo, intervallo
+aperto, cambio muto) più lo scorporo provato sui cinque valori di
+bordo; nel banco del motore la pagina viene **fatta girare** e si guarda
+che la card sia il conto, che la sua base sia la cifra del coordinatore
+(99 000 → 98 505, fee viva 1%, metà 0,5%) e che la testa a due colonne e
+la frase in fondo non ci siano più.
+
+**RESTA DA GUARDARE, ed è fuori dal perimetro di questo giro:**
+`satsNetti` è `order.amount` del coordinatore, cioè il **lordo** — i
+7301 dello scambio vero del 7 set, da cui al destinatario ne sono
+arrivati 7264 (verificato allora, al satoshi). Il conto adesso lo tratta
+per quello che è, e le sue righe tornano. Ma il foglio «Dove ricevere i
+sats» dice ancora «Riceverai 7301 sats» e **rifiuta una fattura da
+7264**, cioè proprio dell'importo che il compratore incassa davvero:
+`inviaIncassoP2P` confronta la cifra della bolt11 con `satsNetti`
+secco. Da verificare sui byte di mostro (`is_valid_invoice`) prima di
+toccarlo — ma il nome `satsNetti` su un numero che netto non è viene da
+lì, ed è la stessa origine. Cantiere suo.
