@@ -12682,3 +12682,16 @@ la barra si apre a vista. La sentinella adesso guarda la
 taratura dice ancora qualcosa. Misurato in Chrome vero: forma a
 destinazione a 364 ms, fantasma posato a 431, colore e voci
 interpolati per intero come prima.
+
+⚠️ **E UNA QUINTA: 320** — `380 → 520 → 450 → 380 → 320`. Stessa
+ricetta della quarta: scendono **tutt'e due** i numeri (la dissolvenza
+a 128, che sono i **due quinti esatti**) e la coreografia non si tocca
+— l'attesa resta 192, i tre quinti in cui la barra si apre a vista.
+Misurato in Chrome vero: forma a destinazione a 301 ms, fantasma
+posato a 368.
+**E QUI C'È UN PAVIMENTO, ed è la cosa da lasciare scritta: sotto i
+300 non si scende.** Più giù l'occhio non segue più una FORMA che si
+trasforma — vede due stati e un lampo in mezzo — e allora tanto
+varrebbe non farla, la morfosi. La sentinella nuova guarda **quello**,
+non il numero di oggi: è l'unica cosa che una sesta taratura non deve
+poter scavalcare per sbaglio.

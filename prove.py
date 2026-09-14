@@ -44205,10 +44205,10 @@ def prove_p2p_pubblica():
     #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
     #    la corsa finisce, e non un istante dopo. Ribattuta nel CSS,
     #    il giorno che una delle due cambia il conto non torna piu'.
-    # 380, ED E' IL QUARTO NUMERO: 380 -> 520 -> 450 -> 380 (tarature
-    # di Andrea, guardate sul telefono). Torna al primo e non e' un
-    # giro a vuoto: il primo 380 andava stretto perche' la CURVA
-    # schizzava via, e a cambiare da allora e' stata quella.
+    # 320, ED E' IL QUINTO NUMERO: 380 -> 520 -> 450 -> 380 -> 320
+    # (tarature di Andrea, guardate sul telefono). Il ritorno a 380 era
+    # stato possibile perche' nel frattempo era cambiata la CURVA: il
+    # primo 380 andava stretto per lei, non per i millesimi.
     # I DUE NUMERI SCENDONO INSIEME, e la riga lo dice col CONTO: la
     # dissolvenza resta il 40% della corsa, quindi l'attesa — la loro
     # differenza — resta i tre quinti in cui la barra si apre a vista.
@@ -44216,8 +44216,15 @@ def prove_p2p_pubblica():
     # che Andrea ne chiede un quinto la riga dice ancora qualcosa.
     _ms = int(re.search(r"const P2P_MORFO_MS = (\d+);", mini).group(1))
     _velo = int(re.search(r"const P2P_MORFO_VELO = (\d+);", mini).group(1))
-    prova("la corsa dura 380ms e la dissolvenza 150", (380, 150),
+    prova("la corsa dura 320ms e la dissolvenza 128", (320, 128),
           (_ms, _velo))
+    # ⚠️ E SOTTO I 300 NON SI SCENDE: piu' giu' l'occhio non segue piu'
+    # una FORMA che si trasforma, vede due stati e un lampo in mezzo —
+    # e allora tanto varrebbe non farla. La riga guarda il PAVIMENTO,
+    # non il numero di oggi: e' l'unica cosa che una taratura non
+    # deve poter scavalcare per sbaglio.
+    prova("...e non scende sotto i 300, dove la morfosi non si legge",
+          True, _ms >= 300)
     prova("...e la dissolvenza resta i due quinti della corsa", 0.4,
           round(_velo / _ms, 1))
     prova("...e l'attesa e' la differenza, per la scritta e per il foglio",

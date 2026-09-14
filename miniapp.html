@@ -40327,20 +40327,24 @@ let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
    il foglio un modale centrato — non c'e' nessun tondo che scende —
    e in reduced-motion il foglio si apre come si e' sempre aperto. In
    tutt'e due i casi la via di ieri non e' un ripiego: e' la strada. */
-/* 380, ed e' il QUARTO numero: 380 -> 520 -> 450 -> 380 (tarature di
-   Andrea, guardate sul telefono). Torna al primo, e non e' un giro a
-   vuoto: il primo 380 andava stretto perche' la CURVA schizzava via —
-   a un decimo della corsa era gia' a meta' strada —, e a cambiare da
-   allora e' stata quella. Con una curva che parte piano gli stessi
-   millesimi si leggono, e mezzo secondo si era rivelato il difetto
-   opposto: un'apertura che si fa aspettare la seconda volta.
-   I DUE NUMERI SCENDONO INSIEME, che e' il modo di non toccare la
-   coreografia: la dissolvenza resta il 40% della corsa, quindi
-   l'attesa — la loro differenza, 230 — resta i tre quinti in cui la
-   barra si apre a vista. E scritta e foglio finiscono di comparire
-   sempre sull'ultimo fotogramma. */
-const P2P_MORFO_MS = 380;     /* la corsa intera: forma, centro, raggio, colore */
-const P2P_MORFO_VELO = 150;   /* la dissolvenza fra il glifo e la scritta */
+/* 320, ed e' il QUINTO numero: 380 -> 520 -> 450 -> 380 -> 320
+   (tarature di Andrea, guardate sul telefono). Mezzo secondo si era
+   rivelato il difetto opposto di 380 — un'apertura che si fa
+   aspettare la seconda volta —, e il ritorno a 380 era stato
+   possibile perche' nel frattempo era cambiata la CURVA: il primo 380
+   andava stretto per lei, che a un decimo della corsa era gia' a
+   meta' strada, non per i millesimi.
+   I NUMERI SCENDONO INSIEME, che e' il modo di non toccare la
+   coreografia: la dissolvenza resta i DUE QUINTI esatti della corsa,
+   quindi l'attesa — la loro differenza, 192 — resta i tre quinti in
+   cui la barra si apre a vista, e scritta e foglio finiscono di
+   comparire sempre sull'ultimo fotogramma.
+   ⚠️ E SOTTO I 300 NON SI SCENDE, che e' l'unica cosa da sapere se un
+   giorno arrivasse un sesto numero: piu' giu' l'occhio non segue piu'
+   una FORMA che si trasforma, vede due stati e un lampo in mezzo — e
+   allora tanto varrebbe non farla, la morfosi. */
+const P2P_MORFO_MS = 320;     /* la corsa intera: forma, centro, raggio, colore */
+const P2P_MORFO_VELO = 128;   /* la dissolvenza fra il glifo e la scritta */
 let p2pMorfoTimer = null;     /* la corsa in volo, per poterla interrompere */
 let p2pMorfoOcchio = null;    /* l'osservatore che si accorge della chiusura */
 
