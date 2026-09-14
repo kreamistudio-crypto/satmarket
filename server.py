@@ -1247,6 +1247,37 @@ except ImportError:
         "buff.ly", "rebrand.ly", "short.io", "rb.gy", "t.ly", "lnkd.in",
         "shorturl.at", "s.id", "bl.ink", "tiny.cc", "shorte.st")
 
+# LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026). Gli UNICI
+# domini che una descrizione puo' rendere TOCCABILI: tutto il resto
+# resta testo copiabile, cioe' quel che e' sempre stato per tutti.
+# BIANCA e non nera, ed e' la differenza che decide tutto: una lista
+# nera e' una rincorsa — ogni dominio di phishing nuovo passa finche'
+# qualcuno non lo aggiunge — mentre una bianca puo' sbagliare solo per
+# DIFETTO, e il suo errore e' un sito onesto che resta testo, cioe'
+# esattamente la vita di oggi. Si sbaglia dalla parte giusta.
+# Coppia (dominio, percorsi ammessi). IL PERCORSO C'E' perche' un
+# dominio fidato puo' ospitare un redirect aperto — `youtube.com/
+# redirect?q=...` e' una pagina YouTube VERA — e senza di lui la lista
+# bianca si scavalcherebbe da dentro. Tupla vuota = tutto il dominio, e
+# si scrive solo dove ogni percorso e' un video (youtu.be, vimeo.com).
+# E' una leva-LISTA: va aggiunta a mano al censimento in `prove.py`, o
+# la suite ESPLODE invece di diventare rossa.
+try:
+    from config import LINK_DESCRIZIONE_AMMESSI
+except ImportError:
+    LINK_DESCRIZIONE_AMMESSI = (
+        ("youtube.com", ("/watch", "/shorts/", "/playlist", "/live/",
+                         "/embed/", "/channel/", "/c/", "/user/", "/@")),
+        ("youtu.be", ()),
+        ("vimeo.com", ()),
+    )
+# Quanti ne diventano toccabili in una descrizione sola. Oltre questo
+# una descrizione non e' piu' una descrizione, e' una bacheca di link —
+# e lo spazio pubblicitario qui SI VENDE (il banner del negozio, che
+# costa una revisione umana). I link in piu' restano testo e l'annuncio
+# non si blocca: e' una misura, non un divieto.
+LINK_DESCRIZIONE_QUANTI = 5
+
 # L'offerta lampo (lug 2026, modello Vinted «sconto ai follower»): il
 # venditore sconta a tempo TUTTO l'annuncio; chi l'ha nel barattolo
 # viene avvisato in modo anonimo. Lo sconto e' PUBBLICO (vale per
@@ -2809,6 +2840,141 @@ def link_banner_ammesso(url: str, vietati, casa: str) -> tuple[str, str]:
             return "", ("Gli indirizzi accorciati non si possono "
                         "controllare: scrivi il link per esteso")
     return u, ""
+
+
+# Un link in una descrizione si riconosce SOLO nella sua forma intera e
+# dichiarata: `https://` e poi tutto cio' che non e' spazio. Niente
+# `www.` nudo, niente `youtu.be/xyz` senza schema — e non per pigrizia:
+# un riconoscitore generoso sbaglia IN AVANTI, e qui sbagliare in avanti
+# vuol dire accendere un link che nessuno aveva scritto come tale.
+_LINK_NEL_TESTO = re.compile(r"https://[^\s<>\"']+")
+# La punteggiatura che in italiano sta attaccata all'ultima parola e non
+# appartiene mai all'indirizzo.
+_CODA_PROSA = ".,;:!?\"'»)]}"
+# Un indirizzo DENTRO l'indirizzo: e' la forma di ogni redirect aperto.
+# Vale su qualunque dominio della lista, ed e' la rete che prende quelli
+# che ancora non sappiamo di avere — si scoprono sempre dopo.
+_URL_ANNIDATO = re.compile(r"https?(://|%3a%2f%2f)", re.I)
+
+
+def _coda_sbucciata(u: str) -> str:
+    """`(vedi https://youtu.be/abc).` senza la coda della frase. La
+    parentesi chiusa se ne va SOLO se dentro l'indirizzo non ce n'e' una
+    aperta: `.../Foo_(bar)` e' un indirizzo vero, e sbucciarlo lo
+    romperebbe in silenzio."""
+    while u and u[-1] in _CODA_PROSA:
+        # `>=` e non `>`, e la differenza e' tutto il caso:
+        # `.../a_(b)` ha le parentesi PARI, cioe' la chiusa e'
+        # sua e non della frase — con `>` se la mangiava.
+        if u[-1] == ")" and u.count("(") >= u.count(")"):
+            break
+        u = u[:-1]
+    return u
+
+
+def link_descrizione(testo: str, ammessi, vietati, casa: str) -> list[dict]:
+    """I link di una descrizione che si possono rendere TOCCABILI:
+    `[{"testo", "link", "dominio"}, ...]`, e quasi sempre vuota.
+
+    IL PATTO CHE REGGE TUTTO: `testo` e `link` sono LA STESSA STRINGA, e
+    non per caso — escono dalla stessa variabile apposta. Quel che si
+    legge E' la destinazione, quindi l'inganno classico — il testo dice
+    una cosa, il link ne apre un'altra — qui non e' difficile: e'
+    IMPOSSIBILE. E' la differenza col banner del negozio, che e'
+    un'immagine e il suo indirizzo lo nasconde per forza, e per cui
+    infatti il dominio va scritto nella testata del foglio.
+    DA QUI LA REGOLA A VERBALE (set 2026, decisione di Andrea): NESSUNA
+    ETICHETTA, MAI. Un «guarda il video» al posto dell'indirizzo
+    ricomprerebbe in un colpo solo tutto il phishing che questa funzione
+    esiste per tenere fuori. Se un giorno sembrera' un'idea carina, e'
+    questa riga che deve fermarla.
+
+    LE SEI REGOLE DURE NON SI RISCRIVONO: le fa `link_banner_ammesso`,
+    nata per il banner e valida identica qui — solo https, niente
+    credenziali nell'URL, host ASCII senza punycode, niente IP nudi ne'
+    porte, niente accorciatori, mai casa nostra. Sopra ci sta la LISTA
+    BIANCA, che e' l'unica cosa nuova.
+
+    IL DOMINIO SI CHIEDE ALL'HOST, MAI AL TESTO. `"youtube.com" in url`
+    e' il modo sbagliato ed e' quello con cui `youtube.com.tizio.ru`
+    passerebbe: il suo host finisce per `.ru`. Si confronta
+    `host == dominio` oppure `host.endswith("." + dominio)`, e a fare
+    tutto il lavoro e' IL PUNTO DAVANTI — senza, entrerebbe
+    `evilyoutube.com`.
+
+    I FALSI NON DANNO ERRORE E NON AVVISANO NESSUNO: restano testo. E'
+    il verso giusto in cui sbagliare — chi ha scritto un indirizzo
+    onesto fuori lista si ritrova la vita di oggi, e chi ne ha scritto
+    uno finto pure.
+
+    Il ritorno e' la stringa ESATTA che sta nella descrizione, e ci si
+    puo' contare: la regex non cattura spazi, quindi lo `.strip()` di
+    `link_banner_ammesso` non ha niente da togliere. E' su questo che il
+    client trova i pezzi senza rifare nessun parse."""
+    fuori: list[dict] = []
+    if not testo:
+        return fuori
+    visti = set()
+    for grezzo in _LINK_NEL_TESTO.findall(testo):
+        u = _coda_sbucciata(grezzo)
+        if not u or u in visti:
+            continue
+        visti.add(u)
+        u, _motivo = link_banner_ammesso(u, vietati, casa)
+        if not u:
+            continue
+        try:
+            p = urlparse(u)
+        except ValueError:
+            continue
+        host = (p.hostname or "").lower()
+        percorso = p.path or "/"
+        ammesso = False
+        for dominio, percorsi in (ammessi or ()):
+            dominio = (dominio or "").lower()
+            if not dominio:
+                continue
+            if host != dominio and not host.endswith("." + dominio):
+                continue
+            ammesso = not percorsi or any(
+                percorso.startswith(pre) for pre in percorsi)
+            break                      # un host sta in un dominio solo
+        if not ammesso:
+            continue
+        if _URL_ANNIDATO.search(f"{percorso}?{p.query}#{p.fragment}"):
+            continue
+        # `testo` e `link` SONO la stessa variabile: vedi il patto in
+        # cima, e la prova che lo tiene in piedi in prove.py
+        fuori.append({"testo": u, "link": u, "dominio": dominio_link(u)})
+        if len(fuori) >= LINK_DESCRIZIONE_QUANTI:
+            break
+    return fuori
+
+
+def link_vivi(testo: str) -> list[dict]:
+    """Il giudice con le leve VIVE. I chiamanti usano solo questa, cosi'
+    le tre costanti stanno in un posto solo e il giorno che una cambia
+    cambia per tutti insieme."""
+    return link_descrizione(testo, LINK_DESCRIZIONE_AMMESSI,
+                            BANNER_LINK_VIETATI, _casa_barattolo())
+
+
+def riga_link_moderazione(testo: str) -> str:
+    """La riga per chi modera, o "" se non c'e' niente da dire.
+
+    Esiste perche' NESSUNO dei giudici vede la descrizione intera: l'AI
+    ne legge 600 caratteri, il messaggio Telegram 300, la riga nella
+    coda del pannello 200 — e il form non ha nessun tetto. Un link messo
+    piu' in la' di cosi' non lo vedrebbe nessuno. Finche' i link erano
+    morti non importava; da quando tre domini si accendono, importa.
+    A contare e' IL GIUDICE e non l'occhio, quindi il troncamento non se
+    la puo' mangiare: e' un fatto che arriva intero."""
+    vivi = link_vivi(testo or "")
+    if not vivi:
+        return ""
+    domini = " · ".join(dict.fromkeys(v["dominio"] for v in vivi))
+    voce = "link toccabile" if len(vivi) == 1 else "link toccabili"
+    return f"\n🔗 {len(vivi)} {voce}: {html.escape(domini)}"
 
 
 def _banner_pubblico(stato: str, foto: str, link: str,
@@ -13568,6 +13734,17 @@ def arricchisci_righe_vetrina(righe):
         # dove oggi la riga si disegna.
         r["avviso_wallet"] = promette_recupero_wallet(
             r.get("titolo") or "", r.get("descrizione") or "")
+        # 3-ter) I LINK TOCCABILI della descrizione (set 2026): il
+        # verdetto lo da' il server e il client non rifa' nessun
+        # giudizio — non e' una preferenza, e' la ragione scritta sopra
+        # `dominio_link`. Qui c'e' in piu' che lo STESSO verdetto lo
+        # legge la moderazione (`riga_link_moderazione`): due parser
+        # darebbero un giorno due risposte, e una delle due sarebbe
+        # quella che decide cosa si apre.
+        # Quasi sempre lista vuota, e costa quasi niente: la regex
+        # fallisce subito su una descrizione senza `https://`, che sono
+        # quasi tutte.
+        r["link_descrizione"] = link_vivi(r.get("descrizione") or "")
         # 3-bis) `ultimo` (ago 2026): «ne resta UNO e ne ha avuti piu'
         # d'uno». UN campo derivato invece del numero grezzo, per la
         # ragione di zona_comune: il nome porta gia' dentro la risposta
@@ -14565,7 +14742,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
         f"«{d['titolo'][:80]}» — "
         f"{testo_prezzo(valuta, prezzo_sats, prezzo_eur)}{marca_asta}\n"
-        f"Venditore: {user['first_name']} (id {user['id']})")
+        f"Venditore: {user['first_name']} (id {user['id']})"
+        + riga_link_moderazione(d.get("descrizione", "")))
     if not asta_secondi:
         # E parte anche verso la piazza Nostr, in sottofondo: se i
         # relay tacciono, chi pubblica non se ne accorge nemmeno.
@@ -16012,6 +16190,31 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # e la scheda la mostra. A sparire e' solo lo squillo.
     # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
     # stabile fa si' che sostituisca il precedente da solo
+    # I LINK CHE NASCONO DA UNA MODIFICA (set 2026). Una modifica pulita
+    # non ha mai suonato a nessuno, ed e' giusto cosi'; ma un link
+    # TOCCABILE che entra in vetrina e' una cosa che entra in vetrina,
+    # cioe' lo strato 3. Senza questa riga si pubblicava pulito e si
+    # infilava il link il giorno dopo, e non lo sapeva nessuno: l'AI
+    # ri-giudica davvero (e blocca il vietato), ma un link AMMESSO le
+    # passa davanti senza lasciare traccia da nessuna parte.
+    # SOLO I NUOVI: ri-dire ogni volta quelli gia' visti sarebbe rumore,
+    # e il rumore si impara a saltare — che e' il modo in cui un avviso
+    # muore.
+    if not in_revisione:
+        prima = {v["link"] for v in link_vivi(a["descrizione"] or "")}
+        nati = [v for v in link_vivi(d.get("descrizione", ""))
+                if v["link"] not in prima]
+        if nati:
+            domini = " · ".join(dict.fromkeys(v["dominio"] for v in nati))
+            await notifica_admin(
+                f"🔗 <b>Link nuovo in un annuncio</b>\n"
+                f"Annuncio #{annuncio_id} "
+                f"«{html.escape(d['titolo'][:80])}» — "
+                f"{html.escape(domini)}\n"
+                f"Venditore: {html.escape(user['first_name'] or '')} "
+                f"(id {user['id']})")
+    # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
+    # stabile fa si' che sostituisca il precedente da solo
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
                                           solo_aggiornamento=True))
     return {"ok": True, "id": annuncio_id, **conto_foto}
@@ -16423,7 +16626,10 @@ async def avvisa_revisione(annuncio_id: int, motivo: str):
              f"Venditore: {html.escape(a['venditore'] or '')} "
              f"(id {a['venditore_id']})\n"
              f"Motivo AI: {html.escape(motivo or 'caso ambiguo')}\n"
-             f"<i>{html.escape((a['descrizione'] or '')[:300])}</i>")
+             f"<i>{html.escape((a['descrizione'] or '')[:300])}</i>"
+             # i 300 caratteri qui sopra possono aver gia' mangiato un
+             # link: questa riga la scrive il giudice, e non tronca
+             + riga_link_moderazione(a["descrizione"] or ""))
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
         destinatari.add(999)
@@ -17632,6 +17838,14 @@ def _leve_stato():
                   len(BANNER_LINK_VIETATI),
                   spento="nessun accorciatore fermato: un link corto si "
                          "approva pulito e domani punta altrove"),
+            _leva("Link toccabili in descrizione",
+                  "LINK_DESCRIZIONE_AMMESSI",
+                  _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
+                  spento="nessun link si tocca: le descrizioni sono "
+                         "tutte testo copiabile, come prima del set 2026",
+                  acceso="solo questi domini si toccano, e solo sui "
+                         "percorsi dichiarati: tutto il resto resta "
+                         "testo"),
         ]},
         {"gruppo": "💾 Consegna digitale", "voci": [
             _leva("Tetto per compratori nuovi (sats)",

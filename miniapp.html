@@ -4865,6 +4865,26 @@
   .sfilza.tocca{cursor:pointer}
   .stars{color:var(--sats);letter-spacing:1px}
   .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
+  /* IL LINK DENTRO LA DESCRIZIONE (set 2026). Si deve vedere che
+     e' toccabile PRIMA di toccarlo — ma soprattutto si deve vedere
+     che gli ALTRI non lo sono, ed e' quella la meta' che conta: il
+     giorno che qui tutto sembrasse uguale, chi legge imparerebbe «i
+     link si toccano» e proverebbe anche su quello di phishing, che
+     resta testo e non risponde.
+     La sottolineatura e' TRATTEGGIATA apposta: dice «toccabile»
+     senza travestirsi da link qualunque del web, e l'indirizzo
+     resta leggibile per intero — perche' l'indirizzo E' la
+     destinazione (vedi link_descrizione, «il patto che regge
+     tutto»). Niente icona e niente etichetta: quel che si legge e
+     quel che si apre sono la stessa stringa.
+     `break-all` sul SOLO link: un indirizzo lungo non deve allargare
+     la scheda oltre lo schermo, e la prosa intorno tiene le sue
+     parole intere. */
+  .desc-link{color:var(--trust);font-weight:700;cursor:pointer;
+    text-decoration:underline;text-decoration-style:dashed;
+    text-underline-offset:2px;word-break:break-all}
+  .desc-link:focus-visible{outline:2px solid var(--trust);
+    outline-offset:2px;border-radius:4px}
 
   /* L'INSEGNA DEL NEGOZIO (ago 2026): la foto che il venditore appende
      sopra il suo catalogo, dentro il rientro di #negozioHeader come
@@ -9746,6 +9766,13 @@ function mapListing(a){
     creato:a.creato||0, modificato:a.modificato||0,
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
+    /* I LINK TOCCABILI della descrizione (set 2026): arrivano GIA'
+       giudicati dal server (`link_descrizione`), e qui non si rifa'
+       nessun giudizio — e' la regola gia' scritta sopra
+       `dominio_link`, portata fino in fondo. Un server di ieri non
+       manda il campo: lista vuota, cioe' descrizione tutta testo,
+       cioe' la vita di prima. Nessun ramo d'errore. */
+    linkOk:Array.isArray(a.link_descrizione)?a.link_descrizione:[],
     /* le visualizzazioni (set 2026): private, il server le manda SOLO
        al proprietario (e agli admin) — un annuncio altrui non porta
        mai questo campo, e undefined||0 lo fa sparire da solo */
@@ -13654,6 +13681,81 @@ function apriLinkBanner(){
     poi: () => {
       if (tg?.initData && tg.openLink) tg.openLink(b.link);
       else window.open(b.link, '_blank', 'noopener');
+    }});
+}
+
+/* LA DESCRIZIONE COI SUOI LINK (set 2026). Il testo resta quel che e'
+   sempre stato — `esc` su tutto — e a diventare toccabili sono SOLO i
+   pezzi che il server ha gia' giudicato ammessi.
+   IL CLIENT NON PARSA NIENTE, ed e' la riga da non ammorbidire: non
+   cerca indirizzi, non guarda domini, non decide. Prende le stringhe
+   che il giudice gli ha consegnato e le TROVA nel testo, che e'
+   un'altra cosa — un secondo parser qui sarebbe il posto da cui un
+   giorno quel che si legge e quel che si apre direbbero due cose
+   diverse (il patto scritto sopra `dominio_link`).
+   E IL FILTRO `v.testo === v.link` E' LA SECONDA META' DEL PATTO:
+   anche se un server di domani mandasse un'etichetta al posto
+   dell'indirizzo, da qui non uscirebbe niente. La regola — il testo
+   visibile E' la destinazione — vale su tutt'e due i lati, o non e'
+   una regola, e' una speranza. */
+function descrizioneHTML(l){
+  const raw = String(l?.desc ?? '');
+  const tutti = l?.linkOk || [];
+  const vivi = tutti.filter(
+    v => v && v.testo && v.testo === v.link && raw.includes(v.testo));
+  if (!vivi.length) return esc(raw);
+  /* i piu' LUNGHI per primi: se un indirizzo e' il prefisso di un
+     altro, deve vincere quello intero — al contrario resterebbe una
+     coda di testo orfana attaccata al link */
+  const rx = new RegExp(vivi.slice()
+    .sort((a,b) => b.testo.length - a.testo.length)
+    .map(v => v.testo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|'), 'g');
+  let fuori = '', da = 0, m;
+  while ((m = rx.exec(raw)) !== null) {
+    fuori += esc(raw.slice(da, m.index));
+    /* l'indice e' quello dell'elenco INTERO, non dei filtrati: e'
+       quello che apriLinkDescrizione andra' a rileggere, e due
+       numerazioni diverse aprirebbero il link sbagliato */
+    const i = tutti.findIndex(v => v.testo === m[0]);
+    /* L'INDIRIZZO NON ENTRA MAI IN UN ATTRIBUTO, nemmeno scappato:
+       nell'onclick va l'INDICE e basta — il patto di `linkCanaleTest`,
+       lo stesso del banner. E NON e' un <a href>: senza href non c'e'
+       niente che un `target="_blank"` possa scavalcare, quindi
+       l'uscita passa per forza dalla conferma. */
+    fuori += `<span class="desc-link" role="button" tabindex="0"`
+      + ` onclick="apriLinkDescrizione(${i})"`
+      + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
+      + `{event.preventDefault();apriLinkDescrizione(${i})}"`
+      + ` title="Apri su ${esc(tutti[i].dominio)}">${esc(m[0])}</span>`;
+    da = m.index + m[0].length;
+  }
+  return fuori + esc(raw.slice(da));
+}
+/* L'USCITA SI CHIEDE, col DOMINIO in testata: chi tocca deve sapere
+   dove va. E' il gemello di `apriLinkBanner` e ne eredita tutto,
+   compreso il pattern di casa per aprire.
+   IL TESTO E' LEGGERO e non quello del banner (decisione di Andrea):
+   «non e' protetto dal deposito di garanzia» su un video sarebbe
+   rumore — nessuno compra su YouTube — e il rumore si impara a
+   saltare, che e' il modo in cui un avviso muore.
+   La conferma non e' un doppione della lista bianca: quella risponde
+   «la destinazione e' onesta?», questa «lo sai che stai uscendo?».
+   Sono due domande diverse, e la seconda e' quella che rende visibile
+   la prima. */
+function apriLinkDescrizione(i){
+  const v = (currentListing?.linkOk || [])[i];
+  if (!v || !v.link || v.testo !== v.link) return;
+  chiediConferma({
+    titolo: 'Esci da Barattolo?',
+    testata: `🔗 <b>${esc(v.dominio)}</b>`,
+    corpo: 'Questo indirizzo non è di Barattolo e non lo controlliamo '
+         + 'noi. Quello che trovi lì non c\'entra col deposito di '
+         + 'garanzia di questo annuncio.',
+    etichetta: 'Apri',
+    poi: () => {
+      if (tg?.initData && tg.openLink) tg.openLink(v.link);
+      else window.open(v.link, '_blank', 'noopener');
     }});
 }
 
@@ -19325,7 +19427,7 @@ function openDetail(id){
               nuovo, e la fila resta una fila di fatti. */
            : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:''))}
       <div class="desc-tit">Descrizione</div>
-      <div class="desc">${esc(l.desc)}</div>
+      <div class="desc">${descrizioneHTML(l)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}</b>${

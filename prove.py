@@ -20611,6 +20611,15 @@ def _censimento(acceso):
     # causa in piu'. Stringhe vere e non [1,2,3], che qui il pannello
     # ci fa una differenza fra due liste.
     amb["RELAYS_VERIFICA"] = ["wss://uno.example", "wss://due.example"]
+    # LA LISTA BIANCA DEI LINK e' una lista di COPPIE
+    # (dominio, percorsi), non di nomi: `[1, 2, 3]` come le altre non
+    # si spacchetta, e la prova ESPLODEREBBE invece di diventare rossa
+    # — la trappola scritta in cima a `_ConfigFinto`, con la causa in
+    # piu' della forma. E il VUOTO qui vuol dire qualcosa («nessun
+    # link si tocca», la vita di prima del set 2026), quindi si
+    # esercitano tutt'e due i rami invece di inchiodarla.
+    amb["LINK_DESCRIZIONE_AMMESSI"] = (
+        [("uno.example", ()), ("due.example", ("/x",))] if acceso else [])
     # I RELAY DEL COORDINATOR P2P sono una lista che a leve spente e'
     # VUOTA (non c'e' una lista di serie, apposta): [1,2,3] fisso come
     # le altre lascerebbe la riga «accesa» anche nel censimento spento,
@@ -29138,8 +29147,13 @@ def prove_fogli_di_casa():
     # CINQUANTASEI (14 set 2026, il dettaglio della fee dinamica): un
     # AVVISO degenere, nessuna azione — solo un «Ho capito» — perche'
     # spiegare due percentuali non e' un gesto che si possa sbagliare.
-    prova("i gesti che passano dalla domanda unica sono cinquantasei",
-          56, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTASETTE (set 2026, i link toccabili nella descrizione):
+    # l'uscita verso un dominio della lista bianca. La lista dice se
+    # la destinazione e' onesta, questa domanda dice a chi tocca che
+    # sta USCENDO — sono due cose diverse, e la seconda e' quella che
+    # rende visibile la prima (il patto del banner del negozio).
+    prova("i gesti che passano dalla domanda unica sono cinquantasette",
+          57, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -55133,6 +55147,375 @@ def prove_profilo_sezioni():
             prova(nome, atteso, avuto)
 
 
+def prove_link_descrizione():
+    """I LINK TOCCABILI NELLE DESCRIZIONI (set 2026, richiesta dal
+    campo: i link si copiavano a mano).
+
+    Fino a ieri una descrizione era testo e basta — e non per una
+    decisione a verbale: per l'EFFETTO COLLATERALE di `esc`. Cercato
+    nei tre documenti, di link nelle descrizioni non c'era scritto
+    niente, quindi non c'era nessuna scelta da rovesciare ma nemmeno
+    nessuna protezione disegnata. Da adesso tre domini — youtube.com,
+    youtu.be, vimeo.com — diventano toccabili, e tutti gli altri
+    restano esattamente quel che erano.
+
+    QUI SI DIFENDE IL PATTO, che vale piu' del codice: `testo` e `link`
+    sono la stessa stringa, quindi quel che si legge E' la
+    destinazione, e l'inganno classico — il testo dice una cosa, il
+    link ne apre un'altra — non e' difficile: e' IMPOSSIBILE. Si
+    difende sui DUE lati (il giudice non emette mai una coppia diversa,
+    il client non renderebbe mai una coppia diversa), perche' su un
+    lato solo sarebbe una speranza e non una regola.
+
+    E IL GIUDICE GIRA sui casi veri, coi CATTIVI per primi: le
+    sentinelle dicono che una funzione esiste, mai che risponda giusto,
+    e `youtube.com.tizio.ru` e' LA domanda del cantiere."""
+    print("\n[i link toccabili nella descrizione]")
+    from urllib.parse import urlparse as _up
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL GIUDICE, girato per davvero -------------------------
+    amb = {"re": re, "urlparse": _up, "LINK_BANNER_MAX": 300,
+           "LINK_DESCRIZIONE_QUANTI": 5}
+    i = src.index("_LINK_NEL_TESTO = ")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    for f in ("dominio_link", "link_banner_ammesso", "_coda_sbucciata",
+              "link_descrizione"):
+        exec(pezzo(f), amb)
+    AMMESSI = (
+        ("youtube.com", ("/watch", "/shorts/", "/playlist", "/live/",
+                         "/embed/", "/channel/", "/c/", "/user/", "/@")),
+        ("youtu.be", ()), ("vimeo.com", ()))
+    VIET, CASA = ("bit.ly", "t.co", "tinyurl.com"), "barattolo.store"
+
+    def G(t):
+        return amb["link_descrizione"](t, AMMESSI, VIET, CASA)
+
+    # I CATTIVI PER PRIMI, ed e' l'ordine giusto: una lista bianca si
+    # giudica da cosa TIENE FUORI, non da cosa lascia passare.
+    cattivi = (
+        # LA domanda del cantiere: il suo host finisce per `.ru`, e a
+        # trovarlo e' il PUNTO davanti al dominio
+        ("youtube.com.tizio.ru", "https://youtube.com.tizio.ru/watch?v=x"),
+        # senza il punto, questo entrerebbe
+        ("evilyoutube.com", "https://evilyoutube.com/watch?v=x"),
+        # l'inganno visivo piu' vecchio che ci sia: l'host e' evil.ru
+        ("credenziali nell'URL", "https://youtube.com@evil.ru/watch"),
+        # un dominio fidato che rimanda dove gli pare: e' la ragione
+        # per cui la lista bianca guarda anche il PERCORSO
+        ("il redirect aperto di YouTube",
+         "https://www.youtube.com/redirect?q=http://evil.ru"),
+        ("...e il suo fratello attribution_link",
+         "https://youtube.com/attribution_link?u=http://evil.ru"),
+        ("un percorso fuori lista", "https://youtube.com/signin"),
+        # e l'indirizzo dentro l'indirizzo prende anche i redirect che
+        # non sappiamo ancora di avere, su qualunque dominio
+        ("URL annidato, codificato",
+         "https://vimeo.com/1?u=https%3A%2F%2Fevil.ru"),
+        ("URL annidato su un host senza percorsi",
+         "https://youtu.be/x?next=https://evil.ru"),
+        ("http, mai", "http://youtu.be/abc12345678"),
+        ("punycode", "https://xn--youtbe-cxa.com/watch?v=x"),
+        # LE DUE CHE ISOLANO LE SEI REGOLE DURE, e ci e' voluta la
+        # tortura per capire che mancavano: su un host FUORI lista a
+        # fermare l'accorciatore o le credenziali basta la lista
+        # bianca, quindi togliendo `link_banner_ammesso` quelle prove
+        # restavano verdi lo stesso. Le sole che lo provano davvero
+        # sono quelle su un host AMMESSO con la forma storta.
+        ("una porta su un host ammesso",
+         "https://youtu.be:8080/abc12345678"),
+        ("credenziali su un host ammesso",
+         "https://tizio:x@youtu.be/abc12345678"),
+        ("un accorciatore", "https://bit.ly/youtube"),
+        ("senza schema non e' un link", "guarda youtu.be/abc12345678"),
+        ("omografo cirillico", "https://y\u043eutube.com/watch?v=x"),
+        ("IP nudo", "https://93.184.216.34/watch"),
+        ("casa nostra", "https://barattolo.store/annuncio/1"),
+        # e il caso piu' comune di tutti: un sito onesto, fuori lista.
+        # Resta testo, cioe' si ritrova la vita di oggi — si sbaglia
+        # per DIFETTO, ed e' il verso giusto.
+        ("un sito onesto fuori lista", "https://lamiabottega.it/scheda"),
+        ("una descrizione normale", "Bici da corsa. Ritiro a Pavia."),
+        ("il vuoto", ""),
+    )
+    for nome, t in cattivi:
+        prova(f"resta testo: {nome}", [], G(t))
+
+    buoni = (
+        ("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "youtube.com"),
+        ("https://youtu.be/dQw4w9WgXcQ", "youtu.be"),
+        ("https://youtube.com/shorts/abc123", "youtube.com"),
+        ("https://vimeo.com/123456789", "vimeo.com"),
+        ("https://m.youtube.com/watch?v=x", "m.youtube.com"),
+        ("https://www.youtube.com/@nomecanale", "youtube.com"),
+    )
+    for u, dom in buoni:
+        prova(f"si accende: {u}",
+              [{"testo": u, "link": u, "dominio": dom}],
+              G(f"Ecco: {u} e basta."))
+
+    # ---- 2. LA CODA DELLA FRASE non entra nell'indirizzo -----------
+    def primo(t):
+        return (G(t) or [{}])[0].get("testo")
+
+    prova("il punto finale resta alla frase", "https://youtu.be/abc123",
+          primo("Video: https://youtu.be/abc123."))
+    prova("...e la parentesi della frase pure", "https://youtu.be/abc123",
+          primo("(vedi https://youtu.be/abc123)"))
+    prova("...e la virgola", "https://youtu.be/abc123",
+          primo("Qui https://youtu.be/abc123, e poi altro"))
+    # ...MA una parentesi PARI e' dell'indirizzo: sbucciarla lo
+    # romperebbe in silenzio, ed e' la rossa che ha corretto il
+    # giudice (era `>`, va `>=`).
+    prova("una parentesi PARI e' dell'indirizzo, e resta",
+          "https://vimeo.com/a_(b)", primo("https://vimeo.com/a_(b)"))
+
+    # ---- 3. IL PATTO, sul lato del giudice -------------------------
+    misti = ("Prova https://youtu.be/uno, poi https://youtube.com/watch?v=due "
+             "e https://evil.ru/tre e https://vimeo.com/4.")
+    r = G(misti)
+    prova("i tre ammessi si accendono e l'intruso no", 3, len(r))
+    prova("...e su OGNUNO testo e link sono la stessa stringa", True,
+          all(v["testo"] == v["link"] for v in r))
+    # e la stringa e' quella VERA della descrizione: e' l'aggancio su
+    # cui il client trova i pezzi senza rifare nessun parse
+    prova("...e ognuna sta DAVVERO dentro la descrizione", True,
+          all(v["testo"] in misti for v in r))
+
+    prova("lo stesso indirizzo due volte esce una volta sola", 1,
+          len(G("https://youtu.be/x1 ... e ancora https://youtu.be/x1")))
+    prova("oltre il tetto restano testo", 5,
+          len(G(" ".join(f"https://youtu.be/v{n:02d}" for n in range(9)))))
+    # SPEGNERE LA LEVA RIPORTA A IERI, ed e' la garanzia che serve al
+    # VPS: una lista vuota nel config e non si tocca piu' niente.
+    prova("lista vuota: nessun link si tocca", [],
+          amb["link_descrizione"]("https://youtu.be/abc", (), VIET, CASA))
+
+    # ---- 4. LE LEVE DI SERIE ---------------------------------------
+    i = src.index("LINK_DESCRIZIONE_AMMESSI = (")
+    leva = src[i:src.index("\n    )", i)]
+    for dom in ("youtube.com", "youtu.be", "vimeo.com"):
+        prova(f"di serie c'e' {dom}", True, f'"{dom}"' in leva)
+    # IL PERCORSO NON E' UN ORNAMENTO: senza, `youtube.com/redirect`
+    # sarebbe un link ammesso. La riga guarda che i percorsi ci siano
+    # DAVVERO e che `/redirect` non sia fra loro.
+    prova("youtube.com dichiara i suoi percorsi", True, '"/watch"' in leva)
+    prova("...e /redirect non e' fra quelli", False, "redirect" in leva)
+
+    # ---- 5. LA RESA NEL CLIENT, girata in node ---------------------
+    for nome, atteso, avuto in (_banco_link_client(mini) or
+                                [("il banco della resa gira", True, True)]):
+        prova(nome, atteso, avuto)
+
+    # ---- 6. SENTINELLE ---------------------------------------------
+    # IL DETTAGLIO passa dalla funzione: se qualcuno rimettesse
+    # `esc(l.desc)` i link tornerebbero morti e nessuna prova
+    # funzionale se ne accorgerebbe.
+    prova("il dettaglio rende la descrizione col giudice", True,
+          '<div class="desc">${descrizioneHTML(l)}</div>' in mini)
+    prova("...e non c'e' piu' nessun esc(l.desc) nudo", False,
+          '<div class="desc">${esc(l.desc)}</div>' in mini)
+    # IL CLIENT NON PARSA: se in `descrizioneHTML` comparisse un
+    # riconoscitore suo — un `https` cercato, una regex di URL —
+    # sarebbe il secondo giudice, e un giorno direbbe un'altra cosa.
+    _dh = _senza_commenti_js(pezzo_js(mini, "function descrizioneHTML"))
+    prova("sentinella: il client non cerca 'https' da solo", False,
+          "https" in _dh)
+    # e non fabbrica un href: senza href non c'e' niente che un
+    # target="_blank" possa scavalcare, quindi l'uscita passa per
+    # forza dalla conferma (il patto del banner)
+    prova("sentinella: niente href nella resa", False, "href" in _dh)
+    # L'INDIRIZZO NON ENTRA IN UN ATTRIBUTO: nell'onclick va l'indice.
+    # ⚠️ LA PRIMA STESURA DI QUESTA RIGA ERA CIECA, e l'ha detto la
+    # tortura: cercava `apriLinkDescrizione(${i})` e basta, cioe' che
+    # la forma buona ci fosse DA QUALCHE PARTE — e mettendo l'URL
+    # nell'onclick restava verde, perche' la forma buona sopravviveva
+    # nell'onkeydown due righe sotto. La cura e' guardare i DUE
+    # attributi (il conto) e soprattutto dire la cosa NEGATIVA: dentro
+    # lo span non deve entrarci nessun `.link`.
+    prova("sentinella: l'indice sta in tutt'e due gli attributi", 2,
+          _dh.count("apriLinkDescrizione(${i})"))
+    _span = _dh[_dh.index('<span class="desc-link"'):_dh.index("</span>")]
+    prova("sentinella: nello span non entra MAI l'indirizzo", False,
+          ".link" in _span)
+    # IL PATTO, sul lato del client: e' la seconda meta', e da sola
+    # varrebbe poco — insieme all'altra rende l'etichetta impossibile
+    prova("sentinella: la resa rifiuta una coppia diversa", True,
+          "v.testo === v.link" in _dh)
+    _al = _senza_commenti_js(pezzo_js(mini, "function apriLinkDescrizione"))
+    prova("sentinella: ...e l'uscita pure", True,
+          "v.testo !== v.link" in _al)
+    # L'USCITA SI CHIEDE, e col DOMINIO: chi tocca deve sapere dove va
+    prova("sentinella: si esce solo dal foglio di conferma", True,
+          "chiediConferma" in _al and "v.dominio" in _al)
+    prova("sentinella: ...e col pattern di casa per aprire", True,
+          "tg.openLink" in _al and "noopener" in _al)
+
+    # LA CHIAVE DEL PAYLOAD SI SCRIVE IN DUE POSTI: il server la mette
+    # nel collo di bottiglia, il client la legge in `mapListing`. Una
+    # `link_descrizione` di qua e una `linkDescrizione` di la' non
+    # farebbero NESSUN rumore — il client leggerebbe `undefined`,
+    # cadrebbe sul fail-open della lista vuota, e i link resterebbero
+    # morti senza che niente diventi rosso. E' il caso di `slug`, che
+    # la sua prova incrociata se l'e' gia' dovuta pagare.
+    prova("il server scrive il campo nel collo di bottiglia", True,
+          'r["link_descrizione"] = link_vivi('
+          in codice(pezzo("arricchisci_righe_vetrina")))
+    prova("...e il client legge ESATTAMENTE quella chiave", True,
+          "a.link_descrizione" in mini)
+    # ...e il collo di bottiglia e' UNO: se un domani una rotta
+    # servisse annunci saltandolo, la descrizione arriverebbe senza
+    # il verdetto e i link sarebbero morti solo li' — il genere di
+    # difetto che si vede solo dalla pagina sbagliata.
+    prova("...e il campo nasce in un posto solo", 1,
+          src.count('r["link_descrizione"] = link_vivi('))
+
+    # LA RIGA PER CHI MODERA, e i tre posti che la chiamano. Esiste
+    # perche' nessun giudice vede la descrizione intera (600 all'AI,
+    # 300 nel messaggio, 200 nella coda) e il form non ha un tetto: un
+    # link piu' in la' non lo vedrebbe nessuno.
+    prova("la riga per chi modera esiste", True,
+          "def riga_link_moderazione(" in src)
+    prova("...e la chiama l'avviso dell'annuncio nuovo", True,
+          "riga_link_moderazione(d.get(\"descrizione\", \"\"))"
+          in codice(pezzo("pubblica")))
+    prova("...e quello della revisione (che copre anche gli import)",
+          True, "riga_link_moderazione(a[\"descrizione\"]"
+          in codice(pezzo("avvisa_revisione")))
+    # E LA MODIFICA: senza, si pubblicava pulito e si infilava il link
+    # il giorno dopo, e non lo sapeva nessuno.
+    _mod = codice(pezzo("modifica_annuncio"))
+    prova("...e la modifica avvisa dei link NUOVI", True,
+          "link_vivi(a[\"descrizione\"]" in _mod and "if nati:" in _mod)
+    # IL PANNELLO DELLE LEVE la nomina: quali leve sono ACCESE lo dice
+    # il valore VIVO, e una leva che il pannello non nomina e' una
+    # leva che nessuno sa di avere.
+    prova("il pannello delle leve nomina la lista bianca", True,
+          '"LINK_DESCRIZIONE_AMMESSI"' in codice(pezzo("_leve_stato")))
+
+
+def _senza_commenti_js(js):
+    """Le sole righe di CODICE di una funzione JS. E' il gemello di
+    `codice()`, e serve per la stessa ragione: in un progetto che
+    commenta molto la parola-spia finisce prima o poi in una riga di
+    prosa che la spiega, e la sentinella diventa rossa (o verde) per
+    il motivo sbagliato — tre volte in due giorni, la lezione e'
+    scritta."""
+    js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+    return "\n".join(r for r in js.split("\n")
+                     if not r.strip().startswith("//"))
+
+
+def _banco_link_client(mini):
+    """La RESA vera dentro node: `descrizioneHTML` e
+    `apriLinkDescrizione` estratte da miniapp.html e girate sui casi.
+    Le sentinelle dicono che il codice c'e'; solo questo dice cosa
+    disegna — e la domanda «quel che si legge e quel che si apre sono
+    la stessa cosa?» si risponde solo guardando l'uscita."""
+    import json as _json
+    import subprocess
+    import tempfile
+    js = (pezzo_js(mini, "const esc = s =>", "\nconst el =") + "\n"
+          + pezzo_js(mini, "function descrizioneHTML") + r"""
+let currentListing = null, apertoCon = null;
+function chiediConferma(c){ apertoCon = c; c.poi && c.poi(); }
+const tg = {};
+const window = {open: (u) => { apertoCon.aperto = u; }};
+function rendi(desc, linkOk){
+  currentListing = {desc, linkOk};
+  return descrizioneHTML(currentListing);
+}
+function visibile(h){
+  return [...h.matchAll(/<span class="desc-link"[^>]*>([^<]*)<\/span>/g)]
+    .map(x => x[1]);
+}
+function apri(i){ apertoCon = null; apriLinkDescrizione(i);
+                  return apertoCon ? apertoCon.aperto : null; }
+const L = (u, d) => ({testo: u, link: u, dominio: d});
+const o = {};
+o.nudo = rendi('Bici nuova <b>occasione</b>', []);
+const uno = [L('https://youtu.be/abc','youtu.be')];
+o.uno = rendi('Prova: https://youtu.be/abc e basta', uno);
+o.uno_vis = visibile(o.uno);
+o.uno_apre = apri(0);
+o.amp_vis = visibile(rendi('Qui https://youtube.com/watch?v=x&t=9 ok',
+  [L('https://youtube.com/watch?v=x&t=9','youtube.com')]));
+o.xss = rendi('<script>alert(1)</script> https://youtu.be/a',
+  [L('https://youtu.be/a','youtu.be')]);
+const et = [{testo:'Guarda il video', link:'https://evil.ru',
+             dominio:'evil.ru'}];
+o.etichetta = rendi('Guarda il video', et);
+o.etichetta_apre = apri(0);
+o.fantasma = rendi('Nessun indirizzo qui',
+  [L('https://youtu.be/zzz','youtu.be')]);
+o.prefisso_vis = visibile(rendi('https://youtu.be/abc123 fine',
+  [L('https://youtu.be/abc','youtu.be'),
+   L('https://youtu.be/abc123','youtu.be')]));
+const misto = [{testo:'ciao', link:'https://evil.ru', dominio:'evil.ru'},
+               L('https://youtu.be/buono','youtu.be')];
+o.indice = rendi('ciao https://youtu.be/buono', misto);
+o.indice_apre = apri(1);
+o.indice_n = (o.indice.match(/apriLinkDescrizione\((\d)\)/) || [])[1];
+o.due_n = visibile(rendi('https://youtu.be/x e ancora https://youtu.be/x',
+  [L('https://youtu.be/x','youtu.be')])).length;
+o.href = o.uno.includes('href');
+console.log(JSON.stringify(o));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        os.unlink(p)
+        return None
+    os.unlink(p)
+    if r.returncode != 0:
+        return [("il banco della resa gira", "", r.stderr[-300:])]
+    o = _json.loads(r.stdout)
+    return [
+        ("senza link la descrizione resta scappata e basta",
+         "Bici nuova &lt;b&gt;occasione&lt;/b&gt;", o["nudo"]),
+        ("un link ammesso diventa uno span toccabile", True,
+         'class="desc-link"' in o["uno"]),
+        # IL PATTO, visto dall'uscita: quel che si LEGGE e quel che si
+        # APRE sono la stessa stringa. E' la prova che vale piu' di
+        # tutte le sentinelle messe insieme.
+        ("...e quel che si legge e' l'indirizzo",
+         ["https://youtu.be/abc"], o["uno_vis"]),
+        ("...e quel che si apre e' lo stesso",
+         "https://youtu.be/abc", o["uno_apre"]),
+        # la & si vede scappata ma l'aggancio regge: la resa scappa i
+        # PEZZI, non cerca dentro il testo gia' scappato
+        ("la & dell'indirizzo non rompe l'aggancio",
+         ["https://youtube.com/watch?v=x&amp;t=9"], o["amp_vis"]),
+        ("lo scudo anti-XSS non cade", True,
+         "&lt;script&gt;" in o["xss"] and "<script>" not in o["xss"]),
+        # IL PATTO sul lato del client: un server di domani che
+        # mandasse un'etichetta non otterrebbe niente
+        ("un'etichetta al posto dell'indirizzo non si rende", False,
+         'class="desc-link"' in o["etichetta"]),
+        ("...e nemmeno si apre", None, o["etichetta_apre"]),
+        ("un link che nel testo non c'e' si ignora", False,
+         'class="desc-link"' in o["fantasma"]),
+        ("fra un prefisso e l'indirizzo intero vince l'intero",
+         ["https://youtu.be/abc123"], o["prefisso_vis"]),
+        # l'indice e' quello dell'elenco INTERO: con due numerazioni
+        # diverse si aprirebbe il link sbagliato, in silenzio
+        ("l'indice nell'onclick e' quello dell'elenco intero",
+         "1", o["indice_n"]),
+        ("...e apre davvero quello", "https://youtu.be/buono",
+         o["indice_apre"]),
+        ("lo stesso indirizzo due volte si accende due volte", 2,
+         o["due_n"]),
+        ("nessun href da nessuna parte", False, o["href"]),
+    ]
+
+
+# ====================================================================
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -58135,7 +58518,7 @@ def main():
               prove_porta_timer, prove_feedback_confermato,
               prove_servizi,
               prove_sintassi_client,
-              prove_banner_negozio,
+              prove_banner_negozio, prove_link_descrizione,
               prove_foto_vuota, prove_foto_metadati,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,

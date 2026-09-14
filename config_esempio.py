@@ -292,6 +292,25 @@ BANNER_LINK_VIETATI = (
     "buff.ly", "rebrand.ly", "short.io", "rb.gy", "t.ly", "lnkd.in",
     "shorturl.at", "s.id", "bl.ink", "tiny.cc", "shorte.st")
 
+# LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
+# domini che una descrizione di annuncio rende TOCCABILI. Tutto il
+# resto resta testo copiabile, cioe' la vita di sempre.
+# BIANCA e non nera: una lista nera e' una rincorsa (ogni dominio di
+# phishing nuovo passa finche' qualcuno non lo aggiunge), una bianca
+# puo' sbagliare solo per difetto — e il suo errore e' un sito onesto
+# che resta testo, che non fa male a nessuno.
+# Coppia (dominio, percorsi ammessi). Il PERCORSO c'e' perche' un
+# dominio fidato puo' ospitare un redirect aperto («youtube.com/
+# redirect?q=...» e' una pagina YouTube vera). Tupla vuota = tutto il
+# dominio, e si scrive solo dove ogni percorso e' un video.
+# Svuotarla ( = () ) spegne la funzione: nessun link si tocca piu'.
+LINK_DESCRIZIONE_AMMESSI = (
+    ("youtube.com", ("/watch", "/shorts/", "/playlist", "/live/",
+                     "/embed/", "/channel/", "/c/", "/user/", "/@")),
+    ("youtu.be", ()),
+    ("vimeo.com", ()),
+)
+
 # --- La ronda del libro mastro ---------------------------------------
 # Una volta al giorno l'orologio ripassa gli INVARIANTI del database
 # (l'aritmetica degli ordini, la cassa delle aste chiuse, la forma di
