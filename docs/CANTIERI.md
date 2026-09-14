@@ -11758,3 +11758,113 @@ base di prima e diceva «178 righe tolte», cioè un `git commit` fatto lì
 sopra avrebbe cancellato in silenzio il lavoro appena spinto. **Finché
 siamo in due sulla stessa cartella il numero globale delle prove non è
 più di nessuno dei due: vale il delta delle sezioni che si toccano.**
+
+
+## Le card di «I miei scambi», in quattro righe (14 set 2026)
+
+**LA CARD DI UNO SCAMBIO MIO ERA RIMASTA INDIETRO**, e si vedeva
+mettendola accanto a quelle del libro: due righe strette — «5,00 €» a
+sinistra e una cifra in sats a destra — e sotto una riga grigia che
+metteva in fila tre cose che non c'entrano l'una con l'altra: il lato
+(«⬇️ Compri»), lo stato e «👉 tocca a te». Per sapere da che parte si
+stava bisognava leggere **in fondo**, e lo stato — che è la ragione per
+cui uno apre quella pagina — stava in mezzo, fra due vicini.
+
+**LE QUATTRO RIGHE** (decisione di Andrea, e il disegno è cambiato in
+corsa: la prima stesura ne aveva tre, coi sats sacrificati). Dall'alto:
+
+1. **«Stai comprando sats» / «Stai vendendo sats»** — la stessa frase
+   che era già il cappello del foglio di dettaglio del libro;
+2. **lo stato** («Ordine pubblicato», «Sats in garanzia», «Dove vuoi i
+   sats?»…);
+3. **la cifra in euro**, coi due capi su un intervallo;
+4. **«per ≈ 8 943 sats»** e accanto il **badge del premio** — «al
+   prezzo di mercato», «4% più conveniente» (verde), «4% meno
+   conveniente» (rosso) — con la formula e le tinte del libro.
+
+⚠️ **I SATS RESTANO SEMPRE VISIBILI, ed è la riga che ha cambiato il
+disegno.** La prima proposta li faceva sparire: la riga 3 diventava
+«euro + badge», come nella card del libro, dove i sats hanno una riga
+loro. Andrea l'ha rovesciata guardandola — su uno scambio in corso la
+cifra in sats è il dato, non un ornamento — e ha aggiunto la quarta
+riga. Costa una riga di card e toglie l'unico caso in cui la card
+sarebbe rimasta muta: un ordine a **prezzo fisso**, che il badge non
+ce l'ha per definizione (quel prezzo il mercato non lo guarda).
+
+**IL GIUDIZIO SI ROVESCIA, e non è un difetto: è la cosa stessa.** Il
+premio è a somma zero, quindi lo stesso +4% è un affare per uno e una
+bastonata per l'altro. Sul MIO ordine di acquisto mi fa ricevere meno
+sats — «meno conveniente» —, mentre a chi lo prende (che vende) ne fa
+consegnare meno — «più conveniente». Nel libro la card descrive
+l'ordine di UN ALTRO, e chi legge sta sempre dall'altra parte; qui
+descrive il PROPRIO, e chi legge è il titolare.
+**A tenere insieme le due letture è una TRADUZIONE, non una seconda
+formula** (`comeLibroP2P`): la riga locale dice il lato con altre
+parole — `compro`/`vendo` invece di `buy`/`sell` — e per giunta dal
+verso opposto, quindi `compro ↦ sell` («in tutt'e due i casi chi legge
+riceve sats»). Con quella in mezzo, le tre formule del libro —
+`satsMercatoP2P`, `nettoLatoP2P` e il giudice del premio — valgono
+tali e quali. Una seconda formula col segno girato si sarebbe scollata
+dalla prima al primo ritocco, **e in silenzio**: un badge verde su un
+affare cattivo non fa fallire niente, lo legge solo chi sta per
+decidere.
+
+**IL BADGE E LA FRASE SONO USCITI DALLE CARD**, perché da oggi le
+dicono due elenchi: `badgePremioP2P` + `affareP2P` e `fraseLatoP2P`
+sono pure, e le chiamano il libro, «I miei scambi» e il cappello del
+dettaglio. Nel farlo è saltata fuori una **TERZA copia del giudice**,
+nel conto scorporato del dettaglio: adesso chiama anche lui. Tre copie
+di un giudizio non si scoprono da sole — vedi sopra: non rompono
+niente.
+
+⚠️ **E UN ROSSO CHE NON DICEVA NIENTE È CADUTO CON LORO.** Il commento
+di `.p2p-ord .p2p-sats` prometteva «solo nel libro: nelle altre case la
+cifra resta arancio», e c'era pure una sentinella che si chiamava così
+— ma la card di uno scambio **è** una `.p2p-ord`, quindi i propri sats
+si vestivano del tab del LIBRO: diventavano rossi solo perché l'ultima
+volta si era guardato «Vendi BTC». Rosso, nella pagina dei propri
+scambi, dove il rosso è l'allarme. Lo chiude una riga —
+`body .p2p-ord.p2p-scambio .p2p-sats` —, e il `body` in testa non è
+decorazione: pareggia la specificità di `body.p2p-vendo .p2p-ord
+.p2p-sats` e sta dopo, quindi vince.
+**LA SENTINELLA È STATA EMENDATA, non cancellata**: contava DUE regole
+e ne concludeva un colore. È la famiglia delle *prove che rispondono
+per il vicino* — si contava il numero di regole invece del colore che
+ne esce. Adesso pretende il neutralizzatore **e il suo posto nel
+foglio**, cioè verifica quel che il suo nome dice.
+
+**LO SPOGLIATOIO DEI COMMENTI HA UN BUCO, e l'ha trovato una prova di
+questo giro.** Il modo di casa per cercare una parola «nel codice vivo»
+— togliere `<!-- -->` e poi `/* */` — si mangia **sessantamila
+caratteri di markup**, il segnaposto del titolo del dettaglio compreso:
+a spalancarlo è `accept="image/*,.heic,.heif"`, dove `/*` apre un finto
+commento JS che si chiude solo al primo `*/` vero, molto più in là. La
+cura NON è stata aggiustare lo spogliatoio — vive in una decina di
+sentinelle altrui, e toccarlo qui voleva dire rimisurarle tutte — ma
+**contare frammenti che solo il codice può contenere**: `'
+conveniente</span>'`, `comprando' : 'vendendo'`. Un commento cita la
+frase in prosa, mai con le sue virgolette e il suo `+`.
+
+**IL PIEDE SI SCRIVE SOLO SE HA QUALCOSA DENTRO.** Lì restano «👉 tocca
+a te» **oppure** la ✕, mai insieme — l'uno esce da `azioniDisponibili`,
+che tace su tutti gli stati finali, cioè esattamente quelli su cui
+compare l'altra — quindi al massimo UNA cosa; e una `.p2p-meta` vuota
+lascerebbe un respiro che non separa niente. Il commento della ✕ è
+stato **rimisurato e riscritto**: dichiarava «il caso peggiore sono DUE
+span», che valeva per una riga più affollata di questa.
+
+**I NUMERI.** Suite: **9532 → 9567, zero rosse**, cioè **+35** — il
+banco nuovo per intero (`prove_p2p_card_scambio`), girato anche con
+`PROVE_SEVERE=1` come fa la CI. La linea di partenza è stata misurata
+in un **worktree staccato su HEAD**, non dedotta: in cartella condivisa
+il numero globale non è di nessuno, e il delta della propria sezione sì.
+Dal vivo, quattro scatti via CDP (il Browser pane compone i frame a
+mosaico): sei card nei due temi, a 375 e a **320**. A 320 il documento
+resta **largo 320** — nessuna card sfora, e il badge scende sotto i
+sats da solo; la ✕ sta a 15px dal bordo della card.
+
+**QUEL CHE RESTA FUORI, dichiarato:** il riquadro in cima alla pagina
+del singolo scambio (`renderOrdineP2P`) ha ancora la vecchia forma e
+dice «⬇️ Compri sats» in fondo. Non era nella richiesta; le funzioni
+pure di questo cantiere gli servono già tutte, quindi è un giro corto
+il giorno che lo si vuole.
