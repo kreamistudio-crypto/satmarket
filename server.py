@@ -16872,7 +16872,7 @@ def _leve_stato():
                          "ma non è ancora questa leva a muovere i sats — "
                          "quelli restano Commissione/Protezione qui sopra"),
             _leva("Fee dinamica: split di base oggi",
-                  "fee_dinamica_stato", _fee_dinamica_leva_valore(),
+                  "db: fee_dinamica_stato", _fee_dinamica_leva_valore(),
                   acceso="prima degli sconti fedeltà (pionieri, livello "
                          "massimo), che dipendono da chi compra e chi "
                          "vende in quel preventivo"),

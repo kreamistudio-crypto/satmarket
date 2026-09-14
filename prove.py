@@ -9309,8 +9309,15 @@ def prove_notifica_fail_open():
           [r for r in aperture if "timeout=" not in r])
     # ...e la sentinella non deve poter passare a vuoto: il giorno
     # che qualcuno scrivesse i client in un altro modo, una lista
-    # vuota direbbe «tutto in regola» su zero righe guardate
-    prova("...e ne ha guardati dieci, non zero", 10, len(aperture))
+    # vuota direbbe «tutto in regola» su zero righe guardate.
+    # ⚠️ IL CONTO NON SI SCRIVE PIU' A MANO (set 2026): erano dieci, un
+    # trasporto nuovo li ha fatti undici e la CI di main e' diventata
+    # rossa per un numero da ricordarsi — mentre la cosa da garantire
+    # e' che di righe ne abbia guardate, non che siano esattamente
+    # dieci. E' la stessa correzione gia' fatta al gruppo dei negozi
+    # («il conto NON si scrive a mano»), che sta in questo stesso file.
+    prova("...e ne ha guardati dieci o piu', non zero", True,
+          len(aperture) >= 10)
 
 
 def prove_messaggio_admin():
@@ -19920,6 +19927,18 @@ def _censimento(acceso):
                                        "wss://tre.example"]) if acceso
                              else (lambda: ["wss://uno.example",
                                             "wss://due.example"]))
+    # LA FEE DINAMICA (set 2026) si chiede al GIUDICE come il canale e
+    # il ritmo, e per la stessa ragione: `_fee_dinamica_leva_valore`
+    # APRE IL DATABASE, e trascinare un file su disco dentro questa
+    # prova e' il modo in cui diventa rossa per conto suo. Senza lo
+    # stub `__missing__` lo risolve a 7, il pannello lo CHIAMA e la
+    # prova ESPLODE con «int object is not callable» invece di
+    # diventare rossa — la trappola gia' scritta qui sotto per
+    # `_prezzo_banner`, alla sua quarta occorrenza.
+    amb["_fee_dinamica_leva_valore"] = (
+        (lambda: "compratore 3,0% · venditore 2,0% "
+                 "(punteggio 60/100, 2026-09-14)") if acceso
+        else (lambda: "mai calcolata: neutro di default (2,5% / 2,5%)"))
     amb["SPIEGA_RITMO"] = {"giorno": "uno al giorno per venditore"}
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
@@ -21536,9 +21555,18 @@ def prove_leve():
     # PACCHETTO, e mandare a cercarla nel config sarebbe l'indirizzo
     # sbagliato. Resta il patto: e' il NOME della cosa da andare a
     # cambiare, e un segreto non ha questa forma.
+    # E dalla fee dinamica (set 2026) e' ammesso anche un
+    # «db: tabella»: quel valore non sta nel config e non sta in un
+    # pacchetto — lo scrive ogni notte il ricalcolo dentro una tabella,
+    # e l'unico posto dove uno ci mette le mani e' quella. La forma
+    # porta la sua CASA davanti (come il «pip install») apposta: un
+    # nome minuscolo e basta lo avrebbe ammesso e basta, e un segreto
+    # e' fatto cosi' — minuscolo e alfanumerico.
     def chiave_lecita(c):
         return (c.isupper() or c.startswith("_")
                 or (c.startswith("/") and c[1:].isalpha())
+                or (c.startswith("db: ")
+                    and c[4:].replace("_", "").isalnum() and c[4:].islower())
                 or (c.startswith("pip install ")
                     and c[12:].replace("-", "").isalnum()))
 
