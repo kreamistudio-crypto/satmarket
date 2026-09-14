@@ -1419,6 +1419,17 @@ except ImportError:
     CONTROLLO_LIBRO_MASTRO = True   # la ronda quotidiana degli invarianti:
                                     # legge e avvisa, non corregge mai nulla
 
+# LA RONDA DEI PAYOUT (set 2026): una volta al giorno si chiede a LNbits,
+# PER HASH, com'e' finito ogni pagamento in uscita che il nostro database
+# da' per concluso. E' la sorella per RIGA del conto di cassa, e la
+# differenza e' tutta: quello su un wallet misto non torna mai e quindi
+# non e' un allarme, questa nomina l'ordine e dice cosa fare.
+try:
+    from config import RICONCILIA_PAYOUT
+except ImportError:
+    RICONCILIA_PAYOUT = True   # False = nessuno ricontrolla i payout
+                               # contro LNbits; restano i soli timbri
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -5484,9 +5495,16 @@ def init_db():
     # quando (e sara' la sveglia del ritentativo), `payout_errore`
     # conserva l'ultima parola di LNbits. Prima di loro, di un payout
     # riuscito non restava scritto NIENTE da nessuna parte.
+    # E la QUARTA (set 2026, la ronda di riconciliazione): QUANDO
+    # abbiamo chiesto a LNbits, per hash, com'e' finito quel pagamento e
+    # ci siamo sentiti rispondere che era saldato. Serve a non richiedere
+    # in eterno la stessa cosa: un pagamento saldato e' TERMINALE, non
+    # torna indietro, quindi una volta confermato non si ricontrolla piu'.
+    # Zero = mai verificato, ed e' lo stato di tutte le righe di ieri.
     for tabella in ("ordini", "rimborsi_asta", "pagamenti"):
         for colonna in ("payout_tentativi INTEGER DEFAULT 0",
                         "payout_ultimo INTEGER DEFAULT 0",
+                        "payout_verificato INTEGER DEFAULT 0",
                         "payout_errore TEXT DEFAULT ''"):
             try:
                 con.execute(f"ALTER TABLE {tabella} ADD COLUMN {colonna}")
@@ -17320,6 +17338,11 @@ def _leve_stato():
                   bool(CONTROLLO_LIBRO_MASTRO),
                   spento="gli invarianti non si controllano più da soli: "
                          "restano le query a mano di query_libro_mastro.sql"),
+            _leva("La ronda dei payout", "RICONCILIA_PAYOUT",
+                  bool(RICONCILIA_PAYOUT),
+                  spento="nessuno ricontrolla contro LNbits i pagamenti che "
+                         "diamo per riusciti: un payout fallito dopo la "
+                         "chiusura resterebbe scritto come concluso"),
         ]},
         {"gruppo": "⏱ Tempi e promemoria", "voci": [
             _leva("Conferma dopo la consegna (ore)", "ORE_CONFERMA",
@@ -42673,6 +42696,15 @@ async def orologio():
             await controlla_libro_mastro()
         except Exception as e:
             print(f"⚠️ Ronda del libro mastro saltata: {e}")
+        try:
+            # LA SORELLA PER RIGA: il libro mastro guarda gli invarianti
+            # del nostro database, questa va a chiedere alla CONTROPARTE
+            # se i pagamenti che diamo per fatti siano davvero usciti.
+            # Girano vicine apposta — stessa cadenza, stesso patto:
+            # leggono e avvisano, non correggono mai niente.
+            await riconcilia_payout()
+        except Exception as e:
+            print(f"⚠️ Riconciliazione dei payout saltata: {e}")
         await asyncio.sleep(600)
 
 
@@ -43746,6 +43778,140 @@ CONTROLLI_LIBRO_MASTRO = (
     #   che ci sia — si compra LA PORTA, e chiedere il banner e' un
     #   gesto che viene dopo, quando pare a lui.
 )
+
+TIMBRO_RICONCILIA = "riconcilia_payout"  # il giorno dell'ultima ronda
+# Quante righe si guardano per giro. E' una misura di EDUCAZIONE verso
+# LNbits, non una paura: cinquanta domande al giorno non le sente
+# nessuno, e le righe che avanzano le prende il giro di domani — ognuna
+# una volta sola, perche' il timbro se lo porta dietro.
+RICONCILIA_PER_GIRO = 50
+
+
+async def riconcilia_payout():
+    """LA RONDA DI RICONCILIAZIONE, PER ORDINE (set 2026).
+
+    Una volta al giorno chiede a LNbits — **per hash** — com'e' finito
+    ogni pagamento in uscita che il nostro database da' per CONCLUSO, e
+    alza il 🧊 su quelli che LNbits dichiara falliti.
+
+    PERCHE' ESISTE, e perche' e' fatta COSI'. Il 14 set 2026 un payout e'
+    fallito e l'ordine e' stato scritto 'released' lo stesso: il guasto
+    c'era da mesi e nessuno poteva vederlo, perche' di un pagamento
+    riuscito non restava scritto NIENTE. La cura di quel giorno ha messo
+    l'hash nella riga; questa e' la conseguenza, ed e' l'unica
+    sorveglianza che ha senso su una cassaforte MISTA — il conto di cassa
+    globale non torna mai e infatti non e' un allarme (vedi il libro
+    mastro, controllo 23), mentre questa **nomina l'ordine** e dice a chi
+    modera cosa guardare.
+
+    NON CORREGGE E NON RIPAGA NULLA, ed e' il patto della sua sorella
+    maggiore: legge, e avvisa. Ripagare da qui sarebbe pagare due volte
+    il giorno che la lettura sbaglia.
+
+    IL TIMBRO E' DOPPIO, e i due fanno mestieri diversi. Quello del
+    GIORNO (`TIMBRO_RICONCILIA`) impedisce alla ronda di girare a ogni
+    battito — 144 volte al giorno — e si scrive PRIMA delle domande,
+    come il patto delle campagne. Quello della RIGA
+    (`payout_verificato`) impedisce di richiedere in eterno la stessa
+    cosa: un pagamento saldato e' TERMINALE — non torna indietro — quindi
+    una volta confermato non si ricontrolla mai piu'. Senza il secondo,
+    fra un anno questa ronda chiederebbe a LNbits di mille pagamenti
+    vecchi ogni giorno per niente.
+
+    E NON SI FIDA DEL NOSTRO TIMBRO: guarda anche le righe che portano
+    gia' `payout_stato='uscito'`. Se si fidasse, verificherebbe solo cio'
+    di cui gia' non dubita, e una riconciliazione che chiede conferma
+    alla parte che deve controllare non e' una riconciliazione.
+
+    LE QUATTRO RISPOSTE. **Saldato** -> si timbra la riga e non se ne
+    parla piu'. **Fallito** -> va nell'avviso: e' il caso del 149, i sats
+    sono ancora in cassaforte e qualcuno deve pagare quella persona.
+    **Ancora in corso** -> non si timbra e non si grida: ci torna domani
+    (il giro dei pagamenti in volo lavora su una scala di minuti, questo
+    di giorni, e non si pestano perche' guardano stati diversi).
+    **Nessuna traccia** -> si dice, separato dai falliti: un pagamento
+    che diamo per fatto e di cui LNbits non sa niente non e' la stessa
+    cosa di uno che ha provato e non ce l'ha fatta, e confonderli
+    manderebbe chi modera a cercare la cosa sbagliata.
+
+    SI FERMA AL PRIMO SILENZIO, come i suoi due fratelli: se LNbits tace
+    per una tace per tutte, e le righe non timbrate le riprende domani."""
+    if not RICONCILIA_PAYOUT:
+        return
+    oggi = time.strftime("%Y-%m-%d")
+    if timbro_letto(TIMBRO_RICONCILIA) == oggi:
+        return
+    timbro_scrivi(TIMBRO_RICONCILIA, oggi)
+    # Le quattro bocche in TRE righe: su `ordini` ne convivono due — il
+    # payout al venditore ('released') e il rimborso al compratore
+    # ('refunded') — e la domanda da fare e' la stessa, perche' quel che
+    # si verifica e' il PAGAMENTO e non chi lo aspettava. La riga dice
+    # «fatto», e la ronda va a chiedere se fosse vero.
+    BOCCHE = (("ordini", "stato IN ('released','refunded')", "prezzo_sats"),
+              ("rimborsi_asta", "stato='riscosso'", "importo_sats"),
+              ("pagamenti", "stato='rimborsato'", "importo_sats"))
+    con = db()
+    righe = []
+    for tab, dove, col in BOCCHE:
+        try:
+            righe += [(tab, r["id"], r["payout_hash"], r["importo"])
+                      for r in con.execute(
+                          f"SELECT id, payout_hash, {col} AS importo "
+                          f"FROM {tab} WHERE {dove} AND payout_hash <> '' "
+                          "AND COALESCE(payout_verificato, 0) = 0 "
+                          "ORDER BY id DESC")]
+        except Exception as e:
+            print(f"⚠️ Riconciliazione, tabella {tab} saltata: {e}")
+    con.close()
+    if not righe:
+        return
+    falliti, ignoti, saldati = [], [], 0
+    for tab, riga_id, phash, importo in righe[:RICONCILIA_PER_GIRO]:
+        try:
+            verdetto = await _stato_pagamento(phash)
+        except LnbitsMuto as e:
+            print(f"🔁 Riconciliazione, LNbits tace ({e}): si riprende "
+                  f"domani.")
+            break
+        if verdetto == "success":
+            con = db()
+            con.execute(f"UPDATE {tab} SET payout_verificato=? WHERE id=?",
+                        (int(time.time()), riga_id))
+            con.commit()
+            con.close()
+            saldati += 1
+        elif verdetto == "failed":
+            falliti.append((tab, riga_id, importo, phash))
+        elif verdetto == "":
+            ignoti.append((tab, riga_id, importo, phash))
+    print(f"🔍 Riconciliazione payout: {len(righe)} da guardare, "
+          f"{saldati} confermati, {len(falliti)} FALLITI, "
+          f"{len(ignoti)} senza traccia")
+    if not falliti and not ignoti:
+        return
+    def _elenco(quali):
+        return "\n".join(
+            f"• {t} #{i} — {_fmt_sats(s)} sats  <code>{h[:32]}</code>"
+            for t, i, s, h in quali[:10])
+    testo = "🧊 <b>Riconciliazione dei pagamenti in uscita.</b>\n\n"
+    if falliti:
+        testo += (f"<b>{len(falliti)} risultano FALLITI</b> su LNbits, ma da "
+                  f"noi l'affare è chiuso: quei sats sono ancora nel "
+                  f"deposito di garanzia e qualcuno non è stato pagato.\n"
+                  + _elenco(falliti) + "\n\n")
+    if ignoti:
+        testo += (f"<b>{len(ignoti)} non hanno nessuna traccia</b> su LNbits. "
+                  f"Non è la stessa cosa di un fallimento: qui il pagamento "
+                  f"potrebbe non essere mai stato creato.\n"
+                  + _elenco(ignoti) + "\n\n")
+    testo += ("Nessun ritentativo parte da qui: questa ronda legge e "
+              "basta. Per pagare serve una fattura <b>nuova</b> — quella "
+              "vecchia, se è bruciata, LNbits non la ripaga.")
+    try:
+        await notifica_admin(testo)
+    except Exception as e:
+        print(f"⚠️ Avviso della riconciliazione non partito: {e}")
+
 
 TIMBRO_LIBRO_MASTRO = "libro_mastro"     # il giorno dell'ultima ronda
 

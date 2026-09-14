@@ -301,6 +301,13 @@ BANNER_LINK_VIETATI = (
 # Gli stessi controlli si lanciano a mano con query_libro_mastro.sql.
 CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 
+# LA RONDA DEI PAYOUT: una volta al giorno chiede a LNbits, per hash,
+# com'e' finito ogni pagamento in uscita che diamo per concluso, e alza
+# il 🧊 su quelli che LNbits dichiara FALLITI. E' la protezione per
+# ORDINE — quella di cassa su un wallet misto non torna mai e non e' un
+# allarme. Legge e basta: non corregge e non ripaga niente.
+RICONCILIA_PAYOUT = True        # False = i payout non si ricontrollano
+
 # Quando il nostro nodo Lightning non risponde, un pagamento in uscita
 # non parte e la riga si timbra «da riprovare» invece di dichiararsi
 # fallita: la fattura del venditore resta buona e nessuno viene

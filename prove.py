@@ -2924,6 +2924,143 @@ def prove_esito_pagamento():
     prova("sentinella: il 404 ha il suo ramo, separato dal resto", True,
           "r.status_code == 404" in codice(pezzo("_stato_pagamento")))
 
+    # --- 11. LA RONDA DI RICONCILIAZIONE, PER ORDINE ----------------
+    # Il 14 set 2026 un payout e' fallito e l'ordine e' stato scritto
+    # 'released' lo stesso, e il guasto era invisibile perche' di un
+    # pagamento riuscito non restava scritto NIENTE. Adesso l'hash c'e',
+    # e questa ronda va a chiedere alla CONTROPARTE se quel che diamo
+    # per fatto sia davvero uscito. E' la protezione per RIGA — quella
+    # di cassa, su un wallet misto, non torna mai e non e' un allarme.
+    def ronda(verdetti, gia_visto=False, hash_riga="h-1", verificato=0,
+              acceso=True, oggi_gia_fatto=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+            "prezzo_sats INT, payout_stato TEXT DEFAULT '', "
+            "payout_hash TEXT DEFAULT '', payout_verificato INT DEFAULT 0)")
+        # una riga CHIUSA che porta gia' il nostro timbro 'uscito': la
+        # ronda deve guardarla lo stesso, o chiederebbe conferma solo di
+        # cio' di cui gia' non dubita
+        vero.execute("INSERT INTO ordini VALUES(1,'released',67672,'uscito',"
+                     "?,?)", (hash_riga, verificato))
+        for tb in ("rimborsi_asta", "pagamenti"):
+            vero.execute(f"CREATE TABLE {tb}(id INTEGER PRIMARY KEY, "
+                         "stato TEXT, importo_sats INT, "
+                         "payout_hash TEXT DEFAULT '', "
+                         "payout_verificato INT DEFAULT 0)")
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        chieste, avvisi, timbri = [], [], {}
+
+        async def _stato(h):
+            chieste.append(h)
+            v = verdetti.pop(0) if verdetti else ""
+            if v == "muto":
+                raise LnbitsMuto("stato del pagamento: LNbits a 520")
+            return v
+
+        async def _avvisa(testo):
+            avvisi.append(testo)
+
+        amb = {"db": Con, "time": __import__("time"),
+               "_stato_pagamento": _stato, "notifica_admin": _avvisa,
+               "LnbitsMuto": LnbitsMuto, "_fmt_sats": reale("_fmt_sats"),
+               "RICONCILIA_PAYOUT": acceso, "RICONCILIA_PER_GIRO": 50,
+               "TIMBRO_RICONCILIA": "ric",
+               "timbro_letto": lambda n: ("2000-01-01" if oggi_gia_fatto
+                                          else timbri.get(n, "")),
+               "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+               "print": lambda *a, **k: None}
+        if oggi_gia_fatto:
+            # il timbro del giorno gia' scritto DA OGGI: si finge che
+            # `time.strftime` e il timbro combacino
+            amb["time"] = type("T", (), {
+                "strftime": staticmethod(lambda f: "2000-01-01"),
+                "time": staticmethod(lambda: 111)})
+        exec(pezzo_async("riconcilia_payout"), amb)
+        gira(amb["riconcilia_payout"]())
+        r = vero.execute("SELECT payout_verificato FROM ordini "
+                         "WHERE id=1").fetchone()[0]
+        vero.close()
+        return len(chieste), bool(r), (avvisi[0] if avvisi else "")
+
+    quante, timbrata, avviso = ronda(["success"])
+    prova("payout confermato: si chiede una volta e la riga si timbra",
+          (1, True, ""), (quante, timbrata, avviso))
+
+    quante, timbrata, avviso = ronda(["failed"])
+    prova("payout FALLITO: la riga non si timbra", (1, False), (quante, timbrata))
+    prova("...e l'avviso lo nomina, con tabella, id, importo e hash", True,
+          "FALLITI" in avviso and "ordini #1" in avviso
+          and "67.672" in avviso and "h-1" in avviso)
+    # e dice che da li' non parte niente: questa ronda legge e basta
+    prova("...e dice che nessun ritentativo parte da qui", True,
+          "legge e" in avviso and "nuova" in avviso)
+
+    # «nessuna traccia» NON e' un fallimento: confonderli manderebbe chi
+    # modera a cercare la cosa sbagliata
+    quante, timbrata, avviso = ronda([""])
+    prova("nessuna traccia: si dice, ma separata dai falliti", True,
+          "nessuna traccia" in avviso and "FALLITI" not in avviso)
+    prova("...e nemmeno quella si timbra", False, timbrata)
+
+    quante, timbrata, avviso = ronda(["pending"])
+    prova("ancora in corso: non si timbra e non si grida",
+          (1, False, ""), (quante, timbrata, avviso))
+
+    quante, timbrata, avviso = ronda(["muto"])
+    prova("LNbits muto: si ferma, non timbra e non avvisa",
+          (1, False, ""), (quante, timbrata, avviso))
+
+    # il timbro della RIGA: un pagamento saldato e' terminale, quindi non
+    # si richiede mai piu'
+    quante, _, _ = ronda(["success"], verificato=1757900000)
+    prova("gia' verificata: non si richiede piu'", 0, quante)
+    # ...e una riga senza hash non si puo' chiedere
+    quante, _, _ = ronda(["success"], hash_riga="")
+    prova("senza hash non c'e' niente da chiedere", 0, quante)
+    # il timbro del GIORNO: la ronda non gira a ogni battito
+    quante, _, _ = ronda(["success"], oggi_gia_fatto=True)
+    prova("gia' girata oggi: non chiede niente", 0, quante)
+    # e la leva la spegne davvero
+    quante, _, _ = ronda(["success"], acceso=False)
+    prova("leva spenta: la ronda non parte", 0, quante)
+
+    # --- 12. SENTINELLE DELLA RONDA ---------------------------------
+    ric = codice(_senza_prosa(pezzo("riconcilia_payout")))
+    # LEGGE E BASTA, come la sorella del libro mastro: ripagare da qui
+    # sarebbe pagare due volte il giorno che la lettura sbaglia
+    prova("sentinella: la ronda non ripaga niente", True,
+          "paga_venditore" not in ric and "invoice_da_ln_address" not in ric)
+    prova("sentinella: la ronda non corregge nessuno stato", True,
+          "SET stato=" not in ric and "payout_stato=" not in ric)
+    # l'unica scrittura ammessa e' il timbro della verifica
+    prova("sentinella: l'unica cosa che scrive e' il timbro", 1,
+          ric.count("UPDATE "))
+    # NON SI FIDA DEL NOSTRO TIMBRO: se filtrasse su payout_stato
+    # chiederebbe conferma solo di cio' di cui gia' non dubita
+    prova("sentinella: guarda anche le righe che diciamo gia' uscite",
+          True, "payout_stato" not in ric)
+    prova("sentinella: si ferma al primo silenzio", True, "break" in ric)
+    # il timbro del giorno si scrive PRIMA delle domande, o un errore a
+    # meta' giro la farebbe ripartire a ogni battito
+    prova("sentinella: il timbro del giorno precede le domande", True,
+          ric.index("timbro_scrivi") < ric.index("_stato_pagamento"))
+    # e gira nell'orologio accanto alla sorella
+    _oro2 = codice(pezzo("orologio"))
+    prova("sentinella: la ronda gira nell'orologio", True,
+          "riconcilia_payout()" in _oro2)
+
 
     # --- 6. IL VOLO (cantiere B) ------------------------------------
     # Un pagamento senza verdetto a budget scaduto non chiama piu' una
