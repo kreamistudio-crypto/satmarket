@@ -13482,6 +13482,9 @@ vestito orfano, e il conto del simbolo scende da quattro posti a tre —
 tutti **stati vuoti**, che è l'unico posto dove il marchio fa da voce.
 E la freccia è **nuda**: «← Torna» diceva a parole quel che la freccia
 dice da sola, e le parole sono passate in `aria-label`.
+⚠️ **EMENDATO un'ora dopo** (voce qui sotto): quel bottone non c'è più —
+la via indietro è entrata **nella riga del titolo**, che è la struttura
+del foglio per intero e non solo il suo vestito.
 
 **I QUATTRO PASSI PARLANO A CHI L'ORDINE CE L'HA.** Prima erano una
 lista sola e parlavano del proprietario in terza persona: «Al recapito
@@ -13571,3 +13574,49 @@ bene, più la prova sbaglia.
 **9783 verdi**, 0 rosse. Guardato dal vivo a 375 su una vetrina di
 cartone col CSS vero: le due testate misurate una contro l'altra, i due
 elenchi di passi, e le tre card nei due versi.
+
+## Il titolo sale, e la via indietro entra nella sua riga (14 set 2026)
+
+Tre ritocchi che **emendano la voce qui sopra**, arrivati guardandola.
+
+**IL TITOLO ERA ANCORA TROPPO IN BASSO**, e la ragione era il `.back`:
+stava **sopra** la `.sicu` con un margine suo, quindi la pagina cominciava
+con un bottone e *poi* si nominava. Adesso la via indietro vive **dentro
+il cappello**, dove il foglio la tiene da sempre — l'uscita a sinistra,
+il titolo in mezzo, il **gemello invisibile a destra** che lo tiene in
+centro. Non è il vestito del foglio preso in prestito: è la sua
+**struttura**, che era già metà del motivo per riusarlo. Il titolo sale
+di una cinquantina di pixel e in cima c'è **una riga sola** invece di
+due.
+
+**IL GLIFO È IL ‹ DI CASA**, il gemello del **›** che sulle card dice
+«si entra»: qui rivolto a sinistra dice «si torna». Il `←` non torna
+perché quello è un **bottone con la sua cornice**, e sopra un cappello
+faceva due cartelli dove ne basta uno.
+⚠️ **E IL ‹ È PIÙ GRANDE DEL ✕, che è una misura e non un gusto**: a
+pari corpo quel glifo è molto più magro, e **misurato** il bottone
+veniva **23px** di larghezza contro i **32** dell'uscita di casa — cioè
+nello stesso posto un segno più piccolo e un bersaglio più stretto. Un
+`min-width:32px` lo ripareggia al gemello e il corpo a 24px lo fa pesare
+uguale a vedersi. E l'**altezza si fissa a 35**: senza, il glifo più
+grande alzava la riga di cinque pixel e il cappello smetteva di essere
+identico a quello della sorella — che è tutto il punto di riusarlo.
+**Rimisurato dopo**: i due cappelli **58px tutti e due**, i quattro
+bottoni **32×35**, e il titolo centrato al pixel (188 su 375).
+La regola è **scoped** alla vista dello scambio: `.foglio-back` veste le
+uscite di mezza app, e allargarle tutte sarebbe un ritocco che nessuno
+ha chiesto.
+
+**E LE PARENTESI DEI PASSI SE NE SONO ANDATE.** Erano il segno che la
+seconda riga è una precisazione, e **in uno stepper la seconda riga è
+già una precisazione**: lo dice il posto, e due segni per la stessa cosa
+sono uno di troppo.
+⚠️ **Con loro è tornata la MAIUSCOLA, e non è una libertà che mi sono
+preso a caso**: la minuscola era **figlia della parentesi**, e senza
+sarebbe stata l'unica `<small>` in minuscola dei due stepper dell'app —
+quello del mercatino le scrive tutte maiuscole («Aspetti la conferma di
+chi ha comprato», «Proponi tu giorno e ora»). Tolta la parentesi, la
+riga torna al vestito di casa. Se invece la minuscola era voluta, è una
+stringa per passo.
+
+**9785 verdi**, 0 rosse. Guardato e **misurato** dal vivo a 375.
