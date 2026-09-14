@@ -24150,7 +24150,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
   sorvegliarlo non è la memoria di chi legge ma le prove).
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/categoria/{slug}` (i 27 reparti, vocabolario CHIUSO
+   `/annuncio/*`, `/e/{bech32}` (il resolver universale di NIP-89, set
+   2026: decodifica una naddr — annuncio o reputazione — e rimanda
+   all'indirizzo canonico che gia' esiste, mai una pagina sua; naddr
+   storta, kind che non apriamo o evento mai importato escono tutti
+   con la pagina generica, vedi «L'HANDLER NIP-89» in CANTIERI.md),
+   `/categoria/{slug}` (i 27 reparti, vocabolario CHIUSO
    su `SLUG_CATEGORIE`), `/sicurezza` (la pagina «Il pagamento
    protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
    manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha

@@ -3879,6 +3879,32 @@ def init_db():
         ritirato INTEGER DEFAULT 0,      -- 1 = premiato e poi ritirato (NIP-09)
         PRIMARY KEY(live_id, pubkey)
     );
+    CREATE TABLE IF NOT EXISTS nostr_reputazione(
+        -- l'ULTIMO kind 30382 (NIP-85, Trusted Assertion) pubblicato per
+        -- ogni utente: firmato dalla piattaforma come "provider di
+        -- fiducia", indirizzabile sul tag "d" = la SUA pubkey. Una riga
+        -- per tg_id tiene solo lo stato dell'ultima pubblicazione, per
+        -- non ripubblicare un evento identico a ogni gancio — la prova
+        -- resta l'evento sui relay, mai questa tabella.
+        tg_id INTEGER PRIMARY KEY,
+        pubkey TEXT NOT NULL,        -- hex, mai npub
+        livello TEXT NOT NULL,       -- id di LIVELLI ("nuovo".."maestro")
+        xp INTEGER NOT NULL,
+        affari INTEGER NOT NULL,
+        evento_id TEXT DEFAULT '',   -- id del kind 30382 pubblicato, '' = non ancora firmato
+        pubblicato_il INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS nostr_handler(
+        -- l'ULTIMO kind 31990 (NIP-89, Handler Information) pubblicato:
+        -- una riga sola, "d" sempre 'barattolo' (la forma resta quella
+        -- delle sorelle, per lo stesso motivo). tags_json e' il
+        -- confronto che evita di ripubblicare un evento identico a ogni
+        -- avvio — la prova resta l'evento sui relay, mai questa tabella.
+        d TEXT PRIMARY KEY,
+        tags_json TEXT DEFAULT '',
+        evento_id TEXT DEFAULT '',
+        pubblicato_il INTEGER DEFAULT 0
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -4237,7 +4263,17 @@ def init_db():
                     # migrare niente. La scrive `_incassa_sblocco` e la
                     # azzera il rimborso del moderatore: nessun'altra
                     # strada la tocca.
-                    "banner_sbloccato_il INTEGER DEFAULT 0"):
+                    "banner_sbloccato_il INTEGER DEFAULT 0",
+                    # nip85_dichiarato (set 2026): l'utente ha firmato di
+                    # SUA chiave il kind 10040 che dichiara Barattolo
+                    # provider di fiducia per il kind 30382 (NIP-85) —
+                    # solo per mostrare il bottone come gia' fatto, mai
+                    # per decidere se pubblicare: quello lo decide
+                    # npub_verificata, non questa colonna. La prova vera
+                    # resta l'evento sui relay, verificato una volta sola
+                    # in /api/me/nip85-dichiarazione (stessa regola dei
+                    # badge Nostr: mai una riga qui al posto della firma).
+                    "nip85_dichiarato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -7857,6 +7893,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE badge_utente SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM badge_utente WHERE tg_id=?", (id_nostr,))
+        # L'ultimo 30382 pubblicato segue l'utente come i distintivi:
+        # e' solo una CACHE (la prova resta l'evento sui relay), quindi
+        # se sopravvive quella di Telegram va bene com'e' — diventera'
+        # stale coi nuovi xp/affari sommati qui sotto, ma si rimette in
+        # pari da sola al prossimo affare concluso (o col bottone admin
+        # di sincronizzazione), stessa attesa gia' accettata per i
+        # badge Nostr dei distintivi in questa stessa fusione.
+        con.execute("UPDATE OR IGNORE nostr_reputazione SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM nostr_reputazione WHERE tg_id=?",
+                    (id_nostr,))
         # Gli avvisi di ricerca seguono l'utente; il dedup delle
         # notifiche migra in unione come i distintivi (se entrambe le
         # meta' erano gia' state avvisate di un annuncio, una riga basta)
@@ -9154,6 +9201,22 @@ async def registra_webhook_telegram():
 
     global _TASK_WEBHOOK
     _TASK_WEBHOOK = asyncio.create_task(_registra())
+
+
+_TASK_HANDLER_NOSTRO = None   # stesso motivo di _TASK_WEBHOOK qui sopra
+
+
+@app.on_event("startup")
+async def registra_handler_nostro():
+    """Il kind 31990 (NIP-89) si ripubblica a ogni avvio, come il
+    campanello del bot qui sopra — ma senza il suo freno: qui non c'e'
+    nessuna produzione da rispettare (l'evento e' sempre lo stesso,
+    chiunque lo pubblichi), e in collaudo _spedisci_ai_relay simula da
+    sola senza toccare un relay vero, stessa guardia di ogni altro
+    evento firmato dalla piattaforma. Fire-and-forget come il webhook:
+    l'avvio del server non aspetta un giro di relay."""
+    global _TASK_HANDLER_NOSTRO
+    _TASK_HANDLER_NOSTRO = asyncio.create_task(aggiorna_handler_nostro())
 
 
 # ------------------------- API: ANNUNCI -----------------------------
@@ -27520,6 +27583,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
     profilo["max_barattolo"] = MAX_PREFERITI
+    # NIP-85 (set 2026): la pubkey di servizio e i relay servono al
+    # browser per costruire e firmare il kind 10040 (la dichiarazione di
+    # fiducia in Barattolo per il tag "30382:rank") — mai una copia a
+    # mano nel client, o cambiare NOSTR_NSEC_PIATTAFORMA la lascerebbe
+    # indietro in silenzio.
+    profilo["nip85_pubkey"] = _NOSTR[1] if _NOSTR else ""
+    profilo["nip85_relays"] = RELAYS_VERIFICA if _NOSTR else []
+    # In collaudo il browser non deve bussare a relay VERI (stesso patto
+    # di modifica-firmata/prepara e della coda delle firme): la firma si
+    # fa lo stesso, sui relay non ci si prova nemmeno.
+    profilo["nip85_collaudo"] = MODALITA_COLLAUDO
     # IL SUO like sulle funzioni in arrivo: solo per accendere il
     # bottone. I TOTALI stanno nella busta di prima pagina della
     # vetrina, che arriva anche agli anonimi — qui c'e' solo il fatto
@@ -31351,6 +31425,54 @@ def hex_to_npub(hexkey: str) -> str:
     return "npub1" + "".join(CHARSET_BECH32[d] for d in dati + checksum)
 
 
+def decodifica_naddr(naddr: str) -> dict:
+    """Decodifica un identificatore 'naddr1...' (NIP-19) nei suoi campi:
+    kind, la pubkey di chi ha COMPOSTO l'evento (tipo TLV 2, "author"),
+    l'identificatore cioe' il tag "d" (tipo 0, "special") e i relay
+    suggeriti (tipo 1, ripetibile). Stessa ricetta bech32 di
+    npub_to_hex — stesso CHARSET_BECH32, stesso checksum SCARTATO e
+    non verificato (coerente: neanche li' si verifica in decodifica) —
+    ma qui il payload non e' una chiave nuda: e' una sequenza TLV
+    (byte di tipo, byte di lunghezza, valore), perche' una naddr porta
+    PIU' di una chiave. Il kind (tipo 3) e' un intero a 4 byte
+    big-endian, non una stringa."""
+    if not naddr.startswith("naddr1"):
+        raise ValueError("deve iniziare con naddr1")
+    dati = [CHARSET_BECH32.find(c) for c in naddr[6:]]
+    if -1 in dati:
+        raise ValueError("naddr non valida: carattere sconosciuto")
+    dati = dati[:-6]                     # togli il checksum
+    bits, val, grezzo = 0, 0, []
+    for d in dati:                       # da gruppi di 5 bit a byte
+        val = (val << 5) | d
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            grezzo.append((val >> bits) & 0xFF)
+    grezzo = bytes(grezzo)
+    identificatore, pubkey, kind, relays = None, None, None, []
+    i = 0
+    while i + 2 <= len(grezzo):
+        tipo, lunghezza = grezzo[i], grezzo[i + 1]
+        valore = grezzo[i + 2:i + 2 + lunghezza]
+        if len(valore) != lunghezza:
+            raise ValueError("naddr non valida: TLV troncato")
+        if tipo == 0:
+            identificatore = valore.decode("utf-8", errors="replace")
+        elif tipo == 1:
+            relays.append(valore.decode("utf-8", errors="replace"))
+        elif tipo == 2 and len(valore) == 32:
+            pubkey = valore.hex()
+        elif tipo == 3 and len(valore) == 4:
+            kind = int.from_bytes(valore, "big")
+        i += 2 + lunghezza
+    if identificatore is None or pubkey is None or kind is None:
+        raise ValueError(
+            "naddr non valida: manca identificatore, autore o kind")
+    return {"identificatore": identificatore, "pubkey": pubkey,
+            "kind": kind, "relays": relays}
+
+
 def cerca_nota_verifica(relay: str, hexkey: str, codice: str, da: int) -> bool:
     """Chiede a UN relay le note recenti della npub e guarda se una
     contiene il codice. E' SINCRONA (websocket-client): il server e'
@@ -31450,6 +31572,10 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
     await premia_distintivi(user["id"])
+    # Prima volta che c'e' un soggetto a cui indirizzare il kind 30382:
+    # se aveva gia' un livello da prima di verificare, esce subito,
+    # senza aspettare il prossimo affare concluso.
+    await premia_reputazione_nostr(user["id"])
     return {"ok": True, "verificata": True}
 
 
@@ -31696,6 +31822,84 @@ def tag_client() -> list:
         return ["client", NOME_CLIENT_NOSTR,
                 f"31990:{_NOSTR[1]}:barattolo", RELAYS_VERIFICA[0]]
     return ["client", NOME_CLIENT_NOSTR]
+
+
+# --- L'HANDLER NIP-89 (set 2026) ---------------------------------------
+# tag_client() qui sopra punta a "31990:{piattaforma}:barattolo" da
+# mesi, su OGNI 30402 che componiamo — ma quell'evento non era mai
+# stato pubblicato: il riferimento puntava al vuoto. E' il kind 31990
+# (Handler Information, NIP-89) che dice a un client Nostr qualunque
+# "questi kind li so aprire, ed ecco l'indirizzo con un posto per la
+# naddr". Lo "d" e' "barattolo", lo stesso valore gia' incastonato nel
+# riferimento di tag_client — cambiarlo spezzerebbe ogni evento gia'
+# pubblicato che lo cita.
+# UN "k" PER KIND CHE SAPPIAMO APRIRE DAVVERO, mai una promessa vuota:
+# 30402 (annunci NIP-99, via nostr_origine_d) e 30382 (reputazione
+# NIP-85, via la pubkey nel tag "d"). Gli ordini Mostro (38383) restano
+# fuori finche' non esiste una rotta che li risolva davvero — vivono
+# solo sui relay del coordinator, mai nel nostro database, ed e' un
+# cantiere suo (client, non solo server).
+
+def _tags_handler_nostro() -> list:
+    """I tag del kind 31990: un "k" per ogni kind aperto DAVVERO e un
+    "web" col placeholder <bech32> che il client sostituisce con la
+    naddr dell'evento da aprire — /e/{bech32} lo risolve."""
+    return [["d", "barattolo"],
+            ["k", "30402"],
+            ["k", "30382"],
+            ["web", f"{URL_PUBBLICO}/e/<bech32>", "naddr"]]
+
+
+def evento_handler_nostro() -> dict:
+    """Costruisce e firma il kind 31990: sostituibile sullo stesso "d"
+    di sempre (ripubblicarlo aggiorna, mai una seconda copia), col
+    content nello stile kind:0 che la spec prevede come alternativa a
+    un profilo separato — riusa i testi del brand gia' scritti, mai
+    una copia nuova da tenere in pari."""
+    content = json.dumps({"name": NOME_CLIENT_NOSTR,
+                          "about": META_TESTO_HOME,
+                          "picture": IMMAGINE_BRAND[0]},
+                         ensure_ascii=False)
+    return firma_evento(31990, _tags_handler_nostro(), content)
+
+
+async def aggiorna_handler_nostro():
+    """Ripubblica il kind 31990 SOLO se i tag sono cambiati da
+    quest'ultima volta — un 31990 sostituibile identico non direbbe
+    niente di nuovo ai relay, la stessa regola di premia_reputazione_
+    nostr. Fail-open totale: chiamata dall'avvio, un intoppo qui non
+    deve impedire al server di partire."""
+    if not _NOSTR:
+        return
+    try:
+        tags = json.dumps(_tags_handler_nostro(), ensure_ascii=False)
+        con = db()
+        riga = con.execute(
+            "SELECT tags_json FROM nostr_handler WHERE d='barattolo'"
+        ).fetchone()
+        if riga and riga["tags_json"] == tags:
+            con.close()
+            return
+        con.close()
+        evento = evento_handler_nostro()
+        if not await _spedisci_ai_relay(evento):
+            print("⚠️ Handler NIP-89: nessun relay ha accettato",
+                  flush=True)
+            return
+        con = db()
+        con.execute(
+            "INSERT INTO nostr_handler(d, tags_json, evento_id, "
+            "pubblicato_il) VALUES('barattolo',?,?,?) "
+            "ON CONFLICT(d) DO UPDATE SET tags_json=excluded.tags_json, "
+            "evento_id=excluded.evento_id, "
+            "pubblicato_il=excluded.pubblicato_il",
+            (tags, evento["id"], int(time.time())))
+        con.commit()
+        con.close()
+        print(f"🔔 Handler NIP-89 pubblicato ({evento['id'][:16]}…)",
+              flush=True)
+    except Exception as e:
+        print(f"⚠️ Handler NIP-89 saltato: {e}", flush=True)
 
 
 def tag_commercio(a: dict) -> list:
@@ -32579,6 +32783,164 @@ async def _premia_distintivo(dist: dict, tg_id: int) -> bool:
     if riga["premiato_evento"]:
         return True
     return bool(await _premia_pubkey(live, pubkey))
+
+
+# --- LA REPUTAZIONE COME EVENTO NIP-85 (set 2026) ----------------------
+# Trusted Assertion (kind 30382): il livello/XP/affari del mercatino,
+# firmato dalla PIATTAFORMA come "provider di fiducia" — non
+# dall'utente, stesso patto del badge NIP-58 (regola ferrea 2, mai una
+# firma che chieda una chiave altrui). Indirizzabile sul tag "d" = la
+# SUA pubkey: ripubblicarlo aggiorna sui relay, mai una seconda copia —
+# lo stesso motore firma_evento/_spedisci_ai_relay del kind 30009.
+#
+# Perche' un client terzo lo raccolga da SOLO come fonte di fiducia
+# serve anche il kind 10040, che pero' lo firma l'UTENTE con la SUA
+# chiave (dichiara "mi fido di Barattolo per il tag 30382:rank"): quello
+# si firma nel browser (estensione/bunker/nsec, mai sul server) e arriva
+# gia' pubblicato sui relay — qui si verifica solo che la firma sia vera
+# prima di segnare nip85_dichiarato, vedi conferma_nip85_dichiarazione.
+
+NIP85_TAG_FIDUCIA = "30382:rank"   # <kind>:<tag> che il kind 10040 dichiara
+
+
+def _tags_reputazione(pubkey_hex: str, liv: dict, xp: int, affari: int) -> list:
+    """I tag del kind 30382: "d" punta al soggetto, "rank" e' la
+    proporzione (0-100) del gradino su LIVELLI — il tag generico che la
+    NIP definisce per un primitivo di Web of Trust —, "livello"/"xp"/
+    "affari" dicono lo stesso fatto nel vocabolario preciso di casa."""
+    rank = round(liv["numero"] / len(LIVELLI) * 100)
+    return [["d", pubkey_hex],
+            ["rank", str(rank)],
+            ["livello", liv["id"]],
+            ["xp", str(xp)],
+            ["affari", str(affari)],
+            ["r", URL_PUBBLICO],
+            tag_client()]
+
+
+def evento_reputazione(pubkey_hex: str, liv: dict, xp: int, affari: int) -> dict:
+    """Costruisce e firma il kind 30382 (NIP-85) per una pubkey:
+    sostituibile come il kind 30009 dei badge (riga ~32141)."""
+    return firma_evento(30382, _tags_reputazione(pubkey_hex, liv, xp, affari), "")
+
+
+async def premia_reputazione_nostr(tg_id: int):
+    """Il gancio standard della reputazione Nostr, gemello di
+    premia_distintivi/premia_xp: connessione propria, fail-open totale
+    — un intoppo qui non deve mai poter rompere il flusso che stava
+    concludendo un ordine o verificando una npub.
+    Fail-open anche senza npub verificata: nessun soggetto a cui
+    indirizzare l'evento, come per i badge. NON ripubblica se
+    livello/xp/affari sono gia' quelli dell'ultima pubblicazione — un
+    evento sostituibile identico non direbbe niente di nuovo ai relay,
+    solo traffico ripetuto a ogni gancio."""
+    try:
+        con = db()
+        u = con.execute(
+            "SELECT npub, npub_verificata, xp, vendite_ok, acquisti_ok "
+            "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+        if not u or not u["npub_verificata"] or not u["npub"]:
+            con.close()
+            return
+        try:
+            pubkey = npub_to_hex(u["npub"])
+        except ValueError:
+            con.close()
+            return
+        xp = u["xp"] or 0
+        affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+        liv = livello_utente(xp, affari)
+        prec = con.execute(
+            "SELECT livello, xp, affari FROM nostr_reputazione "
+            "WHERE tg_id=?", (tg_id,)).fetchone()
+        con.close()
+        if (prec and prec["livello"] == liv["id"] and prec["xp"] == xp
+                and prec["affari"] == affari):
+            return
+        evento = evento_reputazione(pubkey, liv, xp, affari)
+        if not await _spedisci_ai_relay(evento):
+            return
+        con = db()
+        con.execute(
+            "INSERT INTO nostr_reputazione(tg_id, pubkey, livello, xp, "
+            "affari, evento_id, pubblicato_il) VALUES(?,?,?,?,?,?,?) "
+            "ON CONFLICT(tg_id) DO UPDATE SET pubkey=excluded.pubkey, "
+            "livello=excluded.livello, xp=excluded.xp, "
+            "affari=excluded.affari, evento_id=excluded.evento_id, "
+            "pubblicato_il=excluded.pubblicato_il",
+            (tg_id, pubkey, liv["id"], xp, affari, evento["id"],
+             int(time.time())))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Reputazione Nostr saltata per {tg_id}: {e}")
+
+
+@app.post("/api/admin/reputazione/sincronizza")
+async def sincronizza_reputazione_nostr(x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: ripubblica (solo se qualcosa e' davvero cambiato) il
+    kind 30382 di tutti gli utenti con npub verificata — il bottone di
+    riallineamento, gemello di sincronizza_badge_distintivi. Serve a chi
+    aveva gia' un livello PRIMA che questo cantiere esistesse, e si puo'
+    rilanciare quando si vuole: mai un doppione, vedi premia_reputazione_
+    nostr."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    con = db()
+    candidati = con.execute(
+        "SELECT tg_id FROM utenti WHERE npub_verificata=1 AND npub!=''"
+    ).fetchall()
+    con.close()
+    for r in candidati:
+        await premia_reputazione_nostr(r["tg_id"])
+        await asyncio.sleep(0.3)
+    return {"ok": True, "candidati": len(candidati)}
+
+
+@app.post("/api/me/nip85-dichiarazione")
+async def conferma_nip85_dichiarazione(req: Request,
+                                       x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """Il browser ha gia' firmato E pubblicato sui relay il kind 10040
+    che dichiara Barattolo provider di fiducia per '30382:rank': qui si
+    verifica SOLO che la firma sia vera e che l'evento dica davvero
+    quello, mai fidarsi della parola del client — stessa regola della
+    modifica firmata (riga ~14897). Non si ripubblica nulla: l'evento e'
+    gia' sui relay, e' il browser che ce l'ha mandato per conferma."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    d = await leggi_json(req)
+    evento = d.get("evento") or {}
+    if not verifica_firma_nostr(evento):
+        raise HTTPException(400, "Firma non valida")
+    if evento.get("kind") != 10040:
+        raise HTTPException(400, "Non è un kind 10040")
+    con = db()
+    u = con.execute("SELECT npub FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    con.close()
+    try:
+        attesa = npub_to_hex(u["npub"]) if u and u["npub"] else ""
+    except ValueError:
+        attesa = ""
+    if not attesa or evento["pubkey"].lower() != attesa.lower():
+        raise HTTPException(400, "La firma non è della tua npub")
+    if not any(len(t) >= 2 and t[0] == NIP85_TAG_FIDUCIA
+               and t[1].lower() == _NOSTR[1].lower()
+               for t in evento.get("tags", [])):
+        raise HTTPException(400,
+            "L'evento non dichiara Barattolo come fonte di fiducia")
+    con = db()
+    con.execute("UPDATE utenti SET nip85_dichiarato=1 WHERE tg_id=?",
+                (user["id"],))
+    con.commit()
+    con.close()
+    return {"ok": True}
 
 
 @app.post("/api/admin/live/sincronizza-distintivi")
@@ -34485,6 +34847,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 await premia_xp(chi, "ordine",
                                 xp_ordine(o["prezzo_sats"], cambio, ruolo),
                                 f"ordine:{ordine_id}:{ruolo}")
+            # DOPO il giro degli XP e non dentro premia_distintivi qui
+            # sopra: quello girava PRIMA che premia_xp scrivesse i punti
+            # di QUESTO ordine, e avrebbe pubblicato un 30382 con l'XP
+            # vecchio di un giro — la stessa lezione del cronometro che
+            # riparte a ogni fase (vedi Mostro, docs/CANTIERI.md).
+            for chi in (o["venditore_id"], o["compratore_id"]):
+                await premia_reputazione_nostr(chi)
             # Il polso dei moderatori: ordine chiuso, sats consegnati
             if o["disputata"]:
                 await polso_ordini_admin(
@@ -42238,7 +42607,7 @@ async def avvia_orologio():
 # SOLO la Mini App e le foto degli annunci: tutto il resto e'
 # invisibile per costruzione.
 
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 # Header anti-cache: la WebView di Telegram (e ogni browser) non deve mai
 # conservare la pagina HTML — così ogni push arriva subito fresco a tutti.
@@ -43704,6 +44073,59 @@ def pagina_miniapp():
     il noindex e NON il canonical verso «/» — su una pagina
     deindicizzata un canonical che punta altrove puo' propagare il
     noindex all'indirizzo canonico, cioe' proprio alla home."""
+    return _pagina_con_meta(META_GENERICI + META_NOINDEX)
+
+
+@app.get("/e/{bech32}")
+def pagina_evento_nostr(bech32: str):
+    """Il link universale di NIP-89 (kind 31990, tag "web"): un client
+    Nostr qualunque sostituisce <bech32> con la naddr dell'evento che
+    vuole aprire CON NOI. Qui si decodifica e si rimanda all'indirizzo
+    canonico che esiste gia' — mai una pagina sua, che duplicherebbe la
+    costruzione SEO che /annuncio e /negozio hanno gia' fatta.
+
+    UNA naddr STORTA, UN KIND CHE NON APRIAMO O UN EVENTO CHE NON
+    CONOSCIAMO escono tutti e tre con la pagina generica — mai un
+    errore per un link che ha composto qualcun altro, e NIENTE IMPORT
+    AL VOLO: un annuncio che non abbiamo mai importato resta un
+    «non lo conosciamo», la stessa scelta gia' fatta per
+    /annuncio/pippo (nessuna lettura di rete dentro una GET pubblica).
+
+    Il "d" del 30382 e' la pubkey del SOGGETTO (chi ha quel livello),
+    non di chi ha firmato l'assertion — potrebbe averla firmata
+    chiunque, e la pagina che apriamo e' comunque la SUA su Barattolo."""
+    try:
+        d = decodifica_naddr(bech32)
+    except ValueError:
+        d = None
+    if d:
+        con = db()
+        try:
+            if d["kind"] == 30402:
+                r = con.execute(
+                    "SELECT id, titolo FROM annunci WHERE "
+                    "nostr_origine_d=? LIMIT 1",
+                    (d["identificatore"],)).fetchone()
+                if r:
+                    return RedirectResponse(
+                        _url_annuncio(r["id"], r["titolo"]),
+                        status_code=302)
+            elif d["kind"] == 30382:
+                try:
+                    npub = hex_to_npub(d["identificatore"])
+                except ValueError:
+                    npub = ""
+                r = con.execute(
+                    "SELECT username, negozio, nome FROM utenti WHERE "
+                    "npub=? OR npub_accesso=? LIMIT 1", (npub, npub)
+                ).fetchone() if npub else None
+                if r and (r["negozio"] or r["username"]):
+                    url = (_url_negozio(r["negozio"], r["nome"] or "")
+                           if r["negozio"] else
+                           f"{URL_PUBBLICO}/negozio/{r['username']}")
+                    return RedirectResponse(url, status_code=302)
+        finally:
+            con.close()
     return _pagina_con_meta(META_GENERICI + META_NOINDEX)
 
 

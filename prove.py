@@ -2812,6 +2812,10 @@ def prove_pagamento_incerto():
                # due la prova ESPLODE invece di fallire, che e' la
                # trappola scritta in docs/ sulle funzioni estratte.
                "premia_xp": _niente, "xp_ordine": lambda *a: 0,
+               # Il gancio della reputazione Nostr (set 2026): stessa
+               # trappola, terzo giro — _sblocca_sats lo chiama DOPO
+               # il giro degli XP, vedi prove_reputazione_nostr.
+               "premia_reputazione_nostr": _niente,
                # ...e il titolo delle notifiche passa da html.escape
                # (ago 2026, la famiglia di B6): stessa trappola, secondo
                # giro — chi estrae una funzione ne eredita le dipendenze.
@@ -23935,7 +23939,8 @@ def prove_anteprime():
                     '@app.get("/privacy")',
                     '@app.get("/p2p")',
                     '@app.get("/offerta/{oid}")',
-                    '@app.get("/barattolo/{token}")')
+                    '@app.get("/barattolo/{token}")',
+                    '@app.get("/e/{bech32}")')
     for rotta in ROTTE_PAGINA:
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
@@ -54012,6 +54017,538 @@ def prove_badge_nostr():
           "uno solo)", 2, corpo_gancio.count("try:"))
 
 
+def prove_reputazione_nostr():
+    """NIP-85 (set 2026): il livello/XP/affari del mercatino come kind
+    30382 (Trusted Assertion), firmato dalla PIATTAFORMA — mai
+    dall'utente, stesso patto del badge NIP-58 (regola ferrea 2). Un
+    secondo evento, il kind 10040, lo firma invece l'UTENTE nel browser
+    per dichiarare che si fida di Barattolo come fonte: qui non si
+    esegue quella firma (e' nel client), ma si verifica che il server
+    non si fidi MAI della parola del browser senza aver ricontrollato
+    la firma vera — stessa regola della modifica firmata.
+
+    Qui si provano: i tag del 30382, il gancio premia_reputazione_nostr
+    (fail-open, e non ripubblica se niente e' cambiato — un evento
+    sostituibile identico e' solo traffico), i due ganci nei punti
+    giusti (dopo la verifica npub, e DOPO il giro degli XP di un
+    ordine, mai prima), e la rotta di conferma del kind 10040 con le
+    sue quattro guardie."""
+    print("\n[reputazione come evento NIP-85]")
+    import asyncio
+    import sqlite3
+    import time
+
+    # --- 0) npub <-> hex, per costruire i dati della prova ------------
+    # Stessa estrazione isolata del punto 3 di prove_badge_nostr: qui
+    # e' una funzione a se', quindi non eredita il suo amb3.
+    amb_b32 = {}
+    i_charset = _SORGENTE.index("CHARSET_BECH32 = ")
+    exec(_SORGENTE[i_charset:_SORGENTE.index("\n\n\n", i_charset)], amb_b32)
+    exec(pezzo("_bech32_polymod"), amb_b32)
+    exec(pezzo("npub_to_hex"), amb_b32)
+    exec(pezzo("hex_to_npub"), amb_b32)
+    npub_to_hex_f = amb_b32["npub_to_hex"]
+    hex_to_npub_f = amb_b32["hex_to_npub"]
+
+    # --- 1) i tag del kind 30382 ---------------------------------------
+    amb1 = {"LIVELLI": [0, 1, 2, 3, 4],   # basta la LUNGHEZZA: il "rank"
+                                          # e' una proporzione, non un indice
+            "URL_PUBBLICO": "https://barattolo.store",
+            "tag_client": lambda: ["client", "Barattolo"],
+            "firma_evento": lambda kind, tags, content: {
+                "kind": kind, "tags": tags, "content": content}}
+    exec(pezzo("_tags_reputazione"), amb1)
+    exec(pezzo("evento_reputazione"), amb1)
+
+    liv = {"id": "pratico", "numero": 3}
+    ev = amb1["evento_reputazione"]("ab" * 32, liv, 250, 6)
+    prova("il 30382 e' un 30382", 30382, ev["kind"])
+    prova("...il tag d punta alla pubkey del soggetto", True,
+          ["d", "ab" * 32] in ev["tags"])
+    prova("...rank e' la proporzione del gradino su LIVELLI (3 di 5 = "
+          "60)", True, ["rank", "60"] in ev["tags"])
+    prova("...livello/xp/affari restano nel vocabolario preciso di "
+          "casa", True,
+          ["livello", "pratico"] in ev["tags"] and ["xp", "250"] in ev["tags"]
+          and ["affari", "6"] in ev["tags"])
+    prova("...e il riferimento a Barattolo (tag r + client)", True,
+          ["r", "https://barattolo.store"] in ev["tags"]
+          and ["client", "Barattolo"] in ev["tags"])
+
+    # --- 2) premia_reputazione_nostr: fail-open, mai un doppione ------
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                "npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0, "
+                "xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0, "
+                "acquisti_ok INTEGER DEFAULT 0)")
+    vero.execute("CREATE TABLE nostr_reputazione(tg_id INTEGER PRIMARY "
+                "KEY, pubkey TEXT, livello TEXT, xp INTEGER, "
+                "affari INTEGER, evento_id TEXT DEFAULT '', "
+                "pubblicato_il INTEGER DEFAULT 0)")
+    pk_rep = "cd" * 32
+    npub_rep = hex_to_npub_f(pk_rep)
+    vero.execute("INSERT INTO utenti VALUES(111,?,1,250,4,2)", (npub_rep,))
+    vero.execute("INSERT INTO utenti VALUES(222,'',0,999,9,9)")  # niente npub verificata
+    vero.commit()
+
+    class _ConVivaRep:
+        """close() non chiude davvero: il :memory: deve sopravvivere fra
+        una chiamata e l'altra (stesso pattern di prove_badge_nostr)."""
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    async def _corout(v):
+        return v
+
+    esito_relay = {"ok": True}
+    chiamate_evento = {"n": 0}
+
+    def _evento_finto(pk, liv, xp, affari):
+        chiamate_evento["n"] += 1
+        return {"id": f"evrep-{chiamate_evento['n']}", "kind": 30382}
+
+    amb2 = {"db": lambda: _ConVivaRep(), "time": time,
+            "npub_to_hex": npub_to_hex_f,
+            "livello_utente": lambda xp, affari: {
+                "id": "pratico", "numero": 3},
+            "evento_reputazione": _evento_finto,
+            "_spedisci_ai_relay": lambda ev: _corout(
+                1 if esito_relay["ok"] else 0)}
+    exec("async " + pezzo("premia_reputazione_nostr"), amb2)
+
+    asyncio.new_event_loop().run_until_complete(
+        amb2["premia_reputazione_nostr"](222))
+    prova("senza npub verificata: fail-open, niente pubblicazione", 0,
+          chiamate_evento["n"])
+
+    asyncio.new_event_loop().run_until_complete(
+        amb2["premia_reputazione_nostr"](111))
+    prova("con npub verificata: pubblica", 1, chiamate_evento["n"])
+    riga = vero.execute("SELECT * FROM nostr_reputazione WHERE "
+                        "tg_id=111").fetchone()
+    prova("...e registra livello/xp/affari", ("pratico", 250, 6),
+          (riga["livello"], riga["xp"], riga["affari"]))
+
+    asyncio.new_event_loop().run_until_complete(
+        amb2["premia_reputazione_nostr"](111))
+    prova("richiamata a parita' di dati: NON ripubblica (un evento "
+          "identico e' solo traffico)", 1, chiamate_evento["n"])
+
+    vero.execute("UPDATE utenti SET vendite_ok=5 WHERE tg_id=111")
+    vero.commit()
+    asyncio.new_event_loop().run_until_complete(
+        amb2["premia_reputazione_nostr"](111))
+    prova("affari cambiati (un ordine in piu'): ripubblica", 2,
+          chiamate_evento["n"])
+
+    vero.execute("UPDATE utenti SET vendite_ok=9 WHERE tg_id=111")
+    vero.commit()
+    esito_relay["ok"] = False
+    asyncio.new_event_loop().run_until_complete(
+        amb2["premia_reputazione_nostr"](111))
+    riga2 = vero.execute("SELECT xp, affari FROM nostr_reputazione "
+                         "WHERE tg_id=111").fetchone()
+    prova("nessun relay accetta: la riga resta quella dell'ultimo "
+          "successo (mai un successo finto)", (250, 7),
+          (riga2["xp"], riga2["affari"]))
+    vero.close()
+
+    # --- 3) i due ganci nei punti giusti -------------------------------
+    corpo_npub = pezzo("verifica_npub_controlla")
+    prova("dopo la verifica della npub si (ri)pubblica subito: chi "
+          "aveva gia' un livello non aspetta il primo affare nuovo",
+          True, 'await premia_reputazione_nostr(user["id"])' in corpo_npub)
+
+    i_xp = _SORGENTE.index('await premia_xp(chi, "ordine",')
+    finestra = _SORGENTE[i_xp:i_xp + 800]
+    prova("a ordine concluso si aggiorna la reputazione DOPO il giro "
+          "degli XP (mai prima: l'xp di QUESTO ordine non c'e' ancora)",
+          True, "await premia_reputazione_nostr(chi)" in finestra)
+
+    # --- 4) sincronizza_reputazione_nostr: SOLO ADMIN, stesso motore --
+    corpo_sync = pezzo("sincronizza_reputazione_nostr")
+    prova("sincronizza_reputazione_nostr: riservata ai moderatori",
+          True, "verifica_utente(x_tg_init_data, barattolo_sessione)"
+          in corpo_sync and 'if not e_admin(user["id"]):' in corpo_sync)
+    prova("...e riusa lo stesso gancio (nessun motore duplicato)", True,
+          'await premia_reputazione_nostr(r["tg_id"])' in corpo_sync)
+
+    # --- 5) conferma_nip85_dichiarazione: quattro guardie vere --------
+    class _HTTPException(Exception):
+        def __init__(self, status_code, detail=""):
+            self.status_code = status_code
+            self.detail = detail
+            super().__init__(detail)
+
+    vero3 = sqlite3.connect(":memory:")
+    vero3.row_factory = sqlite3.Row
+    vero3.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                 "npub TEXT DEFAULT '', nip85_dichiarato INTEGER "
+                 "DEFAULT 0)")
+    pk_conf = "ab" * 32
+    npub_conf = hex_to_npub_f(pk_conf)
+    vero3.execute("INSERT INTO utenti VALUES(111,?,0)", (npub_conf,))
+    vero3.commit()
+
+    class _ConVivaConf:
+        def execute(self, *a):
+            return vero3.execute(*a)
+
+        def commit(self):
+            vero3.commit()
+
+        def close(self):
+            pass
+
+    async def _leggi_json_finto(req):
+        return req   # nella prova "req" e' gia' il dict del body
+
+    firma_ok = {"v": True}
+    amb3 = {"Request": object, "Header": lambda default="": default,
+            "Cookie": lambda default="": default,
+            "HTTPException": _HTTPException,
+            "verifica_utente": lambda x, y: {"id": 111},
+            "_NOSTR": (None, "f" * 64),
+            "NIP85_TAG_FIDUCIA": "30382:rank",
+            "npub_to_hex": npub_to_hex_f,
+            "db": lambda: _ConVivaConf(),
+            "leggi_json": _leggi_json_finto,
+            "verifica_firma_nostr": lambda ev: firma_ok["v"]}
+    exec("async " + pezzo("conferma_nip85_dichiarazione"), amb3)
+    chiama = amb3["conferma_nip85_dichiarazione"]
+
+    evento_buono = {"pubkey": pk_conf, "kind": 10040,
+                    "tags": [["30382:rank", "f" * 64,
+                             "wss://relay.example"]]}
+
+    firma_ok["v"] = False
+    try:
+        asyncio.new_event_loop().run_until_complete(
+            chiama({"evento": evento_buono}))
+        prova("firma non valida: solleva 400", True, False)
+    except _HTTPException as e:
+        prova("firma non valida: solleva 400", 400, e.status_code)
+    firma_ok["v"] = True
+
+    try:
+        asyncio.new_event_loop().run_until_complete(
+            chiama({"evento": {**evento_buono, "kind": 1}}))
+        prova("kind diverso da 10040: solleva 400", True, False)
+    except _HTTPException as e:
+        prova("kind diverso da 10040: solleva 400", 400, e.status_code)
+
+    try:
+        asyncio.new_event_loop().run_until_complete(
+            chiama({"evento": {**evento_buono, "pubkey": "ee" * 32}}))
+        prova("firmato con la chiave di un altro: solleva 400", True,
+              False)
+    except _HTTPException as e:
+        prova("firmato con la chiave di un altro: solleva 400", 400,
+              e.status_code)
+
+    try:
+        asyncio.new_event_loop().run_until_complete(
+            chiama({"evento": {**evento_buono,
+                               "tags": [["tutt'altro", "x"]]}}))
+        prova("senza il tag 30382:rank verso di noi: solleva 400", True,
+              False)
+    except _HTTPException as e:
+        prova("senza il tag 30382:rank verso di noi: solleva 400", 400,
+              e.status_code)
+
+    riga_prima = vero3.execute("SELECT nip85_dichiarato FROM utenti "
+                               "WHERE tg_id=111").fetchone()
+    prova("...e nessuno dei quattro rifiuti ha segnato nulla", 0,
+          riga_prima["nip85_dichiarato"])
+
+    r = asyncio.new_event_loop().run_until_complete(
+        chiama({"evento": evento_buono}))
+    prova("evento buono, firma vera, chiave giusta, tag giusto: "
+          "conferma", True, r["ok"])
+    riga_dopo = vero3.execute("SELECT nip85_dichiarato FROM utenti "
+                              "WHERE tg_id=111").fetchone()
+    prova("...e SOLO ora segna nip85_dichiarato", 1,
+          riga_dopo["nip85_dichiarato"])
+    vero3.close()
+
+
+def prove_nip89_handler():
+    """NIP-89 (set 2026): il buco che tag_client() aveva da mesi — un
+    riferimento a '31990:{piattaforma}:barattolo' che non puntava a
+    nessun evento vero (tag_client() lo scrive dall'ago 2026, l'evento
+    non e' mai stato pubblicato).
+
+    Qui si provano: il decoder naddr (NUOVO — nessun vettore ufficiale
+    nella spec di NIP-19, quindi si prova per ROTONDITA' come gia' fa
+    hex_to_npub/npub_to_hex: si codifica a mano con una ricetta gemella
+    e si verifica che decodifica_naddr la rilegga esatta), i tag e il
+    content del 31990, il gancio che non ripubblica se niente e'
+    cambiato, e le strade di /e/{bech32} — annuncio trovato,
+    reputazione trovata (con e senza codice negozio), e i tre
+    fail-open: naddr storta, kind che non apriamo, evento che
+    conosciamo ma non abbiamo mai importato (niente import al volo)."""
+    print("\n[l'handler NIP-89, e il decoder naddr]")
+    import asyncio
+    import json as _json
+    import sqlite3
+    import time as _time
+
+    # --- 0) un ENCODER naddr solo per la prova (mai in produzione) ---
+    CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+    def _polymod(valori):
+        gen = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+        chk = 1
+        for v in valori:
+            b = chk >> 25
+            chk = ((chk & 0x1ffffff) << 5) ^ v
+            for i in range(5):
+                if (b >> i) & 1:
+                    chk ^= gen[i]
+        return chk
+
+    def naddr_di_prova(kind, pubkey_hex, identificatore, relays=()):
+        def tlv(tipo, valore):
+            return bytes([tipo, len(valore)]) + valore
+        grezzo = tlv(0, identificatore.encode("utf-8"))
+        for r in relays:
+            grezzo += tlv(1, r.encode("utf-8"))
+        grezzo += tlv(2, bytes.fromhex(pubkey_hex))
+        grezzo += tlv(3, kind.to_bytes(4, "big"))
+        dati, bits, val = [], 0, 0
+        for byte in grezzo:
+            val = (val << 8) | byte
+            bits += 8
+            while bits >= 5:
+                bits -= 5
+                dati.append((val >> bits) & 31)
+        if bits:
+            dati.append((val << (5 - bits)) & 31)
+        hrp = ([ord(c) >> 5 for c in "naddr"] + [0]
+               + [ord(c) & 31 for c in "naddr"])
+        pm = _polymod(hrp + dati + [0] * 6) ^ 1
+        checksum = [(pm >> 5 * (5 - i)) & 31 for i in range(6)]
+        return "naddr1" + "".join(CHARSET[d] for d in dati + checksum)
+
+    amb = {"CHARSET_BECH32": CHARSET}
+    exec(pezzo("decodifica_naddr"), amb)
+    decodifica_naddr = amb["decodifica_naddr"]
+
+    pk = "ab" * 32
+    buona = naddr_di_prova(30402, pk, "barattolo-193",
+                           ["wss://relay.barattolo.store"])
+    d = decodifica_naddr(buona)
+    prova("il decoder rilegge il kind", 30402, d["kind"])
+    prova("...la pubkey", pk, d["pubkey"])
+    prova("...l'identificatore (il tag d)", "barattolo-193",
+          d["identificatore"])
+    prova("...e i relay suggeriti", ["wss://relay.barattolo.store"],
+          d["relays"])
+
+    d2 = decodifica_naddr(naddr_di_prova(30382, pk, pk))
+    prova("senza tag relay: lista vuota, non un errore", [], d2["relays"])
+    prova("il 30382 ha l'identificatore uguale alla pubkey (e' il "
+          "soggetto, non chi firma)", pk, d2["identificatore"])
+
+    for storta, motivo in (("npub1" + buona[6:], "prefisso sbagliato"),
+                           ("naddr1!!!!", "carattere fuori charset"),
+                           ("naddr1qqqqq", "troppo corta per un TLV vero")):
+        try:
+            decodifica_naddr(storta)
+            prova(f"naddr storta ({motivo}): solleva ValueError", True,
+                  False)
+        except ValueError:
+            prova(f"naddr storta ({motivo}): solleva ValueError", True,
+                  True)
+
+    # --- 1) i tag e il content del kind 31990 --------------------------
+    amb2 = {"URL_PUBBLICO": "https://barattolo.store"}
+    exec(pezzo("_tags_handler_nostro"), amb2)
+    tags = amb2["_tags_handler_nostro"]()
+    prova("il d e' 'barattolo', lo stesso che tag_client() referenzia "
+          "gia'", True, ["d", "barattolo"] in tags)
+    prova("k=30402 (annunci) e k=30382 (reputazione), niente altro",
+          {"30402", "30382"}, {t[1] for t in tags if t[0] == "k"})
+    prova("il tag web porta il placeholder <bech32> e il tipo naddr",
+          True,
+          ["web", "https://barattolo.store/e/<bech32>", "naddr"] in tags)
+
+    amb3 = {"URL_PUBBLICO": "https://barattolo.store",
+            "NOME_CLIENT_NOSTR": "Barattolo",
+            "META_TESTO_HOME": "una riga di prova",
+            "IMMAGINE_BRAND": (
+                "https://barattolo.store/assets/icona-512.png", 512, 512),
+            "json": _json,
+            "firma_evento": lambda kind, tags, content: {
+                "kind": kind, "tags": tags, "content": content}}
+    exec(pezzo("_tags_handler_nostro"), amb3)
+    exec(pezzo("evento_handler_nostro"), amb3)
+    ev = amb3["evento_handler_nostro"]()
+    prova("il 31990 e' un 31990", 31990, ev["kind"])
+    contenuto = _json.loads(ev["content"])
+    prova("il content e' uno stile kind:0 coi testi del brand gia' "
+          "scritti (mai una copia nuova)",
+          ("Barattolo", "una riga di prova"),
+          (contenuto["name"], contenuto["about"]))
+
+    # --- 2) aggiorna_handler_nostro: non ripubblica se niente cambia --
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute("CREATE TABLE nostr_handler(d TEXT PRIMARY KEY, "
+                "tags_json TEXT DEFAULT '', evento_id TEXT DEFAULT '', "
+                "pubblicato_il INTEGER DEFAULT 0)")
+    vero.commit()
+
+    class _ConViva:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    async def _corout(v):
+        return v
+
+    esito_relay = {"ok": True}
+    # _tags_handler_nostro DEVE girare a ogni chiamata (serve al
+    # confronto «e' cambiato qualcosa?»): quel che non deve ripetersi
+    # e' la FIRMA vera, quindi si conta evento_handler_nostro e non lei.
+    chiamate_firma = {"n": 0}
+
+    def _evento_finto():
+        chiamate_firma["n"] += 1
+        return {"id": "ev-handler-1"}
+
+    amb4 = {"_NOSTR": (None, "f" * 64), "db": lambda: _ConViva(),
+            "time": _time, "json": _json,
+            "_tags_handler_nostro": lambda: [["d", "barattolo"],
+                                             ["k", "30402"]],
+            "evento_handler_nostro": _evento_finto,
+            "_spedisci_ai_relay": lambda ev: _corout(
+                1 if esito_relay["ok"] else 0),
+            "print": lambda *a, **k: None}
+    exec("async " + pezzo("aggiorna_handler_nostro"), amb4)
+
+    asyncio.new_event_loop().run_until_complete(
+        amb4["aggiorna_handler_nostro"]())
+    riga = vero.execute("SELECT * FROM nostr_handler WHERE "
+                        "d='barattolo'").fetchone()
+    prova("prima volta: pubblica e registra", "ev-handler-1",
+          riga["evento_id"] if riga else None)
+    prova("...firmando una volta sola", 1, chiamate_firma["n"])
+
+    asyncio.new_event_loop().run_until_complete(
+        amb4["aggiorna_handler_nostro"]())
+    prova("richiamata a tag identici: non firma una seconda volta", 1,
+          chiamate_firma["n"])
+    vero.close()
+
+    amb5 = {"_NOSTR": None}
+    exec("async " + pezzo("aggiorna_handler_nostro"), amb5)
+    esploso = False
+    try:
+        asyncio.new_event_loop().run_until_complete(
+            amb5["aggiorna_handler_nostro"]())
+    except Exception:
+        esploso = True
+    prova("Nostr spento (_NOSTR falsy): esce subito, senza toccare "
+          "db() o firmare nulla", False, esploso)
+
+    # --- 3) /e/{bech32}: le due strade e i tre fail-open --------------
+    amb_hex = {"CHARSET_BECH32": CHARSET}
+    exec(pezzo("_bech32_polymod"), amb_hex)
+    exec(pezzo("hex_to_npub"), amb_hex)
+    hex_to_npub_f = amb_hex["hex_to_npub"]
+
+    pk_venditore = "cd" * 32
+    npub_venditore = hex_to_npub_f(pk_venditore)
+    pk_senza_negozio = "12" * 32
+    npub_senza_negozio = hex_to_npub_f(pk_senza_negozio)
+
+    vero2 = sqlite3.connect(":memory:")
+    vero2.row_factory = sqlite3.Row
+    vero2.execute("CREATE TABLE annunci(id INTEGER, titolo TEXT, "
+                 "nostr_origine_d TEXT)")
+    vero2.execute("CREATE TABLE utenti(npub TEXT, npub_accesso TEXT, "
+                 "username TEXT, negozio TEXT, nome TEXT)")
+    vero2.execute("INSERT INTO annunci VALUES(193,'Bicicletta da "
+                 "corsa','barattolo-193')")
+    vero2.execute("INSERT INTO utenti VALUES(?,'','rosina','ab12cd34',"
+                 "'Rosina')", (npub_venditore,))
+    vero2.execute("INSERT INTO utenti VALUES(?,'','mariorossi','',"
+                 "'Mario')", (npub_senza_negozio,))
+    vero2.commit()
+
+    class _ConViva2:
+        def execute(self, *a):
+            return vero2.execute(*a)
+
+        def close(self):
+            pass
+
+    class _FintaRedirect:
+        def __init__(self, url, status_code=307):
+            self.url, self.status_code = url, status_code
+
+    amb6 = {"decodifica_naddr": decodifica_naddr, "db": lambda: _ConViva2(),
+            "hex_to_npub": hex_to_npub_f,
+            "URL_PUBBLICO": "https://barattolo.store",
+            "RedirectResponse": _FintaRedirect,
+            "_url_annuncio": lambda aid, t:
+                f"https://barattolo.store/annuncio/{aid}-slug",
+            "_url_negozio": lambda cod, nome: (
+                f"https://barattolo.store/negozio/{cod}-slug" if cod
+                else "https://barattolo.store"),
+            "_pagina_con_meta": lambda *a: ("PAGINA_GENERICA",),
+            "META_GENERICI": "generici", "META_NOINDEX": "noindex"}
+    exec(pezzo("pagina_evento_nostr"), amb6)
+    apri = amb6["pagina_evento_nostr"]
+
+    r1 = apri(naddr_di_prova(30402, pk_venditore, "barattolo-193"))
+    prova("naddr di un annuncio nostro: rimanda alla pagina canonica",
+          True, isinstance(r1, _FintaRedirect)
+          and "/annuncio/193-slug" in r1.url and r1.status_code == 302)
+
+    r2 = apri(naddr_di_prova(30402, pk_venditore, "barattolo-mai-visto"))
+    prova("annuncio mai importato: niente import al volo, pagina "
+          "generica", ("PAGINA_GENERICA",), r2)
+
+    r3 = apri(naddr_di_prova(30382, pk_venditore, pk_venditore))
+    prova("naddr di una reputazione nostra (col codice negozio): "
+          "rimanda al negozio", True, isinstance(r3, _FintaRedirect)
+          and "/negozio/ab12cd34-slug" in r3.url)
+
+    r4 = apri(naddr_di_prova(30382, pk_senza_negozio, pk_senza_negozio))
+    prova("reputazione di chi non ha ancora un codice negozio: "
+          "rimanda comunque, sullo username", True,
+          isinstance(r4, _FintaRedirect)
+          and r4.url == "https://barattolo.store/negozio/mariorossi")
+
+    pk_ignoto = "ee" * 32
+    r5 = apri(naddr_di_prova(30382, pk_ignoto, pk_ignoto))
+    prova("reputazione di chi non e' un nostro utente: pagina "
+          "generica", ("PAGINA_GENERICA",), r5)
+
+    r6 = apri(naddr_di_prova(1, pk_venditore, "qualcosa"))
+    prova("un kind che non apriamo (es. una nota): pagina generica",
+          ("PAGINA_GENERICA",), r6)
+
+    r7 = apri("naddr1!!!!")
+    prova("naddr che non si decodifica: pagina generica",
+          ("PAGINA_GENERICA",), r7)
+    vero2.close()
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -54136,6 +54673,8 @@ def main():
               prove_login_qr,
               prove_profilo_sezioni,
               prove_badge_nostr,
+              prove_reputazione_nostr,
+              prove_nip89_handler,
               prove_config_esempio):
         try:
             f()

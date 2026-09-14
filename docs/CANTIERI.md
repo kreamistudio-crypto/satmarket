@@ -11274,3 +11274,203 @@ La cura non scommette su di lei: chiude la **classe** dei silenzi —
 qualunque strada non arrivi a un JPEG ora o passa dal server o dice
 perché — e lascia acceso lo strumento per vedere il fenomeno la
 prossima volta che capita.
+
+## La reputazione come evento NIP-85, e i due firmatari
+
+Il livello/XP/affari del mercatino esce anche come kind 30382 (NIP-85,
+"Trusted Assertion"): indirizzabile sul tag `d` = la pubkey
+dell'utente, ripubblicarlo aggiorna sui relay invece di crearne un
+secondo — la stessa ricetta del kind 30009 dei badge, riusando lo
+stesso `firma_evento`/`_spedisci_ai_relay`.
+
+DUE FIRMATARI DIVERSI, ed è il punto da tenere in testa leggendo il
+codice: il 30382 lo firma la PIATTAFORMA (è lei che afferma «questo
+utente ha questo livello», come un badge) — ma perché un client Nostr
+terzo raccolga quell'affermazione come fonte affidabile deve saperlo
+dal DIRETTO INTERESSATO, e quello è un secondo evento, il kind 10040
+("mi fido di Barattolo per il tag 30382:rank"), che la spec vuole
+firmato dal soggetto stesso. Barattolo non può firmarlo per conto
+dell'utente senza la sua nsec — e non la chiede mai (regola ferrea 2)
+— quindi quella firma nasce nel BROWSER: estensione NIP-07, bunker
+NIP-46 o il foglio nsec locale, stessa cintura della modifica firmata
+di un annuncio importato (`salvaModificaFirmata`/`firmaEConsegna`,
+riga ~32394 di `miniapp.html`) — firmatario automatico se c'è
+(`firmatarioAutomatico`), altrimenti il foglio, e l'id dell'evento si
+ricontrolla PRIMA di fidarsi della firma tornata indietro.
+
+I TAG DEL 30382: `d` (soggetto), `rank` (0-100, il tag generico che la
+NIP definisce per un primitivo di Web of Trust — qui una PROPORZIONE
+del gradino su `LIVELLI`, non il suo indice), `livello`/`xp`/`affari`
+nel vocabolario preciso di casa, più `r`/tag_client come i badge.
+
+NON RIPUBBLICA SE NIENTE È CAMBIATO (`premia_reputazione_nostr`,
+tabella `nostr_reputazione` — solo una CACHE dell'ultimo stato
+pubblicato, mai la fonte di verità, che resta l'evento sui relay):
+un kind 30382 sostituibile identico a quello di ieri non direbbe
+niente di nuovo a nessuno, solo traffico ripetuto a ogni gancio.
+
+I DUE GANCI, E LA LEZIONE DELL'ORDINE SBAGLIATO. Il primo è dentro
+`verifica_npub_controlla`: appena la npub è verificata c'è per la
+prima volta un soggetto a cui indirizzare l'evento, e chi aveva già
+un livello da prima non deve aspettare il prossimo affare per vederlo
+comparire. Il secondo è a ordine concluso — ma NON dentro
+`premia_distintivi(o["venditore_id"])`/`premia_distintivi(o["compratore_id"])`
+di quel punto, che è dove sarebbe stato naturale agganciarsi (è il
+"punto unico" dei distintivi): quello gira PRIMA che `premia_xp`
+scriva i punti di QUEST'ordine, quindi un gancio lì dentro avrebbe
+pubblicato un 30382 con l'XP di un giro fa — esattamente la lezione
+già scritta per Mostro sul cronometro che riparte a ogni fase (vedi
+più sopra in questo stesso file, o `docs/ARCHITETTURA.md`). La cura è
+la stessa: il gancio sta DOPO il giro `for chi, ruolo in (...): await
+premia_xp(...)`, mai prima, mai dentro un punto che gira troppo presto
+solo perché è già lì.
+
+IL CENSIMENTO DELLE TABELLE FIGLIE (la sentinella nata nel cantiere
+del ritiro a mano, che guarda ogni `CREATE TABLE` con una colonna
+`tg_id` e pretende che la fusione la nomini) ha subito fatto il suo
+mestiere: `nostr_reputazione` ha `tg_id` in chiave primaria, quindi
+`esegui_fusione` doveva dirlo — aggiunta la stessa coppia
+`UPDATE OR IGNORE ... DELETE` già usata per `badge_utente`. La cache
+può restare stale sull'account sopravvissuto finché non arriva il
+prossimo affare (o il bottone admin qui sotto): stessa attesa già
+accettata per i badge Nostr dei distintivi nella stessa fusione, non
+una novità di questo cantiere.
+
+LA CONFERMA DEL 10040 NON SI FIDA DELLA PAROLA DEL BROWSER
+(`POST /api/me/nip85-dichiarazione`): il client manda l'evento già
+firmato E già pubblicato sui relay, e il server lo accetta SOLO dopo
+aver verificato — con `verifica_firma_nostr`, la stessa usata per gli
+import — che la firma sia vera, che sia un kind 10040, che la chiave
+sia quella della SUA npub verificata (mai la firma di qualcun altro
+spacciata per propria) e che il tag dichiari davvero `30382:rank`
+verso LA NOSTRA pubkey. Se una sola guardia manca la colonna
+`nip85_dichiarato` non si scrive: è solo un flag per mostrare il
+bottone come già fatto, mai la fonte di verità (quella resta l'evento
+sui relay), quindi un flag sbagliato non romperebbe niente di
+concreto — ma scriverlo senza aver controllato sarebbe comunque dire
+il falso, ed è la riga che questo progetto non si concede mai.
+
+IL BACKFILL, gemello di quello dei distintivi: `POST
+/api/admin/reputazione/sincronizza`, SOLO ADMIN, scorre chi ha la
+npub verificata e richiama lo stesso `premia_reputazione_nostr` (mai
+un motore duplicato) — serve a chi aveva già un livello prima che
+questo cantiere esistesse, e alla fusione qui sopra.
+
+COSA RESTA APERTO, dichiarato e non dimenticato: nessun bottone
+admin dedicato (a differenza dei badge live, che hanno un pannello in
+Profilo) — la rotta di sincronizzazione esiste e funziona, ma oggi si
+chiama a mano; un client Nostr terzo che voglia raccogliere il 30382
+in automatico ha bisogno anche del kind 10040 dell'utente, quindi la
+copertura reale dipende da quanti premono il bottone «Firma la
+fiducia NIP-85» — non è un gancio automatico per scelta (regola
+ferrea 2, quella firma non può che essere dell'utente); e il lato
+client (miniapp.html) è verificato per sintassi e per coerenza coi
+pattern esistenti (`firmatarioAutomatico`, `apriNostrSheet`,
+`pubblicaEventoSuRelay`, tutti già provati altrove) ma non da una
+prova end-to-end automatica — lo stesso limite che il resto della
+firma-nel-browser ha sempre avuto in questa suite.
+
+COLLAUDATO: 22 prove nuove in `prove_reputazione_nostr` (i tag del
+30382 e il calcolo del `rank`, il gancio fail-open senza npub
+verificata, la pubblicazione, il non-ripubblicare a parità di dati,
+il ripubblicare quando gli affari cambiano, il non registrare nulla
+se il relay rifiuta, i due ganci nei punti giusti — verificato anche
+che quello dell'ordine sta DOPO il giro degli XP e non dentro
+`premia_distintivi` — la rotta di sincronizzazione riservata agli
+admin, e le quattro guardie della conferma del 10040 provate una per
+una: firma finta, kind sbagliato, chiave di un altro, tag mancante,
+prima che il caso buono confermi davvero) — 9010 verdi, 166 rosse
+preesistenti, stesso numero di prima: zero rotture.
+
+## L'handler NIP-89, e il decoder naddr che mancava
+
+`tag_client()` scrive da mesi un riferimento a `31990:{piattaforma}:
+barattolo` su ogni evento che componiamo (riga ~31506) — ma quel kind
+31990 (Handler Information, NIP-89: "questi kind li so aprire, ed
+ecco dove") non era MAI stato pubblicato. Il riferimento puntava al
+vuoto. Questo cantiere pubblica l'evento vero e costruisce la rotta
+che lo rende utile: `/e/{bech32}`, che decodifica una naddr e rimanda
+all'indirizzo canonico che esiste già — `/annuncio/{id}` per un 30402,
+`/negozio/{chi}` per un 30382 (la reputazione NIP-85 del cantiere
+precedente).
+
+SOLO I KIND CHE SAPPIAMO APRIRE DAVVERO finiscono nei tag `k`: 30402 e
+30382. Gli ordini Mostro (38383) restano fuori apposta — vivono solo
+sui relay del coordinator, mai nel nostro database, e renderli
+apribili vuole un pezzo di CLIENT nuovo (leggere un id dall'URL,
+aspettare il cancello P2P, interrogare live i relay di Mostro per quel
+solo ordine): un cantiere suo, non una riga in più qui. Dichiararlo nei
+tag prima di saperlo aprire sarebbe stata una promessa vuota — esatto
+il difetto che questo cantiere chiude su tag_client().
+
+IL DECODER naddr (`decodifica_naddr`) È NUOVO DA ZERO: il codice aveva
+solo il bech32 semplice di `npub_to_hex` (una chiave nuda). Una naddr
+porta un payload TLV — tipo/lunghezza/valore ripetuto — perché deve
+portare più di una chiave: l'identificatore (il tag "d", tipo 0), i
+relay suggeriti (tipo 1, ripetibile), chi ha composto l'evento (tipo
+2, "author") e il kind (tipo 3, intero a 4 byte big-endian). Stessa
+ricetta bech32 di `npub_to_hex` per il resto — `CHARSET_BECH32`,
+checksum scartato e mai verificato in decodifica, coerente con quel
+che il codice già fa per npub/nsec.
+⚠️ **IL "d" DEL 30382 È LA PUBKEY DEL SOGGETTO, NON DI CHI FIRMA**: chi
+ha composto l'assertion potrebbe essere chiunque (Barattolo, Vertex,
+nostr.band…), e la pagina che apriamo è comunque quella della persona
+di cui parla l'evento sul NOSTRO mercatino — `/e/{bech32}` guarda
+`identificatore`, mai `pubkey`, per questo motivo esatto.
+
+NESSUN VETTORE UFFICIALE PER LA PROVA: la spec di NIP-19 non porta un
+esempio di naddr decodificata (solo uno di nprofile, struttura
+diversa). La cura è quella che `hex_to_npub`/`npub_to_hex` già
+dimostrano in un commento — «proprietà di sanità», rotondità invece di
+un vettore esterno: `prove_nip89_handler` si scrive un piccolo
+ENCODER naddr (mai in produzione, solo lì) seguendo la spec byte per
+byte, e verifica che `decodifica_naddr` rilegga esatti kind, pubkey,
+identificatore e relay — più tre naddr storte (prefisso sbagliato,
+carattere fuori charset, TLV troncato) che devono sollevare, mai
+restituire un dato a metà.
+
+`/e/{bech32}` NON RENDE UNA PAGINA SUA: rimanda con un 302 (mai 301 —
+la mappa naddr→id non è promessa per sempre, un annuncio può sparire)
+all'indirizzo canonico, che ha già la sua costruzione SEO fail-open.
+Duplicarla qui sarebbe stata la stessa lezione già scritta per
+`_seo_o_generici`, un'altra volta. E NIENTE IMPORT AL VOLO: un
+annuncio mai importato o una reputazione di chi non è un nostro utente
+escono con la pagina generica — la stessa scelta già fatta per
+`/annuncio/pippo`, mai una lettura di rete dentro una GET pubblica e
+anonima.
+IL CENSIMENTO DELLE ROTTE-PAGINA (`prove_anteprime`, la stessa
+sentinella che conta `return _pagina_con_meta(` contro `ROTTE_PAGINA`)
+ha subito preso la prima stesura: due `return` nella stessa rotta
+(uno sulla naddr storta, uno sul fallback finale) sballavano il conto.
+La cura non è stata aggiungere un'eccezione alla sentinella ma
+togliere il secondo `return`: `d = None` sull'errore e un solo punto
+di uscita in fondo, che è anche codice più semplice — la sentinella
+aveva ragione.
+
+PUBBLICATO A OGNI AVVIO (`aggiorna_handler_nostro`, agganciato a
+`@app.on_event("startup")` come il campanello del bot, fire-and-forget
+con lo stesso pattern `_TASK_*` che tiene vivo il task), ma SOLO SE I
+TAG SONO CAMBIATI da quest'ultima volta — stessa regola di
+`premia_reputazione_nostr`: un 31990 sostituibile identico non
+direbbe niente di nuovo ai relay a ogni riavvio, e col deploy
+automatico i riavvii sono frequenti. La tabella `nostr_handler` (una
+riga sola, `d='barattolo'`) tiene il confronto, mai la prova — quella
+resta l'evento sui relay.
+IL CONTENT è testi del brand già scritti (`META_TESTO_HOME`,
+`IMMAGINE_BRAND`), mai una copia nuova da tenere in pari: la spec
+prevede uno "stile kind:0" come alternativa a un profilo separato, e
+riusare invece di duplicare è il patto di sempre di questa casa.
+
+COLLAUDATO: 25 prove nuove in `prove_nip89_handler` (il decoder naddr
+per rotondità — codifica a mano, decodifica, confronto — più tre
+naddr storte; i tag e il content del 31990; il gancio che firma una
+volta sola e non ripubblica a tag identici, e che esce subito con
+Nostr spento senza toccare nulla di indefinito; le due strade buone di
+`/e/{bech32}` — annuncio trovato, reputazione trovata con e senza
+codice negozio — e i tre fail-open: naddr storta, kind che non
+apriamo, evento mai importato) — 9036 verdi, 166 rosse preesistenti,
+stesso numero di prima: zero rotture. Una prova propria l'ha trovato
+subito sbagliata (contava le chiamate alla funzione dei tag invece
+che a quella della firma — quella deve girare a ogni giro per il
+confronto, questa no) ed è stata corretta prima di fidarsene.
+

@@ -23079,6 +23079,13 @@ async function rimuoviLnAddress(){
    nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
+/* NIP-85 (set 2026): il kind 10040 con cui l'utente dichiara, di SUA
+   chiave, che si fida di Barattolo come fonte del suo livello (kind
+   30382). La pubkey di servizio e i relay arrivano da /api/me — mai
+   una copia a mano, che cambiare la chiave sul server lascerebbe
+   indietro in silenzio. */
+let myNip85Dichiarato = false, myNip85Pubkey = '', myNip85Relays = [];
+let myNip85Collaudo = false;
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 /* Le reti del negozio e il loro catalogo, da /api/me: le voci non si
    hardcodano mai (il pattern di max_barattolo).
@@ -26442,8 +26449,16 @@ function renderNpubVerifica(){
     return;
   }
   if (myNpubVerified) {
-    /* niente doppione: lo dice gia' la riga Nostr qui sopra */
-    box.innerHTML = '';
+    /* niente doppione sul badge: lo dice gia' la riga Nostr qui sopra.
+       Resta solo, se manca, l'invito a dichiarare la fiducia NIP-85 —
+       un gesto in piu' e non automatico, perche' questo lo firma la
+       TUA chiave e non quella della piattaforma (regola ferrea 2). */
+    box.innerHTML = (myNip85Dichiarato || !myNip85Pubkey) ? '' : `
+      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        🔗 Un client Nostr può leggere il tuo livello (kind 30382), ma
+        per sapere che è <b>Barattolo</b> a dirlo deve saperlo da te:
+        firma una volta la fiducia (NIP-85), poi non serve più.</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="dichiaraNip85()">🔗 Firma la fiducia NIP-85</button>`;
     return;
   }
   if (npubCodice) {
@@ -32930,6 +32945,79 @@ async function pubblicaEventoSuRelay(relays, evento){
     finally { try { relay.close(); } catch(e){} }
   }));
   return esiti.filter(e=>e.status==='fulfilled').length;
+}
+
+/* ---- La dichiarazione di fiducia NIP-85 (set 2026) ----------------
+   Barattolo pubblica DA SOLO il livello di ognuno come kind 30382
+   (server, npub verificata, vedi premia_reputazione_nostr). Ma perche'
+   un client Nostr qualunque lo raccolga come fonte affidabile, deve
+   saperlo dalla chiave del diretto interessato: il kind 10040 che dice
+   "mi fido di Barattolo per 30382:rank". Quello lo firma SOLO il
+   browser dell'utente — stessa cintura della modifica firmata qui
+   sopra: firmatario automatico se c'e' (bunker/estensione), altrimenti
+   il foglio; l'id si ricontrolla PRIMA di fidarsi della firma. */
+async function dichiaraNip85(){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono relay: col backend vero qui parte la firma 🔗'); return; }
+  if (!myNip85Pubkey) { toast('Nostr è spento sul server: niente da dichiarare', 5000); return; }
+  const auto = await firmatarioAutomatico();
+  if (auto) {
+    try { await firmaEConsegnaNip85(auto.f); }
+    finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+    return;
+  }
+  toast('🟣 Ora serve la tua firma…', 4000);
+  apriNostrSheet((f) => firmaEConsegnaNip85(f));
+}
+
+async function firmaEConsegnaNip85(f){
+  if (el('nostrSheet')) el('nostrSheet').classList.remove('open');
+  if (el('sheetBg')) el('sheetBg').classList.remove('open');
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  let pub;
+  try { pub = String(await f.pubkey() || '').toLowerCase(); }
+  catch(e){
+    toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return;
+  }
+  /* Deve essere la STESSA chiave della npub verificata: e' lei che
+     ha il badge 🟣, ed e' lei che deve dire di chi si fida. */
+  const attesa = myNpub.startsWith('npub1')
+    ? NT.nip19.decode(myNpub).data : myNpub.toLowerCase();
+  if (pub !== attesa) {
+    toast('Questa non è la chiave della tua npub verificata', 8000);
+    return;
+  }
+  const bozza = {pubkey: pub, created_at: Math.floor(Date.now()/1000),
+    kind: 10040, tags: [['30382:rank', myNip85Pubkey, myNip85Relays[0] || '']],
+    content: ''};
+  let firmato;
+  try { firmato = await f.firma(bozza); }
+  catch(e){ toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return; }
+  if (!firmato || firmato.id !== NT.getEventHash({...bozza, pubkey: pub})) {
+    toast('Evento alterato dal firmatario: mi fermo', 6000); return;
+  }
+  /* In collaudo il browser non bussa a relay VERI (stesso patto di
+     salvaModificaFirmata/svuotaFirmeNostr): la firma si fa lo stesso,
+     sui relay non ci si prova nemmeno. */
+  const ok = myNip85Collaudo ? 1
+    : await pubblicaEventoSuRelay(myNip85Relays, firmato);
+  if (!ok) { toast('Nessun relay ha accettato: riprova', 6000); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/nip85-dichiarazione`, {
+      method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({evento: firmato})});
+    if (r.ok) {
+      myNip85Dichiarato = true;
+      renderNpubVerifica();
+      toast('🔗 Fiducia dichiarata: la tua reputazione è collegabile', 5000);
+    } else {
+      const d = await r.json().catch(()=>({}));
+      toast(d.detail || 'Pubblicato sui relay, ma il server non conferma', 6000);
+    }
+  } catch(e){
+    toast('Pubblicato sui relay: riprova più tardi a confermare', 5000);
+  }
 }
 
 /* I campi di consegna della strada FIRMATA (ago 2026): la versione
@@ -41651,6 +41739,9 @@ async function avvia(){
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
+    myNip85Dichiarato = !!me.nip85_dichiarato;
+    myNip85Pubkey = me.nip85_pubkey || ''; myNip85Relays = me.nip85_relays || [];
+    myNip85Collaudo = !!me.nip85_collaudo;
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
