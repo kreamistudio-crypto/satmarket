@@ -43983,13 +43983,27 @@ def prove_p2p_conto_dispositivo():
     # conto e non lo diceva. Un timbro senza `conto` rimetterebbe in
     # piedi il difetto del 10 set: si rileggerebbe «da verificare» a
     # ogni render.
-    # DUE FORME, e si contano tutt'e due: le tre derivazioni scrivono un
-    # mazzo NUOVO, il timbro ricopre quello che c'e' con un Object.assign
-    # — cercare la sola prima direbbe «tre» e lascerebbe il timbro senza
-    # guardia, che e' proprio la riga che il 10 set mancava.
-    prova("le derivazioni e i timbri dal seme portano il conto", 4,
-          blocco_mazzo.count("conto: myTgId, versione: s.versione | 0")
-          + blocco_mazzo.count("{origine: 'conto', conto: myTgId,"))
+    # ⚠️ UNA FORMA SOLA dal 14 set 2026 (il terzo pezzo): il mazzo del
+    # conto lo costruisce `mazzoDalSemeP2P` e nessun altro. Le quattro
+    # copie a mano di prima erano quattro posti dove il campo di domani
+    # poteva non arrivare — ed e' esattamente il difetto del 10 set, un
+    # `conto` aggiunto in due copie su tre.
+    prova("il mazzo del conto si costruisce in un posto solo", 1,
+          blocco_mazzo.count("conto: myTgId, versione: s.versione | 0"))
+    cst = pezzo_js(mini, "function mazzoDalSemeP2P(s, vecchio){", "\n}\n")
+    prova("...e il costruttore porta origine, conto e versione", True,
+          "origine: 'conto', conto: myTgId, versione: s.versione | 0};" in cst)
+    # IL TIMBRO NON AZZERA L'INDICE: un mazzo che era gia' qui tiene le
+    # sue trade key bruciate, o si riuserebbe una chiave viva.
+    prova("...e il timbro tiene indice, nascita e debito del vecchio",
+          True, "indice: vecchio ? (vecchio.indice | 0) : 0," in cst
+          and "creato: vecchio ? (vecchio.creato | 0)" in cst
+          and "backupFatto: vecchio ? !!vecchio.backupFatto : true," in cst)
+    # QUATTRO USI: tre NASCITE (il gesto, la gamba dell'app, il
+    # passaggio) e un TIMBRO, che e' l'unico a passare `vecchio`
+    prova("...e i quattro usi passano tutti di li'", 4,
+          blocco_mazzo.count("mazzoDalSemeP2P(s)")
+          + blocco_mazzo.count("mazzoDalSemeP2P(s, m)"))
     prova("...e il campo viaggia nel testo, andata e ritorno", True,
           "conto: numeroConto(m.conto)});" in blocco_mazzo
           and "conto: d ? numeroConto(d.conto) : 0};" in blocco_mazzo)
@@ -44088,7 +44102,8 @@ def prove_p2p_conto_dispositivo():
     # qualcun altro si infili — e se ci si infila, quel che trova
     # scritto non si tocca.
     prova("la chiave nuova nasce PRIMA che il posto si svuoti", True,
-          0 < pas.find("const nuovo = {sk: s.sk") < pas.find("await parcheggiaMazzoAltruiP2P("))
+          0 < pas.find("const nuovo = mazzoDalSemeP2P(s);")
+          < pas.find("await parcheggiaMazzoAltruiP2P("))
     prova("...e un mazzo arrivato nel frattempo non si sovrascrive", True,
           "if (!mazzoMostro()) ricordaMazzo(nuovo);" in pas)
     prova("...e il vecchio si mette da parte, con la sua nota", True,
@@ -44098,7 +44113,7 @@ def prove_p2p_conto_dispositivo():
           "const dove = '@altrui:' + String(m.pub || '').slice(0, 8);" in par)
     prova("il mazzo che ERA gia' quello del conto si timbra e basta",
           True, pas.find("if (s.sk === m.sk) {") < pas.find("parcheggiaMazzoAltruiP2P(")
-          and "origine: 'conto', conto: myTgId," in pas)
+          and "ricordaMazzo(mazzoDalSemeP2P(s, m));" in pas)
     prova("...e la registrazione porta indietro il pavimento", True,
           "await registraChiaviP2P([mazzoMostro().pub]);" in pas)
     # IL RENDER E IL GESTO: si giudica PRIMA di pubblicare, ed e' tutto
@@ -44293,6 +44308,7 @@ console.log(JSON.stringify(out));
             for f in ("function mazzoDaGiudicareP2P(m){",
                       "function numeroConto(x){",
                       "function senzaStoriaP2P(m){",
+                      "function mazzoDalSemeP2P(s, vecchio){",
                       "async function passaAlContoP2P(m, s){",
                       "async function giudicaMazzoP2P(m){")) + r"""
 let LOCALE = null, SEME = null, SCAMBI = {}, LAPIDI = {};
@@ -46309,8 +46325,8 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
           ad.count("if (mazzoMostro()) return"))
     prova("...e una nuvola illeggibile la ferma", True,
           "mazzoNuvola === 'illeggibile'" in ad)
-    prova("...e il profilo nasce del conto, senza debito di backup",
-          True, "origine: 'conto'" in ad and "backupFatto: true" in ad)
+    prova("...e il profilo nasce del conto, dal costruttore unico",
+          True, "const nuovo = mazzoDalSemeP2P(s);" in ad)
     prova("...e porta subito la chiave al pavimento", True,
           "await registraChiaviP2P([nuovo.pub]);" in ad)
     rnd = pezzo_js(mini, "function renderP2P(){", "\n}\n")

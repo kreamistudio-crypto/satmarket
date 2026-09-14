@@ -36327,6 +36327,31 @@ function senzaStoriaP2P(m){
     && !Object.keys(ordiniP2P()).length
     && !Object.keys(lapidiP2P()).length;
 }
+/* IL MAZZO DEL CONTO NASCE IN UN POSTO SOLO (14 set 2026, terzo pezzo
+   del quadro d'insieme): lo costruivano a mano in TRE — il gesto
+   (`assicuraMazzo`), la gamba dell'app (`adottaProfiloContoP2P`) e il
+   passaggio (`passaAlContoP2P`) — con lo stesso oggetto scritto tre
+   volte. Non e' un gusto di ordine: il 10 set il difetto e' stato
+   esattamente questo, un campo aggiunto in due copie su tre — il mazzo
+   derivato senza `conto` si rileggeva «da verificare» a ogni render.
+   Una copia in piu' e' un posto in piu' dove il campo di domani non
+   arrivera'.
+   `vecchio` C'E' QUANDO IL MAZZO ESISTE GIA' ED E' LUI: allora si
+   TIMBRA, e indice, nascita e debito di backup restano i suoi — un
+   timbro che azzerasse l'indice farebbe riusare una trade key gia'
+   bruciata, che e' il guasto che il pavimento esiste per impedire. */
+function mazzoDalSemeP2P(s, vecchio){
+  const NT = window.NostrTools;
+  return {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
+          indice: vecchio ? (vecchio.indice | 0) : 0,
+          creato: vecchio ? (vecchio.creato | 0) : Math.floor(Date.now() / 1000),
+          /* NESSUN DEBITO DI BACKUP: questo profilo torna da solo a ogni
+             ingresso, su qualunque dispositivo — timbrarlo «da mettere
+             al sicuro» chiederebbe un gesto che non serve. Un mazzo che
+             era gia' qui tiene quel che aveva. */
+          backupFatto: vecchio ? !!vecchio.backupFatto : true,
+          origine: 'conto', conto: myTgId, versione: s.versione | 0};
+}
 /* IL PASSAGGIO VERO, in un posto solo perche' lo fanno in due: il
    giudizio silenzioso di qui sotto e il gesto del foglio. La chiave
    nuova si deriva PRIMA del parcheggio, cosi' fra il posto svuotato e
@@ -36340,17 +36365,11 @@ async function passaAlContoP2P(m, s){
     /* E' GIA' LUI e non lo diceva: si timbra, e non si parcheggia
        niente — parcheggiare un mazzo per poi riscriverlo uguale
        sposterebbe le sue righe su una mensola per sbaglio. */
-    ricordaMazzo(Object.assign({}, m, {origine: 'conto', conto: myTgId,
-                                       versione: s.versione | 0}));
+    ricordaMazzo(mazzoDalSemeP2P(s, m));
     console.log('🔑 [p2p] profilo: era quello del conto senza dirlo, timbrato');
     return mazzoMostro();
   }
-  const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
-                 indice: 0, creato: Math.floor(Date.now() / 1000),
-                 /* NESSUN DEBITO DI BACKUP: questo torna da solo a ogni
-                    ingresso, su qualunque dispositivo */
-                 backupFatto: true, origine: 'conto',
-                 conto: myTgId, versione: s.versione | 0};
+  const nuovo = mazzoDalSemeP2P(s);
   await parcheggiaMazzoAltruiP2P(m, 'era di questo dispositivo e non aveva'
     + ' mai scambiato: al suo posto quello del tuo account');
   if (!mazzoMostro()) ricordaMazzo(nuovo);
@@ -37038,14 +37057,7 @@ function assicuraMazzo(){
        di fare su una lettura fallita. */
     if (!nuovo) {
       const s = await semeProfiloP2P();
-      if (s) nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
-                      indice: 0, creato: Math.floor(Date.now()/1000),
-                      /* NESSUN DEBITO DI BACKUP: questo profilo torna
-                         da solo a ogni ingresso, su qualunque
-                         dispositivo. Timbrarlo «da mettere al sicuro»
-                         vorrebbe dire chiedere un gesto che non serve. */
-                      backupFatto: true, origine: 'conto',
-                      conto: myTgId, versione: s.versione | 0};
+      if (s) nuovo = mazzoDalSemeP2P(s);
     }
     if (!nuovo) {
       const sk = NT.utils.bytesToHex(NT.generateSecretKey());
@@ -37104,10 +37116,7 @@ function adottaProfiloContoP2P(){
     /* nel frattempo un gesto puo' aver fatto nascere il mazzo: quello
        che c'e' non si tocca, e' l'invariante di tutto il cantiere */
     if (mazzoMostro()) return mazzoMostro();
-    const nuovo = {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
-                   indice: 0, creato: Math.floor(Date.now()/1000),
-                   backupFatto: true, origine: 'conto',
-                   conto: myTgId, versione: s.versione | 0};
+    const nuovo = mazzoDalSemeP2P(s);
     ricordaMazzo(nuovo);
     /* la registrazione porta indietro il pavimento dell'indice: e' il
        pezzo che rende gli ordini «miei» anche qui, via restore */
