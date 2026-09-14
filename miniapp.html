@@ -3185,6 +3185,27 @@
   .leva-riga.allarme .leva-val{background:var(--warn-bg);color:var(--danger)}
   .leva-riga.allarme .leva-val{border-radius:999px;padding:2px 9px}
 
+  /* ---- 🖼 Anteprima personalizzazioni livello (mockup, set 2026) ----
+     SOLO PER DECIDERE IL VERSO: cornici e temi colore finti, prezzo
+     segnaposto. Niente acquisto vero, niente leva salvata — se l'idea
+     si scarta si toglie questo blocco di CSS e la funzione in coppia,
+     e basta. */
+  .pz-riga{display:flex;gap:16px;overflow-x:auto;padding:10px 2px 6px;
+    -webkit-overflow-scrolling:touch}
+  .pz-voce{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+    gap:5px;width:78px;text-align:center}
+  .pz-avatar{width:56px;height:56px;border-radius:50%;padding:3px;
+    display:flex;align-items:center;justify-content:center}
+  .pz-volto{width:100%;height:100%;border-radius:50%;background:var(--ink);
+    color:var(--on-ink);display:flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:16px}
+  .pz-swatch{width:32px;height:32px;border-radius:50%;
+    box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--line)}
+  .pz-nome{font-size:11.5px;font-weight:700;line-height:1.2}
+  .pz-soglia{font-size:10px;color:var(--muted);font-weight:600}
+  .pz-prezzo{font-family:'JetBrains Mono',monospace;font-size:10.5px;
+    font-weight:700;color:var(--sats-deep)}
+
   /* le pillole del tema nel cassetto Aspetto: gemelle di quelle del
      canale avvisi, ma statiche nel markup (il tema e' solo client) */
   .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
@@ -31038,6 +31059,7 @@ async function loadAdminStats(){
       </div>
       ${boxLeve(leve)}
       ${boxBadgeLive()}
+      ${boxPersonalizzazioniPreview()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
     if (el('grpAdmin')) el('grpAdmin').style.display = '';
@@ -31623,6 +31645,54 @@ function boxBadgeLive(){
       <button class="btn ghost" style="margin-top:8px" onclick="sincronizzaDistintivi()">🔄 Sincronizza i distintivi</button>
     </div>
     <div id="badgeDettaglio" style="margin-top:14px"></div>`);
+}
+
+/* ---- 🖼 Anteprima personalizzazioni livello (mockup, set 2026) ----
+   Proposta ancora da decidere (vedi Trello, card «Gamification: cornici
+   e colori profilo per livello»): qui SOLO per vedere il verso prima di
+   costruirlo davvero. Nessun acquisto è vero, nessuna leva è salvata,
+   nessuna chiamata al server — cornici e temi sono finti, il prezzo
+   (10.000 sats) è un segnaposto uguale per tutti finché non si decide
+   una scala vera. Se l'idea si scarta, questa funzione e il suo CSS
+   gemello si tolgono e basta: non toccano nient'altro. */
+function boxPersonalizzazioniPreview(){
+  const CORNICI = [
+    {nome:'Base', bg:'var(--line)', soglia:'quella di oggi', prezzo:null},
+    {nome:'Bronzo', bg:'linear-gradient(135deg,#C87F4A,#8A5A2B)', soglia:'livello 3'},
+    {nome:'Argento', bg:'linear-gradient(135deg,#E4E4E4,#9A9A9A)', soglia:'livello 5'},
+    {nome:'Oro', bg:'linear-gradient(135deg,#F3D27A,#B8860B)', soglia:'livello 8'},
+    {nome:'Raro', bg:'linear-gradient(135deg,#FFB347,#F7931A)',
+     glow:'0 0 9px 2px rgba(247,147,26,.55)', soglia:'livello 10'},
+  ];
+  const TEMI = [
+    {nome:'Arancione Satoshi', col:'#F7931A'},
+    {nome:'Blu Lampo', col:'#2F80ED'},
+    {nome:'Verde Smeraldo', col:'#0F9B8E'},
+    {nome:'Viola Cosmico', col:'#7C5CFC'},
+    {nome:'Grigio Grafite', col:'#556072'},
+    {nome:'Rosa Corallo', col:'#E85D75'},
+  ];
+  const cornici = CORNICI.map(c => `
+    <div class="pz-voce">
+      <div class="pz-avatar" style="background:${c.bg}${c.glow?`;box-shadow:${c.glow}`:''}">
+        <div class="pz-volto">A</div>
+      </div>
+      <div class="pz-nome">${esc(c.nome)}</div>
+      <div class="pz-soglia">${esc(c.soglia)}</div>
+      <div class="pz-prezzo">${c.prezzo===null?'quella di oggi':'10.000 sats'}</div>
+    </div>`).join('');
+  const temi = TEMI.map(t => `
+    <div class="pz-voce">
+      <div class="pz-swatch" style="background:${t.col}"></div>
+      <div class="pz-nome">${esc(t.nome)}</div>
+      <div class="pz-prezzo">10.000 sats</div>
+    </div>`).join('');
+  return cassettoAdm('accAdmPersonaliz', '🖼', 'Personalizzazioni (anteprima)', 'mockup', `
+    <div class="sub">Solo per vedere il verso, prima di costruirlo davvero: nessun acquisto è vero, nessuna leva è salvata. Cornice e tema si sbloccherebbero in kit, al livello indicato — prezzo segnaposto <b>10.000 sats</b> l'una.</div>
+    <div class="section-label" style="margin-top:14px">Cornici</div>
+    <div class="pz-riga">${cornici}</div>
+    <div class="section-label" style="margin-top:10px">Temi colore</div>
+    <div class="pz-riga">${temi}</div>`);
 }
 
 async function sincronizzaDistintivi(){
