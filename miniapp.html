@@ -1880,6 +1880,24 @@
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
     padding-bottom:3px}
+  /* ⚠️ L'ARIA ATTORNO ALLA RIGA DI STRUMENTI, pareggiata (set 2026,
+     richiesta di Andrea — e MISURATA, non dedotta): sotto la riga ce
+     n'erano 13 — i 10 del suo margine piu' i 3 del fondo dipinto del
+     blocco — e sopra 2, cioe' il solo margine del cappello. La riga
+     stava incollata alla linea di separazione.
+     Tredici anche sopra, e la riga sta in mezzo esatto fra la linea e
+     il bordo del blocco.
+     ⚠️ SOLO IN QUESTA CASA: `.p2p-testa-riga` e' la stessa del libro,
+     e la' sopra non c'e' nessuna linea da cui staccarsi — ci sono i
+     due tab, che l'aria ce l'hanno gia'.
+     ⚠️ E IL MARGINE COLLASSA ATTRAVERSO `#p2pMieiTesta`, che non ha
+     ne' bordo ne' padding: questi 13 non si SOMMANO ai 2 del cappello,
+     li sostituiscono (vince il piu' grande). Misurato, non dedotto —
+     e' la ragione per cui il numero e' 13 e non 11.
+     I due 13 non possono divergere in silenzio: c'e' una prova che
+     rifa' la somma (margine sotto + fondo del blocco) e pretende che
+     torni questo numero. */
+  #p2pMieiTesta .p2p-testa-riga{margin-top:13px}
   /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea) non
      ha piu' un vestito suo, ed e' la terza stesura di questo titolo:
      prima 19px come i due tab della sorella, poi la sola MISURA del

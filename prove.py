@@ -48186,6 +48186,32 @@ def prove_p2p_vista_miei():
               < mini.index(".foglio-testa h3{margin-top:0"))
     prova("...e la variabile e' dichiarata una volta sola", 1,
           mini.count("--tit-foglio:"))
+    # ⚠️ L'ARIA ATTORNO ALLA RIGA DI STRUMENTI E' UGUALE SOPRA E SOTTO
+    # (richiesta di Andrea, e MISURATA dal vivo: erano 2 sopra e 13
+    # sotto, e la riga stava incollata alla linea del cappello). I 13
+    # di sotto sono una SOMMA — il margine della riga piu' il fondo
+    # dipinto del blocco — quindi qui non si ribatte un numero: si
+    # rifa' la somma, e il giorno che uno dei due addendi cambia questa
+    # riga lo dice invece di lasciare la riga storta.
+    # ⚠️ LE ANCORE PORTANO LA PRIMA DICHIARAZIONE, che nel foglio ci
+    # sono le gemelle rientrate dentro le media query e `index` trova
+    # quelle: e' la trappola gia' pagata due volte in questo cantiere.
+    _ariaRiga = pezzo_js(mini, "  .p2p-testa-riga{display:flex", "}")
+    _ariaBlocco = pezzo_js(mini, "  .p2p-sticky{position:sticky", "}")
+    _ariaSopra = pezzo_js(mini, "  #p2pMieiTesta .p2p-testa-riga{", "}")
+    _sotto = (int(re.search(r"margin:\d+px 0 (\d+)px", _ariaRiga).group(1))
+              + int(re.search(r"padding-bottom:(\d+)px",
+                              _ariaBlocco).group(1)))
+    prova("l'aria sopra la riga di strumenti pareggia quella sotto",
+          _sotto,
+          int(re.search(r"margin-top:(\d+)px", _ariaSopra).group(1)))
+    # ...e si tocca SOLO la casa dei propri scambi: `.p2p-testa-riga` e'
+    # la stessa del libro, e la' sopra non c'e' nessuna linea da cui
+    # staccarsi — ci sono i due tab, che l'aria ce l'hanno gia'.
+    prova("...e il libro resta com'era", True,
+          "margin:2px 0 10px" in _ariaRiga
+          and _ariaSopra.startswith("  #p2pMieiTesta"))
+
     # CENTRATO, e adesso da UNA regola sola: i due cappelli sono lo
     # stesso vestito, quindi non c'e' piu' niente da tenere in pari —
     # e' la forma piu' forte di «uguali».
