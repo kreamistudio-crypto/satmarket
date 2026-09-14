@@ -2594,6 +2594,25 @@
     font:inherit;font-size:19px;font-weight:800;line-height:1;
     padding:8px 8px;cursor:pointer;border-radius:10px}
   .foglio-back.vuoto{visibility:hidden}
+  /* ⚠️ IL ‹ DELLA VIA INDIETRO E' PIU' GRANDE DEL ✕, e non e' un
+     capriccio di gusto ma una MISURA: a pari corpo quel glifo e'
+     molto piu' magro, e il bottone veniva 23px di larghezza contro
+     i 32 dell'uscita di casa — cioe' nello stesso posto un segno
+     piu' piccolo e un bersaglio piu' stretto. Il `min-width` lo
+     ripareggia al gemello e il corpo lo fa pesare uguale a
+     vedersi. SCOPED alla vista dello scambio: `.foglio-back` veste
+     le uscite di mezza app, e allargarle tutte sarebbe un ritocco
+     che nessuno ha chiesto. Vale anche per il GEMELLO invisibile,
+     o il titolo si scentrerebbe.
+     ⚠️ E L'ALTEZZA SI FISSA A 35, che e' quella dell'uscita di
+     casa: un glifo piu' grande alzerebbe la riga di cinque pixel,
+     e sarebbe il cappello a non essere piu' identico a quello
+     della sorella — che e' tutto il punto di riusarlo. Col
+     padding a zero il glifo si centra col flex invece che con lo
+     spazio attorno. */
+  #view-p2pordine .foglio-back{font-size:24px;min-width:32px;
+    height:35px;padding:0;display:flex;align-items:center;
+    justify-content:center}
   /* IL PIEDE: LE DUE USCITE, SEMPRE A VISTA — e sono GEMELLE, che ci
      sono volute due cose (ritocco di Andrea, misurato dal vivo).
      1) `.btn.ghost` porta un `margin-top:10px` suo e sta PIU' IN BASSO
@@ -7254,15 +7273,6 @@ document.getElementById('cartello')?.remove();</script>
        scrive renderOrdineP2P — che rilegge sempre da ordiniP2P(), o
        una copia in memoria racconterebbe uno scambio fermo a ieri. -->
   <div class="view" id="view-p2pordine">
-    <!-- LA FRECCIA NUDA (set 2026, ritocco di Andrea): «← Torna»
-         diceva a parole quel che la freccia dice da sola, e sopra un
-         cappello che gia' nomina la pagina la parola era la terza
-         etichetta in tre centimetri. Il bottone resta dov'era e resta
-         quello di casa (`.back`): a cambiare e' solo il contenuto, e
-         le parole passano in `aria-label` — chi naviga a voce sente
-         «Torna indietro» come prima. -->
-    <button class="back" onclick="navIndietro()" title="Torna indietro"
-            aria-label="Torna indietro">←</button>
     <div class="sicu">
       <!-- IL CAPPELLO E' QUELLO DEI FOGLI (set 2026, richiesta di
            Andrea), lo stesso oggetto di «Vuoi comprare sats» e di «I
@@ -7271,19 +7281,27 @@ document.getElementById('cartello')?.remove();</script>
            resto. Non una copia che somiglia — una copia si scolla al
            primo ritocco, e non se ne accorge nessuno finche' non si
            mettono le due pagine una accanto all'altra.
-           ⚠️ I DUE GEMELLI INVISIBILI sono la riga che leggendo non
-           si vede: nel foglio il cappello contiene la ✕ che lo
-           chiude, ed e' quel bottone a dare l'altezza alla riga
-           (`align-items:center`). Senza, lo stesso cappello qui
-           verrebbe piu' basso — identico nelle regole e diverso a
-           vedersi. E' la stessa coppia che tiene in centro il titolo
-           di «I miei scambi».
+           ⚠️ E LA VIA INDIETRO STA NELLA RIGA DEL TITOLO (set 2026,
+           ritocco di Andrea), che e' la struttura del foglio per
+           intero e non solo il suo vestito: li' l'uscita vive DENTRO
+           il cappello, e il gemello invisibile a destra tiene il
+           titolo in centro. Cosi' il titolo sale di una cinquantina di
+           pixel — il `.back` di prima stava SOPRA la `.sicu` e si
+           portava dietro il suo margine — e la riga in cima e' una
+           sola invece di due.
+           IL GLIFO E' IL ‹ DI CASA, il gemello del › che sulle card
+           dice «si entra»: qui rivolto a sinistra dice «si torna». Il
+           ← del bottone `.back` non torna perche' quello e' un
+           BOTTONE con la sua cornice, e sopra un cappello faceva due
+           cartelli dove ne basta uno. Le parole stanno in
+           `aria-label`: chi naviga a voce sente «Torna indietro».
            IL MARCHIO SE N'E' ANDATO, e con lui la sua regola CSS: la
            pagina si chiama col suo nome, come le sorelle. -->
       <div class="foglio-testa">
-        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+        <button type="button" class="foglio-back" onclick="navIndietro()"
+                title="Torna indietro" aria-label="Torna indietro">&#8249;</button>
         <h3>Nel dettaglio</h3>
-        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+        <span class="foglio-back vuoto" aria-hidden="true">&#8249;</span>
       </div>
       <div id="p2pOrdineCorpo"></div>
     </div>
@@ -40439,25 +40457,33 @@ function renderOrdineP2P(){
      richiesta di Andrea), e prima parlavano di lui in terza persona:
      «Al recapito indicato da chi vende» lo leggeva anche IL
      VENDITORE, cioe' si sentiva chiamare «chi vende» a casa sua.
-     LA REGOLA DELLA PARENTESI: il titolo dice DOVE si e', la
-     parentesi dice cosa tocca A TE quando tocca a te, e il FATTO
-     quando la mossa e' dell'altra persona. Per questo i due elenchi
-     non sono la stessa frase con le parole girate — a cambiare e' chi
-     deve muoversi, passo per passo.
+     LA REGOLA DELLA SECONDA RIGA: il titolo dice DOVE si e', la riga
+     sotto dice cosa tocca A TE quando tocca a te, e il FATTO quando
+     la mossa e' dell'altra persona. Per questo i due elenchi non sono
+     la stessa frase con le parole girate — a cambiare e' chi deve
+     muoversi, passo per passo.
+     ⚠️ E LE PARENTESI SE NE SONO ANDATE (set 2026, ritocco di
+     Andrea): erano il segno che quella riga era una precisazione, e
+     in uno stepper la seconda riga e' gia' una precisazione — lo dice
+     il posto, e due segni per la stessa cosa sono uno di troppo. Con
+     loro e' tornata la MAIUSCOLA: la minuscola era figlia della
+     parentesi, e senza sarebbe l'unico `<small>` in minuscola dei due
+     stepper dell'app (quello del mercatino le scrive tutte
+     maiuscole).
      Tabella PURA e gemella di `azioniDisponibili`: li' c'e' il
      bottone del gesto, qui la sua frase, e le due dicono la stessa
      cosa nello stesso ordine — «di' dove ricevere i sats» e «💸 Dove
      ricevere i sats», «invia i sats» e «🔒 Blocca i sats». */
   const passi = o.lato === 'compro' ? [
-    {t: 'Ordine preso', d: 'di\' dove ricevere i sats'},
-    {t: 'Sats bloccati', d: 'chi vende li ha messi in garanzia'},
-    {t: 'Euro inviati', d: 'al recapito che ti dà chi vende'},
-    {t: 'Scambio concluso', d: 'i sats sono arrivati a te'}
+    {t: 'Ordine preso', d: 'Di\' dove ricevere i sats'},
+    {t: 'Sats bloccati', d: 'Chi vende li ha messi in garanzia'},
+    {t: 'Euro inviati', d: 'Al recapito che ti dà chi vende'},
+    {t: 'Scambio concluso', d: 'I sats sono arrivati a te'}
   ] : [
-    {t: 'Ordine preso', d: 'invia i sats'},
-    {t: 'Sats bloccati', d: 'restano in garanzia fino alla fine'},
-    {t: 'Euro inviati', d: 'al recapito che hai indicato'},
-    {t: 'Scambio concluso', d: 'i sats sono arrivati al compratore'}
+    {t: 'Ordine preso', d: 'Invia i sats'},
+    {t: 'Sats bloccati', d: 'Restano in garanzia fino alla fine'},
+    {t: 'Euro inviati', d: 'Al recapito che hai indicato'},
+    {t: 'Scambio concluso', d: 'I sats sono arrivati al compratore'}
   ];
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
   const tog = p2pTogliibile(o);
@@ -40503,8 +40529,8 @@ function renderOrdineP2P(){
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) =>
         '<div class="step ' + (i < prog ? 'done' : i === prog ? 'now' : 'todo') + '">' +
-        '<span class="dot"></span><b>' + esc(p.t) + '</b><small>('
-        + esc(p.d) + ')</small></div>'
+        '<span class="dot"></span><b>' + esc(p.t) + '</b><small>'
+        + esc(p.d) + '</small></div>'
       ).join('') +
     '</div></div>' +
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +

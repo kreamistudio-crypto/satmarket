@@ -41670,21 +41670,21 @@ def prove_p2p_motore():
     # quando la mossa e' dell'altra persona.
     _ren = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
     prova("i quattro passi del lato VENDO parlano al venditore", True,
-          "{t: 'Ordine preso', d: 'invia i sats'}," in _ren
-          and "{t: 'Sats bloccati', d: 'restano in garanzia fino alla fine'},"
+          "{t: 'Ordine preso', d: 'Invia i sats'}," in _ren
+          and "{t: 'Sats bloccati', d: 'Restano in garanzia fino alla fine'},"
           in _ren
-          and "{t: 'Euro inviati', d: 'al recapito che hai indicato'},"
+          and "{t: 'Euro inviati', d: 'Al recapito che hai indicato'},"
           in _ren
-          and "{t: 'Scambio concluso', d: 'i sats sono arrivati al compratore'}"
+          and "{t: 'Scambio concluso', d: 'I sats sono arrivati al compratore'}"
           in _ren)
     prova("...e quelli del lato COMPRO si specchiano al verso giusto",
           True,
-          "{t: 'Ordine preso', d: 'di\\' dove ricevere i sats'}," in _ren
-          and "{t: 'Sats bloccati', d: 'chi vende li ha messi in garanzia'},"
+          "{t: 'Ordine preso', d: 'Di\\' dove ricevere i sats'}," in _ren
+          and "{t: 'Sats bloccati', d: 'Chi vende li ha messi in garanzia'},"
           in _ren
-          and "{t: 'Euro inviati', d: 'al recapito che ti dà chi vende'},"
+          and "{t: 'Euro inviati', d: 'Al recapito che ti dà chi vende'},"
           in _ren
-          and "{t: 'Scambio concluso', d: 'i sats sono arrivati a te'}"
+          and "{t: 'Scambio concluso', d: 'I sats sono arrivati a te'}"
           in _ren)
     # ⚠️ E LA PRIMA PARENTESI DI OGNI LISTA E' IL GESTO DEL BOTTONE:
     # `azioniDisponibili` da' «fattura» a chi compra e «hold» a chi
@@ -41693,13 +41693,19 @@ def prove_p2p_motore():
     # a chi compra di fare quel che tocca a chi vende.
     prova("...e il primo passo dice il gesto che il bottone offre",
           True,
-          _ren.index("di\' dove ricevere i sats") < _ren.index("invia i sats")
+          _ren.index("Di\\' dove ricevere i sats") < _ren.index("Invia i sats")
           and "'<button class=\"btn orange\" onclick=\"apriIncassoP2P()\">"
               "💸 Dove ricevere i sats</button>" in _ren)
-    # la spiegazione sta FRA PARENTESI, e la parentesi la scrive il
-    # render: nelle stringhe ci sono le sole parole
-    prova("...e la spiegazione sta fra parentesi", True,
-          "'</b><small>('" in _ren and "+ esc(p.d) + ')</small></div>'" in _ren)
+    # ⚠️ E LE PARENTESI SE NE SONO ANDATE (set 2026, ritocco di
+    # Andrea): erano il segno che quella riga e' una precisazione, e in
+    # uno stepper la seconda riga e' gia' una precisazione — lo dice il
+    # posto. Con loro e' tornata la MAIUSCOLA: la minuscola era figlia
+    # della parentesi, e senza sarebbe stata l'unica in minuscola dei
+    # due stepper dell'app.
+    prova("...e la spiegazione non porta piu' le parentesi", True,
+          "'</b><small>' + esc(p.d) + '</small></div>'"
+          in _ren.replace("\r\n", "\n").replace("\n        + ", " + ")
+          and "<small>('" not in _ren)
     # ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO: portava il
     # metodo e il lato, e tutt'e due lo dicono gia' altri — le due
     # righe della card da cui si arriva e i quattro passi qui sopra,
@@ -41737,25 +41743,42 @@ def prove_p2p_motore():
           and '<div class="foglio-testa">' in _vista_nuda
           and "Lo scambio</div>" not in _vista_nuda
           and "section-label" not in _vista_nuda)
-    # ⚠️ I DUE GEMELLI INVISIBILI non sono decorazione: nel foglio il
-    # cappello contiene la ✕ che lo chiude, ed e' quel bottone a dare
-    # l'altezza alla riga. Senza, lo stesso cappello qui verrebbe piu'
-    # basso — identico nelle regole e diverso a vedersi. E' la stessa
-    # coppia che «I miei scambi» ha gia'.
-    prova("...coi due gemelli invisibili che ne fanno l'altezza", 2,
-          _vista_nuda.count('<span class="foglio-back vuoto"'))
+    # ⚠️ E L'USCITA STA DENTRO IL CAPPELLO (set 2026, ritocco di
+    # Andrea): e' la struttura del foglio per intero e non solo il suo
+    # vestito — li' la via d'uscita vive nella riga del titolo, e il
+    # gemello invisibile a DESTRA lo tiene in centro. Quindi qui il
+    # bottone e' uno e il gemello uno: il `.back` che stava sopra la
+    # `.sicu` se n'e' andato, e col suo margine il titolo e' salito.
+    prova("...con l'uscita dentro la riga e UN gemello a destra",
+          [1, 1],
+          [_vista_nuda.count('<button type="button" class="foglio-back"'),
+           _vista_nuda.count('<span class="foglio-back vuoto"')])
+    prova("...e sopra la `.sicu` non c'e' piu' nessun bottone", False,
+          'class="back"' in _vista_nuda)
     # ...e il marchio se n'e' andato con la sua regola CSS: niente
     # vestito orfano
     prova("...e il marchio non c'e' piu', ne' lui ne' il suo vestito",
           [False, False],
           ["p2p-marchio" in _vista_nuda, "p2p-marchio" in mini])
-    # ⚠️ LA FRECCIA E' NUDA: «← Torna» diceva a parole quel che la
-    # freccia dice da sola, e le parole sono passate in `aria-label` —
-    # chi naviga a voce sente «Torna indietro» come prima.
-    prova("la via indietro e' la sola freccia, e parla agli assistivi",
+    # ⚠️ IL GLIFO E' IL ‹ DI CASA, il gemello del › che sulle card dice
+    # «si entra»: qui rivolto a sinistra dice «si torna». Le parole
+    # stanno in `aria-label` — chi naviga a voce sente «Torna
+    # indietro» — e il glifo e' un segno, non una scritta.
+    prova("la via indietro e' il ‹ di casa, e parla agli assistivi",
           True,
-          'aria-label="Torna indietro">←</button>' in _vista_nuda
-          and "Torna</button>" not in _vista_nuda)
+          'aria-label="Torna indietro">&#8249;</button>' in _vista_nuda
+          and "Torna</button>" not in _vista_nuda
+          and "←" not in _vista_nuda)
+    # ⚠️ E IL ‹ E' PIU' GRANDE DEL ✕, che e' una MISURA e non un gusto:
+    # a pari corpo quel glifo e' molto piu' magro, e il bottone veniva
+    # 23px di larghezza contro i 32 dell'uscita di casa. Il `min-width`
+    # lo ripareggia, l'altezza fissa tiene il cappello identico a
+    # quello della sorella (58px misurati, tutti e due), e la regola e'
+    # SCOPED — `.foglio-back` veste le uscite di mezza app.
+    _fb = pezzo_js(mini, "  #view-p2pordine .foglio-back{", "}")
+    prova("...e il ‹ pesa quanto il ✕, senza alzare la riga", True,
+          "font-size:24px" in _fb and "min-width:32px" in _fb
+          and "height:35px" in _fb)
     prova("lo stato si dice sulla superficie neutra", True,
           '"trust-note nota-scambio"' in cod)
 
