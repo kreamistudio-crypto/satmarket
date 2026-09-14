@@ -14108,6 +14108,46 @@ non su un nodo vero. Si proverà da sé alla prima rotta che manca, e il
 giorno che succede la cosa da guardare è se i cinque passi bastano o se
 il caso comune si risolve già al primo.
 
+### ⚠️ E il giorno dopo il conto di cassa è sceso di grado (15 set 2026)
+
+**Decisione di Andrea, ed è quella che chiude il cantiere:** il conto di
+cassa **non è un allarme e non lo diventerà**. La ragione è strutturale e
+non si cura con più voci — la cassaforte è un wallet **misto**: ci stanno
+gli escrow degli ordini *e* sats suoi, che entrano ed escono per ragioni
+che il database non vede e non deve vedere. Quindi quel confronto **non
+deve tornare**, e la frase che ha deciso è la sua: *«un rilevatore che
+non torna mai è peggio di nessun rilevatore»*. Un allarme che suona
+sempre insegna a ignorare la riga, e il giorno che avesse ragione nessuno
+gli crederebbe.
+
+Il controllo resta, declassato col vocabolario che il file **già aveva**:
+da numerato — cioè un invariante che *deve* stampare «(nessuna riga)» —
+a **`polso`**, come il 17 e il 21. Si guarda per curiosità contabile, mai
+per decidere. E `capitale_cassa.py` resta con lui, perché «quanta parte
+di questo wallet è nostra» è un fatto utile per sé, che non ha bisogno di
+essere un allarme per meritare uno strumento.
+
+**Sopravvive al declassamento l'unica riga che parla da sola:**
+`movimento_mercatino` non dipende dal capitale, e se è **negativo** sono
+usciti più sats di quanti ne siano entrati dagli utenti — lì non serve
+nessun confronto con niente.
+
+**LA LEZIONE, che vale oltre questo cantiere: la protezione è PER
+ORDINE, non di cassa.** Ogni payout ha il suo `payment_hash` scritto
+nella riga, il suo esito chiesto per hash, il suo ritentativo e il suo
+avviso ai moderatori quando fallisce. Una prova per riga batte una
+quadratura globale su un conto misto, **sempre**: la prima nomina il
+caso e dice cosa fare, la seconda dà un numero che non si sa leggere. È
+anche la spiegazione di perché il 14 settembre il danno si è visto da un
+ORDINE e non da un saldo — e di perché la cura giusta è stata scrivere
+l'hash nella riga, non contare i sats in cassa.
+
+**Il cantiere si chiude qui**, e quel che resta aperto è dichiarato:
+il backoff mai scattato per davvero, le 41 righe cieche pagate dal
+Lightning address, e il censimento che giudica *la fattura in colonna* e
+non *l'ordine* — quando le due cose divergono va letto con la storia
+accanto.
+
 ## Il foglio che non si zoomava, e 81px di cappello sopra la nav (14 set 2026)
 
 Segnalazione di Andrea: **Aspetto → «Quanto grande si legge Barattolo»

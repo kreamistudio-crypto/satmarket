@@ -179,7 +179,22 @@
   riconosce una persona). Dichiara poi le tre cose che non sa: la
   commissione non fotografata sull'ordine, gli ordini nati da un'asta (i
   cui sats erano già in cassa dai `rilanci`), e le fatture create e mai
-  pagate. Il perché
+  pagate.
+  ⚠️⚠️ E DAL 15 SET 2026 NON È UN ALLARME MA UN POLSO (decisione di
+  Andrea), col vocabolario che il file già aveva: i controlli numerati
+  devono stampare «(nessuna riga)», quelli etichettati `polso` no. La
+  ragione è strutturale e non si cura con altre voci — la cassaforte è
+  un wallet MISTO (escrow degli ordini e sats nostri, che entrano ed
+  escono per ragioni che il database non vede), quindi quel confronto
+  NON deve tornare, e «un rilevatore che non torna mai è peggio di
+  nessun rilevatore». Sopravvive `movimento_mercatino`, che non dipende
+  dal capitale: negativo = sono usciti più sats di quanti ne siano
+  entrati dagli utenti, e lì non serve confronto. LA REGOLA CHE NE ESCE,
+  e vale oltre il libro mastro: LA PROTEZIONE È PER ORDINE, NON DI
+  CASSA — hash scritto nella riga, esito chiesto per hash, ritentativo,
+  avviso ai moderatori. Una prova per riga batte una quadratura globale
+  su un conto misto: la prima nomina il caso e dice cosa fare, la
+  seconda dà un numero che non si sa leggere. Il perché
   per intero sta in CANTIERI, alla voce «Il ritentativo, le parole, e il
   conto di cassa».
   I TRE ESITI storici (ago 2026, la voce media

@@ -473,7 +473,7 @@ SELECT id, stato, giri, importo_sats, contro_sats, importo_eur, contro_eur
 -- annuncio.
 SELECT id, stato, giri FROM offerte WHERE giri < 0 OR giri > 9;
 
-SELECT '23) IL CONTO DI CASSA (set 2026) — non e'' un allarme, e'' un metro' AS cassa;
+SELECT '23) IL CONTO DI CASSA — UN POLSO, NON UN ALLARME (set 2026)' AS polso;
 -- QUANTO DOVREBBE ESSERCI nel wallet LNbits della piattaforma, adesso.
 -- Nasce dal 14 set 2026: un payout fallito era stato scritto come
 -- riuscito, e per sapere se i sats fossero ancora in cassa non c'era
@@ -518,18 +518,31 @@ SELECT '23) IL CONTO DI CASSA (set 2026) — non e'' un allarme, e'' un metro' A
 -- E'' la stessa regola del lettore degli esiti — nel dubbio si dice «non
 -- lo so», mai un si''.
 --
--- COME SI LEGGE LO SCARTO, ed e'' la parte che conta:
---   * saldo vero POCO SOTTO l'atteso  -> NORMALE. Sono le commissioni di
---     routing dei pagamenti in uscita, che escono davvero dal wallet e
---     non sono registrate da nessuna parte (misurate: 179 sats su
---     67.672, cioe'' lo 0,26%). Uno scarto sotto l'1% non dice niente.
---   * saldo vero SOPRA l'atteso       -> GUARDARE. Vuol dire che dei
---     sats che risultano PAGATI sono ancora qui: e'' esattamente la
---     forma del guasto del 149, e la ragione per cui questo controllo
---     esiste. Il censimento (`censimento_payout.py`) nomina le righe.
---   * saldo vero MOLTO SOTTO l'atteso -> GUARDARE, ed e'' il caso
---     peggiore dei due: dei sats sono usciti senza che una riga lo
---     dica.
+-- ⚠️⚠️ NON E'' UN ALLARME, E NON DIVENTERA'' MAI TALE SU QUESTO WALLET
+-- (decisione di Andrea, 15 set 2026, il giorno dopo averlo scritto).
+-- LA RAGIONE E'' STRUTTURALE e non si cura con piu'' voci: la cassaforte
+-- e'' un wallet MISTO — ci stanno gli escrow degli ordini e sats suoi,
+-- che entrano ed escono per ragioni che il database non vede e non deve
+-- vedere. Quindi il confronto col saldo vero NON deve tornare, e un
+-- rilevatore che non torna mai e'' peggio di nessun rilevatore: insegna
+-- a ignorare la riga, e il giorno che avesse ragione nessuno gli
+-- crederebbe. Si guarda per CURIOSITA'' contabile, mai per decidere.
+--
+-- QUEL CHE VALE DAVVERO STA ALTROVE, ed e'' la lezione del cantiere: la
+-- protezione e'' PER ORDINE, non di cassa. Ogni payout ha il suo
+-- payment_hash scritto nella riga, il suo esito chiesto per hash, il suo
+-- ritentativo e il suo avviso ai moderatori quando fallisce. Una prova
+-- per riga batte una quadratura globale su un conto misto, sempre: la
+-- prima nomina il caso, la seconda da'' un numero che non si sa leggere.
+--
+-- L'UNICA RIGA CHE PARLA DA SOLA e'' `movimento_mercatino`, che non
+-- dipende dal capitale: se e'' NEGATIVO sono usciti piu'' sats di quanti
+-- ne siano entrati dagli utenti, e li'' non serve nessun confronto con
+-- niente. Quello si guarda.
+--
+-- (Le commissioni di routing, per memoria: escono davvero dal wallet e
+-- non sono registrate da nessuna parte — misurate, 179 sats su 67.672,
+-- cioe'' lo 0,26%.)
 --
 -- TRE COSE CHE QUESTO CONTO NON SA, dichiarate perche'' chi legge non
 -- ci inciampi:
@@ -617,7 +630,7 @@ SELECT
     - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)
                                       AS saldo_atteso_sats;
 
-SELECT '23b) DI CHE COSA E'' FATTO L''ATTESO (le voci che restano a noi)' AS cassa;
+SELECT '23b) DI CHE COSA E'' FATTO L''ATTESO (le voci che restano a noi)' AS polso;
 -- Le due leve che NON escono mai dalla cassaforte: servono a capire
 -- quanta parte dell'atteso e'' denaro NOSTRO e quanta e'' deposito di
 -- garanzia di qualcun altro. Non entrano nel conto qui sopra — sono

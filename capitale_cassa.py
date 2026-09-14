@@ -3,10 +3,17 @@
 IL CAPITALE NOSTRO — quanti sats abbiamo messo NOI in cassaforte, cioe'
 quelli che non vengono da nessun ordine.
 
-Serve al controllo 23 del libro mastro (il conto di cassa). Senza quella
-voce il conto legge il capitale come uno scarto inspiegato, cioe' come
-«sats dati per pagati e ancora qui»: un falso positivo garantito, che
-renderebbe inutile proprio l'allarme che deve restare raro.
+Serve al controllo 23 del libro mastro (il conto di cassa) e a nient'
+altro.
+
+⚠️ E QUEL CONTROLLO NON E' UN ALLARME (decisione di Andrea, 15 set 2026):
+la cassaforte e' un wallet MISTO — escrow degli ordini e sats suoi — e il
+confronto col saldo vero non deve tornare. Un rilevatore che non torna
+mai e' peggio di nessun rilevatore: insegna a ignorare la riga. Questo
+numero serve a sapere QUANTA PARTE del wallet e' nostra, che e' un fatto
+contabile utile per se'; la protezione dei sats di chi scambia sta
+altrove, ed e' per ORDINE — hash scritto nella riga, esito chiesto per
+hash, ritentativo, avviso ai moderatori.
 
 NON SCRIVE NIENTE, ne' qui ne' su LNbits: legge il registro dei pagamenti
 e basta. Il database non lo apre affatto, e la chiave che PAGA non la
@@ -143,8 +150,9 @@ def main():
     print(f"    sqlite3 ~/satmarket/satmarket.db \"INSERT OR REPLACE INTO "
           f"impostazioni(chiave,valore) VALUES('capitale_nostro_sats',"
           f"'{somma}');\"")
-    print("\n  Poi il controllo 23 del libro mastro smette di dire NO e "
-          "dà un\n  saldo atteso confrontabile col saldo vero di LNbits.")
+    print("\n  Serve al controllo 23 del libro mastro, che e' un POLSO e"
+          "\n  non un allarme: su un wallet misto quel confronto non deve"
+          "\n  tornare, e non e' da li' che si sorvegliano i pagamenti.")
     print("=" * 68)
     return 0
 
