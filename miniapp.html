@@ -36141,6 +36141,20 @@ function cessioneInCorsoP2P(m){
     .then(() => { p2pCessione = null; });
   return p2pCessione;
 }
+/* ⚠️ UNA RIGA E' DI QUESTO MAZZO SE LA SUA TRADE KEY SI RIDERIVA DA LUI
+   (14 set 2026, dal campo di Andrea: l'avviso diceva «7 ordini ancora
+   nel libro» e nessuno dei sette era del profilo che stava per andare
+   sulla mensola — erano dell'identita' del CONTO, cioe' proprio quelli
+   che dopo il passaggio restano ritirabili, anzi gli unici).
+   LA PROVA NON E' UN CAMPO CHE SI PUO' SCRIVERE, e' la DERIVAZIONE: la
+   trade key di una riga si rifa' dal segreto del mazzo e dall'indice di
+   quella riga, e se torna uguale quella riga e' sua. Senza bundle, o
+   senza indice, non si sa — e non sapere vuol dire non dire niente. */
+function rigaDiQuestoMazzoP2P(o, m){
+  if (!o || !m || !o.pubTrade || !(o.indice | 0)) return false;
+  try { return chiaveScambio(m.sk, o.indice | 0).pub === o.pubTrade; }
+  catch(e){ return false; }
+}
 /* IL GESTO, per chi il posto non lo cede da solo: sta nel foglio del
    profilo — l'unico posto dove il profilo si guarda — e non e' il bivio
    del conflitto che la fase 6 ha tolto. Quello si apriva davanti a
@@ -36166,9 +36180,15 @@ async function passaAlContoDalFoglioP2P(btn){
   }
   /* L'OFFERTA APPESA SI DICE: non blocca, ma da qui in poi non si
      ritira piu' — la chiave con cui si firma il ritiro va sulla
-     mensola col mazzo vecchio. Tacerlo sarebbe una sorpresa. */
+     mensola col mazzo vecchio. Tacerlo sarebbe una sorpresa.
+     ⚠️ E SI CONTANO SOLO LE SUE: le righe dell'identita' del conto
+     dopo il passaggio restano ritirabili — sono le uniche — e contarle
+     qui spaventava per la ragione esattamente opposta. */
+  await caricaNostrTools();
+  const mio = mazzoMostro();
   const righe = ordiniP2P();
-  const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])).length;
+  const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])
+    && rigaDiQuestoMazzoP2P(righe[k], mio)).length;
   chiediConferma({titolo: 'Usare il profilo del tuo account?',
     corpo: 'Da qui in poi pubblichi e scambi con il profilo legato al tuo '
       + 'account, lo stesso che hai sugli altri dispositivi.\n\nQuello nato '
@@ -37571,6 +37591,16 @@ async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
   const NT = window.NostrTools;
   const tkSk = NT.utils.bytesToHex(NT.generateSecretKey());
   const tk = {sk: tkSk, pub: NT.getPublicKey(NT.utils.hexToBytes(tkSk))};
+  /* ⚠️ OGNI RIGA PORTA L'IDENTITA' CHE L'HA AVUTA IN RISPOSTA (14 set
+     2026, dal campo): da quando le domande sono due, `p2pMieiOrdini`
+     mescola gli ordini di DUE mazzi — e chi legge quella lista poi
+     deriva le trade key da UNO solo. Senza questo timbro
+     `adottaOrdiniAltroveP2P` ricostruiva le righe del conto con le
+     chiavi del profilo di dispositivo: righe che sembrano governabili
+     e non lo sono, perche' il ritiro parte firmato da una chiave che
+     quell'ordine non l'ha mai visto. E' la PUBKEY e mai il segreto:
+     questa riga finisce in memoria e nessuno la scrive sul disco. */
+  const identitaPub = NT.getPublicKey(NT.utils.hexToBytes(identitaSk));
   let risposto = false;
   let sub = null;
   try {
@@ -37589,7 +37619,8 @@ async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
             for (const r of righe)
               if (r && r.order_id)
                 dentro[String(r.order_id)] = {indice: r.trade_index | 0,
-                                              stato: String(r.status || '')};
+                                              stato: String(r.status || ''),
+                                              identita: identitaPub};
             risposto = true;
             basta();
           } catch(e){ /* non e' per noi, o non si apre: si lascia stare */ }
@@ -40775,19 +40806,38 @@ function adottaOrdiniAltroveP2P(locali){
   const adesso = Math.floor(Date.now() / 1000);
   let nati = 0;
   for (const id in p2pMieiOrdini) {
-    if (locali[id]) continue;
     const voce = p2pMieiOrdini[id];
     const indice = voce ? (voce.indice | 0) : 0;
     /* senza indice la chiave non si rideriva: e' il caso anonimo, che
        nella restore per identita' non dovrebbe nemmeno comparire */
     if (!(indice > 0)) continue;
+    /* ⚠️ SOLO QUEL CHE QUESTO MAZZO SA FIRMARE (14 set 2026, dal campo):
+       la lista arriva da DUE restore, e una riga ricostruita con la
+       chiave di un altro profilo e' una riga che sembra governabile e
+       non lo e'. Un ordine dell'altra identita' resta comunque MIO —
+       la card lo marca e il tocco lo dice — ma qui non nasce nessuna
+       riga che prometta un ritiro che non partirebbe. */
+    if (voce.identita && voce.identita !== mz.pub) continue;
+    let tk = null;
+    try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
+    const gia = locali[id];
+    if (gia) {
+      /* LA RIPARAZIONE, per le righe scritte col mazzo sbagliato prima
+         di questa cura: l'identita' e' la mia, quindi la trade key
+         GIUSTA e' quella che si deriva adesso — non e' un'ipotesi, e'
+         la stessa formula con cui l'ordine e' nato. Una riga gia'
+         finita non si tocca, e una che combacia nemmeno. */
+      if (gia.pubTrade === tk.pub || P2P_FINALI.indexOf(gia.stato) >= 0) continue;
+      gia.pubTrade = tk.pub;
+      scriviOrdineP2P(gia);
+      nati++;
+      continue;
+    }
     const o = libro.find(x => x.id === id);
     if (!o) continue;
     const prov = Object.keys(locali).find(k =>
       provvisorioP2P(k) && ((locali[k].indice | 0) === indice));
     if (prov) { rinominaOrdineP2P(locali[prov], id); nati++; continue; }
-    let tk = null;
-    try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
     scriviOrdineP2P({
       id: id, lato: o.lato === 'sell' ? 'vendo' : 'compro',
       indice: indice, pubTrade: tk.pub, mio: true,

@@ -43788,8 +43788,20 @@ def prove_p2p_conto_dispositivo():
     # gate rovesciato a `false` la frase resta nel sorgente e la
     # sentinella passava liscia. Si inchioda il GATE, non il testo.
     prova("...e dice che l'offerta appesa non si ritira piu' da qui",
-          True, "const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])).length;" in ges
+          True, "const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])" in ges
           and "+ (offerte ? '" in ges and "ancora nel libro" in ges)
+    # ⚠️ E CONTA SOLO LE SUE (14 set 2026, dal campo): l'avviso diceva
+    # «7 ordini» e nessuno dei sette era del profilo che stava per
+    # andare sulla mensola — erano dell'identita' del CONTO, cioe'
+    # proprio quelli che dopo il passaggio restano ritirabili. La prova
+    # che una riga e' di un mazzo e' la DERIVAZIONE, non un campo.
+    rqm = pezzo_js(mini, "function rigaDiQuestoMazzoP2P(o, m){", "\n}\n")
+    prova("...e conta SOLO le righe di questo mazzo", True,
+          "&& rigaDiQuestoMazzoP2P(righe[k], mio)).length;" in ges)
+    prova("...e «di questo mazzo» e' la trade key che si rideriva",
+          True, "chiaveScambio(m.sk, o.indice | 0).pub === o.pubTrade" in rqm)
+    prova("...che senza indice o senza chiave non dice niente", True,
+          "if (!o || !m || !o.pubTrade || !(o.indice | 0)) return false;" in rqm)
     # IL «DIMENTICA» RESTA PIU' SEVERO, e va detto: porta via mazzo,
     # copia nel cloud e chiavi dal server, quindi non rinfresca niente
     # e con un libro vecchio blocca.
@@ -45392,6 +45404,17 @@ def prove_p2p_server():
     prova("la domanda parte davvero, con identita' e busta restore", True,
           "busta: 'restore'" in ur and "relay.publish(firmato)" in ur
           and "bustaMostro(tk.sk, identitaSk, msg)" in ur)
+    # ⚠️ E OGNI RIGA PORTA L'IDENTITA' CHE L'HA AVUTA IN RISPOSTA (14 set
+    # 2026, dal campo): da quando le domande sono due, `p2pMieiOrdini`
+    # mescola gli ordini di DUE mazzi, e chi legge quella lista deriva
+    # le trade key da UNO solo. E' la PUBKEY e mai il segreto: quella
+    # riga finisce in memoria, e un segreto li' dentro sarebbe un
+    # segreto in piu' da custodire.
+    prova("ogni riga della restore dice di quale identita' e'", True,
+          "const identitaPub = NT.getPublicKey(NT.utils.hexToBytes(identitaSk));" in ur
+          and "identita: identitaPub};" in ur)
+    prova("...e nel timbro non entra mai il segreto", False,
+          "identita: identitaSk" in ur)
     # --- 15b) LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026) -----
     # Dal campo: dal PC, col conto principale, i propri ordini non si
     # marcavano — dallo smartphone si'. Il dispositivo teneva un
@@ -45462,6 +45485,21 @@ def prove_p2p_server():
     prova("...solo con l'indice in mano e il libro che descrive", True,
           "if (!(indice > 0)) continue;" in ad16
           and "libro.find(" in ad16)
+    # ⚠️ E SOLO QUEL CHE QUESTO MAZZO SA FIRMARE (14 set 2026, dal campo
+    # di Andrea): la lista arriva da DUE restore, e una riga
+    # ricostruita con la chiave di un altro profilo sembra governabile
+    # e non lo e' — il ritiro parte firmato da una chiave che
+    # quell'ordine non ha mai visto. Resta MIO lo stesso (la card lo
+    # marca, il tocco lo dice), ma qui non nasce.
+    prova("...e mai una riga che questo mazzo non sa firmare", True,
+          "if (voce.identita && voce.identita !== mz.pub) continue;" in ad16)
+    # LA RIPARAZIONE: le righe scritte col mazzo sbagliato prima della
+    # cura hanno la trade key storta. Se l'identita' e' la mia, quella
+    # GIUSTA e' la stessa formula con cui l'ordine e' nato — non e'
+    # un'ipotesi. Le finite non si toccano, le giuste nemmeno.
+    prova("...e quelle scritte con la chiave storta si riparano", True,
+          "if (gia.pubTrade === tk.pub || P2P_FINALI.indexOf(gia.stato) >= 0) continue;" in ad16
+          and "gia.pubTrade = tk.pub;" in ad16)
     prova("...e il provvisorio si rinomina invece di raddoppiare", True,
           "rinominaOrdineP2P(" in ad16)
     prova("il tocco sul mio-ma-non-in-lista resta onesto", True,
@@ -45557,8 +45595,10 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   scambiP2P();
   out.provvisorioRinominato = !!ordiniFinti['ord-b'] && !ordiniFinti['nuovo:2']
     && Object.keys(ordiniFinti).length === 1;
-  // f) la riga gia' locale non si tocca e non si ripete
-  ordiniFinti = {'ord-a': {id: 'ord-a', stato: 'attivo', creato: 100}};
+  // f) la riga gia' locale non si tocca e non si ripete (la chiave ce
+  //    l'ha gia' giusta: quella storta e' il caso k)
+  ordiniFinti = {'ord-a': {id: 'ord-a', stato: 'attivo', creato: 100,
+                           indice: 1, pubTrade: 'pub:1'}};
   p2pMieiOrdini = {'ord-a': {indice: 1, stato: 'pending'}};
   p2pLibro = {ordini: [{id: 'ord-a', lato: 'sell', euro: 5, sats: 0, premium: 0, metodi: [], creato: 100}]};
   const s2 = scambiP2P();
@@ -45576,6 +45616,34 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
   // i) senza restore niente cambia
   p2pMieiOrdini = null; p2pLibro = null;
   out.senzaRestoreVuota = scambiP2P() === '';
+  // j) L'ORDINE DELL'ALTRA IDENTITA' non nasce: questo mazzo non lo
+  //    sa firmare, e una riga che promette un ritiro che non partirebbe
+  //    e' peggio di nessuna riga
+  mazzoFinto = {sk: 'S'.repeat(64), pub: 'P', indice: 9};
+  ordiniFinti = {};
+  p2pMieiOrdini = {'ord-altrui': {indice: 3, stato: 'pending', identita: 'P-ALTRO'}};
+  p2pLibro = {ordini: [{id: 'ord-altrui', lato: 'sell', euro: 5, sats: 0,
+                        premium: 0, metodi: [], creato: 100}]};
+  out.altraIdentitaNonNasce = scambiP2P() === '' && !ordiniFinti['ord-altrui'];
+  // ...e quella della MIA identita' nasce come sempre
+  p2pMieiOrdini = {'ord-mio': {indice: 3, stato: 'pending', identita: 'P'}};
+  p2pLibro = {ordini: [{id: 'ord-mio', lato: 'sell', euro: 5, sats: 0,
+                        premium: 0, metodi: [], creato: 100}]};
+  scambiP2P();
+  out.miaIdentitaNasce = !!ordiniFinti['ord-mio']
+    && ordiniFinti['ord-mio'].pubTrade === 'pub:3';
+  // k) LA RIPARAZIONE: una riga scritta con la chiave di un altro mazzo
+  //    (il difetto del 13-14 set) si rimette a posto, e una finita no
+  ordiniFinti = {'ord-storto': {id: 'ord-storto', stato: 'pubblicato',
+                                indice: 4, pubTrade: 'pub:SBAGLIATA', creato: 10},
+                 'ord-finito': {id: 'ord-finito', stato: 'annullato',
+                                indice: 5, pubTrade: 'pub:SBAGLIATA', creato: 10}};
+  p2pMieiOrdini = {'ord-storto': {indice: 4, stato: 'pending', identita: 'P'},
+                   'ord-finito': {indice: 5, stato: 'canceled', identita: 'P'}};
+  p2pLibro = {ordini: []};
+  scambiP2P();
+  out.chiaveStortaRiparata = ordiniFinti['ord-storto'].pubTrade === 'pub:4';
+  out.finitaNonSiTocca = ordiniFinti['ord-finito'].pubTrade === 'pub:SBAGLIATA';
   // j) LE MIE IDENTITA': un mazzo 'conto' E' gia' il seme, e la
   //    seconda domanda non parte nemmeno — nemmeno la POST
   const SK_SEME = 'cd'.repeat(32);
@@ -45643,6 +45711,16 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
                   True, out5["senzaIndiceNonNasce"])
             prova("senza restore la striscia resta quella di prima", True,
                   out5["senzaRestoreVuota"])
+            # 14 set 2026: le due restore mescolano due identita' nella
+            # stessa lista, e l'adozione deriva da UNA sola.
+            prova("l'ordine dell'ALTRA identita' non diventa una riga",
+                  True, out5["altraIdentitaNonNasce"])
+            prova("...e quello della mia nasce come sempre", True,
+                  out5["miaIdentitaNasce"])
+            prova("una riga con la trade key di un altro mazzo si ripara",
+                  True, out5["chiaveStortaRiparata"])
+            prova("...e una riga gia' finita non si tocca", True,
+                  out5["finitaNonSiTocca"])
             # LE MIE IDENTITA' (13 set 2026, il PC di Andrea): il
             # giudice gira davvero, coi sei rami che contano.
             prova("a un mazzo 'conto' il seme non si chiede: E' lui",
