@@ -13460,3 +13460,114 @@ card da 16 a 304. Guardata su cinque casi — pubblicato, col premio, con
 «tocca a te», annullato con la ✕, e la card più corta che esista.
 
 **9770 verdi**, 0 rosse.
+
+## «Nel dettaglio»: la pagina si chiama col suo nome (14 set 2026)
+
+Sei ritocchi di Andrea alla sezione P2P, arrivati in tre messaggi di
+fila. Il filo che li tiene insieme: **ogni superficie parla a chi la sta
+guardando**, e quel che non decide niente se ne va.
+
+**LA TESTATA E' IL CAPPELLO DI CASA.** Tre stesure in due giorni —
+l'etichetta di sezione «Lo scambio», poi il solo marchio, adesso il
+titolo **«Nel dettaglio»** dentro `.foglio-testa`. Non una copia che gli
+somiglia: **lo stesso oggetto** del cappello dei fogli e di «I miei
+scambi», gemelli invisibili compresi (nel foglio il cappello contiene la
+✕ che lo chiude, ed è quel bottone a dargli l'altezza — senza, lo stesso
+cappello fuori da un foglio verrebbe più basso). **MISURATO**, ed è la
+verifica che vale: i due cappelli sono **identici in tutto quel che si
+può leggere dal DOM** — 58px di altezza, titolo a 14px dal bordo,
+18px/800 Baloo 2, stesso `border-bottom`, stesso padding, due gemelli
+per uno. Col marchio se n'è andata anche la sua regola CSS: niente
+vestito orfano, e il conto del simbolo scende da quattro posti a tre —
+tutti **stati vuoti**, che è l'unico posto dove il marchio fa da voce.
+E la freccia è **nuda**: «← Torna» diceva a parole quel che la freccia
+dice da sola, e le parole sono passate in `aria-label`.
+
+**I QUATTRO PASSI PARLANO A CHI L'ORDINE CE L'HA.** Prima erano una
+lista sola e parlavano del proprietario in terza persona: «Al recapito
+indicato da chi vende» lo leggeva **anche il venditore**, cioè si
+sentiva chiamare «chi vende» a casa sua. Adesso sono due liste, una per
+verso, con la spiegazione fra parentesi. **LA REGOLA DELLA PARENTESI**:
+il titolo dice DOVE si è, la parentesi dice **cosa tocca a te** quando
+tocca a te, e il **fatto** quando la mossa è dell'altra persona. Per
+questo i due elenchi non sono la stessa frase con le parole girate — a
+cambiare è chi deve muoversi, passo per passo.
+
+| | lato VENDO | lato COMPRO |
+|---|---|---|
+| 1 | Ordine preso *(invia i sats)* | Ordine preso *(di' dove ricevere i sats)* |
+| 2 | Sats bloccati *(restano in garanzia fino alla fine)* | Sats bloccati *(chi vende li ha messi in garanzia)* |
+| 3 | Euro inviati *(al recapito che hai indicato)* | Euro inviati *(al recapito che ti dà chi vende)* |
+| 4 | Scambio concluso *(i sats sono arrivati al compratore)* | Scambio concluso *(i sats sono arrivati a te)* |
+
+Il lato COMPRO è una proposta, e c'è una prova che la tiene ancorata:
+**la prima parentesi di ogni lista è il gesto del bottone** che
+`azioniDisponibili` offre a quel lato — «di' dove ricevere i sats» e
+«💸 Dove ricevere i sats», «invia i sats» e «🔒 Blocca i sats». Se un
+domani la tabella dei passi si girasse, la pagina direbbe a chi compra
+di fare quel che tocca a chi vende.
+
+**SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO** («💳 SEPA · ⬆️
+Vendi sats»): il lato lo dicono già le due righe della card da cui si
+arriva e i quattro passi lì sopra, il metodo lo dice il foglio dei
+recapiti — che è dove serve davvero. Ripetuti in grigio piccolo sotto un
+conto erano due etichette che non decidevano niente.
+
+⚠️ **E L'ETICHETTA DEL PREMIO DICE DI CHI E', ma non per il segno.**
+Dal libro si guarda l'offerta di un ALTRO — «Premio al venditore», di
+lui si parla —, nella pagina di uno scambio proprio chi legge quella
+riga l'ha scritta. La richiesta era «Premio richiesto» per il positivo e
+«Sconto offerto» per il negativo, ed **è giusta sul lato vendo e
+direbbe il contrario sul lato compro**: un premio positivo favorisce
+SEMPRE chi vende sats (`sats -= premium/100 * sats`, letta sui byte),
+quindi sul mio ordine di vendita un +4% è un premio che **chiedo**,
+mentre sul mio ordine di acquisto lo stesso +4% è un premio che
+**offro** — mi fa ricevere meno sats. Chiamarlo «richiesto» lì direbbe a
+chi legge che sta chiedendo una cosa che invece sta pagando. A decidere
+è `affareP2P`, **lo stesso giudice del colore**, che alla domanda «pende
+dalla mia parte?» risponde già: quindi «richiesto» **è** `affare`, senza
+una seconda tabella da tenere in pari. Le quattro etichette hanno le
+loro quattro prove.
+
+**«ANNULLA L'ORDINE» E NON «RITIRA».** Il gesto è lo stesso (`cancel` al
+coordinatore) e la sorella resta «Chiedi di annullare»: le due non si
+confondono, perché quella è una PROPOSTA che vuole anche il sì
+dell'altra persona e questa sparisce e basta. E nel piede del filtro
+**«Azzera»** al posto di «Cancella»: un filtro non si butta via, si
+riporta a zero — e adesso il bottone si chiama come la funzione che
+chiama da sempre (`azzeraFiltroP2P`).
+
+**LE DUE RIGHE DELLA CARD SI SONO ROVESCIATE, e in testa va sempre quel
+che si RICEVE**: «Vuoi ricevere X» sopra e «pagando Y» sotto, la stessa
+formula nei due versi — a cambiare è la **moneta**, non le parole.
+Prima la prima riga portava sempre i sats e la seconda sempre l'euro,
+quindi secondo il lato in cima c'era una volta quel che **entra** e una
+volta quel che **esce**: scorrendo la lista l'occhio doveva ricominciare
+da capo a ogni card, e i due verbi diversi («per ricevere» / «pagando»)
+erano la **toppa** a quel difetto invece della cura.
+⚠️ **E LE CLASSI RESTANO ATTACCATE ALLA MONETA**, non alla riga:
+`.p2p-sats` sta coi sats e `.p2p-euro` con gli euro dovunque cadano,
+così il colore e il mono della cifra non dipendono dal lato. A cambiare
+col POSTO è la sola **taglia**, e sono due regole CSS che nominano
+tutt'e due le monete — con una sola, la cifra che cambia riga si
+rimpicciolirebbe secondo il verso.
+
+⚠️ **E `vogliaLatoP2P` E' VISSUTA UN GIRO SOLO.** Era nata il ritocco
+prima per dire «Vuoi comprare» / «Vuoi vendere»; col rovesciamento la
+frase è la stessa nei due versi, e una funzione che sceglie fra due
+parole identiche non è un giudice. È tornata in linea, e al suo posto
+resta solo il perché — che è la parte che non si ricostruisce.
+
+⚠️ **QUATTRO SENTINELLE INGANNATE DALLA PROPRIA SPIEGAZIONE in una
+settimana**, e due sono di questo giro: «niente `Vendi sats` sotto il
+conto» leggeva quella stringa nel **verbale che spiega perché la riga se
+n'è andata**, e «la card non chiama più `vogliaLatoP2P`» leggeva il nome
+nel commento che dice perché la funzione non c'è più. La cura è sempre
+la stessa — i commenti si tolgono prima di guardare, o si àncora la
+prova alla **dichiarazione** invece che al nome — e la frequenza dice
+che è la trappola più comune di questo codice: più il verbale spiega
+bene, più la prova sbaglia.
+
+**9783 verdi**, 0 rosse. Guardato dal vivo a 375 su una vetrina di
+cartone col CSS vero: le due testate misurate una contro l'altra, i due
+elenchi di passi, e le tre card nei due versi.
