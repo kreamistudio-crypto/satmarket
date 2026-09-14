@@ -23957,6 +23957,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   conclude SOLO se hanno risposto tutte — una lista parziale scritta
   come definitiva direbbe «non è tuo» di un ordine proprio. Il verbale
   in CANTIERI, voce «LE MIE IDENTITÀ POSSONO ESSERE DUE».
+  ⚠️ E SCRIVERE DA DUE NON SI PUÒ (14 set 2026, il rovescio): leggere da
+  due identità è giusto per sempre, pubblicare da due costruirebbe due
+  storie sullo stesso account. `cediIlPostoAlContoP2P` giudica UNA volta
+  per sessione ogni mazzo non 'conto' — dal render, da `assicuraMazzo`
+  (cioè prima di firmare) e dal foglio del profilo — e il profilo del
+  conto prende il posto di uno che non ha MAI scambiato: indice zero
+  DOPO il pavimento del server, nessuna riga, nessuna lapide
+  (`senzaStoriaP2P`, e ognuno dei tre da solo sarebbe una scommessa).
+  Con una storia il posto non si tocca e lo dice il foglio, che offre il
+  gesto (`passaAlContoDalFoglioP2P`, con la cintura degli scambi aperti
+  del «dimentica»); la strada sovrana ('mia') non cede mai da sola —
+  il foglio le ha promesso che quella chiave non la ricava nessuno, noi
+  compresi. Il vecchio va sulla mensola `@altrui:<pub>` come sempre, e
+  il journal dice QUALE dei due inquilini sta mettendo via (la `nota` di
+  `parcheggiaMazzoAltruiP2P`). Il seme si chiede una volta per sessione
+  (`semeContoP2P`). Verbale in CANTIERI, «IL POSTO CEDUTO AL PROFILO
+  DEL CONTO».
 
 - IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026): la PAGINA che si
   apre toccando una card, in tutt'e due i tab. Prima era un foglietto

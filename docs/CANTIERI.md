@@ -10931,3 +10931,119 @@ giudicava i mazzi che DICHIARANO da dove vengono, e quelli che non lo
 dichiarano sono per definizione i più vecchi — cioè la popolazione per
 cui la cura serviva. Quando un giudizio si appoggia a un campo nuovo, la
 domanda da farsi è chi quel campo non ce l'ha.
+
+IL POSTO CEDUTO AL PROFILO DEL CONTO (14 set 2026, il rovescio della cura
+del giorno prima — visto da Andrea appena letta).
+IL SINTOMO NON C'ERA ANCORA, ed è la ragione per cui questa voce vale più
+di una correzione: da quel PC LEGGERE era tornato giusto (la restore
+chiede a tutt'e due le identità), ma PUBBLICARE avrebbe continuato a usare
+il profilo nato lì — e un solo account si sarebbe costruito DUE STORIE
+separate: le recensioni di qua, gli scambi di là, e nessuna delle due che
+cresce. **Leggere da due identità è giusto per sempre; scrivere da due
+no**, ed è tutta l'asimmetria di questo cantiere.
+LA REGOLA, in una riga: il profilo del conto prende il posto di un
+profilo di dispositivo che non ha MAI scambiato, in silenzio; se ha una
+storia il posto non si tocca e si dice; se è la strada sovrana non si
+tocca mai da sola. Il vecchio va sulla stessa mensola `@altrui:<pub>` del
+mazzo di un altro conto, con la regola delle lapidi: **mai buttato**.
+«MAI USATO» HA TRE APPIGLI E NON UNO (`senzaStoriaP2P`), perché ognuno
+da solo è una scommessa: l'indice conta le trade key BRUCIATE ma torna a
+zero su un dispositivo svuotato; le righe di scambio si perdono (una
+scheda che sovrascrive l'altra, la cache pulita); le lapidi restano
+quando le righe se ne vanno. Insieme sono un fatto.
+E L'INDICE SI LEGGE DOPO IL PAVIMENTO DEL SERVER, che è la memoria vera:
+zero in locale non vuol dire zero. Da qui una riga che leggendo il
+codice non si vede — **il seme si chiede PRIMA**, e non per gusto
+d'ordine: il corpo di una `async` gira SINCRONO fino al primo `await`, e
+`p2pPavimento` lo scrive `renderP2P` dieci righe più sotto di dove questa
+parte. Leggendolo prima si troverebbe `null`, non si aspetterebbe niente
+e si giudicherebbe «mai usato» un profilo con tre scambi: la corsa del
+9 set, nella stessa forma e in un posto nuovo. La sentinella inchioda
+l'ordine dei due `await`, e il banco lo prova col bump messo dopo
+un'attesa vera.
+⚠️ LA STRADA SOVRANA NON SI CEDE MAI IN SILENZIO, e qui ho ristretto
+l'istruzione di Andrea («origine vuota o 'mia'») con un motivo, non per
+prudenza generica: a un profilo `origine 'mia'` il foglio promette, per
+iscritto, «il codice segreto ce l'hai già tu: questo profilo non lo può
+ricavare nessun altro, noi compresi». Rimpiazzarlo con una chiave che il
+SERVER deriva smentirebbe quella riga proprio a chi l'aveva letta, e in
+silenzio. Prende l'avviso senza il bottone; per uscirne c'è il «dimentica
+il profilo», che è un gesto suo e dichiarato. Il caso di Andrea è
+`origine ''` e non cambia di una virgola.
+LA CHIAVE NUOVA SI DERIVA PRIMA DEL PARCHEGGIO: fra il posto svuotato e
+il posto riempito non deve esserci un'attesa in cui qualcun altro si
+infili — e se ci si infila lo stesso (una `.then` già in coda), quel che
+trova scritto non si tocca: `if (!mazzoMostro()) ricordaMazzo(nuovo)`,
+l'invariante di sempre. Il mazzo che ERA già quello del conto e non lo
+diceva non si parcheggia affatto: si timbra `origine 'conto'` col suo
+`conto` e basta — parcheggiare per riscrivere uguale sposterebbe le sue
+righe su una mensola per sbaglio.
+LA MENSOLA HA DUE INQUILINI, e da fuori si distinguono da una riga sola:
+`parcheggiaMazzoAltruiP2P` ha preso una NOTA, perché senza di lei il
+journal avrebbe detto «era di un altro conto» di un mazzo che era il tuo.
+Il nome della funzione resta quello: è un indirizzo, e ARCHITETTURA e
+CANTIERI ci puntano da tre giorni.
+DOVE SI GIUDICA, e sono tre porte: il render del P2P (una volta per
+sessione, e finché non ha risposto non si chiede la restore — partirebbe
+per un'identità che sta per andarsene); `assicuraMazzo`, cioè PRIMA di
+firmare qualunque cosa, che è tutto il senso del cantiere; e il foglio del
+profilo, dove ci si arriva da «I tuoi dati» senza passare dal P2P — senza
+quella terza porta, chi non apre mai lo scambio non saprebbe di avere due
+profili.
+IL SEME SI CHIEDE UNA VOLTA PER SESSIONE (`semeContoP2P`, un memo): senza,
+un profilo che TIENE il posto farebbe due POST identiche a ogni apertura
+— una per questo giudizio, una per `identitaMieP2P` — e il 409 di chi ha
+la leva spenta si ripeterebbe uguale. Gli altri tre chiamanti restano
+diretti: hanno già il loro freno e stanno su strade che si escludono.
+LE STRADE SCARTATE, coi perché. a) Cedere il posto anche a un profilo con
+una storia: il derivato non è «la versione giusta» di un profilo, è UN
+ALTRO profilo, con zero recensioni, che dal coordinatore è un estraneo —
+sostituirlo è distruggere un'identità, l'invariante che tutto questo
+cantiere difende dal primo giorno. b) Riaprire il bivio del conflitto che
+la fase 6 ha tolto: quello si apriva davanti a tutti e chiedeva di
+scegliere; questo avviso lo vede solo chi ha due identità E una storia
+sulla vecchia, dice cosa resta e cosa cambia, e non decide niente da
+solo. c) Buttare il vecchio invece di parcheggiarlo: la chiave sì è
+rederivabile, ma scambi, lapidi e recapiti no. d) Decidere sul solo
+indice locale: è il difetto scritto sopra, ed è anche la mutazione che
+il banco uccide.
+COSA RESTA APERTO, dichiarato. Chi ha una storia sulla vecchia identità
+e non apre mai il foglio del profilo resta com'è: l'avviso vive dove il
+profilo si guarda, e non si va a cercare nessuno. La strada sovrana esce
+solo dal «dimentica». E **la conferma sul campo della diagnosi di ieri
+non è ancora arrivata**: il dump della console del PC dirà se quel
+dispositivo è nel ramo previsto (profilo di dispositivo mai usato → da
+oggi cede il posto da solo) o in quello dichiarato e non curato (nessun
+mazzo, copia illeggibile nel cloud).
+COLLAUDATI: **9394 prove verdi, 0 rosse** (+44 sulle 9350 del giro prima)
+e **14 MUTAZIONI, 14 uccise**: la sovrana ceduta in silenzio, il profilo
+con storia ceduto lo stesso, «mai usato» senza le lapidi e senza le
+righe, il pavimento non aspettato e il pavimento letto prima del primo
+await, il mazzo cambiato giudicato lo stesso, il posto riempito
+sovrascritto, il giudice che guarda anche i mazzi del conto, la restore
+partita prima del giudizio, il gesto che firma senza aspettare, la
+cintura degli scambi aperti tolta dal bottone, il bottone acceso per
+tutti, e il parcheggio che perde la nota e mente nel journal. Il banco fa
+girare il giudizio vero coi nove rami — il caso del PC per primo — più i
+cinque del giudice.
+TRE LEZIONI DI BANCO, piccole e tutte già pagate altrove in altre forme.
+1) Un'ancora di tortura va scelta UNICA: `if (!ora || ora.sk !== m.sk)
+return;` esiste in DUE funzioni, la mutazione non si applicava affatto,
+e leggere quel «?? ancora 2 volte» come un'uccisione sarebbe stato un
+banco che si autopromuove. 2) Due prove non possono avere lo stesso NOME:
+la rossa non dice più quale delle due è caduta — e qui erano una
+sentinella e un caso del banco, cioè proprio le due che si vogliono
+distinguere. 3) **UNA FUNZIONE NUOVA ENTRA IN CENSIMENTI CHE NON SAI DI
+STARE TOCCANDO**, e il giro MIRATO non li vede: quattro sono usciti solo
+col giro intero — i gesti della domanda unica, i gesti del mazzo, i
+chiamanti di `registraChiaviP2P`, e i due «col mazzo già in locale non si
+chiede niente», che erano l'invariante vecchio scritto come prova. Il
+numero di un censimento non è una cifra da alzare: è il posto dove si
+scrive PERCHÉ è cresciuto.
+⚠️ E IL CATCH CHE SALVA IN PRODUZIONE NASCONDE IN BANCO:
+`cessioneInCorsoP2P` trasforma qualunque eccezione in «ignoto» — giusto,
+se non si sa non si tocca niente — e nel banco del mazzo, dove
+`p2pPavimento` e `lapidiP2P` vivono nel blocco del motore e non c'erano,
+quel catch ha trasformato uno stub mancante in un esito legittimo. Qui è
+uscito rosso per fortuna; con l'assertion girata al contrario sarebbe
+stato un VERDE per la ragione sbagliata.
