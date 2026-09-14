@@ -13815,3 +13815,105 @@ col backoff **su una fattura nuova** (automatico solo dove c'è un
 Lightning address, perché lì ogni conio ha un hash nuovo), e le parole
 al venditore, che oggi gli dicono «il tuo wallet non ha risposto come
 doveva» mentre il suo wallet non è mai stato raggiunto.
+
+
+## Il pagamento in volo: togliere l'uomo dalla catena (set 2026)
+
+Il cantiere A aveva un prezzo dichiarato, e valeva la pena pagarlo per
+una settimana e non di più: un pagamento che a otto secondi non aveva
+ancora un verdetto diventava `INCERTO`, cioè **una persona**. E il caso
+vero cade proprio lì — il payout del 149 ci ha messo **86 secondi** a
+dichiararsi fallito, quindi ogni payout senza rotta avrebbe svegliato un
+moderatore per una domanda che una macchina sa fare.
+
+**IL PERNO ERA GIÀ IN CASA, e il cantiere B consiste nel notarlo.** Da
+quando l'hash si conosce **prima** che i sats si muovano, «non lo so»
+smette di essere una condanna: qualunque cosa succeda — il nodo che
+tace, la richiesta che scade, un verdetto che tarda — quella domanda si
+può **rifare**. Una domanda che una macchina sa fare non si gira a una
+persona. `paga_venditore` lo dichiara in una riga
+(`taccuino["risolvibile"]`), e tutto il resto discende da lì.
+
+**IL TERZO TIMBRO.** `payout_stato` guadagna `in_volo`, e le tre parole
+adesso dicono tre cose diverse che prima si confondevano in due:
+`da_riprovare` = «nessun sat si è mosso, si può ribussare subito»;
+**`in_volo`** = «i sats possono essere usciti, e si può chiedere da
+soli»; `incerto` = «i sats possono essere usciti e NON si può chiedere,
+quindi decide una persona». ⚠️ Da `in_volo` **non parte mai un
+pagamento**: le quattro guardie lo trattano come il congelamento, ed è
+la riga che tiene in piedi tutto il resto.
+
+**IL GIRO, tre risposte.** `risolvi_pagamenti_in_volo()` chiede per hash
+a ogni battito. **Saldato** → si timbra `uscito` e si ripassa dalla
+strada di sempre, che vede il timbro, **non paga** e va dritta alla
+chiusura: contatori, notifiche e stato finale restano scritti in un
+posto solo, esattamente come per la decisione di un moderatore.
+**Fallito** → si toglie il fermo e si ripassa di lì lo stesso, dove la
+cintura riconosce l'eco della fattura bruciata e prende la strada del
+fallimento — invoice azzerata, venditore avvisato, moderatori avvisati.
+**Ancora in corso** → si lascia dov'è, finché non scade
+`IN_VOLO_LIMITE_S` (mezz'ora); a quel punto l'umano torna a essere la
+risposta giusta, e stavolta gli si consegna **l'hash** invece di
+un'alzata di spalle.
+
+⚠️ **E «NESSUNA TRACCIA» SI TRATTA COME UN FALLIMENTO, col suo perché:**
+se la richiesta di pagamento era scaduta nel nulla, LNbits potrebbe
+averla registrata un istante DOPO. Chiederlo **dieci minuti più tardi**
+e non trovare niente vuol dire davvero «non è mai partita»; chiederlo
+subito no. **Il ritardo del battito è una sicurezza, non un difetto da
+limare** — e comunque non si paga da lì: si ripassa dalla strada di
+sempre, che ricontrolla tutto da capo prima di muovere un sat.
+
+**IL FRENO DELL'ANELLO**, `MAX_TENTATIVI_PAYOUT = 3`. Senza, un payout
+che fallisce sempre si rimetterebbe in volo per sempre, coniando una
+fattura nuova dal Lightning address a ogni giro. Non sarebbe un doppio
+pagamento — ogni tentativo è **confermato fallito** prima del successivo,
+che è la sola ragione per cui riconiare è lecito qui — ma bussare in
+eterno al wallet di un venditore è maleducazione verso un servizio di
+terzi, e la strada per farsi limitare. Esaurito il tetto, l'umano torna
+a essere la risposta giusta.
+
+**UNA SEMPLIFICAZIONE CHE IL CANTIERE HA IMPOSTO**, ed è di quelle che
+valgono oltre il cantiere: la scelta della strada d'uscita — quale delle
+quattro funzioni chiamare per una riga, e il timbro del timer riletto —
+viveva dentro `riprova_pagamenti_sospesi`. Il giro nuovo ne aveva
+bisogno identica, e **una seconda copia di quella scelta è una copia che
+un giorno manda i sats alla persona sbagliata**: è diventata
+`_riprendi_uscita`, usata dai due giri. La sentinella che sorvegliava
+`automatico=bool(` si è spostata con lei, e se n'è aggiunta una che
+verifica che il giro dei sospesi **non** abbia più una scelta sua.
+
+**LE PROVE.** La storia del volo gira al banco nelle sei direzioni —
+saldato, fallito, nessuna traccia, ancora in corso, troppo lungo, LNbits
+muto — più la riga senza hash, che è un difetto nostro e per cui
+l'avviso ai moderatori lo **dice**. E dentro `_sblocca_sats`: un
+`INCERTO` con un nome manda la riga in volo invece di congelarla, chi ha
+chiamato lo sa, e da lì non parte nessun secondo pagamento né nessuna
+fattura nuova. **9854 verdi**, 0 rosse; i sette collaudi che toccano i
+pagamenti tutti verdi.
+
+**IL CENSIMENTO, a verbale.** Il 149 **era solo**: le altre dieci righe
+chiuse con una fattura in colonna risultano tutte saldate. Il suo
+`NON PAGATO` è la fattura vecchia bruciata — il venditore è stato pagato
+con quella nuova — ed è **un limite dello strumento da ricordare**: il
+censimento giudica *la fattura in colonna*, non *l'ordine*, e quando le
+due cose divergono va letto con la storia accanto.
+⚠️ **E RESTANO 41 RIGHE CIECHE**, pagate dal Lightning address quando la
+fattura non si salvava. Si dichiarano e si chiudono, e la ragione è la
+forma dell'errore: l'unico aggancio possibile sarebbe (importo, minuto)
+contro l'elenco LNbits, che **non è una fonte** — lo abbiamo visto
+troncare il presente — e due righe dello stesso importo nello stesso
+minuto sono indistinguibili. Un aggancio del genere produce sospetti,
+non verdetti, e **il modo in cui un falso sospetto fallisce qui è un
+secondo pagamento a chi era già stato pagato**: con l'hash nuovo non
+ci salverebbe nemmeno Lightning. Il buco non si allarga più — da oggi
+ogni payout scrive il suo hash — e se uno di quei 41 non avesse
+incassato, a dirlo sarebbe la persona che aspetta i sats.
+
+**QUEL CHE RESTA DEL CANTIERE B**, dichiarato e non dimenticato: il
+**ritentativo col backoff** (5 min, 30 min, 2 ore, 6 ore, 24 ore) su una
+fattura **nuova**, automatico solo dove c'è un Lightning address perché
+solo lì ogni conio ha un hash nuovo; e **le parole al venditore**, che
+oggi gli dicono «il tuo wallet non ha risposto come doveva» mentre il
+suo wallet non è mai stato nemmeno raggiunto. Sono la stessa famiglia di
+bugie della notifica del 14 settembre, e vanno chiuse insieme.

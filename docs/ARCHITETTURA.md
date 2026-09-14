@@ -97,6 +97,41 @@
   della chiave che paga e che i quattro rami timbrino. Il perché per
   intero — l'ordine 149 e i 67.672 sats — sta in CANTIERI, alla voce
   «Il giudice dell'esito: un 201 che diceva «fallito»».
+  IL PAGAMENTO IN VOLO (set 2026, cantiere B). `payout_stato` ha un
+  terzo timbro, `in_volo`, e le tre parole dicono tre cose che prima si
+  confondevano in due: `da_riprovare` = nessun sat si è mosso, si
+  ribussa subito; `in_volo` = i sats possono essere usciti E si può
+  chiedere da soli (c'è l'hash); `incerto` = i sats possono essere
+  usciti e NON si può chiedere, quindi decide una persona. Da `in_volo`
+  NON parte mai un pagamento: le quattro guardie lo trattano come il
+  congelamento (`payout_stato"] in ("incerto", "in_volo")`, conto a mano
+  di 4 in `prove.py`). `_in_volo` è il terzo timbro accanto a
+  `_congela_pagamento` e `_sospendi_pagamento`: non tocca `aggiornato`,
+  non avvisa nessuno, chiude la connessione che riceve.
+  `risolvi_pagamenti_in_volo()` gira nell'orologio PRIMA della ripresa
+  dei sospesi (così una riga decisa si riprova nello stesso battito) e
+  chiede per hash: saldato → timbro 'uscito' e si ripassa dalla strada
+  di sempre, che col timbro non paga e chiude; fallito → si toglie il
+  fermo e si ripassa di lì, dove l'eco della fattura bruciata prende la
+  strada del fallimento; ancora in corso → si lascia, fino a
+  `IN_VOLO_LIMITE_S` (1800s), poi `_arrenditi_in_volo` timbra 'incerto'
+  e consegna l'HASH ai moderatori. «Nessuna traccia» vale come un
+  fallimento, e il ritardo del battito è ciò che lo rende vero: una
+  richiesta scaduta nel nulla poteva essere registrata un istante dopo,
+  e chiederlo dieci minuti più tardi è l'unico modo di saperlo. Il
+  freno dell'anello è `MAX_TENTATIVI_PAYOUT` (3): ogni tentativo è
+  confermato fallito prima del successivo — quindi niente doppio
+  pagamento — ma bussare in eterno al wallet di un venditore è la
+  strada per farsi limitare. La scelta della strada d'uscita vive ora
+  in `_riprendi_uscita`, UNA sola, usata dai due giri: `automatico` si
+  rilegge lì da `sbloccato_auto_il`, e una seconda copia di quella
+  scelta è una copia che un giorno manda i sats alla persona sbagliata.
+  Il censimento storico (`censimento_payout.py`, sola lettura, database
+  in mode=ro, non importa server.py perché quel modulo all'avvio scrive
+  e registra il webhook) guarda tutte e quattro le bocche e DICHIARA il
+  proprio punto cieco: le righe pagate dal Lightning address non hanno
+  una fattura in colonna. Il perché per intero sta in CANTIERI, alla
+  voce «Il pagamento in volo: togliere l'uomo dalla catena».
   I TRE ESITI storici (ago 2026, la voce media
   più grave dell'audit): PAGATO, NON_PAGATO e **INCERTO**. La POST
   verso LNbits stava senza `try`: se il nodo pagava ma non riusciva a
