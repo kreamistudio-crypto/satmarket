@@ -47866,6 +47866,46 @@ def prove_p2p_vista_miei():
     prova("...e si chiama come la voce che ci porta", True,
           _nav.endswith("I miei scambi")
           and '>I miei scambi</h2>' in fetta)
+    # ⚠️ ED E' GRANDE ESATTAMENTE COME IL CAPPELLO DI UN FOGLIO
+    # (richiesta di Andrea): e' lo stesso oggetto — il titolo che
+    # presiede una pagina — quindi si veste come «Stai comprando
+    # sats». La misura NON si ribatte: sta in `--tit-foglio` e le due
+    # regole la leggono da li', perche' due numeri uguali scritti in
+    # due posti sono due numeri — al primo ritocco uno resta indietro,
+    # e a dirlo non c'e' niente.
+    # ⚠️ LE REGOLE SONO TRE, e quella che DECIDE non e' quella che
+    # sembra: `.foglio-testa h3` e `.sheet h3` hanno la STESSA
+    # specificita' (una classe piu' un elemento), e a parita' vince chi
+    # e' scritto dopo — cioe' la seconda. Tutt'e due i `.foglio-testa`
+    # dell'app vivono dentro un `.sheet`, quindi il `16.5px` che stava
+    # nella prima era morto in ogni sua occorrenza, e dal sorgente
+    # sembrava il numero buono. L'ha detto la MISURA dal vivo, non la
+    # lettura: il cappello rende 18. Adesso le leggono tutt'e tre dalla
+    # stessa variabile — chiunque vinca, il numero e' quello.
+    _tit = pezzo_js(mini, "  .p2p-miei-tit{", "}")
+    _cap = pezzo_js(mini, "  .foglio-testa h3{", "}")
+    _fog = pezzo_js(mini, "  .sheet h3{", "}")
+    prova("il titolo e i cappelli dei fogli leggono la stessa misura",
+          [True, True, True],
+          ["font-size:var(--tit-foglio)" in _tit,
+           "font-size:var(--tit-foglio)" in _cap,
+           "font-size:var(--tit-foglio)" in _fog])
+    # ...e nessuna se la puo' ricablare: un `px` li' dentro vorrebbe
+    # dire che le misure hanno ricominciato a viaggiare separate — ed
+    # e' il modo in cui quel 16.5 era diventato una bugia silenziosa.
+    prova("...e nessuna ricabla un numero suo", [],
+          [n for n, b in (("titolo", _tit), ("cappello", _cap),
+                          ("foglio", _fog))
+           if re.search(r"font-size:[\d.]+px", b)])
+    # ...e il PESO e' lo stesso, che «grande uguale» a occhio e' anche
+    # questo: un 700 e un 800 alla stessa taglia non si somigliano.
+    prova("...e pesano uguale", [True, True],
+          ["font-weight:800" in _tit, "font-weight:800" in _fog])
+    prova("...e la variabile e' dichiarata una volta sola", 1,
+          mini.count("--tit-foglio:"))
+    # CENTRATO come il cappello, che e' l'altra meta' della richiesta
+    prova("...e sta al centro, come lui", [True, True],
+          ["text-align:center" in _tit, "text-align:center" in _cap])
     # IL DEPOSITO STA NELLA VISTA e non nella testata: #p2pMieiTesta lo
     # riscrive renderP2P a ogni giro, e li' dentro il valore morirebbe.
     prova("...e il deposito dell'ordine sta nella VISTA, non nella testata",

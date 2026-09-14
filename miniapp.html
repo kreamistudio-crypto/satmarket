@@ -103,6 +103,21 @@
        si sta nel tab «Vendi BTC», gemello di --trust-deep */
     --danger-deep:#9A3412;
     --radius:16px; --pad:16px;
+    /* LA MISURA DEL CAPPELLO DI UN FOGLIO (set 2026): la portano i
+       titoli dei fogli — «Stai comprando sats» — e quello di «I miei
+       scambi», che deve essere ESATTAMENTE lo stesso (richiesta di
+       Andrea). Sta qui e non dentro le regole perche' due numeri
+       uguali scritti in due posti sono due numeri: al primo ritocco
+       uno resta indietro, e a dirlo non c'e' niente.
+       ⚠️ ED E' 18 PERCHE' L'HO MISURATO, non perche' l'ho letto: in
+       `.foglio-testa h3` c'era un `16.5px` che NON DECIDE — `.sheet
+       h3` ha la stessa specificita' (una classe piu' un elemento) ed
+       e' scritta piu' in basso, quindi vince, e tutt'e due i
+       `.foglio-testa` dell'app vivono dentro un `.sheet`. Quel 16.5
+       era morto in ogni sua occorrenza, e dal sorgente sembrava il
+       numero buono. Adesso le due regole leggono di qui: qualunque
+       delle due vinca, il numero e' lo stesso. */
+    --tit-foglio:18px;
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
        l'elenco dei contesti accanto a .btn) */
     --radius-btn:12px;
@@ -1864,12 +1879,19 @@
      sta dentro il blocco attaccato, sopra gli strumenti, quindi resta
      a vista mentre si scorre — che e' la differenza fra un titolo e
      l'etichetta di sezione che c'era prima.
-     19px Baloo come i due tab della sorella: le due viste cominciano
-     alla stessa altezza e passando dall'una all'altra la pagina non
-     sobbalza. `margin` a mano perche' un `h2` di sistema ne porta uno
-     suo, grande il doppio. */
+     ⚠️ CENTRATO E DELLA MISURA DEL CAPPELLO DI UN FOGLIO (ritocco di
+     Andrea, lo stesso giorno): e' lo stesso oggetto — il titolo che
+     presiede una pagina — quindi si veste uguale a «Stai comprando
+     sats», e la misura la leggono tutt'e due da `--tit-foglio`
+     invece di ribatterla. La prima stesura lo faceva 19px come i due
+     tab della sorella: era un'altra strada ragionevole (le due viste
+     cominciavano alla stessa altezza), ma un titolo si accompagna coi
+     titoli, non coi comandi.
+     `margin` a mano perche' un `h2` di sistema ne porta uno suo,
+     grande il doppio. */
   .p2p-miei-tit{margin:2px 0 8px;font-family:'Baloo 2',sans-serif;
-    font-weight:700;font-size:19px;line-height:1.1;color:var(--ink)}
+    font-weight:800;font-size:var(--tit-foglio);line-height:1.1;
+    color:var(--ink);text-align:center}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -2507,7 +2529,14 @@
      centrato slitta della larghezza della freccia. */
   .foglio-testa{display:flex;align-items:center;gap:6px;flex:0 0 auto;
     padding-bottom:10px;margin-bottom:2px;border-bottom:1px solid var(--line-soft)}
-  .foglio-testa h3{flex:1;min-width:0;margin:0;text-align:center;font-size:16.5px;
+  /* ⚠️ QUESTA TAGLIA NON DECIDE, e prima portava un `16.5px` che non
+     si e' mai visto: `.sheet h3` ha la stessa specificita' ed e'
+     scritta piu' in basso. Legge la stessa variabile della sorella
+     apposta — cosi' la regola che perde dice comunque il vero, e il
+     giorno che l'altra sparisse i titoli non si rimpicciolirebbero di
+     nascosto. */
+  .foglio-testa h3{flex:1;min-width:0;margin:0;text-align:center;
+    font-size:var(--tit-foglio);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .foglio-back{flex:0 0 auto;border:0;background:none;color:var(--ink);
     font:inherit;font-size:19px;font-weight:800;line-height:1;
@@ -5915,7 +5944,12 @@
      l'inseguimento, e l'assestamento resta immediato. */
   html.con-tastiera .sheet.open{transition:none}
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
-  .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
+  /* ⚠️ E' QUESTA LA REGOLA CHE DECIDE la taglia dei titoli dei fogli,
+     non `.foglio-testa h3` che sta piu' su: stessa specificita', e a
+     parita' vince chi e' scritto dopo. Misurato dal vivo. Legge
+     `--tit-foglio` come la sorella, cosi' chiunque delle due vinca il
+     numero e' lo stesso. */
+  .sheet h3{font-family:'Baloo 2',sans-serif;font-size:var(--tit-foglio);font-weight:800;margin-bottom:4px}
   /* La testata di un foglio: titolo, e a destra gli inquilini di
      servizio (toggle valuta, ✕). A 320px stanno in tre su una riga
      sola, e a stringersi dev'essere il TITOLO — mai la via d'uscita. */
