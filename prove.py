@@ -43940,7 +43940,7 @@ def prove_p2p_conto_dispositivo():
     # gate rovesciato a `false` la frase resta nel sorgente e la
     # sentinella passava liscia. Si inchioda il GATE, non il testo.
     prova("...e dice che l'offerta appesa non si ritira piu' da qui",
-          True, "const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])" in ges
+          True, "Object.keys(righe).filter(k => offertaVivaP2P(righe[k])" in ges
           and "+ (offerte ? '" in ges and "ancora nel libro" in ges)
     # ⚠️ E CONTA SOLO LE SUE (14 set 2026, dal campo): l'avviso diceva
     # «7 ordini» e nessuno dei sette era del profilo che stava per
@@ -43948,12 +43948,29 @@ def prove_p2p_conto_dispositivo():
     # proprio quelli che dopo il passaggio restano ritirabili. La prova
     # che una riga e' di un mazzo e' la DERIVAZIONE, non un campo.
     rqm = pezzo_js(mini, "function rigaDiQuestoMazzoP2P(o, m){", "\n}\n")
+    # ⚠️ E IL CRITERIO E' LA RESTORE, non la chiave che la riga porta
+    # scritta (14 set, il quarto giro): le righe adottate col mazzo
+    # sbagliato una chiave di QUESTO mazzo ce l'hanno sopra — e' proprio
+    # la bugia — quindi la derivazione da sola le conterebbe come sue.
     prova("...e conta SOLO le righe di questo mazzo", True,
-          "&& rigaDiQuestoMazzoP2P(righe[k], mio)).length;" in ges)
+          "&& !ordineDiUnAltroMazzoP2P(righe[k], mio)).length;" in ges)
+    # ...E SE NON SI SA DI CHI SONO, NESSUN NUMERO: al foglio ci si
+    # arriva anche da «I tuoi dati», senza passare dalla vista P2P, e
+    # li' la restore non l'ha chiesta nessuno. Si chiede (una per
+    # sessione) e, se tace, si tace: un avviso sbagliato spaventa per
+    # la ragione opposta a quella vera.
+    prova("...e se la restore non ha parlato, nessun avviso", True,
+          "if (!p2pMieiOrdini) await chiediMieiOrdiniP2P();" in ges
+          and "const offerte = !p2pMieiOrdini ? 0" in ges)
     prova("...e «di questo mazzo» e' la trade key che si rideriva",
           True, "chiaveScambio(m.sk, o.indice | 0).pub === o.pubTrade" in rqm)
-    prova("...che senza indice o senza chiave non dice niente", True,
-          "if (!o || !m || !o.pubTrade || !(o.indice | 0)) return false;" in rqm)
+    # ⚠️ E L'INDICE ZERO E' UN INDICE: uno scambio ANONIMO — senza firma
+    # grezza, quindi senza reputazione — nasce con indice 0 e una trade
+    # key buona derivata proprio da quello zero. Scartarlo come «non si
+    # sa» faceva dire alla cintura «e' di un altro» su un gesto
+    # legittimo.
+    prova("...che senza chiave non dice niente, ma l'indice zero vale",
+          True, "if (!o || !m || !o.pubTrade) return false;" in rqm)
     # IL «DIMENTICA» RESTA PIU' SEVERO, e va detto: porta via mazzo,
     # copia nel cloud e chiavi dal server, quindi non rinfresca niente
     # e con un libro vecchio blocca.
@@ -45466,7 +45483,104 @@ def prove_p2p_server():
     # della presa. Tre posti che devono dire la stessa cosa, o si vede
     # un segno e si riesce a prendere lo stesso.
     prova("...e lo chiamano la card, la porta e la cintura", 3,
-          solo_codice(mini).count("ordineMioP2P(") - 1)   # -1: la definizione
+          solo_codice(mini).count("ordineMioP2P(") - 1)
+    # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
+    # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
+    # mazzo vivo dando per scontato che la riga sia sua, e UNO SOLO
+    # controllava che la chiave tornasse — `mostroArriva`, in ARRIVO.
+    # In uscita no, e `chiamataOrdineP2P` e' la porta unica di presa,
+    # fattura, rilascio, RITIRO, voto e disputa: il messaggio partiva
+    # firmato da una chiave che quell'ordine non ha mai visto, e il
+    # coordinatore lo scartava in silenzio.
+    gda = pezzo_js(mini, "function ordineDiUnAltroMazzoP2P(o, m){", "\n}\n")
+    ch2 = pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n")
+    prova("la porta unica dei gesti ha la cintura del mazzo", True,
+          "if (ordineDiUnAltroMazzoP2P(o, mz))" in ch2)
+    prova("...e sta PRIMA che la chiave si derivi", True,
+          0 < ch2.find("ordineDiUnAltroMazzoP2P(o, mz)")
+          < ch2.find("const tk = chiaveScambio(mz.sk, o.indice);"))
+    prova("...e dice un errore che si legge", True,
+          "Questo ordine è di un altro profilo di scambio" in ch2)
+    # DUE FONTI, in ordine di forza: la restore (la parola del
+    # coordinatore, l'unica che smaschera una riga con la chiave
+    # storta) e poi la derivazione, per le righe appena pubblicate.
+    prova("il giudice guarda PRIMA la restore, poi la derivazione", True,
+          0 < gda.find("if (voce && voce.identita) return voce.identita !== m.pub;")
+          < gda.find("return !rigaDiQuestoMazzoP2P(o, m);"))
+    # FAIL-OPEN SULL'IGNORANZA, e qui e' il verso giusto: una cintura
+    # che ferma quando non sa ferma un gesto legittimo.
+    prova("...e senza prove non dice «di un altro»", True,
+          "if (!o || !m) return false;" in gda
+          and "if (!o.pubTrade) return false;" in gda)
+    # IL BANCO: il giudice gira sui sette rami, e il primo e' il caso
+    # dal campo — la riga adottata col mazzo sbagliato, che una chiave
+    # di questo mazzo ce l'ha scritta sopra.
+    import json as _jsonC, shutil as _shC, subprocess as _spC
+    import tempfile as _tfC
+    nodeC = _shC.which("node")
+    if not nodeC:
+        salta("il banco della cintura del mazzo", "node non c'e'")
+    else:
+        bancoC = "\n".join(
+            pezzo_js(mini, f, "\n}\n") + "\n}"
+            for f in ("function rigaDiQuestoMazzoP2P(o, m){",
+                      "function ordineDiUnAltroMazzoP2P(o, m){")) + r"""
+let p2pMieiOrdini = null;
+function chiaveScambio(sk, i){ return {pub: 'pub:' + sk + ':' + i}; }
+const M = {sk: 'MIO', pub: 'P-MIO'};
+const out = {};
+// a) IL CASO DAL CAMPO: la riga porta una chiave di QUESTO mazzo — e'
+//    proprio la bugia — ma la restore dice che l'ordine e' di un'altra
+//    identita'. Vince la restore.
+p2pMieiOrdini = {'o1': {indice: 3, identita: 'P-ALTRO'}};
+out.restoreSmaschera = ordineDiUnAltroMazzoP2P(
+  {id: 'o1', indice: 3, pubTrade: 'pub:MIO:3'}, M) === true;
+// b) ...e al contrario: la restore dice che e' mio, e la chiave storta
+//    non lo smentisce (e' una riga da riparare, non di un altro)
+p2pMieiOrdini = {'o1': {indice: 3, identita: 'P-MIO'}};
+out.restoreConferma = ordineDiUnAltroMazzoP2P(
+  {id: 'o1', indice: 3, pubTrade: 'pub:STORTA'}, M) === false;
+// c) senza restore vale la derivazione: chiave che non torna
+p2pMieiOrdini = null;
+out.derivazioneStorta = ordineDiUnAltroMazzoP2P(
+  {id: 'o1', indice: 3, pubTrade: 'pub:STORTA'}, M) === true;
+// d) ...e chiave che torna: e' mia
+out.derivazioneBuona = ordineDiUnAltroMazzoP2P(
+  {id: 'o1', indice: 3, pubTrade: 'pub:MIO:3'}, M) === false;
+// e) L'ANONIMO: indice 0 con la sua chiave buona — la cintura non lo
+//    ferma, che e' la ragione per cui lo zero e' un indice
+out.anonimoPassa = ordineDiUnAltroMazzoP2P(
+  {id: 'o1', indice: 0, pubTrade: 'pub:MIO:0'}, M) === false;
+// f) non si sa (niente chiave, niente restore): fail-open
+out.ignotoPassa = ordineDiUnAltroMazzoP2P({id: 'o1', indice: 0}, M) === false;
+// g) senza mazzo non si giudica
+out.senzaMazzoTace = ordineDiUnAltroMazzoP2P({id: 'o1'}, null) === false;
+console.log(JSON.stringify(out));
+"""
+        dC = _tfC.mkdtemp()
+        try:
+            pC = os.path.join(dC, "banco_cintura.js")
+            open(pC, "w", encoding="utf-8").write(bancoC)
+            rC = _spC.run([nodeC, pC], capture_output=True, encoding="utf-8",
+                          timeout=60)
+            oC = _jsonC.loads(rC.stdout.strip()) if rC.returncode == 0 else None
+        finally:
+            _shC.rmtree(dC, ignore_errors=True)
+        if oC is None:
+            prova("il banco della cintura gira", "", (rC.stderr or "")[-600:])
+        else:
+            prova("LA RIGA ADOTTATA STORTA: la restore la smaschera anche "
+                  "se la chiave sembra mia", True, oC["restoreSmaschera"])
+            prova("...e una chiave storta su un ordine MIO non e' «di un "
+                  "altro»", True, oC["restoreConferma"])
+            prova("senza restore decide la derivazione: chiave che non "
+                  "torna", True, oC["derivazioneStorta"])
+            prova("...e chiave che torna e' mia", True, oC["derivazioneBuona"])
+            prova("lo scambio ANONIMO (indice 0) passa la cintura", True,
+                  oC["anonimoPassa"])
+            prova("...e quel che non si sa non si ferma", True,
+                  oC["ignotoPassa"])
+            prova("...e senza mazzo non si giudica", True, oC["senzaMazzoTace"])   # -1: la definizione
     cm = pezzo_js(mini, "async function chiediMieiOrdiniP2P(", "\n}\n")
     ur = pezzo_js(mini, "async function unaRestoreP2P(", "\n}\n")
     im = pezzo_js(mini, "async function identitaMieP2P(mz){", "\n}\n")

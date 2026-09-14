@@ -36213,9 +36213,42 @@ function cessioneInCorsoP2P(m){
    quella riga, e se torna uguale quella riga e' sua. Senza bundle, o
    senza indice, non si sa — e non sapere vuol dire non dire niente. */
 function rigaDiQuestoMazzoP2P(o, m){
-  if (!o || !m || !o.pubTrade || !(o.indice | 0)) return false;
+  if (!o || !m || !o.pubTrade) return false;
+  /* ⚠️ L'INDICE ZERO E' UN INDICE (14 set 2026, il quarto giro): uno
+     scambio ANONIMO — senza firma grezza, quindi senza reputazione —
+     nasce con `indice 0` e una trade key buona, derivata proprio da
+     quello zero. La prima stesura lo scartava come «non si sa», e da
+     qui sotto quella risposta diventava «e' di un altro»: una cintura
+     che ferma un gesto legittimo. */
   try { return chiaveScambio(m.sk, o.indice | 0).pub === o.pubTrade; }
   catch(e){ return false; }
+}
+/* ⚠️ E IL GIUDICE DEL CONTRARIO — «questo ordine e' di un ALTRO mazzo»
+   — che e' la domanda della cintura prima di FIRMARE (14 set 2026, il
+   quarto giro dal campo, e lo strato sotto all'avviso).
+   OTTO POSTI derivano la trade key da `chiaveScambio(mazzoVivo.sk,
+   riga.indice)` dando per scontato che la riga sia di questo mazzo, e
+   UNO SOLO controllava che la chiave tornasse: `mostroArriva`, in
+   ARRIVO. In uscita no — e `chiamataOrdineP2P` e' la porta unica di
+   presa, fattura, rilascio, RITIRO, voto e disputa. Con una riga di
+   un'altra identita' il messaggio parte con una chiave che quell'ordine
+   non ha mai visto, il coordinatore lo scarta, e a schermo non succede
+   NIENTE: e' il «non riesco piu' ad annullare» che ci portavamo dietro.
+   DUE FONTI, in ordine di forza. 1) LA RESTORE, che e' la parola del
+   coordinatore: vale anche per le righe ricostruite con la chiave
+   storta, ed e' l'unica che le smaschera — quelle una chiave di questo
+   mazzo ce l'hanno scritta sopra, ed e' proprio la bugia. 2) LA
+   DERIVAZIONE, per le righe che la restore non ha ancora nominato:
+   appena pubblicate, e sue per costruzione.
+   FAIL-OPEN SULL'IGNORANZA, ed e' il verso giusto QUI e non altrove:
+   una cintura che ferma quando non sa ferma un gesto legittimo. Si dice
+   «di un altro» solo con una prova in mano. */
+function ordineDiUnAltroMazzoP2P(o, m){
+  if (!o || !m) return false;
+  const voce = p2pMieiOrdini && p2pMieiOrdini[o.id];
+  if (voce && voce.identita) return voce.identita !== m.pub;
+  if (!o.pubTrade) return false;
+  return !rigaDiQuestoMazzoP2P(o, m);
 }
 /* IL GESTO, per chi il posto non lo cede da solo: sta nel foglio del
    profilo — l'unico posto dove il profilo si guarda — e non e' il bivio
@@ -36234,7 +36267,16 @@ async function passaAlContoDalFoglioP2P(btn){
      il secondo tocco trova la sua guardia. */
   const ripristina = attesaRitardata(btn, 'Controllo i tuoi scambi…');
   let mossi = 0;
-  try { mossi = await rinfrescaScambiP2P(); } finally { ripristina(); }
+  try {
+    mossi = await rinfrescaScambiP2P();
+    /* ⚠️ E DI CHI SONO, che e' l'altra meta' (14 set 2026, il quarto
+       giro): a questo foglio ci si arriva anche da «I tuoi dati», senza
+       passare dalla vista P2P — e senza la restore il giudice ripiega
+       sulla DERIVAZIONE, che su una riga adottata storta dice proprio
+       la cosa sbagliata («e' tua»). Una domanda per sessione: il freno
+       sta dentro `chiediMieiOrdiniP2P`. */
+    if (!p2pMieiOrdini) await chiediMieiOrdiniP2P();
+  } catch(e){} finally { ripristina(); }
   if (mossi) renderP2P();
   if (scambiApertiP2P()) {
     toast('Hai uno scambio ancora aperto: finiscilo prima di cambiare profilo');
@@ -36249,8 +36291,12 @@ async function passaAlContoDalFoglioP2P(btn){
   await caricaNostrTools();
   const mio = mazzoMostro();
   const righe = ordiniP2P();
-  const offerte = Object.keys(righe).filter(k => offertaVivaP2P(righe[k])
-    && rigaDiQuestoMazzoP2P(righe[k], mio)).length;
+  /* SE NON SI SA DI CHI SONO NON SI DA' UN NUMERO: un avviso sbagliato
+     — e sette ordini altrui contati come propri lo erano — spaventa per
+     la ragione opposta a quella vera, ed e' peggio del silenzio. */
+  const offerte = !p2pMieiOrdini ? 0
+    : Object.keys(righe).filter(k => offertaVivaP2P(righe[k])
+        && !ordineDiUnAltroMazzoP2P(righe[k], mio)).length;
   chiediConferma({titolo: 'Usare il profilo del tuo account?',
     corpo: 'Da qui in poi pubblichi e scambi con il profilo legato al tuo '
       + 'account, lo stesso che hai sugli altri dispositivi.\n\nQuello nato '
@@ -39071,6 +39117,15 @@ async function chiamataOrdineP2P(o, azione, payload){
      spedire un messaggio che verrebbe scartato in silenzio */
   if (!idMostroVero(o.id))
     throw new Error('Questo ordine non risulta ancora registrato: aspetta un momento la risposta');
+  /* ⚠️ LA CINTURA DEL MAZZO (14 set 2026): questa e' la porta UNICA dei
+     gesti verso il coordinatore, e qui sotto la trade key si deriva dal
+     mazzo VIVO dando per scontato che l'ordine sia suo. Quando non lo
+     e' — una riga dell'altra identita', da quando le restore sono due —
+     il messaggio parte firmato da una chiave che quell'ordine non ha
+     mai visto: il coordinatore lo scarta senza rispondere, e il gesto
+     muore in silenzio. Meglio un errore che si legge. */
+  if (ordineDiUnAltroMazzoP2P(o, mz))
+    throw new Error('Questo ordine è di un altro profilo di scambio: da qui si guarda soltanto');
   const NT = window.NostrTools;
   const reput = !!(NT && NT.schnorr) && o.indice > 0;
   const conIndice = (azione === 'take-sell' || azione === 'take-buy' || azione === 'new-order');
