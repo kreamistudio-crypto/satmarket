@@ -2594,25 +2594,13 @@
     font:inherit;font-size:19px;font-weight:800;line-height:1;
     padding:8px 8px;cursor:pointer;border-radius:10px}
   .foglio-back.vuoto{visibility:hidden}
-  /* ⚠️ IL ‹ DELLA VIA INDIETRO E' PIU' GRANDE DEL ✕, e non e' un
-     capriccio di gusto ma una MISURA: a pari corpo quel glifo e'
-     molto piu' magro, e il bottone veniva 23px di larghezza contro
-     i 32 dell'uscita di casa — cioe' nello stesso posto un segno
-     piu' piccolo e un bersaglio piu' stretto. Il `min-width` lo
-     ripareggia al gemello e il corpo lo fa pesare uguale a
-     vedersi. SCOPED alla vista dello scambio: `.foglio-back` veste
-     le uscite di mezza app, e allargarle tutte sarebbe un ritocco
-     che nessuno ha chiesto. Vale anche per il GEMELLO invisibile,
-     o il titolo si scentrerebbe.
-     ⚠️ E L'ALTEZZA SI FISSA A 35, che e' quella dell'uscita di
-     casa: un glifo piu' grande alzerebbe la riga di cinque pixel,
-     e sarebbe il cappello a non essere piu' identico a quello
-     della sorella — che e' tutto il punto di riusarlo. Col
-     padding a zero il glifo si centra col flex invece che con lo
-     spazio attorno. */
-  #view-p2pordine .foglio-back{font-size:24px;min-width:32px;
-    height:35px;padding:0;display:flex;align-items:center;
-    justify-content:center}
+  /* ⚠️ E LA VISTA DELLO SCAMBIO NON HA PIU' UNA REGOLA SUA (set
+     2026): per un giro la sua uscita e' stata un ‹, che a pari corpo
+     e' molto piu' magro della ✕ — misurato, 23px di larghezza contro
+     32 — e per pareggiarlo al gemello ci volevano `min-width`,
+     `height` e il flex per ricentrarlo. Tre dichiarazioni su misura
+     per rifare una cosa che in casa esisteva gia': adesso li' c'e' la
+     ✕ dei fogli e questa regola non serve piu'. Niente CSS orfano. */
   /* IL PIEDE: LE DUE USCITE, SEMPRE A VISTA — e sono GEMELLE, che ci
      sono volute due cose (ritocco di Andrea, misurato dal vivo).
      1) `.btn.ghost` porta un `margin-top:10px` suo e sta PIU' IN BASSO
@@ -7289,19 +7277,27 @@ document.getElementById('cartello')?.remove();</script>
            pixel — il `.back` di prima stava SOPRA la `.sicu` e si
            portava dietro il suo margine — e la riga in cima e' una
            sola invece di due.
-           IL GLIFO E' IL ‹ DI CASA, il gemello del › che sulle card
-           dice «si entra»: qui rivolto a sinistra dice «si torna». Il
-           ← del bottone `.back` non torna perche' quello e' un
-           BOTTONE con la sua cornice, e sopra un cappello faceva due
-           cartelli dove ne basta uno. Le parole stanno in
-           `aria-label`: chi naviga a voce sente «Torna indietro».
+           IL GLIFO E' LA ✕ DEI FOGLI, la stessa identica — stesso
+           segno, stessa misura, stesso bersaglio — e ci sono voluti
+           DUE giri per arrivarci. Il ← del bottone `.back` non
+           tornava perche' quello e' un BOTTONE con la sua cornice, e
+           sopra un cappello faceva due cartelli dove ne basta uno; il
+           ‹ che l'aveva sostituito era troppo PICCOLO (deciso
+           guardandolo), e per pareggiarlo al gemello ci volevano tre
+           dichiarazioni su misura — un vestito nuovo per una cosa che
+           in casa esiste gia'. Con la ✕ non serve NIENTE: e'
+           `.foglio-back` e basta, come nel foglio del libro.
+           ⚠️ L'ETICHETTA RESTA «Torna indietro» e non «Chiudi» come
+           nel foglio, ed e' voluto: qui il gesto e' `navIndietro()` da
+           una PAGINA, non la chiusura di un foglio sopra il libro —
+           il glifo si riusa, la parola dice quel che succede.
            IL MARCHIO SE N'E' ANDATO, e con lui la sua regola CSS: la
            pagina si chiama col suo nome, come le sorelle. -->
       <div class="foglio-testa">
         <button type="button" class="foglio-back" onclick="navIndietro()"
-                title="Torna indietro" aria-label="Torna indietro">&#8249;</button>
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
         <h3>Nel dettaglio</h3>
-        <span class="foglio-back vuoto" aria-hidden="true">&#8249;</span>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
       </div>
       <div id="p2pOrdineCorpo"></div>
     </div>

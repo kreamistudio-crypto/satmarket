@@ -41760,25 +41760,31 @@ def prove_p2p_motore():
     prova("...e il marchio non c'e' piu', ne' lui ne' il suo vestito",
           [False, False],
           ["p2p-marchio" in _vista_nuda, "p2p-marchio" in mini])
-    # ⚠️ IL GLIFO E' IL ‹ DI CASA, il gemello del › che sulle card dice
-    # «si entra»: qui rivolto a sinistra dice «si torna». Le parole
-    # stanno in `aria-label` — chi naviga a voce sente «Torna
-    # indietro» — e il glifo e' un segno, non una scritta.
-    prova("la via indietro e' il ‹ di casa, e parla agli assistivi",
+    # ⚠️ IL GLIFO E' LA ✕ DEI FOGLI, la stessa identica (set 2026,
+    # ritocco di Andrea), e ci sono voluti DUE giri: il ← era un
+    # BOTTONE con la sua cornice, il ‹ che l'aveva sostituito era
+    # troppo piccolo — a pari corpo quel glifo e' molto piu' magro, e
+    # per pareggiarlo al gemello ci volevano tre dichiarazioni su
+    # misura. Con la ✕ non serve niente: `.foglio-back` e basta.
+    # ⚠️ E LA PROVA E' CHE LA VISTA NON ABBIA UNA REGOLA SUA: e' il
+    # modo di dire «stessa misura, stesso bersaglio» senza ribattere
+    # qui i numeri del vestito di casa — il giorno che qualcuno
+    # rimettesse un glifo che non ci sta, la regola su misura
+    # tornerebbe e questa riga lo direbbe.
+    prova("la via indietro e' la ✕ dei fogli, e parla agli assistivi",
           True,
-          'aria-label="Torna indietro">&#8249;</button>' in _vista_nuda
+          'aria-label="Torna indietro">&#10005;</button>' in _vista_nuda
           and "Torna</button>" not in _vista_nuda
-          and "←" not in _vista_nuda)
-    # ⚠️ E IL ‹ E' PIU' GRANDE DEL ✕, che e' una MISURA e non un gusto:
-    # a pari corpo quel glifo e' molto piu' magro, e il bottone veniva
-    # 23px di larghezza contro i 32 dell'uscita di casa. Il `min-width`
-    # lo ripareggia, l'altezza fissa tiene il cappello identico a
-    # quello della sorella (58px misurati, tutti e due), e la regola e'
-    # SCOPED — `.foglio-back` veste le uscite di mezza app.
-    _fb = pezzo_js(mini, "  #view-p2pordine .foglio-back{", "}")
-    prova("...e il ‹ pesa quanto il ✕, senza alzare la riga", True,
-          "font-size:24px" in _fb and "min-width:32px" in _fb
-          and "height:35px" in _fb)
+          and "←" not in _vista_nuda and "&#8249;" not in _vista_nuda)
+    prova("...e la vista non ha un vestito suo per l'uscita", False,
+          "#view-p2pordine .foglio-back" in mini)
+    # ⚠️ L'ETICHETTA RESTA «Torna indietro» e non «Chiudi» come nel
+    # foglio: qui il gesto e' `navIndietro()` da una PAGINA, non la
+    # chiusura di un foglio sopra il libro. Il glifo si riusa, la
+    # parola dice quel che succede.
+    prova("...e l'etichetta dice il gesto, non il foglio", True,
+          'aria-label="Torna indietro"' in _vista_nuda
+          and 'aria-label="Chiudi"' not in _vista_nuda)
     prova("lo stato si dice sulla superficie neutra", True,
           '"trust-note nota-scambio"' in cod)
 
