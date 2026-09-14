@@ -13918,6 +13918,141 @@ oggi gli dicono «il tuo wallet non ha risposto come doveva» mentre il
 suo wallet non è mai stato nemmeno raggiunto. Sono la stessa famiglia di
 bugie della notifica del 14 settembre, e vanno chiuse insieme.
 
+
+## Il ritentativo, le parole, e il conto di cassa (set 2026)
+
+La seconda metà del cantiere B, e chiude la famiglia di bugie aperta il
+14 settembre: non basta smettere di dichiarare un pagamento che non è
+uscito — bisogna anche **riprovarci**, e **dirlo con parole vere** a chi
+aspetta i soldi.
+
+### Il backoff, senza un timbro nuovo
+
+`payout_stato` non guadagna un quinto valore: **`da_riprovare` cambia
+invariante**, e diventa «nessuna fattura è mai stata pagata, quindi
+riconiare è sicuro». A quell'invariante si arriva per **due strade**, e
+la cosa bella è che sono ugualmente solide per ragioni diverse: il
+quarto esito (non si è potuto CHIEDERE — nessun sat si è mosso) e un
+fallimento **confermato** da LNbits (si è chiesto, la risposta è stata un
+no definitivo, nessuna preimage). Un quinto valore avrebbe significato
+una parola nuova accanto a una quasi identica, che è la trappola del
+doppio significato già pagata con «lampo», «attesa» e «nota».
+
+**LA CADENZA È 5 min / 30 min / 2 ore / 6 ore / 24 ore**, cinque
+tentativi in circa 33 ore — dentro i 60 giorni di vita di una fattura con
+abbondanza. Il numero viene dalla natura del guasto: una rotta Lightning
+che non c'è torna a esserci in **ore** — un canale che si riequilibra, un
+telefono che si ricollega — non in secondi. Ritentare ogni minuto
+sarebbe bussare venti volte alla stessa porta chiusa; ritentare una volta
+sola sprecherebbe il caso più comune di tutti.
+
+⚠️ **E `_quando_ritentare` CON `ultimo` A ZERO TORNA ZERO**, che è la riga
+che tiene intatto il comportamento di ieri: sulla strada del quarto
+esito il nodo non è mai stato toccato, quindi `_timbra_pagamento` non
+scrive nessun `payout_ultimo` e non c'è niente da aspettare. **Il backoff
+morde SOLO dove un tentativo vero è stato fatto ed è fallito.** È il
+motivo per cui nessuna prova esistente si è rotta.
+
+**SI RITENTA SOLO COL LIGHTNING ADDRESS**, e non è una preferenza: una
+bolt11 già fallita non si ripaga — a chiederlo due volte torna l'eco del
+record vecchio — mentre ogni conio da un address produce un payment hash
+**nuovo**. Il tetto sale da 3 a 5 (`MAX_TENTATIVI_PAYOUT`), per combaciare
+coi cinque passi della scala.
+
+**LE DUE TRAPPOLE TROVATE SCRIVENDO**, che valgono più del disegno.
+La prima: il giro **cancellava il timbro dopo ogni passata** — era lo
+spazzino del proprio timbro, giusto finché il timbro nasceva una volta
+sola. Col ritentativo avrebbe spento il backoff **al primo fallimento**,
+cioè esattamente dove serve. Ora l'uscita dichiara `ritenta` e il giro
+lascia stare.
+La seconda, più insidiosa: una riga rinviata finiva nel conto dei
+**«rimasti»**, che è quello che fa suonare l'avviso giornaliero — il cui
+testo dice «non riusciamo a farci leggere le fatture da LNbits, quindi
+**non è partito niente**». Su una riga dove qualcosa era partito ed era
+fallito, sarebbe stato falso due volte: la stessa classe del difetto che
+questo cantiere esiste per chiudere, reintrodotta dalla sua cura. I
+rinviati si contano a parte.
+
+### Le parole
+
+Ce n'era **una sola per quattro situazioni diverse**, e diceva «il tuo
+wallet non ha risposto come doveva». Su un fallimento di rotta è falsa
+due volte: il wallet non ha risposto male, **non è mai stato RAGGIUNTO** —
+e la colpa cadeva addosso a chi aspettava i soldi, che è il rovescio
+esatto di quel che era successo. È la stessa famiglia del «✅ Ordine
+concluso» su un pagamento mai uscito: si dichiara un fatto che non si è
+verificato.
+
+Al suo posto **quattro casi**, distinti dal taccuino e non indovinati:
+- **ci riproviamo noi** — i sats sono suoi, dove stanno, ci pensiamo noi,
+  e l'unico gesto che aiuta davvero (i wallet che vivono su un telefono
+  si fanno raggiungere solo da svegli). ⚠️ **Non gli si chiede di fare
+  niente**, ed è la riga più importante: mentre una macchina sta già
+  agendo, un invito ad agire produce due fatture e nessuna certezza. E
+  **non promette un tempo**, perché non lo sappiamo: «nelle prossime ore»
+  è il massimo che si può dire restando veri.
+- **la resa** — esauriti i tentativi, adesso l'invito ad agire è giusto,
+  perché da soli non abbiamo più niente da tentare.
+- **la fattura bruciata** — il «**nuova**» in grassetto è il pezzo
+  operativo: senza, andrebbe a incollare la stessa, che LNbits non
+  pagherà mai.
+- **il pagamento mai partito** — qui **non si dichiara un fallimento**,
+  perché non è stato osservato. È la disciplina del cantiere A applicata
+  alle parole.
+
+E una quinta riga, ai moderatori: l'avviso del rimborso sblocco diceva
+«il pagamento automatico **non è partito**» anche quando era partito ed
+era fallito. Sono due guasti diversi, e chi modera deve distinguerli al
+primo sguardo.
+
+⚠️ **LA SENTINELLA DELLE PAROLE HA DOVUTO IMPARARE A NON LEGGERE LA
+PROSA**, terza volta in tre giorni: la docstring della frase nuova CITA
+quella vecchia per dire perché se n'è andata, quindi una sentinella che
+cercasse nel file intero diventerebbe rossa **per colpa della
+spiegazione**. Guarda `codice(_senza_prosa(pezzo("_sblocca_sats")))`.
+
+### Il conto di cassa
+
+Il controllo **23** del libro mastro, e nasce da una domanda a cui il 14
+settembre non c'era modo di rispondere: **quanti sats dovrebbero esserci
+adesso nel wallet?** Non un elenco paginato di cui non conosciamo
+l'ordine — un numero. Il controllo calcola l'atteso voce per voce
+(escrow degli ordini, versamenti d'asta, incassi nostri, meno le quattro
+uscite) e il confronto col saldo vero lo fa una persona, perché quel
+saldo non sta nel database ma dietro `GET /api/v1/wallet`.
+
+**COME SI LEGGE LO SCARTO** è metà del controllo: poco **sotto** è
+normale, sono le commissioni di routing, che escono davvero dal wallet e
+non sono registrate da nessuna parte (misurate: 179 sats su 67.672, lo
+0,26%). **Sopra** è l'allarme — vuol dire che sats dati per pagati sono
+ancora qui, cioè la forma esatta del guasto del 149.
+
+**E DICHIARA LE TRE COSE CHE NON SA**, perché chi legge non ci inciampi:
+la **commissione non è fotografata** sull'ordine, quindi il netto si
+ricalcola con la leva di oggi e il giorno che `COMMISSIONE_PERCENTO`
+cambia questo numero sbanda (oggi è 0 e il netto è prezzo − protezione);
+gli **ordini nati da un'asta** non hanno pagato una fattura loro — i sats
+erano già in cassa dai `rilanci` — quindi si escludono guardando
+`annunci.asta_base_sats`, o si conterebbero due volte; e le **fatture
+create e mai pagate** non c'entrano, perché non è mai arrivato niente.
+
+Sul database di sviluppo: 622.050 entrati, 135.000 usciti, **atteso
+487.050**. Il file intero gira senza errori.
+
+**9882 verdi**, 0 rosse (+28 fra backoff, giro e parole); i sei collaudi
+che toccano i pagamenti tutti verdi.
+
+### Cosa chiude, e cosa no
+
+Con questo la catena del 14 settembre è chiusa da capo a fondo: si legge
+l'esito vero, si riconosce l'eco, si risolve da soli quel che è in volo,
+si ritenta quel che può ancora riuscire, e si dice la verità a chi
+aspetta. ⚠️ **Resta un caso che nessuno ha ancora provato sul campo**: il
+backoff non è mai scattato per davvero — le cinque tappe girano al banco,
+non su un nodo vero. Si proverà da sé alla prima rotta che manca, e il
+giorno che succede la cosa da guardare è se i cinque passi bastano o se
+il caso comune si risolve già al primo.
+
 ## Il foglio che non si zoomava, e 81px di cappello sopra la nav (14 set 2026)
 
 Segnalazione di Andrea: **Aspetto → «Quanto grande si legge Barattolo»

@@ -132,6 +132,40 @@
   proprio punto cieco: le righe pagate dal Lightning address non hanno
   una fattura in colonna. Il perché per intero sta in CANTIERI, alla
   voce «Il pagamento in volo: togliere l'uomo dalla catena».
+  IL RITENTATIVO E LE PAROLE (set 2026, cantiere B2). `da_riprovare` NON
+  ha un gemello nuovo: cambia invariante e diventa «nessuna fattura è
+  mai stata pagata, quindi riconiare è sicuro», a cui si arriva per due
+  strade ugualmente solide — il quarto esito (non si è chiesto) e un
+  fallimento CONFERMATO (si è chiesto, no definitivo, nessuna preimage).
+  `BACKOFF_PAYOUT` è 5 min / 30 min / 2 ore / 6 ore / 24 ore e
+  `MAX_TENTATIVI_PAYOUT` sale a 5; `_quando_ritentare(tentativi, ultimo)`
+  con `ultimo` a zero torna ZERO, ed è la riga che lascia intatto il
+  comportamento del quarto esito — lì il nodo non è mai stato toccato, e
+  il backoff morde solo dove un tentativo vero è fallito. Si ritenta SOLO
+  col Lightning address, perché una bolt11 già fallita non si ripaga (la
+  dedup di LNbits restituisce l'eco) mentre ogni conio da un address ha
+  un hash nuovo. Due righe da non ammorbidire in
+  `riprova_pagamenti_sospesi`: il timbro NON si cancella quando l'uscita
+  dichiara `ritenta` (cancellarlo spegnerebbe il backoff al primo
+  fallimento), e i rinviati si contano a parte dai «rimasti», o l'avviso
+  giornaliero direbbe «non è partito niente» su una riga dove qualcosa
+  era partito ed era fallito. LE PAROLE: al posto dell'unica frase che
+  diceva «il tuo wallet non ha risposto come doveva» — falsa due volte su
+  un fallimento di rotta — quattro casi distinti dal taccuino: ci
+  riproviamo noi (e non gli si chiede di fare NIENTE, perché un invito ad
+  agire mentre una macchina agisce produce due fatture), la resa, la
+  fattura bruciata (dice «una NUOVA», o incollerebbe la stessa), e il
+  pagamento mai partito (che non dichiara un fallimento non osservato).
+  `_msg_ritentiamo` è una sola, usata dalle tre uscite che parlano a un
+  utente. IL CONTO DI CASSA è il controllo 23 di `query_libro_mastro.sql`:
+  calcola quanti sats DOVREBBERO esserci nel wallet, voce per voce; il
+  confronto col saldo vero (GET /api/v1/wallet) lo fa una persona. Poco
+  sotto = routing; SOPRA = sats dati per pagati ancora in cassa, la forma
+  del guasto del 149. Dichiara le tre cose che non sa: la commissione non
+  fotografata sull'ordine, gli ordini nati da un'asta (i cui sats erano
+  già in cassa dai `rilanci`), e le fatture create e mai pagate. Il perché
+  per intero sta in CANTIERI, alla voce «Il ritentativo, le parole, e il
+  conto di cassa».
   I TRE ESITI storici (ago 2026, la voce media
   più grave dell'audit): PAGATO, NON_PAGATO e **INCERTO**. La POST
   verso LNbits stava senza `try`: se il nodo pagava ma non riusciva a
