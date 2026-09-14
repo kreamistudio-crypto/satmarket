@@ -13405,3 +13405,58 @@ uno scambio), e il giro a commissione ignota dove non si promette e non
 si sbarra. Nel banco della card la cifra del coordinatore adesso è
 `≈ 9899` invece di `9999`, cioè lo stesso numero che la pagina dello
 scambio mostra per la stessa riga.
+
+## «Vuoi vendere», e la freccetta che dice che si entra (14 set 2026)
+
+Due ritocchi alle card di «I miei scambi», chiesti da Andrea.
+
+**LA PRIMA RIGA DICE UN'INTENZIONE, non un'azione in corso.** «Stai
+vendendo ≈ 7.034 sats» è diventato «**Vuoi vendere** ≈ 7.034 sats». Il
+gerundio raccontava qualcosa che sta succedendo *adesso* anche
+sull'ordine appena pubblicato, dove non sta succedendo niente: nel
+libro non l'ha preso nessuno, e quel che c'è è una **voglia**. «Vuoi»
+regge invece su tutti gli stati della lista, dal pubblicato al
+concluso — ed è la prova che serve a una frase che sta in cima a *ogni*
+card. La seconda riga non si tocca: «per ricevere 5,00 €» e «pagando
+5,00 €» restano i due verbi che non si possono confondere.
+
+**E ADESSO LE DUE SUPERFICI NON CONDIVIDONO PIÙ NEMMENO IL VERBO.**
+`vogliaLatoP2P` è **sorella** di `fraseLatoP2P`, non un suo ramo con un
+interruttore: la card della lista e il cappello del foglio del libro
+(«Stai comprando sats», che lì è giusto — quello scambio si sta
+facendo) sono due frasi per due momenti, e tenerle in una funzione sola
+vorrebbe dire che il giorno che una cambia si trascina l'altra. ⚠️ **Quel
+che resta condiviso è la TABELLA DEL LATO**, e c'è la prova: tutte e due
+leggono `sell` come «chi legge riceve sats». Se una delle due si
+girasse, le due superfici direbbero il contrario l'una dell'altra sullo
+stesso ordine.
+
+**LA FRECCETTA: la card era `role="button"` e non lo diceva a nessuno.**
+In un elenco dove ogni riga porta un riquadro di stato e una scatola
+del metodo, il tocco si scopriva provando. Adesso c'è il **›** di casa —
+lo stesso della riga della classifica (`.cl-fr`): stesso glifo, stesso
+corpo, stesso `--muted` — e la prova lo confronta **con la sorella**
+invece di ribatterne i valori, così un ritocco fatto là e non qui lo
+dice una rossa.
+
+**È ANCORATA, e il posto glielo fa la card.** Le righe sono blocchi a
+tutta larghezza — il riquadro dello stato e la scatola del metodo hanno
+un bordo — quindi in fila la freccetta sarebbe finita *sotto* di loro
+invece che al fianco; in assoluto sta a metà altezza, e senza un
+padding destro si siederebbe *sopra* quei bordi. Quindi
+`padding-right:30px` sulla card (14 di padding + 16 di corridoio).
+`aria-hidden`, perché è un **segno**: che si entri lo dice già il
+`role`, e farla leggere a voce sarebbe rumore — la stessa regola della
+manina di «tocca a te».
+
+**MISURATO a 375 e a 320**, che è quel che il verbale di `.p2p-x`
+chiedeva a chiunque avesse rimesso un secondo pezzo nella card: la
+freccetta sta a **11px** dal bordo della card e ha **14px** d'aria sia
+dalla prima riga sia dal riquadro dello stato; la **✕** degli stati
+finali si sposta a sinistra col padding e resta a **31px** dal bordo,
+con almeno **27px** di vuoto verticale fra le due (a 320 sono 39).
+Nessuno scorrimento orizzontale: `scrollWidth` 320 su viewport 320,
+card da 16 a 304. Guardata su cinque casi — pubblicato, col premio, con
+«tocca a te», annullato con la ✕, e la card più corta che esista.
+
+**9770 verdi**, 0 rosse.

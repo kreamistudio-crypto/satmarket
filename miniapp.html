@@ -2291,6 +2291,26 @@
      ROVESCIA la domanda e certifica che la cifra non ci sia. */
   .p2p-scambio-lato{font-family:'Baloo 2',sans-serif;font-weight:800;
     font-size:17px;color:var(--ink)}
+  /* LA FRECCETTA DEL TOCCO (set 2026, richiesta di Andrea): il › di
+     casa, quello della riga della classifica (`.cl-fr`) — stesso
+     glifo, stesso corpo, stesso `--muted`. Non e' un bottone e non ha
+     un bersaglio suo: a essere toccabile e' la CARD intera, e lei la
+     dice.
+     ⚠️ IL POSTO GLIELO FA LA CARD, con un padding destro suo: senza,
+     la freccetta si siederebbe SOPRA il bordo del riquadro dello
+     stato e della scatola del metodo, che sono larghi quanto il
+     contenuto. 30 = 14 di padding + 16 di corridoio, e la ✕ degli
+     stati finali si sposta a sinistra con lui — MISURATO a 320 e a
+     375, che il verbale di `.p2p-x` chiedeva di rimisurare a chi ci
+     avesse rimesso un secondo pezzo: i numeri stanno in CANTIERI.
+     ⚠️ E `top:50%` VUOLE `position:relative` SULLA CARD: ce l'ha gia'
+     `.p2p-ord` per l'anello del libro, e questa regola ci si appoggia
+     — se un domani quella riga sparisse, la freccetta scapperebbe in
+     cima alla pagina. */
+  .p2p-ord.p2p-scambio{padding-right:30px}
+  .p2p-scambio .p2p-fr{position:absolute;right:10px;top:50%;
+    transform:translateY(-50%);color:var(--muted);font-size:20px;
+    line-height:1}
   /* I SATS SONO LA CIFRA IN EVIDENZA (set 2026, terzo ridisegno): il
      mono e l'arancio se li porta `.p2p-sats`, qui si alza la taglia e
      basta. UN GRADINO SOTTO al Baloo che gli sta attorno, non pari:
@@ -36138,6 +36158,26 @@ function verboLatoP2P(o){
 function fraseLatoP2P(o){
   return 'Stai ' + verboLatoP2P(o) + ' sats';
 }
+/* ...e la VOGLIA, che e' la frase della card di «I miei scambi» (set
+   2026, ritocco di Andrea): «Vuoi vendere ≈ 7.034 sats» al posto di
+   «Stai vendendo». Il gerundio raccontava un'azione IN CORSO anche
+   sull'ordine appena pubblicato, dove in corso non c'e' ancora
+   niente — nel libro non l'ha preso nessuno, e quel che c'e' e'
+   un'INTENZIONE. «Vuoi» regge su tutti gli stati della lista, dal
+   pubblicato al concluso, che e' la prova che serve a una frase che
+   sta in cima a ogni card.
+   ⚠️ SORELLA DI `fraseLatoP2P` E NON UN SUO PARAMETRO: sono due frasi
+   in due posti diversi, e il cappello del foglio del LIBRO — dove lo
+   scambio si sta davvero facendo — resta «Stai comprando sats». Un
+   interruttore dentro una funzione sola le terrebbe legate, e il
+   giorno che una cambia si trascina l'altra.
+   ⚠️ E IL LATO E' QUELLO DEL LIBRO: `comeLibroP2P` traduce prima, e
+   `sell` vuol dire che chi legge RICEVE sats — la stessa tabella di
+   `verboLatoP2P`, o le due frasi direbbero il contrario l'una
+   dell'altra. */
+function vogliaLatoP2P(o){
+  return o.lato === 'sell' ? 'Vuoi comprare' : 'Vuoi vendere';
+}
 /* IL GIUDICE DELL'AFFARE, uno per tutti: la formula uniforme di
    get_market_quote verificata sui byte (`sats -= premium/100 * sats`),
    per cui un premio positivo assottiglia SEMPRE i sats — chi compra ne
@@ -42539,7 +42579,7 @@ function rigaScambioP2P(o){
        ⚠️ A CAMBIO MUTO LA FRASE RESTA IN PIEDI: senza cifra si legge
        «Stai vendendo sats», che e' esattamente la frase di ieri — un
        ripiego che non sembra un ripiego. Mai un numero inventato. */
-    + '<div class="p2p-scambio-lato">Stai ' + esc(verboLatoP2P(l)) + ' '
+    + '<div class="p2p-scambio-lato">' + esc(vogliaLatoP2P(l)) + ' '
     + (sats ? '<span class="p2p-sats">' + esc(sats) + '</span>' : 'sats')
     + '</div>'
     /* ...E LA SECONDA DICE COSA SI DA' E COSA SI OTTIENE, con due verbi
@@ -42565,6 +42605,20 @@ function rigaScambioP2P(o){
        si scrive proprio: una `.p2p-meta` vuota lascerebbe un respiro
        che non separa niente. */
     + (via ? '<div class="p2p-meta">' + via + '</div>' : '')
+    /* LA FRECCETTA CHE DICE «SI ENTRA» (set 2026, richiesta di
+       Andrea): la card e' gia' `role="button"`, ma niente lo faceva
+       VEDERE — in un elenco dove ogni riga porta riquadri e scatole,
+       il tocco si scopriva provando. E' il › di casa, lo stesso della
+       riga della classifica: stesso glifo, stessa taglia, stesso
+       grigio muto.
+       ⚠️ ULTIMA nel markup e ANCORATA nel CSS: le righe della card
+       sono blocchi a tutta larghezza — il riquadro dello stato e la
+       scatola del metodo hanno un bordo — quindi in fila finirebbe
+       sotto di loro invece che accanto. `aria-hidden` perche' e' un
+       SEGNO: che si entri lo dice gia' il `role="button"`, e farlo
+       leggere a voce aggiungerebbe rumore senza aggiungere niente —
+       la stessa regola della manina di «tocca a te». */
+    + '<span class="p2p-fr" aria-hidden="true">›</span>'
     + '</div>';
 }
 

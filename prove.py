@@ -41722,6 +41722,7 @@ def prove_p2p_motore():
             "function nettoLatoP2P(o, sats){",
             "function verboLatoP2P(o){",
             "function fraseLatoP2P(o){",
+            "function vogliaLatoP2P(o){",
             "function affareP2P(o){",
             "function badgePremioP2P(o){",
             "function premioTestoP2P(n){",
@@ -47604,8 +47605,8 @@ def prove_p2p_card_scambio():
           rs.index("satsScambioP2P(o)") < rs.index("euroTestoP2P(o)")
           and 'class="p2p-sats"' in rs)
     # ⚠️ E SENZA CIFRA LA FRASE RESTA IN PIEDI: a cambio muto si legge
-    # «Stai vendendo sats», che e' esattamente la frase di ieri — un
-    # ripiego che non sembra un ripiego. Mai un numero inventato.
+    # «Vuoi vendere sats», che e' la frase senza la cifra — un ripiego
+    # che non sembra un ripiego. Mai un numero inventato.
     prova("...e senza cifra la frase regge lo stesso", True,
           ": 'sats')" in rs)
     # IL PUNTINO E' MORTO col terzo ridisegno: le due cifre non stanno
@@ -47664,19 +47665,38 @@ def prove_p2p_card_scambio():
     # del cursore del filtro: il «−» tipografico sta in un posto solo.
     prova("il segno del premio viene da premioTestoP2P", True,
           "premioTestoP2P(o.premium)" in _mio)
-    # ⚠️ ADESSO A ESSERE CONDIVISO E' IL VERBO, non la frase intera: la
-    # card dice «Stai vendendo ≈ 7 034 sats» e il cappello del
-    # dettaglio «Stai vendendo sats», quindi la coda cambia e il verbo
-    # no. E' la stessa mossa del badge — due lettori, due frasi, un
-    # pezzo solo in mezzo — e tiene fermo quel che conta: che
-    # «comprando» e «vendendo» si decidano in un posto solo.
-    prova("il verbo del lato lo chiamano la card e il cappello", True,
-          "verboLatoP2P(l)" in rs
+    # ⚠️ E ADESSO NON SI CONDIVIDE NEMMENO IL VERBO (set 2026, ritocco
+    # di Andrea): la card dice «Vuoi vendere ≈ 7 034 sats» e il
+    # cappello del foglio del libro «Stai vendendo sats». Sono due
+    # frasi per due momenti diversi — nella lista c'e' un'INTENZIONE
+    # (l'ordine puo' essere appena pubblicato e non averlo preso
+    # nessuno), nel foglio c'e' uno scambio che si sta facendo — e
+    # tenerle in una funzione sola con un interruttore vorrebbe dire
+    # che il giorno che una cambia si trascina l'altra.
+    # ⚠️ QUEL CHE RESTA CONDIVISO E' LA TABELLA DEL LATO, ed e' la
+    # cosa da non perdere: tutt'e due leggono `sell` come «chi legge
+    # riceve sats». Se una delle due si girasse, le due superfici
+    # direbbero il contrario l'una dell'altra sullo stesso ordine.
+    _vo = pezzo_js(mini, "function vogliaLatoP2P(o){", "\n}\n")
+    prova("la card dice la VOGLIA, il cappello l'azione in corso", True,
+          "vogliaLatoP2P(l)" in rs
           and "verboLatoP2P(o)" in pezzo_js(
               mini, "function fraseLatoP2P(o){", "\n}\n")
           and "fraseLatoP2P(o)" in rd)
-    prova("...e la card non ripete la frase intera", False,
-          "fraseLatoP2P(" in rs)
+    prova("...e sono due frasi intere, non un verbo con due code", True,
+          "'Vuoi comprare' : 'Vuoi vendere'" in _vo
+          and "verboLatoP2P" not in _vo)
+    prova("...ma la tabella del lato e' la stessa", True,
+          "o.lato === 'sell' ?" in _vo
+          and "o.lato === 'sell' ?" in pezzo_js(
+              mini, "function verboLatoP2P(o){", "\n}\n"))
+    prova("...e la card non chiama piu' ne' il verbo ne' la frase",
+          [False, False],
+          ["verboLatoP2P(" in rs, "fraseLatoP2P(" in rs])
+    # ...e il cappello del libro NON e' cambiato: li' lo scambio si sta
+    # davvero facendo, e «Stai» e' la parola giusta
+    prova("il cappello del foglio del libro resta «Stai»", True,
+          "return 'Stai ' + verboLatoP2P(o) + ' sats';" in mini)
     # ⚠️ SI CONTANO FRAMMENTI CHE SOLO IL CODICE PUO' CONTENERE, e non
     # le parole nel sorgente ripulito dai commenti. Due ragioni, e la
     # seconda e' un difetto misurato: i commenti CITANO le stesure
@@ -47772,6 +47792,8 @@ def prove_p2p_card_scambio():
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function verboLatoP2P(o){",
         "function fraseLatoP2P(o){",
+        # la frase della card, sorella del cappello e non un suo ramo
+        "function vogliaLatoP2P(o){",
         "function affareP2P(o){",
         "function premioTestoP2P(n){",
         "function premioMioP2P(o){",
@@ -47925,8 +47947,60 @@ console.log(JSON.stringify(out));
     # LA PRIMA RIGA DICE DA CHE PARTE STAI E QUANTI SATS, che e' la
     # cifra che si va a cercare scorrendo i propri scambi.
     prova("la prima riga dice il lato e i sats", [True, True],
-          ['Stai comprando <span class="p2p-sats">' in o["compro"],
-           'Stai vendendo <span class="p2p-sats">' in o["vendo"]])
+          ['Vuoi comprare <span class="p2p-sats">' in o["compro"],
+           'Vuoi vendere <span class="p2p-sats">' in o["vendo"]])
+    # ...e il gerundio non e' rimasto da nessuna parte nella card
+    prova("...e il gerundio se n'e' andato dalla lista", [False, False],
+          ["Stai comprando" in o["compro"], "Stai vendendo" in o["vendo"]])
+
+    # ══ LA FRECCETTA CHE DICE «SI ENTRA» (set 2026, richiesta di
+    # Andrea) ══ La card e' `role="button"` da sempre, ma niente lo
+    # faceva VEDERE: in un elenco dove ogni riga porta riquadri e
+    # scatole, il tocco si scopriva provando. E' il › di casa —
+    # quello della riga della classifica — e non un glifo nuovo.
+    prova("ogni card porta la sua freccetta, una sola",
+          [1, 1, 1], [o["compro"].count('class="p2p-fr"'),
+                      o["vendo"].count('class="p2p-fr"'),
+                      o["finale"].count('class="p2p-fr"')])
+    # ⚠️ ULTIMA nel markup: le righe della card sono blocchi a tutta
+    # larghezza, quindi in fila finirebbe SOTTO di loro — e' il CSS a
+    # portarla al fianco. Si guarda che stia dopo tutto il resto.
+    prova("...e sta in fondo, dopo la ✕ degli stati finali", True,
+          o["finale"].rstrip().endswith(
+              '<span class="p2p-fr" aria-hidden="true">›</span></div>')
+          and o["finale"].index("p2p-x") < o["finale"].index("p2p-fr"))
+    # ⚠️ E' UN SEGNO, NON UNA PAROLA: che si entri lo dice gia' il
+    # `role="button"`, e farla leggere a voce aggiungerebbe rumore —
+    # la stessa regola della manina di «tocca a te».
+    prova("...e non si fa leggere a voce", True,
+          '<span class="p2p-fr" aria-hidden="true">›</span>' in o["compro"])
+    # ⚠️ IL GLIFO E IL VESTITO SONO QUELLI DI CASA, e si confrontano
+    # con la sorella invece di ribatterne i valori: `.cl-fr` e' la
+    # freccetta della classifica, e se un domani la si ritocca la' e
+    # non qui questa prova lo dice.
+    _fr = pezzo_js(mini, "  .p2p-scambio .p2p-fr{", "}")
+    _cl = pezzo_js(mini, "  .cl-fr{", "}")
+    prova("la freccetta veste come quella della classifica", True,
+          "color:var(--muted)" in _fr and "color:var(--muted)" in _cl
+          and "font-size:20px" in _fr and "font-size:20px" in _cl
+          and "line-height:1" in _fr)
+    # ⚠️ ANCORATA, e il posto glielo fa la CARD: senza il padding
+    # destro si siederebbe sopra il bordo del riquadro dello stato e
+    # della scatola del metodo, che sono larghi quanto il contenuto.
+    # MISURATO a 375 e a 320 (le due larghezze di casa): la freccetta
+    # sta a 11px dal bordo della card e ha 14px d'aria dalla prima
+    # riga e dal riquadro dello stato; la ✕ degli stati finali si
+    # sposta con lei e resta a 31px dal bordo, con almeno 27px di
+    # vuoto fra le due.
+    prova("...e sta ancorata a meta' altezza, col posto che le fa la card",
+          True,
+          "position:absolute" in _fr and "right:10px" in _fr
+          and "top:50%" in _fr and "translateY(-50%)" in _fr
+          and ".p2p-ord.p2p-scambio{padding-right:30px}" in mini)
+    # ...e l'ancora regge solo se la card e' un riferimento: `.p2p-ord`
+    # ce l'ha gia' per l'anello del libro, e questa ci si appoggia
+    prova("...e la card resta il riferimento dell'ancora", True,
+          "position:relative" in pezzo_js(mini, ".p2p-ord{", "}"))
     # ⚠️ ...E LA SECONDA DICE COSA SI DA' E COSA SI OTTIENE, con due
     # verbi DIVERSI: le due card stanno una sotto l'altra nello stesso
     # elenco, e uno stesso «per» su tutt'e due farebbe completare
