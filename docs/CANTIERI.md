@@ -11168,3 +11168,109 @@ di un altro mazzo, la riparazione che non guarda se la chiave è già
 giusta, quella che tocca anche le finite, l'avviso che torna a contare
 gli ordini di tutti, «di questo mazzo» ridotto a un campo, e la riga
 senza indice presa per sua.
+
+## IL TERZO SILENZIO ERA LA TELA (set 2026)
+
+Il cantiere del GPS era partito da un sintomo che non spiegava:
+«tolgo i metadati e la foto non si vede più». Chiuso quello, il
+sintomo è rimasto, e il primo colpo di scena è arrivato dal database:
+l'annuncio **354** ha la colonna `foto` **vuota**. Non un file
+mancante sul disco — una foto **mai salvata**.
+
+**Il `[]` chiude quasi tutte le porte da solo.** Spiega anche il
+segnaposto che Andrea vedeva: la card disegna l'emoji della categoria
+quando l'annuncio non ha nessuna foto, quindi non era un'immagine
+rotta ma un annuncio senza foto, disegnato come previsto. E dice che
+`salva_foto` non ha scartato niente: uno scarto avrebbe portato
+`foto_scarti` fino al toast di conferma. Resta una sola strada: al
+momento di «Pubblica» `sellFoto` era già vuota. E non è la fretta —
+c'è una guardia che blocca la pubblicazione finché un chip sta ancora
+caricando.
+
+**Lo strumento è Fossify Gallery** (F-Droid), da smartphone. Non
+ricomprime: azzera i valori dei tag lasciando in piedi il blocco EXIF
+e i pixel originali. Il file che ne esce è un JPEG sano —
+**3.498.244 byte, 4080×3060**, orientamento 1, Pillow lo apre senza
+fiatare.
+
+**LA VERIFICA SUI BYTE HA ROVESCIATO LA DOMANDA.** «Qual è il limite
+oltre il quale il ramo nativo molla, e perché non emette un avviso?»
+La risposta è che **quel limite non esiste e quel ramo non era muto**:
+nel nostro codice non c'è nessun tetto di pixel, l'unico tetto di byte
+(15MB) stava DENTRO il ramo di fallimento e su 3,3 MB non scattava
+mai, e il ramo `nativo` un toast lo faceva — «*«nome.jpg» non è una
+foto che riesco a leggere*». Se nessuno ha visto niente, il silenzio
+era **altrove**.
+
+**E stava nella tela.** Tre modi, tutti e tre veri e nessuno dei tre
+sorvegliato: 1) `onload` che parla con `naturalWidth` a zero (certe
+WebView chiamano il callback prima di avere i pixel) — il canvas nasce
+0x0 e `toDataURL` torna `data:,`, una stringa che SEMBRA una foto ed
+entrava in `sellFoto` così com'era; 2) `toDataURL` che torna una
+stringa vuota o monca quando la memoria non basta; 3) — ed è quello
+che combacia col caso — **`toDataURL` che SOLLEVA**: l'eccezione
+usciva da `onload` **col watchdog già disarmato** (la prima riga del
+ramo è `clearTimeout`), quindi la Promise di `ridimensiona` non si
+risolveva mai. Chip «Carico la foto…» eterno, Pubblica che risponde
+«un attimo, sto ancora caricando», e quel chip **non ha nemmeno la ✕**
+per toglierlo: l'unica uscita è lasciare il form, che azzera
+`sellFoto` — e da lì si pubblica un annuncio senza foto, senza che
+nessuno abbia detto niente. Silenzio completo, dall'inizio alla fine.
+
+**LA CURA NON È UN RAMO IN PIÙ, È UNA BOCCA SOLA.** `ridimensiona`
+smette di parlare e comincia a **rispondere**: `{foto}` oppure
+`{motivo}`. A dire il no è il chiamante — `aggiungiFoto` per gli
+annunci, il chip per il banner, il toast per il badge — e il `||` di
+scorta copre anche il rifiuto che qualcuno un domani dimenticasse di
+motivare. Prima la promessa dipendeva dal fatto che OGNI ramo si
+ricordasse di parlare; adesso è di struttura, e tre sentinelle la
+tengono lì (nessun `toast(` dentro le tre funzioni della filiera, il
+motivo di scorta nel chiamante, i tre chiamanti che leggono `.foto`).
+
+**E IL RIPIEGO DEL SERVER VALE PER TUTTI I FORMATI.** Era scritto nel
+codice, in un commento lungo e sicuro di sé: «il browser JPEG, PNG,
+WebP e GIF li sa leggere: se ha detto di no, il file non è quello che
+il suo nome promette oppure è rovinato». **È falso**, e questo caso lo
+dimostra: un JPEG sano da 12 Mpx può non decodificarsi dentro una
+WebView a corto di memoria — decodificarlo vuol dire ~50 MB di bitmap
+— e lo stesso file Pillow lo apre senza fiatare. Rifiutarlo nel client
+voleva dire dare del rotto a una foto buona, e dirlo a chi non poteva
+farci niente. Adesso ogni strada che non arriva a un JPEG **chiede al
+server**: decode fallito, tela muta, e anche il **watchdog scaduto** —
+trenta secondi di silenzio dicono che quel telefono quel file non lo
+decodifica, non che il file sia rotto.
+
+⚠️ **IL PREZZO È DICHIARATO**: un PDF rinominato `.jpg` prima si
+fermava nel client e adesso sale (fino a 15MB) per sentirsi dire di no
+dal server. È il conto giusto da pagare — quel caso è raro e chi lo
+produce lo sa, mentre la foto buona rifiutata capitava a chi non aveva
+sbagliato niente.
+
+**IL BANCO GIRA, NON GUARDA.** Le sentinelle dicono come sono scritti
+i rami; qui node fa **girare davvero** `ridimensiona` e `aggiungiFoto`
+con una tela finta e un server finto, sui nove casi che contano — la
+foto buona, la tela 0x0, la tela che torna `data:,`, il decode che
+fallisce, il decode che non risponde mai, il server che rifiuta, la
+rete che cade, la DEMO senza server, il file oltre i 15MB. L'ultima
+prova è la regola in una riga: **in nessuno dei nove la foto sparisce
+senza che qualcuno lo dica**. Sui primi cinque la foto adesso ENTRA
+(prima quattro su cinque non entravano), sugli altri quattro non entra
+e il motivo si legge.
+
+**E IL FENOMENO DIVENTA MISURABILE**, che è la parte che chiude il
+cerchio: `/api/foto/anteprima` scrive nel journal una riga per ogni
+conversione — formato, KB in ingresso e in uscita — e una anche sul
+rifiuto. Da oggi il client chiede lì **anche per i JPEG**, cioè per
+formati che il browser dovrebbe leggere da solo: se quelle righe
+compaiono, vuol dire che un telefono vero non ce l'ha fatta, ed è un
+fatto che prima non aveva nessun modo di arrivare a noi.
+
+⚠️ **QUEL CHE NON È PROVATO VA DETTO**: il caso 354 **non è stato
+riprodotto**. Nessuno ha visto con i propri occhi la tela sollevare su
+quel telefono con quel file — la ricostruzione tiene perché è l'unica
+strada compatibile con tutti i fatti (colonna vuota, nessuno scarto,
+nessun avviso, pubblicazione riuscita), ma resta una ricostruzione.
+La cura non scommette su di lei: chiude la **classe** dei silenzi —
+qualunque strada non arrivi a un JPEG ora o passa dal server o dice
+perché — e lascia acceso lo strumento per vedere il fenomeno la
+prossima volta che capita.

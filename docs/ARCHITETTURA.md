@@ -5756,6 +5756,50 @@
   l'evento) e il renderer della WebView che muore per la memoria —
   lì l'app si ricarica da capo, e non c'è nessun callback su cui
   parlare.
+  E IL TERZO SILENZIO ERA LA TELA (set 2026, caso dal campo:
+  l'annuncio 354 è nato con la colonna `foto` VUOTA — nessun file
+  mancante, la foto non è mai stata salvata — e chi l'ha pubblicato
+  non ha visto nessun avviso). Il disegno di prima chiedeva a OGNI
+  ramo di ricordarsi di parlare, e per farlo `ridimensiona` faceva i
+  toast da sé: bastava un ramo che tacesse. Adesso `ridimensiona` non
+  ha più una bocca — risponde `{foto}` o `{motivo}` — e a parlare è il
+  CHIAMANTE, in un posto solo: `aggiungiFoto` per gli annunci, il chip
+  per il banner, il toast per l'immagine del badge. La promessa
+  «nessuna foto sparisce in silenzio» diventa così una cosa di
+  STRUTTURA e non di memoria, e tre sentinelle la inchiodano (nessun
+  `toast(` dentro `ridimensiona`, `fotoDalServer` e `jpegDalCanvas`;
+  il `|| motivo di scorta` nel chiamante; tutti e tre i chiamanti che
+  leggono `.foto`).
+  LA TELA SA RISPONDERE COSE CHE SEMBRANO FOTO: con `naturalWidth` a
+  zero — certe WebView chiamano `onload` prima di avere i pixel — il
+  canvas nasce 0x0 e `toDataURL` torna la stringa `data:,`, vera
+  quanto basta per entrare in `sellFoto` (anteprima rotta, e alla
+  pubblicazione lo scarto «formato non riconosciuto»); e quando la
+  memoria non basta `toDataURL` può SOLLEVARE, e allora — nel codice
+  di prima — l'eccezione usciva da `onload` col watchdog GIÀ disarmato
+  e la Promise non si risolveva MAI: chip «Carico la foto…» eterno,
+  Pubblica che risponde «un attimo», e quel chip non ha nemmeno la ✕.
+  Era l'unico silenzio completo della filiera, ed è quello che combacia
+  col caso 354. `jpegDalCanvas` giudica adesso il RISULTATO (regex sul
+  data-URL) e non il gesto, e su qualunque inciampo torna la stringa
+  vuota.
+  E IL RIPIEGO DEL SERVER VALE PER TUTTI I FORMATI, non più per le
+  sole HEIC: `fotoDalServer` manda i byte grezzi a `/foto/anteprima`
+  ogni volta che qui non si arriva a un JPEG — decode fallito, tela
+  muta, watchdog scaduto. Rovescia una premessa che era scritta qui e
+  diceva il falso — «il browser JPEG e PNG li sa leggere, quindi se ha
+  detto di no il file è rotto»: un JPEG sano da 12 Mpx può non
+  decodificarsi dentro una WebView a corto di memoria, e lo stesso
+  file Pillow lo apre senza fiatare. IL PREZZO È DICHIARATO: un PDF
+  rinominato .jpg prima si fermava nel client e adesso sale (fino a
+  15MB) per sentirsi dire di no dal server — il conto giusto, perché
+  quel caso è raro e chi lo produce lo sa, mentre la foto buona
+  rifiutata capitava a chi non aveva sbagliato niente.
+  E IL FENOMENO DIVENTA VISIBILE: `/api/foto/anteprima` scrive nel
+  journal una riga per ogni conversione (formato, KB in ingresso e in
+  uscita, e una riga anche sul rifiuto). Senza, un telefono che non
+  decodifica resterebbe un fatto che nessuno può sapere — l'utente
+  vede solo che la foto entra.
   E LA FOTO CHE NON MOSTRA NIENTE SI RIFIUTA (ago 2026, caso dal
   campo): l'annuncio 254 è rimasto in vetrina SEI GIORNI con una foto
   che a schermo era un rettangolo viola, e l'abbiamo saputo solo
