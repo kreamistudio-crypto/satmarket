@@ -11474,3 +11474,155 @@ subito sbagliata (contava le chiamate alla funzione dei tag invece
 che a quella della firma — quella deve girare a ogni giro per il
 confronto, questa no) ed è stata corretta prima di fidarsene.
 
+## Il conteggio delle visualizzazioni, privato al proprietario
+
+Andrea ha chiesto un contatore di quante volte un proprio annuncio
+viene visto — visibile SOLO a chi vende (e agli admin), mai pubblico
+come i barattolini —, che conti «a scorrimento» (una card vista
+scorrendo il mercatino, non solo aperta) e una volta sola all'ora per
+identità, utente o ospite che sia.
+
+**È IL ROVESCIO ESATTO DEI SAVERS**, ed è la prima cosa da tenere a
+mente leggendo il codice: per i preferiti la regola scritta ad ago
+2026 è «QUANTI sì, CHI mai» — il numero è pubblico, i nomi non
+escono mai da nessuna parte. Qui il numero STESSO è il dato privato:
+un annuncio altrui non lo mostra affatto, nemmeno al compratore che
+lo sta guardando in quel momento.
+
+LA COLONNA È PRIVATA PER COSTRUZIONE, non per un filtro a valle:
+`annunci.visualizzazioni` non entra MAI in `CAMPI_VETRINA` (quella è
+la SELECT pubblica, letta da vetrina/negozio/ricerca/preferiti), e
+`un_annuncio` la aggiunge alla query SOLO se c'è un utente
+autenticato — poi la toglie di nuovo in Python se quell'utente non è
+il proprietario né un admin (`e_admin`). Due cinture, non una: anche
+se domani qualcuno aggiungesse la colonna a CAMPI_VETRINA per
+distrazione, l'esposizione pubblica sarebbe comunque bloccata dal
+secondo controllo — ma è la PRIMA a evitare che il dato lasci il
+database per chi guarda anonimo. `CAMPI_MIEI` invece è `a.*`: la
+colonna ci arriva GRATIS per «I tuoi annunci», senza toccare quella
+SELECT — lo stesso vantaggio già annotato per `origine_stock_visto` e
+gli altri campi nati dopo di lei.
+
+**IL PROPRIETARIO NON SI CONTA DA SOLO**: `registra_vista` confronta
+`venditore_id` con l'utente che chiama, e se combaciano non scrive
+NIENTE — né il totale sale, né nasce una riga di dedup per lui. Senza
+questa guardia scorrere la propria vetrina da editor gonfierebbe un
+numero che dovrebbe dire «quanti compratori hanno guardato», non
+«quante volte l'ho aperto io controllando com'è venuto».
+
+L'IDENTITÀ, PER CHI NON È LOGGATO: `tg:<tg_id>` per chi ha un utente,
+`osp:<token>` per chi arriva anonimo (la vetrina pubblica, sola
+lettura). Il token è un numero CASUALE che nasce nel client
+(`crypto.randomUUID`, o `getRandomValues` di ripiego) e vive nel SUO
+`localStorage` — mai un IP, mai un'impronta del dispositivo, mai
+niente che il server debba calcolare o conservare per conto proprio.
+Chi cancella i dati del browser ne riceve uno nuovo al prossimo giro:
+si riparte a contare, ed è la scelta giusta — nessuna traccia che
+sopravviva a un browser ripulito. `_identita_vista` valida la FORMA
+del token (esadecimale, 16-64 caratteri) prima di fidarsene: è l'unico
+pezzo che arriva dal client senza nessuna firma dietro, e un token
+scritto a mano per sbagliare va scartato in silenzio, non salvato.
+
+**IL DEDUPLICATORE È UNA RIGA PER COPPIA**, non un bucket per ora come
+`sponsor_aperture` (che è comunque il precedente più vicino per lo
+spirito — un contatore anonimo, fail-open, mai un nome): `viste_annuncio(annuncio_id,
+identita, vista)` tiene la PK sulla coppia e aggiorna `vista` con un
+UPSERT condizionato,
+```sql
+INSERT INTO viste_annuncio(...) VALUES(...)
+ON CONFLICT(annuncio_id, identita) DO UPDATE
+  SET vista=excluded.vista WHERE viste_annuncio.vista < ?
+```
+— lo stesso genere di UPDATE condizionato con `rowcount` già usato per
+`codici_sconto.usi`: se la riga non c'era, o c'era ma l'ultima vista
+risale a più di un'ora fa, `cur.rowcount` è 1 e il totale sale di uno;
+altrimenti resta com'era. Una riga per (annuncio, identità) che vive
+per sempre significa una tabella che cresce come `preferiti`, mai
+ripulita — coerente con quella tabella, che non pota nemmeno lei le
+righe di annunci venduti o rimossi.
+
+FAIL-OPEN FINO IN FONDO: `registra_vista` non solleva mai un errore —
+un `try/except` avvolge la scrittura e logga soltanto, esattamente la
+riga già scritta per `sponsor_aperture` («un contatore non deve poter
+rompere una pagina»). Senza nessuna identità riconoscibile (né utente
+né token valido) la rotta esce subito con `{"ok": true}`: il client la
+spara e dimentica, senza mai controllare la risposta.
+
+**«A SCORRIMENTO» VUOL DIRE L'OSSERVATORE, NON IL CLIC**: un'unica
+`IntersectionObserver` condivisa (`osservatoreViste`, sullo stampo di
+quella dei chip appiccicati) osserva ogni card che porta `data-vid`, e
+conta la vista solo se la card resta visibile ALMENO A METÀ per 600ms
+— uno scroll veloce che fa lampeggiare trenta card non deve contare
+trenta viste. `armaViste()` arma le card nuove (quelle senza
+`data-va`, che si marca all'armamento) ed è richiamata in OGNUNO dei
+sette punti dove `cardHTML` produce html da inserire in pagina —
+griglia, negozio, scaffale esauriti, «altri oggetti del venditore» (i
+due giri, il primo e la pagina), e il carrello «Riempi il barattolo».
+Sette chiamate esplicite e non un `MutationObserver` globale sul
+`document`: la scelta rispecchia `osservaSentinella` qui sopra, che
+registra ogni sentinella a mano invece di scoprirle da sola — un
+osservatore che gira su OGNI mutazione della pagina (fogli, toast,
+tendine) avrebbe pagato in prestazioni per una scoperta automatica che
+il codice non chiede altrove.
+APRIRE LA SCHEDA CONTA DA SOLA, fuori dall'osservatore: è la vista più
+forte che c'è, e aspettare 600ms di sosta su una card che si sta già
+aprendo non avrebbe senso. `openDetail` manda `registraVista(id)`
+subito, tranne sul proprio annuncio (il server la scarterebbe
+comunque, ma il gesto risparmiato lo dice IL client). La dedup lato
+client (`visteInviate`, un `Set` per sessione) evita di rimandare la
+stessa richiesta due volte nella stessa pagina — pura economia di
+rete, la correttezza resta tutta lato server.
+
+DOVE SI VEDE: due rese, lo stesso patto di `saversPunto`/`saversFrase`
+— `vistePunto` in coda alla riga di «I tuoi annunci» (dopo
+`saversPunto`, stesso posto), `visteFrase` in testa al blocco del
+proprietario nella scheda, sulla stessa superficie neutra
+`trust-note nota-savers`. `visteMie` è la guardia unica di tutt'e due,
+e QUI l'admin passa mentre in `saversMio` non serve: un admin deve
+poter vedere il numero su un annuncio che non è il suo, un
+proprietario qualunque no.
+
+STRADE SCARTATE. Un IP o un'impronta del dispositivo per l'identità
+ospite: avrebbe reso il conteggio più robusto contro chi cancella i
+dati del browser, ma avrebbe rotto la regola di casa — mai un dato
+che il server debba dedurre dal traffico invece di riceverlo
+dichiarato. Un bucket giornaliero come `sponsor_aperture`: cresce
+peggio (una riga per identità PER GIORNO invece che una per sempre) e
+non regge la finestra di un'ora senza un secondo confronto in Python.
+Un `MutationObserver` globale per non dover richiamare `armaViste()` a
+mano nei sette punti: scartato per lo stesso motivo di
+`osservaSentinella`, vedi sopra.
+
+COLLAUDATO: 28 prove nuove in `prove_visualizzazioni` — i giudici e
+l'osservatore lato client (stringhe, sullo stampo di
+`prove_savers_proprietario`), più un banco VERO lato server:
+`registra_vista` e `_identita_vista` estratte con `pezzo()` e fatte
+girare su un database di cartone reale (non uno stub) — prima vista
+di un ospite conta, la stessa identità entro l'ora non raddoppia,
+un'identità diversa conta a parte, il proprietario sul proprio
+annuncio non si conta (e non lascia nemmeno una riga di dedup), un
+altro utente loggato conta, passata un'ora la stessa identità riconta,
+un annuncio inesistente e un'identità assente escono in pace senza
+sollevare niente. Una prova preesistente (`«I tuoi annunci» porta il
+conteggio in coda alla meta`) verificava la stringa esatta della riga
+e andava aggiornata per il nuovo campo in coda — corretta, non
+aggirata. 9285 verdi, 0 rosse.
+Oltre alle prove pure: un giro vero con `TestClient` contro il
+database locale REALE (non quello di cartone) ha confermato che la
+migrazione (`ALTER TABLE` + la nuova `viste_annuncio`) si applica
+pulita su un database già popolato, e che il giro HTTP completo tiene
+— anonimo non vede il campo, proprietario e admin sì, un terzo utente
+loggato no, l'ospite conta e deduplica. E un giro nel BROWSER vero
+(server di collaudo, miniapp aperta per davvero) ha mostrato
+l'osservatore scattare da solo sullo scroll della vetrina — quattro
+viste vere registrate sulle card che erano a schermo, senza che nessun
+test le avesse chieste: la prova che il conteggio «a scorrimento»
+funziona nel gesto per cui è nato, non solo nella teoria.
+⚠️ NOTA A MARGINE, SLEGATA DAL CANTIERE: avviare `uvicorn server:app`
+diretto in locale fallisce all'import — `anthropic==0.34.1` e
+`httpx==0.28.1` non vanno d'accordo (`Client.__init__() got an
+unexpected keyword argument 'proxies'`) sulla riga
+`ai = anthropic.Anthropic(...)`. Preesistente, non tocca questo
+cantiere: il giro sopra l'ha aggirato SOLO nel processo di prova
+(un `Anthropic` finto iniettato prima dell'import), senza toccare le
+dipendenze vere. Da guardare in un cantiere suo.
