@@ -43527,6 +43527,18 @@ def prove_p2p_pubblica():
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '100001'})).manca,\n"
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '99'})).manca,\n"
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90'})).manca],\n"
+        # OGNI «manca» SI PORTA IL CAMPO che lo risolve (set 2026, col
+        # bottone sempre acceso): la frase e il posto sono la stessa
+        # decisione, e separarli vorrebbe dire che il giorno di un
+        # controllo nuovo arriva la frase e il campo no, in silenzio.
+        "  campi: [\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: ''})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '30'})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', metodi: []})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: ''})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '100001'})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '99'})).campo,\n"
+        "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90'})).campo],\n"
         "  quanto: [\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '19').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '101').ok,\n"
@@ -43713,6 +43725,15 @@ def prove_p2p_pubblica():
            "Troppi: il massimo è 100000 sats",
            "Troppo pochi: il minimo è 100 sats",
            ""], out["manca"])
+    # ...E OGNI NOME SI PORTA IL SUO CAMPO, che e' quel che l'avviso fa
+    # vedere. I tre tetti dei sats indicano lo stesso campo: il posto
+    # da correggere e' uno solo, comunque si sia sbagliato.
+    prova("...e ogni nome si porta il campo che lo risolve",
+          ["p2pNuovoEuro", "p2pNuovoEuroMax", "p2pNuovoMetodiBtn",
+           "p2pNuovoSats", "p2pNuovoSats", "p2pNuovoSats", ""],
+          out["campi"])
+    prova("...e i campi nominati esistono davvero nel foglio", True,
+          all(('id="%s"' % c) in mini for c in set(out["campi"]) if c))
     # LA FASCIA DELL'INTERVALLO si guarda PRIMA del giro di rete: il
     # coordinatore risponde `OutOfRangeSatsAmount`, ma quel no arriva
     # dopo una chiave bruciata.
@@ -44184,11 +44205,13 @@ def prove_p2p_pubblica():
     #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
     #    la corsa finisce, e non un istante dopo. Ribattuta nel CSS,
     #    il giorno che una delle due cambia il conto non torna piu'.
-    # MEZZO SECONDO (ritocco di Andrea): a 380, con una curva che
-    # schizzava via al primo fotogramma, la corsa finiva prima di
-    # essere letta.
-    prova("la corsa dura 520ms e la dissolvenza 180", True,
-          "const P2P_MORFO_MS = 520;" in mini
+    # 450, DOPO UN GIRO A 380 E UNO A 520 (ritocchi di Andrea,
+    # guardati sul telefono): a 380 con una curva che schizzava via la
+    # corsa finiva prima di essere letta, a 520 si godeva ma cominciava
+    # a farsi ASPETTARE — e un'apertura che si fa aspettare la seconda
+    # volta e' gia' troppo lenta.
+    prova("la corsa dura 450ms e la dissolvenza 180", True,
+          "const P2P_MORFO_MS = 450;" in mini
           and "const P2P_MORFO_VELO = 180;" in mini)
     prova("...e l'attesa e' la differenza, per la scritta e per il foglio",
           True, "(P2P_MORFO_MS - P2P_MORFO_VELO) + 'ms'" in tempi
@@ -44312,6 +44335,62 @@ def prove_p2p_pubblica():
           and chiumo.index("g.classList.add('parte')") < chiumo.index("barraViaP2P(false)")
           and (morfo.index("barraViaP2P(true)")
                - morfo.index("g.classList.remove('parte')")) < 120)
+
+    # L) IL BOTTONE RESTA ACCESO, E L'AVVISO ARRIVA AL TOCCO (set
+    #    2026, decisione di Andrea). E' la liturgia del foglio del
+    #    mercatino: il bottone non si spegne mai, e chi lo preme senza
+    #    i dati si prende un toast con la frase e il campo che si fa
+    #    vedere. La ragione e' che un bottone spento non dice MAI cosa
+    #    si deve fare — dice solo cosa non si puo' fare, e a chi non ha
+    #    chiesto niente.
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    avvisa = pezzo_js(mini, "function avvisaMancaP2P(g){", "\n}\n")
+    prova("il bottone che pubblica non si spegne mai", True,
+          "disabled" not in
+          mini[mini.index("'<div class=\"foglio-piede sola\">'"):
+               mini.index("'<div class=\"foglio-piede sola\">'") + 400]
+          and "aggiornaInviaP2P" not in mini)
+    # E LA RIGA ROSSA SEMPRE ACCESA E' CADUTA CON LA SUA RAGIONE:
+    # esisteva per dire PERCHE' il bottone fosse spento, cioe' per
+    # curare un vicolo cieco muto. Col bottone vivo quel vicolo non
+    # c'e', e una riga rossa su un modulo che non si e' ancora
+    # cominciato a riempire e' un rimprovero per una cosa che nessuno
+    # ha ancora sbagliato.
+    prova("...e la riga rossa sempre accesa non c'e' piu'", False,
+          "p2pNuovoManca" in mini)
+    prova("chi preme senza i dati non pubblica: avvisa", True,
+          "if (!g.ok) { avvisaMancaP2P(g); return; }" in invia
+          and invia.index("avvisaMancaP2P(g)") < invia.index("chiudiFoglioP2P"))
+    # LO STESSO STILE DEL MERCATINO, alla lettera: il toast con la
+    # frase e lo scorrimento al campo, con la stessa guardia del moto
+    # ridotto che usa publish() per la zona.
+    prova("...con lo stesso avviso del mercatino: toast e campo a vista",
+          True,
+          "toast(g.manca);" in avvisa
+          and "scrollIntoView({block: 'center'," in avvisa
+          and "behavior: tourRidotto() ? 'auto' : 'smooth'" in avvisa)
+    # L'ANELLO VESTE LA SEZIONE E NON IL CAMPO, e l'hanno deciso i
+    # pixel: intorno all'<input> si vede benissimo, ma ha gli ANGOLI
+    # VIVI — il campo non ha raggio — e quel rettangolino squadrato e'
+    # il riquadro d'errore di un modulo di un altro mondo. Lo
+    # SCORRIMENTO resta sul campo, che e' preciso.
+    prova("...e l'anello veste la sezione, che ha il raggio di casa",
+          True, "const q = c.closest('.p2p-sez') || c;" in avvisa
+          and avvisa.index("scrollIntoView") < avvisa.index("closest('.p2p-sez')"))
+    prova("...e si toglie e si rimette, o al secondo tocco tace",
+          True,
+          avvisa.index("classList.remove('p2p-manca')")
+          < avvisa.index("void q.offsetWidth")
+          < avvisa.index("classList.add('p2p-manca')"))
+    # ...e se ne va da solo: uno stato d'errore che resta acceso
+    # diventa un rimprovero permanente su un campo che magari si sta
+    # gia' riempiendo
+    prova("...e se ne va da solo", True,
+          "setTimeout(() => q.classList.remove('p2p-manca'), 1300);" in avvisa
+          and ".p2p-manca{animation:p2pManca 1.2s ease}" in stile)
+    prova("...e in reduced-motion l'anello si vede fermo", True,
+          ".p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.55)}"
+          in stile)
 
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
     #    cronologia censisce `.sheet.open`, e un quarto strato li'

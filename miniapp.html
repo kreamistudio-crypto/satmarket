@@ -2588,6 +2588,33 @@
   #p2pMorfo.parte .morfo-eti{opacity:0;
     transform:translate(var(--morfo-x),var(--morfo-y));
     transition-delay:0s,0s}
+  /* IL CAMPO CHE MANCA SI FA VEDERE (set 2026, col bottone sempre
+     acceso): l'avviso dice la parola, l'anello dice DOVE. Un'ombra e
+     non un bordo, che un bordo sposterebbe il riquadro di due pixel
+     proprio mentre lo si sta guardando.
+     ⚠️ L'ANELLO VESTE LA SEZIONE, NON IL CAMPO, e l'hanno deciso i
+     pixel: intorno all'<input> l'anello si vede benissimo, ma ha gli
+     ANGOLI VIVI — il campo non ha raggio — e quel rettangolino
+     squadrato e' il riquadro d'errore di un modulo di un altro
+     mondo. La sezione invece e' una carta col raggio di casa, e
+     l'anello ci gira intorno come un contorno suo. Lo SCORRIMENTO
+     resta sul campo, che e' preciso; l'anello sta dove si vede bene.
+     ⚠️ E UNO SCATTO ARRIVATO TARDI HA QUASI DECISO AL POSTO LORO:
+     l'anello si spegne da solo dopo 1300ms, e la fotografia presa
+     dopo quel termine mostra un riquadro senza niente — cioe' la
+     stessa immagine che darebbe un'ombra che non si dipinge. La
+     sonda leggeva `getComputedStyle` e diceva che c'era. Quando una
+     cosa si spegne da sola, il fotogramma va preso PRIMA che si
+     spenga, o si legge il contrario di quel che succede. */
+  .p2p-manca{animation:p2pManca 1.2s ease}
+  @keyframes p2pManca{
+    0%,100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}
+    12%,55%{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .p2p-manca{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+  }
+
   /* ---- LA BARRA SI APRE (set 2026, richiesta di Andrea) ----
      Mentre il bottone si allarga, le voci ai due lati del + vengono
      SPINTE FUORI — a sinistra quelle prima, a destra quelle dopo — e
@@ -40300,12 +40327,14 @@ let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
    il foglio un modale centrato — non c'e' nessun tondo che scende —
    e in reduced-motion il foglio si apre come si e' sempre aperto. In
    tutt'e due i casi la via di ieri non e' un ripiego: e' la strada. */
-/* MEZZO SECONDO, non piu' 380 (ritocco di Andrea): la corsa si deve
-   godere, e a 380 con una curva che schizzava via era finita prima di
-   essere letta. I due numeri restano due, e l'attesa e' ancora la loro
-   differenza — 340 — cosi' la scritta e il foglio finiscono di
-   comparire esattamente sull'ultimo fotogramma della corsa. */
-const P2P_MORFO_MS = 520;     /* la corsa intera: forma, centro, raggio, colore */
+/* 450, dopo un giro a 380 e uno a 520 (ritocchi di Andrea, guardati
+   sul telefono): a 380 con una curva che schizzava via la corsa era
+   finita prima di essere letta, a 520 si godeva ma cominciava a
+   FARSI ASPETTARE — e un'apertura che si fa aspettare la seconda
+   volta e' gia' troppo lenta. I due numeri restano due, e l'attesa e'
+   ancora la loro differenza — 270 — cosi' la scritta e il foglio
+   finiscono di comparire esattamente sull'ultimo fotogramma. */
+const P2P_MORFO_MS = 450;     /* la corsa intera: forma, centro, raggio, colore */
 const P2P_MORFO_VELO = 180;   /* la dissolvenza fra il glifo e la scritta */
 let p2pMorfoTimer = null;     /* la corsa in volo, per poterla interrompere */
 let p2pMorfoOcchio = null;    /* l'osservatore che si accorge della chiusura */
@@ -40567,21 +40596,33 @@ function valeNuovoOrdineP2P(v){
   const e = interoP2P(v.euro), x = interoP2P(v.euroMax);
   const euro = e.n, max = x.n;
   const sats = interoP2P(v.sats).n;
-  if (!(euro > 0)) return {ok: false, manca: 'Scrivi l\'importo in euro'};
+  /* IL GIUDICE DICE ANCHE DOVE (set 2026, col bottone sempre acceso):
+     ogni «manca» si porta il CAMPO che lo risolve, e chi avvisa lo fa
+     vedere. Sta qui e non nell'avviso perche' la frase e il campo
+     sono la stessa decisione — separati, il giorno che si aggiunge un
+     controllo nuovo la frase arriva e il campo no, in silenzio. */
+  if (!(euro > 0))
+    return {ok: false, manca: 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
   if (!x.vuoto && !(max > euro))
-    return {ok: false, manca: 'L\'importo massimo deve superare il primo'};
-  if (!(v.metodi || []).length) return {ok: false, manca: 'Scegli almeno un metodo di pagamento'};
+    return {ok: false, manca: 'L\'importo massimo deve superare il primo',
+            campo: 'p2pNuovoEuroMax'};
+  if (!(v.metodi || []).length)
+    return {ok: false, manca: 'Scegli almeno un metodo di pagamento',
+            campo: 'p2pNuovoMetodiBtn'};
   if (v.fisso) {
-    if (!(sats > 0)) return {ok: false, manca: 'Scrivi quanti sats'};
+    if (!(sats > 0))
+      return {ok: false, manca: 'Scrivi quanti sats', campo: 'p2pNuovoSats'};
     /* i due tetti del coordinatore si guardano QUI, dove il numero e'
        nostro: a prezzo di mercato i sats li fa lui al momento della
        presa, e un controllo a vuoto direbbe una bugia */
     if (v.maxSats > 0 && sats > v.maxSats)
-      return {ok: false, manca: 'Troppi: il massimo è ' + fmt(v.maxSats) + ' sats'};
+      return {ok: false, manca: 'Troppi: il massimo è ' + fmt(v.maxSats) + ' sats',
+              campo: 'p2pNuovoSats'};
     if (v.minSats > 0 && sats < v.minSats)
-      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(v.minSats) + ' sats'};
+      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(v.minSats) + ' sats',
+              campo: 'p2pNuovoSats'};
   }
-  return {ok: true, manca: ''};
+  return {ok: true, manca: '', campo: ''};
 }
 /* quel che c'e' nei campi adesso: un posto solo a leggerlo, cosi' il
    giudizio del bottone e quel che si spedisce non possono divergere */
@@ -40698,7 +40739,10 @@ function renderNuovoOrdineP2P(){
   const metodi = sezioneNuovoP2P({
     ico: 'metodi',
     titolo: 'Metodi di pagamento — puoi sceglierne più di uno',
-    corpo: '<button type="button" class="p2p-tendina' +
+    /* l'id serve all'avviso, che deve poter far vedere ANCHE questo
+       campo: un metodo non si «scrive», si sceglie, ma il posto dove
+       si sceglie e' un campo come gli altri */
+    corpo: '<button type="button" id="p2pNuovoMetodiBtn" class="p2p-tendina' +
       (p2pNuovoMetodi.length ? '' : ' vuota') + '" aria-expanded="' +
       (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
@@ -40776,11 +40820,14 @@ function renderNuovoOrdineP2P(){
      ripete a chi arriva fin la'. */
   box.innerHTML =
     valuta + importo + metodi + tipo + quanti + premio +
-    /* QUEL CHE MANCA E' UN AVVISO, non un consiglio: in mezzo agli
-       altri suggerimenti dello stesso grigio non lo leggeva nessuno,
-       e un bottone spento senza una ragione visibile e' il vicolo
-       cieco muto che questa riga esiste per evitare. */
-    '<div class="hint" id="p2pNuovoManca" style="color:var(--danger);font-weight:800"></div>' +
+    /* LA RIGA ROSSA NON C'E' PIU' (set 2026, col bottone sempre
+       acceso), e cade insieme alla ragione per cui era nata: serviva a
+       dire PERCHE' il bottone fosse spento, cioe' a curare un vicolo
+       cieco muto. Col bottone vivo quel vicolo non esiste, e una riga
+       rossa accesa su un modulo che non si e' ancora cominciato a
+       riempire e' un rimprovero per una cosa che nessuno ha ancora
+       sbagliato. Adesso l'avviso arriva AL TOCCO, come nel foglio del
+       mercatino. */
     tetto + fee +
     '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
     /* IL PIEDE HA UNA SOLA USCITA (set 2026, decisione di Andrea):
@@ -40805,7 +40852,6 @@ function renderNuovoOrdineP2P(){
       '<button type="button" class="btn orange" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">⚡ Pubblica ordine</button>' +
     '</div>';
-  aggiornaInviaP2P();
 }
 /* la nota del premio: cosa cambia PER CHI STA LEGGENDO, col lato che
    ha scelto. A zero non c'e' niente da dire e la riga tace. */
@@ -40821,12 +40867,34 @@ function premioNotaP2P(compro, premio){
 }
 /* SI RISCRIVE IL SOLO BOTTONE, mai il foglio: un render intero mentre
    si digita porta via il cursore (la lezione delle pillole). */
-function aggiornaInviaP2P(){
-  const g = valeNuovoOrdineP2P(campiNuovoP2P());
-  const b = el('p2pNuovoInvia');
-  if (b) b.disabled = !g.ok;
-  const m = el('p2pNuovoManca');
-  if (m) { m.textContent = g.ok ? '' : g.manca; m.style.display = g.ok ? 'none' : ''; }
+/* L'AVVISO DI CHI PUBBLICA (set 2026, decisione di Andrea): il
+   bottone resta SEMPRE acceso, e a dire cosa manca e' il tocco. E' la
+   liturgia del foglio del mercatino, parola per parola — un toast con
+   la frase e il campo che si fa vedere —, e la ragione per cui vale
+   anche qui e' che un bottone spento non dice MAI cosa si deve fare:
+   lo dice solo cosa non si puo' fare, e per giunta a chi non ha
+   chiesto niente.
+   L'ANELLO DURA UN ATTIMO E SE NE VA: uno stato d'errore che resta
+   acceso diventa un rimprovero permanente su un campo che magari si
+   sta gia' riempiendo. */
+function avvisaMancaP2P(g){
+  toast(g.manca);
+  const c = g.campo && el(g.campo);
+  if (!c) return;
+  try {
+    c.scrollIntoView({block: 'center',
+                      behavior: tourRidotto() ? 'auto' : 'smooth'});
+  } catch(e) { try { c.scrollIntoView(); } catch(e2){} }
+  /* si scorre al CAMPO, che e' preciso, e si accende la SEZIONE, che
+     si vede: intorno a un input trasparente l'anello non si vedeva */
+  const q = c.closest('.p2p-sez') || c;
+  /* si toglie e si rimette, o al secondo tocco sullo STESSO riquadro
+     l'animazione non ripartirebbe: la classe c'e' gia' e il browser
+     non vede nessun cambio */
+  q.classList.remove('p2p-manca');
+  void q.offsetWidth;
+  q.classList.add('p2p-manca');
+  setTimeout(() => q.classList.remove('p2p-manca'), 1300);
 }
 function cambiaCampoNuovoP2P(){
   const e = el('p2pNuovoEuro'), x = el('p2pNuovoEuroMax'), s = el('p2pNuovoSats');
@@ -40835,7 +40903,6 @@ function cambiaCampoNuovoP2P(){
   if (e) p2pNuovoEuro = ripuliCifreP2P(e);
   if (x) p2pNuovoEuroMax = ripuliCifreP2P(x);
   if (s) p2pNuovoSats = ripuliCifreP2P(s);
-  aggiornaInviaP2P();
 }
 function apriTendinaMetodiP2P(){
   haptic();
@@ -41066,7 +41133,7 @@ function spiegaPremioP2P(){
 async function inviaNuovoOrdineP2P(){
   const campi = campiNuovoP2P();
   const g = valeNuovoOrdineP2P(campi);
-  if (!g.ok) { toast(g.manca); return; }
+  if (!g.ok) { avvisaMancaP2P(g); return; }
   const lato = p2pLato === 'compro' ? 'compro' : 'vendo';
   const metodi = p2pNuovoMetodi.slice();
   /* L'ORDINE SI COSTRUISCE UNA VOLTA SOLA, e la riga locale legge da
