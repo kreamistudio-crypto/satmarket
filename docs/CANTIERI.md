@@ -12307,3 +12307,122 @@ hunk scartato di nascosto esce dal commit senza che niente protesti.
 Il conto torna: 216 + 93 = 309, cioè i miei 93 sono esattamente quelli
 che sono usciti. Prove nell'albero isolato — «HEAD più i miei soli
 hunk», che è come sta la CI — **9616 → 9623, zero rosse**.
+
+## La morfosi del +: il tondo della barra diventa il bottone che pubblica (14 set 2026)
+
+**CHIESTO DA ANDREA, in due righe.** Il foglio «Pubblica» del P2P si
+apriva e basta; e in fondo aveva due uscite, «Annulla» e «Invia».
+Adesso il **+ della barra e il bottone che pubblica sono LO STESSO
+elemento**: al tocco il tondo scende verso la nav, si allarga a piena
+larghezza e si aggancia in fondo alla pagina come «⚡ Pubblica
+ordine». Alla chiusura la corsa si rifà all'indietro. E «Annulla» se
+n'è andato: da una pagina a pieno schermo si torna con la freccia in
+alto, che è già il gesto indietro — ridirlo in fondo era un bivio
+senza scelta.
+
+**I NUMERI, misurati dal vivo a 375×812.** Il tondo sta a
+`(160,5 · 714,8)` ed è 54×54; il bottone d'arrivo a `(16 · 747,5)` ed
+è 343×50,5. Da lì escono i quattro numeri della corsa: **dx = 0**
+(tondo e bottone sono centrati sulla stessa colonna, e il volo è
+verticale puro), **dy = −31** — il tondo è trentuno pixel più in alto,
+quindi il bottone **scende**, come chiesto —, **sx = 0,15743** e
+**sy = 1,06997**.
+
+**TRE STRATI, E UNO SOLO SCALA**, ed è la decisione che tiene in piedi
+tutto il resto. Scalando il fantasma intero si schiaccerebbero anche
+il glifo e la scritta, e **la scala contraria dentro non li
+raddrizza**: partendo da 0,157, a metà corsa il prodotto delle due
+interpolazioni fa 2,2 invece di 1 — il contenuto ballerebbe. Quindi la
+FORMA si scala, il glifo e l'etichetta **traslano soltanto**, sulla
+stessa curva e verso lo stesso centro, e si scambiano il posto in
+dissolvenza.
+
+**IL RAGGIO PARTE DA 50%, non da un numero di pixel**, ed è la riga
+più elegante del cantiere: schiacciata alla misura del tondo,
+l'ellisse del 50% torna un **cerchio esatto** qualunque sia la
+larghezza del bottone d'arrivo — `343/2 × 0,15743 = 27` e
+`50,5/2 × 1,06997 = 27`. Verificato due volte: in node sulla funzione
+pura e **dal vivo**, dove il rettangolo del fantasma nello stato di
+partenza misura `(160,5 · 714,8) 54×54`, cioè il tondo al pixel.
+
+**IL FOGLIO NON SALE PIÙ: SFUMA SUL POSTO**, e le ragioni sono due. La
+prima è una misura — per sapere dove ARRIVA il bottone bisogna
+misurarlo a foglio già alla sua altezza, e misurare a metà salita è il
+modo in cui la corsa parte storta di quanto manca. La seconda è
+l'occhio: un foglio che sale mentre un bottone scende sono due
+movimenti che si contraddicono. La classe `.morfo` si mette e si
+toglie **a corsa spenta** (`style.transition='none'` più un reflow), o
+il transitorio si vedrebbe: entrando un lampo a pieno schermo,
+uscendo un foglio che torna opaco per scivolare giù.
+
+**IL RITORNO SI AGGANCIA ALLA CLASSE, non a chi chiude.** Il foglio lo
+chiudono in tre — il gesto indietro (`navChiudiStrato`), la spazzata
+di `closeSheet`, `chiudiFoglioP2P` dopo la pubblicazione — e un quarto
+domani lo dimenticherebbe in silenzio. Un `MutationObserver` sulle
+classi del foglio, che è la stessa strada che la nav fa già per il suo
+diff. Provati tutt'e tre dal vivo: ognuno fa partire la corsa
+all'indietro e la lascia pulita.
+
+**I TEMPI: 380 la corsa, 160 la dissolvenza, e l'attesa è la
+DIFFERENZA** — 220 — così la scritta finisce di comparire esattamente
+quando la corsa finisce. Stanno in due costanti nel JS e arrivano al
+CSS come variabili: ribattuti di là, il giorno che una delle due
+cambia il conto non torna più.
+**E IL COLORE CORRE COL VELO, non con la corsa**, e l'ha deciso un
+fotogramma: dal verde del lato all'arancio di casa la strada passa per
+un **verde-oliva torbido** — misurato a t=95ms, `rgb(123,142,59)` — e
+a 380ms quel guado si vedeva per un terzo del volo. A 160 il cambio
+d'identità si consuma insieme alla sparizione del glifo: a t=131 il
+colore è già arancio pieno.
+
+**IL FULMINE TORNA, e rovescia mezza riga scritta un mese fa.** Lì
+c'era il divieto di OGNI simbolo su quel bottone, e il perché era
+vero: il **marchio dello scambio**, arancio su arancio, diventava una
+macchia. Il ⚡ è un'altra cosa — è il segno con cui si PUBBLICA in
+tutta la casa («⚡ Pubblica annuncio» del mercatino), bianco su
+arancio — e questo bottone è il gemello di quello. Il divieto **resta
+per il marchio**, e la sentinella lo tiene ancora.
+
+⚠️ **IL DIFETTO DEL GIRO, e vale più di tutto il resto: `--morfo-curva`
+era USATA e scritta da nessuno.** Un `var()` irrisolto **non
+fallisce**: invalida TUTTA la riga `transition`, che torna al suo
+valore iniziale — `all 0s`. Nessun errore, nessuna riga in console, lo
+stato di partenza e quello d'arrivo **giusti al pixel**, e la corsa
+che semplicemente non c'è: il bottone compariva già arrivato.
+**E NEL BROWSER PANE SI VEDEVA IDENTICO**, perché lì le transizioni
+sono spente per emulazione — cioè lo strumento con cui si guarda era
+cieco proprio su quello che si stava costruendo. A trovarlo è stato un
+**Chrome vero via CDP**, campionando `transitionDuration`: `0s` invece
+di `0.38s`.
+⚠️ **E ANCHE CHROME HEADLESS DICE «reduced-motion: reduce» di suo**:
+senza `Emulation.setEmulatedMedia` il primo giro CDP ha risposto
+«nessuna corsa» per la ragione sbagliata, e sembrava la conferma del
+difetto invece che un secondo strumento cieco. Due strumenti che
+mentono nello stesso modo sono peggio di uno solo, perché si
+confermano a vicenda.
+**LA CURA È UN CENSIMENTO**, non una riga in più: ogni `--morfo-*`
+usata nel foglio di stile dev'essere scritta o dal CSS o da
+`vestiMorfoP2P`. La sentinella morde — tolta la definizione, esce rossa
+e **nomina** `--morfo-curva`.
+
+**COSA È STATO PROVATO.** Ventotto sentinelle nuove, più i numeri fatti
+girare in node sulla funzione pura: l'invariante non è «i numeri sono
+questi» ma **«applicando il transform al bottone si ritrova
+ESATTAMENTE il tondo»**, e c'è anche il caso del bottone di misura zero
+(foglio mai disegnato), che non deve produrre `Infinity`. Dal vivo: le
+tre strade di chiusura, i due lati (verde a comprare, rosso a vendere,
+e il colore lo dice la classe sul body come per il + e il logo), lo
+schermo largo (da 768px in su non c'è nessun tondo che scende: la
+corsa non nasce e il foglio si apre come sempre) e la via
+reduced-motion, che nel pane è provata **gratis** perché è l'unica che
+lì si possa percorrere. Poi la traiettoria fotogramma per fotogramma
+in Chrome vero, dal `(160,5 · 714,8) 54×54` del primo fotogramma al
+`(16 · 747,5) 343×50,5` dell'ultimo — cioè il rettangolo del bottone
+vero.
+
+**COSA RESTA DA GUARDARE.** Il MOVIMENTO lo giudica Andrea su un
+telefono vero: qui si sono viste la traiettoria in numeri e tre
+fotogrammi fermati a 95, 190 e 285 ms, che è un'altra cosa dal
+guardarla correre. E il primo fotogramma dopo che `.morfo` si toglie
+dal foglio è verificato **coi numeri e non a occhio**: se lì scappasse
+un lampo, si vede solo dal vivo.
