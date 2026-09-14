@@ -40328,8 +40328,8 @@ function reset(){ store = new Map(); cloud = new Map(); cloudLog = []; fetches =
   toasts = []; nodi = {}; aperti = []; conferme = []; inviti = []; p2pRegistrato = false;
   p2pCodiceVisibile = false; p2pCodiceMostrato = ''; DEMO = false; VETRINA = false;
   myTgId = 111; tg = {initData: 'x', isVersionAtLeast: v => true, CloudStorage: cloudVero};
-  p2pContoEsito = ''; p2pContoVerifica = null; p2pContoAllineato = null; p2pAdozione = false;
-  lapidiFinte = {}; p2pDispositivoEsito = ''; p2pCessione = null; p2pSemeGiro = null;
+  p2pMazzoEsito = ''; p2pGiudizio = null; p2pContoAllineato = null; p2pAdozione = false;
+  lapidiFinte = {}; p2pSemeGiro = null;
   p2pPavimento = null; }
 const corpo = f => JSON.parse(f.opt.body);
 (async () => {
@@ -40425,12 +40425,17 @@ const corpo = f => JSON.parse(f.opt.body);
     if (!/^[0-9a-f]{64}$/.test(mb.sk) || mb.origine !== '') out.semeStortoScartato = false;
   }
   if (out.semeStortoScartato !== false) out.semeStortoScartato = true;
-  // E IL MAZZO DEL CONTO GIA' IN LOCALE non fa partire nemmeno una
-  // domanda: e' gia' il seme, e chiederlo sarebbe la stessa domanda.
-  reset(); rispSeme = {ok: true, seme: skSeme, versione: 1};
+  // E IL MAZZO GIA' IN LOCALE si fa GIUDICARE, una volta: dal 14 set
+  // 2026 il giudice e' uno solo e non guarda piu' che cosa il mazzo
+  // dichiara di essere — e' il prezzo dichiarato dell'unificazione, ed
+  // e' quello che chiude la fetta che prima non guardava nessuno (un
+  // 'conto' col mio timbro e la sk di un seme che non si rifa' piu').
+  // UNA POST, e il mazzo che c'e' non si tocca.
+  reset(); rispSeme = {ok: true, seme: m.sk, versione: 1};
   ricordaMazzo(Object.assign({}, m, {origine: 'conto', conto: 111, versione: 1}));
   await assicuraMazzo();
-  out.localeNienteSeme = !fetches.some(f => String(f.url).endsWith('/p2p/seme'))
+  out.localeUnSemeSolo = fetches.filter(
+      f => String(f.url).endsWith('/p2p/seme')).length === 1
     && mazzoMostro().sk === m.sk;
   // ...E UNO DI DISPOSITIVO MAI USATO CEDE IL POSTO PRIMA DI FIRMARE
   // (14 set 2026): e' il rovescio della cura del 13 — leggere da due
@@ -40504,13 +40509,15 @@ const corpo = f => JSON.parse(f.opt.body);
   //    cloud si rifa' per conto suo: e' LA MIGRAZIONE, il difetto che ha
   //    aperto il cantiere — un mazzo nato prima del cloud non ci finiva
   //    MAI, e telefono e desktop restavano due identita' diverse.
-  //    ⚠️ E IL MAZZO E' QUELLO DEL CONTO (14 set 2026): uno di
-  //    DISPOSITIVO adesso una domanda la fa — il seme, una volta, per
-  //    sapere se deve cedere il posto — e la prova di quella strada e'
-  //    `dispositivoCedeIlPosto`, qui sopra.
+  //    ⚠️ E UNA CHIAMATA LA FA (14 set 2026, il giudice unico): quella
+  //    del seme, per giudicare il mazzo che trova — qui il conto tace
+  //    (409), quindi l'esito e' «non lo so» e non si tocca niente. La
+  //    strada in cui il giudizio CEDE il posto e' `dispositivoCedeIlPosto`,
+  //    qui sopra.
   reset(); ricordaMazzo(Object.assign({}, m, {origine: 'conto', conto: 111, versione: 1}));
   const ml = await assicuraMazzo();
-  out.localeNienteRete = ml.sk === m.sk && fetches.length === 0;
+  out.localeSoloIlSeme = ml.sk === m.sk && fetches.length === 1
+    && String(fetches[0].url).endsWith('/p2p/seme');
   await new Promise(r => setTimeout(r, 0));
   out.localeMigra = cloudLog.join(',') === 'get,set'
     && (cloud.get('mostro_mazzo') || '').includes(m.sk);
@@ -40682,24 +40689,29 @@ const corpo = f => JSON.parse(f.opt.body);
     && mazzoEstraneoP2P(contoDi(111, skX)) === false
     && mazzoEstraneoP2P(contoDi(0, skX)) === false
     && mazzoEstraneoP2P(Object.assign(contoDi(222, skX), {origine: ''})) === false;
-  out.giudiceDaVerificare = mazzoDaVerificareP2P(contoDi(0, skX)) === true
-    && mazzoDaVerificareP2P(contoDi(111, skX)) === false
-    && mazzoDaVerificareP2P(Object.assign(contoDi(0, skX), {origine: ''})) === false;
+  // ...e la PORTA del giudizio non guarda piu' l'origine: qualunque
+  //    mazzo non ancora giudicato ci passa, ed e' il giudice a
+  //    distinguere (la fetta scoperta era proprio uno che la porta
+  //    vecchia non faceva entrare)
+  out.portaNonGuardaOrigine = mazzoDaGiudicareP2P(contoDi(0, skX)) === true
+    && mazzoDaGiudicareP2P(contoDi(111, skX)) === true
+    && mazzoDaGiudicareP2P(Object.assign(contoDi(0, skX), {origine: ''})) === true
+    && mazzoDaGiudicareP2P(null) === false;
   // ...e il seme che torna nel mazzo lo timbra, una volta per sempre
   reset();
   ricordaMazzo(contoDi(0, skX));
   rispSeme = {seme: skX, versione: 1};
-  await verificaContoInCorsoP2P(mazzoMostro());
-  out.verificaTimbra = mazzoMostro().conto === 111 && mazzoMostro().sk === skX && p2pContoEsito === 'mio'
+  await giudizioInCorsoP2P(mazzoMostro());
+  out.verificaTimbra = mazzoMostro().conto === 111 && mazzoMostro().sk === skX && p2pMazzoEsito === 'mio'
     && JSON.parse(store.get('barattolo_mostro@111')).conto === 111;
-  out.timbratoNonRichiede = mazzoDaVerificareP2P(mazzoMostro()) === false;
+  out.timbratoNonRichiede = mazzoDaGiudicareP2P(mazzoMostro()) === false;
   // ...il 409 e' «non lo so»: non si tocca e non si richiede in sessione
   reset();
   ricordaMazzo(contoDi(0, skX));
   rispSeme = null;
-  await verificaContoInCorsoP2P(mazzoMostro());
+  await giudizioInCorsoP2P(mazzoMostro());
   out.verificaIgnotoNonTocca = !!mazzoMostro() && mazzoMostro().sk === skX && !mazzoMostro().conto
-    && p2pContoEsito === 'ignoto' && mazzoDaVerificareP2P(mazzoMostro()) === false;
+    && p2pMazzoEsito === 'ignoto' && mazzoDaGiudicareP2P(mazzoMostro()) === false;
   // D) IL CASO DEL CAMPO: il mazzo di ieri e' del PRIMO account, il seme
   //    del secondo dice un'altra chiave, e la copia sta anche nel cloud
   //    del secondo. Si mette da parte, il cloud si ripulisce, e il gesto
@@ -40725,7 +40737,7 @@ const corpo = f => JSON.parse(f.opt.body);
   ricordaMazzo(contoDi(0, skX));
   cloud.set('mostro_mazzo', JSON.stringify({sk: skY, pub: NT.getPublicKey(hexToBytes(skY))}));
   rispSeme = {seme: bytesToHex(NT.generateSecretKey()), versione: 1};
-  await verificaContoInCorsoP2P(mazzoMostro());
+  await giudizioInCorsoP2P(mazzoMostro());
   out.altruiCloudDiversoResta = mazzoMostro() === null
     && cloud.has('mostro_mazzo') && mazzoDaTesto(cloud.get('mostro_mazzo')).sk === skY;
   // E) il cloud non da' un profilo di un altro conto: un mazzo timbrato
@@ -40750,8 +40762,11 @@ const corpo = f => JSON.parse(f.opt.body);
   out.contoGrandeIntero = grande.conto === 8711624959
     && JSON.parse(store.get('barattolo_mostro@8711624959')).conto === 8711624959
     && mazzoMostro().conto === 8711624959;
-  out.contoGrandeNonEstraneo = mazzoEstraneoP2P(mazzoMostro()) === false
-    && mazzoDaVerificareP2P(mazzoMostro()) === false;
+  out.contoGrandeNonEstraneo = mazzoEstraneoP2P(mazzoMostro()) === false;
+  // ...e il giudice lo riconosce SUO senza toccarlo (e' il seme)
+  await giudizioInCorsoP2P(mazzoMostro());
+  out.contoGrandeGiudicatoMio = p2pMazzoEsito === 'mio'
+    && mazzoMostro().sk === skY && mazzoMostro().conto === 8711624959;
   // H) LA RIPRESA: il parcheggio con la STESSA sk torna vivo — indice
   //    piu' alto, scambi uniti (vince il vivo), parcheggio svuotato
   reset();
@@ -40811,7 +40826,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "semeNemmenoChiesto": "...e il seme non si chiede nemmeno",
         "senzaSemeSiGenera": "senza seme (409) si genera come sempre",
         "semeStortoScartato": "un seme storto si scarta e non fa un profilo rotto",
-        "localeNienteSeme": "col mazzo del CONTO in locale il seme non si chiede",
+        "localeUnSemeSolo": "col mazzo gia' in locale il seme si chiede UNA volta, e il mazzo non si tocca",
         "dispositivoCedeIlPosto": "...e uno di dispositivo mai usato cede il posto PRIMA di firmare",
         "vecchioSullaMensola": "...e il vecchio resta sulla mensola, mai buttato",
         "conStoriaTiene": "...mentre uno con una storia resta dov'e'",
@@ -40824,7 +40839,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "tornatoDalCloud": "dal cloud il mazzo torna com'era, indice compreso",
         "cloudNonRiscritto": "...senza riscrivere il cloud",
         "registratoLoStesso": "...e la pubkey si registra lo stesso",
-        "localeNienteRete": "col mazzo gia' in locale il gesto non chiama la rete",
+        "localeSoloIlSeme": "...e il gesto non chiama nient'altro che il seme",
         "localeMigra": "...e la copia nel cloud si rifa' da sola (la migrazione)",
         "senzaTelegram": "fuori da Telegram niente cloud, ma il mazzo nasce e si registra",
         "stubNonInganna": "lo stub di Telegram senza initData non apre il cloud",
@@ -40865,7 +40880,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "ieriLetto": "...e si leggono da li', indice compreso",
         "ieriNonSovrascrive": "...ma un posto gia' occupato non si sovrascrive",
         "giudiceEstraneo": "un mazzo 'conto' con un altro tg_id e' di un altro, e solo quello",
-        "giudiceDaVerificare": "un mazzo 'conto' di ieri si verifica, uno timbrato o di dispositivo no",
+        "portaNonGuardaOrigine": "...e la porta del giudizio non guarda l'origine",
         "verificaTimbra": "il seme uguale timbra il mazzo col conto",
         "timbratoNonRichiede": "...e da li' non si richiede piu'",
         "verificaIgnotoNonTocca": "il 409 e' «non lo so»: niente si tocca, e in sessione non si richiede",
@@ -40878,6 +40893,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "derivatoPortaIlConto": "il mazzo derivato porta il conto, e il campo sopravvive al testo",
         "contoGrandeIntero": "un tg_id sopra 2^31 resta intero nel mazzo e nel testo",
         "contoGrandeNonEstraneo": "...e il mazzo appena derivato non si legge «di un altro»",
+        "contoGrandeGiudicatoMio": "...e il giudice lo riconosce suo, senza toccarlo",
         "ripresaPrende": "il parcheggio con la stessa sk torna vivo, con l'indice piu' alto",
         "ripresaUnisce": "...unisce gli scambi (vince il vivo) e si svuota",
         "ripresaNonRuba": "...e una sk diversa non si tocca",
@@ -41254,7 +41270,7 @@ function reset(){
      QUELLA sessione: senza queste tre righe il seme caduto di un caso
      resterebbe in tasca al successivo, e il giudizio gia' dato
      chiuderebbe la porta a chi viene dopo */
-  p2pSemeGiro = null; p2pDispositivoEsito = ''; p2pCessione = null;
+  p2pSemeGiro = null; p2pMazzoEsito = ''; p2pGiudizio = null;
   p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
   P2P_ATTESA_MS = 30000;
   p2pInfo = {fee: 0.01, pow: 8, powPrimo: 10, maxSats: 100000, minSats: 100,
@@ -43911,11 +43927,11 @@ def prove_p2p_conto_dispositivo():
     azz = pezzo_js(mini, "function azzeraSessioneP2P(){", "\n}\n")
     for v in ("p2pRegistrato = false", "p2pAdozione = false", "p2pPavimento = null",
               "p2pMieiOrdini = null", "p2pMieiChiesto = false", "p2pChiaviNote = null",
-              "mazzoNuvola = ''", "p2pOrdiniRegistrati = new Set()", "p2pContoEsito = ''",
-              # 14 set 2026: il giudizio sul profilo di dispositivo e il
-              # seme in tasca sono di QUEL conto — il seme di un altro
-              # account e' un'altra chiave
-              "p2pDispositivoEsito = ''", "p2pSemeGiro = null"):
+              "mazzoNuvola = ''", "p2pOrdiniRegistrati = new Set()",
+              # 14 set 2026: il giudizio sul mazzo e il seme in tasca
+              # sono di QUEL conto — il seme di un altro account e'
+              # un'altra chiave
+              "p2pMazzoEsito = ''", "p2pSemeGiro = null"):
         prova("l'azzeramento tocca %s" % v.split(" =")[0], True, v in azz)
 
     # --- 3) IL RENDER NON FIRMA CON LE CHIAVI DI UN ALTRO ---------------
@@ -43923,16 +43939,20 @@ def prove_p2p_conto_dispositivo():
     prova("il mazzo di un altro conto si mette da parte PRIMA di registrarlo",
           True, 0 < rp.find("if (mz && mazzoEstraneoP2P(mz)) { parcheggiaMazzoAltruiP2P(mz); mz = null; }")
           < rp.find("registraChiaviP2P([mz.pub])"))
-    prova("...e quello di ieri si verifica una volta, senza registrare ne' chiedere la restore",
-          True, "if (daVerificare && !p2pContoVerifica) verificaContoInCorsoP2P(mz).then(renderP2P, renderP2P);" in rp
-          and "if (mz && !daVerificare && !p2pRegistrato" in rp
-          and "if (mz && !daVerificare && !daCedere && !p2pMieiChiesto" in rp)
+    # IL GIUDIZIO E' UNO SOLO dal 14 set 2026, e tiene DUE freni: senza
+    # la sua risposta non si registra (intesterebbe a me una chiave che
+    # potrebbe essere di un altro) e non si chiede la restore (partirebbe
+    # per un'identita' che sta per andarsene).
+    prova("il mazzo si giudica una volta, senza registrare ne' chiedere la restore",
+          True, "if (daGiudicare && !p2pGiudizio) giudizioInCorsoP2P(mz).then(renderP2P, renderP2P);" in rp
+          and "if (mz && !daGiudicare && !p2pRegistrato" in rp
+          and "if (mz && !daGiudicare && !p2pMieiChiesto" in rp)
     prova("l'adozione vuole l'identita', anche dentro Telegram", True,
           "if (!mz && !p2pAdozione && myTgId) {" in rp
           and "(cloudTelegram() || myTgId)" not in rp)
     ass = pezzo_js(mini, "function assicuraMazzo(", "\n}\n")
-    prova("il gesto verifica un mazzo 'conto' di ieri PRIMA di firmarci sopra", True,
-          0 < ass.find("if (m && mazzoDaVerificareP2P(m)) return verificaContoInCorsoP2P(m).then(assicuraMazzo);")
+    prova("il gesto giudica il mazzo PRIMA di firmarci sopra", True,
+          0 < ass.find("if (m && mazzoDaGiudicareP2P(m)) return giudizioInCorsoP2P(m).then(assicuraMazzo);")
           < ass.find("if (m) { sincronizzaMazzo(); return Promise.resolve(m); }"))
 
     # --- 4) DA PARTE, MAI VIA — e il cloud dopo -------------------------
@@ -43948,8 +43968,8 @@ def prove_p2p_conto_dispositivo():
           "if (su && su.sk === m.sk) await cloudCancella(CLOUD_MAZZO);" in par)
     sin = pezzo_js(mini, "function sincronizzaMazzo(", "\n}\n")
     ado = sin[sin.index("if (!m) {"):sin.index("if (letto.testo) {")]
-    prova("un mazzo di ieri adottato dal cloud non si registra prima della verifica", True,
-          "if (!mazzoDaVerificareP2P(su)) await registraChiaviP2P([su.pub]);" in ado)
+    prova("un mazzo adottato dal cloud non si registra prima del giudizio", True,
+          "if (!mazzoDaGiudicareP2P(su)) await registraChiaviP2P([su.pub]);" in ado)
     prova("il cloud non da' un profilo di un altro conto: se ne va invece di essere adottato",
           True, 0 < ado.find("if (mazzoEstraneoP2P(su)) { await cloudCancella(CLOUD_MAZZO); return (mazzoNuvola = ''); }")
           < ado.find("ricordaMazzo(su);"))
@@ -43973,19 +43993,35 @@ def prove_p2p_conto_dispositivo():
     prova("...e il campo viaggia nel testo, andata e ritorno", True,
           "conto: numeroConto(m.conto)});" in blocco_mazzo
           and "conto: d ? numeroConto(d.conto) : 0};" in blocco_mazzo)
-    prova("i due giudici: 'conto' con un altro tg_id = estraneo; 'conto' senza tg_id = da verificare",
-          True, "m.origine === 'conto' && numeroConto(m.conto) && myTgId && numeroConto(m.conto) !== numeroConto(myTgId)" in blocco
-          and "m.origine === 'conto' && !numeroConto(m.conto) && myTgId && p2pContoEsito !== 'ignoto'" in blocco)
-    ver = pezzo_js(mini, "async function verificaContoP2P(m){", "\n}\n")
-    prova("la verifica rilegge il mazzo dopo l'attesa, e non giudica uno cambiato nel frattempo",
-          True, "if (!ora || ora.sk !== m.sk) return;" in ver)
+    # ⚠️ UN GIUDICE SOLO dal 14 set 2026, piu' la SCORCIATOIA sincrona.
+    # I tre predicati di prima erano indicizzati su `origine`, e tre
+    # fette disgiunte di un campo descrittivo non coprono l'insieme: il
+    # mazzo 'conto' col MIO timbro ma con una sk che il seme non rifa'
+    # piu' non lo guardava nessuno. La porta adesso non chiede piu' che
+    # cosa dichiara di essere — a quello serve il giudice.
+    prova("la scorciatoia sincrona resta: 'conto' col timbro di un ALTRO",
+          True, "m.origine === 'conto' && numeroConto(m.conto) && myTgId && numeroConto(m.conto) !== numeroConto(myTgId)" in blocco)
+    prova("...e la porta del giudizio non guarda l'origine", True,
+          "return !!(m && myTgId && !p2pMazzoEsito);" in blocco)
+    giu = pezzo_js(mini, "async function giudicaMazzoP2P(m){", "\n}\n")
+    prova("il giudizio rilegge il mazzo, e non giudica uno cambiato nel frattempo",
+          True, "if (!ora || ora.sk !== m.sk) return;" in giu)
     prova("...il 409 e' «non lo so» e non tocca niente", True,
-          "if (!s) { p2pContoEsito = 'ignoto'; return; }" in ver)
-    prova("...uguale timbra, diverso mette da parte", True,
-          "ricordaMazzo(Object.assign({}, ora, {conto: myTgId}));" in ver
-          and "await parcheggiaMazzoAltruiP2P(ora);" in ver)
-    prova("una verifica sola per sessione", True,
-          "if (!p2pContoVerifica) p2pContoVerifica = verificaContoP2P(m)" in mini)
+          "if (!s) { p2pMazzoEsito = 'ignoto'; return; }" in giu)
+    prova("...uguale al seme: si timbra e basta", True,
+          "if (s.sk === ora.sk) {" in giu
+          and "p2pMazzoEsito = 'mio';" in giu)
+    # ⚠️ E IL TIMBRO MIO NON FINISCE SULLA MENSOLA (14 set, il pezzo 2):
+    # un 'conto' che porta il MIO tg_id l'ha scritto una mia sessione,
+    # quindi e' mio — solo, nato da un seme che oggi non si rifa' piu'
+    # (il sale non committato dell'8-9 set). E' la fetta che i tre
+    # giudici di prima lasciavano scoperta: buttarlo sulla mensola
+    # perche' «dice conto» ne butterebbe via la reputazione in silenzio.
+    prova("...e sulla mensola ci va solo chi dice un conto NON mio", True,
+          "if (ora.origine === 'conto'" in giu
+          and "&& numeroConto(ora.conto) !== numeroConto(myTgId)) {" in giu)
+    prova("un giudizio solo per sessione", True,
+          "if (!p2pGiudizio) p2pGiudizio = giudicaMazzoP2P(m)" in mini)
     # --- 6) IL TG_ID SOPRA 2^31 (il secondo giro dal campo) ---------
     # 8711624959 | 0 fa 121690367: il conto non passa MAI da un
     # bitwise, in nessun punto del blocco ne' nel testo del mazzo
@@ -44010,37 +44046,37 @@ def prove_p2p_conto_dispositivo():
     # Il rovescio della cura del 13: da un PC che tiene un profilo suo
     # LEGGERE funzionava (la restore chiede a tutt'e due le identita')
     # ma PUBBLICARE no — e un solo account avrebbe avuto due storie.
-    ced = pezzo_js(mini, "async function cediIlPostoAlContoP2P(m){", "\n}\n")
     pas = pezzo_js(mini, "async function passaAlContoP2P(m, s){", "\n}\n")
     ges = pezzo_js(mini, "async function passaAlContoDalFoglioP2P(btn){", "\n}\n")
     rpr = pezzo_js(mini, "function renderProfiloP2P(){", "\n}\n")
-    prova("il giudice nuovo guarda i mazzi che NON vengono dal conto",
-          True, "m.origine !== 'conto' && myTgId && !p2pDispositivoEsito" in blocco)
-    prova("...e una cessione sola per sessione", True,
-          "if (!p2pCessione) p2pCessione = cediIlPostoAlContoP2P(m)" in mini)
+    prova("la porta del giudizio guarda solo se c'e' gia' un esito",
+          True, "return !!(m && myTgId && !p2pMazzoEsito);" in blocco)
     # IL SEME PER PRIMO: il corpo di una async gira sincrono fino al
     # primo await, e `p2pPavimento` lo scrive renderP2P DOPO. Leggendolo
     # prima si giudicherebbe «indice zero» su un fatto non ancora
     # chiesto — la corsa del 9 set, di nuovo.
-    prova("il pavimento si aspetta, e DOPO il primo await", True,
-          0 <= ced.find("await semeContoP2P()") < ced.find("await p2pPavimento")
-          < ced.find("const ora = mazzoMostro();"))
-    prova("...e il mazzo si rilegge prima di giudicarlo", True,
-          ced.find("const ora = mazzoMostro();") < ced.find("senzaStoriaP2P(ora)"))
-    prova("un mazzo cambiato nel frattempo non si giudica", True,
-          "if (!ora || ora.sk !== m.sk) return;" in ced)
-    prova("il 409 e' «non lo so», e non tocca niente", True,
-          "if (!s) { p2pDispositivoEsito = 'ignoto'; return; }" in ced)
+    # ⚠️ IL PAVIMENTO SI CHIEDE DOPO, e l'unificazione l'ha spostato:
+    # registrare la pubkey di un mazzo ancora da giudicare puo'
+    # intestare a me, in `p2p_indice`, la chiave di un ALTRO. Da dove
+    # sta adesso si sa gia' che quel mazzo e' mio — non e' il seme, ma
+    # non dichiara nessun conto altrui — e allora si puo' chiedere.
+    prova("il pavimento si chiede solo dopo aver escluso i conti altrui",
+          True, 0 < giu.find("p2pMazzoEsito = 'mensola';")
+          < giu.find("p2pPavimento = p2pPavimento || registraChiaviP2P([ora.pub]);"))
+    prova("...e si ASPETTA prima di dire «mai usato»", True,
+          0 < giu.find("try { await p2pPavimento; } catch(e){}")
+          < giu.find("senzaStoriaP2P(dopo)"))
+    prova("...e il mazzo si rilegge DOPO il pavimento", True,
+          0 < giu.find("const dopo = mazzoMostro();")
+          < giu.find("senzaStoriaP2P(dopo)"))
     # ⚠️ LA STRADA SOVRANA NON SI CEDE MAI IN SILENZIO: il foglio le
     # promette «questo profilo non lo puo' ricavare nessun altro, noi
     # compresi», e rimpiazzarla con una derivata dal server smentirebbe
     # quella riga proprio a chi l'aveva letta.
     prova("la strada sovrana non cede mai il posto da sola", True,
-          "if (ora.origine === 'mia' && s.sk !== ora.sk) { p2pDispositivoEsito = 'sovrano'; return; }"
-          in ced)
+          "if (ora.origine === 'mia') { p2pMazzoEsito = 'sovrano'; return; }" in giu)
     prova("...e un profilo con una storia nemmeno", True,
-          "if (s.sk !== ora.sk && !senzaStoriaP2P(ora)) { p2pDispositivoEsito = 'tenuto'; return; }"
-          in ced)
+          "if (!senzaStoriaP2P(dopo)) { p2pMazzoEsito = 'tenuto'; return; }" in giu)
     # TRE APPIGLI E NON UNO: l'indice torna a zero su un dispositivo
     # svuotato, le righe si perdono, le lapidi restano quando le righe
     # se ne vanno. Una sola sarebbe una scommessa.
@@ -44067,11 +44103,11 @@ def prove_p2p_conto_dispositivo():
           "await registraChiaviP2P([mazzoMostro().pub]);" in pas)
     # IL RENDER E IL GESTO: si giudica PRIMA di pubblicare, ed e' tutto
     # il senso del cantiere.
-    prova("il render giudica il profilo nato qui", True,
-          "const daCedere = !!(mz && mazzoDiDispositivoP2P(mz));" in rp
-          and "if (daCedere && !p2pCessione) cessioneInCorsoP2P(mz).then(renderP2P, renderP2P);" in rp)
+    prova("il render giudica il mazzo che trova", True,
+          "const daGiudicare = !!(mz && mazzoDaGiudicareP2P(mz));" in rp
+          and "if (daGiudicare && !p2pGiudizio) giudizioInCorsoP2P(mz).then(renderP2P, renderP2P);" in rp)
     prova("...e il gesto aspetta il giudizio prima di firmare", True,
-          "if (m && mazzoDiDispositivoP2P(m)) return cessioneInCorsoP2P(m).then(assicuraMazzo);"
+          "if (m && mazzoDaGiudicareP2P(m)) return giudizioInCorsoP2P(m).then(assicuraMazzo);"
           in ass)
     # IL GESTO DEL FOGLIO, per chi il posto non lo cede da solo: la
     # cintura degli scambi aperti e' la stessa del «dimentica», e per la
@@ -44235,14 +44271,14 @@ console.log(JSON.stringify(out));
     prova("...e chiede conferma dicendo che il vecchio resta", True,
           "resta da parte" in ges and "cancella" in ges)
     prova("l'avviso dei due profili si vede a «tenuto» e a «sovrano»",
-          True, "p2pDispositivoEsito === 'tenuto' || p2pDispositivoEsito === 'sovrano'" in rpr)
+          True, "p2pMazzoEsito === 'tenuto' || p2pMazzoEsito === 'sovrano'" in rpr)
     # il CONTEGGIO non basta: un gate rovesciato lascerebbe il bottone
     # una volta sola e acceso per tutti — si guarda anche la condizione
     prova("...ma il bottone SOLO a «tenuto»", True,
-          "+ (p2pDispositivoEsito === 'tenuto'" in rpr
+          "+ (p2pMazzoEsito === 'tenuto'" in rpr
           and rpr.count("passaAlContoDalFoglioP2P(this)") == 1)
     prova("...e il foglio fa partire il giudizio da solo", True,
-          "if (mazzoDiDispositivoP2P(m) && !p2pCessione)" in rpr)
+          "if (mazzoDaGiudicareP2P(m) && !p2pGiudizio)" in rpr)
 
     # --- 8b) IL BANCO DELLA CESSIONE --------------------------------
     # Le sentinelle dicono che le righe ci sono; qui il giudizio GIRA,
@@ -44254,13 +44290,14 @@ console.log(JSON.stringify(out));
     else:
         banco8 = "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
-            for f in ("function mazzoDiDispositivoP2P(m){",
+            for f in ("function mazzoDaGiudicareP2P(m){",
+                      "function numeroConto(x){",
                       "function senzaStoriaP2P(m){",
                       "async function passaAlContoP2P(m, s){",
-                      "async function cediIlPostoAlContoP2P(m){")) + r"""
+                      "async function giudicaMazzoP2P(m){")) + r"""
 let LOCALE = null, SEME = null, SCAMBI = {}, LAPIDI = {};
 let PARCHEGGIO = null, NOTA = '', REGISTRATE = null, p2pPavimento = null;
-let p2pDispositivoEsito = '', myTgId = 111, semeChiesto = 0;
+let p2pMazzoEsito = '', myTgId = 111, semeChiesto = 0;
 function mazzoMostro(){ return LOCALE; }
 function ricordaMazzo(m){ LOCALE = m; }
 function ordiniP2P(){ return SCAMBI; }
@@ -44283,14 +44320,14 @@ console.log = () => {};
   const giro = async (pre) => {
     LOCALE = null; SEME = null; SCAMBI = {}; LAPIDI = {};
     PARCHEGGIO = null; NOTA = ''; REGISTRATE = null; p2pPavimento = null;
-    p2pDispositivoEsito = ''; semeChiesto = 0;
+    p2pMazzoEsito = ''; semeChiesto = 0; p2pPavimento = null;
     const m = pre();
-    await cediIlPostoAlContoP2P(m);
+    await giudicaMazzoP2P(m);
   };
   // a) IL CASO DI ANDREA: nato qui, mai usato, e il conto ne offre uno
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'cc', versione: 2};
     return LOCALE; });
-  out.ceduto = p2pDispositivoEsito === 'ceduto'
+  out.ceduto = p2pMazzoEsito === 'ceduto'
     && !!PARCHEGGIO && PARCHEGGIO.sk === 'aa'
     && NOTA.indexOf('era di questo dispositivo') === 0
     && !!LOCALE && LOCALE.sk === 'cc' && LOCALE.pub === 'Pcc'
@@ -44301,16 +44338,16 @@ console.log = () => {};
   // b) con una trade key bruciata: il posto non si cede
   await giro(() => { LOCALE = Object.assign({}, DI_QUI, {indice: 3});
     SEME = {sk: 'cc', versione: 2}; return LOCALE; });
-  out.conIndiceTiene = p2pDispositivoEsito === 'tenuto' && !PARCHEGGIO
+  out.conIndiceTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO
     && LOCALE.sk === 'aa';
   // c) con una riga di scambio, anche a indice zero
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'cc', versione: 2};
     SCAMBI = {'ord-a': {id: 'ord-a'}}; return LOCALE; });
-  out.conRigaTiene = p2pDispositivoEsito === 'tenuto' && !PARCHEGGIO;
+  out.conRigaTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
   // d) con una lapide, che resta quando la riga se n'e' andata
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'cc', versione: 2};
     LAPIDI = {'ord-b': 1}; return LOCALE; });
-  out.conLapideTiene = p2pDispositivoEsito === 'tenuto' && !PARCHEGGIO;
+  out.conLapideTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
   // e) IL PAVIMENTO PARLA: l'indice locale e' zero, quello vero no.
   //    Il bump sta DOPO un await vero, o la prova passerebbe anche
   //    senza l'attesa (la lezione della tortura).
@@ -44318,38 +44355,63 @@ console.log = () => {};
     p2pPavimento = (async () => { await new Promise(r => setTimeout(r, 30));
       LOCALE = Object.assign({}, LOCALE, {indice: 2}); return true; })();
     return LOCALE; });
-  out.pavimentoAspettato = p2pDispositivoEsito === 'tenuto' && !PARCHEGGIO;
+  out.pavimentoAspettato = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
   // f) LA STRADA SOVRANA non cede mai in silenzio, nemmeno mai usata
   await giro(() => { LOCALE = Object.assign({}, DI_QUI, {origine: 'mia'});
     SEME = {sk: 'cc', versione: 2}; return LOCALE; });
-  out.sovranaTiene = p2pDispositivoEsito === 'sovrano' && !PARCHEGGIO
+  out.sovranaTiene = p2pMazzoEsito === 'sovrano' && !PARCHEGGIO
     && LOCALE.sk === 'aa';
   // g) il 409: non si sa, e non si tocca
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); return LOCALE; });
-  out.ignoto = p2pDispositivoEsito === 'ignoto' && !PARCHEGGIO
+  out.ignoto = p2pMazzoEsito === 'ignoto' && !PARCHEGGIO
     && LOCALE.sk === 'aa';
   // h) ERA GIA' LUI e non lo diceva: si timbra, e non si parcheggia
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'aa', versione: 5};
     return LOCALE; });
-  out.timbrato = p2pDispositivoEsito === 'ceduto' && !PARCHEGGIO
+  out.timbrato = p2pMazzoEsito === 'mio' && !PARCHEGGIO
     && LOCALE.sk === 'aa' && LOCALE.origine === 'conto'
     && LOCALE.conto === 111 && LOCALE.versione === 5;
   // i) cambiato nel frattempo: non si giudica quello di prima
   await giro(() => { const m = Object.assign({}, DI_QUI);
     LOCALE = Object.assign({}, DI_QUI, {sk: 'zz'}); SEME = {sk: 'cc', versione: 2};
     return m; });
-  out.cambiatoNonSiTocca = p2pDispositivoEsito === '' && !PARCHEGGIO
+  out.cambiatoNonSiTocca = p2pMazzoEsito === '' && !PARCHEGGIO
     && LOCALE.sk === 'zz';
   // j) IL GIUDICE, i quattro rami
-  p2pDispositivoEsito = '';
-  out.giudiceConto = mazzoDiDispositivoP2P({origine: 'conto'}) === false;
-  out.giudiceDispositivo = mazzoDiDispositivoP2P({origine: ''}) === true;
-  out.giudiceSovrana = mazzoDiDispositivoP2P({origine: 'mia'}) === true;
+  // l) IL 'CONTO' COL MIO TIMBRO ma nato da un seme che non si rifa'
+  //    piu': e' la fetta che i tre giudici di prima lasciavano
+  //    scoperta. E' MIO — lo dice il timbro — quindi vale la regola
+  //    della storia, non la mensola.
+  await giro(() => { LOCALE = Object.assign({}, DI_QUI,
+    {origine: 'conto', conto: 111}); SEME = {sk: 'cc', versione: 2};
+    return LOCALE; });
+  out.timbratoMioCede = p2pMazzoEsito === 'ceduto' && !!PARCHEGGIO
+    && !!LOCALE && LOCALE.sk === 'cc';
+  await giro(() => { LOCALE = Object.assign({}, DI_QUI,
+    {origine: 'conto', conto: 111, indice: 3}); SEME = {sk: 'cc', versione: 2};
+    return LOCALE; });
+  out.timbratoMioConStoriaTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO
+    && LOCALE.sk === 'aa';
+  // m) ...e un 'conto' col timbro di un ALTRO (o senza timbro) va
+  //    sulla mensola comunque: l'ambiguo del 10 set
+  await giro(() => { LOCALE = Object.assign({}, DI_QUI,
+    {origine: 'conto', conto: 222, indice: 3}); SEME = {sk: 'cc', versione: 2};
+    return LOCALE; });
+  out.timbratoAltruiMensola = p2pMazzoEsito === 'mensola' && !!PARCHEGGIO;
+  await giro(() => { LOCALE = Object.assign({}, DI_QUI,
+    {origine: 'conto', conto: 0, indice: 3}); SEME = {sk: 'cc', versione: 2};
+    return LOCALE; });
+  out.senzaTimbroMensola = p2pMazzoEsito === 'mensola' && !!PARCHEGGIO;
+  // n) LA PORTA, i tre rami che le restano
+  p2pMazzoEsito = '';
+  out.portaApre = mazzoDaGiudicareP2P({origine: 'conto'}) === true
+    && mazzoDaGiudicareP2P({origine: ''}) === true
+    && mazzoDaGiudicareP2P({origine: 'mia'}) === true;
   myTgId = null;
-  out.giudiceSenzaConto = mazzoDiDispositivoP2P({origine: ''}) === false;
+  out.portaSenzaConto = mazzoDaGiudicareP2P({origine: ''}) === false;
   myTgId = 111;
-  p2pDispositivoEsito = 'tenuto';
-  out.giudiceUnaVolta = mazzoDiDispositivoP2P({origine: ''}) === false;
+  p2pMazzoEsito = 'tenuto';
+  out.portaUnaVolta = mazzoDaGiudicareP2P({origine: ''}) === false;
   console.log = c => c;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e.stack || e)); process.exit(1); });
@@ -44379,13 +44441,20 @@ console.log = () => {};
             prova("il 409 non tocca niente", True, o8["ignoto"])
             prova("chi era gia' il profilo del conto si timbra, senza "
                   "parcheggio", True, o8["timbrato"])
+            # LA FETTA CHE PRIMA NON GUARDAVA NESSUNO (il pezzo 2):
+            prova("il 'conto' col MIO timbro e la sk vecchia cede il posto",
+                  True, o8["timbratoMioCede"])
+            prova("...e se ha una storia si tiene, come ogni altro",
+                  True, o8["timbratoMioConStoriaTiene"])
+            prova("il 'conto' col timbro di un ALTRO va sulla mensola",
+                  True, o8["timbratoAltruiMensola"])
+            prova("...e cosi' quello che il timbro non ce l'ha",
+                  True, o8["senzaTimbroMensola"])
             prova("...e un mazzo cambiato sotto il giudizio non si tocca",
                   True, o8["cambiatoNonSiTocca"])
-            for k, nome in (("giudiceConto", "il giudice lascia stare i mazzi 'conto'"),
-                            ("giudiceDispositivo", "...guarda quelli nati qui"),
-                            ("giudiceSovrana", "...e anche la strada sovrana"),
-                            ("giudiceSenzaConto", "...tace senza identita'"),
-                            ("giudiceUnaVolta", "...e una volta data la risposta non torna")):
+            for k, nome in (("portaApre", "la porta fa entrare ogni mazzo, qualunque origine"),
+                            ("portaSenzaConto", "...tace senza identita'"),
+                            ("portaUnaVolta", "...e una volta dato l'esito non torna")):
                 prova(nome, True, o8[k])
 
 
@@ -44625,11 +44694,11 @@ def prove_p2p_nuvola():
           # il conto sul dispositivo (set 2026): il giudice vero, e il cloud
           # che si svuota — il ramo dell'adozione lo chiama per un mazzo
           # 'conto' che dichiara un altro tg_id
-          "let myTgId = 111, p2pContoEsito = '';\n"
+          "let myTgId = 111, p2pMazzoEsito = '';\n"
           "function cloudCancella(){ NUVOLA = null; return Promise.resolve(true); }\n"
           + pezzo_js(mini, "function numeroConto(x){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function mazzoEstraneoP2P(m){", "\n}\n") + "\n}\n"
-          + pezzo_js(mini, "function mazzoDaVerificareP2P(m){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function mazzoDaGiudicareP2P(m){", "\n}\n") + "\n}\n"
           + sin + "\n"
           "const A = {sk:'aa', pub:'AA'}, B = {sk:'bb', pub:'BB'};\n"
           "(async () => {\n"
@@ -44729,8 +44798,15 @@ def prove_p2p_nuvola():
             # dispositivo nuovo restava senza mazzo pur avendone una
             # copia a un centimetro di distanza — e' il sintomo dal
             # campo («il Desktop dice che non c'e' un profilo»).
+            # ⚠️ E NON REGISTRA PIU' SUBITO (14 set 2026, il giudice
+            # unico): la pubkey di un mazzo ancora da giudicare puo'
+            # essere di un ALTRO, e intestarla a me in `p2p_indice` e'
+            # proprio il guasto che il 10 set aveva chiuso per i soli
+            # mazzi 'conto' di ieri. La registrazione arriva col render
+            # dopo, quando il giudizio ha risposto: l'ultimo posto e'
+            # `null` invece di "BB".
             prova("senza mazzo, il cloud pieno si ADOTTA",
-                  ["copia", None, None, "bb", "BB"], g["adotta"])
+                  ["copia", None, None, "bb", None], g["adotta"])
             # ...e non si GENERA: aprire una pagina non deve far nascere
             # un'identita' che nessuno ha chiesto
             prova("senza mazzo e senza copia non nasce niente",
@@ -46212,9 +46288,12 @@ const fmtEur = e => e.toFixed(2).replace('.', ',');
     # restano diretti: hanno gia' il loro freno, e stanno su strade che
     # si escludono a vicenda. Il conto resta un censimento: un quinto
     # chiamante va spiegato qui.
-    prova("...il seme lo chiedono il gesto, la gamba dell'app, la verifica"
-          " del conto e il memo", 3,
-          mini.count("await semeProfiloP2P()"))
+    # ...E DAL 14 SET 2026 SONO DUE PIU' IL MEMO: il giudice unico ha
+    # preso il posto della verifica del conto, e chiede il seme dal
+    # memo come `identitaMieP2P`. Restano diretti il gesto
+    # (`assicuraMazzo`) e la gamba dell'app (`adottaProfiloContoP2P`).
+    prova("...il seme lo chiedono il gesto, la gamba dell'app e il memo",
+          2, mini.count("await semeProfiloP2P()"))
     prova("...e il memo e' l'UNICO che lo chiede senza aspettarlo", 1,
           mini.count("p2pSemeGiro = semeProfiloP2P();"))
     # tre: le mie identita', il giudizio del profilo di dispositivo e
@@ -46320,7 +46399,12 @@ def prove_p2p_campanello():
     # SETTE dal 14 set 2026: `passaAlContoP2P`, per la stessa ragione —
     # il profilo che prende il posto vuole il pavimento subito, o
     # riuserebbe una trade key gia' bruciata da un altro dispositivo.
-    prova("i chiamanti di registraChiaviP2P sono sette", 7, len(_reg))
+    # OTTO col giudice unico: `giudicaMazzoP2P` il pavimento se lo
+    # chiede da solo, e DOPO aver escluso i conti altrui — prima
+    # intesterebbe a me, in `p2p_indice`, una chiave che potrebbe non
+    # essere mia. Senza quel numero, «mai usato» si leggerebbe su uno
+    # zero locale che il server smentisce.
+    prova("i chiamanti di registraChiaviP2P sono otto", 8, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))

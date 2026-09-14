@@ -35646,23 +35646,21 @@ function renderP2P(){
      altrui. */
   let mz = mazzoMostro();
   if (mz && mazzoEstraneoP2P(mz)) { parcheggiaMazzoAltruiP2P(mz); mz = null; }
-  const daVerificare = !!(mz && mazzoDaVerificareP2P(mz));
-  if (daVerificare && !p2pContoVerifica) verificaContoInCorsoP2P(mz).then(renderP2P, renderP2P);
-  /* E IL PROFILO NATO QUI SI GIUDICA UNA VOLTA (14 set 2026, vedi «IL
-     POSTO CEDUTO AL PROFILO DEL CONTO»): se non ha mai scambiato e il
-     conto ne offre uno, quello del conto prende il suo posto — prima
-     che da questo dispositivo si pubblichi un ordine con un'identita'
-     che altrove non esiste. Finche' non ha risposto non si chiede la
-     restore: partirebbe per un'identita' che sta per andarsene, e
-     l'attesa del coordinatore si pagherebbe due volte. La
-     registrazione invece parte SUBITO, ed e' voluto: il pavimento del
-     server e' proprio il fatto che il giudizio aspetta. */
-  const daCedere = !!(mz && mazzoDiDispositivoP2P(mz));
-  if (daCedere && !p2pCessione) cessioneInCorsoP2P(mz).then(renderP2P, renderP2P);
+  /* IL GIUDIZIO E' UNO SOLO (14 set 2026, vedi «IL GIUDICE UNICO DEL
+     MAZZO»): tre fatti — cosa dichiara, se e' il seme, se ha storia —
+     e una tabella esaustiva. Finche' non ha risposto non si REGISTRA e
+     non si chiede la restore: la prima intesterebbe a me, in
+     `p2p_indice`, una chiave che potrebbe essere di un altro; la
+     seconda partirebbe per un'identita' che sta per andarsene, e
+     l'attesa del coordinatore si pagherebbe due volte. Il pavimento,
+     quando gli serve, se lo chiede il giudice — dopo aver stabilito
+     che quel mazzo e' MIO. */
+  const daGiudicare = !!(mz && mazzoDaGiudicareP2P(mz));
+  if (daGiudicare && !p2pGiudizio) giudizioInCorsoP2P(mz).then(renderP2P, renderP2P);
   /* Il mazzo che c'e' gia' si rimanda al server una volta per sessione:
      l'INSERT OR IGNORE e' idempotente, e cosi' un profilo importato
      o tornato dal cloud finisce nella lista da guardare. */
-  if (mz && !daVerificare && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
+  if (mz && !daGiudicare && !p2pRegistrato && !DEMO && !VETRINA && myTgId) {
     p2pRegistrato = true;
     /* il parcheggio con la STESSA sk e' mio: torna PRIMA della
        registrazione, che porta l'indice al server */
@@ -35738,7 +35736,7 @@ function renderP2P(){
      bandierina alta lo renderebbe definitivo. Meglio non chiedere:
      questo render passa, e uno dei prossimi — la rilettura dei 60
      secondi basta — trova il pavimento partito e chiede davvero. */
-  if (mz && !daVerificare && !daCedere && !p2pMieiChiesto && !p2pMieiGiro
+  if (mz && !daGiudicare && !p2pMieiChiesto && !p2pMieiGiro
       && ((mz.indice | 0) > 0 || p2pPavimento)) {
     p2pMieiChiesto = true;
     chiediMieiOrdiniP2P().then((miei) => {
@@ -36188,7 +36186,7 @@ let p2pChiaviGiro = null;
       dal seme porta dentro il tg_id da cui nasce, e un mazzo 'conto'
       con un tg_id diverso dal mio e' di un ALTRO — giudizio sincrono,
       senza rete. Quelli scritti PRIMA di oggi il campo non ce l'hanno:
-      si chiede il seme una volta (`verificaContoP2P`) — uguale, si
+      si chiede il seme una volta (`giudicaMazzoP2P`) — uguale, si
       timbra e non si richiede piu'; diverso, si mette da parte.
    3) UN MAZZO DI UN ALTRO SI METTE DA PARTE, MAI SI BUTTA
       (`parcheggiaMazzoAltruiP2P`): le quattro chiavi finiscono sotto
@@ -36210,8 +36208,6 @@ let p2pChiaviGiro = null;
 const P2P_CHIAVI_DISPOSITIVO = ['barattolo_mostro', 'barattolo_mostro_ordini',
                                 'barattolo_mostro_lapidi', 'barattolo_p2p_recapiti'];
 let p2pContoAllineato = null;   /* il tg_id per cui questa sessione e' allineata */
-let p2pContoEsito = '';         /* '' | mio | ignoto — la verifica del mazzo 'conto' di ieri */
-let p2pContoVerifica = null;    /* la promessa in volo: una per sessione */
 function chiaveP2P(base){
   /* senza identita' vale il nome di ieri: e' il posto che
      `allineaContoP2P` svuota nel conto appena questo arriva */
@@ -36243,13 +36239,12 @@ function azzeraSessioneP2P(){
   p2pChiaviNote = null; p2pChiaviGiro = null;
   mazzoNuvola = ''; mazzoNuvolaAltro = null;
   p2pOrdiniRegistrati = new Set(); p2pStatoChiesto = false; p2pAutoTentati = {};
-  p2pContoEsito = '';
-  /* il giudizio sul profilo di dispositivo e il seme in tasca sono di
-     QUEL conto: il seme di un altro account e' un'altra chiave, e
-     tenerlo sarebbe la stessa confusione da cui nasce tutto il blocco.
-     La promessa in volo no: il suo esito lo giudica chi lo riceve,
-     che rilegge il mazzo prima di scrivere. */
-  p2pDispositivoEsito = ''; p2pSemeGiro = null;
+  /* il giudizio sul mazzo e il seme in tasca sono di QUEL conto: il
+     seme di un altro account e' un'altra chiave, e tenerlo sarebbe la
+     stessa confusione da cui nasce tutto il blocco. La promessa in
+     volo no: il suo esito lo giudica chi lo riceve, che rilegge il
+     mazzo prima di scrivere. */
+  p2pMazzoEsito = ''; p2pSemeGiro = null;
 }
 /* ⚠️ IL CONTO NON PASSA MAI DA `| 0` (10 set 2026, il secondo giro dal
    campo): i tg_id nuovi di Telegram stanno SOPRA 2^31 — 8711624959 —
@@ -36266,73 +36261,59 @@ function numeroConto(x){
 function mazzoEstraneoP2P(m){
   return !!(m && m.origine === 'conto' && numeroConto(m.conto) && myTgId && numeroConto(m.conto) !== numeroConto(myTgId));
 }
-function mazzoDaVerificareP2P(m){
-  return !!(m && m.origine === 'conto' && !numeroConto(m.conto) && myTgId && p2pContoEsito !== 'ignoto');
-}
-async function verificaContoP2P(m){
-  const s = await semeProfiloP2P();
-  const ora = mazzoMostro();
-  if (!ora || ora.sk !== m.sk) return;      /* nel frattempo e' cambiato: si giudica quello nuovo */
-  if (!s) { p2pContoEsito = 'ignoto'; return; }   /* 409 o rete: non si sa, e non si tocca */
-  if (s.sk === ora.sk) {
-    ricordaMazzo(Object.assign({}, ora, {conto: myTgId}));
-    p2pContoEsito = 'mio';
-    return;
-  }
-  await parcheggiaMazzoAltruiP2P(ora);
-}
-function verificaContoInCorsoP2P(m){
-  if (!p2pContoVerifica) p2pContoVerifica = verificaContoP2P(m)
-    .then(() => {}, () => { p2pContoEsito = 'ignoto'; })
-    .then(() => { p2pContoVerifica = null; });
-  return p2pContoVerifica;
-}
-/* ============ IL POSTO CEDUTO AL PROFILO DEL CONTO (14 set 2026) ====
-   IL ROVESCIO DELLA CURA DI IERI, e lo ha visto Andrea guardandola: da
-   un PC che tiene un profilo SUO adesso LEGGERE funziona — la restore
-   chiede a tutt'e due le identita' — ma PUBBLICARE userebbe ancora
-   quello, e col tempo un solo account avrebbe DUE STORIE separate: le
-   recensioni di qua, gli scambi di la', e nessuna delle due che cresce.
-   Leggere da due identita' e' giusto per sempre; scrivere da due no.
-   IL CONTO PRENDE IL POSTO SOLO DI UN PROFILO MAI USATO, e i tre
-   pezzi del giudizio stanno in `senzaStoriaP2P`: un profilo che ha
-   scambiato ha una reputazione attaccata, e il derivato non e' «la
-   versione giusta» di un profilo — e' UN ALTRO profilo, con zero
-   recensioni, che dal coordinatore e' un estraneo. Sostituirlo in
-   silenzio sarebbe distruggere un'identita', che e' l'invariante che
-   tutto questo cantiere difende dal primo giorno.
-   ⚠️ E LA STRADA SOVRANA NON SI CEDE MAI IN SILENZIO, nemmeno mai
-   usata: `origine 'mia'` e' la chiave che uno ha messo LUI, e il
-   foglio del profilo gli promette «questo profilo non lo puo' ricavare
-   nessun altro, noi compresi». Rimpiazzarla con una che il server
-   deriva smentirebbe quella riga proprio a chi l'aveva letta. Prende
-   l'avviso; per uscirne c'e' il «dimentica il profilo», che e' un
-   gesto suo e dichiarato.
-   IL VECCHIO SI METTE DA PARTE, MAI SI BUTTA: stessa mensola
-   `@altrui:<pub>` e stessa regola delle lapidi del mazzo di un altro
-   conto — e' la ragione per cui `parcheggiaMazzoAltruiP2P` ha preso una
-   NOTA: la mensola adesso ospita due inquilini diversi, e chi legge il
-   journal deve sapere quale dei due sta guardando. */
-let p2pDispositivoEsito = '';   /* '' | ceduto | tenuto | sovrano | ignoto */
-let p2pCessione = null;         /* la promessa in volo: una per sessione */
+/* ============ IL GIUDICE UNICO DEL MAZZO (14 set 2026) ============
+   QUATTRO GIRI SULLO STESSO PUNTO hanno detto quel che il disegno non
+   diceva: i tre giudici di prima (`mazzoEstraneoP2P`,
+   `mazzoDaVerificareP2P`, `mazzoDiDispositivoP2P`) erano indicizzati su
+   `origine`, che dice la PROVENIENZA — e tre predicati su tre fette
+   disgiunte di un campo descrittivo hanno una conseguenza strutturale:
+   LE FETTE NON COPRONO L'INSIEME. Quel che restava fuori — un mazzo
+   'conto' col MIO timbro ma con una sk che il seme di oggi non rifà
+   più (la popolazione che il sale non committato dell'8-9 set ha
+   fabbricato) — non lo guardava NESSUNO. Non era sfortuna: era il modo
+   in cui quel disegno sbagliava.
+   ADESSO IL GIUDICE È UNO E LA TABELLA È ESAUSTIVA PER COSTRUZIONE,
+   perché l'ultimo ramo è «tutto il resto». Tre fatti, in quest'ordine:
+     1. il conto risponde?        no  -> ignoto, non si tocca niente
+     2. è il seme?                sì  -> è lui: si timbra e basta
+     3. cosa DICHIARA di essere?
+        - 'conto' col timbro di un ALTRO  -> mensola (è di un altro account)
+        - 'conto' SENZA timbro            -> mensola (l'ambiguo del 10 set:
+          di un altro, o mio con un sale cambiato — si mette da parte in
+          tutt'e due i casi, mai distrutto)
+        - la strada sovrana ('mia')       -> avviso, MAI in silenzio
+     4. e per tutto il resto, HA STORIA?
+        sì -> si tiene, e lo dice il foglio;  no -> cede il posto.
+   ⚠️ `origine` NON È DIVENTATA UNA SOLA ETICHETTA, e la prima stesura
+   del quadro d'insieme lo diceva: un mazzo che DICHIARA di venire da un
+   account e non è il mio è un indizio forte — è nato da un seme, e non
+   dal mio. Resta un fatto del giudizio; quel che non è più è un
+   CRITERIO sparso in tre predicati.
+   ⚠️ E LA STRADA SOVRANA È L'ECCEZIONE DICHIARATA: a un profilo
+   `origine 'mia'` il foglio promette per iscritto «il codice segreto ce
+   l'hai già tu: questo profilo non lo può ricavare nessun altro, noi
+   compresi». Rimpiazzarlo con una chiave che il SERVER deriva
+   smentirebbe quella riga proprio a chi l'aveva letta, e in silenzio.
+   Prende l'avviso senza il bottone; per uscirne c'è il «dimentica il
+   profilo», che è un gesto suo. */
+let p2pMazzoEsito = '';   /* '' | mio | mensola | sovrano | tenuto | ceduto | ignoto */
+let p2pGiudizio = null;   /* la promessa in volo: una per sessione */
 /* IL SEME UNA VOLTA PER SESSIONE, e non e' economia spicciola: senza
-   questo memo un profilo di dispositivo che TIENE il posto farebbe
-   due POST identiche a ogni apertura — una per il giudizio di qui, una
-   per `identitaMieP2P` — e il 409 di chi ha la leva spenta si
-   ripeterebbe uguale. Le altre tre chiamanti (il gesto, la gamba
-   dell'app, la verifica del conto) restano dirette: hanno gia' il loro
-   freno, e passano per strade che si escludono a vicenda. */
+   questo memo un mazzo che TIENE il posto farebbe due POST identiche a
+   ogni apertura — una per il giudizio, una per `identitaMieP2P` — e il
+   409 di chi ha la leva spenta si ripeterebbe uguale. Le altre due
+   chiamanti (il gesto e la gamba dell'app) restano dirette: hanno gia'
+   il loro freno, e passano per strade che si escludono. */
 let p2pSemeGiro = null;
 function semeContoP2P(){
   if (!p2pSemeGiro) p2pSemeGiro = semeProfiloP2P();
   return p2pSemeGiro;
 }
-/* Un mazzo che non viene dal conto, e che questa sessione non ha
-   ancora giudicato. I due giudici di sopra guardano i mazzi 'conto';
-   questo guarda tutti gli ALTRI — che sono esattamente quelli che fin
-   qui non guardava nessuno. */
-function mazzoDiDispositivoP2P(m){
-  return !!(m && m.origine !== 'conto' && myTgId && !p2pDispositivoEsito);
+/* Un mazzo che questa sessione non ha ancora giudicato. UNO SOLO: non
+   guarda piu' che cosa dichiara di essere — a quello serve il giudice,
+   non la porta. */
+function mazzoDaGiudicareP2P(m){
+  return !!(m && myTgId && !p2pMazzoEsito);
 }
 /* MAI USATO, e ci vogliono tutte e tre: l'indice conta le trade key
    BRUCIATE ma torna a zero su un dispositivo svuotato (per questo lo
@@ -36380,27 +36361,63 @@ async function passaAlContoP2P(m, s){
   await registraChiaviP2P([mazzoMostro().pub]);
   return mazzoMostro();
 }
-async function cediIlPostoAlContoP2P(m){
-  /* IL SEME PER PRIMO, e non e' un dettaglio d'ordine: il corpo di una
-     async gira SINCRONO fino al primo await, e `p2pPavimento` lo scrive
-     `renderP2P` due righe piu' sotto di dove questa parte. Leggendolo
-     prima si troverebbe `null` e si giudicherebbe «indice zero» su un
-     fatto non ancora chiesto — la corsa del 9 set, di nuovo. */
+async function giudicaMazzoP2P(m){
   const s = await semeContoP2P();
-  if (!(m.indice | 0) && p2pPavimento) { try { await p2pPavimento; } catch(e){} }
   const ora = mazzoMostro();
   if (!ora || ora.sk !== m.sk) return;     /* cambiato nel frattempo: si giudica quello nuovo */
-  if (!s) { p2pDispositivoEsito = 'ignoto'; return; }   /* 409 o rete: non si sa, e non si tocca */
-  if (ora.origine === 'mia' && s.sk !== ora.sk) { p2pDispositivoEsito = 'sovrano'; return; }
-  if (s.sk !== ora.sk && !senzaStoriaP2P(ora)) { p2pDispositivoEsito = 'tenuto'; return; }
-  await passaAlContoP2P(ora, s);
-  p2pDispositivoEsito = 'ceduto';
+  if (!s) { p2pMazzoEsito = 'ignoto'; return; }   /* 409 o rete: non si sa, e non si tocca */
+  if (s.sk === ora.sk) {
+    await passaAlContoP2P(ora, s);         /* qui timbra e basta: stessa sk */
+    p2pMazzoEsito = 'mio';
+    return;
+  }
+  /* DICE DI VENIRE DA UN CONTO CHE NON E' IL MIO — o non dice quale:
+     mensola. Col timbro di un ALTRO e' una prova (e la scorciatoia
+     sincrona del render ci arriva prima, senza chiedere niente a
+     nessuno); SENZA timbro e' l'ambiguo del 10 set — di un altro, o mio
+     con un sale cambiato — e si mette da parte in tutt'e due i casi,
+     mai distrutto.
+     ⚠️ IL TIMBRO MIO INVECE LO SALVA, ed e' la fetta che prima non
+     guardava nessuno: un 'conto' che porta il MIO tg_id l'ha scritto
+     una mia sessione, quindi e' MIO — solo, e' nato da un seme che oggi
+     non si rifa' piu' (la popolazione del sale non committato dell'8-9
+     set). Da qui in giu' lo tratta la stessa regola di un profilo di
+     dispositivo: cede il posto se non ha mai scambiato, si tiene e lo
+     dice se ha una storia. Metterlo sulla mensola perche' «dice conto»
+     ne butterebbe via la reputazione in silenzio. */
+  if (ora.origine === 'conto'
+      && numeroConto(ora.conto) !== numeroConto(myTgId)) {
+    await parcheggiaMazzoAltruiP2P(ora, 'dice di venire da un conto che non'
+      + ' e il mio: messo da parte');
+    p2pMazzoEsito = 'mensola';
+    return;
+  }
+  if (ora.origine === 'mia') { p2pMazzoEsito = 'sovrano'; return; }
+  /* ⚠️ IL PAVIMENTO SI CHIEDE QUI E NON PRIMA, ed e' la riga che
+     l'unificazione ha spostato: registrare la pubkey di un mazzo ancora
+     da giudicare puo' intestare a me, in `p2p_indice`, la chiave di un
+     ALTRO (la regola del 10 set). Da questo punto in giu' invece si sa
+     che e' MIO — non e' il seme, ma non dichiara nessun conto — quindi
+     il pavimento si puo' chiedere. E serve: l'indice locale torna a
+     zero su un dispositivo svuotato, e «mai usato» letto sullo zero
+     locale sarebbe un giudizio dato prima del fatto (la corsa del
+     9 set). La promessa e' la STESSA che tiene `renderP2P`, cosi' la
+     marcatura «e' mio» non ne aspetta una seconda. */
+  if (!(ora.indice | 0)) {
+    p2pPavimento = p2pPavimento || registraChiaviP2P([ora.pub]);
+    try { await p2pPavimento; } catch(e){}
+  }
+  const dopo = mazzoMostro();
+  if (!dopo || dopo.sk !== ora.sk) return;
+  if (!senzaStoriaP2P(dopo)) { p2pMazzoEsito = 'tenuto'; return; }
+  await passaAlContoP2P(dopo, s);
+  p2pMazzoEsito = 'ceduto';
 }
-function cessioneInCorsoP2P(m){
-  if (!p2pCessione) p2pCessione = cediIlPostoAlContoP2P(m)
-    .then(() => {}, () => { p2pDispositivoEsito = 'ignoto'; })
-    .then(() => { p2pCessione = null; });
-  return p2pCessione;
+function giudizioInCorsoP2P(m){
+  if (!p2pGiudizio) p2pGiudizio = giudicaMazzoP2P(m)
+    .then(() => {}, () => { p2pMazzoEsito = 'ignoto'; })
+    .then(() => { p2pGiudizio = null; });
+  return p2pGiudizio;
 }
 /* ⚠️ UNA RIGA E' DI QUESTO MAZZO SE LA SUA TRADE KEY SI RIDERIVA DA LUI
    (14 set 2026, dal campo di Andrea: l'avviso diceva «7 ordini ancora
@@ -36510,7 +36527,7 @@ async function passaAlContoDalFoglioP2P(btn){
       if (!m || !s) { toast('Il profilo del tuo account non risponde: riprova più tardi'); return; }
       if (mazzoMostro().sk !== m.sk) return;   /* cambiato mentre si confermava */
       await passaAlContoP2P(m, s);
-      p2pDispositivoEsito = 'ceduto';
+      p2pMazzoEsito = 'ceduto';
       renderProfiloP2P();
       renderP2P();
       toast('Fatto: da qui in poi usi il profilo del tuo account 🔁');
@@ -36667,7 +36684,7 @@ function sincronizzaMazzo(){
       /* ...e uno di ieri, che non dice di chi e', non si registra finche'
          la verifica del render non ha detto che e' mio: registrarlo ora
          intesterebbe a me, in `p2p_indice`, la chiave di un altro */
-      if (!mazzoDaVerificareP2P(su)) await registraChiaviP2P([su.pub]);
+      if (!mazzoDaGiudicareP2P(su)) await registraChiaviP2P([su.pub]);
       mazzoNuvolaAltro = null;
       return (mazzoNuvola = 'copia');
     }
@@ -36999,12 +37016,7 @@ function assicuraMazzo(){
   /* un mazzo 'conto' di ieri si verifica PRIMA di firmarci sopra: un
      ordine pubblicato con le chiavi di un altro conto e' esattamente
      il difetto (vedi «IL CONTO SUL DISPOSITIVO») */
-  if (m && mazzoDaVerificareP2P(m)) return verificaContoInCorsoP2P(m).then(assicuraMazzo);
-  /* ...e un profilo nato su questo dispositivo si giudica PRIMA di
-     pubblicarci sopra: e' tutto il senso del cantiere del 14 set —
-     un ordine nato qui con un'identita' che altrove non esiste e'
-     esattamente la seconda storia che non deve cominciare */
-  if (m && mazzoDiDispositivoP2P(m)) return cessioneInCorsoP2P(m).then(assicuraMazzo);
+  if (m && mazzoDaGiudicareP2P(m)) return giudizioInCorsoP2P(m).then(assicuraMazzo);
   /* il mazzo c'e': il gesto parte SUBITO e la riconciliazione col cloud
      va per conto suo — e' la migrazione per chi il foglio non lo apre
      mai, e non deve far aspettare nessuno */
@@ -37195,8 +37207,8 @@ function renderProfiloP2P(){
      lo scambio non saprebbe di avere due profili. Il patto del rientro
      istantaneo: si disegna quel che si sa e si ridisegna quando la
      risposta arriva, e solo se il foglio e' ancora aperto. */
-  if (mazzoDiDispositivoP2P(m) && !p2pCessione)
-    cessioneInCorsoP2P(m).then(() => {
+  if (mazzoDaGiudicareP2P(m) && !p2pGiudizio)
+    giudizioInCorsoP2P(m).then(() => {
       if (el('p2pProfiloSheet')?.classList.contains('open')) renderProfiloP2P();
     }, () => {});
   /* I DUE PROFILI SI DICONO (14 set 2026): questo dispositivo ne tiene
@@ -37205,9 +37217,9 @@ function renderProfiloP2P(){
      inaspettato — e per la strada sovrana non c'e' affatto: quella
      chiave l'ha messa lui, e a toglierla dev'essere un gesto suo (il
      «dimentica il profilo», qui sotto). */
-  const dueProfili = (p2pDispositivoEsito === 'tenuto' || p2pDispositivoEsito === 'sovrano')
+  const dueProfili = (p2pMazzoEsito === 'tenuto' || p2pMazzoEsito === 'sovrano')
     ? `<div class="trust-note"><span>⚠️</span><span>Questo profilo è nato su <b>questo dispositivo</b>, e il tuo account ne ha un altro — quello che usi altrove. Gli scambi e le recensioni restano attaccati al profilo con cui li hai fatti.</span></div>`
-      + (p2pDispositivoEsito === 'tenuto'
+      + (p2pMazzoEsito === 'tenuto'
          ? `<button class="btn ghost" onclick="passaAlContoDalFoglioP2P(this)">🔁 Usa il profilo del tuo account</button>`
          : '')
     : '';
