@@ -47924,10 +47924,19 @@ def prove_p2p_vista_miei():
     # nome della pagina e spariva al primo dito — ma il CAPPELLO del
     # blocco attaccato, SOPRA gli strumenti. Resta a vista mentre si
     # scorre, che e' la differenza fra un'etichetta e un titolo.
+    # ⚠️ ED E' IL CAPPELLO DI CASA, non un titolo che gli somiglia
+    # (richiesta di Andrea, terza stesura di questa riga): stessa
+    # `.foglio-testa` col suo `h3`, quindi la stessa aria sopra e
+    # sotto e la stessa riga che lo stacca dal resto. Una copia che
+    # somiglia si scolla al primo ritocco, e nessuno se ne accorge
+    # finche' non si mettono le due pagine una accanto all'altra.
     prova("...col titolo in cima, dentro il blocco attaccato", True,
-          '<h2 class="p2p-miei-tit">I miei scambi</h2>' in fetta
-          and fetta.index("p2p-miei-tit") > fetta.index('class="p2p-sticky"')
-          and fetta.index("p2p-miei-tit") < fetta.index('id="p2pMieiTesta"'))
+          '<div class="foglio-testa"><h3>I miei scambi</h3></div>' in fetta
+          and fetta.index("foglio-testa") > fetta.index('class="p2p-sticky"')
+          and fetta.index("foglio-testa") < fetta.index('id="p2pMieiTesta"'))
+    # ...e non e' rimasto in giro il vestito suo di ieri
+    prova("...e il vestito di ieri non e' rimasto da morto", False,
+          "p2p-miei-tit" in mini)
     # ⚠️ E SI CHIAMA COME LA VOCE DELLA NAV, parola per parola: due
     # nomi per lo stesso posto, per chi legge, sono due posti — e' la
     # regola con cui «Filtri» e' diventato «Filtro». Si confronta col
@@ -47937,7 +47946,7 @@ def prove_p2p_vista_miei():
     _nav = _nav[:_nav.index("</button>")]
     prova("...e si chiama come la voce che ci porta", True,
           _nav.endswith("I miei scambi")
-          and '>I miei scambi</h2>' in fetta)
+          and '>I miei scambi</h3>' in fetta)
     # ⚠️ ED E' GRANDE ESATTAMENTE COME IL CAPPELLO DI UN FOGLIO
     # (richiesta di Andrea): e' lo stesso oggetto — il titolo che
     # presiede una pagina — quindi si veste come «Stai comprando
@@ -47954,30 +47963,46 @@ def prove_p2p_vista_miei():
     # sembrava il numero buono. L'ha detto la MISURA dal vivo, non la
     # lettura: il cappello rende 18. Adesso le leggono tutt'e tre dalla
     # stessa variabile — chiunque vinca, il numero e' quello.
-    _tit = pezzo_js(mini, "  .p2p-miei-tit{", "}")
     _cap = pezzo_js(mini, "  .foglio-testa h3{", "}")
-    _fog = pezzo_js(mini, "  .sheet h3{", "}")
-    prova("il titolo e i cappelli dei fogli leggono la stessa misura",
-          [True, True, True],
-          ["font-size:var(--tit-foglio)" in _tit,
-           "font-size:var(--tit-foglio)" in _cap,
+    _fog = pezzo_js(mini, "  .sheet h3,.foglio-testa h3{", "}")
+    prova("i cappelli leggono la misura dalla variabile", [True, True],
+          ["font-size:var(--tit-foglio)" in _cap,
            "font-size:var(--tit-foglio)" in _fog])
     # ...e nessuna se la puo' ricablare: un `px` li' dentro vorrebbe
     # dire che le misure hanno ricominciato a viaggiare separate — ed
     # e' il modo in cui quel 16.5 era diventato una bugia silenziosa.
     prova("...e nessuna ricabla un numero suo", [],
-          [n for n, b in (("titolo", _tit), ("cappello", _cap),
-                          ("foglio", _fog))
+          [n for n, b in (("cappello", _cap), ("foglio", _fog))
            if re.search(r"font-size:[\d.]+px", b)])
-    # ...e il PESO e' lo stesso, che «grande uguale» a occhio e' anche
-    # questo: un 700 e un 800 alla stessa taglia non si somigliano.
-    prova("...e pesano uguale", [True, True],
-          ["font-weight:800" in _tit, "font-weight:800" in _fog])
+    # ⚠️ E IL CARATTERE VALE ANCHE FUORI DA UN FOGLIO, che e' quel che
+    # rende il cappello indossabile altrove: `.sheet h3` da sola
+    # lasciava un cappello messo fuori col font di SISTEMA — giusto di
+    # taglia e sbagliato di tutto il resto, cioe' il difetto che non
+    # si vede leggendo. La stessa regola porta dentro tutt'e due i
+    # selettori, quindi i valori non possono divergere.
+    prova("...e il vestito del cappello vale anche fuori da un foglio",
+          True,
+          "font-family:'Baloo 2'" in _fog and "font-weight:800" in _fog
+          and ".sheet h3,.foglio-testa h3{" in mini)
+    # LA FORMA e' quella: l'aria sopra e sotto e la riga che stacca.
+    # Si guardano sulla regola CONDIVISA, non su una copia.
+    # ⚠️ L'ANCORA PORTA LA PRIMA DICHIARAZIONE, e non e' pignoleria:
+    # `"  .foglio-testa{"` combacia ANCHE dentro i quattro spazi della
+    # gemella nella media query, che nel foglio viene PRIMA e porta
+    # solo il padding — la sentinella leggeva quella e non trovava il
+    # bordo. E' la trappola delle prove che rispondono per il vicino,
+    # stavolta su un'indentazione invece che su un contenitore.
+    _box = pezzo_js(mini, "  .foglio-testa{display:flex", "}")
+    prova("...e la forma porta la riga che lo stacca, e l'aria", True,
+          "border-bottom:1px solid var(--line-soft)" in _box
+          and "padding-bottom:10px" in _box and "margin-bottom:2px" in _box)
     prova("...e la variabile e' dichiarata una volta sola", 1,
           mini.count("--tit-foglio:"))
-    # CENTRATO come il cappello, che e' l'altra meta' della richiesta
-    prova("...e sta al centro, come lui", [True, True],
-          ["text-align:center" in _tit, "text-align:center" in _cap])
+    # CENTRATO, e adesso da UNA regola sola: i due cappelli sono lo
+    # stesso vestito, quindi non c'e' piu' niente da tenere in pari —
+    # e' la forma piu' forte di «uguali».
+    prova("...e sta al centro, come lui", True,
+          "text-align:center" in _cap)
     # IL DEPOSITO STA NELLA VISTA e non nella testata: #p2pMieiTesta lo
     # riscrive renderP2P a ogni giro, e li' dentro il valore morirebbe.
     prova("...e il deposito dell'ordine sta nella VISTA, non nella testata",

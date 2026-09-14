@@ -1875,23 +1875,16 @@
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
     padding-bottom:3px}
-  /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea):
-     sta dentro il blocco attaccato, sopra gli strumenti, quindi resta
-     a vista mentre si scorre — che e' la differenza fra un titolo e
-     l'etichetta di sezione che c'era prima.
-     ⚠️ CENTRATO E DELLA MISURA DEL CAPPELLO DI UN FOGLIO (ritocco di
-     Andrea, lo stesso giorno): e' lo stesso oggetto — il titolo che
-     presiede una pagina — quindi si veste uguale a «Stai comprando
-     sats», e la misura la leggono tutt'e due da `--tit-foglio`
-     invece di ribatterla. La prima stesura lo faceva 19px come i due
-     tab della sorella: era un'altra strada ragionevole (le due viste
-     cominciavano alla stessa altezza), ma un titolo si accompagna coi
-     titoli, non coi comandi.
-     `margin` a mano perche' un `h2` di sistema ne porta uno suo,
-     grande il doppio. */
-  .p2p-miei-tit{margin:2px 0 8px;font-family:'Baloo 2',sans-serif;
-    font-weight:800;font-size:var(--tit-foglio);line-height:1.1;
-    color:var(--ink);text-align:center}
+  /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea) non
+     ha piu' un vestito suo, ed e' la terza stesura di questo titolo:
+     prima 19px come i due tab della sorella, poi la sola MISURA del
+     cappello di un foglio, e adesso il cappello INTERO — `.foglio-
+     testa` col suo `h3`, cioe' la stessa aria sopra e sotto e la
+     stessa riga che lo stacca. E' lo stesso oggetto (il titolo che
+     presiede una pagina), quindi porta lo stesso vestito invece di
+     una copia che gli somiglia: una copia si scolla al primo ritocco,
+     e nessuno se ne accorge finche' non si mettono le due pagine una
+     accanto all'altra. */
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -5951,8 +5944,14 @@
      non `.foglio-testa h3` che sta piu' su: stessa specificita', e a
      parita' vince chi e' scritto dopo. Misurato dal vivo. Legge
      `--tit-foglio` come la sorella, cosi' chiunque delle due vinca il
-     numero e' lo stesso. */
-  .sheet h3{font-family:'Baloo 2',sans-serif;font-size:var(--tit-foglio);font-weight:800;margin-bottom:4px}
+     numero e' lo stesso.
+     ⚠️ E PORTA DENTRO ANCHE `.foglio-testa h3`, che e' quel che rende
+     il cappello indossabile FUORI da un foglio (set 2026, il titolo
+     di «I miei scambi»): il carattere e il peso venivano solo di qui,
+     quindi un cappello messo altrove restava col font di sistema —
+     giusto di taglia e sbagliato di tutto il resto. Dentro un foglio
+     non cambia un pixel: i due selettori danno gli stessi valori. */
+  .sheet h3,.foglio-testa h3{font-family:'Baloo 2',sans-serif;font-size:var(--tit-foglio);font-weight:800;margin-bottom:4px}
   /* La testata di un foglio: titolo, e a destra gli inquilini di
      servizio (toggle valuta, ✕). A 320px stanno in tre su una riga
      sola, e a stringersi dev'essere il TITOLO — mai la via d'uscita. */
@@ -7041,7 +7040,7 @@ document.getElementById('cartello')?.remove();</script>
            cosi' le due sorelle cominciano alla stessa altezza, e
            passando dall'una all'altra la pagina non sobbalza. -->
       <div class="p2p-sticky">
-        <h2 class="p2p-miei-tit">I miei scambi</h2>
+        <div class="foglio-testa"><h3>I miei scambi</h3></div>
         <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
              libro: la `<select>` di sistema non si veste, quindi sta
              qui nascosta a tenere il VALORE e col dito parla la
