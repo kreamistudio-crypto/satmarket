@@ -1860,6 +1860,16 @@
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
     padding-bottom:3px}
+  /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea):
+     sta dentro il blocco attaccato, sopra gli strumenti, quindi resta
+     a vista mentre si scorre — che e' la differenza fra un titolo e
+     l'etichetta di sezione che c'era prima.
+     19px Baloo come i due tab della sorella: le due viste cominciano
+     alla stessa altezza e passando dall'una all'altra la pagina non
+     sobbalza. `margin` a mano perche' un `h2` di sistema ne porta uno
+     suo, grande il doppio. */
+  .p2p-miei-tit{margin:2px 0 8px;font-family:'Baloo 2',sans-serif;
+    font-weight:700;font-size:19px;line-height:1.1;color:var(--ink)}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga */
@@ -2230,13 +2240,19 @@
      ROVESCIA la domanda e certifica che la cifra non ci sia. */
   .p2p-scambio-lato{font-family:'Baloo 2',sans-serif;font-weight:800;
     font-size:17px;color:var(--ink)}
-  /* l'euro e il premio sulla stessa riga, e a capo insieme quando non
-     ci stanno: `baseline` perche' i due pezzi hanno caratteri e taglie
-     diverse, e ad allinearli dev'essere la riga di scrittura invece
-     della scatola */
-  .p2p-scambio-riga{display:flex;flex-wrap:wrap;align-items:baseline;
-    gap:2px 8px;margin-top:3px}
-  .p2p-scambio-riga .p2p-badge{margin-top:0}
+  /* I SATS SONO LA CIFRA IN EVIDENZA (set 2026, terzo ridisegno): il
+     mono e l'arancio se li porta `.p2p-sats`, qui si alza la taglia e
+     basta. UN GRADINO SOTTO al Baloo che gli sta attorno, non pari:
+     il mono a parita' di corpo pesa di piu', e a 17 avrebbe spinto
+     piu' della frase che lo introduce. */
+  .p2p-scambio-lato .p2p-sats{font-size:16px}
+  /* la seconda riga e' la frase di servizio — quel che si da' in
+     cambio — quindi muta; dentro, la cifra torna nell'inchiostro di
+     casa, che e' un DATO e non una parola. Un gradino sotto ai sats:
+     l'evidenza e' loro. */
+  .p2p-scambio-euro{margin-top:2px;font-size:13.5px;font-weight:600;
+    color:var(--muted)}
+  .p2p-scambio-euro .p2p-euro{font-size:15px}
   /* LO STATO IN UN RIQUADRO CONTORNATO (richiesta di Andrea): il
      contorno e' quello del conto del dettaglio — `1.5px solid
      var(--line)` —, mai una tinta nuova. Il RAGGIO invece e' quello
@@ -2248,7 +2264,33 @@
      sarebbe una riga che non cambia un pixel. */
   .p2p-scambio-stato{margin-top:8px;border:1.5px solid var(--line);
     border-radius:10px;padding:6px 10px;font-size:13px;
-    font-weight:700;color:var(--ink)}
+    font-weight:700;color:var(--ink);
+    /* lo stato a sinistra e «tocca a te» a destra, coi due capi che
+       scendono insieme quando la riga non ci sta (a 320 succede con
+       gli stati lunghi). `space-between` e non un margine automatico:
+       qui i pezzi sono due e non tre. */
+    display:flex;flex-wrap:wrap;justify-content:space-between;
+    align-items:baseline;gap:2px 10px}
+  /* «TOCCA A TE» PRENDE L'INCHIOSTRO DELLA CASELLA, qualunque sia: la
+     tinta dello stato e' gia' quella giusta — arancio dove c'e' un
+     gesto da fare — e un colore suo sarebbe un secondo giudizio sopra
+     il primo. Un gradino sotto di corpo, che la parola grossa resta
+     lo stato. */
+  .p2p-tocca{font-size:12px;font-weight:700;white-space:nowrap}
+  /* ⚠️ LA MANINA E' L'UNICA COSA CHE SI MUOVE in questa card, ed e'
+     una chiamata e non un racconto: si sposta di tre pixel verso le
+     parole che indica, avanti e indietro. `inline-block` perche' su
+     un inline la `transform` non morde.
+     E HA LA SUA USCITA: chi ha chiesto di non vedere movimento non lo
+     vede — la stessa regola dell'anello che pulsa nell'ultimo giorno,
+     e vale per il movimento, mai per un colore. */
+  @keyframes p2pManina{0%,100%{transform:translateX(0)}
+    50%{transform:translateX(3px)}}
+  .p2p-manina{display:inline-block;
+    animation:p2pManina 1.2s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .p2p-manina{animation:none}
+  }
   /* ⚠️ LA TINTA DELLO STATO NON NASCE QUI: il riquadro prende le
      classi con cui il mercatino veste gli stati di un ordine, e i
      colori restano nel loro unico posto. Qui si rimette a posto la
@@ -2262,8 +2304,9 @@
   .p2p-scambio-stato.badge{font-size:13px;font-weight:700;
     padding:6px 10px;border-radius:10px;white-space:normal;
     border-color:transparent}
-  /* il puntino fra il premio e i sats: e' punteggiatura, non un dato */
-  .p2p-sep{color:var(--muted);font-weight:700}
+  /* il puntino fra il premio e i sats e' MORTO col terzo ridisegno
+     (set 2026): le due cifre non stanno piu' sulla stessa riga, e non
+     c'e' piu' niente da separare — niente CSS orfano */
   /* ⚠️ QUI LA CIFRA NON VESTE IL TAB DEL LIBRO, e questa riga e' nata,
      morta e tornata in un giorno — con i sats, che la card ha perso e
      ripreso. Il commento di `.p2p-ord .p2p-sats` promette «solo nel
@@ -6942,8 +6985,25 @@ document.getElementById('cartello')?.remove();</script>
            casa, e due righe di strumenti che si assomigliano a meta'
            sarebbero due comandi diversi per chi legge.
            Il blocco `sticky` e' quello della sorella, per la stessa
-           ragione: sopra gli strumenti, sotto scorrono le card. -->
+           ragione: sopra gli strumenti, sotto scorrono le card.
+           ⚠️ E IL TITOLO E' TORNATO, ma in un altro posto (set 2026,
+           richiesta di Andrea): non piu' un'etichetta di sezione in
+           mezzo al corpo che scorre — quella se n'era andata perche'
+           ripeteva il nome della pagina e spariva al primo dito — ma
+           il CAPPELLO del blocco attaccato, sopra gli strumenti.
+           Resta a vista mentre si scorre, che e' la differenza fra
+           un'etichetta e un titolo.
+           ⚠️ E SI CHIAMA COME LA VOCE DELLA NAV, parola per parola:
+           «I miei scambi». Due nomi per lo stesso posto, per chi
+           legge, sono due posti — e' la regola con cui «Filtri» e'
+           diventato «Filtro» e «Informazioni» e' diventato «Info
+           P2P». Il titolo e' la stessa stringa del tasto che ci
+           porta, maiuscole comprese.
+           LA TAGLIA E' QUELLA DEI DUE TAB del libro (19px Baloo):
+           cosi' le due sorelle cominciano alla stessa altezza, e
+           passando dall'una all'altra la pagina non sobbalza. -->
       <div class="p2p-sticky">
+        <h2 class="p2p-miei-tit">I miei scambi</h2>
         <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
              libro: la `<select>` di sistema non si veste, quindi sta
              qui nascosta a tenere il VALORE e col dito parla la
@@ -35899,8 +35959,11 @@ function renderP2PInfo(){
    ⚠️ VOGLIONO IL LATO NEL VOCABOLARIO DEL LIBRO — 'buy'/'sell' —, e la
    riga di uno scambio proprio dice 'compro'/'vendo': a tradurre e'
    `comeLibroP2P`, che sta accanto a chi la usa. */
+function verboLatoP2P(o){
+  return o.lato === 'sell' ? 'comprando' : 'vendendo';
+}
 function fraseLatoP2P(o){
-  return 'Stai ' + (o.lato === 'sell' ? 'comprando' : 'vendendo') + ' sats';
+  return 'Stai ' + verboLatoP2P(o) + ' sats';
 }
 /* IL GIUDICE DELL'AFFARE, uno per tutti: la formula uniforme di
    get_market_quote verificata sui byte (`sats -= premium/100 * sats`),
@@ -42083,28 +42146,36 @@ function satsScambioP2P(o){
     : 0;
   return '≈ ' + fmt(da) + (a ? '–' + fmt(a) : '') + ' sats';
 }
-/* PURA: il premio in forma SECCA, per la card di chi l'ordine l'ha
-   scritto lui (set 2026, secondo ridisegno di Andrea).
-   ⚠️ QUI IL GIUDIZIO NON SI SCRIVE, ed e' la differenza col libro:
-   chi legge e' l'AUTORE dell'ordine, il premio se l'e' scelto, e
-   dirgli «piu' conveniente» sarebbe spiegargli una cosa che sa. Si
-   dice il FATTO col suo segno — «+5%», «−5%» — e il segno lo scrive
-   `premioTestoP2P`, che gia' lo fa per i capi del cursore del filtro.
-   Nel libro, dove chi legge sta dall'altra parte e deve decidere in
-   fretta, le parole del verso restano e servono.
-   LA TINTA INVECE E' QUELLA DEL LIBRO, dallo stesso giudice: il segno
-   dice QUANTO pende, il colore DA CHE PARTE — e sono due cose
-   diverse, perche' lo stesso +5% alleggerisce chi vende e pesa su chi
-   compra. A premio zero la frase c'e' lo stesso: «nessun badge»
-   lascerebbe la card muta proprio sul caso piu' comune. A prezzo
-   fisso niente, che quel prezzo il mercato non lo guarda. */
-function premioSeccoP2P(o){
+/* PURA: il premio come lo legge CHI L'ORDINE L'HA SCRITTO (set 2026,
+   terzo ridisegno di Andrea). Tre pezzi in una riga: il segno — «+5%»,
+   «−5%», che lo scrive `premioTestoP2P`, lo stesso dei capi del
+   cursore del filtro —, la tinta, e le parole del verso chiuse da
+   «per te».
+   ⚠️ IL «PER TE» NON E' UN VEZZO, ed e' la ragione per cui questa
+   funzione non e' quella del libro: lo STESSO premio si legge al
+   rovescio dai due lati del vetro. Sul MIO ordine di vendita un +5%
+   e' a mio favore — consegno meno sats per gli stessi euro —, mentre
+   a chi lo guarda dal libro per comprarlo e' una bastonata. Due
+   lettori, due frasi; il GIUDICE invece e' uno solo (`affareP2P`), e
+   la traduzione del lato la fa `comeLibroP2P`.
+   ⚠️ E LA STESURA DI STAMATTINA DICEVA IL CONTRARIO — il premio secco
+   e basta, «qui il giudizio non serve, chi legge e' l'autore» —, poi
+   Andrea l'ha rovesciata guardandola: che il premio l'abbia scelto tu
+   non vuol dire che ti ricordi da che parte pende, e un numero col
+   segno lascia il lavoro a chi legge. La tinta da sola non basta: dice
+   il verso, non dice che ci sei dentro tu.
+   A premio zero la frase c'e' lo stesso: «nessun badge» lascerebbe la
+   card muta proprio sul caso piu' comune. A prezzo fisso niente, che
+   quel prezzo il mercato non lo guarda. */
+function premioMioP2P(o){
   if (o.sats > 0) return '';
   if (!Math.round(o.premium || 0))
     return '<span class="p2p-badge">al prezzo di mercato</span>';
+  const a = affareP2P(o);
   return '<span class="p2p-badge"><b class="'
-    + (affareP2P(o) ? 'p2p-affare' : 'p2p-avviso') + '">'
-    + premioTestoP2P(o.premium) + '</b></span>';
+    + (a ? 'p2p-affare' : 'p2p-avviso') + '">'
+    + premioTestoP2P(o.premium) + '</b> '
+    + (a ? 'più' : 'meno') + ' conveniente per te</span>';
 }
 /* ---- la riga di uno scambio nella lista ----
    QUATTRO RIGHE, e questa e' la SECONDA stesura dello stesso giorno
@@ -42134,32 +42205,58 @@ function rigaScambioP2P(o){
      sono piu' in gioco e scriverle direbbe una cosa non piu' vera. */
   const met = metodoSceltoP2P(o) || (o.metodi || []).join(', ');
   const sats = satsScambioP2P(o);
-  const agire = azioniDisponibili(o) ? '<span>👉 tocca a te</span>' : '';
+  /* ⚠️ «TOCCA A TE» STA DENTRO LA CASELLA DELLO STATO (set 2026,
+     richiesta di Andrea), e non piu' in una riga sua in fondo: quella
+     casella e' gia' tinta dallo stato — arancio quando c'e' un gesto
+     da fare — e il gesto e' la cosa che deve vedersi per prima.
+     Appeso in fondo diceva la stessa cosa tre centimetri piu' giu',
+     dove l'occhio arriva per ultimo.
+     LA MANINA SI MUOVE, ed e' l'unica cosa che si muove in questa
+     card: un'animazione su un elenco che si scorre e' un difetto di
+     accessibilita' prima che di gusto — qui c'e' perche' non
+     racconta, CHIAMA. Il suo `aria-hidden` e' la regola di casa: e'
+     un segno, e le parole accanto lo dicono gia'. */
+  const agire = azioniDisponibili(o)
+    ? '<span class="p2p-tocca"><span class="p2p-manina" aria-hidden="true">👉</span>'
+      + ' tocca a te</span>' : '';
   const via = p2pTogliibile(o).si
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
       + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
     : '';
   return '<div class="p2p-ord p2p-scambio" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
     + 'onclick="apriOrdineP2P(this.dataset.id)">'
-    + '<div class="p2p-scambio-lato">' + esc(fraseLatoP2P(l)) + ' per</div>'
-    + '<div class="p2p-scambio-riga">'
-    + '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>'
-    + premioSeccoP2P(l)
-    /* ⚠️ IL PUNTINO E' UN PEZZO SUO, e non sta dentro lo span dei sats:
-       visto in vetrina, a 375 due card su otto mandano la cifra a capo
-       — e col puntino attaccato a lei la riga nuova COMINCIAVA con un
-       punto, che si legge come un elenco puntato. Da solo e' un
-       elemento del flex largo quattro pixel, quindi ci sta sempre in
-       fondo alla riga di prima: e li' vuol dire «continua sotto».
-       `aria-hidden` perche' e' punteggiatura: chi ascolta la card non
-       deve sentirsi leggere un puntino in mezzo a due cifre. */
-    + (sats ? '<span class="p2p-sep" aria-hidden="true">·</span>'
-              + '<span class="p2p-sats">' + esc(sats) + '</span>' : '')
+    /* LA PRIMA RIGA PORTA I SATS, in evidenza: e' la cifra che si va a
+       cercare scorrendo i propri scambi, e fino a stamattina stava in
+       coda alla riga dell'euro.
+       ⚠️ A CAMBIO MUTO LA FRASE RESTA IN PIEDI: senza cifra si legge
+       «Stai vendendo sats», che e' esattamente la frase di ieri — un
+       ripiego che non sembra un ripiego. Mai un numero inventato. */
+    + '<div class="p2p-scambio-lato">Stai ' + esc(verboLatoP2P(l)) + ' '
+    + (sats ? '<span class="p2p-sats">' + esc(sats) + '</span>' : 'sats')
     + '</div>'
-    + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">' + esc(st.t) + '</div>'
+    /* ...E LA SECONDA DICE COSA SI DA' E COSA SI OTTIENE, con due verbi
+       DIVERSI e non con lo stesso «per» (richiesta di Andrea sul lato
+       vendo, e la scelta sul lato compro e' mia): le due card stanno
+       una sotto l'altra nello stesso elenco, e se una dicesse «per
+       ricevere 5,00 €» e l'altra «per 5,00 €» l'occhio completerebbe
+       l'ellissi — «per [ricevere] 5,00 €» — cioe' il contrario di
+       quel che succede. Due verbi che non si possono confondere:
+       `ricevere` e `pagando`, gli stessi due mestieri che il libro
+       chiama «Ricevi» e «Paghi». */
+    + '<div class="p2p-scambio-euro">'
+    + (l.lato === 'buy' ? 'per ricevere ' : 'pagando ')
+    + '<span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span></div>'
+    + premioMioP2P(l)
+    + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
+    + '<span>' + esc(st.t) + '</span>' + agire + '</div>'
     + (met ? '<div class="p2p-box p2p-paga" title="' + esc(met) + '">💳 '
              + esc(met) + '</div>' : '')
-    + (agire || via ? '<div class="p2p-meta">' + agire + via + '</div>' : '')
+    /* IL PIEDE E' RIMASTO ALLA SOLA ✕: «tocca a te» e' salito nella
+       casella, e le due non potevano comunque coesistere — l'una vive
+       sugli stati vivi, l'altra sui finali. Senza di lei la riga non
+       si scrive proprio: una `.p2p-meta` vuota lascerebbe un respiro
+       che non separa niente. */
+    + (via ? '<div class="p2p-meta">' + via + '</div>' : '')
     + '</div>';
 }
 
