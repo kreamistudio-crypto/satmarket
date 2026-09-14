@@ -38770,7 +38770,13 @@ def prove_p2p_dettaglio():
         # giudizio, e dal set 2026 lo CHIAMA invece di ribatterlo
         "function affareP2P(o){",
         "function premioTestoP2P(n){",
+        # lo scorporo del premio: il conto lo chiama quando la cifra
+        # gliela detta il coordinatore, e senza il banco esplode
+        "function scorporaPremioP2P(sats, premio){",
         "function contoDettP2P(o){",
+        # ...e la traduzione del lato, che e' come il conto arriva
+        # alla pagina di uno scambio PROPRIO
+        "function comeLibroP2P(o){",
         # ⚠️ IL TITOLO STA IN UNA FUNZIONE SUA e va portato dentro
         # con lei: e' la trappola dei DUE RITAGLI, e senza questa
         # riga il banco esplode su `titoloMetodiP2P is not defined`
@@ -38895,6 +38901,32 @@ p2pInfo = {fee: 0.02};
 cambioVivo = false;
 out.contoMuto = contoDettP2P(ordine({}));
 cambioVivo = true;
+
+/* ---- LA CIFRA DETTA DAL COORDINATORE (set 2026) ----
+   Lo stesso conto, chiamato dalla pagina di uno scambio PROPRIO: la
+   riga locale parla il vocabolario dei miei («compro»/«vendo») e
+   `comeLibroP2P` la traduce, poi `satsDetti` porta dentro l'importo
+   che il coordinatore ha gia' fissato. I numeri sono quelli del primo
+   scambio vero (7301 sats, fee 2% = 1% a testa = 73). */
+const mio = (o) => Object.assign({
+  id: 'x', lato: 'compro', euro: 25, euroMax: 0, sats: 0, premium: 0,
+  satsNetti: 0}, o);
+const contoMio = o => contoDettP2P(Object.assign(
+  comeLibroP2P(o), {satsDetti: o.satsNetti || 0}));
+out.mioStima = contoMio(mio({}));
+out.mioDetto = contoMio(mio({satsNetti: 7301}));
+out.mioDettoPremio = contoMio(mio({satsNetti: 7301, premium: 4}));
+out.mioDettoSconto = contoMio(mio({satsNetti: 7301, premium: -2}));
+out.mioVendo = contoMio(mio({lato: 'vendo', satsNetti: 7301}));
+/* un intervallo ANCORA APERTO non si fa fissare da una cifra sola */
+out.mioRange = contoMio(mio({euro: 20, euroMax: 100, satsNetti: 7301}));
+/* ...e a cambio spento la cifra detta regge da sola */
+cambioVivo = false;
+out.mioDettoMuto = contoMio(mio({satsNetti: 7301, premium: 4}));
+cambioVivo = true;
+out.scorporo = [scorporaPremioP2P(7301, 4), scorporaPremioP2P(7301, -2),
+                scorporaPremioP2P(7301, 0), scorporaPremioP2P(0, 4),
+                scorporaPremioP2P(7301, 100)];
 
 /* ---- il riquadro della reputazione ---- */
 out.repSenza = repRiquadroP2P(null);
@@ -39318,6 +39350,63 @@ console.log(JSON.stringify(out));
           and "%" not in _riga_fee(o["contoIgnoto"]))
     prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
           o["contoMuto"].count("—") >= 3 and "6,00 € 🇪🇺" in o["contoMuto"])
+
+    # ══ LO STESSO CONTO NELLA PAGINA DI UNO SCAMBIO PROPRIO (set 2026,
+    # richiesta di Andrea) ══ Fino a ieri chi l'ordine l'aveva scritto
+    # vedeva UNA riga — «25,00 € · ≈ 7 301 sats» — cioe' MENO di chi lo
+    # guarda dal libro: nessun premio, nessuna commissione, nessun
+    # «quanto ricevo davvero». Adesso e' lo stesso conto, tradotto al
+    # suo verso da `comeLibroP2P` — un giudice solo, mai una seconda
+    # formula col segno girato.
+    def _somma(html):
+        """le cifre in sats di un conto, in ordine: e' cosi' che si
+        chiede a una prova se il conto TORNA invece di guardare se le
+        righe ci sono"""
+        return [int(n.replace(".", ""))
+                for n in re.findall(r"([\d.]+) sats", html)]
+    prova("il conto dello scambio proprio e' quello del libro", True,
+          '<div class="ctrl-conto conto-p2p">' in o["mioStima"]
+          and "Fee Barattolo" in o["mioStima"] and "Ricevi" in o["mioStima"])
+    # ⚠️ LA CIFRA DEL COORDINATORE E' UN FATTO E NON UNA STIMA: senza
+    # `≈`, e la fee ci morde sopra. E' la promessa di «Info P2P» —
+    # presa in carico l'ordine, quel che si legge non cambia piu'.
+    prova("...e la cifra detta dal coordinatore entra senza il ≈", True,
+          "<span class=\"num\">7301 sats</span>" in o["mioDetto"])
+    prova("...e la fee morde su di lei: 7301 − 73 = 7228",
+          [7301, 73, 7228], _somma(o["mioDetto"]))
+    # ⚠️ IL PREMIO SI SCORPORA ALL'INDIETRO, e la prova e' che le righe
+    # SOMMANO: la cifra del coordinatore e' gia' scontata del premio
+    # (`get_market_quote` prima, `get_fee` poi), quindi a fare da
+    # Controvalore sarebbe una bugia — 7605 − 304 = 7301, e da li' la
+    # fee.
+    prova("col premio il conto si scorpora, e torna", [7605, 304, 7301, 73, 7228],
+          _somma(o["mioDettoPremio"]))
+    prova("...e lo sconto si aggiunge invece di togliersi",
+          [7158, 143, 7301, 73, 7228], _somma(o["mioDettoSconto"]))
+    prova("...e il Subtotale e' l'unica riga esatta delle tre", True,
+          "≈ 7605 sats" in o["mioDettoPremio"]
+          and "<span class=\"num\">7301 sats</span>" in o["mioDettoPremio"])
+    # dal lato di chi VENDE le righe si specchiano: la meta' si
+    # AGGIUNGE a quel che si blocca, e in fondo si legge «Paghi»
+    prova("chi vende blocca la sua meta' in piu': 7301 + 73 = 7374",
+          [7301, 73, 7374], _somma(o["mioVendo"]))
+    prova("...e in fondo dice «Paghi» invece di «Ricevi»", True,
+          ">Paghi<" in o["mioVendo"] and "Totale da pagare" not in o["mioVendo"])
+    # ⚠️ UN INTERVALLO ANCORA APERTO NON SI FA FISSARE DA UNA CIFRA
+    # SOLA: il coordinatore collassa i due capi insieme all'importo, e
+    # finche' l'euro e' una fascia («20,00–100,00 €») un numero solo di
+    # sats non le corrisponde. Restano le due stime.
+    prova("su un intervallo aperto la cifra detta non si usa", True,
+          "20,00–100,00 €" in o["mioRange"]
+          and "7301" not in o["mioRange"]
+          and "–" in o["mioRange"])
+    # ...e questa e' la ragione per cui il ramo esiste: a cambio muto
+    # la stima non c'e', e senza la cifra del coordinatore la pagina
+    # di uno scambio PRESO sarebbe tutta trattini
+    prova("a cambio muto la cifra detta regge il conto da sola",
+          [7605, 304, 7301, 73, 7228], _somma(o["mioDettoMuto"]))
+    prova("lo scorporo e' la formula del coordinatore, rovesciata",
+          [7605, 7158, 7301, 0, 7301], o["scorporo"])
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
@@ -41475,12 +41564,27 @@ def prove_p2p_motore():
     # `vault` e' il recinto tratteggiato del deposito di garanzia di
     # Barattolo: qui i sats li tiene un altro, e dirlo con la stessa
     # forma sarebbe la bugia piu' facile del cantiere
-    vista = mini[mini.index("<!-- ============ VISTA: LO SCAMBIO (set 2026)"):]
-    vista = vista[:vista.index("============", 40)]
+    vista = mini[mini.index('<div class="view" id="view-p2pordine">'):]
+    vista = vista[:vista.index("<!-- ============")]
     prova("la vista dello scambio non veste il recinto dell'escrow", True,
           'class="vault"' not in vista and "vault" not in cod)
     prova("...e i passi vivono in un contenitore suo", True,
           '<div class="p2p-passi"><div class="steps">' in cod)
+    # ⚠️ IN CIMA RESTA IL SOLO MARCHIO (set 2026, decisione di Andrea):
+    # «Lo scambio» diceva a parole quel che il marchio dice gia', e con
+    # lei se n'e' andata la riga puntinata di `.section-label` — che
+    # separa DUE sezioni, e qui sotto ce n'e' una sola. Il marchio
+    # resta quello di sempre: e' uno dei quattro posti contati dalla
+    # prova del logo, e questa non lo sposta.
+    # (i commenti si tolgono prima: il perche' della riga NOMINA quel
+    # che la riga non deve piu' avere, ed e' il modo in cui una
+    # sentinella si fa ingannare dalla propria spiegazione)
+    _vista_nuda = re.sub(r"<!--.*?-->", "", vista, flags=re.S)
+    prova("la testata dello scambio e' il solo marchio, centrato", True,
+          '<div class="p2p-marchio"><img class="p2p-simbolo"' in _vista_nuda
+          and "Lo scambio</div>" not in _vista_nuda
+          and "section-label" not in _vista_nuda
+          and "text-align:center" in pezzo_js(mini, ".p2p-marchio{", "}"))
     prova("lo stato si dice sulla superficie neutra", True,
           '"trust-note nota-scambio"' in cod)
 
@@ -41499,9 +41603,20 @@ def prove_p2p_motore():
                 if "Mostro" in t or "coordinatore" in t.lower()]
     prova("il custode non si nomina in nessuna stringa a schermo", [],
           nominate)
+    # EMENDATA (set 2026, il conto nella pagina dello scambio): la
+    # frase in fondo — «I sats dello scambio restano custoditi in
+    # garanzia: Barattolo non li tiene e non li vede» — se n'e' andata,
+    # e non solo perche' stava sotto «Ritira l'ordine», cioe' dopo la
+    # decisione. Dal 14 set 2026 il coordinatore SIAMO NOI, e
+    # «Barattolo non li tiene» diceva il contrario di quel che «Info
+    # P2P» scrive per esteso: i sats li tiene il coordinatore, che
+    # siamo noi, e le strade sono due sole. Resta detto il FATTO che
+    # regge — i sats stanno IN GARANZIA — dai passi, dallo stato e dal
+    # foglio della hold; il divieto e' sulla formula SMENTITA.
     prova("...e il fatto resta detto", True,
-          "custoditi in garanzia" in cod
-          and "non li tiene e non li vede" in cod)
+          "in garanzia" in cod)
+    prova("...ma la formula che «Info P2P» smentisce non torna", False,
+          "non li tiene e non li vede" in cod)
 
     # --- 6) I FOGLI, e la navigazione --------------------------------
     cs = pezzo_js(mini, "function closeSheet(){", "\n}\n")
@@ -41548,6 +41663,9 @@ def prove_p2p_motore():
     if not node:
         salta("il motore parla col coordinatore di cartone", "node non c'e'")
         return
+    def riga(inizio):
+        i = mini.index(inizio)
+        return mini[i:mini.index("\n", i)]
     js_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
                     mini.index("/* ---- export CSV degli affari conclusi")]
     js_motore = mini[i_cod:i_fine]
@@ -41559,9 +41677,14 @@ def prove_p2p_motore():
     # libro. Piu' il cambio SPENTO, che qui non deve uscire nessuna
     # stima al mercato: i casi col cambio vivo girano nel banco della
     # card, in prove_p2p_card_scambio.
-    js_pure = "let cambioVivo = false, eurPerSat = 0;\n" + "\n".join(
+    # ...e dal set 2026 la pagina dello scambio porta il CONTO, che ne
+    # chiama altre due di la' dal confine: il listino (la promo) e la
+    # sigla della valuta. Vengono dentro vere come le altre.
+    js_pure = ("let cambioVivo = false, eurPerSat = 0;\n"
+               + riga("const P2P_VALUTA = ") + "\n") + "\n".join(
         pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
             "function commissioneVivaP2P(){",
+            "function commissioneListinoP2P(){",
             "function satsMercatoP2P(o){",
             "function nettoLatoP2P(o, sats){",
             "function verboLatoP2P(o){",
@@ -41836,6 +41959,25 @@ function reset(){
   out.backupOfferto = aperti.indexOf('p2pProfiloSheet') < 0;
   out.paroleDiCasa = !['nostr', 'nsec', 'relay']
     .some(w => (nodi.p2pOrdineCorpo.innerHTML || '').toLowerCase().includes(w));
+  /* ⚠️ IL CONTO E' NELLA CARD, e la sua base e' la cifra che il
+     COORDINATORE ha detto (99000 nel giro qui sopra) — non una stima,
+     che qui il cambio e' spento apposta. E' la prova che il ramo
+     `satsDetti` regge dove serve: nella pagina di uno scambio preso,
+     dove senza di lui ci sarebbero solo trattini. La fee viva e'
+     l'1%, la meta' di chi legge e' lo 0,5% — 495 sats — e resta
+     98505. */
+  {
+    const h = nodi.p2pOrdineCorpo.innerHTML || '';
+    out.contoInCard = h.indexOf('<div class="p2p-ord"><div class="ctrl-conto conto-p2p">') >= 0;
+    out.contoSullaCifraVera = h.indexOf('99000 sats') >= 0
+      && h.indexOf('98505 sats') >= 0;
+    /* ...e la testa a due colonne non c'e' piu': quel che diceva —
+       l'euro e i sats — lo dicono le righe del conto, ognuna col suo
+       nome */
+    out.senzaTesta = h.indexOf('p2p-testa') < 0;
+    /* la frase della garanzia se n'e' andata da sotto le uscite */
+    out.senzaCoda = h.indexOf('non li tiene e non li vede') < 0;
+  }
 
   /* ---- 2) LA DEDUP: il relay puo' ripetere --------------------- */
   reset();
@@ -42230,6 +42372,10 @@ function reset(){
         "dettoConcluso": "...dicendolo",
         "backupOfferto": "a scambio concluso il foglio del profilo NON si apre (fase 6)",
         "paroleDiCasa": "a schermo nessuna parola di protocollo",
+        "contoInCard": "la card dello scambio E' il conto del libro",
+        "contoSullaCifraVera": "...e la sua base e' la cifra detta dal coordinatore",
+        "senzaTesta": "...al posto della riga euro/sats di ieri",
+        "senzaCoda": "...e sotto le uscite non resta la frase smentita",
         "dedup": "lo stesso messaggio due volte muove lo scambio una volta",
         "nonMio": "...e un messaggio che non e' nostro non lo tocca",
         "venditoreAspetta": ("chi vende deve bloccare i sats", "attesa_mia_hold"),

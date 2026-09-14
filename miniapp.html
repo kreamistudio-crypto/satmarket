@@ -1824,6 +1824,11 @@
      serve: la centra `align-items:center` di .section-label. */
   .p2p-simbolo{width:76px;height:76px}
   .empty .p2p-simbolo{display:block;margin:0 auto 10px}
+  /* il marchio DA SOLO, centrato: e' la testata della pagina dello
+     scambio da quando «Lo scambio» se n'e' andato. Niente
+     `.section-label` qui — quella e' un'etichetta che separa due
+     sezioni, e sotto ce n'e' una sola. */
+  .p2p-marchio{padding:16px 0 2px;text-align:center}
   .p2p-logo-pila{display:grid}
   .p2p-logo{grid-area:1/1;width:76px;height:76px;
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
@@ -2090,6 +2095,19 @@
   .p2p-sats .p2p-verbo{color:var(--ink)}
   .p2p-meta{margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600;
     display:flex;flex-wrap:wrap;gap:4px 12px}
+  /* IL CONTO DENTRO LA CARD DELLO SCAMBIO non porta la SUA cornice
+     (set 2026): il fondo, il bordo e il raggio li mette gia'
+     `.p2p-ord`, e due scatole della stessa forma a un dito di
+     distanza sono il difetto gia' pagato dal riquadro finale.
+     IL PADDING VA A ZERO E IL RIQUADRO FINALE PERDE I MARGINI
+     NEGATIVI, ed e' una cosa sola e non due: quei margini sono
+     calcolati sui 10px del conto per portarlo a filo del suo bordo —
+     un bordo che qui non c'e' piu'. A filo ci va della CARD, quindi
+     le righe respirano col padding di lei e la scatola si ripaga il
+     suo dentro. */
+  .p2p-ord>.ctrl-conto{background:none;border:0;border-radius:0;
+    margin:0;padding:0}
+  .p2p-ord>.ctrl-conto .ctrl-chiusa{margin:8px 0 2px;padding:0 10px}
   /* IL TEMPO IN ALTO A DESTRA: e' il posto dove il riferimento mette
      l'ETA' dell'offerta, e da noi il tempo che fa decidere e' un altro
      — quanto ne RESTA, non quanto e' vecchia. Stesso posto, il tempo
@@ -7167,7 +7185,12 @@ document.getElementById('cartello')?.remove();</script>
   <div class="view" id="view-p2pordine">
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
-      <div class="section-label"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"> Lo scambio</div>
+      <!-- IN CIMA RESTA IL SOLO MARCHIO (set 2026, decisione di
+           Andrea): «Lo scambio» diceva a parole quel che il marchio
+           dice gia', e se n'e' andata con lei la riga puntinata di
+           `.section-label` — che serve a SEPARARE due sezioni, e qui
+           sotto ce n'e' UNA sola. -->
+      <div class="p2p-marchio"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"></div>
       <div id="p2pOrdineCorpo"></div>
     </div>
   </div>
@@ -39611,6 +39634,24 @@ function segnoMonetaP2P(o){
   return val ? esc(val.segno) : esc(cod);
 }
 
+/* PURA: il Controvalore RICAVATO all'indietro da una cifra che il
+   coordinatore ha gia' detto. La formula e' la sua, rovesciata:
+   `get_market_quote` fa `sats -= premium/100 * sats`, cioe'
+   mercato = controvalore × (1 − p/100), e di qui il controvalore.
+   ⚠️ SERVE PERCHE' LA CIFRA DEL COORDINATORE E' GIA' SCONTATA DEL
+   PREMIO: prenderla per Controvalore direbbe «controvalore di 25,00 €»
+   accanto a un numero che il premio se l'e' gia' mangiato. Cosi'
+   invece le righe SOMMANO — controvalore − premio = la sua cifra — e
+   il conto non chiede niente al cambio di adesso.
+   A premio zero non c'e' niente da scorporare, e un premio assurdo
+   (dal libro arrivano numeri di sconosciuti) si lascia stare invece
+   di dividere per zero. */
+function scorporaPremioP2P(sats, premio){
+  const p = Number(premio) || 0;
+  if (!(sats > 0) || !p || p >= 100 || p <= -100) return sats > 0 ? sats : 0;
+  return Math.round(sats / (1 - p / 100));
+}
+
 /* ---- IL CONTO SCORPORATO (set 2026, il calco del foglio «Paga») ----
    La riga del prezzo che stava sotto il titolo («per 6,00 € al prezzo
    di mercato (+4%)») e' diventata QUESTO: le stesse righe nome/cifra
@@ -39636,7 +39677,30 @@ function segnoMonetaP2P(o){
 function contoDettP2P(o){
   const compro = o.lato === 'sell';
   const fisso = o.sats > 0;
-  const vivo = fisso || (cambioVivo && eurPerSat > 0);
+  /* ⚠️ LA CIFRA CHE IL COORDINATORE HA GIA' DETTO VINCE SU OGNI
+     STIMA, e arriva in `satsDetti` (set 2026): dal libro non arriva
+     mai — li' l'ordine e' ancora da prendere e questo ramo resta
+     spento — ma nella pagina di uno scambio PRESO il cambio si e'
+     fissato al take, e un conto che continuasse a stimare direbbe
+     oggi un numero e domani un altro su un affare gia' chiuso
+     (e' la promessa di «Info P2P»: da li' in poi non cambia piu').
+     VALE IL SUBTOTALE E NON IL CONTROVALORE: mostro la scrive col
+     premio GIA' applicato — `get_market_amount_and_fee` chiama
+     `get_fee(new_sats_amount)`, e quel numero esce da
+     `get_market_quote` — quindi il Controvalore si ricava
+     all'indietro con `scorporaPremioP2P`.
+     ⚠️ SU UN INTERVALLO ANCORA APERTO NON SI USA: il coordinatore
+     collassa i due capi (`fiat_amount`) insieme all'importo, e
+     finche' l'euro e' una fascia una cifra sola di sats non le
+     corrisponde — meglio la stima a due capi che un numero solo
+     accanto a «20,00–100,00 €». */
+  const detto = o.euroMax ? 0 : Math.floor(Number(o.satsDetti) || 0);
+  /* `esatto` = la base del conto e' un FATTO e non una stima;
+     `ricavato` = il Controvalore e il premio li abbiamo scorporati
+     noi, quindi tornano a portare il ≈ */
+  const esatto = fisso || detto > 0;
+  const ricavato = detto > 0 && !!Math.round(Number(o.premium) || 0);
+  const vivo = esatto || (cambioVivo && eurPerSat > 0);
   const fee = commissioneVivaP2P();
   const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '')
     + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
@@ -39644,9 +39708,17 @@ function contoDettP2P(o){
      `meta` sono POSITIVI, il verso lo mette la riga */
   const euri = (o.euroMax && !fisso) ? [o.euro, o.euroMax] : [o.euro];
   const conti = euri.map(e => {
-    const ctrl = fisso ? o.sats : (vivo ? Math.round(e / eurPerSat) : 0);
-    const merc = fisso ? o.sats
-               : (vivo ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
+    /* ⚠️ `vivo` NON BASTA PIU' PER GUARDARE IL CAMBIO: con la cifra
+       detta dal coordinatore e' vero anche a cambio muto, e una
+       divisione per `eurPerSat` a zero darebbe Infinity. Si chiede
+       al cambio solo dove il cambio serve davvero. */
+    const stimabile = cambioVivo && eurPerSat > 0;
+    const merc = detto > 0 ? detto
+               : fisso ? o.sats
+               : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
+    const ctrl = detto > 0 ? scorporaPremioP2P(detto, o.premium)
+               : fisso ? o.sats
+               : (stimabile ? Math.round(e / eurPerSat) : 0);
     const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
     return {ctrl: ctrl, premio: Math.abs(ctrl - merc), merc: merc,
             meta: meta,
@@ -39665,8 +39737,9 @@ function contoDettP2P(o){
      capo. */
   const cifraNuda = (campo, segno) => {
     if (!vivo) return '—';
-    const circa = !fisso || campo === 'meta'
-      || (campo === 'netto' && conti[0].meta > 0);
+    const circa = !esatto || campo === 'meta'
+      || (campo === 'netto' && conti[0].meta > 0)
+      || (ricavato && campo !== 'merc');
     return (circa ? '≈ ' : '') + (segno || '')
       + conti.map(c => fmt(c[campo])).join('–') + ' sats';
   };
@@ -40212,8 +40285,24 @@ function renderOrdineP2P(){
   ];
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
   const tog = p2pTogliibile(o);
-  const cifra = o.satsNetti > 0 ? fmt(o.satsNetti) + ' sats'
-              : o.sats > 0 ? fmt(o.sats) + ' sats' : 'al prezzo di mercato';
+  /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
+     ce l'ha (set 2026, richiesta di Andrea): stesse righe, stessi
+     nomi, stesso vestito — Controvalore, premio o sconto, Subtotale,
+     «Fee Barattolo» con la pillola «in promo», e il riquadro finale
+     con quel che passa di mano. Prima qui c'era una riga sola («6,00
+     € — ≈ 12 000 sats») che diceva l'affare e taceva il prezzo: chi
+     l'ordine l'ha scritto vedeva DI MENO di chi lo guarda dal libro.
+     LA TRADUZIONE LA FA `comeLibroP2P` e non un secondo conto col
+     segno girato: «compro» ↦ «sell», cioe' in tutt'e due i casi chi
+     legge riceve sats. La META' della commissione ci sta dentro da
+     se', perche' e' il conto stesso a metterla dal verso di chi
+     guarda.
+     E LA CIFRA DEL COORDINATORE ENTRA COME `satsDetti`: qui lo
+     scambio e' quasi sempre gia' preso, e da quel momento il numero
+     e' un fatto invece di una stima — vedi il suo avviso dentro
+     `contoDettP2P`. */
+  const conto = contoDettP2P(Object.assign(comeLibroP2P(o),
+                                           {satsDetti: o.satsNetti || 0}));
   const meta = [];
   /* IL METODO DECISO PRENDE IL POSTO DELL'ELENCO: da quando chi
      prende sceglie, l'elenco intero direbbe una cosa che non e' piu'
@@ -40232,9 +40321,7 @@ function renderOrdineP2P(){
   const secondarie = azioniSecondarieP2P(o);
   const avviso = o.cantDo || o.errore;
   box.innerHTML =
-    '<div class="p2p-ord">' +
-      '<div class="p2p-testa"><span class="p2p-euro">' + esc(euroTestoP2P(o)) + '</span>' +
-      '<span class="p2p-sats">' + esc(cifra) + '</span></div>' +
+    '<div class="p2p-ord">' + conto +
       '<div class="p2p-meta">' + meta.map(m => '<span>' + m + '</span>').join('') + '</div>' +
     '</div>' +
     '<div class="p2p-passi"><div class="steps">' +
@@ -40263,8 +40350,15 @@ function renderOrdineP2P(){
        scambiando: prima non c'e' nessuno a cui mandarli, e un bottone
        che porta a un muro e' peggio di un bottone che non c'e'. */
     (chiaviChatOrdine(o) ? campiOrdineP2P(o) : '') +
-    secondarie.map(a => SECONDARI_P2P[a] || '').join('') +
-    '<div class="hint">I sats dello scambio restano custoditi in garanzia: Barattolo non li tiene e non li vede. Gli euro viaggiano fra voi due, fuori da qui.</div>';
+    /* ⚠️ SOTTO LE USCITE NON C'E' PIU' NIENTE (set 2026, decisione di
+       Andrea), ed e' la stessa scelta gia' fatta sotto il conto del
+       libro: qui stava «I sats dello scambio restano custoditi in
+       garanzia…», che non era falsa ma era nel posto sbagliato —
+       sotto «Ritira l'ordine», cioe' dopo che uno ha gia' deciso, e
+       sopra il niente. La garanzia la dice il conto qui sopra con le
+       sue cifre, e la spiega per intero «Info P2P», dove c'e' lo
+       spazio anche per il perche'. */
+    secondarie.map(a => SECONDARI_P2P[a] || '').join('');
 }
 
 /* ---- il foglio del pagamento da bloccare ----
