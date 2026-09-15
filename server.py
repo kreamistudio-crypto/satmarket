@@ -43608,6 +43608,13 @@ async def orologio():
             await riconcilia_payout()
         except Exception as e:
             print(f"⚠️ Riconciliazione dei payout saltata: {e}")
+        try:
+            # LA FASE 5 SI ANNUNCIA DA SOLA (set 2026): quando il SaaS
+            # non ha piu' una riga aperta, un avviso — una volta —
+            # invece di una data da ricordare
+            await avvisa_saas_senza_doveri()
+        except Exception as e:
+            print(f"⚠️ Conto dei doveri del SaaS saltato: {e}")
         await asyncio.sleep(600)
 
 
@@ -44911,6 +44918,104 @@ async def controlla_libro_mastro():
         + "\n\nNessuna correzione automatica: questi numeri li guarda una "
         "persona. Sul VPS: <code>sqlite3 satmarket.db &lt; "
         "query_libro_mastro.sql</code>")
+
+
+# ----------------- IL SAAS NON HA PIU' DOVERI? -----------------------
+# Set 2026, la fase 5 del doppio wallet: il LNbits ospitato si svuota e
+# si disdice SOLO quando non ha piu' una riga aperta — un wallet chiuso
+# con una riga aperta e' un rimborso che non parte. Il polso 24 del
+# libro mastro lo dice a chi lo lancia; qui lo dice l'orologio, da solo
+# e UNA volta, il giorno che i conti scendono a zero.
+TIMBRO_SAAS_SENZA_DOVERI = "saas_senza_doveri"   # il giorno dell'avviso, o ''
+
+# I DOVERI DEL SAAS: le righe APERTE con cassaforte 'saas', registro per
+# registro. Ogni query torna UN numero. E' il polso 24 riscritto come
+# conteggi, e i criteri sono gli stessi: un ordine fra il pagamento e la
+# chiusura, un'uscita da decidere o ritentare, un versamento su un'asta
+# ancora viva (quelli delle aste chiuse sono gia' nei rimborsi, quelli
+# delle vinte nell'ordine), un rimborso da riscuotere, una fattura
+# nostra viva. Sui rimborsi d'asta senza cassaforte si guarda la
+# puntata, e chi non ha nemmeno quella conta come 'saas': nel dubbio
+# non si dichiara zero.
+DOVERI_SAAS = (
+    ("ordini aperti",
+     "SELECT COUNT(*) FROM ordini WHERE cassaforte='saas' AND stato NOT IN "
+     "('creato','annullato','released','refunded')"),
+    ("ordini con un'uscita da decidere",
+     "SELECT COUNT(*) FROM ordini WHERE cassaforte='saas' AND payout_stato "
+     "IN ('incerto','in_volo','da_riprovare')"),
+    ("versamenti d'asta su aste vive",
+     "SELECT COUNT(*) FROM rilanci WHERE cassaforte='saas' AND stato IN "
+     "('saldato','tardivo') AND puntata_id IN "
+     "(SELECT id FROM puntate WHERE stato='attiva')"),
+    ("rimborsi d'asta da riscuotere o da decidere",
+     "SELECT COUNT(*) FROM rimborsi_asta r WHERE (r.stato='da_riscuotere' "
+     "OR r.payout_stato IN ('incerto','in_volo','da_riprovare')) AND "
+     "COALESCE(NULLIF(r.cassaforte,''), (SELECT cassaforte FROM rilanci "
+     "WHERE puntata_id=r.puntata_id AND stato IN ('saldato','tardivo') "
+     "ORDER BY id LIMIT 1), 'saas')='saas'"),
+    ("fatture nostre vive o rimborsi da decidere",
+     "SELECT COUNT(*) FROM pagamenti WHERE cassaforte='saas' AND "
+     "(stato='creato' OR payout_stato IN ('incerto','in_volo','da_riprovare'))"),
+)
+
+
+async def avvisa_saas_senza_doveri():
+    """L'avviso della fase 5, una volta sola (set 2026).
+
+    TRE REGOLE, e ognuna e' una riga da non ammorbidire.
+    1) Parla SOLO quando il denaro nuovo nasce sul nodo: finche' la
+       leva e' spenta il SaaS e' la cassaforte viva, e «zero righe
+       aperte» sarebbe un momento di calma, non una notizia.
+    2) SUONA ALLA DISCESA A ZERO, non ogni giorno: il timbro nel
+       database ricorda che l'avviso e' partito, e se un dovere
+       RICOMPARE (un ritentativo, una disputa riaperta) il timbro si
+       azzera — cosi' alla prossima discesa suona di nuovo, che e' la
+       sola volta in cui serve. Un avviso quotidiano si impara a
+       ignorare; uno che non torna dopo una ricomparsa si perde.
+    3) NEL DUBBIO NON DICHIARA ZERO: un conteggio che esplode (lo
+       schema cambiato sotto) ferma il giro senza timbrare, e la
+       ragione va nel journal. Dire «puoi disdire» su un conto che non
+       si e' potuto fare e' l'unico errore di questa funzione che costa
+       sats a qualcuno.
+    Legge e avvisa, non corregge niente: il patto del libro mastro."""
+    if cassaforte_nuova() != CASSAFORTE_NODO:
+        return
+    con = db()
+    aperti = []
+    for nome, sql in DOVERI_SAAS:
+        try:
+            n = int(con.execute(sql).fetchone()[0] or 0)
+        except Exception as e:
+            con.close()
+            print(f"⚠️ Doveri del SaaS: «{nome}» non si e' potuto contare "
+                  f"({e}): niente avviso, nel dubbio non e' zero")
+            return
+        if n:
+            aperti.append((nome, n))
+    con.close()
+    gia = timbro_letto(TIMBRO_SAAS_SENZA_DOVERI)
+    if aperti:
+        if gia:
+            # un dovere e' ricomparso dopo l'avviso: si riarma
+            timbro_scrivi(TIMBRO_SAAS_SENZA_DOVERI, "")
+            print("🔁 Doveri del SaaS ricomparsi dopo l'avviso: "
+                  + ", ".join(f"{n} {nome}" for nome, n in aperti))
+        return
+    if gia:
+        return                    # gia' detto, e niente e' cambiato
+    oggi = time.strftime("%Y-%m-%d")
+    timbro_scrivi(TIMBRO_SAAS_SENZA_DOVERI, oggi)   # PRIMA di parlare
+    print(f"🏁 Doveri del SaaS a zero ({oggi}): avviso mandato")
+    await notifica_admin(
+        "🏁 <b>Il SaaS non ha più doveri: si può aprire la fase 5.</b>\n"
+        "Nessuna riga aperta con cassaforte «saas» su ordini, rilanci, "
+        "rimborsi d'asta e pagamenti — e il denaro nuovo nasce sul nodo. "
+        "Da qui: lo sweep del saldo residuo, il backfill della colonna, "
+        "un mese di SaaS come rete, la disdetta (vedi Cantieri, «Il "
+        "doppio wallet»). Il conto a mano è il polso 24 di "
+        "<code>query_libro_mastro.sql</code>. Questo avviso non si "
+        "ripete: se un dovere ricompare e poi torna a zero, suona di nuovo.")
 
 
 @app.on_event("startup")

@@ -2848,6 +2848,149 @@ def prove_doppio_wallet():
                          r"cassaforte=", cod)))
 
 
+def prove_saas_senza_doveri():
+    """L'AVVISO DELLA FASE 5 (set 2026): suona una volta, alla discesa
+    a zero dei doveri del SaaS, solo col denaro nuovo sul nodo, e nel
+    dubbio non dichiara zero. Girato su un database usa-e-getta."""
+    print("\n[il SaaS non ha piu' doveri: l'avviso della fase 5]")
+    import sqlite3
+
+    class _Aperta:
+        # la funzione chiude la connessione che riceve: qui no
+        def __init__(self, con):
+            self._c = con
+
+        def execute(self, *a):
+            return self._c.execute(*a)
+
+        def commit(self):
+            self._c.commit()
+
+        def close(self):
+            pass
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,
+            cassaforte TEXT DEFAULT 'saas', payout_stato TEXT DEFAULT '');
+        CREATE TABLE puntate(id INTEGER PRIMARY KEY, stato TEXT);
+        CREATE TABLE rilanci(id INTEGER PRIMARY KEY, puntata_id INT,
+            stato TEXT, cassaforte TEXT DEFAULT 'saas');
+        CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, puntata_id INT,
+            stato TEXT, cassaforte TEXT DEFAULT '', payout_stato TEXT DEFAULT '');
+        CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, stato TEXT,
+            cassaforte TEXT DEFAULT 'saas', payout_stato TEXT DEFAULT '');
+    """)
+    timbri, avvisi, nuova = {}, [], ["nodo"]
+
+    async def _avvisa(t):
+        avvisi.append(t)
+
+    amb = {"db": lambda: _Aperta(con), "time": __import__("time"),
+           "cassaforte_nuova": lambda: nuova[0], "CASSAFORTE_NODO": "nodo",
+           "timbro_letto": lambda n: timbri.get(n, ""),
+           "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+           "notifica_admin": _avvisa, "print": lambda *a, **k: None}
+    i = _SORGENTE.index("DOVERI_SAAS = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    amb["TIMBRO_SAAS_SENZA_DOVERI"] = "saas_senza_doveri"
+    exec("async " + pezzo("avvisa_saas_senza_doveri"), amb)
+    import asyncio as _as
+
+    def giro():
+        _as.run(amb["avvisa_saas_senza_doveri"]())
+
+    # 1) la leva spenta: il SaaS e' la cassaforte viva, zero non e' una notizia
+    nuova[0] = "saas"
+    giro()
+    prova("leva spenta: a zero doveri non parla", (0, {}), (len(avvisi), timbri))
+    nuova[0] = "nodo"
+    # 2) un dovere aperto sul SaaS: silenzio
+    con.execute("INSERT INTO ordini(stato) VALUES('locked')")
+    giro()
+    prova("un ordine aperto sul SaaS: silenzio", 0, len(avvisi))
+    # ...e le righe del nodo non contano
+    con.execute("INSERT INTO ordini(stato, cassaforte) VALUES('locked','nodo')")
+    con.execute("INSERT INTO pagamenti(stato, cassaforte) VALUES('creato','nodo')")
+    con.execute("UPDATE ordini SET stato='released' WHERE cassaforte='saas'")
+    giro()
+    prova("a zero doveri (e righe del nodo aperte): UN avviso", 1, len(avvisi))
+    prova("...che dice la fase 5", True, "fase 5" in avvisi[-1])
+    prova("...e il timbro e' il giorno", True,
+          timbri.get("saas_senza_doveri", "").count("-") == 2)
+    # 3) il giorno dopo: niente
+    giro(); giro()
+    prova("a giri successivi non si ripete", 1, len(avvisi))
+    # 4) un dovere ricompare: il timbro si riarma, senza avvisare
+    con.execute("UPDATE ordini SET payout_stato='da_riprovare' WHERE cassaforte='saas'")
+    giro()
+    prova("un'uscita da riprovare sul SaaS: si riarma, senza suonare",
+          (1, ""), (len(avvisi), timbri.get("saas_senza_doveri")))
+    con.execute("UPDATE ordini SET payout_stato='uscito'")
+    giro()
+    prova("...e alla prossima discesa a zero suona di nuovo", 2, len(avvisi))
+    # 5) i cinque registri contano, uno per uno
+    casi = [
+        ("versamento su un'asta viva",
+         "INSERT INTO puntate(id, stato) VALUES(1,'attiva'); "
+         "INSERT INTO rilanci(puntata_id, stato) VALUES(1,'saldato')",
+         "UPDATE puntate SET stato='chiusa'"),
+        ("rimborso d'asta da riscuotere senza cassaforte (nel dubbio e' SaaS)",
+         "INSERT INTO rimborsi_asta(puntata_id, stato) VALUES(9,'da_riscuotere')",
+         "UPDATE rimborsi_asta SET stato='riscosso'"),
+        ("fattura nostra viva",
+         "INSERT INTO pagamenti(stato) VALUES('creato')",
+         "UPDATE pagamenti SET stato='annullato' WHERE cassaforte='saas'"),
+        ("rimborso d'asta da decidere",
+         "INSERT INTO rimborsi_asta(puntata_id, stato, payout_stato, cassaforte) "
+         "VALUES(9,'riscosso','incerto','saas')",
+         "UPDATE rimborsi_asta SET payout_stato='uscito'"),
+    ]
+    for nome, apri, chiudi in casi:
+        prima = len(avvisi)
+        con.executescript(apri)
+        giro()
+        prova(f"{nome}: e' un dovere (silenzio, timbro riarmato)",
+              (prima, ""), (len(avvisi), timbri.get("saas_senza_doveri")))
+        con.executescript(chiudi)
+        giro()
+        prova(f"...chiuso, suona", prima + 1, len(avvisi))
+    # ...e la puntata del NODO senza colonna sul rimborso non e' un dovere del SaaS
+    con.executescript("INSERT INTO puntate(id, stato) VALUES(2,'chiusa'); "
+                      "INSERT INTO rilanci(puntata_id, stato, cassaforte) VALUES(2,'saldato','nodo'); "
+                      "INSERT INTO rimborsi_asta(puntata_id, stato) VALUES(2,'da_riscuotere')")
+    prima = len(avvisi)
+    timbri["saas_senza_doveri"] = ""
+    giro()
+    prova("rimborso senza colonna ma con la puntata sul nodo: non conta", prima + 1, len(avvisi))
+    # 6) nel dubbio non e' zero: una query che esplode ferma tutto
+    timbri["saas_senza_doveri"] = ""
+    con.execute("DROP TABLE pagamenti")
+    prima = len(avvisi)
+    giro()
+    prova("schema cambiato sotto: niente avviso e niente timbro",
+          (prima, ""), (len(avvisi), timbri.get("saas_senza_doveri")))
+    con.close()
+
+    # --- le sentinelle
+    corpo = pezzo("avvisa_saas_senza_doveri")
+    prova("l'orologio lo chiama", True,
+          "await avvisa_saas_senza_doveri()" in pezzo("orologio"))
+    prova("il timbro si scrive PRIMA di parlare", True,
+          corpo.index("timbro_scrivi(TIMBRO_SAAS_SENZA_DOVERI, oggi)")
+          < corpo.index("await notifica_admin("))
+    prova("non corregge NULLA", False,
+          any(v in corpo.split('"""')[-1].upper()
+              for v in ("UPDATE ", "INSERT ", "DELETE ")))
+    prova("i doveri sono cinque e ognuno conta una cosa sola", True,
+          _SORGENTE.count('SELECT COUNT(*) FROM') >= 5
+          and 'DOVERI_SAAS = (' in _SORGENTE)
+    prova("il polso 24 conta solo le aste VIVE fra i rilanci", True,
+          "stato = 'attiva'" in open("query_libro_mastro.sql",
+                                      encoding="utf-8").read())
+
+
 def prove_esito_pagamento():
     """IL GIUDICE VERO DEI PAGAMENTI IN USCITA (set 2026).
 
@@ -59698,7 +59841,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
-              prove_doppio_wallet,
+              prove_doppio_wallet, prove_saas_senza_doveri,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,

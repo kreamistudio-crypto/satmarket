@@ -663,10 +663,10 @@ SELECT 'ordini' AS registro, cassaforte, COUNT(*) AS aperte,
  WHERE stato NOT IN ('creato','annullato','released','refunded')
  GROUP BY cassaforte
 UNION ALL
-SELECT 'rilanci (versati, asta viva o da rimborsare)', cassaforte, COUNT(*),
+SELECT 'rilanci (versati su aste ancora vive)', cassaforte, COUNT(*),
        SUM(delta_sats)
   FROM rilanci WHERE stato IN ('saldato','tardivo')
-   AND puntata_id IN (SELECT id FROM puntate WHERE stato IN ('attiva','chiusa','vincitrice'))
+   AND puntata_id IN (SELECT id FROM puntate WHERE stato = 'attiva')
  GROUP BY cassaforte
 UNION ALL
 SELECT 'rimborsi_asta da riscuotere', cassaforte, COUNT(*), SUM(importo_sats)
@@ -680,5 +680,10 @@ UNION ALL
 SELECT 'payout congelati o in volo', cassaforte, COUNT(*), 0
   FROM ordini WHERE payout_stato IN ('incerto','in_volo','da_riprovare')
  GROUP BY cassaforte;
+-- (le puntate 'chiusa' hanno gia'' il loro rimborso nel registro sotto,
+-- le 'vincitrice' i loro sats nell''ordine: contarle qui sarebbe
+-- contarle due volte, e il conto non scenderebbe mai a zero)
 -- e dove nasce il denaro nuovo lo dice il pannello «Stato delle leve»,
--- non questo file: la leva si legge VIVA.
+-- non questo file: la leva si legge VIVA. Lo stesso conto lo fa
+-- l''orologio da solo (`avvisa_saas_senza_doveri`) e avvisa UNA volta,
+-- il giorno che scende a zero.

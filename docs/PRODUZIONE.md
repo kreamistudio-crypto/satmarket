@@ -231,7 +231,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   la riga sopra lo spiega. `False` e riavvio rimanda il nuovo sul
   SaaS; le righe gia' nate sul nodo continuano a chiudersi la'. Il
   SaaS si svuota e si disdice SOLO quando il polso 24 del libro mastro
-  (`query_libro_mastro.sql`) da' zero righe aperte 'saas'.
+  (`query_libro_mastro.sql`) da' zero righe aperte 'saas' — e non c'e'
+  una data da ricordare: l'orologio fa lo stesso conto ogni dieci
+  minuti (`avvisa_saas_senza_doveri`) e manda ai moderatori «🏁 Il
+  SaaS non ha più doveri: si può aprire la fase 5» UNA volta, alla
+  discesa a zero (timbro `saas_senza_doveri` in `timbri`: si riarma da
+  solo se un dovere ricompare, e nel dubbio — un conteggio che esplode
+  — non dichiara zero). Parla solo col denaro nuovo sul nodo.
   BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
   superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
   age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.

@@ -14729,10 +14729,21 @@ NON e' un difetto: lo scrivono solo i tre timbri del non-riuscito, dove
 serve a sapere a chi ritentare; sul riuscito il verso lo dice lo stato.
 Da qui e' FASE 4, il regime doppio: nessun gesto, si guarda il polso 24.
 
-**COSA RESTA**: fase 5 (a zero righe aperte 'saas' sul polso 24: lo
-sweep del saldo, il backfill della colonna sulle righe chiuse, un mese
-di SaaS come rete, la disdetta, e il foglio del panico riscritto — la
-riga «LNbits gira su Spark» e' gia' falsa); `user:` non root nel
+**LA FASE 5 SI ANNUNCIA DA SOLA** (16 set 2026, richiesta di Andrea:
+«per non dimenticarmi»): `avvisa_saas_senza_doveri` nell'orologio
+conta i doveri del SaaS con cinque query (le stesse del polso 24,
+che nello stesso giro ha smesso di contare le puntate vinte e chiuse
+fra i rilanci — i loro sats sono gia' nell'ordine o nel registro dei
+rimborsi, e il conto non sarebbe mai sceso a zero) e manda «🏁» UNA
+volta, alla discesa a zero, solo col denaro nuovo sul nodo; il timbro
+in `timbri` si riarma se un dovere ricompare, e un conteggio che
+esplode non dichiara zero. `prove_saas_senza_doveri`, 23 prove su un
+database usa-e-getta, transizioni comprese. **10148 verdi.**
+
+**COSA RESTA**: fase 5 (quando arriva il 🏁: lo sweep del saldo, il
+backfill della colonna sulle righe chiuse, un mese di SaaS come rete,
+la disdetta, e il foglio del panico riscritto — la riga «LNbits gira
+su Spark» e' gia' falsa); `user:` non root nel
 compose di LNbits; il secondo milione di inbound verso un peer con
 onion; la scadenza del cert TLS di LND (22 ott 2027: ricopiare
 `tls.cert` sul VPS). La strada scartata da non riproporre senza un
