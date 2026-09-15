@@ -35972,7 +35972,9 @@ def prove_script_nel_workflow():
     prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
-TETTO_CLAUDE_MD = 538   # misurato: 518 righe il giorno del taglio, piu' 20
+TETTO_CLAUDE_MD = 539   # misurato: 518 righe il giorno del taglio, piu' 20;
+                        # salito a 539 col doppio wallet (la cosa aperta
+                        # del macaroon dedicato, 5 righe vere)
 
 
 def prove_bussola():
