@@ -15202,3 +15202,96 @@ forma e le gemelle con lei. 5) La prova sul campo a due identità con un
 ordine Amazon vero — fase 5, agganciata alla tappa 8 — e con lei i
 timer mai scaduti: la scadenza di `expiration_seconds`, la riconsegna
 al libro, e i 576 blocchi del cltv.
+
+
+## Il silenzio del coordinator era un namespace orfano (15 set 2026)
+
+**LA RISPOSTA ALLA VOCE QUI SOPRA** («Il verso di chi pubblica…», che
+chiudeva con quattro ipotesi da smentire una alla volta). La prima era
+quella giusta nella forma e sbagliata nella causa: yadio non rispondeva,
+ma non perché bloccasse gli exit Tor — perché **dal container di mostro
+non usciva niente**, verso nessun host, check.torproject.org compreso
+(«000» all'istante, cioè nemmeno il DNS). Log del coordinatore,
+16:15-16:35: `price: yadio skipped: cooldown (circuit breaker open)`
+alle 16:22 e 16:27, poi `yadio error: error sending request` e `all 1
+providers failed this tick — serving last-known-good` alle 16:32, e
+**nessuna riga sull'ordine di Alan**.
+
+**COME FUNZIONA IL PREZZO NELLA 0.18.7, letto sul sorgente** (il fork
+non lo tocca: le tre patch sono LNURL e dev fee). Non si chiede più a
+yadio all'ordine: `src/price/` ha provider, aggregatore, cache e circuit
+breaker; lo scheduler legge i provider al boot e ogni 300 s e riempie una
+cache **solo in RAM** (`store.rs`), da cui `get_market_quote` legge. Se
+la cache ha un prezzo ma più vecchio di 1800 s → `PriceTooStale`, che è
+un cant-do e arriva all'utente. Se non ha MAI avuto un prezzo →
+`NoCurrency` → `NoAPIResponse`, che in `order.rs` è un errore interno: il
+dispatcher logga un WARN («Error in new-order with context
+NoAPIResponse») e **non risponde**. Il breaker: 3 fallimenti consecutivi
+lo aprono, cooldown 120 s raddoppiato a ogni fallimento in più, tetto
+1800 s costante nel binario; aperto, il provider si salta e basta. Il
+riavvio del cltv 576 aveva azzerato la cache, e da lì yadio non ha più
+risposto: tre ore senza un prezzo, ordini a mercato muti.
+
+**LA CAUSA VERA, DUE RIAVVII DI TOR.** Nel compose `mostro` vive nel
+namespace di rete di `mostro-net` (172.28.1.5) e `tor-redirect` in
+quello di `tor` (172.28.1.3): è lì che stanno le tre REDIRECT, `ip_forward`
+e il DROP del FORWARD dell'audit. Alle 13:38 e 13:42 tor è stato
+riavviato due volte per l'hidden service di LNbits: ogni `restart` rifà
+il namespace del container, e il sidecar — su da 13 giorni — è rimasto
+in quello **vecchio**, orfano e senza eth0. Le regole c'erano tutte, e si
+leggevano con `docker exec nodo-tor-redirect-1 iptables -S`: in un
+namespace dove non passava più un pacchetto. In quello vivo di tor: NAT
+vuota, ip_forward 0, ogni pacchetto di mostro morto sul gateway. Guasto
+**chiuso**, che è la cosa buona: niente è uscito in chiaro. Prova sugli
+inode: tor 4026532573, redirect 4026532516; mostro e mostro-net
+4026532389, cioè mostro era sano e la sua route giusta («default via
+172.28.1.3»). La ronda non l'ha visto perché guarda superficie e canali,
+non se il container ESCA.
+
+**LA CURA E LA RIPROVA.** `docker compose up -d --force-recreate
+tor-redirect` (10,5 s): il sidecar si riaggancia al namespace di adesso e
+rifà le regole. `{"IsTor":true,"IP":"185.220.101.37"}` dal namespace di
+mostro, DROP `-s 172.28.1.5` nel FORWARD del namespace vivo, ip_forward
+1: il buco dell'audit non si è riaperto. Il prezzo: due tick ancora
+«skipped: cooldown» (breaker al tetto), poi alle 17:37 «yadio ok (145
+currencies)» e le tariffe pubblicate su Nostr su tre relay; alle 17:42 di
+nuovo ok. Il P2P a mercato è tornato.
+
+**LE QUATTRO COSE DECISE DA ANDREA**, tutte in `deploy/nodo/` e in
+PRODUZIONE. 1) La regola: un servizio che presta il suo namespace non si
+riavvia da solo — dopo `restart tor` sempre `up -d --force-recreate
+tor-redirect`, dopo `restart mostro-net` lo stesso per mostro. 2) La cura
+durevole, da applicare: `tor-entrypoint.sh` mette le regole DENTRO il
+container di tor (NET_ADMIN, sysctl ip_forward, entrypoint che le
+riapplica e poi `exec` tor, fail-closed se iptables manca), e il sidecar
+sparisce; porta anche `ip6tables FORWARD DROP`, la voce aperta
+dell'audit. La domanda che decide se serve un'immagine diversa è se
+l'immagine di tor ha iptables. 3) La quinta domanda della ronda, ogni
+giorno alle 09:20: `ronda-tor.sh` con tre giudici dal punto di vista di
+chi deve uscire — la curl a check.torproject.org (000 = non esce, IsTor
+falso = esce in chiaro, che è peggio), i namespace di tor e del sidecar
+che devono coincidere finché il sidecar c'è, il DROP nel namespace vivo.
+4) La sezione `[price]` coi provider di scorta (CoinGecko, currency-api,
+Blockchain.com, senza chiave) e il timeout per provider a 30 s, perché un
+circuito freddo costa 10,6: `settings-price.toml`, da appendere dopo
+aver provato gli host dalla rete di mostrod.
+
+**RESTA APERTO, E NON È DI OGGI**: il client cerca le ragioni dei
+cant-do in kebab-case (`invalid-trade-index`) mentre mostro-core 0.14.6
+serializza `CantDoReason` in snake_case (`{"cant_do":
+"invalid_trade_index"}`, letto su `error.rs` e `message.rs` del tag) —
+quindi `MOTIVI_CANTDO` probabilmente non ha mai combaciato e a schermo è
+sempre uscita la chiave grezza; e `price_too_stale` non c'è affatto. La
+cura è normalizzare la chiave in `motivoCantDo` e aggiungere la voce del
+prezzo («non disponibile in questo momento: riprova fra poco, o pubblica
+a prezzo fisso»). Con lei, la patch 0004 del fork: in `order.rs` e nelle
+due take, il prezzo MAI visto risponda `PriceTooStale` invece di tacere.
+Nel frattempo gli ordini a prezzo fisso non passano dal prezzo e vanno
+sempre.
+
+**LA LEZIONE, che vale più della cura**: `docker exec` mostra il
+namespace del PROCESSO, non quello del container che credi. Quando le
+regole «ci sono tutte» e i pacchetti non passano, si confrontano gli
+inode prima di cercare altrove — ed è la stessa forma di «la prova verde
+per una ragione diversa da quella che credi»: si guardava il posto
+giusto con lo strumento sbagliato.

@@ -1,0 +1,45 @@
+# settings-price.toml — la sezione [price] di mostrod (v0.18.7), da APPENDERE
+# a ~/nodo/mostro/settings.toml sul nodo (15 set 2026).
+# PERCHE': senza questa sezione mostrod sintetizza «la sola yadio» dal
+# vecchio bitcoin_price_api_url — l'«all 1 providers failed» del log — e
+# un yadio giu' lascia la cache del prezzo vuota: gli ordini a prezzo di
+# mercato non si pubblicano e non si prendono. I tre provider di scorta
+# sono senza chiave e li conosce gia' il codice (src/price/providers/).
+# Il timeout per provider sale da 10 a 30: un circuito Tor freddo costa
+# 10,6 s, e con 10 anche un provider vivo fallirebbe la prima volta.
+# I valori del breaker restano quelli di default, scritti per leggerli:
+# 3 fallimenti consecutivi (= 15 minuti di tick) lo aprono, il cooldown
+# parte da 120 s e raddoppia, tetto 1800 s (costante nel binario).
+# La cache e' SOLO IN RAM: ogni riavvio di mostrod la azzera, e il primo
+# tick parte al boot.
+# APPLICARE: cat settings-price.toml >> ~/nodo/mostro/settings.toml, poi
+# `cd ~/nodo && docker compose restart mostro` (cambia solo il config).
+# Al tick dopo il log deve dire «price: <provider> ok (N currencies)» per
+# piu' di un provider, e il 38385 continua a uscire.
+
+[price]
+update_interval_seconds = 300
+max_price_staleness_seconds = 1800
+outlier_threshold_pct = 5.0
+provider_timeout_seconds = 30
+provider_failure_threshold = 3
+provider_failure_cooldown_seconds = 120
+publish_to_nostr = true
+
+[price.providers.yadio]
+enabled = true
+url = "https://api.yadio.io"
+
+[price.providers.coingecko]
+enabled = true
+url = "https://api.coingecko.com/api/v3"
+
+[price.providers.currency_api]
+enabled = true
+url = "https://currency-api.pages.dev/v1"
+fallback_urls = ["https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1"]
+except = ["CUP", "MLC"]
+
+[price.providers.blockchain]
+enabled = true
+url = "https://blockchain.info"

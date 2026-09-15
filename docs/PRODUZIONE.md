@@ -87,6 +87,74 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ne ricava la finestra utile togliendo 24 blocchi di margine nostro:
   cambiarlo sul nodo cambia il cap del foglio «Pubblica» senza toccare
   niente nel codice.
+- IL NAMESPACE PRESTATO NON SI RIAVVIA DA SOLO (15 set 2026, il giorno
+  in cui mostro non usciva). Nel compose del nodo due servizi vivono
+  nel namespace di rete di un altro: `mostro` in quello di `mostro-net`
+  (il 172.28.1.5) e `tor-redirect` in quello di `tor` (il 172.28.1.3),
+  dove stanno le tre REDIRECT, `ip_forward=1` e il DROP del FORWARD.
+  `docker compose restart tor` rifa' il namespace di tor, e chi ci
+  viveva dentro resta in quello VECCHIO, orfano e senza interfaccia:
+  `docker exec nodo-tor-redirect-1 iptables -S` mostra le regole tutte
+  al loro posto — in un namespace dove non passa piu' un pacchetto. Nel
+  namespace vivo non c'e' niente, ip_forward e' 0, e mostro fa «000»
+  su ogni host, DNS compreso (guasto CHIUSO: niente e' uscito in
+  chiaro). Verificato sugli inode: tor 4026532573, redirect 4026532516.
+  LA REGOLA: dopo `restart tor` sempre
+  `cd ~/nodo && docker compose up -d --force-recreate tor-redirect`
+  (col nome del servizio in fondo); dopo `restart mostro-net` la stessa
+  cosa per `mostro`. Finche' il sidecar esiste. La cura del 15 set e'
+  stata esattamente quella (10,5 s), verificata con
+  `{"IsTor":true}` dal namespace di mostro e col DROP ancora nel FORWARD
+  del namespace VIVO di tor:
+  `docker run --rm --network container:nodo-mostro-1 curlimages/curl -s -m 40 https://check.torproject.org/api/ip`
+  e `nsenter -t $(docker inspect -f '{{.State.Pid}}' nodo-tor-1) -n iptables -S FORWARD`.
+  I namespace si confrontano cosi', ed e' la prova che decide:
+  `for c in nodo-tor-1 nodo-tor-redirect-1 nodo-mostro-net-1 nodo-mostro-1; do printf '%-22s ' $c; sudo readlink /proc/$(docker inspect -f '{{.State.Pid}}' $c)/ns/net; done`.
+- LA CURA DUREVOLE: LE REGOLE DENTRO TOR, VIA IL SIDECAR (preparata il
+  15 set 2026 in `deploy/nodo/tor-entrypoint.sh`, DA APPLICARE). Le
+  stesse regole del sidecar, riapplicate dall'entrypoint del container
+  di tor a ogni avvio — fail-closed: se iptables manca o una regola non
+  entra, tor non parte — piu' `ip6tables -A FORWARD -j DROP`, che chiude
+  la voce aperta dell'audit. Nel compose, sul servizio `tor`:
+  `cap_add: [NET_ADMIN]`, `sysctls: {net.ipv4.ip_forward: 1}`, il
+  volume `./tor-entrypoint.sh:/usr/local/bin/tor-entrypoint.sh:ro`,
+  `entrypoint: ["/usr/local/bin/tor-entrypoint.sh"]` e in `command:` il
+  comando ORIGINALE dell'immagine (si legge con
+  `docker inspect -f '{{.Config.Entrypoint}} {{.Config.Cmd}}' nodo-tor-1`
+  PRIMA di toccare: lo script fa `exec "$@"`, e senza argomenti ripiega
+  su `tor -f /etc/tor/torrc`). Il servizio `tor-redirect` si toglie
+  intero. PRIMA di tutto, la domanda che decide se serve un'immagine
+  diversa: `docker exec nodo-tor-1 sh -c 'command -v iptables'` — se
+  tace, l'immagine di tor non ha iptables e va costruita con (un
+  Dockerfile di due righe sopra la stessa immagine, `apk add iptables`
+  o `apt-get install iptables`). Il file arriva con scp + sha256, mai
+  incollato (i heredoc lunghi troncano). Poi `docker compose up -d tor`
+  — `up -d`, non `restart`, perche' cambia il container — e la verifica
+  e' la stessa della regola qui sopra piu' `ronda-tor.sh --prova`.
+- LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
+  `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
+  Tre giudici dal namespace di mostro: la curl a check.torproject.org
+  (allarme su codice diverso da 200 o `IsTor` non true — il secondo e'
+  il caso peggiore, esce in chiaro), i namespace di tor e del sidecar
+  che devono coincidere finche' il sidecar esiste, e il DROP del
+  FORWARD nel namespace vivo di tor (con nsenter e l'iptables
+  dell'host; se mancano dice «non misurato»). Usa `curlimages/curl`
+  con `--pull never`: e' gia' sul nodo dal 15 set e la ronda non deve
+  dipendere dalla rete per dire che la rete non c'e'. Installazione:
+  scp dei tre file, `sha256sum` da confrontare, poi
+  `sudo install -m 755 ronda-tor.sh /usr/local/bin/ && sudo cp nodo-tor.service nodo-tor.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nodo-tor.timer && sudo /usr/local/bin/ronda-tor.sh --prova`.
+  Il messaggio finisce con `--- fine ronda tor`, come le altre.
+- I PROVIDER DI SCORTA DEL PREZZO (15 set 2026): `settings-price.toml`
+  in `deploy/nodo/` e' la sezione `[price]` da appendere a
+  `~/nodo/mostro/settings.toml` (yadio + CoinGecko + currency-api +
+  Blockchain.com, tutti senza chiave, timeout per provider a 30 s),
+  poi `docker compose restart mostro`. Il perche' e i numeri del
+  breaker stanno in testa al file. Prima di appendere, la prova che
+  gli host rispondano dalla rete di mostrod (il blocco degli exit Tor e'
+  per sito):
+  `for u in https://api.coingecko.com/api/v3/simple/price?ids=bitcoin\&vs_currencies=eur https://currency-api.pages.dev/v1/currencies/btc.json https://blockchain.info/ticker; do docker run --rm --network container:nodo-mostro-1 curlimages/curl -s -m 30 -o /dev/null -w "%{http_code} %{time_appconnect}s $u\n" "$u"; done`.
+  Un host che fa 403 non si mette in lista: un provider morto costa
+  solo un tick, ma un provider che risponde male entra nella mediana.
 - LO SPECCHIO GIRA SULLA MACCHINA DEL RELAY, non su questo VPS: e' il
   servizio `specchio` del `compose.yml` di `/opt/relay` (uno `strfry
   router` con `router.conf`), e si accende con `docker compose up -d

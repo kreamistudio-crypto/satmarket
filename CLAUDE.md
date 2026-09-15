@@ -102,6 +102,18 @@ il compose, riga 48** — a mano sparirebbe al primo `up -d` e il buco si
 riaprirebbe in silenzio — provata con `--force-recreate`. Nessuno dei
 due era un errore di configurazione nostro: il primo era nel codice, il
 secondo era il residuo che le tre regole di redirect non coprivano.
+⚠️ E QUELLE REGOLE VIVONO IN UN NAMESPACE PRESTATO (15 set 2026, tre
+ore di P2P muto): `tor-redirect` sta nel namespace di rete di `tor`, e
+`mostro` in quello di `mostro-net`. Un `docker compose restart tor`
+rifa' il namespace e lascia il sidecar in quello VECCHIO: `docker exec`
+mostra le regole tutte al loro posto, in un namespace dove non passa
+piu' niente, e mostro fa «000» su ogni host — chiuso, non in chiaro.
+REGOLA: dopo `restart tor` sempre `up -d --force-recreate tor-redirect`
+(dopo `restart mostro-net`, lo stesso per `mostro`); la prova e' il
+confronto degli inode di `/proc/<pid>/ns/net`. La cura durevole (regole
+nell'entrypoint di tor, via il sidecar) e la ronda giornaliera che fa
+la curl a check.torproject.org DAL namespace di mostro stanno in
+`deploy/nodo/` e in PRODUZIONE («IL NAMESPACE PRESTATO»).
 
 **IL NODO GIRA LA 0.18.7**, e non lo dice il changelog ma il nodo
 stesso: il suo evento `info` (38385) si annuncia `mostro_version

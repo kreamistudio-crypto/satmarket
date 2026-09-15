@@ -1,0 +1,10 @@
+# nodo-tor.service — il lavoro che nodo-tor.timer lancia.
+# Copia in deploy/nodo/; sul nodo sta in /etc/systemd/system/.
+[Unit]
+Description=Ronda: mostro esce, e esce da Tor?
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ronda-tor.sh

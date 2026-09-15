@@ -1,0 +1,13 @@
+# nodo-tor.timer — la quinta domanda della ronda, ogni giorno alle 09:20 UTC
+# (dieci minuti dopo la liquidita', cosi' i due messaggi non si accavallano).
+# Persistent: se la macchina era spenta all'ora, scatta al primo avvio.
+# Copia in deploy/nodo/; sul nodo sta in /etc/systemd/system/.
+[Unit]
+Description=Ronda giornaliera: mostro esce, e esce da Tor?
+
+[Timer]
+OnCalendar=*-*-* 09:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
