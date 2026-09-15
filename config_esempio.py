@@ -295,6 +295,19 @@ BANNER_LINK_VIETATI = (
     "buff.ly", "rebrand.ly", "short.io", "rb.gy", "t.ly", "lnkd.in",
     "shorturl.at", "s.id", "bl.ink", "tiny.cc", "shorte.st")
 
+# --- IL LINK DEL NEGOZIO A SCELTA (set 2026) --------------------------
+# La personalizzazione SUBITO DOPO il banner: chi arriva al livello
+# «avviato» — lo stesso gradino che apriva la porta del banner prima
+# che diventasse sempre a pagamento — puo' scegliersi un indirizzo
+# leggibile (/negozio/untempoperte) al posto del codice casuale.
+# I gradini sono: nuovo · avviato · pratico · esperto · maestro.
+SLUG_NEGOZIO_LIVELLO = "avviato"
+# Il prezzo si paga OGNI VOLTA che si cambia idea sul nome — niente
+# sconto di livello qui, a differenza del banner: e' il prezzo
+# ripetuto a tenere la scelta rara, non un gradino piu' alto.
+# 0 = la personalizzazione e' spenta del tutto.
+SLUG_NEGOZIO_PREZZO_SATS = 5_000
+
 # LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
 # domini che una descrizione di annuncio rende TOCCABILI. Tutto il
 # resto resta testo copiabile, cioe' la vita di sempre.

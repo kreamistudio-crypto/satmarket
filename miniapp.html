@@ -8264,6 +8264,15 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="bannerBlocco"></div></div>
       </div>
 
+      <!-- Il link del negozio a scelta (set 2026): SUBITO DOPO il
+           banner nella scala delle personalizzazioni — un indirizzo
+           leggibile al posto del codice casuale, a pagamento a ogni
+           cambio. Stessa forma del cassetto del banner. -->
+      <div class="acc" id="accSlugNegozio">
+        <button class="acc-h" onclick="toggleAcc('accSlugNegozio')"><span class="em">🔗</span>Link del negozio <span class="conta" id="slugNegozioConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="slugNegozioBlocco"></div></div>
+      </div>
+
       <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
            data di rientro. Gli annunci RESTANO in vetrina — si
            guardano, non si comprano — e al rientro tornano
@@ -23878,6 +23887,11 @@ let myFerieFino = 0, ferieLeve = null;
    mio profilo) e le sue leve. `bannerScelta` e' la foto appena scelta
    e non ancora spedita, che vive solo qui e mai nel DOM. */
 let myBanner = null, bannerLeve = null, bannerScelta = '';
+/* Il link del negozio a scelta (set 2026), subito dopo il banner
+   nella scala delle personalizzazioni: `slugNegozioLeve` e' il prezzo
+   e il livello che lo sblocca, `myNegozioSlug` il nome che ha oggi
+   ('' = nessuno, vale ancora il codice casuale). */
+let slugNegozioLeve = null, myNegozioSlug = '';
 /* Lo sconto sul carrello: la regola attiva ({soglia, percento} o null)
    e le leve del server. Come le ferie: chiave assente = server di ieri
    = cassetto assente. La BOZZA e' la scelta in corso — le pillole
@@ -24702,6 +24716,7 @@ function renderIdentita(){
   renderCodici();
   renderFerie();
   renderBanner();
+  renderSlugNegozio();
   renderRicerche();
   renderPuntoPacchi();
   /* L'ALTRA CATENA che decide la visibilita' dei cassetti: questa
@@ -26745,8 +26760,8 @@ async function togliBanner(){
     }});
 }
 
-/* ---- LA PORTA SI ANTICIPA PAGANDO (ago 2026, la tappa 2) --------
-   Chi non ha il livello apre la porta con una fattura. Il calco e'
+/* ---- LA PORTA SI APRE PAGANDO (ago 2026, la tappa 2 — set 2026: e'
+   diventata l'UNICA strada, il livello sconta e basta). Il calco e'
    `inviaPuntata`, che e' l'unico altro flusso a portare nel paySheet
    un pagamento che NON e' un ordine: cifra piatta, conto scritto a
    mano (`contoScomposto` su una cifra sola torna stringa vuota),
@@ -26866,6 +26881,156 @@ async function verificaSblocco(pid){
       return;
     }
     toast('Questo sblocco non è più in attesa', 5000);
+  } catch(e) {}
+}
+
+/* ---- «🔗 Link del negozio» a scelta (set 2026) ----
+   SUBITO DOPO il banner nella scala delle personalizzazioni (decisione
+   di Andrea): un indirizzo leggibile al posto del codice casuale,
+   sempre a pagamento — niente sconto di livello qui, a differenza del
+   banner: e' il prezzo RIPETUTO a ogni cambio a tenere la scelta rara,
+   non un gradino piu' alto. Stessa forma del cassetto del banner: leva
+   assente (o prezzo spento) = cassetto nascosto. ---- */
+function renderSlugNegozio(){
+  const box = el('slugNegozioBlocco');
+  if (!box) return;
+  const sez = el('accSlugNegozio');
+  if (DEMO || VETRINA || !slugNegozioLeve
+      || !(slugNegozioLeve.prezzo_sats > 0)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  el('slugNegozioConta').textContent = myNegozioSlug ? '✅' : '';
+  const link = myNegozioSlug || myNegozio;
+  const attuale = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    Il tuo negozio si trova su <b style="color:var(--ink)">barattolo.store/negozio/${esc(link)}</b>${
+      myNegozioSlug ? ''
+        : ' — il codice di sempre: puoi scegliertene uno più bello.'}</div>`;
+  /* LA PORTA CHIUSA SI DICE, come nel banner: chi non ha ancora il
+     livello deve sapere che la personalizzazione esiste e da dove si
+     apre, o non la scoprirebbe mai. */
+  if (!slugNegozioLeve.livello_sblocca){
+    box.innerHTML = attuale + `
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
+        🔒 Si sblocca dal livello <b style="color:var(--ink)">${esc(slugNegozioLeve.livello_nome)}</b>.</div>`;
+    return;
+  }
+  box.innerHTML = attuale + `
+    <div class="field" style="margin-top:12px">
+      <label for="slugNegozioInput">Il nuovo nome</label>
+      <div class="campo-pre">
+        <span class="pre" aria-hidden="true">/negozio/</span>
+        <input type="text" id="slugNegozioInput" placeholder="untempoperte"
+               aria-label="Il nuovo nome del tuo negozio, dopo /negozio/"
+               inputmode="text" autocomplete="off" maxlength="30"
+               oninput="ripuliscilinkSlugNegozio(this)">
+      </div>
+      <div class="hint">Solo lettere minuscole, cifre e trattini, da 3 a 30 caratteri.</div>
+    </div>
+    <div id="slugNegozioErrore"></div>
+    <button class="btn orange" style="margin-top:0" onclick="chiediSlugNegozio()">
+      🔗 Cambia per ${fmt(slugNegozioLeve.prezzo_sats)} sats</button>`;
+}
+/* Si riscrive SOLO quando cambia davvero, come `ripuliscilinkBanner`:
+   minuscolo e [a-z0-9-] per costruzione — riscrivere a ogni tasto
+   sposterebbe il cursore in fondo mentre si sta correggendo in mezzo. */
+function ripuliscilinkSlugNegozio(inp){
+  const pulito = inp.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (pulito !== inp.value) inp.value = pulito;
+}
+function chiediSlugNegozio(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
+  const box = el('slugNegozioErrore');
+  if (box) box.innerHTML = '';
+  const dillo = t => {
+    if (box) box.innerHTML =
+      `<div class="trust-note" style="margin-top:10px">⚠️ <span>${esc(t)}</span></div>`;
+    else toast(t, 6000);
+  };
+  /* LA FORMA SI CONTROLLA ANCHE QUI (oltre che sul server, che resta
+     il giudice vero): un errore di forma non merita un giro di rete,
+     e chi scrive un trattino di troppo lo scopre subito. */
+  const slug = (el('slugNegozioInput')?.value || '').trim().toLowerCase();
+  if (slug.length < 3 || slug.length > 30)
+    return dillo('Ci vogliono fra 3 e 30 caratteri');
+  if (!/^[a-z0-9-]+$/.test(slug))
+    return dillo('Solo lettere minuscole, cifre e trattini');
+  if (slug.startsWith('-') || slug.endsWith('-') || slug.includes('--'))
+    return dillo('Niente trattini all\'inizio, alla fine o doppi');
+  if (slug === myNegozioSlug) return dillo('È già il tuo link');
+  chiediConferma({
+    titolo: 'Cambiare il link del negozio?',
+    corpo: `Paghi ${fmt(slugNegozioLeve.prezzo_sats)} sats e il tuo negozio `
+         + `si trova su barattolo.store/negozio/${slug}. Si paga a ogni `
+         + 'cambio, non è un abbonamento.\n\n'
+         + 'Se nel frattempo qualcun altro prende lo stesso nome, ti '
+         + 'scriviamo noi per sistemarlo — i sats non si perdono.',
+    etichetta: 'Paga e cambia',
+    poi: () => pagaSlugNegozio(slug)});
+}
+async function pagaSlugNegozio(slug){
+  /* le altre modalita' si spengono qui, come in sbloccaBanner: l'
+     «Annulla» di questo foglio non deve poter colpire un ordine o
+     una puntata di un giro prima. */
+  rilancioCorrente = null;
+  currentOrderId = null;
+  pagamentoCorrente = null;
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/me/negozio/slug/richiedi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({slug})});
+    d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  pagamentoCorrente = d.pagamento_id;
+  slugNegozioInCorso = d.slug || slug;
+  /* NESSUN BARRATO qui: il prezzo e' piatto, non c'e' un'offerta di
+     lancio ne' uno sconto da mostrare per questa personalizzazione. */
+  sbloccoPieno = 0; sbloccoPct = 0;
+  el('payAmount').textContent = fmt(d.importo_sats);
+  el('payScomposto').innerHTML = '';
+  const nota = el('payEurNota');
+  nota.style.display = '';
+  nota.textContent = d.ripresa
+    ? 'È la fattura che avevi già chiesto: vale ancora.'
+    : 'La fattura vale 15 minuti.';
+  el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  aggiornaPayHint();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => verificaSlugNegozio(pagamentoCorrente), 4000);
+}
+/* Il nome della fattura in corso, per il messaggio di successo — non
+   basta rileggerlo dalla risposta della verifica, che a pagamento
+   riuscito manda solo lo stato. */
+let slugNegozioInCorso = '';
+async function verificaSlugNegozio(pid){
+  if (!pid) return;
+  try {
+    const r = await fetch(`${API_BASE}/me/negozio/slug/${pid}/verifica`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'in_attesa' || d.stato === 'creato') return;
+    pagamentoCorrente = null;
+    closeSheet();
+    if (d.stato === 'pagato'){
+      if (d.slug_negato){
+        toast('⚠️ Pagato, ma nel frattempo il nome è stato preso: ti '
+            + 'scriviamo noi per sistemarlo', 8000);
+        return;
+      }
+      myNegozioSlug = d.slug || slugNegozioInCorso;
+      renderSlugNegozio();
+      apriCassettoProfilo('accSlugNegozio');
+      toast(`🔗 Fatto! Il tuo negozio è su barattolo.store/negozio/${myNegozioSlug}`, 6000);
+      return;
+    }
+    toast('Questo pagamento non è più in attesa', 5000);
   } catch(e) {}
 }
 
@@ -28858,7 +29023,7 @@ async function proponiAppuntamento(btn){
      disputa, dal doppio tocco su rete lenta */
   const fine = bottoneInAttesa(btn, 'Invio la proposta…');
   try {
-    const r = await fetch(`${API}/orders/${currentOrder.id}/appuntamento`, {
+    const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/appuntamento`, {
       method:'POST', headers:{'Content-Type':'application/json',
         'X-Tg-Init-Data':authHdr()}, credentials:'include',
       body: JSON.stringify({quando})});
@@ -28873,7 +29038,7 @@ async function confermaAppuntamento(btn){
   const fine = bottoneInAttesa(btn, 'Confermo…');
   try {
     const r = await fetch(
-      `${API}/orders/${currentOrder.id}/appuntamento/conferma`,
+      `${API_BASE}/orders/${currentOrder.id}/appuntamento/conferma`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()},
        credentials:'include'});
     const d = await r.json();
@@ -28890,7 +29055,7 @@ async function depositaAccesso(btn){
      `accesso_correzioni`, non i sats */
   const fine = bottoneInAttesa(btn, 'Salvo il collegamento…');
   try {
-    const r = await fetch(`${API}/orders/${currentOrder.id}/accesso`, {
+    const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/accesso`, {
       method:'POST', headers:{'Content-Type':'application/json',
         'X-Tg-Init-Data':authHdr()}, credentials:'include',
       body: JSON.stringify({accesso: v})});
@@ -28919,7 +29084,7 @@ async function mostraAccesso(btn){
      ritiro. E il GET e' puro: non c'e' niente da proteggere. */
   const fine = attesaRitardata(btn, 'Apro il collegamento…');
   try {
-    const r = await fetch(`${API}/orders/${currentOrder.id}/accesso`, {
+    const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/accesso`, {
       headers:{'X-Tg-Init-Data':authHdr()}, credentials:'include'});
     const d = await r.json();
     if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
@@ -43740,6 +43905,10 @@ async function avvia(){
                 foto: me.banner_foto || '', dominio: me.banner_dominio || '',
                 fotoAtt: me.banner_foto_att || '',
                 dominioAtt: me.banner_dominio_att || ''};
+    // Il link del negozio a scelta (set 2026), subito dopo il banner:
+    // leva assente = niente cassetto, stessa regola del banner.
+    slugNegozioLeve = me.negozio_slug_leve || null;
+    myNegozioSlug = me.negozio_slug || '';
     /* le cifre arrivano GREZZE, tutte e tre: e' il suo negozio, e il
        toggle deve poter ritrovare quella dell'altra valuta */
     myScontoPacco = (me.sconto_pacco_percento > 0)

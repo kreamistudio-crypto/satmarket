@@ -16592,10 +16592,18 @@ def prove_pagina_acquisto():
     j = src.index("INSERT INTO pagamenti", i)
     prova("sblocca_banner: zero await tra invoice e INSERT", False,
           "await " in codice(src[i:j]))
+    # IL QUINTO (set 2026): il link del negozio a scelta, stessa
+    # tabella `pagamenti` del quarto — e la stessa razza di corsa da
+    # non lasciare aperta.
+    i = src.index("crea_invoice_escrow(",
+                 src.index("def richiedi_slug_negozio("))
+    j = src.index("INSERT INTO pagamenti", i)
+    prova("richiedi_slug_negozio: zero await tra invoice e INSERT", False,
+          "await " in codice(src[i:j]))
     # E IL CENSIMENTO DEI CHIAMANTI, che vale piu' dell'elenco: sono
-    # QUATTRO, e il quinto di domani lo sente da qui invece di
+    # CINQUE, e il sesto di domani lo sente da qui invece di
     # scoprirlo il giorno che un incasso resta senza riga.
-    prova("chi conia una fattura in entrata e' quattro", 4,
+    prova("chi conia una fattura in entrata e' cinque", 5,
           codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
@@ -18009,7 +18017,8 @@ def prove_libro_mastro():
           sped_gratis_soglia INT DEFAULT 0,
           sped_gratis_soglia_eur INT DEFAULT 0,
           sped_gratis_valuta TEXT DEFAULT 'eur',
-          banner_sbloccato_il INT DEFAULT 0);
+          banner_sbloccato_il INT DEFAULT 0,
+          negozio_slug TEXT DEFAULT '');
         CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
           motivo TEXT, riferimento TEXT DEFAULT '', importo_sats INT,
           stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '');
@@ -18164,6 +18173,13 @@ def prove_libro_mastro():
                 (2, 333, 'banner', 10000, 'annullato'),
                 (3, 333, 'banner', 10000, 'creato'),
                 (4, 555, 'banner', 10000, 'rimborsato');
+        -- IL LINK DEL NEGOZIO A SCELTA, SANO: 222 ha pagato per
+        -- «vecchionome» e il negozio lo porta davvero — l'ULTIMO
+        -- pagato deve combaciare col valore in colonna, non un
+        -- pagato qualunque.
+        UPDATE utenti SET negozio_slug='vecchionome' WHERE tg_id=222;
+        INSERT INTO pagamenti(id,tg_id,motivo,riferimento,importo_sats,stato)
+          VALUES(5, 222, 'negozio_slug', 'vecchionome', 5000, 'pagato');
         """)
         return con
 
@@ -18415,6 +18431,13 @@ def prove_libro_mastro():
          "sblocco pagato due volte", "1"),
         ("UPDATE utenti SET banner_sbloccato_il=500 WHERE tg_id=555",
          "sblocco rimborsato e porta ancora aperta", "4"),
+        # IL LINK DEL NEGOZIO A SCELTA: 222 ha pagato per «vecchionome»
+        # (pagamento #5) ma il negozio ora porta un altro nome — il
+        # caso previsto quando qualcun altro prende il nome nella
+        # finestra della fattura (`_incassa_slug_negozio`).
+        ("UPDATE utenti SET negozio_slug='preso-da-un-altro' "
+         "WHERE tg_id=222",
+         "link del negozio pagato e non applicato", "5"),
         # L'OBIEZIONE SUL PUNTO (ago 2026): il timbro senza il motivo e'
         # una guardia caduta a meta' UPDATE. Il ramo che morde davvero
         # e' l'altro — un'obiezione fuori dalla via punto — perche' li'
@@ -23759,8 +23782,8 @@ def _vetrina_finta(con):
                 "condizione TEXT DEFAULT '', quantita INT DEFAULT 1, "
                 "creato INT DEFAULT 0, modificato INT DEFAULT 0)")
     con.execute("CREATE TABLE utenti (tg_id INT, nome TEXT, username TEXT, "
-                "negozio TEXT, rating REAL, n_feedback INT, "
-                "ferie_fino INT DEFAULT 0)")
+                "negozio TEXT, negozio_slug TEXT DEFAULT '', rating REAL, "
+                "n_feedback INT, ferie_fino INT DEFAULT 0)")
     return con
 
 
@@ -29180,8 +29203,11 @@ def prove_fogli_di_casa():
     # la destinazione e' onesta, questa domanda dice a chi tocca che
     # sta USCENDO — sono due cose diverse, e la seconda e' quella che
     # rende visibile la prima (il patto del banner del negozio).
-    prova("i gesti che passano dalla domanda unica sono cinquantasette",
-          57, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTOTTO (set 2026, il link del negozio a scelta): si paga a
+    # ogni cambio, e non e' un abbonamento — la stessa ragione per cui
+    # lo sblocco del banner chiede prima di pagare.
+    prova("i gesti che passano dalla domanda unica sono cinquantotto",
+          58, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -55262,6 +55288,299 @@ def prove_profilo_sezioni():
             prova(nome, atteso, avuto)
 
 
+def prove_slug_negozio():
+    """IL LINK DEL NEGOZIO A SCELTA (set 2026): la personalizzazione
+    SUBITO DOPO il banner nella scala (decisione di Andrea) — un
+    indirizzo leggibile (`/negozio/untempoperte`) al posto del codice
+    casuale, sempre a pagamento: niente sconto di livello qui, si paga
+    la stessa cifra a ogni cambio. Il livello che apre l'ACCESSO e' lo
+    stesso che apriva la porta del banner prima che diventasse sempre
+    a pagamento («avviato»)."""
+    import asyncio as _aio
+    import sqlite3 as _sq
+    print("\n[il link del negozio a scelta]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. Le leve e la colonna -----------------------------------
+    prova("il livello che sblocca e' una leva col suo default", True,
+          'SLUG_NEGOZIO_LIVELLO = "avviato"' in src)
+    prova("...anche nel config d'esempio", True,
+          'SLUG_NEGOZIO_LIVELLO = "avviato"'
+          in open("config_esempio.py", encoding="utf-8").read())
+    prova("il prezzo e' una leva col suo default", True,
+          "SLUG_NEGOZIO_PREZZO_SATS = 5_000" in src)
+    prova("...anche nel config d'esempio", True,
+          "SLUG_NEGOZIO_PREZZO_SATS = 5_000"
+          in open("config_esempio.py", encoding="utf-8").read())
+    prova("la colonna e' fra le migrazioni additive", True,
+          '"negozio_slug TEXT DEFAULT \'\'"' in src)
+
+    # ---- 2. LA FORMA, girata per davvero ----------------------------
+    amb = {"re": __import__("re"), "MIN_SLUG_NEGOZIO": 3,
+           "MAX_SLUG_NEGOZIO": 30}
+    # SLUG_NEGOZIO_RISERVATI e' un frozenset dichiarato a modulo, non
+    # una funzione: si ESTRAE come letterale invece che con `pezzo`
+    # (che cerca «def nome(»), stessa strada di LIVELLI in amb2 qui
+    # sopra nella sorella del banner.
+    i = src.index("SLUG_NEGOZIO_RISERVATI = frozenset((")
+    j = src.index("))", i) + 2
+    exec(src[i:j], amb)
+    exec(pezzo("_slug_negozio_forma"), amb)
+    forma = amb["_slug_negozio_forma"]
+    prova("un nome buono passa", ("untempoperte", ""),
+          forma("UnTempoPerTe"))
+    prova("...e si abbassa da solo", "un-tempo-per-te",
+          forma("Un-Tempo-Per-Te")[0])
+    prova("troppo corto si rifiuta", True, forma("ab")[0] == ""
+          and bool(forma("ab")[1]))
+    prova("troppo lungo si rifiuta", "", forma("a" * 31)[0])
+    prova("un carattere fuori alfabeto si rifiuta", "",
+          forma("un_tempo_per_te")[0])
+    prova("uno spazio si rifiuta (fuori alfabeto)", "",
+          forma("un tempo")[0])
+    prova("un trattino in testa si rifiuta", "", forma("-abc")[0])
+    prova("...in coda pure", "", forma("abc-")[0])
+    prova("...e un doppio trattino in mezzo pure", "", forma("ab--cd")[0])
+    prova("un nome riservato si rifiuta", "", forma("admin")[0])
+    prova("...e ognuno dei riservati censiti", True,
+          all(not forma(r)[0] for r in amb["SLUG_NEGOZIO_RISERVATI"]))
+    prova("i tre rifiuti hanno tre motivi diversi", True,
+          len({forma("ab")[1], forma("un_tempo")[1],
+              forma("admin")[1]}) == 3)
+
+    # ---- 3. LA DISPONIBILITA', girata su un database vero -----------
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+        username TEXT DEFAULT '', negozio TEXT DEFAULT '',
+        negozio_slug TEXT DEFAULT '');
+      INSERT INTO utenti VALUES(1, '', 'ab12cd34', 'untempoperte');
+      INSERT INTO utenti VALUES(2, 'rosina', 'ef56ab78', '');
+      INSERT INTO utenti VALUES(3, '', '99991111', '');
+    """)
+    con.commit()
+    amb2 = {}
+    exec(pezzo("_slug_negozio_libero"), amb2)
+    libero = amb2["_slug_negozio_libero"]
+    prova("un nome gia' scelto da un altro non e' libero", False,
+          libero(con, "untempoperte", 3))
+    prova("...ma per CHI LO TIENE GIA' e' 'libero' (nessuno scontro con se')",
+          True, libero(con, "untempoperte", 1))
+    prova("lo username di un altro blocca il nome (stesso spazio)", False,
+          libero(con, "rosina", 3))
+    prova("...anche il CODICE di un altro", False,
+          libero(con, "99991111", 1))
+    prova("un nome libero davvero e' libero", True,
+          libero(con, "bottega-nuova", 3))
+    prova("il confronto e' senza guardare le maiuscole", False,
+          libero(con, "UnTempoPerTe", 3))
+    con.close()
+
+    # ---- 4. IL ROUTING: il link si prova PRIMA dello spacco ---------
+    # Le tre rotte sorelle (API, pagina SEO, widget): uno slug con
+    # trattini VERI ("un-tempo-per-te") non deve mai passare da
+    # `_chi_da_percorso` prima di essere cercato, o si troncherebbe a
+    # "un" — la stessa regressione gia' pagata da username e codice,
+    # che pero' non hanno mai un trattino.
+    for nome_fn, ancora in (
+            ("negozio", "WHERE negozio_slug=? COLLATE NOCASE"),
+            ("_seo_negozio", "WHERE negozio_slug=? COLLATE NOCASE"),
+            ("widget_negozio", "WHERE negozio_slug=?")):
+        corpo = pezzo(nome_fn)
+        prova(f"{nome_fn}: prova il link a scelta", True, ancora in corpo)
+        # NON CONTA L'ORDINE DEL TESTO — lo spacco resta scritto prima
+        # per leggibilita' — CONTA la VARIABILE legata come parametro:
+        # la query dello slug deve passare `originale` (la stringa
+        # intera, mai spaccata), non `chi` (gia' troncato sul
+        # trattino). Si guarda la finestra subito dopo la WHERE, dove
+        # vive la tupla dei parametri.
+        finestra = corpo[corpo.index(ancora):corpo.index(ancora) + 160]
+        prova(f"...sulla stringa ORIGINALE, non quella spaccata", True,
+              "originale" in finestra)
+
+    # ---- 5. LA FATTURA, girata per davvero --------------------------
+    con2 = _sq.connect(":memory:")
+    con2.row_factory = _sq.Row
+    con2.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, negozio TEXT,
+        xp INT DEFAULT 0, vendite_ok INT DEFAULT 0,
+        acquisti_ok INT DEFAULT 0, negozio_slug TEXT DEFAULT '',
+        username TEXT DEFAULT '');
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
+        importo_sats INT, payment_hash TEXT DEFAULT '',
+        invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
+        creato INT, pagato_il INT DEFAULT 0, aggiornato INT);
+      INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok)
+        VALUES(1,'ab12',0,0,0),      -- 'nuovo': livello chiuso
+             (2,'cd34',9000,40,40),  -- 'maestro': paghera'
+             (3,'ef56',9000,40,40);  -- 'maestro': per il conteso
+    """)
+    con2.commit()
+
+    class _G3:
+        def __getattr__(self, n): return getattr(con2, n)
+        def close(self): pass
+
+    class _H3(Exception):
+        def __init__(self, code, detail=""):
+            self.code = code
+            super().__init__(detail)
+
+    fatture = []
+
+    async def _finta_invoice(sats, memo, expiry=900):
+        fatture.append((sats, memo))
+        return {"payment_hash": f"hash{len(fatture)}",
+                "payment_request": f"lnbc{len(fatture)}"}
+
+    detti = []
+
+    async def _notif(tg, testo): detti.append((tg, testo))
+    async def _notif_admin(testo): detti.append(("admin", testo))
+
+    amb3 = {"db": _G3, "time": __import__("time"), "Request": object,
+            "HTTPException": _H3, "Header": lambda d="": d,
+            "Cookie": lambda d="": d, "leggi_json": None,
+            "crea_invoice_escrow": _finta_invoice,
+            "invoice_pagata": None,
+            "INVOICE_EXPIRY": 900,
+            "SLUG_NEGOZIO_LIVELLO": "avviato",
+            "SLUG_NEGOZIO_PREZZO_SATS": 5_000,
+            "MSG_SLUG_SPENTO": "spento", "MSG_SLUG_GIA_TUO": "gia' tuo",
+            "notifica": _notif, "notifica_admin": _notif_admin,
+            "URL_PUBBLICO": "https://barattolo.store",
+            "re": __import__("re"), "MIN_SLUG_NEGOZIO": 3,
+            "MAX_SLUG_NEGOZIO": 30}
+    amb3["LIVELLI"] = (
+        (0, 0, "nuovo", "Nuovo arrivato"),
+        (50, 1, "avviato", "Bottega avviata"),
+        (200, 5, "pratico", "Mercante pratico"),
+        (800, 15, "esperto", "Mercante esperto"),
+        (3000, 40, "maestro", "Maestro del banco"))
+    exec(pezzo("livello_utente"), amb3)
+    exec(pezzo("_gradino_livello"), amb3)
+    exec(pezzo("_slug_negozio_forma"), amb3)
+    exec(src[i:j], amb3)                          # SLUG_NEGOZIO_RISERVATI
+    exec(pezzo("_slug_negozio_libero"), amb3)
+
+    async def _leggi(req):
+        return req._d
+
+    class _Req:
+        def __init__(self, d): self._d = d
+    amb3["leggi_json"] = _leggi
+
+    async def _pagata_sempre(h):
+        return True
+    amb3["invoice_pagata"] = _pagata_sempre
+
+    exec("async " + pezzo("richiedi_slug_negozio"), amb3)
+    exec("async " + pezzo("_incassa_slug_negozio"), amb3)
+    richiedi = amb3["richiedi_slug_negozio"]
+    incassa = amb3["_incassa_slug_negozio"]
+
+    def chi(n):
+        amb3["verifica_utente"] = lambda h, s: {"id": n}
+
+    # CHI NON HA IL LIVELLO resta fuori, e nessuna fattura si conia.
+    chi(1)
+    try:
+        _aio.run(richiedi(_Req({"slug": "bottega-di-anna"})))
+        _passa = True
+    except _H3:
+        _passa = False
+    prova("chi non ha il livello non puo' comprare il link", False, _passa)
+    prova("...e nessuna fattura e' stata coniata", 0, len(fatture))
+
+    # IL GIRO VERO: si conia una fattura e nasce una riga.
+    chi(2)
+    r1 = _aio.run(richiedi(_Req({"slug": "bottega-di-anna"})))
+    prova("la fattura si conia per il prezzo della leva", (1, 5_000),
+          (len(fatture), fatture[0][0]))
+    prova("...col memo che nomina lo slug", True,
+          "bottega-di-anna" in fatture[0][1])
+    prova("...e la riga porta lo slug in riferimento", "bottega-di-anna",
+          con2.execute("SELECT riferimento FROM pagamenti WHERE id=?",
+                      (r1["pagamento_id"],)).fetchone()[0])
+
+    # LA RIPRESA sullo STESSO nome non conia una seconda fattura.
+    r2 = _aio.run(richiedi(_Req({"slug": "bottega-di-anna"})))
+    prova("lo stesso nome ripresenta la stessa fattura",
+          (r1["pagamento_id"], True),
+          (r2["pagamento_id"], bool(r2.get("ripresa"))))
+    prova("...e non ne conia una seconda", 1, len(fatture))
+
+    # CAMBIARE IDEA sul nome supera la fattura vecchia, non l'accumula.
+    r3 = _aio.run(richiedi(_Req({"slug": "bottega-nuova"})))
+    prova("un nome diverso conia una fattura nuova", 2, len(fatture))
+    prova("...e la vecchia risulta annullata", "annullato",
+          con2.execute("SELECT stato FROM pagamenti WHERE id=?",
+                      (r1["pagamento_id"],)).fetchone()[0])
+    prova("...la riga resta comunque DUE (mai piu' di una viva)", 2,
+          con2.execute("SELECT COUNT(*) FROM pagamenti").fetchone()[0])
+
+    # L'INCASSO: il link si scrive nella STESSA transazione.
+    detti.clear()
+    e1 = _aio.run(incassa(r3["pagamento_id"]))
+    prova("incassato: la riga e' pagata", "pagato", e1["stato"])
+    prova("...e il negozio porta il nome pagato", "bottega-nuova",
+          con2.execute("SELECT negozio_slug FROM utenti WHERE tg_id=2"
+                      ).fetchone()[0])
+    prova("...il venditore lo viene a sapere", True,
+          any(t == 2 for t, _ in detti))
+
+    # IL NOME CONTESO: pagato ma preso da un altro nel frattempo.
+    chi(3)
+    r4 = _aio.run(richiedi(_Req({"slug": "bottega-contesa"})))
+    con2.execute("UPDATE utenti SET negozio_slug='bottega-contesa' "
+                "WHERE tg_id=1")   # qualcun altro l'ha appena presa
+    con2.commit()
+    detti.clear()
+    e2 = _aio.run(incassa(r4["pagamento_id"]))
+    prova("il pagamento resta 'pagato' anche se il nome e' sfumato",
+          "pagato", e2["stato"])
+    prova("...ma NON si scrive sul venditore che ha pagato", "",
+          con2.execute("SELECT negozio_slug FROM utenti WHERE tg_id=3"
+                      ).fetchone()[0])
+    prova("...e lo dice a chi ha pagato e ai moderatori", True,
+          any(t == 3 for t, _ in detti) and any(t == "admin" for t, _ in detti))
+    con2.close()
+
+    # ---- 6. Il cassetto del venditore --------------------------------
+    rb = pezzo_js(mini, "function renderSlugNegozio(){", "\n}")
+    prova("il cassetto sparisce in DEMO e in vetrina", True,
+          "DEMO || VETRINA" in rb)
+    prova("...e a leva/prezzo spento", True,
+          "slugNegozioLeve.prezzo_sats > 0" in rb)
+    prova("mostra il link attuale (codice o nome scelto)", True,
+          "myNegozioSlug || myNegozio" in rb)
+    prova("la porta chiusa dice il livello, non nasconde la funzione",
+          True, "livello_sblocca" in rb and "livello_nome" in rb)
+    prova("il pulsante porta il prezzo dalla leva, mai scritto a mano",
+          True, "slugNegozioLeve.prezzo_sats" in rb)
+
+    # La sezione HTML vive SUBITO DOPO quella del banner, come chiesto:
+    # nessuna sezione («Negozio in ferie») s'infila in mezzo.
+    i_ban = mini.index('id="accBanner"')
+    i_slug = mini.index('id="accSlugNegozio"')
+    i_ferie = mini.index('id="accFerie"')
+    prova("il cassetto sta subito dopo il banner nel markup", True,
+          i_ban < i_slug < i_ferie)
+    prova("...e si ridisegna dallo stesso giro del banner", True,
+          "renderBanner();\n  renderSlugNegozio();"
+          in pezzo_js(mini, "function renderIdentita(){", "\n}\n"))
+
+    ch = pezzo_js(mini, "function chiediSlugNegozio(){", "\n}")
+    prova("il client controlla la forma prima di spedire (niente giro "
+          "di rete su un errore ovvio)", True,
+          "slug.length < 3" in ch and "/^[a-z0-9-]+$/.test(slug)" in ch)
+    prova("...e chiede conferma PRIMA di pagare", True,
+          "chiediConferma({" in ch)
+
+
 def prove_link_descrizione():
     """I LINK TOCCABILI NELLE DESCRIZIONI (set 2026, richiesta dal
     campo: i link si copiavano a mano).
@@ -58633,7 +58952,7 @@ def main():
               prove_porta_timer, prove_feedback_confermato,
               prove_servizi,
               prove_sintassi_client,
-              prove_banner_negozio, prove_link_descrizione,
+              prove_banner_negozio, prove_slug_negozio, prove_link_descrizione,
               prove_foto_vuota, prove_foto_metadati,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,

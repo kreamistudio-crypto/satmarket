@@ -14514,3 +14514,92 @@ si guarda e si cambia da `config.py` senza toccare il codice. Nessun
 rimborso cambia: chi paga il banner e non viene approvato resta con lo
 stesso percorso di sempre (`_rimborsa_sblocco`, manuale, mai
 automatico).
+
+## Il link del negozio a scelta, subito dopo il banner (15 set 2026)
+
+**LA RICHIESTA DI ANDREA**: fra le personalizzazioni da sbloccare, un
+indirizzo leggibile (`barattolo.store/negozio/untempoperte`) al posto
+del codice casuale di sempre — **subito dopo il banner** nella scala,
+sia come posizione (il cassetto nasce giusto sotto «🖼 Banner del
+negozio», stessa forma) sia come gradino: si sblocca dallo stesso
+livello — «avviato» — che apriva la porta del banner prima che
+diventasse sempre a pagamento. A differenza del banner pero' **non
+c'e' uno sconto di livello**: si paga la stessa cifra OGNI VOLTA che
+si cambia idea sul nome (leva `SLUG_NEGOZIO_PREZZO_SATS`, di serie
+5.000 sats) — e' il prezzo RIPETUTO a tenere la scelta rara, non un
+gradino piu' alto.
+
+**LA FORMA** (`_slug_negozio_forma`): minuscolo, `[a-z0-9-]`, da 3 a
+30 caratteri, niente trattini ai bordi ne' doppi, e una lista di
+riservati (`SLUG_NEGOZIO_RISERVATI`) censita a mano dai primi pezzi
+di ogni rotta vera del server — lo stesso avviso gia' scritto per
+`/negozio/nuovo` applicato a se' stesso.
+
+**LA DISPONIBILITA'** (`_slug_negozio_libero`) guarda TRE colonne e
+non una: un nuovo slug non puo' combaciare con un altro `negozio_slug`
+ne' con uno `username` Telegram ne' con un `negozio` (il codice) —
+`username` e `negozio_slug` vivono nello STESSO spazio di indirizzi
+fin da quando `_chi_da_percorso` esiste, quindi l'unicita' deve
+guardare tutti e tre o un domani un venditore potrebbe rubare
+involontariamente l'indirizzo di un altro. Niente `UNIQUE` a schema:
+stesso patto di `negozio` e `username`, la garanzia e' applicativa.
+
+**LA TRAPPOLA DEL ROUTING, trovata PRIMA di scriverla e non dopo**:
+`_chi_da_percorso` spacca `chi` sul primo trattino (serve al
+`/negozio/ab12cd34-la-bottega` del client) — ma uno slug a scelta PUO'
+avere trattini VERI (`un-tempo-per-te`), e lo spacco lo avrebbe
+troncato a `un` prima ancora di cercarlo. La cura: le tre rotte
+sorelle (`/api/negozio/{chi}`, `/negozio/{chi}`, `/widget/negozio/
+{chi}`) provano PRIMA lo slug sulla stringa `originale` (mai spaccata,
+mai passata da `_chi_da_percorso`), e solo se non trovano niente
+ripiegano su username/codice con lo spacco di sempre — che per loro
+non cambia niente, non potendo mai contenere un trattino.
+
+**IL PAGAMENTO** ricalca `sblocca_banner` (stessa guardia-prima-della-
+fattura, stessa ripresa entro 30 minuti) con una differenza vera: qui
+quel che si compra CAMBIA a ogni fattura (lo slug vive in
+`pagamenti.riferimento`), quindi cambiare idea mentre una fattura per
+un altro nome e' ancora viva la SUPERA (si annulla, non si accumula:
+mai due inviti a pagare aperti insieme). Rotte proprie
+(`/api/me/negozio/slug/richiedi|{id}/verifica|{id}/annulla`) e non
+quelle condivise del banner: la tabella `pagamenti` tiene motivi
+diversi nello stesso spazio di `id`, e scoprirlo DOPO — con un incasso
+sbagliato — costa piu' caro che scoprirlo ora.
+
+**IL NOME CONTESO** (`_incassa_slug_negozio`): la finestra fra
+"fattura creata" e "fattura pagata" e' tempo vero, e un altro
+venditore potrebbe prendere lo stesso nome nel frattempo — raro (due
+persone che vogliono la stessa parola nello stesso minuto) ma non
+impossibile. Si ricontrolla la disponibilita' PRIMA di scrivere: se il
+nome non c'e' piu', i sats restano incassati per davvero (non si
+finge il contrario) ma il link non si scrive — venditore e moderatori
+vengono avvisati, e la strada e' la stessa del rimborso del banner:
+mai automatica, sempre un gesto di una persona. Un controllo nuovo nel
+libro mastro (`link del negozio pagato e non applicato`) sorveglia
+che questo caso non passi in silenzio, guardando SOLO l'ULTIMO
+pagamento riuscito per utente — un cambio successivo e riuscito non
+deve far suonare un allarme su uno superato.
+
+**LE PROVE**: `prove_slug_negozio`, nuova, copre la forma (girata),
+la disponibilita' (girata su un database vero), il routing (che la
+query dello slug leghi `originale` e non `chi`), la fattura per
+davvero (livello chiuso → niente fattura; livello aperto → fattura;
+stesso nome → ripresa; nome diverso → la vecchia si annulla; incasso →
+il link si scrive; nome conteso → i sats restano ma il link no) e il
+cassetto lato client (si nasconde a leva spenta, mostra il link
+attuale, dice il livello quando manca, controlla la forma prima di
+spedire). Il censimento delle leve e tre prove esistenti (`prove_
+libro_mastro`, `prove_anteprime`, `prove_seo`) avevano bisogno della
+nuova colonna nei loro schemi finti — la stessa trappola gia' pagata
+piu' volte in questo file. **10041 verdi.**
+
+**COSA RESTA**: nessun canonical SEO (sitemap, JSON-LD, meta) usa
+ancora lo slug a scelta — restano ancorati al codice stabile per
+costruzione, ed e' una scelta e non una dimenticanza: un canonical che
+si sposta ogni volta che un venditore cambia idea sul nome e' un
+indizio di contenuto duplicato per chi indicizza. Il link «condividi
+il negozio» del client (`condividiMioNegozio`) e il widget non
+preferiscono ancora lo slug quando c'e': oggi condividono comunque
+username o codice, e preferire lo slug li' sarebbe la mossa naturale
+di un prossimo giro, non fatta qui per tenere il cantiere fermo sul
+suo perimetro.

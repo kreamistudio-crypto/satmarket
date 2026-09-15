@@ -1240,6 +1240,26 @@ try:
     from config import BANNER_PREZZO_PIENO_SATS
 except ImportError:
     BANNER_PREZZO_PIENO_SATS = 40_000
+
+# --- IL LINK DEL NEGOZIO A SCELTA (set 2026) --------------------------
+# La personalizzazione SUBITO DOPO il banner (decisione di Andrea): chi
+# arriva al livello «avviato» — lo stesso gradino che apriva la porta
+# del banner prima che diventasse sempre a pagamento — puo' scegliersi
+# un indirizzo leggibile (`/negozio/untempoperte`) al posto del codice
+# casuale di sempre. A differenza del banner qui non c'e' uno sconto di
+# livello: si paga la stessa cifra OGNI VOLTA che si cambia idea, ed e'
+# quello che tiene la scelta rara — un capriccio quotidiano costerebbe
+# come un capriccio quotidiano.
+try:
+    from config import SLUG_NEGOZIO_LIVELLO
+except ImportError:
+    SLUG_NEGOZIO_LIVELLO = "avviato"
+# 0 = la personalizzazione e' spenta del tutto: nessuno puo' comprarla,
+# a nessun livello — stessa regola di BANNER_PREZZO_SATS qui sopra.
+try:
+    from config import SLUG_NEGOZIO_PREZZO_SATS
+except ImportError:
+    SLUG_NEGOZIO_PREZZO_SATS = 5_000
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -1844,6 +1864,57 @@ def nuovo_codice_negozio(con) -> str:
         if not con.execute("SELECT 1 FROM utenti WHERE negozio=?",
                            (codice,)).fetchone():
             return codice
+
+
+# --- IL LINK DEL NEGOZIO A SCELTA, la forma e la disponibilita' ------
+MIN_SLUG_NEGOZIO = 3
+MAX_SLUG_NEGOZIO = 30
+# OGNI PRIMO PEZZO DI UNA ROTTA VERA: `/negozio/{slug}` e' parametrica
+# e vive accanto a queste — un domani un letterale registrato DOPO di
+# lei verrebbe mangiato (lo stesso avviso gia' scritto per `/negozio/
+# nuovo`). Censite a mano da `@app.get`/`@app.post` di primo livello,
+# piu' `admin` di difesa: non e' una rotta pubblica ma resta il primo
+# nome che chi vuole confondere proverebbe a prendere.
+SLUG_NEGOZIO_RISERVATI = frozenset((
+    "annuncio", "api", "assets", "barattolo", "categoria", "e", "foto",
+    "manifest.json", "miniapp.html", "negozio", "offerta",
+    "offline.html", "p2p", "privacy", "robots.txt", "sicurezza",
+    "sitemap.xml", "sw.js", "vendor", "widget", "admin"))
+
+
+def _slug_negozio_forma(grezzo: str) -> tuple:
+    """La FORMA di un link a scelta, prima di chiedere se e' libero:
+    (slug_pulito, "") se passa, ("", motivo) se no. Minuscolo e
+    [a-z0-9-] per costruzione — lo stesso alfabeto degli URL, mai un
+    carattere che vada percent-encoded — senza trattini ai bordi ne'
+    doppi, che si leggono come un refuso di battitura piu' che come
+    una scelta."""
+    s = (grezzo or "").strip().lower()
+    if not (MIN_SLUG_NEGOZIO <= len(s) <= MAX_SLUG_NEGOZIO):
+        return "", (f"Ci vogliono fra {MIN_SLUG_NEGOZIO} e "
+                    f"{MAX_SLUG_NEGOZIO} caratteri")
+    if not re.fullmatch(r"[a-z0-9-]+", s):
+        return "", "Solo lettere minuscole, cifre e trattini"
+    if s.startswith("-") or s.endswith("-") or "--" in s:
+        return "", "Niente trattini all'inizio, alla fine o doppi"
+    if s in SLUG_NEGOZIO_RISERVATI:
+        return "", "Questo nome è riservato: scegline un altro"
+    return s, ""
+
+
+def _slug_negozio_libero(con, slug: str, tg_id: int) -> bool:
+    """Nessun altro puo' gia' arrivarci con quel nome: ne' un altro
+    negozio_slug, ne' uno username Telegram (che vive nello STESSO
+    spazio di indirizzi — vedi `_chi_da_percorso` e i suoi tre
+    chiamanti), ne' — per prudenza, anche se non dovrebbe potersi dare
+    — il codice casuale di un negozio. `tg_id` si esclude da solo: chi
+    tiene gia' quel nome puo' sempre ripagare per tenerlo (non che gli
+    convenga)."""
+    return not con.execute(
+        "SELECT 1 FROM utenti WHERE tg_id!=? AND ("
+        "(negozio_slug=? COLLATE NOCASE AND negozio_slug!='') "
+        "OR username=? COLLATE NOCASE OR negozio=?)",
+        (tg_id, slug, slug, slug)).fetchone()
 
 
 # --------------------------- DISTINTIVI -----------------------------
@@ -4479,11 +4550,13 @@ def init_db():
                     "banner_chiesto_il INTEGER DEFAULT 0",
                     "banner_deciso_il INTEGER DEFAULT 0",
                     # QUANDO la porta e' stata sbloccata pagando (0 = mai:
-                    # resta la strada del livello). E' una DATA e non un
+                    # la porta resta chiusa, set 2026 — vedi
+                    # `banner_porta_aperta`). E' una DATA e non un
                     # flag — decisione di Andrea — cosi' il giorno
                     # dell'abbonamento la scadenza si aggiunge senza
-                    # migrare niente. La scrive `_incassa_sblocco` e la
-                    # azzera il rimborso del moderatore: nessun'altra
+                    # migrare niente. La scrive `_incassa_sblocco` (anche
+                    # il grandfathering di `init_db`, una volta sola) e
+                    # la azzera il rimborso del moderatore: nessun'altra
                     # strada la tocca.
                     "banner_sbloccato_il INTEGER DEFAULT 0",
                     # nip85_dichiarato (set 2026): l'utente ha firmato di
@@ -4495,7 +4568,15 @@ def init_db():
                     # resta l'evento sui relay, verificato una volta sola
                     # in /api/me/nip85-dichiarazione (stessa regola dei
                     # badge Nostr: mai una riga qui al posto della firma).
-                    "nip85_dichiarato INTEGER DEFAULT 0"):
+                    "nip85_dichiarato INTEGER DEFAULT 0",
+                    # IL LINK DEL NEGOZIO A SCELTA (set 2026): '' = nessuno,
+                    # vale il codice casuale di sempre. Niente UNIQUE qui —
+                    # stesso patto di `negozio` e `username`: l'unicita' la
+                    # garantisce l'applicazione (`_slug_negozio_libero`),
+                    # non lo schema, perche' il controllo deve valere anche
+                    # contro `username` e `negozio`, due colonne che una
+                    # UNIQUE su questa sola non potrebbe mai coprire.
+                    "negozio_slug TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -15344,6 +15425,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     meta sul crawler erano perfetti. Allargare qui l'input accettato e'
     totale e idempotente: nessuna risposta esistente cambia."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    originale = chi
     chi = _chi_da_percorso(chi)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -15357,8 +15439,17 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
                      "banner_stato, banner_foto, banner_link, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
-    v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
-                    "AND username!='' LIMIT 1", (chi,)).fetchone()
+    # IL LINK A SCELTA SI PROVA SULLA STRINGA INTERA (set 2026), PRIMA
+    # dello spacco sul trattino qui sopra: uno slug come «un-tempo-per-
+    # te» ha trattini VERI, e _chi_da_percorso lo troncherebbe a «un»
+    # prima ancora di cercarlo. Username e codice non possono contenere
+    # un trattino (vedi la docstring di _chi_da_percorso), quindi
+    # provare prima la stringa intera non cambia niente per loro.
+    v = con.execute(campi_profilo + "WHERE negozio_slug=? COLLATE NOCASE "
+                    "AND negozio_slug!='' LIMIT 1", (originale,)).fetchone()
+    if not v:
+        v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
+                        "AND username!='' LIMIT 1", (chi,)).fetchone()
     if not v:
         v = con.execute(campi_profilo + "WHERE negozio=? LIMIT 1",
                         (chi,)).fetchone()
@@ -17844,6 +17935,13 @@ def _leve_stato():
                   len(BANNER_LINK_VIETATI),
                   spento="nessun accorciatore fermato: un link corto si "
                          "approva pulito e domani punta altrove"),
+            _leva("Link del negozio: livello che lo sblocca",
+                  "SLUG_NEGOZIO_LIVELLO", SLUG_NEGOZIO_LIVELLO),
+            _leva("Link del negozio: prezzo per ogni cambio (sats)",
+                  "SLUG_NEGOZIO_PREZZO_SATS", int(SLUG_NEGOZIO_PREZZO_SATS or 0),
+                  spento="la personalizzazione e' spenta del tutto: "
+                         "nessuno puo' scegliersi un link, a nessun "
+                         "livello"),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -28773,6 +28871,20 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["banner_dominio"] = dominio_link(profilo.get("banner_link") or "")
     profilo["banner_dominio_att"] = dominio_link(
         profilo.get("banner_link_att") or "")
+    # Il link del negozio a scelta, per il cassetto «🔗» — SUBITO DOPO
+    # il banner nella scala delle personalizzazioni (decisione di
+    # Andrea). Il valore attuale (`negozio_slug`) esce gia' dal
+    # `dict(u)` qui sopra; qui si aggiunge solo cio' che il client non
+    # deve calcolarsi da se': il prezzo (0 = spento) e se il livello di
+    # QUESTO venditore apre l'accesso — niente sconto qui, a
+    # differenza del banner: si paga la stessa cifra a ogni cambio.
+    profilo["negozio_slug_leve"] = {
+        "prezzo_sats": int(SLUG_NEGOZIO_PREZZO_SATS or 0),
+        "livello_sblocca": livello_utente(_xp_ban, _aff_ban)["numero"]
+            >= _gradino_livello(SLUG_NEGOZIO_LIVELLO),
+        "livello_nome": next(
+            (l[3] for l in LIVELLI if l[2] == SLUG_NEGOZIO_LIVELLO),
+            SLUG_NEGOZIO_LIVELLO)}
     # Lo sconto sul carrello, per il cassetto «🎁»: criteri, soglie e
     # percentuali proposte sono le PILLOLE del venditore (il patto di
     # LAMPO_SCONTI), i minimi e il tetto servono ai messaggi. I suoi
@@ -30090,11 +30202,9 @@ async def _rimborsa_sblocco(pagamento_id: int,
     parametro e' senza default.
 
     E IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea): i
-    sats tornano, la porta si chiude e il banner si spegne. Se il
-    venditore ha ANCHE il livello la porta resta aperta da li', ed e'
-    giusto: si disfa il pagamento, non i diritti guadagnati — e a
-    dirlo e' il giudice, che e' un OR e non sa niente di questa
-    funzione."""
+    sats tornano, la porta si richiude e il banner si spegne — SEMPRE
+    (set 2026: da quando la porta ha una chiave sola, il pagamento, non
+    c'e' piu' un livello da cui potrebbe restare aperta da solo)."""
     async with _lucchetti_sblocco[pagamento_id]:
         con = db()
         p = con.execute("SELECT * FROM pagamenti WHERE id=?",
@@ -30444,6 +30554,212 @@ async def decidi_banner_admin(tg_id: int, req: Request,
     if not ok:
         raise HTTPException(409, testo)
     return {"ok": True, "detto": testo}
+
+
+# --- IL LINK DEL NEGOZIO A SCELTA, la fattura (set 2026) -------------
+# SUBITO DOPO IL BANNER nella scala delle personalizzazioni (decisione
+# di Andrea): stesso livello che apriva la porta del banner prima che
+# diventasse sempre a pagamento (SLUG_NEGOZIO_LIVELLO = "avviato" di
+# serie). A differenza del banner qui non c'e' uno sconto fedelta': si
+# paga la STESSA cifra ogni volta che si cambia idea — quel che tiene
+# rara la scelta e' il prezzo ripetuto, non un livello piu' alto.
+# LE GUARDIE STANNO TUTTE PRIMA DELLA FATTURA, lo stesso patto di
+# `sblocca_banner`: un 400 dopo `crea_invoice_escrow` lascerebbe una
+# fattura orfana, sats che possono arrivare senza una riga su cui
+# posarsi.
+MSG_SLUG_SPENTO = "La personalizzazione del link non è attiva al momento"
+MSG_SLUG_GIA_TUO = "È già il tuo link"
+
+
+@app.post("/api/me/negozio/slug/richiedi")
+async def richiedi_slug_negozio(req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """La fattura per il link a scelta. RIPRENDE la fattura viva se
+    chiede LO STESSO nome (gemella di `sblocca_banner`); se invece ha
+    cambiato idea sul nome mentre una fattura per un altro era ancora
+    aperta, quella vecchia si SUPERA — un venditore non deve avere due
+    inviti a pagare aperti insieme, che sarebbero due nomi possibili
+    per una porta sola."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    prezzo = int(SLUG_NEGOZIO_PREZZO_SATS or 0)
+    if prezzo <= 0:
+        raise HTTPException(400, MSG_SLUG_SPENTO)
+    d = await leggi_json(req)
+    slug, motivo = _slug_negozio_forma(d.get("slug"))
+    if not slug:
+        raise HTTPException(400, motivo)
+    con = db()
+    u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
+                    "negozio_slug FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not u or not u["negozio"]:
+        con.close()
+        raise HTTPException(400, "Il tuo negozio non è ancora pronto")
+    xp = u["xp"] or 0
+    affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+    if livello_utente(xp, affari)["numero"] < _gradino_livello(
+            SLUG_NEGOZIO_LIVELLO):
+        con.close()
+        nome_liv = next((l[3] for l in LIVELLI
+                         if l[2] == SLUG_NEGOZIO_LIVELLO),
+                        SLUG_NEGOZIO_LIVELLO)
+        raise HTTPException(400, f"Si sblocca dal livello «{nome_liv}»")
+    if slug == (u["negozio_slug"] or ""):
+        con.close()
+        raise HTTPException(400, MSG_SLUG_GIA_TUO)
+    if not _slug_negozio_libero(con, slug, user["id"]):
+        con.close()
+        raise HTTPException(400, "Questo nome è già preso: scegline un altro")
+    adesso = int(time.time())
+    # LA RIPRESA: la finestra e' quella fisica del pagamento (30
+    # minuti), come `sblocca_banner` e `_riservati`.
+    viva = con.execute(
+        "SELECT * FROM pagamenti WHERE tg_id=? AND motivo='negozio_slug' "
+        "AND stato='creato' AND creato>=?",
+        (user["id"], adesso - 1800)).fetchone()
+    if viva and viva["riferimento"] == slug and viva["invoice"]:
+        con.close()
+        return {"pagamento_id": viva["id"], "invoice": viva["invoice"],
+                "payment_hash": viva["payment_hash"],
+                "importo_sats": viva["importo_sats"], "slug": slug,
+                "scadenza_invoice": INVOICE_EXPIRY, "ripresa": True}
+    if viva:
+        con.execute("UPDATE pagamenti SET stato='annullato', aggiornato=? "
+                    "WHERE id=?", (adesso, viva["id"]))
+    # L'UNICO await. Il memo porta lo slug: e' tutto cio' che la
+    # riconciliazione a mano chiede per capire cosa si stava comprando.
+    inv = await crea_invoice_escrow(
+        prezzo, f"Barattolo link negozio #{user['id']}: {slug}")
+    # Da qui al commit NESSUN await: il patto mono-processo.
+    con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
+                "importo_sats,payment_hash,invoice,stato,creato,"
+                "aggiornato) VALUES(?,'negozio_slug',?,?,?,?,'creato',?,?)",
+                (user["id"], slug, prezzo, inv["payment_hash"],
+                 inv["payment_request"], adesso, adesso))
+    pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    return {"pagamento_id": pid, "invoice": inv["payment_request"],
+            "payment_hash": inv["payment_hash"], "importo_sats": prezzo,
+            "slug": slug, "scadenza_invoice": INVOICE_EXPIRY}
+
+
+@app.post("/api/me/negozio/slug/{pagamento_id}/verifica")
+async def verifica_slug_negozio(pagamento_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il poll del link a scelta. ROTTA SUA e non quella condivisa del
+    banner (`/api/pagamenti/{id}/verifica`): la tabella `pagamenti`
+    tiene motivi diversi nello stesso spazio di `id`, e un endpoint
+    unico dovrebbe smistare per motivo PRIMA di incassare — qui a
+    smistare e' la rotta stessa: la WHERE guarda anche `motivo`, quindi
+    l'id di un pagamento banner semplicemente non si trova mai qui."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    p = con.execute(
+        "SELECT id, stato, payment_hash FROM pagamenti "
+        "WHERE id=? AND tg_id=? AND motivo='negozio_slug'",
+        (pagamento_id, user["id"])).fetchone()
+    con.close()
+    if not p:
+        raise HTTPException(400, "Operazione non permessa")
+    if p["stato"] != "creato":
+        return {"stato": p["stato"]}
+    if not await invoice_pagata(p["payment_hash"]):
+        return {"stato": "in_attesa"}
+    return await _incassa_slug_negozio(pagamento_id)
+
+
+@app.post("/api/me/negozio/slug/{pagamento_id}/annulla")
+async def annulla_slug_negozio(pagamento_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Chi ci ripensa: gemella di `annulla_pagamento_sblocco`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    p = con.execute(
+        "SELECT * FROM pagamenti WHERE id=? AND tg_id=? "
+        "AND motivo='negozio_slug'", (pagamento_id, user["id"])).fetchone()
+    con.close()
+    if not p or p["stato"] != "creato":
+        raise HTTPException(400, "Operazione non permessa")
+    if await invoice_pagata(p["payment_hash"]):
+        raise HTTPException(409, "Questo pagamento risulta già arrivato: "
+                                 "niente da annullare")
+    con = db()
+    cur = con.execute("UPDATE pagamenti SET stato='annullato', "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (int(time.time()), pagamento_id))
+    con.commit()
+    con.close()
+    if cur.rowcount == 0:
+        raise HTTPException(409, "Il pagamento è arrivato proprio adesso")
+    return {"ok": True}
+
+
+async def _incassa_slug_negozio(pagamento_id: int) -> dict:
+    """I sats sono arrivati: si scrive il link nella STESSA
+    transazione — gemella di `_incassa_sblocco`, ma RICONTROLLA la
+    disponibilita' del nome prima di scriverlo. E' la differenza vera
+    fra le due: la porta del banner e' sempre la STESSA cosa, qui
+    invece quel che si compra CAMBIA a ogni fattura (lo slug in
+    `riferimento`), quindi un altro venditore puo' averlo preso nella
+    finestra in cui questa fattura era aperta.
+    SE IL NOME NON C'E' PIU': i sats restano incassati per davvero (il
+    pagamento e' vero, non si finge il contrario) ma il link non si
+    scrive — si avvisa il venditore e un moderatore, che decide a mano
+    se rimborsare (mai un rimborso automatico, lo stesso patto di
+    `_rimborsa_sblocco`)."""
+    adesso = int(time.time())
+    con = db()
+    p = con.execute("SELECT * FROM pagamenti WHERE id=?",
+                    (pagamento_id,)).fetchone()
+    if not p or p["stato"] != "creato":
+        stato = p["stato"] if p else "annullato"
+        con.close()
+        return {"stato": stato}
+    cur = con.execute("UPDATE pagamenti SET stato='pagato', pagato_il=?, "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (adesso, adesso, pagamento_id))
+    if cur.rowcount == 0:
+        con.commit()
+        con.close()
+        return {"stato": "pagato"}
+    slug = p["riferimento"]
+    libero = _slug_negozio_libero(con, slug, p["tg_id"])
+    if libero:
+        con.execute("UPDATE utenti SET negozio_slug=? WHERE tg_id=?",
+                    (slug, p["tg_id"]))
+    con.commit()
+    con.close()
+    # Dopo il commit, mai prima.
+    if not libero:
+        try:
+            await notifica(
+                p["tg_id"],
+                f"⚠️ Hai pagato per il link «{slug}», ma nel frattempo lo "
+                "ha preso qualcun altro. Ti scriviamo noi per sistemarlo "
+                "— i sats non sono persi.")
+        except Exception as e:
+            print(f"⚠️ Avviso del link conteso non partito: {e}")
+        try:
+            await notifica_admin(
+                f"⚠️ <b>Link negozio conteso.</b> #{p['tg_id']} ha pagato "
+                f"per «{slug}» (pagamento #{pagamento_id}) ma il nome "
+                "risulta già preso: da sistemare a mano (rimborso o nome "
+                "diverso).")
+        except Exception as e:
+            print(f"⚠️ Polso del link conteso non partito: {e}")
+        return {"stato": "pagato", "slug_negato": True}
+    try:
+        await notifica(
+            p["tg_id"],
+            f"🔗 <b>Fatto!</b> Il tuo negozio ora si trova anche su "
+            f"{URL_PUBBLICO}/negozio/{slug}")
+    except Exception as e:
+        print(f"⚠️ Avviso del link non partito: {e}")
+    return {"stato": "pagato", "slug": slug}
 
 
 @app.post("/api/me/suggerimenti")
@@ -44015,6 +44331,29 @@ CONTROLLI_LIBRO_MASTRO = (
      "AND COALESCE(u.banner_sbloccato_il,0)>0 "
      "AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id=p.tg_id "
      "AND q.motivo='banner' AND q.stato='pagato')"),
+
+    # --- il link del negozio a scelta (set 2026) --------------------
+    # Il gemello del primo controllo del banner, adattato: qui quel
+    # che si compra CAMBIA a ogni fattura (lo slug in `riferimento`),
+    # quindi «pagato e non applicato» non e' un fatto sull'utente ma
+    # sull'ULTIMO pagamento riuscito — un pagamento piu' vecchio,
+    # gia' superato da un cambio successivo, non deve suonare. E' il
+    # caso previsto e gestito da `_incassa_slug_negozio` quando il
+    # nome viene preso da un altro proprio nella finestra della
+    # fattura: i sats restano incassati (e' onesto dirlo cosi', non
+    # si fingono mai arrivati), il link no — a dirlo qui, se
+    # l'avviso al venditore e ai moderatori fosse andato perso.
+    ("link del negozio pagato e non applicato",
+     "l'ultimo pagamento riuscito per il link a scelta non e' quello "
+     "che il negozio porta oggi: probabilmente il nome e' stato preso "
+     "da un altro nella finestra della fattura, ed e' da sistemare a "
+     "mano (vedi il messaggio ai moderatori mandato da "
+     "_incassa_slug_negozio)",
+     "SELECT p.id FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id "
+     "WHERE p.motivo='negozio_slug' AND p.stato='pagato' "
+     "AND u.negozio_slug<>p.riferimento AND p.id=(SELECT MAX(p2.id) "
+     "FROM pagamenti p2 WHERE p2.tg_id=p.tg_id "
+     "AND p2.motivo='negozio_slug' AND p2.stato='pagato')"),
     # E QUALI NON NASCONO QUI, con la stessa domanda:
     # - «una lapide senza payment_hash»: NO, e' innocua e non dice
     #   niente a nessuno — una riga 'annullato' non tiene occupato
@@ -45225,13 +45564,20 @@ def _seo_negozio(chi: str):
     dal database e mai il `chi` arrivato dall'URL, che potrebbe essere
     qualunque cosa: un canonical che riecheggia l'input e' un'iniezione
     a spese proprie."""
+    originale = chi
     chi = _chi_da_percorso(chi)
     con = db()
     try:
         campi = ("SELECT tg_id, nome, negozio, rating, n_feedback "
                  "FROM utenti ")
-        v = con.execute(campi + "WHERE username=? COLLATE NOCASE "
-                        "AND username!='' LIMIT 1", (chi,)).fetchone()
+        # Il link a scelta si prova sulla stringa INTERA, come nelle
+        # rotte sorelle: puo' avere trattini veri che lo spacco
+        # qui sopra troncherebbe prima ancora di cercarlo.
+        v = con.execute(campi + "WHERE negozio_slug=? COLLATE NOCASE "
+                        "AND negozio_slug!='' LIMIT 1", (originale,)).fetchone()
+        if not v:
+            v = con.execute(campi + "WHERE username=? COLLATE NOCASE "
+                            "AND username!='' LIMIT 1", (chi,)).fetchone()
         if not v:
             v = con.execute(campi + "WHERE negozio=? LIMIT 1",
                             (chi,)).fetchone()
@@ -45674,18 +46020,26 @@ def widget_annuncio(aid: str):
 def widget_negozio(chi: str, n: int = WIDGET_DEFAULT):
     """La vetrina di un negozio: le ultime N cose in vendita.
 
-    `chi` e' lo username o il codice, e si spacca sul primo trattino
-    come le rotte sorelle — un widget copiato dall'indirizzo canonico
-    porta lo slug appresso, e senza quello spacco non troverebbe
-    nessuno (la regressione gia' pagata su /negozio)."""
+    `chi` e' lo username, il codice o il link a scelta (set 2026), e
+    si spacca sul primo trattino come le rotte sorelle — un widget
+    copiato dall'indirizzo canonico porta lo slug appresso, e senza
+    quello spacco non troverebbe nessuno (la regressione gia' pagata
+    su /negozio). IL LINK A SCELTA SI PROVA PRIMA, sulla stringa
+    INTERA: puo' contenere trattini veri, che lo spacco troncherebbe."""
+    originale = chi
     chi = _chi_da_percorso(chi)
     n = max(1, min(int(n or WIDGET_DEFAULT), WIDGET_MAX))
     con = db()
     try:
         u = con.execute(
             "SELECT tg_id, nome, negozio FROM utenti "
-            "WHERE (username=? COLLATE NOCASE OR negozio=?) AND negozio!=''",
-            (chi, chi)).fetchone()
+            "WHERE negozio_slug=? COLLATE NOCASE AND negozio_slug!=''",
+            (originale,)).fetchone()
+        if not u:
+            u = con.execute(
+                "SELECT tg_id, nome, negozio FROM utenti "
+                "WHERE (username=? COLLATE NOCASE OR negozio=?) "
+                "AND negozio!=''", (chi, chi)).fetchone()
         righe = [] if not u else [dict(x) for x in con.execute(
             f"SELECT {CAMPI_VETRINA} FROM annunci a "
             "JOIN utenti u ON u.tg_id = a.venditore_id "
