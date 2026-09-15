@@ -78,13 +78,13 @@ FATTURE = {}        # payment_hash -> {"sats", "memo", "pagata"}
 USCITE = []         # le bolt11 che avremmo pagato
 
 
-async def _finta_invoice(sats, memo, expiry=900):
+async def _finta_invoice(sats, memo, expiry=900, cassaforte=""):
     h = f"hash{len(FATTURE) + 1}"
     FATTURE[h] = {"sats": sats, "memo": memo, "pagata": False}
     return {"payment_hash": h, "payment_request": f"lnbc{h}"}
 
 
-async def _finta_pagata(payment_hash):
+async def _finta_pagata(payment_hash, _cassaforte=""):
     return FATTURE.get(payment_hash, {}).get("pagata", False)
 
 
@@ -98,7 +98,7 @@ async def _muta(*a, **k):
 ESITO = ["non_pagato"]
 
 
-async def _finta_uscita(bolt11, atteso_sats, diario=None):
+async def _finta_uscita(bolt11, atteso_sats, diario=None, cassaforte=""):
     """Il gemello di `paga_venditore`. Prende `atteso_sats` senza
     default come l'originale: se un domani la cintura sparisse dal
     chiamante, qui esploderebbe invece di pagare a caso.

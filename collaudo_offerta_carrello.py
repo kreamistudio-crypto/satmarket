@@ -101,7 +101,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         INVOICES.append(int(sats))
         return {"payment_hash": f"hash{len(INVOICES)}",
                 "payment_request": f"lnbc{sats}collaudo{len(INVOICES)}"}
@@ -109,7 +109,7 @@ def avvio():
     async def cambio_finto():
         return CAMBIO
 
-    async def pagata_finta(payment_hash):
+    async def pagata_finta(payment_hash, _cassaforte=""):
         # il saldo del giro completo: verifica_pagamento chiede a
         # LNbits, e qui LNbits dice sempre di si'
         return True

@@ -92,7 +92,7 @@ def avvio():
     async def zitta(*a, **k):
         return None
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         return {"payment_hash": "hashcollaudo",
                 "payment_request": f"lnbc{sats}collaudo"}
 

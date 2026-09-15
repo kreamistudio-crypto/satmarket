@@ -647,3 +647,38 @@ SELECT
   (SELECT COUNT(*) FROM ordini
     WHERE stato NOT IN ('creato','annullato','released','refunded'))
                                                     AS ordini_aperti;
+
+SELECT '24) LE DUE CASSAFORTI: cosa resta aperto, e dove (set 2026)' AS polso;
+-- Il doppio wallet: ogni riga di denaro porta la sua cassaforte
+-- ('saas' = il LNbits ospitato di ieri, 'nodo' = il LNbits nostro sul
+-- VPS). E'' IL NUMERO DELLA FASE 4: il SaaS si puo'' svuotare e disdire
+-- solo quando le righe APERTE con cassaforte 'saas' sono ZERO su tutt''e
+-- quattro i registri — un rimborso di un ordine del SaaS esce dal SaaS,
+-- e un wallet chiuso con una riga aperta e'' un rimborso che non parte.
+-- I rimborsi d''asta con cassaforte '' non sono un errore: la colonna
+-- si compila dalla puntata la prima volta che il rimborso si paga.
+SELECT 'ordini' AS registro, cassaforte, COUNT(*) AS aperte,
+       SUM(prezzo_sats) AS sats
+  FROM ordini
+ WHERE stato NOT IN ('creato','annullato','released','refunded')
+ GROUP BY cassaforte
+UNION ALL
+SELECT 'rilanci (versati, asta viva o da rimborsare)', cassaforte, COUNT(*),
+       SUM(delta_sats)
+  FROM rilanci WHERE stato IN ('saldato','tardivo')
+   AND puntata_id IN (SELECT id FROM puntate WHERE stato IN ('attiva','chiusa','vincitrice'))
+ GROUP BY cassaforte
+UNION ALL
+SELECT 'rimborsi_asta da riscuotere', cassaforte, COUNT(*), SUM(importo_sats)
+  FROM rimborsi_asta WHERE stato = 'da_riscuotere'
+ GROUP BY cassaforte
+UNION ALL
+SELECT 'pagamenti (fattura viva)', cassaforte, COUNT(*), SUM(importo_sats)
+  FROM pagamenti WHERE stato = 'creato'
+ GROUP BY cassaforte
+UNION ALL
+SELECT 'payout congelati o in volo', cassaforte, COUNT(*), 0
+  FROM ordini WHERE payout_stato IN ('incerto','in_volo','da_riprovare')
+ GROUP BY cassaforte;
+-- e dove nasce il denaro nuovo lo dice il pannello «Stato delle leve»,
+-- non questo file: la leva si legge VIVA.

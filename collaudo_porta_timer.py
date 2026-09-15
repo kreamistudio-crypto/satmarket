@@ -97,7 +97,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         return {"payment_hash": f"hash{int(time.time()*1000)}",
                 "payment_request": f"lnbc{sats}collaudo"}
 
@@ -107,7 +107,7 @@ def avvio():
     async def notifica_finta(chi, testo, *a, **k):
         DETTO.append((chi, testo))
 
-    async def paga_finto(bolt11, atteso_sats, diario=None):
+    async def paga_finto(bolt11, atteso_sats, diario=None, cassaforte=""):
         return SRV.PAGATO
 
     async def invoice_da_address(addr, sats):

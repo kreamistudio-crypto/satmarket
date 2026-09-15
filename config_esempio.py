@@ -46,6 +46,18 @@ LNBITS_URL = "https://TUA-ISTANZA-LNBITS.com"
 LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY"   # per incassare
 LNBITS_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY"       # per pagare (SEGRETA!)
 
+# --- La SECONDA cassaforte (set 2026): LNbits nostro, col nodo dietro --
+# Le tre righe sopra restano il LNbits di ieri finche' l'ultimo ordine
+# nato la' non e' chiuso. Queste tre sono il LNbits self-hosted sul VPS
+# (127.0.0.1:5001, dietro il ponte verso LND), e la leva decide dove
+# nasce il denaro NUOVO: ogni riga ricorda la sua cassaforte in colonna.
+# Con la leva False (o le tre righe assenti) tutto nasce sul SaaS come
+# sempre. Vedi docs/CANTIERI.md, «Il doppio wallet».
+LNBITS_NODO_URL = "http://127.0.0.1:5001"
+LNBITS_NODO_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_NODO"
+LNBITS_NODO_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY_DEL_NODO"  # SEGRETA!
+CASSAFORTE_NUOVA = False    # True = i nuovi ordini nascono sul nodo
+
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
 PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE

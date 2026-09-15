@@ -113,7 +113,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         """LNbits non si chiama mai: la cifra si annota e basta. E' lei
         che poi si confronta con `prezzo_sats`."""
         INVOICES.append(int(sats))

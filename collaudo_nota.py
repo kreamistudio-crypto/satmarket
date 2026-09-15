@@ -103,7 +103,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         INVOICES.append(int(sats))
         return {"payment_hash": f"hash{len(INVOICES)}",
                 "payment_request": f"lnbc{sats}collaudo{len(INVOICES)}"}
@@ -115,7 +115,7 @@ def avvio():
         AVVISI.append((chi, testo))
         return None
 
-    async def mai_pagata(_hash):
+    async def mai_pagata(_hash, _cassaforte=""):
         return False
 
     server.crea_invoice_escrow = invoice_finta

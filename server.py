@@ -52,6 +52,7 @@ import unicodedata
 import urllib.request
 import zipfile
 from collections import defaultdict
+from typing import NamedTuple
 from urllib.parse import parse_qsl, urlparse
 
 import anthropic
@@ -161,6 +162,27 @@ try:
     from config import TELEGRAM_WEBHOOK_SEGRETO
 except ImportError:
     TELEGRAM_WEBHOOK_SEGRETO = ""
+
+# LA SECONDA CASSAFORTE (set 2026): LNbits self-hosted sul VPS, col
+# nodo Lightning di Barattolo come funding source. Le tre righe
+# LNBITS_* qui sopra restano il SaaS di ieri e servono finche' l'ultimo
+# ordine nato la' non e' chiuso; queste quattro si AGGIUNGONO al config
+# del VPS — che e' un file suo e non eredita niente da config_esempio —
+# e senza di loro il server parte identico a ieri: e' il patto delle
+# leve (vedi Produzione, «le tre leve del P2P si AGGIUNGONO»).
+# La leva decide SOLO dove nasce il denaro NUOVO: ogni riga di denaro
+# (ordini, rilanci, pagamenti, rimborsi_asta) porta la SUA cassaforte
+# in colonna, e i tubi che leggono o pagano guardano quella. Vedi
+# «LE DUE CASSAFORTI», piu' sotto, e Cantieri, «Il doppio wallet».
+try:
+    from config import (LNBITS_NODO_URL, LNBITS_NODO_INVOICE_KEY,
+                        LNBITS_NODO_ADMIN_KEY)
+except ImportError:
+    LNBITS_NODO_URL = LNBITS_NODO_INVOICE_KEY = LNBITS_NODO_ADMIN_KEY = ""
+try:
+    from config import CASSAFORTE_NUOVA
+except ImportError:
+    CASSAFORTE_NUOVA = False
 
 # Il segreto con cui il RELAY di Barattolo ci chiede la lista di chi
 # ci puo' scrivere. Segnaposto o vuoto = la rotta non esiste (404):
@@ -5761,6 +5783,27 @@ def init_db():
                 con.execute(f"ALTER TABLE {tabella} ADD COLUMN {colonna}")
             except sqlite3.OperationalError:
                 pass
+    # LA CASSAFORTE DI OGNI RIGA (set 2026, il doppio wallet): in quale
+    # LNbits vivono i sats di questa riga — 'saas' o 'nodo'. Il DEFAULT
+    # e' il SaaS apposta: tutto il pregresso e' nato la', e una colonna
+    # che nascesse vuota lascerebbe agli scandagli la scelta, che e'
+    # esattamente il modo in cui un ordine pagato sul SaaS verrebbe
+    # cercato sul nodo e dichiarato non pagato. Sui rimborsi d'asta il
+    # default e' '' e la riga si compila da sola dalla puntata la prima
+    # volta che serve (`_cassaforte_riga`): quelle righe le scrivono
+    # sette strade diverse, e sette copie della stessa scelta sono sei
+    # da tenere in pari.
+    for tabella in ("ordini", "rilanci", "pagamenti"):
+        try:
+            con.execute(f"ALTER TABLE {tabella} ADD COLUMN "
+                        "cassaforte TEXT DEFAULT 'saas'")
+        except sqlite3.OperationalError:
+            pass
+    try:
+        con.execute("ALTER TABLE rimborsi_asta ADD COLUMN "
+                    "cassaforte TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     # Backfill di disputata: questi stati esistono SOLO a valle di una
     # disputa, quindi gli ordini storici che ci si trovano sono marcabili
     # a colpo sicuro. I released passati da una disputa prima della
@@ -6561,33 +6604,158 @@ async def login_nostr_collega(req: Request, response: Response,
 # sbagliata dichiarerebbe annullato un ordine ancora pagabile.
 INVOICE_EXPIRY = 900
 
+# ------------------------- LE DUE CASSAFORTI -------------------------
+# Set 2026, il doppio wallet: l'escrow trasloca dal LNbits ospitato
+# (SaaS, backend Spark) a un LNbits NOSTRO sul VPS col nodo Lightning
+# di Barattolo dietro — e Barattolo NON si ferma. Ogni riga di denaro
+# porta in colonna la cassaforte in cui vivono i suoi sats: i vecchi
+# ordini restano sul SaaS fino a chiusura naturale, i nuovi nascono
+# dove dice la leva CASSAFORTE_NUOVA. Quando l'ultimo 'saas' e' chiuso
+# si sposta il saldo residuo e si disdice (vedi Cantieri).
+#
+# I NOMI SONO DUE E SONO LETTERALI ('saas', 'nodo'): stanno in colonna
+# e nel config, e un terzo non esiste finche' qualcuno non lo aggiunge
+# QUI — `_chiavi_cassaforte` su un nome sconosciuto ALZA, non ripiega,
+# perche' pagare dal wallet sbagliato e' l'unico errore di questo
+# cantiere che non si annulla.
+#
+# LE CHIAVI TENGONO I LORO NOMI DENTRO L'OGGETTO (`cf.LNBITS_ADMIN_KEY`
+# e non `cf.admin`), e non e' pigrizia: le sentinelle di prove.py
+# cercano quei letterali nel sorgente dei tubi per verificare l'ORDINE
+# delle cose — il rifiuto prima dell'admin key, l'eco prima del
+# pagamento — e un nome nuovo le avrebbe rese cieche senza farle
+# rosse.
+CASSAFORTE_SAAS, CASSAFORTE_NODO = "saas", "nodo"
+CASSAFORTI = (CASSAFORTE_SAAS, CASSAFORTE_NODO)
+
+
+class _Cassaforte(NamedTuple):
+    nome: str
+    LNBITS_URL: str
+    LNBITS_INVOICE_KEY: str
+    LNBITS_ADMIN_KEY: str
+
+
+def _nodo_configurato() -> bool:
+    """Le tre righe del nodo ci sono davvero (non vuote, non il
+    segnaposto di config_esempio)."""
+    return bool(LNBITS_NODO_URL and LNBITS_NODO_URL.startswith("http")
+                and LNBITS_NODO_INVOICE_KEY and LNBITS_NODO_ADMIN_KEY
+                and "INCOLLA_QUI" not in LNBITS_NODO_INVOICE_KEY
+                and "INCOLLA_QUI" not in LNBITS_NODO_ADMIN_KEY)
+
+
+def cassaforte_nuova() -> str:
+    """Dove nasce il denaro NUOVO, adesso. E' la leva letta VIVA —
+    il pannello «Stato delle leve» chiede a questa funzione e non alla
+    costante — e la leva accesa senza le tre chiavi del nodo vale
+    SPENTA: meglio coniare sul SaaS di ieri che su un URL vuoto, e la
+    riga all'avvio lo dice (vedi `avvio`)."""
+    if CASSAFORTE_NUOVA and _nodo_configurato():
+        return CASSAFORTE_NODO
+    return CASSAFORTE_SAAS
+
+
+# La riga all'avvio, come per le leve del P2P: e' il primo posto da
+# guardare se la leva sembra accesa e il denaro nuovo nasce ancora sul
+# SaaS. Il pannello delle leve dice la stessa cosa, con l'allarme.
+if CASSAFORTE_NUOVA and not _nodo_configurato():
+    print("⚠️ CASSAFORTE_NUOVA e' True ma LNBITS_NODO_URL / "
+          "LNBITS_NODO_INVOICE_KEY / LNBITS_NODO_ADMIN_KEY mancano o sono "
+          "il segnaposto: la leva vale SPENTA, il denaro nuovo nasce sul SaaS.")
+print(f"🔒 Cassaforte del denaro nuovo: {cassaforte_nuova()}")
+
+
+def _chiavi_cassaforte(nome: str = "") -> _Cassaforte:
+    """Le tre chiavi della cassaforte `nome`. Vuoto = quella del denaro
+    nuovo (per chi CONIA, che una riga non ce l'ha ancora). Chi legge o
+    paga passa il nome letto dalla riga — e i tubi che leggono o pagano
+    lo pretendono SENZA default, cosi' chi lo dimentica lo sente da
+    Python invece di interrogare la cassaforte sbagliata."""
+    nome = nome or cassaforte_nuova()
+    if nome == CASSAFORTE_NODO:
+        return _Cassaforte(nome, LNBITS_NODO_URL, LNBITS_NODO_INVOICE_KEY,
+                           LNBITS_NODO_ADMIN_KEY)
+    if nome == CASSAFORTE_SAAS:
+        return _Cassaforte(nome, LNBITS_URL, LNBITS_INVOICE_KEY,
+                           LNBITS_ADMIN_KEY)
+    raise ValueError(f"cassaforte sconosciuta: {nome!r}")
+
+
+def _cassaforte_puntata(con, puntata_id: int) -> str:
+    """La cassaforte di una PUNTATA d'asta: quella del suo primo
+    versamento saldato, o '' se non ha ancora versato niente. Una
+    puntata vive in una cassaforte sola, anche se la leva gira a meta'
+    asta: i rilanci successivi EREDITANO (vedi `fai_puntata`), e il
+    rimborso esce da dove i sats sono entrati."""
+    r = con.execute("SELECT cassaforte FROM rilanci WHERE puntata_id=? "
+                    "AND stato IN ('saldato','tardivo') ORDER BY id LIMIT 1",
+                    (puntata_id,)).fetchone()
+    return (r["cassaforte"] if r else "") or ""
+
+
+def _cassaforte_riga(con, tabella: str, riga_id: int) -> str:
+    """La cassaforte di una riga di denaro, dalla sua colonna. Sui
+    rimborsi d'asta la colonna nasce vuota e si compila QUI dalla
+    puntata, una volta per sempre: e' l'unico posto che la scrive.
+    `tabella` e' un letterale del nostro codice, mai roba da fuori.
+    Fail-closed: una riga senza cassaforte ne' puntata risolvibile
+    alza, che pagare «da qualche parte» non e' una risposta."""
+    r = con.execute(f"SELECT * FROM {tabella} WHERE id=?",
+                    (riga_id,)).fetchone()
+    if not r:
+        raise ValueError(f"{tabella} #{riga_id}: riga inesistente")
+    nome = r["cassaforte"] or ""
+    if not nome and tabella == "rimborsi_asta":
+        nome = _cassaforte_puntata(con, r["puntata_id"])
+        if nome:
+            con.execute("UPDATE rimborsi_asta SET cassaforte=? WHERE id=?",
+                        (nome, riga_id))
+            con.commit()
+    if nome not in CASSAFORTI:
+        raise ValueError(f"{tabella} #{riga_id}: cassaforte {nome!r}")
+    return nome
+
 
 async def crea_invoice_escrow(sats: int, memo: str,
-                              expiry: int = INVOICE_EXPIRY) -> dict:
+                              expiry: int = INVOICE_EXPIRY,
+                              cassaforte: str = "") -> dict:
     """Crea la invoice che l'acquirente paghera': i sats finiscono
     nel wallet della piattaforma (la cassaforte). Di serie scade in
     15 minuti (se non viene pagata, l'ordine si autodistrugge poco
     dopo); le puntate d'asta passano fatture piu' corte.
     Il timeout e' scritto (ago 2026): era l'unico dei quattro tubi a
     fidarsi del default di httpx — che vale 5 secondi ed e' giusto,
-    ma un numero che si legge batte un numero che si ricorda."""
+    ma un numero che si legge batte un numero che si ricorda.
+    `cassaforte` vuoto = quella del denaro nuovo; i rilanci d'asta
+    passano quella della puntata. La risposta porta `cassaforte`
+    accanto a payment_hash e payment_request: e' quel che il chiamante
+    scrive in colonna, e lo scrive SEMPRE (c'e' la sentinella)."""
+    cf = _chiavi_cassaforte(cassaforte)
     async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.post(f"{LNBITS_URL}/api/v1/payments",
-                         headers={"X-Api-Key": LNBITS_INVOICE_KEY},
+        r = await c.post(f"{cf.LNBITS_URL}/api/v1/payments",
+                         headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY},
                          json={"out": False, "amount": sats, "memo": memo,
                                "expiry": expiry})
         r.raise_for_status()
-        return r.json()  # contiene payment_hash e payment_request (la invoice)
+        inv = r.json()  # contiene payment_hash e payment_request (la invoice)
+        inv["cassaforte"] = cf.nome
+        return inv
 
 
-async def invoice_pagata(payment_hash: str) -> bool:
+async def invoice_pagata(payment_hash: str, cassaforte: str) -> bool:
     """Il poll del pagamento in ENTRATA. Qui un timeout e' innocuo —
     non esce niente, si richiede fra quattro secondi — ma il numero
     si scrive lo stesso: i quattro tubi verso LNbits devono dire
-    tutti quanto aspettano, o l'unico senza sembra una dimenticanza."""
+    tutti quanto aspettano, o l'unico senza sembra una dimenticanza.
+    `cassaforte` e' OBBLIGATORIA e senza default apposta: e' la colonna
+    della riga, e chiedere al wallet sbagliato risponde «non pagato»
+    su un ordine pagato — che e' la risposta con cui gli scandagli
+    annullano."""
+    cf = _chiavi_cassaforte(cassaforte)
     async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(f"{LNBITS_URL}/api/v1/payments/{payment_hash}",
-                        headers={"X-Api-Key": LNBITS_INVOICE_KEY})
+        r = await c.get(f"{cf.LNBITS_URL}/api/v1/payments/{payment_hash}",
+                        headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY})
         return r.status_code == 200 and r.json().get("paid", False)
 
 
@@ -6690,8 +6858,12 @@ def _esito_lnbits(dati: dict) -> str:
     return "pending"
 
 
-async def _stato_pagamento(payment_hash: str) -> str:
-    """Com'e' finita l'uscita con questo hash, chiesto a LNbits.
+async def _stato_pagamento(payment_hash: str, cassaforte: str) -> str:
+    """Com'e' finita l'uscita con questo hash, chiesto a LNbits —
+    a QUELLA LNbits: la riga di un pagamento vive nell'istanza che l'ha
+    fatto, e chiedere all'altra risponde «mai visto» (404) su un hash
+    gia' saldato, cioe' autorizza a ripagare. Per questo `cassaforte`
+    e' obbligatoria e senza default.
     Torna 'success', 'failed' o 'pending' — oppure la stringa VUOTA
     quando di quel pagamento non c'e' nessuna traccia.
 
@@ -6706,10 +6878,11 @@ async def _stato_pagamento(payment_hash: str) -> str:
     e' la stessa: se un 520 tornasse come «non c'e' nessun pagamento»,
     pagheremmo di nuovo proprio nel momento in cui non vediamo
     niente."""
+    cf = _chiavi_cassaforte(cassaforte)
     try:
         async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{LNBITS_URL}/api/v1/payments/{payment_hash}",
-                            headers={"X-Api-Key": LNBITS_INVOICE_KEY})
+            r = await c.get(f"{cf.LNBITS_URL}/api/v1/payments/{payment_hash}",
+                            headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY})
     except Exception as e:
         raise LnbitsMuto(f"stato del pagamento non chiesto "
                          f"({type(e).__name__}: {e})")
@@ -6812,8 +6985,16 @@ def _quando_ritentare(tentativi: int, ultimo: int) -> int:
 
 
 async def paga_venditore(invoice: str, atteso_sats: int,
-                         diario: dict | None = None) -> str:
+                         diario: dict | None = None, *,
+                         cassaforte: str) -> str:
     """Sblocca i sats: paga la invoice fornita dal venditore.
+
+    DA QUALE CASSAFORTE (set 2026): `cassaforte` e' la colonna della
+    riga che aspetta i sats, obbligatoria e SOLO per nome — chi scrive
+    la prossima strada d'uscita non puo' dimenticarla ne' passarla per
+    posizione al posto del diario. I sats escono da dove sono entrati:
+    un rimborso di un ordine del SaaS esce dal SaaS anche il giorno in
+    cui tutto il nuovo nasce sul nodo.
 
     LA CINTURA (ago 2026): l'importo si controlla QUI, sull'ultimo
     tubo prima dell'admin key, contro quello DOVUTO. Nel LNURL-pay la
@@ -6862,8 +7043,10 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     pigrizia: c'e' una sentinella che verifica che nessuno la rimetta
     dentro un «if»."""
     taccuino = diario if diario is not None else {}
+    cf = _chiavi_cassaforte(cassaforte)
+    taccuino["cassaforte"] = cf.nome
     try:
-        dec = await decodifica_invoice(invoice)
+        dec = await decodifica_invoice(invoice, cf.nome)
     except LnbitsMuto as e:
         # NON HO POTUTO CHIEDERE (ago 2026). Sta QUI, prima della
         # cintura e prima di ogni notifica, e la posizione e' la cosa
@@ -6916,7 +7099,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     # solo il numero HTTP lo leggerebbe come una risposta fresca. Qui
     # si risponde con quel che quel record dice, senza toccare il nodo.
     try:
-        gia = await _stato_pagamento(phash) if phash else ""
+        gia = await _stato_pagamento(phash, cf.nome) if phash else ""
     except LnbitsMuto as e:
         print(f"🔁 Pagamento NON CHIESTO ({e}): non si e' potuto sapere se "
               f"quell'hash fosse gia' uscito. Niente e' partito.")
@@ -6943,8 +7126,8 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     try:
         taccuino["tentato"] = True
         async with httpx.AsyncClient(timeout=60) as c:
-            r = await c.post(f"{LNBITS_URL}/api/v1/payments",
-                             headers={"X-Api-Key": LNBITS_ADMIN_KEY},
+            r = await c.post(f"{cf.LNBITS_URL}/api/v1/payments",
+                             headers={"X-Api-Key": cf.LNBITS_ADMIN_KEY},
                              json={"out": True, "bolt11": invoice})
         if r.status_code >= 300:
             taccuino["errore"] = f"LNbits ha risposto {r.status_code}"
@@ -6959,7 +7142,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         while verdetto == "pending" and attese < ATTESE_ESITO:
             await asyncio.sleep(SECONDI_FRA_ATTESE)
             attese += 1
-            verdetto = await _stato_pagamento(phash) or "pending"
+            verdetto = await _stato_pagamento(phash, cf.nome) or "pending"
         taccuino["errore"] = f"LNbits: {verdetto}"
     except Exception as e:
         # Il nodo ha taciuto. Prima di questa riga l'eccezione risaliva
@@ -7097,7 +7280,7 @@ async def _payment_hash(bolt11: str) -> str:
 
 
 async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
-                             verso: str, avviso: str):
+                             verso: str, avviso: str, cassaforte: str = ""):
     """L'esito e' IGNOTO: la riga si congela e la palla passa a un
     umano. Da qui in poi nessuna strada — scandaglio, invoice
     depositata, conferma, orologio — puo' far partire un secondo
@@ -7105,19 +7288,24 @@ async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
     un moderatore non dice com'e' andata. `tabella` e' un letterale
     del nostro codice, mai roba che arriva da fuori.
     Chiude la connessione che riceve: il chiamante l'ha aperta e da
-    qui non ci torna."""
+    qui non ci torna.
+    `cassaforte` serve SOLO all'avviso (set 2026): con due LNbits, «cerca
+    questo pagamento su LNbits» senza dire quale manda il moderatore a
+    cercare un hash dove non c'e' — e un 404 letto la' e' un «mai
+    uscito» falso."""
     phash = await _payment_hash(bolt11)
     con.execute(f"UPDATE {tabella} SET payout_stato='incerto', "
                 "payout_hash=?, payout_verso=?, aggiornato=? WHERE id=?",
                 (phash, verso, int(time.time()), riga_id))
     con.commit()
     con.close()
+    dove = f" (cassaforte <b>{cassaforte}</b>)" if cassaforte else ""
     try:
         await notifica_admin(
             f"🧊 <b>Pagamento da verificare a mano.</b> {avviso}\n\n"
             f"Il nodo non ha risposto: <b>non sappiamo</b> se i sats "
             f"sono usciti. Nessun ritentativo partirà da solo. Cerca "
-            f"questo pagamento su LNbits e poi rispondi dal Profilo, "
+            f"questo pagamento su LNbits{dove} e poi rispondi dal Profilo, "
             f"nella sezione «🧊 Pagamenti da verificare».\n"
             + (f"<code>{phash}</code>" if phash else
                "(il payment_hash non si è potuto leggere)"))
@@ -7186,10 +7374,14 @@ def netto_venditore(prezzo_sats: int) -> int:
     return int(prezzo_sats * (100 - COMMISSIONE_PERCENTO) / 100)
 
 
-async def decodifica_invoice(bolt11: str) -> dict | None:
+async def decodifica_invoice(bolt11: str, cassaforte: str = "") -> dict | None:
     """Chiede a LNbits di leggere la invoice del venditore, per
     controllare che l'importo sia giusto PRIMA di salvarla.
     Ritorna il JSON decodificato, o None se la invoice non e' valida.
+    Leggere una bolt11 non muove sats e qualunque LNbits sa farlo:
+    `cassaforte` vuoto = quella del denaro nuovo, e chi ha in mano una
+    riga passa la sua — cosi' «LnbitsMuto» parla dell'istanza che poi
+    paghera'.
 
     QUI NASCEVA LA CONFUSIONE (ago 2026): `status >= 300 -> None` metteva
     nello stesso cassetto «questa non e' una invoice» e «il mio servizio
@@ -7208,10 +7400,11 @@ async def decodifica_invoice(bolt11: str) -> dict | None:
     quello e' il caso che campa per settimane, perche' con la chiave
     rotta sui soli pagamenti in uscita gli acquisti continuano a
     funzionare benissimo mentre nessuno incassa piu'."""
+    cf = _chiavi_cassaforte(cassaforte)
     try:
         async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.post(f"{LNBITS_URL}/api/v1/payments/decode",
-                             headers={"X-Api-Key": LNBITS_INVOICE_KEY},
+            r = await c.post(f"{cf.LNBITS_URL}/api/v1/payments/decode",
+                             headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY},
                              json={"data": bolt11})
     except Exception as e:
         raise LnbitsMuto(f"decode non riuscito ({type(e).__name__}: {e})")
@@ -7222,8 +7415,8 @@ async def decodifica_invoice(bolt11: str) -> dict | None:
     return r.json()
 
 
-async def importo_invoice(bolt11: str,
-                          dec: dict | None = None) -> int | None:
+async def importo_invoice(bolt11: str, dec: dict | None = None,
+                          cassaforte: str = "") -> int | None:
     """Quanti sats chiede questa invoice. None = illeggibile.
 
     E' il GIUDICE UNICO dell'importo: ci passano il deposito a mano
@@ -7244,7 +7437,7 @@ async def importo_invoice(bolt11: str,
     fattura illeggibile (che e' proprio None) verrebbe riletta da capo
     invece di essere riconosciuta."""
     if dec is None:
-        dec = await decodifica_invoice(bolt11)
+        dec = await decodifica_invoice(bolt11, cassaforte)
     if dec is None:
         return None
     return int(dec.get("amount_msat", 0)) // 1000
@@ -17589,6 +17782,20 @@ def _leve_stato():
                          "decidere una disputa"),
         ]},
         {"gruppo": "🔒 Escrow e denaro", "voci": [
+            _leva("Cassaforte del denaro nuovo: LNbits sul nodo",
+                  "CASSAFORTE_NUOVA",
+                  cassaforte_nuova() == CASSAFORTE_NODO,
+                  allarme=bool(CASSAFORTE_NUOVA) and not _nodo_configurato(),
+                  spento="ordini, rilanci e sblocchi nuovi nascono sul "
+                         "LNbits ospitato (SaaS), com'è sempre stato. Se "
+                         "la leva è True nel config e questa riga dice "
+                         "spenta, mancano le tre righe LNBITS_NODO_* — la "
+                         "leva vale spenta e il journal lo dice all'avvio",
+                  acceso="il denaro NUOVO nasce sul LNbits del nodo; ogni "
+                         "riga già nata resta nella sua cassaforte (colonna "
+                         "«cassaforte») fino a chiusura, rimborsi compresi. "
+                         "False e riavvia rimanda il nuovo sul SaaS — le "
+                         "righe del nodo continuano a chiudersi lì"),
             _leva("Auto-sblocco dei sats", "AUTO_SBLOCCO_ATTIVO",
                   bool(AUTO_SBLOCCO_ATTIVO),
                   spento="nessun timer sposta sats: al posto dello sblocco "
@@ -20436,9 +20643,14 @@ async def fai_puntata(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Hai già versato abbastanza per questo "
                                  "totale: alza la cifra")
+    # LA PUNTATA VIVE IN UNA CASSAFORTE SOLA (set 2026): il secondo
+    # versamento nasce dove e' entrato il primo, anche se la leva del
+    # denaro nuovo e' girata a meta' asta — il rimborso deve uscire da
+    # un wallet solo. Chi versa per la prima volta va dove dice la leva.
+    cf = (_cassaforte_puntata(con, mia["id"]) if mia else "") or cassaforte_nuova()
     inv = await crea_invoice_escrow(
         delta, f"Barattolo asta #{annuncio_id}: puntata {_fmt_sats(totale)} sats",
-        expiry=RILANCIO_EXPIRY)
+        expiry=RILANCIO_EXPIRY, cassaforte=cf)
     # Il ricontrollo che fa fede (patto mono-processo: da qui al
     # commit nessun await). Durante l'attesa della invoice l'asta puo'
     # essere scaduta o la testa salita oltre il mio totale: fallito =
@@ -20478,10 +20690,11 @@ async def fai_puntata(annuncio_id: int, req: Request,
                           "tg_id=?", (annuncio_id, user["id"])).fetchone()
     con.execute("INSERT INTO rilanci(puntata_id,annuncio_id,tg_id,"
                 "offerto_sats,delta_sats,payment_hash,proxy,stato,"
-                "creato,aggiornato) VALUES(?,?,?,?,?,?,?,'creato',?,?)",
+                "creato,aggiornato,cassaforte) "
+                "VALUES(?,?,?,?,?,?,?,'creato',?,?,?)",
                 (mia["id"], annuncio_id, user["id"], totale, delta,
                  inv["payment_hash"], 1 if vuole_proxy else 0,
-                 adesso, adesso))
+                 adesso, adesso, cf))
     rilancio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -20510,7 +20723,7 @@ async def annulla_rilancio(rilancio_id: int,
     con.close()   # niente transazione aperta durante l'await
     if not ril or ril["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
-    if await invoice_pagata(ril["payment_hash"]):
+    if await invoice_pagata(ril["payment_hash"], ril["cassaforte"]):
         raise HTTPException(409, "Questo pagamento risulta già arrivato: "
                                  "niente da annullare — attendi un attimo "
                                  "la verifica della puntata")
@@ -20549,7 +20762,7 @@ async def verifica_rilancio(rilancio_id: int,
         raise HTTPException(404, "Puntata non trovata")
     if ril["stato"] != "creato":
         return {"stato": ril["stato"]}
-    if not await invoice_pagata(ril["payment_hash"]):
+    if not await invoice_pagata(ril["payment_hash"], ril["cassaforte"]):
         return {"stato": "in_attesa"}
     con = db()
     adesso = int(time.time())
@@ -20855,13 +21068,15 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         bolt11 = ""
         taccuino = {"etichetta": f"Riscossione del rimborso d'asta "
                                  f"#{rimborso_id}"}
+        cf = _cassaforte_riga(con, "rimborsi_asta", rimborso_id)
         try:
             if r["payout_stato"] != "uscito":
                 bolt11 = r["invoice_riscossione"]
                 if not bolt11 and u and u["ln_address"]:
                     bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
             esito = (PAGATO if r["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo, taccuino)
+                     else await paga_venditore(bolt11, importo, taccuino,
+                                               cassaforte=cf)
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso d'asta #{rimborso_id}: {e}")
@@ -20875,7 +21090,8 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
                 f"Riscossione del rimborso d'asta #{rimborso_id} "
-                f"(«{titolo}»): <b>{_fmt_sats(importo)} sats</b>.")
+                f"(«{titolo}»): <b>{_fmt_sats(importo)} sats</b>.",
+                cassaforte=cf)
             return {"ok": False, "stato": r["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # Qui il giro serve piu' che altrove: i perdenti d'asta e
@@ -21158,7 +21374,9 @@ def _chiudi_una_asta(annuncio_id: int, cambio: float):
     # l'eventuale eccedenza e' una riga del conto e torna dal registro
     ordine_id = crea_ordine_pagato(con, a, vincitrice["tg_id"],
                                    vincitrice["offerto_sats"],
-                                   payment_hash, scelta, cambio)
+                                   payment_hash, scelta, cambio,
+                                   cassaforte=_cassaforte_puntata(
+                                       con, vincitrice["id"]))
     con.execute("UPDATE puntate SET stato='vincitrice', aggiornato=? "
                 "WHERE id=?", (adesso, vincitrice["id"]))
     for rmb in rimborsi:
@@ -23607,9 +23825,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     prot, totale = conto["protezione"], conto["totale"]
 
     primo = righe[0]["titolo"]
+    cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
-                f"({len(righe)} oggetti)")
+                f"({len(righe)} oggetti)", cassaforte=cf)
     # Il ricontrollo che fa fede, per OGNI riga (il patto del mono:
     # da qui all'INSERT nessun await, e nessun DML prima — l'offerta
     # scaduta qui sopra committa e solleva subito). Fallita una riga,
@@ -23654,7 +23873,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # dipendente da CoinGecko per un dato che serve a raccontarlo.
     cambio_ordine = cambio_misura or cambio_noto_ora()
     con.execute(
-        "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
+        "INSERT INTO ordini(cassaforte,annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
         "tipo_punto,punto_barattolo,"
@@ -23663,8 +23882,8 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
         "codice_sconto,codice_sconto_id,accordo_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
+        "VALUES(?,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (cf, user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
          punto, via_punto, rete, tipo, pid, nota,
          # il timbro guarda il BLOB: col degrado non c'e' niente in
@@ -25147,7 +25366,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # Rinnovo: prima il controllo del pagamento — e l'await impone
         # di chiudere la connessione (niente transazioni in attesa)
         con.close()
-        if mio["payment_hash"] and await invoice_pagata(mio["payment_hash"]):
+        if mio["payment_hash"] and await invoice_pagata(mio["payment_hash"], mio["cassaforte"]):
             await _incassa_ordine(mio["id"])
             raise HTTPException(409, "Il tuo pagamento precedente è appena "
                                      "stato confermato: l'oggetto è già "
@@ -25442,8 +25661,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                 f"{_fmt_sats(TETTO_DIGITALE_NUOVI)} sats non sono disponibili: "
                 f"concludi prima un acquisto qualsiasi")
 
+    cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
-        totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
+        totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
+        cassaforte=cf)
     # Il ricontrollo che fa fede (patto mono-processo: da qui all'INSERT
     # nessun await, il blocco e' atomico). Durante l'attesa della
     # invoice un altro pagamento puo' aver preso l'ultimo pezzo, o il
@@ -25505,15 +25726,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # cioe' «non lo sappiamo», mai un numero inventato.
     cambio_ordine = cambio_misura or cambio_noto_ora()
     con.execute(
-        "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
+        "INSERT INTO ordini(cassaforte,annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
         "punto_barattolo,nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (a["id"], user["id"], a["venditore_id"], totale,
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (cf, a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, rete, tipo, pid,
@@ -25588,7 +25809,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
 
 def crea_ordine_pagato(con, a, compratore_id: int, totale_sats: int,
                        payment_hash: str, consegna_scelta: str = "",
-                       cambio: float = 0) -> int:
+                       cambio: float = 0, cassaforte: str = "") -> int:
     """LA PRIMITIVA «ordine gia' pagato» (ago 2026, nata col cantiere
     aste): i sats sono GIA' in cassaforte — oggi un'asta aggiudicata,
     domani la pagina d'acquisto che incassa prima di creare — e
@@ -25601,13 +25822,20 @@ def crea_ordine_pagato(con, a, compratore_id: int, totale_sats: int,
     varco): finche' e' vuota il venditore non spedisce e nessuna
     finestra di tutela parte."""
     adesso = int(time.time())
+    # I sats sono GIA' in una cassaforte, e l'ordine deve dire quale:
+    # per l'asta e' quella della puntata vincitrice (vedi
+    # `_cassaforte_puntata`), e chi non la sa cade su quella del
+    # denaro nuovo — mai sul DEFAULT della colonna, che e' il SaaS di
+    # ieri e non una scelta.
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
-        "VALUES(?,?,?,?,'locked',?,?,?,?,?,0,0,1)",
+        "consegna_scelta,spedizione_sats,protezione_sats,quantita,"
+        "cassaforte) "
+        "VALUES(?,?,?,?,'locked',?,?,?,?,?,0,0,1,?)",
         (a["id"], compratore_id, a["venditore_id"], totale_sats,
-         payment_hash, adesso, adesso, cambio, consegna_scelta))
+         payment_hash, adesso, adesso, cambio, consegna_scelta,
+         cassaforte or cassaforte_nuova()))
     return con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
 
 
@@ -25634,7 +25862,7 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     enumera non impara niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    o = con.execute("SELECT stato, payment_hash FROM ordini "
+    o = con.execute("SELECT stato, payment_hash, cassaforte FROM ordini "
                     "WHERE id=? AND compratore_id=?",
                     (ordine_id, user["id"])).fetchone()
     con.close()
@@ -25642,7 +25870,7 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Operazione non permessa")
     if o["stato"] != "creato":
         return {"stato": o["stato"]}
-    if not await invoice_pagata(o["payment_hash"]):
+    if not await invoice_pagata(o["payment_hash"], o["cassaforte"]):
         return {"stato": "in_attesa"}
     return await _incassa_ordine(ordine_id)
 
@@ -30049,14 +30277,16 @@ async def sblocca_banner(req: Request,
     # registro LNbits — che e' tutto cio' che la riconciliazione a
     # mano chiede — e NON somiglia ai tre dell'escrow, che non si
     # toccano.
+    cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
-        prezzo, f"Barattolo sblocco banner #{user['id']}")
+        prezzo, f"Barattolo sblocco banner #{user['id']}", cassaforte=cf)
     # Da qui al commit NESSUN await: il patto mono-processo.
     con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
                 "importo_sats,payment_hash,invoice,stato,creato,"
-                "aggiornato) VALUES(?,'banner','',?,?,?,'creato',?,?)",
+                "aggiornato,cassaforte) "
+                "VALUES(?,'banner','',?,?,?,'creato',?,?,?)",
                 (user["id"], prezzo, inv["payment_hash"],
-                 inv["payment_request"], adesso, adesso))
+                 inv["payment_request"], adesso, adesso, cf))
     pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -30074,7 +30304,7 @@ async def verifica_pagamento_sblocco(pagamento_id: int,
     impara niente — «non e' tuo» e «non esiste» rispondono uguale."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    p = con.execute("SELECT id, stato, payment_hash FROM pagamenti "
+    p = con.execute("SELECT id, stato, payment_hash, cassaforte FROM pagamenti "
                     "WHERE id=? AND tg_id=?",
                     (pagamento_id, user["id"])).fetchone()
     con.close()          # niente transazione aperta durante l'await
@@ -30082,7 +30312,7 @@ async def verifica_pagamento_sblocco(pagamento_id: int,
         raise HTTPException(400, "Operazione non permessa")
     if p["stato"] != "creato":
         return {"stato": p["stato"]}
-    if not await invoice_pagata(p["payment_hash"]):
+    if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
         return {"stato": "in_attesa"}
     return await _incassa_sblocco(pagamento_id)
 
@@ -30103,7 +30333,7 @@ async def annulla_pagamento_sblocco(pagamento_id: int,
     con.close()
     if not p or p["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
-    if await invoice_pagata(p["payment_hash"]):
+    if await invoice_pagata(p["payment_hash"], p["cassaforte"]):
         raise HTTPException(409, "Questo pagamento risulta già arrivato: "
                                  "niente da annullare — attendi un attimo "
                                  "che la porta si apra")
@@ -30232,7 +30462,8 @@ async def _rimborsa_sblocco(pagamento_id: int,
                     bolt11 = await invoice_da_ln_address(u["ln_address"],
                                                          importo)
             esito = (PAGATO if p["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo, taccuino)
+                     else await paga_venditore(bolt11, importo, taccuino,
+                                               cassaforte=p["cassaforte"])
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso dello sblocco #{pagamento_id}: {e}")
@@ -30247,7 +30478,8 @@ async def _rimborsa_sblocco(pagamento_id: int,
                 con, "pagamenti", pagamento_id, bolt11, "pagante",
                 f"Rimborso dello sblocco banner #{pagamento_id} "
                 f"a #{p['tg_id']}: "
-                f"<b>{_fmt_sats(importo)} sats</b>.")
+                f"<b>{_fmt_sats(importo)} sats</b>.",
+                cassaforte=p["cassaforte"])
             return {"ok": False, "stato": p["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # La porta del banner NON si chiude: il ramo che non paga
@@ -30629,14 +30861,17 @@ async def richiedi_slug_negozio(req: Request,
                     "WHERE id=?", (adesso, viva["id"]))
     # L'UNICO await. Il memo porta lo slug: e' tutto cio' che la
     # riconciliazione a mano chiede per capire cosa si stava comprando.
+    cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
-        prezzo, f"Barattolo link negozio #{user['id']}: {slug}")
+        prezzo, f"Barattolo link negozio #{user['id']}: {slug}",
+        cassaforte=cf)
     # Da qui al commit NESSUN await: il patto mono-processo.
     con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
                 "importo_sats,payment_hash,invoice,stato,creato,"
-                "aggiornato) VALUES(?,'negozio_slug',?,?,?,?,'creato',?,?)",
+                "aggiornato,cassaforte) "
+                "VALUES(?,'negozio_slug',?,?,?,?,'creato',?,?,?)",
                 (user["id"], slug, prezzo, inv["payment_hash"],
-                 inv["payment_request"], adesso, adesso))
+                 inv["payment_request"], adesso, adesso, cf))
     pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -30658,7 +30893,7 @@ async def verifica_slug_negozio(pagamento_id: int,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     p = con.execute(
-        "SELECT id, stato, payment_hash FROM pagamenti "
+        "SELECT id, stato, payment_hash, cassaforte FROM pagamenti "
         "WHERE id=? AND tg_id=? AND motivo='negozio_slug'",
         (pagamento_id, user["id"])).fetchone()
     con.close()
@@ -30666,7 +30901,7 @@ async def verifica_slug_negozio(pagamento_id: int,
         raise HTTPException(400, "Operazione non permessa")
     if p["stato"] != "creato":
         return {"stato": p["stato"]}
-    if not await invoice_pagata(p["payment_hash"]):
+    if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
         return {"stato": "in_attesa"}
     return await _incassa_slug_negozio(pagamento_id)
 
@@ -30684,7 +30919,7 @@ async def annulla_slug_negozio(pagamento_id: int,
     con.close()
     if not p or p["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
-    if await invoice_pagata(p["payment_hash"]):
+    if await invoice_pagata(p["payment_hash"], p["cassaforte"]):
         raise HTTPException(409, "Questo pagamento risulta già arrivato: "
                                  "niente da annullare")
     con = db()
@@ -36283,7 +36518,8 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 if not bolt11 and v and v["ln_address"]:
                     bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
             esito = (PAGATO if o["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, netto, taccuino)
+                     else await paga_venditore(bolt11, netto, taccuino,
+                                               cassaforte=o["cassaforte"])
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Ordine #{ordine_id}: {e}")
@@ -36304,7 +36540,8 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
                 f"Incasso del venditore sull'ordine #{ordine_id}: "
-                f"<b>{_fmt_sats(netto)} sats</b>.")
+                f"<b>{_fmt_sats(netto)} sats</b>.",
+                cassaforte=o["cassaforte"])
             return {"ok": False, "stato": o["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # Non si e' potuto chiedere: la riga resta ESATTAMENTE
@@ -36558,7 +36795,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                     bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
                                                          importo)
             esito = (PAGATO if o["payout_stato"] == "uscito"
-                     else await paga_venditore(bolt11, importo, taccuino)
+                     else await paga_venditore(bolt11, importo, taccuino,
+                                               cassaforte=o["cassaforte"])
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso sull'ordine #{ordine_id}: {e}")
@@ -36572,7 +36810,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "compratore",
                 f"Rimborso al compratore sull'ordine #{ordine_id}: "
-                f"<b>{_fmt_sats(importo)} sats</b>.")
+                f"<b>{_fmt_sats(importo)} sats</b>.",
+                cassaforte=o["cassaforte"])
             return {"ok": False, "stato": o["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # Gemello del ramo di `_sblocca_sats`: la riga resta com'era
@@ -37306,7 +37545,7 @@ async def controlla_annullati():
     adesso = int(time.time())
     con = db()
     ordini = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash FROM ordini WHERE stato='annullato' "
+        "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='annullato' "
         "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
@@ -37314,12 +37553,12 @@ async def controlla_annullati():
     # gli sblocchi del banner: stessa finestra degli ordini, che la
     # loro fattura vive gli stessi 15 minuti
     sblocchi = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash FROM pagamenti WHERE stato='annullato' "
+        "SELECT id, payment_hash, cassaforte FROM pagamenti WHERE stato='annullato' "
         "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     con.close()
     for o in ordini:
         try:
-            if not await invoice_pagata(o["payment_hash"]):
+            if not await invoice_pagata(o["payment_hash"], o["cassaforte"]):
                 continue
             con = db()
             cur = con.execute(
@@ -37341,7 +37580,7 @@ async def controlla_annullati():
             print(f"⚠️ Riacciuffo ordine #{o['id']} saltato: {e}")
     for ril in rilanci:
         try:
-            if not await invoice_pagata(ril["payment_hash"]):
+            if not await invoice_pagata(ril["payment_hash"], ril["cassaforte"]):
                 continue
             con = db()
             ora = int(time.time())
@@ -37382,7 +37621,7 @@ async def controlla_annullati():
     # fattura ormai saldata.
     for p in sblocchi:
         try:
-            if not await invoice_pagata(p["payment_hash"]):
+            if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
                 continue
             con = db()
             cur = con.execute(
@@ -37441,20 +37680,20 @@ async def controlla_abbandonati():
     adesso = int(time.time())
     con = db()
     ordini = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash FROM ordini WHERE stato='creato' "
+        "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='creato' "
         "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
         "AND creato < ?", (adesso - RILANCIO_EXPIRY,))]
     sblocchi = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash FROM pagamenti WHERE stato='creato' "
+        "SELECT id, payment_hash, cassaforte FROM pagamenti WHERE stato='creato' "
         "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
     con.close()
     for o in ordini:
         try:
-            if await invoice_pagata(o["payment_hash"]):
+            if await invoice_pagata(o["payment_hash"], o["cassaforte"]):
                 print(f"⚠️ Ordine #{o['id']} pagato e mai verificato: "
                       f"riacciuffato")
                 await _incassa_ordine(o["id"])
@@ -37481,7 +37720,7 @@ async def controlla_abbandonati():
     for ril in rilanci:
         try:
             ora = int(time.time())
-            if not await invoice_pagata(ril["payment_hash"]):
+            if not await invoice_pagata(ril["payment_hash"], ril["cassaforte"]):
                 con = db()
                 con.execute("UPDATE rilanci SET stato='annullato', "
                             "aggiornato=? WHERE id=? AND stato='creato'",
@@ -37531,7 +37770,7 @@ async def controlla_abbandonati():
     # spazza perche' tiene occupato lo stock, qui non tiene niente.
     for p in sblocchi:
         try:
-            if await invoice_pagata(p["payment_hash"]):
+            if await invoice_pagata(p["payment_hash"], p["cassaforte"]):
                 print(f"⚠️ Sblocco banner #{p['id']} pagato e mai "
                       f"verificato: riacciuffato")
                 await _incassa_sblocco(p["id"])
@@ -37574,7 +37813,7 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     con.close()   # niente transazione aperta durante l'await qui sotto
     if not o or o["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
-    if o["payment_hash"] and await invoice_pagata(o["payment_hash"]):
+    if o["payment_hash"] and await invoice_pagata(o["payment_hash"], o["cassaforte"]):
         raise HTTPException(409, "Questo pagamento risulta già arrivato: "
                                  "niente da annullare — attendi un attimo "
                                  "la verifica, l'oggetto è tuo")
@@ -40064,12 +40303,17 @@ async def risolvi_pagamenti_in_volo():
     righe = []
     for tab in ("ordini", "rimborsi_asta", "pagamenti"):
         try:
+            # prima la lista, poi la cassaforte di ognuna: sui rimborsi
+            # d'asta `_cassaforte_riga` puo' scrivere, e non lo fa
+            # mentre un cursore legge
+            trovate = con.execute(
+                f"SELECT id, payout_hash, payout_verso, "
+                f"payout_ultimo FROM {tab} "
+                "WHERE payout_stato='in_volo' ORDER BY id").fetchall()
             righe += [(tab, r["id"], r["payout_hash"] or "",
-                       r["payout_verso"] or "", r["payout_ultimo"] or 0)
-                      for r in con.execute(
-                          f"SELECT id, payout_hash, payout_verso, "
-                          f"payout_ultimo FROM {tab} "
-                          "WHERE payout_stato='in_volo' ORDER BY id")]
+                       r["payout_verso"] or "", r["payout_ultimo"] or 0,
+                       _cassaforte_riga(con, tab, r["id"]))
+                      for r in trovate]
         except Exception as e:
             print(f"⚠️ In volo, tabella {tab} saltata: {e}")
     con.close()
@@ -40077,11 +40321,11 @@ async def risolvi_pagamenti_in_volo():
         return
     adesso = int(time.time())
     decisi = fermi = 0
-    for tab, riga_id, phash, verso, quando in righe[:MAX_RIPRESE_GIRO]:
+    for tab, riga_id, phash, verso, quando, cf in righe[:MAX_RIPRESE_GIRO]:
         verdetto = ""
         if phash:
             try:
-                verdetto = await _stato_pagamento(phash)
+                verdetto = await _stato_pagamento(phash, cf)
             except LnbitsMuto as e:
                 print(f"🔁 In volo, LNbits tace ({e}): si riguarda al "
                       f"battito dopo.")
@@ -44442,21 +44686,23 @@ async def riconcilia_payout():
     righe = []
     for tab, dove, col in BOCCHE:
         try:
-            righe += [(tab, r["id"], r["payout_hash"], r["importo"])
-                      for r in con.execute(
-                          f"SELECT id, payout_hash, {col} AS importo "
-                          f"FROM {tab} WHERE {dove} AND payout_hash <> '' "
-                          "AND COALESCE(payout_verificato, 0) = 0 "
-                          "ORDER BY id DESC")]
+            trovate = con.execute(
+                f"SELECT id, payout_hash, {col} AS importo "
+                f"FROM {tab} WHERE {dove} AND payout_hash <> '' "
+                "AND COALESCE(payout_verificato, 0) = 0 "
+                "ORDER BY id DESC").fetchall()
+            righe += [(tab, r["id"], r["payout_hash"], r["importo"],
+                       _cassaforte_riga(con, tab, r["id"]))
+                      for r in trovate]
         except Exception as e:
             print(f"⚠️ Riconciliazione, tabella {tab} saltata: {e}")
     con.close()
     if not righe:
         return
     falliti, ignoti, saldati = [], [], 0
-    for tab, riga_id, phash, importo in righe[:RICONCILIA_PER_GIRO]:
+    for tab, riga_id, phash, importo, cf in righe[:RICONCILIA_PER_GIRO]:
         try:
-            verdetto = await _stato_pagamento(phash)
+            verdetto = await _stato_pagamento(phash, cf)
         except LnbitsMuto as e:
             print(f"🔁 Riconciliazione, LNbits tace ({e}): si riprende "
                   f"domani.")

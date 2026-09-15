@@ -100,7 +100,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         return {"payment_hash": f"hash{int(time.time()*1000000)}",
                 "payment_request": f"lnbc{sats}collaudo"}
 

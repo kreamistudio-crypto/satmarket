@@ -105,6 +105,22 @@ def _classe(nome):
 LnbitsMuto = _classe("LnbitsMuto")
 
 
+def _cassaforte_finta(url="http://x", invoice="k", admin="k"):
+    """Le tre chiavi nella forma che i tubi leggono dal set 2026 (il
+    doppio wallet): un `_chiavi_cassaforte` di cartone che risponde
+    sempre la stessa cassaforte, coi NOMI delle chiavi come nel vero —
+    e' su quei nomi che le sentinelle dell'ordine leggono il sorgente
+    (`pv.index("LNBITS_ADMIN_KEY")`), ed e' la ragione per cui il vero
+    li tiene dentro l'oggetto invece di chiamarli `admin`."""
+    from types import SimpleNamespace
+
+    def chiavi(nome=""):
+        return SimpleNamespace(nome=nome or "saas", LNBITS_URL=url,
+                               LNBITS_INVOICE_KEY=invoice,
+                               LNBITS_ADMIN_KEY=admin)
+    return chiavi
+
+
 def _pezzi_registro():
     """Il registro delle uscite e la sua coda, VERI, con le
     dipendenze montate.
@@ -2040,13 +2056,14 @@ def prove_abbandonati():
         vero.row_factory = sqlite3.Row
         vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
                      "stato TEXT, payment_hash TEXT, creato INT, "
-                     "aggiornato INT)")
+                     "aggiornato INT, cassaforte TEXT DEFAULT 'saas')")
         vero.execute("CREATE TABLE offerte(id INTEGER PRIMARY KEY, "
                      "ordine_id INT, stato TEXT)")
         vero.execute("CREATE TABLE rilanci(id INTEGER PRIMARY KEY, "
                      "stato TEXT, payment_hash TEXT, creato INT, "
                      "aggiornato INT, annuncio_id INT, tg_id INT, "
-                     "puntata_id INT, delta_sats INT)")
+                     "puntata_id INT, delta_sats INT, "
+                     "cassaforte TEXT DEFAULT 'saas')")
         vero.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
                      "annuncio_id INT, tg_id INT, puntata_id INT, "
                      "rilancio_id INT, importo_sats INT, motivo TEXT, "
@@ -2056,14 +2073,18 @@ def prove_abbandonati():
         vero.execute("CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, "
                      "tg_id INT, motivo TEXT, importo_sats INT, "
                      "payment_hash TEXT, invoice TEXT, stato TEXT, "
-                     "creato INT, pagato_il INT, aggiornato INT)")
+                     "creato INT, pagato_il INT, aggiornato INT, "
+                     "cassaforte TEXT DEFAULT 'saas')")
         ora = int(_t.time())
-        vero.executemany("INSERT INTO ordini VALUES(?,?,?,?,?)", [
+        vero.executemany("INSERT INTO ordini(id,stato,payment_hash,creato,"
+                         "aggiornato) VALUES(?,?,?,?,?)", [
             (1, "creato", "hash-pagato", ora - 2000, 0),   # pagato, mai visto
             (2, "creato", "hash-muto",   ora - 2000, 0),   # abbandonato
             (3, "creato", "hash-pagato", ora - 60,   0)])  # fattura ancora VIVA
         vero.execute("INSERT INTO offerte VALUES(9,2,'accettata')")
-        vero.executemany("INSERT INTO rilanci VALUES(?,?,?,?,?,?,?,?,?)", [
+        vero.executemany("INSERT INTO rilanci(id,stato,payment_hash,creato,"
+                         "aggiornato,annuncio_id,tg_id,puntata_id,"
+                         "delta_sats) VALUES(?,?,?,?,?,?,?,?,?)", [
             (1, "creato", "hash-pagato", ora - 900, 0, 7, 111, 5, 300),
             (2, "creato", "hash-muto",   ora - 900, 0, 7, 222, 6, 400),
             (3, "creato", "hash-pagato", ora - 60,  0, 7, 333, 7, 500)])
@@ -2083,7 +2104,7 @@ def prove_abbandonati():
 
         incassati, avvisati, rimborsati = [], [], []
 
-        async def _pagata(h):
+        async def _pagata(h, _cf=""):
             if muto:
                 raise RuntimeError("LNbits non risponde")
             return h == "hash-pagato"
@@ -2544,12 +2565,12 @@ def prove_importo_uscita():
         async def _importo(_b, _dec=None):
             return dice_la_fattura
 
-        async def _decodifica(_b):
+        async def _decodifica(_b, _cf=""):
             # la fattura si legge una volta sola e da li' esce anche
             # l'hash: e' il decode che dal set 2026 apre la funzione
             return {"payment_hash": "abc123"}
 
-        async def _mai_visto(_h):
+        async def _mai_visto(_h, _cf=""):
             return ""        # nessuna eco: per quell'hash non c'e' niente
 
         async def _admin(t):
@@ -2568,6 +2589,7 @@ def prove_importo_uscita():
                "ATTESE_ESITO": 4, "SECONDI_FRA_ATTESE": 0,
                "print": lambda *a, **k: None,
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
+               "_chiavi_cassaforte": _cassaforte_finta(),
                # i quattro esiti (ago 2026): qui interessa il rifiuto,
                # ma senza i nomi la funzione non gira nemmeno
                "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
@@ -2583,7 +2605,7 @@ def prove_importo_uscita():
         # prescindere
         exec(pezzo_async("_avvisa_payout_fallito"), amb)
         exec(pezzo_async("paga_venditore"), amb)
-        return gira(amb["paga_venditore"]("lnbc", dovuti)), len(uscite), len(avvisi)
+        return gira(amb["paga_venditore"]("lnbc", dovuti, cassaforte="saas")), len(uscite), len(avvisi)
 
     # 1: il caso felice deve restare felice — e' meta' della prova
     prova("cintura: importo esatto, il pagamento parte", ("pagato", 1, 0),
@@ -2676,6 +2698,156 @@ def prove_importo_uscita():
           and 'return r.json().get("pr")' not in lna)
 
 
+def prove_doppio_wallet():
+    """IL DOPPIO WALLET (set 2026): ogni riga di denaro porta la sua
+    cassaforte, i tubi che leggono o pagano la pretendono, chi conia
+    la scrive. Le sentinelle difendono la FORMA — un chiamante che
+    dimentica la colonna interrogherebbe il wallet sbagliato, e gli
+    scandagli annullerebbero un ordine pagato senza che nessuna prova
+    funzionale lo veda."""
+    print("\n[il doppio wallet: la cassaforte per riga]")
+    src = _SORGENTE
+    cod = codice(src)
+    pv = pezzo("paga_venditore")
+
+    # 1) i tubi che leggono o pagano pretendono la cassaforte SENZA
+    #    default: chi la dimentica lo sente da Python, non dal SaaS
+    prova("invoice_pagata pretende la cassaforte", True,
+          "async def invoice_pagata(payment_hash: str, cassaforte: str)"
+          in src)
+    prova("_stato_pagamento pretende la cassaforte", True,
+          "async def _stato_pagamento(payment_hash: str, cassaforte: str)"
+          in src)
+    prova("paga_venditore: cassaforte solo per nome e senza default", True,
+          "*,\n                         cassaforte: str) -> str:" in pv)
+    # ...e le sentinelle dell'ordine leggono ancora i nomi delle chiavi
+    prova("le chiavi tengono i loro nomi dentro l'oggetto", True,
+          "cf.LNBITS_ADMIN_KEY" in pv and "cf.LNBITS_INVOICE_KEY" in
+          pezzo("invoice_pagata"))
+
+    # 2) chi conia dice SEMPRE dove, e le strade sono cinque
+    chiamate = [m.start() for m in re.finditer(
+        r"await crea_invoice_escrow\(", cod)]
+    prova("ogni crea_invoice_escrow passa cassaforte=", [],
+          [cod[:i].count("\n") + 1 for i in chiamate
+           if "cassaforte=" not in cod[i:i + 400]])
+    prova("...e le strade che coniano sono cinque", 5, len(chiamate))
+
+    # 3) chi legge passa la colonna della riga, mai un letterale
+    prova("nessun invoice_pagata a un argomento solo", [],
+          re.findall(r"await invoice_pagata\([^,()]*\)", cod))
+    prova("nessuna cassaforte scritta a mano nei poll", [],
+          re.findall(r"""invoice_pagata\([^)]*['"](?:saas|nodo)['"]\)""",
+                     cod))
+    prova("nessun paga_venditore senza cassaforte=", [],
+          [m.group(0)[:50] for m in re.finditer(
+              r"await paga_venditore\((?:[^()]|\([^()]*\))*\)", cod)
+           if "cassaforte=" not in m.group(0)])
+    prova("nessun _stato_pagamento a un argomento solo", [],
+          re.findall(r"await _stato_pagamento\([^,()]*\)", cod))
+
+    # 4) il risolutore: due nomi, la leva letta viva, il terzo alza
+    amb = {"LNBITS_URL": "u1", "LNBITS_INVOICE_KEY": "i1",
+           "LNBITS_ADMIN_KEY": "a1", "LNBITS_NODO_URL": "http://n",
+           "LNBITS_NODO_INVOICE_KEY": "i2", "LNBITS_NODO_ADMIN_KEY": "a2",
+           "CASSAFORTE_NUOVA": False, "CASSAFORTE_SAAS": "saas",
+           "CASSAFORTE_NODO": "nodo", "CASSAFORTI": ("saas", "nodo"),
+           "NamedTuple": __import__("typing").NamedTuple}
+    i = src.index("class _Cassaforte(")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    for f in ("_nodo_configurato", "cassaforte_nuova", "_chiavi_cassaforte"):
+        exec(pezzo(f), amb)
+    prova("leva spenta: il nuovo nasce sul SaaS", "saas",
+          amb["cassaforte_nuova"]())
+    prova("'saas' -> le tre chiavi di ieri", ("u1", "i1", "a1"),
+          tuple(amb["_chiavi_cassaforte"]("saas"))[1:])
+    prova("'nodo' -> le tre chiavi del nodo", ("http://n", "i2", "a2"),
+          tuple(amb["_chiavi_cassaforte"]("nodo"))[1:])
+    prova("vuoto = quella del denaro nuovo", "saas",
+          amb["_chiavi_cassaforte"]("").nome)
+    amb["CASSAFORTE_NUOVA"] = True
+    prova("leva accesa e nodo configurato: nodo", "nodo",
+          amb["cassaforte_nuova"]())
+    prova("...e il vuoto la segue", "nodo", amb["_chiavi_cassaforte"]("").nome)
+    prova("...mentre 'saas' resta il SaaS anche a leva accesa", "u1",
+          amb["_chiavi_cassaforte"]("saas").LNBITS_URL)
+    amb["LNBITS_NODO_ADMIN_KEY"] = "INCOLLA_QUI_LA_ADMIN_KEY_DEL_NODO"
+    prova("leva accesa col segnaposto: vale SPENTA", "saas",
+          amb["cassaforte_nuova"]())
+    amb["LNBITS_NODO_ADMIN_KEY"] = ""
+    prova("leva accesa senza chiave: vale SPENTA", "saas",
+          amb["cassaforte_nuova"]())
+    try:
+        amb["_chiavi_cassaforte"]("spark")
+        esito = "ha risposto"
+    except ValueError:
+        esito = "alza"
+    prova("un terzo nome ALZA, non ripiega", "alza", esito)
+
+    # 5) la cassaforte della riga, su un database usa-e-getta
+    import sqlite3
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE rilanci(id INTEGER PRIMARY KEY, puntata_id INTEGER,
+                             stato TEXT, cassaforte TEXT DEFAULT 'saas');
+        CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, puntata_id INTEGER,
+                                   cassaforte TEXT DEFAULT '');
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, cassaforte TEXT DEFAULT 'saas');
+        INSERT INTO rilanci(puntata_id, stato, cassaforte) VALUES
+            (1, 'creato', 'saas'), (1, 'saldato', 'nodo'), (1, 'saldato', 'nodo'),
+            (2, 'creato', 'nodo');
+        INSERT INTO rimborsi_asta(puntata_id) VALUES (1), (2);
+        INSERT INTO ordini(cassaforte) VALUES ('saas'), ('spark');
+    """)
+    for f in ("_cassaforte_puntata", "_cassaforte_riga"):
+        exec(pezzo(f), amb)
+    prova("puntata: conta il primo versamento SALDATO, non il primo nato",
+          "nodo", amb["_cassaforte_puntata"](con, 1))
+    prova("puntata senza versamenti: vuoto", "", amb["_cassaforte_puntata"](con, 2))
+    prova("rimborso d'asta: si compila dalla puntata", "nodo",
+          amb["_cassaforte_riga"](con, "rimborsi_asta", 1))
+    prova("...e resta scritto", "nodo", con.execute(
+        "SELECT cassaforte FROM rimborsi_asta WHERE id=1").fetchone()[0])
+    prova("ordine: la colonna", "saas", amb["_cassaforte_riga"](con, "ordini", 1))
+    for tab, rid, caso in (("ordini", 2, "una cassaforte sconosciuta"),
+                           ("rimborsi_asta", 2, "una puntata senza versamenti"),
+                           ("ordini", 99, "una riga inesistente")):
+        try:
+            amb["_cassaforte_riga"](con, tab, rid)
+            esito = "ha risposto"
+        except ValueError:
+            esito = "alza"
+        prova(f"{caso} ALZA", "alza", esito)
+    con.close()
+
+    # 6) la colonna, la leva, il pannello e il config
+    prova("la colonna nasce 'saas' su ordini, rilanci e pagamenti", True,
+          'for tabella in ("ordini", "rilanci", "pagamenti"):' in src
+          and "cassaforte TEXT DEFAULT 'saas'" in src)
+    prova("...e vuota sui rimborsi d'asta", True,
+          "cassaforte TEXT DEFAULT ''" in src)
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("leva: nasce False nel codice", True, "CASSAFORTE_NUOVA = False" in src)
+    prova("leva: gemella in config_esempio", True, "CASSAFORTE_NUOVA = False" in cfg)
+    prova("le tre righe del nodo stanno in config_esempio", True,
+          all(k in cfg for k in ("LNBITS_NODO_URL", "LNBITS_NODO_INVOICE_KEY",
+                                 "LNBITS_NODO_ADMIN_KEY")))
+    prova("il pannello chiede alla leva VIVA", True,
+          "cassaforte_nuova() == CASSAFORTE_NODO" in pezzo("_leve_stato"))
+    prova("il pannello suona se la leva e' accesa senza chiavi", True,
+          "allarme=bool(CASSAFORTE_NUOVA) and not _nodo_configurato()"
+          in pezzo("_leve_stato"))
+    prova("all'avvio si dice dove nasce il nuovo", True,
+          "Cassaforte del denaro nuovo: {cassaforte_nuova()}" in src)
+    # 7) il congelamento dice in quale LNbits cercare
+    prova("il congelamento nomina la cassaforte", True,
+          "su LNbits{dove}" in pezzo("_congela_pagamento"))
+    prova("...e tutte e quattro le strade gliela passano", 4,
+          len(re.findall(r"await _congela_pagamento\((?:[^()]|\([^()]*\))*"
+                         r"cassaforte=", cod)))
+
+
 def prove_esito_pagamento():
     """IL GIUDICE VERO DEI PAGAMENTI IN USCITA (set 2026).
 
@@ -2747,10 +2919,11 @@ def prove_esito_pagamento():
         amb = {"httpx": (types.SimpleNamespace(AsyncClient=Rotto) if esplode
                          else _finto_lnbits([], codice, corpo=corpo)),
                "LNBITS_URL": "http://x", "LNBITS_INVOICE_KEY": "k",
+               "_chiavi_cassaforte": _cassaforte_finta(),
                "LnbitsMuto": LnbitsMuto, "_esito_lnbits": leggi}
         exec(pezzo_async("_stato_pagamento"), amb)
         try:
-            return gira(amb["_stato_pagamento"]("abc123"))
+            return gira(amb["_stato_pagamento"]("abc123", "saas"))
         except LnbitsMuto:
             return "muto"
 
@@ -2774,13 +2947,13 @@ def prove_esito_pagamento():
         fila = list(eco)
         taccuino = {"etichetta": "una prova"}
 
-        async def _decodifica(_b):
+        async def _decodifica(_b, _cf=""):
             return {"payment_hash": "abc123"}
 
         async def _importo(_b, _dec=None):
             return chiesto
 
-        async def _stato(h):
+        async def _stato(h, _cf=""):
             chieste.append(h)
             if not fila:
                 return ""
@@ -2799,10 +2972,11 @@ def prove_esito_pagamento():
                "print": lambda *a, **k: None,
                "_fmt_sats": reale("_fmt_sats"),
                "ATTESE_ESITO": 4, "SECONDI_FRA_ATTESE": 0,
-               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
+               "_chiavi_cassaforte": _cassaforte_finta(), **ESITI}
         exec(pezzo_async("_avvisa_payout_fallito"), amb)
         exec(pezzo_async("paga_venditore"), amb)
-        esito = gira(amb["paga_venditore"]("lnbc1", 1000, taccuino))
+        esito = gira(amb["paga_venditore"]("lnbc1", 1000, taccuino, cassaforte="saas"))
         return esito, len(uscite), len(avvisi), taccuino
 
     # IL CASO DEL 14 SETTEMBRE, rifatto al banco: HTTP 201, corpo che
@@ -2893,8 +3067,8 @@ def prove_esito_pagamento():
           "r.status_code < 300" not in pv)
     prova("sentinella: il corpo della risposta si legge davvero", True,
           "_esito_lnbits(r.json())" in pv)
-    prova("sentinella: l'esito si richiede per hash", True,
-          "_stato_pagamento(phash)" in pv)
+    prova("sentinella: l'esito si richiede per hash, alla cassaforte giusta",
+          True, "_stato_pagamento(phash, cf.nome)" in pv)
     # l'eco si chiede PRIMA di toccare la chiave che paga, o non
     # servirebbe a niente: e' li' che si evita il secondo pagamento
     prova("sentinella: l'eco si chiede prima della chiave che paga",
@@ -2962,7 +3136,7 @@ def prove_esito_pagamento():
 
         chieste, avvisi, timbri = [], [], {}
 
-        async def _stato(h):
+        async def _stato(h, _cf=""):
             chieste.append(h)
             v = verdetti.pop(0) if verdetti else ""
             if v == "muto":
@@ -2974,6 +3148,7 @@ def prove_esito_pagamento():
 
         amb = {"db": Con, "time": __import__("time"),
                "_stato_pagamento": _stato, "notifica_admin": _avvisa,
+               "_cassaforte_riga": lambda con, tab, rid: "saas",
                "LnbitsMuto": LnbitsMuto, "_fmt_sats": reale("_fmt_sats"),
                "RICONCILIA_PAYOUT": acceso, "RICONCILIA_PER_GIRO": 50,
                "TIMBRO_RICONCILIA": "ric",
@@ -3090,7 +3265,7 @@ def prove_esito_pagamento():
 
         ripresi, avvisi = [], []
 
-        async def _stato(_h):
+        async def _stato(_h, _cf=""):
             if muto:
                 raise LnbitsMuto("stato del pagamento: LNbits a 520")
             return verdetto
@@ -3104,6 +3279,7 @@ def prove_esito_pagamento():
 
         amb = {"db": Con, "time": __import__("time"),
                "_stato_pagamento": _stato, "_riprendi_uscita": _riprendi,
+               "_cassaforte_riga": lambda con, tab, rid: "saas",
                "notifica_admin": _avvisa, "LnbitsMuto": LnbitsMuto,
                "MAX_RIPRESE_GIRO": 20, "IN_VOLO_LIMITE_S": 1800,
                "print": lambda *a, **k: None}
@@ -3293,7 +3469,7 @@ def prove_pagamento_incerto():
         async def _importo(_b, _dec=None):
             return chiesto
 
-        async def _decodifica(_b):
+        async def _decodifica(_b, _cf=""):
             # `muto_decode` e' il caso di ago 2026: non e' il NODO a
             # tacere mentre paga, e' la DOMANDA che lo precede — «quanto
             # chiede questa fattura?» — a non aver ricevuto risposta. Da
@@ -3303,7 +3479,7 @@ def prove_pagamento_incerto():
                 raise LnbitsMuto("decode: LNbits ha risposto 520")
             return {"payment_hash": "abc123"}
 
-        async def _mai_visto(_h):
+        async def _mai_visto(_h, _cf=""):
             return ""
 
         async def _avvisa(t):
@@ -3320,10 +3496,11 @@ def prove_pagamento_incerto():
                "print": lambda *a, **k: None,
                # chi estrae una funzione ne eredita le dipendenze
                "_fmt_sats": reale("_fmt_sats"),
-               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
+               "_chiavi_cassaforte": _cassaforte_finta(), **ESITI}
         exec(pezzo_async("_avvisa_payout_fallito"), amb)
         exec(pezzo_async("paga_venditore"), amb)
-        return (gira(amb["paga_venditore"]("lnbc1", 1000)),
+        return (gira(amb["paga_venditore"]("lnbc1", 1000, cassaforte="saas")),
                 len(uscite), len(avvisi))
 
     prova("nodo che risponde ok: PAGATO", ("pagato", 1, 0), paga())
@@ -3359,6 +3536,7 @@ def prove_pagamento_incerto():
                    AsyncClient=Rotto) if esplode
                    else _finto_lnbits(uscite, codice)),
                "LNBITS_URL": "http://x", "LNBITS_INVOICE_KEY": "k",
+               "_chiavi_cassaforte": _cassaforte_finta(),
                "LnbitsMuto": LnbitsMuto}
         exec(pezzo_async("decodifica_invoice"), amb)
         try:
@@ -3397,12 +3575,12 @@ def prove_pagamento_incerto():
             "protezione_sats INT, quantita INT, stato TEXT, disputata INT, "
             "invoice_venditore TEXT, aggiornato INT, cambio_eur REAL, "
             "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT, "
-            "sbloccato_auto_il INT DEFAULT 0, "
+            "sbloccato_auto_il INT DEFAULT 0, cassaforte TEXT DEFAULT 'saas', "
             "payout_tentativi INT DEFAULT 0, payout_ultimo INT DEFAULT 0, "
             "payout_errore TEXT DEFAULT '')")
         vero.execute(
             "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
-            f"'{invoice}',0,0,'{payout_stato}','','',0,{tentativi},0,'')")
+            f"'{invoice}',0,0,'{payout_stato}','','',0,'saas',{tentativi},0,'')")
         vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                      "vendite_ok INT, acquisti_ok INT)")
         vero.execute("INSERT INTO utenti VALUES(222,?,0,0)", (address,))
@@ -3426,7 +3604,7 @@ def prove_pagamento_incerto():
         async def _dice(chi, testo, *a, **k):
             detto.append((chi, testo))
 
-        async def _paga(bolt11, atteso, diario=None):
+        async def _paga(bolt11, atteso, diario=None, cassaforte=""):
             tentativi.append((bolt11, atteso))
             # il taccuino di set 2026: chi chiama lo pre-riempie con
             # l'etichetta e lo ritrova pieno. Qui si risponde come il
@@ -3922,8 +4100,10 @@ def prove_idor_verifica():
     vero = sqlite3.connect(":memory:")
     vero.row_factory = sqlite3.Row
     vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
-                 "compratore_id INT, stato TEXT, payment_hash TEXT)")
-    vero.executemany("INSERT INTO ordini VALUES(?,?,?,?)", [
+                 "compratore_id INT, stato TEXT, payment_hash TEXT, "
+                 "cassaforte TEXT DEFAULT 'saas')")
+    vero.executemany("INSERT INTO ordini(id, compratore_id, stato, "
+                     "payment_hash) VALUES(?,?,?,?)", [
         (1, 111, "creato", "hash1"),      # del compratore 111
         (2, 333, "creato", "hash2"),      # di un altro
         (3, 333, "shipped", "hash3")])    # di un altro, gia' avanti
@@ -3938,7 +4118,7 @@ def prove_idor_verifica():
 
     chiesto = []      # ogni riga = una domanda a LNbits
 
-    async def _pagata(h):
+    async def _pagata(h, _cf=""):
         chiesto.append(h)
         return False
 
@@ -20605,6 +20785,9 @@ _SEGRETI_FINTI = {
     "LNBITS_URL": "SEGRETO-url-lnbits",
     "LNBITS_INVOICE_KEY": "SEGRETO-invoice-key",
     "LNBITS_ADMIN_KEY": "SEGRETO-admin-key",
+    "LNBITS_NODO_URL": "SEGRETO-url-lnbits-nodo",
+    "LNBITS_NODO_INVOICE_KEY": "SEGRETO-invoice-key-nodo",
+    "LNBITS_NODO_ADMIN_KEY": "SEGRETO-admin-key-nodo",
     "NOSTR_NSEC_PIATTAFORMA": "SEGRETO-nsec-piattaforma",
     "TELEGRAM_WEBHOOK_SEGRETO": "SEGRETO-webhook",
     "TELEGRAM_CANALE_ID": "SEGRETO-canale",
@@ -20800,9 +20983,13 @@ def _censimento(acceso):
     # ma il giudice — un dizionario di segreti dichiarato senza la
     # versione viva si leggerebbe «acceso» mentre non deriva niente —
     # quindi qui dentro ci vuole la funzione vera.
+    # La cassaforte del denaro nuovo (set 2026): il pannello CHIAMA
+    # `cassaforte_nuova`, stessa trappola dei tre qui sopra — e i due
+    # nomi delle cassaforti vanno scritti, o `__missing__` li fa 7.
+    amb["CASSAFORTE_SAAS"], amb["CASSAFORTE_NODO"] = "saas", "nodo"
     for f in ("webhook_attivo", "relay_chiavi_attivo", "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
-              "_leve_stato"):
+              "_nodo_configurato", "cassaforte_nuova", "_leve_stato"):
         exec(pezzo(f), amb)
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -52371,7 +52558,8 @@ def prove_banner_negozio():
         tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
         importo_sats INT, payment_hash TEXT DEFAULT '',
         invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
-        creato INT, pagato_il INT DEFAULT 0, aggiornato INT);
+        creato INT, pagato_il INT DEFAULT 0, aggiornato INT,
+        cassaforte TEXT DEFAULT 'saas');
       INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok,
                          banner_sbloccato_il)
         VALUES(1,'ab12',0,0,0,1700000000),  -- ha gia' pagato
@@ -52391,7 +52579,7 @@ def prove_banner_negozio():
 
     fatture = []
 
-    async def _finta_invoice(sats, memo, expiry=900):
+    async def _finta_invoice(sats, memo, expiry=900, cassaforte=""):
         # LNbits SIMULATO: un collaudo non conia fatture vere senza
         # che nessuno l'abbia chiesto
         fatture.append((sats, memo))
@@ -52433,6 +52621,7 @@ def prove_banner_negozio():
     exec(pezzo("_prezzo_banner"), amb5)
     exec(pezzo("_prezzo_banner_utente"), amb5)
     exec("async " + pezzo("_incassa_sblocco"), amb5)
+    amb5["cassaforte_nuova"] = lambda: "saas"
     exec("async " + pezzo("sblocca_banner"), amb5)
     sblocca = amb5["sblocca_banner"]
     incassa = amb5["_incassa_sblocco"]
@@ -52541,9 +52730,10 @@ def prove_banner_negozio():
     # LA CINTURA SI EREDITA: `paga_venditore` vuole l'atteso senza
     # default, quindi nemmeno la strada d'uscita nata oggi puo' far
     # partire una cifra diversa da quella incassata.
-    prova("...e paga esattamente l'importo incassato", True,
-          "paga_venditore(bolt11, importo, taccuino)" in _rim
-          and "importo = p[\"importo_sats\"]" in _rim)
+    prova("...e paga esattamente l'importo incassato, dalla sua cassaforte",
+          True, "paga_venditore(bolt11, importo, taccuino," in _rim
+          and 'cassaforte=p["cassaforte"]' in _rim
+          and 'importo = p["importo_sats"]' in _rim)
     # IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea), e
     # nella STESSA transazione dei sats restituiti.
     _ok = _rim[_rim.index("if esito == PAGATO:"):
@@ -55412,7 +55602,8 @@ def prove_slug_negozio():
         tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
         importo_sats INT, payment_hash TEXT DEFAULT '',
         invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
-        creato INT, pagato_il INT DEFAULT 0, aggiornato INT);
+        creato INT, pagato_il INT DEFAULT 0, aggiornato INT,
+        cassaforte TEXT DEFAULT 'saas');
       INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok)
         VALUES(1,'ab12',0,0,0),      -- 'nuovo': livello chiuso
              (2,'cd34',9000,40,40),  -- 'maestro': paghera'
@@ -55431,7 +55622,7 @@ def prove_slug_negozio():
 
     fatture = []
 
-    async def _finta_invoice(sats, memo, expiry=900):
+    async def _finta_invoice(sats, memo, expiry=900, cassaforte=""):
         fatture.append((sats, memo))
         return {"payment_hash": f"hash{len(fatture)}",
                 "payment_request": f"lnbc{len(fatture)}"}
@@ -55477,6 +55668,7 @@ def prove_slug_negozio():
         return True
     amb3["invoice_pagata"] = _pagata_sempre
 
+    amb3["cassaforte_nuova"] = lambda: "saas"
     exec("async " + pezzo("richiedi_slug_negozio"), amb3)
     exec("async " + pezzo("_incassa_slug_negozio"), amb3)
     richiedi = amb3["richiedi_slug_negozio"]
@@ -58858,6 +59050,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
+              prove_doppio_wallet,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,

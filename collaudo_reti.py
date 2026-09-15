@@ -110,7 +110,7 @@ def avvio():
     import server
     SRV = server
 
-    async def invoice_finta(sats, memo, expiry=None):
+    async def invoice_finta(sats, memo, expiry=None, cassaforte=""):
         INVOICES.append(int(sats))
         return {"payment_hash": f"hash{len(INVOICES)}",
                 "payment_request": f"lnbc{sats}collaudo{len(INVOICES)}"}
@@ -124,7 +124,7 @@ def avvio():
         lambda che torna None non si puo' awaitare."""
         return None
 
-    async def mai_pagata(_hash):
+    async def mai_pagata(_hash, _cassaforte=""):
         """La ripresa, quando la richiesta e' DIVERSA, chiede a LNbits
         se la fattura di prima e' stata saldata prima di metterci una
         lapide sopra. Qui nessuno paga mai, quindi la risposta e' no —
