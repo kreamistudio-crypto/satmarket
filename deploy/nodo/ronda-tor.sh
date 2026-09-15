@@ -15,8 +15,11 @@
 #      di tor devono COINCIDERE — e' il guasto del 15 set letto alla
 #      radice, prima ancora che la curl fallisca;
 #   3) il DROP del FORWARD (la cura dell'audit) nel namespace VIVO di
-#      tor, letto con nsenter e l'iptables dell'host: se l'host non ha
-#      iptables si dice «non misurato», mai «ok».
+#      tor, letto con l'iptables DI TOR (`docker exec`): dal 15 set sera
+#      le regole vivono nel suo entrypoint e il namespace e' il suo, non
+#      prestato — quindi qui `docker exec` dice il vero. Ripiego con
+#      nsenter e l'iptables dell'host; senza nessuno dei due si dice
+#      «non misurato», mai «ok».
 # Tace se tutto torna; --prova parla coi numeri. Usa ronda-avvisa.sh come
 # le altre. Timer: nodo-tor.timer (09:20 UTC, Persistent).
 # Vive in /usr/local/bin sul nodo; questa e' la COPIA nel repo
@@ -63,9 +66,15 @@ fi
 
 # 3) il DROP del FORWARD nel namespace VIVO di tor
 PT=$(docker inspect -f '{{.State.Pid}}' "$T" 2>/dev/null)
-if [ -n "${PT:-}" ] && [ "$PT" != 0 ] && command -v nsenter >/dev/null && command -v iptables >/dev/null; then
+FWD=''; IPF=''
+if docker exec "$T" iptables -S FORWARD >/tmp/ronda-tor-fwd 2>/dev/null; then
+  FWD=$(cat /tmp/ronda-tor-fwd); IPF=$(docker exec "$T" cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)
+elif [ -n "${PT:-}" ] && [ "$PT" != 0 ] && command -v nsenter >/dev/null && command -v iptables >/dev/null; then
   FWD=$(nsenter -t "$PT" -n iptables -S FORWARD 2>/dev/null)
   IPF=$(nsenter -t "$PT" -n cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)
+fi
+rm -f /tmp/ronda-tor-fwd
+if [ -n "$IPF" ]; then
   if [ "$IPF" = 1 ] && ! printf '%s' "$FWD" | grep -q -- '-s 172.28.1.5/32 -j DROP'; then
     a+=("ip_forward=1 SENZA il DROP -s 172.28.1.5 nel FORWARD di tor: il buco dell'audit e' riaperto")
   elif [ "$IPF" = 1 ]; then
@@ -74,7 +83,7 @@ if [ -n "${PT:-}" ] && [ "$PT" != 0 ] && command -v nsenter >/dev/null && comman
     q+=("ip_forward=${IPF:-?} in tor (con le regole nell'entrypoint e' 1; a 0 mostro non esce, e lo dice il giudice 1)")
   fi
 else
-  q+=("DROP del FORWARD non misurato (manca nsenter o iptables sull'host)")
+  q+=("DROP del FORWARD non misurato (ne' iptables in tor ne' nsenter+iptables sull'host)")
 fi
 
 QUADRO=$(IFS='; '; echo "${q[*]:-}")

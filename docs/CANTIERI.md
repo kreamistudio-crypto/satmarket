@@ -15295,3 +15295,24 @@ regole «ci sono tutte» e i pacchetti non passano, si confrontano gli
 inode prima di cercare altrove — ed è la stessa forma di «la prova verde
 per una ragione diversa da quella che credi»: si guardava il posto
 giusto con lo strumento sbagliato.
+
+**APPLICATA LA SERA STESSA, con una lezione in più.** Il Dockerfile di
+tor era `debian:stable-slim` + `apt-get install tor`; aggiungere
+`iptables` nella stessa `apt-get` ha cambiato l'ordine in cui i
+pacchetti creano gli utenti, e `debian-tor` è nato `100:101` invece del
+`101:102` che possiedono le cartelle degli hidden service: «not owned by
+this user», «Failed to configure rendezvous options», tor in loop. La
+cura scartata era il `chown` (il disco che rincorre l'immagine, da
+rifare a ogni build); quella scelta è **inchiodare uid e gid nel
+Dockerfile**, creando l'utente PRIMA di installare tor, così il postinst
+lo trova. Il gid vero era 102 e non 101: letto con `stat` sotto `sudo`,
+non dedotto. Poi `up -d tor`: la riga dell'entrypoint, «Bootstrapped
+100%», nessun «not owned», `IsTor` true dal namespace di mostro, le tre
+REDIRECT e il DROP nel namespace vivo, `hostname` di lnbits e zeus
+intatti, `vps.auth` mai toccato. Il sidecar `tor-redirect` non esiste
+più; `ferri-rete` resta perché la usa `mostro-net`; il `depends_on` di
+mostro dice `tor`, che è una deriva da assorbire con un `up -d mostro` a
+scambi fermi. La ronda legge ora il DROP con l'iptables di tor via
+`docker exec` — che da stasera dice il vero, perché il namespace è di
+tor e di nessun altro. Copie in `deploy/nodo/`: `tor-entrypoint.sh`,
+`Dockerfile.tor`, `ronda-tor.sh`, le due unit, `settings-price.toml`.

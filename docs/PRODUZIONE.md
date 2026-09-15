@@ -110,35 +110,42 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   e `nsenter -t $(docker inspect -f '{{.State.Pid}}' nodo-tor-1) -n iptables -S FORWARD`.
   I namespace si confrontano cosi', ed e' la prova che decide:
   `for c in nodo-tor-1 nodo-tor-redirect-1 nodo-mostro-net-1 nodo-mostro-1; do printf '%-22s ' $c; sudo readlink /proc/$(docker inspect -f '{{.State.Pid}}' $c)/ns/net; done`.
-- LA CURA DUREVOLE: LE REGOLE DENTRO TOR, VIA IL SIDECAR (preparata il
-  15 set 2026 in `deploy/nodo/tor-entrypoint.sh`, DA APPLICARE). Le
-  stesse regole del sidecar, riapplicate dall'entrypoint del container
-  di tor a ogni avvio — fail-closed: se iptables manca o una regola non
-  entra, tor non parte — piu' `ip6tables -A FORWARD -j DROP`, che chiude
-  la voce aperta dell'audit. Nel compose, sul servizio `tor`:
-  `cap_add: [NET_ADMIN]`, `sysctls: {net.ipv4.ip_forward: 1}`, il
-  volume `./tor-entrypoint.sh:/usr/local/bin/tor-entrypoint.sh:ro`,
-  `entrypoint: ["/usr/local/bin/tor-entrypoint.sh"]` e in `command:` il
-  comando ORIGINALE dell'immagine (si legge con
-  `docker inspect -f '{{.Config.Entrypoint}} {{.Config.Cmd}}' nodo-tor-1`
-  PRIMA di toccare: lo script fa `exec "$@"`, e senza argomenti ripiega
-  su `tor -f /etc/tor/torrc`). Il servizio `tor-redirect` si toglie
-  intero. PRIMA di tutto, la domanda che decide se serve un'immagine
-  diversa: `docker exec nodo-tor-1 sh -c 'command -v iptables'` — se
-  tace, l'immagine di tor non ha iptables e va costruita con (un
-  Dockerfile di due righe sopra la stessa immagine, `apk add iptables`
-  o `apt-get install iptables`). Il file arriva con scp + sha256, mai
-  incollato (i heredoc lunghi troncano). Poi `docker compose up -d tor`
-  — `up -d`, non `restart`, perche' cambia il container — e la verifica
-  e' la stessa della regola qui sopra piu' `ronda-tor.sh --prova`.
+- LA CURA DUREVOLE: LE REGOLE DENTRO TOR, VIA IL SIDECAR (APPLICATA
+  la sera del 15 set 2026). `tor-entrypoint.sh` (copia in
+  `deploy/nodo/`, sul nodo in `~/nodo/tor/`, montato `:ro` in
+  `/usr/local/bin/`) riapplica a ogni avvio di tor le tre REDIRECT, il
+  DROP del FORWARD e `ip6tables -A FORWARD -j DROP` (la voce aperta
+  dell'audit, chiusa), poi `exec tor -f /etc/tor/torrc`: fail-closed,
+  se iptables manca o una regola non entra tor non parte e lo dice. Nel
+  compose il servizio `tor` ha `cap_add: [NET_ADMIN]`,
+  `sysctls: {net.ipv4.ip_forward: 1}`, `entrypoint` e `command`
+  espliciti; il servizio `tor-redirect` non esiste piu' (`ferri-rete`
+  resta: la usa `mostro-net`), e il `depends_on` di mostro dice `tor`.
+  ⚠️ QUESTA E' UNA DERIVA DEL SERVIZIO `mostro` nel compose: il
+  prossimo `up -d` che lo tocchi lo RICREA (cache del prezzo azzerata,
+  relay da riprendere): si fa a scambi fermi, `up -d mostro`.
+  ⚠️ L'UID DI TOR E' INCHIODATO NEL DOCKERFILE (`Dockerfile.tor` in
+  `deploy/nodo/`, copia di `~/nodo/tor/Dockerfile`): i dati in
+  `~/nodo/tor/data` sono di `101:102`, e mettere `iptables` nella
+  stessa `apt-get` aveva spostato `debian-tor` a `100:101` — «not owned
+  by this user», loop di riavvii, hidden service chiusi. L'utente si
+  crea PRIMA di installare tor. Il disco e' la verita', l'immagine si
+  adatta a lui; mai il contrario (un `chown` sposterebbe le chiavi
+  degli hidden service dietro a un numero che la prossima build puo'
+  cambiare di nuovo). Prova dopo ogni build:
+  `docker run --rm --entrypoint id nodo-tor debian-tor` deve dire
+  `uid=101 gid=102`. Da allora `docker compose restart tor` e' un gesto
+  sicuro: le regole ripartono con lui, e `authorized_clients/vps.auth`
+  resta di chi era.
 - LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org
   (allarme su codice diverso da 200 o `IsTor` non true — il secondo e'
   il caso peggiore, esce in chiaro), i namespace di tor e del sidecar
-  che devono coincidere finche' il sidecar esiste, e il DROP del
-  FORWARD nel namespace vivo di tor (con nsenter e l'iptables
-  dell'host; se mancano dice «non misurato»). Usa `curlimages/curl`
+  che devono coincidere finche' un sidecar esiste (oggi nessuno: il
+  giudice si spegne da solo), e il DROP del FORWARD nel namespace vivo
+  di tor, letto con l'iptables DI TOR via `docker exec` (ripiego nsenter
+  + iptables dell'host; senza, «non misurato»). Usa `curlimages/curl`
   con `--pull never`: e' gia' sul nodo dal 15 set e la ronda non deve
   dipendere dalla rete per dire che la rete non c'e'. Installazione:
   scp dei tre file, `sha256sum` da confrontare, poi

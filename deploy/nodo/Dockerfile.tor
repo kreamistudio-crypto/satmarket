@@ -1,0 +1,17 @@
+# Dockerfile.tor — COPIA di ~/nodo/tor/Dockerfile sul nodo (15 set 2026).
+# Chi tocca il file di la' lo riporta qui nello stesso giro.
+# L'immagine e' quella del servizio `tor` del compose (build: ./tor), che
+# dal 15 set applica da se' le regole del proxy trasparente all'avvio
+# (tor-entrypoint.sh, montato in sola lettura) e ha bisogno di iptables.
+FROM debian:stable-slim
+# uid:gid di debian-tor INCHIODATI ai dati su disco (101:102). Senza,
+# li decide l'ordine dei pacchetti: il 15 set 2026 aggiungere iptables
+# li ha spostati a 100:101 e tor non apriva piu' gli hidden service
+# («/var/lib/tor/zeus is not owned by this user», loop di riavvii).
+# L'utente si crea PRIMA di installare tor, cosi' il postinst del
+# pacchetto lo trova e non ne inventa uno.
+RUN groupadd -g 102 debian-tor \
+ && useradd -u 101 -g 102 -d /var/lib/tor -s /usr/sbin/nologin -M debian-tor \
+ && apt-get update && apt-get install -y --no-install-recommends tor iptables \
+ && rm -rf /var/lib/apt/lists/*
+CMD ["tor", "-f", "/etc/tor/torrc"]

@@ -97,17 +97,17 @@ dichiarandone la trade key, cioè censura per identità a costo zero;
 chiuso salendo a **0.18.6** (rollback taggato `mostro:v0.18.5`). 2) Una
 **fuga di traffico fuori da Tor**: `ip_forward=1` con la tabella filter
 tutta ACCEPT, quindi UDP≠53 (QUIC/HTTP-3 sulla 443) e ICMP uscivano in
-chiaro; chiusa con `iptables -A FORWARD -s 172.28.1.5 -j DROP` **dentro
-il compose, riga 48** — a mano sparirebbe al primo `up -d` e il buco si
-riaprirebbe in silenzio — provata con `--force-recreate`. Nessuno dei
+chiaro; chiusa con `iptables -A FORWARD -s 172.28.1.5 -j DROP`, che dal
+15 set 2026 sta in `tor-entrypoint.sh` e si riapplica a ogni avvio di
+tor (prima nel comando del sidecar, riga 48 del compose). Nessuno dei
 due era un errore di configurazione nostro: il primo era nel codice, il
 secondo era il residuo che le tre regole di redirect non coprivano.
-⚠️ E VIVONO IN UN NAMESPACE PRESTATO (15 set 2026, tre ore di P2P
-muto): `tor-redirect` sta nel namespace di rete di `tor`, `mostro` in
-quello di `mostro-net`. Un `restart tor` rifa' il namespace e lascia il
-sidecar in quello VECCHIO — regole tutte visibili a `docker exec`, e
-mostro fa «000» su ogni host. REGOLA: dopo `restart tor` sempre `up -d
---force-recreate tor-redirect`; il resto in PRODUZIONE («IL NAMESPACE PRESTATO»).
+⚠️ IL NAMESPACE PRESTATO (15 set 2026, tre ore di P2P muto): il sidecar
+`tor-redirect` viveva nel namespace di rete di `tor`, e un `restart tor`
+lo lasciava in quello VECCHIO — regole visibili a `docker exec`, mostro
+«000» su ogni host. Dalla sera stessa il sidecar NON C'E' PIU' (regole
+nell'entrypoint di tor, uid inchiodato nel Dockerfile); `mostro` vive
+ancora in `mostro-net`: dopo `restart mostro-net` sempre `up -d --force-recreate mostro`. Vedi PRODUZIONE («IL NAMESPACE PRESTATO»).
 
 **IL NODO GIRA LA 0.18.7**, e non lo dice il changelog ma il nodo
 stesso: il suo evento `info` (38385) si annuncia `mostro_version
@@ -165,8 +165,8 @@ ne esiste un SECONDO, dedicato a LNbits e revocabile da solo —
 service con client-auth: vedi Cantieri, «Il doppio wallet»); LLMNR sulla 5355
 (superficie che non paga affitto); il pull non è sorvegliato (il
 server sa che l'archivio esiste, non che il PC l'abbia preso); il DROP
-del FORWARD è solo in `iptables` e **non in `ip6tables`**, e va messo
-DENTRO il compose accanto alla riga 48 o evapora al primo `up -d`; la
+del FORWARD in `ip6tables`, che mancava — **CHIUSO il 15 set 2026**
+dall'entrypoint di tor, che lo riapplica a ogni avvio insieme al v4; la
 **dev fee bloccata dal circuito freddo**, che è upstream e ha la sua
 voce in fondo a questa sezione; e la riconciliazione LND↔Mostro, che
 dal 7 set 2026 **si può finalmente fare** — qui c'era scritto
