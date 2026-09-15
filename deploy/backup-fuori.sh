@@ -92,6 +92,45 @@ if [ -n "${DIR_ONION:-}" ] && [ -d "$DIR_ONION" ]; then
     cp -a "$DIR_ONION" "$TMP/sistema/tor-hidden-service" ||       echo "ATTENZIONE: chiave .onion NON copiata da $DIR_ONION - l'archivio e' monco proprio dove conta di piu' (l'indirizzo non si rigenera)" >&2
 fi
 
+# 2c) LA CASSAFORTE SUL NODO (set 2026): LNbits self-hosted in
+#     /opt/lnbits. Il suo database e' DENARO nello stesso senso di
+#     satmarket.db: i sats stanno sul nodo Lightning, ma CHI li ha
+#     versati e per quale wallet lo sa solo questo file — senza, il
+#     saldo del nodo e' una cifra senza nomi. Quindi lo stesso backup
+#     ATOMICO di sqlite, mai `cp` su un db vivo. Attorno: .env (il
+#     macaroon e i nomi delle leve), il compose (la versione pinnata),
+#     il resto di data/ (il cert TLS di LND e il file del superuser),
+#     e l'unit del ponte socat. FUORI i log, che pesano e non servono.
+#     Il percorso e' un nome solo, qui: se un giorno LNbits trasloca,
+#     e' questa riga a seguirla.
+DIR_LNBITS=/opt/lnbits
+if [ -d "$DIR_LNBITS" ]; then
+    mkdir -p "$TMP/lnbits"
+    cp "$DIR_LNBITS/.env" "$DIR_LNBITS/docker-compose.yml" "$TMP/lnbits/" 2>/dev/null || true
+    cp -a "$DIR_LNBITS/data" "$TMP/lnbits/data" 2>/dev/null || true
+    rm -rf "$TMP/lnbits/data/logs"
+    if [ -f "$DIR_LNBITS/data/database.sqlite3" ]; then
+        # Sovrascrive la copia "a caldo" fatta dal cp -a con quella
+        # atomica: e' questa che si apre, alle due di notte.
+        sqlite3 "$DIR_LNBITS/data/database.sqlite3" \
+            ".backup '$TMP/lnbits/data/database.sqlite3'" ||           echo "ATTENZIONE: database LNbits NON copiato in modo atomico - i sats sul nodo restano senza nomi in questo archivio" >&2
+    fi
+    cp /etc/systemd/system/lnd-ponte.service "$TMP/sistema/" 2>/dev/null || true
+fi
+
+# 2d) LA CHIAVE DEL CLIENT VERSO IL NODO: il servizio nascosto che
+#     espone la REST di LND si vede SOLO con questa chiave x25519
+#     (client-auth v3). Si puo' rigenerare — al contrario della chiave
+#     dell'onion qui sopra — ma rigenerarla vuol dire un gesto sul
+#     nodo e uno sul VPS alle due di notte: la si porta dentro, cosi'
+#     il ripristino e' solo rimetterla a posto (proprietario debian-tor,
+#     0700/0600, come la cartella dell'onion). Il percorso si LEGGE dal
+#     torrc, per la stessa ragione di HiddenServiceDir.
+DIR_AUTH=$(awk '$1=="ClientOnionAuthDir"{print $2; exit}' /etc/tor/torrc 2>/dev/null || true)
+if [ -n "${DIR_AUTH:-}" ] && [ -d "$DIR_AUTH" ]; then
+    cp -a "$DIR_AUTH" "$TMP/sistema/tor-onion-auth" ||       echo "ATTENZIONE: chiave client-auth NON copiata da $DIR_AUTH - senza, al ripristino il ponte verso il nodo va rifatto a mano" >&2
+fi
+
 # 3) Tar + age. La pubblica cifra, e nessuno su questa macchina sa
 #    decifrare: e' il punto di tutto lo script.
 ARCHIVIO="$DIR_OUT/barattolo-$STAMP.tar.gz.age"
